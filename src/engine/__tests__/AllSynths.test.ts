@@ -2333,7 +2333,7 @@ describe('Memory and Performance Sanity', () => {
 
         try {
           const instrument = InstrumentFactory.createInstrument(config);
-          instrument.dispose();
+          instrument?.dispose();
         } catch {
           // Ignore AudioContext errors in test env
         }
