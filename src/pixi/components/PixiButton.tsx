@@ -18,6 +18,8 @@ interface PixiButtonProps {
   label: string;
   /** FontAudio icon name (e.g. 'play', 'stop', 'mute'). Rendered before label. */
   icon?: string;
+  /** 'left' = icon before label (default), 'top' = icon above label (vertical layout) */
+  iconPosition?: 'left' | 'top';
   variant?: ButtonVariant;
   size?: ButtonSize;
   color?: ButtonColor;
@@ -25,6 +27,7 @@ interface PixiButtonProps {
   loading?: boolean;
   active?: boolean;
   width?: number;
+  height?: number;
   onClick?: () => void;
   layout?: Record<string, unknown>;
 }
@@ -77,6 +80,7 @@ const SIZE_CONFIG: Record<ButtonSize, { height: number; paddingH: number; fontSi
 export const PixiButton: React.FC<PixiButtonProps> = ({
   label,
   icon,
+  iconPosition = 'left',
   variant = 'default',
   size = 'md',
   color = 'default',
@@ -84,6 +88,7 @@ export const PixiButton: React.FC<PixiButtonProps> = ({
   loading = false,
   active = false,
   width: widthProp,
+  height: heightProp,
   onClick,
   layout,
 }) => {
@@ -95,6 +100,7 @@ export const PixiButton: React.FC<PixiButtonProps> = ({
 
   const config = SIZE_CONFIG[size];
   const btnWidth = widthProp ?? config.minWidth;
+  const btnHeight = heightProp ?? config.height;
 
   const ft2Colors = useMemo(() => getFT2Colors(theme, themeId), [theme, themeId]);
 
@@ -145,11 +151,11 @@ export const PixiButton: React.FC<PixiButtonProps> = ({
   const drawBg = useCallback((g: GraphicsType) => {
     g.clear();
     // Border
-    g.roundRect(0, 0, btnWidth, config.height, 4);
+    g.roundRect(0, 0, btnWidth, btnHeight, 4);
     g.fill({ color: colors.bg, alpha: colors.bgAlpha });
-    g.roundRect(0, 0, btnWidth, config.height, 4);
+    g.roundRect(0, 0, btnWidth, btnHeight, 4);
     g.stroke({ color: colors.border, alpha: colors.borderAlpha, width: 1 });
-  }, [btnWidth, config.height, colors]);
+  }, [btnWidth, btnHeight, colors]);
 
   const handlePointerOver = useCallback(() => { if (!disabled) setHovered(true); }, [disabled]);
   const handlePointerOut = useCallback(() => { setHovered(false); setPressed(false); }, []);
@@ -161,6 +167,9 @@ export const PixiButton: React.FC<PixiButtonProps> = ({
     setPressed(false);
   }, [pressed, disabled, loading, onClick]);
 
+  const isVertical = iconPosition === 'top';
+  const iconFontSize = isVertical ? config.fontSize + 4 : config.fontSize + 2;
+
   return (
     <pixiContainer
       eventMode={disabled ? 'none' : 'static'}
@@ -171,30 +180,31 @@ export const PixiButton: React.FC<PixiButtonProps> = ({
       onPointerUp={handlePointerUp}
       layout={{
         width: btnWidth,
-        height: config.height,
-        flexDirection: 'row',
+        height: btnHeight,
+        flexDirection: isVertical ? 'column' : 'row',
         justifyContent: 'center',
         alignItems: 'center',
+        gap: isVertical ? 1 : 0,
         ...layout,
       }}
     >
       <pixiGraphics
         ref={graphicsRef}
         draw={drawBg}
-        layout={{ position: 'absolute', width: btnWidth, height: config.height }}
+        layout={{ position: 'absolute', width: btnWidth, height: btnHeight }}
       />
-      {/* Icon (fontaudio) — rendered before label */}
+      {/* Icon (fontaudio) */}
       {icon && FAD_ICONS[icon] && (
         <pixiBitmapText
           text={FAD_ICONS[icon]}
           style={{
             fontFamily: PIXI_FONTS.ICONS,
-            fontSize: config.fontSize + 2,
+            fontSize: iconFontSize,
             fill: 0xffffff,
           }}
           tint={colors.text}
           alpha={disabled ? 0.5 : 1}
-          layout={{ marginRight: label ? 4 : 0 }}
+          layout={{ marginRight: !isVertical && label ? 4 : 0 }}
         />
       )}
       {/* Text label */}
@@ -203,7 +213,7 @@ export const PixiButton: React.FC<PixiButtonProps> = ({
           text={loading ? '...' : label}
           style={{
             fontFamily: variant === 'ft2' ? PIXI_FONTS.MONO_BOLD : PIXI_FONTS.SANS_SEMIBOLD,
-            fontSize: config.fontSize,
+            fontSize: isVertical ? Math.max(7, config.fontSize - 2) : config.fontSize,
             fill: 0xffffff,
           }}
           tint={colors.text}
