@@ -135,10 +135,9 @@ interface RenderParams {
 function renderGrid(g: GraphicsType, p: RenderParams, vStart: number): void {
   g.clear();
 
-  if (!p.trackerVisualBg) {
-    g.rect(0, 0, p.width, p.gridHeight);
-    g.fill({ color: p.theme.bg.color });
-  }
+  // Always fill the full grid area to prevent black gaps at edges
+  g.rect(0, 0, p.width, p.gridHeight);
+  g.fill({ color: p.theme.bg.color, alpha: p.trackerVisualBg ? 0.15 : 1 });
 
   for (let i = 0; i < p.visibleLines; i++) {
     const rowNum = vStart + i;

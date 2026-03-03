@@ -139,15 +139,15 @@ export const PixiChannelHeaders: React.FC<PixiChannelHeadersProps> = ({
   // ── Background drawing ─────────────────────────────────────────────────────
   const drawBackground = useCallback((g: GraphicsType) => {
     g.clear();
-    // Full background
+    // Full background — fully opaque so pattern data doesn't bleed through
     g.rect(0, 0, width, HEADER_HEIGHT);
-    g.fill({ color: theme.bgTertiary.color, alpha: 0.9 });
+    g.fill({ color: theme.bgTertiary.color, alpha: 1 });
     // Bottom border
     g.rect(0, HEADER_HEIGHT - 1, width, 1);
     g.fill({ color: theme.border.color, alpha: 0.3 });
     // ROW column background
     g.rect(0, 0, LINE_NUMBER_WIDTH, HEADER_HEIGHT);
-    g.fill({ color: theme.bg.color, alpha: 0.85 });
+    g.fill({ color: theme.bg.color, alpha: 1 });
     // ROW column right border
     g.rect(LINE_NUMBER_WIDTH - 1, 0, 1, HEADER_HEIGHT);
     g.fill({ color: theme.border.color, alpha: 0.3 });
