@@ -463,7 +463,7 @@ export async function createEffect(
 
     // Buzzmachines
     case 'BuzzDistortion': {
-      const { BuzzmachineSynth } = await import('./buzzmachines/BuzzmachineSynth');
+      const { BuzzmachineSynth } = await import('../buzzmachines/BuzzmachineSynth');
       const synth = new BuzzmachineSynth('ArguruDistortion');
 
       // Apply parameters from config
@@ -479,7 +479,7 @@ export async function createEffect(
     }
 
     case 'BuzzSVF': {
-      const { BuzzmachineSynth } = await import('./buzzmachines/BuzzmachineSynth');
+      const { BuzzmachineSynth } = await import('../buzzmachines/BuzzmachineSynth');
       const synth = new BuzzmachineSynth('ElakSVF');
 
       // Apply parameters from config
@@ -495,7 +495,7 @@ export async function createEffect(
     }
 
     case 'BuzzDelay': {
-      const { BuzzmachineSynth } = await import('./buzzmachines/BuzzmachineSynth');
+      const { BuzzmachineSynth } = await import('../buzzmachines/BuzzmachineSynth');
       const synth = new BuzzmachineSynth('JeskolaDelay');
 
       // Apply parameters from config
@@ -511,7 +511,7 @@ export async function createEffect(
     }
 
     case 'BuzzChorus': {
-      const { BuzzmachineSynth } = await import('./buzzmachines/BuzzmachineSynth');
+      const { BuzzmachineSynth } = await import('../buzzmachines/BuzzmachineSynth');
       const synth = new BuzzmachineSynth('FSMChorus');
 
       // Apply parameters from config
@@ -527,7 +527,7 @@ export async function createEffect(
     }
 
     case 'BuzzCompressor': {
-      const { BuzzmachineSynth } = await import('./buzzmachines/BuzzmachineSynth');
+      const { BuzzmachineSynth } = await import('../buzzmachines/BuzzmachineSynth');
       const synth = new BuzzmachineSynth('GeonikCompressor');
       Object.entries(config.parameters).forEach(([key, value]) => {
         const paramIndex = parseInt(key, 10);
@@ -538,7 +538,7 @@ export async function createEffect(
     }
 
     case 'BuzzOverdrive': {
-      const { BuzzmachineSynth } = await import('./buzzmachines/BuzzmachineSynth');
+      const { BuzzmachineSynth } = await import('../buzzmachines/BuzzmachineSynth');
       const synth = new BuzzmachineSynth('GeonikOverdrive');
       Object.entries(config.parameters).forEach(([key, value]) => {
         const paramIndex = parseInt(key, 10);
@@ -549,7 +549,7 @@ export async function createEffect(
     }
 
     case 'BuzzDistortion2': {
-      const { BuzzmachineSynth } = await import('./buzzmachines/BuzzmachineSynth');
+      const { BuzzmachineSynth } = await import('../buzzmachines/BuzzmachineSynth');
       const synth = new BuzzmachineSynth('JeskolaDistortion');
       Object.entries(config.parameters).forEach(([key, value]) => {
         const paramIndex = parseInt(key, 10);
@@ -560,7 +560,7 @@ export async function createEffect(
     }
 
     case 'BuzzCrossDelay': {
-      const { BuzzmachineSynth } = await import('./buzzmachines/BuzzmachineSynth');
+      const { BuzzmachineSynth } = await import('../buzzmachines/BuzzmachineSynth');
       const synth = new BuzzmachineSynth('JeskolaCrossDelay');
       Object.entries(config.parameters).forEach(([key, value]) => {
         const paramIndex = parseInt(key, 10);
@@ -571,7 +571,7 @@ export async function createEffect(
     }
 
     case 'BuzzPhilta': {
-      const { BuzzmachineSynth } = await import('./buzzmachines/BuzzmachineSynth');
+      const { BuzzmachineSynth } = await import('../buzzmachines/BuzzmachineSynth');
       const synth = new BuzzmachineSynth('FSMPhilta');
       Object.entries(config.parameters).forEach(([key, value]) => {
         const paramIndex = parseInt(key, 10);
@@ -582,7 +582,7 @@ export async function createEffect(
     }
 
     case 'BuzzDist2': {
-      const { BuzzmachineSynth } = await import('./buzzmachines/BuzzmachineSynth');
+      const { BuzzmachineSynth } = await import('../buzzmachines/BuzzmachineSynth');
       const synth = new BuzzmachineSynth('ElakDist2');
       Object.entries(config.parameters).forEach(([key, value]) => {
         const paramIndex = parseInt(key, 10);
@@ -593,7 +593,7 @@ export async function createEffect(
     }
 
     case 'BuzzFreeverb': {
-      const { BuzzmachineSynth } = await import('./buzzmachines/BuzzmachineSynth');
+      const { BuzzmachineSynth } = await import('../buzzmachines/BuzzmachineSynth');
       const synth = new BuzzmachineSynth('JeskolaFreeverb');
       Object.entries(config.parameters).forEach(([key, value]) => {
         const paramIndex = parseInt(key, 10);
@@ -604,7 +604,7 @@ export async function createEffect(
     }
 
     case 'BuzzFreqShift': {
-      const { BuzzmachineSynth } = await import('./buzzmachines/BuzzmachineSynth');
+      const { BuzzmachineSynth } = await import('../buzzmachines/BuzzmachineSynth');
       const synth = new BuzzmachineSynth('BigyoFrequencyShifter');
       Object.entries(config.parameters).forEach(([key, value]) => {
         const paramIndex = parseInt(key, 10);
@@ -615,7 +615,7 @@ export async function createEffect(
     }
 
     case 'BuzzNotch': {
-      const { BuzzmachineSynth } = await import('./buzzmachines/BuzzmachineSynth');
+      const { BuzzmachineSynth } = await import('../buzzmachines/BuzzmachineSynth');
       const synth = new BuzzmachineSynth('CyanPhaseNotch');
       Object.entries(config.parameters).forEach(([key, value]) => {
         const paramIndex = parseInt(key, 10);
@@ -626,7 +626,7 @@ export async function createEffect(
     }
 
     case 'BuzzStereoGain': {
-      const { BuzzmachineSynth } = await import('./buzzmachines/BuzzmachineSynth');
+      const { BuzzmachineSynth } = await import('../buzzmachines/BuzzmachineSynth');
       const synth = new BuzzmachineSynth('DedaCodeStereoGain');
       Object.entries(config.parameters).forEach(([key, value]) => {
         const paramIndex = parseInt(key, 10);
@@ -637,7 +637,7 @@ export async function createEffect(
     }
 
     case 'BuzzSoftSat': {
-      const { BuzzmachineSynth } = await import('./buzzmachines/BuzzmachineSynth');
+      const { BuzzmachineSynth } = await import('../buzzmachines/BuzzmachineSynth');
       const synth = new BuzzmachineSynth('GraueSoftSat');
       Object.entries(config.parameters).forEach(([key, value]) => {
         const paramIndex = parseInt(key, 10);
@@ -648,7 +648,7 @@ export async function createEffect(
     }
 
     case 'BuzzLimiter': {
-      const { BuzzmachineSynth } = await import('./buzzmachines/BuzzmachineSynth');
+      const { BuzzmachineSynth } = await import('../buzzmachines/BuzzmachineSynth');
       const synth = new BuzzmachineSynth('LdSLimit');
       Object.entries(config.parameters).forEach(([key, value]) => {
         const paramIndex = parseInt(key, 10);
@@ -659,7 +659,7 @@ export async function createEffect(
     }
 
     case 'BuzzExciter': {
-      const { BuzzmachineSynth } = await import('./buzzmachines/BuzzmachineSynth');
+      const { BuzzmachineSynth } = await import('../buzzmachines/BuzzmachineSynth');
       const synth = new BuzzmachineSynth('OomekExciter');
       Object.entries(config.parameters).forEach(([key, value]) => {
         const paramIndex = parseInt(key, 10);
@@ -670,7 +670,7 @@ export async function createEffect(
     }
 
     case 'BuzzMasterizer': {
-      const { BuzzmachineSynth } = await import('./buzzmachines/BuzzmachineSynth');
+      const { BuzzmachineSynth } = await import('../buzzmachines/BuzzmachineSynth');
       const synth = new BuzzmachineSynth('OomekMasterizer');
       Object.entries(config.parameters).forEach(([key, value]) => {
         const paramIndex = parseInt(key, 10);
@@ -681,7 +681,7 @@ export async function createEffect(
     }
 
     case 'BuzzStereoDist': {
-      const { BuzzmachineSynth } = await import('./buzzmachines/BuzzmachineSynth');
+      const { BuzzmachineSynth } = await import('../buzzmachines/BuzzmachineSynth');
       const synth = new BuzzmachineSynth('WhiteNoiseStereoDist');
       Object.entries(config.parameters).forEach(([key, value]) => {
         const paramIndex = parseInt(key, 10);
@@ -692,7 +692,7 @@ export async function createEffect(
     }
 
     case 'BuzzWhiteChorus': {
-      const { BuzzmachineSynth } = await import('./buzzmachines/BuzzmachineSynth');
+      const { BuzzmachineSynth } = await import('../buzzmachines/BuzzmachineSynth');
       const synth = new BuzzmachineSynth('WhiteNoiseWhiteChorus');
       Object.entries(config.parameters).forEach(([key, value]) => {
         const paramIndex = parseInt(key, 10);
@@ -703,7 +703,7 @@ export async function createEffect(
     }
 
     case 'BuzzZfilter': {
-      const { BuzzmachineSynth } = await import('./buzzmachines/BuzzmachineSynth');
+      const { BuzzmachineSynth } = await import('../buzzmachines/BuzzmachineSynth');
       const synth = new BuzzmachineSynth('QZfilter');
       Object.entries(config.parameters).forEach(([key, value]) => {
         const paramIndex = parseInt(key, 10);
@@ -714,7 +714,7 @@ export async function createEffect(
     }
 
     case 'BuzzChorus2': {
-      const { BuzzmachineSynth } = await import('./buzzmachines/BuzzmachineSynth');
+      const { BuzzmachineSynth } = await import('../buzzmachines/BuzzmachineSynth');
       const synth = new BuzzmachineSynth('FSMChorus2');
       Object.entries(config.parameters).forEach(([key, value]) => {
         const paramIndex = parseInt(key, 10);
@@ -725,7 +725,7 @@ export async function createEffect(
     }
 
     case 'BuzzPanzerDelay': {
-      const { BuzzmachineSynth } = await import('./buzzmachines/BuzzmachineSynth');
+      const { BuzzmachineSynth } = await import('../buzzmachines/BuzzmachineSynth');
       const synth = new BuzzmachineSynth('FSMPanzerDelay');
       Object.entries(config.parameters).forEach(([key, value]) => {
         const paramIndex = parseInt(key, 10);
