@@ -103,6 +103,29 @@ export const FACTORY_PRESETS: InstrumentPreset['config'][] = [
     pan: 0,
     effects: [],
   },
+  // === Init presets for synths without dedicated presets ===
+  { type: 'synth' as const, name: 'Tonewheel Organ Init', synthType: 'TonewheelOrgan' as const, volume: -8, pan: 0, effects: [] },
+  { type: 'synth' as const, name: 'Melodica Init', synthType: 'Melodica' as const, volume: -8, pan: 0, effects: [] },
+  { type: 'synth' as const, name: 'Modular Synth Init', synthType: 'ModularSynth' as const, volume: -8, pan: 0, effects: [] },
+  { type: 'synth' as const, name: 'SunVox Init', synthType: 'SunVoxSynth' as const, volume: -8, pan: 0, effects: [] },
+  // WAM plugins
+  { type: 'synth' as const, name: 'WAM Synth101 Init', synthType: 'WAMSynth101' as const, volume: -8, pan: 0, effects: [] },
+  { type: 'synth' as const, name: 'WAM OBXd Init', synthType: 'WAMOBXd' as const, volume: -8, pan: 0, effects: [] },
+  { type: 'synth' as const, name: 'WAM TinySynth Init', synthType: 'WAMTinySynth' as const, volume: -8, pan: 0, effects: [] },
+  { type: 'synth' as const, name: 'WAM Faust Flute Init', synthType: 'WAMFaustFlute' as const, volume: -8, pan: 0, effects: [] },
+  // External plugin bridges
+  { type: 'synth' as const, name: 'Dexed Bridge Init', synthType: 'DexedBridge' as const, volume: -8, pan: 0, effects: [] },
+  { type: 'synth' as const, name: 'OBXf Init', synthType: 'OBXf' as const, volume: -8, pan: 0, effects: [] },
+  { type: 'synth' as const, name: 'D50 Init', synthType: 'D50' as const, volume: -8, pan: 0, effects: [] },
+  { type: 'synth' as const, name: 'Surge Init', synthType: 'Surge' as const, volume: -8, pan: 0, effects: [] },
+  { type: 'synth' as const, name: 'Vital Init', synthType: 'Vital' as const, volume: -8, pan: 0, effects: [] },
+  { type: 'synth' as const, name: 'Helm Init', synthType: 'Helm' as const, volume: -8, pan: 0, effects: [] },
+  { type: 'synth' as const, name: 'Odin2 Init', synthType: 'Odin2' as const, volume: -8, pan: 0, effects: [] },
+  { type: 'synth' as const, name: 'Amsynth Init', synthType: 'Amsynth' as const, volume: -8, pan: 0, effects: [] },
+  { type: 'synth' as const, name: 'Monique Init', synthType: 'Monique' as const, volume: -8, pan: 0, effects: [] },
+  { type: 'synth' as const, name: 'Sorcer Init', synthType: 'Sorcer' as const, volume: -8, pan: 0, effects: [] },
+  { type: 'synth' as const, name: 'SuperCollider Init', synthType: 'SuperCollider' as const, volume: -8, pan: 0, effects: [] },
+  { type: 'synth' as const, name: 'VFX Init', synthType: 'VFX' as const, volume: -8, pan: 0, effects: [] },
 ];
 
 // Preset categories for browsing
