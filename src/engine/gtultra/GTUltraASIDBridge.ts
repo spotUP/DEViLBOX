@@ -17,11 +17,15 @@ export class GTUltraASIDBridge {
   private enabled = false;
   private lastRegisters: Uint8Array;
   private lastRegisters2: Uint8Array;
+  private _writeCount = 0;
 
   constructor() {
     this.lastRegisters = new Uint8Array(25);
     this.lastRegisters2 = new Uint8Array(25);
   }
+
+  /** Total number of register writes sent to hardware */
+  getWriteCount(): number { return this._writeCount; }
 
   /** Get the MIDI output port for the selected ASID device */
   private getPort(): MIDIOutput | null {
@@ -37,6 +41,7 @@ export class GTUltraASIDBridge {
   /** Disable ASID output. Silences hardware by zeroing volume registers. */
   disable(): void {
     this.enabled = false;
+    this._writeCount = 0;
     const port = this.getPort();
     if (port) {
       // Silence: write 0 to volume register (0x18) on each SID
@@ -67,6 +72,7 @@ export class GTUltraASIDBridge {
 
     const hwReg = reg + (sidIdx * 0x20);
     sendASIDRegisterWrite(port, ASID.DEVICE_ADDRESS.USBSID_PICO, hwReg, value);
+    this._writeCount++;
   }
 
   /**
@@ -87,6 +93,7 @@ export class GTUltraASIDBridge {
       if (registers[i] !== prev[i]) {
         prev[i] = registers[i];
         sendASIDRegisterWrite(port, ASID.DEVICE_ADDRESS.USBSID_PICO, offset + i, registers[i]);
+        this._writeCount++;
       }
     }
   }
