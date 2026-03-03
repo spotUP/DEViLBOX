@@ -1542,6 +1542,16 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
   // C64 / CHIP ENGINES
   // ═══════════════════════════════════════════════════════════════════════════
   {
+    key: 'goatTracker',
+    label: 'GoatTracker',
+    description: 'GoatTracker SID tracker song (GTS magic)',
+    family: 'c64-chip',
+    matchMode: 'extension',
+    extRegex: /\.sng$/i,
+    nativeOnly: true,
+    customDispatch: true, // Magic-byte detection (GTS!..GTS5), also Zound Monitor uses .sng
+  },
+  {
     key: 'c64sid',
     label: 'C64 SID',
     description: 'Commodore 64 SID (PSID/RSID) — C64SIDEngine',
