@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-03-03T00:51:26.557Z
+ * Generated: 2026-03-03T00:58:01.930Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.2005';
-export const BUILD_NUMBER = '2005';
-export const BUILD_HASH = 'fc22b359';
+export const BUILD_VERSION = '1.0.2008';
+export const BUILD_NUMBER = '2008';
+export const BUILD_HASH = '0d71ca89';
 export const BUILD_DATE = '2026-03-03';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,21 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.2005',
+    version: '1.0.2008',
     date: '2026-03-03',
     changes: [
+      {
+        type: 'fix',
+        "description": "Clean up engine constructor syntax errors"
+      },
+      {
+        type: 'fix',
+        "description": "Never fall back to UADE for C64 SID files"
+      },
+      {
+        type: 'improvement',
+        "description": "Verify SID file routing path"
+      },
       {
         type: 'feature',
         "description": "Add HVSC API endpoints"
@@ -226,18 +238,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'feature',
         "description": "Remove channel in GL context menu"
-      },
-      {
-        type: 'feature',
-        "description": "Multi-channel waveforms, track rename, track remove, ctrl+wheel zoom"
-      },
-      {
-        type: 'fix',
-        "description": "Remove layout+sortableChildren from worldRef to eliminate Yoga BindingError"
-      },
-      {
-        type: 'improvement',
-        "description": "Test(sonix): expand SonixMusicDriverParser tests — SNX/TINY/SMUS coverage"
       }
     ]
   }
