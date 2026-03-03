@@ -142,9 +142,6 @@ const LazyArrangementContextMenu = lazy(() =>
 const LazyTrackRenameDialog = lazy(() =>
   import('@/components/arrangement/TrackRenameDialog').then(m => ({ default: m.TrackRenameDialog }))
 );
-const LazyNewSongWizard = lazy(() =>
-  import('@/components/dialogs/NewSongWizard').then(m => ({ default: m.NewSongWizard }))
-);
 const LazySunVoxImportDialog = lazy(() =>
   import('@/components/instruments/SunVoxImportDialog').then(m => ({ default: m.SunVoxImportDialog }))
 );
@@ -169,7 +166,6 @@ export const WebGLModalBridge: React.FC = () => {
   const activeView = useUIStore(s => s.activeView);
   const showTD3Pattern = useMIDIStore(s => s.showPatternDialog);
   const closePatternDialog = useMIDIStore(s => s.closePatternDialog);
-  const newSongWizardOpen = useUIStore(s => s.newSongWizardOpen);
   const pendingModuleFile = useUIStore(s => s.pendingModuleFile);
   const setPendingModuleFile = useUIStore(s => s.setPendingModuleFile);
   const pendingCompanionFiles = useUIStore(s => s.pendingCompanionFiles);
@@ -688,9 +684,6 @@ export const WebGLModalBridge: React.FC = () => {
       <LazyArrangementContextMenu />
       {/* Arrangement track rename dialog (double-click header) */}
       <LazyTrackRenameDialog />
-
-      {/* New Song Wizard */}
-      {newSongWizardOpen && <LazyNewSongWizard />}
 
       {/* Always-mounted dialogs */}
       <LazySynthErrorDialog />
