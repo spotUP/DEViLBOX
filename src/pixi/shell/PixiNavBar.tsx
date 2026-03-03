@@ -41,17 +41,7 @@ const VIEW_TABS = [
 
 // ─── PixiNavBar ──────────────────────────────────────────────────────────────
 
-interface PixiNavBarProps {
-  /** Whether the bottom dock is collapsed (shows expand pill if true) */
-  dockCollapsed?: boolean;
-  /** Callback to expand the dock */
-  onExpandDock?: () => void;
-}
-
-export const PixiNavBar: React.FC<PixiNavBarProps> = ({
-  dockCollapsed = false,
-  onExpandDock,
-}) => {
+export const PixiNavBar: React.FC = () => {
   const theme = usePixiTheme();
   const { width } = usePixiResponsive();
 
@@ -295,16 +285,6 @@ export const PixiNavBar: React.FC<PixiNavBarProps> = ({
           active={exposeActive}
           onClick={handleExpose}
           width={56}
-        />
-
-        {/* Dock expand pill (visible when dock is collapsed) */}
-        <PixiButton
-          label="DOCK"
-          variant="ft2"
-          size="sm"
-          active={!dockCollapsed}
-          onClick={() => dockCollapsed ? onExpandDock?.() : undefined}
-          width={44}
         />
 
         <PixiButton label="THEME" variant="ghost" size="sm" onClick={handleThemeCycle} width={52} />
