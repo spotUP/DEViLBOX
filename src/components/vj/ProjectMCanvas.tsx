@@ -48,7 +48,9 @@ async function loadManifest(): Promise<void> {
     for (const [name, content] of Object.entries(BUILTIN_PRESETS)) {
       presetContentCache.set(name, content);
     }
-  } catch {
+    console.log('[ProjectMCanvas] Manifest loaded:', allPresetNames.length, 'total presets');
+  } catch (err) {
+    console.error('[ProjectMCanvas] Failed to load manifest:', err);
     allPresetNames = Object.keys(BUILTIN_PRESETS);
     for (const [name, content] of Object.entries(BUILTIN_PRESETS)) {
       presetContentCache.set(name, content);

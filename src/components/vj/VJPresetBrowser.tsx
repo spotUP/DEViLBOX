@@ -110,10 +110,15 @@ export function getPresetMap(): Record<string, object> | null {
 let cachedPMPresets: PresetEntry[] | null = null;
 
 async function loadProjectMPresets(): Promise<PresetEntry[]> {
-  if (cachedPMPresets) return cachedPMPresets;
+  if (cachedPMPresets && cachedPMPresets.length > 0) return cachedPMPresets;
   try {
     const resp = await fetch('/projectm/presets-manifest.json');
+    if (!resp.ok) {
+      console.error('[VJPresetBrowser] Manifest fetch failed:', resp.status);
+      return [];
+    }
     const data = await resp.json();
+    console.log('[VJPresetBrowser] Loaded projectM manifest:', data.presets?.length, 'presets');
     cachedPMPresets = data.presets.map((p: { name: string; category: string }, i: number) => ({
       name: p.name,
       author: p.category,
@@ -121,8 +126,8 @@ async function loadProjectMPresets(): Promise<PresetEntry[]> {
       idx: i,
     }));
     return cachedPMPresets!;
-  } catch {
-    cachedPMPresets = [];
+  } catch (err) {
+    console.error('[VJPresetBrowser] Failed to load projectM manifest:', err);
     return [];
   }
 }
