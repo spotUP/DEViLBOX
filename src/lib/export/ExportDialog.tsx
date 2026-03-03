@@ -4,10 +4,9 @@
  */
 
 import React, { useState, useRef, useEffect } from 'react';
-import { X, Download, Upload, FileMusic, Zap, Settings, Volume2, Music2 } from 'lucide-react';
+import { X, Download, Upload, FileMusic, Zap, Settings, Volume2, Music2, Cpu } from 'lucide-react';
 import { useTrackerStore, useInstrumentStore, useProjectStore, useTransportStore, useAutomationStore, useAudioStore, notify } from '@stores';
 import { useUIStore } from '@stores/useUIStore';
-import { useArrangementStore } from '@/stores/useArrangementStore';
 import { getToneEngine } from '@engine/ToneEngine';
 import {
   exportSong,
@@ -19,23 +18,12 @@ import {
   detectFileFormat,
   type ExportOptions,
 } from './exporters';
-import { exportPatternAsWav, exportSongAsWav, getUADEInstrument, exportUADEAsWav } from './audioExport';
-import { exportPatternToMIDI, exportSongToMIDI } from './midiExport';
-import { exportAsXM, type XMExportOptions } from './XMExporter';
-import { exportAsMOD, type MODExportOptions } from './MODExporter';
-import {
-  ChipRecordingSession,
-  exportChipMusic,
-  getAvailableFormats,
-  getLogStatistics,
-  parseRegisterLog,
-  FORMAT_INFO,
-  type ChipExportFormat,
-  type RegisterWrite,
-} from './ChipExporter';
 import { NanoExporter } from './NanoExporter';
 import type { AutomationCurve } from '@typedefs/automation';
-import { Cpu } from 'lucide-react';
+import { AudioExportPanel } from './AudioExportPanel';
+import { MidiExportPanel } from './MidiExportPanel';
+import { ModuleExportPanel } from './ModuleExportPanel';
+import { ChipExportPanel } from './ChipExportPanel';
 
 type ExportMode = 'song' | 'sfx' | 'instrument' | 'audio' | 'midi' | 'xm' | 'mod' | 'chip' | 'nano';
 type DialogMode = 'export' | 'import';
@@ -46,7 +34,7 @@ interface ExportDialogProps {
 }
 
 export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) => {
-  const { patterns, currentPatternIndex, importPattern, setCurrentPattern, loadPatterns, originalModuleData } = useTrackerStore();
+  const { patterns, currentPatternIndex, importPattern, setCurrentPattern, loadPatterns } = useTrackerStore();
   const { instruments, currentInstrumentId, addInstrument, setCurrentInstrument, loadInstruments } = useInstrumentStore();
   const { metadata, setMetadata } = useProjectStore();
   const { bpm, setBPM, isPlaying, stop } = useTransportStore();
@@ -66,59 +54,15 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
   const [selectedInstrumentId, setSelectedInstrumentId] = useState(currentInstrumentId || 0);
   const [isRendering, setIsRendering] = useState(false);
   const [renderProgress, setRenderProgress] = useState(0);
-  const [exportFullSong] = useState(false);
+  const [chipExtension, setChipExtension] = useState('vgm');
 
-  // Arrangement export scope: 'pattern' | 'song' | 'arrangement'
-  type AudioExportScope = 'pattern' | 'song' | 'arrangement';
-  const [audioExportScope, setAudioExportScope] = useState<AudioExportScope>('pattern');
-
-  // Read modal data and arrangement store for arrangement export
   const modalData = useUIStore(s => s.modalData);
-  const arrangementClips = useArrangementStore(s => s.clips);
-  const arrangementTotalRows = useArrangementStore(s => {
-    let max = 0;
-    for (const clip of s.clips) {
-      const end = clip.startRow + (clip.clipLengthRows ?? 64);
-      if (end > max) max = end;
-    }
-    return max;
-  });
-
-  // MIDI export options
-  const [midiType, setMidiType] = useState<0 | 1>(1);
-  const [midiIncludeAutomation, setMidiIncludeAutomation] = useState(true);
-  const [midiExportFullSong, setMidiExportFullSong] = useState(false);
-
-  // MOD/XM export options
-  const [modChannelCount, setModChannelCount] = useState<4 | 6 | 8>(4);
-  const [xmChannelCount, setXmChannelCount] = useState(8);
-  const [bakeSynthsToSamples, setBakeSynthsToSamples] = useState(true);
-  const [exportWarnings, setExportWarnings] = useState<string[]>([]);
-
-  // Chip export options
-  const [chipFormat, setChipFormat] = useState<ChipExportFormat>('vgm');
-  const [chipRecordingSession] = useState(() => new ChipRecordingSession());
-  const [isChipRecording, setIsChipRecording] = useState(false);
-  const [chipRecordingTime, setChipRecordingTime] = useState(0);
-  const [chipLogData, setChipLogData] = useState<Uint8Array | null>(null);
-  const [chipWrites, setChipWrites] = useState<RegisterWrite[]>([]);
-  const [availableChipFormats, setAvailableChipFormats] = useState<ChipExportFormat[]>([]);
-  const [chipTitle, setChipTitle] = useState('');
-  const [chipAuthor, setChipAuthor] = useState('');
-  const [chipLoopPoint, setChipLoopPoint] = useState(0); // Loop row for chip export
-
-  // Get loop point from transport store
-  const { loopStartRow, currentRow, setLoopStartRow } = useTransportStore();
-
-  // Sync chipLoopPoint with global loopStartRow on mount
-  useEffect(() => {
-    if (loopStartRow > 0) {
-      setChipLoopPoint(loopStartRow);
-    }
-  }, [loopStartRow]);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const chipRecordingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const audioHandlerRef = useRef<(() => Promise<false | void>) | null>(null);
+  const midiHandlerRef = useRef<(() => Promise<false | void>) | null>(null);
+  const moduleHandlerRef = useRef<(() => Promise<false | void>) | null>(null);
+  const chipHandlerRef = useRef<(() => Promise<false | void>) | null>(null);
 
   // Handle Escape key
   useEffect(() => {
@@ -135,73 +79,14 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
 
-  // Clear warnings when export mode changes
-  useEffect(() => {
-    setExportWarnings([]);
-  }, [exportMode]);
-
   // Auto-select arrangement scope when opened from arrangement toolbar
   useEffect(() => {
     if (isOpen && modalData?.audioScope === 'arrangement') {
       setExportMode('audio');
-      setAudioExportScope('arrangement');
     }
   }, [isOpen, modalData]);
 
-  // Cleanup chip recording timer on unmount
-  useEffect(() => {
-    return () => {
-      if (chipRecordingTimerRef.current) {
-        clearInterval(chipRecordingTimerRef.current);
-      }
-    };
-  }, []);
-
   if (!isOpen) return null;
-
-  // Chip recording controls
-  const startChipRecording = () => {
-    chipRecordingSession.startRecording();
-    setIsChipRecording(true);
-    setChipRecordingTime(0);
-    setChipLogData(null);
-    setChipWrites([]);
-    setAvailableChipFormats([]);
-
-    // Start timer
-    chipRecordingTimerRef.current = setInterval(() => {
-      setChipRecordingTime((t) => t + 100);
-    }, 100);
-  };
-
-  const stopChipRecording = async () => {
-    if (chipRecordingTimerRef.current) {
-      clearInterval(chipRecordingTimerRef.current);
-      chipRecordingTimerRef.current = null;
-    }
-
-    const logData = await chipRecordingSession.stopRecording();
-    setIsChipRecording(false);
-    setChipLogData(logData);
-
-    if (logData.length > 0) {
-      const writes = parseRegisterLog(logData);
-      setChipWrites(writes);
-      const formats = getAvailableFormats(writes);
-      setAvailableChipFormats(formats);
-      if (formats.length > 0 && !formats.includes(chipFormat)) {
-        setChipFormat(formats[0]);
-      }
-    }
-  };
-
-  const formatTime = (ms: number) => {
-    const seconds = Math.floor(ms / 1000);
-    const minutes = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    const tenths = Math.floor((ms % 1000) / 100);
-    return `${minutes}:${secs.toString().padStart(2, '0')}.${tenths}`;
-  };
 
   const handleExport = async () => {
     try {
@@ -266,261 +151,23 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
         }
 
         case 'audio': {
-          setIsRendering(true);
-          setRenderProgress(0);
-          try {
-            // Check if this is a UADE-backed module — render through UADE for accurate output
-            const uadeInst = getUADEInstrument(instruments);
-            if (uadeInst?.uade?.fileData) {
-              // Module was loaded via UADE parser — use its stored fileData
-              await exportUADEAsWav(
-                uadeInst.uade.fileData,
-                uadeInst.uade.filename,
-                `${metadata.name || 'song'}.wav`,
-                uadeInst.uade.currentSubsong ?? 0,
-                (progress) => setRenderProgress(progress)
-              );
-            } else if (originalModuleData?.base64) {
-              // Module was loaded via native parser but we have original bytes —
-              // render through UADE for accurate effects/mixing
-              const binaryStr = atob(originalModuleData.base64);
-              const bytes = new Uint8Array(binaryStr.length);
-              for (let i = 0; i < binaryStr.length; i++) bytes[i] = binaryStr.charCodeAt(i);
-              const fileData = bytes.buffer;
-              const sourceFilename = originalModuleData.sourceFile || `module.${originalModuleData.format.toLowerCase()}`;
-              await exportUADEAsWav(
-                fileData,
-                sourceFilename,
-                `${metadata.name || 'song'}.wav`,
-                0,
-                (progress) => setRenderProgress(progress)
-              );
-            } else if (audioExportScope === 'arrangement' && arrangementClips.length > 0) {
-              // Export arrangement: build pattern sequence from clips sorted by startRow
-              // Each clip references a patternId; resolve index and deduplicate consecutive repeats
-              const sortedClips = [...arrangementClips]
-                .filter(c => !c.muted)
-                .sort((a, b) => a.startRow - b.startRow);
-              const patternIndexSet: number[] = [];
-              for (const clip of sortedClips) {
-                const idx = patterns.findIndex(p => p.id === clip.patternId);
-                if (idx >= 0) patternIndexSet.push(idx);
-              }
-              if (patternIndexSet.length === 0) {
-                notify.warning('No unmuted clips in arrangement to export');
-                return;
-              }
-              await exportSongAsWav(
-                patterns,
-                patternIndexSet,
-                instruments,
-                bpm,
-                `${metadata.name || 'arrangement'}.wav`,
-                (progress) => setRenderProgress(progress)
-              );
-            } else if (audioExportScope === 'song' || exportFullSong) {
-              // Export all patterns in sequence
-              const sequence = patterns.map((_, index) => index);
-              await exportSongAsWav(
-                patterns,
-                sequence,
-                instruments,
-                bpm,
-                `${metadata.name || 'song'}.wav`,
-                (progress) => setRenderProgress(progress)
-              );
-            } else {
-              // Export single pattern
-              const pattern = patterns[selectedPatternIndex];
-              if (!pattern) {
-                notify.warning('Please select a valid pattern');
-                return;
-              }
-              await exportPatternAsWav(
-                pattern,
-                instruments,
-                bpm,
-                `${pattern.name || 'pattern'}.wav`,
-                (progress) => setRenderProgress(progress)
-              );
-            }
-          } finally {
-            setIsRendering(false);
-            setRenderProgress(0);
-          }
+          if (await audioHandlerRef.current?.() === false) return;
           break;
         }
 
         case 'midi': {
-          const timeSignature: [number, number] = [4, 4];
-          const midiOptions = {
-            type: midiType,
-            includeAutomation: midiIncludeAutomation,
-            velocityScale: 1.0,
-            exportMutedChannels: false,
-          };
-
-          let midiData: Uint8Array;
-          let filename: string;
-
-          if (midiExportFullSong) {
-            const sequence = patterns.map((p) => p.id);
-            midiData = exportSongToMIDI(patterns, sequence, bpm, timeSignature, curves, midiOptions);
-            filename = `${metadata.name || 'song'}.mid`;
-          } else {
-            const pattern = patterns[selectedPatternIndex];
-            if (!pattern) {
-              notify.warning('Please select a valid pattern');
-              return;
-            }
-            midiData = exportPatternToMIDI(pattern, bpm, timeSignature, midiOptions);
-            filename = `${pattern.name || 'pattern'}.mid`;
-          }
-
-          // Download the file - create a fresh Uint8Array to ensure standard ArrayBuffer
-          const blob = new Blob([new Uint8Array(midiData)], { type: 'audio/midi' });
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = filename;
-          document.body.appendChild(a);
-          a.click();
-          document.body.removeChild(a);
-          URL.revokeObjectURL(url);
-
-          notify.success(`MIDI file "${filename}" exported successfully!`);
+          if (await midiHandlerRef.current?.() === false) return;
           break;
         }
 
-        case 'xm': {
-          const xmOptions: XMExportOptions = {
-            channelLimit: xmChannelCount,
-            moduleName: metadata.name || 'DEViLBOX Export',
-            bakeSynthsToSamples,
-          };
-
-          const result = await exportAsXM(patterns, instruments, xmOptions);
-
-          // Download the file
-          const url = URL.createObjectURL(result.data);
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = result.filename;
-          document.body.appendChild(a);
-          a.click();
-          document.body.removeChild(a);
-          URL.revokeObjectURL(url);
-
-          // Show warnings if any
-          if (result.warnings.length > 0) {
-            setExportWarnings(result.warnings);
-            notify.warning(`XM exported with ${result.warnings.length} warnings. Check the dialog for details.`);
-          } else {
-            notify.success(`XM file "${result.filename}" exported successfully!`);
-            onClose();
-          }
-          break;
-        }
-
+        case 'xm':
         case 'mod': {
-          const modOptions: MODExportOptions = {
-            channelCount: modChannelCount,
-            moduleName: metadata.name || 'DEViLBOX Export',
-            bakeSynthsToSamples,
-          };
-
-          const result = await exportAsMOD(patterns, instruments, modOptions);
-
-          // Download the file
-          const url = URL.createObjectURL(result.data);
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = result.filename;
-          document.body.appendChild(a);
-          a.click();
-          document.body.removeChild(a);
-          URL.revokeObjectURL(url);
-
-          // Show warnings if any
-          if (result.warnings.length > 0) {
-            setExportWarnings(result.warnings);
-            notify.warning(`MOD exported with ${result.warnings.length} warnings. Check the dialog for details.`);
-          } else {
-            notify.success(`MOD file "${result.filename}" exported successfully!`);
-            onClose();
-          }
+          if (await moduleHandlerRef.current?.() === false) return;
           break;
         }
 
         case 'chip': {
-          // Validate chip export
-          if (!chipLogData || chipLogData.length === 0) {
-            notify.error('No recording data. Press Record and play your song first.');
-            return;
-          }
-
-          if (chipWrites.length === 0) {
-            notify.error('No register writes captured. Make sure Furnace chips are playing.');
-            return;
-          }
-
-          if (!availableChipFormats.includes(chipFormat)) {
-            const usedChips = getLogStatistics(chipWrites).usedChips
-              .map(c => c.name)
-              .join(', ');
-            notify.error(`${FORMAT_INFO[chipFormat].name} format is not compatible with chips used: ${usedChips}. Try VGM for universal compatibility.`);
-            return;
-          }
-
-          if (!chipTitle.trim()) {
-            notify.error('Please enter a title for your export.');
-            return;
-          }
-
-          // Show progress
-          setIsRendering(true);
-          setRenderProgress(0);
-
-          try {
-            // Calculate loop point in samples from row number
-            // Formula: samples = row * (60 / BPM) * (speed / 6) * sampleRate
-            // Simplified: samples = row * secondsPerRow * 44100
-            const rowsPerBeat = 4; // Assuming 4 rows per beat (tracker standard)
-            const beatsPerSecond = bpm / 60;
-            const secondsPerRow = 1 / (beatsPerSecond * rowsPerBeat);
-            const loopPointSamples = chipLoopPoint > 0
-              ? Math.floor(chipLoopPoint * secondsPerRow * 44100)
-              : undefined;
-
-            setRenderProgress(50);
-
-            const chipResult = await exportChipMusic(chipLogData, {
-              format: chipFormat,
-              title: chipTitle || metadata.name || 'Untitled',
-              author: chipAuthor || metadata.author || 'Unknown',
-              loopPoint: loopPointSamples,
-            });
-
-            setRenderProgress(100);
-
-            // Download the file
-            const url = URL.createObjectURL(chipResult.data);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = chipResult.filename;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-
-            notify.success(`${FORMAT_INFO[chipFormat].name} file exported successfully!`);
-            onClose();
-          } catch (error) {
-            notify.error(`Export failed: ${(error as Error).message}`);
-          } finally {
-            setIsRendering(false);
-            setRenderProgress(0);
-          }
+          if (await chipHandlerRef.current?.() === false) return;
           break;
         }
 
@@ -933,647 +580,44 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
               )}
 
               {exportMode === 'audio' && (
-                <div className="bg-dark-bgSecondary border border-dark-border rounded-lg p-4 mb-4">
-                  <h3 className="text-sm font-mono font-bold text-accent-primary mb-3">
-                    Audio Export (WAV)
-                  </h3>
-                  <div className="space-y-3">
-                    {/* Export scope toggle */}
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => setAudioExportScope('pattern')}
-                        disabled={isRendering}
-                        className={`
-                          flex-1 px-3 py-2 rounded-lg text-sm font-mono transition-all
-                          ${audioExportScope === 'pattern'
-                            ? 'bg-accent-primary text-text-inverse'
-                            : 'bg-dark-bg text-text-secondary hover:bg-dark-bgHover border border-dark-border'
-                          }
-                        `}
-                      >
-                        Single Pattern
-                      </button>
-                      <button
-                        onClick={() => setAudioExportScope('song')}
-                        disabled={isRendering}
-                        className={`
-                          flex-1 px-3 py-2 rounded-lg text-sm font-mono transition-all
-                          ${audioExportScope === 'song'
-                            ? 'bg-accent-primary text-text-inverse'
-                            : 'bg-dark-bg text-text-secondary hover:bg-dark-bgHover border border-dark-border'
-                          }
-                        `}
-                      >
-                        Full Song ({patterns.length} patterns)
-                      </button>
-                      {arrangementClips.length > 0 && (
-                        <button
-                          onClick={() => setAudioExportScope('arrangement')}
-                          disabled={isRendering}
-                          className={`
-                            flex-1 px-3 py-2 rounded-lg text-sm font-mono transition-all
-                            ${audioExportScope === 'arrangement'
-                              ? 'bg-accent-primary text-text-inverse'
-                              : 'bg-dark-bg text-text-secondary hover:bg-dark-bgHover border border-dark-border'
-                            }
-                          `}
-                        >
-                          Arrangement ({arrangementClips.filter(c => !c.muted).length} clips)
-                        </button>
-                      )}
-                    </div>
-
-                    {/* Pattern selector (only shown for single pattern mode) */}
-                    {audioExportScope === 'pattern' && (
-                      <div>
-                        <label className="block text-xs font-mono text-text-muted mb-1">
-                          Pattern to Render
-                        </label>
-                        <select
-                          value={selectedPatternIndex}
-                          onChange={(e) => setSelectedPatternIndex(Number(e.target.value))}
-                          className="input w-full"
-                          disabled={isRendering}
-                        >
-                          {patterns.map((pattern, index) => (
-                            <option key={pattern.id} value={index}>
-                              {index.toString().padStart(2, '0')} - {pattern.name}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    )}
-
-                    <div className="text-sm font-mono text-text-secondary space-y-1">
-                      <div>Format: <span className="text-accent-primary">WAV (16-bit, 44.1kHz)</span></div>
-                      <div>BPM: <span className="text-accent-primary">{bpm}</span></div>
-                      {audioExportScope === 'arrangement' ? (
-                        <>
-                          <div>Clips: <span className="text-accent-primary">{arrangementClips.filter(c => !c.muted).length} unmuted</span></div>
-                          <div>Total Rows: <span className="text-accent-primary">{arrangementTotalRows}</span></div>
-                        </>
-                      ) : audioExportScope === 'song' ? (
-                        <>
-                          <div>Patterns: <span className="text-accent-primary">{patterns.length}</span></div>
-                          <div>Total Rows: <span className="text-accent-primary">{patterns.reduce((sum, p) => sum + p.length, 0)}</span></div>
-                        </>
-                      ) : (
-                        <div>Length: <span className="text-accent-primary">{patterns[selectedPatternIndex]?.length || 64} rows</span></div>
-                      )}
-                    </div>
-                    {isRendering && (
-                      <div className="mt-3">
-                        <div className="text-xs font-mono text-text-muted mb-1">
-                          Rendering{audioExportScope !== 'pattern' ? ` ${audioExportScope}` : ''}... {renderProgress}%
-                        </div>
-                        <div className="w-full bg-dark-border rounded-full h-2">
-                          <div
-                            className="bg-accent-primary h-2 rounded-full transition-all duration-200"
-                            style={{ width: `${renderProgress}%` }}
-                          />
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
+                <AudioExportPanel
+                  handlerRef={audioHandlerRef}
+                  selectedPatternIndex={selectedPatternIndex}
+                  setSelectedPatternIndex={setSelectedPatternIndex}
+                  isRendering={isRendering}
+                  setIsRendering={setIsRendering}
+                  renderProgress={renderProgress}
+                  setRenderProgress={setRenderProgress}
+                  initialScope={modalData?.audioScope === 'arrangement' ? 'arrangement' : undefined}
+                />
               )}
 
               {exportMode === 'midi' && (
-                <div className="bg-dark-bgSecondary border border-dark-border rounded-lg p-4 mb-4">
-                  <h3 className="text-sm font-mono font-bold text-accent-primary mb-3">
-                    MIDI Export (.mid)
-                  </h3>
-                  <div className="space-y-3">
-                    {/* Export scope toggle */}
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => setMidiExportFullSong(false)}
-                        className={`
-                          flex-1 px-3 py-2 rounded-lg text-sm font-mono transition-all
-                          ${!midiExportFullSong
-                            ? 'bg-accent-primary text-text-inverse'
-                            : 'bg-dark-bg text-text-secondary hover:bg-dark-bgHover border border-dark-border'
-                          }
-                        `}
-                      >
-                        Single Pattern
-                      </button>
-                      <button
-                        onClick={() => setMidiExportFullSong(true)}
-                        className={`
-                          flex-1 px-3 py-2 rounded-lg text-sm font-mono transition-all
-                          ${midiExportFullSong
-                            ? 'bg-accent-primary text-text-inverse'
-                            : 'bg-dark-bg text-text-secondary hover:bg-dark-bgHover border border-dark-border'
-                          }
-                        `}
-                      >
-                        Full Song ({patterns.length} patterns)
-                      </button>
-                    </div>
-
-                    {/* Pattern selector (only shown for single pattern mode) */}
-                    {!midiExportFullSong && (
-                      <div>
-                        <label className="block text-xs font-mono text-text-muted mb-1">
-                          Pattern to Export
-                        </label>
-                        <select
-                          value={selectedPatternIndex}
-                          onChange={(e) => setSelectedPatternIndex(Number(e.target.value))}
-                          className="input w-full"
-                        >
-                          {patterns.map((pattern, index) => (
-                            <option key={pattern.id} value={index}>
-                              {index.toString().padStart(2, '0')} - {pattern.name}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    )}
-
-                    {/* MIDI Type */}
-                    <div>
-                      <label className="block text-xs font-mono text-text-muted mb-1">
-                        MIDI Format
-                      </label>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => setMidiType(0)}
-                          className={`
-                            flex-1 px-3 py-2 rounded-lg text-xs font-mono transition-all
-                            ${midiType === 0
-                              ? 'bg-accent-secondary text-text-inverse'
-                              : 'bg-dark-bg text-text-secondary hover:bg-dark-bgHover border border-dark-border'
-                            }
-                          `}
-                        >
-                          Type 0 (Single Track)
-                        </button>
-                        <button
-                          onClick={() => setMidiType(1)}
-                          className={`
-                            flex-1 px-3 py-2 rounded-lg text-xs font-mono transition-all
-                            ${midiType === 1
-                              ? 'bg-accent-secondary text-text-inverse'
-                              : 'bg-dark-bg text-text-secondary hover:bg-dark-bgHover border border-dark-border'
-                            }
-                          `}
-                        >
-                          Type 1 (Multi-Track)
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Include automation */}
-                    <label className="flex items-center gap-3 text-sm font-mono text-text-primary cursor-pointer hover:text-accent-primary transition-colors">
-                      <input
-                        type="checkbox"
-                        checked={midiIncludeAutomation}
-                        onChange={(e) => setMidiIncludeAutomation(e.target.checked)}
-                        className="w-4 h-4 rounded border-dark-border bg-dark-bg text-accent-primary focus:ring-accent-primary"
-                      />
-                      Include automation as CC messages
-                    </label>
-
-                    <div className="text-sm font-mono text-text-secondary space-y-1">
-                      <div>Format: <span className="text-accent-primary">Standard MIDI File (SMF)</span></div>
-                      <div>Resolution: <span className="text-accent-primary">480 PPQ</span></div>
-                      <div>BPM: <span className="text-accent-primary">{bpm}</span></div>
-                      <div>Channels: <span className="text-accent-primary">{patterns[selectedPatternIndex]?.channels.length || 8}</span></div>
-                    </div>
-                  </div>
-                </div>
+                <MidiExportPanel
+                  handlerRef={midiHandlerRef}
+                  selectedPatternIndex={selectedPatternIndex}
+                  setSelectedPatternIndex={setSelectedPatternIndex}
+                />
               )}
 
-              {exportMode === 'xm' && (
-                <div className="bg-dark-bgSecondary border border-dark-border rounded-lg p-4 mb-4">
-                  <h3 className="text-sm font-mono font-bold text-accent-primary mb-3">
-                    FastTracker II XM Export (.xm)
-                  </h3>
-                  <div className="space-y-3">
-                    {/* Channel Count */}
-                    <div>
-                      <label className="block text-xs font-mono text-text-muted mb-1">
-                        Channel Count (max 32)
-                      </label>
-                      <input
-                        type="number"
-                        min={2}
-                        max={32}
-                        value={xmChannelCount}
-                        onChange={(e) => setXmChannelCount(Math.min(32, Math.max(2, Number(e.target.value))))}
-                        className="input w-full"
-                      />
-                    </div>
-
-                    {/* Synth instrument handling */}
-                    <label className="flex items-center gap-3 text-sm font-mono text-text-primary cursor-pointer hover:text-accent-primary transition-colors">
-                      <input
-                        type="checkbox"
-                        checked={bakeSynthsToSamples}
-                        onChange={(e) => setBakeSynthsToSamples(e.target.checked)}
-                        className="w-4 h-4 rounded border-dark-border bg-dark-bg text-accent-primary focus:ring-accent-primary"
-                      />
-                      Include synth instrument slots (audio will be silent)
-                    </label>
-
-                    <div className="text-sm font-mono text-text-secondary space-y-1">
-                      <div>Format: <span className="text-accent-primary">FastTracker II Extended Module</span></div>
-                      <div>Patterns: <span className="text-accent-primary">{patterns.length}</span></div>
-                      <div>Channels: <span className="text-accent-primary">{Math.min(patterns[0]?.channels.length || 8, 32)}</span></div>
-                      <div>Instruments: <span className="text-accent-primary">{Math.min(instruments.length, 128)}</span></div>
-                    </div>
-
-                    {/* Warnings display */}
-                    {exportWarnings.length > 0 && (
-                      <div className="bg-orange-500/10 border border-orange-500/30 rounded-lg p-3">
-                        <h4 className="text-xs font-mono font-bold text-orange-400 mb-2">
-                          Export Warnings ({exportWarnings.length})
-                        </h4>
-                        <ul className="text-xs font-mono text-orange-300 space-y-1 max-h-32 overflow-y-auto">
-                          {exportWarnings.map((warning, idx) => (
-                            <li key={idx} className="flex items-start gap-2">
-                              <span className="text-orange-400">•</span>
-                              <span>{warning}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {exportMode === 'mod' && (
-                <div className="bg-dark-bgSecondary border border-dark-border rounded-lg p-4 mb-4">
-                  <h3 className="text-sm font-mono font-bold text-accent-primary mb-3">
-                    ProTracker MOD Export (.mod)
-                  </h3>
-                  <div className="space-y-3">
-                    {/* Channel Count */}
-                    <div>
-                      <label className="block text-xs font-mono text-text-muted mb-1">
-                        MOD Format
-                      </label>
-                      <div className="grid grid-cols-3 gap-2">
-                        <button
-                          onClick={() => setModChannelCount(4)}
-                          className={`
-                            px-3 py-2 rounded-lg text-xs font-mono transition-all
-                            ${modChannelCount === 4
-                              ? 'bg-accent-secondary text-text-inverse'
-                              : 'bg-dark-bg text-text-secondary hover:bg-dark-bgHover border border-dark-border'
-                            }
-                          `}
-                        >
-                          4 Channel (M.K.)
-                        </button>
-                        <button
-                          onClick={() => setModChannelCount(6)}
-                          className={`
-                            px-3 py-2 rounded-lg text-xs font-mono transition-all
-                            ${modChannelCount === 6
-                              ? 'bg-accent-secondary text-text-inverse'
-                              : 'bg-dark-bg text-text-secondary hover:bg-dark-bgHover border border-dark-border'
-                            }
-                          `}
-                        >
-                          6 Channel (6CHN)
-                        </button>
-                        <button
-                          onClick={() => setModChannelCount(8)}
-                          className={`
-                            px-3 py-2 rounded-lg text-xs font-mono transition-all
-                            ${modChannelCount === 8
-                              ? 'bg-accent-secondary text-text-inverse'
-                              : 'bg-dark-bg text-text-secondary hover:bg-dark-bgHover border border-dark-border'
-                            }
-                          `}
-                        >
-                          8 Channel (8CHN)
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Synth instrument handling */}
-                    <label className="flex items-center gap-3 text-sm font-mono text-text-primary cursor-pointer hover:text-accent-primary transition-colors">
-                      <input
-                        type="checkbox"
-                        checked={bakeSynthsToSamples}
-                        onChange={(e) => setBakeSynthsToSamples(e.target.checked)}
-                        className="w-4 h-4 rounded border-dark-border bg-dark-bg text-accent-primary focus:ring-accent-primary"
-                      />
-                      Include synth instrument slots (audio will be silent)
-                    </label>
-
-                    <div className="text-sm font-mono text-text-secondary space-y-1">
-                      <div>Format: <span className="text-accent-primary">ProTracker MOD</span></div>
-                      <div>Patterns: <span className="text-accent-primary">{patterns.length}</span></div>
-                      <div>Max Samples: <span className="text-accent-primary">31</span></div>
-                      <div>Max Rows/Pattern: <span className="text-accent-primary">64</span></div>
-                      <div>Note Range: <span className="text-accent-primary">C-0 to B-3</span></div>
-                    </div>
-
-                    {/* Warnings display */}
-                    {exportWarnings.length > 0 && (
-                      <div className="bg-orange-500/10 border border-orange-500/30 rounded-lg p-3">
-                        <h4 className="text-xs font-mono font-bold text-orange-400 mb-2">
-                          Export Warnings ({exportWarnings.length})
-                        </h4>
-                        <ul className="text-xs font-mono text-orange-300 space-y-1 max-h-32 overflow-y-auto">
-                          {exportWarnings.map((warning, idx) => (
-                            <li key={idx} className="flex items-start gap-2">
-                              <span className="text-orange-400">•</span>
-                              <span>{warning}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                  </div>
-                </div>
+              {(exportMode === 'xm' || exportMode === 'mod') && (
+                <ModuleExportPanel
+                  handlerRef={moduleHandlerRef}
+                  exportMode={exportMode as 'xm' | 'mod'}
+                  onClose={onClose}
+                />
               )}
 
               {exportMode === 'chip' && (
-                <div className="bg-dark-bgSecondary border border-dark-border rounded-lg p-4 mb-4">
-                  <h3 className="text-sm font-mono font-bold text-accent-primary mb-3">
-                    Chip Music Export
-                  </h3>
-                  <div className="space-y-4">
-                    {/* Recording controls */}
-                    <div className="bg-dark-bg border border-dark-border rounded-lg p-3">
-                      <div className="flex items-center justify-between mb-3">
-                        <span className="text-xs font-mono text-text-muted">RECORDING</span>
-                        <span className="text-lg font-mono text-accent-primary font-bold">
-                          {formatTime(chipRecordingTime)}
-                        </span>
-                      </div>
-                      <div className="flex gap-2">
-                        {!isChipRecording ? (
-                          <button
-                            onClick={startChipRecording}
-                            className="flex-1 px-4 py-2 rounded-lg bg-red-500 text-white font-mono text-sm hover:bg-red-600 transition-colors flex items-center justify-center gap-2"
-                          >
-                            <span className="w-3 h-3 rounded-full bg-white" />
-                            Record
-                          </button>
-                        ) : (
-                          <button
-                            onClick={stopChipRecording}
-                            className="flex-1 px-4 py-2 rounded-lg bg-dark-bgHover text-text-primary font-mono text-sm hover:bg-dark-border transition-colors flex items-center justify-center gap-2"
-                          >
-                            <span className="w-3 h-3 bg-white" />
-                            Stop
-                          </button>
-                        )}
-                      </div>
-                      <p className="text-xs font-mono text-text-muted mt-2">
-                        {isChipRecording
-                          ? 'Recording... Play your song now!'
-                          : chipWrites.length > 0
-                          ? `Captured ${chipWrites.length.toLocaleString()} register writes`
-                          : 'Press Record, then play your song to capture chip output'}
-                      </p>
-                    </div>
-
-                    {/* Chip statistics */}
-                    {chipWrites.length > 0 && (
-                      <div className="bg-dark-bg border border-dark-border rounded-lg p-3">
-                        <h4 className="text-xs font-mono text-text-muted mb-2">CAPTURED DATA</h4>
-                        {(() => {
-                          const stats = getLogStatistics(chipWrites);
-                          return (
-                            <div className="space-y-1 text-sm font-mono">
-                              <div>Duration: <span className="text-accent-primary">{stats.duration.toFixed(1)}s</span></div>
-                              <div>Writes: <span className="text-accent-primary">{stats.totalWrites.toLocaleString()}</span></div>
-                              <div className="pt-1 border-t border-dark-border mt-2">
-                                <span className="text-text-muted">Chips used:</span>
-                                {stats.usedChips.map((chip) => (
-                                  <div key={chip.type} className="ml-2 text-xs">
-                                    {chip.name}: <span className="text-accent-secondary">{chip.writes.toLocaleString()}</span>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          );
-                        })()}
-                      </div>
-                    )}
-
-                    {/* Quick presets */}
-                    {chipWrites.length > 0 && (
-                      <div className="bg-dark-bg border border-dark-border rounded-lg p-3">
-                        <div className="text-xs font-mono text-text-muted mb-2">QUICK PRESETS</div>
-                        <div className="grid grid-cols-2 gap-2">
-                          <button
-                            onClick={() => setChipFormat('vgm')}
-                            className="px-3 py-2 rounded-lg bg-dark-bgSecondary border border-dark-border hover:border-accent-primary text-xs font-mono transition-colors text-left"
-                          >
-                            🌐 Universal (VGM)
-                          </button>
-                          <button
-                            onClick={() => setChipFormat('gym')}
-                            disabled={!availableChipFormats.includes('gym')}
-                            className="px-3 py-2 rounded-lg bg-dark-bgSecondary border border-dark-border hover:border-accent-primary text-xs font-mono transition-colors text-left disabled:opacity-50 disabled:cursor-not-allowed"
-                          >
-                            🎮 Genesis (GYM)
-                          </button>
-                          <button
-                            onClick={() => setChipFormat('nsf')}
-                            disabled={!availableChipFormats.includes('nsf')}
-                            className="px-3 py-2 rounded-lg bg-dark-bgSecondary border border-dark-border hover:border-accent-primary text-xs font-mono transition-colors text-left disabled:opacity-50 disabled:cursor-not-allowed"
-                          >
-                            🕹️ NES (NSF)
-                          </button>
-                          <button
-                            onClick={() => setChipFormat('gbs')}
-                            disabled={!availableChipFormats.includes('gbs')}
-                            className="px-3 py-2 rounded-lg bg-dark-bgSecondary border border-dark-border hover:border-accent-primary text-xs font-mono transition-colors text-left disabled:opacity-50 disabled:cursor-not-allowed"
-                          >
-                            🎮 Game Boy (GBS)
-                          </button>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Format selection */}
-                    <div>
-                      <label className="block text-xs font-mono text-text-muted mb-2">
-                        EXPORT FORMAT
-                      </label>
-                      <div className="grid grid-cols-2 gap-2">
-                        {(['vgm', 'gym', 'nsf', 'gbs', 'spc', 'zsm', 'sap', 'tiuna'] as ChipExportFormat[]).map((fmt) => {
-                          const info = FORMAT_INFO[fmt];
-                          const isAvailable = availableChipFormats.includes(fmt) || chipWrites.length === 0;
-
-                          // Loop support indicators
-                          const loopSupport = {
-                            vgm: { supported: true, type: 'custom' },
-                            gym: { supported: false, type: 'none' },
-                            nsf: { supported: true, type: 'auto' },
-                            gbs: { supported: true, type: 'auto' },
-                            spc: { supported: false, type: 'none' },
-                            zsm: { supported: false, type: 'none' },
-                            sap: { supported: false, type: 'none' },
-                            tiuna: { supported: false, type: 'none' },
-                          }[fmt];
-
-                          return (
-                            <button
-                              key={fmt}
-                              onClick={() => isAvailable && setChipFormat(fmt)}
-                              disabled={!isAvailable && chipWrites.length > 0}
-                              className={`
-                                p-3 rounded-lg text-left transition-all
-                                ${chipFormat === fmt
-                                  ? 'bg-accent-primary text-text-inverse'
-                                  : isAvailable || chipWrites.length === 0
-                                  ? 'bg-dark-bg border border-dark-border hover:border-dark-borderLight'
-                                  : 'bg-dark-bg border border-dark-border opacity-40 cursor-not-allowed'
-                                }
-                              `}
-                            >
-                              <div className="flex items-center justify-between">
-                                <div className="font-mono text-sm font-semibold">{info.name}</div>
-                                {loopSupport.type === 'custom' && (
-                                  <span className="text-xs opacity-70" title="Custom loop point supported">🔁</span>
-                                )}
-                                {loopSupport.type === 'auto' && (
-                                  <span className="text-xs opacity-70" title="Loops entire song automatically">↻</span>
-                                )}
-                              </div>
-                              <div className="text-xs opacity-70">.{info.extension}</div>
-                            </button>
-                          );
-                        })}
-                      </div>
-
-                      {/* Loop point warning/info */}
-                      {chipLoopPoint > 0 && (
-                        <div className="mt-2 text-xs">
-                          {(() => {
-                            const loopType = {
-                              vgm: 'custom',
-                              nsf: 'auto',
-                              gbs: 'auto',
-                              gym: 'none',
-                              spc: 'none',
-                              zsm: 'none',
-                              sap: 'none',
-                              tiuna: 'none',
-                            }[chipFormat];
-
-                            if (loopType === 'custom') {
-                              return (
-                                <div className="text-green-400">
-                                  ✓ Loop point at row {chipLoopPoint} will be used
-                                </div>
-                              );
-                            } else if (loopType === 'auto') {
-                              return (
-                                <div className="text-yellow-400">
-                                  ⚠️ {chipFormat.toUpperCase()} loops entire song (custom loop points not supported)
-                                </div>
-                              );
-                            } else {
-                              return (
-                                <div className="text-yellow-400">
-                                  ⚠️ {chipFormat.toUpperCase()} format does not support loop points
-                                </div>
-                              );
-                            }
-                          })()}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Metadata */}
-                    <div className="space-y-2">
-                      <div>
-                        <label className="block text-xs font-mono text-text-muted mb-1">
-                          Title
-                        </label>
-                        <input
-                          type="text"
-                          value={chipTitle}
-                          onChange={(e) => setChipTitle(e.target.value)}
-                          placeholder={metadata.name || 'Untitled'}
-                          className="input w-full"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-mono text-text-muted mb-1">
-                          Author
-                        </label>
-                        <input
-                          type="text"
-                          value={chipAuthor}
-                          onChange={(e) => setChipAuthor(e.target.value)}
-                          placeholder={metadata.author || 'Unknown'}
-                          className="input w-full"
-                        />
-                      </div>
-                    </div>
-
-                    {/* Loop Point */}
-                    <div className="bg-dark-bg border border-dark-border rounded-lg p-3">
-                      <label className="block text-xs font-mono text-text-muted mb-2">
-                        LOOP POINT (Row)
-                      </label>
-                      <div className="flex gap-2">
-                        <input
-                          type="number"
-                          value={chipLoopPoint}
-                          onChange={(e) => setChipLoopPoint(Math.max(0, Number(e.target.value)))}
-                          min={0}
-                          className="input flex-1 font-mono"
-                          placeholder="0"
-                        />
-                        <button
-                          onClick={() => {
-                            setChipLoopPoint(currentRow);
-                            setLoopStartRow(currentRow);
-                          }}
-                          className="px-3 py-2 rounded-lg bg-dark-bgHover text-text-primary font-mono text-xs hover:bg-dark-border transition-colors"
-                          title="Set loop point to current row"
-                        >
-                          From Cursor
-                        </button>
-                      </div>
-                      <p className="text-xs font-mono text-text-muted mt-2">
-                        {chipLoopPoint > 0
-                          ? `Music will loop back to row ${chipLoopPoint}`
-                          : 'Set to 0 for no loop (one-shot playback)'}
-                      </p>
-                    </div>
-
-                    {/* Export progress */}
-                    {isRendering && exportMode === 'chip' && (
-                      <div className="bg-dark-bg border border-dark-border rounded-lg p-3">
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-xs font-mono text-text-muted">
-                            Exporting {FORMAT_INFO[chipFormat].name}...
-                          </span>
-                          <span className="text-xs font-mono text-accent-primary">
-                            {renderProgress}%
-                          </span>
-                        </div>
-                        <div className="h-2 bg-dark-border rounded-full overflow-hidden">
-                          <div
-                            className="h-full bg-accent-primary transition-all duration-300"
-                            style={{ width: `${renderProgress}%` }}
-                          />
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Format description */}
-                    <div className="text-xs font-mono text-text-muted bg-dark-bg border border-dark-border rounded-lg p-3">
-                      {FORMAT_INFO[chipFormat].description}
-                    </div>
-                  </div>
-                </div>
+                <ChipExportPanel
+                  handlerRef={chipHandlerRef}
+                  isRendering={isRendering}
+                  setIsRendering={setIsRendering}
+                  renderProgress={renderProgress}
+                  setRenderProgress={setRenderProgress}
+                  onClose={onClose}
+                  onFormatChange={setChipExtension}
+                />
               )}
 
               {exportMode === 'nano' && (
@@ -1708,7 +752,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                   : exportMode === 'midi' ? '.mid'
                   : exportMode === 'xm' ? '.xm'
                   : exportMode === 'mod' ? '.mod'
-                  : exportMode === 'chip' ? `.${FORMAT_INFO[chipFormat].extension}`
+                  : exportMode === 'chip' ? `.${chipExtension}`
                   : exportMode === 'nano' ? '.dbn'
                   : `.${exportMode}.json`
                 }`
