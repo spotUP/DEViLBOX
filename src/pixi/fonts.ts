@@ -9,9 +9,13 @@
  * DynamicBitmapFont uses no custom shader → batchable → all BitmapText elements batch
  * into a handful of draw calls. Rasterized at 48px with 2x resolution (96px effective)
  * for crisp rendering even at high zoom levels.
+ *
+ * Icon font: fontaudio (https://github.com/fefanto/fontaudio)
+ * License: Icons CC BY 4.0, Font SIL OFL 1.1, Code MIT
  */
 
 import { BitmapFontManager, Cache, type TextStyleFontWeight } from 'pixi.js';
+import { FAD_ICONS } from './fontaudioIcons';
 
 /** Font family names used throughout the PixiJS UI */
 export const PIXI_FONTS = {
@@ -21,6 +25,7 @@ export const PIXI_FONTS = {
   SANS_MEDIUM: 'Inter-Medium',
   SANS_SEMIBOLD: 'Inter-SemiBold',
   SANS_BOLD: 'Inter-Bold',
+  ICONS: 'FontAudio-Icons',
 } as const;
 
 /**
@@ -32,20 +37,26 @@ let fontLoadPromise: Promise<void> | null = null;
 /**
  * Load all bitmap fonts. Call once during app initialization.
  * Safe to call multiple times — subsequent calls await the same promise.
- * Waits for web fonts to load so Canvas 2D rasterization picks up symbol glyphs.
+ * Waits for web fonts (including fontaudio) to load before rasterizing.
  */
 export function loadPixiFonts(): Promise<void> {
   if (!fontLoadPromise) {
-    fontLoadPromise = document.fonts.ready.then(() => installFonts());
+    fontLoadPromise = loadFontAudioFace().then(() => installFonts());
   }
   return fontLoadPromise;
 }
 
+/** Load the fontaudio @font-face programmatically */
+async function loadFontAudioFace(): Promise<void> {
+  const face = new FontFace('fontaudio', "url('/fonts/fontaudio.woff2')");
+  document.fonts.add(face);
+  await face.load();
+  // Also wait for all other web fonts (Inter, JetBrains Mono)
+  await document.fonts.ready;
+}
+
 /** Guard against multiple installs across HMR reloads / StrictMode double-mounts */
 let _fontsInstalled = false;
-
-/** Extra characters used as icons/symbols in the GL UI (beyond ASCII) */
-const EXTRA_CHARS = '±·¼É×é–—•…₁₂₃₆⅓⅛⅟←↑→↓↔⇥⇱⇲−∞≡⊓⊕⊞⊿⏎─│┊┌┐└┘├┤┬┴┼═█■▲△▴▶▸▾◂◈○◎●★☰♫♬✓✕';
 
 /**
  * Install DynamicBitmapFont for all UI font families.
@@ -54,27 +65,30 @@ const EXTRA_CHARS = '±·¼É×é–—•…₁₂₃₆⅓⅛⅟←↑→↓�
 function installFonts(): void {
   if (_fontsInstalled) return;
   _fontsInstalled = true;
-  const monoFamily = 'JetBrains Mono, Noto Sans Symbols 2, Menlo, Consolas, monospace';
-  const sansFamily = 'Inter, Noto Sans Symbols 2, -apple-system, BlinkMacSystemFont, sans-serif';
+  const monoFamily = 'JetBrains Mono, Menlo, Consolas, monospace';
+  const sansFamily = 'Inter, -apple-system, BlinkMacSystemFont, sans-serif';
 
-  // Build character set: ASCII + UI symbol characters
-  const charSet: [string, string][] = [[' ', '~']];
-  for (const c of EXTRA_CHARS) {
-    charSet.push([c, c]);
+  // ASCII chars for text fonts
+  const asciiChars: [string, string][] = [[' ', '~']];
+
+  // Icon chars — all fontaudio codepoints (Private Use Area U+F100–F1FF)
+  const iconChars: [string, string][] = [];
+  for (const cp of Object.values(FAD_ICONS)) {
+    iconChars.push([cp, cp]);
   }
 
-  const fallbacks: { name: string; family: string; weight: TextStyleFontWeight }[] = [
-    { name: PIXI_FONTS.MONO,          family: monoFamily, weight: 'normal' },
-    { name: PIXI_FONTS.MONO_BOLD,     family: monoFamily, weight: 'bold'   },
-    { name: PIXI_FONTS.SANS,          family: sansFamily, weight: 'normal' },
-    { name: PIXI_FONTS.SANS_MEDIUM,   family: sansFamily, weight: '500'    },
-    { name: PIXI_FONTS.SANS_SEMIBOLD, family: sansFamily, weight: '600'    },
-    { name: PIXI_FONTS.SANS_BOLD,     family: sansFamily, weight: 'bold'   },
+  const fonts: { name: string; family: string; weight: TextStyleFontWeight; chars: [string, string][] }[] = [
+    { name: PIXI_FONTS.MONO,          family: monoFamily, weight: 'normal', chars: asciiChars },
+    { name: PIXI_FONTS.MONO_BOLD,     family: monoFamily, weight: 'bold',   chars: asciiChars },
+    { name: PIXI_FONTS.SANS,          family: sansFamily, weight: 'normal', chars: asciiChars },
+    { name: PIXI_FONTS.SANS_MEDIUM,   family: sansFamily, weight: '500',    chars: asciiChars },
+    { name: PIXI_FONTS.SANS_SEMIBOLD, family: sansFamily, weight: '600',    chars: asciiChars },
+    { name: PIXI_FONTS.SANS_BOLD,     family: sansFamily, weight: 'bold',   chars: asciiChars },
+    { name: PIXI_FONTS.ICONS,         family: 'fontaudio', weight: 'normal', chars: iconChars },
   ];
 
-  for (const fb of fallbacks) {
+  for (const fb of fonts) {
     const cacheKey = `${fb.name}-bitmap`;
-    // Skip if already installed (avoids [Cache] "already has key" warning)
     if (Cache.has(cacheKey)) continue;
     try {
       BitmapFontManager.install({
@@ -85,8 +99,8 @@ function installFonts(): void {
           fontSize: 48,
           fill: 0xffffff,
         },
-        chars: charSet,
-        resolution: 2, // 96px effective — crisp up to ~8x zoom
+        chars: fb.chars,
+        resolution: 2,
       });
     } catch {
       // Font install failed — continue with remaining fonts

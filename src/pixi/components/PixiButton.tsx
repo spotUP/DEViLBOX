@@ -7,6 +7,7 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import type { Graphics as GraphicsType, FederatedPointerEvent } from 'pixi.js';
 import { PIXI_FONTS } from '../fonts';
+import { FAD_ICONS } from '../fontaudioIcons';
 import { usePixiTheme, usePixiThemeId, type PixiTheme } from '../theme';
 
 export type ButtonVariant = 'primary' | 'default' | 'ghost' | 'icon' | 'ft2' | 'danger';
@@ -15,6 +16,8 @@ export type ButtonColor = 'default' | 'red' | 'green' | 'yellow' | 'blue' | 'pur
 
 interface PixiButtonProps {
   label: string;
+  /** FontAudio icon name (e.g. 'play', 'stop', 'mute'). Rendered before label. */
+  icon?: string;
   variant?: ButtonVariant;
   size?: ButtonSize;
   color?: ButtonColor;
@@ -73,6 +76,7 @@ const SIZE_CONFIG: Record<ButtonSize, { height: number; paddingH: number; fontSi
 
 export const PixiButton: React.FC<PixiButtonProps> = ({
   label,
+  icon,
   variant = 'default',
   size = 'md',
   color = 'default',
@@ -168,6 +172,7 @@ export const PixiButton: React.FC<PixiButtonProps> = ({
       layout={{
         width: btnWidth,
         height: config.height,
+        flexDirection: 'row',
         justifyContent: 'center',
         alignItems: 'center',
         ...layout,
@@ -178,17 +183,34 @@ export const PixiButton: React.FC<PixiButtonProps> = ({
         draw={drawBg}
         layout={{ position: 'absolute', width: btnWidth, height: config.height }}
       />
-      <pixiBitmapText
-        text={loading ? '...' : label}
-        style={{
-          fontFamily: variant === 'ft2' ? PIXI_FONTS.MONO_BOLD : PIXI_FONTS.SANS_SEMIBOLD,
-          fontSize: config.fontSize,
-          fill: 0xffffff,
-        }}
-        tint={colors.text}
-        alpha={disabled ? 0.5 : 1}
-        layout={{}}
-      />
+      {/* Icon (fontaudio) — rendered before label */}
+      {icon && FAD_ICONS[icon] && (
+        <pixiBitmapText
+          text={FAD_ICONS[icon]}
+          style={{
+            fontFamily: PIXI_FONTS.ICONS,
+            fontSize: config.fontSize + 2,
+            fill: 0xffffff,
+          }}
+          tint={colors.text}
+          alpha={disabled ? 0.5 : 1}
+          layout={{ marginRight: label ? 4 : 0 }}
+        />
+      )}
+      {/* Text label */}
+      {(loading || label) && (
+        <pixiBitmapText
+          text={loading ? '...' : label}
+          style={{
+            fontFamily: variant === 'ft2' ? PIXI_FONTS.MONO_BOLD : PIXI_FONTS.SANS_SEMIBOLD,
+            fontSize: config.fontSize,
+            fill: 0xffffff,
+          }}
+          tint={colors.text}
+          alpha={disabled ? 0.5 : 1}
+          layout={{}}
+        />
+      )}
     </pixiContainer>
   );
 };
