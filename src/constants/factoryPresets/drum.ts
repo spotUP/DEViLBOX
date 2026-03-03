@@ -1,4 +1,6 @@
 import type { InstrumentPreset } from '../../types/instrument';
+import { V2_PRESET_KICK, V2_PRESET_SNARE, V2_PRESET_HAT } from '../v2Presets';
+import { SYNARE_PRESETS } from '../synarePresets';
 
 // ============================================================================
 // DRUM PRESETS (8)
