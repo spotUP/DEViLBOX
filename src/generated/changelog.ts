@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-03-02T23:55:33.710Z
+ * Generated: 2026-03-03T00:33:08.046Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,10 +19,10 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.1994';
-export const BUILD_NUMBER = '1994';
-export const BUILD_HASH = 'a6fe6c9f';
-export const BUILD_DATE = '2026-03-02';
+export const BUILD_VERSION = '1.0.2003';
+export const BUILD_NUMBER = '2003';
+export const BUILD_HASH = '3fed5b99';
+export const BUILD_DATE = '2026-03-03';
 
 // Full version (patch IS the build number, so no need to append)
 export const FULL_VERSION = BUILD_VERSION;
@@ -30,9 +30,45 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.1994',
+    version: '1.0.2003',
     date: '2026-03-03',
     changes: [
+      {
+        type: 'feature',
+        "description": "Implement STIL parser for SID tune metadata"
+      },
+      {
+        type: 'feature',
+        "description": "Add pattern match floating button"
+      },
+      {
+        type: 'feature',
+        "description": "Add pattern match UI foundation"
+      },
+      {
+        type: 'feature',
+        "description": "Integrate C64 SID engines into playback system"
+      },
+      {
+        type: 'feature',
+        "description": "Add SID engine selector to Settings"
+      },
+      {
+        type: 'feature',
+        "description": "Add SID engine preference to settings"
+      },
+      {
+        type: 'feature',
+        "description": "Add 4 more SID engine wrappers"
+      },
+      {
+        type: 'feature',
+        "description": "Add engine manager and jsSID wrapper"
+      },
+      {
+        type: 'feature',
+        "description": "Add all 5 SID emulation engines"
+      },
       {
         type: 'fix',
         "description": "Fix .mus file format collision (Karl Morton vs UFO/MicroProse)"
@@ -202,42 +238,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         "description": "Stable wrappers for worldRef children prevent Yoga BindingError"
-      },
-      {
-        type: 'fix',
-        "description": "Correct VBlank BPM formula and amiga period-to-note octave mapping"
-      },
-      {
-        type: 'fix',
-        "description": "Separate channelMuted/channelSolo selectors to prevent infinite loop"
-      },
-      {
-        type: 'fix',
-        "description": "Eliminate double-scan and enable tick snapshots for dialog imports"
-      },
-      {
-        type: 'feature',
-        "description": "GL envelope editor + sampler waveform + dropdown overlay store"
-      },
-      {
-        type: 'fix',
-        "description": "Replace react-dom portal in PixiKnob with imperative DOM div"
-      },
-      {
-        type: 'feature',
-        "description": "Per-channel mute/solo GL buttons + FX search and replace panel"
-      },
-      {
-        type: 'feature',
-        "description": "GL save/load nav actions + clip note waveforms + double-click clip opens piano roll"
-      },
-      {
-        type: 'feature',
-        "description": "Automation pan/synth params + clip crop and loop"
-      },
-      {
-        type: 'fix',
-        "description": "Resolve 14 TypeScript errors across pixi views"
       }
     ]
   }
