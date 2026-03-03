@@ -2385,116 +2385,13 @@ export async function tryRouteFormat(
     }
   }
 
-  // ── Remaining UADE prefix formats (no native parsers) ─────────────────────
-  // All eagleplayer.conf prefix= entries not covered above route directly to UADE.
-  // Covers: ManiacsOfNoise (mon.*), FredGray (gray.*), JochenHippel-base (hip.*,
-  //   mcmd.*,sog.*), AHX/thx prefix (thx.*), TFMX variants (tfhd1.5.*, tfmxpro.*,
-  //   tfmx1.5.*, tfmx7V.*, tfhd7V.*, tfhdpro.*), FutureComposer-BSI (bfc.*,bsi.*,
-  //   fc-bsi.*), SeanConnolly (s-c.*,scn.*), SpecialFX_ST (doda.*), many more.
-  // NOTE: files without matching routing reach UADE as a last-resort fallback anyway;
-  //   this block provides explicit routing for performance and clarity.
-  {
-    const _uadeBase = getBasename(filename);
-    // Prefixes that require explicit string matching (hyphens/dots need startsWith not extension-check)
-    const UADE_ONLY_PREFIXES = [
-      // ArtAndMagic, AMOS, Sierra-AGI
-      'aam.', 'abk.', 'agi.',
-      // ActionAmics (prefix form), BeathovenSynthesizer
-      'ast.', 'bss.',
-      // FutureComposer-BSI, custom
-      'bfc.', 'bsi.', 'fc-bsi.', 'cus.', 'cust.', 'custom.',
-      // DavidHanney, DynamicSynthesizer, DariusZendeh
-      'dh.', 'dns.', 'dz.', 'mkiio.',
-      // EarAche, EMS
-      'ea.', 'mg.', 'ems.', 'emsv6.',
-      // ForgottenWorlds, GlueMon
-      'fw.', 'glue.', 'gm.',
-      // HowieDavies, MajorTom variants
-      'hd.', 'hn.', 'thn.', 'mtp2.', 'arp.',
-      // JochenHippel base (hip.*, mcmd.*, sog.*) — different from CoSo and 7V
-      'hip.', 'mcmd.', 'sog.',
-      // MikeDavies, MarkII, MusiclineEditor
-      'md.', 'mk2.', 'mkii.', 'ml.',
-      // Silmarils, Medley
-      'mok.', 'mso.',
-      // Pokeynoise
-      'pn.',
-      // RiffRaff, SeanConnolly
-      'riff.', 's-c.', 'scn.',
-      // SonicArranger variants, SpeedyA1System
-      'sa-p.', 'lion.', 'sa_old.', 'sas.',
-      // SCUMM, SynthDream
-      'scumm.', 'sdr.',
-      // SoundProgrammingLanguage, SoundImages
-      'spl.', 'tw.',
-      // SUN-Tronic, SynTracker
-      'sun.', 'synmod.', 'st.',
-      // TimFollin
-      'tf.',
-      // AHX thx prefix (AbyssHighestExperience — thx.* prefix form of AHX)
-      'thx.',
-      // TFMX variant prefixes (all handled by UADE)
-      'tfhd1.5.', 'tfhd7v.', 'tfhdpro.', 'tfmx1.5.', 'tfmx7v.', 'tfmxpro.',
-      // VoodooSupremeSynthesizer
-      'vss.',
-    ] as const;
-    if (UADE_ONLY_PREFIXES.some(p => _uadeBase.startsWith(p))) {
-      const { parseUADEFile: parseUADE_bulk } = await import('@lib/import/formats/UADEParser');
-      return parseUADE_bulk(buffer, originalFileName, prefs.uade ?? 'enhanced', subsong, preScannedMeta);
-    }
-  }
+  // ── UADE-only prefix formats + catch-all ─────────────────────────────────
+  { const uadeResult = await tryUADEPrefixParse(buffer, filename, originalFileName, prefs, subsong, preScannedMeta);
+    if (uadeResult) return uadeResult; }
 
-  // ── UADE catch-all: 130+ exotic Amiga formats ───────────────────────────
-  // Check extension list first, then fall back to UADE for unknown formats
-  // (UADE also detects many formats by magic bytes, not just extension)
-  const { isUADEFormat, parseUADEFile } = await import('@lib/import/formats/UADEParser');
-  if (isUADEFormat(filename)) {
-        return await parseUADEFile(buffer, originalFileName, prefs.uade ?? 'enhanced', subsong, preScannedMeta);
-  }
-
-  // ── S3M (ScreamTracker 3) ─────────────────────────────────────────────────
-  if (/\.s3m$/i.test(filename)) {
-    try {
-      const { isS3MFormat, parseS3MFile } = await import('@lib/import/formats/S3MParser');
-      if (isS3MFormat(buffer)) return parseS3MFile(buffer, originalFileName);
-    } catch (err) {
-      console.warn(`[S3MParser] Native parse failed for ${filename}, falling back to libopenmpt:`, err);
-    }
-    // Fall through to libopenmpt
-  }
-
-  // ── IT / MPTM (Impulse Tracker / OpenMPT) ─────────────────────────────────
-  if (/\.(it|mptm)$/i.test(filename)) {
-    try {
-      const { isITFormat, parseITFile } = await import('@lib/import/formats/ITParser');
-      if (isITFormat(buffer)) return parseITFile(buffer, originalFileName);
-    } catch (err) {
-      console.warn(`[ITParser] Native parse failed for ${filename}, falling back to libopenmpt:`, err);
-    }
-    // Fall through to libopenmpt
-  }
-
-  // ── XM (FastTracker II) ───────────────────────────────────────────────────
-  if (/\.xm$/i.test(filename)) {
-    try {
-      const { isXMFormat, parseXMFile } = await import('@lib/import/formats/XMParser');
-      if (isXMFormat(buffer)) return await parseXMFile(buffer, originalFileName);
-    } catch (err) {
-      console.warn(`[XMParser] Native parse failed for ${filename}, falling back to libopenmpt:`, err);
-    }
-    // Fall through to libopenmpt
-  }
-
-  // ── MOD (ProTracker / compatible) ────────────────────────────────────────
-  if (/\.(mod|m15)$/i.test(filename)) {
-    try {
-      const { isMODFormat, parseMODFile } = await import('@lib/import/formats/MODParser');
-      if (isMODFormat(buffer)) return await parseMODFile(buffer, originalFileName);
-    } catch (err) {
-      console.warn(`[MODParser] Native parse failed for ${filename}, falling back to libopenmpt:`, err);
-    }
-    // Fall through to UADE/libopenmpt
-  }
+  // ── PC tracker formats (S3M, IT, XM, MOD) — native then libopenmpt ──────
+  { const pcResult = await tryPCTrackerParse(buffer, filename, originalFileName, prefs, subsong, preScannedMeta);
+    if (pcResult) return pcResult; }
 
   // No format matched — caller handles libopenmpt fallback + UADE last resort
   return null;
