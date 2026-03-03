@@ -147,6 +147,7 @@ export function emitInstruction(node: InstructionNode): string {
   const { mnemonic, size, operands: ops } = node;
   const s = size ?? 'L';
   const src = ops[0] ? emitOperand(ops[0], s) : '';
+  const srcRead = ops[0] ? emitOperandRead(ops[0], s) : '';  // value-reading version (wraps label_ref in READ)
   const dst = ops[1] ?? null;
 
   switch (mnemonic) {
@@ -246,28 +247,28 @@ export function emitInstruction(node: InstructionNode): string {
       // Always writes full 32-bit address register.
       const isAddrDst = dst?.kind === 'register' && (dst.name.startsWith('a') || dst.name === 'sp');
       if (mnemonic === 'ADDA' || isAddrDst) {
-        if (dst.kind === 'register') return `${dst.name} = (uint32_t)((int32_t)${dst.name} + (int32_t)(int16_t)(${src}));`;
-        return regWrite(dst, `${emitOperand(dst, 'L')} + ${src}`, 'L');
+        if (dst.kind === 'register') return `${dst.name} = (uint32_t)((int32_t)${dst.name} + (int32_t)(int16_t)(${srcRead}));`;
+        return regWrite(dst, `${emitOperand(dst, 'L')} + ${srcRead}`, 'L');
       }
       // ADD/ADDI/ADDQ set N, Z (and X, V, C which we approximate).
       const addType = s === 'B' ? 'uint8_t' : s === 'W' ? 'uint16_t' : 'uint32_t';
       const addSign = s === 'B' ? '(int8_t)' : s === 'W' ? '(int16_t)' : '(int32_t)';
       if (dst.kind === 'register') {
         const dstExpr = s === 'L' ? dst.name : emitRegSized(dst.name, s);
-        return `{ ${addType} _ar=(${addType})(${dstExpr} + ${src}); ${regWrite(dst, `(${addType})_ar`, s)} flag_z=(${addSign}(_ar)==0); flag_n=(${addSign}(_ar)<0); }`;
+        return `{ ${addType} _ar=(${addType})(${dstExpr} + ${srcRead}); ${regWrite(dst, `(${addType})_ar`, s)} flag_z=(${addSign}(_ar)==0); flag_n=(${addSign}(_ar)<0); }`;
       }
-      const addRd = emitOperand(dst, s);
-      return `{ ${addType} _ar=(${addType})(${addRd} + ${src}); ${regWrite(dst, `(${addType})_ar`, s)} flag_z=(${addSign}(_ar)==0); flag_n=(${addSign}(_ar)<0); }`;
+      const addRd = emitOperandRead(dst, s);
+      return `{ ${addType} _ar=(${addType})(${addRd} + ${srcRead}); ${regWrite(dst, `(${addType})_ar`, s)} flag_z=(${addSign}(_ar)==0); flag_n=(${addSign}(_ar)<0); }`;
     }
     case 'ADDX':
-      return dst ? regWrite(dst, `${emitOperand(dst, s)} + ${src} + flag_x`, s) : '';
+      return dst ? regWrite(dst, `${emitOperandRead(dst, s)} + ${srcRead} + flag_x`, s) : '';
     case 'SUB':  case 'SUBA':  case 'SUBI': case 'SUBQ': {
       if (!dst) return '';
       // SUBA (or SUB/SUBQ to address register) does NOT affect condition codes.
       const isSubAddrDst = dst?.kind === 'register' && (dst.name.startsWith('a') || dst.name === 'sp');
       if (mnemonic === 'SUBA' || isSubAddrDst) {
-        if (dst.kind === 'register') return `${dst.name} = (uint32_t)((int32_t)${dst.name} - (int32_t)(int16_t)(${src}));`;
-        return regWrite(dst, `${emitOperand(dst, 'L')} - ${src}`, 'L');
+        if (dst.kind === 'register') return `${dst.name} = (uint32_t)((int32_t)${dst.name} - (int32_t)(int16_t)(${srcRead}));`;
+        return regWrite(dst, `${emitOperand(dst, 'L')} - ${srcRead}`, 'L');
       }
       // SUB/SUBI/SUBQ set N, Z (and X, V, C which we approximate).
       const subType = s === 'B' ? 'uint8_t' : s === 'W' ? 'uint16_t' : 'uint32_t';
@@ -277,11 +278,11 @@ export function emitInstruction(node: InstructionNode): string {
         const dstExpr = s === 'L' ? dst.name : emitRegSized(dst.name, s);
         return `{ ${subType} _sr=(${subType})(${dstExpr} - ${srcExpr}); ${regWrite(dst, `(${subType})_sr`, s)} flag_z=(${subSign}(_sr)==0); flag_n=(${subSign}(_sr)<0); }`;
       }
-      const subRd = emitOperand(dst, s);
-      return `{ ${subType} _sr=(${subType})(${subRd} - ${src}); ${regWrite(dst, `(${subType})_sr`, s)} flag_z=(${subSign}(_sr)==0); flag_n=(${subSign}(_sr)<0); }`;
+      const subRd = emitOperandRead(dst, s);
+      return `{ ${subType} _sr=(${subType})(${subRd} - ${srcRead}); ${regWrite(dst, `(${subType})_sr`, s)} flag_z=(${subSign}(_sr)==0); flag_n=(${subSign}(_sr)<0); }`;
     }
     case 'SUBX':
-      return dst ? regWrite(dst, `${emitOperand(dst, s)} - ${src} - flag_x`, s) : '';
+      return dst ? regWrite(dst, `${emitOperandRead(dst, s)} - ${srcRead} - flag_x`, s) : '';
 
     case 'MULS': return dst ? `${emitOperand(dst, 'L')} = (uint32_t)((int32_t)(int16_t)${emitOperand(ops[0], 'W')} * (int32_t)(int16_t)${emitOperand(dst, 'W')});` : '';
     case 'MULU': return dst ? `${emitOperand(dst, 'L')} = (uint32_t)((uint16_t)${src} * (uint16_t)${emitOperand(dst, 'W')});` : '';
@@ -298,19 +299,19 @@ export function emitInstruction(node: InstructionNode): string {
 
     case 'AND':  case 'ANDI':
       if (!dst) return '';
-      if (dst.kind === 'register' && s === 'L') return `${dst.name} &= ${src};`;
+      if (dst.kind === 'register' && s === 'L') return `${dst.name} &= ${srcRead};`;
       if (dst.kind === 'register') return `${emitRegSized(dst.name, s)} &= ${sizedSrc(ops[0], s)};`;
-      return regWrite(dst, `${emitOperand(dst, s)} & ${src}`, s);
+      return regWrite(dst, `${emitOperandRead(dst, s)} & ${srcRead}`, s);
     case 'OR':   case 'ORI':
       if (!dst) return '';
-      if (dst.kind === 'register' && s === 'L') return `${dst.name} |= ${src};`;
+      if (dst.kind === 'register' && s === 'L') return `${dst.name} |= ${srcRead};`;
       if (dst.kind === 'register') return `${emitRegSized(dst.name, s)} |= ${sizedSrc(ops[0], s)};`;
-      return regWrite(dst, `${emitOperand(dst, s)} | ${src}`, s);
+      return regWrite(dst, `${emitOperandRead(dst, s)} | ${srcRead}`, s);
     case 'EOR':  case 'EORI':
       if (!dst) return '';
-      if (dst.kind === 'register' && s === 'L') return `${dst.name} ^= ${src};`;
+      if (dst.kind === 'register' && s === 'L') return `${dst.name} ^= ${srcRead};`;
       if (dst.kind === 'register') return `${emitRegSized(dst.name, s)} ^= ${sizedSrc(ops[0], s)};`;
-      return regWrite(dst, `${emitOperand(dst, s)} ^ ${src}`, s);
+      return regWrite(dst, `${emitOperandRead(dst, s)} ^ ${srcRead}`, s);
     case 'NOT': {
       const op0 = ops[0];
       if (op0.kind === 'register') {
@@ -319,7 +320,7 @@ export function emitInstruction(node: InstructionNode): string {
         return `${op0.name} = ~${op0.name};`;
       }
       // Memory destination: read-modify-write via WRITE/READ macros
-      const rdN = emitOperand(op0, s);
+      const rdN = emitOperandRead(op0, s);
       if (s === 'W') return regWrite(op0, `(uint16_t)(~(uint16_t)(${rdN}))`, s);
       if (s === 'B') return regWrite(op0, `(uint8_t)(~(uint8_t)(${rdN}))`, s);
       return regWrite(op0, `~(uint32_t)(${rdN})`, s);
@@ -332,7 +333,7 @@ export function emitInstruction(node: InstructionNode): string {
         return `${op0.name} = (uint32_t)(-(int32_t)${op0.name});`;
       }
       // Memory destination: read-modify-write via WRITE/READ macros
-      const rdG = emitOperand(op0, s);
+      const rdG = emitOperandRead(op0, s);
       if (s === 'W') return regWrite(op0, `(uint16_t)(-(int16_t)(${rdG}))`, s);
       if (s === 'B') return regWrite(op0, `(uint8_t)(-(int8_t)(${rdG}))`, s);
       return regWrite(op0, `(uint32_t)(-(int32_t)(${rdG}))`, s);
@@ -347,35 +348,35 @@ export function emitInstruction(node: InstructionNode): string {
 
     case 'LSL':
       if (!dst) return `${src} <<= 1;`;
-      return regWrite(dst, `${emitOperand(dst, s)} << ${src}`, s);
+      return regWrite(dst, `${emitOperandRead(dst, s)} << ${src}`, s);
     case 'LSR':
       if (!dst) return `${src} >>= 1;`;
       if (dst.kind === 'register' && s === 'L') return `${dst.name} >>= ${src};`;
-      return regWrite(dst, `(uint32_t)(${emitOperand(dst, s)}) >> ${src}`, s);
+      return regWrite(dst, `(uint32_t)(${emitOperandRead(dst, s)}) >> ${src}`, s);
     case 'ASL':
       if (!dst) return `${src} <<= 1;`;
-      return regWrite(dst, `${emitOperand(dst, s)} << ${src}`, s);
+      return regWrite(dst, `${emitOperandRead(dst, s)} << ${src}`, s);
     case 'ASR':
       if (!dst) return `${src} = (uint32_t)((int32_t)${src} >> 1);`;
       if (dst.kind === 'register' && s === 'L') return `${dst.name} = (uint32_t)((int32_t)${dst.name} >> ${src});`;
-      return regWrite(dst, `(uint32_t)((int32_t)${emitOperand(dst, s)} >> ${src})`, s);
-    case 'ROL': return dst ? regWrite(dst, `ROL32(${emitOperand(dst, s)}, ${src})`, s) : ``;
-    case 'ROR': return dst ? regWrite(dst, `ROR32(${emitOperand(dst, s)}, ${src})`, s) : ``;
+      return regWrite(dst, `(uint32_t)((int32_t)${emitOperandRead(dst, s)} >> ${src})`, s);
+    case 'ROL': return dst ? regWrite(dst, `ROL32(${emitOperandRead(dst, s)}, ${src})`, s) : ``;
+    case 'ROR': return dst ? regWrite(dst, `ROR32(${emitOperandRead(dst, s)}, ${src})`, s) : ``;
 
-    case 'BSET': return dst ? regWrite(dst, `${emitOperand(dst, s)} | (1u << (${src} & 31))`, s) : '';
-    case 'BCLR': return dst ? regWrite(dst, `${emitOperand(dst, s)} & ~(1u << (${src} & 31))`, s) : '';
+    case 'BSET': return dst ? regWrite(dst, `${emitOperandRead(dst, s)} | (1u << (${src} & 31))`, s) : '';
+    case 'BCLR': return dst ? regWrite(dst, `${emitOperandRead(dst, s)} & ~(1u << (${src} & 31))`, s) : '';
     case 'BTST': {
       const testOp = dst ?? ops[0];
-      return `flag_z = ((${emitOperand(testOp, s)} & (1u << (${src} & 31))) == 0);`;
+      return `flag_z = ((${emitOperandRead(testOp, s)} & (1u << (${src} & 31))) == 0);`;
     }
-    case 'BCHG': return dst ? regWrite(dst, `${emitOperand(dst, s)} ^ (1u << (${src} & 31))`, s) : '';
+    case 'BCHG': return dst ? regWrite(dst, `${emitOperandRead(dst, s)} ^ (1u << (${src} & 31))`, s) : '';
 
     case 'CMP':  case 'CMPA': case 'CMPI': case 'CMPM': {
       const cmpOp = dst ?? ops[0];
       // Evaluate both operands into temps first — either may contain READ32_POST or similar
       // macros with side effects (register increment). Emitting them twice in a template
       // would double-increment the register and corrupt traversal.
-      return `{ int32_t _lhs=(int32_t)(${emitOperand(cmpOp,s)}),_rhs=(int32_t)(${src}); int32_t _cmp=_lhs-_rhs; flag_z=(_cmp==0); flag_n=(_cmp<0); flag_c=((uint32_t)_lhs<(uint32_t)_rhs); }`;
+      return `{ int32_t _lhs=(int32_t)(${emitOperandRead(cmpOp,s)}),_rhs=(int32_t)(${emitOperandRead(ops[0],s)}); int32_t _cmp=_lhs-_rhs; flag_z=(_cmp==0); flag_n=(_cmp<0); flag_c=((uint32_t)_lhs<(uint32_t)_rhs); }`;
     }
     case 'TST': {
       // Capture src in a temp — src may contain READ8_POST etc. with side effects.
@@ -383,7 +384,8 @@ export function emitInstruction(node: InstructionNode): string {
       // double-incrementing the register and causing infinite loops.
       const tstType = s === 'B' ? 'uint8_t' : s === 'W' ? 'uint16_t' : 'uint32_t';
       const signCast = s === 'B' ? '(int8_t)' : s === 'W' ? '(int16_t)' : '(int32_t)';
-      return `{ ${tstType} _tst=(${tstType})(${src}); flag_z=(_tst==0); flag_n=(${signCast}(_tst)<0); flag_c=0; flag_v=0; }`;
+      const tstSrc = ops[0] ? emitOperandRead(ops[0], s) : src;
+      return `{ ${tstType} _tst=(${tstType})(${tstSrc}); flag_z=(_tst==0); flag_n=(${signCast}(_tst)<0); flag_c=0; flag_v=0; }`;
     }
 
     case 'BRA': case 'JMP': {
