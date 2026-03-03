@@ -242,9 +242,8 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
   const { masterEffects } = useAudioStore(useShallow((s) => ({
     masterEffects: s.masterEffects,
   })));
-  const { oscilloscopeVisible, compactToolbar } = useUIStore(useShallow((s) => ({
+  const { oscilloscopeVisible } = useUIStore(useShallow((s) => ({
     oscilloscopeVisible: s.oscilloscopeVisible,
-    compactToolbar: s.compactToolbar,
   })));
   const { curves, reset: resetAutomation } = useAutomationStore(useShallow((s) => ({
     curves: s.curves,
@@ -862,23 +861,23 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
 
           {oscilloscopeVisible && (
             <>
-              {(vizMode === 'waveform' || vizMode === 'spectrum') && <Oscilloscope width="auto" height={compactToolbar ? 70 : 100} mode={vizMode} />}
-              {vizMode === 'channels' && <ChannelLevelsCompact height={compactToolbar ? 70 : 100} />}
-              {vizMode === 'logo' && <LogoAnimation height={compactToolbar ? 70 : 100} onComplete={handleLogoAnimationComplete} />}
-              {vizMode === 'circular' && <CircularVU height={compactToolbar ? 70 : 100} />}
-              {vizMode === 'bars' && <FrequencyBars height={compactToolbar ? 70 : 100} />}
-              {vizMode === 'particles' && <ParticleField height={compactToolbar ? 70 : 100} />}
-              {vizMode === 'chanWaves' && <ChannelWaveforms height={compactToolbar ? 70 : 100} />}
-              {vizMode === 'chanActivity' && <ChannelActivityGrid height={compactToolbar ? 70 : 100} />}
-              {vizMode === 'chanSpectrum' && <ChannelSpectrums height={compactToolbar ? 70 : 100} />}
-              {vizMode === 'chanCircular' && <ChannelCircularVU height={compactToolbar ? 70 : 100} />}
-              {vizMode === 'chanParticles' && <ChannelParticles height={compactToolbar ? 70 : 100} />}
-              {vizMode === 'chanRings' && <ChannelRings height={compactToolbar ? 70 : 100} />}
-              {vizMode === 'chanTunnel' && <ChannelTunnel height={compactToolbar ? 70 : 100} />}
-              {vizMode === 'chanRadar' && <ChannelRadar height={compactToolbar ? 70 : 100} />}
+              {(vizMode === 'waveform' || vizMode === 'spectrum') && <Oscilloscope width="auto" height={100} mode={vizMode} />}
+              {vizMode === 'channels' && <ChannelLevelsCompact height={100} />}
+              {vizMode === 'logo' && <LogoAnimation height={100} onComplete={handleLogoAnimationComplete} />}
+              {vizMode === 'circular' && <CircularVU height={100} />}
+              {vizMode === 'bars' && <FrequencyBars height={100} />}
+              {vizMode === 'particles' && <ParticleField height={100} />}
+              {vizMode === 'chanWaves' && <ChannelWaveforms height={100} />}
+              {vizMode === 'chanActivity' && <ChannelActivityGrid height={100} />}
+              {vizMode === 'chanSpectrum' && <ChannelSpectrums height={100} />}
+              {vizMode === 'chanCircular' && <ChannelCircularVU height={100} />}
+              {vizMode === 'chanParticles' && <ChannelParticles height={100} />}
+              {vizMode === 'chanRings' && <ChannelRings height={100} />}
+              {vizMode === 'chanTunnel' && <ChannelTunnel height={100} />}
+              {vizMode === 'chanRadar' && <ChannelRadar height={100} />}
               {vizMode === 'chanNibbles' && (
                 <NibblesGame 
-                  height={compactToolbar ? 70 : 100} 
+                  height={100} 
                   onExit={() => {
                     const modes: Array<VizMode> = ['waveform', 'spectrum', 'channels', 'logo', 'circular', 'bars', 'particles', 'chanWaves', 'chanActivity', 'chanSpectrum', 'chanCircular', 'chanParticles', 'chanRings', 'chanTunnel', 'chanRadar', 'chanNibbles', 'sineScroll', 'amLED', 'amBars', 'amMirror', 'amRadial', 'amGraph', 'amRadialGraph', 'amDualStereo', 'amLumi', 'amAlpha', 'amOutline', 'amDualV', 'amDualOverlay', 'amBark', 'amMel', 'amOctave', 'amNotes', 'amMirrorReflex', 'amRadialInvert', 'amRadialLED', 'amLinear', 'amAWeight', 'amLumiMirror'];
                     const currentIndex = modes.indexOf('chanNibbles');
@@ -887,29 +886,29 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
                   }}
                 />
               )}
-              {vizMode === 'sineScroll' && <SineScroller height={compactToolbar ? 70 : 100} />}
-              {vizMode === 'amLED' && <AudioMotionVisualizer preset="ledBars" audioSource="master" height={compactToolbar ? 70 : 100} />}
-              {vizMode === 'amBars' && <AudioMotionVisualizer preset="smoothBars" audioSource="master" height={compactToolbar ? 70 : 100} />}
-              {vizMode === 'amMirror' && <AudioMotionVisualizer preset="mirrorBars" audioSource="master" height={compactToolbar ? 70 : 100} />}
-              {vizMode === 'amRadial' && <AudioMotionVisualizer preset="radialSpectrum" audioSource="master" height={compactToolbar ? 70 : 100} />}
-              {vizMode === 'amGraph' && <AudioMotionVisualizer preset="graphLine" audioSource="master" height={compactToolbar ? 70 : 100} />}
-              {vizMode === 'amRadialGraph' && <AudioMotionVisualizer preset="radialGraph" audioSource="master" height={compactToolbar ? 70 : 100} />}
-              {vizMode === 'amDualStereo' && <AudioMotionVisualizer preset="dualStereo" audioSource="master" height={compactToolbar ? 70 : 100} />}
-              {vizMode === 'amLumi' && <AudioMotionVisualizer preset="lumiBars" audioSource="master" height={compactToolbar ? 70 : 100} />}
-              {vizMode === 'amAlpha' && <AudioMotionVisualizer preset="alphaBars" audioSource="master" height={compactToolbar ? 70 : 100} />}
-              {vizMode === 'amOutline' && <AudioMotionVisualizer preset="outlineBars" audioSource="master" height={compactToolbar ? 70 : 100} />}
-              {vizMode === 'amDualV' && <AudioMotionVisualizer preset="dualVertical" audioSource="master" height={compactToolbar ? 70 : 100} />}
-              {vizMode === 'amDualOverlay' && <AudioMotionVisualizer preset="dualOverlay" audioSource="master" height={compactToolbar ? 70 : 100} />}
-              {vizMode === 'amBark' && <AudioMotionVisualizer preset="barkSpectrum" audioSource="master" height={compactToolbar ? 70 : 100} />}
-              {vizMode === 'amMel' && <AudioMotionVisualizer preset="melGraph" audioSource="master" height={compactToolbar ? 70 : 100} />}
-              {vizMode === 'amOctave' && <AudioMotionVisualizer preset="octaveBands" audioSource="master" height={compactToolbar ? 70 : 100} />}
-              {vizMode === 'amNotes' && <AudioMotionVisualizer preset="noteLabels" audioSource="master" height={compactToolbar ? 70 : 100} />}
-              {vizMode === 'amMirrorReflex' && <AudioMotionVisualizer preset="mirrorReflex" audioSource="master" height={compactToolbar ? 70 : 100} />}
-              {vizMode === 'amRadialInvert' && <AudioMotionVisualizer preset="radialInvert" audioSource="master" height={compactToolbar ? 70 : 100} />}
-              {vizMode === 'amRadialLED' && <AudioMotionVisualizer preset="radialLED" audioSource="master" height={compactToolbar ? 70 : 100} />}
-              {vizMode === 'amLinear' && <AudioMotionVisualizer preset="linearBars" audioSource="master" height={compactToolbar ? 70 : 100} />}
-              {vizMode === 'amAWeight' && <AudioMotionVisualizer preset="aWeighted" audioSource="master" height={compactToolbar ? 70 : 100} />}
-              {vizMode === 'amLumiMirror' && <AudioMotionVisualizer preset="lumiMirror" audioSource="master" height={compactToolbar ? 70 : 100} />}
+              {vizMode === 'sineScroll' && <SineScroller height={100} />}
+              {vizMode === 'amLED' && <AudioMotionVisualizer preset="ledBars" audioSource="master" height={100} />}
+              {vizMode === 'amBars' && <AudioMotionVisualizer preset="smoothBars" audioSource="master" height={100} />}
+              {vizMode === 'amMirror' && <AudioMotionVisualizer preset="mirrorBars" audioSource="master" height={100} />}
+              {vizMode === 'amRadial' && <AudioMotionVisualizer preset="radialSpectrum" audioSource="master" height={100} />}
+              {vizMode === 'amGraph' && <AudioMotionVisualizer preset="graphLine" audioSource="master" height={100} />}
+              {vizMode === 'amRadialGraph' && <AudioMotionVisualizer preset="radialGraph" audioSource="master" height={100} />}
+              {vizMode === 'amDualStereo' && <AudioMotionVisualizer preset="dualStereo" audioSource="master" height={100} />}
+              {vizMode === 'amLumi' && <AudioMotionVisualizer preset="lumiBars" audioSource="master" height={100} />}
+              {vizMode === 'amAlpha' && <AudioMotionVisualizer preset="alphaBars" audioSource="master" height={100} />}
+              {vizMode === 'amOutline' && <AudioMotionVisualizer preset="outlineBars" audioSource="master" height={100} />}
+              {vizMode === 'amDualV' && <AudioMotionVisualizer preset="dualVertical" audioSource="master" height={100} />}
+              {vizMode === 'amDualOverlay' && <AudioMotionVisualizer preset="dualOverlay" audioSource="master" height={100} />}
+              {vizMode === 'amBark' && <AudioMotionVisualizer preset="barkSpectrum" audioSource="master" height={100} />}
+              {vizMode === 'amMel' && <AudioMotionVisualizer preset="melGraph" audioSource="master" height={100} />}
+              {vizMode === 'amOctave' && <AudioMotionVisualizer preset="octaveBands" audioSource="master" height={100} />}
+              {vizMode === 'amNotes' && <AudioMotionVisualizer preset="noteLabels" audioSource="master" height={100} />}
+              {vizMode === 'amMirrorReflex' && <AudioMotionVisualizer preset="mirrorReflex" audioSource="master" height={100} />}
+              {vizMode === 'amRadialInvert' && <AudioMotionVisualizer preset="radialInvert" audioSource="master" height={100} />}
+              {vizMode === 'amRadialLED' && <AudioMotionVisualizer preset="radialLED" audioSource="master" height={100} />}
+              {vizMode === 'amLinear' && <AudioMotionVisualizer preset="linearBars" audioSource="master" height={100} />}
+              {vizMode === 'amAWeight' && <AudioMotionVisualizer preset="aWeighted" audioSource="master" height={100} />}
+              {vizMode === 'amLumiMirror' && <AudioMotionVisualizer preset="lumiMirror" audioSource="master" height={100} />}
             </>
           )}
         </div>

@@ -69,8 +69,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
     setTB303Collapsed,
     oscilloscopeVisible,
     setOscilloscopeVisible,
-    compactToolbar,
-    setCompactToolbar,
   } = useUIStore();
 
   const { currentThemeId, setTheme } = useThemeStore();
@@ -383,17 +381,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                   label=""
                   value={oscilloscopeVisible}
                   onChange={setOscilloscopeVisible}
-                  size="sm"
-                />
-              </div>
-
-              {/* Compact Toolbar */}
-              <div className="flex items-center justify-between">
-                <label className="text-ft2-text text-xs font-mono">Compact Toolbar:</label>
-                <Toggle
-                  label=""
-                  value={compactToolbar}
-                  onChange={setCompactToolbar}
                   size="sm"
                 />
               </div>

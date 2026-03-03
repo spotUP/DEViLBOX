@@ -78,13 +78,6 @@ export function fitToWindow(): boolean {
   return true;
 }
 
-export function toggleCompactMode(): boolean {
-  useUIStore.getState().toggleCompactToolbar();
-  const compact = useUIStore.getState().compactToolbar;
-  useUIStore.getState().setStatusMessage(`Compact mode: ${compact ? 'ON' : 'OFF'}`, false, 1000);
-  return true;
-}
-
 export function toggleRowHighlight(): boolean {
   const { rowHighlightInterval, setRowHighlightInterval } = useUIStore.getState();
   const cycle = [4, 8, 16, 32];
