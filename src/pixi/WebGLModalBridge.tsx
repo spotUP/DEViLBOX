@@ -148,6 +148,9 @@ const LazySunVoxImportDialog = lazy(() =>
 const LazyFurnacePresetBrowser = lazy(() =>
   import('@/components/instruments/FurnacePresetBrowser').then(m => ({ default: m.FurnacePresetBrowser }))
 );
+const LazySIDInfoModal = lazy(() =>
+  import('@/components/dialogs/SIDInfoModal').then(m => ({ default: m.SIDInfoModal }))
+);
 
 export const WebGLModalBridge: React.FC = () => {
   const modalOpen = useUIStore(s => s.modalOpen);
@@ -670,6 +673,10 @@ export const WebGLModalBridge: React.FC = () => {
       {/* Furnace chip preset browser */}
       {modalOpen === 'furnacePresets' && (
         <LazyFurnacePresetBrowser onClose={closeModal} />
+      )}
+      {/* SID file info modal (DeepSID metadata + composer profile) */}
+      {modalOpen === 'sidInfo' && (
+        <LazySIDInfoModal onClose={closeModal} />
       )}
       {/* Arrangement clip rename dialog (F2) */}
       <LazyClipRenameDialog />

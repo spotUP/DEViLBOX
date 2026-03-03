@@ -197,6 +197,82 @@ const SubsongSelector: React.FC = () => {
   );
 };
 
+// ─── SID Subsong Selector + Info Button ──────────────────────────────────────
+
+const SIDSubsongAndInfo: React.FC = () => {
+  const sidMetadata = useTrackerStore(s => s.sidMetadata);
+  const setSidMetadata = useTrackerStore(s => s.setSidMetadata);
+  const songDBInfo = useTrackerStore(s => s.songDBInfo);
+
+  const hasMultipleSubsongs = sidMetadata && sidMetadata.subsongs > 1;
+  const hasInfo = !!(sidMetadata || songDBInfo);
+
+  const subsongOptions = useMemo<SelectOption[]>(() => {
+    if (!sidMetadata || sidMetadata.subsongs <= 1) return [];
+    return Array.from({ length: sidMetadata.subsongs }, (_, i) => ({
+      value: String(i),
+      label: `Sub ${i + 1}`,
+    }));
+  }, [sidMetadata?.subsongs]);
+
+  const handleSubsongChange = useCallback(async (val: string) => {
+    const newIdx = Number(val);
+    if (!sidMetadata || newIdx === sidMetadata.currentSubsong) return;
+    try {
+      const { getTrackerReplayer } = await import('@engine/TrackerReplayer');
+      const engine = getTrackerReplayer().getC64SIDEngine();
+      if (engine) {
+        engine.setSubsong(newIdx);
+        setSidMetadata({ ...sidMetadata, currentSubsong: newIdx });
+        notify.success(`SID Subsong ${newIdx + 1}/${sidMetadata.subsongs}`);
+      }
+    } catch {
+      notify.error('Failed to switch SID subsong');
+    }
+  }, [sidMetadata, setSidMetadata]);
+
+  const handleInfoClick = useCallback(() => {
+    useUIStore.getState().openModal('sidInfo');
+  }, []);
+
+  if (!hasInfo) return null;
+
+  return (
+    <pixiContainer layout={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+      {/* SID chip badge */}
+      {sidMetadata && (
+        <PixiButton
+          label={sidMetadata.chipModel !== 'Unknown' ? sidMetadata.chipModel : 'SID'}
+          variant="ghost"
+          size="sm"
+          color="blue"
+          active
+          onClick={handleInfoClick}
+        />
+      )}
+
+      {/* Subsong dropdown */}
+      {hasMultipleSubsongs && (
+        <PixiSelect
+          options={subsongOptions}
+          value={String(sidMetadata!.currentSubsong)}
+          onChange={handleSubsongChange}
+          width={80}
+          height={24}
+        />
+      )}
+
+      {/* Info button */}
+      <PixiButton
+        label="Info"
+        variant="ghost"
+        size="sm"
+        onClick={handleInfoClick}
+      />
+    </pixiContainer>
+  );
+};
+
 // ─── Main component ──────────────────────────────────────────────────────────
 
 export const PixiEditorControlsBar: React.FC<PixiEditorControlsBarProps> = ({
@@ -224,7 +300,7 @@ export const PixiEditorControlsBar: React.FC<PixiEditorControlsBarProps> = ({
     grooveTemplateId,
     swing,
     jitter,
-    useMpcScale,
+    useMpcScale: _useMpcScale,
     smoothScrolling,
   } = useTransportStore(useShallow(s => ({
     grooveTemplateId: s.grooveTemplateId,
@@ -354,6 +430,9 @@ export const PixiEditorControlsBar: React.FC<PixiEditorControlsBarProps> = ({
 
       {/* Subsong selector — only shows for furnace multi-subsong modules */}
       <SubsongSelector />
+
+      {/* SID subsong selector + info button */}
+      <SIDSubsongAndInfo />
 
       <Sep />
 
