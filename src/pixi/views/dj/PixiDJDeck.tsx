@@ -12,10 +12,10 @@ import { useDJStore } from '@/stores/useDJStore';
 import { PixiDeckTransport } from './PixiDeckTransport';
 import { PixiDeckTurntable } from './PixiDeckTurntable';
 import { PixiDeckWaveform } from './PixiDeckWaveform';
+import { PixiDeckScratch } from './PixiDeckScratch';
+import { PixiDeckCuePoints } from './PixiDeckCuePoints';
+import { PixiDeckScopes } from './PixiDeckScopes';
 import { getDJEngine } from '@engine/dj/DJEngine';
-import { DeckScratch } from '@components/dj/DeckScratch';
-import { DeckScopes } from '@components/dj/DeckScopes';
-import { DeckCuePoints } from '@components/dj/DeckCuePoints';
 import { DeckBeatGrid } from '@components/dj/DeckBeatGrid';
 
 /** Format milliseconds as M:SS */
@@ -251,20 +251,10 @@ export const PixiDJDeck: React.FC<PixiDJDeckProps> = ({ deckId }) => {
       </pixiContainer>
 
       {/* Scratch presets + Fader LFO */}
-      <PixiDOMOverlay
-        layout={{ width: 280, height: 56 }}
-        style={{ overflow: 'hidden' }}
-      >
-        <DeckScratch deckId={deckId} />
-      </PixiDOMOverlay>
+      <PixiDeckScratch deckId={deckId} layout={{ width: 280, height: 56 }} />
 
       {/* Cue points */}
-      <PixiDOMOverlay
-        layout={{ width: 280, height: 36 }}
-        style={{ overflow: 'hidden' }}
-      >
-        <DeckCuePoints deckId={deckId} />
-      </PixiDOMOverlay>
+      <PixiDeckCuePoints deckId={deckId} layout={{ width: 280, height: 36 }} />
 
       {/* Beat grid controls */}
       <PixiDOMOverlay
@@ -275,12 +265,7 @@ export const PixiDJDeck: React.FC<PixiDJDeckProps> = ({ deckId }) => {
       </PixiDOMOverlay>
 
       {/* Oscilloscope / spectrum scopes */}
-      <PixiDOMOverlay
-        layout={{ width: 280, height: 64 }}
-        style={{ overflow: 'hidden' }}
-      >
-        <DeckScopes deckId={deckId} size={60} />
-      </PixiDOMOverlay>
+      <PixiDeckScopes deckId={deckId} size={48} layout={{ width: 280, height: 64, paddingLeft: 2, paddingTop: 4, flexDirection: 'row', gap: 2 }} />
 
       {/* Spacer */}
       <pixiContainer layout={{ flex: 1 }} />

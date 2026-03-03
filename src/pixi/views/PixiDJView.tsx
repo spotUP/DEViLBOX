@@ -22,8 +22,8 @@ import { useDJKeyboardHandler } from '@components/dj/DJKeyboardHandler';
 import { DJPlaylistPanel } from '@components/dj/DJPlaylistPanel';
 import { DJModlandBrowser } from '@components/dj/DJModlandBrowser';
 import { DJSeratoBrowser } from '@components/dj/DJSeratoBrowser';
-import { DJControllerSelector } from '@components/dj/DJControllerSelector';
-import { DJFxQuickPresets } from '@components/dj/DJFxQuickPresets';
+import { PixiDJControllerSelect } from './dj/PixiDJControllerSelect';
+import { PixiDJFxPresets } from './dj/PixiDJFxPresets';
 
 type DJBrowserPanel = 'none' | 'playlists' | 'modland' | 'serato';
 
@@ -224,20 +224,10 @@ const PixiDJTopBar: React.FC<DJTopBarProps> = ({ browserPanel, onBrowserPanelCha
       <pixiContainer layout={{ flex: 1 }} />
 
       {/* Controller selector */}
-      <PixiDOMOverlay
-        layout={{ height: 28, width: 130 }}
-        style={{ overflow: 'visible' }}
-      >
-        <DJControllerSelector />
-      </PixiDOMOverlay>
+      <PixiDJControllerSelect width={130} height={24} layout={{ height: 28, width: 130 }} />
 
       {/* FX Quick Presets */}
-      <PixiDOMOverlay
-        layout={{ height: 28, width: 130 }}
-        style={{ overflow: 'visible' }}
-      >
-        <DJFxQuickPresets />
-      </PixiDOMOverlay>
+      <PixiDJFxPresets width={130} height={24} layout={{ height: 28, width: 130 }} />
 
       <PixiButton
         label="FX"
