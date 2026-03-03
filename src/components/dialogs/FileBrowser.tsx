@@ -215,7 +215,7 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
             {/* File List */}
             <div ref={nav.fileListRef} className="flex-1 min-h-0 overflow-auto p-4">
               {nav.error && (
-                <div className="bg-red-900/30 border border-red-500 text-red-300 px-4 py-2 rounded mb-4 select-text">
+                <div className="bg-accent-error/10 border border-accent-error/50 text-accent-error px-4 py-2 rounded mb-4 select-text">
                   {nav.error}
                 </div>
               )}
@@ -377,7 +377,7 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
                           e.stopPropagation();
                           nav.handleDelete(file);
                         }}
-                        className="text-text-muted hover:text-red-400 p-1"
+                        className="text-text-muted hover:text-accent-error p-1"
                         title="Delete"
                         aria-label="Delete"
                       >

@@ -361,8 +361,8 @@ export const SIDInfoModal: React.FC<SIDInfoModalProps> = ({ onClose }) => {
 
           {/* ─── YouTube Links ─── */}
           {youtubeLinks.length > 0 && (
-            <div className="bg-red-950/20 border border-red-800/30 rounded-lg p-4">
-              <h4 className="text-xs font-medium text-red-300/80 flex items-center gap-1.5 mb-3">
+            <div className="bg-accent-error/5 border border-accent-error/20 rounded-lg p-4">
+              <h4 className="text-xs font-medium text-accent-error/80 flex items-center gap-1.5 mb-3">
                 <Youtube className="w-4 h-4" /> YouTube Performances
               </h4>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -372,14 +372,14 @@ export const SIDInfoModal: React.FC<SIDInfoModalProps> = ({ onClose }) => {
                     href={`https://www.youtube.com/watch?v=${yt.videoId}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center gap-2 px-3 py-2 bg-red-900/10 border border-red-800/20 rounded hover:bg-red-900/20 transition-colors group"
+                    className="flex items-center gap-2 px-3 py-2 bg-accent-error/5 border border-accent-error/10 rounded hover:bg-accent-error/10 transition-colors group"
                   >
-                    <Play className="w-3.5 h-3.5 text-red-400 group-hover:text-red-300" />
-                    <span className="text-xs text-red-200/80 group-hover:text-red-100 truncate">
+                    <Play className="w-3.5 h-3.5 text-accent-error group-hover:text-accent-error/80" />
+                    <span className="text-xs text-text-secondary group-hover:text-text-primary truncate">
                       {yt.channel || `Performance ${i + 1}`}
                       {yt.subtune > 0 ? ` (sub ${yt.subtune})` : ''}
                     </span>
-                    <ExternalLink className="w-3 h-3 text-red-400/40 ml-auto shrink-0" />
+                    <ExternalLink className="w-3 h-3 text-accent-error/40 ml-auto shrink-0" />
                   </a>
                 ))}
               </div>
