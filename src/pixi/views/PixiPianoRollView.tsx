@@ -589,7 +589,8 @@ export const PixiPianoRollView: React.FC<{ isActive?: boolean; windowId?: string
 
         {/* MIDI Record toggle */}
         <PixiButton
-          label="●"
+          label=""
+          icon="record"
           variant={isRecording ? 'ft2' : 'ghost'}
           color={isRecording ? 'red' : undefined}
           size="sm"

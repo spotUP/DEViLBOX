@@ -55,16 +55,16 @@ router.get('/stats', (_req: Request, res: Response) => {
 // ── GET /api/hvsc/featured ──────────────────────────────────────────────────
 
 router.get('/featured', (_req: Request, res: Response) => {
-  // Return curated list of classics
+  // Return curated list of classics (paths use full HVSC directory structure)
   const featured = [
-    { name: 'Commando.sid', path: 'Hubbard_Rob/Commando.sid', isDirectory: false, size: 4096 },
-    { name: 'Last_Ninja.sid', path: 'Hubbard_Rob/Last_Ninja.sid', isDirectory: false, size: 4096 },
-    { name: 'Monty_on_the_Run.sid', path: 'Hubbard_Rob/Monty_on_the_Run.sid', isDirectory: false, size: 4096 },
-    { name: 'One_Man_and_His_Droid.sid', path: 'Galway_Martin/One_Man_and_His_Droid.sid', isDirectory: false, size: 4096 },
-    { name: 'Parallax.sid', path: 'Galway_Martin/Parallax.sid', isDirectory: false, size: 4096 },
-    { name: 'International_Karate.sid', path: 'Hubbard_Rob/International_Karate.sid', isDirectory: false, size: 4096 },
-    { name: 'Sanxion.sid', path: 'Hubbard_Rob/Sanxion.sid', isDirectory: false, size: 4096 },
-    { name: 'Wizball.sid', path: 'Galway_Martin/Wizball.sid', isDirectory: false, size: 4096 },
+    { name: 'Commando.sid', path: 'MUSICIANS/H/Hubbard_Rob/Commando.sid', isDirectory: false, size: 4096 },
+    { name: 'Last_Ninja.sid', path: 'MUSICIANS/H/Hubbard_Rob/Last_Ninja.sid', isDirectory: false, size: 4096 },
+    { name: 'Monty_on_the_Run.sid', path: 'MUSICIANS/H/Hubbard_Rob/Monty_on_the_Run.sid', isDirectory: false, size: 4096 },
+    { name: 'One_Man_and_His_Droid.sid', path: 'MUSICIANS/G/Galway_Martin/One_Man_and_His_Droid.sid', isDirectory: false, size: 4096 },
+    { name: 'Parallax.sid', path: 'MUSICIANS/G/Galway_Martin/Parallax.sid', isDirectory: false, size: 4096 },
+    { name: 'International_Karate.sid', path: 'MUSICIANS/H/Hubbard_Rob/International_Karate.sid', isDirectory: false, size: 4096 },
+    { name: 'Sanxion.sid', path: 'MUSICIANS/H/Hubbard_Rob/Sanxion.sid', isDirectory: false, size: 4096 },
+    { name: 'Wizball.sid', path: 'MUSICIANS/G/Galway_Martin/Wizball.sid', isDirectory: false, size: 4096 },
   ];
   
   res.json({ entries: featured });
@@ -95,9 +95,6 @@ router.get('/browse', async (req: Request, res: Response) => {
         { name: 'DEMOS', path: 'DEMOS', isDirectory: true },
         { name: 'GAMES', path: 'GAMES', isDirectory: true },
         { name: 'MUSICIANS', path: 'MUSICIANS', isDirectory: true },
-        { name: 'Galway_Martin', path: 'Galway_Martin', isDirectory: true },
-        { name: 'Hubbard_Rob', path: 'Hubbard_Rob', isDirectory: true },
-        { name: 'Tel_Jeroen', path: 'Tel_Jeroen', isDirectory: true },
       ];
       
       const result = { entries: rootDirs, path: '', parent: undefined };
@@ -105,8 +102,31 @@ router.get('/browse', async (req: Request, res: Response) => {
       return res.json(result);
     }
     
-    // For subdirectories, return empty (would need indexing in production)
-    const result = { entries: [], path, parent: path.split('/').slice(0, -1).join('/') };
+    // For subdirectories, fetch listing from mirror
+    let entries: any[] = [];
+    for (const mirror of HVSC_MIRRORS) {
+      try {
+        const url = `${mirror}/${path}/`;
+        const response = await axios.get(url, { timeout: 8000, responseType: 'text' });
+        const lines = (response.data as string).split('\n').filter((l: string) => l.trim());
+        entries = lines.map((name: string) => {
+          const trimmed = name.trim();
+          const isFile = trimmed.endsWith('.sid') || trimmed.endsWith('.mus') || trimmed.endsWith('.str');
+          return {
+            name: trimmed,
+            path: path ? `${path}/${trimmed}` : trimmed,
+            isDirectory: !isFile,
+            ...(isFile ? { size: 0 } : {}),
+          };
+        });
+        break;
+      } catch {
+        // Try next mirror
+      }
+    }
+
+    const result = { entries, path, parent: path.split('/').slice(0, -1).join('/') || undefined };
+    if (entries.length > 0) directoryCache.set(cacheKey, result);
     res.json(result);
     
   } catch (err) {

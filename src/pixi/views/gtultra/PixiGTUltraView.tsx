@@ -170,7 +170,8 @@ export const PixiGTUltraView: React.FC<Props> = ({ width, height }) => {
 
         {/* Play/Stop */}
         <PixiButton
-          label={playing ? '■' : '▶'}
+          label=""
+          icon={playing ? 'stop' : 'play'}
           variant="ft2"
           size="sm"
           color={playing ? 'red' : 'green'}

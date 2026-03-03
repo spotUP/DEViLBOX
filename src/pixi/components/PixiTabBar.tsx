@@ -5,6 +5,7 @@
 import React, { useCallback, useState } from 'react';
 import type { Graphics as GraphicsType } from 'pixi.js';
 import { PIXI_FONTS } from '../fonts';
+import { FAD_ICONS } from '../fontaudioIcons';
 import { usePixiTheme } from '../theme';
 
 export interface Tab { id: string; label: string; dirty?: boolean }
@@ -80,13 +81,15 @@ export const PixiTabBar: React.FC<PixiTabBarProps> = ({
       </pixiContainer>
 
       <PixiTabScrollBtn
-        label="◂"
+        label=""
+        icon="caret-left"
         height={height}
         visible={canScrollLeft}
         onClick={() => setScrollOffset(s => Math.max(0, s - tabW))}
       />
       <PixiTabScrollBtn
-        label="▸"
+        label=""
+        icon="caret-right"
         height={height}
         visible={canScrollRight}
         onClick={() => setScrollOffset(s => s + tabW)}
@@ -176,8 +179,9 @@ const PixiTab: React.FC<PixiTabProps> = ({
   );
 };
 
-const PixiTabScrollBtn: React.FC<{ label: string; height: number; visible: boolean; onClick: () => void }> = ({ label, height, visible, onClick }) => {
+const PixiTabScrollBtn: React.FC<{ label: string; icon?: string; height: number; visible: boolean; onClick: () => void }> = ({ icon, height, visible, onClick }) => {
   const theme = usePixiTheme();
+  const iconChar = icon ? FAD_ICONS[icon] : undefined;
   return (
     <pixiContainer
       eventMode={visible ? 'static' : 'none'}
@@ -186,12 +190,14 @@ const PixiTabScrollBtn: React.FC<{ label: string; height: number; visible: boole
       alpha={visible ? 1 : 0}
       layout={{ width: 20, height, justifyContent: 'center', alignItems: 'center' }}
     >
-      <pixiBitmapText
-        text={label}
-        style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 12, fill: 0xffffff }}
-        tint={theme.textSecondary.color}
-        layout={{}}
-      />
+      {iconChar && (
+        <pixiBitmapText
+          text={iconChar}
+          style={{ fontFamily: PIXI_FONTS.ICONS, fontSize: 14, fill: 0xffffff }}
+          tint={theme.textSecondary.color}
+          layout={{}}
+        />
+      )}
     </pixiContainer>
   );
 };
