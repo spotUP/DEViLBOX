@@ -665,7 +665,7 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
                   fullWidth
                   onClick={handlePreview}
                   icon={isPlaying ? <Square size={14} /> : <Play size={14} />}
-                  className={isPlaying ? 'text-red-400 hover:text-red-300' : 'text-green-400 hover:text-green-300'}
+                  className={isPlaying ? 'text-accent-error hover:text-accent-error/80' : 'text-green-400 hover:text-green-300'}
                 >
                   {isPlaying ? 'Stop Preview' : 'Preview'}
                 </Button>

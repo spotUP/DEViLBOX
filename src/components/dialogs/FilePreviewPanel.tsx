@@ -180,7 +180,7 @@ export const ModlandPanel: React.FC<ModlandPanelProps> = ({ isOpen, onLoadTracke
       <div className="flex-1 min-h-0 overflow-auto p-4">
         <div className="flex flex-col gap-1">
           {modlandError && (
-            <div className="flex items-center gap-1.5 text-red-400 text-xs font-mono px-3 py-2 mb-2 bg-red-900/20 rounded border border-red-900/30">
+            <div className="flex items-center gap-1.5 text-accent-error text-xs font-mono px-3 py-2 mb-2 bg-accent-error/10 rounded border border-accent-error/20">
               <AlertCircle size={12} />
               {modlandError}
             </div>
@@ -418,7 +418,7 @@ export const HVSCPanel: React.FC<HVSCPanelProps> = ({ isOpen, onLoadTrackerModul
       <div className="flex-1 min-h-0 overflow-auto p-4">
         <div className="flex flex-col gap-1">
           {hvscError && (
-            <div className="flex items-center gap-1.5 text-red-400 text-xs font-mono px-3 py-2 mb-2 bg-red-900/20 rounded border border-red-900/30">
+            <div className="flex items-center gap-1.5 text-accent-error text-xs font-mono px-3 py-2 mb-2 bg-accent-error/10 rounded border border-accent-error/20">
               <AlertCircle size={12} />
               {hvscError}
             </div>

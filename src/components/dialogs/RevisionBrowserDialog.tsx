@@ -123,7 +123,7 @@ export const RevisionBrowserDialog: React.FC<RevisionBrowserDialogProps> = ({ is
                         </button>
                         <button
                           onClick={() => handleDelete(rev.key)}
-                          className="p-1.5 text-text-muted hover:text-red-400 rounded"
+                          className="p-1.5 text-text-muted hover:text-accent-error rounded"
                           title="Delete this revision"
                         >
                           <Trash2 size={14} />

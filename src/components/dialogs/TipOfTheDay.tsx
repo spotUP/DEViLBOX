@@ -113,7 +113,7 @@ export const TipOfTheDay: React.FC<TipOfTheDayProps> = ({ isOpen, onClose, initi
           ${isCyanTheme ? 'bg-cyan-900/20' : 'bg-dark-bgSecondary'}
         `}>
           <div className="flex items-center gap-3">
-            <div className={`p-2 rounded-lg ${isCyanTheme ? 'bg-cyan-500/20 text-cyan-400' : 'bg-red-500/20 text-red-500'}`}>
+            <div className={`p-2 rounded-lg ${isCyanTheme ? 'bg-cyan-500/20 text-cyan-400' : 'bg-accent-primary/20 text-accent-primary'}`}>
               {activeTab === 'tips' ? <Lightbulb size={20} /> : <Sparkles size={20} />}
             </div>
             <div>
@@ -166,7 +166,7 @@ export const TipOfTheDay: React.FC<TipOfTheDayProps> = ({ isOpen, onClose, initi
           {activeTab === 'tips' ? (
             <div className="h-full p-8 flex flex-col items-center justify-center text-center space-y-6">
               <div className={`w-16 h-16 rounded-full flex items-center justify-center bg-opacity-10 mb-2
-                ${isCyanTheme ? 'bg-cyan-500 text-cyan-400' : 'bg-red-500 text-red-500'}
+                ${isCyanTheme ? 'bg-cyan-500 text-cyan-400' : 'bg-accent-primary text-accent-primary'}
               `}>
                 <Info size={32} />
               </div>
@@ -226,7 +226,7 @@ export const TipOfTheDay: React.FC<TipOfTheDayProps> = ({ isOpen, onClose, initi
               checked={showAtStartup}
               onChange={(e) => toggleStartup(e.target.checked)}
               className={`w-4 h-4 rounded border-2 bg-transparent cursor-pointer
-                ${isCyanTheme ? 'border-cyan-500 checked:bg-cyan-500' : 'border-red-500 checked:bg-red-500'}
+                ${isCyanTheme ? 'border-cyan-500 checked:bg-cyan-500' : 'border-accent-primary checked:bg-accent-primary'}
               `}
             />
             <span className="text-xs text-text-muted group-hover:text-text-secondary transition-colors uppercase font-bold tracking-tighter">

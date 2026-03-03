@@ -73,7 +73,7 @@ export const ImportDBXDialog: React.FC<ImportDBXDialogProps> = ({
         </div>
 
         {error ? (
-          <p className="text-red-400 text-sm mb-5">{error}</p>
+          <p className="text-accent-error text-sm mb-5">{error}</p>
         ) : preview ? (
           <>
             {/* Song name */}
