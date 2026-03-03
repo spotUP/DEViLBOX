@@ -2063,6 +2063,7 @@ export class ToneEngine {
       case 'UADESynth':
       case 'SymphonieSynth':
       case 'MusicLineSynth':
+      case 'JamCrackerSynth':
       // UADE format-specific synths (per-note WASM synthesis)
       case 'SoundMonSynth':
       case 'SidMonSynth':
