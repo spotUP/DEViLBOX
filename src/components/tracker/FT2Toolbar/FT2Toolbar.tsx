@@ -41,7 +41,7 @@ import { NibblesGame } from '@components/visualization/NibblesGame';
 import { SineScroller } from '@components/visualization/SineScroller';
 import { AudioMotionVisualizer } from '@components/visualization/AudioMotionVisualizer';
 import { SettingsModal } from '@components/dialogs/SettingsModal';
-import { GrooveSettingsModal } from '@components/dialogs/GrooveSettingsModal';
+
 import { ImportModuleDialog, type ImportOptions } from '@components/dialogs/ImportModuleDialog';
 import { FileBrowser } from '@components/dialogs/FileBrowser';
 import { importSong, exportSong } from '@lib/export/exporters';
@@ -60,7 +60,7 @@ import { useSettingsStore } from '@stores/useSettingsStore';
 import type { InstrumentConfig, TB303Config } from '@typedefs/instrument';
 import { DEFAULT_OSCILLATOR, DEFAULT_ENVELOPE, DEFAULT_FILTER } from '@typedefs/instrument';
 import type { Pattern } from '@typedefs';
-import { GROOVE_TEMPLATES } from '@typedefs/audio';
+
 import { CURRENT_VERSION } from '@generated/changelog';
 
 // Build accept string for file input
@@ -303,7 +303,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
   }, []);
   
   const [showFxPresetsMenu, setShowFxPresetsMenu] = useState(false);
-  const [showGrooveSettings, setShowGrooveSettings] = useState(false);
+
   const [showSettings, setShowSettings] = useState(false);
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
@@ -813,16 +813,6 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
               </div>
               <div className="ft2-section ft2-col-2">
                 <FT2NumericInput label="Speed" value={speed} onChange={setSpeed} min={1} max={31} />
-                <Button
-                  variant="default"
-                  size="sm"
-                  onClick={() => setShowGrooveSettings(true)}
-                  title={`Groove & Swing Settings (Current: ${GROOVE_TEMPLATES.find(g => g.id === grooveTemplateId)?.name || 'None'})`}
-                  className={`min-w-[32px] ml-1 ${grooveTemplateId !== 'straight' || swing !== (useMpcScale ? 50 : 100) || jitter > 0 ? 'text-accent-primary font-bold shadow-glow-sm border-accent-primary/50' : ''}`}
-                >
-                  Groove
-                </Button>
-                {showGrooveSettings && <GrooveSettingsModal onClose={() => setShowGrooveSettings(false)} />}
               </div>
               <div className="ft2-section ft2-col-3">
                 <FT2NumericInput
