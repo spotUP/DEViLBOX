@@ -20,7 +20,7 @@ import { useTapTempo } from '@hooks/useTapTempo';
 import { getToneEngine } from '@engine/ToneEngine';
 import { getTrackerReplayer } from '@engine/TrackerReplayer';
 import { getTrackerScratchController } from '@engine/TrackerScratchController';
-import { FilePlus, Maximize2, Minimize2, MousePointerClick, ExternalLink } from 'lucide-react';
+import { Maximize2, Minimize2, MousePointerClick, ExternalLink } from 'lucide-react';
 import { focusPopout } from '@components/ui/PopOutWindow';
 import { VisualizerFrame } from '@components/visualization/VisualizerFrame';
 import { Oscilloscope } from '@components/visualization/Oscilloscope';
@@ -929,7 +929,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
         <Button variant="ghost" size="sm" onClick={() => useUIStore.getState().openModal('revisions')}>Revisions</Button>
         <Button variant="ghost" size="sm" onClick={handleSave}>Download</Button>
         <Button variant="ghost" size="sm" onClick={onShowExport}>Export</Button>
-        <Button variant="ghost" size="sm" onClick={() => useUIStore.getState().openNewSongWizard()} icon={<FilePlus size={14} />} iconPosition="left">New</Button>
+        <Button variant="ghost" size="sm" onClick={() => useUIStore.getState().openNewSongWizard()}>New</Button>
         <Button variant="ghost" size="sm" onClick={() => setShowClearModal(true)}>Clear</Button>
         <Button variant="ghost" size="sm" onClick={onShowPatternOrder}>Order</Button>
         <Button variant="ghost" size="sm" onClick={onShowInstruments}>Instruments</Button>
