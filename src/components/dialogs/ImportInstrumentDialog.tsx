@@ -98,7 +98,7 @@ export const ImportInstrumentDialog: React.FC<ImportInstrumentDialogProps> = ({
         </div>
 
         {error ? (
-          <p className="text-red-400 text-sm mb-5">{error}</p>
+          <p className="text-accent-error text-sm mb-5">{error}</p>
         ) : preview ? (
           <div className="bg-dark-bgSecondary rounded-lg p-4 mb-5">
             <p className="text-white font-bold text-base truncate">{preview.name}</p>

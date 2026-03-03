@@ -963,7 +963,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
               {!asidSupported ? (
                 <div className="p-3 bg-ft2-bg/50 border border-ft2-border/50 rounded">
                   <div className="text-ft2-textDim text-[9px] font-mono">
-                    <span className="text-red-400">❌ Not Supported</span>
+                    <span className="text-accent-error">❌ Not Supported</span>
                     <p className="mt-1">
                       Web MIDI API not available in this browser. ASID hardware support requires
                       Chrome, Edge, or Opera. Firefox and Safari do not support Web MIDI.
@@ -1098,7 +1098,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                     .then(dbs => Promise.all(dbs.map(db => indexedDB.deleteDatabase(db.name!))))
                     .then(() => location.reload());
                 }}
-                className="px-3 py-1.5 bg-transparent border border-red-700 text-red-500 text-[10px] font-mono hover:bg-red-900/30 transition-colors focus:outline-none"
+                className="px-3 py-1.5 bg-transparent border border-accent-error/60 text-accent-error text-[10px] font-mono hover:bg-accent-error/10 transition-colors focus:outline-none"
               >
                 CLEAR ALL STATE &amp; RELOAD
               </button>
