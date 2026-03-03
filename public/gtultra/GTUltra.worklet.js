@@ -68,6 +68,18 @@ class GTUltraProcessor extends AudioWorkletProcessor {
           this._undo = this.module.cwrap('gt_undo', null, []);
           this._redo = this.module.cwrap('gt_redo', null, []);
 
+          // Save/Export
+          this._saveSng = this.module.cwrap('gt_save_sng', 'number', ['number']);
+
+          // Instrument editing
+          this._setInstrumentAD = this.module.cwrap('gt_set_instrument_ad', null, ['number', 'number']);
+          this._setInstrumentSR = this.module.cwrap('gt_set_instrument_sr', null, ['number', 'number']);
+          this._setInstrumentFirstwave = this.module.cwrap('gt_set_instrument_firstwave', null, ['number', 'number']);
+          this._setInstrumentTablePtr = this.module.cwrap('gt_set_instrument_table_ptr', null, ['number', 'number', 'number']);
+          this._setSongName = this.module.cwrap('gt_set_song_name', null, ['string']);
+          this._setAuthorName = this.module.cwrap('gt_set_author_name', null, ['string']);
+          this._setCopyright = this.module.cwrap('gt_set_copyright', null, ['string']);
+
           // Initialize with sample rate and SID model (0=6581, 1=8580)
           this._init(sampleRate, msg.sidModel || 0);
 
@@ -259,6 +271,68 @@ class GTUltraProcessor extends AudioWorkletProcessor {
       case 'redo': {
         if (!this.ready) return;
         this._redo();
+        break;
+      }
+
+      case 'saveSng': {
+        if (!this.ready) return;
+        // gt_save_sng returns size written to internal buffer, we need to allocate and get data
+        // The WASM exports a buffer pointer; we allocate a large buffer and pass it
+        const bufSize = 1024 * 1024; // 1MB should be plenty for .sng
+        const ptr = this.module._malloc(bufSize);
+        const size = this._saveSng(ptr);
+        if (size > 0) {
+          const data = this.module.HEAPU8.slice(ptr, ptr + size);
+          this.port.postMessage(
+            { type: 'sngData', data: data.buffer },
+            [data.buffer]
+          );
+        } else {
+          this.port.postMessage({ type: 'sngData', data: null });
+        }
+        this.module._free(ptr);
+        break;
+      }
+
+      case 'setInstrumentAD': {
+        if (!this.ready) return;
+        this._setInstrumentAD(msg.instrument, msg.value);
+        break;
+      }
+
+      case 'setInstrumentSR': {
+        if (!this.ready) return;
+        this._setInstrumentSR(msg.instrument, msg.value);
+        break;
+      }
+
+      case 'setInstrumentFirstwave': {
+        if (!this.ready) return;
+        this._setInstrumentFirstwave(msg.instrument, msg.value);
+        break;
+      }
+
+      case 'setInstrumentTablePtr': {
+        if (!this.ready) return;
+        this._setInstrumentTablePtr(msg.instrument, msg.tableType, msg.value);
+        break;
+      }
+
+      case 'setSongName': {
+        if (!this.ready) return;
+        this._setSongName(msg.name);
+        break;
+      }
+
+      case 'setAuthorName': {
+        if (!this.ready) return;
+        this._setAuthorName(msg.name);
+        break;
+      }
+
+      case 'setCopyright': {
+        if (!this.ready) return;
+        this._setCopyright(msg.name);
         break;
       }
 

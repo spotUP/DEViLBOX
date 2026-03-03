@@ -1,18 +1,13 @@
 /**
  * PixiGTStudioTables — Visual table editors for GoatTracker Ultra Studio Mode.
  *
- * Renders wave/pulse/filter/speed tables as graphical bar charts instead of
- * hex grids. Users can visually see and edit table values by dragging bars.
- *
- * Each table type gets a different visualization:
- * - Wave: Waveform selector icons per step
- * - Pulse: Bar chart of pulse width values
- * - Filter: Frequency + resonance curves
- * - Speed: Tempo/timing bar chart
+ * Renders wave/pulse/filter/speed tables as graphical bar charts.
+ * Users can click bars to set values, drag to draw, and click tab buttons
+ * to switch between table types.
  */
 
-import React, { useCallback, useEffect, useRef } from 'react';
-import type { Graphics as GraphicsType } from 'pixi.js';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import type { Graphics as GraphicsType, FederatedPointerEvent } from 'pixi.js';
 import { PIXI_FONTS } from '@/pixi/fonts';
 import { MegaText, type GlyphLabel } from '@/pixi/utils/MegaText';
 import { useGTUltraStore } from '@/stores/useGTUltraStore';
@@ -41,15 +36,24 @@ export const PixiGTStudioTables: React.FC<Props> = ({ width, height }) => {
   const bgRef = useRef<GraphicsType>(null);
   const barsRef = useRef<GraphicsType>(null);
   const megaRef = useRef<MegaText | null>(null);
+  const [drawing, setDrawing] = useState(false);
 
   const activeTable = useGTUltraStore((s) => s.activeTable);
   const tableData = useGTUltraStore((s) => s.tableData);
   const tableCursor = useGTUltraStore((s) => s.tableCursor);
+  const engine = useGTUltraStore((s) => s.engine);
 
   const tableName = TABLE_NAMES[activeTable] || 'Wave';
   const tableKey = tableName.toLowerCase();
   const data = tableData[tableKey];
   const barColor = TABLE_COLORS[activeTable] || C_BAR_WAVE;
+
+  // Layout
+  const pad = 6;
+  const headerH = 28;
+  const chartY = headerH;
+  const chartH = height - headerH - 20;
+  const chartW = width - pad * 2;
 
   // Init MegaText
   useEffect(() => {
@@ -57,6 +61,78 @@ export const PixiGTStudioTables: React.FC<Props> = ({ width, height }) => {
     megaRef.current = mega;
     if (containerRef.current) containerRef.current.addChild(mega);
     return () => { mega.destroy(); megaRef.current = null; };
+  }, []);
+
+  // ── Pointer event helpers ──
+  const getBarInfo = useCallback(() => {
+    if (!data) return { displayLen: 16, barW: 4 };
+    let lastNonZero = 0;
+    for (let i = 0; i < data.left.length; i++) {
+      if (data.left[i] !== 0 || data.right[i] !== 0) lastNonZero = i;
+    }
+    const displayLen = Math.min(Math.max(lastNonZero + 2, 16), 64);
+    const barW = Math.max(2, (chartW - displayLen) / displayLen);
+    return { displayLen, barW };
+  }, [data, chartW]);
+
+  const pointerToCell = useCallback((e: FederatedPointerEvent): { index: number; value: number } | null => {
+    if (!data) return null;
+    const local = e.getLocalPosition(containerRef.current);
+    const { displayLen, barW } = getBarInfo();
+    const barGap = 1;
+    const index = Math.floor((local.x - pad) / (barW + barGap));
+    if (index < 0 || index >= displayLen) return null;
+    const yFrac = 1 - Math.max(0, Math.min(1, (local.y - chartY) / chartH));
+    const value = Math.round(yFrac * 255);
+    return { index, value };
+  }, [data, getBarInfo, chartY, chartH]);
+
+  const applyValue = useCallback((index: number, value: number) => {
+    if (!engine) return;
+    // Table type 0=wave, 1=pulse, 2=filter, 3=speed
+    engine.setTableEntry(activeTable, 0, index, value); // left column
+    // Update store locally for immediate feedback
+    if (data) {
+      const newLeft = [...data.left];
+      newLeft[index] = value;
+      const newTableData = { ...useGTUltraStore.getState().tableData };
+      newTableData[tableKey] = { ...data, left: newLeft };
+      useGTUltraStore.setState({ tableData: newTableData });
+    }
+  }, [engine, activeTable, data, tableKey]);
+
+  const handlePointerDown = useCallback((e: FederatedPointerEvent) => {
+    const local = e.getLocalPosition(containerRef.current);
+
+    // Check tab button clicks
+    for (let i = 0; i < 4; i++) {
+      const tx = width - 4 * 40 + i * 40;
+      if (local.x >= tx && local.x <= tx + 36 && local.y >= 2 && local.y <= 20) {
+        useGTUltraStore.setState({ activeTable: i });
+        return;
+      }
+    }
+
+    // Bar chart drawing
+    const cell = pointerToCell(e);
+    if (cell) {
+      setDrawing(true);
+      useGTUltraStore.setState({ tableCursor: cell.index });
+      applyValue(cell.index, cell.value);
+    }
+  }, [width, pointerToCell, applyValue]);
+
+  const handlePointerMove = useCallback((e: FederatedPointerEvent) => {
+    if (!drawing) return;
+    const cell = pointerToCell(e);
+    if (cell) {
+      useGTUltraStore.setState({ tableCursor: cell.index });
+      applyValue(cell.index, cell.value);
+    }
+  }, [drawing, pointerToCell, applyValue]);
+
+  const handlePointerUp = useCallback(() => {
+    setDrawing(false);
   }, []);
 
   const redraw = useCallback(() => {
@@ -70,8 +146,6 @@ export const PixiGTStudioTables: React.FC<Props> = ({ width, height }) => {
 
     const labels: GlyphLabel[] = [];
     const ff = PIXI_FONTS.MONO;
-    const pad = 6;
-    const headerH = 28;
 
     // Background
     bg.rect(0, 0, width, height).fill({ color: C_BG });
@@ -100,18 +174,7 @@ export const PixiGTStudioTables: React.FC<Props> = ({ width, height }) => {
     }
 
     // Bar chart area
-    const chartY = headerH;
-    const chartH = height - headerH - 20;
-    const chartW = width - pad * 2;
-
-    // Find the range of non-zero values to display
-    let lastNonZero = 0;
-    for (let i = 0; i < data.left.length; i++) {
-      if (data.left[i] !== 0 || data.right[i] !== 0) lastNonZero = i;
-    }
-    const displayLen = Math.min(Math.max(lastNonZero + 2, 16), 64);
-
-    const barW = Math.max(2, (chartW - displayLen) / displayLen);
+    const { displayLen, barW } = getBarInfo();
     const barGap = 1;
 
     // Grid lines
@@ -164,14 +227,23 @@ export const PixiGTStudioTables: React.FC<Props> = ({ width, height }) => {
     });
 
     mega.updateLabels(labels, 9);
-  }, [width, height, activeTable, data, tableCursor, tableName, barColor]);
+  }, [width, height, activeTable, data, tableCursor, tableName, barColor, getBarInfo, chartY, chartH, chartW]);
 
   useEffect(() => {
     redraw();
   }, [redraw]);
 
   return (
-    <pixiContainer ref={containerRef} layout={{ width, height }}>
+    <pixiContainer
+      ref={containerRef}
+      layout={{ width, height }}
+      eventMode="static"
+      cursor={drawing ? 'crosshair' : 'pointer'}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      onPointerUpOutside={handlePointerUp}
+    >
       <pixiGraphics ref={bgRef} />
       <pixiGraphics ref={barsRef} />
     </pixiContainer>

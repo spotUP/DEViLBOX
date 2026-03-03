@@ -32,6 +32,36 @@ export const GTToolbar: React.FC<{ width: number; height: number }> = ({ width, 
     }
   }, [engine, playing]);
 
+  const handleNewSong = useCallback(() => {
+    if (!engine) return;
+    engine.newSong();
+    useGTUltraStore.getState().setPlaying(false);
+    useGTUltraStore.getState().setSongName('Untitled');
+    useGTUltraStore.getState().setSongAuthor('');
+  }, [engine]);
+
+  const handleSave = useCallback(() => {
+    if (!engine) return;
+    engine.saveSng();
+  }, [engine]);
+
+  // Wire the save callback
+  useEffect(() => {
+    if (!engine) return;
+    engine.callbacks.onSngData = (data: ArrayBuffer | null) => {
+      if (!data) return;
+      const blob = new Blob([data], { type: 'application/octet-stream' });
+      const name = (songName || 'untitled').replace(/[^a-zA-Z0-9_-]/g, '_') + '.sng';
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = name;
+      a.click();
+      URL.revokeObjectURL(url);
+    };
+    return () => { engine.callbacks.onSngData = undefined; };
+  }, [engine, songName]);
+
   return (
     <div
       style={{
@@ -48,6 +78,34 @@ export const GTToolbar: React.FC<{ width: number; height: number }> = ({ width, 
       }}
     >
       {/* Transport */}
+      <button
+        onClick={handleNewSong}
+        style={{
+          background: '#16213e',
+          color: '#aaa',
+          border: '1px solid #333',
+          padding: '2px 8px',
+          cursor: 'pointer',
+          fontSize: 10,
+        }}
+        title="New Song"
+      >
+        📄 New
+      </button>
+      <button
+        onClick={handleSave}
+        style={{
+          background: '#16213e',
+          color: '#aaa',
+          border: '1px solid #333',
+          padding: '2px 8px',
+          cursor: 'pointer',
+          fontSize: 10,
+        }}
+        title="Save .sng file"
+      >
+        💾 Save
+      </button>
       <button
         onClick={togglePlay}
         style={{
