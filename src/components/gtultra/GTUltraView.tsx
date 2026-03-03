@@ -24,6 +24,7 @@ import { GTOrderList } from './GTOrderList';
 import { GTTableEditor } from './GTTableEditor';
 import { useGTKeyboardHandler } from './GTKeyboardHandler';
 import { GTUltraEngine } from '../../engine/gtultra/GTUltraEngine';
+import { getGTUltraASIDBridge } from '../../engine/gtultra/GTUltraASIDBridge';
 
 const SIDEBAR_WIDTH = 320;
 const TOOLBAR_HEIGHT = 36;
@@ -51,6 +52,9 @@ export const GTUltraView: React.FC<{ width: number; height: number }> = ({ width
         },
         onPosition: (pos) => {
           useGTUltraStore.getState().updatePlaybackPos(pos);
+        },
+        onAsidWrite: (chip, reg, value) => {
+          getGTUltraASIDBridge().writeRegister(chip, reg, value);
         },
         onError: (err) => {
           console.error('[GTUltra] Engine error:', err);
