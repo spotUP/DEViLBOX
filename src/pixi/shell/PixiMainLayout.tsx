@@ -8,7 +8,10 @@
  *   StatusBar (28px)
  */
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { useApplication } from '@pixi/react';
+import type { Container as ContainerType, Texture } from 'pixi.js';
+import { Rectangle } from 'pixi.js';
 import { usePixiResponsive } from '../hooks/usePixiResponsive';
 import { useUIStore } from '@stores/useUIStore';
 import { useWorkbenchStore } from '@stores/useWorkbenchStore';
@@ -60,7 +63,14 @@ function resolveMainView(activeView: string): MainViewId {
 
 export const PixiMainLayout: React.FC = () => {
   const { width, height } = usePixiResponsive();
+  const { app } = useApplication();
   const activeView = useUIStore((s) => s.activeView);
+  const viewExposeActive = useUIStore((s) => s.viewExposeActive);
+
+  // Refs to view containers for thumbnail capture
+  const viewRefsMap = useRef<Record<string, ContainerType | null>>({});
+  const thumbnailsRef = useRef<Record<string, Texture>>({});
+  const [thumbnails, setThumbnails] = useState<Record<string, Texture>>({});
 
   // Dock state (local — will be persisted to store later)
   const [dockHeight, setDockHeight] = useState(MODERN_DOCK_DEFAULT_H);
@@ -99,6 +109,74 @@ export const PixiMainLayout: React.FC = () => {
 
   // Determine which view component to render
   const mainViewId = resolveMainView(activeView);
+
+  // ─── Thumbnail capture for Exposé ──────────────────────────────────────────
+
+  // Capture current view thumbnail when switching away
+  const prevViewRef = useRef(mainViewId);
+  useEffect(() => {
+    if (prevViewRef.current !== mainViewId) {
+      // Capture outgoing view before it hides
+      const outgoing = prevViewRef.current;
+      const container = viewRefsMap.current[outgoing];
+      if (container && app?.renderer) {
+        try {
+          // Destroy old thumbnail
+          thumbnailsRef.current[outgoing]?.destroy(true);
+          const tex = app.renderer.generateTexture({
+            target: container,
+            frame: new Rectangle(0, 0, width, Math.max(100, mainViewH)),
+            resolution: 0.35,
+          });
+          thumbnailsRef.current[outgoing] = tex;
+          setThumbnails({ ...thumbnailsRef.current });
+        } catch { /* ignore capture failures */ }
+      }
+      prevViewRef.current = mainViewId;
+    }
+  }, [mainViewId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Capture all visible views when Exposé opens
+  useEffect(() => {
+    if (!viewExposeActive || !app?.renderer) return;
+    const viewH = Math.max(100, mainViewH);
+
+    // Capture current view first (it's visible)
+    const current = viewRefsMap.current[mainViewId];
+    if (current) {
+      try {
+        thumbnailsRef.current[mainViewId]?.destroy(true);
+        const tex = app.renderer.generateTexture({
+          target: current,
+          frame: new Rectangle(0, 0, width, viewH),
+          resolution: 0.35,
+        });
+        thumbnailsRef.current[mainViewId] = tex;
+      } catch { /* ignore */ }
+    }
+
+    // Capture hidden views by briefly making them visible
+    for (const viewId of Object.keys(ALWAYS_MOUNTED_VIEWS)) {
+      if (viewId === mainViewId) continue; // already captured
+      const container = viewRefsMap.current[viewId];
+      if (!container) continue;
+      try {
+        container.visible = true;
+        thumbnailsRef.current[viewId]?.destroy(true);
+        const tex = app.renderer.generateTexture({
+          target: container,
+          frame: new Rectangle(0, 0, width, viewH),
+          resolution: 0.35,
+        });
+        thumbnailsRef.current[viewId] = tex;
+        container.visible = false;
+      } catch {
+        container.visible = false;
+      }
+    }
+
+    setThumbnails({ ...thumbnailsRef.current });
+  }, [viewExposeActive]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Force compact toolbar in modern layout for maximum vertical space
   useEffect(() => {
@@ -164,6 +242,7 @@ export const PixiMainLayout: React.FC = () => {
             return (
               <pixiContainer
                 key={viewId}
+                ref={(c: ContainerType | null) => { viewRefsMap.current[viewId] = c; }}
                 visible={isActive}
                 eventMode={isActive ? 'auto' : 'none'}
                 layout={{
@@ -182,6 +261,7 @@ export const PixiMainLayout: React.FC = () => {
         {mainViewId === 'studio' && (
           <pixiContainer
             key="studio"
+            ref={(c: ContainerType | null) => { viewRefsMap.current['studio'] = c; }}
             visible
             eventMode="auto"
             layout={{
@@ -254,7 +334,7 @@ export const PixiMainLayout: React.FC = () => {
         zIndex={1000}
         layout={{ position: 'absolute', width, height }}
       >
-        <PixiExposeOverlay width={width} height={height} />
+        <PixiExposeOverlay width={width} height={height} thumbnails={thumbnails} />
       </pixiContainer>
     </pixiContainer>
   );
