@@ -1,0 +1,899 @@
+/**
+ * EffectFactory - Creates effect instances and provides default parameters.
+ * Extracted from InstrumentFactory.ts
+ */
+
+import * as Tone from 'tone';
+import type { EffectConfig } from '@typedefs/instrument';
+import type { DevilboxSynth } from '@typedefs/synth';
+import { TapeSaturation } from '../effects/TapeSaturation';
+import { NeuralEffectWrapper } from '../effects/NeuralEffectWrapper';
+import { SpaceEchoEffect } from '../effects/SpaceEchoEffect';
+import { SpaceyDelayerEffect } from '../effects/SpaceyDelayerEffect';
+import { RETapeEchoEffect } from '../effects/RETapeEchoEffect';
+import { BiPhaseEffect } from '../effects/BiPhaseEffect';
+import { DubFilterEffect } from '../effects/DubFilterEffect';
+import { MoogFilterEffect, MoogFilterModel, MoogFilterMode } from '../effects/MoogFilterEffect';
+import { MVerbEffect } from '../effects/MVerbEffect';
+import { LeslieEffect } from '../effects/LeslieEffect';
+import { SpringReverbEffect } from '../effects/SpringReverbEffect';
+import { VinylNoiseEffect } from '../effects/VinylNoiseEffect';
+import { ToneArmEffect } from '../effects/ToneArmEffect';
+import { isEffectBpmSynced, getEffectSyncDivision, computeSyncedValue, SYNCABLE_EFFECT_PARAMS } from '../bpmSync';
+import { SidechainCompressor } from '../effects/SidechainCompressor';
+import { WAMEffectNode } from '../wam/WAMEffectNode';
+import { WAM_EFFECT_URLS } from '@/constants/wamPlugins';
+import { EffectRegistry } from '../registry/EffectRegistry';
+
+export function getDefaultEffectParameters(type: string): Record<string, number | string> {
+// Try registry first
+const desc = EffectRegistry.get(type);
+if (desc) return desc.getDefaultParameters();
+
+// Fallback to switch for unregistered effects
+switch (type) {
+  case 'Distortion':
+    return { drive: 0.4, oversample: 'none' };
+  case 'Reverb':
+    return { decay: 1.5, preDelay: 0.01 };
+  case 'Delay':
+  case 'FeedbackDelay':
+    return { time: 0.25, feedback: 0.5 };
+  case 'Chorus':
+    return { frequency: 1.5, delayTime: 3.5, depth: 0.7 };
+  case 'Phaser':
+    return { frequency: 0.5, octaves: 3, baseFrequency: 350 };
+  case 'Tremolo':
+    return { frequency: 10, depth: 0.5 };
+  case 'Vibrato':
+    return { frequency: 5, depth: 0.1 };
+  case 'AutoFilter':
+    return { frequency: 1, baseFrequency: 200, octaves: 2.6, filterType: 'lowpass' };
+  case 'AutoPanner':
+    return { frequency: 1, depth: 1 };
+  case 'AutoWah':
+    return { baseFrequency: 100, octaves: 6, sensitivity: 0, Q: 2, gain: 2, follower: 0.1 };
+  case 'BitCrusher':
+    return { bits: 4 };
+  case 'Chebyshev':
+    return { order: 2, oversample: 'none' };
+  case 'FrequencyShifter':
+    return { frequency: 0 };
+  case 'PingPongDelay':
+    return { time: 0.25, feedback: 0.5 };
+  case 'PitchShift':
+    return { pitch: 0, windowSize: 0.1, delayTime: 0, feedback: 0 };
+  case 'Compressor':
+    return { threshold: -24, ratio: 12, attack: 0.003, release: 0.25 };
+  case 'EQ3':
+    return { low: 0, mid: 0, high: 0, lowFrequency: 400, highFrequency: 2500 };
+  case 'Filter':
+    return { type: 'lowpass', frequency: 5000, rolloff: -12, Q: 1, gain: 0 };
+  case 'JCReverb':
+    return { roomSize: 0.5 };
+  case 'StereoWidener':
+    return { width: 0.5 };
+  case 'TapeSaturation':
+    return { drive: 50, tone: 12000 };
+  case 'SidechainCompressor':
+    return { threshold: -24, ratio: 4, attack: 0.003, release: 0.25, knee: 6, sidechainGain: 100 };
+  case 'SpaceEcho':
+    return { mode: 4, rate: 300, intensity: 0.5, echoVolume: 0.8, reverbVolume: 0.3, bass: 0, treble: 0 };
+  case 'SpaceyDelayer':
+    return { firstTap: 250, tapSize: 150, feedback: 40, multiTap: 1, tapeFilter: 0 };
+  case 'RETapeEcho':
+    return { mode: 3, repeatRate: 0.5, intensity: 0.5, echoVolume: 0.8, wow: 0, flutter: 0, dirt: 0, inputBleed: 0, loopAmount: 0, playheadFilter: 1 };
+  case 'BiPhase':
+    return { rateA: 0.5, depthA: 0.6, rateB: 4.0, depthB: 0.4, feedback: 0.3, routing: 0 };
+  case 'DubFilter':
+    return { cutoff: 20, resonance: 30, gain: 1 };
+  case 'MoogFilter':
+    return { cutoff: 1000, resonance: 10, drive: 1.0, model: 0, filterMode: 0 };
+  case 'MVerb':
+    return { damping: 0.5, density: 0.5, bandwidth: 0.5, decay: 0.7, predelay: 0.0, size: 0.8, gain: 1.0, mix: 0.4, earlyMix: 0.5 };
+  case 'Leslie':
+    return { speed: 0.0, hornRate: 6.8, drumRate: 5.9, hornDepth: 0.7, drumDepth: 0.5, doppler: 0.5, width: 0.8, acceleration: 0.5 };
+  case 'SpringReverb':
+    return { decay: 0.6, damping: 0.4, tension: 0.5, mix: 0.35, drip: 0.5, diffusion: 0.7 };
+  case 'VinylNoise':
+    return { hiss: 50, dust: 58, age: 45, speed: 5.5,
+             riaa: 52, stylusResonance: 50, wornStylus: 28,
+             pinch: 35, innerGroove: 25, ghostEcho: 20,
+             dropout: 10, warp: 10, eccentricity: 18 };  // "Played" condition at 33 RPM
+  case 'ToneArm':
+    return { wow: 20, coil: 50, flutter: 15, riaa: 50, stylus: 30, hiss: 20, pops: 15, rpm: 33.333 };
+  default:
+    return {};
+}
+}
+
+/** Map synthType strings to FurnaceDispatchPlatform values for non-FM chips */
+
+
+export async function createEffectChain(
+  effects: EffectConfig[]
+): Promise<(Tone.ToneAudioNode | DevilboxSynth)[]> {
+  const enabled = effects.filter((fx) => fx.enabled);
+  return Promise.all(enabled.map((fx) => this.createEffect(fx)));
+}
+
+
+export async function createEffect(
+  config: EffectConfig
+): Promise<Tone.ToneAudioNode | DevilboxSynth> {
+  const wetValue = config.wet / 100;
+  // Helper: Tone.js expects specific numeric/string params; our EffectConfig stores them as number|string
+  const p = config.parameters as Record<string, number & string>;
+
+  // Try EffectRegistry first
+  const effectDesc = await EffectRegistry.ensure(config.type);
+  if (effectDesc) {
+    const registryNode = await effectDesc.create(config);
+    (registryNode as Tone.ToneAudioNode & { _fxType?: string })._fxType = config.type;
+    return registryNode;
+  }
+
+  // Neural effects
+  if (config.category === 'neural') {
+    if (config.neuralModelIndex === undefined) {
+      throw new Error('Neural effect requires neuralModelIndex');
+    }
+
+    const wrapper = new NeuralEffectWrapper({
+      modelIndex: config.neuralModelIndex,
+      wet: wetValue,
+    });
+
+    await wrapper.loadModel();
+
+    // Set all parameters from config
+    Object.entries(config.parameters).forEach(([key, value]) => {
+      wrapper.setParameter(key, value as number);
+    });
+
+    return wrapper;
+  }
+
+  // Tone.js effects
+  let node: Tone.ToneAudioNode | DevilboxSynth;
+  
+  switch (config.type) {
+    case 'Distortion':
+      node = new Tone.Distortion({
+        distortion: p.drive || 0.4,
+        oversample: p.oversample || 'none',
+        wet: wetValue,
+      });
+      break;
+
+    case 'Reverb': {
+      const reverb = new Tone.Reverb({
+        decay: p.decay || 1.5,
+        preDelay: p.preDelay || 0.01,
+        wet: wetValue,
+      });
+      // Reverb needs to generate its impulse response before it can process audio
+      await reverb.ready;
+      node = reverb;
+      break;
+    }
+
+    case 'Delay':
+      node = new Tone.FeedbackDelay({
+        delayTime: p.time || 0.25,
+        feedback: p.feedback || 0.5,
+        wet: wetValue,
+      });
+      break;
+
+    case 'Chorus': {
+      const chorus = new Tone.Chorus({
+        frequency: p.frequency || 1.5,
+        delayTime: p.delayTime || 3.5,
+        depth: p.depth || 0.7,
+        wet: wetValue,
+      });
+      chorus.start(); // Start LFO
+      node = chorus;
+      break;
+    }
+
+    case 'Phaser':
+      node = new Tone.Phaser({
+        frequency: p.frequency || 0.5,
+        octaves: p.octaves || 3,
+        baseFrequency: p.baseFrequency || 350,
+        wet: wetValue,
+      });
+      break;
+
+    case 'Tremolo': {
+      const tremolo = new Tone.Tremolo({
+        frequency: p.frequency || 10,
+        depth: p.depth || 0.5,
+        wet: wetValue,
+      });
+      tremolo.start(); // Start LFO
+      node = tremolo;
+      break;
+    }
+
+    case 'Vibrato': {
+      const vibrato = new Tone.Vibrato({
+        frequency: p.frequency || 5,
+        depth: p.depth || 0.1,
+        wet: wetValue,
+      });
+      node = vibrato;
+      break;
+    }
+
+    case 'AutoFilter': {
+      const autoFilter = new Tone.AutoFilter({
+        frequency: p.frequency || 1,
+        baseFrequency: p.baseFrequency || 200,
+        octaves: p.octaves || 2.6,
+        filter: {
+          type: p.filterType || 'lowpass',
+          rolloff: -12,
+          Q: 1,
+        },
+        wet: wetValue,
+      });
+      autoFilter.start(); // Start LFO
+      node = autoFilter;
+      break;
+    }
+
+    case 'AutoPanner': {
+      const autoPanner = new Tone.AutoPanner({
+        frequency: p.frequency || 1,
+        depth: p.depth || 1,
+        wet: wetValue,
+      });
+      autoPanner.start(); // Start LFO
+      node = autoPanner;
+      break;
+    }
+
+    case 'AutoWah':
+      node = new Tone.AutoWah({
+        baseFrequency: p.baseFrequency || 100,
+        octaves: p.octaves || 6,
+        sensitivity: p.sensitivity || 0,
+        Q: p.Q || 2,
+        gain: p.gain || 2,
+        follower: p.follower || 0.1,
+        wet: wetValue,
+      });
+      break;
+
+    case 'BitCrusher': {
+      // Use Tone.Distortion with a staircase WaveShaper curve instead of
+      // Tone.BitCrusher. The latter uses an AudioWorklet that fails to
+      // initialize due to standardized-audio-context's AudioWorkletNode
+      // throwing InvalidStateError (even though the native API works).
+      // A WaveShaper-based approach is synchronous and fully reliable.
+      const bitsValue = Number(p.bits) || 4;
+      const crusher = new Tone.Distortion({ distortion: 0, wet: wetValue, oversample: 'none' });
+      const step = Math.pow(0.5, bitsValue - 1);
+      (crusher as unknown as { _shaper: { setMap: (fn: (v: number) => number, len?: number) => void } })
+        ._shaper.setMap((val: number) => step * Math.floor(val / step + 0.5), 4096);
+      // Tag for parameter updates in applyEffectParametersDiff
+      (crusher as unknown as Record<string, unknown>)._isBitCrusher = true;
+      (crusher as unknown as Record<string, unknown>)._bitsValue = bitsValue;
+      node = crusher;
+      break;
+    }
+
+    case 'Chebyshev':
+      node = new Tone.Chebyshev({
+        order: p.order || 2,
+        oversample: p.oversample || 'none',
+        wet: wetValue,
+      });
+      break;
+
+    case 'FeedbackDelay':
+      node = new Tone.FeedbackDelay({
+        delayTime: p.time || 0.25,
+        feedback: p.feedback || 0.5,
+        wet: wetValue,
+      });
+      break;
+
+    case 'FrequencyShifter':
+      node = new Tone.FrequencyShifter({
+        frequency: p.frequency || 0,
+        wet: wetValue,
+      });
+      break;
+
+    case 'PingPongDelay':
+      node = new Tone.PingPongDelay({
+        delayTime: p.time || 0.25,
+        feedback: p.feedback || 0.5,
+        wet: wetValue,
+      });
+      break;
+
+    case 'PitchShift':
+      node = new Tone.PitchShift({
+        pitch: p.pitch || 0,
+        windowSize: p.windowSize || 0.1,
+        delayTime: p.delayTime || 0,
+        feedback: p.feedback || 0,
+        wet: wetValue,
+      });
+      break;
+
+    case 'Compressor':
+      node = new Tone.Compressor({
+        threshold: p.threshold || -24,
+        ratio: p.ratio || 12,
+        attack: p.attack || 0.003,
+        release: p.release || 0.25,
+      });
+      break;
+
+    case 'EQ3':
+      node = new Tone.EQ3({
+        low: p.low || 0,
+        mid: p.mid || 0,
+        high: p.high || 0,
+        lowFrequency: p.lowFrequency || 400,
+        highFrequency: p.highFrequency || 2500,
+      });
+      break;
+
+    case 'Filter':
+      node = new Tone.Filter({
+        type: p.type || 'lowpass',
+        frequency: p.frequency || 5000,
+        rolloff: p.rolloff || -12,
+        Q: p.Q || 1,
+        gain: p.gain || 0,
+      });
+      break;
+
+    case 'JCReverb': {
+      const jcr = new Tone.JCReverb({
+        roomSize: p.roomSize || 0.5,
+        wet: wetValue,
+      });
+      // JCReverb uses 4 FeedbackCombFilter AudioWorklets that load async.
+      // Wait for them to connect before returning, otherwise wet path is silent.
+      const combFilters = (jcr as unknown as { _feedbackCombFilters: { _worklet?: AudioWorkletNode }[] })._feedbackCombFilters;
+      if (combFilters?.length) {
+        for (let attempt = 0; attempt < 50; attempt++) {
+          if (combFilters.every(f => f._worklet)) break;
+          await new Promise(r => setTimeout(r, 20));
+        }
+      }
+      node = jcr;
+      break;
+    }
+
+    case 'StereoWidener':
+      node = new Tone.StereoWidener({
+        width: p.width || 0.5,
+      });
+      break;
+
+    case 'TapeSaturation':
+      node = new TapeSaturation({
+        drive: (p.drive || 50) / 100,   // 0-100 -> 0-1
+        tone: p.tone || 12000,          // Hz
+        wet: wetValue,
+      });
+      break;
+
+    case 'SidechainCompressor':
+      node = new SidechainCompressor({
+        threshold: p.threshold ?? -24,
+        ratio: p.ratio ?? 4,
+        attack: p.attack ?? 0.003,
+        release: p.release ?? 0.25,
+        knee: p.knee ?? 6,
+        sidechainGain: (p.sidechainGain ?? 100) / 100,
+        wet: wetValue,
+      });
+      break;
+
+    case 'SpaceEcho':
+      node = new SpaceEchoEffect({
+        mode: Number(p.mode) || 4,
+        rate: Number(p.rate) || 300,
+        intensity: Number(p.intensity) || 0.5,
+        echoVolume: Number(p.echoVolume) || 0.8,
+        reverbVolume: Number(p.reverbVolume) || 0.3,
+        bass: Number(p.bass) || 0,
+        treble: Number(p.treble) || 0,
+        wet: wetValue,
+      });
+      break;
+
+    case 'SpaceyDelayer':
+      node = new SpaceyDelayerEffect({
+        firstTap: Number(p.firstTap) || 250,
+        tapSize: Number(p.tapSize) || 150,
+        feedback: Number(p.feedback) || 40,
+        multiTap: p.multiTap != null ? Number(p.multiTap) : 1,
+        tapeFilter: Number(p.tapeFilter) || 0,
+        wet: wetValue,
+      });
+      break;
+
+    case 'RETapeEcho':
+      node = new RETapeEchoEffect({
+        mode: p.mode != null ? Number(p.mode) : 3,
+        repeatRate: Number(p.repeatRate) || 0.5,
+        intensity: Number(p.intensity) || 0.5,
+        echoVolume: Number(p.echoVolume) || 0.8,
+        wow: Number(p.wow) || 0,
+        flutter: Number(p.flutter) || 0,
+        dirt: Number(p.dirt) || 0,
+        inputBleed: p.inputBleed != null ? Number(p.inputBleed) : 0,
+        loopAmount: Number(p.loopAmount) || 0,
+        playheadFilter: p.playheadFilter != null ? Number(p.playheadFilter) : 1,
+        wet: wetValue,
+      });
+      break;
+
+    case 'BiPhase':
+      node = new BiPhaseEffect({
+        rateA: Number(p.rateA) || 0.5,
+        depthA: Number(p.depthA) || 0.6,
+        rateB: Number(p.rateB) || 4.0,
+        depthB: Number(p.depthB) || 0.4,
+        feedback: Number(p.feedback) || 0.3,
+        routing: Number(p.routing) === 1 ? 'series' : 'parallel',
+        wet: wetValue,
+      });
+      break;
+
+    case 'DubFilter':
+      node = new DubFilterEffect({
+        cutoff: Number(p.cutoff) || 20,
+        resonance: Number(p.resonance) || 30,
+        gain: Number(p.gain) || 1,
+        wet: wetValue,
+      });
+      break;
+
+    // Buzzmachines
+    case 'BuzzDistortion': {
+      const { BuzzmachineSynth } = await import('./buzzmachines/BuzzmachineSynth');
+      const synth = new BuzzmachineSynth('ArguruDistortion');
+
+      // Apply parameters from config
+      Object.entries(config.parameters).forEach(([key, value]) => {
+        const paramIndex = parseInt(key, 10);
+        if (!isNaN(paramIndex)) {
+          synth.setParameter(paramIndex, value as number);
+        }
+      });
+
+      node = synth;
+      break;
+    }
+
+    case 'BuzzSVF': {
+      const { BuzzmachineSynth } = await import('./buzzmachines/BuzzmachineSynth');
+      const synth = new BuzzmachineSynth('ElakSVF');
+
+      // Apply parameters from config
+      Object.entries(config.parameters).forEach(([key, value]) => {
+        const paramIndex = parseInt(key, 10);
+        if (!isNaN(paramIndex)) {
+          synth.setParameter(paramIndex, value as number);
+        }
+      });
+
+      node = synth;
+      break;
+    }
+
+    case 'BuzzDelay': {
+      const { BuzzmachineSynth } = await import('./buzzmachines/BuzzmachineSynth');
+      const synth = new BuzzmachineSynth('JeskolaDelay');
+
+      // Apply parameters from config
+      Object.entries(config.parameters).forEach(([key, value]) => {
+        const paramIndex = parseInt(key, 10);
+        if (!isNaN(paramIndex)) {
+          synth.setParameter(paramIndex, value as number);
+        }
+      });
+
+      node = synth;
+      break;
+    }
+
+    case 'BuzzChorus': {
+      const { BuzzmachineSynth } = await import('./buzzmachines/BuzzmachineSynth');
+      const synth = new BuzzmachineSynth('FSMChorus');
+
+      // Apply parameters from config
+      Object.entries(config.parameters).forEach(([key, value]) => {
+        const paramIndex = parseInt(key, 10);
+        if (!isNaN(paramIndex)) {
+          synth.setParameter(paramIndex, value as number);
+        }
+      });
+
+      node = synth;
+      break;
+    }
+
+    case 'BuzzCompressor': {
+      const { BuzzmachineSynth } = await import('./buzzmachines/BuzzmachineSynth');
+      const synth = new BuzzmachineSynth('GeonikCompressor');
+      Object.entries(config.parameters).forEach(([key, value]) => {
+        const paramIndex = parseInt(key, 10);
+        if (!isNaN(paramIndex)) synth.setParameter(paramIndex, value as number);
+      });
+      node = synth;
+      break;
+    }
+
+    case 'BuzzOverdrive': {
+      const { BuzzmachineSynth } = await import('./buzzmachines/BuzzmachineSynth');
+      const synth = new BuzzmachineSynth('GeonikOverdrive');
+      Object.entries(config.parameters).forEach(([key, value]) => {
+        const paramIndex = parseInt(key, 10);
+        if (!isNaN(paramIndex)) synth.setParameter(paramIndex, value as number);
+      });
+      node = synth;
+      break;
+    }
+
+    case 'BuzzDistortion2': {
+      const { BuzzmachineSynth } = await import('./buzzmachines/BuzzmachineSynth');
+      const synth = new BuzzmachineSynth('JeskolaDistortion');
+      Object.entries(config.parameters).forEach(([key, value]) => {
+        const paramIndex = parseInt(key, 10);
+        if (!isNaN(paramIndex)) synth.setParameter(paramIndex, value as number);
+      });
+      node = synth;
+      break;
+    }
+
+    case 'BuzzCrossDelay': {
+      const { BuzzmachineSynth } = await import('./buzzmachines/BuzzmachineSynth');
+      const synth = new BuzzmachineSynth('JeskolaCrossDelay');
+      Object.entries(config.parameters).forEach(([key, value]) => {
+        const paramIndex = parseInt(key, 10);
+        if (!isNaN(paramIndex)) synth.setParameter(paramIndex, value as number);
+      });
+      node = synth;
+      break;
+    }
+
+    case 'BuzzPhilta': {
+      const { BuzzmachineSynth } = await import('./buzzmachines/BuzzmachineSynth');
+      const synth = new BuzzmachineSynth('FSMPhilta');
+      Object.entries(config.parameters).forEach(([key, value]) => {
+        const paramIndex = parseInt(key, 10);
+        if (!isNaN(paramIndex)) synth.setParameter(paramIndex, value as number);
+      });
+      node = synth;
+      break;
+    }
+
+    case 'BuzzDist2': {
+      const { BuzzmachineSynth } = await import('./buzzmachines/BuzzmachineSynth');
+      const synth = new BuzzmachineSynth('ElakDist2');
+      Object.entries(config.parameters).forEach(([key, value]) => {
+        const paramIndex = parseInt(key, 10);
+        if (!isNaN(paramIndex)) synth.setParameter(paramIndex, value as number);
+      });
+      node = synth;
+      break;
+    }
+
+    case 'BuzzFreeverb': {
+      const { BuzzmachineSynth } = await import('./buzzmachines/BuzzmachineSynth');
+      const synth = new BuzzmachineSynth('JeskolaFreeverb');
+      Object.entries(config.parameters).forEach(([key, value]) => {
+        const paramIndex = parseInt(key, 10);
+        if (!isNaN(paramIndex)) synth.setParameter(paramIndex, value as number);
+      });
+      node = synth;
+      break;
+    }
+
+    case 'BuzzFreqShift': {
+      const { BuzzmachineSynth } = await import('./buzzmachines/BuzzmachineSynth');
+      const synth = new BuzzmachineSynth('BigyoFrequencyShifter');
+      Object.entries(config.parameters).forEach(([key, value]) => {
+        const paramIndex = parseInt(key, 10);
+        if (!isNaN(paramIndex)) synth.setParameter(paramIndex, value as number);
+      });
+      node = synth;
+      break;
+    }
+
+    case 'BuzzNotch': {
+      const { BuzzmachineSynth } = await import('./buzzmachines/BuzzmachineSynth');
+      const synth = new BuzzmachineSynth('CyanPhaseNotch');
+      Object.entries(config.parameters).forEach(([key, value]) => {
+        const paramIndex = parseInt(key, 10);
+        if (!isNaN(paramIndex)) synth.setParameter(paramIndex, value as number);
+      });
+      node = synth;
+      break;
+    }
+
+    case 'BuzzStereoGain': {
+      const { BuzzmachineSynth } = await import('./buzzmachines/BuzzmachineSynth');
+      const synth = new BuzzmachineSynth('DedaCodeStereoGain');
+      Object.entries(config.parameters).forEach(([key, value]) => {
+        const paramIndex = parseInt(key, 10);
+        if (!isNaN(paramIndex)) synth.setParameter(paramIndex, value as number);
+      });
+      node = synth;
+      break;
+    }
+
+    case 'BuzzSoftSat': {
+      const { BuzzmachineSynth } = await import('./buzzmachines/BuzzmachineSynth');
+      const synth = new BuzzmachineSynth('GraueSoftSat');
+      Object.entries(config.parameters).forEach(([key, value]) => {
+        const paramIndex = parseInt(key, 10);
+        if (!isNaN(paramIndex)) synth.setParameter(paramIndex, value as number);
+      });
+      node = synth;
+      break;
+    }
+
+    case 'BuzzLimiter': {
+      const { BuzzmachineSynth } = await import('./buzzmachines/BuzzmachineSynth');
+      const synth = new BuzzmachineSynth('LdSLimit');
+      Object.entries(config.parameters).forEach(([key, value]) => {
+        const paramIndex = parseInt(key, 10);
+        if (!isNaN(paramIndex)) synth.setParameter(paramIndex, value as number);
+      });
+      node = synth;
+      break;
+    }
+
+    case 'BuzzExciter': {
+      const { BuzzmachineSynth } = await import('./buzzmachines/BuzzmachineSynth');
+      const synth = new BuzzmachineSynth('OomekExciter');
+      Object.entries(config.parameters).forEach(([key, value]) => {
+        const paramIndex = parseInt(key, 10);
+        if (!isNaN(paramIndex)) synth.setParameter(paramIndex, value as number);
+      });
+      node = synth;
+      break;
+    }
+
+    case 'BuzzMasterizer': {
+      const { BuzzmachineSynth } = await import('./buzzmachines/BuzzmachineSynth');
+      const synth = new BuzzmachineSynth('OomekMasterizer');
+      Object.entries(config.parameters).forEach(([key, value]) => {
+        const paramIndex = parseInt(key, 10);
+        if (!isNaN(paramIndex)) synth.setParameter(paramIndex, value as number);
+      });
+      node = synth;
+      break;
+    }
+
+    case 'BuzzStereoDist': {
+      const { BuzzmachineSynth } = await import('./buzzmachines/BuzzmachineSynth');
+      const synth = new BuzzmachineSynth('WhiteNoiseStereoDist');
+      Object.entries(config.parameters).forEach(([key, value]) => {
+        const paramIndex = parseInt(key, 10);
+        if (!isNaN(paramIndex)) synth.setParameter(paramIndex, value as number);
+      });
+      node = synth;
+      break;
+    }
+
+    case 'BuzzWhiteChorus': {
+      const { BuzzmachineSynth } = await import('./buzzmachines/BuzzmachineSynth');
+      const synth = new BuzzmachineSynth('WhiteNoiseWhiteChorus');
+      Object.entries(config.parameters).forEach(([key, value]) => {
+        const paramIndex = parseInt(key, 10);
+        if (!isNaN(paramIndex)) synth.setParameter(paramIndex, value as number);
+      });
+      node = synth;
+      break;
+    }
+
+    case 'BuzzZfilter': {
+      const { BuzzmachineSynth } = await import('./buzzmachines/BuzzmachineSynth');
+      const synth = new BuzzmachineSynth('QZfilter');
+      Object.entries(config.parameters).forEach(([key, value]) => {
+        const paramIndex = parseInt(key, 10);
+        if (!isNaN(paramIndex)) synth.setParameter(paramIndex, value as number);
+      });
+      node = synth;
+      break;
+    }
+
+    case 'BuzzChorus2': {
+      const { BuzzmachineSynth } = await import('./buzzmachines/BuzzmachineSynth');
+      const synth = new BuzzmachineSynth('FSMChorus2');
+      Object.entries(config.parameters).forEach(([key, value]) => {
+        const paramIndex = parseInt(key, 10);
+        if (!isNaN(paramIndex)) synth.setParameter(paramIndex, value as number);
+      });
+      node = synth;
+      break;
+    }
+
+    case 'BuzzPanzerDelay': {
+      const { BuzzmachineSynth } = await import('./buzzmachines/BuzzmachineSynth');
+      const synth = new BuzzmachineSynth('FSMPanzerDelay');
+      Object.entries(config.parameters).forEach(([key, value]) => {
+        const paramIndex = parseInt(key, 10);
+        if (!isNaN(paramIndex)) synth.setParameter(paramIndex, value as number);
+      });
+      node = synth;
+      break;
+    }
+
+    // WASM effects
+    case 'MoogFilter':
+      node = new MoogFilterEffect({
+        cutoff: Number(p.cutoff) || 1000,
+        resonance: (Number(p.resonance) || 10) / 100,  // 0-100 -> 0-1
+        drive: Number(p.drive) || 1.0,
+        model: (Number(p.model) || MoogFilterModel.Hyperion) as MoogFilterModel,
+        filterMode: (Number(p.filterMode) || MoogFilterMode.LP4) as MoogFilterMode,
+        wet: wetValue,
+      });
+      break;
+
+    case 'MVerb':
+      node = new MVerbEffect({
+        damping: Number(p.damping),
+        density: Number(p.density),
+        bandwidth: Number(p.bandwidth),
+        decay: Number(p.decay),
+        predelay: Number(p.predelay),
+        size: Number(p.size),
+        gain: Number(p.gain),
+        mix: Number(p.mix),
+        earlyMix: Number(p.earlyMix),
+        wet: wetValue,
+      });
+      break;
+
+    case 'Leslie':
+      node = new LeslieEffect({
+        speed: Number(p.speed),
+        hornRate: Number(p.hornRate),
+        drumRate: Number(p.drumRate),
+        hornDepth: Number(p.hornDepth),
+        drumDepth: Number(p.drumDepth),
+        doppler: Number(p.doppler),
+        width: Number(p.width),
+        acceleration: Number(p.acceleration),
+        wet: wetValue,
+      });
+      break;
+
+    case 'SpringReverb':
+      node = new SpringReverbEffect({
+        decay: Number(p.decay),
+        damping: Number(p.damping),
+        tension: Number(p.tension),
+        mix: Number(p.mix),
+        drip: Number(p.drip),
+        diffusion: Number(p.diffusion),
+        wet: wetValue,
+      });
+      break;
+
+    case 'ToneArm': {
+      const node = new ToneArmEffect({
+        wow:     (p.wow     != null ? Number(p.wow)     : 20) / 100,
+        coil:    (p.coil    != null ? Number(p.coil)    : 50) / 100,
+        flutter: (p.flutter != null ? Number(p.flutter) : 15) / 100,
+        riaa:    (p.riaa    != null ? Number(p.riaa)    : 50) / 100,
+        stylus:  (p.stylus  != null ? Number(p.stylus)  : 30) / 100,
+        hiss:    (p.hiss    != null ? Number(p.hiss)    : 20) / 100,
+        pops:    (p.pops    != null ? Number(p.pops)    : 15) / 100,
+        rpm:     (p.rpm     != null ? Number(p.rpm)     : 33.333),
+        wet:     wetValue,
+      });
+      (node as Tone.ToneAudioNode & { _fxType?: string })._fxType = 'ToneArm';
+      return node;
+    }
+
+    case 'VinylNoise': {
+      const node = new VinylNoiseEffect({
+        hiss:            (p.hiss            != null ? Number(p.hiss)            : 20)  / 100,
+        dust:            (p.dust            != null ? Number(p.dust)            : 30)  / 100,
+        age:             (p.age             != null ? Number(p.age)             : 18)  / 100,
+        speed:           (p.speed           != null ? Number(p.speed)           : 5.5) / 100,
+        riaa:            (p.riaa            != null ? Number(p.riaa)            : 30)  / 100,
+        stylusResonance: (p.stylusResonance != null ? Number(p.stylusResonance) : 25)  / 100,
+        wornStylus:      (p.wornStylus      != null ? Number(p.wornStylus)      : 0)   / 100,
+        pinch:           (p.pinch           != null ? Number(p.pinch)           : 15)  / 100,
+        innerGroove:     (p.innerGroove     != null ? Number(p.innerGroove)     : 0)   / 100,
+        ghostEcho:       (p.ghostEcho       != null ? Number(p.ghostEcho)       : 0)   / 100,
+        dropout:         (p.dropout         != null ? Number(p.dropout)         : 0)   / 100,
+        warp:            (p.warp            != null ? Number(p.warp)            : 0)   / 100,
+        eccentricity:    (p.eccentricity    != null ? Number(p.eccentricity)    : 0)   / 100,
+        wet: wetValue,
+      });
+      (node as Tone.ToneAudioNode & { _fxType?: string })._fxType = 'VinylNoise';
+      return node;
+    }
+
+    // WAM 2.0 effects
+    case 'WAMBigMuff':
+    case 'WAMTS9':
+    case 'WAMDistoMachine':
+    case 'WAMQuadraFuzz':
+    case 'WAMVoxAmp':
+    case 'WAMStonePhaser':
+    case 'WAMPingPongDelay':
+    case 'WAMFaustDelay':
+    case 'WAMPitchShifter':
+    case 'WAMGraphicEQ':
+    case 'WAMPedalboard': {
+      const wamUrl = WAM_EFFECT_URLS[config.type];
+      if (!wamUrl) {
+        console.warn(`[InstrumentFactory] No WAM URL for effect: ${config.type}`);
+        node = new Tone.Gain(1);
+        break;
+      }
+      const wamNode = new WAMEffectNode({ moduleUrl: wamUrl, wet: wetValue });
+      await wamNode.ensureInitialized();
+      node = wamNode;
+      break;
+    }
+
+    default:
+      console.warn(`Unknown effect type: ${config.type}, creating bypass`);
+      node = new Tone.Gain(1);
+  }
+
+  // Attach type metadata for identification in the engine
+  (node as Tone.ToneAudioNode & { _fxType?: string })._fxType = config.type;
+
+  // Apply initial BPM-synced values if sync is enabled
+  if (isEffectBpmSynced(config.parameters)) {
+    const syncEntries = SYNCABLE_EFFECT_PARAMS[config.type];
+    if (syncEntries) {
+      const bpm = Tone.getTransport().bpm.value;
+      const division = getEffectSyncDivision(config.parameters);
+      for (const entry of syncEntries) {
+        const value = computeSyncedValue(bpm, division, entry.unit);
+        // Apply directly via the same pattern as ToneEngine.applyBpmSyncedParam
+        switch (config.type) {
+          case 'Delay':
+          case 'FeedbackDelay':
+            if (entry.param === 'time' && node instanceof Tone.FeedbackDelay) node.delayTime.value = value;
+            break;
+          case 'PingPongDelay':
+            if (entry.param === 'time' && node instanceof Tone.PingPongDelay) node.delayTime.value = value;
+            break;
+          case 'SpaceEcho':
+            if (entry.param === 'rate' && node instanceof SpaceEchoEffect) node.setRate(value);
+            break;
+          case 'SpaceyDelayer':
+            if (entry.param === 'firstTap' && node instanceof SpaceyDelayerEffect) node.setFirstTap(value);
+            break;
+          case 'RETapeEcho':
+            if (entry.param === 'repeatRate' && node instanceof RETapeEchoEffect) node.setRepeatRate(value);
+            break;
+          case 'Chorus':
+            if (entry.param === 'frequency' && node instanceof Tone.Chorus) node.frequency.value = value;
+            break;
+          case 'BiPhase':
+            if (entry.param === 'rateA' && node instanceof BiPhaseEffect) (node as unknown as { rateA: number }).rateA = value;
+            break;
+        }
+      }
+    }
+  }
+
+  return node;
+}
+
