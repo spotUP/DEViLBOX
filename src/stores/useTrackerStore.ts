@@ -17,7 +17,6 @@ import type {
   FurnaceSubsongPlayback,
 } from '@typedefs';
 import { DEFAULT_COLUMN_VISIBILITY, EMPTY_CELL, CHANNEL_COLORS } from '@typedefs';
-import { xmNoteToMidi, midiToXMNote } from '@/lib/xmConversions';
 import { getToneEngine } from '@engine/ToneEngine';
 import { getTrackerReplayer } from '@engine/TrackerReplayer';
 import { useTransportStore } from './useTransportStore';
@@ -27,12 +26,25 @@ import { SYSTEM_PRESETS, DivChanType } from '../constants/systemPresets';
 import { useHistoryStore } from './useHistoryStore';
 import { useCursorStore } from './useCursorStore';
 
+// Extracted helper modules
+import {
+  setCellInPattern, clearCellInPattern, clearChannelInPattern, clearPatternCells,
+  insertRowInChannel, deleteRowInChannel,
+  applyInstrumentToSelectionHelper, transposeSelectionHelper, remapInstrumentHelper,
+  interpolateSelectionHelper, humanizeSelectionHelper, strumSelectionHelper, legatoSelectionHelper,
+  scaleVolumeHelper, fadeVolumeHelper, amplifySelectionHelper, swapChannelsHelper,
+} from './tracker/patternEditActions';
+import {
+  copySelectionHelper, cutSelectionHelper,
+  pasteHelper, pasteMixHelper, pasteFloodHelper, pastePushForwardHelper,
+  copyTrackHelper, cutTrackHelper, pasteTrackHelper,
+} from './tracker/clipboardActions';
+import {
+  type MacroSlot, createEmptyMacroSlot,
+  writeMacroSlotHelper, readMacroSlotHelper, findBestChannelHelper,
+} from './tracker/multiRecordActions';
+
 // FT2-style bitwise mask system for copy/paste/transpose operations
-// Bit 0: Note
-// Bit 1: Instrument
-// Bit 2: Volume
-// Bit 3: Effect
-// Bit 4: Effect2
 const MASK_NOTE = 1 << 0;      // 0b00001
 const MASK_INSTRUMENT = 1 << 1; // 0b00010
 const MASK_VOLUME = 1 << 2;     // 0b00100
@@ -40,30 +52,8 @@ const MASK_EFFECT = 1 << 3;     // 0b01000
 const MASK_EFFECT2 = 1 << 4;    // 0b10000
 const MASK_ALL = 0b11111;       // All columns
 
-// Helper functions for mask operations
 const hasMaskBit = (mask: number, bit: number): boolean => (mask & bit) !== 0;
 const toggleMaskBit = (mask: number, bit: number): number => mask ^ bit;
-
-// Macro slot structure for rapid data entry (FT2-style)
-interface MacroSlot {
-  note: number;
-  instrument: number;
-  volume: number;
-  effTyp: number;
-  eff: number;
-  effTyp2: number;
-  eff2: number;
-}
-
-const createEmptyMacroSlot = (): MacroSlot => ({
-  note: 0,
-  instrument: 0,
-  volume: 0,
-  effTyp: 0,
-  eff: 0,
-  effTyp2: 0,
-  eff2: 0,
-});
 
 interface TrackerStore {
   // State
@@ -388,18 +378,7 @@ export const useTrackerStore = create<TrackerStore>()(
       const patternIndex = get().currentPatternIndex;
       const beforePattern = get().patterns[patternIndex];
       set((state) => {
-        const pattern = state.patterns[state.currentPatternIndex];
-        if (
-          channelIndex >= 0 &&
-          channelIndex < pattern.channels.length &&
-          rowIndex >= 0 &&
-          rowIndex < pattern.length
-        ) {
-          pattern.channels[channelIndex].rows[rowIndex] = {
-            ...pattern.channels[channelIndex].rows[rowIndex],
-            ...cellUpdate,
-          };
-        }
+        setCellInPattern(state.patterns[state.currentPatternIndex], channelIndex, rowIndex, cellUpdate);
       });
       useHistoryStore.getState().pushAction('EDIT_CELL', 'Edit cell', patternIndex, beforePattern, get().patterns[patternIndex]);
     },
@@ -408,15 +387,7 @@ export const useTrackerStore = create<TrackerStore>()(
       const patternIndex = get().currentPatternIndex;
       const beforePattern = get().patterns[patternIndex];
       set((state) => {
-        const pattern = state.patterns[state.currentPatternIndex];
-        if (
-          channelIndex >= 0 &&
-          channelIndex < pattern.channels.length &&
-          rowIndex >= 0 &&
-          rowIndex < pattern.length
-        ) {
-          pattern.channels[channelIndex].rows[rowIndex] = { ...EMPTY_CELL };
-        }
+        clearCellInPattern(state.patterns[state.currentPatternIndex], channelIndex, rowIndex);
       });
       useHistoryStore.getState().pushAction('CLEAR_CELL', 'Clear cell', patternIndex, beforePattern, get().patterns[patternIndex]);
     },
@@ -425,10 +396,7 @@ export const useTrackerStore = create<TrackerStore>()(
       const patternIndex = get().currentPatternIndex;
       const beforePattern = get().patterns[patternIndex];
       set((state) => {
-        const pattern = state.patterns[state.currentPatternIndex];
-        if (channelIndex >= 0 && channelIndex < pattern.channels.length) {
-          pattern.channels[channelIndex].rows = pattern.channels[channelIndex].rows.map(() => ({ ...EMPTY_CELL }));
-        }
+        clearChannelInPattern(state.patterns[state.currentPatternIndex], channelIndex);
       });
       useHistoryStore.getState().pushAction('CLEAR_CHANNEL', 'Clear channel', patternIndex, beforePattern, get().patterns[patternIndex]);
     },
@@ -437,10 +405,7 @@ export const useTrackerStore = create<TrackerStore>()(
       const patternIndex = get().currentPatternIndex;
       const beforePattern = get().patterns[patternIndex];
       set((state) => {
-        const pattern = state.patterns[state.currentPatternIndex];
-        pattern.channels.forEach((channel) => {
-          channel.rows = channel.rows.map(() => ({ ...EMPTY_CELL }));
-        });
+        clearPatternCells(state.patterns[state.currentPatternIndex]);
       });
       useHistoryStore.getState().pushAction('CLEAR_PATTERN', 'Clear pattern', patternIndex, beforePattern, get().patterns[patternIndex]);
     },
@@ -449,21 +414,7 @@ export const useTrackerStore = create<TrackerStore>()(
       const patternIndex = get().currentPatternIndex;
       const beforePattern = get().patterns[patternIndex];
       set((state) => {
-        const pattern = state.patterns[state.currentPatternIndex];
-        if (
-          channelIndex >= 0 &&
-          channelIndex < pattern.channels.length &&
-          rowIndex >= 0 &&
-          rowIndex < pattern.length
-        ) {
-          const rows = pattern.channels[channelIndex].rows;
-          // Shift rows down starting from rowIndex
-          for (let i = pattern.length - 1; i > rowIndex; i--) {
-            rows[i] = { ...rows[i - 1] };
-          }
-          // Clear inserted row
-          rows[rowIndex] = { ...EMPTY_CELL };
-        }
+        insertRowInChannel(state.patterns[state.currentPatternIndex], channelIndex, rowIndex);
       });
       useHistoryStore.getState().pushAction('INSERT_ROW', 'Insert row', patternIndex, beforePattern, get().patterns[patternIndex]);
     },
@@ -472,21 +423,7 @@ export const useTrackerStore = create<TrackerStore>()(
       const patternIndex = get().currentPatternIndex;
       const beforePattern = get().patterns[patternIndex];
       set((state) => {
-        const pattern = state.patterns[state.currentPatternIndex];
-        if (
-          channelIndex >= 0 &&
-          channelIndex < pattern.channels.length &&
-          rowIndex >= 0 &&
-          rowIndex < pattern.length
-        ) {
-          const rows = pattern.channels[channelIndex].rows;
-          // Shift rows up starting from rowIndex
-          for (let i = rowIndex; i < pattern.length - 1; i++) {
-            rows[i] = { ...rows[i + 1] };
-          }
-          // Clear last row
-          rows[pattern.length - 1] = { ...EMPTY_CELL };
-        }
+        deleteRowInChannel(state.patterns[state.currentPatternIndex], channelIndex, rowIndex);
       });
       useHistoryStore.getState().pushAction('DELETE_ROW', 'Delete row', patternIndex, beforePattern, get().patterns[patternIndex]);
     },
@@ -618,28 +555,7 @@ export const useTrackerStore = create<TrackerStore>()(
       const pattern = state.patterns[state.currentPatternIndex];
       const numChannels = pattern?.channels.length || 1;
       const cursorChannel = useCursorStore.getState().cursor.channelIndex;
-
-      // If multi-rec/multi-edit not enabled, use cursor channel
-      if (!state.multiRecEnabled && !state.multiEditEnabled) {
-        return cursorChannel;
-      }
-
-      // Find channel with lowest keyOffTime that has no note playing and is enabled
-      let bestChannel = cursorChannel;
-      let bestTime = Infinity;
-
-      for (let i = 0; i < numChannels; i++) {
-        if (
-          state.multiRecChannels[i] && // Channel is enabled for multi-rec
-          state.keyOnTab[i] === 0 &&   // No note currently playing
-          state.keyOffTime[i] < bestTime
-        ) {
-          bestChannel = i;
-          bestTime = state.keyOffTime[i];
-        }
-      }
-
-      return bestChannel;
+      return findBestChannelHelper(state, numChannels, cursorChannel);
     },
 
     resetKeyTracking: () =>
@@ -669,68 +585,7 @@ export const useTrackerStore = create<TrackerStore>()(
       set((state) => {
         const pattern = state.patterns[state.currentPatternIndex];
         const { cursor, selection } = useCursorStore.getState();
-        let sel = selection;
-        
-        // Fallback: use current cell if no selection
-        if (!sel) {
-          sel = {
-            startChannel: cursor.channelIndex,
-            endChannel: cursor.channelIndex,
-            startRow: cursor.rowIndex,
-            endRow: cursor.rowIndex,
-            startColumn: cursor.columnType,
-            endColumn: cursor.columnType,
-            columnTypes: [cursor.columnType],
-          };
-        }
-
-        const { startChannel, endChannel, startRow, endRow, columnTypes } = sel;
-        const minChannel = Math.min(startChannel, endChannel);
-        const maxChannel = Math.max(startChannel, endChannel);
-        const minRow = Math.min(startRow, endRow);
-        const maxRow = Math.max(startRow, endRow);
-
-        const copiedData: TrackerCell[][] = [];
-        const isFullCell = !columnTypes || columnTypes.length === 0 || columnTypes.length > 8;
-
-        for (let ch = minChannel; ch <= maxChannel; ch++) {
-          const channelData: TrackerCell[] = [];
-          for (let row = minRow; row <= maxRow; row++) {
-            const sourceCell = pattern.channels[ch].rows[row];
-            if (isFullCell) {
-              channelData.push({ ...sourceCell });
-            } else {
-              // Create a "sparse" cell with only selected fields
-              const sparseCell: TrackerCell = { ...EMPTY_CELL };
-              if (columnTypes.includes('note')) {
-                sparseCell.note = sourceCell.note;
-                sparseCell.instrument = sourceCell.instrument;
-              }
-              if (columnTypes.includes('instrument')) sparseCell.instrument = sourceCell.instrument;
-              if (columnTypes.includes('volume')) sparseCell.volume = sourceCell.volume;
-              if (columnTypes.includes('effTyp') || columnTypes.includes('effParam')) {
-                sparseCell.effTyp = sourceCell.effTyp;
-                sparseCell.eff = sourceCell.eff;
-              }
-              if (columnTypes.includes('effTyp2') || columnTypes.includes('effParam2')) {
-                sparseCell.effTyp2 = sourceCell.effTyp2;
-                sparseCell.eff2 = sourceCell.eff2;
-              }
-              if (columnTypes.includes('flag1')) sparseCell.flag1 = sourceCell.flag1;
-              if (columnTypes.includes('flag2')) sparseCell.flag2 = sourceCell.flag2;
-              if (columnTypes.includes('probability')) sparseCell.probability = sourceCell.probability;
-              channelData.push(sparseCell);
-            }
-          }
-          copiedData.push(channelData);
-        }
-
-        state.clipboard = {
-          channels: maxChannel - minChannel + 1,
-          rows: maxRow - minRow + 1,
-          data: copiedData,
-          columnTypes: columnTypes,
-        };
+        state.clipboard = copySelectionHelper(pattern, selection, cursor);
       }),
 
     cutSelection: () => {
@@ -739,92 +594,7 @@ export const useTrackerStore = create<TrackerStore>()(
       set((state) => {
         const pattern = state.patterns[state.currentPatternIndex];
         const { cursor, selection } = useCursorStore.getState();
-        let sel = selection;
-        
-        // Fallback: use current cell if no selection
-        if (!sel) {
-          sel = {
-            startChannel: cursor.channelIndex,
-            endChannel: cursor.channelIndex,
-            startRow: cursor.rowIndex,
-            endRow: cursor.rowIndex,
-            startColumn: cursor.columnType,
-            endColumn: cursor.columnType,
-            columnTypes: [cursor.columnType],
-          };
-        }
-
-        const { startChannel, endChannel, startRow, endRow, columnTypes } = sel;
-        const minChannel = Math.min(startChannel, endChannel);
-        const maxChannel = Math.max(startChannel, endChannel);
-        const minRow = Math.min(startRow, endRow);
-        const maxRow = Math.max(startRow, endRow);
-
-        const copiedData: TrackerCell[][] = [];
-        const isFullCell = !columnTypes || columnTypes.length === 0 || columnTypes.length > 8;
-
-        for (let ch = minChannel; ch <= maxChannel; ch++) {
-          const channelData: TrackerCell[] = [];
-          for (let row = minRow; row <= maxRow; row++) {
-            const cell = pattern.channels[ch].rows[row];
-            
-            // Copy logic
-            if (isFullCell) {
-              channelData.push({ ...cell });
-              pattern.channels[ch].rows[row] = { ...EMPTY_CELL };
-            } else {
-              const sparseCell: TrackerCell = { ...EMPTY_CELL };
-              if (columnTypes.includes('note')) {
-                sparseCell.note = cell.note;
-                sparseCell.instrument = cell.instrument;
-                cell.note = 0;
-                cell.instrument = 0;
-              }
-              if (columnTypes.includes('instrument')) {
-                sparseCell.instrument = cell.instrument;
-                cell.instrument = 0;
-              }
-              if (columnTypes.includes('volume')) {
-                sparseCell.volume = cell.volume;
-                cell.volume = 0;
-              }
-              if (columnTypes.includes('effTyp') || columnTypes.includes('effParam')) {
-                sparseCell.effTyp = cell.effTyp;
-                sparseCell.eff = cell.eff;
-                cell.effTyp = 0;
-                cell.eff = 0;
-              }
-              if (columnTypes.includes('effTyp2') || columnTypes.includes('effParam2')) {
-                sparseCell.effTyp2 = cell.effTyp2;
-                sparseCell.eff2 = cell.eff2;
-                cell.effTyp2 = 0;
-                cell.eff2 = 0;
-              }
-              if (columnTypes.includes('flag1')) {
-                sparseCell.flag1 = cell.flag1;
-                cell.flag1 = undefined;
-              }
-              if (columnTypes.includes('flag2')) {
-                sparseCell.flag2 = cell.flag2;
-                cell.flag2 = undefined;
-              }
-              if (columnTypes.includes('probability')) {
-                sparseCell.probability = cell.probability;
-                cell.probability = undefined;
-              }
-              channelData.push(sparseCell);
-            }
-          }
-          copiedData.push(channelData);
-        }
-
-        state.clipboard = {
-          channels: maxChannel - minChannel + 1,
-          rows: maxRow - minRow + 1,
-          data: copiedData,
-          columnTypes: columnTypes,
-        };
-
+        state.clipboard = cutSelectionHelper(pattern, selection, cursor);
       });
       useCursorStore.getState().clearSelection();
       useHistoryStore.getState().pushAction('CUT_SELECTION', 'Cut', patternIndex, beforePattern, get().patterns[patternIndex]);
@@ -841,59 +611,9 @@ export const useTrackerStore = create<TrackerStore>()(
       const beforePattern = get().patterns[patternIndex];
       set((state) => {
         if (!state.clipboard) return;
-
         const pattern = state.patterns[state.currentPatternIndex];
-        const { channelIndex, rowIndex } = useCursorStore.getState().cursor;
-        const { data, columnTypes } = state.clipboard;
-        const { pasteMask } = state;
-        
-        const isSparse = !!(columnTypes && columnTypes.length > 0 && columnTypes.length <= 8);
-
-        for (let ch = 0; ch < data.length; ch++) {
-          const targetChannel = channelIndex + ch;
-          if (targetChannel >= pattern.channels.length) break;
-
-          for (let row = 0; row < data[ch].length; row++) {
-            const targetRow = rowIndex + row;
-            if (targetRow >= pattern.length) break;
-
-            const sourceCell = data[ch][row];
-            const targetCell = pattern.channels[targetChannel].rows[targetRow];
-
-            // Merge properties based on pasteMask AND columnTypes if sparse
-            if (hasMaskBit(pasteMask, MASK_NOTE) && (!isSparse || columnTypes.includes('note'))) {
-              targetCell.note = sourceCell.note;
-              if (sourceCell.instrument !== 0) {
-                targetCell.instrument = sourceCell.instrument;
-              }
-            }
-            if (hasMaskBit(pasteMask, MASK_INSTRUMENT) && (!isSparse || columnTypes.includes('instrument'))) {
-              targetCell.instrument = sourceCell.instrument;
-            }
-            if (hasMaskBit(pasteMask, MASK_VOLUME) && (!isSparse || columnTypes.includes('volume'))) {
-              targetCell.volume = sourceCell.volume;
-            }
-            if (hasMaskBit(pasteMask, MASK_EFFECT) && (!isSparse || columnTypes.includes('effTyp') || columnTypes.includes('effParam'))) {
-              targetCell.effTyp = sourceCell.effTyp;
-              targetCell.eff = sourceCell.eff;
-            }
-            if (hasMaskBit(pasteMask, MASK_EFFECT2) && (!isSparse || columnTypes.includes('effTyp2') || columnTypes.includes('effParam2'))) {
-              targetCell.effTyp2 = sourceCell.effTyp2;
-              targetCell.eff2 = sourceCell.eff2;
-            }
-            
-            // Flags and prob
-            if (isSparse) {
-              if (columnTypes.includes('flag1')) targetCell.flag1 = sourceCell.flag1;
-              if (columnTypes.includes('flag2')) targetCell.flag2 = sourceCell.flag2;
-              if (columnTypes.includes('probability')) targetCell.probability = sourceCell.probability;
-            } else {
-              if (sourceCell.flag1 !== undefined) targetCell.flag1 = sourceCell.flag1;
-              if (sourceCell.flag2 !== undefined) targetCell.flag2 = sourceCell.flag2;
-              if (sourceCell.probability !== undefined) targetCell.probability = sourceCell.probability;
-            }
-          }
-        }
+        const cursor = useCursorStore.getState().cursor;
+        pasteHelper(pattern, cursor, state.clipboard, state.pasteMask);
       });
       useHistoryStore.getState().pushAction('PASTE', 'Paste', patternIndex, beforePattern, get().patterns[patternIndex]);
     },
@@ -905,43 +625,9 @@ export const useTrackerStore = create<TrackerStore>()(
       const beforePattern = get().patterns[patternIndex];
       set((state) => {
         if (!state.clipboard) return;
-
         const pattern = state.patterns[state.currentPatternIndex];
-        const { channelIndex, rowIndex } = useCursorStore.getState().cursor;
-        const { data } = state.clipboard;
-        const { pasteMask } = state;
-
-        for (let ch = 0; ch < data.length; ch++) {
-          const targetChannel = channelIndex + ch;
-          if (targetChannel >= pattern.channels.length) break;
-
-          for (let row = 0; row < data[ch].length; row++) {
-            const targetRow = rowIndex + row;
-            if (targetRow >= pattern.length) break;
-
-            const sourceCell = data[ch][row];
-            const targetCell = pattern.channels[targetChannel].rows[targetRow];
-
-            // Only paste if target cell field is empty (0 or null)
-            if (hasMaskBit(pasteMask, MASK_NOTE) && sourceCell.note !== 0 && targetCell.note === 0) {
-              targetCell.note = sourceCell.note;
-            }
-            if (hasMaskBit(pasteMask, MASK_INSTRUMENT) && sourceCell.instrument !== 0 && targetCell.instrument === 0) {
-              targetCell.instrument = sourceCell.instrument;
-            }
-            if (hasMaskBit(pasteMask, MASK_VOLUME) && sourceCell.volume !== 0 && targetCell.volume === 0) {
-              targetCell.volume = sourceCell.volume;
-            }
-            if (hasMaskBit(pasteMask, MASK_EFFECT) && (sourceCell.effTyp !== 0 || sourceCell.eff !== 0) && targetCell.effTyp === 0 && targetCell.eff === 0) {
-              targetCell.effTyp = sourceCell.effTyp;
-              targetCell.eff = sourceCell.eff;
-            }
-            if (hasMaskBit(pasteMask, MASK_EFFECT2) && (sourceCell.effTyp2 !== 0 || sourceCell.eff2 !== 0) && targetCell.effTyp2 === 0 && targetCell.eff2 === 0) {
-              targetCell.effTyp2 = sourceCell.effTyp2;
-              targetCell.eff2 = sourceCell.eff2;
-            }
-          }
-        }
+        const cursor = useCursorStore.getState().cursor;
+        pasteMixHelper(pattern, cursor, state.clipboard, state.pasteMask);
       });
       useHistoryStore.getState().pushAction('PASTE_MIX', 'Mix paste', patternIndex, beforePattern, get().patterns[patternIndex]);
     },
@@ -953,49 +639,9 @@ export const useTrackerStore = create<TrackerStore>()(
       const beforePattern = get().patterns[patternIndex];
       set((state) => {
         if (!state.clipboard) return;
-
         const pattern = state.patterns[state.currentPatternIndex];
-        const { channelIndex, rowIndex } = useCursorStore.getState().cursor;
-        const { data } = state.clipboard;
-        const { pasteMask } = state;
-        const clipboardRows = data[0]?.length || 0;
-        if (clipboardRows === 0) return;
-
-        for (let ch = 0; ch < data.length; ch++) {
-          const targetChannel = channelIndex + ch;
-          if (targetChannel >= pattern.channels.length) break;
-
-          // Keep pasting until we reach the end of the pattern
-          let currentRow = rowIndex;
-          while (currentRow < pattern.length) {
-            for (let row = 0; row < data[ch].length; row++) {
-              const targetRow = currentRow + row;
-              if (targetRow >= pattern.length) break;
-
-              const sourceCell = data[ch][row];
-              const targetCell = pattern.channels[targetChannel].rows[targetRow];
-
-              if (hasMaskBit(pasteMask, MASK_NOTE)) {
-                targetCell.note = sourceCell.note;
-              }
-              if (hasMaskBit(pasteMask, MASK_INSTRUMENT)) {
-                targetCell.instrument = sourceCell.instrument;
-              }
-              if (hasMaskBit(pasteMask, MASK_VOLUME)) {
-                targetCell.volume = sourceCell.volume;
-              }
-              if (hasMaskBit(pasteMask, MASK_EFFECT)) {
-                targetCell.effTyp = sourceCell.effTyp;
-                targetCell.eff = sourceCell.eff;
-              }
-              if (hasMaskBit(pasteMask, MASK_EFFECT2)) {
-                targetCell.effTyp2 = sourceCell.effTyp2;
-                targetCell.eff2 = sourceCell.eff2;
-              }
-            }
-            currentRow += clipboardRows;
-          }
-        }
+        const cursor = useCursorStore.getState().cursor;
+        pasteFloodHelper(pattern, cursor, state.clipboard, state.pasteMask);
       });
       useHistoryStore.getState().pushAction('PASTE_FLOOD', 'Flood paste', patternIndex, beforePattern, get().patterns[patternIndex]);
     },
@@ -1007,70 +653,9 @@ export const useTrackerStore = create<TrackerStore>()(
       const beforePattern = get().patterns[patternIndex];
       set((state) => {
         if (!state.clipboard) return;
-
         const pattern = state.patterns[state.currentPatternIndex];
-        const { channelIndex, rowIndex } = useCursorStore.getState().cursor;
-        const { data } = state.clipboard;
-        const { pasteMask } = state;
-        const clipboardRows = data[0]?.length || 0;
-        if (clipboardRows === 0) return;
-
-        for (let ch = 0; ch < data.length; ch++) {
-          const targetChannel = channelIndex + ch;
-          if (targetChannel >= pattern.channels.length) break;
-
-          const channel = pattern.channels[targetChannel];
-
-          // Shift existing rows down (from bottom to insertion point)
-          for (let row = pattern.length - 1; row >= rowIndex + clipboardRows; row--) {
-            const sourceRow = row - clipboardRows;
-            if (sourceRow >= rowIndex) {
-              channel.rows[row] = { ...channel.rows[sourceRow] };
-            }
-          }
-
-          // Insert clipboard data
-          for (let row = 0; row < data[ch].length; row++) {
-            const targetRow = rowIndex + row;
-            if (targetRow >= pattern.length) break;
-
-            const sourceCell = data[ch][row];
-            const targetCell = channel.rows[targetRow];
-
-            // Clear target cell first, then apply paste mask
-            targetCell.note = 0;
-            targetCell.instrument = 0;
-            targetCell.volume = 0;
-            targetCell.effTyp = 0;
-            targetCell.eff = 0;
-            targetCell.effTyp2 = 0;
-            targetCell.eff2 = 0;
-            targetCell.flag1 = 0;
-            targetCell.flag2 = 0;
-            targetCell.probability = 0;
-
-            if (hasMaskBit(pasteMask, MASK_NOTE)) {
-              targetCell.note = sourceCell.note;
-              targetCell.flag1 = sourceCell.flag1 ?? 0;
-              targetCell.flag2 = sourceCell.flag2 ?? 0;
-              targetCell.probability = sourceCell.probability ?? 0;
-            }
-            if (hasMaskBit(pasteMask, MASK_INSTRUMENT)) {
-              targetCell.instrument = sourceCell.instrument;
-            }
-            if (hasMaskBit(pasteMask, MASK_VOLUME)) {
-              targetCell.volume = sourceCell.volume;
-            }
-            if (hasMaskBit(pasteMask, MASK_EFFECT)) {
-              targetCell.effTyp = sourceCell.effTyp;
-              targetCell.eff = sourceCell.eff;
-            }
-            if (hasMaskBit(pasteMask, MASK_EFFECT2)) {
-              targetCell.effTyp2 = sourceCell.effTyp2;
-              targetCell.eff2 = sourceCell.eff2;
-            }
-          }
-        }
+        const cursor = useCursorStore.getState().cursor;
+        pastePushForwardHelper(pattern, cursor, state.clipboard, state.pasteMask);
       });
       useHistoryStore.getState().pushAction('PASTE_PUSH_FORWARD', 'Push-forward paste', patternIndex, beforePattern, get().patterns[patternIndex]);
     },
@@ -1079,23 +664,17 @@ export const useTrackerStore = create<TrackerStore>()(
     copyTrack: (channelIndex) =>
       set((state) => {
         const pattern = state.patterns[state.currentPatternIndex];
-        if (channelIndex < 0 || channelIndex >= pattern.channels.length) return;
-
-        const channel = pattern.channels[channelIndex];
-        state.trackClipboard = channel.rows.map(row => ({ ...row }));
+        const result = copyTrackHelper(pattern, channelIndex);
+        if (result) state.trackClipboard = result;
       }),
 
     cutTrack: (channelIndex) => {
       const patternIndex = get().currentPatternIndex;
-      const pattern = get().patterns[patternIndex];
-      if (channelIndex < 0 || channelIndex >= pattern.channels.length) return;
-      const beforePattern = pattern;
+      const beforePattern = get().patterns[patternIndex];
       set((state) => {
         const p = state.patterns[state.currentPatternIndex];
-        if (channelIndex < 0 || channelIndex >= p.channels.length) return;
-        const channel = p.channels[channelIndex];
-        state.trackClipboard = channel.rows.map(row => ({ ...row }));
-        channel.rows = channel.rows.map(() => ({ ...EMPTY_CELL }));
+        const result = cutTrackHelper(p, channelIndex);
+        if (result) state.trackClipboard = result;
       });
       useHistoryStore.getState().pushAction('CUT_TRACK', 'Cut track', patternIndex, beforePattern, get().patterns[patternIndex]);
     },
@@ -1103,41 +682,11 @@ export const useTrackerStore = create<TrackerStore>()(
     pasteTrack: (channelIndex) => {
       if (!get().trackClipboard) return;
       const patternIndex = get().currentPatternIndex;
-      const pattern = get().patterns[patternIndex];
-      if (channelIndex < 0 || channelIndex >= pattern.channels.length) return;
-      const beforePattern = pattern;
+      const beforePattern = get().patterns[patternIndex];
       set((state) => {
         if (!state.trackClipboard) return;
-
         const p = state.patterns[state.currentPatternIndex];
-        if (channelIndex < 0 || channelIndex >= p.channels.length) return;
-
-        const channel = p.channels[channelIndex];
-        const { pasteMask } = state;
-
-        const maxRows = Math.min(state.trackClipboard.length, p.length);
-        for (let row = 0; row < maxRows; row++) {
-          const sourceCell = state.trackClipboard[row];
-          const targetCell = channel.rows[row];
-
-          if (hasMaskBit(pasteMask, MASK_NOTE)) {
-            targetCell.note = sourceCell.note;
-          }
-          if (hasMaskBit(pasteMask, MASK_INSTRUMENT)) {
-            targetCell.instrument = sourceCell.instrument;
-          }
-          if (hasMaskBit(pasteMask, MASK_VOLUME)) {
-            targetCell.volume = sourceCell.volume;
-          }
-          if (hasMaskBit(pasteMask, MASK_EFFECT)) {
-            targetCell.effTyp = sourceCell.effTyp;
-            targetCell.eff = sourceCell.eff;
-          }
-          if (hasMaskBit(pasteMask, MASK_EFFECT2)) {
-            targetCell.effTyp2 = sourceCell.effTyp2;
-            targetCell.eff2 = sourceCell.eff2;
-          }
-        }
+        pasteTrackHelper(p, channelIndex, state.trackClipboard, state.pasteMask);
       });
       useHistoryStore.getState().pushAction('PASTE_TRACK', 'Paste track', patternIndex, beforePattern, get().patterns[patternIndex]);
     },
@@ -1146,20 +695,9 @@ export const useTrackerStore = create<TrackerStore>()(
     writeMacroSlot: (slotIndex) =>
       set((state) => {
         if (slotIndex < 0 || slotIndex >= 8) return;
-
         const pattern = state.patterns[state.currentPatternIndex];
-        const { channelIndex, rowIndex } = useCursorStore.getState().cursor;
-        const cell = pattern.channels[channelIndex].rows[rowIndex];
-
-        state.macroSlots[slotIndex] = {
-          note: cell.note,
-          instrument: cell.instrument,
-          volume: cell.volume,
-          effTyp: cell.effTyp,
-          eff: cell.eff,
-          effTyp2: cell.effTyp2,
-          eff2: cell.eff2,
-        };
+        const cursor = useCursorStore.getState().cursor;
+        state.macroSlots[slotIndex] = writeMacroSlotHelper(pattern, cursor);
       }),
 
     readMacroSlot: (slotIndex) => {
@@ -1168,64 +706,10 @@ export const useTrackerStore = create<TrackerStore>()(
       const beforePattern = get().patterns[patternIndex];
       set((state) => {
         if (slotIndex < 0 || slotIndex >= 8) return;
-
         const macro = state.macroSlots[slotIndex];
         const pattern = state.patterns[state.currentPatternIndex];
-        const { channelIndex, rowIndex } = useCursorStore.getState().cursor;
-        const { pasteMask } = state;
-
-        if (!state.insertMode) {
-          // Overwrite mode: paste macro to current cell
-          const targetCell = pattern.channels[channelIndex].rows[rowIndex];
-
-          if (hasMaskBit(pasteMask, MASK_NOTE) && macro.note !== 0) {
-            targetCell.note = macro.note;
-          }
-          if (hasMaskBit(pasteMask, MASK_INSTRUMENT) && macro.instrument !== 0) {
-            targetCell.instrument = macro.instrument;
-          }
-          if (hasMaskBit(pasteMask, MASK_VOLUME) && macro.volume !== 0) {
-            targetCell.volume = macro.volume;
-          }
-          if (hasMaskBit(pasteMask, MASK_EFFECT)) {
-            targetCell.effTyp = macro.effTyp;
-            targetCell.eff = macro.eff;
-          }
-          if (hasMaskBit(pasteMask, MASK_EFFECT2) && (macro.effTyp2 !== 0 || macro.eff2 !== 0)) {
-            targetCell.effTyp2 = macro.effTyp2;
-            targetCell.eff2 = macro.eff2;
-          }
-        } else {
-          // Insert mode: shift rows down and insert macro
-          const channel = pattern.channels[channelIndex];
-          const newRow: TrackerCell = { ...EMPTY_CELL };
-
-          if (hasMaskBit(pasteMask, MASK_NOTE) && macro.note !== 0) {
-            newRow.note = macro.note;
-          }
-          if (hasMaskBit(pasteMask, MASK_INSTRUMENT) && macro.instrument !== 0) {
-            newRow.instrument = macro.instrument;
-          }
-          if (hasMaskBit(pasteMask, MASK_VOLUME) && macro.volume !== 0) {
-            newRow.volume = macro.volume;
-          }
-          if (hasMaskBit(pasteMask, MASK_EFFECT)) {
-            newRow.effTyp = macro.effTyp;
-            newRow.eff = macro.eff;
-          }
-          if (hasMaskBit(pasteMask, MASK_EFFECT2) && (macro.effTyp2 !== 0 || macro.eff2 !== 0)) {
-            newRow.effTyp2 = macro.effTyp2;
-            newRow.eff2 = macro.eff2;
-          }
-
-          // Shift rows down
-          channel.rows.splice(rowIndex, 0, newRow);
-
-          // Remove last row to maintain pattern length
-          if (channel.rows.length > pattern.length) {
-            channel.rows.pop();
-          }
-        }
+        const cursor = useCursorStore.getState().cursor;
+        readMacroSlotHelper(pattern, cursor, macro, state.pasteMask, state.insertMode);
       });
       useHistoryStore.getState().pushAction('READ_MACRO', 'Apply macro', patternIndex, beforePattern, get().patterns[patternIndex]);
     },
@@ -1236,29 +720,8 @@ export const useTrackerStore = create<TrackerStore>()(
       const beforePattern = get().patterns[patternIndex];
       set((state) => {
         const pattern = state.patterns[state.currentPatternIndex];
-        const { cursor: _cur, selection: _sel } = useCursorStore.getState();
-        let minChannel: number, maxChannel: number, minRow: number, maxRow: number;
-        if (_sel) {
-          minChannel = Math.min(_sel.startChannel, _sel.endChannel);
-          maxChannel = Math.max(_sel.startChannel, _sel.endChannel);
-          minRow = Math.min(_sel.startRow, _sel.endRow);
-          maxRow = Math.max(_sel.startRow, _sel.endRow);
-        } else {
-          minChannel = _cur.channelIndex;
-          maxChannel = _cur.channelIndex;
-          minRow = _cur.rowIndex;
-          maxRow = _cur.rowIndex;
-        }
-        for (let ch = minChannel; ch <= maxChannel; ch++) {
-          if (ch >= pattern.channels.length) continue;
-          for (let row = minRow; row <= maxRow; row++) {
-            if (row >= pattern.length) continue;
-            const cell = pattern.channels[ch].rows[row];
-            if (cell.note && cell.note !== 0) {
-              cell.instrument = instrumentId;
-            }
-          }
-        }
+        const { cursor, selection } = useCursorStore.getState();
+        applyInstrumentToSelectionHelper(pattern, selection, cursor, instrumentId);
       });
       useHistoryStore.getState().pushAction('EDIT_CELL', 'Apply instrument to selection', patternIndex, beforePattern, get().patterns[patternIndex]);
     },
@@ -1269,51 +732,11 @@ export const useTrackerStore = create<TrackerStore>()(
       const beforePattern = get().patterns[patternIndex];
       set((state) => {
         const pattern = state.patterns[state.currentPatternIndex];
-        const { cursor: _cur, selection: _sel } = useCursorStore.getState();
-        const targetInstrumentId = currentInstrumentOnly ? state.patterns[state.currentPatternIndex].channels[_cur.channelIndex].rows[_cur.rowIndex].instrument : null;
-
-        // Determine range to transpose (selection or just cursor position)
-        let minChannel: number, maxChannel: number, minRow: number, maxRow: number;
-
-        if (_sel) {
-          minChannel = Math.min(_sel.startChannel, _sel.endChannel);
-          maxChannel = Math.max(_sel.startChannel, _sel.endChannel);
-          minRow = Math.min(_sel.startRow, _sel.endRow);
-          maxRow = Math.max(_sel.startRow, _sel.endRow);
-        } else {
-          // No selection - transpose all notes in current channel at current row
-          minChannel = _cur.channelIndex;
-          maxChannel = _cur.channelIndex;
-          minRow = _cur.rowIndex;
-          maxRow = _cur.rowIndex;
-        }
-
-        // Transpose notes in the range
-        for (let ch = minChannel; ch <= maxChannel; ch++) {
-          if (ch >= pattern.channels.length) continue;
-
-          for (let row = minRow; row <= maxRow; row++) {
-            if (row >= pattern.length) continue;
-
-            const cell = pattern.channels[ch].rows[row];
-            // Skip empty (0) and note-off (97)
-            if (!cell.note || cell.note === 0 || cell.note === 97) continue;
-
-            // If filtering by current instrument, skip others
-            if (currentInstrumentOnly && targetInstrumentId !== null && cell.instrument !== targetInstrumentId) {
-              continue;
-            }
-
-            // Convert XM note to MIDI, transpose, convert back
-            const midiNote = xmNoteToMidi(cell.note);
-            if (midiNote === null) continue;
-
-            const newMidiNote = midiNote + semitones;
-            if (newMidiNote >= 12 && newMidiNote <= 107) {
-              cell.note = midiToXMNote(newMidiNote);
-            }
-          }
-        }
+        const { cursor, selection } = useCursorStore.getState();
+        const targetInstrumentId = currentInstrumentOnly
+          ? pattern.channels[cursor.channelIndex].rows[cursor.rowIndex].instrument
+          : null;
+        transposeSelectionHelper(pattern, selection, cursor, semitones, targetInstrumentId);
       });
       useHistoryStore.getState().pushAction('TRANSPOSE', 'Transpose', patternIndex, beforePattern, get().patterns[patternIndex]);
     },
@@ -1321,230 +744,62 @@ export const useTrackerStore = create<TrackerStore>()(
     // Swap all occurrences of Instrument A with Instrument B
     remapInstrument: (oldId, newId, scope) =>
       set((state) => {
-        const processPattern = (patt: Pattern, channelIdx?: number, rowStart?: number, rowEnd?: number) => {
-          const chStart = channelIdx !== undefined ? channelIdx : 0;
-          const chEnd = channelIdx !== undefined ? channelIdx : patt.channels.length - 1;
-          const rStart = rowStart !== undefined ? rowStart : 0;
-          const rEnd = rowEnd !== undefined ? rowEnd : patt.length - 1;
-
-          for (let ch = chStart; ch <= chEnd; ch++) {
-            for (let row = rStart; row <= rEnd; row++) {
-              if (patt.channels[ch].rows[row]?.instrument === oldId) {
-                patt.channels[ch].rows[row].instrument = newId;
-              }
-            }
-          }
-        };
-
-        const { cursor: _cur, selection: _sel } = useCursorStore.getState();
-        if (scope === 'block' && _sel) {
-          const minChannel = Math.min(_sel.startChannel, _sel.endChannel);
-          const maxChannel = Math.max(_sel.startChannel, _sel.endChannel);
-          const minRow = Math.min(_sel.startRow, _sel.endRow);
-          const maxRow = Math.max(_sel.startRow, _sel.endRow);
-
-          for (let ch = minChannel; ch <= maxChannel; ch++) {
-            processPattern(state.patterns[state.currentPatternIndex], ch, minRow, maxRow);
-          }
-        } else if (scope === 'track') {
-          processPattern(state.patterns[state.currentPatternIndex], _cur.channelIndex);
-        } else if (scope === 'pattern') {
-          processPattern(state.patterns[state.currentPatternIndex]);
-        } else if (scope === 'song') {
-          state.patterns.forEach(p => processPattern(p));
-        }
+        const { cursor, selection } = useCursorStore.getState();
+        remapInstrumentHelper(state.patterns, state.currentPatternIndex, selection, cursor, oldId, newId, scope);
       }),
 
     // Advanced editing - Interpolate values in selection
     interpolateSelection: (column, startValue, endValue, curve = 'linear') => {
-      if (!useCursorStore.getState().selection) return;
+      const sel = useCursorStore.getState().selection;
+      if (!sel) return;
       const patternIndex = get().currentPatternIndex;
       const beforePattern = get().patterns[patternIndex];
       set((state) => {
-        const _sel = useCursorStore.getState().selection;
-        if (!_sel) return;
-
-        const pattern = state.patterns[state.currentPatternIndex];
-        const { startChannel, endChannel, startRow, endRow } = _sel;
-
-        const minChannel = Math.min(startChannel, endChannel);
-        const maxChannel = Math.max(startChannel, endChannel);
-        const minRow = Math.min(startRow, endRow);
-        const maxRow = Math.max(startRow, endRow);
-        const rowCount = maxRow - minRow + 1;
-
-        if (rowCount < 2) return; // Need at least 2 rows to interpolate
-
-        // Curve function: maps linear t (0-1) to curved t
-        const applyCurve = (t: number): number => {
-          switch (curve) {
-            case 'log': return Math.log(1 + t * 9) / Math.log(10); // fast start, slow end
-            case 'exp': return (Math.pow(10, t) - 1) / 9; // slow start, fast end
-            case 'scurve': return t * t * (3 - 2 * t); // smooth S-curve (Hermite)
-            default: return t; // linear
-          }
-        };
-
-        // Apply interpolation to each channel in selection
-        for (let ch = minChannel; ch <= maxChannel; ch++) {
-          if (ch >= pattern.channels.length) continue;
-
-          for (let row = minRow; row <= maxRow; row++) {
-            if (row >= pattern.length) continue;
-
-            const cell = pattern.channels[ch].rows[row];
-            const linearT = (row - minRow) / (rowCount - 1); // 0 to 1
-            const t = applyCurve(linearT);
-            const value = Math.round(startValue + (endValue - startValue) * t);
-
-            // Apply to the appropriate column
-            if (column === 'volume') {
-              // XM volume column: 0x10 to 0x50 are volume values 0-64
-              cell.volume = Math.max(0x10, Math.min(0x50, value));
-            } else if (column === 'effParam') {
-              // If no effect type set, default to volume (0x0C)
-              if (cell.effTyp === 0) cell.effTyp = 0x0C; 
-              cell.eff = Math.max(0, Math.min(255, value));
-            } else if (column === 'effParam2') {
-              // If no effect type 2 set, default to volume (0x0C)
-              if (cell.effTyp2 === 0) cell.effTyp2 = 0x0C;
-              cell.eff2 = Math.max(0, Math.min(255, value));
-            } else {
-              // Automation columns: 0x00-0xFF
-              if (column === 'cutoff') cell.cutoff = Math.max(0, Math.min(255, value));
-              else if (column === 'resonance') cell.resonance = Math.max(0, Math.min(255, value));
-              else if (column === 'envMod') cell.envMod = Math.max(0, Math.min(255, value));
-              else if (column === 'pan') cell.pan = Math.max(0, Math.min(255, value));
-            }
-          }
-        }
+        const currentSel = useCursorStore.getState().selection;
+        if (!currentSel) return;
+        interpolateSelectionHelper(state.patterns[state.currentPatternIndex], currentSel, column, startValue, endValue, curve);
       });
       useHistoryStore.getState().pushAction('INTERPOLATE', 'Interpolate', patternIndex, beforePattern, get().patterns[patternIndex]);
     },
 
     // Advanced editing - Humanize selection (add random variation to volume)
     humanizeSelection: (volumeVariation) => {
-      if (!useCursorStore.getState().selection) return;
+      const sel = useCursorStore.getState().selection;
+      if (!sel) return;
       const patternIndex = get().currentPatternIndex;
       const beforePattern = get().patterns[patternIndex];
       set((state) => {
-        const _sel = useCursorStore.getState().selection;
-        if (!_sel) return;
-
-        const pattern = state.patterns[state.currentPatternIndex];
-        const { startChannel, endChannel, startRow, endRow } = _sel;
-
-        const minChannel = Math.min(startChannel, endChannel);
-        const maxChannel = Math.max(startChannel, endChannel);
-        const minRow = Math.min(startRow, endRow);
-        const maxRow = Math.max(startRow, endRow);
-
-        // Apply random variation to volume values
-        for (let ch = minChannel; ch <= maxChannel; ch++) {
-          if (ch >= pattern.channels.length) continue;
-
-          for (let row = minRow; row <= maxRow; row++) {
-            if (row >= pattern.length) continue;
-
-            const cell = pattern.channels[ch].rows[row];
-            // Only humanize cells that have a note and volume
-            // Skip empty (0) and note-off (97)
-            if (!cell.note || cell.note === 0 || cell.note === 97) continue;
-
-            // Extract volume value from XM volume column (0x10-0x50 = set volume 0-64)
-            const hasSetVolume = cell.volume >= 0x10 && cell.volume <= 0x50;
-            const currentVolume = hasSetVolume ? cell.volume - 0x10 : 48; // Default to 48 if not set
-            const maxVariation = Math.floor(currentVolume * (volumeVariation / 100));
-            const randomOffset = Math.floor(Math.random() * (maxVariation * 2 + 1)) - maxVariation;
-            const newVolume = Math.max(0, Math.min(64, currentVolume + randomOffset));
-
-            // Store as XM volume (0x10-0x50)
-            cell.volume = 0x10 + newVolume;
-          }
-        }
+        const currentSel = useCursorStore.getState().selection;
+        if (!currentSel) return;
+        humanizeSelectionHelper(state.patterns[state.currentPatternIndex], currentSel, volumeVariation);
       });
       useHistoryStore.getState().pushAction('HUMANIZE', 'Humanize', patternIndex, beforePattern, get().patterns[patternIndex]);
     },
 
     // Strum: add incremental note delays across channels (EDx effect)
     strumSelection: (tickDelay, direction) => {
-      if (!useCursorStore.getState().selection) return;
+      const sel = useCursorStore.getState().selection;
+      if (!sel) return;
       const patternIndex = get().currentPatternIndex;
       const beforePattern = get().patterns[patternIndex];
       set((state) => {
-        const _sel = useCursorStore.getState().selection;
-        if (!_sel) return;
-
-        const pattern = state.patterns[state.currentPatternIndex];
-        const { startChannel, endChannel, startRow, endRow } = _sel;
-
-        const minChannel = Math.min(startChannel, endChannel);
-        const maxChannel = Math.max(startChannel, endChannel);
-        const minRow = Math.min(startRow, endRow);
-        const maxRow = Math.max(startRow, endRow);
-
-        for (let row = minRow; row <= maxRow; row++) {
-          if (row >= pattern.length) continue;
-
-          for (let ch = minChannel; ch <= maxChannel; ch++) {
-            if (ch >= pattern.channels.length) continue;
-            const cell = pattern.channels[ch].rows[row];
-            if (!cell.note || cell.note === 0 || cell.note === 97) continue;
-
-            // Calculate delay for this channel
-            const chIdx = direction === 'down' ? ch - minChannel : (maxChannel - ch);
-            const delay = Math.min(0xF, chIdx * tickDelay);
-
-            if (delay > 0) {
-              // Set EDx (note delay) effect: effTyp=14 (E), eff=0xD0+delay
-              cell.effTyp = 14; // E
-              cell.eff = 0xD0 + delay;
-            }
-          }
-        }
+        const currentSel = useCursorStore.getState().selection;
+        if (!currentSel) return;
+        strumSelectionHelper(state.patterns[state.currentPatternIndex], currentSel, tickDelay, direction);
       });
       useHistoryStore.getState().pushAction('STRUM', 'Strum', patternIndex, beforePattern, get().patterns[patternIndex]);
     },
 
     // Legato: for each channel in selection, extend each note's duration
-    // by removing empty rows between consecutive notes (set slide flag)
     legatoSelection: () => {
-      if (!useCursorStore.getState().selection) return;
+      const sel = useCursorStore.getState().selection;
+      if (!sel) return;
       const patternIndex = get().currentPatternIndex;
       const beforePattern = get().patterns[patternIndex];
       set((state) => {
-        const _sel = useCursorStore.getState().selection;
-        if (!_sel) return;
-
-        const pattern = state.patterns[state.currentPatternIndex];
-        const { startChannel, endChannel, startRow, endRow } = _sel;
-
-        const minChannel = Math.min(startChannel, endChannel);
-        const maxChannel = Math.max(startChannel, endChannel);
-        const minRow = Math.min(startRow, endRow);
-        const maxRow = Math.max(startRow, endRow);
-
-        // For each channel, find notes and add tone portamento (3xx) to connect them
-        for (let ch = minChannel; ch <= maxChannel; ch++) {
-          if (ch >= pattern.channels.length) continue;
-
-          let lastNoteRow = -1;
-          for (let row = minRow; row <= maxRow; row++) {
-            if (row >= pattern.length) continue;
-            const cell = pattern.channels[ch].rows[row];
-
-            if (cell.note > 0 && cell.note < 97) {
-              if (lastNoteRow >= 0 && row > lastNoteRow + 1) {
-                // Only set tone portamento if effect column is empty
-                if (cell.effTyp === 0) {
-                  cell.effTyp = 3; // Tone portamento
-                  cell.eff = 0xFF; // Max speed
-                }
-              }
-              lastNoteRow = row;
-            }
-          }
-        }
+        const currentSel = useCursorStore.getState().selection;
+        if (!currentSel) return;
+        legatoSelectionHelper(state.patterns[state.currentPatternIndex], currentSel);
       });
       useHistoryStore.getState().pushAction('LEGATO', 'Legato', patternIndex, beforePattern, get().patterns[patternIndex]);
     },
@@ -1555,43 +810,8 @@ export const useTrackerStore = create<TrackerStore>()(
       const beforePattern = get().patterns[patternIndex];
       set((state) => {
         const pattern = state.patterns[state.currentPatternIndex];
-        const { cursor: _cur, selection: _sel } = useCursorStore.getState();
-        const getCells = (): TrackerCell[] => {
-          const cells: TrackerCell[] = [];
-
-          if (scope === 'block' && _sel) {
-            const minChannel = Math.min(_sel.startChannel, _sel.endChannel);
-            const maxChannel = Math.max(_sel.startChannel, _sel.endChannel);
-            const minRow = Math.min(_sel.startRow, _sel.endRow);
-            const maxRow = Math.max(_sel.startRow, _sel.endRow);
-
-            for (let ch = minChannel; ch <= maxChannel; ch++) {
-              for (let row = minRow; row <= maxRow; row++) {
-                if (ch < pattern.channels.length && row < pattern.length) {
-                  cells.push(pattern.channels[ch].rows[row]);
-                }
-              }
-            }
-          } else if (scope === 'track') {
-            const ch = _cur.channelIndex;
-            if (ch < pattern.channels.length) {
-              cells.push(...pattern.channels[ch].rows);
-            }
-          } else if (scope === 'pattern') {
-            pattern.channels.forEach(channel => {
-              cells.push(...channel.rows);
-            });
-          }
-
-          return cells;
-        };
-
-        const cells = getCells();
-        cells.forEach(cell => {
-          if (cell.volume !== null && cell.volume !== undefined) {
-            cell.volume = Math.min(0x40, Math.max(0, Math.round(cell.volume * factor)));
-          }
-        });
+        const { cursor, selection } = useCursorStore.getState();
+        scaleVolumeHelper(pattern, scope, factor, selection, cursor);
       });
       useHistoryStore.getState().pushAction('SCALE_VOLUME', 'Scale volume', patternIndex, beforePattern, get().patterns[patternIndex]);
     },
@@ -1602,46 +822,8 @@ export const useTrackerStore = create<TrackerStore>()(
       const beforePattern = get().patterns[patternIndex];
       set((state) => {
         const pattern = state.patterns[state.currentPatternIndex];
-        const { cursor: _cur, selection: _sel } = useCursorStore.getState();
-        const getCells = (): TrackerCell[] => {
-          const cells: TrackerCell[] = [];
-
-          if (scope === 'block' && _sel) {
-            const minChannel = Math.min(_sel.startChannel, _sel.endChannel);
-            const maxChannel = Math.max(_sel.startChannel, _sel.endChannel);
-            const minRow = Math.min(_sel.startRow, _sel.endRow);
-            const maxRow = Math.max(_sel.startRow, _sel.endRow);
-
-            for (let ch = minChannel; ch <= maxChannel; ch++) {
-              for (let row = minRow; row <= maxRow; row++) {
-                if (ch < pattern.channels.length && row < pattern.length) {
-                  cells.push(pattern.channels[ch].rows[row]);
-                }
-              }
-            }
-          } else if (scope === 'track') {
-            const ch = _cur.channelIndex;
-            if (ch < pattern.channels.length) {
-              cells.push(...pattern.channels[ch].rows);
-            }
-          } else if (scope === 'pattern') {
-            pattern.channels.forEach(channel => {
-              cells.push(...channel.rows);
-            });
-          }
-
-          return cells;
-        };
-
-        const cells = getCells();
-        const count = cells.length;
-        if (count < 2) return;
-
-        cells.forEach((cell, index) => {
-          const t = index / (count - 1); // 0 to 1
-          const volume = Math.round(startVol + t * (endVol - startVol));
-          cell.volume = Math.min(0x40, Math.max(0, volume));
-        });
+        const { cursor, selection } = useCursorStore.getState();
+        fadeVolumeHelper(pattern, scope, startVol, endVol, selection, cursor);
       });
       useHistoryStore.getState().pushAction('FADE_VOLUME', 'Fade volume', patternIndex, beforePattern, get().patterns[patternIndex]);
     },
@@ -1694,20 +876,7 @@ export const useTrackerStore = create<TrackerStore>()(
       if (!selection) return;
       const beforePattern = get().patterns[currentPatternIndex];
       set((state) => {
-        const pattern = state.patterns[state.currentPatternIndex];
-        const { startChannel, endChannel, startRow, endRow } = selection;
-        const minCh = Math.min(startChannel, endChannel);
-        const maxCh = Math.max(startChannel, endChannel);
-        const minRow = Math.min(startRow, endRow);
-        const maxRow = Math.max(startRow, endRow);
-        for (let ch = minCh; ch <= maxCh; ch++) {
-          for (let r = minRow; r <= maxRow; r++) {
-            const cell = pattern.channels[ch]?.rows[r];
-            if (cell && cell.volume != null && cell.volume > 0) {
-              cell.volume = Math.max(0, Math.min(0x40, Math.round(cell.volume * factor)));
-            }
-          }
-        }
+        amplifySelectionHelper(state.patterns[state.currentPatternIndex], selection, factor);
       });
       useHistoryStore.getState().pushAction('AMPLIFY', 'Amplify selection', currentPatternIndex, beforePattern, get().patterns[currentPatternIndex]);
     },
@@ -1750,10 +919,7 @@ export const useTrackerStore = create<TrackerStore>()(
       if (aIdx < 0 || bIdx < 0 || aIdx >= pattern.channels.length || bIdx >= pattern.channels.length) return;
       const beforePattern = pattern;
       set((state) => {
-        const pat = state.patterns[state.currentPatternIndex];
-        const tempRows = pat.channels[aIdx].rows.map(r => ({ ...r }));
-        pat.channels[aIdx].rows = pat.channels[bIdx].rows.map(r => ({ ...r }));
-        pat.channels[bIdx].rows = tempRows;
+        swapChannelsHelper(state.patterns[state.currentPatternIndex], aIdx, bIdx);
       });
       useHistoryStore.getState().pushAction('SWAP_CHANNELS', 'Swap channels', currentPatternIndex, beforePattern, get().patterns[currentPatternIndex]);
     },

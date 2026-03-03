@@ -14,9 +14,7 @@ import type {
 } from '@typedefs/instrument';
 import type { BeatSlice, BeatSliceConfig } from '@typedefs/beatSlicer';
 import {
-  DEFAULT_OSCILLATOR,
   DEFAULT_ENVELOPE,
-  DEFAULT_FILTER,
   DEFAULT_TB303,
   DEFAULT_DUB_SIREN,
   DEFAULT_SPACE_LASER,
@@ -25,27 +23,7 @@ import {
   DEFAULT_V2_SPEECH,
   DEFAULT_SYNARE,
   DEFAULT_BUZZMACHINE,
-  DEFAULT_DRUM_MACHINE,
-  DEFAULT_CHIP_SYNTH,
-  DEFAULT_PWM_SYNTH,
-  DEFAULT_WAVETABLE,
-  DEFAULT_GRANULAR,
-  DEFAULT_SUPERSAW,
-  DEFAULT_POLYSYNTH,
-  DEFAULT_ORGAN,
-  DEFAULT_STRING_MACHINE,
-  DEFAULT_FORMANT_SYNTH,
-  DEFAULT_WOBBLE_BASS,
-  DEFAULT_DEXED,
-  DEFAULT_OBXD,
   DEFAULT_DRUMKIT,
-  DEFAULT_MAME_VFX,
-  DEFAULT_MAME_DOC,
-  DEFAULT_MAME_SWP30,
-  DEFAULT_RDPIANO,
-  DEFAULT_CHIPTUNE_MODULE,
-  DEFAULT_WAM,
-  DEFAULT_SUPERCOLLIDER,
 } from '@typedefs/instrument';
 
 import { getFirstPresetForSynthType } from '@constants/factoryPresets';
@@ -55,6 +33,28 @@ import { FurnaceParser } from '@/lib/import/formats/FurnaceParser';
 import { DefleMaskParser } from '@/lib/import/formats/DefleMaskParser';
 import { deepMerge, ensureCompleteInstrumentConfig } from '@/lib/migration';
 import { WaveformProcessor } from '@/lib/audio/WaveformProcessor';
+
+// Extracted helper modules
+import {
+  processSampleReverse,
+  processSampleNormalize,
+  processSampleInvertLoop,
+  computeSliceRemoval,
+  buildSlicedInstruments,
+  buildDrumKitFromSlices,
+} from './instrument/sampleOperations';
+import {
+  createEffect,
+  createEffectFromConfig,
+  removeEffectFromList,
+  reorderEffectsList,
+  applyEffectUpdates,
+} from './instrument/effectsChainOps';
+import {
+  getInitialConfig,
+  buildPreset,
+  createDefaultInstrument,
+} from './instrument/presetOps';
 
 /**
  * Revoke blob URLs from an instrument's sample to prevent memory leaks.
@@ -75,143 +75,6 @@ function revokeInstrumentSampleUrls(sample: InstrumentConfig['sample']) {
  */
 const bakingInstruments = new Set<number>();
 
-/**
- * Get initial configuration for a synth type
- */
-function getInitialConfig(synthType: string): Partial<InstrumentConfig> {
-  const base: Partial<InstrumentConfig> = {
-    synthType: synthType as SynthType,
-    effects: [],
-    volume: -12,
-    pan: 0,
-  };
-
-  switch (synthType) {
-    case 'TB303':
-      base.tb303 = { ...DEFAULT_TB303 };
-      break;
-    case 'DrumMachine':
-      base.drumMachine = { ...DEFAULT_DRUM_MACHINE };
-      break;
-    case 'ChipSynth':
-      base.chipSynth = { ...DEFAULT_CHIP_SYNTH };
-      break;
-    case 'PWMSynth':
-      base.pwmSynth = { ...DEFAULT_PWM_SYNTH };
-      break;
-    case 'Wavetable':
-      base.wavetable = { ...DEFAULT_WAVETABLE };
-      break;
-    case 'GranularSynth':
-      base.granular = { ...DEFAULT_GRANULAR };
-      break;
-    case 'SuperSaw':
-      base.superSaw = { ...DEFAULT_SUPERSAW };
-      break;
-    case 'PolySynth':
-      base.polySynth = { ...DEFAULT_POLYSYNTH };
-      break;
-    case 'Organ':
-      base.organ = { ...DEFAULT_ORGAN };
-      break;
-    case 'StringMachine':
-      base.stringMachine = { ...DEFAULT_STRING_MACHINE };
-      break;
-    case 'FormantSynth':
-      base.formantSynth = { ...DEFAULT_FORMANT_SYNTH };
-      break;
-    case 'WobbleBass':
-      base.wobbleBass = { ...DEFAULT_WOBBLE_BASS };
-      break;
-    case 'DubSiren':
-      base.dubSiren = { ...DEFAULT_DUB_SIREN };
-      break;
-    case 'SpaceLaser':
-      base.spaceLaser = { ...DEFAULT_SPACE_LASER };
-      break;
-    case 'V2':
-      base.v2 = { ...DEFAULT_V2 };
-      break;
-    case 'Sam':
-      base.sam = { ...DEFAULT_SAM };
-      break;
-    case 'Synare':
-      base.synare = { ...DEFAULT_SYNARE };
-      break;
-    case 'WAMOBXd':
-    case 'WAMSynth101':
-    case 'WAMTinySynth':
-    case 'WAMFaustFlute':
-      base.wam = { ...DEFAULT_WAM };
-      break;
-    case 'WAM':
-      base.wam = { ...DEFAULT_WAM };
-      break;
-    case 'Buzz3o3':
-      base.tb303 = { ...DEFAULT_TB303 };
-      base.buzzmachine = {
-        ...DEFAULT_BUZZMACHINE,
-        machineType: 'OomekAggressor',
-        parameters: {
-          0: 0,    // SAW
-          1: 0x78, // Cutoff
-          2: 0x40, // Reso
-          3: 0x40, // EnvMod
-          4: 0x40, // Decay
-          5: 0x40, // Accent
-          6: 100,  // Tuning
-          7: 100,  // Vol
-        }
-      };
-      break;
-    case 'Buzzmachine':
-      base.buzzmachine = { ...DEFAULT_BUZZMACHINE };
-      break;
-    case 'Dexed':
-      base.dexed = { ...DEFAULT_DEXED };
-      break;
-    case 'OBXd':
-      base.obxd = { ...DEFAULT_OBXD };
-      break;
-    case 'DrumKit':
-      base.drumKit = { ...DEFAULT_DRUMKIT };
-      break;
-    case 'ChiptuneModule':
-      base.chiptuneModule = { ...DEFAULT_CHIPTUNE_MODULE };
-      break;
-    case 'MAMEVFX':
-      base.mame = { ...DEFAULT_MAME_VFX };
-      break;
-    case 'MAMEDOC':
-      base.mame = { ...DEFAULT_MAME_DOC };
-      break;
-    case 'MAMERSA':
-      base.rdpiano = { ...DEFAULT_RDPIANO };
-      break;
-    case 'MAMESWP30':
-      base.mame = { ...DEFAULT_MAME_SWP30 };
-      break;
-    case 'SuperCollider':
-      base.superCollider = { ...DEFAULT_SUPERCOLLIDER };
-      // SC ignores the time parameter in triggerAttack, so always use immediate time.
-      base.isLive = true;
-      break;
-  }
-
-  // Auto-apply first factory preset so new instruments produce useful sound out of the box.
-  // This is critical for synths like V2 (needs patch data) and MAME chips (need _program).
-  const firstPreset = getFirstPresetForSynthType(synthType);
-  if (firstPreset) {
-    const presetObj = firstPreset as Record<string, unknown>;
-    const presetConfig = Object.fromEntries(
-      Object.entries(presetObj).filter(([k]) => k !== 'name' && k !== 'type' && k !== 'synthType')
-    );
-    Object.assign(base, presetConfig);
-    base.synthType = synthType as SynthType; // Preserve the requested synthType
-  }
-
-  return base;
-}
 
 interface InstrumentStore {
   // State
@@ -277,18 +140,6 @@ interface InstrumentStore {
   reset: () => void;
 }
 
-const createDefaultInstrument = (id: number): InstrumentConfig => ({
-  id,
-  name: `Instrument ${String(id).padStart(2, '0')}`,
-  type: 'synth', // DEViLBOX synth instrument
-  synthType: 'Sampler',
-  oscillator: { ...DEFAULT_OSCILLATOR },
-  envelope: { ...DEFAULT_ENVELOPE },
-  filter: { ...DEFAULT_FILTER },
-  effects: [],
-  volume: 0,
-  pan: 0,
-});
 
 /**
  * Scan patterns for unique notes used by a specific instrument
@@ -1084,15 +935,7 @@ export const useInstrumentStore = create<InstrumentStore>()(
       set((state) => {
         const instrument = state.instruments.find((inst) => inst.id === instrumentId);
         if (instrument) {
-          const newEffect: EffectConfig = {
-            id: `effect-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-            category: 'tonejs',  // Legacy addEffect creates Tone.js effects
-            type: effectType,
-            enabled: true,
-            wet: 50,
-            parameters: getDefaultEffectParameters(effectType),
-          };
-          instrument.effects.push(newEffect);
+          instrument.effects.push(createEffect(effectType));
         }
       });
 
@@ -1115,12 +958,7 @@ export const useInstrumentStore = create<InstrumentStore>()(
       set((state) => {
         const instrument = state.instruments.find((inst) => inst.id === instrumentId);
         if (instrument) {
-          const newEffect: EffectConfig = {
-            ...effect,
-            id: `effect-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-            parameters: { ...getDefaultEffectParameters(effect.type), ...effect.parameters },
-          };
-          instrument.effects.push(newEffect);
+          instrument.effects.push(createEffectFromConfig(effect));
         }
       });
 
@@ -1142,10 +980,8 @@ export const useInstrumentStore = create<InstrumentStore>()(
       set((state) => {
         const instrument = state.instruments.find((inst) => inst.id === instrumentId);
         if (instrument) {
-          const index = instrument.effects.findIndex((eff) => eff.id === effectId);
-          if (index !== -1) {
-            instrument.effects.splice(index, 1);
-          }
+          const updated = removeEffectFromList(instrument.effects, effectId);
+          if (updated) instrument.effects = updated;
         }
       });
 
@@ -1167,14 +1003,9 @@ export const useInstrumentStore = create<InstrumentStore>()(
       set((state) => {
         const instrument = state.instruments.find((inst) => inst.id === instrumentId);
         if (instrument) {
-          const effect = instrument.effects.find((eff) => eff.id === effectId);
-          if (effect) {
-            // Ensure defaults are populated for effects with sparse parameters
-            // (e.g., effects created before default population was added)
-            if (updates.parameters && Object.keys(effect.parameters).length < Object.keys(getDefaultEffectParameters(effect.type)).length) {
-              effect.parameters = { ...getDefaultEffectParameters(effect.type), ...effect.parameters };
-            }
-            Object.assign(effect, updates);
+          const idx = instrument.effects.findIndex((eff) => eff.id === effectId);
+          if (idx !== -1) {
+            instrument.effects[idx] = applyEffectUpdates(instrument.effects[idx], updates);
           }
         }
       });
@@ -1224,8 +1055,7 @@ export const useInstrumentStore = create<InstrumentStore>()(
       set((state) => {
         const instrument = state.instruments.find((inst) => inst.id === instrumentId);
         if (instrument) {
-          const [removed] = instrument.effects.splice(fromIndex, 1);
-          instrument.effects.splice(toIndex, 0, removed);
+          instrument.effects = reorderEffectsList(instrument.effects, fromIndex, toIndex);
         }
       });
 
@@ -1266,27 +1096,7 @@ export const useInstrumentStore = create<InstrumentStore>()(
       set((state) => {
         const instrument = state.instruments.find((inst) => inst.id === instrumentId);
         if (instrument) {
-          const newPreset: InstrumentPreset = {
-            id: `preset-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-            name,
-            category,
-            tags: [],
-            author: 'User',
-            config: {
-              name: instrument.name,
-              type: instrument.type,
-              synthType: instrument.synthType,
-              oscillator: instrument.oscillator,
-              envelope: instrument.envelope,
-              filter: instrument.filter,
-              filterEnvelope: instrument.filterEnvelope,
-              tb303: instrument.tb303,
-              effects: instrument.effects,
-              volume: instrument.volume,
-              pan: instrument.pan,
-            },
-          };
-          state.presets.push(newPreset);
+          state.presets.push(buildPreset(instrument, name, category));
         }
       }),
 
@@ -1658,10 +1468,7 @@ export const useInstrumentStore = create<InstrumentStore>()(
       const inst = get().instruments.find((i) => i.id === id);
       if (!inst?.sample?.audioBuffer) return;
 
-      const rawBuffer = inst.sample.audioBuffer;
-      const audioBuffer = await getToneEngine().decodeAudioData(rawBuffer);
-      const newBuffer = WaveformProcessor.reverse(audioBuffer);
-      const arrayBuffer = await getToneEngine().encodeAudioData(newBuffer);
+      const arrayBuffer = await processSampleReverse(inst.sample.audioBuffer, getToneEngine());
 
       set((state) => {
         const instrument = state.instruments.find((i) => i.id === id);
@@ -1677,10 +1484,7 @@ export const useInstrumentStore = create<InstrumentStore>()(
       const inst = get().instruments.find((i) => i.id === id);
       if (!inst?.sample?.audioBuffer) return;
 
-      const rawBuffer = inst.sample.audioBuffer;
-      const audioBuffer = await getToneEngine().decodeAudioData(rawBuffer);
-      const newBuffer = WaveformProcessor.normalize(audioBuffer);
-      const arrayBuffer = await getToneEngine().encodeAudioData(newBuffer);
+      const arrayBuffer = await processSampleNormalize(inst.sample.audioBuffer, getToneEngine());
 
       set((state) => {
         const instrument = state.instruments.find((i) => i.id === id);
@@ -1696,14 +1500,12 @@ export const useInstrumentStore = create<InstrumentStore>()(
       const inst = get().instruments.find((i) => i.id === id);
       if (!inst?.sample?.audioBuffer || !inst.sample.loop) return;
 
-      const rawBuffer = inst.sample.audioBuffer;
-      const audioBuffer = await getToneEngine().decodeAudioData(rawBuffer);
-      const newBuffer = WaveformProcessor.invertLoop(
-        audioBuffer, 
-        inst.sample.loopStart, 
-        inst.sample.loopEnd
+      const arrayBuffer = await processSampleInvertLoop(
+        inst.sample.audioBuffer,
+        inst.sample.loopStart,
+        inst.sample.loopEnd,
+        getToneEngine(),
       );
-      const arrayBuffer = await getToneEngine().encodeAudioData(newBuffer);
 
       set((state) => {
         const instrument = state.instruments.find((i) => i.id === id);
@@ -1756,22 +1558,8 @@ export const useInstrumentStore = create<InstrumentStore>()(
       set((state) => {
         const instrument = state.instruments.find((inst) => inst.id === instrumentId);
         if (instrument?.sample?.slices) {
-          const slices = instrument.sample.slices;
-          const idx = slices.findIndex((s) => s.id === sliceId);
-          if (idx !== -1 && slices.length > 1) {
-            const removedSlice = slices[idx];
-
-            // Merge with previous slice if exists, otherwise extend next slice
-            if (idx > 0) {
-              slices[idx - 1].endFrame = removedSlice.endFrame;
-              slices[idx - 1].endTime = removedSlice.endTime;
-            } else if (idx < slices.length - 1) {
-              slices[idx + 1].startFrame = removedSlice.startFrame;
-              slices[idx + 1].startTime = removedSlice.startTime;
-            }
-
-            slices.splice(idx, 1);
-          }
+          const updated = computeSliceRemoval(instrument.sample.slices, sliceId);
+          if (updated) instrument.sample.slices = updated;
         }
       });
     },
@@ -1783,65 +1571,33 @@ export const useInstrumentStore = create<InstrumentStore>()(
         return [];
       }
 
-      const newInstrumentIds: number[] = [];
       const existingIds = get().instruments.map((i) => i.id);
 
       try {
-        // Get sample rate from source (fetch only to get metadata, not copy data)
         const engine = getToneEngine();
         const response = await fetch(sourceInstrument.sample.url);
         const arrayBuffer = await response.arrayBuffer();
         const audioBuffer = await engine.decodeAudioData(arrayBuffer);
         const sampleRate = audioBuffer.sampleRate;
 
+        // Allocate IDs for each slice
+        const newInstrumentIds: number[] = [];
         for (let i = 0; i < slices.length; i++) {
-          const slice = slices[i];
-          const newId = findNextId([...existingIds, ...newInstrumentIds]);
-          newInstrumentIds.push(newId);
-
-          const sliceLength = slice.endFrame - slice.startFrame;
-          const sliceName = slice.label || `${namePrefix} ${i + 1}`;
-          const instrumentName = sourceInstrument.name
-            ? `${sourceInstrument.name} - ${sliceName}`
-            : sliceName;
-
-          set((state) => {
-            const newInstrument: InstrumentConfig = {
-              id: newId,
-              name: instrumentName.slice(0, 22), // XM 22-char limit
-              type: 'sample',
-              synthType: 'Sampler',
-              sample: {
-                // REFERENCE-BASED: Point to source instead of duplicating data
-                url: sourceInstrument.sample!.url,
-                sourceInstrumentId: sourceId,
-                sliceStart: slice.startFrame,
-                sliceEnd: slice.endFrame,
-                // Inherit sample properties from source
-                baseNote: sourceInstrument.sample?.baseNote || 'C-4',
-                detune: sourceInstrument.sample?.detune || 0,
-                loop: false,
-                loopStart: 0,
-                loopEnd: sliceLength,
-                sampleRate: sampleRate,
-                reverse: false,
-                playbackRate: 1,
-              },
-              envelope: sourceInstrument.envelope || { ...DEFAULT_ENVELOPE },
-              effects: [],
-              volume: sourceInstrument.volume || -6,
-              pan: sourceInstrument.pan || 0,
-            };
-            state.instruments.push(newInstrument);
-          });
+          newInstrumentIds.push(findNextId([...existingIds, ...newInstrumentIds]));
         }
 
-        // Set the first new instrument as current
-        if (newInstrumentIds.length > 0) {
-          set((state) => {
+        const newInstruments = buildSlicedInstruments(
+          sourceInstrument, slices, newInstrumentIds, sampleRate, namePrefix,
+        );
+
+        set((state) => {
+          for (const inst of newInstruments) {
+            state.instruments.push(inst);
+          }
+          if (newInstrumentIds.length > 0) {
             state.currentInstrumentId = newInstrumentIds[0];
-          });
-        }
+          }
+        });
 
         return newInstrumentIds;
       } catch (error) {
@@ -1860,113 +1616,26 @@ export const useInstrumentStore = create<InstrumentStore>()(
       const engine = getToneEngine();
 
       try {
-        // Fetch and decode the source audio
         const response = await fetch(sourceInstrument.sample.url);
         const arrayBuffer = await response.arrayBuffer();
         const audioBuffer = await engine.decodeAudioData(arrayBuffer);
 
         const existingIds = get().instruments.map((i) => i.id);
-        const newInstrumentIds: number[] = [];
-        const keymap: import('@typedefs/instrument').DrumKitKeyMapping[] = [];
-
-        // 1. Create individual sample instruments for each slice (hidden/internal)
+        const sliceIds: number[] = [];
         for (let i = 0; i < slices.length; i++) {
-          const slice = slices[i];
-          const newId = findNextId([...existingIds, ...newInstrumentIds]);
-          newInstrumentIds.push(newId);
-
-          const sliceLength = slice.endFrame - slice.startFrame;
-          const numChannels = audioBuffer.numberOfChannels;
-          const sampleRate = audioBuffer.sampleRate;
-
-          const offlineCtx = new OfflineAudioContext(numChannels, sliceLength, sampleRate);
-          const sliceBuffer = offlineCtx.createBuffer(numChannels, sliceLength, sampleRate);
-
-          for (let ch = 0; ch < numChannels; ch++) {
-            const sourceData = audioBuffer.getChannelData(ch);
-            const destData = sliceBuffer.getChannelData(ch);
-            for (let j = 0; j < sliceLength; j++) {
-              destData[j] = sourceData[slice.startFrame + j];
-            }
-          }
-
-          const sliceArrayBuffer = await engine.encodeAudioData(sliceBuffer);
-          const blob = new Blob([sliceArrayBuffer], { type: 'audio/wav' });
-          const dataUrl = await new Promise<string>((resolve) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(reader.result as string);
-            reader.readAsDataURL(blob);
-          });
-
-          const sliceName = slice.label || `Slice ${i + 1}`;
-          
-          // Add internal sample instrument
-          set((state) => {
-            state.instruments.push({
-              id: newId,
-              name: `(Slice ${i + 1})`.slice(0, 22),
-              type: 'sample',
-              synthType: 'Sampler',
-              sample: {
-                url: dataUrl,
-                audioBuffer: sliceArrayBuffer,
-                baseNote: 'C-4',
-                detune: 0,
-                loop: false,
-                loopStart: 0,
-                loopEnd: sliceLength,
-                sampleRate: sampleRate,
-                reverse: false,
-                playbackRate: 1,
-              },
-              envelope: { ...DEFAULT_ENVELOPE, sustain: 100 },
-              effects: [],
-              volume: -6,
-              pan: 0,
-            });
-          });
-
-          // Create mapping entry (starting from C-1 = MIDI 36)
-          const midiNote = 36 + i;
-          if (midiNote <= 127) {
-            keymap.push({
-              id: `mapping-${newId}`,
-              noteStart: midiNote,
-              noteEnd: midiNote,
-              sampleId: String(newId),
-              sampleUrl: dataUrl,
-              sampleName: sliceName,
-              pitchOffset: 0,
-              fineTune: 0,
-              volumeOffset: 0,
-              panOffset: 0,
-              baseNote: 'C-4',
-            });
-          }
+          sliceIds.push(findNextId([...existingIds, ...sliceIds]));
         }
+        const drumKitId = findNextId([...existingIds, ...sliceIds]);
 
-        // 2. Create the DrumKit instrument
-        const drumKitId = findNextId([...existingIds, ...newInstrumentIds]);
-        const kitName = sourceInstrument.name 
-          ? `${sourceInstrument.name} ${namePrefix}`
-          : `Sliced ${namePrefix}`;
+        const { kit, sliceInstruments } = await buildDrumKitFromSlices(
+          sourceInstrument, slices, audioBuffer, sliceIds, drumKitId, engine, namePrefix,
+        );
 
         set((state) => {
-          const drumKit: InstrumentConfig = {
-            id: drumKitId,
-            name: kitName.slice(0, 22),
-            type: 'synth',
-            synthType: 'DrumKit',
-            drumKit: {
-              ...DEFAULT_DRUMKIT,
-              keymap,
-            },
-            envelope: { ...DEFAULT_ENVELOPE, sustain: 100 },
-            effects: [],
-            volume: 0,
-            pan: 0,
-          };
-          state.instruments.push(drumKit);
+          for (const inst of sliceInstruments) {
+            state.instruments.push(inst);
+          }
+          state.instruments.push(kit);
           state.currentInstrumentId = drumKitId;
         });
 
