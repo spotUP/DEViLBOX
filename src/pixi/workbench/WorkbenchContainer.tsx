@@ -24,6 +24,7 @@ import { usePixiResponsive } from '../hooks/usePixiResponsive';
 import {
   fitAllWindows,
   springCameraTo,
+  BUILTIN_WORKSPACES,
   type CameraSpringHandle,
 } from './WorkbenchExpose';
 import { WORKBENCH_CHROME_H, STATUS_BAR_H } from './workbenchLayout';
@@ -31,6 +32,7 @@ import type { SnapLine } from './windowSnap';
 import { WindowTether } from './WindowTether';
 import { playFocusZoom } from './workbenchSounds';
 import { WorkbenchTiltRenderer } from './WorkbenchTilt';
+import { PixiButton } from '../components/PixiButton';
 import { PixiTrackerView } from '../views/PixiTrackerView';
 import { PixiDJView } from '../views/PixiDJView';
 import { PixiArrangementView } from '../views/PixiArrangementView';
@@ -287,6 +289,29 @@ export const WorkbenchContainer: React.FC = () => {
       startSpring({ x: 0, y: 0, scale: 1 });
     }
   }, [width, workbenchH, startSpring]);
+
+  // ─── Control bar actions ────────────────────────────────────────────────────
+
+  const handleFitAll = useCallback(() => {
+    startSpring(fitAllWindows(useWorkbenchStore.getState().windows, width, workbenchH));
+  }, [width, workbenchH, startSpring]);
+
+  const handleResetCamera = useCallback(() => {
+    startSpring({ x: 0, y: 0, scale: 1 });
+  }, [startSpring]);
+
+  const handleLoadWorkspace = useCallback((name: string) => {
+    const preset = BUILTIN_WORKSPACES[name];
+    if (!preset) return;
+    const s = useWorkbenchStore.getState();
+    // Apply window positions from preset
+    for (const [id, ws] of Object.entries(preset.windows)) {
+      s.moveWindow(id, ws.x, ws.y);
+      s.resizeWindow(id, ws.width, ws.height);
+      if (ws.visible) s.showWindow(id); else s.hideWindow(id);
+    }
+    startSpring(preset.camera);
+  }, [startSpring]);
 
   // ─── Exposé (Alt+Tab hold) ──────────────────────────────────────────────────
 
@@ -560,6 +585,26 @@ export const WorkbenchContainer: React.FC = () => {
           alpha={0.5}
           layout={{ position: 'absolute', bottom: 8, left: 10 }}
         />
+
+        {/* Control bar — screen space, top-right corner */}
+        <pixiContainer
+          layout={{
+            position: 'absolute',
+            top: 8,
+            right: 10,
+            flexDirection: 'row',
+            gap: 4,
+            alignItems: 'center',
+          }}
+          eventMode="static"
+        >
+          <PixiButton label="FIT" variant="ft2" size="sm" onClick={handleFitAll} />
+          <PixiButton label="1:1" variant="ft2" size="sm" onClick={handleResetCamera} />
+          <pixiContainer layout={{ width: 8 }} />
+          <PixiButton label="COMPOSE" variant="ft2" size="sm" onClick={() => handleLoadWorkspace('Compose')} />
+          <PixiButton label="MIX" variant="ft2" size="sm" onClick={() => handleLoadWorkspace('Mix')} />
+          <PixiButton label="FULL" variant="ft2" size="sm" onClick={() => handleLoadWorkspace('Full')} />
+        </pixiContainer>
 
         {/* World container — camera transform via ref.
             NO layout prop: worldRef is not a Yoga container, so its children

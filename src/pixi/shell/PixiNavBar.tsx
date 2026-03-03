@@ -182,7 +182,7 @@ export const PixiNavBar: React.FC<PixiNavBarProps> = ({
           flexDirection: 'row',
           alignItems: 'center',
           paddingLeft: 16,
-          gap: 6,
+          gap: 4,
           flexShrink: 0,
         }}
       >
@@ -205,7 +205,7 @@ export const PixiNavBar: React.FC<PixiNavBarProps> = ({
               size="sm"
               active={isActive}
               onClick={() => setActiveView(id as any)}
-              width={44}
+              width={36}
             />
           );
         })}
@@ -223,7 +223,7 @@ export const PixiNavBar: React.FC<PixiNavBarProps> = ({
           alignItems: 'center',
           justifyContent: 'flex-end',
           paddingRight: 12,
-          gap: 6,
+          gap: 4,
           flexShrink: 0,
         }}
       >
