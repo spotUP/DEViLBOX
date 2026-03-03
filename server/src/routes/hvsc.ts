@@ -58,13 +58,17 @@ router.get('/featured', (_req: Request, res: Response) => {
   // Return curated list of classics (paths use full HVSC directory structure)
   const featured = [
     { name: 'Commando.sid', path: 'MUSICIANS/H/Hubbard_Rob/Commando.sid', isDirectory: false, size: 4096 },
-    { name: 'Last_Ninja.sid', path: 'MUSICIANS/H/Hubbard_Rob/Last_Ninja.sid', isDirectory: false, size: 4096 },
+    { name: 'Ninja.sid', path: 'MUSICIANS/H/Hubbard_Rob/Ninja.sid', isDirectory: false, size: 4096 },
     { name: 'Monty_on_the_Run.sid', path: 'MUSICIANS/H/Hubbard_Rob/Monty_on_the_Run.sid', isDirectory: false, size: 4096 },
-    { name: 'One_Man_and_His_Droid.sid', path: 'MUSICIANS/G/Galway_Martin/One_Man_and_His_Droid.sid', isDirectory: false, size: 4096 },
-    { name: 'Parallax.sid', path: 'MUSICIANS/G/Galway_Martin/Parallax.sid', isDirectory: false, size: 4096 },
-    { name: 'International_Karate.sid', path: 'MUSICIANS/H/Hubbard_Rob/International_Karate.sid', isDirectory: false, size: 4096 },
+    { name: 'Delta.sid', path: 'MUSICIANS/H/Hubbard_Rob/Delta.sid', isDirectory: false, size: 4096 },
     { name: 'Sanxion.sid', path: 'MUSICIANS/H/Hubbard_Rob/Sanxion.sid', isDirectory: false, size: 4096 },
+    { name: 'International_Karate.sid', path: 'MUSICIANS/H/Hubbard_Rob/International_Karate.sid', isDirectory: false, size: 4096 },
+    { name: 'Crazy_Comets.sid', path: 'MUSICIANS/H/Hubbard_Rob/Crazy_Comets.sid', isDirectory: false, size: 4096 },
+    { name: 'Parallax.sid', path: 'MUSICIANS/G/Galway_Martin/Parallax.sid', isDirectory: false, size: 4096 },
     { name: 'Wizball.sid', path: 'MUSICIANS/G/Galway_Martin/Wizball.sid', isDirectory: false, size: 4096 },
+    { name: 'Green_Beret.sid', path: 'MUSICIANS/G/Galway_Martin/Green_Beret.sid', isDirectory: false, size: 4096 },
+    { name: 'Arkanoid.sid', path: 'MUSICIANS/G/Galway_Martin/Arkanoid.sid', isDirectory: false, size: 4096 },
+    { name: 'Cybernoid_II.sid', path: 'MUSICIANS/T/Tel_Jeroen/Cybernoid_II.sid', isDirectory: false, size: 4096 },
   ];
   
   res.json({ entries: featured });
