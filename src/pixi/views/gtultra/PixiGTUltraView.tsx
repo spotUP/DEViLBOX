@@ -178,6 +178,15 @@ export const PixiGTUltraView: React.FC<Props> = ({ width, height }) => {
           />
         </pixiContainer>
 
+        {/* Pro/Studio mode switcher */}
+        <pixiContainer eventMode="static" cursor="pointer" onPointerUp={toggleViewMode}>
+          <pixiBitmapText
+            text={viewMode === 'pro' ? '[PRO]' : '[STUDIO]'}
+            style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }}
+            tint={viewMode === 'pro' ? GT_ACCENT : GT_GREEN}
+          />
+        </pixiContainer>
+
         {/* Info */}
         <pixiBitmapText
           text={infoText}
@@ -203,23 +212,22 @@ export const PixiGTUltraView: React.FC<Props> = ({ width, height }) => {
             width={SIDEBAR_W}
             height={oscH}
           />
-          <PixiGTOrderList
-            width={SIDEBAR_W}
-            height={orderH}
-          />
-          <PixiGTInstrumentPanel
-            width={SIDEBAR_W}
-            height={instrH}
-          />
-          <PixiGTTableEditor
-            width={SIDEBAR_W}
-            height={tableH}
-          />
-          <PixiGTSIDMonitor
-            width={SIDEBAR_W}
-            height={regMonH}
-            sidIndex={0}
-          />
+          {viewMode === 'pro' ? (
+            <>
+              {/* Pro mode: hex-based editors */}
+              <PixiGTOrderList width={SIDEBAR_W} height={orderH} />
+              <PixiGTInstrumentPanel width={SIDEBAR_W} height={instrH} />
+              <PixiGTTableEditor width={SIDEBAR_W} height={tableH} />
+              <PixiGTSIDMonitor width={SIDEBAR_W} height={regMonH} sidIndex={0} />
+            </>
+          ) : (
+            <>
+              {/* Studio mode: visual instrument designer + order list */}
+              <PixiGTStudioInstrument width={SIDEBAR_W} height={instrH + tableH} />
+              <PixiGTOrderList width={SIDEBAR_W} height={orderH} />
+              <PixiGTSIDMonitor width={SIDEBAR_W} height={regMonH} sidIndex={0} />
+            </>
+          )}
         </pixiContainer>
       </pixiContainer>
     </pixiContainer>
