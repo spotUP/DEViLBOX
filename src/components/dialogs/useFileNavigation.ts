@@ -136,7 +136,6 @@ export function useFileNavigation({
   onLoadTrackerModule,
   onClose,
   currentProjectData,
-  mode,
   suggestedFilename,
 }: UseFileNavigationOptions) {
   const [files, setFiles] = useState<FileItem[]>([]);

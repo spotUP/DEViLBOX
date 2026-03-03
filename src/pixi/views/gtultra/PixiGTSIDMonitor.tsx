@@ -167,7 +167,7 @@ export const PixiGTSIDMonitor: React.FC<Props> = ({ width, height, sidIndex = 0 
 
   return (
     <pixiContainer ref={containerRef} layout={{ width, height }}>
-      <pixiGraphics ref={gridRef} />
+      <pixiGraphics ref={gridRef} draw={() => {}} />
     </pixiContainer>
   );
 };

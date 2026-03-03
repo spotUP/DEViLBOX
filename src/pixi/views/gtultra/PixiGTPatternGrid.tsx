@@ -15,7 +15,7 @@ import React, { useCallback, useEffect, useRef, useMemo } from 'react';
 import type { Container as ContainerType, Graphics as GraphicsType } from 'pixi.js';
 import { PIXI_FONTS } from '@/pixi/fonts';
 import { MegaText, type GlyphLabel } from '@/pixi/utils/MegaText';
-import { useGTUltraStore, type GTEditorCursor } from '@/stores/useGTUltraStore';
+import { useGTUltraStore } from '@/stores/useGTUltraStore';
 
 // ── Layout constants ──
 const FONT_SIZE = 11;
@@ -90,7 +90,6 @@ export const PixiGTPatternGrid: React.FC<Props> = ({ width, height }) => {
   const orderPosRef = useRef(0);
 
   const visibleRows = Math.floor((height - HEADER_H) / ROW_H);
-  const totalW = ROW_NUM_W + channelCount * (CHANNEL_W + CHAN_GAP);
 
   // Scroll row: center active row
   const scrollRow = useMemo(() => {
@@ -252,16 +251,22 @@ export const PixiGTPatternGrid: React.FC<Props> = ({ width, height }) => {
   // Subscribe to pattern/order data changes for redraw
   useEffect(() => {
     const unsub1 = useGTUltraStore.subscribe(
-      (s) => s.patternData,
-      (pd) => { patternDataRef.current = pd; imperativeRedraw(); }
+      (s) => {
+        const pd = s.patternData;
+        if (pd !== patternDataRef.current) { patternDataRef.current = pd; imperativeRedraw(); }
+      }
     );
     const unsub2 = useGTUltraStore.subscribe(
-      (s) => s.orderData,
-      (od) => { orderDataRef.current = od; imperativeRedraw(); }
+      (s) => {
+        const od = s.orderData;
+        if (od !== orderDataRef.current) { orderDataRef.current = od; imperativeRedraw(); }
+      }
     );
     const unsub3 = useGTUltraStore.subscribe(
-      (s) => s.playbackPos.position,
-      (pos) => { orderPosRef.current = pos; }
+      (s) => {
+        const pos = s.playbackPos.position;
+        if (pos !== orderPosRef.current) { orderPosRef.current = pos; }
+      }
     );
     return () => { unsub1(); unsub2(); unsub3(); };
   }, [imperativeRedraw]);
@@ -269,10 +274,12 @@ export const PixiGTPatternGrid: React.FC<Props> = ({ width, height }) => {
   // Subscribe to cursor changes for fast overlay redraws
   useEffect(() => {
     const unsub = useGTUltraStore.subscribe(
-      (s) => s.cursor,
-      (cur) => {
-        cursorRef.current = cur;
-        imperativeRedraw();
+      (s) => {
+        const cur = s.cursor;
+        if (cur !== cursorRef.current) {
+          cursorRef.current = cur;
+          imperativeRedraw();
+        }
       }
     );
     return unsub;
@@ -335,10 +342,10 @@ export const PixiGTPatternGrid: React.FC<Props> = ({ width, height }) => {
       layout={{ width, height }}
     >
       {/* Grid backgrounds + separators */}
-      <pixiGraphics ref={gridRef} />
+      <pixiGraphics ref={gridRef} draw={() => {}} />
       {/* Cell text (MegaText added imperatively to container) */}
       {/* Cursor + selection overlay */}
-      <pixiGraphics ref={overlayRef} />
+      <pixiGraphics ref={overlayRef} draw={() => {}} />
     </pixiContainer>
   );
 };

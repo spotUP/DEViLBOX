@@ -5,7 +5,7 @@
  * and keyboard shortcuts into a single hook.
  */
 
-import { useRef, useState, useCallback, useEffect, useMemo } from 'react';
+import { useRef, useState, useCallback, useMemo } from 'react';
 import { WaveformProcessor } from '../lib/audio/WaveformProcessor';
 import { notify } from '../stores/useNotificationStore';
 import { useSampleEditorUndo } from './useSampleEditorUndo';

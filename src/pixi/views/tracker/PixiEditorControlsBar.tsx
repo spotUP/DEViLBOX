@@ -300,13 +300,11 @@ export const PixiEditorControlsBar: React.FC<PixiEditorControlsBarProps> = ({
     grooveTemplateId,
     swing,
     jitter,
-    useMpcScale: _useMpcScale,
     smoothScrolling,
   } = useTransportStore(useShallow(s => ({
     grooveTemplateId: s.grooveTemplateId,
     swing: s.swing,
     jitter: s.jitter,
-    useMpcScale: s.useMpcScale,
     smoothScrolling: s.smoothScrolling,
   })));
 

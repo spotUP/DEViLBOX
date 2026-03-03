@@ -66,13 +66,11 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
     grooveTemplateId,
     swing,
     jitter,
-    useMpcScale,
     smoothScrolling,
   } = useTransportStore(useShallow(s => ({
     grooveTemplateId: s.grooveTemplateId,
     swing: s.swing,
     jitter: s.jitter,
-    useMpcScale: s.useMpcScale,
     smoothScrolling: s.smoothScrolling,
   })));
 

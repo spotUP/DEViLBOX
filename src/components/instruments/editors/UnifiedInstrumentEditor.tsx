@@ -181,6 +181,11 @@ function getEditorMode(synthType: SynthType): EditorMode {
 // UNIFIED INSTRUMENT EDITOR
 // ============================================================================
 
+interface UnifiedInstrumentEditorProps {
+  instrument: InstrumentConfig;
+  onChange: (updates: Partial<InstrumentConfig>) => void;
+}
+
 export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = ({
   instrument,
   onChange,

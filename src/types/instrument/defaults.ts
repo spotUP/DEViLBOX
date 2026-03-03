@@ -13,7 +13,6 @@ import type {
   FilterEnvelopeConfig,
   PitchEnvelopeConfig,
   ArpeggioConfig,
-  VowelType,
   LFOConfig,
   DeepPartial,
   InstrumentType,
@@ -21,7 +20,6 @@ import type {
 } from './base';
 import type { EffectConfig } from './effects';
 import type {
-  DevilFishConfig,
   TB303Config,
   WavetableConfig,
   HarmonicSynthConfig,

@@ -53,23 +53,23 @@ export interface ChannelRoutingContext {
 // ============================================
 
 export class ChannelMeterState {
-  private channelTriggerLevels: Map<number, number> = new Map();
-  private triggerLevelsCache: number[] = new Array(16).fill(0);
-  private triggerGensCache: number[] = new Array(16).fill(0);
-  private channelTriggerGens = new Map<number, number>();
-  private triggerGenCounter = 0;
+  _channelTriggerLevels: Map<number, number> = new Map();
+  _triggerLevelsCache: number[] = new Array(16).fill(0);
+  _triggerGensCache: number[] = new Array(16).fill(0);
+  _channelTriggerGens = new Map<number, number>();
+  _triggerGenCounter = 0;
 }
 
 export function triggerChannelMeter(state: ChannelMeterState, channelIndex: number, velocity: number): void {
   const s = state as any;
-  s.channelTriggerLevels.set(channelIndex, Math.min(1, velocity * 1.2));
-  s.channelTriggerGens.set(channelIndex, ++s.triggerGenCounter);
+  s._channelTriggerLevels.set(channelIndex, Math.min(1, velocity * 1.2));
+  s._channelTriggerGens.set(channelIndex, ++s._triggerGenCounter);
 }
 
 export function clearChannelTriggerLevels(state: ChannelMeterState): void {
   const s = state as any;
-  s.channelTriggerLevels.clear();
-  s.channelTriggerGens.clear();
+  s._channelTriggerLevels.clear();
+  s._channelTriggerGens.clear();
 }
 
 /**
@@ -82,16 +82,16 @@ export function clearChannelTriggerLevels(state: ChannelMeterState): void {
 export function getChannelTriggerLevels(state: ChannelMeterState, numChannels: number): number[] {
   const s = state as any;
   // Grow cache if needed (never shrinks — avoids reallocation)
-  if (s.triggerLevelsCache.length < numChannels) {
-    const old = s.triggerLevelsCache;
-    s.triggerLevelsCache = new Array(Math.max(numChannels, 16)).fill(0);
-    for (let j = 0; j < old.length; j++) s.triggerLevelsCache[j] = old[j];
+  if (s._triggerLevelsCache.length < numChannels) {
+    const old = s._triggerLevelsCache;
+    s._triggerLevelsCache = new Array(Math.max(numChannels, 16)).fill(0);
+    for (let j = 0; j < old.length; j++) s._triggerLevelsCache[j] = old[j];
   }
 
   for (let i = 0; i < numChannels; i++) {
-    s.triggerLevelsCache[i] = s.channelTriggerLevels.get(i) || 0;
+    s._triggerLevelsCache[i] = s._channelTriggerLevels.get(i) || 0;
   }
-  return s.triggerLevelsCache;
+  return s._triggerLevelsCache;
 }
 
 /**
@@ -102,13 +102,13 @@ export function getChannelTriggerLevels(state: ChannelMeterState, numChannels: n
  */
 export function getChannelTriggerGenerations(state: ChannelMeterState, numChannels: number): number[] {
   const s = state as any;
-  if (s.triggerGensCache.length < numChannels) {
-    s.triggerGensCache = new Array(Math.max(numChannels, 16)).fill(0);
+  if (s._triggerGensCache.length < numChannels) {
+    s._triggerGensCache = new Array(Math.max(numChannels, 16)).fill(0);
   }
   for (let i = 0; i < numChannels; i++) {
-    s.triggerGensCache[i] = s.channelTriggerGens.get(i) || 0;
+    s._triggerGensCache[i] = s._channelTriggerGens.get(i) || 0;
   }
-  return s.triggerGensCache;
+  return s._triggerGensCache;
 }
 
 // ============================================

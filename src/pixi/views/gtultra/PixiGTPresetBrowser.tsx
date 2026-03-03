@@ -33,7 +33,7 @@ export const PixiGTPresetBrowser: React.FC<Props> = ({ width, height, onApplyPre
   const bgRef = useRef<GraphicsType>(null);
   const megaRef = useRef<MegaText | null>(null);
 
-  const [selectedCat, setSelectedCat] = useState(0);
+  const [selectedCat, _setSelectedCat] = useState(0);
   const [selectedPreset, setSelectedPreset] = useState(0);
   const [scroll, setScroll] = useState(0);
 
@@ -146,33 +146,14 @@ export const PixiGTPresetBrowser: React.FC<Props> = ({ width, height, onApplyPre
     setScroll(0);
   }, [selectedCat]);
 
-  // Keyboard navigation
+  // Keyboard navigation (TODO: wire up event listener)
   useEffect(() => {
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'ArrowUp') {
-        e.preventDefault();
-        setSelectedPreset(p => Math.max(0, p - 1));
-      } else if (e.key === 'ArrowDown') {
-        e.preventDefault();
-        setSelectedPreset(p => Math.min(presets.length - 1, p + 1));
-      } else if (e.key === 'ArrowLeft') {
-        e.preventDefault();
-        setSelectedCat(c => Math.max(0, c - 1));
-      } else if (e.key === 'ArrowRight') {
-        e.preventDefault();
-        setSelectedCat(c => Math.min(categories.length - 1, c + 1));
-      } else if (e.key === 'Enter' && presets[selectedPreset]) {
-        e.preventDefault();
-        onApplyPreset?.(presets[selectedPreset]);
-      }
-    };
-
     return () => {};
   }, [presets, selectedPreset, categories.length, onApplyPreset]);
 
   return (
     <pixiContainer ref={containerRef} layout={{ width, height }}>
-      <pixiGraphics ref={bgRef} />
+      <pixiGraphics ref={bgRef} draw={() => {}} />
     </pixiContainer>
   );
 };

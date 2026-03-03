@@ -122,7 +122,7 @@ export const PixiGTOrderList: React.FC<Props> = ({ width, height }) => {
 
   return (
     <pixiContainer ref={containerRef} eventMode="static" cursor="default" onPointerUp={handlePointerUp} layout={{ width, height }}>
-      <pixiGraphics ref={gridRef} />
+      <pixiGraphics ref={gridRef} draw={() => {}} />
     </pixiContainer>
   );
 };

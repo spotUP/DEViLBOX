@@ -2,7 +2,6 @@
  * Shared helpers and types for visual effect editors
  */
 
-import React from 'react';
 import type { EffectConfig } from '@typedefs/instrument';
 import { BpmSyncControl } from '../BpmSyncControl';
 import { isEffectBpmSynced, getEffectSyncDivision, type SyncDivision } from '@engine/bpmSync';

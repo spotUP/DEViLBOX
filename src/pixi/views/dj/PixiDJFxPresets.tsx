@@ -5,7 +5,7 @@
  * One-click apply. Clear All FX at top.
  */
 
-import React, { useCallback, useState, useMemo, useEffect } from 'react';
+import React, { useCallback, useState, useMemo } from 'react';
 import { PixiSelect, type SelectOption } from '@/pixi/components/PixiSelect';
 import { MASTER_FX_PRESETS, type MasterFxPreset } from '@/constants/masterFxPresets';
 import { useAudioStore } from '@/stores/useAudioStore';

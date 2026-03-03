@@ -138,7 +138,7 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
   const { handleModuleImport, handleTD3Import, handleSunVoxImport } = useModuleImport();
 
   // View mode state
-  type ViewMode = 'tracker' | 'grid' | 'pianoroll' | 'tb303';
+  type ViewMode = 'tracker' | 'grid' | 'pianoroll' | 'tb303' | 'arrangement' | 'dj' | 'drumpad' | 'vj' | 'mixer';
   const [viewMode, setViewMode] = useState<ViewMode>('tracker');
   const [gridChannelIndex, setGridChannelIndex] = useState(0);
 
@@ -321,8 +321,6 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
     setRandomizeChannel(channelIndex);
     setShowRandomize(true);
   }, []);
-
-  const pattern = patterns[currentPatternIndex];
 
   // Mobile view with tabbed interface
   if (isMobile) {
