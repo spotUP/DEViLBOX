@@ -6,3 +6,4 @@ export { PixiGTTableEditor } from './PixiGTTableEditor';
 export { PixiGTSIDMonitor } from './PixiGTSIDMonitor';
 export { PixiGTOscilloscope } from './PixiGTOscilloscope';
 export { PixiGTStudioInstrument } from './PixiGTStudioInstrument';
+export { PixiGTStudioTables } from './PixiGTStudioTables';
