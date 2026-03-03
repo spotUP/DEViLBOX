@@ -262,16 +262,13 @@ export const PixiKnob: React.FC<PixiKnobProps> = ({
     lastClickTime.current = now;
 
     setIsDragging(true);
-    dragStartY.current = e.globalY;
-    dragStartX.current = e.globalX;
+    dragStartY.current = e.clientY;
+    dragStartX.current = e.clientX;
     dragStartNorm.current = getNormalized(valueRef.current);
 
-    const stage = (containerRef.current as any)?.stage;
-    if (!stage) return;
-
-    const onMove = (ev: FederatedPointerEvent) => {
-      const deltaY = dragStartY.current - ev.globalY;
-      const deltaX = ev.globalX - dragStartX.current;
+    const onMove = (ev: PointerEvent) => {
+      const deltaY = dragStartY.current - ev.clientY;
+      const deltaX = ev.clientX - dragStartX.current;
       const isHoriz = Math.abs(deltaX) > Math.abs(deltaY);
       let delta = (isHoriz ? deltaX : deltaY) / DRAG_SENSITIVITY;
 
@@ -284,14 +281,12 @@ export const PixiKnob: React.FC<PixiKnobProps> = ({
 
     const onUp = () => {
       setIsDragging(false);
-      stage.off('pointermove', onMove);
-      stage.off('pointerup', onUp);
-      stage.off('pointerupoutside', onUp);
+      document.removeEventListener('pointermove', onMove);
+      document.removeEventListener('pointerup', onUp);
     };
 
-    stage.on('pointermove', onMove);
-    stage.on('pointerup', onUp);
-    stage.on('pointerupoutside', onUp);
+    document.addEventListener('pointermove', onMove);
+    document.addEventListener('pointerup', onUp);
   }, [disabled, getNormalized, applyValue, defaultValue, bipolar, min, max]);
 
   // Right-click reset

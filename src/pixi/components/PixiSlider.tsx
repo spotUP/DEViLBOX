@@ -182,30 +182,25 @@ export const PixiSlider: React.FC<PixiSliderProps> = ({
     lastClickTime.current = now;
 
     setIsDragging(true);
-    const startPos = isVert ? e.globalY : e.globalX;
+    const startPos = isVert ? e.clientY : e.clientX;
     const startNorm = norm;
 
-    const stage = (containerRef.current as any)?.stage;
-    if (!stage) return;
-
-    const onMove = (ev: FederatedPointerEvent) => {
-      const currentPos = isVert ? ev.globalY : ev.globalX;
+    const onMove = (ev: PointerEvent) => {
+      const currentPos = isVert ? ev.clientY : ev.clientX;
       const delta = (startPos - currentPos) / length; // Invert for vertical (up = increase)
-      let newNorm = Math.max(0, Math.min(1, startNorm + (isVert ? delta : (currentPos - startPos) / length)));
+      const newNorm = Math.max(0, Math.min(1, startNorm + (isVert ? delta : (currentPos - startPos) / length)));
       const newValue = clampAndSnap(min + newNorm * (max - min));
       onChangeRef.current(newValue);
     };
 
     const onUp = () => {
       setIsDragging(false);
-      stage.off('pointermove', onMove);
-      stage.off('pointerup', onUp);
-      stage.off('pointerupoutside', onUp);
+      document.removeEventListener('pointermove', onMove);
+      document.removeEventListener('pointerup', onUp);
     };
 
-    stage.on('pointermove', onMove);
-    stage.on('pointerup', onUp);
-    stage.on('pointerupoutside', onUp);
+    document.addEventListener('pointermove', onMove);
+    document.addEventListener('pointerup', onUp);
   }, [disabled, isVert, norm, length, min, max, clampAndSnap, defaultValue, detent]);
 
   // Layout dimensions

@@ -214,30 +214,25 @@ export const PixiPitchSlider: React.FC<PixiPitchSliderProps> = ({ width, height 
 
     setIsDragging(true);
 
-    const startY = e.globalY;
+    const startY = e.clientY;
     const startPitch = pitchRef.current;
     const usable = trackH - HANDLE_H - EDGE_PAD * 2;
 
-    const stage = (containerRef.current as any)?.stage;
-    if (!stage) return;
-
-    const onMove = (ev: FederatedPointerEvent) => {
+    const onMove = (ev: PointerEvent) => {
       const fine = ev.shiftKey;
-      const dy = ev.globalY - startY;
+      const dy = ev.clientY - startY;
       const newPitch = deltaYToPitch(startPitch, dy, usable, fine);
       applyPitch(newPitch);
     };
 
     const onUp = () => {
       setIsDragging(false);
-      stage.off('pointermove', onMove);
-      stage.off('pointerup', onUp);
-      stage.off('pointerupoutside', onUp);
+      document.removeEventListener('pointermove', onMove);
+      document.removeEventListener('pointerup', onUp);
     };
 
-    stage.on('pointermove', onMove);
-    stage.on('pointerup', onUp);
-    stage.on('pointerupoutside', onUp);
+    document.addEventListener('pointermove', onMove);
+    document.addEventListener('pointerup', onUp);
   }, [trackH, applyPitch, resetPitch]);
 
   // ─── Render ────────────────────────────────────────────────────────────
