@@ -173,7 +173,7 @@ export const PixiFT2Toolbar: React.FC = () => {
   const songLength = patternOrder.length;
   const currentPatternInOrder = patternOrder[currentPositionIndex] ?? currentPatternIndex;
 
-  const grooveActive = grooveTemplateId !== 'straight' || swing !== (useMpcScale ? 50 : 100) || jitter > 0;
+  const grooveActive = (grooveTemplateId !== 'straight' && swing > 0) || jitter > 0;
   const grooveName = GROOVE_TEMPLATES.find(g => g.id === grooveTemplateId)?.name ?? 'Groove';
 
   const isPlayingSong    = isPlaying && !isLooping;

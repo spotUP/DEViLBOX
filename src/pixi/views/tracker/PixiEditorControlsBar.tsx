@@ -241,7 +241,7 @@ export const PixiEditorControlsBar: React.FC<PixiEditorControlsBarProps> = ({
   const statusMessage = useUIStore(s => s.statusMessage);
 
   // ── Groove ────────────────────────────────────────────────────────────────
-  const grooveActive = grooveTemplateId !== 'straight' || swing !== (useMpcScale ? 50 : 100) || jitter > 0;
+  const grooveActive = (grooveTemplateId !== 'straight' && swing > 0) || jitter > 0;
 
   // ── Channel selector options ──────────────────────────────────────────────
   const channelOptions = useMemo<SelectOption[]>(
