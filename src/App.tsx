@@ -549,6 +549,19 @@ function App() {
       return;
     }
 
+    // GoatTracker .sng files — detect by magic bytes and load directly
+    // (skip confirmation dialog / UADE scan which can't handle GoatTracker format)
+    if (/\.sng$/i.test(file.name)) {
+      const { isGoatTrackerSong } = await import('@/lib/import/formats/GoatTrackerDetect');
+      const buf = await file.arrayBuffer();
+      if (isGoatTrackerSong(buf)) {
+        const gtResult = await loadFile(file);
+        if (gtResult.success === true) notify.success(gtResult.message);
+        else if (gtResult.success === false) notify.error(gtResult.error);
+        return;
+      }
+    }
+
     const result = await loadFile(file, { requireConfirmation: true });
 
     if (result.success === 'pending-confirmation') {

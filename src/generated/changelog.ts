@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-03-03T16:39:22.078Z
+ * Generated: 2026-03-03T18:07:25.710Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.2061';
-export const BUILD_NUMBER = '2061';
-export const BUILD_HASH = '1b2a4c44';
+export const BUILD_VERSION = '1.0.2070';
+export const BUILD_NUMBER = '2070';
+export const BUILD_HASH = '49a4a5a7';
 export const BUILD_DATE = '2026-03-03';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,45 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.2061',
+    version: '1.0.2070',
     date: '2026-03-03',
     changes: [
+      {
+        type: 'fix',
+        "description": "Add GoatTracker .sng to FormatRegistry for drag-drop support"
+      },
+      {
+        type: 'fix',
+        "description": "SID files use classic view, fix GTUltra yoga BindingError"
+      },
+      {
+        type: 'fix',
+        "description": "Switch to GoatTracker view when loading SID files"
+      },
+      {
+        type: 'fix',
+        "description": "Auto-initialize ASID device manager for USB-SID-Pico hot-plug"
+      },
+      {
+        type: 'feature',
+        "description": "DeepSID composer database integration"
+      },
+      {
+        type: 'fix',
+        "description": "Suppress Furnace note triggers during C64SID playback"
+      },
+      {
+        type: 'improvement',
+        "description": "Update AmigaFormatParsers JSDoc for dispatcher architecture"
+      },
+      {
+        type: 'feature',
+        "description": "SID info button in toolbar — modal shows full metadata on demand"
+      },
+      {
+        type: 'feature',
+        "description": "SID metadata UI — info panel, subsong selector, status bar integration"
+      },
       {
         type: 'fix',
         "description": "Restore missing isSupportedModule import in UnifiedFileLoader"
@@ -192,42 +228,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'feature',
         "description": "Add label destination writes, SIZE token skip, emitOperandRead"
-      },
-      {
-        type: 'improvement',
-        "description": "Revert(tracker): restore 47fps every-3rd-frame scroll baseline"
-      },
-      {
-        type: 'improvement',
-        "description": "Add ASID hardware support documentation"
-      },
-      {
-        type: 'feature',
-        "description": "Add ASID status tracking to C64SIDEngine"
-      },
-      {
-        type: 'feature',
-        "description": "Wire ASID protocol into jsSID engine"
-      },
-      {
-        type: 'feature',
-        "description": "Add ASID hardware protocol and settings UI"
-      },
-      {
-        type: 'improvement',
-        "description": "Note that HVSC browser requires backend server"
-      },
-      {
-        type: 'fix',
-        "description": "Improve HVSC error messages and remove broken CORS fallback"
-      },
-      {
-        type: 'improvement',
-        "description": "Revert(tracker): restore pre-tile-shift scroll (every-3rd-frame RAF)"
-      },
-      {
-        type: 'fix',
-        "description": "Debug(vj): add preset selection logging in VJView"
       }
     ]
   }
