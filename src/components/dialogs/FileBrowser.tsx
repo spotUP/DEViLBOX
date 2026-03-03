@@ -6,71 +6,12 @@
  * - Server API (jailed to data/ directory)
  */
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { X, Folder, FolderOpen, FileAudio, ArrowLeft, Trash2, File, Cloud, HardDrive, History, RotateCcw, Globe, Search, Loader2, Download, AlertCircle } from 'lucide-react';
+import React, { useState } from 'react';
+import { X, Folder, FolderOpen, FileAudio, ArrowLeft, Trash2, File, Cloud, HardDrive, History, RotateCcw, Globe } from 'lucide-react';
 import '@cubone/react-file-manager/dist/style.css';
-import {
-  isFileSystemAccessSupported,
-  requestDirectoryAccess,
-  getCurrentDirectory,
-  listDirectory,
-  readFile,
-  writeFile,
-  createFile,
-  deleteFile,
-  pickSaveLocation,
-  pickFiles,
-} from '@/lib/fileSystemAccess';
-import type { FileEntry } from '@/lib/fileSystemAccess';
 import { hasElectronFS } from '@utils/electron';
-import {
-  isServerFSAvailable,
-  isManifestAvailable,
-  listServerDirectory,
-  listManifestDirectory,
-  readServerFile,
-  readStaticFile,
-  writeServerFile,
-  type ServerFileEntry,
-} from '@/lib/serverFS';
-import { useAuthStore } from '@stores/useAuthStore';
-import {
-  isAuthenticated,
-  listUserFiles,
-  getFile as getCloudFile,
-  saveFile as saveCloudFile,
-  deleteFile as deleteCloudFile,
-  listRevisions,
-  restoreRevision,
-  type ServerFile,
-  type FileRevision,
-} from '@/lib/serverFilesApi';
-import {
-  searchModland,
-  getModlandFormats,
-  downloadModlandFile,
-  downloadTFMXCompanion,
-  getModlandStatus,
-  type ModlandFile,
-  type ModlandFormat,
-  type ModlandStatus,
-} from '@/lib/modlandApi';
-import {
-  browseHVSC,
-  downloadHVSCFile,
-  searchHVSC,
-  getFeaturedTunes,
-  type HVSCEntry,
-} from '@/lib/hvscApi';
-import { getSupportedExtensions } from '@/lib/import/ModuleLoader';
-import { getSupportedMIDIExtensions } from '@/lib/import/MIDIImporter';
-
-// Build comprehensive accept string for file inputs (400+ supported formats)
-const ACCEPTED_FILE_FORMATS = [
-  '.json', '.dbx', '.dbox', '.xml',
-  ...getSupportedExtensions(),
-  ...getSupportedMIDIExtensions()
-].join(',');
+import { useFileNavigation, isTrackerModule, type FileSource } from './useFileNavigation';
+import { ModlandPanel, HVSCPanel } from './FilePreviewPanel';
 
 interface FileBrowserProps {
   isOpen: boolean;
@@ -81,72 +22,6 @@ interface FileBrowserProps {
   mode?: 'load' | 'save';
   currentProjectData?: () => object;
   suggestedFilename?: string;
-}
-
-interface FileItem {
-  id: string;
-  name: string;
-  isDirectory: boolean;
-  path: string;
-  size?: number;
-  modifiedAt?: Date;
-  source: 'filesystem' | 'cloud';
-  handle?: FileSystemFileHandle | FileSystemDirectoryHandle;
-  cloudId?: string; // For cloud files
-}
-
-// Helper to detect tracker module files (binary formats)
-const TRACKER_EXTENSIONS = [
-  // Standard tracker formats (libopenmpt)
-  '.mod', '.xm', '.it', '.s3m', '.fur', '.mptm', '.669', '.amf', '.ams', '.dbm',
-  '.dmf', '.dsm', '.far', '.ftm', '.gdm', '.imf', '.mdl', '.med', '.mt2', '.mtm',
-  '.okt', '.psm', '.ptm', '.sfx', '.stm', '.ult', '.umx',
-  // HivelyTracker / AHX
-  '.hvl', '.ahx',
-  // Dedicated parsers
-  '.mmd0', '.mmd1', '.mmd2', '.mmd3', '.digi',
-  // UADE exotic Amiga formats
-  '.hip', '.hip7', '.hipc', '.hst', '.soc', '.sog', '.s7g', '.mcmd',
-  '.tfmx', '.mdat', '.mdst',
-  '.fc', '.fc13', '.fc14', '.fc2', '.fc3', '.fc4', '.sfc', '.smod', '.bfc', '.bsi',
-  '.fred', '.gray',
-  '.sid1', '.sid2', '.smn', '.bp', '.bp3', '.sndmon',
-  '.bd', '.bds', '.dl', '.dln', '.dw', '.dwold', '.dh',
-  '.rjp', '.rh', '.rho', '.mc', '.mcr', '.mco', '.jcb', '.jcbo',
-  '.jp', '.jpn', '.jpnd', '.jt', '.jo', '.jmf', '.jpo', '.jpold',
-  '.kim', '.kh', '.avp', '.mw', '.md', '.thm', '.tf', '.tmk',
-  '.sb', '.wb', '.hn', '.tpu', '.hot', '.bye', '.ash', '.dz',
-  '.scn', '.scr', '.snk', '.ps', '.pvp', '.pap', '.pat', '.dat',
-  '.sa', '.sonic', '.jam', '.jc', '.ims', '.emod', '.qc',
-  '.kris', '.puma', '.tcb', '.prt', '.synmod', '.ex', '.sg', '.mkii', '.mk2',
-  '.lme', '.ma', '.ml',
-  '.bss', '.dns', '.vss', '.sdr', '.osp', '.psa', '.sm', '.sc', '.sct',
-  '.tw', '.spl', '.sfx13', '.sfx20', '.psf', '.sjs', '.mms', '.smus', '.snx',
-  '.dm', '.dm1', '.dm2', '.dlm1', '.dlm2', '.dmu', '.dmu2', '.mug', '.mug2',
-  '.mm4', '.mm8', '.sdata',
-  '.aam', '.aon', '.aon4', '.aon8', '.adsc', '.core', '.cin',
-  '.ea', '.mg', '.fw', '.glue', '.gm', '.gmc', '.dum', '.scumm',
-  '.mok', '.riff', '.max', '.mon', '.dsr', '.dsc', '.dss',
-  '.ems', '.emsv6', '.is', '.is20',
-  '.mfp', '.ntp', '.mosh', '.npp', '.tits', '.alp', '.uds',
-  '.sas', '.ss', '.fp', '.sun', '.trc', '.tro', '.tronic', '.dp',
-  '.ufo', '.mus', '.abk', '.cust', '.custom', '.cm', '.rk',
-  '.ast', '.aps', '.amc', '.mmdc', '.qpa', '.sqt', '.qts',
-  '.jd', '.doda', '.ym', '.ymst', '.agi', '.mso',
-  '.sng', '.tiny', '.one', '.two',
-];
-
-// Binary file formats that need ArrayBuffer loading (not JSON)
-const BINARY_EXTENSIONS = [...TRACKER_EXTENSIONS, '.sqs', '.seq', '.mid', '.midi'];
-
-function isTrackerModule(filename: string): boolean {
-  const ext = filename.toLowerCase().slice(filename.lastIndexOf('.'));
-  return TRACKER_EXTENSIONS.includes(ext);
-}
-
-function isBinaryFile(filename: string): boolean {
-  const ext = filename.toLowerCase().slice(filename.lastIndexOf('.'));
-  return BINARY_EXTENSIONS.includes(ext);
 }
 
 export const FileBrowser: React.FC<FileBrowserProps> = ({
