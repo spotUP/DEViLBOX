@@ -172,21 +172,39 @@ export const GTToolbar: React.FC<{ width: number; height: number }> = ({ width, 
   );
 };
 
-/** ASID hardware toggle — shows connection status and enables/disables hardware output */
+/** ASID hardware toggle — shows connection status, device name, and enables/disables hardware output */
 const ASIDToggle: React.FC = () => {
   const [asidEnabled, setAsidEnabled] = useState(false);
   const [connected, setConnected] = useState(false);
+  const [deviceName, setDeviceName] = useState<string | null>(null);
+  const [writeCount, setWriteCount] = useState(0);
   const engine = useGTUltraStore((s) => s.engine);
 
   useEffect(() => {
     const dm = getASIDDeviceManager();
     dm.init();
     const unsub = dm.onStateChange((state) => {
-      setConnected(state.selectedDevice?.state === 'connected');
+      const isReady = state.selectedDevice?.state === 'connected';
+      setConnected(isReady);
+      setDeviceName(state.selectedDevice?.name ?? null);
+      // Auto-reconnect: if device reconnects while ASID was enabled, re-enable bridge
+      if (isReady && asidEnabled) {
+        getGTUltraASIDBridge().enable();
+      }
     });
     setConnected(dm.isDeviceReady());
+    setDeviceName(dm.getSelectedDevice()?.name ?? null);
     return unsub;
-  }, []);
+  }, [asidEnabled]);
+
+  // Track ASID write count for activity indicator
+  useEffect(() => {
+    if (!asidEnabled) return;
+    const interval = setInterval(() => {
+      setWriteCount(getGTUltraASIDBridge().getWriteCount?.() ?? 0);
+    }, 500);
+    return () => clearInterval(interval);
+  }, [asidEnabled]);
 
   const toggle = useCallback(() => {
     const bridge = getGTUltraASIDBridge();
@@ -194,6 +212,7 @@ const ASIDToggle: React.FC = () => {
       bridge.disable();
       engine?.enableAsid(false);
       setAsidEnabled(false);
+      setWriteCount(0);
     } else {
       bridge.enable();
       engine?.enableAsid(true);
@@ -201,10 +220,18 @@ const ASIDToggle: React.FC = () => {
     }
   }, [asidEnabled, engine]);
 
+  const label = asidEnabled && connected
+    ? `🔌 ${deviceName ? deviceName.slice(0, 12) : 'ASID'} ● ${writeCount > 0 ? `${(writeCount / 1000).toFixed(1)}k` : 'ON'}`
+    : connected
+      ? `🔌 ${deviceName ? deviceName.slice(0, 12) : 'ASID'} OFF`
+      : '🔌 No Device';
+
   return (
     <button
       onClick={toggle}
-      title={connected ? (asidEnabled ? 'ASID: ON (click to disable)' : 'ASID: OFF (click to enable)') : 'No ASID device connected'}
+      title={connected
+        ? (asidEnabled ? `ASID active: ${deviceName} (${writeCount} writes)` : `Click to enable: ${deviceName}`)
+        : 'No ASID device detected — connect USB-SID-Pico or TherapSID'}
       style={{
         background: asidEnabled && connected ? '#2a9d8f' : '#333',
         color: connected ? '#fff' : '#666',
@@ -214,10 +241,11 @@ const ASIDToggle: React.FC = () => {
         fontSize: 10,
         fontWeight: 'bold',
         opacity: connected ? 1 : 0.5,
+        minWidth: 80,
       }}
       disabled={!connected}
     >
-      🔌 ASID {asidEnabled && connected ? 'ON' : 'OFF'}
+      {label}
     </button>
   );
 };

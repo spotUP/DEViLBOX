@@ -149,33 +149,41 @@ export const PixiGTStudioInstrument: React.FC<Props> = ({ width, height }) => {
     const mx = local.x;
     const my = local.y;
 
-    // Map pointer position to parameter value (0-15)
+    // Map pointer position to parameter value (0-15), snapped
     const xFrac = Math.max(0, Math.min(1, (mx - pad) / envW));
     const yFrac = Math.max(0, Math.min(1, 1 - (my - envY) / envH));
 
+    let newAD = inst.ad;
+    let newSR = inst.sr;
     let newVal: number;
     switch (dragging) {
       case 'attack':
         newVal = Math.round(xFrac * 15);
-        engine.setInstrumentAD(currentInstrument, encodeAD(newVal, decay));
+        newAD = encodeAD(newVal, decay);
+        engine.setInstrumentAD(currentInstrument, newAD);
         break;
       case 'decay':
         newVal = Math.round(xFrac * 15);
-        engine.setInstrumentAD(currentInstrument, encodeAD(attack, newVal));
+        newAD = encodeAD(attack, newVal);
+        engine.setInstrumentAD(currentInstrument, newAD);
         break;
       case 'sustain':
         newVal = Math.round(yFrac * 15);
-        engine.setInstrumentSR(currentInstrument, encodeSR(newVal, release));
+        newSR = encodeSR(newVal, release);
+        engine.setInstrumentSR(currentInstrument, newSR);
         break;
       case 'release':
         newVal = Math.round(xFrac * 15);
-        engine.setInstrumentSR(currentInstrument, encodeSR(sustain, newVal));
+        newSR = encodeSR(sustain, newVal);
+        engine.setInstrumentSR(currentInstrument, newSR);
         break;
     }
 
-    // Refresh instrument data from WASM
-    engine.requestInstrumentData(currentInstrument);
-  }, [dragging, engine, currentInstrument, attack, decay, sustain, release, envW, envH]);
+    // Update store locally for instant visual feedback
+    const data = [...useGTUltraStore.getState().instrumentData];
+    data[currentInstrument] = { ...inst, ad: newAD, sr: newSR };
+    useGTUltraStore.setState({ instrumentData: data });
+  }, [dragging, engine, currentInstrument, inst, attack, decay, sustain, release, envW, envH]);
 
   const handlePointerUp = useCallback(() => {
     setDragging(null);
