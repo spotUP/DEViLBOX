@@ -773,6 +773,30 @@ export class TrackerReplayer {
       try { ch.muteGain.dispose(); } catch { /* ignored */ }
     }
 
+    // Recreate master routing chain if AudioContext changed (e.g. iOS audio unlock,
+    // Furnace WASM init creates a new context). Without this, new Tone nodes on the
+    // current context can't connect to masterGain on the old context → InvalidAccessError.
+    try {
+      const testNode = new Tone.Gain(0);
+      testNode.connect(this.masterGain);
+      testNode.dispose();
+    } catch {
+      // Context mismatch — rebuild the routing chain
+      try { this.masterGain.dispose(); } catch { /* ignored */ }
+      this.separationNode.dispose();
+      this.masterGain = new Tone.Gain(1);
+      const newSep = new StereoSeparationNode();
+      this.masterGain.connect(newSep.inputTone);
+      if (this.isDJDeck) {
+        // DJ deck: reconnection to parent mixer handled externally
+      } else {
+        const engine = getToneEngine();
+        newSep.outputTone.connect(engine.masterInput);
+      }
+      // Replace the readonly separation node
+      (this as { separationNode: StereoSeparationNode }).separationNode = newSep;
+    }
+
     // Initialize channels
     this.channels = [];
     for (let i = 0; i < song.numChannels; i++) {
