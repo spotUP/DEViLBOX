@@ -32,10 +32,11 @@ let fontLoadPromise: Promise<void> | null = null;
 /**
  * Load all bitmap fonts. Call once during app initialization.
  * Safe to call multiple times — subsequent calls await the same promise.
+ * Waits for web fonts to load so Canvas 2D rasterization picks up symbol glyphs.
  */
 export function loadPixiFonts(): Promise<void> {
   if (!fontLoadPromise) {
-    fontLoadPromise = Promise.resolve(installFonts());
+    fontLoadPromise = document.fonts.ready.then(() => installFonts());
   }
   return fontLoadPromise;
 }
@@ -53,8 +54,8 @@ const EXTRA_CHARS = '±·¼É×é–—•…₁₂₃₆⅓⅛⅟←↑→↓�
 function installFonts(): void {
   if (_fontsInstalled) return;
   _fontsInstalled = true;
-  const monoFamily = 'JetBrains Mono, Menlo, Consolas, monospace';
-  const sansFamily = 'Inter, -apple-system, BlinkMacSystemFont, sans-serif';
+  const monoFamily = 'JetBrains Mono, Noto Sans Symbols 2, Menlo, Consolas, monospace';
+  const sansFamily = 'Inter, Noto Sans Symbols 2, -apple-system, BlinkMacSystemFont, sans-serif';
 
   // Build character set: ASCII + UI symbol characters
   const charSet: [string, string][] = [[' ', '~']];
