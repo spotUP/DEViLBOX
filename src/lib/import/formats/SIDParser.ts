@@ -220,5 +220,7 @@ export async function parseSIDFile(buffer: ArrayBuffer, filename: string): Promi
     numChannels: numCh,
     initialSpeed: 1,
     initialBPM: 50,
+    // Include raw SID data for C64SIDEngine playback
+    c64SidFileData: new Uint8Array(buffer),
   };
 }

@@ -29,6 +29,7 @@ import { unlockIOSAudio } from '@utils/ios-audio-unlock';
 import { ft2NoteToPeriod, ft2Period2Hz, ft2GetSampleC4Rate, ft2ArpeggioPeriod, ft2Period2NotePeriod, FT2_ARPEGGIO_TAB } from './effects/FT2Tables';
 import { HivelyEngine } from './hively/HivelyEngine';
 import { MusicLineEngine } from './musicline/MusicLineEngine';
+import { C64SIDEngine } from './C64SIDEngine';
 // ============================================================================
 // CONSTANTS
 // ============================================================================
@@ -387,6 +388,8 @@ export interface TrackerSong {
   hivelyFileData?: ArrayBuffer;
   /** Raw MusicLine binary for loading into the MusicLineEngine WASM */
   musiclineFileData?: Uint8Array;
+  /** Raw C64 SID binary for loading into the C64SIDEngine */
+  c64SidFileData?: Uint8Array;
   // Native format data (preserved for format-specific editors)
   furnaceNative?: FurnaceNativeData;
   hivelyNative?: HivelyNativeData;
@@ -542,6 +545,9 @@ export class TrackerReplayer {
   // Pre-allocated VU meter trigger callbacks (avoid closure allocation per note)
   private meterCallbacks: (() => void)[] | null = null;
   private meterStaging = new Float64Array(64);
+
+  // External playback engines for formats that don't use standard tracker playback
+  private c64SidEngine: C64SIDEngine | null = null;
 
   // Stereo separation (0-100): controls how wide the stereo image is.
   // 100 = full Amiga hard-pan (LRRL), 0 = mono, 20 = pt2-clone default for MOD.
@@ -1209,6 +1215,26 @@ export class TrackerReplayer {
       }
     }
 
+    // C64 SID: Load the raw SID file into C64SIDEngine for hardware-accurate playback.
+    // Similar to HivelyEngine, the SID engine handles all synthesis.
+    if (this.song.c64SidFileData && this.song.format === 'SID') {
+      try {
+        const audioContext = Tone.getContext().rawContext as AudioContext;
+        this.c64SidEngine = new C64SIDEngine(this.song.c64SidFileData);
+        await this.c64SidEngine.init(audioContext);
+
+        // Start playback immediately — skip if muted (DJ mode visuals)
+        if (!this._muted) {
+          await this.c64SidEngine.play();
+          console.log('[TrackerReplayer] C64SIDEngine loaded & playing for SID format');
+        } else {
+          console.log('[TrackerReplayer] C64SIDEngine loaded but skipping play (muted for DJ visuals)');
+        }
+      } catch (err) {
+        console.error('[TrackerReplayer] Failed to load SID tune into C64SIDEngine:', err);
+      }
+    }
+
     // MusicLine Editor: load raw binary into MusicLineEngine WASM before playback.
     if (this.song.musiclineFileData) {
       // WASM handles all audio for ML songs — suppress Sampler note triggers to avoid double audio.
@@ -1304,6 +1330,17 @@ export class TrackerReplayer {
           MusicLineEngine.getInstance().stop();
         }
       } catch { /* MusicLineEngine may not be loaded */ }
+    }
+
+    // Stop C64SIDEngine if this is a SID song
+    if (this.c64SidEngine) {
+      try {
+        this.c64SidEngine.stop();
+        this.c64SidEngine.dispose();
+        this.c64SidEngine = null;
+      } catch (err) {
+        console.warn('[TrackerReplayer] Error stopping C64SIDEngine:', err);
+      }
     }
 
     // Stop all channels (release synth notes + stop sample players)
