@@ -137,7 +137,7 @@ export const PixiMixerView: React.FC = () => {
       <pixiContainer
         layout={{
           flexDirection: 'row',
-          alignItems: 'flex-end',
+          alignItems: 'flex-start',
           gap: 8,
           paddingLeft: 8,
           paddingRight: 8,
@@ -173,11 +173,11 @@ export const PixiMixerView: React.FC = () => {
         </pixiContainer>
 
         {/* Divider */}
-        <pixiGraphics draw={drawDivider} layout={{ width: 1, height: 240 }} />
+        <pixiGraphics draw={drawDivider} layout={{ width: 1, height: 240, marginTop: 16 }} />
 
-        {/* MASTER */}
+        {/* MASTER — spacer matches CHANNELS header so VU meters align */}
         <pixiContainer layout={{ flexDirection: 'column', alignItems: 'flex-start', gap: 4 }}>
-          <PixiLabel text="MASTER" size="xs" color="textMuted" layout={{ paddingLeft: 4, paddingBottom: 2 }} />
+          <pixiContainer layout={{ height: 12 }} />
           <PixiMixerChannelStrip
             channelIndex={-1}
             name="MASTER"
