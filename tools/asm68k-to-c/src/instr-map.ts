@@ -402,8 +402,12 @@ export function emitInstruction(node: InstructionNode): string {
     case 'BHI': return `if (!flag_c&&!flag_z) goto ${src};`;
     case 'BLS': return `if (flag_c||flag_z) goto ${src};`;
 
-    case 'DBRA': case 'DBF':
-      return `if ((int16_t)(--${src}) >= 0) goto ${ops[1] ? emitOperand(ops[1]) : '/* missing_label */'};`;
+    case 'DBRA': case 'DBF': {
+      // DBRA with 1 operand (just a label) → use d0 as default counter
+      const dbraReg = ops.length >= 2 ? src : 'd0';
+      const dbraLabel = ops.length >= 2 ? emitOperand(ops[1]) : (ops[0] ? emitOperand(ops[0]) : '/* missing_label */');
+      return `if ((int16_t)(--${dbraReg}) >= 0) goto ${dbraLabel};`;
+    }
     case 'DBEQ':
       return `if (!flag_z && (int16_t)(--${src}) >= 0) goto ${ops[1] ? emitOperand(ops[1]) : '/* missing_label */'};`;
     case 'DBNE':
