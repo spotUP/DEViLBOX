@@ -19,6 +19,7 @@ import { useSettingsStore } from '@stores/useSettingsStore';
 import { useUIStore } from '@stores/useUIStore';
 import { useProjectStore } from '@stores/useProjectStore';
 import { useAudioStore } from '@stores/useAudioStore';
+import { useWorkbenchStore } from '@stores/useWorkbenchStore';
 import { useCollaborationStore } from '@stores/useCollaborationStore';
 import { useAuthStore } from '@stores/useAuthStore';
 import { useMIDIStore } from '@stores/useMIDIStore';
@@ -76,6 +77,11 @@ export const PixiNavBar: React.FC<PixiNavBarProps> = ({
 
   // MIDI store
   const hasMIDI = useMIDIStore((s) => s.isInitialized && s.inputDevices.length > 0);
+
+  // Workbench store — Exposé
+  const exposeActive = useWorkbenchStore((s) => s.exposeActive);
+  const toggleExpose = useWorkbenchStore((s) => s.toggleExpose);
+  const isStudio = activeView === 'studio';
 
   // Project store
   const projectName = useProjectStore((s) => s.metadata?.name ?? 'project');
@@ -157,7 +163,7 @@ export const PixiNavBar: React.FC<PixiNavBarProps> = ({
 
   // Transport bar width: center zone gets whatever's left after left/right
   const LEFT_W = 460;
-  const RIGHT_W = 380;
+  const RIGHT_W = 440;
   const transportW = Math.max(200, width - LEFT_W - RIGHT_W);
 
   return (
@@ -204,7 +210,12 @@ export const PixiNavBar: React.FC<PixiNavBarProps> = ({
               variant="ft2"
               size="sm"
               active={isActive}
-              onClick={() => setActiveView(id as any)}
+              onClick={() => {
+                if (exposeActive && id !== 'studio') {
+                  useWorkbenchStore.getState().setExposeActive(false);
+                }
+                setActiveView(id as any);
+              }}
             />
           );
         })}
@@ -266,6 +277,18 @@ export const PixiNavBar: React.FC<PixiNavBarProps> = ({
         {/* MIDI */}
         {hasMIDI && (
           <PixiButton label="MIDI" variant="ghost" size="sm" onClick={handleOpenMIDI} width={40} />
+        )}
+
+        {/* Exposé — only in Studio view */}
+        {isStudio && (
+          <PixiButton
+            label="EXPOSÉ"
+            variant={exposeActive ? 'ft2' : 'ghost'}
+            size="sm"
+            active={exposeActive}
+            onClick={toggleExpose}
+            width={56}
+          />
         )}
 
         {/* Dock expand pill (visible when dock is collapsed) */}
