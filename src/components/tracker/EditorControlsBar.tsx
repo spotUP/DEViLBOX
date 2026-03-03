@@ -19,7 +19,7 @@ import { GrooveSettingsModal } from '@components/dialogs/GrooveSettingsModal';
 import { notify } from '@stores/useNotificationStore';
 import {
   Eye, EyeOff, List, Grid3x3, Piano, Radio,
-  Activity, LayoutGrid, Cpu, SlidersHorizontal,
+  Activity, LayoutGrid, Cpu, SlidersHorizontal, Zap,
 } from 'lucide-react';
 
 type ViewMode = 'tracker' | 'grid' | 'pianoroll' | 'tb303' | 'arrangement' | 'dj' | 'drumpad' | 'vj' | 'mixer';
@@ -29,6 +29,13 @@ export interface EditorControlsBarProps {
   onViewModeChange: (mode: ViewMode) => void;
   gridChannelIndex: number;
   onGridChannelChange: (idx: number) => void;
+  /** When provided, renders an "Edit" toggle button in the toolbar */
+  showAdvancedEdit?: boolean;
+  onToggleAdvancedEdit?: () => void;
+  /** When provided, renders an "Auto" button that triggers this callback */
+  onShowAutomation?: () => void;
+  /** Optional drumpad callback override (defaults to openModal('drumpads')) */
+  onShowDrumpads?: () => void;
 }
 
 export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
@@ -36,6 +43,10 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
   onViewModeChange,
   gridChannelIndex,
   onGridChannelChange,
+  showAdvancedEdit,
+  onToggleAdvancedEdit,
+  onShowAutomation,
+  onShowDrumpads: onShowDrumpadsProp,
 }) => {
   // ── Store state ──────────────────────────────────────────────────────────
   const {
@@ -105,12 +116,14 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
   }, []);
 
   const handleShowAutoEditor = useCallback(() => {
-    useUIStore.getState().openModal('automation');
-  }, []);
+    if (onShowAutomation) onShowAutomation();
+    else useUIStore.getState().openModal('automation');
+  }, [onShowAutomation]);
 
   const handleShowDrumpads = useCallback(() => {
-    useUIStore.getState().openModal('drumpads');
-  }, []);
+    if (onShowDrumpadsProp) onShowDrumpadsProp();
+    else useUIStore.getState().openModal('drumpads');
+  }, [onShowDrumpadsProp]);
 
   const handleRecSettings = useCallback(() => {
     useUIStore.getState().openModal('settings');
@@ -210,6 +223,24 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
           >
             {showGhostPatterns ? <Eye size={12} /> : <EyeOff size={12} />}
             <span>Ghosts</span>
+          </button>
+        )}
+
+        {/* Advanced Edit Toggle (tracker view only) */}
+        {viewMode === 'tracker' && onToggleAdvancedEdit && (
+          <button
+            onClick={onToggleAdvancedEdit}
+            className={`
+              flex items-center gap-1 px-2 py-1 text-xs rounded transition-colors
+              ${showAdvancedEdit
+                ? 'bg-accent-primary/20 text-accent-primary'
+                : 'bg-dark-bgSecondary text-text-secondary hover:text-text-primary'
+              }
+            `}
+            title="Toggle Advanced Edit Panel"
+          >
+            <Zap size={12} />
+            <span>Edit</span>
           </button>
         )}
 
