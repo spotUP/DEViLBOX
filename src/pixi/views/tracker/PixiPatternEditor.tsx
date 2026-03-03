@@ -888,10 +888,6 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
   const prevVStartRef = useRef(-9999);
   const labelVStartRef = useRef(-9999); // vStart used when labels were last generated (tile-shift origin)
   const fullRedrawRef = useRef(true); // Force full redraw on non-cursor dep changes
-  // Overlay dirty tracking — skip overlay redraw on pure tile-shift frames
-  const overlayCursorChRef = useRef(-1);
-  const overlayCursorColRef = useRef('');
-  const overlaySelRef = useRef<BlockSelection | null>(null);
 
   const imperativeRedraw = useCallback(() => {
     const p = renderParamsRef.current;
@@ -902,7 +898,6 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
     const vStartChanged = vStart !== prevVStartRef.current;
     const mega = megaTextRef.current;
     const bufferExhausted = Math.abs(vStart - labelVStartRef.current) > SCROLL_BUFFER_ROWS;
-    let needOverlay = false;
 
     if (fullRedrawRef.current || bufferExhausted) {
       // Full regeneration — generate labels with buffer rows
@@ -912,17 +907,9 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
       const gGrid = gridGraphicsRef.current;
       if (gGrid) renderGrid(gGrid, p, vStart, SCROLL_BUFFER_ROWS);
       if (mega) mega.updateLabels(generateLabels(p, vStart, currentRow, SCROLL_BUFFER_ROWS));
-      needOverlay = true;
     } else if (vStartChanged) {
       // Tile-shift — skip label regen, just shift the container (THE WIN)
       prevVStartRef.current = vStart;
-      // Overlay is outside the scroll container and uses real vStart,
-      // so during pure vertical scroll the overlay positions are constants
-      // (cursor & center-line always at centerLineTop). Skip overlay unless
-      // selection or cursor channel/column changed.
-    } else {
-      // No scroll — cursor channel/column change, or other state change
-      needOverlay = true;
     }
 
     // Apply tile-shift offset: shift container so labels align with new vStart
@@ -930,24 +917,11 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
       gridScrollContainerRef.current.y = (labelVStartRef.current - vStart) * p.rowHeight;
     }
 
-    // Check if overlay-relevant state changed on tile-shift frames
-    if (!needOverlay) {
-      if (cursor.channelIndex !== overlayCursorChRef.current ||
-          cursor.columnType !== overlayCursorColRef.current ||
-          selection !== overlaySelRef.current) {
-        needOverlay = true;
-      }
-    }
-
-    if (needOverlay) {
-      overlayCursorChRef.current = cursor.channelIndex;
-      overlayCursorColRef.current = cursor.columnType;
-      overlaySelRef.current = selection;
-      // Overlay is outside scroll container — uses real vStart (not labelVStart)
-      const gOverlay = overlayGraphicsRef.current;
-      if (gOverlay) renderOverlay(gOverlay, p, cursor, selection, vStart, currentRow,
-        peerCursorRef.current, peerSelectionRef.current);
-    }
+    // Overlay ALWAYS redraws — cursor highlight, selection, peer cursors (cheap)
+    // Use labelVStart for positioning since overlay is inside the shifted container
+    const gOverlay = overlayGraphicsRef.current;
+    if (gOverlay) renderOverlay(gOverlay, p, cursor, selection, labelVStartRef.current, currentRow,
+      peerCursorRef.current, peerSelectionRef.current);
   }, []); // Empty deps — everything read from refs
 
   // ── Cursor/selection subscription with RAF coalescing ─────────────────────
@@ -1442,13 +1416,10 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
           eventMode="none"
         >
           <pixiGraphics ref={gridGraphicsRef} draw={() => {}} layout={{ position: 'absolute', width, height: gridHeight }} />
+          <pixiGraphics ref={overlayGraphicsRef} draw={() => {}} layout={{ position: 'absolute', width, height: gridHeight }} />
 
           {/* MegaText added imperatively to gridScrollContainerRef */}
         </pixiContainer>
-
-        {/* Overlay OUTSIDE scroll container — uses real vStart so positions are constants during tile-shift.
-            This means overlay doesn't need redraw on pure vertical scroll frames. */}
-        <pixiGraphics ref={overlayGraphicsRef} draw={() => {}} layout={{ position: 'absolute', width, height: gridHeight }} eventMode="none" />
 
         {/* Drag-and-drop overlay for instruments — only visible during drag */}
         <PixiDOMOverlay
