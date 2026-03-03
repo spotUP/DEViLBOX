@@ -65,15 +65,9 @@ function computePoints(
 
 type EnvParam = 'attack' | 'decay' | 'sustain' | 'release';
 
-// Stage shape used for event delegation (mirrors PixiKnob/PixiSlider pattern)
-interface PixiStage {
-  on: (event: string, handler: (e: FederatedPointerEvent) => void) => void;
-  off: (event: string, handler: (e: FederatedPointerEvent) => void) => void;
-}
-
 /**
  * Individual drag handle. Renders a circle + label below it.
- * Pointer-down starts a drag via PixiJS stage event delegation.
+ * Pointer-down starts a drag via document event delegation.
  */
 interface HandleProps {
   cx: number;
@@ -208,34 +202,29 @@ export const PixiEnvelopeEditor: React.FC<PixiEnvelopeEditorProps> = ({
     const colW = graphW / 4;
     const graphH = height - PAD_TOP - PAD_BOT;
 
-    const startX = e.globalX;
-    const startY = e.globalY;
+    const startX = e.clientX;
+    const startY = e.clientY;
     const startValue = paramsRef.current[param];
 
-    const stage = (containerRef.current as unknown as { stage?: PixiStage })?.stage;
-    if (!stage) return;
-
-    const onMove = (ev: FederatedPointerEvent) => {
+    const onMove = (ev: PointerEvent) => {
       let newValue: number;
       if (param === 'sustain') {
-        const deltaNorm = (startY - ev.globalY) / graphH;
+        const deltaNorm = (startY - ev.clientY) / graphH;
         newValue = Math.max(0, Math.min(1, startValue + deltaNorm));
       } else {
-        const deltaNorm = (ev.globalX - startX) / colW;
+        const deltaNorm = (ev.clientX - startX) / colW;
         newValue = Math.max(0, Math.min(1, startValue + deltaNorm));
       }
       onChangeRef.current(param, newValue);
     };
 
     const onUp = () => {
-      stage.off('pointermove', onMove);
-      stage.off('pointerup', onUp);
-      stage.off('pointerupoutside', onUp);
+      document.removeEventListener('pointermove', onMove);
+      document.removeEventListener('pointerup', onUp);
     };
 
-    stage.on('pointermove', onMove);
-    stage.on('pointerup', onUp);
-    stage.on('pointerupoutside', onUp);
+    document.addEventListener('pointermove', onMove);
+    document.addEventListener('pointerup', onUp);
   }, [width, height]);
 
   const handleADrag = useCallback((e: FederatedPointerEvent) => makeHandler('attack')(e), [makeHandler]);

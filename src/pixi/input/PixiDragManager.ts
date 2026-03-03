@@ -96,23 +96,19 @@ export function attachDrag(
 
     const cfg = getActiveConfig();
     state.isDragging = true;
-    state.startX = e.globalX;
-    state.startY = e.globalY;
+    state.startX = e.clientX;
+    state.startY = e.clientY;
     state.startValue = cfg.value;
 
     target.cursor = 'grabbing';
     callbacks.onDragStart?.(cfg.value);
 
-    // Listen on the stage for move/up so drag continues outside the target
-    const stage = (target as any).stage;
-    if (stage) {
-      stage.on('pointermove', onPointerMove);
-      stage.on('pointerup', onPointerUp);
-      stage.on('pointerupoutside', onPointerUp);
-    }
+    // Listen on document for move/up so drag continues outside the target
+    document.addEventListener('pointermove', onPointerMove);
+    document.addEventListener('pointerup', onPointerUp);
   }
 
-  function onPointerMove(e: FederatedPointerEvent) {
+  function onPointerMove(e: PointerEvent) {
     if (!state.isDragging) return;
 
     const cfg = getActiveConfig();
@@ -120,14 +116,14 @@ export function attachDrag(
 
     let delta: number;
     if (cfg.axis === 'vertical') {
-      const dy = state.startY - e.globalY; // Up = positive
+      const dy = state.startY - e.clientY; // Up = positive
       delta = (cfg.invert ? -dy : dy) / cfg.sensitivity * range;
     } else if (cfg.axis === 'horizontal') {
-      const dx = e.globalX - state.startX; // Right = positive
+      const dx = e.clientX - state.startX; // Right = positive
       delta = (cfg.invert ? -dx : dx) / cfg.sensitivity * range;
     } else {
-      const dy = state.startY - e.globalY;
-      const dx = e.globalX - state.startX;
+      const dy = state.startY - e.clientY;
+      const dx = e.clientX - state.startX;
       delta = ((cfg.invert ? -1 : 1) * (dy + dx)) / cfg.sensitivity * range;
     }
 
@@ -140,7 +136,7 @@ export function attachDrag(
     callbacks.onDragMove?.(newValue, delta);
   }
 
-  function onPointerUp(_e: FederatedPointerEvent) {
+  function onPointerUp(_e: PointerEvent) {
     if (!state.isDragging) return;
     state.isDragging = false;
     target.cursor = 'pointer';
@@ -148,12 +144,8 @@ export function attachDrag(
     const cfg = getActiveConfig();
     callbacks.onDragEnd?.(cfg.value);
 
-    const stage = (target as any).stage;
-    if (stage) {
-      stage.off('pointermove', onPointerMove);
-      stage.off('pointerup', onPointerUp);
-      stage.off('pointerupoutside', onPointerUp);
-    }
+    document.removeEventListener('pointermove', onPointerMove);
+    document.removeEventListener('pointerup', onPointerUp);
   }
 
   // Set up the target
@@ -164,11 +156,7 @@ export function attachDrag(
   // Cleanup function
   return () => {
     target.off('pointerdown', onPointerDown);
-    const stage = (target as any).stage;
-    if (stage) {
-      stage.off('pointermove', onPointerMove);
-      stage.off('pointerup', onPointerUp);
-      stage.off('pointerupoutside', onPointerUp);
-    }
+    document.removeEventListener('pointermove', onPointerMove);
+    document.removeEventListener('pointerup', onPointerUp);
   };
 }
