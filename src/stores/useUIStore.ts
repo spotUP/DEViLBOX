@@ -51,7 +51,6 @@ interface UIStore {
   // Responsive layout state
   tb303Collapsed: boolean;
   oscilloscopeVisible: boolean;
-  compactToolbar: boolean;
   autoCompactApplied: boolean; // Track if we've already auto-compacted this session
   showSamplePackModal: boolean;
   uiVersion: number; // Track UI migrations
@@ -114,8 +113,6 @@ interface UIStore {
   setTB303Collapsed: (collapsed: boolean) => void;
   toggleOscilloscopeVisible: () => void;
   setOscilloscopeVisible: (visible: boolean) => void;
-  toggleCompactToolbar: () => void;
-  setCompactToolbar: (compact: boolean) => void;
   applyAutoCompact: () => void; // Auto-collapse panels on small screens
   setShowSamplePackModal: (show: boolean) => void;
 
@@ -202,7 +199,6 @@ export const useUIStore = create<UIStore>()(
       // Responsive layout state (default to expanded/visible)
       tb303Collapsed: true, // TB-303 panel ALWAYS collapsed by default
       oscilloscopeVisible: true,
-      compactToolbar: false, // FT2 toolbar expanded by default
       autoCompactApplied: false,
       showSamplePackModal: false,
       uiVersion: 8, // Start at v8 to ensure migration runs
@@ -393,16 +389,6 @@ export const useUIStore = create<UIStore>()(
           state.oscilloscopeVisible = visible;
         }),
 
-      toggleCompactToolbar: () =>
-        set((state) => {
-          state.compactToolbar = !state.compactToolbar;
-        }),
-
-      setCompactToolbar: (compact) =>
-        set((state) => {
-          state.compactToolbar = compact;
-        }),
-
       applyAutoCompact: () =>
         set((state) => {
           const screenHeight = typeof window !== 'undefined' ? window.innerHeight : 1080;
@@ -415,7 +401,6 @@ export const useUIStore = create<UIStore>()(
           if (state.uiVersion < 8) {
             state.uiVersion = 8;
             state.tb303Collapsed = true; // FORCE collapse TB-303 panel
-            state.compactToolbar = false; // Expand FT2 toolbar
           }
 
           // Only apply once per session
@@ -588,7 +573,6 @@ export const useUIStore = create<UIStore>()(
         showMacroSlots: state.showMacroSlots,
         tb303Collapsed: state.tb303Collapsed,
         oscilloscopeVisible: state.oscilloscopeVisible,
-        compactToolbar: state.compactToolbar,
         sidebarCollapsed: state.sidebarCollapsed,
         trackerZoom: state.trackerZoom,
         useHexNumbers: state.useHexNumbers,
