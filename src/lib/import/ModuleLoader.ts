@@ -12,6 +12,7 @@ import { DefleMaskParser, type DMFModule } from './formats/DefleMaskParser';
 import { isGoatTrackerSong } from './formats/GoatTrackerDetect';
 import { FurnaceDispatchEngine } from '@engine/furnace-dispatch/FurnaceDispatchEngine';
 import type { ParsedInstrument, ImportMetadata } from '../../types/tracker';
+import { getFormatExtensions, isSupportedFormat } from './FormatRegistry';
 
 // Raw pattern cell data from libopenmpt
 // Command indices: 0=NOTE, 1=INSTRUMENT, 2=VOLUMEEFFECT, 3=EFFECT, 4=VOLUME, 5=PARAMETER
@@ -365,154 +366,17 @@ async function loadWithLibopenmpt(
 }
 
 /**
- * Get supported file extensions
+ * Get supported file extensions — delegates to FormatRegistry
  */
 export function getSupportedExtensions(): string[] {
-  return [
-    // ── MIDI ────────────────────────────────────────────────────────────────
-    '.mid', '.midi',
-    // ── libopenmpt formats ──────────────────────────────────────────────────
-    '.mod', '.xm', '.it', '.s3m', '.mptm',
-    '.669', '.amf', '.ams', '.dbm', '.dmf',
-    '.dsm', '.far', '.ftm', '.gdm', '.imf',
-    '.j2b', '.m15', '.mdl', '.mt2',
-    '.mtm', '.psm', '.pt36', '.ptm',
-    '.sfx2', '.stk', '.stm', '.stp', '.stx',
-    '.symmod', '.ult', '.umx',
-    // ── Furnace tracker ─────────────────────────────────────────────────────
-    '.fur',
-    // ── HivelyTracker / AHX ─────────────────────────────────────────────────
-    '.hvl', '.ahx',
-    // ── Dedicated parsers ───────────────────────────────────────────────────
-    '.okt', '.med', '.mmd0', '.mmd1', '.mmd2', '.mmd3',
-    '.digi',
-    '.fc', '.fc13', '.fc14', '.sfc',
-    // ── UADE exotic Amiga formats (130+ via 68k emulation) ──────────────────
-    '.fc2', '.fc3', '.fc4', '.smod',
-    '.hip', '.hip7', '.sog', '.s7g', '.hipc', '.hst', '.soc', '.coso',
-    '.tfmx', '.mdat', '.tfmxpro', '.tfmx1.5', '.tfmx7v', '.tfhd1.5', '.tfhd7v', '.tfhdpro',
-    '.fred', '.gray',
-    '.sm', '.sm1', '.sm2', '.sm3', '.smpro',
-    '.bd', '.bds',
-    '.dw', '.dwold',
-    '.mc', '.mcr', '.mco',
-    '.jp', '.jpn', '.jpnd',
-    '.rj', '.rjp',
-    '.dm', '.dm1', '.dm2', '.dlm1', '.dlm2',
-    '.sa', '.sa-p', '.sa_old', '.sonic', '.lion',
-    '.abk', '.aam', '.aon', '.aon4', '.aon8', '.adpcm', '.adsc', '.mod_adsc4',
-    '.bss', '.bfc', '.bsi',
-    '.core', '.cin',
-    '.dl', '.dl_deli', '.dln',
-    '.ea', '.mg',
-    '.fp', '.fw',
-    '.gmc', '.gm', '.glue',
-    '.hd',
-    '.ims',
-    '.jam', '.jc',
-    '.kris', '.kh',
-    '.lme',
-    '.ma', '.max',
-    '.mdst', '.mkii', '.mk2', '.mkiio',
-    '.ntp',
-    '.osp',
-    '.ps', '.psf',
-    '.pt', '.ptm',
-    '.puma',
-    '.rh', '.rhp', '.rho', '.riff',
-    '.sas', '.sb', '.scr', '.sdr', '.sg',
-    '.snk', '.ss',
-    '.st26', '.sun', '.syn',
-    '.dh', '.uds', '.octamed',
-    '.tpu', '.tcb',
-    '.ufo', '.mus',
-    '.wn', '.wb',
-    '.ym', '.ymst',
-    '.sid', '.sid1', '.sid2', '.smn',
-    '.bp', '.bp3', '.sndmon',
-    '.sfx', '.sfx13', '.sfx20',
-    '.mms', '.smus', '.snx',
-    '.agi', '.vss', '.ml',
-    '.sng', '.qpa', '.qts', '.sqt',
-    '.ash', '.aps', '.ast', '.alp', '.amc',
-    '.dsc', '.dsr', '.dss', '.dns', '.dmu', '.dmu2',
-    '.ems', '.emsv6', '.emod',
-    '.jmf', '.jo', '.js', '.jb', '.jcb', '.jcbo', '.jd', '.jt',
-    '.kim', '.mon', '.mon_old', '.mfp', '.mosh', '.mmdc',
-    '.mug', '.mug2', '.mm4', '.mm8',
-    '.psa', '.prt', '.pn', '.pap', '.pvp', '.pat',
-    '.sc', '.sct', '.scn', '.scumm',
-    '.sjs', '.spl', '.syn', '.synmod',
-    '.tf', '.thm', '.tmk', '.tme',
-    '.dp', '.trc', '.tro', '.tronic',
-    '.dat', '.dum', '.doda', '.dz',
-    '.ex', '.cm', '.cus', '.cust', '.custom',
-    '.hot', '.bye', '.one', '.two',
-    '.avp', '.mw', '.md', '.mok',
-    '.tiny', '.sdata', '.npp',
-    '.is', '.is20',
-    '.jpo', '.jpold',
-    '.powt', '.hn', '.mtp2', '.thn', '.arp',
-    '.tits', '.mcmd', '.mcmd_org',
-    // Prowiz packed module variants
-    '.ac1', '.ac1d', '.aval', '.chan', '.cp', '.cplx', '.crb',
-    '.di', '.eu', '.fc-m', '.fcm', '.ft', '.fuz', '.fuzz',
-    '.gv', '.hmc', '.hrt', '.ice', '.it1',
-    '.kef', '.kef7', '.krs', '.ksm', '.lax',
-    '.mexxmp', '.mpro', '.np', '.np1', '.np2', '.np3', '.nr', '.nru', '.ntpk',
-    '.p10', '.p21', '.p30', '.p40a', '.p40b', '.p41a', '.p4x',
-    '.p50a', '.p5a', '.p5x', '.p60', '.p60a', '.p61', '.p61a', '.p6x',
-    '.pha', '.pin', '.pm', '.pm0', '.pm01', '.pm1', '.pm10c', '.pm18a',
-    '.pm2', '.pm20', '.pm4', '.pm40', '.pmz', '.polk',
-    '.pp10', '.pp20', '.pp21', '.pp30', '.ppk',
-    '.pr1', '.pr2', '.prom', '.pru', '.pru1', '.pru2',
-    '.prun', '.prun1', '.prun2', '.pwr',
-    '.pyg', '.pygm', '.pygmy', '.skt', '.skyt', '.snt',
-    '.st', '.st2', '.st30', '.star', '.stpk',
-    '.tp', '.tp1', '.tp2', '.tp3', '.un2', '.unic', '.unic2',
-    '.wn', '.xan', '.xann', '.zen',
-    '.mod_doc', '.mod15', '.mod15_mst', '.mod_ntk', '.mod_ntk1', '.mod_ntk2',
-    '.mod_ntkamp', '.mod_flt4', '.mod_comp', '.mod15_ust', '.mod15_st-iv',
-    '.mod3',
-    // ── Compressed/Packed formats ───────────────────────────────────────────
-    // ── Additional native-parser formats ────────────────────────────────────
-    '.gt2', '.gtk',    // Graoumf Tracker 2
-    '.dsym',           // Digital Symphony
-    '.cba',            // Chuck Biscuits Atari ST
-    '.act',            // Actionamics
-    '.c67',            // CDFM Composer 670
-    '.667',            // Composer 667
-    '.fmt',            // FM Tracker (Davey W Taylor)
-    // ── Native parsers with previously missing extension registration ────────
-    '.dtm',            // Digital Tracker
-    '.etx',            // EasyTrax
-    '.is10',           // InStereo! 1.0
-    '.plm',            // Disorder Tracker 2
-    '.qc',             // Quadra Composer
-    '.rk', '.rkb',     // Ron Klaren
-    '.rtm',            // Reality Tracker
-    '.tfx',            // TFMX (alternate extension)
-    '.uax',            // Unreal Audio Package
-    '.xmf',            // Astroidea XMF (Imperium Galactica)
-    '.mxtx',           // MaxTrax (Maximum Effect MXTX variant)
-    // ── Compressed/Packed formats ───────────────────────────────────────────
-    '.zip', '.lha', '.rar', '.gz', '.mmcmp', '.xpk', '.pp', '.pack',
-    // ── Chip-dump / CPU-code formats ────────────────────────────────────────
-    '.vgm', '.vgz',    // Video Game Music (OPN2/OPL/SN register dumps)
-    '.nsf', '.nsfe',   // NES Sound Format (2A03 + expansion chips)
-    '.sap',            // Atari 8-bit POKEY
-    '.ay',             // ZX Spectrum AY (ZXAYEMUL)
-    // Note: .ym and .sid already listed above (previously UADE, now native)
-  ];
+  return getFormatExtensions();
 }
 
 /**
- * Check if a file is a supported module format.
- * Also accepts any file — UADE can detect formats by magic bytes.
+ * Check if a file is a supported module format — delegates to FormatRegistry
  */
 export function isSupportedModule(filename: string): boolean {
-  const ext = filename.toLowerCase().slice(filename.lastIndexOf('.'));
-  return getSupportedExtensions().includes(ext);
+  return isSupportedFormat(filename);
 }
 
 /** Converted DMF cell in XM-compatible format */

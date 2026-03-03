@@ -17,6 +17,7 @@ import {
 import { isUADEFormat } from '@lib/import/formats/UADEParser';
 import { getNativeFormatMetadata } from '@lib/import/NativeFormatMetadata';
 import { useSettingsStore, type FormatEnginePreferences } from '@/stores/useSettingsStore';
+import { detectFormat, getLibopenmptPlayableKeys, type FormatDefinition } from '@lib/import/FormatRegistry';
 import type { UADEMetadata } from '@engine/uade/UADEEngine';
 import { computeSongDBHash, lookupSongDB, type SongDBResult } from '@lib/songdb';
 
@@ -41,223 +42,28 @@ interface ImportModuleDialogProps {
   companionFiles?: File[];    // Additional files for multi-file formats (e.g. SMUS instruments)
 }
 
-// ── Format detection ──────────────────────────────────────────────────────────
+// ── Format detection (backed by FormatRegistry) ──────────────────────────────
 
-type NativeFormatKey =
-  // ── Original 11 ─────────────────────────────────────────────────────────────
-  | 'fc' | 'soundmon' | 'sidmon2' | 'fred' | 'soundfx' | 'mugician' | 'tfmx'
-  | 'hvl' | 'okt' | 'med' | 'digi'
-  // ── Additional Amiga formats with native parsers (vs UADE) ──────────────────
-  | 'hippelCoso' | 'robHubbard' | 'sidmon1' | 'davidWhittaker'
-  | 'deltaMusic1' | 'deltaMusic2' | 'artOfNoise' | 'benDaglish'
-  | 'sonicArranger' | 'inStereo1' | 'inStereo2' | 'pumaTracker'
-  | 'synthesis' | 'musicAssembler' | 'digitalSoundStudio' | 'digitalSymphony'
-  | 'daveLowe' | 'ams' | 'fmTracker' | 'graoumfTracker2'
-  | 'symphoniePro' | 'composer667' | 'chuckBiscuits' | 'speedySystem'
-  | 'tronic' | 'digiBoosterPro' | 'gameMusicCreator' | 'faceTheMusic'
-  | 'soundControl' | 'soundFactory' | 'actionamics' | 'activisionPro'
-  | 'ronKlaren' | 'iffSmus' | 'magneticFieldsPacker' | 'richardJoseph' | 'lme' | 'musicLine' | 'medley'
-  | 'futurePlayer' | 'markCooksey' | 'jeroenTel' | 'quartet'
-  | 'soundMaster' | 'zoundMonitor' | 'tcbTracker' | 'jasonPage'
-  | 'mmdc' | 'psa' | 'steveTurner' | 'tme' | 'infogrames' | 'ufo'
-  // ── Batch 3/4: prefix-based composer/packer formats ──────────────────────────
-  | 'synthPack' | 'jasonBrooke' | 'laxity' | 'fredGray' | 'musicMaker4V' | 'musicMaker8V'
-  | 'jochenHippelST' | 'specialFX' | 'timeTracker' | 'kris' | 'cinemaware'
-  | 'novoTradePacker' | 'alcatrazPacker' | 'bladePacker' | 'tomyTracker'
-  | 'fashionTracker' | 'multiMediaSound' | 'seanConran' | 'thomasHermann'
-  | 'titanicsPacker' | 'krisHatlelid' | 'ntsp' | 'moshPacker' | 'coreDesign'
-  | 'jankoMrsicFlogel' | 'soundPlayer' | 'nickPellingPacker' | 'peterVerswyvelenPacker'
-  | 'wallyBeben' | 'steveBarrett' | 'paulSummers' | 'desire' | 'martinWalker'
-  | 'paulShields' | 'paulRobotham' | 'pierreAdane' | 'anders0land' | 'andrewParton'
-  | 'customMade' | 'benDaglishSID' | 'digitalSonixChrome' | 'jesperOlsen'
-  | 'kimChristensen' | 'ashleyHogg' | 'adpcmMono' | 'janneSalmijarvi'
-  | 'jochenHippel7V' | 'midiLoriciel' | 'onEscapee' | 'paulTonge' | 'robHubbardST'
-  | 'maniacsOfNoise'
-  // ── Auto-detect native (no user toggle; native tried first, UADE fallback) ──
-  | 'amosMusicBank' | 'iceTracker'
-  // ── User-selectable native vs UADE (recently added) ─────────────────────────
-  | 'imagesMusicSystem' | 'sawteeth' | 'maximumEffect'
-  // ── Extension-based formats missing from earlier audit ────────────────────────
-  | 'karlMorton' | 'xmf' | 'uax'
-  // ── Formats with native parsers (vs libopenmpt as fallback) ─────────────────
-  | 'imagoOrpheus' | 'cdfm67' | 'easyTrax' | 'madTracker2' | 'psm' | 'pt36'
-  // ── C64 SID ─────────────────────────────────────────────────────────────────
-  | 'c64sid';
-
-const NATIVE_FORMAT_PATTERNS: Array<{ key: NativeFormatKey; regex: RegExp; label: string; description: string; nativeOnly?: boolean }> = [
-  // ── Original entries ─────────────────────────────────────────────────────────
-  { key: 'hvl',      regex: /\.(hvl|ahx)$/i,                                    label: 'HivelyTracker',     description: 'HivelyTracker/AHX — native parser or UADE.' },
-  { key: 'okt',      regex: /\.okt$/i,                                           label: 'Oktalyzer',         description: 'Oktalyzer 8-channel — native parser or UADE.' },
-  { key: 'med',      regex: /\.(med|mmd[0-3])$/i,                                label: 'OctaMED',           description: 'OctaMED/MED — native parser or UADE.' },
-  { key: 'digi',     regex: /\.digi$/i,                                          label: 'DigiBooster',       description: 'DigiBooster (v1) — native parser or UADE.' },
-  { key: 'fc',       regex: /\.(fc|fc2|fc3|fc4|fc13|fc14|sfc|smod|bfc|bsi)$/i,  label: 'Future Composer',   description: 'Handles FC 1.3/1.4. FC2 auto-falls back to UADE.' },
-  { key: 'soundmon', regex: /\.(bp|bp3|sndmon)$/i,                               label: 'SoundMon',          description: 'Brian Postma\'s SoundMon V1/V2/V3.' },
-  { key: 'sidmon2',  regex: /\.(sid2|smn)$/i,                                    label: 'SidMon II',         description: 'SidMon II — native parser or UADE.' },
-  { key: 'fred',     regex: /\.fred$/i,                                           label: 'Fred Editor',       description: 'Fred Editor by Software of Sweden.' },
-  { key: 'soundfx',  regex: /\.(sfx|sfx2|sfx13)$/i,                               label: 'Sound-FX',          description: 'Sound-FX v1.0 and v2.0.' },
-  { key: 'mugician', regex: /\.(dmu|dmu2|mug|mug2)$/i,                           label: 'Digital Mugician',  description: 'Digital Mugician V1/V2 by Rob Hubbard.' },
-  { key: 'tfmx',     regex: /\.(tfmx|mdat|tfx)$/i,                               label: 'TFMX',              description: 'Jochen Hippel TFMX — native parser or UADE.' },
-
-  // ── Jochen Hippel ────────────────────────────────────────────────────────────
-  { key: 'hippelCoso', regex: /\.(hipc|soc|coso)$/i,                             label: 'Hippel-CoSo',       description: 'Jochen Hippel CoSo — native parser or UADE.' },
-
-  // ── Classic Amiga composers ──────────────────────────────────────────────────
-  { key: 'robHubbard',     regex: /^rh\.[^.]+$/i,                                label: 'Rob Hubbard',       description: 'Rob Hubbard Amiga prefix format (rh.*) — native parser or UADE.' },
-  { key: 'davidWhittaker', regex: /\.(dw|dwold)$/i,                              label: 'David Whittaker',   description: 'David Whittaker format — native parser or UADE.' },
-  { key: 'benDaglish',     regex: /^bd\.[^.]+$/i,                                label: 'Ben Daglish',       description: 'Ben Daglish format — native parser or UADE.' },
-  { key: 'jeroenTel',      regex: /^(jt|mon_old)\.[^.]+$/i,                      label: 'Jeroen Tel',        description: 'Jeroen Tel format — native parser or UADE.' },
-  { key: 'jasonPage',      regex: /^(jpn|jpnd|jp)\.[^.]+$/i,                     label: 'Jason Page',        description: 'Jason Page format — native parser or UADE.' },
-  { key: 'steveTurner',    regex: /^(jpo|jpold)\.[^.]+$/i,                       label: 'Steve Turner',      description: 'Steve Turner/JasonPage Old — native parser or UADE.' },
-  { key: 'ronKlaren',      regex: /\.(rk|rkb)$/i,                                label: 'Ron Klaren',        description: 'Ron Klaren format — native parser or UADE.' },
-  { key: 'richardJoseph',  regex: /\.(rj|rjp)$/i,                                label: 'Richard Joseph',    description: 'Richard Joseph format — native parser or UADE.' },
-  { key: 'infogrames',     regex: /\.dum$/i,                                      label: 'Infogrames',        description: 'Infogrames/CPC — native parser or UADE.' },
-
-  // ── SidMon ──────────────────────────────────────────────────────────────────
-  { key: 'sidmon1', regex: /\.sid1$/i,                                            label: 'SidMon 1',          description: 'SidMon 1.0 — native parser or UADE.' },
-
-  // ── C64 SID (PSID/RSID) ──────────────────────────────────────────────────────
-  { key: 'c64sid',  regex: /\.sid$/i,                                             label: 'C64 SID',           description: 'Commodore 64 SID (PSID/RSID) — C64SIDEngine with DeepSID emulators.', nativeOnly: true },
-
-  // ── Delta Music ─────────────────────────────────────────────────────────────
-  { key: 'deltaMusic2', regex: /\.dm2$/i,                                         label: 'Delta Music 2',     description: 'Delta Music 2.0 — native parser or UADE.' },
-  { key: 'deltaMusic1', regex: /\.(dm|dm1)$/i,                                    label: 'Delta Music',       description: 'Delta Music 1.x — native parser or UADE.' },
-
-  // ── Art of Noise ─────────────────────────────────────────────────────────────
-  { key: 'artOfNoise', regex: /\.(aon|aon8)$/i,                                   label: 'Art of Noise',      description: 'Art of Noise — native parser or UADE.' },
-
-  // ── Sonic Arranger ───────────────────────────────────────────────────────────
-  { key: 'sonicArranger', regex: /\.(sa|sonic)$/i,                                label: 'Sonic Arranger',    description: 'Sonic Arranger — native parser or UADE.' },
-
-  // ── InStereo! ────────────────────────────────────────────────────────────────
-  { key: 'inStereo1', regex: /\.is10$/i,                                           label: 'InStereo! 1',       description: 'InStereo! 1.0 — native parser or UADE.' },
-  { key: 'inStereo2', regex: /\.is20$/i,                                           label: 'InStereo! 2',       description: 'InStereo! 2.0 — native parser or UADE.' },
-
-  // ── Various Amiga trackers ───────────────────────────────────────────────────
-  { key: 'pumaTracker',       regex: /\.puma$/i,                                  label: 'Puma Tracker',      description: 'Puma Tracker — native parser or UADE.' },
-  { key: 'synthesis',         regex: /\.syn$/i,                                   label: 'Synthesis',         description: 'Synthesis — native parser or UADE.' },
-  { key: 'musicAssembler',    regex: /\.ma$/i,                                    label: 'Music Assembler',   description: 'Music Assembler — native parser or UADE.' },
-  { key: 'digitalSoundStudio',regex: /\.dss$/i,                                   label: 'Digital Sound Studio', description: 'Digital Sound Studio — native parser or UADE.' },
-  { key: 'digitalSymphony',   regex: /\.dsym$/i,                                  label: 'Digital Symphony',  description: 'Digital Symphony — native parser or UADE.' },
-  { key: 'daveLowe',          regex: /\.(dl|dln|dl_deli)$/i,                      label: 'Dave Lowe',         description: 'Dave Lowe format — native parser or UADE.' },
-  { key: 'ams',               regex: /\.ams$/i,                                   label: 'AMS / Velvet Studio', description: 'AMS (Extreme\'s Tracker / Velvet Studio) — native parser or UADE.' },
-  { key: 'fmTracker',         regex: /\.fmt$/i,                                   label: 'FM Tracker',        description: 'Davey W Taylor FM Tracker — native parser or UADE.' },
-  { key: 'graoumfTracker2',   regex: /\.(gt2|gtk)$/i,                             label: 'Graoumf Tracker 2', description: 'Graoumf Tracker 2 — native parser or UADE.' },
-  { key: 'symphoniePro',      regex: /\.symmod$/i,                                label: 'Symphonie Pro',     description: 'Symphonie Pro — native parser or UADE.' },
-  { key: 'composer667',       regex: /\.(667|c67)$/i,                             label: 'Composer 667',      description: 'CDFM/Composer 667 — native parser or UADE.' },
-  { key: 'chuckBiscuits',     regex: /\.cba$/i,                                   label: 'Chuck Biscuits',    description: 'Chuck Biscuits Atari ST — native parser or UADE.' },
-  { key: 'speedySystem',      regex: /\.ss$/i,                                    label: 'Speedy System',     description: 'Speedy System A1 — native parser or UADE.' },
-  { key: 'tronic',            regex: /\.(trc|dp|tro|tronic)$/i,                   label: 'Tronic',            description: 'Tronic — native parser or UADE.' },
-  { key: 'digiBoosterPro',    regex: /\.dbm$/i,                                   label: 'DigiBooster Pro',   description: 'DigiBooster Pro — native parser or UADE.' },
-  { key: 'gameMusicCreator',  regex: /\.gmc$/i,                                   label: 'Game Music Creator', description: 'Game Music Creator — native parser or UADE.' },
-  { key: 'faceTheMusic',      regex: /\.ftm$/i,                                   label: 'Face the Music',    description: 'Face the Music — native parser or UADE.' },
-  { key: 'soundControl',      regex: /\.(sc|sct)$/i,                              label: 'Sound Control',     description: 'Sound Control — native parser or UADE.' },
-  { key: 'soundFactory',      regex: /\.psf$/i,                                   label: 'Sound Factory',     description: 'Sound Factory Pro — native parser or UADE.' },
-  { key: 'actionamics',       regex: /\.act$/i,                                   label: 'Actionamics',       description: 'Actionamics — native parser or UADE.' },
-  { key: 'activisionPro',     regex: /\.(avp|mw)$/i,                              label: 'Activision Pro',    description: 'Activision Pro — native parser or UADE.' },
-  { key: 'iffSmus',           regex: /\.(smus|snx|tiny)$/i,                       label: 'IFF SMUS',          description: 'IFF SMUS Sonix — native parser or UADE.' },
-  { key: 'lme',               regex: /\.lme$/i,                                   label: 'LME',               description: 'Leggless Music Editor — native parser or UADE.' },
-  { key: 'musicLine',         regex: /\.ml$/i,                                    label: 'MusicLine Editor',  description: 'MusicLine Editor — native WASM engine (no UADE fallback).', nativeOnly: true },
-  { key: 'medley',            regex: /\.ml$/i,                                    label: 'Medley',            description: 'Medley — native parser or UADE.' },
-  { key: 'futurePlayer',      regex: /\.fp$/i,                                    label: 'Future Player',     description: 'Future Player — native parser or UADE.' },
-  { key: 'ufo',               regex: /\.ufo$/i,                                   label: 'UFO',               description: 'UFO format — native parser or UADE.' },
-  { key: 'tme',               regex: /\.tme$/i,                                   label: 'TME',               description: 'The Musical Enlightenment — native parser or UADE.' },
-
-  // ── Prefix-based Amiga formats ───────────────────────────────────────────────
-  { key: 'markCooksey', regex: /^(mc|mcr|mco)\.[^.]+$/i,                         label: 'Mark Cooksey',      description: 'Mark Cooksey format — native parser or UADE.' },
-  { key: 'quartet',     regex: /^(qpa|sqt|qts)\.[^.]+$/i,                        label: 'Quartet',           description: 'Quartet (Atari ST) — native parser or UADE.' },
-  { key: 'soundMaster', regex: /^(sm|sm1|sm2|sm3|smpro)\.[^.]+$/i,               label: 'Sound Master',      description: 'Sound Master — native parser or UADE.' },
-  { key: 'zoundMonitor',regex: /^sng\.[^.]+$/i,                                  label: 'Zound Monitor',     description: 'Zound Monitor — native parser or UADE.' },
-  { key: 'tcbTracker',  regex: /^tcb\.[^.]+$/i,                                  label: 'TCB Tracker',       description: 'TCB Tracker (Atari ST) — native parser or UADE.' },
-  { key: 'mmdc',        regex: /^mmdc\.[^.]+$/i,                                 label: 'MMDC',              description: 'MMDC — native parser or UADE.' },
-  { key: 'psa',         regex: /^psa\.[^.]+$/i,                                  label: 'PSA',               description: 'Professional Sound Artists — native parser or UADE.' },
-  { key: 'magneticFieldsPacker',         regex: /^mfp\.[^.]+$/i,                                  label: 'MFP',               description: 'Magnetic Fields Packer — native parser or UADE.' },
-
-  // ── Batch 3/4: prefix-based composer/packer formats (2026-02-27) ─────────────
-  { key: 'maniacsOfNoise',         regex: /^mon\.[^.]+$/i,            label: 'Maniacs of Noise',         description: 'Maniacs of Noise (mon.*) — native parser or UADE.' },
-  { key: 'synthPack',              regex: /^osp\.[^.]+$/i,            label: 'Synth Pack',               description: 'Synth Pack (osp.*) — native parser or UADE.' },
-  { key: 'jasonBrooke',            regex: /^(jcbo|jcb|jb)\.[^.]+$/i, label: 'Jason Brooke',             description: 'Jason Brooke (jcbo/jcb/jb.*) — native parser or UADE.' },
-  { key: 'laxity',                 regex: /^(powt|pt)\.[^.]+$/i,      label: 'Laxity',                   description: 'Laxity (powt/pt.*) — native parser or UADE.' },
-  { key: 'fredGray',               regex: /^gray\.[^.]+$/i,           label: 'Fred Gray',                description: 'Fred Gray (gray.*) — native parser or UADE.' },
-  { key: 'musicMaker4V',           regex: /^(mm4|sdata)\.[^.]+$/i,    label: 'Music Maker 4V',           description: 'Music Maker 4-Voice (mm4/sdata.*) — native parser or UADE.' },
-  { key: 'musicMaker8V',           regex: /^mm8\.[^.]+$/i,            label: 'Music Maker 8V',           description: 'Music Maker 8-Voice (mm8.*) — native parser or UADE.' },
-  { key: 'jochenHippelST',         regex: /^(hst|mdst)\.[^.]+$/i,    label: 'Jochen Hippel ST',         description: 'Jochen Hippel Atari ST (hst/mdst.*) — native parser or UADE.' },
-  { key: 'specialFX',              regex: /^(jd|doda)\.[^.]+$/i,      label: 'Special FX',               description: 'Special FX (jd/doda.*) — native parser or UADE.' },
-  { key: 'timeTracker',            regex: /^tmk\.[^.]+$/i,            label: 'Time Tracker',             description: 'Time Tracker (tmk.*) — native parser or UADE.' },
-  { key: 'kris',                   regex: /^kris\.[^.]+$/i,           label: 'KRIS',                     description: 'KRIS format (kris.*) — native parser or UADE.' },
-  { key: 'cinemaware',             regex: /^cin\.[^.]+$/i,            label: 'Cinemaware',               description: 'Cinemaware (cin.*) — native parser or UADE.' },
-  { key: 'novoTradePacker',        regex: /^ntp\.[^.]+$/i,            label: 'Novo Trade Packer',        description: 'Novo Trade Packer (ntp.*) — native parser or UADE.' },
-  { key: 'alcatrazPacker',         regex: /^alp\.[^.]+$/i,            label: 'Alcatraz Packer',          description: 'Alcatraz Packer (alp.*) — native parser or UADE.' },
-  { key: 'bladePacker',            regex: /^uds\.[^.]+$/i,            label: 'Blade Packer',             description: 'Blade Packer (uds.*) — native parser or UADE.' },
-  { key: 'tomyTracker',            regex: /^sg\.[^.]+$/i,             label: 'Tomy Tracker',             description: 'Tomy Tracker (sg.*) — native parser or UADE.' },
-  { key: 'fashionTracker',         regex: /^ex\.[^.]+$/i,             label: 'Fashion Tracker',          description: 'Fashion Tracker (ex.*) — native parser or UADE.' },
-  { key: 'multiMediaSound',        regex: /^(mms|sfx20)\.[^.]+$/i,    label: 'Multi Media Sound',        description: 'Multi Media Sound (mms/sfx20.*) — native parser or UADE.' },
-  { key: 'seanConran',             regex: /^scr\.[^.]+$/i,            label: 'Sean Conran',              description: 'Sean Conran (scr.*) — native parser or UADE.' },
-  { key: 'thomasHermann',          regex: /^thm\.[^.]+$/i,            label: 'Thomas Hermann',           description: 'Thomas Hermann (thm.*) — native parser or UADE.' },
-  { key: 'titanicsPacker',         regex: /^tits\.[^.]+$/i,           label: 'Titanics Packer',          description: 'Titanics Packer (tits.*) — native parser or UADE.' },
-  { key: 'krisHatlelid',           regex: /^kh\.[^.]+$/i,             label: 'Kris Hatlelid',            description: 'Kris Hatlelid (kh.*) — native parser or UADE.' },
-  { key: 'ntsp',                   regex: /^two\.[^.]+$/i,            label: 'NTSP',                     description: 'NTSP (two.*) — native parser or UADE.' },
-  { key: 'moshPacker',             regex: /^mosh\.[^.]+$/i,           label: 'Mosh Packer',              description: 'Mosh Packer (mosh.*) — native parser or UADE.' },
-  { key: 'coreDesign',             regex: /^core\.[^.]+$/i,           label: 'Core Design',              description: 'Core Design (core.*) — native parser or UADE.' },
-  { key: 'jankoMrsicFlogel',       regex: /^jmf\.[^.]+$/i,            label: 'Janko Mrsic-Flogel',       description: 'Janko Mrsic-Flogel (jmf.*) — native parser or UADE.' },
-  { key: 'soundPlayer',            regex: /^sjs\.[^.]+$/i,            label: 'Sound Player',             description: 'Sound Player (sjs.*) — native parser or UADE.' },
-  { key: 'nickPellingPacker',      regex: /^npp\.[^.]+$/i,            label: 'Nick Pelling Packer',      description: 'Nick Pelling Packer (npp.*) — native parser or UADE.' },
-  { key: 'peterVerswyvelenPacker', regex: /^pvp\.[^.]+$/i,            label: 'Peter Verswyvelen Packer', description: 'Peter Verswyvelen Packer (pvp.*) — native parser or UADE.' },
-  { key: 'wallyBeben',             regex: /^wb\.[^.]+$/i,             label: 'Wally Beben',              description: 'Wally Beben (wb.*) — native parser or UADE.' },
-  { key: 'steveBarrett',           regex: /^sb\.[^.]+$/i,             label: 'Steve Barrett',            description: 'Steve Barrett (sb.*) — native parser or UADE.' },
-  { key: 'paulSummers',            regex: /^snk\.[^.]+$/i,            label: 'Paul Summers',             description: 'Paul Summers (snk.*) — native parser or UADE.' },
-  { key: 'desire',                 regex: /^dsr\.[^.]+$/i,            label: 'Desire',                   description: 'Desire (dsr.*) — native parser or UADE.' },
-  { key: 'martinWalker',           regex: /^(avp|mw)\.[^.]+$/i,       label: 'Martin Walker',            description: 'Martin Walker prefix form (avp/mw.*) — native parser or UADE.' },
-  { key: 'paulShields',            regex: /^ps\.[^.]+$/i,             label: 'Paul Shields',             description: 'Paul Shields (ps.*) — native parser or UADE.' },
-  { key: 'paulRobotham',           regex: /^dat\.[^.]+$/i,            label: 'Paul Robotham',            description: 'Paul Robotham (dat.*) — native parser or UADE.' },
-  { key: 'pierreAdane',            regex: /^pap\.[^.]+$/i,            label: 'Pierre Adane',             description: 'Pierre Adane Packer (pap.*) — native parser or UADE.' },
-  { key: 'anders0land',            regex: /^hot\.[^.]+$/i,            label: 'Anders Øland',             description: 'Anders Øland (hot.*) — native parser or UADE.' },
-  { key: 'andrewParton',           regex: /^bye\.[^.]+$/i,            label: 'Andrew Parton',            description: 'Andrew Parton (bye.*) — native parser or UADE.' },
-  { key: 'customMade',             regex: /^(cm|rk|rkb)\.[^.]+$/i,    label: 'Custom Made',              description: 'Custom Made prefix form (cm/rk/rkb.*) — native parser or UADE.' },
-  { key: 'benDaglishSID',          regex: /^bds\.[^.]+$/i,            label: 'Ben Daglish SID',          description: 'Ben Daglish SID (bds.*) — native parser or UADE.' },
-  { key: 'digitalSonixChrome',     regex: /^dsc\.[^.]+$/i,            label: 'Digital Sonix Chrome',     description: 'Digital Sonix Chrome (dsc.*) — native parser or UADE.' },
-  { key: 'jesperOlsen',            regex: /^jo\.[^.]+$/i,             label: 'Jesper Olsen',             description: 'Jesper Olsen (jo.*) — native parser or UADE.' },
-  { key: 'kimChristensen',         regex: /^kim\.[^.]+$/i,            label: 'Kim Christensen',          description: 'Kim Christensen (kim.*) — native parser or UADE.' },
-  { key: 'ashleyHogg',             regex: /^ash\.[^.]+$/i,            label: 'Ashley Hogg',              description: 'Ashley Hogg (ash.*) — native parser or UADE.' },
-  { key: 'adpcmMono',              regex: /^adpcm\.[^.]+$/i,          label: 'ADPCM Mono',               description: 'ADPCM Mono (adpcm.*) — native parser or UADE.' },
-  { key: 'janneSalmijarvi',        regex: /^js\.[^.]+$/i,             label: 'Janne Salmijärvi',         description: 'Janne Salmijärvi (js.*) — native parser or UADE.' },
-  { key: 'jochenHippel7V',         regex: /^(hip7|s7g)\.[^.]+$/i,    label: 'Jochen Hippel 7V',         description: 'Jochen Hippel 7-Voice (hip7/s7g.*) — native parser or UADE.' },
-  { key: 'midiLoriciel',           regex: /^midi\.[^.]+$/i,           label: 'MIDI Loriciel',            description: 'MIDI Loriciel Atari ST (midi.*) — native parser or UADE.' },
-  { key: 'onEscapee',              regex: /^one\.[^.]+$/i,            label: 'On Escapee',               description: 'On Escapee (one.*) — native parser or UADE.' },
-  { key: 'paulTonge',              regex: /^pat\.[^.]+$/i,            label: 'Paul Tonge',               description: 'Paul Tonge (pat.*) — native parser or UADE.' },
-  { key: 'robHubbardST',           regex: /^rho\.[^.]+$/i,            label: 'Rob Hubbard ST',           description: 'Rob Hubbard Atari ST (rho.*) — native parser or UADE.' },
-
-  // ── Extension-based formats missing from earlier audit ────────────────────────
-  { key: 'karlMorton',             regex: /\.mus$/i,                   label: 'Karl Morton',              description: 'Karl Morton (.mus) — native parser or libopenmpt.' },
-  { key: 'xmf',                    regex: /\.xmf$/i,                   label: 'XMF',                      description: 'XMF format (Astroidea/Imperium Galactica) — native parser or UADE.' },
-  { key: 'uax',                    regex: /\.uax$/i, nativeOnly: true,  label: 'UAX',                      description: 'Unreal Audio Package (.uax) — native parser only (no UADE fallback).' },
-
-  // ── Auto-detect native (magic-based; no user engine toggle) ─────────────────
-  { key: 'amosMusicBank', regex: /\.abk$/i,              nativeOnly: true,        label: 'AMOS Music Bank',   description: 'AMOS Music Bank — native parser (magic-detected), UADE fallback.' },
-  { key: 'iceTracker',    regex: /\.ice$/i,              nativeOnly: true,        label: 'ICE Tracker',       description: 'ICE Tracker / SoundTracker 2.6 — native parser (magic-detected), UADE fallback.' },
-
-  // ── User-selectable: native parser or UADE ────────────────────────────────────
-  { key: 'imagesMusicSystem', regex: /\.ims$/i,                                   label: 'Images Music System', description: 'Images Music System — native parser or UADE.' },
-  { key: 'sawteeth',          regex: /\.st$/i,                                    label: 'Sawteeth',          description: 'Sawteeth (SWTD magic) — native parser or UADE.' },
-  { key: 'maximumEffect',     regex: /\.(mxtx|max)$/i,                            label: 'Maximum Effect / MaxTrax', description: 'Maximum Effect (max.*) and MaxTrax (.mxtx) — native parser or UADE.' },
-
-  // ── Formats with native parsers (fallback: libopenmpt) ───────────────────────
-  { key: 'imagoOrpheus', regex: /\.imf$/i,                                        label: 'Imago Orpheus',     description: 'Imago Orpheus — native parser or libopenmpt.' },
-  { key: 'cdfm67',       regex: /\.c67$/i,                                        label: 'CDFM 670',          description: 'CDFM Composer 670 — native parser or libopenmpt.' },
-  { key: 'easyTrax',     regex: /\.etx$/i,                                        label: 'EasyTrax',          description: 'EasyTrax (Edlund Tracker) — native parser or libopenmpt.' },
-  { key: 'madTracker2',  regex: /\.mt2$/i,                                        label: 'MadTracker 2',      description: 'MadTracker 2 — native parser or libopenmpt.' },
-  { key: 'psm',          regex: /\.psm$/i,                                        label: 'PSM',               description: 'PSM (Epic MegaGames SAGA) — native parser or libopenmpt.' },
-  { key: 'pt36',         regex: /\.pt36$/i,                                       label: 'ProTracker 3.6',    description: 'ProTracker 3.6 — native parser or libopenmpt.' },
-];
+/** Detect a format with a native parser (non-libopenmpt, non-UADE-only). */
+function detectNativeFormat(filename: string): FormatDefinition | null {
+  const fmt = detectFormat(filename);
+  if (!fmt) return null;
+  // Only return formats that have native parsers or are furnace/chip-dump
+  if (fmt.nativeParser || fmt.family === 'furnace' || fmt.family === 'chip-dump' || fmt.family === 'c64-chip') return fmt;
+  return null;
+}
 
 /** Furnace / DefleMask — always use native parser, no libopenmpt or UADE option. */
-const FURNACE_FORMAT_RE = /\.(fur|dmf)$/i;
+const isFurnaceFormat = (filename: string): boolean => {
+  const fmt = detectFormat(filename);
+  return fmt?.family === 'furnace';
+};
 
 /** Chip-dump formats with dedicated native parsers — no UADE mode selector needed. */
-const CHIP_DUMP_FORMAT_RE = /\.(vgm|vgz|ym|nsf|nsfe|sid1?|sap|ay)$/i;
-
-function detectNativeFormat(filename: string): (typeof NATIVE_FORMAT_PATTERNS)[number] | null {
-  return NATIVE_FORMAT_PATTERNS.find(f => f.regex.test(filename)) ?? null;
-}
+const isChipDumpFormat = (filename: string): boolean => {
+  const fmt = detectFormat(filename);
+  return fmt?.family === 'chip-dump' || fmt?.family === 'c64-chip';
+};
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
@@ -294,7 +100,7 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
 
   // Formats that require companion files (e.g. external Instruments/ folder)
   // Shown as a warning when none were loaded alongside the module.
-  const MULTI_FILE_FORMAT_KEYS = new Set<NativeFormatKey>(['iffSmus']);
+  const MULTI_FILE_FORMAT_KEYS = new Set<string>(['iffSmus']);
   const needsCompanionFiles =
     nativeFmt !== null &&
     MULTI_FILE_FORMAT_KEYS.has(nativeFmt.key) &&
@@ -312,8 +118,8 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
 
     const fname = file.name.toLowerCase();
     const nativeFmtForFile = detectNativeFormat(fname);
-    const isFurnace = FURNACE_FORMAT_RE.test(fname);
-    const isChipDumpFile = CHIP_DUMP_FORMAT_RE.test(fname);
+    const isFurnace = isFurnaceFormat(fname);
+    const isChipDumpFile = isChipDumpFormat(fname);
     const isUADEExclusive = !nativeFmtForFile && !isFurnace && !isChipDumpFile && isUADEFormat(fname);
 
     setIsLoading(true);
@@ -429,20 +235,8 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
     }
   }, [initialFile, isOpen, handleFileSelect]);
 
-  // Native format keys where libopenmpt can successfully preview the file.
-  // All other native formats either need a dedicated engine or have no preview.
-  const LIBOPENMPT_PLAYABLE_NATIVE_KEYS = new Set<NativeFormatKey>([
-    'okt',           // Oktalyzer (.okt)
-    'med',           // OctaMED (.med, .mmd*)
-    'digiBoosterPro',// DigiBooster Pro (.dbm)
-    'ams',           // Extreme's AMS / Velvet Studio (.ams)
-    'faceTheMusic',  // Face the Music (.ftm)
-    'imagoOrpheus',  // Imago Orpheus (.imf)
-    'madTracker2',   // MadTracker 2 (.mt2)
-    'psm',           // Epic MegaGames PSM (.psm)
-    'pt36',          // ProTracker 3.6 (.pt36)
-    'symphoniePro',  // Symphonie Pro (.symmod)
-  ]);
+  // Native format keys where libopenmpt can successfully preview the file (from FormatRegistry).
+  const LIBOPENMPT_PLAYABLE_NATIVE_KEYS = getLibopenmptPlayableKeys();
 
   const isMusicLine = nativeFmt?.key === 'musicLine';
   const isHively    = nativeFmt?.key === 'hvl';

@@ -17,7 +17,7 @@ import { useAutomationStore } from '@/stores/useAutomationStore';
 import { useAudioStore } from '@/stores/useAudioStore';
 import { getToneEngine } from '@/engine/ToneEngine';
 import { notify } from '@/stores/useNotificationStore';
-import { isSupportedModule } from '@/lib/import/ModuleLoader';
+import { isSupportedFormat } from '@/lib/import/FormatRegistry';
 import type { UADEMetadata } from '@engine/uade/UADEEngine';
 import { checkModlandFile } from '@/lib/modland/ModlandDetector';
 import { useModlandContributionModal } from '@/stores/useModlandContributionModal';
@@ -145,7 +145,7 @@ function isSongFormat(filename: string): boolean {
     filename.endsWith('.sqs') ||
     filename.endsWith('.seq') ||
     filename.endsWith('.sunvox') ||
-    isSupportedModule(filename)
+    isSupportedFormat(filename)
   );
 }
 
