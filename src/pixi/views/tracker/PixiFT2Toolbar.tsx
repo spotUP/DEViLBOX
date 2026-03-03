@@ -378,7 +378,7 @@ export const PixiFT2Toolbar: React.FC = () => {
               alignItems: 'center',
               paddingLeft: 8,
               paddingRight: 8,
-              gap: 6,
+              gap: 8,
             }}
           >
             <pixiGraphics draw={drawTransportRowBg} layout={{ ...LAYOUT_FILL_ROW, height: TRANSPORT_ROW_H }} />
@@ -456,7 +456,7 @@ export const PixiFT2Toolbar: React.FC = () => {
               alignItems: 'center',
               paddingLeft: 8,
               paddingRight: 8,
-              gap: 6,
+              gap: 8,
             }}
           >
             <pixiGraphics draw={drawTransportRow2Bg} layout={{ ...LAYOUT_FILL_ROW, height: TRANSPORT_ROW_H }} />
