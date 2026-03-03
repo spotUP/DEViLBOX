@@ -14,10 +14,10 @@ static int flag_z=0, flag_n=0, flag_c=0, flag_v=0, flag_x=0;
 /* Memory access — 68k is big-endian; byte-swap on little-endian hosts.
  * Uses memcpy for alignment-safe access (68k allows unaligned word/long). */
 #include <string.h>
-#define READ8(addr)   (*((const uint8_t*)(uintptr_t)(addr)))
-#define WRITE8(addr,v)  (*((uint8_t*)(uintptr_t)(addr)) = (uint8_t)(v))
-static inline uint16_t _rd16(uintptr_t a) { uint16_t v; memcpy(&v,(void*)a,2); return v; }
-static inline uint32_t _rd32(uintptr_t a) { uint32_t v; memcpy(&v,(void*)a,4); return v; }
+#define READ8(addr)   ((uintptr_t)(addr)>1048576 ? (uint8_t)0 : *((const uint8_t*)(uintptr_t)(addr)))
+#define WRITE8(addr,v)  do { if((uintptr_t)(addr)<=1048576) *((uint8_t*)(uintptr_t)(addr)) = (uint8_t)(v); } while(0)
+static inline uint16_t _rd16(uintptr_t a) { if(a>1048576) return 0; uint16_t v; memcpy(&v,(void*)a,2); return v; }
+static inline uint32_t _rd32(uintptr_t a) { if(a>1048576) return 0; uint32_t v; memcpy(&v,(void*)a,4); return v; }
 static inline void _wr16(uintptr_t a,uint16_t v) {
   if(a>=0xDFF0A0&&a<=0xDFF0DF){uint16_t n=__builtin_bswap16(v);int ch=(int)((a-0xDFF0A0)>>4);int r=(int)((a-0xDFF0A0)&0xF);
     if(r==6)paula_set_period(ch,n);else if(r==8)paula_set_volume(ch,(uint8_t)n);else if(r==4)paula_set_length(ch,n);return;}
