@@ -7,10 +7,6 @@
  * The issue is specific to held keyboard keys — trackpad and playback are fine.
  */
 
-import type { Application } from 'pixi.js';
-
-let app: Application | null = null;
-
 // ── Keyboard repeat rate diagnosis ──────────────────────────────────────────
 // Measure the actual interval between keydown repeat events
 let _keyTimes: number[] = [];
@@ -40,37 +36,9 @@ export function diagKeyRepeatRate(): void {
   _lastKeyTime = now;
 }
 
-// ── Frame timing diagnosis ──────────────────────────────────────────────────
-// Measure how long the entire frame takes including keydown processing + render
-
-let _frameStart = 0;
-let _frameDurations: number[] = [];
-let _frameDiagPrinted = false;
-
-/** Call at the START of the keydown handler (before any work). */
-export function diagFrameStart(): void {
-  _frameStart = performance.now();
-}
-
-/** Call at the END of the keydown handler (after all work). */
-export function diagFrameEnd(): void {
-  if (_frameStart > 0) {
-    const dt = performance.now() - _frameStart;
-    _frameDurations.push(dt);
-    if (_frameDurations.length >= 30 && !_frameDiagPrinted) {
-      _frameDiagPrinted = true;
-      const avg = _frameDurations.reduce((a, b) => a + b, 0) / _frameDurations.length;
-      const max = Math.max(..._frameDurations);
-      console.log(`[scrollPerf] KEYDOWN HANDLER TIME: avg=${avg.toFixed(2)}ms max=${max.toFixed(2)}ms`);
-      _frameDurations = [];
-      _frameDiagPrinted = false;
-    }
-  }
-}
-
 /** Register the PixiJS app — call once from PixiAppContent. */
-export function setScrollPerfApp(pixiApp: Application): void {
-  app = pixiApp;
+export function setScrollPerfApp(_pixiApp: unknown): void {
+  // Reserved for future use
 }
 
 /** True while rapid scrolling is active — useTick callbacks can skip work. */

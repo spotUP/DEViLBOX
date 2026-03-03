@@ -101,7 +101,7 @@ export const useTransportStore = create<TransportStore>()(
     // Initial state (125 BPM = ProTracker/Amiga default)
     bpm: 125,
     timeSignature: [4, 4],
-    swing: 100, // 100 = neutral (for straight) or 1x (for templates)
+    swing: 0, // 0 = no groove (for straight); 100 = 1x template intensity
     position: '0:0:0',
     isPlaying: false,
     isPaused: false,
@@ -394,7 +394,7 @@ export const useTransportStore = create<TransportStore>()(
       set((state) => {
         state.bpm = 125;
         state.timeSignature = [4, 4];
-        state.swing = 100; // 100% intensity
+        state.swing = 0; // 0 = no groove (straight)
         state.position = '0:0:0';
         state.isPlaying = false;
         state.isPaused = false;

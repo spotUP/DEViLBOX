@@ -62,6 +62,7 @@ export class SonicArrangerSynth implements DevilboxSynth {
   private audioContext: AudioContext;
   private _disposed = false;
   private _playerHandle = -1;
+  private _loadPromise: Promise<void> | null = null;
 
   private static _engineConnectedToSynth = false;
   private _ownsEngineConnection = false;
@@ -80,6 +81,12 @@ export class SonicArrangerSynth implements DevilboxSynth {
   }
 
   async setInstrument(config: SonicArrangerConfig): Promise<void> {
+    const p = this._doSetInstrument(config);
+    this._loadPromise = p;
+    return p;
+  }
+
+  private async _doSetInstrument(config: SonicArrangerConfig): Promise<void> {
     await this.engine.ready();
 
     // Destroy old player if we have one
@@ -100,6 +107,12 @@ export class SonicArrangerSynth implements DevilboxSynth {
       { type: 'loadInstrument', handle: this._playerHandle, buffer: blob },
       [blob],
     );
+  }
+
+  /** Wait for the WASM engine + instrument to be fully loaded. Called by ensureWASMSynthsReady. */
+  async ensureInitialized(): Promise<void> {
+    await this.engine.ready();
+    if (this._loadPromise) await this._loadPromise;
   }
 
   triggerAttack(note?: string | number, _time?: number, velocity?: number): void {
