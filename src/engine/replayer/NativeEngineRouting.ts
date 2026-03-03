@@ -96,6 +96,8 @@ export async function startNativeEngines(
   // C64 SID: Load the raw SID file into C64SIDEngine for hardware-accurate playback.
   // Similar to HivelyEngine, the SID engine handles all synthesis.
   if (song.c64SidFileData && song.format === 'SID') {
+    // C64SIDEngine handles all audio — suppress pattern note triggers to avoid double synthesis.
+    suppressNotes = true;
     try {
       const audioContext = Tone.getContext().rawContext as AudioContext;
       c64SidEngine = new C64SIDEngine(song.c64SidFileData);
