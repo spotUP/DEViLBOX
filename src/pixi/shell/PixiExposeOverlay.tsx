@@ -161,7 +161,9 @@ export const PixiExposeOverlay: React.FC<PixiExposeOverlayProps> = ({ width, hei
     g.fill({ color: 0x000000, alpha: 0.78 });
   }, [width, height]);
 
-  if (!viewExposeActive) return null;
+  if (!viewExposeActive) return (
+    <pixiContainer visible={false} layout={{ width: 0, height: 0 }} />
+  );
 
   return (
     <pixiContainer
@@ -188,7 +190,8 @@ export const PixiExposeOverlay: React.FC<PixiExposeOverlayProps> = ({ width, hei
         const y = offsetY + row * (cardH + CARD_GAP);
         const isActive = activeView === view.id;
         const isSelected = selectedIdx === i;
-        const tex = thumbnails?.[view.id];
+        const rawTex = thumbnails?.[view.id];
+        const tex = rawTex && !rawTex.destroyed ? rawTex : null;
 
         // Scale thumbnail to fit within the card's thumbnail area
         let spriteW = thumbW;
