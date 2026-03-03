@@ -9,8 +9,8 @@
  * optionally loads starter instruments, tracks active system.
  */
 
-import React, { useState, useCallback } from 'react';
-import { X, Music2, Cpu, ChevronRight, ChevronLeft, Check } from 'lucide-react';
+import React, { useState, useCallback, useMemo } from 'react';
+import { X, Music2, Cpu, ChevronRight, ChevronLeft, Check, Search } from 'lucide-react';
 import { useUIStore } from '@stores/useUIStore';
 import { useTrackerStore } from '@stores/useTrackerStore';
 import { useInstrumentStore } from '@stores/useInstrumentStore';
@@ -131,7 +131,7 @@ export const NewSongWizard: React.FC = () => {
 
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[9999] p-4 backdrop-blur-sm">
-      <div className="bg-dark-bgSecondary border border-dark-border rounded-lg shadow-2xl w-full max-w-2xl flex flex-col max-h-[85vh]">
+      <div className="bg-dark-bgSecondary border border-dark-border rounded-lg shadow-2xl w-full max-w-2xl flex flex-col" style={{ height: 'min(92vh, 700px)' }}>
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-dark-border shrink-0">
           <div className="flex items-center gap-3">
@@ -274,34 +274,70 @@ const StepPresetBrowser: React.FC<StepPresetBrowserProps> = ({
   selectedPresetId,
   onSelectPreset,
 }) => {
+  const [filter, setFilter] = useState('');
   const selected = SYSTEM_PRESETS.find((p) => p.id === selectedPresetId);
   const hasPresetInstruments =
     (UADE_INSTRUMENT_PRESETS[selectedPresetId]?.length ?? 0) > 0;
 
+  const filteredGroups = useMemo(() => {
+    const sorted = GROUPED_PRESETS.map((group) => ({
+      ...group,
+      presets: [...group.presets].sort((a, b) => a.name.localeCompare(b.name)),
+    }));
+    if (!filter.trim()) return sorted;
+    const q = filter.toLowerCase();
+    return sorted
+      .map((group) => ({
+        ...group,
+        presets: group.presets.filter(
+          (p) => p.name.toLowerCase().includes(q) || p.description?.toLowerCase().includes(q) || group.label.toLowerCase().includes(q)
+        ),
+      }))
+      .filter((g) => g.presets.length > 0);
+  }, [filter]);
+
   return (
-    <div className="flex h-full min-h-0" style={{ height: '420px' }}>
-      {/* Left: Group + preset list */}
-      <div className="w-64 shrink-0 border-r border-dark-border overflow-y-auto">
-        {GROUPED_PRESETS.map((group) => (
-          <div key={group.label}>
-            <div className="px-3 py-1.5 text-[10px] font-bold text-text-muted uppercase tracking-wider bg-dark-bg border-b border-dark-border sticky top-0">
-              {group.label}
-            </div>
-            {group.presets.map((preset) => (
-              <button
-                key={preset.id}
-                onClick={() => onSelectPreset(preset.id)}
-                className={`w-full text-left px-3 py-2 text-xs transition-colors ${
-                  selectedPresetId === preset.id
-                    ? 'bg-accent-primary/20 text-text-primary border-l-2 border-accent-primary'
-                    : 'text-text-muted hover:bg-dark-border hover:text-text-primary'
-                }`}
-              >
-                {preset.name}
-              </button>
-            ))}
+    <div className="flex h-full min-h-0">
+      {/* Left: Search + Group + preset list */}
+      <div className="w-64 shrink-0 border-r border-dark-border flex flex-col min-h-0">
+        <div className="px-2 py-2 border-b border-dark-border shrink-0">
+          <div className="relative">
+            <Search size={12} className="absolute left-2 top-1/2 -translate-y-1/2 text-text-muted" />
+            <input
+              type="text"
+              value={filter}
+              onChange={(e) => setFilter(e.target.value)}
+              placeholder="Filter presets..."
+              className="w-full pl-7 pr-2 py-1.5 text-xs bg-dark-bg border border-dark-border rounded text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent-primary"
+              autoFocus
+            />
           </div>
-        ))}
+        </div>
+        <div className="flex-1 overflow-y-auto min-h-0">
+          {filteredGroups.map((group) => (
+            <div key={group.label}>
+              <div className="px-3 py-1.5 text-[10px] font-bold text-text-muted uppercase tracking-wider bg-dark-bg border-b border-dark-border sticky top-0">
+                {group.label}
+              </div>
+              {group.presets.map((preset) => (
+                <button
+                  key={preset.id}
+                  onClick={() => onSelectPreset(preset.id)}
+                  className={`w-full text-left px-3 py-2 text-xs transition-colors ${
+                    selectedPresetId === preset.id
+                      ? 'bg-accent-primary/20 text-text-primary border-l-2 border-accent-primary'
+                      : 'text-text-muted hover:bg-dark-border hover:text-text-primary'
+                  }`}
+                >
+                  {preset.name}
+                </button>
+              ))}
+            </div>
+          ))}
+          {filteredGroups.length === 0 && (
+            <div className="text-xs text-text-muted text-center py-6">No matches</div>
+          )}
+        </div>
       </div>
 
       {/* Right: Preset details */}
