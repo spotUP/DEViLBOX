@@ -78,10 +78,17 @@ export const PixiNavBar: React.FC<PixiNavBarProps> = ({
   // MIDI store
   const hasMIDI = useMIDIStore((s) => s.isInitialized && s.inputDevices.length > 0);
 
-  // Workbench store — Exposé
-  const exposeActive = useWorkbenchStore((s) => s.exposeActive);
-  const toggleExpose = useWorkbenchStore((s) => s.toggleExpose);
+  // Exposé state
   const isStudio = activeView === 'studio';
+  const workbenchExposeActive = useWorkbenchStore((s) => s.exposeActive);
+  const toggleWorkbenchExpose = useWorkbenchStore((s) => s.toggleExpose);
+  const viewExposeActive = useUIStore((s) => s.viewExposeActive);
+  const toggleViewExpose = useUIStore((s) => s.toggleViewExpose);
+  const exposeActive = isStudio ? workbenchExposeActive : viewExposeActive;
+  const handleExpose = useCallback(() => {
+    if (isStudio) toggleWorkbenchExpose();
+    else toggleViewExpose();
+  }, [isStudio, toggleWorkbenchExpose, toggleViewExpose]);
 
   // Project store
   const projectName = useProjectStore((s) => s.metadata?.name ?? 'project');
@@ -211,9 +218,9 @@ export const PixiNavBar: React.FC<PixiNavBarProps> = ({
               size="sm"
               active={isActive}
               onClick={() => {
-                if (exposeActive && id !== 'studio') {
-                  useWorkbenchStore.getState().setExposeActive(false);
-                }
+                // Close any active expose when switching views
+                if (workbenchExposeActive) useWorkbenchStore.getState().setExposeActive(false);
+                if (viewExposeActive) useUIStore.getState().setViewExposeActive(false);
                 setActiveView(id as any);
               }}
             />
@@ -279,17 +286,15 @@ export const PixiNavBar: React.FC<PixiNavBarProps> = ({
           <PixiButton label="MIDI" variant="ghost" size="sm" onClick={handleOpenMIDI} width={40} />
         )}
 
-        {/* Exposé — only in Studio view */}
-        {isStudio && (
-          <PixiButton
-            label="EXPOSÉ"
-            variant={exposeActive ? 'ft2' : 'ghost'}
-            size="sm"
-            active={exposeActive}
-            onClick={toggleExpose}
-            width={56}
-          />
-        )}
+        {/* Exposé — shows in all views */}
+        <PixiButton
+          label="EXPOSÉ"
+          variant={exposeActive ? 'ft2' : 'ghost'}
+          size="sm"
+          active={exposeActive}
+          onClick={handleExpose}
+          width={56}
+        />
 
         {/* Dock expand pill (visible when dock is collapsed) */}
         <PixiButton

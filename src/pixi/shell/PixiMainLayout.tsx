@@ -15,6 +15,7 @@ import { useWorkbenchStore } from '@stores/useWorkbenchStore';
 import { PixiNavBar } from './PixiNavBar';
 import { PixiStatusBar } from './PixiStatusBar';
 import { PixiBottomDock, type DockTab } from './PixiBottomDock';
+import { PixiExposeOverlay } from './PixiExposeOverlay';
 import {
   MODERN_NAV_H,
   MODERN_STATUS_BAR_H,
@@ -246,6 +247,14 @@ export const PixiMainLayout: React.FC = () => {
           onCollapse={handleRedock}
           onUndock={handleRedock}
         />
+      </pixiContainer>
+
+      {/* View Exposé overlay — macOS Mission Control style view switcher */}
+      <pixiContainer
+        zIndex={1000}
+        layout={{ position: 'absolute', width, height }}
+      >
+        <PixiExposeOverlay width={width} height={height} />
       </pixiContainer>
     </pixiContainer>
   );
