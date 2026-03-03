@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-03-03T19:17:51.936Z
+ * Generated: 2026-03-03T23:13:17.405Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.2079';
-export const BUILD_NUMBER = '2079';
-export const BUILD_HASH = '49d02ae9';
+export const BUILD_VERSION = '1.0.2132';
+export const BUILD_NUMBER = '2132';
+export const BUILD_HASH = 'b8de79c3';
 export const BUILD_DATE = '2026-03-03';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,204 +30,214 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.2079',
+    version: '1.0.2132',
+    date: '2026-03-04',
+    changes: [
+      {
+        type: 'fix',
+        "description": "Switch to tracker view after loading GoatTracker .sng"
+      },
+      {
+        type: 'feature',
+        "description": "Add starter instruments for all Furnace chip presets"
+      },
+      {
+        type: 'fix',
+        "description": "Replace hardcoded red colors with theme colors in dialogs"
+      },
+      {
+        type: 'fix',
+        "description": "Preset instruments not loading in New Song wizard"
+      },
+      {
+        type: 'fix',
+        "description": "Remove icon from New button in toolbar"
+      },
+      {
+        type: 'feature',
+        "description": "Improve New Song wizard — taller modal, search filter, A-Z sorting"
+      }
+    ]
+  },
+  {
+    version: '2026-03-03',
     date: '2026-03-03',
     changes: [
       {
-        type: 'feature',
-        "description": "Add SID info button + subsong selector to tracker toolbar"
-      },
-      {
-        type: 'feature',
-        "description": "Replace DJ DOM overlays with native GL components"
-      },
-      {
-        type: 'feature',
-        "description": "Native GL horizontal scrollbar in pattern editor"
-      },
-      {
-        type: 'improvement',
-        "description": "Remove: delete PatternManagement component and panel"
+        type: 'fix',
+        "description": "Sync DOM/GL tracker state via useUIStore"
       },
       {
         type: 'fix',
-        "description": "Remove duplicate Groove button from FT2 toolbar panel"
+        "description": "GT Ultra view stuck initializing when loading .sng files"
       },
       {
         type: 'fix',
-        "description": "Fix groove indicator showing active when set to straight/0%"
+        "description": "NewSongWizard hooks order — move useCallback before early return"
+      },
+      {
+        type: 'feature',
+        "description": "Remove compact toolbar option from both UIs"
       },
       {
         type: 'fix',
-        "description": "Add missing node-cache dependency to server"
+        "description": "PixiJS render crashes on Exposé toggle"
+      },
+      {
+        type: 'feature',
+        "description": "Big SID info modal with full DeepSID metadata"
       },
       {
         type: 'fix',
-        "description": "Fix JamCracker drag-drop crash: add JamCrackerSynth to ToneEngine switch"
+        "description": "SID files use C64SID synthType instead of Furnace"
       },
       {
         type: 'fix',
-        "description": "GoatTracker .sng files bypass UADE import dialog"
+        "description": "Scale up GL instrument list — larger fonts and row height"
       },
       {
         type: 'fix',
-        "description": "Add GoatTracker .sng to FormatRegistry for drag-drop support"
+        "description": "TypeScript errors — add 'studio' to ViewType, fix implicit any"
+      },
+      {
+        type: 'feature',
+        "description": "Add Inst FX button to GL toolbar"
       },
       {
         type: 'fix',
-        "description": "SID files use classic view, fix GTUltra yoga BindingError"
+        "description": "HVSC search input keyboard protection + vertical action bar buttons"
       },
       {
         type: 'fix',
-        "description": "Switch to GoatTracker view when loading SID files"
+        "description": "GL pattern editor visual issues"
       },
       {
         type: 'fix',
-        "description": "Auto-initialize ASID device manager for USB-SID-Pico hot-plug"
-      },
-      {
-        type: 'feature',
-        "description": "DeepSID composer database integration"
+        "description": "Improve GL instrument list to match DOM quality"
       },
       {
         type: 'fix',
-        "description": "Suppress Furnace note triggers during C64SID playback"
-      },
-      {
-        type: 'improvement',
-        "description": "Update AmigaFormatParsers JSDoc for dispatcher architecture"
+        "description": "HVSC download paths and directory browsing"
       },
       {
         type: 'feature',
-        "description": "SID info button in toolbar — modal shows full metadata on demand"
-      },
-      {
-        type: 'feature',
-        "description": "SID metadata UI — info panel, subsong selector, status bar integration"
+        "description": "Integrate fontaudio icon font for GL view icons"
       },
       {
         type: 'fix',
-        "description": "Restore missing isSupportedModule import in UnifiedFileLoader"
+        "description": "Load Noto Sans Symbols 2 web font for GL icon rendering"
       },
       {
         type: 'fix',
-        "description": "Restore updateBpmSyncedEffects method removed during modularization"
-      },
-      {
-        type: 'improvement',
-        "description": "Delegate ToneEngine methods to 8 extracted modules"
-      },
-      {
-        type: 'feature',
-        "description": "Add withFallback helper, convert 83 format blocks to use DRY pattern"
-      },
-      {
-        type: 'improvement',
-        "description": "Clean up TrackerView, FileBrowser, and EditorControlsBar after modularization"
+        "description": "Allow typing in GL view input fields"
       },
       {
         type: 'fix',
-        "description": "Missing imports in factoryPresets/drum.ts and EffectFactory.ts"
-      },
-      {
-        type: 'improvement',
-        "description": "Split stores and input hooks into focused helper modules (Tier 4)"
-      },
-      {
-        type: 'improvement',
-        "description": "Split TrackerReplayer.ts into focused modules (Tier 4)"
-      },
-      {
-        type: 'improvement',
-        "description": "Split FurnaceSongParser.ts into focused parser modules (Tier 4)"
-      },
-      {
-        type: 'improvement',
-        "description": "Split parseModuleToSong.ts into focused parser modules (Tier 4)"
-      },
-      {
-        type: 'improvement',
-        "description": "Split InstrumentFactory.ts into focused sub-factories (Tier 4)"
-      },
-      {
-        type: 'improvement',
-        "description": "Extract FilePreviewPanel and useModuleImport from FileBrowser/TrackerView"
-      },
-      {
-        type: 'improvement',
-        "description": "Split VisualEffectEditors.tsx into category files"
-      },
-      {
-        type: 'improvement',
-        "description": "Extract SampleLoopEditor and useSampleEditorUndo from SampleEditor"
-      },
-      {
-        type: 'improvement',
-        "description": "Split ExportDialog.tsx into per-format export panels"
-      },
-      {
-        type: 'improvement',
-        "description": "Split JeskolaEditors.tsx into per-category Buzzmachine editors"
-      },
-      {
-        type: 'improvement',
-        "description": "Split UnifiedInstrumentEditor into sub-modules"
-      },
-      {
-        type: 'improvement',
-        "description": "Split instrument.ts types into domain-grouped modules (Tier 2)"
-      },
-      {
-        type: 'improvement',
-        "description": "Split constant/preset files into per-category directories (Tier 1)"
-      },
-      {
-        type: 'feature',
-        "description": "Add FormatRegistry as single source of truth for 130+ format definitions"
-      },
-      {
-        type: 'feature',
-        "description": "JamCracker Pro full integration — WASM replayer, AM synth, editor UI"
-      },
-      {
-        type: 'feature',
-        "description": "Dual SID toggle button, .sng file validation tests"
-      },
-      {
-        type: 'feature',
-        "description": "Dual SID monitors, ASID UX, test .sng files, ADSR drag polish"
-      },
-      {
-        type: 'feature',
-        "description": "Interactive ADSR, table editing, preset browser, block ops, save/export"
-      },
-      {
-        type: 'improvement',
-        "description": "Test: GTUltra test suite — 39 tests for mapping, detection, presets"
-      },
-      {
-        type: 'feature',
-        "description": "ASID hardware toggle in tracker toolbar"
+        "description": "Use string ranges for bitmap font chars (matches PixiJS API)"
       },
       {
         type: 'fix',
-        "description": "SID monitor syntax error — missing y: property key"
+        "description": "Add unicode symbols to GL bitmap font character set"
+      },
+      {
+        type: 'fix',
+        "description": "Status bar text overlap + LOAD opens full file browser in GL mode"
+      },
+      {
+        type: 'fix',
+        "description": "Eliminate trackpad momentum/easing in pattern editor scroll"
+      },
+      {
+        type: 'fix',
+        "description": "Remove duplicate MASTER heading, top-align VU meters in mixer"
+      },
+      {
+        type: 'fix',
+        "description": "Bottom-align master strip with channel strips in mixer view"
       },
       {
         type: 'feature',
-        "description": "GTUltra piano roll, preset browser, and visual mapping"
+        "description": "Remove bottom dock, integrate Device/Master FX into mixer view"
       },
       {
         type: 'feature',
-        "description": "GTUltra SID presets and visual table editor"
+        "description": "Move mixer from bottom dock to its own top-level view"
       },
       {
         type: 'feature',
-        "description": "GTUltra oscilloscope, studio mode, and visual instrument designer"
+        "description": "Add view thumbnails to Exposé overlay (macOS Mission Control style)"
       },
       {
         type: 'feature',
-        "description": "GTUltra UI enhancements and VJ component refactoring"
+        "description": "MacOS Mission Control style Exposé for all views"
+      },
+      {
+        type: 'fix',
+        "description": "Restore arrow key hold-to-scroll in pattern editor"
+      },
+      {
+        type: 'feature',
+        "description": "Full-featured GL instrument list matching DOM version"
+      },
+      {
+        type: 'feature',
+        "description": "Add Exposé toolbar button in Studio view"
+      },
+      {
+        type: 'fix',
+        "description": "Use display:none for compact toolbar to prevent Yoga BindingError"
+      },
+      {
+        type: 'fix',
+        "description": "Use full names for nav view buttons and fix spacing"
+      },
+      {
+        type: 'fix',
+        "description": "Offset VU/automation/macro overlays below channel headers"
+      },
+      {
+        type: 'fix',
+        "description": "Render window tethers behind panels in studio view"
+      },
+      {
+        type: 'feature',
+        "description": "Add control bar to studio/workbench view"
+      },
+      {
+        type: 'fix',
+        "description": "Avoid Yoga BindingError when toggling compact toolbar"
+      },
+      {
+        type: 'fix',
+        "description": "Add migrate function for workbench persist v2→v3"
+      },
+      {
+        type: 'fix',
+        "description": "Studio view window layout — tile windows with proper spacing"
+      },
+      {
+        type: 'fix',
+        "description": "Move hooks before early return in SIDInfoModal to fix Rules of Hooks violation"
+      },
+      {
+        type: 'feature',
+        "description": "Add missing GL UI gadgets — volume, collab, auth, MIDI, import, zoom-fit, inst FX"
+      },
+      {
+        type: 'improvement',
+        "description": "Soften all 100% white borders with opacity"
+      },
+      {
+        type: 'improvement',
+        "description": "Remove gradients from Rare Finds modal, highlight filename in accent color"
+      },
+      {
+        type: 'improvement',
+        "description": "Redesign Rare Finds modal with design system tokens"
+      },
+      {
+        type: 'fix',
+        "description": "Conditionally mount WorkbenchContainer to avoid Yoga BindingError"
       }
     ]
   }

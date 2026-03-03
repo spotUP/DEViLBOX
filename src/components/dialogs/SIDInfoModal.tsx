@@ -4,11 +4,10 @@
  * Below: discography, YouTube links, tags, player distribution, career, external links.
  */
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
-  X, Loader2, Cpu, Music, Clock, User, Disc, Hash, Globe, Calendar,
+  X, Loader2, Cpu, Music, Clock, User, Disc, Globe, Calendar,
   Star, ExternalLink, Briefcase, Tag, Play, Youtube, ChevronDown, ChevronUp,
-  MessageSquare,
 } from 'lucide-react';
 import { useTrackerStore } from '@stores';
 import { useShallow } from 'zustand/react/shallow';

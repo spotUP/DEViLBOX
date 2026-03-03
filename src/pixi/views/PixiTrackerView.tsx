@@ -264,7 +264,7 @@ export const PixiTrackerView: React.FC = () => {
         <PixiInstrumentToggle
           show={canShowInstrumentPanel && viewMode !== 'tb303' && viewMode !== 'sunvox'}
           visible={instrumentPanelVisible}
-          onClick={() => setShowInstrumentPanel(p => !p)}
+          onClick={() => useUIStore.getState().toggleInstrumentPanel()}
         />
 
         {/* Instrument list */}

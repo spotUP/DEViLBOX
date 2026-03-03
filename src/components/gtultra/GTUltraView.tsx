@@ -50,7 +50,7 @@ export const GTUltraView: React.FC<{ width: number; height: number }> = ({ width
           const store = useGTUltraStore.getState();
           // Load any pending song data that arrived before engine was ready
           if (store.pendingSongData) {
-            gtEngine!.loadSong(store.pendingSongData.buffer);
+            gtEngine!.loadSong(store.pendingSongData.buffer as ArrayBuffer);
             store.setPendingSongData(null);
           }
           store.refreshSongInfo();
