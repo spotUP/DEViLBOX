@@ -21,6 +21,7 @@ import { PixiMainLayout } from './shell/PixiMainLayout';
 import { CRTRenderer } from './CRTRenderer';
 import { Rectangle } from 'pixi.js';
 import { getAverageFps } from './performance';
+import { PixiNewSongWizard } from './dialogs/PixiNewSongWizard';
 
 export const PixiRoot: React.FC = () => {
   const { width, height } = usePixiResponsive();
@@ -99,6 +100,11 @@ export const PixiRoot: React.FC = () => {
 
       {/* Global dropdown layer — above all window masks (zIndex 9999) */}
       <PixiGlobalDropdownLayer />
+
+      {/* GL-native modals — inside scene graph so CRT shader catches them */}
+      <pixiContainer zIndex={300} layout={{ position: 'absolute', width, height }}>
+        <PixiNewSongWizard />
+      </pixiContainer>
 
       {/* Peer cursor overlay — above everything */}
       <pixiContainer
