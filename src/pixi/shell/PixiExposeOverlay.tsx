@@ -1,13 +1,13 @@
 /**
- * PixiExposeOverlay — macOS Mission Control style view switcher.
+ * PixiExposeOverlay — macOS Mission Control style view switcher with thumbnails.
  *
  * Triggered by EXPOSÉ button or Ctrl+↑.
- * Shows all available views as labeled cards in a grid.
+ * Shows all available views as thumbnail cards in a grid.
  * Navigation: Arrow keys, Tab to cycle, Enter/click to select, Escape to dismiss.
  */
 
 import React, { useCallback, useEffect, useMemo } from 'react';
-import type { Graphics as GraphicsType } from 'pixi.js';
+import type { Graphics as GraphicsType, Texture } from 'pixi.js';
 import { PIXI_FONTS } from '../fonts';
 import { usePixiTheme } from '../theme';
 import { useUIStore } from '@stores/useUIStore';
@@ -26,25 +26,29 @@ const EXPOSE_VIEWS = [
 
 const COLS = 3;
 const ROWS = 2;
-const CARD_GAP = 20;
-const CARD_RADIUS = 12;
-const ANIM_DURATION = 0; // instant for now
+const CARD_GAP = 24;
+const CARD_RADIUS = 10;
+const LABEL_H = 28; // space reserved for label below thumbnail
+const THUMB_PAD = 4; // padding inside card around thumbnail
 
 interface PixiExposeOverlayProps {
   width: number;
   height: number;
+  thumbnails?: Record<string, Texture>;
 }
 
-export const PixiExposeOverlay: React.FC<PixiExposeOverlayProps> = ({ width, height }) => {
+export const PixiExposeOverlay: React.FC<PixiExposeOverlayProps> = ({ width, height, thumbnails }) => {
   const theme = usePixiTheme();
   const viewExposeActive = useUIStore((s) => s.viewExposeActive);
   const selectedIdx = useUIStore((s) => s.viewExposeSelectedIdx);
   const activeView = useUIStore((s) => s.activeView);
   const setActiveView = useUIStore((s) => s.setActiveView);
 
-  // Card dimensions
-  const cardW = useMemo(() => Math.min(280, (width - CARD_GAP * (COLS + 1)) / COLS), [width]);
-  const cardH = useMemo(() => Math.min(180, (height - CARD_GAP * (ROWS + 1) - 60) / ROWS), [height]);
+  // Card dimensions — larger to accommodate thumbnails
+  const cardW = useMemo(() => Math.min(380, (width - CARD_GAP * (COLS + 1)) / COLS), [width]);
+  const cardH = useMemo(() => Math.min(260, (height - CARD_GAP * (ROWS + 1) - 80) / ROWS), [height]);
+  const thumbW = cardW - THUMB_PAD * 2;
+  const thumbH = cardH - LABEL_H - THUMB_PAD * 2;
   const gridW = COLS * cardW + (COLS - 1) * CARD_GAP;
   const gridH = ROWS * cardH + (ROWS - 1) * CARD_GAP;
   const offsetX = (width - gridW) / 2;
@@ -124,14 +128,12 @@ export const PixiExposeOverlay: React.FC<PixiExposeOverlayProps> = ({ width, hei
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      // Ctrl+↑ or Ctrl+↓ toggle (matches macOS Mission Control)
       if ((e.ctrlKey || e.metaKey) && e.key === 'ArrowUp' && !e.altKey && !e.shiftKey) {
         const tag = document.activeElement?.tagName.toLowerCase();
         if (tag === 'input' || tag === 'textarea') return;
         e.preventDefault();
         const store = useUIStore.getState();
         if (store.activeView === 'studio') {
-          // In studio mode, toggle workbench expose instead
           useWorkbenchStore.getState().toggleExpose();
         } else {
           store.toggleViewExpose();
@@ -155,7 +157,7 @@ export const PixiExposeOverlay: React.FC<PixiExposeOverlayProps> = ({ width, hei
   const drawOverlayBg = useCallback((g: GraphicsType) => {
     g.clear();
     g.rect(0, 0, width, height);
-    g.fill({ color: 0x000000, alpha: 0.75 });
+    g.fill({ color: 0x000000, alpha: 0.78 });
   }, [width, height]);
 
   if (!viewExposeActive) return null;
@@ -185,6 +187,26 @@ export const PixiExposeOverlay: React.FC<PixiExposeOverlayProps> = ({ width, hei
         const y = offsetY + row * (cardH + CARD_GAP);
         const isActive = activeView === view.id;
         const isSelected = selectedIdx === i;
+        const tex = thumbnails?.[view.id];
+
+        // Scale thumbnail to fit within the card's thumbnail area
+        let spriteW = thumbW;
+        let spriteH = thumbH;
+        let spriteX = THUMB_PAD;
+        let spriteY = THUMB_PAD;
+        if (tex) {
+          const aspect = tex.width / tex.height;
+          const fitAspect = thumbW / thumbH;
+          if (aspect > fitAspect) {
+            spriteW = thumbW;
+            spriteH = thumbW / aspect;
+            spriteY = THUMB_PAD + (thumbH - spriteH) / 2;
+          } else {
+            spriteH = thumbH;
+            spriteW = thumbH * aspect;
+            spriteX = THUMB_PAD + (thumbW - spriteW) / 2;
+          }
+        }
 
         return (
           <pixiContainer
@@ -198,46 +220,72 @@ export const PixiExposeOverlay: React.FC<PixiExposeOverlayProps> = ({ width, hei
             onPointerEnter={() => useUIStore.getState().setViewExposeSelectedIdx(i)}
             layout={{ position: 'absolute', left: x, top: y, width: cardW, height: cardH }}
           >
-            {/* Card background */}
+            {/* Card background + border */}
             <pixiGraphics
               draw={(g) => {
                 g.clear();
-                // Card bg
                 g.roundRect(0, 0, cardW, cardH, CARD_RADIUS);
-                g.fill({ color: isActive ? theme.accent.color : theme.bgTertiary.color, alpha: isActive ? 0.25 : 0.85 });
-                // Border
+                g.fill({ color: 0x1a1a2e, alpha: 0.92 });
                 g.roundRect(0, 0, cardW, cardH, CARD_RADIUS);
                 g.stroke({
                   color: isSelected ? 0xffffff : (isActive ? theme.accent.color : theme.border.color),
                   width: isSelected ? 3 : 1,
-                  alpha: isSelected ? 0.9 : (isActive ? 0.6 : 0.3),
+                  alpha: isSelected ? 0.95 : (isActive ? 0.7 : 0.25),
                 });
               }}
               layout={{ position: 'absolute', width: cardW, height: cardH }}
             />
 
-            {/* Icon (large, centered) */}
-            <pixiBitmapText
-              text={view.icon}
-              style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 36, fill: 0xffffff }}
-              tint={view.color}
-              layout={{ position: 'absolute', left: cardW / 2 - 14, top: cardH / 2 - 32 }}
+            {/* Thumbnail or fallback icon */}
+            {tex ? (
+              <pixiSprite
+                texture={tex}
+                x={spriteX}
+                y={spriteY}
+                width={spriteW}
+                height={spriteH}
+                alpha={isActive ? 1 : 0.7}
+              />
+            ) : (
+              /* Fallback: large icon when no thumbnail is available */
+              <pixiBitmapText
+                text={view.icon}
+                style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 36, fill: 0xffffff }}
+                tint={view.color}
+                alpha={0.5}
+                layout={{ position: 'absolute', left: cardW / 2 - 14, top: thumbH / 2 - 10 }}
+              />
+            )}
+
+            {/* Label bar at bottom */}
+            <pixiGraphics
+              draw={(g) => {
+                g.clear();
+                // Subtle gradient bar at bottom
+                g.roundRect(0, cardH - LABEL_H, cardW, LABEL_H, 0);
+                g.fill({ color: 0x000000, alpha: 0.4 });
+              }}
+              layout={{ position: 'absolute', width: cardW, height: cardH }}
             />
 
-            {/* Label */}
+            {/* View label */}
             <pixiBitmapText
               text={view.label}
-              style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 14, fill: 0xffffff }}
+              style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 13, fill: 0xffffff }}
               tint={isActive ? theme.accent.color : theme.text.color}
-              layout={{ position: 'absolute', left: cardW / 2 - view.label.length * 4, top: cardH / 2 + 14 }}
+              layout={{
+                position: 'absolute',
+                left: cardW / 2 - view.label.length * 3.5,
+                top: cardH - LABEL_H + 7,
+              }}
             />
 
-            {/* "Active" indicator dot */}
+            {/* Active dot next to label */}
             {isActive && (
               <pixiGraphics
                 draw={(g) => {
                   g.clear();
-                  g.circle(cardW / 2, cardH - 16, 4);
+                  g.circle(cardW / 2 + view.label.length * 3.5 + 8, cardH - LABEL_H + 14, 3);
                   g.fill({ color: theme.accent.color });
                 }}
                 layout={{ position: 'absolute', width: cardW, height: cardH }}
