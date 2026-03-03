@@ -313,10 +313,26 @@ export const WorkbenchContainer: React.FC = () => {
     startSpring(preset.camera);
   }, [startSpring]);
 
-  // ─── Exposé (Alt+Tab hold) ──────────────────────────────────────────────────
+  // ─── Exposé (store-driven toggle + legacy Alt+Tab hold) ─────────────────────
 
+  const exposeActive = useWorkbenchStore((s) => s.exposeActive);
+  const preExposeCam = useWorkbenchStore((s) => s.preExposeCam);
   const exposeCameraRef = useRef<CameraState | null>(null);
 
+  // React to store toggle (from NavBar button)
+  useEffect(() => {
+    if (exposeActive) {
+      startSpring(fitAllWindows(useWorkbenchStore.getState().windows, width, workbenchH));
+    } else if (preExposeCam) {
+      // Restore saved camera when deactivating
+      const saved = preExposeCam;
+      startSpring(saved, () => {
+        useWorkbenchStore.getState().setExposeActive(false);
+      });
+    }
+  }, [exposeActive]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Legacy Alt+Tab hold (keep as fallback for non-macOS)
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key !== 'Tab' || !e.altKey || e.repeat) return;

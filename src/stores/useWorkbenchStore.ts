@@ -105,6 +105,10 @@ interface WorkbenchStore {
   // 3D tilt state (not persisted — resets to flat on page load)
   isTilted: boolean;
 
+  // Exposé state (not persisted — resets on page load)
+  exposeActive: boolean;
+  preExposeCam: CameraState | null;
+
   // ─── Actions ───────────────────────────────────────────────────────────────
 
   setCamera: (camera: Partial<CameraState>) => void;
@@ -133,6 +137,9 @@ interface WorkbenchStore {
   setGridSize: (size: number) => void;
   setUiSoundVolume: (vol: number) => void;
   setTilted: (tilted: boolean) => void;
+  /** Toggle Exposé (fit-all-windows overview). */
+  toggleExpose: () => void;
+  setExposeActive: (active: boolean) => void;
 
   /** The window that last received a pointerdown — null when background is clicked. */
   activeWindowId: string | null;
@@ -154,6 +161,8 @@ export const useWorkbenchStore = create<WorkbenchStore>()(
       snapToGrid: false,
       gridSize: 40,
       isTilted: false,
+      exposeActive: false,
+      preExposeCam: null,
       activeWindowId: null,
 
       // ─── Camera ────────────────────────────────────────────────────────────
@@ -322,6 +331,24 @@ export const useWorkbenchStore = create<WorkbenchStore>()(
 
       setTilted: (tilted) =>
         set((state) => { state.isTilted = tilted; }),
+
+      toggleExpose: () =>
+        set((state) => {
+          if (state.exposeActive) {
+            // Deactivate — WorkbenchContainer will spring back to preExposeCam
+            state.exposeActive = false;
+          } else {
+            // Activate — save current camera so we can restore later
+            state.preExposeCam = { ...state.camera };
+            state.exposeActive = true;
+          }
+        }),
+
+      setExposeActive: (active) =>
+        set((state) => {
+          state.exposeActive = active;
+          if (!active) state.preExposeCam = null;
+        }),
 
       setActiveWindowId: (id) =>
         set((state) => { state.activeWindowId = id; }),
