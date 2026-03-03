@@ -216,18 +216,19 @@ export const PixiTrackerView: React.FC = () => {
             const PE_SCROLLBAR = 12;  // PixiPatternEditor top scrollbar
             const PE_HEADER = 28;     // PixiPatternEditor channel header
             const PE_ROW = 24;        // PixiPatternEditor row height
+            const HEADER_OFFSET = PE_SCROLLBAR + PE_HEADER; // 40px — below scrollbar + channel headers
             const gridH = instrumentPanelHeight - PE_HEADER - PE_SCROLLBAR;
-            const vuHeight = Math.max(50, Math.floor(PE_SCROLLBAR + PE_HEADER + (gridH - PE_ROW) / 2));
+            const vuHeight = Math.max(50, Math.floor((gridH - PE_ROW) / 2));
             return (
-              <pixiContainer alpha={viewMode === 'tracker' && editorMode === 'classic' ? 1 : 0} renderable={viewMode === 'tracker' && editorMode === 'classic'} eventMode={viewMode === 'tracker' && editorMode === 'classic' ? 'static' : 'none'} layout={{ position: 'absolute', width: Math.max(100, editorWidth), height: vuHeight }}>
+              <pixiContainer alpha={viewMode === 'tracker' && editorMode === 'classic' ? 1 : 0} renderable={viewMode === 'tracker' && editorMode === 'classic'} eventMode={viewMode === 'tracker' && editorMode === 'classic' ? 'static' : 'none'} layout={{ position: 'absolute', top: HEADER_OFFSET, width: Math.max(100, editorWidth), height: vuHeight }}>
                 <PixiChannelVUMeters width={Math.max(100, editorWidth)} height={vuHeight} />
               </pixiContainer>
             );
           })()}
-          <pixiContainer alpha={viewMode === 'tracker' && showAutomation && !!patternId ? 1 : 0} renderable={viewMode === 'tracker' && showAutomation && !!patternId} eventMode={viewMode === 'tracker' && showAutomation && !!patternId ? 'static' : 'none'} layout={{ position: 'absolute' }}>
+          <pixiContainer alpha={viewMode === 'tracker' && showAutomation && !!patternId ? 1 : 0} renderable={viewMode === 'tracker' && showAutomation && !!patternId} eventMode={viewMode === 'tracker' && showAutomation && !!patternId ? 'static' : 'none'} layout={{ position: 'absolute', top: 40 }}>
             <PixiAutomationLanes
               width={Math.max(100, editorWidth)}
-              height={Math.max(100, instrumentPanelHeight)}
+              height={Math.max(100, instrumentPanelHeight - 40)}
               patternId={patternId || ''}
               patternLength={patternLength}
               rowHeight={ROW_HEIGHT}
@@ -238,10 +239,10 @@ export const PixiTrackerView: React.FC = () => {
               nextPatternLength={nextPatternLength}
             />
           </pixiContainer>
-          <pixiContainer alpha={viewMode === 'tracker' && showMacroLanes ? 1 : 0} renderable={viewMode === 'tracker' && showMacroLanes} eventMode={viewMode === 'tracker' && showMacroLanes ? 'static' : 'none'} layout={{ position: 'absolute' }}>
+          <pixiContainer alpha={viewMode === 'tracker' && showMacroLanes ? 1 : 0} renderable={viewMode === 'tracker' && showMacroLanes} eventMode={viewMode === 'tracker' && showMacroLanes ? 'static' : 'none'} layout={{ position: 'absolute', top: 40 }}>
             <PixiMacroLanes
               width={Math.max(100, editorWidth)}
-              height={Math.max(100, instrumentPanelHeight)}
+              height={Math.max(100, instrumentPanelHeight - 40)}
               patternLength={patternLength}
               rowHeight={ROW_HEIGHT}
               channelCount={channelCount}
