@@ -299,8 +299,8 @@ export const PixiGTStudioInstrument: React.FC<Props> = ({ width, height }) => {
       onPointerUp={handlePointerUp}
       onPointerUpOutside={handlePointerUp}
     >
-      <pixiGraphics ref={bgRef} />
-      <pixiGraphics ref={envRef} />
+      <pixiGraphics ref={bgRef} draw={() => {}} />
+      <pixiGraphics ref={envRef} draw={() => {}} />
     </pixiContainer>
   );
 };

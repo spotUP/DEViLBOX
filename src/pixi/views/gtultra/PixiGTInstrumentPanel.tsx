@@ -127,7 +127,7 @@ export const PixiGTInstrumentPanel: React.FC<Props> = ({ width, height }) => {
 
   return (
     <pixiContainer ref={containerRef} eventMode="static" cursor="pointer" onPointerUp={handlePointerUp} layout={{ width, height }}>
-      <pixiGraphics ref={gridRef} />
+      <pixiGraphics ref={gridRef} draw={() => {}} />
     </pixiContainer>
   );
 };

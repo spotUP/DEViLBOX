@@ -1,7 +1,7 @@
 /**
  * Shared constants and types for tracker input handlers.
  */
-import { MutableRefObject } from 'react';
+import type { MutableRefObject } from 'react';
 import type { CursorPosition, BlockSelection } from '@/types/tracker';
 
 // Track currently held notes to prevent retriggering and enable proper release

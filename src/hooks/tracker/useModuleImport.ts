@@ -21,7 +21,7 @@ import { getToneEngine } from '@engine/ToneEngine';
 import * as Tone from 'tone';
 import type { InstrumentConfig } from '@typedefs/instrument';
 import { notify } from '@stores/useNotificationStore';
-import { getTrackerReplayer, type TrackerSong } from '@engine/TrackerReplayer';
+import { type TrackerSong } from '@engine/TrackerReplayer';
 import type { ModuleInfo } from '@lib/import/ModuleLoader';
 import type { ImportOptions } from '@components/dialogs/ImportModuleDialog';
 import type { SunVoxConfig } from '@/types/instrument/exotic';

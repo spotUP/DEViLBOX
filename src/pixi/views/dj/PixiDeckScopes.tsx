@@ -5,7 +5,7 @@
  * Click a scope to mute/unmute. Shift+click to solo. Click ALL to enable all.
  */
 
-import React, { useRef, useEffect, useCallback, useMemo } from 'react';
+import React, { useRef, useEffect, useCallback } from 'react';
 import type { Graphics as GraphicsType, FederatedPointerEvent } from 'pixi.js';
 import { PIXI_FONTS } from '@/pixi/fonts';
 import { usePixiTheme } from '@/pixi/theme';
@@ -95,7 +95,7 @@ const ScopeBox: React.FC<{
       cursor="pointer"
       onPointerUp={onClick}
     >
-      <pixiGraphics ref={graphicsRef} />
+      <pixiGraphics ref={graphicsRef} draw={() => {}} />
       <pixiBitmapText
         text={isAll ? 'ALL' : `CH${channel + 1}`}
         style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 8, fill: 0xffffff }}

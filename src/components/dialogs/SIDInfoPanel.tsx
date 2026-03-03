@@ -33,7 +33,7 @@ export const SIDInfoPanel: React.FC<SIDInfoPanelProps> = ({
   const chipCount = 1 + (header.secondSID ? 1 : 0) + (header.thirdSID ? 1 : 0);
 
   // Get duration from SongDB for current subsong
-  const subsongDuration = songDBInfo?.found !== false && songDBInfo?.subsongs?.[selectedSubsong];
+  const subsongDuration = songDBInfo?.found && songDBInfo?.subsongs?.[selectedSubsong];
   const durationStr = subsongDuration
     ? `${Math.floor(subsongDuration.duration_ms / 60000)}:${String(Math.floor((subsongDuration.duration_ms % 60000) / 1000)).padStart(2, '0')}`
     : null;
@@ -116,7 +116,7 @@ export const SIDInfoPanel: React.FC<SIDInfoPanelProps> = ({
                 {Array.from({ length: header.subsongs }, (_, i) => (
                   <option key={i} value={i}>
                     {`Subsong ${i + 1}${i === header.defaultSubsong ? ' (default)' : ''}`}
-                    {songDBInfo?.found !== false && songDBInfo?.subsongs?.[i]
+                    {songDBInfo?.found && songDBInfo?.subsongs?.[i]
                       ? ` — ${Math.floor(songDBInfo.subsongs[i].duration_ms / 60000)}:${String(Math.floor((songDBInfo.subsongs[i].duration_ms % 60000) / 1000)).padStart(2, '0')}`
                       : ''}
                   </option>
@@ -128,7 +128,7 @@ export const SIDInfoPanel: React.FC<SIDInfoPanelProps> = ({
       </div>
 
       {/* SongDB Info (album, year, group) */}
-      {songDBInfo && songDBInfo.found !== false && (songDBInfo.album || songDBInfo.year || songDBInfo.publishers?.length > 0) && (
+      {songDBInfo && songDBInfo.found && (songDBInfo.album || songDBInfo.year || songDBInfo.publishers?.length > 0) && (
         <div className="grid grid-cols-2 gap-1.5 text-xs border-t border-dark-border pt-2">
           {songDBInfo.album && (
             <div className="flex justify-between text-text-muted col-span-2">

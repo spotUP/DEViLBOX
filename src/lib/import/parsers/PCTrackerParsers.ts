@@ -19,9 +19,9 @@ export async function tryPCTrackerParse(
   buffer: ArrayBuffer,
   filename: string,
   originalFileName: string,
-  prefs: FormatEnginePreferences,
-  subsong: number,
-  preScannedMeta?: UADEMetadata,
+  _prefs: FormatEnginePreferences,
+  _subsong: number,
+  _preScannedMeta?: UADEMetadata,
 ): Promise<TrackerSong | null> {
 
   // ── S3M (ScreamTracker 3) ─────────────────────────────────────────────────

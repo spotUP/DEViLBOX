@@ -141,7 +141,7 @@ interface TrackerStore {
     secondSID: boolean;
     thirdSID: boolean;
   } | null;
-  setSidMetadata: (info: TrackerState['sidMetadata']) => void;
+  setSidMetadata: (info: TrackerStore['sidMetadata']) => void;
 
   // Actions
   setCurrentPattern: (index: number, fromReplayer?: boolean) => void;

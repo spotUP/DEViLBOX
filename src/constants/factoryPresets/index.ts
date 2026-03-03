@@ -9,7 +9,7 @@ import { TB303_PRESETS } from '../tb303Presets';
 import { FURNACE_PRESETS } from '../furnacePresets';
 import { DUB_SIREN_PRESETS } from '../dubSirenPresets';
 import { SPACE_LASER_PRESETS } from '../spaceLaserPresets';
-import { V2_PRESETS, V2_PRESET_KICK, V2_PRESET_SNARE, V2_PRESET_HAT } from '../v2Presets';
+import { V2_PRESETS } from '../v2Presets';
 import { SYNARE_PRESETS } from '../synarePresets';
 import { DRUMNIBUS_PRESETS as DRUMNIBUS_KIT_PRESETS } from '../drumnibusPresets';
 import { V2_FACTORY_PRESETS } from '../v2FactoryPresets';

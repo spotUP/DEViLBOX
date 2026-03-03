@@ -6,7 +6,7 @@
  */
 
 import React, { useCallback, lazy, Suspense } from 'react';
-import type { InstrumentConfig, SynthType, EffectConfig } from '@typedefs/instrument';
+import type { InstrumentConfig, EffectConfig } from '@typedefs/instrument';
 import {
   DEFAULT_FURNACE, DEFAULT_DUB_SIREN, DEFAULT_SPACE_LASER, DEFAULT_V2, DEFAULT_V2_SPEECH, DEFAULT_SYNARE,
   DEFAULT_MAME_VFX, DEFAULT_MAME_DOC, DEFAULT_DEXED, DEFAULT_OBXD, DEFAULT_SAM,
@@ -24,7 +24,7 @@ import { VisualizerFrame } from '@components/visualization/VisualizerFrame';
 import { PresetDropdown } from '../presets/PresetDropdown';
 import { ChannelOscilloscope } from '../../visualization/ChannelOscilloscope';
 import { getToneEngine } from '@engine/ToneEngine';
-import { isMAMEChipType, getChipSynthDef } from '@constants/chipParameters';
+import { getChipSynthDef } from '@constants/chipParameters';
 import { getChipCapabilities } from '@engine/mame/MAMEMacroTypes';
 import { Radio, MessageSquare, Music, Mic, Monitor, Cpu, SlidersHorizontal } from 'lucide-react';
 import { HardwareUIWrapper, hasHardwareUI } from '../hardware/HardwareUIWrapper';

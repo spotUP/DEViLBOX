@@ -7,7 +7,6 @@ import React, { useRef, useEffect, useCallback } from 'react';
 import { useGTUltraStore } from '../../stores/useGTUltraStore';
 
 const ROW_H = 16;
-const CHAR_W = 8;
 
 export const GTOrderList: React.FC<{
   width: number;

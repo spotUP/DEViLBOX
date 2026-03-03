@@ -15,6 +15,8 @@ import type {
 import type { BeatSlice, BeatSliceConfig } from '@typedefs/beatSlicer';
 import {
   DEFAULT_ENVELOPE,
+  DEFAULT_OSCILLATOR,
+  DEFAULT_FILTER,
   DEFAULT_TB303,
   DEFAULT_DUB_SIREN,
   DEFAULT_SPACE_LASER,
@@ -23,11 +25,10 @@ import {
   DEFAULT_V2_SPEECH,
   DEFAULT_SYNARE,
   DEFAULT_BUZZMACHINE,
-  DEFAULT_DRUMKIT,
 } from '@typedefs/instrument';
 
 import { getFirstPresetForSynthType } from '@constants/factoryPresets';
-import { getDefaultFurnaceConfig, getDefaultEffectParameters } from '@engine/InstrumentFactory';
+import { getDefaultFurnaceConfig } from '@engine/InstrumentFactory';
 import { getToneEngine } from '@engine/ToneEngine';
 import { FurnaceParser } from '@/lib/import/formats/FurnaceParser';
 import { DefleMaskParser } from '@/lib/import/formats/DefleMaskParser';

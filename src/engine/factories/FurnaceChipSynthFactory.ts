@@ -8,7 +8,7 @@ import type { InstrumentConfig } from '@typedefs/instrument';
 import { DEFAULT_FURNACE } from '@/types/instrument';
 import { FurnaceSynth } from '../FurnaceSynth';
 import { FurnaceChipType } from '../chips/FurnaceChipEngine';
-import { FurnaceDispatchSynth, FurnaceDispatchPlatform } from '../furnace-dispatch';
+import { FurnaceDispatchPlatform } from '../furnace-dispatch';
 import { BuzzmachineGenerator } from '../buzzmachines/BuzzmachineGenerator';
 import { BuzzmachineType } from '../buzzmachines/BuzzmachineEngine';
 import { getNormalizedVolume } from './volumeNormalization';

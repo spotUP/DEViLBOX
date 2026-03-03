@@ -86,7 +86,6 @@ export const GTPatternEditor: React.FC<GTPatternEditorProps> = ({
 
   // Calculate visible rows
   const visibleRows = Math.floor((height - HEADER_H) / ROW_H);
-  const totalW = ROW_NUM_W + channelCount * (CHANNEL_W + CHAN_GAP);
 
   // Scroll offset: center cursor row in view
   const scrollRow = useMemo(() => {

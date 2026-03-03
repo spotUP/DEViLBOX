@@ -11,7 +11,6 @@ import {
   detectFormat,
   getLibopenmptPlayableKeys,
   getNativeOnlyKeys,
-  type FormatDefinition,
 } from '../FormatRegistry';
 
 // ─── Registry Integrity ──────────────────────────────────────────────────────

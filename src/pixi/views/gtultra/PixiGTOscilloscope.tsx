@@ -186,8 +186,8 @@ export const PixiGTOscilloscope: React.FC<Props> = ({ width, height }) => {
 
   return (
     <pixiContainer ref={containerRef} layout={{ width, height }}>
-      <pixiGraphics ref={bgRef} />
-      <pixiGraphics ref={waveRef} />
+      <pixiGraphics ref={bgRef} draw={() => {}} />
+      <pixiGraphics ref={waveRef} draw={() => {}} />
     </pixiContainer>
   );
 };

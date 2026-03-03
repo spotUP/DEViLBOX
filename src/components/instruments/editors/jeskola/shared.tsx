@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef } from 'react';
+import { useRef, useEffect, useCallback } from 'react';
 import type { InstrumentConfig } from '@typedefs/instrument';
 
 export interface GeneratorEditorProps {

@@ -20,22 +20,21 @@ import { FurnaceMacroType } from '@/types/instrument';
 import { PatternAccessor } from './PatternAccessor';
 import { getToneEngine } from './ToneEngine';
 import { StereoSeparationNode } from './StereoSeparationNode';
-import { getNativeAudioNode } from '@utils/audio-context';
+// getNativeAudioNode used in audio-context utilities
 import { getPatternScheduler } from './PatternScheduler';
 import { useTransportStore, cancelPendingRowUpdate } from '@/stores/useTransportStore';
 import { unlockIOSAudio } from '@utils/ios-audio-unlock';
-import { ft2NoteToPeriod, ft2Period2Hz, ft2GetSampleC4Rate, ft2ArpeggioPeriod, ft2Period2NotePeriod, FT2_ARPEGGIO_TAB } from './effects/FT2Tables';
-import { HivelyEngine } from './hively/HivelyEngine';
-import { MusicLineEngine } from './musicline/MusicLineEngine';
+import { ft2NoteToPeriod, ft2Period2Hz, ft2GetSampleC4Rate } from './effects/FT2Tables';
+// HivelyEngine used via dynamic import
+// MusicLineEngine used via dynamic import
 
 // Extracted modules
 import {
-  AMIGA_PAL_FREQUENCY, FINETUNE_MULTIPLIERS, SEMITONE_RATIOS,
-  OCTAVE_UP, OCTAVE_DOWN, AUTO_VIB_SINE_TAB,
+  AMIGA_PAL_FREQUENCY, SEMITONE_RATIOS,
+  OCTAVE_UP, AUTO_VIB_SINE_TAB,
   DEBUG_NOTE_NAMES, NOTE_STRING_MAP, PERIOD_TABLE,
-  NOTE_NAMES, NOTE_NAMES_CLEAN, XM_NOTE_NAMES,
-  FURNACE_CHIP_ENGINE_TYPES, PERIOD_NOTE_MAP,
-  VIBRATO_TABLE, GROOVE_MAP,
+  FURNACE_CHIP_ENGINE_TYPES,
+  GROOVE_MAP,
   xmNoteToNoteName, periodToNoteName,
   getGrooveOffset, getGrooveVelocity,
 } from './replayer/PeriodTables';

@@ -43,9 +43,6 @@ import {
   parsePattern,
   convertFurnaceCell,
   convertFurnaceNoteValue,
-  NOTE_OFF,
-  NOTE_RELEASE,
-  MACRO_RELEASE,
 } from './furnace/FurnacePatternParser';
 import { parseInstrument } from './furnace/FurnaceInstrumentParser';
 
@@ -157,7 +154,7 @@ import type {
   FurnaceN163Data,
   FurnaceFDSData,
 } from './furnace/FurnaceInstrumentParser';
-import type { FurnacePatternCell, FurnacePattern, ConvertedPatternCell } from './furnace/FurnacePatternParser';
+import type { FurnacePattern, ConvertedPatternCell } from './furnace/FurnacePatternParser';
 
 // Element types for new format
 const DIV_ELEMENT_END = 0x00;

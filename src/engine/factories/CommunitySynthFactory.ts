@@ -1025,147 +1025,147 @@ export function applyChipParameters(synth: { setParam: (key: string, value: numb
 export function createMAMEAICA(config: InstrumentConfig): Tone.ToneAudioNode {
   const synth = new AICASynth();
   synth.output.gain.value = Tone.dbToGain(getNormalizedVolume('MAMEAICA', config.volume));
-  this.applyChipParameters(synth, config);
+  applyChipParameters(synth, config);
   return synth as unknown as Tone.ToneAudioNode;
 }
 
 export function createMAMEASC(config: InstrumentConfig): Tone.ToneAudioNode {
   const synth = new ASCSynth();
   synth.output.gain.value = Tone.dbToGain(getNormalizedVolume('MAMEASC', config.volume));
-  this.applyChipParameters(synth, config);
+  applyChipParameters(synth, config);
   return synth as unknown as Tone.ToneAudioNode;
 }
 
 export function createMAMEAstrocade(config: InstrumentConfig): Tone.ToneAudioNode {
   const synth = new AstrocadeSynth();
   synth.output.gain.value = Tone.dbToGain(getNormalizedVolume('MAMEAstrocade', config.volume));
-  this.applyChipParameters(synth, config);
+  applyChipParameters(synth, config);
   return synth as unknown as Tone.ToneAudioNode;
 }
 
 export function createMAMEC352(config: InstrumentConfig): Tone.ToneAudioNode {
   const synth = new C352Synth();
   synth.output.gain.value = Tone.dbToGain(getNormalizedVolume('MAMEC352', config.volume));
-  this.applyChipParameters(synth, config);
+  applyChipParameters(synth, config);
   return synth as unknown as Tone.ToneAudioNode;
 }
 
 export function createMAMEES5503(config: InstrumentConfig): Tone.ToneAudioNode {
   const synth = new ES5503Synth();
   synth.output.gain.value = Tone.dbToGain(getNormalizedVolume('MAMEES5503', config.volume));
-  this.applyChipParameters(synth, config);
+  applyChipParameters(synth, config);
   return synth as unknown as Tone.ToneAudioNode;
 }
 
 export function createMAMEICS2115(config: InstrumentConfig): Tone.ToneAudioNode {
   const synth = new ICS2115Synth();
   synth.output.gain.value = Tone.dbToGain(getNormalizedVolume('MAMEICS2115', config.volume));
-  this.applyChipParameters(synth, config);
+  applyChipParameters(synth, config);
   return synth as unknown as Tone.ToneAudioNode;
 }
 
 export function createMAMEK054539(config: InstrumentConfig): Tone.ToneAudioNode {
   const synth = new K054539Synth();
   synth.output.gain.value = Tone.dbToGain(getNormalizedVolume('MAMEK054539', config.volume));
-  this.applyChipParameters(synth, config);
+  applyChipParameters(synth, config);
   return synth as unknown as Tone.ToneAudioNode;
 }
 
 export function createMAMEMEA8000(config: InstrumentConfig): Tone.ToneAudioNode {
   const synth = new MEA8000Synth();
   synth.output.gain.value = Tone.dbToGain(getNormalizedVolume('MAMEMEA8000', config.volume));
-  this.applyChipParameters(synth, config);
+  applyChipParameters(synth, config);
   return synth as unknown as Tone.ToneAudioNode;
 }
 
 export function createMAMERF5C400(config: InstrumentConfig): Tone.ToneAudioNode {
   const synth = new RF5C400Synth();
   synth.output.gain.value = Tone.dbToGain(getNormalizedVolume('MAMERF5C400', config.volume));
-  this.applyChipParameters(synth, config);
+  applyChipParameters(synth, config);
   return synth as unknown as Tone.ToneAudioNode;
 }
 
 export function createMAMESN76477(config: InstrumentConfig): Tone.ToneAudioNode {
   const synth = new SN76477Synth();
   synth.output.gain.value = Tone.dbToGain(getNormalizedVolume('MAMESN76477', config.volume));
-  this.applyChipParameters(synth, config);
+  applyChipParameters(synth, config);
   return synth as unknown as Tone.ToneAudioNode;
 }
 
 export function createMAMESNKWave(config: InstrumentConfig): Tone.ToneAudioNode {
   const synth = new SNKWaveSynth();
   synth.output.gain.value = Tone.dbToGain(getNormalizedVolume('MAMESNKWave', config.volume));
-  this.applyChipParameters(synth, config);
+  applyChipParameters(synth, config);
   return synth as unknown as Tone.ToneAudioNode;
 }
 
 export function createMAMESP0250(config: InstrumentConfig): Tone.ToneAudioNode {
   const synth = new SP0250Synth();
   synth.output.gain.value = Tone.dbToGain(getNormalizedVolume('MAMESP0250', config.volume));
-  this.applyChipParameters(synth, config);
+  applyChipParameters(synth, config);
   return synth as unknown as Tone.ToneAudioNode;
 }
 
 export function createMAMETMS36XX(config: InstrumentConfig): Tone.ToneAudioNode {
   const synth = new TMS36XXSynth();
   synth.output.gain.value = Tone.dbToGain(getNormalizedVolume('MAMETMS36XX', config.volume));
-  this.applyChipParameters(synth, config);
+  applyChipParameters(synth, config);
   return synth as unknown as Tone.ToneAudioNode;
 }
 
 export function createMAMETMS5220(config: InstrumentConfig): Tone.ToneAudioNode {
   const synth = new TMS5220Synth();
   synth.output.gain.value = Tone.dbToGain(getNormalizedVolume('MAMETMS5220', config.volume));
-  this.applyChipParameters(synth, config);
+  applyChipParameters(synth, config);
   return synth as unknown as Tone.ToneAudioNode;
 }
 
 export function createMAMETR707(config: InstrumentConfig): Tone.ToneAudioNode {
   const synth = new TR707Synth();
   synth.output.gain.value = Tone.dbToGain(getNormalizedVolume('MAMETR707', config.volume));
-  this.applyChipParameters(synth, config);
+  applyChipParameters(synth, config);
   return synth as unknown as Tone.ToneAudioNode;
 }
 
 export function createMAMEUPD931(config: InstrumentConfig): Tone.ToneAudioNode {
   const synth = new UPD931Synth();
   synth.output.gain.value = Tone.dbToGain(getNormalizedVolume('MAMEUPD931', config.volume));
-  this.applyChipParameters(synth, config);
+  applyChipParameters(synth, config);
   return synth as unknown as Tone.ToneAudioNode;
 }
 
 export function createMAMEUPD933(config: InstrumentConfig): Tone.ToneAudioNode {
   const synth = new UPD933Synth();
   synth.output.gain.value = Tone.dbToGain(getNormalizedVolume('MAMEUPD933', config.volume));
-  this.applyChipParameters(synth, config);
+  applyChipParameters(synth, config);
   return synth as unknown as Tone.ToneAudioNode;
 }
 
 export function createMAMEVotrax(config: InstrumentConfig): Tone.ToneAudioNode {
   const synth = new VotraxSynth();
   synth.output.gain.value = Tone.dbToGain(getNormalizedVolume('MAMEVotrax', config.volume));
-  this.applyChipParameters(synth, config);
+  applyChipParameters(synth, config);
   return synth as unknown as Tone.ToneAudioNode;
 }
 
 export function createMAMEYMF271(config: InstrumentConfig): Tone.ToneAudioNode {
   const synth = new YMF271Synth();
   synth.output.gain.value = Tone.dbToGain(getNormalizedVolume('MAMEYMF271', config.volume));
-  this.applyChipParameters(synth, config);
+  applyChipParameters(synth, config);
   return synth as unknown as Tone.ToneAudioNode;
 }
 
 export function createMAMEYMOPQ(config: InstrumentConfig): Tone.ToneAudioNode {
   const synth = new YMOPQSynth();
   synth.output.gain.value = Tone.dbToGain(getNormalizedVolume('MAMEYMOPQ', config.volume));
-  this.applyChipParameters(synth, config);
+  applyChipParameters(synth, config);
   return synth as unknown as Tone.ToneAudioNode;
 }
 
 export function createMAMEVASynth(config: InstrumentConfig): Tone.ToneAudioNode {
   const synth = new VASynthSynth();
   synth.output.gain.value = Tone.dbToGain(getNormalizedVolume('MAMEVASynth', config.volume));
-  this.applyChipParameters(synth, config);
+  applyChipParameters(synth, config);
   return synth as unknown as Tone.ToneAudioNode;
 }
 

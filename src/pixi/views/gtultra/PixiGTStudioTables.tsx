@@ -96,7 +96,7 @@ export const PixiGTStudioTables: React.FC<Props> = ({ width, height }) => {
       const newLeft = [...data.left];
       newLeft[index] = value;
       const newTableData = { ...useGTUltraStore.getState().tableData };
-      newTableData[tableKey] = { ...data, left: newLeft };
+      newTableData[tableKey] = { ...data, left: new Uint8Array(newLeft) };
       useGTUltraStore.setState({ tableData: newTableData });
     }
   }, [engine, activeTable, data, tableKey]);
@@ -244,8 +244,8 @@ export const PixiGTStudioTables: React.FC<Props> = ({ width, height }) => {
       onPointerUp={handlePointerUp}
       onPointerUpOutside={handlePointerUp}
     >
-      <pixiGraphics ref={bgRef} />
-      <pixiGraphics ref={barsRef} />
+      <pixiGraphics ref={bgRef} draw={() => {}} />
+      <pixiGraphics ref={barsRef} draw={() => {}} />
     </pixiContainer>
   );
 };

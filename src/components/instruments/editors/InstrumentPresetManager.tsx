@@ -10,7 +10,7 @@ import type { InstrumentConfig } from '@typedefs/instrument';
 import { DEFAULT_V2_SPEECH } from '@typedefs/instrument';
 import { EditorHeader, type VizMode } from '../shared/EditorHeader';
 import { PresetDropdown } from '../presets/PresetDropdown';
-import { Box, Drum, Megaphone, Zap, Radio, Mic, Music } from 'lucide-react';
+import { Box, Drum, Megaphone, Zap, Radio, Mic } from 'lucide-react';
 
 export interface SynthHeaderProps {
   instrument: InstrumentConfig;

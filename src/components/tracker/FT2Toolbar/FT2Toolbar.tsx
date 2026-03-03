@@ -210,9 +210,6 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
     setCurrentRow,
     grooveTemplateId,
     setGrooveTemplate,
-    swing,
-    jitter,
-    useMpcScale,
     reset: resetTransport,
   } = useTransportStore(useShallow((s) => ({
     isPlaying: s.isPlaying,
@@ -227,9 +224,6 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
     setCurrentRow: s.setCurrentRow,
     grooveTemplateId: s.grooveTemplateId,
     setGrooveTemplate: s.setGrooveTemplate,
-    swing: s.swing,
-    jitter: s.jitter,
-    useMpcScale: s.useMpcScale,
     reset: s.reset,
   })));
 
@@ -271,7 +265,6 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
 
   // ASID hardware toggle
   const asidEnabled = useSettingsStore((s) => s.asidEnabled);
-  const asidDeviceId = useSettingsStore((s) => s.asidDeviceId);
   const [asidReady, setAsidReady] = useState(false);
 
   const handleToggleASID = useCallback(async () => {
@@ -279,14 +272,14 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
     if (settings.asidEnabled) {
       settings.setAsidEnabled(false);
       setAsidReady(false);
-      notify({ type: 'info', message: 'ASID hardware output disabled' });
+      notify.info('ASID hardware output disabled');
     } else {
       try {
         const mgr = getASIDDeviceManager();
         await mgr.init();
         const devices = mgr.getDevices();
         if (devices.length === 0) {
-          notify({ type: 'warning', message: 'No ASID devices found. Connect USB-SID-Pico and retry.' });
+          notify.warning('No ASID devices found. Connect USB-SID-Pico and retry.');
           return;
         }
         if (!settings.asidDeviceId && devices.length > 0) {
@@ -295,9 +288,9 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
         }
         settings.setAsidEnabled(true);
         setAsidReady(mgr.isDeviceReady());
-        notify({ type: 'success', message: `ASID enabled: ${devices[0]?.name || 'device'}` });
+        notify.success(`ASID enabled: ${devices[0]?.name || 'device'}`);
       } catch (err) {
-        notify({ type: 'error', message: `ASID init failed: ${err}` });
+        notify.error(`ASID init failed: ${err}`);
       }
     }
   }, []);

@@ -114,7 +114,7 @@ export async function createEffectChain(
   effects: EffectConfig[]
 ): Promise<(Tone.ToneAudioNode | DevilboxSynth)[]> {
   const enabled = effects.filter((fx) => fx.enabled);
-  return Promise.all(enabled.map((fx) => this.createEffect(fx)));
+  return Promise.all(enabled.map((fx) => createEffect(fx)));
 }
 
 

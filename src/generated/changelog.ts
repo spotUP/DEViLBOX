@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-03-03T18:51:24.708Z
+ * Generated: 2026-03-03T19:17:51.936Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.2076';
-export const BUILD_NUMBER = '2076';
-export const BUILD_HASH = 'a7a0dc10';
+export const BUILD_VERSION = '1.0.2079';
+export const BUILD_NUMBER = '2079';
+export const BUILD_HASH = '49d02ae9';
 export const BUILD_DATE = '2026-03-03';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,21 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.2076',
+    version: '1.0.2079',
     date: '2026-03-03',
     changes: [
+      {
+        type: 'feature',
+        "description": "Add SID info button + subsong selector to tracker toolbar"
+      },
+      {
+        type: 'feature',
+        "description": "Replace DJ DOM overlays with native GL components"
+      },
+      {
+        type: 'feature',
+        "description": "Native GL horizontal scrollbar in pattern editor"
+      },
       {
         type: 'improvement',
         "description": "Remove: delete PatternManagement component and panel"
@@ -216,18 +228,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'feature',
         "description": "GTUltra UI enhancements and VJ component refactoring"
-      },
-      {
-        type: 'fix',
-        "description": "Use READ macros for label_ref operands in RMW ops"
-      },
-      {
-        type: 'feature',
-        "description": "Wire WASM heap data to GTUltra UI components"
-      },
-      {
-        type: 'feature',
-        "description": "GTUltra ASID hardware bridge for USB-SID-Pico"
       }
     ]
   }
