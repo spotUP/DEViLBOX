@@ -224,6 +224,49 @@ function App() {
     initAudio();
   }, []);
 
+  // Auto-initialize ASID device manager for hot-plug detection
+  useEffect(() => {
+    if (typeof navigator === 'undefined' || !('requestMIDIAccess' in navigator)) return;
+
+    let unsubscribe: (() => void) | undefined;
+
+    (async () => {
+      const { getASIDDeviceManager } = await import('@lib/sid/ASIDDeviceManager');
+      const mgr = getASIDDeviceManager();
+      await mgr.init();
+
+      // Auto-select first device if one is already connected
+      const settings = useSettingsStore.getState();
+      const devices = mgr.getDevices();
+      if (devices.length > 0 && !settings.asidDeviceId) {
+        settings.setAsidDeviceId(devices[0].id);
+        mgr.selectDevice(devices[0].id);
+      }
+
+      // Listen for hot-plug events
+      unsubscribe = mgr.onStateChange((state) => {
+        const s = useSettingsStore.getState();
+        if (state.devices.length > 0 && !s.asidDeviceId) {
+          // Auto-select first ASID device on plug-in
+          s.setAsidDeviceId(state.devices[0].id);
+          mgr.selectDevice(state.devices[0].id);
+          console.log('[ASID] Auto-selected device:', state.devices[0].name);
+          useUIStore.getState().setStatusMessage(
+            `USB-SID-Pico detected: ${state.devices[0].name}`, false, 5000
+          );
+        } else if (state.devices.length === 0 && s.asidDeviceId) {
+          // Device unplugged
+          s.setAsidDeviceId(null);
+          if (s.asidEnabled) {
+            useUIStore.getState().setStatusMessage('ASID device disconnected', false, 3000);
+          }
+        }
+      });
+    })();
+
+    return () => { unsubscribe?.(); };
+  }, []);
+
   // Sync BLEP setting with ToneEngine
   const useBLEP = useSettingsStore(state => state.useBLEP);
   useEffect(() => {
