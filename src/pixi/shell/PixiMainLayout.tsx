@@ -28,10 +28,11 @@ import { PixiArrangementView } from '../views/PixiArrangementView';
 import { PixiPianoRollView } from '../views/PixiPianoRollView';
 import { PixiDJView } from '../views/PixiDJView';
 import { PixiVJView } from '../views/PixiVJView';
+import { WorkbenchContainer } from '../workbench/WorkbenchContainer';
 
 // ─── View router ─────────────────────────────────────────────────────────────
 
-type MainViewId = 'tracker' | 'arrangement' | 'pianoroll' | 'dj' | 'vj';
+type MainViewId = 'tracker' | 'arrangement' | 'pianoroll' | 'dj' | 'vj' | 'studio';
 
 const MAIN_VIEW_COMPONENTS: Record<MainViewId, React.ComponentType> = {
   tracker: PixiTrackerView,
@@ -39,6 +40,7 @@ const MAIN_VIEW_COMPONENTS: Record<MainViewId, React.ComponentType> = {
   pianoroll: PixiPianoRollView,
   dj: PixiDJView,
   vj: PixiVJView,
+  studio: WorkbenchContainer,
 };
 
 // Map UIStore activeView to our MainViewId (some views map to tracker)

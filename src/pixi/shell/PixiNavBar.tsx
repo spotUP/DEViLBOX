@@ -29,6 +29,7 @@ const VIEW_TABS = [
   { id: 'pianoroll',   label: 'PRD' },
   { id: 'dj',          label: 'DJ'  },
   { id: 'vj',          label: 'VJ'  },
+  { id: 'studio',      label: 'STU' },
 ] as const;
 
 // ─── PixiNavBar ──────────────────────────────────────────────────────────────

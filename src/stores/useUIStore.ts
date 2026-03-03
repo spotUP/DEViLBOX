@@ -64,8 +64,8 @@ interface UIStore {
   scratchAcceleration: boolean; // Scroll acceleration for scratch (true = smoothed, false = raw 1:1)
   platterMass: number; // Turntable platter mass 0-1 (0=CDJ light, 0.5=Technics 1200, 1=heavy)
 
-  // View switching (tracker vs arrangement vs DJ vs drum pads vs piano roll vs VJ)
-  activeView: 'tracker' | 'arrangement' | 'dj' | 'drumpad' | 'pianoroll' | 'vj' | 'mixer';
+  // View switching (tracker vs arrangement vs DJ vs drum pads vs piano roll vs VJ vs studio)
+  activeView: 'tracker' | 'arrangement' | 'dj' | 'drumpad' | 'pianoroll' | 'vj' | 'mixer' | 'studio';
 
   // Pop-out window state
   tb303PoppedOut: boolean;
@@ -124,7 +124,7 @@ interface UIStore {
   setPlatterMass: (mass: number) => void;
 
   // View switching actions
-  setActiveView: (view: 'tracker' | 'arrangement' | 'dj' | 'drumpad' | 'pianoroll' | 'vj' | 'mixer') => void;
+  setActiveView: (view: 'tracker' | 'arrangement' | 'dj' | 'drumpad' | 'pianoroll' | 'vj' | 'mixer' | 'studio') => void;
   toggleActiveView: () => void;
 
   // Pop-out window actions
