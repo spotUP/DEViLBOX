@@ -11,7 +11,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Upload } from 'lucide-react';
-import { getSupportedExtensions } from '@lib/import/ModuleLoader';
+import { getFormatExtensions } from '@lib/import/FormatRegistry';
 
 interface GlobalDragDropHandlerProps {
   onFileLoaded: (file: File) => Promise<void>;
@@ -36,7 +36,7 @@ const SUPPORTED_EXTENSIONS = new Set([
   // Audio samples
   '.wav', '.mp3', '.ogg', '.flac', '.aiff', '.aif', '.m4a', '.iff', '.8svx',
   // All tracker/module formats (MOD, XM, IT, S3M, Furnace, HVL, UADE exotic, etc.)
-  ...getSupportedExtensions(),
+  ...getFormatExtensions(),
 ]);
 
 function isSupportedFile(filename: string): boolean {
