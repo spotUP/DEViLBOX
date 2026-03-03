@@ -121,7 +121,7 @@ export const PixiGTSIDMonitor: React.FC<Props> = ({ width, height, sidIndex = 0 
       if (ctrl & 0x40) wave.push('█');  // Pulse
       if (ctrl & 0x80) wave.push('~');  // Noise
       const gate = ctrl & 0x01 ? '●' : '○';
-      labels.push({ x: 145, y - VOICE_REGS.length * LINE_H + LINE_H * 4, text: `${gate} ${wave.join(' ')}`, color: C_CTRL, fontFamily: ff });
+      labels.push({ x: 145, y: y - VOICE_REGS.length * LINE_H + LINE_H * 4, text: `${gate} ${wave.join(' ')}`, color: C_CTRL, fontFamily: ff });
 
       y += 2;
     }
