@@ -74,7 +74,7 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
           <button
             onClick={() => {
               setFileSource('demo');
-              setSelectedFile(null);
+              nav.setSelectedFile(null);
             }}
             className={`flex items-center gap-2 px-4 py-2 text-sm font-medium transition-colors ${
               fileSource === 'demo'
@@ -87,12 +87,12 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
           </button>
 
           {/* Cloud Files Tab - only shown when logged in */}
-          {user && isServerAvailable && (
+          {nav.user && nav.isServerAvailable && (
             <button
               onClick={() => {
                 setFileSource('cloud');
-                setSelectedFile(null);
-                setCurrentPath('');
+                nav.setSelectedFile(null);
+                nav.setCurrentPath('');
               }}
               className={`flex items-center gap-2 px-4 py-2 text-sm font-medium transition-colors ${
                 fileSource === 'cloud'
@@ -110,7 +110,7 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
             <button
               onClick={() => {
                 setFileSource('modland');
-                setSelectedFile(null);
+                nav.setSelectedFile(null);
               }}
               className={`flex items-center gap-2 px-4 py-2 text-sm font-medium transition-colors ${
                 fileSource === 'modland'
@@ -128,8 +128,7 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
             <button
               onClick={() => {
                 setFileSource('hvsc');
-                setSelectedFile(null);
-                setHvscQuery('');
+                nav.setSelectedFile(null);
               }}
               className={`flex items-center gap-2 px-4 py-2 text-sm font-medium transition-colors ${
                 fileSource === 'hvsc'
@@ -148,7 +147,7 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
           {/* Browse Files button - opens native file picker */}
           {mode === 'load' && (
             <button
-              onClick={handleBrowseFiles}
+              onClick={nav.handleBrowseFiles}
               className="px-4 py-2 text-sm font-medium text-text-muted hover:text-text-primary transition-colors"
             >
               Browse Files...
@@ -158,515 +157,225 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
           {/* Open Folder button (when Web FS API available) */}
           {!hasElectronFS() && fileSource === 'demo' && (
             <button
-              onClick={handleRequestFilesystemAccess}
+              onClick={nav.handleRequestFilesystemAccess}
               className="px-4 py-2 text-sm font-medium text-text-muted hover:text-text-primary transition-colors"
             >
-              {hasFilesystemAccess ? 'Filesystem' : 'Open Folder...'}
+              {nav.hasFilesystemAccess ? 'Filesystem' : 'Open Folder...'}
             </button>
           )}
         </div>
 
-        {/* Breadcrumb / Current Path */}
-        {currentPath && fileSource === 'demo' && (
-          <div className="flex-shrink-0 px-4 py-2 bg-dark-bgTertiary border-b border-dark-border">
-            <div className="flex items-center gap-1.5 text-xs text-text-muted font-mono truncate">
-              <FolderOpen size={14} /> {currentPath}
-            </div>
-          </div>
-        )}
-
-        {/* Cloud Files Info */}
-        {fileSource === 'cloud' && user && (
-          <div className="flex-shrink-0 px-4 py-2 bg-accent-primary/10 border-b border-dark-border">
-            <div className="flex items-center gap-1.5 text-xs text-accent-primary">
-              <Cloud size={14} /> Your saved files ({cloudFiles.length})
-            </div>
-          </div>
-        )}
-
-        {/* Modland search bar */}
-        {fileSource === 'modland' && (
-          <div className="flex-shrink-0 px-4 py-2 bg-dark-bgTertiary border-b border-dark-border flex gap-2 items-center">
-            <div className="flex items-center gap-2 text-xs text-text-muted font-mono">
-              {modlandStatus?.status === 'ready' && (
-                <span>{modlandStatus.totalFiles.toLocaleString()} files</span>
-              )}
-              {modlandStatus?.status === 'indexing' && (
-                <span className="text-amber-400 flex items-center gap-1">
-                  <Loader2 size={10} className="animate-spin" /> Indexing...
-                </span>
-              )}
-            </div>
-            <div className="flex-1 relative">
-              <Search size={12} className="absolute left-2 top-1/2 -translate-y-1/2 text-text-muted" />
-              <input
-                ref={modlandSearchRef}
-                value={modlandQuery}
-                onChange={(e) => setModlandQuery(e.target.value)}
-                placeholder="Search modules..."
-                className="w-full pl-7 pr-2 py-1.5 text-xs font-mono bg-dark-bg border border-dark-borderLight
-                           rounded text-text-primary placeholder:text-text-muted/40
-                           focus:border-green-600 focus:outline-none transition-colors"
-              />
-            </div>
-            <select
-              value={modlandFormat}
-              onChange={(e) => setModlandFormat(e.target.value)}
-              className="px-2 py-1.5 text-[11px] font-mono bg-dark-bg border border-dark-borderLight
-                         rounded text-text-secondary cursor-pointer hover:bg-dark-bgHover transition-colors"
-            >
-              <option value="">All formats</option>
-              {modlandFormats.map((f) => (
-                <option key={f.format} value={f.format}>
-                  {f.format} ({f.count.toLocaleString()})
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
-
-        {/* HVSC search/browse bar */}
-        {fileSource === 'hvsc' && (
-          <div className="flex-shrink-0 px-4 py-2 bg-dark-bgTertiary border-b border-dark-border flex gap-2 items-center">
-            <div className="flex items-center gap-2 text-xs text-text-muted font-mono">
-              <FileAudio size={12} />
-              <span>80K+ SID tunes</span>
-            </div>
-            <div className="flex-1 relative">
-              <Search size={12} className="absolute left-2 top-1/2 -translate-y-1/2 text-text-muted" />
-              <input
-                ref={hvscSearchRef}
-                value={hvscQuery}
-                onChange={(e) => setHvscQuery(e.target.value)}
-                placeholder="Search composers, songs..."
-                className="w-full pl-7 pr-2 py-1.5 text-xs font-mono bg-dark-bg border border-dark-borderLight
-                           rounded text-text-primary placeholder:text-text-muted/40
-                           focus:border-blue-600 focus:outline-none transition-colors"
-              />
-            </div>
-            {hvscPath && (
-              <div className="text-xs text-text-muted font-mono truncate max-w-[200px]">
-                {hvscPath}
+        {/* Modland / HVSC panels render their own toolbar + content */}
+        {fileSource === 'modland' ? (
+          <ModlandPanel isOpen={isOpen} onLoadTrackerModule={onLoadTrackerModule} onClose={onClose} />
+        ) : fileSource === 'hvsc' ? (
+          <HVSCPanel isOpen={isOpen} onLoadTrackerModule={onLoadTrackerModule} onClose={onClose} />
+        ) : (
+          <>
+            {/* Breadcrumb / Current Path */}
+            {nav.currentPath && fileSource === 'demo' && (
+              <div className="flex-shrink-0 px-4 py-2 bg-dark-bgTertiary border-b border-dark-border">
+                <div className="flex items-center gap-1.5 text-xs text-text-muted font-mono truncate">
+                  <FolderOpen size={14} /> {nav.currentPath}
+                </div>
               </div>
             )}
-          </div>
-        )}
 
-        {/* File List */}
-        <div ref={fileListRef} className="flex-1 min-h-0 overflow-auto p-4">
-          {error && (
-            <div className="bg-red-900/30 border border-red-500 text-red-300 px-4 py-2 rounded mb-4 select-text">
-              {error}
-            </div>
-          )}
+            {/* Cloud Files Info */}
+            {fileSource === 'cloud' && nav.user && (
+              <div className="flex-shrink-0 px-4 py-2 bg-accent-primary/10 border-b border-dark-border">
+                <div className="flex items-center gap-1.5 text-xs text-accent-primary">
+                  <Cloud size={14} /> Your saved files ({nav.cloudFiles.length})
+                </div>
+              </div>
+            )}
 
-          {/* Modland results */}
-          {fileSource === 'modland' ? (
-            <div className="flex flex-col gap-1">
-              {modlandError && (
-                <div className="flex items-center gap-1.5 text-red-400 text-xs font-mono px-3 py-2 mb-2 bg-red-900/20 rounded border border-red-900/30">
-                  <AlertCircle size={12} />
-                  {modlandError}
+            {/* File List */}
+            <div ref={nav.fileListRef} className="flex-1 min-h-0 overflow-auto p-4">
+              {nav.error && (
+                <div className="bg-red-900/30 border border-red-500 text-red-300 px-4 py-2 rounded mb-4 select-text">
+                  {nav.error}
                 </div>
               )}
 
-              {modlandResults.length === 0 && !modlandLoading ? (
+              {nav.isLoading ? (
+                <div className="flex items-center justify-center py-16 text-text-muted">
+                  Loading...
+                </div>
+              ) : fileSource === 'cloud' && !nav.user ? (
+                // Cloud mode but not logged in
                 <div className="flex flex-col items-center justify-center py-16 text-text-muted">
-                  <Globe size={32} className="mb-3 opacity-40" />
-                  <p className="text-sm font-mono">
-                    {modlandQuery || modlandFormat ? 'No results found' : 'Search the modland archive'}
-                  </p>
-                  <p className="text-xs text-text-muted/60 mt-1">
-                    165K+ tracker modules from ftp.modland.com
-                  </p>
-                </div>
-              ) : (
-                <>
-                  {modlandResults.map((file) => (
-                    <div
-                      key={file.full_path}
-                      className="flex items-center gap-3 px-3 py-2 bg-dark-bgTertiary rounded border border-transparent
-                                 hover:bg-dark-bgHover hover:border-dark-border transition-colors group"
-                    >
-                      <FileAudio size={16} className="text-text-muted flex-shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <div className="text-text-primary text-sm font-mono truncate">
-                          {file.filename}
-                        </div>
-                        <div className="flex gap-3 text-xs text-text-muted">
-                          <span className="text-green-400/70">{file.format}</span>
-                          <span>{file.author}</span>
-                        </div>
-                      </div>
-
-                      {modlandDownloading.has(file.full_path) ? (
-                        <Loader2 size={14} className="animate-spin text-green-400 flex-shrink-0" />
-                      ) : (
-                        <button
-                          onClick={() => handleModlandLoad(file)}
-                          className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded
-                                     bg-green-900/30 text-green-400 border border-green-800/50
-                                     hover:bg-green-800/40 hover:text-green-300 transition-colors
-                                     opacity-0 group-hover:opacity-100 flex-shrink-0"
-                        >
-                          <Download size={12} />
-                          Load
-                        </button>
-                      )}
-                    </div>
-                  ))}
-
-                  {modlandHasMore && (
-                    <button
-                      onClick={modlandLoadMore}
-                      disabled={modlandLoading}
-                      className="mt-2 py-2 text-xs font-mono text-text-secondary bg-dark-bgTertiary
-                                 border border-dark-borderLight rounded hover:bg-dark-bgHover
-                                 hover:text-text-primary transition-colors disabled:opacity-50"
-                    >
-                      {modlandLoading ? (
-                        <span className="flex items-center justify-center gap-1">
-                          <Loader2 size={12} className="animate-spin" /> Loading...
-                        </span>
-                      ) : (
-                        'Load more results'
-                      )}
-                    </button>
-                  )}
-                </>
-              )}
-
-              {modlandLoading && modlandResults.length === 0 && (
-                <div className="flex items-center justify-center py-16">
-                  <Loader2 size={20} className="animate-spin text-green-400" />
-                </div>
-              )}
-            </div>
-          ) : fileSource === 'hvsc' ? (
-            <div className="flex flex-col gap-1">
-              {hvscError && (
-                <div className="flex items-center gap-1.5 text-red-400 text-xs font-mono px-3 py-2 mb-2 bg-red-900/20 rounded border border-red-900/30">
-                  <AlertCircle size={12} />
-                  {hvscError}
-                </div>
-              )}
-
-              {/* Show search results if searching, otherwise show browse entries */}
-              {hvscQuery ? (
-                // Search results
-                hvscSearchResults.length === 0 && !hvscLoading ? (
-                  <div className="flex flex-col items-center justify-center py-16 text-text-muted">
-                    <FileAudio size={32} className="mb-3 opacity-40" />
-                    <p className="text-sm font-mono">No results found</p>
-                  </div>
-                ) : (
-                  <div className="flex flex-col gap-1">
-                    {hvscSearchResults.map((entry) => (
-                      <div
-                        key={entry.path}
-                        className="flex items-center gap-3 px-3 py-2 bg-dark-bgTertiary rounded border border-transparent
-                                   hover:bg-dark-bgHover hover:border-dark-border transition-colors group cursor-pointer"
-                        onClick={() => entry.isDirectory ? browseHVSCDirectory(entry.path) : handleHVSCLoad(entry)}
-                      >
-                        {entry.isDirectory ? (
-                          <Folder size={16} className="text-blue-400 flex-shrink-0" />
-                        ) : (
-                          <FileAudio size={16} className="text-text-muted flex-shrink-0" />
-                        )}
-                        <div className="flex-1 min-w-0">
-                          <div className="text-text-primary text-sm font-mono truncate">
-                            {entry.name}
-                          </div>
-                          <div className="text-xs text-text-muted truncate">
-                            {entry.path}
-                          </div>
-                        </div>
-
-                        {!entry.isDirectory && (
-                          hvscDownloading.has(entry.path) ? (
-                            <Loader2 size={14} className="animate-spin text-blue-400 flex-shrink-0" />
-                          ) : (
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleHVSCLoad(entry);
-                              }}
-                              className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded
-                                         bg-blue-900/30 text-blue-400 border border-blue-800/50
-                                         hover:bg-blue-800/40 hover:text-blue-300 transition-colors
-                                         opacity-0 group-hover:opacity-100 flex-shrink-0"
-                            >
-                              <Download size={12} />
-                              Load
-                            </button>
-                          )
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )
-              ) : (
-                // Browse mode (featured or directory)
-                hvscEntries.length === 0 && !hvscLoading ? (
-                  <div className="flex flex-col items-center justify-center py-16 text-text-muted">
-                    <FileAudio size={32} className="mb-3 opacity-40" />
-                    <p className="text-sm font-mono">Browse the HVSC collection</p>
-                    <p className="text-xs text-text-muted/60 mt-1">
-                      80K+ C64 SID tunes
-                    </p>
-                  </div>
-                ) : (
-                  <div className="flex flex-col gap-1">
-                    {/* Back button for directories */}
-                    {hvscPath && (
-                      <div
-                        className="flex items-center gap-3 px-3 py-2 bg-dark-bgTertiary/50 rounded border border-dark-borderLight
-                                   hover:bg-dark-bgHover hover:border-dark-border transition-colors cursor-pointer"
-                        onClick={() => {
-                          const parentPath = hvscPath.split('/').slice(0, -1).join('/');
-                          browseHVSCDirectory(parentPath);
-                        }}
-                      >
-                        <ArrowLeft size={16} className="text-text-muted" />
-                        <span className="text-text-secondary text-sm font-mono">..(back)</span>
-                      </div>
-                    )}
-
-                    {hvscEntries.map((entry) => (
-                      <div
-                        key={entry.path}
-                        className="flex items-center gap-3 px-3 py-2 bg-dark-bgTertiary rounded border border-transparent
-                                   hover:bg-dark-bgHover hover:border-dark-border transition-colors group cursor-pointer"
-                        onClick={() => handleHVSCDirectoryClick(entry)}
-                      >
-                        {entry.isDirectory ? (
-                          <Folder size={16} className="text-blue-400 flex-shrink-0" />
-                        ) : (
-                          <FileAudio size={16} className="text-text-muted flex-shrink-0" />
-                        )}
-                        <div className="flex-1 min-w-0">
-                          <div className="text-text-primary text-sm font-mono truncate">
-                            {entry.name}
-                          </div>
-                          {entry.size && (
-                            <div className="text-xs text-text-muted">
-                              {(entry.size / 1024).toFixed(1)} KB
-                            </div>
-                          )}
-                        </div>
-
-                        {!entry.isDirectory && (
-                          hvscDownloading.has(entry.path) ? (
-                            <Loader2 size={14} className="animate-spin text-blue-400 flex-shrink-0" />
-                          ) : (
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleHVSCLoad(entry);
-                              }}
-                              className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded
-                                         bg-blue-900/30 text-blue-400 border border-blue-800/50
-                                         hover:bg-blue-800/40 hover:text-blue-300 transition-colors
-                                         opacity-0 group-hover:opacity-100 flex-shrink-0"
-                            >
-                              <Download size={12} />
-                              Load
-                            </button>
-                          )
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )
-              )}
-
-              {hvscLoading && (
-                <div className="flex items-center justify-center py-16">
-                  <Loader2 size={20} className="animate-spin text-blue-400" />
-                </div>
-              )}
-            </div>
-          ) : isLoading ? (
-            <div className="flex items-center justify-center py-16 text-text-muted">
-              Loading...
-            </div>
-          ) : fileSource === 'cloud' && !user ? (
-            // Cloud mode but not logged in
-            <div className="flex flex-col items-center justify-center py-16 text-text-muted">
-              <Cloud size={48} className="mb-4 text-text-muted/50" />
-              <p className="mb-2 text-lg font-medium">Sign in to save files</p>
-              <p className="mb-4 text-sm text-center max-w-md">
-                Create a free account to save your songs to the cloud and access them from any device.
-              </p>
-              <button
-                onClick={() => setFileSource('demo')}
-                className="px-4 py-2 text-text-muted hover:text-text-primary"
-              >
-                View Demo Files Instead
-              </button>
-            </div>
-          ) : files.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-16 text-text-muted">
-              {fileSource === 'cloud' ? (
-                <>
                   <Cloud size={48} className="mb-4 text-text-muted/50" />
-                  <p className="mb-2">No saved files yet</p>
-                  <p className="text-sm text-center max-w-md">
-                    {mode === 'save' 
-                      ? 'Enter a filename below and click Save to save your first file.'
-                      : 'Save a project first to see it here.'}
+                  <p className="mb-2 text-lg font-medium">Sign in to save files</p>
+                  <p className="mb-4 text-sm text-center max-w-md">
+                    Create a free account to save your songs to the cloud and access them from any device.
                   </p>
-                </>
-              ) : (
-                <>
-                  <p className="mb-4">No files found</p>
-                  {!hasElectronFS() && !hasServerFS && !hasFilesystemAccess && (
-                    <button
-                      onClick={handleRequestFilesystemAccess}
-                      className="px-4 py-2 bg-accent-primary text-white rounded hover:bg-accent-hover"
-                    >
-                      Open Folder
-                    </button>
-                  )}
-                </>
-              )}
-              {hasElectronFS() && !electronDirectory && fileSource === 'demo' && (
-                <button
-                  onClick={async () => {
-                    if (window.electron?.fs) {
-                      const dir = await window.electron.fs.openDirectory();
-                      if (dir) {
-                        setElectronDirectory(dir);
-                        setCurrentPath(dir);
-                        loadFiles();
-                      }
-                    }
-                  }}
-                  className="px-4 py-2 bg-accent-primary text-white rounded hover:bg-accent-hover"
-                >
-                  Select Folder
-                </button>
-              )}
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 gap-2">
-              {/* Back button when in subdirectory (not for cloud files) */}
-              {currentPath !== '' && fileSource === 'demo' && (
-                <div
-                  onClick={() => {
-                    if (hasElectronFS() && currentPath) {
-                      // Navigate to parent directory in Electron
-                      const parentPath = currentPath.split('/').slice(0, -1).join('/') || '/';
-                      setCurrentPath(parentPath);
-                      setElectronDirectory(parentPath);
-                    } else if (currentPath) {
-                      // Navigate to parent directory (server or manifest)
-                      const parentPath = currentPath.split('/').slice(0, -1).join('/') || '';
-                      setCurrentPath(parentPath);
-                    }
-                    setSelectedFile(null);
-                  }}
-                  data-file-row
-                  className="flex items-center gap-3 p-3 rounded cursor-pointer transition-colors bg-dark-bgSecondary hover:bg-dark-bgHover border border-dark-border"
-                >
-                  <ArrowLeft size={18} className="text-text-muted" />
-                  <div className="flex-1">
-                    <div className="font-medium text-text-primary">.. (back)</div>
-                  </div>
-                </div>
-              )}
-              {files.map((file) => (
-                <div
-                  key={file.id}
-                  data-file-row
-                  onClick={() => {
-                    // Directories: open on single tap (standard file browser behavior)
-                    if (file.isDirectory) {
-                      if (hasElectronFS()) {
-                        setCurrentPath(file.path);
-                        setElectronDirectory(file.path);
-                      } else {
-                        setCurrentPath(file.path);
-                      }
-                      setSelectedFile(null);
-                      return;
-                    }
-
-                    // Files: select on single tap, load on double tap
-                    const now = Date.now();
-                    const isDoubleTap = lastClickRef.current.id === file.id && (now - lastClickRef.current.time) < 500;
-                    
-                    if (isDoubleTap) {
-                      // Double tap on file: load it
-                      setSelectedFile(file);
-                      if (mode === 'load') handleLoad();
-                      // Reset to prevent triple-tap
-                      lastClickRef.current = { id: '', time: 0 };
-                      return;
-                    }
-
-                    // Single tap on file: select it
-                    lastClickRef.current = { id: file.id, time: now };
-                    setSelectedFile(file);
-                  }}
-                  className={`flex items-center gap-3 p-3 rounded cursor-pointer transition-colors ${
-                    selectedFile?.id === file.id
-                      ? 'bg-accent-primary/20 border border-accent-primary'
-                      : 'bg-dark-bgTertiary hover:bg-dark-bgHover border border-transparent'
-                  }`}
-                >
-                  <div className="text-text-muted flex-shrink-0">
-                    {file.isDirectory
-                      ? <Folder size={18} />
-                      : isTrackerModule(file.name)
-                        ? <FileAudio size={18} />
-                        : <File size={18} />}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="font-medium text-text-primary truncate">{file.name}</div>
-                    <div className="text-xs text-text-muted">
-                      {file.size ? `${(file.size / 1024).toFixed(1)} KB` : ''}
-                      {file.modifiedAt && ` • ${file.modifiedAt.toLocaleDateString()}`}
-                    </div>
-                  </div>
-                  {/* Version history button for cloud files */}
-                  {file.source === 'cloud' && file.cloudId && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        loadRevisions(file.cloudId!, file.name);
-                      }}
-                      className="text-text-muted hover:text-accent-primary p-1"
-                      title="Version History"
-                      aria-label="Version History"
-                    >
-                      <History size={14} />
-                    </button>
-                  )}
                   <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleDelete(file);
-                    }}
-                    className="text-text-muted hover:text-red-400 p-1"
-                    title="Delete"
-                    aria-label="Delete"
+                    onClick={() => setFileSource('demo')}
+                    className="px-4 py-2 text-text-muted hover:text-text-primary"
                   >
-                    <Trash2 size={14} />
+                    View Demo Files Instead
                   </button>
                 </div>
-              ))}
+              ) : nav.files.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-16 text-text-muted">
+                  {fileSource === 'cloud' ? (
+                    <>
+                      <Cloud size={48} className="mb-4 text-text-muted/50" />
+                      <p className="mb-2">No saved files yet</p>
+                      <p className="text-sm text-center max-w-md">
+                        {mode === 'save' 
+                          ? 'Enter a filename below and click Save to save your first file.'
+                          : 'Save a project first to see it here.'}
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <p className="mb-4">No files found</p>
+                      {!hasElectronFS() && !nav.hasServerFS && !nav.hasFilesystemAccess && (
+                        <button
+                          onClick={nav.handleRequestFilesystemAccess}
+                          className="px-4 py-2 bg-accent-primary text-white rounded hover:bg-accent-hover"
+                        >
+                          Open Folder
+                        </button>
+                      )}
+                    </>
+                  )}
+                  {hasElectronFS() && !nav.electronDirectory && fileSource === 'demo' && (
+                    <button
+                      onClick={async () => {
+                        if (window.electron?.fs) {
+                          const dir = await window.electron.fs.openDirectory();
+                          if (dir) {
+                            nav.setElectronDirectory(dir);
+                            nav.setCurrentPath(dir);
+                            nav.loadFiles();
+                          }
+                        }
+                      }}
+                      className="px-4 py-2 bg-accent-primary text-white rounded hover:bg-accent-hover"
+                    >
+                      Select Folder
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 gap-2">
+                  {/* Back button when in subdirectory (not for cloud files) */}
+                  {nav.currentPath !== '' && fileSource === 'demo' && (
+                    <div
+                      onClick={() => {
+                        if (hasElectronFS() && nav.currentPath) {
+                          const parentPath = nav.currentPath.split('/').slice(0, -1).join('/') || '/';
+                          nav.setCurrentPath(parentPath);
+                          nav.setElectronDirectory(parentPath);
+                        } else if (nav.currentPath) {
+                          const parentPath = nav.currentPath.split('/').slice(0, -1).join('/') || '';
+                          nav.setCurrentPath(parentPath);
+                        }
+                        nav.setSelectedFile(null);
+                      }}
+                      data-file-row
+                      className="flex items-center gap-3 p-3 rounded cursor-pointer transition-colors bg-dark-bgSecondary hover:bg-dark-bgHover border border-dark-border"
+                    >
+                      <ArrowLeft size={18} className="text-text-muted" />
+                      <div className="flex-1">
+                        <div className="font-medium text-text-primary">.. (back)</div>
+                      </div>
+                    </div>
+                  )}
+                  {nav.files.map((file) => (
+                    <div
+                      key={file.id}
+                      data-file-row
+                      onClick={() => {
+                        // Directories: open on single tap (standard file browser behavior)
+                        if (file.isDirectory) {
+                          if (hasElectronFS()) {
+                            nav.setCurrentPath(file.path);
+                            nav.setElectronDirectory(file.path);
+                          } else {
+                            nav.setCurrentPath(file.path);
+                          }
+                          nav.setSelectedFile(null);
+                          return;
+                        }
+
+                        // Files: select on single tap, load on double tap
+                        const now = Date.now();
+                        const isDoubleTap = nav.lastClickRef.current.id === file.id && (now - nav.lastClickRef.current.time) < 500;
+                        
+                        if (isDoubleTap) {
+                          nav.setSelectedFile(file);
+                          if (mode === 'load') nav.handleLoad();
+                          nav.lastClickRef.current = { id: '', time: 0 };
+                          return;
+                        }
+
+                        nav.lastClickRef.current = { id: file.id, time: now };
+                        nav.setSelectedFile(file);
+                      }}
+                      className={`flex items-center gap-3 p-3 rounded cursor-pointer transition-colors ${
+                        nav.selectedFile?.id === file.id
+                          ? 'bg-accent-primary/20 border border-accent-primary'
+                          : 'bg-dark-bgTertiary hover:bg-dark-bgHover border border-transparent'
+                      }`}
+                    >
+                      <div className="text-text-muted flex-shrink-0">
+                        {file.isDirectory
+                          ? <Folder size={18} />
+                          : isTrackerModule(file.name)
+                            ? <FileAudio size={18} />
+                            : <File size={18} />}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium text-text-primary truncate">{file.name}</div>
+                        <div className="text-xs text-text-muted">
+                          {file.size ? `${(file.size / 1024).toFixed(1)} KB` : ''}
+                          {file.modifiedAt && ` • ${file.modifiedAt.toLocaleDateString()}`}
+                        </div>
+                      </div>
+                      {/* Version history button for cloud files */}
+                      {file.source === 'cloud' && file.cloudId && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            nav.loadRevisions(file.cloudId!, file.name);
+                          }}
+                          className="text-text-muted hover:text-accent-primary p-1"
+                          title="Version History"
+                          aria-label="Version History"
+                        >
+                          <History size={14} />
+                        </button>
+                      )}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          nav.handleDelete(file);
+                        }}
+                        className="text-text-muted hover:text-red-400 p-1"
+                        title="Delete"
+                        aria-label="Delete"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
-          )}
-        </div>
+          </>
+        )}
 
         {/* Footer */}
         <div className="flex-shrink-0 flex items-center gap-4 px-4 py-3 border-t border-dark-border">
           {mode === 'save' && fileSource !== 'modland' && (
             <input
               type="text"
-              value={saveFilename}
-              onChange={(e) => setSaveFilename(e.target.value)}
+              value={nav.saveFilename}
+              onChange={(e) => nav.setSaveFilename(e.target.value)}
               placeholder="Filename"
               className="flex-1 px-3 py-2 bg-dark-bgTertiary border border-dark-border rounded text-text-primary"
             />
@@ -680,10 +389,10 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
           </button>
           {fileSource !== 'modland' && fileSource !== 'hvsc' && (
             <button
-              onClick={mode === 'load' ? handleLoad : handleSave}
-              disabled={mode === 'load' && (!selectedFile || selectedFile.isDirectory)}
+              onClick={mode === 'load' ? nav.handleLoad : nav.handleSave}
+              disabled={mode === 'load' && (!nav.selectedFile || nav.selectedFile.isDirectory)}
               className={`flex items-center gap-2 px-6 py-2 rounded font-medium ${
-                (mode === 'load' && (!selectedFile || selectedFile.isDirectory))
+                (mode === 'load' && (!nav.selectedFile || nav.selectedFile.isDirectory))
                   ? 'bg-dark-bgTertiary text-text-muted cursor-not-allowed'
                   : 'bg-accent-primary text-white hover:bg-accent-primaryHover'
               }`}
@@ -696,7 +405,7 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
       </div>
 
       {/* Version History Modal */}
-      {showRevisions && (
+      {nav.showRevisions && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[60]">
           <div className="bg-dark-bgPrimary border border-dark-border rounded-lg w-[400px] h-[500px] max-h-[80vh] flex flex-col">
             {/* Header */}
@@ -706,11 +415,7 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
                 <span className="font-semibold text-text-primary">Version History</span>
               </div>
               <button
-                onClick={() => {
-                  setShowRevisions(false);
-                  setRevisions([]);
-                  setRevisionsFileId(null);
-                }}
+                onClick={nav.closeRevisions}
                 className="text-text-muted hover:text-text-primary"
               >
                 <X size={18} />
@@ -720,16 +425,16 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
             {/* File info */}
             <div className="flex-shrink-0 px-4 py-2 bg-dark-bgSecondary border-b border-dark-border">
               <span className="text-sm text-text-muted">File: </span>
-              <span className="text-sm text-text-primary font-medium">{revisionsFilename}</span>
+              <span className="text-sm text-text-primary font-medium">{nav.revisionsFilename}</span>
             </div>
 
             {/* Revision list */}
             <div className="flex-1 min-h-0 overflow-y-auto p-4">
-              {revisionsLoading ? (
+              {nav.revisionsLoading ? (
                 <div className="flex items-center justify-center py-8">
                   <div className="animate-spin w-6 h-6 border-2 border-accent-primary border-t-transparent rounded-full" />
                 </div>
-              ) : revisions.length === 0 ? (
+              ) : nav.revisions.length === 0 ? (
                 <div className="text-center py-8 text-text-muted">
                   No previous versions available.
                   <br />
@@ -737,7 +442,7 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
                 </div>
               ) : (
                 <div className="space-y-2">
-                  {revisions.map((rev) => (
+                  {nav.revisions.map((rev) => (
                     <div
                       key={rev.id}
                       className="flex items-center justify-between p-3 bg-dark-bgTertiary rounded border border-dark-border"
@@ -751,8 +456,8 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
                         </div>
                       </div>
                       <button
-                        onClick={() => handleRestoreRevision(rev.revisionNumber)}
-                        disabled={revisionsLoading}
+                        onClick={() => nav.handleRestoreRevision(rev.revisionNumber)}
+                        disabled={nav.revisionsLoading}
                         className="flex items-center gap-1 px-3 py-1.5 bg-accent-primary/20 text-accent-primary hover:bg-accent-primary/30 rounded text-sm font-medium disabled:opacity-50"
                       >
                         <RotateCcw size={14} />

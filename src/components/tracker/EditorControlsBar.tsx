@@ -8,7 +8,7 @@
  * Extracted from TrackerView.tsx to be reusable in both DOM and GL modes.
  */
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { useTrackerStore, useTransportStore, useAudioStore, useUIStore } from '@stores';
 import { useShallow } from 'zustand/react/shallow';
 import { useFPSMonitor } from '@hooks/useFPSMonitor';
@@ -78,11 +78,21 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
   const masterMuted = useAudioStore(s => s.masterMuted);
   const statusMessage = useUIStore(s => s.statusMessage);
   const setActiveView = useUIStore(s => s.setActiveView);
+  const dialogOpen = useUIStore(s => s.dialogOpen);
+  const closeDialogCommand = useUIStore(s => s.closeDialogCommand);
 
   const fps = useFPSMonitor();
 
   // ── Local state ──────────────────────────────────────────────────────────
   const [showGrooveSettings, setShowGrooveSettings] = useState(false);
+
+  // Handle groove-settings dialog command from keyboard shortcuts
+  useEffect(() => {
+    if (dialogOpen === 'groove-settings') {
+      setShowGrooveSettings(true);
+      closeDialogCommand();
+    }
+  }, [dialogOpen, closeDialogCommand]);
 
   // ── Grouped hardware presets ─────────────────────────────────────────────
   const groupedPresets = React.useMemo(() => getGroupedPresets(), []);

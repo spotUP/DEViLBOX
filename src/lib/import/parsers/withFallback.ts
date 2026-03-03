@@ -1,0 +1,98 @@
+/**
+ * withFallback — DRY helper for the native→UADE fallback pattern
+ *
+ * Eliminates 130+ copy-paste blocks in AmigaFormatParsers.ts where each
+ * format checks user prefs, tries a native parser, and falls back to UADE.
+ *
+ * Three dispatch modes:
+ *   - nativeDefault: native parser is default; UADE only if user selects it
+ *   - uadeDefault:   UADE is default; native only if user selects 'native'
+ *   - nativeOnly:    always use native parser (no UADE fallback)
+ */
+
+import type { TrackerSong } from '@/engine/TrackerReplayer';
+import type { UADEMetadata } from '@/engine/uade/UADEEngine';
+import type { FormatEnginePreferences } from '@/stores/useSettingsStore';
+
+/** Common context passed through all fallback helpers */
+export interface FallbackContext {
+  buffer: ArrayBuffer;
+  originalFileName: string;
+  prefs: FormatEnginePreferences;
+  subsong: number;
+  preScannedMeta?: UADEMetadata;
+}
+
+type NativeParser = (buffer: ArrayBuffer, filename: string) => Promise<TrackerSong> | TrackerSong;
+type NativeParserWithBytes = (bytes: Uint8Array, filename: string) => Promise<TrackerSong | null> | TrackerSong | null;
+
+/** Call UADE as fallback */
+async function callUADE(ctx: FallbackContext): Promise<TrackerSong> {
+  const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
+  return parseUADEFile(
+    ctx.buffer, ctx.originalFileName,
+    ctx.prefs.uade ?? 'enhanced', ctx.subsong, ctx.preScannedMeta,
+  );
+}
+
+/**
+ * Format where native parser is the DEFAULT (most common: HVL, OKT, MED, DIGI).
+ * If user sets pref to 'uade', uses UADE instead.
+ */
+export async function withNativeDefault(
+  prefKey: keyof FormatEnginePreferences,
+  ctx: FallbackContext,
+  nativeParse: NativeParser,
+): Promise<TrackerSong> {
+  if (ctx.prefs[prefKey] === 'uade') return callUADE(ctx);
+  return nativeParse(ctx.buffer, ctx.originalFileName);
+}
+
+/**
+ * Format where UADE is the default; native parser used only when user
+ * explicitly selects 'native'. On native failure, falls back to UADE.
+ * Includes optional magic-byte detection via `isFormat` predicate.
+ */
+export async function withNativeThenUADE(
+  prefKey: keyof FormatEnginePreferences,
+  ctx: FallbackContext,
+  nativeParse: NativeParser | NativeParserWithBytes,
+  parserName: string,
+  opts?: {
+    isFormat?: (bytes: Uint8Array) => boolean;
+    usesBytes?: boolean;
+  },
+): Promise<TrackerSong> {
+  if (ctx.prefs[prefKey] === 'native') {
+    try {
+      const bytes = (opts?.usesBytes || opts?.isFormat) ? new Uint8Array(ctx.buffer) : undefined;
+      if (opts?.isFormat && bytes && !opts.isFormat(bytes)) {
+        // Magic bytes don't match — skip native, go to UADE
+        return callUADE(ctx);
+      }
+      const input = (opts?.usesBytes || opts?.isFormat) ? bytes! : ctx.buffer;
+      const result = await (nativeParse as NativeParserWithBytes)(input as any, ctx.originalFileName);
+      if (result) return result;
+    } catch (err) {
+      console.warn(`[${parserName}] Native parse failed for ${ctx.originalFileName}, falling back to UADE:`, err);
+    }
+  }
+  return callUADE(ctx);
+}
+
+/**
+ * Format that is native-only (no UADE fallback). Throws on failure.
+ */
+export async function withNativeOnly(
+  ctx: FallbackContext,
+  nativeParse: NativeParser,
+): Promise<TrackerSong> {
+  return nativeParse(ctx.buffer, ctx.originalFileName);
+}
+
+/**
+ * Convenience: extract basename from a potentially path-containing filename.
+ */
+export function getBasename(filename: string): string {
+  return (filename.split('/').pop() ?? filename).split('\\').pop()!.toLowerCase();
+}
