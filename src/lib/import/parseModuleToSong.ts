@@ -505,7 +505,13 @@ export async function parseModuleToSong(file: File, subsong = 0, preScannedMeta?
     // First check if it's C64 SID (PSID/RSID magic at offset 0)
     const { isSIDFormat, parseSIDFile } = await import('@lib/import/formats/SIDParser');
     if (isSIDFormat(buffer)) {
-      return parseSIDFile(buffer, file.name);
+      try {
+        return parseSIDFile(buffer, file.name);
+      } catch (err) {
+        console.warn(`[SIDParser] C64 SID parse failed for ${filename}, falling back to UADE:`, err);
+        const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
+        return parseUADEFile(buffer, file.name, prefs.uade ?? 'enhanced', subsong, preScannedMeta);
+      }
     }
     
     // Not C64 SID — try SidMon 1.0 (if not disabled)

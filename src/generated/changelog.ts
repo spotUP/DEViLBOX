@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-03-02T22:46:29.085Z
+ * Generated: 2026-03-02T23:55:33.710Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.1989';
-export const BUILD_NUMBER = '1989';
-export const BUILD_HASH = 'c396c1ef';
+export const BUILD_VERSION = '1.0.1994';
+export const BUILD_NUMBER = '1994';
+export const BUILD_HASH = 'a6fe6c9f';
 export const BUILD_DATE = '2026-03-02';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,35 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.1989',
+    version: '1.0.1994',
+    date: '2026-03-03',
+    changes: [
+      {
+        type: 'fix',
+        "description": "Fix .mus file format collision (Karl Morton vs UFO/MicroProse)"
+      },
+      {
+        type: 'fix',
+        "description": "Fix .sid file format detection (C64 vs SidMon1 Amiga)"
+      }
+    ]
+  },
+  {
+    version: '2026-03-02',
     date: '2026-03-02',
     changes: [
+      {
+        type: 'improvement',
+        "description": "Update status doc with dismissal feature"
+      },
+      {
+        type: 'feature',
+        "description": "Add 'Don't show again' option to Modland contribution modal"
+      },
+      {
+        type: 'feature',
+        "description": "Implement Modland pattern hash computation (FNV-1a)"
+      },
       {
         type: 'improvement',
         "description": "Add Modland pattern hash algorithm implementation"
@@ -212,26 +238,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         "description": "Resolve 14 TypeScript errors across pixi views"
-      },
-      {
-        type: 'feature',
-        "description": "Cmd+J consolidation, MIDI recording, and chord detection in piano roll"
-      },
-      {
-        type: 'feature',
-        "description": "Implement full XM instrument/sample writing in XMExporter"
-      },
-      {
-        type: 'fix',
-        "description": "Use logarithmic toDb conversion for perceptually correct fader taper"
-      },
-      {
-        type: 'fix',
-        "description": "Correct instrument numbers and speed detection in pattern reconstructor"
-      },
-      {
-        type: 'feature',
-        "description": "Add interactive volume/pan faders to track headers"
       }
     ]
   }

@@ -541,6 +541,13 @@ function App() {
 
   // WebGL render mode — render PixiJS UI instead of DOM
   const renderMode = useSettingsStore(state => state.renderMode);
+
+  // Extract hook calls that appear in the webgl branch JSX — must be called
+  // unconditionally to satisfy React's rules of hooks (same count every render).
+  const modlandIsOpen = useModlandContributionModal((s) => s.isOpen);
+  const modlandFilename = useModlandContributionModal((s) => s.filename);
+  const modlandHash = useModlandContributionModal((s) => s.hash);
+
   if (renderMode === 'webgl') {
     return (
       <Suspense fallback={
@@ -554,12 +561,12 @@ function App() {
           <ToastNotification />
           <SynthErrorDialog />
           <RomUploadDialog />
-          <ModlandContributionModal 
-            isOpen={useModlandContributionModal((s) => s.isOpen)}
+          <ModlandContributionModal
+            isOpen={modlandIsOpen}
             onClose={() => useModlandContributionModal.getState().closeModal()}
             onDismiss={() => useModlandContributionModal.getState().dismissForFile()}
-            filename={useModlandContributionModal((s) => s.filename)}
-            hash={useModlandContributionModal((s) => s.hash)}
+            filename={modlandFilename}
+            hash={modlandHash}
           />
           {isDevServerDown && <DevServerDownBanner />}
           {updateAvailable && !updateDismissed && (
