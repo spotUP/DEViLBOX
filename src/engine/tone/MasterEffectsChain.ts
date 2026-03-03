@@ -1,0 +1,356 @@
+import * as Tone from 'tone';
+import type { EffectConfig } from '@typedefs/instrument';
+import { InstrumentFactory } from '../InstrumentFactory';
+import { getNativeAudioNode } from '@utils/audio-context';
+
+export interface MasterEffectsContext {
+  masterEffectsInput: Tone.Gain;
+  blepInput: Tone.Gain;
+  masterEffectsNodes: Tone.ToneAudioNode[];
+  masterEffectConfigs: Map<string, { node: Tone.ToneAudioNode; config: EffectConfig }>;
+  masterEffectAnalysers: Map<string, { pre: AnalyserNode; post: AnalyserNode }>;
+  masterEffectsRebuildVersion: number;
+  _isPlaying: boolean;
+  _notifyNoiseEffectsPlaying: (playing: boolean) => void;
+  applyEffectParametersDiff: (node: Tone.ToneAudioNode, type: string, changed: Record<string, number | string>) => void;
+  updateBpmSyncedEffects: (bpm: number) => Promise<void>;
+}
+
+/**
+ * Rebuild entire master effects chain from config array (now async for neural effects)
+ * Called when effects are added, removed, or reordered
+ */
+export async function rebuildMasterEffects(ctx: MasterEffectsContext, effects: EffectConfig[]): Promise<void> {
+  // Fast path: if only parameters changed (no add/remove/reorder), just update params
+  if (canUseParameterUpdatePath(ctx, effects)) {
+    updateEffectParameters(ctx, effects);
+    return;
+  }
+
+  // Version guard: if another rebuild starts while we're async, abort this one
+  const myVersion = ++ctx.masterEffectsRebuildVersion;
+  // Debug log only (verbose in StrictMode due to double-invocation)
+  // console.log('[ToneEngine] rebuildMasterEffects v' + myVersion + ', effects:', effects.map(e => `${e.type}(${e.id})`));
+
+  // Deep clone effects to avoid Immer proxy revocation issues during async operations
+  const effectsCopy = structuredClone(effects) as EffectConfig[];
+
+  // Disconnect masterEffectsInput output (preserves upstream connections from amigaFilter & synthBus)
+  ctx.masterEffectsInput.disconnect();
+  ctx.masterEffectsNodes.forEach((node) => {
+    try {
+      node.disconnect();
+      node.dispose();
+    } catch {
+      // Node may already be disposed
+    }
+  });
+  ctx.masterEffectsNodes = [];
+  ctx.masterEffectConfigs.clear();
+  // Disconnect and clear analyser taps
+  ctx.masterEffectAnalysers.forEach(({ pre, post }) => {
+    try { pre.disconnect(); } catch { /* */ }
+    try { post.disconnect(); } catch { /* */ }
+  });
+  ctx.masterEffectAnalysers.clear();
+
+  // Filter to only enabled effects
+  const enabledEffects = effectsCopy.filter((fx) => fx.enabled);
+
+  if (enabledEffects.length === 0) {
+    // No effects - direct connection to BLEP input (which routes to masterChannel)
+    ctx.masterEffectsInput.connect(ctx.blepInput);
+    return;
+  }
+
+  // Ensure AudioContext is running before creating worklet-based effects (BitCrusher, etc.)
+  if (Tone.getContext().state === 'suspended') {
+    try { await Tone.start(); } catch { /* user gesture required */ }
+  }
+
+  // Check if a newer rebuild superseded us
+  if (myVersion !== ctx.masterEffectsRebuildVersion) {
+    // Debug: console.log('[ToneEngine] rebuildMasterEffects v' + myVersion + ' aborted (superseded by v' + ctx.masterEffectsRebuildVersion + ')');
+    return;
+  }
+
+  // Create effect nodes individually — skip any that fail (e.g. worklet on suspended context)
+  const successNodes: Tone.ToneAudioNode[] = [];
+  const successConfigs: EffectConfig[] = [];
+  for (const config of enabledEffects) {
+    try {
+      const node = await InstrumentFactory.createEffect(config) as Tone.ToneAudioNode;
+      // Check again after each async operation
+      if (myVersion !== ctx.masterEffectsRebuildVersion) {
+        // Debug: console.log('[ToneEngine] rebuildMasterEffects v' + myVersion + ' aborted mid-create');
+        // Dispose the node we just created since we're aborting
+        try { node.disconnect(); node.dispose(); } catch { /* */ }
+        // Dispose any previously created nodes in this batch
+        successNodes.forEach(n => { try { n.disconnect(); n.dispose(); } catch { /* */ } });
+        return;
+      }
+      successNodes.push(node);
+      successConfigs.push(config);
+    } catch (error) {
+      console.warn(`[ToneEngine] Failed to create effect ${config.type}, skipping:`, error);
+    }
+  }
+
+  // Final version check before connecting
+  if (myVersion !== ctx.masterEffectsRebuildVersion) {
+    // Debug: console.log('[ToneEngine] rebuildMasterEffects v' + myVersion + ' aborted before connect');
+    successNodes.forEach(n => { try { n.disconnect(); n.dispose(); } catch { /* */ } });
+    return;
+  }
+
+  if (successNodes.length === 0) {
+    // All effects failed — direct connection to BLEP input
+    ctx.masterEffectsInput.connect(ctx.blepInput);
+    return;
+  }
+
+  // Store nodes and configs
+  successNodes.forEach((node, index) => {
+    ctx.masterEffectsNodes.push(node);
+    ctx.masterEffectConfigs.set(successConfigs[index].id, { node, config: successConfigs[index] });
+  });
+
+  // Connect chain: masterEffectsInput → effects[0] → effects[n] → blepInput → [BLEP?] → masterChannel
+  // Both tracker audio (via amigaFilter) and synth audio (via synthBus) feed masterEffectsInput
+  ctx.masterEffectsInput.connect(ctx.masterEffectsNodes[0]);
+
+  for (let i = 0; i < ctx.masterEffectsNodes.length - 1; i++) {
+    ctx.masterEffectsNodes[i].connect(ctx.masterEffectsNodes[i + 1]);
+  }
+
+  ctx.masterEffectsNodes[ctx.masterEffectsNodes.length - 1].connect(ctx.blepInput);
+  // Debug: Success
+  // console.log('[ToneEngine] rebuildMasterEffects v' + myVersion + ' connected chain OK, nodes:',
+  //   ctx.masterEffectsNodes.map(n => n?.name || n?.constructor?.name).join(' → '));
+
+  // Create pre/post AnalyserNode taps for each effect (side-branch, non-destructive)
+  const rawCtx = Tone.getContext().rawContext as AudioContext;
+  for (let i = 0; i < successNodes.length; i++) {
+    const config = successConfigs[i];
+
+    const pre = rawCtx.createAnalyser();
+    pre.fftSize = 2048;
+    pre.smoothingTimeConstant = 0.8;
+
+    const post = rawCtx.createAnalyser();
+    post.fftSize = 2048;
+    post.smoothingTimeConstant = 0.8;
+
+    // Pre-tap: tap the signal feeding into effect[i]
+    // For effect[0]: source is masterEffectsInput; for others: source is the OUTPUT of the previous effect
+    const preSourceToneNode = i === 0
+      ? ctx.masterEffectsInput
+      : successNodes[i - 1];
+    const preOutputNode = i === 0
+      ? undefined
+      : (successNodes[i - 1] as unknown as { output?: unknown }).output;
+    const preNative = preOutputNode
+      ? getNativeAudioNode(preOutputNode)
+      : getNativeAudioNode(preSourceToneNode);
+    if (preNative) {
+      try { preNative.connect(pre); } catch (e) {
+        // Non-fatal: analyser just won't show data for this effect
+        console.debug('[ToneEngine] Pre-analyser tap failed for effect', config.id, e);
+      }
+    } else {
+      // Some effect types don't expose their internal AudioNode — analyser won't display
+      console.debug('[ToneEngine] Pre-analyser: could not get native node for effect', config.id);
+    }
+
+    // Post-tap: tap the output of effect[i]
+    const postOutputNode = (successNodes[i] as unknown as { output?: unknown }).output;
+    const postNative = postOutputNode
+      ? getNativeAudioNode(postOutputNode)
+      : getNativeAudioNode(successNodes[i]);
+    if (postNative) {
+      try { postNative.connect(post); } catch (e) {
+        console.debug('[ToneEngine] Post-analyser tap failed for effect', config.id, e);
+      }
+    } else {
+      console.debug('[ToneEngine] Post-analyser: could not get native node for effect', config.id);
+    }
+
+    ctx.masterEffectAnalysers.set(config.id, { pre, post });
+  }
+
+  // Sync playback state into freshly created noise-generating nodes
+  ctx._notifyNoiseEffectsPlaying(ctx._isPlaying);
+}
+
+export function canUseParameterUpdatePath(ctx: MasterEffectsContext, newEffects: EffectConfig[]): boolean {
+  // Filter to enabled effects (like rebuild does)
+  const enabledNew = newEffects.filter((fx) => fx.enabled);
+  const currentIds = Array.from(ctx.masterEffectConfigs.keys());
+
+  // Different number of effects - need full rebuild
+  if (enabledNew.length !== currentIds.length) {
+    return false;
+  }
+
+  // Check if IDs and order match
+  for (let i = 0; i < enabledNew.length; i++) {
+    if (enabledNew[i].id !== currentIds[i]) {
+      return false; // Order changed or different effect
+    }
+
+    const current = ctx.masterEffectConfigs.get(currentIds[i]);
+    if (!current) return false;
+
+    // Type changed - need rebuild
+    if (enabledNew[i].type !== current.config.type) {
+      return false;
+    }
+  }
+
+  return true; // Only parameters changed - safe for fast path
+}
+
+/**
+ * Update effect parameters without rebuilding the chain (fast path).
+ */
+export function updateEffectParameters(ctx: MasterEffectsContext, newEffects: EffectConfig[]): void {
+  const enabledNew = newEffects.filter((fx) => fx.enabled);
+
+  for (const newConfig of enabledNew) {
+    const existing = ctx.masterEffectConfigs.get(newConfig.id);
+    if (!existing) continue;
+
+    // Update parameters on the existing node
+    Object.entries(newConfig.parameters || {}).forEach(([key, value]) => {
+      if (key in existing.node) {
+        const nodeAny = existing.node as any;
+        // Handle Tone.js Signal/Param types
+        if (nodeAny[key]?.value !== undefined) {
+          nodeAny[key].value = value;
+        } else {
+          nodeAny[key] = value;
+        }
+      }
+    });
+
+    // Update enabled state (bypass)
+    if ('wet' in existing.node) {
+      (existing.node as any).wet.value = newConfig.enabled ? 1 : 0;
+    }
+
+    // Update stored config
+    existing.config = newConfig;
+  }
+}
+
+/**
+ * Get the audio node for a master effect by ID (used by WAM GUI rendering)
+ */
+export function getMasterEffectNode(ctx: MasterEffectsContext, effectId: string): Tone.ToneAudioNode | null {
+  return ctx.masterEffectConfigs.get(effectId)?.node ?? null;
+}
+
+/**
+ * Returns the pre/post AnalyserNodes for a master effect by ID.
+ * Pre-analyser receives the signal before the effect; post receives after.
+ * Returns null if the effect ID is not found (effect disabled or not yet built).
+ */
+export function getMasterEffectAnalysers(ctx: MasterEffectsContext, id: string): { pre: AnalyserNode; post: AnalyserNode } | null {
+  return ctx.masterEffectAnalysers.get(id) ?? null;
+}
+
+/**
+ * Update parameters for a single master effect
+ * Called when effect parameters change (wet, specific params)
+ */
+export function updateMasterEffectParams(ctx: MasterEffectsContext, effectId: string, config: EffectConfig): void {
+  const effectData = ctx.masterEffectConfigs.get(effectId);
+  if (!effectData) {
+    console.warn('[ToneEngine] Effect not found for update:', effectId, 'available:', [...ctx.masterEffectConfigs.keys()]);
+    return;
+  }
+
+  const { node, config: prevConfig } = effectData;
+
+  try {
+    // Only update wet if it actually changed
+    if (config.wet !== prevConfig.wet) {
+      const wetValue = config.wet / 100;
+      if ('wet' in node && node.wet instanceof Tone.Signal) {
+        node.wet.rampTo(wetValue, 0.02);
+      } else if ('wet' in node && typeof (node as Record<string, unknown>).wet === 'number') {
+        // Custom WASM effects (MoogFilter, MVerb, Leslie, SpringReverb) use a plain setter
+        (node as Record<string, unknown>).wet = wetValue;
+      }
+    }
+
+    // Compute which parameters actually changed
+    const changedParams: Record<string, number | string> = {};
+    for (const [key, value] of Object.entries(config.parameters)) {
+      if (prevConfig.parameters[key] !== value) {
+        changedParams[key] = value;
+      }
+    }
+
+    // Only apply effect params if something actually changed
+    if (Object.keys(changedParams).length > 0) {
+      ctx.applyEffectParametersDiff(node, config.type, changedParams);
+
+      // If bpmSync or syncDivision changed, immediately recompute synced params
+      if ('bpmSync' in changedParams || 'syncDivision' in changedParams) {
+        const currentBpm = Tone.getTransport().bpm.value;
+        ctx.updateBpmSyncedEffects(currentBpm).catch(() => {});
+      }
+    }
+
+    // Update stored config
+    effectData.config = config;
+
+  } catch (error) {
+    console.error('[ToneEngine] Failed to update effect params:', error);
+  }
+}
+
+/**
+ * Update parameters for a per-instrument effect in real-time
+ */
+export function updateInstrumentEffectParams(
+  instrumentEffectNodes: Map<string, { node: Tone.ToneAudioNode; config: EffectConfig }>,
+  applyDiff: (node: Tone.ToneAudioNode, type: string, changed: Record<string, number | string>) => void,
+  effectId: string,
+  config: EffectConfig
+): void {
+  const effectData = instrumentEffectNodes.get(effectId);
+  if (!effectData) return; // Effect not in active chain
+
+  const { node, config: prevConfig } = effectData;
+
+  try {
+    // Only update wet if it actually changed
+    if (config.wet !== prevConfig.wet) {
+      const wetValue = config.wet / 100;
+      if ('wet' in node && node.wet instanceof Tone.Signal) {
+        node.wet.rampTo(wetValue, 0.02);
+      } else if ('wet' in node && typeof (node as Record<string, unknown>).wet === 'number') {
+        (node as Record<string, unknown>).wet = wetValue;
+      }
+    }
+
+    // Compute which parameters actually changed
+    const changedParams: Record<string, number | string> = {};
+    for (const [key, value] of Object.entries(config.parameters)) {
+      if (prevConfig.parameters[key] !== value) {
+        changedParams[key] = value;
+      }
+    }
+
+    // Only apply effect params if something actually changed
+    if (Object.keys(changedParams).length > 0) {
+      applyDiff(node, config.type, changedParams);
+    }
+
+    effectData.config = config;
+  } catch (error) {
+    console.error('[ToneEngine] Failed to update instrument effect params:', error);
+  }
+}

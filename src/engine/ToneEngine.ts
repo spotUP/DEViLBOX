@@ -15,29 +15,14 @@ import { periodToNoteIndex, getPeriodExtended } from './effects/PeriodTables';
 import { AmigaFilter } from './effects/AmigaFilter';
 import { TrackerEnvelope } from './TrackerEnvelope';
 import { InstrumentAnalyser } from './InstrumentAnalyser';
-import { FurnaceChipEngine, FurnaceChipType } from './chips/FurnaceChipEngine';
+import { FurnaceChipEngine } from './chips/FurnaceChipEngine';
 import { FurnaceDispatchSynth } from './furnace-dispatch/FurnaceDispatchSynth';
 import { FurnaceDispatchEngine } from './furnace-dispatch/FurnaceDispatchEngine';
 import { FurnaceSynth } from './FurnaceSynth';
 import { normalizeUrl } from '@utils/urlUtils';
 import { getNativeAudioNode, setDevilboxAudioContext } from '@utils/audio-context';
-import { SpaceyDelayerEffect } from './effects/SpaceyDelayerEffect';
-import { RETapeEchoEffect } from './effects/RETapeEchoEffect';
-import { SpaceEchoEffect } from './effects/SpaceEchoEffect';
-import { BiPhaseEffect } from './effects/BiPhaseEffect';
-import { DubFilterEffect } from './effects/DubFilterEffect';
-import { MoogFilterEffect, type MoogFilterModel, type MoogFilterMode } from './effects/MoogFilterEffect';
-import { MVerbEffect } from './effects/MVerbEffect';
-import { LeslieEffect } from './effects/LeslieEffect';
-import { SpringReverbEffect } from './effects/SpringReverbEffect';
 import { VinylNoiseEffect } from './effects/VinylNoiseEffect';
-import { TumultEffect, type TumultOptions } from './effects/TumultEffect';
-import { TapeSimulatorEffect } from './effects/TapeSimulatorEffect';
-import { ToneArmEffect } from './effects/ToneArmEffect';
-import { NeuralEffectWrapper } from './effects/NeuralEffectWrapper';
-import { WAMEffectNode } from './wam/WAMEffectNode';
-import { SidechainCompressor } from './effects/SidechainCompressor';
-import { TapeSaturation } from './effects/TapeSaturation';
+import { TumultEffect } from './effects/TumultEffect';
 import { isEffectBpmSynced, getEffectSyncDivision, computeSyncedValue, SYNCABLE_EFFECT_PARAMS } from './bpmSync';
 import { reportSynthError } from '../stores/useSynthErrorStore';
 import { SYNTH_REGISTRY } from './vstbridge/synth-registry';
@@ -47,6 +32,91 @@ import { useRomDialogStore } from '../stores/useRomDialogStore';
 import { BlepManager } from './blep/BlepManager';
 import { SynthRegistry } from './registry/SynthRegistry';
 import { VoiceAllocator } from './audio/VoiceAllocator';
+
+// Extracted modules
+import { EFFECT_RAMP_TIME as _EFFECT_RAMP_TIME, applyEffectParametersDiff as _applyEffectParamsDiff, applyBpmSyncedParam as _applyBpmSyncedParam } from './tone/EffectParameterEngine';
+import { applyFurnaceSynthEffect as _applyFurnaceSynthEffect } from './tone/FurnaceEffects';
+import { MetronomeManager } from './tone/Metronome';
+import { AutoGainController } from './tone/AutoGainController';
+import {
+  type SynthUpdateContext,
+  updateWAMParameters as _updateWAMParameters,
+  updateTB303Parameters as _updateTB303Parameters,
+  updateFurnaceInstrument as _updateFurnaceInstrument,
+  updateHarmonicSynthParameters as _updateHarmonicSynthParameters,
+  getMAMESynthHandle as _getMAMESynthHandle,
+  getMAMEChipSynth as _getMAMEChipSynth,
+  updateMAMEParameters as _updateMAMEParameters,
+  updateMAMEChipParam as _updateMAMEChipParam,
+  loadMAMEChipPreset as _loadMAMEChipPreset,
+  updateMAMEChipTextParam as _updateMAMEChipTextParam,
+  speakMAMEChipText as _speakMAMEChipText,
+  loadSynthROM as _loadSynthROM,
+  updateDubSirenParameters as _updateDubSirenParameters,
+  updateSpaceLaserParameters as _updateSpaceLaserParameters,
+  updateV2Parameters as _updateV2Parameters,
+  updateSynareParameters as _updateSynareParameters,
+  updateFurnaceParameters as _updateFurnaceParameters,
+  updateDexedParameters as _updateDexedParameters,
+  updateOBXdParameters as _updateOBXdParameters,
+  updateComplexSynthParameters as _updateComplexSynthParameters,
+  updateToneJsSynthInPlace as _updateToneJsSynthInPlace,
+  updateBuzzmachineParameters as _updateBuzzmachineParameters,
+  updateTB303Pedalboard as _updateTB303Pedalboard,
+  updateChipSynthArpeggio as _updateChipSynthArpeggio,
+  getChipSynthArpeggioStep as _getChipSynthArpeggioStep,
+  isChipSynthArpeggioPlaying as _isChipSynthArpeggioPlaying,
+} from './tone/SynthParameterUpdates';
+import {
+  type ChannelRoutingContext,
+  ChannelMeterState,
+  triggerChannelMeter as _triggerChannelMeter,
+  clearChannelTriggerLevels as _clearChannelTriggerLevels,
+  getChannelTriggerLevels as _getChannelTriggerLevels,
+  getChannelTriggerGenerations as _getChannelTriggerGenerations,
+  getChannelOutput as _getChannelOutput,
+  createVoice as _createVoice,
+  stopVoice as _stopVoice,
+  setChannelVolume as _setChannelVolume,
+  setChannelFilterCutoff as _setChannelFilterCutoff,
+  setChannelFilterResonance as _setChannelFilterResonance,
+  setChannelPan as _setChannelPan,
+  setChannelFunkRepeat as _setChannelFunkRepeat,
+  handlePastNoteAction as _handlePastNoteAction,
+  setChannelPitch as _setChannelPitch,
+  applyPitchToNode as _applyPitchToNode,
+  setChannelFrequency as _setChannelFrequency,
+  initChannelPitch as _initChannelPitch,
+  clearChannelPitch as _clearChannelPitch,
+  setChannelMute as _setChannelMute,
+  setMixerChannelVolume as _setMixerChannelVolume,
+  setMixerChannelPan as _setMixerChannelPan,
+  updateMuteStates as _updateMuteStates,
+  isChannelMuted as _isChannelMuted,
+  disposeChannelOutputs as _disposeChannelOutputs,
+  getChannelLevels as _getChannelLevels,
+  updateChannelEnvelopes as _updateChannelEnvelopes,
+  setChannelKeyOff as _setChannelKeyOff,
+} from './tone/ChannelRouting';
+import {
+  type MasterEffectsContext,
+  rebuildMasterEffects as _rebuildMasterEffects,
+  canUseParameterUpdatePath as _canUseParameterUpdatePath,
+  updateEffectParameters as _updateEffectParameters,
+  getMasterEffectNode as _getMasterEffectNode,
+  getMasterEffectAnalysers as _getMasterEffectAnalysers,
+  updateMasterEffectParams as _updateMasterEffectParams,
+  updateInstrumentEffectParams as _updateInstrumentEffectParams,
+} from './tone/MasterEffectsChain';
+import {
+  type InstrumentEffectsContext,
+  buildInstrumentEffectChain as _buildInstrumentEffectChain,
+  rebuildInstrumentEffects as _rebuildInstrumentEffects,
+  setInstrumentOutputOverride as _setInstrumentOutputOverride,
+  removeInstrumentOutputOverride as _removeInstrumentOutputOverride,
+  throwInstrumentToEffect as _throwInstrumentToEffect,
+  disposeInstrumentEffectChain as _disposeInstrumentEffectChain,
+} from './tone/InstrumentEffectsChain';
 
 // Module-level frequency cache: avoids creating transient Tone.Frequency objects on every call.
 // Note name strings (e.g. "C4", "D#3") are finite and reused, so this cache stays small.
@@ -98,10 +168,6 @@ export class ToneEngine {
   private analysersConnected: boolean = false;
 
   // Auto-gain: proportional controller that balances sample bus vs synth bus levels
-  private autoGainEnabled: boolean = false;
-  private autoGainLoopId: ReturnType<typeof setInterval> | null = null;
-  private sampleLevelAnalyser: AnalyserNode | null = null;
-  private synthLevelAnalyser: AnalyserNode | null = null;
   private autoGainSampleCorr: number = 0; // dB correction applied on top of manual gain
   private autoGainSynthCorr: number = 0;
   private _manualSampleGainDb: number = 0; // tracks last setSampleBusGain arg
@@ -219,11 +285,14 @@ export class ToneEngine {
   // Pitch cents LUT for common pitch multipliers (avoid Math.log2 in hot path)
   public static readonly PITCH_CENTS_CACHE: Map<number, number> = new Map();
 
-  // Metronome synth and state
-  private metronomeSynth: Tone.MembraneSynth | null = null;
-  private metronomeVolume: Tone.Gain | null = null;
-  private metronomeEnabled: boolean = false;
-  private metronomePart: Tone.Part | null = null;
+  // Metronome (delegated to MetronomeManager)
+  private metronome: MetronomeManager | null = null;
+
+  // Auto-gain controller (delegated to AutoGainController)
+  private autoGain: AutoGainController | null = null;
+
+  // Channel metering state (delegated to ChannelMeterState)
+  private channelMeter: ChannelMeterState = new ChannelMeterState();
 
   // Amiga audio filter (E0x command) - 1:1 hardware emulation
   // E00 = filter ON (LED on), E01 = filter OFF (LED off/bypassed)
@@ -1040,12 +1109,18 @@ export class ToneEngine {
    * bus gains to equalize their RMS levels. Corrections reset to 0 when disabled.
    */
   public setAutoGain(enabled: boolean): void {
-    this.autoGainEnabled = enabled;
-    if (enabled) {
-      this._ensureAutoGainAnalysers();
-      this._startAutoGainLoop();
-    } else {
-      this._stopAutoGainLoop();
+    if (!this.autoGain) {
+      this.autoGain = new AutoGainController(
+        this.masterInput, this.synthBus,
+        (sampleCorr, synthCorr) => {
+          this.autoGainSampleCorr = sampleCorr;
+          this.autoGainSynthCorr = synthCorr;
+          this._applyBusGains();
+        }
+      );
+    }
+    this.autoGain.setAutoGain(enabled);
+    if (!enabled) {
       this.autoGainSampleCorr = 0;
       this.autoGainSynthCorr = 0;
       this._applyBusGains();
@@ -1053,77 +1128,12 @@ export class ToneEngine {
   }
 
   public getAutoGain(): boolean {
-    return this.autoGainEnabled;
+    return this.autoGain?.getAutoGain() ?? false;
   }
 
   /** Returns current auto-gain corrections in dB (informational, for UI display) */
   public getAutoGainCorrections(): { sample: number; synth: number } {
-    return { sample: this.autoGainSampleCorr, synth: this.autoGainSynthCorr };
-  }
-
-  private _ensureAutoGainAnalysers(): void {
-    if (this.sampleLevelAnalyser && this.synthLevelAnalyser) return;
-    const ctx = Tone.getContext().rawContext as AudioContext;
-
-    if (!this.sampleLevelAnalyser) {
-      const a = ctx.createAnalyser();
-      a.fftSize = 2048;
-      a.smoothingTimeConstant = 0;
-      (getNativeAudioNode(this.masterInput as any) as GainNode).connect(a);
-      this.sampleLevelAnalyser = a;
-    }
-
-    if (!this.synthLevelAnalyser) {
-      const a = ctx.createAnalyser();
-      a.fftSize = 2048;
-      a.smoothingTimeConstant = 0;
-      (getNativeAudioNode(this.synthBus as any) as GainNode).connect(a);
-      this.synthLevelAnalyser = a;
-    }
-  }
-
-  private _computeRmsDb(data: Float32Array): number {
-    let sumSq = 0;
-    for (let i = 0; i < data.length; i++) sumSq += data[i] * data[i];
-    const rms = Math.sqrt(sumSq / data.length);
-    return rms < 1e-10 ? -120 : 20 * Math.log10(rms);
-  }
-
-  private _startAutoGainLoop(): void {
-    if (this.autoGainLoopId !== null) return;
-    const buf = new Float32Array(2048);
-    const RATE = 0.2;
-    const SILENCE = -50;
-    const MAX_CORR = 12;
-
-    this.autoGainLoopId = setInterval(() => {
-      if (!this.sampleLevelAnalyser || !this.synthLevelAnalyser) return;
-
-      this.sampleLevelAnalyser.getFloatTimeDomainData(buf);
-      const sampleDb = this._computeRmsDb(buf);
-      this.synthLevelAnalyser.getFloatTimeDomainData(buf);
-      const synthDb = this._computeRmsDb(buf);
-
-      // Only balance when both buses have signal
-      if (sampleDb < SILENCE || synthDb < SILENCE) return;
-
-      // error > 0 → samples louder; apply symmetric correction
-      const error = sampleDb - synthDb;
-      this.autoGainSampleCorr -= error * RATE * 0.5;
-      this.autoGainSynthCorr += error * RATE * 0.5;
-
-      this.autoGainSampleCorr = Math.max(-MAX_CORR, Math.min(MAX_CORR, this.autoGainSampleCorr));
-      this.autoGainSynthCorr = Math.max(-MAX_CORR, Math.min(MAX_CORR, this.autoGainSynthCorr));
-
-      this._applyBusGains();
-    }, 100) as unknown as ReturnType<typeof setInterval>;
-  }
-
-  private _stopAutoGainLoop(): void {
-    if (this.autoGainLoopId !== null) {
-      clearInterval(this.autoGainLoopId as unknown as number);
-      this.autoGainLoopId = null;
-    }
+    return this.autoGain?.getAutoGainCorrections() ?? { sample: 0, synth: 0 };
   }
 
   /**
@@ -4045,424 +4055,34 @@ export class ToneEngine {
   /**
    * Update WAM parameters in real-time
    */
-  public updateWAMParameters(instrumentId: number, wamConfig: NonNullable<InstrumentConfig['wam']>): void {
-    const synths: WAMSynth[] = [];
-    this.instruments.forEach((instrument, key) => {
-      if (this.instrumentIdFromKey(key) === instrumentId && instrument instanceof WAMSynth) {
-        synths.push(instrument);
-      }
-    });
-
-    if (synths.length === 0) {
-      this.invalidateInstrument(instrumentId);
-      return;
-    }
-
-    synths.forEach((synth) => {
-      // Handle individual parameter updates (from fallback UI)
-      if (wamConfig.parameterValues) {
-        Object.entries(wamConfig.parameterValues).forEach(([id, value]) => {
-          synth.setParameter(id, value);
-        });
-      }
-      // Handle full state replacement
-      if (wamConfig.pluginState) {
-        synth.setPluginState(wamConfig.pluginState);
-      }
-    });
+  // Extracted synth update context
+  private get _synthCtx(): SynthUpdateContext {
+    return {
+      instruments: this.instruments,
+      instrumentIdFromKey: (key: number) => this.instrumentIdFromKey(key),
+      getInstrumentKey: (id: number, ch: number) => this.getInstrumentKey(id, ch),
+      invalidateInstrument: (id: number) => this.invalidateInstrument(id),
+      getInstrument: (id: number, config: InstrumentConfig) => this.getInstrument(id, config),
+    };
   }
 
-  /**
-   * Update TB303 parameters in real-time without recreating the synth
-   * Supports both JC303Synth (TB303) and BuzzmachineGenerator (Buzz3o3)
-   */
-  public updateTB303Parameters(instrumentId: number, tb303Config: NonNullable<InstrumentConfig['tb303']>): void {
-    // Find all DB303Synth instances for this instrument
-    const synths: DB303Synth[] = [];
-    this.instruments.forEach((instrument, key) => {
-      if (this.instrumentIdFromKey(key) === instrumentId && instrument instanceof DB303Synth) {
-        synths.push(instrument);
-      }
-    });
-
-    if (synths.length === 0) {
-      // No instances yet - instrument will be created with correct config on next note
-      this.invalidateInstrument(instrumentId);
-      return;
-    }
-
-    // Delegate directly to DB303Synth — it owns its own parameter mapping.
-    // All config values are already 0-1 normalized from the UI knobs.
-    synths.forEach((synth) => synth.applyConfig(tb303Config));
-  }
-
-  /**
-   * Update Furnace instrument parameters in real-time
-   * Re-encodes the instrument config to binary format and re-uploads to WASM
-   */
-  public updateFurnaceInstrument(instrumentId: number, config: InstrumentConfig): void {
-    if (!config.furnace || !config.synthType?.startsWith('Furnace')) {
-      console.warn('[ToneEngine] updateFurnaceInstrument called on non-Furnace instrument');
-      return;
-    }
-
-    // Find all FurnaceDispatchSynth instances for this instrument
-    const synths: Array<{ uploadInstrumentData: (data: Uint8Array) => void }> = [];
-    this.instruments.forEach((instrument, key) => {
-      if (this.instrumentIdFromKey(key) === instrumentId && (instrument as unknown as { uploadInstrumentData?: unknown }).uploadInstrumentData) {
-        synths.push(instrument as unknown as { uploadInstrumentData: (data: Uint8Array) => void });
-      }
-    });
-
-    if (synths.length === 0) {
-      // No instances yet - instrument will be created with correct config on next note
-      this.invalidateInstrument(instrumentId);
-      return;
-    }
-
-    // Dynamically import the encoder (code-split to reduce main bundle)
-    import('@lib/export/FurnaceInstrumentEncoder').then(({ updateFurnaceInstrument }) => {
-      const furnaceIndex = config.furnace!.furnaceIndex ?? 0;
-      const binaryData = updateFurnaceInstrument(config.furnace!, config.name, furnaceIndex);
-      
-      // Update all synth instances
-      synths.forEach((synth) => {
-        synth.uploadInstrumentData(binaryData);
-      });
-      
-    }).catch(err => {
-      console.error('[ToneEngine] Failed to encode Furnace instrument:', err);
-    });
-  }
-
-  /**
-   * Update HarmonicSynth parameters in real-time without recreating the synth
-   */
-  public updateHarmonicSynthParameters(instrumentId: number, harmonicConfig: NonNullable<InstrumentConfig['harmonicSynth']>): void {
-    const synths: Array<{ applyConfig: (config: typeof harmonicConfig) => void }> = [];
-    this.instruments.forEach((instrument, key) => {
-      if (this.instrumentIdFromKey(key) === instrumentId && (instrument as unknown as { applyConfig?: unknown }).applyConfig) {
-        synths.push(instrument as unknown as { applyConfig: (config: typeof harmonicConfig) => void });
-      }
-    });
-
-    if (synths.length === 0) {
-      // No instances yet - instrument will be created with correct config on next note
-      this.invalidateInstrument(instrumentId);
-      return;
-    }
-
-    // Apply config to all active instances
-    synths.forEach((synth) => synth.applyConfig(harmonicConfig));
-  }
-
-  /**
-   * Get the WASM handle for a MAME synth instance
-   */
-  public getMAMESynthHandle(instrumentId: number): number {
-    const key = this.getInstrumentKey(instrumentId, -1);
-    const instrument = this.instruments.get(key);
-    if (instrument instanceof MAMESynth) {
-      return (instrument as unknown as { getHandle: () => number }).getHandle();
-    }
-    return 0;
-  }
-
-  /**
-   * Get a MAME chip synth instance (extends MAMEBaseSynth)
-   * Used for accessing oscilloscope data and macro controls
-   */
-  public getMAMEChipSynth(instrumentId: number): MAMEBaseSynth | null {
-    const key = this.getInstrumentKey(instrumentId, -1);
-    const instrument = this.instruments.get(key);
-    if (instrument instanceof MAMEBaseSynth) {
-      return instrument;
-    }
-    // Also check channel-specific keys
-    for (const [k, inst] of this.instruments) {
-      if ((k >> 16) === instrumentId && inst instanceof MAMEBaseSynth) {
-        return inst;
-      }
-    }
-    return null;
-  }
-
-  /**
-   * Update MAME parameters in real-time
-   */
-  public updateMAMEParameters(instrumentId: number, config: Partial<import('@typedefs/instrument').MAMEConfig>): void {
-    const key = this.getInstrumentKey(instrumentId, -1);
-    const instrument = this.instruments.get(key);
-    if (instrument instanceof MAMESynth) {
-      // MAMESynth instances are typically updated via register writes
-      // Apply global config changes like clock if provided
-      void config; // Reserved for future per-register update support
-    }
-  }
-
-  /**
-   * Update a parameter on a MAME chip synth instrument in real-time.
-   * @param instrumentId - The instrument ID
-   * @param key - Parameter key (e.g. 'vibrato_speed', 'algorithm')
-   * @param value - Parameter value
-   */
-  public updateMAMEChipParam(instrumentId: number, key: string, value: number): void {
-    const instrumentKey = this.getInstrumentKey(instrumentId, -1);
-    const instrument = this.instruments.get(instrumentKey);
-    if (!instrument) return;
-    const inst = instrument as unknown as { setParam?: (key: string, value: number) => void };
-    if (typeof inst.setParam === 'function') {
-      inst.setParam(key, value);
-    }
-  }
-
-  /**
-   * Load a built-in WASM preset on a MAME chip synth instrument.
-   * @param instrumentId - The instrument ID
-   * @param program - Preset program number
-   */
-  public loadMAMEChipPreset(instrumentId: number, program: number): void {
-    const instrumentKey = this.getInstrumentKey(instrumentId, -1);
-    const instrument = this.instruments.get(instrumentKey);
-    if (!instrument) return;
-    const inst = instrument as unknown as { loadPreset?: (program: number) => void };
-    if (typeof inst.loadPreset === 'function') {
-      inst.loadPreset(program);
-    }
-  }
-
-  /**
-   * Update a text parameter on a MAME chip synth instrument (e.g. speech text).
-   */
-  public updateMAMEChipTextParam(instrumentId: number, key: string, value: string): void {
-    const instrumentKey = this.getInstrumentKey(instrumentId, -1);
-    const instrument = this.instruments.get(instrumentKey);
-    if (!instrument) return;
-    const inst = instrument as unknown as { setTextParam?: (key: string, value: string) => void; applyConfig?: (config: Record<string, string>) => void };
-    if (typeof inst.setTextParam === 'function') {
-      inst.setTextParam(key, value);
-    } else if (typeof inst.applyConfig === 'function') {
-      inst.applyConfig({ [key]: value });
-    }
-  }
-
-  /**
-   * Trigger text-to-speech on a MAME speech chip synth.
-   * Lazily creates the instrument if it hasn't been preloaded into the engine yet.
-   */
-  public async speakMAMEChipText(instrumentId: number, text: string): Promise<void> {
-    const instrumentKey = this.getInstrumentKey(instrumentId, -1);
-    let instrument = this.instruments.get(instrumentKey);
-
-    // If instrument not in engine map, create it on-demand from the instrument store
-    if (!instrument) {
-      try {
-        const { useInstrumentStore } = await import('../stores/useInstrumentStore');
-        const config = useInstrumentStore.getState().instruments.find(
-          (i: InstrumentConfig) => i.id === instrumentId
-        );
-        if (config) {
-          instrument = this.getInstrument(instrumentId, config) ?? undefined;
-          // Wait for WASM synth to initialize (ensures worklet is ready before speakText)
-          if (instrument && typeof (instrument as any).ensureInitialized === 'function') {
-            await (instrument as any).ensureInitialized();
-          }
-          // Also wait for async effect chain to connect (buildInstrumentEffectChain is fire-and-forget in getInstrument)
-          await new Promise(resolve => setTimeout(resolve, 50));
-        }
-      } catch (_err) {
-        console.warn('[ToneEngine] speakMAMEChipText: failed to lazy-create instrument:', _err);
-      }
-    }
-
-    if (!instrument) {
-      console.warn(`[ToneEngine] speakMAMEChipText: no instrument config found for id=${instrumentId}`);
-      return;
-    }
-
-    const synth = instrument as unknown as { speakText?: (text: string) => void; _isReady?: boolean; workletNode?: unknown };
-    if (typeof synth.speakText === 'function') {
-      synth.speakText(text);
-    } else {
-      console.warn(`[ToneEngine] speakMAMEChipText: instrument key="${instrumentKey}" has no speakText method`);
-    }
-  }
-
-  /**
-   * Load ROM data into a synth that requires external ROM files.
-   * Dispatches to the appropriate ROM loading method based on synthType.
-   */
-  public loadSynthROM(instrumentId: number, synthType: string, bank: number, data: Uint8Array): void {
-    const instrumentKey = this.getInstrumentKey(instrumentId, -1);
-    const instrument = this.instruments.get(instrumentKey);
-    if (!instrument) return;
-
-    const synth = instrument as unknown as { loadROM?: (bank: number, data: Uint8Array) => void; loadWaveROM?: (buffer: ArrayBuffer) => void; setRom?: (bank: number, data: Uint8Array) => void };
-
-    if (synthType === 'MAMERSA') {
-      // RdPianoSynth / D50Synth: loadROM(romId, data)
-      if (typeof synth.loadROM === 'function') {
-        synth.loadROM(bank, data);
-      }
-    } else if (synthType === 'MAMESWP30') {
-      // MU2000Synth: loadWaveROM(data) - single ROM bank
-      if (typeof synth.loadWaveROM === 'function') {
-        synth.loadWaveROM(data.buffer as ArrayBuffer);
-      }
-    } else {
-      // Generic fallback: try loadROM, then setRom
-      if (typeof synth.loadROM === 'function') {
-        synth.loadROM(bank, data);
-      } else if (typeof synth.setRom === 'function') {
-        synth.setRom(bank, data);
-      }
-    }
-  }
-
-  /**
-   * Update Dub Siren parameters in real-time
-   */
-  public updateDubSirenParameters(instrumentId: number, config: NonNullable<InstrumentConfig['dubSiren']>): void {
-    let found = false;
-    this.instruments.forEach((instrument, key) => {
-      if (this.instrumentIdFromKey(key) === instrumentId) {
-        // Use feature detection for more reliable check across HMR/bundling
-        if (instrument && typeof (instrument as unknown as { applyConfig?: unknown }).applyConfig === 'function') {
-          (instrument as unknown as { applyConfig: (config: unknown) => void }).applyConfig(config);
-          found = true;
-        }
-      }
-    });
-    if (!found) {
-      console.warn(`[ToneEngine] No DubSiren synth found to update for instrument ${instrumentId}`);
-    }
-  }
-
-  /**
-   * Update Space Laser parameters in real-time
-   */
-  public updateSpaceLaserParameters(instrumentId: number, config: NonNullable<InstrumentConfig['spaceLaser']>): void {
-    this.instruments.forEach((instrument, key) => {
-      if (this.instrumentIdFromKey(key) === instrumentId) {
-        if (instrument && typeof (instrument as unknown as { applyConfig?: unknown }).applyConfig === 'function') {
-          (instrument as unknown as { applyConfig: (config: unknown) => void }).applyConfig(config);
-        }
-      }
-    });
-  }
-
-  /**
-   * Update V2 parameters in real-time
-   */
-  public updateV2Parameters(instrumentId: number, config: NonNullable<InstrumentConfig['v2']>): void {
-    this.instruments.forEach((instrument, key) => {
-      if (this.instrumentIdFromKey(key) === instrumentId) {
-        if (instrument && (instrument as unknown as { name?: string }).name === 'V2Synth') {
-          const v2 = instrument as unknown as { setParameter: (index: number, value: number) => void };
-          
-          // Ground Truth Mapping from V2 v2defs.cpp / Params[]
-          
-          // Osc 1 (indices 2-7)
-          if (config.osc1) {
-            v2.setParameter(2, config.osc1.mode);
-            v2.setParameter(4, config.osc1.transpose + 64);
-            v2.setParameter(5, config.osc1.detune + 64);
-            v2.setParameter(6, config.osc1.color);
-            v2.setParameter(7, config.osc1.level);
-          }
-          
-          // Osc 2 (indices 8-13)
-          if (config.osc2) {
-            v2.setParameter(8, config.osc2.mode);
-            v2.setParameter(9, config.osc2.ringMod ? 1 : 0);
-            v2.setParameter(10, config.osc2.transpose + 64);
-            v2.setParameter(11, config.osc2.detune + 64);
-            v2.setParameter(12, config.osc2.color);
-            v2.setParameter(13, config.osc2.level);
-          }
-
-          // Osc 3 (indices 14-19)
-          if (config.osc3) {
-            v2.setParameter(14, config.osc3.mode);
-            v2.setParameter(15, config.osc3.ringMod ? 1 : 0);
-            v2.setParameter(16, config.osc3.transpose + 64);
-            v2.setParameter(17, config.osc3.detune + 64);
-            v2.setParameter(18, config.osc3.color);
-            v2.setParameter(19, config.osc3.level);
-          }
-
-          // Filter 1 (indices 20-22)
-          if (config.filter1) {
-            v2.setParameter(20, config.filter1.mode);
-            v2.setParameter(21, config.filter1.cutoff);
-            v2.setParameter(22, config.filter1.resonance);
-          }
-
-          // Filter 2 (indices 23-25)
-          if (config.filter2) {
-            v2.setParameter(23, config.filter2.mode);
-            v2.setParameter(24, config.filter2.cutoff);
-            v2.setParameter(25, config.filter2.resonance);
-          }
-
-          // Routing (indices 26-27)
-          if (config.routing) {
-            v2.setParameter(26, config.routing.mode);
-            v2.setParameter(27, config.routing.balance);
-          }
-
-          // Amp Envelope (indices 32-37: Attack, Decay, Sustain, SusTime, Release, Amplify)
-          if (config.envelope) {
-            v2.setParameter(32, config.envelope.attack);
-            v2.setParameter(33, config.envelope.decay);
-            v2.setParameter(34, config.envelope.sustain);
-            v2.setParameter(36, config.envelope.release);
-          }
-
-          // Envelope 2 (indices 38-43: Attack, Decay, Sustain, SusTime, Release, Amplify)
-          if (config.envelope2) {
-            v2.setParameter(38, config.envelope2.attack);
-            v2.setParameter(39, config.envelope2.decay);
-            v2.setParameter(40, config.envelope2.sustain);
-            v2.setParameter(42, config.envelope2.release);
-          }
-
-          // LFO 1 (indices 44-50: Mode, KeySync, EnvMode, Rate, Phase, Polarity, Amplify)
-          if (config.lfo1) {
-            v2.setParameter(47, config.lfo1.rate);
-            v2.setParameter(50, config.lfo1.depth);
-          }
-        }
-      }
-    });
-  }
-
-  /**
-   * Update Synare parameters in real-time
-   */
-  public updateSynareParameters(instrumentId: number, config: NonNullable<InstrumentConfig['synare']>): void {
-    this.instruments.forEach((instrument, key) => {
-      if (this.instrumentIdFromKey(key) === instrumentId) {
-        if (instrument && typeof (instrument as unknown as { applyConfig?: unknown }).applyConfig === 'function') {
-          (instrument as unknown as { applyConfig: (config: unknown) => void }).applyConfig(config);
-        }
-      }
-    });
-  }
-
-  /**
-   * Update Furnace parameters in real-time
-   */
-  public updateFurnaceParameters(instrumentId: number, config: NonNullable<InstrumentConfig['furnace']>): void {
-    void config; // Reserved for future direct parameter update support
-    this.instruments.forEach((instrument, key) => {
-      if (this.instrumentIdFromKey(key) === instrumentId) {
-        if (instrument && typeof (instrument as unknown as { updateParameters?: unknown }).updateParameters === 'function') {
-          (instrument as unknown as { updateParameters: () => void }).updateParameters();
-        }
-      }
-    });
-  }
+  public updateWAMParameters(instrumentId: number, wamConfig: NonNullable<InstrumentConfig['wam']>): void { _updateWAMParameters(this._synthCtx, instrumentId, wamConfig); }
+  public updateTB303Parameters(instrumentId: number, tb303Config: NonNullable<InstrumentConfig['tb303']>): void { _updateTB303Parameters(this._synthCtx, instrumentId, tb303Config); }
+  public updateFurnaceInstrument(instrumentId: number, config: InstrumentConfig): void { _updateFurnaceInstrument(this._synthCtx, instrumentId, config); }
+  public updateHarmonicSynthParameters(instrumentId: number, harmonicConfig: NonNullable<InstrumentConfig['harmonicSynth']>): void { _updateHarmonicSynthParameters(this._synthCtx, instrumentId, harmonicConfig); }
+  public getMAMESynthHandle(instrumentId: number): number { return _getMAMESynthHandle(this._synthCtx, instrumentId); }
+  public getMAMEChipSynth(instrumentId: number): MAMEBaseSynth | null { return _getMAMEChipSynth(this._synthCtx, instrumentId); }
+  public updateMAMEParameters(instrumentId: number, config: Partial<import('@typedefs/instrument').MAMEConfig>): void { _updateMAMEParameters(this._synthCtx, instrumentId, config); }
+  public updateMAMEChipParam(instrumentId: number, key: string, value: number): void { _updateMAMEChipParam(this._synthCtx, instrumentId, key, value); }
+  public loadMAMEChipPreset(instrumentId: number, program: number): void { _loadMAMEChipPreset(this._synthCtx, instrumentId, program); }
+  public updateMAMEChipTextParam(instrumentId: number, key: string, value: string): void { _updateMAMEChipTextParam(this._synthCtx, instrumentId, key, value); }
+  public async speakMAMEChipText(instrumentId: number, text: string): Promise<void> { return _speakMAMEChipText(this._synthCtx, instrumentId, text); }
+  public loadSynthROM(instrumentId: number, synthType: string, bank: number, data: Uint8Array): void { _loadSynthROM(this._synthCtx, instrumentId, synthType, bank, data); }
+  public updateDubSirenParameters(instrumentId: number, config: NonNullable<InstrumentConfig['dubSiren']>): void { _updateDubSirenParameters(this._synthCtx, instrumentId, config); }
+  public updateSpaceLaserParameters(instrumentId: number, config: NonNullable<InstrumentConfig['spaceLaser']>): void { _updateSpaceLaserParameters(this._synthCtx, instrumentId, config); }
+  public updateV2Parameters(instrumentId: number, config: NonNullable<InstrumentConfig['v2']>): void { _updateV2Parameters(this._synthCtx, instrumentId, config); }
+  public updateSynareParameters(instrumentId: number, config: NonNullable<InstrumentConfig['synare']>): void { _updateSynareParameters(this._synthCtx, instrumentId, config); }
+  public updateFurnaceParameters(instrumentId: number, config: NonNullable<InstrumentConfig['furnace']>): void { _updateFurnaceParameters(this._synthCtx, instrumentId, config); }
 
   /**
    * Apply a tracker effect to a Furnace instrument.
@@ -4533,506 +4153,39 @@ export class ToneEngine {
    * Effect codes match FurnaceEffectRouter mappings.
    */
   private applyFurnaceSynthEffect(synth: FurnaceSynth, effect: number, param: number): void {
-    const x = (param >> 4) & 0x0F;
-    const y = param & 0x0F;
-    const chipType = synth.getChipType();
-
-    // Standard effects (all platforms)
-    switch (effect) {
-      case 0x08: // Panning
-        synth.writePanRegister(param);
-        return;
-    }
-
-    // Platform-specific effect routing
-    if (this.isFMChip(chipType)) {
-      this.applyFMEffect(synth, effect, param, x, y);
-    } else if (this.isPSGChip(chipType)) {
-      this.applyPSGEffect(synth, effect, param, chipType);
-    } else if (this.isWavetableChip(chipType)) {
-      this.applyWavetableEffect(synth, effect, param, chipType);
-    } else if (this.isC64Chip(chipType)) {
-      this.applyC64Effect(synth, effect, param);
-    }
-  }
-
-  /** Check if chip is FM-based */
-  private isFMChip(chipType: number): boolean {
-    return ([
-      FurnaceChipType.OPN2, FurnaceChipType.OPM, FurnaceChipType.OPL3,
-      FurnaceChipType.OPLL, FurnaceChipType.OPNA, FurnaceChipType.OPNB,
-      FurnaceChipType.OPZ, FurnaceChipType.Y8950, FurnaceChipType.OPL4,
-      FurnaceChipType.OPN, FurnaceChipType.OPNB_B, FurnaceChipType.ESFM
-    ] as number[]).includes(chipType);
-  }
-
-  /** Check if chip is PSG-based (square wave with duty/envelope) */
-  private isPSGChip(chipType: number): boolean {
-    return ([
-      FurnaceChipType.NES, FurnaceChipType.GB, FurnaceChipType.PSG,
-      FurnaceChipType.AY, FurnaceChipType.AY8930, FurnaceChipType.SAA,
-      FurnaceChipType.VIC, FurnaceChipType.TED
-    ] as number[]).includes(chipType);
-  }
-
-  /** Check if chip is wavetable-based */
-  private isWavetableChip(chipType: number): boolean {
-    return ([
-      FurnaceChipType.PCE, FurnaceChipType.SCC, FurnaceChipType.SWAN,
-      FurnaceChipType.N163, FurnaceChipType.NAMCO, FurnaceChipType.FDS,
-      FurnaceChipType.BUBBLE, FurnaceChipType.X1_010, FurnaceChipType.SM8521
-    ] as number[]).includes(chipType);
-  }
-
-  /** Check if chip is C64/SID-based */
-  private isC64Chip(chipType: number): boolean {
-    return ([
-      FurnaceChipType.SID, FurnaceChipType.SID_6581, FurnaceChipType.SID_8580
-    ] as number[]).includes(chipType);
-  }
-
-  /** Apply FM-specific effects */
-  private applyFMEffect(synth: FurnaceSynth, effect: number, _param: number, x: number, y: number): void {
-    switch (effect) {
-      // 0x10 = LFO - not directly supported by FurnaceSynth register writes
-      case 0x11: // 11xy - Set operator TL (x=op, y=value*8)
-        synth.writeOperatorTL(x, y * 8);
-        break;
-      case 0x12: // 12xy - Set operator AR (x=op, y=value*2)
-        synth.writeOperatorAR(x, y * 2);
-        break;
-      case 0x13: // 13xy - Set operator DR (x=op, y=value*2)
-        synth.writeOperatorDR(x, y * 2);
-        break;
-      case 0x14: // 14xy - Set operator MULT (x=op, y=value)
-        synth.writeOperatorMult(x, y);
-        break;
-      case 0x15: // 15xy - Set operator RR (x=op, y=value)
-        synth.writeOperatorRR(x, y);
-        break;
-      case 0x16: // 16xy - Set operator SL (x=op, y=value)
-        synth.writeOperatorSL(x, y);
-        break;
-      // 0x17 = DT, 0x18 = ALG/FB, 0x19 = FB - not directly supported
-    }
-  }
-
-  /** Apply PSG-specific effects (NES, GB, AY, etc.) */
-  private applyPSGEffect(synth: FurnaceSynth, effect: number, param: number, chipType: number): void {
-    switch (chipType) {
-      case FurnaceChipType.GB:
-        // GB: 0x10 = sweep, 0x11 = wave select, 0x12 = length/duty
-        if (effect === 0x11) {
-          synth.writeWavetableSelect(param);
-        } else if (effect === 0x12) {
-          synth.writeDutyRegister(param & 0x03); // Lower 2 bits = duty
-        }
-        break;
-
-      case FurnaceChipType.NES:
-        // NES: 0x11 = length counter, 0x12 = duty/envelope
-        if (effect === 0x12) {
-          synth.writeDutyRegister((param >> 6) & 0x03); // Upper 2 bits = duty
-        }
-        break;
-
-      case FurnaceChipType.AY:
-      case FurnaceChipType.AY8930:
-        // AY: 0x10 = envelope shape, 0x11-0x12 = envelope period
-        // These are envelope effects, not duty - handled differently
-        break;
-
-      case FurnaceChipType.PSG:
-        // SN76489: No programmable duty
-        break;
-    }
-  }
-
-  /** Apply wavetable-specific effects (PCE, SCC, N163, etc.) */
-  private applyWavetableEffect(synth: FurnaceSynth, effect: number, param: number, chipType: number): void {
-    switch (chipType) {
-      case FurnaceChipType.PCE:
-        // PCE: 0x10 = LFO mode, 0x11 = LFO speed, 0x12 = wave select
-        if (effect === 0x12) {
-          synth.writeWavetableSelect(param);
-        }
-        break;
-
-      case FurnaceChipType.SCC:
-        // SCC: 0x10 = wave select
-        if (effect === 0x10) {
-          synth.writeWavetableSelect(param);
-        }
-        break;
-
-      case FurnaceChipType.N163:
-        // N163: 0x10 = wave select, 0x11 = wave position, 0x12 = wave length
-        if (effect === 0x10) {
-          synth.writeWavetableSelect(param);
-        }
-        break;
-
-      case FurnaceChipType.NAMCO:
-        // Namco WSG: 0x10 = wave select
-        if (effect === 0x10) {
-          synth.writeWavetableSelect(param);
-        }
-        break;
-
-      case FurnaceChipType.FDS:
-        // FDS: 0x10-0x14 = modulation effects
-        // Wave is set via instrument, not effects
-        break;
-
-      case FurnaceChipType.SWAN:
-      case FurnaceChipType.SM8521:
-      case FurnaceChipType.BUBBLE:
-      case FurnaceChipType.X1_010:
-        // Generic wavetable: 0x10 or 0x11 for wave select
-        if (effect === 0x10 || effect === 0x11) {
-          synth.writeWavetableSelect(param);
-        }
-        break;
-    }
-  }
-
-  /** Apply C64/SID-specific effects */
-  private applyC64Effect(synth: FurnaceSynth, effect: number, param: number): void {
-    // C64: 0x10 = duty reset, 0x11 = cutoff, 0x12 = fine duty
-    // Note: FurnaceSynth may not fully support C64 register writes
-    // These would need specific register write methods in FurnaceSynth
-    if (effect === 0x10 || effect === 0x12) {
-      // Duty effects - would need C64-specific implementation
-      synth.writeDutyRegister(param);
-    }
+    _applyFurnaceSynthEffect(synth, effect, param);
   }
 
   /**
    * Update Dexed (DX7) parameters in real-time
    */
-  public updateDexedParameters(instrumentId: number, config: NonNullable<InstrumentConfig['dexed']>): void {
-    this.instruments.forEach((instrument, key) => {
-      if (this.instrumentIdFromKey(key) === instrumentId) {
-        if (instrument && typeof (instrument as unknown as { applyConfig?: unknown }).applyConfig === 'function') {
-          (instrument as unknown as { applyConfig: (config: unknown) => void }).applyConfig(config);
-        }
-      }
-    });
-  }
-
-  /**
-   * Update OBXd (Oberheim) parameters in real-time
-   */
-  public updateOBXdParameters(instrumentId: number, config: NonNullable<InstrumentConfig['obxd']>): void {
-    this.instruments.forEach((instrument, key) => {
-      if (this.instrumentIdFromKey(key) === instrumentId) {
-        if (instrument && typeof (instrument as unknown as { applyConfig?: unknown }).applyConfig === 'function') {
-          (instrument as unknown as { applyConfig: (config: unknown) => void }).applyConfig(config);
-        }
-      }
-    });
-  }
-
-  /**
-   * Generic method to update complex synths that use the applyConfig pattern
-   */
-  public updateComplexSynthParameters(instrumentId: number, config: unknown): void {
-    this.instruments.forEach((instrument, key) => {
-      if (this.instrumentIdFromKey(key) === instrumentId) {
-        if (instrument && typeof (instrument as unknown as { applyConfig?: unknown }).applyConfig === 'function') {
-          (instrument as unknown as { applyConfig: (config: unknown) => void }).applyConfig(config);
-        }
-      }
-    });
-  }
-
-  /**
-   * Update standard Tone.js synth parameters in real-time (no instrument recreation)
-   * Handles oscillator, envelope, filter, filterEnvelope changes with smooth ramping
-   */
-  public updateToneJsSynthInPlace(instrumentId: number, config: InstrumentConfig): void {
-    const R = ToneEngine.EFFECT_RAMP_TIME;
-    this.instruments.forEach((instrument, key) => {
-      if (this.instrumentIdFromKey(key) !== instrumentId) return;
-      const inst = instrument as any;
-
-      // Update oscillator type (discrete, no ramp needed)
-      if (config.oscillator?.type && inst.oscillator) {
-        try {
-          const type = config.oscillator.type === 'noise' ? 'sawtooth' : config.oscillator.type;
-          inst.oscillator.type = type;
-        } catch { /* PolySynth wraps oscillator differently */ }
-      }
-      // PolySynth: update via .set()
-      if (instrument instanceof Tone.PolySynth && config.oscillator?.type) {
-        try {
-          const type = config.oscillator.type === 'noise' ? 'sawtooth' : config.oscillator.type;
-          instrument.set({ oscillator: { type: type as Tone.ToneOscillatorType } } as any);
-        } catch { /* ignore */ }
-      }
-
-      // Update envelope (with ramp for smooth transitions)
-      if (config.envelope) {
-        const env = config.envelope;
-        try {
-          if (instrument instanceof Tone.PolySynth) {
-            instrument.set({
-              envelope: {
-                attack: (env.attack ?? 10) / 1000,
-                decay: (env.decay ?? 200) / 1000,
-                sustain: (env.sustain ?? 50) / 100,
-                release: (env.release ?? 1000) / 1000,
-              }
-            });
-          } else if (inst.envelope) {
-            inst.envelope.attack = (env.attack ?? 10) / 1000;
-            inst.envelope.decay = (env.decay ?? 200) / 1000;
-            inst.envelope.sustain = (env.sustain ?? 50) / 100;
-            inst.envelope.release = (env.release ?? 1000) / 1000;
-          }
-        } catch { /* ignore */ }
-      }
-
-      // Update filter (with ramp)
-      if (config.filter && inst.filter) {
-        try {
-          if (config.filter.frequency !== undefined) {
-            inst.filter.frequency.rampTo(config.filter.frequency, R);
-          }
-          if (config.filter.Q !== undefined) {
-            inst.filter.Q.rampTo(config.filter.Q, R);
-          }
-          if (config.filter.type) {
-            inst.filter.type = config.filter.type;
-          }
-        } catch { /* ignore */ }
-      }
-
-      // Update volume (with ramp)
-      if (config.volume !== undefined && inst.volume) {
-        try {
-          inst.volume.rampTo(config.volume, R);
-        } catch { /* ignore */ }
-      }
-    });
-  }
-
-  /**
-   * Update Buzzmachine parameters in real-time
-   */
-  public updateBuzzmachineParameters(instrumentId: number, buzzmachine: NonNullable<InstrumentConfig['buzzmachine']>): void {
-    this.instruments.forEach((instrument, key) => {
-      if (this.instrumentIdFromKey(key) === instrumentId) {
-        const inst = instrument as unknown as { setParameter?: (index: number, value: number) => void };
-        if (instrument && typeof inst.setParameter === 'function') {
-          Object.entries(buzzmachine.parameters).forEach(([index, value]) => {
-            inst.setParameter!(Number(index), value);
-          });
-        }
-      }
-    });
-  }
-
-  /**
-   * Update TB303 pedalboard/GuitarML configuration
-   * Only call this when pedalboard config changes to avoid audio interruptions
-   */
-  public async updateTB303Pedalboard(instrumentId: number, pedalboard: NonNullable<InstrumentConfig['tb303']>['pedalboard']): Promise<void> {
-    if (!pedalboard) return;
-
-    // Find all channel instances of this instrument
-    const synths: JC303Synth[] = [];
-    this.instruments.forEach((instrument, key) => {
-      if ((key >> 16) === instrumentId && (instrument instanceof JC303Synth)) {
-        synths.push(instrument);
-      }
-    });
-
-    if (synths.length === 0) {
-      console.warn('[ToneEngine] Cannot update TB303 pedalboard - no TB303 instances found for instrument', instrumentId);
-      return;
-    }
-
-    const hasNeuralEffect = pedalboard.enabled && pedalboard.chain.some((fx: { enabled: boolean; type: string }) => fx.enabled && fx.type === 'neural');
-
-    // Update all instances
-    for (const synth of synths) {
-      if (hasNeuralEffect) {
-        // Find first enabled neural effect
-        const neuralEffect = pedalboard.chain.find((fx: { enabled: boolean; type: string }) => fx.enabled && fx.type === 'neural');
-        const fx = neuralEffect as EffectConfig | undefined;
-        if (fx && fx.neuralModelIndex !== undefined) {
-          try {
-            // Load GuitarML model and enable
-            await synth.loadGuitarMLModel(fx.neuralModelIndex);
-            await synth.setGuitarMLEnabled(true);
-
-            // Set dry/wet mix if specified
-            if (fx.parameters?.dryWet !== undefined) {
-              synth.setGuitarMLMix(fx.parameters.dryWet as number);
-            }
-          } catch (err) {
-            console.error('[ToneEngine] Failed to update GuitarML:', err);
-          }
-        }
-      } else {
-        // Disable GuitarML if no neural effects
-        try {
-          await synth.setGuitarMLEnabled(false);
-        } catch (err) {
-          console.error('[ToneEngine] Failed to disable GuitarML:', err);
-        }
-      }
-    }
-  }
-
-  /**
-   * Update ChipSynth arpeggio configuration in real-time
-   * @param instrumentId - Instrument ID
-   * @param arpeggioConfig - New arpeggio configuration
-   */
-  public updateChipSynthArpeggio(instrumentId: number, arpeggioConfig: NonNullable<InstrumentConfig['chipSynth']>['arpeggio']): void {
-    if (!arpeggioConfig) return;
-
-    // Find all channel instances of this instrument
-    this.instruments.forEach((instrument, key) => {
-      if ((key >> 16) === instrumentId && (instrument as any).updateArpeggio) {
-        (instrument as any).updateArpeggio(arpeggioConfig);
-      }
-    });
-  }
-
-  /**
-   * Get current arpeggio step for a ChipSynth instrument (for UI visualization)
-   * @param instrumentId - Instrument ID
-   * @returns Current step index or 0 if not found/playing
-   */
-  public getChipSynthArpeggioStep(instrumentId: number): number {
-    // Find first channel instance with arpeggio engine
-    for (const [key, instrument] of this.instruments.entries()) {
-      if ((key >> 16) === instrumentId && (instrument as any).getCurrentArpeggioStep) {
-        return (instrument as any).getCurrentArpeggioStep();
-      }
-    }
-    return 0;
-  }
-
-  /**
-   * Check if ChipSynth arpeggio is currently playing
-   * @param instrumentId - Instrument ID
-   * @returns True if arpeggio is actively playing
-   */
-  public isChipSynthArpeggioPlaying(instrumentId: number): boolean {
-    // Find first channel instance with arpeggio engine
-    for (const [key, instrument] of this.instruments.entries()) {
-      if ((key >> 16) === instrumentId && (instrument as any).isArpeggioPlaying) {
-        return (instrument as any).isArpeggioPlaying();
-      }
-    }
-    return false;
-  }
+  public updateDexedParameters(instrumentId: number, config: NonNullable<InstrumentConfig['dexed']>): void { _updateDexedParameters(this._synthCtx, instrumentId, config); }
+  public updateOBXdParameters(instrumentId: number, config: NonNullable<InstrumentConfig['obxd']>): void { _updateOBXdParameters(this._synthCtx, instrumentId, config); }
+  public updateComplexSynthParameters(instrumentId: number, config: unknown): void { _updateComplexSynthParameters(this._synthCtx, instrumentId, config); }
+  public updateToneJsSynthInPlace(instrumentId: number, config: InstrumentConfig): void { _updateToneJsSynthInPlace(this._synthCtx, instrumentId, config); }
+  public updateBuzzmachineParameters(instrumentId: number, buzzmachine: NonNullable<InstrumentConfig['buzzmachine']>): void { _updateBuzzmachineParameters(this._synthCtx, instrumentId, buzzmachine); }
+  public async updateTB303Pedalboard(instrumentId: number, pedalboard: NonNullable<InstrumentConfig['tb303']>['pedalboard']): Promise<void> { return _updateTB303Pedalboard(this._synthCtx, instrumentId, pedalboard); }
+  public updateChipSynthArpeggio(instrumentId: number, arpeggioConfig: NonNullable<InstrumentConfig['chipSynth']>['arpeggio']): void { _updateChipSynthArpeggio(this._synthCtx, instrumentId, arpeggioConfig); }
+  public getChipSynthArpeggioStep(instrumentId: number): number { return _getChipSynthArpeggioStep(this._synthCtx, instrumentId); }
+  public isChipSynthArpeggioPlaying(instrumentId: number): boolean { return _isChipSynthArpeggioPlaying(this._synthCtx, instrumentId); }
 
   // ============================================================================
-  // METRONOME
+  // METRONOME (delegated to MetronomeManager)
   // ============================================================================
 
-  /**
-   * Initialize metronome synth (lazy initialization)
-   */
-  private initMetronome(): void {
-    if (this.metronomeSynth) return;
-
-    // Create a percussive click synth
-    this.metronomeSynth = new Tone.MembraneSynth({
-      pitchDecay: 0.008,
-      octaves: 2,
-      oscillator: { type: 'sine' },
-      envelope: {
-        attack: 0.001,
-        decay: 0.1,
-        sustain: 0,
-        release: 0.1,
-      },
-    });
-
-    // Create volume control for metronome
-    this.metronomeVolume = new Tone.Gain(0.5);
-
-    // Route through volume to master (bypassing master input to keep it separate)
-    this.metronomeSynth.connect(this.metronomeVolume);
-    this.metronomeVolume.connect(this.masterChannel);
-
-  }
-
-  /**
-   * Set metronome enabled state
-   */
-  public setMetronomeEnabled(enabled: boolean): void {
-    this.metronomeEnabled = enabled;
-    if (enabled) {
-      this.initMetronome();
+  private ensureMetronome(): MetronomeManager {
+    if (!this.metronome) {
+      this.metronome = new MetronomeManager(this.masterChannel);
     }
+    return this.metronome;
   }
 
-  /**
-   * Check if metronome is enabled
-   */
-  public isMetronomeEnabled(): boolean {
-    return this.metronomeEnabled;
-  }
-
-  /**
-   * Set metronome volume (0-100)
-   */
-  public setMetronomeVolume(volume: number): void {
-    if (!this.metronomeVolume) {
-      this.initMetronome();
-    }
-    // Convert 0-100 to gain (0-1)
-    const gain = Math.max(0, Math.min(1, volume / 100));
-    this.metronomeVolume?.set({ gain });
-  }
-
-  /**
-   * Trigger a metronome click at precise time
-   * @param time Transport time for the click
-   * @param isDownbeat True for accented beat (beat 1), false for regular beat
-   */
-  public triggerMetronomeClick(time: number, isDownbeat: boolean = false): void {
-    if (!this.metronomeEnabled || !this.metronomeSynth) return;
-
-    // Use different pitch for downbeat vs regular beat
-    const note = isDownbeat ? 'C5' : 'C4';
-    const velocity = isDownbeat ? 0.8 : 0.5;
-
-    this.metronomeSynth.triggerAttackRelease(note, '32n', time, velocity);
-  }
-
-  /**
-   * Stop and dispose metronome part
-   */
-  public stopMetronome(): void {
-    if (this.metronomePart) {
-      this.metronomePart.stop();
-      this.metronomePart.dispose();
-      this.metronomePart = null;
-    }
-  }
-
-  /**
-   * Dispose metronome resources
-   */
-  private disposeMetronome(): void {
-    this.stopMetronome();
-    if (this.metronomeSynth) {
-      this.metronomeSynth.dispose();
-      this.metronomeSynth = null;
-    }
-    if (this.metronomeVolume) {
-      this.metronomeVolume.dispose();
-      this.metronomeVolume = null;
-    }
-  }
+  public setMetronomeEnabled(enabled: boolean): void { this.ensureMetronome().setMetronomeEnabled(enabled); }
+  public isMetronomeEnabled(): boolean { return this.metronome?.isMetronomeEnabled() ?? false; }
+  public setMetronomeVolume(volume: number): void { this.ensureMetronome().setMetronomeVolume(volume); }
+  public triggerMetronomeClick(time: number, isDownbeat: boolean = false): void { this.metronome?.triggerMetronomeClick(time, isDownbeat); }
+  public stopMetronome(): void { this.metronome?.stopMetronome(); }
+  private disposeMetronome(): void { this.metronome?.dispose(); this.metronome = null; }
 
   /**
    * Dispose of all resources
@@ -5109,1622 +4262,164 @@ export class ToneEngine {
   }
 
   // ============================================================================
-  // INSTRUMENT EFFECTS CHAIN MANAGEMENT
+  // INSTRUMENT EFFECTS CHAIN MANAGEMENT (delegated to InstrumentEffectsChain)
   // ============================================================================
 
-  /**
-   * Build or rebuild an instrument's effect chain (now async for neural effects)
-   * Route: instrument → effects → masterInput
-   * Supports both Tone.js ToneAudioNodes and native DevilboxSynths.
-   * @param key - Composite key (instrumentId-channelIndex) for per-channel chains
-   */
-  private async buildInstrumentEffectChain(
-    key: number,
-    effects: EffectConfig[],
-    instrument: Tone.ToneAudioNode | DevilboxSynth
-  ): Promise<void> {
-    // Dispose existing effect chain if any
-    const existing = this.instrumentEffectChains.get(key);
-    if (existing) {
-      // Clean up per-node registry entries
-      for (const [effectId, entry] of this.instrumentEffectNodes) {
-        if (existing.effects.includes(entry.node)) {
-          this.instrumentEffectNodes.delete(effectId);
-        }
-      }
-      existing.effects.forEach((fx) => {
-        try {
-          fx.disconnect();
-          fx.dispose();
-        } catch {
-          // Node may already be disposed
-        }
-      });
-      if (existing.bridge) {
-        try {
-          existing.bridge.disconnect();
-          existing.bridge.dispose();
-        } catch {
-          // Bridge may already be disposed
-        }
-      }
-      existing.output.disconnect();
-      existing.output.dispose();
-    }
-
-    // Create output gain node
-    const output = new Tone.Gain(1);
-
-    // Detect if this is a native DevilboxSynth (non-Tone.js) or a Tone.js node
-    const isNativeSynth = isDevilboxSynth(instrument);
-
-    // Helper: connect instrument to a Tone.js destination node
-    const connectInstrumentTo = (dest: Tone.ToneAudioNode) => {
-      if (isNativeSynth) {
-        // Native AudioNode → Tone.js node bridge
-        this.connectNativeSynth((instrument as DevilboxSynth).output, dest);
-      } else {
-        // Tone.js → Tone.js (existing path)
-        (instrument as Tone.ToneAudioNode).connect(dest);
-      }
+  private get _instrFxCtx(): InstrumentEffectsContext {
+    return {
+      instrumentEffectChains: this.instrumentEffectChains,
+      instrumentEffectNodes: this.instrumentEffectNodes,
+      instrumentAnalysers: this.instrumentAnalysers,
+      instrumentOutputOverrides: this.instrumentOutputOverrides,
+      instruments: this.instruments,
+      masterInput: this.masterInput,
+      synthBus: this.synthBus,
+      connectNativeSynth: (o, d) => this.connectNativeSynth(o, d),
+      getInstrumentOutputDestination: (id, n) => this.getInstrumentOutputDestination(id, n),
+      getInstrumentKey: (id, ch) => this.getInstrumentKey(id, ch),
     };
-
-    // Filter to only enabled effects
-    const enabledEffects = effects.filter((fx) => fx.enabled);
-
-    if (enabledEffects.length === 0) {
-      // No effects - direct connection
-      connectInstrumentTo(output);
-
-      // Determine destination: use instrument analyser if active, otherwise master input
-      const instrumentId = key >>> 16;
-      const activeAnalyser = this.instrumentAnalysers.get(instrumentId);
-
-      if (activeAnalyser) {
-        output.connect(activeAnalyser.input);
-      } else {
-        output.connect(this.getInstrumentOutputDestination(instrumentId, isNativeSynth));
-      }
-
-      this.instrumentEffectChains.set(key, { effects: [], output });
-      return;
-    }
-
-    // Create effect nodes (async for neural effects)
-    const effectNodes = (await Promise.all(
-      enabledEffects.map((config) => InstrumentFactory.createEffect(config))
-    )) as Tone.ToneAudioNode[];
-
-    // Build full chain: instrument → [bridge?] → effect[0] → ... → effect[N-1] → output → destination
-    let bridge: Tone.Gain | undefined;
-    if (effectNodes.length > 0) {
-      if (isNativeSynth) {
-        // Native synths can't connect directly to Tone.js effects (CrossFade input).
-        // Insert a Tone.Gain bridge whose .input IS a native GainNode.
-        bridge = new Tone.Gain(1);
-        connectInstrumentTo(bridge);
-        bridge.connect(effectNodes[0] as Tone.ToneAudioNode);
-      } else {
-        (instrument as Tone.ToneAudioNode).connect(effectNodes[0] as Tone.ToneAudioNode);
-      }
-      // Chain effects together
-      for (let i = 0; i < effectNodes.length - 1; i++) {
-        (effectNodes[i] as Tone.ToneAudioNode).connect(effectNodes[i + 1] as Tone.ToneAudioNode);
-      }
-      // Connect last effect to output
-      (effectNodes[effectNodes.length - 1] as Tone.ToneAudioNode).connect(output);
-    } else {
-      connectInstrumentTo(output);
-    }
-
-    // Determine destination: use instrument analyser if active, otherwise master input
-    const instrumentId2 = key >>> 16;
-    const activeAnalyser = this.instrumentAnalysers.get(instrumentId2);
-
-    if (activeAnalyser) {
-      output.connect(activeAnalyser.input);
-    } else {
-      output.connect(this.getInstrumentOutputDestination(instrumentId2, isNativeSynth));
-    }
-
-    this.instrumentEffectChains.set(key, { effects: effectNodes as Tone.ToneAudioNode[], output, bridge });
-
-    // Register individual effect nodes for real-time parameter updates
-    enabledEffects.forEach((config, i) => {
-      this.instrumentEffectNodes.set(config.id, { node: effectNodes[i] as Tone.ToneAudioNode, config });
-    });
   }
 
-  /**
-   * Rebuild an instrument's effect chain (public method for store to call, now async)
-   */
+  private async buildInstrumentEffectChain(key: number, effects: EffectConfig[], instrument: Tone.ToneAudioNode | DevilboxSynth): Promise<void> {
+    return _buildInstrumentEffectChain(this._instrFxCtx, key, effects, instrument);
+  }
+
   public async rebuildInstrumentEffects(instrumentId: number, effects: EffectConfig[]): Promise<void> {
-    const key = this.getInstrumentKey(instrumentId, -1);
-    const instrument = this.instruments.get(key);
-    if (!instrument) {
-      console.warn('[ToneEngine] Cannot rebuild effects - instrument not found:', instrumentId);
-      return;
-    }
-
-    // Disconnect instrument from current chain
-    try {
-      if (isDevilboxSynth(instrument)) {
-        // Native synth — disconnect the AudioNode output
-        instrument.output.disconnect();
-      } else {
-        instrument.disconnect();
-      }
-    } catch {
-      // May not be connected
-    }
-
-    // Build new effect chain (await for neural effects)
-    await this.buildInstrumentEffectChain(key, effects, instrument);
+    return _rebuildInstrumentEffects(this._instrFxCtx, instrumentId, effects);
   }
 
-  /**
-   * Override the output destination for an instrument's effect chain and voice routing.
-   * Used by DJ mode to route audio through deck gain → EQ → filter → crossfader.
-   * Must be called BEFORE the instrument is created/preloaded, as existing
-   * effect chains are not re-routed.
-   */
   public setInstrumentOutputOverride(instrumentId: number, destination: Tone.ToneAudioNode): void {
-    this.instrumentOutputOverrides.set(instrumentId, destination);
+    _setInstrumentOutputOverride(this._instrFxCtx, instrumentId, destination);
   }
 
   public removeInstrumentOutputOverride(instrumentId: number): void {
-    this.instrumentOutputOverrides.delete(instrumentId);
+    _removeInstrumentOutputOverride(this._instrFxCtx, instrumentId);
   }
 
-  /**
-   * Momentarily "throw" an instrument into an effect (e.g. Dub Delay Throw)
-   * Ramps the wet level of a specific effect type in the instrument's chain
-   */
-  public throwInstrumentToEffect(
-    instrumentId: number, 
-    effectType: string, 
-    wetAmount: number = 1.0, 
-    durationMs: number = 0
-  ): void {
-    // Find the chain - for throws, we typically look at the base instrument chain (-1)
-    // or iterate all channels if it's a live instrument
-    const chains: Array<{ effects: Tone.ToneAudioNode[]; output: Tone.Gain }> = [];
-    this.instrumentEffectChains.forEach((chain, chainKey) => {
-      if ((chainKey >> 16) === instrumentId) {
-        chains.push(chain);
-      }
-    });
-
-    if (chains.length === 0) return;
-
-    chains.forEach(chain => {
-      // Find the target effect node in the chain
-      const targetFx = chain.effects.find((fx) => (fx as unknown as { _fxType?: string })._fxType === effectType);
-
-      if (targetFx && 'wet' in targetFx) {
-        const wetParam = (targetFx as unknown as { wet: Tone.Param<"normalRange"> }).wet;
-        const now = Tone.immediate();
-        
-        // Ramp up instantly (10ms)
-        wetParam.cancelScheduledValues(now);
-        wetParam.rampTo(wetAmount, 0.01, now);
-        
-        // If duration is provided, ramp back down after that time
-        if (durationMs > 0) {
-          wetParam.rampTo(0, 0.1, now + durationMs / 1000);
-        }
-      }
-    });
+  public throwInstrumentToEffect(instrumentId: number, effectType: string, wetAmount: number = 1.0, durationMs: number = 0): void {
+    _throwInstrumentToEffect(this._instrFxCtx, instrumentId, effectType, wetAmount, durationMs);
   }
 
-  /**
-   * Dispose instrument effect chain
-   */
   private disposeInstrumentEffectChain(key: number): void {
-    const chain = this.instrumentEffectChains.get(key);
-    if (chain) {
-      chain.effects.forEach((fx) => {
-        try {
-          fx.dispose();
-        } catch {
-          // Node may already be disposed
-        }
-      });
-      try {
-        chain.output.dispose();
-      } catch {
-        // Node may already be disposed
-      }
-      this.instrumentEffectChains.delete(key);
-    }
+    _disposeInstrumentEffectChain(this._instrFxCtx, key);
   }
 
   // ============================================================================
-  // MASTER EFFECTS CHAIN MANAGEMENT
+  // ============================================================================
+  // MASTER EFFECTS CHAIN MANAGEMENT (delegated to MasterEffectsChain)
   // ============================================================================
 
-  /**
-   * Rebuild entire master effects chain from config array (now async for neural effects)
-   * Called when effects are added, removed, or reordered
-   */
+  private get _masterFxCtx(): MasterEffectsContext {
+    const self = this;
+    const ctx = {
+      masterEffectsInput: this.masterEffectsInput,
+      blepInput: this.blepInput,
+      masterEffectConfigs: this.masterEffectConfigs,
+      masterEffectAnalysers: this.masterEffectAnalysers,
+      _notifyNoiseEffectsPlaying: (p: boolean) => this._notifyNoiseEffectsPlaying(p),
+      applyEffectParametersDiff: (n: Tone.ToneAudioNode, t: string, c: Record<string, number | string>) => this.applyEffectParametersDiff(n, t, c),
+      updateBpmSyncedEffects: (bpm: number) => this.updateBpmSyncedEffects(bpm),
+    } as MasterEffectsContext;
+    // Mutable fields need property proxies so writes flow back to ToneEngine
+    Object.defineProperty(ctx, 'masterEffectsRebuildVersion', {
+      get: () => self.masterEffectsRebuildVersion,
+      set: (v: number) => { self.masterEffectsRebuildVersion = v; },
+    });
+    Object.defineProperty(ctx, 'masterEffectsNodes', {
+      get: () => self.masterEffectsNodes,
+      set: (v: Tone.ToneAudioNode[]) => { self.masterEffectsNodes = v; },
+    });
+    Object.defineProperty(ctx, '_isPlaying', {
+      get: () => self._isPlaying,
+    });
+    return ctx;
+  }
+
   public async rebuildMasterEffects(effects: EffectConfig[]): Promise<void> {
-    // Fast path: if only parameters changed (no add/remove/reorder), just update params
-    if (this.canUseParameterUpdatePath(effects)) {
-      this.updateEffectParameters(effects);
-      return;
-    }
-
-    // Version guard: if another rebuild starts while we're async, abort this one
-    const myVersion = ++this.masterEffectsRebuildVersion;
-    // Debug log only (verbose in StrictMode due to double-invocation)
-    // console.log('[ToneEngine] rebuildMasterEffects v' + myVersion + ', effects:', effects.map(e => `${e.type}(${e.id})`));
-
-    // Deep clone effects to avoid Immer proxy revocation issues during async operations
-    const effectsCopy = structuredClone(effects) as EffectConfig[];
-
-    // Disconnect masterEffectsInput output (preserves upstream connections from amigaFilter & synthBus)
-    this.masterEffectsInput.disconnect();
-    this.masterEffectsNodes.forEach((node) => {
-      try {
-        node.disconnect();
-        node.dispose();
-      } catch {
-        // Node may already be disposed
-      }
-    });
-    this.masterEffectsNodes = [];
-    this.masterEffectConfigs.clear();
-    // Disconnect and clear analyser taps
-    this.masterEffectAnalysers.forEach(({ pre, post }) => {
-      try { pre.disconnect(); } catch { /* */ }
-      try { post.disconnect(); } catch { /* */ }
-    });
-    this.masterEffectAnalysers.clear();
-
-    // Filter to only enabled effects
-    const enabledEffects = effectsCopy.filter((fx) => fx.enabled);
-
-    if (enabledEffects.length === 0) {
-      // No effects - direct connection to BLEP input (which routes to masterChannel)
-      this.masterEffectsInput.connect(this.blepInput);
-      return;
-    }
-
-    // Ensure AudioContext is running before creating worklet-based effects (BitCrusher, etc.)
-    if (Tone.getContext().state === 'suspended') {
-      try { await Tone.start(); } catch { /* user gesture required */ }
-    }
-
-    // Check if a newer rebuild superseded us
-    if (myVersion !== this.masterEffectsRebuildVersion) {
-      // Debug: console.log('[ToneEngine] rebuildMasterEffects v' + myVersion + ' aborted (superseded by v' + this.masterEffectsRebuildVersion + ')');
-      return;
-    }
-
-    // Create effect nodes individually — skip any that fail (e.g. worklet on suspended context)
-    const successNodes: Tone.ToneAudioNode[] = [];
-    const successConfigs: EffectConfig[] = [];
-    for (const config of enabledEffects) {
-      try {
-        const node = await InstrumentFactory.createEffect(config) as Tone.ToneAudioNode;
-        // Check again after each async operation
-        if (myVersion !== this.masterEffectsRebuildVersion) {
-          // Debug: console.log('[ToneEngine] rebuildMasterEffects v' + myVersion + ' aborted mid-create');
-          // Dispose the node we just created since we're aborting
-          try { node.disconnect(); node.dispose(); } catch { /* */ }
-          // Dispose any previously created nodes in this batch
-          successNodes.forEach(n => { try { n.disconnect(); n.dispose(); } catch { /* */ } });
-          return;
-        }
-        successNodes.push(node);
-        successConfigs.push(config);
-      } catch (error) {
-        console.warn(`[ToneEngine] Failed to create effect ${config.type}, skipping:`, error);
-      }
-    }
-
-    // Final version check before connecting
-    if (myVersion !== this.masterEffectsRebuildVersion) {
-      // Debug: console.log('[ToneEngine] rebuildMasterEffects v' + myVersion + ' aborted before connect');
-      successNodes.forEach(n => { try { n.disconnect(); n.dispose(); } catch { /* */ } });
-      return;
-    }
-
-    if (successNodes.length === 0) {
-      // All effects failed — direct connection to BLEP input
-      this.masterEffectsInput.connect(this.blepInput);
-      return;
-    }
-
-    // Store nodes and configs
-    successNodes.forEach((node, index) => {
-      this.masterEffectsNodes.push(node);
-      this.masterEffectConfigs.set(successConfigs[index].id, { node, config: successConfigs[index] });
-    });
-
-    // Connect chain: masterEffectsInput → effects[0] → effects[n] → blepInput → [BLEP?] → masterChannel
-    // Both tracker audio (via amigaFilter) and synth audio (via synthBus) feed masterEffectsInput
-    this.masterEffectsInput.connect(this.masterEffectsNodes[0]);
-
-    for (let i = 0; i < this.masterEffectsNodes.length - 1; i++) {
-      this.masterEffectsNodes[i].connect(this.masterEffectsNodes[i + 1]);
-    }
-
-    this.masterEffectsNodes[this.masterEffectsNodes.length - 1].connect(this.blepInput);
-    // Debug: Success
-    // console.log('[ToneEngine] rebuildMasterEffects v' + myVersion + ' connected chain OK, nodes:',
-    //   this.masterEffectsNodes.map(n => n?.name || n?.constructor?.name).join(' → '));
-
-    // Create pre/post AnalyserNode taps for each effect (side-branch, non-destructive)
-    const rawCtx = Tone.getContext().rawContext as AudioContext;
-    for (let i = 0; i < successNodes.length; i++) {
-      const config = successConfigs[i];
-
-      const pre = rawCtx.createAnalyser();
-      pre.fftSize = 2048;
-      pre.smoothingTimeConstant = 0.8;
-
-      const post = rawCtx.createAnalyser();
-      post.fftSize = 2048;
-      post.smoothingTimeConstant = 0.8;
-
-      // Pre-tap: tap the signal feeding into effect[i]
-      // For effect[0]: source is masterEffectsInput; for others: source is the OUTPUT of the previous effect
-      const preSourceToneNode = i === 0
-        ? this.masterEffectsInput
-        : successNodes[i - 1];
-      const preOutputNode = i === 0
-        ? undefined
-        : (successNodes[i - 1] as unknown as { output?: unknown }).output;
-      const preNative = preOutputNode
-        ? getNativeAudioNode(preOutputNode)
-        : getNativeAudioNode(preSourceToneNode);
-      if (preNative) {
-        try { preNative.connect(pre); } catch (e) {
-          // Non-fatal: analyser just won't show data for this effect
-          console.debug('[ToneEngine] Pre-analyser tap failed for effect', config.id, e);
-        }
-      } else {
-        // Some effect types don't expose their internal AudioNode — analyser won't display
-        console.debug('[ToneEngine] Pre-analyser: could not get native node for effect', config.id);
-      }
-
-      // Post-tap: tap the output of effect[i]
-      const postOutputNode = (successNodes[i] as unknown as { output?: unknown }).output;
-      const postNative = postOutputNode
-        ? getNativeAudioNode(postOutputNode)
-        : getNativeAudioNode(successNodes[i]);
-      if (postNative) {
-        try { postNative.connect(post); } catch (e) {
-          console.debug('[ToneEngine] Post-analyser tap failed for effect', config.id, e);
-        }
-      } else {
-        console.debug('[ToneEngine] Post-analyser: could not get native node for effect', config.id);
-      }
-
-      this.masterEffectAnalysers.set(config.id, { pre, post });
-    }
-
-    // Sync playback state into freshly created noise-generating nodes
-    this._notifyNoiseEffectsPlaying(this._isPlaying);
+    return _rebuildMasterEffects(this._masterFxCtx, effects);
   }
 
-  /**
-   * Check if we can use the fast parameter update path (no structural changes).
-   */
   private canUseParameterUpdatePath(newEffects: EffectConfig[]): boolean {
-    // Filter to enabled effects (like rebuild does)
-    const enabledNew = newEffects.filter((fx) => fx.enabled);
-    const currentIds = Array.from(this.masterEffectConfigs.keys());
-
-    // Different number of effects - need full rebuild
-    if (enabledNew.length !== currentIds.length) {
-      return false;
-    }
-
-    // Check if IDs and order match
-    for (let i = 0; i < enabledNew.length; i++) {
-      if (enabledNew[i].id !== currentIds[i]) {
-        return false; // Order changed or different effect
-      }
-
-      const current = this.masterEffectConfigs.get(currentIds[i]);
-      if (!current) return false;
-
-      // Type changed - need rebuild
-      if (enabledNew[i].type !== current.config.type) {
-        return false;
-      }
-    }
-
-    return true; // Only parameters changed - safe for fast path
+    return _canUseParameterUpdatePath(this._masterFxCtx, newEffects);
   }
 
-  /**
-   * Update effect parameters without rebuilding the chain (fast path).
-   */
   private updateEffectParameters(newEffects: EffectConfig[]): void {
-    const enabledNew = newEffects.filter((fx) => fx.enabled);
-
-    for (const newConfig of enabledNew) {
-      const existing = this.masterEffectConfigs.get(newConfig.id);
-      if (!existing) continue;
-
-      // Update parameters on the existing node
-      Object.entries(newConfig.parameters || {}).forEach(([key, value]) => {
-        if (key in existing.node) {
-          const nodeAny = existing.node as any;
-          // Handle Tone.js Signal/Param types
-          if (nodeAny[key]?.value !== undefined) {
-            nodeAny[key].value = value;
-          } else {
-            nodeAny[key] = value;
-          }
-        }
-      });
-
-      // Update enabled state (bypass)
-      if ('wet' in existing.node) {
-        (existing.node as any).wet.value = newConfig.enabled ? 1 : 0;
-      }
-
-      // Update stored config
-      existing.config = newConfig;
-    }
+    _updateEffectParameters(this._masterFxCtx, newEffects);
   }
 
-  /**
-   * Get the audio node for a master effect by ID (used by WAM GUI rendering)
-   */
   public getMasterEffectNode(effectId: string): Tone.ToneAudioNode | null {
-    return this.masterEffectConfigs.get(effectId)?.node ?? null;
+    return _getMasterEffectNode(this._masterFxCtx, effectId);
   }
 
-  /**
-   * Returns the pre/post AnalyserNodes for a master effect by ID.
-   * Pre-analyser receives the signal before the effect; post receives after.
-   * Returns null if the effect ID is not found (effect disabled or not yet built).
-   */
   public getMasterEffectAnalysers(id: string): { pre: AnalyserNode; post: AnalyserNode } | null {
-    return this.masterEffectAnalysers.get(id) ?? null;
+    return _getMasterEffectAnalysers(this._masterFxCtx, id);
   }
 
-  /**
-   * Update parameters for a single master effect
-   * Called when effect parameters change (wet, specific params)
-   */
   public updateMasterEffectParams(effectId: string, config: EffectConfig): void {
-    const effectData = this.masterEffectConfigs.get(effectId);
-    if (!effectData) {
-      console.warn('[ToneEngine] Effect not found for update:', effectId, 'available:', [...this.masterEffectConfigs.keys()]);
-      return;
-    }
-
-    const { node, config: prevConfig } = effectData;
-
-    try {
-      // Only update wet if it actually changed
-      if (config.wet !== prevConfig.wet) {
-        const wetValue = config.wet / 100;
-        if ('wet' in node && node.wet instanceof Tone.Signal) {
-          node.wet.rampTo(wetValue, 0.02);
-        } else if ('wet' in node && typeof (node as Record<string, unknown>).wet === 'number') {
-          // Custom WASM effects (MoogFilter, MVerb, Leslie, SpringReverb) use a plain setter
-          (node as Record<string, unknown>).wet = wetValue;
-        }
-      }
-
-      // Compute which parameters actually changed
-      const changedParams: Record<string, number | string> = {};
-      for (const [key, value] of Object.entries(config.parameters)) {
-        if (prevConfig.parameters[key] !== value) {
-          changedParams[key] = value;
-        }
-      }
-
-      // Only apply effect params if something actually changed
-      if (Object.keys(changedParams).length > 0) {
-        this.applyEffectParametersDiff(node, config.type, changedParams);
-
-        // If bpmSync or syncDivision changed, immediately recompute synced params
-        if ('bpmSync' in changedParams || 'syncDivision' in changedParams) {
-          const currentBpm = Tone.getTransport().bpm.value;
-          this.updateBpmSyncedEffects(currentBpm).catch(() => {});
-        }
-      }
-
-      // Update stored config
-      effectData.config = config;
-
-    } catch (error) {
-      console.error('[ToneEngine] Failed to update effect params:', error);
-    }
+    _updateMasterEffectParams(this._masterFxCtx, effectId, config);
   }
 
-  /**
-   * Update parameters for a per-instrument effect in real-time
-   */
   public updateInstrumentEffectParams(effectId: string, config: EffectConfig): void {
-    const effectData = this.instrumentEffectNodes.get(effectId);
-    if (!effectData) return; // Effect not in active chain
-
-    const { node, config: prevConfig } = effectData;
-
-    try {
-      // Only update wet if it actually changed
-      if (config.wet !== prevConfig.wet) {
-        const wetValue = config.wet / 100;
-        if ('wet' in node && node.wet instanceof Tone.Signal) {
-          node.wet.rampTo(wetValue, 0.02);
-        } else if ('wet' in node && typeof (node as Record<string, unknown>).wet === 'number') {
-          (node as Record<string, unknown>).wet = wetValue;
-        }
-      }
-
-      // Compute which parameters actually changed
-      const changedParams: Record<string, number | string> = {};
-      for (const [key, value] of Object.entries(config.parameters)) {
-        if (prevConfig.parameters[key] !== value) {
-          changedParams[key] = value;
-        }
-      }
-
-      // Only apply effect params if something actually changed
-      if (Object.keys(changedParams).length > 0) {
-        this.applyEffectParametersDiff(node, config.type, changedParams);
-      }
-
-      effectData.config = config;
-    } catch (error) {
-      console.error('[ToneEngine] Failed to update instrument effect params:', error);
-    }
+    _updateInstrumentEffectParams(this._masterFxCtx, effectId, config);
   }
 
-  // Smooth ramp time for effect parameter changes (20ms eliminates zipper noise)
-  private static readonly EFFECT_RAMP_TIME = 0.02;
+  private static readonly EFFECT_RAMP_TIME = _EFFECT_RAMP_TIME;
 
-  /**
-   * Apply only the changed parameters to an effect node (diff-based).
-   * Avoids redundant parameter sets which cause clicks/zipper noise.
-   */
-  private applyEffectParametersDiff(
-    node: Tone.ToneAudioNode,
-    type: string,
-    changed: Record<string, number | string>
-  ): void {
-    const R = ToneEngine.EFFECT_RAMP_TIME;
-
-    switch (type) {
-      case 'Distortion':
-        if (node instanceof Tone.Distortion) {
-          if ('drive' in changed) node.distortion = changed.drive as number;
-          if ('oversample' in changed) node.oversample = changed.oversample as OverSampleType;
-        }
-        break;
-
-      case 'Delay':
-      case 'FeedbackDelay':
-        if (node instanceof Tone.FeedbackDelay) {
-          if ('time' in changed) node.delayTime.rampTo(changed.time as number, R);
-          if ('feedback' in changed) node.feedback.rampTo(changed.feedback as number, R);
-        }
-        break;
-
-      case 'Chorus':
-        if (node instanceof Tone.Chorus) {
-          if ('frequency' in changed) node.frequency.rampTo(changed.frequency as number, R);
-          if ('depth' in changed) node.depth = changed.depth as number;
-        }
-        break;
-
-      case 'Phaser':
-        if (node instanceof Tone.Phaser) {
-          if ('frequency' in changed) node.frequency.rampTo(changed.frequency as number, R);
-          if ('octaves' in changed) node.octaves = changed.octaves as number;
-          if ('baseFrequency' in changed) node.baseFrequency = Number(changed.baseFrequency);
-          if ('Q' in changed) node.Q.rampTo(changed.Q as number, R);
-        }
-        break;
-
-      case 'Tremolo':
-        if (node instanceof Tone.Tremolo) {
-          if ('frequency' in changed) node.frequency.rampTo(changed.frequency as number, R);
-          if ('depth' in changed) node.depth.rampTo(changed.depth as number, R);
-        }
-        break;
-
-      case 'Vibrato':
-        if (node instanceof Tone.Vibrato) {
-          if ('frequency' in changed) node.frequency.rampTo(changed.frequency as number, R);
-          if ('depth' in changed) node.depth.rampTo(changed.depth as number, R);
-        }
-        break;
-
-      case 'BitCrusher': {
-        // BitCrusher is implemented as a Distortion with a staircase WaveShaper curve
-        const crusherNode = node as unknown as {
-          _isBitCrusher?: boolean;
-          _bitsValue?: number;
-          _shaper?: { setMap: (fn: (v: number) => number, len?: number) => void };
-        };
-        if (crusherNode._isBitCrusher && 'bits' in changed) {
-          const newBits = Number(changed.bits) || 4;
-          crusherNode._bitsValue = newBits;
-          const step = Math.pow(0.5, newBits - 1);
-          crusherNode._shaper?.setMap(
-            (val: number) => step * Math.floor(val / step + 0.5), 4096
-          );
-        }
-        break;
-      }
-
-      case 'PingPongDelay':
-        if (node instanceof Tone.PingPongDelay) {
-          if ('time' in changed) node.delayTime.rampTo(changed.time as number, R);
-          if ('feedback' in changed) node.feedback.rampTo(changed.feedback as number, R);
-        }
-        break;
-
-      case 'PitchShift':
-        if (node instanceof Tone.PitchShift) {
-          if ('pitch' in changed) node.pitch = changed.pitch as number;
-        }
-        break;
-
-      case 'Compressor':
-        if (node instanceof Tone.Compressor) {
-          if ('threshold' in changed) node.threshold.rampTo(changed.threshold as number, R);
-          if ('ratio' in changed) node.ratio.rampTo(changed.ratio as number, R);
-          if ('attack' in changed) node.attack.rampTo(changed.attack as number, R);
-          if ('release' in changed) node.release.rampTo(changed.release as number, R);
-        }
-        break;
-
-      case 'EQ3':
-        if (node instanceof Tone.EQ3) {
-          if ('low' in changed) node.low.rampTo(changed.low as number, R);
-          if ('mid' in changed) node.mid.rampTo(changed.mid as number, R);
-          if ('high' in changed) node.high.rampTo(changed.high as number, R);
-        }
-        break;
-
-      case 'Filter':
-        if (node instanceof Tone.Filter) {
-          if ('frequency' in changed) node.frequency.rampTo(changed.frequency as number, R);
-          if ('Q' in changed) node.Q.rampTo(changed.Q as number, R);
-          if ('type' in changed) node.type = changed.type as Tone.Filter['type'];
-          if ('rolloff' in changed) node.rolloff = changed.rolloff as Tone.FilterRollOff;
-          if ('gain' in changed) node.gain.rampTo(changed.gain as number, R);
-        }
-        break;
-
-      case 'AutoFilter':
-        if (node instanceof Tone.AutoFilter) {
-          if ('frequency' in changed) node.frequency.rampTo(changed.frequency as number, R);
-          if ('baseFrequency' in changed) node.baseFrequency = changed.baseFrequency as number;
-          if ('octaves' in changed) node.octaves = changed.octaves as number;
-        }
-        break;
-
-      case 'AutoPanner':
-        if (node instanceof Tone.AutoPanner) {
-          if ('frequency' in changed) node.frequency.rampTo(changed.frequency as number, R);
-          if ('depth' in changed) node.depth.rampTo(changed.depth as number, R);
-        }
-        break;
-
-      case 'StereoWidener':
-        if (node instanceof Tone.StereoWidener) {
-          if ('width' in changed) node.width.rampTo(Math.min(0.85, Number(changed.width)), R);
-        }
-        break;
-
-      case 'SpaceyDelayer':
-        if (node instanceof SpaceyDelayerEffect) {
-          if ('firstTap' in changed) node.setFirstTap(Number(changed.firstTap));
-          if ('tapSize' in changed) node.setTapSize(Number(changed.tapSize));
-          if ('feedback' in changed) node.setFeedback(Number(changed.feedback));
-          if ('multiTap' in changed) node.setMultiTap(Number(changed.multiTap));
-          if ('tapeFilter' in changed) node.setTapeFilter(Number(changed.tapeFilter));
-        }
-        break;
-
-      case 'RETapeEcho':
-        if (node instanceof RETapeEchoEffect) {
-          if ('mode' in changed) node.setMode(Number(changed.mode));
-          if ('repeatRate' in changed) node.setRepeatRate(Number(changed.repeatRate));
-          if ('intensity' in changed) node.setIntensity(Number(changed.intensity));
-          if ('echoVolume' in changed) node.setEchoVolume(Number(changed.echoVolume));
-          if ('wow' in changed) node.setWow(Number(changed.wow));
-          if ('flutter' in changed) node.setFlutter(Number(changed.flutter));
-          if ('dirt' in changed) node.setDirt(Number(changed.dirt));
-          if ('inputBleed' in changed) node.setInputBleed(Number(changed.inputBleed));
-          if ('loopAmount' in changed) node.setLoopAmount(Number(changed.loopAmount));
-          if ('playheadFilter' in changed) node.setPlayheadFilter(Number(changed.playheadFilter));
-        }
-        break;
-
-      case 'SpaceEcho':
-        if (node instanceof SpaceEchoEffect) {
-          if ('mode' in changed) node.setMode(Number(changed.mode));
-          if ('rate' in changed) node.setRate(Number(changed.rate));
-          if ('intensity' in changed) node.setIntensity(Number(changed.intensity));
-          if ('echoVolume' in changed) node.setEchoVolume(Number(changed.echoVolume));
-          if ('reverbVolume' in changed) node.setReverbVolume(Number(changed.reverbVolume));
-          if ('bass' in changed) node.setBass(Number(changed.bass));
-          if ('treble' in changed) node.setTreble(Number(changed.treble));
-        }
-        break;
-
-      case 'BiPhase':
-        if (node instanceof BiPhaseEffect) {
-          const biPhase = node as unknown as { rateA: number; depthA: number; rateB: number; depthB: number; feedback: number };
-          if ('rateA' in changed) biPhase.rateA = Number(changed.rateA);
-          if ('depthA' in changed) biPhase.depthA = Number(changed.depthA);
-          if ('rateB' in changed) biPhase.rateB = Number(changed.rateB);
-          if ('depthB' in changed) biPhase.depthB = Number(changed.depthB);
-          if ('feedback' in changed) biPhase.feedback = Number(changed.feedback);
-        }
-        break;
-
-      case 'DubFilter':
-        if (node instanceof DubFilterEffect) {
-          if ('cutoff' in changed) node.setCutoff(Number(changed.cutoff));
-          if ('resonance' in changed) node.setResonance(Number(changed.resonance));
-          if ('gain' in changed) node.setGain(Number(changed.gain));
-        }
-        break;
-
-      case 'MoogFilter':
-        if (node instanceof MoogFilterEffect) {
-          if ('cutoff' in changed) node.setCutoff(Number(changed.cutoff));
-          if ('resonance' in changed) node.setResonance(Number(changed.resonance) / 100); // UI 0-100 → WASM 0-1
-          if ('drive' in changed) node.setDrive(Number(changed.drive));
-          if ('model' in changed) node.setModel(Number(changed.model) as MoogFilterModel);
-          if ('filterMode' in changed) node.setFilterMode(Number(changed.filterMode) as MoogFilterMode);
-        }
-        break;
-
-      case 'MVerb':
-        if (node instanceof MVerbEffect) {
-          if ('damping' in changed) node.setDamping(Number(changed.damping));
-          if ('density' in changed) node.setDensity(Number(changed.density));
-          if ('bandwidth' in changed) node.setBandwidth(Number(changed.bandwidth));
-          if ('decay' in changed) node.setDecay(Number(changed.decay));
-          if ('predelay' in changed) node.setPredelay(Number(changed.predelay));
-          if ('size' in changed) node.setSize(Number(changed.size));
-          if ('gain' in changed) node.setGain(Number(changed.gain));
-          if ('mix' in changed) node.setMix(Number(changed.mix));
-          if ('earlyMix' in changed) node.setEarlyMix(Number(changed.earlyMix));
-        }
-        break;
-
-      case 'Leslie':
-        if (node instanceof LeslieEffect) {
-          if ('speed' in changed) node.setSpeed(Number(changed.speed));
-          if ('hornRate' in changed) node.setHornRate(Number(changed.hornRate));
-          if ('drumRate' in changed) node.setDrumRate(Number(changed.drumRate));
-          if ('hornDepth' in changed) node.setHornDepth(Number(changed.hornDepth));
-          if ('drumDepth' in changed) node.setDrumDepth(Number(changed.drumDepth));
-          if ('doppler' in changed) node.setDoppler(Number(changed.doppler));
-          if ('mix' in changed) node.setMix(Number(changed.mix));
-          if ('width' in changed) node.setWidth(Number(changed.width));
-          if ('acceleration' in changed) node.setAcceleration(Number(changed.acceleration));
-        }
-        break;
-
-      case 'SpringReverb':
-        if (node instanceof SpringReverbEffect) {
-          if ('decay' in changed) node.setDecay(Number(changed.decay));
-          if ('damping' in changed) node.setDamping(Number(changed.damping));
-          if ('tension' in changed) node.setTension(Number(changed.tension));
-          if ('mix' in changed) node.setSpringMix(Number(changed.mix));
-          if ('drip' in changed) node.setDrip(Number(changed.drip));
-          if ('diffusion' in changed) node.setDiffusion(Number(changed.diffusion));
-        }
-        break;
-
-      case 'Reverb':
-        if (node instanceof Tone.Reverb) {
-          if ('decay' in changed) node.decay = changed.decay as number;
-          if ('preDelay' in changed) node.preDelay = changed.preDelay as number;
-        }
-        break;
-
-      case 'JCReverb':
-        if (node instanceof Tone.JCReverb) {
-          if ('roomSize' in changed) node.roomSize.rampTo(Math.min(0.9, Number(changed.roomSize)), R);
-        }
-        break;
-
-      case 'SidechainCompressor':
-        if (node instanceof SidechainCompressor) {
-          if ('threshold' in changed) node.threshold = changed.threshold as number;
-          if ('ratio' in changed) node.ratio = changed.ratio as number;
-          if ('attack' in changed) node.attack = changed.attack as number;
-          if ('release' in changed) node.release = changed.release as number;
-          if ('knee' in changed) node.knee = changed.knee as number;
-          if ('sidechainGain' in changed) node.sidechainGain = changed.sidechainGain as number;
-        }
-        break;
-
-      case 'TapeSaturation':
-        if (node instanceof TapeSaturation) {
-          if ('drive' in changed) node.drive = (changed.drive as number) / 100; // UI 0-100 → internal 0-1
-          if ('tone' in changed) node.tone = changed.tone as number;
-        }
-        break;
-
-      case 'VinylNoise':
-        if (node instanceof VinylNoiseEffect) {
-          if ('hiss'            in changed) node.setHiss           (Number(changed.hiss)            / 100);
-          if ('dust'            in changed) node.setDust           (Number(changed.dust)            / 100);
-          if ('age'             in changed) node.setAge            (Number(changed.age)             / 100);
-          if ('speed'           in changed) node.setSpeed          (Number(changed.speed)           / 100);
-          if ('riaa'            in changed) node.setRiaa           (Number(changed.riaa)            / 100);
-          if ('stylusResonance' in changed) node.setStylusResonance(Number(changed.stylusResonance) / 100);
-          if ('wornStylus'      in changed) node.setWornStylus     (Number(changed.wornStylus)      / 100);
-          if ('pinch'           in changed) node.setPinch          (Number(changed.pinch)           / 100);
-          if ('innerGroove'     in changed) node.setInnerGroove    (Number(changed.innerGroove)     / 100);
-          if ('ghostEcho'       in changed) node.setGhostEcho      (Number(changed.ghostEcho)       / 100);
-          if ('dropout'         in changed) node.setDropout        (Number(changed.dropout)         / 100);
-          if ('warp'            in changed) node.setWarp           (Number(changed.warp)            / 100);
-          if ('eccentricity'    in changed) node.setEccentricity   (Number(changed.eccentricity)    / 100);
-        }
-        break;
-
-      case 'Tumult':
-        if (node instanceof TumultEffect) {
-          for (const key of Object.keys(changed)) {
-            node.setParam(key as keyof TumultOptions, Number(changed[key]));
-          }
-        }
-        break;
-
-      case 'TapeSimulator':
-        if (node instanceof TapeSimulatorEffect) {
-          if ('drive'     in changed) node.setDrive    (Number(changed.drive)     / 100);
-          if ('character' in changed) node.setCharacter(Number(changed.character) / 100);
-          if ('bias'      in changed) node.setBias     (Number(changed.bias)      / 100);
-          if ('shame'     in changed) node.setShame    (Number(changed.shame)     / 100);
-          if ('hiss'      in changed) node.setHiss     (Number(changed.hiss)      / 100);
-          if ('speed'     in changed) node.setSpeed    (Number(changed.speed)); // 0|1 integer, not /100
-        }
-        break;
-
-      case 'ToneArm':
-        if (node instanceof ToneArmEffect) {
-          if ('wow'     in changed) node.setWow    (Number(changed.wow)     / 100);
-          if ('coil'    in changed) node.setCoil   (Number(changed.coil)    / 100);
-          if ('flutter' in changed) node.setFlutter(Number(changed.flutter) / 100);
-          if ('riaa'    in changed) node.setRiaa   (Number(changed.riaa)    / 100);
-          if ('stylus'  in changed) node.setStylus (Number(changed.stylus)  / 100);
-          if ('hiss'    in changed) node.setHiss   (Number(changed.hiss)    / 100);
-          if ('pops'    in changed) node.setPops   (Number(changed.pops)    / 100);
-          if ('rpm'     in changed) node.setRpm    (Number(changed.rpm)); // raw value, not /100
-        }
-        break;
-
-      case 'AutoWah':
-        if (node instanceof Tone.AutoWah) {
-          if ('baseFrequency' in changed) node.baseFrequency = changed.baseFrequency as number;
-          if ('octaves' in changed) node.octaves = changed.octaves as number;
-          if ('sensitivity' in changed) node.sensitivity = changed.sensitivity as number;
-          if ('Q' in changed) node.Q.rampTo(changed.Q as number, R);
-          if ('gain' in changed) node.gain.rampTo(changed.gain as number, R);
-          if ('follower' in changed) node.follower = changed.follower as number;
-        }
-        break;
-
-      case 'Chebyshev':
-        if (node instanceof Tone.Chebyshev) {
-          if ('order' in changed) node.order = changed.order as number;
-          if ('oversample' in changed) node.oversample = changed.oversample as OverSampleType;
-        }
-        break;
-
-      case 'FrequencyShifter':
-        if (node instanceof Tone.FrequencyShifter) {
-          if ('frequency' in changed) node.frequency.rampTo(changed.frequency as number, R);
-        }
-        break;
-
-      // WAM 2.0 effects
-      case 'WAMBigMuff':
-      case 'WAMTS9':
-      case 'WAMDistoMachine':
-      case 'WAMQuadraFuzz':
-      case 'WAMVoxAmp':
-      case 'WAMStonePhaser':
-      case 'WAMPingPongDelay':
-      case 'WAMFaustDelay':
-      case 'WAMPitchShifter':
-      case 'WAMGraphicEQ':
-      case 'WAMPedalboard':
-        if (node instanceof WAMEffectNode) {
-          for (const [key, value] of Object.entries(changed)) {
-            if (key === 'bpmSync' || key === 'syncDivision') continue;
-            node.setParameter(key, Number(value));
-          }
-        }
-        break;
-
-      case 'Neural':
-        if (node instanceof NeuralEffectWrapper) {
-          for (const [key, value] of Object.entries(changed)) {
-            node.setParameter(key, Number(value));
-          }
-        }
-        break;
-    }
+  private applyEffectParametersDiff(node: Tone.ToneAudioNode, type: string, changed: Record<string, number | string>): void {
+    _applyEffectParamsDiff(node, type, changed);
   }
 
-  /**
-   * Update all BPM-synced effects (master + per-instrument) when BPM changes.
-   * Recalculates timing values in-place — no chain rebuild needed.
-   */
-  public async updateBpmSyncedEffects(bpm: number): Promise<void> {
-    // 1. Master effects
-    this.masterEffectConfigs.forEach(({ node, config }) => {
-      if (!isEffectBpmSynced(config.parameters)) return;
-      const syncEntries = SYNCABLE_EFFECT_PARAMS[config.type];
-      if (!syncEntries) return;
-      const division = getEffectSyncDivision(config.parameters);
-      for (const entry of syncEntries) {
-        const value = computeSyncedValue(bpm, division, entry.unit);
-        this.applyBpmSyncedParam(node, config.type, entry.param, value);
-      }
-    });
-
-    // 2. Per-instrument effects
-    // Lazy-import to avoid circular: useInstrumentStore -> ToneEngine -> useInstrumentStore
-    try {
-      const { useInstrumentStore } = await import('../stores/useInstrumentStore');
-      const instruments = useInstrumentStore.getState().instruments;
-
-      this.instrumentEffectChains.forEach((chain, key) => {
-        // key format: numeric composite (instrumentId << 16 | channelIndex)
-        const instrumentId = key >> 16;
-        const instrument = instruments.find((inst: { id: number }) => inst.id === instrumentId);
-        if (!instrument?.effects) return;
-
-        const enabledEffects = instrument.effects.filter((fx: EffectConfig) => fx.enabled);
-
-        // Match chain nodes to enabled configs by index
-        enabledEffects.forEach((config: EffectConfig, idx: number) => {
-          if (idx >= chain.effects.length) return;
-          if (!isEffectBpmSynced(config.parameters)) return;
-          const syncEntries = SYNCABLE_EFFECT_PARAMS[config.type];
-          if (!syncEntries) return;
-          const division = getEffectSyncDivision(config.parameters);
-          const node = chain.effects[idx];
-          for (const entry of syncEntries) {
-            const value = computeSyncedValue(bpm, division, entry.unit);
-            this.applyBpmSyncedParam(node, config.type, entry.param, value);
-          }
-        });
-      });
-    } catch {
-      // Store not yet initialized — skip instrument sync
-    }
-  }
-
-  /**
-   * Apply a single BPM-synced parameter value to an effect node.
-   * Routes via the correct setter per effect type.
-   */
-  private applyBpmSyncedParam(
-    node: Tone.ToneAudioNode,
-    effectType: string,
-    paramKey: string,
-    value: number,
-  ): void {
-    try {
-      switch (effectType) {
-        case 'Delay':
-        case 'FeedbackDelay':
-          if (paramKey === 'time' && node instanceof Tone.FeedbackDelay) {
-            node.delayTime.rampTo(value, 0.02);
-          }
-          break;
-        case 'PingPongDelay':
-          if (paramKey === 'time' && node instanceof Tone.PingPongDelay) {
-            node.delayTime.rampTo(value, 0.02);
-          }
-          break;
-        case 'SpaceEcho':
-          if (paramKey === 'rate' && node instanceof SpaceEchoEffect) {
-            node.setRate(value);
-          }
-          break;
-        case 'SpaceyDelayer':
-          if (paramKey === 'firstTap' && node instanceof SpaceyDelayerEffect) {
-            node.setFirstTap(value);
-          }
-          break;
-        case 'RETapeEcho':
-          if (paramKey === 'repeatRate' && node instanceof RETapeEchoEffect) {
-            node.setRepeatRate(value);
-          }
-          break;
-        case 'Chorus':
-          if (paramKey === 'frequency' && node instanceof Tone.Chorus) {
-            node.frequency.rampTo(value, 0.02);
-          }
-          break;
-        case 'BiPhase':
-          if (paramKey === 'rateA' && node instanceof BiPhaseEffect) {
-            (node as unknown as { rateA: number }).rateA = value;
-          }
-          break;
-      }
-    } catch (error) {
-      console.warn('[ToneEngine] Failed to apply BPM-synced param:', effectType, paramKey, error);
-    }
+  private applyBpmSyncedParam(node: Tone.ToneAudioNode, effectType: string, paramKey: string, value: number): void {
+    _applyBpmSyncedParam(node, effectType, paramKey, value);
   }
 
   // ============================================================================
-  // PER-CHANNEL ROUTING (VOLUME, PAN, MUTE/SOLO)
+  // PER-CHANNEL ROUTING — delegated to ChannelRouting module
   // ============================================================================
 
-  /**
-   * Get or create a channel's audio chain
-   * Route: [Voices] → channelInput → channel (volume/pan) → masterInput
-   */
-  public getChannelOutput(channelIndex: number): Tone.Gain {
-    if (!this.channelOutputs.has(channelIndex)) {
-      // Create channel audio chain with metering
-      const input = new Tone.Gain(1);
-      const channel = new Tone.Channel({ volume: 0, pan: 0 });
-      const meter = new Tone.Meter({ smoothing: 0.8 });
-
-      // Connect: input → channel → meter → masterInput
-      input.connect(channel);
-      channel.connect(meter);
-      channel.connect(this.masterInput);
-
-      this.channelOutputs.set(channelIndex, {
-        input,
-        channel,
-        meter,
-      });
-    }
-
-    return this.channelOutputs.get(channelIndex)!.input;
-  }
-
-  /**
-   * Create a new voice chain for a note
-   */
-  private createVoice(channelIndex: number, instrument: Tone.ToneAudioNode | DevilboxSynth, note: string, config: InstrumentConfig): VoiceState {
-    const channelOutput = this.channelOutputs.get(channelIndex);
-    if (!channelOutput) throw new Error(`Channel ${channelIndex} not initialized`);
-
-    const gain = new Tone.Gain(1);
-    
-    // Hardware Quirk: Use IT-specific high-fidelity filter for IT modules
-    let filter: Tone.Filter | AudioWorkletNode;
-    const isIT = config.metadata?.importedFrom === 'IT';
-    
-    if (isIT && ToneEngine.itFilterWorkletLoaded) {
-      // Use native AudioWorkletNode directly (matches FurnaceDispatch fix)
-      const nCtx = this._nativeContext!;
-      filter = new AudioWorkletNode(nCtx, 'it-filter-processor');
-    } else {
-      filter = new Tone.Filter({
-        type: 'lowpass',
-        frequency: 20000,
-        Q: 0,
-        rolloff: -12,
-      });
-    }
-    
-    const panner = new Tone.Panner(0);
-
-    // Connect: Voice → gain → filter → panner → channelInput
-    if (filter instanceof Tone.Filter) {
-      gain.connect(filter);
-      filter.connect(panner);
-    } else {
-      // Raw Web Audio node connection
-      gain.connect(filter);
-      Tone.connect(filter, panner);
-    }
-    
-    // In DJ mode, route voices through deck audio chain instead of per-channel masterInput
-    const voiceOverride = this.instrumentOutputOverrides.get(config.id);
-    if (voiceOverride) {
-      panner.connect(voiceOverride);
-    } else {
-      panner.connect(channelOutput.input);
-    }
-
-    const envs = config.metadata?.envelopes?.[config.id];
-    const volEnv = new TrackerEnvelope();
-    const panEnv = new TrackerEnvelope();
-    const pitchEnv = new TrackerEnvelope();
-
-    if (envs?.volumeEnvelope) volEnv.init(envs.volumeEnvelope);
-    if (envs?.panningEnvelope) panEnv.init(envs.panningEnvelope);
-    if (envs?.pitchEnvelope) pitchEnv.init(envs.pitchEnvelope);
-
+  private get _channelCtx(): ChannelRoutingContext {
     return {
-      instrument,
-      note,
-      volumeEnv: volEnv,
-      panningEnv: panEnv,
-      pitchEnv: pitchEnv,
-      fadeout: 65536,
-      fadeoutStep: config.metadata?.modPlayback?.fadeout || 0,
-      isKeyOff: false,
-      isFilterEnvelope: (envs?.pitchEnvelope as any)?.type === 'filter',
-      lastCutoff: 127,
-      lastResonance: 0,
-      nodes: { gain, filter, panner }
+      masterInput: this.masterInput,
+      channelOutputs: this.channelOutputs,
+      activeVoices: this.activeVoices,
+      channelPitchState: this.channelPitchState,
+      channelMuteStates: this.channelMuteStates,
+      instruments: this.instruments,
+      instrumentSynthTypes: this.instrumentSynthTypes,
+      instrumentOutputOverrides: this.instrumentOutputOverrides,
+      itFilterWorkletLoaded: ToneEngine.itFilterWorkletLoaded,
+      nativeContext: this._nativeContext,
+      FILTER_CUTOFF_LUT: ToneEngine.FILTER_CUTOFF_LUT,
     };
   }
 
-  /**
-   * Helper to stop a specific voice
-   */
-  private stopVoice(voice: VoiceState, time: number): void {
-    if ((voice.instrument as any).stop) (voice.instrument as any).stop(time);
-    else if ((voice.instrument as any).triggerRelease) (voice.instrument as any).triggerRelease(time);
+  public getChannelOutput(channelIndex: number): Tone.Gain { return _getChannelOutput(this._channelCtx, channelIndex); }
+  private createVoice(channelIndex: number, instrument: Tone.ToneAudioNode | DevilboxSynth, note: string, config: InstrumentConfig): VoiceState { return _createVoice(this._channelCtx, channelIndex, instrument, note, config); }
+  private stopVoice(voice: VoiceState, time: number): void { _stopVoice(voice, time); }
+  public setChannelVolume(channelIndex: number, volumeDb: number): void { _setChannelVolume(this._channelCtx, channelIndex, volumeDb); }
+  public setChannelFilterCutoff(channelIndex: number, cutoff: number): void { _setChannelFilterCutoff(this._channelCtx, channelIndex, cutoff); }
+  public setChannelFilterResonance(channelIndex: number, resonance: number): void { _setChannelFilterResonance(this._channelCtx, channelIndex, resonance); }
+  public setChannelPan(channelIndex: number, pan: number | null | undefined): void { _setChannelPan(this._channelCtx, channelIndex, pan); }
+  public setChannelFunkRepeat(channelIndex: number, position: number): void { _setChannelFunkRepeat(this._channelCtx, channelIndex, position); }
+  public handlePastNoteAction(channelIndex: number, action: number): void { _handlePastNoteAction(this._channelCtx, channelIndex, action); }
+  public setChannelPitch(channelIndex: number, pitchMultiplier: number): void { _setChannelPitch(this._channelCtx, channelIndex, pitchMultiplier); }
+  private applyPitchToNode(node: Tone.ToneAudioNode | DevilboxSynth, pitchMultiplier: number, baseRate: number, instrumentKey: number): void { _applyPitchToNode(node, pitchMultiplier, baseRate, instrumentKey, this.instrumentSynthTypes); }
+  public setChannelFrequency(channelIndex: number, frequency: number): void { _setChannelFrequency(this._channelCtx, channelIndex, frequency); }
+  public initChannelPitch(channelIndex: number, instrumentKey: number, baseFrequency: number, basePlaybackRate: number = 1): void { _initChannelPitch(this._channelCtx, channelIndex, instrumentKey, baseFrequency, basePlaybackRate); }
+  public clearChannelPitch(channelIndex: number): void { _clearChannelPitch(this._channelCtx, channelIndex); }
+  public setChannelMute(channelIndex: number, muted: boolean): void { _setChannelMute(this._channelCtx, channelIndex, muted); }
+  public setMixerChannelVolume(channelIndex: number, volumeDb: number): void { _setMixerChannelVolume(this._channelCtx, channelIndex, volumeDb); }
+  public setMixerChannelPan(channelIndex: number, pan: number): void { _setMixerChannelPan(this._channelCtx, channelIndex, pan); }
+  public updateMuteStates(channels: { muted: boolean; solo: boolean }[]): void { _updateMuteStates(this._channelCtx, channels); }
+  public isChannelMuted(channelIndex: number): boolean { return _isChannelMuted(this._channelCtx, channelIndex); }
+  private disposeChannelOutputs(): void { _disposeChannelOutputs(this._channelCtx); }
+  public getChannelLevels(numChannels: number): number[] { return _getChannelLevels(this._channelCtx, numChannels); }
 
-    // Dispose nodes after a short delay to allow for audio tail/clipping prevention
-    setTimeout(() => {
-      voice.nodes.gain.dispose();
-      if (typeof (voice.nodes.filter as any).dispose === 'function') (voice.nodes.filter as any).dispose();
-      voice.nodes.panner.dispose();
-    }, 100);
-  }
-
-  /**
-   * Set channel volume (affects active voices on this channel)
-   * ProTracker Cxx command targets the voice/sample volume, not mixer volume
-   */
-  public setChannelVolume(channelIndex: number, volumeDb: number): void {
-    // Update active voice gains (ProTracker-style: Cxx affects sample volume)
-    const voices = this.activeVoices.get(channelIndex);
-
-    if (voices && voices.length > 0) {
-      const now = Tone.now();
-      // Convert dB to linear gain for voice nodes
-      const linearGain = volumeDb <= -60 ? 0 : Math.pow(10, volumeDb / 20);
-      for (const voice of voices) {
-        if (voice.nodes.gain) {
-          voice.nodes.gain.gain.setValueAtTime(linearGain, now);
-        } else {
-          console.warn(`[ToneEngine] Voice has no gain node!`, voice.nodes);
-        }
-      }
-    }
-
-    // Also update channel output for consistency (affects future notes)
-    const channelOutput = this.channelOutputs.get(channelIndex);
-    if (channelOutput) {
-      // Store as "base" volume but don't apply to channel mixer
-      // The voice gain handles the actual volume control
-    }
-  }
-
-  /**
-   * Set channel filter cutoff (IT Zxx command)
-   * Target the "current" voice's filter
-   */
-  public setChannelFilterCutoff(channelIndex: number, cutoff: number): void {
-    const voices = this.activeVoices.get(channelIndex);
-    if (!voices || voices.length === 0) return;
-
-    // Apply to the most recent voice (the "current" one)
-    const voice = voices[voices.length - 1];
-    voice.lastCutoff = cutoff;
-    const resonance = voice.lastResonance;
-
-    const filter = voice.nodes.filter;
-    const now = Tone.now();
-
-    // Hardware Quirk: Filter is bypassed ONLY if Cutoff=127 AND Resonance=0
-    // Or if ITHandler explicitly requested bypass via value 255
-    if ((cutoff >= 127 && resonance === 0) || cutoff === 255) {
-      if (filter instanceof Tone.Filter) {
-        filter.frequency.setValueAtTime(24000, now);
-        filter.Q.setValueAtTime(0, now);
-      } else if (filter instanceof AudioWorkletNode) {
-        filter.parameters.get('cutoff')?.setValueAtTime(127, now);
-        filter.parameters.get('resonance')?.setValueAtTime(0, now);
-      }
-      return;
-    }
-
-    if (filter instanceof Tone.Filter) {
-      // High-Fidelity IT Mapping:
-      // Cutoff 0-127 -> ~100Hz to 10000Hz (Exponential)
-      const freq = 100 * Math.pow(100, cutoff / 127);
-      filter.frequency.setValueAtTime(freq, now);
-    } else if (filter instanceof AudioWorkletNode) {
-      // Worklet uses raw IT values
-      filter.parameters.get('cutoff')?.setValueAtTime(cutoff, now);
-    }
-  }
-
-  /**
-   * Set channel filter resonance (IT Z8x command)
-   * Target the "current" voice's filter
-   */
-  public setChannelFilterResonance(channelIndex: number, resonance: number): void {
-    const voices = this.activeVoices.get(channelIndex);
-    if (!voices || voices.length === 0) return;
-
-    // Apply to the most recent voice
-    const voice = voices[voices.length - 1];
-    voice.lastResonance = resonance;
-    const cutoff = voice.lastCutoff;
-
-    const filter = voice.nodes.filter;
-    const now = Tone.now();
-
-    if (filter instanceof Tone.Filter) {
-      // High-Fidelity IT Mapping:
-      // IT resonance was quite aggressive. 0-127 -> Q 0.0 to ~25.0
-      // We use an exponential mapping for that "biting" resonance character
-      const q = (resonance / 127) * (resonance / 127) * 25;
-      filter.Q.setValueAtTime(q, now);
-    } else if (filter instanceof AudioWorkletNode) {
-      filter.parameters.get('resonance')?.setValueAtTime(resonance, now);
-    }
-
-    // If resonance was set but cutoff is at max, re-evaluate bypass
-    if (resonance > 0 && cutoff >= 127) {
-      this.setChannelFilterCutoff(channelIndex, cutoff);
-    }
-  }
-
-  /**
-   * Set channel pan (-100 to 100)
-   */
-  public setChannelPan(channelIndex: number, pan: number | null | undefined): void {
-    const voices = this.activeVoices.get(channelIndex);
-    if (!voices || voices.length === 0) return;
-
-    // Apply to current voice
-    const voice = voices[voices.length - 1];
-    const panValue = (pan ?? 0) / 100; // -1..1
-    voice.nodes.panner.pan.setValueAtTime(panValue, Tone.now());
-  }
-
-  /**
-   * Set channel Funk Repeat (EFx Invert Loop)
-   * Shifts the loop points of the current voice
-   */
-  public setChannelFunkRepeat(channelIndex: number, position: number): void {
-    const voices = this.activeVoices.get(channelIndex);
-    if (!voices || voices.length === 0) return;
-
-    const voice = voices[voices.length - 1];
-    const player = voice.instrument;
-
-    // Funk repeat only works on looping Players
-    if (player instanceof Tone.Player && player.loop) {
-      if (position === 0) {
-        // Reset to original loop points if needed (would need to store them)
-        return;
-      }
-
-      // ProTracker EFx shifts the loop start point within the loop
-      // position 0x00..0x80
-      const buffer = player.buffer;
-      if (buffer.loaded) {
-        const playerExt = player as unknown as { _originalLoopStart?: number };
-        const originalLoopStart = playerExt._originalLoopStart ?? player.loopStart;
-        if (playerExt._originalLoopStart === undefined) {
-          playerExt._originalLoopStart = player.loopStart as number;
-        }
-
-        // Shift loopStart based on position (approximate behavior)
-        const shiftSeconds = (position / 128) * ((player.loopEnd as number) - (originalLoopStart as number));
-        player.loopStart = (originalLoopStart as number) + shiftSeconds;
-      }
-    }
-  }
-
-  /**
-   * Handle IT Past Note Action (S77-S79)
-   * Targets all voices EXCEPT the most recent one
-   */
-  public handlePastNoteAction(channelIndex: number, action: number): void {
-    const voices = this.activeVoices.get(channelIndex);
-    if (!voices || voices.length <= 1) return;
-
-    // All voices except the last one are "past"
-    const pastVoices = voices.slice(0, voices.length - 1);
-    const currentVoice = voices[voices.length - 1];
-
-    if (action === 0) { // CUT
-      pastVoices.forEach(v => this.stopVoice(v, Tone.now()));
-      this.activeVoices.set(channelIndex, [currentVoice]);
-    } else if (action === 2) { // NOTE OFF
-      pastVoices.forEach(v => v.volumeEnv.keyOff());
-    } else if (action === 3) { // NOTE FADE
-      pastVoices.forEach(v => {
-        v.isKeyOff = true;
-        if (v.fadeoutStep === 0) v.fadeoutStep = 1024;
-      });
-    }
-  }
-
-  /**
-   * Set channel pitch for ProTracker effects (arpeggio, portamento, vibrato)
-   * @param channelIndex - Channel to modify
-   * @param pitchMultiplier - Pitch multiplier (1.0 = no change, 2.0 = octave up, 0.5 = octave down)
-   */
-  public setChannelPitch(channelIndex: number, pitchMultiplier: number): void {
-    const pitchState = this.channelPitchState.get(channelIndex);
-    if (!pitchState) return;
-
-    // Update current pitch multiplier
-    pitchState.currentPitchMult = pitchMultiplier;
-
-    // Apply to the most recent active voice on this channel
-    const voices = this.activeVoices.get(channelIndex);
-    if (!voices || voices.length === 0) {
-      // Fallback to shared instrument for non-NNA playback
-      const instrument = this.instruments.get(pitchState.instrumentKey);
-      if (!instrument) return;
-      this.applyPitchToNode(instrument, pitchMultiplier, pitchState.basePlaybackRate, pitchState.instrumentKey);
-      return;
-    }
-
-    const currentVoice = voices[voices.length - 1];
-    this.applyPitchToNode(currentVoice.instrument, pitchMultiplier, pitchState.basePlaybackRate, pitchState.instrumentKey);
-  }
-
-  /**
-   * Helper to apply pitch multiplier to a specific Tone node
-   */
-  private applyPitchToNode(node: Tone.ToneAudioNode | DevilboxSynth, pitchMultiplier: number, baseRate: number, instrumentKey: number): void {
-    const synthType = this.instrumentSynthTypes.get(instrumentKey);
-    const cents = 1200 * Math.log2(pitchMultiplier);
-
-    const n = node as any;
-    if (node instanceof Tone.Player || node instanceof Tone.GrainPlayer) {
-      (node as unknown as { playbackRate: number }).playbackRate = baseRate * pitchMultiplier;
-    } else if (synthType === 'Sampler') {
-      if (n.detune !== undefined) n.detune.value = cents;
-    } else {
-      // For synths: use detune property
-      if (n.detune !== undefined && n.detune instanceof Tone.Signal) {
-        n.detune.value = cents;
-      } else if (n.oscillator?.detune !== undefined) {
-        n.oscillator.detune.value = cents;
-      } else if (n.detune !== undefined) {
-        n.detune = cents; // Primitive
-      }
-    }
-  }
-
-  /**
-   * Set channel pitch using frequency directly (for portamento/arpeggio)
-   * @param channelIndex - Channel to modify
-   * @param frequency - Target frequency in Hz
-   */
-  public setChannelFrequency(channelIndex: number, frequency: number): void {
-    const pitchState = this.channelPitchState.get(channelIndex);
-    if (!pitchState || pitchState.baseFrequency === 0) {
-      // No pitch state - normal for channels without active notes
-      return;
-    }
-
-    // Calculate pitch multiplier from frequency ratio
-    const pitchMultiplier = frequency / pitchState.baseFrequency;
-    this.setChannelPitch(channelIndex, pitchMultiplier);
-  }
-
-  /**
-   * Initialize pitch state when a note is triggered on a channel
-   * Called from PatternScheduler when a note starts
-   */
-  public initChannelPitch(
-    channelIndex: number,
-    instrumentKey: number,
-    baseFrequency: number,
-    basePlaybackRate: number = 1
-  ): void {
-    this.channelPitchState.set(channelIndex, {
-      instrumentKey,
-      basePlaybackRate,
-      baseFrequency,
-      currentPitchMult: 1.0,
-    });
-  }
-
-  /**
-   * Clear pitch state for a channel (on note off or channel reset)
-   */
-  public clearChannelPitch(channelIndex: number): void {
-    const pitchState = this.channelPitchState.get(channelIndex);
-    if (pitchState) {
-      // Reset pitch to normal before clearing
-      this.setChannelPitch(channelIndex, 1.0);
-      this.channelPitchState.delete(channelIndex);
-    }
-  }
-
-  /**
-   * Mute/unmute channel
-   */
-  public setChannelMute(channelIndex: number, muted: boolean): void {
-    // Ensure channel exists
-    if (!this.channelOutputs.has(channelIndex)) {
-      this.getChannelOutput(channelIndex);
-    }
-    const channelOutput = this.channelOutputs.get(channelIndex);
-    if (channelOutput) {
-      channelOutput.channel.mute = muted;
-    }
-  }
-
-  /** Sets the persistent mixer fader volume (dB) on the channel output.
-   *  Unlike setChannelVolume (which affects active voice gains), this sets
-   *  the channel's Tone.Channel node directly — persists across notes. */
-  public setMixerChannelVolume(channelIndex: number, volumeDb: number): void {
-    if (!this.channelOutputs.has(channelIndex)) {
-      this.getChannelOutput(channelIndex);
-    }
-    const channelOutput = this.channelOutputs.get(channelIndex);
-    if (channelOutput) {
-      channelOutput.channel.volume.value = volumeDb;
-    }
-  }
-
-  /** Sets the persistent mixer pan on the channel output (-1..1). */
-  public setMixerChannelPan(channelIndex: number, pan: number): void {
-    if (!this.channelOutputs.has(channelIndex)) {
-      this.getChannelOutput(channelIndex);
-    }
-    const channelOutput = this.channelOutputs.get(channelIndex);
-    if (channelOutput) {
-      channelOutput.channel.pan.value = pan;
-    }
-  }
-
-  /**
-   * Update mute states for all channels considering solo logic
-   * Solo logic: if any channel is solo'd, only solo'd channels play
-   */
-  public updateMuteStates(channels: { muted: boolean; solo: boolean }[]): void {
-    const anySolo = channels.some(ch => ch.solo);
-
-    channels.forEach((channel, idx) => {
-      const shouldMute = anySolo
-        ? !channel.solo  // If any solo, mute non-solo'd channels
-        : channel.muted;  // Otherwise, respect individual mute states
-
-      // Store in quick lookup map
-      this.channelMuteStates.set(idx, shouldMute);
-
-      // Also update channel output if it exists
-      this.setChannelMute(idx, shouldMute);
-    });
-  }
-
-  /**
-   * Check if a channel should be muted (for use during note triggering)
-   */
-  public isChannelMuted(channelIndex: number): boolean {
-    return this.channelMuteStates.get(channelIndex) ?? false;
-  }
-
-  /**
-   * Dispose channel outputs
-   */
-  private disposeChannelOutputs(): void {
-    this.channelOutputs.forEach((channelOutput, channelIndex) => {
-      try {
-        channelOutput.meter.dispose();
-      } catch (e) {
-        console.warn(`[ToneEngine] Failed to dispose meter for channel ${channelIndex}:`, e);
-      }
-      try {
-        channelOutput.channel.dispose();
-      } catch (e) {
-        console.warn(`[ToneEngine] Failed to dispose channel ${channelIndex}:`, e);
-      }
-      try {
-        channelOutput.input.dispose();
-      } catch (e) {
-        console.warn(`[ToneEngine] Failed to dispose input for channel ${channelIndex}:`, e);
-      }
-    });
-    this.channelOutputs.clear();
-  }
-
-  /**
-   * Get all channel meter levels for VU meters
-   * Returns array of normalized values (0-1) for each channel
-   */
-  public getChannelLevels(numChannels: number): number[] {
-    const levels: number[] = [];
-    for (let i = 0; i < numChannels; i++) {
-      const channelOutput = this.channelOutputs.get(i);
-      if (channelOutput) {
-        // Meter returns dB value, convert to 0-1 range
-        // -60dB = 0, 0dB = 1
-        const db = channelOutput.meter.getValue() as number;
-        const normalized = Math.max(0, Math.min(1, (db + 60) / 60));
-        levels.push(normalized);
-      } else {
-        levels.push(0);
-      }
-    }
-    return levels;
-  }
-
-  // Channel trigger levels for VU meters (set when notes trigger)
-  private channelTriggerLevels: Map<number, number> = new Map();
-  // PERF: Pre-allocated arrays for trigger levels — never reallocated
-  private triggerLevelsCache: number[] = new Array(16).fill(0);
-  private triggerGensCache: number[] = new Array(16).fill(0);
-
-  // Per-channel generation counter — bumped each time a trigger fires.
-  // Consumers compare their "last seen" generation to detect new triggers
-  // without consume-on-read zeroing (which caused missed triggers due to
-  // RAF ordering between Tone.Draw and consumer animation loops).
-  private channelTriggerGens = new Map<number, number>();
-  private triggerGenCounter = 0;
-
-  /**
-   * Trigger a channel's VU meter (called when a note plays on that channel)
-   */
-  public triggerChannelMeter(channelIndex: number, velocity: number): void {
-    this.channelTriggerLevels.set(channelIndex, Math.min(1, velocity * 1.2));
-    this.channelTriggerGens.set(channelIndex, ++this.triggerGenCounter);
-  }
-
-  /**
-   * Clear all channel trigger levels (called on playback stop for instant VU silence)
-   */
-  public clearChannelTriggerLevels(): void {
-    this.channelTriggerLevels.clear();
-    this.channelTriggerGens.clear();
-  }
-
-  /**
-   * Get channel trigger levels for VU meters (real-time note triggers).
-   * Does NOT zero triggers on read — multiple consumers can read the same
-   * trigger. Consumers use getChannelTriggerGenerations() to detect NEW
-   * triggers vs. stale ones they've already processed.
-   * PERF: Reuses internal array to avoid allocations every frame.
-   */
-  public getChannelTriggerLevels(numChannels: number): number[] {
-    // Grow cache if needed (never shrinks — avoids reallocation)
-    if (this.triggerLevelsCache.length < numChannels) {
-      const old = this.triggerLevelsCache;
-      this.triggerLevelsCache = new Array(Math.max(numChannels, 16)).fill(0);
-      for (let j = 0; j < old.length; j++) this.triggerLevelsCache[j] = old[j];
-    }
-
-    for (let i = 0; i < numChannels; i++) {
-      this.triggerLevelsCache[i] = this.channelTriggerLevels.get(i) || 0;
-    }
-    return this.triggerLevelsCache;
-  }
-
-  /**
-   * Get per-channel trigger generation counters.
-   * Each call to triggerChannelMeter() bumps the generation for that channel.
-   * Consumers compare with their "last seen" generation to detect new triggers.
-   * PERF: Reuses internal array to avoid allocations every frame.
-   */
-  public getChannelTriggerGenerations(numChannels: number): number[] {
-    if (this.triggerGensCache.length < numChannels) {
-      this.triggerGensCache = new Array(Math.max(numChannels, 16)).fill(0);
-    }
-    for (let i = 0; i < numChannels; i++) {
-      this.triggerGensCache[i] = this.channelTriggerGens.get(i) || 0;
-    }
-    return this.triggerGensCache;
-  }
+  // Channel metering — delegated to ChannelMeterState
+  public triggerChannelMeter(channelIndex: number, velocity: number): void { _triggerChannelMeter(this.channelMeter, channelIndex, velocity); }
+  public clearChannelTriggerLevels(): void { _clearChannelTriggerLevels(this.channelMeter); }
+  public getChannelTriggerLevels(numChannels: number): number[] { return _getChannelTriggerLevels(this.channelMeter, numChannels); }
+  public getChannelTriggerGenerations(numChannels: number): number[] { return _getChannelTriggerGenerations(this.channelMeter, numChannels); }
 
   /**
    * Get waveform data for oscilloscope
@@ -6847,104 +4542,8 @@ export class ToneEngine {
   /**
    * Process tracker envelopes for a channel (Sub-tick processing)
    */
-  public updateChannelEnvelopes(channelIndex: number): void {
-    const voices = this.activeVoices.get(channelIndex);
-    const channelOutput = this.channelOutputs.get(channelIndex);
-    if (!voices || voices.length === 0 || !channelOutput) return;
-
-    // Cache current time once for all voices (hot path optimization)
-    const now = Tone.now();
-    const basePan = channelOutput.channel.pan.value;
-
-    // In-place filtering: track write index
-    let writeIdx = 0;
-    const len = voices.length;
-
-    for (let i = 0; i < len; i++) {
-      const voice = voices[i];
-
-      // 1. Advance volume envelope (0-64)
-      const envVol = voice.volumeEnv.tickNext();
-
-      // Advance fadeout if key is off
-      if (voice.isKeyOff && voice.fadeout > 0) {
-        voice.fadeout = Math.max(0, voice.fadeout - voice.fadeoutStep);
-      }
-
-      // Calculate final volume multiplier (0.0 to 1.0)
-      const volMult = (envVol / 64) * (voice.fadeout / 65536);
-      voice.nodes.gain.gain.setValueAtTime(volMult, now);
-
-      // 2. Advance panning envelope (0-64)
-      const envPan = voice.panningEnv.tickNext();
-      if (envPan !== 32) {
-        const envOffset = (envPan - 32) / 32;
-        const finalPan = Math.max(-1, Math.min(1, basePan + envOffset));
-        voice.nodes.panner.pan.setValueAtTime(finalPan, now);
-      }
-
-      // 3. Advance pitch/filter envelope
-      const envPitch = voice.pitchEnv.tickNext();
-      if (voice.pitchEnv.isEnabled()) {
-        if (voice.isFilterEnvelope) {
-          const baseCutoff = voice.lastCutoff;
-          const envOffset = (envPitch - 32);
-          const finalCutoff = Math.max(0, Math.min(127, baseCutoff + envOffset));
-
-          // Apply to voice filter using LUT
-          if (voice.nodes.filter instanceof Tone.Filter) {
-            const freq = ToneEngine.FILTER_CUTOFF_LUT[finalCutoff];
-            voice.nodes.filter.frequency.setValueAtTime(freq, now);
-          } else if (voice.nodes.filter instanceof AudioWorkletNode) {
-            voice.nodes.filter.parameters.get('cutoff')?.setValueAtTime(finalCutoff, now);
-          }
-        } else {
-          // Pitch modulation (Additive semitones)
-          const semitoneOffset = (envPitch - 32) / 32 * 12; // +/- 12 semitones
-          const instWithDetune = voice.instrument as unknown as { detune?: { value: number } };
-          if (instWithDetune.detune !== undefined) {
-            instWithDetune.detune.value = semitoneOffset * 100;
-          }
-        }
-      }
-
-      // Cleanup: check if voice is finished
-      const isFinished = (voice.isKeyOff && voice.fadeout <= 0) ||
-                        (voice.volumeEnv.isFinished() && voice.isKeyOff);
-
-      if (!isFinished) {
-        // Keep voice - write to current position
-        voices[writeIdx++] = voice;
-      } else {
-        // Dispose nodes
-        voice.nodes.gain.dispose();
-        if (typeof (voice.nodes.filter as any).dispose === 'function') (voice.nodes.filter as any).dispose();
-        voice.nodes.panner.dispose();
-      }
-    }
-
-    // Truncate array in-place
-    if (writeIdx > 0) {
-      voices.length = writeIdx;
-    } else {
-      this.activeVoices.delete(channelIndex);
-    }
-  }
-
-  /**
-   * Signal key-off for a channel
-   */
-  public setChannelKeyOff(channelIndex: number): void {
-    const voices = this.activeVoices.get(channelIndex);
-    if (voices) {
-      voices.forEach(voice => {
-        voice.isKeyOff = true;
-        voice.volumeEnv.keyOff();
-        voice.panningEnv.keyOff();
-        voice.pitchEnv.keyOff();
-      });
-    }
-  }
+  public updateChannelEnvelopes(channelIndex: number): void { _updateChannelEnvelopes(this._channelCtx, channelIndex); }
+  public setChannelKeyOff(channelIndex: number): void { _setChannelKeyOff(this._channelCtx, channelIndex); }
 
   // ============================================
   // END TRACKER ENVELOPE PROCESSING
