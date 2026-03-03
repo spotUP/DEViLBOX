@@ -472,7 +472,7 @@ export const useUIStore = create<UIStore>()(
           state.viewExposeActive = !state.viewExposeActive;
           if (state.viewExposeActive) {
             // Pre-select current view when opening
-            const EXPOSE_VIEWS = ['tracker', 'arrangement', 'pianoroll', 'dj', 'vj', 'studio'];
+            const EXPOSE_VIEWS = ['tracker', 'arrangement', 'pianoroll', 'mixer', 'dj', 'vj', 'studio'];
             const idx = EXPOSE_VIEWS.indexOf(state.activeView);
             state.viewExposeSelectedIdx = idx >= 0 ? idx : 0;
           }
