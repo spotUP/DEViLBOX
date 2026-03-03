@@ -2,7 +2,7 @@
  * PixiNavBar — Modern single-row navigation bar.
  *
  * Three zones:
- *   Left (160px):  Logo + view selector pills (TRK, ARR, PRD, DJ, VJ, STU)
+ *   Left (460px):  Logo + view selector pills (Tracker, Arrange, Piano, DJ, VJ, Studio)
  *   Center (flex):  PixiTransportBar (play/stop/BPM/position/loop)
  *   Right:  Volume knob, Save, Load, Collab, Auth, MIDI, Theme, Dock, DOM
  */
@@ -29,12 +29,12 @@ import { PixiTransportBar } from './PixiTransportBar';
 // ─── View selector pills ─────────────────────────────────────────────────────
 
 const VIEW_TABS = [
-  { id: 'tracker',     label: 'TRK' },
-  { id: 'arrangement', label: 'ARR' },
-  { id: 'pianoroll',   label: 'PRD' },
+  { id: 'tracker',     label: 'Tracker' },
+  { id: 'arrangement', label: 'Arrange' },
+  { id: 'pianoroll',   label: 'Piano' },
   { id: 'dj',          label: 'DJ'  },
   { id: 'vj',          label: 'VJ'  },
-  { id: 'studio',      label: 'STU' },
+  { id: 'studio',      label: 'Studio' },
 ] as const;
 
 // ─── PixiNavBar ──────────────────────────────────────────────────────────────
@@ -156,7 +156,7 @@ export const PixiNavBar: React.FC<PixiNavBarProps> = ({
   }, [width, theme]);
 
   // Transport bar width: center zone gets whatever's left after left/right
-  const LEFT_W = 280;
+  const LEFT_W = 460;
   const RIGHT_W = 380;
   const transportW = Math.max(200, width - LEFT_W - RIGHT_W);
 
@@ -182,7 +182,7 @@ export const PixiNavBar: React.FC<PixiNavBarProps> = ({
           flexDirection: 'row',
           alignItems: 'center',
           paddingLeft: 16,
-          gap: 4,
+          gap: 6,
           flexShrink: 0,
         }}
       >
@@ -205,7 +205,6 @@ export const PixiNavBar: React.FC<PixiNavBarProps> = ({
               size="sm"
               active={isActive}
               onClick={() => setActiveView(id as any)}
-              width={36}
             />
           );
         })}
