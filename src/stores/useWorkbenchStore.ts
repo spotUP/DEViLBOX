@@ -51,17 +51,37 @@ function computeDefaultWindows(): Record<WindowId, WindowState> {
   const ww = typeof window !== 'undefined' ? window.innerWidth  : 1280;
   const wh = typeof window !== 'undefined' ? window.innerHeight : 768;
   const workbenchH = Math.max(400, wh - CHROME_H);
-  const trackerW   = Math.max(700, ww - 80);
-  const trackerH   = Math.max(500, workbenchH - 20);
+  const gap = 20;
+
+  // Row 1: Tracker (left, main) + VJ (right)
+  const trackerW = Math.max(700, Math.round((ww - gap * 3) * 0.65));
+  const trackerH = Math.max(400, Math.round(workbenchH * 0.6));
+  const vjW = Math.max(400, ww - trackerW - gap * 3);
+  const vjH = trackerH;
+
+  // Row 2: Instrument + Piano Roll + Mixer (tiled below tracker row)
+  const row2Y = trackerH + gap * 2;
+  const row2H = Math.max(250, workbenchH - trackerH - gap * 3);
+  const instrW = 700;
+  const pianoW = 900;
+  const mixerW = Math.min(900, ww - gap * 2);
+
+  // Row 3: Arrangement (full width below row 2)
+  const row3Y = row2Y + row2H + gap;
+  const arrH = 300;
+
+  // DJ gets its own area offset to the right
+  const djW = Math.min(1100, ww - gap * 2);
+
   return {
-    tracker:     { x: 20, y: 10, width: trackerW, height: trackerH,         zIndex: 1, visible: true,  minimized: false, maximized: false },
-    pianoroll:   { x: 20, y: trackerH + 80, width: 900,      height: 400,   zIndex: 2, visible: false, minimized: false, maximized: false },
-    arrangement: { x: 20, y: trackerH + 80, width: trackerW, height: 300,   zIndex: 3, visible: false, minimized: false, maximized: false },
-    dj:          { x: 20, y: 10, width: Math.min(1100, ww - 80), height: 500, zIndex: 4, visible: false, minimized: false, maximized: false },
-    vj:          { x: 800, y: 40, width: 600, height: 400,                  zIndex: 5, visible: false, minimized: false, maximized: false },
-    instrument:  { x: 20, y: trackerH + 80, width: 700, height: 260,        zIndex: 6, visible: true,  minimized: false, maximized: false },
-    mixer:       { x: 20, y: trackerH + 80, width: Math.min(900, ww - 80), height: 220, zIndex: 7, visible: false, minimized: false, maximized: false },
-    'master-fx': { x: 20 + Math.min(900, ww - 80) + 20, y: trackerH + 80, width: 280, height: 360, zIndex: 8, visible: false, minimized: false, maximized: false },
+    tracker:     { x: gap,                    y: gap,   width: trackerW,  height: trackerH,  zIndex: 1, visible: true,  minimized: false, maximized: false },
+    instrument:  { x: gap,                    y: row2Y, width: instrW,    height: row2H,     zIndex: 6, visible: true,  minimized: false, maximized: false },
+    pianoroll:   { x: instrW + gap * 2,       y: row2Y, width: pianoW,    height: row2H,     zIndex: 2, visible: false, minimized: false, maximized: false },
+    arrangement: { x: gap,                    y: row3Y, width: trackerW,  height: arrH,      zIndex: 3, visible: false, minimized: false, maximized: false },
+    mixer:       { x: gap,                    y: row3Y + arrH + gap, width: mixerW, height: 220, zIndex: 7, visible: false, minimized: false, maximized: false },
+    'master-fx': { x: mixerW + gap * 2,       y: row3Y + arrH + gap, width: 280,  height: 360,  zIndex: 8, visible: false, minimized: false, maximized: false },
+    dj:          { x: trackerW + gap * 2,     y: gap,   width: djW,       height: 500,       zIndex: 4, visible: false, minimized: false, maximized: false },
+    vj:          { x: trackerW + gap * 2,     y: gap,   width: vjW,       height: vjH,       zIndex: 5, visible: false, minimized: false, maximized: false },
   };
 }
 
@@ -318,7 +338,7 @@ export const useWorkbenchStore = create<WorkbenchStore>()(
     })),
     {
       name: 'devilbox-workbench',
-      version: 2,
+      version: 3,
       partialize: (state) => ({
         camera: state.camera,
         windows: state.windows,

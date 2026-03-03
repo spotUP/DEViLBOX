@@ -109,7 +109,9 @@ export const PixiMainLayout: React.FC = () => {
   // In the modern fixed-zone layout, keep those window entries in sync so views
   // fill the zone correctly. Height includes TITLE_H so views compute
   // contentH = height - TITLE_H correctly.
+  // NOTE: Skip when in studio mode — the workbench manages its own window positions.
   useEffect(() => {
+    if (mainViewId === 'studio') return;
     const store = useWorkbenchStore.getState();
     // Map our view IDs to workbench window IDs
     const viewToWindowId: Record<string, string> = {
@@ -121,8 +123,8 @@ export const PixiMainLayout: React.FC = () => {
     };
     const winId = viewToWindowId[mainViewId];
     if (winId && store.windows[winId]) {
+      // Only resize — don't move, to preserve workbench positions
       store.resizeWindow(winId, width, mainViewH + TITLE_H);
-      store.moveWindow(winId, 0, 0);
       if (!store.windows[winId].visible) store.showWindow(winId);
     }
     // Also sync dock views (mixer, instrument, master-fx)

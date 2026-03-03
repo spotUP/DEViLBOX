@@ -184,12 +184,14 @@ export const PixiAutomationLanes: React.FC<PixiAutomationLanesProps> = ({
 
       if (points.length < 2) continue;
 
-      // Fill area
-      g.moveTo(laneLeft + LANE_WIDTH, yOffset);
-      for (let i = points.length - 1; i >= 0; i--) {
+      // Fill area between curve and right edge of lane
+      const rightX = laneLeft + LANE_WIDTH;
+      g.moveTo(rightX, points[0].y);
+      g.lineTo(points[0].x, points[0].y);
+      for (let i = 1; i < points.length; i++) {
         g.lineTo(points[i].x, points[i].y);
       }
-      g.lineTo(laneLeft + LANE_WIDTH, yOffset + pLength * rowHeight);
+      g.lineTo(rightX, points[points.length - 1].y);
       g.closePath();
       g.fill({ color: accentColor, alpha: 0.1 * alpha });
 
