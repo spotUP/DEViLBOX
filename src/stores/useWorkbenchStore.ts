@@ -339,6 +339,18 @@ export const useWorkbenchStore = create<WorkbenchStore>()(
     {
       name: 'devilbox-workbench',
       version: 3,
+      migrate: (_persisted, version) => {
+        // v2→v3: window positions were corrupted by zone sync moveWindow(0,0).
+        // Discard old windows and use fresh defaults.
+        if (version < 3) {
+          return {
+            ...(_persisted as Record<string, unknown>),
+            windows: computeDefaultWindows(),
+            camera: { x: 0, y: 0, scale: 1 },
+          };
+        }
+        return _persisted as Record<string, unknown>;
+      },
       partialize: (state) => ({
         camera: state.camera,
         windows: state.windows,
