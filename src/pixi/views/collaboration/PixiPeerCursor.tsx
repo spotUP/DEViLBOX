@@ -81,7 +81,7 @@ export const PixiPeerCursor: React.FC<PixiPeerCursorProps> = ({ width, height })
         g.lineTo(x + 14, y + 12);
         g.closePath();
         g.fill({ color: CURSOR_COLOR });
-        g.stroke({ color: 0xffffff, width: 1.5 });
+        g.stroke({ color: 0xffffff, alpha: 0.7, width: 1.5 });
       }
 
       rafId = requestAnimationFrame(tick);
