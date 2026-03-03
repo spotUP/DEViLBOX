@@ -212,6 +212,7 @@ export type SynthType =
   | 'DeltaMusic1Synth' // Delta Music 1.0 (4-channel Amiga wavetable + ADSR synthesis)
   | 'DeltaMusic2Synth' // Delta Music 2.0 (4-channel Amiga wavetable + vol/vib table synthesis)
   | 'SonicArrangerSynth' // Sonic Arranger (18-mode wavetable synthesis + ADSR/AMF tables)
+  | 'JamCrackerSynth' // JamCracker Pro (transpiled 68k replayer + Paula emulation WASM)
   // SunVox modular synthesizer
   | 'SunVoxSynth'     // SunVox WASM patch player (.sunsynth / .sunvox)
   // Modular Synthesis
@@ -705,6 +706,37 @@ export const DEFAULT_HIVELY: HivelyConfig = {
     speed: 1,
     entries: [{ note: 0, waveform: 2, fixed: false, fx: [0, 0], fxParam: [0, 0] }],
   },
+};
+
+// ── JamCracker Pro Configuration ────────────────────────────────────────────
+
+export interface JamCrackerConfig {
+  /** Instrument name (up to 31 chars) */
+  name: string;
+  /** Instrument flags: bit 0 = loop, bit 1 = AM synth (vs PCM) */
+  flags: number;
+  /** AM synthesis: waveform data (64 bytes per waveform chunk) */
+  waveformData?: Uint8Array;
+  /** AM synthesis: phase modulation delta (controls blend rate) */
+  phaseDelta: number;
+  /** Volume (0-64, Amiga standard) */
+  volume: number;
+  /** Sample size in bytes */
+  sampleSize: number;
+  /** Is this an AM/synthesis instrument? */
+  isAM: boolean;
+  /** Has sample loop? */
+  hasLoop: boolean;
+}
+
+export const DEFAULT_JAMCRACKER: JamCrackerConfig = {
+  name: 'JC Instrument',
+  flags: 0,
+  phaseDelta: 0,
+  volume: 64,
+  sampleSize: 0,
+  isAM: false,
+  hasLoop: false,
 };
 
 /**
@@ -3850,6 +3882,8 @@ export interface InstrumentConfig {
   chiptuneModule?: ChiptuneModuleConfig;
   // HivelyTracker / AHX instrument
   hively?: HivelyConfig;
+  // JamCracker Pro (AM synth / PCM instruments)
+  jamCracker?: JamCrackerConfig;
   // UADE exotic Amiga format (playback-only)
   uade?: UADEConfig;
   // UADE Format-Specific Synths (native DSP via WASM)

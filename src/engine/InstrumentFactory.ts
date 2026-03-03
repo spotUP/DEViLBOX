@@ -30,6 +30,7 @@ import {
 } from '@/types/instrument';
 import { TapeSaturation } from './effects/TapeSaturation';
 import { HivelySynth } from './hively/HivelySynth';
+import { JamCrackerSynth } from './jamcracker/JamCrackerSynth';
 import { SoundMonSynth } from './soundmon/SoundMonSynth';
 import { SidMonSynth } from './sidmon/SidMonSynth';
 import { DigMugSynth } from './digmug/DigMugSynth';
@@ -428,6 +429,7 @@ export class InstrumentFactory {
     'MAMERF5C400': 0,      // Silent (sample-playback chip, needs ROM + mapping)
     'ModularSynth': 0,     // Not yet calibrated
     'HivelySynth': 0,     // WASM song player — volume managed internally
+    'JamCrackerSynth': 0, // JamCracker WASM replayer — volume managed internally
     'OctaMEDSynth': 0,   // OctaMED synth instrument — volume managed internally
     'UADESynth': 0,       // UADE exotic Amiga player — volume managed internally
     'SunVoxSynth': 0,     // SunVox WASM patch player — volume managed internally
@@ -855,6 +857,10 @@ export class InstrumentFactory {
 
       case 'HivelySynth':
         instrument = new HivelySynth();
+        break;
+
+      case 'JamCrackerSynth':
+        instrument = new JamCrackerSynth();
         break;
 
       case 'SoundMonSynth': {

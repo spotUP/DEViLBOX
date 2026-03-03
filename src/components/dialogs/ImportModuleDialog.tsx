@@ -80,7 +80,9 @@ type NativeFormatKey =
   // ── Extension-based formats missing from earlier audit ────────────────────────
   | 'karlMorton' | 'xmf' | 'uax'
   // ── Formats with native parsers (vs libopenmpt as fallback) ─────────────────
-  | 'imagoOrpheus' | 'cdfm67' | 'easyTrax' | 'madTracker2' | 'psm' | 'pt36';
+  | 'imagoOrpheus' | 'cdfm67' | 'easyTrax' | 'madTracker2' | 'psm' | 'pt36'
+  // ── C64 SID ─────────────────────────────────────────────────────────────────
+  | 'c64sid';
 
 const NATIVE_FORMAT_PATTERNS: Array<{ key: NativeFormatKey; regex: RegExp; label: string; description: string; nativeOnly?: boolean }> = [
   // ── Original entries ─────────────────────────────────────────────────────────
@@ -112,6 +114,9 @@ const NATIVE_FORMAT_PATTERNS: Array<{ key: NativeFormatKey; regex: RegExp; label
 
   // ── SidMon ──────────────────────────────────────────────────────────────────
   { key: 'sidmon1', regex: /\.sid1$/i,                                            label: 'SidMon 1',          description: 'SidMon 1.0 — native parser or UADE.' },
+
+  // ── C64 SID (PSID/RSID) ──────────────────────────────────────────────────────
+  { key: 'c64sid',  regex: /\.sid$/i,                                             label: 'C64 SID',           description: 'Commodore 64 SID (PSID/RSID) — C64SIDEngine with DeepSID emulators.', nativeOnly: true },
 
   // ── Delta Music ─────────────────────────────────────────────────────────────
   { key: 'deltaMusic2', regex: /\.dm2$/i,                                         label: 'Delta Music 2',     description: 'Delta Music 2.0 — native parser or UADE.' },

@@ -14,7 +14,7 @@
  */
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
-import type { Pattern, ChannelData, TrackerCell, InstrumentConfig } from '@/types';
+import type { Pattern, ChannelData, TrackerCell, InstrumentConfig, JamCrackerConfig } from '@/types';
 import { createSamplerInstrument, amigaNoteToXM } from './AmigaUtils';
 
 // -- Binary reading helpers ---------------------------------------------------
@@ -195,16 +195,24 @@ export async function parseJamCrackerFile(
   // NOI samples concatenated. Advance pos even for AM instruments.
 
   const sampleBuffers: (Uint8Array | null)[] = [];
+  const amSampleBuffers: (Uint8Array | null)[] = [];
   for (let i = 0; i < noi; i++) {
     const size = jcInstruments[i].size;
     const isAM = (jcInstruments[i].flags & 0x02) !== 0;
 
-    if (isAM || size === 0) {
+    if (size === 0) {
+      sampleBuffers.push(null);
+      amSampleBuffers.push(null);
+    } else if (isAM) {
+      // Preserve AM waveform data for synth editing
+      const avail = Math.min(size, Math.max(0, buffer.byteLength - pos));
+      amSampleBuffers.push(avail > 0 ? bytes.slice(pos, pos + avail) : null);
       sampleBuffers.push(null);
       pos += size;
     } else {
       const avail = Math.min(size, Math.max(0, buffer.byteLength - pos));
       sampleBuffers.push(avail > 0 ? bytes.slice(pos, pos + avail) : null);
+      amSampleBuffers.push(null);
       pos += size;
     }
   }
@@ -219,23 +227,41 @@ export async function parseJamCrackerFile(
     const pcm     = sampleBuffers[i];
     const name    = inst.name || `Sample ${i + 1}`;
 
+    // Build JamCracker-specific config for all instruments
+    const jcConfig: JamCrackerConfig = {
+      name,
+      flags: inst.flags,
+      phaseDelta: 0,
+      volume: 64,
+      sampleSize: inst.size,
+      isAM,
+      hasLoop,
+    };
+
+    // AM instruments: extract waveform data for synthesis editing
+    if (isAM && amSampleBuffers[i]) {
+      jcConfig.waveformData = amSampleBuffers[i]!;
+    }
+
     if (isAM || pcm === null) {
-      // AM instrument or empty sample — silent placeholder
+      // AM instrument or empty sample — JamCracker synth instrument
       instruments.push({
         id: i + 1,
         name,
         type: 'sample' as const,
-        synthType: 'Sampler' as const,
+        synthType: 'JamCrackerSynth' as const,
         effects: [],
         volume: -60,
         pan: 0,
+        jamCracker: jcConfig,
       } as unknown as InstrumentConfig);
     } else {
-      // PCM sample. JamCracker has no loop points — loop the entire sample
-      // if the loop flag is set.
+      // PCM sample with JamCracker metadata
       const loopStart = 0;
       const loopEnd   = hasLoop ? pcm.length : 0;
-      instruments.push(createSamplerInstrument(i + 1, name, pcm, 64, 8287, loopStart, loopEnd));
+      const samplerInst = createSamplerInstrument(i + 1, name, pcm, 64, 8287, loopStart, loopEnd);
+      (samplerInst as unknown as Record<string, unknown>).jamCracker = jcConfig;
+      instruments.push(samplerInst);
     }
   }
 
@@ -372,7 +398,7 @@ export async function parseJamCrackerFile(
 
   return {
     name: moduleName,
-    format: 'MOD' as TrackerFormat,
+    format: 'JamCracker' as TrackerFormat,
     patterns,
     instruments,
     songPositions,
@@ -382,5 +408,6 @@ export async function parseJamCrackerFile(
     initialSpeed,
     initialBPM: 125,
     linearPeriods: false,
+    jamCrackerFileData: buffer.slice(0),
   };
 }

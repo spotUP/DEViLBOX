@@ -50,9 +50,9 @@ describe('parseJamCrackerFile — genesis (mountains).jam', () => {
     await expect(parseJamCrackerFile(loadAB(JAM_FILE_1), 'genesis (mountains).jam')).resolves.toBeDefined();
   });
 
-  it('returns format MOD', async () => {
+  it('returns format JamCracker', async () => {
     const song = await parseJamCrackerFile(loadAB(JAM_FILE_1), 'genesis (mountains).jam');
-    expect(song.format).toBe('MOD');
+    expect(song.format).toBe('JamCracker');
   });
 
   it('has 4 channels', async () => {
