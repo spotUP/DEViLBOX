@@ -17,12 +17,28 @@ export interface GTUltraPosition {
   pos: number;
 }
 
+export interface GTUltraSongInfo {
+  name: string;
+  author: string;
+  copyright: string;
+  numPatterns: number;
+  numInstruments: number;
+  numSongs: number;
+  channelCount: number;
+}
+
 export interface GTUltraCallbacks {
   onReady?: () => void;
   onError?: (error: string) => void;
   onSongLoaded?: (ok: boolean) => void;
   onPosition?: (pos: GTUltraPosition) => void;
   onAsidWrite?: (chip: number, reg: number, value: number) => void;
+  onPatternData?: (pattern: number, length: number, data: Uint8Array) => void;
+  onOrderData?: (channel: number, data: Uint8Array) => void;
+  onInstrumentData?: (instrument: number, data: Uint8Array) => void;
+  onTableData?: (tableType: number, left: Uint8Array, right: Uint8Array) => void;
+  onSidRegisters?: (sidIdx: number, data: Uint8Array) => void;
+  onSongInfo?: (info: GTUltraSongInfo) => void;
 }
 
 export class GTUltraEngine {
@@ -129,6 +145,41 @@ export class GTUltraEngine {
         break;
       case 'songCleared':
         break;
+      case 'patternData':
+        this.callbacks.onPatternData?.(
+          msg.pattern as number,
+          msg.length as number,
+          new Uint8Array(msg.data as ArrayBuffer)
+        );
+        break;
+      case 'orderData':
+        this.callbacks.onOrderData?.(
+          msg.channel as number,
+          new Uint8Array(msg.data as ArrayBuffer)
+        );
+        break;
+      case 'instrumentData':
+        this.callbacks.onInstrumentData?.(
+          msg.instrument as number,
+          new Uint8Array(msg.data as ArrayBuffer)
+        );
+        break;
+      case 'tableData':
+        this.callbacks.onTableData?.(
+          msg.tableType as number,
+          new Uint8Array(msg.left as ArrayBuffer),
+          new Uint8Array(msg.right as ArrayBuffer)
+        );
+        break;
+      case 'sidRegisters':
+        this.callbacks.onSidRegisters?.(
+          msg.sidIdx as number,
+          new Uint8Array(msg.data as ArrayBuffer)
+        );
+        break;
+      case 'songInfo':
+        this.callbacks.onSongInfo?.(msg as unknown as GTUltraSongInfo);
+        break;
     }
   }
 
@@ -178,6 +229,54 @@ export class GTUltraEngine {
 
   enableAsid(enabled: boolean): void {
     this.post({ type: 'enableAsid', enabled });
+  }
+
+  // --- Data queries (async, responses come via callbacks) ---
+
+  requestPatternData(pattern: number): void {
+    this.post({ type: 'getPatternData', pattern });
+  }
+
+  requestOrderData(channel: number): void {
+    this.post({ type: 'getOrderData', channel });
+  }
+
+  requestInstrumentData(instrument: number): void {
+    this.post({ type: 'getInstrumentData', instrument });
+  }
+
+  requestTableData(tableType: number): void {
+    this.post({ type: 'getTableData', tableType });
+  }
+
+  requestSidRegisters(sidIdx: number = 0): void {
+    this.post({ type: 'getSidRegisters', sidIdx });
+  }
+
+  requestSongInfo(): void {
+    this.post({ type: 'getSongInfo' });
+  }
+
+  // --- Editing ---
+
+  setPatternCell(pattern: number, row: number, col: number, value: number): void {
+    this.post({ type: 'setPatternCell', pattern, row, col, value });
+  }
+
+  setOrderEntry(channel: number, position: number, value: number): void {
+    this.post({ type: 'setOrderEntry', channel, position, value });
+  }
+
+  setTableEntry(tableType: number, side: number, index: number, value: number): void {
+    this.post({ type: 'setTableEntry', tableType, side, index, value });
+  }
+
+  undo(): void {
+    this.post({ type: 'undo' });
+  }
+
+  redo(): void {
+    this.post({ type: 'redo' });
   }
 
   // --- Lifecycle ---

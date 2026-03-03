@@ -84,6 +84,11 @@ export const PixiGTPatternGrid: React.FC<Props> = ({ width, height }) => {
   const sidCount = useGTUltraStore((s) => s.sidCount);
   const channelCount = sidCount * 3;
 
+  // Refs for WASM data (updated via subscription, no re-render on each frame)
+  const patternDataRef = useRef(useGTUltraStore.getState().patternData);
+  const orderDataRef = useRef(useGTUltraStore.getState().orderData);
+  const orderPosRef = useRef(0);
+
   const visibleRows = Math.floor((height - HEADER_H) / ROW_H);
   const totalW = ROW_NUM_W + channelCount * (CHANNEL_W + CHAN_GAP);
 
@@ -176,15 +181,23 @@ export const PixiGTPatternGrid: React.FC<Props> = ({ width, height }) => {
         fontFamily,
       });
 
-      // Cell data per channel (using store's pattern data or empty)
+      // Cell data per channel (from WASM pattern data in store)
       for (let ch = 0; ch < channelCount; ch++) {
         const baseX = ROW_NUM_W + ch * (CHANNEL_W + CHAN_GAP);
 
-        // TODO: Read from WASM heap when connected. For now, show empty cells.
-        const note = 0;
-        const instr = 0;
-        const cmd = 0;
-        const param = 0;
+        // Read from store's patternData cache
+        const pData = patternDataRef.current;
+        const chOrderData = orderDataRef.current[ch];
+        const patIdx = chOrderData ? chOrderData[orderPosRef.current] : 0;
+        const pat = pData.get(patIdx);
+        let note = 0, instr = 0, cmd = 0, param = 0;
+        if (pat && row < pat.length) {
+          const off = row * 4;
+          note = pat.data[off];
+          instr = pat.data[off + 1];
+          cmd = pat.data[off + 2];
+          param = pat.data[off + 3];
+        }
 
         let colX = baseX;
 
@@ -235,6 +248,23 @@ export const PixiGTPatternGrid: React.FC<Props> = ({ width, height }) => {
     mega.updateLabels(labels, FONT_SIZE);
   }, [width, height, scrollRow, visibleRows, patternLength, playbackPos, playing,
       followPlay, selection, channelCount]);
+
+  // Subscribe to pattern/order data changes for redraw
+  useEffect(() => {
+    const unsub1 = useGTUltraStore.subscribe(
+      (s) => s.patternData,
+      (pd) => { patternDataRef.current = pd; imperativeRedraw(); }
+    );
+    const unsub2 = useGTUltraStore.subscribe(
+      (s) => s.orderData,
+      (od) => { orderDataRef.current = od; imperativeRedraw(); }
+    );
+    const unsub3 = useGTUltraStore.subscribe(
+      (s) => s.playbackPos.position,
+      (pos) => { orderPosRef.current = pos; }
+    );
+    return () => { unsub1(); unsub2(); unsub3(); };
+  }, [imperativeRedraw]);
 
   // Subscribe to cursor changes for fast overlay redraws
   useEffect(() => {

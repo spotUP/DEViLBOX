@@ -49,12 +49,38 @@ export const GTUltraView: React.FC<{ width: number; height: number }> = ({ width
       gtEngine = new GTUltraEngine(audioCtx, {
         onReady: () => {
           console.log('[GTUltra] Engine ready');
+          // Request initial song data from WASM
+          const store = useGTUltraStore.getState();
+          store.refreshSongInfo();
+          store.refreshAllOrders();
+          store.refreshAllInstruments();
+          store.refreshAllTables();
         },
         onPosition: (pos) => {
           useGTUltraStore.getState().updatePlaybackPos(pos);
         },
         onAsidWrite: (chip, reg, value) => {
           getGTUltraASIDBridge().writeRegister(chip, reg, value);
+        },
+        onPatternData: (pattern, length, data) => {
+          useGTUltraStore.getState().updatePatternData(pattern, length, data);
+        },
+        onOrderData: (channel, data) => {
+          useGTUltraStore.getState().updateOrderData(channel, data);
+        },
+        onInstrumentData: (instrument, data) => {
+          useGTUltraStore.getState().updateInstrumentData(instrument, data);
+        },
+        onTableData: (tableType, left, right) => {
+          useGTUltraStore.getState().updateTableData(tableType, left, right);
+        },
+        onSidRegisters: (sidIdx, data) => {
+          useGTUltraStore.getState().updateSidRegisters(sidIdx, data);
+        },
+        onSongInfo: (info) => {
+          const store = useGTUltraStore.getState();
+          store.setSongName(info.name);
+          store.setSongAuthor(info.author);
         },
         onError: (err) => {
           console.error('[GTUltra] Engine error:', err);
