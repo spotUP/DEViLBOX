@@ -88,8 +88,7 @@ export const PixiMainLayout: React.FC = () => {
       const container = viewRefsMap.current[outgoing];
       if (container && app?.renderer) {
         try {
-          // Destroy old thumbnail
-          thumbnailsRef.current[outgoing]?.destroy(true);
+          const oldTex = thumbnailsRef.current[outgoing];
           const tex = app.renderer.generateTexture({
             target: container,
             frame: new Rectangle(0, 0, width, Math.max(100, mainViewH)),
@@ -97,6 +96,8 @@ export const PixiMainLayout: React.FC = () => {
           });
           thumbnailsRef.current[outgoing] = tex;
           setThumbnails({ ...thumbnailsRef.current });
+          // Destroy old texture AFTER React has re-rendered with the new one
+          requestAnimationFrame(() => { oldTex?.destroy(true); });
         } catch { /* ignore capture failures */ }
       }
       prevViewRef.current = mainViewId;
@@ -114,12 +115,13 @@ export const PixiMainLayout: React.FC = () => {
     const rafId = requestAnimationFrame(() => {
       if (!app?.renderer) return;
       const viewH = Math.max(100, mainViewH);
+      const oldTextures: (import('pixi.js').Texture | undefined)[] = [];
 
       // Capture current view first (it's visible)
       const current = viewRefsMap.current[mainViewId];
       if (current) {
         try {
-          thumbnailsRef.current[mainViewId]?.destroy(true);
+          oldTextures.push(thumbnailsRef.current[mainViewId]);
           const tex = app.renderer.generateTexture({
             target: current,
             frame: new Rectangle(0, 0, width, viewH),
@@ -136,7 +138,7 @@ export const PixiMainLayout: React.FC = () => {
         if (!container) continue;
         try {
           container.visible = true;
-          thumbnailsRef.current[viewId]?.destroy(true);
+          oldTextures.push(thumbnailsRef.current[viewId]);
           const tex = app.renderer.generateTexture({
             target: container,
             frame: new Rectangle(0, 0, width, viewH),
@@ -150,6 +152,8 @@ export const PixiMainLayout: React.FC = () => {
       }
 
       setThumbnails({ ...thumbnailsRef.current });
+      // Destroy old textures after React re-renders with new ones
+      requestAnimationFrame(() => { oldTextures.forEach(t => t?.destroy(true)); });
     });
 
     return () => cancelAnimationFrame(rafId);

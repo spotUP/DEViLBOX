@@ -10,6 +10,7 @@ import { GLRenderer } from '../ui/renderer-context';
 import { Container, Graphics, BitmapText, Sprite, Text } from 'pixi.js';
 import '@pixi/layout'; // Side-effect: registers layout mixin on Container
 import { setYoga, setYogaConfig } from '@pixi/layout';
+import { LayoutContainer } from '@pixi/layout/components';
 import { loadYoga } from 'yoga-layout/load';
 import { loadPixiFonts } from './fonts';
 import { usePixiTheme } from './theme';
@@ -19,7 +20,7 @@ import { setScrollPerfApp } from './scrollPerf';
 import { useTransportStore } from '@stores';
 
 // Register PixiJS classes for use in @pixi/react JSX
-extend({ Container, Graphics, BitmapText, Sprite, Text });
+extend({ Container, Graphics, BitmapText, Sprite, Text, LayoutContainer });
 
 /**
  * Shared promise for Yoga WASM + font initialization.

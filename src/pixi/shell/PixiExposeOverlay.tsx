@@ -191,7 +191,7 @@ export const PixiExposeOverlay: React.FC<PixiExposeOverlayProps> = ({ width, hei
         const isActive = activeView === view.id;
         const isSelected = selectedIdx === i;
         const rawTex = thumbnails?.[view.id];
-        const tex = rawTex && !rawTex.destroyed ? rawTex : null;
+        const tex = rawTex && !rawTex.destroyed && rawTex.source ? rawTex : null;
 
         // Scale thumbnail to fit within the card's thumbnail area
         let spriteW = thumbW;
