@@ -10,6 +10,9 @@
  * - Multi-SID support (2SID/3SID)
  */
 
+import { getASIDDeviceManager } from '@lib/sid/ASIDDeviceManager';
+import { useSettingsStore } from '@stores/useSettingsStore';
+
 export interface JSSIDConfig {
   chipModel?: '6581' | '8580';
   sampleRate?: number;
@@ -39,6 +42,7 @@ export class JSSIDEngine {
   private isPlaying = false;
   private subsong = 0;
   private numSubsongs = 1;
+  private asidEnabled = false;
 
   constructor(sidData: Uint8Array, config: JSSIDConfig = {}) {
     this.sidData = sidData;
@@ -49,9 +53,32 @@ export class JSSIDEngine {
    * Initialize the engine
    */
   async init(module: any): Promise<void> {
+    // Check if ASID hardware is enabled in settings
+    const settings = useSettingsStore.getState();
+    const asidEnabled = settings.asidEnabled && this.config.enableASID !== false;
+    
+    // If ASID is enabled, set up MIDI output
+    if (asidEnabled) {
+      const asidManager = getASIDDeviceManager();
+      await asidManager.init();
+      
+      const port = asidManager.getSelectedPort();
+      if (port) {
+        // jsSID expects a global `selectedMidiOutput` variable
+        (window as any).selectedMidiOutput = port;
+        this.asidEnabled = true;
+        console.log('[jsSID] ASID hardware enabled, output:', port.name);
+      } else {
+        console.warn('[jsSID] ASID enabled but no device selected, falling back to software');
+      }
+    }
+    
+    // Create jsSID instance with ASID support
     this.jsSID = new module.jsSID(
       this.config.bufferSize || 16384,
-      0.0005 // Decay factor
+      0.0005, // Decay factor
+      this.asidEnabled, // asid_enable
+      false // webusb_enable
     );
 
     // Load SID data
@@ -70,6 +97,7 @@ export class JSSIDEngine {
       copyright: metadata.copyright,
       subsongs: this.numSubsongs,
       chipModel: metadata.sidModel === 1 ? '6581' : '8580',
+      asid: this.asidEnabled ? 'ENABLED' : 'disabled',
     });
   }
 
@@ -126,6 +154,13 @@ export class JSSIDEngine {
     }
 
     this.isPlaying = false;
+    
+    // Clear ASID hardware output if enabled
+    if (this.asidEnabled && (window as any).selectedMidiOutput) {
+      console.log('[jsSID] Clearing ASID hardware state');
+      // jsSID's asidSend() will be called on stop, clearing the hardware
+    }
+    
     console.log('[jsSID] Playback stopped');
   }
 
@@ -259,7 +294,20 @@ export class JSSIDEngine {
    */
   dispose(): void {
     this.stop();
+    
+    // Clear ASID MIDI port reference
+    if (this.asidEnabled) {
+      (window as any).selectedMidiOutput = null;
+    }
+    
     this.jsSID = null;
     this.audioContext = null;
+  }
+  
+  /**
+   * Check if ASID hardware is currently active
+   */
+  isASIDActive(): boolean {
+    return this.asidEnabled;
   }
 }
