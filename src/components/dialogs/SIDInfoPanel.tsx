@@ -4,10 +4,13 @@
  */
 
 import React from 'react';
-import { Cpu, Music, Clock, User, Disc, MessageSquare, Hash } from 'lucide-react';
+import { Cpu, Music, Clock, User, Disc, MessageSquare, Hash, Zap } from 'lucide-react';
 import type { SIDHeaderInfo } from '@/lib/sid/SIDHeaderParser';
 import type { STILSubsongInfo } from '@/lib/sid/STILParser';
 import type { SongDBResult } from '@/lib/songdb';
+import { useSettingsStore } from '@stores/useSettingsStore';
+import { SID_ENGINES } from '@engine/deepsid/DeepSIDEngineManager';
+import type { SIDEngineType } from '@engine/deepsid/DeepSIDEngineManager';
 
 interface SIDInfoPanelProps {
   header: SIDHeaderInfo;
@@ -24,6 +27,8 @@ export const SIDInfoPanel: React.FC<SIDInfoPanelProps> = ({
   selectedSubsong,
   onSubsongChange,
 }) => {
+  const sidEngine = useSettingsStore(s => s.sidEngine);
+  const setSidEngine = useSettingsStore(s => s.setSidEngine);
   const chipLabel = header.chipModel !== 'Unknown'
     ? `MOS ${header.chipModel}`
     : 'Unknown';
@@ -125,6 +130,25 @@ export const SIDInfoPanel: React.FC<SIDInfoPanelProps> = ({
             )}
           </div>
         )}
+
+        {/* SID Engine Selector */}
+        <div className="flex items-center gap-3 border-t border-blue-800/30 pt-2">
+          <div className="flex items-center gap-1.5 shrink-0">
+            <Zap className="w-3 h-3 text-blue-400/60" />
+            <label className="text-xs text-text-muted whitespace-nowrap">Engine:</label>
+          </div>
+          <select
+            value={sidEngine}
+            onChange={(e) => setSidEngine(e.target.value as SIDEngineType)}
+            className="flex-1 text-xs bg-dark-bgSecondary border border-blue-800/40 rounded px-2 py-1 text-text-primary"
+          >
+            {Object.values(SID_ENGINES).map(eng => (
+              <option key={eng.id} value={eng.id}>
+                {eng.name} — {eng.accuracy}, {eng.speed} ({eng.size})
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
 
       {/* SongDB Info (album, year, group) */}

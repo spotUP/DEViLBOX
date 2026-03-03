@@ -83,17 +83,6 @@ export async function loadFile(
 ): Promise<FileLoadResult> {
   const filename = file.name.toLowerCase();
   
-  // Check if file exists in Modland database (non-blocking)
-  // If it's a new/unknown module, show contribution modal
-  checkModlandFile(file).then((result) => {
-    if (!result.found && result.hash && isSongFormat(filename)) {
-      // Unknown tracker module - show contribution modal!
-      const { showModal } = useModlandContributionModal.getState();
-      showModal(file.name, result.hash);
-      console.log('🆕 Unknown module detected (hash: ' + result.hash + ') - showing contribution modal');
-    }
-  }).catch(() => {});
-  
   try {
     // === SONG FORMATS (replace project) ===
     if (isSongFormat(filename)) {
