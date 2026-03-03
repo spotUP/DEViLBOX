@@ -8,10 +8,14 @@ import React, { useCallback, useEffect, useState } from 'react';
 import {
   X, Loader2, Cpu, Music, Clock, User, Disc, Globe, Calendar,
   Star, ExternalLink, Briefcase, Tag, Play, Youtube, ChevronDown, ChevronUp,
+  Zap,
 } from 'lucide-react';
 import { useTrackerStore } from '@stores';
 import { useShallow } from 'zustand/react/shallow';
 import { notify } from '@stores/useNotificationStore';
+import { useSettingsStore } from '@stores/useSettingsStore';
+import { SID_ENGINES } from '@engine/deepsid/DeepSIDEngineManager';
+import type { SIDEngineType } from '@engine/deepsid/DeepSIDEngineManager';
 import { fetchComposerProfile, fetchComposerTunes, fetchFileInfoByPath, getComposerPhotoUrl } from '@/lib/sid/composerApi';
 import type { ComposerProfile as ComposerData, DeepSIDFileInfo, ComposerTune } from '@/lib/sid/composerApi';
 
@@ -27,6 +31,9 @@ export const SIDInfoModal: React.FC<SIDInfoModalProps> = ({ onClose }) => {
       songDBInfo: state.songDBInfo,
     }))
   );
+
+  const sidEngine = useSettingsStore(s => s.sidEngine);
+  const setSidEngine = useSettingsStore(s => s.setSidEngine);
 
   const [composer, setComposer] = useState<ComposerData | null>(null);
   const [composerLoading, setComposerLoading] = useState(false);
@@ -203,6 +210,32 @@ export const SIDInfoModal: React.FC<SIDInfoModalProps> = ({ onClose }) => {
                   </div>
                 </div>
               )}
+
+              {/* SID Engine Selector */}
+              <div className="bg-dark-bgSecondary/50 border border-dark-border/50 rounded-lg p-3">
+                <div className="flex items-center gap-2 mb-2">
+                  <Zap className="w-3.5 h-3.5 text-blue-400/60" />
+                  <label className="text-xs text-text-muted font-medium">SID Engine</label>
+                </div>
+                <select
+                  value={sidEngine}
+                  onChange={(e) => {
+                    const engine = e.target.value as SIDEngineType;
+                    setSidEngine(engine);
+                    notify.success(`SID engine changed to ${SID_ENGINES[engine].name}`);
+                  }}
+                  className="w-full text-sm bg-dark-bgPrimary border border-blue-800/40 rounded px-2 py-1.5 text-text-primary mb-2"
+                >
+                  {Object.values(SID_ENGINES).map(eng => (
+                    <option key={eng.id} value={eng.id}>
+                      {eng.name} — {eng.accuracy}, {eng.speed} ({eng.size})
+                    </option>
+                  ))}
+                </select>
+                <p className="text-[10px] text-text-muted/60 leading-tight">
+                  {SID_ENGINES[sidEngine].description}
+                </p>
+              </div>
 
               {/* SongDB Album/Year Info */}
               {songDBInfo && (songDBInfo.album || songDBInfo.year) && (
