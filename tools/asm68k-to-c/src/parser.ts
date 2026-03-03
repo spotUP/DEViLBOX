@@ -251,13 +251,18 @@ export function parse(tokens: Token[]): AstNode[] {
         if (lt[j].kind === 'IMMEDIATE' && lt[j + 1]?.kind === 'NUMBER' &&
             (lt[j + 2]?.kind === 'COMMA' || lt[j + 2]?.kind === 'NEWLINE' || j + 2 >= lt.length || lt[j + 2] === undefined)) {
           const imm = lt[j].value.replace(/^#/, '');
-          const mult = parseNumber(lt[j + 1].value);
+          const rhs = parseNumber(lt[j + 1].value);
           const immVal = parseNumber(imm);
-          if (!isNaN(immVal)) {
-            operands.push({ kind: 'immediate', value: immVal * mult, raw: `#${immVal * mult}` });
+          // If rhs is negative, it was #SYM-N (subtraction: SYM + (-N)).
+          // If rhs is positive, it was #SYM*N (multiplication: SYM * N).
+          const combined = !isNaN(immVal)
+            ? (rhs < 0 ? immVal + rhs : immVal * rhs)
+            : NaN;
+          if (!isNaN(combined)) {
+            operands.push({ kind: 'immediate', value: combined, raw: `#${combined}` });
           } else {
-            // Symbolic: emit as string expression "sym * n" for the emitter to handle
-            operands.push({ kind: 'immediate', value: NaN, raw: `#(${imm}*${mult})` });
+            const op = rhs < 0 ? '+' : '*';
+            operands.push({ kind: 'immediate', value: NaN, raw: `#(${imm}${op}${rhs})` });
           }
           j += 2;
           continue;
