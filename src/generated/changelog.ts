@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-03-03T18:07:25.710Z
+ * Generated: 2026-03-03T18:23:05.660Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.2070';
-export const BUILD_NUMBER = '2070';
-export const BUILD_HASH = '49a4a5a7';
+export const BUILD_VERSION = '1.0.2074';
+export const BUILD_NUMBER = '2074';
+export const BUILD_HASH = '072239b1';
 export const BUILD_DATE = '2026-03-03';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,25 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.2070',
+    version: '1.0.2074',
     date: '2026-03-03',
     changes: [
+      {
+        type: 'fix',
+        "description": "Fix groove indicator showing active when set to straight/0%"
+      },
+      {
+        type: 'fix',
+        "description": "Add missing node-cache dependency to server"
+      },
+      {
+        type: 'fix',
+        "description": "Fix JamCracker drag-drop crash: add JamCrackerSynth to ToneEngine switch"
+      },
+      {
+        type: 'fix',
+        "description": "GoatTracker .sng files bypass UADE import dialog"
+      },
       {
         type: 'fix',
         "description": "Add GoatTracker .sng to FormatRegistry for drag-drop support"
@@ -212,22 +228,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'feature',
         "description": "GoatTracker .sng file detection and loading pipeline"
-      },
-      {
-        type: 'feature',
-        "description": "GoatTracker Ultra Phase 3 — Pixi/WebGL UI components"
-      },
-      {
-        type: 'feature',
-        "description": "GoatTracker Ultra Phase 2 — DOM UI components"
-      },
-      {
-        type: 'feature',
-        "description": "GoatTracker Ultra WASM engine — Phase 1 complete"
-      },
-      {
-        type: 'feature',
-        "description": "Add label destination writes, SIZE token skip, emitOperandRead"
       }
     ]
   }
