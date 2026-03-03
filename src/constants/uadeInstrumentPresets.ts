@@ -8,10 +8,77 @@
  * + optional synth-specific sub-config).
  */
 
-import type { DeepPartial, InstrumentConfig, SoundMonConfig, SidMonConfig } from '@typedefs/instrument';
+import type { DeepPartial, InstrumentConfig, SoundMonConfig, SidMonConfig, SynthType } from '@typedefs/instrument';
 import { DEFAULT_SOUNDMON, DEFAULT_SIDMON } from '@typedefs/instrument';
 
 type PresetPartial = DeepPartial<InstrumentConfig>;
+
+/** Map system preset ID → Furnace SynthType for auto-generating starter instruments */
+const PRESET_SYNTH_MAP: Record<string, SynthType> = {
+  // Yamaha FM
+  ymu759: 'Furnace', ym2151: 'FurnaceOPM', ym2612: 'FurnaceOPN', ym2612_ext: 'FurnaceOPN',
+  ym2612_dualpcm: 'FurnaceOPN', ym2612_csm: 'FurnaceOPN',
+  ym2203: 'FurnaceOPN', ym2203_ext: 'FurnaceOPN',
+  ym2608: 'FurnaceOPNA', ym2610_full: 'FurnaceOPNB', ym2610b: 'FurnaceOPNB',
+  opz: 'FurnaceOPZ',
+  // Yamaha OPL
+  opl: 'FurnaceOPL', opl2: 'FurnaceOPL', opl3: 'FurnaceOPL',
+  opl_drums: 'FurnaceOPL', opl2_drums: 'FurnaceOPL', opl3_drums: 'FurnaceOPL',
+  opl4: 'FurnaceOPL4', opll: 'FurnaceOPLL', opll_drums: 'FurnaceOPLL',
+  esfm: 'FurnaceESFM', y8950: 'FurnaceY8950', y8950_drums: 'FurnaceY8950',
+  vrc7: 'FurnaceOPLL',
+  // Console
+  nes: 'FurnaceNES', gb: 'FurnaceGB', sms: 'FurnacePSG', pce: 'FurnacePCE',
+  snes: 'FurnaceSNES', gba_dma: 'FurnaceGB', gba_minmod: 'FurnaceGB',
+  nds: 'FurnaceGB', lynx: 'FurnaceLynx', swan: 'FurnaceSWAN',
+  vboy: 'FurnaceVB', pokemini: 'FurnacePSG',
+  // Commodore
+  c64_6581: 'FurnaceSID6581', c64_8580: 'FurnaceSID8580',
+  // Atari
+  pokey: 'FurnacePOKEY', tia: 'FurnacePSG',
+  // AY/PSG
+  ay8910: 'FurnaceAY', ay8930: 'FurnaceAY',
+  // Famicom Expansion
+  vrc6: 'FurnaceVRC6', fds: 'FurnaceFDS', mmc5: 'FurnaceNES', n163: 'FurnaceN163',
+  '5e01': 'FurnaceNES',
+  // Konami
+  scc: 'FurnaceSCC', 
+  // Other
+  dave: 'FurnacePSG', saa1099: 'FurnacePSG', pet: 'FurnacePSG', vic20: 'FurnacePSG',
+  ted: 'FurnacePSG', pcspkr: 'FurnacePSG', pv1000: 'FurnacePSG',
+  sm8521: 'FurnacePSG', supervision: 'FurnacePSG',
+  // PCM / sample-based
+  amiga: 'Sampler', segapcm: 'Sampler', qsound: 'Sampler', rf5c68: 'Sampler',
+  multipcm: 'Sampler', pcm_dac: 'Sampler', c140: 'Sampler', c219: 'Sampler',
+  es5506: 'Sampler', k007232: 'Sampler', k053260: 'Sampler', ga20: 'Sampler',
+  msm6258: 'Sampler', msm6295: 'Sampler', ymz280b: 'Sampler', x1_010: 'Sampler',
+};
+
+/** Generate generic starter instruments for a chip preset */
+function genStarter(synthType: SynthType, count: number): PresetPartial[] {
+  const names = ['Lead', 'Bass', 'Chord', 'Arp', 'Pad', 'FX', 'Perc', 'Drone'];
+  const result: PresetPartial[] = [];
+  const n = Math.min(count, names.length);
+  for (let i = 0; i < n; i++) {
+    result.push(synthType === 'Sampler'
+      ? { name: names[i], synthType: 'Sampler' }
+      : { name: names[i], synthType });
+  }
+  return result;
+}
+
+/**
+ * Get starter instrument presets for any system preset.
+ * Returns hand-crafted presets for UADE formats, and auto-generated ones for Furnace chips.
+ */
+export function getInstrumentPresetsForSystem(presetId: string): PresetPartial[] {
+  // Hand-crafted presets take priority
+  if (UADE_INSTRUMENT_PRESETS[presetId]) return UADE_INSTRUMENT_PRESETS[presetId];
+  // Auto-generate for known Furnace chips
+  const synthType = PRESET_SYNTH_MAP[presetId];
+  if (synthType) return genStarter(synthType, 4);
+  return [];
+}
 
 /** Sampler starter — just a named empty slot */
 function samp(name: string): PresetPartial {
