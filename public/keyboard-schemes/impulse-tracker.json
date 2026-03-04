@@ -150,7 +150,9 @@
       "Shift+Alt+7": "tracker_scratch_twdl",
       "Shift+Alt+0": "tracker_scratch_stop",
       "Shift+Alt+B": "tracker_spinback",
-      "Shift+Space": "power_cut_stop"
+      "Shift+Space": "power_cut_stop",
+      "Ctrl+=": "zoom_in",
+      "Ctrl+-": "zoom_out"
     },
     "mac": {
       "Space": "toggle_edit_mode",
@@ -297,7 +299,10 @@
       "Shift+Alt+7": "tracker_scratch_twdl",
       "Shift+Alt+0": "tracker_scratch_stop",
       "Shift+Alt+B": "tracker_spinback",
-      "Shift+Space": "power_cut_stop"
+      "Shift+Space": "power_cut_stop",
+      "Cmd+=": "zoom_in",
+      "Cmd+-": "zoom_out",
+      "Ctrl+1": "reset_zoom"
     }
   }
 }
