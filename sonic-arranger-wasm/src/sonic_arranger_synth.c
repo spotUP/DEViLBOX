@@ -164,6 +164,7 @@ typedef struct {
     /* Arpeggio */
     int          activeArpTable;
     uint8_t      arpPosition;
+    uint8_t      effectArpArg;   /* 0xy effect arpeggio arg (0=off) */
 
     /* Vibrato */
     uint16_t     vibratoDelayCtr;
@@ -257,25 +258,39 @@ static int findBestPeriodIndex(double targetPeriod) {
  *   1,2,3 = use instrument arpeggio table 0,1,2 respectively
  */
 static void doArpeggio(SAPlayer *p) {
-    if (p->activeArpTable == 0) return;  /* 0 = no instrument arp */
+    if (p->activeArpTable != 0) {
+        /* Instrument arpeggio table */
+        int tbl = p->activeArpTable - 1;  /* 1-indexed → 0-indexed */
+        if (tbl < 0 || tbl > 2) return;
 
-    int tbl = p->activeArpTable - 1;  /* 1-indexed → 0-indexed */
-    if (tbl < 0 || tbl > 2) return;
+        SAArpTable *at = &p->ins.arpTables[tbl];
 
-    SAArpTable *at = &p->ins.arpTables[tbl];
+        int8_t arpVal = at->values[p->arpPosition];
+        int noteIdx = p->baseNote + arpVal;
+        if (noteIdx < 0 || noteIdx > 108) noteIdx = 0;
+        p->currentPeriod = PERIOD_TABLE[noteIdx];
 
-    int8_t arpVal = at->values[p->arpPosition];
-    int noteIdx = p->baseNote + arpVal;
-    if (noteIdx < 0 || noteIdx > 108) noteIdx = 0;  /* out of range → period 0 (silence) */
-    p->currentPeriod = PERIOD_TABLE[noteIdx];
+        p->arpPosition++;
 
-    p->arpPosition++;
+        int maxLength = at->length + at->repeat;
+        if (maxLength > 13) maxLength = 13;
+        if (p->arpPosition > maxLength) {
+            p->arpPosition = at->length;
+        }
+    } else if (p->effectArpArg != 0) {
+        /* Effect 0xy arpeggio — ref: DoArpeggio lines 1456-1484.
+         * Cycles base / base+x / base+y on speedCounter % 3. */
+        uint8_t arpVal;
+        switch (p->speedCounter % 3) {
+        default:
+        case 0: arpVal = 0; break;
+        case 1: arpVal = (p->effectArpArg >> 4) & 0x0F; break;
+        case 2: arpVal = p->effectArpArg & 0x0F; break;
+        }
 
-    /* Ref: maxLength = min(Length + Repeat, 13); wraps to Length */
-    int maxLength = at->length + at->repeat;
-    if (maxLength > 13) maxLength = 13;
-    if (p->arpPosition > maxLength) {
-        p->arpPosition = at->length;
+        int noteIdx = p->baseNote + arpVal;
+        if (noteIdx < 0 || noteIdx > 108) noteIdx = 0;
+        p->currentPeriod = PERIOD_TABLE[noteIdx];
     }
 }
 
@@ -1174,6 +1189,9 @@ void sa_set_param(void *ctxPtr, int handle, int paramId, float value) {
         break;
     case 10: /* Slide speed (direct set, integer) */
         p->slideSpeed = (int16_t)value;
+        break;
+    case 11: /* Effect 0xy arpeggio arg (0=off, 0xXY=arp) — sent as integer 0-255 */
+        p->effectArpArg = (uint8_t)clamp_i((int)value, 0, 255);
         break;
     default:
         break;

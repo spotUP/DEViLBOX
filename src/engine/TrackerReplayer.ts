@@ -1481,11 +1481,17 @@ export class TrackerReplayer {
     // SA synth: send arpeggio table on every row (ref: GetNewNotes line 1155)
     // The reference sets voiceInfo.Arpeggio from trackLine.Arpeggio on EVERY row,
     // regardless of whether there's a note trigger.
-    if (row.saArpTable !== undefined && ch.instrument?.synthType === 'SonicArrangerSynth') {
+    if (ch.instrument?.synthType === 'SonicArrangerSynth') {
       const engine = getToneEngine();
       const saInst = engine.getInstrument(ch.instrument.id, ch.instrument, chIndex);
       if (saInst && typeof (saInst as any).set === 'function') {
-        (saInst as any).set('arpeggioTable', row.saArpTable);
+        if (row.saArpTable !== undefined) {
+          (saInst as any).set('arpeggioTable', row.saArpTable);
+        }
+        // Send 0xy effect arpeggio arg (effect 0 with non-zero param)
+        // The WASM handles the speedCounter % 3 cycling internally
+        const arpEffArg = (effect === 0 && param !== 0) ? param : 0;
+        (saInst as any).set('effectArpArg', arpEffArg);
       }
     }
 
@@ -2512,7 +2518,7 @@ export class TrackerReplayer {
     }
 
     switch (effect) {
-      case 0x0: if (param !== 0) this.doArpeggio(ch, param); break;
+      case 0x0: if (param !== 0 && ch.instrument?.synthType !== 'SonicArrangerSynth') this.doArpeggio(ch, param); break;
       case 0x1: // Portamento up
         if (this.useXMPeriods) {
           ch.period -= ch.portaUpSpeed * 4;
