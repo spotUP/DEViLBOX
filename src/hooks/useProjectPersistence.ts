@@ -19,6 +19,34 @@ import { needsMigration, migrateProject } from '@/lib/migration';
 
 const AUTO_SAVE_INTERVAL = 30000; // 30 seconds
 
+// ============================================================================
+// EXPLICIT SAVE TRACKING
+// ============================================================================
+// Tracks whether the user has explicitly saved this project (Ctrl+S / save button).
+// Auto-save and revision creation are gated on this flag to prevent:
+// - Auto-saving songs that were only loaded/played (not user's own work)
+// - Creating revisions for other people's songs loaded from files
+// - Overwriting saved state with an externally-loaded song
+let explicitlySaved = false;
+
+/**
+ * Mark the current project as explicitly saved by the user.
+ * Called after Ctrl+S / save button and when restoring from IDB / revision.
+ */
+export function markExplicitlySaved(): void { explicitlySaved = true; }
+
+/**
+ * Clear the explicit-save flag. Called when loading external songs/files.
+ * This prevents auto-save from overwriting the user's saved project with
+ * someone else's song that was just loaded for playback.
+ */
+export function clearExplicitlySaved(): void { explicitlySaved = false; }
+
+/**
+ * Check if the current project has been explicitly saved at least once.
+ */
+export function isExplicitlySaved(): boolean { return explicitlySaved; }
+
 // IndexedDB constants
 const IDB_NAME = 'devilbox';
 const IDB_VERSION = 2;
@@ -315,9 +343,22 @@ function buildSavedProject(): SavedProject {
 // ============================================================================
 
 /**
- * Save current project to IndexedDB
+ * Save current project to IndexedDB.
+ * @param options.explicit - If true, marks this as a user-initiated save (Ctrl+S / button).
+ *   Auto-saves call without this flag and are skipped if the project hasn't been explicitly saved.
  */
-export async function saveProjectToStorage(): Promise<boolean> {
+export async function saveProjectToStorage(options?: { explicit?: boolean }): Promise<boolean> {
+  const isExplicit = options?.explicit ?? false;
+
+  if (isExplicit) {
+    explicitlySaved = true;
+  }
+
+  // Skip auto-save for projects the user never explicitly saved
+  if (!explicitlySaved) {
+    return false;
+  }
+
   try {
     const savedProject = buildSavedProject();
     await idbPut(savedProject);
@@ -402,6 +443,8 @@ export async function loadProjectFromStorage(): Promise<boolean> {
 
     instrumentStore.autoBakeInstruments();
     projectStore.markAsSaved();
+    // Restoring user's own saved project — auto-save is safe
+    explicitlySaved = true;
     return true;
   } catch (error) {
     console.error('[Persistence] Failed to load project:', error);
@@ -443,6 +486,8 @@ export function serializeProjectToBlob(): Blob {
  * Returns true on success, false on failure/incompatible schema.
  */
 export async function loadProjectFromObject(data: unknown): Promise<boolean> {
+  // Loading from external file — not the user's saved project
+  explicitlySaved = false;
   try {
     const project = data as SavedProject;
     if (!project?.version || !project?.patterns || !project?.instruments) {
@@ -547,6 +592,8 @@ export async function loadLocalRevision(key: number): Promise<boolean> {
     }
     instrumentStore.autoBakeInstruments();
     projectStore.markAsSaved();
+    // Restoring user's own revision — auto-save is safe
+    explicitlySaved = true;
     return true;
   } catch (err) {
     console.error('[Persistence] Failed to load revision:', err);
@@ -642,7 +689,7 @@ export function useProjectPersistence() {
     }
 
     saveTimeoutRef.current = setTimeout(() => {
-      if (!isDirty) return;
+      if (!isDirty || !explicitlySaved) return;
 
       idleCallbackRef.current = safeRequestIdleCallback(
         (deadline) => {
@@ -650,7 +697,7 @@ export function useProjectPersistence() {
             void saveProjectToStorage();
           } else {
             saveTimeoutRef.current = setTimeout(() => {
-              if (isDirty) {
+              if (isDirty && explicitlySaved) {
                 void saveProjectToStorage();
               }
             }, 5000);
@@ -675,10 +722,10 @@ export function useProjectPersistence() {
     };
   }, [isDirty, scheduleAutoSave]);
 
-  // Save before unload
+  // Save before unload (only if project was explicitly saved before)
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (isDirty) {
+      if (isDirty && explicitlySaved) {
         void saveProjectToStorage();
         e.preventDefault();
         e.returnValue = '';
@@ -688,7 +735,7 @@ export function useProjectPersistence() {
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [isDirty]);
 
-  const save = useCallback(() => saveProjectToStorage(), []);
+  const save = useCallback(() => saveProjectToStorage({ explicit: true }), []);
   const load = useCallback(() => loadProjectFromStorage(), []);
 
   return { save, load, clear: clearSavedProject, isDirty };

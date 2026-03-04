@@ -9,6 +9,7 @@
  */
 
 import { useTrackerStore, useInstrumentStore, useTransportStore, useAudioStore, useProjectStore } from '@stores';
+import { clearExplicitlySaved } from '@hooks/useProjectPersistence';
 import type { CollaborationClient } from './CollaborationClient';
 import type { DataChannelMsg, SavedProject } from './types';
 import type { Pattern } from '@typedefs';
@@ -44,6 +45,8 @@ export function applyRemotePatch(msg: DataChannelMsg): void {
     const store = useTrackerStore.getState();
 
     if (msg.type === 'full_sync') {
+      // Receiving remote song — prevent auto-save from overwriting user's saved project
+      clearExplicitlySaved();
       const { loadPatterns, setPatternOrder } = store;
       const { loadInstruments } = useInstrumentStore.getState();
       const { setBPM } = useTransportStore.getState();

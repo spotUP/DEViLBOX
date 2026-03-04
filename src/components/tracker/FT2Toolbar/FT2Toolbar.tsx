@@ -53,7 +53,7 @@ import type { XMNote } from '@lib/import/formats/XMParser';
 import type { MODNote } from '@lib/import/formats/MODParser';
 import { convertToInstrument } from '@lib/import/InstrumentConverter';
 import { importMIDIFile, isMIDIFile, getSupportedMIDIExtensions } from '@lib/import/MIDIImporter';
-import { clearSavedProject } from '@hooks/useProjectPersistence';
+import { clearSavedProject, clearExplicitlySaved } from '@hooks/useProjectPersistence';
 import { parseDb303Pattern, exportCurrentPatternToDb303 } from '@lib/import/Db303PatternConverter';
 import { getASIDDeviceManager } from '@lib/sid/ASIDDeviceManager';
 import { useSettingsStore } from '@stores/useSettingsStore';
@@ -395,6 +395,8 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
   };
 
   const handleModuleImport = async (moduleInfo: ModuleInfo, options: ImportOptions = { useLibopenmpt: true }) => {
+    // Loading an external module — prevent auto-save from overwriting user's saved project
+    clearExplicitlySaved();
     // Fire-and-forget SongDB metadata lookup (non-blocking)
     const songBuf = moduleInfo.arrayBuffer ?? (moduleInfo.file ? await moduleInfo.file.arrayBuffer() : null);
     if (songBuf) {
@@ -563,6 +565,8 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
       setShowImportDialog(true);
       return;
     }
+    // Loading an external file — prevent auto-save from overwriting user's saved project
+    clearExplicitlySaved();
     if (isPlaying) {
       stop();
       engine.releaseAll();
@@ -958,6 +962,8 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
         companionFiles={pendingCompanions}
       />
       <FileBrowser isOpen={showFileBrowser} onClose={() => setShowFileBrowser(false)} mode="load" onLoad={async (data, filename) => {
+        // Loading from file browser — prevent auto-save from overwriting user's saved project
+        clearExplicitlySaved();
         if (isPlaying) { stop(); engine.releaseAll(); }
         try {
           // Handle XML files (DB303 patterns or presets)
@@ -1152,6 +1158,8 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
           notify.success(`Loaded: ${proj.metadata?.name || filename}`);
         } catch { notify.error('Failed to load file'); }
       }} onLoadTrackerModule={async (buffer: ArrayBuffer, filename: string) => {
+        // Loading from file browser — prevent auto-save from overwriting user's saved project
+        clearExplicitlySaved();
         if (isPlaying) { stop(); engine.releaseAll(); }
         try {
           const lower = filename.toLowerCase();
