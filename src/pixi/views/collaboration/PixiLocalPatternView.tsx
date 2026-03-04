@@ -48,7 +48,6 @@ export const PixiLocalPatternView: React.FC<PixiLocalPatternViewProps> = ({
 
   const pattern = patterns[currentPatternIndex] ?? null;
   const channels = pattern ? pattern.channels : [];
-  const channelCount = channels.length;
   const rowCount = pattern?.length ?? 0;
   const contentHeight = rowCount * ROW_HEIGHT;
 

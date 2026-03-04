@@ -249,7 +249,8 @@ export const PixiPadEditor: React.FC<PixiPadEditorProps> = ({ padId, width, onCl
         layout={{
           paddingLeft: 10,
           paddingRight: 10,
-          paddingY: 8,
+          paddingTop: 8,
+          paddingBottom: 8,
           borderBottomWidth: 1,
           borderColor: theme.border.color,
         }}

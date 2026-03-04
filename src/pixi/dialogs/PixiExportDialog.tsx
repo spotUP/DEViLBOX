@@ -179,9 +179,9 @@ export const PixiExportDialog: React.FC<PixiExportDialogProps> = ({ isOpen, onCl
   // Chip extended state
   const [chipRecordingTime, setChipRecordingTime] = useState(0);
   const [chipLoopPoint, setChipLoopPoint] = useState(0);
-  const [chipWrites, setChipWrites] = useState<any[]>([]);
+  const [, setChipWrites] = useState<any[]>([]);
   const [chipStats, setChipStats] = useState<{ duration: number; totalWrites: number; usedChips: { name: string; writes: number; type: number }[] } | null>(null);
-  const [availableChipFormats, setAvailableChipFormats] = useState<string[]>([]);
+  const [, setAvailableChipFormats] = useState<string[]>([]);
 
   // Auto-select audio scope when opened from arrangement toolbar
   useEffect(() => {
@@ -385,7 +385,7 @@ export const PixiExportDialog: React.FC<PixiExportDialogProps> = ({ isOpen, onCl
           } else {
             midiData = exportPatternToMIDI(patterns[selectedPatternIndex], bpm, timeSignature, midiOptions);
           }
-          downloadFile(new Blob([midiData.buffer.slice(midiData.byteOffset, midiData.byteOffset + midiData.byteLength)], { type: 'audio/midi' }), `${metadata.name || 'song'}.mid`);
+          downloadFile(new Blob([midiData.slice(0)], { type: 'audio/midi' }), `${metadata.name || 'song'}.mid`);
           notify.success('MIDI exported!');
           onClose();
           break;

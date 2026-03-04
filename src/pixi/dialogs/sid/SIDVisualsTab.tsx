@@ -12,7 +12,6 @@ import { MegaText, type GlyphLabel } from '@/pixi/utils/MegaText';
 
 /* ── Colours ── */
 const C_BG       = 0x0a0a1a;
-const C_GRID     = 0x1a1a3a;
 const C_OCTAVE   = 0x222244;
 const C_BORDER   = 0x333366;
 const C_V1       = 0x00ff88;
