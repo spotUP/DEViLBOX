@@ -40,14 +40,16 @@ const CONTENT_W = MODAL_W - 30;
 const SLIDER_W = 200;
 const LABEL_W = 130;
 
-const KEYBOARD_SCHEMES: SelectOption[] = [
-  { value: 'fasttracker2', label: 'FastTracker 2' },
-  { value: 'impulse-tracker', label: 'Impulse Tracker' },
-  { value: 'protracker', label: 'ProTracker' },
-  { value: 'octamed', label: 'OctaMED SoundStudio' },
-  { value: 'renoise', label: 'Renoise' },
-  { value: 'openmpt', label: 'OpenMPT' },
+const KEYBOARD_SCHEMES = [
+  { value: 'fasttracker2', label: 'FastTracker 2', description: 'Classic FT2 layout (DOS/PC) - from ft2-clone source' },
+  { value: 'impulse-tracker', label: 'Impulse Tracker', description: 'IT/Schism Tracker style - from schismtracker source' },
+  { value: 'protracker', label: 'ProTracker', description: 'Amiga MOD tracker layout - from pt2-clone source' },
+  { value: 'octamed', label: 'OctaMED SoundStudio', description: 'Amiga OctaMED layout - from official documentation' },
+  { value: 'renoise', label: 'Renoise', description: 'Modern DAW/tracker layout - from official documentation' },
+  { value: 'openmpt', label: 'OpenMPT', description: 'ModPlug Tracker layout - from official wiki documentation' },
 ];
+
+const KEYBOARD_SCHEME_OPTIONS: SelectOption[] = KEYBOARD_SCHEMES.map(s => ({ value: s.value, label: s.label }));
 
 const THEME_OPTIONS: SelectOption[] = themes.map((t) => ({ value: t.id, label: t.name }));
 
@@ -85,12 +87,7 @@ const STEREO_MODE_OPTIONS: SelectOption[] = [
   { value: 'modplug', label: 'ModPlug' },
 ];
 
-const SID_ENGINE_OPTIONS: SelectOption[] = Object.values(SID_ENGINES).map((e) => ({
-  value: e.id,
-  label: `${e.name} — ${e.description.split('.')[0]}`,
-}));
-
-// CRT slider definitions
+// CRT slider definitions — labels match DOM SettingsModal 1:1
 interface CRTSliderDef {
   key: keyof CRTParams;
   label: string;
@@ -101,18 +98,18 @@ interface CRTSliderDef {
 }
 
 const CRT_SLIDERS: CRTSliderDef[] = [
-  { key: 'scanlineIntensity', label: 'Intensity',  min: 0,   max: 1,    step: 0.01,  group: 'SCANLINES' },
-  { key: 'scanlineCount',     label: 'Count',      min: 50,  max: 1200, step: 1,     group: 'SCANLINES' },
-  { key: 'adaptiveIntensity', label: 'Adaptive',   min: 0,   max: 1,    step: 0.01,  group: 'SCANLINES' },
-  { key: 'brightness',        label: 'Brightness', min: 0.6, max: 1.8,  step: 0.01,  group: 'COLOR' },
-  { key: 'contrast',          label: 'Contrast',   min: 0.6, max: 1.8,  step: 0.01,  group: 'COLOR' },
-  { key: 'saturation',        label: 'Saturation', min: 0,   max: 2,    step: 0.01,  group: 'COLOR' },
-  { key: 'bloomIntensity',    label: 'Bloom Int.',  min: 0,   max: 1.5,  step: 0.01,  group: 'EFFECTS' },
-  { key: 'bloomThreshold',    label: 'Bloom Thr.',  min: 0,   max: 1,    step: 0.01,  group: 'EFFECTS' },
-  { key: 'rgbShift',          label: 'RGB Shift',   min: 0,   max: 1,    step: 0.01,  group: 'EFFECTS' },
-  { key: 'vignetteStrength',  label: 'Vignette',    min: 0,   max: 2,    step: 0.01,  group: 'FRAMING' },
-  { key: 'curvature',         label: 'Curvature',   min: 0,   max: 0.5,  step: 0.005, group: 'FRAMING' },
-  { key: 'flickerStrength',   label: 'Flicker',     min: 0,   max: 0.15, step: 0.001, group: 'FRAMING' },
+  { key: 'scanlineIntensity', label: 'Intensity',       min: 0,   max: 1,    step: 0.01,  group: 'SCANLINES' },
+  { key: 'scanlineCount',     label: 'Count',           min: 50,  max: 1200, step: 1,     group: 'SCANLINES' },
+  { key: 'adaptiveIntensity', label: 'Adaptive',        min: 0,   max: 1,    step: 0.01,  group: 'SCANLINES' },
+  { key: 'brightness',        label: 'Brightness',      min: 0.6, max: 1.8,  step: 0.01,  group: 'COLOR' },
+  { key: 'contrast',          label: 'Contrast',        min: 0.6, max: 1.8,  step: 0.01,  group: 'COLOR' },
+  { key: 'saturation',        label: 'Saturation',      min: 0,   max: 2,    step: 0.01,  group: 'COLOR' },
+  { key: 'bloomIntensity',    label: 'Bloom Intensity', min: 0,   max: 1.5,  step: 0.01,  group: 'EFFECTS' },
+  { key: 'bloomThreshold',    label: 'Bloom Threshold', min: 0,   max: 1,    step: 0.01,  group: 'EFFECTS' },
+  { key: 'rgbShift',          label: 'RGB Shift',       min: 0,   max: 1,    step: 0.01,  group: 'EFFECTS' },
+  { key: 'vignetteStrength',  label: 'Vignette',        min: 0,   max: 2,    step: 0.01,  group: 'FRAMING' },
+  { key: 'curvature',         label: 'Curvature',       min: 0,   max: 0.5,  step: 0.005, group: 'FRAMING' },
+  { key: 'flickerStrength',   label: 'Flicker',         min: 0,   max: 0.15, step: 0.001, group: 'FRAMING' },
 ];
 
 // ── Sub-components ─────────────────────────────────────────────────────────────
@@ -348,7 +345,7 @@ export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, on
   // Estimate total content height for the scroll view
   const crtSectionH = crtEnabled ? CRT_SLIDERS.length * 28 + 4 * 18 + 60 : 40;
   const lensSectionH = lensEnabled ? 3 * 28 + 2 * 18 + 60 + 40 : 40;
-  const contentH = 1500 + crtSectionH + lensSectionH;
+  const contentH = 2000 + crtSectionH + lensSectionH;
   const scrollAreaH = MODAL_H - 48 - 44; // header + footer
 
   // CRT sliders grouped
@@ -366,6 +363,7 @@ export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, on
 
   const handleOverlayClick = (_e: FederatedPointerEvent) => { onClose(); };
   const handlePanelClick = (e: FederatedPointerEvent) => { e.stopPropagation(); };
+  const blockWheel = useCallback((e: { stopPropagation: () => void }) => { e.stopPropagation(); }, []);
 
   return (
     <pixiContainer visible={isOpen} layout={{ position: 'absolute', width: '100%', height: '100%' }}>
@@ -374,6 +372,7 @@ export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, on
         draw={drawOverlay}
         eventMode="static"
         onPointerUp={handleOverlayClick}
+        onWheel={blockWheel}
         layout={{ position: 'absolute', width: screenW, height: screenH }}
       />
 
@@ -417,7 +416,7 @@ export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, on
           <layoutContainer
             eventMode="static"
             cursor="pointer"
-            onPointerUp={onClose}
+            onClick={onClose}
             layout={{
               width: 24,
               height: 24,
@@ -491,15 +490,15 @@ export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, on
           {/* ═══════ CRT SHADER ═══════ */}
           <SectionHeader text="CRT SHADER" />
 
-          <SettingRow label="CRT Effect:" description="Scanlines, curvature, bloom">
+          <SettingRow label="CRT Effect:" description="WebGL post-processing — scanlines, curvature, bloom">
             <PixiCheckbox checked={crtEnabled} onChange={setCrtEnabled} />
           </SettingRow>
 
           {crtEnabled && (
-            <Div className="flex-col gap-1" layout={{ width: CONTENT_W }}>
-              {crtGroups.map((group) => (
+            <Div className="flex-col gap-1" layout={{ width: CONTENT_W, borderTopWidth: 1, borderColor: theme.border.color, paddingTop: 8 }}>
+              {crtGroups.map((group, gi) => (
                 <React.Fragment key={group}>
-                  <Div className="pt-1">
+                  <Div className={gi > 0 ? "pt-2" : "pt-1"}>
                     <Txt className="text-[10px] font-bold font-mono text-accent-primary uppercase">{group}</Txt>
                   </Div>
                   {CRT_SLIDERS.filter((s) => s.group === group).map((slider) => {
@@ -687,35 +686,21 @@ export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, on
             <PixiCheckbox checked={midiPolyphonic} onChange={setMidiPolyphonic} />
           </SettingRow>
 
-          {/* ═══════ SCRATCH ═══════ */}
-          <SectionHeader text="SCRATCH" />
+          {/* ═══════ DJ / SCRATCH ═══════ */}
+          <SectionHeader text="DJ / SCRATCH" />
 
-          <SettingRow label="Scratch Toggle:" description="Always enable scratch (OFF = only during playback)">
-            <PixiCheckbox checked={scratchEnabled} onChange={setScratchEnabled} />
-          </SettingRow>
-
-          <SettingRow label="Scroll Acceleration:" description="Smooth velocity curve vs raw 1:1 scroll">
+          <SettingRow label="Scroll Acceleration:" description="Smooth scroll-to-scratch (off = raw 1:1)">
             <PixiCheckbox checked={scratchAcceleration} onChange={setScratchAcceleration} />
           </SettingRow>
 
-          <SettingRow label="Platter Mass:" description="CDJ → Technics 1200 → Heavy">
-            <Div className="flex-row items-center gap-2">
-              <PixiSlider
-                value={Math.round(platterMass * 100)}
-                min={0}
-                max={100}
-                step={1}
-                onChange={(v) => setPlatterMass(v / 100)}
-                orientation="horizontal"
-                length={120}
-                thickness={4}
-                handleWidth={10}
-                handleHeight={10}
-                color={theme.accent.color}
-              />
-              <Txt className="text-[10px] font-mono text-text-primary">{`${Math.round(platterMass * 100)}%`}</Txt>
-            </Div>
-          </SettingRow>
+          <Div className="flex-col gap-1" layout={{ width: CONTENT_W, borderTopWidth: 1, borderColor: theme.border.color, paddingTop: 6 }}>
+            <Txt className="text-[9px] font-bold font-mono text-accent-primary">Scratch during playback:</Txt>
+            <Txt className="text-[9px] font-mono text-text-muted">Scroll wheel/trackpad controls speed &amp; direction</Txt>
+            <Txt className="text-[9px] font-bold font-mono text-accent-primary" layout={{ paddingTop: 4 }}>Keyboard (Shift+Alt):</Txt>
+            <Txt className="text-[9px] font-mono text-text-muted">F = Fader cut (hold) · 1 = Trans · 2 = Crab</Txt>
+            <Txt className="text-[9px] font-mono text-text-muted">3 = Flare · 4 = Chirp · 5 = Stab</Txt>
+            <Txt className="text-[9px] font-mono text-text-muted">6 = 8-Finger Crab · 7 = Twiddle · 0 = Stop</Txt>
+          </Div>
 
           {/* ═══════ ENGINE ═══════ */}
           <SectionHeader text="ENGINE" />
@@ -782,8 +767,8 @@ export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, on
             </SettingRow>
           )}
 
-          {/* Bus Gain Balance */}
-          <SettingRow label="Bus Gain Auto:">
+          {/* Bus Gain Balance — matches DOM layout */}
+          <SettingRow label="Bus Gain Balance:" description={autoGain ? 'Auto-balancing active — plays at least 1s to calibrate' : 'Balance sample vs synth/chip engine levels'}>
             <PixiCheckbox checked={autoGain} onChange={setAutoGain} />
           </SettingRow>
 
@@ -831,17 +816,55 @@ export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, on
             </Div>
           </SettingRow>
 
+          {/* ═══════ SCRATCH ═══════ */}
+          <SectionHeader text="SCRATCH" />
+
+          <SettingRow label="Scratch Toggle:" description="Always enable scratch (OFF = only during playback)">
+            <PixiCheckbox checked={scratchEnabled} onChange={setScratchEnabled} />
+          </SettingRow>
+
+          <SettingRow label="Scroll Acceleration:" description="Smooth velocity curve vs raw 1:1 scroll">
+            <PixiCheckbox checked={scratchAcceleration} onChange={setScratchAcceleration} />
+          </SettingRow>
+
+          <Txt className="text-[9px] font-mono text-text-muted" layout={{ width: CONTENT_W }}>
+            {'Scroll the pattern editor during playback to vinyl scratch. Hold Z for fader cut, hold X for crab scratch. On touchscreens: 2-finger swipe = nudge, 3-finger touch = grab.'}
+          </Txt>
+
+          <SettingRow label="Platter Mass:" description="CDJ → Technics 1200 → Heavy">
+            <Div className="flex-row items-center gap-2">
+              <PixiSlider
+                value={Math.round(platterMass * 100)}
+                min={0}
+                max={100}
+                step={1}
+                onChange={(v) => setPlatterMass(v / 100)}
+                orientation="horizontal"
+                length={120}
+                thickness={4}
+                handleWidth={10}
+                handleHeight={10}
+                color={theme.accent.color}
+              />
+              <Txt className="text-[10px] font-mono text-text-primary">{`${Math.round(platterMass * 100)}%`}</Txt>
+            </Div>
+          </SettingRow>
+
           {/* ═══════ KEYBOARD ═══════ */}
           <SectionHeader text="KEYBOARD" />
 
           <SettingRow label="Keyboard Scheme:">
             <PixiSelect
-              options={KEYBOARD_SCHEMES}
+              options={KEYBOARD_SCHEME_OPTIONS}
               value={activeScheme}
               onChange={setActiveScheme}
               width={180}
             />
           </SettingRow>
+
+          <Txt className="text-[9px] font-mono text-text-muted" layout={{ width: CONTENT_W }}>
+            {KEYBOARD_SCHEMES.find(s => s.value === activeScheme)?.description || 'Select a tracker layout'}
+          </Txt>
 
           <SettingRow label="Platform:" description="Override Cmd/Ctrl detection">
             <PixiSelect
@@ -853,24 +876,70 @@ export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, on
           </SettingRow>
 
           {/* ═══════ C64 SID ENGINE ═══════ */}
-          <SectionHeader text="C64 SID ENGINE" />
+          <SectionHeader text="C64 SID PLAYER ENGINE" />
 
-          <SettingRow label="SID Engine:" description="Emulation engine for .sid playback">
-            <PixiSelect
-              options={SID_ENGINE_OPTIONS}
-              value={sidEngine}
-              onChange={(v) => setSidEngine(v as SIDEngineType)}
-              width={280}
-            />
-          </SettingRow>
+          <Txt className="text-[9px] font-mono text-text-muted" layout={{ width: CONTENT_W }}>
+            {'Choose the emulation engine for C64 SID music playback (.sid files). Each engine offers different accuracy/performance tradeoffs.'}
+          </Txt>
+
+          {Object.values(SID_ENGINES).map((engine) => {
+            const isSelected = sidEngine === engine.id;
+            return (
+              <layoutContainer
+                key={engine.id}
+                eventMode="static"
+                cursor="pointer"
+                onClick={() => setSidEngine(engine.id as SIDEngineType)}
+                layout={{
+                  width: CONTENT_W,
+                  flexDirection: 'row',
+                  alignItems: 'flex-start',
+                  paddingLeft: 8,
+                  paddingRight: 8,
+                  paddingTop: 6,
+                  paddingBottom: 6,
+                  borderWidth: 1,
+                  borderColor: isSelected ? theme.accent.color : theme.border.color,
+                  borderRadius: 2,
+                  backgroundColor: isSelected ? theme.bgActive.color : undefined,
+                  gap: 8,
+                }}
+              >
+                <Div className="flex-col gap-1" layout={{ flex: 1 }}>
+                  <Div className="flex-row items-center gap-2">
+                    <Txt className="text-[10px] font-bold font-mono text-text-primary">{engine.name}</Txt>
+                    <Txt className="text-[9px] font-mono text-text-muted">{engine.size}</Txt>
+                    {engine.id === 'websid' && (
+                      <Txt className="text-[9px] font-mono text-accent-primary">(Recommended)</Txt>
+                    )}
+                  </Div>
+                  <Txt className="text-[9px] font-mono text-text-muted">{engine.description}</Txt>
+                  <Div className="flex-row gap-3">
+                    <Txt className="text-[8px] font-mono text-text-muted">{'Accuracy: '}<Txt className="text-[8px] font-mono text-text-primary">{engine.accuracy}</Txt></Txt>
+                    <Txt className="text-[8px] font-mono text-text-muted">{'Speed: '}<Txt className="text-[8px] font-mono text-text-primary">{engine.speed}</Txt></Txt>
+                    {!engine.requiresWASM && (
+                      <Txt className="text-[8px] font-mono text-accent-primary">No WASM</Txt>
+                    )}
+                  </Div>
+                </Div>
+              </layoutContainer>
+            );
+          })}
 
           {/* ═══════ ASID HARDWARE ═══════ */}
           <SectionHeader text="ASID HARDWARE OUTPUT" />
 
+          <Txt className="text-[9px] font-mono text-text-muted" layout={{ width: CONTENT_W }}>
+            {'Route SID playback to real hardware (USB-SID-Pico, TherapSID) via MIDI for authentic MOS 6581/8580 sound.'}
+          </Txt>
+
           {!asidSupported ? (
-            <Txt className="text-[10px] font-mono text-text-muted">
-              Web MIDI API not available. Requires Chrome, Edge, or Opera.
-            </Txt>
+            <Div className="flex-col gap-1" layout={{ width: CONTENT_W, paddingLeft: 8, paddingRight: 8, paddingTop: 6, paddingBottom: 6, borderWidth: 1, borderColor: theme.border.color, borderRadius: 2 }}>
+              <Txt className="text-[10px] font-mono text-accent-error">Not Supported</Txt>
+              <Txt className="text-[9px] font-mono text-text-muted">
+                {'Web MIDI API not available in this browser. ASID hardware support requires Chrome, Edge, or Opera.'}
+              </Txt>
+            </Div>
           ) : (
             <>
               <SettingRow label="Enable ASID:" description="Route SID to real hardware via MIDI">
@@ -901,6 +970,16 @@ export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, on
                     />
                   </SettingRow>
 
+                  {asidDevices.length === 0 && (
+                    <Div className="flex-col gap-1" layout={{ width: CONTENT_W, paddingLeft: 8, paddingRight: 8, paddingTop: 6, paddingBottom: 6, borderWidth: 1, borderColor: theme.border.color, borderRadius: 2 }}>
+                      <Txt className="text-[9px] font-bold font-mono text-text-primary">No ASID devices detected.</Txt>
+                      <Txt className="text-[8px] font-mono text-text-muted">1. Connect USB-SID-Pico or TherapSID via USB</Txt>
+                      <Txt className="text-[8px] font-mono text-text-muted">2. Ensure device drivers are installed</Txt>
+                      <Txt className="text-[8px] font-mono text-text-muted">3. Grant MIDI permissions in browser if prompted</Txt>
+                      <Txt className="text-[8px] font-mono text-text-muted">4. Refresh this settings modal</Txt>
+                    </Div>
+                  )}
+
                   <SettingRow label="Device Address:" description={`USB-SID-Pico default: 0x4D (77)`}>
                     <Div className="flex-row items-center gap-2">
                       <PixiNumericInput
@@ -916,6 +995,13 @@ export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, on
                       </Txt>
                     </Div>
                   </SettingRow>
+
+                  <Div className="flex-col gap-1" layout={{ width: CONTENT_W, paddingLeft: 8, paddingRight: 8, paddingTop: 6, paddingBottom: 6, borderWidth: 1, borderColor: theme.border.color, borderRadius: 2 }}>
+                    <Txt className="text-[9px] font-bold font-mono text-text-primary">About ASID:</Txt>
+                    <Txt className="text-[8px] font-mono text-text-muted">
+                      {'ASID sends SID register writes via MIDI SysEx to real hardware. Only jsSID engine supports ASID — other engines fall back to software emulation.'}
+                    </Txt>
+                  </Div>
                 </>
               )}
             </>

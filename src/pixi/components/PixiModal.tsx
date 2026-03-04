@@ -83,6 +83,11 @@ export const PixiModal: React.FC<PixiModalProps> = ({
     e.stopPropagation();
   }, []);
 
+  // Block wheel events on overlay to prevent scroll-through to content behind modal
+  const blockWheel = useCallback((e: { stopPropagation: () => void }) => {
+    e.stopPropagation();
+  }, []);
+
   // Always render a persistent pixiContainer so pixi-react never does
   // a null→tree insertion at the parent level. The custom reconciler can
   // silently fail when inserting new display objects among many null siblings.
@@ -98,6 +103,7 @@ export const PixiModal: React.FC<PixiModalProps> = ({
             draw={drawOverlay}
             eventMode="static"
             onPointerUp={handleOverlayClick}
+            onWheel={blockWheel}
             layout={{ position: 'absolute', width: screenW, height: screenH }}
           />
 
