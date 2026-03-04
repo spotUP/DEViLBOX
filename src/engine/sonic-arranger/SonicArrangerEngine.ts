@@ -38,6 +38,15 @@ export class SonicArrangerEngine {
   }
 
   static getInstance(): SonicArrangerEngine {
+    // Invalidate singleton when AudioContext changes (e.g. HMR / ToneEngine recreate)
+    if (SonicArrangerEngine.instance && !SonicArrangerEngine.instance._disposed) {
+      try {
+        const currentCtx = getDevilboxAudioContext();
+        if (SonicArrangerEngine.instance.audioContext !== currentCtx) {
+          SonicArrangerEngine.instance.dispose();
+        }
+      } catch { /* context not yet set */ }
+    }
     if (!SonicArrangerEngine.instance || SonicArrangerEngine.instance._disposed) {
       SonicArrangerEngine.instance = new SonicArrangerEngine();
     }
