@@ -324,7 +324,7 @@ export const VisualEffectEditorWrapper: React.FC<VisualEffectEditorWrapperProps>
       </div>
 
       {/* Editor Content */}
-      <div className="p-4 overflow-y-auto scrollbar-modern">
+      <div className="flex-1 min-h-0 p-4 overflow-y-auto scrollbar-modern">
         <EffectEditorDispatch
           effectType={effect.type}
           effect={effect}
