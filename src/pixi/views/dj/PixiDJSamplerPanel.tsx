@@ -75,11 +75,24 @@ const NOTE_REPEAT_RATES: SelectOption[] = [
   { value: '1/16T', label: '1/16T' },
 ];
 
+// ─── Color blend helper ─────────────────────────────────────────────────────
+
+function blendColor(base: number, target: number, t: number): number {
+  const r1 = (base >> 16) & 0xff, g1 = (base >> 8) & 0xff, b1 = base & 0xff;
+  const r2 = (target >> 16) & 0xff, g2 = (target >> 8) & 0xff, b2 = target & 0xff;
+  return (
+    (Math.round(r1 + (r2 - r1) * t) << 16) |
+    (Math.round(g1 + (g2 - g1) * t) << 8) |
+    Math.round(b1 + (b2 - b1) * t)
+  );
+}
+
 // ─── Individual Pad ─────────────────────────────────────────────────────────
 
 interface PadCellProps {
   pad: DrumPad;
-  isPressed: boolean;
+  velocity: number;
+  isSelected: boolean;
   accentColor: number;
   bgColor: number;
   borderColor: number;
@@ -90,14 +103,19 @@ interface PadCellProps {
 }
 
 const PadCell: React.FC<PadCellProps> = ({
-  pad, isPressed, accentColor, bgColor, borderColor, textColor, textMutedColor,
+  pad, velocity, isSelected, accentColor, bgColor, borderColor, textColor, textMutedColor,
   onTrigger, onRelease,
 }) => {
+  const isPressed = velocity > 0;
   const hasSample = pad.sample !== null;
   const hasScratch = !!pad.scratchAction;
   const hasContent = hasSample || hasScratch;
-  const fillColor = isPressed ? accentColor : bgColor;
-  const fillAlpha = isPressed ? 0.8 : hasContent ? 1 : 0.5;
+  const brightness = isPressed ? 0.3 + (velocity / 127) * 0.7 : 0;
+  const fillColor = isPressed ? blendColor(bgColor, 0xffffff, brightness) : bgColor;
+  const fillAlpha = isPressed ? 0.9 : hasContent ? 1 : 0.5;
+  const strokeColor = isSelected ? accentColor : isPressed ? accentColor : borderColor;
+  const strokeWidth = isSelected ? 2 : 1;
+  const strokeAlpha = isSelected ? 1 : isPressed ? 1 : 0.4;
   const padNum = ((pad.id - 1) % 16) + 1;
   const displayName = pad.name.length > 8 ? pad.name.slice(0, 7) + '\u2026' : pad.name;
 
@@ -116,7 +134,7 @@ const PadCell: React.FC<PadCellProps> = ({
           g.roundRect(0, 0, PAD_SIZE, PAD_SIZE, 4);
           g.fill({ color: fillColor, alpha: fillAlpha });
           g.roundRect(0, 0, PAD_SIZE, PAD_SIZE, 4);
-          g.stroke({ color: isPressed ? accentColor : borderColor, width: 1, alpha: isPressed ? 1 : 0.4 });
+          g.stroke({ color: strokeColor, width: strokeWidth, alpha: strokeAlpha });
         }}
         layout={{ position: 'absolute', left: 0, top: 0, width: PAD_SIZE, height: PAD_SIZE }}
       />
@@ -179,7 +197,8 @@ export const PixiDJSamplerPanel: React.FC<PixiDJSamplerPanelProps> = ({ isOpen, 
   const noteRepeatRef = useRef<NoteRepeatEngine | null>(null);
   const noteRepeatEnabledRef = useRef(false);
   const heldPadsRef = useRef<Set<number>>(new Set());
-  const [pressedPad, setPressedPad] = useState<number | null>(null);
+  const [padVelocities, setPadVelocities] = useState<Record<number, number>>({});
+  const [selectedPad, setSelectedPad] = useState<number | null>(null);
 
   const currentBank = useDrumPadStore(s => s.currentBank);
   const setBank = useDrumPadStore(s => s.setBank);
@@ -256,7 +275,7 @@ export const PixiDJSamplerPanel: React.FC<PixiDJSamplerPanelProps> = ({ isOpen, 
 
   // Velocity derived from pointer Y position within pad (top=loud, bottom=soft)
   const handleTrigger = useCallback(async (pad: DrumPad, e: FederatedPointerEvent) => {
-    setPressedPad(pad.id);
+    setSelectedPad(pad.id);
     await resumeAudioContext();
 
     let velocity = 100;
@@ -265,6 +284,8 @@ export const PixiDJSamplerPanel: React.FC<PixiDJSamplerPanelProps> = ({ isOpen, 
       const relY = (e.global.y - bounds.y) / bounds.height;
       velocity = Math.round(40 + (1 - relY) * 87); // 40-127, top=loud
     }
+
+    setPadVelocities(prev => ({ ...prev, [pad.id]: velocity }));
 
     if (currentProgram && engineRef.current) {
       // Fire scratch action if assigned
@@ -284,11 +305,11 @@ export const PixiDJSamplerPanel: React.FC<PixiDJSamplerPanelProps> = ({ isOpen, 
       }
     }
 
-    setTimeout(() => setPressedPad(prev => prev === pad.id ? null : prev), 200);
+    setTimeout(() => setPadVelocities(prev => ({ ...prev, [pad.id]: 0 })), 200);
   }, [currentProgram]);
 
   const handleRelease = useCallback((pad: DrumPad) => {
-    setPressedPad(prev => prev === pad.id ? null : prev);
+    setPadVelocities(prev => ({ ...prev, [pad.id]: 0 }));
 
     if (heldPadsRef.current.has(pad.id)) {
       heldPadsRef.current.delete(pad.id);
@@ -401,7 +422,8 @@ export const PixiDJSamplerPanel: React.FC<PixiDJSamplerPanelProps> = ({ isOpen, 
                 <PadCell
                   key={col}
                   pad={pad}
-                  isPressed={pressedPad === pad.id}
+                  velocity={padVelocities[pad.id] ?? 0}
+                  isSelected={selectedPad === pad.id}
                   accentColor={theme.accent.color}
                   bgColor={theme.bgTertiary.color}
                   borderColor={theme.border.color}
