@@ -1,15 +1,17 @@
 /**
  * Furnace chip synth registrations
  *
- * Registers all 79 Furnace chip synths:
- * - FM chips (via FurnaceSynth): OPN, OPM, OPL, OPLL, ESFM, OPZ, OPNA, OPNB, OPL4, Y8950, VRC7, OPN2203, OPNBB
- * - Dispatch chips (via FurnaceDispatchSynth): NES, GB, SID, AY, etc.
+ * Registers all 79+ Furnace chip synths via unified FurnaceDispatchSynth:
+ * - FM chips: OPN2, OPM, OPL, OPLL, ESFM, OPZ, OPNA, OPNB, OPL4, Y8950, VRC7, YM2203, YM2610B
+ * - PSG/Console: NES, GB, SID, AY, SNES, PCE, etc.
+ * - Sample-based: Amiga, SEGA PCM, QSound, RF5C68, etc.
+ *
+ * All chips use the Furnace Dispatch WASM engine with blip_buf resampling
+ * for correct chip clocking at any output sample rate.
  */
 
 import { SynthRegistry } from '../SynthRegistry';
 import type { SynthDescriptor } from '../SynthDescriptor';
-import { FurnaceSynth } from '../../FurnaceSynth';
-import { FurnaceChipType } from '../../chips/FurnaceChipEngine';
 import { FurnaceDispatchSynth, FurnaceDispatchPlatform } from '../../furnace-dispatch';
 import type { InstrumentConfig } from '@typedefs/instrument';
 
@@ -36,59 +38,12 @@ const FURNACE_VOLUME_OFFSETS: Record<string, number> = {
   FurnaceSCVTONE: 3,
 };
 
-// ── Chip-specific default FM configs ─────────────────────────────────────────
-
-const CHIP_DEFAULTS: Record<number, Partial<import('@typedefs/instrument').FurnaceConfig>> = {
-  0: { // OPN2 (Genesis)
-    algorithm: 4, feedback: 5,
-    operators: [
-      { enabled: true, mult: 1, tl: 20, ar: 31, dr: 8, d2r: 0, sl: 2, rr: 8, dt: 0, am: false },
-      { enabled: true, mult: 2, tl: 30, ar: 31, dr: 12, d2r: 0, sl: 4, rr: 6, dt: 3, am: false },
-      { enabled: true, mult: 1, tl: 25, ar: 31, dr: 10, d2r: 0, sl: 3, rr: 8, dt: 0, am: false },
-      { enabled: true, mult: 4, tl: 35, ar: 28, dr: 15, d2r: 0, sl: 5, rr: 10, dt: -1, am: false },
-    ],
-  },
-  1: { // OPM
-    algorithm: 5, feedback: 6,
-    operators: [
-      { enabled: true, mult: 1, tl: 15, ar: 31, dr: 5, d2r: 0, sl: 1, rr: 6, dt: 0, am: false },
-      { enabled: true, mult: 3, tl: 40, ar: 31, dr: 8, d2r: 0, sl: 3, rr: 8, dt: 2, am: false },
-      { enabled: true, mult: 2, tl: 35, ar: 31, dr: 10, d2r: 0, sl: 4, rr: 8, dt: -2, am: false },
-      { enabled: true, mult: 1, tl: 25, ar: 31, dr: 12, d2r: 0, sl: 5, rr: 10, dt: 0, am: true },
-    ],
-  },
-};
-
-const DEFAULT_FM_OPERATORS = [
-  { enabled: true, mult: 1, tl: 0, ar: 31, dr: 0, d2r: 0, sl: 0, rr: 15, dt: 0, am: false },
-  { enabled: true, mult: 2, tl: 40, ar: 31, dr: 10, d2r: 5, sl: 8, rr: 8, dt: 0, am: false },
-  { enabled: true, mult: 1, tl: 40, ar: 31, dr: 10, d2r: 5, sl: 8, rr: 8, dt: 0, am: false },
-  { enabled: true, mult: 1, tl: 20, ar: 31, dr: 15, d2r: 0, sl: 4, rr: 10, dt: 0, am: false },
-];
-
-function createFurnaceWithChip(config: InstrumentConfig, chipType: number): FurnaceSynth {
-  const chipDefaults = CHIP_DEFAULTS[chipType] || { algorithm: 0, feedback: 0, operators: DEFAULT_FM_OPERATORS };
-  const baseConfig = config.furnace || {
-    algorithm: chipDefaults.algorithm ?? 0,
-    feedback: chipDefaults.feedback ?? 0,
-    operators: chipDefaults.operators || [],
-    macros: [],
-    opMacros: [],
-    wavetables: chipDefaults.wavetables || [],
-  };
-  return new FurnaceSynth({ ...baseConfig, chipType });
-}
-
 // ── Shared trigger hooks ─────────────────────────────────────────────────────
 // FM chips: no onTriggerAttack — ToneEngine handles channel index + triggerAttack
 
 function furnaceReleaseHook(synth: any, note: string | undefined, time: number): boolean {
-  // FurnaceDispatchSynth.triggerRelease(note?, time?) — must pass note to find correct channel
-  // FurnaceSynth.triggerRelease(time) — only takes time
   if (synth instanceof FurnaceDispatchSynth) {
     synth.triggerRelease(note, time);
-  } else {
-    (synth as any).triggerRelease(time);
   }
   return true;
 }
@@ -154,66 +109,25 @@ const SYNTH_TO_DISPATCH: Record<string, number> = {
   FurnaceSUPERVISION: FurnaceDispatchPlatform.SUPERVISION,
   FurnaceUPD1771: FurnaceDispatchPlatform.UPD1771C,
   FurnaceSCVTONE: FurnaceDispatchPlatform.UPD1771C,
+  // FM chips (Yamaha) — now unified under FurnaceDispatch
+  FurnaceOPN: FurnaceDispatchPlatform.GENESIS,
+  FurnaceOPM: FurnaceDispatchPlatform.ARCADE,
+  FurnaceOPL: FurnaceDispatchPlatform.OPL3,
+  FurnaceOPLL: FurnaceDispatchPlatform.OPLL,
+  FurnaceESFM: FurnaceDispatchPlatform.ESFM,
+  FurnaceOPZ: FurnaceDispatchPlatform.OPZ,
+  FurnaceOPNA: FurnaceDispatchPlatform.YM2608,
+  FurnaceOPNB: FurnaceDispatchPlatform.YM2610,
+  FurnaceOPL4: FurnaceDispatchPlatform.OPL4,
+  FurnaceY8950: FurnaceDispatchPlatform.Y8950,
+  FurnaceVRC7: FurnaceDispatchPlatform.VRC7,
+  FurnaceOPN2203: FurnaceDispatchPlatform.YM2203,
+  FurnaceOPNBB: FurnaceDispatchPlatform.YM2610B,
+  // Generic Furnace defaults to Genesis (OPN2)
+  Furnace: FurnaceDispatchPlatform.GENESIS,
 };
 
-// ── FM Chips (via FurnaceSynth) ──────────────────────────────────────────────
-
-interface FMChipDef {
-  id: string;
-  name: string;
-  chipType: number;
-}
-
-const FM_CHIPS: FMChipDef[] = [
-  { id: 'FurnaceOPN', name: 'Sega Genesis (YM2612)', chipType: FurnaceChipType.OPN2 },
-  { id: 'FurnaceOPM', name: 'Yamaha OPM (X68000)', chipType: FurnaceChipType.OPM },
-  { id: 'FurnaceOPL', name: 'OPL3 (AdLib)', chipType: FurnaceChipType.OPL3 },
-  { id: 'FurnaceOPLL', name: 'Yamaha OPLL (MSX)', chipType: FurnaceChipType.OPLL },
-  { id: 'FurnaceESFM', name: 'Enhanced OPL3 FM', chipType: FurnaceChipType.ESFM },
-  { id: 'FurnaceOPZ', name: 'Yamaha OPZ (TX81Z)', chipType: FurnaceChipType.OPZ },
-  { id: 'FurnaceOPNA', name: 'YM2608 (PC-98)', chipType: FurnaceChipType.OPNA },
-  { id: 'FurnaceOPNB', name: 'YM2610 (Neo Geo)', chipType: FurnaceChipType.OPNB },
-  { id: 'FurnaceOPL4', name: 'YMF278B (OPL4)', chipType: FurnaceChipType.OPL4 },
-  { id: 'FurnaceY8950', name: 'Y8950 (MSX-Audio)', chipType: FurnaceChipType.Y8950 },
-  { id: 'FurnaceVRC7', name: 'Konami VRC7', chipType: FurnaceChipType.OPLL },
-  { id: 'FurnaceOPN2203', name: 'YM2203 (PC-88)', chipType: FurnaceChipType.OPN },
-  { id: 'FurnaceOPNBB', name: 'YM2610B (Neo Geo ext.)', chipType: FurnaceChipType.OPNB_B },
-];
-
-const fmChipDescs: SynthDescriptor[] = FM_CHIPS.map(chip => ({
-  id: chip.id,
-  name: chip.name,
-  category: 'wasm' as const,
-  loadMode: 'eager' as const,
-  sharedInstance: true,
-  useSynthBus: true,
-  volumeOffsetDb: FURNACE_VOLUME_OFFSETS[chip.id] ?? 0,
-  controlsComponent: 'FurnaceControls',
-  create: (config: InstrumentConfig) => createFurnaceWithChip(config, chip.chipType),
-  onTriggerRelease: furnaceReleaseHook,
-}));
-
-// ── Generic Furnace (no specific chip) ───────────────────────────────────────
-
-const furnaceGenericDesc: SynthDescriptor = {
-  id: 'Furnace',
-  name: 'Furnace',
-  category: 'wasm',
-  loadMode: 'eager',
-  sharedInstance: true,
-  useSynthBus: true,
-  volumeOffsetDb: 0,
-  controlsComponent: 'FurnaceControls',
-  create: (config) => {
-    if (!config.furnace) {
-      throw new Error('Furnace config required for Furnace synth type');
-    }
-    return new FurnaceSynth(config.furnace);
-  },
-  onTriggerRelease: furnaceReleaseHook,
-};
-
-// ── Dispatch Chips (via FurnaceDispatchSynth) ────────────────────────────────
+// ── All Furnace Chips (via FurnaceDispatchSynth) ─────────────────────────────
 
 const DISPATCH_CHIPS = Object.keys(SYNTH_TO_DISPATCH);
 
@@ -245,8 +159,6 @@ const dispatchChipDescs: SynthDescriptor[] = DISPATCH_CHIPS.map(id => ({
   onTriggerRelease: furnaceReleaseHook,
 }));
 
-// ── Register all ─────────────────────────────────────────────────────────────
+// ── Register all (unified under FurnaceDispatchSynth) ─────────────────────────
 
-SynthRegistry.register(furnaceGenericDesc);
-SynthRegistry.register(fmChipDescs);
 SynthRegistry.register(dispatchChipDescs);
