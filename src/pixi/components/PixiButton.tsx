@@ -4,7 +4,7 @@
  * Reference: src/components/ui/Button.tsx
  */
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import type { FederatedPointerEvent } from 'pixi.js';
 import { PIXI_FONTS } from '../fonts';
 import { FAD_ICONS } from '../fontaudioIcons';
@@ -96,6 +96,7 @@ export const PixiButton: React.FC<PixiButtonProps> = ({
   const themeId = usePixiThemeId();
   const [hovered, setHovered] = useState(false);
   const [pressed, setPressed] = useState(false);
+  const pressedRef = useRef(false);
 
   const config = SIZE_CONFIG[size];
   const btnWidth = widthProp ?? config.minWidth;
@@ -148,14 +149,15 @@ export const PixiButton: React.FC<PixiButtonProps> = ({
   const colors = getColors();
 
   const handlePointerOver = useCallback(() => { if (!disabled) setHovered(true); }, [disabled]);
-  const handlePointerOut = useCallback(() => { setHovered(false); setPressed(false); }, []);
-  const handlePointerDown = useCallback((_e: FederatedPointerEvent) => { if (!disabled) setPressed(true); }, [disabled]);
+  const handlePointerOut = useCallback(() => { setHovered(false); setPressed(false); pressedRef.current = false; }, []);
+  const handlePointerDown = useCallback((_e: FederatedPointerEvent) => { if (!disabled) { pressedRef.current = true; setPressed(true); } }, [disabled]);
   const handlePointerUp = useCallback(() => {
-    if (pressed && !disabled && !loading) {
+    if (pressedRef.current && !disabled && !loading) {
       onClick?.();
     }
+    pressedRef.current = false;
     setPressed(false);
-  }, [pressed, disabled, loading, onClick]);
+  }, [disabled, loading, onClick]);
 
   const isVertical = iconPosition === 'top';
   const iconFontSize = isVertical ? config.fontSize + 4 : config.fontSize + 2;

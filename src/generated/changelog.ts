@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-03-04T10:02:50.316Z
+ * Generated: 2026-03-04T10:52:39.611Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.2201';
-export const BUILD_NUMBER = '2201';
-export const BUILD_HASH = '42db5bc0';
+export const BUILD_VERSION = '1.0.2208';
+export const BUILD_NUMBER = '2208';
+export const BUILD_HASH = 'f274c79d';
 export const BUILD_DATE = '2026-03-04';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,37 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.2201',
+    version: '1.0.2208',
     date: '2026-03-04',
     changes: [
+      {
+        type: 'improvement',
+        "description": "Add no-emoji rule to project memory — always use FontAudio flat icons"
+      },
+      {
+        type: 'improvement',
+        "description": "Replace all emojis with FontAudio flat icons in Pixi UI"
+      },
+      {
+        type: 'improvement',
+        "description": "Guard all Yoga WASM node operations against BindingErrors"
+      },
+      {
+        type: 'fix',
+        "description": "Always-mount tab contents in TipOfTheDay to prevent Yoga BindingError"
+      },
+      {
+        type: 'improvement',
+        "description": "Increase Pixi UI font sizes for readability"
+      },
+      {
+        type: 'fix',
+        "description": "Guard PixiModal against uninitialized renderer"
+      },
+      {
+        type: 'fix',
+        "description": "Fix ReferenceError: cellContextMenu → openCellContextMenu in PixiPatternEditor"
+      },
       {
         type: 'fix',
         "description": "Pixel-perfect GL dialog parity: fix 38 dialogs + create 6 new GL dialogs"
@@ -204,34 +232,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'feature',
         "description": "Add 4 GL-native dialogs: ShortcutSheet, GrooveSettings, FindReplace, EffectPicker"
-      },
-      {
-        type: 'improvement',
-        "description": "Wire 5 GL dialogs into PixiRoot, remove DOM versions from bridge"
-      },
-      {
-        type: 'feature',
-        "description": "Add 5 GL-native dialogs: ClipRename, TrackRename, Download, SynthError, UndoHistory"
-      },
-      {
-        type: 'improvement',
-        "description": "Chore: update auto-generated changelog"
-      },
-      {
-        type: 'feature',
-        "description": "Add GL-native dialog components"
-      },
-      {
-        type: 'fix',
-        "description": "Ghost/transparent buttons invisible — alpha was applied to entire container"
-      },
-      {
-        type: 'fix',
-        "description": "Remove unused draw callbacks left from layoutContainer migration"
-      },
-      {
-        type: 'feature',
-        "description": "Wire 7 GL-native dialogs into PixiRoot, remove DOM versions"
       }
     ]
   }
