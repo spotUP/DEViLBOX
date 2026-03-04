@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-03-04T21:48:11.241Z
+ * Generated: 2026-03-04T22:35:18.508Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.2277';
-export const BUILD_NUMBER = '2277';
-export const BUILD_HASH = 'cc6637eb';
+export const BUILD_VERSION = '1.0.2283';
+export const BUILD_NUMBER = '2283';
+export const BUILD_HASH = '7ab2741d';
 export const BUILD_DATE = '2026-03-04';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,33 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.2277',
+    version: '1.0.2283',
     date: '2026-03-04',
     changes: [
+      {
+        type: 'fix',
+        "description": "Prevent turntable platter non-uniform scaling"
+      },
+      {
+        type: 'fix',
+        "description": "Prevent non-uniform knob scaling"
+      },
+      {
+        type: 'fix',
+        "description": "SID files produce no audio — store c64SidFileData in tracker state"
+      },
+      {
+        type: 'fix',
+        "description": "Channel headers 1:1 parity with DOM"
+      },
+      {
+        type: 'feature',
+        "description": "Fix 3 'unfixable' GL-DOM parity gaps"
+      },
+      {
+        type: 'fix',
+        "description": "Update FM synth metering to use dispatch path"
+      },
       {
         type: 'improvement',
         "description": "Chore: update generated changelog to build 2267"
@@ -208,30 +232,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         "description": "CXX (set volume) now applies before note trigger in MOD path"
-      },
-      {
-        type: 'fix',
-        "description": "Increase master FX panel preset dropdown height to 70vh"
-      },
-      {
-        type: 'feature',
-        "description": "Add Neural amp, WAM, Buzz, and Tumult FX presets"
-      },
-      {
-        type: 'fix',
-        "description": "SID engines bypass blob URL pipeline for direct data loading"
-      },
-      {
-        type: 'fix',
-        "description": "Restore correct SA note offset -36 (was incorrectly reverted to -24)"
-      },
-      {
-        type: 'fix',
-        "description": "Prevent AudioContext mismatch crash in TrackerReplayer.loadSong"
-      },
-      {
-        type: 'fix',
-        "description": "SID engines silence — add player.play(), share AudioContext, playcont() hack"
       }
     ]
   }
