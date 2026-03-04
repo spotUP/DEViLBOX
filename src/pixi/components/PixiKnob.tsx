@@ -367,12 +367,14 @@ export const PixiKnob: React.FC<PixiKnobProps> = ({
           />
         )}
 
-        {/* Knob graphic */}
-        <pixiGraphics
-          ref={graphicsRef}
-          draw={draw}
-          layout={{ width: config.knob, height: config.knob }}
-        />
+        {/* Knob graphic — wrapped to prevent layout-driven non-uniform scaling */}
+        <pixiContainer layout={{ width: config.knob, height: config.knob }}>
+          <pixiGraphics
+            ref={graphicsRef}
+            draw={draw}
+            layout={{ position: 'absolute', left: 0, top: 0 }}
+          />
+        </pixiContainer>
 
         {/* Value display */}
         <pixiBitmapText
