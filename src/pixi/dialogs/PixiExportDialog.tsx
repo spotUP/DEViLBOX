@@ -88,11 +88,6 @@ const FORMAT_EXTENSIONS: Record<ExportMode, string> = {
   nano: '.dbn',
 };
 
-const MOD_CHANNEL_OPTIONS: SelectOption[] = [
-  { value: '4', label: '4 Channel (M.K.)' },
-  { value: '6', label: '6 Channel (6CHN)' },
-  { value: '8', label: '8 Channel (8CHN)' },
-];
 
 const CHIP_FORMAT_DESCRIPTIONS: Record<string, string> = {
   vgm: 'Video Game Music — multi-chip, custom loop support',
@@ -103,6 +98,27 @@ const CHIP_FORMAT_DESCRIPTIONS: Record<string, string> = {
   zsm: 'ZSM — Commander X16 audio',
   sap: 'SAP — Atari 8-bit POKEY audio',
   tiuna: 'TIAUna — Atari 2600 TIA audio',
+};
+
+const CHIP_FORMATS = [
+  { id: 'vgm', label: 'VGM', loop: 'custom' as const, ext: '.vgm' },
+  { id: 'gym', label: 'GYM', loop: 'none' as const, ext: '.gym' },
+  { id: 'nsf', label: 'NSF', loop: 'auto' as const, ext: '.nsf' },
+  { id: 'gbs', label: 'GBS', loop: 'auto' as const, ext: '.gbs' },
+  { id: 'spc', label: 'SPC', loop: 'none' as const, ext: '.spc' },
+  { id: 'zsm', label: 'ZSM', loop: 'none' as const, ext: '.zsm' },
+];
+
+const getLoopInfo = (chipFormat: string, chipLoopRow: number) => {
+  if (chipFormat === 'vgm') {
+    return chipLoopRow > 0
+      ? { text: `Loop point at row ${chipLoopRow} will be used`, color: 0x44cc44 }
+      : { text: 'Set loop point above for custom loop', color: 0x888888 };
+  }
+  if (['nsf', 'gbs'].includes(chipFormat)) {
+    return { text: `${chipFormat.toUpperCase()} loops entire song automatically`, color: 0xddaa00 };
+  }
+  return { text: `${chipFormat.toUpperCase()} does not support loop points`, color: 0xff6644 };
 };
 
 // ── Component ──────────────────────────────────────────────────────────────────
@@ -703,21 +719,33 @@ export const PixiExportDialog: React.FC<PixiExportDialogProps> = ({ isOpen, onCl
                 <PixiLabel text="Format: WAV 16-bit 44.1kHz" size="xs" font="mono" color="textMuted" />
                 {audioScope === 'arrangement' ? (
                   <>
-                    <PixiLabel text={`BPM: ${bpm} · Clips: ${arrangementClips.filter((c: any) => !c.muted).length} unmuted`} size="xs" font="mono" color="textMuted" />
+                    <PixiLabel text={`BPM: ${bpm}`} size="xs" font="mono" color="textMuted" />
+                    <PixiLabel text={`Clips: ${arrangementClips.length} total, ${arrangementClips.filter((c: any) => !c.muted).length} unmuted`} size="xs" font="mono" color="textMuted" />
+                    <PixiLabel text={`Total Rows: ${arrangementClips.reduce((sum: number, c: any) => sum + (c.clipLengthRows ?? 64), 0)}`} size="xs" font="mono" color="textMuted" />
                   </>
                 ) : audioScope === 'song' ? (
                   <>
-                    <PixiLabel text={`BPM: ${bpm} · Patterns: ${patterns.length}`} size="xs" font="mono" color="textMuted" />
+                    <PixiLabel text={`BPM: ${bpm}`} size="xs" font="mono" color="textMuted" />
+                    <PixiLabel text={`Patterns: ${patterns.length}`} size="xs" font="mono" color="textMuted" />
                     <PixiLabel text={`Total Rows: ${patterns.reduce((sum, p) => sum + p.length, 0)}`} size="xs" font="mono" color="textMuted" />
                   </>
                 ) : (
-                  <PixiLabel text={`BPM: ${bpm} · Rows: ${patterns[selectedPatternIndex]?.channels[0]?.rows?.length ?? 0}`} size="xs" font="mono" color="textMuted" />
+                  <>
+                    <PixiLabel text={`BPM: ${bpm}`} size="xs" font="mono" color="textMuted" />
+                    <PixiLabel text={`Rows: ${patterns[selectedPatternIndex]?.channels[0]?.rows?.length ?? 0}`} size="xs" font="mono" color="textMuted" />
+                  </>
                 )}
 
                 {isRendering && (
-                  <layoutContainer layout={{ width: CONTENT_W - 24, height: 16, borderRadius: 4, borderWidth: 1, borderColor: theme.border.color, overflow: 'hidden' }}>
-                    <pixiGraphics draw={(g: any) => { g.clear(); g.rect(0, 0, (CONTENT_W - 26) * renderProgress, 14).fill(theme.accent.color); }} />
-                    <PixiLabel text={`Rendering: ${Math.round(renderProgress * 100)}%`} size="xs" color="text" layout={{ position: 'absolute', left: 4, top: 1 }} />
+                  <layoutContainer layout={{ flexDirection: 'column', gap: 4, width: CONTENT_W - 24 }}>
+                    <PixiLabel text={`Rendering ${audioScope}... ${Math.round(renderProgress * 100)}%`} size="xs" color="text" />
+                    <layoutContainer layout={{ width: CONTENT_W - 24, height: 8, borderRadius: 4, overflow: 'hidden' }}>
+                      <pixiGraphics draw={(g: any) => {
+                        g.clear();
+                        g.roundRect(0, 0, CONTENT_W - 24, 8, 4).fill(theme.bgSecondary?.color ?? 0x222222);
+                        g.roundRect(0, 0, (CONTENT_W - 24) * renderProgress, 8, 4).fill(theme.accent?.color ?? 0x4488ff);
+                      }} />
+                    </layoutContainer>
                   </layoutContainer>
                 )}
               </layoutContainer>
@@ -786,8 +814,10 @@ export const PixiExportDialog: React.FC<PixiExportDialogProps> = ({ isOpen, onCl
                 </layoutContainer>
 
                 {/* Metadata display */}
-                <PixiLabel text={`Format: MIDI Type ${midiFormat} · Resolution: 480 PPQ`} size="xs" font="mono" color="textMuted" />
-                <PixiLabel text={`BPM: ${bpm} · Channels: ${patterns[0]?.channels?.length ?? 0}`} size="xs" font="mono" color="textMuted" />
+                <PixiLabel text="Format: Standard MIDI File (SMF)" size="xs" font="mono" color="textMuted" />
+                <PixiLabel text="Resolution: 480 PPQ" size="xs" font="mono" color="textMuted" />
+                <PixiLabel text={`BPM: ${bpm}`} size="xs" font="mono" color="textMuted" />
+                <PixiLabel text={`Channels: ${patterns[selectedPatternIndex]?.channels?.length ?? 0}`} size="xs" font="mono" color="textMuted" />
                 {midiScope === 'song' && (
                   <PixiLabel text={`Patterns: ${patterns.length}`} size="xs" font="mono" color="textMuted" />
                 )}
@@ -863,12 +893,21 @@ export const PixiExportDialog: React.FC<PixiExportDialogProps> = ({ isOpen, onCl
 
                 <layoutContainer layout={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: CONTENT_W - 24 }}>
                   <PixiLabel text="Channels" size="xs" color="textMuted" />
-                  <PixiSelect
-                    options={MOD_CHANNEL_OPTIONS}
-                    value={String(modChannels)}
-                    onChange={(v) => setModChannels(Number(v) as 4 | 6 | 8)}
-                    width={200}
-                  />
+                  <layoutContainer layout={{ flexDirection: 'row', gap: 4 }}>
+                    {([
+                      { value: 4 as const, label: '4ch (M.K.)' },
+                      { value: 6 as const, label: '6ch (6CHN)' },
+                      { value: 8 as const, label: '8ch (8CHN)' },
+                    ]).map(opt => (
+                      <PixiButton
+                        key={opt.value}
+                        label={opt.label}
+                        variant={modChannels === opt.value ? 'primary' : 'ghost'}
+                        width={100}
+                        onClick={() => setModChannels(opt.value)}
+                      />
+                    ))}
+                  </layoutContainer>
                 </layoutContainer>
 
                 <layoutContainer layout={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: CONTENT_W - 24 }}>
@@ -911,27 +950,34 @@ export const PixiExportDialog: React.FC<PixiExportDialogProps> = ({ isOpen, onCl
                 <PixiLabel text="Chip Music Export" size="sm" weight="bold" color="accent" />
 
                 {/* Recording controls */}
-                <layoutContainer layout={{ flexDirection: 'row', alignItems: 'center', gap: 8, width: CONTENT_W - 24 }}>
-                  <PixiButton
-                    label={chipIsRecording ? 'Stop Recording' : 'Record'}
-                    variant={chipIsRecording ? 'danger' : 'primary'}
-                    onClick={handleChipRecord}
-                  />
-                  {chipIsRecording && (
-                    <PixiLabel
-                      text={`${Math.floor(chipRecordingTime / 60)}:${(chipRecordingTime % 60).toFixed(1).padStart(4, '0')}`}
-                      size="sm"
-                      font="mono"
-                      weight="bold"
-                      color="accent"
+                <layoutContainer layout={{
+                  flexDirection: 'column', gap: 4, padding: 8, borderRadius: 6,
+                  borderWidth: 1, borderColor: 0xff4444,
+                  backgroundColor: 0x1a0000, width: CONTENT_W - 24,
+                }}>
+                  <PixiLabel text="RECORDING" size="xs" weight="bold" color="custom" customColor={0xff4444} />
+                  <layoutContainer layout={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <PixiButton
+                      label={chipIsRecording ? 'Stop Recording' : 'Record'}
+                      variant={chipIsRecording ? 'danger' : 'primary'}
+                      onClick={handleChipRecord}
                     />
-                  )}
-                  {chipIsRecording && (
-                    <PixiLabel text="Recording... play your song now" size="xs" color="warning" />
-                  )}
-                  {chipLogDataRef.current && !chipIsRecording && (
-                    <PixiLabel text="Recording ready" size="xs" color="accent" />
-                  )}
+                    {chipIsRecording && (
+                      <PixiLabel
+                        text={`${Math.floor(chipRecordingTime / 60)}:${(chipRecordingTime % 60).toFixed(1).padStart(4, '0')}`}
+                        size="sm"
+                        font="mono"
+                        weight="bold"
+                        color="accent"
+                      />
+                    )}
+                    {chipIsRecording && (
+                      <PixiLabel text="Recording... play your song now" size="xs" color="warning" />
+                    )}
+                    {chipLogDataRef.current && !chipIsRecording && (
+                      <PixiLabel text="Recording ready" size="xs" color="accent" />
+                    )}
+                  </layoutContainer>
                 </layoutContainer>
 
                 {/* Statistics display */}
@@ -946,45 +992,29 @@ export const PixiExportDialog: React.FC<PixiExportDialogProps> = ({ isOpen, onCl
                   </layoutContainer>
                 )}
 
-                {/* Quick format presets */}
-                <layoutContainer layout={{ flexDirection: 'row', gap: 4, flexWrap: 'wrap', width: CONTENT_W - 24 }}>
-                  {(['vgm', 'gym', 'nsf', 'gbs'] as const).map(fmt => (
-                    <PixiButton key={fmt} label={fmt.toUpperCase()} variant={chipFormat === fmt ? 'primary' : 'ghost'} width={60} onClick={() => setChipFormat(fmt)} />
+                {/* Format grid with loop indicators */}
+                <layoutContainer layout={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4, width: CONTENT_W - 24 }}>
+                  {CHIP_FORMATS.map(fmt => (
+                    <PixiButton
+                      key={fmt.id}
+                      label={`${fmt.label} ${fmt.loop === 'custom' ? '\u21BB' : fmt.loop === 'auto' ? '\u21BA' : ''}`}
+                      variant={chipFormat === fmt.id ? 'primary' : 'ghost'}
+                      width={Math.floor((CONTENT_W - 32) / 3)}
+                      onClick={() => setChipFormat(fmt.id)}
+                    />
                   ))}
-                </layoutContainer>
-
-                <layoutContainer layout={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: CONTENT_W - 24 }}>
-                  <PixiLabel text="Format" size="xs" color="textMuted" />
-                  <PixiSelect
-                    options={[
-                      { value: 'vgm', label: 'VGM' },
-                      { value: 'gym', label: 'GYM' },
-                      { value: 'nsf', label: 'NSF' },
-                      { value: 'gbs', label: 'GBS' },
-                      { value: 'spc', label: 'SPC' },
-                      { value: 'zsm', label: 'ZSM' },
-                      { value: 'sap', label: 'SAP' },
-                      { value: 'tiuna', label: 'TIunA' },
-                    ]}
-                    value={chipFormat}
-                    onChange={(v) => setChipFormat(v)}
-                    width={200}
-                  />
                 </layoutContainer>
 
                 {/* Format description */}
                 <PixiLabel text={CHIP_FORMAT_DESCRIPTIONS[chipFormat] || ''} size="xs" font="mono" color="textMuted" />
 
-                {/* Loop support indicator */}
+                {/* Color-coded loop support indicator */}
                 {(() => {
-                  const loopSupport = chipFormat === 'vgm' ? 'custom' : ['nsf', 'gbs'].includes(chipFormat) ? 'auto' : 'none';
+                  const loopInfo = getLoopInfo(chipFormat, chipLoopPoint);
                   return (
-                    <PixiLabel
-                      text={loopSupport === 'custom' ? 'Custom loop point supported' : loopSupport === 'auto' ? 'Auto-loop (entire song)' : 'No loop support'}
-                      size="xs"
-                      color="custom"
-                      customColor={loopSupport === 'custom' ? 0x44ff44 : loopSupport === 'auto' ? 0xffaa00 : 0xff4444}
-                    />
+                    <layoutContainer layout={{ padding: 8, borderRadius: 4, borderWidth: 1, borderColor: loopInfo.color, width: CONTENT_W - 24 }}>
+                      <PixiLabel text={loopInfo.text} size="xs" color="custom" customColor={loopInfo.color} />
+                    </layoutContainer>
                   );
                 })()}
 
@@ -1021,6 +1051,7 @@ export const PixiExportDialog: React.FC<PixiExportDialogProps> = ({ isOpen, onCl
                   />
                   <PixiButton label="From Cursor" variant="ghost" width={90} onClick={() => {
                     setChipLoopPoint(currentRow);
+                    useTransportStore.getState().setLoopStartRow(currentRow);
                   }} />
                 </layoutContainer>
                 <PixiLabel
