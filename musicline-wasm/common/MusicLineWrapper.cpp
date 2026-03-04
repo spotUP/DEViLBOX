@@ -201,6 +201,101 @@ int ml_get_speed() {
     return static_cast<int>(mod->m_nCurrentTickSize);
 }
 
+// ----------------------------------------------------------------------------
+// Pattern data queries (inspired by emoon's SA state reader gist)
+// ----------------------------------------------------------------------------
+
+/**
+ * ml_get_channel_count() → number of active channels in the current song.
+ */
+int ml_get_channel_count() {
+    if (!s_song) return 0;
+    MLModule* mod = s_song->get_module();
+    if (!mod) return 0;
+    // Count non-null ChannelBuf entries
+    int count = 0;
+    for (int i = 0; i < MAXCHANS; i++) {
+        if (mod->m_ChannelBuf[i]) count++;
+        else break;
+    }
+    return count;
+}
+
+/**
+ * ml_get_part_length() → number of rows per pattern (PartSize = 128).
+ */
+int ml_get_part_length() {
+    return PartSize;
+}
+
+/**
+ * ml_get_num_parts() → total number of patterns in the module.
+ */
+int ml_get_num_parts() {
+    if (!s_song) return 0;
+    MLModule* mod = s_song->get_module();
+    if (!mod) return 0;
+    return static_cast<int>(mod->m_PartNum);
+}
+
+/**
+ * ml_get_channel_state(channel, outBuf)
+ * Writes 8 bytes of channel state:
+ *   [0] tunePos  (u8) — position in tune list
+ *   [1] partPos  (u8) — current row in pattern
+ *   [2-3] partNum (u16 LE) — current pattern number
+ *   [4] transposeNum (s8) — current transpose
+ *   [5] speed    (u8) — ticks per row for this channel
+ *   [6] groove   (u8)
+ *   [7] reserved
+ * Returns 1 on success, 0 on failure.
+ */
+int ml_get_channel_state(int channel, uint8_t* outBuf) {
+    if (!s_song || !outBuf) return 0;
+    MLModule* mod = s_song->get_module();
+    if (!mod) return 0;
+    if (channel < 0 || channel >= MAXCHANS || !mod->m_ChannelBuf[channel]) return 0;
+
+    Channel* ch = mod->m_ChannelBuf[channel];
+    outBuf[0] = ch->m_TunePos;
+    outBuf[1] = ch->m_PartPos;
+    outBuf[2] = static_cast<uint8_t>(ch->m_PartNum & 0xFF);
+    outBuf[3] = static_cast<uint8_t>((ch->m_PartNum >> 8) & 0xFF);
+    outBuf[4] = static_cast<uint8_t>(ch->m_TransposeNum);
+    outBuf[5] = ch->m_SpdPart;
+    outBuf[6] = ch->m_GrvPart;
+    outBuf[7] = 0;
+    return 1;
+}
+
+/**
+ * ml_get_pattern_data(partNum, outBuf, maxRows)
+ * Reads pattern data for pattern `partNum` into outBuf.
+ * Each row is 4 bytes: [note, instrument, fx_hi, fx_lo]
+ * where fx is the first effect column (Fx[0]).
+ * Returns the number of rows written (up to min(PartSize, maxRows)).
+ */
+int ml_get_pattern_data(int partNum, uint8_t* outBuf, int maxRows) {
+    if (!s_song || !outBuf || maxRows <= 0) return 0;
+    MLModule* mod = s_song->get_module();
+    if (!mod) return 0;
+    if (partNum < 0 || partNum >= 1025 || !mod->m_PartList[partNum]) return 0;
+
+    Part* part = mod->m_PartList[partNum];
+    int rows = (maxRows < PartSize) ? maxRows : PartSize;
+
+    for (int r = 0; r < rows; r++) {
+        PartLine& pl = part->Data[r];
+        int off = r * 4;
+        outBuf[off]     = pl.Note;
+        outBuf[off + 1] = pl.Inst;
+        // Pack first effect column: hi byte = flags/effect, lo byte = argument
+        outBuf[off + 2] = static_cast<uint8_t>((pl.Fx[0] >> 8) & 0xFF);
+        outBuf[off + 3] = static_cast<uint8_t>(pl.Fx[0] & 0xFF);
+    }
+    return rows;
+}
+
 // ============================================================================
 // Preview API
 // ============================================================================
