@@ -19,6 +19,8 @@ import {
 } from '../../lib/drumpad/defaultKitLoader';
 import { getBankPads } from '../../types/drumpad';
 import type { PadBank, MpcResampleConfig, DrumPad } from '../../types/drumpad';
+import { DrumPadEngine } from '../../engine/drumpad/DrumPadEngine';
+import { getAudioContext, resumeAudioContext } from '../../audio/AudioContextSingleton';
 import { PixiButton } from '../components';
 import { PixiSelect, type SelectOption } from '../components/PixiSelect';
 import { PixiCheckbox } from '../components';
@@ -55,19 +57,33 @@ const PadCell: React.FC<{
   pad: DrumPad;
   selected: boolean;
   onSelect: () => void;
+  onTrigger: (padId: number) => void;
   size: number;
-}> = React.memo(({ pad, selected, onSelect, size }) => {
+}> = React.memo(({ pad, selected, onSelect, onTrigger, size }) => {
   const theme = usePixiTheme();
   const [hovered, setHovered] = useState(false);
+  const [pressed, setPressed] = useState(false);
   const hasSample = !!pad.sample;
 
-  const bg = selected
+  const bg = pressed
     ? theme.accent.color
-    : hovered
-      ? theme.bgHover.color
-      : hasSample
-        ? theme.bgTertiary.color
-        : theme.bg.color;
+    : selected
+      ? theme.accent.color
+      : hovered
+        ? theme.bgHover.color
+        : hasSample
+          ? theme.bgTertiary.color
+          : theme.bg.color;
+
+  const handlePointerDown = useCallback(() => {
+    setPressed(true);
+    onSelect();
+    onTrigger(pad.id);
+  }, [onSelect, onTrigger, pad.id]);
+
+  const handlePointerUp = useCallback(() => {
+    setPressed(false);
+  }, []);
 
   return (
     <Div
@@ -85,9 +101,11 @@ const PadCell: React.FC<{
       }}
       eventMode="static"
       cursor="pointer"
-      onPointerUp={onSelect}
+      onPointerDown={handlePointerDown}
+      onPointerUp={handlePointerUp}
+      onPointerUpOutside={handlePointerUp}
       onPointerOver={() => setHovered(true)}
-      onPointerOut={() => setHovered(false)}
+      onPointerOut={() => { setHovered(false); setPressed(false); }}
     >
       <Txt className={`${size >= 80 ? 'text-sm' : 'text-xs'} font-bold text-text-primary`}>{`${pad.id}`}</Txt>
       <Txt className={`${size >= 80 ? 'text-sm' : 'text-xs'} text-text-muted`}>
@@ -153,6 +171,50 @@ export const PixiDrumPadManager: React.FC = () => {
       if (masterTuneTimerRef.current) clearTimeout(masterTuneTimerRef.current);
     };
   }, []);
+
+  /* ── Audio engine ── */
+  const engineRef = useRef<DrumPadEngine | null>(null);
+
+  useEffect(() => {
+    const audioContext = getAudioContext();
+    engineRef.current = new DrumPadEngine(audioContext);
+    return () => {
+      engineRef.current?.dispose();
+      engineRef.current = null;
+    };
+  }, []);
+
+  // Sync master level to engine
+  useEffect(() => {
+    if (engineRef.current && currentProgram) {
+      engineRef.current.setMasterLevel(currentProgram.masterLevel);
+    }
+  }, [currentProgram?.masterLevel]);
+
+  // Sync mute groups to engine
+  useEffect(() => {
+    if (engineRef.current && currentProgram) {
+      engineRef.current.setMuteGroups(currentProgram.pads);
+    }
+  }, [currentProgram]);
+
+  // Sync bus levels to engine
+  useEffect(() => {
+    if (!engineRef.current || !busLevels) return;
+    for (const [bus, level] of Object.entries(busLevels)) {
+      engineRef.current.setOutputLevel(bus, level);
+    }
+  }, [busLevels]);
+
+  const handlePadTrigger = useCallback(async (padId: number) => {
+    await resumeAudioContext();
+    if (currentProgram && engineRef.current) {
+      const pad = currentProgram.pads.find(p => p.id === padId);
+      if (pad?.sample) {
+        engineRef.current.triggerPad(pad, 100);
+      }
+    }
+  }, [currentProgram]);
 
   /* ── Current program / pads ── */
   const currentProgram = programs.get(currentProgramId);
@@ -369,6 +431,7 @@ export const PixiDrumPadManager: React.FC = () => {
                 pad={pad}
                 selected={pad.id === selectedPadId}
                 onSelect={() => setSelectedPadId(pad.id)}
+                onTrigger={handlePadTrigger}
                 size={padSize}
               />
             ))}
