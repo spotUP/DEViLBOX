@@ -143,24 +143,25 @@ export const PixiRoot: React.FC = () => {
   const handleModuleImportGL = useCallback(async (info: ModuleInfo, options: ImportOptions) => {
     setPendingModuleFile(null);
     if (info.file) {
-      info.file.arrayBuffer().then(buf => {
-        lookupSongDB(computeSongDBHash(buf)).then(result => {
-          useTrackerStore.getState().setSongDBInfo(result ? {
-            authors: result.authors, publishers: result.publishers,
-            album: result.album, year: result.year, format: result.format,
-            duration_ms: result.subsongs[0]?.duration_ms ?? 0,
-          } : null);
-        });
-        const sidInfo = parseSIDHeader(new Uint8Array(buf));
-        useTrackerStore.getState().setSidMetadata(sidInfo ? {
-          format: sidInfo.format, version: sidInfo.version,
-          title: sidInfo.title, author: sidInfo.author, copyright: sidInfo.copyright,
-          chipModel: sidInfo.chipModel, clockSpeed: sidInfo.clockSpeed,
-          subsongs: sidInfo.subsongs, defaultSubsong: sidInfo.defaultSubsong,
-          currentSubsong: options.subsong ?? sidInfo.defaultSubsong,
-          secondSID: sidInfo.secondSID, thirdSID: sidInfo.thirdSID,
+      // Use the already-available ArrayBuffer (read by import dialog) — avoids
+      // async race where loadFile() could complete before setSidMetadata runs.
+      const buf = info.arrayBuffer ?? await info.file.arrayBuffer();
+      lookupSongDB(computeSongDBHash(buf)).then(result => {
+        useTrackerStore.getState().setSongDBInfo(result ? {
+          authors: result.authors, publishers: result.publishers,
+          album: result.album, year: result.year, format: result.format,
+          duration_ms: result.subsongs[0]?.duration_ms ?? 0,
         } : null);
       });
+      const sidInfo = parseSIDHeader(new Uint8Array(buf));
+      useTrackerStore.getState().setSidMetadata(sidInfo ? {
+        format: sidInfo.format, version: sidInfo.version,
+        title: sidInfo.title, author: sidInfo.author, copyright: sidInfo.copyright,
+        chipModel: sidInfo.chipModel, clockSpeed: sidInfo.clockSpeed,
+        subsongs: sidInfo.subsongs, defaultSubsong: sidInfo.defaultSubsong,
+        currentSubsong: options.subsong ?? sidInfo.defaultSubsong,
+        secondSID: sidInfo.secondSID, thirdSID: sidInfo.thirdSID,
+      } : null);
     }
     try {
       const { loadFile } = await import('@lib/file/UnifiedFileLoader');
