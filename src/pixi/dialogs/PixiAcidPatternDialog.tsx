@@ -65,8 +65,8 @@ export const PixiAcidPatternDialog: React.FC<PixiAcidPatternDialogProps> = ({ is
     <PixiModal isOpen={isOpen} onClose={onClose} width={340} height={380}>
       <PixiModalHeader title="Acid Pattern Generator" onClose={onClose} />
 
-      <pixiContainer layout={{ flex: 1, padding: 12, flexDirection: 'column', gap: 12, alignItems: 'center' }}>
-        <pixiContainer layout={{ flexDirection: 'row', gap: 16, justifyContent: 'center' }}>
+      <layoutContainer layout={{ flex: 1, padding: 12, flexDirection: 'column', gap: 12, alignItems: 'center' }}>
+        <layoutContainer layout={{ flexDirection: 'row', gap: 16, justifyContent: 'center' }}>
           <PixiKnob
             value={density}
             min={0}
@@ -89,9 +89,9 @@ export const PixiAcidPatternDialog: React.FC<PixiAcidPatternDialogProps> = ({ is
             formatValue={(v) => `${Math.round(v)}%`}
             onChange={setSpread}
           />
-        </pixiContainer>
+        </layoutContainer>
 
-        <pixiContainer layout={{ flexDirection: 'row', gap: 16, justifyContent: 'center' }}>
+        <layoutContainer layout={{ flexDirection: 'row', gap: 16, justifyContent: 'center' }}>
           <PixiKnob
             value={accentsDensity}
             min={0}
@@ -114,14 +114,14 @@ export const PixiAcidPatternDialog: React.FC<PixiAcidPatternDialogProps> = ({ is
             formatValue={(v) => `${Math.round(v)}%`}
             onChange={setSlidesDensity}
           />
-        </pixiContainer>
+        </layoutContainer>
 
         <PixiLabel
           text={existing303 ? `Using: ${existing303.name}` : 'Will create new TB-303'}
           size="xs"
           color="textMuted"
         />
-      </pixiContainer>
+      </layoutContainer>
 
       <PixiModalFooter>
         <PixiButton label="Random" variant="ghost" onClick={handleRandomize} />

@@ -157,24 +157,9 @@ export const PixiFXSearchReplace: React.FC<PixiFXSearchReplaceProps> = ({
   }, [searchEffTyp, searchEff, replaceEffTyp, replaceEff, scope]);
 
   // ── Draw functions ────────────────────────────────────────────────────────
-  const drawPanel = useCallback((g: GraphicsType) => {
-    g.clear();
-    // Panel background
-    g.rect(0, 0, width, height);
-    g.fill({ color: theme.bgSecondary.color });
-    // Border
-    g.rect(0, 0, width, height);
-    g.stroke({ color: theme.border.color, alpha: 0.7, width: 1 });
-    // Title bar background
-    g.rect(0, 0, width, TITLE_H);
-    g.fill({ color: theme.bgTertiary.color });
-    // Title bar bottom border
-    g.rect(0, TITLE_H - 1, width, 1);
-    g.fill({ color: theme.border.color, alpha: 0.5 });
-    // Footer top border
-    g.rect(0, height - FOOTER_H, width, 1);
-    g.fill({ color: theme.border.color, alpha: 0.4 });
-  }, [width, height, theme]);
+  const drawPanel = useCallback((_g: GraphicsType) => {
+    // Panel background now handled by layoutContainer
+  }, []);
 
   const drawScopeBtn = useCallback((isActive: boolean) => (g: GraphicsType) => {
     g.clear();
@@ -200,12 +185,17 @@ export const PixiFXSearchReplace: React.FC<PixiFXSearchReplaceProps> = ({
       : '';
 
   return (
-    <pixiContainer
-      layout={{ position: 'absolute', width, height }}
+    <layoutContainer
+      layout={{
+        position: 'absolute',
+        width,
+        height,
+        backgroundColor: theme.bgSecondary.color,
+        borderWidth: 1,
+        borderColor: theme.border.color,
+      }}
       eventMode="static"
     >
-      {/* Panel background / border / title bar */}
-      <pixiGraphics draw={drawPanel} layout={{ position: 'absolute', width, height }} />
 
       {/* Title */}
       <pixiBitmapText
@@ -359,6 +349,6 @@ export const PixiFXSearchReplace: React.FC<PixiFXSearchReplaceProps> = ({
         onClick={onClose}
         layout={{ position: 'absolute', right: 4, top: footerY }}
       />
-    </pixiContainer>
+    </layoutContainer>
   );
 };

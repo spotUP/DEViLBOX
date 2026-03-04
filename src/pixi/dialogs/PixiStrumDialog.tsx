@@ -30,7 +30,7 @@ export const PixiStrumDialog: React.FC<PixiStrumDialogProps> = ({ isOpen, onClos
     <PixiModal isOpen={isOpen} onClose={onClose} width={260} height={220}>
       <PixiModalHeader title="Strum" onClose={onClose} />
 
-      <pixiContainer layout={{ flex: 1, padding: 12, flexDirection: 'column', gap: 12, alignItems: 'center' }}>
+      <layoutContainer layout={{ flex: 1, padding: 12, flexDirection: 'column', gap: 12, alignItems: 'center' }}>
         <PixiKnob
           value={delay}
           min={0}
@@ -42,7 +42,7 @@ export const PixiStrumDialog: React.FC<PixiStrumDialogProps> = ({ isOpen, onClos
           onChange={setDelay}
         />
 
-        <pixiContainer layout={{ flexDirection: 'row', gap: 4 }}>
+        <layoutContainer layout={{ flexDirection: 'row', gap: 4 }}>
           <PixiButton
             label="Down"
             variant={direction === 'down' ? 'primary' : 'ghost'}
@@ -55,12 +55,12 @@ export const PixiStrumDialog: React.FC<PixiStrumDialogProps> = ({ isOpen, onClos
             size="sm"
             onClick={() => setDirection('up')}
           />
-        </pixiContainer>
+        </layoutContainer>
 
         {!hasSelection && (
           <PixiLabel text="Select a region first" size="xs" color="textMuted" />
         )}
-      </pixiContainer>
+      </layoutContainer>
 
       <PixiModalFooter>
         <PixiButton label="Cancel" variant="ghost" onClick={onClose} />
