@@ -89,7 +89,7 @@ export const PixiToast: React.FC = () => {
         const typeColor = getTypeColor(notif.type);
 
         return (
-          <pixiContainer
+          <layoutContainer
             key={notif.id}
             layout={{
               width: TOAST_WIDTH,
@@ -98,21 +98,20 @@ export const PixiToast: React.FC = () => {
               alignItems: 'center',
               paddingLeft: 10,
               paddingRight: 10,
+              backgroundColor: theme.bgSecondary.color,
+              borderWidth: 1,
+              borderColor: typeColor,
+              borderRadius: 6,
             }}
           >
+            {/* Left accent bar — custom shape, keep as Graphics */}
             <pixiGraphics
               draw={(g: GraphicsType) => {
                 g.clear();
-                // Background
-                g.roundRect(0, 0, TOAST_WIDTH, TOAST_HEIGHT, 6);
-                g.fill({ color: theme.bgSecondary.color, alpha: 0.95 });
-                g.roundRect(0, 0, TOAST_WIDTH, TOAST_HEIGHT, 6);
-                g.stroke({ color: typeColor, alpha: 0.4, width: 1 });
-                // Left accent bar
                 g.roundRect(0, 0, 3, TOAST_HEIGHT, 3);
                 g.fill({ color: typeColor });
               }}
-              layout={{ position: 'absolute', width: TOAST_WIDTH, height: TOAST_HEIGHT }}
+              layout={{ position: 'absolute', width: 3, height: TOAST_HEIGHT }}
             />
 
             <pixiBitmapText
@@ -121,7 +120,7 @@ export const PixiToast: React.FC = () => {
               tint={theme.text.color}
               layout={{ marginLeft: 8 }}
             />
-          </pixiContainer>
+          </layoutContainer>
         );
       })}
     </pixiContainer>

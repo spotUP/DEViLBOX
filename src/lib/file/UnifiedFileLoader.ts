@@ -522,6 +522,12 @@ async function loadSongFile(file: File, options: FileLoadOptions): Promise<FileL
       uiState.setActiveView('tracker');
       uiState.setTrackerViewMode('tracker');
 
+      // GTUltra requires WebGL mode — auto-switch if in DOM mode
+      const { useSettingsStore } = await import('@stores/useSettingsStore');
+      if (useSettingsStore.getState().renderMode !== 'webgl') {
+        useSettingsStore.getState().setRenderMode('webgl');
+      }
+
       return {
         success: true,
         message: `Loaded GoatTracker song: ${file.name}`,

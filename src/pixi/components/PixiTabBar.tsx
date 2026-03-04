@@ -1,6 +1,7 @@
 /**
  * PixiTabBar — Project tabs for PixiNavBar.
  * Scrollable tab pills with close buttons and a new-tab button.
+ * Uses layoutContainer native bg/border — no manual Graphics.
  */
 import React, { useCallback, useState } from 'react';
 import type { Graphics as GraphicsType } from 'pixi.js';
@@ -47,20 +48,19 @@ export const PixiTabBar: React.FC<PixiTabBarProps> = ({
   const canScrollLeft = scrollOffset > 0;
   const canScrollRight = totalTabsW - scrollOffset > viewportW;
 
-  const drawBar = useCallback((g: GraphicsType) => {
-    g.clear();
-    g.rect(0, 0, width, height);
-    g.fill({ color: theme.bgTertiary.color });
-    g.rect(0, height - 1, width, 1);
-    g.fill({ color: theme.border.color, alpha: 0.5 });
-  }, [width, height, theme]);
-
   return (
-    <pixiContainer
-      layout={{ width, height, flexDirection: 'row', ...layoutProp }}
+    <layoutContainer
+      layout={{
+        width,
+        height,
+        flexDirection: 'row',
+        backgroundColor: theme.bgTertiary.color,
+        borderBottomWidth: 1,
+        borderColor: theme.border.color,
+        ...layoutProp,
+      }}
       eventMode="static"
     >
-      <pixiGraphics draw={drawBar} layout={{ position: 'absolute', width, height }} />
 
       <pixiContainer
         layout={{ width: viewportW, height, overflow: 'hidden', flexDirection: 'row' }}
@@ -96,7 +96,7 @@ export const PixiTabBar: React.FC<PixiTabBarProps> = ({
       />
 
       <PixiTabNewBtn height={height} onClick={onNew} />
-    </pixiContainer>
+    </layoutContainer>
   );
 };
 
@@ -122,19 +122,6 @@ const PixiTab: React.FC<PixiTabProps> = ({
   const displayLabel = tab.dirty ? `${rawLabel} •` : rawLabel;
   const showClose = isActive || hovered;
 
-  const drawBg = useCallback((g: GraphicsType) => {
-    g.clear();
-    if (isActive) {
-      g.rect(0, 0, width, height - 2);
-      g.fill({ color: theme.bgSecondary.color });
-    } else if (hovered) {
-      g.rect(0, 0, width, height - 2);
-      g.fill({ color: theme.bgHover.color, alpha: 0.5 });
-    }
-    g.rect(width - 1, 4, 1, height - 8);
-    g.fill({ color: theme.border.color, alpha: 0.4 });
-  }, [isActive, hovered, width, height, theme]);
-
   const drawUnderline = useCallback((g: GraphicsType) => {
     g.clear();
     if (!isActive) return;
@@ -143,15 +130,23 @@ const PixiTab: React.FC<PixiTabProps> = ({
   }, [isActive, tabIndex, width, scrollOffset, height, theme]);
 
   return (
-    <pixiContainer
+    <layoutContainer
       eventMode="static"
       cursor="pointer"
       onPointerOver={() => setHovered(true)}
       onPointerOut={() => setHovered(false)}
       onPointerUp={onSelect}
-      layout={{ width, height, flexDirection: 'row', alignItems: 'center', paddingLeft: PADDING_H }}
+      layout={{
+        width,
+        height,
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingLeft: PADDING_H,
+        backgroundColor: isActive ? theme.bgSecondary.color : hovered ? theme.bgHover.color : undefined,
+        borderRightWidth: 1,
+        borderColor: theme.border.color,
+      }}
     >
-      <pixiGraphics draw={drawBg} layout={{ position: 'absolute', width, height }} />
       {/* Active underline — always rendered, only visible when active */}
       <pixiGraphics draw={drawUnderline} layout={{ position: 'absolute', width, height }} />
       <pixiBitmapText
@@ -175,7 +170,7 @@ const PixiTab: React.FC<PixiTabProps> = ({
           layout={{}}
         />
       </pixiContainer>
-    </pixiContainer>
+    </layoutContainer>
   );
 };
 

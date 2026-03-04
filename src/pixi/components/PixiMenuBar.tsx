@@ -126,31 +126,31 @@ const PixiMenuButton: React.FC<PixiMenuButtonProps> = ({
     }
   }, [isOpen, onHoverOpen, handleOpen]);
 
-  const drawBtnBg = useCallback((g: GraphicsType) => {
-    g.clear();
-    if (!isOpen && !hovered) return;
-    g.rect(0, 0, btnW, height);
-    g.fill({ color: isOpen ? theme.accent.color : theme.bgHover.color, alpha: isOpen ? 0.25 : 0.5 });
-  }, [isOpen, hovered, btnW, height, theme]);
+  const drawBtnBg = useCallback((_g: GraphicsType) => {}, []);
 
   return (
-    <pixiContainer
+    <layoutContainer
       ref={containerRef}
       eventMode="static"
       cursor="pointer"
       onPointerOver={() => { setHovered(true); handleHoverOpen(); }}
       onPointerOut={() => setHovered(false)}
       onPointerUp={handleToggle}
-      layout={{ width: btnW, height, justifyContent: 'center', alignItems: 'center' }}
+      layout={{
+        width: btnW,
+        height,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: isOpen ? theme.accent.color : hovered ? theme.bgHover.color : undefined,
+      }}
     >
-      <pixiGraphics draw={drawBtnBg} layout={{ position: 'absolute', width: btnW, height }} />
       <pixiBitmapText
         text={menu.label}
         style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 11, fill: 0xffffff }}
         tint={isOpen ? theme.accent.color : theme.textSecondary.color}
         layout={{}}
       />
-    </pixiContainer>
+    </layoutContainer>
   );
 };
 

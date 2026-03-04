@@ -1,6 +1,7 @@
 /**
  * PixiModal — Full-screen semi-transparent overlay with centered content container.
  * Includes header/footer bars. Click-outside-to-close, Escape key.
+ * Uses layoutContainer native bg/border — no manual Graphics.
  */
 
 import { useCallback, useEffect } from 'react';
@@ -55,26 +56,6 @@ export const PixiModal: React.FC<PixiModalProps> = ({
     g.fill({ color: 0x000000, alpha: 0.6 });
   };
 
-  const drawPanel = (g: GraphicsType) => {
-    g.clear();
-    // Panel background
-    g.roundRect(0, 0, width, height, 8);
-    g.fill({ color: theme.bgSecondary.color });
-    g.roundRect(0, 0, width, height, 8);
-    g.stroke({ color: theme.border.color, alpha: 0.6, width: 1 });
-  };
-
-  const drawHeader = (g: GraphicsType) => {
-    g.clear();
-    // Header background
-    g.roundRect(0, 0, width, 36, 0);
-    g.fill({ color: theme.bgTertiary.color });
-    // Bottom border
-    g.moveTo(0, 35);
-    g.lineTo(width, 35);
-    g.stroke({ color: theme.border.color, alpha: 0.4, width: 1 });
-  };
-
   // Click overlay to close
   const handleOverlayClick = useCallback((_e: FederatedPointerEvent) => {
     onClose();
@@ -87,7 +68,7 @@ export const PixiModal: React.FC<PixiModalProps> = ({
 
   return (
     <pixiContainer layout={{ position: 'absolute', width: '100%', height: '100%' }}>
-      {/* Overlay backdrop */}
+      {/* Overlay backdrop — Graphics needed for semi-transparent fill */}
       <pixiGraphics
         draw={drawOverlay}
         eventMode="static"
@@ -95,8 +76,8 @@ export const PixiModal: React.FC<PixiModalProps> = ({
         layout={{ position: 'absolute', width: screenW, height: screenH }}
       />
 
-      {/* Centered panel */}
-      <pixiContainer
+      {/* Centered panel — native bg/border via layoutContainer */}
+      <layoutContainer
         eventMode="static"
         onPointerDown={handlePanelClick}
         layout={{
@@ -106,36 +87,34 @@ export const PixiModal: React.FC<PixiModalProps> = ({
           width,
           height,
           flexDirection: 'column',
+          backgroundColor: theme.bgSecondary.color,
+          borderWidth: 1,
+          borderColor: theme.border.color,
+          borderRadius: 8,
+          overflow: 'hidden',
         }}
       >
-        {/* Panel background */}
-        <pixiGraphics
-          draw={drawPanel}
-          layout={{ position: 'absolute', width, height }}
-        />
-
         {/* Header */}
         {title && (
-          <pixiContainer
+          <layoutContainer
             layout={{
               width,
               height: 36,
               flexDirection: 'row',
               alignItems: 'center',
               paddingLeft: 12,
+              backgroundColor: theme.bgTertiary.color,
+              borderBottomWidth: 1,
+              borderColor: theme.border.color,
             }}
           >
-            <pixiGraphics
-              draw={drawHeader}
-              layout={{ position: 'absolute', width, height: 36 }}
-            />
             <pixiBitmapText
               text={title}
               style={{ fontFamily: PIXI_FONTS.SANS_SEMIBOLD, fontSize: 13, fill: 0xffffff }}
               tint={theme.text.color}
               layout={{}}
             />
-          </pixiContainer>
+          </layoutContainer>
         )}
 
         {/* Content area */}
@@ -149,7 +128,7 @@ export const PixiModal: React.FC<PixiModalProps> = ({
         >
           {children}
         </pixiContainer>
-      </pixiContainer>
+      </layoutContainer>
     </pixiContainer>
   );
 };
@@ -170,7 +149,7 @@ export const PixiModalHeader: React.FC<PixiModalHeaderProps> = ({
   const theme = usePixiTheme();
 
   return (
-    <pixiContainer
+    <layoutContainer
       layout={{
         width,
         height: 36,
@@ -179,6 +158,9 @@ export const PixiModalHeader: React.FC<PixiModalHeaderProps> = ({
         justifyContent: 'space-between',
         paddingLeft: 12,
         paddingRight: 12,
+        backgroundColor: theme.bgTertiary.color,
+        borderBottomWidth: 1,
+        borderColor: theme.border.color,
       }}
     >
       <pixiBitmapText
@@ -198,7 +180,7 @@ export const PixiModalHeader: React.FC<PixiModalHeaderProps> = ({
           layout={{}}
         />
       )}
-    </pixiContainer>
+    </layoutContainer>
   );
 };
 
@@ -215,17 +197,8 @@ export const PixiModalFooter: React.FC<PixiModalFooterProps> = ({
 }) => {
   const theme = usePixiTheme();
 
-  const drawFooter = (g: GraphicsType) => {
-    g.clear();
-    g.moveTo(0, 0);
-    g.lineTo(width, 0);
-    g.stroke({ color: theme.border.color, alpha: 0.4, width: 1 });
-    g.rect(0, 1, width, 43);
-    g.fill({ color: theme.bgTertiary.color });
-  };
-
   return (
-    <pixiContainer
+    <layoutContainer
       layout={{
         width,
         height: 44,
@@ -234,13 +207,12 @@ export const PixiModalFooter: React.FC<PixiModalFooterProps> = ({
         justifyContent: 'flex-end',
         paddingRight: 12,
         gap: 8,
+        backgroundColor: theme.bgTertiary.color,
+        borderTopWidth: 1,
+        borderColor: theme.border.color,
       }}
     >
-      <pixiGraphics
-        draw={drawFooter}
-        layout={{ position: 'absolute', width, height: 44 }}
-      />
       {children}
-    </pixiContainer>
+    </layoutContainer>
   );
 };
