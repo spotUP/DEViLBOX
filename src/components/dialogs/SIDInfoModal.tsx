@@ -20,6 +20,33 @@ import { fetchComposerProfile, fetchComposerTunes, fetchFileInfoByPath, getCompo
 import type { ComposerProfile as ComposerData, DeepSIDFileInfo, ComposerTune } from '@/lib/sid/composerApi';
 import { downloadHVSCFile } from '@/lib/hvscApi';
 import { loadFile } from '@/lib/file/UnifiedFileLoader';
+import { SIDScopeTab } from './sid/SIDScopeTab';
+import { SIDStereoTab } from './sid/SIDStereoTab';
+import { SIDFilterTab } from './sid/SIDFilterTab';
+import { SIDVisualsTab } from './sid/SIDVisualsTab';
+import { SIDSTILTab } from './sid/SIDSTILTab';
+import { SIDPlayerTab } from './sid/SIDPlayerTab';
+import { SIDCSDbTab } from './sid/SIDCSDbTab';
+import { SIDGB64Tab } from './sid/SIDGB64Tab';
+import { SIDRemixTab } from './sid/SIDRemixTab';
+import { SIDSettingsTab } from './sid/SIDSettingsTab';
+import { SIDTransportBar } from './sid/SIDTransportBar';
+
+type SIDTabId = 'profile' | 'scope' | 'stereo' | 'filter' | 'visuals' | 'stil' | 'player' | 'csdb' | 'gb64' | 'remix' | 'settings';
+
+const SID_TABS: { id: SIDTabId; label: string }[] = [
+  { id: 'profile', label: 'Profile' },
+  { id: 'scope', label: 'Scope' },
+  { id: 'stereo', label: 'Stereo' },
+  { id: 'filter', label: 'Filter' },
+  { id: 'visuals', label: 'Visuals' },
+  { id: 'stil', label: 'STIL' },
+  { id: 'player', label: 'Player' },
+  { id: 'csdb', label: 'CSDb' },
+  { id: 'gb64', label: 'GB64' },
+  { id: 'remix', label: 'Remix' },
+  { id: 'settings', label: 'Settings' },
+];
 
 interface SIDInfoModalProps {
   onClose: () => void;
@@ -44,6 +71,7 @@ export const SIDInfoModal: React.FC<SIDInfoModalProps> = ({ onClose }) => {
   const [tunesTotal, setTunesTotal] = useState(0);
   const [showAllTunes, setShowAllTunes] = useState(false);
   const [loadingTuneId, setLoadingTuneId] = useState<number | null>(null);
+  const [activeTab, setActiveTab] = useState<SIDTabId>('profile');
 
   const handleLoadTune = useCallback(async (tune: ComposerTune) => {
     if (loadingTuneId !== null) return;
@@ -160,7 +188,28 @@ export const SIDInfoModal: React.FC<SIDInfoModalProps> = ({ onClose }) => {
           </button>
         </div>
 
-        {/* ═══ Content (scrollable) ═══ */}
+        {/* ═══ Transport Bar ═══ */}
+        <SIDTransportBar />
+
+        {/* ═══ Tab Bar ═══ */}
+        <div className="flex border-b border-dark-border/50 bg-dark-bgSecondary/30 overflow-x-auto shrink-0">
+          {SID_TABS.map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`px-3 py-2 text-xs whitespace-nowrap border-b-2 transition-colors ${
+                activeTab === tab.id
+                  ? 'border-blue-500 text-blue-300'
+                  : 'border-transparent text-text-muted hover:text-text-secondary'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {/* ═══ Tab Content ═══ */}
+        {activeTab === 'profile' ? (
         <div className="flex-1 overflow-y-auto p-6 space-y-5 scrollbar-modern">
 
           {/* ─── Top Row: File Info + Composer Card ─── */}
@@ -543,6 +592,27 @@ export const SIDInfoModal: React.FC<SIDInfoModalProps> = ({ onClose }) => {
           )}
 
         </div>
+        ) : activeTab === 'scope' ? (
+          <SIDScopeTab className="flex-1" />
+        ) : activeTab === 'stereo' ? (
+          <SIDStereoTab className="flex-1 p-4 overflow-y-auto" />
+        ) : activeTab === 'filter' ? (
+          <SIDFilterTab className="flex-1 p-4 overflow-y-auto" />
+        ) : activeTab === 'visuals' ? (
+          <SIDVisualsTab className="flex-1" />
+        ) : activeTab === 'stil' ? (
+          <SIDSTILTab className="flex-1 p-4 overflow-y-auto" hvscPath={composer?.fullname ? `${composer.fullname}/${sidMetadata.title}.sid` : null} currentSubsong={sidMetadata.currentSubsong} totalSubsongs={sidMetadata.subsongs} />
+        ) : activeTab === 'player' ? (
+          <SIDPlayerTab className="flex-1 p-4 overflow-y-auto" playerName={fileInfo?.player || null} />
+        ) : activeTab === 'csdb' ? (
+          <SIDCSDbTab className="flex-1 p-4 overflow-y-auto" csdbId={composer?.csdbId || null} composerName={composer?.name || null} />
+        ) : activeTab === 'gb64' ? (
+          <SIDGB64Tab className="flex-1 p-4 overflow-y-auto" composerName={composer?.name || null} tuneName={sidMetadata.title || null} />
+        ) : activeTab === 'remix' ? (
+          <SIDRemixTab className="flex-1 p-4 overflow-y-auto" composerName={composer?.name || null} tuneName={sidMetadata.title || null} />
+        ) : activeTab === 'settings' ? (
+          <SIDSettingsTab className="flex-1 p-4 overflow-y-auto" />
+        ) : null}
       </div>
     </div>
   );

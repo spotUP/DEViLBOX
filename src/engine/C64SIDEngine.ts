@@ -12,9 +12,10 @@
 import { deepSIDManager, type SIDEngineType } from './deepsid/DeepSIDEngineManager';
 import { JSSIDEngine } from './deepsid/engines/JSSIDEngine';
 import { ScriptNodePlayerEngine } from './deepsid/engines/ScriptNodePlayerEngine';
+import { JSIDPlay2Engine } from './deepsid/engines/JSIDPlay2Engine';
 import { useSettingsStore } from '@stores/useSettingsStore';
 
-type EngineInstance = JSSIDEngine | ScriptNodePlayerEngine;
+type EngineInstance = JSSIDEngine | ScriptNodePlayerEngine | JSIDPlay2Engine;
 
 export interface C64SIDMetadata {
   title: string;
@@ -153,11 +154,8 @@ export class C64SIDEngine {
         break;
 
       case 'jsidplay2':
-        // JSIDPlay2 uses TeaVM (Java→WASM), not ScriptNodePlayer — not yet supported
-        console.warn('[C64SIDEngine] JSIDPlay2 not yet supported, falling back to websid');
-        this.engineType = 'websid';
-        await deepSIDManager.loadEngine('websid');
-        this.engine = new ScriptNodePlayerEngine(this.sidData, 'websid', {
+        // JSIDPlay2 uses its own worker-based architecture (not ScriptNodePlayer)
+        this.engine = new JSIDPlay2Engine(this.sidData, {
           chipModel: this.metadata?.chipModel,
           sampleRate: audioContext.sampleRate,
         });
@@ -272,6 +270,44 @@ export class C64SIDEngine {
       type: this.engineType,
       asid: this.isASIDActive(),
     };
+  }
+
+  /**
+   * Seek to time position (JSIDPlay2 only)
+   */
+  seek(timeSeconds: number): void {
+    if (this.engine && this.engine instanceof JSIDPlay2Engine) {
+      this.engine.seek(timeSeconds);
+    }
+  }
+
+  /**
+   * Get current playback time (JSIDPlay2 only)
+   */
+  getCurrentTime(): number {
+    if (this.engine && this.engine instanceof JSIDPlay2Engine) {
+      return this.engine.getCurrentTime();
+    }
+    return 0;
+  }
+
+  /**
+   * Set playback speed multiplier
+   */
+  setSpeed(multiplier: number): void {
+    if (this.engine && 'setSpeed' in this.engine) {
+      (this.engine as any).setSpeed(multiplier);
+    }
+  }
+
+  /**
+   * Get voice state for oscilloscope/pattern extraction
+   */
+  getVoiceState(voice: number): any {
+    if (this.engine && 'getVoiceState' in this.engine) {
+      return (this.engine as any).getVoiceState(voice);
+    }
+    return null;
   }
 
   /**

@@ -148,12 +148,45 @@ router.get('/search', async (req: Request, res: Response) => {
     const offset = parseInt(req.query.offset as string) || 0;
     
     if (!query) {
-      return res.json({ results: [] });
+      return res.json({ results: [], total: 0 });
     }
     
-    // In a full implementation, this would search a local index
-    // For now, return empty (would need HVSC directory indexing)
-    res.json({ results: [] });
+    // Search the DeepSID database's hvsc_files table for HVSC content
+    try {
+      const { getDeepSIDDb } = await import('../db/deepsidDb');
+      const db = getDeepSIDDb();
+      if (db) {
+        const countRow = db.prepare(`
+          SELECT COUNT(*) as cnt FROM hvsc_files
+          WHERE fullname LIKE ? OR name LIKE ? OR author LIKE ? OR copyright LIKE ?
+        `).get(`%${query}%`, `%${query}%`, `%${query}%`, `%${query}%`) as { cnt: number };
+
+        const rows = db.prepare(`
+          SELECT id, fullname, name, author, player, sidmodel, clockspeed, subtunes
+          FROM hvsc_files
+          WHERE fullname LIKE ? OR name LIKE ? OR author LIKE ? OR copyright LIKE ?
+          ORDER BY fullname
+          LIMIT ? OFFSET ?
+        `).all(`%${query}%`, `%${query}%`, `%${query}%`, `%${query}%`, limit, offset) as any[];
+
+        return res.json({
+          total: countRow.cnt,
+          results: rows.map(r => ({
+            id: r.id,
+            path: r.fullname,
+            filename: r.fullname.split('/').pop(),
+            name: r.name || r.fullname.split('/').pop(),
+            author: r.author,
+            player: r.player,
+            sidModel: r.sidmodel,
+            clockSpeed: r.clockspeed,
+            subtunes: r.subtunes,
+          })),
+        });
+      }
+    } catch { /* DeepSID DB not available */ }
+    
+    res.json({ results: [], total: 0 });
     
   } catch (err) {
     console.error('[HVSC] Search error:', err);

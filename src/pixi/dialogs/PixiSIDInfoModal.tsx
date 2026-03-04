@@ -29,14 +29,41 @@ import { PixiModal, PixiButton, PixiLabel, PixiScrollView, PixiSelect, PixiIcon 
 import type { SelectOption } from '../components';
 import { usePixiTheme } from '../theme';
 import { PIXI_FONTS } from '../fonts';
+import { SIDScopeTab } from './sid/SIDScopeTab';
+import { SIDStereoTab } from './sid/SIDStereoTab';
+import { SIDFilterTab } from './sid/SIDFilterTab';
+import { SIDVisualsTab } from './sid/SIDVisualsTab';
+import { SIDSTILTab } from './sid/SIDSTILTab';
+import { SIDPlayerTab } from './sid/SIDPlayerTab';
+import { SIDCSDbTab } from './sid/SIDCSDbTab';
+import { SIDGB64Tab } from './sid/SIDGB64Tab';
+import { SIDRemixTab } from './sid/SIDRemixTab';
+import { SIDSettingsTab } from './sid/SIDSettingsTab';
+import { SIDTransportBar } from './sid/SIDTransportBar';
 
 interface PixiSIDInfoModalProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
+type SIDTabId = 'profile' | 'scope' | 'stereo' | 'filter' | 'visuals' | 'stil' | 'player' | 'csdb' | 'gb64' | 'remix' | 'settings';
+
+const SID_TABS: { id: SIDTabId; label: string }[] = [
+  { id: 'profile', label: 'Profile' },
+  { id: 'scope', label: 'Scope' },
+  { id: 'stereo', label: 'Stereo' },
+  { id: 'filter', label: 'Filter' },
+  { id: 'visuals', label: 'Visuals' },
+  { id: 'stil', label: 'STIL' },
+  { id: 'player', label: 'Player' },
+  { id: 'csdb', label: 'CSDb' },
+  { id: 'gb64', label: 'GB64' },
+  { id: 'remix', label: 'Remix' },
+  { id: 'settings', label: 'Settings' },
+];
+
 const W = 800;
-const H = 580;
+const H = 680;
 const PAD = 24; // DOM: p-6
 const CONTENT_W = W - PAD * 2;
 const COL_GAP = 20; // DOM: gap-5
@@ -155,6 +182,7 @@ export const PixiSIDInfoModal: React.FC<PixiSIDInfoModalProps> = ({ isOpen, onCl
   const [tunesTotal, setTunesTotal] = useState(0);
   const [showAllTunes, setShowAllTunes] = useState(false);
   const [loadingTuneId, setLoadingTuneId] = useState<number | null>(null);
+  const [activeTab, setActiveTab] = useState<SIDTabId>('profile');
 
   // ── Callbacks ──────────────────────────────────────────────────────────────
 
@@ -295,7 +323,8 @@ export const PixiSIDInfoModal: React.FC<PixiSIDInfoModalProps> = ({ isOpen, onCl
   const discoH = tunes.length > 0 ? 24 + displayTunes.length * 18 + (tunes.length > 10 ? 24 : 0) : 0;
   const totalContentH = topRowH + youtubeH + bottomGridH + discoH + 60; // padding
 
-  const scrollH = H - 48 - 4; // minus header, small bottom margin
+  const scrollH = H - 48 - 40 - 32 - 4; // minus header, transport, tab bar, bottom margin
+  const tabContentH = scrollH;
 
   return (
     <PixiModal
@@ -350,7 +379,35 @@ export const PixiSIDInfoModal: React.FC<PixiSIDInfoModalProps> = ({ isOpen, onCl
         </layoutContainer>
       </layoutContainer>
 
-      {/* ═══ Scrollable content — DOM: p-6 space-y-5 ═══ */}
+      {/* ═══ Transport Bar ═══ */}
+      <SIDTransportBar width={W} />
+
+      {/* ═══ Tab Bar ═══ */}
+      <layoutContainer layout={{ flexDirection: 'row', gap: 0, borderBottomWidth: 1, borderColor: theme.border.color, backgroundColor: theme.bgSecondary.color }}>
+        {SID_TABS.map(tab => (
+          <layoutContainer
+            key={tab.id}
+            eventMode="static"
+            cursor="pointer"
+            onPointerUp={() => setActiveTab(tab.id)}
+            layout={{
+              paddingLeft: 12, paddingRight: 12, paddingTop: 8, paddingBottom: 8,
+              borderBottomWidth: activeTab === tab.id ? 2 : 0,
+              borderColor: 0x3b82f6,
+            }}
+          >
+            <pixiBitmapText
+              text={tab.label}
+              style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 12, fill: 0xffffff }}
+              tint={activeTab === tab.id ? 0x93c5fd : theme.textMuted.color}
+              layout={{}}
+            />
+          </layoutContainer>
+        ))}
+      </layoutContainer>
+
+      {/* ═══ Tab Content ═══ */}
+      {activeTab === 'profile' ? (
       <PixiScrollView width={W} height={scrollH} contentHeight={totalContentH}>
         <layoutContainer
           layout={{
@@ -862,6 +919,27 @@ export const PixiSIDInfoModal: React.FC<PixiSIDInfoModalProps> = ({ isOpen, onCl
           )}
         </layoutContainer>
       </PixiScrollView>
+      ) : activeTab === 'scope' ? (
+        <SIDScopeTab width={W - 2} height={tabContentH} />
+      ) : activeTab === 'stereo' ? (
+        <SIDStereoTab width={W - 2} height={tabContentH} />
+      ) : activeTab === 'filter' ? (
+        <SIDFilterTab width={W - 2} height={tabContentH} />
+      ) : activeTab === 'visuals' ? (
+        <SIDVisualsTab width={W - 2} height={tabContentH} />
+      ) : activeTab === 'stil' ? (
+        <SIDSTILTab width={W - 2} height={tabContentH} hvscPath={composer?.fullname ? `${composer.fullname}/${sidMetadata.title}.sid` : null} currentSubsong={sidMetadata.currentSubsong} totalSubsongs={sidMetadata.subsongs} />
+      ) : activeTab === 'player' ? (
+        <SIDPlayerTab width={W - 2} height={tabContentH} playerName={fileInfo?.player || null} />
+      ) : activeTab === 'csdb' ? (
+        <SIDCSDbTab width={W - 2} height={tabContentH} csdbId={composer?.csdbId || null} composerName={composer?.name || null} />
+      ) : activeTab === 'gb64' ? (
+        <SIDGB64Tab width={W - 2} height={tabContentH} composerName={composer?.name || null} tuneName={sidMetadata.title || null} />
+      ) : activeTab === 'remix' ? (
+        <SIDRemixTab width={W - 2} height={tabContentH} composerName={composer?.name || null} tuneName={sidMetadata.title || null} />
+      ) : activeTab === 'settings' ? (
+        <SIDSettingsTab width={W - 2} height={tabContentH} />
+      ) : null}
     </PixiModal>
   );
 };
