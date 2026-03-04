@@ -7,6 +7,7 @@ import { X, Maximize2, Keyboard, Usb } from 'lucide-react';
 import { useUIStore } from '@stores/useUIStore';
 import { useThemeStore, themes } from '@stores/useThemeStore';
 import { useSettingsStore, type SIDEngineType } from '@stores/useSettingsStore';
+import { LENS_PRESETS, LENS_PRESET_ORDER } from '@/pixi/LensFilter';
 import { SID_ENGINES } from '@engine/deepsid/DeepSIDEngineManager';
 import { useKeyboardStore } from '@stores/useKeyboardStore';
 import { useTrackerStore } from '@stores/useTrackerStore';
@@ -98,6 +99,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
     setCrtEnabled,
     setCrtParam,
     resetCrtParams,
+    lensEnabled,
+    lensPreset,
+    lensParams,
+    setLensEnabled,
+    setLensPreset,
+    setLensParam,
+    resetLensParams,
     sidEngine,
     setSidEngine,
     asidEnabled,
