@@ -1478,6 +1478,17 @@ export class TrackerReplayer {
     // FT2: store volume column byte (needed for Rxy quirk)
     ch.volColumnVol = row.volume ?? 0;
 
+    // SA synth: send arpeggio table on every row (ref: GetNewNotes line 1155)
+    // The reference sets voiceInfo.Arpeggio from trackLine.Arpeggio on EVERY row,
+    // regardless of whether there's a note trigger.
+    if (row.saArpTable !== undefined && ch.instrument?.synthType === 'SonicArrangerSynth') {
+      const engine = getToneEngine();
+      const saInst = engine.getInstrument(ch.instrument.id, ch.instrument, chIndex);
+      if (saInst && typeof (saInst as any).set === 'function') {
+        (saInst as any).set('arpeggioTable', row.saArpTable);
+      }
+    }
+
     // FT2: Period reset when arpeggio or vibrato from previous row ends
     // Reference: ft2_replayer.c getNewNote() lines 1333-1349
     if (this.useXMPeriods) {
@@ -1703,14 +1714,6 @@ export class TrackerReplayer {
         // Trigger note
         this.triggerNote(ch, time, offset, chIndex, accent, slideActive, effectiveSlide, hammer);
 
-        // SA synth: send arpeggio table from pattern data after note trigger
-        if (ch.instrument?.synthType === 'SonicArrangerSynth' && row.saArpTable !== undefined) {
-          const saInst = getToneEngine().getInstrument(ch.instrument.id, ch.instrument, chIndex);
-          if (saInst && typeof (saInst as any).set === 'function') {
-            (saInst as any).set('arpeggioTable', row.saArpTable);
-          }
-        }
-
         // Update slide flag for next row
         ch.previousSlideFlag = (slide || hammer) ?? false;
       }
@@ -1796,14 +1799,6 @@ export class TrackerReplayer {
         ch.lastPlayedNoteName = newNoteName;
 
         this.triggerNote(ch, time, offset, chIndex, accent, slideActive, effectiveSlide, hammer);
-
-        // SA synth: send arpeggio table from pattern data after note trigger
-        if (ch.instrument?.synthType === 'SonicArrangerSynth' && row.saArpTable !== undefined) {
-          const saInst = getToneEngine().getInstrument(ch.instrument.id, ch.instrument, chIndex);
-          if (saInst && typeof (saInst as any).set === 'function') {
-            (saInst as any).set('arpeggioTable', row.saArpTable);
-          }
-        }
 
         this.triggerEnvelopes(ch);
         ch.outVol = ch.volume;
