@@ -103,14 +103,6 @@ const PixiGlobalMenuDropdown: React.FC<MenuDropdownProps> = ({ x, y, width, item
   const panelH = items.reduce((sum, item) => sum + itemH(item), 0) + MENU_PANEL_PADDING * 2;
   const innerW = width - MENU_PANEL_PADDING * 2;
 
-  const drawBg = useCallback((g: GraphicsType) => {
-    g.clear();
-    g.roundRect(0, 0, width, panelH, 4);
-    g.fill({ color: theme.bgSecondary.color });
-    g.roundRect(0, 0, width, panelH, 4);
-    g.stroke({ color: theme.border.color, alpha: 0.8, width: 1 });
-  }, [width, panelH, theme]);
-
   return (
     <pixiContainer
       zIndex={9999}
@@ -118,17 +110,22 @@ const PixiGlobalMenuDropdown: React.FC<MenuDropdownProps> = ({ x, y, width, item
       eventMode="static"
       onPointerDown={(e: FederatedPointerEvent) => e.stopPropagation()}
     >
-      <pixiContainer
-        layout={{ width, height: panelH, flexDirection: 'column', padding: MENU_PANEL_PADDING }}
+      <layoutContainer
+        layout={{
+          width,
+          height: panelH,
+          flexDirection: 'column',
+          padding: MENU_PANEL_PADDING,
+          backgroundColor: theme.bgSecondary.color,
+          borderWidth: 1,
+          borderColor: theme.border.color,
+          borderRadius: 4,
+        }}
       >
-        <pixiGraphics
-          draw={drawBg}
-          layout={{ position: 'absolute', width, height: panelH }}
-        />
         {items.map((item, j) => (
           <PixiMenuItem key={j} item={item} width={innerW} onClose={onClose} />
         ))}
-      </pixiContainer>
+      </layoutContainer>
     </pixiContainer>
   );
 };

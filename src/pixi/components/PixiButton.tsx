@@ -1,11 +1,11 @@
 /**
  * PixiButton — Button component with 6 variants matching DOM Button.
- * Uses Graphics backgrounds + MSDF BitmapText labels.
+ * Uses layoutContainer native bg/border + MSDF BitmapText labels.
  * Reference: src/components/ui/Button.tsx
  */
 
-import { useCallback, useMemo, useRef, useState } from 'react';
-import type { Graphics as GraphicsType, FederatedPointerEvent } from 'pixi.js';
+import { useCallback, useMemo, useState } from 'react';
+import type { FederatedPointerEvent } from 'pixi.js';
 import { PIXI_FONTS } from '../fonts';
 import { FAD_ICONS } from '../fontaudioIcons';
 import { usePixiTheme, usePixiThemeId, type PixiTheme } from '../theme';
@@ -96,7 +96,6 @@ export const PixiButton: React.FC<PixiButtonProps> = ({
   const themeId = usePixiThemeId();
   const [hovered, setHovered] = useState(false);
   const [pressed, setPressed] = useState(false);
-  const graphicsRef = useRef<GraphicsType>(null);
 
   const config = SIZE_CONFIG[size];
   const btnWidth = widthProp ?? config.minWidth;
@@ -148,15 +147,6 @@ export const PixiButton: React.FC<PixiButtonProps> = ({
 
   const colors = getColors();
 
-  const drawBg = useCallback((g: GraphicsType) => {
-    g.clear();
-    // Border
-    g.roundRect(0, 0, btnWidth, btnHeight, 4);
-    g.fill({ color: colors.bg, alpha: colors.bgAlpha });
-    g.roundRect(0, 0, btnWidth, btnHeight, 4);
-    g.stroke({ color: colors.border, alpha: colors.borderAlpha, width: 1 });
-  }, [btnWidth, btnHeight, colors]);
-
   const handlePointerOver = useCallback(() => { if (!disabled) setHovered(true); }, [disabled]);
   const handlePointerOut = useCallback(() => { setHovered(false); setPressed(false); }, []);
   const handlePointerDown = useCallback((_e: FederatedPointerEvent) => { if (!disabled) setPressed(true); }, [disabled]);
@@ -171,13 +161,14 @@ export const PixiButton: React.FC<PixiButtonProps> = ({
   const iconFontSize = isVertical ? config.fontSize + 4 : config.fontSize + 2;
 
   return (
-    <pixiContainer
+    <layoutContainer
       eventMode={disabled ? 'none' : 'static'}
       cursor={disabled ? 'not-allowed' : 'pointer'}
       onPointerOver={handlePointerOver}
       onPointerOut={handlePointerOut}
       onPointerDown={handlePointerDown}
       onPointerUp={handlePointerUp}
+      alpha={colors.bgAlpha}
       layout={{
         width: btnWidth,
         height: btnHeight,
@@ -185,14 +176,13 @@ export const PixiButton: React.FC<PixiButtonProps> = ({
         justifyContent: 'center',
         alignItems: 'center',
         gap: isVertical ? 1 : 0,
+        backgroundColor: colors.bg,
+        borderColor: colors.border,
+        borderWidth: colors.borderAlpha > 0 ? 1 : 0,
+        borderRadius: 4,
         ...layout,
       }}
     >
-      <pixiGraphics
-        ref={graphicsRef}
-        draw={drawBg}
-        layout={{ position: 'absolute', width: btnWidth, height: btnHeight }}
-      />
       {/* Icon (fontaudio) */}
       {icon && FAD_ICONS[icon] && (
         <pixiBitmapText
@@ -221,6 +211,6 @@ export const PixiButton: React.FC<PixiButtonProps> = ({
           layout={{}}
         />
       )}
-    </pixiContainer>
+    </layoutContainer>
   );
 };

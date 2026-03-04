@@ -498,17 +498,17 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
         {/* Pattern Editor / Grid Sequencer / Piano Roll / TB-303 Editor - Flex item 1 */}
         <div className="flex-1 min-w-0 min-h-0 flex flex-col overflow-hidden">
           {viewMode === 'tracker' ? (
-            (editorMode === 'hively' || editorMode === 'furnace') ? (
+            (editorMode === 'hively' || editorMode === 'furnace' || editorMode === 'goattracker') ? (
               <div className="flex-1 flex flex-col items-center justify-center bg-dark-bgPrimary p-8 text-center">
                 <div className="max-w-md space-y-4">
                   <div className="text-4xl mb-4">
-                    {editorMode === 'hively' ? '🎵' : '🎹'}
+                    {editorMode === 'hively' ? '🎵' : editorMode === 'goattracker' ? '🎸' : '🎹'}
                   </div>
                   <h2 className="text-xl font-bold text-text-primary mb-2">
-                    {editorMode === 'hively' ? 'HivelyTracker/AHX' : 'Furnace'} Editor Mode
+                    {editorMode === 'hively' ? 'HivelyTracker/AHX' : editorMode === 'goattracker' ? 'GoatTracker Ultra' : 'Furnace'} Editor Mode
                   </h2>
                   <p className="text-text-secondary mb-4">
-                    This file uses a specialized {editorMode === 'hively' ? 'track-based' : 'multi-chip'} pattern editor that's only available in WebGL mode.
+                    This file uses a specialized {editorMode === 'hively' ? 'track-based' : editorMode === 'goattracker' ? 'SID tracker' : 'multi-chip'} pattern editor that's only available in WebGL mode.
                   </p>
                   <button
                     onClick={() => {
