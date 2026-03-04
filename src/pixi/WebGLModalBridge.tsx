@@ -49,9 +49,6 @@ const LazyInstrumentEffectsModal = lazy(() =>
 const LazyDrumpadEditorModal = lazy(() =>
   import('@/components/midi/DrumpadEditorModal').then(m => ({ default: m.DrumpadEditorModal }))
 );
-const LazyTipOfTheDay = lazy(() =>
-  import('@/components/dialogs/TipOfTheDay').then(m => ({ default: m.TipOfTheDay }))
-);
 const LazyAuthModal = lazy(() =>
   import('@/components/dialogs/AuthModal').then(m => ({ default: m.AuthModal }))
 );
@@ -69,9 +66,6 @@ const LazyRevisionBrowserDialog = lazy(() =>
 );
 const LazyDrumPadManager = lazy(() =>
   import('@/components/drumpad/DrumPadManager').then(m => ({ default: m.DrumPadManager }))
-);
-const LazyAdvancedEditModal = lazy(() =>
-  import('@/components/dialogs/AdvancedEditModal').then(m => ({ default: m.AdvancedEditModal }))
 );
 const LazyAutomationPanel = lazy(() =>
   import('@/components/automation/AutomationPanel').then(m => ({ default: m.AutomationPanel }))
@@ -445,9 +439,6 @@ export const WebGLModalBridge: React.FC = () => {
       {modalOpen === 'drumpads' && (
         <LazyDrumpadEditorModal isOpen={true} onClose={closeModal} />
       )}
-      {modalOpen === 'tips' && (
-        <LazyTipOfTheDay isOpen={true} onClose={closeModal} initialTab={(modalData?.initialTab as 'tips' | 'changelog') || 'tips'} />
-      )}
       {modalOpen === 'auth' && (
         <LazyAuthModal isOpen={true} onClose={closeModal} />
       )}
@@ -483,13 +474,6 @@ export const WebGLModalBridge: React.FC = () => {
       )}
       {modalOpen === 'midi-pads' && (
         <LazyDrumpadEditorModal isOpen={true} onClose={closeModal} />
-      )}
-      {modalOpen === 'advancedEdit' && (
-        <LazyAdvancedEditModal
-          onClose={closeModal}
-          onShowScaleVolume={(scope) => openModal('scaleVolume', { scope })}
-          onShowFadeVolume={(scope) => openModal('fadeVolume', { scope })}
-        />
       )}
       {modalOpen === 'automation' && (
         <div style={{
