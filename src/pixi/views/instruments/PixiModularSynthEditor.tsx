@@ -26,7 +26,7 @@ registerBuiltInModules();
 const STRIP_GAP = 4, PORT_R = 5, CELL = 22, HDR = 56;
 // Color-code: audio=green, CV=blue, gate=red, trigger=orange
 const SIG_CLR: Record<SignalType, number> = { audio: 0x44ff44, cv: 0x4488ff, gate: 0xff4444, trigger: 0xff8844 };
-type ViewMode = 'rack' | 'matrix';
+type ViewMode = 'rack' | 'matrix' | 'canvas';
 
 // Category config matching DOM ModuleShelf
 const CATEGORY_ORDER: ModuleCategory[] = ['source', 'filter', 'amplifier', 'modulator', 'envelope', 'utility', 'io'];
@@ -57,6 +57,7 @@ export const PixiModularSynthEditor: React.FC<PixiModularSynthEditorProps> = ({ 
   useEffect(() => { cfgRef.current = config; });
 
   const update = useCallback((p: Partial<ModularPatchConfig>) => onChange({ ...cfgRef.current, ...p }), [onChange]);
+  const updateModules = useCallback((mods: ModularModuleInstance[]) => update({ modules: mods }), [update]);
 
   const addModule = useCallback((descriptorId: string) => {
     const desc = getDesc(descriptorId);
@@ -124,7 +125,7 @@ export const PixiModularSynthEditor: React.FC<PixiModularSynthEditorProps> = ({ 
         const active = document.activeElement;
         if (!active || active.tagName === 'BODY' || active.tagName === 'CANVAS') {
           e.preventDefault();
-          setViewMode(prev => prev === 'rack' ? 'matrix' : 'rack');
+          setViewMode(prev => prev === 'rack' ? 'matrix' : prev === 'matrix' ? 'canvas' : 'rack');
         }
       }
     };
@@ -148,7 +149,7 @@ export const PixiModularSynthEditor: React.FC<PixiModularSynthEditorProps> = ({ 
     return modulesByCategory[browserCategory] ?? [];
   }, [browserCategory, modulesByCategory]);
 
-  const contentH = height - 30 - (wiring ? 20 : 0) - (browserOpen ? 80 : 0);
+  const contentH = height - 30 - (wiring ? 20 : 0) - (browserOpen ? 200 : 0);
 
   return (
     <layoutContainer layout={{ flexDirection: 'column', width, height }}>
@@ -156,6 +157,7 @@ export const PixiModularSynthEditor: React.FC<PixiModularSynthEditorProps> = ({ 
       <layoutContainer layout={{ flexDirection: 'row', gap: 6, alignItems: 'center', height: 30 }}>
         <PixiButton label="Rack" size="sm" active={viewMode === 'rack'} onClick={() => { setViewMode('rack'); cancelWire(); }} />
         <PixiButton label="Matrix" size="sm" active={viewMode === 'matrix'} onClick={() => { setViewMode('matrix'); cancelWire(); }} />
+        <PixiButton label="Canvas" size="sm" active={viewMode === 'canvas'} onClick={() => { setViewMode('canvas'); cancelWire(); }} />
         <layoutContainer layout={{ width: 8 }} />
         <PixiButton label={browserOpen ? '- Module' : '+ Module'} size="sm" color="green" onClick={() => setBrowserOpen(!browserOpen)} />
         <layoutContainer layout={{ flex: 1 }} />
@@ -163,19 +165,25 @@ export const PixiModularSynthEditor: React.FC<PixiModularSynthEditorProps> = ({ 
         <PixiLabel text={`${config.modules.length}m ${config.connections.length}c`} size="xs" color="textMuted" />
       </layoutContainer>
 
-      {/* Module browser with categories */}
+      {/* Module browser — dropdown panel with categories */}
       {browserOpen && (
-        <layoutContainer layout={{ flexDirection: 'column', gap: 2, height: 80, backgroundColor: theme.bgSecondary.color, borderRadius: 4, padding: 4 }}>
-          <layoutContainer layout={{ flexDirection: 'row', gap: 2, height: 20, flexWrap: 'wrap' }}>
+        <layoutContainer layout={{ flexDirection: 'column', gap: 4, padding: 8, borderRadius: 6, borderWidth: 1, borderColor: theme.border?.color ?? 0x444444, backgroundColor: theme.bgSecondary?.color ?? 0x1a1a1a, width: width, maxHeight: 200 }}>
+          {/* Category tabs */}
+          <layoutContainer layout={{ flexDirection: 'row', gap: 4, flexWrap: 'wrap' }}>
             <PixiButton label="All" size="sm" active={browserCategory === null} onClick={() => setBrowserCategory(null)} />
             {CATEGORY_ORDER.map((cat) => modulesByCategory[cat] ? (
               <PixiButton key={cat} label={CATEGORY_NAMES[cat]} size="sm" active={browserCategory === cat} onClick={() => setBrowserCategory(cat)} />
             ) : null)}
           </layoutContainer>
-          <PixiScrollView width={width - 8} height={48} direction="horizontal">
-            <layoutContainer layout={{ flexDirection: 'row', gap: 4, height: 44, padding: 2 }}>
+          {/* Module list */}
+          <PixiScrollView width={width - 16} height={148} direction="vertical">
+            <layoutContainer layout={{ flexDirection: 'column', gap: 2 }}>
               {filteredBrowserModules.map((desc) => (
-                <PixiButton key={desc.id} label={desc.name} size="sm" onClick={() => addModule(desc.id)} />
+                <layoutContainer key={desc.id} layout={{ flexDirection: 'row', gap: 6, alignItems: 'center', padding: 4, borderRadius: 3 }}
+                  eventMode="static" cursor="pointer" onPointerUp={() => { addModule(desc.id); setBrowserOpen(false); }}>
+                  <PixiLabel text={desc.name} size="xs" weight="bold" color="text" />
+                  <PixiLabel text={CATEGORY_NAMES[desc.category]} size="xs" color="textMuted" />
+                </layoutContainer>
               ))}
             </layoutContainer>
           </PixiScrollView>
@@ -184,9 +192,11 @@ export const PixiModularSynthEditor: React.FC<PixiModularSynthEditorProps> = ({ 
 
       {/* View */}
       {viewMode === 'rack' ? (
-        <RackView modules={config.modules} connections={config.connections} width={width} height={contentH} wiring={wiring} selectedModule={selectedModule} onSelect={setSelectedModule} onPort={portClick} onParam={setParam} onRemove={removeModule} />
-      ) : (
+        <RackView modules={config.modules} connections={config.connections} width={width} height={contentH} wiring={wiring} selectedModule={selectedModule} onSelect={setSelectedModule} onPort={portClick} onParam={setParam} onRemove={removeModule} onReorder={updateModules} />
+      ) : viewMode === 'matrix' ? (
         <MatrixView modules={config.modules} connections={config.connections} width={width} height={contentH} onToggle={toggleConn} onCycleAmount={cycleAmount} onParam={setParam} />
+      ) : (
+        <CanvasView modules={config.modules} connections={config.connections} width={width} height={contentH} wiring={wiring} selectedModule={selectedModule} onSelect={setSelectedModule} onPort={portClick} onParam={setParam} onRemove={removeModule} onUpdateModules={updateModules} />
       )}
       {/* Wiring status */}
       {wiring && (
@@ -209,6 +219,7 @@ interface RackViewProps {
   onPort: (ref: PortRef, dir: 'input' | 'output') => void;
   onParam: (mid: string, pid: string, v: number) => void;
   onRemove: (mid: string) => void;
+  onReorder: (modules: ModularModuleInstance[]) => void;
 }
 
 /** Height of a module strip depending on collapse and parameter count */
@@ -219,8 +230,10 @@ const getStripH = (mod: ModularModuleInstance, collapsed: boolean) => {
   return Math.max(80, 28 + paramRows * 48 + 8);
 };
 
-const RackView: React.FC<RackViewProps> = ({ modules, connections, width, height, wiring, selectedModule, onSelect, onPort, onParam, onRemove }) => {
+const RackView: React.FC<RackViewProps> = ({ modules, connections, width, height, wiring, selectedModule, onSelect, onPort, onParam, onRemove, onReorder }) => {
+  const theme = usePixiTheme();
   const [collapsedModules, setCollapsedModules] = useState<Set<string>>(new Set());
+  const [hoveredModule, setHoveredModule] = useState<string | null>(null);
 
   const toggleCollapse = useCallback((moduleId: string) => {
     setCollapsedModules(prev => {
@@ -229,6 +242,28 @@ const RackView: React.FC<RackViewProps> = ({ modules, connections, width, height
       return next;
     });
   }, []);
+
+  // Rack drag reorder state
+  const [dragReorderIdx, setDragReorderIdx] = useState<number | null>(null);
+  const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
+
+  const handleReorderEnd = useCallback(() => {
+    if (dragReorderIdx !== null && dragOverIdx !== null && dragReorderIdx !== dragOverIdx) {
+      const newModules = [...modules];
+      const [moved] = newModules.splice(dragReorderIdx, 1);
+      newModules.splice(dragOverIdx, 0, moved);
+      onReorder(newModules);
+    }
+    setDragReorderIdx(null);
+    setDragOverIdx(null);
+  }, [dragReorderIdx, dragOverIdx, modules, onReorder]);
+
+  useEffect(() => {
+    if (dragReorderIdx === null) return;
+    const handler = () => handleReorderEnd();
+    window.addEventListener('pointerup', handler);
+    return () => window.removeEventListener('pointerup', handler);
+  }, [dragReorderIdx, handleReorderEnd]);
 
   const portPos = useMemo(() => {
     const m = new Map<string, { x: number; y: number }>();
@@ -249,12 +284,13 @@ const RackView: React.FC<RackViewProps> = ({ modules, connections, width, height
   // Orthogonal cable routing: source → down → horizontal → up → target
   const drawCables = useCallback((g: GraphicsType) => {
     g.clear();
-    connections.forEach((cn) => {
+    connections.forEach((cn, ci) => {
       const s = portPos.get(pk(cn.source)), t = portPos.get(pk(cn.target)); if (!s || !t) return;
       const mod = modules.find((m) => m.id === cn.source.moduleId);
       const port = mod ? getDesc(mod.descriptorId)?.ports.find((p) => p.id === cn.source.portId) : undefined;
       const clr = SIG_CLR[port?.signal ?? 'audio'];
-      const midY = (s.y + t.y) / 2;
+      const laneOffset = (ci % 8 - 3.5) * 6;
+      const midY = (s.y + t.y) / 2 + laneOffset;
       g.moveTo(s.x, s.y);
       g.lineTo(s.x, midY);
       g.lineTo(t.x, midY);
@@ -268,16 +304,30 @@ const RackView: React.FC<RackViewProps> = ({ modules, connections, width, height
   return (
     <PixiScrollView width={width} height={height} contentHeight={totalH}>
       <layoutContainer layout={{ flexDirection: 'column', gap: STRIP_GAP, width }}>
-        {modules.map((mod) => (
-          <ModuleStrip
-            key={mod.id} mod={mod} width={width} wiring={wiring}
-            collapsed={collapsedModules.has(mod.id)}
-            selected={selectedModule === mod.id}
-            onToggleCollapse={toggleCollapse}
-            onSelect={onSelect}
-            onPort={onPort} onParam={onParam} onRemove={onRemove}
-          />
-        ))}
+        {modules.map((mod, idx) => {
+          const showBefore = dragOverIdx === idx && dragReorderIdx !== null && dragReorderIdx > idx;
+          const showAfter = dragOverIdx === idx && dragReorderIdx !== null && dragReorderIdx < idx;
+          return (
+            <layoutContainer key={mod.id} layout={{ flexDirection: 'column', width }}>
+              {showBefore && <layoutContainer layout={{ height: 3, width, backgroundColor: theme.accent.color, borderRadius: 1 }} />}
+              <ModuleStrip
+                mod={mod} width={width} wiring={wiring}
+                collapsed={collapsedModules.has(mod.id)}
+                selected={selectedModule === mod.id}
+                hovered={hoveredModule === mod.id}
+                isDragging={dragReorderIdx === idx}
+                isDropTarget={dragOverIdx === idx && dragReorderIdx !== null && dragReorderIdx !== idx}
+                onToggleCollapse={toggleCollapse}
+                onSelect={onSelect}
+                onPort={onPort} onParam={onParam} onRemove={onRemove}
+                onReorderStart={() => setDragReorderIdx(idx)}
+                onReorderOver={() => { if (dragReorderIdx !== null) setDragOverIdx(idx); }}
+                onHover={setHoveredModule}
+              />
+              {showAfter && <layoutContainer layout={{ height: 3, width, backgroundColor: theme.accent.color, borderRadius: 1 }} />}
+            </layoutContainer>
+          );
+        })}
       </layoutContainer>
       <pixiGraphics draw={drawCables} layout={{ position: 'absolute', left: 0, top: 0 }} />
     </PixiScrollView>
@@ -288,30 +338,43 @@ const RackView: React.FC<RackViewProps> = ({ modules, connections, width, height
 
 const ModuleStrip: React.FC<{
   mod: ModularModuleInstance; width: number; wiring: PortRef | null;
-  collapsed: boolean; selected: boolean;
+  collapsed: boolean; selected: boolean; hovered: boolean;
+  isDragging?: boolean; isDropTarget?: boolean;
   onToggleCollapse: (id: string) => void;
   onSelect: (id: string) => void;
   onPort: (r: PortRef, d: 'input' | 'output') => void;
   onParam: (m: string, p: string, v: number) => void;
   onRemove: (m: string) => void;
-}> = ({ mod, width, wiring, collapsed, selected, onToggleCollapse, onSelect, onPort, onParam, onRemove }) => {
+  onReorderStart?: () => void;
+  onReorderOver?: () => void;
+  onHover?: (id: string | null) => void;
+}> = ({ mod, width, wiring, collapsed, selected, hovered, isDragging, isDropTarget, onToggleCollapse, onSelect, onPort, onParam, onRemove, onReorderStart, onReorderOver, onHover }) => {
   const theme = usePixiTheme();
   const desc = getDesc(mod.descriptorId); if (!desc) return null;
   const clr = desc.color ? parseInt(desc.color.replace('#', ''), 16) : theme.accent.color;
   const ins = desc.ports.filter((p) => p.direction === 'input');
   const outs = desc.ports.filter((p) => p.direction === 'output');
-  const borderClr = selected ? theme.accent.color : theme.border.color;
+  const borderClr = isDropTarget ? theme.accent.color : selected ? theme.accent.color : theme.border.color;
   const paramRows = Math.ceil(desc.parameters.length / 4);
   const bodyH = collapsed ? 0 : Math.max(52, paramRows * 48 + 8);
   const stripH = collapsed ? 28 : 28 + bodyH;
 
+  const stripBg = hovered && !selected ? 0x222222 : theme.bgSecondary.color;
+
   return (
     <layoutContainer
-      layout={{ flexDirection: 'column', height: stripH, width, backgroundColor: theme.bgSecondary.color, borderRadius: 4, borderWidth: selected ? 2 : 1, borderColor: borderClr, overflow: 'hidden' }}
-      eventMode="static" cursor="pointer" onPointerUp={() => onSelect(mod.id)}
+      layout={{ flexDirection: 'column', height: stripH, width, backgroundColor: stripBg, borderRadius: 4, borderWidth: selected || isDropTarget ? 2 : 1, borderColor: borderClr, overflow: 'hidden' }}
+      alpha={isDragging ? 0.5 : 1}
+      eventMode="static" cursor="pointer"
+      onPointerUp={() => onSelect(mod.id)}
+      onPointerOver={() => { if (onReorderOver) onReorderOver(); if (onHover) onHover(mod.id); }}
+      onPointerOut={() => { if (onHover) onHover(null); }}
     >
-      {/* Header */}
-      <layoutContainer layout={{ flexDirection: 'row', height: 28, alignItems: 'center', gap: 4, padding: 4, borderBottomWidth: collapsed ? 0 : 1, borderColor: theme.border.color, backgroundColor: clr }}>
+      {/* Header — drag handle for reorder */}
+      <layoutContainer layout={{ flexDirection: 'row', height: 28, alignItems: 'center', gap: 4, padding: 4, borderBottomWidth: collapsed ? 0 : 1, borderColor: theme.border.color, backgroundColor: clr }}
+        eventMode="static" cursor="grab"
+        onPointerDown={(e: any) => { if (e.button === 0 && onReorderStart) onReorderStart(); }}
+      >
         <PixiButton label={collapsed ? '+' : '-'} variant="ghost" width={24} onClick={() => onToggleCollapse(mod.id)} />
         <PixiLabel text={mod.label || desc.name} size="xs" weight="bold" color="custom" customColor={0xffffff} />
         <PixiLabel text={CATEGORY_NAMES[desc.category]} size="xs" color="custom" customColor={0xcccccc} />
@@ -447,5 +510,250 @@ const MatrixView: React.FC<{
         )}
       </layoutContainer>
     </layoutContainer>
+  );
+};
+
+// ── Canvas View ──────────────────────────────────────────────────────────
+
+const CANVAS_MODULE_W = 180, CANVAS_HDR_H = 24, CANVAS_PORT_SP = 16;
+
+interface CanvasViewProps {
+  modules: ModularModuleInstance[]; connections: ModularConnection[];
+  width: number; height: number; wiring: PortRef | null;
+  selectedModule: string | null;
+  onSelect: (id: string | null) => void;
+  onPort: (ref: PortRef, dir: 'input' | 'output') => void;
+  onParam: (mid: string, pid: string, v: number) => void;
+  onRemove: (mid: string) => void;
+  onUpdateModules: (modules: ModularModuleInstance[]) => void;
+}
+
+const CanvasView: React.FC<CanvasViewProps> = ({ modules, connections, width, height, wiring, selectedModule, onSelect, onPort, onParam, onRemove, onUpdateModules }) => {
+  const theme = usePixiTheme();
+  const [canvasOffset, setCanvasOffset] = useState({ x: 0, y: 0 });
+  const [canvasZoom, setCanvasZoom] = useState(1);
+  const isPanningRef = useRef(false);
+  const panStartRef = useRef({ x: 0, y: 0 });
+  const draggingModuleRef = useRef<string | null>(null);
+  const dragOffsetRef = useRef({ x: 0, y: 0 });
+  const canvasOffsetRef = useRef({ x: 0, y: 0 });
+  const canvasZoomRef = useRef(1);
+  const modulesRef = useRef(modules);
+
+  useEffect(() => { canvasOffsetRef.current = canvasOffset; }, [canvasOffset]);
+  useEffect(() => { canvasZoomRef.current = canvasZoom; }, [canvasZoom]);
+  useEffect(() => { modulesRef.current = modules; }, [modules]);
+
+  // Auto-layout modules without positions
+  useEffect(() => {
+    if (!modules.some(m => !m.position)) return;
+    onUpdateModules(modules.map((m, i) => m.position ? m : { ...m, position: { x: 20 + (i % 4) * 200, y: 20 + Math.floor(i / 4) * 160 } }));
+  }, [modules.length]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Fit to view
+  const fitToView = useCallback(() => {
+    if (modules.length === 0) return;
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    modules.forEach(m => {
+      const px = m.position?.x ?? 0, py = m.position?.y ?? 0;
+      minX = Math.min(minX, px); minY = Math.min(minY, py);
+      maxX = Math.max(maxX, px + CANVAS_MODULE_W); maxY = Math.max(maxY, py + 200);
+    });
+    const cw = maxX - minX + 60, ch = maxY - minY + 60;
+    const z = Math.max(0.25, Math.min(3, Math.min(width / cw, height / ch)));
+    setCanvasZoom(z);
+    setCanvasOffset({ x: width / 2 - ((minX + maxX) / 2) * z, y: height / 2 - ((minY + maxY) / 2) * z });
+  }, [modules, width, height]);
+
+  // F key for fit-to-view
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.key === 'f' || e.key === 'F') && !e.ctrlKey && !e.metaKey) {
+        const el = document.activeElement;
+        if (!el || el.tagName === 'BODY' || el.tagName === 'CANVAS') fitToView();
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [fitToView]);
+
+  // Global pointerup safety
+  useEffect(() => {
+    const handler = () => { isPanningRef.current = false; draggingModuleRef.current = null; };
+    window.addEventListener('pointerup', handler);
+    return () => window.removeEventListener('pointerup', handler);
+  }, []);
+
+  const handleBgDown = useCallback((e: any) => {
+    if (e.button === 1 || e.button === 2) {
+      isPanningRef.current = true;
+      panStartRef.current = { x: e.global.x - canvasOffsetRef.current.x, y: e.global.y - canvasOffsetRef.current.y };
+    } else if (e.button === 0) {
+      onSelect(null);
+    }
+  }, [onSelect]);
+
+  const handleBgMove = useCallback((e: any) => {
+    if (isPanningRef.current) {
+      setCanvasOffset({ x: e.global.x - panStartRef.current.x, y: e.global.y - panStartRef.current.y });
+    } else if (draggingModuleRef.current) {
+      const off = canvasOffsetRef.current, z = canvasZoomRef.current;
+      const newX = (e.global.x - off.x) / z - dragOffsetRef.current.x;
+      const newY = (e.global.y - off.y) / z - dragOffsetRef.current.y;
+      const newModules = modulesRef.current.map(m => m.id === draggingModuleRef.current ? { ...m, position: { x: newX, y: newY } } : m);
+      modulesRef.current = newModules;
+      onUpdateModules(newModules);
+    }
+  }, [onUpdateModules]);
+
+  const handleBgUp = useCallback(() => {
+    isPanningRef.current = false;
+    draggingModuleRef.current = null;
+  }, []);
+
+  const handleWheel = useCallback((e: any) => {
+    const dy = e.deltaY ?? 0;
+    setCanvasZoom(z => Math.max(0.25, Math.min(3, z * (dy > 0 ? 0.9 : 1.1))));
+  }, []);
+
+  const handleModuleDragStart = useCallback((moduleId: string, e: any) => {
+    draggingModuleRef.current = moduleId;
+    const pos = modulesRef.current.find(m => m.id === moduleId)?.position || { x: 0, y: 0 };
+    const off = canvasOffsetRef.current, z = canvasZoomRef.current;
+    dragOffsetRef.current = { x: (e.global.x - off.x) / z - pos.x, y: (e.global.y - off.y) / z - pos.y };
+    onSelect(moduleId);
+  }, [onSelect]);
+
+  // Port positions in world space for cable drawing
+  const getPortPos = useCallback((ref: PortRef): { x: number; y: number } | null => {
+    const mod = modules.find(m => m.id === ref.moduleId);
+    if (!mod) return null;
+    const desc = getDesc(mod.descriptorId); if (!desc) return null;
+    const pos = mod.position || { x: 0, y: 0 };
+    const port = desc.ports.find(p => p.id === ref.portId); if (!port) return null;
+    const sameDir = desc.ports.filter(p => p.direction === port.direction);
+    const idx = sameDir.indexOf(port);
+    return port.direction === 'input'
+      ? { x: pos.x + 8, y: pos.y + CANVAS_HDR_H + 8 + idx * CANVAS_PORT_SP }
+      : { x: pos.x + CANVAS_MODULE_W - 8, y: pos.y + CANVAS_HDR_H + 8 + idx * CANVAS_PORT_SP };
+  }, [modules]);
+
+  const drawGrid = useCallback((g: GraphicsType) => {
+    g.clear();
+    const baseGrid = 40;
+    const gridSize = baseGrid * canvasZoom;
+    if (gridSize < 4) return;
+    const majorEvery = 4;
+    const ox = ((canvasOffset.x % gridSize) + gridSize) % gridSize;
+    const oy = ((canvasOffset.y % gridSize) + gridSize) % gridSize;
+    // Minor grid lines
+    for (let x = ox; x < width; x += gridSize) {
+      const worldX = (x - canvasOffset.x) / canvasZoom;
+      const isMajor = Math.abs(Math.round(worldX / baseGrid) % majorEvery) === 0;
+      if (!isMajor) g.moveTo(x, 0).lineTo(x, height).stroke({ color: 0x222222, width: 0.5 });
+    }
+    for (let y = oy; y < height; y += gridSize) {
+      const worldY = (y - canvasOffset.y) / canvasZoom;
+      const isMajor = Math.abs(Math.round(worldY / baseGrid) % majorEvery) === 0;
+      if (!isMajor) g.moveTo(0, y).lineTo(width, y).stroke({ color: 0x222222, width: 0.5 });
+    }
+    // Major grid lines
+    for (let x = ox; x < width; x += gridSize) {
+      const worldX = (x - canvasOffset.x) / canvasZoom;
+      if (Math.abs(Math.round(worldX / baseGrid) % majorEvery) === 0) {
+        g.moveTo(x, 0).lineTo(x, height).stroke({ color: 0x333333, width: 1 });
+      }
+    }
+    for (let y = oy; y < height; y += gridSize) {
+      const worldY = (y - canvasOffset.y) / canvasZoom;
+      if (Math.abs(Math.round(worldY / baseGrid) % majorEvery) === 0) {
+        g.moveTo(0, y).lineTo(width, y).stroke({ color: 0x333333, width: 1 });
+      }
+    }
+  }, [canvasOffset, canvasZoom, width, height]);
+
+  const drawCables = useCallback((g: GraphicsType) => {
+    g.clear();
+    connections.forEach((cn, ci) => {
+      const s = getPortPos(cn.source), t = getPortPos(cn.target); if (!s || !t) return;
+      const mod = modules.find(m => m.id === cn.source.moduleId);
+      const port = mod ? getDesc(mod.descriptorId)?.ports.find(p => p.id === cn.source.portId) : undefined;
+      const clr = SIG_CLR[port?.signal ?? 'audio'];
+      const laneOffset = (ci % 8 - 3.5) * 6;
+      const midY = (s.y + t.y) / 2 + laneOffset;
+      g.moveTo(s.x, s.y).lineTo(s.x + 20, s.y).lineTo(s.x + 20, midY).lineTo(t.x - 20, midY).lineTo(t.x - 20, t.y).lineTo(t.x, t.y);
+      g.stroke({ color: clr, alpha: 0.8 * cn.amount, width: 2 });
+    });
+  }, [connections, modules, getPortPos]);
+
+  return (
+    <layoutContainer layout={{ width, height, overflow: 'hidden' }} eventMode="static"
+      onPointerDown={handleBgDown} onPointerMove={handleBgMove} onPointerUp={handleBgUp} onWheel={handleWheel}>
+      <pixiGraphics draw={drawGrid} layout={{ position: 'absolute', left: 0, top: 0 }} />
+      <pixiContainer x={canvasOffset.x} y={canvasOffset.y} scale={canvasZoom}>
+        <pixiGraphics draw={drawCables} />
+        {modules.map(mod => (
+          <CanvasModuleCard key={mod.id} mod={mod} selectedModule={selectedModule} wiring={wiring}
+            onDragStart={handleModuleDragStart} onSelect={onSelect} onPort={onPort} onParam={onParam} onRemove={onRemove} />
+        ))}
+      </pixiContainer>
+      {modules.length === 0 && (
+        <layoutContainer layout={{ position: 'absolute', left: 0, top: 0, width, height, justifyContent: 'center', alignItems: 'center' }}>
+          <PixiLabel text="No modules. Click +Module to start." size="xs" color="textMuted" />
+        </layoutContainer>
+      )}
+    </layoutContainer>
+  );
+};
+
+// ── Canvas Module Card ───────────────────────────────────────────────────
+
+const CanvasModuleCard: React.FC<{
+  mod: ModularModuleInstance; selectedModule: string | null; wiring: PortRef | null;
+  onDragStart: (id: string, e: any) => void;
+  onSelect: (id: string) => void;
+  onPort: (ref: PortRef, dir: 'input' | 'output') => void;
+  onParam: (mid: string, pid: string, v: number) => void;
+  onRemove: (mid: string) => void;
+}> = ({ mod, selectedModule, wiring, onDragStart, onSelect, onPort, onParam, onRemove }) => {
+  const theme = usePixiTheme();
+  const desc = getDesc(mod.descriptorId); if (!desc) return null;
+  const pos = mod.position || { x: 0, y: 0 };
+  const clr = desc.color ? parseInt(desc.color.replace('#', ''), 16) : theme.accent.color;
+  const ins = desc.ports.filter(p => p.direction === 'input');
+  const outs = desc.ports.filter(p => p.direction === 'output');
+  const sel = selectedModule === mod.id;
+  const portCount = Math.max(ins.length, outs.length);
+  const keyParams = desc.parameters.slice(0, 3);
+  const cardH = CANVAS_HDR_H + Math.max(portCount * CANVAS_PORT_SP + 8, 40) + (keyParams.length > 0 ? 44 : 0);
+
+  return (
+    <pixiContainer x={pos.x} y={pos.y}>
+      <layoutContainer
+        layout={{ width: CANVAS_MODULE_W, height: cardH, flexDirection: 'column', backgroundColor: theme.bgSecondary.color, borderRadius: 4, borderWidth: sel ? 2 : 1, borderColor: sel ? theme.accent.color : theme.border.color, overflow: 'hidden' }}
+        eventMode="static" cursor="move"
+        onPointerDown={(e: any) => { if (e.button === 0) { e.stopPropagation(); onDragStart(mod.id, e); } }}
+      >
+        {/* Header */}
+        <layoutContainer layout={{ height: CANVAS_HDR_H, flexDirection: 'row', alignItems: 'center', gap: 4, padding: 4, backgroundColor: clr }}>
+          <PixiLabel text={mod.label || desc.name} size="xs" weight="bold" color="custom" customColor={0xffffff} />
+          <layoutContainer layout={{ flex: 1 }} />
+          <PixiLabel text={desc.category.slice(0, 3).toUpperCase()} size="xs" color="custom" customColor={0xdddddd} />
+        </layoutContainer>
+        {/* Ports */}
+        <layoutContainer layout={{ flexDirection: 'row', flex: 1, padding: 4, justifyContent: 'space-between' }}>
+          <PortColumn label="IN" ports={ins} moduleId={mod.id} wiring={wiring} onPort={onPort} />
+          <PortColumn label="OUT" ports={outs} moduleId={mod.id} wiring={wiring} onPort={onPort} />
+        </layoutContainer>
+        {/* Key parameters */}
+        {keyParams.length > 0 && (
+          <layoutContainer layout={{ flexDirection: 'row', gap: 4, padding: 4, height: 44 }}>
+            {keyParams.map(p => (
+              <PixiKnob key={p.id} value={mod.parameters[p.id] ?? p.default} min={p.min} max={p.max} onChange={(v) => onParam(mod.id, p.id, v)} label={p.name.slice(0, 5)} size="sm" />
+            ))}
+          </layoutContainer>
+        )}
+      </layoutContainer>
+    </pixiContainer>
   );
 };
