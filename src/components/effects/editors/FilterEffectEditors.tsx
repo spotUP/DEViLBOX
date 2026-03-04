@@ -5,7 +5,7 @@
 
 import React from 'react';
 import { useEffectAnalyser } from '@hooks/useEffectAnalyser';
-import { EffectSpectrum, GainReductionMeter } from '../EffectVisualizer';
+import { EffectSpectrum, EffectOscilloscope, GainReductionMeter } from '../EffectVisualizer';
 import { Knob } from '@components/controls/Knob';
 import { SectionHeader, getParam, type VisualEffectEditorProps } from './shared';
 
@@ -92,6 +92,7 @@ export const CompressorEditor: React.FC<VisualEffectEditorProps> = ({
 
   return (
     <div className="space-y-4">
+      <EffectOscilloscope pre={pre} post={post} color="#10b981" />
       <GainReductionMeter pre={pre} post={post} />
       <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
         <SectionHeader color="#10b981" title="Compressor" />
@@ -400,6 +401,7 @@ export const SidechainCompressorEditor: React.FC<VisualEffectEditorProps> = ({
 
   return (
     <div className="space-y-4">
+      <EffectOscilloscope pre={pre} post={post} color="#10b981" />
       <GainReductionMeter pre={pre} post={post} />
       <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
         <SectionHeader color="#10b981" title="Compressor" />
