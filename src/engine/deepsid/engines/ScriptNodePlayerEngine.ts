@@ -45,7 +45,6 @@ const MODULE_STATE_MAP: Record<string, string> = {
  */
 export class ScriptNodePlayerEngine {
   private readonly sidData: Uint8Array;
-  private readonly _config: ScriptNodePlayerConfig;
   private readonly engineType: SIDEngineType;
 
   private player: any = null;
@@ -58,11 +57,10 @@ export class ScriptNodePlayerEngine {
   constructor(
     sidData: Uint8Array,
     engineType: SIDEngineType,
-    config: ScriptNodePlayerConfig = {},
+    _config: ScriptNodePlayerConfig = {},
   ) {
     this.sidData = sidData;
     this.engineType = engineType;
-    this._config = config;
   }
 
   /**
