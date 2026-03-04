@@ -263,6 +263,50 @@ const SIDSubsongAndInfo: React.FC = () => {
   );
 };
 
+// ─── Module Info Button (non-SID) ────────────────────────────────────────────
+
+const ModuleInfoButton: React.FC = () => {
+  const sidMetadata = useTrackerStore(s => s.sidMetadata);
+  const songDBInfo = useTrackerStore(s => s.songDBInfo);
+  const patterns = useTrackerStore(s => s.patterns);
+
+  // Only show for non-SID modules that have metadata
+  const importMeta = patterns[0]?.importMetadata;
+  const hasMetadata = !!(songDBInfo || importMeta?.modData);
+  if (sidMetadata || !hasMetadata) return <pixiContainer />;
+
+  const format = importMeta?.sourceFormat ?? songDBInfo?.format ?? '';
+
+  return (
+    <pixiContainer layout={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+      {format && (
+        <PixiButton
+          label={format}
+          variant="ghost"
+          size="sm"
+          color="blue"
+          active
+          onClick={() => {
+            requestAnimationFrame(() => {
+              useUIStore.getState().openModal('moduleInfo');
+            });
+          }}
+        />
+      )}
+      <PixiButton
+        label="Info"
+        variant="ghost"
+        size="sm"
+        onClick={() => {
+          requestAnimationFrame(() => {
+            useUIStore.getState().openModal('moduleInfo');
+          });
+        }}
+      />
+    </pixiContainer>
+  );
+};
+
 // ─── Main component ──────────────────────────────────────────────────────────
 
 export const PixiEditorControlsBar: React.FC<PixiEditorControlsBarProps> = ({
@@ -398,6 +442,9 @@ export const PixiEditorControlsBar: React.FC<PixiEditorControlsBarProps> = ({
 
       {/* SID subsong selector + info button */}
       <SIDSubsongAndInfo />
+
+      {/* Module info button (non-SID) */}
+      <ModuleInfoButton />
 
       <Sep />
 
