@@ -172,14 +172,12 @@ router.get('/search', async (req: Request, res: Response) => {
         return res.json({
           total: countRow.cnt,
           results: rows.map(r => ({
-            id: r.id,
-            path: r.fullname,
-            filename: r.fullname.split('/').pop(),
             name: r.name || r.fullname.split('/').pop(),
+            path: normalizeHVSCPath(r.fullname),
+            isDirectory: false,
             author: r.author,
             player: r.player,
             sidModel: r.sidmodel,
-            clockSpeed: r.clockspeed,
             subtunes: r.subtunes,
           })),
         });

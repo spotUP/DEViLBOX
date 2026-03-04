@@ -451,7 +451,7 @@ export const HVSCPanel: React.FC<HVSCPanelProps> = ({ isOpen, onLoadTrackerModul
                         {entry.name}
                       </div>
                       <div className="text-xs text-text-muted truncate">
-                        {entry.path}
+                        {entry.author ? `${entry.author} — ` : ''}{entry.path}
                       </div>
                     </div>
 
