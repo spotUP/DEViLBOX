@@ -82,7 +82,7 @@ export const PixiSynthErrorDialog: React.FC = () => {
           }}
         >
           <PixiLabel text={synthLabel} size="sm" weight="bold" color="custom" customColor={0xFF6666} />
-          <PixiLabel text={activeError.message} size="xs" color="text" layout={{ maxWidth: MODAL_W - 50 }} />
+          <PixiLabel text={activeError?.message ?? ''} size="xs" color="text" layout={{ maxWidth: MODAL_W - 50 }} />
         </layoutContainer>
 
         {/* Toggle debug details */}
@@ -118,19 +118,19 @@ export const PixiSynthErrorDialog: React.FC = () => {
             <layoutContainer layout={{ flexDirection: 'row', gap: 16, flexWrap: 'wrap' }}>
               <layoutContainer layout={{ flexDirection: 'column', gap: 2, width: (MODAL_W - 70) / 2 }}>
                 <PixiLabel text="Timestamp" size="xs" color="textMuted" />
-                <PixiLabel text={activeError.debugData.timestamp} size="xs" font="mono" color="textSecondary" />
+                <PixiLabel text={activeError?.debugData.timestamp ?? ''} size="xs" font="mono" color="textSecondary" />
               </layoutContainer>
               <layoutContainer layout={{ flexDirection: 'column', gap: 2, width: (MODAL_W - 70) / 2 }}>
                 <PixiLabel text="AudioContext" size="xs" color="textMuted" />
-                <PixiLabel text={activeError.debugData.audioContextState ?? 'unknown'} size="xs" font="mono" color="textSecondary" />
+                <PixiLabel text={activeError?.debugData.audioContextState ?? 'unknown'} size="xs" font="mono" color="textSecondary" />
               </layoutContainer>
               <layoutContainer layout={{ flexDirection: 'column', gap: 2, width: (MODAL_W - 70) / 2 }}>
                 <PixiLabel text="WASM Supported" size="xs" color="textMuted" />
-                <PixiLabel text={activeError.debugData.wasmSupported ? 'Yes' : 'No'} size="xs" font="mono" color="textSecondary" />
+                <PixiLabel text={activeError?.debugData.wasmSupported ? 'Yes' : 'No'} size="xs" font="mono" color="textSecondary" />
               </layoutContainer>
               <layoutContainer layout={{ flexDirection: 'column', gap: 2, width: (MODAL_W - 70) / 2 }}>
                 <PixiLabel text="Error Type" size="xs" color="textMuted" />
-                <PixiLabel text={activeError.errorType} size="xs" font="mono" color="textSecondary" />
+                <PixiLabel text={activeError?.errorType ?? ''} size="xs" font="mono" color="textSecondary" />
               </layoutContainer>
             </layoutContainer>
 
