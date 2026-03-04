@@ -287,7 +287,7 @@ export const PixiDrumpadEditorModal: React.FC<PixiDrumpadEditorModalProps> = ({
             width: LEFT_W,
             borderRightWidth: 1,
             borderColor: theme.border.color,
-            padding: 12,
+            padding: 16,
             gap: 10,
           }}
         >

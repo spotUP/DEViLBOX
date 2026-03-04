@@ -175,8 +175,8 @@ export const PixiEffectPicker: React.FC<PixiEffectPickerProps> = ({
           height: SEARCH_H,
           flexDirection: 'row',
           alignItems: 'center',
-          paddingLeft: 8,
-          paddingRight: 8,
+          paddingLeft: 16,
+          paddingRight: 16,
           borderBottomWidth: 1,
           borderColor: theme.border.color,
         }}
@@ -185,7 +185,7 @@ export const PixiEffectPicker: React.FC<PixiEffectPickerProps> = ({
           value={filter}
           onChange={setFilter}
           placeholder="Search effects..."
-          width={LIST_WIDTH - 16}
+          width={LIST_WIDTH - 32}
           height={24}
           fontSize={11}
           font="sans"
@@ -201,8 +201,8 @@ export const PixiEffectPicker: React.FC<PixiEffectPickerProps> = ({
           flexWrap: 'wrap',
           alignItems: 'center',
           gap: 3,
-          paddingLeft: 6,
-          paddingRight: 6,
+          paddingLeft: 16,
+          paddingRight: 16,
           borderBottomWidth: 1,
           borderColor: theme.border.color,
         }}
@@ -274,8 +274,8 @@ export const PixiEffectPicker: React.FC<PixiEffectPickerProps> = ({
                     height: ROW_HEIGHT,
                     flexDirection: 'row',
                     alignItems: 'center',
-                    paddingLeft: 8,
-                    paddingRight: 8,
+                    paddingLeft: 16,
+                    paddingRight: 16,
                     gap: 8,
                   }}
                 >

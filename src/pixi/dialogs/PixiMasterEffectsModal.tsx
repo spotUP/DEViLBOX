@@ -607,7 +607,7 @@ export const PixiMasterEffectsModal: React.FC<PixiMasterEffectsModalProps> = ({
       {/* ── Footer ──────────────────────────────────────────────────────── */}
       <PixiModalFooter width={MODAL_W}>
         <layoutContainer
-          layout={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 8, padding: 8, width: MODAL_W }}
+          layout={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 8, width: MODAL_W }}
         >
           <PixiButton label="Close" variant="default" onClick={onClose} />
         </layoutContainer>

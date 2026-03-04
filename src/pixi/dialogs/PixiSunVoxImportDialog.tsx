@@ -77,7 +77,7 @@ export const PixiSunVoxImportDialog: React.FC<PixiSunVoxImportDialogProps> = ({
     <PixiModal isOpen={true} onClose={onClose} width={MODAL_W} height={MODAL_H}>
       <PixiModalHeader title={title} onClose={onClose} />
 
-      <layoutContainer layout={{ flex: 1, padding: 12, flexDirection: 'column', gap: 8 }}>
+      <layoutContainer layout={{ flex: 1, padding: 16, flexDirection: 'column', gap: 8 }}>
         {/* Filename */}
         {filename && !error && (
           <PixiLabel text={filename} size="xs" color="textSecondary" />

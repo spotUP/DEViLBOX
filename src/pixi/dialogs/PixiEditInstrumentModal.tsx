@@ -44,7 +44,7 @@ const TAB_BAR_H = 32;
 const FOOTER_H = 44;
 const CONTENT_H = MODAL_H - HEADER_H - FOOTER_H;
 const RIGHT_CONTENT_H = CONTENT_H - TAB_BAR_H;
-const PAD = 10;
+const PAD = 16;
 const KNOB_SIZE = 'sm' as const;
 
 // ── Synth type palette (Tailwind class → hex) ──────────────────────────────
@@ -256,7 +256,6 @@ export const PixiEditInstrumentModal: React.FC<PixiEditInstrumentModalProps> = (
     <PixiModal isOpen={isOpen} onClose={onClose} width={MODAL_W} height={MODAL_H}>
       <PixiModalHeader
         title={isCreating ? 'Create Instrument' : 'Edit Instrument'}
-        width={MODAL_W}
         onClose={onClose}
       />
 
@@ -428,10 +427,8 @@ export const PixiEditInstrumentModal: React.FC<PixiEditInstrumentModalProps> = (
       </layoutContainer>
 
       {/* ── Footer ───────────────────────────────────────────────────────── */}
-      <PixiModalFooter width={MODAL_W}>
-        <layoutContainer layout={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 8, padding: 8, width: MODAL_W }}>
-          <PixiButton label="Close" variant="default" onClick={onClose} />
-        </layoutContainer>
+      <PixiModalFooter align="right">
+        <PixiButton label="Close" variant="default" onClick={onClose} />
       </PixiModalFooter>
     </PixiModal>
   );

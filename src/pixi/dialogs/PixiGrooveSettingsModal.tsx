@@ -15,7 +15,7 @@ import type { FederatedWheelEvent } from 'pixi.js';
 
 const MODAL_W = 620;
 const MODAL_H = 500;
-const LEFT_W = 200;
+const LEFT_W = 240;
 const RIGHT_W = MODAL_W - LEFT_W;
 
 const CATEGORIES = ['straight', 'shuffle', 'swing', 'funk', 'hip-hop', 'custom'] as const;
@@ -86,8 +86,8 @@ export const PixiGrooveSettingsModal: React.FC<PixiGrooveSettingsModalProps> = (
             overflow: 'hidden',
           }}
         >
-          <Div className="px-3 py-2">
-            <Txt className="text-xs font-bold text-text-muted uppercase">Templates</Txt>
+          <Div className="px-6 pt-6 pb-4">
+            <Txt className="text-xs font-bold text-text-muted uppercase">Groove Templates</Txt>
           </Div>
 
           {/* Scrollable template list */}
@@ -98,13 +98,13 @@ export const PixiGrooveSettingsModal: React.FC<PixiGrooveSettingsModalProps> = (
             onWheel={handleWheel}
           >
             <pixiContainer y={-clampedScrollY}>
-              <Div className="flex-col gap-1 px-2 pb-2" layout={{ width: LEFT_W - 4 }}>
+              <Div className="flex-col gap-4 px-6 pb-6" layout={{ width: LEFT_W - 12 }}>
                 {CATEGORIES.map((category) => {
                   const grooves = GROOVE_TEMPLATES.filter((g) => g.category === category);
                   if (grooves.length === 0) return null;
                   return (
-                    <Div key={category} className="flex-col gap-0.5">
-                      <Div className="px-1 py-1">
+                    <Div key={category} className="flex-col gap-1">
+                      <Div className="px-1 pb-1" layout={{ borderBottomWidth: 1, borderColor: theme.border.color }}>
                         <Txt className="text-[10px] font-bold text-text-muted uppercase">
                           {category}
                         </Txt>
@@ -114,7 +114,7 @@ export const PixiGrooveSettingsModal: React.FC<PixiGrooveSettingsModalProps> = (
                         return (
                           <Div
                             key={groove.id}
-                            className="px-2 py-1 rounded-sm"
+                            className="px-3 py-2 rounded-sm"
                             layout={{
                               backgroundColor: isActive
                                 ? theme.accent.color
@@ -145,10 +145,10 @@ export const PixiGrooveSettingsModal: React.FC<PixiGrooveSettingsModalProps> = (
         </Div>
 
         {/* ── Right panel: Settings ─────────────────────────────── */}
-        <Div className="flex-1 flex-col p-4 gap-4" layout={{ overflow: 'hidden' }}>
+        <Div className="flex-1 flex-col p-6 gap-8" layout={{ overflow: 'hidden' }}>
           {/* Global Intensity section */}
           <Div
-            className="flex-col gap-3 p-3 rounded"
+            className="flex-col gap-4 p-4 rounded"
             layout={{
               backgroundColor: theme.bgTertiary.color,
               borderWidth: 1,
@@ -205,7 +205,7 @@ export const PixiGrooveSettingsModal: React.FC<PixiGrooveSettingsModalProps> = (
 
           {/* Swing Resolution section */}
           <Div
-            className="flex-col gap-3 p-3 rounded"
+            className="flex-col gap-4 p-4 rounded"
             layout={{
               backgroundColor: theme.bgTertiary.color,
               borderWidth: 1,
@@ -238,7 +238,7 @@ export const PixiGrooveSettingsModal: React.FC<PixiGrooveSettingsModalProps> = (
 
           {/* Humanization (Jitter) section */}
           <Div
-            className="flex-col gap-3 p-3 rounded"
+            className="flex-col gap-4 p-4 rounded"
             layout={{
               backgroundColor: theme.bgTertiary.color,
               borderWidth: 1,

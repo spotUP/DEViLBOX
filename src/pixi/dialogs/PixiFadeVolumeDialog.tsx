@@ -32,7 +32,7 @@ export const PixiFadeVolumeDialog: React.FC<PixiFadeVolumeDialogProps> = ({ isOp
     <PixiModal isOpen={isOpen} onClose={onClose} width={280} height={200}>
       <PixiModalHeader title="Fade Volume" onClose={onClose} />
 
-      <layoutContainer layout={{ flex: 1, padding: 12, flexDirection: 'column', gap: 12 }}>
+      <layoutContainer layout={{ flex: 1, padding: 16, flexDirection: 'column', gap: 12 }}>
         <layoutContainer layout={{ flexDirection: 'row', gap: 16 }}>
           <PixiNumericInput
             value={startVol}

@@ -79,6 +79,7 @@ import { PixiSettingsModal } from './dialogs/PixiSettingsModal';
 import { PixiEditInstrumentModal } from './dialogs/PixiEditInstrumentModal';
 import { PixiMasterEffectsModal } from './dialogs/PixiMasterEffectsModal';
 import { PixiInstrumentEffectsModal } from './dialogs/PixiInstrumentEffectsModal';
+import { PixiNonEditableDialog } from './dialogs/PixiNonEditableDialog';
 import { clearExplicitlySaved } from '@hooks/useProjectPersistence';
 
 export const PixiRoot: React.FC = () => {
@@ -480,6 +481,7 @@ export const PixiRoot: React.FC = () => {
         <PixiClipRenameDialog />
         <PixiTrackRenameDialog />
         <PixiSynthErrorDialog />
+        <PixiNonEditableDialog />
         <PixiArrangementContextMenu />
       </pixiContainer>
 

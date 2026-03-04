@@ -196,7 +196,10 @@ export const PixiKeyboardShortcutSheet: React.FC<PixiKeyboardShortcutSheetProps>
           flexDirection: 'row',
           justifyContent: 'space-between',
           alignItems: 'center',
-          padding: 12,
+          paddingLeft: 16,
+          paddingRight: 16,
+          paddingTop: 12,
+          paddingBottom: 12,
           borderBottomWidth: 1,
           borderColor: theme.border.color,
         }}
@@ -216,7 +219,7 @@ export const PixiKeyboardShortcutSheet: React.FC<PixiKeyboardShortcutSheetProps>
       </layoutContainer>
 
       {/* Two-column content */}
-      <layoutContainer layout={{ flexDirection: 'row', gap: 16, flex: 1, overflow: 'scroll', padding: 12 }}>
+      <layoutContainer layout={{ flexDirection: 'row', gap: 16, flex: 1, overflow: 'scroll', padding: 16 }}>
         <layoutContainer layout={{ flex: 1, flexDirection: 'column', gap: 8 }}>
           {leftSections.map((section) => (
             <SectionBlock key={section.title} section={section} />
