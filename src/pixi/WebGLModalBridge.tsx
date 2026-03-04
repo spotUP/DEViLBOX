@@ -20,10 +20,6 @@ import { useMIDIStore } from '@/stores/useMIDIStore';
 import { notify } from '@stores/useNotificationStore';
 import { getToneEngine } from '@engine/ToneEngine';
 import type { InstrumentConfig } from '@/types/instrument';
-import type { ModuleInfo } from '@/lib/import/ModuleLoader';
-import type { ImportOptions } from '@/components/dialogs/ImportModuleDialog';
-import { computeSongDBHash, lookupSongDB } from '@lib/songdb';
-import { parseSIDHeader } from '@/lib/sid/SIDHeaderParser';
 
 const LazySettingsModal = lazy(() =>
   import('@/components/dialogs/SettingsModal').then(m => ({ default: m.SettingsModal }))
@@ -56,18 +52,10 @@ const LazyDrumPadManager = lazy(() =>
 );
 const LazyAutomationPanel_REMOVED = null; // moved to GL: PixiAutomationPanel
 const LazyRomUploadDialog_REMOVED = null; // moved to GL: PixiRomUploadDialog
-const LazyImportModuleDialog = lazy(() =>
-  import('@/components/dialogs/ImportModuleDialog').then(m => ({ default: m.ImportModuleDialog }))
-);
-const LazyImportFurnaceDialog = lazy(() =>
-  import('@/components/dialogs/ImportFurnaceDialog').then(m => ({ default: m.ImportFurnaceDialog }))
-);
-const LazyImportMIDIDialog = lazy(() =>
-  import('@/components/dialogs/ImportMIDIDialog').then(m => ({ default: m.ImportMIDIDialog }))
-);
-const LazyImportAudioDialog = lazy(() =>
-  import('@/components/dialogs/ImportAudioDialog').then(m => ({ default: m.ImportAudioDialog }))
-);
+const LazyImportModuleDialog_REMOVED = null; // moved to GL: PixiImportModuleDialog
+const LazyImportFurnaceDialog_REMOVED = null; // moved to GL: PixiImportFurnaceDialog
+const LazyImportMIDIDialog_REMOVED = null; // moved to GL: PixiImportMIDIDialog
+const LazyImportAudioDialog_REMOVED = null; // moved to GL: PixiImportAudioDialog
 const LazyImportTD3Dialog_REMOVED = null; // moved to GL: PixiImportTD3Dialog
 const LazySunVoxImportDialog_REMOVED = null; // moved to GL: PixiSunVoxImportDialog
 
@@ -86,11 +74,6 @@ export const WebGLModalBridge: React.FC = () => {
   const activeView = useUIStore(s => s.activeView);
   const showTD3Pattern = useMIDIStore(s => s.showPatternDialog);
   const closePatternDialog = useMIDIStore(s => s.closePatternDialog);
-  const pendingModuleFile = useUIStore(s => s.pendingModuleFile);
-  const setPendingModuleFile = useUIStore(s => s.setPendingModuleFile);
-  const pendingCompanionFiles = useUIStore(s => s.pendingCompanionFiles);
-  const pendingAudioFile = useUIStore(s => s.pendingAudioFile);
-  const setPendingAudioFile = useUIStore(s => s.setPendingAudioFile);
 
   // Portal container on document.body — ensures modals render above
   // PixiDOMOverlay divs (z-index 10) which are also direct body children.
@@ -198,50 +181,7 @@ export const WebGLModalBridge: React.FC = () => {
     }
   }, [setShowFileBrowser]);
 
-  // Handler for ImportModuleDialog in GL mode — called when user confirms import.
-  // Uses UnifiedFileLoader to keep behaviour identical to the DOM mode confirm path.
-  const handleModuleImportGL = useCallback(async (info: ModuleInfo, options: ImportOptions) => {
-    setPendingModuleFile(null);
-    // Fire-and-forget SongDB metadata lookup (non-blocking)
-    if (info.file) {
-      info.file.arrayBuffer().then(buf => {
-        lookupSongDB(computeSongDBHash(buf)).then(result => {
-          useTrackerStore.getState().setSongDBInfo(result ? {
-            authors: result.authors, publishers: result.publishers,
-            album: result.album, year: result.year, format: result.format,
-            duration_ms: result.subsongs[0]?.duration_ms ?? 0,
-          } : null);
-        });
-        // Extract C64 SID header metadata if applicable
-        const sidInfo = parseSIDHeader(new Uint8Array(buf));
-        useTrackerStore.getState().setSidMetadata(sidInfo ? {
-          format: sidInfo.format, version: sidInfo.version,
-          title: sidInfo.title, author: sidInfo.author, copyright: sidInfo.copyright,
-          chipModel: sidInfo.chipModel, clockSpeed: sidInfo.clockSpeed,
-          subsongs: sidInfo.subsongs, defaultSubsong: sidInfo.defaultSubsong,
-          currentSubsong: options.subsong ?? sidInfo.defaultSubsong,
-          secondSID: sidInfo.secondSID, thirdSID: sidInfo.thirdSID,
-        } : null);
-      });
-    }
-    try {
-      const { loadFile } = await import('@lib/file/UnifiedFileLoader');
-      const result = await loadFile(info.file, {
-        subsong: options.subsong,
-        uadeMetadata: options.uadeMetadata,
-        midiOptions: options.midiOptions,
-        companionFiles: options.companionFiles,
-      });
-      if (result.success === true) {
-        notify.success(result.message);
-      } else if (result.success === false) {
-        notify.error(result.error);
-      }
-    } catch (error) {
-      console.error('[WebGLModalBridge] Module import failed:', error);
-      notify.error('Failed to import file');
-    }
-  }, [setPendingModuleFile]);
+  // handleModuleImportGL → moved to PixiRoot
 
   const handleLoadTrackerModule = useCallback(async (buffer: ArrayBuffer, filename: string) => {
     const { isPlaying, stop } = useTransportStore.getState();
@@ -389,40 +329,8 @@ export const WebGLModalBridge: React.FC = () => {
         />
       )}
       {/* automation → moved to GL: PixiAutomationPanel */}
-      {/* Module file drop — dialog routed through portal to sit above PixiDOMOverlay */}
-      {pendingModuleFile && (
-        /\.(fur|dmf)$/i.test(pendingModuleFile.name) ? (
-          <LazyImportFurnaceDialog
-            isOpen={true}
-            onClose={() => { setPendingModuleFile(null); useUIStore.getState().setPendingCompanionFiles([]); }}
-            onImport={handleModuleImportGL}
-            initialFile={pendingModuleFile}
-          />
-        ) : /\.(mid|midi)$/i.test(pendingModuleFile.name) ? (
-          <LazyImportMIDIDialog
-            isOpen={true}
-            onClose={() => { setPendingModuleFile(null); useUIStore.getState().setPendingCompanionFiles([]); }}
-            onImport={handleModuleImportGL}
-            initialFile={pendingModuleFile}
-          />
-        ) : (
-          <LazyImportModuleDialog
-            isOpen={true}
-            onClose={() => { setPendingModuleFile(null); useUIStore.getState().setPendingCompanionFiles([]); }}
-            onImport={handleModuleImportGL}
-            initialFile={pendingModuleFile}
-            companionFiles={pendingCompanionFiles}
-          />
-        )
-      )}
-      {/* Audio sample import dialog */}
-      {pendingAudioFile && (
-        <LazyImportAudioDialog
-          isOpen={true}
-          onClose={() => setPendingAudioFile(null)}
-          initialFile={pendingAudioFile}
-        />
-      )}
+      {/* Module imports → moved to GL: PixiImportModuleDialog/Furnace/MIDI */}
+      {/* Audio import → moved to GL: PixiImportAudioDialog */}
       {/* TD-3 import → moved to GL: PixiImportTD3Dialog */}
       {/* SunVox import → moved to GL: PixiSunVoxImportDialog */}
 

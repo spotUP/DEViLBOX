@@ -15,7 +15,12 @@ import { isRapidScrolling } from './scrollPerf';
 import { useUIStore, useSettingsStore } from '@stores';
 import { useCollaborationStore } from '@stores/useCollaborationStore';
 import { useInstrumentStore } from '@stores/useInstrumentStore';
+import { useTrackerStore } from '@stores';
 import { notify } from '@stores/useNotificationStore';
+import { computeSongDBHash, lookupSongDB } from '@lib/songdb';
+import { parseSIDHeader } from '@/lib/sid/SIDHeaderParser';
+import type { ModuleInfo } from '@/lib/import/ModuleLoader';
+import type { ImportOptions } from '@/components/dialogs/ImportModuleDialog';
 import { usePixiResponsive } from './hooks/usePixiResponsive';
 import { PixiPeerCursor } from './views/collaboration/PixiPeerCursor';
 import { PixiGlobalDropdownLayer } from './components/PixiGlobalDropdownLayer';
@@ -55,6 +60,10 @@ import { PixiAutomationPanel } from './dialogs/PixiAutomationPanel';
 import { PixiPatternOrderModal } from './dialogs/PixiPatternOrderModal';
 import { PixiAuthModal } from './dialogs/PixiAuthModal';
 import { PixiRomUploadDialog } from './dialogs/PixiRomUploadDialog';
+import { PixiImportModuleDialog } from './dialogs/PixiImportModuleDialog';
+import { PixiImportFurnaceDialog } from './dialogs/PixiImportFurnaceDialog';
+import { PixiImportMIDIDialog } from './dialogs/PixiImportMIDIDialog';
+import { PixiImportAudioDialog } from './dialogs/PixiImportAudioDialog';
 
 export const PixiRoot: React.FC = () => {
   const { width, height } = usePixiResponsive();
@@ -64,11 +73,16 @@ export const PixiRoot: React.FC = () => {
   const modalData = useUIStore(s => s.modalData);
   const closeModal = useUIStore(s => s.closeModal);
 
-  // Pending file imports (for TD3, SunVox dialogs)
+  // Pending file imports (for TD3, SunVox, Module, Audio dialogs)
   const pendingTD3File = useUIStore(s => s.pendingTD3File);
   const setPendingTD3File = useUIStore(s => s.setPendingTD3File);
   const pendingSunVoxFile = useUIStore(s => s.pendingSunVoxFile);
   const setPendingSunVoxFile = useUIStore(s => s.setPendingSunVoxFile);
+  const pendingModuleFile = useUIStore(s => s.pendingModuleFile);
+  const setPendingModuleFile = useUIStore(s => s.setPendingModuleFile);
+  const pendingCompanionFiles = useUIStore(s => s.pendingCompanionFiles);
+  const pendingAudioFile = useUIStore(s => s.pendingAudioFile);
+  const setPendingAudioFile = useUIStore(s => s.setPendingAudioFile);
 
   // Handler for ImportTD3Dialog
   const handleTD3ImportGL = useCallback(async (file: File, replacePatterns: boolean) => {
@@ -103,6 +117,45 @@ export const PixiRoot: React.FC = () => {
       console.error('[PixiRoot] SunVox import failed:', err);
     }
   }, [pendingSunVoxFile, setPendingSunVoxFile]);
+
+  // Handler for ImportModuleDialog (module/furnace/midi)
+  const handleModuleImportGL = useCallback(async (info: ModuleInfo, options: ImportOptions) => {
+    setPendingModuleFile(null);
+    if (info.file) {
+      info.file.arrayBuffer().then(buf => {
+        lookupSongDB(computeSongDBHash(buf)).then(result => {
+          useTrackerStore.getState().setSongDBInfo(result ? {
+            authors: result.authors, publishers: result.publishers,
+            album: result.album, year: result.year, format: result.format,
+            duration_ms: result.subsongs[0]?.duration_ms ?? 0,
+          } : null);
+        });
+        const sidInfo = parseSIDHeader(new Uint8Array(buf));
+        useTrackerStore.getState().setSidMetadata(sidInfo ? {
+          format: sidInfo.format, version: sidInfo.version,
+          title: sidInfo.title, author: sidInfo.author, copyright: sidInfo.copyright,
+          chipModel: sidInfo.chipModel, clockSpeed: sidInfo.clockSpeed,
+          subsongs: sidInfo.subsongs, defaultSubsong: sidInfo.defaultSubsong,
+          currentSubsong: options.subsong ?? sidInfo.defaultSubsong,
+          secondSID: sidInfo.secondSID, thirdSID: sidInfo.thirdSID,
+        } : null);
+      });
+    }
+    try {
+      const { loadFile } = await import('@lib/file/UnifiedFileLoader');
+      const result = await loadFile(info.file, {
+        subsong: options.subsong,
+        uadeMetadata: options.uadeMetadata,
+        midiOptions: options.midiOptions,
+        companionFiles: options.companionFiles,
+      });
+      if (result.success === true) notify.success(result.message);
+      else if (result.success === false) notify.error(result.error);
+    } catch (error) {
+      console.error('[PixiRoot] Module import failed:', error);
+      notify.error('Failed to import file');
+    }
+  }, [setPendingModuleFile]);
 
   const { app } = useApplication();
   const crtEnabled = useSettingsStore((s) => s.crtEnabled);
@@ -245,6 +298,40 @@ export const PixiRoot: React.FC = () => {
         )}
         <PixiAuthModal isOpen={modalOpen === 'auth'} onClose={closeModal} />
         <PixiRomUploadDialog />
+        {/* Module file imports — routed by file extension */}
+        {pendingModuleFile && (
+          /\.(fur|dmf)$/i.test(pendingModuleFile.name) ? (
+            <PixiImportFurnaceDialog
+              isOpen={true}
+              onClose={() => { setPendingModuleFile(null); useUIStore.getState().setPendingCompanionFiles([]); }}
+              onImport={handleModuleImportGL}
+              initialFile={pendingModuleFile}
+            />
+          ) : /\.(mid|midi)$/i.test(pendingModuleFile.name) ? (
+            <PixiImportMIDIDialog
+              isOpen={true}
+              onClose={() => { setPendingModuleFile(null); useUIStore.getState().setPendingCompanionFiles([]); }}
+              onImport={handleModuleImportGL}
+              initialFile={pendingModuleFile}
+            />
+          ) : (
+            <PixiImportModuleDialog
+              isOpen={true}
+              onClose={() => { setPendingModuleFile(null); useUIStore.getState().setPendingCompanionFiles([]); }}
+              onImport={handleModuleImportGL}
+              initialFile={pendingModuleFile}
+              companionFiles={pendingCompanionFiles}
+            />
+          )
+        )}
+        {/* Audio sample import */}
+        {pendingAudioFile && (
+          <PixiImportAudioDialog
+            isOpen={true}
+            onClose={() => setPendingAudioFile(null)}
+            initialFile={pendingAudioFile}
+          />
+        )}
         <PixiClipRenameDialog />
         <PixiTrackRenameDialog />
         <PixiSynthErrorDialog />
