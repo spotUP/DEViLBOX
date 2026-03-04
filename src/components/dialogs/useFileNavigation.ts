@@ -129,6 +129,23 @@ interface UseFileNavigationOptions {
   suggestedFilename: string;
 }
 
+// Module-level cache so the dialog remembers its last state across open/close
+const _lastState = {
+  fileSource: 'demo' as FileSource,
+  currentPath: '',
+  electronDirectory: null as string | null,
+};
+
+/** Read the last file source the dialog was on. */
+export function getLastFileSource(): FileSource {
+  return _lastState.fileSource;
+}
+
+/** Persist the current dialog state so next open restores it. */
+export function setLastFileSource(source: FileSource): void {
+  _lastState.fileSource = source;
+}
+
 export function useFileNavigation({
   isOpen,
   fileSource,
@@ -145,9 +162,19 @@ export function useFileNavigation({
   const [saveFilename, setSaveFilename] = useState(suggestedFilename);
   const [hasFilesystemAccess, setHasFilesystemAccess] = useState(false);
   const [hasServerFS, setHasServerFS] = useState(false);
-  const [currentPath, setCurrentPath] = useState<string>('');
-  const [electronDirectory, setElectronDirectory] = useState<string | null>(null);
+  const [currentPath, _setCurrentPath] = useState<string>(_lastState.currentPath);
+  const [electronDirectory, _setElectronDirectory] = useState<string | null>(_lastState.electronDirectory);
   const [cloudFiles, setCloudFiles] = useState<ServerFile[]>([]);
+
+  // Wrap setters to persist to module-level cache
+  const setCurrentPath = useCallback((p: string) => {
+    _lastState.currentPath = p;
+    _setCurrentPath(p);
+  }, []);
+  const setElectronDirectory = useCallback((d: string | null) => {
+    _lastState.electronDirectory = d;
+    _setElectronDirectory(d);
+  }, []);
 
   // Revision history state
   const [showRevisions, setShowRevisions] = useState(false);

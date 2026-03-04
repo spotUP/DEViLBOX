@@ -10,7 +10,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { X, Folder, FolderOpen, FileAudio, ArrowLeft, Trash2, File, Cloud, HardDrive, History, RotateCcw, Globe } from 'lucide-react';
 import '@cubone/react-file-manager/dist/style.css';
 import { hasElectronFS } from '@utils/electron';
-import { useFileNavigation, isTrackerModule, type FileSource } from './useFileNavigation';
+import { useFileNavigation, isTrackerModule, type FileSource, getLastFileSource, setLastFileSource } from './useFileNavigation';
 import { ModlandPanel, HVSCPanel } from './FilePreviewPanel';
 
 interface FileBrowserProps {
@@ -33,7 +33,8 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
   currentProjectData,
   suggestedFilename = 'untitled.dbx',
 }) => {
-  const [fileSource, setFileSource] = useState<FileSource>('demo');
+  const [fileSource, _setFileSource] = useState<FileSource>(getLastFileSource);
+  const setFileSource = (s: FileSource) => { setLastFileSource(s); _setFileSource(s); };
   const modalRef = useRef<HTMLDivElement>(null);
 
   // Protect text inputs inside the modal from being intercepted by global
