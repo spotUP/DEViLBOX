@@ -118,10 +118,11 @@ export class GTUltraEngine {
     this.workletNode.connect(keepalive);
     keepalive.connect(this.context.destination);
 
-    // Send init with WASM binary
+    // Copy the WASM binary so the cached modulePromise stays valid for re-init
+    const wasmCopy = wasmBinary.slice(0);
     this.workletNode.port.postMessage(
-      { type: 'init', wasmBinary, jsCode, sidModel },
-      [wasmBinary]
+      { type: 'init', wasmBinary: wasmCopy, jsCode, sidModel },
+      [wasmCopy]
     );
   }
 

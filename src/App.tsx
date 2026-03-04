@@ -555,11 +555,6 @@ function App() {
     const result = await loadFile(file, { requireConfirmation: true });
 
     if (result.success === 'pending-confirmation') {
-      // Tracker modules (including .mid/.midi) open ImportModuleDialog (full UADE scan,
-      // subsong picker, engine selector, MIDI options).  In WebGL mode this is rendered as
-      // a portal by WebGLModalBridge (z-100 on body) so it sits above PixiDOMOverlay;
-      // in DOM mode TrackerView renders the same dialog inside the React tree — both share
-      // the pendingModuleFile store key.
       useUIStore.getState().setPendingModuleFile(result.file);
     } else if (result.success === true) {
       notify.success(result.message);
