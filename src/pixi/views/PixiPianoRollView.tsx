@@ -39,8 +39,15 @@ function midiToNoteStr(midi: number): string {
 
 const GRID_DIVISIONS = [1, 2, 4, 8, 16];
 
-const NOTE_LENGTH_PRESETS = [16, 8, 4, 2, 1, 0.5];
-const NOTE_LENGTH_LABELS = ['1/1', '1/2', '1/4', '1/8', '1/16', '1/32'];
+const NOTE_LENGTH_PRESETS = [
+  { label: 'Grid', value: 0 },
+  { label: '1/1', value: 16 },
+  { label: '1/2', value: 8 },
+  { label: '1/4', value: 4 },
+  { label: '1/8', value: 2 },
+  { label: '1/16', value: 1 },
+  { label: '1/32', value: 0.5 },
+];
 
 /** QWERTY keyboard → semitone offset from base octave */
 const QWERTY_NOTE_MAP: Record<string, number> = {
@@ -54,12 +61,19 @@ export const PixiPianoRollView: React.FC<{ isActive?: boolean; windowId?: string
   windowId = 'pianoroll',
 }) => {
   const [followPlayback, setFollowPlayback] = useState(true);
-  const [noteLength, setNoteLength] = useState(4);
-  const noteLengthRef = useRef(noteLength);
-  useEffect(() => { noteLengthRef.current = noteLength; }, [noteLength]);
   const tool = usePianoRollStore(s => s.tool);
   const setTool = usePianoRollStore(s => s.setTool);
   const view = usePianoRollStore(s => s.view);
+  const noteLengthPreset = view.noteLengthPreset;
+
+  // Effective note length: 0 = "Grid" mode (use grid division), >0 = fixed preset
+  const getEffectiveNoteLength = useCallback(() => {
+    if (noteLengthPreset > 0) return noteLengthPreset;
+    return view.snapToGrid ? Math.max(1, Math.floor(4 / view.gridDivision)) : 1;
+  }, [noteLengthPreset, view.snapToGrid, view.gridDivision]);
+
+  const noteLengthRef = useRef(getEffectiveNoteLength());
+  useEffect(() => { noteLengthRef.current = getEffectiveNoteLength(); }, [getEffectiveNoteLength]);
   const selectedNotes = usePianoRollStore(s => s.selection.notes);
   const chordBuffer = usePianoRollStore(s => s.chordBuffer);
   const horizontalZoom = usePianoRollStore(s => s.view.horizontalZoom);
@@ -509,10 +523,10 @@ export const PixiPianoRollView: React.FC<{ isActive?: boolean; windowId?: string
   }, []);
 
   const handleCycleNoteLength = useCallback(() => {
-    setNoteLength(prev => {
-      const idx = NOTE_LENGTH_PRESETS.indexOf(prev);
-      return NOTE_LENGTH_PRESETS[(idx + 1) % NOTE_LENGTH_PRESETS.length];
-    });
+    const s = usePianoRollStore.getState();
+    const curIdx = NOTE_LENGTH_PRESETS.findIndex(p => p.value === s.view.noteLengthPreset);
+    const nextIdx = (curIdx + 1) % NOTE_LENGTH_PRESETS.length;
+    s.setNoteLengthPreset(NOTE_LENGTH_PRESETS[nextIdx].value);
   }, []);
 
   const handleToggleSnap = useCallback(() => {
@@ -595,7 +609,9 @@ export const PixiPianoRollView: React.FC<{ isActive?: boolean; windowId?: string
           onClick={handleCycleGrid}
         />
         <PixiButton
-          label={`Len:${NOTE_LENGTH_LABELS[NOTE_LENGTH_PRESETS.indexOf(noteLength)]}`}
+          label={noteLengthPreset === 0
+            ? `Len:Grid(1/${view.gridDivision})`
+            : `Len:${NOTE_LENGTH_PRESETS.find(p => p.value === noteLengthPreset)?.label ?? '1/4'}`}
           variant="ghost"
           size="sm"
           onClick={handleCycleNoteLength}
