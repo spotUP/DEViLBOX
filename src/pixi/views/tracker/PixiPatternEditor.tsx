@@ -1225,7 +1225,7 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
       cursorStore.startSelection();
     }
     isDraggingRef.current = true;
-  }, [getCellFromLocal, cellContextMenu]);
+  }, [getCellFromLocal, openCellContextMenu]);
 
   const handlePointerMove = useCallback((e: FederatedPointerEvent) => {
     // Scratch drag — route to scratch controller

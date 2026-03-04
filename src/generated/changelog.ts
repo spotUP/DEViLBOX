@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-03-04T09:53:28.882Z
+ * Generated: 2026-03-04T10:02:50.316Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.2200';
-export const BUILD_NUMBER = '2200';
-export const BUILD_HASH = '835f5afd';
+export const BUILD_VERSION = '1.0.2201';
+export const BUILD_NUMBER = '2201';
+export const BUILD_HASH = '42db5bc0';
 export const BUILD_DATE = '2026-03-04';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,13 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.2200',
+    version: '1.0.2201',
     date: '2026-03-04',
     changes: [
+      {
+        type: 'fix',
+        "description": "Pixel-perfect GL dialog parity: fix 38 dialogs + create 6 new GL dialogs"
+      },
       {
         type: 'fix',
         "description": "Gate auto-save and revisions on explicit user save"
@@ -228,10 +232,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'feature',
         "description": "Wire 7 GL-native dialogs into PixiRoot, remove DOM versions"
-      },
-      {
-        type: 'fix',
-        "description": "Furnace FM frequency formulas and MAME noteOff"
       }
     ]
   }
