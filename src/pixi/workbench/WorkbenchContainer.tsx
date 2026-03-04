@@ -14,7 +14,7 @@ import React, { createContext, useCallback, useContext, useMemo, useRef, useEffe
 import { useApplication, useTick } from '@pixi/react';
 import { Rectangle, Graphics } from 'pixi.js';
 import type { FederatedPointerEvent, Container as ContainerType, Graphics as GraphicsType, BitmapText as BitmapTextType } from 'pixi.js';
-import { useWorkbenchStore, type CameraState } from '@stores/useWorkbenchStore';
+import { useWorkbenchStore, TILT_PRESETS, type CameraState } from '@stores/useWorkbenchStore';
 import { applyTransform } from './WorkbenchCamera';
 import { PIXI_FONTS } from '../fonts';
 import { usePixiTheme } from '../theme';
@@ -141,6 +141,7 @@ export const WorkbenchContainer: React.FC = () => {
   const panCamera         = useWorkbenchStore((s) => s.panCamera);
   const zoomCamera        = useWorkbenchStore((s) => s.zoomCamera);
   const isTilted          = useWorkbenchStore((s) => s.isTilted);
+  const tiltPreset        = useWorkbenchStore((s) => s.tiltPreset);
   const setActiveWindowId = useWorkbenchStore((s) => s.setActiveWindowId);
   const activeWindowId    = useWorkbenchStore((s) => s.activeWindowId);
 
@@ -181,6 +182,8 @@ export const WorkbenchContainer: React.FC = () => {
   // Refs so the useTick callback always reads current values
   const isTiltedRef     = useRef(isTilted);
   isTiltedRef.current   = isTilted;
+  const tiltPresetRef   = useRef(tiltPreset);
+  tiltPresetRef.current = tiltPreset;
   const rootContainerRef = useRef<ContainerType>(null);
 
   // Apply camera transform imperatively via store subscription — no React re-render.
@@ -568,7 +571,7 @@ export const WorkbenchContainer: React.FC = () => {
 
     tilt.setActive(tiltActive, world);
     if (tiltActive) {
-      tilt.renderFrame(world, tiltFactorRef.current);
+      tilt.renderFrame(world, tiltFactorRef.current, TILT_PRESETS[tiltPresetRef.current].params);
     }
   });
 
@@ -637,6 +640,9 @@ export const WorkbenchContainer: React.FC = () => {
           <PixiButton label="MIX" variant="ft2" size="sm" onClick={() => handleLoadWorkspace('Mix')} />
           <PixiButton label="FULL" variant="ft2" size="sm" onClick={() => handleLoadWorkspace('Full')} />
           <PixiButton label="3D" variant={isTilted ? 'ft2' : 'ghost'} color={isTilted ? 'blue' : undefined} size="sm" active={isTilted} onClick={() => useWorkbenchStore.getState().setTilted(!isTilted)} />
+          {isTilted && (
+            <PixiButton label={TILT_PRESETS[tiltPreset].label} variant="ft2" color="blue" size="sm" onClick={() => useWorkbenchStore.getState().cycleTiltPreset()} />
+          )}
         </pixiContainer>
 
         {/* World container — camera transform via ref.

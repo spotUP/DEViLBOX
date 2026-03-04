@@ -43,6 +43,37 @@ export type WindowId =
   | 'mixer'
   | 'master-fx';
 
+// ─── 3D Tilt Presets ──────────────────────────────────────────────────────────
+
+export type TiltPreset = 'desk' | 'scroller' | 'cockpit' | 'widescreen' | 'tower';
+
+export interface TiltParams {
+  /** Top edge inset fraction (0–0.3) — how much narrower the top is */
+  inset: number;
+  /** Top edge vertical shift fraction (0–0.3) — perspective foreshortening */
+  topShift: number;
+  /** Bottom edge inset fraction — for reverse/symmetric perspectives */
+  bottomInset: number;
+  /** Bottom edge vertical shift fraction */
+  bottomShift: number;
+  /** Barrel distortion strength (0 = none, 0.3 = mild fisheye, 0.8 = extreme) */
+  barrel: number;
+  /** Chromatic aberration strength (0 = none, subtle RGB split at edges) */
+  chromatic: number;
+  /** Vignette darkness at edges (0 = none, 1 = full black corners) */
+  vignette: number;
+}
+
+export const TILT_PRESETS: Record<TiltPreset, { label: string; params: TiltParams }> = {
+  desk:       { label: 'Desk',       params: { inset: 0.07,  topShift: 0.04,  bottomInset: 0,     bottomShift: 0,    barrel: 0,    chromatic: 0,     vignette: 0 } },
+  scroller:   { label: 'Scroller',   params: { inset: 0.20,  topShift: 0.15,  bottomInset: 0,     bottomShift: 0,    barrel: 0,    chromatic: 0,     vignette: 0 } },
+  cockpit:    { label: 'Cockpit',    params: { inset: 0.28,  topShift: 0.22,  bottomInset: 0,     bottomShift: 0,    barrel: 0.15, chromatic: 0.003, vignette: 0.3 } },
+  widescreen: { label: 'Widescreen', params: { inset: 0.10,  topShift: 0.02,  bottomInset: 0.10,  bottomShift: 0.02, barrel: 0,    chromatic: 0,     vignette: 0 } },
+  tower:      { label: 'Tower',      params: { inset: 0,     topShift: 0,     bottomInset: 0.18,  bottomShift: 0.12, barrel: 0,    chromatic: 0,     vignette: 0 } },
+};
+
+export const TILT_PRESET_ORDER: TiltPreset[] = ['desk', 'scroller', 'cockpit', 'widescreen', 'tower'];
+
 /** Total height of NavBar + StatusBar chrome (matches workbenchLayout.ts WORKBENCH_CHROME_H) */
 const CHROME_H = 130;
 
@@ -104,6 +135,7 @@ interface WorkbenchStore {
 
   // 3D tilt state (not persisted — resets to flat on page load)
   isTilted: boolean;
+  tiltPreset: TiltPreset;
 
   // Exposé state (not persisted — resets on page load)
   exposeActive: boolean;
@@ -137,6 +169,8 @@ interface WorkbenchStore {
   setGridSize: (size: number) => void;
   setUiSoundVolume: (vol: number) => void;
   setTilted: (tilted: boolean) => void;
+  setTiltPreset: (preset: TiltPreset) => void;
+  cycleTiltPreset: () => void;
   /** Toggle Exposé (fit-all-windows overview). */
   toggleExpose: () => void;
   setExposeActive: (active: boolean) => void;
@@ -161,6 +195,7 @@ export const useWorkbenchStore = create<WorkbenchStore>()(
       snapToGrid: false,
       gridSize: 40,
       isTilted: false,
+      tiltPreset: 'desk' as TiltPreset,
       exposeActive: false,
       preExposeCam: null,
       activeWindowId: null,
@@ -331,6 +366,15 @@ export const useWorkbenchStore = create<WorkbenchStore>()(
 
       setTilted: (tilted) =>
         set((state) => { state.isTilted = tilted; }),
+
+      setTiltPreset: (preset) =>
+        set((state) => { state.tiltPreset = preset; }),
+
+      cycleTiltPreset: () =>
+        set((state) => {
+          const idx = TILT_PRESET_ORDER.indexOf(state.tiltPreset);
+          state.tiltPreset = TILT_PRESET_ORDER[(idx + 1) % TILT_PRESET_ORDER.length];
+        }),
 
       toggleExpose: () =>
         set((state) => {
