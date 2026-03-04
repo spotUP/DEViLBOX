@@ -8,7 +8,6 @@
 
 import { useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { usePixiTheme } from '../theme';
 
 interface PixiTextInputProps {
   /** Current text value */
@@ -49,8 +48,8 @@ export const PixiTextInput: React.FC<PixiTextInputProps> = ({
   onSubmit,
   onCancel,
   placeholder,
-  width = 80,
-  height = 24,
+  width: _width = 80,
+  height: _height = 24,
   screenX,
   screenY,
   isActive,
@@ -59,7 +58,6 @@ export const PixiTextInput: React.FC<PixiTextInputProps> = ({
   max,
 }) => {
   const inputRef = useRef<HTMLInputElement>(null);
-  const theme = usePixiTheme();
 
   // Auto-focus when activated
   useEffect(() => {
@@ -110,18 +108,14 @@ export const PixiTextInput: React.FC<PixiTextInputProps> = ({
         position: 'fixed',
         left: screenX,
         top: screenY,
-        width,
-        height,
-        fontFamily: 'JetBrains Mono, monospace',
-        fontSize: 12,
-        background: `#${theme.bg.color.toString(16).padStart(6, '0')}`,
-        color: `#${theme.accent.color.toString(16).padStart(6, '0')}`,
-        border: `1px solid #${theme.border.color.toString(16).padStart(6, '0')}`,
-        borderRadius: 4,
-        padding: '2px 6px',
+        width: 1,
+        height: 1,
+        opacity: 0,
+        padding: 0,
+        border: 'none',
         outline: 'none',
-        zIndex: 10000,
-        boxSizing: 'border-box',
+        zIndex: -1,
+        pointerEvents: 'none',
       }}
     />,
     document.body,
