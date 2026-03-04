@@ -20,6 +20,28 @@ export interface MusicLinePositionUpdate {
   speed: number;
 }
 
+export interface MusicLinePatternData {
+  partNum: number;
+  rows: number;
+  data: Uint8Array;  // rows × 4 bytes: [note, inst, fx_hi, fx_lo]
+}
+
+export interface MusicLineChannelState {
+  channel: number;
+  tunePos: number;
+  partPos: number;
+  partNum: number;
+  transpose: number;
+  speed: number;
+  groove: number;
+}
+
+export interface MusicLineSongDetails {
+  channelCount: number;
+  partLength: number;
+  numParts: number;
+}
+
 type PositionCallback = (update: MusicLinePositionUpdate) => void;
 
 export class MusicLineEngine {
@@ -40,6 +62,9 @@ export class MusicLineEngine {
   private _rejectLoad: ((err: Error) => void) | null = null;
   private _positionCallbacks: Set<PositionCallback> = new Set();
   private _endedCallbacks: Set<() => void> = new Set();
+  private _patternDataCallbacks: Map<number, (data: MusicLinePatternData) => void> = new Map();
+  private _channelStateCallbacks: Map<number, (state: MusicLineChannelState) => void> = new Map();
+  private _songDetailsCallbacks: Set<(details: MusicLineSongDetails) => void> = new Set();
   private _playing = false;
   private _disposed = false;
 
@@ -173,6 +198,49 @@ export class MusicLineEngine {
             this._rejectLoad = null;
           }
           break;
+
+        case 'pattern-data': {
+          const cb = this._patternDataCallbacks.get(data.partNum);
+          if (cb) {
+            this._patternDataCallbacks.delete(data.partNum);
+            cb({
+              partNum: data.partNum,
+              rows: data.rows,
+              data: new Uint8Array(data.data),
+            });
+          }
+          break;
+        }
+
+        case 'channel-state': {
+          const cb2 = this._channelStateCallbacks.get(data.channel);
+          if (cb2) {
+            this._channelStateCallbacks.delete(data.channel);
+            const buf = new Uint8Array(data.data);
+            cb2({
+              channel: data.channel,
+              tunePos: buf[0],
+              partPos: buf[1],
+              partNum: buf[2] | (buf[3] << 8),
+              transpose: (buf[4] << 24) >> 24,  // sign-extend s8
+              speed: buf[5],
+              groove: buf[6],
+            });
+          }
+          break;
+        }
+
+        case 'song-info': {
+          for (const cb3 of this._songDetailsCallbacks) {
+            cb3({
+              channelCount: data.channelCount,
+              partLength: data.partLength,
+              numParts: data.numParts,
+            });
+          }
+          this._songDetailsCallbacks.clear();
+          break;
+        }
       }
     };
 
@@ -270,6 +338,30 @@ export class MusicLineEngine {
     return () => this._endedCallbacks.delete(cb);
   }
 
+  /** Request pattern data for a specific pattern number. Returns a promise. */
+  requestPatternData(partNum: number): Promise<MusicLinePatternData> {
+    return new Promise((resolve) => {
+      this._patternDataCallbacks.set(partNum, resolve);
+      this.workletNode?.port.postMessage({ type: 'get-pattern-data', partNum, maxRows: 128 });
+    });
+  }
+
+  /** Request channel state for a specific channel. Returns a promise. */
+  requestChannelState(channel: number): Promise<MusicLineChannelState> {
+    return new Promise((resolve) => {
+      this._channelStateCallbacks.set(channel, resolve);
+      this.workletNode?.port.postMessage({ type: 'get-channel-state', channel });
+    });
+  }
+
+  /** Request song details (channel count, pattern count, etc.). */
+  requestSongDetails(): Promise<MusicLineSongDetails> {
+    return new Promise((resolve) => {
+      this._songDetailsCallbacks.add(resolve);
+      this.workletNode?.port.postMessage({ type: 'get-song-info' });
+    });
+  }
+
   dispose(): void {
     this._disposed = true;
     this.stop();
@@ -277,6 +369,9 @@ export class MusicLineEngine {
     this.workletNode = null;
     this._positionCallbacks.clear();
     this._endedCallbacks.clear();
+    this._patternDataCallbacks.clear();
+    this._channelStateCallbacks.clear();
+    this._songDetailsCallbacks.clear();
     if (MusicLineEngine.instance === this) {
       MusicLineEngine.instance = null;
     }
