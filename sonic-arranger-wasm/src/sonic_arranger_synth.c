@@ -46,8 +46,8 @@ static const uint16_t PERIOD_TABLE[109] = {
      856,  808,  762,  720,  678,  640, 604, 570, 538, 508, 480, 453,
      428,  404,  381,  360,  339,  320, 302, 285, 269, 254, 240, 226,
      214,  202,  190,  180,  170,  160, 151, 143, 135, 127, 120, 113,
-     107,  101,   95,   90,   85,   80,  76,  71,  67,  64,  60,  57,
-      54,   51,   48,   45,   43,   40,  38,  36,  34,  32,  30,  28
+     107,  101,   95,   90,   85,   80,  75,  71,  67,  63,  60,  56,
+      53,   50,   47,   45,   42,   40,  37,  35,  33,  31,  30,  28
 };
 
 /* ── Vibrato sine table (256 entries, -128 to +127) ───────────────────────── */
@@ -803,7 +803,7 @@ static void doAdsr(SAPlayer *p) {
     /* Sustain hold — only gates AFTER note-off (ref line 1638:
      * if (voiceInfo.Note == 0x80 && adsrPosition >= sustainPoint)).
      * While note is held (noteReleased==0), ADSR advances freely past sustainPoint. */
-    if (p->noteReleased && p->ins.sustainPoint > 0 && p->adsrPosition >= p->ins.sustainPoint) {
+    if (p->noteReleased && p->adsrPosition >= p->ins.sustainPoint) {
         if (p->ins.sustainDelay == 0)
             return;
         if (p->sustainDelayCounter > 0) {
