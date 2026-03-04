@@ -46,7 +46,7 @@ export const PixiClipRenameDialog: React.FC = () => {
   return (
     <PixiModal isOpen={!!renamingClipId} onClose={cancel} width={300} height={160}>
       <PixiModalHeader title="Rename Clip" onClose={cancel} />
-      <layoutContainer layout={{ flex: 1, padding: 12 }}>
+      <layoutContainer layout={{ flex: 1, padding: 16 }}>
         <PixiPureTextInput value={name} onChange={setName} onSubmit={commit} onCancel={cancel} width={268} height={28} />
       </layoutContainer>
       <PixiModalFooter>

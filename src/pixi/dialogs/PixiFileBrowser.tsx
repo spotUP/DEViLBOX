@@ -22,11 +22,11 @@ import { hasElectronFS } from '@utils/electron';
 
 const MODAL_W = 780;
 const MODAL_H = 560;
-const HEADER_H = 40;
-const TABS_H = 32;
-const BREADCRUMB_H = 28;
+const HEADER_H = 44;
+const TABS_H = 36;
+const BREADCRUMB_H = 32;
 const FOOTER_H = 48;
-const LIST_PAD = 8;
+const LIST_PAD = 16;
 
 // ---------------------------------------------------------------------------
 // Types
@@ -184,12 +184,12 @@ export const PixiFileBrowser: React.FC<PixiFileBrowserProps> = ({
         layout={{
           width: MODAL_W,
           height: HEADER_H,
-          backgroundColor: theme.bgTertiary.color,
+          backgroundColor: theme.bgSecondary.color,
           borderBottomWidth: 1,
           borderColor: theme.border.color,
         }}
       >
-        <Txt className="text-sm font-bold text-text-primary">
+        <Txt className="text-lg font-bold text-text-primary">
           {mode === 'load' ? 'Load Module' : 'Save Module'}
         </Txt>
         <Div eventMode="static" cursor="pointer" onPointerUp={onClose} layout={{ padding: 4 }}>
@@ -206,8 +206,8 @@ export const PixiFileBrowser: React.FC<PixiFileBrowserProps> = ({
           backgroundColor: theme.bgTertiary.color,
           borderBottomWidth: 1,
           borderColor: theme.border.color,
-          gap: 2,
-          paddingLeft: 4,
+          gap: 0,
+          paddingLeft: 0,
         }}
       >
         <SourceTab
@@ -247,7 +247,7 @@ export const PixiFileBrowser: React.FC<PixiFileBrowserProps> = ({
             variant="ghost"
             size="sm"
             onClick={nav.handleBrowseFiles}
-            layout={{ marginRight: 4 }}
+            layout={{ marginRight: 16 }}
           />
         )}
       </Div>
@@ -327,7 +327,7 @@ export const PixiFileBrowser: React.FC<PixiFileBrowserProps> = ({
           backgroundColor: theme.bgTertiary.color,
           borderTopWidth: 1,
           borderColor: theme.border.color,
-          gap: 8,
+          gap: 16,
         }}
       >
         {mode === 'save' && !isModlandOrHvsc && (
@@ -386,8 +386,8 @@ const SourceTab: React.FC<SourceTabProps> = ({ label, active, onSelect }) => {
       onPointerUp={onSelect}
       layout={{
         height: TABS_H,
-        paddingLeft: 10,
-        paddingRight: 10,
+        paddingLeft: 16,
+        paddingRight: 16,
         justifyContent: 'center',
         alignItems: 'center',
         borderBottomWidth: active ? 2 : 0,
@@ -396,7 +396,7 @@ const SourceTab: React.FC<SourceTabProps> = ({ label, active, onSelect }) => {
     >
       <pixiBitmapText
         text={label}
-        style={{ fontFamily: PIXI_FONTS.SANS_MEDIUM, fontSize: 11, fill: 0xffffff }}
+        style={{ fontFamily: PIXI_FONTS.SANS_MEDIUM, fontSize: 14, fill: 0xffffff }}
         tint={active ? theme.accent.color : theme.textMuted.color}
         layout={{}}
       />

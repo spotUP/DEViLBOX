@@ -4,6 +4,8 @@
  * Pixel-perfect port of NewSongWizard.tsx using Div/Txt/GlModal.
  * 3-step wizard: Empty/Preset → Preset browser → Starter instruments.
  * Rendered inside the Pixi scene graph so the CRT shader catches it.
+ *
+ * DOM reference: src/components/dialogs/NewSongWizard.tsx
  */
 
 import React, { useState, useCallback, useMemo } from 'react';
@@ -17,8 +19,11 @@ import { AMIGA_UADE_PRESET_IDS, getInstrumentPresetsForSystem } from '@constants
 import { PixiButton } from '../components';
 import { PixiPureTextInput } from '../input/PixiPureTextInput';
 import { usePixiTheme } from '../theme';
-import { Div, Txt, GlModal, GlModalFooter } from '../layout';
-import type { FederatedWheelEvent } from 'pixi.js';
+import { PIXI_FONTS } from '../fonts';
+import { Div, Txt } from '../layout';
+import type { FederatedPointerEvent, FederatedWheelEvent } from 'pixi.js';
+import { useApplication } from '@pixi/react';
+import type { Graphics as GraphicsType } from 'pixi.js';
 
 type WizardStep = 1 | 2 | 3;
 type StartMode = 'empty' | 'preset';
@@ -30,6 +35,8 @@ const MODAL_H = 560;
 export const PixiNewSongWizard: React.FC = () => {
   const isOpen = useUIStore((s) => s.newSongWizardOpen);
   const close = useUIStore((s) => s.closeNewSongWizard);
+  const theme = usePixiTheme();
+  const { app } = useApplication();
 
   const [step, setStep] = useState<WizardStep>(1);
   const [startMode, setStartMode] = useState<StartMode>('empty');
@@ -96,49 +103,150 @@ export const PixiNewSongWizard: React.FC = () => {
   const stepCount = startMode === 'preset' ? (hasStarterInstruments ? 3 : 2) : 1;
   const nextLabel = step === 1 ? 'Next' : step === 2 ? (hasStarterInstruments ? 'Next' : 'Finish') : 'Finish';
 
-  return (
-    <GlModal
-      isOpen={isOpen}
-      onClose={handleCancel}
-      title={`New Song — Step ${step} of ${stepCount}`}
-      width={MODAL_W}
-      height={MODAL_H}
-    >
-      {/* Body */}
-      {step === 1 && (
-        <GlStep1 startMode={startMode} onSelectMode={setStartMode} />
-      )}
-      {step === 2 && (
-        <GlStep2
-          selectedPresetId={selectedPresetId}
-          onSelectPreset={setSelectedPresetId}
-          filter={filter}
-          onFilterChange={setFilter}
-          scrollY={scrollY}
-          onScrollY={setScrollY}
-        />
-      )}
-      {step === 3 && (
-        <GlStep3
-          presetName={selectedPreset?.name ?? ''}
-          instruments={starterInstruments.map((i) => i.name ?? '')}
-          withInstruments={withPresetInstruments}
-          onToggle={setWithPresetInstruments}
-        />
-      )}
+  const screenW = app?.screen?.width ?? 1920;
+  const screenH = app?.screen?.height ?? 1080;
 
-      {/* Footer */}
-      <GlModalFooter>
-        <PixiButton label="Cancel" variant="ghost" size="sm" onClick={handleCancel} />
-        {step > 1 && <PixiButton label="Back" variant="ghost" size="sm" onClick={handleBack} />}
-        <PixiButton
-          label={nextLabel}
-          variant="primary"
-          size="sm"
-          onClick={step === 3 ? handleFinish : handleNext}
-        />
-      </GlModalFooter>
-    </GlModal>
+  const drawOverlay = useCallback((g: GraphicsType) => {
+    g.clear();
+    g.rect(0, 0, screenW, screenH);
+    g.fill({ color: 0x000000, alpha: 0.7 });
+  }, [screenW, screenH]);
+
+  const handleOverlayClick = useCallback((_e: FederatedPointerEvent) => {
+    handleCancel();
+  }, [handleCancel]);
+
+  const handlePanelClick = useCallback((e: FederatedPointerEvent) => {
+    e.stopPropagation();
+  }, []);
+
+  return (
+    <pixiContainer layout={{ position: 'absolute', width: '100%', height: '100%' }}>
+      <pixiGraphics
+        draw={drawOverlay}
+        eventMode="static"
+        onPointerUp={handleOverlayClick}
+        layout={{ position: 'absolute', width: screenW, height: screenH }}
+      />
+
+      <layoutContainer
+        eventMode="static"
+        onPointerDown={handlePanelClick}
+        layout={{
+          position: 'absolute',
+          left: Math.round((screenW - MODAL_W) / 2),
+          top: Math.round((screenH - MODAL_H) / 2),
+          width: MODAL_W,
+          height: MODAL_H,
+          flexDirection: 'column',
+          backgroundColor: theme.bgSecondary.color,
+          borderWidth: 1,
+          borderColor: theme.border.color,
+          borderRadius: 8,
+          overflow: 'hidden',
+        }}
+      >
+        {/* Header — DOM: px-5 py-4 border-b */}
+        <layoutContainer
+          layout={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            paddingLeft: 20,
+            paddingRight: 20,
+            paddingTop: 16,
+            paddingBottom: 16,
+            borderBottomWidth: 1,
+            borderColor: theme.border.color,
+          }}
+        >
+          <layoutContainer layout={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+            <pixiBitmapText
+              text="New Song"
+              style={{ fontFamily: PIXI_FONTS.SANS_SEMIBOLD, fontSize: 14, fill: 0xffffff }}
+              tint={theme.text.color}
+              layout={{}}
+            />
+            <pixiBitmapText
+              text={`Step ${step} of ${stepCount}`}
+              style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 12, fill: 0xffffff }}
+              tint={theme.textMuted.color}
+              layout={{}}
+            />
+          </layoutContainer>
+          <layoutContainer
+            eventMode="static"
+            cursor="pointer"
+            onPointerUp={handleCancel}
+            layout={{
+              width: 24,
+              height: 24,
+              justifyContent: 'center',
+              alignItems: 'center',
+              borderRadius: 4,
+            }}
+          >
+            <pixiBitmapText
+              text="✕"
+              style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 14, fill: 0xffffff }}
+              tint={theme.textMuted.color}
+              layout={{}}
+            />
+          </layoutContainer>
+        </layoutContainer>
+
+        {/* Body */}
+        <layoutContainer layout={{ flex: 1, flexDirection: 'column', overflow: 'hidden' }}>
+          {step === 1 && (
+            <GlStep1 startMode={startMode} onSelectMode={setStartMode} />
+          )}
+          {step === 2 && (
+            <GlStep2
+              selectedPresetId={selectedPresetId}
+              onSelectPreset={setSelectedPresetId}
+              filter={filter}
+              onFilterChange={setFilter}
+              scrollY={scrollY}
+              onScrollY={setScrollY}
+            />
+          )}
+          {step === 3 && (
+            <GlStep3
+              presetName={selectedPreset?.name ?? ''}
+              instruments={starterInstruments.map((i) => i.name ?? '')}
+              withInstruments={withPresetInstruments}
+              onToggle={setWithPresetInstruments}
+            />
+          )}
+        </layoutContainer>
+
+        {/* Footer — DOM: px-5 py-3 border-t justify-between */}
+        <layoutContainer
+          layout={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            paddingLeft: 20,
+            paddingRight: 20,
+            paddingTop: 12,
+            paddingBottom: 12,
+            borderTopWidth: 1,
+            borderColor: theme.border.color,
+          }}
+        >
+          <PixiButton label="Cancel" variant="ghost" size="sm" onClick={handleCancel} />
+          <layoutContainer layout={{ flexDirection: 'row', gap: 8 }}>
+            {step > 1 && <PixiButton label="Back" variant="ghost" size="sm" onClick={handleBack} />}
+            <PixiButton
+              label={nextLabel}
+              variant="primary"
+              size="sm"
+              onClick={step === 3 ? handleFinish : handleNext}
+            />
+          </layoutContainer>
+        </layoutContainer>
+      </layoutContainer>
+    </pixiContainer>
   );
 };
 
@@ -179,9 +287,9 @@ interface GlStep2Props {
   onScrollY: (y: number) => void;
 }
 
-const LIST_W = 220;
-const ITEM_H = 26;
-const HEADER_H = 22;
+const LIST_W = 256; // DOM: w-64 = 256px
+const ITEM_H = 28;  // DOM: py-2 = ~28px
+const HEADER_H = 24; // DOM: py-1.5 = ~24px
 
 const GlStep2: React.FC<GlStep2Props> = ({
   selectedPresetId, onSelectPreset, filter, onFilterChange,
@@ -208,7 +316,6 @@ const GlStep2: React.FC<GlStep2Props> = ({
       .filter((g) => g.presets.length > 0);
   }, [filter]);
 
-  // Build flat item list with section headers
   const flatItems = useMemo(() => {
     const items: Array<{ type: 'header'; label: string } | { type: 'item'; preset: SystemPreset }> = [];
     for (const group of filteredGroups) {
@@ -221,7 +328,7 @@ const GlStep2: React.FC<GlStep2Props> = ({
   }, [filteredGroups]);
 
   const totalHeight = flatItems.reduce((h, item) => h + (item.type === 'header' ? HEADER_H : ITEM_H), 0);
-  const listHeight = MODAL_H - 44 - 44 - 34; // modal - header - footer - search
+  const listHeight = MODAL_H - 52 - 44 - 36; // header + footer + search
   const maxScroll = Math.max(0, totalHeight - listHeight);
 
   const handleWheel = useCallback((e: FederatedWheelEvent) => {
@@ -229,23 +336,21 @@ const GlStep2: React.FC<GlStep2Props> = ({
     setScrollY((y) => Math.max(0, Math.min(maxScroll, y + e.deltaY)));
   }, [maxScroll]);
 
-  // Calculate visible items
-
   return (
     <Div className="flex-row flex-1" layout={{ minHeight: 0 }}>
-      {/* Left: Search + list */}
+      {/* Left: Search + list — DOM: w-64 border-r */}
       <Div className="flex-col" layout={{
         width: LIST_W, borderRightWidth: 1, borderColor: theme.border.color, overflow: 'hidden',
       }}>
-        {/* Search input */}
+        {/* Search input — DOM: px-2 py-2 border-b */}
         <Div className="px-2 py-2" layout={{ borderBottomWidth: 1, borderColor: theme.border.color }}>
           <PixiPureTextInput
             value={filter}
             onChange={onFilterChange}
             placeholder="Filter presets..."
             width={LIST_W - 16}
-            height={24}
-            fontSize={11}
+            height={26}
+            fontSize={12}
             font="sans"
           />
         </Div>
@@ -308,7 +413,7 @@ const GlStep2: React.FC<GlStep2Props> = ({
         </Div>
       </Div>
 
-      {/* Right: Preset details */}
+      {/* Right: Preset details — DOM: p-5 overflow-y-auto */}
       <Div className="flex-1 flex-col p-5 gap-4" layout={{ overflow: 'scroll' }}>
         {selected ? (
           <>
@@ -319,13 +424,13 @@ const GlStep2: React.FC<GlStep2Props> = ({
               )}
             </Div>
 
-            {/* Stats row */}
+            {/* Stats row — DOM: grid grid-cols-2 gap-3 */}
             <Div className="flex-row gap-3">
               <InfoBox label="Channels" value={String(selected.channels)} />
               <InfoBox label="BPM" value={String(selected.defaultBpm ?? 125)} />
             </Div>
 
-            {/* Compatible synths */}
+            {/* Compatible synths — DOM: bg-dark-bg rounded p-3 border */}
             {selected.compatibleSynthTypes && selected.compatibleSynthTypes.length > 0 && (
               <Div className="flex-col gap-2 p-3 rounded" layout={{
                 backgroundColor: theme.bg.color, borderWidth: 1, borderColor: theme.border.color,
@@ -343,7 +448,7 @@ const GlStep2: React.FC<GlStep2Props> = ({
               </Div>
             )}
 
-            {/* Channel layout */}
+            {/* Channel layout — DOM: space-y-1 */}
             {selected.channelDefs.length > 0 && (
               <Div className="flex-col gap-1">
                 <Txt className="text-xs text-text-muted">Channel Layout</Txt>
@@ -403,15 +508,17 @@ const GlStep3: React.FC<GlStep3Props> = ({ presetName, instruments, withInstrume
   const theme = usePixiTheme();
   return (
     <Div className="flex-col gap-4 p-6">
+      {/* DOM: text-sm, with <span> font-medium for preset name */}
       <Div className="flex-row gap-1">
-        <Txt className="text-sm font-semibold text-text-primary">{presetName}</Txt>
+        <Txt className="text-sm font-medium text-text-primary">{presetName}</Txt>
         <Txt className="text-sm text-text-muted"> includes starter instruments.</Txt>
       </Div>
 
+      {/* DOM: grid grid-cols-2 gap-4 */}
       <Div className="flex-row gap-4">
         <OptionCard
           title="Load Preset Instruments"
-          description={`Add ${instruments.length} named instruments`}
+          description={`Add ${instruments.length} named instruments ready to use`}
           selected={withInstruments}
           onClick={() => onToggle(true)}
         />
@@ -423,6 +530,7 @@ const GlStep3: React.FC<GlStep3Props> = ({ presetName, instruments, withInstrume
         />
       </Div>
 
+      {/* DOM: grid grid-cols-2 gap-1 */}
       {withInstruments && instruments.length > 0 && (
         <Div className="flex-col gap-1">
           <Txt className="text-xs text-text-muted">Instruments to be added:</Txt>
@@ -453,7 +561,7 @@ const OptionCard: React.FC<{
   const theme = usePixiTheme();
   return (
     <Div
-      className="flex-1 flex-col items-center justify-center gap-2 p-4"
+      className="flex-1 flex-col items-center justify-center gap-3 p-6"
       layout={{
         borderWidth: selected ? 2 : 1,
         borderColor: selected ? theme.accent.color : theme.border.color,

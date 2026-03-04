@@ -25,7 +25,7 @@ import type {
 } from '@/lib/sid/composerApi';
 import { downloadHVSCFile } from '@/lib/hvscApi';
 import { loadFile } from '@/lib/file/UnifiedFileLoader';
-import { PixiModal, PixiModalHeader, PixiModalFooter, PixiButton, PixiLabel, PixiScrollView, PixiSelect } from '../components';
+import { PixiModal, PixiButton, PixiLabel, PixiScrollView, PixiSelect } from '../components';
 import type { SelectOption } from '../components';
 import { usePixiTheme } from '../theme';
 import { PIXI_FONTS } from '../fonts';
@@ -36,31 +36,36 @@ interface PixiSIDInfoModalProps {
 }
 
 const W = 800;
-const H = 560;
-const CONTENT_W = W - 24; // padding 12 each side
-const COL_W = (CONTENT_W - 12) / 2; // two columns with 12px gap
+const H = 580;
+const PAD = 24; // DOM: p-6
+const CONTENT_W = W - PAD * 2;
+const COL_GAP = 20; // DOM: gap-5
+const COL_W = (CONTENT_W - COL_GAP) / 2;
 
 // ── Utility ─────────────────────────────────────────────────────────────────
 
-/** Tiny badge: colored background + text */
+/** Tiny badge: colored background + text — DOM: px-2 py-0.5 text-[10px] rounded border */
 const Badge: React.FC<{
   text: string;
   bg: number;
   fg: number;
-}> = ({ text, bg, fg }) => (
+  borderColor?: number;
+}> = ({ text, bg, fg, borderColor }) => (
   <layoutContainer
     layout={{
-      paddingLeft: 6,
-      paddingRight: 6,
+      paddingLeft: 8,
+      paddingRight: 8,
       paddingTop: 2,
       paddingBottom: 2,
       borderRadius: 4,
       backgroundColor: bg,
+      borderWidth: borderColor ? 1 : 0,
+      borderColor: borderColor ?? 0,
     }}
   >
     <pixiBitmapText
       text={text}
-      style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }}
+      style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }}
       tint={fg}
       layout={{}}
     />
@@ -96,7 +101,7 @@ const LinkButton: React.FC<{
   </layoutContainer>
 );
 
-/** Key-value row */
+/** Key-value row — DOM: flex justify-between text-xs */
 const InfoRow: React.FC<{
   label: string;
   value: string;
@@ -114,13 +119,13 @@ const InfoRow: React.FC<{
   >
     <pixiBitmapText
       text={label}
-      style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 10, fill: 0xffffff }}
+      style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 12, fill: 0xffffff }}
       tint={labelColor}
       layout={{}}
     />
     <pixiBitmapText
       text={value}
-      style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 10, fill: 0xffffff }}
+      style={{ fontFamily: PIXI_FONTS.SANS_MEDIUM, fontSize: 12, fill: 0xffffff }}
       tint={valueColor}
       layout={{}}
     />
@@ -290,52 +295,115 @@ export const PixiSIDInfoModal: React.FC<PixiSIDInfoModalProps> = ({ isOpen, onCl
   const discoH = tunes.length > 0 ? 24 + displayTunes.length * 18 + (tunes.length > 10 ? 24 : 0) : 0;
   const totalContentH = topRowH + youtubeH + bottomGridH + discoH + 60; // padding
 
-  const scrollH = H - 36 - 44; // minus header and footer
+  const scrollH = H - 48 - 4; // minus header, small bottom margin
 
   return (
-    <PixiModal isOpen={isOpen} onClose={onClose} width={W} height={H}>
-      <PixiModalHeader title="SID File Info" width={W} onClose={onClose} />
+    <PixiModal
+      isOpen={isOpen}
+      onClose={onClose}
+      width={W}
+      height={H}
+      overlayAlpha={0.7}
+      borderRadius={12}
+    >
+      {/* Header — DOM: px-6 py-3 border-b bg-gradient-to-r from-blue-950/40 */}
+      <layoutContainer
+        layout={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          paddingLeft: 24,
+          paddingRight: 24,
+          paddingTop: 12,
+          paddingBottom: 12,
+          backgroundColor: 0x0c1630,
+          borderBottomWidth: 1,
+          borderColor: 0x1e3050,
+        }}
+      >
+        <layoutContainer layout={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+          <pixiBitmapText
+            text="SID File Info"
+            style={{ fontFamily: PIXI_FONTS.SANS_BOLD, fontSize: 18, fill: 0xffffff }}
+            tint={0xdbeafe}
+            layout={{}}
+          />
+          <Badge
+            text={`${sidMetadata.format}v${sidMetadata.version}`}
+            bg={0x1e3a5f}
+            fg={0x93c5fd}
+          />
+        </layoutContainer>
+        <layoutContainer
+          eventMode="static"
+          cursor="pointer"
+          onPointerUp={onClose}
+          layout={{
+            width: 28,
+            height: 28,
+            justifyContent: 'center',
+            alignItems: 'center',
+            borderRadius: 8,
+          }}
+        >
+          <pixiBitmapText
+            text="✕"
+            style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 16, fill: 0xffffff }}
+            tint={theme.textMuted.color}
+            layout={{}}
+          />
+        </layoutContainer>
+      </layoutContainer>
 
-      {/* ═══ Scrollable content ═══ */}
-      <PixiScrollView width={CONTENT_W + 24} height={scrollH} contentHeight={totalContentH}>
+      {/* ═══ Scrollable content — DOM: p-6 space-y-5 ═══ */}
+      <PixiScrollView width={W} height={scrollH} contentHeight={totalContentH}>
         <layoutContainer
           layout={{
             width: CONTENT_W,
             flexDirection: 'column',
-            padding: 12,
-            gap: 12,
+            padding: PAD,
+            gap: 20,
           }}
         >
-          {/* Format badge */}
-          <layoutContainer layout={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
-            <Badge text={`${sidMetadata.format}v${sidMetadata.version}`} bg={0x1e3a5f} fg={0x93c5fd} />
-            {chipCount > 1 && <Badge text={`${chipCount}× SID`} bg={0x3b1f5f} fg={0xc4b5fd} />}
-          </layoutContainer>
-
-          {/* ─── Top Row: two columns ─── */}
-          <layoutContainer layout={{ flexDirection: 'row', gap: 12, width: CONTENT_W }}>
-            {/* ─ Left column: SID file details ─ */}
-            <layoutContainer layout={{ width: COL_W, flexDirection: 'column', gap: 8 }}>
-              {/* Title / Author / Copyright card */}
+          {/* ─── Top Row: two columns — DOM: grid grid-cols-2 gap-5 ─── */}
+          <layoutContainer layout={{ flexDirection: 'row', gap: COL_GAP, width: CONTENT_W }}>
+            {/* ─ Left column: SID file details — DOM: space-y-4 ─ */}
+            <layoutContainer layout={{ width: COL_W, flexDirection: 'column', gap: 16 }}>
+              {/* Title / Author / Copyright card — DOM: p-4 */}
               <layoutContainer
                 layout={{
                   width: COL_W,
                   flexDirection: 'column',
                   gap: 4,
-                  padding: 10,
-                  borderRadius: 6,
+                  padding: 16,
+                  borderRadius: 8,
                   borderWidth: 1,
                   backgroundColor: 0x0c1e3a,
                   borderColor: 0x1e3a5f,
                 }}
               >
-                <PixiLabel text={sidMetadata.title || 'Untitled'} size="sm" weight="semibold" color="text" />
-                <PixiLabel text={sidMetadata.author || 'Unknown'} size="xs" color="textSecondary" />
-                {sidMetadata.copyright ? (
-                  <PixiLabel text={sidMetadata.copyright} size="xs" color="textMuted" />
-                ) : null}
+                <pixiBitmapText
+                text={sidMetadata.title || 'Untitled'}
+                style={{ fontFamily: PIXI_FONTS.SANS_SEMIBOLD, fontSize: 16, fill: 0xffffff }}
+                tint={0xdbeafe}
+                layout={{}}
+              />
+              <pixiBitmapText
+                text={sidMetadata.author || 'Unknown'}
+                style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 14, fill: 0xffffff }}
+                tint={0x93c5fd}
+                layout={{}}
+              />
+              {sidMetadata.copyright ? (
+                <pixiBitmapText
+                  text={sidMetadata.copyright}
+                  style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 12, fill: 0xffffff }}
+                  tint={theme.textMuted.color}
+                  layout={{}}
+                />
+              ) : null}
 
-                {/* Chip / Clock / Duration */}
+                {/* Chip / Clock / Duration — DOM: text-xs border-t pt-2 */}
                 <layoutContainer
                   layout={{
                     flexDirection: 'row',
@@ -344,27 +412,42 @@ export const PixiSIDInfoModal: React.FC<PixiSIDInfoModalProps> = ({ isOpen, onCl
                     marginTop: 4,
                     borderTopWidth: 1,
                     borderColor: 0x1e3a5f,
-                    paddingTop: 6,
+                    paddingTop: 8,
                   }}
                 >
-                  <PixiLabel text={`${chipLabel}${chipCount > 1 ? ` × ${chipCount}` : ''}`} size="xs" color="accent" />
-                  <PixiLabel text={clockLabel} size="xs" color="textSecondary" />
+                  <pixiBitmapText
+                    text={`${chipLabel}${chipCount > 1 ? ` × ${chipCount}` : ''}`}
+                    style={{ fontFamily: PIXI_FONTS.SANS_MEDIUM, fontSize: 12, fill: 0xffffff }}
+                    tint={0x93c5fd}
+                    layout={{}}
+                  />
+                  <pixiBitmapText
+                    text={clockLabel}
+                    style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 12, fill: 0xffffff }}
+                    tint={0x93c5fd}
+                    layout={{}}
+                  />
                   {durationStr ? (
-                    <PixiLabel text={durationStr} size="sm" weight="semibold" font="mono" color="textSecondary" />
+                    <pixiBitmapText
+                      text={durationStr}
+                      style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 14, fill: 0xffffff }}
+                      tint={0xdbeafe}
+                      layout={{}}
+                    />
                   ) : null}
                 </layoutContainer>
               </layoutContainer>
 
-              {/* Subsong selector */}
+              {/* Subsong selector — DOM: p-3 rounded-lg */}
               {sidMetadata.subsongs > 1 && (
                 <layoutContainer
                   layout={{
                     width: COL_W,
                     flexDirection: 'row',
                     alignItems: 'center',
-                    gap: 6,
-                    padding: 8,
-                    borderRadius: 6,
+                    gap: 8,
+                    padding: 12,
+                    borderRadius: 8,
                     borderWidth: 1,
                     backgroundColor: theme.bg.color,
                     borderColor: theme.border.color,
@@ -383,14 +466,14 @@ export const PixiSIDInfoModal: React.FC<PixiSIDInfoModalProps> = ({ isOpen, onCl
                 </layoutContainer>
               )}
 
-              {/* SID Engine selector */}
+              {/* SID Engine selector — DOM: p-3 rounded-lg */}
               <layoutContainer
                 layout={{
                   width: COL_W,
                   flexDirection: 'column',
-                  gap: 4,
-                  padding: 8,
-                  borderRadius: 6,
+                  gap: 6,
+                  padding: 12,
+                  borderRadius: 8,
                   borderWidth: 1,
                   backgroundColor: theme.bg.color,
                   borderColor: theme.border.color,
@@ -401,7 +484,7 @@ export const PixiSIDInfoModal: React.FC<PixiSIDInfoModalProps> = ({ isOpen, onCl
                   options={engineOptions}
                   value={sidEngine}
                   onChange={handleEngineChange}
-                  width={COL_W - 20}
+                  width={COL_W - 28}
                 />
                 <PixiLabel
                   text={SID_ENGINES[sidEngine].description}
@@ -410,15 +493,15 @@ export const PixiSIDInfoModal: React.FC<PixiSIDInfoModalProps> = ({ isOpen, onCl
                 />
               </layoutContainer>
 
-              {/* SongDB Album / Year info */}
+              {/* SongDB Album / Year info — DOM: p-3 rounded-lg */}
               {songDBInfo && (songDBInfo.album || songDBInfo.year) && (
                 <layoutContainer
                   layout={{
                     width: COL_W,
                     flexDirection: 'column',
-                    gap: 4,
-                    padding: 8,
-                    borderRadius: 6,
+                    gap: 6,
+                    padding: 12,
+                    borderRadius: 8,
                     borderWidth: 1,
                     backgroundColor: theme.bg.color,
                     borderColor: theme.border.color,
@@ -456,16 +539,16 @@ export const PixiSIDInfoModal: React.FC<PixiSIDInfoModalProps> = ({ isOpen, onCl
               )}
             </layoutContainer>
 
-            {/* ─ Right column: Composer profile ─ */}
-            <layoutContainer layout={{ width: COL_W, flexDirection: 'column', gap: 8 }}>
+            {/* ─ Right column: Composer profile — DOM: space-y-4 ─ */}
+            <layoutContainer layout={{ width: COL_W, flexDirection: 'column', gap: 16 }}>
               {composerLoading ? (
                 <layoutContainer
                   layout={{
                     width: COL_W,
-                    height: 80,
+                    height: 96,
                     alignItems: 'center',
                     justifyContent: 'center',
-                    borderRadius: 6,
+                    borderRadius: 8,
                     borderWidth: 1,
                     backgroundColor: 0x0c1e3a,
                     borderColor: 0x1e3a5f,
@@ -475,14 +558,14 @@ export const PixiSIDInfoModal: React.FC<PixiSIDInfoModalProps> = ({ isOpen, onCl
                 </layoutContainer>
               ) : composer ? (
                 <>
-                  {/* Bio card */}
+                  {/* Bio card — DOM: p-4 rounded-lg */}
                   <layoutContainer
                     layout={{
                       width: COL_W,
                       flexDirection: 'column',
-                      gap: 4,
-                      padding: 10,
-                      borderRadius: 6,
+                      gap: 6,
+                      padding: 16,
+                      borderRadius: 8,
                       borderWidth: 1,
                       backgroundColor: 0x0c1e3a,
                       borderColor: 0x1e3a5f,
@@ -549,10 +632,10 @@ export const PixiSIDInfoModal: React.FC<PixiSIDInfoModalProps> = ({ isOpen, onCl
                 <layoutContainer
                   layout={{
                     width: COL_W,
-                    height: 80,
+                    height: 96,
                     alignItems: 'center',
                     justifyContent: 'center',
-                    borderRadius: 6,
+                    borderRadius: 8,
                     borderWidth: 1,
                     backgroundColor: theme.bg.color,
                     borderColor: theme.border.color,
@@ -564,15 +647,15 @@ export const PixiSIDInfoModal: React.FC<PixiSIDInfoModalProps> = ({ isOpen, onCl
             </layoutContainer>
           </layoutContainer>
 
-          {/* ─── YouTube Links ─── */}
+          {/* ─── YouTube Links — DOM: p-4 rounded-lg ─── */}
           {youtubeLinks.length > 0 && (
             <layoutContainer
               layout={{
                 width: CONTENT_W,
                 flexDirection: 'column',
-                gap: 6,
-                padding: 10,
-                borderRadius: 6,
+                gap: 12,
+                padding: 16,
+                borderRadius: 8,
                 borderWidth: 1,
                 backgroundColor: 0x2d0a0a,
                 borderColor: 0x5f1e1e,
@@ -592,19 +675,19 @@ export const PixiSIDInfoModal: React.FC<PixiSIDInfoModalProps> = ({ isOpen, onCl
             </layoutContainer>
           )}
 
-          {/* ─── Bottom 3-column grid: Players, Career, Links ─── */}
+          {/* ─── Bottom 3-column grid — DOM: grid grid-cols-3 gap-5 ─── */}
           {composer &&
             (composer.players.length > 0 || composer.employment.length > 0 || composer.links.length > 0) && (
-              <layoutContainer layout={{ flexDirection: 'row', gap: 8, width: CONTENT_W }}>
-                {/* Players used */}
+              <layoutContainer layout={{ flexDirection: 'row', gap: COL_GAP, width: CONTENT_W }}>
+                {/* Players used — DOM: p-4 rounded-lg */}
                 {composer.players.length > 0 && (
                   <layoutContainer
                     layout={{
                       flex: 1,
                       flexDirection: 'column',
-                      gap: 4,
-                      padding: 10,
-                      borderRadius: 6,
+                      gap: 8,
+                      padding: 16,
+                      borderRadius: 8,
                       borderWidth: 1,
                       backgroundColor: theme.bg.color,
                       borderColor: theme.border.color,
@@ -625,21 +708,21 @@ export const PixiSIDInfoModal: React.FC<PixiSIDInfoModalProps> = ({ isOpen, onCl
                         >
                           <pixiBitmapText
                             text={p.player}
-                            style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 10, fill: 0xffffff }}
+                            style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 12, fill: 0xffffff }}
                             tint={theme.text.color}
                             layout={{ flex: 1 }}
                           />
                           <layoutContainer
                             layout={{
                               width: barW,
-                              height: 4,
-                              borderRadius: 2,
+                              height: 6,
+                              borderRadius: 3,
                               backgroundColor: 0x3b82f6,
                             }}
                           />
                           <pixiBitmapText
                             text={String(p.cnt)}
-                            style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }}
+                            style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }}
                             tint={theme.textMuted.color}
                             layout={{ width: 24 }}
                           />
@@ -649,15 +732,15 @@ export const PixiSIDInfoModal: React.FC<PixiSIDInfoModalProps> = ({ isOpen, onCl
                   </layoutContainer>
                 )}
 
-                {/* Career / Employment */}
+                {/* Career / Employment — DOM: p-4 rounded-lg */}
                 {composer.employment.length > 0 && (
                   <layoutContainer
                     layout={{
                       flex: 1,
                       flexDirection: 'column',
-                      gap: 4,
-                      padding: 10,
-                      borderRadius: 6,
+                      gap: 8,
+                      padding: 16,
+                      borderRadius: 8,
                       borderWidth: 1,
                       backgroundColor: theme.bg.color,
                       borderColor: theme.border.color,
@@ -676,22 +759,22 @@ export const PixiSIDInfoModal: React.FC<PixiSIDInfoModalProps> = ({ isOpen, onCl
                   </layoutContainer>
                 )}
 
-                {/* External Links */}
+                {/* External Links — DOM: p-4 rounded-lg */}
                 {composer.links.length > 0 && (
                   <layoutContainer
                     layout={{
                       flex: 1,
                       flexDirection: 'column',
-                      gap: 4,
-                      padding: 10,
-                      borderRadius: 6,
+                      gap: 8,
+                      padding: 16,
+                      borderRadius: 8,
                       borderWidth: 1,
                       backgroundColor: theme.bg.color,
                       borderColor: theme.border.color,
                     }}
                   >
                     <PixiLabel text="Links" size="xs" weight="semibold" color="textMuted" />
-                    <layoutContainer layout={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4 }}>
+                    <layoutContainer layout={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
                       {composer.links.map((link, i) => (
                         <LinkButton key={i} text={link.name} url={link.url} tint={0x93c5fd} />
                       ))}
@@ -701,15 +784,15 @@ export const PixiSIDInfoModal: React.FC<PixiSIDInfoModalProps> = ({ isOpen, onCl
               </layoutContainer>
             )}
 
-          {/* ─── Discography ─── */}
+          {/* ─── Discography — DOM: p-4 rounded-lg ─── */}
           {tunes.length > 0 && (
             <layoutContainer
               layout={{
                 width: CONTENT_W,
                 flexDirection: 'column',
-                gap: 4,
-                padding: 10,
-                borderRadius: 6,
+                gap: 8,
+                padding: 16,
+                borderRadius: 8,
                 borderWidth: 1,
                 backgroundColor: theme.bg.color,
                 borderColor: theme.border.color,
@@ -720,7 +803,7 @@ export const PixiSIDInfoModal: React.FC<PixiSIDInfoModalProps> = ({ isOpen, onCl
                 <PixiLabel text={`(${tunesTotal} tunes)`} size="xs" color="textMuted" />
               </layoutContainer>
 
-              <layoutContainer layout={{ flexDirection: 'row', flexWrap: 'wrap', gap: 2, width: CONTENT_W - 20 }}>
+              <layoutContainer layout={{ flexDirection: 'row', flexWrap: 'wrap', gap: 2, width: CONTENT_W - 32 }}>
                 {displayTunes.map((tune) => (
                   <layoutContainer
                     key={tune.id}
@@ -728,12 +811,12 @@ export const PixiSIDInfoModal: React.FC<PixiSIDInfoModalProps> = ({ isOpen, onCl
                     cursor="pointer"
                     onPointerUp={() => handleLoadTune(tune)}
                     layout={{
-                      width: (CONTENT_W - 28) / 2,
+                      width: (CONTENT_W - 40) / 2,
                       flexDirection: 'row',
                       alignItems: 'center',
-                      gap: 4,
-                      paddingTop: 2,
-                      paddingBottom: 2,
+                      gap: 8,
+                      paddingTop: 4,
+                      paddingBottom: 4,
                       paddingLeft: 4,
                       borderBottomWidth: 1,
                       borderColor: theme.border.color,
@@ -741,21 +824,21 @@ export const PixiSIDInfoModal: React.FC<PixiSIDInfoModalProps> = ({ isOpen, onCl
                   >
                     <pixiBitmapText
                       text={loadingTuneId === tune.id ? '⏳' : '↓'}
-                      style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 9, fill: 0xffffff }}
+                      style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 10, fill: 0xffffff }}
                       tint={0x3b82f6}
                       alpha={loadingTuneId === tune.id ? 1 : 0.4}
                       layout={{}}
                     />
                     <pixiBitmapText
                       text={tune.filename}
-                      style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 10, fill: 0xffffff }}
+                      style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 12, fill: 0xffffff }}
                       tint={theme.text.color}
                       layout={{ flex: 1 }}
                     />
                     {tune.player && (
                       <pixiBitmapText
                         text={tune.player}
-                        style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 8, fill: 0xffffff }}
+                        style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 10, fill: 0xffffff }}
                         tint={theme.textMuted.color}
                         alpha={0.6}
                         layout={{}}
@@ -770,11 +853,11 @@ export const PixiSIDInfoModal: React.FC<PixiSIDInfoModalProps> = ({ isOpen, onCl
                   eventMode="static"
                   cursor="pointer"
                   onPointerUp={() => setShowAllTunes(!showAllTunes)}
-                  layout={{ flexDirection: 'row', gap: 4, alignItems: 'center', marginTop: 4 }}
+                  layout={{ flexDirection: 'row', gap: 4, alignItems: 'center', marginTop: 8 }}
                 >
                   <pixiBitmapText
                     text={showAllTunes ? '▲ Show less' : `▼ Show all ${tunes.length} tunes`}
-                    style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 10, fill: 0xffffff }}
+                    style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 12, fill: 0xffffff }}
                     tint={0x60a5fa}
                     layout={{}}
                   />
@@ -784,10 +867,6 @@ export const PixiSIDInfoModal: React.FC<PixiSIDInfoModalProps> = ({ isOpen, onCl
           )}
         </layoutContainer>
       </PixiScrollView>
-
-      <PixiModalFooter width={W}>
-        <PixiButton label="Close" variant="ghost" onClick={onClose} />
-      </PixiModalFooter>
     </PixiModal>
   );
 };

@@ -38,11 +38,18 @@ interface PixiImportTD3DialogProps {
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
-const MODAL_W = 440;
+const MODAL_W = 420;
 const MODAL_H = 420;
-const CONTENT_W = MODAL_W - 26; // padding on each side
+const CONTENT_W = MODAL_W - 34;
 const PATTERN_LIST_H = 140;
 const PATTERN_ROW_H = 18;
+
+/** Pre-blend two 0xRRGGBB colours at a given alpha (for semi-transparent backgrounds). */
+function blendColor(base: number, overlay: number, alpha: number): number {
+  const r1 = (base >> 16) & 0xFF, g1 = (base >> 8) & 0xFF, b1 = base & 0xFF;
+  const r2 = (overlay >> 16) & 0xFF, g2 = (overlay >> 8) & 0xFF, b2 = overlay & 0xFF;
+  return (Math.round(r1 + (r2 - r1) * alpha) << 16) | (Math.round(g1 + (g2 - g1) * alpha) << 8) | Math.round(b1 + (b2 - b1) * alpha);
+}
 
 // ── Component ──────────────────────────────────────────────────────────────────
 
@@ -114,16 +121,18 @@ export const PixiImportTD3Dialog: React.FC<PixiImportTD3DialogProps> = ({
   const patternCount = preview?.patternNames.length ?? 0;
   const patternCountLabel = `${patternCount} pattern${patternCount !== 1 ? 's' : ''}`;
 
+  const accentBg = blendColor(theme.bg.color, theme.accent.color, 0.2);
+
   return (
     <PixiModal isOpen={isOpen} onClose={handleClose} width={MODAL_W} height={MODAL_H}>
       <PixiModalHeader title="Import TD-3 / TB-303 Patterns" onClose={handleClose} width={MODAL_W} />
 
-      <layoutContainer layout={{ flex: 1, padding: 12, flexDirection: 'column', gap: 10, overflow: 'hidden' }}>
+      <layoutContainer layout={{ flex: 1, padding: 16, flexDirection: 'column', gap: 16, overflow: 'hidden' }}>
 
         {/* Loading state */}
         {isLoading && (
           <layoutContainer layout={{ alignItems: 'center', justifyContent: 'center', height: 60 }}>
-            <PixiLabel text="Parsing file…" size="sm" color="textMuted" />
+            <PixiLabel text="Parsing file…" size="md" color="textMuted" />
           </layoutContainer>
         )}
 
@@ -134,7 +143,7 @@ export const PixiImportTD3Dialog: React.FC<PixiImportTD3DialogProps> = ({
               flexDirection: 'row',
               alignItems: 'center',
               gap: 8,
-              padding: 10,
+              padding: 12,
               borderRadius: 6,
               borderWidth: 1,
               backgroundColor: 0x3B1515,
@@ -142,8 +151,8 @@ export const PixiImportTD3Dialog: React.FC<PixiImportTD3DialogProps> = ({
               width: CONTENT_W,
             }}
           >
-            <PixiLabel text="⚠" size="sm" color="error" />
-            <PixiLabel text={error} size="xs" color="error" layout={{ maxWidth: CONTENT_W - 40 }} />
+            <PixiLabel text="⚠" size="md" color="error" />
+            <PixiLabel text={error} size="md" color="error" layout={{ maxWidth: CONTENT_W - 40 }} />
           </layoutContainer>
         )}
 
@@ -154,8 +163,8 @@ export const PixiImportTD3Dialog: React.FC<PixiImportTD3DialogProps> = ({
             <layoutContainer
               layout={{
                 flexDirection: 'column',
-                gap: 4,
-                padding: 12,
+                gap: 8,
+                padding: 16,
                 borderRadius: 8,
                 borderWidth: 1,
                 backgroundColor: theme.bg.color,
@@ -163,22 +172,22 @@ export const PixiImportTD3Dialog: React.FC<PixiImportTD3DialogProps> = ({
                 width: CONTENT_W,
               }}
             >
-              <layoutContainer layout={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: CONTENT_W - 24 }}>
-                <PixiLabel text={preview.name} size="sm" weight="semibold" color="text" />
+              <layoutContainer layout={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: CONTENT_W - 32 }}>
+                <PixiLabel text={preview.name} size="lg" weight="medium" color="text" />
                 <layoutContainer
                   layout={{
-                    paddingLeft: 6,
-                    paddingRight: 6,
+                    paddingLeft: 8,
+                    paddingRight: 8,
                     paddingTop: 2,
                     paddingBottom: 2,
                     borderRadius: 4,
-                    backgroundColor: theme.accent.color,
+                    backgroundColor: accentBg,
                   }}
                 >
-                  <PixiLabel text={`v${preview.version}`} size="xs" weight="semibold" color="text" />
+                  <PixiLabel text={`v${preview.version}`} size="sm" color="accent" />
                 </layoutContainer>
               </layoutContainer>
-              <PixiLabel text={patternCountLabel} size="xs" color="textMuted" />
+              <PixiLabel text={patternCountLabel} size="sm" color="textMuted" />
             </layoutContainer>
 
             {/* Pattern list */}
@@ -187,6 +196,7 @@ export const PixiImportTD3Dialog: React.FC<PixiImportTD3DialogProps> = ({
                 layout={{
                   borderRadius: 8,
                   borderWidth: 1,
+                  padding: 12,
                   backgroundColor: theme.bg.color,
                   borderColor: theme.border.color,
                   width: CONTENT_W,
@@ -194,11 +204,11 @@ export const PixiImportTD3Dialog: React.FC<PixiImportTD3DialogProps> = ({
                 }}
               >
                 <PixiScrollView
-                  width={CONTENT_W - 2}
+                  width={CONTENT_W - 26}
                   height={Math.min(PATTERN_LIST_H, patternCount * PATTERN_ROW_H + 8)}
                   contentHeight={patternCount * PATTERN_ROW_H + 8}
                 >
-                  <layoutContainer layout={{ flexDirection: 'column', padding: 4, gap: 0 }}>
+                  <layoutContainer layout={{ flexDirection: 'column', gap: 4 }}>
                     {preview.patternNames.map((name, i) => (
                       <layoutContainer
                         key={i}
@@ -207,17 +217,16 @@ export const PixiImportTD3Dialog: React.FC<PixiImportTD3DialogProps> = ({
                           alignItems: 'center',
                           gap: 8,
                           height: PATTERN_ROW_H,
-                          paddingLeft: 4,
                         }}
                       >
                         <PixiLabel
                           text={String(i + 1).padStart(2, ' ')}
-                          size="xs"
+                          size="sm"
                           font="mono"
                           color="textMuted"
-                          layout={{ width: 20 }}
+                          layout={{ width: 24 }}
                         />
-                        <PixiLabel text={name} size="xs" color="text" />
+                        <PixiLabel text={name} size="sm" color="text" />
                       </layoutContainer>
                     ))}
                   </layoutContainer>
@@ -230,7 +239,7 @@ export const PixiImportTD3Dialog: React.FC<PixiImportTD3DialogProps> = ({
               layout={{
                 flexDirection: 'column',
                 gap: 8,
-                padding: 12,
+                padding: 16,
                 borderRadius: 8,
                 borderWidth: 1,
                 backgroundColor: theme.bg.color,
@@ -238,7 +247,7 @@ export const PixiImportTD3Dialog: React.FC<PixiImportTD3DialogProps> = ({
                 width: CONTENT_W,
               }}
             >
-              <PixiLabel text="Import Mode" size="xs" weight="semibold" color="text" />
+              <PixiLabel text="Import Mode" size="sm" weight="medium" color="text" />
 
               <PixiCheckbox
                 checked={!replacePatterns}
@@ -247,7 +256,7 @@ export const PixiImportTD3Dialog: React.FC<PixiImportTD3DialogProps> = ({
               />
               <PixiLabel
                 text="Add patterns alongside existing patterns"
-                size="xs"
+                size="sm"
                 color="textMuted"
                 layout={{ marginLeft: 18 }}
               />
@@ -259,7 +268,7 @@ export const PixiImportTD3Dialog: React.FC<PixiImportTD3DialogProps> = ({
               />
               <PixiLabel
                 text="Clear all existing patterns first"
-                size="xs"
+                size="sm"
                 color="textMuted"
                 layout={{ marginLeft: 18 }}
               />

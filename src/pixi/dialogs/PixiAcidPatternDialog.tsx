@@ -65,7 +65,7 @@ export const PixiAcidPatternDialog: React.FC<PixiAcidPatternDialogProps> = ({ is
     <PixiModal isOpen={isOpen} onClose={onClose} width={340} height={380}>
       <PixiModalHeader title="Acid Pattern Generator" onClose={onClose} />
 
-      <layoutContainer layout={{ flex: 1, padding: 12, flexDirection: 'column', gap: 12, alignItems: 'center' }}>
+      <layoutContainer layout={{ flex: 1, padding: 16, flexDirection: 'column', gap: 16, alignItems: 'center' }}>
         <layoutContainer layout={{ flexDirection: 'row', gap: 16, justifyContent: 'center' }}>
           <PixiKnob
             value={density}
@@ -123,10 +123,12 @@ export const PixiAcidPatternDialog: React.FC<PixiAcidPatternDialogProps> = ({ is
         />
       </layoutContainer>
 
-      <PixiModalFooter>
-        <PixiButton label="Random" variant="ghost" onClick={handleRandomize} />
-        <PixiButton label="Cancel" variant="ghost" onClick={onClose} />
-        <PixiButton label="Generate" variant="primary" onClick={handleGenerate} />
+      <PixiModalFooter align="between">
+        <PixiButton label="Randomize" variant="ghost" onClick={handleRandomize} />
+        <layoutContainer layout={{ flexDirection: 'row', gap: 8 }}>
+          <PixiButton label="Cancel" variant="ghost" onClick={onClose} />
+          <PixiButton label="Generate Pattern" variant="primary" onClick={handleGenerate} />
+        </layoutContainer>
       </PixiModalFooter>
     </PixiModal>
   );

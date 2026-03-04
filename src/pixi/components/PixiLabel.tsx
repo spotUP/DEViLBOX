@@ -17,10 +17,10 @@ export type LabelFont = 'mono' | 'sans';
 export type LabelColor = 'text' | 'textSecondary' | 'textMuted' | 'accent' | 'error' | 'success' | 'warning' | 'custom';
 
 const SIZE_MAP: Record<LabelSize, number> = {
-  xs: 10,
-  sm: 12,
-  md: 14,
-  lg: 17,
+  xs: 12,
+  sm: 14,
+  md: 16,
+  lg: 18,
   xl: 21,
 };
 

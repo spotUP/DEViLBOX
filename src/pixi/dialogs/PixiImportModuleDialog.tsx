@@ -70,9 +70,9 @@ interface PixiImportModuleDialogProps {
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
-const MODAL_W = 500;
+const MODAL_W = 480;
 const MODAL_H = 520;
-const CONTENT_W = MODAL_W - 26;
+const CONTENT_W = MODAL_W - 34;
 const ROW_H = 18;
 const MULTI_FILE_FORMAT_KEYS = new Set<string>(['iffSmus']);
 
@@ -88,6 +88,13 @@ function fmtDurationMs(ms: number): string {
 
 function metaVal(v: number): string {
   return v < 0 ? '--' : String(v);
+}
+
+/** Pre-blend two 0xRRGGBB colours at a given alpha (for semi-transparent backgrounds). */
+function blendColor(base: number, overlay: number, alpha: number): number {
+  const r1 = (base >> 16) & 0xFF, g1 = (base >> 8) & 0xFF, b1 = base & 0xFF;
+  const r2 = (overlay >> 16) & 0xFF, g2 = (overlay >> 8) & 0xFF, b2 = overlay & 0xFF;
+  return (Math.round(r1 + (r2 - r1) * alpha) << 16) | (Math.round(g1 + (g2 - g1) * alpha) << 8) | Math.round(b1 + (b2 - b1) * alpha);
 }
 
 // ── Component ────────────────────────────────────────────────────────────────
@@ -386,11 +393,13 @@ export const PixiImportModuleDialog: React.FC<PixiImportModuleDialogProps> = ({
 
   if (!isOpen) return null;
 
+  const accentBg = blendColor(theme.bg.color, theme.accent.color, 0.2);
+
   return (
     <PixiModal isOpen={isOpen} onClose={handleClose} width={MODAL_W} height={MODAL_H}>
       <PixiModalHeader title="Import Tracker Module" onClose={handleClose} width={MODAL_W} />
 
-      <layoutContainer layout={{ flex: 1, padding: 12, flexDirection: 'column', gap: 10, overflow: 'hidden' }}>
+      <layoutContainer layout={{ flex: 1, padding: 16, flexDirection: 'column', gap: 16, overflow: 'hidden' }}>
 
         {/* ── Drop zone / file pickers (before file is loaded) ── */}
         {!moduleInfo && !isLoading && !error && (
@@ -398,15 +407,15 @@ export const PixiImportModuleDialog: React.FC<PixiImportModuleDialogProps> = ({
             layout={{
               flexDirection: 'column',
               alignItems: 'center',
-              gap: 10,
-              padding: 24,
+              gap: 16,
+              padding: 32,
               borderRadius: 8,
               borderWidth: 2,
               borderColor: theme.border.color,
               width: CONTENT_W,
             }}
           >
-            <PixiLabel text="Drop a file here, or pick one below" size="sm" color="textMuted" />
+            <PixiLabel text="Drop a file here, or pick one below" size="md" color="textMuted" />
             <layoutContainer layout={{ flexDirection: 'row', gap: 8 }}>
               <PixiButton label="Pick File" variant="default" onClick={handlePickFile} />
               <PixiButton label="Pick Files" variant="default" onClick={handlePickCompanions} />
@@ -428,7 +437,7 @@ export const PixiImportModuleDialog: React.FC<PixiImportModuleDialogProps> = ({
               flexDirection: 'row',
               alignItems: 'center',
               gap: 8,
-              padding: 10,
+              padding: 12,
               borderRadius: 6,
               borderWidth: 1,
               backgroundColor: 0x3B1515,
@@ -436,8 +445,8 @@ export const PixiImportModuleDialog: React.FC<PixiImportModuleDialogProps> = ({
               width: CONTENT_W,
             }}
           >
-            <PixiLabel text="⚠" size="sm" color="error" />
-            <PixiLabel text={error} size="xs" color="error" layout={{ maxWidth: CONTENT_W - 40 }} />
+            <PixiLabel text="⚠" size="md" color="error" />
+            <PixiLabel text={error} size="md" color="error" layout={{ maxWidth: CONTENT_W - 40 }} />
           </layoutContainer>
         )}
 
@@ -446,8 +455,8 @@ export const PixiImportModuleDialog: React.FC<PixiImportModuleDialogProps> = ({
           <layoutContainer
             layout={{
               flexDirection: 'column',
-              gap: 6,
-              padding: 12,
+              gap: 12,
+              padding: 16,
               borderRadius: 8,
               borderWidth: 1,
               backgroundColor: theme.bg.color,
@@ -456,29 +465,28 @@ export const PixiImportModuleDialog: React.FC<PixiImportModuleDialogProps> = ({
             }}
           >
             {/* Title + format badge */}
-            <layoutContainer layout={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: CONTENT_W - 24 }}>
+            <layoutContainer layout={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: CONTENT_W - 32 }}>
               <PixiLabel
                 text={moduleInfo.metadata.title}
-                size="sm"
-                weight="semibold"
+                size="lg"
+                weight="medium"
                 color="text"
                 layout={{ maxWidth: CONTENT_W - 120 }}
               />
               <layoutContainer
                 layout={{
-                  paddingLeft: 6,
-                  paddingRight: 6,
+                  paddingLeft: 8,
+                  paddingRight: 8,
                   paddingTop: 2,
                   paddingBottom: 2,
                   borderRadius: 4,
-                  backgroundColor: theme.accent.color,
+                  backgroundColor: accentBg,
                 }}
               >
                 <PixiLabel
                   text={uadeMetadata ? (uadeMetadata.formatName || 'UADE') : moduleInfo.metadata.type}
-                  size="xs"
-                  weight="semibold"
-                  color="text"
+                  size="sm"
+                  color="accent"
                 />
               </layoutContainer>
             </layoutContainer>
@@ -509,7 +517,7 @@ export const PixiImportModuleDialog: React.FC<PixiImportModuleDialogProps> = ({
 
             {/* SID header info */}
             {sidHeader && (
-              <layoutContainer layout={{ flexDirection: 'column', gap: 2, marginTop: 4, borderTopWidth: 1, borderColor: theme.border.color, paddingTop: 6 }}>
+              <layoutContainer layout={{ flexDirection: 'column', gap: 2, marginTop: 4, borderTopWidth: 1, borderColor: theme.border.color, paddingTop: 8 }}>
                 <MetaRow label="Title" value={sidHeader.title || '--'} />
                 <MetaRow label="Author" value={sidHeader.author || '--'} />
                 {sidHeader.subsongCount > 1 && (
@@ -520,7 +528,7 @@ export const PixiImportModuleDialog: React.FC<PixiImportModuleDialogProps> = ({
 
             {/* SongDB metadata (non-SID) */}
             {songDBInfo && !sidHeader && (
-              <layoutContainer layout={{ flexDirection: 'column', gap: 2, marginTop: 4, borderTopWidth: 1, borderColor: theme.border.color, paddingTop: 6 }}>
+              <layoutContainer layout={{ flexDirection: 'column', gap: 2, marginTop: 4, borderTopWidth: 1, borderColor: theme.border.color, paddingTop: 8 }}>
                 {songDBInfo.authors.length > 0 && (
                   <MetaRow label="Author" value={songDBInfo.authors.join(', ')} />
                 )}
@@ -541,7 +549,7 @@ export const PixiImportModuleDialog: React.FC<PixiImportModuleDialogProps> = ({
             {/* Subsong picker (UADE with multiple subsongs) */}
             {uadeMetadata && uadeMetadata.subsongCount > 1 && (
               <layoutContainer layout={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 }}>
-                <PixiLabel text="Import subsong:" size="xs" color="textMuted" />
+                <PixiLabel text="Import subsong:" size="sm" color="textMuted" />
                 {subsongOptions ? (
                   <PixiSelect
                     options={subsongOptions}
@@ -558,7 +566,7 @@ export const PixiImportModuleDialog: React.FC<PixiImportModuleDialogProps> = ({
                       onChange={(v) => setSelectedSubsong(v - 1)}
                       width={60}
                     />
-                    <PixiLabel text={`of ${uadeMetadata.subsongCount}`} size="xs" color="textMuted" />
+                    <PixiLabel text={`of ${uadeMetadata.subsongCount}`} size="sm" color="textMuted" />
                   </>
                 )}
               </layoutContainer>
@@ -567,7 +575,7 @@ export const PixiImportModuleDialog: React.FC<PixiImportModuleDialogProps> = ({
             {/* SID subsong picker */}
             {sidHeader && sidHeader.subsongCount > 1 && !uadeMetadata && (
               <layoutContainer layout={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 }}>
-                <PixiLabel text="Subsong:" size="xs" color="textMuted" />
+                <PixiLabel text="Subsong:" size="sm" color="textMuted" />
                 <PixiNumericInput
                   value={selectedSubsong + 1}
                   min={1}
@@ -575,7 +583,7 @@ export const PixiImportModuleDialog: React.FC<PixiImportModuleDialogProps> = ({
                   onChange={(v) => setSelectedSubsong(v - 1)}
                   width={60}
                 />
-                <PixiLabel text={`of ${sidHeader.subsongCount}`} size="xs" color="textMuted" />
+                <PixiLabel text={`of ${sidHeader.subsongCount}`} size="sm" color="textMuted" />
               </layoutContainer>
             )}
 
@@ -596,7 +604,7 @@ export const PixiImportModuleDialog: React.FC<PixiImportModuleDialogProps> = ({
               >
                 <PixiLabel
                   text={`📁 ${activeCompanions.length} companion file${activeCompanions.length > 1 ? 's' : ''} loaded`}
-                  size="xs"
+                  size="sm"
                   color="success"
                 />
               </layoutContainer>
@@ -619,7 +627,7 @@ export const PixiImportModuleDialog: React.FC<PixiImportModuleDialogProps> = ({
               >
                 <PixiLabel
                   text="⚠ Audio requires companion files. Use Pick Files to load them."
-                  size="xs"
+                  size="sm"
                   color="warning"
                 />
               </layoutContainer>
@@ -629,7 +637,7 @@ export const PixiImportModuleDialog: React.FC<PixiImportModuleDialogProps> = ({
             {moduleInfo.metadata.message && (
               <layoutContainer
                 layout={{
-                  padding: 6,
+                  padding: 8,
                   borderRadius: 4,
                   backgroundColor: theme.bgSecondary.color,
                   marginTop: 4,
@@ -637,7 +645,7 @@ export const PixiImportModuleDialog: React.FC<PixiImportModuleDialogProps> = ({
                   overflow: 'hidden',
                 }}
               >
-                <PixiLabel text={moduleInfo.metadata.message} size="xs" font="mono" color="textMuted" />
+                <PixiLabel text={moduleInfo.metadata.message} size="sm" font="mono" color="textMuted" />
               </layoutContainer>
             )}
 
@@ -669,7 +677,7 @@ export const PixiImportModuleDialog: React.FC<PixiImportModuleDialogProps> = ({
 
 const MetaRow: React.FC<{ label: string; value: string }> = ({ label, value }) => (
   <layoutContainer layout={{ flexDirection: 'row', justifyContent: 'space-between', height: ROW_H, alignItems: 'center' }}>
-    <PixiLabel text={label} size="xs" color="textMuted" />
-    <PixiLabel text={value} size="xs" font="mono" color="text" />
+    <PixiLabel text={label} size="sm" color="textMuted" />
+    <PixiLabel text={value} size="sm" font="mono" color="text" />
   </layoutContainer>
 );

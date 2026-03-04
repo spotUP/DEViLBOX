@@ -53,8 +53,9 @@ export const PixiCollaborationModal: React.FC<PixiCollaborationModalProps> = ({ 
 
   return (
     <PixiModal isOpen={isOpen} onClose={onClose} width={MODAL_W} height={MODAL_H}>
+      <layoutContainer layout={{ flex: 1, padding: 16, flexDirection: 'column' }}>
       {/* Header */}
-      <layoutContainer layout={{ width: MODAL_W - 24, flexDirection: 'column', marginBottom: 8 }}>
+      <layoutContainer layout={{ width: MODAL_W - 32, flexDirection: 'column', marginBottom: 8 }}>
         <PixiLabel text="Live Collaboration" size="lg" weight="bold" font="sans" />
         <PixiLabel text="Jam together in real-time" size="sm" color="textMuted" font="sans" layout={{ marginTop: 2 }} />
       </layoutContainer>
@@ -63,7 +64,7 @@ export const PixiCollaborationModal: React.FC<PixiCollaborationModalProps> = ({ 
       {errorMessage && (
         <layoutContainer
           layout={{
-            width: MODAL_W - 24,
+            width: MODAL_W - 32,
             paddingLeft: 10,
             paddingRight: 10,
             paddingTop: 8,
@@ -81,15 +82,15 @@ export const PixiCollaborationModal: React.FC<PixiCollaborationModalProps> = ({ 
 
       {/* Pick mode */}
       {mode === 'pick' && (
-        <layoutContainer layout={{ width: MODAL_W - 24, flexDirection: 'column', gap: 8, marginTop: 8 }}>
-          <PixiButton label="Create Room" variant="primary" width={MODAL_W - 24} height={36} onClick={handleCreate} />
-          <PixiButton label="Join Room" variant="default" width={MODAL_W - 24} height={36} onClick={() => setMode('join')} />
+        <layoutContainer layout={{ width: MODAL_W - 32, flexDirection: 'column', gap: 8, marginTop: 8 }}>
+          <PixiButton label="Create Room" variant="primary" width={MODAL_W - 32} height={36} onClick={handleCreate} />
+          <PixiButton label="Join Room" variant="default" width={MODAL_W - 32} height={36} onClick={() => setMode('join')} />
         </layoutContainer>
       )}
 
       {/* Create mode */}
       {mode === 'create' && (
-        <layoutContainer layout={{ width: MODAL_W - 24, flexDirection: 'column', alignItems: 'center', marginTop: 12 }}>
+        <layoutContainer layout={{ width: MODAL_W - 32, flexDirection: 'column', alignItems: 'center', marginTop: 12 }}>
           {status === 'creating' && (
             <layoutContainer layout={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 16 }}>
               <PixiLabel text="⟳" size="md" color="textMuted" font="sans" />
@@ -98,7 +99,7 @@ export const PixiCollaborationModal: React.FC<PixiCollaborationModalProps> = ({ 
           )}
 
           {(status === 'waiting' || status === 'error') && roomCode && (
-            <layoutContainer layout={{ flexDirection: 'column', alignItems: 'center', width: MODAL_W - 24 }}>
+            <layoutContainer layout={{ flexDirection: 'column', alignItems: 'center', width: MODAL_W - 32 }}>
               <PixiLabel text="Share this code with your friend:" size="sm" color="textSecondary" font="sans" />
 
               {/* Room code display */}
@@ -143,14 +144,14 @@ export const PixiCollaborationModal: React.FC<PixiCollaborationModalProps> = ({ 
 
       {/* Join mode */}
       {mode === 'join' && (
-        <layoutContainer layout={{ width: MODAL_W - 24, flexDirection: 'column', gap: 10, marginTop: 8 }}>
+        <layoutContainer layout={{ width: MODAL_W - 32, flexDirection: 'column', gap: 10, marginTop: 8 }}>
           <PixiLabel text="Room Code" size="sm" color="textSecondary" font="sans" />
           <PixiPureTextInput
             value={joinCode}
             onChange={handleJoinCodeChange}
             onSubmit={handleJoin}
             placeholder="XXXXXX"
-            width={MODAL_W - 24}
+            width={MODAL_W - 32}
             height={36}
             fontSize={18}
             font="mono"
@@ -158,7 +159,7 @@ export const PixiCollaborationModal: React.FC<PixiCollaborationModalProps> = ({ 
           <PixiButton
             label={status === 'joining' ? 'Connecting...' : 'Join Room'}
             variant="primary"
-            width={MODAL_W - 24}
+            width={MODAL_W - 32}
             height={36}
             onClick={handleJoin}
             disabled={joinCode.trim().length < 6 || status === 'joining'}
@@ -174,6 +175,7 @@ export const PixiCollaborationModal: React.FC<PixiCollaborationModalProps> = ({ 
           </layoutContainer>
         </layoutContainer>
       )}
+      </layoutContainer>
     </PixiModal>
   );
 };

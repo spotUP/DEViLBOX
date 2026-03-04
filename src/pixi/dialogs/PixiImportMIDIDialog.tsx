@@ -44,7 +44,7 @@ interface PixiImportMIDIDialogProps {
 
 const MODAL_W = 480;
 const MODAL_H = 460;
-const CONTENT_W = MODAL_W - 26;
+const CONTENT_W = MODAL_W - 34;
 
 const QUANTIZE_OPTIONS = [
   { value: '0', label: 'None' },
@@ -60,6 +60,13 @@ const PATTERN_LENGTH_OPTIONS = [
   { value: '128', label: '128 rows' },
   { value: '256', label: '256 rows' },
 ];
+
+/** Pre-blend two 0xRRGGBB colours at a given alpha (for semi-transparent backgrounds). */
+function blendColor(base: number, overlay: number, alpha: number): number {
+  const r1 = (base >> 16) & 0xFF, g1 = (base >> 8) & 0xFF, b1 = base & 0xFF;
+  const r2 = (overlay >> 16) & 0xFF, g2 = (overlay >> 8) & 0xFF, b2 = overlay & 0xFF;
+  return (Math.round(r1 + (r2 - r1) * alpha) << 16) | (Math.round(g1 + (g2 - g1) * alpha) << 8) | Math.round(b1 + (b2 - b1) * alpha);
+}
 
 // ── Component ──────────────────────────────────────────────────────────────────
 
@@ -174,16 +181,18 @@ export const PixiImportMIDIDialog: React.FC<PixiImportMIDIDialogProps> = ({
     ? `${Math.floor(preview.totalSeconds / 60)}:${String(preview.totalSeconds % 60).padStart(2, '0')}`
     : '0:00';
 
+  const accentBg = blendColor(theme.bg.color, theme.accent.color, 0.2);
+
   return (
     <PixiModal isOpen={isOpen} onClose={handleClose} width={MODAL_W} height={MODAL_H}>
       <PixiModalHeader title="Import MIDI File" onClose={handleClose} width={MODAL_W} />
 
-      <layoutContainer layout={{ flex: 1, padding: 12, flexDirection: 'column', gap: 10, overflow: 'hidden' }}>
+      <layoutContainer layout={{ flex: 1, padding: 16, flexDirection: 'column', gap: 16, overflow: 'hidden' }}>
 
         {/* Loading state */}
         {isLoading && (
           <layoutContainer layout={{ alignItems: 'center', justifyContent: 'center', height: 60 }}>
-            <PixiLabel text="Parsing MIDI file…" size="sm" color="textMuted" />
+            <PixiLabel text="Parsing MIDI file…" size="md" color="textMuted" />
           </layoutContainer>
         )}
 
@@ -194,7 +203,7 @@ export const PixiImportMIDIDialog: React.FC<PixiImportMIDIDialogProps> = ({
               flexDirection: 'row',
               alignItems: 'center',
               gap: 8,
-              padding: 10,
+              padding: 12,
               borderRadius: 6,
               borderWidth: 1,
               backgroundColor: 0x3B1515,
@@ -202,8 +211,8 @@ export const PixiImportMIDIDialog: React.FC<PixiImportMIDIDialogProps> = ({
               width: CONTENT_W,
             }}
           >
-            <PixiLabel text="⚠" size="sm" color="error" />
-            <PixiLabel text={error} size="xs" color="error" layout={{ maxWidth: CONTENT_W - 40 }} />
+            <PixiLabel text="⚠" size="md" color="error" />
+            <PixiLabel text={error} size="md" color="error" layout={{ maxWidth: CONTENT_W - 40 }} />
           </layoutContainer>
         )}
 
@@ -212,8 +221,8 @@ export const PixiImportMIDIDialog: React.FC<PixiImportMIDIDialogProps> = ({
           <layoutContainer
             layout={{
               flexDirection: 'column',
-              gap: 4,
-              padding: 12,
+              gap: 12,
+              padding: 16,
               borderRadius: 8,
               borderWidth: 1,
               backgroundColor: theme.bg.color,
@@ -221,35 +230,35 @@ export const PixiImportMIDIDialog: React.FC<PixiImportMIDIDialogProps> = ({
               width: CONTENT_W,
             }}
           >
-            <layoutContainer layout={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: CONTENT_W - 24 }}>
-              <PixiLabel text={preview.name} size="sm" weight="semibold" color="text" />
+            <layoutContainer layout={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: CONTENT_W - 32 }}>
+              <PixiLabel text={preview.name} size="lg" weight="medium" color="text" />
               <layoutContainer
                 layout={{
-                  paddingLeft: 6, paddingRight: 6, paddingTop: 2, paddingBottom: 2,
-                  borderRadius: 4, backgroundColor: theme.accent.color,
+                  paddingLeft: 8, paddingRight: 8, paddingTop: 2, paddingBottom: 2,
+                  borderRadius: 4, backgroundColor: accentBg,
                 }}
               >
-                <PixiLabel text="MIDI" size="xs" weight="semibold" color="text" />
+                <PixiLabel text="MIDI" size="sm" color="accent" />
               </layoutContainer>
             </layoutContainer>
 
             {/* Metadata grid */}
-            <layoutContainer layout={{ flexDirection: 'row', gap: 16, marginTop: 6, width: CONTENT_W - 24 }}>
+            <layoutContainer layout={{ flexDirection: 'row', gap: 8, width: CONTENT_W - 32 }}>
               <layoutContainer layout={{ flexDirection: 'column', gap: 2 }}>
-                <PixiLabel text="BPM" size="xs" color="textMuted" />
-                <PixiLabel text={String(preview.bpm)} size="xs" font="mono" color="text" />
+                <PixiLabel text="BPM" size="sm" color="textMuted" />
+                <PixiLabel text={String(preview.bpm)} size="sm" font="mono" color="text" />
               </layoutContainer>
               <layoutContainer layout={{ flexDirection: 'column', gap: 2 }}>
-                <PixiLabel text="Time sig" size="xs" color="textMuted" />
-                <PixiLabel text={`${preview.timeSignature[0]}/${preview.timeSignature[1]}`} size="xs" font="mono" color="text" />
+                <PixiLabel text="Time sig" size="sm" color="textMuted" />
+                <PixiLabel text={`${preview.timeSignature[0]}/${preview.timeSignature[1]}`} size="sm" font="mono" color="text" />
               </layoutContainer>
               <layoutContainer layout={{ flexDirection: 'column', gap: 2 }}>
-                <PixiLabel text="Tracks" size="xs" color="textMuted" />
-                <PixiLabel text={String(preview.tracks)} size="xs" font="mono" color="text" />
+                <PixiLabel text="Tracks" size="sm" color="textMuted" />
+                <PixiLabel text={String(preview.tracks)} size="sm" font="mono" color="text" />
               </layoutContainer>
               <layoutContainer layout={{ flexDirection: 'column', gap: 2 }}>
-                <PixiLabel text="Duration" size="xs" color="textMuted" />
-                <PixiLabel text={duration} size="xs" font="mono" color="text" />
+                <PixiLabel text="Duration" size="sm" color="textMuted" />
+                <PixiLabel text={duration} size="sm" font="mono" color="text" />
               </layoutContainer>
             </layoutContainer>
           </layoutContainer>
@@ -259,8 +268,8 @@ export const PixiImportMIDIDialog: React.FC<PixiImportMIDIDialogProps> = ({
         <layoutContainer
           layout={{
             flexDirection: 'column',
-            gap: 10,
-            padding: 12,
+            gap: 12,
+            padding: 16,
             borderRadius: 8,
             borderWidth: 1,
             backgroundColor: theme.bg.color,
@@ -268,13 +277,13 @@ export const PixiImportMIDIDialog: React.FC<PixiImportMIDIDialogProps> = ({
             width: CONTENT_W,
           }}
         >
-          <PixiLabel text="Import Options" size="xs" weight="semibold" color="text" />
+          <PixiLabel text="Import Options" size="sm" weight="medium" color="text" />
 
           {/* Quantize */}
-          <layoutContainer layout={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: CONTENT_W - 24 }}>
+          <layoutContainer layout={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: CONTENT_W - 32 }}>
             <layoutContainer layout={{ flexDirection: 'column', gap: 2 }}>
-              <PixiLabel text="Quantize" size="sm" color="text" />
-              <PixiLabel text="Snap notes to grid" size="xs" color="textMuted" />
+              <PixiLabel text="Quantize" size="md" color="text" />
+              <PixiLabel text="Snap notes to grid" size="sm" color="textMuted" />
             </layoutContainer>
             <PixiSelect
               options={QUANTIZE_OPTIONS}
@@ -285,10 +294,10 @@ export const PixiImportMIDIDialog: React.FC<PixiImportMIDIDialogProps> = ({
           </layoutContainer>
 
           {/* Pattern length */}
-          <layoutContainer layout={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: CONTENT_W - 24 }}>
+          <layoutContainer layout={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: CONTENT_W - 32 }}>
             <layoutContainer layout={{ flexDirection: 'column', gap: 2 }}>
-              <PixiLabel text="Pattern Length" size="sm" color="text" />
-              <PixiLabel text="Rows per pattern" size="xs" color="textMuted" />
+              <PixiLabel text="Pattern Length" size="md" color="text" />
+              <PixiLabel text="Rows per pattern" size="sm" color="textMuted" />
             </layoutContainer>
             <PixiSelect
               options={PATTERN_LENGTH_OPTIONS}
@@ -299,19 +308,19 @@ export const PixiImportMIDIDialog: React.FC<PixiImportMIDIDialogProps> = ({
           </layoutContainer>
 
           {/* Velocity to Volume */}
-          <layoutContainer layout={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: CONTENT_W - 24 }}>
+          <layoutContainer layout={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: CONTENT_W - 32 }}>
             <layoutContainer layout={{ flexDirection: 'column', gap: 2 }}>
-              <PixiLabel text="Velocity → Volume" size="sm" color="text" />
-              <PixiLabel text="Map note velocity to volume column" size="xs" color="textMuted" />
+              <PixiLabel text="Velocity → Volume" size="md" color="text" />
+              <PixiLabel text="Map note velocity to volume column" size="sm" color="textMuted" />
             </layoutContainer>
             <PixiCheckbox checked={velocityToVolume} onChange={setVelocityToVolume} />
           </layoutContainer>
 
           {/* Merge Channels */}
-          <layoutContainer layout={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: CONTENT_W - 24 }}>
+          <layoutContainer layout={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: CONTENT_W - 32 }}>
             <layoutContainer layout={{ flexDirection: 'column', gap: 2 }}>
-              <PixiLabel text="Merge Channels" size="sm" color="text" />
-              <PixiLabel text="Combine MIDI channels into fewer tracker channels" size="xs" color="textMuted" />
+              <PixiLabel text="Merge Channels" size="md" color="text" />
+              <PixiLabel text="Combine MIDI channels into fewer tracker channels" size="sm" color="textMuted" />
             </layoutContainer>
             <PixiCheckbox checked={mergeChannels} onChange={setMergeChannels} />
           </layoutContainer>

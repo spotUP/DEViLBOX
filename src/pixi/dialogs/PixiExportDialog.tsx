@@ -338,7 +338,7 @@ export const PixiExportDialog: React.FC<PixiExportDialogProps> = ({ isOpen, onCl
       </layoutContainer>
 
       {/* ── Content area ──────────────────────────────────────────────────── */}
-      <layoutContainer layout={{ flex: 1, flexDirection: 'column', padding: 12, gap: 10 }}>
+      <layoutContainer layout={{ flex: 1, flexDirection: 'column', padding: 16, gap: 10 }}>
         {dialogMode === 'export' ? (
           <>
             {/* Format selector */}

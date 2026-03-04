@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-03-04T05:57:48.492Z
+ * Generated: 2026-03-04T09:53:28.882Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.2152';
-export const BUILD_NUMBER = '2152';
-export const BUILD_HASH = '87f6f791';
+export const BUILD_VERSION = '1.0.2200';
+export const BUILD_NUMBER = '2200';
+export const BUILD_HASH = '835f5afd';
 export const BUILD_DATE = '2026-03-04';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,201 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.2152',
+    version: '1.0.2200',
     date: '2026-03-04',
     changes: [
+      {
+        type: 'fix',
+        "description": "Gate auto-save and revisions on explicit user save"
+      },
+      {
+        type: 'feature',
+        "description": "Add PRG/SID export for GoatTracker Ultra"
+      },
+      {
+        type: 'improvement',
+        "description": "Pixel-perfect GL modal foundation + TipOfTheDay rewrite"
+      },
+      {
+        type: 'fix',
+        "description": "Runtime errors — guard PixiModal app.screen, fix invalid 8-digit hex colors"
+      },
+      {
+        type: 'feature',
+        "description": "Convert VJ view to hidden canvas + Pixi texture"
+      },
+      {
+        type: 'feature',
+        "description": "Convert DJ view to fully GL-native — panels, browsers, beat grid"
+      },
+      {
+        type: 'improvement',
+        "description": "Convert context menus, color picker, channel headers to GL"
+      },
+      {
+        type: 'improvement',
+        "description": "Convert knob tooltip and text input to GL-native"
+      },
+      {
+        type: 'feature',
+        "description": "Convert PixiPatternEditor DOM overlays to GL"
+      },
+      {
+        type: 'improvement',
+        "description": "Convert TrackerVisualBackground from PixiDOMOverlay to pure GL (Pixi.js)"
+      },
+      {
+        type: 'fix',
+        "description": "Fix C64 SID silence from missing c64 instrument block"
+      },
+      {
+        type: 'fix',
+        "description": "Fix Lynx silence and sample chip silence"
+      },
+      {
+        type: 'improvement',
+        "description": "Convert drag-and-drop overlay from PixiDOMOverlay to pure GL"
+      },
+      {
+        type: 'improvement',
+        "description": "Convert PixiContextMenu from DOM portal to pure GL (Pixi.js)"
+      },
+      {
+        type: 'improvement',
+        "description": "Wire Phase 5 GL dialogs, eliminate all DOM modals from bridge"
+      },
+      {
+        type: 'feature',
+        "description": "Phase 5 GL dialogs — Settings, EditInstrument, MasterFx, InstrumentFx, EffectParamEditor"
+      },
+      {
+        type: 'fix',
+        "description": "Add default instruments for FM/OPLL/VERA chips, fix SNES clipping"
+      },
+      {
+        type: 'improvement',
+        "description": "Wire Phase 4 GL dialogs, strip bridge to 4 DOM modals"
+      },
+      {
+        type: 'feature',
+        "description": "Phase 4 GL dialogs — Export, TD3 Pattern, FileBrowser, SamplePack, DrumPad"
+      },
+      {
+        type: 'improvement',
+        "description": "Wire Phase 3 import dialogs into PixiRoot, remove from bridge"
+      },
+      {
+        type: 'feature',
+        "description": "Add Phase 3 GL import dialogs (4 modals)"
+      },
+      {
+        type: 'improvement',
+        "description": "Wire Phase 2 GL dialogs into PixiRoot, remove from bridge"
+      },
+      {
+        type: 'feature',
+        "description": "Add GL infrastructure and Phase 2 dialogs (6 modals + 3 utilities)"
+      },
+      {
+        type: 'improvement',
+        "description": "Unify FM chips under FurnaceDispatchSynth"
+      },
+      {
+        type: 'fix',
+        "description": "Add view selector to piano roll, fix sign-in button wrapping"
+      },
+      {
+        type: 'fix',
+        "description": "Correct clocking for PSG, NES, AY, SID, SNES, ESFM chips"
+      },
+      {
+        type: 'improvement',
+        "description": "Wire DrumpadEditorModal into PixiRoot, remove from bridge"
+      },
+      {
+        type: 'feature',
+        "description": "Add GL DrumpadEditorModal (4x4 pad grid, MIDI learn, instrument picker)"
+      },
+      {
+        type: 'fix',
+        "description": "Remove stray closing paren in WebGLModalBridge"
+      },
+      {
+        type: 'improvement',
+        "description": "Wire SIDInfoModal, ArrangementContextMenu, HelpModal into PixiRoot"
+      },
+      {
+        type: 'feature',
+        "description": "Add 3 GL dialogs (SIDInfoModal, ArrangementContextMenu, HelpModal)"
+      },
+      {
+        type: 'fix',
+        "description": "Correct FM chip clocking for accurate pitch"
+      },
+      {
+        type: 'improvement',
+        "description": "Wire SIDInfoModal + ArrangementContextMenu into PixiRoot, remove from bridge"
+      },
+      {
+        type: 'feature',
+        "description": "Add 2 GL dialogs (SIDInfoModal, ArrangementContextMenu)"
+      },
+      {
+        type: 'fix',
+        "description": "MAME synths sound never stops — stale note in triggerAttackRelease"
+      },
+      {
+        type: 'improvement',
+        "description": "Wire 3 GL dialogs into PixiRoot, remove from bridge"
+      },
+      {
+        type: 'feature',
+        "description": "Add 3 GL dialogs (Collaboration, RevisionBrowser, FurnacePresetBrowser)"
+      },
+      {
+        type: 'fix',
+        "description": "Visualizer modes not responding to music"
+      },
+      {
+        type: 'improvement',
+        "description": "Wire AdvancedEdit + TipOfTheDay into PixiRoot, remove from bridge"
+      },
+      {
+        type: 'feature',
+        "description": "Add GL-native AdvancedEditModal and TipOfTheDay dialogs"
+      },
+      {
+        type: 'improvement',
+        "description": "Wire 4 GL dialogs into PixiRoot, remove DOM versions from bridge"
+      },
+      {
+        type: 'feature',
+        "description": "Add 4 GL-native dialogs: ShortcutSheet, GrooveSettings, FindReplace, EffectPicker"
+      },
+      {
+        type: 'improvement',
+        "description": "Wire 5 GL dialogs into PixiRoot, remove DOM versions from bridge"
+      },
+      {
+        type: 'feature',
+        "description": "Add 5 GL-native dialogs: ClipRename, TrackRename, Download, SynthError, UndoHistory"
+      },
+      {
+        type: 'improvement',
+        "description": "Chore: update auto-generated changelog"
+      },
+      {
+        type: 'feature',
+        "description": "Add GL-native dialog components"
+      },
+      {
+        type: 'fix',
+        "description": "Ghost/transparent buttons invisible — alpha was applied to entire container"
+      },
+      {
+        type: 'fix',
+        "description": "Remove unused draw callbacks left from layoutContainer migration"
+      },
       {
         type: 'feature',
         "description": "Wire 7 GL-native dialogs into PixiRoot, remove DOM versions"
@@ -40,204 +232,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         "description": "Furnace FM frequency formulas and MAME noteOff"
-      },
-      {
-        type: 'improvement',
-        "description": "Phase 4 — migrate shell/toolbar/view backgrounds to layoutContainer"
-      },
-      {
-        type: 'fix',
-        "description": "Cursor navigation — arrow right no longer jumps back to note column"
-      },
-      {
-        type: 'improvement',
-        "description": "Migrate remaining GL components to layoutContainer"
-      },
-      {
-        type: 'fix',
-        "description": "GTUltra .sng files now reach the GT Ultra UI"
-      },
-      {
-        type: 'fix',
-        "description": "Resolve CI TypeScript errors"
-      },
-      {
-        type: 'feature',
-        "description": "GL-native New Song Wizard using Div/Txt/GlModal layout bridge"
-      },
-      {
-        type: 'fix',
-        "description": "Normalize HVSC paths for SID download from mirrors"
-      },
-      {
-        type: 'fix',
-        "description": "PixiJS alphaMode null crash from stale thumbnail textures"
-      },
-      {
-        type: 'fix',
-        "description": "BindingError in SIDSubsongAndInfo component"
-      },
-      {
-        type: 'feature',
-        "description": "Clickable discography tunes + hide empty photo container"
-      },
-      {
-        type: 'fix',
-        "description": "New button not working in GL UI"
-      },
-      {
-        type: 'fix',
-        "description": "Duplicate Modland toast, AudioContext mismatch crash, SID engine in import"
-      },
-      {
-        type: 'feature',
-        "description": "Add SID engine selector dropdown to SID info modal"
-      },
-      {
-        type: 'feature',
-        "description": "Add init presets for all synth types"
-      },
-      {
-        type: 'fix',
-        "description": "Defer PixiSelect open to avoid BindingError during event dispatch"
-      },
-      {
-        type: 'fix',
-        "description": "Null-guard instrument.dispose() and remove unused import"
-      },
-      {
-        type: 'feature',
-        "description": "Complete starter instrument coverage for all system presets"
-      },
-      {
-        type: 'fix',
-        "description": "Resolve 10 TypeScript compilation errors"
-      },
-      {
-        type: 'fix',
-        "description": "Switch to tracker view after loading GoatTracker .sng"
-      },
-      {
-        type: 'feature',
-        "description": "Add starter instruments for all Furnace chip presets"
-      },
-      {
-        type: 'fix',
-        "description": "Replace hardcoded red colors with theme colors in dialogs"
-      },
-      {
-        type: 'fix',
-        "description": "Preset instruments not loading in New Song wizard"
-      },
-      {
-        type: 'fix',
-        "description": "Remove icon from New button in toolbar"
-      },
-      {
-        type: 'feature',
-        "description": "Improve New Song wizard — taller modal, search filter, A-Z sorting"
-      }
-    ]
-  },
-  {
-    version: '2026-03-03',
-    date: '2026-03-03',
-    changes: [
-      {
-        type: 'fix',
-        "description": "Sync DOM/GL tracker state via useUIStore"
-      },
-      {
-        type: 'fix',
-        "description": "GT Ultra view stuck initializing when loading .sng files"
-      },
-      {
-        type: 'fix',
-        "description": "NewSongWizard hooks order — move useCallback before early return"
-      },
-      {
-        type: 'feature',
-        "description": "Remove compact toolbar option from both UIs"
-      },
-      {
-        type: 'fix',
-        "description": "PixiJS render crashes on Exposé toggle"
-      },
-      {
-        type: 'feature',
-        "description": "Big SID info modal with full DeepSID metadata"
-      },
-      {
-        type: 'fix',
-        "description": "SID files use C64SID synthType instead of Furnace"
-      },
-      {
-        type: 'fix',
-        "description": "Scale up GL instrument list — larger fonts and row height"
-      },
-      {
-        type: 'fix',
-        "description": "TypeScript errors — add 'studio' to ViewType, fix implicit any"
-      },
-      {
-        type: 'feature',
-        "description": "Add Inst FX button to GL toolbar"
-      },
-      {
-        type: 'fix',
-        "description": "HVSC search input keyboard protection + vertical action bar buttons"
-      },
-      {
-        type: 'fix',
-        "description": "GL pattern editor visual issues"
-      },
-      {
-        type: 'fix',
-        "description": "Improve GL instrument list to match DOM quality"
-      },
-      {
-        type: 'fix',
-        "description": "HVSC download paths and directory browsing"
-      },
-      {
-        type: 'feature',
-        "description": "Integrate fontaudio icon font for GL view icons"
-      },
-      {
-        type: 'fix',
-        "description": "Load Noto Sans Symbols 2 web font for GL icon rendering"
-      },
-      {
-        type: 'fix',
-        "description": "Allow typing in GL view input fields"
-      },
-      {
-        type: 'fix',
-        "description": "Use string ranges for bitmap font chars (matches PixiJS API)"
-      },
-      {
-        type: 'fix',
-        "description": "Add unicode symbols to GL bitmap font character set"
-      },
-      {
-        type: 'fix',
-        "description": "Status bar text overlap + LOAD opens full file browser in GL mode"
-      },
-      {
-        type: 'fix',
-        "description": "Eliminate trackpad momentum/easing in pattern editor scroll"
-      },
-      {
-        type: 'fix',
-        "description": "Remove duplicate MASTER heading, top-align VU meters in mixer"
-      },
-      {
-        type: 'fix',
-        "description": "Bottom-align master strip with channel strips in mixer view"
-      },
-      {
-        type: 'feature',
-        "description": "Remove bottom dock, integrate Device/Master FX into mixer view"
       }
     ]
   }

@@ -113,11 +113,18 @@ function getChipName(id: number): string {
   return CHIP_NAMES[id] ?? `Chip 0x${id.toString(16).toUpperCase()}`;
 }
 
+/** Pre-blend two 0xRRGGBB colours at a given alpha (for semi-transparent backgrounds). */
+function blendColor(base: number, overlay: number, alpha: number): number {
+  const r1 = (base >> 16) & 0xFF, g1 = (base >> 8) & 0xFF, b1 = base & 0xFF;
+  const r2 = (overlay >> 16) & 0xFF, g2 = (overlay >> 8) & 0xFF, b2 = overlay & 0xFF;
+  return (Math.round(r1 + (r2 - r1) * alpha) << 16) | (Math.round(g1 + (g2 - g1) * alpha) << 8) | Math.round(b1 + (b2 - b1) * alpha);
+}
+
 // ── Layout constants ───────────────────────────────────────────────────────────
 
 const MODAL_W = 500;
 const MODAL_H = 520;
-const CONTENT_W = MODAL_W - 26;
+const CONTENT_W = MODAL_W - 34;
 const CHIP_ROW_H = 20;
 const STAT_CELL_W = Math.floor(CONTENT_W / 3) - 8;
 
@@ -218,16 +225,18 @@ export const PixiImportFurnaceDialog: React.FC<PixiImportFurnaceDialogProps> = (
     label: `${i + 1}. ${ss.name || `Subsong ${i + 1}`}${i === 0 ? ' (default)' : ''}`,
   }));
 
+  const accentBg = blendColor(theme.bg.color, theme.accent.color, 0.2);
+
   return (
     <PixiModal isOpen={isOpen} onClose={handleClose} width={MODAL_W} height={MODAL_H}>
       <PixiModalHeader title="Import Furnace Module" onClose={handleClose} width={MODAL_W} />
 
-      <layoutContainer layout={{ flex: 1, padding: 12, flexDirection: 'column', gap: 10, overflow: 'hidden' }}>
+      <layoutContainer layout={{ flex: 1, padding: 16, flexDirection: 'column', gap: 16, overflow: 'hidden' }}>
 
         {/* Loading state */}
         {isLoading && (
           <layoutContainer layout={{ alignItems: 'center', justifyContent: 'center', height: 60 }}>
-            <PixiLabel text="Parsing Furnace file…" size="sm" color="textMuted" />
+            <PixiLabel text="Parsing Furnace file…" size="md" color="textMuted" />
           </layoutContainer>
         )}
 
@@ -238,7 +247,7 @@ export const PixiImportFurnaceDialog: React.FC<PixiImportFurnaceDialogProps> = (
               flexDirection: 'row',
               alignItems: 'center',
               gap: 8,
-              padding: 10,
+              padding: 12,
               borderRadius: 6,
               borderWidth: 1,
               backgroundColor: 0x3B1515,
@@ -246,8 +255,8 @@ export const PixiImportFurnaceDialog: React.FC<PixiImportFurnaceDialogProps> = (
               width: CONTENT_W,
             }}
           >
-            <PixiLabel text="⚠" size="sm" color="error" />
-            <PixiLabel text={error} size="xs" color="error" layout={{ maxWidth: CONTENT_W - 40 }} />
+            <PixiLabel text="⚠" size="md" color="error" />
+            <PixiLabel text={error} size="md" color="error" layout={{ maxWidth: CONTENT_W - 40 }} />
           </layoutContainer>
         )}
 
@@ -257,15 +266,17 @@ export const PixiImportFurnaceDialog: React.FC<PixiImportFurnaceDialogProps> = (
             layout={{
               alignItems: 'center',
               justifyContent: 'center',
-              height: 80,
+              padding: 32,
+              flexDirection: 'column',
+              gap: 8,
               borderWidth: 2,
               borderColor: theme.border.color,
               borderRadius: 8,
               width: CONTENT_W,
             }}
           >
-            <PixiLabel text="Drop a .fur or .dmf file to import" size="sm" color="textMuted" />
-            <PixiLabel text="Furnace tracker and DefleMask modules" size="xs" color="textMuted" />
+            <PixiLabel text="Drop a .fur or .dmf file to import" size="md" color="text" />
+            <PixiLabel text="Furnace tracker and DefleMask modules" size="sm" color="textMuted" />
           </layoutContainer>
         )}
 
@@ -276,8 +287,8 @@ export const PixiImportFurnaceDialog: React.FC<PixiImportFurnaceDialogProps> = (
             <layoutContainer
               layout={{
                 flexDirection: 'column',
-                gap: 6,
-                padding: 12,
+                gap: 12,
+                padding: 16,
                 borderRadius: 8,
                 borderWidth: 1,
                 backgroundColor: theme.bg.color,
@@ -286,35 +297,35 @@ export const PixiImportFurnaceDialog: React.FC<PixiImportFurnaceDialogProps> = (
               }}
             >
               {/* Title row */}
-              <layoutContainer layout={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: CONTENT_W - 24 }}>
+              <layoutContainer layout={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: CONTENT_W - 32 }}>
                 <layoutContainer layout={{ flexDirection: 'column', gap: 2, flexShrink: 1 }}>
                   <PixiLabel
                     text={module.name || moduleFile?.name.replace(/\.[^/.]+$/, '') || 'Untitled'}
-                    size="sm"
-                    weight="semibold"
+                    size="lg"
+                    weight="medium"
                     color="text"
                   />
                   {module.author ? (
-                    <PixiLabel text={`by ${module.author}`} size="xs" color="textMuted" />
+                    <PixiLabel text={`by ${module.author}`} size="sm" color="textMuted" />
                   ) : null}
                 </layoutContainer>
                 <layoutContainer
                   layout={{
-                    paddingLeft: 6,
-                    paddingRight: 6,
+                    paddingLeft: 8,
+                    paddingRight: 8,
                     paddingTop: 2,
                     paddingBottom: 2,
                     borderRadius: 4,
-                    backgroundColor: theme.accent.color,
+                    backgroundColor: accentBg,
                   }}
                 >
-                  <PixiLabel text={`Furnace v${module.version}`} size="xs" weight="semibold" color="text" />
+                  <PixiLabel text={`Furnace v${module.version}`} size="sm" color="accent" />
                 </layoutContainer>
               </layoutContainer>
 
               {/* Chip / system badges */}
               {module.systems.length > 0 && (
-                <layoutContainer layout={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4, width: CONTENT_W - 24 }}>
+                <layoutContainer layout={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, width: CONTENT_W - 32 }}>
                   {module.systems.map((chipId, i) => {
                     const chanLabel = module.systemChans[i] ? ` ${module.systemChans[i]}ch` : '';
                     return (
@@ -325,15 +336,15 @@ export const PixiImportFurnaceDialog: React.FC<PixiImportFurnaceDialogProps> = (
                           alignItems: 'center',
                           gap: 4,
                           height: CHIP_ROW_H,
-                          paddingLeft: 6,
-                          paddingRight: 6,
+                          paddingLeft: 8,
+                          paddingRight: 8,
                           borderRadius: 4,
                           borderWidth: 1,
                           backgroundColor: theme.bgSecondary.color,
                           borderColor: theme.border.color,
                         }}
                       >
-                        <PixiLabel text={getChipName(chipId) + chanLabel} size="xs" color="text" />
+                        <PixiLabel text={getChipName(chipId) + chanLabel} size="sm" color="text" />
                       </layoutContainer>
                     );
                   })}
@@ -341,32 +352,32 @@ export const PixiImportFurnaceDialog: React.FC<PixiImportFurnaceDialogProps> = (
               )}
 
               {/* Stats grid (3 columns) */}
-              <layoutContainer layout={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, width: CONTENT_W - 24 }}>
+              <layoutContainer layout={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, width: CONTENT_W - 32 }}>
                 <layoutContainer layout={{ flexDirection: 'column', width: STAT_CELL_W }}>
-                  <PixiLabel text="Channels" size="xs" color="textMuted" />
-                  <PixiLabel text={String(module.chans)} size="xs" font="mono" color="text" />
+                  <PixiLabel text="Channels" size="sm" color="textMuted" />
+                  <PixiLabel text={String(module.chans)} size="sm" font="mono" color="text" />
                 </layoutContainer>
                 <layoutContainer layout={{ flexDirection: 'column', width: STAT_CELL_W }}>
-                  <PixiLabel text="Instruments" size="xs" color="textMuted" />
-                  <PixiLabel text={String(module.instruments.length)} size="xs" font="mono" color="text" />
+                  <PixiLabel text="Instruments" size="sm" color="textMuted" />
+                  <PixiLabel text={String(module.instruments.length)} size="sm" font="mono" color="text" />
                 </layoutContainer>
                 <layoutContainer layout={{ flexDirection: 'column', width: STAT_CELL_W }}>
-                  <PixiLabel text="Samples" size="xs" color="textMuted" />
-                  <PixiLabel text={String(module.samples.length)} size="xs" font="mono" color="text" />
+                  <PixiLabel text="Samples" size="sm" color="textMuted" />
+                  <PixiLabel text={String(module.samples.length)} size="sm" font="mono" color="text" />
                 </layoutContainer>
                 <layoutContainer layout={{ flexDirection: 'column', width: STAT_CELL_W }}>
-                  <PixiLabel text="Subsongs" size="xs" color="textMuted" />
-                  <PixiLabel text={String(module.subsongs.length)} size="xs" font="mono" color="text" />
+                  <PixiLabel text="Subsongs" size="sm" color="textMuted" />
+                  <PixiLabel text={String(module.subsongs.length)} size="sm" font="mono" color="text" />
                 </layoutContainer>
                 {subsong && (
                   <>
                     <layoutContainer layout={{ flexDirection: 'column', width: STAT_CELL_W }}>
-                      <PixiLabel text="Pattern len" size="xs" color="textMuted" />
-                      <PixiLabel text={`${subsong.patLen} rows`} size="xs" font="mono" color="text" />
+                      <PixiLabel text="Pattern len" size="sm" color="textMuted" />
+                      <PixiLabel text={`${subsong.patLen} rows`} size="sm" font="mono" color="text" />
                     </layoutContainer>
                     <layoutContainer layout={{ flexDirection: 'column', width: STAT_CELL_W }}>
-                      <PixiLabel text="BPM" size="xs" color="textMuted" />
-                      <PixiLabel text={`${bpm} @ ${subsong.hz}Hz`} size="xs" font="mono" color="text" />
+                      <PixiLabel text="BPM" size="sm" color="textMuted" />
+                      <PixiLabel text={`${bpm} @ ${subsong.hz}Hz`} size="sm" font="mono" color="text" />
                     </layoutContainer>
                   </>
                 )}
@@ -376,17 +387,17 @@ export const PixiImportFurnaceDialog: React.FC<PixiImportFurnaceDialogProps> = (
               {module.comment ? (
                 <layoutContainer
                   layout={{
-                    padding: 6,
+                    padding: 8,
                     borderRadius: 4,
                     borderWidth: 1,
                     backgroundColor: theme.bgSecondary.color,
                     borderColor: theme.border.color,
-                    width: CONTENT_W - 24,
+                    width: CONTENT_W - 32,
                     maxHeight: 60,
                     overflow: 'hidden',
                   }}
                 >
-                  <PixiLabel text={module.comment} size="xs" font="mono" color="textMuted" />
+                  <PixiLabel text={module.comment} size="sm" font="mono" color="textMuted" />
                 </layoutContainer>
               ) : null}
             </layoutContainer>
@@ -396,7 +407,7 @@ export const PixiImportFurnaceDialog: React.FC<PixiImportFurnaceDialogProps> = (
               <layoutContainer
                 layout={{
                   flexDirection: 'column',
-                  gap: 6,
+                  gap: 8,
                   padding: 12,
                   borderRadius: 8,
                   borderWidth: 1,
@@ -405,7 +416,7 @@ export const PixiImportFurnaceDialog: React.FC<PixiImportFurnaceDialogProps> = (
                   width: CONTENT_W,
                 }}
               >
-                <PixiLabel text="Import Subsong" size="xs" weight="semibold" color="text" />
+                <PixiLabel text="Import Subsong" size="sm" weight="medium" color="text" />
                 <PixiSelect
                   options={subsongOptions}
                   value={String(selectedSubsong)}
@@ -413,7 +424,7 @@ export const PixiImportFurnaceDialog: React.FC<PixiImportFurnaceDialogProps> = (
                   width={CONTENT_W - 24}
                 />
                 {subsong?.comment ? (
-                  <PixiLabel text={subsong.comment} size="xs" color="textMuted" />
+                  <PixiLabel text={subsong.comment} size="sm" color="textMuted" />
                 ) : null}
               </layoutContainer>
             )}
@@ -432,8 +443,8 @@ export const PixiImportFurnaceDialog: React.FC<PixiImportFurnaceDialogProps> = (
                   overflow: 'hidden',
                 }}
               >
-                <layoutContainer layout={{ paddingLeft: 12, paddingTop: 8 }}>
-                  <PixiLabel text={`Instruments (${module.instruments.length})`} size="xs" weight="semibold" color="text" />
+                <layoutContainer layout={{ paddingLeft: 16, paddingTop: 8 }}>
+                  <PixiLabel text={`Instruments (${module.instruments.length})`} size="sm" weight="medium" color="text" />
                 </layoutContainer>
                 <PixiScrollView
                   width={CONTENT_W - 2}
@@ -454,12 +465,12 @@ export const PixiImportFurnaceDialog: React.FC<PixiImportFurnaceDialogProps> = (
                       >
                         <PixiLabel
                           text={String(i).padStart(2, '0')}
-                          size="xs"
+                          size="sm"
                           font="mono"
                           color="textMuted"
                           layout={{ width: 20 }}
                         />
-                        <PixiLabel text={ins.name || `Instrument ${i}`} size="xs" color="text" />
+                        <PixiLabel text={ins.name || `Instrument ${i}`} size="sm" color="text" />
                       </layoutContainer>
                     ))}
                   </layoutContainer>
@@ -470,7 +481,7 @@ export const PixiImportFurnaceDialog: React.FC<PixiImportFurnaceDialogProps> = (
             {/* Info note */}
             <PixiLabel
               text="Furnace files are imported using the native parser. Chip-specific instruments are preserved."
-              size="xs"
+              size="sm"
               color="textMuted"
               layout={{ width: CONTENT_W }}
             />

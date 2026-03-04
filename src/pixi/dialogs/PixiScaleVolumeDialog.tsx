@@ -31,7 +31,7 @@ export const PixiScaleVolumeDialog: React.FC<PixiScaleVolumeDialogProps> = ({ is
     <PixiModal isOpen={isOpen} onClose={onClose} width={260} height={200}>
       <PixiModalHeader title="Scale Volume" onClose={onClose} />
 
-      <layoutContainer layout={{ flex: 1, padding: 12, flexDirection: 'column', gap: 12, alignItems: 'center' }}>
+      <layoutContainer layout={{ flex: 1, padding: 16, flexDirection: 'column', gap: 12, alignItems: 'center' }}>
         <PixiKnob
           value={scale}
           min={0}

@@ -1,6 +1,6 @@
 /**
  * PixiRevisionBrowserDialog — GL-native dialog for browsing/restoring local IndexedDB song revisions.
- * Reference: src/components/dialogs/RevisionBrowserDialog.tsx
+ * Matches DOM: src/components/dialogs/RevisionBrowserDialog.tsx
  */
 
 import React, { useEffect, useState, useCallback } from 'react';
@@ -16,7 +16,7 @@ interface PixiRevisionBrowserDialogProps {
 }
 
 const MODAL_W = 440;
-const MODAL_H = 480;
+const MODAL_H = 520;
 
 const formatDate = (iso: string) => new Date(iso).toLocaleString();
 
@@ -66,62 +66,62 @@ export const PixiRevisionBrowserDialog: React.FC<PixiRevisionBrowserDialogProps>
 
   return (
     <PixiModal isOpen={isOpen} onClose={onClose} width={MODAL_W} height={MODAL_H}>
-      <PixiModalHeader title="Local Revisions" width={MODAL_W} onClose={onClose} />
+      <PixiModalHeader title="Local Revisions" onClose={onClose} />
 
-      {/* Content area */}
-      <layoutContainer layout={{ flex: 1, flexDirection: 'column', padding: 12, overflow: 'scroll' }}>
+      {/* Content area — matches DOM flex-1 overflow-y-auto p-4 (padding:16) */}
+      <layoutContainer layout={{ flex: 1, flexDirection: 'column', padding: 16, overflow: 'scroll' }}>
         {loading ? (
           /* Loading indicator */
-          <layoutContainer layout={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 48 }}>
-            <PixiLabel text="Loading revisions…" size="xs" color="textMuted" />
+          <layoutContainer layout={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 32 }}>
+            <PixiLabel text="Loading revisions…" size="sm" color="textMuted" font="sans" />
           </layoutContainer>
         ) : revisions.length === 0 ? (
-          /* Empty state */
-          <layoutContainer layout={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 48, gap: 6 }}>
-            <PixiLabel text="No revisions yet." size="sm" color="textMuted" />
-            <PixiLabel text="Revisions are created automatically when you save." size="xs" color="textMuted" />
+          /* Empty state — matches DOM text-center py-8 */
+          <layoutContainer layout={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 32, gap: 8 }}>
+            <PixiLabel text="No revisions yet." size="sm" color="textMuted" font="sans" />
+            <PixiLabel text="Revisions are created automatically when you save." size="xs" color="textMuted" font="sans" />
           </layoutContainer>
         ) : (
-          /* Revision cards */
-          <layoutContainer layout={{ flexDirection: 'column', gap: 6 }}>
+          /* Revision cards — matches DOM space-y-2 (gap:8) */
+          <layoutContainer layout={{ flexDirection: 'column', gap: 8 }}>
             {revisions.map((rev) => (
               <layoutContainer
                 key={rev.key}
                 layout={{
                   flexDirection: 'row',
                   alignItems: 'center',
-                  padding: 10,
+                  justifyContent: 'space-between',
+                  padding: 12,
                   borderRadius: 6,
                   borderWidth: 1,
                   backgroundColor: theme.bgTertiary.color,
                   borderColor: theme.border.color,
-                  gap: 8,
                 }}
               >
-                {/* Info column */}
+                {/* Info column — matches DOM min-w-0 flex-1 */}
                 <layoutContainer layout={{ flex: 1, flexDirection: 'column', gap: 2 }}>
                   <pixiBitmapText
                     text={truncate(rev.name)}
-                    style={{ fontFamily: PIXI_FONTS.SANS_MEDIUM, fontSize: 12, fill: 0xffffff }}
+                    style={{ fontFamily: PIXI_FONTS.SANS_BOLD, fontSize: 12, fill: 0xffffff }}
                     tint={theme.text.color}
                     layout={{}}
                   />
                   <pixiBitmapText
                     text={formatDate(rev.savedAt)}
-                    style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }}
+                    style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 10, fill: 0xffffff }}
                     tint={theme.textMuted.color}
                     layout={{}}
                   />
                   <pixiBitmapText
                     text={`${rev.patternCount} pattern${rev.patternCount !== 1 ? 's' : ''}, ${rev.instrumentCount} instrument${rev.instrumentCount !== 1 ? 's' : ''}`}
-                    style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }}
+                    style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 10, fill: 0xffffff }}
                     tint={theme.textMuted.color}
                     layout={{}}
                   />
                 </layoutContainer>
 
-                {/* Action buttons */}
-                <layoutContainer layout={{ flexDirection: 'row', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+                {/* Action buttons — matches DOM flex items-center gap-1 ml-2 */}
+                <layoutContainer layout={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginLeft: 8, flexShrink: 0 }}>
                   {confirmRestore === rev.key ? (
                     <>
                       <PixiButton
@@ -130,7 +130,7 @@ export const PixiRevisionBrowserDialog: React.FC<PixiRevisionBrowserDialogProps>
                         size="sm"
                         onClick={() => handleRestore(rev.key)}
                         width={64}
-                        height={24}
+                        height={28}
                       />
                       <PixiButton
                         label="Cancel"
@@ -138,7 +138,7 @@ export const PixiRevisionBrowserDialog: React.FC<PixiRevisionBrowserDialogProps>
                         size="sm"
                         onClick={() => setConfirmRestore(null)}
                         width={52}
-                        height={24}
+                        height={28}
                       />
                     </>
                   ) : (
@@ -149,15 +149,15 @@ export const PixiRevisionBrowserDialog: React.FC<PixiRevisionBrowserDialogProps>
                         size="sm"
                         onClick={() => setConfirmRestore(rev.key)}
                         width={64}
-                        height={24}
+                        height={28}
                       />
                       <PixiButton
                         label="x"
                         variant="danger"
                         size="sm"
                         onClick={() => handleDelete(rev.key)}
-                        width={24}
-                        height={24}
+                        width={28}
+                        height={28}
                       />
                     </>
                   )}
@@ -168,13 +168,13 @@ export const PixiRevisionBrowserDialog: React.FC<PixiRevisionBrowserDialogProps>
         )}
       </layoutContainer>
 
-      {/* Footer */}
-      <PixiModalFooter width={MODAL_W}>
-        <pixiBitmapText
+      {/* Footer — matches DOM px-4 py-3 border-t text-xs text-text-muted */}
+      <PixiModalFooter align="left">
+        <PixiLabel
           text="Up to 50 revisions are kept. Restoring overwrites current project state."
-          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }}
-          tint={theme.textMuted.color}
-          layout={{ flex: 1 }}
+          size="xs"
+          color="textMuted"
+          font="sans"
         />
       </PixiModalFooter>
     </PixiModal>

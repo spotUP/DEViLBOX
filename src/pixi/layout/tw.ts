@@ -100,15 +100,18 @@ export function resolveTextColor(cls: string, theme: PixiTheme): number | undefi
 
 // Text size classes → font size in pixels
 export const TEXT_SIZE: Record<string, number> = {
-  'text-xs': 10,
-  'text-sm': 12,
-  'text-base': 14,
-  'text-lg': 17,
+  'text-xs': 12,
+  'text-sm': 14,
+  'text-base': 16,
+  'text-lg': 18,
   'text-xl': 21,
   'text-2xl': 26,
   'text-[10px]': 10,
   'text-[11px]': 11,
   'text-[12px]': 12,
+  'text-[14px]': 14,
+  'text-[16px]': 16,
+  'text-[18px]': 18,
 };
 
 /**

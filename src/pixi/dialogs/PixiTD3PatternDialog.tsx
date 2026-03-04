@@ -402,7 +402,7 @@ export const PixiTD3PatternDialog: React.FC<PixiTD3PatternDialogProps> = ({ isOp
       </layoutContainer>
 
       {/* Content */}
-      <layoutContainer layout={{ flex: 1, padding: 12, flexDirection: 'column', gap: 10, overflow: 'hidden' }}>
+      <layoutContainer layout={{ flex: 1, padding: 16, flexDirection: 'column', gap: 10, overflow: 'hidden' }}>
         {/* MIDI warning */}
         {!selectedOutputId && activeTab === 'export' && (
           <layoutContainer

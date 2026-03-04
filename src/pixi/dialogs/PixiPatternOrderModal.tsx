@@ -23,9 +23,9 @@ const CELL_W = 52;
 const CELL_H = 44;
 const GAP = 4;
 const COLS = 10;
-const PADDING = 12;
-const TOOLBAR_H = 36;
-const HELP_H = 28;
+const PADDING = 16;
+const TOOLBAR_H = 44;
+const HELP_H = 38;
 const HEADER_H = 36;
 const FOOTER_H = 0; // no footer, buttons in toolbar
 const GRID_W = MODAL_W - PADDING * 2;
@@ -129,7 +129,7 @@ export const PixiPatternOrderModal: React.FC<PixiPatternOrderModalProps> = ({
             height: TOOLBAR_H,
             flexDirection: 'row',
             alignItems: 'center',
-            gap: 6,
+            gap: 8,
             paddingLeft: PADDING,
             paddingRight: PADDING,
             backgroundColor: theme.bgTertiary.color,
@@ -285,7 +285,7 @@ export const PixiPatternOrderModal: React.FC<PixiPatternOrderModalProps> = ({
               ? 'Per-channel track table (read-only)'
               : 'Click: Select · Drag: Reorder · Shift+Click: Duplicate · Ctrl+Click: Remove'
           }
-          size="xs"
+          size="sm"
           color="textMuted"
         />
       </layoutContainer>
