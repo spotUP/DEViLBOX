@@ -20,6 +20,14 @@ import type { FurnaceConfig } from '@typedefs/instrument';
 import { FurnaceChipType } from '@engine/chips/FurnaceChipEngine';
 import { getToneEngine } from '@engine/ToneEngine';
 
+// DivInstrumentType constants (matching FurnaceInstrumentEncoder)
+const DIV_INS_FM = 1;
+const DIV_INS_OPM = 33;
+const DIV_INS_OPL = 14;
+const DIV_INS_OPLL = 13;
+const DIV_INS_OPZ = 19;
+const DIV_INS_ESFM = 55;
+
 /** Channel names for each platform */
 const PLATFORM_CHANNELS: Record<number, string[]> = {
   [FurnaceDispatchPlatform.GB]: ['PU1', 'PU2', 'WAV', 'NOI'],
@@ -84,6 +92,10 @@ const PLATFORM_VOL_MAX: Record<number, number> = {
   [FurnaceDispatchPlatform.MMC5]: 15,
   [FurnaceDispatchPlatform.SWAN]: 15,
   [FurnaceDispatchPlatform.LYNX]: 127,     // 7-bit volume
+  [FurnaceDispatchPlatform.VERA]: 63,      // 6-bit volume (PSG channels)
+  [FurnaceDispatchPlatform.SNES]: 127,     // 7-bit volume (SPC700)
+  [FurnaceDispatchPlatform.NDS]: 127,      // 7-bit volume
+  [FurnaceDispatchPlatform.GBA_DMA]: 255,  // 8-bit volume
 };
 
 function getMaxVolume(platform: number): number {
@@ -323,6 +335,47 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
         this.setupDefaultGBInstrument();
         break;
 
+      // === FM chips need a playable default instrument ===
+      // Without explicit FM operator data, the WASM default instrument has AR=0
+      // (no attack envelope) → silence. Upload a basic electric piano patch.
+      case P.GENESIS:
+      case P.GENESIS_EXT:
+      case P.YM2203:
+      case P.YM2203_EXT:
+      case P.YM2608:
+      case P.YM2608_EXT:
+      case P.YM2610:
+      case P.YM2610_EXT:
+      case P.YM2610B:
+      case P.YM2610B_EXT:
+        this.setupDefaultFMInstrument(DIV_INS_FM);
+        break;
+      case P.ARCADE:
+        this.setupDefaultFMInstrument(DIV_INS_OPM);
+        break;
+      case P.OPL:
+      case P.OPL2:
+      case P.OPL3:
+      case P.OPL2_DRUMS:
+      case P.OPL3_DRUMS:
+      case P.Y8950:
+      case P.Y8950_DRUMS:
+      case P.OPL4:
+      case P.OPL4_DRUMS:
+        this.setupDefaultFMInstrument(DIV_INS_OPL);
+        break;
+      case P.OPLL:
+      case P.OPLL_DRUMS:
+      case P.VRC7:
+        this.setupDefaultOPLLInstrument();
+        break;
+      case P.OPZ:
+        this.setupDefaultFMInstrument(DIV_INS_OPZ);
+        break;
+      case P.ESFM:
+        this.setupDefaultFMInstrument(DIV_INS_ESFM);
+        break;
+
       // === C64 SID needs waveform in instrument ===
       case P.C64_6581:
       case P.C64_8580:
@@ -436,6 +489,17 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
       // giving mTapSelector=1 → alternating ±output → audible square wave.
       case P.LYNX:
         this.setupDefaultLynxInstrument();
+        break;
+
+      // === Commander X16 VERA PSG: needs waveform set (default is 0 after reset) ===
+      // VERA PSG has 4 waveforms: 0=pulse, 1=sawtooth, 2=triangle, 3=noise
+      // Without an explicit WAVE command, the waveform register is 0 (pulse) which
+      // should work, but we need to ensure the duty cycle is also set.
+      // VERA dispatch uses STD_NOISE_MODE for panning/enable and WAVE for waveform.
+      case P.VERA:
+        for (let ch = 0; ch < Math.min(numCh, 16); ch++) {
+          disp(DivCmd.WAVE, ch, 0, 0); // Pulse waveform
+        }
         break;
     }
 
@@ -565,6 +629,80 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
   }
 
   /**
+   * Set up a default FM instrument (OPN2/OPM/OPL/OPZ/ESFM).
+   * Without this, the WASM default has AR=0 → envelope never opens → silence.
+   */
+  private setupDefaultFMInstrument(insType: number): void {
+    const pt = this.platformType;
+    const numCh = this.engine.getChannelCount(pt) || 6;
+
+    // Basic electric piano: algorithm 4 (parallel carriers), moderate feedback
+    const config: FurnaceConfig = {
+      chipType: insType === DIV_INS_OPM ? 1 : insType === DIV_INS_OPL ? 2 : insType === DIV_INS_OPZ ? 22 : insType === DIV_INS_ESFM ? 49 : 0,
+      algorithm: insType === DIV_INS_OPL ? 0 : 4,
+      feedback: 4,
+      fms: 0, ams: 0, fms2: 0, ams2: 0,
+      ops: insType === DIV_INS_OPL ? 2 : 4,
+      opllPreset: 0, fixedDrums: false,
+      operators: insType === DIV_INS_OPL ? [
+        // 2-op OPL: modulator + carrier
+        { enabled: true, mult: 2, tl: 30, ar: 15, dr: 4, d2r: 0, sl: 4, rr: 8, dt: 0, am: false },
+        { enabled: true, mult: 1, tl: 0, ar: 15, dr: 6, d2r: 0, sl: 2, rr: 8, dt: 0, am: false },
+      ] : [
+        // 4-op FM: two modulators + two carriers
+        { enabled: true, mult: 2, tl: 40, ar: 31, dr: 8, d2r: 2, sl: 4, rr: 6, dt: 0, am: false },
+        { enabled: true, mult: 1, tl: 50, ar: 28, dr: 6, d2r: 2, sl: 4, rr: 6, dt: 0, am: false },
+        { enabled: true, mult: 1, tl: 0, ar: 31, dr: 10, d2r: 4, sl: 2, rr: 6, dt: 0, am: false },
+        { enabled: true, mult: 1, tl: 0, ar: 31, dr: 8, d2r: 3, sl: 3, rr: 5, dt: 0, am: false },
+      ],
+      macros: [],
+      opMacros: Array.from({ length: insType === DIV_INS_OPL ? 2 : 4 }, () => ({})),
+      wavetables: [],
+    };
+
+    const binaryData = encodeFurnaceInstrument(config, 'Default FM');
+    this.engine.uploadFurnaceInstrument(0, binaryData, pt);
+
+    for (let ch = 0; ch < numCh; ch++) {
+      this.engine.setInstrument(ch, 0, pt);
+      this.engine.setVolume(ch, getMaxVolume(pt), pt);
+    }
+  }
+
+  /**
+   * Set up a default OPLL/VRC7 instrument using built-in preset 1 (violin).
+   * OPLL is 2-op and has 15 built-in ROM patches. Using a preset is more
+   * reliable than custom patch data which requires specific register format.
+   */
+  private setupDefaultOPLLInstrument(): void {
+    const pt = this.platformType;
+    const numCh = this.engine.getChannelCount(pt) || 9;
+
+    const config: FurnaceConfig = {
+      chipType: 11, // OPLL
+      algorithm: 0, feedback: 0, fms: 0, ams: 0, fms2: 0, ams2: 0,
+      ops: 2, opllPreset: 1, fixedDrums: false, // Preset 1 = violin
+      operators: [
+        // Modulator
+        { enabled: true, mult: 1, tl: 20, ar: 15, dr: 5, d2r: 0, sl: 2, rr: 7, dt: 0, am: false },
+        // Carrier
+        { enabled: true, mult: 1, tl: 0, ar: 15, dr: 7, d2r: 0, sl: 3, rr: 7, dt: 0, am: false },
+      ],
+      macros: [],
+      opMacros: [{}, {}],
+      wavetables: [],
+    };
+
+    const binaryData = encodeFurnaceInstrument(config, 'Default OPLL');
+    this.engine.uploadFurnaceInstrument(0, binaryData, pt);
+
+    for (let ch = 0; ch < numCh; ch++) {
+      this.engine.setInstrument(ch, 0, pt);
+      this.engine.setVolume(ch, getMaxVolume(pt), pt);
+    }
+  }
+
+  /**
    * Set up a default wavetable (sawtooth) for wavetable-based chips.
    * @param waveLen - Number of samples (typically 32 or 64)
    * @param waveMax - Maximum value (depends on chip bit depth)
@@ -659,12 +797,12 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
     const header = this.buildSampleHeader(sampleLen, 9 /* DIV_SAMPLE_DEPTH_BRR */, 8363);
     new Uint8Array(data.buffer, 0, headerSize).set(new Uint8Array(header.buffer));
     // BRR encoding: header byte sets range/filter/loop/end flags
-    // Simple approach: range=12 (max shift), filter=0 (no filter)
+    // Use range=10 to avoid clipping (range=12 at ±7/8 = near full-scale 16-bit)
     for (let b = 0; b < numBlocks; b++) {
       const offset = headerSize + b * brrBlockSize;
-      // Header: range=12 (bits 4-7), filter=0 (bits 2-3), loop=1 (bit 1), end=last block (bit 0)
+      // Header: range=10 (bits 4-7), filter=0 (bits 2-3), loop=1 (bit 1), end=last block (bit 0)
       const isLast = b === numBlocks - 1;
-      data[offset] = (12 << 4) | (0 << 2) | (1 << 1) | (isLast ? 1 : 0);
+      data[offset] = (10 << 4) | (0 << 2) | (1 << 1) | (isLast ? 1 : 0);
       // 8 data bytes, each has two 4-bit nibbles (high=sample N, low=sample N+1)
       // For a square wave: first 8 samples positive (+7), next 8 negative (-8)
       for (let i = 0; i < 8; i++) {
