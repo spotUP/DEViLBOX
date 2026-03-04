@@ -191,3 +191,157 @@ export function getComposerPhotoUrl(photoUrl: string | null): string | null {
   // photoUrl is already a relative API path like /api/deepsid/image/composers/xxx.jpg
   return `${API_URL.replace('/api', '')}${photoUrl}`;
 }
+
+// ── Search API ──────────────────────────────────────────────────────────────
+
+export type SearchCategory = 'all' | 'filename' | 'author' | 'copyright' | 'player' | 'type' | 'tags' | 'stil' | 'country';
+
+export interface SearchResult {
+  composers: {
+    id: number;
+    fullname: string;
+    name: string;
+    handles: string;
+    country: string;
+    notable: string;
+  }[];
+  files: {
+    id: number;
+    path: string;
+    filename: string;
+    name: string;
+    author: string;
+    player: string;
+    sidModel?: string;
+    subtunes?: number;
+  }[];
+  total: number;
+}
+
+export async function searchDeepSID(opts: {
+  query: string;
+  category?: SearchCategory;
+  sort?: 'relevance' | 'name' | 'author';
+  scope?: string;
+  limit?: number;
+  offset?: number;
+}): Promise<SearchResult> {
+  try {
+    const params = new URLSearchParams({ q: opts.query });
+    if (opts.category && opts.category !== 'all') params.set('category', opts.category);
+    if (opts.sort && opts.sort !== 'relevance') params.set('sort', opts.sort);
+    if (opts.scope) params.set('scope', opts.scope);
+    if (opts.limit) params.set('limit', String(opts.limit));
+    if (opts.offset) params.set('offset', String(opts.offset));
+
+    const res = await fetch(`${API_URL}/deepsid/search?${params}`);
+    if (!res.ok) return { composers: [], files: [], total: 0 };
+    return res.json();
+  } catch {
+    return { composers: [], files: [], total: 0 };
+  }
+}
+
+// ── Tag Management API ──────────────────────────────────────────────────────
+
+export interface TagInfo {
+  id: number;
+  name: string;
+  type: string;
+  count?: number;
+}
+
+/** Get all available tags */
+export async function fetchAllTags(): Promise<TagInfo[]> {
+  try {
+    const res = await fetch(`${API_URL}/deepsid/tags`);
+    if (!res.ok) return [];
+    return res.json();
+  } catch {
+    return [];
+  }
+}
+
+/** Get tags for a specific file */
+export async function fetchFileTags(fileId: number): Promise<TagInfo[]> {
+  try {
+    const res = await fetch(`${API_URL}/deepsid/tags/${fileId}`);
+    if (!res.ok) return [];
+    return res.json();
+  } catch {
+    return [];
+  }
+}
+
+/** Add a tag to a file */
+export async function addTagToFile(fileId: number, tagId: number): Promise<boolean> {
+  try {
+    const res = await fetch(`${API_URL}/deepsid/tags/${fileId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tagId }),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+/** Remove a tag from a file */
+export async function removeTagFromFile(fileId: number, tagId: number): Promise<boolean> {
+  try {
+    const res = await fetch(`${API_URL}/deepsid/tags/${fileId}/${tagId}`, {
+      method: 'DELETE',
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+/** Create a new tag */
+export async function createTag(name: string, type = 'music'): Promise<TagInfo | null> {
+  try {
+    const res = await fetch(`${API_URL}/deepsid/tags`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, type }),
+    });
+    if (!res.ok) return null;
+    return res.json();
+  } catch {
+    return null;
+  }
+}
+
+// ── Recommended API ─────────────────────────────────────────────────────────
+
+export interface RecommendedResult {
+  topTunes: {
+    id: number;
+    path: string;
+    filename: string;
+    name: string;
+    author: string;
+    player: string;
+    youtubeLinks: number;
+  }[];
+  notableComposers: {
+    id: number;
+    fullname: string;
+    name: string;
+    handles: string;
+    country: string;
+    notable: string;
+  }[];
+}
+
+export async function fetchRecommended(): Promise<RecommendedResult> {
+  try {
+    const res = await fetch(`${API_URL}/deepsid/recommended`);
+    if (!res.ok) return { topTunes: [], notableComposers: [] };
+    return res.json();
+  } catch {
+    return { topTunes: [], notableComposers: [] };
+  }
+}

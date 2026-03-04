@@ -30,9 +30,10 @@ import { SIDCSDbTab } from './sid/SIDCSDbTab';
 import { SIDGB64Tab } from './sid/SIDGB64Tab';
 import { SIDRemixTab } from './sid/SIDRemixTab';
 import { SIDSettingsTab } from './sid/SIDSettingsTab';
+import { SIDTagsTab } from './sid/SIDTagsTab';
 import { SIDTransportBar } from './sid/SIDTransportBar';
 
-type SIDTabId = 'profile' | 'scope' | 'stereo' | 'filter' | 'visuals' | 'stil' | 'player' | 'csdb' | 'gb64' | 'remix' | 'settings';
+type SIDTabId = 'profile' | 'scope' | 'stereo' | 'filter' | 'visuals' | 'stil' | 'player' | 'csdb' | 'gb64' | 'remix' | 'tags' | 'settings';
 
 const SID_TABS: { id: SIDTabId; label: string }[] = [
   { id: 'profile', label: 'Profile' },
@@ -45,6 +46,7 @@ const SID_TABS: { id: SIDTabId; label: string }[] = [
   { id: 'csdb', label: 'CSDb' },
   { id: 'gb64', label: 'GB64' },
   { id: 'remix', label: 'Remix' },
+  { id: 'tags', label: 'Tags' },
   { id: 'settings', label: 'Settings' },
 ];
 
@@ -612,6 +614,8 @@ export const SIDInfoModal: React.FC<SIDInfoModalProps> = ({ onClose }) => {
           <SIDRemixTab className="flex-1 p-4 overflow-y-auto" composerName={composer?.name || null} tuneName={sidMetadata.title || null} />
         ) : activeTab === 'settings' ? (
           <SIDSettingsTab className="flex-1 p-4 overflow-y-auto" />
+        ) : activeTab === 'tags' ? (
+          <SIDTagsTab className="flex-1 p-4 overflow-y-auto" fileId={fileInfo?.id ?? null} />
         ) : null}
       </div>
     </div>

@@ -39,6 +39,7 @@ import { SIDCSDbTab } from './sid/SIDCSDbTab';
 import { SIDGB64Tab } from './sid/SIDGB64Tab';
 import { SIDRemixTab } from './sid/SIDRemixTab';
 import { SIDSettingsTab } from './sid/SIDSettingsTab';
+import { SIDTagsTab } from './sid/SIDTagsTab';
 import { SIDTransportBar } from './sid/SIDTransportBar';
 
 interface PixiSIDInfoModalProps {
@@ -46,7 +47,7 @@ interface PixiSIDInfoModalProps {
   onClose: () => void;
 }
 
-type SIDTabId = 'profile' | 'scope' | 'stereo' | 'filter' | 'visuals' | 'stil' | 'player' | 'csdb' | 'gb64' | 'remix' | 'settings';
+type SIDTabId = 'profile' | 'scope' | 'stereo' | 'filter' | 'visuals' | 'stil' | 'player' | 'csdb' | 'gb64' | 'remix' | 'tags' | 'settings';
 
 const SID_TABS: { id: SIDTabId; label: string }[] = [
   { id: 'profile', label: 'Profile' },
@@ -59,6 +60,7 @@ const SID_TABS: { id: SIDTabId; label: string }[] = [
   { id: 'csdb', label: 'CSDb' },
   { id: 'gb64', label: 'GB64' },
   { id: 'remix', label: 'Remix' },
+  { id: 'tags', label: 'Tags' },
   { id: 'settings', label: 'Settings' },
 ];
 
@@ -939,6 +941,8 @@ export const PixiSIDInfoModal: React.FC<PixiSIDInfoModalProps> = ({ isOpen, onCl
         <SIDRemixTab width={W - 2} height={tabContentH} composerName={composer?.name || null} tuneName={sidMetadata.title || null} />
       ) : activeTab === 'settings' ? (
         <SIDSettingsTab width={W - 2} height={tabContentH} />
+      ) : activeTab === 'tags' ? (
+        <SIDTagsTab width={W - 2} height={tabContentH} fileId={fileInfo?.id ?? null} />
       ) : null}
     </PixiModal>
   );
