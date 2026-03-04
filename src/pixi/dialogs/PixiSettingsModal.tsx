@@ -20,6 +20,7 @@ import { Div, Txt } from '../layout';
 import { useUIStore } from '@stores/useUIStore';
 import { useThemeStore, themes } from '@stores/useThemeStore';
 import { useSettingsStore, type SIDEngineType, type CRTParams } from '@stores/useSettingsStore';
+import { LENS_PRESETS, LENS_PRESET_ORDER } from '../LensFilter';
 import { SID_ENGINES } from '@engine/deepsid/DeepSIDEngineManager';
 import { useKeyboardStore } from '@stores/useKeyboardStore';
 import { useTrackerStore } from '@stores/useTrackerStore';
@@ -193,6 +194,13 @@ export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, on
   const crtParams = useSettingsStore((s) => s.crtParams);
   const setCrtParam = useSettingsStore((s) => s.setCrtParam);
   const resetCrtParams = useSettingsStore((s) => s.resetCrtParams);
+  const lensEnabled = useSettingsStore((s) => s.lensEnabled);
+  const setLensEnabled = useSettingsStore((s) => s.setLensEnabled);
+  const lensPreset = useSettingsStore((s) => s.lensPreset);
+  const setLensPreset = useSettingsStore((s) => s.setLensPreset);
+  const lensParams = useSettingsStore((s) => s.lensParams);
+  const setLensParam = useSettingsStore((s) => s.setLensParam);
+  const resetLensParams = useSettingsStore((s) => s.resetLensParams);
   const sidEngine = useSettingsStore((s) => s.sidEngine);
   const setSidEngine = useSettingsStore((s) => s.setSidEngine);
   const asidEnabled = useSettingsStore((s) => s.asidEnabled);
@@ -339,7 +347,8 @@ export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, on
 
   // Estimate total content height for the scroll view
   const crtSectionH = crtEnabled ? CRT_SLIDERS.length * 28 + 4 * 18 + 60 : 40;
-  const contentH = 1500 + crtSectionH;
+  const lensSectionH = lensEnabled ? 3 * 28 + 2 * 18 + 60 + 40 : 40;
+  const contentH = 1500 + crtSectionH + lensSectionH;
   const scrollAreaH = MODAL_H - 48 - 44; // header + footer
 
   // CRT sliders grouped
@@ -528,6 +537,80 @@ export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, on
               ))}
 
               <PixiButton label="Reset CRT to Defaults" variant="ghost" onClick={resetCrtParams} width={200} />
+            </Div>
+          )}
+
+          {/* ═══════ LENS DISTORTION ═══════ */}
+          <SectionHeader text="LENS DISTORTION" />
+
+          <SettingRow label="Lens Effect:" description="Fish-eye, barrel, chromatic aberration">
+            <PixiCheckbox checked={lensEnabled} onChange={setLensEnabled} />
+          </SettingRow>
+
+          {lensEnabled && (
+            <Div className="flex-col gap-1" layout={{ width: CONTENT_W }}>
+              <Div className="pt-1">
+                <Txt className="text-[10px] font-bold font-mono text-accent-primary uppercase">PRESET</Txt>
+              </Div>
+              <Div className="flex-row flex-wrap gap-1" layout={{ width: CONTENT_W }}>
+                {LENS_PRESET_ORDER.filter((p) => p !== 'off').map((presetKey) => {
+                  const preset = LENS_PRESETS[presetKey];
+                  return (
+                    <PixiButton
+                      key={presetKey}
+                      label={preset.label}
+                      variant={lensPreset === presetKey ? 'ft2' : 'ghost'}
+                      color={lensPreset === presetKey ? 'blue' : undefined}
+                      size="sm"
+                      onClick={() => {
+                        setLensPreset(presetKey);
+                        setLensParam('barrel', preset.params.barrel);
+                        setLensParam('chromatic', preset.params.chromatic);
+                        setLensParam('vignette', preset.params.vignette);
+                      }}
+                    />
+                  );
+                })}
+              </Div>
+              <Div className="pt-1">
+                <Txt className="text-[10px] font-bold font-mono text-accent-primary uppercase">MANUAL</Txt>
+              </Div>
+              {([
+                { key: 'barrel'    as const, label: 'Barrel',    min: -0.5, max: 1,   step: 0.01 },
+                { key: 'chromatic' as const, label: 'Chromatic', min: 0,    max: 1,   step: 0.01 },
+                { key: 'vignette'  as const, label: 'Vignette',  min: 0,    max: 1,   step: 0.01 },
+              ]).map((slider) => {
+                const val = lensParams[slider.key];
+                return (
+                  <Div
+                    key={slider.key}
+                    className="flex-row items-center gap-2"
+                    layout={{ width: CONTENT_W, height: 24 }}
+                  >
+                    <Txt className="text-[10px] font-mono text-text-secondary" layout={{ width: LABEL_W }}>
+                      {slider.label}
+                    </Txt>
+                    <PixiSlider
+                      value={val}
+                      min={slider.min}
+                      max={slider.max}
+                      step={slider.step}
+                      onChange={(v) => { setLensParam(slider.key, v); setLensPreset('custom'); }}
+                      orientation="horizontal"
+                      length={SLIDER_W}
+                      thickness={4}
+                      handleWidth={10}
+                      handleHeight={10}
+                      color={theme.accent.color}
+                    />
+                    <Txt className="text-[10px] font-mono text-text-muted" layout={{ width: 50 }}>
+                      {val.toFixed(2)}
+                    </Txt>
+                  </Div>
+                );
+              })}
+
+              <PixiButton label="Reset Lens to Defaults" variant="ghost" onClick={resetLensParams} width={200} />
             </Div>
           )}
 

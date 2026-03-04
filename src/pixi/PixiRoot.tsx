@@ -30,7 +30,8 @@ import { PixiGlobalDropdownLayer } from './components/PixiGlobalDropdownLayer';
 import { PixiGlobalTooltipLayer } from './components/PixiGlobalTooltipLayer';
 import { PixiMainLayout } from './shell/PixiMainLayout';
 import { CRTRenderer } from './CRTRenderer';
-import { Rectangle } from 'pixi.js';
+import { LensFilter } from './LensFilter';
+import { Filter, Rectangle } from 'pixi.js';
 import { getAverageFps } from './performance';
 import { PixiNewSongWizard } from './dialogs/PixiNewSongWizard';
 import { PixiInterpolateDialog } from './dialogs/PixiInterpolateDialog';
@@ -212,10 +213,13 @@ export const PixiRoot: React.FC = () => {
   }, []);
 
   const { app } = useApplication();
-  const crtEnabled = useSettingsStore((s) => s.crtEnabled);
-  const crtParams  = useSettingsStore((s) => s.crtParams);
+  const crtEnabled  = useSettingsStore((s) => s.crtEnabled);
+  const crtParams   = useSettingsStore((s) => s.crtParams);
+  const lensEnabled = useSettingsStore((s) => s.lensEnabled);
+  const lensParams  = useSettingsStore((s) => s.lensParams);
 
-  const crtRef = useRef<CRTRenderer | null>(null);
+  const crtRef  = useRef<CRTRenderer | null>(null);
+  const lensRef = useRef<LensFilter | null>(null);
   // Hysteresis state: bloom off below 45fps, back on above 55fps
   const bloomEnabledRef = useRef(true);
 
@@ -227,15 +231,18 @@ export const PixiRoot: React.FC = () => {
     }
   }, [activeView]);
 
-  // Create CRTRenderer filter once on mount.
+  // Create CRTRenderer + LensFilter once on mount.
   useEffect(() => {
-    const filter = new CRTRenderer();
-    crtRef.current = filter;
+    const crt = new CRTRenderer();
+    const lens = new LensFilter();
+    crtRef.current = crt;
+    lensRef.current = lens;
     return () => {
-      // Remove from stage before destroying
-      if (app?.stage?.filters?.includes(filter)) app.stage.filters = [];
-      filter.destroy();
+      if (app?.stage?.filters?.length) app.stage.filters = [];
+      crt.destroy();
+      lens.destroy();
       crtRef.current = null;
+      lensRef.current = null;
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -247,15 +254,22 @@ export const PixiRoot: React.FC = () => {
     app.stage.filterArea = new Rectangle(0, 0, width, height);
   }, [app, width, height]);
 
-  // Apply CRT filter to app.stage.
+  // Apply CRT + Lens filters to app.stage.
   useTick(() => {
     if (isRapidScrolling()) return;
     const crt = crtRef.current;
-    if (!crt || !app?.stage) return;
+    const lens = lensRef.current;
+    if (!crt || !lens || !app?.stage) return;
+
+    // Build active filter list
+    const filters: Filter[] = [];
+
+    if (lensEnabled) {
+      lens.updateParams(lensParams);
+      filters.push(lens);
+    }
 
     if (crtEnabled) {
-      if (!app.stage.filters?.includes(crt)) app.stage.filters = [crt];
-
       // Adaptive quality: hysteresis — bloom off below 45fps, stays off until > 55fps
       const fps = getAverageFps();
       if (bloomEnabledRef.current  && fps < 45) bloomEnabledRef.current = false;
@@ -265,8 +279,13 @@ export const PixiRoot: React.FC = () => {
         ...crtParams,
         bloomIntensity: bloomEnabledRef.current ? crtParams.bloomIntensity : 0,
       });
-    } else {
-      if (app.stage.filters?.length) app.stage.filters = [];
+      filters.push(crt);
+    }
+
+    // Only update filters array ref when membership changes
+    const current = app.stage.filters ?? [];
+    if (current.length !== filters.length || filters.some((f, i) => current[i] !== f)) {
+      app.stage.filters = filters.length ? filters : [];
     }
   });
 
