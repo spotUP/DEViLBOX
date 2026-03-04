@@ -877,7 +877,6 @@ export const PixiPadEditor: React.FC<PixiPadEditorProps> = ({ padId, width, onCl
                             updateLayerOnPad(padId, idx, { levelOffset: Math.round(v) })
                           }
                         />
-                      </Div>
                     </Div>
                   </Div>
                 ))}
