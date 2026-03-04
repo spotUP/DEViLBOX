@@ -31,8 +31,6 @@ const LazySettingsModal = lazy(() =>
 const LazyFileBrowser = lazy(() =>
   import('@/components/dialogs/FileBrowser').then(m => ({ default: m.FileBrowser }))
 );
-const LazyHelpModal = lazy(() =>
-  import('@/components/help/HelpModal').then(m => ({ default: m.HelpModal }))
 );
 const LazyExportDialog = lazy(() =>
   import('@/lib/export/ExportDialog').then(m => ({ default: m.ExportDialog }))
@@ -406,9 +404,6 @@ export const WebGLModalBridge: React.FC = () => {
     <Suspense fallback={null}>
       {modalOpen === 'settings' && (
         <LazySettingsModal onClose={closeModal} />
-      )}
-      {modalOpen === 'help' && (
-        <LazyHelpModal isOpen={true} onClose={closeModal} initialTab={(modalData?.initialTab as any) || 'shortcuts'} />
       )}
       {modalOpen === 'export' && (
         <LazyExportDialog isOpen={true} onClose={closeModal} />
