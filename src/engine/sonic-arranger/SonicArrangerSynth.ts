@@ -156,12 +156,23 @@ export class SonicArrangerSynth implements DevilboxSynth {
       case 'volume':
         this.output.gain.value = Math.max(0, Math.min(1, value));
         break;
+      case 'arpeggioTable':
+        // 0=no arp, 1-3=table 0-2 — send directly as int
+        if (this._playerHandle >= 0) {
+          this.engine.sendMessage({
+            type: 'setParam',
+            handle: this._playerHandle,
+            paramId: 5,
+            value: Math.max(0, Math.min(3, Math.round(value))),
+          });
+        }
+        break;
       case 'vibratoLevel':
         if (this._playerHandle >= 0) {
           this.engine.sendMessage({
             type: 'setParam',
             handle: this._playerHandle,
-            paramId: 6,
+            paramId: 2,
             value: Math.max(0, Math.min(1, value / 63)),
           });
         }
@@ -171,7 +182,7 @@ export class SonicArrangerSynth implements DevilboxSynth {
           this.engine.sendMessage({
             type: 'setParam',
             handle: this._playerHandle,
-            paramId: 5,
+            paramId: 1,
             value: Math.max(0, Math.min(1, value / 63)),
           });
         }

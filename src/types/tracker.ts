@@ -103,6 +103,10 @@ export interface TrackerCell {
 
   // DEViLBOX: Probability/maybe (0-100, percentage chance note plays)
   probability?: number;         // undefined/0 = always play, 1-99 = percentage
+
+  // Sonic Arranger: per-row instrument arpeggio table selector
+  // 0 = no instrument arp (use XM 0xy if present), 1-3 = SA arp table 0-2
+  saArpTable?: number;
 }
 
 export interface TrackerRow {
