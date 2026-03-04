@@ -7,9 +7,11 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { PIXI_FONTS } from '../fonts';
 import { usePixiTheme } from '../theme';
 import { PixiButton, PixiSelect } from '../components';
-import { PixiDOMOverlay } from '../components/PixiDOMOverlay';
 import { PixiDJDeck } from './dj/PixiDJDeck';
 import { PixiDJMixer } from './dj/PixiDJMixer';
+import { PixiDJPlaylistPanel } from './dj/PixiDJPlaylistPanel';
+import { PixiDJModlandBrowser } from './dj/PixiDJModlandBrowser';
+import { PixiDJSeratoBrowser } from './dj/PixiDJSeratoBrowser';
 import { useUIStore } from '@stores';
 import { useDJStore } from '@stores/useDJStore';
 import { useTransportStore } from '@stores/useTransportStore';
@@ -18,9 +20,6 @@ import { clearSongCache } from '@engine/dj/DJSongCache';
 import { getToneEngine } from '@engine/ToneEngine';
 import type { DJEngine } from '@engine/dj/DJEngine';
 import { useDJKeyboardHandler } from '@components/dj/DJKeyboardHandler';
-import { DJPlaylistPanel } from '@components/dj/DJPlaylistPanel';
-import { DJModlandBrowser } from '@components/dj/DJModlandBrowser';
-import { DJSeratoBrowser } from '@components/dj/DJSeratoBrowser';
 import { PixiDJControllerSelect } from './dj/PixiDJControllerSelect';
 import { PixiDJFxPresets } from './dj/PixiDJFxPresets';
 
@@ -79,16 +78,12 @@ export const PixiDJView: React.FC = () => {
       {/* Top control bar */}
       <PixiDJTopBar browserPanel={browserPanel} onBrowserPanelChange={setBrowserPanel} />
 
-      {/* Browser panel — always mounted to avoid @pixi/layout BindingError; visible prop hides when 'none' */}
-      <PixiDOMOverlay
-        layout={{ width: '100%', height: browserPanel !== 'none' ? 280 : 0 }}
-        style={{ overflow: 'hidden', borderBottom: '1px solid rgba(255,255,255,0.1)' }}
-        visible={browserPanel !== 'none'}
-      >
-        {browserPanel === 'playlists' && <DJPlaylistPanel onClose={() => setBrowserPanel('none')} />}
-        {browserPanel === 'modland' && <DJModlandBrowser onClose={() => setBrowserPanel('none')} />}
-        {browserPanel === 'serato' && <DJSeratoBrowser onClose={() => setBrowserPanel('none')} />}
-      </PixiDOMOverlay>
+      {/* Browser panel — GL-native, collapses to 0 height when hidden */}
+      <pixiContainer layout={{ width: '100%', height: browserPanel !== 'none' ? 280 : 0 }}>
+        {browserPanel === 'playlists' && <PixiDJPlaylistPanel />}
+        {browserPanel === 'modland' && <PixiDJModlandBrowser />}
+        {browserPanel === 'serato' && <PixiDJSeratoBrowser />}
+      </pixiContainer>
 
       {/* Main deck area: Deck A | Mixer | Deck B [| Deck C] */}
       <pixiContainer
