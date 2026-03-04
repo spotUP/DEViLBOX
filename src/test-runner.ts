@@ -10,6 +10,13 @@ import {
   DEFAULT_FURNACE,
   DEFAULT_SOUNDMON,
   DEFAULT_SIDMON,
+  DEFAULT_SUPERCOLLIDER,
+  DEFAULT_SUNVOX,
+  DEFAULT_DRUM_MACHINE,
+  DEFAULT_BUZZMACHINE,
+  DEFAULT_WAM,
+  DEFAULT_V2,
+  DEFAULT_V2_SPEECH,
 } from './types/instrument';
 import type { EffectConfig } from './types/instrument';
 import { HivelyEngine } from './engine/hively/HivelyEngine';
@@ -270,6 +277,66 @@ const SYNTH_CONFIGS: Record<string, Record<string, unknown>> = {
   'SoundMonSynth': { synthType: 'SoundMonSynth', volume: -12, soundMon: DEFAULT_SOUNDMON },
   // SidMonSynth: SidMon II SID synth — note-triggered
   'SidMonSynth': { synthType: 'SidMonSynth', volume: -12, sidMon: DEFAULT_SIDMON },
+
+  // === Missing MAME Synths ===
+  'MAMEAICA': { synthType: 'MAMEAICA', volume: -12 },
+  'MAMEDOC': { synthType: 'MAMEDOC', volume: -12 },
+  'MAMEMSM5232': { synthType: 'MAMEMSM5232', volume: -12 },
+  'MAMERF5C400': { synthType: 'MAMERF5C400', volume: -12 },
+  'MAMESWP30': { synthType: 'MAMESWP30', volume: -12 },
+  'MAMETIA': { synthType: 'MAMETIA', volume: -12 },
+  'MAMEVFX': { synthType: 'MAMEVFX', volume: -12 },
+
+  // === VSTBridge Synths (load WASM plugins via bridge) ===
+  'Helm': { synthType: 'Helm', volume: -12 },
+  'Vital': { synthType: 'Vital', volume: -12 },
+  'Surge': { synthType: 'Surge', volume: -12 },
+  'Amsynth': { synthType: 'Amsynth', volume: -12 },
+  'Monique': { synthType: 'Monique', volume: -12 },
+  'Odin2': { synthType: 'Odin2', volume: -12 },
+  'OBXf': { synthType: 'OBXf', volume: -12 },
+  'Sorcer': { synthType: 'Sorcer', volume: -12 },
+  'D50': { synthType: 'D50', volume: -12 },
+  'DexedBridge': { synthType: 'DexedBridge', volume: -12 },
+  'TonewheelOrgan': { synthType: 'TonewheelOrgan', volume: -12 },
+  'Melodica': { synthType: 'Melodica', volume: -12 },
+  'VFX': { synthType: 'VFX', volume: -12 },
+
+  // === WAM Synths (Web Audio Module 2.0 plugins) ===
+  'WAM': { synthType: 'WAM', volume: -12, wam: DEFAULT_WAM },
+  'WAMOBXd': { synthType: 'WAMOBXd', volume: -12 },
+  'WAMSynth101': { synthType: 'WAMSynth101', volume: -12 },
+  'WAMTinySynth': { synthType: 'WAMTinySynth', volume: -12 },
+  'WAMFaustFlute': { synthType: 'WAMFaustFlute', volume: -12 },
+
+  // === SuperCollider ===
+  'SuperCollider': { synthType: 'SuperCollider', volume: -12, superCollider: DEFAULT_SUPERCOLLIDER },
+
+  // === Scripted/Misc Synths ===
+  'SunVoxSynth': { synthType: 'SunVoxSynth', volume: -12, sunvox: DEFAULT_SUNVOX },
+  'V2': { synthType: 'V2', volume: -12, v2: DEFAULT_V2 },
+  'V2Speech': { synthType: 'V2Speech', volume: -12, v2Speech: DEFAULT_V2_SPEECH },
+  'Buzzmachine': { synthType: 'Buzzmachine', volume: -12, buzzmachine: DEFAULT_BUZZMACHINE },
+  'DrumMachine': { synthType: 'DrumMachine', volume: -12, drumMachine: DEFAULT_DRUM_MACHINE },
+  'ChiptuneModule': { synthType: 'ChiptuneModule', volume: -12 },
+  'C64SID': { synthType: 'C64SID', volume: -12 },
+
+  // === Amiga Tracker Synths (instrument data-driven, tested with defaults) ===
+  'DigMugSynth': { synthType: 'DigMugSynth', volume: -12 },
+  'FCSynth': { synthType: 'FCSynth', volume: -12 },
+  'FredSynth': { synthType: 'FredSynth', volume: -12 },
+  'TFMXSynth': { synthType: 'TFMXSynth', volume: -12 },
+  'HippelCoSoSynth': { synthType: 'HippelCoSoSynth', volume: -12 },
+  'RobHubbardSynth': { synthType: 'RobHubbardSynth', volume: -12 },
+  'SidMon1Synth': { synthType: 'SidMon1Synth', volume: -12 },
+  'OctaMEDSynth': { synthType: 'OctaMEDSynth', volume: -12 },
+  'DavidWhittakerSynth': { synthType: 'DavidWhittakerSynth', volume: -12 },
+  'SonicArrangerSynth': { synthType: 'SonicArrangerSynth', volume: -12 },
+  'SymphonieSynth': { synthType: 'SymphonieSynth', volume: -12 },
+  'MusicLineSynth': { synthType: 'MusicLineSynth', volume: -12 },
+  'DeltaMusic1Synth': { synthType: 'DeltaMusic1Synth', volume: -12 },
+  'DeltaMusic2Synth': { synthType: 'DeltaMusic2Synth', volume: -12 },
+  'JamCrackerSynth': { synthType: 'JamCrackerSynth', volume: -12 },
 };
 
 /* ALL FURNACE SYNTHS - FULL TEST CONFIG (for reference)
