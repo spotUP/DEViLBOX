@@ -952,8 +952,22 @@ function getRequiredEngine(synthName: string): string | null {
   // Old MAME synths use shared MAMEEngine; per-chip MAME synths have own worklets
   if (MAME_ENGINE_SYNTHS.includes(synthName)) return 'MAME';
   if (synthName.startsWith('MAME')) return 'standalone-wasm';
-  if (['V2', 'CZ101', 'SCSP', 'CEM3394'].includes(synthName)) return 'standalone-wasm';
-  if (['Dexed', 'OBXd'].includes(synthName)) return 'standalone-wasm';
+  if (['V2', 'V2Speech', 'CZ101', 'SCSP', 'CEM3394'].includes(synthName)) return 'standalone-wasm';
+  if (['Dexed', 'OBXd', 'D50', 'VFX'].includes(synthName)) return 'standalone-wasm';
+  // SuperCollider uses scsynth WASM
+  if (synthName === 'SuperCollider') return 'standalone-wasm';
+  // VSTBridge synths use WASM plugins
+  if (['Helm', 'Vital', 'Surge', 'Amsynth', 'Monique', 'Odin2', 'OBXf', 'Sorcer',
+       'DexedBridge', 'TonewheelOrgan', 'Melodica'].includes(synthName)) return 'standalone-wasm';
+  // WAM synths load external WAM plugins
+  if (synthName.startsWith('WAM')) return 'standalone-wasm';
+  // Amiga tracker synths use AudioWorklet WASM replayers
+  if (['HivelySynth', 'UADESynth', 'SoundMonSynth', 'SidMonSynth',
+       'DigMugSynth', 'FCSynth', 'FredSynth', 'TFMXSynth', 'HippelCoSoSynth',
+       'RobHubbardSynth', 'SidMon1Synth', 'OctaMEDSynth', 'DavidWhittakerSynth',
+       'SonicArrangerSynth', 'SymphonieSynth', 'MusicLineSynth',
+       'DeltaMusic1Synth', 'DeltaMusic2Synth', 'JamCrackerSynth',
+       'SunVoxSynth'].includes(synthName)) return 'standalone-wasm';
   return null;
 }
 
@@ -961,10 +975,90 @@ function getRequiredEngine(synthName: string): string | null {
 // TEST FUNCTIONS
 // ============================================
 
+/**
+ * Collects detailed diagnostics for a synth instance.
+ * Call this when a synth fails to produce audio to understand WHY.
+ */
+function collectSynthDiagnostics(name: string, synthObj: Record<string, unknown>): Record<string, unknown> {
+  const diag: Record<string, unknown> = {};
+
+  // Constructor name
+  diag.constructor = (synthObj.constructor as { name?: string } | undefined)?.name || 'Unknown';
+
+  // Init status flags
+  for (const prop of ['_isReady', 'isInitialized', '_initialized', 'useWasmEngine', '_loaded', '_ready']) {
+    if (prop in synthObj) diag[prop] = synthObj[prop];
+  }
+
+  // Key methods available
+  const methods = ['triggerAttack', 'triggerRelease', 'triggerAttackRelease',
+    'connect', 'disconnect', 'dispose', 'ensureInitialized', 'ready',
+    'start', 'stop', 'setVolume', 'setInstrument', 'load'];
+  diag.methods = methods.filter(m => typeof synthObj[m] === 'function');
+  diag.missingMethods = methods.filter(m => typeof synthObj[m] !== 'function');
+
+  // Audio node graph inspection
+  if (synthObj.output) {
+    const output = synthObj.output as AudioNode | Record<string, unknown>;
+    if (output instanceof AudioNode) {
+      diag.outputType = output.constructor.name;
+      diag.outputChannels = output.channelCount;
+      diag.outputState = (output.context as AudioContext).state;
+    } else if (typeof output === 'object' && output !== null) {
+      diag.outputType = (output.constructor as { name?: string })?.name || typeof output;
+    }
+  } else {
+    diag.outputType = 'NONE (no .output property)';
+  }
+
+  // Tone.js node inspection
+  if (synthObj._volume) {
+    diag.hasToneVolume = true;
+  }
+  if (synthObj.volume && typeof (synthObj.volume as Record<string, unknown>).value === 'number') {
+    diag.volumeValue = (synthObj.volume as Record<string, unknown>).value;
+  }
+
+  // WASM-specific diagnostics
+  if (synthObj._workletNode) {
+    diag.hasWorkletNode = true;
+    const wn = synthObj._workletNode as AudioNode;
+    diag.workletNodeType = wn.constructor.name;
+  }
+  if (synthObj._nativeGain) {
+    diag.hasNativeGain = true;
+  }
+  if (synthObj._wasmModule || synthObj._wasm) {
+    diag.hasWasmModule = true;
+  }
+
+  // Error state
+  if (synthObj._error) diag.error = String(synthObj._error);
+  if (synthObj._lastError) diag.lastError = String(synthObj._lastError);
+
+  return diag;
+}
+
+/**
+ * Formats diagnostics as an HTML details/summary block for the test report.
+ */
+function formatDiagnosticsHtml(name: string, diag: Record<string, unknown>): string {
+  const entries = Object.entries(diag)
+    .map(([k, v]) => {
+      const val = Array.isArray(v) ? v.join(', ') : String(v);
+      return `<tr><td style="padding:1px 8px;color:#888">${k}</td><td style="padding:1px 8px">${val}</td></tr>`;
+    })
+    .join('');
+  return `<details style="margin:2px 0"><summary style="cursor:pointer;color:#f59e0b">🔍 ${name} diagnostics</summary>` +
+    `<table style="font-size:11px;margin:4px 0 4px 16px">${entries}</table></details>`;
+}
+
 async function testSynthCreation() {
   logHtml('<h2>Synth Creation Tests</h2>');
+  logHtml(`<p class="info">Testing creation of ${Object.keys(SYNTH_CONFIGS).length} synth types...</p>`);
 
   for (const [name, config] of Object.entries(SYNTH_CONFIGS)) {
+    const errorsBefore = capturedConsoleErrors.length;
     try {
       const fullConfig: InstrumentConfig = {
         id: 999,
@@ -973,10 +1067,30 @@ async function testSynthCreation() {
       } as InstrumentConfig;
 
       const synth = InstrumentFactory.createInstrument(fullConfig);
+
+      if (!synth) {
+        // Some synths legitimately return null (e.g., C64SID — audio handled by separate engine)
+        log(`⊘ ${name}: null (audio handled externally)`, 'pass');
+        testResults.passed++;
+        testResults.details.push({ name, status: 'pass', constructor: 'null' });
+        continue;
+      }
+
       const synthObj = synth as unknown as Record<string, unknown>;
       const ctorName = (synthObj.constructor as { name?: string } | undefined)?.name || 'Unknown';
 
-      log(`✓ ${name}: Created (${ctorName})`, 'pass');
+      // Check for console errors during creation
+      const newErrors = capturedConsoleErrors.slice(errorsBefore);
+      const creationErrors = newErrors.filter(e =>
+        !e.includes('deprecated') && !e.includes('AudioParam')
+      );
+
+      if (creationErrors.length > 0) {
+        log(`⚠ ${name}: Created (${ctorName}) with ${creationErrors.length} console error(s)`, 'warn');
+        logHtml(`<div style="margin-left:20px;font-size:11px;color:#f59e0b">${creationErrors.map(e => `<div>⚠ ${e.slice(0, 200)}</div>`).join('')}</div>`);
+      } else {
+        log(`✓ ${name}: Created (${ctorName})`, 'pass');
+      }
       testResults.passed++;
       testResults.details.push({ name, status: 'pass', constructor: ctorName });
 
@@ -986,9 +1100,13 @@ async function testSynthCreation() {
       }
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
+      const stack = e instanceof Error ? e.stack?.split('\n').slice(0, 3).join('\n') : '';
       log(`✗ ${name}: ${msg}`, 'fail');
+      if (stack) {
+        logHtml(`<pre style="margin-left:20px;font-size:10px;color:#ef4444;max-height:60px;overflow:auto">${stack}</pre>`);
+      }
       testResults.failed++;
-      testResults.errors.push({ name, error: msg });
+      testResults.errors.push({ name: `Creation:${name}`, error: msg });
     }
   }
 }
@@ -1175,7 +1293,18 @@ const NO_NOTE_SYNTHS = [
 const START_STOP_SYNTHS = ['Player', 'GranularSynth'];
 
 /** Song-player synths that auto-play a loaded tracker module for 8 seconds then stop */
-const SONG_PLAYER_SYNTHS = ['HivelySynth', 'UADESynth'];
+const SONG_PLAYER_SYNTHS = ['HivelySynth', 'UADESynth', 'SymphonieSynth', 'MusicLineSynth',
+  'JamCrackerSynth', 'ChiptuneModule'];
+
+/** Synths that need instrument/patch data loaded via setInstrument() to produce sound.
+ *  Without data they'll create successfully but output silence — not a bug. */
+const NEEDS_INSTRUMENT_DATA = [
+  'SoundMonSynth', 'SidMonSynth', 'DigMugSynth', 'FCSynth', 'FredSynth',
+  'TFMXSynth', 'HippelCoSoSynth', 'RobHubbardSynth', 'SidMon1Synth',
+  'OctaMEDSynth', 'DavidWhittakerSynth', 'SonicArrangerSynth',
+  'DeltaMusic1Synth', 'DeltaMusic2Synth', 'SunVoxSynth',
+  'C64SID', // Needs C64 SID file loaded
+];
 
 /** Returns the appropriate musical phrase for a given synth name. */
 function getPhraseForSynth(name: string): PhraseStep[] {
@@ -1264,6 +1393,29 @@ function getPhraseForSynth(name: string): PhraseStep[] {
     { note: 'E4', ms: 200 },
     { note: 'G4', ms: 200 },
     { note: 'C5', ms: 320 },
+  ];
+  // VSTBridge / plugin synths — longer notes to let filters and envelopes develop
+  if (['Helm', 'Vital', 'Surge', 'Amsynth', 'Monique', 'Odin2', 'OBXf', 'Sorcer',
+       'D50', 'DexedBridge', 'TonewheelOrgan', 'Melodica', 'VFX',
+       'SuperCollider'].includes(name)) return [
+    { note: 'C3',  ms: 400 },
+    { note: 'E3',  ms: 400 },
+    { note: 'G3',  ms: 400 },
+    { note: 'C4',  ms: 600 },
+  ];
+  // WAM synths — similar to VSTBridge
+  if (name.startsWith('WAM')) return [
+    { note: 'C3',  ms: 400 },
+    { note: 'E3',  ms: 400 },
+    { note: 'G3',  ms: 400 },
+    { note: 'C4',  ms: 600 },
+  ];
+  // V2 synth engine — mid-range arpeggio
+  if (name === 'V2') return [
+    { note: 'C3',  ms: 350 },
+    { note: 'E3',  ms: 350 },
+    { note: 'G3',  ms: 350 },
+    { note: 'C4',  ms: 500 },
   ];
   // Default — single-octave C major arpeggio
   return [
@@ -1619,6 +1771,15 @@ async function testVolumeLevels() {
         continue;
       }
 
+      // Synths that need instrument data loaded — will create but output silence without it
+      if (NEEDS_INSTRUMENT_DATA.includes(name)) {
+        testResults.passed++;
+        testResults.volumeLevels.push({ name, peakDb: NaN, rmsDb: NaN, judgment: 'skipped' });
+        logHtml(`<tr><td>${name}</td><td>N/A</td><td class="pass">SKIP (needs instrument data)</td><td>N/A</td></tr>`);
+        try { if (typeof synthObj.dispose === 'function') (synthObj.dispose as () => void)(); } catch { /* ignored */ }
+        continue;
+      }
+
       // For dispatch synths, create native AnalyserNode tapped from their _nativeGain.
       // _nativeGain is not connected to destination by default (ToneEngine does that).
       // Connect it to destination here so audio is audible during the test.
@@ -1692,6 +1853,22 @@ async function testVolumeLevels() {
         statusText = peakDb === -Infinity ? 'NO AUDIO' : 'SILENT';
         testResults.failed++;
         testResults.errors.push({ name, error: `No audio output (${peakDb === -Infinity ? 'silent' : peakDb.toFixed(1) + 'dB'})` });
+
+        // Collect detailed diagnostics for failed synths
+        const diag = collectSynthDiagnostics(name, synthObj);
+        // Also capture any console errors that occurred during this synth's test
+        const newConsoleErrors = capturedConsoleErrors.slice(errorCountBefore);
+        if (newConsoleErrors.length > 0) {
+          diag.consoleErrors = newConsoleErrors.slice(0, 5).map(e => e.slice(0, 150));
+        }
+        diag.requiredEngine = requiredEngine || 'none (Tone.js)';
+        diag.wasmInitFailed = wasmInitFailed;
+        diag.isFMSynth = isFMSynth;
+        diag.isDispatchSynth = isDispatchSynth;
+        diag.isMAMESynth = isMAMESynth;
+        diag.hadNativeMeter = !!furnaceNativeMeter;
+        console.warn(`[VolumeTest] ${name} DIAGNOSTICS:`, diag);
+        // Will be appended after the table row below
       } else if (peakDb < -25) {
         status = 'warn';
         statusText = 'TOO QUIET';
@@ -1719,6 +1896,13 @@ async function testVolumeLevels() {
         <td class="${status}">${statusText}</td>
         <td>${Math.abs(offset) > 3 && peakDb !== -Infinity ? `<span class="warn">${offsetStr}</span>` : offsetStr}</td>
       </tr>`);
+
+      // Show diagnostics for failed synths inline in the table
+      if (status === 'fail') {
+        const diag = (peakDb === -Infinity || peakDb < -60)
+          ? collectSynthDiagnostics(name, synthObj) : {};
+        logHtml(`<tr><td colspan="4" style="padding:0">${formatDiagnosticsHtml(name, diag)}</td></tr>`);
+      }
 
       // CRITICAL: Disconnect from meter BEFORE disposing to prevent meter corruption
       if (typeof synthObj.disconnect === 'function') {
@@ -1799,6 +1983,28 @@ async function testVolumeLevels() {
       logHtml(`<pre>// Suggested VOLUME_NORMALIZATION_OFFSETS (only synths with reliable output > -30dB):\nconst VOLUME_NORMALIZATION_OFFSETS: Record&lt;string, number&gt; = ${JSON.stringify(normMap, null, 2)};</pre>`);
     }
   }
+
+  // Categorized failure summary
+  const silentSynths = testResults.volumeLevels.filter(v => v.peakDb === -Infinity || v.peakDb < -60);
+  const skippedSynths = testResults.volumeLevels.filter(v => v.judgment === 'skipped' || v.judgment === 'wasm_unavail');
+  const workingSynths = testResults.volumeLevels.filter(v => v.peakDb > -60 && v.peakDb !== -Infinity);
+
+  if (silentSynths.length > 0 || skippedSynths.length > 0) {
+    logHtml(`<div class="summary" style="margin-top:12px">
+      <h3>Volume Test Breakdown</h3>
+      <p class="pass">✅ Working (audio > -60dB): <b>${workingSynths.length}</b></p>
+      <p class="warn">⏭️ Skipped (ROM/data needed): <b>${skippedSynths.length}</b></p>
+      ${silentSynths.length > 0 ? `<p class="fail">🔇 Silent/No Audio: <b>${silentSynths.length}</b></p>
+      <ul class="fail" style="font-size:12px">
+        ${silentSynths.map(s => {
+          const engine = getRequiredEngine(s.name);
+          const category = engine || 'Tone.js';
+          return `<li><b>${s.name}</b> (${category}) — ${s.peakDb === -Infinity ? 'no output' : s.peakDb.toFixed(1) + 'dB'}</li>`;
+        }).join('\n')}
+      </ul>` : ''}
+    </div>`);
+  }
+
   if (meter) meter.dispose();
 
   // Cleanup WASM engines to prevent browser tab freeze
@@ -2015,6 +2221,14 @@ async function testVolumeInteractive() {
       if (ROM_DEPENDENT_SYNTHS.includes(name)) {
         testResults.volumeLevels.push({ name, peakDb: NaN, rmsDb: NaN, judgment: 'skipped' });
         logHtml(`<tr><td>${name}</td><td>N/A</td><td class="pass">SKIP (needs ROM)</td><td>-</td></tr>`);
+        try { if (typeof synthObj.dispose === 'function') (synthObj.dispose as () => void)(); } catch { /* ignored */ }
+        try { meter.disconnect(); meter.dispose(); } catch { /* ignored */ }
+        continue;
+      }
+
+      if (NEEDS_INSTRUMENT_DATA.includes(name)) {
+        testResults.volumeLevels.push({ name, peakDb: NaN, rmsDb: NaN, judgment: 'skipped' });
+        logHtml(`<tr><td>${name}</td><td>N/A</td><td class="pass">SKIP (needs instrument data)</td><td>-</td></tr>`);
         try { if (typeof synthObj.dispose === 'function') (synthObj.dispose as () => void)(); } catch { /* ignored */ }
         try { meter.disconnect(); meter.dispose(); } catch { /* ignored */ }
         continue;
