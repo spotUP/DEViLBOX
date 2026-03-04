@@ -226,6 +226,17 @@ export class SonicArrangerSynth implements DevilboxSynth {
           });
         }
         break;
+      case 'effectArpArg':
+        // 0xy effect arpeggio arg (0=off, 0xXY=arp offsets) — integer 0-255
+        if (this._playerHandle >= 0) {
+          this.engine.sendMessage({
+            type: 'setParam',
+            handle: this._playerHandle,
+            paramId: 11,
+            value: Math.max(0, Math.min(255, Math.round(value))),
+          });
+        }
+        break;
     }
   }
 
