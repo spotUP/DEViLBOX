@@ -755,7 +755,6 @@ const MainStatusRow: React.FC<MainRowProps> = ({
           <StudioStatusContent barHeight={STATUS_BAR_HEIGHT} />
         </pixiContainer>
         </pixiContainer>
-      </pixiContainer>
 
       {/* Right content — flexShrink:0 to keep its natural size */}
       <RightSide
