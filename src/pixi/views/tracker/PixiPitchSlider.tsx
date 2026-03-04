@@ -249,7 +249,7 @@ export const PixiPitchSlider: React.FC<PixiPitchSliderProps> = ({ width, height 
       {/* PITCH label — pinned to top */}
       <pixiBitmapText
         text="PITCH"
-        style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }}
+        style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 11, fill: 0xffffff }}
         tint={theme.textMuted.color}
         layout={{ position: 'absolute', top: 0, left: 0, width }}
       />
@@ -257,7 +257,7 @@ export const PixiPitchSlider: React.FC<PixiPitchSliderProps> = ({ width, height 
       {/* Value readout — below label */}
       <pixiBitmapText
         text={displayValue}
-        style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }}
+        style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 11, fill: 0xffffff }}
         tint={atCenter ? theme.textMuted.color : AMBER}
         layout={{ position: 'absolute', top: LABEL_H + 2, left: 0, width }}
       />

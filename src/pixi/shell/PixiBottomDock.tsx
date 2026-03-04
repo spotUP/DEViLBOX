@@ -83,7 +83,7 @@ const DockTabButton: React.FC<DockTabButtonProps> = ({ label, isActive, onPress 
       <pixiGraphics draw={drawBg} layout={{ position: 'absolute', width: W, height: MODERN_DOCK_TAB_H }} />
       <pixiBitmapText
         text={label}
-        style={{ fontFamily: PIXI_FONTS.SANS_SEMIBOLD, fontSize: 11, fill: 0xffffff }}
+        style={{ fontFamily: PIXI_FONTS.SANS_SEMIBOLD, fontSize: 13, fill: 0xffffff }}
         tint={isActive ? theme.text.color : theme.textSecondary.color}
         layout={{}}
       />
@@ -212,7 +212,7 @@ export const PixiBottomDock: React.FC<PixiBottomDockProps> = ({
         >
           <pixiBitmapText
             text={'\u2B06'}
-            style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 12, fill: 0xffffff }}
+            style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 14, fill: 0xffffff }}
             tint={theme.textMuted.color}
             layout={{}}
           />
@@ -227,7 +227,7 @@ export const PixiBottomDock: React.FC<PixiBottomDockProps> = ({
         >
           <pixiBitmapText
             text={'\u2715'}
-            style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 12, fill: 0xffffff }}
+            style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 14, fill: 0xffffff }}
             tint={theme.textMuted.color}
             layout={{}}
           />

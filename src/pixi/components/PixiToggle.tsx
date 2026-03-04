@@ -21,8 +21,8 @@ interface PixiToggleProps {
 }
 
 const SIZE_CONFIG = {
-  sm: { width: 36, height: 18, thumbSize: 12, fontSize: 9 },
-  md: { width: 44, height: 22, thumbSize: 16, fontSize: 10 },
+  sm: { width: 36, height: 18, thumbSize: 12, fontSize: 10 },
+  md: { width: 44, height: 22, thumbSize: 16, fontSize: 12 },
 } as const;
 
 export const PixiToggle: React.FC<PixiToggleProps> = ({

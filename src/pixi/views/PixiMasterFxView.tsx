@@ -150,7 +150,7 @@ const EffectCard: React.FC<EffectCardProps> = ({ effect, onToggle }) => {
         {/* Category label */}
         <pixiBitmapText
           text={categoryLabel(effect.category)}
-          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }}
+          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 11, fill: 0xffffff }}
           tint={theme.textMuted.color}
           layout={{ width: 44 }}
         />

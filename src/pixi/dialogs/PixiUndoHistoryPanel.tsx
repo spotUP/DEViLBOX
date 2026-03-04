@@ -171,7 +171,7 @@ export const PixiUndoHistoryPanel: React.FC<PixiUndoHistoryPanelProps> = ({ isOp
             <layoutContainer layout={{ paddingLeft: 8, paddingTop: 4, paddingBottom: 2 }}>
               <pixiBitmapText
                 text={`REDO (${redoReversed.length})`}
-                style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }}
+                style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 11, fill: 0xffffff }}
                 tint={theme.textMuted.color}
                 layout={{}}
               />
@@ -196,13 +196,13 @@ export const PixiUndoHistoryPanel: React.FC<PixiUndoHistoryPanelProps> = ({ isOp
                 <Dot color={getDotColor(action.type)} />
                 <pixiBitmapText
                   text={getActionTypeName(action.type)}
-                  style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 10, fill: 0xffffff }}
+                  style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 12, fill: 0xffffff }}
                   tint={theme.textSecondary.color}
                   layout={{ flex: 1 }}
                 />
                 <pixiBitmapText
                   text={formatTime(action.timestamp)}
-                  style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }}
+                  style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 11, fill: 0xffffff }}
                   tint={theme.textMuted.color}
                   layout={{}}
                 />
@@ -216,7 +216,7 @@ export const PixiUndoHistoryPanel: React.FC<PixiUndoHistoryPanelProps> = ({ isOp
           <pixiGraphics draw={drawCurrentMarker} layout={{ position: 'absolute', width: PANEL_W, height: 20 }} />
           <pixiBitmapText
             text="Current State"
-            style={{ fontFamily: PIXI_FONTS.SANS_MEDIUM, fontSize: 10, fill: 0xffffff }}
+            style={{ fontFamily: PIXI_FONTS.SANS_MEDIUM, fontSize: 12, fill: 0xffffff }}
             tint={0x60A5FA}
             layout={{}}
           />
@@ -228,7 +228,7 @@ export const PixiUndoHistoryPanel: React.FC<PixiUndoHistoryPanelProps> = ({ isOp
             <layoutContainer layout={{ paddingLeft: 8, paddingTop: 4, paddingBottom: 2 }}>
               <pixiBitmapText
                 text={`UNDO (${undoReversed.length})`}
-                style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }}
+                style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 11, fill: 0xffffff }}
                 tint={theme.textMuted.color}
                 layout={{}}
               />
@@ -252,13 +252,13 @@ export const PixiUndoHistoryPanel: React.FC<PixiUndoHistoryPanelProps> = ({ isOp
                 <Dot color={getDotColor(action.type)} />
                 <pixiBitmapText
                   text={getActionTypeName(action.type)}
-                  style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 10, fill: 0xffffff }}
+                  style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 12, fill: 0xffffff }}
                   tint={theme.text.color}
                   layout={{ flex: 1 }}
                 />
                 <pixiBitmapText
                   text={formatTime(action.timestamp)}
-                  style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }}
+                  style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 11, fill: 0xffffff }}
                   tint={theme.textMuted.color}
                   layout={{}}
                 />
@@ -277,7 +277,7 @@ export const PixiUndoHistoryPanel: React.FC<PixiUndoHistoryPanelProps> = ({ isOp
         <pixiGraphics draw={drawFooterBorder} layout={{ position: 'absolute', width: PANEL_W, height: 1 }} />
         <pixiBitmapText
           text="Ctrl+Z undo | Ctrl+Y redo"
-          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }}
+          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 11, fill: 0xffffff }}
           tint={theme.textMuted.color}
           layout={{}}
         />

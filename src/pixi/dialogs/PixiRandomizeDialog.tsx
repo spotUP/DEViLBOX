@@ -82,13 +82,13 @@ export const PixiRandomizeDialog: React.FC<PixiRandomizeDialogProps> = ({ isOpen
           <layoutContainer layout={{ flexDirection: 'row', gap: 4 }}>
             <pixiBitmapText
               text="Density: "
-              style={{ fontFamily: PIXI_FONTS.SANS_BOLD, fontSize: 12, fill: 0xffffff }}
+              style={{ fontFamily: PIXI_FONTS.SANS_BOLD, fontSize: 14, fill: 0xffffff }}
               tint={theme.text.color}
               layout={{}}
             />
             <pixiBitmapText
               text={`${density}%`}
-              style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 12, fill: 0xffffff }}
+              style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 14, fill: 0xffffff }}
               tint={theme.accent.color}
               layout={{}}
             />

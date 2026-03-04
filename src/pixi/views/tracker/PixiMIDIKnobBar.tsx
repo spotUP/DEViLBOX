@@ -51,7 +51,7 @@ export const PixiMIDIKnobBar: React.FC<PixiMIDIKnobBarProps> = ({ width }) => {
       <pixiContainer layout={{ width, height: BAR_HEIGHT_COLLAPSED, flexDirection: 'row', alignItems: 'center', paddingLeft: 8, gap: 4 }}>
         <pixiBitmapText
           text="MIDI"
-          style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 8, fill: 0xffffff }}
+          style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 10, fill: 0xffffff }}
           tint={theme.success.color}
           layout={{}}
         />
@@ -117,13 +117,13 @@ const KnobCell: React.FC<{ assignment: KnobAssignment; index: number }> = ({ ass
       <pixiGraphics draw={drawCellBg} layout={{ position: 'absolute', width: 80, height: 32 }} />
       <pixiBitmapText
         text={`K${index + 1} (CC ${assignment.cc})`}
-        style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 7, fill: 0xffffff }}
+        style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 11, fill: 0xffffff }}
         tint={hovered ? theme.textSecondary.color : theme.textMuted.color}
         layout={{}}
       />
       <pixiBitmapText
         text={assignment.label.toUpperCase().slice(0, 8)}
-        style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 8, fill: 0xffffff }}
+        style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 10, fill: 0xffffff }}
         tint={theme.accent.color}
         layout={{}}
       />

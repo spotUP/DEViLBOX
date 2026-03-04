@@ -310,7 +310,7 @@ export const PixiTrackerVisualBg: React.FC<PixiTrackerVisualBgProps> = React.mem
         <pixiGraphics draw={drawButtonBg} />
         <pixiBitmapText
           text={modeLabel}
-          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }}
+          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 11, fill: 0xffffff }}
           alpha={0.5}
           x={6}
           y={2}

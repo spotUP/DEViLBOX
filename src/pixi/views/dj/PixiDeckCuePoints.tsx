@@ -111,7 +111,7 @@ export const PixiDeckCuePoints: React.FC<Props> = ({ deckId, width = 280, height
             }} />
             <pixiBitmapText
               text={cue?.name || String(i + 1)}
-              style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 9, fill: 0xffffff }}
+              style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 11, fill: 0xffffff }}
               tint={cue ? color : 0x666666}
               alpha={cue ? 1 : 0.3}
               layout={{ position: 'absolute', left: CUE_W / 2 - 4, top: 4 }}

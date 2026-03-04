@@ -136,7 +136,7 @@ const PixiChannelStrip: FC<StripProps> = ({ index, ch, instruments }) => {
       <pixiContainer layout={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: BAR_W, height: 10 }}>
         <pixiBitmapText
           text={CHANNEL_LABELS[index]}
-          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 8, fill: 0xffffff }}
+          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }}
           tint={0x336688}
           layout={{}}
         />
@@ -146,7 +146,7 @@ const PixiChannelStrip: FC<StripProps> = ({ index, ch, instruments }) => {
       {/* Note name */}
       <pixiBitmapText
         text={noteText}
-        style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 11, fill: 0xffffff }}
+        style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 13, fill: 0xffffff }}
         tint={noteColor}
         layout={{ marginBottom: 1 }}
       />
@@ -158,13 +158,13 @@ const PixiChannelStrip: FC<StripProps> = ({ index, ch, instruments }) => {
       <pixiContainer layout={{ flexDirection: 'row', justifyContent: 'space-between', width: BAR_W, height: 8 }}>
         <pixiBitmapText
           text={periodText}
-          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 7, fill: 0xffffff }}
+          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 11, fill: 0xffffff }}
           tint={0x224466}
           layout={{}}
         />
         <pixiBitmapText
           text={volText}
-          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 7, fill: 0xffffff }}
+          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 11, fill: 0xffffff }}
           tint={0x224466}
           layout={{}}
         />
@@ -173,7 +173,7 @@ const PixiChannelStrip: FC<StripProps> = ({ index, ch, instruments }) => {
       {/* Instrument name */}
       <pixiBitmapText
         text={instrName}
-        style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 7, fill: 0xffffff }}
+        style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 11, fill: 0xffffff }}
         tint={0x334455}
         layout={{}}
       />
@@ -231,7 +231,7 @@ export const PixiUADEDebuggerPanel: FC<PixiUADEDebuggerPanelProps> = ({ instrume
       >
         <pixiBitmapText
           text="Paula debugger — waiting for playback..."
-          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 8, fill: 0xffffff }}
+          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }}
           tint={0x112233}
           layout={{}}
         />
@@ -256,7 +256,7 @@ export const PixiUADEDebuggerPanel: FC<PixiUADEDebuggerPanelProps> = ({ instrume
       {/* Header label */}
       <pixiBitmapText
         text="PAULA DEBUGGER"
-        style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 8, fill: 0xffffff }}
+        style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 10, fill: 0xffffff }}
         tint={0x336688}
         layout={{ marginBottom: 2 }}
       />

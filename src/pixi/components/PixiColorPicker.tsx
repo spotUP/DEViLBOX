@@ -78,7 +78,7 @@ export const PixiColorPicker: React.FC<PixiColorPickerProps> = ({
         {color === null && (
           <pixiBitmapText
             text="X"
-            style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }}
+            style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 12, fill: 0xffffff }}
             tint={theme.textMuted.color}
             layout={{ alignSelf: 'center', marginTop: 3, marginLeft: 5 }}
           />
@@ -108,7 +108,7 @@ export const PixiColorPicker: React.FC<PixiColorPickerProps> = ({
         {/* Title */}
         <pixiBitmapText
           text="Channel Color"
-          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }}
+          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 11, fill: 0xffffff }}
           tint={theme.textMuted.color}
           layout={{ position: 'absolute', left: PAD, top: PAD }}
         />

@@ -210,7 +210,7 @@ export const PixiArrangementAutomationLane: React.FC<PixiArrangementAutomationLa
       <pixiGraphics draw={drawLabel} layout={{ position: 'absolute', left: 2, top: 2, width: 38, height: 14 }} />
       <pixiBitmapText
         text={paramLabel}
-        style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 8, fill: 0xffffff }}
+        style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }}
         tint={0x94a3b8}
         layout={{ position: 'absolute', left: 5, top: 3 }}
       />

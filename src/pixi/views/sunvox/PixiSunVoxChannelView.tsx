@@ -344,7 +344,7 @@ export const PixiSunVoxChannelView: React.FC<PixiSunVoxChannelViewProps> = ({
             <pixiBitmapText
               key={`hdr-${i}`}
               text={hl.text}
-              style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 9, fill: 0xffffff }}
+              style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 11, fill: 0xffffff }}
               tint={hl.color}
               x={hl.x}
               y={hl.y}

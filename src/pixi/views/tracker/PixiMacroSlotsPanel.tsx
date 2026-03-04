@@ -30,7 +30,7 @@ export const PixiMacroSlotsPanel: React.FC<PixiMacroSlotsPanelProps> = ({ width 
 
       <pixiBitmapText
         text="MACRO"
-        style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 8, fill: 0xffffff }}
+        style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 10, fill: 0xffffff }}
         tint={theme.textMuted.color}
         layout={{ marginRight: 4 }}
       />
@@ -46,7 +46,7 @@ export const PixiMacroSlotsPanel: React.FC<PixiMacroSlotsPanelProps> = ({ width 
           <pixiContainer key={index} layout={{ flexDirection: 'row', gap: 1, alignItems: 'center' }}>
             <pixiBitmapText
               text={cellText}
-              style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }}
+              style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 11, fill: 0xffffff }}
               tint={isEmpty ? theme.textMuted.color : theme.accent.color}
               layout={{}}
             />

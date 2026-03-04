@@ -123,7 +123,7 @@ export const PixiChannelLevels: React.FC<PixiChannelLevelsProps> = ({ width, hei
       <pixiGraphics ref={graphicsRef} draw={isPlaying ? () => {} : drawStatic} layout={{ position: 'absolute', width, height }} />
       <pixiBitmapText
         text="LEVELS"
-        style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }}
+        style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 11, fill: 0xffffff }}
         tint={theme.textMuted.color}
         layout={isPlaying ? LABEL_LAYOUT_COLLAPSED : LABEL_LAYOUT_VISIBLE}
         alpha={!isPlaying ? 1 : 0}

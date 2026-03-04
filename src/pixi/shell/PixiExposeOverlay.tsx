@@ -275,7 +275,7 @@ export const PixiExposeOverlay: React.FC<PixiExposeOverlayProps> = ({ width, hei
             {/* View label */}
             <pixiBitmapText
               text={view.label}
-              style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 13, fill: 0xffffff }}
+              style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 15, fill: 0xffffff }}
               tint={isActive ? theme.accent.color : theme.text.color}
               layout={{
                 position: 'absolute',
@@ -302,7 +302,7 @@ export const PixiExposeOverlay: React.FC<PixiExposeOverlayProps> = ({ width, hei
       {/* Hint bar at bottom */}
       <pixiBitmapText
         text="←→↑↓ Navigate  ⏎ Select  ⇥ Cycle  Esc Dismiss"
-        style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 11, fill: 0xffffff }}
+        style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 13, fill: 0xffffff }}
         tint={theme.textMuted.color}
         layout={{ position: 'absolute', left: offsetX, top: offsetY + gridH + 16 }}
       />

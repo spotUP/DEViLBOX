@@ -86,7 +86,7 @@ export const PixiAuthModal: React.FC<PixiAuthModalProps> = ({ isOpen, onClose, o
       >
         <pixiBitmapText
           text={mode === 'login' ? 'Login to DEViLBOX' : 'Create Account'}
-          style={{ fontFamily: PIXI_FONTS.SANS_BOLD, fontSize: 18, fill: 0xffffff }}
+          style={{ fontFamily: PIXI_FONTS.SANS_BOLD, fontSize: 20, fill: 0xffffff }}
           tint={theme.text.color}
           layout={{}}
         />
@@ -107,7 +107,7 @@ export const PixiAuthModal: React.FC<PixiAuthModalProps> = ({ isOpen, onClose, o
         >
           <pixiBitmapText
             text="✕"
-            style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 16, fill: 0xffffff }}
+            style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 18, fill: 0xffffff }}
             tint={closeHovered ? theme.text.color : theme.textMuted.color}
             layout={{}}
           />
@@ -141,7 +141,7 @@ export const PixiAuthModal: React.FC<PixiAuthModalProps> = ({ isOpen, onClose, o
                 ? 'Login to save your songs to the server and access them from any device.'
                 : 'Create an account to save your songs to the server. No email required!'
             }
-            style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 12, fill: 0xffffff }}
+            style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 14, fill: 0xffffff }}
             tint={0x60a5fa}
             layout={{}}
           />
@@ -161,7 +161,7 @@ export const PixiAuthModal: React.FC<PixiAuthModalProps> = ({ isOpen, onClose, o
           >
             <pixiBitmapText
               text={error}
-              style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 12, fill: 0xffffff }}
+              style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 14, fill: 0xffffff }}
               tint={theme.error.color}
               layout={{}}
             />
@@ -172,7 +172,7 @@ export const PixiAuthModal: React.FC<PixiAuthModalProps> = ({ isOpen, onClose, o
         <layoutContainer layout={{ flexDirection: 'column', width: INPUT_W }}>
           <pixiBitmapText
             text="Username"
-            style={{ fontFamily: PIXI_FONTS.SANS_MEDIUM, fontSize: 14, fill: 0xffffff }}
+            style={{ fontFamily: PIXI_FONTS.SANS_MEDIUM, fontSize: 16, fill: 0xffffff }}
             tint={theme.text.color}
             layout={{ marginBottom: 8 }}
           />
@@ -186,7 +186,7 @@ export const PixiAuthModal: React.FC<PixiAuthModalProps> = ({ isOpen, onClose, o
           />
           <pixiBitmapText
             text="3-20 characters"
-            style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 12, fill: 0xffffff }}
+            style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 14, fill: 0xffffff }}
             tint={theme.textMuted.color}
             layout={{ marginTop: 4 }}
           />
@@ -196,7 +196,7 @@ export const PixiAuthModal: React.FC<PixiAuthModalProps> = ({ isOpen, onClose, o
         <layoutContainer layout={{ flexDirection: 'column', width: INPUT_W }}>
           <pixiBitmapText
             text="Password"
-            style={{ fontFamily: PIXI_FONTS.SANS_MEDIUM, fontSize: 14, fill: 0xffffff }}
+            style={{ fontFamily: PIXI_FONTS.SANS_MEDIUM, fontSize: 16, fill: 0xffffff }}
             tint={theme.text.color}
             layout={{ marginBottom: 8 }}
           />
@@ -211,7 +211,7 @@ export const PixiAuthModal: React.FC<PixiAuthModalProps> = ({ isOpen, onClose, o
           />
           <pixiBitmapText
             text="At least 6 characters"
-            style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 12, fill: 0xffffff }}
+            style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 14, fill: 0xffffff }}
             tint={theme.textMuted.color}
             layout={{ marginTop: 4 }}
           />
@@ -222,7 +222,7 @@ export const PixiAuthModal: React.FC<PixiAuthModalProps> = ({ isOpen, onClose, o
           <layoutContainer layout={{ flexDirection: 'column', width: INPUT_W }}>
             <pixiBitmapText
               text="Confirm Password"
-              style={{ fontFamily: PIXI_FONTS.SANS_MEDIUM, fontSize: 14, fill: 0xffffff }}
+              style={{ fontFamily: PIXI_FONTS.SANS_MEDIUM, fontSize: 16, fill: 0xffffff }}
               tint={theme.text.color}
               layout={{ marginBottom: 8 }}
             />
@@ -238,7 +238,7 @@ export const PixiAuthModal: React.FC<PixiAuthModalProps> = ({ isOpen, onClose, o
             {passwordMismatch && (
               <pixiBitmapText
                 text="Passwords don't match"
-                style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 12, fill: 0xffffff }}
+                style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 14, fill: 0xffffff }}
                 tint={theme.error.color}
                 layout={{ marginTop: 4 }}
               />
@@ -272,7 +272,7 @@ export const PixiAuthModal: React.FC<PixiAuthModalProps> = ({ isOpen, onClose, o
         >
           <pixiBitmapText
             text={mode === 'login' ? "Don't have an account? Sign up" : 'Already have an account? Login'}
-            style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 14, fill: 0xffffff }}
+            style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 16, fill: 0xffffff }}
             tint={theme.accent.color}
             layout={{}}
           />

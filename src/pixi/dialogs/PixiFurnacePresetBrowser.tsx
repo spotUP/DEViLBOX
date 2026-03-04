@@ -243,7 +243,7 @@ export const PixiFurnacePresetBrowser: React.FC<PixiFurnacePresetBrowserProps> =
                   text={family}
                   style={{
                     fontFamily: PIXI_FONTS.SANS_BOLD,
-                    fontSize: 12,
+                    fontSize: 14,
                     fill: 0xffffff,
                   }}
                   tint={isActive ? theme.accent.color : theme.textSecondary.color}
@@ -253,7 +253,7 @@ export const PixiFurnacePresetBrowser: React.FC<PixiFurnacePresetBrowserProps> =
                   text={`${CHIP_FAMILIES[family].length} chips`}
                   style={{
                     fontFamily: PIXI_FONTS.SANS,
-                    fontSize: 10,
+                    fontSize: 12,
                     fill: 0xffffff,
                   }}
                   tint={theme.textMuted.color}
@@ -279,7 +279,7 @@ export const PixiFurnacePresetBrowser: React.FC<PixiFurnacePresetBrowserProps> =
               text={FAMILY_DESCRIPTIONS[activeFamily]}
               style={{
                 fontFamily: PIXI_FONTS.SANS,
-                fontSize: 11,
+                fontSize: 13,
                 fill: 0xffffff,
               }}
               tint={theme.textMuted.color}
@@ -339,7 +339,7 @@ export const PixiFurnacePresetBrowser: React.FC<PixiFurnacePresetBrowserProps> =
           text="Click a chip to add it as a new instrument."
           style={{
             fontFamily: PIXI_FONTS.SANS,
-            fontSize: 10,
+            fontSize: 12,
             fill: 0xffffff,
           }}
           tint={theme.textMuted.color}
@@ -402,7 +402,7 @@ const ChipCard: React.FC<ChipCardProps> = ({
         text={chip.name}
         style={{
           fontFamily: PIXI_FONTS.SANS_SEMIBOLD,
-          fontSize: 11,
+          fontSize: 13,
           fill: 0xffffff,
         }}
         tint={isHovered ? theme.accent.color : theme.text.color}
@@ -413,7 +413,7 @@ const ChipCard: React.FC<ChipCardProps> = ({
         text={truncatedDesc}
         style={{
           fontFamily: PIXI_FONTS.SANS,
-          fontSize: 10,
+          fontSize: 12,
           fill: 0xffffff,
         }}
         tint={theme.textMuted.color}
@@ -439,7 +439,7 @@ const ChipCard: React.FC<ChipCardProps> = ({
               text={tag}
               style={{
                 fontFamily: PIXI_FONTS.MONO,
-                fontSize: 9,
+                fontSize: 11,
                 fill: 0xffffff,
               }}
               tint={theme.textMuted.color}

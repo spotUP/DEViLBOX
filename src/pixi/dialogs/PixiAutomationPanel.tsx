@@ -239,7 +239,7 @@ export const PixiAutomationPanel: React.FC<PixiAutomationPanelProps> = ({
                   {/* Section header */}
                   <pixiBitmapText
                     text={group.label.toUpperCase()}
-                    style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }}
+                    style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 11, fill: 0xffffff }}
                     tint={theme.textMuted.color}
                     layout={{ marginBottom: 2 }}
                   />
@@ -390,7 +390,7 @@ const ParamButton: React.FC<ParamButtonProps> = ({
         {hasData && !isSelected && <DataDot color={hasDataColor} />}
         <pixiBitmapText
           text={name}
-          style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 10, fill: 0xffffff }}
+          style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 12, fill: 0xffffff }}
           tint={textColor}
           layout={{}}
         />

@@ -98,7 +98,7 @@ const ScopeBox: React.FC<{
       <pixiGraphics ref={graphicsRef} draw={() => {}} />
       <pixiBitmapText
         text={isAll ? 'ALL' : `CH${channel + 1}`}
-        style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 8, fill: 0xffffff }}
+        style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }}
         tint={muted ? theme.error.color : theme.textMuted.color}
         alpha={muted ? 0.8 : 0.5}
         layout={{ position: 'absolute', left: 3, top: 2 }}

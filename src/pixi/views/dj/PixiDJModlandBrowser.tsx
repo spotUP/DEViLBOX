@@ -458,20 +458,20 @@ export const PixiDJModlandBrowser: React.FC<PixiDJModlandBrowserProps> = ({
               <layoutContainer layout={{ flex: 1, flexDirection: 'column', justifyContent: 'center', gap: 1, overflow: 'hidden' }}>
                 <pixiBitmapText
                   text={file.filename}
-                  style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 11, fill: 0xffffff }}
+                  style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 13, fill: 0xffffff }}
                   tint={theme.text.color}
                   layout={{ maxWidth: contentW - 180 }}
                 />
                 <layoutContainer layout={{ flexDirection: 'row', gap: 8 }}>
                   <pixiBitmapText
                     text={file.format}
-                    style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }}
+                    style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 11, fill: 0xffffff }}
                     tint={theme.textMuted.color}
                     layout={{}}
                   />
                   <pixiBitmapText
                     text={file.author}
-                    style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }}
+                    style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 11, fill: 0xffffff }}
                     tint={theme.textMuted.color}
                     alpha={0.6}
                     layout={{}}

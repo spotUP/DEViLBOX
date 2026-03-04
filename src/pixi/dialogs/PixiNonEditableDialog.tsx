@@ -49,13 +49,13 @@ export const PixiNonEditableDialog: React.FC = () => {
       >
         <pixiBitmapText
           text="🔒"
-          style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 14, fill: 0xffffff }}
+          style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 16, fill: 0xffffff }}
           tint={theme.accent.color}
           layout={{}}
         />
         <pixiBitmapText
           text="Pattern is Read-Only"
-          style={{ fontFamily: PIXI_FONTS.SANS_SEMIBOLD, fontSize: 14, fill: 0xffffff }}
+          style={{ fontFamily: PIXI_FONTS.SANS_SEMIBOLD, fontSize: 16, fill: 0xffffff }}
           tint={theme.text.color}
           layout={{}}
         />
@@ -102,7 +102,7 @@ export const PixiNonEditableDialog: React.FC = () => {
         >
           <pixiBitmapText
             text="↻"
-            style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 10, fill: 0xffffff }}
+            style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 12, fill: 0xffffff }}
             tint={theme.accent.color}
             layout={{ marginTop: 2 }}
           />
