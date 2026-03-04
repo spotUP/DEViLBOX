@@ -29,6 +29,7 @@ import type { ImportOptions } from '@/components/dialogs/ImportModuleDialog';
 import { usePixiResponsive } from './hooks/usePixiResponsive';
 import { PixiPeerCursor } from './views/collaboration/PixiPeerCursor';
 import { PixiGlobalDropdownLayer } from './components/PixiGlobalDropdownLayer';
+import { PixiGlobalTooltipLayer } from './components/PixiGlobalTooltipLayer';
 import { PixiMainLayout } from './shell/PixiMainLayout';
 import { CRTRenderer } from './CRTRenderer';
 import { Rectangle } from 'pixi.js';
@@ -335,6 +336,9 @@ export const PixiRoot: React.FC = () => {
 
       {/* Global dropdown layer — above all window masks (zIndex 9999) */}
       <PixiGlobalDropdownLayer />
+
+      {/* Global tooltip layer — above windows, below dropdowns (zIndex 9998) */}
+      <PixiGlobalTooltipLayer />
 
       {/* GL-native modals — inside scene graph so CRT shader catches them */}
       <pixiContainer zIndex={300} layout={{ position: 'absolute', width, height }}>
