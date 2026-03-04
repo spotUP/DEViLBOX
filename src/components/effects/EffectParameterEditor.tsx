@@ -12,6 +12,8 @@ import { X, Volume2, AlertTriangle } from 'lucide-react';
 import { NeuralParameterMapper } from '@engine/effects/NeuralParameterMapper';
 import { VisualEffectEditorWrapper, getVisualEffectEditor } from './VisualEffectEditors';
 import { Knob } from '@components/controls/Knob';
+import { useEffectAnalyser } from '@hooks/useEffectAnalyser';
+import { EffectOscilloscope } from './EffectVisualizer';
 
 interface EffectParameter {
   name: string;
@@ -140,6 +142,9 @@ const NeuralEffectEditor: React.FC<NeuralEffectEditorProps> = ({
     return typeof value === 'number' ? value : param.defaultValue;
   };
 
+  // Pre/post waveform overlay
+  const { pre, post } = useEffectAnalyser(effect.id, 'waveform');
+
   // Split parameters into implemented and unimplemented
   const implementedParams = parameters.filter(p => p.implemented !== false);
   const unimplementedParams = parameters.filter(p => p.implemented === false);
@@ -206,6 +211,9 @@ const NeuralEffectEditor: React.FC<NeuralEffectEditorProps> = ({
 
       {/* Content */}
       <div className="p-4 space-y-4">
+        {/* Dry / Wet waveform overlay */}
+        <EffectOscilloscope pre={pre} post={post} color="#a855f7" />
+
         {/* Implemented Parameters */}
         {implementedParams.length > 0 && (
           <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
