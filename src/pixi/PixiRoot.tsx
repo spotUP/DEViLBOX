@@ -34,6 +34,10 @@ import { PixiTrackRenameDialog } from './dialogs/PixiTrackRenameDialog';
 import { PixiDownloadModal } from './dialogs/PixiDownloadModal';
 import { PixiSynthErrorDialog } from './dialogs/PixiSynthErrorDialog';
 import { PixiUndoHistoryPanel } from './dialogs/PixiUndoHistoryPanel';
+import { PixiKeyboardShortcutSheet } from './dialogs/PixiKeyboardShortcutSheet';
+import { PixiGrooveSettingsModal } from './dialogs/PixiGrooveSettingsModal';
+import { PixiFindReplaceDialog } from './dialogs/PixiFindReplaceDialog';
+import { PixiEffectPicker } from './dialogs/PixiEffectPicker';
 
 export const PixiRoot: React.FC = () => {
   const { width, height } = usePixiResponsive();
@@ -136,6 +140,14 @@ export const PixiRoot: React.FC = () => {
         <PixiRandomizeDialog isOpen={modalOpen === 'randomize'} onClose={closeModal} />
         <PixiDownloadModal isOpen={modalOpen === 'download'} onClose={closeModal} />
         <PixiUndoHistoryPanel isOpen={modalOpen === 'undoHistory'} onClose={closeModal} />
+        <PixiKeyboardShortcutSheet isOpen={modalOpen === 'shortcutSheet'} onClose={closeModal} />
+        <PixiGrooveSettingsModal isOpen={modalOpen === 'grooveSettings'} onClose={closeModal} />
+        <PixiFindReplaceDialog isOpen={modalOpen === 'findReplace'} onClose={closeModal} />
+        <PixiEffectPicker
+          isOpen={modalOpen === 'effectPicker'}
+          onSelect={() => closeModal()}
+          onClose={closeModal}
+        />
         <PixiClipRenameDialog />
         <PixiTrackRenameDialog />
         <PixiSynthErrorDialog />
