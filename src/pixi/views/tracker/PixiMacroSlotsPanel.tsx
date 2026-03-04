@@ -3,8 +3,6 @@
  * Compact horizontal bar showing slot contents with Write/Read actions.
  */
 
-import { useCallback } from 'react';
-import type { Graphics as GraphicsType } from 'pixi.js';
 import { PIXI_FONTS } from '../../fonts';
 import { usePixiTheme } from '../../theme';
 import { PixiButton } from '../../components';
@@ -22,22 +20,13 @@ export const PixiMacroSlotsPanel: React.FC<PixiMacroSlotsPanelProps> = ({ width 
   const writeMacroSlot = useTrackerStore(s => s.writeMacroSlot);
   const readMacroSlot = useTrackerStore(s => s.readMacroSlot);
 
-  const drawBg = useCallback((g: GraphicsType) => {
-    g.clear();
-    g.rect(0, 0, width, PANEL_HEIGHT);
-    g.fill({ color: theme.bgTertiary.color });
-    g.rect(0, 0, width, 1);
-    g.fill({ color: theme.border.color, alpha: theme.border.alpha });
-  }, [width, theme]);
-
   const formatHex = (v: number | null): string => {
     if (v === null || v === undefined || v === 0) return '..';
     return v.toString(16).padStart(2, '0').toUpperCase();
   };
 
   return (
-    <pixiContainer layout={{ width, height: PANEL_HEIGHT, flexDirection: 'row', alignItems: 'center', paddingLeft: 4, gap: 2 }}>
-      <pixiGraphics draw={drawBg} layout={{ position: 'absolute', width, height: PANEL_HEIGHT }} />
+    <layoutContainer layout={{ width, height: PANEL_HEIGHT, flexDirection: 'row', alignItems: 'center', paddingLeft: 4, gap: 2, backgroundColor: theme.bgTertiary.color, borderTopWidth: 1, borderColor: theme.border.color }}>
 
       <pixiBitmapText
         text="MACRO"
@@ -66,6 +55,6 @@ export const PixiMacroSlotsPanel: React.FC<PixiMacroSlotsPanelProps> = ({ width 
           </pixiContainer>
         );
       })}
-    </pixiContainer>
+    </layoutContainer>
   );
 };

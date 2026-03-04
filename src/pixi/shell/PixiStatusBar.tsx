@@ -405,14 +405,6 @@ const BANK_DEFS: { id: KnobBankMode; label: string }[] = [
 const KnobPanel: React.FC<KnobPanelProps> = ({ width, height, knobBank, setKnobBank, assignments }) => {
   const theme = usePixiTheme();
 
-  const drawBg = useCallback((g: GraphicsType) => {
-    g.clear();
-    g.rect(0, 0, width, height);
-    g.fill({ color: theme.bgTertiary.color });
-    g.rect(0, 0, width, 1);
-    g.fill({ color: theme.border.color });
-  }, [width, height, theme]);
-
   // Bank tab row height
   const TAB_H = 24;
   const KNOB_H = height - TAB_H - 8; // 8px = top+bottom padding
@@ -424,8 +416,12 @@ const KnobPanel: React.FC<KnobPanelProps> = ({ width, height, knobBank, setKnobB
   const cellW = Math.floor((width - hPad * 2 - gap * (numKnobs - 1)) / numKnobs);
 
   return (
-    <pixiContainer layout={{ width, height, flexDirection: 'column' }}>
-      <pixiGraphics draw={drawBg} layout={{ position: 'absolute', width, height }} />
+    <layoutContainer layout={{
+      width, height, flexDirection: 'column',
+      backgroundColor: theme.bgTertiary.color,
+      borderTopWidth: 1,
+      borderColor: theme.border.color,
+    }}>
 
       {/* Bank tabs row */}
       <pixiContainer layout={{
@@ -472,7 +468,7 @@ const KnobPanel: React.FC<KnobPanelProps> = ({ width, height, knobBank, setKnobB
           />
         ))}
       </pixiContainer>
-    </pixiContainer>
+    </layoutContainer>
   );
 };
 
@@ -600,23 +596,17 @@ const MainStatusRow: React.FC<MainRowProps> = ({
 }) => {
   const theme = usePixiTheme();
 
-  const drawBg = useCallback((g: GraphicsType) => {
-    g.clear();
-    g.rect(0, 0, width, STATUS_BAR_HEIGHT);
-    g.fill({ color: theme.bgSecondary.color });
-    g.rect(0, 0, width, 1);
-    g.fill({ color: theme.border.color });
-  }, [width, theme]);
-
   return (
-    <pixiContainer layout={{
+    <layoutContainer layout={{
       width,
       height: STATUS_BAR_HEIGHT,
       flexDirection: 'row',
       alignItems: 'center',
       paddingLeft: 12,
+      backgroundColor: theme.bgSecondary.color,
+      borderTopWidth: 1,
+      borderColor: theme.border.color,
     }}>
-      <pixiGraphics draw={drawBg} layout={{ position: 'absolute', width, height: STATUS_BAR_HEIGHT }} />
 
       {/* Left content — flex:1 with overflow hidden so it doesn't overlap right side.
           All always mounted (stacked via position:absolute, alpha-toggled) to avoid BindingError. */}
@@ -655,7 +645,7 @@ const MainStatusRow: React.FC<MainRowProps> = ({
       >
         <WorkbenchMinimap screenW={width} screenH={window.innerHeight} />
       </pixiContainer>
-    </pixiContainer>
+    </layoutContainer>
   );
 };
 
@@ -711,13 +701,8 @@ export const PixiStatusBar: React.FC = () => {
 
   const collabConnected = collabStatus === 'connected';
 
-  const drawRoot = useCallback((g: GraphicsType) => {
-    g.clear();
-  }, []);
-
   return (
     <pixiContainer layout={{ width, height: totalHeight, flexDirection: 'column' }}>
-      <pixiGraphics draw={drawRoot} layout={{ position: 'absolute', width, height: totalHeight }} />
 
       {/* MIDI knob panel — always mounted, zero-height when hidden to avoid @pixi/layout BindingError */}
       <pixiContainer

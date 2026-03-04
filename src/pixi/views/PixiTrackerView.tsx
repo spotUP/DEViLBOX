@@ -10,8 +10,6 @@
  * are hooked here — they only attach window event listeners, no DOM rendering.
  */
 
-import { useCallback } from 'react';
-import type { Graphics as GraphicsType } from 'pixi.js';
 import { usePixiTheme } from '../theme';
 import { PIXI_FONTS } from '../fonts';
 import { PixiFT2Toolbar, FT2_TOOLBAR_HEIGHT } from './tracker/PixiFT2Toolbar';
@@ -301,12 +299,6 @@ export const PixiTrackerView: React.FC = () => {
 const PixiInstrumentToggle: React.FC<{ show: boolean; visible: boolean; onClick: () => void }> = ({ show, visible, onClick }) => {
   const theme = usePixiTheme();
 
-  const drawBorder = useCallback((g: GraphicsType) => {
-    g.clear();
-    g.rect(0, 0, 1, 9999);
-    g.fill({ color: theme.border.color, alpha: 0.25 });
-  }, [theme]);
-
   return (
     <pixiContainer
       alpha={show ? 1 : 0}
@@ -317,7 +309,7 @@ const PixiInstrumentToggle: React.FC<{ show: boolean; visible: boolean; onClick:
       onPointerUp={onClick}
     >
       {/* Left border */}
-      <pixiGraphics draw={drawBorder} layout={{ position: 'absolute', left: 0, top: 0, width: 1, height: '100%' }} />
+      <layoutContainer alpha={0.25} layout={{ position: 'absolute', left: 0, top: 0, width: 1, height: '100%', backgroundColor: theme.border.color }} />
       {/* Arrow */}
       <pixiBitmapText
         text={visible ? '\u25B6' : '\u25C0'}

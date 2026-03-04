@@ -4,7 +4,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { Graphics as GraphicsType, FederatedPointerEvent } from 'pixi.js';
+import type { FederatedPointerEvent } from 'pixi.js';
 import { usePixiTheme } from '../theme';
 import { usePixiDropdownStore } from '../stores/usePixiDropdownStore';
 import { PixiButton, PixiLabel, PixiSelect } from '../components';
@@ -522,14 +522,6 @@ export const PixiPianoRollView: React.FC<{ isActive?: boolean; windowId?: string
     });
   }, []);
 
-  const drawToolbarBg = useCallback((g: GraphicsType) => {
-    g.clear();
-    g.rect(0, 0, winW, TOOLBAR_HEIGHT);
-    g.fill({ color: theme.bgSecondary.color });
-    g.rect(0, TOOLBAR_HEIGHT - 1, winW, 1);
-    g.fill({ color: theme.border.color, alpha: theme.border.alpha });
-  }, [winW, theme]);
-
   return (
     <pixiContainer
       layout={{
@@ -539,7 +531,7 @@ export const PixiPianoRollView: React.FC<{ isActive?: boolean; windowId?: string
       }}
     >
       {/* Toolbar */}
-      <pixiContainer
+      <layoutContainer
         layout={{
           width: '100%',
           height: TOOLBAR_HEIGHT,
@@ -547,9 +539,11 @@ export const PixiPianoRollView: React.FC<{ isActive?: boolean; windowId?: string
           alignItems: 'center',
           paddingLeft: 8,
           gap: 6,
+          backgroundColor: theme.bgSecondary.color,
+          borderBottomWidth: 1,
+          borderColor: theme.border.color,
         }}
       >
-        <pixiGraphics draw={drawToolbarBg} layout={{ position: 'absolute', width: '100%', height: TOOLBAR_HEIGHT }} />
 
         {/* View mode selector */}
         <PixiSelect
@@ -671,7 +665,7 @@ export const PixiPianoRollView: React.FC<{ isActive?: boolean; windowId?: string
           }}
           layout={{ marginRight: 8 }}
         />
-      </pixiContainer>
+      </layoutContainer>
 
       {/* Main area: Keyboard | Grid | V-scrollbar — hover tracked for wheel scroll */}
       <pixiContainer

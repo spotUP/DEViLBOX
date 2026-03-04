@@ -50,13 +50,6 @@ export const WorkbenchBackground: React.FC<Props> = ({
     el.y = startY - effectivePitch;
   }, [camera.x, camera.y, effectivePitch]);
 
-  // ── Solid background — only resizes on viewport change ───────────────────
-  const drawBg = useCallback((g: GraphicsType) => {
-    g.clear();
-    g.rect(0, 0, width, height);
-    g.fill({ color: 0x0e0e14 });
-  }, [width, height]);
-
   // ── Dot grid — redraws only when zoom or viewport changes ────────────────
   // Draw from 0 to bufW/bufH (one extra tile on all sides).
   // Container position (above) handles the pan offset.
@@ -107,9 +100,8 @@ export const WorkbenchBackground: React.FC<Props> = ({
 
   return (
     <>
-      <pixiGraphics
-        draw={drawBg}
-        layout={{ position: 'absolute', width, height }}
+      <layoutContainer
+        layout={{ position: 'absolute', width, height, backgroundColor: 0x0e0e14 }}
       />
       <pixiContainer
         ref={dotsContainerRef}

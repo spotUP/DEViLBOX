@@ -4,7 +4,6 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef } from 'react';
-import type { Graphics as GraphicsType } from 'pixi.js';
 import { usePixiTheme } from '../theme';
 import { PixiButton, PixiLabel, PixiSelect } from '../components';
 import { PixiArrangementCanvas } from './arrangement/PixiArrangementCanvas';
@@ -440,14 +439,6 @@ export const PixiArrangementView: React.FC = () => {
     useArrangementStore.getState().addTrack();
   }, []);
 
-  const drawToolbarBg = useCallback((g: GraphicsType) => {
-    g.clear();
-    g.rect(0, 0, winW, ARR_TOOLBAR_H);
-    g.fill({ color: theme.bgSecondary.color });
-    g.rect(0, ARR_TOOLBAR_H - 1, winW, 1);
-    g.fill({ color: theme.border.color, alpha: theme.border.alpha });
-  }, [winW, theme]);
-
   return (
     <pixiContainer
       layout={{
@@ -457,7 +448,7 @@ export const PixiArrangementView: React.FC = () => {
       }}
     >
       {/* Toolbar */}
-      <pixiContainer
+      <layoutContainer
         layout={{
           width: '100%',
           height: 36,
@@ -465,9 +456,11 @@ export const PixiArrangementView: React.FC = () => {
           alignItems: 'center',
           paddingLeft: 8,
           gap: 8,
+          backgroundColor: theme.bgSecondary.color,
+          borderBottomWidth: 1,
+          borderColor: theme.border.color,
         }}
       >
-        <pixiGraphics draw={drawToolbarBg} layout={{ position: 'absolute', width: '100%', height: 36 }} />
 
         {/* View mode selector */}
         <PixiSelect
@@ -556,7 +549,7 @@ export const PixiArrangementView: React.FC = () => {
           color="textMuted"
           layout={{ marginRight: 8 }}
         />
-      </pixiContainer>
+      </layoutContainer>
 
       {/* Main area: Track headers | Canvas + scrollbars — hover tracked for wheel scroll */}
       <pixiContainer

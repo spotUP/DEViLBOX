@@ -374,15 +374,6 @@ export const PixiEditorControlsBar: React.FC<PixiEditorControlsBarProps> = ({
     useUIStore.getState().openModal('settings');
   }, []);
 
-  // ── Background ────────────────────────────────────────────────────────────
-  const drawBg = useCallback((g: GraphicsType) => {
-    g.clear();
-    g.rect(0, 0, 4000, BAR_H);
-    g.fill({ color: theme.bgTertiary.color });
-    g.rect(0, BAR_H - 1, 4000, 1);
-    g.fill({ color: theme.border.color, alpha: theme.border.alpha });
-  }, [theme]);
-
   // ── FPS tint ──────────────────────────────────────────────────────────────
   const fpsTint = fps.quality === 'high'
     ? theme.success.color
@@ -391,7 +382,7 @@ export const PixiEditorControlsBar: React.FC<PixiEditorControlsBarProps> = ({
     : theme.error.color;
 
   return (
-    <pixiContainer
+    <layoutContainer
       layout={{
         width: '100%',
         height: BAR_H,
@@ -400,9 +391,11 @@ export const PixiEditorControlsBar: React.FC<PixiEditorControlsBarProps> = ({
         paddingLeft: 8,
         paddingRight: 8,
         gap: 6,
+        backgroundColor: theme.bgTertiary.color,
+        borderBottomWidth: 1,
+        borderColor: theme.border.color,
       }}
     >
-      <pixiGraphics draw={drawBg} layout={{ position: 'absolute', width: '100%', height: BAR_H }} />
 
       {/* View Mode Select */}
       <PixiSelect
@@ -532,6 +525,6 @@ export const PixiEditorControlsBar: React.FC<PixiEditorControlsBarProps> = ({
         tint={fpsTint}
         layout={{}}
       />
-    </pixiContainer>
+    </layoutContainer>
   );
 };

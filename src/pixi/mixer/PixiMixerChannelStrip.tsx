@@ -19,7 +19,7 @@
 import React, { useCallback, useRef, useState } from 'react';
 import { useTick } from '@pixi/react';
 import { isRapidScrolling } from '../scrollPerf';
-import type { Graphics as GraphicsType, Container as ContainerType } from 'pixi.js';
+import type { Container as ContainerType } from 'pixi.js';
 import { PixiLabel } from '../components/PixiLabel';
 import { PixiSlider } from '../components/PixiSlider';
 import { PixiKnob } from '../components/PixiKnob';
@@ -93,17 +93,6 @@ const PixiEffectSlot: React.FC<PixiEffectSlotProps> = ({
   const containerRef = useRef<ContainerType>(null);
   const idRef = useRef(`fx-slot-${channelIndex}-${slotIndex}`);
 
-  const drawBg = useCallback(
-    (g: GraphicsType) => {
-      g.clear();
-      g.roundRect(0, 0, width, FX_SLOT_H, 2);
-      g.fill({ color: hovered ? theme.bgHover.color : theme.bgTertiary.color });
-      g.roundRect(0, 0, width, FX_SLOT_H, 2);
-      g.stroke({ color: theme.border.color, alpha: 0.5, width: 1 });
-    },
-    [hovered, width, theme],
-  );
-
   const label = effectType
     ? (EFFECT_OPTIONS.find(o => o.value === effectType)?.label ?? effectType)
     : '—';
@@ -136,12 +125,15 @@ const PixiEffectSlot: React.FC<PixiEffectSlotProps> = ({
       onPointerOver={() => setHovered(true)}
       onPointerOut={() => setHovered(false)}
       onPointerUp={handleClick}
-      layout={{ width, height: FX_SLOT_H }}
+      layout={{
+        width,
+        height: FX_SLOT_H,
+        backgroundColor: hovered ? theme.bgHover.color : theme.bgTertiary.color,
+        borderWidth: 1,
+        borderColor: theme.border.color,
+        borderRadius: 2,
+      }}
     >
-      <pixiGraphics
-        draw={drawBg}
-        layout={{ position: 'absolute', width, height: FX_SLOT_H }}
-      />
       <pixiBitmapText
         text={label}
         style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 10, fill: 0xffffff }}

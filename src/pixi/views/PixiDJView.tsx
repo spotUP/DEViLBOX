@@ -4,7 +4,6 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { Graphics as GraphicsType } from 'pixi.js';
 import { PIXI_FONTS } from '../fonts';
 import { usePixiTheme } from '../theme';
 import { PixiButton, PixiSelect } from '../components';
@@ -149,16 +148,8 @@ const PixiDJTopBar: React.FC<DJTopBarProps> = ({ browserPanel, onBrowserPanelCha
     s.modalOpen === 'settings' ? s.closeModal() : s.openModal('settings');
   }, []);
 
-  const drawBg = useCallback((g: GraphicsType) => {
-    g.clear();
-    g.rect(0, 0, 4000, 40);
-    g.fill({ color: theme.bgSecondary.color });
-    g.rect(0, 39, 4000, 1);
-    g.fill({ color: theme.border.color, alpha: theme.border.alpha });
-  }, [theme]);
-
   return (
-    <pixiContainer
+    <layoutContainer
       layout={{
         width: '100%',
         height: 40,
@@ -167,10 +158,11 @@ const PixiDJTopBar: React.FC<DJTopBarProps> = ({ browserPanel, onBrowserPanelCha
         paddingLeft: 12,
         paddingRight: 12,
         gap: 6,
+        backgroundColor: theme.bgSecondary.color,
+        borderBottomWidth: 1,
+        borderColor: theme.border.color,
       }}
     >
-      <pixiGraphics draw={drawBg} layout={{ position: 'absolute', width: '100%', height: 40 }} />
-
       {/* View mode selector */}
       <PixiSelect
         value="dj"
@@ -251,6 +243,6 @@ const PixiDJTopBar: React.FC<DJTopBarProps> = ({ browserPanel, onBrowserPanelCha
         active={modalOpen === 'settings'}
         onClick={handleSettings}
       />
-    </pixiContainer>
+    </layoutContainer>
   );
 };

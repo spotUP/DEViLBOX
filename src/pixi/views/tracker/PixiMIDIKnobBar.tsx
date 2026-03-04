@@ -40,21 +40,12 @@ export const PixiMIDIKnobBar: React.FC<PixiMIDIKnobBarProps> = ({ width }) => {
   const currentAssignments = KNOB_BANKS[knobBank];
   const barHeight = showKnobBar ? BAR_HEIGHT_EXPANDED : BAR_HEIGHT_COLLAPSED;
 
-  const drawBg = useCallback((g: GraphicsType) => {
-    g.clear();
-    g.rect(0, 0, width, barHeight);
-    g.fill({ color: theme.bgTertiary.color });
-    g.rect(0, 0, width, 1);
-    g.fill({ color: theme.border.color, alpha: theme.border.alpha });
-  }, [width, barHeight, theme]);
-
   const handleToggle = useCallback(() => {
     setShowKnobBar(!showKnobBar);
   }, [showKnobBar, setShowKnobBar]);
 
   return (
-    <pixiContainer layout={{ width, height: barHeight, flexDirection: 'column' }}>
-      <pixiGraphics draw={drawBg} layout={{ position: 'absolute', width, height: barHeight }} />
+    <layoutContainer layout={{ width, height: barHeight, flexDirection: 'column', backgroundColor: theme.bgTertiary.color, borderTopWidth: 1, borderColor: theme.border.color }}>
 
       {/* Header row */}
       <pixiContainer layout={{ width, height: BAR_HEIGHT_COLLAPSED, flexDirection: 'row', alignItems: 'center', paddingLeft: 8, gap: 4 }}>
@@ -95,7 +86,7 @@ export const PixiMIDIKnobBar: React.FC<PixiMIDIKnobBarProps> = ({ width }) => {
           ))}
         </pixiContainer>
       )}
-    </pixiContainer>
+    </layoutContainer>
   );
 };
 
