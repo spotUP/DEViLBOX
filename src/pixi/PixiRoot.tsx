@@ -45,6 +45,7 @@ import { PixiRevisionBrowserDialog } from './dialogs/PixiRevisionBrowserDialog';
 import { PixiFurnacePresetBrowser } from './dialogs/PixiFurnacePresetBrowser';
 import { PixiSIDInfoModal } from './dialogs/PixiSIDInfoModal';
 import { PixiArrangementContextMenu } from './dialogs/PixiArrangementContextMenu';
+import { PixiHelpModal } from './dialogs/PixiHelpModal';
 
 export const PixiRoot: React.FC = () => {
   const { width, height } = usePixiResponsive();
@@ -170,6 +171,11 @@ export const PixiRoot: React.FC = () => {
         <PixiRevisionBrowserDialog isOpen={modalOpen === 'revisions'} onClose={closeModal} />
         <PixiFurnacePresetBrowser isOpen={modalOpen === 'furnacePresets'} onClose={closeModal} />
         <PixiSIDInfoModal isOpen={modalOpen === 'sidInfo'} onClose={closeModal} />
+        <PixiHelpModal
+          isOpen={modalOpen === 'help'}
+          onClose={closeModal}
+          initialTab={(modalData?.initialTab as 'shortcuts' | 'effects' | 'chip-effects' | 'tutorial') || 'shortcuts'}
+        />
         <PixiClipRenameDialog />
         <PixiTrackRenameDialog />
         <PixiSynthErrorDialog />
