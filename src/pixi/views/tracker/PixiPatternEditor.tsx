@@ -90,7 +90,7 @@ function probColor(val: number): number {
 
 type TrackerPattern = NonNullable<ReturnType<typeof useTrackerStore.getState>['patterns'][0]>;
 
-/** Helper for context-menu "Interpolate Block" items — mirrors CellContextMenu logic */
+/** Helper for context-menu "Interpolate Block" items */
 function _interpolateBlock(
   ts: ReturnType<typeof useTrackerStore.getState>,
   pat: TrackerPattern | undefined,
@@ -431,7 +431,7 @@ function generateLabels(p: RenderParams, vStart: number, currentRow: number): La
 interface PixiPatternEditorProps {
   width: number;
   height: number;
-  /** When false, always-visible PixiDOMOverlay children are hidden to prevent leaking when this view is inactive. */
+  /** Accepted for compatibility; no longer controls DOM overlay visibility. */
   isActive?: boolean;
 }
 

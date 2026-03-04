@@ -42,7 +42,17 @@ interface ContextMenuDropdown {
   onClose: () => void;
 }
 
-export type GlobalDropdown = SelectDropdown | MenuDropdown | ContextMenuDropdown;
+interface ColorPickerDropdown {
+  kind: 'colorPicker';
+  id: string;
+  x: number;
+  y: number;
+  currentColor: string | null;
+  onColorSelect: (color: string | null) => void;
+  onClose: () => void;
+}
+
+export type GlobalDropdown = SelectDropdown | MenuDropdown | ContextMenuDropdown | ColorPickerDropdown;
 
 interface PixiDropdownStore {
   dropdown: GlobalDropdown | null;
