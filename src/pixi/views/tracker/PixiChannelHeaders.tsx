@@ -15,6 +15,7 @@ import { createPortal } from 'react-dom';
 import type { Graphics as GraphicsType, FederatedPointerEvent } from 'pixi.js';
 import { usePixiTheme } from '../../theme';
 import { PIXI_FONTS } from '../../fonts';
+import { FAD_ICONS } from '../../fontaudioIcons';
 import { usePixiDropdownStore } from '../../stores/usePixiDropdownStore';
 import { useUIStore } from '@stores';
 import { useLiveModeStore } from '@stores/useLiveModeStore';
@@ -30,6 +31,66 @@ const BTN_W = 16;
 const BTN_H = 14;
 const BTN_GAP = 2;
 const BTN_R = 3;
+
+// ─── Hoverable button sub-component ─────────────────────────────────────────
+const HoverableHeaderBtn: React.FC<{
+  drawBg: (g: GraphicsType) => void;
+  drawHoverBg: (g: GraphicsType) => void;
+  onPress: (e: FederatedPointerEvent) => void;
+  children: React.ReactNode;
+}> = React.memo(({ drawBg, drawHoverBg, onPress, children }) => {
+  const [hovered, setHovered] = useState(false);
+  return (
+    <pixiContainer
+      eventMode="static"
+      cursor="pointer"
+      onPointerUp={(e: FederatedPointerEvent) => { e.stopPropagation(); onPress(e); }}
+      onPointerOver={() => setHovered(true)}
+      onPointerOut={() => setHovered(false)}
+      layout={{ width: BTN_W, height: BTN_H, justifyContent: 'center', alignItems: 'center' }}
+    >
+      <pixiGraphics draw={hovered ? drawHoverBg : drawBg} layout={{ position: 'absolute', width: BTN_W, height: BTN_H }} />
+      {children}
+    </pixiContainer>
+  );
+});
+
+const AddChannelBtn: React.FC<{
+  left: number;
+  drawBg: (g: GraphicsType) => void;
+  drawHoverBg: (g: GraphicsType) => void;
+  textColor: number;
+  hoverTextColor: number;
+  onPress: () => void;
+}> = React.memo(({ left, drawBg, drawHoverBg, textColor, hoverTextColor, onPress }) => {
+  const [hovered, setHovered] = useState(false);
+  return (
+    <pixiContainer
+      eventMode="static"
+      cursor="pointer"
+      onPointerUp={() => onPress()}
+      onPointerOver={() => setHovered(true)}
+      onPointerOut={() => setHovered(false)}
+      layout={{
+        position: 'absolute',
+        left,
+        top: (HEADER_HEIGHT - BTN_H) / 2,
+        width: 32,
+        height: BTN_H,
+        justifyContent: 'center',
+        alignItems: 'center',
+      }}
+    >
+      <pixiGraphics draw={hovered ? drawHoverBg : drawBg} layout={{ position: 'absolute', width: 32, height: BTN_H }} />
+      <pixiBitmapText
+        text="+"
+        style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 12, fill: 0xffffff }}
+        tint={hovered ? hoverTextColor : textColor}
+        layout={{}}
+      />
+    </pixiContainer>
+  );
+});
 
 type TrackerPattern = {
   id: string;
@@ -197,9 +258,9 @@ export const PixiChannelHeaders: React.FC<PixiChannelHeadersProps> = ({
     g.clear();
     g.roundRect(0, 0, BTN_W, BTN_H, BTN_R);
     if (solo) {
-      g.fill({ color: theme.warning.color, alpha: 0.25 });
+      g.fill({ color: theme.accent.color, alpha: 0.2 });
       g.roundRect(0, 0, BTN_W, BTN_H, BTN_R);
-      g.stroke({ color: theme.warning.color, alpha: 0.6, width: 1 });
+      g.stroke({ color: theme.accent.color, alpha: 0.6, width: 1 });
     } else {
       g.fill({ color: theme.bgSecondary.color, alpha: 0.5 });
       g.roundRect(0, 0, BTN_W, BTN_H, BTN_R);
@@ -217,6 +278,12 @@ export const PixiChannelHeaders: React.FC<PixiChannelHeadersProps> = ({
     g.clear();
     g.roundRect(0, 0, BTN_W, BTN_H, BTN_R);
     g.fill({ color: theme.bgSecondary.color, alpha: 0.3 });
+  }, [theme]);
+
+  const drawHoverBtn = useCallback((g: GraphicsType) => {
+    g.clear();
+    g.roundRect(0, 0, BTN_W, BTN_H, BTN_R);
+    g.fill({ color: theme.bgHover.color, alpha: 0.5 });
   }, [theme]);
 
   const drawColorBtn = useCallback((g: GraphicsType, color: string | null) => {
@@ -420,20 +487,14 @@ export const PixiChannelHeaders: React.FC<PixiChannelHeadersProps> = ({
               layout={{}}
             />
             {/* Expand button */}
-            <pixiContainer
-              eventMode="static"
-              cursor="pointer"
-              onPointerUp={(e: FederatedPointerEvent) => { e.stopPropagation(); onToggleCollapse(ch); }}
-              layout={{ width: BTN_W, height: BTN_H, justifyContent: 'center', alignItems: 'center' }}
-            >
-              <pixiGraphics draw={drawCollapseBtn} layout={{ position: 'absolute', width: BTN_W, height: BTN_H }} />
+            <HoverableHeaderBtn drawBg={drawCollapseBtn} drawHoverBg={drawHoverBtn} onPress={() => onToggleCollapse(ch)}>
               <pixiBitmapText
-                text={'\u25B6'}
-                style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 8, fill: 0xffffff }}
+                text={FAD_ICONS['caret-right']}
+                style={{ fontFamily: PIXI_FONTS.ICONS, fontSize: 10, fill: 0xffffff }}
                 tint={theme.textMuted.color}
                 layout={{}}
               />
-            </pixiContainer>
+            </HoverableHeaderBtn>
           </pixiContainer>
         );
         continue;
@@ -543,87 +604,57 @@ export const PixiChannelHeaders: React.FC<PixiChannelHeadersProps> = ({
           {/* Button area */}
           <pixiContainer layout={{ flexDirection: 'row', alignItems: 'center', gap: BTN_GAP, marginLeft: 'auto' }}>
             {/* Context menu button (three dots) */}
-            <pixiContainer
-              eventMode="static"
-              cursor="pointer"
-              onPointerUp={(e: FederatedPointerEvent) => { e.stopPropagation(); openContextMenu(ch, e); }}
-              layout={{ width: BTN_W, height: BTN_H, justifyContent: 'center', alignItems: 'center' }}
-            >
-              <pixiGraphics draw={drawContextBtn} layout={{ position: 'absolute', width: BTN_W, height: BTN_H }} />
+            <HoverableHeaderBtn drawBg={drawContextBtn} drawHoverBg={drawHoverBtn} onPress={(e) => openContextMenu(ch, e)}>
               <pixiBitmapText
                 text={'\u2026'}
                 style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 10, fill: 0xffffff }}
                 tint={theme.textMuted.color}
                 layout={{}}
               />
-            </pixiContainer>
+            </HoverableHeaderBtn>
 
             {/* Color picker button */}
-            <pixiContainer
-              eventMode="static"
-              cursor="pointer"
-              onPointerUp={(e: FederatedPointerEvent) => { e.stopPropagation(); openColorPicker(ch, e); }}
-              layout={{ width: BTN_W, height: BTN_H, justifyContent: 'center', alignItems: 'center' }}
+            <HoverableHeaderBtn
+              drawBg={(g: GraphicsType) => drawColorBtn(g, channel.color)}
+              drawHoverBg={(g: GraphicsType) => {
+                drawColorBtn(g, channel.color);
+                g.roundRect(0, 0, BTN_W, BTN_H, BTN_R);
+                g.stroke({ color: theme.text.color, alpha: 0.3, width: 1 });
+              }}
+              onPress={(e) => openColorPicker(ch, e)}
             >
-              <pixiGraphics
-                draw={(g: GraphicsType) => drawColorBtn(g, channel.color)}
-                layout={{ position: 'absolute', width: BTN_W, height: BTN_H }}
-              />
-            </pixiContainer>
+              {null}
+            </HoverableHeaderBtn>
 
-            {/* Mute button */}
-            <pixiContainer
-              eventMode="static"
-              cursor="pointer"
-              onPointerUp={(e: FederatedPointerEvent) => { e.stopPropagation(); onToggleMute(ch); }}
-              layout={{ width: BTN_W, height: BTN_H, justifyContent: 'center', alignItems: 'center' }}
-            >
-              <pixiGraphics
-                draw={(g: GraphicsType) => drawMuteBtn(g, channel.muted)}
-                layout={{ position: 'absolute', width: BTN_W, height: BTN_H }}
-              />
+            {/* Mute button — speaker/mute icon matching DOM VolumeX/Volume2 */}
+            <HoverableHeaderBtn drawBg={(g: GraphicsType) => drawMuteBtn(g, channel.muted)} drawHoverBg={drawHoverBtn} onPress={() => onToggleMute(ch)}>
               <pixiBitmapText
-                text="M"
-                style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 8, fill: 0xffffff }}
+                text={channel.muted ? FAD_ICONS['mute'] : FAD_ICONS['speaker']}
+                style={{ fontFamily: PIXI_FONTS.ICONS, fontSize: 10, fill: 0xffffff }}
                 tint={channel.muted ? theme.error.color : theme.textMuted.color}
                 layout={{}}
               />
-            </pixiContainer>
+            </HoverableHeaderBtn>
 
-            {/* Solo button */}
-            <pixiContainer
-              eventMode="static"
-              cursor="pointer"
-              onPointerUp={(e: FederatedPointerEvent) => { e.stopPropagation(); onToggleSolo(ch); }}
-              layout={{ width: BTN_W, height: BTN_H, justifyContent: 'center', alignItems: 'center' }}
-            >
-              <pixiGraphics
-                draw={(g: GraphicsType) => drawSoloBtn(g, channel.solo)}
-                layout={{ position: 'absolute', width: BTN_W, height: BTN_H }}
-              />
+            {/* Solo button — headphones icon matching DOM Headphones */}
+            <HoverableHeaderBtn drawBg={(g: GraphicsType) => drawSoloBtn(g, channel.solo)} drawHoverBg={drawHoverBtn} onPress={() => onToggleSolo(ch)}>
               <pixiBitmapText
-                text="S"
-                style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 8, fill: 0xffffff }}
-                tint={channel.solo ? theme.warning.color : theme.textMuted.color}
+                text={FAD_ICONS['headphones']}
+                style={{ fontFamily: PIXI_FONTS.ICONS, fontSize: 10, fill: 0xffffff }}
+                tint={channel.solo ? theme.accent.color : theme.textMuted.color}
                 layout={{}}
               />
-            </pixiContainer>
+            </HoverableHeaderBtn>
 
-            {/* Collapse button */}
-            <pixiContainer
-              eventMode="static"
-              cursor="pointer"
-              onPointerUp={(e: FederatedPointerEvent) => { e.stopPropagation(); onToggleCollapse(ch); }}
-              layout={{ width: BTN_W, height: BTN_H, justifyContent: 'center', alignItems: 'center' }}
-            >
-              <pixiGraphics draw={drawCollapseBtn} layout={{ position: 'absolute', width: BTN_W, height: BTN_H }} />
+            {/* Collapse button — caret-left matching DOM ChevronLeft */}
+            <HoverableHeaderBtn drawBg={drawCollapseBtn} drawHoverBg={drawHoverBtn} onPress={() => onToggleCollapse(ch)}>
               <pixiBitmapText
-                text={'\u25C0'}
-                style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 8, fill: 0xffffff }}
+                text={FAD_ICONS['caret-left']}
+                style={{ fontFamily: PIXI_FONTS.ICONS, fontSize: 10, fill: 0xffffff }}
                 tint={theme.textMuted.color}
                 layout={{}}
               />
-            </pixiContainer>
+            </HoverableHeaderBtn>
           </pixiContainer>
         </pixiContainer>
       );
@@ -635,29 +666,21 @@ export const PixiChannelHeaders: React.FC<PixiChannelHeadersProps> = ({
         ? channelOffsets[numChannels - 1] + channelWidths[numChannels - 1] - LINE_NUMBER_WIDTH
         : 0;
       headers.push(
-        <pixiContainer
+        <AddChannelBtn
           key="add-channel"
-          eventMode="static"
-          cursor="pointer"
-          onPointerUp={() => onAddChannel()}
-          layout={{
-            position: 'absolute',
-            left: lastOffset + 4,
-            top: (HEADER_HEIGHT - BTN_H) / 2,
-            width: 32,
-            height: BTN_H,
-            justifyContent: 'center',
-            alignItems: 'center',
+          left={lastOffset + 4}
+          drawBg={drawAddBtn}
+          drawHoverBg={(g: GraphicsType) => {
+            g.clear();
+            g.roundRect(0, 0, 32, BTN_H, BTN_R);
+            g.fill({ color: theme.bgHover.color, alpha: 0.5 });
+            g.roundRect(0, 0, 32, BTN_H, BTN_R);
+            g.stroke({ color: theme.accent.color, alpha: 0.3, width: 1 });
           }}
-        >
-          <pixiGraphics draw={drawAddBtn} layout={{ position: 'absolute', width: 32, height: BTN_H }} />
-          <pixiBitmapText
-            text="+"
-            style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 12, fill: 0xffffff }}
-            tint={theme.textMuted.color}
-            layout={{}}
-          />
-        </pixiContainer>
+          textColor={theme.textMuted.color}
+          hoverTextColor={theme.accent.color}
+          onPress={onAddChannel}
+        />
       );
     }
 
@@ -667,7 +690,7 @@ export const PixiChannelHeaders: React.FC<PixiChannelHeadersProps> = ({
     theme, showChannelNames, channelSpeeds, songInitialSpeed, editingChannel, editValue,
     onToggleMute, onToggleSolo, onToggleCollapse, onAddChannel,
     openContextMenu, openColorPicker, startEditing,
-    drawMuteBtn, drawSoloBtn, drawCollapseBtn, drawContextBtn, drawColorBtn, drawAddBtn,
+    drawMuteBtn, drawSoloBtn, drawCollapseBtn, drawContextBtn, drawColorBtn, drawAddBtn, drawHoverBtn,
   ]);
 
 
