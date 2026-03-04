@@ -1,10 +1,10 @@
 /**
  * PixiModal — Full-screen semi-transparent overlay with centered content container.
- * Includes header/footer bars. Click-outside-to-close, Escape key.
+ * Matches DOM Modal/ModalHeader/ModalFooter styling 1:1.
  * Uses layoutContainer native bg/border — no manual Graphics.
  */
 
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import type { Graphics as GraphicsType, FederatedPointerEvent } from 'pixi.js';
 import { useApplication } from '@pixi/react';
 import { PIXI_FONTS } from '../fonts';
@@ -18,6 +18,16 @@ interface PixiModalProps {
   title?: string;
   width?: number;
   height?: number;
+  /** Backdrop opacity 0-1 (default 0.6 = DOM bg-black/60) */
+  overlayAlpha?: number;
+  /** Outer border width (default 1 = DOM border) */
+  borderWidth?: number;
+  /** Outer border radius (default 8 = DOM rounded-lg) */
+  borderRadius?: number;
+  /** Override panel background color */
+  bgColor?: number;
+  /** Override panel border color */
+  borderColor?: number;
   children?: React.ReactNode;
 }
 
@@ -27,19 +37,20 @@ export const PixiModal: React.FC<PixiModalProps> = ({
   title,
   width = 400,
   height = 300,
+  overlayAlpha = 0.6,
+  borderWidth: bw = 1,
+  borderRadius: br = 8,
+  bgColor,
+  borderColor: bc,
   children,
 }) => {
   const theme = usePixiTheme();
   const { app } = useApplication();
 
-  // Escape key handler
   useEffect(() => {
     if (!isOpen) return;
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.preventDefault();
-        onClose();
-      }
+      if (e.key === 'Escape') { e.preventDefault(); onClose(); }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
@@ -50,26 +61,25 @@ export const PixiModal: React.FC<PixiModalProps> = ({
 
   const screenW = app.screen.width ?? 1920;
   const screenH = app.screen.height ?? 1080;
+  const panelBg = bgColor ?? theme.bg.color;
+  const panelBorder = bc ?? theme.border.color;
 
-  const drawOverlay = (g: GraphicsType) => {
+  const drawOverlay = useCallback((g: GraphicsType) => {
     g.clear();
     g.rect(0, 0, screenW, screenH);
-    g.fill({ color: 0x000000, alpha: 0.6 });
-  };
+    g.fill({ color: 0x000000, alpha: overlayAlpha });
+  }, [screenW, screenH, overlayAlpha]);
 
-  // Click overlay to close
   const handleOverlayClick = useCallback((_e: FederatedPointerEvent) => {
     onClose();
   }, [onClose]);
 
-  // Prevent click propagation on the panel
   const handlePanelClick = useCallback((e: FederatedPointerEvent) => {
     e.stopPropagation();
   }, []);
 
   return (
     <pixiContainer layout={{ position: 'absolute', width: '100%', height: '100%' }}>
-      {/* Overlay backdrop — Graphics needed for semi-transparent fill */}
       <pixiGraphics
         draw={drawOverlay}
         eventMode="static"
@@ -77,138 +87,153 @@ export const PixiModal: React.FC<PixiModalProps> = ({
         layout={{ position: 'absolute', width: screenW, height: screenH }}
       />
 
-      {/* Centered panel — native bg/border via layoutContainer */}
+      {/* Centered panel — matches DOM: bg-dark-bg, border, rounded-lg, shadow-xl */}
       <layoutContainer
         eventMode="static"
         onPointerDown={handlePanelClick}
         layout={{
           position: 'absolute',
-          left: (screenW - width) / 2,
-          top: (screenH - height) / 2,
+          left: Math.round((screenW - width) / 2),
+          top: Math.round((screenH - height) / 2),
           width,
           height,
           flexDirection: 'column',
-          backgroundColor: theme.bgSecondary.color,
-          borderWidth: 1,
-          borderColor: theme.border.color,
-          borderRadius: 8,
+          backgroundColor: panelBg,
+          borderWidth: bw,
+          borderColor: panelBorder,
+          borderRadius: br,
           overflow: 'hidden',
         }}
       >
-        {/* Header */}
+        {/* Built-in header (when title prop is used) — matches DOM ModalHeader */}
         {title && (
-          <layoutContainer
-            layout={{
-              width,
-              height: 36,
-              flexDirection: 'row',
-              alignItems: 'center',
-              paddingLeft: 12,
-              backgroundColor: theme.bgTertiary.color,
-              borderBottomWidth: 1,
-              borderColor: theme.border.color,
-            }}
-          >
-            <pixiBitmapText
-              text={title}
-              style={{ fontFamily: PIXI_FONTS.SANS_SEMIBOLD, fontSize: 13, fill: 0xffffff }}
-              tint={theme.text.color}
-              layout={{}}
-            />
-          </layoutContainer>
+          <PixiModalHeader title={title} onClose={onClose} />
         )}
 
-        {/* Content area */}
-        <pixiContainer
-          layout={{
-            flex: 1,
-            width,
-            padding: 12,
-            flexDirection: 'column',
-          }}
-        >
+        {/* Content — NO padding, each modal controls its own layout */}
+        <layoutContainer layout={{ flex: 1, flexDirection: 'column', overflow: 'hidden' }}>
           {children}
-        </pixiContainer>
+        </layoutContainer>
       </layoutContainer>
     </pixiContainer>
   );
 };
 
 // ─── PixiModalHeader ──────────────────────────────────────────────────────────
+// Matches DOM ModalHeader: px-4 py-3, bg-dark-bgSecondary, border-b, icon + title + subtitle
 
 interface PixiModalHeaderProps {
   title: string;
+  subtitle?: string;
+  /** Override bg color */
+  bgColor?: number;
   width?: number;
   onClose?: () => void;
 }
 
 export const PixiModalHeader: React.FC<PixiModalHeaderProps> = ({
   title,
-  width = 400,
+  subtitle,
+  bgColor,
   onClose,
 }) => {
   const theme = usePixiTheme();
+  const [closeHovered, setCloseHovered] = useState(false);
 
   return (
     <layoutContainer
       layout={{
-        width,
-        height: 36,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        paddingLeft: 12,
-        paddingRight: 12,
-        backgroundColor: theme.bgTertiary.color,
+        paddingLeft: 16,
+        paddingRight: 16,
+        paddingTop: 12,
+        paddingBottom: 12,
+        backgroundColor: bgColor ?? theme.bgSecondary.color,
         borderBottomWidth: 1,
         borderColor: theme.border.color,
       }}
     >
-      <pixiBitmapText
-        text={title}
-        style={{ fontFamily: PIXI_FONTS.SANS_SEMIBOLD, fontSize: 13, fill: 0xffffff }}
-        tint={theme.text.color}
-        layout={{}}
-      />
-      {onClose && (
+      <layoutContainer layout={{ flexDirection: 'column', gap: 2, flex: 1 }}>
         <pixiBitmapText
-          text="X"
-          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 13, fill: 0xffffff }}
-          tint={theme.textMuted.color}
-          eventMode="static"
-          cursor="pointer"
-          onPointerUp={onClose}
+          text={title}
+          style={{ fontFamily: PIXI_FONTS.SANS_BOLD, fontSize: 14, fill: 0xffffff }}
+          tint={theme.text.color}
           layout={{}}
         />
+        {subtitle && (
+          <pixiBitmapText
+            text={subtitle}
+            style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 11, fill: 0xffffff }}
+            tint={theme.textSecondary.color}
+            layout={{}}
+          />
+        )}
+      </layoutContainer>
+      {onClose && (
+        <layoutContainer
+          eventMode="static"
+          cursor="pointer"
+          onPointerOver={() => setCloseHovered(true)}
+          onPointerOut={() => setCloseHovered(false)}
+          onPointerUp={onClose}
+          layout={{
+            width: 28,
+            height: 28,
+            justifyContent: 'center',
+            alignItems: 'center',
+            borderRadius: 6,
+            ...(closeHovered ? { backgroundColor: theme.bgHover.color } : {}),
+          }}
+        >
+          <pixiBitmapText
+            text="✕"
+            style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 14, fill: 0xffffff }}
+            tint={closeHovered ? theme.text.color : theme.textMuted.color}
+            layout={{}}
+          />
+        </layoutContainer>
       )}
     </layoutContainer>
   );
 };
 
 // ─── PixiModalFooter ──────────────────────────────────────────────────────────
+// Matches DOM ModalFooter: px-4 py-3, bg-dark-bgSecondary, border-t, flex alignment
 
 interface PixiModalFooterProps {
   width?: number;
+  align?: 'left' | 'center' | 'right' | 'between';
+  /** Override bg color */
+  bgColor?: number;
   children?: React.ReactNode;
 }
 
 export const PixiModalFooter: React.FC<PixiModalFooterProps> = ({
-  width = 400,
+  align = 'right',
+  bgColor,
   children,
 }) => {
   const theme = usePixiTheme();
 
+  const justifyContent = align === 'between' ? 'space-between'
+    : align === 'center' ? 'center'
+    : align === 'left' ? 'flex-start'
+    : 'flex-end';
+
   return (
     <layoutContainer
       layout={{
-        width,
-        height: 44,
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'flex-end',
-        paddingRight: 12,
+        justifyContent,
+        paddingLeft: 16,
+        paddingRight: 16,
+        paddingTop: 12,
+        paddingBottom: 12,
         gap: 8,
-        backgroundColor: theme.bgTertiary.color,
+        backgroundColor: bgColor ?? theme.bgSecondary.color,
         borderTopWidth: 1,
         borderColor: theme.border.color,
       }}
