@@ -67,6 +67,10 @@ export const GlModal: React.FC<GlModalProps> = ({
     e.stopPropagation();
   }, []);
 
+  const blockWheel = useCallback((e: { stopPropagation: () => void }) => {
+    e.stopPropagation();
+  }, []);
+
   return (
     <pixiContainer layout={{ position: 'absolute', width: '100%', height: '100%' }}>
       {/* Backdrop overlay */}
@@ -74,6 +78,7 @@ export const GlModal: React.FC<GlModalProps> = ({
         draw={drawOverlay}
         eventMode="static"
         onPointerUp={handleOverlayClick}
+        onWheel={blockWheel}
         layout={{ position: 'absolute', width: screenW, height: screenH }}
       />
 

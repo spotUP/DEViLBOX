@@ -44,12 +44,13 @@ const HoverableHeaderBtn: React.FC<{
     <pixiContainer
       eventMode="static"
       cursor="pointer"
+      onClick={(e: FederatedPointerEvent) => { e.stopPropagation(); onPress(e); }}
       onPointerUp={(e: FederatedPointerEvent) => { e.stopPropagation(); onPress(e); }}
       onPointerOver={() => setHovered(true)}
       onPointerOut={() => setHovered(false)}
       layout={{ width: BTN_W, height: BTN_H, justifyContent: 'center', alignItems: 'center' }}
     >
-      <pixiGraphics draw={hovered ? drawHoverBg : drawBg} layout={{ position: 'absolute', width: BTN_W, height: BTN_H }} />
+      <pixiGraphics draw={hovered ? drawHoverBg : drawBg} eventMode="none" layout={{ position: 'absolute', width: BTN_W, height: BTN_H }} />
       {children}
     </pixiContainer>
   );
@@ -68,6 +69,7 @@ const AddChannelBtn: React.FC<{
     <pixiContainer
       eventMode="static"
       cursor="pointer"
+      onClick={() => onPress()}
       onPointerUp={() => onPress()}
       onPointerOver={() => setHovered(true)}
       onPointerOut={() => setHovered(false)}
@@ -81,11 +83,12 @@ const AddChannelBtn: React.FC<{
         alignItems: 'center',
       }}
     >
-      <pixiGraphics draw={hovered ? drawHoverBg : drawBg} layout={{ position: 'absolute', width: 32, height: BTN_H }} />
+      <pixiGraphics draw={hovered ? drawHoverBg : drawBg} eventMode="none" layout={{ position: 'absolute', width: 32, height: BTN_H }} />
       <pixiBitmapText
         text="+"
         style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 12, fill: 0xffffff }}
         tint={hovered ? hoverTextColor : textColor}
+        eventMode="none"
         layout={{}}
       />
     </pixiContainer>
@@ -492,6 +495,7 @@ export const PixiChannelHeaders: React.FC<PixiChannelHeadersProps> = ({
                 text={FAD_ICONS['caret-right']}
                 style={{ fontFamily: PIXI_FONTS.ICONS, fontSize: 10, fill: 0xffffff }}
                 tint={theme.textMuted.color}
+                eventMode="none"
                 layout={{}}
               />
             </HoverableHeaderBtn>
@@ -609,6 +613,7 @@ export const PixiChannelHeaders: React.FC<PixiChannelHeadersProps> = ({
                 text={'\u2026'}
                 style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 10, fill: 0xffffff }}
                 tint={theme.textMuted.color}
+                eventMode="none"
                 layout={{}}
               />
             </HoverableHeaderBtn>
@@ -632,6 +637,7 @@ export const PixiChannelHeaders: React.FC<PixiChannelHeadersProps> = ({
                 text={channel.muted ? FAD_ICONS['mute'] : FAD_ICONS['speaker']}
                 style={{ fontFamily: PIXI_FONTS.ICONS, fontSize: 10, fill: 0xffffff }}
                 tint={channel.muted ? theme.error.color : theme.textMuted.color}
+                eventMode="none"
                 layout={{}}
               />
             </HoverableHeaderBtn>
@@ -642,6 +648,7 @@ export const PixiChannelHeaders: React.FC<PixiChannelHeadersProps> = ({
                 text={FAD_ICONS['headphones']}
                 style={{ fontFamily: PIXI_FONTS.ICONS, fontSize: 10, fill: 0xffffff }}
                 tint={channel.solo ? theme.accent.color : theme.textMuted.color}
+                eventMode="none"
                 layout={{}}
               />
             </HoverableHeaderBtn>
@@ -652,6 +659,7 @@ export const PixiChannelHeaders: React.FC<PixiChannelHeadersProps> = ({
                 text={FAD_ICONS['caret-left']}
                 style={{ fontFamily: PIXI_FONTS.ICONS, fontSize: 10, fill: 0xffffff }}
                 tint={theme.textMuted.color}
+                eventMode="none"
                 layout={{}}
               />
             </HoverableHeaderBtn>
