@@ -4,7 +4,6 @@
  */
 
 import React, { useCallback, useEffect, useState } from 'react';
-import { fetchFileInfoByPath } from '@/lib/sid/composerApi';
 import type { STILEntry, STILSubsongInfo } from '@/lib/sid/STILParser';
 import { parseSTIL, lookupSTIL } from '@/lib/sid/STILParser';
 import { PixiButton, PixiLabel, PixiScrollView } from '../../components';
