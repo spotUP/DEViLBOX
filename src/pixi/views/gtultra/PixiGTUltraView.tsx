@@ -15,6 +15,7 @@
 
 import React, { useCallback, useEffect, useMemo } from 'react';
 import type { Graphics as GraphicsType } from 'pixi.js';
+import * as Tone from 'tone';
 import { PIXI_FONTS } from '@/pixi/fonts';
 import { PixiButton } from '@/pixi/components/PixiButton';
 import { PixiGTPatternGrid } from './PixiGTPatternGrid';
@@ -69,12 +70,15 @@ export const PixiGTUltraView: React.FC<Props> = ({ width, height }) => {
     let disposed = false;
 
     const setup = async () => {
-      const audioCtx = new AudioContext();
+      const audioCtx = Tone.getContext().rawContext as AudioContext;
+      if (audioCtx.state === 'suspended') await audioCtx.resume();
       gtEngine = new GTUltraEngine(audioCtx, {
         onReady: () => {
           if (disposed) return;
           console.log('[GTUltra/Pixi] Engine ready');
           const store = useGTUltraStore.getState();
+          // Set engine in store FIRST so refresh methods can use it
+          useGTUltraStore.getState().setEngine(gtEngine);
           // Load any pending song data that arrived before engine was ready
           if (store.pendingSongData) {
             gtEngine!.loadSong(store.pendingSongData.buffer as ArrayBuffer);
@@ -107,7 +111,7 @@ export const PixiGTUltraView: React.FC<Props> = ({ width, height }) => {
       await gtEngine.ready;
       if (disposed) { gtEngine.dispose(); return; }
       gtEngine.output.connect(audioCtx.destination);
-      useGTUltraStore.getState().setEngine(gtEngine);
+      // Engine already set in store by onReady callback above
     };
 
     setup().catch(console.error);
@@ -290,13 +294,13 @@ export const PixiGTUltraView: React.FC<Props> = ({ width, height }) => {
         {/* Pattern editor: hex grid in Pro, piano roll in Studio.
             Both always mounted to avoid @pixi/layout Yoga BindingErrors
             when switching modes. Inactive view hidden via alpha/renderable. */}
-        <pixiContainer alpha={viewMode === 'pro' ? 1 : 0} renderable={viewMode === 'pro'} eventMode={viewMode === 'pro' ? 'static' : 'none'}>
+        <pixiContainer alpha={viewMode === 'pro' ? 1 : 0} renderable={viewMode === 'pro'} eventMode={viewMode === 'pro' ? 'static' : 'none'} layout={{ width: editorWidth, height: editorHeight }}>
           <PixiGTPatternGrid
             width={Math.max(100, editorWidth)}
             height={Math.max(100, editorHeight)}
           />
         </pixiContainer>
-        <pixiContainer alpha={viewMode !== 'pro' ? 1 : 0} renderable={viewMode !== 'pro'} eventMode={viewMode !== 'pro' ? 'static' : 'none'} layout={{ position: 'absolute', top: 0, left: 0 }}>
+        <pixiContainer alpha={viewMode !== 'pro' ? 1 : 0} renderable={viewMode !== 'pro'} eventMode={viewMode !== 'pro' ? 'static' : 'none'} layout={{ position: 'absolute', top: 0, left: 0, width: editorWidth, height: editorHeight }}>
           <PixiGTPianoRoll
             width={Math.max(100, editorWidth)}
             height={Math.max(100, editorHeight)}
