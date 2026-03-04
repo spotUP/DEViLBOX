@@ -81,13 +81,13 @@ function readString(v: DataView, off: number, len: number): string {
 }
 
 // -- SA note → XM note --------------------------------------------------------
-// SA period table is 1-based: index 37 = period 856 = ProTracker C-1.
-// ProTracker C-1 = XM note 13 (MIDI 24).  So xmNote = saNote - 24.
-// This maps SA 25→XM 1 (lowest valid XM note) up through SA 120→XM 96.
+// SA period table is 1-based: index 49 = period 856 = ProTracker C-1.
+// ProTracker C-1 = XM note 13 (MIDI 24).  So xmNote = saNote - 36.
+// This maps SA 37→XM 1 (lowest valid XM note) up through SA 132→XM 96.
 
 function saNote2XM(note: number): number {
   if (note === 0) return 0;
-  const xm = note - 24;
+  const xm = note - 36;
   return xm >= 1 ? xm : 0;
 }
 
