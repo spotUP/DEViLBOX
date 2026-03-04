@@ -671,9 +671,9 @@ export function updateSonicArrangerParameters(
   instrumentId: number,
   config: import('@typedefs/instrument').SonicArrangerConfig,
 ): void {
-  for (const [key, instrument] of ctx.instruments.entries()) {
-    if ((key >> 16) === instrumentId && typeof (instrument as any).updateConfig === 'function') {
+  ctx.instruments.forEach((instrument, key) => {
+    if (ctx.instrumentIdFromKey(key) === instrumentId && typeof (instrument as any).updateConfig === 'function') {
       (instrument as any).updateConfig(config);
     }
-  }
+  });
 }
