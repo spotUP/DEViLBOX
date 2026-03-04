@@ -55,6 +55,7 @@ import { PixiCollaborationModal } from './dialogs/PixiCollaborationModal';
 import { PixiRevisionBrowserDialog } from './dialogs/PixiRevisionBrowserDialog';
 import { PixiFurnacePresetBrowser } from './dialogs/PixiFurnacePresetBrowser';
 import { PixiSIDInfoModal } from './dialogs/PixiSIDInfoModal';
+import { PixiModuleInfoModal } from './dialogs/PixiModuleInfoModal';
 import { PixiArrangementContextMenu } from './dialogs/PixiArrangementContextMenu';
 import { PixiHelpModal } from './dialogs/PixiHelpModal';
 import { PixiDrumpadEditorModal } from './dialogs/PixiDrumpadEditorModal';
@@ -329,6 +330,7 @@ export const PixiRoot: React.FC = () => {
         <PixiRevisionBrowserDialog isOpen={modalOpen === 'revisions'} onClose={closeModal} />
         <PixiFurnacePresetBrowser isOpen={modalOpen === 'furnacePresets'} onClose={closeModal} />
         <PixiSIDInfoModal isOpen={modalOpen === 'sidInfo'} onClose={closeModal} />
+        <PixiModuleInfoModal isOpen={modalOpen === 'moduleInfo'} onClose={closeModal} />
         <PixiHelpModal
           isOpen={modalOpen === 'help'}
           onClose={closeModal}
