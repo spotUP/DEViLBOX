@@ -529,7 +529,6 @@ interface CanvasViewProps {
 }
 
 const CanvasView: React.FC<CanvasViewProps> = ({ modules, connections, width, height, wiring, selectedModule, onSelect, onPort, onParam, onRemove, onUpdateModules }) => {
-  const theme = usePixiTheme();
   const [canvasOffset, setCanvasOffset] = useState({ x: 0, y: 0 });
   const [canvasZoom, setCanvasZoom] = useState(1);
   const isPanningRef = useRef(false);
@@ -715,7 +714,7 @@ const CanvasModuleCard: React.FC<{
   onPort: (ref: PortRef, dir: 'input' | 'output') => void;
   onParam: (mid: string, pid: string, v: number) => void;
   onRemove: (mid: string) => void;
-}> = ({ mod, selectedModule, wiring, onDragStart, onSelect, onPort, onParam, onRemove }) => {
+}> = ({ mod, selectedModule, wiring, onDragStart, onSelect: _onSelect, onPort, onParam, onRemove: _onRemove }) => {
   const theme = usePixiTheme();
   const desc = getDesc(mod.descriptorId); if (!desc) return null;
   const pos = mod.position || { x: 0, y: 0 };

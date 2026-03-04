@@ -664,10 +664,6 @@ const PixiVinylDisplay: React.FC<{
 
     // We need the wheel on the actual DOM canvas; pixi doesn't have onWheel
     const handler = (e: WheelEvent) => {
-      // Only handle if pointer is within vinyl bounds
-      const bounds = g.getBounds();
-      // WheelEvent doesn't have a reliable way to check bounds in pixi,
-      // so delegate to the generic handler
       handleWheel(e);
     };
     // Note: wheel events are handled by the pixi canvas globally;
@@ -706,9 +702,10 @@ const PixiVinylDisplay: React.FC<{
   );
 };
 
-/* ─── Tonearm overlay for turntable mode ────────────────────────────── */
+/* ─── Tonearm overlay for turntable mode (reserved, not yet wired) ─── */
 
-const PixiTonearm: React.FC<{
+// @ts-expect-error — reserved component, will be used when tonearm is wired
+const _PixiTonearm: React.FC<{
   size: number;
   isPlaying: boolean;
 }> = ({ size, isPlaying }) => {

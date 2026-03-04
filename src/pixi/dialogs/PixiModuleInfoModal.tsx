@@ -12,7 +12,6 @@ import { useInstrumentStore } from '@stores/useInstrumentStore';
 import { useShallow } from 'zustand/react/shallow';
 import { PixiModal, PixiLabel, PixiScrollView, PixiIcon } from '../components';
 import { usePixiTheme } from '../theme';
-import { PIXI_FONTS } from '../fonts';
 
 interface Props {
   isOpen: boolean;
@@ -34,20 +33,21 @@ function formatDuration(ms: number): string {
 const InfoRow: React.FC<{
   label: string;
   value: string | number | undefined | null;
-  color?: number;
+  color?: 'text' | 'textSecondary' | 'accent';
 }> = ({ label, value, color }) => {
-  const theme = usePixiTheme();
   if (value == null || value === '' || value === 'Unknown') return null;
   return (
     <pixiContainer layout={{ flexDirection: 'row', gap: 8, paddingTop: 2, paddingBottom: 2 }}>
       <PixiLabel
         text={label}
-        style={{ ...PIXI_FONTS.tiny, fill: theme.textSecondary }}
+        size="xs"
+        color="textSecondary"
         layout={{ width: 110, flexShrink: 0 }}
       />
       <PixiLabel
         text={String(value)}
-        style={{ ...PIXI_FONTS.tiny, fill: color ?? theme.textPrimary }}
+        size="xs"
+        color={color ?? 'text'}
         layout={{ flex: 1 }}
       />
     </pixiContainer>
@@ -60,10 +60,12 @@ const SectionHeader: React.FC<{ icon: string; title: string }> = ({ icon, title 
   const theme = usePixiTheme();
   return (
     <pixiContainer layout={{ flexDirection: 'row', gap: 6, alignItems: 'center', paddingTop: 8, paddingBottom: 4 }}>
-      <PixiIcon name={icon} size={12} color={theme.accent} />
+      <PixiIcon name={icon} size={12} color={theme.accent.color} />
       <PixiLabel
         text={title}
-        style={{ ...PIXI_FONTS.smallBold, fill: theme.accent }}
+        size="xs"
+        weight="bold"
+        color="accent"
       />
     </pixiContainer>
   );
@@ -72,7 +74,6 @@ const SectionHeader: React.FC<{ icon: string; title: string }> = ({ icon, title 
 // ── Main modal ───────────────────────────────────────────────────────────────
 
 export const PixiModuleInfoModal: React.FC<Props> = ({ isOpen, onClose }) => {
-  const theme = usePixiTheme();
 
   const { songDBInfo, sidMetadata, patterns } = useTrackerStore(
     useShallow((s) => ({
@@ -154,6 +155,8 @@ export const PixiModuleInfoModal: React.FC<Props> = ({ isOpen, onClose }) => {
   return (
     <PixiModal isOpen={isOpen} onClose={onClose} title="Module Info" width={480} height={520}>
       <PixiScrollView
+        width={448}
+        height={460}
         layout={{
           flex: 1,
           paddingLeft: 16,
@@ -174,7 +177,7 @@ export const PixiModuleInfoModal: React.FC<Props> = ({ isOpen, onClose }) => {
           <>
             <SectionHeader icon="preset-a" title="Database" />
             {info.authors.length > 0 && (
-              <InfoRow label="Author(s)" value={info.authors.join(', ')} color={theme.accent} />
+              <InfoRow label="Author(s)" value={info.authors.join(', ')} color="accent" />
             )}
             {info.publishers.length > 0 && (
               <InfoRow label="Group" value={info.publishers.join(', ')} />
@@ -188,7 +191,7 @@ export const PixiModuleInfoModal: React.FC<Props> = ({ isOpen, onClose }) => {
         {hasModland && (
           <>
             <SectionHeader icon="thunderbolt" title="Modland" />
-            <InfoRow label="Artist" value={info.modlandArtist} color={theme.accent} />
+            <InfoRow label="Artist" value={info.modlandArtist} color="accent" />
             <InfoRow label="Title" value={info.modlandTitle} />
             <InfoRow label="Format" value={info.modlandFormat} />
           </>
@@ -220,12 +223,8 @@ export const PixiModuleInfoModal: React.FC<Props> = ({ isOpen, onClose }) => {
             >
               <PixiLabel
                 text={info.songMessage}
-                style={{
-                  ...PIXI_FONTS.tiny,
-                  fill: theme.textSecondary,
-                  wordWrap: true,
-                  wordWrapWidth: 420,
-                }}
+                size="xs"
+                color="textSecondary"
               />
             </pixiContainer>
           </>

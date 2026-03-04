@@ -5,7 +5,7 @@
  */
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Music, Cpu, ToggleLeft, ToggleRight } from 'lucide-react';
+import { Music, Cpu } from 'lucide-react';
 
 interface SIDVisualsTabProps {
   className?: string;
