@@ -14,7 +14,7 @@ import type { EffectConfig } from '@typedefs/instrument';
 export interface MasterFxPreset {
   name: string;
   description: string;
-  category: 'Clean' | 'Warm' | 'Loud' | 'Wide' | 'Vinyl' | 'Genre' | 'DJ';
+  category: 'Clean' | 'Warm' | 'Loud' | 'Wide' | 'Vinyl' | 'Genre' | 'DJ' | 'Neural';
   effects: Omit<EffectConfig, 'id'>[];
 }
 
@@ -778,6 +778,162 @@ export const MASTER_FX_PRESETS: MasterFxPreset[] = [
         enabled: true,
         wet: 100,
         parameters: { threshold: -10, ratio: 6, attack: 0.003, release: 0.1 },
+      },
+    ],
+  },
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // NEURAL — AI-modeled amp/pedal coloring on the master bus
+  // ═══════════════════════════════════════════════════════════════════════════
+  {
+    name: 'Princeton Glow',
+    description: 'Fender Princeton clean amp — shimmery tube warmth across the bus',
+    category: 'Neural',
+    effects: [
+      {
+        category: 'neural',
+        type: 'Neural',
+        enabled: true,
+        wet: 25,
+        neuralModelIndex: 14,
+        parameters: { drive: 20, level: 80, presence: 50, dryWet: 25 },
+      },
+      {
+        category: 'tonejs',
+        type: 'Compressor',
+        enabled: true,
+        wet: 100,
+        parameters: { threshold: -16, ratio: 2.5, attack: 0.015, release: 0.25 },
+      },
+    ],
+  },
+  {
+    name: 'Blackstar Clean',
+    description: 'Blackstar HT40 clean channel — British tube console sheen',
+    category: 'Neural',
+    effects: [
+      {
+        category: 'neural',
+        type: 'Neural',
+        enabled: true,
+        wet: 20,
+        neuralModelIndex: 10,
+        parameters: { drive: 15, level: 85, presence: 55, dryWet: 20 },
+      },
+      {
+        category: 'tonejs',
+        type: 'EQ3',
+        enabled: true,
+        wet: 100,
+        parameters: { low: 1, mid: 0.5, high: 0.5 },
+      },
+      {
+        category: 'tonejs',
+        type: 'Compressor',
+        enabled: true,
+        wet: 100,
+        parameters: { threshold: -16, ratio: 2.5, attack: 0.015, release: 0.25 },
+      },
+    ],
+  },
+  {
+    name: 'Tube Screamer Glue',
+    description: 'TS808 at low gain — mid-hump saturation glue on the mix bus',
+    category: 'Neural',
+    effects: [
+      {
+        category: 'neural',
+        type: 'Neural',
+        enabled: true,
+        wet: 18,
+        neuralModelIndex: 6,
+        parameters: { drive: 20, tone: 55, level: 75, dryWet: 18 },
+      },
+      {
+        category: 'tonejs',
+        type: 'Compressor',
+        enabled: true,
+        wet: 100,
+        parameters: { threshold: -15, ratio: 3, attack: 0.01, release: 0.2 },
+      },
+    ],
+  },
+  {
+    name: 'Sovtek Warmth',
+    description: 'Sovtek 50 at medium gain + tape — thick Russian tube harmonics',
+    category: 'Neural',
+    effects: [
+      {
+        category: 'neural',
+        type: 'Neural',
+        enabled: true,
+        wet: 22,
+        neuralModelIndex: 25,
+        parameters: { drive: 35, level: 70, presence: 45, dryWet: 22 },
+      },
+      {
+        category: 'wasm',
+        type: 'TapeSimulator',
+        enabled: true,
+        wet: 20,
+        parameters: { drive: 20, character: 30, bias: 45, shame: 10, hiss: 3, speed: 1 },
+      },
+      {
+        category: 'tonejs',
+        type: 'Compressor',
+        enabled: true,
+        wet: 100,
+        parameters: { threshold: -16, ratio: 2.5, attack: 0.015, release: 0.25 },
+      },
+    ],
+  },
+  {
+    name: 'Filmosound Master',
+    description: 'Filmosound projector amp — unique vintage coloring for lo-fi mastering',
+    category: 'Neural',
+    effects: [
+      {
+        category: 'neural',
+        type: 'Neural',
+        enabled: true,
+        wet: 30,
+        neuralModelIndex: 29,
+        parameters: { drive: 25, level: 75, presence: 40, dryWet: 30 },
+      },
+      {
+        category: 'tonejs',
+        type: 'EQ3',
+        enabled: true,
+        wet: 100,
+        parameters: { low: 2, mid: 1, high: -1 },
+      },
+      {
+        category: 'tonejs',
+        type: 'Compressor',
+        enabled: true,
+        wet: 100,
+        parameters: { threshold: -18, ratio: 2, attack: 0.02, release: 0.3 },
+      },
+    ],
+  },
+  {
+    name: 'Mastered by Buzz',
+    description: 'Oomek Masterizer + Exciter — Jeskola Buzz mastering chain',
+    category: 'Neural',
+    effects: [
+      {
+        category: 'buzzmachine',
+        type: 'BuzzExciter',
+        enabled: true,
+        wet: 100,
+        parameters: {},
+      },
+      {
+        category: 'buzzmachine',
+        type: 'BuzzMasterizer',
+        enabled: true,
+        wet: 100,
+        parameters: {},
       },
     ],
   },

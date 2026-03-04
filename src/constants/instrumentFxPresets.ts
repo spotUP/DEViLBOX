@@ -18,7 +18,9 @@ export type InstrumentFxCategory =
   | 'Grit'
   | 'Modulation'
   | 'Ambient'
-  | 'Texture';
+  | 'Texture'
+  | 'Amp'
+  | 'Guitar';
 
 export interface InstrumentFxPreset {
   name: string;
@@ -738,6 +740,500 @@ export const INSTRUMENT_FX_PRESETS: InstrumentFxPreset[] = [
         enabled: true,
         wet: 60,
         parameters: { decay: 7, preDelay: 0.04 },
+      },
+    ],
+  },
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // AMP — Neural amp modeling and amp simulations
+  // ═══════════════════════════════════════════════════════════════════════════
+  {
+    name: 'Clean Fender',
+    description: 'Princeton clean — sparkling Fender cleans with tube shimmer',
+    category: 'Amp',
+    effects: [
+      {
+        category: 'neural',
+        type: 'Neural',
+        enabled: true,
+        wet: 80,
+        neuralModelIndex: 14,
+        parameters: { drive: 25, level: 75, presence: 55, dryWet: 80 },
+      },
+      {
+        category: 'wasm',
+        type: 'SpringReverb',
+        enabled: true,
+        wet: 25,
+        parameters: { decay: 0.4, damping: 0.5, tension: 0.4, mix: 0.3, drip: 0.3, diffusion: 0.6 },
+      },
+    ],
+  },
+  {
+    name: 'Crunch Marshall',
+    description: 'Blackstar HT40 gain channel — British crunch and growl',
+    category: 'Amp',
+    effects: [
+      {
+        category: 'neural',
+        type: 'Neural',
+        enabled: true,
+        wet: 85,
+        neuralModelIndex: 16,
+        parameters: { drive: 55, level: 65, presence: 60, dryWet: 85 },
+      },
+      {
+        category: 'tonejs',
+        type: 'EQ3',
+        enabled: true,
+        wet: 100,
+        parameters: { low: 2, mid: 1, high: 2 },
+      },
+    ],
+  },
+  {
+    name: 'High Gain Mesa',
+    description: 'Mesa Mini Rectifier — tight modern high gain with aggressive mids',
+    category: 'Amp',
+    effects: [
+      {
+        category: 'neural',
+        type: 'Neural',
+        enabled: true,
+        wet: 90,
+        neuralModelIndex: 11,
+        parameters: { drive: 70, level: 60, presence: 55, dryWet: 90 },
+      },
+      {
+        category: 'tonejs',
+        type: 'Compressor',
+        enabled: true,
+        wet: 100,
+        parameters: { threshold: -12, ratio: 4, attack: 0.003, release: 0.1 },
+      },
+    ],
+  },
+  {
+    name: 'Dumble Lead',
+    description: 'Dumble high gain — smooth, singing lead tones with infinite sustain',
+    category: 'Amp',
+    effects: [
+      {
+        category: 'neural',
+        type: 'Neural',
+        enabled: true,
+        wet: 85,
+        neuralModelIndex: 15,
+        parameters: { drive: 65, level: 65, presence: 50, dryWet: 85 },
+      },
+      {
+        category: 'tonejs',
+        type: 'FeedbackDelay',
+        enabled: true,
+        wet: 20,
+        parameters: { delayTime: 0.35, feedback: 0.3 },
+      },
+      {
+        category: 'wasm',
+        type: 'MVerb',
+        enabled: true,
+        wet: 20,
+        parameters: { damping: 0.4, density: 0.6, bandwidth: 0.6, decay: 0.4, predelay: 0.02, size: 0.5, gain: 1.0, mix: 0.35, earlyMix: 0.5 },
+      },
+    ],
+  },
+  {
+    name: 'Sovtek Doom',
+    description: 'Sovtek 50 + DOD boost — massive Russian tube doom/stoner sound',
+    category: 'Amp',
+    effects: [
+      {
+        category: 'neural',
+        type: 'Neural',
+        enabled: true,
+        wet: 90,
+        neuralModelIndex: 27,
+        parameters: { drive: 75, level: 55, presence: 40, dryWet: 90 },
+      },
+      {
+        category: 'tonejs',
+        type: 'EQ3',
+        enabled: true,
+        wet: 100,
+        parameters: { low: 5, mid: 2, high: -1 },
+      },
+    ],
+  },
+  {
+    name: 'BadCat Jazz',
+    description: 'BadCat 50 clean — warm, round jazz tones with lush reverb',
+    category: 'Amp',
+    effects: [
+      {
+        category: 'neural',
+        type: 'Neural',
+        enabled: true,
+        wet: 75,
+        neuralModelIndex: 23,
+        parameters: { drive: 15, level: 80, presence: 40, dryWet: 75 },
+      },
+      {
+        category: 'tonejs',
+        type: 'Chorus',
+        enabled: true,
+        wet: 15,
+        parameters: { frequency: 0.3, depth: 0.2 },
+      },
+      {
+        category: 'wasm',
+        type: 'MVerb',
+        enabled: true,
+        wet: 30,
+        parameters: { damping: 0.3, density: 0.7, bandwidth: 0.5, decay: 0.5, predelay: 0.03, size: 0.6, gain: 1.0, mix: 0.4, earlyMix: 0.4 },
+      },
+    ],
+  },
+  {
+    name: 'ENGL Metal',
+    description: 'ENGL E645 with boost — tight European metal tone',
+    category: 'Amp',
+    effects: [
+      {
+        category: 'neural',
+        type: 'Neural',
+        enabled: true,
+        wet: 90,
+        neuralModelIndex: 28,
+        parameters: { drive: 70, level: 60, presence: 65, dryWet: 90 },
+      },
+      {
+        category: 'tonejs',
+        type: 'Compressor',
+        enabled: true,
+        wet: 100,
+        parameters: { threshold: -10, ratio: 6, attack: 0.002, release: 0.08 },
+      },
+      {
+        category: 'tonejs',
+        type: 'EQ3',
+        enabled: true,
+        wet: 100,
+        parameters: { low: 3, mid: 2, high: 3 },
+      },
+    ],
+  },
+  {
+    name: 'Supro Bold Crunch',
+    description: 'Supro Bold amp — gritty vintage American crunch with character',
+    category: 'Amp',
+    effects: [
+      {
+        category: 'neural',
+        type: 'Neural',
+        enabled: true,
+        wet: 80,
+        neuralModelIndex: 32,
+        parameters: { drive: 50, level: 70, presence: 50, dryWet: 80 },
+      },
+      {
+        category: 'tonejs',
+        type: 'Tremolo',
+        enabled: true,
+        wet: 20,
+        parameters: { frequency: 3.5, depth: 0.3 },
+      },
+      {
+        category: 'wasm',
+        type: 'SpringReverb',
+        enabled: true,
+        wet: 20,
+        parameters: { decay: 0.4, damping: 0.5, tension: 0.5, mix: 0.25, drip: 0.4, diffusion: 0.6 },
+      },
+    ],
+  },
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // GUITAR — Pedalboard chains (neural pedals + amps + FX)
+  // ═══════════════════════════════════════════════════════════════════════════
+  {
+    name: 'TS9 + Spring',
+    description: 'Tube Screamer into spring reverb — classic blues/rock pedalboard',
+    category: 'Guitar',
+    effects: [
+      {
+        category: 'neural',
+        type: 'Neural',
+        enabled: true,
+        wet: 70,
+        neuralModelIndex: 0,
+        parameters: { drive: 50, tone: 55, level: 70, dryWet: 70 },
+      },
+      {
+        category: 'wasm',
+        type: 'SpringReverb',
+        enabled: true,
+        wet: 30,
+        parameters: { decay: 0.5, damping: 0.4, tension: 0.5, mix: 0.35, drip: 0.5, diffusion: 0.6 },
+      },
+    ],
+  },
+  {
+    name: 'Big Muff Doom',
+    description: 'Big Muff V6 + massive reverb — wall of fuzzy doom',
+    category: 'Guitar',
+    effects: [
+      {
+        category: 'neural',
+        type: 'Neural',
+        enabled: true,
+        wet: 85,
+        neuralModelIndex: 36,
+        parameters: { drive: 70, tone: 40, level: 60, dryWet: 85 },
+      },
+      {
+        category: 'tonejs',
+        type: 'EQ3',
+        enabled: true,
+        wet: 100,
+        parameters: { low: 4, mid: 1, high: -1 },
+      },
+      {
+        category: 'tonejs',
+        type: 'Reverb',
+        enabled: true,
+        wet: 35,
+        parameters: { decay: 5, preDelay: 0.04 },
+      },
+    ],
+  },
+  {
+    name: 'RAT + Delay',
+    description: 'ProCo RAT distortion into feedback delay — aggressive post-punk',
+    category: 'Guitar',
+    effects: [
+      {
+        category: 'neural',
+        type: 'Neural',
+        enabled: true,
+        wet: 80,
+        neuralModelIndex: 4,
+        parameters: { drive: 60, tone: 50, level: 65, dryWet: 80 },
+      },
+      {
+        category: 'tonejs',
+        type: 'FeedbackDelay',
+        enabled: true,
+        wet: 30,
+        parameters: { delayTime: 0.35, feedback: 0.45 },
+      },
+    ],
+  },
+  {
+    name: 'Prince Of Tone',
+    description: 'Analog Man Prince of Tone — transparent overdrive for any genre',
+    category: 'Guitar',
+    effects: [
+      {
+        category: 'neural',
+        type: 'Neural',
+        enabled: true,
+        wet: 75,
+        neuralModelIndex: 18,
+        parameters: { drive: 45, tone: 55, level: 70, dryWet: 75 },
+      },
+      {
+        category: 'tonejs',
+        type: 'Chorus',
+        enabled: true,
+        wet: 15,
+        parameters: { frequency: 0.5, depth: 0.3 },
+      },
+    ],
+  },
+  {
+    name: 'Revv G3 Chug',
+    description: 'Revv G3 tight distortion — modern metal chug machine',
+    category: 'Guitar',
+    effects: [
+      {
+        category: 'neural',
+        type: 'Neural',
+        enabled: true,
+        wet: 90,
+        neuralModelIndex: 7,
+        parameters: { drive: 70, tone: 55, level: 60, dryWet: 90 },
+      },
+      {
+        category: 'tonejs',
+        type: 'Compressor',
+        enabled: true,
+        wet: 100,
+        parameters: { threshold: -10, ratio: 6, attack: 0.002, release: 0.08 },
+      },
+    ],
+  },
+  {
+    name: 'Friedman Sizzle',
+    description: 'Friedman BE-OD — searing high-gain overdrive with presence',
+    category: 'Guitar',
+    effects: [
+      {
+        category: 'neural',
+        type: 'Neural',
+        enabled: true,
+        wet: 85,
+        neuralModelIndex: 9,
+        parameters: { drive: 65, tone: 60, level: 65, dryWet: 85 },
+      },
+      {
+        category: 'tonejs',
+        type: 'PingPongDelay',
+        enabled: true,
+        wet: 15,
+        parameters: { delayTime: 0.3, feedback: 0.3, bpmSync: 1, syncDivision: '1/8' },
+      },
+      {
+        category: 'wasm',
+        type: 'MVerb',
+        enabled: true,
+        wet: 15,
+        parameters: { damping: 0.5, density: 0.5, bandwidth: 0.7, decay: 0.3, predelay: 0.0, size: 0.35, gain: 1.0, mix: 0.3, earlyMix: 0.7 },
+      },
+    ],
+  },
+  {
+    name: 'Aguilar Bass Grit',
+    description: 'Aguilar Agro bright + compressor — punchy bass distortion',
+    category: 'Guitar',
+    effects: [
+      {
+        category: 'neural',
+        type: 'Neural',
+        enabled: true,
+        wet: 70,
+        neuralModelIndex: 21,
+        parameters: { drive: 45, tone: 55, level: 70, dryWet: 70 },
+      },
+      {
+        category: 'tonejs',
+        type: 'Compressor',
+        enabled: true,
+        wet: 100,
+        parameters: { threshold: -14, ratio: 4, attack: 0.005, release: 0.12 },
+      },
+      {
+        category: 'tonejs',
+        type: 'EQ3',
+        enabled: true,
+        wet: 100,
+        parameters: { low: 4, mid: 1, high: 0 },
+      },
+    ],
+  },
+  {
+    name: 'Goat + Leslie',
+    description: 'Goat Pedal fuzz into Leslie rotary — psychedelic swirl',
+    category: 'Guitar',
+    effects: [
+      {
+        category: 'neural',
+        type: 'Neural',
+        enabled: true,
+        wet: 75,
+        neuralModelIndex: 33,
+        parameters: { drive: 55, tone: 50, level: 65, dryWet: 75 },
+      },
+      {
+        category: 'wasm',
+        type: 'Leslie',
+        enabled: true,
+        wet: 45,
+        parameters: { speed: 1.0, hornRate: 6.8, drumRate: 5.9, hornDepth: 0.7, drumDepth: 0.5, doppler: 0.6, width: 0.8, acceleration: 0.5 },
+      },
+    ],
+  },
+  {
+    name: 'Rain Ambience',
+    description: 'Tumult rain noise layer — subtle rain texture behind the instrument',
+    category: 'Texture',
+    effects: [
+      {
+        category: 'wasm',
+        type: 'Tumult',
+        enabled: true,
+        wet: 30,
+        parameters: { noiseGain: -18, mix: 0.3, noiseMode: 0, sourceMode: 0, switchBranch: 0, duckThreshold: -25, duckAttack: 0, duckRelease: 20, followThreshold: -20, followAttack: 0, followRelease: 15, followAmount: 0.5, clipAmount: 0.3, hpEnable: 1, hpFreq: 400, hpQ: 0.7, peak1Enable: 0, peak1Type: 0, peak1Freq: 20, peak1Gain: 0, peak1Q: 0.7, peak2Enable: 0, peak2Freq: 600, peak2Gain: 0, peak2Q: 1, peak3Enable: 0, peak3Type: 1, peak3Freq: 2500, peak3Gain: 0, peak3Q: 1, lpEnable: 1, lpFreq: 6000, lpQ: 0.7, sampleIndex: 0, playerStart: 0, playerEnd: 1, playerFade: 0.01, playerGain: 0 },
+      },
+    ],
+  },
+  {
+    name: 'Spacey Delay',
+    description: 'SpaceyDelayer multi-tap shimmer — celestial delay trails',
+    category: 'Space',
+    effects: [
+      {
+        category: 'tonejs',
+        type: 'SpaceyDelayer',
+        enabled: true,
+        wet: 45,
+        parameters: { time: 0.4, feedback: 0.55, tone: 0.6, modDepth: 0.3, modRate: 0.5, shimmer: 0.4, width: 0.7, mix: 0.5 },
+      },
+      {
+        category: 'wasm',
+        type: 'MVerb',
+        enabled: true,
+        wet: 20,
+        parameters: { damping: 0.3, density: 0.7, bandwidth: 0.5, decay: 0.6, predelay: 0.04, size: 0.7, gain: 1.0, mix: 0.35, earlyMix: 0.3 },
+      },
+    ],
+  },
+  {
+    name: 'Buzz Chorus Wash',
+    description: 'FSM White Chorus + Freeverb — shimmering Buzz machine FX',
+    category: 'Modulation',
+    effects: [
+      {
+        category: 'buzzmachine',
+        type: 'BuzzWhiteChorus',
+        enabled: true,
+        wet: 45,
+        parameters: {},
+      },
+      {
+        category: 'buzzmachine',
+        type: 'BuzzFreeverb',
+        enabled: true,
+        wet: 30,
+        parameters: {},
+      },
+    ],
+  },
+  {
+    name: 'El Coyote Blues',
+    description: 'El Coyote crunch amp + spring + tremolo — desert blues tone',
+    category: 'Amp',
+    effects: [
+      {
+        category: 'neural',
+        type: 'Neural',
+        enabled: true,
+        wet: 80,
+        neuralModelIndex: 31,
+        parameters: { drive: 45, level: 70, presence: 50, dryWet: 80 },
+      },
+      {
+        category: 'tonejs',
+        type: 'Tremolo',
+        enabled: true,
+        wet: 25,
+        parameters: { frequency: 4, depth: 0.4 },
+      },
+      {
+        category: 'wasm',
+        type: 'SpringReverb',
+        enabled: true,
+        wet: 25,
+        parameters: { decay: 0.5, damping: 0.4, tension: 0.5, mix: 0.3, drip: 0.5, diffusion: 0.6 },
       },
     ],
   },
