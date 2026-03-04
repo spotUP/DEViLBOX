@@ -5,7 +5,8 @@
  * - Left: 4×4 pad grid (per bank) with bank selector
  * - Right: Program selector, kit source, master controls, settings, note repeat, MPC resampling
  *
- * Port of src/components/drumpad/DrumPadManager.tsx using Div/Txt layout primitives.
+ * Port of src/components/drumpad/DrumPadManager.tsx + PadGrid.tsx + PadButton.tsx
+ * using Div/Txt layout primitives.
  */
 
 import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
@@ -13,22 +14,70 @@ import { useApplication } from '@pixi/react';
 import { useDrumPadStore } from '../../stores/useDrumPadStore';
 import { useInstrumentStore, useAllSamplePacks } from '../../stores';
 import { useUIStore } from '../../stores/useUIStore';
+import { useTransportStore } from '../../stores/useTransportStore';
 import {
   getAllKitSources,
   createInstrumentsFromPreset,
   createInstrumentsFromSamplePack,
 } from '../../lib/drumpad/defaultKitLoader';
 import { getBankPads } from '../../types/drumpad';
-import type { PadBank, MpcResampleConfig, DrumPad, SampleData } from '../../types/drumpad';
+import type { PadBank, MpcResampleConfig, DrumPad, SampleData, ScratchActionId } from '../../types/drumpad';
 import { DrumPadEngine } from '../../engine/drumpad/DrumPadEngine';
+import { NoteRepeatEngine } from '../../engine/drumpad/NoteRepeatEngine';
+import type { NoteRepeatRate } from '../../engine/drumpad/NoteRepeatEngine';
 import { getAudioContext, resumeAudioContext } from '../../audio/AudioContextSingleton';
 import { PixiButton } from '../components';
 import { PixiSelect, type SelectOption } from '../components/PixiSelect';
 import { PixiCheckbox } from '../components';
 import { PixiViewHeader, VIEW_HEADER_HEIGHT } from '../components/PixiViewHeader';
 import { PixiSlider } from '../components/PixiSlider';
+import { PixiPadEditor } from './PixiPadEditor';
 import { usePixiTheme } from '../theme';
 import { Div, Txt } from '../layout';
+import type { Container, FederatedPointerEvent } from 'pixi.js';
+import {
+  djScratchBaby, djScratchTrans, djScratchFlare, djScratchHydro, djScratchCrab, djScratchOrbit,
+  djScratchChirp, djScratchStab, djScratchScrbl, djScratchTear,
+  djScratchUzi, djScratchTwiddle, djScratch8Crab, djScratch3Flare,
+  djScratchLaser, djScratchPhaser, djScratchTweak, djScratchDrag, djScratchVibrato,
+  djScratchStop, djFaderLFOOff, djFaderLFO14, djFaderLFO18, djFaderLFO116, djFaderLFO132,
+} from '../../engine/keyboard/commands/djScratch';
+
+/* ── Scratch action handlers ────────────────────────────────────────────────── */
+
+const SCRATCH_ACTION_HANDLERS: Record<ScratchActionId, () => boolean> = {
+  scratch_baby: djScratchBaby,
+  scratch_trans: djScratchTrans,
+  scratch_flare: djScratchFlare,
+  scratch_hydro: djScratchHydro,
+  scratch_crab: djScratchCrab,
+  scratch_orbit: djScratchOrbit,
+  scratch_chirp: djScratchChirp,
+  scratch_stab: djScratchStab,
+  scratch_scribble: djScratchScrbl,
+  scratch_tear: djScratchTear,
+  scratch_uzi: djScratchUzi,
+  scratch_twiddle: djScratchTwiddle,
+  scratch_8crab: djScratch8Crab,
+  scratch_3flare: djScratch3Flare,
+  scratch_laser: djScratchLaser,
+  scratch_phaser: djScratchPhaser,
+  scratch_tweak: djScratchTweak,
+  scratch_drag: djScratchDrag,
+  scratch_vibrato: djScratchVibrato,
+  scratch_stop: djScratchStop,
+  lfo_off: djFaderLFOOff,
+  lfo_14: djFaderLFO14,
+  lfo_18: djFaderLFO18,
+  lfo_116: djFaderLFO116,
+  lfo_132: djFaderLFO132,
+};
+
+/* ── QWERTY pad map ─────────────────────────────────────────────────────────── */
+
+const KEY_TO_PAD: Record<string, number> = {
+  q:0, w:1, e:2, r:3, a:4, s:5, d:6, f:7, z:8, x:9, c:10, v:11, t:12, y:13, u:14, i:15,
+};
 
 /* ── Constants ──────────────────────────────────────────────────────────────── */
 
@@ -38,8 +87,10 @@ const GRID_ROWS = 4;
 const MIN_PAD_SIZE = 48;
 const MAX_PAD_SIZE = 160;
 const RIGHT_W = 240;
+const EDITOR_W = 320;
 const HEADER_H = 36;
 const BANK_ROW_H = 36; // bank selector row
+const PROGRAM_INFO_H = 40; // program info row
 const PAD_INFO_H = 56; // selected pad info box
 const SHORTCUTS_H = 68; // shortcuts box
 const LEFT_PADDING = 32; // p-4 top+bottom = 16+16
@@ -54,17 +105,44 @@ const MPC_MODELS: { value: MpcResampleConfig['model']; label: string }[] = [
 
 /* ── Pad cell ───────────────────────────────────────────────────────────────── */
 
-const PadCell: React.FC<{
+interface PadCellProps {
   pad: DrumPad;
   selected: boolean;
+  focused: boolean;
+  velocity: number;
   onSelect: () => void;
-  onTrigger: (padId: number) => void;
+  onTrigger: (padId: number, velocity: number) => void;
+  onRelease: (padId: number) => void;
   size: number;
-}> = React.memo(({ pad, selected, onSelect, onTrigger, size }) => {
+}
+
+const PadCell: React.FC<PadCellProps> = React.memo(({ pad, selected, focused, velocity, onSelect, onTrigger, onRelease, size }) => {
   const theme = usePixiTheme();
   const [hovered, setHovered] = useState(false);
   const [pressed, setPressed] = useState(false);
+  const [flashIntensity, setFlashIntensity] = useState(0);
+  const flashRef = useRef<number>(0);
   const hasSample = !!pad.sample;
+
+  // Clean up rAF on unmount
+  useEffect(() => {
+    return () => cancelAnimationFrame(flashRef.current);
+  }, []);
+
+  const startFlash = useCallback((vel: number) => {
+    const intensity = vel / 127;
+    setFlashIntensity(intensity);
+    cancelAnimationFrame(flashRef.current);
+    const startTime = performance.now();
+    const duration = 200 + intensity * 200;
+    const decay = () => {
+      const elapsed = performance.now() - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      setFlashIntensity(intensity * Math.pow(1 - progress, 2));
+      if (progress < 1) flashRef.current = requestAnimationFrame(decay);
+    };
+    flashRef.current = requestAnimationFrame(decay);
+  }, []);
 
   const bg = pressed
     ? theme.accent.color
@@ -76,15 +154,29 @@ const PadCell: React.FC<{
           ? theme.bgTertiary.color
           : theme.bg.color;
 
-  const handlePointerDown = useCallback(() => {
+  const borderColor = focused && !selected
+    ? 0x60a5fa // blue-400 for keyboard focus
+    : selected
+      ? theme.accent.color
+      : theme.border.color;
+
+  const handlePointerDown = useCallback((e: FederatedPointerEvent) => {
+    const local = e.getLocalPosition(e.currentTarget as Container);
+    const relativeY = local.y / size;
+    const vel = Math.max(1, Math.min(127, Math.floor((1 - relativeY) * 127)));
     setPressed(true);
     onSelect();
-    onTrigger(pad.id);
-  }, [onSelect, onTrigger, pad.id]);
+    startFlash(vel);
+    onTrigger(pad.id, vel);
+  }, [pad.id, size, onSelect, onTrigger, startFlash]);
 
   const handlePointerUp = useCallback(() => {
     setPressed(false);
-  }, []);
+    onRelease(pad.id);
+  }, [pad.id, onRelease]);
+
+  const maxNameLen = size >= 100 ? 14 : 8;
+  const truncatedName = pad.name.length > maxNameLen ? pad.name.slice(0, maxNameLen - 2) + '..' : pad.name;
 
   return (
     <Div
@@ -92,13 +184,10 @@ const PadCell: React.FC<{
         width: size,
         height: size,
         backgroundColor: bg,
-        borderWidth: 1,
-        borderColor: selected ? theme.accent.color : theme.border.color,
+        borderWidth: focused && !selected ? 2 : 1,
+        borderColor,
         borderRadius: 4,
-        alignItems: 'center',
-        justifyContent: 'center',
         flexDirection: 'column',
-        gap: 2,
       }}
       eventMode="static"
       cursor="pointer"
@@ -108,10 +197,67 @@ const PadCell: React.FC<{
       onPointerOver={() => setHovered(true)}
       onPointerOut={() => { setHovered(false); setPressed(false); }}
     >
-      <Txt className={`${size >= 80 ? 'text-sm' : 'text-xs'} font-bold text-text-primary`}>{`${pad.id}`}</Txt>
-      <Txt className={`${size >= 80 ? 'text-sm' : 'text-xs'} text-text-muted`}>
-        {pad.name.length > (size >= 100 ? 14 : 8) ? pad.name.slice(0, size >= 100 ? 12 : 8) : pad.name}
+      {/* Flash overlay */}
+      {flashIntensity > 0.01 && (
+        <Div
+          layout={{
+            position: 'absolute',
+            width: size,
+            height: size,
+            backgroundColor: 0x10b981,
+            borderRadius: 4,
+          }}
+          alpha={flashIntensity * 0.7}
+        />
+      )}
+
+      {/* Pad number — top-left */}
+      <Txt
+        className="text-[10px] font-mono text-text-muted"
+        layout={{ position: 'absolute', left: 4, top: 3 }}
+      >
+        {String(pad.id)}
       </Txt>
+
+      {/* Pad name — centered */}
+      <Div layout={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingLeft: 4, paddingRight: 4 }}>
+        {hasSample ? (
+          <Txt className={`${size >= 80 ? 'text-xs' : 'text-[10px]'} font-bold text-text-primary`}>
+            {truncatedName}
+          </Txt>
+        ) : (
+          <Txt className="text-lg text-text-muted">+</Txt>
+        )}
+      </Div>
+
+      {/* Badges — bottom-left */}
+      <Div layout={{ position: 'absolute', left: 4, bottom: 3, flexDirection: 'row', gap: 2 }}>
+        {pad.muteGroup > 0 && (
+          <Txt className="text-[8px] font-mono" style={{ color: 0xfbbf24 }}>{`M${pad.muteGroup}`}</Txt>
+        )}
+        {pad.playMode === 'sustain' && (
+          <Txt className="text-[8px] font-mono" style={{ color: 0x60a5fa }}>S</Txt>
+        )}
+        {pad.reverse && (
+          <Txt className="text-[8px] font-mono" style={{ color: 0xa78bfa }}>R</Txt>
+        )}
+      </Div>
+
+      {/* Velocity dot — bottom-right */}
+      {velocity > 0 && hasSample && (
+        <Div
+          layout={{
+            position: 'absolute',
+            right: 4,
+            bottom: 4,
+            width: 6,
+            height: 6,
+            backgroundColor: 0x34d399,
+            borderRadius: 3,
+          }}
+          alpha={0.3 + (velocity / 127) * 0.7}
+        />
+      )}
     </Div>
   );
 });
@@ -151,6 +297,7 @@ export const PixiDrumPadManager: React.FC = () => {
     currentBank,
     setBank,
     loadSampleToPad,
+    clearPad,
   } = useDrumPadStore();
 
   const allSamplePacks = useAllSamplePacks();
@@ -161,6 +308,15 @@ export const PixiDrumPadManager: React.FC = () => {
   const [selectedKitSourceId, setSelectedKitSourceId] = useState<string>(allKitSources[0]?.id || '');
   const [importInstrumentId, setImportInstrumentId] = useState<number | null>(null);
   const [alertMsg, setAlertMsg] = useState<string | null>(null);
+  const [showPadEditor, setShowPadEditor] = useState(false);
+  const [padVelocities, setPadVelocities] = useState<Record<number, number>>({});
+  const [focusedPadId, setFocusedPadId] = useState<number>(1);
+  const noteRepeatRef = useRef<NoteRepeatEngine | null>(null);
+  const noteRepeatEnabledRef = useRef(false);
+  const heldPadsRef = useRef<Set<number>>(new Set());
+
+  /* ── Current program / pads ── */
+  const currentProgram = programs.get(currentProgramId);
 
   // Debounced master controls
   const [localMasterLevel, setLocalMasterLevel] = useState<number | null>(null);
@@ -175,13 +331,19 @@ export const PixiDrumPadManager: React.FC = () => {
     };
   }, []);
 
-  /* ── Audio engine ── */
+  /* ── Audio engine + NoteRepeat ── */
   const engineRef = useRef<DrumPadEngine | null>(null);
+  const bpm = useTransportStore(s => s.bpm);
 
   useEffect(() => {
     const audioContext = getAudioContext();
     engineRef.current = new DrumPadEngine(audioContext);
+    noteRepeatRef.current = new NoteRepeatEngine(engineRef.current);
+    // Load persisted audio samples from IndexedDB
+    useDrumPadStore.getState().loadFromIndexedDB(audioContext);
     return () => {
+      noteRepeatRef.current?.dispose();
+      noteRepeatRef.current = null;
       engineRef.current?.dispose();
       engineRef.current = null;
     };
@@ -209,18 +371,69 @@ export const PixiDrumPadManager: React.FC = () => {
     }
   }, [busLevels]);
 
-  const handlePadTrigger = useCallback(async (padId: number) => {
+  // Sync note repeat state
+  useEffect(() => {
+    noteRepeatEnabledRef.current = noteRepeatEnabled;
+    noteRepeatRef.current?.setEnabled(noteRepeatEnabled);
+  }, [noteRepeatEnabled]);
+
+  useEffect(() => {
+    noteRepeatRef.current?.setRate(noteRepeatRate as NoteRepeatRate);
+  }, [noteRepeatRate]);
+
+  useEffect(() => {
+    noteRepeatRef.current?.setBpm(bpm);
+  }, [bpm]);
+
+  // Reset focused pad on bank change
+  useEffect(() => {
+    const bankOffset = { A: 0, B: 16, C: 32, D: 48 }[currentBank];
+    setFocusedPadId(bankOffset + 1);
+  }, [currentBank]);
+
+  const handlePadTrigger = useCallback(async (padId: number, velocity: number) => {
+    setPadVelocities(prev => ({ ...prev, [padId]: velocity }));
     await resumeAudioContext();
     if (currentProgram && engineRef.current) {
       const pad = currentProgram.pads.find(p => p.id === padId);
-      if (pad?.sample) {
-        engineRef.current.triggerPad(pad, 100);
+      if (pad) {
+        if (pad.scratchAction) {
+          SCRATCH_ACTION_HANDLERS[pad.scratchAction]?.();
+        }
+        if (pad.sample) {
+          engineRef.current.triggerPad(pad, velocity);
+        }
+        if (pad.playMode === 'sustain') {
+          heldPadsRef.current.add(padId);
+        }
+        if (noteRepeatEnabledRef.current && noteRepeatRef.current) {
+          noteRepeatRef.current.startRepeat(pad, velocity);
+          heldPadsRef.current.add(padId);
+        }
+      }
+    }
+    setTimeout(() => {
+      setPadVelocities(prev => ({ ...prev, [padId]: 0 }));
+    }, 200);
+  }, [currentProgram]);
+
+  const handlePadRelease = useCallback((padId: number) => {
+    if (!heldPadsRef.current.has(padId)) return;
+    heldPadsRef.current.delete(padId);
+    noteRepeatRef.current?.stopRepeat(padId);
+    if (currentProgram && engineRef.current) {
+      const pad = currentProgram.pads.find(p => p.id === padId);
+      if (pad && pad.playMode === 'sustain') {
+        engineRef.current.stopPad(padId, pad.release / 1000);
       }
     }
   }, [currentProgram]);
 
-  /* ── Current program / pads ── */
-  const currentProgram = programs.get(currentProgramId);
+  const handleStopAll = useCallback(() => {
+    engineRef.current?.stopAll();
+    heldPadsRef.current.clear();
+  }, []);
+
   const bankPads = useMemo(
     () => (currentProgram ? getBankPads(currentProgram.pads, currentBank) : []),
     [currentProgram, currentBank],
@@ -423,6 +636,120 @@ export const PixiDrumPadManager: React.FC = () => {
     [currentProgram, saveProgram],
   );
 
+  const handleLoadSampleFromFile = useCallback(() => {
+    if (selectedPadId == null) {
+      setAlertMsg('Select a pad first.');
+      return;
+    }
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'audio/*,.wav,.mp3,.ogg,.flac,.aiff,.aif';
+    input.onchange = async () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      try {
+        const audioContext = getAudioContext();
+        const arrayBuffer = await file.arrayBuffer();
+        const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+        const sampleData: SampleData = {
+          id: `file_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          name: file.name.replace(/\.[^/.]+$/, ''),
+          audioBuffer,
+          duration: audioBuffer.duration,
+          sampleRate: audioBuffer.sampleRate,
+        };
+        await loadSampleToPad(selectedPadId, sampleData);
+        setAlertMsg(`Loaded "${sampleData.name}" to pad ${selectedPadId}.`);
+      } catch (err) {
+        setAlertMsg(`Failed to load audio: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      }
+    };
+    input.click();
+  }, [selectedPadId, loadSampleToPad]);
+
+  const handleExport = useCallback(async () => {
+    try {
+      const blob = await useDrumPadStore.getState().exportAllConfigs();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${currentProgram?.name || 'drumpad'}.dvbpads`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      setAlertMsg('Export failed.');
+    }
+  }, [currentProgram]);
+
+  const handleImport = useCallback(() => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.dvbpads';
+    input.onchange = async () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      try {
+        const audioContext = getAudioContext();
+        await useDrumPadStore.getState().importConfigs(file, audioContext);
+        setAlertMsg('Programs imported successfully.');
+      } catch {
+        setAlertMsg('Import failed.');
+      }
+    };
+    input.click();
+  }, []);
+
+  // Keyboard navigation + QWERTY pad triggers
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement;
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT') return;
+
+      const bankOffset = { A: 0, B: 16, C: 32, D: 48 }[currentBank];
+      const bankStart = bankOffset + 1;
+      const bankEnd = bankOffset + 16;
+      let newFocused = focusedPadId;
+
+      switch (event.key) {
+        case 'ArrowLeft': event.preventDefault(); newFocused = focusedPadId > bankStart ? focusedPadId - 1 : bankEnd; break;
+        case 'ArrowRight': event.preventDefault(); newFocused = focusedPadId < bankEnd ? focusedPadId + 1 : bankStart; break;
+        case 'ArrowUp': event.preventDefault(); newFocused = focusedPadId > bankStart + 3 ? focusedPadId - 4 : focusedPadId + 12; break;
+        case 'ArrowDown': event.preventDefault(); newFocused = focusedPadId <= bankEnd - 4 ? focusedPadId + 4 : focusedPadId - 12; break;
+        case 'Enter': case ' ': event.preventDefault(); handlePadTrigger(focusedPadId, 100); break;
+        default: break;
+      }
+      if (newFocused !== focusedPadId) setFocusedPadId(newFocused);
+    };
+
+    const handleQWERTY = (event: KeyboardEvent) => {
+      if (event.repeat) return;
+      const target = event.target as HTMLElement;
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT') return;
+      const idx = KEY_TO_PAD[event.key.toLowerCase()];
+      if (idx === undefined) return;
+      const bankOffset = { A: 0, B: 16, C: 32, D: 48 }[currentBank];
+      const padId = bankOffset + idx + 1;
+      const velocity = event.shiftKey ? 100 : 80;
+      handlePadTrigger(padId, velocity);
+    };
+
+    const handleQWERTYUp = (event: KeyboardEvent) => {
+      const idx = KEY_TO_PAD[event.key.toLowerCase()];
+      if (idx === undefined) return;
+      const bankOffset = { A: 0, B: 16, C: 32, D: 48 }[currentBank];
+      handlePadRelease(bankOffset + idx + 1);
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keydown', handleQWERTY);
+    window.addEventListener('keyup', handleQWERTYUp);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keydown', handleQWERTY);
+      window.removeEventListener('keyup', handleQWERTYUp);
+    };
+  }, [focusedPadId, currentBank, handlePadTrigger, handlePadRelease]);
+
   /* ── Derived values ── */
   const masterLevel = localMasterLevel ?? currentProgram?.masterLevel ?? 100;
   const masterTune = localMasterTune ?? currentProgram?.masterTune ?? 0;
@@ -446,9 +773,13 @@ export const PixiDrumPadManager: React.FC = () => {
     [],
   );
 
+  const bankLoadedCount = bankPads.filter(p => p.sample !== null).length;
+  const totalLoadedCount = currentProgram?.pads.filter(p => p.sample !== null).length ?? 0;
+
   /* ── Layout — compute pad size to fill available space ── */
-  const availW = screenW - RIGHT_W - LEFT_PADDING - 1; // -1 for border
-  const availH = screenH - HEADER_H - BANK_ROW_H - PAD_INFO_H - SHORTCUTS_H - LEFT_PADDING - 16; // extra gap
+  const rightPanelW = showPadEditor ? EDITOR_W : RIGHT_W;
+  const availW = screenW - rightPanelW - LEFT_PADDING - 1; // -1 for border
+  const availH = screenH - HEADER_H - BANK_ROW_H - PROGRAM_INFO_H - PAD_INFO_H - SHORTCUTS_H - LEFT_PADDING - 16;
   const maxFromW = Math.floor((availW - (GRID_COLS - 1) * PAD_GAP) / GRID_COLS);
   const maxFromH = Math.floor((availH - (GRID_ROWS - 1) * PAD_GAP) / GRID_ROWS);
   const padSize = Math.max(MIN_PAD_SIZE, Math.min(MAX_PAD_SIZE, maxFromW, maxFromH));
@@ -482,8 +813,19 @@ export const PixiDrumPadManager: React.FC = () => {
       <Div className="flex-1 flex-row" layout={{ overflow: 'hidden' }}>
         {/* ── Left: Pad grid + bank selector ── */}
         <Div className="flex-col items-center p-4 gap-4" layout={{ flex: 1 }}>
+          {/* Program info row */}
+          <Div className="flex-row items-center gap-2" layout={{ width: gridW }}>
+            <Div className="flex-col" layout={{ flex: 1 }}>
+              <Txt className="text-sm font-bold text-text-primary">{currentProgram?.name ?? ''}</Txt>
+              <Txt className="text-xs text-text-muted">{currentProgramId}</Txt>
+            </Div>
+            <PixiButton label="Stop All" size="sm" variant="ghost" onClick={handleStopAll} />
+            <PixiButton label="Export" size="sm" variant="ghost" onClick={handleExport} />
+            <PixiButton label="Import" size="sm" variant="ghost" onClick={handleImport} />
+          </Div>
+
           {/* Bank selector */}
-          <Div className="flex-row gap-2">
+          <Div className="flex-row items-center gap-2" layout={{ width: gridW }}>
             {BANKS.map((bank) => (
               <PixiButton
                 key={bank}
@@ -494,6 +836,8 @@ export const PixiDrumPadManager: React.FC = () => {
                 width={72}
               />
             ))}
+            <Div layout={{ flex: 1 }} />
+            <Txt className="text-xs text-text-muted">{`${bankLoadedCount}/16 (${totalLoadedCount}/64)`}</Txt>
           </Div>
 
           {/* 4×4 Pad grid */}
@@ -511,15 +855,42 @@ export const PixiDrumPadManager: React.FC = () => {
                 key={pad.id}
                 pad={pad}
                 selected={pad.id === selectedPadId}
+                focused={pad.id === focusedPadId}
+                velocity={padVelocities[pad.id] || 0}
                 onSelect={() => setSelectedPadId(pad.id)}
                 onTrigger={handlePadTrigger}
+                onRelease={handlePadRelease}
                 size={padSize}
               />
             ))}
           </Div>
 
           {/* Selected pad info */}
-          {selectedPad && (
+          {selectedPad ? (
+            <Div
+              className="flex-row gap-2 items-center p-3"
+              layout={{
+                width: gridW,
+                backgroundColor: theme.bgSecondary.color,
+                borderWidth: 1,
+                borderColor: theme.border.color,
+                borderRadius: 4,
+              }}
+            >
+              <Txt className="text-xs text-text-muted" layout={{ flex: 1 }}>
+                {`Pad ${selectedPad.id}: ${selectedPad.name} ${selectedPad.sample ? `(${selectedPad.sample.duration.toFixed(2)}s)` : '(empty)'}`}
+              </Txt>
+              <PixiButton label="Edit" size="sm" variant="primary" onClick={() => setShowPadEditor(true)} />
+              <PixiButton label="Load File" size="sm" color="blue" onClick={handleLoadSampleFromFile} />
+              <PixiButton
+                label="Clear"
+                size="sm"
+                variant="danger"
+                onClick={() => { if (selectedPadId != null) clearPad(selectedPadId); }}
+                disabled={!selectedPad.sample}
+              />
+            </Div>
+          ) : (
             <Div
               className="flex-col p-3 gap-2"
               layout={{
@@ -530,31 +901,35 @@ export const PixiDrumPadManager: React.FC = () => {
                 borderRadius: 4,
               }}
             >
-              <Txt className="text-xs font-bold text-text-muted">{`PAD ${selectedPad.id}`}</Txt>
-              <Txt className="text-sm text-text-primary">
-                {selectedPad.name || 'Empty'}
-              </Txt>
+              <Txt className="text-xs text-text-muted">Click a pad to select it</Txt>
             </Div>
           )}
 
-          {/* Shortcuts */}
+          {/* Keyboard shortcuts */}
           <Div
             className="flex-col p-3 gap-1"
             layout={{
               width: gridW,
-              backgroundColor: theme.bgSecondary.color,
+              backgroundColor: theme.bgTertiary.color,
               borderWidth: 1,
               borderColor: theme.border.color,
               borderRadius: 4,
             }}
           >
-            <Txt className="text-xs font-bold text-text-muted">SHORTCUTS</Txt>
-            <Txt className="text-xs text-text-muted">Click: Select pad</Txt>
-            <Txt className="text-xs text-text-muted">Q-R / A-F / Z-V / T-N: Trigger</Txt>
+            <Txt className="text-xs text-text-muted">Q-R / A-F / Z-V / T-I = trigger pads</Txt>
+            <Txt className="text-xs text-text-muted">Arrow keys = navigate  |  Enter = trigger</Txt>
+            <Txt className="text-xs text-text-muted">Shift = harder velocity</Txt>
           </Div>
         </Div>
 
-        {/* ── Right: Controls panel ── */}
+        {/* ── Right: Pad editor or Controls panel ── */}
+        {showPadEditor && selectedPadId != null ? (
+          <PixiPadEditor
+            padId={selectedPadId}
+            width={EDITOR_W}
+            onClose={() => setShowPadEditor(false)}
+          />
+        ) : (
         <Div
           className="flex-col p-4 gap-4"
           layout={{
@@ -734,7 +1109,8 @@ export const PixiDrumPadManager: React.FC = () => {
               </Div>
             )}
           </Div>
-        </Div>
+          </Div>
+        )}
       </Div>
 
       {/* ── Alert overlay ── */}
