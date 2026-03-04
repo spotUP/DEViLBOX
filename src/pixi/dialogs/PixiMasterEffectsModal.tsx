@@ -15,7 +15,6 @@ import {
   PixiModalFooter,
   PixiButton,
   PixiLabel,
-  PixiSlider,
   PixiScrollView,
   PixiSelect,
   type SelectOption,
@@ -27,7 +26,7 @@ import { usePixiTheme } from '../theme';
 import { useAudioStore } from '@stores/useAudioStore';
 import type { EffectConfig, AudioEffectType as EffectType } from '@typedefs/instrument';
 import { AVAILABLE_EFFECTS, getEffectsByGroup, type AvailableEffect } from '@constants/unifiedEffects';
-import { MASTER_FX_PRESETS, type MasterFxPreset } from '@constants/masterFxPresets';
+import { MASTER_FX_PRESETS } from '@constants/masterFxPresets';
 import { GUITARML_MODEL_REGISTRY, getModelCharacteristicDefaults } from '@constants/guitarMLRegistry';
 import { getDefaultEffectParameters } from '@engine/InstrumentFactory';
 
@@ -670,14 +669,14 @@ const MasterEffectChainRow: React.FC<MasterEffectChainRowProps> = ({
             label="▲"
             variant="ghost"
             size="sm"
-            onClick={(e) => { e?.stopPropagation?.(); onMoveUp(); }}
+            onClick={() => { onMoveUp(); }}
             disabled={index === 0}
           />
           <PixiButton
             label="▼"
             variant="ghost"
             size="sm"
-            onClick={(e) => { e?.stopPropagation?.(); onMoveDown(); }}
+            onClick={() => { onMoveDown(); }}
             disabled={index >= total - 1}
           />
         </layoutContainer>
@@ -721,14 +720,14 @@ const MasterEffectChainRow: React.FC<MasterEffectChainRowProps> = ({
           label={effect.enabled ? 'ON' : 'OFF'}
           variant={effect.enabled ? 'primary' : 'ghost'}
           size="sm"
-          onClick={(e) => { e?.stopPropagation?.(); onToggle(); }}
+          onClick={() => { onToggle(); }}
         />
         <PixiButton
           icon="close"
           label=""
           variant="ghost"
           size="sm"
-          onClick={(e) => { e?.stopPropagation?.(); onRemove(); }}
+          onClick={() => { onRemove(); }}
         />
       </layoutContainer>
     </layoutContainer>

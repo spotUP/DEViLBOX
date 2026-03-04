@@ -13,7 +13,7 @@
  */
 
 import React, { useMemo, useCallback } from 'react';
-import { PixiLabel, PixiKnob, PixiSlider, PixiCheckbox, PixiScrollView } from '../components';
+import { PixiLabel, PixiKnob, PixiSlider, PixiScrollView } from '../components';
 import { usePixiTheme } from '../theme';
 import type { EffectConfig } from '@typedefs/instrument';
 import { NeuralParameterMapper } from '@engine/effects/NeuralParameterMapper';
@@ -42,7 +42,6 @@ interface ParamDef {
 
 const CONTENT_W = 380;
 const KNOBS_PER_ROW = 4;
-const KNOB_W = 76;
 const KNOB_H = 84;
 const ROW_GAP = 8;
 const SECTION_PAD = 10;

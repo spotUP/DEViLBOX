@@ -8,7 +8,7 @@
 
 import React, { useState, useCallback, useMemo } from 'react';
 import { usePixiTheme } from '../theme';
-import { Div, Txt, GlModal, GlModalFooter } from '../layout';
+import { Div, Txt, GlModal } from '../layout';
 import { PIXI_FONTS } from '../fonts';
 import { PixiButton } from '../components/PixiButton';
 import { PixiList } from '../components/PixiList';

@@ -440,7 +440,6 @@ function drawChannelLevels(g: GraphicsType, data: Float32Array, w: number, h: nu
   const drawW = w - padX * 2;
   const barH = Math.max(4, (h - padY * 2) / bandCount - 2);
   const bandColors = [theme.success.color, theme.accent.color, theme.warning.color, theme.error.color];
-  const bandLabels = ['LOW', 'MID', 'HIGH', 'PEAK'];
 
   for (let band = 0; band < bandCount; band++) {
     const y = padY + band * (barH + 2);

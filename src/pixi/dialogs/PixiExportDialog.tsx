@@ -7,7 +7,7 @@
  * DOM reference: src/lib/export/ExportDialog.tsx
  */
 
-import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import {
   PixiModal,
   PixiModalHeader,
@@ -107,11 +107,11 @@ export const PixiExportDialog: React.FC<PixiExportDialogProps> = ({ isOpen, onCl
     compress: false,
     prettify: true,
   });
-  const [sfxName, setSfxName] = useState('MySound');
+  const [sfxName] = useState('MySound');
   const [selectedPatternIndex, setSelectedPatternIndex] = useState(currentPatternIndex);
   const [selectedInstrumentId, setSelectedInstrumentId] = useState(currentInstrumentId || 0);
-  const [isRendering, setIsRendering] = useState(false);
-  const [renderProgress, setRenderProgress] = useState(0);
+  const [isRendering] = useState(false);
+  const [renderProgress] = useState(0);
 
   // Auto-select audio scope when opened from arrangement toolbar
   useEffect(() => {

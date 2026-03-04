@@ -15,7 +15,6 @@ import {
   PixiModalFooter,
   PixiButton,
   PixiLabel,
-  PixiSlider,
   PixiScrollView,
   PixiSelect,
   type SelectOption,
@@ -28,7 +27,7 @@ import { useInstrumentStore, notify } from '@stores';
 import type { EffectConfig, AudioEffectType as EffectType } from '@typedefs/instrument';
 import { AVAILABLE_EFFECTS, getEffectsByGroup, type AvailableEffect } from '@constants/unifiedEffects';
 import { GUITARML_MODEL_REGISTRY, getModelCharacteristicDefaults } from '@constants/guitarMLRegistry';
-import { INSTRUMENT_FX_PRESETS, type InstrumentFxPreset } from '@constants/instrumentFxPresets';
+import { INSTRUMENT_FX_PRESETS } from '@constants/instrumentFxPresets';
 
 // ── Layout constants ────────────────────────────────────────────────────────
 
@@ -534,14 +533,14 @@ const EffectChainRow: React.FC<EffectChainRowProps> = ({
           label={effect.enabled ? 'ON' : 'OFF'}
           variant={effect.enabled ? 'primary' : 'ghost'}
           size="sm"
-          onClick={(e) => { e?.stopPropagation?.(); onToggle(); }}
+          onClick={() => { onToggle(); }}
         />
         <PixiButton
           icon="close"
           label=""
           variant="ghost"
           size="sm"
-          onClick={(e) => { e?.stopPropagation?.(); onRemove(); }}
+          onClick={() => { onRemove(); }}
         />
       </layoutContainer>
     </layoutContainer>

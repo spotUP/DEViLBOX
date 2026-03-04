@@ -20,16 +20,14 @@ import {
   PixiLabel,
   PixiList,
   PixiKnob,
-  PixiSlider,
   PixiToggle,
   PixiSelect,
   type SelectOption,
 } from '../components';
 import { PixiPureTextInput } from '../input/PixiPureTextInput';
 import { usePixiTheme } from '../theme';
-import { PIXI_FONTS } from '../fonts';
 import { useInstrumentStore, notify } from '@stores';
-import { ALL_SYNTH_TYPES, getSynthInfo, SYNTH_CATEGORIES } from '@constants/synthCategories';
+import { ALL_SYNTH_TYPES, getSynthInfo } from '@constants/synthCategories';
 import type { SynthType } from '@typedefs/instrument';
 import type { InstrumentConfig, EffectConfig } from '@typedefs/instrument';
 
@@ -43,7 +41,6 @@ const HEADER_H = 38;
 const TAB_BAR_H = 32;
 const FOOTER_H = 44;
 const CONTENT_H = MODAL_H - HEADER_H - FOOTER_H;
-const RIGHT_CONTENT_H = CONTENT_H - TAB_BAR_H;
 const PAD = 16;
 const KNOB_SIZE = 'sm' as const;
 
@@ -78,7 +75,7 @@ interface PixiEditInstrumentModalProps {
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
 /** Build PixiList items from the instrument array */
-function instrumentListItems(instruments: InstrumentConfig[], currentId: number | null) {
+function instrumentListItems(instruments: InstrumentConfig[]) {
   return instruments.map((inst) => {
     const info = getSynthInfo(inst.synthType);
     return {
@@ -90,13 +87,7 @@ function instrumentListItems(instruments: InstrumentConfig[], currentId: number 
   });
 }
 
-/** Build SelectOption list for synth types */
-function synthTypeOptions(): SelectOption[] {
-  return ALL_SYNTH_TYPES.map((st) => {
-    const info = getSynthInfo(st);
-    return { value: st, label: info?.shortName ?? st };
-  });
-}
+
 
 /** Synth type list items for the create-mode browser */
 function synthTypeListItems() {
@@ -149,7 +140,7 @@ export const PixiEditInstrumentModal: React.FC<PixiEditInstrumentModalProps> = (
     [instruments, currentInstrumentId],
   );
 
-  const instListItems = useMemo(() => instrumentListItems(instruments, currentInstrumentId), [instruments, currentInstrumentId]);
+  const instListItems = useMemo(() => instrumentListItems(instruments), [instruments]);
 
   const filteredSynthItems = useMemo(() => {
     const items = synthTypeListItems();
@@ -172,9 +163,9 @@ export const PixiEditInstrumentModal: React.FC<PixiEditInstrumentModalProps> = (
 
   const handleCreate = useCallback(() => {
     const inst = createInstrument();
-    if (inst) {
-      updateInstrument(inst.id, { name: newName, synthType: selectedSynthType });
-      setCurrentInstrument(inst.id);
+    if (inst != null) {
+      updateInstrument(inst, { name: newName, synthType: selectedSynthType });
+      setCurrentInstrument(inst);
       notify.success(`Created ${newName}`);
     }
     setIsCreating(false);

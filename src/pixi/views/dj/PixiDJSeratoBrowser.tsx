@@ -6,9 +6,9 @@
  * track list, PixiSelect for crate filtering, PixiPureTextInput for search.
  */
 
-import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { usePixiTheme } from '../../theme';
-import { Div, Txt } from '../../layout';
+import { Div } from '../../layout';
 import { PIXI_FONTS } from '../../fonts';
 import { PixiButton } from '../../components/PixiButton';
 import { PixiList } from '../../components/PixiList';
@@ -53,11 +53,9 @@ const COL_ARTIST_W = 160;
 const COL_BPM_W = 50;
 const COL_KEY_W = 50;
 const COL_DUR_W = 50;
-const COL_DECK_W = 70;
 
 // Colors
 const PURPLE = 0x9333ea;
-const PURPLE_DIM = 0x581c87;
 
 // ---------------------------------------------------------------------------
 // Helpers

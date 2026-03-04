@@ -20,7 +20,6 @@ import {
 } from '@/lib/SamplePackPrefetcher';
 import { getToneEngine } from '@engine/ToneEngine';
 import { usePixiTheme } from '../theme';
-import { PIXI_FONTS } from '../fonts';
 import { PixiModal, PixiModalFooter } from '../components/PixiModal';
 import { PixiButton } from '../components/PixiButton';
 import { PixiLabel } from '../components/PixiLabel';
@@ -29,7 +28,7 @@ import { PixiSelect } from '../components/PixiSelect';
 import type { SelectOption } from '../components/PixiSelect';
 import { PixiPureTextInput } from '../input/PixiPureTextInput';
 import { pickFile } from '../services/glFilePicker';
-import type { FederatedWheelEvent } from 'pixi.js';
+
 
 // ---------------------------------------------------------------------------
 // Cache helpers (mirrored from DOM version)

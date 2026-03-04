@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useCallback, useMemo } from 'react';
-import { PixiModal, PixiModalHeader, PixiModalFooter, PixiButton, PixiLabel } from '../components';
+import { PixiModal, PixiModalHeader, PixiButton, PixiLabel } from '../components';
 import { PixiScrollView } from '../components/PixiScrollView';
 import { usePixiTheme } from '../theme';
 import { PIXI_FONTS } from '../fonts';
@@ -27,7 +27,7 @@ const PADDING = 16;
 const TOOLBAR_H = 44;
 const HELP_H = 38;
 const HEADER_H = 36;
-const FOOTER_H = 0; // no footer, buttons in toolbar
+// no footer, buttons in toolbar
 const GRID_W = MODAL_W - PADDING * 2;
 const GRID_H = MODAL_H - HEADER_H - TOOLBAR_H - HELP_H - PADDING * 2;
 

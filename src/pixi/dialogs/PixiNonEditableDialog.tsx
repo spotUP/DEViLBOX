@@ -11,7 +11,7 @@
  */
 
 import React, { useCallback } from 'react';
-import { PixiModal, PixiModalHeader, PixiModalFooter, PixiButton, PixiLabel, PixiIcon } from '../components';
+import { PixiModal, PixiModalFooter, PixiButton, PixiLabel, PixiIcon } from '../components';
 import { usePixiTheme } from '../theme';
 import { PIXI_FONTS } from '../fonts';
 import { useUIStore } from '@stores/useUIStore';
