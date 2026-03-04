@@ -74,7 +74,7 @@ export const PixiDeckTurntable: React.FC<PixiDeckTurntableProps> = ({ deckId, si
         alignItems: 'center',
       }}
     >
-      <pixiGraphics draw={drawPlatter} layout={{ width: size, height: size }} />
+      <pixiGraphics draw={drawPlatter} layout={{ position: 'absolute', left: 0, top: 0 }} />
     </pixiContainer>
   );
 };
