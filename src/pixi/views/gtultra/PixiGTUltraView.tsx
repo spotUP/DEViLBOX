@@ -95,6 +95,10 @@ export const PixiGTUltraView: React.FC<Props> = ({ width, height }) => {
           const store = useGTUltraStore.getState();
           store.setSongName(info.name);
           store.setSongAuthor(info.author);
+          // Request all pattern data now that we know how many patterns exist
+          if (info.numPatterns > 0) {
+            store.refreshAllPatterns(info.numPatterns);
+          }
         },
         onError: (err) => console.error('[GTUltra/Pixi] Engine error:', err),
       });
