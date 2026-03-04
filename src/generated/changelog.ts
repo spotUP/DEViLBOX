@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-03-04T10:52:39.611Z
+ * Generated: 2026-03-04T11:47:37.118Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.2208';
-export const BUILD_NUMBER = '2208';
-export const BUILD_HASH = 'f274c79d';
+export const BUILD_VERSION = '1.0.2212';
+export const BUILD_NUMBER = '2212';
+export const BUILD_HASH = 'f40d7a3c';
 export const BUILD_DATE = '2026-03-04';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,25 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.2208',
+    version: '1.0.2212',
     date: '2026-03-04',
     changes: [
+      {
+        type: 'improvement',
+        "description": "Unify file import paths through UnifiedFileLoader"
+      },
+      {
+        type: 'fix',
+        "description": "GTUltra view Yoga BindingError fixes and diagnostic logging"
+      },
+      {
+        type: 'fix',
+        "description": "Resolve all 62 TypeScript errors across Pixi UI and engine"
+      },
+      {
+        type: 'fix',
+        "description": "Fix PixiButton click not firing due to stale pressed state in closure"
+      },
       {
         type: 'improvement',
         "description": "Add no-emoji rule to project memory — always use FontAudio flat icons"
@@ -216,22 +232,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         "description": "Visualizer modes not responding to music"
-      },
-      {
-        type: 'improvement',
-        "description": "Wire AdvancedEdit + TipOfTheDay into PixiRoot, remove from bridge"
-      },
-      {
-        type: 'feature',
-        "description": "Add GL-native AdvancedEditModal and TipOfTheDay dialogs"
-      },
-      {
-        type: 'improvement',
-        "description": "Wire 4 GL dialogs into PixiRoot, remove DOM versions from bridge"
-      },
-      {
-        type: 'feature',
-        "description": "Add 4 GL-native dialogs: ShortcutSheet, GrooveSettings, FindReplace, EffectPicker"
       }
     ]
   }
