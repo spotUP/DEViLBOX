@@ -6,8 +6,8 @@
  * the GL scene graph so the CRT shader affects it, and naturally disappears when
  * the tracker view is unmounted.
  *
- * DOM portals are used only for popups (ChannelContextMenu, ChannelColorPicker)
- * which need to float above everything, and for the channel name editing input.
+ * Context menu and color picker use the GL PixiDropdownStore system.
+ * A DOM portal is used only for the channel name editing input (keyboard/IME).
  */
 
 import React, { useCallback, useMemo, useRef, useState, type RefCallback } from 'react';
@@ -15,11 +15,13 @@ import { createPortal } from 'react-dom';
 import type { Graphics as GraphicsType, FederatedPointerEvent } from 'pixi.js';
 import { usePixiTheme } from '../../theme';
 import { PIXI_FONTS } from '../../fonts';
-import { ChannelContextMenu } from '@/components/tracker/ChannelContextMenu';
-import { ChannelColorPicker } from '@/components/tracker/ChannelColorPicker';
+import { usePixiDropdownStore } from '../../stores/usePixiDropdownStore';
 import { useUIStore } from '@stores';
-import type { GeneratorType } from '@utils/patternGenerators';
+import { useLiveModeStore } from '@stores/useLiveModeStore';
+import { useTrackerStore } from '@stores/useTrackerStore';
+import { GENERATORS, type GeneratorType } from '@utils/patternGenerators';
 import type { ChannelData } from '@typedefs/tracker';
+import type { ContextMenuItem } from '../../input/PixiContextMenu';
 
 // ─── Layout constants ────────────────────────────────────────────────────────
 const HEADER_HEIGHT = 28;
@@ -72,12 +74,6 @@ interface PixiChannelHeadersProps {
   onChaos: (ch: number) => void;
 }
 
-// ─── Popup state for context menu and color picker ───────────────────────────
-interface PopupState {
-  type: 'context' | 'color';
-  channelIndex: number;
-  position: { x: number; y: number };
-}
 
 export const PixiChannelHeaders: React.FC<PixiChannelHeadersProps> = ({
   pattern,
@@ -117,7 +113,6 @@ export const PixiChannelHeaders: React.FC<PixiChannelHeadersProps> = ({
 }) => {
   const theme = usePixiTheme();
   const showChannelNames = useUIStore(s => s.showChannelNames);
-  const [popup, setPopup] = useState<PopupState | null>(null);
   const [editingChannel, setEditingChannel] = useState<number | null>(null);
   const [editValue, setEditValue] = useState('');
   const [clipMask, setClipMask] = useState<GraphicsType | null>(null);
@@ -261,15 +256,128 @@ export const PixiChannelHeaders: React.FC<PixiChannelHeadersProps> = ({
   // ── Popup handlers ─────────────────────────────────────────────────────────
   const openContextMenu = useCallback((ch: number, e: FederatedPointerEvent) => {
     const native = e.nativeEvent as PointerEvent;
-    setPopup({ type: 'context', channelIndex: ch, position: { x: native.clientX, y: native.clientY } });
-  }, []);
+    const channel = pattern.channels[ch];
+    const { isLiveMode, queueChannelAction } = useLiveModeStore.getState();
+    const { removeChannel, patterns, toggleChannelMute, toggleChannelSolo, toggleChannelCollapse } = useTrackerStore.getState();
+
+    let items: ContextMenuItem[];
+
+    if (isLiveMode) {
+      items = [
+        { label: 'Trigger', submenu: [
+          { label: '4/4 Kicks', action: () => { queueChannelAction(ch, { type: 'trigger', pattern: 'kicks' }); onFillPattern(ch, '4on4'); } },
+          { label: 'Build', action: () => { queueChannelAction(ch, { type: 'trigger', pattern: 'build' }); onFillPattern(ch, 'build'); } },
+          { label: 'Drop', action: () => { queueChannelAction(ch, { type: 'trigger', pattern: 'drop' }); onFillPattern(ch, '16ths'); } },
+          { label: 'Breakdown', action: () => { queueChannelAction(ch, { type: 'trigger', pattern: 'breakdown' }); onFillPattern(ch, 'breakdown'); } },
+        ]},
+        { label: 'Stutter', action: () => queueChannelAction(ch, { type: 'stutter' }) },
+        { label: 'Roll', submenu: [
+          { label: '1/4 Note', action: () => queueChannelAction(ch, { type: 'roll', division: '1/4' }) },
+          { label: '1/8 Note', action: () => queueChannelAction(ch, { type: 'roll', division: '1/8' }) },
+          { label: '1/16 Note', action: () => queueChannelAction(ch, { type: 'roll', division: '1/16' }) },
+        ]},
+        { label: '', separator: true },
+        { label: channel.muted ? 'Unmute' : 'Mute', action: () => toggleChannelMute(ch) },
+        { label: channel.solo ? 'Unsolo' : 'Solo', action: () => toggleChannelSolo(ch) },
+        { label: 'Kill', action: () => { queueChannelAction(ch, { type: 'kill' }); toggleChannelMute(ch); } },
+      ];
+    } else {
+      items = [
+        { label: channel.collapsed ? 'Expand Channel' : 'Collapse Channel', action: () => {
+          if (onToggleCollapse) onToggleCollapse(ch);
+          else toggleChannelCollapse(ch);
+        }},
+        { label: '', separator: true },
+        { label: 'Copy Track', action: () => onCopyChannel(ch) },
+        { label: 'Cut Track', action: () => onCutChannel(ch) },
+        { label: 'Paste Track', action: () => onPasteChannel(ch) },
+        { label: 'Clear Channel', action: () => onClearChannel(ch) },
+        { label: '', separator: true },
+        { label: 'Fill', submenu: [
+          { label: GENERATORS['4on4'].name, action: () => onFillPattern(ch, '4on4') },
+          { label: GENERATORS.offbeat.name, action: () => onFillPattern(ch, 'offbeat') },
+          { label: GENERATORS.backbeat.name, action: () => onFillPattern(ch, 'backbeat') },
+          { label: GENERATORS.hiHats.name, action: () => onFillPattern(ch, 'hiHats') },
+          { label: '', separator: true },
+          { label: GENERATORS['8ths'].name, action: () => onFillPattern(ch, '8ths') },
+          { label: GENERATORS['16ths'].name, action: () => onFillPattern(ch, '16ths') },
+          { label: GENERATORS.random.name, action: () => onFillPattern(ch, 'random') },
+          { label: '', separator: true },
+          { label: GENERATORS.syncopated.name, action: () => onFillPattern(ch, 'syncopated') },
+          { label: GENERATORS.walking.name, action: () => onFillPattern(ch, 'walking') },
+          { label: '', separator: true },
+          { label: GENERATORS.build.name, action: () => onFillPattern(ch, 'build') },
+          { label: GENERATORS.breakdown.name, action: () => onFillPattern(ch, 'breakdown') },
+        ]},
+        { label: '', separator: true },
+        { label: 'Transpose', submenu: [
+          { label: '+12 (Octave Up)', action: () => onTranspose(ch, 12) },
+          { label: '+7 (Fifth)', action: () => onTranspose(ch, 7) },
+          { label: '+1 (Semitone)', action: () => onTranspose(ch, 1) },
+          { label: '', separator: true },
+          { label: '-1 (Semitone)', action: () => onTranspose(ch, -1) },
+          { label: '-7 (Fifth)', action: () => onTranspose(ch, -7) },
+          { label: '-12 (Octave Down)', action: () => onTranspose(ch, -12) },
+        ]},
+        { label: 'Humanize', action: () => onHumanize(ch) },
+        { label: 'Interpolate', action: () => onInterpolate(ch) },
+        { label: '', separator: true },
+        { label: 'B/D Animations', submenu: [
+          { label: 'Reverse Visual', action: () => onReverseVisual(ch) },
+          { label: '', separator: true },
+          { label: 'Polyrhythm', action: () => onPolyrhythm(ch) },
+          { label: 'Fibonacci', action: () => onFibonacci(ch) },
+          { label: 'Euclidean', action: () => onEuclidean(ch) },
+          { label: '', separator: true },
+          { label: 'Ping-Pong', action: () => onPingPong(ch) },
+          { label: 'Glitch', action: () => onGlitch(ch) },
+          { label: 'Strobe', action: () => onStrobe(ch) },
+          { label: 'Visual Echo', action: () => onVisualEcho(ch) },
+          { label: '', separator: true },
+          { label: 'Converge', action: () => onConverge(ch) },
+          { label: 'Spiral', action: () => onSpiral(ch) },
+          { label: 'Bounce', action: () => onBounce(ch) },
+          { label: 'Chaos', action: () => onChaos(ch) },
+        ]},
+        { label: '', separator: true },
+        { label: channel.muted ? 'Unmute' : 'Mute', action: () => toggleChannelMute(ch) },
+        { label: channel.solo ? 'Unsolo' : 'Solo', action: () => toggleChannelSolo(ch) },
+        { label: '', separator: true },
+        { label: 'Delete Channel', action: () => removeChannel(ch), disabled: patterns[0]?.channels.length <= 1 },
+      ];
+    }
+
+    const menuId = `ch-ctx-${ch}`;
+    usePixiDropdownStore.getState().openDropdown({
+      kind: 'contextMenu',
+      id: menuId,
+      x: Math.min(native.clientX, (window.innerWidth || 1920) - 200),
+      y: Math.min(native.clientY, (window.innerHeight || 1080) - 400),
+      items,
+      onClose: () => usePixiDropdownStore.getState().closeDropdown(menuId),
+    });
+  }, [
+    pattern.channels,
+    onToggleCollapse, onCopyChannel, onCutChannel, onPasteChannel, onClearChannel,
+    onFillPattern, onTranspose, onHumanize, onInterpolate,
+    onReverseVisual, onPolyrhythm, onFibonacci, onEuclidean,
+    onPingPong, onGlitch, onStrobe, onVisualEcho,
+    onConverge, onSpiral, onBounce, onChaos,
+  ]);
 
   const openColorPicker = useCallback((ch: number, e: FederatedPointerEvent) => {
     const native = e.nativeEvent as PointerEvent;
-    setPopup({ type: 'color', channelIndex: ch, position: { x: native.clientX, y: native.clientY } });
-  }, []);
+    usePixiDropdownStore.getState().openDropdown({
+      kind: 'colorPicker',
+      id: `ch-color-${ch}`,
+      x: native.clientX,
+      y: native.clientY,
+      currentColor: pattern.channels[ch]?.color ?? null,
+      onColorSelect: (color) => { onSetColor(ch, color); },
+      onClose: () => usePixiDropdownStore.getState().closeDropdown(`ch-color-${ch}`),
+    });
+  }, [pattern.channels, onSetColor]);
 
-  const closePopup = useCallback(() => setPopup(null), []);
 
   // ── Per-channel header rendering ───────────────────────────────────────────
   const channelHeaders = useMemo(() => {
@@ -396,6 +504,27 @@ export const PixiChannelHeaders: React.FC<PixiChannelHeadersProps> = ({
                   text={`S:${channelSpeeds![ch]}`}
                   style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 8, fill: 0xffffff }}
                   tint={0xfbbf24}
+                  layout={{}}
+                />
+              </pixiContainer>
+            )}
+            {showChannelNames && editingChannel === ch && (
+              <pixiContainer layout={{ height: 18, flexDirection: 'row', alignItems: 'center', paddingLeft: 2, paddingRight: 2 }}>
+                <pixiGraphics
+                  draw={(g: GraphicsType) => {
+                    g.clear();
+                    g.roundRect(0, 0, Math.max(50, chW - 120), 18, 3);
+                    g.fill({ color: 0x000000, alpha: 0.85 });
+                    g.roundRect(0, 0, Math.max(50, chW - 120), 18, 3);
+                    g.stroke({ color: 0x6366f1, alpha: 0.6, width: 1 });
+                  }}
+                  layout={{ position: 'absolute', width: Math.max(50, chW - 120), height: 18 }}
+                />
+                <pixiBitmapText
+                  text={(editValue || '').toUpperCase() || ' '}
+                  style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 10, fill: 0xffffff }}
+                  tint={0xffffff}
+                  alpha={0.9}
                   layout={{}}
                 />
               </pixiContainer>
@@ -535,19 +664,12 @@ export const PixiChannelHeaders: React.FC<PixiChannelHeadersProps> = ({
     return headers;
   }, [
     numChannels, pattern.channels, channelWidths, channelOffsets, scrollLeft,
-    theme, showChannelNames, channelSpeeds, songInitialSpeed, editingChannel,
+    theme, showChannelNames, channelSpeeds, songInitialSpeed, editingChannel, editValue,
     onToggleMute, onToggleSolo, onToggleCollapse, onAddChannel,
     openContextMenu, openColorPicker, startEditing,
     drawMuteBtn, drawSoloBtn, drawCollapseBtn, drawContextBtn, drawColorBtn, drawAddBtn,
   ]);
 
-  // ── Popup portal (ChannelContextMenu) ──────────────────────────────────────
-  const contextMenuChannel = popup?.type === 'context' ? popup.channelIndex : -1;
-  const contextMenuOpen = popup?.type === 'context';
-  const contextMenuPos = popup?.type === 'context' ? popup.position : { x: 0, y: 0 };
-  const colorPickerChannel = popup?.type === 'color' ? popup.channelIndex : -1;
-  const colorPickerOpen = popup?.type === 'color';
-  const colorPickerPos = popup?.type === 'color' ? popup.position : { x: 0, y: 0 };
 
   return (
     <pixiContainer layout={{ width, height: HEADER_HEIGHT }}>
@@ -579,67 +701,7 @@ export const PixiChannelHeaders: React.FC<PixiChannelHeadersProps> = ({
         </pixiContainer>
       </pixiContainer>
 
-      {/* ─── DOM Portals for popups ──────────────────────────────────────── */}
-      {contextMenuOpen && contextMenuChannel >= 0 && createPortal(
-        <div
-          style={{
-            position: 'fixed',
-            left: contextMenuPos.x,
-            top: contextMenuPos.y,
-            zIndex: 9999,
-          }}
-        >
-          <ChannelContextMenu
-            channelIndex={contextMenuChannel}
-            channel={pattern.channels[contextMenuChannel]}
-            patternId={pattern.id}
-            patternLength={pattern.length}
-            onFillPattern={(ch, g) => { onFillPattern(ch, g); closePopup(); }}
-            onClearChannel={(ch) => { onClearChannel(ch); closePopup(); }}
-            onCopyChannel={(ch) => { onCopyChannel(ch); closePopup(); }}
-            onCutChannel={(ch) => { onCutChannel(ch); closePopup(); }}
-            onPasteChannel={(ch) => { onPasteChannel(ch); closePopup(); }}
-            onTranspose={(ch, s) => { onTranspose(ch, s); closePopup(); }}
-            onHumanize={(ch) => { onHumanize(ch); closePopup(); }}
-            onInterpolate={(ch) => { onInterpolate(ch); closePopup(); }}
-            onAcidGenerator={() => {}}
-            onRandomize={() => {}}
-            onToggleCollapse={onToggleCollapse}
-            onReverseVisual={onReverseVisual}
-            onPolyrhythm={onPolyrhythm}
-            onFibonacci={onFibonacci}
-            onEuclidean={onEuclidean}
-            onPingPong={onPingPong}
-            onGlitch={onGlitch}
-            onStrobe={onStrobe}
-            onVisualEcho={onVisualEcho}
-            onConverge={onConverge}
-            onSpiral={onSpiral}
-            onBounce={onBounce}
-            onChaos={onChaos}
-          />
-        </div>,
-        document.body,
-      )}
-
-      {colorPickerOpen && colorPickerChannel >= 0 && createPortal(
-        <div
-          style={{
-            position: 'fixed',
-            left: colorPickerPos.x,
-            top: colorPickerPos.y,
-            zIndex: 9999,
-          }}
-        >
-          <ChannelColorPicker
-            currentColor={pattern.channels[colorPickerChannel]?.color ?? null}
-            onColorSelect={(color) => { onSetColor(colorPickerChannel, color); closePopup(); }}
-          />
-        </div>,
-        document.body,
-      )}
-
-      {/* Channel name editing input — DOM portal */}
+      {/* Hidden DOM input for keyboard/IME capture during channel name editing */}
       {editingChannel !== null && createPortal(
         <input
           autoFocus
@@ -650,21 +712,12 @@ export const PixiChannelHeaders: React.FC<PixiChannelHeadersProps> = ({
           onKeyDown={(e) => { if (e.key === 'Enter') finishEditing(); if (e.key === 'Escape') setEditingChannel(null); }}
           style={{
             position: 'fixed',
-            left: channelOffsets[editingChannel] - scrollLeft + 40,
-            top: 4,
-            width: Math.max(60, channelWidths[editingChannel] - 120),
-            height: 20,
-            background: 'rgba(0,0,0,0.85)',
-            border: '1px solid rgba(99,102,241,0.5)',
-            borderRadius: 3,
-            color: '#fff',
-            fontFamily: 'JetBrains Mono, monospace',
-            fontSize: 10,
-            fontWeight: 'bold',
-            padding: '0 4px',
-            textTransform: 'uppercase',
-            outline: 'none',
-            zIndex: 10000,
+            left: 0,
+            top: 0,
+            width: 1,
+            height: 1,
+            opacity: 0,
+            pointerEvents: 'none',
           }}
         />,
         document.body,
