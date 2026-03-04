@@ -4,24 +4,26 @@
 
 import { useState, useCallback } from 'react';
 import { PixiModal, PixiModalHeader, PixiModalFooter, PixiButton, PixiKnob, PixiLabel } from '../components';
-import { useCursorStore } from '@stores';
+import { useTrackerStore, useCursorStore } from '@stores';
 
 interface PixiScaleVolumeDialogProps {
   isOpen: boolean;
   onClose: () => void;
+  scope?: 'block' | 'track' | 'pattern';
 }
 
-export const PixiScaleVolumeDialog: React.FC<PixiScaleVolumeDialogProps> = ({ isOpen, onClose }) => {
+export const PixiScaleVolumeDialog: React.FC<PixiScaleVolumeDialogProps> = ({ isOpen, onClose, scope = 'block' }) => {
   const selection = useCursorStore(s => s.selection);
+  const scaleVolume = useTrackerStore(s => s.scaleVolume);
 
   const [scale, setScale] = useState(100);
   const hasSelection = selection != null;
 
   const handleApply = useCallback(() => {
     if (!hasSelection) return;
-    // Scale volume action — will be wired to store action
+    scaleVolume(scope, scale / 100);
     onClose();
-  }, [hasSelection, scale, onClose]);
+  }, [hasSelection, scale, scope, scaleVolume, onClose]);
 
   if (!isOpen) return null;
 

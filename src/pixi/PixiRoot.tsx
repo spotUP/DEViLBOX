@@ -22,11 +22,21 @@ import { CRTRenderer } from './CRTRenderer';
 import { Rectangle } from 'pixi.js';
 import { getAverageFps } from './performance';
 import { PixiNewSongWizard } from './dialogs/PixiNewSongWizard';
+import { PixiInterpolateDialog } from './dialogs/PixiInterpolateDialog';
+import { PixiHumanizeDialog } from './dialogs/PixiHumanizeDialog';
+import { PixiScaleVolumeDialog } from './dialogs/PixiScaleVolumeDialog';
+import { PixiFadeVolumeDialog } from './dialogs/PixiFadeVolumeDialog';
+import { PixiStrumDialog } from './dialogs/PixiStrumDialog';
+import { PixiAcidPatternDialog } from './dialogs/PixiAcidPatternDialog';
+import { PixiRandomizeDialog } from './dialogs/PixiRandomizeDialog';
 
 export const PixiRoot: React.FC = () => {
   const { width, height } = usePixiResponsive();
   const collabStatus = useCollaborationStore(s => s.status);
   const activeView = useUIStore(s => s.activeView);
+  const modalOpen = useUIStore(s => s.modalOpen);
+  const modalData = useUIStore(s => s.modalData);
+  const closeModal = useUIStore(s => s.closeModal);
 
   const { app } = useApplication();
   const crtEnabled = useSettingsStore((s) => s.crtEnabled);
@@ -104,6 +114,21 @@ export const PixiRoot: React.FC = () => {
       {/* GL-native modals — inside scene graph so CRT shader catches them */}
       <pixiContainer zIndex={300} layout={{ position: 'absolute', width, height }}>
         <PixiNewSongWizard />
+        <PixiInterpolateDialog isOpen={modalOpen === 'interpolate'} onClose={closeModal} />
+        <PixiHumanizeDialog isOpen={modalOpen === 'humanize'} onClose={closeModal} />
+        <PixiScaleVolumeDialog
+          isOpen={modalOpen === 'scaleVolume'}
+          onClose={closeModal}
+          scope={(modalData?.scope as 'block' | 'track' | 'pattern') || 'block'}
+        />
+        <PixiFadeVolumeDialog
+          isOpen={modalOpen === 'fadeVolume'}
+          onClose={closeModal}
+          scope={(modalData?.scope as 'block' | 'track' | 'pattern') || 'block'}
+        />
+        <PixiStrumDialog isOpen={modalOpen === 'strum'} onClose={closeModal} />
+        <PixiAcidPatternDialog isOpen={modalOpen === 'acidPattern'} onClose={closeModal} />
+        <PixiRandomizeDialog isOpen={modalOpen === 'randomize'} onClose={closeModal} />
       </pixiContainer>
 
       {/* Peer cursor overlay — above everything */}
