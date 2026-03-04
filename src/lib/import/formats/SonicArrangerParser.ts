@@ -47,7 +47,7 @@
  *
  * Note → XM note conversion:
  *   SA period table entry 49 (1-based) = 856 = C-1 = DEViLBOX XM 13
- *   Formula: xmNote = saNote - 36   (valid for saNote 37..108 → XM 1..72)
+ *   Formula: xmNote = saNote - 36   (valid for saNote 37..132 → XM 1..96)
  */
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
@@ -83,6 +83,7 @@ function readString(v: DataView, off: number, len: number): string {
 // -- SA note → XM note --------------------------------------------------------
 // SA period table is 1-based: index 49 = period 856 = ProTracker C-1.
 // ProTracker C-1 = XM note 13 (MIDI 24).  So xmNote = saNote - 36.
+// Verified: SA 49 → XM 13 → MOD period 856 ✓  (with -24 it gives 428, one octave too high)
 // This maps SA 37→XM 1 (lowest valid XM note) up through SA 132→XM 96.
 
 function saNote2XM(note: number): number {
