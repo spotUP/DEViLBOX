@@ -207,6 +207,16 @@ export async function parseSIDFile(buffer: ArrayBuffer, filename: string): Promi
     };
   }
 
+  // Add import metadata so playback hook detects SID format
+  pattern.importMetadata = {
+    sourceFormat: 'SID',
+    sourceFile: filename,
+    importedAt: new Date().toISOString(),
+    originalChannelCount: numCh,
+    originalPatternCount: 1,
+    originalInstrumentCount: instruments.length,
+  };
+
   return {
     name: (title || filename.replace(/\.sid$/i, '')) + (author ? ` — ${author}` : ''),
     format: 'SID' as TrackerFormat,

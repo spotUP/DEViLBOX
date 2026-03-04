@@ -179,6 +179,12 @@ export class ScriptNodePlayerEngine {
     // Ensure audio pipeline is set up (Chrome defers until user gesture)
     this.player._initByUserGesture();
 
+    // Set the track-ready callback — createInstance leaves it undefined,
+    // causing a TypeError in _initIfNeeded on first file load.
+    if (!this.player._onTrackReadyToPlay) {
+      this.player._onTrackReadyToPlay = () => {};
+    }
+
     // Set volume before loading
     this.player.setVolume(1);
 
