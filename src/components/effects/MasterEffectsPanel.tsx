@@ -359,7 +359,7 @@ export const MasterEffectsPanel: React.FC<MasterEffectsPanelProps> = ({ onEditEf
             </button>
 
             {showPresetMenu && (
-              <div className="absolute right-0 top-full mt-1 w-56 bg-dark-bgSecondary border border-dark-border rounded-lg shadow-xl z-50 max-h-80 overflow-y-auto">
+              <div className="absolute right-0 top-full mt-1 w-56 bg-dark-bgSecondary border border-dark-border rounded-lg shadow-xl z-50 max-h-[70vh] overflow-y-auto">
                 {/* User Presets */}
                 {userPresets.length > 0 && (
                   <>
