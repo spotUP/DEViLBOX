@@ -61,9 +61,6 @@ const LazySamplePackBrowser = lazy(() =>
 const LazyPatternOrderModal = lazy(() =>
   import('@/components/dialogs/PatternOrderModal').then(m => ({ default: m.PatternOrderModal }))
 );
-const LazyRevisionBrowserDialog = lazy(() =>
-  import('@/components/dialogs/RevisionBrowserDialog').then(m => ({ default: m.RevisionBrowserDialog }))
-);
 const LazyDrumPadManager = lazy(() =>
   import('@/components/drumpad/DrumPadManager').then(m => ({ default: m.DrumPadManager }))
 );
@@ -72,9 +69,6 @@ const LazyAutomationPanel = lazy(() =>
 );
 const LazyRomUploadDialog = lazy(() =>
   import('@/components/ui/RomUploadDialog').then(m => ({ default: m.RomUploadDialog }))
-);
-const LazyCollaborationModal = lazy(() =>
-  import('@/components/collaboration/CollaborationModal').then(m => ({ default: m.CollaborationModal }))
 );
 const LazyImportModuleDialog = lazy(() =>
   import('@/components/dialogs/ImportModuleDialog').then(m => ({ default: m.ImportModuleDialog }))
@@ -93,9 +87,6 @@ const LazyImportTD3Dialog = lazy(() =>
 );
 const LazySunVoxImportDialog = lazy(() =>
   import('@/components/instruments/SunVoxImportDialog').then(m => ({ default: m.SunVoxImportDialog }))
-);
-const LazyFurnacePresetBrowser = lazy(() =>
-  import('@/components/instruments/FurnacePresetBrowser').then(m => ({ default: m.FurnacePresetBrowser }))
 );
 const LazySIDInfoModal = lazy(() =>
   import('@/components/dialogs/SIDInfoModal').then(m => ({ default: m.SIDInfoModal }))
@@ -445,9 +436,6 @@ export const WebGLModalBridge: React.FC = () => {
       {modalOpen === 'patternOrder' && (
         <LazyPatternOrderModal onClose={closeModal} />
       )}
-      {modalOpen === 'revisions' && (
-        <LazyRevisionBrowserDialog isOpen={true} onClose={closeModal} />
-      )}
       {showFileBrowser && (
         <LazyFileBrowser
           isOpen={showFileBrowser}
@@ -500,9 +488,6 @@ export const WebGLModalBridge: React.FC = () => {
           </div>
         </div>
       )}
-      {modalOpen === 'collaboration' && (
-        <LazyCollaborationModal isOpen={true} onClose={closeModal} />
-      )}
       {/* Module file drop — dialog routed through portal to sit above PixiDOMOverlay */}
       {pendingModuleFile && (
         /\.(fur|dmf)$/i.test(pendingModuleFile.name) ? (
@@ -553,10 +538,6 @@ export const WebGLModalBridge: React.FC = () => {
           onImport={handleSunVoxImportGL}
           initialFile={pendingSunVoxFile}
         />
-      )}
-      {/* Furnace chip preset browser */}
-      {modalOpen === 'furnacePresets' && (
-        <LazyFurnacePresetBrowser onClose={closeModal} />
       )}
       {/* SID file info modal (DeepSID metadata + composer profile) */}
       {modalOpen === 'sidInfo' && (

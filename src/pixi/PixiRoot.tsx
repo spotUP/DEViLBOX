@@ -40,6 +40,9 @@ import { PixiFindReplaceDialog } from './dialogs/PixiFindReplaceDialog';
 import { PixiEffectPicker } from './dialogs/PixiEffectPicker';
 import { PixiAdvancedEditModal } from './dialogs/PixiAdvancedEditModal';
 import { PixiTipOfTheDay } from './dialogs/PixiTipOfTheDay';
+import { PixiCollaborationModal } from './dialogs/PixiCollaborationModal';
+import { PixiRevisionBrowserDialog } from './dialogs/PixiRevisionBrowserDialog';
+import { PixiFurnacePresetBrowser } from './dialogs/PixiFurnacePresetBrowser';
 
 export const PixiRoot: React.FC = () => {
   const { width, height } = usePixiResponsive();
@@ -161,6 +164,9 @@ export const PixiRoot: React.FC = () => {
           onClose={closeModal}
           initialTab={(modalData?.initialTab as 'tips' | 'changelog') || 'tips'}
         />
+        <PixiCollaborationModal isOpen={modalOpen === 'collaboration'} onClose={closeModal} />
+        <PixiRevisionBrowserDialog isOpen={modalOpen === 'revisions'} onClose={closeModal} />
+        <PixiFurnacePresetBrowser isOpen={modalOpen === 'furnacePresets'} onClose={closeModal} />
         <PixiClipRenameDialog />
         <PixiTrackRenameDialog />
         <PixiSynthErrorDialog />
