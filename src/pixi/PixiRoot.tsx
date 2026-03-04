@@ -74,6 +74,10 @@ import { PixiTD3PatternDialog } from './dialogs/PixiTD3PatternDialog';
 import { PixiFileBrowser } from './dialogs/PixiFileBrowser';
 import { PixiSamplePackBrowser } from './dialogs/PixiSamplePackBrowser';
 import { PixiDrumPadManager } from './dialogs/PixiDrumPadManager';
+import { PixiSettingsModal } from './dialogs/PixiSettingsModal';
+import { PixiEditInstrumentModal } from './dialogs/PixiEditInstrumentModal';
+import { PixiMasterEffectsModal } from './dialogs/PixiMasterEffectsModal';
+import { PixiInstrumentEffectsModal } from './dialogs/PixiInstrumentEffectsModal';
 
 export const PixiRoot: React.FC = () => {
   const { width, height } = usePixiResponsive();
@@ -460,6 +464,10 @@ export const PixiRoot: React.FC = () => {
           <PixiSamplePackBrowser onClose={() => setShowSamplePackModal(false)} />
         )}
         {activeView === 'drumpad' && <PixiDrumPadManager />}
+        <PixiSettingsModal isOpen={modalOpen === 'settings'} onClose={closeModal} />
+        <PixiEditInstrumentModal isOpen={modalOpen === 'instruments'} onClose={closeModal} />
+        <PixiMasterEffectsModal isOpen={modalOpen === 'masterFx'} onClose={closeModal} />
+        <PixiInstrumentEffectsModal isOpen={modalOpen === 'instrumentFx'} onClose={closeModal} />
         <PixiClipRenameDialog />
         <PixiTrackRenameDialog />
         <PixiSynthErrorDialog />
