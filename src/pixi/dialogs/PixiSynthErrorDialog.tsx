@@ -47,22 +47,20 @@ export const PixiSynthErrorDialog: React.FC = () => {
     setShowDetails((v) => !v);
   }, []);
 
-  if (!activeError) return null;
-
-  const subtitle = ERROR_TYPE_LABELS[activeError.errorType];
-  const synthLabel = activeError.synthName
+  const subtitle = activeError ? ERROR_TYPE_LABELS[activeError.errorType] : '';
+  const synthLabel = activeError?.synthName
     ? `${activeError.synthType} (${activeError.synthName})`
-    : activeError.synthType;
+    : activeError?.synthType ?? '';
 
-  const debugString = getDebugString(activeError);
-  const stackText = activeError.stack
+  const debugString = activeError ? getDebugString(activeError) : '';
+  const stackText = activeError?.stack
     ? activeError.stack.length > 300
       ? activeError.stack.slice(0, 300) + '…'
       : activeError.stack
     : '';
 
   return (
-    <PixiModal isOpen={true} onClose={handleDismiss} width={MODAL_W} height={MODAL_H}>
+    <PixiModal isOpen={!!activeError} onClose={handleDismiss} width={MODAL_W} height={MODAL_H}>
       <PixiModalHeader title="Synth Error" onClose={handleDismiss} />
 
       {/* Scrollable content area */}

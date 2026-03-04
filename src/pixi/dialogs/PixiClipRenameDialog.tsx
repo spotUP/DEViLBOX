@@ -41,8 +41,6 @@ export const PixiClipRenameDialog: React.FC = () => {
     setRenamingClipId(null);
   }, [renamingClipId, name, setClipName, setRenamingClipId]);
 
-  if (!renamingClipId) return null;
-
   return (
     <PixiModal isOpen={!!renamingClipId} onClose={cancel} width={300} height={160}>
       <PixiModalHeader title="Rename Clip" onClose={cancel} />

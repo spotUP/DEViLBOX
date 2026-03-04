@@ -234,10 +234,6 @@ export const PixiEditInstrumentModal: React.FC<PixiEditInstrumentModalProps> = (
     [updateInstrument],
   );
 
-  // ── Guard ───────────────────────────────────────────────────────────────
-
-  if (!isOpen) return null;
-
   const synthInfo = currentInstrument ? getSynthInfo(currentInstrument.synthType) : null;
   const instIdx = instruments.findIndex((i) => i.id === currentInstrumentId);
 

@@ -390,9 +390,10 @@ export const PixiImportModuleDialog: React.FC<PixiImportModuleDialogProps> = ({
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
-  if (!isOpen) return null;
-
-  const accentBg = blendColor(theme.bg.color, theme.accent.color, 0.2);
+  // Always render a pixiContainer so pixi-react never does a null→tree insertion
+  // at the parent level (which can fail silently in the custom reconciler).
+  // PixiModal handles visibility gating internally.
+  const accentBg = isOpen ? blendColor(theme.bg.color, theme.accent.color, 0.2) : 0;
 
   return (
     <PixiModal isOpen={isOpen} onClose={handleClose} width={MODAL_W} height={MODAL_H}>

@@ -290,9 +290,8 @@ export const PixiImportAudioDialog: React.FC<PixiImportAudioDialogProps> = ({
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
-  if (!isOpen) return null;
-
-  const accentBg = blendColor(theme.bg.color, theme.accent.color, 0.2);
+  // PixiModal handles visibility gating — don't return null here
+  const accentBg = isOpen ? blendColor(theme.bg.color, theme.accent.color, 0.2) : 0;
 
   return (
     <PixiModal isOpen={isOpen} onClose={handleClose} width={MODAL_W} height={MODAL_H}>
