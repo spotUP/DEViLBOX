@@ -396,7 +396,7 @@ const SourceTab: React.FC<SourceTabProps> = ({ label, active, onSelect }) => {
     >
       <pixiBitmapText
         text={label}
-        style={{ fontFamily: PIXI_FONTS.SANS_MEDIUM, fontSize: 14, fill: 0xffffff }}
+        style={{ fontFamily: PIXI_FONTS.SANS_MEDIUM, fontSize: 16, fill: 0xffffff }}
         tint={active ? theme.accent.color : theme.textMuted.color}
         layout={{}}
       />

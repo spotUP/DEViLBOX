@@ -433,7 +433,7 @@ export const PixiDJSeratoBrowser: React.FC<PixiDJSeratoBrowserProps> = ({
               text={`${col.label}${sortKey === col.key ? (sortDir === 'asc' ? ' \u25B2' : ' \u25BC') : ''}`}
               style={{
                 fontFamily: PIXI_FONTS.MONO,
-                fontSize: 10,
+                fontSize: 12,
                 fill: 0xffffff,
               }}
               tint={sortKey === col.key ? PURPLE : theme.textMuted.color}

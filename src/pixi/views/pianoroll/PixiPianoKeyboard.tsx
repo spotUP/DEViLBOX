@@ -137,7 +137,7 @@ export const PixiPianoKeyboard: React.FC<PixiPianoKeyboardProps> = ({
         <pixiBitmapText
           key={text}
           text={text}
-          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 8, fill: 0xffffff }}
+          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }}
           tint={0x333338}
           x={width * 0.68}
           y={y}

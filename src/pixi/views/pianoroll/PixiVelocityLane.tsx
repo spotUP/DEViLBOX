@@ -257,7 +257,7 @@ export const PixiVelocityLane: React.FC<PixiVelocityLaneProps> = ({
       <pixiGraphics draw={drawVelocities} layout={{ position: 'absolute', width, height }} />
       <pixiBitmapText
         text="VEL"
-        style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 8, fill: 0xffffff }}
+        style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }}
         tint={theme.textMuted.color}
         layout={{ position: 'absolute', left: 4, top: 4 }}
       />

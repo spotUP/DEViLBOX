@@ -91,7 +91,7 @@ export const PixiStereoField: React.FC<PixiStereoFieldProps> = ({ width, height 
   return (
     <pixiContainer layout={{ width, height, justifyContent: 'center', alignItems: 'center' }}>
       <pixiGraphics ref={graphicsRef} draw={isPlaying ? () => {} : drawStatic} layout={{ position: 'absolute', width, height }} />
-      <pixiBitmapText text="STEREO" style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }} tint={theme.textMuted.color} layout={{}} alpha={!isPlaying ? 1 : 0} />
+      <pixiBitmapText text="STEREO" style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 11, fill: 0xffffff }} tint={theme.textMuted.color} layout={{}} alpha={!isPlaying ? 1 : 0} />
     </pixiContainer>
   );
 };

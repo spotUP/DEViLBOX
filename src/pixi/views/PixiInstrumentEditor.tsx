@@ -73,7 +73,7 @@ const PixiEnvelopeSection: React.FC<PixiEnvelopeSectionProps> = ({ envelope, con
       <pixiContainer layout={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
         <pixiBitmapText
           text="ENVELOPE"
-          style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 9, fill: 0xffffff }}
+          style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 11, fill: 0xffffff }}
           tint={theme.textMuted.color}
           layout={{}}
         />

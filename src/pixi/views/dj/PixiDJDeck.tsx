@@ -101,20 +101,20 @@ export const PixiDJDeck: React.FC<PixiDJDeckProps> = ({ deckId }) => {
       <pixiContainer layout={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
         <pixiBitmapText
           text={`DECK ${deckId}`}
-          style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 13, fill: 0xffffff }}
+          style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 15, fill: 0xffffff }}
           tint={DECK_COLOR}
           layout={{}}
         />
         <pixiBitmapText
           text={isPlaying ? 'PLAYING' : 'STOPPED'}
-          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }}
+          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 11, fill: 0xffffff }}
           tint={isPlaying ? theme.success.color : theme.textMuted.color}
           layout={{}}
         />
         <pixiContainer layout={{ flex: 1 }} />
         <pixiBitmapText
           text={`${bpm.toFixed(1)} BPM`}
-          style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 11, fill: 0xffffff }}
+          style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 13, fill: 0xffffff }}
           tint={DECK_COLOR}
           layout={{}}
         />
@@ -123,7 +123,7 @@ export const PixiDJDeck: React.FC<PixiDJDeckProps> = ({ deckId }) => {
       {/* Track name */}
       <pixiBitmapText
         text={trackName || 'No track loaded'}
-        style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 11, fill: 0xffffff }}
+        style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 13, fill: 0xffffff }}
         tint={trackName ? theme.text.color : theme.textMuted.color}
         layout={{}}
       />
@@ -146,7 +146,7 @@ export const PixiDJDeck: React.FC<PixiDJDeckProps> = ({ deckId }) => {
           />
           <pixiBitmapText
             text={`${((pitchOffset ?? 0) * 100).toFixed(1)}%`}
-            style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }}
+            style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 11, fill: 0xffffff }}
             tint={theme.textMuted.color}
             layout={{}}
           />
@@ -191,7 +191,7 @@ export const PixiDJDeck: React.FC<PixiDJDeckProps> = ({ deckId }) => {
             ? `${formatTime(audioPosition)} / ${formatTime(durationMs)}`
             : 'No track loaded'
           }
-          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 7, fill: 0xffffff }}
+          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 11, fill: 0xffffff }}
           tint={theme.textMuted.color}
           layout={{ position: 'absolute', left: 4, top: 3 }}
         />
@@ -235,7 +235,7 @@ export const PixiDJDeck: React.FC<PixiDJDeckProps> = ({ deckId }) => {
         {cuePoint > 0 && (
           <pixiBitmapText
             text={formatTime(cuePoint)}
-            style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 8, fill: 0xffffff }}
+            style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }}
             tint={theme.textMuted.color}
             layout={{}}
           />

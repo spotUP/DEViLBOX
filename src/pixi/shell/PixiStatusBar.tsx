@@ -97,41 +97,41 @@ const DJStatusContent: React.FC<{ barHeight: number }> = ({ barHeight }) => {
   return (
     <pixiContainer layout={{ flexDirection: 'row', alignItems: 'center', flex: 1, height: barHeight }}>
       {/* Deck 1 label */}
-      <pixiBitmapText text="D1" style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 10, fill: 0xffffff }} tint={0x60a5fa} layout={{ alignSelf: 'center', marginRight: 4 }} />
-      <pixiBitmapText text={d1Label} style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 10, fill: 0xffffff }} tint={d1Color} layout={textLayout} />
+      <pixiBitmapText text="D1" style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 12, fill: 0xffffff }} tint={0x60a5fa} layout={{ alignSelf: 'center', marginRight: 4 }} />
+      <pixiBitmapText text={d1Label} style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 12, fill: 0xffffff }} tint={d1Color} layout={textLayout} />
       {/* Always mounted — conditional render causes @pixi/layout BindingError */}
       <pixiContainer alpha={deck1Name ? 1 : 0} layout={{ flexDirection: 'row', flexShrink: 0 }}>
         <PixiSep height={10} />
         <pixiBitmapText
           text={deck1Name ? (deck1Name.length > 14 ? deck1Name.slice(0, 12) + '\u2026' : deck1Name) : ''}
-          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }}
+          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 12, fill: 0xffffff }}
           tint={theme.textMuted.color}
           layout={textLayout}
         />
       </pixiContainer>
       <PixiSep height={10} />
-      <pixiBitmapText text={d1BpmStr} style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }} tint={0x60a5fa} layout={textLayout} />
-      <pixiBitmapText text=" BPM" style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }} tint={theme.text.color} layout={textLayout} />
+      <pixiBitmapText text={d1BpmStr} style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 12, fill: 0xffffff }} tint={0x60a5fa} layout={textLayout} />
+      <pixiBitmapText text=" BPM" style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 12, fill: 0xffffff }} tint={theme.text.color} layout={textLayout} />
 
       <PixiSep height={10} />
-      <pixiBitmapText text={xFadeStr} style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }} tint={theme.text.color} layout={textLayout} />
+      <pixiBitmapText text={xFadeStr} style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 12, fill: 0xffffff }} tint={theme.text.color} layout={textLayout} />
 
       <PixiSep height={10} />
-      <pixiBitmapText text="D2" style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 10, fill: 0xffffff }} tint={0xf87171} layout={{ alignSelf: 'center', marginRight: 4 }} />
-      <pixiBitmapText text={d2Label} style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 10, fill: 0xffffff }} tint={d2Color} layout={textLayout} />
+      <pixiBitmapText text="D2" style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 12, fill: 0xffffff }} tint={0xf87171} layout={{ alignSelf: 'center', marginRight: 4 }} />
+      <pixiBitmapText text={d2Label} style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 12, fill: 0xffffff }} tint={d2Color} layout={textLayout} />
       {/* Always mounted — conditional render causes @pixi/layout BindingError */}
       <pixiContainer alpha={deck2Name ? 1 : 0} layout={{ flexDirection: 'row', flexShrink: 0 }}>
         <PixiSep height={10} />
         <pixiBitmapText
           text={deck2Name ? (deck2Name.length > 14 ? deck2Name.slice(0, 12) + '\u2026' : deck2Name) : ''}
-          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }}
+          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 12, fill: 0xffffff }}
           tint={theme.textMuted.color}
           layout={textLayout}
         />
       </pixiContainer>
       <PixiSep height={10} />
-      <pixiBitmapText text={d2BpmStr} style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }} tint={0xf87171} layout={textLayout} />
-      <pixiBitmapText text=" BPM" style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }} tint={theme.text.color} layout={textLayout} />
+      <pixiBitmapText text={d2BpmStr} style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 12, fill: 0xffffff }} tint={0xf87171} layout={textLayout} />
+      <pixiBitmapText text=" BPM" style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 12, fill: 0xffffff }} tint={theme.text.color} layout={textLayout} />
     </pixiContainer>
   );
 };
@@ -230,32 +230,32 @@ const TrackerStatusContent: React.FC<{ barHeight: number }> = ({ barHeight }) =>
 
   return (
     <pixiContainer layout={{ flexDirection: 'row', alignItems: 'center', flex: 1, height: barHeight }}>
-      <pixiBitmapText text="Row" style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }} tint={theme.text.color} layout={{ ...textLayout, marginRight: 4 }} />
+      <pixiBitmapText text="Row" style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 12, fill: 0xffffff }} tint={theme.text.color} layout={{ ...textLayout, marginRight: 4 }} />
       <pixiBitmapText
         ref={rowBitmapTextRef as any}
         text="00/00"
-        style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 10, fill: 0xffffff }}
+        style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 12, fill: 0xffffff }}
         tint={theme.accent.color}
         layout={textLayout}
       />
       <PixiSep height={10} />
-      <pixiBitmapText ref={channelBitmapTextRef as any} text={channelStr} style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }} tint={theme.text.color} layout={textLayout} />
+      <pixiBitmapText ref={channelBitmapTextRef as any} text={channelStr} style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 12, fill: 0xffffff }} tint={theme.text.color} layout={textLayout} />
       <PixiSep height={10} />
-      <pixiBitmapText ref={columnBitmapTextRef as any} text={columnStr} style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }} tint={theme.text.color} layout={textLayout} />
+      <pixiBitmapText ref={columnBitmapTextRef as any} text={columnStr} style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 12, fill: 0xffffff }} tint={theme.text.color} layout={textLayout} />
       <PixiSep height={10} />
-      <pixiBitmapText text="Oct" style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }} tint={theme.text.color} layout={{ ...textLayout, marginRight: 4 }} />
-      <pixiBitmapText text={octStr} style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 10, fill: 0xffffff }} tint={theme.accent.color} layout={textLayout} />
+      <pixiBitmapText text="Oct" style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 12, fill: 0xffffff }} tint={theme.text.color} layout={{ ...textLayout, marginRight: 4 }} />
+      <pixiBitmapText text={octStr} style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 12, fill: 0xffffff }} tint={theme.accent.color} layout={textLayout} />
       <PixiSep height={10} />
-      <pixiBitmapText text="Mode:" style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }} tint={theme.text.color} layout={{ ...textLayout, marginRight: 4 }} />
-      <pixiBitmapText text={modeStr} style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 10, fill: 0xffffff }} tint={modeColor} layout={textLayout} />
+      <pixiBitmapText text="Mode:" style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 12, fill: 0xffffff }} tint={theme.text.color} layout={{ ...textLayout, marginRight: 4 }} />
+      <pixiBitmapText text={modeStr} style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 12, fill: 0xffffff }} tint={modeColor} layout={textLayout} />
       <PixiSep height={10} />
-      <pixiBitmapText text={recStr} style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 10, fill: 0xffffff }} tint={recColor} layout={textLayout} />
+      <pixiBitmapText text={recStr} style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 12, fill: 0xffffff }} tint={recColor} layout={textLayout} />
       {/* SongDB metadata — always mounted to avoid @pixi/layout BindingError */}
       <pixiContainer alpha={hasMetadata ? 1 : 0} layout={{ flexDirection: 'row', flexShrink: 0 }}>
         <PixiSep height={10} />
         <pixiBitmapText
           text={metadataStr}
-          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }}
+          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 12, fill: 0xffffff }}
           tint={theme.textMuted.color}
           layout={textLayout}
         />
@@ -271,11 +271,11 @@ const VJStatusContent: React.FC<{ barHeight: number }> = ({ barHeight }) => {
   const textLayout = useMemo(() => ({ alignSelf: 'center' as const }), []);
   return (
     <pixiContainer layout={{ flexDirection: 'row', alignItems: 'center', flex: 1, height: barHeight }}>
-      <pixiBitmapText text="VJ" style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 10, fill: 0xffffff }} tint={theme.accent.color} layout={textLayout} />
+      <pixiBitmapText text="VJ" style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 12, fill: 0xffffff }} tint={theme.accent.color} layout={textLayout} />
       <PixiSep height={10} />
       <pixiBitmapText
         text="Esc: back  Cmd+Shift+V: toggle  Milkdrop | ISF | 3D"
-        style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }}
+        style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 12, fill: 0xffffff }}
         tint={theme.textMuted.color}
         layout={textLayout}
       />
@@ -325,8 +325,8 @@ const RightSide: React.FC<RightSideProps> = ({
       {/* Collab badge — always mounted to avoid @pixi/layout BindingError */}
       <pixiContainer alpha={collabConnected && collabRoomCode ? 1 : 0} layout={{ flexDirection: 'row', flexShrink: 0 }}>
         <PixiDot color={theme.success.color} />
-        <pixiBitmapText text="Collab" style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 10, fill: 0xffffff }} tint={theme.success.color} layout={textLayout} />
-        <pixiBitmapText text={collabRoomCode ? ` ${collabRoomCode}` : ''} style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }} tint={theme.textMuted.color} layout={textLayout} />
+        <pixiBitmapText text="Collab" style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 12, fill: 0xffffff }} tint={theme.success.color} layout={textLayout} />
+        <pixiBitmapText text={collabRoomCode ? ` ${collabRoomCode}` : ''} style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 12, fill: 0xffffff }} tint={theme.textMuted.color} layout={textLayout} />
         <PixiSep height={10} />
       </pixiContainer>
 
@@ -341,13 +341,13 @@ const RightSide: React.FC<RightSideProps> = ({
           <PixiDot color={theme.success.color} />
           <pixiBitmapText
             text={deviceName.toUpperCase()}
-            style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 10, fill: 0xffffff }}
+            style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 12, fill: 0xffffff }}
             tint={theme.textMuted.color}
             layout={textLayout}
           />
           <pixiBitmapText
             text={` ${chevron}`}
-            style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }}
+            style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 12, fill: 0xffffff }}
             tint={theme.textMuted.color}
             layout={textLayout}
           />
@@ -366,7 +366,7 @@ const RightSide: React.FC<RightSideProps> = ({
       >
         <pixiBitmapText
           text="💡 TIPS"
-          style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 10, fill: 0xffffff }}
+          style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 12, fill: 0xffffff }}
           tint={tipsHovered ? theme.warning.color : theme.warning.color}
           layout={{ alignSelf: 'center' }}
         />
@@ -377,7 +377,7 @@ const RightSide: React.FC<RightSideProps> = ({
       <PixiDot color={audioDotColor} />
       <pixiBitmapText
         text={audioLabel}
-        style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }}
+        style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 12, fill: 0xffffff }}
         tint={audioLabelColor}
         layout={textLayout}
       />
@@ -434,7 +434,7 @@ const KnobPanel: React.FC<KnobPanelProps> = ({ width, height, knobBank, setKnobB
       }}>
         <pixiBitmapText
           text="KNOB BANK:"
-          style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 9, fill: 0xffffff }}
+          style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 11, fill: 0xffffff }}
           tint={theme.textMuted.color}
           layout={{ alignSelf: 'center', marginRight: 4 }}
         />
@@ -511,7 +511,7 @@ const PixiBankTab: React.FC<BankTabProps> = ({ label, isActive, height, onPress 
       <pixiGraphics draw={drawBg} layout={{ position: 'absolute', width: W, height }} />
       <pixiBitmapText
         text={label.toUpperCase()}
-        style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 9, fill: 0xffffff }}
+        style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 11, fill: 0xffffff }}
         tint={textColor}
         layout={{}}
       />
@@ -551,13 +551,13 @@ const KnobCell: React.FC<KnobCellProps> = ({ index, assignment, cellW, cellH }) 
       <pixiGraphics draw={drawCell} layout={{ position: 'absolute', width: cellW, height: cellH }} />
       <pixiBitmapText
         text={ccLabel}
-        style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 8, fill: 0xffffff }}
+        style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }}
         tint={theme.textMuted.color}
         layout={{ marginBottom: 2 }}
       />
       <pixiBitmapText
         text={nameLabel}
-        style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 9, fill: 0xffffff }}
+        style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 11, fill: 0xffffff }}
         tint={theme.accent.color}
         layout={{}}
       />

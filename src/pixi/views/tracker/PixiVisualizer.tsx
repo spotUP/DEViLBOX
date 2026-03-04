@@ -155,7 +155,7 @@ export const PixiVisualizer: React.FC<PixiVisualizerProps> = ({
       {/* Centered mode label — visible when stopped, collapsed when playing */}
       <pixiBitmapText
         text={VIZ_MODE_LABELS[mode]}
-        style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 8, fill: 0xffffff }}
+        style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }}
         tint={theme.textMuted.color}
         layout={isPlaying ? LAYOUT_MODE_LABEL_COLLAPSED : LAYOUT_MODE_LABEL}
         alpha={!isPlaying ? 1 : 0}
@@ -164,7 +164,7 @@ export const PixiVisualizer: React.FC<PixiVisualizerProps> = ({
       {/* Bottom-right mode indicator — visible when playing, collapsed when stopped */}
       <pixiBitmapText
         text={VIZ_MODE_LABELS[mode]}
-        style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 7, fill: 0xffffff }}
+        style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 11, fill: 0xffffff }}
         tint={theme.textMuted.color}
         layout={isPlaying ? LAYOUT_MODE_INDICATOR : LAYOUT_MODE_INDICATOR_COLLAPSED}
         alpha={isPlaying ? 0.5 : 0}

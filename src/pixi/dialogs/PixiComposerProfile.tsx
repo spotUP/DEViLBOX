@@ -44,13 +44,13 @@ const GenreTag: React.FC<{ name: string }> = ({ name }) => (
   >
     <pixiBitmapText
       text="♦"
-      style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 8, fill: 0xffffff }}
+      style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 10, fill: 0xffffff }}
       tint={0xc084fc}
       layout={{}}
     />
     <pixiBitmapText
       text={name}
-      style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 10, fill: 0xffffff }}
+      style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 12, fill: 0xffffff }}
       tint={0xc084fc}
       layout={{}}
     />
@@ -71,7 +71,7 @@ const ProdTag: React.FC<{ name: string }> = ({ name }) => (
   >
     <pixiBitmapText
       text={name}
-      style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 10, fill: 0xffffff }}
+      style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 12, fill: 0xffffff }}
       tint={0x86efac}
       layout={{}}
     />
@@ -128,7 +128,7 @@ export const PixiComposerProfile: React.FC<PixiComposerProfileProps> = ({ compos
         >
           <pixiBitmapText
             text="♫"
-            style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 28, fill: 0xffffff }}
+            style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 30, fill: 0xffffff }}
             tint={0x1e3a5a}
             layout={{}}
           />
@@ -139,7 +139,7 @@ export const PixiComposerProfile: React.FC<PixiComposerProfileProps> = ({ compos
           {/* Name */}
           <pixiBitmapText
             text={composer.name}
-            style={{ fontFamily: PIXI_FONTS.SANS_BOLD, fontSize: 14, fill: 0xffffff }}
+            style={{ fontFamily: PIXI_FONTS.SANS_BOLD, fontSize: 16, fill: 0xffffff }}
             tint={0xbfdbfe}
             layout={{}}
           />
@@ -148,7 +148,7 @@ export const PixiComposerProfile: React.FC<PixiComposerProfileProps> = ({ compos
           {composer.handles.length > 0 && (
             <pixiBitmapText
               text={`aka ${composer.handles.join(', ')}`}
-              style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 12, fill: 0xffffff }}
+              style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 14, fill: 0xffffff }}
               tint={0x6b8db5}
               layout={{}}
             />
@@ -159,12 +159,12 @@ export const PixiComposerProfile: React.FC<PixiComposerProfileProps> = ({ compos
             <layoutContainer layout={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>
               <pixiBitmapText
                 text="🌐"
-                style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 10, fill: 0xffffff }}
+                style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 12, fill: 0xffffff }}
                 layout={{}}
               />
               <pixiBitmapText
                 text={composer.country}
-                style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 12, fill: 0xffffff }}
+                style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 14, fill: 0xffffff }}
                 tint={0x5a7fa0}
                 layout={{}}
               />
@@ -176,12 +176,12 @@ export const PixiComposerProfile: React.FC<PixiComposerProfileProps> = ({ compos
             <layoutContainer layout={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>
               <pixiBitmapText
                 text="📅"
-                style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 10, fill: 0xffffff }}
+                style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 12, fill: 0xffffff }}
                 layout={{}}
               />
               <pixiBitmapText
                 text={dateStr}
-                style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 12, fill: 0xffffff }}
+                style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 14, fill: 0xffffff }}
                 tint={0x5a7fa0}
                 layout={{}}
               />
@@ -193,13 +193,13 @@ export const PixiComposerProfile: React.FC<PixiComposerProfileProps> = ({ compos
             <layoutContainer layout={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>
               <pixiBitmapText
                 text="★"
-                style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 10, fill: 0xffffff }}
+                style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 12, fill: 0xffffff }}
                 tint={0xfbbf24}
                 layout={{}}
               />
               <pixiBitmapText
                 text={composer.notable}
-                style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 12, fill: 0xffffff }}
+                style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 14, fill: 0xffffff }}
                 tint={0xe2b940}
                 layout={{}}
               />
@@ -214,13 +214,13 @@ export const PixiComposerProfile: React.FC<PixiComposerProfileProps> = ({ compos
         <layoutContainer layout={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>
           <pixiBitmapText
             text="♪"
-            style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 10, fill: 0xffffff }}
+            style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 12, fill: 0xffffff }}
             tint={0x5a8abf}
             layout={{}}
           />
           <pixiBitmapText
             text={`${composer.tuneCount} tune${composer.tuneCount !== 1 ? 's' : ''}`}
-            style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 12, fill: 0xffffff }}
+            style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 14, fill: 0xffffff }}
             tint={theme.textMuted.color}
             layout={{}}
           />
@@ -231,13 +231,13 @@ export const PixiComposerProfile: React.FC<PixiComposerProfileProps> = ({ compos
           <layoutContainer layout={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>
             <pixiBitmapText
               text="📅"
-              style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 10, fill: 0xffffff }}
+              style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 12, fill: 0xffffff }}
               tint={0x5a8abf}
               layout={{}}
             />
             <pixiBitmapText
               text={`${composer.activeYears[0]}–${composer.activeYears[composer.activeYears.length - 1]}`}
-              style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 12, fill: 0xffffff }}
+              style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 14, fill: 0xffffff }}
               tint={theme.textMuted.color}
               layout={{}}
             />
@@ -248,7 +248,7 @@ export const PixiComposerProfile: React.FC<PixiComposerProfileProps> = ({ compos
         {composer.csdbId && (
           <pixiBitmapText
             text="CSDb ↗"
-            style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 12, fill: 0xffffff }}
+            style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 14, fill: 0xffffff }}
             tint={0x5a8abf}
             layout={{ marginLeft: 'auto' }}
           />
@@ -272,13 +272,13 @@ export const PixiComposerProfile: React.FC<PixiComposerProfileProps> = ({ compos
           <layoutContainer layout={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>
             <pixiBitmapText
               text="♪"
-              style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 10, fill: 0xffffff }}
+              style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 12, fill: 0xffffff }}
               tint={theme.textMuted.color}
               layout={{}}
             />
             <pixiBitmapText
               text="Players Used"
-              style={{ fontFamily: PIXI_FONTS.SANS_MEDIUM, fontSize: 12, fill: 0xffffff }}
+              style={{ fontFamily: PIXI_FONTS.SANS_MEDIUM, fontSize: 14, fill: 0xffffff }}
               tint={theme.textMuted.color}
               layout={{}}
             />
@@ -294,7 +294,7 @@ export const PixiComposerProfile: React.FC<PixiComposerProfileProps> = ({ compos
               >
                 <pixiBitmapText
                   text={p.player}
-                  style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 12, fill: 0xffffff }}
+                  style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 14, fill: 0xffffff }}
                   tint={theme.text.color}
                   layout={{ flex: 1 }}
                 />
@@ -309,7 +309,7 @@ export const PixiComposerProfile: React.FC<PixiComposerProfileProps> = ({ compos
                   />
                   <pixiBitmapText
                     text={String(p.cnt)}
-                    style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 12, fill: 0xffffff }}
+                    style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 14, fill: 0xffffff }}
                     tint={theme.textMuted.color}
                     layout={{ width: 24, textAlign: 'right' }}
                   />
@@ -344,12 +344,12 @@ export const PixiComposerProfile: React.FC<PixiComposerProfileProps> = ({ compos
           <layoutContainer layout={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>
             <pixiBitmapText
               text="💼"
-              style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 10, fill: 0xffffff }}
+              style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 12, fill: 0xffffff }}
               layout={{}}
             />
             <pixiBitmapText
               text="Career"
-              style={{ fontFamily: PIXI_FONTS.SANS_MEDIUM, fontSize: 12, fill: 0xffffff }}
+              style={{ fontFamily: PIXI_FONTS.SANS_MEDIUM, fontSize: 14, fill: 0xffffff }}
               tint={theme.textMuted.color}
               layout={{}}
             />
@@ -361,13 +361,13 @@ export const PixiComposerProfile: React.FC<PixiComposerProfileProps> = ({ compos
             >
               <pixiBitmapText
                 text={e.company}
-                style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 12, fill: 0xffffff }}
+                style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 14, fill: 0xffffff }}
                 tint={theme.text.color}
                 layout={{ flex: 1 }}
               />
               <pixiBitmapText
                 text={e.years}
-                style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 12, fill: 0xffffff }}
+                style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 14, fill: 0xffffff }}
                 tint={theme.textMuted.color}
                 layout={{}}
               />
@@ -396,13 +396,13 @@ export const PixiComposerProfile: React.FC<PixiComposerProfileProps> = ({ compos
             >
               <pixiBitmapText
                 text="↗"
-                style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 8, fill: 0xffffff }}
+                style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 10, fill: 0xffffff }}
                 tint={0x5a8abf}
                 layout={{}}
               />
               <pixiBitmapText
                 text={link.name}
-                style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 10, fill: 0xffffff }}
+                style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 12, fill: 0xffffff }}
                 tint={0x5a8abf}
                 layout={{}}
               />

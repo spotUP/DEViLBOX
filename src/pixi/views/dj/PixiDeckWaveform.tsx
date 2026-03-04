@@ -95,7 +95,7 @@ export const PixiDeckWaveform: React.FC<PixiDeckWaveformProps> = ({ deckId, widt
       {(!peaks || peaks.length === 0) && (
         <pixiBitmapText
           text="No waveform data"
-          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }}
+          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 11, fill: 0xffffff }}
           tint={theme.textMuted.color}
           layout={{ position: 'absolute', top: height / 2 - 6, left: width / 2 - 40 }}
         />

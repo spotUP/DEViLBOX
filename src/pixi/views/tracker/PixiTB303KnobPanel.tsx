@@ -292,7 +292,7 @@ export const PixiTB303KnobPanel: React.FC<PixiTB303KnobPanelProps> = ({ width })
           {/* "TB-303" label */}
           <pixiBitmapText
             text="TB-303"
-            style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 10, fill: 0xffffff }}
+            style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 12, fill: 0xffffff }}
             tint={theme.accent.color}
             layout={{}}
           />
@@ -300,7 +300,7 @@ export const PixiTB303KnobPanel: React.FC<PixiTB303KnobPanelProps> = ({ width })
           {/* CH number */}
           <pixiBitmapText
             text={chLabel}
-            style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }}
+            style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 11, fill: 0xffffff }}
             tint={theme.textMuted.color}
             layout={{}}
           />
@@ -308,7 +308,7 @@ export const PixiTB303KnobPanel: React.FC<PixiTB303KnobPanelProps> = ({ width })
           {/* Instrument name */}
           <pixiBitmapText
             text={targetInstrument.name}
-            style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }}
+            style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 11, fill: 0xffffff }}
             tint={theme.textSecondary.color}
             layout={{}}
           />
@@ -349,14 +349,14 @@ export const PixiTB303KnobPanel: React.FC<PixiTB303KnobPanelProps> = ({ width })
           {/* Brand */}
           <pixiBitmapText
             text="DB-303"
-            style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 12, fill: 0xffffff }}
+            style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 14, fill: 0xffffff }}
             tint={0xffcc00}
             layout={{}}
           />
 
           <pixiBitmapText
             text="TB-303 WASM ENGINE"
-            style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 7, fill: 0xffffff }}
+            style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 11, fill: 0xffffff }}
             tint={theme.textMuted.color}
             layout={{}}
           />
@@ -364,7 +364,7 @@ export const PixiTB303KnobPanel: React.FC<PixiTB303KnobPanelProps> = ({ width })
           {/* CH label */}
           <pixiBitmapText
             text={chLabel}
-            style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }}
+            style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 11, fill: 0xffffff }}
             tint={theme.textMuted.color}
             layout={{}}
           />
@@ -372,7 +372,7 @@ export const PixiTB303KnobPanel: React.FC<PixiTB303KnobPanelProps> = ({ width })
           {/* Instrument name */}
           <pixiBitmapText
             text={targetInstrument.name}
-            style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }}
+            style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 11, fill: 0xffffff }}
             tint={theme.textSecondary.color}
             layout={{}}
           />

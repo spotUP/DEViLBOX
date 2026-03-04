@@ -52,19 +52,19 @@ const StatCard: React.FC<{ icon: string; value: string; label: string; accentCol
   >
     <pixiBitmapText
       text={icon}
-      style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 14, fill: 0xffffff }}
+      style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 16, fill: 0xffffff }}
       tint={accentColor}
       layout={{}}
     />
     <pixiBitmapText
       text={value}
-      style={{ fontFamily: PIXI_FONTS.SANS_BOLD, fontSize: 14, fill: 0xffffff }}
+      style={{ fontFamily: PIXI_FONTS.SANS_BOLD, fontSize: 16, fill: 0xffffff }}
       tint={0xffffff}
       layout={{}}
     />
     <pixiBitmapText
       text={label}
-      style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 12, fill: 0xffffff }}
+      style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 14, fill: 0xffffff }}
       tint={0x888888}
       layout={{}}
     />
@@ -124,20 +124,20 @@ export const PixiImportDBXDialog: React.FC<PixiImportDBXDialogProps> = ({
         <layoutContainer layout={{ flexDirection: 'row', gap: 12, alignItems: 'center', marginBottom: 20 }}>
           <pixiBitmapText
             text="📂"
-            style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 18, fill: 0xffffff }}
+            style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 20, fill: 0xffffff }}
             tint={theme.accent.color}
             layout={{}}
           />
           <layoutContainer layout={{ flexDirection: 'column', flex: 1, gap: 2 }}>
             <pixiBitmapText
               text="Load Project?"
-              style={{ fontFamily: PIXI_FONTS.SANS_BOLD, fontSize: 18, fill: 0xffffff }}
+              style={{ fontFamily: PIXI_FONTS.SANS_BOLD, fontSize: 20, fill: 0xffffff }}
               tint={0xffffff}
               layout={{}}
             />
             <pixiBitmapText
               text={file.name}
-              style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 12, fill: 0xffffff }}
+              style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 14, fill: 0xffffff }}
               tint={theme.textMuted.color}
               layout={{}}
             />
@@ -152,7 +152,7 @@ export const PixiImportDBXDialog: React.FC<PixiImportDBXDialogProps> = ({
             <layoutContainer layout={{ flexDirection: 'column', gap: 2, marginBottom: 16 }}>
               <pixiBitmapText
                 text={preview.name}
-                style={{ fontFamily: PIXI_FONTS.SANS_BOLD, fontSize: 20, fill: 0xffffff }}
+                style={{ fontFamily: PIXI_FONTS.SANS_BOLD, fontSize: 22, fill: 0xffffff }}
                 tint={theme.accent.color}
                 layout={{}}
               />
@@ -160,7 +160,7 @@ export const PixiImportDBXDialog: React.FC<PixiImportDBXDialogProps> = ({
                 <layoutContainer layout={{ flexDirection: 'row', gap: 4, alignItems: 'center', marginTop: 2 }}>
                   <pixiBitmapText
                     text="👤"
-                    style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 10, fill: 0xffffff }}
+                    style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 12, fill: 0xffffff }}
                     layout={{}}
                   />
                   <PixiLabel text={preview.author} size="sm" color="textSecondary" />
@@ -214,7 +214,7 @@ export const PixiImportDBXDialog: React.FC<PixiImportDBXDialogProps> = ({
           <layoutContainer layout={{ flexDirection: 'row', gap: 8, alignItems: 'center', marginBottom: 20 }}>
             <pixiBitmapText
               text="♪"
-              style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 14, fill: 0xffffff }}
+              style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 16, fill: 0xffffff }}
               tint={theme.textMuted.color}
               layout={{}}
             />

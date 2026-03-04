@@ -56,7 +56,7 @@ const ChangeBadge: React.FC<{ type: string }> = ({ type }) => {
     >
       <pixiBitmapText
         text={CHANGE_LABELS[type] ?? type}
-        style={{ fontFamily: PIXI_FONTS.SANS_BOLD, fontSize: 10, fill: 0xffffff }}
+        style={{ fontFamily: PIXI_FONTS.SANS_BOLD, fontSize: 12, fill: 0xffffff }}
         tint={c.text}
         layout={{}}
       />
@@ -86,13 +86,13 @@ const VersionEntry: React.FC<{ entry: ChangelogEntry; isLatest: boolean; width: 
       <layoutContainer layout={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 }}>
         <pixiBitmapText
           text={`v${entry.version}`}
-          style={{ fontFamily: PIXI_FONTS.SANS_BOLD, fontSize: 14, fill: 0xffffff }}
+          style={{ fontFamily: PIXI_FONTS.SANS_BOLD, fontSize: 16, fill: 0xffffff }}
           tint={isLatest ? theme.accent.color : theme.text.color}
           layout={{}}
         />
         <pixiBitmapText
           text={entry.date}
-          style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 12, fill: 0xffffff }}
+          style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 14, fill: 0xffffff }}
           tint={theme.textMuted.color}
           layout={{}}
         />
@@ -107,7 +107,7 @@ const VersionEntry: React.FC<{ entry: ChangelogEntry; isLatest: boolean; width: 
           >
             <pixiBitmapText
               text="LATEST"
-              style={{ fontFamily: PIXI_FONTS.SANS_BOLD, fontSize: 10, fill: 0xffffff }}
+              style={{ fontFamily: PIXI_FONTS.SANS_BOLD, fontSize: 12, fill: 0xffffff }}
               tint={0x000000}
               layout={{}}
             />
@@ -122,7 +122,7 @@ const VersionEntry: React.FC<{ entry: ChangelogEntry; isLatest: boolean; width: 
             <ChangeBadge type={change.type} />
             <pixiBitmapText
               text={change.description}
-              style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 14, fill: 0xffffff }}
+              style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 16, fill: 0xffffff }}
               tint={theme.textSecondary.color}
               layout={{ maxWidth: width - 100 }}
             />
@@ -182,7 +182,7 @@ export const PixiWhatsNewModal: React.FC<PixiWhatsNewModalProps> = ({ onClose })
           >
             <pixiBitmapText
               text="✨"
-              style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 18, fill: 0xffffff }}
+              style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 20, fill: 0xffffff }}
               tint={theme.accent.color}
               layout={{}}
             />
@@ -190,13 +190,13 @@ export const PixiWhatsNewModal: React.FC<PixiWhatsNewModalProps> = ({ onClose })
           <layoutContainer layout={{ flexDirection: 'column', gap: 2 }}>
             <pixiBitmapText
               text="What's New"
-              style={{ fontFamily: PIXI_FONTS.SANS_BOLD, fontSize: 18, fill: 0xffffff }}
+              style={{ fontFamily: PIXI_FONTS.SANS_BOLD, fontSize: 20, fill: 0xffffff }}
               tint={theme.text.color}
               layout={{}}
             />
             <pixiBitmapText
               text={`DEViLBOX v${CURRENT_VERSION}`}
-              style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 12, fill: 0xffffff }}
+              style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 14, fill: 0xffffff }}
               tint={theme.textMuted.color}
               layout={{}}
             />
@@ -217,7 +217,7 @@ export const PixiWhatsNewModal: React.FC<PixiWhatsNewModalProps> = ({ onClose })
         >
           <pixiBitmapText
             text="✕"
-            style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 14, fill: 0xffffff }}
+            style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 16, fill: 0xffffff }}
             tint={theme.textMuted.color}
             layout={{}}
           />

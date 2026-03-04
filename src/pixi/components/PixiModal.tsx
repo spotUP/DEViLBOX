@@ -164,14 +164,14 @@ export const PixiModalHeader: React.FC<PixiModalHeaderProps> = ({
       <layoutContainer layout={{ flexDirection: 'column', gap: 2, flex: 1 }}>
         <pixiBitmapText
           text={title}
-          style={{ fontFamily: PIXI_FONTS.SANS_BOLD, fontSize: 14, fill: 0xffffff }}
+          style={{ fontFamily: PIXI_FONTS.SANS_BOLD, fontSize: 16, fill: 0xffffff }}
           tint={theme.text.color}
           layout={{}}
         />
         {subtitle && (
           <pixiBitmapText
             text={subtitle}
-            style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 11, fill: 0xffffff }}
+            style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 13, fill: 0xffffff }}
             tint={theme.textSecondary.color}
             layout={{}}
           />
@@ -195,7 +195,7 @@ export const PixiModalHeader: React.FC<PixiModalHeaderProps> = ({
         >
           <pixiBitmapText
             text="✕"
-            style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 14, fill: 0xffffff }}
+            style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 16, fill: 0xffffff }}
             tint={closeHovered ? theme.text.color : theme.textMuted.color}
             layout={{}}
           />

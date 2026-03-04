@@ -89,14 +89,14 @@ export const PixiTransportBar: React.FC<PixiTransportBarProps> = ({ width, heigh
       }}>
         <pixiBitmapText
           text={String(Math.round(bpm))}
-          style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 13, fill: 0xffffff }}
+          style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 15, fill: 0xffffff }}
           tint={theme.accent.color}
           layout={{}}
         />
       </layoutContainer>
       <pixiBitmapText
         text="BPM"
-        style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }}
+        style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 11, fill: 0xffffff }}
         tint={theme.textMuted.color}
         layout={{ alignSelf: 'center', marginRight: 4 }}
       />
@@ -112,7 +112,7 @@ export const PixiTransportBar: React.FC<PixiTransportBarProps> = ({ width, heigh
         <pixiBitmapText
           ref={posTextRef as any}
           text="00:000"
-          style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 13, fill: 0xffffff }}
+          style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 15, fill: 0xffffff }}
           tint={theme.text.color}
           layout={{}}
         />

@@ -47,9 +47,9 @@ interface PixiKnobProps {
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const SIZE_CONFIG = {
-  sm: { knob: 40, fontSize: 9,  stroke: 3, indicatorLen: 6,  bodyRadius: 12 },
-  md: { knob: 56, fontSize: 11, stroke: 4, indicatorLen: 8,  bodyRadius: 17 },
-  lg: { knob: 72, fontSize: 12, stroke: 5, indicatorLen: 10, bodyRadius: 22 },
+  sm: { knob: 40, fontSize: 11, stroke: 3, indicatorLen: 6,  bodyRadius: 12 },
+  md: { knob: 56, fontSize: 13, stroke: 4, indicatorLen: 8,  bodyRadius: 17 },
+  lg: { knob: 72, fontSize: 14, stroke: 5, indicatorLen: 10, bodyRadius: 22 },
 } as const;
 
 const ARC_START_DEG = -135;

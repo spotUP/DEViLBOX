@@ -71,10 +71,10 @@ function getFT2Colors(
 }
 
 const SIZE_CONFIG: Record<ButtonSize, { height: number; paddingH: number; fontSize: number; minWidth: number }> = {
-  sm:   { height: 24, paddingH: 8,  fontSize: 11, minWidth: 60 },
-  md:   { height: 28, paddingH: 12, fontSize: 12, minWidth: 80 },
-  lg:   { height: 36, paddingH: 20, fontSize: 14, minWidth: 100 },
-  icon: { height: 28, paddingH: 6,  fontSize: 12, minWidth: 28 },
+  sm:   { height: 24, paddingH: 8,  fontSize: 12, minWidth: 60 },
+  md:   { height: 28, paddingH: 12, fontSize: 13, minWidth: 80 },
+  lg:   { height: 36, paddingH: 20, fontSize: 16, minWidth: 100 },
+  icon: { height: 28, paddingH: 6,  fontSize: 13, minWidth: 28 },
 };
 
 export const PixiButton: React.FC<PixiButtonProps> = ({

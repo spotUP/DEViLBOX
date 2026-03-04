@@ -63,7 +63,7 @@ const FT2Cell: React.FC<FT2CellProps> = ({ label, value, min, max, onChange, wid
     <pixiContainer layout={{ flexDirection: 'column', alignItems: 'flex-start', gap: 1 }}>
       <pixiBitmapText
         text={label.toUpperCase()}
-        style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 8, fill: 0xffffff }}
+        style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 10, fill: 0xffffff }}
         tint={theme.textMuted.color}
         layout={{}}
       />
@@ -472,7 +472,7 @@ export const PixiFT2Toolbar: React.FC = () => {
             {/* Pattern name */}
             <pixiBitmapText
               text="PAT"
-              style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 8, fill: 0xffffff }}
+              style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 10, fill: 0xffffff }}
               tint={theme.textMuted.color}
               layout={{ alignSelf: 'center' }}
             />

@@ -49,13 +49,13 @@ export const PixiHumanizeDialog: React.FC<PixiHumanizeDialogProps> = ({ isOpen, 
           <layoutContainer layout={{ flexDirection: 'row', gap: 4 }}>
             <pixiBitmapText
               text="Volume Variation: "
-              style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 12, fill: 0xffffff }}
+              style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 14, fill: 0xffffff }}
               tint={theme.textMuted.color}
               layout={{}}
             />
             <pixiBitmapText
               text={`${variation}%`}
-              style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 12, fill: 0xffffff }}
+              style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 14, fill: 0xffffff }}
               tint={theme.accent.color}
               layout={{}}
             />

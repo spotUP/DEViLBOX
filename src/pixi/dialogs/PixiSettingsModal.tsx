@@ -400,7 +400,7 @@ export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, on
         >
           <pixiBitmapText
             text="SETTINGS"
-            style={{ fontFamily: PIXI_FONTS.SANS_BOLD, fontSize: 14, fill: 0xffffff }}
+            style={{ fontFamily: PIXI_FONTS.SANS_BOLD, fontSize: 16, fill: 0xffffff }}
             tint={theme.accent.color}
             layout={{}}
           />
@@ -418,7 +418,7 @@ export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, on
           >
             <pixiBitmapText
               text="✕"
-              style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 14, fill: 0xffffff }}
+              style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 16, fill: 0xffffff }}
               tint={theme.textMuted.color}
               layout={{}}
             />

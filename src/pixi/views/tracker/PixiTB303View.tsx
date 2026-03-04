@@ -391,7 +391,7 @@ export const PixiTB303View: React.FC<PixiTB303ViewProps> = ({ channelIndex = 0, 
         alpha={!hasInstrument ? 1 : 0}
         renderable={!hasInstrument}
         text={hasInstrument ? '' : `No instrument on Ch ${channelIndex + 1}`}
-        style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 12, fill: 0xffffff }}
+        style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 14, fill: 0xffffff }}
         tint={theme.error.color}
         layout={{ position: 'absolute', marginTop: 40, marginLeft: 20 }}
       />
@@ -428,7 +428,7 @@ export const PixiTB303View: React.FC<PixiTB303ViewProps> = ({ channelIndex = 0, 
             <pixiBitmapText
               key={idx}
               text={label.text}
-              style={{ fontFamily: label.bold ? PIXI_FONTS.MONO_BOLD : PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }}
+              style={{ fontFamily: label.bold ? PIXI_FONTS.MONO_BOLD : PIXI_FONTS.MONO, fontSize: 11, fill: 0xffffff }}
               tint={label.color}
               x={label.x}
               y={label.y}

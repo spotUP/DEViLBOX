@@ -125,7 +125,7 @@ export const PixiDeckScratch: React.FC<Props> = ({ deckId, width = 280, height =
               <pixiGraphics draw={(g: GraphicsType) => drawBtn(g, 0, BTN_W, isActive, isWaiting, disabled)} />
               <pixiBitmapText
                 text={isWaiting ? 'WAIT' : pattern.shortName}
-                style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }}
+                style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 11, fill: 0xffffff }}
                 tint={textColor}
                 alpha={textAlpha}
                 layout={{ position: 'absolute', left: 2, top: 3 }}
@@ -139,7 +139,7 @@ export const PixiDeckScratch: React.FC<Props> = ({ deckId, width = 280, height =
       <pixiContainer layout={{ flexDirection: 'row', gap: BTN_GAP, height: ROW_H, alignItems: 'center' }}>
         <pixiBitmapText
           text="LFO"
-          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }}
+          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 11, fill: 0xffffff }}
           tint={theme.textMuted.color}
           alpha={0.5}
           layout={{ marginRight: 2 }}
@@ -154,7 +154,7 @@ export const PixiDeckScratch: React.FC<Props> = ({ deckId, width = 280, height =
           <pixiGraphics draw={(g: GraphicsType) => drawBtn(g, 0, LFO_BTN_W, !faderLFOActive, false, false)} />
           <pixiBitmapText
             text="OFF"
-            style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }}
+            style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 11, fill: 0xffffff }}
             tint={!faderLFOActive ? deckColor : 0x999999}
             alpha={!faderLFOActive ? 1 : 0.5}
             layout={{ position: 'absolute', left: 3, top: 3 }}
@@ -173,7 +173,7 @@ export const PixiDeckScratch: React.FC<Props> = ({ deckId, width = 280, height =
               <pixiGraphics draw={(g: GraphicsType) => drawBtn(g, 0, LFO_BTN_W, isActive, false, false)} />
               <pixiBitmapText
                 text={label}
-                style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }}
+                style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 11, fill: 0xffffff }}
                 tint={isActive ? deckColor : 0x999999}
                 alpha={isActive ? 1 : 0.5}
                 layout={{ position: 'absolute', left: 2, top: 3 }}

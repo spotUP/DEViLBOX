@@ -513,7 +513,7 @@ export const PixiEditorControlsBar: React.FC<PixiEditorControlsBarProps> = ({
       {/* Status message */}
       <pixiBitmapText
         text={statusMessage?.toUpperCase() ?? ''}
-        style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 10, fill: 0xffffff }}
+        style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 12, fill: 0xffffff }}
         tint={theme.accent.color}
         layout={{ display: statusMessage ? 'flex' : 'none', marginRight: 8 }}
       />
@@ -521,7 +521,7 @@ export const PixiEditorControlsBar: React.FC<PixiEditorControlsBarProps> = ({
       {/* FPS pill */}
       <pixiBitmapText
         text={`${fps.averageFps}FPS`}
-        style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }}
+        style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 11, fill: 0xffffff }}
         tint={fpsTint}
         layout={{}}
       />

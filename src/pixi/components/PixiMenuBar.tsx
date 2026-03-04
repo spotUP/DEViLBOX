@@ -144,7 +144,7 @@ const PixiMenuButton: React.FC<PixiMenuButtonProps> = ({
     >
       <pixiBitmapText
         text={menu.label}
-        style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 11, fill: 0xffffff }}
+        style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 13, fill: 0xffffff }}
         tint={isOpen ? theme.accent.color : theme.textSecondary.color}
         layout={{}}
       />
@@ -211,14 +211,14 @@ export const PixiMenuItem: React.FC<PixiMenuItemProps> = ({ item, width, onClose
     >
       <pixiBitmapText
         text={label}
-        style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 11, fill: 0xffffff }}
+        style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 13, fill: 0xffffff }}
         tint={theme.text.color}
         layout={{ flex: 1 }}
       />
       {shortcut && (
         <pixiBitmapText
           text={shortcut}
-          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }}
+          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 12, fill: 0xffffff }}
           tint={theme.textMuted.color}
           layout={{ width: 80, marginRight: 8 }}
         />
