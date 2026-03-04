@@ -143,7 +143,7 @@ export class ES5503Synth extends MAMEBaseSynth {
     if (!this.workletNode || this._disposed) return;
     this.workletNode.port.postMessage({
       type: 'noteOff',
-      note: 0,
+      note: this.currentNote,
       osc: this.currentOsc,
     });
   }

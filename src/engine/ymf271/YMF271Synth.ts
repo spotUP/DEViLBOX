@@ -121,7 +121,7 @@ export class YMF271Synth extends MAMEBaseSynth {
     if (!this.workletNode || this._disposed) return;
     this.workletNode.port.postMessage({
       type: 'noteOff',
-      note: 0,
+      note: this.currentNote,
       group: this.currentGroup,
     });
   }
