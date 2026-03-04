@@ -120,11 +120,9 @@ export class C64SIDEngine {
     this.audioContext = audioContext;
     
     // Share Tone.js's already-unlocked AudioContext with ScriptNodePlayer.
-    // Without this, ScriptNodePlayer creates its own AudioContext which may be
-    // suspended on Chrome (created outside a user gesture after async script loads).
-    if (typeof (window as any)._gPlayerAudioCtx === 'undefined') {
-      (window as any)._gPlayerAudioCtx = audioContext;
-    }
+    // Always overwrite to ensure we use Tone.js's context (which is unlocked).
+    (window as any)._gPlayerAudioCtx = audioContext;
+    console.log('[C64SIDEngine] AudioContext state:', audioContext.state, 'sampleRate:', audioContext.sampleRate);
     
     // Get user's preferred engine from settings
     const engineType = useSettingsStore.getState().sidEngine || 'websid';
