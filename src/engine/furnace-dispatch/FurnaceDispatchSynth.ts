@@ -595,16 +595,18 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
   }
 
   /**
-   * Inject chip-required macros into a user-supplied config before encoding.
-   * Some chips need specific macros to produce any sound at all:
+   * Inject chip-required defaults into a user-supplied config before encoding.
+   * Some chips need specific macros or instrument fields to produce any sound:
    * - Lynx: duty macro (code=2) with value [1] for LFSR feedback
    * - VERA: wave macro (code=3) with value [0] for pulse waveform
+   * - C64: c64 block with waveform, ADSR, and duty settings
    */
   private injectChipRequiredMacros(config: FurnaceConfig): FurnaceConfig {
     const P = FurnaceDispatchPlatform;
     const pt = this.platformType;
     const macros = [...(config.macros || [])];
     let modified = false;
+    let result = config;
 
     if (pt === P.LYNX) {
       // Lynx needs duty macro to set LFSR feedback register
@@ -618,9 +620,20 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
         macros.push({ code: 3, type: 0, data: [0], loop: -1, release: -1, mode: 0 });
         modified = true;
       }
+    } else if (pt === P.C64_6581 || pt === P.C64_8580) {
+      // C64 SID needs c64 block with waveform bits set — without them, the voice
+      // control register has waveform=0 and produces silence.
+      if (!config.c64) {
+        result = { ...config, c64: {
+          triOn: false, sawOn: false, pulseOn: true, noiseOn: false,
+          a: 0, d: 0, s: 15, r: 1, duty: 2048,
+          ringMod: false, oscSync: false,
+        }};
+        modified = true;
+      }
     }
 
-    return modified ? { ...config, macros } : config;
+    return modified ? { ...result, macros } : result;
   }
 
   /**
