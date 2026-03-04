@@ -38,6 +38,8 @@ import { PixiKeyboardShortcutSheet } from './dialogs/PixiKeyboardShortcutSheet';
 import { PixiGrooveSettingsModal } from './dialogs/PixiGrooveSettingsModal';
 import { PixiFindReplaceDialog } from './dialogs/PixiFindReplaceDialog';
 import { PixiEffectPicker } from './dialogs/PixiEffectPicker';
+import { PixiAdvancedEditModal } from './dialogs/PixiAdvancedEditModal';
+import { PixiTipOfTheDay } from './dialogs/PixiTipOfTheDay';
 
 export const PixiRoot: React.FC = () => {
   const { width, height } = usePixiResponsive();
@@ -147,6 +149,17 @@ export const PixiRoot: React.FC = () => {
           isOpen={modalOpen === 'effectPicker'}
           onSelect={() => closeModal()}
           onClose={closeModal}
+        />
+        <PixiAdvancedEditModal
+          isOpen={modalOpen === 'advancedEdit'}
+          onClose={closeModal}
+          onShowScaleVolume={(scope) => useUIStore.getState().openModal('scaleVolume', { scope })}
+          onShowFadeVolume={(scope) => useUIStore.getState().openModal('fadeVolume', { scope })}
+        />
+        <PixiTipOfTheDay
+          isOpen={modalOpen === 'tips'}
+          onClose={closeModal}
+          initialTab={(modalData?.initialTab as 'tips' | 'changelog') || 'tips'}
         />
         <PixiClipRenameDialog />
         <PixiTrackRenameDialog />
