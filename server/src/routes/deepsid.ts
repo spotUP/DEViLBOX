@@ -392,32 +392,102 @@ router.get('/player/:name', (req: Request, res: Response) => {
   });
 });
 
-// ── GET /api/deepsid/search?q=... ───────────────────────────────────────────
+// ── GET /api/deepsid/search?q=...&category=...&sort=...&scope=... ────────────
 
 router.get('/search', (req: Request, res: Response) => {
   const db = getDeepSIDDb();
   if (!db) return res.status(503).json({ error: 'DeepSID database not available' });
 
   const query = (req.query.q as string || '').trim();
-  if (!query) return res.json({ composers: [], files: [] });
+  if (!query) return res.json({ composers: [], files: [], total: 0 });
 
-  const limit = Math.min(parseInt(req.query.limit as string) || 20, 50);
+  const limit = Math.min(parseInt(req.query.limit as string) || 20, 100);
+  const offset = parseInt(req.query.offset as string) || 0;
+  const category = (req.query.category as string) || 'all';
+  const sort = (req.query.sort as string) || 'relevance';
+  const scope = (req.query.scope as string) || ''; // folder path to scope search
 
-  // Search composers
-  const composers = db.prepare(`
-    SELECT id, fullname, name, handles, country, notable
-    FROM composers
-    WHERE name LIKE ? OR handles LIKE ? OR shortname LIKE ?
-    LIMIT ?
-  `).all(`%${query}%`, `%${query}%`, `%${query}%`, limit) as ComposerRow[];
+  const pattern = `%${query}%`;
+  const scopePattern = scope ? `${scope}%` : '%';
 
-  // Search files
-  const files = db.prepare(`
-    SELECT id, fullname, name, author, player
-    FROM hvsc_files
-    WHERE name LIKE ? OR fullname LIKE ?
-    LIMIT ?
-  `).all(`%${query}%`, `%${query}%`, limit) as HVSCFileRow[];
+  // Build category-specific queries
+  let composers: ComposerRow[] = [];
+  let files: HVSCFileRow[] = [];
+  let totalFiles = 0;
+
+  const shouldSearchComposers = ['all', 'author', 'country'].includes(category);
+  const shouldSearchFiles = ['all', 'filename', 'author', 'copyright', 'player', 'type', 'tags', 'stil'].includes(category);
+
+  if (shouldSearchComposers) {
+    const composerWhere = category === 'country'
+      ? 'WHERE country LIKE ?'
+      : 'WHERE name LIKE ? OR handles LIKE ? OR shortname LIKE ?';
+    const composerParams = category === 'country'
+      ? [pattern, limit]
+      : [pattern, pattern, pattern, limit];
+
+    composers = db.prepare(`
+      SELECT id, fullname, name, handles, country, notable
+      FROM composers
+      ${composerWhere}
+      LIMIT ?
+    `).all(...composerParams) as ComposerRow[];
+  }
+
+  if (shouldSearchFiles) {
+    let fileWhere = 'WHERE fullname LIKE ?';
+    let fileParams: any[] = [scopePattern];
+
+    switch (category) {
+      case 'filename':
+        fileWhere += ' AND fullname LIKE ?';
+        fileParams.push(pattern);
+        break;
+      case 'author':
+        fileWhere += ' AND author LIKE ?';
+        fileParams.push(pattern);
+        break;
+      case 'copyright':
+        fileWhere += ' AND copyright LIKE ?';
+        fileParams.push(pattern);
+        break;
+      case 'player':
+        fileWhere += ' AND player LIKE ?';
+        fileParams.push(pattern);
+        break;
+      case 'type':
+        fileWhere += ' AND type LIKE ?';
+        fileParams.push(pattern);
+        break;
+      case 'tags':
+        fileWhere = `WHERE f.id IN (
+          SELECT tl.files_id FROM tags_lookup tl
+          JOIN tags_info ti ON tl.tags_id = ti.id
+          WHERE ti.name LIKE ?
+        ) AND f.fullname LIKE ?`;
+        fileParams = [pattern, scopePattern];
+        break;
+      default: // 'all'
+        fileWhere += ' AND (fullname LIKE ? OR name LIKE ? OR author LIKE ?)';
+        fileParams.push(pattern, pattern, pattern);
+        break;
+    }
+
+    const orderBy = sort === 'name' ? 'ORDER BY name' : sort === 'author' ? 'ORDER BY author' : 'ORDER BY fullname';
+    const tableAlias = category === 'tags' ? 'f' : 'hvsc_files';
+    const fromClause = category === 'tags' ? 'hvsc_files f' : 'hvsc_files';
+
+    const countRow = db.prepare(`SELECT COUNT(*) as cnt FROM ${fromClause} ${fileWhere}`).get(...fileParams) as { cnt: number };
+    totalFiles = countRow.cnt;
+
+    files = db.prepare(`
+      SELECT ${tableAlias}.id, ${tableAlias}.fullname, ${tableAlias}.name, ${tableAlias}.author, ${tableAlias}.player, ${tableAlias}.sidmodel, ${tableAlias}.subtunes
+      FROM ${fromClause}
+      ${fileWhere}
+      ${orderBy}
+      LIMIT ? OFFSET ?
+    `).all(...fileParams, limit, offset) as HVSCFileRow[];
+  }
 
   res.json({
     composers: composers.map(c => ({
@@ -432,10 +502,13 @@ router.get('/search', (req: Request, res: Response) => {
       id: f.id,
       path: f.fullname,
       filename: f.fullname.split('/').pop(),
-      name: f.name,
-      author: f.author,
+      name: (f as any).name,
+      author: (f as any).author,
       player: f.player,
+      sidModel: f.sidmodel,
+      subtunes: f.subtunes,
     })),
+    total: totalFiles,
   });
 });
 
@@ -487,6 +560,157 @@ router.get('/image/:type/:filename', (req: Request, res: Response) => {
   res.setHeader('Content-Type', mimeTypes[ext] || 'application/octet-stream');
   res.setHeader('Cache-Control', 'public, max-age=604800'); // 1 week
   res.sendFile(filePath);
+});
+
+// ── GET /api/deepsid/tags ───────────────────────────────────────────────────
+
+router.get('/tags', (_req: Request, res: Response) => {
+  const db = getDeepSIDDb();
+  if (!db) return res.status(503).json({ error: 'DeepSID database not available' });
+
+  const tags = db.prepare(`
+    SELECT ti.id, ti.name, ti.type, COUNT(tl.files_id) as count
+    FROM tags_info ti
+    LEFT JOIN tags_lookup tl ON ti.id = tl.tags_id
+    GROUP BY ti.id
+    ORDER BY ti.name
+  `).all() as any[];
+
+  res.json(tags.map(t => ({
+    id: t.id,
+    name: t.name,
+    type: t.type || 'music',
+    count: t.count,
+  })));
+});
+
+// ── GET /api/deepsid/tags/:fileId ───────────────────────────────────────────
+
+router.get('/tags/:fileId', (req: Request, res: Response) => {
+  const db = getDeepSIDDb();
+  if (!db) return res.status(503).json({ error: 'DeepSID database not available' });
+
+  const fileId = parseInt(req.params.fileId);
+  if (isNaN(fileId)) return res.status(400).json({ error: 'Invalid file ID' });
+
+  const tags = db.prepare(`
+    SELECT ti.id, ti.name, ti.type
+    FROM tags_lookup tl
+    JOIN tags_info ti ON tl.tags_id = ti.id
+    WHERE tl.files_id = ?
+    ORDER BY ti.name
+  `).all(fileId) as any[];
+
+  res.json(tags.map(t => ({
+    id: t.id,
+    name: t.name,
+    type: t.type || 'music',
+  })));
+});
+
+// ── POST /api/deepsid/tags/:fileId ──────────────────────────────────────────
+
+router.post('/tags/:fileId', (req: Request, res: Response) => {
+  const db = getDeepSIDDb();
+  if (!db) return res.status(503).json({ error: 'DeepSID database not available' });
+
+  const fileId = parseInt(req.params.fileId);
+  const { tagId } = req.body;
+  if (isNaN(fileId) || !tagId) return res.status(400).json({ error: 'Missing fileId or tagId' });
+
+  try {
+    db.prepare('INSERT OR IGNORE INTO tags_lookup (files_id, tags_id) VALUES (?, ?)').run(fileId, tagId);
+    res.json({ success: true });
+  } catch (err) {
+    console.error('[DeepSID] Tag add error:', err);
+    res.status(500).json({ error: 'Failed to add tag' });
+  }
+});
+
+// ── DELETE /api/deepsid/tags/:fileId/:tagId ─────────────────────────────────
+
+router.delete('/tags/:fileId/:tagId', (req: Request, res: Response) => {
+  const db = getDeepSIDDb();
+  if (!db) return res.status(503).json({ error: 'DeepSID database not available' });
+
+  const fileId = parseInt(req.params.fileId);
+  const tagId = parseInt(req.params.tagId);
+  if (isNaN(fileId) || isNaN(tagId)) return res.status(400).json({ error: 'Invalid IDs' });
+
+  try {
+    db.prepare('DELETE FROM tags_lookup WHERE files_id = ? AND tags_id = ?').run(fileId, tagId);
+    res.json({ success: true });
+  } catch (err) {
+    console.error('[DeepSID] Tag remove error:', err);
+    res.status(500).json({ error: 'Failed to remove tag' });
+  }
+});
+
+// ── POST /api/deepsid/tags ──────────────────────────────────────────────────
+
+router.post('/tags', (req: Request, res: Response) => {
+  const db = getDeepSIDDb();
+  if (!db) return res.status(503).json({ error: 'DeepSID database not available' });
+
+  const { name, type } = req.body;
+  if (!name) return res.status(400).json({ error: 'Missing tag name' });
+
+  try {
+    const existing = db.prepare('SELECT id FROM tags_info WHERE name = ?').get(name) as any;
+    if (existing) return res.json({ id: existing.id, name, type: type || 'music', exists: true });
+
+    const result = db.prepare('INSERT INTO tags_info (name, type) VALUES (?, ?)').run(name, type || 'music');
+    res.json({ id: result.lastInsertRowid, name, type: type || 'music', exists: false });
+  } catch (err) {
+    console.error('[DeepSID] Tag create error:', err);
+    res.status(500).json({ error: 'Failed to create tag' });
+  }
+});
+
+// ── GET /api/deepsid/recommended ────────────────────────────────────────────
+
+router.get('/recommended', (_req: Request, res: Response) => {
+  const db = getDeepSIDDb();
+  if (!db) return res.status(503).json({ error: 'DeepSID database not available' });
+
+  // Return tunes flagged as notable or with the most YouTube links as "recommended"
+  const recommended = db.prepare(`
+    SELECT f.id, f.fullname, f.name, f.author, f.player, f.sidmodel, f.subtunes,
+           COUNT(y.id) as yt_count
+    FROM hvsc_files f
+    LEFT JOIN youtube y ON f.id = y.files_id
+    GROUP BY f.id
+    HAVING yt_count > 0
+    ORDER BY yt_count DESC
+    LIMIT 50
+  `).all() as any[];
+
+  const notableComposers = db.prepare(`
+    SELECT id, fullname, name, handles, country, notable
+    FROM composers
+    WHERE notable IS NOT NULL AND notable != ''
+    LIMIT 30
+  `).all() as ComposerRow[];
+
+  res.json({
+    topTunes: recommended.map(r => ({
+      id: r.id,
+      path: r.fullname,
+      filename: r.fullname.split('/').pop(),
+      name: r.name,
+      author: r.author,
+      player: r.player,
+      youtubeLinks: r.yt_count,
+    })),
+    notableComposers: notableComposers.map(c => ({
+      id: c.id,
+      fullname: c.fullname,
+      name: c.name,
+      handles: c.handles,
+      country: c.country,
+      notable: c.notable,
+    })),
+  });
 });
 
 export default router;
