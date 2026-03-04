@@ -46,6 +46,7 @@ import { PixiFurnacePresetBrowser } from './dialogs/PixiFurnacePresetBrowser';
 import { PixiSIDInfoModal } from './dialogs/PixiSIDInfoModal';
 import { PixiArrangementContextMenu } from './dialogs/PixiArrangementContextMenu';
 import { PixiHelpModal } from './dialogs/PixiHelpModal';
+import { PixiDrumpadEditorModal } from './dialogs/PixiDrumpadEditorModal';
 
 export const PixiRoot: React.FC = () => {
   const { width, height } = usePixiResponsive();
@@ -176,6 +177,7 @@ export const PixiRoot: React.FC = () => {
           onClose={closeModal}
           initialTab={(modalData?.initialTab as 'shortcuts' | 'effects' | 'chip-effects' | 'tutorial') || 'shortcuts'}
         />
+        <PixiDrumpadEditorModal isOpen={modalOpen === 'drumpads' || modalOpen === 'midi-pads'} onClose={closeModal} />
         <PixiClipRenameDialog />
         <PixiTrackRenameDialog />
         <PixiSynthErrorDialog />
