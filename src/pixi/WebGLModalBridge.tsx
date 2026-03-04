@@ -85,23 +85,14 @@ const LazyAdvancedEditModal = lazy(() =>
 const LazyEffectPicker = lazy(() =>
   import('@/components/tracker/EffectPicker').then(m => ({ default: m.EffectPicker }))
 );
-const LazyUndoHistoryPanel = lazy(() =>
-  import('@/components/tracker/UndoHistoryPanel').then(m => ({ default: m.UndoHistoryPanel }))
-);
 const LazyAutomationPanel = lazy(() =>
   import('@/components/automation/AutomationPanel').then(m => ({ default: m.AutomationPanel }))
-);
-const LazySynthErrorDialog = lazy(() =>
-  import('@/components/ui/SynthErrorDialog').then(m => ({ default: m.SynthErrorDialog }))
 );
 const LazyRomUploadDialog = lazy(() =>
   import('@/components/ui/RomUploadDialog').then(m => ({ default: m.RomUploadDialog }))
 );
 const LazyCollaborationModal = lazy(() =>
   import('@/components/collaboration/CollaborationModal').then(m => ({ default: m.CollaborationModal }))
-);
-const LazyDownloadModal = lazy(() =>
-  import('@/components/dialogs/DownloadModal').then(m => ({ default: m.DownloadModal }))
 );
 const LazyImportModuleDialog = lazy(() =>
   import('@/components/dialogs/ImportModuleDialog').then(m => ({ default: m.ImportModuleDialog }))
@@ -118,15 +109,6 @@ const LazyImportAudioDialog = lazy(() =>
 const LazyImportTD3Dialog = lazy(() =>
   import('@/components/dialogs/ImportTD3Dialog').then(m => ({ default: m.ImportTD3Dialog }))
 );
-const LazyClipRenameDialog = lazy(() =>
-  import('@/components/arrangement/ClipRenameDialog').then(m => ({ default: m.ClipRenameDialog }))
-);
-const LazyArrangementContextMenu = lazy(() =>
-  import('@/components/arrangement/ArrangementContextMenu').then(m => ({ default: m.ArrangementContextMenu }))
-);
-const LazyTrackRenameDialog = lazy(() =>
-  import('@/components/arrangement/TrackRenameDialog').then(m => ({ default: m.TrackRenameDialog }))
-);
 const LazySunVoxImportDialog = lazy(() =>
   import('@/components/instruments/SunVoxImportDialog').then(m => ({ default: m.SunVoxImportDialog }))
 );
@@ -135,6 +117,9 @@ const LazyFurnacePresetBrowser = lazy(() =>
 );
 const LazySIDInfoModal = lazy(() =>
   import('@/components/dialogs/SIDInfoModal').then(m => ({ default: m.SIDInfoModal }))
+);
+const LazyArrangementContextMenu = lazy(() =>
+  import('@/components/arrangement/ArrangementContextMenu').then(m => ({ default: m.ArrangementContextMenu }))
 );
 
 export const WebGLModalBridge: React.FC = () => {
@@ -534,9 +519,6 @@ export const WebGLModalBridge: React.FC = () => {
           onClose={closeModal}
         />
       )}
-      {modalOpen === 'undoHistory' && (
-        <LazyUndoHistoryPanel isOpen={true} onClose={closeModal} />
-      )}
       {modalOpen === 'automation' && (
         <div style={{
           position: 'fixed', inset: 0, zIndex: 9999,
@@ -564,9 +546,6 @@ export const WebGLModalBridge: React.FC = () => {
       )}
       {modalOpen === 'collaboration' && (
         <LazyCollaborationModal isOpen={true} onClose={closeModal} />
-      )}
-      {modalOpen === 'download' && (
-        <LazyDownloadModal isOpen={true} onClose={closeModal} />
       )}
       {/* Module file drop — dialog routed through portal to sit above PixiDOMOverlay */}
       {pendingModuleFile && (
@@ -627,15 +606,10 @@ export const WebGLModalBridge: React.FC = () => {
       {modalOpen === 'sidInfo' && (
         <LazySIDInfoModal onClose={closeModal} />
       )}
-      {/* Arrangement clip rename dialog (F2) */}
-      <LazyClipRenameDialog />
       {/* Arrangement clip right-click context menu */}
       <LazyArrangementContextMenu />
-      {/* Arrangement track rename dialog (double-click header) */}
-      <LazyTrackRenameDialog />
 
       {/* Always-mounted dialogs */}
-      <LazySynthErrorDialog />
       <LazyRomUploadDialog />
       {activeView === 'drumpad' && (
         <LazyDrumPadManager />

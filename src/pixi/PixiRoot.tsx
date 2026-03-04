@@ -29,6 +29,11 @@ import { PixiFadeVolumeDialog } from './dialogs/PixiFadeVolumeDialog';
 import { PixiStrumDialog } from './dialogs/PixiStrumDialog';
 import { PixiAcidPatternDialog } from './dialogs/PixiAcidPatternDialog';
 import { PixiRandomizeDialog } from './dialogs/PixiRandomizeDialog';
+import { PixiClipRenameDialog } from './dialogs/PixiClipRenameDialog';
+import { PixiTrackRenameDialog } from './dialogs/PixiTrackRenameDialog';
+import { PixiDownloadModal } from './dialogs/PixiDownloadModal';
+import { PixiSynthErrorDialog } from './dialogs/PixiSynthErrorDialog';
+import { PixiUndoHistoryPanel } from './dialogs/PixiUndoHistoryPanel';
 
 export const PixiRoot: React.FC = () => {
   const { width, height } = usePixiResponsive();
@@ -129,6 +134,11 @@ export const PixiRoot: React.FC = () => {
         <PixiStrumDialog isOpen={modalOpen === 'strum'} onClose={closeModal} />
         <PixiAcidPatternDialog isOpen={modalOpen === 'acidPattern'} onClose={closeModal} />
         <PixiRandomizeDialog isOpen={modalOpen === 'randomize'} onClose={closeModal} />
+        <PixiDownloadModal isOpen={modalOpen === 'download'} onClose={closeModal} />
+        <PixiUndoHistoryPanel isOpen={modalOpen === 'undoHistory'} onClose={closeModal} />
+        <PixiClipRenameDialog />
+        <PixiTrackRenameDialog />
+        <PixiSynthErrorDialog />
       </pixiContainer>
 
       {/* Peer cursor overlay — above everything */}
