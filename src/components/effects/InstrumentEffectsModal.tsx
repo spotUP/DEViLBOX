@@ -190,12 +190,14 @@ export const InstrumentEffectsModal: React.FC<InstrumentEffectsModalProps> = ({ 
                     if (!acc[preset.category]) acc[preset.category] = [];
                     acc[preset.category].push(preset);
                     return acc;
-                  }, {} as Record<string, InstrumentFxPreset[]>)).map(([category, presets]) => (
+                  }, {} as Record<string, InstrumentFxPreset[]>))
+                    .sort(([a], [b]) => a.localeCompare(b))
+                    .map(([category, presets]) => (
                     <div key={category}>
                       <div className="px-4 py-2 text-xs text-text-muted font-medium uppercase tracking-wide bg-dark-bgTertiary sticky top-0">
                         {category}
                       </div>
-                      {presets.map((preset) => (
+                      {[...presets].sort((a, b) => a.name.localeCompare(b.name)).map((preset) => (
                         <div
                           key={preset.name}
                           onClick={() => handleLoadPreset(preset)}
