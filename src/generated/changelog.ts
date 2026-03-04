@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-03-04T19:56:51.640Z
+ * Generated: 2026-03-04T21:31:01.104Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.2255';
-export const BUILD_NUMBER = '2255';
-export const BUILD_HASH = 'da23acce';
+export const BUILD_VERSION = '1.0.2267';
+export const BUILD_NUMBER = '2267';
+export const BUILD_HASH = 'd6c267c6';
 export const BUILD_DATE = '2026-03-04';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,57 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.2255',
+    version: '1.0.2267',
     date: '2026-03-04',
     changes: [
+      {
+        type: 'feature',
+        "description": "Add comprehensive FX test runner: music-driven tests, clipping detection, 39 param wiring tests, 19 new effects"
+      },
+      {
+        type: 'fix',
+        "description": "Alphabetically sort FX preset categories and items"
+      },
+      {
+        type: 'fix',
+        "description": "PixiSelect dropdown scroll support for long option lists"
+      },
+      {
+        type: 'feature',
+        "description": "Achieve 1:1 GL-DOM parity across all components"
+      },
+      {
+        type: 'fix',
+        "description": "Fix collaboration split view and remote pattern view to match DOM versions"
+      },
+      {
+        type: 'fix',
+        "description": "Resolve 17 TypeScript errors across Pixi components"
+      },
+      {
+        type: 'fix',
+        "description": "Escape apostrophe in PixiRemotePatternView string literal"
+      },
+      {
+        type: 'fix',
+        "description": "Remove extra </Div> closing tag in PixiPadEditor"
+      },
+      {
+        type: 'feature',
+        "description": "Pad name editing, MIDI learn, add layer from file"
+      },
+      {
+        type: 'fix',
+        "description": "SA: fix 11 period table values and ADSR sustain gate"
+      },
+      {
+        type: 'feature',
+        "description": "Add PixiPadEditor — 6-tab GL pad parameter editor"
+      },
+      {
+        type: 'improvement',
+        "description": "Enhance PixiDrumPadManager with full DOM drumpad feature parity"
+      },
       {
         type: 'feature',
         "description": "Isolate drumpad samples from project instrument slots"
@@ -184,54 +232,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         "description": "Always-mount import dialogs to fix SID modal not showing in GL mode"
-      },
-      {
-        type: 'fix',
-        "description": "Fix GT engine double-init in React StrictMode consuming pendingSongData"
-      },
-      {
-        type: 'fix',
-        "description": "Fix GTUltra engine init crash: detached ArrayBuffer on re-init"
-      },
-      {
-        type: 'fix',
-        "description": "Fix GT Ultra pattern data not loading after song load"
-      },
-      {
-        type: 'fix',
-        "description": "Welcome modal 'Start Jamming' button clipped by overflow"
-      },
-      {
-        type: 'fix',
-        "description": "Fix GT song drop causing black pattern editor"
-      },
-      {
-        type: 'improvement',
-        "description": "Unify file import paths through UnifiedFileLoader"
-      },
-      {
-        type: 'fix',
-        "description": "GTUltra view Yoga BindingError fixes and diagnostic logging"
-      },
-      {
-        type: 'fix',
-        "description": "Resolve all 62 TypeScript errors across Pixi UI and engine"
-      },
-      {
-        type: 'fix',
-        "description": "Fix PixiButton click not firing due to stale pressed state in closure"
-      },
-      {
-        type: 'improvement',
-        "description": "Add no-emoji rule to project memory — always use FontAudio flat icons"
-      },
-      {
-        type: 'improvement',
-        "description": "Replace all emojis with FontAudio flat icons in Pixi UI"
-      },
-      {
-        type: 'improvement',
-        "description": "Guard all Yoga WASM node operations against BindingErrors"
       }
     ]
   }
