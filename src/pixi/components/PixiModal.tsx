@@ -56,11 +56,15 @@ export const PixiModal: React.FC<PixiModalProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
 
-  if (!isOpen) return null;
-  if (!app?.screen) return null;
+  // app.screen getter throws if renderer isn't ready — safe access with fallback
+  let screenW = 1920, screenH = 1080;
+  try {
+    if (app?.screen) {
+      screenW = app.screen.width ?? 1920;
+      screenH = app.screen.height ?? 1080;
+    }
+  } catch { /* renderer not initialized yet — use fallback dimensions */ }
 
-  const screenW = app.screen.width ?? 1920;
-  const screenH = app.screen.height ?? 1080;
   const panelBg = bgColor ?? theme.bg.color;
   const panelBorder = bc ?? theme.border.color;
 
@@ -77,6 +81,8 @@ export const PixiModal: React.FC<PixiModalProps> = ({
   const handlePanelClick = useCallback((e: FederatedPointerEvent) => {
     e.stopPropagation();
   }, []);
+
+  if (!isOpen) return null;
 
   return (
     <pixiContainer layout={{ position: 'absolute', width: '100%', height: '100%' }}>
