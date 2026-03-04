@@ -169,6 +169,7 @@ export const PixiExposeOverlay: React.FC<PixiExposeOverlayProps> = ({ width, hei
     <pixiContainer
       eventMode="static"
       onPointerUp={() => useUIStore.getState().setViewExposeActive(false)}
+      onClick={() => useUIStore.getState().setViewExposeActive(false)}
       layout={{ position: 'absolute', width, height }}
     >
       {/* Dimmed background */}
@@ -218,6 +219,10 @@ export const PixiExposeOverlay: React.FC<PixiExposeOverlayProps> = ({ width, hei
             eventMode="static"
             cursor="pointer"
             onPointerUp={(e: import('pixi.js').FederatedPointerEvent) => {
+              e.stopPropagation();
+              handleSelectView(view.id);
+            }}
+            onClick={(e: import('pixi.js').FederatedPointerEvent) => {
               e.stopPropagation();
               handleSelectView(view.id);
             }}

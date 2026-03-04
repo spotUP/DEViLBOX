@@ -961,6 +961,7 @@ const TabButton: React.FC<{
       eventMode="static"
       cursor="pointer"
       onPointerUp={onSelect}
+      onClick={onSelect}
     >
       <PixiLabel
         text={label}

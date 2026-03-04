@@ -541,6 +541,7 @@ export const PixiExportDialog: React.FC<PixiExportDialogProps> = ({ isOpen, onCl
           eventMode="static"
           cursor="pointer"
           onPointerUp={() => setDialogMode('export')}
+          onClick={() => setDialogMode('export')}
         >
           <PixiLabel
             text="Export"
@@ -560,6 +561,7 @@ export const PixiExportDialog: React.FC<PixiExportDialogProps> = ({ isOpen, onCl
           eventMode="static"
           cursor="pointer"
           onPointerUp={() => setDialogMode('import')}
+          onClick={() => setDialogMode('import')}
         >
           <PixiLabel
             text="Import"

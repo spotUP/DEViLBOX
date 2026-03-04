@@ -374,6 +374,7 @@ const ParamButton: React.FC<ParamButtonProps> = ({
       onPointerOver={() => setHovered(true)}
       onPointerOut={() => setHovered(false)}
       onPointerUp={onClick}
+      onClick={onClick}
       layout={{ width: 80, height: PARAM_BTN_H }}
     >
       <pixiGraphics draw={drawBg} layout={{ position: 'absolute', width: 80, height: PARAM_BTN_H }} />

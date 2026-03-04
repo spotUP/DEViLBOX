@@ -31,6 +31,7 @@ export const PixiCheckbox: React.FC<PixiCheckboxProps> = ({
       onPointerOver={() => setHovered(true)}
       onPointerOut={() => setHovered(false)}
       onPointerUp={() => !disabled && onChange(!checked)}
+      onClick={() => !disabled && onChange(!checked)}
       alpha={disabled ? 0.4 : 1}
       layout={{ width: totalWidth, height: size, flexDirection: 'row', alignItems: 'center', gap: 6, ...layoutProp }}
     >

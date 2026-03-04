@@ -454,6 +454,7 @@ const RightSide: React.FC<RightSideProps> = ({
           eventMode="static"
           cursor="pointer"
           onPointerUp={onToggleKnobBar}
+          onClick={onToggleKnobBar}
           layout={{ flexDirection: 'row', alignItems: 'center', height: barHeight }}
         >
           <PixiDot color={theme.success.color} />
@@ -478,6 +479,7 @@ const RightSide: React.FC<RightSideProps> = ({
         eventMode="static"
         cursor="pointer"
         onPointerUp={onShowTips}
+        onClick={onShowTips}
         onPointerOver={() => setTipsHovered(true)}
         onPointerOut={() => setTipsHovered(false)}
         layout={{ flexDirection: 'row', alignItems: 'center', height: barHeight, marginRight: 8 }}
@@ -625,6 +627,7 @@ const PixiBankTab: React.FC<BankTabProps> = ({ label, isActive, height, onPress 
       eventMode="static"
       cursor="pointer"
       onPointerUp={onPress}
+      onClick={onPress}
       layout={{ width: W, height, justifyContent: 'center', alignItems: 'center' }}
     >
       <pixiGraphics draw={drawBg} layout={{ position: 'absolute', width: W, height }} />

@@ -716,7 +716,7 @@ export const PixiHelpModal: React.FC<PixiHelpModalProps> = ({
           eventMode="static"
           cursor="pointer"
           onPointerUp={onClose}
-          layout={{}}
+          onClick={onClose}
         />
       </layoutContainer>
 
@@ -739,6 +739,7 @@ export const PixiHelpModal: React.FC<PixiHelpModalProps> = ({
               eventMode="static"
               cursor="pointer"
               onPointerUp={() => setActiveTab(tab.id)}
+              onClick={() => setActiveTab(tab.id)}
               layout={{
                 flex: 1,
                 height: 32,
