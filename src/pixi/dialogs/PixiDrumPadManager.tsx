@@ -15,10 +15,11 @@ import { useInstrumentStore, useAllSamplePacks } from '../../stores';
 import { useUIStore } from '../../stores/useUIStore';
 import {
   getAllKitSources,
-  loadKitSource,
+  createInstrumentsFromPreset,
+  createInstrumentsFromSamplePack,
 } from '../../lib/drumpad/defaultKitLoader';
 import { getBankPads } from '../../types/drumpad';
-import type { PadBank, MpcResampleConfig, DrumPad } from '../../types/drumpad';
+import type { PadBank, MpcResampleConfig, DrumPad, SampleData } from '../../types/drumpad';
 import { DrumPadEngine } from '../../engine/drumpad/DrumPadEngine';
 import { getAudioContext, resumeAudioContext } from '../../audio/AudioContextSingleton';
 import { PixiButton } from '../components';
@@ -149,14 +150,16 @@ export const PixiDrumPadManager: React.FC = () => {
     setNoteRepeatRate,
     currentBank,
     setBank,
+    loadSampleToPad,
   } = useDrumPadStore();
 
   const allSamplePacks = useAllSamplePacks();
   const allKitSources = useMemo(() => getAllKitSources(allSamplePacks), [allSamplePacks]);
-  const { createInstrument } = useInstrumentStore();
+  const instruments = useInstrumentStore(s => s.instruments);
 
   const [selectedPadId, setSelectedPadId] = useState<number | null>(null);
   const [selectedKitSourceId, setSelectedKitSourceId] = useState<string>(allKitSources[0]?.id || '');
+  const [importInstrumentId, setImportInstrumentId] = useState<number | null>(null);
   const [alertMsg, setAlertMsg] = useState<string | null>(null);
 
   // Debounced master controls
@@ -243,6 +246,15 @@ export const PixiDrumPadManager: React.FC = () => {
     [allKitSources],
   );
 
+  /* ── Import from project options ── */
+  const importInstrumentOptions: SelectOption[] = useMemo(
+    () =>
+      instruments
+        .filter(inst => inst.type === 'sample' && inst.sample?.url)
+        .map(inst => ({ value: String(inst.id), label: `${inst.id}: ${inst.name}` })),
+    [instruments],
+  );
+
   /* ── Handlers ── */
   const handleProgramChange = useCallback(
     (id: string) => {
@@ -285,16 +297,85 @@ export const PixiDrumPadManager: React.FC = () => {
     deleteProgram(currentProgramId);
   }, [programs.size, currentProgramId, deleteProgram]);
 
-  const handleLoadKit = useCallback(() => {
+  const handleLoadKit = useCallback(async () => {
     try {
       const src = allKitSources.find((s) => s.id === selectedKitSourceId);
       if (!src) throw new Error('Kit source not found');
-      const ids = loadKitSource(src, allSamplePacks, createInstrument);
-      setAlertMsg(`Added ${ids.length} instruments from "${src.name}".`);
+
+      // Get sample URLs from kit source (no project instruments created)
+      let samples: Array<{ name: string; url: string }> = [];
+      if (src.type === 'preset') {
+        samples = createInstrumentsFromPreset(src.id);
+      } else if (src.type === 'samplepack') {
+        const pack = allSamplePacks.find(p => p.id === src.id);
+        if (!pack) throw new Error('Sample pack not found');
+        samples = createInstrumentsFromSamplePack(pack);
+      }
+
+      // Fetch audio and load directly onto current bank's pads
+      const audioContext = getAudioContext();
+      const bankOffset = { A: 0, B: 16, C: 32, D: 48 }[currentBank];
+      let loaded = 0;
+      for (let i = 0; i < Math.min(samples.length, 16); i++) {
+        const { name, url } = samples[i];
+        const padId = bankOffset + i + 1;
+        try {
+          const response = await fetch(url);
+          const arrayBuffer = await response.arrayBuffer();
+          const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+          const sampleData: SampleData = {
+            id: `kit-${src.id}-${i}`,
+            name,
+            audioBuffer,
+            duration: audioBuffer.duration,
+            sampleRate: audioBuffer.sampleRate,
+          };
+          await loadSampleToPad(padId, sampleData);
+          loaded++;
+        } catch (e) {
+          console.warn(`[DrumPad] Failed to load sample "${name}" from ${url}:`, e);
+        }
+      }
+      setAlertMsg(`Loaded ${loaded} samples from "${src.name}" to Bank ${currentBank}.`);
     } catch (err) {
       setAlertMsg(`Failed to load kit: ${err instanceof Error ? err.message : 'Unknown error'}`);
     }
-  }, [selectedKitSourceId, allKitSources, allSamplePacks, createInstrument]);
+  }, [selectedKitSourceId, allKitSources, allSamplePacks, currentBank, loadSampleToPad]);
+
+  const handleImportFromProject = useCallback(async () => {
+    if (selectedPadId == null) {
+      setAlertMsg('Select a pad first to import a project instrument.');
+      return;
+    }
+    // Build list of sample-type instruments
+    const sampleInstruments = instruments.filter(
+      inst => inst.type === 'sample' && inst.sample?.url,
+    );
+    if (sampleInstruments.length === 0) {
+      setAlertMsg('No sample instruments in project to import.');
+      return;
+    }
+    // Load first available sample instrument onto selected pad (user picks via dropdown)
+    const inst = sampleInstruments.find(i => i.id === importInstrumentId) ?? sampleInstruments[0];
+    if (!inst.sample?.url) return;
+    try {
+      const audioContext = getAudioContext();
+      const response = await fetch(inst.sample.url);
+      const arrayBuffer = await response.arrayBuffer();
+      const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+      const sampleData: SampleData = {
+        id: `proj-${inst.id}`,
+        name: inst.name,
+        audioBuffer,
+        duration: audioBuffer.duration,
+        sampleRate: audioBuffer.sampleRate,
+      };
+      await loadSampleToPad(selectedPadId, sampleData);
+      setAlertMsg(`Imported "${inst.name}" to pad ${selectedPadId}.`);
+    } catch (err) {
+      setAlertMsg(`Failed to import: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    }
+  }, [selectedPadId, instruments, importInstrumentId, loadSampleToPad]);
 
   const handleMasterLevelChange = useCallback(
     (level: number) => {
@@ -517,10 +598,29 @@ export const PixiDrumPadManager: React.FC = () => {
               width={RIGHT_W - 32}
             />
             <PixiButton
-              label="Add to Instruments"
+              label="Load to Pads"
               size="sm"
               color="green"
               onClick={handleLoadKit}
+              width={RIGHT_W - 32}
+            />
+          </Div>
+
+          {/* Import from project */}
+          <Div className="flex-col gap-2">
+            <SectionHeader>IMPORT FROM PROJECT</SectionHeader>
+            <PixiSelect
+              options={importInstrumentOptions}
+              value={importInstrumentId != null ? String(importInstrumentId) : ''}
+              onChange={(v) => setImportInstrumentId(Number(v))}
+              width={RIGHT_W - 32}
+            />
+            <PixiButton
+              label="Import to Pad"
+              size="sm"
+              color="blue"
+              onClick={handleImportFromProject}
+              disabled={selectedPadId == null || importInstrumentOptions.length === 0}
               width={RIGHT_W - 32}
             />
           </Div>
