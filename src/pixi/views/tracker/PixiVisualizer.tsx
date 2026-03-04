@@ -104,8 +104,11 @@ export const PixiVisualizer: React.FC<PixiVisualizerProps> = ({
             drawParticles(g, engine.getWaveform(), width, height, theme, particlesRef.current);
             break;
         }
-      } catch {
-        // Engine not ready
+      } catch (e) {
+        // Engine not ready — only log unexpected errors
+        if (e instanceof Error && !e.message.includes('not ready') && !e.message.includes('disposed')) {
+          console.warn('[Visualizer]', e.message);
+        }
       }
 
       rafId = requestAnimationFrame(draw);
@@ -282,23 +285,36 @@ function drawVectorscope(g: GraphicsType, data: Float32Array, w: number, h: numb
   g.circle(cx, cy, radius);
   g.stroke({ color: theme.border.color, alpha: 0.1, width: 1 });
 
-  // Lissajous: treat consecutive samples as L/R pairs
-  const sampleCount = Math.min(512, Math.floor(data.length / 2));
-  const step = Math.max(1, Math.floor(data.length / sampleCount / 2));
+  // Time-delay Lissajous — use sample[i] vs sample[i+offset] to create
+  // proper circular/spiral patterns even with mono analyser data.
+  // Offset ~1/4 buffer creates ~90° phase shift → circular figures.
+  const offset = Math.floor(data.length / 4);
+  const sampleCount = Math.min(512, data.length - offset);
+  const step = Math.max(1, Math.floor((data.length - offset) / sampleCount));
 
-  for (let i = 0; i < sampleCount - 1; i++) {
-    const idx = i * step * 2;
-    const l = data[idx] ?? 0;
-    const r = data[idx + 1] ?? 0;
-
-    const x = cx + (l - r) * radius * 0.7;
-    const y = cy - (l + r) * radius * 0.35;
-
-    const dist = Math.sqrt((x - cx) ** 2 + (y - cy) ** 2) / radius;
-    const alpha = 0.3 + dist * 0.7;
-    g.circle(x, y, 1);
-    g.fill({ color: theme.accent.color, alpha: Math.min(1, alpha) });
+  // Draw as connected line for smoother appearance
+  let started = false;
+  for (let i = 0; i < sampleCount; i++) {
+    const idx = i * step;
+    const a = data[idx] ?? 0;
+    const b = data[idx + offset] ?? 0;
+    const x = cx + a * radius * 0.8;
+    const y = cy - b * radius * 0.8;
+    if (!started) { g.moveTo(x, y); started = true; } else { g.lineTo(x, y); }
   }
+  g.stroke({ color: theme.accent.color, alpha: 0.7, width: 1.5 });
+
+  // Glow pass
+  started = false;
+  for (let i = 0; i < sampleCount; i++) {
+    const idx = i * step;
+    const a = data[idx] ?? 0;
+    const b = data[idx + offset] ?? 0;
+    const x = cx + a * radius * 0.8;
+    const y = cy - b * radius * 0.8;
+    if (!started) { g.moveTo(x, y); started = true; } else { g.lineTo(x, y); }
+  }
+  g.stroke({ color: theme.accent.color, alpha: 0.15, width: 4 });
 }
 
 // ─── Extended visualizer modes ──────────────────────────────────────────────
@@ -315,7 +331,9 @@ function drawChannelOscilloscopes(g: GraphicsType, data: Float32Array, w: number
   const rows = 2;
   const cellW = (w - 6) / cols;
   const cellH = (h - 6) / rows;
-  const samplesPerCh = Math.floor(data.length / channelCount);
+  // Show 4 overlapping time windows with different offsets for visual variety
+  const windowSize = Math.floor(data.length / 2);
+  const chColors = [theme.accent.color, 0xa855f7, theme.success.color, theme.warning.color];
 
   for (let ch = 0; ch < channelCount; ch++) {
     const col = ch % cols;
@@ -328,15 +346,16 @@ function drawChannelOscilloscopes(g: GraphicsType, data: Float32Array, w: number
     g.rect(ox, oy, cellW - 1, cellH - 1);
     g.stroke({ color: theme.border.color, alpha: 0.15, width: 0.5 });
 
-    // Waveform
-    const offset = ch * samplesPerCh;
-    const step = samplesPerCh / (cellW - 4);
+    // Waveform with staggered offset for each "channel"
+    const offset = Math.floor(ch * data.length / (channelCount + 1));
+    const samples = Math.min(windowSize, data.length - offset);
+    const step = samples / (cellW - 4);
     g.moveTo(ox + 2, midY + (data[offset] ?? 0) * (cellH / 2 - 2));
     for (let i = 1; i < cellW - 4; i++) {
       const val = data[offset + Math.floor(i * step)] ?? 0;
       g.lineTo(ox + 2 + i, midY + val * (cellH / 2 - 2));
     }
-    g.stroke({ color: theme.accent.color, alpha: 0.8, width: 1 });
+    g.stroke({ color: chColors[ch], alpha: 0.8, width: 1 });
   }
 }
 
@@ -355,20 +374,25 @@ function drawStereoField(g: GraphicsType, data: Float32Array, w: number, h: numb
   g.moveTo(cx - radius, cy); g.lineTo(cx + radius, cy);
   g.stroke({ color: theme.border.color, alpha: 0.1, width: 0.5 });
 
-  const sampleCount = Math.min(256, Math.floor(data.length / 2));
-  const step = Math.max(1, Math.floor(data.length / sampleCount / 2));
+  // Time-delay phase plot — similar to vectorscope but with shorter delay
+  // for a tighter, more "metered" look
+  const offset = Math.floor(data.length / 6);
+  const sampleCount = Math.min(256, data.length - offset);
+  const step = Math.max(1, Math.floor((data.length - offset) / sampleCount));
 
+  // Draw as connected line
+  let started = false;
   for (let i = 0; i < sampleCount; i++) {
-    const idx = i * step * 2;
-    const l = data[idx] ?? 0;
-    const r = data[idx + 1] ?? 0;
-    const m = (l + r) * 0.5;
-    const s = (l - r) * 0.5;
-    const x = cx + s * radius * 1.2;
-    const y = cy - m * radius * 0.6;
-    g.circle(x, y, 0.8);
-    g.fill({ color: 0xa855f7, alpha: 0.5 });
+    const idx = i * step;
+    const a = data[idx] ?? 0;
+    const b = data[idx + offset] ?? 0;
+    const m = (a + b) * 0.5;
+    const s = (a - b) * 0.5;
+    const x = cx + s * radius * 1.4;
+    const y = cy - m * radius * 0.7;
+    if (!started) { g.moveTo(x, y); started = true; } else { g.lineTo(x, y); }
   }
+  g.stroke({ color: 0xa855f7, alpha: 0.6, width: 1.5 });
 }
 
 function drawFrequencyBars(g: GraphicsType, data: Float32Array, w: number, h: number, theme: PixiTheme, peaks: Float32Array) {
@@ -408,25 +432,39 @@ function drawFrequencyBars(g: GraphicsType, data: Float32Array, w: number, h: nu
 
 function drawChannelLevels(g: GraphicsType, data: Float32Array, w: number, h: number, theme: PixiTheme) {
   if (!data || data.length === 0) return;
-  const channelCount = 4;
+  // Show 4 bars representing different energy bands of the waveform
+  // (since we only have mono, split into frequency-ish bands via simple windowing)
+  const bandCount = 4;
   const padX = 4;
   const padY = 3;
   const drawW = w - padX * 2;
-  const barH = Math.max(4, (h - padY * 2) / channelCount - 2);
-  const samplesPerCh = Math.floor(data.length / channelCount);
+  const barH = Math.max(4, (h - padY * 2) / bandCount - 2);
+  const bandColors = [theme.success.color, theme.accent.color, theme.warning.color, theme.error.color];
+  const bandLabels = ['LOW', 'MID', 'HIGH', 'PEAK'];
 
-  for (let ch = 0; ch < channelCount; ch++) {
-    const y = padY + ch * (barH + 2);
+  for (let band = 0; band < bandCount; band++) {
+    const y = padY + band * (barH + 2);
 
-    // Compute RMS level
+    // Each band looks at a different "derivative" order for variety:
+    // band 0: RMS of raw signal (low freq energy)
+    // band 1: RMS of differences (mid freq energy)
+    // band 2: RMS of 2nd differences (high freq energy)
+    // band 3: peak amplitude
     let sum = 0;
-    const offset = ch * samplesPerCh;
-    for (let i = 0; i < samplesPerCh; i++) {
-      const v = data[offset + i] ?? 0;
-      sum += v * v;
+    const count = data.length;
+    if (band === 0) {
+      for (let i = 0; i < count; i++) sum += (data[i] ?? 0) ** 2;
+      sum = Math.sqrt(sum / count);
+    } else if (band === 1) {
+      for (let i = 1; i < count; i++) { const d = (data[i] ?? 0) - (data[i-1] ?? 0); sum += d * d; }
+      sum = Math.sqrt(sum / count) * 4;
+    } else if (band === 2) {
+      for (let i = 2; i < count; i++) { const d = (data[i] ?? 0) - 2*(data[i-1] ?? 0) + (data[i-2] ?? 0); sum += d * d; }
+      sum = Math.sqrt(sum / count) * 12;
+    } else {
+      for (let i = 0; i < count; i++) sum = Math.max(sum, Math.abs(data[i] ?? 0));
     }
-    const rms = Math.sqrt(sum / samplesPerCh);
-    const level = Math.min(1, rms * 3);
+    const level = Math.min(1, sum * 3);
 
     // Background track
     g.rect(padX, y, drawW, barH);
@@ -434,16 +472,15 @@ function drawChannelLevels(g: GraphicsType, data: Float32Array, w: number, h: nu
 
     // Level bar
     const barW = level * drawW;
-    const color = level > 0.8 ? theme.error.color : level > 0.6 ? theme.warning.color : theme.success.color;
     g.rect(padX, y, barW, barH);
-    g.fill({ color, alpha: 0.7 });
+    g.fill({ color: bandColors[band], alpha: 0.7 });
   }
 }
 
 function drawParticles(g: GraphicsType, data: Float32Array, w: number, h: number, theme: PixiTheme, particles: ParticleState[]) {
   // Initialize particles on first call
   if (particles.length === 0) {
-    for (let i = 0; i < 80; i++) {
+    for (let i = 0; i < 60; i++) {
       particles.push({
         x: Math.random() * w,
         y: Math.random() * h,
@@ -453,29 +490,32 @@ function drawParticles(g: GraphicsType, data: Float32Array, w: number, h: number
     }
   }
 
-  // Audio energy
+  // Audio energy from waveform
   let energy = 0;
+  let peak = 0;
   if (data && data.length > 0) {
     for (let i = 0; i < Math.min(256, data.length); i++) {
-      energy += Math.abs(data[i] ?? 0);
+      const a = Math.abs(data[i] ?? 0);
+      energy += a;
+      if (a > peak) peak = a;
     }
     energy = energy / Math.min(256, data.length);
   }
 
   const cx = w / 2;
   const cy = h / 2;
-  const force = energy * 8;
+  const force = energy * 12;
 
   for (const p of particles) {
     // Center attraction
     const dx = cx - p.x;
     const dy = cy - p.y;
     const dist = Math.sqrt(dx * dx + dy * dy) + 1;
-    p.vx += (dx / dist) * 0.002 + (Math.random() - 0.5) * force;
-    p.vy += (dy / dist) * 0.002 + (Math.random() - 0.5) * force;
+    p.vx += (dx / dist) * 0.003 + (Math.random() - 0.5) * force;
+    p.vy += (dy / dist) * 0.003 + (Math.random() - 0.5) * force;
 
-    p.vx *= 0.97;
-    p.vy *= 0.97;
+    p.vx *= 0.96;
+    p.vy *= 0.96;
     p.x += p.vx;
     p.y += p.vy;
 
@@ -485,8 +525,10 @@ function drawParticles(g: GraphicsType, data: Float32Array, w: number, h: number
     if (p.y < 0) p.y = h;
     if (p.y > h) p.y = 0;
 
-    const alpha = 0.3 + Math.min(0.7, Math.sqrt(p.vx * p.vx + p.vy * p.vy) * 0.5);
-    g.circle(p.x, p.y, 1 + energy * 2);
+    const speed = Math.sqrt(p.vx * p.vx + p.vy * p.vy);
+    const alpha = 0.4 + Math.min(0.6, speed * 0.4);
+    const size = 1.5 + energy * 4 + speed * 0.3;
+    g.circle(p.x, p.y, size);
     g.fill({ color: theme.accent.color, alpha });
   }
 }
