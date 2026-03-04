@@ -45,6 +45,16 @@ export const GTToolbar: React.FC<{ width: number; height: number }> = ({ width, 
     engine.saveSng();
   }, [engine]);
 
+  const handleExportPrg = useCallback(() => {
+    if (!engine) return;
+    engine.exportPrg();
+  }, [engine]);
+
+  const handleExportSid = useCallback(() => {
+    if (!engine) return;
+    engine.exportSid();
+  }, [engine]);
+
   // Wire the save callback
   useEffect(() => {
     if (!engine) return;
@@ -60,6 +70,40 @@ export const GTToolbar: React.FC<{ width: number; height: number }> = ({ width, 
       URL.revokeObjectURL(url);
     };
     return () => { engine.callbacks.onSngData = undefined; };
+  }, [engine, songName]);
+
+  // Wire PRG export callback
+  useEffect(() => {
+    if (!engine) return;
+    engine.callbacks.onPrgData = (data: ArrayBuffer | null) => {
+      if (!data) return;
+      const blob = new Blob([data], { type: 'application/octet-stream' });
+      const name = (songName || 'untitled').replace(/[^a-zA-Z0-9_-]/g, '_') + '.prg';
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = name;
+      a.click();
+      URL.revokeObjectURL(url);
+    };
+    return () => { engine.callbacks.onPrgData = undefined; };
+  }, [engine, songName]);
+
+  // Wire SID export callback
+  useEffect(() => {
+    if (!engine) return;
+    engine.callbacks.onSidData = (data: ArrayBuffer | null) => {
+      if (!data) return;
+      const blob = new Blob([data], { type: 'audio/prs.sid' });
+      const name = (songName || 'untitled').replace(/[^a-zA-Z0-9_-]/g, '_') + '.sid';
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = name;
+      a.click();
+      URL.revokeObjectURL(url);
+    };
+    return () => { engine.callbacks.onSidData = undefined; };
   }, [engine, songName]);
 
   return (
@@ -105,6 +149,34 @@ export const GTToolbar: React.FC<{ width: number; height: number }> = ({ width, 
         title="Save .sng file"
       >
         💾 Save
+      </button>
+      <button
+        onClick={handleExportPrg}
+        style={{
+          background: '#16213e',
+          color: '#aaa',
+          border: '1px solid #333',
+          padding: '2px 8px',
+          cursor: 'pointer',
+          fontSize: 10,
+        }}
+        title="Export as C64 .prg"
+      >
+        📦 PRG
+      </button>
+      <button
+        onClick={handleExportSid}
+        style={{
+          background: '#16213e',
+          color: '#aaa',
+          border: '1px solid #333',
+          padding: '2px 8px',
+          cursor: 'pointer',
+          fontSize: 10,
+        }}
+        title="Export as .sid (SIDPlay format)"
+      >
+        🎵 SID
       </button>
       <button
         onClick={togglePlay}

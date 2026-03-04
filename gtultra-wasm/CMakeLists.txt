@@ -61,6 +61,7 @@ file(GLOB ASM_SOURCES src/asm/*.c)
 set(BRIDGE_SOURCES
     src/GTUltraBridge.cpp
     src/bme_end.c
+    src/bme_io_stub.c
 )
 
 add_executable(GTUltra
@@ -97,5 +98,13 @@ set_target_properties(GTUltra PROPERTIES
         -s INITIAL_MEMORY=67108864 \
         -O3 \
         --no-entry \
+        --embed-file ${CMAKE_SOURCE_DIR}/players/player.s@player.s \
+        --embed-file ${CMAKE_SOURCE_DIR}/players/player3.s@player3.s \
+        --embed-file ${CMAKE_SOURCE_DIR}/players/player9.s@player9.s \
+        --embed-file ${CMAKE_SOURCE_DIR}/players/player12.s@player12.s \
+        --embed-file ${CMAKE_SOURCE_DIR}/players/altplayer.s@altplayer.s \
+        --embed-file ${CMAKE_SOURCE_DIR}/players/altplayer3.s@altplayer3.s \
+        --embed-file ${CMAKE_SOURCE_DIR}/players/altplayer9.s@altplayer9.s \
+        --embed-file ${CMAKE_SOURCE_DIR}/players/altplayer12.s@altplayer12.s \
     "
 )

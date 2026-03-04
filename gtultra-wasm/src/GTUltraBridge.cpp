@@ -16,6 +16,7 @@
 
 extern "C" {
 #include "goattrk2.h"
+#include "greloc.h"
 }
 #include "gsid.h"
 
@@ -332,6 +333,8 @@ void playFromCurrentPosition(GTOBJECT *gt, int p) { (void)gt; (void)p; }
 void handleLoad(GTOBJECT *gt, char *f) { (void)gt; (void)f; }
 void waitkey(GTOBJECT *gt) { (void)gt; }
 void waitkeymouse(GTOBJECT *gt) { (void)gt; }
+void waitkeynoupdate(void) {}
+void waitkeymousenoupdate(void) {}
 void onlinehelp(int s, int c, GTOBJECT *gt) { (void)s; (void)c; (void)gt; }
 void reInitSID(void) {}
 
@@ -390,6 +393,70 @@ int gt_save_sng(unsigned char* outBuf, int maxLen) {
     strcpy(songfilename, "/tmp/temp_save.sng");
     if (savesong() == 0) return 0;
     FILE *f = fopen("/tmp/temp_save.sng", "rb");
+    if (!f) return 0;
+    fseek(f, 0, SEEK_END);
+    int size = ftell(f);
+    fseek(f, 0, SEEK_SET);
+    if (size > maxLen) { fclose(f); return 0; }
+    fread(outBuf, 1, size, f);
+    fclose(f);
+    return size;
+}
+
+/* --- Export PRG/SID --- */
+
+EMSCRIPTEN_KEEPALIVE
+int gt_export_prg(unsigned char* outBuf, int maxLen) {
+    if (editorInfo.maxSIDChannels == 0) editorInfo.maxSIDChannels = 3;
+    if (editorInfo.adparam == 0) editorInfo.adparam = 0x0f00;
+    if (editorInfo.multiplier == 0) editorInfo.multiplier = 1;
+    editorInfo.optimizepulse = 1;
+    editorInfo.optimizerealtime = 1;
+    editorInfo.finevibrato = 1;
+    fileformat = FORMAT_PRG;
+    playerversion = PLAYER_BUFFERED;
+    zeropageadr = 0xfc;
+    playeradr = 0x1000;
+    strcpy(packedsongname, "/tmp/temp_export.prg");
+
+    songExported = 0;
+    songExportSuccessFlag = 0;
+    relocator(&gtObject, 0, 1);
+
+    if (!songExported) return 0;
+
+    FILE *f = fopen("/tmp/temp_export.prg", "rb");
+    if (!f) return 0;
+    fseek(f, 0, SEEK_END);
+    int size = ftell(f);
+    fseek(f, 0, SEEK_SET);
+    if (size > maxLen) { fclose(f); return 0; }
+    fread(outBuf, 1, size, f);
+    fclose(f);
+    return size;
+}
+
+EMSCRIPTEN_KEEPALIVE
+int gt_export_sid(unsigned char* outBuf, int maxLen) {
+    if (editorInfo.maxSIDChannels == 0) editorInfo.maxSIDChannels = 3;
+    if (editorInfo.adparam == 0) editorInfo.adparam = 0x0f00;
+    if (editorInfo.multiplier == 0) editorInfo.multiplier = 1;
+    editorInfo.optimizepulse = 1;
+    editorInfo.optimizerealtime = 1;
+    editorInfo.finevibrato = 1;
+    fileformat = FORMAT_SID;
+    playerversion = PLAYER_BUFFERED | PLAYER_AUTHORINFO;
+    zeropageadr = 0xfc;
+    playeradr = 0x1000;
+    strcpy(packedsongname, "/tmp/temp_export.sid");
+
+    songExported = 0;
+    songExportSuccessFlag = 0;
+    relocator(&gtObject, 0, 1);
+
+    if (!songExported) return 0;
+
+    FILE *f = fopen("/tmp/temp_export.sid", "rb");
     if (!f) return 0;
     fseek(f, 0, SEEK_END);
     int size = ftell(f);
