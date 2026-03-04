@@ -5,14 +5,13 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { FederatedPointerEvent } from 'pixi.js';
-import { usePixiTheme } from '../theme';
 import { usePixiDropdownStore } from '../stores/usePixiDropdownStore';
 import { PixiButton, PixiLabel, PixiViewHeader } from '../components';
 import { PixiPianoKeyboard } from './pianoroll/PixiPianoKeyboard';
 import { PixiPianoRollGrid } from './pianoroll/PixiPianoRollGrid';
 import { PixiScrollbar } from './pianoroll/PixiScrollbar';
 import { PixiVelocityLane } from './pianoroll/PixiVelocityLane';
-import { usePianoRollStore, useUIStore, useTransportStore } from '@stores';
+import { usePianoRollStore, useTransportStore } from '@stores';
 import { useTrackerStore } from '@stores';
 import { useInstrumentStore } from '@stores/useInstrumentStore';
 import { useWorkbenchStore } from '@stores/useWorkbenchStore';
@@ -58,7 +57,6 @@ export const PixiPianoRollView: React.FC<{ isActive?: boolean; windowId?: string
   const [noteLength, setNoteLength] = useState(4);
   const noteLengthRef = useRef(noteLength);
   useEffect(() => { noteLengthRef.current = noteLength; }, [noteLength]);
-  const theme = usePixiTheme();
   const tool = usePianoRollStore(s => s.tool);
   const setTool = usePianoRollStore(s => s.setTool);
   const view = usePianoRollStore(s => s.view);
@@ -315,10 +313,9 @@ export const PixiPianoRollView: React.FC<{ isActive?: boolean; windowId?: string
       if (key === 'enter') {
         const chordPitches = store.chordBuffer;
         if (chordPitches.length > 0) {
-          const gridStep = Math.max(1, Math.floor(4 / store.view.gridDivision));
           const startRow = Math.floor(store.view.scrollX);
           chordPitches.forEach(pitch => {
-            pianoData.addNote(pitch, startRow, gridStep, 100);
+            pianoData.addNote(pitch, startRow, noteLengthRef.current, 100);
           });
           store.clearChordBuffer();
           handleNotesChanged();
@@ -405,8 +402,7 @@ export const PixiPianoRollView: React.FC<{ isActive?: boolean; windowId?: string
         if (semitone != null) {
           const baseOctave = 4; // C4 = MIDI 60
           const midiNote = baseOctave * 12 + semitone;
-          const gridStep = Math.max(1, Math.floor(4 / store.view.gridDivision));
-          pianoData.addNote(midiNote, Math.floor(store.view.scrollX), gridStep, 100);
+          pianoData.addNote(midiNote, Math.floor(store.view.scrollX), noteLengthRef.current, 100);
           handleNotesChanged();
           e.preventDefault();
         }
@@ -473,8 +469,7 @@ export const PixiPianoRollView: React.FC<{ isActive?: boolean; windowId?: string
     } else {
       // Plain click in draw mode: insert a single note at current scroll position
       if (store.tool === 'draw') {
-        const gridStep = Math.max(1, Math.floor(4 / store.view.gridDivision));
-        pianoData.addNote(pitch, Math.floor(store.view.scrollX), gridStep, 100);
+        pianoData.addNote(pitch, Math.floor(store.view.scrollX), noteLengthRef.current, 100);
         handleNotesChanged();
       }
     }
@@ -598,6 +593,12 @@ export const PixiPianoRollView: React.FC<{ isActive?: boolean; windowId?: string
           variant="ghost"
           size="sm"
           onClick={handleCycleGrid}
+        />
+        <PixiButton
+          label={`Len:${NOTE_LENGTH_LABELS[NOTE_LENGTH_PRESETS.indexOf(noteLength)]}`}
+          variant="ghost"
+          size="sm"
+          onClick={handleCycleNoteLength}
         />
         <PixiButton
           label={view.snapToGrid ? 'Snap:ON' : 'Snap:OFF'}

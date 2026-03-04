@@ -224,7 +224,7 @@ export const PixiPadEditor: React.FC<PixiPadEditorProps> = ({ padId, width, onCl
   if (!pad) {
     return (
       <Div className="flex-col items-center justify-center" layout={{ width, height: 120 }}>
-        <Txt className="text-xs text-text-muted">Pad {padId} not found</Txt>
+        <Txt className="text-xs text-text-muted">{`Pad ${padId} not found`}</Txt>
       </Div>
     );
   }
@@ -247,7 +247,8 @@ export const PixiPadEditor: React.FC<PixiPadEditorProps> = ({ padId, width, onCl
       <Div
         className="flex-row items-center justify-between"
         layout={{
-          paddingX: 10,
+          paddingLeft: 10,
+          paddingRight: 10,
           paddingY: 8,
           borderBottomWidth: 1,
           borderColor: theme.border.color,

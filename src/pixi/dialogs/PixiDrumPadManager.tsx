@@ -29,7 +29,7 @@ import { getAudioContext, resumeAudioContext } from '../../audio/AudioContextSin
 import { PixiButton } from '../components';
 import { PixiSelect, type SelectOption } from '../components/PixiSelect';
 import { PixiCheckbox } from '../components';
-import { PixiViewHeader, VIEW_HEADER_HEIGHT } from '../components/PixiViewHeader';
+import { PixiViewHeader } from '../components/PixiViewHeader';
 import { PixiSlider } from '../components/PixiSlider';
 import { PixiPadEditor } from './PixiPadEditor';
 import { usePixiTheme } from '../theme';
@@ -193,7 +193,6 @@ const PadCell: React.FC<PadCellProps> = React.memo(({ pad, selected, focused, ve
       cursor="pointer"
       onPointerDown={handlePointerDown}
       onPointerUp={handlePointerUp}
-      onPointerUpOutside={handlePointerUp}
       onPointerOver={() => setHovered(true)}
       onPointerOut={() => { setHovered(false); setPressed(false); }}
     >
@@ -233,13 +232,13 @@ const PadCell: React.FC<PadCellProps> = React.memo(({ pad, selected, focused, ve
       {/* Badges — bottom-left */}
       <Div layout={{ position: 'absolute', left: 4, bottom: 3, flexDirection: 'row', gap: 2 }}>
         {pad.muteGroup > 0 && (
-          <Txt className="text-[8px] font-mono" style={{ color: 0xfbbf24 }}>{`M${pad.muteGroup}`}</Txt>
+          <Txt className="text-[8px] font-mono text-[#fbbf24]">{`M${pad.muteGroup}`}</Txt>
         )}
         {pad.playMode === 'sustain' && (
-          <Txt className="text-[8px] font-mono" style={{ color: 0x60a5fa }}>S</Txt>
+          <Txt className="text-[8px] font-mono text-[#60a5fa]">S</Txt>
         )}
         {pad.reverse && (
-          <Txt className="text-[8px] font-mono" style={{ color: 0xa78bfa }}>R</Txt>
+          <Txt className="text-[8px] font-mono text-[#a78bfa]">R</Txt>
         )}
       </Div>
 

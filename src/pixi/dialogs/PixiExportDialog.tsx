@@ -88,19 +88,37 @@ const FORMAT_EXTENSIONS: Record<ExportMode, string> = {
   nano: '.dbn',
 };
 
+const MOD_CHANNEL_OPTIONS: SelectOption[] = [
+  { value: '4', label: '4 Channel (M.K.)' },
+  { value: '6', label: '6 Channel (6CHN)' },
+  { value: '8', label: '8 Channel (8CHN)' },
+];
+
+const CHIP_FORMAT_DESCRIPTIONS: Record<string, string> = {
+  vgm: 'Video Game Music — multi-chip, custom loop support',
+  gym: 'Genesis YM2612 — Sega Genesis/Mega Drive audio',
+  nsf: 'NES Sound Format — Nintendo 8-bit audio',
+  gbs: 'Game Boy Sound — original Game Boy audio',
+  spc: 'SPC700 — Super Nintendo audio processor',
+  zsm: 'ZSM — Commander X16 audio',
+  sap: 'SAP — Atari 8-bit POKEY audio',
+  tiuna: 'TIAUna — Atari 2600 TIA audio',
+};
+
 // ── Component ──────────────────────────────────────────────────────────────────
 
 export const PixiExportDialog: React.FC<PixiExportDialogProps> = ({ isOpen, onClose }) => {
   const theme = usePixiTheme();
 
   // ── Store hooks ────────────────────────────────────────────────────────────
-  const { patterns, currentPatternIndex, importPattern, setCurrentPattern, loadPatterns } = useTrackerStore();
+  const { patterns, currentPatternIndex, originalModuleData, importPattern, setCurrentPattern, loadPatterns } = useTrackerStore();
   const { instruments, currentInstrumentId, addInstrument, setCurrentInstrument, loadInstruments } = useInstrumentStore();
   const { metadata, setMetadata } = useProjectStore();
-  const { bpm, setBPM, isPlaying, stop } = useTransportStore();
+  const { bpm, setBPM, isPlaying, stop, currentRow } = useTransportStore();
   const { curves, loadCurves } = useAutomationStore();
   const { masterEffects, setMasterEffects } = useAudioStore();
   const modalData = useUIStore((s) => s.modalData);
+  const arrangementClips = useArrangementStore(s => s.clips);
 
   // ── Local state ────────────────────────────────────────────────────────────
   const [dialogMode, setDialogMode] = useState<DialogMode>('export');
@@ -139,12 +157,34 @@ export const PixiExportDialog: React.FC<PixiExportDialogProps> = ({ isOpen, onCl
   const chipLogDataRef = useRef<Uint8Array | null>(null);
   const chipSessionRef = useRef<any>(null);
 
+  // XM/MOD export warnings
+  const [exportWarnings, setExportWarnings] = useState<string[]>([]);
+
+  // Chip extended state
+  const [chipRecordingTime, setChipRecordingTime] = useState(0);
+  const [chipLoopPoint, setChipLoopPoint] = useState(0);
+  const [chipWrites, setChipWrites] = useState<any[]>([]);
+  const [chipStats, setChipStats] = useState<{ duration: number; totalWrites: number; usedChips: { name: string; writes: number; type: number }[] } | null>(null);
+  const [availableChipFormats, setAvailableChipFormats] = useState<string[]>([]);
+
   // Auto-select audio scope when opened from arrangement toolbar
   useEffect(() => {
     if (isOpen && modalData?.audioScope === 'arrangement') {
       setExportMode('audio');
     }
   }, [isOpen, modalData]);
+
+  // Chip recording timer
+  useEffect(() => {
+    if (!chipIsRecording) return;
+    const interval = setInterval(() => setChipRecordingTime(t => t + 0.1), 100);
+    return () => clearInterval(interval);
+  }, [chipIsRecording]);
+
+  // Clear export warnings when export mode changes
+  useEffect(() => {
+    setExportWarnings([]);
+  }, [exportMode]);
 
   // ── Derived data ───────────────────────────────────────────────────────────
   const patternOptions: SelectOption[] = useMemo(
@@ -177,6 +217,20 @@ export const PixiExportDialog: React.FC<PixiExportDialogProps> = ({ isOpen, onCl
         const logData = await chipSessionRef.current.stopRecording();
         chipLogDataRef.current = logData;
         setChipIsRecording(false);
+        setChipRecordingTime(0);
+        // Parse writes and detect available formats
+        if (logData.length > 0) {
+          const { parseRegisterLog, getAvailableFormats, getLogStatistics } = await import('@lib/export/ChipExporter');
+          const writes = parseRegisterLog(logData);
+          setChipWrites(writes);
+          const stats = getLogStatistics(writes);
+          setChipStats(stats);
+          const formats = getAvailableFormats(writes);
+          setAvailableChipFormats(formats.map(String));
+          if (formats.length > 0 && !formats.includes(chipFormat as any)) {
+            setChipFormat(formats[0]);
+          }
+        }
       }
     } else {
       const { ChipRecordingSession } = await import('@lib/export/ChipExporter');
@@ -184,8 +238,12 @@ export const PixiExportDialog: React.FC<PixiExportDialogProps> = ({ isOpen, onCl
       chipSessionRef.current.startRecording();
       chipLogDataRef.current = null;
       setChipIsRecording(true);
+      setChipRecordingTime(0);
+      setChipWrites([]);
+      setChipStats(null);
+      setAvailableChipFormats([]);
     }
-  }, [chipIsRecording]);
+  }, [chipIsRecording, chipFormat]);
 
   // ── Export handler ─────────────────────────────────────────────────────────
   const handleExport = useCallback(async () => {
@@ -244,7 +302,29 @@ export const PixiExportDialog: React.FC<PixiExportDialogProps> = ({ isOpen, onCl
           const { exportPatternAsWav, exportSongAsWav, getUADEInstrument, exportUADEAsWav } = await import('@lib/export/audioExport');
           setIsRendering(true);
           try {
-            if (audioScope === 'arrangement') {
+            // Check UADE instrument first (matches DOM AudioExportPanel logic)
+            const uadeInst = getUADEInstrument(instruments);
+            if (uadeInst && (uadeInst as any).uade?.fileData) {
+              await exportUADEAsWav(
+                (uadeInst as any).uade.fileData,
+                (uadeInst as any).uade.filename || 'song',
+                `${metadata.name || 'song'}.wav`,
+                (uadeInst as any).uade.currentSubsong ?? 0,
+                (p: number) => setRenderProgress(p),
+              );
+            } else if (originalModuleData?.base64) {
+              const binaryStr = atob(originalModuleData.base64);
+              const bytes = new Uint8Array(binaryStr.length);
+              for (let i = 0; i < binaryStr.length; i++) bytes[i] = binaryStr.charCodeAt(i);
+              const sourceFilename = originalModuleData.sourceFile || `module.${originalModuleData.format.toLowerCase()}`;
+              await exportUADEAsWav(
+                bytes.buffer,
+                sourceFilename,
+                `${metadata.name || 'song'}.wav`,
+                0,
+                (p: number) => setRenderProgress(p),
+              );
+            } else if (audioScope === 'arrangement') {
               const clips = useArrangementStore.getState?.()?.clips ?? [];
               if (clips.length > 0) {
                 const patternIdToIndex = new Map(patterns.map((p, i) => [p.id, i]));
@@ -252,27 +332,22 @@ export const PixiExportDialog: React.FC<PixiExportDialogProps> = ({ isOpen, onCl
                   .filter((c: any) => !c.muted)
                   .sort((a: any, b: any) => a.startRow - b.startRow)
                   .map((c: any) => patternIdToIndex.get(c.patternId) ?? 0);
+                if (sequence.length === 0) {
+                  notify.warning('No unmuted clips in arrangement to export');
+                  break;
+                }
                 await exportSongAsWav(patterns, sequence, instruments, bpm, metadata.name || 'arrangement', (p: number) => setRenderProgress(p));
               } else {
-                const sequence = patterns.map((_: any, i: number) => i);
-                await exportSongAsWav(patterns, sequence, instruments, bpm, metadata.name || 'song', (p: number) => setRenderProgress(p));
+                notify.warning('No clips in arrangement to export');
+                break;
               }
             } else if (audioScope === 'song') {
-              const uadeInst = getUADEInstrument(instruments);
-              if (uadeInst && (uadeInst as any).uade?.fileData) {
-                await exportUADEAsWav((uadeInst as any).uade.fileData, (uadeInst as any).uade.filename || 'song', metadata.name || 'song', 0, (p: number) => setRenderProgress(p));
-              } else {
-                const sequence = patterns.map((_: any, i: number) => i);
-                await exportSongAsWav(patterns, sequence, instruments, bpm, metadata.name || 'song', (p: number) => setRenderProgress(p));
-              }
+              const sequence = patterns.map((_: any, i: number) => i);
+              await exportSongAsWav(patterns, sequence, instruments, bpm, metadata.name || 'song', (p: number) => setRenderProgress(p));
             } else {
               const pattern = patterns[selectedPatternIndex];
-              const uadeInst = getUADEInstrument(instruments);
-              if (uadeInst && (uadeInst as any).uade?.fileData) {
-                await exportUADEAsWav((uadeInst as any).uade.fileData, (uadeInst as any).uade.filename || 'pattern', `${metadata.name || 'pattern'}_${selectedPatternIndex}`, 0, (p: number) => setRenderProgress(p));
-              } else {
-                await exportPatternAsWav(pattern, instruments, bpm, `${metadata.name || 'pattern'}_${selectedPatternIndex}`, (p: number) => setRenderProgress(p));
-              }
+              if (!pattern) { notify.warning('Please select a valid pattern'); break; }
+              await exportPatternAsWav(pattern, instruments, bpm, `${metadata.name || 'pattern'}_${selectedPatternIndex}`, (p: number) => setRenderProgress(p));
             }
             notify.success('Audio exported!');
             onClose();
@@ -294,7 +369,7 @@ export const PixiExportDialog: React.FC<PixiExportDialogProps> = ({ isOpen, onCl
           } else {
             midiData = exportPatternToMIDI(patterns[selectedPatternIndex], bpm, timeSignature, midiOptions);
           }
-          downloadFile(new Blob([midiData], { type: 'audio/midi' }), `${metadata.name || 'song'}.mid`);
+          downloadFile(new Blob([midiData.buffer.slice(midiData.byteOffset, midiData.byteOffset + midiData.byteLength)], { type: 'audio/midi' }), `${metadata.name || 'song'}.mid`);
           notify.success('MIDI exported!');
           onClose();
           break;
@@ -303,20 +378,28 @@ export const PixiExportDialog: React.FC<PixiExportDialogProps> = ({ isOpen, onCl
         case 'xm': {
           const { exportAsXM } = await import('@lib/export/XMExporter');
           const result = await exportAsXM(patterns, instruments, { channelLimit: xmChannels, bakeSynthsToSamples: bakeSynths, moduleName: metadata.name || 'song' });
-          if (result.warnings?.length) result.warnings.forEach((w: string) => notify.warning(w));
           downloadFile(result.data, result.filename || `${metadata.name || 'song'}.xm`);
-          notify.success('XM module exported!');
-          onClose();
+          if (result.warnings?.length) {
+            setExportWarnings(result.warnings);
+            notify.warning(`XM exported with ${result.warnings.length} warnings`);
+          } else {
+            notify.success('XM module exported!');
+            onClose();
+          }
           break;
         }
 
         case 'mod': {
           const { exportAsMOD } = await import('@lib/export/MODExporter');
           const result = await exportAsMOD(patterns, instruments, { channelCount: modChannels, bakeSynthsToSamples: bakeSynths, moduleName: metadata.name || 'song' });
-          if (result.warnings?.length) result.warnings.forEach((w: string) => notify.warning(w));
           downloadFile(result.data, result.filename || `${metadata.name || 'song'}.mod`);
-          notify.success('MOD module exported!');
-          onClose();
+          if (result.warnings?.length) {
+            setExportWarnings(result.warnings);
+            notify.warning(`MOD exported with ${result.warnings.length} warnings`);
+          } else {
+            notify.success('MOD module exported!');
+            onClose();
+          }
           break;
         }
 
@@ -324,7 +407,11 @@ export const PixiExportDialog: React.FC<PixiExportDialogProps> = ({ isOpen, onCl
           const { exportChipMusic } = await import('@lib/export/ChipExporter');
           const chipLogData = chipLogDataRef.current;
           if (!chipLogData) { notify.warning('No chip data recorded. Press Record and play your song first.'); break; }
-          const chipResult = await exportChipMusic(chipLogData, { format: chipFormat as any, title: chipTitle, author: chipAuthor, loopPoint: undefined });
+          const rowsPerBeat = 4;
+          const beatsPerSecond = bpm / 60;
+          const secondsPerRow = 1 / (beatsPerSecond * rowsPerBeat);
+          const loopPointSamples = chipLoopPoint > 0 ? Math.floor(chipLoopPoint * secondsPerRow * 44100) : undefined;
+          const chipResult = await exportChipMusic(chipLogData, { format: chipFormat as any, title: chipTitle || metadata.name || 'Untitled', author: chipAuthor || metadata.author || 'Unknown', loopPoint: loopPointSamples });
           downloadFile(chipResult.data, chipResult.filename || `${metadata.name || 'song'}.${chipFormat}`);
           notify.success(`${chipFormat.toUpperCase()} chip music exported!`);
           onClose();
@@ -339,9 +426,9 @@ export const PixiExportDialog: React.FC<PixiExportDialogProps> = ({ isOpen, onCl
       notify.error('Export failed: ' + (error as Error).message);
     }
   }, [exportMode, patterns, instruments, metadata, bpm, curves, masterEffects, options,
-      selectedPatternIndex, selectedInstrumentId, sfxName, onClose,
+      selectedPatternIndex, selectedInstrumentId, sfxName, onClose, originalModuleData,
       audioScope, midiScope, midiFormat, midiIncludeAutomation,
-      xmChannels, bakeSynths, modChannels, chipFormat, chipTitle, chipAuthor]);
+      xmChannels, bakeSynths, modChannels, chipFormat, chipTitle, chipAuthor, chipLoopPoint]);
 
   // ── Import handler ─────────────────────────────────────────────────────────
   const handleImport = useCallback(async () => {
@@ -612,9 +699,25 @@ export const PixiExportDialog: React.FC<PixiExportDialogProps> = ({ isOpen, onCl
                   </layoutContainer>
                 )}
 
+                {/* Metadata display */}
+                <PixiLabel text="Format: WAV 16-bit 44.1kHz" size="xs" font="mono" color="textMuted" />
+                {audioScope === 'arrangement' ? (
+                  <>
+                    <PixiLabel text={`BPM: ${bpm} · Clips: ${arrangementClips.filter((c: any) => !c.muted).length} unmuted`} size="xs" font="mono" color="textMuted" />
+                  </>
+                ) : audioScope === 'song' ? (
+                  <>
+                    <PixiLabel text={`BPM: ${bpm} · Patterns: ${patterns.length}`} size="xs" font="mono" color="textMuted" />
+                    <PixiLabel text={`Total Rows: ${patterns.reduce((sum, p) => sum + p.length, 0)}`} size="xs" font="mono" color="textMuted" />
+                  </>
+                ) : (
+                  <PixiLabel text={`BPM: ${bpm} · Rows: ${patterns[selectedPatternIndex]?.channels[0]?.rows?.length ?? 0}`} size="xs" font="mono" color="textMuted" />
+                )}
+
                 {isRendering && (
-                  <layoutContainer layout={{ flexDirection: 'row', alignItems: 'center', gap: 8, width: CONTENT_W - 24 }}>
-                    <PixiLabel text={`Rendering: ${Math.round(renderProgress * 100)}%`} size="xs" color="accent" />
+                  <layoutContainer layout={{ width: CONTENT_W - 24, height: 16, borderRadius: 4, borderWidth: 1, borderColor: theme.border.color, overflow: 'hidden' }}>
+                    <pixiGraphics draw={(g: any) => { g.clear(); g.rect(0, 0, (CONTENT_W - 26) * renderProgress, 14).fill(theme.accent.color); }} />
+                    <PixiLabel text={`Rendering: ${Math.round(renderProgress * 100)}%`} size="xs" color="text" layout={{ position: 'absolute', left: 4, top: 1 }} />
                   </layoutContainer>
                 )}
               </layoutContainer>
@@ -681,6 +784,13 @@ export const PixiExportDialog: React.FC<PixiExportDialogProps> = ({ isOpen, onCl
                     onChange={(v) => setMidiIncludeAutomation(v)}
                   />
                 </layoutContainer>
+
+                {/* Metadata display */}
+                <PixiLabel text={`Format: MIDI Type ${midiFormat} · Resolution: 480 PPQ`} size="xs" font="mono" color="textMuted" />
+                <PixiLabel text={`BPM: ${bpm} · Channels: ${patterns[0]?.channels?.length ?? 0}`} size="xs" font="mono" color="textMuted" />
+                {midiScope === 'song' && (
+                  <PixiLabel text={`Patterns: ${patterns.length}`} size="xs" font="mono" color="textMuted" />
+                )}
               </layoutContainer>
             )}
 
@@ -719,6 +829,19 @@ export const PixiExportDialog: React.FC<PixiExportDialogProps> = ({ isOpen, onCl
                     onChange={(v) => setBakeSynths(v)}
                   />
                 </layoutContainer>
+
+                {/* Metadata display */}
+                <PixiLabel text={`Format: FastTracker II · Patterns: ${patterns.length} · Channels: ${xmChannels} · Max Instruments: 128`} size="xs" font="mono" color="textMuted" />
+
+                {/* Warnings display */}
+                {exportWarnings.length > 0 && (
+                  <layoutContainer layout={{ flexDirection: 'column', gap: 4, padding: 8, borderRadius: 4, borderWidth: 1, borderColor: 0xff8800, backgroundColor: 0x332200, width: CONTENT_W - 24, maxHeight: 100 }}>
+                    <PixiLabel text={`Export Warnings (${exportWarnings.length})`} size="xs" weight="bold" color="custom" customColor={0xff8800} />
+                    {exportWarnings.map((w, i) => (
+                      <PixiLabel key={i} text={`• ${w}`} size="xs" color="textMuted" layout={{ maxWidth: CONTENT_W - 44 }} />
+                    ))}
+                  </layoutContainer>
+                )}
               </layoutContainer>
             )}
 
@@ -741,11 +864,7 @@ export const PixiExportDialog: React.FC<PixiExportDialogProps> = ({ isOpen, onCl
                 <layoutContainer layout={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: CONTENT_W - 24 }}>
                   <PixiLabel text="Channels" size="xs" color="textMuted" />
                   <PixiSelect
-                    options={[
-                      { value: '4', label: '4 Channels' },
-                      { value: '6', label: '6 Channels' },
-                      { value: '8', label: '8 Channels' },
-                    ]}
+                    options={MOD_CHANNEL_OPTIONS}
                     value={String(modChannels)}
                     onChange={(v) => setModChannels(Number(v) as 4 | 6 | 8)}
                     width={200}
@@ -759,6 +878,19 @@ export const PixiExportDialog: React.FC<PixiExportDialogProps> = ({ isOpen, onCl
                     onChange={(v) => setBakeSynths(v)}
                   />
                 </layoutContainer>
+
+                {/* Metadata display */}
+                <PixiLabel text={`Format: ProTracker (${modChannels === 4 ? 'M.K.' : modChannels === 6 ? '6CHN' : '8CHN'}) · Max Samples: 31 · Max Rows: 64 · Notes: C-0 to B-3`} size="xs" font="mono" color="textMuted" />
+
+                {/* Warnings display */}
+                {exportWarnings.length > 0 && (
+                  <layoutContainer layout={{ flexDirection: 'column', gap: 4, padding: 8, borderRadius: 4, borderWidth: 1, borderColor: 0xff8800, backgroundColor: 0x332200, width: CONTENT_W - 24, maxHeight: 100 }}>
+                    <PixiLabel text={`Export Warnings (${exportWarnings.length})`} size="xs" weight="bold" color="custom" customColor={0xff8800} />
+                    {exportWarnings.map((w, i) => (
+                      <PixiLabel key={i} text={`• ${w}`} size="xs" color="textMuted" layout={{ maxWidth: CONTENT_W - 44 }} />
+                    ))}
+                  </layoutContainer>
+                )}
               </layoutContainer>
             )}
 
@@ -778,6 +910,49 @@ export const PixiExportDialog: React.FC<PixiExportDialogProps> = ({ isOpen, onCl
               >
                 <PixiLabel text="Chip Music Export" size="sm" weight="bold" color="accent" />
 
+                {/* Recording controls */}
+                <layoutContainer layout={{ flexDirection: 'row', alignItems: 'center', gap: 8, width: CONTENT_W - 24 }}>
+                  <PixiButton
+                    label={chipIsRecording ? 'Stop Recording' : 'Record'}
+                    variant={chipIsRecording ? 'danger' : 'primary'}
+                    onClick={handleChipRecord}
+                  />
+                  {chipIsRecording && (
+                    <PixiLabel
+                      text={`${Math.floor(chipRecordingTime / 60)}:${(chipRecordingTime % 60).toFixed(1).padStart(4, '0')}`}
+                      size="sm"
+                      font="mono"
+                      weight="bold"
+                      color="accent"
+                    />
+                  )}
+                  {chipIsRecording && (
+                    <PixiLabel text="Recording... play your song now" size="xs" color="warning" />
+                  )}
+                  {chipLogDataRef.current && !chipIsRecording && (
+                    <PixiLabel text="Recording ready" size="xs" color="accent" />
+                  )}
+                </layoutContainer>
+
+                {/* Statistics display */}
+                {chipStats && !chipIsRecording && (
+                  <layoutContainer layout={{ flexDirection: 'column', gap: 4, padding: 8, borderRadius: 4, borderWidth: 1, borderColor: theme.border.color, backgroundColor: theme.bg.color, width: CONTENT_W - 24 }}>
+                    <PixiLabel text="Captured Data" size="xs" weight="bold" color="accent" />
+                    <PixiLabel text={`Duration: ${chipStats.duration.toFixed(1)}s`} size="xs" font="mono" color="text" />
+                    <PixiLabel text={`Total Writes: ${chipStats.totalWrites.toLocaleString()}`} size="xs" font="mono" color="text" />
+                    {chipStats.usedChips.map((chip) => (
+                      <PixiLabel key={chip.type} text={`  ${chip.name}: ${chip.writes.toLocaleString()} writes`} size="xs" font="mono" color="textMuted" />
+                    ))}
+                  </layoutContainer>
+                )}
+
+                {/* Quick format presets */}
+                <layoutContainer layout={{ flexDirection: 'row', gap: 4, flexWrap: 'wrap', width: CONTENT_W - 24 }}>
+                  {(['vgm', 'gym', 'nsf', 'gbs'] as const).map(fmt => (
+                    <PixiButton key={fmt} label={fmt.toUpperCase()} variant={chipFormat === fmt ? 'primary' : 'ghost'} width={60} onClick={() => setChipFormat(fmt)} />
+                  ))}
+                </layoutContainer>
+
                 <layoutContainer layout={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: CONTENT_W - 24 }}>
                   <PixiLabel text="Format" size="xs" color="textMuted" />
                   <PixiSelect
@@ -796,6 +971,22 @@ export const PixiExportDialog: React.FC<PixiExportDialogProps> = ({ isOpen, onCl
                     width={200}
                   />
                 </layoutContainer>
+
+                {/* Format description */}
+                <PixiLabel text={CHIP_FORMAT_DESCRIPTIONS[chipFormat] || ''} size="xs" font="mono" color="textMuted" />
+
+                {/* Loop support indicator */}
+                {(() => {
+                  const loopSupport = chipFormat === 'vgm' ? 'custom' : ['nsf', 'gbs'].includes(chipFormat) ? 'auto' : 'none';
+                  return (
+                    <PixiLabel
+                      text={loopSupport === 'custom' ? 'Custom loop point supported' : loopSupport === 'auto' ? 'Auto-loop (entire song)' : 'No loop support'}
+                      size="xs"
+                      color="custom"
+                      customColor={loopSupport === 'custom' ? 0x44ff44 : loopSupport === 'auto' ? 0xffaa00 : 0xff4444}
+                    />
+                  );
+                })()}
 
                 <layoutContainer layout={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: CONTENT_W - 24 }}>
                   <PixiLabel text="Title" size="xs" color="textMuted" />
@@ -817,19 +1008,27 @@ export const PixiExportDialog: React.FC<PixiExportDialogProps> = ({ isOpen, onCl
                   />
                 </layoutContainer>
 
+                {/* Loop point */}
                 <layoutContainer layout={{ flexDirection: 'row', alignItems: 'center', gap: 8, width: CONTENT_W - 24 }}>
-                  <PixiButton
-                    label={chipIsRecording ? 'Stop Recording' : 'Record'}
-                    variant={chipIsRecording ? 'danger' : 'primary'}
-                    onClick={handleChipRecord}
+                  <PixiLabel text="Loop Row" size="xs" color="textMuted" />
+                  <PixiNumericInput
+                    value={chipLoopPoint}
+                    min={0}
+                    max={9999}
+                    step={1}
+                    onChange={setChipLoopPoint}
+                    width={80}
                   />
-                  {chipLogDataRef.current && !chipIsRecording && (
-                    <PixiLabel text="Recording ready" size="xs" color="accent" />
-                  )}
-                  {chipIsRecording && (
-                    <PixiLabel text="Recording... play your song now" size="xs" color="warning" />
-                  )}
+                  <PixiButton label="From Cursor" variant="ghost" width={90} onClick={() => {
+                    setChipLoopPoint(currentRow);
+                  }} />
                 </layoutContainer>
+                <PixiLabel
+                  text={chipLoopPoint > 0 ? `Music will loop back to row ${chipLoopPoint}` : 'Set to 0 for no loop (one-shot playback)'}
+                  size="xs"
+                  font="mono"
+                  color="textMuted"
+                />
               </layoutContainer>
             )}
 
