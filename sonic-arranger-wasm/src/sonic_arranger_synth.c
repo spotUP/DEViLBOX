@@ -173,6 +173,7 @@ typedef struct {
     uint16_t     currentPeriod;
     uint16_t     targetPeriod;
     uint16_t     previousPeriod;
+    uint16_t     portamentoPeriod;  /* persistent glide state (ref: PortamentoPeriod) */
 
     /* Volume slide */
     int16_t      volumeSlideSpeed;
@@ -239,48 +240,77 @@ static int findBestPeriodIndex(double targetPeriod) {
 
 /* ── Per-tick pipeline helpers ────────────────────────────────────────────── */
 
+/**
+ * Arpeggio — ref: DoArpeggio (lines 1435-1500)
+ *
+ * activeArpTable semantics (matching reference voiceInfo.Arpeggio):
+ *   0 = NO instrument arpeggio (falls through to XM-style 0xy if effect present)
+ *   1,2,3 = use instrument arpeggio table 0,1,2 respectively
+ */
 static void doArpeggio(SAPlayer *p) {
-    int tbl = p->activeArpTable;
+    if (p->activeArpTable == 0) return;  /* 0 = no instrument arp */
+
+    int tbl = p->activeArpTable - 1;  /* 1-indexed → 0-indexed */
     if (tbl < 0 || tbl > 2) return;
 
     SAArpTable *at = &p->ins.arpTables[tbl];
-    if (at->length == 0) return;
 
-    int offset = at->values[p->arpPosition];
-    /* baseNote is already an SA period table index (set by sa_note_on) */
-    int saIndex = clamp_i(p->baseNote + offset, 1, 108);
+    int8_t arpVal = at->values[p->arpPosition];
+    int saIndex = clamp_i(p->baseNote + arpVal, 0, 108);
     p->currentPeriod = PERIOD_TABLE[saIndex];
 
     p->arpPosition++;
-    if (p->arpPosition >= at->length) {
-        if (at->repeat > 0 && at->repeat <= at->length) {
-            p->arpPosition = at->repeat - 1;
-        } else {
-            p->arpPosition = 0;
-        }
+
+    /* Ref: maxLength = min(Length + Repeat, 13); wraps to Length */
+    int maxLength = at->length + at->repeat;
+    if (maxLength > 13) maxLength = 13;
+    if (p->arpPosition > maxLength) {
+        p->arpPosition = at->length;
     }
 }
 
+/**
+ * Portamento — ref: DoPortamento (lines 1510-1537)
+ *
+ * Reference uses a persistent PortamentoPeriod that starts at previousPeriod
+ * and glides toward currentPeriod. When |diff| < speed, speed is set to 0
+ * (arrived at target).
+ */
 static void doPortamento(SAPlayer *p) {
     if (p->ins.portamentoSpeed == 0) return;
-    if (p->currentPeriod == p->targetPeriod) return;
 
-    if (p->currentPeriod < p->targetPeriod) {
-        p->currentPeriod += p->ins.portamentoSpeed;
-        if (p->currentPeriod > p->targetPeriod)
-            p->currentPeriod = p->targetPeriod;
+    /* Lazy init from previousPeriod (ref: line 1514-1515) */
+    if (p->portamentoPeriod == 0)
+        p->portamentoPeriod = p->previousPeriod;
+
+    int diff = (int)p->currentPeriod - (int)p->portamentoPeriod;
+    if (diff < 0) diff = -diff;
+
+    diff -= (int)p->ins.portamentoSpeed;
+    if (diff < 0) {
+        /* Close enough — stop portamento */
+        p->portamentoPeriod = p->currentPeriod;
     } else {
-        if (p->currentPeriod >= p->ins.portamentoSpeed)
-            p->currentPeriod -= p->ins.portamentoSpeed;
+        uint16_t newPeriod = p->portamentoPeriod;
+        if (newPeriod >= p->currentPeriod)
+            newPeriod -= p->ins.portamentoSpeed;
         else
-            p->currentPeriod = p->targetPeriod;
-        if (p->currentPeriod < p->targetPeriod)
-            p->currentPeriod = p->targetPeriod;
+            newPeriod += p->ins.portamentoSpeed;
+
+        p->portamentoPeriod = newPeriod;
+        p->currentPeriod = newPeriod;
     }
 }
 
+/**
+ * Vibrato — ref: DoVibrato (lines 1546-1563)
+ *
+ * Reference formula: period += (vibVal * 4) / vibLevel
+ * vibratoDelay == 255 means permanently disabled.
+ * Higher vibLevel = LESS depth (it's a divisor).
+ */
 static void doVibrato(SAPlayer *p) {
-    if (p->ins.vibratoLevel == 0 || p->ins.vibratoSpeed == 0) return;
+    if (p->vibratoDelayCtr == 255) return;  /* permanently disabled */
 
     if (p->vibratoDelayCtr > 0) {
         p->vibratoDelayCtr--;
@@ -288,55 +318,56 @@ static void doVibrato(SAPlayer *p) {
     }
 
     int vibVal = VIBRATO_TABLE[p->vibratoPosition & 0xFF];
-    int mod = (vibVal * (int)p->ins.vibratoLevel) >> 7;
-    /* Apply to period: positive vibrato value lowers pitch (increases period) */
-    int newPeriod = (int)p->currentPeriod + mod;
-    if (newPeriod < 28) newPeriod = 28;
-    if (newPeriod > 13696) newPeriod = 13696;
-    p->currentPeriod = (uint16_t)newPeriod;
+    uint16_t vibLevel = p->ins.vibratoLevel;
 
-    p->vibratoPosition += p->ins.vibratoSpeed;
-    /* vibratoPosition wraps naturally at 16-bit boundary;
-       we mask to 8 bits when indexing the table */
+    if (vibVal != 0 && vibLevel != 0) {
+        int mod = (vibVal * 4) / (int)vibLevel;
+        int newPeriod = (int)p->currentPeriod + mod;
+        if (newPeriod < 113) newPeriod = 113;
+        if (newPeriod > 13696) newPeriod = 13696;
+        p->currentPeriod = (uint16_t)newPeriod;
+    }
+
+    p->vibratoPosition = (uint16_t)((p->vibratoPosition + p->ins.vibratoSpeed) & 0xFF);
 }
 
 static void doAmf(SAPlayer *p) {
-    if (p->ins.amfLength == 0) return;
+    if (p->ins.amfLength + p->ins.amfRepeat == 0) return;
 
-    if (p->amfDelayCounter > 0) {
-        p->amfDelayCounter--;
-        return;
-    }
+    int8_t amfVal = p->ins.amfTable[p->amfPosition];
 
-    p->amfValue = p->ins.amfTable[p->amfPosition];
-
-    /* Apply AMF as period modulation */
-    int newPeriod = (int)p->currentPeriod + p->amfValue;
+    /* Apply AMF as period modulation (subtraction, matching reference) */
+    int newPeriod = (int)p->currentPeriod - amfVal;
     if (newPeriod < 28) newPeriod = 28;
     if (newPeriod > 13696) newPeriod = 13696;
     p->currentPeriod = (uint16_t)newPeriod;
 
-    p->amfPosition++;
+    /* Delay-reload pattern: decrement counter, advance position when it hits 0 */
+    p->amfDelayCounter--;
+    if (p->amfDelayCounter == 0) {
+        p->amfDelayCounter = p->ins.amfDelay;
 
-    /* One-shot portion: 0..amfLength-1, then loop portion: amfLength..amfLength+amfRepeat-1 */
-    uint16_t totalLen = p->ins.amfLength + p->ins.amfRepeat;
-    if (totalLen > SA_TABLE_SIZE) totalLen = SA_TABLE_SIZE;
+        p->amfPosition++;
 
-    if (p->amfPosition >= totalLen) {
-        if (p->ins.amfRepeat > 0) {
+        uint16_t totalLen = p->ins.amfLength + p->ins.amfRepeat;
+        if (totalLen > SA_TABLE_SIZE) totalLen = SA_TABLE_SIZE;
+
+        if (p->amfPosition >= totalLen) {
             p->amfPosition = p->ins.amfLength;
-        } else {
-            p->amfPosition = totalLen > 0 ? totalLen - 1 : 0;
+            if (p->ins.amfRepeat == 0 && p->amfPosition > 0)
+                p->amfPosition--;
         }
     }
 }
 
 static void doSlide(SAPlayer *p) {
-    if (p->slideValue == 0) return;
+    /* Slide subtracts from period (positive slideValue = pitch up) */
     int newPeriod = (int)p->currentPeriod - p->slideValue;
-    if (newPeriod < 28) newPeriod = 28;
+    if (newPeriod < 113) newPeriod = 113;
     if (newPeriod > 13696) newPeriod = 13696;
     p->currentPeriod = (uint16_t)newPeriod;
+    /* slideSpeed accumulates into slideValue each tick */
+    p->slideValue += p->slideSpeed;
 }
 
 /**
@@ -365,18 +396,18 @@ static void computePhaseInc(SAPlayer *p) {
 /* ── Synthesis effects (18 modes) ─────────────────────────────────────────── */
 
 static void doSynthEffect(SAPlayer *p) {
-    if (p->effectDelayCounter > 0) {
-        p->effectDelayCounter--;
-        return;
-    }
+    p->effectDelayCounter--;
+    if (p->effectDelayCounter > 0) return;
+    p->effectDelayCounter = p->ins.effectDelay;
 
     int8_t *buf = p->waveformBuffer;
     int byteLen = p->ins.waveformLength * 2;
     if (byteLen <= 0) byteLen = SA_WAVE_SIZE;
     if (byteLen > SA_WAVE_SIZE) byteLen = SA_WAVE_SIZE;
 
-    uint16_t start = 0;
-    uint16_t stop = (uint16_t)(byteLen - 1);
+    /* effectArg2/effectArg3 define start/stop range for most effects */
+    uint16_t start = p->ins.effectArg2;
+    uint16_t stop = p->ins.effectArg3;
     uint16_t pos = p->synthEffectPosition;
     uint16_t wavePos = p->synthEffectWavePosition;
 
@@ -386,240 +417,332 @@ static void doSynthEffect(SAPlayer *p) {
 
     case 1: { /* WaveNegator */
         if (pos <= stop) {
-            buf[pos] = clamp_i8(-(int)buf[pos]);
+            buf[pos] = (int8_t)(-(int)buf[pos]);
         }
         pos++;
-        if (pos > stop) pos = start;
+        if (pos >= stop) pos = start;
         break;
     }
 
-    case 2: { /* FreeNegator */
-        /* Uses secondary waveform (effectArg1) as modulation source */
-        int modWaveIdx = p->ins.effectArg1;
-        if (modWaveIdx >= p->ins.numWaveforms) modWaveIdx = 0;
-        const int8_t *modWave = p->ins.allWaveforms[modWaveIdx];
+    case 2: { /* FreeNegator — ref: DoSynthEffectFreeNegator */
+        if ((p->flag & 0x04) == 0) {
+            /* effectArg1=waveNumber, effectArg2=waveLength, effectArg3=waveRepeat */
+            uint16_t waveformNumber = p->ins.effectArg1;
+            uint16_t waveLength = p->ins.effectArg2;
+            uint16_t waveRepeat = p->ins.effectArg3;
 
-        int threshold = modWave[wavePos & (SA_WAVE_SIZE - 1)] & 0x7F;
-        /* Walk buffer: bytes above threshold copy from source; below threshold negate */
-        for (int i = (int)stop; i >= (int)start; i--) {
-            int val = (int)p->ins.waveformData[i];
-            if (abs(val) >= threshold) {
-                buf[i] = p->ins.waveformData[i];
-            } else {
-                buf[i] = clamp_i8(-val);
+            if (waveformNumber >= p->ins.numWaveforms) waveformNumber = 0;
+            const int8_t *waveform = p->ins.allWaveforms[waveformNumber];
+            int16_t waveVal = (int16_t)(waveform[wavePos & (SA_WAVE_SIZE - 1)] & 0x7F);
+
+            const int8_t *sourceWaveform = p->ins.waveformData;
+            int16_t count = (int16_t)(p->ins.waveformLength * 2);
+            if (count <= 0) count = SA_WAVE_SIZE;
+            if (count > SA_WAVE_SIZE) count = SA_WAVE_SIZE;
+
+            int bufferOffset = count;
+
+            /* Copy from source where count >= waveVal */
+            while ((count > 0) && (count >= waveVal)) {
+                bufferOffset--;
+                buf[bufferOffset] = sourceWaveform[bufferOffset];
+                count--;
+            }
+
+            /* Negate from source for the rest */
+            int16_t left = (int16_t)(waveVal - count);
+            count += left;
+            bufferOffset += left;
+
+            while (count > 0) {
+                bufferOffset--;
+                buf[bufferOffset] = (int8_t)(-(int)sourceWaveform[bufferOffset]);
+                count--;
+            }
+
+            wavePos++;
+            if (wavePos > (waveLength + waveRepeat)) {
+                wavePos = waveLength;
+                if ((waveRepeat == 0) && (waveVal == 0))
+                    p->flag |= 0x04;
             }
         }
+        break;
+    }
 
+    case 3: { /* RotateVertical — ref: DoSynthEffectRotateVertical */
+        int8_t delta = (int8_t)(p->ins.effectArg1 & 0xFF);
+        int16_t count = (int16_t)(stop - start);
+        int bufOff = (int)start;
+        while (count >= 0) {
+            buf[bufOff++] += delta;
+            count--;
+        }
+        /* IncrementSynthEffectPosition */
+        pos++;
+        if (pos >= stop) pos = start;
+        break;
+    }
+
+    case 4: { /* RotateHorizontal — ref: DoSynthEffectRotateHorizontal */
+        int16_t count = (int16_t)(stop - start);
+        int bufOff = (int)start;
+        int8_t firstByte = buf[bufOff];
+        do {
+            buf[bufOff] = buf[bufOff + 1];
+            bufOff++;
+            count--;
+        } while (count >= 0);
+        buf[bufOff] = firstByte;
+        /* IncrementSynthEffectPosition */
+        pos++;
+        if (pos >= stop) pos = start;
+        break;
+    }
+
+    case 5: { /* AlienVoice — ref: DoSynthEffectAlienVoice */
+        uint16_t waveformNumber = p->ins.effectArg1;
+        if (waveformNumber >= p->ins.numWaveforms) waveformNumber = 0;
+        const int8_t *srcWave = p->ins.allWaveforms[waveformNumber];
+        int bufOff = (int)start;
+        int16_t count = (int16_t)(stop - start);
+        while (count >= 0) {
+            buf[bufOff] += srcWave[bufOff];
+            bufOff++;
+            count--;
+        }
+        /* No IncrementSynthEffectPosition in reference */
+        break;
+    }
+
+    case 6: { /* PolyNegator — ref: DoSynthEffectPolyNegator */
+        buf[pos] = p->ins.waveformData[pos];
+        if (pos >= stop)
+            pos = (uint16_t)(start > 0 ? start - 1 : 0);
+        buf[pos + 1] = (int8_t)(-(int)buf[pos + 1]);
+        /* IncrementSynthEffectPosition */
+        pos++;
+        if (pos >= stop) pos = start;
+        break;
+    }
+
+    case 7: { /* ShackWave1 — ref: DoSynthEffectShackWave1 */
+        uint16_t waveformNumber = p->ins.effectArg1;
+        if (waveformNumber >= p->ins.numWaveforms) waveformNumber = 0;
+        const int8_t *srcWave = p->ins.allWaveforms[waveformNumber];
+        int8_t delta = srcWave[start + pos];
+        int bufOff = (int)start;
+        int16_t count = (int16_t)(stop - start);
+        while (count >= 0) {
+            buf[bufOff++] += delta;
+            count--;
+        }
+        /* IncrementSynthEffectPosition */
+        pos++;
+        if (pos >= stop) pos = start;
+        break;
+    }
+
+    case 8: { /* ShackWave2 — ref: DoSynthEffectShackWave2 */
+        /* ShackWaveHelper first */
+        uint16_t waveformNumber = p->ins.effectArg1;
+        if (waveformNumber >= p->ins.numWaveforms) waveformNumber = 0;
+        const int8_t *srcWave = p->ins.allWaveforms[waveformNumber];
+        int8_t delta = srcWave[start + pos];
+        int bufOff = (int)start;
+        int16_t count = (int16_t)(stop - start);
+        while (count >= 0) {
+            buf[bufOff++] += delta;
+            count--;
+        }
+        /* Then negate at start+wavePos */
+        buf[start + wavePos] = (int8_t)(-(int)buf[start + wavePos]);
         wavePos++;
-        uint16_t wrapPoint = p->ins.effectArg2 + p->ins.effectArg3;
-        if (p->ins.effectArg3 == 0 && threshold == 0) {
-            /* Stop condition: effectArg3==0 and threshold reached 0 */
-        } else if (wavePos > wrapPoint) {
+        if (wavePos > (uint16_t)(stop - start))
+            wavePos = 0;
+        /* IncrementSynthEffectPosition */
+        pos++;
+        if (pos >= stop) pos = start;
+        break;
+    }
+
+    case 9: { /* Metamorph — ref: DoSynthEffectMetamorph */
+        if ((p->flag & 0x01) == 0) {
+            uint16_t waveformNumber = p->ins.effectArg1;
+            if (waveformNumber >= p->ins.numWaveforms) waveformNumber = 0;
+            const int8_t *target = p->ins.allWaveforms[waveformNumber];
+            int bufOff = (int)start;
+            int16_t count = (int16_t)(stop - start);
+            int setFlag = 0;
+            while (count >= 0) {
+                if (buf[bufOff] != target[bufOff]) {
+                    setFlag = 1;
+                    if (buf[bufOff] < target[bufOff])
+                        buf[bufOff]++;
+                    else
+                        buf[bufOff]--;
+                }
+                bufOff++;
+                count--;
+            }
+            if (!setFlag)
+                p->flag |= 0x02;
+        }
+        break;
+    }
+
+    case 10: { /* Laser — ref: DoSynthEffectLaser */
+        int8_t detune = (int8_t)(p->ins.effectArg2 & 0xFF);
+        uint16_t repeats = p->ins.effectArg3;
+        if (wavePos < repeats) {
+            p->slideValue += detune;
+            wavePos++;
+        }
+        /* IncrementSynthEffectPosition */
+        pos++;
+        if (pos >= stop) pos = start;
+        break;
+    }
+
+    case 11: { /* WaveAlias — ref: DoSynthEffectWaveAlias */
+        int8_t delta = (int8_t)(p->ins.effectArg1 & 0xFF);
+        int16_t count = (int16_t)(stop - start);
+        int bufOff = (int)start;
+        while (count >= 0) {
+            int8_t val = buf[bufOff];
+            if (((bufOff + 1) >= byteLen) || (val > buf[bufOff + 1]))
+                val -= delta;
+            else
+                val += delta;
+            buf[bufOff++] = val;
+            count--;
+        }
+        /* IncrementSynthEffectPosition */
+        pos++;
+        if (pos >= stop) pos = start;
+        break;
+    }
+
+    case 12: { /* NoiseGenerator1 — ref: DoSynthEffectNoiseGenerator1 */
+        buf[pos] ^= (int8_t)(xorshift32(&p->prngState) & 0xFF);
+        /* IncrementSynthEffectPosition */
+        pos++;
+        if (pos >= stop) pos = start;
+        break;
+    }
+
+    case 13: { /* LowPassFilter1 — ref: DoSynthEffectLowPassFilter1 */
+        uint16_t deltaValue = p->ins.effectArg1;
+        for (int i = (int)start; i <= (int)stop; i++) {
+            int flag = 0;
+            int8_t val1 = buf[i];
+            int8_t val2 = (i == (int)stop) ? buf[start] : buf[i + 1];
+            if (val1 <= val2) flag = 1;
+            int diff = (int)val1 - (int)val2;
+            if (diff < 0) diff = -diff;
+            if (diff > (int)deltaValue) {
+                if (flag)
+                    buf[i] += 2;
+                else
+                    buf[i] -= 2;
+            }
+        }
+        /* IncrementSynthEffectPosition */
+        pos++;
+        if (pos >= stop) pos = start;
+        break;
+    }
+
+    case 14: { /* LowPassFilter2 — ref: DoSynthEffectLowPassFilter2 */
+        uint16_t waveformNumber = p->ins.effectArg1;
+        if (waveformNumber >= p->ins.numWaveforms) waveformNumber = 0;
+        const int8_t *lpfWave = p->ins.allWaveforms[waveformNumber];
+        int bufferIndex = (int)stop;
+        for (int i = (int)start; i <= (int)stop; i++) {
+            int flag = 0;
+            int8_t val1 = buf[i];
+            int8_t val2 = (i == (int)stop) ? buf[start] : buf[i + 1];
+            if (val1 <= val2) flag = 1;
+            int diff = (int)val1 - (int)val2;
+            if (diff < 0) diff = -diff;
+            uint8_t deltaValue = (uint8_t)(lpfWave[bufferIndex++] & 0x7F);
+            bufferIndex &= 0x7F;
+            if (diff > (int)deltaValue) {
+                if (flag)
+                    buf[i] += 2;
+                else
+                    buf[i] -= 2;
+            }
+        }
+        /* IncrementSynthEffectPosition */
+        pos++;
+        if (pos >= stop) pos = start;
+        break;
+    }
+
+    case 15: { /* Oszilator — ref: DoSynthEffectOszilator */
+        if (p->flag & 0x02) {
+            p->flag ^= 0x08;
+            p->flag &= ~0x02;
+        }
+        const int8_t *sourceWaveform;
+        if (p->flag & 0x08)
+            sourceWaveform = p->ins.waveformData;
+        else {
+            uint16_t waveformNumber = p->ins.effectArg1;
+            if (waveformNumber >= p->ins.numWaveforms) waveformNumber = 0;
+            sourceWaveform = p->ins.allWaveforms[waveformNumber];
+        }
+        /* MetamorphAndOszilatorHelper */
+        {
+            int bufOff = (int)start;
+            int16_t count = (int16_t)(stop - start);
+            int setFlag = 0;
+            while (count >= 0) {
+                if (buf[bufOff] != sourceWaveform[bufOff]) {
+                    setFlag = 1;
+                    if (buf[bufOff] < sourceWaveform[bufOff])
+                        buf[bufOff]++;
+                    else
+                        buf[bufOff]--;
+                }
+                bufOff++;
+                count--;
+            }
+            if (!setFlag)
+                p->flag |= 0x02;
+        }
+        break;
+    }
+
+    case 16: { /* NoiseGenerator2 — ref: DoSynthEffectNoiseGenerator2 */
+        int16_t count = (int16_t)(stop - start);
+        int bufOff = (int)start;
+        do {
+            int8_t val = buf[bufOff + count];
+            val ^= 0x05;
+            val = (int8_t)(((uint8_t)val << 2) | ((uint8_t)val >> 6));
+            val += (int8_t)(xorshift32(&p->prngState) & 0xFF);
+            buf[bufOff + count] = val;
+            count--;
+        } while (count >= 0);
+        break;
+    }
+
+    case 17: { /* FmDrum — ref: DoSynthEffectFmDrum */
+        uint8_t level = (uint8_t)(p->ins.effectArg1 & 0xFF);
+        uint16_t factor = p->ins.effectArg2;
+        uint16_t repeats = p->ins.effectArg3;
+        if (wavePos >= repeats) {
+            p->slideValue = p->ins.fineTuning;
             wavePos = 0;
         }
-        break;
-    }
-
-    case 3: { /* RotateVertical */
-        int8_t delta = (int8_t)(p->ins.effectArg1 & 0xFF);
-        for (int i = (int)start; i <= (int)stop; i++) {
-            buf[i] = clamp_i8((int)buf[i] + (int)delta);
-        }
-        break;
-    }
-
-    case 4: { /* RotateHorizontal */
-        /* Circular left-shift of buffer bytes [start..stop] */
-        int8_t saved = buf[start];
-        for (int i = (int)start; i < (int)stop; i++) {
-            buf[i] = buf[i + 1];
-        }
-        buf[stop] = saved;
-        break;
-    }
-
-    case 5: { /* AlienVoice */
-        int srcIdx = p->ins.effectArg1;
-        if (srcIdx >= p->ins.numWaveforms) srcIdx = 0;
-        const int8_t *srcWave = p->ins.allWaveforms[srcIdx];
-        for (int i = (int)start; i <= (int)stop; i++) {
-            buf[i] = clamp_i8((int)buf[i] + (int)srcWave[i]);
-        }
-        /* No position increment */
-        break;
-    }
-
-    case 6: { /* PolyNegator */
-        /* Restore buf[pos] from source waveform */
-        if (pos <= stop) {
-            buf[pos] = p->ins.waveformData[pos];
-        }
-        /* Negate buf[pos+1] (wrap) */
-        uint16_t nextPos = pos + 1;
-        if (nextPos > stop) nextPos = start;
-        buf[nextPos] = clamp_i8(-(int)buf[nextPos]);
-
-        pos++;
-        if (pos > stop) pos = start;
-        break;
-    }
-
-    case 7: { /* ShackWave1 */
-        int srcIdx = p->ins.effectArg1;
-        if (srcIdx >= p->ins.numWaveforms) srcIdx = 0;
-        const int8_t *srcWave = p->ins.allWaveforms[srcIdx];
-
-        int8_t delta = srcWave[start + (pos % (stop - start + 1))];
-        for (int i = (int)start; i <= (int)stop; i++) {
-            buf[i] = clamp_i8((int)buf[i] + (int)delta);
-        }
-
-        pos++;
-        if (pos > (stop - start)) pos = 0;
-        break;
-    }
-
-    case 8: { /* ShackWave2 */
-        /* Same as ShackWave1 */
-        int srcIdx = p->ins.effectArg1;
-        if (srcIdx >= p->ins.numWaveforms) srcIdx = 0;
-        const int8_t *srcWave = p->ins.allWaveforms[srcIdx];
-
-        int8_t delta = srcWave[start + (pos % (stop - start + 1))];
-        for (int i = (int)start; i <= (int)stop; i++) {
-            buf[i] = clamp_i8((int)buf[i] + (int)delta);
-        }
-
-        pos++;
-        if (pos > (stop - start)) pos = 0;
-
-        /* Plus: negate buf[start+wavePos] and advance wavePos */
-        uint16_t negIdx = start + wavePos;
-        if (negIdx <= stop) {
-            buf[negIdx] = clamp_i8(-(int)buf[negIdx]);
-        }
+        uint16_t decrement = (uint16_t)((factor << 8) | level);
+        p->slideValue = (int16_t)(p->slideValue - decrement);
         wavePos++;
-        if (wavePos > (stop - start)) wavePos = 0;
-        break;
-    }
-
-    case 9: { /* Metamorph */
-        /* Morph toward target waveform (effectArg1) */
-        int targetIdx = p->ins.effectArg1;
-        if (targetIdx >= p->ins.numWaveforms) targetIdx = 0;
-        const int8_t *target = p->ins.allWaveforms[targetIdx];
-
-        int allMatch = 1;
-        for (int i = (int)start; i <= (int)stop; i++) {
-            if (buf[i] != target[i]) {
-                if (buf[i] < target[i]) buf[i]++;
-                else buf[i]--;
-                allMatch = 0;
-            }
-        }
-        if (allMatch) {
-            p->flag |= 0x02; /* bit 1: morph complete */
-        }
-        break;
-    }
-
-    case 10: { /* Laser */
-        p->slideValue += (int8_t)(p->ins.effectArg2 & 0xFF);
-        wavePos++;
-        if (wavePos >= p->ins.effectArg3 && p->ins.effectArg3 > 0) {
-            /* Stop adding after effectArg3 steps */
-        } else if (p->ins.effectArg3 == 0) {
-            /* effectArg3==0: keep going indefinitely */
-        }
+        /* IncrementSynthEffectPosition */
         pos++;
-        if (pos > stop) pos = start;
-        break;
-    }
-
-    case 11: { /* WaveAlias */
-        int8_t delta = (int8_t)(p->ins.effectArg1 & 0xFF);
-        for (int i = (int)start; i <= (int)stop; i++) {
-            int next = (i + 1 <= (int)stop) ? i + 1 : (int)start;
-            if (buf[i] > buf[next]) {
-                buf[i] = clamp_i8((int)buf[i] - (int)delta);
-            } else {
-                buf[i] = clamp_i8((int)buf[i] + (int)delta);
-            }
-        }
-        pos++;
-        if (pos > stop) pos = start;
-        break;
-    }
-
-    case 12: { /* NoiseGenerator1 */
-        if (pos <= stop) {
-            buf[pos] ^= (int8_t)(xorshift32(&p->prngState) & 0xFF);
-        }
-        pos++;
-        if (pos > stop) pos = start;
-        break;
-    }
-
-    case 13: { /* LowPassFilter1 */
-        for (int i = (int)start; i <= (int)stop; i++) {
-            if (buf[i] > 0) buf[i]--;
-            else if (buf[i] < 0) buf[i]++;
-        }
-        /* No position increment */
-        break;
-    }
-
-    case 14: { /* LowPassFilter2 */
-        int threshold = (int)(int8_t)(p->ins.effectArg1 & 0xFF);
-        for (int i = (int)start; i <= (int)stop; i++) {
-            if (buf[i] > threshold) buf[i]--;
-            else if (buf[i] < -threshold) buf[i]++;
-        }
-        /* No position increment */
-        break;
-    }
-
-    case 15: { /* Oszilator */
-        /* Use metamorph toward target waveform (effectArg1) */
-        int targetIdx = p->ins.effectArg1;
-        if (targetIdx >= p->ins.numWaveforms) targetIdx = 0;
-        const int8_t *target = p->ins.allWaveforms[targetIdx];
-
-        if (p->flag & 0x02) {
-            /* Morph complete: swap target with original and clear flag */
-            /* Copy current buffer as new source, morph back toward original */
-            memcpy(p->ins.waveformData, buf, byteLen);
-            p->flag &= ~0x02;
-        } else {
-            int allMatch = 1;
-            for (int i = (int)start; i <= (int)stop; i++) {
-                if (buf[i] != target[i]) {
-                    if (buf[i] < target[i]) buf[i]++;
-                    else buf[i]--;
-                    allMatch = 0;
-                }
-            }
-            if (allMatch) {
-                p->flag |= 0x02;
-            }
-        }
-        break;
-    }
-
-    case 16: { /* NoiseGenerator2 */
-        for (int i = (int)start; i <= (int)stop; i++) {
-            buf[i] ^= (int8_t)(xorshift32(&p->prngState) & 0xFF);
-        }
-        break;
-    }
-
-    case 17: { /* FmDrum */
-        p->slideValue += (int8_t)(p->ins.effectArg2 & 0xFF);
-        if (p->slideValue < -(int16_t)p->ins.effectArg3) {
-            /* Mute: drum has decayed */
-            p->flag |= 0x01;
-            p->currentVolume = 0.0f;
-        }
+        if (pos >= stop) pos = start;
         break;
     }
 
@@ -634,49 +757,47 @@ static void doSynthEffect(SAPlayer *p) {
 /* ── ADSR table processing ────────────────────────────────────────────────── */
 
 static void doAdsr(SAPlayer *p) {
-    if (p->ins.adsrLength == 0 && p->ins.adsrRepeat == 0) {
+    if (p->ins.adsrLength + p->ins.adsrRepeat == 0) {
         /* No ADSR table: use instrument volume directly */
         p->currentVolume = (float)p->ins.volume;
         return;
     }
 
-    if (p->adsrDelayCounter > 0) {
-        p->adsrDelayCounter--;
-        return;
-    }
-
-    /* Sustain hold */
-    if (p->ins.sustainPoint > 0 && p->adsrPosition == p->ins.sustainPoint) {
-        if (p->sustainDelayCounter < p->ins.sustainDelay) {
-            p->sustainDelayCounter++;
-            p->currentVolume = (float)p->ins.adsrTable[p->adsrPosition] *
-                               (float)p->ins.volume / 256.0f;
-            return;
-        }
-    }
-
-    /* Read current ADSR value */
+    /* Read current ADSR value and apply to volume */
     uint16_t tablePos = p->adsrPosition;
     if (tablePos >= SA_TABLE_SIZE) tablePos = SA_TABLE_SIZE - 1;
     p->currentVolume = (float)p->ins.adsrTable[tablePos] *
                        (float)p->ins.volume / 256.0f;
 
-    p->adsrPosition++;
-
-    /* One-shot portion: 0..adsrLength-1 */
-    /* Loop portion: adsrLength..adsrLength+adsrRepeat-1 */
-    uint16_t totalLen = p->ins.adsrLength + p->ins.adsrRepeat;
-    if (totalLen > SA_TABLE_SIZE) totalLen = SA_TABLE_SIZE;
-
-    if (p->ins.adsrRepeat > 0) {
-        if (p->adsrPosition >= totalLen) {
-            /* Jump to loop start */
-            p->adsrPosition = p->ins.adsrLength;
+    /* Sustain hold (note-off sets a flag; while held at sustain point, count delay) */
+    if (p->ins.sustainPoint > 0 && p->adsrPosition >= p->ins.sustainPoint) {
+        if (p->ins.sustainDelay == 0)
+            return;
+        if (p->sustainDelayCounter > 0) {
+            p->sustainDelayCounter--;
+            return;
         }
-    } else {
-        /* One-shot: clamp at end */
-        if (p->adsrPosition >= p->ins.adsrLength && p->ins.adsrLength > 0) {
-            p->adsrPosition = p->ins.adsrLength - 1;
+        p->sustainDelayCounter = p->ins.sustainDelay;
+    }
+
+    /* Delay-reload pattern: decrement counter, advance position when it hits 0 */
+    p->adsrDelayCounter--;
+    if (p->adsrDelayCounter == 0) {
+        p->adsrDelayCounter = p->ins.adsrDelay;
+
+        p->adsrPosition++;
+
+        uint16_t totalLen = p->ins.adsrLength + p->ins.adsrRepeat;
+        if (totalLen > SA_TABLE_SIZE) totalLen = SA_TABLE_SIZE;
+
+        if (p->adsrPosition >= totalLen) {
+            p->adsrPosition = p->ins.adsrLength;
+
+            if (p->ins.adsrRepeat == 0 && p->adsrPosition > 0)
+                p->adsrPosition--;
+
+            if (p->ins.adsrRepeat == 0 && p->currentVolume == 0.0f)
+                p->flag |= 0x01;
         }
     }
 }
@@ -885,16 +1006,18 @@ void sa_note_on(void *ctxPtr, int handle, int note, int velocity) {
     p->vibratoDelayCtr = p->ins.vibratoDelay;
     p->vibratoPosition = 0;
 
-    /* Reset arpeggio */
-    p->activeArpTable = 0;
+    /* Reset arpeggio — activeArpTable set via setParam from replayer */
     p->arpPosition = 0;
 
-    /* Reset synth effects */
-    p->synthEffectPosition = 0;
+    /* Reset portamento */
+    p->portamentoPeriod = 0;
+
+    /* Reset synth effects — position starts at effectArg2 per reference */
+    p->synthEffectPosition = p->ins.effectArg2;
     p->synthEffectWavePosition = 0;
     p->effectDelayCounter = p->ins.effectDelay;
     p->flag = 0;
-    p->slideValue = 0;
+    p->slideValue = p->ins.fineTuning;  /* fineTuning is initial slide value */
     p->slideSpeed = 0;
 
     /* Reset volume slide */
@@ -996,8 +1119,8 @@ void sa_set_param(void *ctxPtr, int handle, int paramId, float value) {
     case 4: /* Portamento speed */
         p->ins.portamentoSpeed = (uint16_t)(value * 255.0f);
         break;
-    case 5: /* Active arpeggio table (0, 1, 2) */
-        p->activeArpTable = clamp_i((int)value, 0, 2);
+    case 5: /* Active arpeggio table (0=none, 1-3=table 0-2) */
+        p->activeArpTable = clamp_i((int)value, 0, 3);
         break;
     case 6: /* Volume slide speed (-64..+64 mapped from -1..+1) */
         p->volumeSlideSpeed = (int16_t)(value * 64.0f);

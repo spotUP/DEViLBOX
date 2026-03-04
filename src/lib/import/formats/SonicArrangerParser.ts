@@ -815,6 +815,7 @@ export async function parseSonicArrangerFile(
           eff:        effVal,
           effTyp2: 0,
           eff2:    0,
+          saArpTable: tl.arpeggioTable,
         });
       }
 

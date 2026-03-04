@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-03-04T12:53:31.367Z
+ * Generated: 2026-03-04T15:22:32.357Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.2215';
-export const BUILD_NUMBER = '2215';
-export const BUILD_HASH = 'b9f106eb';
+export const BUILD_VERSION = '1.0.2232';
+export const BUILD_NUMBER = '2232';
+export const BUILD_HASH = 'a521a7b8';
 export const BUILD_DATE = '2026-03-04';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,77 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.2215',
+    version: '1.0.2232',
     date: '2026-03-04',
     changes: [
+      {
+        type: 'feature',
+        "description": "Add Neural amp, WAM, Buzz, and Tumult FX presets"
+      },
+      {
+        type: 'fix',
+        "description": "SID engines bypass blob URL pipeline for direct data loading"
+      },
+      {
+        type: 'fix',
+        "description": "Restore correct SA note offset -36 (was incorrectly reverted to -24)"
+      },
+      {
+        type: 'fix',
+        "description": "Prevent AudioContext mismatch crash in TrackerReplayer.loadSong"
+      },
+      {
+        type: 'fix',
+        "description": "SID engines silence — add player.play(), share AudioContext, playcont() hack"
+      },
+      {
+        type: 'fix',
+        "description": "Handle AudioContext mismatch in SonicArrangerEngine singleton"
+      },
+      {
+        type: 'fix',
+        "description": "Correct SA note-to-XM offset from -24 to -36"
+      },
+      {
+        type: 'fix',
+        "description": "Remove unused _config field in ScriptNodePlayerEngine"
+      },
+      {
+        type: 'fix',
+        "description": "Resolve TypeScript errors in SID engine wrappers"
+      },
+      {
+        type: 'fix',
+        "description": "Rewrite SID engine wrappers to use ScriptNodePlayer API"
+      },
+      {
+        type: 'feature',
+        "description": "Revert \"Add pattern data reading to MusicLine/Sonic Arranger engine\""
+      },
+      {
+        type: 'feature',
+        "description": "Add pattern data reading to MusicLine/Sonic Arranger engine"
+      },
+      {
+        type: 'fix',
+        "description": "Rewrite JSSIDEngine to use jsSID native API"
+      },
+      {
+        type: 'fix',
+        "description": "Fix GT Ultra: pattern data, layout, and audio routing"
+      },
+      {
+        type: 'fix',
+        "description": "Always-mount import dialogs to fix SID modal not showing in GL mode"
+      },
+      {
+        type: 'fix',
+        "description": "Fix GT engine double-init in React StrictMode consuming pendingSongData"
+      },
+      {
+        type: 'fix',
+        "description": "Fix GTUltra engine init crash: detached ArrayBuffer on re-init"
+      },
       {
         type: 'fix',
         "description": "Fix GT Ultra pattern data not loading after song load"
@@ -164,74 +232,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'improvement',
         "description": "Wire Phase 4 GL dialogs, strip bridge to 4 DOM modals"
-      },
-      {
-        type: 'feature',
-        "description": "Phase 4 GL dialogs — Export, TD3 Pattern, FileBrowser, SamplePack, DrumPad"
-      },
-      {
-        type: 'improvement',
-        "description": "Wire Phase 3 import dialogs into PixiRoot, remove from bridge"
-      },
-      {
-        type: 'feature',
-        "description": "Add Phase 3 GL import dialogs (4 modals)"
-      },
-      {
-        type: 'improvement',
-        "description": "Wire Phase 2 GL dialogs into PixiRoot, remove from bridge"
-      },
-      {
-        type: 'feature',
-        "description": "Add GL infrastructure and Phase 2 dialogs (6 modals + 3 utilities)"
-      },
-      {
-        type: 'improvement',
-        "description": "Unify FM chips under FurnaceDispatchSynth"
-      },
-      {
-        type: 'fix',
-        "description": "Add view selector to piano roll, fix sign-in button wrapping"
-      },
-      {
-        type: 'fix',
-        "description": "Correct clocking for PSG, NES, AY, SID, SNES, ESFM chips"
-      },
-      {
-        type: 'improvement',
-        "description": "Wire DrumpadEditorModal into PixiRoot, remove from bridge"
-      },
-      {
-        type: 'feature',
-        "description": "Add GL DrumpadEditorModal (4x4 pad grid, MIDI learn, instrument picker)"
-      },
-      {
-        type: 'fix',
-        "description": "Remove stray closing paren in WebGLModalBridge"
-      },
-      {
-        type: 'improvement',
-        "description": "Wire SIDInfoModal, ArrangementContextMenu, HelpModal into PixiRoot"
-      },
-      {
-        type: 'feature',
-        "description": "Add 3 GL dialogs (SIDInfoModal, ArrangementContextMenu, HelpModal)"
-      },
-      {
-        type: 'fix',
-        "description": "Correct FM chip clocking for accurate pitch"
-      },
-      {
-        type: 'improvement',
-        "description": "Wire SIDInfoModal + ArrangementContextMenu into PixiRoot, remove from bridge"
-      },
-      {
-        type: 'feature',
-        "description": "Add 2 GL dialogs (SIDInfoModal, ArrangementContextMenu)"
-      },
-      {
-        type: 'fix',
-        "description": "MAME synths sound never stops — stale note in triggerAttackRelease"
       }
     ]
   }
