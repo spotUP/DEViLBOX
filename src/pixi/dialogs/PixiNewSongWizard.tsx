@@ -120,12 +120,17 @@ export const PixiNewSongWizard: React.FC = () => {
     e.stopPropagation();
   }, []);
 
+  const blockWheel = useCallback((e: { stopPropagation: () => void }) => {
+    e.stopPropagation();
+  }, []);
+
   return (
     <pixiContainer layout={{ position: 'absolute', width: '100%', height: '100%' }}>
       <pixiGraphics
         draw={drawOverlay}
         eventMode="static"
         onPointerUp={handleOverlayClick}
+        onWheel={blockWheel}
         layout={{ position: 'absolute', width: screenW, height: screenH }}
       />
 

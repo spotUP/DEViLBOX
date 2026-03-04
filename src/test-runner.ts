@@ -4992,6 +4992,7 @@ async function runFilteredVolume() {
     await initAudio();
     await preWarmEngines(filtered);
     await testVolumeLevels(true);
+    displaySummary();
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
     log('Test error: ' + msg, 'fail');
