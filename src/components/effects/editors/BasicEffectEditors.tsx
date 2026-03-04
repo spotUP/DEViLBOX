@@ -19,9 +19,11 @@ export const DistortionEditor: React.FC<VisualEffectEditorProps> = ({
   onUpdateWet,
 }) => {
   const drive = getParam(effect, 'drive', 0.4);
+  const { pre, post } = useEffectAnalyser(effect.id, 'waveform');
 
   return (
     <div className="space-y-4">
+      <EffectOscilloscope pre={pre} post={post} color="#ef4444" />
       <WaveshaperCurve type="Distortion" drive={drive} color="#ef4444" height={100} />
       <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
         <SectionHeader color="#ef4444" title="Distortion" />

@@ -143,9 +143,11 @@ export const TapeSaturationEditor: React.FC<VisualEffectEditorProps> = ({
 }) => {
   const drive = getParam(effect, 'drive', 50);
   const tone = getParam(effect, 'tone', 12000);
+  const { pre, post } = useEffectAnalyser(effect.id, 'waveform');
 
   return (
     <div className="space-y-4">
+      <EffectOscilloscope pre={pre} post={post} color="#ef4444" />
       <WaveshaperCurve type="TapeSaturation" drive={drive / 100} color="#ef4444" height={100} />
       <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
         <SectionHeader color="#ef4444" title="Tape Saturation" />

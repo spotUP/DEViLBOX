@@ -195,9 +195,11 @@ export const ChebyshevEditor: React.FC<VisualEffectEditorProps> = ({
   onUpdateWet,
 }) => {
   const order = getParam(effect, 'order', 2);
+  const { pre, post } = useEffectAnalyser(effect.id, 'waveform');
 
   return (
     <div className="space-y-4">
+      <EffectOscilloscope pre={pre} post={post} color="#f59e0b" />
       <WaveshaperCurve type="Chebyshev" order={order} color="#f59e0b" height={100} />
       <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
         <SectionHeader color="#f59e0b" title="Chebyshev Waveshaper" />
