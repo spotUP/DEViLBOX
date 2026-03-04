@@ -23,6 +23,8 @@ import type { UADEMetadata } from '@engine/uade/UADEEngine';
 import { checkModlandFile } from '@/lib/modland/ModlandDetector';
 import { useModlandContributionModal } from '@/stores/useModlandContributionModal';
 
+import { clearExplicitlySaved } from '@hooks/useProjectPersistence';
+
 export interface FileLoadOptions {
   /** Whether to show confirmation dialog before replacing project (song formats only) */
   requireConfirmation?: boolean;
@@ -150,6 +152,9 @@ function isAudioFile(filename: string): boolean {
  * Load a song file (replaces entire project).
  */
 async function loadSongFile(file: File, options: FileLoadOptions): Promise<FileLoadResult> {
+  // Loading an external song — prevent auto-save from overwriting user's saved project
+  clearExplicitlySaved();
+
   const { loadPatterns, setPatternOrder, setCurrentPattern, applyEditorMode } = useTrackerStore.getState();
   const { loadInstruments, addInstrument, reset: resetInstruments } = useInstrumentStore.getState();
   const { setBPM, setSpeed, setGrooveTemplate, reset: resetTransport, isPlaying, stop: stopTransport } = useTransportStore.getState();

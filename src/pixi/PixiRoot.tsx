@@ -79,6 +79,7 @@ import { PixiSettingsModal } from './dialogs/PixiSettingsModal';
 import { PixiEditInstrumentModal } from './dialogs/PixiEditInstrumentModal';
 import { PixiMasterEffectsModal } from './dialogs/PixiMasterEffectsModal';
 import { PixiInstrumentEffectsModal } from './dialogs/PixiInstrumentEffectsModal';
+import { clearExplicitlySaved } from '@hooks/useProjectPersistence';
 
 export const PixiRoot: React.FC = () => {
   const { width, height } = usePixiResponsive();
@@ -180,6 +181,8 @@ export const PixiRoot: React.FC = () => {
 
   // Handler for FileBrowser load
   const handleFileBrowserLoad = useCallback(async (data: any, filename: string) => {
+    // Loading from file browser — prevent auto-save from overwriting user's saved project
+    clearExplicitlySaved();
     setShowFileBrowser(false);
     const { loadPatterns, setCurrentPattern } = useTrackerStore.getState();
     const { addInstrument } = useInstrumentStore.getState();
@@ -200,6 +203,8 @@ export const PixiRoot: React.FC = () => {
 
   // Handler for FileBrowser tracker module load
   const handleLoadTrackerModule = useCallback(async (buffer: ArrayBuffer, filename: string) => {
+    // Loading from file browser — prevent auto-save from overwriting user's saved project
+    clearExplicitlySaved();
     const { isPlaying, stop } = useTransportStore.getState();
     const engine = getToneEngine();
     if (isPlaying) { stop(); engine.releaseAll(); }
