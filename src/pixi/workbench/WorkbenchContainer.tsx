@@ -636,6 +636,7 @@ export const WorkbenchContainer: React.FC = () => {
           <PixiButton label="COMPOSE" variant="ft2" size="sm" onClick={() => handleLoadWorkspace('Compose')} />
           <PixiButton label="MIX" variant="ft2" size="sm" onClick={() => handleLoadWorkspace('Mix')} />
           <PixiButton label="FULL" variant="ft2" size="sm" onClick={() => handleLoadWorkspace('Full')} />
+          <PixiButton label="3D" variant={isTilted ? 'ft2' : 'ghost'} color={isTilted ? 'blue' : undefined} size="sm" active={isTilted} onClick={() => useWorkbenchStore.getState().setTilted(!isTilted)} />
         </pixiContainer>
 
         {/* World container — camera transform via ref.
