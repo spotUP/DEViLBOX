@@ -178,6 +178,12 @@ typedef struct {
     /* Volume slide */
     int16_t      volumeSlideSpeed;
 
+    /* Speed counter — tracks tick within row; 0 = first tick of row */
+    uint16_t     speedCounter;
+
+    /* Master volume (0-64, default 64) — set by SetMasterVolume effect */
+    uint16_t     masterVolume;
+
     /* PRNG for noise effects */
     uint32_t     prngState;
 } SAPlayer;
@@ -366,8 +372,9 @@ static void doSlide(SAPlayer *p) {
     if (newPeriod < 113) newPeriod = 113;
     if (newPeriod > 13696) newPeriod = 13696;
     p->currentPeriod = (uint16_t)newPeriod;
-    /* slideSpeed accumulates into slideValue each tick */
-    p->slideValue += p->slideSpeed;
+    /* slideSpeed accumulates into slideValue ONLY on non-zero ticks (ref line 1612) */
+    if (p->speedCounter != 0)
+        p->slideValue += p->slideSpeed;
 }
 
 /**
@@ -758,16 +765,21 @@ static void doSynthEffect(SAPlayer *p) {
 
 static void doAdsr(SAPlayer *p) {
     if (p->ins.adsrLength + p->ins.adsrRepeat == 0) {
-        /* No ADSR table: use instrument volume directly */
-        p->currentVolume = (float)p->ins.volume;
+        /* No ADSR table: vol = (currentVolume * masterVolume) / 64  (ref line 1626) */
+        uint16_t vol = (uint16_t)((p->ins.volume * p->masterVolume) / 64);
+        if (vol > 64) vol = 64;
+        p->currentVolume = (float)vol;
         return;
     }
 
-    /* Read current ADSR value and apply to volume */
+    /* Read current ADSR value and apply to volume (ref line 1632):
+     * vol = (masterVolume * currentVolume * adsrVal) / 4096 */
     uint16_t tablePos = p->adsrPosition;
     if (tablePos >= SA_TABLE_SIZE) tablePos = SA_TABLE_SIZE - 1;
-    p->currentVolume = (float)p->ins.adsrTable[tablePos] *
-                       (float)p->ins.volume / 256.0f;
+    uint16_t adsrVal = p->ins.adsrTable[tablePos];
+    uint16_t vol = (uint16_t)((p->masterVolume * (uint32_t)p->ins.volume * adsrVal) / 4096);
+    if (vol > 64) vol = 64;
+    p->currentVolume = (float)vol;
 
     /* Sustain hold (note-off sets a flag; while held at sustain point, count delay) */
     if (p->ins.sustainPoint > 0 && p->adsrPosition >= p->ins.sustainPoint) {
@@ -856,6 +868,7 @@ int sa_create_player(void *ctxPtr) {
             ctx->players[i].sampleRate = ctx->sampleRate;
             ctx->players[i].samplesPerTick = ctx->sampleRate / TICKS_PER_SEC;
             ctx->players[i].baseNote = -1;
+            ctx->players[i].masterVolume = 64;  /* default master volume */
             ctx->players[i].prngState = 0x12345678;
             return i;
         }
@@ -963,21 +976,17 @@ void sa_note_on(void *ctxPtr, int handle, int note, int velocity) {
     /* Store previous period for portamento reference */
     p->previousPeriod = p->currentPeriod;
 
-    /* Convert MIDI note to the correct Amiga period for this instrument's waveform length.
+    /* Convert MIDI note to SA period table index.
      *
-     * On real Amiga: audible_freq = PAL_CLOCK / (period * waveform_bytes)
-     * For MIDI note M: target_freq = 440 * 2^((M - 69) / 12)
-     * So: period = PAL_CLOCK / (target_freq * waveform_bytes)
-     *
-     * We then find the closest SA period table entry so arpeggio/effects work correctly.
+     * SA note index = MIDI + 25 (derived from saNote2XM offset of -36 and XM→MIDI offset of +11).
+     * The period table is used directly — waveform length is NOT factored into the period.
+     * On real Amiga hardware, shorter waveforms naturally sound higher in pitch because:
+     *   audible_freq = PAL_CLOCK / (period * waveform_bytes)
+     * The SA player always uses the same period for a given note regardless of waveform size.
      */
-    int byteLen = p->ins.waveformLength * 2;
-    if (byteLen <= 0) byteLen = SA_WAVE_SIZE;
-    if (byteLen > SA_WAVE_SIZE) byteLen = SA_WAVE_SIZE;
-
-    double midiFreq = 440.0 * pow(2.0, ((double)note - 69.0) / 12.0);
-    double wantedPeriod = AMIGA_PAL_CLOCK / (midiFreq * (double)byteLen);
-    int saIndex = findBestPeriodIndex(wantedPeriod);
+    int saIndex = note + 25;
+    if (saIndex < 1) saIndex = 1;
+    if (saIndex > 108) saIndex = 108;
 
     /* Store SA index (not MIDI note) — arpeggio adds offsets to this index */
     p->baseNote = saIndex;
@@ -1127,6 +1136,16 @@ void sa_set_param(void *ctxPtr, int handle, int paramId, float value) {
         break;
     case 7: /* Slide value (pitch slide, -128..+128 mapped from -1..+1) */
         p->slideValue = (int16_t)(value * 128.0f);
+        break;
+    case 8: /* Speed counter — tick within current row (integer 0..N) */
+        p->speedCounter = (uint16_t)value;
+        break;
+    case 9: /* Master volume (0-64, passed as float 0.0-64.0) */
+        p->masterVolume = (uint16_t)value;
+        if (p->masterVolume > 64) p->masterVolume = 64;
+        break;
+    case 10: /* Slide speed (direct set, integer) */
+        p->slideSpeed = (int16_t)value;
         break;
     default:
         break;

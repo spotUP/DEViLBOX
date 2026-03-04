@@ -187,6 +187,39 @@ export class SonicArrangerSynth implements DevilboxSynth {
           });
         }
         break;
+      case 'speedCounter':
+        // Pass tick-within-row as integer (0 = first tick of row)
+        if (this._playerHandle >= 0) {
+          this.engine.sendMessage({
+            type: 'setParam',
+            handle: this._playerHandle,
+            paramId: 8,
+            value,
+          });
+        }
+        break;
+      case 'masterVolume':
+        // Master volume 0-64
+        if (this._playerHandle >= 0) {
+          this.engine.sendMessage({
+            type: 'setParam',
+            handle: this._playerHandle,
+            paramId: 9,
+            value: Math.max(0, Math.min(64, Math.round(value))),
+          });
+        }
+        break;
+      case 'slideSpeed':
+        // Direct slide speed as integer
+        if (this._playerHandle >= 0) {
+          this.engine.sendMessage({
+            type: 'setParam',
+            handle: this._playerHandle,
+            paramId: 10,
+            value,
+          });
+        }
+        break;
     }
   }
 
