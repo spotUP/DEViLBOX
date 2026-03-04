@@ -94,12 +94,11 @@ export const PixiRomUploadDialog: React.FC = () => {
     setUploading(false);
   }, [dismissRomDialog]);
 
-  if (!pendingRomRequest) return null;
-
-  const { chipName, requiredZip } = pendingRomRequest;
+  const chipName = pendingRomRequest?.chipName ?? '';
+  const requiredZip = pendingRomRequest?.requiredZip ?? '';
 
   return (
-    <PixiModal isOpen={true} onClose={handleDismiss} width={MODAL_W} height={MODAL_H}>
+    <PixiModal isOpen={!!pendingRomRequest} onClose={handleDismiss} width={MODAL_W} height={MODAL_H}>
       <PixiModalHeader title="ROM Required" onClose={handleDismiss} width={MODAL_W} />
 
       <layoutContainer layout={{ flex: 1, padding: 16, flexDirection: 'column', gap: 10, overflow: 'hidden' }}>

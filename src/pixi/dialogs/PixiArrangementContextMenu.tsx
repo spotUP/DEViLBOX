@@ -177,7 +177,12 @@ export const PixiArrangementContextMenu: React.FC = () => {
 
   // --- Rendering ---
 
-  if (!menu || !clip) return null;
+  // Always return a persistent pixiContainer — never null.
+  // When not visible, return an empty invisible container so pixi-react
+  // always has a display object in the scene graph (avoids null→tree insertion bug).
+  if (!menu || !clip) {
+    return <pixiContainer visible={false} layout={{ position: 'absolute', width: '100%', height: '100%' }} />;
+  }
 
   const screenW = app?.screen?.width ?? 1920;
   const screenH = app?.screen?.height ?? 1080;

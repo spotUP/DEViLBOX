@@ -37,8 +37,6 @@ export const PixiTrackRenameDialog: React.FC = () => {
     setRenamingTrackId(null);
   }, [renamingTrackId, name, setRenamingTrackId]);
 
-  if (!renamingTrackId) return null;
-
   return (
     <PixiModal isOpen={!!renamingTrackId} onClose={cancel} width={300} height={160}>
       <PixiModalHeader title="Rename Track" onClose={cancel} />

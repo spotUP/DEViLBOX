@@ -278,8 +278,6 @@ export const PixiExportDialog: React.FC<PixiExportDialogProps> = ({ isOpen, onCl
   }, [isPlaying, stop, onClose, setMetadata, setBPM, loadPatterns, loadInstruments,
       loadCurves, setMasterEffects, importPattern, addInstrument, setCurrentPattern, setCurrentInstrument]);
 
-  if (!isOpen) return null;
-
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <PixiModal isOpen={isOpen} onClose={onClose} width={MODAL_W} height={MODAL_H}>

@@ -213,9 +213,9 @@ export const PixiImportFurnaceDialog: React.FC<PixiImportFurnaceDialogProps> = (
 
   // ── Derived state ─────────────────────────────────────────────────────────
 
-  if (!isOpen) return null;
-
-  const subsong = module?.subsongs[selectedSubsong] ?? module?.subsongs[0];
+  // PixiModal handles visibility gating — don't return null here
+  // (pixi-react reconciler can fail silently on null→tree transitions)
+  const subsong = isOpen ? (module?.subsongs[selectedSubsong] ?? module?.subsongs[0]) : undefined;
   const bpm = subsong
     ? Math.round(2.5 * (subsong.hz || 60) * ((subsong.virtualTempo || 150) / (subsong.virtualTempoD || 150)))
     : 0;

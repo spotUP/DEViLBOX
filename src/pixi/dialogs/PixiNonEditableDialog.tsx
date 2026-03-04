@@ -28,10 +28,8 @@ export const PixiNonEditableDialog: React.FC = () => {
     close();
   }, [close]);
 
-  if (!isOpen) return null;
-
   return (
-    <PixiModal isOpen={true} onClose={handleClose} width={MODAL_W} height={MODAL_H} overlayAlpha={0.6}>
+    <PixiModal isOpen={isOpen} onClose={handleClose} width={MODAL_W} height={MODAL_H} overlayAlpha={0.6}>
       {/* Header — Lock icon + title */}
       <layoutContainer
         layout={{
