@@ -32,7 +32,7 @@ import { useBDAnimations } from '@hooks/tracker/useBDAnimations';
 import { GENERATORS, type GeneratorType } from '@utils/patternGenerators';
 import { CellContextMenu, useCellContextMenu } from '@/components/tracker/CellContextMenu';
 import { ParameterEditor } from '@/components/tracker/ParameterEditor';
-import { TrackerVisualBackground } from '@/components/tracker/TrackerVisualBackground';
+import { PixiTrackerVisualBg } from './PixiTrackerVisualBg';
 import { PixiChannelHeaders } from './PixiChannelHeaders';
 import { haptics } from '@/utils/haptics';
 import * as Tone from 'tone';
@@ -1335,14 +1335,10 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
         onPointerUp={handlePointerUp}
         onPointerUpOutside={handlePointerUp}
       >
-        {/* TrackerVisualBackground behind the grid */}
-        <PixiDOMOverlay
-          layout={{ position: 'absolute', width, height: gridHeight, left: 0, top: 0 }}
-          style={{ pointerEvents: 'none', zIndex: 0 }}
-          visible={trackerVisualBg}
-        >
-          <TrackerVisualBackground width={width} height={gridHeight} />
-        </PixiDOMOverlay>
+        {/* TrackerVisualBackground behind the grid (pure GL) */}
+        {trackerVisualBg && (
+          <PixiTrackerVisualBg width={width} height={gridHeight} />
+        )}
 
         {/* Smooth-scroll layer — y updated imperatively by RAF; eventMode="none" so clicks pass to outer container */}
         <pixiContainer
