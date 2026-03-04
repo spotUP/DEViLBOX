@@ -22,6 +22,7 @@ import * as Tone from 'tone';
 import type { InstrumentConfig } from '@typedefs/instrument';
 import { notify } from '@stores/useNotificationStore';
 import { type TrackerSong } from '@engine/TrackerReplayer';
+import { clearExplicitlySaved } from '@hooks/useProjectPersistence';
 import type { ModuleInfo } from '@lib/import/ModuleLoader';
 import type { ImportOptions } from '@components/dialogs/ImportModuleDialog';
 import type { SunVoxConfig } from '@/types/instrument/exotic';
@@ -80,6 +81,9 @@ export function useModuleImport() {
 
   // ── Module import (MOD / XM / IT / S3M / FUR / DMF / etc.) ──────────────
   const handleModuleImport = useCallback(async (info: ModuleInfo, options: ImportOptions) => {
+    // Loading an external module — prevent auto-save from overwriting user's saved project
+    clearExplicitlySaved();
+
     const { useLibopenmpt } = options;
     let format = info.metadata.type;
 

@@ -11,7 +11,7 @@ function openFileBrowser(): boolean {
 }
 
 function doSave(): boolean {
-  void saveProjectToStorage().then(ok => {
+  void saveProjectToStorage({ explicit: true }).then(ok => {
     useUIStore.getState().setStatusMessage(ok ? 'Project saved' : 'Save failed', false, 1500);
   });
   return true;
