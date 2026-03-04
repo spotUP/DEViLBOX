@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-03-04T15:22:32.357Z
+ * Generated: 2026-03-04T19:56:51.640Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.2232';
-export const BUILD_NUMBER = '2232';
-export const BUILD_HASH = 'a521a7b8';
+export const BUILD_VERSION = '1.0.2255';
+export const BUILD_NUMBER = '2255';
+export const BUILD_HASH = 'da23acce';
 export const BUILD_DATE = '2026-03-04';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,101 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.2232',
+    version: '1.0.2255',
     date: '2026-03-04',
     changes: [
+      {
+        type: 'feature',
+        "description": "Isolate drumpad samples from project instrument slots"
+      },
+      {
+        type: 'fix',
+        "description": "Remove extra closing pixiContainer tag in PixiStatusBar"
+      },
+      {
+        type: 'fix',
+        "description": "Wire drumpad audio — pads now trigger sounds on click"
+      },
+      {
+        type: 'feature',
+        "description": "Unify view headers/footers, fix danger button, resize drumpad"
+      },
+      {
+        type: 'fix',
+        "description": "Use theme.text instead of nonexistent theme.textPrimary"
+      },
+      {
+        type: 'feature',
+        "description": "Add view selector dropdown to drumpad header bar"
+      },
+      {
+        type: 'fix',
+        "description": "SA instrument editor changes now reach running WASM synth"
+      },
+      {
+        type: 'fix',
+        "description": "Remove auto-preview from instrument editors"
+      },
+      {
+        type: 'fix',
+        "description": "SA instrument preview plays at C3 instead of C4"
+      },
+      {
+        type: 'fix',
+        "description": "PixiButton click not firing due to layout-shift pointerOut"
+      },
+      {
+        type: 'feature',
+        "description": "Add drag-handle camera controls to studio workbench"
+      },
+      {
+        type: 'fix',
+        "description": "Guard nullable activeError references in PixiSynthErrorDialog"
+      },
+      {
+        type: 'fix',
+        "description": "Studio navigation — Ableton-style Cmd+drag pan, Cmd+/-/0/1 zoom"
+      },
+      {
+        type: 'fix',
+        "description": "SA portamento arrival zeros speed (ref line 1523)"
+      },
+      {
+        type: 'feature',
+        "description": "Wire SA instrument editor to running WASM synth"
+      },
+      {
+        type: 'fix',
+        "description": "SA effect routing — send effects 1,2,4,7,8,A to WASM directly"
+      },
+      {
+        type: 'fix',
+        "description": "Wire 0xy effect arpeggio to WASM synth"
+      },
+      {
+        type: 'fix',
+        "description": "ADSR sustain/release, note-off, special notes"
+      },
+      {
+        type: 'fix',
+        "description": "Effect editor content scrolling — add flex-1 min-h-0 for knob accessibility"
+      },
+      {
+        type: 'fix',
+        "description": "FX modal improvements — oscilloscope overlays, preset ordering, DnD constraint"
+      },
+      {
+        type: 'fix',
+        "description": "Arpeggio silence on out-of-range, speedCounter tick, wire arpTable from replayer"
+      },
+      {
+        type: 'fix',
+        "description": "CXX (set volume) now applies before note trigger in MOD path"
+      },
+      {
+        type: 'fix',
+        "description": "Increase master FX panel preset dropdown height to 70vh"
+      },
       {
         type: 'feature',
         "description": "Add Neural amp, WAM, Buzz, and Tumult FX presets"
@@ -140,98 +232,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'improvement',
         "description": "Guard all Yoga WASM node operations against BindingErrors"
-      },
-      {
-        type: 'fix',
-        "description": "Always-mount tab contents in TipOfTheDay to prevent Yoga BindingError"
-      },
-      {
-        type: 'improvement',
-        "description": "Increase Pixi UI font sizes for readability"
-      },
-      {
-        type: 'fix',
-        "description": "Guard PixiModal against uninitialized renderer"
-      },
-      {
-        type: 'fix',
-        "description": "Fix ReferenceError: cellContextMenu → openCellContextMenu in PixiPatternEditor"
-      },
-      {
-        type: 'fix',
-        "description": "Pixel-perfect GL dialog parity: fix 38 dialogs + create 6 new GL dialogs"
-      },
-      {
-        type: 'fix',
-        "description": "Gate auto-save and revisions on explicit user save"
-      },
-      {
-        type: 'feature',
-        "description": "Add PRG/SID export for GoatTracker Ultra"
-      },
-      {
-        type: 'improvement',
-        "description": "Pixel-perfect GL modal foundation + TipOfTheDay rewrite"
-      },
-      {
-        type: 'fix',
-        "description": "Runtime errors — guard PixiModal app.screen, fix invalid 8-digit hex colors"
-      },
-      {
-        type: 'feature',
-        "description": "Convert VJ view to hidden canvas + Pixi texture"
-      },
-      {
-        type: 'feature',
-        "description": "Convert DJ view to fully GL-native — panels, browsers, beat grid"
-      },
-      {
-        type: 'improvement',
-        "description": "Convert context menus, color picker, channel headers to GL"
-      },
-      {
-        type: 'improvement',
-        "description": "Convert knob tooltip and text input to GL-native"
-      },
-      {
-        type: 'feature',
-        "description": "Convert PixiPatternEditor DOM overlays to GL"
-      },
-      {
-        type: 'improvement',
-        "description": "Convert TrackerVisualBackground from PixiDOMOverlay to pure GL (Pixi.js)"
-      },
-      {
-        type: 'fix',
-        "description": "Fix C64 SID silence from missing c64 instrument block"
-      },
-      {
-        type: 'fix',
-        "description": "Fix Lynx silence and sample chip silence"
-      },
-      {
-        type: 'improvement',
-        "description": "Convert drag-and-drop overlay from PixiDOMOverlay to pure GL"
-      },
-      {
-        type: 'improvement',
-        "description": "Convert PixiContextMenu from DOM portal to pure GL (Pixi.js)"
-      },
-      {
-        type: 'improvement',
-        "description": "Wire Phase 5 GL dialogs, eliminate all DOM modals from bridge"
-      },
-      {
-        type: 'feature',
-        "description": "Phase 5 GL dialogs — Settings, EditInstrument, MasterFx, InstrumentFx, EffectParamEditor"
-      },
-      {
-        type: 'fix',
-        "description": "Add default instruments for FM/OPLL/VERA chips, fix SNES clipping"
-      },
-      {
-        type: 'improvement',
-        "description": "Wire Phase 4 GL dialogs, strip bridge to 4 DOM modals"
       }
     ]
   }

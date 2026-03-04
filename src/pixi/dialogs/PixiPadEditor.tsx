@@ -6,12 +6,16 @@
  * matching the DOM version pixel-for-pixel in controls and layout.
  */
 
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import { useDrumPadStore } from '../../stores/useDrumPadStore';
-import type { DrumPad, FilterType, OutputBus, PlayMode, ScratchActionId } from '../../types/drumpad';
+import type { DrumPad, FilterType, OutputBus, PlayMode, ScratchActionId, SampleData } from '../../types/drumpad';
 import { PixiButton, PixiCheckbox } from '../components';
 import { PixiSelect, type SelectOption } from '../components/PixiSelect';
 import { PixiSlider } from '../components/PixiSlider';
+import { PixiPureTextInput } from '../input/PixiPureTextInput';
+import { getMIDIManager } from '../../midi/MIDIManager';
+import type { MIDIMessage } from '../../midi/types';
+import { getAudioContext } from '../../audio/AudioContextSingleton';
 import { usePixiTheme } from '../theme';
 import { Div, Txt } from '../layout';
 
@@ -120,6 +124,15 @@ export const PixiPadEditor: React.FC<PixiPadEditorProps> = ({ padId, width, onCl
   const pastePad = useDrumPadStore((s) => s.pastePad);
   const removeLayerFromPad = useDrumPadStore((s) => s.removeLayerFromPad);
   const updateLayerOnPad = useDrumPadStore((s) => s.updateLayerOnPad);
+  const addLayerToPad = useDrumPadStore((s) => s.addLayerToPad);
+  const midiMappings = useDrumPadStore((s) => s.midiMappings);
+  const setMIDIMapping = useDrumPadStore((s) => s.setMIDIMapping);
+  const clearMIDIMapping = useDrumPadStore((s) => s.clearMIDIMapping);
+
+  const [isLearning, setIsLearning] = useState(false);
+  const learningRef = useRef(false);
+
+  const midiMapping = midiMappings[String(padId)];
 
   const pad = useMemo(() => {
     const program = programs.get(currentProgramId);
@@ -130,6 +143,72 @@ export const PixiPadEditor: React.FC<PixiPadEditorProps> = ({ padId, width, onCl
     (updates: Partial<DrumPad>) => updatePad(padId, updates),
     [padId, updatePad],
   );
+
+  // ─── MIDI Learn ────────────────────────────────────────────────────────────
+  const handleMIDILearn = useCallback(() => {
+    if (isLearning) {
+      setIsLearning(false);
+      learningRef.current = false;
+      return;
+    }
+    setIsLearning(true);
+    learningRef.current = true;
+
+    const manager = getMIDIManager();
+    const handler = (message: MIDIMessage) => {
+      if (!learningRef.current) return;
+      if (message.type === 'noteOn' && message.note !== undefined) {
+        setMIDIMapping(String(padId), { type: 'note', note: message.note });
+        setIsLearning(false);
+        learningRef.current = false;
+        manager.removeMessageHandler(handler);
+      }
+    };
+    manager.addMessageHandler(handler);
+
+    setTimeout(() => {
+      if (learningRef.current) {
+        setIsLearning(false);
+        learningRef.current = false;
+        manager.removeMessageHandler(handler);
+      }
+    }, 10000);
+  }, [isLearning, padId, setMIDIMapping]);
+
+  useEffect(() => {
+    return () => { learningRef.current = false; };
+  }, []);
+
+  // ─── Add Layer via file picker ─────────────────────────────────────────────
+  const handleAddLayerFromFile = useCallback(() => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'audio/*,.wav,.mp3,.ogg,.flac,.aiff,.aif';
+    input.onchange = async () => {
+      const file = input.files?.[0];
+      if (!file || !pad) return;
+      try {
+        const audioContext = getAudioContext();
+        const arrayBuffer = await file.arrayBuffer();
+        const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+        const sampleData: SampleData = {
+          id: `layer_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          name: file.name.replace(/\.[^/.]+$/, ''),
+          audioBuffer,
+          duration: audioBuffer.duration,
+          sampleRate: audioBuffer.sampleRate,
+        };
+        const existingCount = pad.layers.length;
+        const rangeSize = Math.floor(128 / (existingCount + 1));
+        const min = existingCount * rangeSize;
+        const max = existingCount === 0 ? 127 : Math.min(min + rangeSize - 1, 127);
+        addLayerToPad(padId, sampleData, [min, max]);
+      } catch {
+        // silently fail — audio decode error
+      }
+    };
+    input.click();
+  }, [pad, padId, addLayerToPad]);
 
   // ─── ADSR visualization heights ──────────────────────────────────────────
   const adsrBars = useMemo(() => {
@@ -219,18 +298,17 @@ export const PixiPadEditor: React.FC<PixiPadEditorProps> = ({ padId, width, onCl
         {/* ════════════════════════════════════════════════════════════════ */}
         {activeTab === 'main' && (
           <>
-            {/* Pad name (display only) */}
-            <Div
-              layout={{
-                backgroundColor: theme.bgTertiary.color,
-                borderWidth: 1,
-                borderColor: theme.border.color,
-                borderRadius: 4,
-                paddingX: 8,
-                paddingY: 6,
-              }}
-            >
-              <Txt className="text-sm text-text-primary">{pad.name}</Txt>
+            {/* Pad name (editable) */}
+            <Div className="flex-col gap-1">
+              <Txt className="text-xs text-text-muted">Name</Txt>
+              <PixiPureTextInput
+                value={pad.name}
+                onChange={(v) => handleUpdate({ name: v })}
+                width={innerW}
+                height={28}
+                fontSize={12}
+                font="sans"
+              />
             </Div>
 
             {/* Level */}
@@ -359,6 +437,40 @@ export const PixiPadEditor: React.FC<PixiPadEditorProps> = ({ padId, width, onCl
                 disabled={!clipboardPad}
                 onClick={() => pastePad(padId)}
                 layout={{ flex: 1 }}
+              />
+            </Div>
+
+            {/* MIDI Trigger */}
+            <Div
+              className="flex-col gap-2"
+              layout={{
+                borderTopWidth: 1,
+                borderColor: theme.border.color,
+                paddingTop: 8,
+                marginTop: 4,
+              }}
+            >
+              <Txt className="text-xs font-bold text-text-muted">MIDI TRIGGER</Txt>
+              {midiMapping ? (
+                <Div className="flex-row items-center gap-2">
+                  <Txt className="text-sm font-mono text-text-primary">{`Note ${midiMapping.note}`}</Txt>
+                  <PixiButton
+                    label="Clear"
+                    variant="ghost"
+                    size="sm"
+                    color="red"
+                    onClick={() => clearMIDIMapping(String(padId))}
+                  />
+                </Div>
+              ) : (
+                <Txt className="text-xs text-text-muted">No MIDI note assigned</Txt>
+              )}
+              <PixiButton
+                label={isLearning ? 'Hit a MIDI pad...' : 'MIDI Learn'}
+                variant={isLearning ? 'primary' : 'default'}
+                size="sm"
+                onClick={handleMIDILearn}
+                layout={{ width: innerW }}
               />
             </Div>
 
@@ -718,19 +830,40 @@ export const PixiPadEditor: React.FC<PixiPadEditorProps> = ({ padId, width, onCl
                     </Div>
                     <Div className="flex-row gap-3">
                       <Div className="flex-col gap-1" layout={{ flex: 1 }}>
-                        <Txt className="text-xs text-text-muted">Vel Min</Txt>
-                        <Txt className="text-xs text-text-primary">
-                          {String(layer.velocityRange[0])}
-                        </Txt>
-                      </Div>
-                      <Div className="flex-col gap-1" layout={{ flex: 1 }}>
-                        <Txt className="text-xs text-text-muted">Vel Max</Txt>
-                        <Txt className="text-xs text-text-primary">
-                          {String(layer.velocityRange[1])}
-                        </Txt>
+                        <PixiSlider
+                          label="Vel Min"
+                          value={layer.velocityRange[0]}
+                          min={0}
+                          max={127}
+                          step={1}
+                          showValue
+                          formatValue={(v) => String(Math.round(v))}
+                          onChange={(v) =>
+                            updateLayerOnPad(padId, idx, {
+                              velocityRange: [Math.round(v), layer.velocityRange[1]],
+                            })
+                          }
+                        />
                       </Div>
                       <Div className="flex-col gap-1" layout={{ flex: 1 }}>
                         <PixiSlider
+                          label="Vel Max"
+                          value={layer.velocityRange[1]}
+                          min={0}
+                          max={127}
+                          step={1}
+                          showValue
+                          formatValue={(v) => String(Math.round(v))}
+                          onChange={(v) =>
+                            updateLayerOnPad(padId, idx, {
+                              velocityRange: [layer.velocityRange[0], Math.round(v)],
+                            })
+                          }
+                        />
+                      </Div>
+                    </Div>
+                    <Div className="flex-col gap-1">
+                      <PixiSlider
                           label="Level"
                           value={layer.levelOffset}
                           min={-24}
@@ -752,16 +885,12 @@ export const PixiPadEditor: React.FC<PixiPadEditorProps> = ({ padId, width, onCl
             )}
 
             <PixiButton
-              label="+ Add Layer"
+              label="+ Add Layer (from file)"
               variant="primary"
               size="sm"
-              disabled
-              onClick={() => {}}
+              onClick={handleAddLayerFromFile}
               layout={{ width: innerW }}
             />
-            <Txt className="text-xs text-text-muted">
-              Add Layer requires sample browser (not yet available in GL view)
-            </Txt>
           </>
         )}
 

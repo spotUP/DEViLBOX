@@ -40,6 +40,9 @@ function midiToNoteStr(midi: number): string {
 
 const GRID_DIVISIONS = [1, 2, 4, 8, 16];
 
+const NOTE_LENGTH_PRESETS = [16, 8, 4, 2, 1, 0.5];
+const NOTE_LENGTH_LABELS = ['1/1', '1/2', '1/4', '1/8', '1/16', '1/32'];
+
 /** QWERTY keyboard → semitone offset from base octave */
 const QWERTY_NOTE_MAP: Record<string, number> = {
   z: 0, s: 1, x: 2, d: 3, c: 4, v: 5, g: 6, b: 7, h: 8, n: 9, j: 10, m: 11,
@@ -52,6 +55,9 @@ export const PixiPianoRollView: React.FC<{ isActive?: boolean; windowId?: string
   windowId = 'pianoroll',
 }) => {
   const [followPlayback, setFollowPlayback] = useState(true);
+  const [noteLength, setNoteLength] = useState(4);
+  const noteLengthRef = useRef(noteLength);
+  useEffect(() => { noteLengthRef.current = noteLength; }, [noteLength]);
   const theme = usePixiTheme();
   const tool = usePianoRollStore(s => s.tool);
   const setTool = usePianoRollStore(s => s.setTool);
@@ -505,6 +511,13 @@ export const PixiPianoRollView: React.FC<{ isActive?: boolean; windowId?: string
     const idx = GRID_DIVISIONS.indexOf(s.view.gridDivision);
     const next = GRID_DIVISIONS[(idx + 1) % GRID_DIVISIONS.length];
     s.setGridDivision(next);
+  }, []);
+
+  const handleCycleNoteLength = useCallback(() => {
+    setNoteLength(prev => {
+      const idx = NOTE_LENGTH_PRESETS.indexOf(prev);
+      return NOTE_LENGTH_PRESETS[(idx + 1) % NOTE_LENGTH_PRESETS.length];
+    });
   }, []);
 
   const handleToggleSnap = useCallback(() => {
