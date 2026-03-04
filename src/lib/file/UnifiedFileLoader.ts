@@ -88,6 +88,15 @@ export async function loadFile(
   try {
     // === SONG FORMATS (replace project) ===
     if (isSongFormat(filename)) {
+      // GoatTracker .sng files can be detected by magic bytes and always bypass
+      // the confirmation dialog — they route directly to the GTUltra engine.
+      if (filename.endsWith('.sng')) {
+        const { isGoatTrackerSong } = await import('../import/formats/GoatTrackerDetect');
+        const buf = await file.arrayBuffer();
+        if (isGoatTrackerSong(buf)) {
+          return await loadSongFile(file, options);
+        }
+      }
       if (options.requireConfirmation) {
         return { success: 'pending-confirmation', file };
       }

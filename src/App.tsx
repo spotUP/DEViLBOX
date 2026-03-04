@@ -548,25 +548,9 @@ function App() {
       return;
     }
 
-    // GoatTracker .sng files — detect by magic bytes and load directly
-    // (skip confirmation dialog / UADE scan which can't handle GoatTracker format)
-    if (/\.sng$/i.test(file.name)) {
-      try {
-        const { isGoatTrackerSong } = await import('@/lib/import/formats/GoatTrackerDetect');
-        const buf = await file.arrayBuffer();
-        if (isGoatTrackerSong(buf)) {
-          console.log('[App] GoatTracker .sng detected:', file.name);
-          const gtResult = await loadFile(file);
-          if (gtResult.success === true) notify.success(gtResult.message);
-          else if (gtResult.success === false) notify.error(gtResult.error);
-          return;
-        }
-      } catch (err) {
-        console.error('[App] GoatTracker .sng load failed:', err);
-        notify.error(`Failed to load GoatTracker song: ${err instanceof Error ? err.message : String(err)}`);
-        return;
-      }
-    }
+    // GoatTracker .sng files are auto-detected by loadFile() via magic bytes
+    // and bypass confirmation — they route directly to the GTUltra engine.
+    // Non-GT .sng files fall through to the default tracker module path below.
 
     const result = await loadFile(file, { requireConfirmation: true });
 
