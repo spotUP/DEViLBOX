@@ -299,10 +299,6 @@ export const PixiMasterEffectsModal: React.FC<PixiMasterEffectsModalProps> = ({
     [updateMasterEffect],
   );
 
-  // ── Guard ────────────────────────────────────────────────────────────────
-
-  if (!isOpen) return null;
-
   // ── Layout helpers ───────────────────────────────────────────────────────
 
   const chainItemH = 60;

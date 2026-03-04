@@ -83,16 +83,23 @@ export const PixiModal: React.FC<PixiModalProps> = ({
     e.stopPropagation();
   }, []);
 
-  if (!isOpen) return null;
-
+  // Always render a persistent pixiContainer so pixi-react never does
+  // a null→tree insertion at the parent level. The custom reconciler can
+  // silently fail when inserting new display objects among many null siblings.
+  // When closed, this is an invisible empty container (costs nothing).
   return (
-    <pixiContainer layout={{ position: 'absolute', width: '100%', height: '100%' }}>
-      <pixiGraphics
-        draw={drawOverlay}
-        eventMode="static"
-        onPointerUp={handleOverlayClick}
-        layout={{ position: 'absolute', width: screenW, height: screenH }}
-      />
+    <pixiContainer
+      visible={isOpen}
+      layout={{ position: 'absolute', width: '100%', height: '100%' }}
+    >
+      {isOpen && (
+        <>
+          <pixiGraphics
+            draw={drawOverlay}
+            eventMode="static"
+            onPointerUp={handleOverlayClick}
+            layout={{ position: 'absolute', width: screenW, height: screenH }}
+          />
 
       {/* Centered panel — matches DOM: bg-dark-bg, border, rounded-lg, shadow-xl */}
       <layoutContainer
@@ -122,6 +129,8 @@ export const PixiModal: React.FC<PixiModalProps> = ({
           {children}
         </layoutContainer>
       </layoutContainer>
+      </>
+      )}
     </pixiContainer>
   );
 };

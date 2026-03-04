@@ -335,7 +335,7 @@ export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, on
     [asidDevices],
   );
 
-  if (!isOpen) return null;
+  // Computations are safe regardless of isOpen (no null dereference risk)
 
   // Estimate total content height for the scroll view
   const crtSectionH = crtEnabled ? CRT_SLIDERS.length * 28 + 4 * 18 + 60 : 40;
@@ -359,7 +359,8 @@ export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, on
   const handlePanelClick = (e: FederatedPointerEvent) => { e.stopPropagation(); };
 
   return (
-    <pixiContainer layout={{ position: 'absolute', width: '100%', height: '100%' }}>
+    <pixiContainer visible={isOpen} layout={{ position: 'absolute', width: '100%', height: '100%' }}>
+      {isOpen && (<>
       <pixiGraphics
         draw={drawOverlay}
         eventMode="static"
@@ -888,6 +889,7 @@ export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, on
         <PixiButton label="CLOSE" variant="primary" width={80} onClick={onClose} />
       </layoutContainer>
       </layoutContainer>
+      </>)}
     </pixiContainer>
   );
 };

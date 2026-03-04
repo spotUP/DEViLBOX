@@ -175,13 +175,12 @@ export const PixiImportMIDIDialog: React.FC<PixiImportMIDIDialogProps> = ({
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
-  if (!isOpen) return null;
-
-  const duration = preview
+  // PixiModal handles visibility gating — don't return null here
+  const duration = isOpen && preview
     ? `${Math.floor(preview.totalSeconds / 60)}:${String(preview.totalSeconds % 60).padStart(2, '0')}`
     : '0:00';
 
-  const accentBg = blendColor(theme.bg.color, theme.accent.color, 0.2);
+  const accentBg = isOpen ? blendColor(theme.bg.color, theme.accent.color, 0.2) : 0;
 
   return (
     <PixiModal isOpen={isOpen} onClose={handleClose} width={MODAL_W} height={MODAL_H}>

@@ -207,11 +207,10 @@ export const PixiInstrumentEffectsModal: React.FC<PixiInstrumentEffectsModalProp
     [currentInstrumentId, updateEffect],
   );
 
-  // ── Guard ────────────────────────────────────────────────────────────────
-
-  if (!isOpen || !currentInstrument) return null;
-
-  const title = `${currentInstrument.name || `Instrument ${currentInstrument.id}`} Effects`;
+  const effectiveOpen = isOpen && !!currentInstrument;
+  const title = currentInstrument
+    ? `${currentInstrument.name || `Instrument ${currentInstrument.id}`} Effects`
+    : 'Effects';
 
   // ── Layout helpers ───────────────────────────────────────────────────────
 
@@ -229,7 +228,7 @@ export const PixiInstrumentEffectsModal: React.FC<PixiInstrumentEffectsModalProp
   const addScrollH = BODY_H - SUB_HEADER_H - 40; // extra room for search
 
   return (
-    <PixiModal isOpen={isOpen} onClose={onClose} width={MODAL_W} height={MODAL_H}>
+    <PixiModal isOpen={effectiveOpen} onClose={onClose} width={MODAL_W} height={MODAL_H}>
       <PixiModalHeader title={title} width={MODAL_W} onClose={onClose} />
 
       {/* ── Body: left + right columns ─────────────────────────────────── */}

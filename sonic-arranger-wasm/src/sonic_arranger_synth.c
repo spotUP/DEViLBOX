@@ -313,8 +313,8 @@ static void doPortamento(SAPlayer *p) {
 
     diff -= (int)p->ins.portamentoSpeed;
     if (diff < 0) {
-        /* Close enough — stop portamento */
-        p->portamentoPeriod = p->currentPeriod;
+        /* Close enough — stop portamento (ref line 1523: zero speed) */
+        p->ins.portamentoSpeed = 0;
     } else {
         uint16_t newPeriod = p->portamentoPeriod;
         if (newPeriod >= p->currentPeriod)
