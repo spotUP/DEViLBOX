@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-03-04T21:31:01.104Z
+ * Generated: 2026-03-04T21:48:11.241Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.2267';
-export const BUILD_NUMBER = '2267';
-export const BUILD_HASH = 'd6c267c6';
+export const BUILD_VERSION = '1.0.2277';
+export const BUILD_NUMBER = '2277';
+export const BUILD_HASH = 'cc6637eb';
 export const BUILD_DATE = '2026-03-04';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,49 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.2267',
+    version: '1.0.2277',
     date: '2026-03-04',
     changes: [
+      {
+        type: 'improvement',
+        "description": "Chore: update generated changelog to build 2267"
+      },
+      {
+        type: 'feature',
+        "description": "Chip format metadata, improved render progress bar"
+      },
+      {
+        type: 'feature',
+        "description": "Preset tags, tag filtering, synth browser, escape-to-close"
+      },
+      {
+        type: 'feature',
+        "description": "Canvas view mode, improved module browser layout"
+      },
+      {
+        type: 'feature',
+        "description": "Pulsing connection dot, per-channel widths, collapsed channels"
+      },
+      {
+        type: 'feature',
+        "description": "Multi-mode visualizer, velocity-sensitive pads, turntable physics"
+      },
+      {
+        type: 'fix',
+        "description": "Add comprehensive synth debugging diagnostics to test runner"
+      },
+      {
+        type: 'feature',
+        "description": "Tag management UI, search/recommended APIs, HVSC search fixes"
+      },
+      {
+        type: 'feature',
+        "description": "Add all 48 missing synths to test runner — full 190/190 coverage"
+      },
+      {
+        type: 'feature',
+        "description": "Full DeepSID feature implementation — all tabs, search, tags, transport"
+      },
       {
         type: 'feature',
         "description": "Add comprehensive FX test runner: music-driven tests, clipping detection, 39 param wiring tests, 19 new effects"
@@ -192,46 +232,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         "description": "SID engines silence — add player.play(), share AudioContext, playcont() hack"
-      },
-      {
-        type: 'fix',
-        "description": "Handle AudioContext mismatch in SonicArrangerEngine singleton"
-      },
-      {
-        type: 'fix',
-        "description": "Correct SA note-to-XM offset from -24 to -36"
-      },
-      {
-        type: 'fix',
-        "description": "Remove unused _config field in ScriptNodePlayerEngine"
-      },
-      {
-        type: 'fix',
-        "description": "Resolve TypeScript errors in SID engine wrappers"
-      },
-      {
-        type: 'fix',
-        "description": "Rewrite SID engine wrappers to use ScriptNodePlayer API"
-      },
-      {
-        type: 'feature',
-        "description": "Revert \"Add pattern data reading to MusicLine/Sonic Arranger engine\""
-      },
-      {
-        type: 'feature',
-        "description": "Add pattern data reading to MusicLine/Sonic Arranger engine"
-      },
-      {
-        type: 'fix',
-        "description": "Rewrite JSSIDEngine to use jsSID native API"
-      },
-      {
-        type: 'fix',
-        "description": "Fix GT Ultra: pattern data, layout, and audio routing"
-      },
-      {
-        type: 'fix',
-        "description": "Always-mount import dialogs to fix SID modal not showing in GL mode"
       }
     ]
   }
