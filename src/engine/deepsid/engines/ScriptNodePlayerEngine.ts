@@ -45,7 +45,7 @@ const MODULE_STATE_MAP: Record<string, string> = {
  */
 export class ScriptNodePlayerEngine {
   private readonly sidData: Uint8Array;
-  private readonly config: ScriptNodePlayerConfig;
+  private readonly _config: ScriptNodePlayerConfig;
   private readonly engineType: SIDEngineType;
 
   private player: any = null;
@@ -62,7 +62,7 @@ export class ScriptNodePlayerEngine {
   ) {
     this.sidData = sidData;
     this.engineType = engineType;
-    this.config = config;
+    this._config = config;
   }
 
   /**
@@ -173,7 +173,7 @@ export class ScriptNodePlayerEngine {
     if (!this.player) throw new Error('Player not initialized');
 
     // Create a blob URL for the SID data
-    const blob = new Blob([this.sidData], { type: 'application/octet-stream' });
+    const blob = new Blob([new Uint8Array(this.sidData)], { type: 'application/octet-stream' });
     this.blobUrl = URL.createObjectURL(blob);
 
     const ScriptNodePlayer = (window as any).ScriptNodePlayer;

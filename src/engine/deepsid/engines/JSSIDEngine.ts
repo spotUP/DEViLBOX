@@ -96,7 +96,7 @@ export class JSSIDEngine {
   private loadSIDData(): Promise<void> {
     return new Promise((resolve, reject) => {
       let resolved = false;
-      const blob = new Blob([this.sidData], { type: 'application/octet-stream' });
+      const blob = new Blob([new Uint8Array(this.sidData)], { type: 'application/octet-stream' });
       this.blobUrl = URL.createObjectURL(blob);
 
       // jsSID calls the load callback when XHR completes
@@ -241,7 +241,7 @@ export class JSSIDEngine {
    * Mute/unmute a voice — jsSID uses a bitmask via enableVoices(mask)
    * where bit N=1 means voice N is enabled (up to 9 voices for 3SID)
    */
-  setVoiceMask(voice: number, muted: boolean): void {
+  setVoiceMask(_voice: number, muted: boolean): void {
     if (this.jsSID?.enableVoices) {
       // enableVoices expects a bitmask where 1 = enabled
       // We don't have a getter, so we track externally
