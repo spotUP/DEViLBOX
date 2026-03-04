@@ -1703,6 +1703,14 @@ export class TrackerReplayer {
         // Trigger note
         this.triggerNote(ch, time, offset, chIndex, accent, slideActive, effectiveSlide, hammer);
 
+        // SA synth: send arpeggio table from pattern data after note trigger
+        if (ch.instrument?.synthType === 'SonicArrangerSynth' && row.saArpTable !== undefined) {
+          const saInst = getToneEngine().getInstrument(ch.instrument.id, ch.instrument, chIndex);
+          if (saInst && typeof (saInst as any).set === 'function') {
+            (saInst as any).set('arpeggioTable', row.saArpTable);
+          }
+        }
+
         // Update slide flag for next row
         ch.previousSlideFlag = (slide || hammer) ?? false;
       }
@@ -1788,6 +1796,15 @@ export class TrackerReplayer {
         ch.lastPlayedNoteName = newNoteName;
 
         this.triggerNote(ch, time, offset, chIndex, accent, slideActive, effectiveSlide, hammer);
+
+        // SA synth: send arpeggio table from pattern data after note trigger
+        if (ch.instrument?.synthType === 'SonicArrangerSynth' && row.saArpTable !== undefined) {
+          const saInst = getToneEngine().getInstrument(ch.instrument.id, ch.instrument, chIndex);
+          if (saInst && typeof (saInst as any).set === 'function') {
+            (saInst as any).set('arpeggioTable', row.saArpTable);
+          }
+        }
+
         this.triggerEnvelopes(ch);
         ch.outVol = ch.volume;
         ch.outPan = ch.panning;
