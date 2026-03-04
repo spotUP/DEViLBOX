@@ -72,6 +72,7 @@ export const PixiGTUltraView: React.FC<Props> = ({ width, height }) => {
       const audioCtx = new AudioContext();
       gtEngine = new GTUltraEngine(audioCtx, {
         onReady: () => {
+          if (disposed) return;
           console.log('[GTUltra/Pixi] Engine ready');
           const store = useGTUltraStore.getState();
           // Load any pending song data that arrived before engine was ready
