@@ -29,7 +29,7 @@ export const PixiScaleVolumeDialog: React.FC<PixiScaleVolumeDialogProps> = ({ is
     <PixiModal isOpen={isOpen} onClose={onClose} width={260} height={200}>
       <PixiModalHeader title="Scale Volume" onClose={onClose} />
 
-      <pixiContainer layout={{ flex: 1, padding: 12, flexDirection: 'column', gap: 12, alignItems: 'center' }}>
+      <layoutContainer layout={{ flex: 1, padding: 12, flexDirection: 'column', gap: 12, alignItems: 'center' }}>
         <PixiKnob
           value={scale}
           min={0}
@@ -44,7 +44,7 @@ export const PixiScaleVolumeDialog: React.FC<PixiScaleVolumeDialogProps> = ({ is
         {!hasSelection && (
           <PixiLabel text="Select a region first" size="xs" color="textMuted" />
         )}
-      </pixiContainer>
+      </layoutContainer>
 
       <PixiModalFooter>
         <PixiButton label="Cancel" variant="ghost" onClick={onClose} />

@@ -54,9 +54,9 @@ export const PixiInterpolateDialog: React.FC<PixiInterpolateDialogProps> = ({ is
     <PixiModal isOpen={isOpen} onClose={onClose} width={320} height={280}>
       <PixiModalHeader title="Interpolate" onClose={onClose} />
 
-      <pixiContainer layout={{ flex: 1, padding: 12, flexDirection: 'column', gap: 10 }}>
+      <layoutContainer layout={{ flex: 1, padding: 12, flexDirection: 'column', gap: 10 }}>
         {/* Column selector */}
-        <pixiContainer layout={{ flexDirection: 'row', gap: 4, flexWrap: 'wrap' }}>
+        <layoutContainer layout={{ flexDirection: 'row', gap: 4, flexWrap: 'wrap' }}>
           {COLUMNS.map(col => (
             <PixiButton
               key={col.id}
@@ -70,10 +70,10 @@ export const PixiInterpolateDialog: React.FC<PixiInterpolateDialogProps> = ({ is
               }}
             />
           ))}
-        </pixiContainer>
+        </layoutContainer>
 
         {/* Start / End values */}
-        <pixiContainer layout={{ flexDirection: 'row', gap: 16 }}>
+        <layoutContainer layout={{ flexDirection: 'row', gap: 16 }}>
           <PixiNumericInput
             value={startValue}
             min={colConfig.min}
@@ -90,10 +90,10 @@ export const PixiInterpolateDialog: React.FC<PixiInterpolateDialogProps> = ({ is
             onChange={setEndValue}
             width={50}
           />
-        </pixiContainer>
+        </layoutContainer>
 
         {/* Curve type */}
-        <pixiContainer layout={{ flexDirection: 'row', gap: 4 }}>
+        <layoutContainer layout={{ flexDirection: 'row', gap: 4 }}>
           {CURVES.map(c => (
             <PixiButton
               key={c.id}
@@ -103,12 +103,12 @@ export const PixiInterpolateDialog: React.FC<PixiInterpolateDialogProps> = ({ is
               onClick={() => setCurve(c.id)}
             />
           ))}
-        </pixiContainer>
+        </layoutContainer>
 
         {!hasSelection && (
           <PixiLabel text="Select a region first" size="xs" color="textMuted" />
         )}
-      </pixiContainer>
+      </layoutContainer>
 
       <PixiModalFooter>
         <PixiButton label="Cancel" variant="ghost" onClick={onClose} />

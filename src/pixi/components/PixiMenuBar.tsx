@@ -171,26 +171,17 @@ export const PixiMenuItem: React.FC<PixiMenuItemProps> = ({ item, width, onClose
 
   if (item.type === 'separator') {
     return (
-      <pixiContainer layout={{ width, height: SEP_ITEM_H, justifyContent: 'center' }}>
-        <pixiGraphics
-          draw={(g: GraphicsType) => {
-            g.clear();
-            g.rect(0, SEP_ITEM_H / 2 - 0.5, width, 1);
-            g.fill({ color: theme.border.color, alpha: 0.5 });
-          }}
-          layout={{ width, height: SEP_ITEM_H }}
-        />
-      </pixiContainer>
+      <layoutContainer layout={{
+        width,
+        height: SEP_ITEM_H,
+        justifyContent: 'center',
+        borderBottomWidth: 1,
+        borderColor: theme.border.color,
+      }} />
     );
   }
 
   const isDisabled = item.type === 'action' && item.disabled;
-  const drawItemBg = useCallback((g: GraphicsType) => {
-    g.clear();
-    if (!hovered || isDisabled) return;
-    g.roundRect(0, 0, width, h, 2);
-    g.fill({ color: theme.accent.color, alpha: 0.2 });
-  }, [hovered, isDisabled, width, h, theme]);
 
   const handleClick = useCallback(() => {
     if (isDisabled) return;
@@ -204,16 +195,22 @@ export const PixiMenuItem: React.FC<PixiMenuItemProps> = ({ item, width, onClose
   const shortcut = item.type === 'action' ? (item.shortcut ?? '') : '';
 
   return (
-    <pixiContainer
+    <layoutContainer
       eventMode={isDisabled ? 'none' : 'static'}
       cursor={isDisabled ? 'default' : 'pointer'}
       onPointerOver={() => setHovered(true)}
       onPointerOut={() => setHovered(false)}
       onPointerUp={handleClick}
       alpha={isDisabled ? 0.4 : 1}
-      layout={{ width, height: h, alignItems: 'center', paddingLeft: 8 }}
+      layout={{
+        width,
+        height: h,
+        alignItems: 'center',
+        paddingLeft: 8,
+        backgroundColor: hovered && !isDisabled ? theme.accent.color : undefined,
+        borderRadius: 2,
+      }}
     >
-      <pixiGraphics draw={drawItemBg} layout={{ position: 'absolute', width, height: h }} />
       <pixiBitmapText
         text={label}
         style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 11, fill: 0xffffff }}
@@ -228,6 +225,6 @@ export const PixiMenuItem: React.FC<PixiMenuItemProps> = ({ item, width, onClose
           layout={{ width: 80, marginRight: 8 }}
         />
       )}
-    </pixiContainer>
+    </layoutContainer>
   );
 };

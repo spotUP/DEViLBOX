@@ -30,8 +30,8 @@ export const PixiFadeVolumeDialog: React.FC<PixiFadeVolumeDialogProps> = ({ isOp
     <PixiModal isOpen={isOpen} onClose={onClose} width={280} height={200}>
       <PixiModalHeader title="Fade Volume" onClose={onClose} />
 
-      <pixiContainer layout={{ flex: 1, padding: 12, flexDirection: 'column', gap: 12 }}>
-        <pixiContainer layout={{ flexDirection: 'row', gap: 16 }}>
+      <layoutContainer layout={{ flex: 1, padding: 12, flexDirection: 'column', gap: 12 }}>
+        <layoutContainer layout={{ flexDirection: 'row', gap: 16 }}>
           <PixiNumericInput
             value={startVol}
             min={0}
@@ -48,17 +48,17 @@ export const PixiFadeVolumeDialog: React.FC<PixiFadeVolumeDialogProps> = ({ isOp
             onChange={setEndVol}
             width={50}
           />
-        </pixiContainer>
+        </layoutContainer>
 
-        <pixiContainer layout={{ flexDirection: 'row', gap: 4 }}>
+        <layoutContainer layout={{ flexDirection: 'row', gap: 4 }}>
           <PixiButton label="Fade In" variant="ghost" size="sm" onClick={() => { setStartVol(0); setEndVol(64); }} />
           <PixiButton label="Fade Out" variant="ghost" size="sm" onClick={() => { setStartVol(64); setEndVol(0); }} />
-        </pixiContainer>
+        </layoutContainer>
 
         {!hasSelection && (
           <PixiLabel text="Select a region first" size="xs" color="textMuted" />
         )}
-      </pixiContainer>
+      </layoutContainer>
 
       <PixiModalFooter>
         <PixiButton label="Cancel" variant="ghost" onClick={onClose} />
