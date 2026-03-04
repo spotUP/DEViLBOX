@@ -62,7 +62,7 @@ const DragPad: React.FC<{
   }, [onDrag]);
 
   const iconChar = FAD_ICONS[icon] ?? '?';
-  const textColor = theme.textPrimary?.color ?? 0xcccccc;
+  const textColor = theme.text?.color ?? 0xcccccc;
 
   return (
     <layoutContainer
@@ -112,7 +112,7 @@ const SmallButton: React.FC<{
 }> = ({ label, onClick }) => {
   const [hovered, setHovered] = React.useState(false);
   const theme = usePixiTheme();
-  const textColor = theme.textPrimary?.color ?? 0xcccccc;
+  const textColor = theme.text?.color ?? 0xcccccc;
 
   return (
     <layoutContainer
