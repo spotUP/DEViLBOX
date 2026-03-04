@@ -10,18 +10,19 @@
  *    selection overlay, cursor caret, peer cursor/selection, ghost patterns
  *  - pixiBitmapText for all visible cell text (~30 visible rows)
  *  - Channel header via PixiChannelHeaders (native GL rendering; DOM portals
- *    only for context menu, color picker, and name editing input)
- *  - Cell context menu via PixiDOMOverlay (right-click menu)
+ *    only for color picker and name editing input)
+ *  - Cell context menu via GL PixiContextMenu (right-click menu)
+ *  - ParameterEditor via React portal to document.body (full-screen modal)
  *  - Collaboration peer cursor/selection in drawGrid
  *  - Stepped horizontal scroll with accumulator (matches DOM behavior)
  */
 
 import React, { useCallback, useMemo, useRef, useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import type { Graphics as GraphicsType, FederatedPointerEvent, Container as ContainerType } from 'pixi.js';
 import { usePixiTheme, type PixiTheme } from '../../theme';
 import { PIXI_FONTS } from '../../fonts';
 import { MegaText, type GlyphLabel } from '../../utils/MegaText';
-import { PixiDOMOverlay } from '../../components/PixiDOMOverlay';
 import { useTrackerStore, useTransportStore, useUIStore, useCursorStore } from '@stores';
 import { useShallow } from 'zustand/react/shallow';
 import { useSettingsStore } from '@/stores/useSettingsStore';
@@ -30,7 +31,7 @@ import { getTrackerReplayer } from '@engine/TrackerReplayer';
 import { getTrackerScratchController } from '@engine/TrackerScratchController';
 import { useBDAnimations } from '@hooks/tracker/useBDAnimations';
 import { GENERATORS, type GeneratorType } from '@utils/patternGenerators';
-import { CellContextMenu, useCellContextMenu } from '@/components/tracker/CellContextMenu';
+import { PixiContextMenu, type ContextMenuItem } from '../../input/PixiContextMenu';
 import { ParameterEditor } from '@/components/tracker/ParameterEditor';
 import { PixiTrackerVisualBg } from './PixiTrackerVisualBg';
 import { PixiChannelHeaders } from './PixiChannelHeaders';
@@ -88,6 +89,32 @@ function probColor(val: number): number {
 // ─── Imperative render helpers (pure functions, no closures over React state) ─
 
 type TrackerPattern = NonNullable<ReturnType<typeof useTrackerStore.getState>['patterns'][0]>;
+
+/** Helper for context-menu "Interpolate Block" items — mirrors CellContextMenu logic */
+function _interpolateBlock(
+  ts: ReturnType<typeof useTrackerStore.getState>,
+  pat: TrackerPattern | undefined,
+  ch: number,
+  sel: BlockSelection | null,
+  column: 'volume' | 'cutoff' | 'resonance' | 'envMod' | 'pan' | 'effParam' | 'effParam2',
+) {
+  if (!sel || !pat) return;
+  const minRow = Math.min(sel.startRow, sel.endRow);
+  const maxRow = Math.max(sel.startRow, sel.endRow);
+  const cellProp = column === 'effParam' ? 'eff' : column === 'effParam2' ? 'eff2' : column;
+  let startVal: number | null = null;
+  for (let r = minRow; r <= maxRow; r++) {
+    const val = pat.channels[ch].rows[r][cellProp] as number;
+    if (val !== undefined && val !== 0) { startVal = val; break; }
+  }
+  let endVal: number | null = null;
+  for (let r = maxRow; r >= minRow; r--) {
+    const val = pat.channels[ch].rows[r][cellProp] as number;
+    if (val !== undefined && val !== 0) { endVal = val; break; }
+  }
+  if (startVal === null || endVal === null) return;
+  ts.interpolateSelection(column, startVal, endVal);
+}
 
 type LabelData = GlyphLabel;
 
@@ -408,7 +435,7 @@ interface PixiPatternEditorProps {
   isActive?: boolean;
 }
 
-export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, height, isActive = true }) => {
+export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, height }) => {
   const theme = usePixiTheme();
 
   // ── Store subscriptions ────────────────────────────────────────────────────
@@ -476,8 +503,20 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
   const cursorRef = useRef(useCursorStore.getState().cursor);
   const selectionRef = useRef(useCursorStore.getState().selection);
 
-  // ── Cell context menu ─────────────────────────────────────────────────────
-  const cellContextMenu = useCellContextMenu();
+  // ── Cell context menu (GL-native via PixiContextMenu) ─────────────────────
+  const [ctxMenuState, setCtxMenuState] = useState<{
+    position: { x: number; y: number } | null;
+    rowIndex: number;
+    channelIndex: number;
+  }>({ position: null, rowIndex: 0, channelIndex: 0 });
+
+  const openCellContextMenu = useCallback((clientX: number, clientY: number, rowIndex: number, channelIndex: number) => {
+    setCtxMenuState({ position: { x: clientX, y: clientY }, rowIndex, channelIndex });
+  }, []);
+
+  const closeCellContextMenu = useCallback(() => {
+    setCtxMenuState(prev => ({ ...prev, position: null }));
+  }, []);
 
   // ── Parameter editor state ────────────────────────────────────────────────
   const [parameterEditorState, setParameterEditorState] = useState<{
@@ -492,12 +531,12 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
     if (!pattern) return;
     const cur = cursorRef.current;
     const sel = selectionRef.current;
-    const channelIdx = cellContextMenu.cellInfo?.channelIndex ?? cur.channelIndex;
+    const channelIdx = ctxMenuState.position ? ctxMenuState.channelIndex : cur.channelIndex;
     const start = sel?.startRow ?? cur.rowIndex;
     const end = sel?.endRow ?? Math.min(cur.rowIndex + 15, pattern.length - 1);
     setParameterEditorState({ isOpen: true, field, channelIndex: channelIdx, startRow: start, endRow: end });
-    cellContextMenu.closeMenu();
-  }, [cellContextMenu, pattern]);
+    closeCellContextMenu();
+  }, [ctxMenuState, pattern, closeCellContextMenu]);
 
   // ── B/D Animation handlers ────────────────────────────────────────────────
   const bdAnimations = useBDAnimations();
@@ -521,6 +560,140 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
   const handleSpiral = useCallback((ch: number) => bdAnimations.applySpiral(getBDAnimationOptions(ch)), [bdAnimations, getBDAnimationOptions]);
   const handleBounce = useCallback((ch: number) => bdAnimations.applyBounce(getBDAnimationOptions(ch)), [bdAnimations, getBDAnimationOptions]);
   const handleChaos = useCallback((ch: number) => bdAnimations.applyChaos(getBDAnimationOptions(ch)), [bdAnimations, getBDAnimationOptions]);
+
+  // ── Build GL context menu items ───────────────────────────────────────────
+  const ctxMenuItems = useMemo((): ContextMenuItem[] => {
+    const ch = ctxMenuState.channelIndex;
+    const row = ctxMenuState.rowIndex;
+    const sel = selectionRef.current;
+    const hasSelection = !!sel;
+    const ts = useTrackerStore.getState();
+    const cs = useCursorStore.getState();
+    const pat = ts.patterns[ts.currentPatternIndex];
+
+    const items: ContextMenuItem[] = [];
+
+    // Block operations (if selection active)
+    if (hasSelection) {
+      items.push({ label: 'BLOCK OPERATIONS', disabled: true });
+      items.push({ label: 'Copy Block', action: () => ts.copySelection() });
+      items.push({ label: 'Cut Block', action: () => ts.cutSelection() });
+      items.push({ label: 'Paste Block', action: () => ts.paste() });
+      items.push({
+        label: 'Transpose Block',
+        submenu: [
+          { label: '+1 Semitone', action: () => ts.transposeSelection(1) },
+          { label: '-1 Semitone', action: () => ts.transposeSelection(-1) },
+          { label: '+1 Octave', action: () => ts.transposeSelection(12) },
+          { label: '-1 Octave', action: () => ts.transposeSelection(-12) },
+        ],
+      });
+      items.push({
+        label: 'Interpolate Block',
+        submenu: [
+          { label: 'Interpolate Volume', action: () => _interpolateBlock(ts, pat, ch, sel, 'volume') },
+          { label: 'Interpolate Effect 1', action: () => _interpolateBlock(ts, pat, ch, sel, 'effParam') },
+          { label: 'Interpolate Effect 2', action: () => _interpolateBlock(ts, pat, ch, sel, 'effParam2') },
+          { label: 'Interpolate Cutoff', action: () => _interpolateBlock(ts, pat, ch, sel, 'cutoff') },
+          { label: 'Interpolate Resonance', action: () => _interpolateBlock(ts, pat, ch, sel, 'resonance') },
+        ],
+      });
+      items.push({
+        label: 'B/D Operations',
+        submenu: [
+          { label: 'Reverse Visual', action: () => handleReverseVisual(ch) },
+          { label: 'Polyrhythm', action: () => handlePolyrhythm(ch) },
+          { label: 'Fibonacci Sequence', action: () => handleFibonacci(ch) },
+          { label: 'Euclidean Pattern', action: () => handleEuclidean(ch) },
+          { label: 'Ping-Pong', action: () => handlePingPong(ch) },
+          { label: 'Glitch', action: () => handleGlitch(ch) },
+          { label: 'Strobe', action: () => handleStrobe(ch) },
+          { label: 'Visual Echo', action: () => handleVisualEcho(ch) },
+          { label: 'Converge', action: () => handleConverge(ch) },
+          { label: 'Spiral', action: () => handleSpiral(ch) },
+          { label: 'Bounce', action: () => handleBounce(ch) },
+          { label: 'Chaos', action: () => handleChaos(ch) },
+        ],
+      });
+      items.push({ label: 'Deselect Block', action: () => cs.clearSelection() });
+      items.push({ separator: true, label: '' });
+    }
+
+    // Single cell operations
+    items.push({ label: 'CELL OPERATIONS', disabled: true });
+    items.push({
+      label: 'Cut Cell',
+      action: () => {
+        if (!pat) return;
+        const cell = pat.channels[ch].rows[row];
+        localStorage.setItem('devilbox-cell-clipboard', JSON.stringify(cell));
+        ts.setCell(ch, row, { note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0 });
+      },
+    });
+    items.push({
+      label: 'Copy Cell',
+      action: () => {
+        if (!pat) return;
+        localStorage.setItem('devilbox-cell-clipboard', JSON.stringify(pat.channels[ch].rows[row]));
+      },
+    });
+    items.push({
+      label: 'Paste Cell',
+      action: () => {
+        const data = localStorage.getItem('devilbox-cell-clipboard');
+        if (data) { try { ts.setCell(ch, row, JSON.parse(data)); } catch { /* ignore */ } }
+      },
+    });
+    items.push({
+      label: 'Clear',
+      action: () => ts.setCell(ch, row, { note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0 }),
+    });
+    items.push({ separator: true, label: '' });
+
+    // Insert/Delete row
+    items.push({
+      label: 'Insert Row',
+      action: () => {
+        if (!pat) return;
+        for (let r = pat.length - 1; r > row; r--) ts.setCell(ch, r, pat.channels[ch].rows[r - 1]);
+        ts.setCell(ch, row, { note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0 });
+      },
+    });
+    items.push({
+      label: 'Delete Row',
+      action: () => {
+        if (!pat) return;
+        for (let r = row; r < pat.length - 1; r++) ts.setCell(ch, r, pat.channels[ch].rows[r + 1]);
+        ts.setCell(ch, pat.length - 1, { note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0 });
+      },
+    });
+    items.push({ separator: true, label: '' });
+
+    // Visual Parameter Editor
+    items.push({
+      label: 'Parameter Editor',
+      submenu: [
+        { label: 'Edit Volume...', action: () => handleOpenParameterEditor('volume') },
+        { label: 'Edit Effect Type...', action: () => handleOpenParameterEditor('effect') },
+        { label: 'Edit Effect Param...', action: () => handleOpenParameterEditor('effectParam') },
+      ],
+    });
+    items.push({ separator: true, label: '' });
+
+    // Selection
+    items.push({ label: 'Select Column', action: () => { cs.selectColumn(ch, cs.cursor.columnType); } });
+    items.push({ label: 'Select Channel', action: () => { cs.selectChannel(ch); } });
+
+    if (pat && pat.channels.length > 1) {
+      items.push({ separator: true, label: '' });
+      items.push({ label: 'Remove Channel', action: () => ts.removeChannel(ch) });
+    }
+
+    return items;
+  }, [ctxMenuState.channelIndex, ctxMenuState.rowIndex, ctxMenuState.position,
+      handleOpenParameterEditor, handleReverseVisual, handlePolyrhythm, handleFibonacci,
+      handleEuclidean, handlePingPong, handleGlitch, handleStrobe, handleVisualEcho,
+      handleConverge, handleSpiral, handleBounce, handleChaos]);
 
   // ── Channel operation handlers (for ChannelContextMenu) ───────────────────
   const handleFillPattern = useCallback((channelIndex: number, generatorType: GeneratorType) => {
@@ -1031,11 +1204,7 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
 
     // Right-click → context menu
     if (nativeEvent.button === 2) {
-      cellContextMenu.openMenu(
-        { clientX: nativeEvent.clientX, clientY: nativeEvent.clientY, preventDefault: () => {}, stopPropagation: () => {} } as React.MouseEvent,
-        cell.rowIndex,
-        cell.channelIndex,
-      );
+      openCellContextMenu(nativeEvent.clientX, nativeEvent.clientY, cell.rowIndex, cell.channelIndex);
       return;
     }
 
@@ -1365,45 +1534,26 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
         />
       </pixiContainer>
 
-      {/* ─── DOM overlays for context menus + parameter editor ────────── */}
-      <PixiDOMOverlay
-        layout={{ position: 'absolute', width, height, left: 0, top: 0 }}
-        style={{ pointerEvents: 'none', zIndex: 30 }}
-        visible={isActive}
-      >
-        {/* Cell context menu */}
-        <CellContextMenu
-          isOpen={cellContextMenu.isOpen}
-          position={cellContextMenu.position}
-          onClose={cellContextMenu.closeMenu}
-          channelIndex={cellContextMenu.cellInfo?.channelIndex ?? 0}
-          rowIndex={cellContextMenu.cellInfo?.rowIndex ?? 0}
-          onOpenParameterEditor={handleOpenParameterEditor}
-          onReverseVisual={() => handleReverseVisual(cellContextMenu.cellInfo?.channelIndex ?? 0)}
-          onPolyrhythm={() => handlePolyrhythm(cellContextMenu.cellInfo?.channelIndex ?? 0)}
-          onFibonacci={() => handleFibonacci(cellContextMenu.cellInfo?.channelIndex ?? 0)}
-          onEuclidean={() => handleEuclidean(cellContextMenu.cellInfo?.channelIndex ?? 0)}
-          onPingPong={() => handlePingPong(cellContextMenu.cellInfo?.channelIndex ?? 0)}
-          onGlitch={() => handleGlitch(cellContextMenu.cellInfo?.channelIndex ?? 0)}
-          onStrobe={() => handleStrobe(cellContextMenu.cellInfo?.channelIndex ?? 0)}
-          onVisualEcho={() => handleVisualEcho(cellContextMenu.cellInfo?.channelIndex ?? 0)}
-          onConverge={() => handleConverge(cellContextMenu.cellInfo?.channelIndex ?? 0)}
-          onSpiral={() => handleSpiral(cellContextMenu.cellInfo?.channelIndex ?? 0)}
-          onBounce={() => handleBounce(cellContextMenu.cellInfo?.channelIndex ?? 0)}
-          onChaos={() => handleChaos(cellContextMenu.cellInfo?.channelIndex ?? 0)}
-        />
+      {/* ─── GL Context Menu (rendered by PixiGlobalDropdownLayer) ──────── */}
+      <PixiContextMenu
+        items={ctxMenuItems}
+        x={ctxMenuState.position?.x ?? 0}
+        y={ctxMenuState.position?.y ?? 0}
+        isOpen={!!ctxMenuState.position}
+        onClose={closeCellContextMenu}
+      />
 
-        {/* Parameter Editor */}
-        {parameterEditorState?.isOpen && (
-          <ParameterEditor
-            onClose={() => setParameterEditorState(null)}
-            channelIndex={parameterEditorState.channelIndex}
-            startRow={parameterEditorState.startRow}
-            endRow={parameterEditorState.endRow}
-            field={parameterEditorState.field}
-          />
-        )}
-      </PixiDOMOverlay>
+      {/* ─── Parameter Editor (full-screen modal via React portal) ─────── */}
+      {parameterEditorState?.isOpen && createPortal(
+        <ParameterEditor
+          onClose={() => setParameterEditorState(null)}
+          channelIndex={parameterEditorState.channelIndex}
+          startRow={parameterEditorState.startRow}
+          endRow={parameterEditorState.endRow}
+          field={parameterEditorState.field}
+        />,
+        document.body,
+      )}
     </pixiContainer>
   );
 };
