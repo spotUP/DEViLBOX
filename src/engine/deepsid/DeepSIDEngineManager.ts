@@ -279,12 +279,20 @@ export class DeepSIDEngineManager {
   }
 
   /**
+   * Ensure ScriptNodePlayer base library is loaded (needed by all WASM backends)
+   */
+  private async ensureScriptNodePlayer(): Promise<void> {
+    // Set WASM search path before any backend scripts load
+    (window as any).WASM_SEARCH_PATH = '/deepsid/';
+    await this.loadScript('/deepsid/scriptprocessor_player.min.js');
+  }
+
+  /**
    * Load jsSID (pure JavaScript)
    */
   private async loadJSSID(): Promise<any> {
     // Load jsSID script
     await this.loadScript('/deepsid/jsSID-modified.js');
-    await this.loadScript('/deepsid/scriptprocessor_player.min.js');
 
     // Check if jsSID is available globally
     if (typeof (window as any).jsSID === 'undefined') {
@@ -294,75 +302,44 @@ export class DeepSIDEngineManager {
     return {
       type: 'jssid',
       jsSID: (window as any).jsSID,
-      player: (window as any).SIDPlayer,
     };
   }
 
   /**
-   * Load WebSID (WASM)
+   * Load WebSID (WASM) — uses ScriptNodePlayer architecture
    */
   private async loadWebSID(): Promise<any> {
+    await this.ensureScriptNodePlayer();
     await this.loadScript('/deepsid/backend_websid.js');
-    
-    // WebSID backend should be available as global
-    if (typeof (window as any).SIDBackend === 'undefined') {
-      throw new Error('WebSID backend not loaded');
-    }
-
-    return {
-      type: 'websid',
-      backend: (window as any).SIDBackend,
-    };
+    return { type: 'websid' };
   }
 
   /**
-   * Load TinyRSID (WASM)
+   * Load TinyRSID (WASM) — uses ScriptNodePlayer architecture
    */
   private async loadTinyRSID(): Promise<any> {
+    await this.ensureScriptNodePlayer();
     await this.loadScript('/deepsid/backend_tinyrsid.js');
-    
-    if (typeof (window as any).reSIDBackend === 'undefined') {
-      throw new Error('TinyRSID backend not loaded');
-    }
-
-    return {
-      type: 'tinyrsid',
-      backend: (window as any).reSIDBackend,
-    };
+    return { type: 'tinyrsid' };
   }
 
   /**
-   * Load WebSIDPlay (WASM)
+   * Load WebSIDPlay (WASM) — uses ScriptNodePlayer architecture
    */
   private async loadWebSIDPlay(): Promise<any> {
+    await this.ensureScriptNodePlayer();
     await this.loadScript('/deepsid/backend_websidplay.js');
-    
-    if (typeof (window as any).reSIDBackend === 'undefined') {
-      throw new Error('WebSIDPlay backend not loaded');
-    }
-
-    return {
-      type: 'websidplay',
-      backend: (window as any).reSIDBackend,
-    };
+    return { type: 'websidplay' };
   }
 
   /**
-   * Load JSIDPlay2 (WASM with workers)
+   * Load JSIDPlay2 (WASM with workers) — uses ScriptNodePlayer architecture
    */
   private async loadJSIDPlay2(): Promise<any> {
-    // Load runtime and worker
+    await this.ensureScriptNodePlayer();
     await this.loadScript('/deepsid/jsidplay2-004.wasm_gc-runtime.js');
     await this.loadScript('/deepsid/jsidplay2-004.wasm_gc-worker.js');
-    
-    if (typeof (window as any).JSIDPlay2 === 'undefined') {
-      throw new Error('JSIDPlay2 not loaded');
-    }
-
-    return {
-      type: 'jsidplay2',
-      player: (window as any).JSIDPlay2,
-    };
+    return { type: 'jsidplay2' };
   }
 
   /**

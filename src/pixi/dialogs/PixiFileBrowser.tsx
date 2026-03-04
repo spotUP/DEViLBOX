@@ -14,7 +14,7 @@ import { PixiButton } from '../components/PixiButton';
 import { PixiList } from '../components/PixiList';
 import { PixiIcon } from '../components/PixiIcon';
 import { PixiPureTextInput } from '../input/PixiPureTextInput';
-import { useFileNavigation, isTrackerModule, type FileSource } from '@/components/dialogs/useFileNavigation';
+import { useFileNavigation, isTrackerModule, type FileSource, getLastFileSource, setLastFileSource } from '@/components/dialogs/useFileNavigation';
 import { hasElectronFS } from '@utils/electron';
 
 // ---------------------------------------------------------------------------
@@ -83,7 +83,8 @@ export const PixiFileBrowser: React.FC<PixiFileBrowserProps> = ({
   onLoadTrackerModule,
 }) => {
   const theme = usePixiTheme();
-  const [fileSource, setFileSource] = useState<FileSource>('demo');
+  const [fileSource, _setFileSource] = useState<FileSource>(getLastFileSource);
+  const setFileSource = (s: FileSource) => { setLastFileSource(s); _setFileSource(s); };
 
   const nav = useFileNavigation({
     isOpen,

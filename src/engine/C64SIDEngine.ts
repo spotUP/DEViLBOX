@@ -11,13 +11,10 @@
 
 import { deepSIDManager, type SIDEngineType } from './deepsid/DeepSIDEngineManager';
 import { JSSIDEngine } from './deepsid/engines/JSSIDEngine';
-import { WebSIDEngine } from './deepsid/engines/WebSIDEngine';
-import { TinyRSIDEngine } from './deepsid/engines/TinyRSIDEngine';
-import { WebSIDPlayEngine } from './deepsid/engines/WebSIDPlayEngine';
-import { JSIDPlay2Engine } from './deepsid/engines/JSIDPlay2Engine';
+import { ScriptNodePlayerEngine } from './deepsid/engines/ScriptNodePlayerEngine';
 import { useSettingsStore } from '@stores/useSettingsStore';
 
-type EngineInstance = JSSIDEngine | WebSIDEngine | TinyRSIDEngine | WebSIDPlayEngine | JSIDPlay2Engine;
+type EngineInstance = JSSIDEngine | ScriptNodePlayerEngine;
 
 export interface C64SIDMetadata {
   title: string;
@@ -142,32 +139,22 @@ export class C64SIDEngine {
         break;
       
       case 'websid':
-        this.engine = new WebSIDEngine(this.sidData, {
-          chipModel: this.metadata?.chipModel,
-          sampleRate: audioContext.sampleRate,
-        });
-        break;
-      
       case 'tinyrsid':
-        this.engine = new TinyRSIDEngine(this.sidData, {
-          chipModel: this.metadata?.chipModel,
-          sampleRate: audioContext.sampleRate,
-        });
-        break;
-      
       case 'websidplay':
-        this.engine = new WebSIDPlayEngine(this.sidData, {
+        this.engine = new ScriptNodePlayerEngine(this.sidData, engineType, {
           chipModel: this.metadata?.chipModel,
           sampleRate: audioContext.sampleRate,
-          quality: 'resample', // Best quality
         });
         break;
-      
+
       case 'jsidplay2':
-        this.engine = new JSIDPlay2Engine(this.sidData, {
+        // JSIDPlay2 uses TeaVM (Java→WASM), not ScriptNodePlayer — not yet supported
+        console.warn('[C64SIDEngine] JSIDPlay2 not yet supported, falling back to websid');
+        this.engineType = 'websid';
+        await deepSIDManager.loadEngine('websid');
+        this.engine = new ScriptNodePlayerEngine(this.sidData, 'websid', {
           chipModel: this.metadata?.chipModel,
           sampleRate: audioContext.sampleRate,
-          forceSIDModel: true,
         });
         break;
     }
