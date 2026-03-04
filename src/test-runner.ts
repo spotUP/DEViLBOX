@@ -3233,6 +3233,86 @@ const EFFECT_CONFIGS: Record<string, EffectConfig> = {
     parameters: { drive: 50, presence: 50, level: 50, dryWet: 50 },
     neuralModelIndex: 36, neuralModelName: 'Gibson EH-185',
   },
+
+  // === WASM Effects (native C++ DSP) ===
+  'MoogFilter': {
+    id: 'test-moogfilter', category: 'wasm', type: 'MoogFilter', enabled: true, wet: 100,
+    parameters: { cutoff: 1000, resonance: 10, drive: 1.0, model: 0, filterMode: 0 },
+  },
+  'MVerb': {
+    id: 'test-mverb', category: 'wasm', type: 'MVerb', enabled: true, wet: 50,
+    parameters: { damping: 0.5, density: 0.5, bandwidth: 0.5, decay: 0.7, predelay: 0.0, size: 0.8, gain: 1.0, mix: 0.4, earlyMix: 0.5 },
+  },
+  'Leslie': {
+    id: 'test-leslie', category: 'wasm', type: 'Leslie', enabled: true, wet: 80,
+    parameters: { speed: 0.0, hornRate: 6.8, drumRate: 5.9, hornDepth: 0.7, drumDepth: 0.5, doppler: 0.5, width: 0.8, acceleration: 0.5 },
+  },
+  'SpringReverb': {
+    id: 'test-springreverb', category: 'wasm', type: 'SpringReverb', enabled: true, wet: 50,
+    parameters: { decay: 0.6, damping: 0.4, tension: 0.5, mix: 0.35, drip: 0.5, diffusion: 0.7 },
+  },
+  'VinylNoise': {
+    id: 'test-vinylnoise', category: 'wasm', type: 'VinylNoise', enabled: true, wet: 80,
+    parameters: { hiss: 50, dust: 58, age: 45, speed: 5.5, riaa: 52, stylusResonance: 50, wornStylus: 28, pinch: 35, innerGroove: 25, ghostEcho: 20, dropout: 10, warp: 10, eccentricity: 18 },
+  },
+  'Tumult': {
+    id: 'test-tumult', category: 'wasm', type: 'Tumult', enabled: true, wet: 60,
+    parameters: { noiseGain: -10.0, mix: 0.5, noiseMode: 0, sourceMode: 0, switchBranch: 0, duckThreshold: -20.0, clipAmount: 0.497 },
+  },
+  'TapeSimulator': {
+    id: 'test-tapesim', category: 'wasm', type: 'TapeSimulator', enabled: true, wet: 70,
+    parameters: { drive: 30, character: 40, bias: 40, shame: 20, hiss: 20, speed: 0 },
+  },
+  'ToneArm': {
+    id: 'test-tonearm', category: 'wasm', type: 'ToneArm', enabled: true, wet: 70,
+    parameters: { wow: 20, coil: 50, flutter: 15, riaa: 50, stylus: 30, hiss: 20, pops: 15, rpm: 33.333 },
+  },
+
+  // === WAM 2.0 Effects (external Web Audio Module plugins) ===
+  'WAMBigMuff': {
+    id: 'test-wam-bigmuff', category: 'wam', type: 'WAMBigMuff', enabled: true, wet: 50,
+    parameters: {},
+  },
+  'WAMTS9': {
+    id: 'test-wam-ts9', category: 'wam', type: 'WAMTS9', enabled: true, wet: 50,
+    parameters: {},
+  },
+  'WAMDistoMachine': {
+    id: 'test-wam-distomachine', category: 'wam', type: 'WAMDistoMachine', enabled: true, wet: 50,
+    parameters: {},
+  },
+  'WAMQuadraFuzz': {
+    id: 'test-wam-quadrafuzz', category: 'wam', type: 'WAMQuadraFuzz', enabled: true, wet: 50,
+    parameters: {},
+  },
+  'WAMVoxAmp': {
+    id: 'test-wam-voxamp', category: 'wam', type: 'WAMVoxAmp', enabled: true, wet: 50,
+    parameters: {},
+  },
+  'WAMStonePhaser': {
+    id: 'test-wam-stonephaser', category: 'wam', type: 'WAMStonePhaser', enabled: true, wet: 50,
+    parameters: {},
+  },
+  'WAMPingPongDelay': {
+    id: 'test-wam-ppdelay', category: 'wam', type: 'WAMPingPongDelay', enabled: true, wet: 50,
+    parameters: {},
+  },
+  'WAMFaustDelay': {
+    id: 'test-wam-faustdelay', category: 'wam', type: 'WAMFaustDelay', enabled: true, wet: 50,
+    parameters: {},
+  },
+  'WAMPitchShifter': {
+    id: 'test-wam-pitchshift', category: 'wam', type: 'WAMPitchShifter', enabled: true, wet: 50,
+    parameters: {},
+  },
+  'WAMGraphicEQ': {
+    id: 'test-wam-graphiceq', category: 'wam', type: 'WAMGraphicEQ', enabled: true, wet: 100,
+    parameters: {},
+  },
+  'WAMPedalboard': {
+    id: 'test-wam-pedalboard', category: 'wam', type: 'WAMPedalboard', enabled: true, wet: 50,
+    parameters: {},
+  },
 };
 
 // ============================================
@@ -3242,7 +3322,8 @@ const EFFECT_CONFIGS: Record<string, EffectConfig> = {
 function getEffectCategory(name: string): string {
   if (name.startsWith('Buzz')) return 'Buzzmachine';
   if (name.startsWith('Neural')) return 'Neural';
-  if (['SpaceyDelayer', 'RETapeEcho'].includes(name)) return 'WASM';
+  if (name.startsWith('WAM')) return 'WAM';
+  if (['SpaceyDelayer', 'RETapeEcho', 'MoogFilter', 'MVerb', 'Leslie', 'SpringReverb', 'VinylNoise', 'Tumult', 'TapeSimulator', 'ToneArm'].includes(name)) return 'WASM';
   return 'ToneJS';
 }
 
@@ -3394,6 +3475,27 @@ const EFFECT_BEHAVIORS: Record<string, EffectBehavior> = {
   'SpaceyDelayer': 'tail',
   'RETapeEcho': 'tail',
   'SidechainCompressor': 'dynamics',
+  // WASM effects
+  'MoogFilter': 'filter',
+  'MVerb': 'tail',
+  'Leslie': 'modulation',
+  'SpringReverb': 'tail',
+  'VinylNoise': 'modify',
+  'Tumult': 'modify',
+  'TapeSimulator': 'modify',
+  'ToneArm': 'modify',
+  // WAM effects
+  'WAMBigMuff': 'modify',
+  'WAMTS9': 'modify',
+  'WAMDistoMachine': 'modify',
+  'WAMQuadraFuzz': 'modify',
+  'WAMVoxAmp': 'modify',
+  'WAMStonePhaser': 'modulation',
+  'WAMPingPongDelay': 'tail',
+  'WAMFaustDelay': 'tail',
+  'WAMPitchShifter': 'modify',
+  'WAMGraphicEQ': 'passthrough',
+  'WAMPedalboard': 'passthrough',
 };
 
 async function testEffectSignalPath() {
@@ -3420,12 +3522,18 @@ async function testEffectSignalPath() {
   await drainMeter(meter);
 
   const fastEffects = [
+    // Tone.js
     'Chorus', 'Tremolo', 'Vibrato', 'AutoPanner', 'Phaser',
     'Distortion', 'BitCrusher', 'Chebyshev', 'TapeSaturation',
     'Reverb', 'JCReverb', 'Delay', 'FeedbackDelay', 'PingPongDelay',
     'AutoFilter', 'AutoWah', 'PitchShift', 'FrequencyShifter',
     'BiPhase', 'DubFilter',
     'Compressor', 'EQ3', 'Filter', 'StereoWidener',
+    'SpaceEcho', 'SidechainCompressor',
+    // WASM
+    'MoogFilter', 'MVerb', 'Leslie', 'SpringReverb',
+    'VinylNoise', 'Tumult', 'TapeSimulator', 'ToneArm',
+    'SpaceyDelayer', 'RETapeEcho',
   ];
 
   logHtml('<table><tr><th>Effect</th><th>Peak (dB)</th><th>Status</th></tr>');
@@ -3559,9 +3667,14 @@ async function testEffectBehavior() {
   const effectsToTest = [
     'Distortion', 'BitCrusher', 'Chebyshev', 'TapeSaturation',  // Should modify
     'Reverb', 'JCReverb', 'Delay', 'FeedbackDelay',              // Should have tail
+    'PingPongDelay', 'SpaceEcho', 'SpaceyDelayer', 'RETapeEcho', // More tail effects
     'Tremolo', 'Chorus', 'Phaser', 'AutoPanner',                 // Modulation
+    'AutoFilter', 'BiPhase',                                      // More modulation
     'Filter', 'DubFilter',                                        // Filter
-    'Compressor',                                                 // Dynamics
+    'Compressor', 'SidechainCompressor',                          // Dynamics
+    // WASM effects
+    'MoogFilter', 'MVerb', 'Leslie', 'SpringReverb',
+    'VinylNoise', 'Tumult', 'TapeSimulator', 'ToneArm',
   ];
 
   for (const name of effectsToTest) {
@@ -3818,10 +3931,49 @@ async function testEffectParameters() {
 
   logHtml('<table><tr><th>Effect</th><th>Parameter</th><th>Value 1</th><th>Level 1</th><th>Value 2</th><th>Level 2</th><th>Diff</th><th>Status</th></tr>');
 
-  // Test Filter cutoff
+  // Comprehensive parameter wiring tests — two contrasting values for each knob
   const filterTests = [
+    // Tone.js core effects
     { effect: 'Filter', param: 'frequency', val1: 200, val2: 8000, paramPath: 'frequency' },
     { effect: 'Delay', param: 'feedback', val1: 0, val2: 0.8, paramPath: 'feedback' },
+    { effect: 'Distortion', param: 'distortion', val1: 0.01, val2: 0.99, paramPath: 'distortion' },
+    { effect: 'BitCrusher', param: 'bits', val1: 1, val2: 8, paramPath: 'bits' },
+    { effect: 'Chebyshev', param: 'order', val1: 1, val2: 50, paramPath: 'order' },
+    { effect: 'Reverb', param: 'decay', val1: 0.1, val2: 8, paramPath: 'decay' },
+    { effect: 'Chorus', param: 'depth', val1: 0.01, val2: 1, paramPath: 'depth' },
+    { effect: 'Phaser', param: 'frequency', val1: 0.1, val2: 15, paramPath: 'frequency' },
+    { effect: 'Tremolo', param: 'frequency', val1: 0.5, val2: 20, paramPath: 'frequency' },
+    { effect: 'Tremolo', param: 'depth', val1: 0, val2: 1, paramPath: 'depth' },
+    { effect: 'Vibrato', param: 'frequency', val1: 0.5, val2: 20, paramPath: 'frequency' },
+    { effect: 'Vibrato', param: 'depth', val1: 0, val2: 1, paramPath: 'depth' },
+    { effect: 'AutoFilter', param: 'frequency', val1: 0.1, val2: 10, paramPath: 'frequency' },
+    { effect: 'AutoWah', param: 'sensitivity', val1: -40, val2: 0, paramPath: 'sensitivity' },
+    { effect: 'PitchShift', param: 'pitch', val1: -12, val2: 12, paramPath: 'pitch' },
+    { effect: 'FrequencyShifter', param: 'frequency', val1: 0, val2: 500, paramPath: 'frequency' },
+    { effect: 'Compressor', param: 'threshold', val1: 0, val2: -50, paramPath: 'threshold' },
+    { effect: 'FeedbackDelay', param: 'feedback', val1: 0, val2: 0.8, paramPath: 'feedback' },
+    { effect: 'PingPongDelay', param: 'feedback', val1: 0, val2: 0.8, paramPath: 'feedback' },
+    { effect: 'JCReverb', param: 'roomSize', val1: 0.1, val2: 0.95, paramPath: 'roomSize' },
+    { effect: 'BiPhase', param: 'rateA', val1: 0.1, val2: 8.0, paramPath: 'rateA' },
+    { effect: 'DubFilter', param: 'cutoff', val1: 5, val2: 95, paramPath: 'cutoff' },
+    { effect: 'SpaceEcho', param: 'echoVolume', val1: 0, val2: 1, paramPath: 'echoVolume' },
+    { effect: 'TapeSaturation', param: 'saturation', val1: 0, val2: 1, paramPath: 'saturation' },
+    // WASM effects
+    { effect: 'MoogFilter', param: 'cutoff', val1: 200, val2: 5000, paramPath: 'cutoff' },
+    { effect: 'MoogFilter', param: 'resonance', val1: 0, val2: 90, paramPath: 'resonance' },
+    { effect: 'MVerb', param: 'decay', val1: 0.1, val2: 0.99, paramPath: 'decay' },
+    { effect: 'MVerb', param: 'size', val1: 0.1, val2: 1.0, paramPath: 'size' },
+    { effect: 'Leslie', param: 'hornRate', val1: 0.5, val2: 12.0, paramPath: 'hornRate' },
+    { effect: 'SpringReverb', param: 'decay', val1: 0.1, val2: 0.95, paramPath: 'decay' },
+    { effect: 'VinylNoise', param: 'dust', val1: 0, val2: 95, paramPath: 'dust' },
+    { effect: 'VinylNoise', param: 'hiss', val1: 0, val2: 95, paramPath: 'hiss' },
+    { effect: 'TapeSimulator', param: 'drive', val1: 0, val2: 95, paramPath: 'drive' },
+    { effect: 'TapeSimulator', param: 'shame', val1: 0, val2: 95, paramPath: 'shame' },
+    { effect: 'ToneArm', param: 'wow', val1: 0, val2: 90, paramPath: 'wow' },
+    { effect: 'ToneArm', param: 'pops', val1: 0, val2: 90, paramPath: 'pops' },
+    { effect: 'Tumult', param: 'noiseGain', val1: -60, val2: 0, paramPath: 'noiseGain' },
+    { effect: 'SpaceyDelayer', param: 'feedback', val1: 0, val2: 85, paramPath: 'feedback' },
+    { effect: 'RETapeEcho', param: 'echoVolume', val1: 0, val2: 1, paramPath: 'echoVolume' },
   ];
 
   for (const test of filterTests) {
@@ -3929,27 +4081,40 @@ async function testEffectABComparison() {
     { name: 'Phaser', expectation: 'sweep', desc: 'Should add sweeping notches' },
     { name: 'AutoFilter', expectation: 'sweep', desc: 'Should sweep filter' },
     { name: 'BiPhase', expectation: 'sweep', desc: 'Should add phaser sweep' },
+    { name: 'Leslie', expectation: 'modulate', desc: 'Should add rotary speaker modulation' },
     // Distortion effects
     { name: 'Distortion', expectation: 'modify', desc: 'Should add harmonics/saturation' },
     { name: 'BitCrusher', expectation: 'modify', desc: 'Should quantize/crush signal' },
     { name: 'Chebyshev', expectation: 'modify', desc: 'Should add waveshaping' },
     { name: 'TapeSaturation', expectation: 'modify', desc: 'Should add warmth/saturation' },
+    { name: 'TapeSimulator', expectation: 'modify', desc: 'Should add tape character' },
+    { name: 'ToneArm', expectation: 'modify', desc: 'Should add vinyl character' },
+    { name: 'VinylNoise', expectation: 'modify', desc: 'Should add vinyl noise/crackle' },
+    { name: 'Tumult', expectation: 'modify', desc: 'Should add noise/ambience' },
     // Delay/Reverb effects (need time-based tail measurement)
     { name: 'Reverb', expectation: 'tail', desc: 'Should add reverb tail' },
     { name: 'JCReverb', expectation: 'tail', desc: 'Should add reverb tail' },
+    { name: 'MVerb', expectation: 'tail', desc: 'Should add plate reverb tail' },
+    { name: 'SpringReverb', expectation: 'tail', desc: 'Should add spring reverb tail' },
     { name: 'Delay', expectation: 'tail', desc: 'Should add echo/repeat' },
     { name: 'FeedbackDelay', expectation: 'tail', desc: 'Should add repeating echo' },
     { name: 'PingPongDelay', expectation: 'tail', desc: 'Should add stereo ping-pong' },
+    { name: 'SpaceEcho', expectation: 'tail', desc: 'Should add tape echo' },
+    { name: 'SpaceyDelayer', expectation: 'tail', desc: 'Should add multitap delay' },
+    { name: 'RETapeEcho', expectation: 'tail', desc: 'Should add RE tape echo' },
     // Filter effects
     { name: 'Filter', expectation: 'filter', desc: 'Should attenuate frequencies' },
     { name: 'AutoWah', expectation: 'filter', desc: 'Should add envelope following' },
     { name: 'DubFilter', expectation: 'filter', desc: 'Should filter signal' },
+    { name: 'MoogFilter', expectation: 'filter', desc: 'Should add Moog ladder filtering' },
     // Pitch effects
     { name: 'PitchShift', expectation: 'modify', desc: 'Should shift pitch' },
     { name: 'FrequencyShifter', expectation: 'modify', desc: 'Should shift frequencies' },
     // Processors (no wet/dry)
     { name: 'Compressor', expectation: 'dynamics', desc: 'Should compress dynamics' },
+    { name: 'SidechainCompressor', expectation: 'dynamics', desc: 'Should compress dynamics' },
     { name: 'EQ3', expectation: 'passthrough', desc: 'At flat settings, should pass through' },
+    { name: 'StereoWidener', expectation: 'passthrough', desc: 'Should pass through (mono test)' },
   ];
 
   logHtml('<table><tr><th>Effect</th><th>Expected</th><th>Dry Peak</th><th>Dry Tail</th><th>Wet Peak</th><th>Wet Tail</th><th>Δ Peak</th><th>Δ Tail</th><th>Status</th></tr>');
@@ -4144,9 +4309,298 @@ async function testEffectABComparison() {
   meter.dispose();
 }
 
+// ============================================
+// MUSIC SOURCE — rich test signal for FX tests
+// ============================================
+
+/**
+ * Creates a multi-voice musical test signal: pad chord + bass + noise transient.
+ * Returns a Gain node (the output) and a cleanup function.
+ * Much better than a sine wave for revealing distortion, filter issues, etc.
+ */
+function createTestMusicSource(destination: Tone.ToneAudioNode): {
+  output: Tone.Gain;
+  play: () => void;
+  stop: () => void;
+  dispose: () => void;
+} {
+  const output = new Tone.Gain(0.7).connect(destination);
+
+  // Pad: rich chord with harmonics
+  const pad = new Tone.PolySynth(Tone.Synth, {
+    maxPolyphony: 4,
+    voice: Tone.Synth,
+    options: {
+      volume: -18,
+      oscillator: { type: 'sawtooth' },
+      envelope: { attack: 0.02, decay: 0.3, sustain: 0.6, release: 0.5 },
+    },
+  }).connect(output);
+
+  // Bass: low fundamental for testing low-end behaviour
+  const bass = new Tone.Synth({
+    volume: -14,
+    oscillator: { type: 'square' },
+    envelope: { attack: 0.01, decay: 0.2, sustain: 0.5, release: 0.3 },
+  }).connect(output);
+
+  // Noise: transient for testing dynamics/clipping
+  const noise = new Tone.NoiseSynth({
+    volume: -22,
+    noise: { type: 'white' },
+    envelope: { attack: 0.001, decay: 0.08, sustain: 0, release: 0.05 },
+  }).connect(output);
+
+  return {
+    output,
+    play: () => {
+      pad.triggerAttack(['C4', 'E4', 'G4', 'Bb4']);
+      bass.triggerAttack('C2');
+      noise.triggerAttackRelease('32n');
+    },
+    stop: () => {
+      try { pad.releaseAll(); } catch { /* */ }
+      try { bass.triggerRelease(); } catch { /* */ }
+    },
+    dispose: () => {
+      try { pad.dispose(); } catch { /* */ }
+      try { bass.dispose(); } catch { /* */ }
+      try { noise.dispose(); } catch { /* */ }
+      try { output.dispose(); } catch { /* */ }
+    },
+  };
+}
+
+// ============================================
+// CLIPPING / DISTORTION DETECTION TEST
+// ============================================
+
+/**
+ * Measure whether an AnalyserNode detects values at or above 0dBFS (clipping).
+ */
+function measureClipping(analyser: AnalyserNode, durationMs: number): Promise<{ peakDb: number; clippedRatio: number }> {
+  return new Promise((resolve) => {
+    const buf = new Float32Array(analyser.fftSize);
+    let peak = 0;
+    let clipped = 0;
+    let total = 0;
+
+    const start = performance.now();
+    const poll = () => {
+      analyser.getFloatTimeDomainData(buf);
+      for (let i = 0; i < buf.length; i++) {
+        const abs = Math.abs(buf[i]);
+        if (abs > peak) peak = abs;
+        if (abs >= 0.999) clipped++;
+        total++;
+      }
+      if (performance.now() - start < durationMs) {
+        requestAnimationFrame(poll);
+      } else {
+        const peakDb = peak > 0 ? 20 * Math.log10(peak) : -Infinity;
+        resolve({ peakDb, clippedRatio: total > 0 ? clipped / total : 0 });
+      }
+    };
+    poll();
+  });
+}
+
+async function testEffectClipping() {
+  logHtml('<h2>🔊 Clipping / Distortion Detection</h2>');
+  logHtml('<p class="info">Plays a musical test signal (chord + bass + noise) through each effect and checks for unintended clipping (peak ≥ 0dBFS). Effects that intentionally distort are expected to clip.</p>');
+
+  const ctx = Tone.getContext().rawContext as AudioContext;
+  const analyser = ctx.createAnalyser();
+  analyser.fftSize = 2048;
+  const analyserGain = new Tone.Gain(1);
+  analyserGain.connect(Tone.getDestination());
+  // Connect the raw Web Audio analyser node to the Tone.js gain output
+  const rawGainNode = (analyserGain as unknown as { output: GainNode }).output;
+  rawGainNode.connect(analyser);
+
+  // Intentional distortion effects — clipping is expected and OK
+  const intentionalClippers = new Set([
+    'Distortion', 'BitCrusher', 'Chebyshev', 'TapeSaturation',
+    'BuzzDistortion', 'BuzzDistortion2', 'BuzzDist2', 'BuzzOverdrive',
+    'BuzzStereoDist', 'BuzzSoftSat', 'BuzzExciter',
+    'WAMBigMuff', 'WAMTS9', 'WAMDistoMachine', 'WAMQuadraFuzz', 'WAMVoxAmp',
+  ]);
+
+  // Test Tone.js + WASM effects (Buzz/Neural/WAM need AudioWorklet warm-up)
+  const effectsToTest = Object.keys(EFFECT_CONFIGS).filter(name => {
+    const cat = getEffectCategory(name);
+    return cat === 'ToneJS' || cat === 'WASM';
+  });
+
+  logHtml('<table><tr><th>Effect</th><th>Peak (dBFS)</th><th>Clip %</th><th>Expected?</th><th>Status</th></tr>');
+
+  for (const name of effectsToTest) {
+    const config = EFFECT_CONFIGS[name];
+    if (!config) continue;
+
+    try {
+      const effect = await InstrumentFactory.createEffect(config);
+      const effectObj = effect as unknown as Record<string, unknown>;
+      const music = createTestMusicSource(effect as Tone.ToneAudioNode);
+      if (typeof effectObj.connect === 'function') (effectObj.connect as (dest: unknown) => void)(analyserGain);
+
+      await new Promise(r => setTimeout(r, 100));
+
+      music.play();
+      const { peakDb, clippedRatio } = await measureClipping(analyser, 600);
+      music.stop();
+      await new Promise(r => setTimeout(r, 100));
+
+      const isIntentional = intentionalClippers.has(name);
+      const clipPercent = (clippedRatio * 100).toFixed(2);
+      let status = 'pass';
+      let statusText = 'OK';
+
+      if (peakDb >= -0.1 && !isIntentional) {
+        if (clippedRatio > 0.01) {
+          status = 'fail';
+          statusText = `CLIPPING (${clipPercent}%)`;
+          testResults.failed++;
+          testResults.errors.push({ name: `Clip: ${name}`, error: `Unintended clipping: ${peakDb.toFixed(1)}dBFS, ${clipPercent}% clipped` });
+        } else {
+          status = 'warn';
+          statusText = 'NEAR CLIP';
+          testResults.passed++;
+        }
+      } else if (peakDb >= -0.1 && isIntentional) {
+        statusText = 'OK (expected)';
+        testResults.passed++;
+      } else if (peakDb === -Infinity) {
+        status = 'fail';
+        statusText = 'SILENT';
+        testResults.failed++;
+        testResults.errors.push({ name: `Clip: ${name}`, error: 'No signal detected' });
+      } else {
+        testResults.passed++;
+      }
+
+      logHtml(`<tr>
+        <td>${name}</td>
+        <td>${peakDb === -Infinity ? '-∞' : peakDb.toFixed(1)}</td>
+        <td>${clipPercent}%</td>
+        <td>${isIntentional ? '⚡ yes' : 'no'}</td>
+        <td class="${status}">${statusText}</td>
+      </tr>`);
+
+      music.dispose();
+      try { if (typeof effectObj.dispose === 'function') (effectObj.dispose as () => void)(); } catch { /* */ }
+      await new Promise(r => setTimeout(r, 50));
+
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      logHtml(`<tr><td>${name}</td><td>-</td><td>-</td><td>-</td><td class="fail">Error: ${msg}</td></tr>`);
+      testResults.failed++;
+      testResults.errors.push({ name: `Clip: ${name}`, error: msg });
+    }
+  }
+
+  logHtml('</table>');
+  analyserGain.dispose();
+}
+
+// ============================================
+// MUSIC-DRIVEN SIGNAL PATH TEST
+// ============================================
+
+async function testEffectWithMusic() {
+  logHtml('<h2>🎵 Music Signal Path Tests</h2>');
+  logHtml('<p class="info">Plays a chord+bass+noise loop through each effect. Verifies signal passes and measures output level with real musical content.</p>');
+
+  const meter = new Tone.Meter(0);
+  meter.connect(Tone.getDestination());
+
+  // Warm up
+  const warmup = createTestMusicSource(meter as unknown as Tone.ToneAudioNode);
+  warmup.play();
+  await new Promise(r => setTimeout(r, 300));
+  warmup.stop();
+  await new Promise(r => setTimeout(r, 200));
+  warmup.dispose();
+  await drainMeter(meter);
+
+  // Baseline dry measurement
+  logHtml('<h3>Baseline (dry music)</h3>');
+  const baseline = createTestMusicSource(meter as unknown as Tone.ToneAudioNode);
+  baseline.play();
+  const baselinePeak = await measurePeak(meter, 400);
+  baseline.stop();
+  await new Promise(r => setTimeout(r, 100));
+  baseline.dispose();
+  await drainMeter(meter);
+  logHtml(`<p>Dry music signal: <b>${baselinePeak.toFixed(1)} dBFS</b></p>`);
+
+  // All Tone.js + WASM effects
+  const effectsToTest = Object.keys(EFFECT_CONFIGS).filter(name => {
+    const cat = getEffectCategory(name);
+    return cat === 'ToneJS' || cat === 'WASM';
+  });
+
+  logHtml('<table><tr><th>Effect</th><th>Category</th><th>Peak (dB)</th><th>Δ vs Dry</th><th>Status</th></tr>');
+
+  for (const name of effectsToTest) {
+    const config = EFFECT_CONFIGS[name];
+    if (!config) continue;
+
+    try {
+      const effect = await InstrumentFactory.createEffect(config);
+      const effectObj = effect as unknown as Record<string, unknown>;
+      const music = createTestMusicSource(effect as Tone.ToneAudioNode);
+      if (typeof effectObj.connect === 'function') (effectObj.connect as (dest: unknown) => void)(meter);
+
+      await new Promise(r => setTimeout(r, 100));
+
+      music.play();
+      const peak = await measurePeak(meter, 500);
+      music.stop();
+      await new Promise(r => setTimeout(r, 100));
+
+      const diff = peak - baselinePeak;
+      let status = 'pass';
+      let statusText = 'OK';
+
+      if (peak === -Infinity || peak < -60) {
+        status = 'fail';
+        statusText = peak === -Infinity ? 'SILENT' : 'TOO QUIET';
+        testResults.failed++;
+        testResults.errors.push({ name: `Music: ${name}`, error: `No signal: ${peak === -Infinity ? '-∞' : peak.toFixed(1)} dB` });
+      } else if (diff > 12) {
+        status = 'warn';
+        statusText = `LOUD (+${diff.toFixed(1)}dB)`;
+        testResults.passed++;
+        testResults.errors.push({ name: `Music: ${name}`, error: `Warning: ${diff.toFixed(1)}dB louder than dry — possible gain issue` });
+      } else {
+        testResults.passed++;
+      }
+
+      const cat = getEffectCategory(name);
+      const formatDiff = (v: number) => (v >= 0 ? '+' : '') + v.toFixed(1);
+      logHtml(`<tr><td>${name}</td><td>${cat}</td><td>${peak === -Infinity ? '-∞' : peak.toFixed(1)}</td><td>${formatDiff(diff)}</td><td class="${status}">${statusText}</td></tr>`);
+
+      music.dispose();
+      try { if (typeof effectObj.dispose === 'function') (effectObj.dispose as () => void)(); } catch { /* */ }
+      await drainMeter(meter);
+
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      logHtml(`<tr><td>${name}</td><td>-</td><td>-</td><td>-</td><td class="fail">Error: ${msg}</td></tr>`);
+      testResults.failed++;
+      testResults.errors.push({ name: `Music: ${name}`, error: msg });
+    }
+  }
+
+  logHtml('</table>');
+  meter.dispose();
+}
+
 async function runEffectTests() {
   clearResults();
   logHtml('<h2>Running Comprehensive Effect Tests...</h2>');
+  logHtml(`<p class="info">Testing ${Object.keys(EFFECT_CONFIGS).length} effects: creation, signal path, clipping detection, parameter wiring, behavior, wet/dry, A/B comparison.</p>`);
 
   const buttons = document.querySelectorAll('button');
   buttons.forEach(b => (b as HTMLButtonElement).disabled = true);
@@ -4161,6 +4615,10 @@ async function runEffectTests() {
     await testEffectCreation();
     await testEffectSignalPath();
 
+    // Music-driven tests (use real musical content)
+    await testEffectWithMusic();
+    await testEffectClipping();
+
     // Advanced tests
     await testEffectBehavior();
     await testEffectWetDry();
@@ -4174,7 +4632,9 @@ async function runEffectTests() {
       e.name.startsWith('A/B:') ||
       e.name.startsWith('EffectBehavior:') ||
       e.name.startsWith('WetDry:') ||
-      e.name.startsWith('Param:')
+      e.name.startsWith('Param:') ||
+      e.name.startsWith('Clip:') ||
+      e.name.startsWith('Music:')
     );
 
     logHtml(`
