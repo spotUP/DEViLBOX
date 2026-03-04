@@ -103,46 +103,46 @@ export const PixiButton: React.FC<PixiButtonProps> = ({
 
   const ft2Colors = useMemo(() => getFT2Colors(theme, themeId), [theme, themeId]);
 
-  const getColors = useCallback((): { bg: number; bgAlpha: number; border: number; borderAlpha: number; text: number } => {
+  const getColors = useCallback((): { bg: number; border: number; borderAlpha: number; text: number; showBg: boolean } => {
     if (disabled || loading) {
       return {
         bg: theme.bgActive.color,
-        bgAlpha: 0.4,
         border: theme.border.color,
         borderAlpha: 0.3,
         text: theme.textMuted.color,
+        showBg: true,
       };
     }
 
     if (variant === 'ft2') {
       const ft2 = ft2Colors[color] || ft2Colors.default;
-      if (active || pressed) return { bg: ft2.active, bgAlpha: 1, border: ft2.active, borderAlpha: 1, text: 0xffffff };
-      if (hovered) return { bg: ft2.hover, bgAlpha: 1, border: ft2.active, borderAlpha: 0.6, text: ft2.text };
-      return { bg: ft2.base, bgAlpha: 1, border: theme.borderLight.color, borderAlpha: 0.5, text: ft2.text };
+      if (active || pressed) return { bg: ft2.active, border: ft2.active, borderAlpha: 1, text: 0xffffff, showBg: true };
+      if (hovered) return { bg: ft2.hover, border: ft2.active, borderAlpha: 0.6, text: ft2.text, showBg: true };
+      return { bg: ft2.base, border: theme.borderLight.color, borderAlpha: 0.5, text: ft2.text, showBg: true };
     }
 
     if (variant === 'primary') {
-      if (pressed) return { bg: theme.accent.color, bgAlpha: 0.9, border: theme.accent.color, borderAlpha: 1, text: theme.textInverse.color };
-      if (hovered) return { bg: theme.accent.color, bgAlpha: 0.85, border: theme.accent.color, borderAlpha: 1, text: theme.textInverse.color };
-      return { bg: theme.accent.color, bgAlpha: 0.8, border: theme.accent.color, borderAlpha: 1, text: theme.textInverse.color };
+      if (pressed) return { bg: theme.accent.color, border: theme.accent.color, borderAlpha: 1, text: theme.textInverse.color, showBg: true };
+      if (hovered) return { bg: theme.accent.color, border: theme.accent.color, borderAlpha: 1, text: theme.textInverse.color, showBg: true };
+      return { bg: theme.accent.color, border: theme.accent.color, borderAlpha: 1, text: theme.textInverse.color, showBg: true };
     }
 
     if (variant === 'danger') {
-      if (pressed) return { bg: theme.error.color, bgAlpha: 0.9, border: theme.error.color, borderAlpha: 1, text: 0xffffff };
-      if (hovered) return { bg: theme.error.color, bgAlpha: 0.3, border: theme.error.color, borderAlpha: 0.8, text: theme.error.color };
-      return { bg: theme.error.color, bgAlpha: 0.15, border: theme.error.color, borderAlpha: 0.4, text: theme.error.color };
+      if (pressed) return { bg: theme.error.color, border: theme.error.color, borderAlpha: 1, text: 0xffffff, showBg: true };
+      if (hovered) return { bg: theme.error.color, border: theme.error.color, borderAlpha: 0.8, text: theme.error.color, showBg: true };
+      return { bg: theme.error.color, border: theme.error.color, borderAlpha: 0.4, text: theme.error.color, showBg: true };
     }
 
     if (variant === 'ghost') {
-      if (pressed) return { bg: theme.bgActive.color, bgAlpha: 0.8, border: 0x000000, borderAlpha: 0, text: theme.text.color };
-      if (hovered) return { bg: theme.bgHover.color, bgAlpha: 0.6, border: 0x000000, borderAlpha: 0, text: theme.text.color };
-      return { bg: 0x000000, bgAlpha: 0, border: 0x000000, borderAlpha: 0, text: theme.textSecondary.color };
+      if (pressed) return { bg: theme.bgActive.color, border: 0x000000, borderAlpha: 0, text: theme.text.color, showBg: true };
+      if (hovered) return { bg: theme.bgHover.color, border: 0x000000, borderAlpha: 0, text: theme.text.color, showBg: true };
+      return { bg: 0x000000, border: 0x000000, borderAlpha: 0, text: theme.textSecondary.color, showBg: false };
     }
 
     // default
-    if (pressed) return { bg: theme.bgActive.color, bgAlpha: 1, border: theme.accent.color, borderAlpha: 0.8, text: theme.text.color };
-    if (hovered) return { bg: theme.bgHover.color, bgAlpha: 1, border: theme.borderLight.color, borderAlpha: 0.8, text: theme.text.color };
-    return { bg: theme.bgTertiary.color, bgAlpha: 1, border: theme.border.color, borderAlpha: 0.6, text: theme.textSecondary.color };
+    if (pressed) return { bg: theme.bgActive.color, border: theme.accent.color, borderAlpha: 0.8, text: theme.text.color, showBg: true };
+    if (hovered) return { bg: theme.bgHover.color, border: theme.borderLight.color, borderAlpha: 0.8, text: theme.text.color, showBg: true };
+    return { bg: theme.bgTertiary.color, border: theme.border.color, borderAlpha: 0.6, text: theme.textSecondary.color, showBg: true };
   }, [theme, ft2Colors, variant, color, disabled, loading, active, hovered, pressed]);
 
   const colors = getColors();
@@ -168,7 +168,7 @@ export const PixiButton: React.FC<PixiButtonProps> = ({
       onPointerOut={handlePointerOut}
       onPointerDown={handlePointerDown}
       onPointerUp={handlePointerUp}
-      alpha={colors.bgAlpha}
+      alpha={disabled ? 0.5 : 1}
       layout={{
         width: btnWidth,
         height: btnHeight,
@@ -176,7 +176,7 @@ export const PixiButton: React.FC<PixiButtonProps> = ({
         justifyContent: 'center',
         alignItems: 'center',
         gap: isVertical ? 1 : 0,
-        backgroundColor: colors.bg,
+        ...(colors.showBg ? { backgroundColor: colors.bg } : {}),
         borderColor: colors.border,
         borderWidth: colors.borderAlpha > 0 ? 1 : 0,
         borderRadius: 4,
