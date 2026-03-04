@@ -32,6 +32,8 @@ export const usePatternPlayback = () => {
     hivelyFileData: s.hivelyFileData,
     hivelyMeta: s.hivelyMeta,
     musiclineFileData: s.musiclineFileData,
+    c64SidFileData: s.c64SidFileData,
+    jamCrackerFileData: s.jamCrackerFileData,
   })));
   const { isPlaying, isLooping, bpm, setCurrentRow, setCurrentRowThrottled } = useTransportStore(useShallow((s) => ({
     isPlaying: s.isPlaying,
@@ -325,6 +327,10 @@ export const usePatternPlayback = () => {
           hivelyMeta: hivelyMeta ?? undefined,
           // MusicLine Editor raw binary (required for MusicLineEngine WASM)
           musiclineFileData: musiclineFileData ?? undefined,
+          // C64 SID raw binary (required for C64SIDEngine)
+          c64SidFileData: c64SidFileData ?? undefined,
+          // JamCracker raw binary (required for JamCrackerEngine WASM)
+          jamCrackerFileData: jamCrackerFileData ?? undefined,
           // Furnace-specific timing data (only set for .fur imports)
           speed2: furnaceData?.speed2,
           hz: furnaceData?.hz,
