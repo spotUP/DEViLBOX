@@ -1,10 +1,11 @@
 /**
- * PixiContextMenu — DOM overlay context menu positioned via PixiJS screen coordinates.
- * Complex menus with nested submenus stay DOM for practicality.
+ * PixiContextMenu — GL-native context menu positioned via PixiJS screen coordinates.
+ * Registers in usePixiDropdownStore so PixiGlobalDropdownLayer renders it at
+ * root stage level (zIndex 9999), above all PixiWindow masks.
  */
 
 import { useEffect, useRef } from 'react';
-import { createPortal } from 'react-dom';
+import { usePixiDropdownStore } from '../stores/usePixiDropdownStore';
 
 export interface ContextMenuItem {
   label: string;
@@ -22,6 +23,8 @@ interface PixiContextMenuProps {
   onClose: () => void;
 }
 
+let _ctxMenuIdCounter = 0;
+
 export const PixiContextMenu: React.FC<PixiContextMenuProps> = ({
   items,
   x,
@@ -29,92 +32,48 @@ export const PixiContextMenu: React.FC<PixiContextMenuProps> = ({
   isOpen,
   onClose,
 }) => {
-  const menuRef = useRef<HTMLDivElement>(null);
+  const idRef = useRef(`pixi-ctx-menu-${++_ctxMenuIdCounter}`);
+  const onCloseRef = useRef(onClose);
+  useEffect(() => { onCloseRef.current = onClose; }, [onClose]);
 
-  // Close on outside click
+  // Register / unregister in the global dropdown store
+  useEffect(() => {
+    const id = idRef.current;
+    const store = usePixiDropdownStore.getState();
+    if (isOpen) {
+      // Clamp position to stay within reasonable bounds
+      const adjustedX = Math.min(x, (window.innerWidth || 1920) - 200);
+      const adjustedY = Math.min(y, (window.innerHeight || 1080) - items.length * 28 - 16);
+
+      store.openDropdown({
+        kind: 'contextMenu',
+        id,
+        x: adjustedX,
+        y: adjustedY,
+        items,
+        onClose: () => onCloseRef.current(),
+      });
+    } else {
+      store.closeDropdown(id);
+    }
+  }, [isOpen, x, y, items]);
+
+  // Escape key handler
   useEffect(() => {
     if (!isOpen) return;
-    const handleClick = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        onClose();
-      }
-    };
     const handleEsc = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape') onCloseRef.current();
     };
-    window.addEventListener('mousedown', handleClick);
     window.addEventListener('keydown', handleEsc);
-    return () => {
-      window.removeEventListener('mousedown', handleClick);
-      window.removeEventListener('keydown', handleEsc);
-    };
-  }, [isOpen, onClose]);
+    return () => window.removeEventListener('keydown', handleEsc);
+  }, [isOpen]);
 
-  if (!isOpen) return null;
+  // Clean up on unmount
+  useEffect(() => {
+    const id = idRef.current;
+    return () => usePixiDropdownStore.getState().closeDropdown(id);
+  }, []);
 
-  // Ensure menu stays within viewport
-  const adjustedX = Math.min(x, window.innerWidth - 200);
-  const adjustedY = Math.min(y, window.innerHeight - items.length * 28 - 16);
-
-  return createPortal(
-    <div
-      ref={menuRef}
-      style={{
-        position: 'fixed',
-        left: adjustedX,
-        top: adjustedY,
-        zIndex: 10001,
-        minWidth: 180,
-        background: '#111113',
-        border: '1px solid #2a2a2f',
-        borderRadius: 6,
-        padding: '4px 0',
-        boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
-        fontFamily: 'JetBrains Mono, monospace',
-        fontSize: 12,
-      }}
-    >
-      {items.map((item, i) => {
-        if (item.separator) {
-          return (
-            <div
-              key={i}
-              style={{
-                height: 1,
-                margin: '4px 8px',
-                background: '#2a2a2f',
-              }}
-            />
-          );
-        }
-        return (
-          <div
-            key={i}
-            onClick={() => {
-              if (item.disabled) return;
-              item.action?.();
-              onClose();
-            }}
-            style={{
-              padding: '6px 12px',
-              color: item.disabled ? '#404048' : '#f0f0f2',
-              cursor: item.disabled ? 'default' : 'pointer',
-              transition: 'background 0.1s',
-            }}
-            onMouseEnter={(e) => {
-              if (!item.disabled) {
-                (e.target as HTMLDivElement).style.background = '#222226';
-              }
-            }}
-            onMouseLeave={(e) => {
-              (e.target as HTMLDivElement).style.background = 'transparent';
-            }}
-          >
-            {item.label}
-          </div>
-        );
-      })}
-    </div>,
-    document.body,
-  );
+  // Rendering is handled by PixiGlobalDropdownLayer
+  return null;
 };

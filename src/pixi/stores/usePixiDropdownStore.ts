@@ -10,6 +10,7 @@
 import { create } from 'zustand';
 import type { SelectOption } from '../components/PixiSelect';
 import type { MenuItem } from '../components/PixiMenuBar';
+import type { ContextMenuItem } from '../input/PixiContextMenu';
 
 interface SelectDropdown {
   kind: 'select';
@@ -32,7 +33,16 @@ interface MenuDropdown {
   onClose: () => void;
 }
 
-export type GlobalDropdown = SelectDropdown | MenuDropdown;
+interface ContextMenuDropdown {
+  kind: 'contextMenu';
+  id: string;
+  x: number;
+  y: number;
+  items: ContextMenuItem[];
+  onClose: () => void;
+}
+
+export type GlobalDropdown = SelectDropdown | MenuDropdown | ContextMenuDropdown;
 
 interface PixiDropdownStore {
   dropdown: GlobalDropdown | null;
