@@ -232,6 +232,11 @@ interface SettingsStore {
   crtEnabled: boolean;
   crtParams:  CRTParams;
 
+  // Lens Distortion
+  lensEnabled: boolean;
+  lensPreset:  string;   // LensPreset key
+  lensParams:  { barrel: number; chromatic: number; vignette: number };
+
   // Render Mode
   renderMode: 'dom' | 'webgl';  // UI rendering: 'dom' = React/Tailwind, 'webgl' = PixiJS
 
@@ -257,6 +262,10 @@ interface SettingsStore {
   setCrtEnabled:  (enabled: boolean) => void;
   setCrtParam:    (param: keyof CRTParams, value: number) => void;
   resetCrtParams: () => void;
+  setLensEnabled: (enabled: boolean) => void;
+  setLensPreset:  (preset: string) => void;
+  setLensParam:   (param: 'barrel' | 'chromatic' | 'vignette', value: number) => void;
+  resetLensParams: () => void;
 }
 
 export const useSettingsStore = create<SettingsStore>()(
@@ -413,6 +422,9 @@ export const useSettingsStore = create<SettingsStore>()(
       vjPatternOverlay: false, // Default: off
       crtEnabled: false,
       crtParams:  { ...CRT_DEFAULT_PARAMS },
+      lensEnabled: false,
+      lensPreset: 'off',
+      lensParams: { barrel: 0, chromatic: 0, vignette: 0 },
       renderMode: 'webgl' as const,  // Default: WebGL/workbench rendering
       
       // ASID Hardware defaults
@@ -519,6 +531,18 @@ export const useSettingsStore = create<SettingsStore>()(
 
     resetCrtParams: () =>
       set((state) => { state.crtParams = { ...CRT_DEFAULT_PARAMS }; }),
+
+    setLensEnabled: (lensEnabled) =>
+      set((state) => { state.lensEnabled = lensEnabled; }),
+
+    setLensPreset: (preset) =>
+      set((state) => { state.lensPreset = preset; }),
+
+    setLensParam: (param, value) =>
+      set((state) => { state.lensParams[param] = value; }),
+
+    resetLensParams: () =>
+      set((state) => { state.lensParams = { barrel: 0, chromatic: 0, vignette: 0 }; state.lensPreset = 'off'; }),
     })),
     {
       name: 'devilbox-settings',
@@ -562,6 +586,9 @@ export const useSettingsStore = create<SettingsStore>()(
         vjPatternOverlay: state.vjPatternOverlay,
         crtEnabled: state.crtEnabled,
         crtParams:  state.crtParams,
+        lensEnabled: state.lensEnabled,
+        lensPreset:  state.lensPreset,
+        lensParams:  state.lensParams,
         // renderMode intentionally not persisted — always start in webgl/workbench mode
       }),
     }
