@@ -85,6 +85,7 @@ export const PixiLabel: React.FC<PixiLabelProps> = ({
 
   return (
     <pixiBitmapText
+      eventMode="none"
       text={text}
       style={{ fontFamily, fontSize, fill: 0xffffff }}
       tint={tint}

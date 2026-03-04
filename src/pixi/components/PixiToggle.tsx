@@ -100,6 +100,7 @@ export const PixiToggle: React.FC<PixiToggleProps> = ({
     >
       {/* Label */}
       <pixiBitmapText
+        eventMode="none"
         text={label}
         style={{
           fontFamily: PIXI_FONTS.MONO,
@@ -112,6 +113,7 @@ export const PixiToggle: React.FC<PixiToggleProps> = ({
 
       {/* Toggle track + thumb */}
       <pixiGraphics
+        eventMode="none"
         draw={drawTrack}
         layout={{ width: config.width, height: config.height }}
       />

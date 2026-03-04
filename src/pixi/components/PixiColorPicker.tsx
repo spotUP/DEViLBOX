@@ -77,6 +77,7 @@ export const PixiColorPicker: React.FC<PixiColorPickerProps> = ({
         {/* "X" for the null/no-color swatch */}
         {color === null && (
           <pixiBitmapText
+            eventMode="none"
             text="X"
             style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 12, fill: 0xffffff }}
             tint={theme.textMuted.color}

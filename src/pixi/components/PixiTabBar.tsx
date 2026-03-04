@@ -148,8 +148,9 @@ const PixiTab: React.FC<PixiTabProps> = ({
       }}
     >
       {/* Active underline — always rendered, only visible when active */}
-      <pixiGraphics draw={drawUnderline} layout={{ position: 'absolute', width, height }} />
+      <pixiGraphics eventMode="none" draw={drawUnderline} layout={{ position: 'absolute', width, height }} />
       <pixiBitmapText
+        eventMode="none"
         text={displayLabel}
         style={{ fontFamily: PIXI_FONTS.SANS_MEDIUM, fontSize: 13, fill: 0xffffff }}
         tint={isActive ? theme.text.color : theme.textSecondary.color}
@@ -164,6 +165,7 @@ const PixiTab: React.FC<PixiTabProps> = ({
         layout={{ width: CLOSE_BTN_SIZE, height: CLOSE_BTN_SIZE, justifyContent: 'center', alignItems: 'center', marginRight: 4 }}
       >
         <pixiBitmapText
+          eventMode="none"
           text="×"
           style={{ fontFamily: PIXI_FONTS.SANS_BOLD, fontSize: 15, fill: 0xffffff }}
           tint={hovered ? theme.error.color : theme.textMuted.color}
@@ -187,6 +189,7 @@ const PixiTabScrollBtn: React.FC<{ label: string; icon?: string; height: number;
     >
       {iconChar && (
         <pixiBitmapText
+          eventMode="none"
           text={iconChar}
           style={{ fontFamily: PIXI_FONTS.ICONS, fontSize: 14, fill: 0xffffff }}
           tint={theme.textSecondary.color}
