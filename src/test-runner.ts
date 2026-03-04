@@ -842,8 +842,19 @@ const engineStatus: Record<string, boolean> = {
  * Pre-warm all shared WASM engines before running synth tests.
  * This prevents cascading failures where one engine timeout delays all subsequent tests.
  */
-async function preWarmEngines(): Promise<void> {
+async function preWarmEngines(synthNames?: string[]): Promise<void> {
+  // Determine which engines are actually needed
+  const neededEngines = new Set<string>();
+  const names = synthNames || Object.keys(SYNTH_CONFIGS);
+  for (const name of names) {
+    const eng = getRequiredEngine(name);
+    if (eng) neededEngines.add(eng);
+  }
+
   logHtml('<h3>Pre-warming WASM Engines</h3>');
+  if (synthNames) {
+    logHtml(`<p class="info">Only warming engines needed for ${names.length} synths: ${[...neededEngines].join(', ') || 'none (Tone.js only)'}</p>`);
+  }
 
   const initTimeout = <T>(promise: Promise<T>, ms: number, label: string): Promise<boolean> =>
     Promise.race([
@@ -857,71 +868,79 @@ async function preWarmEngines(): Promise<void> {
       return false;
     });
 
-  // Furnace
-  try {
-    const furnaceEngine = FurnaceChipEngine.getInstance();
-    engineStatus.Furnace = await initTimeout(
-      furnaceEngine.init(Tone.getContext()),
-      10000, 'FurnaceChipEngine'
-    );
-    // Test write to verify messages reach the worklet
-    if (engineStatus.Furnace) {
-      console.log('[PreWarm] Testing Furnace write capability...');
-      furnaceEngine.testPing();
-      const eng = furnaceEngine as unknown as Record<string, unknown>;
-      if (typeof eng.testWrite === 'function') eng.testWrite();
-      await new Promise(r => setTimeout(r, 100)); // Give time for response
+  // Furnace (old chip engine — needed by FurnaceDispatch for some initialization paths)
+  if (!synthNames || neededEngines.has('FurnaceDispatch')) {
+    try {
+      const furnaceEngine = FurnaceChipEngine.getInstance();
+      engineStatus.Furnace = await initTimeout(
+        furnaceEngine.init(Tone.getContext()),
+        10000, 'FurnaceChipEngine'
+      );
+      // Test write to verify messages reach the worklet
+      if (engineStatus.Furnace) {
+        console.log('[PreWarm] Testing Furnace write capability...');
+        furnaceEngine.testPing();
+        const eng = furnaceEngine as unknown as Record<string, unknown>;
+        if (typeof eng.testWrite === 'function') eng.testWrite();
+        await new Promise(r => setTimeout(r, 100)); // Give time for response
+      }
+    } catch { // ignored
+      engineStatus.Furnace = false;
     }
-  } catch { // ignored
-    engineStatus.Furnace = false;
   }
 
   // FurnaceDispatch (for GB and other dispatch-based chips)
-  try {
-    const ctx = Tone.getContext();
-    const ctxRec = ctx as unknown as Record<string, unknown>;
-    const rawCtx = (ctxRec.rawContext || ctxRec._context || ctx) as BaseAudioContext;
-    const furnaceDispatchEngine = FurnaceDispatchEngine.getInstance();
-    engineStatus.FurnaceDispatch = await initTimeout(
-      furnaceDispatchEngine.init(rawCtx as unknown as Record<string, unknown>),
-      10000, 'FurnaceDispatchEngine'
-    );
-  } catch (e) {
-    console.warn('[PreWarm] FurnaceDispatch init failed:', e);
-    engineStatus.FurnaceDispatch = false;
+  if (!synthNames || neededEngines.has('FurnaceDispatch')) {
+    try {
+      const ctx = Tone.getContext();
+      const ctxRec = ctx as unknown as Record<string, unknown>;
+      const rawCtx = (ctxRec.rawContext || ctxRec._context || ctx) as BaseAudioContext;
+      const furnaceDispatchEngine = FurnaceDispatchEngine.getInstance();
+      engineStatus.FurnaceDispatch = await initTimeout(
+        furnaceDispatchEngine.init(rawCtx as unknown as Record<string, unknown>),
+        10000, 'FurnaceDispatchEngine'
+      );
+    } catch (e) {
+      console.warn('[PreWarm] FurnaceDispatch init failed:', e);
+      engineStatus.FurnaceDispatch = false;
+    }
   }
 
   // Buzzmachine - requires AudioWorklet which is only available in full browser environments
-  try {
-    const ctx = Tone.getContext();
-    const buzzCtxRec = ctx as unknown as Record<string, unknown>;
-    const rawCtx = (buzzCtxRec.rawContext || buzzCtxRec._context || ctx) as BaseAudioContext & { audioWorklet?: { addModule: (url: string) => Promise<void> } };
-    // Use duck-typing instead of instanceof to handle standardized-audio-context wrappers
-    const hasAudioWorklet = rawCtx && rawCtx.audioWorklet && typeof rawCtx.audioWorklet.addModule === 'function';
-    if (hasAudioWorklet) {
-      const buzzEngine = BuzzmachineEngine.getInstance();
-      engineStatus.Buzzmachine = await initTimeout(
-        buzzEngine.init(rawCtx as unknown as AudioContext),
-        10000, 'BuzzmachineEngine'
-      );
-    } else {
-      console.log('[PreWarm] Buzzmachine: AudioWorklet not available in this context');
+  if (!synthNames || neededEngines.has('Buzzmachine')) {
+    try {
+      const ctx = Tone.getContext();
+      const buzzCtxRec = ctx as unknown as Record<string, unknown>;
+      const rawCtx = (buzzCtxRec.rawContext || buzzCtxRec._context || ctx) as BaseAudioContext & { audioWorklet?: { addModule: (url: string) => Promise<void> } };
+      // Use duck-typing instead of instanceof to handle standardized-audio-context wrappers
+      const hasAudioWorklet = rawCtx && rawCtx.audioWorklet && typeof rawCtx.audioWorklet.addModule === 'function';
+      if (hasAudioWorklet) {
+        const buzzEngine = BuzzmachineEngine.getInstance();
+        engineStatus.Buzzmachine = await initTimeout(
+          buzzEngine.init(rawCtx as unknown as AudioContext),
+          10000, 'BuzzmachineEngine'
+        );
+      } else {
+        console.log('[PreWarm] Buzzmachine: AudioWorklet not available in this context');
+        engineStatus.Buzzmachine = false;
+      }
+    } catch (e) {
+      console.warn('[PreWarm] Buzzmachine init failed:', e);
       engineStatus.Buzzmachine = false;
     }
-  } catch (e) {
-    console.warn('[PreWarm] Buzzmachine init failed:', e);
-    engineStatus.Buzzmachine = false;
   }
 
   // MAME
-  try {
-    const mameEngine = MAMEEngine.getInstance();
-    engineStatus.MAME = await initTimeout(
-      mameEngine.init(),
-      10000, 'MAMEEngine'
-    );
-  } catch { // ignored
-    engineStatus.MAME = false;
+  if (!synthNames || neededEngines.has('MAME')) {
+    try {
+      const mameEngine = MAMEEngine.getInstance();
+      engineStatus.MAME = await initTimeout(
+        mameEngine.init(),
+        10000, 'MAMEEngine'
+      );
+    } catch { // ignored
+      engineStatus.MAME = false;
+    }
   }
 
   // Display engine status table
@@ -980,11 +999,11 @@ function getRequiredEngine(synthName: string): string | null {
  * Collects detailed diagnostics for a synth instance.
  * Call this when a synth fails to produce audio to understand WHY.
  */
-function collectSynthDiagnostics(name: string, synthObj: Record<string, unknown>): Record<string, unknown> {
+function collectSynthDiagnostics(_name: string, synthObj: Record<string, unknown>): Record<string, unknown> {
   const diag: Record<string, unknown> = {};
 
   // Constructor name
-  diag.constructor = (synthObj.constructor as { name?: string } | undefined)?.name || 'Unknown';
+  diag.constructorName = (synthObj.constructor as { name?: string } | undefined)?.name || 'Unknown';
 
   // Init status flags
   for (const prop of ['_isReady', 'isInitialized', '_initialized', 'useWasmEngine', '_loaded', '_ready']) {
@@ -1562,12 +1581,13 @@ async function playPhraseOnce(
   return peakDb;
 }
 
-async function testVolumeLevels() {
+async function testVolumeLevels(skipPreWarm = false) {
   logHtml('<h2>Volume Level Tests</h2>');
   logHtml('<p class="info">Testing output levels at volume=-12dB. Target range: -15dB to -6dB peak.</p>');
 
   // Pre-warm all WASM engines before testing individual synths
-  await preWarmEngines();
+  // (skip if caller already warmed the engines, e.g. runFilteredVolume)
+  if (!skipPreWarm) await preWarmEngines();
 
   // IMPORTANT: We'll create a fresh meter for each synth test.
   // WASM synth disposal (especially V2) can corrupt Tone.Meter, causing getValue() to return null.
@@ -2089,7 +2109,6 @@ async function testVolumeInteractive() {
 
     // All Furnace synths (including FM) now use dispatch path
     let furnaceNativeMeter: AnalyserNode | null = null;
-    const isFMSynth = FM_SYNTHS.includes(name);
     const isDispatchSynth = name.startsWith('Furnace');
 
     try {
@@ -4568,13 +4587,9 @@ function createTestMusicSource(destination: Tone.ToneAudioNode): {
 
   // Pad: rich chord with harmonics
   const pad = new Tone.PolySynth(Tone.Synth, {
-    maxPolyphony: 4,
-    voice: Tone.Synth,
-    options: {
-      volume: -18,
-      oscillator: { type: 'sawtooth' },
-      envelope: { attack: 0.02, decay: 0.3, sustain: 0.6, release: 0.5 },
-    },
+    volume: -18,
+    oscillator: { type: 'sawtooth' },
+    envelope: { attack: 0.02, decay: 0.3, sustain: 0.6, release: 0.5 },
   }).connect(output);
 
   // Bass: low fundamental for testing low-end behaviour
@@ -4975,8 +4990,8 @@ async function runFilteredVolume() {
 
   try {
     await initAudio();
-    await preWarmEngines();
-    await testVolumeLevels();
+    await preWarmEngines(filtered);
+    await testVolumeLevels(true);
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
     log('Test error: ' + msg, 'fail');
@@ -5015,7 +5030,7 @@ async function runFilteredCreation() {
 
   try {
     await initAudio();
-    await preWarmEngines();
+    await preWarmEngines(filtered);
     await testSynthCreation();
     await testMethodAvailability();
   } catch (e: unknown) {
