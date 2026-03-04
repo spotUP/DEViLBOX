@@ -70,17 +70,8 @@ const LazyRevisionBrowserDialog = lazy(() =>
 const LazyGrooveSettingsModal = lazy(() =>
   import('@/components/dialogs/GrooveSettingsModal').then(m => ({ default: m.GrooveSettingsModal }))
 );
-const LazyInterpolateDialog = lazy(() =>
-  import('@/components/dialogs/InterpolateDialog').then(m => ({ default: m.InterpolateDialog }))
-);
-const LazyHumanizeDialog = lazy(() =>
-  import('@/components/dialogs/HumanizeDialog').then(m => ({ default: m.HumanizeDialog }))
-);
 const LazyFindReplaceDialog = lazy(() =>
   import('@/components/dialogs/FindReplaceDialog').then(m => ({ default: m.FindReplaceDialog }))
-);
-const LazyScaleVolumeDialog = lazy(() =>
-  import('@/components/tracker/ScaleVolumeDialog').then(m => ({ default: m.ScaleVolumeDialog }))
 );
 const LazyKeyboardShortcutSheet = lazy(() =>
   import('@/components/tracker/KeyboardShortcutSheet').then(m => ({ default: m.KeyboardShortcutSheet }))
@@ -90,12 +81,6 @@ const LazyDrumPadManager = lazy(() =>
 );
 const LazyAdvancedEditModal = lazy(() =>
   import('@/components/dialogs/AdvancedEditModal').then(m => ({ default: m.AdvancedEditModal }))
-);
-const LazyFadeVolumeDialog = lazy(() =>
-  import('@/components/tracker/FadeVolumeDialog').then(m => ({ default: m.FadeVolumeDialog }))
-);
-const LazyStrumDialog = lazy(() =>
-  import('@/components/dialogs/StrumDialog').then(m => ({ default: m.StrumDialog }))
 );
 const LazyEffectPicker = lazy(() =>
   import('@/components/tracker/EffectPicker').then(m => ({ default: m.EffectPicker }))
@@ -259,12 +244,6 @@ export const WebGLModalBridge: React.FC = () => {
     }
     closeDialogCommand();
   }, [dialogOpen, closeDialogCommand, openModal]);
-
-  const handleScaleVolumeConfirm = useCallback((factor: number) => {
-    const scope = (useUIStore.getState().modalData?.scope as 'block' | 'track' | 'pattern') || 'block';
-    useTrackerStore.getState().scaleVolume(scope, factor);
-    closeModal();
-  }, [closeModal]);
 
   const handleFileBrowserLoad = useCallback(async (data: any, filename: string) => {
     setShowFileBrowser(false);
@@ -508,21 +487,8 @@ export const WebGLModalBridge: React.FC = () => {
       {modalOpen === 'grooveSettings' && (
         <LazyGrooveSettingsModal onClose={closeModal} />
       )}
-      {modalOpen === 'interpolate' && (
-        <LazyInterpolateDialog isOpen={true} onClose={closeModal} />
-      )}
-      {modalOpen === 'humanize' && (
-        <LazyHumanizeDialog isOpen={true} onClose={closeModal} />
-      )}
       {modalOpen === 'findReplace' && (
         <LazyFindReplaceDialog isOpen={true} onClose={closeModal} />
-      )}
-      {modalOpen === 'scaleVolume' && (
-        <LazyScaleVolumeDialog
-          scope={(modalData?.scope as 'block' | 'track' | 'pattern') || 'block'}
-          onConfirm={handleScaleVolumeConfirm}
-          onCancel={closeModal}
-        />
       )}
       {modalOpen === 'shortcutSheet' && (
         <LazyKeyboardShortcutSheet isOpen={true} onClose={closeModal} />
@@ -560,23 +526,6 @@ export const WebGLModalBridge: React.FC = () => {
           onShowScaleVolume={(scope) => openModal('scaleVolume', { scope })}
           onShowFadeVolume={(scope) => openModal('fadeVolume', { scope })}
         />
-      )}
-      {modalOpen === 'fadeVolume' && (
-        <LazyFadeVolumeDialog
-          scope={(modalData?.scope as 'block' | 'track' | 'pattern') || 'block'}
-          onConfirm={(startVol, endVol) => {
-            useTrackerStore.getState().fadeVolume(
-              (useUIStore.getState().modalData?.scope as 'block' | 'track' | 'pattern') || 'block',
-              startVol,
-              endVol,
-            );
-            closeModal();
-          }}
-          onCancel={closeModal}
-        />
-      )}
-      {modalOpen === 'strum' && (
-        <LazyStrumDialog isOpen={true} onClose={closeModal} />
       )}
       {modalOpen === 'effectPicker' && (
         <LazyEffectPicker

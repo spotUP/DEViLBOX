@@ -4,7 +4,7 @@
 
 import { useState, useCallback } from 'react';
 import { PixiModal, PixiModalHeader, PixiModalFooter, PixiButton, PixiKnob, PixiLabel } from '../components';
-import { useCursorStore } from '@stores';
+import { useTrackerStore, useCursorStore } from '@stores';
 
 interface PixiStrumDialogProps {
   isOpen: boolean;
@@ -13,6 +13,7 @@ interface PixiStrumDialogProps {
 
 export const PixiStrumDialog: React.FC<PixiStrumDialogProps> = ({ isOpen, onClose }) => {
   const selection = useCursorStore(s => s.selection);
+  const strumSelection = useTrackerStore(s => s.strumSelection);
 
   const [delay, setDelay] = useState(2);
   const [direction, setDirection] = useState<'down' | 'up'>('down');
@@ -20,9 +21,9 @@ export const PixiStrumDialog: React.FC<PixiStrumDialogProps> = ({ isOpen, onClos
 
   const handleApply = useCallback(() => {
     if (!hasSelection) return;
-    // Strum action — will be wired to store action
+    strumSelection(Math.round(delay), direction);
     onClose();
-  }, [hasSelection, delay, direction, onClose]);
+  }, [hasSelection, delay, direction, strumSelection, onClose]);
 
   if (!isOpen) return null;
 

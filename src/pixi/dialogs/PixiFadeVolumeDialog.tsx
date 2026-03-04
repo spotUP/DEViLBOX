@@ -4,15 +4,17 @@
 
 import { useState, useCallback } from 'react';
 import { PixiModal, PixiModalHeader, PixiModalFooter, PixiButton, PixiNumericInput, PixiLabel } from '../components';
-import { useCursorStore } from '@stores';
+import { useTrackerStore, useCursorStore } from '@stores';
 
 interface PixiFadeVolumeDialogProps {
   isOpen: boolean;
   onClose: () => void;
+  scope?: 'block' | 'track' | 'pattern';
 }
 
-export const PixiFadeVolumeDialog: React.FC<PixiFadeVolumeDialogProps> = ({ isOpen, onClose }) => {
+export const PixiFadeVolumeDialog: React.FC<PixiFadeVolumeDialogProps> = ({ isOpen, onClose, scope = 'block' }) => {
   const selection = useCursorStore(s => s.selection);
+  const fadeVolume = useTrackerStore(s => s.fadeVolume);
 
   const [startVol, setStartVol] = useState(64);
   const [endVol, setEndVol] = useState(0);
@@ -20,9 +22,9 @@ export const PixiFadeVolumeDialog: React.FC<PixiFadeVolumeDialogProps> = ({ isOp
 
   const handleApply = useCallback(() => {
     if (!hasSelection) return;
-    // Fade volume action — will be wired to store action
+    fadeVolume(scope, startVol, endVol);
     onClose();
-  }, [hasSelection, startVol, endVol, onClose]);
+  }, [hasSelection, startVol, endVol, scope, fadeVolume, onClose]);
 
   if (!isOpen) return null;
 
