@@ -108,6 +108,10 @@ export class JSSIDEngine {
         }
       });
 
+      // DeepSID calls playcont() before loadinit() as a hack to avoid console errors
+      // and to ensure the AudioContext/ScriptProcessorNode are connected
+      this.jsSID.playcont();
+
       // loadinit fetches the URL, parses the SID header, and calls init(subtune)
       this.jsSID.loadinit(this.blobUrl, this.subsong);
 
