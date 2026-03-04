@@ -781,16 +781,17 @@ export class TrackerReplayer {
       testNode.connect(this.masterGain);
       testNode.dispose();
     } catch {
-      // Context mismatch — rebuild the routing chain
+      // Context mismatch — rebuild the routing chain.
+      // IMPORTANT: call getToneEngine() FIRST so ToneEngine (re)creates its AudioContext
+      // and calls Tone.setContext() before we create any new Tone.js nodes. Otherwise
+      // the new nodes end up on a stale Tone context and can't connect to masterInput.
+      const engine = this.isDJDeck ? null : getToneEngine();
       try { this.masterGain.dispose(); } catch { /* ignored */ }
       this.separationNode.dispose();
       this.masterGain = new Tone.Gain(1);
       const newSep = new StereoSeparationNode();
       this.masterGain.connect(newSep.inputTone);
-      if (this.isDJDeck) {
-        // DJ deck: reconnection to parent mixer handled externally
-      } else {
-        const engine = getToneEngine();
+      if (engine) {
         newSep.outputTone.connect(engine.masterInput);
       }
       // Replace the readonly separation node
