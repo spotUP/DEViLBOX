@@ -53,6 +53,8 @@ const KNOB_SIZE = 'sm' as const;
 
 const PRESET_CATEGORIES: Array<'All' | PresetCategory> = ['All', 'Bass', 'Lead', 'Pad', 'Drum', 'FX', 'User'];
 
+const SUGGESTED_TAGS = ['acid', 'deep', 'aggressive', 'soft', 'bright', 'dark', 'punchy', 'smooth', 'warm', 'cold', 'fat', 'thin', 'vintage', 'modern', 'ambient', 'percussive'];
+
 // ── Synth type palette (Tailwind class → hex) ──────────────────────────────
 
 const TW_TO_HEX: Record<string, number> = {
@@ -135,6 +137,7 @@ export const PixiEditInstrumentModal: React.FC<PixiEditInstrumentModalProps> = (
   const [synthSearch, setSynthSearch] = useState('');
 
   // Preset state
+  const [showSynthBrowser, setShowSynthBrowser] = useState(false);
   const [showSaveDialog, setShowSaveDialog] = useState(false);
   const [presetName, setPresetName] = useState('');
   const [presetCategory, setPresetCategory] = useState<PresetCategory>('User');
@@ -142,6 +145,8 @@ export const PixiEditInstrumentModal: React.FC<PixiEditInstrumentModalProps> = (
   const [presetSearch, setPresetSearch] = useState('');
   const [presetExpanded, setPresetExpanded] = useState(false);
   const [selectedPresetId, setSelectedPresetId] = useState<string | null>(null);
+  const [presetTags, setPresetTags] = useState<string[]>([]);
+  const [filterTags, setFilterTags] = useState<string[]>([]);
 
   // Reset create mode when modal opens
   useEffect(() => {
@@ -150,13 +155,28 @@ export const PixiEditInstrumentModal: React.FC<PixiEditInstrumentModalProps> = (
       setActiveTab('sound');
       setSynthSearch('');
       setShowSaveDialog(false);
+      setShowSynthBrowser(false);
       setPresetName('');
       setPresetSearch('');
       setFilterCategory('All');
       setPresetExpanded(false);
       setSelectedPresetId(null);
+      setPresetTags([]);
+      setFilterTags([]);
     }
   }, [isOpen, createMode]);
+
+  // ── Escape key to close ────────────────────────────────────────────────
+  useEffect(() => {
+    if (!isOpen) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose?.();
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [isOpen, onClose]);
 
   // ── Derived ─────────────────────────────────────────────────────────────
   const currentInstrument = useMemo(
@@ -192,6 +212,7 @@ export const PixiEditInstrumentModal: React.FC<PixiEditInstrumentModalProps> = (
       name: p.name,
       category: p.category ?? 'factory',
       isUser: false,
+      tags: [] as string[],
     }));
     const user = userPresets
       .filter((p) => p.synthType === synthType)
@@ -200,6 +221,7 @@ export const PixiEditInstrumentModal: React.FC<PixiEditInstrumentModalProps> = (
         name: p.name,
         category: p.category.toLowerCase(),
         isUser: true,
+        tags: p.tags ?? [],
       }));
     const all = [...factory, ...user];
 
@@ -208,10 +230,15 @@ export const PixiEditInstrumentModal: React.FC<PixiEditInstrumentModalProps> = (
       ? all
       : all.filter((p) => p.category.toLowerCase() === filterCategory.toLowerCase() || (filterCategory === 'User' && p.isUser));
 
+    // Tag filter
+    const tagFiltered = filterTags.length > 0
+      ? catFiltered.filter((p) => filterTags.every((t) => p.tags.includes(t)))
+      : catFiltered;
+
     // Search filter
     const searched = presetSearch
-      ? catFiltered.filter((p) => p.name.toLowerCase().includes(presetSearch.toLowerCase()))
-      : catFiltered;
+      ? tagFiltered.filter((p) => p.name.toLowerCase().includes(presetSearch.toLowerCase()))
+      : tagFiltered;
 
     const options: SelectOption[] = searched.map((p) => ({
       value: p.id,
@@ -219,7 +246,7 @@ export const PixiEditInstrumentModal: React.FC<PixiEditInstrumentModalProps> = (
     }));
 
     return { allPresets: all, filteredPresets: searched, presetOptions: options };
-  }, [currentInstrument?.synthType, userPresets, filterCategory, presetSearch]);
+  }, [currentInstrument?.synthType, userPresets, filterCategory, filterTags, presetSearch]);
 
   const handlePresetSelect = useCallback(
     (presetId: string) => {
@@ -250,11 +277,12 @@ export const PixiEditInstrumentModal: React.FC<PixiEditInstrumentModalProps> = (
   const handleSavePreset = useCallback(() => {
     const inst = instRef.current;
     if (!inst || !presetName.trim()) return;
-    usePresetStore.getState().savePreset(inst, presetName.trim(), presetCategory);
+    usePresetStore.getState().savePreset(inst, presetName.trim(), presetCategory, presetTags);
     notify.success(`Saved preset: ${presetName.trim()}`);
     setShowSaveDialog(false);
     setPresetName('');
-  }, [presetName, presetCategory]);
+    setPresetTags([]);
+  }, [presetName, presetCategory, presetTags]);
 
   const handleDeletePreset = useCallback(() => {
     if (!selectedPresetId) return;
@@ -267,6 +295,33 @@ export const PixiEditInstrumentModal: React.FC<PixiEditInstrumentModalProps> = (
     setSelectedPresetId(null);
     notify.success(`Deleted preset: ${preset.name}`);
   }, [selectedPresetId]);
+
+  const handleExportNKSF = useCallback(() => {
+    const inst = instRef.current;
+    if (!inst) return;
+    // Save as user preset first, then export
+    const name = presetName.trim() || inst.name || 'Untitled';
+    const presetId = usePresetStore.getState().savePreset(inst, name, presetCategory, presetTags);
+    usePresetStore.getState().exportPresetAsNKSF(presetId);
+    notify.success(`Exported: ${name}.nksf`);
+  }, [presetName, presetCategory, presetTags]);
+
+  const addTag = useCallback((tag: string) => {
+    const t = tag.trim().toLowerCase();
+    if (t && !presetTags.includes(t) && presetTags.length < 5) {
+      setPresetTags((prev) => [...prev, t]);
+    }
+  }, [presetTags]);
+
+  const removeTag = useCallback((tag: string) => {
+    setPresetTags((prev) => prev.filter((t) => t !== tag));
+  }, []);
+
+  const toggleFilterTag = useCallback((tag: string) => {
+    setFilterTags((prev) =>
+      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag],
+    );
+  }, []);
 
   const isSelectedPresetUser = useMemo(() => {
     if (!selectedPresetId) return false;
@@ -296,12 +351,18 @@ export const PixiEditInstrumentModal: React.FC<PixiEditInstrumentModalProps> = (
 
   const handlePrev = useCallback(() => {
     const idx = instruments.findIndex((i) => i.id === currentInstrumentId);
-    if (idx > 0) setCurrentInstrument(instruments[idx - 1].id);
+    const count = instruments.length;
+    if (count === 0) return;
+    const prevIdx = (idx - 1 + count) % count;
+    setCurrentInstrument(instruments[prevIdx].id);
   }, [instruments, currentInstrumentId, setCurrentInstrument]);
 
   const handleNext = useCallback(() => {
     const idx = instruments.findIndex((i) => i.id === currentInstrumentId);
-    if (idx >= 0 && idx < instruments.length - 1) setCurrentInstrument(instruments[idx + 1].id);
+    const count = instruments.length;
+    if (count === 0) return;
+    const nextIdx = (idx + 1) % count;
+    setCurrentInstrument(instruments[nextIdx].id);
   }, [instruments, currentInstrumentId, setCurrentInstrument]);
 
   const updateParam = useCallback(
@@ -361,6 +422,21 @@ export const PixiEditInstrumentModal: React.FC<PixiEditInstrumentModalProps> = (
     [updateInstrument],
   );
 
+  const handlePopOut = useCallback(() => {
+    const url = `${window.location.origin}${window.location.pathname}#instrument-editor`;
+    window.open(url, '_blank', 'width=800,height=600,menubar=no,toolbar=no');
+  }, []);
+
+  const handleChangeSynthType = useCallback(
+    (synthType: SynthType) => {
+      const inst = instRef.current;
+      if (!inst) return;
+      updateInstrument(inst.id, { synthType });
+      setShowSynthBrowser(false);
+    },
+    [updateInstrument],
+  );
+
   const synthInfo = currentInstrument ? getSynthInfo(currentInstrument.synthType) : null;
   const instIdx = instruments.findIndex((i) => i.id === currentInstrumentId);
 
@@ -372,6 +448,62 @@ export const PixiEditInstrumentModal: React.FC<PixiEditInstrumentModalProps> = (
         title={isCreating ? 'Create Instrument' : 'Edit Instrument'}
         onClose={onClose}
       />
+
+      {/* ── Header action buttons (pop out, browse synths) ────────────── */}
+      {!isCreating && currentInstrument && (
+        <layoutContainer
+          layout={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 4,
+            paddingLeft: 8,
+            paddingRight: 8,
+            height: 28,
+            backgroundColor: theme.bgSecondary.color,
+            borderBottomWidth: 1,
+            borderColor: theme.border.color,
+          }}
+        >
+          <PixiButton icon="open" label="" variant="ghost" width={28} onClick={handlePopOut} />
+          <PixiButton
+            label="Browse Synths"
+            variant="ghost"
+            width={110}
+            size="sm"
+            onClick={() => setShowSynthBrowser(!showSynthBrowser)}
+          />
+          <layoutContainer layout={{ flex: 1 }} />
+        </layoutContainer>
+      )}
+
+      {/* ── Synth type browser (inline, toggled) ─────────────────────── */}
+      {showSynthBrowser && !isCreating && currentInstrument && (
+        <layoutContainer
+          layout={{
+            flexDirection: 'row',
+            flexWrap: 'wrap',
+            gap: 4,
+            padding: 8,
+            borderRadius: 6,
+            borderWidth: 1,
+            borderColor: theme.border?.color ?? 0x444444,
+            backgroundColor: theme.bgSecondary?.color ?? 0x1a1a1a,
+            width: MODAL_W,
+            borderBottomWidth: 1,
+          }}
+        >
+          {ALL_SYNTH_TYPES.map((st) => (
+            <PixiButton
+              key={st}
+              label={getSynthInfo(st)?.shortName ?? st}
+              variant={currentInstrument.synthType === st ? 'primary' : 'ghost'}
+              width={Math.floor((MODAL_W - 32) / 4)}
+              size="sm"
+              onClick={() => handleChangeSynthType(st)}
+            />
+          ))}
+        </layoutContainer>
+      )}
 
       {/* ── Body: left + right panels ────────────────────────────────────── */}
       <layoutContainer layout={{ flex: 1, flexDirection: 'row', width: MODAL_W }}>
@@ -471,15 +603,18 @@ export const PixiEditInstrumentModal: React.FC<PixiEditInstrumentModalProps> = (
                 label=""
                 variant="ghost"
                 size="sm"
-                disabled={instIdx <= 0}
                 onClick={handlePrev}
+              />
+              <PixiLabel
+                text={`${instIdx + 1}/${instruments.length}`}
+                size="xs"
+                color="textMuted"
               />
               <PixiButton
                 icon="next"
                 label=""
                 variant="ghost"
                 size="sm"
-                disabled={instIdx >= instruments.length - 1}
                 onClick={handleNext}
               />
               <PixiPureTextInput
@@ -588,6 +723,33 @@ export const PixiEditInstrumentModal: React.FC<PixiEditInstrumentModalProps> = (
                     width={RIGHT_PANEL_W - 24}
                     height={22}
                   />
+
+                  {/* Tag filter row */}
+                  {filterTags.length > 0 && (
+                    <layoutContainer layout={{ flexDirection: 'row', flexWrap: 'wrap', gap: 3 }}>
+                      {filterTags.map((tag) => (
+                        <PixiButton
+                          key={tag}
+                          label={tag}
+                          variant="primary"
+                          size="sm"
+                          onClick={() => toggleFilterTag(tag)}
+                        />
+                      ))}
+                      <PixiButton label="Clear" variant="ghost" size="sm" onClick={() => setFilterTags([])} />
+                    </layoutContainer>
+                  )}
+                  <layoutContainer layout={{ flexDirection: 'row', flexWrap: 'wrap', gap: 3 }}>
+                    {SUGGESTED_TAGS.filter((t) => !filterTags.includes(t)).slice(0, 8).map((tag) => (
+                      <PixiButton
+                        key={tag}
+                        label={tag}
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => toggleFilterTag(tag)}
+                      />
+                    ))}
+                  </layoutContainer>
                 </layoutContainer>
               )}
 
@@ -628,6 +790,12 @@ export const PixiEditInstrumentModal: React.FC<PixiEditInstrumentModalProps> = (
                   }}
                 >
                   <PixiLabel text="SAVE PRESET" size="xs" weight="bold" color="textMuted" layout={{ paddingTop: 4 }} />
+                  <PixiLabel
+                    text={`Synth: ${currentInstrument.synthType} \u00b7 Effects: ${currentInstrument.effects?.length ?? 0}`}
+                    size="xs"
+                    font="mono"
+                    color="textMuted"
+                  />
                   <PixiPureTextInput
                     value={presetName}
                     onChange={setPresetName}
@@ -652,6 +820,39 @@ export const PixiEditInstrumentModal: React.FC<PixiEditInstrumentModalProps> = (
                       width={100}
                     />
                   </layoutContainer>
+
+                  {/* Current tags */}
+                  <layoutContainer layout={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4, width: RIGHT_PANEL_W - 24 }}>
+                    {presetTags.map((tag) => (
+                      <layoutContainer
+                        key={tag}
+                        layout={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          gap: 2,
+                          padding: 4,
+                          paddingLeft: 8,
+                          paddingRight: 4,
+                          borderRadius: 12,
+                          backgroundColor: theme.accent?.color ?? 0x4488ff,
+                        }}
+                      >
+                        <PixiLabel text={tag} size="xs" color="text" />
+                        <PixiButton label="x" variant="ghost" width={18} height={18} onClick={() => removeTag(tag)} />
+                      </layoutContainer>
+                    ))}
+                    {presetTags.length < 5 && (
+                      <PixiLabel text={`${presetTags.length}/5 tags`} size="xs" color="textMuted" />
+                    )}
+                  </layoutContainer>
+
+                  {/* Suggested tags */}
+                  <layoutContainer layout={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4, width: RIGHT_PANEL_W - 24 }}>
+                    {SUGGESTED_TAGS.filter((t) => !presetTags.includes(t)).slice(0, 10).map((tag) => (
+                      <PixiButton key={tag} label={tag} variant="ghost" width={70} height={22} onClick={() => addTag(tag)} />
+                    ))}
+                  </layoutContainer>
+
                   <layoutContainer layout={{ flexDirection: 'row', gap: 4 }}>
                     <PixiButton
                       icon="save"
@@ -660,6 +861,13 @@ export const PixiEditInstrumentModal: React.FC<PixiEditInstrumentModalProps> = (
                       size="sm"
                       disabled={!presetName.trim()}
                       onClick={handleSavePreset}
+                    />
+                    <PixiButton
+                      label="Export .nksf"
+                      variant="ghost"
+                      size="sm"
+                      disabled={!presetName.trim()}
+                      onClick={handleExportNKSF}
                     />
                     <PixiButton
                       label="Cancel"
