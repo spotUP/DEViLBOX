@@ -115,16 +115,6 @@ export const PixiBottomDock: React.FC<PixiBottomDockProps> = ({
   const theme = usePixiTheme();
   const dragRef = useRef<{ startY: number; startH: number } | null>(null);
 
-  // Dock background
-  const drawBg = useCallback((g: GraphicsType) => {
-    g.clear();
-    g.rect(0, 0, width, height);
-    g.fill({ color: theme.bgSecondary.color });
-    // Top border
-    g.rect(0, 0, width, 1);
-    g.fill({ color: theme.border.color });
-  }, [width, height, theme]);
-
   // Resize handle (4px tall at top edge)
   const drawHandle = useCallback((g: GraphicsType) => {
     g.clear();
@@ -163,8 +153,12 @@ export const PixiBottomDock: React.FC<PixiBottomDockProps> = ({
   const contentH = height - MODERN_DOCK_TAB_H - 4; // -4 for resize handle
 
   return (
-    <pixiContainer layout={{ width, height, flexDirection: 'column' }}>
-      <pixiGraphics draw={drawBg} layout={{ position: 'absolute', width, height }} />
+    <layoutContainer layout={{
+      width, height, flexDirection: 'column',
+      backgroundColor: theme.bgSecondary.color,
+      borderTopWidth: 1,
+      borderColor: theme.border.color,
+    }}>
 
       {/* Resize handle */}
       <pixiGraphics
@@ -255,6 +249,6 @@ export const PixiBottomDock: React.FC<PixiBottomDockProps> = ({
           {activeTab === 'master-fx' && <PixiMasterFxView />}
         </pixiContainer>
       </pixiContainer>
-    </pixiContainer>
+    </layoutContainer>
   );
 };

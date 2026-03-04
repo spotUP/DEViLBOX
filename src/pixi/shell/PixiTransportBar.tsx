@@ -6,7 +6,7 @@
 import React, { useCallback, useRef } from 'react';
 import { useTick } from '@pixi/react';
 import { isRapidScrolling } from '../scrollPerf';
-import type { Graphics as GraphicsType, BitmapText as BitmapTextType } from 'pixi.js';
+import type { BitmapText as BitmapTextType } from 'pixi.js';
 import { PIXI_FONTS } from '../fonts';
 import { usePixiTheme } from '../theme';
 import { useTransportStore } from '@stores/useTransportStore';
@@ -47,24 +47,6 @@ export const PixiTransportBar: React.FC<PixiTransportBarProps> = ({ width, heigh
   const handleStop = useCallback(() => { stop(); }, [stop]);
   const handleLoop = useCallback(() => { setIsLooping(!isLooping); }, [setIsLooping, isLooping]);
 
-  // BPM display background
-  const drawBpmBg = useCallback((g: GraphicsType) => {
-    g.clear();
-    g.roundRect(0, 0, 64, 28, 4);
-    g.fill({ color: theme.bg.color });
-    g.roundRect(0, 0, 64, 28, 4);
-    g.stroke({ color: theme.border.color, alpha: 0.5, width: 1 });
-  }, [theme]);
-
-  // Position display background
-  const drawPosBg = useCallback((g: GraphicsType) => {
-    g.clear();
-    g.roundRect(0, 0, 72, 28, 4);
-    g.fill({ color: theme.bg.color });
-    g.roundRect(0, 0, 72, 28, 4);
-    g.stroke({ color: theme.border.color, alpha: 0.5, width: 1 });
-  }, [theme]);
-
   return (
     <pixiContainer
       layout={{
@@ -98,15 +80,20 @@ export const PixiTransportBar: React.FC<PixiTransportBarProps> = ({ width, heigh
       <pixiContainer layout={{ width: 8 }} />
 
       {/* BPM display */}
-      <pixiContainer layout={{ width: 64, height: 28, justifyContent: 'center', alignItems: 'center' }}>
-        <pixiGraphics draw={drawBpmBg} layout={{ position: 'absolute', width: 64, height: 28 }} />
+      <layoutContainer layout={{
+        width: 64, height: 28, justifyContent: 'center', alignItems: 'center',
+        backgroundColor: theme.bg.color,
+        borderColor: theme.border.color,
+        borderWidth: 1,
+        borderRadius: 4,
+      }}>
         <pixiBitmapText
           text={String(Math.round(bpm))}
           style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 13, fill: 0xffffff }}
           tint={theme.accent.color}
           layout={{}}
         />
-      </pixiContainer>
+      </layoutContainer>
       <pixiBitmapText
         text="BPM"
         style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }}
@@ -115,8 +102,13 @@ export const PixiTransportBar: React.FC<PixiTransportBarProps> = ({ width, heigh
       />
 
       {/* Position display */}
-      <pixiContainer layout={{ width: 72, height: 28, justifyContent: 'center', alignItems: 'center' }}>
-        <pixiGraphics draw={drawPosBg} layout={{ position: 'absolute', width: 72, height: 28 }} />
+      <layoutContainer layout={{
+        width: 72, height: 28, justifyContent: 'center', alignItems: 'center',
+        backgroundColor: theme.bg.color,
+        borderColor: theme.border.color,
+        borderWidth: 1,
+        borderRadius: 4,
+      }}>
         <pixiBitmapText
           ref={posTextRef as any}
           text="00:000"
@@ -124,7 +116,7 @@ export const PixiTransportBar: React.FC<PixiTransportBarProps> = ({ width, heigh
           tint={theme.text.color}
           layout={{}}
         />
-      </pixiContainer>
+      </layoutContainer>
 
       {/* Separator */}
       <pixiContainer layout={{ width: 8 }} />

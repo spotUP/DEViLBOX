@@ -12,7 +12,6 @@
  */
 
 import React, { useCallback } from 'react';
-import type { Graphics as GraphicsType } from 'pixi.js';
 import { usePixiTheme } from '../../theme';
 import { PIXI_FONTS } from '../../fonts';
 import { PixiKnob, PixiButton } from '../../components';
@@ -266,64 +265,6 @@ export const PixiTB303KnobPanel: React.FC<PixiTB303KnobPanelProps> = ({ width })
   const chIndex = targetInstrument ? instruments.indexOf(targetInstrument) : -1;
   const chLabel = chIndex >= 0 ? `CH${String(chIndex + 1).padStart(2, '0')}` : 'CH--';
 
-  // ── Background drawing helpers ────────────────────────────────────────────
-
-  const drawPanelBg = useCallback(
-    (g: GraphicsType) => {
-      const h = tb303Collapsed ? COLLAPSED_H : EXPANDED_H;
-      g.clear();
-      g.rect(0, 0, width, h);
-      g.fill({ color: 0x1a1a1a });
-      // Top border line
-      g.rect(0, 0, width, 1);
-      g.fill({ color: theme.border.color, alpha: 0.5 });
-    },
-    [width, theme, tb303Collapsed]
-  );
-
-  const drawHeaderBg = useCallback(
-    (g: GraphicsType) => {
-      g.clear();
-      g.rect(0, 0, width, HEADER_H);
-      g.fill({ color: 0x141414 });
-      // Bottom separator under header
-      g.rect(0, HEADER_H - 1, width, 1);
-      g.fill({ color: theme.border.color, alpha: 0.3 });
-    },
-    [width, theme]
-  );
-
-  const drawDivider = useCallback(
-    (g: GraphicsType) => {
-      g.clear();
-      g.rect(0, 0, width, 1);
-      g.fill({ color: theme.border.color, alpha: 0.25 });
-    },
-    [width, theme]
-  );
-
-  const drawTabBg = useCallback(
-    (g: GraphicsType) => {
-      g.clear();
-      g.rect(0, 0, width, TAB_BAR_H);
-      g.fill({ color: 0x111111 });
-      g.rect(0, 0, width, 1);
-      g.fill({ color: theme.border.color, alpha: 0.2 });
-      g.rect(0, TAB_BAR_H - 1, width, 1);
-      g.fill({ color: theme.border.color, alpha: 0.2 });
-    },
-    [width, theme]
-  );
-
-  const drawTabContentBg = useCallback(
-    (g: GraphicsType) => {
-      g.clear();
-      g.rect(0, 0, width, TAB_CONTENT_H);
-      g.fill({ color: 0x161616 });
-    },
-    [width]
-  );
-
   // ── No TB303 instrument: render zero-size placeholder (keeps Yoga tree stable) ──
 
   if (!targetInstrument || !config) {
@@ -334,8 +275,7 @@ export const PixiTB303KnobPanel: React.FC<PixiTB303KnobPanelProps> = ({ width })
 
   if (tb303Collapsed) {
     return (
-      <pixiContainer layout={{ width, height: COLLAPSED_H, flexDirection: 'column' }}>
-        <pixiGraphics draw={drawPanelBg} layout={{ position: 'absolute', width, height: COLLAPSED_H }} />
+      <layoutContainer layout={{ width, height: COLLAPSED_H, flexDirection: 'column', backgroundColor: 0x1a1a1a, borderTopWidth: 1, borderColor: theme.border.color }}>
 
         {/* Collapsed header row */}
         <pixiContainer
@@ -384,19 +324,17 @@ export const PixiTB303KnobPanel: React.FC<PixiTB303KnobPanelProps> = ({ width })
             onClick={toggleTB303Collapsed}
           />
         </pixiContainer>
-      </pixiContainer>
+      </layoutContainer>
     );
   }
 
   // ── Expanded state ────────────────────────────────────────────────────────
 
   return (
-    <pixiContainer layout={{ width, height: EXPANDED_H, flexDirection: 'column' }}>
-      <pixiGraphics draw={drawPanelBg} layout={{ position: 'absolute', width, height: EXPANDED_H }} />
+    <layoutContainer layout={{ width, height: EXPANDED_H, flexDirection: 'column', backgroundColor: 0x1a1a1a, borderTopWidth: 1, borderColor: theme.border.color }}>
 
       {/* ── Header bar ── */}
-      <pixiContainer layout={{ width, height: HEADER_H, flexDirection: 'column' }}>
-        <pixiGraphics draw={drawHeaderBg} layout={{ position: 'absolute', width, height: HEADER_H }} />
+      <layoutContainer layout={{ width, height: HEADER_H, flexDirection: 'column', backgroundColor: 0x141414, borderBottomWidth: 1, borderColor: theme.border.color }}>
         <pixiContainer
           layout={{
             width,
@@ -450,7 +388,7 @@ export const PixiTB303KnobPanel: React.FC<PixiTB303KnobPanelProps> = ({ width })
             onClick={toggleTB303Collapsed}
           />
         </pixiContainer>
-      </pixiContainer>
+      </layoutContainer>
 
       {/* ── Row 1: Classic TB-303 knobs (always visible) ── */}
       <pixiContainer
@@ -558,11 +496,10 @@ export const PixiTB303KnobPanel: React.FC<PixiTB303KnobPanelProps> = ({ width })
       </pixiContainer>
 
       {/* Thin divider */}
-      <pixiGraphics draw={drawDivider} layout={{ width, height: 1 }} />
+      <layoutContainer alpha={0.25} layout={{ width, height: 1, backgroundColor: theme.border.color }} />
 
       {/* ── Tab bar ── */}
-      <pixiContainer layout={{ width, height: TAB_BAR_H, flexDirection: 'column' }}>
-        <pixiGraphics draw={drawTabBg} layout={{ position: 'absolute', width, height: TAB_BAR_H }} />
+      <layoutContainer layout={{ width, height: TAB_BAR_H, flexDirection: 'column', backgroundColor: 0x111111, borderTopWidth: 1, borderBottomWidth: 1, borderColor: theme.border.color }}>
         <pixiContainer
           layout={{
             width,
@@ -585,14 +522,10 @@ export const PixiTB303KnobPanel: React.FC<PixiTB303KnobPanelProps> = ({ width })
             />
           ))}
         </pixiContainer>
-      </pixiContainer>
+      </layoutContainer>
 
       {/* ── Tab content ── */}
-      <pixiContainer layout={{ width, height: TAB_CONTENT_H, flexDirection: 'column' }}>
-        <pixiGraphics
-          draw={drawTabContentBg}
-          layout={{ position: 'absolute', width, height: TAB_CONTENT_H }}
-        />
+      <layoutContainer layout={{ width, height: TAB_CONTENT_H, flexDirection: 'column', backgroundColor: 0x161616 }}>
 
         {/* OSC Tab */}
         {activeTab === 'osc' && (
@@ -897,8 +830,8 @@ export const PixiTB303KnobPanel: React.FC<PixiTB303KnobPanelProps> = ({ width })
             />
           </pixiContainer>
         )}
-      </pixiContainer>
-    </pixiContainer>
+      </layoutContainer>
+    </layoutContainer>
   );
 };
 

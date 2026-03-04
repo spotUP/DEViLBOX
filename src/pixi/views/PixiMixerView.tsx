@@ -2,7 +2,6 @@
 // Full GL mixer: 16 channel strips + master, scrollable, live VU meters
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import type { Graphics as GraphicsType } from 'pixi.js';
 import { useMixerStore } from '../../stores/useMixerStore';
 import { getToneEngine } from '@engine/ToneEngine';
 import { PixiMixerChannelStrip } from '../mixer/PixiMixerChannelStrip';
@@ -108,20 +107,6 @@ export const PixiMixerView: React.FC = () => {
     setSolo(ch, !channelsRef.current[ch].soloed);
   }, [setSolo]);
 
-  // ── Divider draw ─────────────────────────────────────────────────────────
-
-  const drawDivider = useCallback((g: GraphicsType) => {
-    g.clear();
-    g.rect(0, 0, 1, 240);
-    g.fill({ color: theme.border.color, alpha: theme.border.alpha });
-  }, [theme.border.color, theme.border.alpha]);
-
-  const drawHDivider = useCallback((g: GraphicsType) => {
-    g.clear();
-    g.rect(0, 0, 2000, 1);
-    g.fill({ color: theme.border.color, alpha: theme.border.alpha });
-  }, [theme.border.color, theme.border.alpha]);
-
   // ── Render ───────────────────────────────────────────────────────────────
 
   return (
@@ -173,7 +158,7 @@ export const PixiMixerView: React.FC = () => {
         </pixiContainer>
 
         {/* Divider */}
-        <pixiGraphics draw={drawDivider} layout={{ width: 1, height: 240, marginTop: 16 }} />
+        <layoutContainer alpha={theme.border.alpha} layout={{ width: 1, height: 240, marginTop: 16, backgroundColor: theme.border.color }} />
 
         {/* MASTER — spacer matches CHANNELS header so VU meters align */}
         <pixiContainer layout={{ flexDirection: 'column', alignItems: 'flex-start', gap: 4 }}>
@@ -197,7 +182,7 @@ export const PixiMixerView: React.FC = () => {
       </pixiContainer>
 
       {/* ── Horizontal divider ─────────────────────────────────────────────── */}
-      <pixiGraphics draw={drawHDivider} layout={{ width: '100%', height: 1 }} />
+      <layoutContainer alpha={theme.border.alpha} layout={{ width: '100%', height: 1, backgroundColor: theme.border.color }} />
 
       {/* ── Bottom: Device / Master FX panel ───────────────────────────────── */}
       <pixiContainer

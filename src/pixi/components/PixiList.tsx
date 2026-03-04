@@ -117,13 +117,6 @@ export const PixiList: React.FC<PixiListProps> = ({
     g.fill({ color: isDraggingRef.current ? theme.accent.color : theme.textMuted.color, alpha: isDraggingRef.current ? 0.6 : 0.4 });
   }, [thumbHeight, maxScroll, theme]);
 
-  // Draw list background (uses theme color, not white)
-  const drawListBg = useCallback((g: GraphicsType) => {
-    g.clear();
-    g.rect(0, 0, width, height);
-    g.fill({ color: theme.bg.color });
-  }, [width, height, theme]);
-
   return (
     <pixiContainer
       eventMode="static"
@@ -131,9 +124,8 @@ export const PixiList: React.FC<PixiListProps> = ({
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
       onPointerUpOutside={handlePointerUp}
-      layout={{ width, height, overflow: 'hidden', ...layoutProp }}
+      layout={{ width, height, overflow: 'hidden', backgroundColor: theme.bg.color, ...layoutProp }}
     >
-      <pixiGraphics draw={drawListBg} layout={{ position: 'absolute', width, height }} />
 
       {/* Virtual items */}
       {visibleItems.map((item, i) => {
@@ -174,13 +166,8 @@ export const PixiList: React.FC<PixiListProps> = ({
             />
 
             {item.dotColor != null && (
-              <pixiGraphics
-                draw={(g) => {
-                  g.clear();
-                  g.roundRect(0, 0, 6, 6, 1);
-                  g.fill({ color: item.dotColor! });
-                }}
-                layout={{ width: 6, height: 6, flexShrink: 0, marginRight: 5 }}
+              <layoutContainer
+                layout={{ width: 6, height: 6, flexShrink: 0, marginRight: 5, backgroundColor: item.dotColor!, borderRadius: 1 }}
               />
             )}
             <pixiBitmapText

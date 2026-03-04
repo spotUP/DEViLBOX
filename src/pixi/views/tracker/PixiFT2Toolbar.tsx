@@ -21,7 +21,6 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { Graphics as GraphicsType } from 'pixi.js';
 import { usePixiTheme } from '../../theme';
 import { PIXI_FONTS } from '../../fonts';
 import { PixiButton, PixiNumericInput } from '../../components';
@@ -45,8 +44,6 @@ const VIZ_WIDTH   = 220;
 export const FT2_TOOLBAR_HEIGHT = TRANSPORT_ROW_H * 2 + FILE_ROW_H;
 
 // ─── Stable layout objects ───────────────────────────────────────────────────
-
-const LAYOUT_FILL_ROW: Record<string, unknown> = { position: 'absolute', width: '100%' };
 
 // ─── Labeled FT2-style numeric cell ──────────────────────────────────────────
 
@@ -87,12 +84,7 @@ const FT2Cell: React.FC<FT2CellProps> = ({ label, value, min, max, onChange, wid
 
 const TransportSep: React.FC<{ height?: number }> = ({ height = 26 }) => {
   const theme = usePixiTheme();
-  const draw = useCallback((g: GraphicsType) => {
-    g.clear();
-    g.rect(0, 0, 1, height);
-    g.fill({ color: theme.border.color, alpha: 0.4 });
-  }, [height, theme]);
-  return <pixiGraphics draw={draw} layout={{ width: 1, height, alignSelf: 'center', marginLeft: 2, marginRight: 2 }} />;
+  return <layoutContainer alpha={0.4} layout={{ width: 1, height, alignSelf: 'center', marginLeft: 2, marginRight: 2, backgroundColor: theme.border.color }} />;
 };
 
 // ─── PixiFT2Toolbar ──────────────────────────────────────────────────────────
@@ -321,31 +313,6 @@ export const PixiFT2Toolbar: React.FC = () => {
     } catch { /* ignore */ }
   }, []);
 
-  // ── Background draws ──────────────────────────────────────────────────────
-  const drawTransportRowBg = useCallback((g: GraphicsType) => {
-    g.clear();
-    g.rect(0, 0, 4000, TRANSPORT_ROW_H);
-    g.fill({ color: theme.bgSecondary.color });
-    g.rect(0, TRANSPORT_ROW_H - 1, 4000, 1);
-    g.fill({ color: theme.border.color, alpha: 0.4 });
-  }, [theme]);
-
-  const drawTransportRow2Bg = useCallback((g: GraphicsType) => {
-    g.clear();
-    g.rect(0, 0, 4000, TRANSPORT_ROW_H);
-    g.fill({ color: theme.bgSecondary.color });
-    g.rect(0, TRANSPORT_ROW_H - 1, 4000, 1);
-    g.fill({ color: theme.border.color, alpha: 0.4 });
-  }, [theme]);
-
-  const drawFileRowBg = useCallback((g: GraphicsType) => {
-    g.clear();
-    g.rect(0, 0, 4000, FILE_ROW_H);
-    g.fill({ color: theme.bgSecondary.color });
-    g.rect(0, FILE_ROW_H - 1, 4000, 1);
-    g.fill({ color: theme.border.color, alpha: 0.4 });
-  }, [theme]);
-
   return (
     <pixiContainer
       layout={{
@@ -366,7 +333,7 @@ export const PixiFT2Toolbar: React.FC = () => {
         <pixiContainer layout={{ flex: 1, flexDirection: 'column' }}>
 
           {/* Transport Row 1: Position | BPM | Pattern | EditStep | PlaySong PlayPattern */}
-          <pixiContainer
+          <layoutContainer
             layout={{
               width: '100%',
               height: TRANSPORT_ROW_H,
@@ -375,9 +342,11 @@ export const PixiFT2Toolbar: React.FC = () => {
               paddingLeft: 8,
               paddingRight: 8,
               gap: 6,
+              backgroundColor: theme.bgSecondary.color,
+              borderBottomWidth: 1,
+              borderColor: theme.border.color,
             }}
           >
-            <pixiGraphics draw={drawTransportRowBg} layout={{ ...LAYOUT_FILL_ROW, height: TRANSPORT_ROW_H }} />
 
             {/* Position */}
             <FT2Cell label="Pos" value={currentPositionIndex} min={0} max={Math.max(0, songLength - 1)} onChange={handlePositionChange} width={44} />
@@ -435,10 +404,10 @@ export const PixiFT2Toolbar: React.FC = () => {
 
             {/* Spacer */}
             <pixiContainer layout={{ flex: 1 }} />
-          </pixiContainer>
+          </layoutContainer>
 
           {/* Transport Row 2: SongLen | Speed Groove | Length | PatternName */}
-          <pixiContainer
+          <layoutContainer
             layout={{
               width: '100%',
               height: TRANSPORT_ROW_H,
@@ -447,9 +416,11 @@ export const PixiFT2Toolbar: React.FC = () => {
               paddingLeft: 8,
               paddingRight: 8,
               gap: 6,
+              backgroundColor: theme.bgSecondary.color,
+              borderBottomWidth: 1,
+              borderColor: theme.border.color,
             }}
           >
-            <pixiGraphics draw={drawTransportRow2Bg} layout={{ ...LAYOUT_FILL_ROW, height: TRANSPORT_ROW_H }} />
 
             {/* Song Length */}
             <FT2Cell
@@ -534,7 +505,7 @@ export const PixiFT2Toolbar: React.FC = () => {
               size="sm"
               onClick={handleStop}
             />
-          </pixiContainer>
+          </layoutContainer>
         </pixiContainer>
 
         {/* Right: Visualizer */}
@@ -570,7 +541,7 @@ export const PixiFT2Toolbar: React.FC = () => {
       </pixiContainer>
 
       {/* ── Row 4: File / action buttons ── */}
-      <pixiContainer
+      <layoutContainer
         layout={{
           width: '100%',
           height: FILE_ROW_H,
@@ -579,9 +550,11 @@ export const PixiFT2Toolbar: React.FC = () => {
           paddingLeft: 8,
           paddingRight: 8,
           gap: 4,
+          backgroundColor: theme.bgSecondary.color,
+          borderBottomWidth: 1,
+          borderColor: theme.border.color,
         }}
       >
-        <pixiGraphics draw={drawFileRowBg} layout={{ ...LAYOUT_FILL_ROW, height: FILE_ROW_H }} />
 
         <PixiButton label="Load"                    variant="ghost" size="sm" onClick={handleLoad} />
         <PixiButton label={isDirty ? 'Save*' : 'Save'} variant="ghost" size="sm" onClick={handleSave} />
@@ -631,7 +604,7 @@ export const PixiFT2Toolbar: React.FC = () => {
           active={isFullscreen}
           onClick={handleToggleFullscreen}
         />
-      </pixiContainer>
+      </layoutContainer>
 
       {/* FX Search & Replace floating panel */}
       {showFXSearchReplace && (

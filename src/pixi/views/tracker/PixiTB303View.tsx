@@ -378,15 +378,6 @@ export const PixiTB303View: React.FC<PixiTB303ViewProps> = ({ channelIndex = 0, 
     return labels;
   }, [steps, theme]);
 
-  // ─── Draw transport bar ─────────────────────────────────────────────────────
-  const drawTransport = useCallback((g: GraphicsType) => {
-    g.clear();
-    g.rect(0, 0, width, TRANSPORT_H);
-    g.fill({ color: theme.bgSecondary.color });
-    g.rect(0, TRANSPORT_H - 1, width, 1);
-    g.fill({ color: theme.border.color, alpha: theme.border.alpha });
-  }, [width, theme]);
-
   // Use visible prop instead of early return to avoid @pixi/layout BindingError.
   // Conditional mount/unmount of Pixi children triggers Yoga node swap errors;
   // always render the same tree structure and control visibility instead.
@@ -408,8 +399,7 @@ export const PixiTB303View: React.FC<PixiTB303ViewProps> = ({ channelIndex = 0, 
       {/* Main content — always mounted; hidden when no instrument */}
       <pixiContainer alpha={hasInstrument ? 1 : 0} renderable={hasInstrument} eventMode={hasInstrument ? 'static' : 'none'} layout={{ width, height, flexDirection: 'column' }}>
         {/* Transport bar */}
-        <pixiContainer layout={{ width, height: TRANSPORT_H, flexDirection: 'row', alignItems: 'center', paddingLeft: 8, gap: 8 }}>
-          <pixiGraphics draw={drawTransport} layout={{ position: 'absolute', width, height: TRANSPORT_H }} />
+        <layoutContainer layout={{ width, height: TRANSPORT_H, flexDirection: 'row', alignItems: 'center', paddingLeft: 8, gap: 8, backgroundColor: theme.bgSecondary.color, borderBottomWidth: 1, borderColor: theme.border.color }}>
 
           <PixiLabel text="TB-303" size="sm" weight="bold" color="accent" />
 
@@ -422,7 +412,7 @@ export const PixiTB303View: React.FC<PixiTB303ViewProps> = ({ channelIndex = 0, 
 
           <PixiButton label="RANDOM" variant="ghost" size="sm" onClick={handleRandomize} />
           <PixiButton label="CLEAR" variant="ghost" size="sm" color="red" onClick={handleClear} />
-        </pixiContainer>
+        </layoutContainer>
 
         {/* Sequencer grid */}
         <pixiContainer

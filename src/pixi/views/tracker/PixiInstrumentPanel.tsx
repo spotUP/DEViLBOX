@@ -238,53 +238,29 @@ export const PixiInstrumentPanel: React.FC<PixiInstrumentPanelProps> = ({ width,
 
   // ─── Draw helpers ───────────────────────────────────────────────────────────
 
-  const drawActionBarBg = useCallback((g: GraphicsType) => {
-    g.clear();
-    g.rect(0, 0, width, ACTION_BAR_H);
-    g.fill({ color: theme.bgTertiary.color });
-    g.rect(0, ACTION_BAR_H - 1, width, 1);
-    g.fill({ color: theme.border.color, alpha: 0.4 });
-  }, [width, theme]);
-
-  const drawListBg = useCallback((g: GraphicsType) => {
-    g.clear();
-    g.rect(0, 0, width, listH);
-    g.fill({ color: theme.bg.color });
-  }, [width, listH, theme]);
-
-  const drawFooterBg = useCallback((g: GraphicsType) => {
-    g.clear();
-    g.rect(0, 0, width, 1);
-    g.fill({ color: theme.border.color, alpha: 0.3 });
-    g.rect(0, 1, width, FOOTER_H - 1);
-    g.fill({ color: theme.bgTertiary.color });
-  }, [width, theme]);
-
   // Width budget: 8px pad + 24px num + 18px icon + 8px gap + name(flex) + badge(56) + actions(44) + 10px scrollbar
   const nameMaxW = width - 8 - 24 - 18 - 8 - 56 - 44 - 10;
 
   return (
     <pixiContainer layout={{ width, height, flexDirection: 'column' }}>
       {/* ═══ Action Bar ═══ */}
-      <pixiContainer layout={{ width, height: ACTION_BAR_H, flexDirection: 'row', alignItems: 'center', paddingLeft: 3, paddingRight: 3, gap: 2, flexShrink: 0 }}>
-        <pixiGraphics draw={drawActionBarBg} layout={{ position: 'absolute', width, height: ACTION_BAR_H }} />
+      <layoutContainer layout={{ width, height: ACTION_BAR_H, flexDirection: 'row', alignItems: 'center', paddingLeft: 3, paddingRight: 3, gap: 2, flexShrink: 0, backgroundColor: theme.bgTertiary.color, borderBottomWidth: 1, borderColor: theme.border.color }}>
         <PixiButton label="ADD"    icon="preset-a"    iconPosition="top" variant="ghost" size="sm" onClick={handleAdd}        width={40} height={40} />
         <PixiButton label="PRESET" icon="open"        iconPosition="top" variant="ghost" size="sm" onClick={handlePreset}     width={50} height={40} />
         <PixiButton label="SAMPLE" icon="diskio"      iconPosition="top" variant="ghost" size="sm" onClick={handleSamplePack} width={50} height={40} color="green" />
         <PixiButton label="EDIT"   icon="pen"         iconPosition="top" variant="ghost" size="sm" onClick={handleEdit}       width={40} height={40} />
         <PixiButton label="CHIP"   icon="cpu"         iconPosition="top" variant="ghost" size="sm" onClick={handleChip}       width={40} height={40} />
-      </pixiContainer>
+      </layoutContainer>
 
       {/* ═══ Instrument List ═══ */}
-      <pixiContainer
+      <layoutContainer
         eventMode="static"
         onWheel={handleWheel}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onPointerUpOutside={handlePointerUp}
-        layout={{ width, height: listH, overflow: 'hidden', flexShrink: 1 }}
+        layout={{ width, height: listH, overflow: 'hidden', flexShrink: 1, backgroundColor: theme.bg.color }}
       >
-        <pixiGraphics draw={drawListBg} layout={{ position: 'absolute', width, height: listH }} />
 
         {visibleItems.map((inst, i) => {
           const actualIdx = startIdx + i;
@@ -419,18 +395,17 @@ export const PixiInstrumentPanel: React.FC<PixiInstrumentPanelProps> = ({ width,
             />
           </pixiContainer>
         )}
-      </pixiContainer>
+      </layoutContainer>
 
       {/* ═══ Footer ═══ */}
-      <pixiContainer layout={{ width, height: FOOTER_H, flexShrink: 0, alignItems: 'center', paddingLeft: 8 }}>
-        <pixiGraphics draw={drawFooterBg} layout={{ position: 'absolute', width, height: FOOTER_H }} />
+      <layoutContainer layout={{ width, height: FOOTER_H, flexShrink: 0, alignItems: 'center', paddingLeft: 8, backgroundColor: theme.bgTertiary.color, borderTopWidth: 1, borderColor: theme.border.color }}>
         <pixiBitmapText
           text={`${instruments.length} instrument${instruments.length !== 1 ? 's' : ''}`}
           style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 11, fill: 0xffffff }}
           tint={theme.textMuted.color}
           layout={{ marginTop: 4 }}
         />
-      </pixiContainer>
+      </layoutContainer>
     </pixiContainer>
   );
 };
