@@ -69,7 +69,9 @@ class GTUltraProcessor extends AudioWorkletProcessor {
           this._redo = this.module.cwrap('gt_redo', null, []);
 
           // Save/Export
-          this._saveSng = this.module.cwrap('gt_save_sng', 'number', ['number']);
+          this._saveSng = this.module.cwrap('gt_save_sng', 'number', ['number', 'number']);
+          this._exportPrg = this.module.cwrap('gt_export_prg', 'number', ['number', 'number']);
+          this._exportSid = this.module.cwrap('gt_export_sid', 'number', ['number', 'number']);
 
           // Instrument editing
           this._setInstrumentAD = this.module.cwrap('gt_set_instrument_ad', null, ['number', 'number']);
@@ -276,11 +278,9 @@ class GTUltraProcessor extends AudioWorkletProcessor {
 
       case 'saveSng': {
         if (!this.ready) return;
-        // gt_save_sng returns size written to internal buffer, we need to allocate and get data
-        // The WASM exports a buffer pointer; we allocate a large buffer and pass it
         const bufSize = 1024 * 1024; // 1MB should be plenty for .sng
         const ptr = this.module._malloc(bufSize);
-        const size = this._saveSng(ptr);
+        const size = this._saveSng(ptr, bufSize);
         if (size > 0) {
           const data = this.module.HEAPU8.slice(ptr, ptr + size);
           this.port.postMessage(
@@ -333,6 +333,36 @@ class GTUltraProcessor extends AudioWorkletProcessor {
       case 'setCopyright': {
         if (!this.ready) return;
         this._setCopyright(msg.name);
+        break;
+      }
+
+      case 'exportPrg': {
+        if (!this.ready) return;
+        const bufSize = 1024 * 1024;
+        const ptr = this.module._malloc(bufSize);
+        const size = this._exportPrg(ptr, bufSize);
+        if (size > 0) {
+          const data = this.module.HEAPU8.slice(ptr, ptr + size);
+          this.port.postMessage({ type: 'prgData', data: data.buffer }, [data.buffer]);
+        } else {
+          this.port.postMessage({ type: 'prgData', data: null });
+        }
+        this.module._free(ptr);
+        break;
+      }
+
+      case 'exportSid': {
+        if (!this.ready) return;
+        const bufSize = 1024 * 1024;
+        const ptr = this.module._malloc(bufSize);
+        const size = this._exportSid(ptr, bufSize);
+        if (size > 0) {
+          const data = this.module.HEAPU8.slice(ptr, ptr + size);
+          this.port.postMessage({ type: 'sidData', data: data.buffer }, [data.buffer]);
+        } else {
+          this.port.postMessage({ type: 'sidData', data: null });
+        }
+        this.module._free(ptr);
         break;
       }
 

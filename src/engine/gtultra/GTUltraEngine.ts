@@ -40,6 +40,8 @@ export interface GTUltraCallbacks {
   onSidRegisters?: (sidIdx: number, data: Uint8Array) => void;
   onSongInfo?: (info: GTUltraSongInfo) => void;
   onSngData?: (data: ArrayBuffer | null) => void;
+  onPrgData?: (data: ArrayBuffer | null) => void;
+  onSidData?: (data: ArrayBuffer | null) => void;
 }
 
 export class GTUltraEngine {
@@ -185,6 +187,12 @@ export class GTUltraEngine {
       case 'sngData':
         this.callbacks.onSngData?.(msg.data as ArrayBuffer | null);
         break;
+      case 'prgData':
+        this.callbacks.onPrgData?.(msg.data as ArrayBuffer | null);
+        break;
+      case 'sidData':
+        this.callbacks.onSidData?.(msg.data as ArrayBuffer | null);
+        break;
     }
   }
 
@@ -288,6 +296,14 @@ export class GTUltraEngine {
 
   saveSng(): void {
     this.post({ type: 'saveSng' });
+  }
+
+  exportPrg(): void {
+    this.post({ type: 'exportPrg' });
+  }
+
+  exportSid(): void {
+    this.post({ type: 'exportSid' });
   }
 
   // --- Instrument editing ---
