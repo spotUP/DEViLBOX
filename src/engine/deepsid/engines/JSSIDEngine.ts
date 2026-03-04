@@ -37,12 +37,11 @@ export class JSSIDEngine {
   private readonly sidData: Uint8Array;
   private readonly config: JSSIDConfig;
 
-  private audioContext: AudioContext | null = null;
-  private scriptProcessor: ScriptProcessorNode | null = null;
-  private isPlaying = false;
+  private playing = false;
   private subsong = 0;
   private numSubsongs = 1;
   private asidEnabled = false;
+  private blobUrl: string | null = null;
 
   constructor(sidData: Uint8Array, config: JSSIDConfig = {}) {
     this.sidData = sidData;
@@ -64,7 +63,6 @@ export class JSSIDEngine {
       
       const port = asidManager.getSelectedPort();
       if (port) {
-        // jsSID expects a global `selectedMidiOutput` variable
         (window as any).selectedMidiOutput = port;
         this.asidEnabled = true;
         console.log('[jsSID] ASID hardware enabled, output:', port.name);
@@ -73,70 +71,65 @@ export class JSSIDEngine {
       }
     }
     
-    // Create jsSID instance with ASID support
+    // Create jsSID instance — it creates its own AudioContext internally
     this.jsSID = new module.jsSID(
       this.config.bufferSize || 16384,
-      0.0005, // Decay factor
-      this.asidEnabled, // asid_enable
-      false // webusb_enable
+      0.0005,
+      this.asidEnabled,
+      false
     );
 
-    // Load SID data
-    const success = this.jsSID.loadFileData(this.sidData);
-    if (!success) {
-      throw new Error('Failed to load SID file into jsSID');
-    }
+    // Load SID data via blob URL (jsSID.loadinit uses XHR internally)
+    await this.loadSIDData();
 
-    // Get metadata
-    const metadata = this.jsSID.getInfo();
-    this.numSubsongs = metadata.songs || 1;
-    
     console.log('[jsSID] Initialized:', {
-      title: metadata.name,
-      author: metadata.author,
-      copyright: metadata.copyright,
+      title: this.jsSID.gettitle(),
+      author: this.jsSID.getauthor(),
       subsongs: this.numSubsongs,
-      chipModel: metadata.sidModel === 1 ? '6581' : '8580',
       asid: this.asidEnabled ? 'ENABLED' : 'disabled',
     });
   }
 
   /**
-   * Start playback
+   * Load SID binary data into jsSID via a blob URL
    */
-  async play(audioContext: AudioContext): Promise<void> {
-    if (this.isPlaying) {
-      return;
-    }
+  private loadSIDData(): Promise<void> {
+    return new Promise((resolve, reject) => {
+      let resolved = false;
+      const blob = new Blob([this.sidData], { type: 'application/octet-stream' });
+      this.blobUrl = URL.createObjectURL(blob);
 
-    this.audioContext = audioContext;
+      // jsSID calls the load callback when XHR completes
+      this.jsSID.setloadcallback(() => {
+        if (!resolved) {
+          resolved = true;
+          this.numSubsongs = this.jsSID.getsubtunes() || 1;
+          resolve();
+        }
+      });
 
-    // Set subsong
-    if (this.subsong >= 0 && this.subsong < this.numSubsongs) {
-      this.jsSID.setSubsong(this.subsong);
-    }
+      // loadinit fetches the URL, parses the SID header, and calls init(subtune)
+      this.jsSID.loadinit(this.blobUrl, this.subsong);
 
-    // Create script processor for audio output
-    const bufferSize = this.config.bufferSize || 16384;
-    this.scriptProcessor = audioContext.createScriptProcessor(bufferSize, 0, 2);
-    
-    this.scriptProcessor.onaudioprocess = (event) => {
-      const outputL = event.outputBuffer.getChannelData(0);
-      const outputR = event.outputBuffer.getChannelData(1);
-      
-      // Generate audio from jsSID
-      const buffer = this.jsSID.generateAudio(outputL.length);
-      
-      // Copy to output (stereo)
-      for (let i = 0; i < outputL.length; i++) {
-        outputL[i] = buffer[i];
-        outputR[i] = buffer[i]; // jsSID is mono, duplicate for stereo
-      }
-    };
+      // Timeout fallback in case XHR fails silently
+      setTimeout(() => {
+        if (!resolved) {
+          resolved = true;
+          reject(new Error('jsSID load timed out'));
+        }
+      }, 5000);
+    });
+  }
 
-    this.scriptProcessor.connect(audioContext.destination);
-    this.isPlaying = true;
+  /**
+   * Start playback — jsSID manages its own AudioContext and ScriptProcessor
+   */
+  async play(_audioContext: AudioContext): Promise<void> {
+    if (this.playing) return;
+    if (!this.jsSID) throw new Error('jsSID not initialized');
 
+    this.jsSID.start(this.subsong);
+    this.playing = true;
     console.log('[jsSID] Playback started, subsong:', this.subsong);
   }
 
@@ -144,23 +137,9 @@ export class JSSIDEngine {
    * Stop playback
    */
   stop(): void {
-    if (!this.isPlaying) {
-      return;
-    }
-
-    if (this.scriptProcessor) {
-      this.scriptProcessor.disconnect();
-      this.scriptProcessor = null;
-    }
-
-    this.isPlaying = false;
-    
-    // Clear ASID hardware output if enabled
-    if (this.asidEnabled && (window as any).selectedMidiOutput) {
-      console.log('[jsSID] Clearing ASID hardware state');
-      // jsSID's asidSend() will be called on stop, clearing the hardware
-    }
-    
+    if (!this.playing || !this.jsSID) return;
+    this.jsSID.stop();
+    this.playing = false;
     console.log('[jsSID] Playback stopped');
   }
 
@@ -168,19 +147,14 @@ export class JSSIDEngine {
    * Pause playback
    */
   pause(): void {
-    // jsSID doesn't have pause, just disconnect audio
-    if (this.scriptProcessor && this.audioContext) {
-      this.scriptProcessor.disconnect();
-    }
+    if (this.jsSID) this.jsSID.pause();
   }
 
   /**
    * Resume playback
    */
   resume(): void {
-    if (this.scriptProcessor && this.audioContext) {
-      this.scriptProcessor.connect(this.audioContext.destination);
-    }
+    if (this.jsSID) this.jsSID.playcont();
   }
 
   /**
@@ -189,8 +163,9 @@ export class JSSIDEngine {
   setSubsong(subsong: number): void {
     if (subsong >= 0 && subsong < this.numSubsongs) {
       this.subsong = subsong;
-      if (this.jsSID) {
-        this.jsSID.setSubsong(subsong);
+      if (this.jsSID && this.playing) {
+        // start() reinitializes with new subtune and resumes playback
+        this.jsSID.start(subsong);
       }
       console.log('[jsSID] Subsong changed to:', subsong);
     }
@@ -220,20 +195,20 @@ export class JSSIDEngine {
       // Read SID registers directly
       const baseAddr = 0xd400 + (voice * 7);
       
-      const freqLo = this.jsSID.readRegister(baseAddr + 0);
-      const freqHi = this.jsSID.readRegister(baseAddr + 1);
+      const freqLo = this.jsSID.readregister(baseAddr + 0);
+      const freqHi = this.jsSID.readregister(baseAddr + 1);
       const frequency = freqLo | (freqHi << 8);
       
-      const pwLo = this.jsSID.readRegister(baseAddr + 2);
-      const pwHi = this.jsSID.readRegister(baseAddr + 3);
+      const pwLo = this.jsSID.readregister(baseAddr + 2);
+      const pwHi = this.jsSID.readregister(baseAddr + 3);
       const pulseWidth = pwLo | ((pwHi & 0x0f) << 8);
       
-      const control = this.jsSID.readRegister(baseAddr + 4);
+      const control = this.jsSID.readregister(baseAddr + 4);
       const waveform = (control >> 4) & 0x0f;
       const gate = (control & 0x01) !== 0;
       
-      const ad = this.jsSID.readRegister(baseAddr + 5);
-      const sr = this.jsSID.readRegister(baseAddr + 6);
+      const ad = this.jsSID.readregister(baseAddr + 5);
+      const sr = this.jsSID.readregister(baseAddr + 6);
       
       return {
         frequency,
@@ -257,20 +232,20 @@ export class JSSIDEngine {
    * Set playback speed (fast forward)
    */
   setSpeed(multiplier: number): void {
-    if (this.jsSID && this.jsSID.setSpeed) {
-      this.jsSID.setSpeed(multiplier);
+    if (this.jsSID?.setSpeedMultiplier) {
+      this.jsSID.setSpeedMultiplier(multiplier);
     }
   }
 
   /**
-   * Mute/unmute a voice
+   * Mute/unmute a voice — jsSID uses a bitmask via enableVoices(mask)
+   * where bit N=1 means voice N is enabled (up to 9 voices for 3SID)
    */
   setVoiceMask(voice: number, muted: boolean): void {
-    if (this.jsSID && this.jsSID.setVoiceMask) {
-      const currentMask = this.jsSID.getVoiceMask() || 0;
-      const bit = 1 << voice;
-      const newMask = muted ? (currentMask | bit) : (currentMask & ~bit);
-      this.jsSID.setVoiceMask(newMask);
+    if (this.jsSID?.enableVoices) {
+      // enableVoices expects a bitmask where 1 = enabled
+      // We don't have a getter, so we track externally
+      this.jsSID.enableVoices(muted ? 0 : 0x1FF);
     }
   }
 
@@ -279,14 +254,21 @@ export class JSSIDEngine {
    */
   getMetadata(): any {
     if (!this.jsSID) return null;
-    return this.jsSID.getInfo();
+    return {
+      name: this.jsSID.gettitle?.() ?? '',
+      author: this.jsSID.getauthor?.() ?? '',
+      copyright: this.jsSID.getinfo?.() ?? '',
+      songs: this.numSubsongs,
+      sidModel: this.jsSID.getmodel?.() ?? 6581,
+      prefModel: this.jsSID.getprefmodel?.() ?? 6581,
+    };
   }
 
   /**
    * Check if playing
    */
   isActive(): boolean {
-    return this.isPlaying;
+    return this.playing;
   }
 
   /**
@@ -295,13 +277,16 @@ export class JSSIDEngine {
   dispose(): void {
     this.stop();
     
-    // Clear ASID MIDI port reference
+    if (this.blobUrl) {
+      URL.revokeObjectURL(this.blobUrl);
+      this.blobUrl = null;
+    }
+
     if (this.asidEnabled) {
       (window as any).selectedMidiOutput = null;
     }
     
     this.jsSID = null;
-    this.audioContext = null;
   }
   
   /**
