@@ -267,6 +267,7 @@ export const PixiEffectPicker: React.FC<PixiEffectPickerProps> = ({
                   eventMode="static"
                   cursor="pointer"
                   onPointerUp={() => handleSelect(eff)}
+                  onClick={() => handleSelect(eff)}
                   layout={{
                     position: 'absolute',
                     top: (startIdx + i) * ROW_HEIGHT,

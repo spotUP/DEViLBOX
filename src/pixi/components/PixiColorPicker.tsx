@@ -62,6 +62,11 @@ export const PixiColorPicker: React.FC<PixiColorPickerProps> = ({
           onColorSelect(color);
           onClose();
         }}
+        onClick={(e: FederatedPointerEvent) => {
+          e.stopPropagation();
+          onColorSelect(color);
+          onClose();
+        }}
         layout={{
           position: 'absolute',
           left: sx,

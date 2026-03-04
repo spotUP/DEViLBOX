@@ -194,7 +194,7 @@ export const PixiFileBrowser: React.FC<PixiFileBrowserProps> = ({
         <Txt className="text-lg font-bold text-text-primary">
           {mode === 'load' ? 'Load Module' : 'Save Module'}
         </Txt>
-        <Div eventMode="static" cursor="pointer" onPointerUp={onClose} layout={{ padding: 4 }}>
+        <Div eventMode="static" cursor="pointer" onPointerUp={onClose} onClick={onClose} layout={{ padding: 4 }}>
           <PixiIcon name="close" size={14} color={theme.textMuted.color} layout={{}} />
         </Div>
       </Div>
@@ -386,6 +386,7 @@ const SourceTab: React.FC<SourceTabProps> = ({ label, active, onSelect }) => {
       eventMode="static"
       cursor="pointer"
       onPointerUp={onSelect}
+      onClick={onSelect}
       layout={{
         height: TABS_H,
         paddingLeft: 16,

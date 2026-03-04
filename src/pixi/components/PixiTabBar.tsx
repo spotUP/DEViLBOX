@@ -136,6 +136,7 @@ const PixiTab: React.FC<PixiTabProps> = ({
       onPointerOver={() => setHovered(true)}
       onPointerOut={() => setHovered(false)}
       onPointerUp={onSelect}
+      onClick={onSelect}
       layout={{
         width,
         height,
@@ -162,6 +163,7 @@ const PixiTab: React.FC<PixiTabProps> = ({
         cursor="pointer"
         alpha={showClose ? 1 : 0}
         onPointerUp={(e: { stopPropagation: () => void }) => { e.stopPropagation(); onClose(); }}
+        onClick={(e: { stopPropagation: () => void }) => { e.stopPropagation(); onClose(); }}
         layout={{ width: CLOSE_BTN_SIZE, height: CLOSE_BTN_SIZE, justifyContent: 'center', alignItems: 'center', marginRight: 4 }}
       >
         <pixiBitmapText
@@ -184,6 +186,7 @@ const PixiTabScrollBtn: React.FC<{ label: string; icon?: string; height: number;
       eventMode={visible ? 'static' : 'none'}
       cursor="pointer"
       onPointerUp={onClick}
+      onClick={onClick}
       alpha={visible ? 1 : 0}
       layout={{ width: 20, height, justifyContent: 'center', alignItems: 'center' }}
     >
@@ -210,6 +213,7 @@ const PixiTabNewBtn: React.FC<{ height: number; onClick: () => void }> = ({ heig
       onPointerOver={() => setHovered(true)}
       onPointerOut={() => setHovered(false)}
       onPointerUp={onClick}
+      onClick={onClick}
       layout={{ width: NEW_BTN_W, height, justifyContent: 'center', alignItems: 'center' }}
     >
       <pixiBitmapText

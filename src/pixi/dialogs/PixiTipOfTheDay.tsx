@@ -168,6 +168,7 @@ const TabButton: React.FC<{
       onPointerOver={() => setHovered(true)}
       onPointerOut={() => setHovered(false)}
       onPointerUp={onClick}
+      onClick={onClick}
       layout={{
         flex: 1,
         height: 40,

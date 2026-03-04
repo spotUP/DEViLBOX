@@ -140,6 +140,7 @@ export const PixiList: React.FC<PixiListProps> = ({
             eventMode="static"
             cursor="pointer"
             onPointerUp={() => handleItemClick(item.id)}
+            onClick={() => handleItemClick(item.id)}
             layout={{
               position: 'absolute',
               left: 0,

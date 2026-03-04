@@ -352,6 +352,7 @@ export const PixiDrumpadEditorModal: React.FC<PixiDrumpadEditorModalProps> = ({
                   eventMode="static"
                   cursor="pointer"
                   onPointerUp={() => setSelectedPadIndex(pad.index)}
+                  onClick={() => setSelectedPadIndex(pad.index)}
                 >
                   <Txt className={`text-[10px] font-bold ${isSelected ? 'text-text-primary' : 'text-text-muted'}`}>
                     {pad.label}
@@ -454,6 +455,7 @@ export const PixiDrumpadEditorModal: React.FC<PixiDrumpadEditorModalProps> = ({
                           eventMode="static"
                           cursor="pointer"
                           onPointerUp={() => handleInstrumentChange(inst.id)}
+                          onClick={() => handleInstrumentChange(inst.id)}
                         >
                           <Txt
                             className={`text-[10px] font-mono ${isActive ? 'text-text-primary' : 'text-text-muted'}`}
