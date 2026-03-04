@@ -41,11 +41,13 @@ export const GTUltraView: React.FC<{ width: number; height: number }> = ({ width
   // Initialize engine on mount
   useEffect(() => {
     let gtEngine: GTUltraEngine | null = null;
+    let disposed = false;
 
     const setup = async () => {
       const audioCtx = new AudioContext();
       gtEngine = new GTUltraEngine(audioCtx, {
         onReady: () => {
+          if (disposed) return;
           console.log('[GTUltra] Engine ready');
           const store = useGTUltraStore.getState();
           // Load any pending song data that arrived before engine was ready
@@ -94,6 +96,7 @@ export const GTUltraView: React.FC<{ width: number; height: number }> = ({ width
       });
       await gtEngine.init();
       await gtEngine.ready;
+      if (disposed) { gtEngine.dispose(); return; }
       gtEngine.output.connect(audioCtx.destination);
       setEngine(gtEngine);
     };
@@ -101,6 +104,7 @@ export const GTUltraView: React.FC<{ width: number; height: number }> = ({ width
     setup().catch(console.error);
 
     return () => {
+      disposed = true;
       gtEngine?.dispose();
       setEngine(null);
     };
