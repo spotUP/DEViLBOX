@@ -27,6 +27,8 @@ interface PixiPureTextInputProps {
   max?: number;
   disabled?: boolean;
   layout?: Record<string, unknown>;
+  /** When set, displayed text is masked with this character (e.g. "•") */
+  mask?: string;
 }
 
 const PADDING_H = 6;
@@ -48,6 +50,7 @@ export const PixiPureTextInput: React.FC<PixiPureTextInputProps> = ({
   max,
   disabled = false,
   layout: layoutProp,
+  mask,
 }) => {
   const theme = usePixiTheme();
   const [focused, setFocused] = useState(false);
@@ -188,7 +191,8 @@ export const PixiPureTextInput: React.FC<PixiPureTextInputProps> = ({
       if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
         if (hasSelection) {
           const lo = Math.min(ss, se), hi = Math.max(ss, se);
-          navigator.clipboard.writeText(v.slice(lo, hi)).catch(() => {});
+          const copied = mask ? mask.repeat(hi - lo) : v.slice(lo, hi);
+          navigator.clipboard.writeText(copied).catch(() => {});
         }
         return;
       }
@@ -228,7 +232,7 @@ export const PixiPureTextInput: React.FC<PixiPureTextInputProps> = ({
 
     window.addEventListener('keydown', handler, { capture: true });
     return () => window.removeEventListener('keydown', handler, { capture: true });
-  }, [focused, numeric, min, max]);
+  }, [focused, numeric, min, max, mask]);
 
   const charWidth = fontSize * (font === 'mono' ? 0.6 : 0.55);
 
@@ -242,7 +246,8 @@ export const PixiPureTextInput: React.FC<PixiPureTextInputProps> = ({
     setCursorVisible(true);
   }, [disabled, value.length, charWidth]);
 
-  const displayText = value || (focused ? '' : placeholder);
+  const maskedValue = mask ? mask.repeat(value.length) : value;
+  const displayText = maskedValue || (focused ? '' : placeholder);
   const isPlaceholder = !value && !focused;
 
   const cursorX = PADDING_H + cursorPos * charWidth;
