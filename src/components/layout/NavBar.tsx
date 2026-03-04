@@ -201,7 +201,7 @@ const NavBarComponent: React.FC = () => {
                   iconPosition="left"
                   title="Sign in to save files to the cloud"
                 >
-                  <span className="hidden sm:inline">Sign In</span>
+                  <span className="hidden sm:inline whitespace-nowrap">Sign In</span>
                 </Button>
               )}
             </div>
