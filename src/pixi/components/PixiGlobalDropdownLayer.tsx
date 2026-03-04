@@ -8,12 +8,14 @@
  * maps directly to screen coordinates in the root container.
  */
 
-import React, { useCallback } from 'react';
+import React, { useCallback, useState } from 'react';
 import type { Graphics as GraphicsType, FederatedPointerEvent } from 'pixi.js';
 import { usePixiDropdownStore } from '../stores/usePixiDropdownStore';
 import { PixiDropdownPanel } from './PixiSelect';
 import { PixiMenuItem, type MenuItem } from './PixiMenuBar';
 import { usePixiTheme } from '../theme';
+import type { ContextMenuItem } from '../input/PixiContextMenu';
+import { PIXI_FONTS } from '../fonts';
 
 // Large enough to cover any screen; drawn with near-zero alpha so it's
 // invisible but still hittable for outside-click close behaviour.
@@ -86,6 +88,15 @@ export const PixiGlobalDropdownLayer: React.FC = () => {
           onClose={dropdown.onClose}
         />
       )}
+      {dropdown?.kind === 'contextMenu' && (
+        <PixiGlobalContextMenu
+          key={dropdown.id}
+          x={dropdown.x}
+          y={dropdown.y}
+          items={dropdown.items}
+          onClose={dropdown.onClose}
+        />
+      )}
     </pixiContainer>
   );
 };
@@ -125,6 +136,114 @@ const PixiGlobalMenuDropdown: React.FC<MenuDropdownProps> = ({ x, y, width, item
         {items.map((item, j) => (
           <PixiMenuItem key={j} item={item} width={innerW} onClose={onClose} />
         ))}
+      </layoutContainer>
+    </pixiContainer>
+  );
+};
+
+// ── Context Menu rendered at root level ─────────────────────────────────────
+
+const CTX_MENU_W = 180;
+const CTX_ITEM_H = 24;
+const CTX_SEP_H = 9;
+const CTX_PADDING = 4;
+
+interface ContextMenuProps {
+  x: number;
+  y: number;
+  items: ContextMenuItem[];
+  onClose: () => void;
+}
+
+const PixiGlobalContextMenu: React.FC<ContextMenuProps> = ({ x, y, items, onClose }) => {
+  const theme = usePixiTheme();
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+
+  const panelH = items.reduce(
+    (sum, item) => sum + (item.separator ? CTX_SEP_H : CTX_ITEM_H),
+    0,
+  ) + CTX_PADDING * 2;
+
+  let yOffset = CTX_PADDING;
+  const rows: React.ReactNode[] = [];
+
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i];
+    const rowY = yOffset;
+
+    if (item.separator) {
+      rows.push(
+        <layoutContainer
+          key={`sep-${i}`}
+          layout={{
+            position: 'absolute',
+            top: rowY + 4,
+            left: 8,
+            width: CTX_MENU_W - 16,
+            height: 1,
+            backgroundColor: theme.border.color,
+          }}
+        />,
+      );
+      yOffset += CTX_SEP_H;
+    } else {
+      const isHovered = hoveredIndex === i;
+      rows.push(
+        <layoutContainer
+          key={i}
+          eventMode={item.disabled ? 'none' : 'static'}
+          cursor={item.disabled ? 'default' : 'pointer'}
+          onPointerOver={() => !item.disabled && setHoveredIndex(i)}
+          onPointerOut={() => setHoveredIndex(null)}
+          onPointerUp={() => {
+            if (item.disabled) return;
+            item.action?.();
+            onClose();
+          }}
+          alpha={item.disabled ? 0.4 : 1}
+          layout={{
+            position: 'absolute',
+            top: rowY,
+            left: 0,
+            width: CTX_MENU_W,
+            height: CTX_ITEM_H,
+            alignItems: 'center',
+            paddingLeft: 12,
+            backgroundColor: isHovered && !item.disabled ? theme.bgHover.color : undefined,
+          }}
+        >
+          <pixiBitmapText
+            text={item.label}
+            style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 11, fill: 0xffffff }}
+            tint={item.disabled ? theme.textMuted.color : theme.text.color}
+            layout={{}}
+          />
+        </layoutContainer>,
+      );
+      yOffset += CTX_ITEM_H;
+    }
+  }
+
+  return (
+    <pixiContainer
+      zIndex={9999}
+      layout={{ position: 'absolute', left: x, top: y }}
+      eventMode="static"
+      onPointerDown={(e: FederatedPointerEvent) => e.stopPropagation()}
+    >
+      <layoutContainer
+        layout={{
+          width: CTX_MENU_W,
+          height: panelH,
+          flexDirection: 'column',
+          backgroundColor: theme.bgSecondary.color,
+          borderWidth: 1,
+          borderColor: theme.border.color,
+          borderRadius: 6,
+          overflow: 'hidden',
+        }}
+      >
+        {rows}
       </layoutContainer>
     </pixiContainer>
   );
