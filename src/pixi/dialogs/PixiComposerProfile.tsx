@@ -311,7 +311,7 @@ export const PixiComposerProfile: React.FC<PixiComposerProfileProps> = ({ compos
                     text={String(p.cnt)}
                     style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 14, fill: 0xffffff }}
                     tint={theme.textMuted.color}
-                    layout={{ width: 24, textAlign: 'right' }}
+                    layout={{ width: 24 }}
                   />
                 </layoutContainer>
               </layoutContainer>

@@ -5,8 +5,6 @@
 
 import { useState, useCallback } from 'react';
 import { PixiModal, PixiModalHeader, PixiModalFooter, PixiButton, PixiNumericInput, PixiLabel } from '../components';
-import { usePixiTheme } from '../theme';
-import { PIXI_FONTS } from '../fonts';
 import { useTrackerStore, useCursorStore } from '@stores';
 
 interface PixiStrumDialogProps {
@@ -15,7 +13,6 @@ interface PixiStrumDialogProps {
 }
 
 export const PixiStrumDialog: React.FC<PixiStrumDialogProps> = ({ isOpen, onClose }) => {
-  const theme = usePixiTheme();
   const selection = useCursorStore(s => s.selection);
   const strumSelection = useTrackerStore(s => s.strumSelection);
 

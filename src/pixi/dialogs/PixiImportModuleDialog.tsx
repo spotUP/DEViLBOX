@@ -15,7 +15,6 @@ import {
   PixiLabel,
 } from '../components';
 import { PixiSelect } from '../components/PixiSelect';
-import { PixiScrollView } from '../components/PixiScrollView';
 import { PixiNumericInput } from '../components/PixiNumericInput';
 import { usePixiTheme } from '../theme';
 import { pickFile, pickFiles } from '../services/glFilePicker';
@@ -520,8 +519,8 @@ export const PixiImportModuleDialog: React.FC<PixiImportModuleDialogProps> = ({
               <layoutContainer layout={{ flexDirection: 'column', gap: 2, marginTop: 4, borderTopWidth: 1, borderColor: theme.border.color, paddingTop: 8 }}>
                 <MetaRow label="Title" value={sidHeader.title || '--'} />
                 <MetaRow label="Author" value={sidHeader.author || '--'} />
-                {sidHeader.subsongCount > 1 && (
-                  <MetaRow label="Subsongs" value={String(sidHeader.subsongCount)} />
+                {sidHeader.subsongs > 1 && (
+                  <MetaRow label="Subsongs" value={String(sidHeader.subsongs)} />
                 )}
               </layoutContainer>
             )}
@@ -573,17 +572,17 @@ export const PixiImportModuleDialog: React.FC<PixiImportModuleDialogProps> = ({
             )}
 
             {/* SID subsong picker */}
-            {sidHeader && sidHeader.subsongCount > 1 && !uadeMetadata && (
+            {sidHeader && sidHeader.subsongs > 1 && !uadeMetadata && (
               <layoutContainer layout={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 }}>
                 <PixiLabel text="Subsong:" size="sm" color="textMuted" />
                 <PixiNumericInput
                   value={selectedSubsong + 1}
                   min={1}
-                  max={sidHeader.subsongCount}
+                  max={sidHeader.subsongs}
                   onChange={(v) => setSelectedSubsong(v - 1)}
                   width={60}
                 />
-                <PixiLabel text={`of ${sidHeader.subsongCount}`} size="sm" color="textMuted" />
+                <PixiLabel text={`of ${sidHeader.subsongs}`} size="sm" color="textMuted" />
               </layoutContainer>
             )}
 

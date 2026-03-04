@@ -12,7 +12,7 @@
  */
 
 import React, { useMemo } from 'react';
-import type { FederatedPointerEvent } from 'pixi.js';
+import type { FederatedPointerEvent, FederatedWheelEvent } from 'pixi.js';
 import type { LayoutStyles } from '@pixi/layout';
 import { usePixiTheme } from '../theme';
 import { tw } from './tw';
@@ -35,7 +35,7 @@ interface DivProps {
   onPointerOut?: (e: FederatedPointerEvent) => void;
   onPointerMove?: (e: FederatedPointerEvent) => void;
   /** Wheel event */
-  onWheel?: (e: FederatedPointerEvent) => void;
+  onWheel?: (e: FederatedWheelEvent) => void;
   children?: React.ReactNode;
 }
 

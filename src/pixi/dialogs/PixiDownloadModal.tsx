@@ -6,7 +6,7 @@
  */
 
 import React, { useCallback, useState } from 'react';
-import { PixiModal, PixiButton, PixiIcon } from '../components';
+import { PixiModal, PixiIcon } from '../components';
 import { usePixiTheme } from '../theme';
 import { PIXI_FONTS } from '../fonts';
 

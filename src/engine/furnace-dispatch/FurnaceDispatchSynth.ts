@@ -24,7 +24,7 @@ import { getToneEngine } from '@engine/ToneEngine';
 const DIV_INS_FM = 1;
 const DIV_INS_OPM = 33;
 const DIV_INS_OPL = 14;
-const DIV_INS_OPLL = 13;
+
 const DIV_INS_OPZ = 19;
 const DIV_INS_ESFM = 55;
 

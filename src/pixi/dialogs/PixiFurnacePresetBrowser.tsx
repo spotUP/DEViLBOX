@@ -6,12 +6,12 @@
  * Clicking a chip card creates a new instrument and closes the dialog.
  */
 
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback } from 'react';
 import { useInstrumentStore } from '@stores/useInstrumentStore';
 import { notify } from '@stores/useNotificationStore';
 import type { SynthType } from '@typedefs/instrument';
 import { usePixiTheme } from '../theme';
-import { Div, Txt, GlModal, GlModalFooter } from '../layout';
+import { Div, Txt, GlModal } from '../layout';
 import { PIXI_FONTS } from '../fonts';
 import { PixiIcon } from '../components/PixiIcon';
 import type { FederatedWheelEvent } from 'pixi.js';
