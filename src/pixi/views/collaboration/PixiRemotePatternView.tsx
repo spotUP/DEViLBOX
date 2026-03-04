@@ -3,15 +3,20 @@
  * Matches the DOM RemotePatternView 1:1: FT2-style toolbar, channel headers,
  * playback position highlight, dynamic channel count, column visibility toggles,
  * and effect column support.
+ *
+ * Grid body uses MegaText batched rendering for performance (single draw call
+ * instead of thousands of individual PixiLabel elements).
  */
 
-import React, { useMemo, useState, useCallback } from 'react';
+import React, { useMemo, useState, useCallback, useRef, useEffect } from 'react';
+import type { Container as ContainerType, Graphics as GraphicsType, FederatedWheelEvent } from 'pixi.js';
 import { PixiLabel, PixiButton } from '../../components';
-import { PixiScrollView } from '../../components/PixiScrollView';
 import { usePixiTheme } from '../../theme';
 import { useCollaborationStore } from '@stores/useCollaborationStore';
 import { useTrackerStore } from '@stores';
 import { useTransportStore } from '@stores/useTransportStore';
+import { MegaText, type GlyphLabel } from '../../utils/MegaText';
+import { PIXI_FONTS } from '../../fonts';
 
 const NOTE_NAMES = ['C-', 'C#', 'D-', 'D#', 'E-', 'F-', 'F#', 'G-', 'G#', 'A-', 'A#', 'B-'];
 
@@ -38,7 +43,6 @@ function formatEffect(effTyp: number, eff: number): string {
 const ROW_HEIGHT = 16;
 const CHAR_WIDTH = 7;
 const ROW_NUM_WIDTH = 28;
-const HEADER_HEIGHT = 32;
 const TOOLBAR_ROW_HEIGHT = 18;
 const TOOLBAR_HEIGHT = TOOLBAR_ROW_HEIGHT * 2 + 28; // 2 rows + friend indicator
 const CHANNEL_HEADER_HEIGHT = 24;
@@ -75,6 +79,7 @@ export const PixiRemotePatternView: React.FC<{ width: number; height: number }> 
   const [showColumns, setShowColumns] = useState<ColumnVisibility>({
     note: true, inst: true, vol: true, fx: false,
   });
+  const [scrollY, setScrollY] = useState(0);
 
   const toggleColumn = useCallback((col: keyof ColumnVisibility) => {
     setShowColumns(prev => ({ ...prev, [col]: !prev[col] }));
@@ -104,6 +109,186 @@ export const PixiRemotePatternView: React.FC<{ width: number; height: number }> 
 
   const totalChannelsWidth = channelWidths.reduce((a, b) => a + b, 0);
 
+  // ── MegaText refs ──
+  const gridContainerRef = useRef<ContainerType>(null);
+  const gridGraphicsRef = useRef<GraphicsType>(null);
+  const scrollbarGraphicsRef = useRef<GraphicsType>(null);
+  const megaRef = useRef<MegaText | null>(null);
+
+  // Initialize MegaText instance
+  useEffect(() => {
+    const mega = new MegaText();
+    megaRef.current = mega;
+    if (gridContainerRef.current) {
+      gridContainerRef.current.addChild(mega);
+    }
+    return () => {
+      mega.destroy();
+      megaRef.current = null;
+    };
+  }, []);
+
+  // Re-attach MegaText when container mounts
+  useEffect(() => {
+    const mega = megaRef.current;
+    const container = gridContainerRef.current;
+    if (mega && container && !mega.parent) {
+      container.addChild(mega);
+    }
+  });
+
+  const gridHeight = height - TOOLBAR_HEIGHT - CHANNEL_HEADER_HEIGHT - COLUMN_TOGGLE_HEIGHT;
+  const maxScrollY = Math.max(0, contentHeight - gridHeight);
+  const visibleRows = Math.ceil(gridHeight / ROW_HEIGHT) + 1;
+
+  // Scroll handler
+  const handleWheel = useCallback((e: FederatedWheelEvent) => {
+    e.stopPropagation();
+    setScrollY(prev => Math.max(0, Math.min(maxScrollY, prev + e.deltaY)));
+  }, [maxScrollY]);
+
+  // Reset scroll when pattern changes
+  useEffect(() => { setScrollY(0); }, [peerPatternIndex]);
+
+  // ── Imperative grid redraw (backgrounds + MegaText labels) ──
+  const imperativeRedraw = useCallback(() => {
+    const grid = gridGraphicsRef.current;
+    const mega = megaRef.current;
+    if (!grid || !mega) return;
+
+    grid.clear();
+    const labels: GlyphLabel[] = [];
+    const fontFamily = PIXI_FONTS.MONO;
+    const FONT_SIZE = 11;
+
+    const startRow = Math.floor(scrollY / ROW_HEIGHT);
+    const endRow = Math.min(rowCount, startRow + visibleRows);
+    const yOffset = -(scrollY % ROW_HEIGHT);
+
+    const gridW = ROW_NUM_WIDTH + totalChannelsWidth + 4;
+
+    for (let vi = 0; vi < endRow - startRow; vi++) {
+      const row = startRow + vi;
+      if (row >= rowCount) break;
+      const y = vi * ROW_HEIGHT + yOffset;
+
+      // Row background highlights
+      const isPlaybackRow = isPlaying && row === currentRow;
+      const isPeerCursor = row === peerCursorRow;
+      const isHighlight = row % 16 === 0;
+      const isBeat = row % 4 === 0;
+
+      if (isPlaybackRow) {
+        grid.rect(0, y, gridW, ROW_HEIGHT).fill({ color: theme.accent.color });
+      } else if (isPeerCursor) {
+        grid.rect(0, y, gridW, ROW_HEIGHT).fill({ color: 0x2a4060, alpha: 0.5 });
+      } else if (isHighlight) {
+        grid.rect(0, y, gridW, ROW_HEIGHT).fill({ color: theme.trackerRowHighlight.color, alpha: 0.3 });
+      } else if (isBeat) {
+        grid.rect(0, y, gridW, ROW_HEIGHT).fill({ color: theme.trackerRowEven.color, alpha: 0.2 });
+      }
+
+      // Channel column backgrounds (alternating tint)
+      let colX = ROW_NUM_WIDTH;
+      for (let chIdx = 0; chIdx < channelCount; chIdx++) {
+        const w = channelWidths[chIdx];
+        if (chIdx % 2 === 0) {
+          const chColor = CHANNEL_COLORS[chIdx % CHANNEL_COLORS.length];
+          const colBg = (chColor >> 3) & 0x1f1f1f;
+          grid.rect(colX, y, w, ROW_HEIGHT).fill({ color: colBg, alpha: 0.3 });
+        }
+        colX += w;
+      }
+
+      const textY = y + 2;
+      const textColor = isPlaybackRow ? 0x000000 : undefined;
+
+      // Row number
+      labels.push({
+        x: 2,
+        y: textY,
+        text: row.toString(16).toUpperCase().padStart(2, '0'),
+        color: textColor ?? theme.textMuted.color,
+        fontFamily,
+      });
+
+      // Cell data per channel
+      let xOffset = ROW_NUM_WIDTH;
+      for (let chIdx = 0; chIdx < channelCount; chIdx++) {
+        const ch = channels[chIdx];
+        const w = channelWidths[chIdx];
+
+        if (ch.collapsed) {
+          xOffset += w;
+          continue;
+        }
+
+        const cell = ch.rows[row];
+        if (!cell) {
+          xOffset += w;
+          continue;
+        }
+
+        const parts: string[] = [];
+        if (showColumns.note) parts.push(formatNote(cell.note));
+        if (showColumns.inst) parts.push(formatHex(cell.instrument, 2));
+        if (showColumns.vol) parts.push(formatHex(cell.volume, 2));
+        if (showColumns.fx) parts.push(formatEffect(cell.effTyp, cell.eff));
+        if (showAcid) {
+          const f = cell.flag1 ?? 0;
+          parts.push(f === 1 ? 'A' : f === 2 ? 'S' : '.');
+        }
+        if (showColumns.fx) {
+          const p = cell.probability ?? 0;
+          parts.push(p > 0 ? p.toString(16).toUpperCase().padStart(2, '0') : '..');
+        }
+        const text = parts.join(' ');
+
+        const isEmpty = cell.note <= 0 && cell.instrument <= 0 && cell.volume <= 0
+          && (!showColumns.fx || (cell.effTyp <= 0 && cell.eff <= 0));
+
+        labels.push({
+          x: xOffset + 2,
+          y: textY,
+          text,
+          color: textColor ?? (isEmpty ? theme.textMuted.color : theme.text.color),
+          fontFamily,
+        });
+
+        xOffset += w;
+      }
+    }
+
+    mega.updateLabels(labels, FONT_SIZE);
+  }, [scrollY, rowCount, visibleRows, channelCount, channels, channelWidths,
+      totalChannelsWidth, showColumns, showAcid, isPlaying, currentRow,
+      peerCursorRow, theme]);
+
+  // Trigger redraw when dependencies change
+  useEffect(() => { imperativeRedraw(); }, [imperativeRedraw]);
+
+  // ── Scrollbar drawing ──
+  const drawScrollbar = useCallback((g: GraphicsType) => {
+    g.clear();
+    if (maxScrollY <= 0) return;
+    const SCROLLBAR_W = 6;
+    const trackH = gridHeight - 4;
+    const thumbH = Math.max(20, (gridHeight / contentHeight) * trackH);
+    const thumbY = 2 + (scrollY / maxScrollY) * (trackH - thumbH);
+
+    g.roundRect(width - SCROLLBAR_W - 2, 2, SCROLLBAR_W, trackH, 3);
+    g.fill({ color: theme.bgActive.color, alpha: 0.3 });
+    g.roundRect(width - SCROLLBAR_W - 2, thumbY, SCROLLBAR_W, thumbH, 3);
+    g.fill({ color: theme.textMuted.color, alpha: 0.4 });
+  }, [width, gridHeight, contentHeight, scrollY, maxScrollY, theme]);
+
+  // ── Clipping mask for grid area ──
+  const drawMask = useCallback((g: GraphicsType) => {
+    g.clear();
+    g.rect(0, 0, width, gridHeight);
+    g.fill({ color: 0xffffff });
+  }, [width, gridHeight]);
+
   if (!pattern) {
     return (
       <layoutContainer
@@ -119,8 +304,6 @@ export const PixiRemotePatternView: React.FC<{ width: number; height: number }> 
       </layoutContainer>
     );
   }
-
-  const gridHeight = height - TOOLBAR_HEIGHT - CHANNEL_HEADER_HEIGHT - COLUMN_TOGGLE_HEIGHT;
 
   return (
     <layoutContainer
@@ -291,106 +474,29 @@ export const PixiRemotePatternView: React.FC<{ width: number; height: number }> 
         })}
       </layoutContainer>
 
-      {/* ── Pattern grid ── */}
+      {/* ── Pattern grid (MegaText) ── */}
       {rowCount > 0 && (
-        <PixiScrollView
-          width={width}
-          height={gridHeight}
-          contentHeight={contentHeight}
-          direction="vertical"
-          showScrollbar={true}
+        <pixiContainer
+          eventMode="static"
+          onWheel={handleWheel}
+          layout={{ width, height: gridHeight, overflow: 'hidden' }}
         >
-          <layoutContainer layout={{ flexDirection: 'column' }}>
-            {Array.from({ length: rowCount }, (_, row) => {
-              const isHighlight = row % 16 === 0;
-              const isBeat = row % 4 === 0;
-              const isPeerCursor = row === peerCursorRow;
-              const isPlaybackRow = isPlaying && row === currentRow;
+          {/* Clipping mask */}
+          <pixiGraphics draw={drawMask} layout={{ position: 'absolute' }} />
 
-              let bgColor: number | undefined;
-              if (isPlaybackRow) {
-                bgColor = theme.accent.color;
-              } else if (isPeerCursor) {
-                bgColor = 0x2a4060;
-              } else if (isHighlight) {
-                bgColor = theme.trackerRowHighlight.color;
-              } else if (isBeat) {
-                bgColor = theme.trackerRowEven.color;
-              }
+          {/* Grid backgrounds + channel tints (drawn imperatively) */}
+          <pixiGraphics ref={gridGraphicsRef} draw={() => {}} />
 
-              const textColor = isPlaybackRow ? 'custom' as const : undefined;
-              const playbackTextCustomColor = isPlaybackRow ? 0x000000 : undefined;
+          {/* MegaText container (MegaText added imperatively as child) */}
+          <pixiContainer ref={gridContainerRef} />
 
-              return (
-                <layoutContainer
-                  key={row}
-                  layout={{
-                    flexDirection: 'row',
-                    height: ROW_HEIGHT,
-                    alignItems: 'center',
-                    paddingLeft: 2,
-                    ...(bgColor !== undefined ? { backgroundColor: bgColor } : {}),
-                  }}
-                >
-                  {/* Row number */}
-                  <layoutContainer layout={{ width: ROW_NUM_WIDTH }}>
-                    <PixiLabel
-                      text={row.toString(16).toUpperCase().padStart(2, '0')}
-                      size="xs"
-                      font="mono"
-                      color={textColor ?? 'textMuted'}
-                      customColor={playbackTextCustomColor}
-                    />
-                  </layoutContainer>
-
-                  {/* Cells per channel */}
-                  {channels.map((ch, chIdx) => {
-                    const chColor = CHANNEL_COLORS[chIdx % CHANNEL_COLORS.length];
-                    const colBg = (chIdx % 2 === 0) ? ((chColor >> 3) & 0x1f1f1f) : undefined;
-                    const w = channelWidths[chIdx];
-
-                    if (ch.collapsed) {
-                      return <layoutContainer key={chIdx} layout={{ width: w, ...(colBg !== undefined ? { backgroundColor: colBg } : {}) }} />;
-                    }
-
-                    const cell = ch.rows[row];
-                    if (!cell) return <layoutContainer key={chIdx} layout={{ width: w, ...(colBg !== undefined ? { backgroundColor: colBg } : {}) }} />;
-
-                    const parts: string[] = [];
-                    if (showColumns.note) parts.push(formatNote(cell.note));
-                    if (showColumns.inst) parts.push(formatHex(cell.instrument, 2));
-                    if (showColumns.vol) parts.push(formatHex(cell.volume, 2));
-                    if (showColumns.fx) parts.push(formatEffect(cell.effTyp, cell.eff));
-                    if (showAcid) {
-                      const f = cell.flag1 ?? 0;
-                      parts.push(f === 1 ? 'A' : f === 2 ? 'S' : '.');
-                    }
-                    if (showColumns.fx) {
-                      const p = cell.probability ?? 0;
-                      parts.push(p > 0 ? p.toString(16).toUpperCase().padStart(2, '0') : '..');
-                    }
-                    const text = parts.join(' ');
-
-                    const isEmpty = cell.note <= 0 && cell.instrument <= 0 && cell.volume <= 0
-                      && (!showColumns.fx || (cell.effTyp <= 0 && cell.eff <= 0));
-
-                    return (
-                      <layoutContainer key={chIdx} layout={{ width: w, ...(colBg !== undefined ? { backgroundColor: colBg } : {}) }}>
-                        <PixiLabel
-                          text={text}
-                          size="xs"
-                          font="mono"
-                          color={textColor ?? (isEmpty ? 'textMuted' : 'text')}
-                          customColor={playbackTextCustomColor}
-                        />
-                      </layoutContainer>
-                    );
-                  })}
-                </layoutContainer>
-              );
-            })}
-          </layoutContainer>
-        </PixiScrollView>
+          {/* Scrollbar overlay */}
+          <pixiGraphics
+            ref={scrollbarGraphicsRef}
+            draw={drawScrollbar}
+            layout={{ position: 'absolute', width, height: gridHeight }}
+          />
+        </pixiContainer>
       )}
     </layoutContainer>
   );
