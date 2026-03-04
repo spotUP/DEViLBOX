@@ -4,7 +4,6 @@
  */
 
 import { useCallback } from 'react';
-import type { Graphics as GraphicsType } from 'pixi.js';
 import { PIXI_FONTS } from '../fonts';
 import { usePixiTheme } from '../theme';
 import { PixiLabel } from '../components';
@@ -40,12 +39,6 @@ const PixiEnvelopeSection: React.FC<PixiEnvelopeSectionProps> = ({ envelope, con
     const current = (configRef() as unknown as InstrumentConfig).envelope ?? {};
     onChange({ envelope: { ...current, [param]: value } });
   }, [configRef, onChange]);
-
-  const drawSectionBg = useCallback((g: GraphicsType) => {
-    g.clear();
-    g.rect(0, 0, 4000, 1);
-    g.fill({ color: theme.border.color, alpha: 0.15 });
-  }, [theme]);
 
   // Normalize envelope values to 0-1 for the editor.
   // EnvelopeConfig uses raw ms/% values; normalize against max ranges:
@@ -84,7 +77,7 @@ const PixiEnvelopeSection: React.FC<PixiEnvelopeSectionProps> = ({ envelope, con
           tint={theme.textMuted.color}
           layout={{}}
         />
-        <pixiGraphics draw={drawSectionBg} layout={{ flex: 1, height: 1 }} />
+        <layoutContainer alpha={0.15} layout={{ flex: 1, height: 1, backgroundColor: theme.border.color }} />
       </pixiContainer>
 
       <PixiEnvelopeEditor
@@ -120,14 +113,6 @@ export const PixiInstrumentEditor: React.FC<PixiInstrumentEditorProps> = ({
   const isUADE = uadeChipRam != null;
   const allInstruments = useInstrumentStore((s) => s.instruments);
 
-  const drawHeaderBg = useCallback((g: GraphicsType) => {
-    g.clear();
-    g.rect(0, 0, 4000, 40);
-    g.fill({ color: theme.bgSecondary.color });
-    g.rect(0, 39, 4000, 1);
-    g.fill({ color: theme.border.color, alpha: theme.border.alpha });
-  }, [theme]);
-
   return (
     <pixiContainer
       layout={{
@@ -137,7 +122,7 @@ export const PixiInstrumentEditor: React.FC<PixiInstrumentEditorProps> = ({
       }}
     >
       {/* Header */}
-      <pixiContainer
+      <layoutContainer
         layout={{
           width: '100%',
           height: 40,
@@ -146,9 +131,11 @@ export const PixiInstrumentEditor: React.FC<PixiInstrumentEditorProps> = ({
           paddingLeft: 12,
           paddingRight: 12,
           gap: 12,
+          backgroundColor: theme.bgSecondary.color,
+          borderBottomWidth: 1,
+          borderColor: theme.border.color,
         }}
       >
-        <pixiGraphics draw={drawHeaderBg} layout={{ position: 'absolute', width: '100%', height: 40 }} />
 
         <PixiLabel text="INSTRUMENT EDITOR" size="sm" weight="bold" color="accent" />
 
@@ -159,7 +146,7 @@ export const PixiInstrumentEditor: React.FC<PixiInstrumentEditorProps> = ({
         <pixiContainer layout={{ flex: 1 }} />
 
         <PixiLabel text={synthType} size="xs" color="textMuted" />
-      </pixiContainer>
+      </layoutContainer>
 
       {/* Content area */}
       <pixiContainer

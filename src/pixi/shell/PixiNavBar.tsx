@@ -8,7 +8,6 @@
  */
 
 import React, { useCallback } from 'react';
-import type { Graphics as GraphicsType } from 'pixi.js';
 import { PIXI_FONTS } from '../fonts';
 import { usePixiTheme } from '../theme';
 import { PixiButton } from '../components/PixiButton';
@@ -132,34 +131,23 @@ export const PixiNavBar: React.FC = () => {
     useUIStore.getState().openModal('settings');
   }, []);
 
-  // Background
-  const drawBg = useCallback((g: GraphicsType) => {
-    g.clear();
-    g.rect(0, 0, width, MODERN_NAV_H);
-    g.fill({ color: theme.bgTertiary.color });
-    // Bottom border
-    g.rect(0, MODERN_NAV_H - 1, width, 1);
-    g.fill({ color: theme.border.color, alpha: 0.4 });
-  }, [width, theme]);
-
   // Transport bar width: center zone gets whatever's left after left/right
   const LEFT_W = 460;
   const RIGHT_W = 440;
   const transportW = Math.max(200, width - LEFT_W - RIGHT_W);
 
   return (
-    <pixiContainer
+    <layoutContainer
       layout={{
         width,
         height: MODERN_NAV_H,
         flexDirection: 'row',
         alignItems: 'center',
+        backgroundColor: theme.bgTertiary.color,
+        borderBottomWidth: 1,
+        borderColor: theme.border.color,
       }}
     >
-      <pixiGraphics
-        draw={drawBg}
-        layout={{ position: 'absolute', width, height: MODERN_NAV_H }}
-      />
 
       {/* ═══ Left zone: Logo + view selector pills ═══ */}
       <pixiContainer
@@ -273,6 +261,6 @@ export const PixiNavBar: React.FC = () => {
         <PixiButton label="THEME" variant="ghost" size="sm" onClick={handleThemeCycle} width={52} />
         <PixiButton label="DOM" variant="ghost" size="sm" onClick={handleSwitchToDom} width={36} />
       </pixiContainer>
-    </pixiContainer>
+    </layoutContainer>
   );
 };
