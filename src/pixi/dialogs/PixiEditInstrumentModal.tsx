@@ -27,9 +27,14 @@ import {
 import { PixiPureTextInput } from '../input/PixiPureTextInput';
 import { usePixiTheme } from '../theme';
 import { useInstrumentStore, notify } from '@stores';
+import { usePresetStore, type PresetCategory } from '@stores/usePresetStore';
 import { ALL_SYNTH_TYPES, getSynthInfo } from '@constants/synthCategories';
+import { getPresetsForSynthType } from '@constants/synthPresets/allPresets';
 import type { SynthType } from '@typedefs/instrument';
 import type { InstrumentConfig, EffectConfig } from '@typedefs/instrument';
+import { PixiModularSynthEditor } from '../views/instruments/PixiModularSynthEditor';
+import type { ModularPatchConfig } from '@typedefs/modular';
+import { MODULAR_INIT_PATCH } from '@constants/modularPresets';
 
 // ── Layout constants ────────────────────────────────────────────────────────
 
@@ -43,6 +48,10 @@ const FOOTER_H = 44;
 const CONTENT_H = MODAL_H - HEADER_H - FOOTER_H;
 const PAD = 16;
 const KNOB_SIZE = 'sm' as const;
+
+// ── Preset category constants ───────────────────────────────────────────────
+
+const PRESET_CATEGORIES: Array<'All' | PresetCategory> = ['All', 'Bass', 'Lead', 'Pad', 'Drum', 'FX', 'User'];
 
 // ── Synth type palette (Tailwind class → hex) ──────────────────────────────
 
@@ -125,12 +134,27 @@ export const PixiEditInstrumentModal: React.FC<PixiEditInstrumentModalProps> = (
   const [newName, setNewName] = useState('New Instrument');
   const [synthSearch, setSynthSearch] = useState('');
 
+  // Preset state
+  const [showSaveDialog, setShowSaveDialog] = useState(false);
+  const [presetName, setPresetName] = useState('');
+  const [presetCategory, setPresetCategory] = useState<PresetCategory>('User');
+  const [filterCategory, setFilterCategory] = useState<'All' | PresetCategory>('All');
+  const [presetSearch, setPresetSearch] = useState('');
+  const [presetExpanded, setPresetExpanded] = useState(false);
+  const [selectedPresetId, setSelectedPresetId] = useState<string | null>(null);
+
   // Reset create mode when modal opens
   useEffect(() => {
     if (isOpen) {
       setIsCreating(createMode);
       setActiveTab('sound');
       setSynthSearch('');
+      setShowSaveDialog(false);
+      setPresetName('');
+      setPresetSearch('');
+      setFilterCategory('All');
+      setPresetExpanded(false);
+      setSelectedPresetId(null);
     }
   }, [isOpen, createMode]);
 
@@ -154,6 +178,100 @@ export const PixiEditInstrumentModal: React.FC<PixiEditInstrumentModalProps> = (
   // ── Config ref for knob callbacks (avoid stale closures) ────────────────
   const instRef = useRef(currentInstrument);
   useEffect(() => { instRef.current = currentInstrument; }, [currentInstrument]);
+
+  // ── Presets ─────────────────────────────────────────────────────────────
+  const userPresets = usePresetStore((s) => s.userPresets);
+
+  /** Merged factory + user presets, filtered by category and search */
+  const { allPresets, filteredPresets, presetOptions } = useMemo(() => {
+    if (!currentInstrument) return { allPresets: [], filteredPresets: [], presetOptions: [] };
+
+    const synthType = currentInstrument.synthType;
+    const factory = getPresetsForSynthType(synthType).map((p) => ({
+      id: p.id,
+      name: p.name,
+      category: p.category ?? 'factory',
+      isUser: false,
+    }));
+    const user = userPresets
+      .filter((p) => p.synthType === synthType)
+      .map((p) => ({
+        id: p.id,
+        name: p.name,
+        category: p.category.toLowerCase(),
+        isUser: true,
+      }));
+    const all = [...factory, ...user];
+
+    // Category filter
+    const catFiltered = filterCategory === 'All'
+      ? all
+      : all.filter((p) => p.category.toLowerCase() === filterCategory.toLowerCase() || (filterCategory === 'User' && p.isUser));
+
+    // Search filter
+    const searched = presetSearch
+      ? catFiltered.filter((p) => p.name.toLowerCase().includes(presetSearch.toLowerCase()))
+      : catFiltered;
+
+    const options: SelectOption[] = searched.map((p) => ({
+      value: p.id,
+      label: p.isUser ? `\u2605 ${p.name}` : p.name,
+    }));
+
+    return { allPresets: all, filteredPresets: searched, presetOptions: options };
+  }, [currentInstrument?.synthType, userPresets, filterCategory, presetSearch]);
+
+  const handlePresetSelect = useCallback(
+    (presetId: string) => {
+      const inst = instRef.current;
+      if (!inst) return;
+      setSelectedPresetId(presetId);
+
+      // Try factory presets first
+      const factoryPresets = getPresetsForSynthType(inst.synthType);
+      const factoryPreset = factoryPresets.find((p) => p.id === presetId);
+      if (factoryPreset) {
+        updateInstrument(inst.id, factoryPreset.config as any);
+        notify.success(`Loaded preset: ${factoryPreset.name}`);
+        return;
+      }
+
+      // Try user presets
+      const userPreset = usePresetStore.getState().getPreset(presetId);
+      if (userPreset) {
+        updateInstrument(inst.id, userPreset.config as any);
+        usePresetStore.getState().addToRecent(presetId);
+        notify.success(`Loaded preset: ${userPreset.name}`);
+      }
+    },
+    [updateInstrument],
+  );
+
+  const handleSavePreset = useCallback(() => {
+    const inst = instRef.current;
+    if (!inst || !presetName.trim()) return;
+    usePresetStore.getState().savePreset(inst, presetName.trim(), presetCategory);
+    notify.success(`Saved preset: ${presetName.trim()}`);
+    setShowSaveDialog(false);
+    setPresetName('');
+  }, [presetName, presetCategory]);
+
+  const handleDeletePreset = useCallback(() => {
+    if (!selectedPresetId) return;
+    const preset = usePresetStore.getState().getPreset(selectedPresetId);
+    if (!preset) {
+      notify.error('Can only delete user presets');
+      return;
+    }
+    usePresetStore.getState().deletePreset(selectedPresetId);
+    setSelectedPresetId(null);
+    notify.success(`Deleted preset: ${preset.name}`);
+  }, [selectedPresetId]);
+
+  const isSelectedPresetUser = useMemo(() => {
+    if (!selectedPresetId) return false;
+    return filteredPresets.some((p) => p.id === selectedPresetId && p.isUser);
+  }, [selectedPresetId, filteredPresets]);
 
   // ── Callbacks ───────────────────────────────────────────────────────────
 
@@ -218,6 +336,15 @@ export const PixiEditInstrumentModal: React.FC<PixiEditInstrumentModalProps> = (
       const inst = instRef.current;
       if (!inst) return;
       updateInstrument(inst.id, { envelope: { ...inst.envelope, [key]: value } });
+    },
+    [updateInstrument],
+  );
+
+  const updateModularPatch = useCallback(
+    (patch: ModularPatchConfig) => {
+      const inst = instRef.current;
+      if (!inst) return;
+      updateInstrument(inst.id, { modularSynth: patch });
     },
     [updateInstrument],
   );
@@ -374,6 +501,178 @@ export const PixiEditInstrumentModal: React.FC<PixiEditInstrumentModalProps> = (
             </layoutContainer>
           )}
 
+          {/* ── Preset selector row ─────────────────────────────────────── */}
+          {!isCreating && currentInstrument && (
+            <layoutContainer
+              layout={{
+                flexDirection: 'column',
+                borderBottomWidth: 1,
+                borderColor: theme.border.color,
+              }}
+            >
+              {/* Preset header with expand toggle + save/delete buttons */}
+              <layoutContainer
+                layout={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 6,
+                  paddingLeft: 8,
+                  paddingRight: 8,
+                  height: 30,
+                }}
+              >
+                <PixiButton
+                  icon={presetExpanded ? 'caret-down' : 'caret-right'}
+                  label=""
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setPresetExpanded((v) => !v)}
+                />
+                <PixiLabel text="PRESETS" size="xs" weight="bold" color="textMuted" />
+                <PixiLabel
+                  text={`${filteredPresets.length} of ${allPresets.length}`}
+                  size="xs"
+                  color="textMuted"
+                />
+                <layoutContainer layout={{ flex: 1 }} />
+                <PixiButton
+                  icon="save"
+                  label="Save"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setPresetName(currentInstrument.name);
+                    setShowSaveDialog((v) => !v);
+                  }}
+                />
+                {isSelectedPresetUser && (
+                  <PixiButton
+                    icon="close"
+                    label="Del"
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleDeletePreset}
+                  />
+                )}
+              </layoutContainer>
+
+              {/* Expanded preset browser area */}
+              {presetExpanded && (
+                <layoutContainer
+                  layout={{
+                    flexDirection: 'column',
+                    gap: 4,
+                    paddingLeft: 8,
+                    paddingRight: 8,
+                    paddingBottom: 6,
+                  }}
+                >
+                  {/* Category filter row */}
+                  <layoutContainer layout={{ flexDirection: 'row', gap: 3, flexWrap: 'wrap' }}>
+                    {PRESET_CATEGORIES.map((cat) => (
+                      <PixiButton
+                        key={cat}
+                        label={cat}
+                        variant={filterCategory === cat ? 'primary' : 'ghost'}
+                        size="sm"
+                        onClick={() => setFilterCategory(cat)}
+                      />
+                    ))}
+                  </layoutContainer>
+
+                  {/* Search input */}
+                  <PixiPureTextInput
+                    value={presetSearch}
+                    onChange={setPresetSearch}
+                    placeholder="Search presets..."
+                    width={RIGHT_PANEL_W - 24}
+                    height={22}
+                  />
+                </layoutContainer>
+              )}
+
+              {/* Preset dropdown (always visible) */}
+              {presetOptions.length > 0 && (
+                <layoutContainer
+                  layout={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 8,
+                    paddingLeft: 8,
+                    paddingRight: 8,
+                    paddingBottom: 6,
+                  }}
+                >
+                  <PixiSelect
+                    options={presetOptions}
+                    value={selectedPresetId ?? ''}
+                    onChange={handlePresetSelect}
+                    width={RIGHT_PANEL_W - 24}
+                    placeholder="Load preset..."
+                  />
+                </layoutContainer>
+              )}
+
+              {/* Save dialog (inline) */}
+              {showSaveDialog && (
+                <layoutContainer
+                  layout={{
+                    flexDirection: 'column',
+                    gap: 4,
+                    paddingLeft: 8,
+                    paddingRight: 8,
+                    paddingBottom: 8,
+                    backgroundColor: theme.bgTertiary.color,
+                    borderTopWidth: 1,
+                    borderColor: theme.border.color,
+                  }}
+                >
+                  <PixiLabel text="SAVE PRESET" size="xs" weight="bold" color="textMuted" layout={{ paddingTop: 4 }} />
+                  <PixiPureTextInput
+                    value={presetName}
+                    onChange={setPresetName}
+                    onSubmit={handleSavePreset}
+                    placeholder="Preset name"
+                    width={RIGHT_PANEL_W - 24}
+                    height={22}
+                  />
+                  <layoutContainer layout={{ flexDirection: 'row', gap: 4, alignItems: 'center' }}>
+                    <PixiLabel text="Category:" size="xs" color="textMuted" />
+                    <PixiSelect
+                      options={[
+                        { value: 'User', label: 'User' },
+                        { value: 'Bass', label: 'Bass' },
+                        { value: 'Lead', label: 'Lead' },
+                        { value: 'Pad', label: 'Pad' },
+                        { value: 'Drum', label: 'Drum' },
+                        { value: 'FX', label: 'FX' },
+                      ]}
+                      value={presetCategory}
+                      onChange={(v) => setPresetCategory(v as PresetCategory)}
+                      width={100}
+                    />
+                  </layoutContainer>
+                  <layoutContainer layout={{ flexDirection: 'row', gap: 4 }}>
+                    <PixiButton
+                      icon="save"
+                      label="Save"
+                      variant="primary"
+                      size="sm"
+                      disabled={!presetName.trim()}
+                      onClick={handleSavePreset}
+                    />
+                    <PixiButton
+                      label="Cancel"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setShowSaveDialog(false)}
+                    />
+                  </layoutContainer>
+                </layoutContainer>
+              )}
+            </layoutContainer>
+          )}
+
           {/* ── Tab bar ──────────────────────────────────────────────────── */}
           <layoutContainer
             layout={{
@@ -400,7 +699,15 @@ export const PixiEditInstrumentModal: React.FC<PixiEditInstrumentModalProps> = (
 
           {/* ── Content area ──────────────────────────────────────────────── */}
           <layoutContainer layout={{ flex: 1, padding: PAD, gap: 8, flexDirection: 'column', overflow: 'hidden' }}>
-            {activeTab === 'sound' && currentInstrument && (
+            {activeTab === 'sound' && currentInstrument && currentInstrument.synthType === 'ModularSynth' && (
+              <PixiModularSynthEditor
+                config={currentInstrument.modularSynth || MODULAR_INIT_PATCH}
+                onChange={updateModularPatch}
+                width={RIGHT_PANEL_W - PAD * 2}
+                height={CONTENT_H - TAB_BAR_H - PAD * 2}
+              />
+            )}
+            {activeTab === 'sound' && currentInstrument && currentInstrument.synthType !== 'ModularSynth' && (
               <SoundPanel instrument={currentInstrument} updateParam={updateParam} updateOsc={updateOsc} updateFilter={updateFilter} updateEnvelope={updateEnvelope} />
             )}
             {activeTab === 'effects' && currentInstrument && (
