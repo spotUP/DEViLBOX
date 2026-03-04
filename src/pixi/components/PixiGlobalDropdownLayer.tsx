@@ -224,6 +224,11 @@ const PixiGlobalContextMenu: React.FC<ContextMenuProps> = ({ x, y, items, onClos
             item.action?.();
             onClose();
           }}
+          onClick={() => {
+            if (item.disabled || hasSubmenu) return;
+            item.action?.();
+            onClose();
+          }}
           alpha={item.disabled ? 0.4 : 1}
           layout={{
             position: 'absolute',
@@ -342,6 +347,11 @@ const PixiContextSubmenu: React.FC<SubmenuProps> = ({ items, x, y, onClose, onPo
           onPointerOver={() => !sub.disabled && setHoveredSub(j)}
           onPointerOut={() => setHoveredSub(null)}
           onPointerUp={() => {
+            if (sub.disabled) return;
+            sub.action?.();
+            onClose();
+          }}
+          onClick={() => {
             if (sub.disabled) return;
             sub.action?.();
             onClose();

@@ -134,6 +134,7 @@ const PixiMenuButton: React.FC<PixiMenuButtonProps> = ({
       onPointerOver={() => { setHovered(true); handleHoverOpen(); }}
       onPointerOut={() => setHovered(false)}
       onPointerUp={handleToggle}
+      onClick={handleToggle}
       layout={{
         width: btnW,
         height,
@@ -200,6 +201,7 @@ export const PixiMenuItem: React.FC<PixiMenuItemProps> = ({ item, width, onClose
       onPointerOver={() => setHovered(true)}
       onPointerOut={() => setHovered(false)}
       onPointerUp={handleClick}
+      onClick={handleClick}
       alpha={isDisabled ? 0.4 : 1}
       layout={{
         width,

@@ -101,6 +101,7 @@ export const PixiDropdownPanel: React.FC<PixiDropdownPanelProps> = ({
             onPointerOver={() => !isGroup && !opt.disabled && setHoveredIndex(i)}
             onPointerOut={() => setHoveredIndex(null)}
             onPointerUp={() => { if (!isGroup && !opt.disabled) { onSelect(opt.value); onClose(); } }}
+            onClick={() => { if (!isGroup && !opt.disabled) { onSelect(opt.value); onClose(); } }}
             layout={{
               width: width - PANEL_PADDING * 2,
               height: itemHeight,
@@ -228,6 +229,7 @@ export const PixiSelect: React.FC<PixiSelectProps> = ({
       onPointerOver={() => setHovered(true)}
       onPointerOut={() => setHovered(false)}
       onPointerUp={handleToggle}
+      onClick={handleToggle}
       alpha={disabled ? 0.4 : 1}
       layout={{
         width,

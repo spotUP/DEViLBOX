@@ -192,6 +192,7 @@ export const PixiUndoHistoryPanel: React.FC<PixiUndoHistoryPanelProps> = ({ isOp
                 eventMode="static"
                 cursor="pointer"
                 onPointerUp={redo as () => void}
+                onClick={redo as () => void}
               >
                 <Dot color={getDotColor(action.type)} />
                 <pixiBitmapText
@@ -248,6 +249,7 @@ export const PixiUndoHistoryPanel: React.FC<PixiUndoHistoryPanelProps> = ({ isOp
                 eventMode="static"
                 cursor="pointer"
                 onPointerUp={undo as () => void}
+                onClick={undo as () => void}
               >
                 <Dot color={getDotColor(action.type)} />
                 <pixiBitmapText

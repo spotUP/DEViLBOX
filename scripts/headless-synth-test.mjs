@@ -53,14 +53,23 @@ async function run() {
   await page.click('body');
   await new Promise(r => setTimeout(r, 1000));
 
-  // If filter is provided, type it and click filtered volume button
+  // If filter is provided, type it and call the function directly
   if (filter) {
     console.log(`Setting filter: ${filter}`);
     await page.type('#synthFilter', filter);
-    // Small delay for UI
     await new Promise(r => setTimeout(r, 300));
-    console.log('Clicking "Test Selected (Volume)" ...');
-    await page.click('#runFilteredVolume');
+    console.log('Calling runFilteredVolume() via evaluate ...');
+    // Call the function directly and catch errors
+    page.evaluate(() => {
+      const fn = window.runFilteredVolume;
+      if (!fn) { document.title = 'ERROR: runFilteredVolume not found'; return; }
+      fn().then(() => {
+        console.log('[Puppeteer] runFilteredVolume completed');
+      }).catch(err => {
+        console.error('[Puppeteer] runFilteredVolume error:', err);
+        document.title = 'ERROR: ' + (err.message || err);
+      });
+    }).catch(err => console.error('evaluate error:', err));
   } else {
     console.log('Clicking "Run Volume Level Tests" ...');
     await page.click('#runVolumeTests');
@@ -70,12 +79,18 @@ async function run() {
   console.log('Waiting for tests to complete (timeout: 10 min) ...');
   const startTime = Date.now();
   let done = false;
+  let lastLogTime = Date.now();
   while (!done && (Date.now() - startTime) < TIMEOUT_MS) {
     await new Promise(r => setTimeout(r, 3000));
     try {
       const title = await page.title();
+      const elapsed = ((Date.now() - startTime) / 1000).toFixed(0);
+      if (Date.now() - lastLogTime > 15000) {
+        console.log(`  [${elapsed}s] title="${title}"`);
+        lastLogTime = Date.now();
+      }
       if (title.startsWith('DONE ')) {
-        console.log(`\n=== ${title} ===\n`);
+        console.log(`\n=== ${title} === (${elapsed}s)\n`);
         done = true;
       }
     } catch (e) {

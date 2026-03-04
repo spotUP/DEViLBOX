@@ -78,6 +78,7 @@ const DockTabButton: React.FC<DockTabButtonProps> = ({ label, isActive, onPress 
       onPointerOver={() => setHovered(true)}
       onPointerOut={() => setHovered(false)}
       onPointerUp={onPress}
+      onClick={onPress}
       layout={{ width: W, height: MODERN_DOCK_TAB_H, justifyContent: 'center', alignItems: 'center' }}
     >
       <pixiGraphics draw={drawBg} layout={{ position: 'absolute', width: W, height: MODERN_DOCK_TAB_H }} />
@@ -207,6 +208,7 @@ export const PixiBottomDock: React.FC<PixiBottomDockProps> = ({
           eventMode="static"
           cursor="pointer"
           onPointerUp={onUndock}
+      onClick={onUndock}
           alpha={onUndock ? 1 : 0.3}
           layout={{ width: 28, height: 28, justifyContent: 'center', alignItems: 'center', marginRight: 4 }}
         >
@@ -223,6 +225,7 @@ export const PixiBottomDock: React.FC<PixiBottomDockProps> = ({
           eventMode="static"
           cursor="pointer"
           onPointerUp={onCollapse}
+      onClick={onCollapse}
           layout={{ width: 28, height: 28, justifyContent: 'center', alignItems: 'center', marginRight: 8 }}
         >
           <pixiBitmapText

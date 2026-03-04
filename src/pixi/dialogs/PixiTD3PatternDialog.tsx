@@ -361,6 +361,7 @@ export const PixiTD3PatternDialog: React.FC<PixiTD3PatternDialogProps> = ({ isOp
         eventMode="static"
         cursor="pointer"
         onPointerUp={() => setActiveTab(tab)}
+        onClick={() => setActiveTab(tab)}
         layout={{
           flex: 1,
           height: 30,
