@@ -11,71 +11,115 @@ export interface ChipPitch {
 }
 
 export class FurnacePitchUtils {
-  // Constants for standard hardware clocks and frequency bases
-  // Reference: Furnace genesis.h, ym2203.h, fmshared_OPN.h
-  public static readonly CLOCK_OPN2 = 7670454;     // Genesis NTSC (COLOR_NTSC * 15 / 7)
-  public static readonly CLOCK_OPN2_PAL = 7600489; // Genesis PAL
-  public static readonly CLOCK_OPN = 4000000;      // YM2203 PC-88/98 (4MHz typical)
-  public static readonly CLOCK_OPM  = 3579545;     // Arcade standard
+  // Standard hardware clocks (from Furnace platform init with default flags)
+  // Reference: Furnace genesis.cpp, ym2203.cpp, ym2608.cpp, ym2610shared.h, opl.cpp
+  public static readonly CLOCK_OPN2 = 7670454;      // Genesis NTSC (COLOR_NTSC * 12 / 7)
+  public static readonly CLOCK_OPN2_PAL = 7600489;  // Genesis PAL
+  public static readonly CLOCK_OPN  = 3579545;      // YM2203 default (COLOR_NTSC)
+  public static readonly CLOCK_OPNA = 8000000;      // YM2608 default (8 MHz)
+  public static readonly CLOCK_OPNB = 8000000;      // YM2610/YM2610B default (8 MHz)
+  public static readonly CLOCK_OPM  = 3579545;      // YM2151 arcade standard
+  public static readonly CLOCK_OPL  = 3579545;      // OPL2/Y8950 (COLOR_NTSC)
+  public static readonly CLOCK_OPL3 = 14318180;     // OPL3/ESFM (4x OPL2)
 
-  // Frequency bases (clock * prescaler factor) - used for F-Number calculation
-  public static readonly FREQ_BASE_OPN2 = 9440540.0;  // Genesis (divBase=72)
-  public static readonly FREQ_BASE_OPN = 4720270.0;   // YM2203 (divBase=36)
-  public static readonly FREQ_BASE_OPM = 3579545.0;   // YM2151
+  // Hardware dividers (from ymfm phase step: FM samples per clock cycle)
+  public static readonly DIVIDER_OPN2 = 144;  // Genesis: 6*24 (prescale /6)
+  public static readonly DIVIDER_OPN  = 72;   // YM2203: fmDivBase=36, 36*2=72
+  public static readonly DIVIDER_OPNA = 144;  // YM2608: fmDivBase=72, 72*2=144
+  public static readonly DIVIDER_OPNB = 144;  // YM2610/B: same as OPNA
+
+  // OPL effective sample rate: chipClock/divider ≈ 49716 Hz for all standard OPL chips
+  // OPL2/Y8950: 3579545/72, OPL3/ESFM: 14318180/288, OPL4: 33868800/684
+  public static readonly OPL_FM_RATE = 49716;
 
   /**
-   * Calculate OPN2 (YM2612) Block and F-Number
-   * Reference: YM2612 Application Manual, Furnace genesis.cpp
+   * Generalized OPN-family F-Number calculation.
+   * Works for OPN2, OPN, OPNA, OPNB, OPNB_B by passing correct clock/divider.
    *
-   * Hardware formula: Freq = (Fnum * chipClock) / (144 * 2^(21-Block))
-   * Rearranged: Fnum = (Freq * 144 * 2^(21-Block)) / chipClock
+   * From ymfm_opn.cpp compute_phase_step:
+   *   phase_step = (fnum << 1) << block >> 2 = fnum * 2^(block-1)
+   *   fout = phase_step * (chipClock/divider) / 2^20
+   *        = fnum * 2^(block-1) * chipClock / (divider * 2^20)
    *
-   * The YM2612 has:
-   * - 11-bit F-Number (0-2047)
-   * - 3-bit Block (0-7), each block doubles the frequency
-   * - At block 4, F-Number ~1084 = A4 (440Hz)
+   * Rearranged: fnum = freq * divider * 2^(21-block) / chipClock
+   * At block 0:  fnum0 = freq * divider * 2^21 / chipClock
    */
-  public static freqToOPN2(freq: number): ChipPitch {
+  public static freqToOPNFamily(freq: number, clock: number, divider: number): ChipPitch {
     if (freq <= 0) return { block: 0, fnum: 0 };
 
-    const clock = this.CLOCK_OPN2; // 7670454 Hz (Genesis NTSC)
+    // Compute fnum at block 0 (maximum precision)
+    let fnum = Math.round(freq * divider * 2097152 / clock);
+    let block = 0;
 
-    // Find the appropriate block (octave)
-    // Higher blocks = lower fnum for same frequency
-    // We want fnum in valid 0-2047 range, ideally 600-1200 for precision
-    let block = 7;
-    let fnum = 0;
-
-    // Start from highest block (smallest fnum) and work down until fnum is large enough
-    for (block = 7; block >= 0; block--) {
-      // Fnum = (Freq * 144 * 2^21) / (chipClock * 2^Block)
-      const divisor = Math.pow(2, block);
-      fnum = Math.round((freq * 144 * 2097152) / (clock * divisor));
-
-      // If fnum is in valid range and reasonably large, use this block
-      if (fnum <= 2047 && fnum >= 600) {
-        break;
-      }
-      // If fnum is valid but small, try lower block for more precision
-      if (fnum <= 2047 && fnum < 600 && block > 0) {
-        continue;
-      }
-      // If we're at block 0 and fnum is still valid, use it
-      if (block === 0 && fnum <= 2047) {
-        break;
-      }
+    // Shift down until fnum fits in 11 bits (0-2047)
+    while (fnum > 2047 && block < 7) {
+      fnum >>= 1;
+      block++;
     }
+    fnum = Math.min(2047, Math.max(0, fnum));
+    return { block, fnum };
+  }
 
-    // Handle edge cases: if fnum overflows at block 7, clamp to max
-    if (fnum > 2047) {
-      block = 7;
-      fnum = 2047;
+  /** OPN2 (YM2612/Genesis): clock=7670454, divider=144 */
+  public static freqToOPN2(freq: number): ChipPitch {
+    return this.freqToOPNFamily(freq, this.CLOCK_OPN2, this.DIVIDER_OPN2);
+  }
+
+  /** OPN (YM2203): clock=3579545, divider=72 */
+  public static freqToOPN(freq: number): ChipPitch {
+    return this.freqToOPNFamily(freq, this.CLOCK_OPN, this.DIVIDER_OPN);
+  }
+
+  /** OPNA (YM2608): clock=8000000, divider=144 */
+  public static freqToOPNA(freq: number): ChipPitch {
+    return this.freqToOPNFamily(freq, this.CLOCK_OPNA, this.DIVIDER_OPNA);
+  }
+
+  /** OPNB/OPNB_B (YM2610/B): clock=8000000, divider=144 */
+  public static freqToOPNB(freq: number): ChipPitch {
+    return this.freqToOPNFamily(freq, this.CLOCK_OPNB, this.DIVIDER_OPNB);
+  }
+
+  /**
+   * OPL-family F-Number calculation (10-bit fnum, 3-bit block).
+   * Works for OPL2, OPL3, Y8950, ESFM, OPL4 FM channels.
+   *
+   * From ymfm_opl.cpp compute_phase_step:
+   *   phase_step = (fnum << 1) << block >> 1 = fnum * 2^block
+   *   fout = phase_step * Fm / 2^20   where Fm = chipClock/divider ≈ 49716 Hz
+   *
+   * Rearranged: fnum = freq * 2^(20-block) / Fm
+   * At block 0:  fnum0 = freq * 2^20 / Fm
+   */
+  public static freqToOPL(freq: number): { block: number; fnum: number } {
+    if (freq <= 0) return { block: 0, fnum: 0 };
+
+    let fnum = Math.round(freq * 1048576 / this.OPL_FM_RATE);
+    let block = 0;
+
+    while (fnum > 1023 && block < 7) {
+      fnum >>= 1;
+      block++;
     }
+    fnum = Math.min(1023, Math.max(0, fnum));
+    return { block, fnum };
+  }
 
-    // Clamp to valid ranges
-    block = Math.max(0, Math.min(7, block));
-    fnum = Math.max(0, Math.min(2047, fnum));
+  /**
+   * OPLL/VRC7 F-Number calculation (9-bit fnum, 3-bit block).
+   * Same formula as OPL but max fnum is 511 (9 bits).
+   */
+  public static freqToOPLL(freq: number): { block: number; fnum: number } {
+    if (freq <= 0) return { block: 0, fnum: 0 };
 
+    let fnum = Math.round(freq * 1048576 / this.OPL_FM_RATE);
+    let block = 0;
+
+    while (fnum > 511 && block < 7) {
+      fnum >>= 1;
+      block++;
+    }
+    fnum = Math.min(511, Math.max(0, fnum));
     return { block, fnum };
   }
 
