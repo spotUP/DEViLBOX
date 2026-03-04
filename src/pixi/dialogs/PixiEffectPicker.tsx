@@ -282,7 +282,7 @@ export const PixiEffectPicker: React.FC<PixiEffectPickerProps> = ({
                   {/* Command hex code */}
                   <pixiBitmapText
                     text={eff.command.substring(0, 3)}
-                    style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 11, fill: hexColor }}
+                    style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 13, fill: hexColor }}
                     layout={{ width: 30 }}
                   />
 
@@ -290,12 +290,12 @@ export const PixiEffectPicker: React.FC<PixiEffectPickerProps> = ({
                   <layoutContainer layout={{ flex: 1, flexDirection: 'column', gap: 1 }}>
                     <pixiBitmapText
                       text={eff.name + (eff.isFurnace ? ' (Chip)' : '')}
-                      style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 11, fill: theme.text.color }}
+                      style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 13, fill: theme.text.color }}
                       layout={{}}
                     />
                     <pixiBitmapText
                       text={eff.description.length > 50 ? eff.description.substring(0, 48) + '..' : eff.description}
-                      style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 9, fill: theme.textMuted.color }}
+                      style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 11, fill: theme.textMuted.color }}
                       layout={{}}
                     />
                   </layoutContainer>
@@ -303,7 +303,7 @@ export const PixiEffectPicker: React.FC<PixiEffectPickerProps> = ({
                   {/* Tick indicator */}
                   <pixiBitmapText
                     text={tickLabel}
-                    style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: theme.textMuted.color }}
+                    style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 11, fill: theme.textMuted.color }}
                     layout={{ width: 18 }}
                   />
                 </layoutContainer>

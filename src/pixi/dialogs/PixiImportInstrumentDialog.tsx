@@ -113,20 +113,20 @@ export const PixiImportInstrumentDialog: React.FC<PixiImportInstrumentDialogProp
         <layoutContainer layout={{ flexDirection: 'row', gap: 12, alignItems: 'center', marginBottom: 20 }}>
           <pixiBitmapText
             text="⚙"
-            style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 18, fill: 0xffffff }}
+            style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 20, fill: 0xffffff }}
             tint={theme.accent.color}
             layout={{}}
           />
           <layoutContainer layout={{ flexDirection: 'column', flex: 1, gap: 2 }}>
             <pixiBitmapText
               text="Add Instrument?"
-              style={{ fontFamily: PIXI_FONTS.SANS_BOLD, fontSize: 18, fill: 0xffffff }}
+              style={{ fontFamily: PIXI_FONTS.SANS_BOLD, fontSize: 20, fill: 0xffffff }}
               tint={0xffffff}
               layout={{}}
             />
             <pixiBitmapText
               text={file.name}
-              style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 12, fill: 0xffffff }}
+              style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 14, fill: 0xffffff }}
               tint={theme.textMuted.color}
               layout={{}}
             />
@@ -149,7 +149,7 @@ export const PixiImportInstrumentDialog: React.FC<PixiImportInstrumentDialogProp
           >
             <pixiBitmapText
               text={preview.name}
-              style={{ fontFamily: PIXI_FONTS.SANS_BOLD, fontSize: 16, fill: 0xffffff }}
+              style={{ fontFamily: PIXI_FONTS.SANS_BOLD, fontSize: 18, fill: 0xffffff }}
               tint={0xffffff}
               layout={{}}
             />
@@ -160,7 +160,7 @@ export const PixiImportInstrumentDialog: React.FC<PixiImportInstrumentDialogProp
           <layoutContainer layout={{ flexDirection: 'row', gap: 8, alignItems: 'center', marginBottom: 20 }}>
             <pixiBitmapText
               text="⚙"
-              style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 14, fill: 0xffffff }}
+              style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 16, fill: 0xffffff }}
               tint={theme.textMuted.color}
               layout={{}}
             />

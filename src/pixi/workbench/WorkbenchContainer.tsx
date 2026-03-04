@@ -596,7 +596,7 @@ export const WorkbenchContainer: React.FC = () => {
         <pixiBitmapText
           ref={zoomTextRef}
           text="100%"
-          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 11, fill: 0xffffff }}
+          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 13, fill: 0xffffff }}
           tint={theme.textMuted.color}
           alpha={0.5}
           layout={{ position: 'absolute', bottom: 8, left: 10 }}

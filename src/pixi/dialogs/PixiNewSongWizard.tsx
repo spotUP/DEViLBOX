@@ -163,13 +163,13 @@ export const PixiNewSongWizard: React.FC = () => {
           <layoutContainer layout={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
             <pixiBitmapText
               text="New Song"
-              style={{ fontFamily: PIXI_FONTS.SANS_SEMIBOLD, fontSize: 14, fill: 0xffffff }}
+              style={{ fontFamily: PIXI_FONTS.SANS_SEMIBOLD, fontSize: 16, fill: 0xffffff }}
               tint={theme.text.color}
               layout={{}}
             />
             <pixiBitmapText
               text={`Step ${step} of ${stepCount}`}
-              style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 12, fill: 0xffffff }}
+              style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 14, fill: 0xffffff }}
               tint={theme.textMuted.color}
               layout={{}}
             />
@@ -188,7 +188,7 @@ export const PixiNewSongWizard: React.FC = () => {
           >
             <pixiBitmapText
               text="✕"
-              style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 14, fill: 0xffffff }}
+              style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 16, fill: 0xffffff }}
               tint={theme.textMuted.color}
               layout={{}}
             />

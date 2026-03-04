@@ -85,12 +85,12 @@ export const PixiSwitch3Way: React.FC<PixiSwitch3WayProps> = ({
         <pixiBitmapText
           key={i}
           text={lbl}
-          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }}
+          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 11, fill: 0xffffff }}
           tint={value === i ? accent : theme.textMuted.color}
           layout={{
             position: 'absolute',
             left: i * SEGMENT_WIDTH + SEGMENT_WIDTH / 2 - lbl.length * 2.5,
-            top: (SWITCH_HEIGHT - 9) / 2,
+            top: (SWITCH_HEIGHT - 11) / 2,
           }}
         />
       ))}

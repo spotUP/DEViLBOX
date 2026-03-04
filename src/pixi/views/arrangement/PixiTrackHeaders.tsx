@@ -141,7 +141,7 @@ export const PixiTrackHeaders: React.FC<PixiTrackHeadersProps> = ({
               >
                 <pixiBitmapText
                   text={isFolded ? '\u25B6' : '\u25BC'}
-                  style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 8, fill: 0xffffff }}
+                  style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }}
                   tint={0x94a3b8}
                   layout={{}}
                 />
@@ -176,7 +176,7 @@ export const PixiTrackHeaders: React.FC<PixiTrackHeadersProps> = ({
             {/* Track name */}
             <pixiBitmapText
               text={track.name}
-              style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }}
+              style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 12, fill: 0xffffff }}
               tint={track.muted ? theme.textMuted.color : theme.text.color}
               layout={{ flex: 1 }}
             />
@@ -206,7 +206,7 @@ export const PixiTrackHeaders: React.FC<PixiTrackHeadersProps> = ({
               />
               <pixiBitmapText
                 text="M"
-                style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 8, fill: 0xffffff }}
+                style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 10, fill: 0xffffff }}
                 tint={track.muted ? theme.error.color : theme.textMuted.color}
                 layout={{}}
               />
@@ -237,7 +237,7 @@ export const PixiTrackHeaders: React.FC<PixiTrackHeadersProps> = ({
               />
               <pixiBitmapText
                 text="S"
-                style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 8, fill: 0xffffff }}
+                style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 10, fill: 0xffffff }}
                 tint={track.solo ? theme.warning.color : theme.textMuted.color}
                 layout={{}}
               />
@@ -258,7 +258,7 @@ export const PixiTrackHeaders: React.FC<PixiTrackHeadersProps> = ({
               >
                 <pixiBitmapText
                   text="\u00D7"
-                  style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 12, fill: 0xffffff }}
+                  style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 14, fill: 0xffffff }}
                   tint={theme.error.color}
                   layout={{}}
                 />

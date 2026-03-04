@@ -97,7 +97,7 @@ export const PixiChannelOscilloscope: React.FC<PixiChannelOscilloscopeProps> = (
       <pixiGraphics ref={graphicsRef} draw={isPlaying ? () => {} : drawStatic} layout={{ position: 'absolute', width, height }} />
       <pixiBitmapText
         text="CH SCOPE"
-        style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }}
+        style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 11, fill: 0xffffff }}
         tint={theme.textMuted.color}
         layout={{}}
         alpha={!isPlaying ? 1 : 0}

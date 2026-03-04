@@ -581,7 +581,7 @@ export const PixiWindow: React.FC<PixiWindowProps> = ({
         />
         <pixiBitmapText
           text={title.toUpperCase()}
-          style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 10, fill: 0xffffff }}
+          style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 12, fill: 0xffffff }}
           tint={theme.textSecondary.color}
           x={8}
           y={MINIMIZED_H / 2 - 4}
@@ -624,7 +624,7 @@ export const PixiWindow: React.FC<PixiWindowProps> = ({
         />
         <pixiBitmapText
           text={title.toUpperCase()}
-          style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 11, fill: 0xffffff }}
+          style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 13, fill: 0xffffff }}
           tint={focused ? theme.accent.color : theme.textSecondary.color}
           x={12}
           y={TITLE_H / 2 - 5}

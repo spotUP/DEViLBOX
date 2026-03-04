@@ -242,7 +242,7 @@ export const PixiPatternOrderModal: React.FC<PixiPatternOrderModalProps> = ({
                       text={posHex}
                       style={{
                         fontFamily: PIXI_FONTS.MONO,
-                        fontSize: 8,
+                        fontSize: 10,
                         fill: 0xffffff,
                       }}
                       tint={isCurrent ? theme.textInverse.color : theme.textMuted.color}
@@ -252,7 +252,7 @@ export const PixiPatternOrderModal: React.FC<PixiPatternOrderModalProps> = ({
                       text={patHex}
                       style={{
                         fontFamily: PIXI_FONTS.MONO_BOLD,
-                        fontSize: 14,
+                        fontSize: 16,
                         fill: 0xffffff,
                       }}
                       tint={isCurrent ? theme.textInverse.color : theme.text.color}

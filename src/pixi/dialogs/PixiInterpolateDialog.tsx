@@ -92,7 +92,7 @@ export const PixiInterpolateDialog: React.FC<PixiInterpolateDialogProps> = ({ is
         <layoutContainer layout={{ flexDirection: 'column', gap: 4 }}>
           <pixiBitmapText
             text={`Start Value (${colConfig.min} - ${colConfig.max})`}
-            style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 12, fill: 0xffffff }}
+            style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 14, fill: 0xffffff }}
             tint={theme.textMuted.color}
             layout={{}}
           />
@@ -109,7 +109,7 @@ export const PixiInterpolateDialog: React.FC<PixiInterpolateDialogProps> = ({ is
         <layoutContainer layout={{ flexDirection: 'column', gap: 4 }}>
           <pixiBitmapText
             text={`End Value (${colConfig.min} - ${colConfig.max})`}
-            style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 12, fill: 0xffffff }}
+            style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 14, fill: 0xffffff }}
             tint={theme.textMuted.color}
             layout={{}}
           />

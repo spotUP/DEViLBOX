@@ -945,7 +945,7 @@ export const PixiArrangementCanvas: React.FC<PixiArrangementCanvasProps> = ({
         <pixiBitmapText
           key={`bar-${text}`}
           text={text}
-          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }}
+          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 11, fill: 0xffffff }}
           tint={theme.textMuted.color}
           x={x + 3}
           y={3}
@@ -956,7 +956,7 @@ export const PixiArrangementCanvas: React.FC<PixiArrangementCanvasProps> = ({
         <pixiBitmapText
           key={`marker-${id}`}
           text={text}
-          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 8, fill: 0xffffff }}
+          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }}
           tint={color}
           x={x + (isTimeSig ? 6 : 3)}
           y={isTimeSig ? 10 : 13}
@@ -967,7 +967,7 @@ export const PixiArrangementCanvas: React.FC<PixiArrangementCanvasProps> = ({
         <pixiBitmapText
           key={`clip-${id}`}
           text={text}
-          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 8, fill: 0xffffff }}
+          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }}
           tint={muted ? theme.textMuted.color : color}
           alpha={muted ? 0.5 : 0.9}
           x={x}

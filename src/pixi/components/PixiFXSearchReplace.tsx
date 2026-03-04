@@ -196,9 +196,9 @@ export const PixiFXSearchReplace: React.FC<PixiFXSearchReplaceProps> = ({
       {/* Title */}
       <pixiBitmapText
         text="FX SEARCH & REPLACE"
-        style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 10, fill: 0xffffff }}
+        style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 12, fill: 0xffffff }}
         tint={theme.text.color}
-        layout={{ position: 'absolute', left: PAD, top: (TITLE_H - 10) / 2 }}
+        layout={{ position: 'absolute', left: PAD, top: (TITLE_H - 12) / 2 }}
       />
 
       {/* Close button */}
@@ -213,9 +213,9 @@ export const PixiFXSearchReplace: React.FC<PixiFXSearchReplaceProps> = ({
       {/* Row 1: Find */}
       <pixiBitmapText
         text="FIND:"
-        style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 9, fill: 0xffffff }}
+        style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 11, fill: 0xffffff }}
         tint={theme.textMuted.color}
-        layout={{ position: 'absolute', left: PAD, top: row1Y + (ROW_H - 9) / 2 }}
+        layout={{ position: 'absolute', left: PAD, top: row1Y + (ROW_H - 11) / 2 }}
       />
       <PixiPureTextInput
         value={searchTypStr}
@@ -223,15 +223,15 @@ export const PixiFXSearchReplace: React.FC<PixiFXSearchReplaceProps> = ({
         placeholder="EF"
         width={INPUT_W}
         height={22}
-        fontSize={11}
+        fontSize={13}
         font="mono"
         layout={{ position: 'absolute', left: PAD + LABEL_W, top: row1Y + (ROW_H - 22) / 2 }}
       />
       <pixiBitmapText
         text="PARAM:"
-        style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 9, fill: 0xffffff }}
+        style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 11, fill: 0xffffff }}
         tint={theme.textMuted.color}
-        layout={{ position: 'absolute', left: PAD + LABEL_W + INPUT_W + GAP, top: row1Y + (ROW_H - 9) / 2 }}
+        layout={{ position: 'absolute', left: PAD + LABEL_W + INPUT_W + GAP, top: row1Y + (ROW_H - 11) / 2 }}
       />
       <PixiPureTextInput
         value={searchEffStr}
@@ -239,7 +239,7 @@ export const PixiFXSearchReplace: React.FC<PixiFXSearchReplaceProps> = ({
         placeholder="any"
         width={INPUT_W}
         height={22}
-        fontSize={11}
+        fontSize={13}
         font="mono"
         layout={{ position: 'absolute', left: PAD + LABEL_W + INPUT_W + GAP + 44, top: row1Y + (ROW_H - 22) / 2 }}
       />
@@ -247,9 +247,9 @@ export const PixiFXSearchReplace: React.FC<PixiFXSearchReplaceProps> = ({
       {/* Row 2: Replace */}
       <pixiBitmapText
         text="REPL:"
-        style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 9, fill: 0xffffff }}
+        style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 11, fill: 0xffffff }}
         tint={theme.textMuted.color}
-        layout={{ position: 'absolute', left: PAD, top: row2Y + (ROW_H - 9) / 2 }}
+        layout={{ position: 'absolute', left: PAD, top: row2Y + (ROW_H - 11) / 2 }}
       />
       <PixiPureTextInput
         value={replaceTypStr}
@@ -257,15 +257,15 @@ export const PixiFXSearchReplace: React.FC<PixiFXSearchReplaceProps> = ({
         placeholder="EF"
         width={INPUT_W}
         height={22}
-        fontSize={11}
+        fontSize={13}
         font="mono"
         layout={{ position: 'absolute', left: PAD + LABEL_W, top: row2Y + (ROW_H - 22) / 2 }}
       />
       <pixiBitmapText
         text="PARAM:"
-        style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 9, fill: 0xffffff }}
+        style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 11, fill: 0xffffff }}
         tint={theme.textMuted.color}
-        layout={{ position: 'absolute', left: PAD + LABEL_W + INPUT_W + GAP, top: row2Y + (ROW_H - 9) / 2 }}
+        layout={{ position: 'absolute', left: PAD + LABEL_W + INPUT_W + GAP, top: row2Y + (ROW_H - 11) / 2 }}
       />
       <PixiPureTextInput
         value={replaceEffStr}
@@ -273,7 +273,7 @@ export const PixiFXSearchReplace: React.FC<PixiFXSearchReplaceProps> = ({
         placeholder="--"
         width={INPUT_W}
         height={22}
-        fontSize={11}
+        fontSize={13}
         font="mono"
         layout={{ position: 'absolute', left: PAD + LABEL_W + INPUT_W + GAP + 44, top: row2Y + (ROW_H - 22) / 2 }}
       />
@@ -281,9 +281,9 @@ export const PixiFXSearchReplace: React.FC<PixiFXSearchReplaceProps> = ({
       {/* Row 3: Scope */}
       <pixiBitmapText
         text="SCOPE:"
-        style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 9, fill: 0xffffff }}
+        style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 11, fill: 0xffffff }}
         tint={theme.textMuted.color}
-        layout={{ position: 'absolute', left: PAD, top: row3Y + (ROW_H - 9) / 2 }}
+        layout={{ position: 'absolute', left: PAD, top: row3Y + (ROW_H - 11) / 2 }}
       />
       <pixiContainer
         eventMode="static"
@@ -294,7 +294,7 @@ export const PixiFXSearchReplace: React.FC<PixiFXSearchReplaceProps> = ({
         <pixiGraphics draw={drawScopeCurrent} layout={{ position: 'absolute', width: 100, height: 20 }} />
         <pixiBitmapText
           text="Cur.Pattern"
-          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }}
+          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 11, fill: 0xffffff }}
           tint={scope === 'current' ? theme.accent.color : theme.textSecondary.color}
           layout={{ position: 'absolute', left: 6, top: 5 }}
         />
@@ -308,7 +308,7 @@ export const PixiFXSearchReplace: React.FC<PixiFXSearchReplaceProps> = ({
         <pixiGraphics draw={drawScopeAll} layout={{ position: 'absolute', width: 100, height: 20 }} />
         <pixiBitmapText
           text="All Patterns"
-          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }}
+          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 11, fill: 0xffffff }}
           tint={scope === 'all' ? theme.accent.color : theme.textSecondary.color}
           layout={{ position: 'absolute', left: 6, top: 5 }}
         />
@@ -318,9 +318,9 @@ export const PixiFXSearchReplace: React.FC<PixiFXSearchReplaceProps> = ({
       {statusText !== '' && (
         <pixiBitmapText
           text={statusText}
-          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }}
+          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 11, fill: 0xffffff }}
           tint={lastReplaced !== null ? theme.success.color : theme.accentSecondary.color}
-          layout={{ position: 'absolute', left: PAD, top: footerY + (24 - 9) / 2 }}
+          layout={{ position: 'absolute', left: PAD, top: footerY + (24 - 11) / 2 }}
         />
       )}
       <PixiButton

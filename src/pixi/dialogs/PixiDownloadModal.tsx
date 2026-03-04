@@ -63,13 +63,13 @@ export const PixiDownloadModal: React.FC<PixiDownloadModalProps> = ({ isOpen, on
         <layoutContainer layout={{ flexDirection: 'column', gap: 2 }}>
           <pixiBitmapText
             text="Download DEViLBOX"
-            style={{ fontFamily: PIXI_FONTS.SANS_BOLD, fontSize: 18, fill: 0xffffff }}
+            style={{ fontFamily: PIXI_FONTS.SANS_BOLD, fontSize: 20, fill: 0xffffff }}
             tint={theme.text.color}
             layout={{}}
           />
           <pixiBitmapText
             text="Native Desktop Applications"
-            style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 12, fill: 0xffffff }}
+            style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 14, fill: 0xffffff }}
             tint={theme.textMuted.color}
             layout={{}}
           />
@@ -91,7 +91,7 @@ export const PixiDownloadModal: React.FC<PixiDownloadModalProps> = ({ isOpen, on
         >
           <pixiBitmapText
             text="✕"
-            style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 16, fill: 0xffffff }}
+            style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 18, fill: 0xffffff }}
             tint={closeHovered ? theme.text.color : theme.textMuted.color}
             layout={{}}
           />
@@ -103,7 +103,7 @@ export const PixiDownloadModal: React.FC<PixiDownloadModalProps> = ({ isOpen, on
         {/* Description — DOM: text-sm text-text-secondary mb-6 leading-relaxed */}
         <pixiBitmapText
           text="Experience DEViLBOX with lower latency, better performance, and offline support. Native apps provide full access to system audio and MIDI resources."
-          style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 14, fill: 0xffffff }}
+          style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 16, fill: 0xffffff }}
           tint={theme.textSecondary.color}
           layout={{ marginBottom: 24 }}
         />
@@ -130,13 +130,13 @@ export const PixiDownloadModal: React.FC<PixiDownloadModalProps> = ({ isOpen, on
               <layoutContainer layout={{ flexDirection: 'column', flex: 1 }}>
                 <pixiBitmapText
                   text={p.name}
-                  style={{ fontFamily: PIXI_FONTS.SANS_SEMIBOLD, fontSize: 14, fill: 0xffffff }}
+                  style={{ fontFamily: PIXI_FONTS.SANS_SEMIBOLD, fontSize: 16, fill: 0xffffff }}
                   tint={theme.text.color}
                   layout={{}}
                 />
                 <pixiBitmapText
                   text={p.desc}
-                  style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 12, fill: 0xffffff }}
+                  style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 14, fill: 0xffffff }}
                   tint={theme.textMuted.color}
                   layout={{}}
                 />
@@ -157,7 +157,7 @@ export const PixiDownloadModal: React.FC<PixiDownloadModalProps> = ({ isOpen, on
         >
           <pixiBitmapText
             text="BUILT WITH ELECTRON & TONE.JS"
-            style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }}
+            style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 12, fill: 0xffffff }}
             tint={theme.textMuted.color}
             layout={{}}
           />

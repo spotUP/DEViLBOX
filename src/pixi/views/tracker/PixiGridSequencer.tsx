@@ -478,7 +478,7 @@ export const PixiGridSequencer: React.FC<PixiGridSequencerProps> = ({
           <pixiBitmapText
             key={`step-${label.text}`}
             text={label.text}
-            style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }}
+            style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 11, fill: 0xffffff }}
             tint={label.highlight ? 0xffffff : theme.textMuted.color}
             x={label.x}
             y={HEADER_HEIGHT / 2 - 5}
@@ -492,7 +492,7 @@ export const PixiGridSequencer: React.FC<PixiGridSequencerProps> = ({
             text={label.text}
             style={{
               fontFamily: label.isRoot ? PIXI_FONTS.MONO_BOLD : PIXI_FONTS.MONO,
-              fontSize: 10,
+              fontSize: 12,
               fill: 0xffffff,
             }}
             tint={label.isRoot ? theme.accent.color : label.isSharp ? theme.textMuted.color : theme.textSecondary.color}

@@ -71,13 +71,13 @@ const Section: React.FC<SectionProps> = ({ title, id: _id, expanded, onToggle, w
       >
         <pixiBitmapText
           text={title}
-          style={{ fontFamily: PIXI_FONTS.SANS_MEDIUM, fontSize: 14, fill: 0xffffff }}
+          style={{ fontFamily: PIXI_FONTS.SANS_MEDIUM, fontSize: 16, fill: 0xffffff }}
           tint={theme.text.color}
           layout={{}}
         />
         <pixiBitmapText
           text={expanded ? '\u25BC' : '\u25B6'}
-          style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 10, fill: 0xffffff }}
+          style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 12, fill: 0xffffff }}
           tint={theme.textMuted.color}
           layout={{}}
         />

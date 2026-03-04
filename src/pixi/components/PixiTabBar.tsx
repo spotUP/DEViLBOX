@@ -151,7 +151,7 @@ const PixiTab: React.FC<PixiTabProps> = ({
       <pixiGraphics draw={drawUnderline} layout={{ position: 'absolute', width, height }} />
       <pixiBitmapText
         text={displayLabel}
-        style={{ fontFamily: PIXI_FONTS.SANS_MEDIUM, fontSize: 11, fill: 0xffffff }}
+        style={{ fontFamily: PIXI_FONTS.SANS_MEDIUM, fontSize: 13, fill: 0xffffff }}
         tint={isActive ? theme.text.color : theme.textSecondary.color}
         layout={{ flex: 1, maxWidth: maxLabelW }}
       />
@@ -165,7 +165,7 @@ const PixiTab: React.FC<PixiTabProps> = ({
       >
         <pixiBitmapText
           text="×"
-          style={{ fontFamily: PIXI_FONTS.SANS_BOLD, fontSize: 13, fill: 0xffffff }}
+          style={{ fontFamily: PIXI_FONTS.SANS_BOLD, fontSize: 15, fill: 0xffffff }}
           tint={hovered ? theme.error.color : theme.textMuted.color}
           layout={{}}
         />
@@ -211,7 +211,7 @@ const PixiTabNewBtn: React.FC<{ height: number; onClick: () => void }> = ({ heig
     >
       <pixiBitmapText
         text="+"
-        style={{ fontFamily: PIXI_FONTS.SANS_BOLD, fontSize: 16, fill: 0xffffff }}
+        style={{ fontFamily: PIXI_FONTS.SANS_BOLD, fontSize: 18, fill: 0xffffff }}
         tint={hovered ? theme.accent.color : theme.textSecondary.color}
         layout={{}}
       />

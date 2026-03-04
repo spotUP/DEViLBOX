@@ -106,7 +106,7 @@ const EnvelopeHandle: React.FC<HandleProps> = ({ cx, cy, label, accent, textMute
       />
       <pixiBitmapText
         text={label}
-        style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 9, fill: 0xffffff }}
+        style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 11, fill: 0xffffff }}
         tint={textMuted}
         layout={{
           position: 'absolute',

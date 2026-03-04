@@ -48,7 +48,7 @@ const ChangeBadge: React.FC<{ type: string }> = ({ type }) => {
     >
       <pixiBitmapText
         text={CHANGE_LABELS[type] ?? type}
-        style={{ fontFamily: PIXI_FONTS.SANS_BOLD, fontSize: 10, fill: 0xffffff }}
+        style={{ fontFamily: PIXI_FONTS.SANS_BOLD, fontSize: 12, fill: 0xffffff }}
         tint={c.text}
         layout={{}}
       />
@@ -72,7 +72,7 @@ const CategoryBadge: React.FC<{ category: string; accentColor: number; isCyan: b
   >
     <pixiBitmapText
       text={`Category: ${category}`}
-      style={{ fontFamily: PIXI_FONTS.SANS_BOLD, fontSize: 10, fill: 0xffffff }}
+      style={{ fontFamily: PIXI_FONTS.SANS_BOLD, fontSize: 12, fill: 0xffffff }}
       tint={isCyan ? accentColor : 0x888888}
       layout={{}}
     />
@@ -105,13 +105,13 @@ const VersionEntry: React.FC<{
     <layoutContainer layout={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 }}>
       <pixiBitmapText
         text={`v${entry.version}`}
-        style={{ fontFamily: PIXI_FONTS.SANS_BOLD, fontSize: 13, fill: 0xffffff }}
+        style={{ fontFamily: PIXI_FONTS.SANS_BOLD, fontSize: 14, fill: 0xffffff }}
         tint={isLatest ? accentColor : 0xeeeeee}
         layout={{}}
       />
       <pixiBitmapText
         text={entry.date}
-        style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 11, fill: 0xffffff }}
+        style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 13, fill: 0xffffff }}
         tint={mutedColor}
         layout={{}}
       />
@@ -126,7 +126,7 @@ const VersionEntry: React.FC<{
         >
           <pixiBitmapText
             text="LATEST"
-            style={{ fontFamily: PIXI_FONTS.SANS_BOLD, fontSize: 10, fill: 0x000000 }}
+            style={{ fontFamily: PIXI_FONTS.SANS_BOLD, fontSize: 12, fill: 0x000000 }}
             layout={{}}
           />
         </layoutContainer>
@@ -138,7 +138,7 @@ const VersionEntry: React.FC<{
         <ChangeBadge type={change.type} />
         <pixiBitmapText
           text={change.description}
-          style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 12, fill: 0xffffff }}
+          style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 14, fill: 0xffffff }}
           tint={secondaryColor}
           layout={{ maxWidth: W - 100 }}
         />
@@ -180,7 +180,7 @@ const TabButton: React.FC<{
     >
       <pixiBitmapText
         text={label}
-        style={{ fontFamily: PIXI_FONTS.SANS_BOLD, fontSize: 11, fill: 0xffffff }}
+        style={{ fontFamily: PIXI_FONTS.SANS_BOLD, fontSize: 13, fill: 0xffffff }}
         tint={active ? accentColor : hovered ? 0xcccccc : mutedColor}
         layout={{}}
       />
@@ -285,7 +285,7 @@ export const PixiTipOfTheDay: React.FC<PixiTipOfTheDayProps> = ({
           >
             <pixiBitmapText
               text={activeTab === 'tips' ? '💡' : '✨'}
-              style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 18, fill: 0xffffff }}
+              style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 20, fill: 0xffffff }}
               tint={accentColor}
               layout={{}}
             />
@@ -293,13 +293,13 @@ export const PixiTipOfTheDay: React.FC<PixiTipOfTheDayProps> = ({
           <layoutContainer layout={{ flexDirection: 'column', gap: 2 }}>
             <pixiBitmapText
               text={activeTab === 'tips' ? 'TIP OF THE DAY' : "WHAT'S NEW"}
-              style={{ fontFamily: PIXI_FONTS.SANS_BOLD, fontSize: 16, fill: 0xffffff }}
+              style={{ fontFamily: PIXI_FONTS.SANS_BOLD, fontSize: 18, fill: 0xffffff }}
               tint={theme.text.color}
               layout={{}}
             />
             <pixiBitmapText
               text={`DEViLBOX v${CURRENT_VERSION}`}
-              style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 10, fill: 0xffffff }}
+              style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 12, fill: 0xffffff }}
               tint={mutedColor}
               layout={{}}
             />
@@ -356,7 +356,7 @@ export const PixiTipOfTheDay: React.FC<PixiTipOfTheDayProps> = ({
             >
               <pixiBitmapText
                 text="ℹ"
-                style={{ fontFamily: PIXI_FONTS.SANS_BOLD, fontSize: 28, fill: 0xffffff }}
+                style={{ fontFamily: PIXI_FONTS.SANS_BOLD, fontSize: 30, fill: 0xffffff }}
                 tint={accentColor}
                 layout={{}}
               />
@@ -365,14 +365,14 @@ export const PixiTipOfTheDay: React.FC<PixiTipOfTheDayProps> = ({
             {/* Tip title — text-xl font-bold */}
             <pixiBitmapText
               text={tip.title}
-              style={{ fontFamily: PIXI_FONTS.SANS_BOLD, fontSize: 18, fill: 0xffffff }}
+              style={{ fontFamily: PIXI_FONTS.SANS_BOLD, fontSize: 20, fill: 0xffffff }}
               tint={accentColor}
               layout={{}}
             />
             {/* Tip content — text-sm text-secondary leading-relaxed */}
             <pixiBitmapText
               text={tip.content}
-              style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 12, fill: 0xffffff }}
+              style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 14, fill: 0xffffff }}
               tint={secondaryColor}
               layout={{ maxWidth: W - 80 }}
             />
@@ -418,7 +418,7 @@ export const PixiTipOfTheDay: React.FC<PixiTipOfTheDayProps> = ({
         ) : (
           <pixiBitmapText
             text="Showing recent updates"
-            style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 11, fill: 0xffffff }}
+            style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 13, fill: 0xffffff }}
             tint={mutedColor}
             layout={{}}
           />

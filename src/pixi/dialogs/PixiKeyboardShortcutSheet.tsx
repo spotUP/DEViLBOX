@@ -125,7 +125,7 @@ const SectionBlock: React.FC<{ section: ShortcutSection }> = ({ section }) => {
     <layoutContainer layout={{ flexDirection: 'column', gap: 2 }}>
       <pixiBitmapText
         text={section.title.toUpperCase()}
-        style={{ fontFamily: PIXI_FONTS.SANS_BOLD, fontSize: 10, fill: 0xffffff }}
+        style={{ fontFamily: PIXI_FONTS.SANS_BOLD, fontSize: 12, fill: 0xffffff }}
         tint={0x60A5FA}
         layout={{ marginBottom: 4 }}
       />
@@ -143,13 +143,13 @@ const SectionBlock: React.FC<{ section: ShortcutSection }> = ({ section }) => {
         >
           <pixiBitmapText
             text={s.keys}
-            style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }}
+            style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 12, fill: 0xffffff }}
             tint={KEY_COLOR}
             layout={{}}
           />
           <pixiBitmapText
             text={s.action}
-            style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 10, fill: 0xffffff }}
+            style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 12, fill: 0xffffff }}
             tint={theme.textSecondary.color}
             layout={{}}
           />
@@ -236,7 +236,7 @@ export const PixiKeyboardShortcutSheet: React.FC<PixiKeyboardShortcutSheetProps>
       <PixiModalFooter width={700}>
         <pixiBitmapText
           text="Press Esc to close | Ctrl/Cmd shown as Ctrl (use Cmd on macOS)"
-          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }}
+          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 11, fill: 0xffffff }}
           tint={theme.textMuted.color}
           layout={{}}
         />

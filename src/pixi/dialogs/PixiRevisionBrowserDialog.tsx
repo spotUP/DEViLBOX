@@ -102,19 +102,19 @@ export const PixiRevisionBrowserDialog: React.FC<PixiRevisionBrowserDialogProps>
                 <layoutContainer layout={{ flex: 1, flexDirection: 'column', gap: 2 }}>
                   <pixiBitmapText
                     text={truncate(rev.name)}
-                    style={{ fontFamily: PIXI_FONTS.SANS_BOLD, fontSize: 12, fill: 0xffffff }}
+                    style={{ fontFamily: PIXI_FONTS.SANS_BOLD, fontSize: 14, fill: 0xffffff }}
                     tint={theme.text.color}
                     layout={{}}
                   />
                   <pixiBitmapText
                     text={formatDate(rev.savedAt)}
-                    style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 10, fill: 0xffffff }}
+                    style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 12, fill: 0xffffff }}
                     tint={theme.textMuted.color}
                     layout={{}}
                   />
                   <pixiBitmapText
                     text={`${rev.patternCount} pattern${rev.patternCount !== 1 ? 's' : ''}, ${rev.instrumentCount} instrument${rev.instrumentCount !== 1 ? 's' : ''}`}
-                    style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 10, fill: 0xffffff }}
+                    style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 12, fill: 0xffffff }}
                     tint={theme.textMuted.color}
                     layout={{}}
                   />

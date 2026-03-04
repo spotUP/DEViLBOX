@@ -73,7 +73,7 @@ export const PixiAddToHomeScreenModal: React.FC<PixiAddToHomeScreenModalProps> =
           <layoutContainer layout={{ flexDirection: 'column', alignItems: 'center', paddingTop: 32, paddingBottom: 32, gap: 16 }}>
             <pixiBitmapText
               text="✓"
-              style={{ fontFamily: PIXI_FONTS.SANS_BOLD, fontSize: 48, fill: 0xffffff }}
+              style={{ fontFamily: PIXI_FONTS.SANS_BOLD, fontSize: 50, fill: 0xffffff }}
               tint={theme.success.color}
               layout={{}}
             />

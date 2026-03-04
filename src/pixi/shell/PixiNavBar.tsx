@@ -164,7 +164,7 @@ export const PixiNavBar: React.FC = () => {
         {/* Logo */}
         <pixiBitmapText
           text="DEViLBOX"
-          style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 14, fill: 0xffffff }}
+          style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 16, fill: 0xffffff }}
           tint={theme.accent.color}
           layout={{ marginRight: 12 }}
         />

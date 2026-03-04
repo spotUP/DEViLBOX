@@ -46,7 +46,7 @@ export const PixiCheckbox: React.FC<PixiCheckboxProps> = ({
       {label && (
         <pixiBitmapText
           text={label}
-          style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 11, fill: 0xffffff }}
+          style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 13, fill: 0xffffff }}
           tint={checked ? theme.text.color : theme.textSecondary.color}
           layout={{}}
         />

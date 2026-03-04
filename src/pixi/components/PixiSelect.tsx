@@ -88,7 +88,7 @@ export const PixiDropdownPanel: React.FC<PixiDropdownPanelProps> = ({
           >
             <pixiBitmapText
               text={opt.label}
-              style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 11, fill: 0xffffff }}
+              style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 13, fill: 0xffffff }}
               tint={isGroup ? theme.textMuted.color : opt.disabled ? theme.textMuted.color : theme.text.color}
               alpha={isGroup ? 0.7 : opt.disabled ? 0.4 : 1}
               layout={{}}
@@ -213,15 +213,15 @@ export const PixiSelect: React.FC<PixiSelectProps> = ({
     >
       <pixiBitmapText
         text={selectedLabel}
-        style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 11, fill: 0xffffff }}
+        style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 13, fill: 0xffffff }}
         tint={theme.textSecondary.color}
-        layout={{ position: 'absolute', left: 6, top: (height - 11) / 2 }}
+        layout={{ position: 'absolute', left: 6, top: (height - 13) / 2 }}
       />
       <pixiBitmapText
         text="▾"
-        style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 10, fill: 0xffffff }}
+        style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 12, fill: 0xffffff }}
         tint={theme.textMuted.color}
-        layout={{ position: 'absolute', left: width - 14, top: (height - 10) / 2 }}
+        layout={{ position: 'absolute', left: width - 14, top: (height - 12) / 2 }}
       />
     </layoutContainer>
   );
