@@ -252,8 +252,7 @@ export const MasterEffectsPanel: React.FC<MasterEffectsPanelProps> = ({ onEditEf
 
   const userPresets = getUserPresets();
 
-  // Group factory presets by category (ordered: new/interesting first)
-  const CATEGORY_ORDER = ['Neural', 'Genre', 'DJ', 'Warm', 'Clean', 'Loud', 'Wide', 'Vinyl'];
+  // Group factory presets by category, sorted alphabetically
   const presetsByCategory = MASTER_FX_PRESETS.reduce((acc, preset) => {
     if (!acc[preset.category]) {
       acc[preset.category] = [];
@@ -261,6 +260,7 @@ export const MasterEffectsPanel: React.FC<MasterEffectsPanelProps> = ({ onEditEf
     acc[preset.category].push(preset);
     return acc;
   }, {} as Record<string, MasterFxPreset[]>);
+  const sortedCategories = Object.keys(presetsByCategory).sort();
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -395,14 +395,12 @@ export const MasterEffectsPanel: React.FC<MasterEffectsPanelProps> = ({ onEditEf
                 )}
 
                 {/* Factory Presets by Category */}
-                {CATEGORY_ORDER
-                  .filter(cat => presetsByCategory[cat])
-                  .map((category) => (
+                {sortedCategories.map((category) => (
                   <div key={category}>
                     <div className="px-3 py-2 text-xs text-text-muted font-medium uppercase tracking-wide bg-dark-bgTertiary">
                       {category}
                     </div>
-                    {presetsByCategory[category].map((preset) => (
+                    {[...presetsByCategory[category]].sort((a, b) => a.name.localeCompare(b.name)).map((preset) => (
                       <div
                         key={preset.name}
                         onClick={() => handleLoadPreset(preset)}

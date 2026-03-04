@@ -86,13 +86,28 @@ function buildPresetOptions(): SelectOption[] {
   const opts: SelectOption[] = [{ value: '', label: 'Load preset…' }];
 
   if (userPresets.length > 0) {
-    userPresets.forEach((p, i) => {
-      opts.push({ value: `user:${i}`, label: `★ ${p.name}` });
-    });
+    [...userPresets]
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .forEach((p) => {
+        const origIdx = userPresets.indexOf(p);
+        opts.push({ value: `user:${origIdx}`, label: `★ ${p.name}` });
+      });
   }
 
+  // Group by category, sort categories and presets alphabetically
+  const byCategory: Record<string, { preset: typeof MASTER_FX_PRESETS[0]; index: number }[]> = {};
   MASTER_FX_PRESETS.forEach((p, i) => {
-    opts.push({ value: `factory:${i}`, label: `${p.category} — ${p.name}` });
+    if (!byCategory[p.category]) byCategory[p.category] = [];
+    byCategory[p.category].push({ preset: p, index: i });
+  });
+
+  Object.keys(byCategory).sort().forEach((cat) => {
+    opts.push({ value: '__group__', label: cat });
+    byCategory[cat]
+      .sort((a, b) => a.preset.name.localeCompare(b.preset.name))
+      .forEach(({ preset, index }) => {
+        opts.push({ value: `factory:${index}`, label: preset.name });
+      });
   });
 
   return opts;

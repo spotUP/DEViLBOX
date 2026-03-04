@@ -251,8 +251,7 @@ export const MasterEffectsModal: React.FC<MasterEffectsModalProps> = ({ isOpen, 
 
   const userPresets = getUserPresets();
 
-  // Group factory presets by category (ordered: new/interesting first)
-  const CATEGORY_ORDER = ['Neural', 'Genre', 'DJ', 'Warm', 'Clean', 'Loud', 'Wide', 'Vinyl'];
+  // Group factory presets by category, sorted alphabetically
   const presetsByCategory = MASTER_FX_PRESETS.reduce((acc, preset) => {
     if (!acc[preset.category]) {
       acc[preset.category] = [];
@@ -260,6 +259,7 @@ export const MasterEffectsModal: React.FC<MasterEffectsModalProps> = ({ isOpen, 
     acc[preset.category].push(preset);
     return acc;
   }, {} as Record<string, MasterFxPreset[]>);
+  const sortedCategories = Object.keys(presetsByCategory).sort();
 
   // Group effects by category for the add menu, filtered by search
   const effectsByGroup = getEffectsByGroup();
@@ -339,14 +339,12 @@ export const MasterEffectsModal: React.FC<MasterEffectsModalProps> = ({ isOpen, 
                   )}
 
                   {/* Factory Presets by Category */}
-                  {CATEGORY_ORDER
-                    .filter(cat => presetsByCategory[cat])
-                    .map((category) => (
+                  {sortedCategories.map((category) => (
                     <div key={category}>
                       <div className="px-4 py-2 text-xs text-text-muted font-medium uppercase tracking-wide bg-dark-bgTertiary sticky top-0">
                         {category}
                       </div>
-                      {presetsByCategory[category].map((preset) => (
+                      {[...presetsByCategory[category]].sort((a, b) => a.name.localeCompare(b.name)).map((preset) => (
                         <div
                           key={preset.name}
                           onClick={() => handleLoadPreset(preset)}
