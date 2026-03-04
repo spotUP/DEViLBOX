@@ -28,6 +28,18 @@ import { Div, Txt } from '../layout';
 
 /* ── Constants ──────────────────────────────────────────────────────────────── */
 
+const VIEW_MODE_OPTIONS: SelectOption[] = [
+  { value: 'tracker',     label: 'Tracker' },
+  { value: 'grid',        label: 'Grid' },
+  { value: 'pianoroll',   label: 'Piano Roll' },
+  { value: 'tb303',       label: 'TB-303' },
+  { value: 'arrangement', label: 'Arrangement' },
+  { value: 'dj',          label: 'DJ Mixer' },
+  { value: 'drumpad',     label: 'Drum Pads' },
+  { value: 'vj',          label: 'VJ View' },
+  { value: 'studio',      label: 'Studio' },
+];
+
 const PAD_SIZE = 64;
 const PAD_GAP = 6;
 const GRID_COLS = 4;
@@ -295,6 +307,19 @@ export const PixiDrumPadManager: React.FC = () => {
     [],
   );
 
+  const handleViewModeChange = useCallback((val: string) => {
+    if (val === 'drumpad') return; // already here
+    if (val === 'tracker' || val === 'grid' || val === 'tb303') {
+      const store = useUIStore.getState();
+      setTimeout(() => {
+        store.setActiveView('tracker');
+        store.setTrackerViewMode(val as any);
+      }, 0);
+    } else {
+      setTimeout(() => useUIStore.getState().setActiveView(val as any), 0);
+    }
+  }, []);
+
   /* ── Layout ── */
   const gridW = GRID_COLS * PAD_SIZE + (GRID_COLS - 1) * PAD_GAP;
   const gridH = GRID_ROWS * PAD_SIZE + (GRID_ROWS - 1) * PAD_GAP;
@@ -321,6 +346,13 @@ export const PixiDrumPadManager: React.FC = () => {
         }}
       >
         <Div className="flex-row items-center gap-3">
+          <PixiSelect
+            options={VIEW_MODE_OPTIONS}
+            value="drumpad"
+            onChange={handleViewModeChange}
+            width={110}
+            height={24}
+          />
           <Txt className="text-sm font-bold text-accent-primary">DRUM PADS</Txt>
           <Txt className="text-xs text-text-muted">MPC-style 64-pad drum machine</Txt>
         </Div>
