@@ -72,10 +72,15 @@ export const PixiMainLayout: React.FC = () => {
   const thumbnailsRef = useRef<Record<string, Texture>>({});
   const [thumbnails, setThumbnails] = useState<Record<string, Texture>>({});
 
-  const mainViewH = height - MODERN_NAV_H - MODERN_STATUS_BAR_H;
+  const mainViewH = isFullscreenView
+    ? height
+    : height - MODERN_NAV_H - MODERN_STATUS_BAR_H;
 
   // Determine which view component to render
   const mainViewId = resolveMainView(activeView);
+
+  // Fullscreen views hide nav + status bar (matching DOM AppLayout.isFullscreenView)
+  const isFullscreenView = mainViewId === 'vj';
 
   // ─── Thumbnail capture for Exposé ──────────────────────────────────────────
 
@@ -193,10 +198,12 @@ export const PixiMainLayout: React.FC = () => {
 
   return (
     <pixiContainer layout={{ width, height, flexDirection: 'column' }}>
-      {/* NavBar */}
-      <pixiContainer zIndex={100} layout={{ width, height: MODERN_NAV_H, flexShrink: 0 }}>
-        <PixiNavBar />
-      </pixiContainer>
+      {/* NavBar — hidden in fullscreen views (VJ) */}
+      {!isFullscreenView && (
+        <pixiContainer zIndex={100} layout={{ width, height: MODERN_NAV_H, flexShrink: 0 }}>
+          <PixiNavBar />
+        </pixiContainer>
+      )}
 
       {/* Main view zone — always-mounted views are stacked; only the active one is visible.
           WorkbenchContainer is conditionally mounted (it has its own sub-views that
@@ -250,10 +257,12 @@ export const PixiMainLayout: React.FC = () => {
         )}
       </pixiContainer>
 
-      {/* Status bar */}
-      <pixiContainer zIndex={100} layout={{ width, height: MODERN_STATUS_BAR_H, flexShrink: 0 }}>
-        <PixiStatusBar />
-      </pixiContainer>
+      {/* Status bar — hidden in fullscreen views (VJ) */}
+      {!isFullscreenView && (
+        <pixiContainer zIndex={100} layout={{ width, height: MODERN_STATUS_BAR_H, flexShrink: 0 }}>
+          <PixiStatusBar />
+        </pixiContainer>
+      )}
 
       {/* View Exposé overlay — macOS Mission Control style view switcher */}
       <pixiContainer
