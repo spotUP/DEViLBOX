@@ -331,70 +331,73 @@ export const PixiTipOfTheDay: React.FC<PixiTipOfTheDayProps> = ({
           backgroundColor: contentBg,
         }}
       >
-        {activeTab === 'tips' ? (
-          /* Tips — centered layout, p-8 */
+        {/* Always mount both tabs to avoid Yoga BindingError on tab switch */}
+        <layoutContainer
+          visible={activeTab === 'tips'}
+          layout={activeTab === 'tips' ? {
+            flex: 1,
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 32,
+            gap: 16,
+          } : { width: 0, height: 0, overflow: 'hidden' }}
+        >
+          {/* Info circle icon — w-16 h-16 rounded-full */}
           <layoutContainer
             layout={{
-              flex: 1,
-              flexDirection: 'column',
-              alignItems: 'center',
+              width: 64, height: 64,
               justifyContent: 'center',
-              padding: 32,
-              gap: 16,
+              alignItems: 'center',
+              backgroundColor: isCyan ? 0x003333 : 0x2a0808,
+              borderRadius: 32,
+              marginBottom: 8,
             }}
           >
-            {/* Info circle icon — w-16 h-16 rounded-full */}
-            <layoutContainer
-              layout={{
-                width: 64, height: 64,
-                justifyContent: 'center',
-                alignItems: 'center',
-                backgroundColor: isCyan ? 0x003333 : 0x2a0808,
-                borderRadius: 32,
-                marginBottom: 8,
-              }}
-            >
-              <pixiBitmapText
-                text="ℹ"
-                style={{ fontFamily: PIXI_FONTS.SANS_BOLD, fontSize: 30, fill: 0xffffff }}
-                tint={accentColor}
-                layout={{}}
-              />
-            </layoutContainer>
-
-            {/* Tip title — text-xl font-bold */}
             <pixiBitmapText
-              text={tip.title}
-              style={{ fontFamily: PIXI_FONTS.SANS_BOLD, fontSize: 20, fill: 0xffffff }}
+              text="ℹ"
+              style={{ fontFamily: PIXI_FONTS.SANS_BOLD, fontSize: 30, fill: 0xffffff }}
               tint={accentColor}
               layout={{}}
             />
-            {/* Tip content — text-sm text-secondary leading-relaxed */}
-            <pixiBitmapText
-              text={tip.content}
-              style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 14, fill: 0xffffff }}
-              tint={secondaryColor}
-              layout={{ maxWidth: W - 80 }}
+          </layoutContainer>
+
+          {/* Tip title — text-xl font-bold */}
+          <pixiBitmapText
+            text={tip.title}
+            style={{ fontFamily: PIXI_FONTS.SANS_BOLD, fontSize: 20, fill: 0xffffff }}
+            tint={accentColor}
+            layout={{}}
+          />
+          {/* Tip content — text-sm text-secondary leading-relaxed */}
+          <pixiBitmapText
+            text={tip.content}
+            style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 14, fill: 0xffffff }}
+            tint={secondaryColor}
+            layout={{ maxWidth: W - 80 }}
+          />
+          {/* Category badge */}
+          <CategoryBadge category={tip.category} accentColor={accentColor} isCyan={isCyan} />
+        </layoutContainer>
+
+        <layoutContainer
+          visible={activeTab === 'changelog'}
+          layout={activeTab === 'changelog' ? {
+            flexDirection: 'column',
+          } : { width: 0, height: 0, overflow: 'hidden' }}
+        >
+          {CHANGELOG.slice(0, 5).map((entry, idx) => (
+            <VersionEntry
+              key={entry.version}
+              entry={entry}
+              isLatest={idx === 0}
+              accentColor={accentColor}
+              mutedColor={mutedColor}
+              secondaryColor={secondaryColor}
+              isCyan={isCyan}
             />
-            {/* Category badge */}
-            <CategoryBadge category={tip.category} accentColor={accentColor} isCyan={isCyan} />
-          </layoutContainer>
-        ) : (
-          /* Changelog — scrollable list */
-          <layoutContainer layout={{ flexDirection: 'column' }}>
-            {CHANGELOG.slice(0, 5).map((entry, idx) => (
-              <VersionEntry
-                key={entry.version}
-                entry={entry}
-                isLatest={idx === 0}
-                accentColor={accentColor}
-                mutedColor={mutedColor}
-                secondaryColor={secondaryColor}
-                isCyan={isCyan}
-              />
-            ))}
-          </layoutContainer>
-        )}
+          ))}
+        </layoutContainer>
       </layoutContainer>
 
       {/* ── Nav Footer ── px-6 py-4 border-t bg-black/20 */}
@@ -410,19 +413,21 @@ export const PixiTipOfTheDay: React.FC<PixiTipOfTheDayProps> = ({
           backgroundColor: navFooterBg,
         }}
       >
-        {activeTab === 'tips' ? (
-          <layoutContainer layout={{ flexDirection: 'row', gap: 8 }}>
-            <PixiButton label="◀" variant="default" size="sm" onClick={handlePrev} width={36} height={32} />
-            <PixiButton label="▶" variant="default" size="sm" onClick={handleNext} width={36} height={32} />
-          </layoutContainer>
-        ) : (
-          <pixiBitmapText
-            text="Showing recent updates"
-            style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 13, fill: 0xffffff }}
-            tint={mutedColor}
-            layout={{}}
-          />
-        )}
+        {/* Always mount both nav variants to avoid Yoga BindingError */}
+        <layoutContainer
+          visible={activeTab === 'tips'}
+          layout={activeTab === 'tips' ? { flexDirection: 'row', gap: 8 } : { width: 0, height: 0, overflow: 'hidden' }}
+        >
+          <PixiButton label="◀" variant="default" size="sm" onClick={handlePrev} width={36} height={32} />
+          <PixiButton label="▶" variant="default" size="sm" onClick={handleNext} width={36} height={32} />
+        </layoutContainer>
+        <pixiBitmapText
+          visible={activeTab === 'changelog'}
+          text="Showing recent updates"
+          style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 13, fill: 0xffffff }}
+          tint={mutedColor}
+          layout={activeTab === 'changelog' ? {} : { width: 0, height: 0 }}
+        />
         <PixiCheckbox
           checked={showAtStartup}
           onChange={toggleStartup}
