@@ -55,6 +55,7 @@ import {
   Music,
   Layers,
   ExternalLink,
+  Piano,
 } from 'lucide-react';
 import { useUIStore } from '../../stores';
 import { focusPopout } from '../ui/PopOutWindow';
@@ -962,6 +963,27 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ channelIndex }) => {
     <div ref={containerRef} className="flex flex-col h-full w-full bg-dark-bgSecondary" role="application" aria-label="Piano roll editor">
       {/* Toolbar */}
       <div className="flex items-center gap-2 px-3 py-2 border-b border-dark-border bg-dark-bgTertiary shrink-0 flex-wrap">
+        {/* View mode selector */}
+        <div className="flex items-center gap-1">
+          <Piano size={14} className="shrink-0 text-text-secondary" />
+          <select
+            value="pianoroll"
+            onChange={(e) => useUIStore.getState().setActiveView(e.target.value as any)}
+            className="px-2 py-1 text-xs bg-dark-bgSecondary text-text-primary border border-dark-border rounded hover:bg-dark-bgHover transition-colors"
+            title="Select editor view"
+          >
+            <option value="tracker">Tracker</option>
+            <option value="pianoroll">Piano Roll</option>
+            <option value="arrangement">Arrangement</option>
+            <option value="dj">DJ Mixer</option>
+            <option value="drumpad">Drum Pads</option>
+            <option value="vj">VJ View</option>
+            <option value="mixer">Mixer</option>
+          </select>
+        </div>
+
+        <div className="w-px h-4 bg-dark-border" />
+
         {/* Tool buttons */}
         <div className="flex items-center bg-dark-bg rounded-md p-0.5" role="toolbar" aria-label="Editing tools">
           <button
