@@ -1,0 +1,793 @@
+/**
+ * PixiSIDInfoModal — GL-native SID file info dialog.
+ * Shows SID metadata, composer profile, tags, YouTube links, discography,
+ * SID player usage, career info, and external links.
+ *
+ * GL replacement for src/components/dialogs/SIDInfoModal.tsx
+ */
+
+import React, { useCallback, useEffect, useState } from 'react';
+import { useTrackerStore } from '@stores';
+import { useShallow } from 'zustand/react/shallow';
+import { notify } from '@stores/useNotificationStore';
+import { useSettingsStore } from '@stores/useSettingsStore';
+import { SID_ENGINES } from '@engine/deepsid/DeepSIDEngineManager';
+import type { SIDEngineType } from '@engine/deepsid/DeepSIDEngineManager';
+import {
+  fetchComposerProfile,
+  fetchComposerTunes,
+  fetchFileInfoByPath,
+} from '@/lib/sid/composerApi';
+import type {
+  ComposerProfile as ComposerData,
+  DeepSIDFileInfo,
+  ComposerTune,
+} from '@/lib/sid/composerApi';
+import { downloadHVSCFile } from '@/lib/hvscApi';
+import { loadFile } from '@/lib/file/UnifiedFileLoader';
+import { PixiModal, PixiModalHeader, PixiModalFooter, PixiButton, PixiLabel, PixiScrollView, PixiSelect } from '../components';
+import type { SelectOption } from '../components';
+import { usePixiTheme } from '../theme';
+import { PIXI_FONTS } from '../fonts';
+
+interface PixiSIDInfoModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+}
+
+const W = 800;
+const H = 560;
+const CONTENT_W = W - 24; // padding 12 each side
+const COL_W = (CONTENT_W - 12) / 2; // two columns with 12px gap
+
+// ── Utility ─────────────────────────────────────────────────────────────────
+
+/** Tiny badge: colored background + text */
+const Badge: React.FC<{
+  text: string;
+  bg: number;
+  fg: number;
+}> = ({ text, bg, fg }) => (
+  <layoutContainer
+    layout={{
+      paddingLeft: 6,
+      paddingRight: 6,
+      paddingTop: 2,
+      paddingBottom: 2,
+      borderRadius: 4,
+      backgroundColor: bg,
+    }}
+  >
+    <pixiBitmapText
+      text={text}
+      style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }}
+      tint={fg}
+      layout={{}}
+    />
+  </layoutContainer>
+);
+
+/** Clickable link text → opens URL in browser */
+const LinkButton: React.FC<{
+  text: string;
+  url: string;
+  tint: number;
+  fontSize?: number;
+}> = ({ text, url, tint, fontSize = 10 }) => (
+  <layoutContainer
+    eventMode="static"
+    cursor="pointer"
+    onPointerUp={() => window.open(url, '_blank')}
+    layout={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}
+  >
+    <pixiBitmapText
+      text={text}
+      style={{ fontFamily: PIXI_FONTS.SANS, fontSize, fill: 0xffffff }}
+      tint={tint}
+      layout={{}}
+    />
+    <pixiBitmapText
+      text="↗"
+      style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 8, fill: 0xffffff }}
+      tint={tint}
+      alpha={0.5}
+      layout={{}}
+    />
+  </layoutContainer>
+);
+
+/** Key-value row */
+const InfoRow: React.FC<{
+  label: string;
+  value: string;
+  labelColor: number;
+  valueColor: number;
+  width?: number;
+}> = ({ label, value, labelColor, valueColor, width }) => (
+  <layoutContainer
+    layout={{
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      width,
+    }}
+  >
+    <pixiBitmapText
+      text={label}
+      style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 10, fill: 0xffffff }}
+      tint={labelColor}
+      layout={{}}
+    />
+    <pixiBitmapText
+      text={value}
+      style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 10, fill: 0xffffff }}
+      tint={valueColor}
+      layout={{}}
+    />
+  </layoutContainer>
+);
+
+// ── Main Component ──────────────────────────────────────────────────────────
+
+export const PixiSIDInfoModal: React.FC<PixiSIDInfoModalProps> = ({ isOpen, onClose }) => {
+  const theme = usePixiTheme();
+
+  const { sidMetadata, setSidMetadata, songDBInfo } = useTrackerStore(
+    useShallow((state) => ({
+      sidMetadata: state.sidMetadata,
+      setSidMetadata: state.setSidMetadata,
+      songDBInfo: state.songDBInfo,
+    }))
+  );
+
+  const sidEngine = useSettingsStore((s) => s.sidEngine);
+  const setSidEngine = useSettingsStore((s) => s.setSidEngine);
+
+  const [composer, setComposer] = useState<ComposerData | null>(null);
+  const [composerLoading, setComposerLoading] = useState(false);
+  const [fileInfo, setFileInfo] = useState<DeepSIDFileInfo | null>(null);
+  const [tunes, setTunes] = useState<ComposerTune[]>([]);
+  const [tunesTotal, setTunesTotal] = useState(0);
+  const [showAllTunes, setShowAllTunes] = useState(false);
+  const [loadingTuneId, setLoadingTuneId] = useState<number | null>(null);
+
+  // ── Callbacks ──────────────────────────────────────────────────────────────
+
+  const handleLoadTune = useCallback(
+    async (tune: ComposerTune) => {
+      if (loadingTuneId !== null) return;
+      setLoadingTuneId(tune.id);
+      try {
+        const buffer = await downloadHVSCFile(tune.path);
+        const file = new File([buffer], tune.filename || tune.path.split('/').pop() || 'tune.sid');
+        const result = await loadFile(file, { requireConfirmation: false });
+        if (result.success === true) {
+          notify.success(result.message);
+          onClose();
+        } else if (result.success === false) {
+          notify.error(result.error);
+        }
+      } catch (err) {
+        notify.error(err instanceof Error ? err.message : 'Failed to load tune');
+      } finally {
+        setLoadingTuneId(null);
+      }
+    },
+    [loadingTuneId, onClose]
+  );
+
+  const handleSubsongChange = useCallback(
+    async (newIdx: number) => {
+      if (!sidMetadata || newIdx === sidMetadata.currentSubsong) return;
+      try {
+        const { getTrackerReplayer } = await import('@engine/TrackerReplayer');
+        const engine = getTrackerReplayer().getC64SIDEngine();
+        if (engine) {
+          engine.setSubsong(newIdx);
+          setSidMetadata({ ...sidMetadata, currentSubsong: newIdx });
+          notify.success(`SID Subsong ${newIdx + 1}/${sidMetadata.subsongs}`);
+        }
+      } catch {
+        notify.error('Failed to switch SID subsong');
+      }
+    },
+    [sidMetadata, setSidMetadata]
+  );
+
+  const handleEngineChange = useCallback(
+    (value: string) => {
+      const engine = value as SIDEngineType;
+      setSidEngine(engine);
+      notify.success(`SID engine changed to ${SID_ENGINES[engine].name}`);
+    },
+    [setSidEngine]
+  );
+
+  const handleSubsongPrev = useCallback(() => {
+    if (!sidMetadata) return;
+    const next = (sidMetadata.currentSubsong - 1 + sidMetadata.subsongs) % sidMetadata.subsongs;
+    handleSubsongChange(next);
+  }, [sidMetadata, handleSubsongChange]);
+
+  const handleSubsongNext = useCallback(() => {
+    if (!sidMetadata) return;
+    const next = (sidMetadata.currentSubsong + 1) % sidMetadata.subsongs;
+    handleSubsongChange(next);
+  }, [sidMetadata, handleSubsongChange]);
+
+  // ── Data fetching ──────────────────────────────────────────────────────────
+
+  useEffect(() => {
+    if (!sidMetadata?.author) return;
+    setComposerLoading(true);
+    fetchComposerProfile({ author: sidMetadata.author })
+      .then((result) => {
+        if (result.found) setComposer(result);
+      })
+      .finally(() => setComposerLoading(false));
+  }, [sidMetadata?.author]);
+
+  useEffect(() => {
+    if (!sidMetadata?.title) return;
+    if (composer?.fullname && sidMetadata.title) {
+      fetchFileInfoByPath(
+        composer.fullname + '/' + sidMetadata.title.replace(/\s+/g, '_') + '.sid'
+      ).then((info) => {
+        if (info) setFileInfo(info);
+      });
+    }
+  }, [composer?.fullname, sidMetadata?.title]);
+
+  useEffect(() => {
+    if (!sidMetadata?.author) return;
+    fetchComposerTunes({ author: sidMetadata.author, limit: 50 }).then((result) => {
+      setTunes(result.tunes);
+      setTunesTotal(result.total);
+    });
+  }, [sidMetadata?.author]);
+
+  // ── Early return ───────────────────────────────────────────────────────────
+
+  if (!isOpen || !sidMetadata) return null;
+
+  // ── Derived data ───────────────────────────────────────────────────────────
+
+  const chipLabel = sidMetadata.chipModel !== 'Unknown' ? `MOS ${sidMetadata.chipModel}` : 'Unknown';
+  const clockLabel = sidMetadata.clockSpeed !== 'Unknown' ? sidMetadata.clockSpeed : 'Unknown';
+  const chipCount = 1 + (sidMetadata.secondSID ? 1 : 0) + (sidMetadata.thirdSID ? 1 : 0);
+
+  const durationMs = songDBInfo?.duration_ms;
+  const durationStr = durationMs
+    ? `${Math.floor(durationMs / 60000)}:${String(Math.floor((durationMs % 60000) / 1000)).padStart(2, '0')}`
+    : null;
+
+  const birthYear = composer?.born ? parseInt(composer.born.slice(0, 4)) : null;
+  const deathYear = composer?.died ? parseInt(composer.died.slice(0, 4)) : null;
+  const currentAge = birthYear && !deathYear ? new Date().getFullYear() - birthYear : null;
+  const deathAge = birthYear && deathYear ? deathYear - birthYear : null;
+
+  const genreTags = composer?.tags.filter((t) => t.type === 'GENRE') ?? [];
+  const prodTags = composer?.tags.filter((t) => t.type === 'PRODUCTION') ?? [];
+  const fileTags = fileInfo?.tags ?? [];
+
+  const youtubeLinks = fileInfo?.youtube ?? [];
+  const displayTunes = showAllTunes ? tunes : tunes.slice(0, 10);
+
+  // Engine select options
+  const engineOptions: SelectOption[] = Object.values(SID_ENGINES).map((eng) => ({
+    value: eng.id,
+    label: `${eng.name} — ${eng.accuracy}, ${eng.speed}`,
+  }));
+
+  // ── Estimated content height for scroll view ──────────────────────────────
+
+  const topRowH = 250;
+  const youtubeH = youtubeLinks.length > 0 ? 24 + youtubeLinks.length * 22 : 0;
+  const bottomGridH =
+    composer && (composer.players.length > 0 || composer.employment.length > 0 || composer.links.length > 0)
+      ? 160
+      : 0;
+  const discoH = tunes.length > 0 ? 24 + displayTunes.length * 18 + (tunes.length > 10 ? 24 : 0) : 0;
+  const totalContentH = topRowH + youtubeH + bottomGridH + discoH + 60; // padding
+
+  const scrollH = H - 36 - 44; // minus header and footer
+
+  return (
+    <PixiModal isOpen={isOpen} onClose={onClose} width={W} height={H}>
+      <PixiModalHeader title="SID File Info" width={W} onClose={onClose} />
+
+      {/* ═══ Scrollable content ═══ */}
+      <PixiScrollView width={CONTENT_W + 24} height={scrollH} contentHeight={totalContentH}>
+        <layoutContainer
+          layout={{
+            width: CONTENT_W,
+            flexDirection: 'column',
+            padding: 12,
+            gap: 12,
+          }}
+        >
+          {/* Format badge */}
+          <layoutContainer layout={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+            <Badge text={`${sidMetadata.format}v${sidMetadata.version}`} bg={0x1e3a5f} fg={0x93c5fd} />
+            {chipCount > 1 && <Badge text={`${chipCount}× SID`} bg={0x3b1f5f} fg={0xc4b5fd} />}
+          </layoutContainer>
+
+          {/* ─── Top Row: two columns ─── */}
+          <layoutContainer layout={{ flexDirection: 'row', gap: 12, width: CONTENT_W }}>
+            {/* ─ Left column: SID file details ─ */}
+            <layoutContainer layout={{ width: COL_W, flexDirection: 'column', gap: 8 }}>
+              {/* Title / Author / Copyright card */}
+              <layoutContainer
+                layout={{
+                  width: COL_W,
+                  flexDirection: 'column',
+                  gap: 4,
+                  padding: 10,
+                  borderRadius: 6,
+                  borderWidth: 1,
+                  backgroundColor: 0x0c1e3a,
+                  borderColor: 0x1e3a5f,
+                }}
+              >
+                <PixiLabel text={sidMetadata.title || 'Untitled'} size="sm" weight="semibold" color="text" />
+                <PixiLabel text={sidMetadata.author || 'Unknown'} size="xs" color="textSecondary" />
+                {sidMetadata.copyright ? (
+                  <PixiLabel text={sidMetadata.copyright} size="xs" color="textMuted" />
+                ) : null}
+
+                {/* Chip / Clock / Duration */}
+                <layoutContainer
+                  layout={{
+                    flexDirection: 'row',
+                    gap: 12,
+                    alignItems: 'center',
+                    marginTop: 4,
+                    borderTopWidth: 1,
+                    borderColor: 0x1e3a5f,
+                    paddingTop: 6,
+                  }}
+                >
+                  <PixiLabel text={`${chipLabel}${chipCount > 1 ? ` × ${chipCount}` : ''}`} size="xs" color="accent" />
+                  <PixiLabel text={clockLabel} size="xs" color="textSecondary" />
+                  {durationStr ? (
+                    <PixiLabel text={durationStr} size="sm" weight="semibold" font="mono" color="textSecondary" />
+                  ) : null}
+                </layoutContainer>
+              </layoutContainer>
+
+              {/* Subsong selector */}
+              {sidMetadata.subsongs > 1 && (
+                <layoutContainer
+                  layout={{
+                    width: COL_W,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 6,
+                    padding: 8,
+                    borderRadius: 6,
+                    borderWidth: 1,
+                    backgroundColor: theme.bg.color,
+                    borderColor: theme.border.color,
+                  }}
+                >
+                  <PixiLabel text="Subsong:" size="xs" color="textMuted" />
+                  <PixiButton label="◀" variant="ghost" size="sm" onClick={handleSubsongPrev} />
+                  <PixiLabel
+                    text={`${sidMetadata.currentSubsong + 1} / ${sidMetadata.subsongs}`}
+                    size="xs"
+                    weight="semibold"
+                    font="mono"
+                    color="text"
+                  />
+                  <PixiButton label="▶" variant="ghost" size="sm" onClick={handleSubsongNext} />
+                </layoutContainer>
+              )}
+
+              {/* SID Engine selector */}
+              <layoutContainer
+                layout={{
+                  width: COL_W,
+                  flexDirection: 'column',
+                  gap: 4,
+                  padding: 8,
+                  borderRadius: 6,
+                  borderWidth: 1,
+                  backgroundColor: theme.bg.color,
+                  borderColor: theme.border.color,
+                }}
+              >
+                <PixiLabel text="SID Engine" size="xs" weight="semibold" color="textMuted" />
+                <PixiSelect
+                  options={engineOptions}
+                  value={sidEngine}
+                  onChange={handleEngineChange}
+                  width={COL_W - 20}
+                />
+                <PixiLabel
+                  text={SID_ENGINES[sidEngine].description}
+                  size="xs"
+                  color="textMuted"
+                />
+              </layoutContainer>
+
+              {/* SongDB Album / Year info */}
+              {songDBInfo && (songDBInfo.album || songDBInfo.year) && (
+                <layoutContainer
+                  layout={{
+                    width: COL_W,
+                    flexDirection: 'column',
+                    gap: 4,
+                    padding: 8,
+                    borderRadius: 6,
+                    borderWidth: 1,
+                    backgroundColor: theme.bg.color,
+                    borderColor: theme.border.color,
+                  }}
+                >
+                  {songDBInfo.album ? (
+                    <InfoRow label="Album" value={songDBInfo.album} labelColor={theme.textMuted.color} valueColor={theme.text.color} />
+                  ) : null}
+                  {songDBInfo.year ? (
+                    <InfoRow label="Year" value={songDBInfo.year} labelColor={theme.textMuted.color} valueColor={theme.text.color} />
+                  ) : null}
+                  {songDBInfo.publishers?.length > 0 ? (
+                    <InfoRow
+                      label="Group"
+                      value={songDBInfo.publishers.join(', ')}
+                      labelColor={theme.textMuted.color}
+                      valueColor={theme.text.color}
+                    />
+                  ) : null}
+                </layoutContainer>
+              )}
+
+              {/* File tags */}
+              {fileTags.length > 0 && (
+                <layoutContainer layout={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4 }}>
+                  {fileTags.map((t) => (
+                    <Badge
+                      key={t.name}
+                      text={t.name}
+                      bg={t.type === 'GENRE' ? 0x2e1065 : 0x14532d}
+                      fg={t.type === 'GENRE' ? 0xc4b5fd : 0x86efac}
+                    />
+                  ))}
+                </layoutContainer>
+              )}
+            </layoutContainer>
+
+            {/* ─ Right column: Composer profile ─ */}
+            <layoutContainer layout={{ width: COL_W, flexDirection: 'column', gap: 8 }}>
+              {composerLoading ? (
+                <layoutContainer
+                  layout={{
+                    width: COL_W,
+                    height: 80,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    borderRadius: 6,
+                    borderWidth: 1,
+                    backgroundColor: 0x0c1e3a,
+                    borderColor: 0x1e3a5f,
+                  }}
+                >
+                  <PixiLabel text="Loading composer…" size="xs" color="textMuted" />
+                </layoutContainer>
+              ) : composer ? (
+                <>
+                  {/* Bio card */}
+                  <layoutContainer
+                    layout={{
+                      width: COL_W,
+                      flexDirection: 'column',
+                      gap: 4,
+                      padding: 10,
+                      borderRadius: 6,
+                      borderWidth: 1,
+                      backgroundColor: 0x0c1e3a,
+                      borderColor: 0x1e3a5f,
+                    }}
+                  >
+                    <PixiLabel text={composer.name} size="sm" weight="bold" color="text" />
+                    {composer.handles.length > 0 && (
+                      <PixiLabel text={`aka ${composer.handles.join(', ')}`} size="xs" color="textMuted" />
+                    )}
+                    {composer.country && (
+                      <PixiLabel text={composer.country} size="xs" color="textSecondary" />
+                    )}
+                    {(birthYear || deathYear) && (
+                      <PixiLabel
+                        text={[
+                          birthYear ? `b. ${birthYear}` : '',
+                          deathYear ? `d. ${deathYear}` : '',
+                          currentAge ? `(age ${currentAge})` : '',
+                          deathAge ? `(age ${deathAge})` : '',
+                        ]
+                          .filter(Boolean)
+                          .join(' — ')}
+                        size="xs"
+                        color="textMuted"
+                      />
+                    )}
+                    {composer.notable && (
+                      <PixiLabel text={`★ ${composer.notable}`} size="xs" color="warning" />
+                    )}
+                  </layoutContainer>
+
+                  {/* Stats bar */}
+                  <layoutContainer layout={{ flexDirection: 'row', gap: 12, alignItems: 'center', paddingLeft: 4 }}>
+                    <PixiLabel text={`${composer.tuneCount} tunes`} size="xs" weight="semibold" color="textMuted" />
+                    {composer.activeYears.length > 0 && (
+                      <PixiLabel
+                        text={`${composer.activeYears[0]}–${composer.activeYears[composer.activeYears.length - 1]}`}
+                        size="xs"
+                        color="textMuted"
+                      />
+                    )}
+                    {composer.csdbId && (
+                      <LinkButton
+                        text="CSDb"
+                        url={`https://csdb.dk/${composer.csdbType}/?id=${composer.csdbId}`}
+                        tint={0x60a5fa}
+                      />
+                    )}
+                  </layoutContainer>
+
+                  {/* Genre & Production tags */}
+                  {(genreTags.length > 0 || prodTags.length > 0) && (
+                    <layoutContainer layout={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4, paddingLeft: 4 }}>
+                      {genreTags.map((t) => (
+                        <Badge key={t.name} text={t.name} bg={0x2e1065} fg={0xc4b5fd} />
+                      ))}
+                      {prodTags.map((t) => (
+                        <Badge key={t.name} text={t.name} bg={0x14532d} fg={0x86efac} />
+                      ))}
+                    </layoutContainer>
+                  )}
+                </>
+              ) : (
+                <layoutContainer
+                  layout={{
+                    width: COL_W,
+                    height: 80,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    borderRadius: 6,
+                    borderWidth: 1,
+                    backgroundColor: theme.bg.color,
+                    borderColor: theme.border.color,
+                  }}
+                >
+                  <PixiLabel text={`No composer profile for "${sidMetadata.author}"`} size="xs" color="textMuted" />
+                </layoutContainer>
+              )}
+            </layoutContainer>
+          </layoutContainer>
+
+          {/* ─── YouTube Links ─── */}
+          {youtubeLinks.length > 0 && (
+            <layoutContainer
+              layout={{
+                width: CONTENT_W,
+                flexDirection: 'column',
+                gap: 6,
+                padding: 10,
+                borderRadius: 6,
+                borderWidth: 1,
+                backgroundColor: 0x2d0a0a,
+                borderColor: 0x5f1e1e,
+              }}
+            >
+              <PixiLabel text="▶ YouTube Performances" size="xs" weight="semibold" color="error" />
+              <layoutContainer layout={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                {youtubeLinks.map((yt, i) => (
+                  <LinkButton
+                    key={i}
+                    text={`${yt.channel || `Performance ${i + 1}`}${yt.subtune > 0 ? ` (sub ${yt.subtune})` : ''}`}
+                    url={`https://www.youtube.com/watch?v=${yt.videoId}`}
+                    tint={0xfca5a5}
+                  />
+                ))}
+              </layoutContainer>
+            </layoutContainer>
+          )}
+
+          {/* ─── Bottom 3-column grid: Players, Career, Links ─── */}
+          {composer &&
+            (composer.players.length > 0 || composer.employment.length > 0 || composer.links.length > 0) && (
+              <layoutContainer layout={{ flexDirection: 'row', gap: 8, width: CONTENT_W }}>
+                {/* Players used */}
+                {composer.players.length > 0 && (
+                  <layoutContainer
+                    layout={{
+                      flex: 1,
+                      flexDirection: 'column',
+                      gap: 4,
+                      padding: 10,
+                      borderRadius: 6,
+                      borderWidth: 1,
+                      backgroundColor: theme.bg.color,
+                      borderColor: theme.border.color,
+                    }}
+                  >
+                    <PixiLabel text="SID Players Used" size="xs" weight="semibold" color="textMuted" />
+                    {composer.players.slice(0, 10).map((p) => {
+                      const barW = Math.max(8, (p.cnt / composer.players[0].cnt) * 60);
+                      return (
+                        <layoutContainer
+                          key={p.player}
+                          layout={{
+                            flexDirection: 'row',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            gap: 4,
+                          }}
+                        >
+                          <pixiBitmapText
+                            text={p.player}
+                            style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 10, fill: 0xffffff }}
+                            tint={theme.text.color}
+                            layout={{ flex: 1 }}
+                          />
+                          <layoutContainer
+                            layout={{
+                              width: barW,
+                              height: 4,
+                              borderRadius: 2,
+                              backgroundColor: 0x3b82f6,
+                            }}
+                          />
+                          <pixiBitmapText
+                            text={String(p.cnt)}
+                            style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }}
+                            tint={theme.textMuted.color}
+                            layout={{ width: 24 }}
+                          />
+                        </layoutContainer>
+                      );
+                    })}
+                  </layoutContainer>
+                )}
+
+                {/* Career / Employment */}
+                {composer.employment.length > 0 && (
+                  <layoutContainer
+                    layout={{
+                      flex: 1,
+                      flexDirection: 'column',
+                      gap: 4,
+                      padding: 10,
+                      borderRadius: 6,
+                      borderWidth: 1,
+                      backgroundColor: theme.bg.color,
+                      borderColor: theme.border.color,
+                    }}
+                  >
+                    <PixiLabel text="Career" size="xs" weight="semibold" color="textMuted" />
+                    {composer.employment.map((e, i) => (
+                      <InfoRow
+                        key={i}
+                        label={e.company}
+                        value={e.years}
+                        labelColor={theme.text.color}
+                        valueColor={theme.textMuted.color}
+                      />
+                    ))}
+                  </layoutContainer>
+                )}
+
+                {/* External Links */}
+                {composer.links.length > 0 && (
+                  <layoutContainer
+                    layout={{
+                      flex: 1,
+                      flexDirection: 'column',
+                      gap: 4,
+                      padding: 10,
+                      borderRadius: 6,
+                      borderWidth: 1,
+                      backgroundColor: theme.bg.color,
+                      borderColor: theme.border.color,
+                    }}
+                  >
+                    <PixiLabel text="Links" size="xs" weight="semibold" color="textMuted" />
+                    <layoutContainer layout={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4 }}>
+                      {composer.links.map((link, i) => (
+                        <LinkButton key={i} text={link.name} url={link.url} tint={0x93c5fd} />
+                      ))}
+                    </layoutContainer>
+                  </layoutContainer>
+                )}
+              </layoutContainer>
+            )}
+
+          {/* ─── Discography ─── */}
+          {tunes.length > 0 && (
+            <layoutContainer
+              layout={{
+                width: CONTENT_W,
+                flexDirection: 'column',
+                gap: 4,
+                padding: 10,
+                borderRadius: 6,
+                borderWidth: 1,
+                backgroundColor: theme.bg.color,
+                borderColor: theme.border.color,
+              }}
+            >
+              <layoutContainer layout={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>
+                <PixiLabel text="Discography" size="xs" weight="semibold" color="textMuted" />
+                <PixiLabel text={`(${tunesTotal} tunes)`} size="xs" color="textMuted" />
+              </layoutContainer>
+
+              <layoutContainer layout={{ flexDirection: 'row', flexWrap: 'wrap', gap: 2, width: CONTENT_W - 20 }}>
+                {displayTunes.map((tune) => (
+                  <layoutContainer
+                    key={tune.id}
+                    eventMode="static"
+                    cursor="pointer"
+                    onPointerUp={() => handleLoadTune(tune)}
+                    layout={{
+                      width: (CONTENT_W - 28) / 2,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 4,
+                      paddingTop: 2,
+                      paddingBottom: 2,
+                      paddingLeft: 4,
+                      borderBottomWidth: 1,
+                      borderColor: theme.border.color,
+                    }}
+                  >
+                    <pixiBitmapText
+                      text={loadingTuneId === tune.id ? '⏳' : '↓'}
+                      style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 9, fill: 0xffffff }}
+                      tint={0x3b82f6}
+                      alpha={loadingTuneId === tune.id ? 1 : 0.4}
+                      layout={{}}
+                    />
+                    <pixiBitmapText
+                      text={tune.filename}
+                      style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 10, fill: 0xffffff }}
+                      tint={theme.text.color}
+                      layout={{ flex: 1 }}
+                    />
+                    {tune.player && (
+                      <pixiBitmapText
+                        text={tune.player}
+                        style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 8, fill: 0xffffff }}
+                        tint={theme.textMuted.color}
+                        alpha={0.6}
+                        layout={{}}
+                      />
+                    )}
+                  </layoutContainer>
+                ))}
+              </layoutContainer>
+
+              {tunes.length > 10 && (
+                <layoutContainer
+                  eventMode="static"
+                  cursor="pointer"
+                  onPointerUp={() => setShowAllTunes(!showAllTunes)}
+                  layout={{ flexDirection: 'row', gap: 4, alignItems: 'center', marginTop: 4 }}
+                >
+                  <pixiBitmapText
+                    text={showAllTunes ? '▲ Show less' : `▼ Show all ${tunes.length} tunes`}
+                    style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 10, fill: 0xffffff }}
+                    tint={0x60a5fa}
+                    layout={{}}
+                  />
+                </layoutContainer>
+              )}
+            </layoutContainer>
+          )}
+        </layoutContainer>
+      </PixiScrollView>
+
+      <PixiModalFooter width={W}>
+        <PixiButton label="Close" variant="ghost" onClick={onClose} />
+      </PixiModalFooter>
+    </PixiModal>
+  );
+};
