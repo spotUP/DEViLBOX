@@ -295,7 +295,7 @@ const PianoRollStatusContent: React.FC<{ barHeight: number }> = ({ barHeight }) 
   const textLayout = useMemo(() => ({ alignSelf: 'center' as const }), []);
   const tool = usePianoRollStore(s => s.tool);
   const view = usePianoRollStore(s => s.view);
-  const channelCount = useTrackerStore(s => s.channelCount);
+  const channelCount = useTrackerStore(s => s.patterns[0]?.channels.length ?? 4);
 
   return (
     <pixiContainer layout={{ flexDirection: 'row', alignItems: 'center', flex: 1, height: barHeight }}>
@@ -389,8 +389,8 @@ const MixerStatusContent: React.FC<{ barHeight: number }> = ({ barHeight }) => {
 const StudioStatusContent: React.FC<{ barHeight: number }> = ({ barHeight }) => {
   const theme = usePixiTheme();
   const textLayout = useMemo(() => ({ alignSelf: 'center' as const }), []);
-  const windowCount = useWorkbenchStore(s => s.windows.length);
-  const zoom = useWorkbenchStore(s => s.camera.zoom);
+  const windowCount = useWorkbenchStore(s => Object.keys(s.windows).length);
+  const zoom = useWorkbenchStore(s => s.camera.scale);
 
   return (
     <pixiContainer layout={{ flexDirection: 'row', alignItems: 'center', flex: 1, height: barHeight }}>
