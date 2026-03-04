@@ -9,11 +9,13 @@
  * that have no parent layout to resolve percentages against.
  */
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useCallback } from 'react';
 import { useApplication, useTick } from '@pixi/react';
 import { isRapidScrolling } from './scrollPerf';
 import { useUIStore, useSettingsStore } from '@stores';
 import { useCollaborationStore } from '@stores/useCollaborationStore';
+import { useInstrumentStore } from '@stores/useInstrumentStore';
+import { notify } from '@stores/useNotificationStore';
 import { usePixiResponsive } from './hooks/usePixiResponsive';
 import { PixiPeerCursor } from './views/collaboration/PixiPeerCursor';
 import { PixiGlobalDropdownLayer } from './components/PixiGlobalDropdownLayer';
@@ -47,6 +49,12 @@ import { PixiSIDInfoModal } from './dialogs/PixiSIDInfoModal';
 import { PixiArrangementContextMenu } from './dialogs/PixiArrangementContextMenu';
 import { PixiHelpModal } from './dialogs/PixiHelpModal';
 import { PixiDrumpadEditorModal } from './dialogs/PixiDrumpadEditorModal';
+import { PixiImportTD3Dialog } from './dialogs/PixiImportTD3Dialog';
+import { PixiSunVoxImportDialog } from './dialogs/PixiSunVoxImportDialog';
+import { PixiAutomationPanel } from './dialogs/PixiAutomationPanel';
+import { PixiPatternOrderModal } from './dialogs/PixiPatternOrderModal';
+import { PixiAuthModal } from './dialogs/PixiAuthModal';
+import { PixiRomUploadDialog } from './dialogs/PixiRomUploadDialog';
 
 export const PixiRoot: React.FC = () => {
   const { width, height } = usePixiResponsive();
@@ -55,6 +63,46 @@ export const PixiRoot: React.FC = () => {
   const modalOpen = useUIStore(s => s.modalOpen);
   const modalData = useUIStore(s => s.modalData);
   const closeModal = useUIStore(s => s.closeModal);
+
+  // Pending file imports (for TD3, SunVox dialogs)
+  const pendingTD3File = useUIStore(s => s.pendingTD3File);
+  const setPendingTD3File = useUIStore(s => s.setPendingTD3File);
+  const pendingSunVoxFile = useUIStore(s => s.pendingSunVoxFile);
+  const setPendingSunVoxFile = useUIStore(s => s.setPendingSunVoxFile);
+
+  // Handler for ImportTD3Dialog
+  const handleTD3ImportGL = useCallback(async (file: File, replacePatterns: boolean) => {
+    setPendingTD3File(null);
+    try {
+      const { loadFile } = await import('@lib/file/UnifiedFileLoader');
+      const result = await loadFile(file, { requireConfirmation: false, replacePatterns });
+      if (result.success === true) notify.success(result.message);
+      else if (result.success === false) notify.error(result.error);
+    } catch (err) {
+      notify.error('Failed to import TD-3 file');
+      console.error('[PixiRoot] TD-3 import failed:', err);
+    }
+  }, [setPendingTD3File]);
+
+  // Handler for SunVoxImportDialog
+  const handleSunVoxImportGL = useCallback(async (name: string, config: import('@/types/instrument').SunVoxConfig) => {
+    const file = pendingSunVoxFile;
+    setPendingSunVoxFile(null);
+    try {
+      if (config.isSong && file) {
+        const { loadFile } = await import('@lib/file/UnifiedFileLoader');
+        const result = await loadFile(file, { requireConfirmation: false });
+        if (result.success === true) notify.success(result.message);
+        else if (result.success === false) notify.error(result.error);
+      } else {
+        useInstrumentStore.getState().createInstrument({ name, synthType: 'SunVoxSynth', sunvox: config });
+        notify.success(`Imported SunVox patch: ${name}`);
+      }
+    } catch (err) {
+      notify.error('Failed to import SunVox file');
+      console.error('[PixiRoot] SunVox import failed:', err);
+    }
+  }, [pendingSunVoxFile, setPendingSunVoxFile]);
 
   const { app } = useApplication();
   const crtEnabled = useSettingsStore((s) => s.crtEnabled);
@@ -178,6 +226,25 @@ export const PixiRoot: React.FC = () => {
           initialTab={(modalData?.initialTab as 'shortcuts' | 'effects' | 'chip-effects' | 'tutorial') || 'shortcuts'}
         />
         <PixiDrumpadEditorModal isOpen={modalOpen === 'drumpads' || modalOpen === 'midi-pads'} onClose={closeModal} />
+        <PixiPatternOrderModal isOpen={modalOpen === 'patternOrder'} onClose={closeModal} />
+        <PixiAutomationPanel isOpen={modalOpen === 'automation'} onClose={closeModal} />
+        {pendingTD3File && (
+          <PixiImportTD3Dialog
+            isOpen={true}
+            onClose={() => setPendingTD3File(null)}
+            initialFile={pendingTD3File}
+            onImport={handleTD3ImportGL}
+          />
+        )}
+        {pendingSunVoxFile && (
+          <PixiSunVoxImportDialog
+            onClose={() => setPendingSunVoxFile(null)}
+            onImport={handleSunVoxImportGL}
+            initialFile={pendingSunVoxFile}
+          />
+        )}
+        <PixiAuthModal isOpen={modalOpen === 'auth'} onClose={closeModal} />
+        <PixiRomUploadDialog />
         <PixiClipRenameDialog />
         <PixiTrackRenameDialog />
         <PixiSynthErrorDialog />

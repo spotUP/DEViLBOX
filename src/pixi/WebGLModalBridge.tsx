@@ -43,27 +43,19 @@ const LazyMasterEffectsModal = lazy(() =>
 const LazyInstrumentEffectsModal = lazy(() =>
   import('@/components/effects').then(m => ({ default: m.InstrumentEffectsModal }))
 );
-const LazyAuthModal = lazy(() =>
-  import('@/components/dialogs/AuthModal').then(m => ({ default: m.AuthModal }))
-);
+const LazyAuthModal_REMOVED = null; // moved to GL: PixiAuthModal
 const LazyTD3PatternDialog = lazy(() =>
   import('@/components/midi/TD3PatternDialog').then(m => ({ default: m.TD3PatternDialog }))
 );
 const LazySamplePackBrowser = lazy(() =>
   import('@/components/instruments/SamplePackBrowser').then(m => ({ default: m.SamplePackBrowser }))
 );
-const LazyPatternOrderModal = lazy(() =>
-  import('@/components/dialogs/PatternOrderModal').then(m => ({ default: m.PatternOrderModal }))
-);
+const LazyPatternOrderModal_REMOVED = null; // moved to GL: PixiPatternOrderModal
 const LazyDrumPadManager = lazy(() =>
   import('@/components/drumpad/DrumPadManager').then(m => ({ default: m.DrumPadManager }))
 );
-const LazyAutomationPanel = lazy(() =>
-  import('@/components/automation/AutomationPanel').then(m => ({ default: m.AutomationPanel }))
-);
-const LazyRomUploadDialog = lazy(() =>
-  import('@/components/ui/RomUploadDialog').then(m => ({ default: m.RomUploadDialog }))
-);
+const LazyAutomationPanel_REMOVED = null; // moved to GL: PixiAutomationPanel
+const LazyRomUploadDialog_REMOVED = null; // moved to GL: PixiRomUploadDialog
 const LazyImportModuleDialog = lazy(() =>
   import('@/components/dialogs/ImportModuleDialog').then(m => ({ default: m.ImportModuleDialog }))
 );
@@ -76,13 +68,9 @@ const LazyImportMIDIDialog = lazy(() =>
 const LazyImportAudioDialog = lazy(() =>
   import('@/components/dialogs/ImportAudioDialog').then(m => ({ default: m.ImportAudioDialog }))
 );
-const LazyImportTD3Dialog = lazy(() =>
-  import('@/components/dialogs/ImportTD3Dialog').then(m => ({ default: m.ImportTD3Dialog }))
-);
-const LazySunVoxImportDialog = lazy(() =>
-  import('@/components/instruments/SunVoxImportDialog').then(m => ({ default: m.SunVoxImportDialog }))
-);
-);
+const LazyImportTD3Dialog_REMOVED = null; // moved to GL: PixiImportTD3Dialog
+const LazySunVoxImportDialog_REMOVED = null; // moved to GL: PixiSunVoxImportDialog
+
 
 export const WebGLModalBridge: React.FC = () => {
   const modalOpen = useUIStore(s => s.modalOpen);
@@ -103,10 +91,6 @@ export const WebGLModalBridge: React.FC = () => {
   const pendingCompanionFiles = useUIStore(s => s.pendingCompanionFiles);
   const pendingAudioFile = useUIStore(s => s.pendingAudioFile);
   const setPendingAudioFile = useUIStore(s => s.setPendingAudioFile);
-  const pendingTD3File = useUIStore(s => s.pendingTD3File);
-  const setPendingTD3File = useUIStore(s => s.setPendingTD3File);
-  const pendingSunVoxFile = useUIStore(s => s.pendingSunVoxFile);
-  const setPendingSunVoxFile = useUIStore(s => s.setPendingSunVoxFile);
 
   // Portal container on document.body — ensures modals render above
   // PixiDOMOverlay divs (z-index 10) which are also direct body children.
@@ -213,41 +197,6 @@ export const WebGLModalBridge: React.FC = () => {
       notify.error('Failed to load project');
     }
   }, [setShowFileBrowser]);
-
-  // Handler for ImportTD3Dialog in GL mode
-  const handleTD3ImportGL = useCallback(async (file: File, replacePatterns: boolean) => {
-    setPendingTD3File(null);
-    try {
-      const { loadFile } = await import('@lib/file/UnifiedFileLoader');
-      const result = await loadFile(file, { requireConfirmation: false, replacePatterns });
-      if (result.success === true) notify.success(result.message);
-      else if (result.success === false) notify.error(result.error);
-    } catch (err) {
-      notify.error('Failed to import TD-3 file');
-      console.error('[WebGLModalBridge] TD-3 import failed:', err);
-    }
-  }, [setPendingTD3File]);
-
-  // Handler for SunVoxImportDialog in GL mode
-  const handleSunVoxImportGL = useCallback(async (name: string, config: import('@/types/instrument').SunVoxConfig) => {
-    const file = pendingSunVoxFile;
-    setPendingSunVoxFile(null);
-    try {
-      if (config.isSong && file) {
-        // Full module extraction — one SunVoxSynth per module + tracker channels
-        const { loadFile } = await import('@lib/file/UnifiedFileLoader');
-        const result = await loadFile(file, { requireConfirmation: false });
-        if (result.success === true) notify.success(result.message);
-        else if (result.success === false) notify.error(result.error);
-      } else {
-        useInstrumentStore.getState().createInstrument({ name, synthType: 'SunVoxSynth', sunvox: config });
-        notify.success(`Imported SunVox patch: ${name}`);
-      }
-    } catch (err) {
-      notify.error('Failed to import SunVox file');
-      console.error('[WebGLModalBridge] SunVox import failed:', err);
-    }
-  }, [pendingSunVoxFile, setPendingSunVoxFile]);
 
   // Handler for ImportModuleDialog in GL mode — called when user confirms import.
   // Uses UnifiedFileLoader to keep behaviour identical to the DOM mode confirm path.
@@ -413,12 +362,8 @@ export const WebGLModalBridge: React.FC = () => {
       {modalOpen === 'instrumentFx' && (
         <LazyInstrumentEffectsModal isOpen={true} onClose={closeModal} />
       )}
-      {modalOpen === 'auth' && (
-        <LazyAuthModal isOpen={true} onClose={closeModal} />
-      )}
-      {modalOpen === 'patternOrder' && (
-        <LazyPatternOrderModal onClose={closeModal} />
-      )}
+      {/* auth → moved to GL: PixiAuthModal */}
+      {/* patternOrder → moved to GL: PixiPatternOrderModal */}
       {showFileBrowser && (
         <LazyFileBrowser
           isOpen={showFileBrowser}
@@ -443,31 +388,7 @@ export const WebGLModalBridge: React.FC = () => {
           onLoadTrackerModule={handleLoadTrackerModule}
         />
       )}
-      {modalOpen === 'automation' && (
-        <div style={{
-          position: 'fixed', inset: 0, zIndex: 9999,
-          background: 'rgba(0,0,0,0.6)', display: 'flex', flexDirection: 'column',
-        }}>
-          <div style={{
-            display: 'flex', justifyContent: 'flex-end', padding: '8px 12px',
-            background: '#1e1e2e', borderBottom: '1px solid #333',
-          }}>
-            <button
-              onClick={closeModal}
-              style={{
-                background: 'transparent', border: '1px solid #555', borderRadius: 4,
-                color: '#aaa', padding: '4px 12px', cursor: 'pointer', fontSize: 11,
-                fontFamily: 'JetBrains Mono, monospace',
-              }}
-            >
-              Close Automation
-            </button>
-          </div>
-          <div style={{ flex: 1, overflow: 'auto' }}>
-            <LazyAutomationPanel />
-          </div>
-        </div>
-      )}
+      {/* automation → moved to GL: PixiAutomationPanel */}
       {/* Module file drop — dialog routed through portal to sit above PixiDOMOverlay */}
       {pendingModuleFile && (
         /\.(fur|dmf)$/i.test(pendingModuleFile.name) ? (
@@ -502,26 +423,10 @@ export const WebGLModalBridge: React.FC = () => {
           initialFile={pendingAudioFile}
         />
       )}
-      {/* TD-3 / TB-303 pattern import dialog */}
-      {pendingTD3File && (
-        <LazyImportTD3Dialog
-          isOpen={true}
-          onClose={() => setPendingTD3File(null)}
-          initialFile={pendingTD3File}
-          onImport={handleTD3ImportGL}
-        />
-      )}
-      {/* SunVox patch/song import dialog */}
-      {pendingSunVoxFile && (
-        <LazySunVoxImportDialog
-          onClose={() => setPendingSunVoxFile(null)}
-          onImport={handleSunVoxImportGL}
-          initialFile={pendingSunVoxFile}
-        />
-      )}
+      {/* TD-3 import → moved to GL: PixiImportTD3Dialog */}
+      {/* SunVox import → moved to GL: PixiSunVoxImportDialog */}
 
-      {/* Always-mounted dialogs */}
-      <LazyRomUploadDialog />
+      {/* ROM upload → moved to GL: PixiRomUploadDialog */}
       {activeView === 'drumpad' && (
         <LazyDrumPadManager />
       )}
