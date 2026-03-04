@@ -103,6 +103,60 @@ class MusicLineProcessor extends AudioWorkletProcessor {
         }
         break;
 
+      case 'get-channel-count':
+        if (this.wasm && this.songLoaded) {
+          this.port.postMessage({
+            type: 'channel-count',
+            count: this.wasm._ml_get_channel_count(),
+          });
+        }
+        break;
+
+      case 'get-pattern-data': {
+        if (!this.wasm || !this.songLoaded) break;
+        const partNum = data.partNum || 0;
+        const maxRows = data.maxRows || 128;
+        const bufSize = maxRows * 4;
+        const ptr = this.wasm._malloc(bufSize);
+        if (!ptr) break;
+        const rows = this.wasm._ml_get_pattern_data(partNum, ptr, maxRows);
+        const buf = new Uint8Array(this.wasm.HEAPU8.buffer, ptr, rows * 4).slice();
+        this.wasm._free(ptr);
+        this.port.postMessage(
+          { type: 'pattern-data', partNum, rows, data: buf.buffer },
+          [buf.buffer]
+        );
+        break;
+      }
+
+      case 'get-channel-state': {
+        if (!this.wasm || !this.songLoaded) break;
+        const ch = data.channel || 0;
+        const ptr2 = this.wasm._malloc(8);
+        if (!ptr2) break;
+        const ok = this.wasm._ml_get_channel_state(ch, ptr2);
+        const info = ok ? new Uint8Array(this.wasm.HEAPU8.buffer, ptr2, 8).slice() : null;
+        this.wasm._free(ptr2);
+        if (info) {
+          this.port.postMessage(
+            { type: 'channel-state', channel: ch, data: info.buffer },
+            [info.buffer]
+          );
+        }
+        break;
+      }
+
+      case 'get-song-info': {
+        if (!this.wasm || !this.songLoaded) break;
+        this.port.postMessage({
+          type: 'song-info',
+          channelCount: this.wasm._ml_get_channel_count(),
+          partLength: this.wasm._ml_get_part_length(),
+          numParts: this.wasm._ml_get_num_parts(),
+        });
+        break;
+      }
+
       default:
         break;
     }
