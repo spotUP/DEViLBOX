@@ -173,6 +173,53 @@ async function loadSongFile(file: File, options: FileLoadOptions): Promise<FileL
 
   const filename = file.name.toLowerCase();
 
+  // === GoatTracker .sng — detect BEFORE state reset ===
+  // GT songs bypass the classic tracker pipeline entirely.  We must detect them
+  // before the full state reset below, otherwise instruments are cleared and
+  // React flushes a black pattern editor during the async gap.
+  if (filename.endsWith('.sng')) {
+    const { isGoatTrackerSong } = await import('../import/formats/GoatTrackerDetect');
+    const gtBuf = await file.arrayBuffer();
+    if (isGoatTrackerSong(gtBuf)) {
+      console.log('[UnifiedFileLoader] GoatTracker .sng detected — routing to GTUltra engine');
+      // Stop playback but do NOT reset instruments/patterns — GT has its own state
+      if (isPlaying) stopTransport();
+      engine.releaseAll();
+
+      const { useGTUltraStore } = await import('@/stores/useGTUltraStore');
+      const gtStore = useGTUltraStore.getState();
+
+      const songBytes = new Uint8Array(gtBuf);
+      if (gtStore.engine) {
+        gtStore.engine.loadSong(gtBuf);
+        gtStore.setSongName(file.name.replace(/\.sng$/i, ''));
+      } else {
+        gtStore.setPendingSongData(songBytes);
+        gtStore.setSongName(file.name.replace(/\.sng$/i, ''));
+      }
+
+      // Switch to GoatTracker editor mode
+      applyEditorMode({ goatTrackerData: songBytes });
+
+      // Ensure tracker view is visible
+      const { useUIStore } = await import('@stores/useUIStore');
+      const uiState = useUIStore.getState();
+      uiState.setActiveView('tracker');
+      uiState.setTrackerViewMode('tracker');
+
+      // GTUltra requires WebGL mode
+      const { useSettingsStore } = await import('@stores/useSettingsStore');
+      if (useSettingsStore.getState().renderMode !== 'webgl') {
+        useSettingsStore.getState().setRenderMode('webgl');
+      }
+
+      return {
+        success: true,
+        message: `Loaded GoatTracker song: ${file.name}`,
+      };
+    }
+  }
+
   // Pre-read binary formats before the reset so there is no `await` between
   // resetInstruments() and the subsequent loadPatterns/createInstrument calls.
   // Without this, React flushes after the reset and renders an empty (black) scene.
@@ -504,50 +551,8 @@ async function loadSongFile(file: File, options: FileLoadOptions): Promise<FileL
     return { success: true, message: `Loaded SunVox project: ${name}` };
   }
 
-  // === GoatTracker .sng files ===
-  // Detected by magic bytes (GTS!/GTS2/GTS3/GTS4/GTS5) in loadModuleFile
-  // Route directly to GTUltra engine — skip parseModuleToSong pipeline
-  {
-    const { isGoatTrackerSong } = await import('../import/formats/GoatTrackerDetect');
-    const buf = await file.arrayBuffer();
-    if (isGoatTrackerSong(buf)) {
-      console.log('[UnifiedFileLoader] GoatTracker .sng detected — routing to GTUltra engine');
-      const { useGTUltraStore } = await import('@/stores/useGTUltraStore');
-      const gtStore = useGTUltraStore.getState();
-
-      // Queue song data — engine will load it when ready (or immediately if already init'd)
-      const songBytes = new Uint8Array(buf);
-      if (gtStore.engine) {
-        gtStore.engine.loadSong(buf);
-        gtStore.setSongName(file.name.replace(/\.sng$/i, ''));
-      } else {
-        // Engine not yet initialized — store for later
-        gtStore.setPendingSongData(songBytes);
-        gtStore.setSongName(file.name.replace(/\.sng$/i, ''));
-      }
-
-      // Switch to GoatTracker editor mode
-      applyEditorMode({ goatTrackerData: songBytes });
-
-      // Ensure we're on the tracker view with the tracker sub-view so the
-      // GTUltra editor is visible (it renders when editorMode === 'goattracker')
-      const { useUIStore } = await import('@stores/useUIStore');
-      const uiState = useUIStore.getState();
-      uiState.setActiveView('tracker');
-      uiState.setTrackerViewMode('tracker');
-
-      // GTUltra requires WebGL mode — auto-switch if in DOM mode
-      const { useSettingsStore } = await import('@stores/useSettingsStore');
-      if (useSettingsStore.getState().renderMode !== 'webgl') {
-        useSettingsStore.getState().setRenderMode('webgl');
-      }
-
-      return {
-        success: true,
-        message: `Loaded GoatTracker song: ${file.name}`,
-      };
-    }
-  }
+  // (GoatTracker .sng is handled above, before the state reset, to avoid
+  //  clearing instruments/patterns during the async gap.)
 
   // === All other tracker/module formats ===
   if (isSupportedModule(filename)) {
