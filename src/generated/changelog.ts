@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-03-04T23:18:01.380Z
+ * Generated: 2026-03-04T23:30:54.294Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.2295';
-export const BUILD_NUMBER = '2295';
-export const BUILD_HASH = '7aa5cab7';
+export const BUILD_VERSION = '1.0.2299';
+export const BUILD_NUMBER = '2299';
+export const BUILD_HASH = '77381cff';
 export const BUILD_DATE = '2026-03-04';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,25 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.2295',
+    version: '1.0.2299',
     date: '2026-03-05',
     changes: [
+      {
+        type: 'feature',
+        "description": "Add global lens distortion filter with presets"
+      },
+      {
+        type: 'feature',
+        "description": "Add lens distortion settings (barrel, chromatic, vignette)"
+      },
+      {
+        type: 'improvement',
+        "description": "Chore: update changelog, tilt shader, test runner, headless test"
+      },
+      {
+        type: 'fix',
+        "description": "Resolve all TypeScript build errors across codebase"
+      },
       {
         type: 'feature',
         "description": "Add 3D toggle button to studio workbench control bar"
@@ -222,22 +238,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'feature',
         "description": "Add view selector dropdown to drumpad header bar"
-      },
-      {
-        type: 'fix',
-        "description": "SA instrument editor changes now reach running WASM synth"
-      },
-      {
-        type: 'fix',
-        "description": "Remove auto-preview from instrument editors"
-      },
-      {
-        type: 'fix',
-        "description": "SA instrument preview plays at C3 instead of C4"
-      },
-      {
-        type: 'fix',
-        "description": "PixiButton click not firing due to layout-shift pointerOut"
       }
     ]
   }
