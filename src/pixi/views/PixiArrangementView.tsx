@@ -5,7 +5,7 @@
 
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { usePixiTheme } from '../theme';
-import { PixiButton, PixiLabel, PixiSelect } from '../components';
+import { PixiButton, PixiLabel, PixiViewHeader } from '../components';
 import { PixiArrangementCanvas } from './arrangement/PixiArrangementCanvas';
 import type { ClipRenderData, ClipChannelNotes } from './arrangement/PixiArrangementCanvas';
 import { PixiTrackHeaders } from './arrangement/PixiTrackHeaders';
@@ -22,15 +22,6 @@ import { MarkerRenameInput } from '@/components/arrangement/MarkerRenameInput';
 import { TrackRenameDialog } from '@/components/arrangement/TrackRenameDialog';
 import { usePixiDropdownStore } from '../stores/usePixiDropdownStore';
 import type { MenuItem } from '../components/PixiMenuBar';
-
-const VIEW_OPTIONS = [
-  { value: 'tracker', label: 'Tracker' },
-  { value: 'arrangement', label: 'Arrangement' },
-  { value: 'pianoroll', label: 'Piano Roll' },
-  { value: 'dj', label: 'DJ Mixer' },
-  { value: 'drumpad', label: 'Drum Pads' },
-  { value: 'vj', label: 'VJ View' },
-];
 
 // Default channel colors when falling back to tracker channels
 const CHANNEL_COLORS = [0x60a5fa, 0xf87171, 0x4ade80, 0xfbbf24, 0xa78bfa, 0xfb923c, 0x38bdf8, 0xe879f9];
@@ -448,30 +439,7 @@ export const PixiArrangementView: React.FC = () => {
       }}
     >
       {/* Toolbar */}
-      <layoutContainer
-        layout={{
-          width: '100%',
-          height: 36,
-          flexDirection: 'row',
-          alignItems: 'center',
-          paddingLeft: 8,
-          gap: 8,
-          backgroundColor: theme.bgSecondary.color,
-          borderBottomWidth: 1,
-          borderColor: theme.border.color,
-        }}
-      >
-
-        {/* View mode selector */}
-        <PixiSelect
-          value="arrangement"
-          options={VIEW_OPTIONS}
-          onChange={(v) => useUIStore.getState().setActiveView(v as any)}
-          width={100}
-          height={24}
-        />
-
-        <PixiLabel text="ARRANGEMENT" size="sm" weight="bold" color="accent" />
+      <PixiViewHeader activeView="arrangement" title="ARRANGEMENT">
 
         <PixiButton
           label="Select"
@@ -549,7 +517,7 @@ export const PixiArrangementView: React.FC = () => {
           color="textMuted"
           layout={{ marginRight: 8 }}
         />
-      </layoutContainer>
+      </PixiViewHeader>
 
       {/* Main area: Track headers | Canvas + scrollbars — hover tracked for wheel scroll */}
       <pixiContainer

@@ -112,7 +112,7 @@ export const PixiTrackerView: React.FC = () => {
   // Compute usable heights from the PixiWindow's content area.
   // Unlike the old full-screen layout, PixiTrackerView is inside a PixiWindow so
   // there's no NavBar or StatusBar to subtract — those are outside the window.
-  const CONTROLS_BAR_H = 32;
+  const CONTROLS_BAR_H = 36;
   const MACRO_SLOTS_H = showMacroSlots ? 32 : 0;
   const toolbarH = FT2_TOOLBAR_HEIGHT;
   const tb303PanelH = hasTB303 && viewMode !== 'tb303' && viewMode !== 'sunvox'

@@ -7,7 +7,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { FederatedPointerEvent } from 'pixi.js';
 import { usePixiTheme } from '../theme';
 import { usePixiDropdownStore } from '../stores/usePixiDropdownStore';
-import { PixiButton, PixiLabel, PixiSelect } from '../components';
+import { PixiButton, PixiLabel, PixiViewHeader } from '../components';
 import { PixiPianoKeyboard } from './pianoroll/PixiPianoKeyboard';
 import { PixiPianoRollGrid } from './pianoroll/PixiPianoRollGrid';
 import { PixiScrollbar } from './pianoroll/PixiScrollbar';
@@ -39,15 +39,6 @@ function midiToNoteStr(midi: number): string {
 }
 
 const GRID_DIVISIONS = [1, 2, 4, 8, 16];
-
-const VIEW_OPTIONS = [
-  { value: 'tracker', label: 'Tracker' },
-  { value: 'arrangement', label: 'Arrangement' },
-  { value: 'pianoroll', label: 'Piano Roll' },
-  { value: 'dj', label: 'DJ Mixer' },
-  { value: 'drumpad', label: 'Drum Pads' },
-  { value: 'vj', label: 'VJ View' },
-];
 
 /** QWERTY keyboard → semitone offset from base octave */
 const QWERTY_NOTE_MAP: Record<string, number> = {
@@ -531,30 +522,7 @@ export const PixiPianoRollView: React.FC<{ isActive?: boolean; windowId?: string
       }}
     >
       {/* Toolbar */}
-      <layoutContainer
-        layout={{
-          width: '100%',
-          height: TOOLBAR_HEIGHT,
-          flexDirection: 'row',
-          alignItems: 'center',
-          paddingLeft: 8,
-          gap: 6,
-          backgroundColor: theme.bgSecondary.color,
-          borderBottomWidth: 1,
-          borderColor: theme.border.color,
-        }}
-      >
-
-        {/* View mode selector */}
-        <PixiSelect
-          value="pianoroll"
-          options={VIEW_OPTIONS}
-          onChange={(v) => useUIStore.getState().setActiveView(v as any)}
-          width={100}
-          height={24}
-        />
-
-        <PixiLabel text="PIANO ROLL" size="sm" weight="bold" color="accent" />
+      <PixiViewHeader activeView="pianoroll" title="PIANO ROLL">
 
         <PixiButton
           label="Select"
@@ -665,7 +633,7 @@ export const PixiPianoRollView: React.FC<{ isActive?: boolean; windowId?: string
           }}
           layout={{ marginRight: 8 }}
         />
-      </layoutContainer>
+      </PixiViewHeader>
 
       {/* Main area: Keyboard | Grid | V-scrollbar — hover tracked for wheel scroll */}
       <pixiContainer

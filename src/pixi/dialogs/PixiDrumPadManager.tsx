@@ -22,29 +22,24 @@ import type { PadBank, MpcResampleConfig, DrumPad } from '../../types/drumpad';
 import { PixiButton } from '../components';
 import { PixiSelect, type SelectOption } from '../components/PixiSelect';
 import { PixiCheckbox } from '../components';
+import { PixiViewHeader, VIEW_HEADER_HEIGHT } from '../components/PixiViewHeader';
 import { PixiSlider } from '../components/PixiSlider';
 import { usePixiTheme } from '../theme';
 import { Div, Txt } from '../layout';
 
 /* ── Constants ──────────────────────────────────────────────────────────────── */
 
-const VIEW_MODE_OPTIONS: SelectOption[] = [
-  { value: 'tracker',     label: 'Tracker' },
-  { value: 'grid',        label: 'Grid' },
-  { value: 'pianoroll',   label: 'Piano Roll' },
-  { value: 'tb303',       label: 'TB-303' },
-  { value: 'arrangement', label: 'Arrangement' },
-  { value: 'dj',          label: 'DJ Mixer' },
-  { value: 'drumpad',     label: 'Drum Pads' },
-  { value: 'vj',          label: 'VJ View' },
-  { value: 'studio',      label: 'Studio' },
-];
-
-const PAD_SIZE = 64;
 const PAD_GAP = 6;
 const GRID_COLS = 4;
 const GRID_ROWS = 4;
+const MIN_PAD_SIZE = 48;
+const MAX_PAD_SIZE = 160;
 const RIGHT_W = 240;
+const HEADER_H = 36;
+const BANK_ROW_H = 36; // bank selector row
+const PAD_INFO_H = 56; // selected pad info box
+const SHORTCUTS_H = 68; // shortcuts box
+const LEFT_PADDING = 32; // p-4 top+bottom = 16+16
 const BANKS: PadBank[] = ['A', 'B', 'C', 'D'];
 const NOTE_REPEAT_RATES = ['1/4', '1/8', '1/16', '1/32', '1/8T', '1/16T'] as const;
 const MPC_MODELS: { value: MpcResampleConfig['model']; label: string }[] = [
@@ -60,7 +55,8 @@ const PadCell: React.FC<{
   pad: DrumPad;
   selected: boolean;
   onSelect: () => void;
-}> = React.memo(({ pad, selected, onSelect }) => {
+  size: number;
+}> = React.memo(({ pad, selected, onSelect, size }) => {
   const theme = usePixiTheme();
   const [hovered, setHovered] = useState(false);
   const hasSample = !!pad.sample;
@@ -76,8 +72,8 @@ const PadCell: React.FC<{
   return (
     <Div
       layout={{
-        width: PAD_SIZE,
-        height: PAD_SIZE,
+        width: size,
+        height: size,
         backgroundColor: bg,
         borderWidth: 1,
         borderColor: selected ? theme.accent.color : theme.border.color,
@@ -93,9 +89,9 @@ const PadCell: React.FC<{
       onPointerOver={() => setHovered(true)}
       onPointerOut={() => setHovered(false)}
     >
-      <Txt className="text-xs font-bold text-text-primary">{`${pad.id}`}</Txt>
-      <Txt className="text-xs text-text-muted">
-        {pad.name.length > 8 ? pad.name.slice(0, 8) : pad.name}
+      <Txt className={`${size >= 80 ? 'text-sm' : 'text-xs'} font-bold text-text-primary`}>{`${pad.id}`}</Txt>
+      <Txt className={`${size >= 80 ? 'text-sm' : 'text-xs'} text-text-muted`}>
+        {pad.name.length > (size >= 100 ? 14 : 8) ? pad.name.slice(0, size >= 100 ? 12 : 8) : pad.name}
       </Txt>
     </Div>
   );
@@ -307,22 +303,14 @@ export const PixiDrumPadManager: React.FC = () => {
     [],
   );
 
-  const handleViewModeChange = useCallback((val: string) => {
-    if (val === 'drumpad') return; // already here
-    if (val === 'tracker' || val === 'grid' || val === 'tb303') {
-      const store = useUIStore.getState();
-      setTimeout(() => {
-        store.setActiveView('tracker');
-        store.setTrackerViewMode(val as any);
-      }, 0);
-    } else {
-      setTimeout(() => useUIStore.getState().setActiveView(val as any), 0);
-    }
-  }, []);
-
-  /* ── Layout ── */
-  const gridW = GRID_COLS * PAD_SIZE + (GRID_COLS - 1) * PAD_GAP;
-  const gridH = GRID_ROWS * PAD_SIZE + (GRID_ROWS - 1) * PAD_GAP;
+  /* ── Layout — compute pad size to fill available space ── */
+  const availW = screenW - RIGHT_W - LEFT_PADDING - 1; // -1 for border
+  const availH = screenH - HEADER_H - BANK_ROW_H - PAD_INFO_H - SHORTCUTS_H - LEFT_PADDING - 16; // extra gap
+  const maxFromW = Math.floor((availW - (GRID_COLS - 1) * PAD_GAP) / GRID_COLS);
+  const maxFromH = Math.floor((availH - (GRID_ROWS - 1) * PAD_GAP) / GRID_ROWS);
+  const padSize = Math.max(MIN_PAD_SIZE, Math.min(MAX_PAD_SIZE, maxFromW, maxFromH));
+  const gridW = GRID_COLS * padSize + (GRID_COLS - 1) * PAD_GAP;
+  const gridH = GRID_ROWS * padSize + (GRID_ROWS - 1) * PAD_GAP;
 
   return (
     <Div
@@ -336,33 +324,16 @@ export const PixiDrumPadManager: React.FC = () => {
       eventMode="static"
     >
       {/* ── Header bar ── */}
-      <Div
-        className="flex-row items-center justify-between px-4"
-        layout={{
-          height: 36,
-          backgroundColor: theme.bgSecondary.color,
-          borderBottomWidth: 1,
-          borderColor: theme.border.color,
-        }}
-      >
-        <Div className="flex-row items-center gap-3">
-          <PixiSelect
-            options={VIEW_MODE_OPTIONS}
-            value="drumpad"
-            onChange={handleViewModeChange}
-            width={110}
-            height={24}
-          />
-          <Txt className="text-sm font-bold text-accent-primary">DRUM PADS</Txt>
-          <Txt className="text-xs text-text-muted">MPC-style 64-pad drum machine</Txt>
-        </Div>
+      <PixiViewHeader activeView="drumpad" title="DRUM PADS">
+        <Txt className="text-xs text-text-muted">MPC-style 64-pad drum machine</Txt>
+        <pixiContainer layout={{ flex: 1 }} />
         <PixiButton
           label="MIDI Map"
           size="sm"
           variant="ghost"
           onClick={() => useUIStore.getState().openModal('midi-pads')}
         />
-      </Div>
+      </PixiViewHeader>
 
       {/* ── Main content: grid left, controls right ── */}
       <Div className="flex-1 flex-row" layout={{ overflow: 'hidden' }}>
@@ -398,6 +369,7 @@ export const PixiDrumPadManager: React.FC = () => {
                 pad={pad}
                 selected={pad.id === selectedPadId}
                 onSelect={() => setSelectedPadId(pad.id)}
+                size={padSize}
               />
             ))}
           </Div>
