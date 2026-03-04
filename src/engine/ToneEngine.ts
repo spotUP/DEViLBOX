@@ -66,6 +66,7 @@ import {
   updateChipSynthArpeggio as _updateChipSynthArpeggio,
   getChipSynthArpeggioStep as _getChipSynthArpeggioStep,
   isChipSynthArpeggioPlaying as _isChipSynthArpeggioPlaying,
+  updateSonicArrangerParameters as _updateSonicArrangerParameters,
 } from './tone/SynthParameterUpdates';
 import {
   type ChannelRoutingContext,
@@ -4166,6 +4167,7 @@ export class ToneEngine {
   public updateComplexSynthParameters(instrumentId: number, config: unknown): void { _updateComplexSynthParameters(this._synthCtx, instrumentId, config); }
   public updateToneJsSynthInPlace(instrumentId: number, config: InstrumentConfig): void { _updateToneJsSynthInPlace(this._synthCtx, instrumentId, config); }
   public updateBuzzmachineParameters(instrumentId: number, buzzmachine: NonNullable<InstrumentConfig['buzzmachine']>): void { _updateBuzzmachineParameters(this._synthCtx, instrumentId, buzzmachine); }
+  public updateSonicArrangerParameters(instrumentId: number, config: NonNullable<InstrumentConfig['sonicArranger']>): void { _updateSonicArrangerParameters(this._synthCtx, instrumentId, config); }
   public async updateTB303Pedalboard(instrumentId: number, pedalboard: NonNullable<InstrumentConfig['tb303']>['pedalboard']): Promise<void> { return _updateTB303Pedalboard(this._synthCtx, instrumentId, pedalboard); }
   public updateChipSynthArpeggio(instrumentId: number, arpeggioConfig: NonNullable<InstrumentConfig['chipSynth']>['arpeggio']): void { _updateChipSynthArpeggio(this._synthCtx, instrumentId, arpeggioConfig); }
   public getChipSynthArpeggioStep(instrumentId: number): number { return _getChipSynthArpeggioStep(this._synthCtx, instrumentId); }

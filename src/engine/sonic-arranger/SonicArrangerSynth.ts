@@ -153,6 +153,16 @@ export class SonicArrangerSynth implements DevilboxSynth {
     this.engine.sendMessage({ type: 'forceQuiet', handle: this._playerHandle });
   }
 
+  /** Re-upload instrument config to running WASM synth (for live parameter editing) */
+  updateConfig(config: SonicArrangerConfig): void {
+    if (this._disposed || this._playerHandle < 0) return;
+    const blob = serializeSonicArrangerConfig(config);
+    this.engine.sendMessage(
+      { type: 'loadInstrument', handle: this._playerHandle, buffer: blob },
+      [blob],
+    );
+  }
+
   releaseAll(): void {
     this.triggerRelease();
   }
