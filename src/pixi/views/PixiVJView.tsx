@@ -11,7 +11,7 @@
  */
 
 import React, { useRef, useEffect, useState } from 'react';
-import { Texture } from 'pixi.js';
+import { Texture, Sprite as SpriteType } from 'pixi.js';
 import type { Container as ContainerType } from 'pixi.js';
 import { useTick } from '@pixi/react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -21,7 +21,7 @@ import { useUIStore } from '@stores';
 export const PixiVJView: React.FC = () => {
   const isActive = useUIStore((s) => s.activeView === 'vj');
   const containerRef = useRef<ContainerType>(null);
-  const spriteRef = useRef<ContainerType>(null);
+  const spriteRef = useRef<SpriteType>(null);
   const isActiveRef = useRef(isActive);
   isActiveRef.current = isActive;
 

@@ -5,7 +5,7 @@
  */
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { PixiModal, PixiModalFooter, PixiButton, PixiLabel } from '../components';
+import { PixiModal, PixiModalFooter, PixiButton } from '../components';
 import { PixiScrollView } from '../components/PixiScrollView';
 import { usePixiTheme } from '../theme';
 import { PIXI_FONTS } from '../fonts';

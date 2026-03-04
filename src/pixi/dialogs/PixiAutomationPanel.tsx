@@ -50,7 +50,7 @@ export const PixiAutomationPanel: React.FC<PixiAutomationPanelProps> = ({
   const patterns = useTrackerStore(s => s.patterns);
   const currentPatternIndex = useTrackerStore(s => s.currentPatternIndex);
   const getAutomation = useAutomationStore(s => s.getAutomation);
-  const setAutomation = useAutomationStore(s => s.setAutomation);
+
   const setActiveParameter = useAutomationStore(s => s.setActiveParameter);
   const setShowLane = useAutomationStore(s => s.setShowLane);
 

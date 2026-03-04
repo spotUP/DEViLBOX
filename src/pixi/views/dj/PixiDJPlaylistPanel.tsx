@@ -7,7 +7,6 @@
  */
 
 import React, { useState, useCallback, useMemo } from 'react';
-import { PIXI_FONTS } from '../../fonts';
 import { usePixiTheme } from '../../theme';
 import { PixiButton } from '../../components/PixiButton';
 import { PixiLabel } from '../../components/PixiLabel';

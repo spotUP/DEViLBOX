@@ -9,7 +9,7 @@
  */
 
 import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
-import type { Graphics as GraphicsType, FederatedPointerEvent } from 'pixi.js';
+import type { Graphics as GraphicsType } from 'pixi.js';
 import {
   searchModland,
   getModlandFormats,
