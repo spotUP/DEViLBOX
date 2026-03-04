@@ -99,6 +99,8 @@ export const PixiRoot: React.FC = () => {
   const setPendingSunVoxFile = useUIStore(s => s.setPendingSunVoxFile);
   const pendingModuleFile = useUIStore(s => s.pendingModuleFile);
   const setPendingModuleFile = useUIStore(s => s.setPendingModuleFile);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { if (pendingModuleFile) console.log('[SID-DEBUG] PixiRoot pendingModuleFile:', pendingModuleFile.name); }, [pendingModuleFile]);
   const pendingCompanionFiles = useUIStore(s => s.pendingCompanionFiles);
   const pendingAudioFile = useUIStore(s => s.pendingAudioFile);
   const setPendingAudioFile = useUIStore(s => s.setPendingAudioFile);
