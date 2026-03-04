@@ -52,13 +52,26 @@ const CATEGORY_ACCENT: Record<string, number> = {
 
 // ── Preset options for PixiSelect ───────────────────────────────────────────
 
-const PRESET_OPTIONS: SelectOption[] = [
-  { value: '', label: 'Load preset…' },
-  ...INSTRUMENT_FX_PRESETS.map((p, i) => ({
-    value: String(i),
-    label: `${p.name}`,
-  })),
-];
+const PRESET_OPTIONS: SelectOption[] = (() => {
+  const opts: SelectOption[] = [{ value: '', label: 'Load preset…' }];
+
+  const byCategory: Record<string, { name: string; index: number }[]> = {};
+  INSTRUMENT_FX_PRESETS.forEach((p, i) => {
+    if (!byCategory[p.category]) byCategory[p.category] = [];
+    byCategory[p.category].push({ name: p.name, index: i });
+  });
+
+  Object.keys(byCategory).sort().forEach((cat) => {
+    opts.push({ value: '__group__', label: cat });
+    byCategory[cat]
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .forEach(({ name, index }) => {
+        opts.push({ value: String(index), label: name });
+      });
+  });
+
+  return opts;
+})();
 
 // ── Props ───────────────────────────────────────────────────────────────────
 
