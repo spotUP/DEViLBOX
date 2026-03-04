@@ -1492,6 +1492,37 @@ export class TrackerReplayer {
         // The WASM handles the speedCounter % 3 cycling internally
         const arpEffArg = (effect === 0 && param !== 0) ? param : 0;
         (saInst as any).set('effectArpArg', arpEffArg);
+
+        // Route SA-specific effects to WASM (ref: SetEffects lines 1700-1798)
+        // The reference resets slideSpeed=0, volumeSlideSpeed=0 on every row,
+        // then sets them if the current effect matches.
+        const saEff = row.saEffect ?? 0;
+        const saArg = row.saEffectArg ?? 0;
+
+        // Always reset slide/volumeSlide to 0 (ref lines 1702-1703)
+        (saInst as any).set('setSlideSpeed', 0);
+        (saInst as any).set('volumeSlide', 0);
+
+        switch (saEff) {
+          case 0x1: // SetSlideSpeed — signed byte
+            (saInst as any).set('setSlideSpeed', saArg);
+            break;
+          case 0x2: // RestartAdsr — set ADSR position
+            (saInst as any).set('restartAdsr', saArg);
+            break;
+          case 0x4: // SetVibrato — packed 0xXY arg
+            (saInst as any).set('setVibrato', saArg);
+            break;
+          case 0x7: // SetPortamento — set portamento speed directly
+            (saInst as any).set('setPortamento', saArg);
+            break;
+          case 0x8: // SkipPortamento — zero portamento speed
+            (saInst as any).set('skipPortamento', 0);
+            break;
+          case 0xA: // VolumeSlide — signed byte
+            (saInst as any).set('volumeSlide', saArg);
+            break;
+        }
       }
     }
 
