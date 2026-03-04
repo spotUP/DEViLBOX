@@ -7,6 +7,7 @@ import { getToneEngine } from '@engine/ToneEngine';
 import { PixiMixerChannelStrip } from '../mixer/PixiMixerChannelStrip';
 import { PixiLabel } from '../components/PixiLabel';
 import { PixiButton } from '../components/PixiButton';
+import { PixiViewHeader } from '../components/PixiViewHeader';
 import { usePixiTheme } from '../theme';
 import { useInstrumentStore } from '@stores/useInstrumentStore';
 import { PixiInstrumentEditor } from './PixiInstrumentEditor';
@@ -118,6 +119,8 @@ export const PixiMixerView: React.FC = () => {
         gap: 0,
       }}
     >
+      <PixiViewHeader activeView="mixer" title="MIXER" />
+
       {/* ── Top: mixer strips row ──────────────────────────────────────────── */}
       <pixiContainer
         layout={{

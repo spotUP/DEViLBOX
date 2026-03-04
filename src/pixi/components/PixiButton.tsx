@@ -130,8 +130,8 @@ export const PixiButton: React.FC<PixiButtonProps> = ({
 
     if (variant === 'danger') {
       if (pressed) return { bg: theme.error.color, border: theme.error.color, borderAlpha: 1, text: 0xffffff, showBg: true };
-      if (hovered) return { bg: theme.error.color, border: theme.error.color, borderAlpha: 0.8, text: theme.error.color, showBg: true };
-      return { bg: theme.error.color, border: theme.error.color, borderAlpha: 0.4, text: theme.error.color, showBg: true };
+      if (hovered) return { bg: theme.error.color, border: theme.error.color, borderAlpha: 0.8, text: 0xffffff, showBg: true };
+      return { bg: 0x000000, border: theme.error.color, borderAlpha: 0.6, text: theme.error.color, showBg: true };
     }
 
     if (variant === 'ghost') {

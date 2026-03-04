@@ -20,8 +20,9 @@ import { usePixiTheme } from '../../theme';
 import { PIXI_FONTS } from '../../fonts';
 import { PixiButton } from '../../components/PixiButton';
 import { PixiSelect, type SelectOption } from '../../components/PixiSelect';
+import { PixiViewHeader } from '../../components/PixiViewHeader';
 
-const BAR_H = 32;
+const BAR_H = 36;
 
 // ─── View Mode ───────────────────────────────────────────────────────────────
 
@@ -33,20 +34,6 @@ export interface PixiEditorControlsBarProps {
   gridChannelIndex: number;
   onGridChannelChange: (index: number) => void;
 }
-
-// ─── View mode options ───────────────────────────────────────────────────────
-
-const VIEW_MODE_OPTIONS: SelectOption[] = [
-  { value: 'tracker',     label: 'Tracker' },
-  { value: 'grid',        label: 'Grid' },
-  { value: 'pianoroll',   label: 'Piano Roll' },
-  { value: 'tb303',       label: 'TB-303' },
-  { value: 'arrangement', label: 'Arrangement' },
-  { value: 'dj',          label: 'DJ Mixer' },
-  { value: 'drumpad',     label: 'Drum Pads' },
-  { value: 'vj',          label: 'VJ View' },
-  { value: 'studio',      label: 'Studio' },
-];
 
 // ─── Separator ───────────────────────────────────────────────────────────────
 
@@ -328,11 +315,11 @@ export const PixiEditorControlsBar: React.FC<PixiEditorControlsBarProps> = ({
 
   // ── Handlers ─────────────────────────────────────────────────────────────
   const handleViewModeChange = useCallback((val: string) => {
-    // Some select values (arrangement, dj, etc.) switch the global activeView rather than the local viewMode
-    if (val === 'arrangement' || val === 'dj' || val === 'drumpad' || val === 'pianoroll' || val === 'vj' || val === 'studio') {
-      setTimeout(() => useUIStore.getState().setActiveView(val as any), 0);
-    } else {
+    // Local sub-modes stay in tracker view; global views switch activeView
+    if (val === 'tracker' || val === 'grid' || val === 'tb303' || val === 'sunvox') {
       setTimeout(() => onViewModeChange(val as ViewMode), 0);
+    } else {
+      setTimeout(() => useUIStore.getState().setActiveView(val as any), 0);
     }
   }, [onViewModeChange]);
 
@@ -381,30 +368,15 @@ export const PixiEditorControlsBar: React.FC<PixiEditorControlsBarProps> = ({
     ? theme.warning.color
     : theme.error.color;
 
-  return (
-    <layoutContainer
-      layout={{
-        width: '100%',
-        height: BAR_H,
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingLeft: 8,
-        paddingRight: 8,
-        gap: 6,
-        backgroundColor: theme.bgTertiary.color,
-        borderBottomWidth: 1,
-        borderColor: theme.border.color,
-      }}
-    >
+  // Title for the header — based on current local view mode
+  const viewTitle = viewMode === 'tracker' ? 'TRACKER'
+    : viewMode === 'grid' ? 'GRID'
+    : viewMode === 'tb303' ? 'TB-303'
+    : viewMode === 'sunvox' ? 'SUNVOX'
+    : 'TRACKER';
 
-      {/* View Mode Select */}
-      <PixiSelect
-        options={VIEW_MODE_OPTIONS}
-        value={viewMode}
-        onChange={handleViewModeChange}
-        width={110}
-        height={24}
-      />
+  return (
+    <PixiViewHeader activeView={viewMode} title={viewTitle} onViewChange={handleViewModeChange}>
 
       {/* Channel selector — only in non-tracker modes */}
       <PixiSelect
@@ -525,6 +497,6 @@ export const PixiEditorControlsBar: React.FC<PixiEditorControlsBarProps> = ({
         tint={fpsTint}
         layout={{}}
       />
-    </layoutContainer>
+    </PixiViewHeader>
   );
 };
