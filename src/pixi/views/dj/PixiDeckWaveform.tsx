@@ -91,9 +91,10 @@ export const PixiDeckWaveform: React.FC<PixiDeckWaveformProps> = ({ deckId, widt
 
   return (
     <pixiContainer eventMode="static" cursor="pointer" onPointerUp={handleSeek} layout={{ width, height }}>
-      <pixiGraphics draw={drawWaveform} layout={{ width, height }} />
+      <pixiGraphics eventMode="none" draw={drawWaveform} layout={{ width, height }} />
       {(!peaks || peaks.length === 0) && (
         <pixiBitmapText
+          eventMode="none"
           text="No waveform data"
           style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 11, fill: 0xffffff }}
           tint={theme.textMuted.color}

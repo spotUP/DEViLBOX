@@ -146,7 +146,7 @@ export const PixiGTTableEditor: React.FC<Props> = ({ width, height }) => {
 
   return (
     <pixiContainer ref={containerRef} eventMode="static" cursor="default" onPointerUp={handlePointerUp} layout={{ width, height }}>
-      <pixiGraphics ref={gridRef} draw={() => {}} />
+      <pixiGraphics eventMode="none" ref={gridRef} draw={() => {}} />
     </pixiContainer>
   );
 };
