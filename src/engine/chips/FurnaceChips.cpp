@@ -102,6 +102,11 @@ static int g_sample_rate = 48000;  // Output sample rate for cycle calculations
 #define CLOCK_OPN    3579545   // YM2203
 #define CLOCK_OPNA   8000000   // YM2608
 #define CLOCK_OPNB   8000000   // YM2610/YM2610B
+#define CLOCK_PSG    3579545   // SN76489 / PSG
+#define CLOCK_AY     1789773   // AY-3-8910
+#define CLOCK_SID    985248    // C64 SID (PAL)
+#define CLOCK_ESFM   14318180  // ESFM/OPL3 master clock
+#define CLOCK_NES    1789773   // NES CPU clock (NTSC)
 
 // Fractional phase accumulators for correct chip clocking
 // OPN2 (Nuked): needs chipClock/6 total clocks/sec, currently 24/sample
@@ -119,6 +124,20 @@ static double opz_gen_phase = 0.0;
 static double y8950_gen_phase = 0.0;
 // OPLL (Nuked): 9 slots per FM cycle, native FM rate = clock/72 = 49716
 static double opll_clock_phase = 0.0;
+// SNES DSP: native rate = 32000 Hz, 32 SPC700 clocks per sample
+static double snes_gen_phase = 0.0;
+static float snes_last_l = 0.0f, snes_last_r = 0.0f;
+// PSG (Nuked): master clock = 3579545, clocked at full rate
+static double psg_clock_phase = 0.0;
+// AY-3-8910: internal rate = clock/8 = 223721 Hz
+static double ay_gen_phase = 0.0;
+// SID3: cycle-accurate at 985248 Hz
+static double sid_clock_phase = 0.0;
+// ESFM: native rate = clock/288 = 49716 Hz
+static double esfm_gen_phase = 0.0;
+static int16_t esfm_last_l = 0, esfm_last_r = 0;
+// NES APU: CPU clock = 1789773, Tick takes CPU clocks
+static double nes_clock_phase = 0.0;
 
 // Interfaces
 class msm6295_intf_impl : public vgsound_emu_mem_intf { public: msm6295_intf_impl() : vgsound_emu_mem_intf() {} };
@@ -955,8 +974,31 @@ void furnace_chip_render(int type, float* buffer_l, float* buffer_r, int length)
                 buffer_r[i] = (float)opl3_r / 32768.0f;
                 break;
             }
-            case CHIP_PSG:  YMPSG_Clock(&psg_chip); YMPSG_GetOutput(&psg_chip, &out32[0], &out32[1]); buffer_l[i] = (float)out32[0] / 32768.0f; buffer_r[i] = (float)out32[1] / 32768.0f; break;
-            case CHIP_NES:  if (nes_apu) { nes_apu->Tick(1); nes_dmc->Tick(1); nes_apu->Render(out32); buffer_l[i] = (float)out32[0] / 32768.0f; buffer_r[i] = (float)out32[0] / 32768.0f; } break;
+            case CHIP_PSG: {
+                // PSG (SN76489): master clock = 3,579,545 Hz
+                // Each YMPSG_Clock = 1 master clock. Need ~74.6 clocks per output sample.
+                psg_clock_phase += (double)CLOCK_PSG / g_sample_rate;
+                int psg_n = (int)psg_clock_phase;
+                psg_clock_phase -= psg_n;
+                for (int j = 0; j < psg_n; j++) YMPSG_Clock(&psg_chip);
+                YMPSG_GetOutput(&psg_chip, &out32[0], &out32[1]);
+                buffer_l[i] = (float)out32[0] / 32768.0f;
+                buffer_r[i] = (float)out32[1] / 32768.0f;
+                break;
+            }
+            case CHIP_NES:  if (nes_apu) {
+                // NES APU: CPU clock 1,789,773 Hz. Tick takes CPU clocks.
+                nes_clock_phase += (double)CLOCK_NES / g_sample_rate;
+                int nes_n = (int)nes_clock_phase;
+                nes_clock_phase -= nes_n;
+                if (nes_n < 1) nes_n = 1;
+                nes_apu->Tick(nes_n);
+                nes_dmc->TickFrameSequence(nes_n);
+                nes_dmc->Tick(nes_n);
+                nes_apu->Render(out32);
+                buffer_l[i] = (float)out32[0] / 32768.0f;
+                buffer_r[i] = (float)out32[0] / 32768.0f;
+            } break;
             case CHIP_GB: { int gb_cycles = g_sample_rate > 0 ? (4194304 / g_sample_rate) : 87; GB_advance_cycles(&gb_chip, gb_cycles); buffer_l[i] = (float)gb_chip.apu_output.final_sample.left / 32768.0f; buffer_r[i] = (float)gb_chip.apu_output.final_sample.right / 32768.0f; break; }
             case CHIP_PCE: {
                 // PCE PSG - batch processing for blip_buf
@@ -994,7 +1036,15 @@ void furnace_chip_render(int type, float* buffer_l, float* buffer_r, int length)
                 }
                 break;
             }
-            case CHIP_SID:  if (sid_chip) { sid3_clock(sid_chip); buffer_l[i] = (float)sid_chip->output_l / 32768.0f; buffer_r[i] = (float)sid_chip->output_r / 32768.0f; } break;
+            case CHIP_SID:  if (sid_chip) {
+                // SID3: cycle-accurate at 985,248 Hz. Need ~20.5 clocks per output sample.
+                sid_clock_phase += (double)CLOCK_SID / g_sample_rate;
+                int sid_n = (int)sid_clock_phase;
+                sid_clock_phase -= sid_n;
+                for (int j = 0; j < sid_n; j++) sid3_clock(sid_chip);
+                buffer_l[i] = (float)sid_chip->output_l / 32768.0f;
+                buffer_r[i] = (float)sid_chip->output_r / 32768.0f;
+            } break;
             case CHIP_OPLL: {
                 // OPLL: 9 slots per FM cycle. Native FM rate = clock/72 = 49716 Hz.
                 // Clocks per output = (clock/72 * 9) / sampleRate = clock/8/sampleRate
@@ -1061,7 +1111,18 @@ void furnace_chip_render(int type, float* buffer_l, float* buffer_r, int length)
                 buffer_l[i] = (float)(output_2610b.data[0] * 8) / 32768.0f;
                 buffer_r[i] = (float)(output_2610b.data[1] * 8) / 32768.0f;
             } break;
-            case CHIP_AY:   if (ay_chip) { short ay_o[3]; ay_chip->sound_stream_update(ay_o, 1); float m = (ay_o[0]+ay_o[1]+ay_o[2])/(3.0f*32768.0f); buffer_l[i] = m; buffer_r[i] = m; } break;
+            case CHIP_AY:   if (ay_chip) {
+                // AY-3-8910: internal rate = clock/8 = 223,721 Hz
+                // sound_stream_update(out, advance) uses 'advance' as internal cycles
+                short ay_o[3];
+                ay_gen_phase += (double)CLOCK_AY / 8.0 / g_sample_rate;
+                int ay_adv = (int)ay_gen_phase;
+                ay_gen_phase -= ay_adv;
+                if (ay_adv < 1) ay_adv = 1;
+                ay_chip->sound_stream_update(ay_o, ay_adv);
+                float m = (ay_o[0]+ay_o[1]+ay_o[2])/(3.0f*32768.0f);
+                buffer_l[i] = m; buffer_r[i] = m;
+            } break;
             case CHIP_SWAN: if (swan_chip) { int16_t s_o[2]; swan_chip->SoundUpdate(); swan_chip->SoundFlush(s_o, 1); buffer_l[i] = (float)s_o[0]/32768.0f; buffer_r[i] = (float)s_o[1]/32768.0f; } break;
             case CHIP_OPZ: if (opz_chip) {
                 // YM2414 (OPZ): native FM rate = clock/(2×32) = 55930 Hz
@@ -1181,17 +1242,27 @@ void furnace_chip_render(int type, float* buffer_l, float* buffer_r, int length)
                 buffer_r[i] = (float)out / 32768.0f;
             } break;
             case CHIP_ESFM: {
-                // ESFM uses its own ESFMu emulator — apply ×8 gain
-                int16_t esfm_buf[2];
-                ESFM_generate(&esfm_chip_inst, esfm_buf);
-                buffer_l[i] = (float)(esfm_buf[0] * 8) / 32768.0f;
-                buffer_r[i] = (float)(esfm_buf[1] * 8) / 32768.0f;
+                // ESFM: native rate = clock/288 = 49716 Hz
+                esfm_gen_phase += (double)CLOCK_ESFM / 288.0 / g_sample_rate;
+                while (esfm_gen_phase >= 1.0) {
+                    esfm_gen_phase -= 1.0;
+                    int16_t esfm_buf[2];
+                    ESFM_generate(&esfm_chip_inst, esfm_buf);
+                    esfm_last_l = esfm_buf[0];
+                    esfm_last_r = esfm_buf[1];
+                }
+                buffer_l[i] = (float)(esfm_last_l * 8) / 32768.0f;
+                buffer_r[i] = (float)(esfm_last_r * 8) / 32768.0f;
                 break;
             }
             case CHIP_AY8930: // Enhanced AY uses same render as AY
                 if (ay_chip) {
                     short ay_o[3];
-                    ay_chip->sound_stream_update(ay_o, 1);
+                    ay_gen_phase += (double)CLOCK_AY / 8.0 / g_sample_rate;
+                    int ay_adv = (int)ay_gen_phase;
+                    ay_gen_phase -= ay_adv;
+                    if (ay_adv < 1) ay_adv = 1;
+                    ay_chip->sound_stream_update(ay_o, ay_adv);
                     float m = (ay_o[0]+ay_o[1]+ay_o[2])/(3.0f*32768.0f);
                     buffer_l[i] = m;
                     buffer_r[i] = m;
@@ -1401,13 +1472,20 @@ void furnace_chip_render(int type, float* buffer_l, float* buffer_r, int length)
                 break;
             }
             case CHIP_SNES: {
-                // SNES SPC700 DSP - run and read stereo output
+                // SNES SPC700 DSP - native rate 32000 Hz (32 clocks per sample)
+                // Use fractional accumulator to resample 32kHz → 48kHz output
                 if (snes_chip) {
-                    short stereo_buf[2];
-                    snes_chip->set_output(stereo_buf, 1);
-                    snes_chip->run(32);  // ~32 clocks per sample at 32kHz
-                    buffer_l[i] = stereo_buf[0] / 32768.0f;
-                    buffer_r[i] = stereo_buf[1] / 32768.0f;
+                    snes_gen_phase += 32000.0 / g_sample_rate;
+                    while (snes_gen_phase >= 1.0) {
+                        snes_gen_phase -= 1.0;
+                        short stereo_buf[2];
+                        snes_chip->set_output(stereo_buf, 1);
+                        snes_chip->run(32);
+                        snes_last_l = stereo_buf[0] / 32768.0f;
+                        snes_last_r = stereo_buf[1] / 32768.0f;
+                    }
+                    buffer_l[i] = snes_last_l;
+                    buffer_r[i] = snes_last_r;
                 } else {
                     buffer_l[i] = buffer_r[i] = 0;
                 }
