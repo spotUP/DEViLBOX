@@ -240,6 +240,7 @@ const PixiGlobalContextMenu: React.FC<ContextMenuProps> = ({ x, y, items, onClos
           }}
         >
           <pixiBitmapText
+            eventMode="none"
             text={item.label}
             style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 13, fill: 0xffffff }}
             tint={item.disabled ? theme.textMuted.color : theme.text.color}
@@ -247,6 +248,7 @@ const PixiGlobalContextMenu: React.FC<ContextMenuProps> = ({ x, y, items, onClos
           />
           {hasSubmenu && (
             <pixiBitmapText
+              eventMode="none"
               text="▸"
               style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 13, fill: 0xffffff }}
               tint={theme.textMuted.color}
@@ -357,6 +359,7 @@ const PixiContextSubmenu: React.FC<SubmenuProps> = ({ items, x, y, onClose, onPo
           }}
         >
           <pixiBitmapText
+            eventMode="none"
             text={sub.label}
             style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 13, fill: 0xffffff }}
             tint={sub.disabled ? theme.textMuted.color : theme.text.color}

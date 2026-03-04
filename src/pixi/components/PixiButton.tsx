@@ -188,6 +188,7 @@ export const PixiButton: React.FC<PixiButtonProps> = ({
       {/* Icon (fontaudio) */}
       {icon && FAD_ICONS[icon] && (
         <pixiBitmapText
+          eventMode="none"
           text={FAD_ICONS[icon]}
           style={{
             fontFamily: PIXI_FONTS.ICONS,
@@ -202,6 +203,7 @@ export const PixiButton: React.FC<PixiButtonProps> = ({
       {/* Text label */}
       {(loading || label) && (
         <pixiBitmapText
+          eventMode="none"
           text={loading ? '...' : label}
           style={{
             fontFamily: variant === 'ft2' ? PIXI_FONTS.MONO_BOLD : PIXI_FONTS.SANS_SEMIBOLD,

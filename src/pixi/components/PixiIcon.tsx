@@ -28,6 +28,7 @@ export const PixiIcon: React.FC<PixiIconProps> = ({
 
   return (
     <pixiBitmapText
+      eventMode="none"
       text={char}
       style={{ fontFamily: PIXI_FONTS.ICONS, fontSize: size, fill: 0xffffff }}
       tint={color}

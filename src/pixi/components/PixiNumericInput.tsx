@@ -129,6 +129,7 @@ export const PixiNumericInput: React.FC<PixiNumericInputProps> = ({
       {/* Label */}
       {label && (
         <pixiBitmapText
+          eventMode="none"
           text={label}
           style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 12, fill: 0xffffff }}
           tint={theme.textMuted.color}
@@ -148,6 +149,7 @@ export const PixiNumericInput: React.FC<PixiNumericInputProps> = ({
         borderRadius: 4,
       }}>
         <pixiBitmapText
+          eventMode="none"
           text={displayText}
           style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 14, fill: 0xffffff }}
           tint={theme.accent.color}
