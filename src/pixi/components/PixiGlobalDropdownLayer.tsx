@@ -13,6 +13,7 @@ import type { Graphics as GraphicsType, FederatedPointerEvent } from 'pixi.js';
 import { usePixiDropdownStore } from '../stores/usePixiDropdownStore';
 import { PixiDropdownPanel } from './PixiSelect';
 import { PixiMenuItem, type MenuItem } from './PixiMenuBar';
+import { PixiColorPicker } from './PixiColorPicker';
 import { usePixiTheme } from '../theme';
 import type { ContextMenuItem } from '../input/PixiContextMenu';
 import { PIXI_FONTS } from '../fonts';
@@ -97,6 +98,16 @@ export const PixiGlobalDropdownLayer: React.FC = () => {
           onClose={dropdown.onClose}
         />
       )}
+      {dropdown?.kind === 'colorPicker' && (
+        <PixiColorPicker
+          key={dropdown.id}
+          x={dropdown.x}
+          y={dropdown.y}
+          currentColor={dropdown.currentColor}
+          onColorSelect={dropdown.onColorSelect}
+          onClose={dropdown.onClose}
+        />
+      )}
     </pixiContainer>
   );
 };
@@ -158,18 +169,22 @@ interface ContextMenuProps {
 const PixiGlobalContextMenu: React.FC<ContextMenuProps> = ({ x, y, items, onClose }) => {
   const theme = usePixiTheme();
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+  const [openSubmenuIndex, setOpenSubmenuIndex] = useState<number | null>(null);
 
   const panelH = items.reduce(
     (sum, item) => sum + (item.separator ? CTX_SEP_H : CTX_ITEM_H),
     0,
   ) + CTX_PADDING * 2;
 
+  // Compute submenu panel position for the currently open submenu
+  let submenuY = 0;
   let yOffset = CTX_PADDING;
   const rows: React.ReactNode[] = [];
 
   for (let i = 0; i < items.length; i++) {
     const item = items[i];
     const rowY = yOffset;
+    if (i === openSubmenuIndex) submenuY = rowY;
 
     if (item.separator) {
       rows.push(
@@ -187,16 +202,25 @@ const PixiGlobalContextMenu: React.FC<ContextMenuProps> = ({ x, y, items, onClos
       );
       yOffset += CTX_SEP_H;
     } else {
+      const hasSubmenu = !!(item.submenu && item.submenu.length > 0);
       const isHovered = hoveredIndex === i;
       rows.push(
         <layoutContainer
           key={i}
           eventMode={item.disabled ? 'none' : 'static'}
           cursor={item.disabled ? 'default' : 'pointer'}
-          onPointerOver={() => !item.disabled && setHoveredIndex(i)}
-          onPointerOut={() => setHoveredIndex(null)}
-          onPointerUp={() => {
+          onPointerOver={() => {
             if (item.disabled) return;
+            setHoveredIndex(i);
+            if (hasSubmenu) setOpenSubmenuIndex(i);
+            else setOpenSubmenuIndex(null);
+          }}
+          onPointerOut={() => {
+            // Don't clear hover/submenu immediately — allow moving to submenu panel
+            if (!hasSubmenu) setHoveredIndex(null);
+          }}
+          onPointerUp={() => {
+            if (item.disabled || hasSubmenu) return;
             item.action?.();
             onClose();
           }}
@@ -207,8 +231,11 @@ const PixiGlobalContextMenu: React.FC<ContextMenuProps> = ({ x, y, items, onClos
             left: 0,
             width: CTX_MENU_W,
             height: CTX_ITEM_H,
+            flexDirection: 'row',
             alignItems: 'center',
+            justifyContent: 'space-between',
             paddingLeft: 12,
+            paddingRight: 8,
             backgroundColor: isHovered && !item.disabled ? theme.bgHover.color : undefined,
           }}
         >
@@ -218,11 +245,23 @@ const PixiGlobalContextMenu: React.FC<ContextMenuProps> = ({ x, y, items, onClos
             tint={item.disabled ? theme.textMuted.color : theme.text.color}
             layout={{}}
           />
+          {hasSubmenu && (
+            <pixiBitmapText
+              text="▸"
+              style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 11, fill: 0xffffff }}
+              tint={theme.textMuted.color}
+              layout={{}}
+            />
+          )}
         </layoutContainer>,
       );
       yOffset += CTX_ITEM_H;
     }
   }
+
+  // Submenu panel
+  const openSubmenuItem = openSubmenuIndex !== null ? items[openSubmenuIndex] : null;
+  const submenuItems = openSubmenuItem?.submenu;
 
   return (
     <pixiContainer
@@ -244,6 +283,111 @@ const PixiGlobalContextMenu: React.FC<ContextMenuProps> = ({ x, y, items, onClos
         }}
       >
         {rows}
+      </layoutContainer>
+      {submenuItems && submenuItems.length > 0 && (
+        <PixiContextSubmenu
+          items={submenuItems}
+          x={CTX_MENU_W - 2}
+          y={submenuY}
+          onClose={onClose}
+          onPointerLeave={() => { setOpenSubmenuIndex(null); setHoveredIndex(null); }}
+        />
+      )}
+    </pixiContainer>
+  );
+};
+
+// ── Submenu panel ───────────────────────────────────────────────────────────
+
+interface SubmenuProps {
+  items: ContextMenuItem[];
+  x: number;
+  y: number;
+  onClose: () => void;
+  onPointerLeave: () => void;
+}
+
+const PixiContextSubmenu: React.FC<SubmenuProps> = ({ items, x, y, onClose, onPointerLeave }) => {
+  const theme = usePixiTheme();
+  const [hoveredSub, setHoveredSub] = useState<number | null>(null);
+
+  const subPanelH = items.reduce(
+    (sum, item) => sum + (item.separator ? CTX_SEP_H : CTX_ITEM_H),
+    0,
+  ) + CTX_PADDING * 2;
+
+  let subY = CTX_PADDING;
+  const subRows: React.ReactNode[] = [];
+
+  for (let j = 0; j < items.length; j++) {
+    const sub = items[j];
+    const rowY = subY;
+    if (sub.separator) {
+      subRows.push(
+        <layoutContainer
+          key={`sub-sep-${j}`}
+          layout={{ position: 'absolute', top: rowY + 4, left: 8, width: CTX_MENU_W - 16, height: 1, backgroundColor: theme.border.color }}
+        />,
+      );
+      subY += CTX_SEP_H;
+    } else {
+      const isSubHovered = hoveredSub === j;
+      subRows.push(
+        <layoutContainer
+          key={`sub-${j}`}
+          eventMode={sub.disabled ? 'none' : 'static'}
+          cursor={sub.disabled ? 'default' : 'pointer'}
+          onPointerOver={() => !sub.disabled && setHoveredSub(j)}
+          onPointerOut={() => setHoveredSub(null)}
+          onPointerUp={() => {
+            if (sub.disabled) return;
+            sub.action?.();
+            onClose();
+          }}
+          alpha={sub.disabled ? 0.4 : 1}
+          layout={{
+            position: 'absolute',
+            top: rowY,
+            left: 0,
+            width: CTX_MENU_W,
+            height: CTX_ITEM_H,
+            alignItems: 'center',
+            paddingLeft: 12,
+            backgroundColor: isSubHovered && !sub.disabled ? theme.bgHover.color : undefined,
+          }}
+        >
+          <pixiBitmapText
+            text={sub.label}
+            style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 11, fill: 0xffffff }}
+            tint={sub.disabled ? theme.textMuted.color : theme.text.color}
+            layout={{}}
+          />
+        </layoutContainer>,
+      );
+      subY += CTX_ITEM_H;
+    }
+  }
+
+  return (
+    <pixiContainer
+      layout={{ position: 'absolute', left: x, top: y }}
+      eventMode="static"
+      onPointerDown={(e: FederatedPointerEvent) => e.stopPropagation()}
+      onPointerLeave={onPointerLeave}
+    >
+      <layoutContainer
+        layout={{
+          width: CTX_MENU_W,
+          height: subPanelH,
+          flexDirection: 'column',
+          backgroundColor: theme.bgSecondary.color,
+          borderWidth: 1,
+          borderColor: theme.border.color,
+          borderRadius: 6,
+          overflow: 'hidden',
+        }}
+      >
+        {subRows}
       </layoutContainer>
     </pixiContainer>
   );
