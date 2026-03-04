@@ -129,7 +129,7 @@ export class SonicArrangerSynth implements DevilboxSynth {
     } else if (typeof note === 'number') {
       midiNote = note;
     } else {
-      midiNote = 48; // default C-3
+      midiNote = 48; // default C3 (Amiga middle register)
     }
 
     const vel = Math.round((velocity ?? 0.8) * 127);
