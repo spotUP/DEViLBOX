@@ -531,6 +531,13 @@ export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, on
             </Div>
           )}
 
+          {/* ═══════ WORKBENCH ═══════ */}
+          <SectionHeader text="WORKBENCH" />
+
+          <Txt className="text-[9px] font-mono text-text-muted leading-tight">
+            <Txt className="text-[9px] font-mono text-accent-primary">Tab</Txt>{' — hold for Exposé (fit all windows) · release to restore'}
+          </Txt>
+
           {/* ═══════ LAYOUT ═══════ */}
           <SectionHeader text="LAYOUT" />
 

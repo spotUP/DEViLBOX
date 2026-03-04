@@ -12,7 +12,7 @@
 
 # =============================================================================
 # Project: SonicArranger
-# Configurations: 
+# Configurations: Release
 # =============================================================================
 
 #############################################
@@ -20,6 +20,11 @@
 
 ninja_required_version = 1.5
 
+
+#############################################
+# Set configuration variable for custom commands.
+
+CONFIGURATION = Release
 # =============================================================================
 # Include auxiliary files.
 
@@ -44,9 +49,10 @@ cmake_ninja_workdir = /Users/spot/Code/DEViLBOX/sonic-arranger-wasm/build/
 
 build cmake_object_order_depends_target_SonicArranger: phony || .
 
-build CMakeFiles/SonicArranger.dir/src/sonic_arranger_synth.c.o: C_COMPILER__SonicArranger_unscanned_ /Users/spot/Code/DEViLBOX/sonic-arranger-wasm/src/sonic_arranger_synth.c || cmake_object_order_depends_target_SonicArranger
+build CMakeFiles/SonicArranger.dir/src/sonic_arranger_synth.c.o: C_COMPILER__SonicArranger_unscanned_Release /Users/spot/Code/DEViLBOX/sonic-arranger-wasm/src/sonic_arranger_synth.c || cmake_object_order_depends_target_SonicArranger
+  CONFIG = Release
   DEP_FILE = CMakeFiles/SonicArranger.dir/src/sonic_arranger_synth.c.o.d
-  FLAGS = -std=gnu99
+  FLAGS = -O3 -DNDEBUG -std=gnu99
   INCLUDES = -I/Users/spot/Code/DEViLBOX/sonic-arranger-wasm/include
   OBJECT_DIR = CMakeFiles/SonicArranger.dir
   OBJECT_FILE_DIR = CMakeFiles/SonicArranger.dir/src
@@ -59,7 +65,9 @@ build CMakeFiles/SonicArranger.dir/src/sonic_arranger_synth.c.o: C_COMPILER__Son
 #############################################
 # Link the executable /Users/spot/Code/DEViLBOX/public/sonic-arranger/SonicArranger.js
 
-build /Users/spot/Code/DEViLBOX/public/sonic-arranger/SonicArranger.js: C_EXECUTABLE_LINKER__SonicArranger_ CMakeFiles/SonicArranger.dir/src/sonic_arranger_synth.c.o
+build /Users/spot/Code/DEViLBOX/public/sonic-arranger/SonicArranger.js: C_EXECUTABLE_LINKER__SonicArranger_Release CMakeFiles/SonicArranger.dir/src/sonic_arranger_synth.c.o
+  CONFIG = Release
+  FLAGS = -O3 -DNDEBUG
   LINK_FLAGS = -s MODULARIZE=1 -s EXPORT_NAME=createSonicArranger -s ALLOW_MEMORY_GROWTH=1 -s ENVIRONMENT=web,worker -s INITIAL_MEMORY=8388608 -s EXPORTED_FUNCTIONS=[_malloc,_free,_sa_init,_sa_dispose,_sa_create_player,_sa_destroy_player,_sa_load_instrument,_sa_note_on,_sa_note_off,_sa_render,_sa_set_param,_sa_get_param] -s EXPORTED_RUNTIME_METHODS=[ccall,cwrap,setValue,getValue,UTF8ToString] -s FILESYSTEM=0 -s INVOKE_RUN=0 -O2
   LINK_LIBRARIES = -lm
   OBJECT_DIR = CMakeFiles/SonicArranger.dir
@@ -116,14 +124,14 @@ build all: phony /Users/spot/Code/DEViLBOX/public/sonic-arranger/SonicArranger.j
 #############################################
 # Re-run CMake if any of its inputs changed.
 
-build build.ninja /Users/spot/Code/DEViLBOX/sonic-arranger-wasm/build/cmake_install.cmake: RERUN_CMAKE | /Users/spot/Code/DEViLBOX/sonic-arranger-wasm/CMakeLists.txt /opt/homebrew/Cellar/emscripten/4.0.16/libexec/cmake/Modules/Platform/Emscripten.cmake /opt/homebrew/share/cmake/Modules/CMakeCCompiler.cmake.in /opt/homebrew/share/cmake/Modules/CMakeCInformation.cmake /opt/homebrew/share/cmake/Modules/CMakeCommonLanguageInclude.cmake /opt/homebrew/share/cmake/Modules/CMakeDetermineCCompiler.cmake /opt/homebrew/share/cmake/Modules/CMakeDetermineCompiler.cmake /opt/homebrew/share/cmake/Modules/CMakeDetermineSystem.cmake /opt/homebrew/share/cmake/Modules/CMakeFindBinUtils.cmake /opt/homebrew/share/cmake/Modules/CMakeGenericSystem.cmake /opt/homebrew/share/cmake/Modules/CMakeInitializeConfigs.cmake /opt/homebrew/share/cmake/Modules/CMakeLanguageInformation.cmake /opt/homebrew/share/cmake/Modules/CMakeNinjaFindMake.cmake /opt/homebrew/share/cmake/Modules/CMakeSystem.cmake.in /opt/homebrew/share/cmake/Modules/CMakeSystemSpecificInformation.cmake /opt/homebrew/share/cmake/Modules/CMakeSystemSpecificInitialize.cmake /opt/homebrew/share/cmake/Modules/CMakeTestCCompiler.cmake /opt/homebrew/share/cmake/Modules/Compiler/CMakeCommonCompilerMacros.cmake /opt/homebrew/share/cmake/Modules/Compiler/Clang-C.cmake /opt/homebrew/share/cmake/Modules/Compiler/Clang-FindBinUtils.cmake /opt/homebrew/share/cmake/Modules/Compiler/Clang.cmake /opt/homebrew/share/cmake/Modules/Compiler/GNU.cmake /opt/homebrew/share/cmake/Modules/Internal/CMakeCLinkerInformation.cmake /opt/homebrew/share/cmake/Modules/Internal/CMakeCommonLinkerInformation.cmake /opt/homebrew/share/cmake/Modules/Internal/CMakeInspectCLinker.cmake CMakeCache.txt CMakeFiles/4.1.1/CMakeCCompiler.cmake CMakeFiles/4.1.1/CMakeSystem.cmake
+build build.ninja /Users/spot/Code/DEViLBOX/sonic-arranger-wasm/build/cmake_install.cmake: RERUN_CMAKE | /Users/spot/Code/DEViLBOX/sonic-arranger-wasm/CMakeLists.txt /opt/homebrew/Cellar/emscripten/4.0.16/libexec/cmake/Modules/Platform/Emscripten.cmake /opt/homebrew/share/cmake/Modules/CMakeCInformation.cmake /opt/homebrew/share/cmake/Modules/CMakeCommonLanguageInclude.cmake /opt/homebrew/share/cmake/Modules/CMakeGenericSystem.cmake /opt/homebrew/share/cmake/Modules/CMakeInitializeConfigs.cmake /opt/homebrew/share/cmake/Modules/CMakeLanguageInformation.cmake /opt/homebrew/share/cmake/Modules/CMakeSystemSpecificInformation.cmake /opt/homebrew/share/cmake/Modules/CMakeSystemSpecificInitialize.cmake /opt/homebrew/share/cmake/Modules/Compiler/CMakeCommonCompilerMacros.cmake /opt/homebrew/share/cmake/Modules/Compiler/Clang-C.cmake /opt/homebrew/share/cmake/Modules/Compiler/Clang.cmake /opt/homebrew/share/cmake/Modules/Compiler/GNU.cmake /opt/homebrew/share/cmake/Modules/Internal/CMakeCLinkerInformation.cmake /opt/homebrew/share/cmake/Modules/Internal/CMakeCommonLinkerInformation.cmake CMakeCache.txt CMakeFiles/4.1.1/CMakeCCompiler.cmake CMakeFiles/4.1.1/CMakeSystem.cmake
   pool = console
 
 
 #############################################
 # A missing CMake input file is not an error.
 
-build /Users/spot/Code/DEViLBOX/sonic-arranger-wasm/CMakeLists.txt /opt/homebrew/Cellar/emscripten/4.0.16/libexec/cmake/Modules/Platform/Emscripten.cmake /opt/homebrew/share/cmake/Modules/CMakeCCompiler.cmake.in /opt/homebrew/share/cmake/Modules/CMakeCInformation.cmake /opt/homebrew/share/cmake/Modules/CMakeCommonLanguageInclude.cmake /opt/homebrew/share/cmake/Modules/CMakeDetermineCCompiler.cmake /opt/homebrew/share/cmake/Modules/CMakeDetermineCompiler.cmake /opt/homebrew/share/cmake/Modules/CMakeDetermineSystem.cmake /opt/homebrew/share/cmake/Modules/CMakeFindBinUtils.cmake /opt/homebrew/share/cmake/Modules/CMakeGenericSystem.cmake /opt/homebrew/share/cmake/Modules/CMakeInitializeConfigs.cmake /opt/homebrew/share/cmake/Modules/CMakeLanguageInformation.cmake /opt/homebrew/share/cmake/Modules/CMakeNinjaFindMake.cmake /opt/homebrew/share/cmake/Modules/CMakeSystem.cmake.in /opt/homebrew/share/cmake/Modules/CMakeSystemSpecificInformation.cmake /opt/homebrew/share/cmake/Modules/CMakeSystemSpecificInitialize.cmake /opt/homebrew/share/cmake/Modules/CMakeTestCCompiler.cmake /opt/homebrew/share/cmake/Modules/Compiler/CMakeCommonCompilerMacros.cmake /opt/homebrew/share/cmake/Modules/Compiler/Clang-C.cmake /opt/homebrew/share/cmake/Modules/Compiler/Clang-FindBinUtils.cmake /opt/homebrew/share/cmake/Modules/Compiler/Clang.cmake /opt/homebrew/share/cmake/Modules/Compiler/GNU.cmake /opt/homebrew/share/cmake/Modules/Internal/CMakeCLinkerInformation.cmake /opt/homebrew/share/cmake/Modules/Internal/CMakeCommonLinkerInformation.cmake /opt/homebrew/share/cmake/Modules/Internal/CMakeInspectCLinker.cmake CMakeCache.txt CMakeFiles/4.1.1/CMakeCCompiler.cmake CMakeFiles/4.1.1/CMakeSystem.cmake: phony
+build /Users/spot/Code/DEViLBOX/sonic-arranger-wasm/CMakeLists.txt /opt/homebrew/Cellar/emscripten/4.0.16/libexec/cmake/Modules/Platform/Emscripten.cmake /opt/homebrew/share/cmake/Modules/CMakeCInformation.cmake /opt/homebrew/share/cmake/Modules/CMakeCommonLanguageInclude.cmake /opt/homebrew/share/cmake/Modules/CMakeGenericSystem.cmake /opt/homebrew/share/cmake/Modules/CMakeInitializeConfigs.cmake /opt/homebrew/share/cmake/Modules/CMakeLanguageInformation.cmake /opt/homebrew/share/cmake/Modules/CMakeSystemSpecificInformation.cmake /opt/homebrew/share/cmake/Modules/CMakeSystemSpecificInitialize.cmake /opt/homebrew/share/cmake/Modules/Compiler/CMakeCommonCompilerMacros.cmake /opt/homebrew/share/cmake/Modules/Compiler/Clang-C.cmake /opt/homebrew/share/cmake/Modules/Compiler/Clang.cmake /opt/homebrew/share/cmake/Modules/Compiler/GNU.cmake /opt/homebrew/share/cmake/Modules/Internal/CMakeCLinkerInformation.cmake /opt/homebrew/share/cmake/Modules/Internal/CMakeCommonLinkerInformation.cmake CMakeCache.txt CMakeFiles/4.1.1/CMakeCCompiler.cmake CMakeFiles/4.1.1/CMakeSystem.cmake: phony
 
 
 #############################################
