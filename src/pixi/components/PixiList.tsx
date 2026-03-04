@@ -171,6 +171,7 @@ export const PixiList: React.FC<PixiListProps> = ({
               />
             )}
             <pixiBitmapText
+              eventMode="none"
               text={item.label}
               style={{
                 fontFamily: PIXI_FONTS.MONO,
@@ -183,6 +184,7 @@ export const PixiList: React.FC<PixiListProps> = ({
 
             {item.sublabel && (
               <pixiBitmapText
+                eventMode="none"
                 text={item.sublabel}
                 style={{
                   fontFamily: PIXI_FONTS.MONO,

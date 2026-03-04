@@ -110,6 +110,7 @@ export const PixiDropdownPanel: React.FC<PixiDropdownPanelProps> = ({
             }}
           >
             <pixiBitmapText
+              eventMode="none"
               text={opt.label}
               style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 13, fill: 0xffffff }}
               tint={isGroup ? theme.textMuted.color : opt.disabled ? theme.textMuted.color : theme.text.color}
@@ -239,12 +240,14 @@ export const PixiSelect: React.FC<PixiSelectProps> = ({
       }}
     >
       <pixiBitmapText
+        eventMode="none"
         text={selectedLabel}
         style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 13, fill: 0xffffff }}
         tint={theme.textSecondary.color}
         layout={{ position: 'absolute', left: 6, top: (height - 13) / 2 }}
       />
       <pixiBitmapText
+        eventMode="none"
         text="▾"
         style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 12, fill: 0xffffff }}
         tint={theme.textMuted.color}
