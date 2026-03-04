@@ -7,7 +7,7 @@
  * every PixiWindow mask — so they always appear on top.
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import type { FederatedPointerEvent, Container as ContainerType } from 'pixi.js';
+import type { FederatedPointerEvent, FederatedWheelEvent, Container as ContainerType } from 'pixi.js';
 import { PIXI_FONTS } from '../fonts';
 import { usePixiTheme } from '../theme';
 import { usePixiDropdownStore } from '../stores/usePixiDropdownStore';
@@ -39,15 +39,31 @@ export const PixiDropdownPanel: React.FC<PixiDropdownPanelProps> = ({
   onClose,
   width,
   visible = true,
-  maxItems = 12,
+  maxItems = 20,
   itemHeight = ITEM_H,
   layout: layoutProp,
 }) => {
   const theme = usePixiTheme();
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+  const [scrollOffset, setScrollOffset] = useState(0);
 
   const visibleCount = Math.min(options.length, maxItems);
   const panelH = visibleCount * itemHeight + PANEL_PADDING * 2;
+  const needsScroll = options.length > maxItems;
+  const maxScroll = Math.max(0, options.length - maxItems);
+
+  // Reset scroll when options change
+  useEffect(() => { setScrollOffset(0); }, [options]);
+
+  const handleWheel = useCallback((e: FederatedWheelEvent) => {
+    if (!needsScroll) return;
+    e.stopPropagation();
+    setScrollOffset(prev => Math.max(0, Math.min(maxScroll, prev + (e.deltaY > 0 ? 1 : -1))));
+  }, [needsScroll, maxScroll]);
+
+  const visibleOptions = needsScroll
+    ? options.slice(scrollOffset, scrollOffset + maxItems)
+    : options;
 
   return (
     <layoutContainer
@@ -63,12 +79,19 @@ export const PixiDropdownPanel: React.FC<PixiDropdownPanelProps> = ({
         borderWidth: 1,
         borderColor: theme.border.color,
         borderRadius: 4,
+        overflow: 'hidden',
         ...layoutProp,
       }}
       eventMode={visible ? 'static' : 'none'}
       onPointerDown={(e: FederatedPointerEvent) => e.stopPropagation()}
+      onWheel={handleWheel}
     >
-      {options.map((opt, i) => {
+      {/* Scroll-up indicator */}
+      {needsScroll && scrollOffset > 0 && (
+        <layoutContainer layout={{ width: width - PANEL_PADDING * 2, height: 2, backgroundColor: theme.accent.color, borderRadius: 1 }} />
+      )}
+      {visibleOptions.map((opt, vi) => {
+        const i = needsScroll ? vi + scrollOffset : vi;
         const isGroup = opt.value === '__group__';
         return (
           <layoutContainer
@@ -96,6 +119,10 @@ export const PixiDropdownPanel: React.FC<PixiDropdownPanelProps> = ({
           </layoutContainer>
         );
       })}
+      {/* Scroll-down indicator */}
+      {needsScroll && scrollOffset < maxScroll && (
+        <layoutContainer layout={{ width: width - PANEL_PADDING * 2, height: 2, backgroundColor: theme.accent.color, borderRadius: 1 }} />
+      )}
     </layoutContainer>
   );
 };
