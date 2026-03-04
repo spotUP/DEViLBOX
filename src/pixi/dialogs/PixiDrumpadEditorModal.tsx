@@ -494,7 +494,8 @@ export const PixiDrumpadEditorModal: React.FC<PixiDrumpadEditorModalProps> = ({
                 </Txt>
                 {currentPadMapping?.targetInstrumentId && (
                   <PixiButton
-                    label="▶"
+                    icon="play"
+                    label=""
                     variant="ghost"
                     size="sm"
                     width={28}

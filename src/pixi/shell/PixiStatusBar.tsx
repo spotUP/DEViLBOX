@@ -24,6 +24,7 @@ import { KNOB_BANKS, type KnobAssignment } from '@/midi/knobBanks';
 import type { KnobBankMode } from '@/midi/types';
 import { useWorkbenchStore } from '@stores/useWorkbenchStore';
 import { WorkbenchMinimap } from '../workbench/WorkbenchMinimap';
+import { PixiIcon } from '../components/PixiIcon';
 
 /** Main status bar height (matches DOM py-1.5 + text) */
 const STATUS_BAR_HEIGHT = 32;
@@ -364,8 +365,9 @@ const RightSide: React.FC<RightSideProps> = ({
         onPointerOut={() => setTipsHovered(false)}
         layout={{ flexDirection: 'row', alignItems: 'center', height: barHeight, marginRight: 8 }}
       >
+        <PixiIcon name="thunderbolt" size={12} color={tipsHovered ? theme.warning.color : theme.warning.color} layout={{ alignSelf: 'center' }} />
         <pixiBitmapText
-          text="💡 TIPS"
+          text="TIPS"
           style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 12, fill: 0xffffff }}
           tint={tipsHovered ? theme.warning.color : theme.warning.color}
           layout={{ alignSelf: 'center' }}

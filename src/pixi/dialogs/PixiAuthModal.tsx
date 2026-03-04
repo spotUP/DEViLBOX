@@ -7,7 +7,7 @@
 
 import React, { useState, useCallback } from 'react';
 import { useAuthStore } from '@stores/useAuthStore';
-import { PixiModal, PixiButton } from '../components';
+import { PixiModal, PixiButton, PixiIcon } from '../components';
 import { PixiPureTextInput } from '../input/PixiPureTextInput';
 import { usePixiTheme } from '../theme';
 import { PIXI_FONTS } from '../fonts';
@@ -105,12 +105,7 @@ export const PixiAuthModal: React.FC<PixiAuthModalProps> = ({ isOpen, onClose, o
             ...(closeHovered ? { backgroundColor: theme.bgHover.color } : {}),
           }}
         >
-          <pixiBitmapText
-            text="✕"
-            style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 18, fill: 0xffffff }}
-            tint={closeHovered ? theme.text.color : theme.textMuted.color}
-            layout={{}}
-          />
+          <PixiIcon name="close" size={16} color={closeHovered ? theme.text.color : theme.textMuted.color} layout={{}} />
         </layoutContainer>
       </layoutContainer>
 

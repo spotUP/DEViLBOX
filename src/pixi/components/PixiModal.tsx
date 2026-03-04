@@ -9,6 +9,7 @@ import type { Graphics as GraphicsType, FederatedPointerEvent } from 'pixi.js';
 import { useApplication } from '@pixi/react';
 import { PIXI_FONTS } from '../fonts';
 import { usePixiTheme } from '../theme';
+import { PixiIcon } from './PixiIcon';
 
 // ─── PixiModal ────────────────────────────────────────────────────────────────
 
@@ -193,12 +194,7 @@ export const PixiModalHeader: React.FC<PixiModalHeaderProps> = ({
             ...(closeHovered ? { backgroundColor: theme.bgHover.color } : {}),
           }}
         >
-          <pixiBitmapText
-            text="✕"
-            style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 16, fill: 0xffffff }}
-            tint={closeHovered ? theme.text.color : theme.textMuted.color}
-            layout={{}}
-          />
+          <PixiIcon name="close" size={16} color={closeHovered ? theme.text.color : theme.textMuted.color} layout={{}} />
         </layoutContainer>
       )}
     </layoutContainer>

@@ -603,7 +603,7 @@ export const PixiImportModuleDialog: React.FC<PixiImportModuleDialogProps> = ({
                 }}
               >
                 <PixiLabel
-                  text={`📁 ${activeCompanions.length} companion file${activeCompanions.length > 1 ? 's' : ''} loaded`}
+                  text={`${activeCompanions.length} companion file${activeCompanions.length > 1 ? 's' : ''} loaded`}
                   size="sm"
                   color="success"
                 />

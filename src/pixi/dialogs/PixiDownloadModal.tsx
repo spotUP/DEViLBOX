@@ -6,7 +6,7 @@
  */
 
 import React, { useCallback, useState } from 'react';
-import { PixiModal, PixiButton } from '../components';
+import { PixiModal, PixiButton, PixiIcon } from '../components';
 import { usePixiTheme } from '../theme';
 import { PIXI_FONTS } from '../fonts';
 
@@ -89,12 +89,7 @@ export const PixiDownloadModal: React.FC<PixiDownloadModalProps> = ({ isOpen, on
             ...(closeHovered ? { backgroundColor: theme.bgHover.color } : {}),
           }}
         >
-          <pixiBitmapText
-            text="✕"
-            style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 18, fill: 0xffffff }}
-            tint={closeHovered ? theme.text.color : theme.textMuted.color}
-            layout={{}}
-          />
+          <PixiIcon name="close" size={16} color={closeHovered ? theme.text.color : theme.textMuted.color} layout={{}} />
         </layoutContainer>
       </layoutContainer>
 
