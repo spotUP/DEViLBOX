@@ -88,14 +88,6 @@ export const PixiNumericInput: React.FC<PixiNumericInputProps> = ({
 
   const displayText = formatValue ? formatValue(value) : String(value);
 
-  const drawValueBg = useCallback((g: GraphicsType) => {
-    g.clear();
-    g.roundRect(0, 0, width, INPUT_HEIGHT, 4);
-    g.fill({ color: theme.bg.color });
-    g.roundRect(0, 0, width, INPUT_HEIGHT, 4);
-    g.stroke({ color: theme.border.color, alpha: 0.6, width: 1 });
-  }, [width, theme]);
-
   const drawArrow = useCallback((g: GraphicsType, isUp: boolean, isHovered: boolean) => {
     g.clear();
     g.roundRect(0, 0, ARROW_BTN_SIZE, ARROW_BTN_SIZE / 2, 2);
@@ -144,16 +136,24 @@ export const PixiNumericInput: React.FC<PixiNumericInputProps> = ({
         />
       )}
 
-      {/* Value display */}
-      <pixiContainer layout={{ width, height: INPUT_HEIGHT, justifyContent: 'center', alignItems: 'center' }}>
-        <pixiGraphics draw={drawValueBg} layout={{ position: 'absolute', width, height: INPUT_HEIGHT }} />
+      {/* Value display — native bg via layoutContainer */}
+      <layoutContainer layout={{
+        width,
+        height: INPUT_HEIGHT,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: theme.bg.color,
+        borderWidth: 1,
+        borderColor: theme.border.color,
+        borderRadius: 4,
+      }}>
         <pixiBitmapText
           text={displayText}
           style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 12, fill: 0xffffff }}
           tint={theme.accent.color}
           layout={{}}
         />
-      </pixiContainer>
+      </layoutContainer>
 
       {/* Arrow buttons */}
       {showButtons && (
