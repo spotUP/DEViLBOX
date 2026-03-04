@@ -348,6 +348,61 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
             </div>
           </section>
 
+          {/* Lens Distortion Section */}
+          <section>
+            <h3 className="text-ft2-highlight text-xs font-bold mb-3 tracking-wide">LENS DISTORTION</h3>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <label className="text-ft2-text text-xs font-mono">Lens Effect:</label>
+                  <div className="text-[9px] text-ft2-textDim font-mono">Fish-eye, barrel, chromatic aberration</div>
+                </div>
+                <Toggle label="" value={lensEnabled} onChange={setLensEnabled} size="sm" />
+              </div>
+
+              {lensEnabled && (
+                <div className="space-y-2">
+                  <div className="text-[9px] text-ft2-highlight font-mono font-bold tracking-wide">PRESET</div>
+                  <div className="flex flex-wrap gap-1">
+                    {LENS_PRESET_ORDER.filter((p) => p !== 'off').map((presetKey) => {
+                      const preset = LENS_PRESETS[presetKey];
+                      return (
+                        <button
+                          key={presetKey}
+                          onClick={() => {
+                            setLensPreset(presetKey);
+                            setLensParam('barrel', preset.params.barrel);
+                            setLensParam('chromatic', preset.params.chromatic);
+                            setLensParam('vignette', preset.params.vignette);
+                          }}
+                          className={`text-[10px] font-mono px-2 py-0.5 border transition-colors ${
+                            lensPreset === presetKey
+                              ? 'border-ft2-highlight text-ft2-highlight bg-ft2-highlight/10'
+                              : 'border-ft2-border text-ft2-textDim hover:border-ft2-highlight hover:text-ft2-highlight'
+                          }`}
+                        >
+                          {preset.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <div className="text-[9px] text-ft2-highlight font-mono font-bold tracking-wide pt-1">MANUAL</div>
+                  <CRTSlider label="Barrel"    value={lensParams.barrel}    min={-0.5} max={1}   step={0.01} onChange={(v) => { setLensParam('barrel', v); setLensPreset('custom'); }} />
+                  <CRTSlider label="Chromatic" value={lensParams.chromatic} min={0}    max={1}   step={0.01} onChange={(v) => { setLensParam('chromatic', v); setLensPreset('custom'); }} />
+                  <CRTSlider label="Vignette"  value={lensParams.vignette}  min={0}    max={1}   step={0.01} onChange={(v) => { setLensParam('vignette', v); setLensPreset('custom'); }} />
+
+                  <button
+                    onClick={resetLensParams}
+                    className="w-full text-[10px] font-mono text-ft2-textDim border border-ft2-border hover:border-ft2-highlight hover:text-ft2-highlight px-2 py-1 transition-colors mt-1"
+                  >
+                    Reset to defaults
+                  </button>
+                </div>
+              )}
+            </div>
+          </section>
+
           {/* Workbench Section */}
           <section>
             <h3 className="text-ft2-highlight text-xs font-bold mb-3 tracking-wide">WORKBENCH</h3>
