@@ -3,7 +3,7 @@
  * Mirrors the DOM CollaborationToolbar, shown when a session is connected.
  */
 
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import type { Graphics as GraphicsType } from 'pixi.js';
 import { PixiButton, PixiLabel } from '../../components';
 import { PixiSelect, type SelectOption } from '../../components/PixiSelect';
@@ -43,6 +43,18 @@ export const PixiCollaborationToolbar: React.FC = () => {
 
   const visible = status === 'connected';
   const [copyFeedback, setCopyFeedback] = useState(false);
+  const [pulseAlpha, setPulseAlpha] = useState(1);
+
+  useEffect(() => {
+    if (status !== 'connected') return;
+    let frame: number;
+    const pulse = () => {
+      setPulseAlpha(0.5 + 0.5 * Math.sin(Date.now() / 500));
+      frame = requestAnimationFrame(pulse);
+    };
+    frame = requestAnimationFrame(pulse);
+    return () => cancelAnimationFrame(frame);
+  }, [status]);
 
   const handleCopyRoom = useCallback(() => {
     if (!roomCode) return;
@@ -164,6 +176,7 @@ export const PixiCollaborationToolbar: React.FC = () => {
         {/* Green dot + Connected label */}
         <pixiGraphics
           draw={drawDot}
+          alpha={pulseAlpha}
           layout={{ width: DOT_SIZE, height: DOT_SIZE, alignSelf: 'center' }}
         />
         <PixiLabel text="Connected" size="xs" color="success" layout={{ alignSelf: 'center' }} />
