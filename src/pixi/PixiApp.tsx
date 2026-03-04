@@ -46,6 +46,93 @@ declare global {
 
 let initPromise: Promise<void> | null = null;
 
+/**
+ * Monkey-patch Yoga Node prototype to guard insertChild/removeChild against
+ * BindingErrors caused by stale/freed nodes during React reconciliation.
+ * The error "Expected null or instance of Node, got an instance of Node"
+ * occurs when @pixi/layout tries to reparent a Yoga node that was freed
+ * or belongs to a different WASM instance.
+ */
+function patchYogaNodePrototype(yoga: any): void {
+  if (yoga.__nodePatched) return;
+  yoga.__nodePatched = true;
+
+  const configObj = yoga.Config.create();
+  const sampleNode = yoga.Node.create(configObj);
+  const proto = Object.getPrototypeOf(sampleNode);
+  sampleNode.free();
+  configObj.free();
+
+  if (!proto) return;
+
+  const origInsert = proto.insertChild;
+  const origRemove = proto.removeChild;
+
+  if (origInsert) {
+    proto.insertChild = function safeInsertChild(child: any, index: number) {
+      try {
+        return origInsert.call(this, child, index);
+      } catch (e: any) {
+        if (e?.name === 'BindingError') return;
+        throw e;
+      }
+    };
+  }
+  if (origRemove) {
+    proto.removeChild = function safeRemoveChild(child: any) {
+      try {
+        return origRemove.call(this, child);
+      } catch (e: any) {
+        if (e?.name === 'BindingError') return;
+        throw e;
+      }
+    };
+  }
+
+  const origFree = proto.free;
+  if (origFree) {
+    proto.free = function safeFree() {
+      try {
+        return origFree.call(this);
+      } catch (e: any) {
+        if (e?.name === 'BindingError') return;
+        throw e;
+      }
+    };
+  }
+
+  const origGetParent = proto.getParent;
+  if (origGetParent) {
+    proto.getParent = function safeGetParent() {
+      try {
+        return origGetParent.call(this);
+      } catch (e: any) {
+        if (e?.name === 'BindingError') return null;
+        throw e;
+      }
+    };
+  }
+
+  // Guard getChildCount and calculateLayout which also touch WASM bindings
+  for (const method of ['getChildCount', 'getChild', 'calculateLayout', 'getComputedLayout'] as const) {
+    const orig = proto[method];
+    if (orig) {
+      proto[method] = function safeguarded(...args: any[]) {
+        try {
+          return orig.apply(this, args);
+        } catch (e: any) {
+          if (e?.name === 'BindingError') {
+            if (method === 'getChildCount') return 0;
+            if (method === 'getComputedLayout') return { left: 0, top: 0, width: 0, height: 0, right: 0, bottom: 0 };
+            return null;
+          }
+          throw e;
+        }
+      };
+    }
+  }
+}
+
 function initPixiLayout(): Promise<void> {
   if (!initPromise) {
     initPromise = (async () => {
@@ -54,6 +141,8 @@ function initPixiLayout(): Promise<void> {
         yoga = await loadYoga();
         window.__pixiYogaInstance = yoga;
       }
+      // Guard Yoga node ops against BindingErrors from stale nodes
+      patchYogaNodePrototype(yoga);
       // Always re-set so @pixi/layout uses the instance even after HMR
       setYoga(yoga);
       // Reuse the same Config object across HMR reloads. Creating a new Config

@@ -20,3 +20,4 @@ export type { MenuSeparator, MenuAction, MenuCheckbox, MenuItem, Menu } from './
 export { PixiMenuBar } from './PixiMenuBar';
 export type { Tab } from './PixiTabBar';
 export { PixiTabBar } from './PixiTabBar';
+export { PixiIcon } from './PixiIcon';
