@@ -173,6 +173,7 @@ export interface GTUltraState {
 
   // Request data refresh from WASM engine
   refreshPatternData: (pattern: number) => void;
+  refreshAllPatterns: (numPatterns: number) => void;
   refreshAllOrders: () => void;
   refreshAllInstruments: () => void;
   refreshAllTables: () => void;
@@ -411,6 +412,14 @@ export const useGTUltraStore = create<GTUltraState>()((set, get) => ({
 
   refreshPatternData: (pattern) => {
     get().engine?.requestPatternData(pattern);
+  },
+
+  refreshAllPatterns: (numPatterns) => {
+    const engine = get().engine;
+    if (!engine) return;
+    for (let p = 0; p < numPatterns; p++) {
+      engine.requestPatternData(p);
+    }
   },
 
   refreshAllOrders: () => {
