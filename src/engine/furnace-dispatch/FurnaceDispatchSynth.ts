@@ -195,11 +195,16 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
 
     console.log(`[FurnaceDispatchSynth] Encoding and uploading instrument ${this.furnaceInstrumentIndex} "${name}" to platform ${this.platformType}`);
 
+    // Inject chip-required macros that the platform needs to produce sound.
+    // Some platforms (e.g., Lynx) need a duty macro to oscillate — without it,
+    // the LFSR feedback register stays 0 and no waveform is generated.
+    const enriched = this.injectChipRequiredMacros(config as unknown as FurnaceConfig);
+
     // Encode from config using our encoder
     // The raw binary data from .fur files is in INS2 format, but the WASM expects
     // the 0xF0 0xB1 format with proper offsets. Our encoder handles this conversion.
     const { updateFurnaceInstrument } = await import('@lib/export/FurnaceInstrumentEncoder');
-    const binaryData = updateFurnaceInstrument(config as unknown as import('@typedefs/instrument').FurnaceConfig, name, this.furnaceInstrumentIndex);
+    const binaryData = updateFurnaceInstrument(enriched as unknown as import('@typedefs/instrument').FurnaceConfig, name, this.furnaceInstrumentIndex);
     console.log(`[FurnaceDispatchSynth] Encoded ${binaryData.length} bytes for instrument ${this.furnaceInstrumentIndex}`);
     this.engine.uploadFurnaceInstrument(this.furnaceInstrumentIndex, binaryData, this.platformType);
 
@@ -454,30 +459,30 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
       case P.YMZ280B:
       case P.QSOUND:
       case P.MULTIPCM:
-        if (!hasModuleSamples) { this.loadTestSample8bit(); this.engine.renderSamples(pt); }
+        if (!hasModuleSamples) { this.loadTestSample8bit(); this.uploadSampleInstrument(); this.engine.renderSamples(pt); }
         for (let ch = 0; ch < numCh; ch++) { setIns(ch, 0); setVol(ch, maxVol); }
         break;
       // === RF5C68 and GA20: standard signed 8-bit (WASM renderSamples converts) ===
       case P.RF5C68:
       case P.GA20:
-        if (!hasModuleSamples) { this.loadTestSample8bit(); this.engine.renderSamples(pt); }
+        if (!hasModuleSamples) { this.loadTestSample8bit(); this.uploadSampleInstrument(); this.engine.renderSamples(pt); }
         for (let ch = 0; ch < numCh; ch++) { setIns(ch, 0); setVol(ch, maxVol); }
         break;
       // === VOX ADPCM chips ===
       case P.MSM6258:
       case P.MSM6295:
-        if (!hasModuleSamples) { this.loadTestSampleVOX(); this.engine.renderSamples(pt); }
+        if (!hasModuleSamples) { this.loadTestSampleVOX(); this.uploadSampleInstrument(); this.engine.renderSamples(pt); }
         for (let ch = 0; ch < numCh; ch++) { setIns(ch, 0); setVol(ch, maxVol); }
         break;
       case P.ES5506:
       case P.C140:
       case P.C219:
       case P.PCM_DAC:
-        if (!hasModuleSamples) { this.loadTestSample16bit(); this.engine.renderSamples(pt); }
+        if (!hasModuleSamples) { this.loadTestSample16bit(); this.uploadSampleInstrument(); this.engine.renderSamples(pt); }
         for (let ch = 0; ch < numCh; ch++) { setIns(ch, 0); setVol(ch, maxVol); }
         break;
       case P.SNES:
-        if (!hasModuleSamples) { this.loadTestSampleBRR(); this.engine.renderSamples(pt); }
+        if (!hasModuleSamples) { this.loadTestSampleBRR(); this.uploadSampleInstrument(); this.engine.renderSamples(pt); }
         for (let ch = 0; ch < numCh; ch++) { setIns(ch, 0); setVol(ch, maxVol); }
         break;
 
@@ -587,6 +592,35 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
       this.engine.setInstrument(ch, 0, pt);
       this.engine.setVolume(ch, 15, pt);
     }
+  }
+
+  /**
+   * Inject chip-required macros into a user-supplied config before encoding.
+   * Some chips need specific macros to produce any sound at all:
+   * - Lynx: duty macro (code=2) with value [1] for LFSR feedback
+   * - VERA: wave macro (code=3) with value [0] for pulse waveform
+   */
+  private injectChipRequiredMacros(config: FurnaceConfig): FurnaceConfig {
+    const P = FurnaceDispatchPlatform;
+    const pt = this.platformType;
+    const macros = [...(config.macros || [])];
+    let modified = false;
+
+    if (pt === P.LYNX) {
+      // Lynx needs duty macro to set LFSR feedback register
+      if (!macros.some(m => (m.code ?? m.type) === 2)) {
+        macros.push({ code: 2, type: 0, data: [1], loop: -1, release: -1, mode: 0 });
+        modified = true;
+      }
+    } else if (pt === P.VERA) {
+      // VERA PSG needs wave macro for waveform selection
+      if (!macros.some(m => (m.code ?? m.type) === 3)) {
+        macros.push({ code: 3, type: 0, data: [0], loop: -1, release: -1, mode: 0 });
+        modified = true;
+      }
+    }
+
+    return modified ? { ...config, macros } : config;
   }
 
   /**
@@ -742,6 +776,23 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
     header.setUint32(16, centerRate, true);    // centerRate
     header.setUint8(22, loop ? 1 : 0);        // loop flag
     return header;
+  }
+
+  /**
+   * Upload a sample-pointing Amiga instrument to slot 0.
+   * This ensures the chip's dispatch uses `amiga.useSample=true` when playing notes.
+   * Without this, the default FM/PSG instrument (uploaded by the user config or
+   * setupDefaultInstrument) doesn't reference any sample → silence on sample chips.
+   *
+   * Binary format: [type(1), initSample(2), flags(1), waveLen(1)]
+   */
+  private uploadSampleInstrument(): void {
+    const data = new Uint8Array(5);
+    data[0] = 4; // DIV_INS_AMIGA
+    data[1] = 0; data[2] = 0; // initSample = 0 (little-endian short)
+    data[3] = 0x02; // flags: bit1 = useSample
+    data[4] = 0;    // waveLen = 0
+    this.engine.setAmigaInstrument(0, data, this.platformType);
   }
 
   /**
