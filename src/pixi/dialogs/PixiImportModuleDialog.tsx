@@ -249,7 +249,6 @@ export const PixiImportModuleDialog: React.FC<PixiImportModuleDialogProps> = ({
   // Auto-load initial file
   useEffect(() => {
     if (initialFile && isOpen) {
-      console.log('[SID-DEBUG] PixiImportModuleDialog auto-loading:', initialFile.name);
       handleFileSelect(initialFile);
     }
   }, [initialFile, isOpen, handleFileSelect]);
@@ -391,9 +390,8 @@ export const PixiImportModuleDialog: React.FC<PixiImportModuleDialogProps> = ({
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
-  if (!isOpen) { console.log('[SID-DEBUG] PixiImportModuleDialog: isOpen=false, returning null'); return null; }
+  if (!isOpen) return null;
 
-  console.log('[SID-DEBUG] PixiImportModuleDialog rendering, isLoading:', isLoading, 'moduleInfo:', !!moduleInfo, 'error:', error);
   const accentBg = blendColor(theme.bg.color, theme.accent.color, 0.2);
 
   return (

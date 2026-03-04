@@ -99,8 +99,6 @@ export const PixiRoot: React.FC = () => {
   const setPendingSunVoxFile = useUIStore(s => s.setPendingSunVoxFile);
   const pendingModuleFile = useUIStore(s => s.pendingModuleFile);
   const setPendingModuleFile = useUIStore(s => s.setPendingModuleFile);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { if (pendingModuleFile) console.log('[SID-DEBUG] PixiRoot pendingModuleFile:', pendingModuleFile.name); }, [pendingModuleFile]);
   const pendingCompanionFiles = useUIStore(s => s.pendingCompanionFiles);
   const pendingAudioFile = useUIStore(s => s.pendingAudioFile);
   const setPendingAudioFile = useUIStore(s => s.setPendingAudioFile);
@@ -353,40 +351,33 @@ export const PixiRoot: React.FC = () => {
         )}
         <PixiAuthModal isOpen={modalOpen === 'auth'} onClose={closeModal} />
         <PixiRomUploadDialog />
-        {/* Module file imports — routed by file extension */}
-        {pendingModuleFile && (
-          /\.(fur|dmf)$/i.test(pendingModuleFile.name) ? (
-            <PixiImportFurnaceDialog
-              isOpen={true}
-              onClose={() => { setPendingModuleFile(null); useUIStore.getState().setPendingCompanionFiles([]); }}
-              onImport={handleModuleImportGL}
-              initialFile={pendingModuleFile}
-            />
-          ) : /\.(mid|midi)$/i.test(pendingModuleFile.name) ? (
-            <PixiImportMIDIDialog
-              isOpen={true}
-              onClose={() => { setPendingModuleFile(null); useUIStore.getState().setPendingCompanionFiles([]); }}
-              onImport={handleModuleImportGL}
-              initialFile={pendingModuleFile}
-            />
-          ) : (
-            <PixiImportModuleDialog
-              isOpen={true}
-              onClose={() => { setPendingModuleFile(null); useUIStore.getState().setPendingCompanionFiles([]); }}
-              onImport={handleModuleImportGL}
-              initialFile={pendingModuleFile}
-              companionFiles={pendingCompanionFiles}
-            />
-          )
-        )}
+        {/* Module file imports — always mounted, isOpen controls visibility
+             (conditional mount/unmount can fail silently in pixi-react reconciler) */}
+        <PixiImportFurnaceDialog
+          isOpen={!!pendingModuleFile && /\.(fur|dmf)$/i.test(pendingModuleFile.name)}
+          onClose={() => { setPendingModuleFile(null); useUIStore.getState().setPendingCompanionFiles([]); }}
+          onImport={handleModuleImportGL}
+          initialFile={pendingModuleFile}
+        />
+        <PixiImportMIDIDialog
+          isOpen={!!pendingModuleFile && /\.(mid|midi)$/i.test(pendingModuleFile.name)}
+          onClose={() => { setPendingModuleFile(null); useUIStore.getState().setPendingCompanionFiles([]); }}
+          onImport={handleModuleImportGL}
+          initialFile={pendingModuleFile}
+        />
+        <PixiImportModuleDialog
+          isOpen={!!pendingModuleFile && !/\.(fur|dmf|mid|midi)$/i.test(pendingModuleFile.name)}
+          onClose={() => { setPendingModuleFile(null); useUIStore.getState().setPendingCompanionFiles([]); }}
+          onImport={handleModuleImportGL}
+          initialFile={pendingModuleFile}
+          companionFiles={pendingCompanionFiles}
+        />
         {/* Audio sample import */}
-        {pendingAudioFile && (
-          <PixiImportAudioDialog
-            isOpen={true}
-            onClose={() => setPendingAudioFile(null)}
-            initialFile={pendingAudioFile}
-          />
-        )}
+        <PixiImportAudioDialog
+          isOpen={!!pendingAudioFile}
+          onClose={() => setPendingAudioFile(null)}
+          initialFile={pendingAudioFile}
+        />
         <PixiExportDialog isOpen={modalOpen === 'export'} onClose={closeModal} />
         {showFileBrowser && (
           <PixiFileBrowser
