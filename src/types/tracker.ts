@@ -107,6 +107,11 @@ export interface TrackerCell {
   // Sonic Arranger: per-row instrument arpeggio table selector
   // 0 = no instrument arp (use XM 0xy if present), 1-3 = SA arp table 0-2
   saArpTable?: number;
+
+  // Sonic Arranger: raw SA effect/arg for WASM-direct routing
+  // Effects 1,2,4,7,8,A are handled by WASM synth, not XM replayer
+  saEffect?: number;
+  saEffectArg?: number;
 }
 
 export interface TrackerRow {

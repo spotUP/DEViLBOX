@@ -663,21 +663,17 @@ export async function parseSonicArrangerFile(
       case 0x0:  // Arpeggio
         if (arg !== 0) { effTyp = 0x00; effVal = arg; }
         break;
-      case 0x1:  // SetSlideSpeed — portamento up (positive) or down (negative arg nibble)
-        if (arg & 0xF0) { effTyp = 0x02; effVal = arg >> 4; }   // portamento down
-        else if (arg & 0x0F) { effTyp = 0x01; effVal = arg & 0x0F; } // portamento up
-        break;
-      case 0x4:  // SetVibrato → XM 4xy
-        effTyp = 0x04; effVal = arg;
-        break;
+      // Effects 1, 2, 4, 7, 8, A are routed directly to WASM synth via replayer.
+      // They are stored in saEffect/saEffectArg fields, not mapped to XM effects.
+      case 0x1:  // SetSlideSpeed — handled by WASM paramId 16
+      case 0x2:  // RestartAdsr — handled by WASM paramId 13
+      case 0x4:  // SetVibrato — handled by WASM paramId 12
+      case 0x7:  // SetPortamento — handled by WASM paramId 15
+      case 0x8:  // SkipPortamento — handled by WASM paramId 14
+      case 0xA:  // VolumeSlide — handled by WASM paramId 17
+        break;  // no XM mapping; raw values stored in TrackerCell.saEffect/saEffectArg
       case 0x6:  // SetMasterVolume → XM Gxx (global volume)
         effTyp = 0x10; effVal = Math.min(arg, 64);
-        break;
-      case 0x7:  // SetPortamento → XM 3xx (portamento to note)
-        effTyp = 0x03; effVal = arg;
-        break;
-      case 0xA:  // VolumeSlide → XM Axy
-        effTyp = 0x0A; effVal = arg;
         break;
       case 0xB:  // PositionJump → XM Bxx
         effTyp = 0x0B; effVal = arg;
@@ -694,7 +690,7 @@ export async function parseSonicArrangerFile(
       case 0xF:  // SetSpeed → XM Fxx
         effTyp = 0x0F; effVal = arg;
         break;
-      // 2=RestartAdsr, 5=Sync, 8=SkipPortamento, 9=SetTrackLen → no XM equivalent
+      // 5=Sync, 9=SetTrackLen → no XM equivalent
       default: break;
     }
     return { effTyp, eff: effVal, volCol };
@@ -783,7 +779,7 @@ export async function parseSonicArrangerFile(
         const tl    = tlidx < trackLines.length ? trackLines[tlidx] : null;
 
         if (!tl || (tl.note === 0 && tl.instr === 0 && tl.effect === 0 && tl.effArg === 0)) {
-          rows.push({ note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0, saArpTable: tl?.arpeggioTable ?? 0 });
+          rows.push({ note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0, saArpTable: tl?.arpeggioTable ?? 0, saEffect: 0, saEffectArg: 0 });
           continue;
         }
 
@@ -825,6 +821,8 @@ export async function parseSonicArrangerFile(
           effTyp2: 0,
           eff2:    0,
           saArpTable: tl.arpeggioTable,
+          saEffect: tl.effect,
+          saEffectArg: tl.effArg,
         });
       }
 

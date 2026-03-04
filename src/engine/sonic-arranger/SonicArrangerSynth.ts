@@ -237,6 +237,42 @@ export class SonicArrangerSynth implements DevilboxSynth {
           });
         }
         break;
+      case 'setVibrato':
+        // SA effect 4: SetVibrato — packed arg 0xXY
+        if (this._playerHandle >= 0) {
+          this.engine.sendMessage({ type: 'setParam', handle: this._playerHandle, paramId: 12, value });
+        }
+        break;
+      case 'restartAdsr':
+        // SA effect 2: RestartAdsr — set ADSR position
+        if (this._playerHandle >= 0) {
+          this.engine.sendMessage({ type: 'setParam', handle: this._playerHandle, paramId: 13, value });
+        }
+        break;
+      case 'skipPortamento':
+        // SA effect 8: zero portamento speed
+        if (this._playerHandle >= 0) {
+          this.engine.sendMessage({ type: 'setParam', handle: this._playerHandle, paramId: 14, value: 0 });
+        }
+        break;
+      case 'setPortamento':
+        // SA effect 7: set portamento speed directly
+        if (this._playerHandle >= 0) {
+          this.engine.sendMessage({ type: 'setParam', handle: this._playerHandle, paramId: 15, value });
+        }
+        break;
+      case 'setSlideSpeed':
+        // SA effect 1: signed byte slide speed
+        if (this._playerHandle >= 0) {
+          this.engine.sendMessage({ type: 'setParam', handle: this._playerHandle, paramId: 16, value });
+        }
+        break;
+      case 'volumeSlide':
+        // SA effect A: signed byte volume slide speed
+        if (this._playerHandle >= 0) {
+          this.engine.sendMessage({ type: 'setParam', handle: this._playerHandle, paramId: 17, value });
+        }
+        break;
     }
   }
 
