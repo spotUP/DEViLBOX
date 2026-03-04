@@ -1753,6 +1753,14 @@ export class TrackerReplayer {
           ch.sampleOffset = param > 0 ? param : ch.sampleOffset;
         }
 
+        // PT2: volumeChange runs inside checkMoreEffects (called from setPeriod)
+        // BEFORE the note triggers, so CXX volume is used for the note's velocity
+        // and VU meter. Apply CXX here before triggerNote.
+        if (effect === 0xC) {
+          ch.volume = Math.min(64, param);
+          ch.gainNode.gain.setValueAtTime(ch.volume / 64, time);
+        }
+
         // TB-303 slide semantics
         const slideActive = ch.previousSlideFlag && noteValue !== null && !hammer;
         const is303Synth = ch.instrument?.synthType === 'TB303' ||
@@ -1961,6 +1969,12 @@ export class TrackerReplayer {
       case 0xC: // Set volume
         ch.volume = Math.min(64, param);
         ch.gainNode.gain.setValueAtTime(ch.volume / 64, time);
+        // PT2: setVisualsVolume runs on every tick 0 (intMusic line 1391)
+        // Trigger VU meter update so volume-only rows (no note) still show activity
+        if (chIndex !== undefined) {
+          const engine = getToneEngine();
+          engine.triggerChannelMeter(chIndex, ch.volume / 64);
+        }
         break;
 
       case 0xD: // Pattern break
