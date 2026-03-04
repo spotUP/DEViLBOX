@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-03-04T12:33:16.518Z
+ * Generated: 2026-03-04T12:53:31.367Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.2214';
-export const BUILD_NUMBER = '2214';
-export const BUILD_HASH = 'de03e595';
+export const BUILD_VERSION = '1.0.2215';
+export const BUILD_NUMBER = '2215';
+export const BUILD_HASH = 'b9f106eb';
 export const BUILD_DATE = '2026-03-04';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,13 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.2214',
+    version: '1.0.2215',
     date: '2026-03-04',
     changes: [
+      {
+        type: 'fix',
+        "description": "Fix GT Ultra pattern data not loading after song load"
+      },
       {
         type: 'fix',
         "description": "Welcome modal 'Start Jamming' button clipped by overflow"
@@ -228,10 +232,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         "description": "MAME synths sound never stops — stale note in triggerAttackRelease"
-      },
-      {
-        type: 'improvement',
-        "description": "Wire 3 GL dialogs into PixiRoot, remove from bridge"
       }
     ]
   }
