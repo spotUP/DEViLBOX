@@ -24,6 +24,8 @@ import type { ModuleInfo } from '@/lib/import/ModuleLoader';
 import type { ImportOptions } from '@/components/dialogs/ImportModuleDialog';
 import { usePixiResponsive } from './hooks/usePixiResponsive';
 import { PixiPeerCursor } from './views/collaboration/PixiPeerCursor';
+import { PixiCollaborationToolbar } from './views/collaboration/PixiCollaborationToolbar';
+import { PixiCollaborationSplitView } from './views/collaboration/PixiCollaborationSplitView';
 import { PixiGlobalDropdownLayer } from './components/PixiGlobalDropdownLayer';
 import { PixiGlobalTooltipLayer } from './components/PixiGlobalTooltipLayer';
 import { PixiMainLayout } from './shell/PixiMainLayout';
@@ -415,6 +417,9 @@ export const PixiRoot: React.FC = () => {
         <PixiArrangementContextMenu />
       </pixiContainer>
 
+      {/* Collaboration split view — overlays tracker area */}
+      <PixiCollaborationSplitView />
+
       {/* Peer cursor overlay — above everything */}
       <pixiContainer
         zIndex={200}
@@ -424,6 +429,7 @@ export const PixiRoot: React.FC = () => {
         layout={{ position: 'absolute', width, height }}
       >
         <PixiPeerCursor width={width} height={height} />
+        <PixiCollaborationToolbar />
       </pixiContainer>
     </pixiContainer>
   );
