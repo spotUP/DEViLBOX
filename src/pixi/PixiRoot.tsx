@@ -43,6 +43,8 @@ import { PixiTipOfTheDay } from './dialogs/PixiTipOfTheDay';
 import { PixiCollaborationModal } from './dialogs/PixiCollaborationModal';
 import { PixiRevisionBrowserDialog } from './dialogs/PixiRevisionBrowserDialog';
 import { PixiFurnacePresetBrowser } from './dialogs/PixiFurnacePresetBrowser';
+import { PixiSIDInfoModal } from './dialogs/PixiSIDInfoModal';
+import { PixiArrangementContextMenu } from './dialogs/PixiArrangementContextMenu';
 
 export const PixiRoot: React.FC = () => {
   const { width, height } = usePixiResponsive();
@@ -167,9 +169,11 @@ export const PixiRoot: React.FC = () => {
         <PixiCollaborationModal isOpen={modalOpen === 'collaboration'} onClose={closeModal} />
         <PixiRevisionBrowserDialog isOpen={modalOpen === 'revisions'} onClose={closeModal} />
         <PixiFurnacePresetBrowser isOpen={modalOpen === 'furnacePresets'} onClose={closeModal} />
+        <PixiSIDInfoModal isOpen={modalOpen === 'sidInfo'} onClose={closeModal} />
         <PixiClipRenameDialog />
         <PixiTrackRenameDialog />
         <PixiSynthErrorDialog />
+        <PixiArrangementContextMenu />
       </pixiContainer>
 
       {/* Peer cursor overlay — above everything */}

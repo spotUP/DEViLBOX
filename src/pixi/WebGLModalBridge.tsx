@@ -88,11 +88,6 @@ const LazyImportTD3Dialog = lazy(() =>
 const LazySunVoxImportDialog = lazy(() =>
   import('@/components/instruments/SunVoxImportDialog').then(m => ({ default: m.SunVoxImportDialog }))
 );
-const LazySIDInfoModal = lazy(() =>
-  import('@/components/dialogs/SIDInfoModal').then(m => ({ default: m.SIDInfoModal }))
-);
-const LazyArrangementContextMenu = lazy(() =>
-  import('@/components/arrangement/ArrangementContextMenu').then(m => ({ default: m.ArrangementContextMenu }))
 );
 
 export const WebGLModalBridge: React.FC = () => {
@@ -539,12 +534,6 @@ export const WebGLModalBridge: React.FC = () => {
           initialFile={pendingSunVoxFile}
         />
       )}
-      {/* SID file info modal (DeepSID metadata + composer profile) */}
-      {modalOpen === 'sidInfo' && (
-        <LazySIDInfoModal onClose={closeModal} />
-      )}
-      {/* Arrangement clip right-click context menu */}
-      <LazyArrangementContextMenu />
 
       {/* Always-mounted dialogs */}
       <LazyRomUploadDialog />
