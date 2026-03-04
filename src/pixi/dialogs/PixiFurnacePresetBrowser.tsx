@@ -13,6 +13,7 @@ import type { SynthType } from '@typedefs/instrument';
 import { usePixiTheme } from '../theme';
 import { Div, Txt, GlModal, GlModalFooter } from '../layout';
 import { PIXI_FONTS } from '../fonts';
+import { PixiIcon } from '../components/PixiIcon';
 import type { FederatedWheelEvent } from 'pixi.js';
 
 // ---------------------------------------------------------------------------
@@ -206,7 +207,7 @@ export const PixiFurnacePresetBrowser: React.FC<PixiFurnacePresetBrowserProps> =
           onPointerUp={onClose}
           layout={{ padding: 4 }}
         >
-          <Txt className="text-sm font-bold text-text-muted">✕</Txt>
+          <PixiIcon name="close" size={14} color={theme.textMuted.color} layout={{}} />
         </Div>
       </Div>
 

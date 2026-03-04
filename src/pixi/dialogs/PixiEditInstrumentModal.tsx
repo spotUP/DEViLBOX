@@ -353,14 +353,16 @@ export const PixiEditInstrumentModal: React.FC<PixiEditInstrumentModalProps> = (
               }}
             >
               <PixiButton
-                label="◀"
+                icon="prev"
+                label=""
                 variant="ghost"
                 size="sm"
                 disabled={instIdx <= 0}
                 onClick={handlePrev}
               />
               <PixiButton
-                label="▶"
+                icon="next"
+                label=""
                 variant="ghost"
                 size="sm"
                 disabled={instIdx >= instruments.length - 1}

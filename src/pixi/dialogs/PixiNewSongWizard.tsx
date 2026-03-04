@@ -16,7 +16,7 @@ import { useTabsStore } from '@stores/useTabsStore';
 import { getGroupedPresets, SYSTEM_PRESETS } from '@constants/systemPresets';
 import type { SystemPreset } from '@constants/systemPresets';
 import { AMIGA_UADE_PRESET_IDS, getInstrumentPresetsForSystem } from '@constants/uadeInstrumentPresets';
-import { PixiButton } from '../components';
+import { PixiButton, PixiIcon } from '../components';
 import { PixiPureTextInput } from '../input/PixiPureTextInput';
 import { usePixiTheme } from '../theme';
 import { PIXI_FONTS } from '../fonts';
@@ -186,12 +186,7 @@ export const PixiNewSongWizard: React.FC = () => {
               borderRadius: 4,
             }}
           >
-            <pixiBitmapText
-              text="✕"
-              style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 16, fill: 0xffffff }}
-              tint={theme.textMuted.color}
-              layout={{}}
-            />
+            <PixiIcon name="close" size={16} color={theme.textMuted.color} layout={{}} />
           </layoutContainer>
         </layoutContainer>
 

@@ -537,7 +537,8 @@ const EffectChainRow: React.FC<EffectChainRowProps> = ({
           onClick={(e) => { e?.stopPropagation?.(); onToggle(); }}
         />
         <PixiButton
-          label="✕"
+          icon="close"
+          label=""
           variant="ghost"
           size="sm"
           onClick={(e) => { e?.stopPropagation?.(); onRemove(); }}

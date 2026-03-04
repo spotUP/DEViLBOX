@@ -12,9 +12,10 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { PixiModal, PixiModalFooter, PixiButton, PixiLabel } from '../components';
+import { PixiModal, PixiModalFooter, PixiButton, PixiLabel, PixiIcon } from '../components';
 import { usePixiTheme } from '../theme';
 import { PIXI_FONTS } from '../fonts';
+import { FAD_ICONS } from '../fontaudioIcons';
 
 interface DBXPreview {
   name: string;
@@ -50,12 +51,16 @@ const StatCard: React.FC<{ icon: string; value: string; label: string; accentCol
       gap: 4,
     }}
   >
-    <pixiBitmapText
-      text={icon}
-      style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 16, fill: 0xffffff }}
-      tint={accentColor}
-      layout={{}}
-    />
+    {FAD_ICONS[icon] ? (
+      <PixiIcon name={icon} size={16} color={accentColor} layout={{}} />
+    ) : (
+      <pixiBitmapText
+        text={icon}
+        style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 16, fill: 0xffffff }}
+        tint={accentColor}
+        layout={{}}
+      />
+    )}
     <pixiBitmapText
       text={value}
       style={{ fontFamily: PIXI_FONTS.SANS_BOLD, fontSize: 16, fill: 0xffffff }}
@@ -122,12 +127,7 @@ export const PixiImportDBXDialog: React.FC<PixiImportDBXDialogProps> = ({
 
         {/* Header row — icon + title + filename */}
         <layoutContainer layout={{ flexDirection: 'row', gap: 12, alignItems: 'center', marginBottom: 20 }}>
-          <pixiBitmapText
-            text="📂"
-            style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 20, fill: 0xffffff }}
-            tint={theme.accent.color}
-            layout={{}}
-          />
+          <PixiIcon name="open" size={20} color={theme.accent.color} layout={{}} />
           <layoutContainer layout={{ flexDirection: 'column', flex: 1, gap: 2 }}>
             <pixiBitmapText
               text="Load Project?"
@@ -193,7 +193,7 @@ export const PixiImportDBXDialog: React.FC<PixiImportDBXDialogProps> = ({
                 bgColor={theme.bgSecondary.color}
               />
               <StatCard
-                icon="⚙"
+                icon="preset-a"
                 value={String(preview.instrumentCount)}
                 label="Instruments"
                 accentColor={theme.accent.color}

@@ -387,7 +387,8 @@ export const PixiDJPlaylistPanel: React.FC<PixiDJPlaylistPanelProps> = ({
                 onClick={() => handleMoveDown(selectedIdx)}
               />
               <PixiButton
-                label="✕"
+                icon="close"
+                label=""
                 variant="ghost"
                 size="sm"
                 width={24}

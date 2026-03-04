@@ -12,7 +12,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { PixiModal, PixiModalFooter, PixiButton, PixiLabel } from '../components';
+import { PixiModal, PixiModalFooter, PixiButton, PixiLabel, PixiIcon } from '../components';
 import { usePixiTheme } from '../theme';
 import { PIXI_FONTS } from '../fonts';
 
@@ -111,12 +111,7 @@ export const PixiImportInstrumentDialog: React.FC<PixiImportInstrumentDialogProp
 
         {/* Header row — icon + title + filename, mb-5 = marginBottom 20 */}
         <layoutContainer layout={{ flexDirection: 'row', gap: 12, alignItems: 'center', marginBottom: 20 }}>
-          <pixiBitmapText
-            text="⚙"
-            style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 20, fill: 0xffffff }}
-            tint={theme.accent.color}
-            layout={{}}
-          />
+          <PixiIcon name="preset-a" size={20} color={theme.accent.color} layout={{}} />
           <layoutContainer layout={{ flexDirection: 'column', flex: 1, gap: 2 }}>
             <pixiBitmapText
               text="Add Instrument?"
@@ -158,12 +153,7 @@ export const PixiImportInstrumentDialog: React.FC<PixiImportInstrumentDialogProp
         ) : (
           /* Loading */
           <layoutContainer layout={{ flexDirection: 'row', gap: 8, alignItems: 'center', marginBottom: 20 }}>
-            <pixiBitmapText
-              text="⚙"
-              style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 16, fill: 0xffffff }}
-              tint={theme.textMuted.color}
-              layout={{}}
-            />
+            <PixiIcon name="preset-a" size={14} color={theme.textMuted.color} layout={{}} />
             <PixiLabel text="Reading instrument…" size="sm" color="textMuted" />
           </layoutContainer>
         )}

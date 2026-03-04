@@ -25,7 +25,7 @@ import type {
 } from '@/lib/sid/composerApi';
 import { downloadHVSCFile } from '@/lib/hvscApi';
 import { loadFile } from '@/lib/file/UnifiedFileLoader';
-import { PixiModal, PixiButton, PixiLabel, PixiScrollView, PixiSelect } from '../components';
+import { PixiModal, PixiButton, PixiLabel, PixiScrollView, PixiSelect, PixiIcon } from '../components';
 import type { SelectOption } from '../components';
 import { usePixiTheme } from '../theme';
 import { PIXI_FONTS } from '../fonts';
@@ -346,12 +346,7 @@ export const PixiSIDInfoModal: React.FC<PixiSIDInfoModalProps> = ({ isOpen, onCl
             borderRadius: 8,
           }}
         >
-          <pixiBitmapText
-            text="✕"
-            style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 18, fill: 0xffffff }}
-            tint={theme.textMuted.color}
-            layout={{}}
-          />
+          <PixiIcon name="close" size={16} color={theme.textMuted.color} layout={{}} />
         </layoutContainer>
       </layoutContainer>
 
@@ -454,7 +449,7 @@ export const PixiSIDInfoModal: React.FC<PixiSIDInfoModalProps> = ({ isOpen, onCl
                   }}
                 >
                   <PixiLabel text="Subsong:" size="xs" color="textMuted" />
-                  <PixiButton label="◀" variant="ghost" size="sm" onClick={handleSubsongPrev} />
+                  <PixiButton icon="prev" label="" variant="ghost" size="sm" onClick={handleSubsongPrev} />
                   <PixiLabel
                     text={`${sidMetadata.currentSubsong + 1} / ${sidMetadata.subsongs}`}
                     size="xs"
@@ -462,7 +457,7 @@ export const PixiSIDInfoModal: React.FC<PixiSIDInfoModalProps> = ({ isOpen, onCl
                     font="mono"
                     color="text"
                   />
-                  <PixiButton label="▶" variant="ghost" size="sm" onClick={handleSubsongNext} />
+                  <PixiButton icon="next" label="" variant="ghost" size="sm" onClick={handleSubsongNext} />
                 </layoutContainer>
               )}
 
@@ -661,7 +656,7 @@ export const PixiSIDInfoModal: React.FC<PixiSIDInfoModalProps> = ({ isOpen, onCl
                 borderColor: 0x5f1e1e,
               }}
             >
-              <PixiLabel text="▶ YouTube Performances" size="xs" weight="semibold" color="error" />
+              <PixiLabel text="> YouTube Performances" size="xs" weight="semibold" color="error" />
               <layoutContainer layout={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
                 {youtubeLinks.map((yt, i) => (
                   <LinkButton
