@@ -33,6 +33,7 @@ import { WindowTether } from './WindowTether';
 import { playFocusZoom } from './workbenchSounds';
 import { WorkbenchTiltRenderer } from './WorkbenchTilt';
 import { PixiButton } from '../components/PixiButton';
+import { WorkbenchCameraControls } from './WorkbenchCameraControls';
 import { PixiTrackerView } from '../views/PixiTrackerView';
 import { PixiDJView } from '../views/PixiDJView';
 import { PixiArrangementView } from '../views/PixiArrangementView';
@@ -299,6 +300,17 @@ export const WorkbenchContainer: React.FC = () => {
   const handleResetCamera = useCallback(() => {
     startSpring({ x: 0, y: 0, scale: 1 });
   }, [startSpring]);
+
+  // Drag-pad callbacks for WorkbenchCameraControls
+  const handlePadPan = useCallback((dx: number, dy: number) => {
+    cancelSpring();
+    panCamera(dx, dy);
+  }, [panCamera, cancelSpring]);
+
+  const handlePadZoom = useCallback((delta: number) => {
+    cancelSpring();
+    zoomCamera(delta, width / 2, workbenchH / 2);
+  }, [zoomCamera, cancelSpring, width, workbenchH]);
 
   const handleLoadWorkspace = useCallback((name: string) => {
     const preset = BUILTIN_WORKSPACES[name];
@@ -601,6 +613,14 @@ export const WorkbenchContainer: React.FC = () => {
           layout={{ position: 'absolute', bottom: 8, left: 10 }}
         />
 
+        {/* Drag-handle camera controls — screen space, bottom-right corner */}
+        <WorkbenchCameraControls
+          onPan={handlePadPan}
+          onZoom={handlePadZoom}
+          onFitAll={handleFitAll}
+          onReset={handleResetCamera}
+        />
+
         {/* Control bar — screen space, top-right corner */}
         <pixiContainer
           layout={{
@@ -613,9 +633,6 @@ export const WorkbenchContainer: React.FC = () => {
           }}
           eventMode="static"
         >
-          <PixiButton label="FIT" variant="ft2" size="sm" onClick={handleFitAll} />
-          <PixiButton label="1:1" variant="ft2" size="sm" onClick={handleResetCamera} />
-          <pixiContainer layout={{ width: 8 }} />
           <PixiButton label="COMPOSE" variant="ft2" size="sm" onClick={() => handleLoadWorkspace('Compose')} />
           <PixiButton label="MIX" variant="ft2" size="sm" onClick={() => handleLoadWorkspace('Mix')} />
           <PixiButton label="FULL" variant="ft2" size="sm" onClick={() => handleLoadWorkspace('Full')} />
