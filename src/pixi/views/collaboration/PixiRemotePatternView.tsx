@@ -43,6 +43,12 @@ const TOOLBAR_ROW_HEIGHT = 18;
 const TOOLBAR_HEIGHT = TOOLBAR_ROW_HEIGHT * 2 + 28; // 2 rows + friend indicator
 const CHANNEL_HEADER_HEIGHT = 24;
 const COLUMN_TOGGLE_HEIGHT = 20;
+const COLLAPSED_WIDTH = 28;
+
+const CHANNEL_COLORS = [
+  0x4488ff, 0xff4488, 0x44ff88, 0xffaa44,
+  0x8844ff, 0xff8844, 0x44ffaa, 0xaa44ff,
+];
 
 interface ColumnVisibility {
   note: boolean;
@@ -63,6 +69,9 @@ export const PixiRemotePatternView: React.FC<{ width: number; height: number }> 
   const bpm = useTransportStore(s => s.bpm);
   const speed = useTransportStore(s => s.speed);
 
+  const storeColVis = useTrackerStore(s => s.columnVisibility);
+  const showAcid = storeColVis.flag1 || storeColVis.flag2;
+
   const [showColumns, setShowColumns] = useState<ColumnVisibility>({
     note: true, inst: true, vol: true, fx: false,
   });
@@ -78,17 +87,22 @@ export const PixiRemotePatternView: React.FC<{ width: number; height: number }> 
   const songLength = patternOrder.length;
   const contentHeight = rowCount * ROW_HEIGHT;
 
-  // Compute per-channel cell width based on visible columns
-  const cellWidth = useMemo(() => {
-    let w = 4; // padding
-    if (showColumns.note) w += CHAR_WIDTH * 3 + 4;
-    if (showColumns.inst) w += CHAR_WIDTH * 2 + 4;
-    if (showColumns.vol) w += CHAR_WIDTH * 2 + 4;
-    if (showColumns.fx) w += CHAR_WIDTH * 3 + 4;
-    return Math.max(w, 24);
-  }, [showColumns]);
+  // Compute per-channel cell width based on visible columns and collapsed state
+  const channelWidths = useMemo(() => {
+    return channels.map((ch) => {
+      if (ch.collapsed) return COLLAPSED_WIDTH;
+      let w = 4; // padding
+      if (showColumns.note) w += CHAR_WIDTH * 3 + 4;
+      if (showColumns.inst) w += CHAR_WIDTH * 2 + 4;
+      if (showColumns.vol) w += CHAR_WIDTH * 2 + 4;
+      if (showColumns.fx) w += CHAR_WIDTH * 3 + 4;
+      if (showAcid) w += CHAR_WIDTH * 2 + 4;
+      if (showColumns.fx) w += CHAR_WIDTH * 2 + 4; // probability when fx visible
+      return Math.max(w, 24);
+    });
+  }, [channels, showColumns, showAcid]);
 
-  const totalChannelsWidth = channelCount * cellWidth;
+  const totalChannelsWidth = channelWidths.reduce((a, b) => a + b, 0);
 
   if (!pattern) {
     return (
@@ -229,25 +243,52 @@ export const PixiRemotePatternView: React.FC<{ width: number; height: number }> 
         <layoutContainer layout={{ width: ROW_NUM_WIDTH }}>
           <PixiLabel text="ROW" size="xs" font="mono" color="textMuted" />
         </layoutContainer>
-        {channels.map((ch, idx) => (
-          <layoutContainer
-            key={ch.id}
-            layout={{
-              width: cellWidth,
-              height: CHANNEL_HEADER_HEIGHT,
-              flexDirection: 'column',
-              justifyContent: 'center',
-              paddingLeft: 2,
-            }}
-          >
-            <PixiLabel
-              text={`${(idx + 1).toString().padStart(2, '0')} ${ch.shortName || ch.name || `CH${idx + 1}`}`}
-              size="xs"
-              font="mono"
-              color={ch.muted ? 'textMuted' : 'textSecondary'}
-            />
-          </layoutContainer>
-        ))}
+        {channels.map((ch, idx) => {
+          const chColor = CHANNEL_COLORS[idx % CHANNEL_COLORS.length];
+          const tintBg = (chColor >> 2) & 0x3f3f3f;
+          const w = channelWidths[idx];
+          if (ch.collapsed) {
+            return (
+              <layoutContainer
+                key={ch.id}
+                layout={{
+                  width: w,
+                  height: CHANNEL_HEADER_HEIGHT,
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  backgroundColor: tintBg,
+                }}
+              >
+                <PixiLabel
+                  text={(idx + 1).toString().padStart(2, '0')}
+                  size="xs"
+                  font="mono"
+                  color="textMuted"
+                />
+              </layoutContainer>
+            );
+          }
+          return (
+            <layoutContainer
+              key={ch.id}
+              layout={{
+                width: w,
+                height: CHANNEL_HEADER_HEIGHT,
+                flexDirection: 'column',
+                justifyContent: 'center',
+                paddingLeft: 2,
+                backgroundColor: tintBg,
+              }}
+            >
+              <PixiLabel
+                text={`${(idx + 1).toString().padStart(2, '0')} ${ch.shortName || ch.name || `CH${idx + 1}`}`}
+                size="xs"
+                font="mono"
+                color={ch.muted ? 'textMuted' : 'textSecondary'}
+              />
+            </layoutContainer>
+          );
+        })}
       </layoutContainer>
 
       {/* ── Pattern grid ── */}
@@ -304,21 +345,37 @@ export const PixiRemotePatternView: React.FC<{ width: number; height: number }> 
 
                   {/* Cells per channel */}
                   {channels.map((ch, chIdx) => {
+                    const chColor = CHANNEL_COLORS[chIdx % CHANNEL_COLORS.length];
+                    const colBg = (chIdx % 2 === 0) ? ((chColor >> 3) & 0x1f1f1f) : undefined;
+                    const w = channelWidths[chIdx];
+
+                    if (ch.collapsed) {
+                      return <layoutContainer key={chIdx} layout={{ width: w, ...(colBg !== undefined ? { backgroundColor: colBg } : {}) }} />;
+                    }
+
                     const cell = ch.rows[row];
-                    if (!cell) return <layoutContainer key={chIdx} layout={{ width: cellWidth }} />;
+                    if (!cell) return <layoutContainer key={chIdx} layout={{ width: w, ...(colBg !== undefined ? { backgroundColor: colBg } : {}) }} />;
 
                     const parts: string[] = [];
                     if (showColumns.note) parts.push(formatNote(cell.note));
                     if (showColumns.inst) parts.push(formatHex(cell.instrument, 2));
                     if (showColumns.vol) parts.push(formatHex(cell.volume, 2));
                     if (showColumns.fx) parts.push(formatEffect(cell.effTyp, cell.eff));
+                    if (showAcid) {
+                      const f = cell.flag1 ?? 0;
+                      parts.push(f === 1 ? 'A' : f === 2 ? 'S' : '.');
+                    }
+                    if (showColumns.fx) {
+                      const p = cell.probability ?? 0;
+                      parts.push(p > 0 ? p.toString(16).toUpperCase().padStart(2, '0') : '..');
+                    }
                     const text = parts.join(' ');
 
                     const isEmpty = cell.note <= 0 && cell.instrument <= 0 && cell.volume <= 0
                       && (!showColumns.fx || (cell.effTyp <= 0 && cell.eff <= 0));
 
                     return (
-                      <layoutContainer key={chIdx} layout={{ width: cellWidth }}>
+                      <layoutContainer key={chIdx} layout={{ width: w, ...(colBg !== undefined ? { backgroundColor: colBg } : {}) }}>
                         <PixiLabel
                           text={text}
                           size="xs"
