@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-03-04T11:47:37.118Z
+ * Generated: 2026-03-04T12:33:16.518Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.2212';
-export const BUILD_NUMBER = '2212';
-export const BUILD_HASH = 'f40d7a3c';
+export const BUILD_VERSION = '1.0.2214';
+export const BUILD_NUMBER = '2214';
+export const BUILD_HASH = 'de03e595';
 export const BUILD_DATE = '2026-03-04';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,17 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.2212',
+    version: '1.0.2214',
     date: '2026-03-04',
     changes: [
+      {
+        type: 'fix',
+        "description": "Welcome modal 'Start Jamming' button clipped by overflow"
+      },
+      {
+        type: 'fix',
+        "description": "Fix GT song drop causing black pattern editor"
+      },
       {
         type: 'improvement',
         "description": "Unify file import paths through UnifiedFileLoader"
@@ -224,14 +232,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'improvement',
         "description": "Wire 3 GL dialogs into PixiRoot, remove from bridge"
-      },
-      {
-        type: 'feature',
-        "description": "Add 3 GL dialogs (Collaboration, RevisionBrowser, FurnacePresetBrowser)"
-      },
-      {
-        type: 'fix',
-        "description": "Visualizer modes not responding to music"
       }
     ]
   }

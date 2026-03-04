@@ -193,6 +193,11 @@ async function loadSongFile(file: File, options: FileLoadOptions): Promise<FileL
       if (gtStore.engine) {
         gtStore.engine.loadSong(gtBuf);
         gtStore.setSongName(file.name.replace(/\.sng$/i, ''));
+        // Refresh song info which triggers pattern data loading via onSongInfo callback
+        gtStore.refreshSongInfo();
+        gtStore.refreshAllOrders();
+        gtStore.refreshAllInstruments();
+        gtStore.refreshAllTables();
       } else {
         gtStore.setPendingSongData(songBytes);
         gtStore.setSongName(file.name.replace(/\.sng$/i, ''));
