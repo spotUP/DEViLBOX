@@ -149,7 +149,7 @@ export const PixiButton: React.FC<PixiButtonProps> = ({
   const colors = getColors();
 
   const handlePointerOver = useCallback(() => { if (!disabled) setHovered(true); }, [disabled]);
-  const handlePointerOut = useCallback(() => { setHovered(false); setPressed(false); pressedRef.current = false; }, []);
+  const handlePointerOut = useCallback(() => { setHovered(false); setPressed(false); }, []);
   const handlePointerDown = useCallback((_e: FederatedPointerEvent) => { if (!disabled) { pressedRef.current = true; setPressed(true); } }, [disabled]);
   const handlePointerUp = useCallback(() => {
     if (pressedRef.current && !disabled && !loading) {
