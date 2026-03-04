@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-03-03T23:18:19.902Z
+ * Generated: 2026-03-04T05:57:48.492Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,10 +19,10 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.2135';
-export const BUILD_NUMBER = '2135';
-export const BUILD_HASH = 'f8a26c2c';
-export const BUILD_DATE = '2026-03-03';
+export const BUILD_VERSION = '1.0.2152';
+export const BUILD_NUMBER = '2152';
+export const BUILD_HASH = '87f6f791';
+export const BUILD_DATE = '2026-03-04';
 
 // Full version (patch IS the build number, so no need to append)
 export const FULL_VERSION = BUILD_VERSION;
@@ -30,9 +30,77 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.2135',
+    version: '1.0.2152',
     date: '2026-03-04',
     changes: [
+      {
+        type: 'feature',
+        "description": "Wire 7 GL-native dialogs into PixiRoot, remove DOM versions"
+      },
+      {
+        type: 'fix',
+        "description": "Furnace FM frequency formulas and MAME noteOff"
+      },
+      {
+        type: 'improvement',
+        "description": "Phase 4 — migrate shell/toolbar/view backgrounds to layoutContainer"
+      },
+      {
+        type: 'fix',
+        "description": "Cursor navigation — arrow right no longer jumps back to note column"
+      },
+      {
+        type: 'improvement',
+        "description": "Migrate remaining GL components to layoutContainer"
+      },
+      {
+        type: 'fix',
+        "description": "GTUltra .sng files now reach the GT Ultra UI"
+      },
+      {
+        type: 'fix',
+        "description": "Resolve CI TypeScript errors"
+      },
+      {
+        type: 'feature',
+        "description": "GL-native New Song Wizard using Div/Txt/GlModal layout bridge"
+      },
+      {
+        type: 'fix',
+        "description": "Normalize HVSC paths for SID download from mirrors"
+      },
+      {
+        type: 'fix',
+        "description": "PixiJS alphaMode null crash from stale thumbnail textures"
+      },
+      {
+        type: 'fix',
+        "description": "BindingError in SIDSubsongAndInfo component"
+      },
+      {
+        type: 'feature',
+        "description": "Clickable discography tunes + hide empty photo container"
+      },
+      {
+        type: 'fix',
+        "description": "New button not working in GL UI"
+      },
+      {
+        type: 'fix',
+        "description": "Duplicate Modland toast, AudioContext mismatch crash, SID engine in import"
+      },
+      {
+        type: 'feature',
+        "description": "Add SID engine selector dropdown to SID info modal"
+      },
+      {
+        type: 'feature',
+        "description": "Add init presets for all synth types"
+      },
+      {
+        type: 'fix',
+        "description": "Defer PixiSelect open to avoid BindingError during event dispatch"
+      },
       {
         type: 'fix',
         "description": "Null-guard instrument.dispose() and remove unused import"
@@ -170,74 +238,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'feature',
         "description": "Remove bottom dock, integrate Device/Master FX into mixer view"
-      },
-      {
-        type: 'feature',
-        "description": "Move mixer from bottom dock to its own top-level view"
-      },
-      {
-        type: 'feature',
-        "description": "Add view thumbnails to Exposé overlay (macOS Mission Control style)"
-      },
-      {
-        type: 'feature',
-        "description": "MacOS Mission Control style Exposé for all views"
-      },
-      {
-        type: 'fix',
-        "description": "Restore arrow key hold-to-scroll in pattern editor"
-      },
-      {
-        type: 'feature',
-        "description": "Full-featured GL instrument list matching DOM version"
-      },
-      {
-        type: 'feature',
-        "description": "Add Exposé toolbar button in Studio view"
-      },
-      {
-        type: 'fix',
-        "description": "Use display:none for compact toolbar to prevent Yoga BindingError"
-      },
-      {
-        type: 'fix',
-        "description": "Use full names for nav view buttons and fix spacing"
-      },
-      {
-        type: 'fix',
-        "description": "Offset VU/automation/macro overlays below channel headers"
-      },
-      {
-        type: 'fix',
-        "description": "Render window tethers behind panels in studio view"
-      },
-      {
-        type: 'feature',
-        "description": "Add control bar to studio/workbench view"
-      },
-      {
-        type: 'fix',
-        "description": "Avoid Yoga BindingError when toggling compact toolbar"
-      },
-      {
-        type: 'fix',
-        "description": "Add migrate function for workbench persist v2→v3"
-      },
-      {
-        type: 'fix',
-        "description": "Studio view window layout — tile windows with proper spacing"
-      },
-      {
-        type: 'fix',
-        "description": "Move hooks before early return in SIDInfoModal to fix Rules of Hooks violation"
-      },
-      {
-        type: 'feature',
-        "description": "Add missing GL UI gadgets — volume, collab, auth, MIDI, import, zoom-fit, inst FX"
-      },
-      {
-        type: 'improvement',
-        "description": "Soften all 100% white borders with opacity"
       }
     ]
   }
