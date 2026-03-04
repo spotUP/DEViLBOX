@@ -147,7 +147,7 @@ const TabButton: React.FC<{ label: string; active: boolean; accentColor: number;
         height: 32,
         justifyContent: 'center',
         alignItems: 'center',
-        ...(active ? { borderBottomWidth: 2, borderColor: accentColor, backgroundColor: 0xffffff10 } : {}),
+        ...(active ? { borderBottomWidth: 2, borderColor: accentColor, backgroundColor: 0x222233 } : {}),
       }}
     >
       <pixiBitmapText
@@ -244,7 +244,7 @@ export const PixiTipOfTheDay: React.FC<PixiTipOfTheDayProps> = ({
           height: 32,
           borderBottomWidth: 1,
           borderColor: theme.border.color,
-          backgroundColor: 0x00000033,
+          backgroundColor: 0x111122,
         }}
       >
         <TabButton label="Tips" active={activeTab === 'tips'} accentColor={accentColor} mutedColor={mutedColor} onClick={() => setActiveTab('tips')} />
