@@ -33,7 +33,6 @@ import { useBDAnimations } from '@hooks/tracker/useBDAnimations';
 import { GENERATORS, type GeneratorType } from '@utils/patternGenerators';
 import { PixiContextMenu, type ContextMenuItem } from '../../input/PixiContextMenu';
 import { ParameterEditor } from '@/components/tracker/ParameterEditor';
-import { PixiTrackerVisualBg } from './PixiTrackerVisualBg';
 import { PixiChannelHeaders } from './PixiChannelHeaders';
 import { haptics } from '@/utils/haptics';
 import * as Tone from 'tone';
@@ -1504,10 +1503,6 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
         onPointerUp={handlePointerUp}
         onPointerUpOutside={handlePointerUp}
       >
-        {/* TrackerVisualBackground behind the grid (pure GL) */}
-        {trackerVisualBg && (
-          <PixiTrackerVisualBg width={width} height={gridHeight} />
-        )}
 
         {/* Smooth-scroll layer — y updated imperatively by RAF; eventMode="none" so clicks pass to outer container */}
         <pixiContainer

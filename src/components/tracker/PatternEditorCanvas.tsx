@@ -27,7 +27,6 @@ import { getTrackerScratchController } from '@engine/TrackerScratchController';
 import * as Tone from 'tone';
 import { useBDAnimations } from '@hooks/tracker/useBDAnimations';
 import { useSettingsStore } from '@stores/useSettingsStore';
-import { TrackerVisualBackground } from './TrackerVisualBackground';
 import type { CursorPosition } from '@typedefs';
 import { useCollaborationStore, getCollabClient } from '@stores/useCollaborationStore';
 // OffscreenCanvas + WebGL2 worker bridge
@@ -1408,14 +1407,6 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     }
   }, [dimensions]);
 
-  // Sync canvas z-index when trackerVisualBg overlay is toggled
-  useEffect(() => {
-    if (canvasRef.current) {
-      canvasRef.current.style.position = trackerVisualBg ? 'relative' : '';
-      canvasRef.current.style.zIndex   = trackerVisualBg ? '1' : '';
-    }
-  }, [trackerVisualBg]);
-
   // Reset horizontal scroll when all channels fit in viewport
   useEffect(() => {
     if (allChannelsFit && scrollLeft > 0) {
@@ -1829,9 +1820,6 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
         onDrop={handleDrop}
         {...patternGestures}
       >
-        {trackerVisualBg && (
-          <TrackerVisualBackground width={dimensions.width} height={dimensions.height} />
-        )}
         {/* Canvas is created imperatively in useEffect to support OffscreenCanvas transfer */}
 
         {/* Automation Lanes Overlay */}
