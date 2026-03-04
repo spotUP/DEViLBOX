@@ -31,7 +31,6 @@ const LazySettingsModal = lazy(() =>
 const LazyFileBrowser = lazy(() =>
   import('@/components/dialogs/FileBrowser').then(m => ({ default: m.FileBrowser }))
 );
-);
 const LazyExportDialog = lazy(() =>
   import('@/lib/export/ExportDialog').then(m => ({ default: m.ExportDialog }))
 );
