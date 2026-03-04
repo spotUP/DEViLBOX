@@ -72,8 +72,8 @@ export const PixiRandomizeDialog: React.FC<PixiRandomizeDialogProps> = ({ isOpen
     <PixiModal isOpen={isOpen} onClose={onClose} width={300} height={320}>
       <PixiModalHeader title="Randomize" onClose={onClose} />
 
-      <pixiContainer layout={{ flex: 1, padding: 12, flexDirection: 'column', gap: 16, alignItems: 'center' }}>
-        <pixiContainer layout={{ flexDirection: 'row', gap: 16, justifyContent: 'center' }}>
+      <layoutContainer layout={{ flex: 1, padding: 12, flexDirection: 'column', gap: 16, alignItems: 'center' }}>
+        <layoutContainer layout={{ flexDirection: 'row', gap: 16, justifyContent: 'center' }}>
           <PixiKnob
             value={density}
             min={0}
@@ -94,7 +94,7 @@ export const PixiRandomizeDialog: React.FC<PixiRandomizeDialogProps> = ({ isOpen
             formatValue={(v) => `${Math.round(v)}`}
             onChange={setOctaveRange}
           />
-        </pixiContainer>
+        </layoutContainer>
 
         <PixiKnob
           value={accentDensity}
@@ -108,7 +108,7 @@ export const PixiRandomizeDialog: React.FC<PixiRandomizeDialogProps> = ({ isOpen
         />
 
         <PixiLabel text="Generates random notes in C minor scale" size="xs" color="textMuted" />
-      </pixiContainer>
+      </layoutContainer>
 
       <PixiModalFooter>
         <PixiButton label="Cancel" variant="ghost" onClick={onClose} />

@@ -281,14 +281,21 @@ export const PixiPureTextInput: React.FC<PixiPureTextInputProps> = ({
   const fontFamily = font === 'mono' ? PIXI_FONTS.MONO : PIXI_FONTS.SANS;
 
   return (
-    <pixiContainer
+    <layoutContainer
       eventMode={disabled ? 'none' : 'static'}
       cursor={disabled ? 'default' : 'text'}
       onPointerDown={handlePointerDown}
       alpha={disabled ? 0.4 : 1}
-      layout={{ width, height, ...layoutProp }}
+      layout={{
+        width,
+        height,
+        backgroundColor: focused ? theme.bg.color : theme.bgSecondary.color,
+        borderWidth: focused ? 1.5 : 1,
+        borderColor: focused ? theme.accent.color : theme.border.color,
+        borderRadius: 3,
+        ...layoutProp,
+      }}
     >
-      <pixiGraphics draw={drawBg} layout={{ position: 'absolute', width, height }} />
       <pixiGraphics draw={drawSelection} layout={{ position: 'absolute', width, height }} />
       <pixiBitmapText
         text={displayText}
@@ -298,6 +305,6 @@ export const PixiPureTextInput: React.FC<PixiPureTextInputProps> = ({
         layout={{ position: 'absolute', left: PADDING_H, top: (height - fontSize) / 2 }}
       />
       <pixiGraphics draw={drawCursor} layout={{ position: 'absolute', width, height }} />
-    </pixiContainer>
+    </layoutContainer>
   );
 };
