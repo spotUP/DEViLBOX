@@ -68,13 +68,18 @@ export class SonicArrangerSynth implements DevilboxSynth {
   private _ownsEngineConnection = false;
 
   constructor() {
+    this.engine = SonicArrangerEngine.getInstance();
     this.audioContext = getDevilboxAudioContext();
     this.output = this.audioContext.createGain();
 
-    this.engine = SonicArrangerEngine.getInstance();
-
     if (!SonicArrangerSynth._engineConnectedToSynth) {
-      this.engine.output.connect(this.output);
+      try {
+        this.engine.output.connect(this.output);
+      } catch {
+        // Context mismatch — recreate engine with current context
+        this.engine = SonicArrangerEngine.getInstance();
+        this.engine.output.connect(this.output);
+      }
       SonicArrangerSynth._engineConnectedToSynth = true;
       this._ownsEngineConnection = true;
     }
