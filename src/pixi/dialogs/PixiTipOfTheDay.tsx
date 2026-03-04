@@ -184,6 +184,7 @@ const TabButton: React.FC<{
     >
       {icon && <PixiIcon name={icon} size={13} color={tint} layout={{}} />}
       <pixiBitmapText
+        eventMode="none"
         text={label}
         style={{ fontFamily: PIXI_FONTS.SANS_BOLD, fontSize: 13, fill: 0xffffff }}
         tint={tint}

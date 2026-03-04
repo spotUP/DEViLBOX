@@ -266,6 +266,7 @@ export const PixiGTUltraView: React.FC<Props> = ({ width, height }) => {
         {/* Follow */}
         <pixiContainer eventMode="static" cursor="pointer" onPointerUp={toggleFollow}>
           <pixiBitmapText
+            eventMode="none"
             text={followPlay ? '[FOLLOW]' : '[follow]'}
             style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }}
             tint={followPlay ? GT_GREEN : GT_TEXT_DIM}
@@ -275,6 +276,7 @@ export const PixiGTUltraView: React.FC<Props> = ({ width, height }) => {
         {/* Pro/Studio mode switcher */}
         <pixiContainer eventMode="static" cursor="pointer" onPointerUp={toggleViewMode}>
           <pixiBitmapText
+            eventMode="none"
             text={viewMode === 'pro' ? '[PRO]' : '[STUDIO]'}
             style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }}
             tint={viewMode === 'pro' ? GT_ACCENT : GT_GREEN}

@@ -407,7 +407,7 @@ const PortColumn: React.FC<{ label: string; ports: ModulePortDef[]; moduleId: st
       const active = wiring?.moduleId === moduleId && wiring?.portId === p.id;
       return (
         <layoutContainer key={p.id} layout={{ width: 14, height: 14 }} eventMode="static" cursor="pointer" onPointerUp={() => onPort({ moduleId, portId: p.id }, p.direction)}>
-          <pixiGraphics draw={useCallback((g: GraphicsType) => { g.clear(); g.circle(6, 6, PORT_R); g.fill({ color: SIG_CLR[p.signal], alpha: active ? 1 : 0.7 }); if (active) { g.circle(6, 6, PORT_R + 2); g.stroke({ color: 0xffffff, width: 1.5 }); } }, [active, p.signal])} layout={{}} />
+          <pixiGraphics eventMode="none" draw={useCallback((g: GraphicsType) => { g.clear(); g.circle(6, 6, PORT_R); g.fill({ color: SIG_CLR[p.signal], alpha: active ? 1 : 0.7 }); if (active) { g.circle(6, 6, PORT_R + 2); g.stroke({ color: 0xffffff, width: 1.5 }); } }, [active, p.signal])} layout={{}} />
         </layoutContainer>
       );
     })}
