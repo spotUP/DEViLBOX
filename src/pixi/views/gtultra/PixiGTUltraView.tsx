@@ -61,6 +61,7 @@ export const PixiGTUltraView: React.FC<Props> = ({ width, height }) => {
 
   // Initialize engine on mount (mirrors GTUltraView.tsx logic)
   useEffect(() => {
+    console.log('[GTUltra/Pixi] PixiGTUltraView mounted, engine:', !!useGTUltraStore.getState().engine, 'pendingSong:', !!useGTUltraStore.getState().pendingSongData);
     // Skip if engine already exists (e.g. DOM view initialized it)
     if (useGTUltraStore.getState().engine) return;
 
@@ -243,13 +244,13 @@ export const PixiGTUltraView: React.FC<Props> = ({ width, height }) => {
           tint={GT_ACCENT}
         />
 
-        {songAuthor ? (
-          <pixiBitmapText
-            text={`by ${songAuthor}`}
-            style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }}
-            tint={GT_TEXT_DIM}
-          />
-        ) : null}
+        {/* Always mount to avoid Yoga BindingError — hide via alpha */}
+        <pixiBitmapText
+          text={songAuthor ? `by ${songAuthor}` : ''}
+          alpha={songAuthor ? 1 : 0}
+          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }}
+          tint={GT_TEXT_DIM}
+        />
 
         <pixiContainer layout={{ flex: 1 }} />
 
@@ -281,18 +282,21 @@ export const PixiGTUltraView: React.FC<Props> = ({ width, height }) => {
 
       {/* ─── Main area ─── */}
       <pixiContainer alpha={ready ? 1 : 0} renderable={ready} layout={{ flexDirection: 'row', flex: 1, width, height: editorHeight }}>
-        {/* Pattern editor: hex grid in Pro, piano roll in Studio */}
-        {viewMode === 'pro' ? (
+        {/* Pattern editor: hex grid in Pro, piano roll in Studio.
+            Both always mounted to avoid @pixi/layout Yoga BindingErrors
+            when switching modes. Inactive view hidden via alpha/renderable. */}
+        <pixiContainer alpha={viewMode === 'pro' ? 1 : 0} renderable={viewMode === 'pro'} eventMode={viewMode === 'pro' ? 'static' : 'none'}>
           <PixiGTPatternGrid
             width={Math.max(100, editorWidth)}
             height={Math.max(100, editorHeight)}
           />
-        ) : (
+        </pixiContainer>
+        <pixiContainer alpha={viewMode !== 'pro' ? 1 : 0} renderable={viewMode !== 'pro'} eventMode={viewMode !== 'pro' ? 'static' : 'none'} layout={{ position: 'absolute', top: 0, left: 0 }}>
           <PixiGTPianoRoll
             width={Math.max(100, editorWidth)}
             height={Math.max(100, editorHeight)}
           />
-        )}
+        </pixiContainer>
 
         {/* Sidebar separator */}
         <pixiGraphics draw={drawSidebarSep} layout={{ position: 'absolute', left: editorWidth, width: 1, height: editorHeight }} />
@@ -303,25 +307,27 @@ export const PixiGTUltraView: React.FC<Props> = ({ width, height }) => {
             width={SIDEBAR_W}
             height={oscH}
           />
-          {viewMode === 'pro' ? (
-            <>
-              {/* Pro mode: hex-based editors */}
-              <PixiGTOrderList width={SIDEBAR_W} height={orderH} />
-              <PixiGTInstrumentPanel width={SIDEBAR_W} height={instrH} />
-              <PixiGTTableEditor width={SIDEBAR_W} height={tableH} />
-              <PixiGTSIDMonitor width={SIDEBAR_W} height={regMonH} sidIndex={0} />
-              {sidCount === 2 && <PixiGTSIDMonitor width={SIDEBAR_W} height={regMon2H} sidIndex={1} />}
-            </>
-          ) : (
-            <>
-              {/* Studio mode: visual instrument designer + presets + visual tables + register monitor */}
-              <PixiGTStudioInstrument width={SIDEBAR_W} height={studioInstrH} />
-              <PixiGTPresetBrowser width={SIDEBAR_W} height={studioPresetH} onApplyPreset={handleApplyPreset} />
-              <PixiGTStudioTables width={SIDEBAR_W} height={studioTableH} />
-              <PixiGTSIDMonitor width={SIDEBAR_W} height={studioRegH} sidIndex={0} />
-              {sidCount === 2 && <PixiGTSIDMonitor width={SIDEBAR_W} height={studioReg2H} sidIndex={1} />}
-            </>
-          )}
+          {/* Always mount both sidebar modes to avoid Yoga BindingErrors */}
+          <pixiContainer alpha={viewMode === 'pro' ? 1 : 0} renderable={viewMode === 'pro'} eventMode={viewMode === 'pro' ? 'static' : 'none'} layout={{ width: SIDEBAR_W, flexDirection: 'column' }}>
+            {/* Pro mode: hex-based editors */}
+            <PixiGTOrderList width={SIDEBAR_W} height={orderH} />
+            <PixiGTInstrumentPanel width={SIDEBAR_W} height={instrH} />
+            <PixiGTTableEditor width={SIDEBAR_W} height={tableH} />
+            <PixiGTSIDMonitor width={SIDEBAR_W} height={regMonH} sidIndex={0} />
+            <pixiContainer alpha={sidCount === 2 ? 1 : 0} renderable={sidCount === 2} layout={{ height: sidCount === 2 ? regMon2H : 0 }}>
+              <PixiGTSIDMonitor width={SIDEBAR_W} height={regMon2H} sidIndex={1} />
+            </pixiContainer>
+          </pixiContainer>
+          <pixiContainer alpha={viewMode !== 'pro' ? 1 : 0} renderable={viewMode !== 'pro'} eventMode={viewMode !== 'pro' ? 'static' : 'none'} layout={{ position: 'absolute', top: oscH, width: SIDEBAR_W, flexDirection: 'column' }}>
+            {/* Studio mode: visual instrument designer + presets + visual tables + register monitor */}
+            <PixiGTStudioInstrument width={SIDEBAR_W} height={studioInstrH} />
+            <PixiGTPresetBrowser width={SIDEBAR_W} height={studioPresetH} onApplyPreset={handleApplyPreset} />
+            <PixiGTStudioTables width={SIDEBAR_W} height={studioTableH} />
+            <PixiGTSIDMonitor width={SIDEBAR_W} height={studioRegH} sidIndex={0} />
+            <pixiContainer alpha={sidCount === 2 ? 1 : 0} renderable={sidCount === 2} layout={{ height: sidCount === 2 ? studioReg2H : 0 }}>
+              <PixiGTSIDMonitor width={SIDEBAR_W} height={studioReg2H} sidIndex={1} />
+            </pixiContainer>
+          </pixiContainer>
         </pixiContainer>
       </pixiContainer>
     </pixiContainer>
