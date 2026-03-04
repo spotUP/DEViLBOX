@@ -1409,7 +1409,7 @@ export class ToneEngine {
     const isMAME = config.synthType?.startsWith('MAME') || config.synthType === 'CZ101' || config.synthType === 'CEM3394' || config.synthType === 'SCSP';
     const isFurnace = config.synthType?.startsWith('Furnace') || config.synthType === 'Furnace';
     const isBuzzmachine = config.synthType?.startsWith('Buzz') || config.synthType === 'Buzzmachine';
-    const isWASMSynth = ['TB303', 'V2', 'Sam', 'DubSiren', 'SpaceLaser', 'Synare', 'Dexed', 'OBXd', 'WAM'].includes(config.synthType || '');
+    const isWASMSynth = ['TB303', 'V2', 'Sam', 'DubSiren', 'SpaceLaser', 'Synare', 'Dexed', 'OBXd', 'WAM', 'SonicArrangerSynth'].includes(config.synthType || '');
     const isVSTBridge = !isWASMSynth && typeof config.synthType === 'string' && SYNTH_REGISTRY.has(config.synthType);
     const isSharedType = config.synthType === 'Sampler' || config.synthType === 'Player' || config.synthType === 'SunVoxSynth' || isMAME || isFurnace || isBuzzmachine || isWASMSynth || isVSTBridge;
     const key = isSharedType
