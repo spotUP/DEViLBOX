@@ -319,6 +319,8 @@ export interface ImportMetadata {
   sourceFormat:
     | 'MOD' | 'XM' | 'IT' | 'S3M' | 'FUR' | 'HVL' | 'AHX' | 'OKT' | 'MED' | 'DIGI' | 'DBM' | 'FC'
     | 'SFX' | 'SMON' | 'SIDMON2' | 'FRED' | 'DMUG' | 'UADE' | 'TFMX'
+    // Chip-dump / CPU-code formats
+    | 'SID' | 'VGM' | 'YM' | 'NSF' | 'SAP' | 'AY'
     // Amiga native formats (Phase 2+)
     | '667' | '669' | 'AMOSMusicBank' | 'AON' | 'AST' | 'AVP' | 'BD' | 'C67' | 'CBA'
     | 'DigitalSymphony' | 'DM1' | 'DM2' | 'DSM' | 'DSS' | 'DTM' | 'ETX'
