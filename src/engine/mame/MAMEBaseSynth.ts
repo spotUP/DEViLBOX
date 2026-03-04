@@ -274,10 +274,21 @@ export abstract class MAMEBaseSynth implements DevilboxSynth, MAMEEffectTarget {
     if (this._disposed) return;
     this.triggerAttack(note, time, velocity || 1);
 
+    // Capture the note NOW — by the time setTimeout fires, this.currentNote
+    // may have been overwritten by a subsequent triggerAttack call.
+    const capturedNote = this.currentNote;
+
     const d = timeToSeconds(duration);
     setTimeout(() => {
-      if (!this._disposed) {
-        this.triggerRelease();
+      if (!this._disposed && this.workletNode) {
+        this.releaseMacros();
+        // Send noteOff directly with the captured note, not this.currentNote
+        // which may point to a newer note by now
+        this.workletNode.port.postMessage({ type: 'noteOff', note: capturedNote });
+        // Only clear isNoteOn if we're releasing the current note
+        if (this.currentNote === capturedNote) {
+          this.isNoteOn = false;
+        }
       }
     }, d * 1000);
   }

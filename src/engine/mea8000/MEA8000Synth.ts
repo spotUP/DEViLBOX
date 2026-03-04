@@ -127,11 +127,7 @@ export class MEA8000Synth extends MAMEBaseSynth {
 
   protected writeKeyOff(): void {
     if (!this.workletNode || this._disposed) return;
-    if (this._mode === 1) {
-      // Speech mode: let speech finish naturally
-    } else {
-      this.workletNode.port.postMessage({ type: 'noteOff', note: this.currentNote });
-    }
+    this.workletNode.port.postMessage({ type: 'noteOff', note: this.currentNote });
   }
 
   protected writeFrequency(freq: number): void {
