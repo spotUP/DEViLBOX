@@ -661,3 +661,19 @@ export function isChipSynthArpeggioPlaying(ctx: SynthUpdateContext, instrumentId
   }
   return false;
 }
+
+/**
+ * Re-upload Sonic Arranger instrument config to running WASM synth.
+ * Called when the user edits SA instrument parameters in the instrument editor.
+ */
+export function updateSonicArrangerParameters(
+  ctx: SynthUpdateContext,
+  instrumentId: number,
+  config: import('@typedefs/instrument').SonicArrangerConfig,
+): void {
+  for (const [key, instrument] of ctx.instruments.entries()) {
+    if ((key >> 16) === instrumentId && typeof (instrument as any).updateConfig === 'function') {
+      (instrument as any).updateConfig(config);
+    }
+  }
+}

@@ -288,8 +288,17 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
   // Handle Sonic Arranger config updates
   const handleSonicArrangerChange = useCallback((updates: Partial<typeof instrument.sonicArranger>) => {
     const current = instrument.sonicArranger || DEFAULT_SONIC_ARRANGER;
-    handleChange({ sonicArranger: { ...current, ...updates } });
-  }, [instrument.sonicArranger, handleChange]);
+    const newConfig = { ...current, ...updates };
+    handleChange({ sonicArranger: newConfig });
+
+    // Real-time update — re-upload instrument config to running WASM synth
+    try {
+      const engine = getToneEngine();
+      engine.updateSonicArrangerParameters(instrument.id, newConfig);
+    } catch {
+      // Ignored — engine may not be initialized
+    }
+  }, [instrument.sonicArranger, instrument.id, handleChange]);
 
   // Handle Space Laser config updates
   const handleSpaceLaserChange = useCallback((updates: Partial<typeof instrument.spaceLaser>) => {
