@@ -4,7 +4,6 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef } from 'react';
-import { usePixiTheme } from '../theme';
 import { PixiButton, PixiLabel, PixiViewHeader } from '../components';
 import { PixiArrangementCanvas } from './arrangement/PixiArrangementCanvas';
 import type { ClipRenderData, ClipChannelNotes } from './arrangement/PixiArrangementCanvas';
@@ -40,7 +39,6 @@ const ARR_TRACK_HEIGHT = 40;
 const ARR_RULER_HEIGHT = 24;
 
 export const PixiArrangementView: React.FC = () => {
-  const theme = usePixiTheme();
   const isPlaying = useTransportStore(s => s.isPlaying);
   const playbackRowRef = useRef(0);
   // Track the last pattern id we switched to during arrangement playback

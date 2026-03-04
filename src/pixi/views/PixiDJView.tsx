@@ -4,7 +4,6 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { usePixiTheme } from '../theme';
 import { PixiButton, PixiViewHeader } from '../components';
 import { PixiDJDeck } from './dj/PixiDJDeck';
 import { PixiDJMixer } from './dj/PixiDJMixer';
@@ -21,6 +20,7 @@ import type { DJEngine } from '@engine/dj/DJEngine';
 import { useDJKeyboardHandler } from '@components/dj/DJKeyboardHandler';
 import { PixiDJControllerSelect } from './dj/PixiDJControllerSelect';
 import { PixiDJFxPresets } from './dj/PixiDJFxPresets';
+import { PixiDJSamplerPanel } from './dj/PixiDJSamplerPanel';
 
 type DJBrowserPanel = 'none' | 'playlists' | 'modland' | 'serato';
 
@@ -56,6 +56,7 @@ export const PixiDJView: React.FC = () => {
   }, [setDJModeActive]);
 
   const [browserPanel, setBrowserPanel] = useState<DJBrowserPanel>('none');
+  const [samplerOpen, setSamplerOpen] = useState(false);
 
   return (
     <pixiContainer
@@ -66,7 +67,12 @@ export const PixiDJView: React.FC = () => {
       }}
     >
       {/* Top control bar */}
-      <PixiDJTopBar browserPanel={browserPanel} onBrowserPanelChange={setBrowserPanel} />
+      <PixiDJTopBar
+        browserPanel={browserPanel}
+        onBrowserPanelChange={setBrowserPanel}
+        samplerOpen={samplerOpen}
+        onSamplerToggle={() => setSamplerOpen(p => !p)}
+      />
 
       {/* Browser panel — GL-native, collapses to 0 height when hidden */}
       <pixiContainer layout={{ width: '100%', height: browserPanel !== 'none' ? 280 : 0 }}>
@@ -94,6 +100,13 @@ export const PixiDJView: React.FC = () => {
         >
           <PixiDJDeck deckId="C" />
         </pixiContainer>
+
+        {/* Sampler panel overlay */}
+        {samplerOpen && (
+          <pixiContainer layout={{ position: 'absolute', right: 8, top: 8 }}>
+            <PixiDJSamplerPanel isOpen={samplerOpen} onClose={() => setSamplerOpen(false)} />
+          </pixiContainer>
+        )}
       </pixiContainer>
     </pixiContainer>
   );
@@ -104,10 +117,11 @@ export const PixiDJView: React.FC = () => {
 interface DJTopBarProps {
   browserPanel: DJBrowserPanel;
   onBrowserPanelChange: (panel: DJBrowserPanel) => void;
+  samplerOpen: boolean;
+  onSamplerToggle: () => void;
 }
 
-const PixiDJTopBar: React.FC<DJTopBarProps> = ({ browserPanel, onBrowserPanelChange }) => {
-  const theme = usePixiTheme();
+const PixiDJTopBar: React.FC<DJTopBarProps> = ({ browserPanel, onBrowserPanelChange, samplerOpen, onSamplerToggle }) => {
   const modalOpen = useUIStore(s => s.modalOpen);
 
   const handleBrowser = useCallback(() => {
@@ -122,10 +136,6 @@ const PixiDJTopBar: React.FC<DJTopBarProps> = ({ browserPanel, onBrowserPanelCha
   const handleFX = useCallback(() => {
     const s = useUIStore.getState();
     s.modalOpen === 'masterFx' ? s.closeModal() : s.openModal('masterFx');
-  }, []);
-
-  const handleDrumpads = useCallback(() => {
-    useUIStore.getState().openModal('drumpads');
   }, []);
 
   const handleSettings = useCallback(() => {
@@ -188,9 +198,11 @@ const PixiDJTopBar: React.FC<DJTopBarProps> = ({ browserPanel, onBrowserPanelCha
       />
       <PixiButton
         label="Pads"
-        variant="ghost"
+        variant={samplerOpen ? 'ft2' : 'ghost'}
+        color={samplerOpen ? 'yellow' : undefined}
         size="sm"
-        onClick={handleDrumpads}
+        active={samplerOpen}
+        onClick={onSamplerToggle}
       />
       <PixiButton
         label="Settings"
