@@ -16,11 +16,13 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import * as Tone from 'tone';
 import { AudioDataBus } from '@engine/vj/AudioDataBus';
-import { ExternalLink, SkipForward, Shuffle, Pause, Play, List, Maximize, Minimize } from 'lucide-react';
+import { ExternalLink, SkipForward, Shuffle, Pause, Play, List, Maximize, Minimize, Music } from 'lucide-react';
 import { useUIStore } from '@stores/useUIStore';
 import { useDJStore } from '@stores/useDJStore';
+import { useSettingsStore } from '@stores/useSettingsStore';
 import { focusPopout } from '@components/ui/PopOutWindow';
 import { VJPresetBrowser } from './VJPresetBrowser';
+import { VJPatternOverlay } from './VJPatternOverlay';
 import { ISFCanvas, type ISFCanvasHandle } from './ISFCanvas';
 import { ThreeCanvas, type ThreeCanvasHandle } from './ThreeCanvas';
 
@@ -258,6 +260,30 @@ export const VJCanvas = React.forwardRef<VJCanvasHandle, VJCanvasProps>(
 VJCanvas.displayName = 'VJCanvas';
 
 
+// ─── Pattern overlay toggle (reads/writes settings store directly) ──────────
+const PatternOverlayToggle: React.FC = () => {
+  const enabled = useSettingsStore(s => s.vjPatternOverlay);
+  const toggle = useSettingsStore(s => s.setVjPatternOverlay);
+  return (
+    <button
+      onClick={() => toggle(!enabled)}
+      className={`p-2 rounded-full transition-colors text-white ${
+        enabled ? 'bg-purple-600/50 hover:bg-purple-600/70' : 'bg-white/10 hover:bg-white/20'
+      }`}
+      title={enabled ? 'Hide pattern overlay' : 'Show pattern overlay'}
+    >
+      <Music size={18} />
+    </button>
+  );
+};
+
+// ─── Conditional wrapper for pattern overlay on VJ view ─────────────────────
+const VJPatternOverlayWrapper: React.FC = () => {
+  const enabled = useSettingsStore(s => s.vjPatternOverlay);
+  if (!enabled) return null;
+  return <VJPatternOverlay />;
+};
+
 // ─── VJControls — DOM overlay controls (used by both DOM view + PixiDOMOverlay) ─
 
 export type VJLayer = 'milkdrop' | 'isf' | 'three' | 'projectm';
@@ -439,6 +465,8 @@ export const VJControls: React.FC<VJControlsProps> = ({
                 <List size={18} />
               </button>
             )}
+
+            <PatternOverlayToggle />
 
             {!isPopout && onPopOut && (
               <button
@@ -625,6 +653,7 @@ export const VJView: React.FC<VJViewProps> = ({ isPopout = false }) => {
           />
         </React.Suspense>
       </div>
+      <VJPatternOverlayWrapper />
       <VJControls
         currentName={currentName}
         currentIdx={currentIdx}

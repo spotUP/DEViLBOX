@@ -226,6 +226,7 @@ interface SettingsStore {
   // Visual Settings
   trackerVisualBg: boolean;  // Enable WebGL visual background behind tracker pattern
   trackerVisualMode: number; // Current visualizer mode index (0-5)
+  vjPatternOverlay: boolean; // Show pattern data overlay on VJ view
 
   // CRT Shader
   crtEnabled: boolean;
@@ -251,6 +252,7 @@ interface SettingsStore {
   setMidiPolyphonic: (enabled: boolean) => void;
   setTrackerVisualBg: (enabled: boolean) => void;
   setTrackerVisualMode: (mode: number) => void;
+  setVjPatternOverlay: (enabled: boolean) => void;
   setRenderMode: (mode: 'dom' | 'webgl') => void;
   setCrtEnabled:  (enabled: boolean) => void;
   setCrtParam:    (param: keyof CRTParams, value: number) => void;
@@ -408,6 +410,7 @@ export const useSettingsStore = create<SettingsStore>()(
       midiPolyphonic: true,  // Default: polyphonic enabled for better jamming
       trackerVisualBg: false,  // Default: off
       trackerVisualMode: 0,    // Default: spectrum bars
+      vjPatternOverlay: false, // Default: off
       crtEnabled: false,
       crtParams:  { ...CRT_DEFAULT_PARAMS },
       renderMode: 'webgl' as const,  // Default: WebGL/workbench rendering
@@ -498,6 +501,11 @@ export const useSettingsStore = create<SettingsStore>()(
           state.trackerVisualMode = trackerVisualMode;
         }),
 
+      setVjPatternOverlay: (vjPatternOverlay) =>
+        set((state) => {
+          state.vjPatternOverlay = vjPatternOverlay;
+        }),
+
       setRenderMode: (renderMode) =>
         set((state) => {
           state.renderMode = renderMode;
@@ -551,6 +559,7 @@ export const useSettingsStore = create<SettingsStore>()(
         midiPolyphonic: state.midiPolyphonic,
         trackerVisualBg: state.trackerVisualBg,
         trackerVisualMode: state.trackerVisualMode,
+        vjPatternOverlay: state.vjPatternOverlay,
         crtEnabled: state.crtEnabled,
         crtParams:  state.crtParams,
         // renderMode intentionally not persisted — always start in webgl/workbench mode
