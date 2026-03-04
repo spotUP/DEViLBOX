@@ -72,15 +72,15 @@ export const PixiMainLayout: React.FC = () => {
   const thumbnailsRef = useRef<Record<string, Texture>>({});
   const [thumbnails, setThumbnails] = useState<Record<string, Texture>>({});
 
-  const mainViewH = isFullscreenView
-    ? height
-    : height - MODERN_NAV_H - MODERN_STATUS_BAR_H;
-
   // Determine which view component to render
   const mainViewId = resolveMainView(activeView);
 
   // Fullscreen views hide nav + status bar (matching DOM AppLayout.isFullscreenView)
   const isFullscreenView = mainViewId === 'vj';
+
+  const mainViewH = isFullscreenView
+    ? height
+    : height - MODERN_NAV_H - MODERN_STATUS_BAR_H;
 
   // ─── Thumbnail capture for Exposé ──────────────────────────────────────────
 

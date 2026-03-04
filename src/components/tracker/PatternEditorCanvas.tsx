@@ -159,8 +159,6 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     instruments: state.instruments
   })));
 
-  const trackerVisualBg = useSettingsStore((s) => s.trackerVisualBg);
-
   const trackerZoom = useUIStore(s => s.trackerZoom);
   const showChannelNames = useUIStore(s => s.showChannelNames);
   const showAutomationLanes = useUIStore(s => s.showAutomationLanes);
