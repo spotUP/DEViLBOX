@@ -251,8 +251,8 @@ export const PixiTipOfTheDay: React.FC<PixiTipOfTheDayProps> = ({
   }, []);
 
   const tip = DEVILBOX_TIPS[currentTipIndex];
-  // Estimate total height: header(64) + tabs(40) + content(300) + navFooter(56) + actionFooter(52) = 512
-  const H = 512;
+  // header(~68) + tabs(40) + content(CONTENT_H) + navFooter(~65) + actionFooter(~72)
+  const H = 548;
 
   return (
     <PixiModal
