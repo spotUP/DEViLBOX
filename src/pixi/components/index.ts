@@ -21,3 +21,4 @@ export { PixiMenuBar } from './PixiMenuBar';
 export type { Tab } from './PixiTabBar';
 export { PixiTabBar } from './PixiTabBar';
 export { PixiIcon } from './PixiIcon';
+export { PixiViewHeader, VIEW_HEADER_HEIGHT } from './PixiViewHeader';

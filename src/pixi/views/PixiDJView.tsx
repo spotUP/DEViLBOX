@@ -4,9 +4,8 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { PIXI_FONTS } from '../fonts';
 import { usePixiTheme } from '../theme';
-import { PixiButton, PixiSelect } from '../components';
+import { PixiButton, PixiViewHeader } from '../components';
 import { PixiDJDeck } from './dj/PixiDJDeck';
 import { PixiDJMixer } from './dj/PixiDJMixer';
 import { PixiDJPlaylistPanel } from './dj/PixiDJPlaylistPanel';
@@ -24,15 +23,6 @@ import { PixiDJControllerSelect } from './dj/PixiDJControllerSelect';
 import { PixiDJFxPresets } from './dj/PixiDJFxPresets';
 
 type DJBrowserPanel = 'none' | 'playlists' | 'modland' | 'serato';
-
-const VIEW_OPTIONS = [
-  { value: 'tracker', label: 'Tracker' },
-  { value: 'arrangement', label: 'Arrangement' },
-  { value: 'pianoroll', label: 'Piano Roll' },
-  { value: 'dj', label: 'DJ Mixer' },
-  { value: 'drumpad', label: 'Drum Pads' },
-  { value: 'vj', label: 'VJ View' },
-];
 
 export const PixiDJView: React.FC = () => {
   const engineRef = useRef<DJEngine | null>(null);
@@ -144,35 +134,7 @@ const PixiDJTopBar: React.FC<DJTopBarProps> = ({ browserPanel, onBrowserPanelCha
   }, []);
 
   return (
-    <layoutContainer
-      layout={{
-        width: '100%',
-        height: 40,
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingLeft: 12,
-        paddingRight: 12,
-        gap: 6,
-        backgroundColor: theme.bgSecondary.color,
-        borderBottomWidth: 1,
-        borderColor: theme.border.color,
-      }}
-    >
-      {/* View mode selector */}
-      <PixiSelect
-        value="dj"
-        options={VIEW_OPTIONS}
-        onChange={(v) => useUIStore.getState().setActiveView(v as any)}
-        width={100}
-        height={24}
-      />
-
-      <pixiBitmapText
-        text="DEViLBOX DJ"
-        style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 12, fill: 0xffffff }}
-        tint={theme.accent.color}
-        layout={{}}
-      />
+    <PixiViewHeader activeView="dj" title="DEViLBOX DJ">
 
       {/* Browser panels */}
       <PixiButton
@@ -238,6 +200,6 @@ const PixiDJTopBar: React.FC<DJTopBarProps> = ({ browserPanel, onBrowserPanelCha
         active={modalOpen === 'settings'}
         onClick={handleSettings}
       />
-    </layoutContainer>
+    </PixiViewHeader>
   );
 };
