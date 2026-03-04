@@ -43,9 +43,6 @@ const LazyMasterEffectsModal = lazy(() =>
 const LazyInstrumentEffectsModal = lazy(() =>
   import('@/components/effects').then(m => ({ default: m.InstrumentEffectsModal }))
 );
-const LazyDrumpadEditorModal = lazy(() =>
-  import('@/components/midi/DrumpadEditorModal').then(m => ({ default: m.DrumpadEditorModal }))
-);
 const LazyAuthModal = lazy(() =>
   import('@/components/dialogs/AuthModal').then(m => ({ default: m.AuthModal }))
 );
@@ -416,9 +413,6 @@ export const WebGLModalBridge: React.FC = () => {
       {modalOpen === 'instrumentFx' && (
         <LazyInstrumentEffectsModal isOpen={true} onClose={closeModal} />
       )}
-      {modalOpen === 'drumpads' && (
-        <LazyDrumpadEditorModal isOpen={true} onClose={closeModal} />
-      )}
       {modalOpen === 'auth' && (
         <LazyAuthModal isOpen={true} onClose={closeModal} />
       )}
@@ -448,9 +442,6 @@ export const WebGLModalBridge: React.FC = () => {
           onLoad={handleFileBrowserLoad}
           onLoadTrackerModule={handleLoadTrackerModule}
         />
-      )}
-      {modalOpen === 'midi-pads' && (
-        <LazyDrumpadEditorModal isOpen={true} onClose={closeModal} />
       )}
       {modalOpen === 'automation' && (
         <div style={{
