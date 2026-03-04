@@ -96,6 +96,30 @@ static bool logging_enabled = false;
 static uint32_t current_sample_time = 0;
 static int g_sample_rate = 48000;  // Output sample rate for cycle calculations
 
+// Chip clock rates (Hz) — must match FurnacePitchUtils.ts formulas
+#define CLOCK_OPN2   7670454   // Genesis YM2612
+#define CLOCK_OPM    3579545   // Arcade YM2151
+#define CLOCK_OPN    3579545   // YM2203
+#define CLOCK_OPNA   8000000   // YM2608
+#define CLOCK_OPNB   8000000   // YM2610/YM2610B
+
+// Fractional phase accumulators for correct chip clocking
+// OPN2 (Nuked): needs chipClock/6 total clocks/sec, currently 24/sample
+static double opn2_clock_phase = 0.0;
+// OPM (Nuked): needs chipClock/2 total clocks/sec, currently 32/sample
+static double opm_clock_phase = 0.0;
+// ymfm chips at MIN fidelity: need generate() at chip-specific rates
+static double opn_gen_phase = 0.0;   // YM2203: clock/24
+static double opna_gen_phase = 0.0;  // YM2608: clock/48
+static double opnb_gen_phase = 0.0;  // YM2610: clock/144
+static double opnb_b_gen_phase = 0.0; // YM2610B: clock/144
+// OPZ (YM2414): each generate() = 1 FM sample, native rate = clock/(2×32) = 55930
+static double opz_gen_phase = 0.0;
+// Y8950: each generate() = 1 FM sample, native rate = clock/72 = 49716
+static double y8950_gen_phase = 0.0;
+// OPLL (Nuked): 9 slots per FM cycle, native FM rate = clock/72 = 49716
+static double opll_clock_phase = 0.0;
+
 // Interfaces
 class msm6295_intf_impl : public vgsound_emu_mem_intf { public: msm6295_intf_impl() : vgsound_emu_mem_intf() {} };
 class es550x_intf_impl : public es550x_intf { public: es550x_intf_impl() : es550x_intf() {} s16 read_sample(u8 bank, u32 addr) override { return 0; } };
@@ -400,10 +424,14 @@ void furnace_init_chips(int sample_rate) {
     OPLL_Reset(&opll_chip, opll_type_ym2413);
     EM_ASM({ console.log('[FurnaceWASM] Init: AY, OPNA, OPNB, OPN, OPNB-B...'); });
     if (ay_chip) delete ay_chip; ay_chip = new ay8910_device(1789773); ay_chip->device_start(); ay_chip->device_reset();
-    if (opna_chip) delete opna_chip; opna_chip = new ymfm::ym2608(ymfm_intf); opna_chip->reset();
-    if (opnb_chip) delete opnb_chip; opnb_chip = new ymfm::ym2610(ymfm_intf); opnb_chip->reset();
-    if (opn_chip) delete opn_chip; opn_chip = new ymfm::ym2203(ymfm_intf); opn_chip->reset();
-    if (opnb_b_chip) delete opnb_b_chip; opnb_b_chip = new ymfm::ym2610b(ymfm_intf); opnb_b_chip->reset();
+    if (opna_chip) delete opna_chip; opna_chip = new ymfm::ym2608(ymfm_intf); opna_chip->set_fidelity(ymfm::OPN_FIDELITY_MIN); opna_chip->reset();
+    if (opnb_chip) delete opnb_chip; opnb_chip = new ymfm::ym2610(ymfm_intf); opnb_chip->set_fidelity(ymfm::OPN_FIDELITY_MIN); opnb_chip->reset();
+    if (opn_chip) delete opn_chip; opn_chip = new ymfm::ym2203(ymfm_intf); opn_chip->set_fidelity(ymfm::OPN_FIDELITY_MIN); opn_chip->reset();
+    if (opnb_b_chip) delete opnb_b_chip; opnb_b_chip = new ymfm::ym2610b(ymfm_intf); opnb_b_chip->set_fidelity(ymfm::OPN_FIDELITY_MIN); opnb_b_chip->reset();
+    // Reset phase accumulators
+    opn2_clock_phase = 0.0; opm_clock_phase = 0.0;
+    opn_gen_phase = 0.0; opna_gen_phase = 0.0; opnb_gen_phase = 0.0; opnb_b_gen_phase = 0.0;
+    opz_gen_phase = 0.0; y8950_gen_phase = 0.0; opll_clock_phase = 0.0;
 
     EM_ASM({ console.log('[FurnaceWASM] Init: TIA, SAA, OKI, ES5506, SWAN...'); });
     if (tia_chip) delete tia_chip; tia_chip = new TIA::Audio(); tia_chip->reset(false);
@@ -863,41 +891,43 @@ void furnace_chip_render(int type, float* buffer_l, float* buffer_r, int length)
         
         switch (type) {
             case CHIP_OPN2: {
-                // OPN2 clocking: Each OPN2_Clock advances 1 slot (24 slots per sample)
-                // Native sample rate: 7.67MHz / 144 = ~53.3kHz
-                // Output sample rate: g_sample_rate (typically 48kHz)
-                //
-                // For proper timing, we accumulate over ~24 clocks (1 native sample)
-                // and output at our target rate. For 48kHz output from 53kHz native,
-                // we generate slightly more than 1 native sample per output sample.
-                //
-                // Simple approach: clock 24 times per output sample (1:1 with native)
-                // This gives ~53kHz effective rate, close enough to 48kHz
+                // OPN2: Nuked-OPN2 clocks 1 slot per OPN2_Clock call.
+                // 24 clocks = 1 FM sample. Native clock rate = 7.67MHz.
+                // Total clocks/sec needed = chipClock/6 = 1,278,409.
+                // Clocks per output sample = chipClock/6/sampleRate ≈ 26.63 at 48kHz.
+                // Using fractional accumulator for correct pitch.
                 int32_t sum_l = 0, sum_r = 0;
-                const int clocks_per_sample = 24;  // 24 clocks = 1 native sample
-                for (int c = 0; c < clocks_per_sample; c++) {
+                int count = 0;
+                double clocks_per_sample = (double)CLOCK_OPN2 / 6.0 / g_sample_rate;
+                opn2_clock_phase += clocks_per_sample;
+                while (opn2_clock_phase >= 1.0) {
                     OPN2_Clock(&opn2_chip, out16);
                     sum_l += out16[0];
                     sum_r += out16[1];
+                    opn2_clock_phase -= 1.0;
+                    count++;
                 }
-                // Furnace genesis.cpp uses: 6 clocks, <<5 (×32) gain
-                // We clock 24 (4× more), so effective gain = ×32/4 = ×8
-                // Aggressive gain for single-channel audibility
-                int32_t ol = sum_l;
-                int32_t or_ = sum_r;
-                ol = (ol > 512) ? 512 : (ol < -512) ? -512 : ol;
-                or_ = (or_ > 512) ? 512 : (or_ < -512) ? -512 : or_;
-                buffer_l[i] = (float)ol / 512.0f;
-                buffer_r[i] = (float)or_ / 512.0f;
+                // Scale: ~27 clocks summed. OPN2 DAC is 9-bit (±256).
+                // With 6 ch cycling, one FM sample spans 24 clocks.
+                // Average over count to normalize, then apply gain.
+                float scale = (count > 0) ? (1.0f / count) : 0.0f;
+                buffer_l[i] = (float)sum_l * scale * 8.0f / 512.0f;
+                buffer_r[i] = (float)sum_r * scale * 8.0f / 512.0f;
                 break;
             }
             case CHIP_OPM: {
-                // OPM: 8 groups of 4 clocks per output sample (matching Furnace arcade.cpp)
-                for (int g = 0; g < 8; g++) {
+                // OPM: Nuked-OPM cycles 32 slots per FM sample.
+                // Each OPM_Clock = 1 half-cycle. Need chipClock/2 clocks/sec.
+                // Clocks per output sample = chipClock/2/sampleRate ≈ 37.3 at 48kHz.
+                double opm_clocks_per_sample = (double)CLOCK_OPM / 2.0 / g_sample_rate;
+                opm_clock_phase += opm_clocks_per_sample;
+                while (opm_clock_phase >= 4.0) {
+                    // Clock in groups of 4 (3 discard + 1 capture) per Furnace convention
                     OPM_Clock(&opm_chip, NULL, NULL, NULL, NULL);
                     OPM_Clock(&opm_chip, NULL, NULL, NULL, NULL);
                     OPM_Clock(&opm_chip, NULL, NULL, NULL, NULL);
                     OPM_Clock(&opm_chip, out32, &d1, &d2, &d3);
+                    opm_clock_phase -= 4.0;
                 }
                 int32_t ol = out32[0];
                 int32_t or_ = out32[1];
@@ -966,14 +996,16 @@ void furnace_chip_render(int type, float* buffer_l, float* buffer_r, int length)
             }
             case CHIP_SID:  if (sid_chip) { sid3_clock(sid_chip); buffer_l[i] = (float)sid_chip->output_l / 32768.0f; buffer_r[i] = (float)sid_chip->output_r / 32768.0f; } break;
             case CHIP_OPLL: {
-                // OPLL: 9 clocks per output sample (matching Furnace opll.cpp)
-                // Each clock produces one channel's output, sum all 9
+                // OPLL: 9 slots per FM cycle. Native FM rate = clock/72 = 49716 Hz.
+                // Clocks per output = (clock/72 * 9) / sampleRate = clock/8/sampleRate
                 int32_t os = 0;
-                for (int c = 0; c < 9; c++) {
+                double opll_step = (double)CLOCK_OPN * 9.0 / 72.0 / g_sample_rate;
+                opll_clock_phase += opll_step;
+                while (opll_clock_phase >= 1.0) {
                     OPLL_Clock(&opll_chip, opll_buf);
                     os += (opll_buf[0] + opll_buf[1]);
+                    opll_clock_phase -= 1.0;
                 }
-                // OPLL raw output is low — apply gain (reduced since write timing fix improved output)
                 os *= 30;
                 if (os < -32768) os = -32768;
                 if (os > 32767) os = 32767;
@@ -982,14 +1014,77 @@ void furnace_chip_render(int type, float* buffer_l, float* buffer_r, int length)
                 break;
             }
             case CHIP_TIA:  if (tia_chip) { tia_chip->tick(1); buffer_l[i] = (float)tia_chip->myCurrentSample[0] / 32768.0f; buffer_r[i] = (float)tia_chip->myCurrentSample[1] / 32768.0f; } break;
-            case CHIP_OPNA: if (opna_chip) { opna_chip->generate(&output_2608); buffer_l[i] = (float)(output_2608.data[0] * 8) / 32768.0f; buffer_r[i] = (float)(output_2608.data[1] * 8) / 32768.0f; } break;
-            case CHIP_OPNB: if (opnb_chip) { opnb_chip->generate(&output_2610); buffer_l[i] = (float)(output_2610.data[0] * 8) / 32768.0f; buffer_r[i] = (float)(output_2610.data[1] * 8) / 32768.0f; } break;
-            case CHIP_OPN: if (opn_chip) { opn_chip->generate(&output_2203); buffer_l[i] = (float)(output_2203.data[0] * 16) / 32768.0f; buffer_r[i] = (float)(output_2203.data[0] * 16) / 32768.0f; } break;
-            case CHIP_OPNB_B: if (opnb_b_chip) { opnb_b_chip->generate(&output_2610b); buffer_l[i] = (float)(output_2610b.data[0] * 8) / 32768.0f; buffer_r[i] = (float)(output_2610b.data[1] * 8) / 32768.0f; } break;
+            case CHIP_OPNA: if (opna_chip) {
+                // YM2608: MIN fidelity expects generate rate = clock/48 = 166667 Hz
+                // fm_samples_per_output = 3, so FM rate = generate_rate/3 = 55556 Hz
+                double opna_step = (double)CLOCK_OPNA / 48.0 / g_sample_rate;
+                opna_gen_phase += opna_step;
+                while (opna_gen_phase >= 1.0) {
+                    opna_chip->generate(&output_2608);
+                    opna_gen_phase -= 1.0;
+                }
+                buffer_l[i] = (float)(output_2608.data[0] * 8) / 32768.0f;
+                buffer_r[i] = (float)(output_2608.data[1] * 8) / 32768.0f;
+            } break;
+            case CHIP_OPNB: if (opnb_chip) {
+                // YM2610: MIN fidelity expects generate rate = clock/144 = 55556 Hz
+                // fm_samples_per_output = 1, so FM rate = generate_rate = 55556 Hz
+                double opnb_step = (double)CLOCK_OPNB / 144.0 / g_sample_rate;
+                opnb_gen_phase += opnb_step;
+                while (opnb_gen_phase >= 1.0) {
+                    opnb_chip->generate(&output_2610);
+                    opnb_gen_phase -= 1.0;
+                }
+                buffer_l[i] = (float)(output_2610.data[0] * 8) / 32768.0f;
+                buffer_r[i] = (float)(output_2610.data[1] * 8) / 32768.0f;
+            } break;
+            case CHIP_OPN: if (opn_chip) {
+                // YM2203: MIN fidelity expects generate rate = clock/24 = 149147 Hz
+                // fm_samples_per_output = 3, so FM rate = generate_rate/3 = 49716 Hz
+                double opn_step = (double)CLOCK_OPN / 24.0 / g_sample_rate;
+                opn_gen_phase += opn_step;
+                while (opn_gen_phase >= 1.0) {
+                    opn_chip->generate(&output_2203);
+                    opn_gen_phase -= 1.0;
+                }
+                buffer_l[i] = (float)(output_2203.data[0] * 16) / 32768.0f;
+                buffer_r[i] = (float)(output_2203.data[0] * 16) / 32768.0f;
+            } break;
+            case CHIP_OPNB_B: if (opnb_b_chip) {
+                // YM2610B: same clocking as YM2610
+                double opnbb_step = (double)CLOCK_OPNB / 144.0 / g_sample_rate;
+                opnb_b_gen_phase += opnbb_step;
+                while (opnb_b_gen_phase >= 1.0) {
+                    opnb_b_chip->generate(&output_2610b);
+                    opnb_b_gen_phase -= 1.0;
+                }
+                buffer_l[i] = (float)(output_2610b.data[0] * 8) / 32768.0f;
+                buffer_r[i] = (float)(output_2610b.data[1] * 8) / 32768.0f;
+            } break;
             case CHIP_AY:   if (ay_chip) { short ay_o[3]; ay_chip->sound_stream_update(ay_o, 1); float m = (ay_o[0]+ay_o[1]+ay_o[2])/(3.0f*32768.0f); buffer_l[i] = m; buffer_r[i] = m; } break;
             case CHIP_SWAN: if (swan_chip) { int16_t s_o[2]; swan_chip->SoundUpdate(); swan_chip->SoundFlush(s_o, 1); buffer_l[i] = (float)s_o[0]/32768.0f; buffer_r[i] = (float)s_o[1]/32768.0f; } break;
-            case CHIP_OPZ: if (opz_chip) { opz_chip->generate(&output_2414); buffer_l[i] = (float)(output_2414.data[0] * 8) / 32768.0f; buffer_r[i] = (float)(output_2414.data[1] * 8) / 32768.0f; } break;
-            case CHIP_Y8950: if (y8950_chip) { y8950_chip->generate(&output_8950); buffer_l[i] = (float)(output_8950.data[0] * 8) / 32768.0f; buffer_r[i] = buffer_l[i]; } break;
+            case CHIP_OPZ: if (opz_chip) {
+                // YM2414 (OPZ): native FM rate = clock/(2×32) = 55930 Hz
+                double opz_step = (double)CLOCK_OPM / (2.0 * 32.0) / g_sample_rate;
+                opz_gen_phase += opz_step;
+                while (opz_gen_phase >= 1.0) {
+                    opz_chip->generate(&output_2414);
+                    opz_gen_phase -= 1.0;
+                }
+                buffer_l[i] = (float)(output_2414.data[0] * 8) / 32768.0f;
+                buffer_r[i] = (float)(output_2414.data[1] * 8) / 32768.0f;
+            } break;
+            case CHIP_Y8950: if (y8950_chip) {
+                // Y8950: native FM rate = clock/72 = 49716 Hz
+                double y8950_step = (double)CLOCK_OPN / 72.0 / g_sample_rate;
+                y8950_gen_phase += y8950_step;
+                while (y8950_gen_phase >= 1.0) {
+                    y8950_chip->generate(&output_8950);
+                    y8950_gen_phase -= 1.0;
+                }
+                buffer_l[i] = (float)(output_8950.data[0] * 8) / 32768.0f;
+                buffer_r[i] = buffer_l[i];
+            } break;
             case CHIP_K007232: if (k7232_chip) { k7232_chip->tick(1); buffer_l[i] = (float)k7232_chip->output(0)/32768.0f; buffer_r[i] = (float)k7232_chip->output(1)/32768.0f; } break;
             case CHIP_K053260: if (k53260_chip) { k53260_chip->tick(1); buffer_l[i] = (float)k53260_chip->output(0)/32768.0f; buffer_r[i] = (float)k53260_chip->output(1)/32768.0f; } break;
             case CHIP_X1_010: if (x1_010_chip) { x1_010_chip->tick(); buffer_l[i] = (float)x1_010_chip->output(0)/32768.0f; buffer_r[i] = (float)x1_010_chip->output(1)/32768.0f; } break;
