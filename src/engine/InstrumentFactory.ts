@@ -31,8 +31,7 @@ import { SunVoxSynth } from './sunvox/SunVoxSynth';
 import { UADESynth } from './uade/UADESynth';
 import { SuperColliderSynth } from './sc/SuperColliderSynth';
 import { MAMESynth } from './MAMESynth';
-import { FurnaceChipType } from './chips/FurnaceChipEngine';
-import { FurnaceDispatchSynth } from './furnace-dispatch';
+import { FurnaceDispatchSynth, FurnaceDispatchPlatform } from './furnace-dispatch';
 import { BuzzmachineType } from './buzzmachines/BuzzmachineEngine';
 import { VSTBridgeSynth } from './vstbridge/VSTBridgeSynth';
 import { SYNTH_REGISTRY } from './vstbridge/synth-registry';
@@ -46,8 +45,6 @@ import {
 } from './factories/ToneJSSynthFactory';
 import {
   SYNTH_TO_DISPATCH,
-  createFurnace,
-  createFurnaceWithChip,
   createBuzzmachine,
 } from './factories/FurnaceChipSynthFactory';
 import {
@@ -167,49 +164,18 @@ export class InstrumentFactory {
       case 'C64SID':
         return null;
 
-      case 'Furnace':
-        instrument = createFurnace(config);
-        break;
-
       case 'Buzzmachine':
         instrument = createBuzzmachine(config);
         break;
 
-      // Furnace Chip Types - using FurnaceChipType enum for correct IDs
-      case 'FurnaceOPN':
-        instrument = createFurnaceWithChip(config, FurnaceChipType.OPN2);
-        break;
-      case 'FurnaceOPM':
-        instrument = createFurnaceWithChip(config, FurnaceChipType.OPM);
-        break;
-      case 'FurnaceOPL':
-        instrument = createFurnaceWithChip(config, FurnaceChipType.OPL3);
-        break;
-      case 'FurnaceOPLL':
-        instrument = createFurnaceWithChip(config, FurnaceChipType.OPLL);
-        break;
-      case 'FurnaceESFM':
-        instrument = createFurnaceWithChip(config, FurnaceChipType.ESFM);
-        break;
-      case 'FurnaceOPZ':
-        instrument = createFurnaceWithChip(config, FurnaceChipType.OPZ);
-        break;
-      case 'FurnaceOPNA':
-        instrument = createFurnaceWithChip(config, FurnaceChipType.OPNA);
-        break;
-      case 'FurnaceOPNB':
-        instrument = createFurnaceWithChip(config, FurnaceChipType.OPNB);
-        break;
-      case 'FurnaceOPL4':
-        instrument = createFurnaceWithChip(config, FurnaceChipType.OPL4);
-        break;
-      case 'FurnaceY8950':
-        instrument = createFurnaceWithChip(config, FurnaceChipType.Y8950);
-        break;
-      case 'FurnaceVRC7':
-        instrument = createFurnaceWithChip(config, FurnaceChipType.OPLL); // VRC7 uses OPLL core
-        break;
-      // Non-FM Furnace chips — use FurnaceDispatchSynth (native WASM dispatch)
+      case 'Furnace':
+      // All Furnace chips — unified under FurnaceDispatchSynth (native WASM dispatch)
+      // FM chips
+      case 'FurnaceOPN': case 'FurnaceOPM': case 'FurnaceOPL': case 'FurnaceOPLL':
+      case 'FurnaceESFM': case 'FurnaceOPZ': case 'FurnaceOPNA': case 'FurnaceOPNB':
+      case 'FurnaceOPL4': case 'FurnaceY8950': case 'FurnaceVRC7':
+      case 'FurnaceOPN2203': case 'FurnaceOPNBB':
+      // Non-FM chips
       case 'FurnaceNES': case 'FurnaceGB': case 'FurnaceSNES': case 'FurnacePCE':
       case 'FurnacePSG': case 'FurnaceVB': case 'FurnaceLynx': case 'FurnaceSWAN':
       case 'FurnaceVRC6': case 'FurnaceN163': case 'FurnaceFDS': case 'FurnaceMMC5':
@@ -244,18 +210,11 @@ export class InstrumentFactory {
             (instrument as FurnaceDispatchSynth).setInstrumentUploadPromise(uploadPromise as Promise<void>);
           }
         } else {
-          instrument = createFurnaceWithChip(config, FurnaceChipType.OPN2);
+          console.warn(`[InstrumentFactory] No dispatch mapping for ${config.synthType}, falling back to dummy`);
+          instrument = new FurnaceDispatchSynth(FurnaceDispatchPlatform.GENESIS);
         }
         break;
       }
-
-      // FM chips that stay on FurnaceSynth (already produce audio)
-      case 'FurnaceOPN2203':
-        instrument = createFurnaceWithChip(config, FurnaceChipType.OPN);
-        break;
-      case 'FurnaceOPNBB':
-        instrument = createFurnaceWithChip(config, FurnaceChipType.OPNB_B);
-        break;
 
       case 'Sampler': {
         // Check if this is a MOD/XM sample that needs period-based playback

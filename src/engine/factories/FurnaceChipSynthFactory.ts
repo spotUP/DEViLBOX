@@ -78,6 +78,22 @@ FurnaceT6W28: FurnaceDispatchPlatform.T6W28,
 FurnaceSUPERVISION: FurnaceDispatchPlatform.SUPERVISION,
 FurnaceUPD1771: FurnaceDispatchPlatform.UPD1771C,
 FurnaceSCVTONE: FurnaceDispatchPlatform.UPD1771C,
+// FM chips (Yamaha) — unified under FurnaceDispatch
+FurnaceOPN: FurnaceDispatchPlatform.GENESIS,
+FurnaceOPM: FurnaceDispatchPlatform.ARCADE,
+FurnaceOPL: FurnaceDispatchPlatform.OPL3,
+FurnaceOPLL: FurnaceDispatchPlatform.OPLL,
+FurnaceESFM: FurnaceDispatchPlatform.ESFM,
+FurnaceOPZ: FurnaceDispatchPlatform.OPZ,
+FurnaceOPNA: FurnaceDispatchPlatform.YM2608,
+FurnaceOPNB: FurnaceDispatchPlatform.YM2610,
+FurnaceOPL4: FurnaceDispatchPlatform.OPL4,
+FurnaceY8950: FurnaceDispatchPlatform.Y8950,
+FurnaceVRC7: FurnaceDispatchPlatform.VRC7,
+FurnaceOPN2203: FurnaceDispatchPlatform.YM2203,
+FurnaceOPNBB: FurnaceDispatchPlatform.YM2610B,
+// Generic Furnace type defaults to Genesis (OPN2)
+Furnace: FurnaceDispatchPlatform.GENESIS,
 };
 
 
