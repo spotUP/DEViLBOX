@@ -164,7 +164,12 @@ export class ScriptNodePlayerEngine {
   }
 
   /**
-   * Start playback — feeds SID binary data to ScriptNodePlayer via blob URL
+   * Start playback — feeds SID binary data to ScriptNodePlayer via blob URL.
+   *
+   * Flow matches DeepSID reference (Chordian/deepsid js/player.js):
+   *   1. setVolume(1) before loading
+   *   2. loadMusicFromURL(blobUrl, options) — loads SID data into backend
+   *   3. player.play() — tells backend to start generating audio
    */
   async play(_audioContext: AudioContext): Promise<void> {
     if (this.playing) return;
@@ -174,20 +179,24 @@ export class ScriptNodePlayerEngine {
     const blob = new Blob([new Uint8Array(this.sidData)], { type: 'application/octet-stream' });
     this.blobUrl = URL.createObjectURL(blob);
 
+    // Set volume before loading (DeepSID does this in onPlayerReady)
+    if (this.player.setVolume) {
+      this.player.setVolume(1);
+    }
+
     const ScriptNodePlayer = (window as any).ScriptNodePlayer;
 
     await ScriptNodePlayer.loadMusicFromURL(
       this.blobUrl,
       { track: this.subsong },
-      () => {
-        // onCompletion
-        console.log(`[${this.engineType}] Load completed`);
-      },
-      () => {
-        // onFail
-        console.warn(`[${this.engineType}] Load failed`);
+      (err: any) => {
+        if (err) console.warn(`[${this.engineType}] Load failed:`, err);
       },
     );
+
+    // Explicitly start playback — loadMusicFromURL only loads data,
+    // player.play() calls _backendAdapter.play() which starts audio generation
+    this.player.play();
 
     this.playing = true;
     console.log(`[${this.engineType}] Playback started, subsong:`, this.subsong);
