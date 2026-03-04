@@ -91,31 +91,46 @@ export class JSSIDEngine {
   }
 
   /**
-   * Load SID binary data into jsSID via a blob URL
+   * Load SID binary data into jsSID.
+   * Uses loaddata() for direct buffer loading (no XHR/blob URL needed).
    */
   private loadSIDData(): Promise<void> {
     return new Promise((resolve, reject) => {
       let resolved = false;
-      const blob = new Blob([new Uint8Array(this.sidData)], { type: 'application/octet-stream' });
-      this.blobUrl = URL.createObjectURL(blob);
 
-      // jsSID calls the load callback when XHR completes
       this.jsSID.setloadcallback(() => {
+        if (!resolved) {
+          resolved = true;
+          this.numSubsongs = this.jsSID.getsubtunes() || 1;
+          console.log('[jsSID] loadcallback fired, subtunes:', this.numSubsongs);
+          resolve();
+        }
+      });
+
+      // Feed SID data directly from buffer — bypasses blob URL + XHR entirely
+      if (this.jsSID.loaddata) {
+        const buf = this.sidData.buffer.slice(
+          this.sidData.byteOffset,
+          this.sidData.byteOffset + this.sidData.byteLength,
+        );
+        console.log('[jsSID] Loading SID data directly (%d bytes)', this.sidData.byteLength);
+        this.jsSID.loaddata(buf, this.subsong);
+        // loaddata calls loadcallback synchronously
         if (!resolved) {
           resolved = true;
           this.numSubsongs = this.jsSID.getsubtunes() || 1;
           resolve();
         }
-      });
+        return;
+      }
 
-      // DeepSID calls playcont() before loadinit() as a hack to avoid console errors
-      // and to ensure the AudioContext/ScriptProcessorNode are connected
+      // Fallback: blob URL + XHR (for older jsSID without loaddata)
+      console.log('[jsSID] Falling back to blob URL loading');
+      const blob = new Blob([new Uint8Array(this.sidData)], { type: 'application/octet-stream' });
+      this.blobUrl = URL.createObjectURL(blob);
       this.jsSID.playcont();
-
-      // loadinit fetches the URL, parses the SID header, and calls init(subtune)
       this.jsSID.loadinit(this.blobUrl, this.subsong);
 
-      // Timeout fallback in case XHR fails silently
       setTimeout(() => {
         if (!resolved) {
           resolved = true;

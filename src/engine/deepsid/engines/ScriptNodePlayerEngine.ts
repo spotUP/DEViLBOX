@@ -49,7 +49,6 @@ export class ScriptNodePlayerEngine {
 
   private player: any = null;
   private adapter: any = null;
-  private blobUrl: string | null = null;
   private playing = false;
   private subsong = 0;
   private numSubsongs = 1;
@@ -164,42 +163,61 @@ export class ScriptNodePlayerEngine {
   }
 
   /**
-   * Start playback — feeds SID binary data to ScriptNodePlayer via blob URL.
+   * Start playback — feeds SID binary data directly to ScriptNodePlayer internals.
    *
-   * Flow matches DeepSID reference (Chordian/deepsid js/player.js):
-   *   1. setVolume(1) before loading
-   *   2. loadMusicFromURL(blobUrl, options) — loads SID data into backend
-   *   3. player.play() — tells backend to start generating audio
+   * Bypasses the blob URL + XHR pipeline entirely to avoid ScriptNodePlayer's
+   * URL path mangling (mapToVirtualFilename replaces ':' with '{3]') which can
+   * break Emscripten FS registration and filename-based format detection.
+   *
+   * Calls _prepareTrackForPlayback directly, which invokes:
+   *   _loadMusicData → backend.loadMusicData → WASM emu_load_file
    */
   async play(_audioContext: AudioContext): Promise<void> {
     if (this.playing) return;
     if (!this.player) throw new Error('Player not initialized');
 
-    // Create a blob URL for the SID data
-    const blob = new Blob([new Uint8Array(this.sidData)], { type: 'application/octet-stream' });
-    this.blobUrl = URL.createObjectURL(blob);
+    // Ensure audio pipeline is set up (Chrome defers until user gesture)
+    this.player._initByUserGesture();
 
-    // Set volume before loading (DeepSID does this in onPlayerReady)
-    if (this.player.setVolume) {
-      this.player.setVolume(1);
-    }
+    // Set volume before loading
+    this.player.setVolume(1);
 
-    const ScriptNodePlayer = (window as any).ScriptNodePlayer;
-
-    await ScriptNodePlayer.loadMusicFromURL(
-      this.blobUrl,
-      { track: this.subsong },
-      (err: any) => {
-        if (err) console.warn(`[${this.engineType}] Load failed:`, err);
-      },
+    // Create a standalone ArrayBuffer copy of the SID data
+    const dataBuffer = this.sidData.buffer.slice(
+      this.sidData.byteOffset,
+      this.sidData.byteOffset + this.sidData.byteLength,
     );
 
-    // Explicitly start playback — loadMusicFromURL only loads data,
-    // player.play() calls _backendAdapter.play() which starts audio generation
-    this.player.play();
+    const filename = 'loaded.sid';
+    const options = { track: this.subsong };
+
+    console.log(`[${this.engineType}] Loading SID data directly (%d bytes)`, this.sidData.byteLength);
+
+    // Feed data directly: _prepareTrackForPlayback → _initIfNeeded → _loadMusicData → WASM
+    const success = this.player._prepareTrackForPlayback(
+      filename,
+      dataBuffer,
+      options,
+      () => {}, // onCompletion
+      (err: any) => console.error(`[${this.engineType}] Track prep failed:`, err),
+    );
+
+    if (!success) {
+      // Log diagnostic state
+      console.error(`[${this.engineType}] _prepareTrackForPlayback returned false`, {
+        isSongReady: this.player._isSongReady,
+        isPaused: this.player._isPaused,
+        sampleRate: this.player._sampleRate,
+        ctxState: (window as any)._gPlayerAudioCtx?.state,
+      });
+      throw new Error(`[${this.engineType}] Failed to load SID data into WASM backend`);
+    }
 
     this.playing = true;
-    console.log(`[${this.engineType}] Playback started, subsong:`, this.subsong);
+    console.log(`[${this.engineType}] Playback started, subsong:`, this.subsong,
+      'isSongReady:', this.player._isSongReady,
+      'isPaused:', this.player._isPaused,
+      'ctxState:', (window as any)._gPlayerAudioCtx?.state);
   }
 
   /**
@@ -233,9 +251,14 @@ export class ScriptNodePlayerEngine {
     if (subsong >= 0 && subsong < this.numSubsongs) {
       this.subsong = subsong;
       // Reload with new track if currently playing
-      if (this.playing && this.player && this.blobUrl) {
-        this.player.loadMusicFromURL(
-          this.blobUrl,
+      if (this.playing && this.player) {
+        const dataBuffer = this.sidData.buffer.slice(
+          this.sidData.byteOffset,
+          this.sidData.byteOffset + this.sidData.byteLength,
+        );
+        this.player._prepareTrackForPlayback(
+          'loaded.sid',
+          dataBuffer,
           { track: subsong },
           () => console.log(`[${this.engineType}] Subsong changed to:`, subsong),
           () => console.warn(`[${this.engineType}] Failed to change subsong`),
@@ -328,12 +351,6 @@ export class ScriptNodePlayerEngine {
    */
   dispose(): void {
     this.stop();
-
-    if (this.blobUrl) {
-      URL.revokeObjectURL(this.blobUrl);
-      this.blobUrl = null;
-    }
-
     this.player = null;
     this.adapter = null;
   }
