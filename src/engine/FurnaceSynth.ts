@@ -635,8 +635,8 @@ export class FurnaceSynth implements DevilboxSynth {
       this.chipEngine.write(FurnaceChipType.OPN2, regBase | (0xA4 + chanOffset), ((block & 7) << 3) | ((fnum >> 8) & 7));
       this.chipEngine.write(FurnaceChipType.OPN2, regBase | (0xA0 + chanOffset), fnum & 0xFF);
     } else if (this.config.chipType === FurnaceChipType.OPN) { // OPN/YM2203 (47)
-      // OPN uses same frequency format as OPN2 but only has 3 channels (no second bank)
-      const { block, fnum } = FurnacePitchUtils.freqToOPN2(freq);
+      // OPN uses 11-bit fnum like OPN2 but clock=3579545 Hz, divider=72 (not 144)
+      const { block, fnum } = FurnacePitchUtils.freqToOPN(freq);
       const opnChanOffset = this.channelIndex % 3;
       // CRITICAL: Write A4 before A0 (frequency latch, same as OPN2)
       this.chipEngine.write(FurnaceChipType.OPN, 0xA4 + opnChanOffset, ((block & 7) << 3) | ((fnum >> 8) & 7));
@@ -672,21 +672,9 @@ export class FurnaceSynth implements DevilboxSynth {
                this.config.chipType === FurnaceChipType.ESFM) { // OPL family
       const chanOff = this.channelIndex % 9;
       const oplPart = this.channelIndex < 9 ? 0x000 : 0x100;
-      // OPL F-Number calculation: fnum = (freq * 2^19) / (chipClock / 72)
-      // For OPL3 at 14.31818MHz: chipClock/72 = 198863 Hz
-      // Simplified: fnum = freq * 2^19 / 200000, block adjusts octave
-      let block = 4; // Default block (octave)
-      let fnum = Math.floor((freq * (1 << 19)) / 200000);
-      // Adjust block to keep fnum in valid 10-bit range
-      while (fnum > 1023 && block < 7) {
-        fnum >>= 1;
-        block++;
-      }
-      while (fnum < 256 && block > 0) {
-        fnum <<= 1;
-        block--;
-      }
-      fnum = fnum & 0x3FF;
+      // OPL F-Number: fnum = freq * 2^(20-block) / Fm, Fm ≈ 49716 Hz
+      // Reference: ymfm_opl.cpp compute_phase_step, Furnace opl.cpp toFreq
+      const { block, fnum } = FurnacePitchUtils.freqToOPL(freq);
       // Store for writeKeyOn to use
       this._oplBlock = block;
       this._oplFnum = fnum;
@@ -696,19 +684,9 @@ export class FurnaceSynth implements DevilboxSynth {
       this.chipEngine.write(this.config.chipType, oplPart | (0xB0 + chanOff), ((block & 7) << 2) | ((fnum >> 8) & 3));
     } else if (this.config.chipType === FurnaceChipType.OPLL) { // OPLL (11)
       const chanOff = this.channelIndex % 9;
-      // OPLL F-Number calculation similar to OPL but 9-bit fnum
-      // Reference: opll.cpp toFreq function
-      let block = 4;
-      let fnum = Math.floor((freq * (1 << 18)) / 200000);
-      while (fnum > 511 && block < 7) {
-        fnum >>= 1;
-        block++;
-      }
-      while (fnum < 128 && block > 0) {
-        fnum <<= 1;
-        block--;
-      }
-      fnum = fnum & 0x1FF;
+      // OPLL F-Number: 9-bit fnum, same formula as OPL but max 511
+      // Reference: ymfm_opl.cpp, Furnace opll.cpp
+      const { block, fnum } = FurnacePitchUtils.freqToOPLL(freq);
       this._oplBlock = block;
       this._oplFnum = fnum;
       // Write frequency low (register 0x10+chan)
@@ -717,8 +695,10 @@ export class FurnaceSynth implements DevilboxSynth {
     } else if (this.config.chipType === FurnaceChipType.OPNA ||
                this.config.chipType === FurnaceChipType.OPNB ||
                this.config.chipType === FurnaceChipType.OPNB_B) { // OPN family
-      // Same frequency format as OPN2
-      const { block, fnum } = FurnacePitchUtils.freqToOPN2(freq);
+      // OPNA/OPNB/OPNB_B: clock=8000000, divider=144 (differs from Genesis OPN2)
+      const { block, fnum } = this.config.chipType === FurnaceChipType.OPNA
+        ? FurnacePitchUtils.freqToOPNA(freq)
+        : FurnacePitchUtils.freqToOPNB(freq);
       let opnaChanOff: number;
       let opnaRegBase: number;
       if (this.config.chipType === FurnaceChipType.OPNB) {
@@ -2283,20 +2263,9 @@ export class FurnaceSynth implements DevilboxSynth {
         break;
       }
       case FurnaceChipType.OPLL: { // 11
-        // Key-off: clear bit 4, preserve freqH
+        // Key-off: use stored block/fnum from updateFrequency, clear key-on bit
         const chanOff = chan % 9;
-        const OPLL_CLOCK = 3579545;
-
-        // Same calculation as updateFrequency/writeKeyOn
-        let block = 0;
-        let fnum = Math.round(this.activeNoteFreq * 72 * Math.pow(2, 19 - block) / OPLL_CLOCK);
-        while (fnum > 511 && block < 7) {
-          block++;
-          fnum = Math.round(this.activeNoteFreq * 72 * Math.pow(2, 19 - block) / OPLL_CLOCK);
-        }
-        fnum = Math.min(511, Math.max(0, fnum));
-
-        const freqH = ((block & 7) << 1) | ((fnum >> 8) & 1);
+        const freqH = ((this._oplBlock & 7) << 1) | ((this._oplFnum >> 8) & 1);
         // Key-off: just freqH, no key-on or sustain bits
         this.chipEngine.write(FurnaceChipType.OPLL, 0x20 + chanOff, freqH);
         break;
