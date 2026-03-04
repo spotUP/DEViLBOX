@@ -67,23 +67,11 @@ const LazyPatternOrderModal = lazy(() =>
 const LazyRevisionBrowserDialog = lazy(() =>
   import('@/components/dialogs/RevisionBrowserDialog').then(m => ({ default: m.RevisionBrowserDialog }))
 );
-const LazyGrooveSettingsModal = lazy(() =>
-  import('@/components/dialogs/GrooveSettingsModal').then(m => ({ default: m.GrooveSettingsModal }))
-);
-const LazyFindReplaceDialog = lazy(() =>
-  import('@/components/dialogs/FindReplaceDialog').then(m => ({ default: m.FindReplaceDialog }))
-);
-const LazyKeyboardShortcutSheet = lazy(() =>
-  import('@/components/tracker/KeyboardShortcutSheet').then(m => ({ default: m.KeyboardShortcutSheet }))
-);
 const LazyDrumPadManager = lazy(() =>
   import('@/components/drumpad/DrumPadManager').then(m => ({ default: m.DrumPadManager }))
 );
 const LazyAdvancedEditModal = lazy(() =>
   import('@/components/dialogs/AdvancedEditModal').then(m => ({ default: m.AdvancedEditModal }))
-);
-const LazyEffectPicker = lazy(() =>
-  import('@/components/tracker/EffectPicker').then(m => ({ default: m.EffectPicker }))
 );
 const LazyAutomationPanel = lazy(() =>
   import('@/components/automation/AutomationPanel').then(m => ({ default: m.AutomationPanel }))
@@ -469,15 +457,6 @@ export const WebGLModalBridge: React.FC = () => {
       {modalOpen === 'revisions' && (
         <LazyRevisionBrowserDialog isOpen={true} onClose={closeModal} />
       )}
-      {modalOpen === 'grooveSettings' && (
-        <LazyGrooveSettingsModal onClose={closeModal} />
-      )}
-      {modalOpen === 'findReplace' && (
-        <LazyFindReplaceDialog isOpen={true} onClose={closeModal} />
-      )}
-      {modalOpen === 'shortcutSheet' && (
-        <LazyKeyboardShortcutSheet isOpen={true} onClose={closeModal} />
-      )}
       {showFileBrowser && (
         <LazyFileBrowser
           isOpen={showFileBrowser}
@@ -510,13 +489,6 @@ export const WebGLModalBridge: React.FC = () => {
           onClose={closeModal}
           onShowScaleVolume={(scope) => openModal('scaleVolume', { scope })}
           onShowFadeVolume={(scope) => openModal('fadeVolume', { scope })}
-        />
-      )}
-      {modalOpen === 'effectPicker' && (
-        <LazyEffectPicker
-          isOpen={true}
-          onSelect={() => closeModal()}
-          onClose={closeModal}
         />
       )}
       {modalOpen === 'automation' && (
