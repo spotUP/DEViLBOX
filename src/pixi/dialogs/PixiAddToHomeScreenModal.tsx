@@ -99,7 +99,7 @@ export const PixiAddToHomeScreenModal: React.FC<PixiAddToHomeScreenModalProps> =
             <layoutContainer layout={{ flexDirection: 'row', gap: 12 }}>
               <PixiLabel text="1." size="sm" weight="bold" color="accent" />
               <PixiLabel
-                text={'Tap the Share button ⬆ at the bottom of Safari'}
+                text={'Tap the Share button at the bottom of Safari'}
                 size="sm"
                 color="textSecondary"
                 layout={{ maxWidth: MODAL_W - 96 }}

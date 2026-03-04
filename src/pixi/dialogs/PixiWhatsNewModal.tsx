@@ -12,7 +12,7 @@
  */
 
 import React, { useMemo } from 'react';
-import { PixiModal, PixiModalFooter, PixiButton, PixiScrollView } from '../components';
+import { PixiModal, PixiModalFooter, PixiButton, PixiScrollView, PixiIcon } from '../components';
 import { usePixiTheme } from '../theme';
 import { PIXI_FONTS } from '../fonts';
 import { CHANGELOG, CURRENT_VERSION } from '@generated/changelog';
@@ -180,12 +180,7 @@ export const PixiWhatsNewModal: React.FC<PixiWhatsNewModalProps> = ({ onClose })
               backgroundColor: 0x1a2a1a,
             }}
           >
-            <pixiBitmapText
-              text="✨"
-              style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 20, fill: 0xffffff }}
-              tint={theme.accent.color}
-              layout={{}}
-            />
+            <PixiIcon name="thunderbolt" size={20} color={theme.accent.color} layout={{}} />
           </layoutContainer>
           <layoutContainer layout={{ flexDirection: 'column', gap: 2 }}>
             <pixiBitmapText
@@ -215,12 +210,7 @@ export const PixiWhatsNewModal: React.FC<PixiWhatsNewModalProps> = ({ onClose })
             borderRadius: 8,
           }}
         >
-          <pixiBitmapText
-            text="✕"
-            style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 16, fill: 0xffffff }}
-            tint={theme.textMuted.color}
-            layout={{}}
-          />
+          <PixiIcon name="close" size={16} color={theme.textMuted.color} layout={{}} />
         </layoutContainer>
       </layoutContainer>
 

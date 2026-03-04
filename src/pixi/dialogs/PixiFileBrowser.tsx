@@ -12,6 +12,7 @@ import { Div, Txt, GlModal, GlModalFooter } from '../layout';
 import { PIXI_FONTS } from '../fonts';
 import { PixiButton } from '../components/PixiButton';
 import { PixiList } from '../components/PixiList';
+import { PixiIcon } from '../components/PixiIcon';
 import { PixiPureTextInput } from '../input/PixiPureTextInput';
 import { useFileNavigation, isTrackerModule, type FileSource } from '@/components/dialogs/useFileNavigation';
 import { hasElectronFS } from '@utils/electron';
@@ -193,7 +194,7 @@ export const PixiFileBrowser: React.FC<PixiFileBrowserProps> = ({
           {mode === 'load' ? 'Load Module' : 'Save Module'}
         </Txt>
         <Div eventMode="static" cursor="pointer" onPointerUp={onClose} layout={{ padding: 4 }}>
-          <Txt className="text-sm font-bold text-text-muted">✕</Txt>
+          <PixiIcon name="close" size={14} color={theme.textMuted.color} layout={{}} />
         </Div>
       </Div>
 

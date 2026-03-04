@@ -10,7 +10,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import type { FederatedPointerEvent, Graphics as GraphicsType } from 'pixi.js';
 import { useApplication } from '@pixi/react';
-import { PixiButton, PixiCheckbox, PixiSlider, PixiNumericInput } from '../components';
+import { PixiButton, PixiCheckbox, PixiSlider, PixiNumericInput, PixiIcon } from '../components';
 import { PixiSelect, type SelectOption } from '../components/PixiSelect';
 import { PixiScrollView } from '../components/PixiScrollView';
 import { usePixiTheme } from '../theme';
@@ -416,12 +416,7 @@ export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, on
               borderRadius: 4,
             }}
           >
-            <pixiBitmapText
-              text="✕"
-              style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 16, fill: 0xffffff }}
-              tint={theme.textMuted.color}
-              layout={{}}
-            />
+            <PixiIcon name="close" size={16} color={theme.textMuted.color} layout={{}} />
           </layoutContainer>
         </layoutContainer>
 

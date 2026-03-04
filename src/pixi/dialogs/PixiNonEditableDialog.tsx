@@ -11,7 +11,7 @@
  */
 
 import React, { useCallback } from 'react';
-import { PixiModal, PixiModalHeader, PixiModalFooter, PixiButton, PixiLabel } from '../components';
+import { PixiModal, PixiModalHeader, PixiModalFooter, PixiButton, PixiLabel, PixiIcon } from '../components';
 import { usePixiTheme } from '../theme';
 import { PIXI_FONTS } from '../fonts';
 import { useUIStore } from '@stores/useUIStore';
@@ -47,12 +47,7 @@ export const PixiNonEditableDialog: React.FC = () => {
           borderColor: theme.border.color,
         }}
       >
-        <pixiBitmapText
-          text="🔒"
-          style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 16, fill: 0xffffff }}
-          tint={theme.accent.color}
-          layout={{}}
-        />
+        <PixiIcon name="lock" size={20} color={theme.accent.color} layout={{}} />
         <pixiBitmapText
           text="Pattern is Read-Only"
           style={{ fontFamily: PIXI_FONTS.SANS_SEMIBOLD, fontSize: 16, fill: 0xffffff }}

@@ -13,7 +13,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { PixiModal, PixiButton, PixiCheckbox } from '../components';
+import { PixiModal, PixiButton, PixiCheckbox, PixiIcon } from '../components';
 import { usePixiTheme, usePixiThemeId } from '../theme';
 import { PIXI_FONTS } from '../fonts';
 import { DEVILBOX_TIPS } from '../../constants/tips';
@@ -152,13 +152,15 @@ const VersionEntry: React.FC<{
 
 const TabButton: React.FC<{
   label: string;
+  icon?: string;
   active: boolean;
   accentColor: number;
   mutedColor: number;
   activeBg: number;
   onClick: () => void;
-}> = ({ label, active, accentColor, mutedColor, activeBg, onClick }) => {
+}> = ({ label, icon, active, accentColor, mutedColor, activeBg, onClick }) => {
   const [hovered, setHovered] = useState(false);
+  const tint = active ? accentColor : hovered ? 0xcccccc : mutedColor;
   return (
     <layoutContainer
       eventMode="static"
@@ -169,8 +171,10 @@ const TabButton: React.FC<{
       layout={{
         flex: 1,
         height: 40,
+        flexDirection: 'row',
         justifyContent: 'center',
         alignItems: 'center',
+        gap: 6,
         ...(active ? {
           borderBottomWidth: 2,
           borderColor: accentColor,
@@ -178,10 +182,11 @@ const TabButton: React.FC<{
         } : {}),
       }}
     >
+      {icon && <PixiIcon name={icon} size={13} color={tint} layout={{}} />}
       <pixiBitmapText
         text={label}
         style={{ fontFamily: PIXI_FONTS.SANS_BOLD, fontSize: 13, fill: 0xffffff }}
-        tint={active ? accentColor : hovered ? 0xcccccc : mutedColor}
+        tint={tint}
         layout={{}}
       />
     </layoutContainer>
@@ -283,12 +288,7 @@ export const PixiTipOfTheDay: React.FC<PixiTipOfTheDayProps> = ({
               borderRadius: 8,
             }}
           >
-            <pixiBitmapText
-              text={activeTab === 'tips' ? '💡' : '✨'}
-              style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 20, fill: 0xffffff }}
-              tint={accentColor}
-              layout={{}}
-            />
+            <PixiIcon name="thunderbolt" size={20} color={accentColor} layout={{}} />
           </layoutContainer>
           <layoutContainer layout={{ flexDirection: 'column', gap: 2 }}>
             <pixiBitmapText
@@ -305,7 +305,7 @@ export const PixiTipOfTheDay: React.FC<PixiTipOfTheDayProps> = ({
             />
           </layoutContainer>
         </layoutContainer>
-        <PixiButton label="✕" variant="ghost" size="sm" onClick={onClose} width={28} height={28} />
+        <PixiButton icon="close" label="" variant="ghost" size="sm" onClick={onClose} width={28} height={28} />
       </layoutContainer>
 
       {/* ── Tab bar ── flex border-b bg-black/20 */}
@@ -318,8 +318,8 @@ export const PixiTipOfTheDay: React.FC<PixiTipOfTheDayProps> = ({
           backgroundColor: tabBg,
         }}
       >
-        <TabButton label="💡  Tips" active={activeTab === 'tips'} accentColor={accentColor} mutedColor={mutedColor} activeBg={activeTabBg} onClick={() => setActiveTab('tips')} />
-        <TabButton label="📜  Changelog" active={activeTab === 'changelog'} accentColor={accentColor} mutedColor={mutedColor} activeBg={activeTabBg} onClick={() => setActiveTab('changelog')} />
+        <TabButton icon="thunderbolt" label="Tips" active={activeTab === 'tips'} accentColor={accentColor} mutedColor={mutedColor} activeBg={activeTabBg} onClick={() => setActiveTab('tips')} />
+        <TabButton icon="diskio" label="Changelog" active={activeTab === 'changelog'} accentColor={accentColor} mutedColor={mutedColor} activeBg={activeTabBg} onClick={() => setActiveTab('changelog')} />
       </layoutContainer>
 
       {/* ── Content area ── h-[300px] overflow-y-auto bg-black/10 */}
@@ -355,7 +355,7 @@ export const PixiTipOfTheDay: React.FC<PixiTipOfTheDayProps> = ({
             }}
           >
             <pixiBitmapText
-              text="ℹ"
+              text="i"
               style={{ fontFamily: PIXI_FONTS.SANS_BOLD, fontSize: 30, fill: 0xffffff }}
               tint={accentColor}
               layout={{}}
@@ -418,8 +418,8 @@ export const PixiTipOfTheDay: React.FC<PixiTipOfTheDayProps> = ({
           visible={activeTab === 'tips'}
           layout={activeTab === 'tips' ? { flexDirection: 'row', gap: 8 } : { width: 0, height: 0, overflow: 'hidden' }}
         >
-          <PixiButton label="◀" variant="default" size="sm" onClick={handlePrev} width={36} height={32} />
-          <PixiButton label="▶" variant="default" size="sm" onClick={handleNext} width={36} height={32} />
+          <PixiButton icon="prev" label="" variant="default" size="sm" onClick={handlePrev} width={36} height={32} />
+          <PixiButton icon="next" label="" variant="default" size="sm" onClick={handleNext} width={36} height={32} />
         </layoutContainer>
         <pixiBitmapText
           visible={activeTab === 'changelog'}
