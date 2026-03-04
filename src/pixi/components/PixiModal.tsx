@@ -46,9 +46,10 @@ export const PixiModal: React.FC<PixiModalProps> = ({
   }, [isOpen, onClose]);
 
   if (!isOpen) return null;
+  if (!app?.screen) return null;
 
-  const screenW = app?.screen?.width ?? 1920;
-  const screenH = app?.screen?.height ?? 1080;
+  const screenW = app.screen.width ?? 1920;
+  const screenH = app.screen.height ?? 1080;
 
   const drawOverlay = (g: GraphicsType) => {
     g.clear();
