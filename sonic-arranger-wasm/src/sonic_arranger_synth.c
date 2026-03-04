@@ -184,6 +184,9 @@ typedef struct {
     /* Master volume (0-64, default 64) — set by SetMasterVolume effect */
     uint16_t     masterVolume;
 
+    /* Note-off release flag (ref: voiceInfo.Note == 0x80) */
+    int          noteReleased;
+
     /* PRNG for noise effects */
     uint32_t     prngState;
 } SAPlayer;
@@ -782,8 +785,10 @@ static void doAdsr(SAPlayer *p) {
     if (vol > 64) vol = 64;
     p->currentVolume = (float)vol;
 
-    /* Sustain hold (note-off sets a flag; while held at sustain point, count delay) */
-    if (p->ins.sustainPoint > 0 && p->adsrPosition >= p->ins.sustainPoint) {
+    /* Sustain hold — only gates AFTER note-off (ref line 1638:
+     * if (voiceInfo.Note == 0x80 && adsrPosition >= sustainPoint)).
+     * While note is held (noteReleased==0), ADSR advances freely past sustainPoint. */
+    if (p->noteReleased && p->ins.sustainPoint > 0 && p->adsrPosition >= p->ins.sustainPoint) {
         if (p->ins.sustainDelay == 0)
             return;
         if (p->sustainDelayCounter > 0) {
@@ -1040,6 +1045,9 @@ void sa_note_on(void *ctxPtr, int handle, int note, int velocity) {
     /* Reset PRNG to deterministic seed per note */
     p->prngState = 0x12345678 ^ (uint32_t)note;
 
+    /* Clear release flag — note is active */
+    p->noteReleased = 0;
+
     /* Reset speed counter — note triggers happen on tick 0 of a row */
     p->speedCounter = 0;
 
@@ -1054,8 +1062,20 @@ void sa_note_off(void *ctxPtr, int handle) {
     if (!ctxPtr || handle < 0 || handle >= MAX_PLAYERS) return;
     SAContext *ctx = (SAContext *)ctxPtr;
     SAPlayer *p = &ctx->players[handle];
-    /* Immediate cutoff for now; could add release envelope later */
+    /* Set release flag — ADSR will gate at sustain point (ref: voiceInfo.Note = 0x80).
+     * Sound continues playing through ADSR release; silence happens when ADSR
+     * reaches volume 0 with repeat=0 (flag |= 0x01). */
+    p->noteReleased = 1;
+}
+
+EMSCRIPTEN_KEEPALIVE
+void sa_force_quiet(void *ctxPtr, int handle) {
+    if (!ctxPtr || handle < 0 || handle >= MAX_PLAYERS) return;
+    SAContext *ctx = (SAContext *)ctxPtr;
+    SAPlayer *p = &ctx->players[handle];
+    /* Immediate silence — ref: ForceQuiet() sets volume=0, mutes channel */
     p->playing = 0;
+    p->currentVolume = 0.0f;
 }
 
 EMSCRIPTEN_KEEPALIVE

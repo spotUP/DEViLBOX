@@ -83,6 +83,16 @@ class SonicArrangerProcessor extends AudioWorkletProcessor {
         }
         break;
 
+      case 'forceQuiet':
+        if (this.wasm && this.ctx) {
+          if (this.wasm._sa_force_quiet) {
+            this.wasm._sa_force_quiet(this.ctx, data.handle);
+          } else {
+            this.wasm._sa_note_off(this.ctx, data.handle);
+          }
+        }
+        break;
+
       case 'setParam':
         if (this.wasm && this.ctx) {
           this.wasm._sa_set_param(this.ctx, data.handle, data.paramId, data.value);

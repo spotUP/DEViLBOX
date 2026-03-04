@@ -88,6 +88,7 @@ function readString(v: DataView, off: number, len: number): string {
 
 function saNote2XM(note: number): number {
   if (note === 0) return 0;
+  if (note === 0x7F || note === 0x80) return 97; // note-off (0x7F=force quiet, 0x80=release)
   const xm = note - 36;
   return xm >= 1 ? xm : 0;
 }
@@ -782,15 +783,18 @@ export async function parseSonicArrangerFile(
         const tl    = tlidx < trackLines.length ? trackLines[tlidx] : null;
 
         if (!tl || (tl.note === 0 && tl.instr === 0 && tl.effect === 0 && tl.effArg === 0)) {
-          rows.push({ note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 });
+          rows.push({ note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0, saArpTable: tl?.arpeggioTable ?? 0 });
           continue;
         }
 
         // Note: apply NoteTranspose unless disabled
         let xmNote = saNote2XM(tl.note);
-        if (xmNote > 0 && !tl.disableNoteTranspose && noteTranspose !== 0) {
+        if (xmNote > 0 && xmNote < 97 && !tl.disableNoteTranspose && noteTranspose !== 0) {
           xmNote = Math.max(1, Math.min(96, xmNote + noteTranspose));
         }
+
+        // SA 0x7F = force quiet: note-off + volume 0
+        const isForceQuiet = tl.note === 0x7F;
 
         // Instrument: apply SoundTranspose unless disabled
         let instrNum = tl.instr > 0 ? tl.instr : 0;
@@ -800,6 +804,11 @@ export async function parseSonicArrangerFile(
         }
 
         let { effTyp, eff: effVal, volCol } = saEffectToXM(tl.effect, tl.effArg);
+
+        // Force quiet (SA 0x7F) → set volume to 0 (XM vol column 0x10 = vol 0)
+        if (isForceQuiet && volCol === 0) {
+          volCol = 0x10; // volume 0
+        }
 
         // Adjust PositionJump (Bxx) arg relative to firstPosition offset
         // SA position args are absolute; our songPositions start at firstPosition

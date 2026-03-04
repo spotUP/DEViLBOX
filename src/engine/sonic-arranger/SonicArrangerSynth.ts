@@ -147,6 +147,12 @@ export class SonicArrangerSynth implements DevilboxSynth {
     this.engine.sendMessage({ type: 'noteOff', handle: this._playerHandle });
   }
 
+  /** Immediate silence — SA 0x7F force quiet (ref: ForceQuiet()) */
+  forceQuiet(): void {
+    if (this._disposed || this._playerHandle < 0) return;
+    this.engine.sendMessage({ type: 'forceQuiet', handle: this._playerHandle });
+  }
+
   releaseAll(): void {
     this.triggerRelease();
   }
