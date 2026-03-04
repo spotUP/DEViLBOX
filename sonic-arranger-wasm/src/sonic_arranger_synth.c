@@ -262,8 +262,9 @@ static void doArpeggio(SAPlayer *p) {
     SAArpTable *at = &p->ins.arpTables[tbl];
 
     int8_t arpVal = at->values[p->arpPosition];
-    int saIndex = clamp_i(p->baseNote + arpVal, 0, 108);
-    p->currentPeriod = PERIOD_TABLE[saIndex];
+    int noteIdx = p->baseNote + arpVal;
+    if (noteIdx < 0 || noteIdx > 108) noteIdx = 0;  /* out of range → period 0 (silence) */
+    p->currentPeriod = PERIOD_TABLE[noteIdx];
 
     p->arpPosition++;
 
@@ -839,6 +840,10 @@ static void sa_player_tick(SAPlayer *p) {
     doSynthEffect(p);
     doAdsr(p);
     doVolumeSlide(p);
+
+    /* speedCounter auto-increments each tick; reset to 0 via setParam(8,0) by replayer.
+     * Used by doSlide to gate slide accumulation (ref line 1612). */
+    p->speedCounter++;
 }
 
 /* ── WASM exports ─────────────────────────────────────────────────────────── */
@@ -1034,6 +1039,9 @@ void sa_note_on(void *ctxPtr, int handle, int note, int velocity) {
 
     /* Reset PRNG to deterministic seed per note */
     p->prngState = 0x12345678 ^ (uint32_t)note;
+
+    /* Reset speed counter — note triggers happen on tick 0 of a row */
+    p->speedCounter = 0;
 
     /* Compute initial phase increment */
     computePhaseInc(p);
