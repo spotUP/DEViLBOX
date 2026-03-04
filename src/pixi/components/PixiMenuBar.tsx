@@ -6,7 +6,7 @@
  * PixiGlobalDropdownLayer at root stage level — above all PixiWindow masks.
  */
 import React, { useCallback, useRef, useState } from 'react';
-import type { Graphics as GraphicsType, Container as ContainerType } from 'pixi.js';
+import type { Container as ContainerType } from 'pixi.js';
 import { PIXI_FONTS } from '../fonts';
 import { usePixiTheme } from '../theme';
 import { usePixiDropdownStore } from '../stores/usePixiDropdownStore';
@@ -125,8 +125,6 @@ const PixiMenuButton: React.FC<PixiMenuButtonProps> = ({
       handleOpen();
     }
   }, [isOpen, onHoverOpen, handleOpen]);
-
-  const drawBtnBg = useCallback((_g: GraphicsType) => {}, []);
 
   return (
     <layoutContainer

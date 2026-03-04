@@ -157,10 +157,6 @@ export const PixiFXSearchReplace: React.FC<PixiFXSearchReplaceProps> = ({
   }, [searchEffTyp, searchEff, replaceEffTyp, replaceEff, scope]);
 
   // ── Draw functions ────────────────────────────────────────────────────────
-  const drawPanel = useCallback((_g: GraphicsType) => {
-    // Panel background now handled by layoutContainer
-  }, []);
-
   const drawScopeBtn = useCallback((isActive: boolean) => (g: GraphicsType) => {
     g.clear();
     g.rect(0, 0, 100, 20);

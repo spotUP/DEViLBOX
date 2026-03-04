@@ -252,18 +252,6 @@ export const PixiPureTextInput: React.FC<PixiPureTextInputProps> = ({
   const selW = (selHi - selLo) * charWidth;
   const hasSelection = selStart !== selEnd;
 
-  const drawBg = useCallback((g: GraphicsType) => {
-    g.clear();
-    g.roundRect(0, 0, width, height, 3);
-    g.fill({ color: focused ? theme.bg.color : theme.bgSecondary.color });
-    g.roundRect(0, 0, width, height, 3);
-    g.stroke({
-      color: focused ? theme.accent.color : theme.border.color,
-      alpha: focused ? 0.8 : 0.6,
-      width: focused ? 1.5 : 1,
-    });
-  }, [width, height, theme, focused]);
-
   const drawSelection = useCallback((g: GraphicsType) => {
     g.clear();
     if (!hasSelection) return;
