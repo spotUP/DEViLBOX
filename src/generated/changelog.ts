@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-03-04T22:35:18.508Z
+ * Generated: 2026-03-04T23:18:01.380Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.2283';
-export const BUILD_NUMBER = '2283';
-export const BUILD_HASH = '7ab2741d';
+export const BUILD_VERSION = '1.0.2295';
+export const BUILD_NUMBER = '2295';
+export const BUILD_HASH = '7aa5cab7';
 export const BUILD_DATE = '2026-03-04';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,63 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.2283',
+    version: '1.0.2295',
+    date: '2026-03-05',
+    changes: [
+      {
+        type: 'feature',
+        "description": "Add 3D toggle button to studio workbench control bar"
+      },
+      {
+        type: 'fix',
+        "description": "Complete app-wide eventMode=\"none\" audit for GL views/dialogs"
+      },
+      {
+        type: 'fix',
+        "description": "Add eventMode=\"none\" to all GL component children to fix click handling"
+      },
+      {
+        type: 'fix',
+        "description": "Resolve build errors from tracker visual bg removal"
+      },
+      {
+        type: 'fix',
+        "description": "Rewrite GL welcome modal to match DOM version 1:1"
+      }
+    ]
+  },
+  {
+    version: '2026-03-04',
     date: '2026-03-04',
     changes: [
+      {
+        type: 'feature',
+        "description": "Add module info button and modal for non-SID tunes"
+      },
+      {
+        type: 'feature',
+        "description": "Add pattern data overlay, remove tracker visual bg"
+      },
+      {
+        type: 'improvement',
+        "description": "Throttle visual bg copy to 30fps, cap DPR at 1"
+      },
+      {
+        type: 'fix',
+        "description": "Restore original DOM overlay + fullscreen layout"
+      },
+      {
+        type: 'fix',
+        "description": "Set sidMetadata synchronously to ensure info button appears"
+      },
+      {
+        type: 'improvement',
+        "description": "Chore: regenerate changelog (build 2283)"
+      },
+      {
+        type: 'feature',
+        "description": "Chore: add puppeteer headless synth test infrastructure"
+      },
       {
         type: 'fix',
         "description": "Prevent turntable platter non-uniform scaling"
@@ -184,54 +238,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         "description": "PixiButton click not firing due to layout-shift pointerOut"
-      },
-      {
-        type: 'feature',
-        "description": "Add drag-handle camera controls to studio workbench"
-      },
-      {
-        type: 'fix',
-        "description": "Guard nullable activeError references in PixiSynthErrorDialog"
-      },
-      {
-        type: 'fix',
-        "description": "Studio navigation — Ableton-style Cmd+drag pan, Cmd+/-/0/1 zoom"
-      },
-      {
-        type: 'fix',
-        "description": "SA portamento arrival zeros speed (ref line 1523)"
-      },
-      {
-        type: 'feature',
-        "description": "Wire SA instrument editor to running WASM synth"
-      },
-      {
-        type: 'fix',
-        "description": "SA effect routing — send effects 1,2,4,7,8,A to WASM directly"
-      },
-      {
-        type: 'fix',
-        "description": "Wire 0xy effect arpeggio to WASM synth"
-      },
-      {
-        type: 'fix',
-        "description": "ADSR sustain/release, note-off, special notes"
-      },
-      {
-        type: 'fix',
-        "description": "Effect editor content scrolling — add flex-1 min-h-0 for knob accessibility"
-      },
-      {
-        type: 'fix',
-        "description": "FX modal improvements — oscilloscope overlays, preset ordering, DnD constraint"
-      },
-      {
-        type: 'fix',
-        "description": "Arpeggio silence on out-of-range, speedCounter tick, wire arpTable from replayer"
-      },
-      {
-        type: 'fix',
-        "description": "CXX (set volume) now applies before note trigger in MOD path"
       }
     ]
   }

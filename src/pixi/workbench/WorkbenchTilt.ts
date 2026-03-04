@@ -2,20 +2,13 @@
  * WorkbenchTiltRenderer — WebGL perspective tilt for the infinite canvas.
  *
  * Renders the world container to a full-size RenderTexture, then displays
- * it on a trapezoid mesh that simulates a desk viewed at a slight angle.
- *
- * Because everything happens inside WebGL (not CSS 3D transforms), the
- * browser compositor sees a flat canvas — fast and compositor-friendly.
+ * it on a trapezoid mesh that simulates perspective viewing angles.
  *
  * Technique:
  *   1. Render the world container to an offscreen RenderTexture each frame.
- *   2. Display the RT on a quad Mesh whose vertex positions form a trapezoid
- *      (top edge narrower + slightly shifted = perspective desk illusion).
- *   3. Vertex positions are in clip space (-1→1), so no projection uniform needed.
- *   4. tiltFactor: 0 = flat quad, 1 = full 20° desk tilt.
- *
- * DOM overlays (PixiDOMOverlay portals) must be hidden during tilt since they
- * cannot participate in the WebGL transform.
+ *   2. Display the RT on a quad Mesh whose vertex positions form a trapezoid.
+ *   3. Vertex positions are in clip space (-1→1), no projection uniform needed.
+ *   4. tiltFactor: 0 (flat) → 1 (full effect). Preset params control the shape.
  */
 
 import type { Application, Container as ContainerType } from 'pixi.js';
@@ -28,12 +21,10 @@ import {
   Shader,
   GlProgram,
 } from 'pixi.js';
+import type { TiltParams } from '@stores/useWorkbenchStore';
 
 // ─── GLSL shaders ─────────────────────────────────────────────────────────────
 
-// Clip-space vertex shader: no projection matrix needed.
-// aPosition is pre-computed in clip space (x ∈ [-1,1], y ∈ [-1,1]).
-// #version 300 es must be the very first characters — no leading whitespace.
 const VERT = /* glsl */`#version 300 es
 in vec2 aPosition;
 in vec2 aUV;
@@ -44,9 +35,6 @@ void main() {
 }
 `;
 
-// Samples the render texture.
-// Y is not flipped here — Pixi's RenderTexture already handles orientation
-// via framebuffer.invertY so UV (0,0) = top-left of rendered image.
 const FRAG = /* glsl */`#version 300 es
 precision highp float;
 in vec2 vUV;
@@ -64,8 +52,6 @@ export class WorkbenchTiltRenderer {
   private rt: RenderTexture;
   private mesh: Mesh<Geometry, Shader>;
 
-  // Float32Array kept as a persistent view into the posBuffer's data.
-  // Modified in-place each frame then buf.update() signals the GPU.
   private posData: Float32Array;
   private posBuffer: Buffer;
 
@@ -74,7 +60,7 @@ export class WorkbenchTiltRenderer {
 
   constructor(
     app: Application,
-    parentContainer: ContainerType,  // mesh is added here imperatively
+    parentContainer: ContainerType,
     width: number,
     height: number,
   ) {
@@ -86,13 +72,11 @@ export class WorkbenchTiltRenderer {
     this.rt = RenderTexture.create({ width, height });
 
     // ── Vertex buffers ─────────────────────────────────────────────────────
-    // 4 vertices × 2 floats each = 8 values.
-    // Initialised to the full-screen rectangle in clip space.
     this.posData = new Float32Array([
-      -1,  1,  // TL
-       1,  1,  // TR
-       1, -1,  // BR
-      -1, -1,  // BL
+      -1,  1,   // TL
+       1,  1,   // TR
+       1, -1,   // BR
+      -1, -1,   // BL
     ]);
 
     this.posBuffer = new Buffer({
@@ -129,33 +113,40 @@ export class WorkbenchTiltRenderer {
     // ── Mesh ───────────────────────────────────────────────────────────────
     this.mesh = new Mesh({ geometry, shader });
     this.mesh.visible = false;
-    this.mesh.zIndex = 9000; // above all workbench layers
+    this.mesh.zIndex = 9000;
     parentContainer.addChild(this.mesh);
   }
 
   /**
    * Render worldContainer → RenderTexture and update the trapezoid shape.
-   * Call BEFORE the main Pixi render pass (i.e. inside a ticker callback).
    *
    * @param worldContainer  The camera-transformed world container.
-   * @param tiltFactor      0 (flat) → 1 (full desk tilt).
+   * @param tiltFactor      0 (flat) → 1 (full effect).
+   * @param params          Preset parameters controlling trapezoid shape.
    */
-  renderFrame(worldContainer: ContainerType, tiltFactor: number): void {
-    // Render world at full opacity to the offscreen RT.
-    // The container must be rendered before it is hidden for the main pass.
+  renderFrame(worldContainer: ContainerType, tiltFactor: number, params: TiltParams): void {
     this.app.renderer.render({ container: worldContainer, target: this.rt, clear: true });
 
-    // Update trapezoid vertex positions in clip space.
-    // At tiltFactor=1: top edge insets ~7% and rises ~4% relative to canvas.
-    const inset   = this.w * tiltFactor * 0.07;  // pixel inset per side
-    const topY    = this.h * tiltFactor * 0.04;  // pixel drop at top
     const { w, h } = this;
+    const f = tiltFactor;
 
-    // Pixel → clip-space: clipX = px/w*2-1,  clipY = 1-py/h*2
-    const tlx = (inset     / w) * 2 - 1;   const tly =  1 - (topY / h) * 2;
-    const trx = ((w-inset) / w) * 2 - 1;   const try_ = tly;
-    const brx =  1;                          const bry  = -1;
-    const blx = -1;                          const bly  = -1;
+    // Top edge: inset + vertical shift
+    const topInset = w * f * params.inset;
+    const topY     = h * f * params.topShift;
+
+    // Bottom edge: inset + vertical shift (for widescreen/tower presets)
+    const botInset = w * f * params.bottomInset;
+    const botY     = h * f * params.bottomShift;
+
+    // Pixel → clip-space
+    const tlx = (topInset       / w) * 2 - 1;
+    const tly = 1 - (topY       / h) * 2;
+    const trx = ((w - topInset) / w) * 2 - 1;
+    const try_ = tly;
+    const brx = ((w - botInset) / w) * 2 - 1;
+    const bry = -1 + (botY      / h) * 2;
+    const blx = (botInset       / w) * 2 - 1;
+    const bly = bry;
 
     this.posData[0] = tlx;  this.posData[1] = tly;
     this.posData[2] = trx;  this.posData[3] = try_;

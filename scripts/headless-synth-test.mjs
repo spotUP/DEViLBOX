@@ -15,13 +15,11 @@ const TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes max
 
 async function run() {
   const browser = await puppeteer.launch({
-    headless: 'new',
+    headless: false,
     args: [
       '--autoplay-policy=no-user-gesture-required',
       '--no-sandbox',
       '--disable-setuid-sandbox',
-      '--use-fake-ui-for-media-stream',
-      '--use-fake-device-for-media-stream',
     ],
   });
 
@@ -44,11 +42,16 @@ async function run() {
   page.on('pageerror', err => console.error(`[PAGE ERROR] ${err.message}`));
 
   console.log(`Navigating to ${BASE_URL}/synth-test.html ...`);
-  await page.goto(`${BASE_URL}/synth-test.html`, { waitUntil: 'networkidle0', timeout: 30000 });
+  await page.goto(`${BASE_URL}/synth-test.html`, { waitUntil: 'networkidle0', timeout: 60000 });
+
+  // Wait for test runner module to finish loading (it sets window.runFilteredVolume)
+  console.log('Waiting for test runner module to load ...');
+  await page.waitForFunction('typeof window.runFilteredVolume === "function"', { timeout: 120000 });
+  console.log('Test runner module loaded.');
 
   // Click on the page body first to establish user gesture context
   await page.click('body');
-  await new Promise(r => setTimeout(r, 500));
+  await new Promise(r => setTimeout(r, 1000));
 
   // If filter is provided, type it and click filtered volume button
   if (filter) {
