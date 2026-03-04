@@ -667,9 +667,11 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
   const [playbackRow, setPlaybackRow] = useState(0);
   const [playbackPatternIdx, setPlaybackPatternIdx] = useState(0);
   const smoothOffsetRef = useRef(0);          // frame-rate smooth offset — NO React state
+  const gridContainerRef = useRef<ContainerType | null>(null);       // outer grid container (for drag coord conversion)
   const gridScrollContainerRef = useRef<ContainerType | null>(null); // inner scroll container
   const gridGraphicsRef = useRef<GraphicsType | null>(null);
   const overlayGraphicsRef = useRef<GraphicsType | null>(null);
+  const dragOverlayRef = useRef<GraphicsType | null>(null);
   const megaTextRef = useRef<MegaText | null>(null);
   const prevRowRef = useRef(-1);
   const prevPatternRef = useRef(-1);
@@ -946,45 +948,71 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
     return { rowIndex: Math.max(0, Math.min(rowIndex, patternLength - 1)), channelIndex, columnType };
   }, [pattern, numChannels, channelOffsets, channelWidths, centerLineTop, isPlaying, playbackRow, patternLength, columnVisibility, rowHeight]);
 
-  // ── Instrument drag-and-drop handlers (need getCellFromLocal) ─────────────
-  const handleDragOver = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    const localX = e.clientX - rect.left;
-    const localY = e.clientY - rect.top;
-    const cell = getCellFromLocal(localX, localY);
-    if (cell) {
-      setDragOverCell({ channelIndex: cell.channelIndex, rowIndex: cell.rowIndex });
-      e.dataTransfer.dropEffect = 'copy';
-    } else {
+  // ── Instrument drag-and-drop handlers (native canvas events) ────────────
+  const getCellFromLocalRef = useRef(getCellFromLocal);
+  useEffect(() => { getCellFromLocalRef.current = getCellFromLocal; }, [getCellFromLocal]);
+
+  // Attach native dragover/dragleave/drop on the canvas (like wheel/touch)
+  useEffect(() => {
+    const canvas = document.querySelector('canvas[data-pixijs]') as HTMLCanvasElement | null
+      ?? document.querySelector('#pixi-app canvas') as HTMLCanvasElement | null
+      ?? document.querySelector('canvas') as HTMLCanvasElement | null;
+    if (!canvas) return;
+
+    /** Convert client coords to grid-local coords using the grid container's global position */
+    const toLocal = (clientX: number, clientY: number): { x: number; y: number } | null => {
+      const gc = gridContainerRef.current;
+      if (!gc) return null;
+      const canvasRect = canvas.getBoundingClientRect();
+      const gp = gc.getGlobalPosition();
+      return { x: clientX - canvasRect.left - gp.x, y: clientY - canvasRect.top - gp.y };
+    };
+
+    const onDragOver = (e: DragEvent) => {
+      if (!e.dataTransfer?.types.includes('application/x-devilbox-instrument')) return;
+      e.preventDefault();
+      const local = toLocal(e.clientX, e.clientY);
+      if (!local) return;
+      const cell = getCellFromLocalRef.current(local.x, local.y);
+      if (cell) {
+        setDragOverCell({ channelIndex: cell.channelIndex, rowIndex: cell.rowIndex });
+        e.dataTransfer.dropEffect = 'copy';
+      } else {
+        setDragOverCell(null);
+      }
+    };
+
+    const onDragLeave = () => { setDragOverCell(null); };
+
+    const onDrop = (e: DragEvent) => {
       setDragOverCell(null);
-    }
-  }, [getCellFromLocal]);
+      setIsDragActive(false);
+      const dragData = e.dataTransfer?.getData('application/x-devilbox-instrument');
+      if (!dragData) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const local = toLocal(e.clientX, e.clientY);
+      if (!local) return;
+      const cell = getCellFromLocalRef.current(local.x, local.y);
+      if (!cell) return;
+      try {
+        const { id } = JSON.parse(dragData);
+        useTrackerStore.getState().setCell(cell.channelIndex, cell.rowIndex, { instrument: id });
+        haptics.success();
+      } catch (err) {
+        console.error('[PixiPatternEditor] Drop failed:', err);
+      }
+    };
 
-  const handleDragLeave = useCallback(() => {
-    setDragOverCell(null);
+    canvas.addEventListener('dragover', onDragOver);
+    canvas.addEventListener('dragleave', onDragLeave);
+    canvas.addEventListener('drop', onDrop);
+    return () => {
+      canvas.removeEventListener('dragover', onDragOver);
+      canvas.removeEventListener('dragleave', onDragLeave);
+      canvas.removeEventListener('drop', onDrop);
+    };
   }, []);
-
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    setDragOverCell(null);
-    setIsDragActive(false);
-    const dragData = e.dataTransfer.getData('application/x-devilbox-instrument');
-    if (!dragData) return;
-    e.preventDefault();
-    e.stopPropagation();
-    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    const localX = e.clientX - rect.left;
-    const localY = e.clientY - rect.top;
-    const cell = getCellFromLocal(localX, localY);
-    if (!cell) return;
-    try {
-      const { id } = JSON.parse(dragData);
-      useTrackerStore.getState().setCell(cell.channelIndex, cell.rowIndex, { instrument: id });
-      haptics.success();
-    } catch (err) {
-      console.error('[PixiPatternEditor] Drop failed:', err);
-    }
-  }, [getCellFromLocal]);
 
   // ── Mouse handlers ────────────────────────────────────────────────────────
   const isDraggingRef = useRef(false);
@@ -1298,6 +1326,7 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
 
       {/* ─── Pattern Grid — native Pixi rendering ────────────────────── */}
       <pixiContainer
+        ref={gridContainerRef}
         layout={{ width, height: gridHeight }}
         eventMode="static"
         cursor={isPlaying ? 'grab' : 'text'}
@@ -1327,19 +1356,17 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
           {/* MegaText added imperatively to gridScrollContainerRef */}
         </pixiContainer>
 
-        {/* Drag-and-drop overlay for instruments — only visible during drag */}
-        <PixiDOMOverlay
+        {/* Drag-and-drop highlight overlay — pure GL, visible during instrument drag */}
+        <pixiGraphics
+          ref={dragOverlayRef}
+          visible={isDragActive && !!dragOverCell}
+          eventMode="none"
+          draw={useCallback((g: GraphicsType) => {
+            g.clear();
+            g.rect(0, 0, width, gridHeight).fill({ color: 0x6366f1, alpha: 0.08 });
+          }, [width, gridHeight])}
           layout={{ position: 'absolute', width, height: gridHeight, left: 0, top: 0 }}
-          style={{ pointerEvents: isDragActive ? 'auto' : 'none', zIndex: 10, background: isDragActive && dragOverCell ? 'rgba(99,102,241,0.08)' : 'transparent', transition: 'background 0.15s' }}
-          visible={isDragActive}
-        >
-          <div
-            style={{ width: '100%', height: '100%' }}
-            onDragOver={handleDragOver}
-            onDragLeave={handleDragLeave}
-            onDrop={handleDrop}
-          />
-        </PixiDOMOverlay>
+        />
       </pixiContainer>
 
       {/* ─── DOM overlays for context menus + parameter editor ────────── */}
