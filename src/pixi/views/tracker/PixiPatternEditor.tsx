@@ -260,8 +260,8 @@ function renderOverlay(
     const noteWidth = CHAR_WIDTH * 3 + 4;
     if (cursor.columnType === 'instrument') { cursorX = colX + 8 + noteWidth + 4; cursorW = CHAR_WIDTH * 2; }
     else if (cursor.columnType === 'volume') { cursorX = colX + 8 + noteWidth + 4 + CHAR_WIDTH * 2 + 4; cursorW = CHAR_WIDTH * 2; }
-    else if (cursor.columnType === 'effTyp') { cursorX = colX + 8 + noteWidth + CHAR_WIDTH * 4 + 12; cursorW = CHAR_WIDTH * 3; }
-    else if (cursor.columnType === 'effTyp2') { cursorX = colX + 8 + noteWidth + CHAR_WIDTH * 7 + 16; cursorW = CHAR_WIDTH * 3; }
+    else if (cursor.columnType === 'effTyp' || cursor.columnType === 'effParam') { cursorX = colX + 8 + noteWidth + CHAR_WIDTH * 4 + 12; cursorW = CHAR_WIDTH * 3; }
+    else if (cursor.columnType === 'effTyp2' || cursor.columnType === 'effParam2') { cursorX = colX + 8 + noteWidth + CHAR_WIDTH * 7 + 16; cursorW = CHAR_WIDTH * 3; }
     else if (cursor.columnType === 'flag1') { cursorX = colX + 8 + noteWidth + CHAR_WIDTH * 10 + 20; cursorW = CHAR_WIDTH; }
     else if (cursor.columnType === 'flag2') { cursorX = colX + 8 + noteWidth + CHAR_WIDTH * 11 + 24; cursorW = CHAR_WIDTH; }
     else if (cursor.columnType === 'probability') { cursorX = colX + 8 + noteWidth + CHAR_WIDTH * 12 + 28; cursorW = CHAR_WIDTH * 2; }

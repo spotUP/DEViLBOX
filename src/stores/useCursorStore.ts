@@ -92,12 +92,19 @@ export const useCursorStore = create<CursorStore>()((set, get) => ({
         if (vis.volume) cols.push('volume');
         if (vis.effect) { cols.push('effTyp'); cols.push('effParam'); }
         if (vis.effect2) { cols.push('effTyp2'); cols.push('effParam2'); }
+        if (vis.cutoff) cols.push('cutoff');
+        if (vis.resonance) cols.push('resonance');
+        if (vis.envMod) cols.push('envMod');
+        if (vis.pan) cols.push('pan');
         if (vis.flag1) cols.push('flag1');
         if (vis.flag2) cols.push('flag2');
         if (vis.probability) cols.push('probability');
 
-        const ci = cols.indexOf(columnType);
-        if (ci === -1) { columnType = 'note'; digitIndex = 0; break; }
+        let ci = cols.indexOf(columnType);
+        if (ci === -1) {
+          // Cursor on a hidden/unknown column — find nearest visible column to the left
+          ci = 0; // fall back to first column (note)
+        }
         if (ci > 0) {
           columnType = cols[ci - 1];
           const nd = DIGIT_COUNTS[columnType] || 0;
@@ -119,12 +126,22 @@ export const useCursorStore = create<CursorStore>()((set, get) => ({
         if (vis.volume) cols.push('volume');
         if (vis.effect) { cols.push('effTyp'); cols.push('effParam'); }
         if (vis.effect2) { cols.push('effTyp2'); cols.push('effParam2'); }
+        if (vis.cutoff) cols.push('cutoff');
+        if (vis.resonance) cols.push('resonance');
+        if (vis.envMod) cols.push('envMod');
+        if (vis.pan) cols.push('pan');
         if (vis.flag1) cols.push('flag1');
         if (vis.flag2) cols.push('flag2');
         if (vis.probability) cols.push('probability');
 
-        const ci = cols.indexOf(columnType);
-        if (ci === -1) { columnType = 'note'; digitIndex = 0; break; }
+        let ci = cols.indexOf(columnType);
+        if (ci === -1) {
+          // Cursor on a hidden/unknown column — advance to next channel
+          channelIndex = channelIndex < numChannels - 1 ? channelIndex + 1 : 0;
+          columnType = 'note';
+          digitIndex = 0;
+          break;
+        }
         if (ci < cols.length - 1) {
           columnType = cols[ci + 1];
           digitIndex = 0;
