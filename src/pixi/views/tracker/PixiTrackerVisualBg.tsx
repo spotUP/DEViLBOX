@@ -106,9 +106,13 @@ export const PixiTrackerVisualBg: React.FC<PixiTrackerVisualBgProps> = React.mem
   const modeRef = useRef(currentBg);
   modeRef.current = currentBg;
 
-  const dpr = Math.min(window.devicePixelRatio, 2);
-  const drawW = Math.round(width * dpr);
-  const drawH = Math.round(height * dpr);
+  // Cap DPR at 1 — this is a translucent background layer (alpha 0.45),
+  // full retina resolution is wasted and doubles the copy cost.
+  const drawW = Math.round(width);
+  const drawH = Math.round(height);
+
+  // Throttle the expensive GPU→CPU→GPU copy to ~30fps
+  const lastRenderRef = useRef(0);
 
   // ── Init offscreen canvases & Pixi texture ──────────────────────────────
 
@@ -237,6 +241,11 @@ export const PixiTrackerVisualBg: React.FC<PixiTrackerVisualBgProps> = React.mem
     const ctx = displayCtxRef.current;
     const texture = textureRef.current;
     if (!ctx || !texture || width <= 0 || height <= 0) return;
+
+    // Throttle to ~30fps — the canvas copy is expensive and this is just a bg
+    const now = performance.now();
+    if (now - lastRenderRef.current < 33) return;
+    lastRenderRef.current = now;
 
     const bg = modeRef.current;
 
