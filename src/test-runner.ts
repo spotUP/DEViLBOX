@@ -42,6 +42,8 @@ interface TestRunnerWindow {
   runSamplePackTests: () => Promise<void>;
   runEffectTests: () => Promise<void>;
   runInteractiveVolumeTests: () => Promise<void>;
+  runFilteredVolume: () => Promise<void>;
+  runFilteredCreation: () => Promise<void>;
 }
 
 declare const window: Window & TestRunnerWindow;
@@ -933,7 +935,8 @@ async function preWarmEngines(): Promise<void> {
 /**
  * Get the WASM engine name required for a given synth, or null if it's a Tone.js synth.
  */
-/** FM synths that stay on FurnaceSynth (old chip engine) */
+/** FM synths — now unified under FurnaceDispatchSynth (commit db1eb5de).
+ *  Kept as list for logging/reference but treated same as dispatch synths. */
 const FM_SYNTHS = [
   'FurnaceOPN', 'FurnaceOPM', 'FurnaceOPL', 'FurnaceOPLL', 'FurnaceESFM',
   'FurnaceOPZ', 'FurnaceOPNA', 'FurnaceOPNB', 'FurnaceOPL4', 'FurnaceY8950',
@@ -944,10 +947,8 @@ const FM_SYNTHS = [
 const MAME_ENGINE_SYNTHS = ['MAMEVFX', 'MAMEDOC', 'MAMERSA', 'MAMESWP30'];
 
 function getRequiredEngine(synthName: string): string | null {
-  // FM chips use the old FurnaceChipEngine
-  if (FM_SYNTHS.includes(synthName)) return 'Furnace';
-  // All other Furnace chips use FurnaceDispatchEngine
-  if (synthName.startsWith('Furnace')) return 'FurnaceDispatch';
+  // ALL Furnace chips (including FM) now use FurnaceDispatchEngine
+  if (synthName.startsWith('Furnace') || synthName === 'Furnace') return 'FurnaceDispatch';
   if (synthName.startsWith('Buzz')) return 'Buzzmachine';
   // Old MAME synths use shared MAMEEngine; per-chip MAME synths have own worklets
   if (MAME_ENGINE_SYNTHS.includes(synthName)) return 'MAME';
@@ -1607,29 +1608,12 @@ async function testVolumeLevels() {
       continue;
     }
 
-    // Debug: For FM Furnace synths, verify engine instance and reset write counter.
-    // IMPORTANT: FM synths and Dispatch synths both route audio through native nodes
-    // (FurnaceChipEngine or FurnaceDispatchEngine → native destination).
-    // Standard Tone.Meter doesn't pick up this audio, so we use native AnalyserNode.
+    // All Furnace synths (including FM) now use FurnaceDispatchSynth with _nativeGain.
+    // The old FurnaceChipEngine path is no longer used since commit db1eb5de.
     let furnaceNativeMeter: AnalyserNode | null = null;
     const isFMSynth = FM_SYNTHS.includes(name);
-    const isDispatchSynth = name.startsWith('Furnace') && !isFMSynth;
-    if (isFMSynth) {
-      const furnaceEngine = FurnaceChipEngine.getInstance();
-      furnaceEngine.resetWriteCount();
-      console.log(`[VolumeTest] ${name}: Before synth creation - isInitialized=${furnaceEngine.isInitialized()}, diag:`, furnaceEngine.getDiagnostics(), 'worklet:', furnaceEngine.getWorkletDiagnostics());
-
-      // Create native AnalyserNode to measure FM Furnace audio (bypasses Tone.js)
-      // This is needed because FurnaceChipEngine audio goes directly to native destination
-      const nativeOutput = furnaceEngine.getNativeOutput();
-      if (nativeOutput && nativeOutput.context) {
-        furnaceNativeMeter = nativeOutput.context.createAnalyser();
-        furnaceNativeMeter.fftSize = 256;
-        nativeOutput.connect(furnaceNativeMeter);
-        furnaceNativeMeter.connect(nativeOutput.context.destination);
-        console.log(`[VolumeTest] ${name}: Created native AnalyserNode for FM metering`);
-      }
-    }
+    const isDispatchSynth = name.startsWith('Furnace');
+    // FM synths are now dispatch synths — no separate metering path needed
 
     try {
       // Auto-enrich config with first factory preset if available.
@@ -1912,22 +1896,14 @@ async function testVolumeLevels() {
         try { (synthObj.dispose as () => void)(); } catch { /* ignored */ }
       }
 
-      // Cleanup native meter for FM, dispatch Furnace, and MAME/HW synths
+      // Cleanup native meter for dispatch Furnace and MAME/HW synths
       if (furnaceNativeMeter) {
-        if (isFMSynth) {
-          const furnaceEngine = FurnaceChipEngine.getInstance();
-          furnaceEngine.requestWorkletStatus();
-          const nativeOutput = furnaceEngine.getNativeOutput();
-          if (nativeOutput) {
-            try { nativeOutput.disconnect(furnaceNativeMeter); } catch { /* ignored */ }
-            try { furnaceNativeMeter.disconnect(nativeOutput.context.destination); } catch { /* ignored */ }
-          }
-        } else if (isMAMESynth && mameOutputNode) {
+        if (isMAMESynth && mameOutputNode) {
           // MAME/HW: output → analyser → destination
           try { mameOutputNode.disconnect(furnaceNativeMeter); } catch { /* ignored */ }
           try { furnaceNativeMeter.disconnect(mameOutputNode.context.destination); } catch { /* ignored */ }
         } else {
-          // Dispatch synth — disconnect analyser and destination connection
+          // Dispatch synth (including FM) — disconnect analyser and destination connection
           if (dispatchNativeGain) {
             try { dispatchNativeGain.disconnect(dispatchNativeGain.context.destination); } catch { /* ignored */ }
           }
@@ -2111,21 +2087,10 @@ async function testVolumeInteractive() {
       continue;
     }
 
-    // FM native analyser
+    // All Furnace synths (including FM) now use dispatch path
     let furnaceNativeMeter: AnalyserNode | null = null;
     const isFMSynth = FM_SYNTHS.includes(name);
-    const isDispatchSynth = name.startsWith('Furnace') && !isFMSynth;
-    if (isFMSynth) {
-      const furnaceEngine = FurnaceChipEngine.getInstance();
-      furnaceEngine.resetWriteCount();
-      const nativeOutput = furnaceEngine.getNativeOutput();
-      if (nativeOutput && nativeOutput.context) {
-        furnaceNativeMeter = nativeOutput.context.createAnalyser();
-        furnaceNativeMeter.fftSize = 256;
-        nativeOutput.connect(furnaceNativeMeter);
-        furnaceNativeMeter.connect(nativeOutput.context.destination);
-      }
-    }
+    const isDispatchSynth = name.startsWith('Furnace');
 
     try {
       const preset = getFirstPresetForSynthType(config.synthType as string);
@@ -2341,17 +2306,11 @@ async function testVolumeInteractive() {
 
       // Native metre cleanup
       if (furnaceNativeMeter) {
-        if (isFMSynth) {
-          const furnaceEngine = FurnaceChipEngine.getInstance();
-          const nativeOutput = furnaceEngine.getNativeOutput();
-          if (nativeOutput) {
-            try { nativeOutput.disconnect(furnaceNativeMeter); } catch { /* ignored */ }
-            try { furnaceNativeMeter.disconnect(nativeOutput.context.destination); } catch { /* ignored */ }
-          }
-        } else if (isMAMESynth && mameOutputNode) {
+        if (isMAMESynth && mameOutputNode) {
           try { mameOutputNode.disconnect(furnaceNativeMeter); } catch { /* ignored */ }
           try { furnaceNativeMeter.disconnect(mameOutputNode.context.destination); } catch { /* ignored */ }
         } else {
+          // Dispatch synth (including FM) cleanup
           if (dispatchNativeGain) {
             try { dispatchNativeGain.disconnect(dispatchNativeGain.context.destination); } catch { /* ignored */ }
           }
@@ -4943,6 +4902,135 @@ async function runEffectTests() {
 }
 
 // ============================================
+// FILTERED SYNTH TESTING
+// ============================================
+
+/**
+ * Parse the synth filter input. Supports:
+ * - Comma-separated names: "TB303, Dexed, OBXd"
+ * - Regex: "/^Furnace.*/" or "/MAME/"
+ * - Mixed: "TB303, /^Buzz.*/"
+ * Returns a list of matching synth names from SYNTH_CONFIGS.
+ */
+function parseSynthFilter(): string[] {
+  const input = (document.getElementById('synthFilter') as HTMLInputElement)?.value?.trim() || '';
+  if (!input) return Object.keys(SYNTH_CONFIGS); // No filter = all synths
+
+  const allNames = Object.keys(SYNTH_CONFIGS);
+  const matched = new Set<string>();
+
+  const parts = input.split(',').map(s => s.trim()).filter(Boolean);
+  for (const part of parts) {
+    // Check if it's a regex pattern: /pattern/ or /pattern/i
+    const regexMatch = part.match(/^\/(.+)\/([gi]*)$/);
+    if (regexMatch) {
+      try {
+        const re = new RegExp(regexMatch[1], regexMatch[2]);
+        for (const name of allNames) {
+          if (re.test(name)) matched.add(name);
+        }
+      } catch {
+        log(`Invalid regex: ${part}`, 'fail');
+      }
+    } else {
+      // Exact name match (case-insensitive lookup)
+      const exact = allNames.find(n => n.toLowerCase() === part.toLowerCase());
+      if (exact) {
+        matched.add(exact);
+      } else {
+        // Partial match
+        for (const name of allNames) {
+          if (name.toLowerCase().includes(part.toLowerCase())) matched.add(name);
+        }
+      }
+    }
+  }
+
+  return Array.from(matched);
+}
+
+/**
+ * Run volume tests for only the filtered synths.
+ */
+async function runFilteredVolume() {
+  const filtered = parseSynthFilter();
+  if (filtered.length === 0) {
+    clearResults();
+    log('No synths match the filter.', 'fail');
+    return;
+  }
+
+  // Temporarily replace SYNTH_CONFIGS with filtered subset
+  const backup = { ...SYNTH_CONFIGS };
+  for (const key of Object.keys(SYNTH_CONFIGS)) {
+    if (!filtered.includes(key)) delete SYNTH_CONFIGS[key];
+  }
+
+  clearResults();
+  logHtml(`<h2>Filtered Volume Tests (${filtered.length} synths)</h2>`);
+  logHtml(`<p class="info">Testing: ${filtered.join(', ')}</p>`);
+
+  const buttons = document.querySelectorAll('button');
+  buttons.forEach(b => (b as HTMLButtonElement).disabled = true);
+
+  try {
+    await initAudio();
+    await preWarmEngines();
+    await testVolumeLevels();
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    log('Test error: ' + msg, 'fail');
+  }
+
+  // Restore full config
+  for (const key of Object.keys(backup)) {
+    SYNTH_CONFIGS[key] = backup[key];
+  }
+
+  buttons.forEach(b => (b as HTMLButtonElement).disabled = false);
+}
+
+/**
+ * Run creation tests for only the filtered synths.
+ */
+async function runFilteredCreation() {
+  const filtered = parseSynthFilter();
+  if (filtered.length === 0) {
+    clearResults();
+    log('No synths match the filter.', 'fail');
+    return;
+  }
+
+  const backup = { ...SYNTH_CONFIGS };
+  for (const key of Object.keys(SYNTH_CONFIGS)) {
+    if (!filtered.includes(key)) delete SYNTH_CONFIGS[key];
+  }
+
+  clearResults();
+  logHtml(`<h2>Filtered Creation Tests (${filtered.length} synths)</h2>`);
+  logHtml(`<p class="info">Testing: ${filtered.join(', ')}</p>`);
+
+  const buttons = document.querySelectorAll('button');
+  buttons.forEach(b => (b as HTMLButtonElement).disabled = true);
+
+  try {
+    await initAudio();
+    await preWarmEngines();
+    await testSynthCreation();
+    await testMethodAvailability();
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    log('Test error: ' + msg, 'fail');
+  }
+
+  for (const key of Object.keys(backup)) {
+    SYNTH_CONFIGS[key] = backup[key];
+  }
+
+  buttons.forEach(b => (b as HTMLButtonElement).disabled = false);
+}
+
+// ============================================
 // SETUP EVENT LISTENERS
 // ============================================
 
@@ -4953,6 +5041,8 @@ document.getElementById('runBehaviorTests')?.addEventListener('click', runBehavi
 document.getElementById('runSamplePackTests')?.addEventListener('click', runSamplePackTests);
 document.getElementById('runEffectTests')?.addEventListener('click', runEffectTests);
 document.getElementById('runInteractiveTest')?.addEventListener('click', runInteractiveVolumeTests);
+document.getElementById('runFilteredVolume')?.addEventListener('click', runFilteredVolume);
+document.getElementById('runFilteredCreation')?.addEventListener('click', runFilteredCreation);
 
 // Export for console access
 window.runAllTests = runAllTests;
@@ -4962,3 +5052,5 @@ window.runBehaviorTests = runBehaviorTests;
 window.runSamplePackTests = runSamplePackTests;
 window.runEffectTests = runEffectTests;
 window.runInteractiveVolumeTests = runInteractiveVolumeTests;
+window.runFilteredVolume = runFilteredVolume;
+window.runFilteredCreation = runFilteredCreation;
