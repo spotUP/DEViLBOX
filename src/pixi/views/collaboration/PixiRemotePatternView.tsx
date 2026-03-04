@@ -1,21 +1,23 @@
 /**
  * PixiRemotePatternView — Read-only pattern grid showing the peer's current pattern.
- * Renders a simplified view of pattern data using PixiLabel for each cell.
+ * Matches the DOM RemotePatternView 1:1: FT2-style toolbar, channel headers,
+ * playback position highlight, dynamic channel count, column visibility toggles,
+ * and effect column support.
  */
 
-import React, { useMemo } from 'react';
-import { PixiLabel } from '../../components';
+import React, { useMemo, useState, useCallback } from 'react';
+import { PixiLabel, PixiButton } from '../../components';
 import { PixiScrollView } from '../../components/PixiScrollView';
 import { usePixiTheme } from '../../theme';
 import { useCollaborationStore } from '@stores/useCollaborationStore';
 import { useTrackerStore } from '@stores';
+import { useTransportStore } from '@stores/useTransportStore';
 
 const NOTE_NAMES = ['C-', 'C#', 'D-', 'D#', 'E-', 'F-', 'F#', 'G-', 'G#', 'A-', 'A#', 'B-'];
 
 function formatNote(note: number): string {
   if (note <= 0) return '---';
-  if (note === 97) return '===';
-  if (note === 255) return '===';
+  if (note === 97 || note === 255) return '===';
   const octave = Math.floor((note - 1) / 12);
   const name = NOTE_NAMES[(note - 1) % 12];
   return `${name}${octave}`;
@@ -26,29 +28,85 @@ function formatHex(val: number, digits: number): string {
   return val.toString(16).toUpperCase().padStart(digits, '0');
 }
 
+function formatEffect(effTyp: number, eff: number): string {
+  if (effTyp <= 0 && eff <= 0) return '...';
+  const t = effTyp > 0 ? effTyp.toString(16).toUpperCase() : '.';
+  const p = eff > 0 ? eff.toString(16).toUpperCase().padStart(2, '0') : '..';
+  return `${t}${p}`;
+}
+
 const ROW_HEIGHT = 16;
-const CELL_WIDTH = 90;
+const CHAR_WIDTH = 7;
 const ROW_NUM_WIDTH = 28;
-const MAX_CHANNELS = 8;
 const HEADER_HEIGHT = 32;
+const TOOLBAR_ROW_HEIGHT = 18;
+const TOOLBAR_HEIGHT = TOOLBAR_ROW_HEIGHT * 2 + 28; // 2 rows + friend indicator
+const CHANNEL_HEADER_HEIGHT = 24;
+const COLUMN_TOGGLE_HEIGHT = 20;
+
+interface ColumnVisibility {
+  note: boolean;
+  inst: boolean;
+  vol: boolean;
+  fx: boolean;
+}
 
 export const PixiRemotePatternView: React.FC<{ width: number; height: number }> = ({ width, height }) => {
   const theme = usePixiTheme();
   const peerPatternIndex = useCollaborationStore(s => s.peerPatternIndex);
+  const peerCursorRow = useCollaborationStore(s => s.peerCursorRow);
   const patterns = useTrackerStore(s => s.patterns);
+  const patternOrder = useTrackerStore(s => s.patternOrder);
+  const currentPositionIndex = useTrackerStore(s => s.currentPositionIndex);
+  const isPlaying = useTransportStore(s => s.isPlaying);
+  const currentRow = useTransportStore(s => s.currentRow);
+  const bpm = useTransportStore(s => s.bpm);
+  const speed = useTransportStore(s => s.speed);
+
+  const [showColumns, setShowColumns] = useState<ColumnVisibility>({
+    note: true, inst: true, vol: true, fx: false,
+  });
+
+  const toggleColumn = useCallback((col: keyof ColumnVisibility) => {
+    setShowColumns(prev => ({ ...prev, [col]: !prev[col] }));
+  }, []);
 
   const pattern = patterns[peerPatternIndex] ?? null;
-  const channels = pattern ? pattern.channels.slice(0, MAX_CHANNELS) : [];
+  const channels = pattern ? pattern.channels : [];
+  const channelCount = channels.length;
   const rowCount = pattern?.length ?? 0;
+  const songLength = patternOrder.length;
   const contentHeight = rowCount * ROW_HEIGHT;
 
-  const headerText = pattern
-    ? `Friend's Pattern — ${pattern.name || `Pattern ${peerPatternIndex}`}`
-    : "Friend's Pattern — (none)";
+  // Compute per-channel cell width based on visible columns
+  const cellWidth = useMemo(() => {
+    let w = 4; // padding
+    if (showColumns.note) w += CHAR_WIDTH * 3 + 4;
+    if (showColumns.inst) w += CHAR_WIDTH * 2 + 4;
+    if (showColumns.vol) w += CHAR_WIDTH * 2 + 4;
+    if (showColumns.fx) w += CHAR_WIDTH * 3 + 4;
+    return Math.max(w, 24);
+  }, [showColumns]);
 
-  const channelHeaders = useMemo(() => {
-    return channels.map((ch, i) => ch.shortName || ch.name || `CH${i + 1}`);
-  }, [channels]);
+  const totalChannelsWidth = channelCount * cellWidth;
+
+  if (!pattern) {
+    return (
+      <layoutContainer
+        layout={{
+          width,
+          height,
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: theme.bg.color,
+        }}
+      >
+        <PixiLabel text="Waiting for friend's view..." size="sm" font="sans" color="textMuted" />
+      </layoutContainer>
+    );
+  }
+
+  const gridHeight = height - TOOLBAR_HEIGHT - CHANNEL_HEADER_HEIGHT - COLUMN_TOGGLE_HEIGHT;
 
   return (
     <layoutContainer
@@ -59,46 +117,144 @@ export const PixiRemotePatternView: React.FC<{ width: number; height: number }> 
         backgroundColor: theme.bg.color,
       }}
     >
-      {/* Header */}
+      {/* ── Read-only FT2 Toolbar ── */}
       <layoutContainer
         layout={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          height: HEADER_HEIGHT,
+          flexDirection: 'column',
           paddingLeft: 8,
           paddingRight: 8,
-          gap: 8,
+          paddingTop: 4,
+          paddingBottom: 4,
           backgroundColor: theme.bgSecondary.color,
         }}
       >
-        <PixiLabel text={headerText} size="sm" weight="semibold" font="sans" color="text" />
+        {/* Friend indicator */}
+        <layoutContainer layout={{ flexDirection: 'row', alignItems: 'center', gap: 6, height: 16, marginBottom: 2 }}>
+          <PixiLabel text="Friend's View" size="xs" weight="bold" color="accent" />
+          <PixiLabel text="(read-only)" size="xs" color="textMuted" />
+        </layoutContainer>
+
+        {/* Row 1: Position, BPM, Pattern */}
+        <layoutContainer layout={{ flexDirection: 'row', height: TOOLBAR_ROW_HEIGHT, gap: 16 }}>
+          <layoutContainer layout={{ flexDirection: 'row', gap: 4 }}>
+            <PixiLabel text="Pos:" size="xs" font="mono" color="textSecondary" />
+            <PixiLabel text={String(currentPositionIndex).padStart(3, '0')} size="xs" font="mono" color="text" />
+          </layoutContainer>
+          <layoutContainer layout={{ flexDirection: 'row', gap: 4 }}>
+            <PixiLabel text="BPM:" size="xs" font="mono" color="textSecondary" />
+            <PixiLabel text={String(bpm).padStart(3, '0')} size="xs" font="mono" color="text" />
+          </layoutContainer>
+          <layoutContainer layout={{ flexDirection: 'row', gap: 4 }}>
+            <PixiLabel text="Pat:" size="xs" font="mono" color="textSecondary" />
+            <PixiLabel text={String(peerPatternIndex).padStart(3, '0')} size="xs" font="mono" color="text" />
+          </layoutContainer>
+        </layoutContainer>
+
+        {/* Row 2: Song Length, Speed, Pattern Length */}
+        <layoutContainer layout={{ flexDirection: 'row', height: TOOLBAR_ROW_HEIGHT, gap: 16 }}>
+          <layoutContainer layout={{ flexDirection: 'row', gap: 4 }}>
+            <PixiLabel text="Len:" size="xs" font="mono" color="textSecondary" />
+            <PixiLabel text={String(songLength).padStart(3, '0')} size="xs" font="mono" color="text" />
+          </layoutContainer>
+          <layoutContainer layout={{ flexDirection: 'row', gap: 4 }}>
+            <PixiLabel text="Spd:" size="xs" font="mono" color="textSecondary" />
+            <PixiLabel text={String(speed).padStart(3, '0')} size="xs" font="mono" color="text" />
+          </layoutContainer>
+          <layoutContainer layout={{ flexDirection: 'row', gap: 4 }}>
+            <PixiLabel text="Rows:" size="xs" font="mono" color="textSecondary" />
+            <PixiLabel text={String(rowCount).padStart(3, '0')} size="xs" font="mono" color="text" />
+          </layoutContainer>
+          {isPlaying && (
+            <PixiLabel text="PLAYING" size="xs" weight="bold" color="success" />
+          )}
+        </layoutContainer>
       </layoutContainer>
 
-      {/* Channel headers row */}
+      {/* ── Column visibility toggles ── */}
       <layoutContainer
         layout={{
           flexDirection: 'row',
-          height: ROW_HEIGHT + 4,
+          height: COLUMN_TOGGLE_HEIGHT,
+          alignItems: 'center',
+          paddingLeft: 4,
+          gap: 2,
+          backgroundColor: theme.bgTertiary.color,
+        }}
+      >
+        <PixiLabel text="Show:" size="xs" font="sans" color="textMuted" layout={{ marginRight: 4 }} />
+        <PixiButton
+          label="Note"
+          size="sm"
+          variant={showColumns.note ? 'primary' : 'ghost'}
+          onClick={() => toggleColumn('note')}
+          height={16}
+          layout={{ paddingLeft: 4, paddingRight: 4 }}
+        />
+        <PixiButton
+          label="Inst"
+          size="sm"
+          variant={showColumns.inst ? 'primary' : 'ghost'}
+          onClick={() => toggleColumn('inst')}
+          height={16}
+          layout={{ paddingLeft: 4, paddingRight: 4 }}
+        />
+        <PixiButton
+          label="Vol"
+          size="sm"
+          variant={showColumns.vol ? 'primary' : 'ghost'}
+          onClick={() => toggleColumn('vol')}
+          height={16}
+          layout={{ paddingLeft: 4, paddingRight: 4 }}
+        />
+        <PixiButton
+          label="Fx"
+          size="sm"
+          variant={showColumns.fx ? 'primary' : 'ghost'}
+          onClick={() => toggleColumn('fx')}
+          height={16}
+          layout={{ paddingLeft: 4, paddingRight: 4 }}
+        />
+      </layoutContainer>
+
+      {/* ── Channel headers ── */}
+      <layoutContainer
+        layout={{
+          flexDirection: 'row',
+          height: CHANNEL_HEADER_HEIGHT,
           alignItems: 'center',
           paddingLeft: 2,
           backgroundColor: theme.bgTertiary.color,
         }}
       >
         <layoutContainer layout={{ width: ROW_NUM_WIDTH }}>
-          <PixiLabel text="##" size="xs" font="mono" color="textMuted" />
+          <PixiLabel text="ROW" size="xs" font="mono" color="textMuted" />
         </layoutContainer>
-        {channelHeaders.map((name, i) => (
-          <layoutContainer key={i} layout={{ width: CELL_WIDTH }}>
-            <PixiLabel text={name} size="xs" font="mono" color="textSecondary" />
+        {channels.map((ch, idx) => (
+          <layoutContainer
+            key={ch.id}
+            layout={{
+              width: cellWidth,
+              height: CHANNEL_HEADER_HEIGHT,
+              flexDirection: 'column',
+              justifyContent: 'center',
+              paddingLeft: 2,
+            }}
+          >
+            <PixiLabel
+              text={`${(idx + 1).toString().padStart(2, '0')} ${ch.shortName || ch.name || `CH${idx + 1}`}`}
+              size="xs"
+              font="mono"
+              color={ch.muted ? 'textMuted' : 'textSecondary'}
+            />
           </layoutContainer>
         ))}
       </layoutContainer>
 
-      {/* Scrollable pattern rows */}
+      {/* ── Pattern grid ── */}
       {rowCount > 0 && (
         <PixiScrollView
           width={width}
-          height={height - HEADER_HEIGHT - ROW_HEIGHT - 4}
+          height={gridHeight}
           contentHeight={contentHeight}
           direction="vertical"
           showScrollbar={true}
@@ -107,11 +263,22 @@ export const PixiRemotePatternView: React.FC<{ width: number; height: number }> 
             {Array.from({ length: rowCount }, (_, row) => {
               const isHighlight = row % 16 === 0;
               const isBeat = row % 4 === 0;
-              const bgColor = isHighlight
-                ? theme.trackerRowHighlight.color
-                : isBeat
-                  ? theme.trackerRowEven.color
-                  : undefined;
+              const isPeerCursor = row === peerCursorRow;
+              const isPlaybackRow = isPlaying && row === currentRow;
+
+              let bgColor: number | undefined;
+              if (isPlaybackRow) {
+                bgColor = theme.accent.color;
+              } else if (isPeerCursor) {
+                bgColor = 0x2a4060;
+              } else if (isHighlight) {
+                bgColor = theme.trackerRowHighlight.color;
+              } else if (isBeat) {
+                bgColor = theme.trackerRowEven.color;
+              }
+
+              const textColor = isPlaybackRow ? 'custom' as const : undefined;
+              const playbackTextCustomColor = isPlaybackRow ? 0x000000 : undefined;
 
               return (
                 <layoutContainer
@@ -130,29 +297,34 @@ export const PixiRemotePatternView: React.FC<{ width: number; height: number }> 
                       text={row.toString(16).toUpperCase().padStart(2, '0')}
                       size="xs"
                       font="mono"
-                      color="textMuted"
+                      color={textColor ?? 'textMuted'}
+                      customColor={playbackTextCustomColor}
                     />
                   </layoutContainer>
 
                   {/* Cells per channel */}
                   {channels.map((ch, chIdx) => {
                     const cell = ch.rows[row];
-                    if (!cell) return <layoutContainer key={chIdx} layout={{ width: CELL_WIDTH }} />;
+                    if (!cell) return <layoutContainer key={chIdx} layout={{ width: cellWidth }} />;
 
-                    const noteStr = formatNote(cell.note);
-                    const instStr = formatHex(cell.instrument, 2);
-                    const volStr = formatHex(cell.volume, 2);
-                    const text = `${noteStr} ${instStr} ${volStr}`;
+                    const parts: string[] = [];
+                    if (showColumns.note) parts.push(formatNote(cell.note));
+                    if (showColumns.inst) parts.push(formatHex(cell.instrument, 2));
+                    if (showColumns.vol) parts.push(formatHex(cell.volume, 2));
+                    if (showColumns.fx) parts.push(formatEffect(cell.effTyp, cell.eff));
+                    const text = parts.join(' ');
 
-                    const isEmpty = cell.note <= 0 && cell.instrument <= 0 && cell.volume <= 0;
+                    const isEmpty = cell.note <= 0 && cell.instrument <= 0 && cell.volume <= 0
+                      && (!showColumns.fx || (cell.effTyp <= 0 && cell.eff <= 0));
 
                     return (
-                      <layoutContainer key={chIdx} layout={{ width: CELL_WIDTH }}>
+                      <layoutContainer key={chIdx} layout={{ width: cellWidth }}>
                         <PixiLabel
                           text={text}
                           size="xs"
                           font="mono"
-                          color={isEmpty ? 'textMuted' : 'text'}
+                          color={textColor ?? (isEmpty ? 'textMuted' : 'text')}
+                          customColor={playbackTextCustomColor}
                         />
                       </layoutContainer>
                     );
