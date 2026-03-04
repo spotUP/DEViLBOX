@@ -16,6 +16,7 @@
  */
 
 import React, { useEffect, useState } from 'react';
+import * as Tone from 'tone';
 import { useGTUltraStore } from '../../stores/useGTUltraStore';
 import { GTPatternEditor } from './GTPatternEditor';
 import { GTToolbar } from './GTToolbar';
@@ -44,11 +45,14 @@ export const GTUltraView: React.FC<{ width: number; height: number }> = ({ width
     let disposed = false;
 
     const setup = async () => {
-      const audioCtx = new AudioContext();
+      const audioCtx = Tone.getContext().rawContext as AudioContext;
+      if (audioCtx.state === 'suspended') await audioCtx.resume();
       gtEngine = new GTUltraEngine(audioCtx, {
         onReady: () => {
           if (disposed) return;
           console.log('[GTUltra] Engine ready');
+          // Set engine in store FIRST so refresh methods can use it
+          setEngine(gtEngine);
           const store = useGTUltraStore.getState();
           // Load any pending song data that arrived before engine was ready
           if (store.pendingSongData) {
@@ -98,7 +102,7 @@ export const GTUltraView: React.FC<{ width: number; height: number }> = ({ width
       await gtEngine.ready;
       if (disposed) { gtEngine.dispose(); return; }
       gtEngine.output.connect(audioCtx.destination);
-      setEngine(gtEngine);
+      // Engine already set in store by onReady callback above
     };
 
     setup().catch(console.error);
