@@ -4908,8 +4908,8 @@ async function runEffectTests() {
 /**
  * Parse the synth filter input. Supports:
  * - Comma-separated names: "TB303, Dexed, OBXd"
- * - Regex: "/^Furnace.*/" or "/MAME/"
- * - Mixed: "TB303, /^Buzz.*/"
+ * - Regex patterns wrapped in slashes
+ * - Partial matching for convenience
  * Returns a list of matching synth names from SYNTH_CONFIGS.
  */
 function parseSynthFilter(): string[] {
