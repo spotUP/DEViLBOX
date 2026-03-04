@@ -102,7 +102,7 @@ export const PixiRomUploadDialog: React.FC = () => {
     <PixiModal isOpen={true} onClose={handleDismiss} width={MODAL_W} height={MODAL_H}>
       <PixiModalHeader title="ROM Required" onClose={handleDismiss} width={MODAL_W} />
 
-      <layoutContainer layout={{ flex: 1, padding: 12, flexDirection: 'column', gap: 10, overflow: 'hidden' }}>
+      <layoutContainer layout={{ flex: 1, padding: 16, flexDirection: 'column', gap: 10, overflow: 'hidden' }}>
         {/* Chip name subtitle */}
         <PixiLabel text={`${chipName} needs ROM data to produce sound`} size="sm" color="warning" />
 

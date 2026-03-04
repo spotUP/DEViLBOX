@@ -8,11 +8,14 @@
  */
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import type { FederatedPointerEvent, Graphics as GraphicsType } from 'pixi.js';
+import { useApplication } from '@pixi/react';
 import { PixiButton, PixiCheckbox, PixiSlider, PixiNumericInput } from '../components';
 import { PixiSelect, type SelectOption } from '../components/PixiSelect';
 import { PixiScrollView } from '../components/PixiScrollView';
 import { usePixiTheme } from '../theme';
-import { Div, Txt, GlModal, GlModalFooter } from '../layout';
+import { PIXI_FONTS } from '../fonts';
+import { Div, Txt } from '../layout';
 
 import { useUIStore } from '@stores/useUIStore';
 import { useThemeStore, themes } from '@stores/useThemeStore';
@@ -113,7 +116,7 @@ const CRT_SLIDERS: CRTSliderDef[] = [
 
 // ── Sub-components ─────────────────────────────────────────────────────────────
 
-/** Section header label */
+/** Section header label — DOM: text-xs font-bold, tracking-wide */
 const SectionHeader: React.FC<{ text: string }> = ({ text }) => (
   <Div className="py-1">
     <Txt className="text-xs font-bold text-accent-primary uppercase">{text}</Txt>
@@ -144,6 +147,7 @@ interface PixiSettingsModalProps {
 
 export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, onClose }) => {
   const theme = usePixiTheme();
+  const { app } = useApplication();
 
   // ── Store hooks ──────────────────────────────────────────────────────────
   const useHexNumbers = useUIStore((s) => s.useHexNumbers);
@@ -336,21 +340,99 @@ export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, on
   // Estimate total content height for the scroll view
   const crtSectionH = crtEnabled ? CRT_SLIDERS.length * 28 + 4 * 18 + 60 : 40;
   const contentH = 1500 + crtSectionH;
-  const scrollAreaH = MODAL_H - 44 - 44; // header + footer
+  const scrollAreaH = MODAL_H - 48 - 44; // header + footer
 
-  // ── CRT sliders grouped ──────────────────────────────────────────────────
+  // CRT sliders grouped
   const crtGroups: string[] = [];
   CRT_SLIDERS.forEach((s) => { if (!crtGroups.includes(s.group)) crtGroups.push(s.group); });
 
+  const screenW = app?.screen?.width ?? 1920;
+  const screenH = app?.screen?.height ?? 1080;
+
+  const drawOverlay = (g: GraphicsType) => {
+    g.clear();
+    g.rect(0, 0, screenW, screenH);
+    g.fill({ color: 0x000000, alpha: 0.5 });
+  };
+
+  const handleOverlayClick = (_e: FederatedPointerEvent) => { onClose(); };
+  const handlePanelClick = (e: FederatedPointerEvent) => { e.stopPropagation(); };
+
   return (
-    <GlModal isOpen={isOpen} onClose={onClose} title="Settings" width={MODAL_W} height={MODAL_H}>
-      <PixiScrollView
-        width={MODAL_W}
-        height={scrollAreaH}
-        contentHeight={contentH}
-        direction="vertical"
+    <pixiContainer layout={{ position: 'absolute', width: '100%', height: '100%' }}>
+      <pixiGraphics
+        draw={drawOverlay}
+        eventMode="static"
+        onPointerUp={handleOverlayClick}
+        layout={{ position: 'absolute', width: screenW, height: screenH }}
+      />
+
+      <layoutContainer
+        eventMode="static"
+        onPointerDown={handlePanelClick}
+        layout={{
+          position: 'absolute',
+          left: Math.round((screenW - MODAL_W) / 2),
+          top: Math.round((screenH - MODAL_H) / 2),
+          width: MODAL_W,
+          height: MODAL_H,
+          flexDirection: 'column',
+          backgroundColor: theme.bg.color,
+          borderWidth: 2,
+          borderColor: theme.border.color,
+          overflow: 'hidden',
+        }}
       >
-        <Div className="flex-col gap-3 p-4" layout={{ width: CONTENT_W }}>
+        {/* Header — DOM: px-4 py-3 bg-ft2-header border-b-2 */}
+        <layoutContainer
+          layout={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            paddingLeft: 16,
+            paddingRight: 16,
+            paddingTop: 12,
+            paddingBottom: 12,
+            backgroundColor: theme.bgTertiary.color,
+            borderBottomWidth: 2,
+            borderColor: theme.border.color,
+          }}
+        >
+          <pixiBitmapText
+            text="SETTINGS"
+            style={{ fontFamily: PIXI_FONTS.SANS_BOLD, fontSize: 14, fill: 0xffffff }}
+            tint={theme.accent.color}
+            layout={{}}
+          />
+          <layoutContainer
+            eventMode="static"
+            cursor="pointer"
+            onPointerUp={onClose}
+            layout={{
+              width: 24,
+              height: 24,
+              justifyContent: 'center',
+              alignItems: 'center',
+              borderRadius: 4,
+            }}
+          >
+            <pixiBitmapText
+              text="✕"
+              style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 14, fill: 0xffffff }}
+              tint={theme.textMuted.color}
+              layout={{}}
+            />
+          </layoutContainer>
+        </layoutContainer>
+
+        {/* Content — DOM: p-4 space-y-6 max-h-[70vh] overflow-y-auto */}
+        <PixiScrollView
+          width={MODAL_W}
+          height={scrollAreaH}
+          contentHeight={contentH}
+          direction="vertical"
+        >
+          <Div className="flex-col gap-3 p-4" layout={{ width: CONTENT_W }}>
 
           {/* ═══════ DISPLAY ═══════ */}
           <SectionHeader text="DISPLAY" />
@@ -793,12 +875,24 @@ export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, on
         </Div>
       </PixiScrollView>
 
-      <GlModalFooter>
-        <Txt className="text-[10px] text-text-muted" layout={{ flex: 1 }}>
-          Settings are saved automatically
-        </Txt>
-        <PixiButton label="Close" variant="primary" width={80} onClick={onClose} />
-      </GlModalFooter>
-    </GlModal>
+      {/* Footer — DOM: px-4 py-3 bg-ft2-header border-t-2 flex justify-end */}
+      <layoutContainer
+        layout={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'flex-end',
+          paddingLeft: 16,
+          paddingRight: 16,
+          paddingTop: 12,
+          paddingBottom: 12,
+          backgroundColor: theme.bgTertiary.color,
+          borderTopWidth: 2,
+          borderColor: theme.border.color,
+        }}
+      >
+        <PixiButton label="CLOSE" variant="primary" width={80} onClick={onClose} />
+      </layoutContainer>
+      </layoutContainer>
+    </pixiContainer>
   );
 };

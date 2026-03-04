@@ -1,11 +1,14 @@
 /**
  * PixiDownloadModal — GL-native download dialog.
  * Shows download links for Windows, macOS, and Linux native apps.
+ *
+ * DOM reference: src/components/dialogs/DownloadModal.tsx
  */
 
-import React, { useCallback } from 'react';
-import { PixiModal, PixiModalHeader, PixiModalFooter, PixiButton, PixiLabel } from '../components';
+import React, { useCallback, useState } from 'react';
+import { PixiModal, PixiButton } from '../components';
 import { usePixiTheme } from '../theme';
+import { PIXI_FONTS } from '../fonts';
 
 interface PixiDownloadModalProps {
   isOpen: boolean;
@@ -20,8 +23,12 @@ const platforms = [
   { name: 'Linux', desc: 'AppImage, Debian, or Tarball' },
 ];
 
+const MODAL_W = 480;
+const MODAL_H = 420;
+
 export const PixiDownloadModal: React.FC<PixiDownloadModalProps> = ({ isOpen, onClose }) => {
   const theme = usePixiTheme();
+  const [closeHovered, setCloseHovered] = useState(false);
 
   const handleDownload = useCallback(() => {
     window.open(RELEASES_URL, '_blank');
@@ -30,52 +37,132 @@ export const PixiDownloadModal: React.FC<PixiDownloadModalProps> = ({ isOpen, on
   if (!isOpen) return null;
 
   return (
-    <PixiModal isOpen={isOpen} onClose={onClose} width={420} height={360}>
-      <PixiModalHeader title="Download DEViLBOX" onClose={onClose} />
+    <PixiModal
+      isOpen={isOpen}
+      onClose={onClose}
+      width={MODAL_W}
+      height={MODAL_H}
+      bgColor={theme.bgSecondary.color}
+      borderRadius={12}
+    >
+      {/* Header — DOM: bg-dark-bgTertiary px-6 py-4 border-b */}
+      <layoutContainer
+        layout={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          paddingLeft: 24,
+          paddingRight: 24,
+          paddingTop: 16,
+          paddingBottom: 16,
+          backgroundColor: theme.bgTertiary.color,
+          borderBottomWidth: 1,
+          borderColor: theme.border.color,
+        }}
+      >
+        <layoutContainer layout={{ flexDirection: 'column', gap: 2 }}>
+          <pixiBitmapText
+            text="Download DEViLBOX"
+            style={{ fontFamily: PIXI_FONTS.SANS_BOLD, fontSize: 18, fill: 0xffffff }}
+            tint={theme.text.color}
+            layout={{}}
+          />
+          <pixiBitmapText
+            text="Native Desktop Applications"
+            style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 12, fill: 0xffffff }}
+            tint={theme.textMuted.color}
+            layout={{}}
+          />
+        </layoutContainer>
+        <layoutContainer
+          eventMode="static"
+          cursor="pointer"
+          onPointerOver={() => setCloseHovered(true)}
+          onPointerOut={() => setCloseHovered(false)}
+          onPointerUp={onClose}
+          layout={{
+            width: 28,
+            height: 28,
+            justifyContent: 'center',
+            alignItems: 'center',
+            borderRadius: 6,
+            ...(closeHovered ? { backgroundColor: theme.bgHover.color } : {}),
+          }}
+        >
+          <pixiBitmapText
+            text="✕"
+            style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 16, fill: 0xffffff }}
+            tint={closeHovered ? theme.text.color : theme.textMuted.color}
+            layout={{}}
+          />
+        </layoutContainer>
+      </layoutContainer>
 
-      <layoutContainer layout={{ flex: 1, flexDirection: 'column', padding: 16, gap: 12 }}>
-        {/* Subtitle */}
-        <PixiLabel text="Native Desktop Applications" size="xs" weight="bold" color="textMuted" />
-
-        {/* Description */}
-        <PixiLabel
+      {/* Content — DOM: p-6 */}
+      <layoutContainer layout={{ flex: 1, flexDirection: 'column', padding: 24 }}>
+        {/* Description — DOM: text-sm text-text-secondary mb-6 leading-relaxed */}
+        <pixiBitmapText
           text="Experience DEViLBOX with lower latency, better performance, and offline support. Native apps provide full access to system audio and MIDI resources."
-          size="xs"
-          color="textSecondary"
+          style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 14, fill: 0xffffff }}
+          tint={theme.textSecondary.color}
+          layout={{ marginBottom: 24 }}
         />
 
-        {/* Platform cards */}
-        <layoutContainer layout={{ flexDirection: 'column', gap: 8 }}>
+        {/* Platform cards — DOM: space-y-3 */}
+        <layoutContainer layout={{ flexDirection: 'column', gap: 12 }}>
           {platforms.map((p) => (
             <layoutContainer
               key={p.name}
+              eventMode="static"
+              cursor="pointer"
+              onPointerUp={handleDownload}
               layout={{
                 flexDirection: 'row',
                 alignItems: 'center',
-                gap: 12,
-                padding: 12,
-                borderRadius: 8,
+                gap: 16,
+                padding: 16,
+                borderRadius: 12,
                 borderWidth: 1,
                 backgroundColor: theme.bg.color,
                 borderColor: theme.border.color,
               }}
             >
-              <PixiLabel text={p.name} size="sm" weight="semibold" color="text" />
-              <PixiLabel text={p.desc} size="xs" color="textMuted" />
+              <layoutContainer layout={{ flexDirection: 'column', flex: 1 }}>
+                <pixiBitmapText
+                  text={p.name}
+                  style={{ fontFamily: PIXI_FONTS.SANS_SEMIBOLD, fontSize: 14, fill: 0xffffff }}
+                  tint={theme.text.color}
+                  layout={{}}
+                />
+                <pixiBitmapText
+                  text={p.desc}
+                  style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 12, fill: 0xffffff }}
+                  tint={theme.textMuted.color}
+                  layout={{}}
+                />
+              </layoutContainer>
             </layoutContainer>
           ))}
         </layoutContainer>
 
-        {/* Footer note */}
-        <layoutContainer layout={{ alignItems: 'center', marginTop: 8 }}>
-          <PixiLabel text="Built with Electron & Tone.js" size="xs" color="textMuted" />
+        {/* Footer note — DOM: mt-8 pt-6 border-t text-center text-[10px] font-mono uppercase */}
+        <layoutContainer
+          layout={{
+            alignItems: 'center',
+            marginTop: 32,
+            paddingTop: 24,
+            borderTopWidth: 1,
+            borderColor: theme.border.color,
+          }}
+        >
+          <pixiBitmapText
+            text="BUILT WITH ELECTRON & TONE.JS"
+            style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }}
+            tint={theme.textMuted.color}
+            layout={{}}
+          />
         </layoutContainer>
       </layoutContainer>
-
-      <PixiModalFooter>
-        <PixiButton label="Close" variant="ghost" onClick={onClose} />
-        <PixiButton label="Go to Downloads" variant="primary" onClick={handleDownload} />
-      </PixiModalFooter>
     </PixiModal>
   );
 };

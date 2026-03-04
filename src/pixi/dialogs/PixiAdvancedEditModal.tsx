@@ -44,7 +44,7 @@ const Section: React.FC<SectionProps> = ({ title, id: _id, expanded, onToggle, w
   return (
     <layoutContainer
       layout={{
-        width: width - 24,
+        width: width - 32,
         flexDirection: 'column',
         borderWidth: 1,
         borderColor: theme.border.color,
@@ -52,25 +52,26 @@ const Section: React.FC<SectionProps> = ({ title, id: _id, expanded, onToggle, w
         overflow: 'hidden',
       }}
     >
-      {/* Section header */}
+      {/* Section header — DOM: px-3 py-2, text-sm font-medium */}
       <layoutContainer
         eventMode="static"
         cursor="pointer"
         onPointerUp={onToggle}
         layout={{
-          width: width - 26,
-          height: 28,
+          width: width - 34,
           flexDirection: 'row',
           alignItems: 'center',
           justifyContent: 'space-between',
-          paddingLeft: 8,
-          paddingRight: 8,
+          paddingLeft: 12,
+          paddingRight: 12,
+          paddingTop: 8,
+          paddingBottom: 8,
           backgroundColor: theme.bgTertiary.color,
         }}
       >
         <pixiBitmapText
           text={title}
-          style={{ fontFamily: PIXI_FONTS.SANS_SEMIBOLD, fontSize: 11, fill: 0xffffff }}
+          style={{ fontFamily: PIXI_FONTS.SANS_MEDIUM, fontSize: 14, fill: 0xffffff }}
           tint={theme.text.color}
           layout={{}}
         />
@@ -82,14 +83,14 @@ const Section: React.FC<SectionProps> = ({ title, id: _id, expanded, onToggle, w
         />
       </layoutContainer>
 
-      {/* Section content */}
+      {/* Section content — DOM: p-3 space-y-2 */}
       {expanded && (
         <layoutContainer
           layout={{
-            width: width - 26,
+            width: width - 34,
             flexDirection: 'column',
-            padding: 8,
-            gap: 6,
+            padding: 12,
+            gap: 8,
             backgroundColor: theme.bgSecondary.color,
           }}
         >
@@ -124,6 +125,7 @@ export const PixiAdvancedEditModal: React.FC<PixiAdvancedEditModalProps> = ({
   onDuplicate,
   onMath,
 }) => {
+  const theme = usePixiTheme();
   const selection = useCursorStore((s) => s.selection);
   const [expandedSection, setExpandedSection] = useState<string | null>('volume');
   const [mathValue, setMathValue] = useState(1);
@@ -145,14 +147,14 @@ export const PixiAdvancedEditModal: React.FC<PixiAdvancedEditModalProps> = ({
     <PixiModal isOpen={isOpen} onClose={onClose} width={MODAL_W} height={MODAL_H}>
       <PixiModalHeader title="FT2 Advanced Edit" width={MODAL_W} onClose={onClose} />
 
-      {/* Scrollable body */}
+      {/* Scrollable body — DOM: p-4 space-y-4 */}
       <layoutContainer
         layout={{
           flex: 1,
           width: MODAL_W,
-          padding: 12,
+          padding: 16,
           flexDirection: 'column',
-          gap: 8,
+          gap: 16,
           overflow: 'scroll',
         }}
       >
@@ -167,7 +169,7 @@ export const PixiAdvancedEditModal: React.FC<PixiAdvancedEditModalProps> = ({
           <PixiLabel text="Transform volume values across selection, track, or pattern" size="xs" color="textMuted" />
 
           {/* Row 1: Scale Block / Fade Block */}
-          <layoutContainer layout={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap' }}>
+          <layoutContainer layout={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
             <PixiButton label="Scale Block" variant="ft2" color="blue" size="sm" width={BTN_W} height={BTN_H}
               disabled={!hasSelection} onClick={() => onShowScaleVolume?.('block')} />
             <PixiButton label="Fade Block" variant="ft2" color="blue" size="sm" width={BTN_W} height={BTN_H}
@@ -175,7 +177,7 @@ export const PixiAdvancedEditModal: React.FC<PixiAdvancedEditModalProps> = ({
           </layoutContainer>
 
           {/* Row 2: Scale Track / Fade Track */}
-          <layoutContainer layout={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap' }}>
+          <layoutContainer layout={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
             <PixiButton label="Scale Track" variant="ft2" color="blue" size="sm" width={BTN_W} height={BTN_H}
               onClick={() => onShowScaleVolume?.('track')} />
             <PixiButton label="Fade Track" variant="ft2" color="blue" size="sm" width={BTN_W} height={BTN_H}
@@ -183,7 +185,7 @@ export const PixiAdvancedEditModal: React.FC<PixiAdvancedEditModalProps> = ({
           </layoutContainer>
 
           {/* Row 3: Scale Pattern / Fade Pattern */}
-          <layoutContainer layout={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap' }}>
+          <layoutContainer layout={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
             <PixiButton label="Scale Pattern" variant="ft2" color="blue" size="sm" width={BTN_W} height={BTN_H}
               onClick={() => onShowScaleVolume?.('pattern')} />
             <PixiButton label="Fade Pattern" variant="ft2" color="blue" size="sm" width={BTN_W} height={BTN_H}
@@ -201,25 +203,25 @@ export const PixiAdvancedEditModal: React.FC<PixiAdvancedEditModalProps> = ({
         >
           <PixiLabel text="Transform selected block content" size="xs" color="textMuted" />
 
-          <layoutContainer layout={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap' }}>
+          <layoutContainer layout={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
             <PixiButton label="Reverse" variant="ft2" color="yellow" size="sm" width={BTN_W} height={BTN_H}
               disabled={!hasSelection} onClick={() => onReverse?.()} />
             <PixiButton label="Duplicate" variant="ft2" color="yellow" size="sm" width={BTN_W} height={BTN_H}
               disabled={!hasSelection} onClick={() => onDuplicate?.()} />
           </layoutContainer>
 
-          <layoutContainer layout={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap' }}>
+          <layoutContainer layout={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
             <PixiButton label="Expand 2x" variant="ft2" color="yellow" size="sm" width={BTN_W} height={BTN_H}
               disabled={!hasSelection} onClick={() => onExpand?.()} />
             <PixiButton label="Shrink 2x" variant="ft2" color="yellow" size="sm" width={BTN_W} height={BTN_H}
               disabled={!hasSelection} onClick={() => onShrink?.()} />
           </layoutContainer>
 
-          {/* Math Operations sub-section */}
-          <layoutContainer layout={{ flexDirection: 'column', gap: 4, marginTop: 4, borderTopWidth: 1, borderColor: 0x333333, paddingTop: 6 }}>
+          {/* Math Operations sub-section — DOM: mt-3 pt-2 border-t */}
+          <layoutContainer layout={{ flexDirection: 'column', gap: 8, marginTop: 12, borderTopWidth: 1, borderColor: theme.border.color, paddingTop: 8 }}>
             <PixiLabel text="Math Operations" size="xs" color="textMuted" />
 
-            <layoutContainer layout={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>
+            <layoutContainer layout={{ flexDirection: 'row', gap: 4, alignItems: 'center' }}>
               <PixiButton
                 label={mathColumn === 'volume' ? 'Volume' : 'Effect'}
                 variant="ft2"
@@ -263,14 +265,14 @@ export const PixiAdvancedEditModal: React.FC<PixiAdvancedEditModalProps> = ({
         >
           <PixiLabel text="Find and replace instrument IDs" size="xs" color="textMuted" />
 
-          <layoutContainer layout={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap' }}>
+          <layoutContainer layout={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
             <PixiButton label="Remap Block" variant="ft2" color="purple" size="sm" width={BTN_W} height={BTN_H}
               disabled={!hasSelection} onClick={() => onShowRemapInstrument?.('block')} />
             <PixiButton label="Remap Track" variant="ft2" color="purple" size="sm" width={BTN_W} height={BTN_H}
               onClick={() => onShowRemapInstrument?.('track')} />
           </layoutContainer>
 
-          <layoutContainer layout={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap' }}>
+          <layoutContainer layout={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
             <PixiButton label="Remap Pattern" variant="ft2" color="purple" size="sm" width={BTN_W} height={BTN_H}
               onClick={() => onShowRemapInstrument?.('pattern')} />
             <PixiButton label="Remap Song" variant="ft2" color="purple" size="sm" width={BTN_W} height={BTN_H}
@@ -288,7 +290,7 @@ export const PixiAdvancedEditModal: React.FC<PixiAdvancedEditModalProps> = ({
         >
           <PixiLabel text="Export patterns and tracks as FT2-compatible files" size="xs" color="textMuted" />
 
-          <layoutContainer layout={{ flexDirection: 'row', gap: 6 }}>
+          <layoutContainer layout={{ flexDirection: 'row', gap: 8 }}>
             <PixiButton label="Pattern (.xp)" variant="ft2" color="green" size="sm" width={BTN_W} height={BTN_H}
               onClick={() => onExportPattern?.()} />
             <PixiButton label="Track (.xt)" variant="ft2" color="green" size="sm" width={BTN_W} height={BTN_H}
@@ -308,7 +310,7 @@ export const PixiAdvancedEditModal: React.FC<PixiAdvancedEditModalProps> = ({
         >
           <PixiLabel text="Quick access to command references and documentation" size="xs" color="textMuted" />
 
-          <layoutContainer layout={{ flexDirection: 'row', gap: 6 }}>
+          <layoutContainer layout={{ flexDirection: 'row', gap: 8 }}>
             <PixiButton label="Full Reference (?)" variant="default" size="sm" width={140} height={BTN_H}
               onClick={() => {
                 onClose();

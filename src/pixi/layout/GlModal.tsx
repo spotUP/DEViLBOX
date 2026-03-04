@@ -98,7 +98,7 @@ export const GlModal: React.FC<GlModalProps> = ({
         {/* Header */}
         {title && (
           <Div
-            className="flex-row items-center px-5 py-3"
+            className="flex-row items-center px-4 py-3"
             layout={{
               width,
               height: 44,
@@ -107,7 +107,7 @@ export const GlModal: React.FC<GlModalProps> = ({
               borderColor: theme.border.color,
             }}
           >
-            <Txt className="text-sm font-semibold text-text-primary">{title}</Txt>
+            <Txt className="text-sm font-bold text-text-primary">{title}</Txt>
           </Div>
         )}
 

@@ -420,7 +420,7 @@ export const PixiSamplePackBrowser: React.FC<PixiSamplePackBrowserProps> = ({
   return (
     <PixiModal isOpen onClose={onClose} width={MODAL_W} height={MODAL_H} title="SAMPLE PACKS">
       {/* Body: sidebar + main */}
-      <pixiContainer layout={{ flex: 1, width: MODAL_W - 24, flexDirection: 'row' }}>
+      <pixiContainer layout={{ flex: 1, paddingLeft: 16, paddingRight: 16, flexDirection: 'row' }}>
         {/* ---- Left sidebar: pack list ---- */}
         <layoutContainer
           layout={{
@@ -466,7 +466,7 @@ export const PixiSamplePackBrowser: React.FC<PixiSamplePackBrowserProps> = ({
           {/* Pack info bar */}
           <layoutContainer
             layout={{
-              width: LIST_W - 24,
+              width: LIST_W - 32,
               height: 28,
               flexDirection: 'row',
               alignItems: 'center',
@@ -493,7 +493,7 @@ export const PixiSamplePackBrowser: React.FC<PixiSamplePackBrowserProps> = ({
           {/* Search + category row */}
           <layoutContainer
             layout={{
-              width: LIST_W - 24,
+              width: LIST_W - 32,
               height: SEARCH_H + CATEGORY_H,
               flexDirection: 'column',
               paddingLeft: 6,
@@ -529,7 +529,7 @@ export const PixiSamplePackBrowser: React.FC<PixiSamplePackBrowserProps> = ({
           {/* Sample list */}
           <PixiList
             items={sampleListItems}
-            width={LIST_W - 24}
+            width={LIST_W - 32}
             height={LIST_H - 28}
             itemHeight={26}
             selectedId={selectedSampleUrl}

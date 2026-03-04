@@ -141,23 +141,23 @@ export const PixiFindReplaceDialog: React.FC<PixiFindReplaceDialogProps> = ({ is
 
   if (!isOpen) return null;
 
-  const inputWidth = 348;
+  const inputWidth = 346;
 
   return (
-    <PixiModal isOpen={isOpen} onClose={onClose} width={380} height={400}>
+    <PixiModal isOpen={isOpen} onClose={onClose} width={380} height={420}>
       <PixiModalHeader title="Find & Replace" onClose={onClose} />
 
-      <layoutContainer layout={{ flex: 1, padding: 12, flexDirection: 'column', gap: 10 }}>
+      <layoutContainer layout={{ flex: 1, padding: 16, flexDirection: 'column', gap: 4 }}>
         {/* Search type toggles */}
         <PixiLabel text="Search type" size="xs" color="textMuted" />
-        <layoutContainer layout={{ flexDirection: 'row', gap: 4 }}>
+        <layoutContainer layout={{ flexDirection: 'row', gap: 8 }}>
           <PixiButton label="Note" variant={searchType === 'note' ? 'primary' : 'default'} onClick={() => setSearchType('note')} />
           <PixiButton label="Instrument" variant={searchType === 'instrument' ? 'primary' : 'default'} onClick={() => setSearchType('instrument')} />
           <PixiButton label="Effect" variant={searchType === 'effect' ? 'primary' : 'default'} onClick={() => setSearchType('effect')} />
         </layoutContainer>
 
         {/* Scope toggles */}
-        <PixiLabel text="Scope" size="xs" color="textMuted" layout={{ marginTop: 4 }} />
+        <PixiLabel text="Scope" size="xs" color="textMuted" layout={{ marginTop: 12 }} />
         <layoutContainer layout={{ flexDirection: 'row', gap: 4 }}>
           <PixiButton label={selection ? 'Selection' : 'Selection (none)'} variant={scope === 'selection' ? 'primary' : 'default'} disabled={!selection} onClick={() => setScope('selection')} />
           <PixiButton label="Pattern" variant={scope === 'pattern' ? 'primary' : 'default'} onClick={() => setScope('pattern')} />
@@ -165,7 +165,7 @@ export const PixiFindReplaceDialog: React.FC<PixiFindReplaceDialogProps> = ({ is
         </layoutContainer>
 
         {/* Find input */}
-        <PixiLabel text="Find" size="xs" color="textMuted" layout={{ marginTop: 4 }} />
+        <PixiLabel text="Find" size="xs" color="textMuted" layout={{ marginTop: 12 }} />
         <PixiPureTextInput
           value={findValue}
           onChange={setFindValue}
@@ -177,7 +177,7 @@ export const PixiFindReplaceDialog: React.FC<PixiFindReplaceDialogProps> = ({ is
         />
 
         {/* Replace input */}
-        <PixiLabel text="Replace with" size="xs" color="textMuted" layout={{ marginTop: 4 }} />
+        <PixiLabel text="Replace with" size="xs" color="textMuted" layout={{ marginTop: 12 }} />
         <PixiPureTextInput
           value={replaceValue}
           onChange={setReplaceValue}

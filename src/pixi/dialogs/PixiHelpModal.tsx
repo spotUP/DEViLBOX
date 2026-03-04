@@ -761,7 +761,7 @@ export const PixiHelpModal: React.FC<PixiHelpModalProps> = ({
       </layoutContainer>
 
       {/* Content area */}
-      <pixiContainer layout={{ flex: 1, width: W, padding: 8 }}>
+      <pixiContainer layout={{ flex: 1, width: W, padding: 16 }}>
         {/* ── Keyboard Shortcuts ───────────────────────────────────── */}
         {activeTab === 'shortcuts' && (
           <PixiScrollView

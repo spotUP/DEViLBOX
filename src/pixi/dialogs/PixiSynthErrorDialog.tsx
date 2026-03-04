@@ -66,7 +66,7 @@ export const PixiSynthErrorDialog: React.FC = () => {
       <PixiModalHeader title="Synth Error" onClose={handleDismiss} />
 
       {/* Scrollable content area */}
-      <layoutContainer layout={{ flex: 1, padding: 12, flexDirection: 'column', gap: 10, overflow: 'hidden' }}>
+      <layoutContainer layout={{ flex: 1, padding: 16, flexDirection: 'column', gap: 10, overflow: 'hidden' }}>
         {/* Subtitle */}
         <PixiLabel text={subtitle} size="xs" color="error" />
 

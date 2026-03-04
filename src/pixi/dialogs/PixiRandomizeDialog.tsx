@@ -1,10 +1,12 @@
 /**
  * PixiRandomizeDialog — Pixi-native pattern randomizer dialog.
- * Simplified version: density knob + scale selector + Apply/Cancel.
+ * Simplified version matching DOM visual patterns from RandomizeDialog.tsx.
  */
 
 import { useState, useCallback } from 'react';
-import { PixiModal, PixiModalHeader, PixiModalFooter, PixiButton, PixiKnob, PixiLabel } from '../components';
+import { PixiModal, PixiModalHeader, PixiModalFooter, PixiButton, PixiSlider, PixiKnob, PixiLabel } from '../components';
+import { usePixiTheme } from '../theme';
+import { PIXI_FONTS } from '../fonts';
 import { useTrackerStore } from '@stores';
 import { midiToXMNote } from '@lib/xmConversions';
 import { noteNameToMidi } from '@lib/generators/acidPatternGenerator';
@@ -23,6 +25,7 @@ function randomInt(min: number, max: number): number {
 }
 
 export const PixiRandomizeDialog: React.FC<PixiRandomizeDialogProps> = ({ isOpen, onClose, channelIndex = 0 }) => {
+  const theme = usePixiTheme();
   const setChannelRows = useTrackerStore(s => s.setChannelRows);
   const patterns = useTrackerStore(s => s.patterns);
   const currentPatternIndex = useTrackerStore(s => s.currentPatternIndex);
@@ -69,21 +72,42 @@ export const PixiRandomizeDialog: React.FC<PixiRandomizeDialogProps> = ({ isOpen
   if (!isOpen) return null;
 
   return (
-    <PixiModal isOpen={isOpen} onClose={onClose} width={300} height={320}>
+    <PixiModal isOpen={isOpen} onClose={onClose} width={360} height={380}>
       <PixiModalHeader title="Randomize" onClose={onClose} />
 
-      <layoutContainer layout={{ flex: 1, padding: 12, flexDirection: 'column', gap: 16, alignItems: 'center' }}>
-        <layoutContainer layout={{ flexDirection: 'row', gap: 16, justifyContent: 'center' }}>
-          <PixiKnob
+      {/* Body — matches DOM p-4 space-y-3 (padding:16, gap:12) */}
+      <layoutContainer layout={{ flex: 1, padding: 16, flexDirection: 'column', gap: 12 }}>
+        {/* Density slider — matches DOM slider row */}
+        <layoutContainer layout={{ flexDirection: 'column', gap: 8 }}>
+          <layoutContainer layout={{ flexDirection: 'row', gap: 4 }}>
+            <pixiBitmapText
+              text="Density: "
+              style={{ fontFamily: PIXI_FONTS.SANS_BOLD, fontSize: 12, fill: 0xffffff }}
+              tint={theme.text.color}
+              layout={{}}
+            />
+            <pixiBitmapText
+              text={`${density}%`}
+              style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 12, fill: 0xffffff }}
+              tint={theme.accent.color}
+              layout={{}}
+            />
+          </layoutContainer>
+          <PixiSlider
             value={density}
             min={0}
             max={100}
-            defaultValue={50}
-            label="DENSITY"
-            size="md"
-            formatValue={(v) => `${Math.round(v)}%`}
             onChange={setDensity}
+            orientation="horizontal"
+            length={328}
+            handleWidth={16}
+            handleHeight={16}
+            thickness={6}
           />
+        </layoutContainer>
+
+        {/* Knob row */}
+        <layoutContainer layout={{ flexDirection: 'row', gap: 24, justifyContent: 'center', paddingTop: 8 }}>
           <PixiKnob
             value={octaveRange}
             min={1}
@@ -94,23 +118,31 @@ export const PixiRandomizeDialog: React.FC<PixiRandomizeDialogProps> = ({ isOpen
             formatValue={(v) => `${Math.round(v)}`}
             onChange={setOctaveRange}
           />
+          <PixiKnob
+            value={accentDensity}
+            min={0}
+            max={100}
+            defaultValue={30}
+            label="ACCENTS"
+            size="md"
+            formatValue={(v) => `${Math.round(v)}%`}
+            onChange={setAccentDensity}
+          />
         </layoutContainer>
 
-        <PixiKnob
-          value={accentDensity}
-          min={0}
-          max={100}
-          defaultValue={30}
-          label="ACCENTS"
-          size="md"
-          formatValue={(v) => `${Math.round(v)}%`}
-          onChange={setAccentDensity}
-        />
-
-        <PixiLabel text="Generates random notes in C minor scale" size="xs" color="textMuted" />
+        {/* Info text — matches DOM bg area */}
+        <layoutContainer
+          layout={{
+            padding: 12,
+            borderRadius: 6,
+            backgroundColor: theme.bgTertiary.color,
+          }}
+        >
+          <PixiLabel text="Generates random notes in C minor scale" size="xs" color="textMuted" font="sans" />
+        </layoutContainer>
       </layoutContainer>
 
-      <PixiModalFooter>
+      <PixiModalFooter align="right">
         <PixiButton label="Cancel" variant="ghost" onClick={onClose} />
         <PixiButton label="Randomize" variant="primary" onClick={handleApply} />
       </PixiModalFooter>

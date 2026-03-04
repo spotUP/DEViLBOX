@@ -128,8 +128,8 @@ export const PixiUndoHistoryPanel: React.FC<PixiUndoHistoryPanelProps> = ({ isOp
           flexDirection: 'row',
           alignItems: 'center',
           height: 28,
-          paddingLeft: 8,
-          paddingRight: 4,
+          paddingLeft: 16,
+          paddingRight: 16,
         }}
       >
         <pixiGraphics draw={drawHeaderBorder} layout={{ position: 'absolute', width: PANEL_W, height: 28 }} />
@@ -163,7 +163,7 @@ export const PixiUndoHistoryPanel: React.FC<PixiUndoHistoryPanelProps> = ({ isOp
       </layoutContainer>
 
       {/* Scrollable list */}
-      <layoutContainer layout={{ flex: 1, flexDirection: 'column', overflow: 'scroll' }}>
+      <layoutContainer layout={{ flex: 1, flexDirection: 'column', overflow: 'scroll', padding: 16 }}>
         {/* Redo section */}
         {redoReversed.length > 0 && (
           <layoutContainer layout={{ flexDirection: 'column' }} alpha={0.4}>
