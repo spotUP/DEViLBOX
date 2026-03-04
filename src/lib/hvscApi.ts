@@ -20,6 +20,10 @@ export interface HVSCEntry {
   path: string;
   isDirectory: boolean;
   size?: number;
+  author?: string;
+  player?: string;
+  sidModel?: string;
+  subtunes?: number;
 }
 
 export interface HVSCBrowseResult {
