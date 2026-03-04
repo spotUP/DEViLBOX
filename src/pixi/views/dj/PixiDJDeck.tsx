@@ -7,7 +7,6 @@ import type { Graphics as GraphicsType } from 'pixi.js';
 import { PIXI_FONTS } from '../../fonts';
 import { usePixiTheme, usePixiThemeId, getDeckColors } from '../../theme';
 import { PixiButton, PixiLabel, PixiSlider } from '../../components';
-import { PixiDOMOverlay } from '../../components/PixiDOMOverlay';
 import { useDJStore } from '@/stores/useDJStore';
 import { PixiDeckTransport } from './PixiDeckTransport';
 import { PixiDeckTurntable } from './PixiDeckTurntable';
@@ -15,8 +14,8 @@ import { PixiDeckWaveform } from './PixiDeckWaveform';
 import { PixiDeckScratch } from './PixiDeckScratch';
 import { PixiDeckCuePoints } from './PixiDeckCuePoints';
 import { PixiDeckScopes } from './PixiDeckScopes';
+import { PixiDeckBeatGrid } from './PixiDeckBeatGrid';
 import { getDJEngine } from '@engine/dj/DJEngine';
-import { DeckBeatGrid } from '@components/dj/DeckBeatGrid';
 
 /** Format milliseconds as M:SS */
 function formatTime(ms: number): string {
@@ -256,13 +255,8 @@ export const PixiDJDeck: React.FC<PixiDJDeckProps> = ({ deckId }) => {
       {/* Cue points */}
       <PixiDeckCuePoints deckId={deckId} layout={{ width: 280, height: 36 }} />
 
-      {/* Beat grid controls */}
-      <PixiDOMOverlay
-        layout={{ width: 280, height: 32 }}
-        style={{ overflow: 'hidden' }}
-      >
-        <DeckBeatGrid deckId={deckId} />
-      </PixiDOMOverlay>
+      {/* Beat grid */}
+      <PixiDeckBeatGrid deckId={deckId} />
 
       {/* Oscilloscope / spectrum scopes */}
       <PixiDeckScopes deckId={deckId} size={48} layout={{ width: 280, height: 64, paddingLeft: 2, paddingTop: 4, flexDirection: 'row', gap: 2 }} />
