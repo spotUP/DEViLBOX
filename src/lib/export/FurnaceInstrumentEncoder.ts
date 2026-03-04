@@ -32,6 +32,8 @@ const DIV_INS_GB = 2;
 const DIV_INS_C64 = 3;
 const DIV_INS_N163 = 17;
 const DIV_INS_OPZ = 19;
+const DIV_INS_MIKEY = 23;
+const DIV_INS_VERA = 24;
 const DIV_INS_SNES = 29;
 const DIV_INS_OPL_DRUMS = 32;
 const DIV_INS_OPM = 33;
@@ -125,7 +127,9 @@ const CHIPTYPE_TO_DIV_INS: Record<number, number> = {
   14: DIV_INS_FM,        // OPNB → DIV_INS_FM (1)
   22: DIV_INS_OPZ,       // OPZ → DIV_INS_OPZ (19)
   23: DIV_INS_OPL,       // Y8950 → DIV_INS_OPL (14) — OPL variant
+  25: DIV_INS_MIKEY,     // Lynx → DIV_INS_MIKEY (23)
   26: DIV_INS_OPL,       // OPL4 → DIV_INS_OPL (14)
+  36: DIV_INS_VERA,      // VERA → DIV_INS_VERA (24)
   47: DIV_INS_FM,        // OPN2203 → DIV_INS_FM (1)
   48: DIV_INS_FM,        // OPNBB → DIV_INS_FM (1)
   49: DIV_INS_ESFM,      // ESFM → DIV_INS_ESFM (55)
