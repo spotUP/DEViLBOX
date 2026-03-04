@@ -359,27 +359,26 @@ export const WorkbenchContainer: React.FC = () => {
     };
   }, [width, workbenchH, startSpring]);
 
-  // ─── Space-pan (Space held + drag anywhere) ─────────────────────────────────
+  // ─── Cmd/Ctrl held state (for Cmd+drag pan) ──────────────────────────────────
 
-  const [spaceHeld, setSpaceHeld] = useState(false);
+  const [cmdHeld, setCmdHeld] = useState(false);
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.code !== 'Space' || e.repeat) return;
-      const tag = document.activeElement?.tagName.toLowerCase();
-      if (tag === 'input' || tag === 'textarea') return;
-      e.preventDefault();
-      setSpaceHeld(true);
+      if (e.key === 'Meta' || e.key === 'Control') setCmdHeld(true);
     };
     const onKeyUp = (e: KeyboardEvent) => {
-      if (e.code !== 'Space') return;
-      setSpaceHeld(false);
+      if (e.key === 'Meta' || e.key === 'Control') setCmdHeld(false);
     };
+    // Also clear when window loses focus (Cmd+Tab etc.)
+    const onBlur = () => setCmdHeld(false);
     window.addEventListener('keydown', onKeyDown);
     window.addEventListener('keyup',   onKeyUp);
+    window.addEventListener('blur',    onBlur);
     return () => {
       window.removeEventListener('keydown', onKeyDown);
       window.removeEventListener('keyup',   onKeyUp);
+      window.removeEventListener('blur',    onBlur);
     };
   }, []);
 
@@ -672,12 +671,12 @@ export const WorkbenchContainer: React.FC = () => {
           />
         </pixiContainer>
 
-        {/* Space-pan overlay — above windows, active only when Space is held.
+        {/* Cmd/Ctrl+drag pan overlay — above windows, active only when Cmd/Ctrl is held.
             eventMode="none" when inactive so all events fall through normally. */}
         <pixiContainer
           layout={{ position: 'absolute', width, height }}
-          eventMode={spaceHeld ? 'static' : 'none'}
-          cursor={spaceHeld ? 'grab' : 'default'}
+          eventMode={cmdHeld ? 'static' : 'none'}
+          cursor={cmdHeld ? 'grab' : 'default'}
           onPointerDown={handleBgPointerDown}
         />
       </pixiContainer>
