@@ -986,6 +986,18 @@ int sa_load_instrument(void *ctxPtr, int handle, const uint8_t *data, int len) {
     if (p->ins.waveformLength == 0) p->ins.waveformLength = SA_WAVE_SIZE / 2;
     if (p->ins.waveformLength * 2 > SA_WAVE_SIZE) p->ins.waveformLength = SA_WAVE_SIZE / 2;
 
+    /* Reset synth effect state so new effect/waveform takes effect immediately */
+    p->synthEffectPosition = 0;
+    p->synthEffectWavePosition = 0;
+    p->effectDelayCounter = p->ins.effectDelay;
+    memcpy(p->waveformBuffer, p->ins.waveformData, SA_WAVE_SIZE);
+
+    /* Reset vibrato/AMF/ADSR counters to match new instrument params */
+    p->vibratoDelayCtr = p->ins.vibratoDelay;
+    p->vibratoPosition = 0;
+    p->amfPosition = 0;
+    p->amfDelayCounter = p->ins.amfDelay;
+
     return 0;
 }
 
