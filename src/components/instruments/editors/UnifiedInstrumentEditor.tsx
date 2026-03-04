@@ -13,7 +13,6 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import type { InstrumentConfig, SynthType } from '@typedefs/instrument';
 import { EditorHeader, type VizMode } from '../shared/EditorHeader';
-import { useAutoPreview } from '@hooks/useAutoPreview';
 import { SynthEditorTabs, type SynthEditorTab } from '../shared/SynthEditorTabs';
 import { SYNTH_REGISTRY } from '@engine/vstbridge/synth-registry';
 import { useThemeStore, useInstrumentStore } from '@stores';
@@ -203,12 +202,9 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
 
   const { bakeInstrument, unbakeInstrument } = useInstrumentStore();
 
-  // Auto-preview: trigger a short note on parameter changes so the oscilloscope shows waveform
-  const { triggerPreview } = useAutoPreview(instrument.id, instrument);
   const handleChange = useCallback((updates: Partial<InstrumentConfig>) => {
     onChange(updates);
-    triggerPreview();
-  }, [onChange, triggerPreview]);
+  }, [onChange]);
 
   const isBaked = !!instrument.metadata?.preservedSynth;
 
