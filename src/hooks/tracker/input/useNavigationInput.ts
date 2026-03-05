@@ -202,14 +202,16 @@ export const useNavigationInput = (refs: TrackerInputRefs) => {
         if (selecting && !selectionRef.current) startSelection();
         moveCursor(dir);
         if (selecting) endSelection();
-        // Start RAF-driven scroll
+        // Start RAF-driven scroll (time-based throttle — refresh-rate independent)
         heldArrowRef.current = { dir, selecting };
         if (!arrowRafRef.current) {
-          let frameCount = 0;
-          const tick = () => {
+          let lastMoveTime = 0;
+          const MOVE_INTERVAL = 50; // ~20 moves/sec regardless of refresh rate
+          const tick = (now: number) => {
             const held = heldArrowRef.current;
             if (!held) { arrowRafRef.current = 0; return; }
-            if (++frameCount % 3 === 0) {
+            if (now - lastMoveTime >= MOVE_INTERVAL) {
+              lastMoveTime = now;
               moveCursorRef.current(held.dir);
               if (held.selecting) endSelectionRef.current();
             }
