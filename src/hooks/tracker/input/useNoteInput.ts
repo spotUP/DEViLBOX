@@ -195,7 +195,7 @@ export const useNoteInput = (refs: TrackerInputRefs) => {
           const key = warnings[0];
           if (key !== lastWarningRef.current) {
             lastWarningRef.current = key;
-            notify.warn(warnings[0]);
+            notify.warning(warnings[0]);
           }
         }
       }

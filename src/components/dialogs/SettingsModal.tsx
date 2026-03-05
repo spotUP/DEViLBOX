@@ -108,7 +108,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
     resetLensParams,
     sidEngine,
     setSidEngine,
-    asidEnabled,
+    asidEnabled: _asidEnabled,
     setAsidEnabled,
     asidDeviceId,
     setAsidDeviceId,
@@ -1115,7 +1115,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                                 const rate = parseInt(e.target.value, 10);
                                 setWebusbClockRate(rate);
                                 const { getSIDHardwareManager } = await import('@lib/sid/SIDHardwareManager');
-                                getSIDHardwareManager().setClock(rate);
+                                getSIDHardwareManager().setClock(rate as any);
                               }}
                               className="bg-ft2-bg border border-ft2-border text-ft2-text text-[10px] font-mono px-2 py-1 w-48 focus:outline-none focus:border-ft2-highlight"
                             >

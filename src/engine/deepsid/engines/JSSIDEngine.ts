@@ -12,7 +12,7 @@
  */
 
 import { getASIDDeviceManager } from '@lib/sid/ASIDDeviceManager';
-import { getUSBSIDPico } from '@lib/sid/USBSIDPico';
+import { getUSBSIDPico, type ClockRateValue } from '@lib/sid/USBSIDPico';
 import { useSettingsStore } from '@stores/useSettingsStore';
 
 export interface JSSIDConfig {
@@ -67,7 +67,7 @@ export class JSSIDEngine {
         this.webusbEnabled = true;
         // Apply clock rate setting
         const clockRate = settings.webusbClockRate;
-        if (clockRate >= 0 && clockRate <= 3) pico.setClock(clockRate);
+        if (clockRate >= 0 && clockRate <= 3) pico.setClock(clockRate as ClockRateValue);
         console.log('[jsSID] WebUSB hardware enabled:', pico.deviceInfo?.productName);
       } else {
         console.warn('[jsSID] WebUSB enabled but device not connected, falling back to software');

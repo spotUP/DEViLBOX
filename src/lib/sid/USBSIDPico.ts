@@ -24,14 +24,11 @@ export const USBSID_PID = 0x4011;
 
 // --- Buffer constants ---
 const BUFFER_SIZE       = 64;
-const MAX_WRITE_BYTES   =  3;  // cmd + register + value
-const MAX_CYCLED_BYTES  =  5;  // cmd + register + value + cycles_hi + cycles_lo
 const MAX_WRITE_BUFFER  = 63;  // cmd + 62 bytes (31 writes)
 const MAX_CYCLED_BUFFER = 61;  // cmd + 60 bytes (15 cycled writes)
 
 // --- Command byte encoding (top 2 bits of byte 0) ---
 const WRITE        = 0;  // 0b00 << 6 = 0x00
-const READ         = 1;  // 0b01 << 6 = 0x40
 const CYCLED_WRITE = 2;  // 0b10 << 6 = 0x80
 const COMMAND      = 3;  // 0b11 << 6 = 0xC0
 
@@ -125,11 +122,9 @@ export class USBSIDPicoDevice {
   private cycleExact: boolean;
   private backbuf = new Uint8Array(BUFFER_SIZE);
   private backbufIdx = 1;
-  private maxPacketSize: number;
 
   constructor(cycleExact = true) {
     this.cycleExact = cycleExact;
-    this.maxPacketSize = cycleExact ? MAX_CYCLED_BUFFER : MAX_WRITE_BUFFER;
   }
 
   get state(): USBSIDState { return this._state; }

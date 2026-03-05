@@ -199,7 +199,7 @@ function parseChannelStream(
         break;
       case CMD_VOLUME:
         if (pos < limit) {
-          _currentVolume = buf[pos++];
+          pos++; // skip volume byte (tracked internally by replayer)
         }
         break;
       case CMD_NOTE_LEN:

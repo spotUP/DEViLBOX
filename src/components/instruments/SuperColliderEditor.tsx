@@ -537,7 +537,7 @@ export const SuperColliderEditor: React.FC<Props> = ({ config, onChange }) => {
               name: p.name, value: p.default ?? 0, min: p.min ?? 0, max: p.max ?? 1,
             })),
           });
-          setStatus({ state: 'success', message: `Loaded pre-compiled: ${cached.synthDefName}` });
+          setStatus({ state: 'success' as any, message: `Loaded pre-compiled: ${cached.synthDefName}` });
           return;
         }
       }
