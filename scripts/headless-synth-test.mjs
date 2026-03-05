@@ -134,27 +134,36 @@ async function run() {
     // Sort: silent first, then by peak
     const sorted = [...results.volumeResults].sort((a, b) => a.peakDb - b.peakDb);
 
-    const silent = sorted.filter(v => v.peakDb === -Infinity || v.peakDb < -60);
-    const quiet = sorted.filter(v => v.peakDb >= -60 && v.peakDb < -30);
-    const ok = sorted.filter(v => v.peakDb >= -30);
+    const silent = sorted.filter(v => v.peakDb === -Infinity || (v.peakDb != null && v.peakDb < -60));
+    const quiet = sorted.filter(v => v.peakDb != null && v.peakDb >= -60 && v.peakDb < -30);
+    const skipped = sorted.filter(v => v.peakDb == null || v.peakDb !== v.peakDb); // NaN or null
+    const ok = sorted.filter(v => v.peakDb != null && v.peakDb === v.peakDb && v.peakDb >= -30);
 
     if (silent.length > 0) {
       console.log(`\n🔇 SILENT (${silent.length}):`);
       for (const v of silent) {
-        console.log(`  ${v.name}: ${v.peakDb === -Infinity ? '-∞' : v.peakDb.toFixed(1)} dB ${v.judgment || ''} ${v.reason || ''}`);
+        console.log(`  ${v.name}: ${v.peakDb == null || v.peakDb !== v.peakDb ? 'N/A' : v.peakDb === -Infinity ? '-∞' : v.peakDb.toFixed(1)} dB ${v.judgment || ''} ${v.reason || ''}`);
       }
     }
 
     if (quiet.length > 0) {
       console.log(`\n🔉 QUIET (${quiet.length}):`);
       for (const v of quiet) {
-        console.log(`  ${v.name}: ${v.peakDb.toFixed(1)} dB ${v.judgment || ''}`);
+      console.log(`  ${v.name}: ${v.peakDb == null || v.peakDb !== v.peakDb ? 'N/A' : v.peakDb.toFixed(1)} dB ${v.judgment || ''}`);
+      }
+    }
+
+    if (skipped.length > 0) {
+      console.log(`\n⏭️  SKIPPED (${skipped.length}):`);
+      for (const v of skipped) {
+        console.log(`  ${v.name}: ${v.judgment || 'skipped'}`);
       }
     }
 
     console.log(`\n✅ OK (${ok.length}):`);
     for (const v of ok) {
-      console.log(`  ${v.name}: ${v.peakDb.toFixed(1)} dB`);
+      const db = v.peakDb == null || v.peakDb !== v.peakDb ? 'N/A' : v.peakDb.toFixed(1);
+      console.log(`  ${v.name}: ${db} dB`);
     }
   }
 

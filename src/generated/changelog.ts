@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-03-04T23:30:54.294Z
+ * Generated: 2026-03-05T00:14:08.641Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,10 +19,10 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.2299';
-export const BUILD_NUMBER = '2299';
-export const BUILD_HASH = '77381cff';
-export const BUILD_DATE = '2026-03-04';
+export const BUILD_VERSION = '1.0.2308';
+export const BUILD_NUMBER = '2308';
+export const BUILD_HASH = 'cd59a1fc';
+export const BUILD_DATE = '2026-03-05';
 
 // Full version (patch IS the build number, so no need to append)
 export const FULL_VERSION = BUILD_VERSION;
@@ -30,9 +30,45 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.2299',
+    version: '1.0.2308',
     date: '2026-03-05',
     changes: [
+      {
+        type: 'fix',
+        "description": "Remove invalid onClick on Pixi Div, fix nested Txt in settings"
+      },
+      {
+        type: 'fix',
+        "description": "VJ pattern overlay width matches actual channel count"
+      },
+      {
+        type: 'feature',
+        "description": "Music-reactive animated VJ pattern overlay"
+      },
+      {
+        type: 'fix',
+        "description": "Fix app.screen getter crash in all GL modals"
+      },
+      {
+        type: 'fix',
+        "description": "Fix SID backend adapter not found — class declarations don't create window properties"
+      },
+      {
+        type: 'fix',
+        "description": "GL settings modal 1:1 parity with DOM, scroll leak fix, channel header click fix"
+      },
+      {
+        type: 'fix',
+        "description": "Add onClick handlers to all GL interactive elements"
+      },
+      {
+        type: 'improvement',
+        "description": "Chore: update generated changelog"
+      },
+      {
+        type: 'fix',
+        "description": "Add lens distortion controls to DOM SettingsModal"
+      },
       {
         type: 'feature',
         "description": "Add global lens distortion filter with presets"
@@ -202,42 +238,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'feature',
         "description": "Pad name editing, MIDI learn, add layer from file"
-      },
-      {
-        type: 'fix',
-        "description": "SA: fix 11 period table values and ADSR sustain gate"
-      },
-      {
-        type: 'feature',
-        "description": "Add PixiPadEditor — 6-tab GL pad parameter editor"
-      },
-      {
-        type: 'improvement',
-        "description": "Enhance PixiDrumPadManager with full DOM drumpad feature parity"
-      },
-      {
-        type: 'feature',
-        "description": "Isolate drumpad samples from project instrument slots"
-      },
-      {
-        type: 'fix',
-        "description": "Remove extra closing pixiContainer tag in PixiStatusBar"
-      },
-      {
-        type: 'fix',
-        "description": "Wire drumpad audio — pads now trigger sounds on click"
-      },
-      {
-        type: 'feature',
-        "description": "Unify view headers/footers, fix danger button, resize drumpad"
-      },
-      {
-        type: 'fix',
-        "description": "Use theme.text instead of nonexistent theme.textPrimary"
-      },
-      {
-        type: 'feature',
-        "description": "Add view selector dropdown to drumpad header bar"
       }
     ]
   }
