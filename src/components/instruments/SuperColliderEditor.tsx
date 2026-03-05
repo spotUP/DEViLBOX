@@ -2,12 +2,13 @@ import React, { useEffect, useRef, useCallback, useMemo, useState } from 'react'
 import { EditorView, keymap } from '@codemirror/view';
 import { EditorState, StateEffect, StateField } from '@codemirror/state';
 import { Decoration, type DecorationSet } from '@codemirror/view';
-import { Play, CheckCircle, AlertCircle, Loader, Download, Upload, Plus, X, Copy, RefreshCw, Layout } from 'lucide-react';
+import { Play, CheckCircle, AlertCircle, Loader, Download, Upload, Plus, X, Copy, RefreshCw, Layout, BookOpen, ChevronDown } from 'lucide-react';
 import type { SuperColliderConfig, SCParam } from '@typedefs/instrument';
 import { useInstrumentStore } from '@stores/useInstrumentStore';
 import { superColliderLanguage } from '@engine/sc/scLanguage';
 import { parseSCGui, type SCGuiParseResult } from '@engine/sc/scGuiParser';
 import { SCGuiRenderer } from './SCGuiRenderer';
+import { SC_PRESETS, SC_PRESET_CATEGORIES, type SCPreset } from '@constants/scPresets';
 
 const API_URL = import.meta.env.VITE_API_URL as string | undefined ?? 'https://devilbox.uprough.net/api';
 
@@ -138,6 +139,8 @@ export const SuperColliderEditor: React.FC<Props> = ({ config, onChange }) => {
   const [progress, setProgress] = React.useState(0);
   const [showProgress, setShowProgress] = React.useState(false);
   const [showGui, setShowGui] = useState(false);
+  const [showPresets, setShowPresets] = useState(false);
+  const [presetCategory, setPresetCategory] = useState<string>('All');
   const progressRef = useRef(0);
   const progressIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -440,6 +443,26 @@ export const SuperColliderEditor: React.FC<Props> = ({ config, onChange }) => {
   }, [createInstrument, setCurrentInstrument]);
 
   // -------------------------------------------------------------------------
+  // Load community preset
+  // -------------------------------------------------------------------------
+  const handleLoadPreset = useCallback((preset: SCPreset) => {
+    onChangeRef.current({
+      ...configRef.current,
+      source: preset.source,
+      synthDefName: preset.name,
+      binary: '',
+      params: [],
+    });
+    setShowPresets(false);
+    setStatus({ state: 'idle' });
+  }, []);
+
+  const filteredPresets = useMemo(() => {
+    if (presetCategory === 'All') return SC_PRESETS;
+    return SC_PRESETS.filter(p => p.category === presetCategory);
+  }, [presetCategory]);
+
+  // -------------------------------------------------------------------------
   // Status bar
   // -------------------------------------------------------------------------
   const renderStatus = () => {
@@ -515,6 +538,20 @@ export const SuperColliderEditor: React.FC<Props> = ({ config, onChange }) => {
             Reload
           </button>
           <button
+            onClick={() => setShowPresets(p => !p)}
+            title="Browse community SynthDef presets"
+            className={[
+              'flex items-center gap-1 px-2 py-1 rounded text-xs transition-colors',
+              showPresets
+                ? 'text-accent-primary bg-dark-bgTertiary'
+                : 'text-text-secondary hover:text-text-primary hover:bg-dark-bgTertiary',
+            ].join(' ')}
+          >
+            <BookOpen size={11} />
+            Presets
+            <ChevronDown size={9} />
+          </button>
+          <button
             onClick={() => { importInputRef.current?.click(); }}
             title="Import .scpreset"
             className="flex items-center gap-1 px-2 py-1 rounded text-xs text-text-secondary hover:text-text-primary hover:bg-dark-bgTertiary transition-colors"
@@ -575,8 +612,72 @@ export const SuperColliderEditor: React.FC<Props> = ({ config, onChange }) => {
         />
       </div>
 
-      {/* Body: editor (left) + optional GUI preview + param panel (right) */}
-      <div className="flex flex-1 min-h-0 overflow-hidden">
+      {/* Body: editor (left) + optional preset browser / GUI preview + param panel (right) */}
+      <div className="flex flex-1 min-h-0 overflow-hidden relative">
+        {/* Preset browser overlay */}
+        {showPresets && (
+          <div className="absolute inset-0 z-10 bg-dark-bgPrimary/95 backdrop-blur-sm flex flex-col overflow-hidden" style={{ background: 'rgba(10,10,10,0.97)' }}>
+            {/* Category tabs */}
+            <div className="flex flex-wrap gap-1 px-3 py-2 border-b border-dark-border shrink-0">
+              <button
+                onClick={() => setPresetCategory('All')}
+                className={`px-2 py-0.5 rounded text-xs transition-colors ${
+                  presetCategory === 'All' ? 'bg-accent-primary/20 text-accent-primary' : 'text-text-secondary hover:text-text-primary'
+                }`}
+              >
+                All ({SC_PRESETS.length})
+              </button>
+              {SC_PRESET_CATEGORIES.map(cat => {
+                const count = SC_PRESETS.filter(p => p.category === cat).length;
+                return (
+                  <button
+                    key={cat}
+                    onClick={() => setPresetCategory(cat)}
+                    className={`px-2 py-0.5 rounded text-xs transition-colors ${
+                      presetCategory === cat ? 'bg-accent-primary/20 text-accent-primary' : 'text-text-secondary hover:text-text-primary'
+                    }`}
+                  >
+                    {cat} ({count})
+                  </button>
+                );
+              })}
+            </div>
+            {/* Preset grid */}
+            <div className="flex-1 overflow-y-auto p-3">
+              <div className="grid gap-1.5" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))' }}>
+                {filteredPresets.map((preset, i) => (
+                  <button
+                    key={`${preset.category}-${preset.name}-${i}`}
+                    onClick={() => handleLoadPreset(preset)}
+                    className="text-left px-3 py-2 rounded border border-dark-border hover:border-accent-primary/40 hover:bg-dark-bgTertiary transition-colors group"
+                  >
+                    <div className="text-xs font-medium text-text-primary group-hover:text-accent-primary truncate">
+                      {preset.name}
+                    </div>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span className="text-[10px] text-text-muted">{preset.category}</span>
+                      {preset.credit && (
+                        <span className="text-[10px] text-text-muted truncate">· {preset.credit}</span>
+                      )}
+                    </div>
+                    {preset.tags.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {preset.tags.slice(0, 3).map(tag => (
+                          <span key={tag} className="text-[9px] px-1 rounded bg-dark-bgSecondary text-text-muted">{tag}</span>
+                        ))}
+                      </div>
+                    )}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {/* Attribution footer */}
+            <div className="shrink-0 px-3 py-1.5 border-t border-dark-border text-[10px] text-text-muted">
+              Community presets from <a href="https://github.com/SCLOrkHub/SCLOrkSynths" target="_blank" rel="noopener noreferrer" className="text-accent-primary hover:underline">SCLOrkSynths</a> (GPL-3.0). Click a preset to load its source, then Compile.
+            </div>
+          </div>
+        )}
+
         {/* CodeMirror editor */}
         <div
           ref={containerRef}
