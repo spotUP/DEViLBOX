@@ -110,6 +110,7 @@ interface TrackerStore {
   musiclineFileData: Uint8Array | null;
   c64SidFileData: Uint8Array | null;
   jamCrackerFileData: ArrayBuffer | null;
+  futurePlayerFileData: ArrayBuffer | null;
   hivelyMeta: { stereoMode: number; mixGain: number; speedMultiplier: number; version: number } | null;
   furnaceSubsongs: FurnaceSubsongPlayback[] | null;
   furnaceActiveSubsong: number;
@@ -285,7 +286,7 @@ interface TrackerStore {
   setFurnaceOrderEntry: (channel: number, position: number, patternIndex: number) => void;
   setHivelyNative: (data: HivelyNativeData | null) => void;
   setSongDBInfo: (info: { authors: string[]; publishers: string[]; album: string; year: string; format: string; duration_ms: number } | null) => void;
-  applyEditorMode: (song: { linearPeriods?: boolean; furnaceNative?: FurnaceNativeData; hivelyNative?: HivelyNativeData; hivelyFileData?: ArrayBuffer; musiclineFileData?: Uint8Array; c64SidFileData?: Uint8Array; jamCrackerFileData?: ArrayBuffer; hivelyMeta?: { stereoMode: number; mixGain: number; speedMultiplier: number; version: number }; furnaceSubsongs?: FurnaceSubsongPlayback[]; furnaceActiveSubsong?: number; channelTrackTables?: number[][]; channelSpeeds?: number[]; channelGrooves?: number[]; goatTrackerData?: Uint8Array }) => void;
+  applyEditorMode: (song: { linearPeriods?: boolean; furnaceNative?: FurnaceNativeData; hivelyNative?: HivelyNativeData; hivelyFileData?: ArrayBuffer; musiclineFileData?: Uint8Array; c64SidFileData?: Uint8Array; jamCrackerFileData?: ArrayBuffer; futurePlayerFileData?: ArrayBuffer; hivelyMeta?: { stereoMode: number; mixGain: number; speedMultiplier: number; version: number }; furnaceSubsongs?: FurnaceSubsongPlayback[]; furnaceActiveSubsong?: number; channelTrackTables?: number[][]; channelSpeeds?: number[]; channelGrooves?: number[]; goatTrackerData?: Uint8Array }) => void;
   setFurnaceActiveSubsong: (index: number) => void;
 
   // Undo/Redo support
@@ -368,6 +369,7 @@ export const useTrackerStore = create<TrackerStore>()(
     musiclineFileData: null,
     c64SidFileData: null,
     jamCrackerFileData: null,
+    futurePlayerFileData: null,
     hivelyMeta: null,
     furnaceSubsongs: null,
     furnaceActiveSubsong: 0,
@@ -1616,6 +1618,7 @@ export const useTrackerStore = create<TrackerStore>()(
         // Always store native file data for C64 SID and JamCracker engines
         state.c64SidFileData = song.c64SidFileData ?? null;
         state.jamCrackerFileData = song.jamCrackerFileData ?? null;
+        state.futurePlayerFileData = song.futurePlayerFileData ?? null;
         if (song.furnaceNative) {
           state.editorMode = 'furnace';
           state.furnaceNative = song.furnaceNative;

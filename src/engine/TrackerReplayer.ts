@@ -91,7 +91,8 @@ export type TrackerFormat =
   | 'SID'  // Commodore 64 SID (PSID/RSID)
   | 'SAP'  // Atari 8-bit POKEY
   | 'AY'   // ZX Spectrum AY (ZXAYEMUL)
-  | 'JamCracker';  // JamCracker Pro (.jam, .jc)
+  | 'JamCracker'       // JamCracker Pro (.jam, .jc)
+  | 'FuturePlayer';    // Future Player (Wanted Team, .fp)
 
 /**
  * Channel state - all the per-channel data needed for playback
@@ -241,6 +242,8 @@ export interface TrackerSong {
   c64SidFileData?: Uint8Array;
   /** Raw JamCracker .jam binary for loading into the JamCrackerEngine WASM */
   jamCrackerFileData?: ArrayBuffer;
+  /** Raw Future Player .fp binary for loading into the FuturePlayerEngine WASM */
+  futurePlayerFileData?: ArrayBuffer;
   // Native format data (preserved for format-specific editors)
   furnaceNative?: FurnaceNativeData;
   hivelyNative?: HivelyNativeData;

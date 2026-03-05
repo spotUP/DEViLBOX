@@ -17,7 +17,7 @@ import { resolveArrangement } from '@lib/arrangement/resolveArrangement';
 import type { UADEEngine } from '@engine/uade/UADEEngine';
 
 export const usePatternPlayback = () => {
-  const { patterns, currentPatternIndex, setCurrentPattern, patternOrder, currentPositionIndex, setCurrentPosition, channelTrackTables, channelSpeeds, channelGrooves, linearPeriods, hivelyNative, hivelyFileData, hivelyMeta, musiclineFileData, c64SidFileData, jamCrackerFileData } = useTrackerStore(useShallow((s) => ({
+  const { patterns, currentPatternIndex, setCurrentPattern, patternOrder, currentPositionIndex, setCurrentPosition, channelTrackTables, channelSpeeds, channelGrooves, linearPeriods, hivelyNative, hivelyFileData, hivelyMeta, musiclineFileData, c64SidFileData, jamCrackerFileData, futurePlayerFileData } = useTrackerStore(useShallow((s) => ({
     patterns: s.patterns,
     currentPatternIndex: s.currentPatternIndex,
     setCurrentPattern: s.setCurrentPattern,
@@ -34,6 +34,7 @@ export const usePatternPlayback = () => {
     musiclineFileData: s.musiclineFileData,
     c64SidFileData: s.c64SidFileData,
     jamCrackerFileData: s.jamCrackerFileData,
+    futurePlayerFileData: s.futurePlayerFileData,
   })));
   const { isPlaying, isLooping, bpm, setCurrentRow, setCurrentRowThrottled } = useTransportStore(useShallow((s) => ({
     isPlaying: s.isPlaying,
@@ -331,6 +332,7 @@ export const usePatternPlayback = () => {
           c64SidFileData: c64SidFileData ?? undefined,
           // JamCracker raw binary (required for JamCrackerEngine WASM)
           jamCrackerFileData: jamCrackerFileData ?? undefined,
+          futurePlayerFileData: futurePlayerFileData ?? undefined,
           // Furnace-specific timing data (only set for .fur imports)
           speed2: furnaceData?.speed2,
           hz: furnaceData?.hz,

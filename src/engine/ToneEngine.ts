@@ -1026,7 +1026,7 @@ export class ToneEngine {
       ['TB303', 'Buzz3o3', 'V2', 'Sam', 'Synare', 'DubSiren', 'SpaceLaser', 'Dexed', 'OBXd', 'Furnace', 'HivelySynth', 'UADESynth', 'SymphonieSynth', 'MusicLineSynth',
        'SoundMonSynth', 'SidMonSynth', 'DigMugSynth', 'FCSynth', 'FredSynth', 'TFMXSynth',
        'OctaMEDSynth', 'SidMon1Synth', 'HippelCoSoSynth', 'RobHubbardSynth', 'DavidWhittakerSynth',
-       'SonicArrangerSynth', 'SunVoxSynth', 'JamCrackerSynth'].includes(c.synthType || '') ||
+       'SonicArrangerSynth', 'SunVoxSynth', 'JamCrackerSynth', 'FuturePlayerSynth'].includes(c.synthType || '') ||
       c.synthType?.startsWith('Furnace')
     );
     if (wasmConfigs.length === 0) return;
@@ -1036,7 +1036,7 @@ export class ToneEngine {
     // is a singleton that handles all channels internally.
     const seenNativePlayers = new Set<string>();
     const deduped = wasmConfigs.filter(c => {
-      if (c.synthType === 'HivelySynth' || c.synthType === 'UADESynth' || c.synthType === 'SymphonieSynth' || c.synthType === 'MusicLineSynth' || c.synthType === 'JamCrackerSynth') {
+      if (c.synthType === 'HivelySynth' || c.synthType === 'UADESynth' || c.synthType === 'SymphonieSynth' || c.synthType === 'MusicLineSynth' || c.synthType === 'JamCrackerSynth' || c.synthType === 'FuturePlayerSynth') {
         if (seenNativePlayers.has(c.synthType!)) return false;
         seenNativePlayers.add(c.synthType!);
       }
@@ -2062,6 +2062,7 @@ export class ToneEngine {
       case 'SymphonieSynth':
       case 'MusicLineSynth':
       case 'JamCrackerSynth':
+      case 'FuturePlayerSynth':
       // UADE format-specific synths (per-note WASM synthesis)
       case 'SoundMonSynth':
       case 'SidMonSynth':
