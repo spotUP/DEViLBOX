@@ -30,12 +30,24 @@ export interface C64SIDMetadata {
 /**
  * C64SIDEngine - High-level wrapper for DeepSID playback
  */
+// Per-engine volume compensation (linear gain multipliers).
+// Tuned so all engines produce roughly the same perceived loudness.
+const ENGINE_GAIN: Record<SIDEngineType, number> = {
+  jssid: 0.7,
+  websid: 1.0,
+  tinyrsid: 0.65,
+  websidplay: 0.8,
+  jsidplay2: 0.75,
+};
+
 export class C64SIDEngine {
   private engine: EngineInstance | null = null;
   private engineType: SIDEngineType | null = null;
   private audioContext: AudioContext | null = null;
   private metadata: C64SIDMetadata | null = null;
   private sidData: Uint8Array;
+  private gainNode: GainNode | null = null;
+  private masterVolume = 1.0; // 0-1 linear
 
   constructor(sidData: Uint8Array) {
     this.sidData = sidData;
@@ -125,6 +137,11 @@ export class C64SIDEngine {
     (window as any)._gPlayerAudioCtx = audioContext;
     console.log('[C64SIDEngine] AudioContext state:', audioContext.state, 'sampleRate:', audioContext.sampleRate);
     
+    // Create a master GainNode for volume control + per-engine level compensation.
+    // All engine outputs connect here instead of directly to destination.
+    this.gainNode = audioContext.createGain();
+    this.gainNode.connect(audioContext.destination);
+
     // Get user's preferred engine from settings
     const engineType = useSettingsStore.getState().sidEngine || 'websid';
     
@@ -135,6 +152,10 @@ export class C64SIDEngine {
     
     // Create engine instance
     this.engineType = engineType;
+
+    // Apply per-engine gain compensation
+    const engineGain = ENGINE_GAIN[engineType] ?? 1.0;
+    this.gainNode.gain.value = this.masterVolume * engineGain;
     
     switch (engineType) {
       case 'jssid':
@@ -176,7 +197,13 @@ export class C64SIDEngine {
       throw new Error('Engine not initialized');
     }
     
-    await this.engine.play(this.audioContext);
+    await this.engine.play(this.audioContext, this.gainNode ?? undefined);
+
+    // Apply initial volume for jsSID (uses separate AudioContext)
+    if (this.engineType === 'jssid') {
+      const engineGain = ENGINE_GAIN.jssid;
+      (this.engine as JSSIDEngine).setVolume(this.masterVolume * engineGain);
+    }
   }
 
   /**
@@ -311,12 +338,44 @@ export class C64SIDEngine {
   }
 
   /**
+   * Set master volume (0-1 linear). Combined with per-engine gain compensation.
+   */
+  setMasterVolume(volume: number): void {
+    this.masterVolume = Math.max(0, Math.min(1, volume));
+    if (this.engineType) {
+      const engineGain = ENGINE_GAIN[this.engineType] ?? 1.0;
+      const combined = this.masterVolume * engineGain;
+
+      // jsSID uses its own AudioContext — control volume via its API
+      if (this.engineType === 'jssid' && this.engine) {
+        (this.engine as JSSIDEngine).setVolume(combined);
+      }
+      // All other engines route through our GainNode
+      if (this.gainNode) {
+        this.gainNode.gain.value = combined;
+      }
+    }
+  }
+
+  /**
+   * Get the GainNode that all engine output routes through.
+   * Can be used to reroute SID audio into the main mixer.
+   */
+  getOutputNode(): GainNode | null {
+    return this.gainNode;
+  }
+
+  /**
    * Cleanup
    */
   dispose(): void {
     if (this.engine) {
       this.engine.dispose();
       this.engine = null;
+    }
+    if (this.gainNode) {
+      this.gainNode.disconnect();
+      this.gainNode = null;
     }
     this.audioContext = null;
   }

@@ -184,7 +184,7 @@ export class ScriptNodePlayerEngine {
    * Calls _prepareTrackForPlayback directly, which invokes:
    *   _loadMusicData → backend.loadMusicData → WASM emu_load_file
    */
-  async play(_audioContext: AudioContext): Promise<void> {
+  async play(_audioContext: AudioContext, outputNode?: AudioNode): Promise<void> {
     if (this.playing) return;
     if (!this.player) throw new Error('Player not initialized');
 
@@ -197,8 +197,17 @@ export class ScriptNodePlayerEngine {
       this.player._onTrackReadyToPlay = () => {};
     }
 
-    // Set volume before loading
+    // Set volume to full — volume control is handled by C64SIDEngine's GainNode
     this.player.setVolume(1);
+
+    // If an output node is provided, reroute ScriptNodePlayer's internal
+    // gain node through it instead of going directly to audioContext.destination.
+    if (outputNode && this.player._gainNode) {
+      try {
+        this.player._gainNode.disconnect();
+        this.player._gainNode.connect(outputNode);
+      } catch { /* disconnect may throw if not connected */ }
+    }
 
     // Create a standalone ArrayBuffer copy of the SID data
     const dataBuffer = this.sidData.buffer.slice(
