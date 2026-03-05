@@ -129,7 +129,12 @@ export class JSSIDEngine {
       const value = array[2];
       const chip = (addr >> 5) & 3;
       const reg = addr & 0x1F;
-      pico.write(chip, reg, value);
+      try {
+        pico.write(chip, reg, value);
+      } catch (err) {
+        // write() is synchronous but queues async USB transfers —
+        // errors are handled by USBSIDPico's consecutive error counter
+      }
     };
 
     // autoConnect — jsSID calls this during init if savedport exists

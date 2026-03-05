@@ -374,7 +374,7 @@ export class USBSIDPicoDevice {
 
     if (this.backbufIdx >= MAX_WRITE_BUFFER || flush) {
       this.backbuf[0] = (WRITE << 6) | (this.backbufIdx - 1);
-      this.rawWrite(this.backbuf.slice(0, this.backbufIdx));
+      this.fireWrite(this.backbuf.slice(0, this.backbufIdx));
       this.backbufIdx = 1;
     }
   }
@@ -396,7 +396,7 @@ export class USBSIDPicoDevice {
 
     if (this.backbufIdx >= MAX_CYCLED_BUFFER) {
       this.backbuf[0] = (CYCLED_WRITE << 6) | (this.backbufIdx - 1);
-      this.rawWrite(this.backbuf.slice(0, this.backbufIdx));
+      this.fireWrite(this.backbuf.slice(0, this.backbufIdx));
       this.backbufIdx = 1;
     }
   }
@@ -407,20 +407,25 @@ export class USBSIDPicoDevice {
 
     const cmd = this.cycleExact ? CYCLED_WRITE : WRITE;
     this.backbuf[0] = (cmd << 6) | (this.backbufIdx - 1);
-    this.rawWrite(this.backbuf.slice(0, this.backbufIdx));
+    this.fireWrite(this.backbuf.slice(0, this.backbufIdx));
     this.backbufIdx = 1;
   }
 
   // ─── Device Commands ─────────────────────────────────────
 
+  /** Fire-and-forget write — swallows rejections (error counting is in rawWrite) */
+  private fireWrite(data: Uint8Array): void {
+    this.rawWrite(data).catch(() => { /* handled by rawWrite error counter */ });
+  }
+
   /** Send a command to the device */
   private sendCommand(command: number): void {
-    this.rawWrite(new Uint8Array([(COMMAND << 6) | command]));
+    this.fireWrite(new Uint8Array([(COMMAND << 6) | command]));
   }
 
   /** Send a config command with optional parameters */
   private sendConfig(subCmd: number, a = 0, b = 0, c = 0, d = 0, e = 0): void {
-    this.rawWrite(new Uint8Array([
+    this.fireWrite(new Uint8Array([
       (COMMAND << 6) | CMD.CONFIG, subCmd, a, b, c, d, e,
     ]));
   }
