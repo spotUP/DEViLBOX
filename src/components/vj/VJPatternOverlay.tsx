@@ -46,15 +46,14 @@ function fmtCell(cell: TrackerCell): string {
 const VISIBLE_ROWS = 16;
 const ROW_H = 16;
 const ROW_NUM_W = 28;
-const CELL_W = 120;  // per-channel column width
-const CANVAS_H = (VISIBLE_ROWS * 2 + 3) * ROW_H; // extra rows for smooth scroll headroom
+const CELL_W = 120;
+const CANVAS_H = (VISIBLE_ROWS * 2 + 3) * ROW_H;
 
 // ── Color helpers ────────────────────────────────────────────────────────────
 function hsl(h: number, s: number, l: number, a: number): string {
   return `hsla(${h | 0},${s | 0}%,${l | 0}%,${a.toFixed(3)})`;
 }
 
-/** Map dominant frequency band to hue: sub→0(red), bass→30(orange), mid→180(cyan), high→270(violet) */
 function bandHue(frame: VJAudioFrame): number {
   const bands = [frame.subEnergy, frame.bassEnergy, frame.midEnergy, frame.highEnergy];
   const hues = [0, 30, 180, 270];
@@ -65,17 +64,17 @@ function bandHue(frame: VJAudioFrame): number {
   return hues[maxI];
 }
 
-// ── Animation state (persists across frames, no React state) ─────────────────
+// ── Animation state ──────────────────────────────────────────────────────────
 interface AnimState {
-  beatFlash: number;    // 0-1, decays quickly after beat
-  bassAccum: number;    // accumulated bass for scale
-  hueShift: number;     // random hue offset, shifted on beat
-  tiltKickX: number;    // beat impulse on rotateX
-  tiltKickY: number;    // beat impulse on rotateY
-  bounceY: number;      // beat bounce translateY
-  prevRow: number;      // previous row for smooth scroll
-  scrollOffset: number; // smooth scroll pixel offset (decays to 0)
-  time: number;         // accumulated time for Lissajous
+  beatFlash: number;
+  bassAccum: number;
+  hueShift: number;
+  tiltKickX: number;
+  tiltKickY: number;
+  bounceY: number;
+  prevRow: number;
+  scrollOffset: number;
+  time: number;
 }
 
 function createAnimState(): AnimState {
@@ -100,7 +99,6 @@ export const VJPatternOverlay: React.FC = React.memo(() => {
     if (!canvas || !wrap) return;
     const ctx = canvas.getContext('2d')!;
 
-    // Create our own AudioDataBus (shared singleton analyser — lightweight)
     const bus = new AudioDataBus();
     bus.enable();
     busRef.current = bus;
@@ -110,8 +108,9 @@ export const VJPatternOverlay: React.FC = React.memo(() => {
       lastTimeRef.current = timestamp;
       const anim = animRef.current;
       anim.time += dt;
+      const t = anim.time;
 
-      // ── Read stores ──────────────────────────────────────────────────────
+      // ── Read stores ────────────────────────────────────────────────────
       const { patterns, currentPatternIndex } = useTrackerStore.getState();
       const { currentRow, isPlaying } = useTransportStore.getState();
       const pattern = patterns[currentPatternIndex];
@@ -124,7 +123,6 @@ export const VJPatternOverlay: React.FC = React.memo(() => {
       const numChannels = channels.length;
       const patLen = pattern.length;
 
-      // Dynamic canvas width based on channel count
       const canvasW = ROW_NUM_W + numChannels * CELL_W;
       if (canvas.width !== canvasW) canvas.width = canvasW;
 
@@ -135,20 +133,23 @@ export const VJPatternOverlay: React.FC = React.memo(() => {
       // ── Update animation state ─────────────────────────────────────────
       const decay = (v: number, rate: number) => v * Math.exp(-rate * dt);
 
-      // Beat triggers
       if (frame.beat) {
         anim.beatFlash = 1;
         anim.hueShift += 20 + Math.random() * 40;
+        anim.tiltKickX += (Math.random() - 0.5) * 12;
+        anim.tiltKickY += (Math.random() - 0.5) * 8;
+        anim.bounceY = 6 + Math.random() * 4;
       }
 
-      // Decay animation values
       anim.beatFlash = decay(anim.beatFlash, 8);
       anim.bassAccum = anim.bassAccum * 0.85 + frame.bassEnergy * 0.15;
+      anim.tiltKickX = decay(anim.tiltKickX, 5);
+      anim.tiltKickY = decay(anim.tiltKickY, 5);
+      anim.bounceY = decay(anim.bounceY, 6);
 
-      // Smooth scroll: detect row change, add offset, decay to zero
+      // Smooth scroll
       if (anim.prevRow >= 0 && currentRow !== anim.prevRow) {
         const rowDelta = currentRow - anim.prevRow;
-        // Only smooth for small jumps (1-2 rows), snap for large jumps
         if (Math.abs(rowDelta) <= 2) {
           anim.scrollOffset += rowDelta * ROW_H;
         }
@@ -157,15 +158,25 @@ export const VJPatternOverlay: React.FC = React.memo(() => {
       anim.scrollOffset = decay(anim.scrollOffset, 12);
 
       // ── 3D transform ──────────────────────────────────────────────────
-      // Scale: subtle bass breathing
+      // Lissajous orbit
+      const orbitX = Math.sin(t * 0.13) * Math.cos(t * 0.07) * 8;
+      const orbitY = Math.sin(t * 0.11) * Math.cos(t * 0.17) * 5;
+      const bassTilt = frame.bassEnergy * 6;
+      const shimmerZ = frame.highEnergy * Math.sin(t * 37) * 1.5;
+      const rx = orbitX + bassTilt + anim.tiltKickX;
+      const ry = orbitY + anim.tiltKickY + shimmerZ;
       const scale = 2.1 + anim.bassAccum * 0.06 + anim.beatFlash * 0.03;
-      // Overall opacity: base + RMS pulse
+      const driftX = Math.sin(t * 0.09) * 15 + Math.cos(t * 0.23) * 10;
+      const driftY = Math.sin(t * 0.14) * 8 + anim.bounceY;
       const opacity = 0.85 + frame.rms * 0.15 + anim.beatFlash * 0.1;
 
-      wrap.style.transform = `scale(${scale.toFixed(4)})`;
+      wrap.style.transform =
+        `translate(${driftX.toFixed(1)}px, ${driftY.toFixed(1)}px) ` +
+        `perspective(800px) rotateX(${rx.toFixed(2)}deg) rotateY(${ry.toFixed(2)}deg) ` +
+        `scale(${scale.toFixed(4)})`;
       wrap.style.opacity = Math.min(1, opacity).toFixed(3);
 
-      // ── Canvas glow (RMS-driven shadow) ───────────────────────────────
+      // ── Canvas glow ────────────────────────────────────────────────────
       const glowRadius = 4 + frame.rms * 16 + anim.beatFlash * 12;
       const glowHue = (bandHue(frame) + anim.hueShift) % 360;
       canvas.style.filter = `drop-shadow(0 0 ${glowRadius.toFixed(0)}px ${hsl(glowHue, 80, 60, 0.5 + anim.beatFlash * 0.3)})`;
@@ -173,14 +184,12 @@ export const VJPatternOverlay: React.FC = React.memo(() => {
       // ── Draw pattern ──────────────────────────────────────────────────
       ctx.clearRect(0, 0, canvasW, CANVAS_H);
       ctx.save();
-      // Smooth scroll offset
       ctx.translate(0, -anim.scrollOffset);
 
       const rowNumW = ROW_NUM_W;
       const cellW = CELL_W;
       const baseHue = (bandHue(frame) + anim.hueShift) % 360;
 
-      // ── Character spacing driven by bass ──────────────────────────────
       const letterSpacing = anim.bassAccum * 1.5;
       ctx.textBaseline = 'middle';
 
@@ -194,7 +203,7 @@ export const VJPatternOverlay: React.FC = React.memo(() => {
         ctx.fillText(name.slice(0, 8), x + 2, ROW_H * 0.5);
       }
 
-      // Separator line
+      // Separator
       ctx.strokeStyle = hsl(baseHue, 60, 50, 0.4 + anim.beatFlash * 0.3);
       ctx.lineWidth = 1 + anim.beatFlash * 2;
       ctx.beginPath();
@@ -209,13 +218,10 @@ export const VJPatternOverlay: React.FC = React.memo(() => {
         const y = ROW_H + (i + VISIBLE_ROWS) * ROW_H;
         const isCurrent = i === 0;
 
-        // Distance-based depth fade (0 at cursor, 1 at edges)
         const dist = Math.abs(i) / VISIBLE_ROWS;
-        // Row shimmer wave — rolling sine phase
-        const shimmer = 0.5 + 0.5 * Math.sin(anim.time * 3 + i * 0.4);
+        const shimmer = 0.5 + 0.5 * Math.sin(t * 3 + i * 0.4);
         const depthAlpha = (1 - dist * 0.5) * (0.9 + shimmer * 0.1);
 
-        // Current row highlight
         if (isCurrent) {
           const flashBright = 0.4 + anim.beatFlash * 0.5;
           ctx.fillStyle = isPlaying
@@ -223,21 +229,18 @@ export const VJPatternOverlay: React.FC = React.memo(() => {
             : 'rgba(255,255,255,0.1)';
           ctx.fillRect(0, y, canvasW, ROW_H);
 
-          // Extra glow bar on beat
           if (anim.beatFlash > 0.05) {
             ctx.fillStyle = hsl(baseHue, 90, 80, anim.beatFlash * 0.4);
             ctx.fillRect(0, y, canvasW, ROW_H);
           }
         }
 
-        // Row number
         const rnAlpha = isCurrent ? 1.0 : 0.45 * depthAlpha;
         ctx.fillStyle = isCurrent
           ? hsl(baseHue, 60, 90, 0.9 + anim.beatFlash * 0.1)
           : `rgba(255,255,255,${rnAlpha.toFixed(3)})`;
         ctx.fillText(row.toString(16).toUpperCase().padStart(2, '0'), 4, y + ROW_H * 0.5);
 
-        // Cell data
         for (let ch = 0; ch < numChannels; ch++) {
           const cell = channels[ch].rows[row];
           if (!cell) continue;
@@ -246,7 +249,6 @@ export const VJPatternOverlay: React.FC = React.memo(() => {
           const hasData = hasNote || cell.instrument > 0 || cell.effTyp > 0 || cell.eff > 0;
 
           if (isCurrent && hasData) {
-            // Active notes on current row: frequency-colored
             const noteHue = (baseHue + ch * 30) % 360;
             const noteBright = 80 + anim.beatFlash * 20;
             ctx.fillStyle = hsl(noteHue, 80, noteBright, 0.95);
@@ -275,12 +277,11 @@ export const VJPatternOverlay: React.FC = React.memo(() => {
   }, []);
 
   return (
-    <div
-      className="absolute inset-0 flex items-center justify-center pointer-events-none"
-    >
+    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
       <div
         ref={wrapRef}
         style={{
+          transformStyle: 'preserve-3d',
           willChange: 'transform, opacity',
         }}
       >
@@ -288,9 +289,7 @@ export const VJPatternOverlay: React.FC = React.memo(() => {
           ref={canvasRef}
           width={ROW_NUM_W + 4 * CELL_W}
           height={CANVAS_H}
-          style={{
-            maxWidth: '90vw',
-          }}
+          style={{ maxWidth: '90vw' }}
         />
       </div>
     </div>
