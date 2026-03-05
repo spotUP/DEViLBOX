@@ -212,7 +212,7 @@ export const VJPatternOverlay: React.FC = React.memo(() => {
         // Distance-based depth fade (0 at cursor, 1 at edges)
         const dist = Math.abs(i) / VISIBLE_ROWS;
         // Row shimmer wave — rolling sine phase
-        const shimmer = 0.5 + 0.5 * Math.sin(t * 3 + i * 0.4);
+        const shimmer = 0.5 + 0.5 * Math.sin(anim.time * 3 + i * 0.4);
         const depthAlpha = (1 - dist * 0.5) * (0.9 + shimmer * 0.1);
 
         // Current row highlight
