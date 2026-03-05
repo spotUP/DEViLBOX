@@ -183,7 +183,12 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
       case 'setSample':
         if (this.initialized && this.module) {
           const chip = this.getChip(data.platformType);
-          if (chip) this.setInstrumentData('setSample', chip.handle, data.sampleIndex, data.sampleData);
+          if (chip) {
+            this.setInstrumentData('setSample', chip.handle, data.sampleIndex, data.sampleData);
+            console.log('[FurnaceDispatch Worklet] setSample: index=', data.sampleIndex, 'size=', data.sampleData?.length, 'platform=', data.platformType);
+          }
+        } else {
+          console.warn('[FurnaceDispatch Worklet] setSample SKIPPED: initialized=', this.initialized, 'module=', !!this.module);
         }
         break;
 
@@ -191,7 +196,9 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
         const chip = this.getChip(data.platformType);
         if (chip && this.wasm) {
           this.wasm.renderSamples(chip.handle);
-          console.log('[FurnaceDispatch Worklet] renderSamples called for platform', data.platformType);
+          console.log('[FurnaceDispatch Worklet] renderSamples called for platform', data.platformType, 'handle', chip.handle);
+        } else {
+          console.warn('[FurnaceDispatch Worklet] renderSamples SKIPPED: chip=', !!chip, 'wasm=', !!this.wasm, 'platform=', data.platformType);
         }
         break;
       }
@@ -348,6 +355,14 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
       }
       // Prevent Emscripten from using URL() to locate files (not available in WorkletGlobalScope)
       config.locateFile = (path) => path;
+      // Capture printf output from WASM and forward to main thread
+      const self = this;
+      config.print = (text) => {
+        self.port.postMessage({ type: 'debug', msg: `[WASM] ${text}` });
+      };
+      config.printErr = (text) => {
+        self.port.postMessage({ type: 'debug', msg: `[WASM ERR] ${text}` });
+      };
 
       try {
         this.module = await globalThis.createFurnaceDispatch(config);

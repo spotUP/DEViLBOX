@@ -31,7 +31,7 @@ export const VOLUME_NORMALIZATION_OFFSETS: Record<string, number> = {
   'FurnaceOPNA': 2,      // Measured: -23.1dB → target -10dB
   'FurnaceOPNB': 2,      // Measured: -21.8dB → target -10dB
   'FurnaceOPL4': 17,     // Measured: -34.8dB → target -10dB
-  'FurnaceY8950': -5,    // Recalibrated 2026-02-28
+  'FurnaceY8950': 9,     // Measured: -23.6dB → target -10dB (was silent, fixed chipType + ymfm core)
   'FurnaceVRC7': 24,     // Measured: -40.1dB → target -10dB
   'FurnaceOPN2203': -4,  // Measured: -29.1dB → target -10dB
   'FurnaceOPNBB': 2,     // Measured: -33.1dB → target -10dB
@@ -75,7 +75,7 @@ export const VOLUME_NORMALIZATION_OFFSETS: Record<string, number> = {
   'FurnaceSEGAPCM': -5,  // Measured: -10.4dB → on target
   'FurnaceQSOUND': 4,    // Recalibrated 2026-02-28
   'FurnaceES5506': 38,   // Recalibrated 2026-02-28
-  'FurnaceRF5C68': 0,    // Silent - sample format mismatch (needs signed magnitude)
+  'FurnaceRF5C68': -4,   // Measured: -1.99dB raw → -14.0@-8 → target -10dB (fixed setFlags bug)
   'FurnaceC140': 8,      // Recalibrated 2026-02-28
   'FurnaceK007232': -4,  // Measured: -9.9dB → on target
   'FurnaceK053260': -1,  // Recalibrated 2026-02-28

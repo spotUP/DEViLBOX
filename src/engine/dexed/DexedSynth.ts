@@ -230,10 +230,12 @@ export class DexedSynth implements DevilboxSynth {
       ]);
 
       // Preprocess JS code for AudioWorklet new Function() compatibility:
-      // 1. Replace import.meta.url (not available in Function constructor scope)
-      // 2. Remove ES module export statement (invalid syntax in Function body)
-      // 3. Strip Node.js-specific dynamic import block (fails in worklet context)
-      const jsCode = jsCodeRaw
+      // 1. Polyfill URL class (not available in AudioWorklet's WorkletGlobalScope)
+      // 2. Replace import.meta.url (not available in Function constructor scope)
+      // 3. Remove ES module export statement (invalid syntax in Function body)
+      // 4. Strip Node.js-specific dynamic import block (fails in worklet context)
+      const urlPolyfill = 'if(typeof URL==="undefined"){globalThis.URL=class{constructor(p,b){this.href=(b||"")+p;this.pathname=p;}};}\n';
+      const jsCode = urlPolyfill + jsCodeRaw
         .replace(/import\.meta\.url/g, `"${baseUrl}dexed/"`)
         .replace(/export\s+default\s+\w+;?\s*$/, '')
         .replace(/if\s*\(ENVIRONMENT_IS_NODE\)\s*\{[^}]*await\s+import\([^)]*\)[^}]*\}/g, '')
