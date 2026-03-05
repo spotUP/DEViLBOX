@@ -163,4 +163,22 @@ export const amigaSynthEntries: Record<string, SynthInfo> = {
     icon: 'Disc',
     color: 'text-gray-400',
   },
+  JamCrackerSynth: {
+    type: 'JamCrackerSynth',
+    name: 'JamCracker',
+    shortName: 'JC',
+    description: 'Amiga JamCracker — 4-channel tracker with AM synthesis and PCM samples',
+    bestFor: ['Amiga', 'AM synthesis', 'Tracker'],
+    icon: 'Disc',
+    color: 'text-gray-400',
+  },
+  FuturePlayerSynth: {
+    type: 'FuturePlayerSynth',
+    name: 'Future Player',
+    shortName: 'FP',
+    description: 'Amiga Future Player — 4-channel synth with wavetable, modulation and envelope effects',
+    bestFor: ['Amiga', 'Wavetable', 'Modulation synthesis'],
+    icon: 'Disc',
+    color: 'text-gray-400',
+  },
 };
