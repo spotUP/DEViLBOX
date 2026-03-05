@@ -281,7 +281,6 @@ export const VJPatternOverlay: React.FC = React.memo(() => {
       <div
         ref={wrapRef}
         style={{
-          transformStyle: 'preserve-3d',
           willChange: 'transform, opacity',
         }}
       >
@@ -291,7 +290,6 @@ export const VJPatternOverlay: React.FC = React.memo(() => {
           height={CANVAS_H}
           style={{
             maxWidth: '90vw',
-            mixBlendMode: 'screen',
           }}
         />
       </div>
