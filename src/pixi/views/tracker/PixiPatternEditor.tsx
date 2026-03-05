@@ -836,7 +836,7 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
   const vScrollAccRef = useRef(0);
 
   // Playback row tracking — smooth offset is imperative (no React state)
-  const [playbackRow, setPlaybackRow] = useState(0);
+  const playbackRowRef = useRef(0);
   const [playbackPatternIdx, setPlaybackPatternIdx] = useState(0);
   const smoothOffsetRef = useRef(0);          // frame-rate smooth offset — NO React state
   const gridContainerRef = useRef<ContainerType | null>(null);       // outer grid container (for drag coord conversion)
@@ -964,6 +964,7 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
     if (gridScrollContainerRef.current) gridScrollContainerRef.current.pivot.y = newOffset;
 
     if (newRow !== prevRowRef.current || newPattern !== prevPatternRef.current) {
+      const patternChanged = newPattern !== prevPatternRef.current;
       prevRowRef.current = newRow;
       prevPatternRef.current = newPattern;
       renderParamsRef.current = {
@@ -973,8 +974,10 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
       };
       fullRedrawRef.current = true;
       imperativeRedrawRef.current?.();
-      setPlaybackRow(newRow);
-      setPlaybackPatternIdx(newPattern);
+      playbackRowRef.current = newRow;
+      if (patternChanged) {
+        setPlaybackPatternIdx(newPattern);
+      }
     }
   });
 
@@ -1013,7 +1016,7 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
     displayPattern, displayPatternIndex, patterns, isPlaying, recordMode,
     scrollLeft: scrollLeftRef.current, rowHeight, rowHighlightInterval,
     channelMuted, channelSolo, useHex, blankEmpty, showBeatLabels, columnVisibility,
-    currentPatternIndex, playbackRow, playbackPatternIdx,
+    currentPatternIndex, playbackRow: playbackRowRef.current, playbackPatternIdx,
   };
 
   // ── Imperative redraw — called from subscription (cursor) and useEffect (other deps) ──
@@ -1075,13 +1078,13 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
       showGhostPatterns, trackerVisualBg, numChannels, channelOffsets, channelWidths,
       displayPattern, displayPatternIndex, patterns, isPlaying, recordMode, scrollLeft,
       rowHeight, rowHighlightInterval, channelMuted, channelSolo, useHex, blankEmpty,
-      showBeatLabels, columnVisibility, currentPatternIndex, playbackRow, playbackPatternIdx,
+      showBeatLabels, columnVisibility, currentPatternIndex, playbackPatternIdx,
       imperativeRedraw]);
 
   // ── Click → cell mapping ──────────────────────────────────────────────────
   const getCellFromLocal = useCallback((localX: number, localY: number): { rowIndex: number; channelIndex: number; columnType: CursorPosition['columnType'] } | null => {
     if (!pattern) return null;
-    const currentRowLocal = isPlaying ? playbackRow : cursorRef.current.rowIndex;
+    const currentRowLocal = isPlaying ? playbackRowRef.current : cursorRef.current.rowIndex;
     const rowOffset = Math.floor((localY - centerLineTop) / rowHeight);
     const rowIndex = currentRowLocal + rowOffset;
 
@@ -1130,7 +1133,7 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
     }
 
     return { rowIndex: Math.max(0, Math.min(rowIndex, patternLength - 1)), channelIndex, columnType };
-  }, [pattern, numChannels, channelOffsets, channelWidths, centerLineTop, isPlaying, playbackRow, patternLength, columnVisibility, rowHeight]);
+  }, [pattern, numChannels, channelOffsets, channelWidths, centerLineTop, isPlaying, patternLength, columnVisibility, rowHeight]);
 
   // ── Instrument drag-and-drop handlers (native canvas events) ────────────
   const getCellFromLocalRef = useRef(getCellFromLocal);
