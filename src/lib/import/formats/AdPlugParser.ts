@@ -614,7 +614,7 @@ function oplEventsToPatterns(
 // ── DRO Parser ────────────────────────────────────────────────────────────────
 
 function parseDRO(buf: Uint8Array, filename: string): TrackerSong {
-  const versionMinor = le16(buf, 8);
+  const _versionMinor = le16(buf, 8);
   const versionMajor = le16(buf, 10);
 
   if (versionMajor >= 2) return parseDROv2(buf, filename);
@@ -623,9 +623,9 @@ function parseDRO(buf: Uint8Array, filename: string): TrackerSong {
 
 function parseDROv1(buf: Uint8Array, filename: string): TrackerSong {
   const NUM_CH = 9;
-  const lengthMs = le32(buf, 12);
+  const _lengthMs = le32(buf, 12);
   const dataLength = le32(buf, 16);
-  const hwType = buf[20]; // 0=OPL2, 1=OPL3, 2=dual OPL2
+  const _hwType = buf[20]; // 0=OPL2, 1=OPL3, 2=dual OPL2
   const numCh = hwType === 1 ? 18 : NUM_CH;
 
   const pairs: Array<{ reg: number; val: number; delay: number }> = [];
