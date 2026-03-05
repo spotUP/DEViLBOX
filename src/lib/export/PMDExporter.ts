@@ -31,10 +31,13 @@ const PMD_CMD = {
   NOTE_MAX: 0xDF,
 
   SET_TEMPO: 0xFF,
-  SET_VOICE: 0xFD,
-  SET_PAN: 0xFC,
-  SET_VOLUME: 0xFB,
   OPN_WRITE: 0xFE,
+  SET_VOICE: 0xFD,
+  SET_VOLUME: 0xFC,
+  SET_PAN: 0xF4,
+  DETUNE: 0xFA,
+  LFO: 0xF6,
+  PORTAMENTO: 0xF3,
   LOOP_START: 0xE6,
   LOOP_END: 0xE7,
 } as const;
@@ -329,11 +332,41 @@ function emitPan(cmds: number[], pan: number): void {
 
 /**
  * Map XM effect type + param to PMD MML commands.
- * PMD supports: volume, panning, tempo via MML commands.
+ * PMD supports: volume, panning, tempo, detune, LFO (vibrato), portamento.
  */
 function emitPMDEffect(cmds: number[], effTyp: number, eff: number, isFM: boolean): void {
   switch (effTyp) {
-    case 0x8: // Set panning (XM: 0=left, 128=center, 255=right → OPN: 0xC0=both, 0x80=L, 0x40=R)
+    case 0x1: // Portamento up — positive detune
+      if (eff > 0) {
+        const offset = eff * 4;
+        cmds.push(PMD_CMD.DETUNE, offset & 0xFF, (offset >> 8) & 0xFF);
+      }
+      break;
+    case 0x2: // Portamento down — negative detune
+      if (eff > 0) {
+        const offset = -(eff * 4);
+        cmds.push(PMD_CMD.DETUNE, offset & 0xFF, (offset >> 8) & 0xFF);
+      }
+      break;
+    case 0x3: // Tone portamento
+      if (eff > 0) {
+        cmds.push(PMD_CMD.PORTAMENTO, 0x00, eff & 0xFF);
+      }
+      break;
+    case 0x4: { // Vibrato — PMD LFO (0xF6 + delay + speed + depth + waveform)
+      const speed = (eff >> 4) & 0x0F;
+      const depth = eff & 0x0F;
+      if (speed > 0 || depth > 0) {
+        cmds.push(PMD_CMD.LFO,
+          0,                                // delay
+          Math.max(1, 16 - speed),          // speed
+          Math.max(1, depth * 8),           // depth
+          0,                                // waveform (0=sine)
+        );
+      }
+      break;
+    }
+    case 0x8: // Set panning
       if (eff < 64) cmds.push(PMD_CMD.SET_PAN, 0x80);
       else if (eff < 192) cmds.push(PMD_CMD.SET_PAN, 0xC0);
       else cmds.push(PMD_CMD.SET_PAN, 0x40);

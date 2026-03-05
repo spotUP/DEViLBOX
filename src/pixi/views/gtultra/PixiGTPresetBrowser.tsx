@@ -33,7 +33,7 @@ export const PixiGTPresetBrowser: React.FC<Props> = ({ width, height, onApplyPre
   const bgRef = useRef<GraphicsType>(null);
   const megaRef = useRef<MegaText | null>(null);
 
-  const [selectedCat, _setSelectedCat] = useState(0);
+  const [selectedCat, setSelectedCat] = useState(0);
   const [selectedPreset, setSelectedPreset] = useState(0);
   const [scroll, setScroll] = useState(0);
 
@@ -146,10 +146,45 @@ export const PixiGTPresetBrowser: React.FC<Props> = ({ width, height, onApplyPre
     setScroll(0);
   }, [selectedCat]);
 
-  // Keyboard navigation (TODO: wire up event listener)
+  // Keyboard navigation
   useEffect(() => {
-    return () => {};
-  }, [presets, selectedPreset, categories.length, onApplyPreset]);
+    const handler = (e: KeyboardEvent) => {
+      switch (e.key) {
+        case 'ArrowUp':
+          e.preventDefault();
+          setSelectedPreset((prev) => {
+            const next = Math.max(0, prev - 1);
+            setScroll((s) => Math.min(s, next));
+            return next;
+          });
+          break;
+        case 'ArrowDown':
+          e.preventDefault();
+          setSelectedPreset((prev) => {
+            const next = Math.min(presets.length - 1, prev + 1);
+            const maxVisible = Math.floor((height - 40) / 14);
+            setScroll((s) => Math.max(s, next - maxVisible + 1));
+            return next;
+          });
+          break;
+        case 'ArrowLeft':
+          e.preventDefault();
+          setSelectedCat((prev) => Math.max(0, prev - 1));
+          break;
+        case 'ArrowRight':
+          e.preventDefault();
+          setSelectedCat((prev) => Math.min(categories.length - 1, prev + 1));
+          break;
+        case 'Enter': {
+          const preset = presets[selectedPreset];
+          if (preset && onApplyPreset) onApplyPreset(preset);
+          break;
+        }
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [presets, selectedPreset, categories.length, height, onApplyPreset]);
 
   return (
     <pixiContainer ref={containerRef} layout={{ width, height }}>
