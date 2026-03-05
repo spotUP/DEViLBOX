@@ -19,7 +19,7 @@ export const VOLUME_NORMALIZATION_OFFSETS: Record<string, number> = {
   // Custom synths (WASM and specialized engines) - recalibrated 2026-03-05
   'TB303': 1,            // Measured: 4.0dB → target -10dB
   'JC303': 1,            // Same engine as TB303
-  'Buzz3o3': 5,          // Kept (WASM-dependent)
+  'Buzz3o3': 2,         // Measured: -12.2dB @ offset 0 → target -10dB
   'Furnace': 0,          // Generic Furnace - WASM dispatcher, no chip-specific output
   // Furnace FM chips - recalibrated 2026-02-13 via browser test runner
   'FurnaceOPN': 3,       // Measured: -6.4dB → target -10dB
@@ -100,7 +100,7 @@ export const VOLUME_NORMALIZATION_OFFSETS: Record<string, number> = {
   'BuzzTrilok': 5,       // Calibrated with output gain: measured -22.4dB, target -10
   'Buzz4FM2F': 7,        // Calibrated with output gain: measured -21.2dB, target -10
   'BuzzFreqBomb': 4,     // Calibrated with output gain: measured -21.3dB, target -10
-  'Buzz3o3DF': 8,        // Calibrated with output gain: measured -13.8dB, target -10
+  'Buzz3o3DF': 2,       // Measured: -12.2dB @ offset 0 → target -10dB
   'Synare': -4,          // Measured: 1.2dB → target -10dB
   'DubSiren': 7,         // Measured: -4.2dB → target -10dB
   'SpaceLaser': 17,      // Measured: -3.1dB → target -10dB (required reverb .ready await)
