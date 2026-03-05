@@ -166,12 +166,18 @@ export class SuperColliderEngine {
       throw new Error('[SC:Engine] scsynth did not create a ScriptProcessor');
     }
 
-    // Create output GainNode and route ScriptProcessor through it.
-    // Keep proc connected to destination too so onaudioprocess keeps firing.
+    // Create output GainNode and route ScriptProcessor through it EXCLUSIVELY.
+    // Disconnect proc from destination (scsynth connects it there during init)
+    // so all audio goes through our gain-controlled output only.
     const output = audioContext.createGain();
     output.gain.value = 1.0;
+    try { module.audioDriver.proc.disconnect(audioContext.destination); } catch { /* may not be connected */ }
     module.audioDriver.proc.connect(output);
-    console.log('[SC:Engine] ScriptProcessor connected to output GainNode');
+    // Temporarily connect output→destination so onaudioprocess keeps firing during
+    // SynthDef loading. SuperColliderSynth will disconnect this after taking over.
+    output.connect(audioContext.destination);
+    module.audioDriver.connected = true;
+    console.log('[SC:Engine] ScriptProcessor → GainNode → destination (temporary)');
 
     // Keep Module on globalThis — scsynth pthreads need it for their lifecycle.
 

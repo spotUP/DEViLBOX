@@ -13,7 +13,7 @@ SynthRegistry.register({
   category: 'wasm',
   loadMode: 'eager',
   useSynthBus: true,
-  volumeOffsetDb: 0,
+  volumeOffsetDb: 2,
   controlsComponent: 'SuperColliderEditor',
   create: (config) => {
     const sc = config.superCollider ?? DEFAULT_SUPERCOLLIDER;

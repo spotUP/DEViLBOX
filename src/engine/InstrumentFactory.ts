@@ -115,6 +115,14 @@ export class InstrumentFactory {
       if (config.synthType.startsWith('Furnace') && registryDesc.volumeOffsetDb && 'setVolumeOffset' in instrument) {
         (instrument as unknown as { setVolumeOffset: (offset: number) => void }).setVolumeOffset(registryDesc.volumeOffsetDb);
       }
+      // Apply volume offset for native-output synths via output GainNode
+      else if (registryDesc.volumeOffsetDb) {
+        const dsInst = instrument as unknown as { output?: { gain?: { value: number } } };
+        if (dsInst.output?.gain) {
+          const volDb = (config.volume ?? -12) + registryDesc.volumeOffsetDb;
+          dsInst.output.gain.value = Math.pow(10, volDb / 20);
+        }
+      }
       return instrument;
     }
 
@@ -658,7 +666,12 @@ export class InstrumentFactory {
       case 'SuperCollider': {
         const sc = config.superCollider ?? DEFAULT_SUPERCOLLIDER;
         const audioCtx = getDevilboxAudioContext();
-        instrument = new SuperColliderSynth(sc, audioCtx);
+        const scSynth = new SuperColliderSynth(sc, audioCtx);
+        // Apply volume normalization via output GainNode
+        const scOffset = VOLUME_NORMALIZATION_OFFSETS['SuperCollider'] ?? 0;
+        const scVolDb = (config.volume ?? -12) + scOffset;
+        (scSynth.output as GainNode).gain.value = Math.pow(10, scVolDb / 20);
+        instrument = scSynth;
         break;
       }
 

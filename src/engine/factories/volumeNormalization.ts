@@ -129,7 +129,7 @@ export const VOLUME_NORMALIZATION_OFFSETS: Record<string, number> = {
   'CZ101': 0,            // Reset to 0 - was unmeasured guess of 10
   'Dexed': 41,           // VERIFIED: measured -9.9dB with this offset (correct!)
   'OBXd': 9,             // VERIFIED: measured -10.0dB with this offset (correct!)
-  'SuperCollider': -10,   // Measured: -0.1dB @ offset 0 → target -10dB
+  'SuperCollider': 2,   // Measured: -22.3dB @ offset -10 → adjusted to target -10dB
   'CEM3394': 14,         // Recalibrated 2026-02-28
   'SCSP': 1,             // Recalibrated 2026-02-28
   // MAME chip synths - calibrated 2026-02-07 via browser test runner
