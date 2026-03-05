@@ -142,6 +142,12 @@ export class PatternScheduler {
     // Update synth detune (cents = semitones * 100)
     engine.setGlobalDetune((this.pitchShiftSemitones + this.globalPitchOffset) * 100);
 
+    // Apply pitch to C64SIDEngine if active (SID playback)
+    const c64Engine = replayer.getC64SIDEngine();
+    if (c64Engine) {
+      c64Engine.setPlaybackRate(playbackRate);
+    }
+
     // Debounce BPM updates - only update when slider hasn't moved for 200ms
     // This prevents scheduler breakage during active drag
     if (this.bpmUpdateTimer) {

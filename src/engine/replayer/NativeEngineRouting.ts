@@ -127,19 +127,26 @@ export async function startNativeEngines(
     suppressNotes = true;
     try {
       const audioContext = Tone.getContext().rawContext as AudioContext;
-      c64SidEngine = new C64SIDEngine(song.c64SidFileData);
-      await c64SidEngine.init(audioContext);
 
-      // Apply current master volume (dB → linear)
-      const { useAudioStore } = await import('@stores/useAudioStore');
-      const masterDb = useAudioStore.getState().masterVolume;
-      const linear = masterDb <= -60 ? 0 : Math.pow(10, masterDb / 20);
-      c64SidEngine.setMasterVolume(linear);
+      // Get the native AudioNode for synthBus so SID audio goes through the
+      // master effects chain (reverb, delay, etc.) and BLEP filter.
+      const synthBusNode = getNativeAudioNode(engine.synthBus as any);
+
+      c64SidEngine = new C64SIDEngine(song.c64SidFileData);
+      await c64SidEngine.init(audioContext, synthBusNode ?? undefined);
+
+      // Apply current pitch offset (if DJ pitch slider was moved before loading)
+      const { useTransportStore } = await import('@stores/useTransportStore');
+      const globalPitch = useTransportStore.getState().globalPitch ?? 0;
+      if (globalPitch !== 0) {
+        const rate = Math.pow(2, globalPitch / 12);
+        c64SidEngine.setPlaybackRate(rate);
+      }
 
       // Start playback immediately — skip if muted (DJ mode visuals)
       if (!muted) {
         await c64SidEngine.play();
-        console.log('[TrackerReplayer] C64SIDEngine loaded & playing for SID format');
+        console.log('[TrackerReplayer] C64SIDEngine loaded & playing for SID format (routed through synthBus)');
       } else {
         console.log('[TrackerReplayer] C64SIDEngine loaded but skipping play (muted for DJ visuals)');
       }
