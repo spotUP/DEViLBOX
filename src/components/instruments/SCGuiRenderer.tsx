@@ -64,6 +64,7 @@ interface WidgetProps {
 /** StaticText → label span */
 const SCStaticText: React.FC<WidgetProps> = ({ widget }) => {
   const text = widget.label ?? widget.properties.string ?? '';
+  if (!text.trim()) return null; // skip empty labels
   const bg = scColorToCSS(widget.properties.background);
   const color = scColorToCSS(widget.properties.stringColor, 'var(--color-text-secondary, #aaa)');
   const style: React.CSSProperties = {
@@ -243,8 +244,12 @@ function groupWidgetsIntoRows(widgets: SCWidget[]): WidgetRow[] {
   let currentLabels: SCWidget[] = [];
   let currentControls: SCWidget[] = [];
 
-  // Sort widgets by source order (approximate via rect position)
-  const sorted = [...widgets].filter(w => w.type !== 'window' && w.type !== 'compositeView');
+  // Filter out non-renderable widgets
+  const sorted = [...widgets].filter(w =>
+    w.type !== 'window' && w.type !== 'compositeView' &&
+    // Skip StaticText with no label (dynamic expressions stripped by parser)
+    !(w.type === 'staticText' && !w.action && !w.label && !w.properties.string)
+  );
 
   for (const w of sorted) {
     if (w.type === 'staticText' && !w.action) {
@@ -313,7 +318,7 @@ export const SCGuiRenderer: React.FC<SCGuiRendererProps> = ({
 
       {/* Widget rows */}
       {rows.map((row, i) => (
-        <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+        <div key={`row-${i}`} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           {/* Label row */}
           {row.labels.length > 0 && (
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>

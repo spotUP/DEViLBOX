@@ -391,7 +391,12 @@ export function parseSCGui(source: string): SCGuiParseResult {
         } else {
           const strInChain = fullChain.match(/\.string_\s*\(\s*(.+?)\s*\)/);
           if (strInChain) {
-            label = strInChain[1].replace(/^["']|["']$/g, '');
+            const raw = strInChain[1].replace(/^["']|["']$/g, '');
+            // Only use as label if it's a string literal, not a code expression
+            if (/^["']/.test(strInChain[1]) || /^[\w\s:.,!?#\-+/]+$/.test(raw)) {
+              label = raw;
+            }
+            // else: dynamic expression (e.g., ~bpm, i+1) — leave label undefined
           }
         }
       }
