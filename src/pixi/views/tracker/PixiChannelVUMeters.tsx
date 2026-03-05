@@ -35,6 +35,12 @@ const COLOR_GREEN = 0x22c55e;
 const COLOR_YELLOW = 0xeab308;
 const COLOR_RED = 0xef4444;
 
+// Pre-allocated fill style objects to avoid GC pressure in the rAF loop
+const FILL_GREEN = { color: COLOR_GREEN, alpha: 0.9 };
+const FILL_YELLOW = { color: COLOR_YELLOW, alpha: 0.9 };
+const FILL_RED = { color: COLOR_RED, alpha: 0.9 };
+const FILL_CLEAR = { color: 0x000000, alpha: 0 };
+
 interface MeterState {
   level: number;
 }
@@ -119,6 +125,8 @@ export const PixiChannelVUMeters: React.FC<PixiChannelVUMetersProps> = ({ width,
   // no need to gate on performanceQuality which can oscillate and kill the loop)
   useEffect(() => {
     let rafId: number;
+    let lastDrawTime = 0;
+    const MIN_DRAW_INTERVAL = 16; // cap VU draws at ~60fps
 
     const draw = () => {
       const g = graphicsRef.current;
@@ -127,13 +135,21 @@ export const PixiChannelVUMeters: React.FC<PixiChannelVUMetersProps> = ({ width,
         return;
       }
 
+      // Throttle draw rate — VU meters don't need 700+ fps
+      const now = performance.now();
+      if (now - lastDrawTime < MIN_DRAW_INTERVAL) {
+        rafId = requestAnimationFrame(draw);
+        return;
+      }
+      lastDrawTime = now;
+
       const playing = useTransportStore.getState().isPlaying;
 
       if (!playing) {
         if (!wasIdleRef.current) {
           g.clear();
           g.rect(0, 0, widthRef.current, heightRef.current);
-          g.fill({ color: 0x000000, alpha: 0 });
+          g.fill(FILL_CLEAR);
           for (const m of metersRef.current) m.level = 0;
           wasIdleRef.current = true;
         }
@@ -191,7 +207,7 @@ export const PixiChannelVUMeters: React.FC<PixiChannelVUMetersProps> = ({ width,
 
       g.clear();
       g.rect(0, 0, widthRef.current, heightRef.current);
-      g.fill({ color: 0x000000, alpha: 0 });
+      g.fill(FILL_CLEAR);
 
       for (let i = 0; i < nc; i++) {
         const meter = metersRef.current[i];
@@ -226,7 +242,7 @@ export const PixiChannelVUMeters: React.FC<PixiChannelVUMetersProps> = ({ width,
             const segY = h - 2 - s * (SEGMENT_HEIGHT + SEGMENT_GAP) - SEGMENT_HEIGHT;
             g.rect(meterX, segY, METER_WIDTH, SEGMENT_HEIGHT);
           }
-          g.fill({ color: COLOR_GREEN, alpha: 0.9 });
+          g.fill(FILL_GREEN);
         }
 
         // Yellow segments
@@ -237,7 +253,7 @@ export const PixiChannelVUMeters: React.FC<PixiChannelVUMetersProps> = ({ width,
             const segY = h - 2 - s * (SEGMENT_HEIGHT + SEGMENT_GAP) - SEGMENT_HEIGHT;
             g.rect(meterX, segY, METER_WIDTH, SEGMENT_HEIGHT);
           }
-          g.fill({ color: COLOR_YELLOW, alpha: 0.9 });
+          g.fill(FILL_YELLOW);
         }
 
         // Red segments
@@ -247,7 +263,7 @@ export const PixiChannelVUMeters: React.FC<PixiChannelVUMetersProps> = ({ width,
             const segY = h - 2 - s * (SEGMENT_HEIGHT + SEGMENT_GAP) - SEGMENT_HEIGHT;
             g.rect(meterX, segY, METER_WIDTH, SEGMENT_HEIGHT);
           }
-          g.fill({ color: COLOR_RED, alpha: 0.9 });
+          g.fill(FILL_RED);
         }
       }
 
