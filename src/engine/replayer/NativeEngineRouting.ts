@@ -104,6 +104,12 @@ export async function startNativeEngines(
       c64SidEngine = new C64SIDEngine(song.c64SidFileData);
       await c64SidEngine.init(audioContext);
 
+      // Apply current master volume (dB → linear)
+      const { useAudioStore } = await import('@stores/useAudioStore');
+      const masterDb = useAudioStore.getState().masterVolume;
+      const linear = masterDb <= -60 ? 0 : Math.pow(10, masterDb / 20);
+      c64SidEngine.setMasterVolume(linear);
+
       // Start playback immediately — skip if muted (DJ mode visuals)
       if (!muted) {
         await c64SidEngine.play();
