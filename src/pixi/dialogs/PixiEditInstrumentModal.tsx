@@ -22,6 +22,7 @@ import {
   PixiKnob,
   PixiToggle,
   PixiSelect,
+  PixiSlider,
   type SelectOption,
 } from '../components';
 import { PixiPureTextInput } from '../input/PixiPureTextInput';
@@ -165,6 +166,15 @@ export const PixiEditInstrumentModal: React.FC<PixiEditInstrumentModalProps> = (
       setFilterTags([]);
     }
   }, [isOpen, createMode]);
+
+  // Switch to appropriate tab when instrument type changes
+  useEffect(() => {
+    if (currentInstrument?.synthType === 'SuperCollider') {
+      if (activeTab === 'sound') setActiveTab('script');
+    } else {
+      if (activeTab === 'script' || activeTab === 'controls') setActiveTab('sound');
+    }
+  }, [currentInstrument?.synthType]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Escape key to close ────────────────────────────────────────────────
   useEffect(() => {
@@ -932,6 +942,14 @@ export const PixiEditInstrumentModal: React.FC<PixiEditInstrumentModalProps> = (
 
           {/* ── Content area ──────────────────────────────────────────────── */}
           <layoutContainer layout={{ flex: 1, padding: PAD, gap: 8, flexDirection: 'column', overflow: 'hidden' }}>
+            {/* SC Script tab — read-only source display */}
+            {activeTab === 'script' && currentInstrument?.synthType === 'SuperCollider' && (
+              <SCScriptPanel source={currentInstrument.superCollider?.source ?? ''} />
+            )}
+            {/* SC Controls tab — param sliders */}
+            {activeTab === 'controls' && currentInstrument?.synthType === 'SuperCollider' && (
+              <SCControlsPanel instrument={currentInstrument} onUpdate={updateInstrument} />
+            )}
             {activeTab === 'sound' && currentInstrument && currentInstrument.synthType === 'ModularSynth' && (
               <PixiModularSynthEditor
                 config={currentInstrument.modularSynth || MODULAR_INIT_PATCH}
@@ -999,6 +1017,104 @@ const TabButton: React.FC<{
         color={active ? 'custom' : 'textSecondary'}
         customColor={active ? 0x000000 : undefined}
       />
+    </layoutContainer>
+  );
+};
+
+// ── SuperCollider panels ─────────────────────────────────────────────────────
+
+/** SC Script tab — read-only source display in a scrollable container */
+const SCScriptPanel: React.FC<{ source: string }> = ({ source }) => {
+  const theme = usePixiTheme();
+  const lines = source ? source.split('\n') : [];
+  const displayLines = lines.slice(0, 80); // cap at 80 lines for GL perf
+  return (
+    <layoutContainer layout={{ flex: 1, flexDirection: 'column', gap: 4, overflow: 'scroll' }}>
+      <PixiLabel text="SuperCollider Source" size="sm" weight="bold" color="textSecondary" />
+      <layoutContainer
+        layout={{
+          flexDirection: 'column',
+          gap: 1,
+          padding: 8,
+          backgroundColor: theme.bgTertiary?.color ?? 0x1a1a1a,
+          borderRadius: 4,
+          borderWidth: 1,
+          borderColor: theme.border.color,
+        }}
+      >
+        {displayLines.map((line, i) => (
+          <PixiLabel key={i} text={`${String(i + 1).padStart(3, ' ')}  ${line}`} size="xs" color="textMuted" />
+        ))}
+        {lines.length > 80 && (
+          <PixiLabel text={`... ${lines.length - 80} more lines (edit in DOM editor)`} size="xs" color="textMuted" />
+        )}
+        {lines.length === 0 && (
+          <PixiLabel text="No source code. Open the full editor to write SC code." size="xs" color="textMuted" />
+        )}
+      </layoutContainer>
+    </layoutContainer>
+  );
+};
+
+/** SC Controls tab — param sliders extracted from compiled SynthDef */
+const SCControlsPanel: React.FC<{
+  instrument: InstrumentConfig;
+  onUpdate: (id: number, changes: Partial<InstrumentConfig>) => void;
+}> = ({ instrument, onUpdate }) => {
+  const scConfig = instrument.superCollider;
+  const params = scConfig?.params ?? [];
+  const synthDefName = scConfig?.synthDefName ?? 'unknown';
+
+  const handleParamChange = useCallback((paramName: string, value: number) => {
+    if (!scConfig) return;
+    const updatedParams = scConfig.params.map(p =>
+      p.name === paramName ? { ...p, value } : p
+    );
+    onUpdate(instrument.id, {
+      superCollider: { ...scConfig, params: updatedParams },
+    });
+  }, [instrument.id, scConfig, onUpdate]);
+
+  if (!scConfig?.binary) {
+    return (
+      <layoutContainer layout={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+        <PixiLabel text="Compile SynthDef first (use DOM editor)" size="sm" color="textMuted" />
+      </layoutContainer>
+    );
+  }
+
+  return (
+    <layoutContainer layout={{ flex: 1, flexDirection: 'column', gap: 8, overflow: 'scroll' }}>
+      <layoutContainer layout={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+        <PixiLabel text={`\\${synthDefName}`} size="sm" weight="bold" color="textPrimary" />
+        <PixiLabel text={`${params.length} params`} size="xs" color="textMuted" />
+      </layoutContainer>
+
+      {params.length === 0 ? (
+        <PixiLabel text="No controllable parameters extracted" size="xs" color="textMuted" />
+      ) : (
+        <layoutContainer layout={{ flexDirection: 'column', gap: 12 }}>
+          {params.map((param) => (
+            <layoutContainer key={param.name} layout={{ flexDirection: 'column', gap: 2 }}>
+              <layoutContainer layout={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                <PixiLabel text={param.name} size="xs" color="textSecondary" />
+                <PixiLabel text={String(Number(param.value.toPrecision(3)))} size="xs" color="textMuted" />
+              </layoutContainer>
+              <PixiSlider
+                value={param.value}
+                min={param.min}
+                max={param.max}
+                step={(param.max - param.min) / 200}
+                onChange={(v) => handleParamChange(param.name, v)}
+                orientation="horizontal"
+                length={RIGHT_PANEL_W - PAD * 2 - 16}
+                thickness={6}
+                showValue={false}
+              />
+            </layoutContainer>
+          ))}
+        </layoutContainer>
+      )}
     </layoutContainer>
   );
 };
