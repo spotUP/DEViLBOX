@@ -223,8 +223,11 @@ function App() {
     initAudio();
   }, []);
 
-  // Auto-initialize ASID device manager for hot-plug detection
+  // Initialize ASID device manager only when ASID is enabled in settings
+  // (requestMIDIAccess with sysex:true triggers a browser permission prompt)
+  const asidEnabled = useSettingsStore(state => state.asidEnabled);
   useEffect(() => {
+    if (!asidEnabled) return;
     if (typeof navigator === 'undefined' || !('requestMIDIAccess' in navigator)) return;
 
     let unsubscribe: (() => void) | undefined;
@@ -264,7 +267,7 @@ function App() {
     })();
 
     return () => { unsubscribe?.(); };
-  }, []);
+  }, [asidEnabled]);
 
   // Sync BLEP setting with ToneEngine
   const useBLEP = useSettingsStore(state => state.useBLEP);
