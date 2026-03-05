@@ -45,14 +45,14 @@ export const GTTableEditor: React.FC<{ width: number; height: number }> = ({ wid
     canvas.height = contentHeight * dpr;
     ctx.scale(dpr, dpr);
 
-    ctx.fillStyle = '#1a1a2e';
+    ctx.fillStyle = '#0d0d0d';
     ctx.fillRect(0, 0, width, contentHeight);
 
     ctx.font = `11px "JetBrains Mono", monospace`;
     ctx.textBaseline = 'top';
 
     // Header
-    ctx.fillStyle = '#0f3460';
+    ctx.fillStyle = '#1a1a1a';
     ctx.fillRect(0, 0, width, headerHeight);
     ctx.fillStyle = '#888';
     ctx.fillText(' IDX  LEFT  RIGHT', 4, 2);
@@ -109,15 +109,15 @@ export const GTTableEditor: React.FC<{ width: number; height: number }> = ({ wid
   return (
     <div style={{ width, height, display: 'flex', flexDirection: 'column' }}>
       {/* Tab bar */}
-      <div style={{ display: 'flex', height: tabHeight, background: '#0f3460' }}>
+      <div style={{ display: 'flex', height: tabHeight, background: '#1a1a1a' }}>
         {(['wave', 'pulse', 'filter', 'speed'] as TableType[]).map((t) => (
           <button
             key={t}
             onClick={() => setActiveTable(t)}
             style={{
               flex: 1,
-              background: activeTable === t ? '#1a1a2e' : 'transparent',
-              color: activeTable === t ? TABLE_COLORS[t] : '#666',
+              background: activeTable === t ? '#0d0d0d' : 'transparent',
+              color: activeTable === t ? TABLE_COLORS[t] : '#555',
               border: 'none',
               borderBottom: activeTable === t ? `2px solid ${TABLE_COLORS[t]}` : '2px solid transparent',
               cursor: 'pointer',

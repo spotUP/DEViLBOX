@@ -1,7 +1,7 @@
 /**
- * GTUltraView — Main GoatTracker Ultra editor layout.
+ * GTUltraView — Main GoatTracker Ultra editor layout (DOM mode).
  *
- * Layout (matching GoatTracker's classic 80x50 layout):
+ * Layout:
  * ┌────────────────────────────────────────────┐
  * │ Toolbar: Song name, Play/Stop, SID config  │
  * ├───────────────────────┬────────────────────┤
@@ -10,12 +10,10 @@
  * │  (3 or 6 channels)    │ Instrument editor  │
  * │                       ├────────────────────┤
  * │                       │ Table editors      │
- * │                       │ (wave/pulse/filter/ │
- * │                       │  speed)            │
  * └───────────────────────┴────────────────────┘
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import * as Tone from 'tone';
 import { useGTUltraStore } from '../../stores/useGTUltraStore';
 import { GTPatternEditor } from './GTPatternEditor';
@@ -27,14 +25,32 @@ import { useGTKeyboardHandler } from './GTKeyboardHandler';
 import { GTUltraEngine } from '../../engine/gtultra/GTUltraEngine';
 import { getGTUltraASIDBridge } from '../../engine/gtultra/GTUltraASIDBridge';
 
-const SIDEBAR_WIDTH = 320;
-const TOOLBAR_HEIGHT = 36;
+const SIDEBAR_WIDTH = 300;
 
-export const GTUltraView: React.FC<{ width: number; height: number }> = ({ width, height }) => {
+export const GTUltraView: React.FC<{ width?: number; height?: number }> = ({ width: propW, height: propH }) => {
   const setEngine = useGTUltraStore((s) => s.setEngine);
   const sidCount = useGTUltraStore((s) => s.sidCount);
   const channelCount = sidCount * 3;
-  const [patternData, setPatternData] = useState<Uint8Array[]>([]);
+
+  // Measure container if no explicit dimensions
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [size, setSize] = useState({ w: propW ?? 800, h: propH ?? 600 });
+
+  useEffect(() => {
+    if (propW && propH) { setSize({ w: propW, h: propH }); return; }
+    const el = containerRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(([entry]) => {
+      const { width, height } = entry.contentRect;
+      if (width > 0 && height > 0) setSize({ w: width, h: height });
+    });
+    ro.observe(el);
+    // Initial measurement
+    setSize({ w: el.clientWidth || 800, h: el.clientHeight || 600 });
+    return () => ro.disconnect();
+  }, [propW, propH]);
+
+  const { w: width, h: height } = size;
 
   // Keyboard input
   useGTKeyboardHandler(true);
@@ -51,10 +67,8 @@ export const GTUltraView: React.FC<{ width: number; height: number }> = ({ width
         onReady: () => {
           if (disposed) return;
           console.log('[GTUltra] Engine ready');
-          // Set engine in store FIRST so refresh methods can use it
           setEngine(gtEngine);
           const store = useGTUltraStore.getState();
-          // Load any pending song data that arrived before engine was ready
           if (store.pendingSongData) {
             gtEngine!.loadSong(store.pendingSongData.buffer as ArrayBuffer);
             store.setPendingSongData(null);
@@ -64,45 +78,25 @@ export const GTUltraView: React.FC<{ width: number; height: number }> = ({ width
           store.refreshAllInstruments();
           store.refreshAllTables();
         },
-        onPosition: (pos) => {
-          useGTUltraStore.getState().updatePlaybackPos(pos);
-        },
-        onAsidWrite: (chip, reg, value) => {
-          getGTUltraASIDBridge().writeRegister(chip, reg, value);
-        },
-        onPatternData: (pattern, length, data) => {
-          useGTUltraStore.getState().updatePatternData(pattern, length, data);
-        },
-        onOrderData: (channel, data) => {
-          useGTUltraStore.getState().updateOrderData(channel, data);
-        },
-        onInstrumentData: (instrument, data) => {
-          useGTUltraStore.getState().updateInstrumentData(instrument, data);
-        },
-        onTableData: (tableType, left, right) => {
-          useGTUltraStore.getState().updateTableData(tableType, left, right);
-        },
-        onSidRegisters: (sidIdx, data) => {
-          useGTUltraStore.getState().updateSidRegisters(sidIdx, data);
-        },
+        onPosition: (pos) => { useGTUltraStore.getState().updatePlaybackPos(pos); },
+        onAsidWrite: (chip, reg, value) => { getGTUltraASIDBridge().writeRegister(chip, reg, value); },
+        onPatternData: (pattern, length, data) => { useGTUltraStore.getState().updatePatternData(pattern, length, data); },
+        onOrderData: (channel, data) => { useGTUltraStore.getState().updateOrderData(channel, data); },
+        onInstrumentData: (instrument, data) => { useGTUltraStore.getState().updateInstrumentData(instrument, data); },
+        onTableData: (tableType, left, right) => { useGTUltraStore.getState().updateTableData(tableType, left, right); },
+        onSidRegisters: (sidIdx, data) => { useGTUltraStore.getState().updateSidRegisters(sidIdx, data); },
         onSongInfo: (info) => {
           const store = useGTUltraStore.getState();
           store.setSongName(info.name);
           store.setSongAuthor(info.author);
-          // Request all pattern data now that we know how many patterns exist
-          if (info.numPatterns > 0) {
-            store.refreshAllPatterns(info.numPatterns);
-          }
+          if (info.numPatterns > 0) store.refreshAllPatterns(info.numPatterns);
         },
-        onError: (err) => {
-          console.error('[GTUltra] Engine error:', err);
-        },
+        onError: (err) => { console.error('[GTUltra] Engine error:', err); },
       });
       await gtEngine.init();
       await gtEngine.ready;
       if (disposed) { gtEngine.dispose(); return; }
       gtEngine.output.connect(audioCtx.destination);
-      // Engine already set in store by onReady callback above
     };
 
     setup().catch(console.error);
@@ -114,48 +108,44 @@ export const GTUltraView: React.FC<{ width: number; height: number }> = ({ width
     };
   }, [setEngine]);
 
-  // Provide empty pattern data until WASM heap reading is implemented
+  // Provide empty pattern data until WASM returns real data
+  const [patternData, setPatternData] = useState<Uint8Array[]>([]);
   useEffect(() => {
-    const empty = Array.from({ length: channelCount }, () => new Uint8Array(128 * 4));
-    setPatternData(empty);
+    setPatternData(Array.from({ length: channelCount }, () => new Uint8Array(128 * 4)));
   }, [channelCount]);
 
-  const editorWidth = width - SIDEBAR_WIDTH;
-  const editorHeight = height - TOOLBAR_HEIGHT;
-  const sidebarHeight = editorHeight;
-  const orderHeight = Math.floor(sidebarHeight * 0.25);
-  const instrHeight = Math.floor(sidebarHeight * 0.35);
-  const tableHeight = sidebarHeight - orderHeight - instrHeight;
+  const sidebarW = Math.min(SIDEBAR_WIDTH, Math.floor(width * 0.35));
+  const editorW = width - sidebarW;
 
   return (
-    <div style={{ width, height, display: 'flex', flexDirection: 'column', background: '#1a1a2e', color: '#e0e0ff' }}>
+    <div ref={containerRef} className="flex flex-col flex-1 min-h-0 bg-dark-bgPrimary text-ft2-text font-mono" style={propW ? { width, height } : undefined}>
       {/* Toolbar */}
-      <GTToolbar width={width} height={TOOLBAR_HEIGHT} />
+      <GTToolbar />
 
       {/* Main content */}
-      <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+      <div className="flex flex-1 min-h-0 overflow-hidden">
         {/* Pattern editor */}
         <GTPatternEditor
-          width={editorWidth}
-          height={editorHeight}
+          width={editorW}
+          height={height - 36}
           patternData={patternData}
           channelCount={channelCount}
         />
 
         {/* Sidebar */}
-        <div style={{ width: SIDEBAR_WIDTH, display: 'flex', flexDirection: 'column' }}>
+        <div className="flex flex-col border-l border-ft2-border" style={{ width: sidebarW }}>
           <GTOrderList
-            width={SIDEBAR_WIDTH}
-            height={orderHeight}
+            width={sidebarW}
+            height={Math.floor((height - 36) * 0.25)}
             channelCount={channelCount}
           />
           <GTInstrumentPanel
-            width={SIDEBAR_WIDTH}
-            height={instrHeight}
+            width={sidebarW}
+            height={Math.floor((height - 36) * 0.35)}
           />
           <GTTableEditor
-            width={SIDEBAR_WIDTH}
-            height={tableHeight}
+            width={sidebarW}
+            height={Math.floor((height - 36) * 0.40)}
           />
         </div>
       </div>

@@ -52,6 +52,7 @@ import { DJPitchSlider } from '@components/transport/DJPitchSlider';
 import { PatternMinimap } from './PatternMinimap';
 import { PianoRoll } from '../pianoroll';
 import { AutomationPanel } from '@components/automation/AutomationPanel';
+import { GTUltraView } from '@components/gtultra/GTUltraView';
 
 interface TrackerViewProps {
   onShowExport?: () => void;
@@ -505,30 +506,7 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
         <div className="flex-1 min-w-0 min-h-0 flex flex-col overflow-hidden">
           {viewMode === 'tracker' ? (
             editorMode === 'goattracker' ? (
-              <div className="flex-1 flex flex-col items-center justify-center bg-dark-bgPrimary p-8 text-center">
-                <div className="max-w-md space-y-4">
-                  <h2 className="text-xl font-bold text-text-primary mb-2">
-                    GoatTracker Ultra Editor Mode
-                  </h2>
-                  <p className="text-text-secondary mb-4">
-                    This file uses a specialized SID tracker pattern editor that's only available in WebGL mode.
-                  </p>
-                  {!/iPhone|iPod|Android.*Mobile/i.test(navigator.userAgent) && (
-                  <button
-                    onClick={() => {
-                      useSettingsStore.getState().setRenderMode('webgl');
-                      notify.success('Switched to WebGL mode');
-                    }}
-                    className="px-6 py-3 bg-accent-primary hover:bg-accent-primary/80 text-white font-semibold rounded-lg transition-colors"
-                  >
-                    Switch to WebGL Mode
-                  </button>
-                  )}
-                  <p className="text-xs text-text-muted mt-4">
-                    You can change this anytime in Settings → Display → Render Mode
-                  </p>
-                </div>
-              </div>
+              <GTUltraView />
             ) : editorMode === 'musicline' ? (
               <div className="flex-1 flex flex-col min-h-0 bg-dark-bgPrimary">
                 {/* Per-channel track table matrix */}
