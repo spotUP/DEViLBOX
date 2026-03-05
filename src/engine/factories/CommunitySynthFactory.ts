@@ -196,11 +196,11 @@ export function createBuzz3o3(config: InstrumentConfig): BuzzmachineGenerator {
         synth.setFilterFM(df.filterFmDepth);
       }
     }
-
-    // Apply normalized volume
-    const normalizedVolume = getNormalizedVolume('Buzz3o3', config.volume);
-    synth.setVolume(normalizedVolume);
   }
+
+  // Apply normalized volume (always, even without tb303 config)
+  const normalizedVolume = getNormalizedVolume('Buzz3o3', config.volume);
+  synth.output.gain.value = Tone.dbToGain(normalizedVolume);
 
   return synth;
 }
@@ -995,10 +995,11 @@ export function createBuzz3o3DF(config: InstrumentConfig): BuzzmachineGenerator 
       if (df.sweepSpeed !== undefined) synth.setSweepSpeed(df.sweepSpeed);
       if (df.filterFmDepth !== undefined) synth.setFilterFM(df.filterFmDepth);
     }
-
-    const normalizedVolume = getNormalizedVolume('Buzz3o3DF', config.volume);
-    synth.setVolume(normalizedVolume);
   }
+
+  // Apply normalized volume (always, even without tb303 config)
+  const normalizedVolume = getNormalizedVolume('Buzz3o3DF', config.volume);
+  synth.output.gain.value = Tone.dbToGain(normalizedVolume);
 
   return synth;
 }
