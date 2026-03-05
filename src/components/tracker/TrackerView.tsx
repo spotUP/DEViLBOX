@@ -504,14 +504,14 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
         {/* Pattern Editor / Grid Sequencer / Piano Roll / TB-303 Editor - Flex item 1 */}
         <div className="flex-1 min-w-0 min-h-0 flex flex-col overflow-hidden">
           {viewMode === 'tracker' ? (
-            (editorMode === 'hively' || editorMode === 'goattracker') ? (
+            editorMode === 'goattracker' ? (
               <div className="flex-1 flex flex-col items-center justify-center bg-dark-bgPrimary p-8 text-center">
                 <div className="max-w-md space-y-4">
                   <h2 className="text-xl font-bold text-text-primary mb-2">
-                    {editorMode === 'hively' ? 'HivelyTracker/AHX' : 'GoatTracker Ultra'} Editor Mode
+                    GoatTracker Ultra Editor Mode
                   </h2>
                   <p className="text-text-secondary mb-4">
-                    This file uses a specialized {editorMode === 'hively' ? 'track-based' : 'SID tracker'} pattern editor that's only available in WebGL mode.
+                    This file uses a specialized SID tracker pattern editor that's only available in WebGL mode.
                   </p>
                   {!/iPhone|iPod|Android.*Mobile/i.test(navigator.userAgent) && (
                   <button
