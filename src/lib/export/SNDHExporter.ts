@@ -363,7 +363,6 @@ function buildStubV2(frames: Uint8Array[], _numFrames: number, frameDataLen: num
   w16(0x0C, 0x41FA); w16(0x0E, FRAME_DATA - 0x0E);     // lea frame_data(pc),a0
   w16(0x10, 0x43FA); w16(0x12, FRAME_PTR - 0x12);       // lea frame_ptr(pc),a1
   w16(0x14, 0x2288);                                      // move.l a0,(a1)
-  const _FRAME_DATA_END = FRAME_DATA + frameDataLen;
   // lea frame_data_end(pc),a0 — points past last byte of frame data
   // But frame_data_end is beyond our buffer, so we use: lea frame_data(pc),a0 then adda
   // Simpler: store the offset to end. Since it's PC-relative:

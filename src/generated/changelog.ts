@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-03-05T19:19:47.397Z
+ * Generated: 2026-03-05T19:25:36.882Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.2388';
-export const BUILD_NUMBER = '2388';
-export const BUILD_HASH = '243fa3a4';
+export const BUILD_VERSION = '1.0.2391';
+export const BUILD_NUMBER = '2391';
+export const BUILD_HASH = 'b0df6a1d';
 export const BUILD_DATE = '2026-03-05';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,21 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.2388',
+    version: '1.0.2391',
     date: '2026-03-05',
     changes: [
+      {
+        type: 'fix',
+        "description": "Unused variable warnings in AdPlugParser"
+      },
+      {
+        type: 'improvement',
+        "description": "Cleanup: remove dead WASM scaffold, worklets, and engine classes"
+      },
+      {
+        type: 'feature',
+        "description": "Add referenceEngine field to FormatRegistry + export barrel updates"
+      },
       {
         type: 'feature',
         "description": "Add 9 new retro music format parsers, exporters, engines & WASM infrastructure"
@@ -216,18 +228,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'improvement',
         "description": "Reduce GC pressure and throttle VU meters to 60fps"
-      },
-      {
-        type: 'fix',
-        "description": "WebSIDPlay teardown via global module state, JSIDPlay2 remove pre-buffer delay"
-      },
-      {
-        type: 'fix',
-        "description": "Call WASM emu_teardown on engine dispose/switch to reset emulator state"
-      },
-      {
-        type: 'fix',
-        "description": "JSIDPlay2 fire-and-forget CLOCK loop, non-blocking SET_SAMPLING_RATE, better ScriptNodePlayer teardown in test page"
       }
     ]
   }
