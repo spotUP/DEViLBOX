@@ -496,9 +496,15 @@ dst[off] = src[off+2]; dst[off+1] = src[off+1]; dst[off+2] = src[off]; dst[off+3
 
 ## Skill: Debug Transpiled Replayer Channel Waveform Mismatch
 
-Systematically debug a waveform mismatch between a transpiled C replayer and UADE (reference 68k emulation) for a specific channel. Uses binary bisection of effects to isolate the problem, then printf-based debugging to fix it.
+Systematically debug a waveform mismatch between a transpiled C replayer and the UADE reference rendering for a specific channel. **UADE is the ground truth** -- it runs the original 68k assembly on an accurate Amiga emulator. The transpiled C code is correct when its output is near-binary-identical to UADE's output. Uses binary bisection of effects to isolate the problem, then printf-based debugging to fix it.
 
 Applies to **any** transpiled Amiga music replayer (SNX, TFMX, Fred, Hippel, SidMon, SoundMon, JamCracker, etc.).
+
+### Ground Truth
+
+- **UADE rendering = truth.** Render the module through UADE to produce a reference WAV.
+- **Transpiled C = candidate.** Render the same module through the transpiled native player.
+- **Goal: waveform 1:1 match.** The transpiled output is done when its waveform matches UADE's (allowing only for expected phase offset from DMA timing differences).
 
 ### Arguments
 
