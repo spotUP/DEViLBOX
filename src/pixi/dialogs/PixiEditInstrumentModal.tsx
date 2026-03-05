@@ -75,7 +75,7 @@ function twColor(tw: string): number {
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
-type ActiveTab = 'sound' | 'effects';
+type ActiveTab = 'sound' | 'effects' | 'script' | 'controls';
 
 interface PixiEditInstrumentModalProps {
   isOpen: boolean;
@@ -891,18 +891,43 @@ export const PixiEditInstrumentModal: React.FC<PixiEditInstrumentModalProps> = (
               borderColor: theme.border.color,
             }}
           >
-            <TabButton
-              label="Sound"
-              active={activeTab === 'sound'}
-              onSelect={() => setActiveTab('sound')}
-              width={RIGHT_PANEL_W / 2}
-            />
-            <TabButton
-              label="Effects"
-              active={activeTab === 'effects'}
-              onSelect={() => setActiveTab('effects')}
-              width={RIGHT_PANEL_W / 2}
-            />
+            {currentInstrument?.synthType === 'SuperCollider' ? (
+              <>
+                <TabButton
+                  label="Script"
+                  active={activeTab === 'script'}
+                  onSelect={() => setActiveTab('script')}
+                  width={RIGHT_PANEL_W / 3}
+                />
+                <TabButton
+                  label="Controls"
+                  active={activeTab === 'controls'}
+                  onSelect={() => setActiveTab('controls')}
+                  width={RIGHT_PANEL_W / 3}
+                />
+                <TabButton
+                  label="Effects"
+                  active={activeTab === 'effects'}
+                  onSelect={() => setActiveTab('effects')}
+                  width={RIGHT_PANEL_W / 3}
+                />
+              </>
+            ) : (
+              <>
+                <TabButton
+                  label="Sound"
+                  active={activeTab === 'sound'}
+                  onSelect={() => setActiveTab('sound')}
+                  width={RIGHT_PANEL_W / 2}
+                />
+                <TabButton
+                  label="Effects"
+                  active={activeTab === 'effects'}
+                  onSelect={() => setActiveTab('effects')}
+                  width={RIGHT_PANEL_W / 2}
+                />
+              </>
+            )}
           </layoutContainer>
 
           {/* ── Content area ──────────────────────────────────────────────── */}
