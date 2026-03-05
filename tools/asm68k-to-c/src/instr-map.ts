@@ -4,6 +4,37 @@ function sizeStr(size: Size): string {
   switch (size) { case 'B': return '8'; case 'W': return '16'; default: return '32'; }
 }
 
+/* ── ASM reconstruction ────────────────────────────────────────────── */
+
+/** Reconstruct an operand back to 68k assembly syntax (best-effort). */
+function asmOperand(op: Operand): string {
+  switch (op.kind) {
+    case 'register':  return op.name.toUpperCase();
+    case 'immediate': return `#${op.raw.startsWith('#') ? op.raw.slice(1) : op.raw}`;
+    case 'address':
+      if (op.mode === 'pre_dec') return `-(${op.reg.toUpperCase()})`;
+      if (op.mode === 'post_inc') return `(${op.reg.toUpperCase()})+`;
+      return `(${op.reg.toUpperCase()})`;
+    case 'disp': {
+      const off = typeof op.offset === 'number'
+        ? (op.offset < 0 ? `${op.offset}` : `${op.offset}`)
+        : op.offset;
+      return `${off}(${op.base.toUpperCase()})`;
+    }
+    case 'abs_addr':  return op.raw.startsWith('$') ? `$${op.raw.slice(1).toUpperCase()}` : op.raw;
+    case 'label_ref': return op.name;
+    case 'pc_rel':    return `${op.label}(PC)`;
+    default:          return '?';
+  }
+}
+
+/** Reconstruct the original 68k assembly text from an InstructionNode. */
+export function reconstructAsm(node: InstructionNode): string {
+  const sizeSuffix = node.size ? `.${node.size}` : '';
+  const ops = node.operands.map(asmOperand).join(',');
+  return ops ? `${node.mnemonic}${sizeSuffix}\t${ops}` : `${node.mnemonic}${sizeSuffix}`;
+}
+
 // Returns true if the value string is a simple identifier (register name or plain label)
 // that doesn't need extra parens when used in a cast.
 function isSimpleIdent(v: string): boolean {
@@ -143,6 +174,16 @@ function emitOperandRead(op: Operand, size: Size): string {
   return emitOperand(op, size);
 }
 
+/**
+ * Format a compound block as indented multi-line.
+ * Input:  ['uint8_t _mv = (uint8_t)(val);', 'dst = _mv;', 'flag_z = (_mv==0);']
+ * Output: '{\n    uint8_t _mv = ...;\n    dst = _mv;\n    flag_z = ...;\n  }'
+ * The 4-space indent inside the block keeps it visually distinct from function body (2-space).
+ */
+function block(stmts: string[]): string {
+  return '{\n' + stmts.map(s => `    ${s}`).join('\n') + '\n  }';
+}
+
 export function emitInstruction(node: InstructionNode): string {
   const { mnemonic, size, operands: ops } = node;
   const s = size ?? 'L';
@@ -166,7 +207,13 @@ export function emitInstruction(node: InstructionNode): string {
       // Capture src in a temp to avoid double-evaluation of side-effect macros.
       const mvType = s === 'B' ? 'uint8_t' : s === 'W' ? 'uint16_t' : 'uint32_t';
       const signCastM = s === 'B' ? '(int8_t)' : s === 'W' ? '(int16_t)' : '(int32_t)';
-      return `{ ${mvType} _mv=(${mvType})(${moveVal}); ${regWrite(dst, '_mv', s)} flag_z=(${signCastM}(_mv)==0); flag_n=(${signCastM}(_mv)<0); flag_v=0; flag_c=0; }`;
+      return block([
+        `${mvType} _mv = (${mvType})(${moveVal});`,
+        regWrite(dst, '_mv', s),
+        `flag_z = (${signCastM}(_mv) == 0);`,
+        `flag_n = (${signCastM}(_mv) < 0);`,
+        `flag_v = 0; flag_c = 0;`,
+      ]);
     }
 
     case 'MOVEQ': {
@@ -255,10 +302,20 @@ export function emitInstruction(node: InstructionNode): string {
       const addSign = s === 'B' ? '(int8_t)' : s === 'W' ? '(int16_t)' : '(int32_t)';
       if (dst.kind === 'register') {
         const dstExpr = s === 'L' ? dst.name : emitRegSized(dst.name, s);
-        return `{ ${addType} _ar=(${addType})(${dstExpr} + ${srcRead}); ${regWrite(dst, `(${addType})_ar`, s)} flag_z=(${addSign}(_ar)==0); flag_n=(${addSign}(_ar)<0); }`;
+        return block([
+          `${addType} _ar = (${addType})(${dstExpr} + ${srcRead});`,
+          regWrite(dst, `(${addType})_ar`, s),
+          `flag_z = (${addSign}(_ar) == 0);`,
+          `flag_n = (${addSign}(_ar) < 0);`,
+        ]);
       }
       const addRd = emitOperandRead(dst, s);
-      return `{ ${addType} _ar=(${addType})(${addRd} + ${srcRead}); ${regWrite(dst, `(${addType})_ar`, s)} flag_z=(${addSign}(_ar)==0); flag_n=(${addSign}(_ar)<0); }`;
+      return block([
+        `${addType} _ar = (${addType})(${addRd} + ${srcRead});`,
+        regWrite(dst, `(${addType})_ar`, s),
+        `flag_z = (${addSign}(_ar) == 0);`,
+        `flag_n = (${addSign}(_ar) < 0);`,
+      ]);
     }
     case 'ADDX':
       return dst ? regWrite(dst, `${emitOperandRead(dst, s)} + ${srcRead} + flag_x`, s) : '';
@@ -276,10 +333,20 @@ export function emitInstruction(node: InstructionNode): string {
       if (dst.kind === 'register') {
         const srcExpr = sizedSrc(ops[0], s);
         const dstExpr = s === 'L' ? dst.name : emitRegSized(dst.name, s);
-        return `{ ${subType} _sr=(${subType})(${dstExpr} - ${srcExpr}); ${regWrite(dst, `(${subType})_sr`, s)} flag_z=(${subSign}(_sr)==0); flag_n=(${subSign}(_sr)<0); }`;
+        return block([
+          `${subType} _sr = (${subType})(${dstExpr} - ${srcExpr});`,
+          regWrite(dst, `(${subType})_sr`, s),
+          `flag_z = (${subSign}(_sr) == 0);`,
+          `flag_n = (${subSign}(_sr) < 0);`,
+        ]);
       }
       const subRd = emitOperandRead(dst, s);
-      return `{ ${subType} _sr=(${subType})(${subRd} - ${srcRead}); ${regWrite(dst, `(${subType})_sr`, s)} flag_z=(${subSign}(_sr)==0); flag_n=(${subSign}(_sr)<0); }`;
+      return block([
+        `${subType} _sr = (${subType})(${subRd} - ${srcRead});`,
+        regWrite(dst, `(${subType})_sr`, s),
+        `flag_z = (${subSign}(_sr) == 0);`,
+        `flag_n = (${subSign}(_sr) < 0);`,
+      ]);
     }
     case 'SUBX':
       return dst ? regWrite(dst, `${emitOperandRead(dst, s)} - ${srcRead} - flag_x`, s) : '';
@@ -289,12 +356,20 @@ export function emitInstruction(node: InstructionNode): string {
     case 'DIVS': {
       if (!dst) return '';
       const dv = emitOperand(dst, 'L'), sv = src;
-      return `{ int16_t q=(int16_t)((int32_t)${dv}/(int16_t)${sv}); int16_t r=(int16_t)((int32_t)${dv}%(int16_t)${sv}); ${dv}=((uint32_t)(uint16_t)r<<16)|(uint16_t)q; }`;
+      return block([
+        `int16_t q = (int16_t)((int32_t)${dv} / (int16_t)${sv});`,
+        `int16_t r = (int16_t)((int32_t)${dv} % (int16_t)${sv});`,
+        `${dv} = ((uint32_t)(uint16_t)r << 16) | (uint16_t)q;`,
+      ]);
     }
     case 'DIVU': {
       if (!dst) return '';
       const dv = emitOperand(dst, 'L'), sv = src;
-      return `{ uint16_t q=(uint16_t)((uint32_t)${dv}/(uint16_t)${sv}); uint16_t r=(uint16_t)((uint32_t)${dv}%(uint16_t)${sv}); ${dv}=((uint32_t)r<<16)|q; }`;
+      return block([
+        `uint16_t q = (uint16_t)((uint32_t)${dv} / (uint16_t)${sv});`,
+        `uint16_t r = (uint16_t)((uint32_t)${dv} % (uint16_t)${sv});`,
+        `${dv} = ((uint32_t)r << 16) | q;`,
+      ]);
     }
 
     case 'AND':  case 'ANDI':
@@ -373,19 +448,25 @@ export function emitInstruction(node: InstructionNode): string {
 
     case 'CMP':  case 'CMPA': case 'CMPI': case 'CMPM': {
       const cmpOp = dst ?? ops[0];
-      // Evaluate both operands into temps first — either may contain READ32_POST or similar
-      // macros with side effects (register increment). Emitting them twice in a template
-      // would double-increment the register and corrupt traversal.
-      return `{ int32_t _lhs=(int32_t)(${emitOperandRead(cmpOp,s)}),_rhs=(int32_t)(${emitOperandRead(ops[0],s)}); int32_t _cmp=_lhs-_rhs; flag_z=(_cmp==0); flag_n=(_cmp<0); flag_c=((uint32_t)_lhs<(uint32_t)_rhs); }`;
+      return block([
+        `int32_t _lhs = (int32_t)(${emitOperandRead(cmpOp, s)});`,
+        `int32_t _rhs = (int32_t)(${emitOperandRead(ops[0], s)});`,
+        `int32_t _cmp = _lhs - _rhs;`,
+        `flag_z = (_cmp == 0);`,
+        `flag_n = (_cmp < 0);`,
+        `flag_c = ((uint32_t)_lhs < (uint32_t)_rhs);`,
+      ]);
     }
     case 'TST': {
-      // Capture src in a temp — src may contain READ8_POST etc. with side effects.
-      // Without this, the macro runs twice (once for flag_z, once for flag_n),
-      // double-incrementing the register and causing infinite loops.
       const tstType = s === 'B' ? 'uint8_t' : s === 'W' ? 'uint16_t' : 'uint32_t';
       const signCast = s === 'B' ? '(int8_t)' : s === 'W' ? '(int16_t)' : '(int32_t)';
       const tstSrc = ops[0] ? emitOperandRead(ops[0], s) : src;
-      return `{ ${tstType} _tst=(${tstType})(${tstSrc}); flag_z=(_tst==0); flag_n=(${signCast}(_tst)<0); flag_c=0; flag_v=0; }`;
+      return block([
+        `${tstType} _tst = (${tstType})(${tstSrc});`,
+        `flag_z = (_tst == 0);`,
+        `flag_n = (${signCast}(_tst) < 0);`,
+        `flag_c = 0; flag_v = 0;`,
+      ]);
     }
 
     case 'BRA': case 'JMP': {

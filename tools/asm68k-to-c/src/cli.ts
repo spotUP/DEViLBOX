@@ -48,7 +48,7 @@ program
         console.log(`[${name}] Paula writes: ${resolved.paulaWrites.length}`);
       }
 
-      const cOutput = emit(ast, resolved);
+      const cOutput = emit(ast, resolved, basename(inputPath));
       const finalOutput = opts.pass2 ? restructure(cOutput) : cOutput;
 
       if (opts.dryRun) {
