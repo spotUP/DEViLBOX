@@ -436,17 +436,32 @@ export function parseFuturePlayerFile(buffer: ArrayBuffer, filename: string): Tr
 
   // ── Build instruments list ──────────────────────────────────────────
 
+  // Read instrument metadata from binary for each discovered pointer
+  function getInstrumentMeta(instrPtr: number): { isWavetable: boolean; sampleSize: number } {
+    if (instrPtr === 0 || instrPtr + 16 > code.length) return { isWavetable: false, sampleSize: 0 };
+    const sampInfoPtr = rd32(code, instrPtr + 8);
+    if (sampInfoPtr === 0 || sampInfoPtr + 14 > code.length) return { isWavetable: false, sampleSize: 0 };
+    const wtFlag = rd8(code, sampInfoPtr + 8);
+    if (wtFlag !== 0) return { isWavetable: true, sampleSize: 0 };
+    const lenWords = rd16(code, sampInfoPtr + 4);
+    return { isWavetable: false, sampleSize: lenWords * 2 };
+  }
+
   // One FuturePlayerSynth per discovered instrument pointer
   const instruments: InstrumentConfig[] = [];
-  instrumentMap.forEach((id) => {
+  instrumentMap.forEach((id, instrPtr) => {
+    const meta = getInstrumentMeta(instrPtr);
+    const typeLabel = meta.isWavetable ? 'Synth' : 'Sample';
+    const sizeLabel = meta.sampleSize > 0 ? ` (${meta.sampleSize}B)` : '';
     instruments.push({
       id: `fp-instr-${id}`,
-      name: `Instrument ${id}`,
+      name: `${typeLabel} ${id}${sizeLabel}`,
       type: 'synth' as const,
       synthType: 'FuturePlayerSynth' as const,
       effects: [],
       volume: -6,
       pan: 0,
+      metadata: { fpInstrPtr: instrPtr, fpIsWavetable: meta.isWavetable, fpSampleSize: meta.sampleSize },
     } as unknown as InstrumentConfig);
   });
 
