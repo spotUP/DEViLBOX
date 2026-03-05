@@ -473,6 +473,7 @@ export function downloadAsNKSF(
     comment?: string;
     category?: PresetCategory;
     tags?: string[];
+    includePreview?: boolean;
   }
 ): void {
   const nksPreset = instrumentConfigToNKSPreset(config, options);
@@ -481,7 +482,8 @@ export function downloadAsNKSF(
   const blob = new Blob([buffer], { type: 'application/octet-stream' });
   const url = URL.createObjectURL(blob);
 
-  const filename = `${options?.name || config.name || 'preset'}.nksf`;
+  const presetName = options?.name || config.name || 'preset';
+  const filename = `${presetName}.nksf`;
 
   const a = document.createElement('a');
   a.href = url;
@@ -489,6 +491,18 @@ export function downloadAsNKSF(
   a.click();
 
   URL.revokeObjectURL(url);
+
+  // Generate and download preview audio alongside the .nksf
+  if (options?.includePreview) {
+    import('./previewGenerator').then(({ generatePreview, downloadPreview, getPreviewPattern }) => {
+      const pattern = getPreviewPattern(config.synthType, options?.category);
+      generatePreview(config, { pattern }).then((result) => {
+        downloadPreview(result, presetName);
+      }).catch((err) => {
+        console.warn('Preview generation failed:', err);
+      });
+    });
+  }
 }
 
 /**
