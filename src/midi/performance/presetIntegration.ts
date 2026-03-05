@@ -11,7 +11,7 @@
 import type { InstrumentConfig, SynthType } from '@typedefs/instrument';
 import type { NKSPreset, NKSPresetMetadata, NKSParameter } from './types';
 import { NKS_CONSTANTS } from './types';
-import { getNKSParametersForSynth } from './synthParameterMaps';
+import { getNKSParametersForSynth, getNKS2Profile } from './synthParameterMaps';
 import { writeNKSF, parseNKSF } from './NKSFileFormat';
 import type { UserPreset, PresetCategory } from '@/stores/usePresetStore';
 import {
@@ -231,10 +231,15 @@ export function instrumentConfigToNKSPreset(
   // Store the full config as a JSON blob for roundtrip
   const configBlob = new TextEncoder().encode(JSON.stringify(config));
 
+  // Build NKS2 profile for hierarchical navigation + PDI
+  const nks2Profile = getNKS2Profile(synthType);
+
   return {
     metadata,
     parameters: parameterValues,
     blob: configBlob.buffer,
+    nks2Navigation: nks2Profile.navigation,
+    nks2PDI: nks2Profile.parameters.map(p => p.pdi),
   };
 }
 

@@ -5,7 +5,7 @@
  * This enables hardware control via Komplete Kontrol, Maschine, etc.
  */
 
-import type { NKSParameter, NKSPage, NKS2PDI, NKS2Parameter, NKS2PerformanceSection, NKS2SynthProfile, NKS2Navigation } from './types';
+import type { NKSParameter, NKSPage, NKS2PDI, NKS2Parameter, NKS2PerformanceSection, NKS2EditGroup, NKS2EditSection, NKS2SynthProfile, NKS2Navigation } from './types';
 import { NKSParameterType, NKSSection } from './types';
 import type { SynthType } from '@typedefs/instrument';
 
@@ -1028,6 +1028,53 @@ export function getNKSParametersForSynth(synthType: SynthType): NKSParameter[] {
   return SYNTH_PARAMETER_MAPS[synthType] || GENERIC_NKS_PARAMETERS;
 }
 
+// ============================================================================
+// NKS2 PRODUCT VISUAL IDENTITY
+// Per-synth color, shortname, and control color for NI hardware display
+// ============================================================================
+
+export interface SynthVisualIdentity {
+  color: string;         // Background color (hex)
+  controlColor: number;  // NI display accent color (0xRRGGBB)
+  shortName: string;     // Max 12 chars per SDK spec
+}
+
+export const SYNTH_VISUAL_IDENTITY: Partial<Record<SynthType, SynthVisualIdentity>> = {
+  'TB303':        { color: '#FF6600', controlColor: 0xFF6600, shortName: 'TB303' },
+  'Dexed':        { color: '#3366FF', controlColor: 0x3366FF, shortName: 'Dexed' },
+  'OBXd':         { color: '#CC3333', controlColor: 0xCC3333, shortName: 'OB-Xd' },
+  'V2':           { color: '#8833CC', controlColor: 0x8833CC, shortName: 'V2 Synth' },
+  'MonoSynth':    { color: '#00CC66', controlColor: 0x00CC66, shortName: 'MonoSynth' },
+  'DuoSynth':     { color: '#009999', controlColor: 0x009999, shortName: 'DuoSynth' },
+  'PolySynth':    { color: '#6633CC', controlColor: 0x6633CC, shortName: 'PolySynth' },
+  'FMSynth':      { color: '#CC6600', controlColor: 0xCC6600, shortName: 'FM Synth' },
+  'AMSynth':      { color: '#CC9900', controlColor: 0xCC9900, shortName: 'AM Synth' },
+  'SuperSaw':     { color: '#FF3366', controlColor: 0xFF3366, shortName: 'SuperSaw' },
+  'Organ':        { color: '#996633', controlColor: 0x996633, shortName: 'Organ' },
+  'DrumMachine':  { color: '#CC0033', controlColor: 0xCC0033, shortName: 'DrumMachine' },
+  'ChipSynth':    { color: '#33CC33', controlColor: 0x33CC33, shortName: 'ChipSynth' },
+  'WobbleBass':   { color: '#FF0066', controlColor: 0xFF0066, shortName: 'WobbleBass' },
+  'StringMachine': { color: '#663399', controlColor: 0x663399, shortName: 'StringMach' },
+  'GranularSynth': { color: '#339999', controlColor: 0x339999, shortName: 'Granular' },
+  'Wavetable':    { color: '#3399CC', controlColor: 0x3399CC, shortName: 'Wavetable' },
+  'DubSiren':     { color: '#FF3300', controlColor: 0xFF3300, shortName: 'DubSiren' },
+  'SpaceLaser':   { color: '#00CCFF', controlColor: 0x00CCFF, shortName: 'SpaceLaser' },
+  'Synare':       { color: '#FF6633', controlColor: 0xFF6633, shortName: 'Synare' },
+  'Vital':        { color: '#FF00CC', controlColor: 0xFF00CC, shortName: 'Vital' },
+  'Odin2':        { color: '#6600CC', controlColor: 0x6600CC, shortName: 'Odin2' },
+  'Surge':        { color: '#0066CC', controlColor: 0x0066CC, shortName: 'Surge' },
+  'Monique':      { color: '#CC0066', controlColor: 0xCC0066, shortName: 'Monique' },
+  'Sam':          { color: '#66CC00', controlColor: 0x66CC00, shortName: 'Sam' },
+};
+
+const DEFAULT_VISUAL_IDENTITY: SynthVisualIdentity = {
+  color: '#1A1A2E', controlColor: 0x00DDFF, shortName: 'DEViLBOX',
+};
+
+export function getSynthVisualIdentity(synthType: SynthType): SynthVisualIdentity {
+  return SYNTH_VISUAL_IDENTITY[synthType] || DEFAULT_VISUAL_IDENTITY;
+}
+
 /**
  * Build NKS pages from parameters
  */
@@ -1120,29 +1167,86 @@ export function formatNKSValue(param: NKSParameter, value: number): string {
  * Infer NKS2 PDI from an NKS1 parameter definition.
  * This allows existing parameter maps to work with NKS2 without rewriting.
  */
+// SDK-standard waveform display_values that trigger hardware icons on Kontrol MK3
+const WAVEFORM_VALUE_MAP: Record<string, string> = {
+  'saw': 'saw', 'sawtooth': 'saw', 'ramp': 'saw',
+  'square': 'square', 'pulse': 'square', 'pwm': 'pwm',
+  'triangle': 'triangle', 'tri': 'triangle',
+  'sine': 'sine', 'sin': 'sine',
+  'noise': 'noise', 's&h': 'noise', 'random': 'noise',
+  'wavetable': 'wavetable', 'wt': 'wavetable',
+  'fm': 'complex', 'complex': 'complex',
+  'off': 'default',
+};
+
+// SDK-standard filter type display_values
+const FILTER_VALUE_MAP: Record<string, string> = {
+  'low': 'lo_pass', 'lowpass': 'lo_pass', 'lp': 'lo_pass', 'lpf': 'lo_pass', 'moogl': 'lo_pass',
+  'high': 'hi_pass', 'highpass': 'hi_pass', 'hp': 'hi_pass', 'hpf': 'hi_pass', 'moogh': 'hi_pass',
+  'band': 'band_pass', 'bandpass': 'band_pass', 'bp': 'band_pass', 'bpf': 'band_pass',
+  'notch': 'band_reject', 'bandreject': 'band_reject', 'br': 'band_reject',
+  'all': 'all_pass', 'allpass': 'all_pass', 'ap': 'all_pass',
+  'comb': 'comb',
+  'off': 'default',
+};
+
+/**
+ * Map raw valueStrings to SDK-standard display_values for hardware icon rendering.
+ */
+function mapDisplayValues(valueStrings: string[], mapping: Record<string, string>): string[] {
+  return valueStrings.map(v => {
+    const key = v.toLowerCase().replace(/[^a-z0-9&]/g, '');
+    return mapping[key] || 'default';
+  });
+}
+
 export function inferNKS2PDI(param: NKSParameter): NKS2PDI {
   // If param already has explicit PDI, use it
   if (param.pdi) return param.pdi;
 
   switch (param.type) {
-    case NKSParameterType.BOOLEAN:
+    case NKSParameterType.BOOLEAN: {
+      // Detect tempo sync toggles
+      const lowerName = param.name.toLowerCase();
+      if (lowerName.includes('sync') || lowerName.includes('tempo')) {
+        return { type: 'toggle', style: 'temposync' };
+      }
       return { type: 'toggle', style: 'power' };
+    }
 
     case NKSParameterType.SELECTOR: {
       const count = param.valueStrings?.length ?? Math.round(param.max - param.min + 1);
-      // Detect waveform and filter type selectors by name
       const lowerName = param.name.toLowerCase();
-      let style: NKS2PDI['style'] = 'menu';
-      if (lowerName.includes('wave') || lowerName.includes('osc type') || lowerName.includes('waveform')) {
+      let style: NKS2PDI['style'] = count > 20 ? 'menuXL' : 'menu';
+      let display_values = param.valueStrings;
+
+      // Detect waveform selectors
+      if (lowerName.includes('wave') || lowerName.includes('osc type') || lowerName.includes('waveform')
+        || lowerName.includes('shape') || (lowerName.includes('osc') && lowerName.includes('mode'))) {
         style = 'waveform';
-      } else if (lowerName.includes('filter') && (lowerName.includes('mode') || lowerName.includes('type'))) {
+        if (param.valueStrings) {
+          display_values = mapDisplayValues(param.valueStrings, WAVEFORM_VALUE_MAP);
+        }
+      // Detect filter type selectors
+      } else if ((lowerName.includes('filt') || lowerName.includes('flt'))
+        && (lowerName.includes('mode') || lowerName.includes('type') || lowerName.includes('select'))) {
         style = 'filterType';
+        if (param.valueStrings) {
+          display_values = mapDisplayValues(param.valueStrings, FILTER_VALUE_MAP);
+        }
+      // Detect LFO waveform selectors
+      } else if (lowerName.includes('lfo') && (lowerName.includes('wave') || lowerName.includes('shape'))) {
+        style = 'waveform';
+        if (param.valueStrings) {
+          display_values = mapDisplayValues(param.valueStrings, WAVEFORM_VALUE_MAP);
+        }
       }
+
       return {
         type: 'discrete',
         style,
         value_count: count,
-        display_values: param.valueStrings,
+        display_values,
       };
     }
 
@@ -1287,39 +1391,172 @@ export function toNKS2Parameter(param: NKSParameter): NKS2Parameter {
   };
 }
 
+// NKS2 Edit Group ordering — maps NKSSection to a display order and group name
+const SECTION_GROUP_ORDER: Record<string, { order: number; groupName: string }> = {
+  [NKSSection.SYNTHESIS]: { order: 0, groupName: 'Oscillator' },
+  [NKSSection.FILTER]: { order: 1, groupName: 'Filter' },
+  [NKSSection.ENVELOPE]: { order: 2, groupName: 'Envelope' },
+  [NKSSection.LFO]: { order: 3, groupName: 'LFO' },
+  [NKSSection.MODULATION]: { order: 4, groupName: 'Modulation' },
+  [NKSSection.EFFECTS]: { order: 5, groupName: 'Effects' },
+  [NKSSection.SEQUENCER]: { order: 6, groupName: 'Sequencer' },
+  [NKSSection.ARP]: { order: 7, groupName: 'Arpeggiator' },
+  [NKSSection.MACRO]: { order: 8, groupName: 'Macro' },
+  [NKSSection.MIXER]: { order: 9, groupName: 'Mixer' },
+  [NKSSection.OUTPUT]: { order: 10, groupName: 'Output' },
+};
+
+/**
+ * Build proper hierarchical NKS2 Edit Groups from NKS1 parameters.
+ * Groups params by NKSSection, then subdivides into subsections using
+ * the param's `subsection` hint or auto-detected clusters (e.g., "Osc 1" vs "Osc 2",
+ * "Amp Env" vs "Filter Env"). Enforces SDK limit of 48 params per group.
+ */
+export function buildNKS2EditGroups(nks1Params: NKSParameter[]): NKS2EditGroup[] {
+  // Group params by their NKSSection
+  const sectionMap = new Map<string, NKSParameter[]>();
+  for (const param of nks1Params) {
+    if (param.isAutomatable === false) continue;
+    const key = param.section;
+    if (!sectionMap.has(key)) sectionMap.set(key, []);
+    sectionMap.get(key)!.push(param);
+  }
+
+  const editGroups: NKS2EditGroup[] = [];
+
+  for (const [sectionKey, params] of sectionMap.entries()) {
+    const groupInfo = SECTION_GROUP_ORDER[sectionKey] || { order: 99, groupName: sectionKey };
+
+    // Subdivide into subsections by explicit `subsection` hint or auto-detect
+    const subsectionMap = new Map<string, NKSParameter[]>();
+    for (const param of params) {
+      const sub = param.subsection || inferSubsection(param, sectionKey);
+      if (!subsectionMap.has(sub)) subsectionMap.set(sub, []);
+      subsectionMap.get(sub)!.push(param);
+    }
+
+    // Build sections preserving original param order (by page, then index)
+    const sections: NKS2EditSection[] = [];
+    for (const [subName, subParams] of subsectionMap.entries()) {
+      subParams.sort((a, b) => a.page !== b.page ? a.page - b.page : a.index - b.index);
+      sections.push({
+        name: subName,
+        parameters: subParams.map(toNKS2Parameter),
+      });
+    }
+
+    // Enforce SDK limit: max 48 params per group. If over, split into numbered groups.
+    const totalParams = sections.reduce((sum, s) => sum + s.parameters.length, 0);
+    if (totalParams <= 48) {
+      editGroups.push({ name: groupInfo.groupName, sections, _order: groupInfo.order } as NKS2EditGroup & { _order: number });
+    } else {
+      // Split sections into chunks that fit within 48 params
+      let chunk: NKS2EditSection[] = [];
+      let chunkCount = 0;
+      let groupNum = 1;
+      for (const section of sections) {
+        if (chunkCount + section.parameters.length > 48 && chunk.length > 0) {
+          editGroups.push({ name: `${groupInfo.groupName} ${groupNum}`, sections: chunk, _order: groupInfo.order + (groupNum - 1) * 0.01 } as NKS2EditGroup & { _order: number });
+          groupNum++;
+          chunk = [];
+          chunkCount = 0;
+        }
+        chunk.push(section);
+        chunkCount += section.parameters.length;
+      }
+      if (chunk.length > 0) {
+        const name = groupNum > 1 ? `${groupInfo.groupName} ${groupNum}` : groupInfo.groupName;
+        editGroups.push({ name, sections: chunk, _order: groupInfo.order + (groupNum - 1) * 0.01 } as NKS2EditGroup & { _order: number });
+      }
+    }
+  }
+
+  // Sort by synth-logical order (Osc → Filter → Env → LFO → FX → Output)
+  editGroups.sort((a, b) => ((a as any)._order ?? 99) - ((b as any)._order ?? 99));
+
+  // Strip internal _order property
+  return editGroups.map(({ name, sections }) => ({ name, sections }));
+}
+
+/**
+ * Auto-detect subsection from param name patterns when no explicit hint is set.
+ * E.g., "Osc1 Wave" → "Osc 1", "Amp Attack" → "Amp Env", "Flt1 Cutoff" → "Filter 1"
+ */
+function inferSubsection(param: NKSParameter, sectionKey: string): string {
+  const name = param.name;
+
+  // Oscillator subsections: Osc1/Osc2 patterns
+  if (sectionKey === NKSSection.SYNTHESIS) {
+    if (/\bOsc\s*1\b/i.test(name)) return 'Osc 1';
+    if (/\bOsc\s*2\b/i.test(name)) return 'Osc 2';
+    if (/\bOsc\s*3\b/i.test(name)) return 'Osc 3';
+  }
+
+  // Filter subsections: Flt1/Flt2 or Filter 1/2
+  if (sectionKey === NKSSection.FILTER) {
+    if (/\bFlt\s*1\b/i.test(name) || /\bFilter\s*1\b/i.test(name)) return 'Filter 1';
+    if (/\bFlt\s*2\b/i.test(name) || /\bFilter\s*2\b/i.test(name)) return 'Filter 2';
+  }
+
+  // Envelope subsections: Amp vs Filter envelopes
+  if (sectionKey === NKSSection.ENVELOPE) {
+    if (/\bAmp\b/i.test(name)) return 'Amp Env';
+    if (/\bFlt\b/i.test(name) || /\bFilter\b/i.test(name) || /\bFil\b/i.test(name)) return 'Filter Env';
+    if (/\bEnv\s*2\b/i.test(name) || /\bMod\s*Env\b/i.test(name)) return 'Mod Env';
+    if (/\bEnv\s*3\b/i.test(name)) return 'Env 3';
+  }
+
+  // Effects subsections: Delay, Reverb, Distortion, Chorus, etc.
+  if (sectionKey === NKSSection.EFFECTS) {
+    if (/\bDelay\b/i.test(name)) return 'Delay';
+    if (/\bReverb\b/i.test(name)) return 'Reverb';
+    if (/\bDist\b/i.test(name) || /\bDrive\b/i.test(name)) return 'Distortion';
+    if (/\bChorus\b/i.test(name)) return 'Chorus';
+    if (/\bPhaser\b/i.test(name)) return 'Phaser';
+    if (/\bFlanger\b/i.test(name)) return 'Flanger';
+  }
+
+  // LFO subsections
+  if (sectionKey === NKSSection.LFO) {
+    if (/\bLFO\s*1\b/i.test(name)) return 'LFO 1';
+    if (/\bLFO\s*2\b/i.test(name)) return 'LFO 2';
+    if (/\bLFO\s*3\b/i.test(name)) return 'LFO 3';
+  }
+
+  // Default: use the group name itself as subsection
+  const groupInfo = SECTION_GROUP_ORDER[sectionKey];
+  return groupInfo?.groupName || sectionKey;
+}
+
 /**
  * Build an NKS2 synth profile from an NKS1 parameter array.
- * Performance mode uses page 0 (first 8 params).
- * Additional pages become additional performance sections or edit groups.
+ * Performance mode uses pages 0-1 (first 8-16 most important params).
+ * Edit mode uses hierarchical groups organized by NKSSection with subsections.
  */
 export function buildNKS2Profile(synthType: SynthType): NKS2SynthProfile {
   const nks1Params = getNKSParametersForSynth(synthType);
-  const nks2Params = nks1Params.map(toNKS2Parameter);
+  const nks2Params = nks1Params.filter(p => p.isAutomatable !== false).map(toNKS2Parameter);
 
-  // Build performance sections from NKS1 pages
+  // Build performance sections from NKS1 pages 0-1 (max 16 params)
   const pages = buildNKSPages(nks1Params);
   const performance: NKS2PerformanceSection[] = pages.slice(0, 2).map(page => ({
     name: page.name,
     parameters: page.parameters.map(toNKS2Parameter),
   }));
 
-  // Remaining pages become edit groups (if any)
-  const editGroups = pages.length > 2
-    ? pages.slice(2).map(page => ({
-        name: page.name,
-        sections: [{ name: page.name, parameters: page.parameters.map(toNKS2Parameter) }],
-      }))
-    : undefined;
+  // Build proper hierarchical edit groups from all params
+  const editGroups = buildNKS2EditGroups(nks1Params);
 
   const navigation: NKS2Navigation = {
     performance,
-    editGroups,
+    editGroups: editGroups.length > 0 ? editGroups : undefined,
   };
 
   return {
     synthType,
     parameters: nks2Params,
     navigation,
+    controlColor: getSynthVisualIdentity(synthType).controlColor,
   };
 }
 
