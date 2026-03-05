@@ -18,6 +18,8 @@ export interface SCGuiRendererProps {
   gui: SCGuiParseResult;
   /** Called when a widget action fires a synth param change */
   onParamChange?: (param: string, value: number) => void;
+  /** Called when user clicks "Generate Pattern" on a routine view */
+  onGeneratePattern?: (routine: SCRoutinePattern) => void;
   /** Optional className on the root container */
   className?: string;
 }
@@ -241,7 +243,10 @@ function midiToNoteName(midi: number): string {
   return `${NOTE_NAMES[midi % 12]}${oct}`;
 }
 
-const RoutinePatternView: React.FC<{ routine: SCRoutinePattern }> = ({ routine }) => {
+const RoutinePatternView: React.FC<{
+  routine: SCRoutinePattern;
+  onGeneratePattern?: (routine: SCRoutinePattern) => void;
+}> = ({ routine, onGeneratePattern }) => {
   const { pitches, gates, steps, bpm, rootNote } = routine;
   const root = rootNote ?? 60;
 
@@ -317,6 +322,23 @@ const RoutinePatternView: React.FC<{ routine: SCRoutinePattern }> = ({ routine }
           </div>
         ))}
       </div>
+      {onGeneratePattern && (
+        <button
+          onClick={() => onGeneratePattern(routine)}
+          style={{
+            marginTop: 6,
+            padding: '3px 10px',
+            fontSize: 10,
+            background: 'rgba(80,160,255,0.15)',
+            color: 'rgb(80,160,255)',
+            border: '1px solid rgba(80,160,255,0.3)',
+            borderRadius: 3,
+            cursor: 'pointer',
+          }}
+        >
+          Generate Tracker Pattern
+        </button>
+      )}
     </div>
   );
 };
@@ -371,6 +393,7 @@ function groupWidgetsIntoRows(widgets: SCWidget[]): WidgetRow[] {
 export const SCGuiRenderer: React.FC<SCGuiRendererProps> = ({
   gui,
   onParamChange,
+  onGeneratePattern,
   className,
 }) => {
   const rows = useMemo(() => groupWidgetsIntoRows(gui.widgets), [gui.widgets]);
@@ -430,7 +453,7 @@ export const SCGuiRenderer: React.FC<SCGuiRendererProps> = ({
       ))}
 
       {/* Routine step-sequencer pattern */}
-      {gui.routine && <RoutinePatternView routine={gui.routine} />}
+      {gui.routine && <RoutinePatternView routine={gui.routine} onGeneratePattern={onGeneratePattern} />}
     </div>
   );
 };
