@@ -10,7 +10,7 @@ import { getChipSynthDef, type ChipParameterDef } from '@constants/chipParameter
 import { Knob } from '@components/controls/Knob';
 import { useThemeStore } from '@stores';
 import type { SynthType } from '@typedefs/instrument';
-import JSZip from 'jszip';
+import type JSZipType from 'jszip';
 import { VowelEditor } from './VowelEditor';
 import { ScrollLockContainer } from '@components/ui/ScrollLockContainer';
 
@@ -78,10 +78,11 @@ export const ChipSynthControls: React.FC<ChipSynthControlsProps> = ({
 
     if (file.name.toLowerCase().endsWith('.zip')) {
       try {
+        const JSZip = (await import('jszip')).default;
         const zip = new JSZip();
         const loadedZip = await zip.loadAsync(file);
 
-        const files: { name: string; entry: JSZip.JSZipObject }[] = [];
+        const files: { name: string; entry: JSZipType.JSZipObject }[] = [];
         loadedZip.forEach((relativePath, zipEntry) => {
           const isMetadata = relativePath.toLowerCase().match(/\.(txt|md|pdf|url|inf)$/);
           if (!zipEntry.dir && !isMetadata) {

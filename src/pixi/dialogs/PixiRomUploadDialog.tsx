@@ -12,7 +12,7 @@ import { pickFile } from '../services/glFilePicker';
 import { useRomDialogStore } from '@/stores/useRomDialogStore';
 import { useInstrumentStore } from '@/stores/useInstrumentStore';
 import { getToneEngine } from '@engine/ToneEngine';
-import JSZip from 'jszip';
+import type JSZipType from 'jszip';
 
 const MODAL_W = 460;
 const MODAL_H = 380;
@@ -41,10 +41,11 @@ export const PixiRomUploadDialog: React.FC = () => {
       const { instrumentId, synthType } = pendingRomRequest;
 
       if (file.name.toLowerCase().endsWith('.zip')) {
+        const JSZip = (await import('jszip')).default;
         const zip = new JSZip();
         const loadedZip = await zip.loadAsync(file);
 
-        const files: { name: string; entry: JSZip.JSZipObject }[] = [];
+        const files: { name: string; entry: JSZipType.JSZipObject }[] = [];
         loadedZip.forEach((relativePath, zipEntry) => {
           const isMetadata = relativePath.toLowerCase().match(/\.(txt|md|pdf|url|inf)$/);
           if (!zipEntry.dir && !isMetadata) {

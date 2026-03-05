@@ -7,7 +7,7 @@ import { useThemeStore } from '@stores';
 import { MAMEVFXVoiceMatrix } from './MAMEVFXVoiceMatrix';
 import { MAMEDOCVoiceMatrix } from './MAMEDOCVoiceMatrix';
 import { MAMERSAVoiceMatrix } from './MAMERSAVoiceMatrix';
-import JSZip from 'jszip';
+import type JSZipType from 'jszip';
 
 interface MAMEControlsProps {
   config: MAMEConfig;
@@ -55,11 +55,12 @@ export const MAMEControls: React.FC<MAMEControlsProps> = ({
 
     if (file.name.toLowerCase().endsWith('.zip')) {
       try {
+        const JSZip = (await import('jszip')).default;
         const zip = new JSZip();
         const loadedZip = await zip.loadAsync(file);
         
         // Get all files, filter out directories and metadata/text files
-        const files: { name: string, entry: JSZip.JSZipObject }[] = [];
+        const files: { name: string, entry: JSZipType.JSZipObject }[] = [];
         loadedZip.forEach((relativePath, zipEntry) => {
           const isMetadata = relativePath.toLowerCase().match(/\.(txt|md|txt|pdf|url|inf)$/);
           if (!zipEntry.dir && !isMetadata) {

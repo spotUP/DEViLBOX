@@ -18,7 +18,6 @@
  * - RF5C400: Ricoh PCM (varies)
  */
 
-import JSZip from 'jszip';
 import { normalizeUrl } from '@/utils/urlUtils';
 
 export interface ROMFile {
@@ -271,6 +270,7 @@ async function loadFromZip(zipPath: string, config: ChipROMConfig): Promise<Uint
       return null;
     }
 
+    const JSZip = (await import('jszip')).default;
     const zip = await JSZip.loadAsync(arrayBuffer);
 
     // Calculate max size needed (only from files with known sizes)

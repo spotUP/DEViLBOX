@@ -13,7 +13,7 @@ import { useRomDialogStore } from '@/stores/useRomDialogStore';
 import { useInstrumentStore } from '@/stores/useInstrumentStore';
 import { getToneEngine } from '@engine/ToneEngine';
 import { HardDrive, Upload, Check, X, AlertTriangle } from 'lucide-react';
-import JSZip from 'jszip';
+import type JSZipType from 'jszip';
 
 export const RomUploadDialog: React.FC = () => {
   const { pendingRomRequest, dismissRomDialog } = useRomDialogStore();
@@ -37,10 +37,11 @@ export const RomUploadDialog: React.FC = () => {
 
       if (file.name.toLowerCase().endsWith('.zip')) {
         // Extract files from ZIP and load as ROM banks
+        const JSZip = (await import('jszip')).default;
         const zip = new JSZip();
         const loadedZip = await zip.loadAsync(file);
 
-        const files: { name: string; entry: JSZip.JSZipObject }[] = [];
+        const files: { name: string; entry: JSZipType.JSZipObject }[] = [];
         loadedZip.forEach((relativePath, zipEntry) => {
           const isMetadata = relativePath.toLowerCase().match(/\.(txt|md|pdf|url|inf)$/);
           if (!zipEntry.dir && !isMetadata) {
