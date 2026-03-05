@@ -17,7 +17,7 @@ import { usePixiTheme } from '../../theme';
 import { PIXI_FONTS } from '../../fonts';
 import { FAD_ICONS } from '../../fontaudioIcons';
 import { usePixiDropdownStore } from '../../stores/usePixiDropdownStore';
-import { useUIStore } from '@stores';
+import { useUIStore, useInstrumentStore } from '@stores';
 import { useLiveModeStore } from '@stores/useLiveModeStore';
 import { useTrackerStore } from '@stores/useTrackerStore';
 import { GENERATORS, type GeneratorType } from '@utils/patternGenerators';
@@ -194,6 +194,9 @@ export const PixiChannelHeaders: React.FC<PixiChannelHeadersProps> = ({
   }, [clipMask]);
   // For double-click detection on channel name
   const lastClickRef = useRef<{ time: number; ch: number }>({ time: 0, ch: -1 });
+
+  // Instrument type lookup for channel badges (SC, TB303, etc.)
+  const instruments = useInstrumentStore(s => s.instruments);
 
   const numChannels = pattern.channels.length;
 
@@ -473,6 +476,10 @@ export const PixiChannelHeaders: React.FC<PixiChannelHeadersProps> = ({
 
       const hasSpeed = channelSpeeds && channelSpeeds[ch] !== undefined && channelSpeeds[ch] !== songInitialSpeed;
 
+      // Check if this channel's instrument is SuperCollider
+      const chInstr = channel.instrumentId != null ? instruments[channel.instrumentId] : null;
+      const isSC = chInstr?.synthType === 'SuperCollider';
+
       if (isCollapsed) {
         // Collapsed: channel number + expand button
         headers.push(
@@ -578,6 +585,26 @@ export const PixiChannelHeaders: React.FC<PixiChannelHeadersProps> = ({
                   text={`S:${channelSpeeds![ch]}`}
                   style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 8, fill: 0xffffff }}
                   tint={0xfbbf24}
+                  layout={LAYOUT_EMPTY}
+                />
+              </pixiContainer>
+            )}
+            {isSC && (
+              <pixiContainer layout={LAYOUT_GEN_BADGE_ROW}>
+                <pixiGraphics
+                  draw={(g: GraphicsType) => {
+                    g.clear();
+                    g.roundRect(0, 0, 20, 12, 2);
+                    g.fill({ color: 0x00cc66, alpha: 0.2 });
+                    g.roundRect(0, 0, 20, 12, 2);
+                    g.stroke({ color: 0x00cc66, alpha: 0.5, width: 1 });
+                  }}
+                  layout={{ position: 'absolute', width: 20, height: 12 }}
+                />
+                <pixiBitmapText
+                  text="SC"
+                  style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 7, fill: 0xffffff }}
+                  tint={0x00cc66}
                   layout={LAYOUT_EMPTY}
                 />
               </pixiContainer>
@@ -705,6 +732,7 @@ export const PixiChannelHeaders: React.FC<PixiChannelHeadersProps> = ({
   }, [
     numChannels, pattern.channels, channelWidths, channelOffsets, scrollLeft,
     theme, showChannelNames, channelSpeeds, songInitialSpeed, editingChannel, editValue,
+    instruments,
     onToggleMute, onToggleSolo, onToggleCollapse, onAddChannel,
     openContextMenu, openColorPicker, startEditing,
     drawMuteBtn, drawSoloBtn, drawCollapseBtn, drawContextBtn, drawColorBtn, drawAddBtn, drawHoverBtn,
