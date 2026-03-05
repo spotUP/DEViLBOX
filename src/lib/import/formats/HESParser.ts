@@ -62,8 +62,8 @@ export function parseHESFile(buffer: ArrayBuffer, filename?: string): TrackerSon
   const buf = new Uint8Array(buffer);
   if (!isHESFormat(buffer)) throw new Error('Not a valid HES file');
 
-  const version   = buf[4];
-  const firstSong = buf[5];
+  const _version   = buf[4];
+  const _firstSong = buf[5];
   const dv        = new DataView(buffer);
   const _reqAddr  = dv.getUint16(6, true);
   const _dataStart = dv.getUint32(8, true);

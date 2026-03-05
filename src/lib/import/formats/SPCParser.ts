@@ -171,7 +171,7 @@ function readDIR(buf: Uint8Array): number {
 
 // ── Instrument Builder ────────────────────────────────────────────────────────
 
-function buildInstruments(voices: VoiceInfo[]): InstrumentConfig[] {
+function buildInstruments(_voices: VoiceInfo[]): InstrumentConfig[] {
   const insts: InstrumentConfig[] = [];
   for (let v = 0; v < 8; v++) {
     insts.push({
