@@ -28,6 +28,59 @@ const DIV_INS_OPL = 14;
 const DIV_INS_OPZ = 19;
 const DIV_INS_ESFM = 55;
 
+/**
+ * Map FurnaceDispatchPlatform → correct chipType for instrument encoding.
+ * This ensures that when a generic config (e.g. DEFAULT_FURNACE with chipType=1)
+ * is uploaded to a specific chip, the instrument type matches what the chip expects.
+ * Without this, a 4-op OPN2 instrument could be uploaded to a 2-op OPL chip,
+ * causing silence or wrong register writes.
+ */
+const PLATFORM_TO_CHIPTYPE: Record<number, number> = {
+  // OPN family → chipType 0
+  [FurnaceDispatchPlatform.GENESIS]: 0,
+  [FurnaceDispatchPlatform.YM2612]: 0,
+  [FurnaceDispatchPlatform.YM2612_EXT]: 0,
+  [FurnaceDispatchPlatform.YM2612_DUALPCM]: 0,
+  [FurnaceDispatchPlatform.YM2612_DUALPCM_EXT]: 0,
+  [FurnaceDispatchPlatform.YM2612_CSM]: 0,
+  [FurnaceDispatchPlatform.YM2203]: 0,
+  [FurnaceDispatchPlatform.YM2203_EXT]: 0,
+  [FurnaceDispatchPlatform.YM2203_CSM]: 0,
+  [FurnaceDispatchPlatform.YM2608]: 0,
+  [FurnaceDispatchPlatform.YM2608_EXT]: 0,
+  [FurnaceDispatchPlatform.YM2608_CSM]: 0,
+  [FurnaceDispatchPlatform.YM2610]: 0,
+  [FurnaceDispatchPlatform.YM2610_EXT]: 0,
+  [FurnaceDispatchPlatform.YM2610_FULL]: 0,
+  [FurnaceDispatchPlatform.YM2610_FULL_EXT]: 0,
+  [FurnaceDispatchPlatform.YM2610_CSM]: 0,
+  [FurnaceDispatchPlatform.YM2610B]: 0,
+  [FurnaceDispatchPlatform.YM2610B_EXT]: 0,
+  [FurnaceDispatchPlatform.YM2610B_CSM]: 0,
+  // OPM → chipType 1
+  [FurnaceDispatchPlatform.YM2151]: 1,
+  // OPL family → chipType 2
+  [FurnaceDispatchPlatform.OPL]: 2,
+  [FurnaceDispatchPlatform.OPL2]: 2,
+  [FurnaceDispatchPlatform.OPL3]: 2,
+  [FurnaceDispatchPlatform.OPL_DRUMS]: 2,
+  [FurnaceDispatchPlatform.OPL2_DRUMS]: 2,
+  [FurnaceDispatchPlatform.OPL3_DRUMS]: 2,
+  [FurnaceDispatchPlatform.OPL4]: 2,
+  [FurnaceDispatchPlatform.OPL4_DRUMS]: 2,
+  [FurnaceDispatchPlatform.Y8950]: 2,
+  [FurnaceDispatchPlatform.Y8950_DRUMS]: 2,
+  // OPLL → chipType 11
+  [FurnaceDispatchPlatform.OPLL]: 11,
+  [FurnaceDispatchPlatform.OPLL_DRUMS]: 11,
+  [FurnaceDispatchPlatform.VRC7]: 11,
+  // OPZ → chipType 22
+  [FurnaceDispatchPlatform.OPZ]: 22,
+  [FurnaceDispatchPlatform.TX81Z]: 22,
+  // ESFM → chipType 49
+  [FurnaceDispatchPlatform.ESFM]: 49,
+};
+
 /** Channel names for each platform */
 const PLATFORM_CHANNELS: Record<number, string[]> = {
   [FurnaceDispatchPlatform.GB]: ['PU1', 'PU2', 'WAV', 'NOI'],
@@ -96,6 +149,8 @@ const PLATFORM_VOL_MAX: Record<number, number> = {
   [FurnaceDispatchPlatform.SNES]: 127,     // 7-bit volume (SPC700)
   [FurnaceDispatchPlatform.NDS]: 127,      // 7-bit volume
   [FurnaceDispatchPlatform.GBA_DMA]: 255,  // 8-bit volume
+  [FurnaceDispatchPlatform.RF5C68]: 255,   // 8-bit volume
+  [FurnaceDispatchPlatform.GA20]: 255,     // 8-bit volume
 };
 
 function getMaxVolume(platform: number): number {
@@ -195,10 +250,42 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
 
     console.log(`[FurnaceDispatchSynth] Encoding and uploading instrument ${this.furnaceInstrumentIndex} "${name}" to platform ${this.platformType}`);
 
+    // Skip FM instrument upload for non-FM platforms (sample/wavetable/PSG chips).
+    // initPlatform already sets up the correct instrument (sample, wavetable, etc.).
+    // Uploading an FM instrument would overwrite it, causing silence.
+    const correctChipType = PLATFORM_TO_CHIPTYPE[this.platformType];
+    const configFurnace = config as unknown as FurnaceConfig;
+    if (correctChipType === undefined && configFurnace.operators && configFurnace.operators.length > 0) {
+      console.log(`[FurnaceDispatchSynth] Skipping FM instrument upload for non-FM platform ${this.platformType}`);
+      this._pendingUploadConfig = null;
+      return;
+    }
+
     // Inject chip-required macros that the platform needs to produce sound.
     // Some platforms (e.g., Lynx) need a duty macro to oscillate — without it,
     // the LFSR feedback register stays 0 and no waveform is generated.
     const enriched = this.injectChipRequiredMacros(config as unknown as FurnaceConfig);
+
+    // Correct chipType to match the platform's FM family.
+    // A generic config (e.g. DEFAULT_FURNACE chipType=1/OPN2) uploaded to an OPL chip
+    // would produce a mismatched instrument type, causing silence or wrong register writes.
+    if (correctChipType !== undefined && enriched.chipType !== correctChipType) {
+      console.log(`[FurnaceDispatchSynth] Correcting chipType ${enriched.chipType} → ${correctChipType} for platform ${this.platformType}`);
+      enriched.chipType = correctChipType;
+
+      // If converting from 4-op to 2-op (OPL family), fix operator config
+      if (correctChipType === 2 && enriched.ops !== 2) {
+        enriched.ops = 2;
+        enriched.algorithm = 0; // OPL alg 0 = FM (modulator→carrier)
+        if (enriched.operators && enriched.operators.length >= 2) {
+          // Ensure carrier (op[1]) has tl=0 for full output
+          enriched.operators = [
+            { ...enriched.operators[0], tl: Math.min(enriched.operators[0].tl, 30) },
+            { ...enriched.operators[enriched.operators.length > 2 ? 2 : 1], tl: 0 },
+          ];
+        }
+      }
+    }
 
     // Encode from config using our encoder
     // The raw binary data from .fur files is in INS2 format, but the WASM expects
