@@ -103,8 +103,8 @@ export const PixiNewSongWizard: React.FC = () => {
   const stepCount = startMode === 'preset' ? (hasStarterInstruments ? 3 : 2) : 1;
   const nextLabel = step === 1 ? 'Next' : step === 2 ? (hasStarterInstruments ? 'Next' : 'Finish') : 'Finish';
 
-  const screenW = app?.screen?.width ?? 1920;
-  const screenH = app?.screen?.height ?? 1080;
+  let screenW = 1920, screenH = 1080;
+  try { if (app?.screen) { screenW = app.screen.width ?? 1920; screenH = app.screen.height ?? 1080; } } catch { /* renderer not ready */ }
 
   const drawOverlay = useCallback((g: GraphicsType) => {
     g.clear();
