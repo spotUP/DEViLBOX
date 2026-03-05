@@ -33,6 +33,7 @@ class JamCrackerProcessor extends AudioWorkletProcessor {
     // Position reporting
     this.reportCounter = 0;
     this.reportInterval = 8;
+    this.previewActive = false;
 
     this.port.onmessage = (event) => this.handleMessage(event.data);
   }
@@ -62,6 +63,12 @@ class JamCrackerProcessor extends AudioWorkletProcessor {
         }
         this.playing = false;
         this.initialized = false;
+        break;
+      case 'noteOn':
+        this.handleNoteOn(data.instrument, data.note, data.velocity);
+        break;
+      case 'noteOff':
+        this.handleNoteOff();
         break;
     }
   }
@@ -123,7 +130,9 @@ class JamCrackerProcessor extends AudioWorkletProcessor {
 
   // Decode more Paula audio into the ring buffer
   fillRingBuffer() {
-    if (!this.wasm || !this.tuneLoaded || !this.playing) return;
+    if (!this.wasm || !this.tuneLoaded || !this.initialized) return;
+    // In preview mode, use jc_render_preview instead of jc_render
+    if (this.previewActive && !this.playing) return this.fillRingBufferPreview();
 
     const space = this.ringSize - this.ringAvailable;
     if (space < this.decodeBufSize) return;
@@ -144,6 +153,43 @@ class JamCrackerProcessor extends AudioWorkletProcessor {
     this.ringAvailable += frames;
   }
 
+  // ---- Per-note instrument preview ----
+
+  handleNoteOn(instrIndex, noteIndex, velocity) {
+    if (!this.wasm || !this.initialized || !this.tuneLoaded) return;
+    this.wasm._jc_note_on(instrIndex, noteIndex, velocity);
+    this.previewActive = true;
+    this.resetRingBuffer();
+    this.resamplePos = 0.0;
+  }
+
+  handleNoteOff() {
+    if (!this.wasm || !this.initialized) return;
+    this.wasm._jc_note_off();
+    this.previewActive = false;
+  }
+
+  fillRingBufferPreview() {
+    if (!this.wasm || !this.tuneLoaded) return;
+
+    const space = this.ringSize - this.ringAvailable;
+    if (space < this.decodeBufSize) return;
+
+    const frames = Math.min(this.decodeBufSize, space);
+    this.wasm._jc_render_preview(this.decodeBufPtr, frames);
+
+    const floatOffset = this.decodeBufPtr >> 2;
+    const heap = this.wasm.HEAPF32;
+
+    for (let i = 0; i < frames; i++) {
+      const wp = (this.ringWritePos + i) & (this.ringSize - 1);
+      this.ringL[wp] = heap[floatOffset + i * 2];
+      this.ringR[wp] = heap[floatOffset + i * 2 + 1];
+    }
+    this.ringWritePos = (this.ringWritePos + frames) & (this.ringSize - 1);
+    this.ringAvailable += frames;
+  }
+
   process(inputs, outputs, parameters) {
     const output = outputs[0];
     if (!output || output.length < 2) return true;
@@ -152,7 +198,7 @@ class JamCrackerProcessor extends AudioWorkletProcessor {
     const outR = output[1];
     const blockSize = outL.length; // typically 128
 
-    if (!this.playing || !this.tuneLoaded || !this.initialized) {
+    if ((!this.playing && !this.previewActive) || !this.tuneLoaded || !this.initialized) {
       outL.fill(0);
       outR.fill(0);
       return true;
