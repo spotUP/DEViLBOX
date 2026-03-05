@@ -84,13 +84,12 @@ async function run() {
     await new Promise(r => setTimeout(r, 3000));
     try {
       const title = await page.title();
-      const isComplete = await page.evaluate(() => window.SYNTH_TEST_COMPLETE === true).catch(() => false);
       const elapsed = ((Date.now() - startTime) / 1000).toFixed(0);
       if (Date.now() - lastLogTime > 15000) {
-        console.log(`  [${elapsed}s] title="${title}" complete=${isComplete}`);
+        console.log(`  [${elapsed}s] title="${title}"`);
         lastLogTime = Date.now();
       }
-      if (title.startsWith('DONE ') || isComplete) {
+      if (title.startsWith('DONE ') || title.startsWith('ERROR')) {
         console.log(`\n=== ${title} === (${elapsed}s)\n`);
         done = true;
       }
