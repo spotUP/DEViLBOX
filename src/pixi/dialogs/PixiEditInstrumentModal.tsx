@@ -917,7 +917,7 @@ export const PixiEditInstrumentModal: React.FC<PixiEditInstrumentModalProps> = (
             )}
             {activeTab === 'sound' && currentInstrument && currentInstrument.synthType !== 'ModularSynth' && (
               isNativeWASMSynth(currentInstrument.synthType) ? (
-                <NativeInstrumentPanel instrument={currentInstrument} />
+                <NativeInstrumentPanel instrument={currentInstrument} onUpdate={updateInstrument} />
               ) : (
                 <SoundPanel instrument={currentInstrument} updateParam={updateParam} updateOsc={updateOsc} updateFilter={updateFilter} updateEnvelope={updateEnvelope} />
               )
@@ -992,7 +992,230 @@ function isNativeWASMSynth(synthType?: string): boolean {
   return NATIVE_WASM_SYNTH_TYPES.has(synthType ?? '');
 }
 
-const NativeInstrumentPanel: React.FC<{ instrument: InstrumentConfig }> = ({ instrument }) => {
+const NativeInstrumentPanel: React.FC<{
+  instrument: InstrumentConfig;
+  onUpdate: (id: number, changes: Partial<InstrumentConfig>) => void;
+}> = ({ instrument, onUpdate }) => {
+  // Route to format-specific panels
+  if (instrument.synthType === 'JamCrackerSynth' && instrument.jamCracker) {
+    return <JamCrackerPanel instrument={instrument} onUpdate={onUpdate} />;
+  }
+  if (instrument.synthType === 'FuturePlayerSynth') {
+    return <FuturePlayerPanel instrument={instrument} />;
+  }
+  return <GenericNativePanel instrument={instrument} />;
+};
+
+// ── JamCracker Panel ────────────────────────────────────────────────────────
+
+const JamCrackerPanel: React.FC<{
+  instrument: InstrumentConfig;
+  onUpdate: (id: number, changes: Partial<InstrumentConfig>) => void;
+}> = ({ instrument, onUpdate }) => {
+  const theme = usePixiTheme();
+  const jc = instrument.jamCracker!;
+
+  const updateJC = useCallback(
+    (key: string, value: number) => {
+      onUpdate(instrument.id, {
+        jamCracker: { ...instrument.jamCracker!, [key]: value },
+      });
+    },
+    [instrument.id, instrument.jamCracker, onUpdate],
+  );
+
+  // Draw AM waveform using Pixi Graphics
+  const drawWaveform = useCallback(
+    (g: import('pixi.js').Graphics) => {
+      g.clear();
+      const W = 320;
+      const H = 100;
+      const mid = H / 2;
+
+      // Background
+      g.rect(0, 0, W, H).fill({ color: 0x0a0e14 });
+
+      // Center line
+      g.moveTo(0, mid).lineTo(W, mid).stroke({ color: 0x1a2a3a, width: 1 });
+
+      const waveformData = jc.waveformData;
+      if (!waveformData || waveformData.length < 64) {
+        return;
+      }
+
+      const WAVE_SIZE = 64;
+
+      // Raw waveform (dim)
+      g.moveTo(0, mid);
+      for (let x = 0; x < W; x++) {
+        const idx = Math.floor((x / W) * WAVE_SIZE) % WAVE_SIZE;
+        const s = waveformData[idx] > 127 ? waveformData[idx] - 256 : waveformData[idx];
+        const y = mid - (s / 128) * (mid - 4);
+        if (x === 0) g.moveTo(x, y);
+        else g.lineTo(x, y);
+      }
+      g.stroke({ color: 0x00ff8840, width: 1 });
+
+      // Blended waveform (bright)
+      let phase = 0;
+      g.moveTo(0, mid);
+      for (let x = 0; x < W; x++) {
+        const idx = Math.floor((x / W) * WAVE_SIZE) % WAVE_SIZE;
+        const phaseIdx = (idx + Math.floor(phase / 4)) % WAVE_SIZE;
+        const s1 = waveformData[idx] > 127 ? waveformData[idx] - 256 : waveformData[idx];
+        const s2 = waveformData[phaseIdx] > 127 ? waveformData[phaseIdx] - 256 : waveformData[phaseIdx];
+        const blended = (s1 + s2) / 2;
+        const y = mid - (blended / 128) * (mid - 4);
+        if (x === 0) g.moveTo(x, y);
+        else g.lineTo(x, y);
+        phase = (phase + Math.floor(jc.phaseDelta * WAVE_SIZE / W)) & 0xFF;
+      }
+      g.stroke({ color: 0x00ff88, width: 2 });
+    },
+    [jc.waveformData, jc.phaseDelta],
+  );
+
+  return (
+    <layoutContainer layout={{ flexDirection: 'column', gap: 8 }}>
+      {/* Header */}
+      <layoutContainer
+        layout={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 8,
+          padding: 6,
+          borderRadius: 4,
+          backgroundColor: theme.bgTertiary.color,
+        }}
+      >
+        <PixiLabel text="JamCracker Pro" size="sm" weight="bold" color="custom" customColor={0x00DDFF} />
+        <PixiLabel text={jc.name} size="sm" color="textSecondary" />
+        <layoutContainer layout={{ flex: 1 }} />
+        {jc.isAM && <PixiLabel text="AM SYNTH" size="xs" weight="bold" color="custom" customColor={0xC084FC} />}
+        {jc.hasLoop && <PixiLabel text="LOOP" size="xs" weight="bold" color="custom" customColor={0x4ADE80} />}
+        {!jc.isAM && <PixiLabel text={`PCM ${jc.sampleSize}b`} size="xs" weight="bold" color="custom" customColor={0x60A5FA} />}
+      </layoutContainer>
+
+      {/* AM Waveform */}
+      {jc.isAM && (
+        <>
+          <SectionHeading text="AM WAVEFORM (64-BYTE PHASE MODULATION)" />
+          <layoutContainer
+            layout={{
+              width: 320,
+              height: 100,
+              borderWidth: 1,
+              borderColor: theme.border.color,
+              borderRadius: 4,
+            }}
+          >
+            <pixiGraphics draw={drawWaveform} layout={{ width: 320, height: 100 }} />
+          </layoutContainer>
+        </>
+      )}
+
+      {/* Controls */}
+      <SectionHeading text="PARAMETERS" />
+      <layoutContainer layout={{ flexDirection: 'row', gap: 16, paddingTop: 4 }}>
+        <PixiKnob
+          value={jc.volume}
+          min={0}
+          max={64}
+          onChange={(v) => updateJC('volume', Math.round(v))}
+          label="Volume"
+          size={KNOB_SIZE}
+          defaultValue={64}
+        />
+        {jc.isAM && (
+          <PixiKnob
+            value={jc.phaseDelta}
+            min={0}
+            max={255}
+            onChange={(v) => updateJC('phaseDelta', Math.round(v))}
+            label="Phase Δ"
+            size={KNOB_SIZE}
+            defaultValue={0}
+          />
+        )}
+      </layoutContainer>
+
+      {/* Info */}
+      <layoutContainer layout={{ paddingTop: 4 }}>
+        <PixiLabel
+          text={`Flags: 0x${jc.flags.toString(16).padStart(2, '0')}${jc.isAM ? ' — AM synthesis with 64-byte waveform loop' : ' — PCM sample playback'}`}
+          size="xs"
+          color="textMuted"
+        />
+      </layoutContainer>
+    </layoutContainer>
+  );
+};
+
+// ── Future Player Panel ─────────────────────────────────────────────────────
+
+const FuturePlayerPanel: React.FC<{ instrument: InstrumentConfig }> = ({ instrument }) => {
+  const theme = usePixiTheme();
+  const meta = instrument.metadata;
+  const isWavetable = meta?.fpIsWavetable ?? false;
+  const sampleSize = meta?.fpSampleSize ?? 0;
+  const instrPtr = meta?.fpInstrPtr;
+
+  return (
+    <layoutContainer layout={{ flexDirection: 'column', gap: 8 }}>
+      {/* Header */}
+      <layoutContainer
+        layout={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 8,
+          padding: 6,
+          borderRadius: 4,
+          backgroundColor: theme.bgTertiary.color,
+        }}
+      >
+        <PixiLabel text="Future Player" size="sm" weight="bold" color="custom" customColor={0xFACC15} />
+        <PixiLabel text={instrument.name} size="sm" color="textSecondary" />
+        <layoutContainer layout={{ flex: 1 }} />
+        {isWavetable ? (
+          <PixiLabel text="WAVETABLE" size="xs" weight="bold" color="custom" customColor={0xC084FC} />
+        ) : (
+          <PixiLabel text={`SAMPLE ${sampleSize}b`} size="xs" weight="bold" color="custom" customColor={0x60A5FA} />
+        )}
+      </layoutContainer>
+
+      <SectionHeading text="INSTRUMENT INFO" />
+
+      <layoutContainer layout={{ flexDirection: 'column', gap: 4, paddingLeft: 4 }}>
+        <PixiLabel
+          text={isWavetable ? 'Wavetable synthesis instrument — sound generated by the replayer engine' : `PCM sample instrument — ${sampleSize} bytes`}
+          size="sm"
+          color="textSecondary"
+        />
+        {instrPtr != null && (
+          <PixiLabel text={`Module offset: 0x${instrPtr.toString(16).toUpperCase()}`} size="xs" color="textMuted" />
+        )}
+      </layoutContainer>
+
+      <SectionHeading text="PLAYBACK" />
+      <layoutContainer layout={{ flexDirection: 'column', gap: 4, paddingLeft: 4 }}>
+        <PixiLabel
+          text="Future Player instruments are rendered by the native WASM replayer. Click an instrument in the list to preview it at different notes."
+          size="xs"
+          color="textMuted"
+        />
+        <PixiLabel
+          text="Pattern data drives note playback through the original Amiga replayer code."
+          size="xs"
+          color="textMuted"
+        />
+      </layoutContainer>
+    </layoutContainer>
+  );
+};
+
+// ── Generic fallback for other native WASM synths ───────────────────────────
+
+const GenericNativePanel: React.FC<{ instrument: InstrumentConfig }> = ({ instrument }) => {
   const theme = usePixiTheme();
   const info = getSynthInfo(instrument.synthType);
   return (
@@ -1012,9 +1235,6 @@ const NativeInstrumentPanel: React.FC<{ instrument: InstrumentConfig }> = ({ ins
       </layoutContainer>
       <SectionHeading text="NATIVE INSTRUMENT" />
       <PixiLabel text="This is a native WASM instrument. Sound is generated by the original replayer engine." size="sm" color="textSecondary" />
-      {instrument.metadata?.fpInstrPtr != null && (
-        <PixiLabel text={`Instrument pointer: 0x${instrument.metadata.fpInstrPtr.toString(16).toUpperCase()}`} size="xs" color="textMuted" />
-      )}
     </layoutContainer>
   );
 };
