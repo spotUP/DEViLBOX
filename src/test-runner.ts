@@ -27,7 +27,7 @@ import { FurnaceDispatchEngine } from './engine/furnace-dispatch/FurnaceDispatch
 import { BuzzmachineEngine } from './engine/buzzmachines/BuzzmachineEngine';
 import { MAMEEngine } from './engine/MAMEEngine';
 import { getFirstPresetForSynthType } from './constants/factoryPresets';
-import { setDevilboxAudioContext } from './utils/audio-context';
+import { setDevilboxAudioContext, getNativeContext } from './utils/audio-context';
 
 /** Extend Window with test-runner globals so we avoid `(window as any)` */
 interface TestRunnerWindow {
@@ -817,14 +817,28 @@ function clearResults() {
 }
 
 async function initAudio() {
-  // Create a REAL native AudioContext first (same pattern as ToneEngine),
-  // then hand it to Tone.js. This ensures getDevilboxAudioContext() always
-  // returns a true browser-native context for WASM worklets and native nodes.
-  const nativeCtx = new AudioContext({ latencyHint: 'interactive' });
-  Tone.setContext(nativeCtx);
+  // Let Tone.js create and manage its own context (required for Tone.js synth
+  // connect() calls to work — passing a raw native AudioContext to setContext()
+  // breaks Tone.js node connections).
   await Tone.start();
+
+  // Extract the native AudioContext from Tone.js's wrapper chain.
+  // Tone.js v14 uses standardized-audio-context (SAC):
+  //   Tone.getContext() → Tone.Context → .rawContext → SAC AudioContext → ._nativeAudioContext → native
+  const toneCtx = Tone.getContext() as unknown as Record<string, unknown>;
+  const rawCtx = toneCtx.rawContext as Record<string, unknown> | undefined;
+
+  let nativeCtx: AudioContext;
+  if (rawCtx && rawCtx._nativeAudioContext && (rawCtx._nativeAudioContext as unknown) instanceof AudioContext) {
+    nativeCtx = rawCtx._nativeAudioContext as unknown as AudioContext;
+  } else if (rawCtx && (rawCtx as unknown) instanceof AudioContext) {
+    nativeCtx = rawCtx as unknown as AudioContext;
+  } else {
+    nativeCtx = getNativeContext(toneCtx);
+  }
+
   setDevilboxAudioContext(nativeCtx);
-  log('AudioContext started: ' + nativeCtx.state + ' (native, sampleRate=' + nativeCtx.sampleRate + ')', 'pass');
+  log('AudioContext started: ' + nativeCtx.state + ' (sampleRate=' + nativeCtx.sampleRate + ')', 'pass');
 }
 
 // ============================================
@@ -1820,7 +1834,9 @@ async function testVolumeLevels(skipPreWarm = false) {
 
       // Catch-all for DevilboxSynths that have a native output node but no
       // Tone.js connect() method (DubSiren, SpaceLaser, Synare, TB303, Sam, etc.)
-      if (!furnaceNativeMeter && synthObj.output && typeof (synthObj.output as AudioNode).connect === 'function') {
+      // IMPORTANT: Only apply when synthObj.connect is NOT a function — otherwise
+      // Tone.js synths (which also have .output) would match and get broken.
+      if (!furnaceNativeMeter && typeof synthObj.connect !== 'function' && synthObj.output && typeof (synthObj.output as AudioNode).connect === 'function') {
         const output = synthObj.output as AudioNode;
         if (output.context) {
           furnaceNativeMeter = output.context.createAnalyser();
