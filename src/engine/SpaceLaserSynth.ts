@@ -6,6 +6,7 @@ import { getDevilboxAudioContext, getNativeAudioNode, audioNow, noteToFrequency 
 export class SpaceLaserSynth implements DevilboxSynth {
   readonly name = 'SpaceLaserSynth';
   readonly output: GainNode;
+  readonly ready: Promise<void>;
   private synth: Tone.FMSynth;
   private filter: Tone.Filter;
   private noise: Tone.Noise;
@@ -79,6 +80,9 @@ export class SpaceLaserSynth implements DevilboxSynth {
 
     // Start background nodes
     this.noise.start();
+
+    // Expose reverb readiness — Tone.Reverb passes no audio until its IR is generated
+    this.ready = this.reverb.ready;
   }
 
   /**
