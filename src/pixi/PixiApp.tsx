@@ -53,6 +53,33 @@ let initPromise: Promise<void> | null = null;
  * occurs when @pixi/layout tries to reparent a Yoga node that was freed
  * or belongs to a different WASM instance.
  */
+// Track BindingError occurrences so we can trigger recovery
+let _bindingErrorCount = 0;
+let _bindingErrorTimer: ReturnType<typeof setTimeout> | null = null;
+
+/** Number of Yoga BindingErrors since last check. Resets on read. */
+export function drainBindingErrorCount(): number {
+  const n = _bindingErrorCount;
+  _bindingErrorCount = 0;
+  return n;
+}
+
+function onBindingError(_method: string): void {
+  _bindingErrorCount++;
+  // Batch console warnings to avoid spam
+  if (!_bindingErrorTimer) {
+    _bindingErrorTimer = setTimeout(() => {
+      if (_bindingErrorCount > 0) {
+        console.warn(
+          `[Yoga] ${_bindingErrorCount} BindingError(s) suppressed — layout may be stale. ` +
+          `Try switching views or resizing the window to recover.`
+        );
+      }
+      _bindingErrorTimer = null;
+    }, 1000);
+  }
+}
+
 function patchYogaNodePrototype(yoga: any): void {
   if (yoga.__nodePatched) return;
   yoga.__nodePatched = true;
@@ -73,7 +100,7 @@ function patchYogaNodePrototype(yoga: any): void {
       try {
         return origInsert.call(this, child, index);
       } catch (e: any) {
-        if (e?.name === 'BindingError') return;
+        if (e?.name === 'BindingError') { onBindingError('insertChild'); return; }
         throw e;
       }
     };
@@ -83,7 +110,7 @@ function patchYogaNodePrototype(yoga: any): void {
       try {
         return origRemove.call(this, child);
       } catch (e: any) {
-        if (e?.name === 'BindingError') return;
+        if (e?.name === 'BindingError') { onBindingError('removeChild'); return; }
         throw e;
       }
     };
@@ -95,7 +122,7 @@ function patchYogaNodePrototype(yoga: any): void {
       try {
         return origFree.call(this);
       } catch (e: any) {
-        if (e?.name === 'BindingError') return;
+        if (e?.name === 'BindingError') { onBindingError('free'); return; }
         throw e;
       }
     };
@@ -107,7 +134,7 @@ function patchYogaNodePrototype(yoga: any): void {
       try {
         return origGetParent.call(this);
       } catch (e: any) {
-        if (e?.name === 'BindingError') return null;
+        if (e?.name === 'BindingError') { onBindingError('getParent'); return null; }
         throw e;
       }
     };
@@ -122,6 +149,7 @@ function patchYogaNodePrototype(yoga: any): void {
           return orig.apply(this, args);
         } catch (e: any) {
           if (e?.name === 'BindingError') {
+            onBindingError(method);
             if (method === 'getChildCount') return 0;
             if (method === 'getComputedLayout') return { left: 0, top: 0, width: 0, height: 0, right: 0, bottom: 0 };
             return null;
