@@ -510,6 +510,7 @@ interface VJViewProps {
 }
 
 export const VJView: React.FC<VJViewProps> = ({ isPopout = false }) => {
+  const vjViewActive = useUIStore((s) => s.activeView === 'vj') || isPopout;
   const canvasHandleRef = useRef<VJCanvasHandle>(null);
   const isfHandleRef = useRef<ISFCanvasHandle>(null);
   const threeHandleRef = useRef<ThreeCanvasHandle>(null);
@@ -632,7 +633,7 @@ export const VJView: React.FC<VJViewProps> = ({ isPopout = false }) => {
           ref={canvasHandleRef}
           onReady={handleReady}
           onPresetChange={handlePresetChange}
-          visible={activeLayer === 'milkdrop'}
+          visible={vjViewActive && activeLayer === 'milkdrop'}
         />
       </div>
       {/* ISF layer */}
@@ -641,7 +642,7 @@ export const VJView: React.FC<VJViewProps> = ({ isPopout = false }) => {
           ref={isfHandleRef}
           onReady={(count) => setISFPresetCount(count)}
           onPresetChange={(idx, name) => { setISFPresetIdx(idx); setISFPresetName(name); }}
-          visible={activeLayer === 'isf'}
+          visible={vjViewActive && activeLayer === 'isf'}
         />
       </div>
       {/* Three.js 3D layer */}
@@ -659,7 +660,7 @@ export const VJView: React.FC<VJViewProps> = ({ isPopout = false }) => {
             ref={projectmHandleRef}
             onReady={(count) => setPmPresetCount(count)}
             onPresetChange={(idx, name) => { setPmPresetIdx(idx); setPmPresetName(name); }}
-            visible={activeLayer === 'projectm'}
+            visible={vjViewActive && activeLayer === 'projectm'}
           />
         </React.Suspense>
       </div>
