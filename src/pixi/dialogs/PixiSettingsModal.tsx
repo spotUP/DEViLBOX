@@ -697,6 +697,23 @@ export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, on
             <PixiCheckbox checked={midiPolyphonic} onChange={setMidiPolyphonic} />
           </SettingRow>
 
+          <Div className="flex-row gap-2" layout={{ width: CONTENT_W, paddingTop: 6 }}>
+            <PixiButton
+              label="Controller Wizard"
+              variant="default"
+              size="sm"
+              onClick={() => { onClose(); useUIStore.getState().openModal('midi-wizard'); }}
+              layout={{ flex: 1 }}
+            />
+            <PixiButton
+              label="NKS Setup"
+              variant="default"
+              size="sm"
+              onClick={() => { onClose(); useUIStore.getState().openModal('nks-wizard'); }}
+              layout={{ flex: 1 }}
+            />
+          </Div>
+
           {/* ═══════ DJ / SCRATCH ═══════ */}
           <SectionHeader text="DJ / SCRATCH" />
 
