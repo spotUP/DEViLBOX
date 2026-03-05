@@ -29,6 +29,7 @@ import { ToastNotification } from '@components/ui/ToastNotification';
 import { PopOutWindow } from '@components/ui/PopOutWindow';
 import { UpdateNotification } from '@components/ui/UpdateNotification';
 import { SynthErrorDialog } from '@components/ui/SynthErrorDialog';
+import { USBSIDWizard } from '@components/dialogs/USBSIDWizard';
 import { RomUploadDialog } from '@components/ui/RomUploadDialog';
 import { ModlandContributionModal } from '@components/modland/ModlandContributionModal';
 import { PatternMatchModal } from '@components/modland/PatternMatchModal';
@@ -150,6 +151,24 @@ function App() {
     import('@lib/sid/SIDHardwareManager').then(({ initSIDHardwareFromSettings }) => {
       initSIDHardwareFromSettings();
     });
+  }, []);
+
+  // Detect USB-SID-Pico plug-in and show setup wizard
+  useEffect(() => {
+    if (!navigator.usb) return;
+    const handleConnect = (ev: USBConnectionEvent) => {
+      const d = ev.device;
+      if (d.vendorId === 0xCAFE && d.productId === 0x4011) {
+        console.log('[USB-SID-Pico] Device plugged in:', d.productName);
+        const settings = useSettingsStore.getState();
+        // Only show wizard if not already configured for WebUSB
+        if (settings.sidHardwareMode !== 'webusb') {
+          useUIStore.getState().openModal('usb-sid-wizard');
+        }
+      }
+    };
+    navigator.usb.addEventListener('connect', handleConnect);
+    return () => navigator.usb.removeEventListener('connect', handleConnect);
   }, []);
 
   // Background sample pack download on first run
@@ -1208,6 +1227,9 @@ function App() {
 
       {/* Synth Error Dialog - Shows when synth initialization fails */}
       <SynthErrorDialog />
+
+      {/* USB-SID-Pico Setup Wizard */}
+      <USBSIDWizard />
 
       {/* ROM Upload Dialog - Shows when ROM-dependent synths can't auto-load ROMs */}
       <RomUploadDialog />
