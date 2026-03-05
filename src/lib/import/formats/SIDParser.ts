@@ -148,22 +148,30 @@ function gcd(a: number, b: number): number {
   return a;
 }
 
-/** Detect frames-per-row by analyzing SID register change intervals */
+/** Detect frames-per-row by analyzing note change intervals */
 function detectSpeed(frames: FrameState[]): number {
-  // Find frames where ANY SID register changed from previous frame
+  // Track frames where a note-on or note change occurs on ANY voice.
+  // Only look at note values (derived from freq regs + gate), NOT filter/volume.
   const changeFrames: number[] = [];
-  for (let f = 1; f < frames.length; f++) {
-    for (let r = 0; r < 21; r++) {
-      if (frames[f].regs[r] !== frames[f - 1].regs[r]) {
-        changeFrames.push(f);
-        break;
+  const prevNotes: (number | null)[] = [];
+
+  for (let f = 0; f < frames.length; f++) {
+    let changed = false;
+    for (let v = 0; v < frames[f].notes.length; v++) {
+      const n = frames[f].notes[v];
+      if (f === 0) { prevNotes[v] = n; continue; }
+      if (n !== prevNotes[v]) {
+        // A voice changed note (new note, note-off, or pitch change)
+        changed = true;
+        prevNotes[v] = n;
       }
     }
+    if (changed && f > 0) changeFrames.push(f);
   }
 
   if (changeFrames.length < 3) return 6;
 
-  // Compute intervals between consecutive register-change frames
+  // Compute intervals between consecutive note-change frames
   const intervals: number[] = [];
   for (let i = 1; i < changeFrames.length; i++) {
     const iv = changeFrames[i] - changeFrames[i - 1];
@@ -171,17 +179,23 @@ function detectSpeed(frames: FrameState[]): number {
   }
   if (intervals.length === 0) return 6;
 
-  // GCD of first ~200 intervals (sufficient sample, avoids outlier noise)
-  let g = intervals[0];
-  for (let i = 1; i < Math.min(intervals.length, 200); i++) {
-    g = gcd(g, intervals[i]);
-    if (g === 1) break;
-  }
-  if (g >= 2 && g <= 12) return g;
-
-  // GCD was 1 (noise) — fall back to most common interval
+  // Build histogram of intervals
   const hist = new Map<number, number>();
   for (const iv of intervals) hist.set(iv, (hist.get(iv) || 0) + 1);
+
+  // Try GCD of the most common intervals (skip rare outliers)
+  const sorted = [...hist.entries()].sort((a, b) => b[1] - a[1]);
+  // Take intervals that appear in at least 10% of samples
+  const threshold = intervals.length * 0.1;
+  const common = sorted.filter(([, count]) => count >= threshold).map(([iv]) => iv);
+
+  if (common.length > 0) {
+    let g = common[0];
+    for (let i = 1; i < common.length; i++) g = gcd(g, common[i]);
+    if (g >= 2 && g <= 12) return g;
+  }
+
+  // Fallback: most common interval in the typical range
   let bestIv = 6, bestCount = 0;
   for (const [iv, count] of hist) {
     if (iv >= 2 && iv <= 12 && count > bestCount) {
