@@ -916,8 +916,8 @@ export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, on
                   </Div>
                   <Txt className="text-[9px] font-mono text-text-muted">{engine.description}</Txt>
                   <Div className="flex-row gap-3">
-                    <Txt className="text-[8px] font-mono text-text-muted">{'Accuracy: '}<Txt className="text-[8px] font-mono text-text-primary">{engine.accuracy}</Txt></Txt>
-                    <Txt className="text-[8px] font-mono text-text-muted">{'Speed: '}<Txt className="text-[8px] font-mono text-text-primary">{engine.speed}</Txt></Txt>
+                    <Txt className="text-[8px] font-mono text-text-muted">{`Accuracy: ${engine.accuracy}`}</Txt>
+                    <Txt className="text-[8px] font-mono text-text-muted">{`Speed: ${engine.speed}`}</Txt>
                     {!engine.requiresWASM && (
                       <Txt className="text-[8px] font-mono text-accent-primary">No WASM</Txt>
                     )}
