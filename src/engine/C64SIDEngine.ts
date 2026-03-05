@@ -48,6 +48,7 @@ export class C64SIDEngine {
   private sidData: Uint8Array;
   private gainNode: GainNode | null = null;
   private masterVolume = 1.0; // 0-1 linear
+  private playbackRate = 1.0; // pitch multiplier (1.0 = normal)
 
   constructor(sidData: Uint8Array) {
     this.sidData = sidData;
@@ -129,7 +130,7 @@ export class C64SIDEngine {
   /**
    * Initialize the SID engine
    */
-  async init(audioContext: AudioContext): Promise<void> {
+  async init(audioContext: AudioContext, destination?: AudioNode): Promise<void> {
     this.audioContext = audioContext;
     
     // Share Tone.js's already-unlocked AudioContext with ScriptNodePlayer.
@@ -140,7 +141,7 @@ export class C64SIDEngine {
     // Create a master GainNode for volume control + per-engine level compensation.
     // All engine outputs connect here instead of directly to destination.
     this.gainNode = audioContext.createGain();
-    this.gainNode.connect(audioContext.destination);
+    this.gainNode.connect(destination ?? audioContext.destination);
 
     // Get user's preferred engine from settings
     const engineType = useSettingsStore.getState().sidEngine || 'websid';
@@ -153,9 +154,9 @@ export class C64SIDEngine {
     // Create engine instance
     this.engineType = engineType;
 
-    // Apply per-engine gain compensation
+    // Apply per-engine gain compensation only (master volume handled by ToneEngine)
     const engineGain = ENGINE_GAIN[engineType] ?? 1.0;
-    this.gainNode.gain.value = this.masterVolume * engineGain;
+    this.gainNode.gain.value = engineGain;
     
     switch (engineType) {
       case 'jssid':
@@ -328,6 +329,35 @@ export class C64SIDEngine {
   }
 
   /**
+   * Set playback rate for pitch control (1.0 = normal, 2.0 = +1 octave).
+   * Adjusts both the emulation speed and the effective BPM.
+   */
+  setPlaybackRate(rate: number): void {
+    this.playbackRate = Math.max(0.25, Math.min(4.0, rate));
+    // Forward to underlying engine's speed control
+    if (this.engine && 'setSpeed' in this.engine) {
+      (this.engine as any).setSpeed(this.playbackRate);
+    }
+  }
+
+  /**
+   * Get current playback rate
+   */
+  getPlaybackRate(): number {
+    return this.playbackRate;
+  }
+
+  /**
+   * Reconnect GainNode output to a new destination (e.g. synthBus for master FX).
+   * Disconnects from all previous destinations first.
+   */
+  connectTo(destination: AudioNode): void {
+    if (!this.gainNode) return;
+    try { this.gainNode.disconnect(); } catch { /* already disconnected */ }
+    this.gainNode.connect(destination);
+  }
+
+  /**
    * Get voice state for oscilloscope/pattern extraction
    */
   getVoiceState(voice: number): any {
@@ -339,20 +369,24 @@ export class C64SIDEngine {
 
   /**
    * Set master volume (0-1 linear). Combined with per-engine gain compensation.
+   * NOTE: When routed through synthBus (default), the Tone.js masterChannel
+   * handles the actual master volume. This method only applies per-engine
+   * gain compensation. The volume param is retained for jsSID which manages
+   * its own audio pipeline.
    */
   setMasterVolume(volume: number): void {
     this.masterVolume = Math.max(0, Math.min(1, volume));
     if (this.engineType) {
       const engineGain = ENGINE_GAIN[this.engineType] ?? 1.0;
-      const combined = this.masterVolume * engineGain;
 
       // jsSID uses its own AudioContext — control volume via its API
       if (this.engineType === 'jssid' && this.engine) {
-        (this.engine as JSSIDEngine).setVolume(combined);
+        (this.engine as JSSIDEngine).setVolume(this.masterVolume * engineGain);
       }
-      // All other engines route through our GainNode
+      // For engines routed through synthBus, only apply engine-specific compensation.
+      // Master volume is handled by ToneEngine's masterChannel.
       if (this.gainNode) {
-        this.gainNode.gain.value = combined;
+        this.gainNode.gain.value = engineGain;
       }
     }
   }
