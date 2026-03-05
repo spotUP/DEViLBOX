@@ -915,14 +915,11 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
   }, [allChannelsFit, scrollLeft]);
 
   // ── Pixi ticker for playback tracking ──────────────────────────────────────
-  // Runs inside Pixi's own ticker, BEFORE each render. This eliminates jitter
-  // caused by two unsynchronized RAF loops (our old separate rAF could run
-  // before or after Pixi's render, causing the smooth scroll offset to be
-  // applied 0 or 1 frames late depending on execution order).
+  // Runs inside Pixi's own ticker, BEFORE each render. Eliminates jitter from
+  // unsynchronized RAF loops and ensures layout engine can't reset our offset.
   useTick(() => {
     const { isPlaying: playing, smoothScrolling: smooth } = useTransportStore.getState();
     if (!playing) {
-      // Reset smooth scroll when stopped
       if (smoothOffsetRef.current !== 0) {
         smoothOffsetRef.current = 0;
         if (gridScrollContainerRef.current) gridScrollContainerRef.current.pivot.y = 0;
@@ -945,7 +942,6 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
       newPattern = audioState.pattern;
       newOffset = 0;
       if (smooth) {
-        // Cache row duration on row change to prevent frame-to-frame fluctuation.
         if (newRow !== prevRowRef.current || newPattern !== prevPatternRef.current) {
           const bpm = useTransportStore.getState().bpm;
           const speed = useTransportStore.getState().speed;
@@ -964,17 +960,12 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
       newPattern = ts.currentPatternIndex;
     }
 
-    // Always update smooth offset imperatively — NO React setState
-    // Use pivot.y instead of position.y because @pixi/layout may reset position
-    // during layout passes. Pivot is never touched by the layout engine.
     smoothOffsetRef.current = newOffset;
     if (gridScrollContainerRef.current) gridScrollContainerRef.current.pivot.y = newOffset;
 
-    // Only update React state when integer row or pattern changes
     if (newRow !== prevRowRef.current || newPattern !== prevPatternRef.current) {
       prevRowRef.current = newRow;
       prevPatternRef.current = newPattern;
-      // Immediately update renderParams + redraw in THIS frame to avoid 1-frame jitter.
       renderParamsRef.current = {
         ...renderParamsRef.current,
         playbackRow: newRow,
@@ -982,7 +973,6 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
       };
       fullRedrawRef.current = true;
       imperativeRedrawRef.current?.();
-      // Queue React state update for any downstream consumers
       setPlaybackRow(newRow);
       setPlaybackPatternIdx(newPattern);
     }
