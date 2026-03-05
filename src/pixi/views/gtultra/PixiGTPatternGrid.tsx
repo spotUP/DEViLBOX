@@ -89,9 +89,13 @@ export const PixiGTPatternGrid: React.FC<Props> = ({ width, height }) => {
   // Refs for WASM data (updated via subscription, no re-render on each frame)
   const patternDataRef = useRef(useGTUltraStore.getState().patternData);
   const orderDataRef = useRef(useGTUltraStore.getState().orderData);
-  const orderPosRef = useRef(0);
 
   const visibleRows = Math.floor((height - HEADER_H) / ROW_H);
+
+  // Determine which order position to show: use playback pos when following, else orderCursor
+  const orderPos = useMemo(() => {
+    return (playing && followPlay) ? playbackPos.position : orderCursor;
+  }, [playing, followPlay, playbackPos.position, orderCursor]);
 
   // Scroll row: center active row
   const scrollRow = useMemo(() => {
@@ -197,7 +201,7 @@ export const PixiGTPatternGrid: React.FC<Props> = ({ width, height }) => {
         // Read from store's patternData cache
         const pData = patternDataRef.current;
         const chOrderData = orderDataRef.current[ch];
-        const patIdx = chOrderData ? chOrderData[orderPosRef.current] : 0;
+        const patIdx = chOrderData ? chOrderData[orderPos] : 0;
         const pat = pData.get(patIdx);
         let note = 0, instr = 0, cmd = 0, param = 0;
         if (pat && row < pat.length) {
@@ -256,7 +260,7 @@ export const PixiGTPatternGrid: React.FC<Props> = ({ width, height }) => {
     // Update MegaText
     mega.updateLabels(labels, FONT_SIZE);
   }, [width, height, scrollRow, visibleRows, patternLength, playbackPos, playing,
-      followPlay, selection, channelCount, recordMode, orderCursor]);
+      followPlay, selection, channelCount, recordMode, orderCursor, orderPos]);
 
   // Subscribe to pattern/order data changes for redraw
   useEffect(() => {
@@ -272,13 +276,7 @@ export const PixiGTPatternGrid: React.FC<Props> = ({ width, height }) => {
         if (od !== orderDataRef.current) { orderDataRef.current = od; imperativeRedraw(); }
       }
     );
-    const unsub3 = useGTUltraStore.subscribe(
-      (s) => {
-        const pos = s.playbackPos.position;
-        if (pos !== orderPosRef.current) { orderPosRef.current = pos; }
-      }
-    );
-    return () => { unsub1(); unsub2(); unsub3(); };
+    return () => { unsub1(); unsub2(); };
   }, [imperativeRedraw]);
 
   // Subscribe to cursor changes for fast overlay redraws

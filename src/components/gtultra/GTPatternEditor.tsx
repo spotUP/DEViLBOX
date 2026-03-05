@@ -64,15 +64,12 @@ const COLORS = {
 interface GTPatternEditorProps {
   width: number;
   height: number;
-  /** Pattern data as flat Uint8Array (rows * channels * 4 bytes) */
-  patternData: Uint8Array[];  // one per channel, each MAX_PATTROWS*4 bytes
   channelCount: number;
 }
 
 export const GTPatternEditor: React.FC<GTPatternEditorProps> = ({
   width,
   height,
-  patternData,
   channelCount,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -85,6 +82,7 @@ export const GTPatternEditor: React.FC<GTPatternEditorProps> = ({
   const recordMode = useGTUltraStore((s) => s.recordMode);
   const orderData = useGTUltraStore((s) => s.orderData);
   const orderCursor = useGTUltraStore((s) => s.orderCursor);
+  const patternData = useGTUltraStore((s) => s.patternData);
   const moveCursor = useGTUltraStore((s) => s.moveCursor);
   const setCursor = useGTUltraStore((s) => s.setCursor);
 
@@ -189,14 +187,19 @@ export const GTPatternEditor: React.FC<GTPatternEditorProps> = ({
       // Cell data per channel
       for (let ch = 0; ch < channelCount; ch++) {
         const baseX = ROW_NUM_W + ch * (CHANNEL_W + CHAN_GAP);
-        const data = patternData[ch];
-        if (!data) continue;
 
-        const offset = row * 4;
-        const note = data[offset];
-        const instr = data[offset + 1];
-        const cmd = data[offset + 2];
-        const param = data[offset + 3];
+        // Look up which pattern this channel is playing from order data
+        const patIdx = orderData[ch]?.[orderCursor] ?? 0;
+        const pat = patternData.get(patIdx);
+
+        let note = 0, instr = 0, cmd = 0, param = 0;
+        if (pat && row < pat.length) {
+          const offset = row * 4;
+          note = pat.data[offset];
+          instr = pat.data[offset + 1];
+          cmd = pat.data[offset + 2];
+          param = pat.data[offset + 3];
+        }
 
         let colX = baseX;
 

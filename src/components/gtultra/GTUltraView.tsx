@@ -108,12 +108,6 @@ export const GTUltraView: React.FC<{ width?: number; height?: number }> = ({ wid
     };
   }, [setEngine]);
 
-  // Provide empty pattern data until WASM returns real data
-  const [patternData, setPatternData] = useState<Uint8Array[]>([]);
-  useEffect(() => {
-    setPatternData(Array.from({ length: channelCount }, () => new Uint8Array(128 * 4)));
-  }, [channelCount]);
-
   const sidebarW = Math.min(SIDEBAR_WIDTH, Math.floor(width * 0.35));
   const editorW = width - sidebarW;
 
@@ -128,7 +122,6 @@ export const GTUltraView: React.FC<{ width?: number; height?: number }> = ({ wid
         <GTPatternEditor
           width={editorW}
           height={height - 36}
-          patternData={patternData}
           channelCount={channelCount}
         />
 
