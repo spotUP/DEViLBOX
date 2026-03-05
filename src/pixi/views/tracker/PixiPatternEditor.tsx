@@ -19,6 +19,7 @@
 
 import React, { useCallback, useMemo, useRef, useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
+import { useTick } from '@pixi/react';
 import type { Graphics as GraphicsType, FederatedPointerEvent, Container as ContainerType } from 'pixi.js';
 import { usePixiTheme, type PixiTheme } from '../../theme';
 import { PIXI_FONTS } from '../../fonts';
@@ -493,7 +494,6 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
   useEffect(() => { rowHeightRef.current = rowHeight; }, [rowHeight]);
   const trackerVisualBg = useSettingsStore(s => s.trackerVisualBg);
   const isPlaying = useTransportStore(s => s.isPlaying);
-  const smoothScrolling = useTransportStore(s => s.smoothScrolling);
 
   // ── Cursor/selection refs — updated via subscription, NOT React state ──────
   // Cursor/selection changes are the hottest path (every keypress). By keeping
@@ -914,84 +914,77 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
     }
   }, [allChannelsFit, scrollLeft]);
 
-  // ── RAF loop for playback tracking ─────────────────────────────────────────
-  // Smooth scroll offset is applied imperatively to the inner container (no React
-  // setState), so React re-renders only happen when the INTEGER row or pattern changes.
-  useEffect(() => {
-    let rafId: number;
-    const tick = () => {
-      if (!isPlaying) {
-        // Reset smooth scroll when stopped
+  // ── Pixi ticker for playback tracking ──────────────────────────────────────
+  // Runs inside Pixi's own ticker, BEFORE each render. This eliminates jitter
+  // caused by two unsynchronized RAF loops (our old separate rAF could run
+  // before or after Pixi's render, causing the smooth scroll offset to be
+  // applied 0 or 1 frames late depending on execution order).
+  useTick(() => {
+    const { isPlaying: playing, smoothScrolling: smooth } = useTransportStore.getState();
+    if (!playing) {
+      // Reset smooth scroll when stopped
+      if (smoothOffsetRef.current !== 0) {
         smoothOffsetRef.current = 0;
         if (gridScrollContainerRef.current) gridScrollContainerRef.current.y = 0;
-        prevRowRef.current = -1;
-        prevPatternRef.current = -1;
-        rafId = requestAnimationFrame(tick);
-        return;
       }
-      const replayer = getTrackerReplayer();
-      const audioTime = Tone.now() + 0.01;
-      const audioState = replayer.getStateAtTime(audioTime);
-      const ts = useTrackerStore.getState();
+      prevRowRef.current = -1;
+      prevPatternRef.current = -1;
+      return;
+    }
+    const replayer = getTrackerReplayer();
+    const audioTime = Tone.now() + 0.01;
+    const audioState = replayer.getStateAtTime(audioTime);
+    const ts = useTrackerStore.getState();
 
-      let newRow: number;
-      let newOffset: number;
-      let newPattern: number;
+    let newRow: number;
+    let newOffset: number;
+    let newPattern: number;
 
-      if (audioState) {
-        newRow = audioState.row;
-        newPattern = audioState.pattern;
-        newOffset = 0;
-        if (smoothScrolling) {
-          // Cache row duration on row change to prevent frame-to-frame fluctuation.
-          // The peek-ahead can return different future states each frame, causing dur
-          // to oscillate — which, combined with roundPixels, produces visible jitter.
-          if (newRow !== prevRowRef.current || newPattern !== prevPatternRef.current) {
-            const bpm = useTransportStore.getState().bpm;
-            const speed = useTransportStore.getState().speed;
-            const nextState = replayer.getStateAtTime(audioTime + 0.5, true);
-            cachedRowDurRef.current = (nextState && nextState.row !== audioState.row)
-              ? nextState.time - audioState.time
-              : (2.5 / bpm) * speed;
-          }
-          const dur = cachedRowDurRef.current || 0.125; // fallback if not yet set
-          const progress = Math.min(Math.max((audioTime - audioState.time) / dur, 0), 1);
-          newOffset = progress * rowHeightRef.current;
+    if (audioState) {
+      newRow = audioState.row;
+      newPattern = audioState.pattern;
+      newOffset = 0;
+      if (smooth) {
+        // Cache row duration on row change to prevent frame-to-frame fluctuation.
+        if (newRow !== prevRowRef.current || newPattern !== prevPatternRef.current) {
+          const bpm = useTransportStore.getState().bpm;
+          const speed = useTransportStore.getState().speed;
+          const nextState = replayer.getStateAtTime(audioTime + 0.5, true);
+          cachedRowDurRef.current = (nextState && nextState.row !== audioState.row)
+            ? nextState.time - audioState.time
+            : (2.5 / bpm) * speed;
         }
-      } else {
-        newRow = useTransportStore.getState().currentRow;
-        newOffset = 0;
-        newPattern = ts.currentPatternIndex;
+        const dur = cachedRowDurRef.current || 0.125;
+        const progress = Math.min(Math.max((audioTime - audioState.time) / dur, 0), 1);
+        newOffset = progress * rowHeightRef.current;
       }
+    } else {
+      newRow = useTransportStore.getState().currentRow;
+      newOffset = 0;
+      newPattern = ts.currentPatternIndex;
+    }
 
-      // Always update smooth offset imperatively — NO React setState
-      smoothOffsetRef.current = newOffset;
-      if (gridScrollContainerRef.current) gridScrollContainerRef.current.y = -newOffset;
+    // Always update smooth offset imperatively — NO React setState
+    smoothOffsetRef.current = newOffset;
+    if (gridScrollContainerRef.current) gridScrollContainerRef.current.y = -newOffset;
 
-      // Only update React state when integer row or pattern changes
-      if (newRow !== prevRowRef.current || newPattern !== prevPatternRef.current) {
-        prevRowRef.current = newRow;
-        prevPatternRef.current = newPattern;
-        // Immediately update renderParams + redraw in THIS frame to avoid 1-frame jitter.
-        // Without this, container.y resets to ~0 but the grid is still positioned for the
-        // OLD row until React re-renders next frame → visible upward jump.
-        renderParamsRef.current = {
-          ...renderParamsRef.current,
-          playbackRow: newRow,
-          playbackPatternIdx: newPattern,
-        };
-        fullRedrawRef.current = true;
-        imperativeRedrawRef.current?.();
-        // Queue React state update for any downstream consumers
-        setPlaybackRow(newRow);
-        setPlaybackPatternIdx(newPattern);
-      }
-
-      rafId = requestAnimationFrame(tick);
-    };
-    rafId = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(rafId);
-  }, [isPlaying, smoothScrolling]);
+    // Only update React state when integer row or pattern changes
+    if (newRow !== prevRowRef.current || newPattern !== prevPatternRef.current) {
+      prevRowRef.current = newRow;
+      prevPatternRef.current = newPattern;
+      // Immediately update renderParams + redraw in THIS frame to avoid 1-frame jitter.
+      renderParamsRef.current = {
+        ...renderParamsRef.current,
+        playbackRow: newRow,
+        playbackPatternIdx: newPattern,
+      };
+      fullRedrawRef.current = true;
+      imperativeRedrawRef.current?.();
+      // Queue React state update for any downstream consumers
+      setPlaybackRow(newRow);
+      setPlaybackPatternIdx(newPattern);
+    }
+  });
 
   // During playback, use the replayer's pattern index for rendering rather than
   // the store's currentPatternIndex. The RAF loop reads the replayer directly,
