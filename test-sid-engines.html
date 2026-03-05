@@ -32,6 +32,9 @@
   <div id="sid-info"></div>
   <div id="results"></div>
 
+<!-- Load C64 ROM data for WebSIDPlay/WebSID -->
+<script src="/deepsid/c64roms.js"></script>
+
 <script>
 // ─── Globals ───────────────────────────────────────────────────────────────
 let sidData = null;
@@ -245,9 +248,25 @@ async function testScriptNodePlayer(engineId) {
   if (engineId === 'tinyrsid') {
     adapter = new AdapterClass();
   } else {
-    adapter = new AdapterClass(null, null, null, undefined, false);
+    // WebSIDPlay (libsidplayfp) REQUIRES C64 ROMs to emulate the CPU.
+    // Without ROMs, only direct SID register writes work (test beeps).
+    const basicROM = window.C64_BASIC_ROM || null;
+    const charROM = window.C64_CHAR_ROM || null;
+    const kernalROM = window.C64_KERNAL_ROM || null;
+    adapter = new AdapterClass(basicROM, charROM, kernalROM, undefined, false);
   }
   log(engineId, 'Adapter created ✓', 'ok');
+
+  // Instrument loadMusicData for debugging
+  if (engineId === 'websidplay') {
+    const origLoad = adapter.loadMusicData.bind(adapter);
+    adapter.loadMusicData = function(sampleRate, path, filename, data, options) {
+      log(engineId, `loadMusicData: sampleRate=${sampleRate} path="${path}" filename="${filename}" dataLen=${data?.length}`, 'warn');
+      const ret = origLoad(sampleRate, path, filename, data, options);
+      log(engineId, `loadMusicData returned: ${ret}`, ret === 0 ? 'ok' : 'error');
+      return ret;
+    };
+  }
 
   // Share audio context
   window._gPlayerAudioCtx = audioCtx;
@@ -266,8 +285,11 @@ async function testScriptNodePlayer(engineId) {
   log(engineId, 'Loading SID data...');
   const dataBuffer = sidData.buffer.slice(sidData.byteOffset, sidData.byteOffset + sidData.byteLength);
 
+  // For websidplay, try with a .sid filename path that looks like an HVSC path
+  const filename = 'test.sid';
+
   const success = player._prepareTrackForPlayback(
-    'test.sid', dataBuffer, { track: 0 },
+    filename, dataBuffer, { track: 0 },
     () => log(engineId, 'Track ready callback fired', 'ok'),
     (err) => log(engineId, `Track prep error: ${err}`, 'error')
   );
@@ -275,6 +297,8 @@ async function testScriptNodePlayer(engineId) {
   if (!success) {
     log(engineId, `_prepareTrackForPlayback returned: ${success}`, 'warn');
     log(engineId, `isSongReady: ${player._isSongReady}, isPaused: ${player._isPaused}`, 'warn');
+  } else {
+    log(engineId, `_prepareTrackForPlayback returned: ${success}`, 'ok');
   }
 
   engineStates[engineId] = { player, type: 'scriptnodeplayer' };
