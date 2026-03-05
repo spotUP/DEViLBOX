@@ -401,7 +401,7 @@ export const useSettingsStore = create<SettingsStore>()(
         paulTonge: 'native',            // PaulTongeParser — dedicated Paul Tonge support
         robHubbardST: 'native',         // RobHubbardSTParser — dedicated Rob Hubbard ST support
         robHubbard: 'native',           // RobHubbardParser — dedicated Rob Hubbard support
-        futurePlayer: 'native',       // FuturePlayerParser — dedicated Future Player support
+        futurePlayer: 'native',       // Native WASM replayer (transpiled 68k)
         jasonPage: 'native',          // JasonPageParser — dedicated Jason Page support
         infogrames: 'native',         // InfogramesParser — dedicated Infogrames support
         sawteeth: 'native',           // SawteethParser — dedicated Sawteeth support
@@ -425,7 +425,7 @@ export const useSettingsStore = create<SettingsStore>()(
       lensEnabled: false,
       lensPreset: 'off',
       lensParams: { barrel: 0, chromatic: 0, vignette: 0 },
-      renderMode: 'webgl' as const,  // Default: WebGL/workbench rendering
+      renderMode: 'dom' as const,  // Default: DOM rendering (GL UI is experimental)
       
       // ASID Hardware defaults
       asidEnabled: false,
@@ -520,6 +520,10 @@ export const useSettingsStore = create<SettingsStore>()(
 
       setRenderMode: (renderMode) =>
         set((state) => {
+          // Block WebGL mode on mobile phones — GL UI doesn't work on mobile
+          if (renderMode === 'webgl' && /iPhone|iPod|Android.*Mobile/i.test(navigator.userAgent)) {
+            return;
+          }
           state.renderMode = renderMode;
         }),
 
@@ -551,7 +555,7 @@ export const useSettingsStore = create<SettingsStore>()(
         const s = (persistedState ?? {}) as Record<string, unknown>;
         if (version < 2) {
           // v2: workbench becomes the default UI
-          s.renderMode = 'webgl';
+          s.renderMode = 'dom';
         }
         return s;
       },
@@ -589,7 +593,7 @@ export const useSettingsStore = create<SettingsStore>()(
         lensEnabled: state.lensEnabled,
         lensPreset:  state.lensPreset,
         lensParams:  state.lensParams,
-        // renderMode intentionally not persisted — always start in webgl/workbench mode
+        // renderMode intentionally not persisted — always start in DOM mode
       }),
     }
   )
