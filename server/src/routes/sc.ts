@@ -78,7 +78,19 @@ function extractSynthDefBlock(source: string): string | null {
   let i = openParen;
   while (i < source.length) {
     const ch = source[i];
-    if (ch === '"') {
+    if (ch === '/' && i + 1 < source.length) {
+      if (source[i + 1] === '/') {
+        // Skip // line comment (avoids apostrophes in words like "can't")
+        i += 2;
+        while (i < source.length && source[i] !== '\n') i++;
+        i++; continue;
+      } else if (source[i + 1] === '*') {
+        // Skip /* block comment */
+        i += 2;
+        while (i < source.length && !(source[i] === '*' && source[i + 1] === '/')) i++;
+        i += 2; continue;
+      }
+    } else if (ch === '"') {
       // Skip double-quoted string literal
       i++;
       while (i < source.length && source[i] !== '"') {
@@ -110,8 +122,6 @@ function extractSynthDefBlock(source: string): string | null {
   // Strip any chained calls like .add, .send(s), .store, .play — these are
   // interactive-mode calls that contact a server or mutate global state.
   // We replace them with .writeDefFile() in the wrapper, so they must be removed.
-  // (Previously we included them, which broke the expression chain via semicolons
-  // and caused .send(s) to hang waiting for a non-existent server.)
   return source.slice(blockStart, i).trim();
 }
 
