@@ -50,9 +50,10 @@ const C_CHAN_SEP    = 0x222222;
 const NOTE_NAMES = ['C-', 'C#', 'D-', 'D#', 'E-', 'F-', 'F#', 'G-', 'G#', 'A-', 'A#', 'B-'];
 
 function noteStr(n: number): string {
-  if (n === 0) return '...';
-  if (n === 0xBE) return '===';
-  if (n === 0xBF) return '+++';
+  if (n === 0 || n === 0xBD) return '...'; // 0=empty, 0xBD=REST
+  if (n === 0xBE) return '==='; // keyoff
+  if (n === 0xBF) return '+++'; // keyon
+  if (n >= 0xC0) return '...'; // ENDPATT and other special values
   const v = n - 1;
   return `${NOTE_NAMES[v % 12]}${Math.floor(v / 12)}`;
 }
@@ -215,7 +216,7 @@ export const PixiGTPatternGrid: React.FC<Props> = ({ width, height }) => {
         let colX = baseX;
 
         // Note
-        labels.push({ x: colX, y: y + 2, text: noteStr(note), color: note === 0 ? C_EMPTY : C_NOTE, fontFamily });
+        labels.push({ x: colX, y: y + 2, text: noteStr(note), color: (note === 0 || note >= 0xBD) ? C_EMPTY : C_NOTE, fontFamily });
         colX += NOTE_W + COL_GAP;
 
         // Instrument
