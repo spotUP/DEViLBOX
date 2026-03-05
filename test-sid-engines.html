@@ -38,6 +38,7 @@
 <script>
 // ─── Globals ───────────────────────────────────────────────────────────────
 let sidData = null;
+let sidFileName = 'test.sid';
 let audioCtx = null;
 
 const ENGINES = [
@@ -260,10 +261,15 @@ async function testScriptNodePlayer(engineId) {
   // Instrument loadMusicData for debugging
   if (engineId === 'websidplay') {
     const origLoad = adapter.loadMusicData.bind(adapter);
+    let loadCount = 0;
     adapter.loadMusicData = function(sampleRate, path, filename, data, options) {
-      log(engineId, `loadMusicData: sampleRate=${sampleRate} path="${path}" filename="${filename}" dataLen=${data?.length}`, 'warn');
+      loadCount++;
+      log(engineId, `loadMusicData #${loadCount}: sampleRate=${sampleRate} path="${path}" filename="${filename}" dataLen=${data?.length}`, 'warn');
+      if (loadCount > 1) {
+        console.trace('[websidplay] 2nd loadMusicData call stack:');
+      }
       const ret = origLoad(sampleRate, path, filename, data, options);
-      log(engineId, `loadMusicData returned: ${ret}`, ret === 0 ? 'ok' : 'error');
+      log(engineId, `loadMusicData #${loadCount} returned: ${ret}`, ret === 0 ? 'ok' : 'error');
       return ret;
     };
   }
@@ -282,11 +288,34 @@ async function testScriptNodePlayer(engineId) {
   if (!player._onTrackReadyToPlay) player._onTrackReadyToPlay = () => {};
   player.setVolume(1);
 
+  // Instrument _fileRequestCallback to see what files WASM requests
+  if (engineId === 'websidplay') {
+    const origFileReq = player._fileRequestCallback?.bind(player);
+    if (origFileReq) {
+      player._fileRequestCallback = function(e) {
+        const name = adapter.Module?.UTF8ToString?.(e) || '(unknown)';
+        log(engineId, `WASM requesting file: "${name}"`, 'warn');
+        console.trace('[websidplay] _fileRequestCallback for:', name);
+        return origFileReq(e);
+      };
+    }
+  }
+
   log(engineId, 'Loading SID data...');
   const dataBuffer = sidData.buffer.slice(sidData.byteOffset, sidData.byteOffset + sidData.byteLength);
 
-  // For websidplay, try with a .sid filename path that looks like an HVSC path
-  const filename = 'test.sid';
+  // Use actual filename from file picker
+  const filename = sidFileName;
+
+  // Pre-populate ScriptNodePlayer's internal file cache so _preloadFile finds
+  // the file when WASM requests it via _fileRequestCallback. Without this,
+  // _preloadFile tries an XHR (404) then re-triggers _initIfNeeded which calls
+  // _loadMusicData (including teardown()) → corrupts emulator state.
+  if (player._getCache) {
+    const cacheData = new Uint8Array(dataBuffer);
+    player._getCache().setFile(filename, cacheData);
+    player._getCache().setFile('/' + filename, cacheData);
+  }
 
   const success = player._prepareTrackForPlayback(
     filename, dataBuffer, { track: 0 },
@@ -499,6 +528,7 @@ document.getElementById('btn-load-test').addEventListener('click', async () => {
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     const buf = await resp.arrayBuffer();
     sidData = new Uint8Array(buf);
+    sidFileName = 'test.sid';
     loadSIDFile(sidData);
   } catch (e) {
     sidInfo.innerHTML = `<span style="color:#f44336">Failed to load test.sid: ${e.message}</span>`;
@@ -530,6 +560,7 @@ function loadSIDFile(data) {
 document.getElementById('sid-file').addEventListener('change', async (e) => {
   const file = e.target.files[0];
   if (!file) return;
+  sidFileName = file.name;
 
   const buf = await file.arrayBuffer();
   sidData = new Uint8Array(buf);
