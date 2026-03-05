@@ -6,7 +6,7 @@ import { Play, CheckCircle, AlertCircle, Loader, Download, Upload, Plus, X, Copy
 import type { SuperColliderConfig, SCParam } from '@typedefs/instrument';
 import { useInstrumentStore } from '@stores/useInstrumentStore';
 import { superColliderLanguage } from '@engine/sc/scLanguage';
-import { parseSCGui, type SCGuiParseResult } from '@engine/sc/scGuiParser';
+import { parseSCGui, type SCGuiParseResult, type SCRoutinePattern } from '@engine/sc/scGuiParser';
 import { SCGuiRenderer } from './SCGuiRenderer';
 import { SC_PRESETS, SC_PRESET_CATEGORIES, type SCPreset } from '@constants/scPresets';
 import { getToneEngine } from '@engine/ToneEngine';
@@ -284,6 +284,13 @@ export const SuperColliderEditor: React.FC<Props> = ({ config, onChange }) => {
         });
         finishProgress(true);
         setStatus({ state: 'compiled' });
+
+        // Cache result on server for instant future loading
+        fetch(`${API_URL}/sc/presets/cache`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: data.synthDefName, result: data }),
+        }).catch(() => {});
       } else {
         finishProgress(false);
         setStatus({ state: 'error', message: data.error, line: data.line, rawOutput: data.rawOutput });
@@ -375,6 +382,52 @@ export const SuperColliderEditor: React.FC<Props> = ({ config, onChange }) => {
     } catch { /* engine not ready or no active synth */ }
   }, []);
 
+  // Generate tracker pattern from SC Routine data
+  const handleGeneratePattern = useCallback((routine: SCRoutinePattern) => {
+    import('@stores/useTrackerStore').then(({ useTrackerStore }) => {
+      const store = useTrackerStore.getState();
+      const instrumentId = useInstrumentStore.getState().currentInstrumentId ?? 1;
+      const { pitches, gates, rootNote } = routine;
+      const root = rootNote ?? 60;
+      const steps = pitches.length;
+
+      // Create a new pattern
+      store.addPattern(steps);
+      const patternIdx = store.patterns.length - 1;
+      const pattern = store.patterns[patternIdx];
+      if (!pattern || pattern.channels.length === 0) return;
+
+      // Fill channel 0 with routine data
+      useTrackerStore.setState(state => {
+        const ch = state.patterns[patternIdx].channels[0];
+        for (let i = 0; i < steps && i < ch.rows.length; i++) {
+          const midi = root + pitches[i];
+          const xmNote = Math.max(1, Math.min(96, midi - 11));
+          const gate = gates[i] ?? 1;
+          if (gate < 0.01) {
+            // Rest — leave empty
+            ch.rows[i] = { note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 };
+          } else {
+            ch.rows[i] = {
+              note: xmNote,
+              instrument: instrumentId,
+              volume: Math.round(gate * 0x40) + 0x10,
+              effTyp: 0, eff: 0, effTyp2: 0, eff2: 0,
+            };
+          }
+        }
+        ch.instrumentId = instrumentId;
+      });
+
+      // Navigate to the new pattern
+      store.setCurrentPattern(patternIdx);
+
+      import('@stores/useUIStore').then(({ useUIStore }) => {
+        useUIStore.getState().setStatusMessage(`Pattern generated: ${steps} steps from SC Routine`);
+      });
+    });
+  }, []);
+
   // -------------------------------------------------------------------------
   // Export / Import
   // -------------------------------------------------------------------------
@@ -458,7 +511,8 @@ export const SuperColliderEditor: React.FC<Props> = ({ config, onChange }) => {
   // -------------------------------------------------------------------------
   // Load community preset
   // -------------------------------------------------------------------------
-  const handleLoadPreset = useCallback((preset: SCPreset) => {
+  const handleLoadPreset = useCallback(async (preset: SCPreset) => {
+    // Set source immediately
     onChangeRef.current({
       ...configRef.current,
       source: preset.source,
@@ -467,6 +521,28 @@ export const SuperColliderEditor: React.FC<Props> = ({ config, onChange }) => {
       params: [],
     });
     setShowPresets(false);
+
+    // Try cached pre-compiled version
+    try {
+      const cacheRes = await fetch(`${API_URL}/sc/presets/${encodeURIComponent(preset.name)}`);
+      if (cacheRes.ok) {
+        const cached = await cacheRes.json();
+        if (cached.success && cached.binary) {
+          onChangeRef.current({
+            ...configRef.current,
+            source: preset.source,
+            synthDefName: cached.synthDefName,
+            binary: cached.binary,
+            params: (cached.params ?? []).map((p: any) => ({
+              name: p.name, value: p.default ?? 0, min: p.min ?? 0, max: p.max ?? 1,
+            })),
+          });
+          setStatus({ state: 'success', message: `Loaded pre-compiled: ${cached.synthDefName}` });
+          return;
+        }
+      }
+    } catch { /* no cache, user will need to compile */ }
+
     setStatus({ state: 'idle' });
   }, []);
 
@@ -723,6 +799,7 @@ export const SuperColliderEditor: React.FC<Props> = ({ config, onChange }) => {
             <SCGuiRenderer
               gui={guiResult}
               onParamChange={handleGuiParamChange}
+              onGeneratePattern={handleGeneratePattern}
               className="h-full"
             />
           </div>
