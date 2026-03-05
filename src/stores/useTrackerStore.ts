@@ -1669,6 +1669,19 @@ export const useTrackerStore = create<TrackerStore>()(
           state.channelTrackTables = null;
           state.channelSpeeds = null;
           state.channelGrooves = null;
+        } else if (song.c64SidFileData) {
+          // C64 .sid files — use GT Ultra view for SID register display
+          state.editorMode = 'goattracker';
+          state.furnaceNative = null;
+          state.hivelyNative = null;
+          state.hivelyFileData = null;
+          state.musiclineFileData = null;
+          state.hivelyMeta = null;
+          state.furnaceSubsongs = null;
+          state.furnaceActiveSubsong = 0;
+          state.channelTrackTables = null;
+          state.channelSpeeds = null;
+          state.channelGrooves = null;
         } else {
           state.editorMode = 'classic';
           state.furnaceNative = null;
