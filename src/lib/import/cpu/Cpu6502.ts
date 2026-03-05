@@ -272,10 +272,77 @@ export class Cpu6502 {
       case 0x0C: { this.fetch16(); return 4; }
       case 0x14: case 0x34: case 0x54: case 0x74: case 0xD4: case 0xF4: { this.fetch(); return 4; }
       case 0x1C: case 0x3C: case 0x5C: case 0x7C: case 0xDC: case 0xFC: { this.fetch16(); return 4; }
+      // ── Commonly used illegal opcodes (many SID players use these) ──
+      // LAX — Load A and X simultaneously
+      case 0xA7: { const v=this.rd(this.fetch());                this.A=v; this.X=v; this.nz(v); return 3; }
+      case 0xB7: { const v=this.rd((this.fetch()+this.Y)&0xFF); this.A=v; this.X=v; this.nz(v); return 4; }
+      case 0xAF: { const v=this.rd(this.fetch16());              this.A=v; this.X=v; this.nz(v); return 4; }
+      case 0xBF: { const v=this.rd(this.fetch16()+this.Y);      this.A=v; this.X=v; this.nz(v); return 4; }
+      case 0xA3: { const zp=(this.fetch()+this.X)&0xFF; const v=this.rd(this.rd16wrap(zp)); this.A=v; this.X=v; this.nz(v); return 6; }
+      case 0xB3: { const zp=this.fetch(); const v=this.rd(this.rd16wrap(zp)+this.Y); this.A=v; this.X=v; this.nz(v); return 5; }
+      // SAX — Store A AND X
+      case 0x87: { this.wr(this.fetch(), this.A&this.X); return 3; }
+      case 0x97: { this.wr((this.fetch()+this.Y)&0xFF, this.A&this.X); return 4; }
+      case 0x8F: { this.wr(this.fetch16(), this.A&this.X); return 4; }
+      case 0x83: { const zp=(this.fetch()+this.X)&0xFF; this.wr(this.rd16wrap(zp), this.A&this.X); return 6; }
+      // DCP — Decrement then Compare (DEC + CMP)
+      case 0xC7: { const a=this.fetch(); const v=(this.rd(a)-1)&0xFF; this.wr(a,v); this.cmp(this.A,v); return 5; }
+      case 0xD7: { const a=(this.fetch()+this.X)&0xFF; const v=(this.rd(a)-1)&0xFF; this.wr(a,v); this.cmp(this.A,v); return 6; }
+      case 0xCF: { const a=this.fetch16(); const v=(this.rd(a)-1)&0xFF; this.wr(a,v); this.cmp(this.A,v); return 6; }
+      case 0xDF: { const a=this.fetch16()+this.X; const v=(this.rd(a)-1)&0xFF; this.wr(a,v); this.cmp(this.A,v); return 7; }
+      case 0xDB: { const a=this.fetch16()+this.Y; const v=(this.rd(a)-1)&0xFF; this.wr(a,v); this.cmp(this.A,v); return 7; }
+      case 0xC3: { const zp=(this.fetch()+this.X)&0xFF; const a=this.rd16wrap(zp); const v=(this.rd(a)-1)&0xFF; this.wr(a,v); this.cmp(this.A,v); return 8; }
+      case 0xD3: { const zp=this.fetch(); const a=this.rd16wrap(zp)+this.Y; const v=(this.rd(a)-1)&0xFF; this.wr(a,v); this.cmp(this.A,v); return 8; }
+      // ISB/ISC — Increment then Subtract (INC + SBC)
+      case 0xE7: { const a=this.fetch(); const v=(this.rd(a)+1)&0xFF; this.wr(a,v); this.sbc(v); return 5; }
+      case 0xF7: { const a=(this.fetch()+this.X)&0xFF; const v=(this.rd(a)+1)&0xFF; this.wr(a,v); this.sbc(v); return 6; }
+      case 0xEF: { const a=this.fetch16(); const v=(this.rd(a)+1)&0xFF; this.wr(a,v); this.sbc(v); return 6; }
+      case 0xFF: { const a=this.fetch16()+this.X; const v=(this.rd(a)+1)&0xFF; this.wr(a,v); this.sbc(v); return 7; }
+      case 0xFB: { const a=this.fetch16()+this.Y; const v=(this.rd(a)+1)&0xFF; this.wr(a,v); this.sbc(v); return 7; }
+      case 0xE3: { const zp=(this.fetch()+this.X)&0xFF; const a=this.rd16wrap(zp); const v=(this.rd(a)+1)&0xFF; this.wr(a,v); this.sbc(v); return 8; }
+      case 0xF3: { const zp=this.fetch(); const a=this.rd16wrap(zp)+this.Y; const v=(this.rd(a)+1)&0xFF; this.wr(a,v); this.sbc(v); return 8; }
+      // SLO — Shift Left then OR (ASL + ORA)
+      case 0x07: { const a=this.fetch(); const v=this.asl(this.rd(a)); this.wr(a,v); this.A|=v; this.nz(this.A); return 5; }
+      case 0x17: { const a=(this.fetch()+this.X)&0xFF; const v=this.asl(this.rd(a)); this.wr(a,v); this.A|=v; this.nz(this.A); return 6; }
+      case 0x0F: { const a=this.fetch16(); const v=this.asl(this.rd(a)); this.wr(a,v); this.A|=v; this.nz(this.A); return 6; }
+      case 0x1F: { const a=this.fetch16()+this.X; const v=this.asl(this.rd(a)); this.wr(a,v); this.A|=v; this.nz(this.A); return 7; }
+      case 0x1B: { const a=this.fetch16()+this.Y; const v=this.asl(this.rd(a)); this.wr(a,v); this.A|=v; this.nz(this.A); return 7; }
+      case 0x03: { const zp=(this.fetch()+this.X)&0xFF; const a=this.rd16wrap(zp); const v=this.asl(this.rd(a)); this.wr(a,v); this.A|=v; this.nz(this.A); return 8; }
+      case 0x13: { const zp=this.fetch(); const a=this.rd16wrap(zp)+this.Y; const v=this.asl(this.rd(a)); this.wr(a,v); this.A|=v; this.nz(this.A); return 8; }
+      // RLA — Rotate Left then AND (ROL + AND)
+      case 0x27: { const a=this.fetch(); const v=this.rol(this.rd(a)); this.wr(a,v); this.A&=v; this.nz(this.A); return 5; }
+      case 0x37: { const a=(this.fetch()+this.X)&0xFF; const v=this.rol(this.rd(a)); this.wr(a,v); this.A&=v; this.nz(this.A); return 6; }
+      case 0x2F: { const a=this.fetch16(); const v=this.rol(this.rd(a)); this.wr(a,v); this.A&=v; this.nz(this.A); return 6; }
+      case 0x3F: { const a=this.fetch16()+this.X; const v=this.rol(this.rd(a)); this.wr(a,v); this.A&=v; this.nz(this.A); return 7; }
+      case 0x3B: { const a=this.fetch16()+this.Y; const v=this.rol(this.rd(a)); this.wr(a,v); this.A&=v; this.nz(this.A); return 7; }
+      case 0x23: { const zp=(this.fetch()+this.X)&0xFF; const a=this.rd16wrap(zp); const v=this.rol(this.rd(a)); this.wr(a,v); this.A&=v; this.nz(this.A); return 8; }
+      case 0x33: { const zp=this.fetch(); const a=this.rd16wrap(zp)+this.Y; const v=this.rol(this.rd(a)); this.wr(a,v); this.A&=v; this.nz(this.A); return 8; }
+      // SRE — Shift Right then EOR (LSR + EOR)
+      case 0x47: { const a=this.fetch(); const v=this.lsr(this.rd(a)); this.wr(a,v); this.A^=v; this.nz(this.A); return 5; }
+      case 0x57: { const a=(this.fetch()+this.X)&0xFF; const v=this.lsr(this.rd(a)); this.wr(a,v); this.A^=v; this.nz(this.A); return 6; }
+      case 0x4F: { const a=this.fetch16(); const v=this.lsr(this.rd(a)); this.wr(a,v); this.A^=v; this.nz(this.A); return 6; }
+      case 0x5F: { const a=this.fetch16()+this.X; const v=this.lsr(this.rd(a)); this.wr(a,v); this.A^=v; this.nz(this.A); return 7; }
+      case 0x5B: { const a=this.fetch16()+this.Y; const v=this.lsr(this.rd(a)); this.wr(a,v); this.A^=v; this.nz(this.A); return 7; }
+      case 0x43: { const zp=(this.fetch()+this.X)&0xFF; const a=this.rd16wrap(zp); const v=this.lsr(this.rd(a)); this.wr(a,v); this.A^=v; this.nz(this.A); return 8; }
+      case 0x53: { const zp=this.fetch(); const a=this.rd16wrap(zp)+this.Y; const v=this.lsr(this.rd(a)); this.wr(a,v); this.A^=v; this.nz(this.A); return 8; }
+      // RRA — Rotate Right then Add (ROR + ADC)
+      case 0x67: { const a=this.fetch(); const v=this.ror(this.rd(a)); this.wr(a,v); this.adc(v); return 5; }
+      case 0x77: { const a=(this.fetch()+this.X)&0xFF; const v=this.ror(this.rd(a)); this.wr(a,v); this.adc(v); return 6; }
+      case 0x6F: { const a=this.fetch16(); const v=this.ror(this.rd(a)); this.wr(a,v); this.adc(v); return 6; }
+      case 0x7F: { const a=this.fetch16()+this.X; const v=this.ror(this.rd(a)); this.wr(a,v); this.adc(v); return 7; }
+      case 0x7B: { const a=this.fetch16()+this.Y; const v=this.ror(this.rd(a)); this.wr(a,v); this.adc(v); return 7; }
+      case 0x63: { const zp=(this.fetch()+this.X)&0xFF; const a=this.rd16wrap(zp); const v=this.ror(this.rd(a)); this.wr(a,v); this.adc(v); return 8; }
+      case 0x73: { const zp=this.fetch(); const a=this.rd16wrap(zp)+this.Y; const v=this.ror(this.rd(a)); this.wr(a,v); this.adc(v); return 8; }
+      // ANC — AND + set C from N
+      case 0x0B: case 0x2B: { this.A&=this.fetch(); this.nz(this.A); this.C=this.N; return 2; }
+      // ALR — AND + LSR
+      case 0x4B: { this.A&=this.fetch(); this.A=this.lsr(this.A); return 2; }
+      // ARR — AND + ROR (with special C/V handling)
+      case 0x6B: { this.A&=this.fetch(); this.A=this.ror(this.A); this.C=(this.A>>6)&1; this.V=((this.A>>6)^(this.A>>5))&1; return 2; }
+      // AXS/SBX — (A AND X) - imm → X
+      case 0xCB: { const v=this.fetch(); const r=(this.A&this.X)-v; this.X=r&0xFF; this.C=r>=0?1:0; this.nz(this.X); return 2; }
       case 0x00: {
         // BRK: consume padding byte; treat as fatal driver error / stop execution
-        // BCD on the NES is disabled; on C64/Atari it is implemented in hardware but
-        // music drivers rarely use it for audio logic.
         this.fetch(); // skip padding byte
         return 200_000; // exhaust remaining cycle budget — prevents hanging on $00 sea
       }
