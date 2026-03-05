@@ -720,13 +720,43 @@ async function loadDB303Pattern(xmlDoc: Document, filename: string): Promise<Fil
  * Load an audio sample file.
  */
 async function loadAudioSample(file: File): Promise<FileLoadResult> {
-  // TODO: Auto-create sample instrument
-  // For now, just show a notification
-  notify.info(`Audio sample: ${file.name} — Auto-import coming soon. Open instrument editor to add manually.`);
-  
-  return {
-    success: true,
-    message: `Recognized audio sample: ${file.name} (manual import required)`
-  };
+  try {
+    const { getDevilboxAudioContext } = await import('@/utils/audio-context');
+    const audioCtx = getDevilboxAudioContext();
+    const arrayBuf = await file.arrayBuffer();
+    const audioBuffer = await audioCtx.decodeAudioData(arrayBuf.slice(0));
+
+    const name = file.name.replace(/\.[^.]+$/, '').slice(0, 22);
+    const newId = useInstrumentStore.getState().createInstrument({
+      name,
+      synthType: 'Sampler',
+      sample: {
+        audioBuffer: arrayBuf,
+        url: '',
+        baseNote: 'C-4',
+        detune: 0,
+        loop: false,
+        loopStart: 0,
+        loopEnd: audioBuffer.length,
+        reverse: false,
+        playbackRate: 1,
+        sampleRate: audioBuffer.sampleRate,
+      },
+    });
+
+    useInstrumentStore.getState().setCurrentInstrument(newId);
+    notify.success(`Created sample instrument: ${name}`);
+
+    return {
+      success: true,
+      message: `Imported audio sample as instrument ${newId}: ${name}`
+    };
+  } catch (error) {
+    notify.info(`Audio sample: ${file.name} — Could not auto-import. Open instrument editor to add manually.`);
+    return {
+      success: true,
+      message: `Recognized audio sample: ${file.name} (manual import required)`
+    };
+  }
 }
 

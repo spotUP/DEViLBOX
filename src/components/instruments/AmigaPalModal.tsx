@@ -334,8 +334,48 @@ export const AmigaPalModal: React.FC<AmigaPalModalProps> = ({
     fileInputRef.current?.click();
   };
 
-  const handleFileChange = (_e: React.ChangeEvent<HTMLInputElement>) => {
-    // TODO: Load multiple audio files
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    const { getDevilboxAudioContext } = await import('@/utils/audio-context');
+    const audioCtx = getDevilboxAudioContext();
+    const newSamples: SampleItem[] = [];
+
+    for (const file of Array.from(files)) {
+      try {
+        const arrayBuf = await file.arrayBuffer();
+        const audioBuffer = await audioCtx.decodeAudioData(arrayBuf);
+        newSamples.push({
+          id: Math.random().toString(36),
+          buffer: audioBuffer,
+          filename: file.name,
+          targetFilename: file.name.replace(/\.[^.]+$/, '.8svx'),
+          size: audioBuffer.length * 2,
+          length: audioBuffer.duration,
+          trimStart: 0,
+          trimEnd: audioBuffer.duration,
+          loCutHz: 90,
+          hiCutHz: 2663,
+          limiterEnabled: false,
+          limiterThresh: 0,
+          limiterMakeup: 0,
+          ptNote: 'A-3',
+          ptSampleRate: 27920,
+          pitchShift: 0,
+        });
+      } catch {
+        setStatusMessage(`Failed to decode: ${file.name}`, true, 3000);
+      }
+    }
+
+    if (newSamples.length > 0) {
+      setSamples(prev => [...prev, ...newSamples]);
+      setSelectedIndex(samples.length); // select first new sample
+      setStatusMessage(`Loaded ${newSamples.length} sample${newSamples.length > 1 ? 's' : ''}`, false, 2000);
+    }
+    // Reset file input so same file can be re-selected
+    e.target.value = '';
   };
 
   const handleClearAll = () => {
@@ -968,10 +1008,16 @@ export const AmigaPalModal: React.FC<AmigaPalModalProps> = ({
                           <Trash2 size={12} className="mx-auto" />
                         </button>
                         <button
-                          onClick={(e) => {
+                          onClick={async (e) => {
                             e.stopPropagation();
-                            // TODO: Process single item
-                          }}
+                            try {
+                              const processed = await processSamplePreview(sample);
+                              setSamples(prev => prev.map((s, i) => i === index ? { ...s, buffer: processed } : s));
+                              setStatusMessage(`Processed: ${sample.filename}`, false, 2000);
+                            } catch {
+                              setStatusMessage(`Failed to process: ${sample.filename}`, true, 2000);
+                            }
+                          }}}
                           className="flex-1 bg-ft2-header px-2 py-1 border border-ft2-border hover:border-ft2-highlight hover:text-ft2-highlight transition-colors"
                         >
                           <Shuffle size={12} className="mx-auto" />

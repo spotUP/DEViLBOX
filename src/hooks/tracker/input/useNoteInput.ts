@@ -12,6 +12,9 @@ import { useUIStore } from '@stores/useUIStore';
 import { getToneEngine } from '@engine/ToneEngine';
 import { stringNoteToXM } from '@/lib/xmConversions';
 import { NOTE_MAP, type HeldNote, type TrackerInputRefs } from './inputConstants';
+import { validateEdit } from '@/lib/import/formatConstraints';
+import { notify } from '@/stores/useNotificationStore';
+import type { TrackerFormat } from '@/engine/TrackerReplayer';
 
 export const useNoteInput = (refs: TrackerInputRefs) => {
   const { cursorRef } = refs;
@@ -67,6 +70,9 @@ export const useNoteInput = (refs: TrackerInputRefs) => {
 
   // Track held notes by key to enable proper release
   const heldNotesRef = useRef<Map<string, HeldNote>>(new Map());
+
+  // Avoid spamming format constraint warnings
+  const lastWarningRef = useRef<string>('');
 
   // FT2: Get the channel to use for note entry (multi-channel allocation)
   const getTargetChannel = useCallback(() => {
@@ -180,6 +186,19 @@ export const useNoteInput = (refs: TrackerInputRefs) => {
         note: xmNote,
         instrument: currentInstrumentId !== null ? currentInstrumentId : undefined,
       });
+
+      // Format constraint validation — warn if edit exceeds source format limits
+      const fmt = pattern.importMetadata?.sourceFormat as TrackerFormat | undefined;
+      if (fmt && fmt !== 'XM' && fmt !== 'MOD') {
+        const warnings = validateEdit(fmt, targetChannel, xmNote, currentInstrumentId ?? undefined, 0);
+        if (warnings.length > 0) {
+          const key = warnings[0];
+          if (key !== lastWarningRef.current) {
+            lastWarningRef.current = key;
+            notify.warn(warnings[0]);
+          }
+        }
+      }
 
       // Auto-enable 303 flag columns when entering notes with a TB-303/Buzz3o3 instrument
       if (currentInstrumentId !== null) {
