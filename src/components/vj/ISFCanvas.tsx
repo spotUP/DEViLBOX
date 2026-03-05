@@ -25,18 +25,22 @@ export interface ISFCanvasHandle {
 interface ISFCanvasProps {
   onReady?: (presetCount: number) => void;
   onPresetChange?: (idx: number, name: string) => void;
+  visible?: boolean;
 }
 
 // ─── Component ─────────────────────────────────────────────────────────────────
 
 export const ISFCanvas = React.forwardRef<ISFCanvasHandle, ISFCanvasProps>(
-  ({ onReady, onPresetChange }, ref) => {
+  ({ onReady, onPresetChange, visible = true }, ref) => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const engineRef = useRef<ISFEngine | null>(null);
     const audioBusRef = useRef<AudioDataBus | null>(null);
     const rafRef = useRef<number>(0);
     const currentIdxRef = useRef(0);
+    const visibleRef = useRef(visible);
     const [ready, setReady] = useState(false);
+
+    useEffect(() => { visibleRef.current = visible; }, [visible]);
 
     // Init engine
     useEffect(() => {
@@ -78,22 +82,24 @@ export const ISFCanvas = React.forwardRef<ISFCanvasHandle, ISFCanvasProps>(
     useEffect(() => {
       if (!ready) return;
       const render = () => {
-        const engine = engineRef.current;
-        const bus = audioBusRef.current;
-        if (engine) {
-          if (bus) {
-            bus.update();
-            const data = bus.getFrame();
-            const audioUniforms: AudioUniforms = {
-              audio_bass: data.subEnergy * 0.5 + data.bassEnergy * 0.5,
-              audio_mid: data.midEnergy,
-              audio_high: data.highEnergy,
-              audio_level: data.rms,
-              audio_beat: data.beat ? 1.0 : 0.0,
-            };
-            engine.setAudioUniforms(audioUniforms);
+        if (visibleRef.current) {
+          const engine = engineRef.current;
+          const bus = audioBusRef.current;
+          if (engine) {
+            if (bus) {
+              bus.update();
+              const data = bus.getFrame();
+              const audioUniforms: AudioUniforms = {
+                audio_bass: data.subEnergy * 0.5 + data.bassEnergy * 0.5,
+                audio_mid: data.midEnergy,
+                audio_high: data.highEnergy,
+                audio_level: data.rms,
+                audio_beat: data.beat ? 1.0 : 0.0,
+              };
+              engine.setAudioUniforms(audioUniforms);
+            }
+            engine.draw();
           }
-          engine.draw();
         }
         rafRef.current = requestAnimationFrame(render);
       };

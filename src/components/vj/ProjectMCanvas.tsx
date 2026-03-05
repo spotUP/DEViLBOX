@@ -92,18 +92,22 @@ export { loadManifest as loadProjectMManifest };
 interface ProjectMCanvasProps {
   onReady?: (presetCount: number) => void;
   onPresetChange?: (idx: number, name: string) => void;
+  visible?: boolean;
 }
 
 export const ProjectMCanvas = React.forwardRef<VJCanvasHandle, ProjectMCanvasProps>(
-  ({ onReady, onPresetChange }, ref) => {
+  ({ onReady, onPresetChange, visible = true }, ref) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const engineRef = useRef<ProjectMEngine | null>(null);
     const rafRef = useRef<number>(0);
     const currentIdxRef = useRef(0);
+    const visibleRef = useRef(visible);
     const [ready, setReady] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const audioBusRef = useRef<AudioDataBus | null>(null);
+
+    useEffect(() => { visibleRef.current = visible; }, [visible]);
 
     // Init — wait until canvas has real dimensions (layout complete)
     useEffect(() => {
@@ -176,20 +180,20 @@ export const ProjectMCanvas = React.forwardRef<VJCanvasHandle, ProjectMCanvasPro
     useEffect(() => {
       if (!ready) return;
       const render = () => {
-        const engine = engineRef.current;
-        const bus = audioBusRef.current;
-        if (engine && bus) {
-          // Get audio frame from AudioDataBus (proven tap on Tone.Destination)
-          const frame = bus.update();
-          const waveform = frame.waveform;
-          // Create stereo interleaved buffer (duplicate mono → stereo)
-          const stereo = new Float32Array(waveform.length * 2);
-          for (let i = 0; i < waveform.length; i++) {
-            stereo[i * 2] = waveform[i];
-            stereo[i * 2 + 1] = waveform[i];
+        if (visibleRef.current) {
+          const engine = engineRef.current;
+          const bus = audioBusRef.current;
+          if (engine && bus) {
+            const frame = bus.update();
+            const waveform = frame.waveform;
+            const stereo = new Float32Array(waveform.length * 2);
+            for (let i = 0; i < waveform.length; i++) {
+              stereo[i * 2] = waveform[i];
+              stereo[i * 2 + 1] = waveform[i];
+            }
+            engine.pushAudio(stereo, waveform.length);
+            engine.renderFrame();
           }
-          engine.pushAudio(stereo, waveform.length);
-          engine.renderFrame();
         }
         rafRef.current = requestAnimationFrame(render);
       };

@@ -81,10 +81,12 @@ interface VJCanvasProps {
   onReady?: (presetCount: number) => void;
   /** Called when the active preset changes */
   onPresetChange?: (idx: number, name: string) => void;
+  /** Whether this layer is currently visible */
+  visible?: boolean;
 }
 
 export const VJCanvas = React.forwardRef<VJCanvasHandle, VJCanvasProps>(
-  ({ onReady, onPresetChange }, ref) => {
+  ({ onReady, onPresetChange, visible = true }, ref) => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const visualizerRef = useRef<any>(null);
     const audioDataBusRef = useRef<AudioDataBus | null>(null);
@@ -92,7 +94,10 @@ export const VJCanvas = React.forwardRef<VJCanvasHandle, VJCanvasProps>(
     const presetNamesRef = useRef<string[]>([]);
     const presetMapRef = useRef<Record<string, object>>({});
     const currentIdxRef = useRef(0);
+    const visibleRef = useRef(visible);
     const [ready, setReady] = useState(false);
+
+    useEffect(() => { visibleRef.current = visible; }, [visible]);
 
     // Init butterchurn
     useEffect(() => {
@@ -162,8 +167,10 @@ export const VJCanvas = React.forwardRef<VJCanvasHandle, VJCanvasProps>(
     useEffect(() => {
       if (!ready) return;
       const render = () => {
-        visualizerRef.current?.render();
-        audioDataBusRef.current?.update();
+        if (visibleRef.current) {
+          visualizerRef.current?.render();
+          audioDataBusRef.current?.update();
+        }
         rafRef.current = requestAnimationFrame(render);
       };
       rafRef.current = requestAnimationFrame(render);
@@ -625,6 +632,7 @@ export const VJView: React.FC<VJViewProps> = ({ isPopout = false }) => {
           ref={canvasHandleRef}
           onReady={handleReady}
           onPresetChange={handlePresetChange}
+          visible={activeLayer === 'milkdrop'}
         />
       </div>
       {/* ISF layer */}
@@ -633,6 +641,7 @@ export const VJView: React.FC<VJViewProps> = ({ isPopout = false }) => {
           ref={isfHandleRef}
           onReady={(count) => setISFPresetCount(count)}
           onPresetChange={(idx, name) => { setISFPresetIdx(idx); setISFPresetName(name); }}
+          visible={activeLayer === 'isf'}
         />
       </div>
       {/* Three.js 3D layer */}
@@ -650,6 +659,7 @@ export const VJView: React.FC<VJViewProps> = ({ isPopout = false }) => {
             ref={projectmHandleRef}
             onReady={(count) => setPmPresetCount(count)}
             onPresetChange={(idx, name) => { setPmPresetIdx(idx); setPmPresetName(name); }}
+            visible={activeLayer === 'projectm'}
           />
         </React.Suspense>
       </div>
