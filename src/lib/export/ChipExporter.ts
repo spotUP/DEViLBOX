@@ -14,8 +14,10 @@ import { exportToGYM, canExportGYM, type GYMExportOptions } from './GYMExporter'
 import { exportToNSF, canExportNSF, type NSFExportOptions } from './NSFExporter';
 import { exportToGBS, canExportGBS, type GBSExportOptions } from './GBSExporter';
 import { exportToSPC, canExportSPC, type SPCExportOptions } from './SPCExporter';
+import { exportToS98, canExportS98, type S98ExportOptions } from './S98Exporter';
+import { exportToSNDH, canExportSNDH, type SNDHExportOptions } from './SNDHExporter';
 
-export type ChipExportFormat = 'vgm' | 'zsm' | 'sap' | 'tiuna' | 'gym' | 'nsf' | 'gbs' | 'spc';
+export type ChipExportFormat = 'vgm' | 'zsm' | 'sap' | 'tiuna' | 'gym' | 'nsf' | 'gbs' | 'spc' | 's98' | 'sndh';
 
 export interface ChipExportOptions {
   format: ChipExportFormat;
@@ -32,6 +34,8 @@ export interface ChipExportOptions {
   nsf?: Partial<NSFExportOptions>;
   gbs?: Partial<GBSExportOptions>;
   spc?: Partial<SPCExportOptions>;
+  s98?: Partial<S98ExportOptions>;
+  sndh?: Partial<SNDHExportOptions>;
 }
 
 export interface ChipExportResult {
@@ -131,6 +135,23 @@ export const FORMAT_INFO: Record<ChipExportFormat, {
     mimeType: 'application/octet-stream',
     description: 'Super Nintendo music format with SPC700 driver and 64KB RAM dump.',
     supportedChips: [FurnaceChipType.SNES]
+  },
+  s98: {
+    name: 'Sound Format 98',
+    extension: 's98',
+    mimeType: 'application/octet-stream',
+    description: 'Japanese FM register dump format. Supports YM2203/2608/2612/2151/2413/AY/SN76489.',
+    supportedChips: [
+      FurnaceChipType.OPN2, FurnaceChipType.OPM, FurnaceChipType.AY,
+      FurnaceChipType.OPLL, FurnaceChipType.PSG, FurnaceChipType.OPL3
+    ]
+  },
+  sndh: {
+    name: 'Atari ST SNDH',
+    extension: 'sndh',
+    mimeType: 'application/octet-stream',
+    description: 'Atari ST music format for YM2149 (AY-compatible) chip.',
+    supportedChips: [FurnaceChipType.AY]
   }
 };
 
@@ -179,6 +200,16 @@ export function getAvailableFormats(writes: RegisterWrite[]): ChipExportFormat[]
   // SPC requires SNES/SPC700
   if (canExportSPC(writes)) {
     formats.push('spc');
+  }
+
+  // S98 supports most FM chips
+  if (canExportS98(writes)) {
+    formats.push('s98');
+  }
+
+  // SNDH requires AY/YM2149
+  if (canExportSNDH(writes)) {
+    formats.push('sndh');
   }
 
   return formats;
@@ -297,6 +328,22 @@ export async function exportChipMusic(
         title: options.title,
         artist: options.author,
         ...options.spc
+      });
+      break;
+
+    case 's98':
+      data = exportToS98(writes, {
+        title: options.title,
+        author: options.author,
+        ...options.s98
+      });
+      break;
+
+    case 'sndh':
+      data = exportToSNDH(writes, {
+        title: options.title,
+        author: options.author,
+        ...options.sndh
       });
       break;
 
