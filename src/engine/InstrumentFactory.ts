@@ -692,6 +692,26 @@ export class InstrumentFactory {
         break;
       }
 
+      case 'GearmulatorVirus':
+      case 'GearmulatorVirusTI':
+      case 'GearmulatorMicroQ':
+      case 'GearmulatorXT':
+      case 'GearmulatorNord':
+      case 'GearmulatorJP8000': {
+        // Lazy-load gearmulator module; returns a placeholder synth that
+        // initialises asynchronously once the WASM module is ready.
+        const gmConfig = config.gearmulator ?? { synthType: 0 };
+        const gmVolDb = config.volume ?? -12;
+        const placeholder = createToneJSBasicSynth(config);
+        import('./gearmulator/GearmulatorSynth').then(({ createGearmulatorSynth }) => {
+          createGearmulatorSynth(gmConfig, gmVolDb).catch((err: unknown) => {
+            console.error('[InstrumentFactory] Gearmulator init failed:', err);
+          });
+        });
+        instrument = placeholder;
+        break;
+      }
+
       default: {
         // Check VSTBridge registry for dynamically registered synths
         const desc = SYNTH_REGISTRY.get(config.synthType);
