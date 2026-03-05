@@ -502,7 +502,7 @@ function jsSID (bufferlen, background_noise, asid_enable = false, webusb_enable 
  }
  
  this.opl = null;
- OPL.create(jsSID_audioCtx.sampleRate).then(opl1 => opl = opl1)
+ if (typeof OPL !== 'undefined') { OPL.create(jsSID_audioCtx.sampleRate).then(opl1 => opl = opl1); }
  
  //user functions callable from outside
  this.loadstart = function(sidurl,subt) { this.loadinit(sidurl,subt); if (startcallback!==null) startcallback(); this.playcont(); }

@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-03-05T00:14:08.641Z
+ * Generated: 2026-03-05T00:50:49.644Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.2308';
-export const BUILD_NUMBER = '2308';
-export const BUILD_HASH = 'cd59a1fc';
+export const BUILD_VERSION = '1.0.2322';
+export const BUILD_NUMBER = '2322';
+export const BUILD_HASH = 'f2247987';
 export const BUILD_DATE = '2026-03-05';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,61 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.2308',
+    version: '1.0.2322',
     date: '2026-03-05',
     changes: [
+      {
+        type: 'fix',
+        "description": "GL smooth scroll jitter — cache row duration to prevent oscillation"
+      },
+      {
+        type: 'fix',
+        "description": "Fix hooks ordering violation in GlModal — move hooks before early return"
+      },
+      {
+        type: 'fix',
+        "description": "GL tracker smooth scroll jitter on row transitions"
+      },
+      {
+        type: 'feature',
+        "description": "Restore all VJ pattern overlay effects (3D tilt, drift, beat kicks, shimmer)"
+      },
+      {
+        type: 'fix',
+        "description": "VJ pattern overlay crash — undefined 't' variable after shake removal"
+      },
+      {
+        type: 'fix',
+        "description": "Remove screen blend mode making overlay invisible on bright backgrounds"
+      },
+      {
+        type: 'fix',
+        "description": "Remove all shake/tilt/drift from VJ pattern overlay"
+      },
+      {
+        type: 'fix',
+        "description": "Reduce VJ pattern overlay shake ~60%"
+      },
+      {
+        type: 'fix',
+        "description": "Zoom VJ pattern overlay 50% more (base scale 1.4→2.1)"
+      },
+      {
+        type: 'fix',
+        "description": "Zoom VJ pattern overlay another 20% (base scale 1.2→1.4)"
+      },
+      {
+        type: 'fix',
+        "description": "Zoom VJ pattern overlay 20% larger (base scale 1.0→1.2)"
+      },
+      {
+        type: 'fix',
+        "description": "Increase VJ pattern overlay visibility"
+      },
+      {
+        type: 'fix',
+        "description": "Center VJ pattern overlay using flex instead of translate"
+      },
       {
         type: 'fix',
         "description": "Remove invalid onClick on Pixi Div, fix nested Txt in settings"
@@ -182,62 +234,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'feature',
         "description": "Pulsing connection dot, per-channel widths, collapsed channels"
-      },
-      {
-        type: 'feature',
-        "description": "Multi-mode visualizer, velocity-sensitive pads, turntable physics"
-      },
-      {
-        type: 'fix',
-        "description": "Add comprehensive synth debugging diagnostics to test runner"
-      },
-      {
-        type: 'feature',
-        "description": "Tag management UI, search/recommended APIs, HVSC search fixes"
-      },
-      {
-        type: 'feature',
-        "description": "Add all 48 missing synths to test runner — full 190/190 coverage"
-      },
-      {
-        type: 'feature',
-        "description": "Full DeepSID feature implementation — all tabs, search, tags, transport"
-      },
-      {
-        type: 'feature',
-        "description": "Add comprehensive FX test runner: music-driven tests, clipping detection, 39 param wiring tests, 19 new effects"
-      },
-      {
-        type: 'fix',
-        "description": "Alphabetically sort FX preset categories and items"
-      },
-      {
-        type: 'fix',
-        "description": "PixiSelect dropdown scroll support for long option lists"
-      },
-      {
-        type: 'feature',
-        "description": "Achieve 1:1 GL-DOM parity across all components"
-      },
-      {
-        type: 'fix',
-        "description": "Fix collaboration split view and remote pattern view to match DOM versions"
-      },
-      {
-        type: 'fix',
-        "description": "Resolve 17 TypeScript errors across Pixi components"
-      },
-      {
-        type: 'fix',
-        "description": "Escape apostrophe in PixiRemotePatternView string literal"
-      },
-      {
-        type: 'fix',
-        "description": "Remove extra </Div> closing tag in PixiPadEditor"
-      },
-      {
-        type: 'feature',
-        "description": "Pad name editing, MIDI learn, add layer from file"
       }
     ]
   }
