@@ -333,12 +333,11 @@ export class DeepSIDEngineManager {
   }
 
   /**
-   * Load JSIDPlay2 (WASM with workers) — uses ScriptNodePlayer architecture
+   * Load JSIDPlay2 (WASM with workers) — Worker-based, not ScriptNodePlayer.
+   * The actual Worker is created by JSIDPlay2Engine.init(), so we just
+   * return a marker module. No scripts need loading in the main thread.
    */
   private async loadJSIDPlay2(): Promise<any> {
-    await this.ensureScriptNodePlayer();
-    await this.loadScript('/deepsid/jsidplay2-004.wasm_gc-runtime.js');
-    await this.loadScript('/deepsid/jsidplay2-004.wasm_gc-worker.js');
     return { type: 'jsidplay2' };
   }
 
