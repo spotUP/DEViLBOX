@@ -1245,13 +1245,13 @@ int furnace_dispatch_create(int platformType, int sampleRate) {
     case DIV_SYSTEM_Y8950:
       inst->dispatch = new DivPlatformOPL();
       ((DivPlatformOPL*)inst->dispatch)->setOPLType(8950, false);
-      ((DivPlatformOPL*)inst->dispatch)->setCore(0);
+      ((DivPlatformOPL*)inst->dispatch)->setCore(1);
       inst->numChannels = 10; // 9 FM + 1 ADPCM
       break;
     case DIV_SYSTEM_Y8950_DRUMS:
       inst->dispatch = new DivPlatformOPL();
       ((DivPlatformOPL*)inst->dispatch)->setOPLType(8950, true);
-      ((DivPlatformOPL*)inst->dispatch)->setCore(0);
+      ((DivPlatformOPL*)inst->dispatch)->setCore(1);
       inst->numChannels = 12; // 6 FM + 5 drums + 1 ADPCM
       break;
 
@@ -1992,25 +1992,28 @@ void furnace_dispatch_mute(int handle, int chan, int mute) {
 
 /**
  * Set tick rate.
+ * NOTE: Do NOT call setFlags() here — it recreates the sound device for
+ * platforms like RF5C68, wiping all register state (m_enable, pan, volume).
+ * curHz is an engine-level timing parameter, not a platform flag.
  */
 EMSCRIPTEN_KEEPALIVE
 void furnace_dispatch_set_tick_rate(int handle, float hz) {
   auto it = g_instances.find(handle);
   if (it != g_instances.end()) {
     it->second->engine.curHz = hz;
-    it->second->dispatch->setFlags(DivConfig());
   }
 }
 
 /**
  * Set tuning.
+ * NOTE: Do NOT call setFlags() here — same reason as setTickRate.
+ * song.tuning is used on-the-fly by calcFreq(), not by platform flags.
  */
 EMSCRIPTEN_KEEPALIVE
 void furnace_dispatch_set_tuning(int handle, float tuning) {
   auto it = g_instances.find(handle);
   if (it != g_instances.end()) {
     it->second->engine.song.tuning = tuning;
-    it->second->dispatch->setFlags(DivConfig());
   }
 }
 

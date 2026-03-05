@@ -1232,6 +1232,10 @@ export class FurnaceDispatchEngine {
           this._wasmReadyResolve = null;
         }
         break;
+
+      case 'debug':
+        console.log(data.msg);
+        break;
     }
   }
 
