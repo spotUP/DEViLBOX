@@ -17,9 +17,10 @@ export function getCategoryForSynth(synthType: SynthType): SynthCategory | undef
   return SYNTH_CATEGORIES.find((cat) => cat.synths.some((s) => s.type === synthType));
 }
 
-// Helper to get synth info
+// Helper to get synth info (returns fallback for unknown types)
+const UNKNOWN_SYNTH_INFO: SynthInfo = { name: 'Unknown', shortName: '???', icon: 'Music2', color: 'text-gray-400' };
 export function getSynthInfo(synthType: SynthType): SynthInfo {
-  return SYNTH_INFO[synthType];
+  return SYNTH_INFO[synthType] ?? UNKNOWN_SYNTH_INFO;
 }
 
 // Map Tailwind color classes to CSS hex values
