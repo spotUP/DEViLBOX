@@ -13,17 +13,17 @@ import { MegaText, type GlyphLabel } from '@/pixi/utils/MegaText';
 import { useGTUltraStore } from '@/stores/useGTUltraStore';
 import { encodeAD, encodeSR, attackLabel, decayLabel, sustainLabel } from '@/lib/gtultra/GTVisualMapping';
 
-// ── Colors ──
-const C_BG       = 0x16213e;
-const C_BORDER   = 0x333366;
-const C_LABEL    = 0x888899;
-const C_HEADER   = 0xe94560;
+// ── Colors (FT2 neutral dark theme) ──
+const C_BG       = 0x0d0d0d;
+const C_BORDER   = 0x222222;
+const C_LABEL    = 0x666666;
+const C_HEADER   = 0x888888;
 const C_ENV_LINE = 0x2a9d8f;
 const C_ENV_FILL = 0x2a9d8f;
 const C_POINT    = 0xffffff;
 const C_POINT_HOVER = 0xffcc00;
 const C_WAVE_ON  = 0x00ff88;
-const C_WAVE_OFF = 0x444466;
+const C_WAVE_OFF = 0x333333;
 
 const WAVEFORMS = [
   { name: 'TRI', bit: 0x10, icon: '△' },
@@ -259,7 +259,7 @@ export const PixiGTStudioInstrument: React.FC<Props> = ({ width, height }) => {
       const wf = WAVEFORMS[i];
       const bx = pad + i * (btnW + 6);
       const isOn = (waveform & wf.bit) !== 0;
-      bg.rect(bx, btnY, btnW, btnH).fill({ color: isOn ? 0x1a3a2a : 0x1a1a2e });
+      bg.rect(bx, btnY, btnW, btnH).fill({ color: isOn ? 0x0a2a1a : 0x0d0d0d });
       bg.rect(bx, btnY, btnW, btnH).stroke({ color: isOn ? C_WAVE_ON : C_WAVE_OFF, width: 1 });
       labels.push({
         x: bx + 4, y: btnY + 4,
