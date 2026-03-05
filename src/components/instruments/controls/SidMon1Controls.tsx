@@ -28,9 +28,10 @@
  *   +31     : pitchFall (signed int8)        ✓ written via writeS8
  *
  * Fields NOT written to chip RAM (with reason):
- *   mainWave   — 32-byte sample data stored at waveData + waveIndex * 32;
- *                requires knowing the waveform index stored at +0..+3. TODO.
- *   phaseWave  — same region as mainWave; same complexity. TODO.
+ *   mainWave   — NOW IMPLEMENTED: reads waveform index at +0..+3, writes 32 bytes
+ *                at sections.waveData + waveIndex * 32
+ *   phaseWave  — NOW IMPLEMENTED: uses phaseShift at +28, writes 32 bytes
+ *                at sections.waveData + phaseShift * 32
  */
 
 import React, { useRef, useEffect, useCallback, useState } from 'react';
@@ -274,7 +275,20 @@ export const SidMon1Controls: React.FC<SidMon1ControlsProps> = ({ config, onChan
           <SequenceEditor
             label="Main Wave"
             data={mainWave}
-            onChange={(d) => upd('mainWave', d)}
+            onChange={(d) => {
+              upd('mainWave', d);
+              if (uadeChipRam && uadeChipRam.sections.waveData) {
+                // Read waveform index from instrBase+0..+3, write 32 bytes
+                void (async () => {
+                  const editor = getEditor();
+                  const waveIdx = await editor.readU32(uadeChipRam.instrBase);
+                  const addr = uadeChipRam.sections.waveData + waveIdx * 32;
+                  // Convert signed int8 → unsigned byte for chip RAM
+                  const bytes = d.slice(0, 32).map((v) => ((v ?? 0) + 256) & 0xFF);
+                  void editor.writeBlock(addr, bytes);
+                })();
+              }
+            }}
             min={-128} max={127}
             bipolar
             fixedLength
@@ -282,10 +296,6 @@ export const SidMon1Controls: React.FC<SidMon1ControlsProps> = ({ config, onChan
             color={accent}
             height={80}
           />
-          {/* TODO chip RAM: mainWave lives at sections.waveData + waveIndex * 32.
-              The waveform index is stored as uint32 BE at instrBase + 0..+3.
-              Writing this region requires reading the index first, then writing
-              32 bytes at the correct waveData offset. Deferred. */}
         </div>
 
         {/* Phase Wave */}
@@ -294,7 +304,18 @@ export const SidMon1Controls: React.FC<SidMon1ControlsProps> = ({ config, onChan
           <SequenceEditor
             label="Phase Wave"
             data={phaseWave}
-            onChange={(d) => upd('phaseWave', d)}
+            onChange={(d) => {
+              upd('phaseWave', d);
+              if (uadeChipRam && uadeChipRam.sections.waveData) {
+                // phaseShift index at instrBase+28; write 32 bytes at waveData + phaseShift * 32
+                const phaseIdx = config.phaseShift ?? 0;
+                if (phaseIdx > 0) {
+                  const addr = uadeChipRam.sections.waveData + phaseIdx * 32;
+                  const bytes = d.slice(0, 32).map((v) => ((v ?? 0) + 256) & 0xFF);
+                  void getEditor().writeBlock(addr, bytes);
+                }
+              }
+            }}
             min={-128} max={127}
             bipolar
             fixedLength
@@ -302,9 +323,6 @@ export const SidMon1Controls: React.FC<SidMon1ControlsProps> = ({ config, onChan
             color={knob}
             height={80}
           />
-          {/* TODO chip RAM: phaseWave lives at sections.waveData + phaseShift * 32.
-              The phaseShift index at +28 identifies the waveform. Writing requires
-              the same waveData region lookup as mainWave. Deferred. */}
         </div>
       </div>
     );

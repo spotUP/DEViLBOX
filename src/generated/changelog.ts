@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-03-05T19:25:36.882Z
+ * Generated: 2026-03-05T19:31:30.708Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.2391';
-export const BUILD_NUMBER = '2391';
-export const BUILD_HASH = 'b0df6a1d';
+export const BUILD_VERSION = '1.0.2393';
+export const BUILD_NUMBER = '2393';
+export const BUILD_HASH = '2ef4b271';
 export const BUILD_DATE = '2026-03-05';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,17 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.2391',
+    version: '1.0.2393',
     date: '2026-03-05',
     changes: [
+      {
+        type: 'fix',
+        "description": "Remove 15 unused variables causing TS6133 errors"
+      },
+      {
+        type: 'fix',
+        "description": "Unused variable warnings in HES/PMD/SPC parsers"
+      },
       {
         type: 'fix',
         "description": "Unused variable warnings in AdPlugParser"
@@ -220,14 +228,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'improvement',
         "description": "Memoize layout objects in PixiChannelHeaders"
-      },
-      {
-        type: 'improvement',
-        "description": "Stop rAF loops entirely when not visible"
-      },
-      {
-        type: 'improvement',
-        "description": "Reduce GC pressure and throttle VU meters to 60fps"
       }
     ]
   }
