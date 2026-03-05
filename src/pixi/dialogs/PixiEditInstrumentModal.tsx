@@ -413,7 +413,7 @@ export const PixiEditInstrumentModal: React.FC<PixiEditInstrumentModalProps> = (
   const toggleEffect = useCallback(
     (effectId: string, enabled: boolean) => {
       const inst = instRef.current;
-      if (!inst) return;
+      if (!inst?.effects) return;
       const effects = inst.effects.map((fx) =>
         fx.id === effectId ? { ...fx, enabled } : fx,
       );
