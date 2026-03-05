@@ -279,3 +279,99 @@ export function encodeFCFreqMacro(
 
   return buf;
 }
+
+
+// ── SoundMon Waveform Generator ────────────────────────────────────────────────
+//
+// SoundMon wavetables are 64 unsigned bytes (0-255) stored in the synth table
+// region. Values 0-127 = positive half, 128-255 = negative half (signed → unsigned).
+// Center point = 128.
+
+/**
+ * Generate a 64-byte SoundMon waveform for a given wave type index.
+ * Matches the WAVE_DEFS order in SoundMonControls.tsx.
+ */
+export function generateSoundMonWaveform(waveType: number): Uint8Array {
+  const buf = new Uint8Array(64);
+
+  switch (waveType) {
+    case 0: // Square
+      for (let i = 0; i < 64; i++) buf[i] = i < 32 ? 255 : 0;
+      break;
+    case 1: // Saw (descending)
+      for (let i = 0; i < 64; i++) buf[i] = 255 - Math.round((i / 63) * 255);
+      break;
+    case 2: // Triangle
+      for (let i = 0; i < 64; i++)
+        buf[i] = i < 32 ? Math.round((i / 31) * 255) : Math.round(((63 - i) / 31) * 255);
+      break;
+    case 3: // Noise (pseudo-random)
+      for (let i = 0; i < 64; i++) buf[i] = Math.round(Math.random() * 255);
+      break;
+    case 4: // Pulse 25%
+      for (let i = 0; i < 64; i++) buf[i] = i < 16 ? 255 : 0;
+      break;
+    case 5: // Pulse 12.5%
+      for (let i = 0; i < 64; i++) buf[i] = i < 8 ? 255 : 0;
+      break;
+    case 6: // Pulse 12.5% (variant — phase shifted)
+      for (let i = 0; i < 64; i++) buf[i] = (i >= 16 && i < 24) ? 255 : 0;
+      break;
+    case 7: // Pulse 25% (variant — inverted)
+      for (let i = 0; i < 64; i++) buf[i] = i >= 48 ? 255 : 0;
+      break;
+    case 8: // Blend 1 — sine
+      for (let i = 0; i < 64; i++) buf[i] = Math.round(128 + 127 * Math.sin((i / 64) * Math.PI * 2));
+      break;
+    case 9: // Blend 2 — soft triangle (sine-shaped triangle)
+      for (let i = 0; i < 64; i++) {
+        const t = i < 32 ? i / 31 : (63 - i) / 31;
+        buf[i] = Math.round(128 + 127 * (2 * t - 1));
+      }
+      break;
+    case 10: // Blend 3 — saw + sine harmonic
+      for (let i = 0; i < 64; i++) {
+        const saw = 1 - (i / 63) * 2;
+        const sin2 = Math.sin((i / 64) * Math.PI * 4) * 0.3;
+        buf[i] = Math.round(128 + 127 * Math.max(-1, Math.min(1, saw + sin2)));
+      }
+      break;
+    case 11: // Blend 4 — square + harmonics
+      for (let i = 0; i < 64; i++) {
+        const sq = i < 32 ? 1 : -1;
+        const h3 = Math.sin((i / 64) * Math.PI * 6) * 0.2;
+        buf[i] = Math.round(128 + 127 * Math.max(-1, Math.min(1, sq * 0.8 + h3)));
+      }
+      break;
+    case 12: // Ring 1 — sine ring mod (sine × 2× sine)
+      for (let i = 0; i < 64; i++) {
+        const s1 = Math.sin((i / 64) * Math.PI * 2);
+        const s2 = Math.sin((i / 64) * Math.PI * 4);
+        buf[i] = Math.round(128 + 127 * s1 * s2);
+      }
+      break;
+    case 13: // Ring 2 — triangle ring mod
+      for (let i = 0; i < 64; i++) {
+        const tri = i < 32 ? (i / 31) * 2 - 1 : ((63 - i) / 31) * 2 - 1;
+        const s2 = Math.sin((i / 64) * Math.PI * 6);
+        buf[i] = Math.round(128 + 127 * tri * s2);
+      }
+      break;
+    case 14: // FM 1 — simple FM synthesis (carrier × modulator)
+      for (let i = 0; i < 64; i++) {
+        const mod = Math.sin((i / 64) * Math.PI * 4) * 2;
+        buf[i] = Math.round(128 + 127 * Math.sin((i / 64) * Math.PI * 2 + mod));
+      }
+      break;
+    case 15: // FM 2 — complex FM synthesis
+      for (let i = 0; i < 64; i++) {
+        const mod = Math.sin((i / 64) * Math.PI * 6) * 3;
+        buf[i] = Math.round(128 + 127 * Math.sin((i / 64) * Math.PI * 2 + mod));
+      }
+      break;
+    default: // Silence
+      buf.fill(128);
+  }
+
+  return buf;
+}

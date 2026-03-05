@@ -40,8 +40,9 @@
  *     ... ADSR/EG/FX/mod/volume (skipped)
  *
  * Fields NOT written to chip RAM (with reason):
- *   waveType       — +1 is the table index pointer; partial overwrite would
- *                    corrupt the waveform table reference
+ *   waveType       — table index pointer at +1; instead of overwriting the pointer,
+ *                    we generate the waveform and write 64 bytes to the synth table
+ *                    region at synthTables + (tableIndex << 6)
  *   waveSpeed      — purely a SoundMonConfig concept; no chip RAM equivalent
  *   portamentoSpeed — no dedicated byte in the instrument header
  *   arpTable       — stored in separate synth table region; not in instr header
@@ -66,7 +67,7 @@ import {
 import type { SequencePreset } from '@components/instruments/shared';
 import { UADEChipEditor } from '@/engine/uade/UADEChipEditor';
 import { UADEEngine } from '@/engine/uade/UADEEngine';
-import { encodeSoundMonADSR } from '@/engine/uade/chipRamEncoders';
+import { encodeSoundMonADSR, generateSoundMonWaveform } from '@/engine/uade/chipRamEncoders';
 
 interface SoundMonControlsProps {
   config: SoundMonConfig;
@@ -206,6 +207,28 @@ export const SoundMonControls: React.FC<SoundMonControlsProps> = ({
     [upd, uadeChipRam, getEditor],
   );
 
+  /**
+   * Update waveType and write the generated waveform to chip RAM.
+   * Waveform data (64 bytes) lives at sections.synthTables + (tableIndex << 6).
+   * We read the table index from instrBase+1 to find the write address.
+   */
+  const updWaveTypeWithChipRam = useCallback(
+    (waveType: number) => {
+      upd('waveType', waveType);
+      if (uadeChipRam && uadeChipRam.sections.synthTables) {
+        void (async () => {
+          const editor = getEditor();
+          const tableIndexBytes = await editor.readBytes(uadeChipRam.instrBase + 1, 1);
+          const tableIndex = tableIndexBytes[0] & 0x0F;
+          const waveAddr = uadeChipRam.sections.synthTables + (tableIndex << 6);
+          const waveData = generateSoundMonWaveform(waveType);
+          void editor.writeBlock(waveAddr, Array.from(waveData));
+        })();
+      }
+    },
+    [upd, uadeChipRam, getEditor],
+  );
+
   const SectionLabel: React.FC<{ label: string }> = ({ label }) => (
     <div className="text-[10px] font-bold uppercase tracking-widest mb-2"
       style={{ color: accent, opacity: 0.7 }}>
@@ -226,7 +249,7 @@ export const SoundMonControls: React.FC<SoundMonControlsProps> = ({
             const active = config.waveType === i;
             return (
               <button key={i}
-                onClick={() => upd('waveType', i)}
+                onClick={() => updWaveTypeWithChipRam(i)}
                 className="flex flex-col items-center gap-0.5 px-1 py-1.5 rounded transition-colors"
                 style={{
                   background: active ? accent + '28' : '#0a0e14',
