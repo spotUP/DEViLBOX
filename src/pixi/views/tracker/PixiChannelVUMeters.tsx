@@ -90,6 +90,7 @@ export const PixiChannelVUMeters: React.FC<PixiChannelVUMetersProps> = ({ width,
   const graphicsRef = useRef<GraphicsType | null>(null);
   const metersRef = useRef<MeterState[]>([]);
   const lastGensRef = useRef<number[]>([]);
+  const wasIdleRef = useRef(false); // true when last frame had all meters at 0
 
   // Refs for values needed inside the RAF loop (avoids effect re-runs)
   const numChannelsRef = useRef(numChannels);
@@ -126,21 +127,20 @@ export const PixiChannelVUMeters: React.FC<PixiChannelVUMetersProps> = ({ width,
         return;
       }
 
-      g.clear();
-
-      // Draw transparent full-size rect to establish correct content bounds.
-      // Without this, @pixi/layout scales the small VU rects up to fill the
-      // layout area, making them appear huge.
-      g.rect(0, 0, widthRef.current, heightRef.current);
-      g.fill({ color: 0x000000, alpha: 0 });
-
       const playing = useTransportStore.getState().isPlaying;
 
       if (!playing) {
-        for (const m of metersRef.current) m.level = 0;
+        if (!wasIdleRef.current) {
+          g.clear();
+          g.rect(0, 0, widthRef.current, heightRef.current);
+          g.fill({ color: 0x000000, alpha: 0 });
+          for (const m of metersRef.current) m.level = 0;
+          wasIdleRef.current = true;
+        }
         rafId = requestAnimationFrame(draw);
         return;
       }
+      // wasIdleRef tracks whether the previous frame was all-zero during playback
 
       const nc = numChannelsRef.current;
       const h = heightRef.current;
@@ -165,16 +165,13 @@ export const PixiChannelVUMeters: React.FC<PixiChannelVUMetersProps> = ({ width,
         for (let j = 0; j < old.length; j++) lastGensRef.current[j] = old[j];
       }
 
+      // Update levels and check if any meter is active
+      let anyActive = false;
       for (let i = 0; i < nc; i++) {
         const meter = metersRef.current[i];
         if (!meter) continue;
-
-        if (widths[i] && widths[i] < 20) continue;
-
-        // Detect NEW trigger by comparing generation counter
         const isNewTrigger = triggerGens[i] !== lastGensRef.current[i];
         const staggerOffset = i * 0.012;
-
         if (isNewTrigger && triggerLevels[i] > 0) {
           meter.level = triggerLevels[i];
           lastGensRef.current[i] = triggerGens[i];
@@ -182,6 +179,27 @@ export const PixiChannelVUMeters: React.FC<PixiChannelVUMetersProps> = ({ width,
           meter.level *= (DECAY_RATE - staggerOffset);
           if (meter.level < 0.01) meter.level = 0;
         }
+        if (meter.level > 0) anyActive = true;
+      }
+
+      // Skip draw if all meters at zero and already cleared
+      if (!anyActive && wasIdleRef.current) {
+        rafId = requestAnimationFrame(draw);
+        return;
+      }
+      wasIdleRef.current = !anyActive;
+
+      g.clear();
+      g.rect(0, 0, widthRef.current, heightRef.current);
+      g.fill({ color: 0x000000, alpha: 0 });
+
+      for (let i = 0; i < nc; i++) {
+        const meter = metersRef.current[i];
+        if (!meter) continue;
+
+        if (widths[i] && widths[i] < 20) continue;
+
+        if (meter.level < 0.01) continue;
 
         // Swing position — global time-based sine wave with per-channel phase offset.
         // All channels share one clock so they move as a synced staggered wave.
