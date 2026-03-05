@@ -22,7 +22,7 @@ export function restructure(code: string): string {
     }
   );
 
-  // Pattern: conditional skip
+  // Pattern: conditional skip (forward branch over a block)
   // Before:
   //   if (!flag_z) goto skip_N;
   //   ...body...
@@ -35,6 +35,23 @@ export function restructure(code: string): string {
     (_m, neg, flag, _label, body) => {
       const cond = neg ? flag : `!${flag}`;
       return `if (${cond}) {\n${body}}\n`;
+    }
+  );
+
+  // Pattern: while loop (backward branch at end of block)
+  // Before:
+  // label:
+  //   ...body (no other goto to label)...
+  //   if (cond) goto label;
+  //
+  // After:
+  //   do { ...body... } while (cond);
+  out = out.replace(
+    /^(\w+):\n((?:  [^\n]*\n)+?)  if \(([^)]+)\) goto \1;[^\n]*\n/gm,
+    (_m, _label, body, cond) => {
+      // Only convert if the label isn't used elsewhere in the body
+      if (body.includes(`goto ${_label}`)) return _m;
+      return `do {\n${body}} while (${cond});\n`;
     }
   );
 
