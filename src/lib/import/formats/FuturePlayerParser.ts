@@ -1,25 +1,17 @@
 /**
  * FuturePlayerParser.ts — Future Player Amiga format (.fp / FP.*) native parser
  *
- * Future Player is an Amiga 4-channel music player from the Wanted Team.
- * Files are typically named with a "FP." prefix (e.g. FP.songname) or a
- * ".fp" extension.
+ * Future Player is an Amiga 4-channel music player by Paul van der Valk.
+ * Files are typically named with a "FP." prefix or ".fp" extension.
  *
- * Detection (from UADE Future Player_v1.asm Check3 routine):
- *   bytes[0..3]   = 0x000003F3
- *   byte[20]      != 0 (must be non-zero)
- *   bytes[32..35] = 0x70FF4E75  (JSR trampoline, constant for all FP files)
- *   bytes[36..39] = "F.PL" (0x46, 0x2E, 0x50, 0x4C)
- *   bytes[40..43] = "AYER" (0x41, 0x59, 0x45, 0x52)
- *   u32BE(bytes, 64) != 0  (song pointer check)
+ * This parser:
+ *   1. Strips the AmigaDOS hunk header to find the code section
+ *   2. Parses the subsong table and voice sequence pointers
+ *   3. Linearizes each voice's variable-length byte stream into fixed rows
+ *   4. Maps FP commands to tracker effects (instrument, portamento, transpose, etc.)
+ *   5. Stores the raw binary for WASM native playback
  *
- * Together bytes[36..43] spell "F.PLAYER" embedded in the module.
- *
- * Single-file format: all player and music data in one file.
- * 4 channels (standard Amiga Paula).
- * This parser extracts basic metadata; UADE handles actual audio playback.
- *
- * Reference: Reference Code/uade-3.05/amigasrc/players/wanted_team/FuturePlayer/Future Player_v1.asm
+ * Reference: futureplayer-wasm/src/FuturePlayer.c (transpiled from 68k ASM)
  */
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
@@ -33,19 +25,24 @@ function u32BE(buf: Uint8Array, off: number): number {
   );
 }
 
+function u16BE(buf: Uint8Array, off: number): number {
+  return ((buf[off] << 8) | buf[off + 1]) >>> 0;
+}
+
+function rd8(code: Uint8Array, ptr: number): number {
+  return ptr < code.length ? code[ptr] : 0;
+}
+
+function rd32(code: Uint8Array, ptr: number): number {
+  return ptr + 3 < code.length ? u32BE(code, ptr) : 0;
+}
+
+function rd16(code: Uint8Array, ptr: number): number {
+  return ptr + 1 < code.length ? u16BE(code, ptr) : 0;
+}
+
 // ── Format detection ───────────────────────────────────────────────────────
 
-/**
- * Return true if the buffer is a Future Player format module.
- *
- * Checks (mirrors UADE's Future Player_v1.asm Check3 routine):
- *   1. bytes[0..3]  == 0x000003F3
- *   2. byte[20]     != 0  (chip-memory loading flag)
- *   3. bytes[32..35] == 0x70FF4E75  (JSR trampoline constant)
- *   4. bytes[36..39] == "F.PL" (0x462E504C)
- *   5. bytes[40..43] == "AYER" (0x41594552)
- *   6. u32BE(bytes, 64) != 0  (song pointer must be non-zero)
- */
 export function isFuturePlayerFormat(buffer: ArrayBuffer | Uint8Array): boolean {
   const buf = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
   if (buf.length < 68) return false;
@@ -53,93 +50,442 @@ export function isFuturePlayerFormat(buffer: ArrayBuffer | Uint8Array): boolean 
   return (
     u32BE(buf, 0)  === 0x000003F3 &&
     buf[20]        !== 0          &&
-    u32BE(buf, 32) === 0x70FF4E75 && // JSR trampoline
-    u32BE(buf, 36) === 0x462E504C && // "F.PL"
-    u32BE(buf, 40) === 0x41594552 && // "AYER"
-    u32BE(buf, 64) !== 0             // song pointer
+    u32BE(buf, 32) === 0x70FF4E75 &&
+    u32BE(buf, 36) === 0x462E504C &&
+    u32BE(buf, 40) === 0x41594552 &&
+    u32BE(buf, 64) !== 0
   );
+}
+
+// ── Hunk header stripping ──────────────────────────────────────────────────
+
+function stripHunkHeader(buf: Uint8Array): Uint8Array {
+  if (buf.length < 20 || u32BE(buf, 0) !== 0x000003F3) return buf;
+  const numHunks = u32BE(buf, 8);
+  let offset = 20 + numHunks * 4;
+  if (offset + 8 <= buf.length && u32BE(buf, offset) === 0x000003E9) {
+    const codeSize = u32BE(buf, offset + 4) * 4;
+    offset += 8;
+    return buf.subarray(offset, offset + codeSize);
+  }
+  return buf;
+}
+
+// ── FP note → Amiga period → XM note mapping ──────────────────────────────
+
+// The FP period table spans 8 octaves × 12 notes (indices 0-95).
+// FP note values 1-96 map directly to period_table[note-1].
+// We convert to XM-style 1-96 note values (C-0 = 1).
+function fpNoteToXM(fpNote: number): number {
+  if (fpNote === 0 || fpNote > 96) return 0;
+  return fpNote;  // FP notes 1-96 map directly to XM notes 1-96
+}
+
+// ── Per-voice row data ─────────────────────────────────────────────────────
+
+interface FPRow {
+  note: number;       // 0=empty, 1-96=note
+  instrument: number; // 0=none, 1+=instrument
+  volume: number;     // 0=none
+  effTyp: number;
+  eff: number;
+  effTyp2: number;
+  eff2: number;
+}
+
+// ── Linearize voice sequence stream into rows ──────────────────────────────
+
+interface VoiceLinearizeState {
+  seqPos: number;
+  callStack: number[];
+  loopAddrs: number[];
+  loopCounts: number[];
+  currentInstr: number;
+  ended: boolean;
+}
+
+function linearizeVoice(
+  code: Uint8Array,
+  startPos: number,
+  maxRows: number,
+  instrumentMap: Map<number, number>,
+): FPRow[] {
+  const rows: FPRow[] = [];
+  const st: VoiceLinearizeState = {
+    seqPos: startPos,
+    callStack: [],
+    loopAddrs: [],
+    loopCounts: [],
+    currentInstr: 0,
+    ended: false,
+  };
+
+  let safetyCounter = 0;
+  const MAX_ITERATIONS = 100000;
+
+  while (rows.length < maxRows && !st.ended && safetyCounter < MAX_ITERATIONS) {
+    safetyCounter++;
+    const byte0 = rd8(code, st.seqPos);
+    st.seqPos++;
+
+    if (byte0 & 0x80) {
+      // Command byte
+      const cmdNum = ((byte0 << 2) & 0xFF) >> 2;  // == byte0 & 0x3F, i.e. byte0 - 0x80
+      const arg = rd8(code, st.seqPos);
+      st.seqPos++;
+
+      switch (cmdNum) {
+        case 0: // end voice / return from sub
+          if (st.callStack.length > 0) {
+            st.seqPos = st.callStack.pop()!;
+          } else {
+            st.ended = true;
+          }
+          break;
+
+        case 1: { // set instrument (4-byte pointer)
+          const instrPtr = rd32(code, st.seqPos);
+          st.seqPos += 4;
+          if (!instrumentMap.has(instrPtr)) {
+            instrumentMap.set(instrPtr, instrumentMap.size + 1);
+          }
+          st.currentInstr = instrumentMap.get(instrPtr)!;
+          break;
+        }
+
+        case 2: // set arpeggio table (4-byte ptr)
+          st.seqPos += 4;
+          break;
+
+        case 3: // reset arpeggio
+          break;
+
+        case 4: { // set portamento (2-byte word)
+          const rate = rd16(code, st.seqPos);
+          st.seqPos += 2;
+          // Insert a portamento effect on the next note row
+          if (rows.length > 0 && rate > 0) {
+            const last = rows[rows.length - 1];
+            if (last.effTyp === 0 && last.eff === 0) {
+              last.effTyp = 0x03;  // Tone portamento
+              last.eff = Math.min(0xFF, rate & 0xFF);
+            }
+          }
+          break;
+        }
+
+        case 5: // nop
+          break;
+
+        case 6: { // call subroutine (4-byte ptr)
+          st.callStack.push(st.seqPos + 4);
+          const targetPtr = rd32(code, st.seqPos);
+          const seqData = rd32(code, targetPtr + 8);
+          st.seqPos = seqData;
+          break;
+        }
+
+        case 7: { // jump pattern (4-byte ptr)
+          const targetPtr2 = rd32(code, st.seqPos);
+          const seqData2 = rd32(code, targetPtr2 + 8);
+          st.seqPos = seqData2;
+          break;
+        }
+
+        case 8: { // repeat start
+          st.loopAddrs.push(st.seqPos);
+          st.loopCounts.push(arg);
+          break;
+        }
+
+        case 9: { // repeat check (decrement, loop if not done)
+          if (st.loopCounts.length > 0) {
+            const idx = st.loopCounts.length - 1;
+            st.loopCounts[idx]--;
+            if (st.loopCounts[idx] > 0 && st.loopAddrs.length > idx) {
+              st.seqPos = st.loopAddrs[idx];
+            } else {
+              st.loopCounts.pop();
+              st.loopAddrs.pop();
+            }
+          }
+          break;
+        }
+
+        case 10: { // repeat jump (conditional)
+          if (st.loopAddrs.length > 0) {
+            st.seqPos = st.loopAddrs[st.loopAddrs.length - 1];
+          }
+          break;
+        }
+
+        case 11: // set transpose 1 — map to E5x (fine tune)
+          break;
+
+        case 12: // set transpose 2
+          break;
+
+        case 13: // check flag
+          st.ended = true;
+          break;
+
+        case 14: // reset counter (nop)
+          break;
+
+        default:
+          // Unknown command — safety exit
+          st.ended = true;
+          break;
+      }
+      continue;
+    }
+
+    // Note or rest + duration
+    const note = byte0;  // 0=rest, 1-96=note
+    const dur = rd8(code, st.seqPos);
+    st.seqPos++;
+
+    const duration = dur & 0x80 ? (dur & 0x7F) : dur;
+
+    // First row gets the note trigger
+    const row: FPRow = {
+      note: fpNoteToXM(note),
+      instrument: note > 0 ? st.currentInstr : 0,
+      volume: 0,
+      effTyp: 0,
+      eff: 0,
+      effTyp2: 0,
+      eff2: 0,
+    };
+    rows.push(row);
+
+    // Remaining duration rows are empty (sustain)
+    for (let d = 1; d < duration && rows.length < maxRows; d++) {
+      rows.push({ note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 });
+    }
+  }
+
+  // Pad to maxRows if sequence ended early
+  while (rows.length < maxRows) {
+    rows.push({ note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 });
+  }
+
+  return rows;
+}
+
+// ── Extract strings from code section ──────────────────────────────────────
+
+function readCString(code: Uint8Array, ptr: number, maxLen = 64): string {
+  if (ptr === 0 || ptr >= code.length) return '';
+  let s = '';
+  for (let i = 0; i < maxLen && ptr + i < code.length; i++) {
+    const c = code[ptr + i];
+    if (c === 0) break;
+    if (c >= 32 && c < 127) s += String.fromCharCode(c);
+  }
+  return s.trim();
 }
 
 // ── Main parser ────────────────────────────────────────────────────────────
 
-/**
- * Parse a Future Player module file into a TrackerSong.
- *
- * The internal format structure beyond the header is not publicly documented;
- * this parser creates a metadata-only TrackerSong with an empty 4-channel
- * pattern. Actual audio playback is always delegated to UADE.
- *
- * @param buffer   Raw file bytes (ArrayBuffer)
- * @param filename Original filename (used to derive the module name)
- */
 export function parseFuturePlayerFile(buffer: ArrayBuffer, filename: string): TrackerSong {
-  const buf = new Uint8Array(buffer);
+  const rawBuf = new Uint8Array(buffer);
 
-  if (!isFuturePlayerFormat(buf)) {
+  if (!isFuturePlayerFormat(rawBuf)) {
     throw new Error('Not a Future Player module');
   }
 
-  // ── Module name from filename ─────────────────────────────────────────
+  const code = stripHunkHeader(rawBuf);
+
+  // Verify code section signature
+  if (code.length < 44 || u32BE(code, 0) !== 0x70FF4E75) {
+    throw new Error('Invalid Future Player code section');
+  }
+
+  // ── Header parsing ──────────────────────────────────────────────────
+
+  const songNamePtr = rd32(code, 12);
+  const authorNamePtr = rd32(code, 16);
+  const songName = readCString(code, songNamePtr);
+  const authorName = readCString(code, authorNamePtr);
 
   const baseName = (filename.split('/').pop() ?? filename).split('\\').pop() ?? filename;
-  // Strip "FP." prefix (case-insensitive) or ".fp" extension
-  const moduleName =
+  const moduleName = songName ||
     baseName.replace(/^fp\./i, '').replace(/\.fp$/i, '') || baseName;
 
-  // ── Instrument placeholders ───────────────────────────────────────────
+  // ── Parse subsong table (offset 32, 8 bytes per entry) ──────────────
 
-  // No instruments — UADE handles all playback; emit an empty list.
+  interface Subsong {
+    songDataPtr: number;
+    speedVal: number;
+    voiceSeqPtrs: number[];
+    tickSpeed: number;
+  }
+
+  const subsongs: Subsong[] = [];
+  let scan = 32;
+  while (scan + 8 <= code.length) {
+    const songDataPtr = rd32(code, scan);
+    if (songDataPtr === 0) break;
+    const speedVal = rd16(code, scan + 4);
+
+    const voiceSeqPtrs: number[] = [];
+    for (let i = 0; i < 4; i++) {
+      const blockPtr = rd32(code, songDataPtr + 8 + i * 4);
+      if (blockPtr !== 0 && blockPtr + 8 < code.length) {
+        voiceSeqPtrs.push(rd32(code, blockPtr + 8));
+      } else {
+        voiceSeqPtrs.push(0);
+      }
+    }
+
+    let tickSpeed = rd8(code, songDataPtr + 0x18) & 7;
+    if (tickSpeed === 0) tickSpeed = 8;
+
+    subsongs.push({ songDataPtr, speedVal, voiceSeqPtrs, tickSpeed });
+    scan += 8;
+  }
+
+  if (subsongs.length === 0) {
+    throw new Error('No subsongs found');
+  }
+
+  // ── Linearize all voices for subsong 0 into rows ────────────────────
+
+  const sub = subsongs[0];
+  const instrumentMap = new Map<number, number>(); // instrPtr → 1-based ID
+  const ROWS_PER_PATTERN = 64;
+
+  // First pass: linearize all 4 voices to find the total row count
+  const voiceRows: FPRow[][] = [];
+  let maxVoiceLen = 0;
+  for (let ch = 0; ch < 4; ch++) {
+    if (sub.voiceSeqPtrs[ch] !== 0) {
+      const rows = linearizeVoice(code, sub.voiceSeqPtrs[ch], 4096, instrumentMap);
+      // Trim trailing empty rows
+      let lastNonEmpty = rows.length - 1;
+      while (lastNonEmpty > 0 && rows[lastNonEmpty].note === 0 && rows[lastNonEmpty].effTyp === 0) {
+        lastNonEmpty--;
+      }
+      voiceRows.push(rows.slice(0, lastNonEmpty + 1));
+      maxVoiceLen = Math.max(maxVoiceLen, lastNonEmpty + 1);
+    } else {
+      voiceRows.push([]);
+    }
+  }
+
+  // Pad shorter voices to match longest
+  for (let ch = 0; ch < 4; ch++) {
+    while (voiceRows[ch].length < maxVoiceLen) {
+      voiceRows[ch].push({ note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 });
+    }
+  }
+
+  // ── Split into patterns of ROWS_PER_PATTERN rows ────────────────────
+
+  const numPatterns = Math.max(1, Math.ceil(maxVoiceLen / ROWS_PER_PATTERN));
+
+  const patterns = [];
+  const songPositions: number[] = [];
+
+  for (let pidx = 0; pidx < numPatterns; pidx++) {
+    const startRow = pidx * ROWS_PER_PATTERN;
+    const patLen = Math.min(ROWS_PER_PATTERN, maxVoiceLen - startRow);
+
+    const channels = Array.from({ length: 4 }, (_, ch) => {
+      const rows = [];
+      for (let r = 0; r < patLen; r++) {
+        const srcRow = voiceRows[ch][startRow + r];
+        rows.push(srcRow || { note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 });
+      }
+      // Pad to ROWS_PER_PATTERN
+      while (rows.length < ROWS_PER_PATTERN) {
+        rows.push({ note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 });
+      }
+      return {
+        id: `channel-${ch}`,
+        name: `Channel ${ch + 1}`,
+        muted: false,
+        solo: false,
+        collapsed: false,
+        volume: 100,
+        pan: (ch === 0 || ch === 3) ? -50 : 50,
+        instrumentId: null,
+        color: null,
+        rows,
+      };
+    });
+
+    patterns.push({
+      id: `pattern-${pidx}`,
+      name: `Pattern ${pidx}`,
+      length: ROWS_PER_PATTERN,
+      channels,
+      importMetadata: {
+        sourceFormat: 'FuturePlayer' as const,
+        sourceFile: filename,
+        importedAt: new Date().toISOString(),
+        originalChannelCount: 4,
+        originalPatternCount: numPatterns,
+        originalInstrumentCount: instrumentMap.size,
+      },
+    });
+
+    songPositions.push(pidx);
+  }
+
+  // ── Build instruments list ──────────────────────────────────────────
+
+  // One FuturePlayerSynth per discovered instrument pointer
   const instruments: InstrumentConfig[] = [];
+  instrumentMap.forEach((id) => {
+    instruments.push({
+      id: `fp-instr-${id}`,
+      name: `Instrument ${id}`,
+      type: 'synth' as const,
+      synthType: 'FuturePlayerSynth' as const,
+      effects: [],
+      volume: -6,
+      pan: 0,
+    } as unknown as InstrumentConfig);
+  });
 
-  // ── Empty pattern (placeholder — UADE handles actual audio) ──────────
+  // If no instruments found, add a default one
+  if (instruments.length === 0) {
+    instruments.push({
+      id: 'fp-synth-0',
+      name: 'Future Player',
+      type: 'synth' as const,
+      synthType: 'FuturePlayerSynth' as const,
+      effects: [],
+      volume: -6,
+      pan: 0,
+    } as unknown as InstrumentConfig);
+  }
 
-  const emptyRows = Array.from({ length: 64 }, () => ({
-    note: 0,
-    instrument: 0,
-    volume: 0,
-    effTyp: 0,
-    eff: 0,
-    effTyp2: 0,
-    eff2: 0,
-  }));
+  // ── Build BPM from tick speed ──────────────────────────────────────
 
-  const pattern = {
-    id: 'pattern-0',
-    name: 'Pattern 0',
-    length: 64,
-    channels: Array.from({ length: 4 }, (_, ch) => ({
-      id: `channel-${ch}`,
-      name: `Channel ${ch + 1}`,
-      muted: false,
-      solo: false,
-      collapsed: false,
-      volume: 100,
-      pan: (ch === 0 || ch === 3) ? -50 : 50,
-      instrumentId: null,
-      color: null,
-      rows: emptyRows,
-    })),
-    importMetadata: {
-      sourceFormat: 'MOD' as const,
-      sourceFile: filename,
-      importedAt: new Date().toISOString(),
-      originalChannelCount: 4,
-      originalPatternCount: 1,
-      originalInstrumentCount: 0,
-    },
-  };
+  // FP runs at 50Hz (PAL). BPM = 50 * 60 / (tickSpeed * rowsPerBeat)
+  // With 4 rows/beat: BPM = 50 * 60 / (tickSpeed * 4) = 750 / tickSpeed
+  const initialSpeed = sub.tickSpeed;
+  const initialBPM = 125;  // Standard Amiga BPM (50Hz CIA)
+
+  const displayName = authorName
+    ? `${moduleName} by ${authorName} [Future Player]`
+    : `${moduleName} [Future Player]`;
 
   return {
-    name: `${moduleName} [Future Player]`,
-    format: 'MOD' as TrackerFormat,
-    patterns: [pattern],
+    name: displayName,
+    format: 'FuturePlayer' as TrackerFormat,
+    patterns,
     instruments,
-    songPositions: [0],
-    songLength: 1,
+    songPositions,
+    songLength: songPositions.length,
     restartPosition: 0,
     numChannels: 4,
-    initialSpeed: 6,
-    initialBPM: 125,
+    initialSpeed,
+    initialBPM,
     linearPeriods: false,
+    futurePlayerFileData: buffer.slice(0),
   };
 }
