@@ -503,7 +503,7 @@ export class InstrumentFactory {
       case 'FuturePlayerSynth': {
         const fpSynth = new FuturePlayerSynth();
         // Set raw binary instrument pointer from parser metadata
-        const fpPtr = (config.metadata as any)?.fpInstrPtr;
+        const fpPtr = config.metadata?.fpInstrPtr;
         if (typeof fpPtr === 'number' && fpPtr > 0) {
           fpSynth.set('instrumentPtr', fpPtr);
         }

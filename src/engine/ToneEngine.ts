@@ -1409,7 +1409,7 @@ export class ToneEngine {
     const isMAME = config.synthType?.startsWith('MAME') || config.synthType === 'CZ101' || config.synthType === 'CEM3394' || config.synthType === 'SCSP';
     const isFurnace = config.synthType?.startsWith('Furnace') || config.synthType === 'Furnace';
     const isBuzzmachine = config.synthType?.startsWith('Buzz') || config.synthType === 'Buzzmachine';
-    const isWASMSynth = ['TB303', 'V2', 'Sam', 'DubSiren', 'SpaceLaser', 'Synare', 'Dexed', 'OBXd', 'WAM', 'SonicArrangerSynth'].includes(config.synthType || '');
+    const isWASMSynth = ['TB303', 'V2', 'Sam', 'DubSiren', 'SpaceLaser', 'Synare', 'Dexed', 'OBXd', 'WAM', 'SonicArrangerSynth', 'JamCrackerSynth', 'FuturePlayerSynth'].includes(config.synthType || '');
     const isVSTBridge = !isWASMSynth && typeof config.synthType === 'string' && SYNTH_REGISTRY.has(config.synthType);
     const isSharedType = config.synthType === 'Sampler' || config.synthType === 'Player' || config.synthType === 'SunVoxSynth' || isMAME || isFurnace || isBuzzmachine || isWASMSynth || isVSTBridge;
     const key = isSharedType
@@ -1450,6 +1450,31 @@ export class ToneEngine {
         this.disposeInstrumentByKey(legacyKey);
       } else {
         return this.instruments.get(legacyKey) ?? null;
+      }
+    }
+
+    // Singleton WASM engine synths: FuturePlayer and JamCracker engines are singletons.
+    // Reuse any existing instance of the same synthType (just update the instrument pointer/index).
+    // This avoids creating disconnected synth instances that can't route audio.
+    if (config.synthType === 'FuturePlayerSynth' || config.synthType === 'JamCrackerSynth') {
+      for (const [existingKey, existingSynth] of this.instruments) {
+        const storedType = this.instrumentSynthTypes.get(existingKey);
+        if (storedType === config.synthType && existingSynth) {
+          // Update the instrument pointer/index for the new instrument
+          if (config.synthType === 'FuturePlayerSynth') {
+            const fpPtr = config.metadata?.fpInstrPtr;
+            if (typeof fpPtr === 'number' && fpPtr > 0) {
+              (existingSynth as any).set('instrumentPtr', fpPtr);
+            }
+          } else if (config.synthType === 'JamCrackerSynth') {
+            const jcIdx = typeof config.id === 'number' ? config.id - 1 : 0;
+            (existingSynth as any).set('instrumentIndex', jcIdx);
+          }
+          // Cache under the new key so future lookups find it
+          this.instruments.set(key, existingSynth);
+          this.instrumentSynthTypes.set(key, config.synthType);
+          return existingSynth;
+        }
       }
     }
 

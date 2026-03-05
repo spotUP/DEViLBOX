@@ -163,10 +163,10 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
       // SA synths use Amiga period tables where C3 is the natural middle register.
       const isModSample = inst.metadata?.modPlayback?.usePeriodPlayback;
       const isBass = inst.synthType === 'TB303' || inst.name.toLowerCase().includes('bass');
-      const isSonicArranger = inst.synthType === 'SonicArrangerSynth';
+      const isAmigaNative = inst.synthType === 'SonicArrangerSynth' || inst.synthType === 'FuturePlayerSynth' || inst.synthType === 'JamCrackerSynth';
       const previewNote = isModSample
         ? (inst.sample?.baseNote || 'C3')   // Natural pitch: playbackRate = 1.0
-        : (isBass || isSonicArranger ? 'C3' : 'C4');
+        : (isBass || isAmigaNative ? 'C3' : 'C4');
 
       const now = Tone.now();
       engine.triggerNoteAttack(inst.id, previewNote, now, 0.8, inst);
