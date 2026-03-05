@@ -46,9 +46,9 @@ export class FuturePlayerSynth implements DevilboxSynth {
       } else {
         midiNote = note;
       }
-      // Convert MIDI note to FP note (1-96): MIDI 24=C-1(FP1), octave-relative
+      // Convert MIDI note to FP note (1-96): FP note 1 = C-0 = MIDI 12
       // FP period table has 96 entries (8 octaves × 12 notes)
-      const fpNote = Math.max(1, Math.min(96, midiNote - 23));
+      const fpNote = Math.max(1, Math.min(96, midiNote - 11));
       const vol = Math.round((velocity ?? 0.8) * 127);
       this.engine.noteOn(this._instrumentPtr, fpNote, vol);
     } else {
