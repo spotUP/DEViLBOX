@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useCallback, useMemo, useState } from 'react'
 import { EditorView, keymap } from '@codemirror/view';
 import { EditorState, StateEffect, StateField } from '@codemirror/state';
 import { Decoration, type DecorationSet } from '@codemirror/view';
-import { Play, CheckCircle, AlertCircle, Loader, Download, Upload, Plus, X, Copy, RefreshCw, Layout, BookOpen, ChevronDown } from 'lucide-react';
+import { Play, CheckCircle, AlertCircle, Loader, Download, Upload, Plus, X, Copy, RefreshCw, BookOpen, ChevronDown } from 'lucide-react';
 import type { SuperColliderConfig, SCParam } from '@typedefs/instrument';
 import { useInstrumentStore } from '@stores/useInstrumentStore';
 import { superColliderLanguage } from '@engine/sc/scLanguage';
@@ -139,10 +139,10 @@ export const SuperColliderEditor: React.FC<Props> = ({ config, onChange }) => {
   const [status, setStatus] = React.useState<CompileStatus>({ state: 'idle' });
   const [progress, setProgress] = React.useState(0);
   const [showProgress, setShowProgress] = React.useState(false);
-  const [showGui, setShowGui] = useState(false);
   const [showPresets, setShowPresets] = useState(false);
   const [presetCategory, setPresetCategory] = useState<string>('All');
   const [presetSearch, setPresetSearch] = useState('');
+  const [scTab, setScTab] = useState<'script' | 'controls'>('script');
   const presetSearchRef = useRef<HTMLInputElement>(null);
   const progressRef = useRef(0);
   const progressIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -612,9 +612,29 @@ export const SuperColliderEditor: React.FC<Props> = ({ config, onChange }) => {
     <div className="flex flex-col h-full bg-dark-bg rounded-lg border border-dark-border overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between px-3 py-2 bg-dark-bgSecondary border-b border-dark-border shrink-0">
-        <span className="text-xs font-semibold text-text-primary font-mono tracking-wide">
-          SuperCollider
-        </span>
+        {/* Tab bar */}
+        <div className="flex items-center gap-0.5">
+          <button
+            onClick={() => setScTab('script')}
+            className={`px-2.5 py-1 rounded text-xs font-semibold transition-colors ${
+              scTab === 'script'
+                ? 'bg-accent-primary/15 text-accent-primary'
+                : 'text-text-muted hover:text-text-secondary'
+            }`}
+          >
+            Script
+          </button>
+          <button
+            onClick={() => setScTab('controls')}
+            className={`px-2.5 py-1 rounded text-xs font-semibold transition-colors ${
+              scTab === 'controls'
+                ? 'bg-accent-primary/15 text-accent-primary'
+                : 'text-text-muted hover:text-text-secondary'
+            }`}
+          >
+            Controls
+          </button>
+        </div>
         <div className="flex items-center gap-2">
           {config.synthDefName && (
             <span className="text-xs text-text-muted font-mono mr-2">
@@ -673,21 +693,6 @@ export const SuperColliderEditor: React.FC<Props> = ({ config, onChange }) => {
             <Plus size={11} />
             Save as Instrument
           </button>
-          {guiResult.hasGui && (
-            <button
-              onClick={() => setShowGui(g => !g)}
-              title={showGui ? 'Hide SC GUI preview' : 'Show SC GUI preview'}
-              className={[
-                'flex items-center gap-1 px-2 py-1 rounded text-xs transition-colors',
-                showGui
-                  ? 'text-accent-primary bg-dark-bgTertiary'
-                  : 'text-text-secondary hover:text-text-primary hover:bg-dark-bgTertiary',
-              ].join(' ')}
-            >
-              <Layout size={11} />
-              GUI
-            </button>
-          )}
         </div>
       </div>
 
@@ -710,9 +715,9 @@ export const SuperColliderEditor: React.FC<Props> = ({ config, onChange }) => {
         />
       </div>
 
-      {/* Body: editor (left) + optional preset browser / GUI preview + param panel (right) */}
+      {/* Body */}
       <div className="flex flex-1 min-h-0 overflow-hidden relative">
-        {/* Preset browser overlay */}
+        {/* Preset browser overlay — shared across tabs */}
         {showPresets && (
           <div className="absolute inset-0 z-10 bg-dark-bgPrimary/95 backdrop-blur-sm flex flex-col overflow-hidden" style={{ background: 'rgba(10,10,10,0.97)' }}>
             {/* Search + category tabs */}
@@ -786,120 +791,121 @@ export const SuperColliderEditor: React.FC<Props> = ({ config, onChange }) => {
           </div>
         )}
 
-        {/* CodeMirror editor */}
+        {/* ── Script tab: CodeMirror editor ─────────────────────────── */}
         <div
           ref={containerRef}
           className="flex-1 overflow-auto min-h-0"
-          style={{ minHeight: 0 }}
+          style={{ minHeight: 0, display: scTab === 'script' ? 'block' : 'none' }}
         />
 
-        {/* SC GUI preview panel */}
-        {showGui && guiResult.hasGui && (
-          <div className="w-64 shrink-0 border-l border-dark-border overflow-y-auto">
-            <SCGuiRenderer
-              gui={guiResult}
-              onParamChange={handleGuiParamChange}
-              onGeneratePattern={handleGeneratePattern}
-              className="h-full"
-            />
-          </div>
+        {/* ── Controls tab: SC GUI + Params side by side ──────────── */}
+        {scTab === 'controls' && (
+          <>
+            {/* SC GUI panel */}
+            <div className="flex-1 overflow-y-auto min-h-0">
+              {guiResult.hasGui ? (
+                <SCGuiRenderer
+                  gui={guiResult}
+                  onParamChange={handleGuiParamChange}
+                  onGeneratePattern={handleGeneratePattern}
+                  className="h-full"
+                />
+              ) : (
+                <div className="flex items-center justify-center h-full text-text-muted text-xs p-4 text-center">
+                  {config.binary
+                    ? 'No GUI widgets detected in this SynthDef.\nUse the param sliders on the right.'
+                    : 'Compile a SynthDef first to see controls.'}
+                </div>
+              )}
+            </div>
+
+            {/* Param panel */}
+            <div className="w-52 shrink-0 border-l border-dark-border bg-dark-bgSecondary overflow-y-auto flex flex-col">
+              <div className="px-3 py-2 border-b border-dark-border shrink-0 flex items-center justify-between">
+                <span className="text-xs font-semibold text-text-muted uppercase tracking-wider">
+                  Parameters
+                </span>
+                <span className="text-xs text-text-muted">
+                  {config.params.length > 0 ? config.params.length : ''}
+                </span>
+              </div>
+
+              {config.params.length === 0 ? (
+                <div className="flex flex-col items-center justify-center flex-1 p-4 gap-3 text-center">
+                  <p className="text-xs text-text-muted leading-relaxed">
+                    Compile to auto-extract params, or add manually.
+                  </p>
+                  <button
+                    onClick={handleAddParam}
+                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded text-xs text-text-secondary border border-dark-border hover:text-text-primary hover:border-text-muted transition-colors"
+                  >
+                    <Plus size={11} />
+                    Add param
+                  </button>
+                </div>
+              ) : (
+                <div className="flex flex-col p-3 gap-4">
+                  {config.params.map((param) => {
+                    const step = (param.max - param.min) / 200;
+                    return (
+                      <div key={param.name} className="flex flex-col gap-1.5">
+                        <div className="flex items-center justify-between gap-1">
+                          <span className="text-xs text-text-secondary font-mono truncate flex-1" title={param.name}>
+                            {param.name}
+                          </span>
+                          <span className="text-xs text-text-muted font-mono shrink-0">
+                            {Number(param.value.toPrecision(3))}
+                          </span>
+                          <button
+                            onClick={() => handleRemoveParam(param.name)}
+                            className="shrink-0 ml-1 text-text-muted hover:text-accent-error transition-colors"
+                            title={`Remove ${param.name}`}
+                          >
+                            <X size={10} />
+                          </button>
+                        </div>
+                        <input
+                          type="range"
+                          min={param.min}
+                          max={param.max}
+                          step={step}
+                          value={param.value}
+                          onChange={(e) => handleParamChange(param.name, Number(e.target.value))}
+                          className="w-full h-1.5 appearance-none rounded cursor-pointer"
+                          style={{ accentColor: 'var(--color-accent-primary, #7c3aed)' }}
+                        />
+                        <div className="flex items-center gap-1 mt-0.5">
+                          <input
+                            type="number"
+                            value={param.min}
+                            onChange={(e) => handleParamRangeChange(param.name, 'min', e.target.value)}
+                            className="w-0 flex-1 bg-dark-bgTertiary border border-dark-border rounded px-1 py-0.5 text-xs text-text-muted font-mono text-center focus:outline-none focus:border-text-muted"
+                            title="Min"
+                          />
+                          <span className="text-text-muted text-xs shrink-0">—</span>
+                          <input
+                            type="number"
+                            value={param.max}
+                            onChange={(e) => handleParamRangeChange(param.name, 'max', e.target.value)}
+                            className="w-0 flex-1 bg-dark-bgTertiary border border-dark-border rounded px-1 py-0.5 text-xs text-text-muted font-mono text-center focus:outline-none focus:border-text-muted"
+                            title="Max"
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                  <button
+                    onClick={handleAddParam}
+                    className="flex items-center justify-center gap-1.5 w-full py-1.5 rounded text-xs text-text-muted border border-dashed border-dark-border hover:text-text-secondary hover:border-text-muted transition-colors mt-1"
+                  >
+                    <Plus size={11} />
+                    Add param
+                  </button>
+                </div>
+              )}
+            </div>
+          </>
         )}
-
-        {/* Param panel — always visible */}
-        <div className="w-52 shrink-0 border-l border-dark-border bg-dark-bgSecondary overflow-y-auto flex flex-col">
-          <div className="px-3 py-2 border-b border-dark-border shrink-0 flex items-center justify-between">
-            <span className="text-xs font-semibold text-text-muted uppercase tracking-wider">
-              Parameters
-            </span>
-            <span className="text-xs text-text-muted">
-              {config.params.length > 0 ? config.params.length : ''}
-            </span>
-          </div>
-
-          {config.params.length === 0 ? (
-            /* Empty state */
-            <div className="flex flex-col items-center justify-center flex-1 p-4 gap-3 text-center">
-              <p className="text-xs text-text-muted leading-relaxed">
-                Compile to auto-extract params, or add manually.
-              </p>
-              <button
-                onClick={handleAddParam}
-                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded text-xs text-text-secondary border border-dark-border hover:text-text-primary hover:border-text-muted transition-colors"
-              >
-                <Plus size={11} />
-                Add param
-              </button>
-            </div>
-          ) : (
-            /* Param rows */
-            <div className="flex flex-col p-3 gap-4">
-              {config.params.map((param) => {
-                const step = (param.max - param.min) / 200;
-                return (
-                  <div key={param.name} className="flex flex-col gap-1.5">
-                    {/* Name + value + remove */}
-                    <div className="flex items-center justify-between gap-1">
-                      <span
-                        className="text-xs text-text-secondary font-mono truncate flex-1"
-                        title={param.name}
-                      >
-                        {param.name}
-                      </span>
-                      <span className="text-xs text-text-muted font-mono shrink-0">
-                        {Number(param.value.toPrecision(3))}
-                      </span>
-                      <button
-                        onClick={() => handleRemoveParam(param.name)}
-                        className="shrink-0 ml-1 text-text-muted hover:text-accent-error transition-colors"
-                        title={`Remove ${param.name}`}
-                      >
-                        <X size={10} />
-                      </button>
-                    </div>
-                    {/* Slider */}
-                    <input
-                      type="range"
-                      min={param.min}
-                      max={param.max}
-                      step={step}
-                      value={param.value}
-                      onChange={(e) => handleParamChange(param.name, Number(e.target.value))}
-                      className="w-full h-1.5 appearance-none rounded cursor-pointer"
-                      style={{ accentColor: 'var(--color-accent-primary, #7c3aed)' }}
-                    />
-                    {/* Min / max range inputs */}
-                    <div className="flex items-center gap-1 mt-0.5">
-                      <input
-                        type="number"
-                        value={param.min}
-                        onChange={(e) => handleParamRangeChange(param.name, 'min', e.target.value)}
-                        className="w-0 flex-1 bg-dark-bgTertiary border border-dark-border rounded px-1 py-0.5 text-xs text-text-muted font-mono text-center focus:outline-none focus:border-text-muted"
-                        title="Min"
-                      />
-                      <span className="text-text-muted text-xs shrink-0">—</span>
-                      <input
-                        type="number"
-                        value={param.max}
-                        onChange={(e) => handleParamRangeChange(param.name, 'max', e.target.value)}
-                        className="w-0 flex-1 bg-dark-bgTertiary border border-dark-border rounded px-1 py-0.5 text-xs text-text-muted font-mono text-center focus:outline-none focus:border-text-muted"
-                        title="Max"
-                      />
-                    </div>
-                  </div>
-                );
-              })}
-
-              {/* Add param button */}
-              <button
-                onClick={handleAddParam}
-                className="flex items-center justify-center gap-1.5 w-full py-1.5 rounded text-xs text-text-muted border border-dashed border-dark-border hover:text-text-secondary hover:border-text-muted transition-colors mt-1"
-              >
-                <Plus size={11} />
-                Add param
-              </button>
-            </div>
-          )}
-        </div>
       </div>
 
       {/* Compiler output log — visible only on error */}
