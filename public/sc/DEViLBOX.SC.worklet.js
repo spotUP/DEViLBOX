@@ -38,14 +38,34 @@ const NUM_OUT_CHANNELS = 2;
 const NUM_IN_CHANNELS = 0;
 
 class DEViLBOXSCProcessor extends AudioWorkletProcessor {
+  /**
+   * Custom AudioParams for note control. Port messages to the worklet
+   * are blocked once process()/WaRun() starts running, so we use
+   * AudioParams as a lock-free communication channel.
+   *
+   * - gate:  0 → 1 triggers note-on, 1 → 0 triggers note-off
+   * - freq:  note frequency in Hz
+   * - amp:   note amplitude 0-1
+   */
+  static get parameterDescriptors() {
+    return [
+      { name: 'gate', defaultValue: 0, minValue: 0, maxValue: 1, automationRate: 'k-rate' },
+      { name: 'freq', defaultValue: 440, minValue: 20, maxValue: 20000, automationRate: 'k-rate' },
+      { name: 'amp', defaultValue: 0.5, minValue: 0, maxValue: 1, automationRate: 'k-rate' },
+    ];
+  }
+
   constructor() {
     super();
 
     this._ready = false;
-    this._waDriver = null;  // Embind audio_driver() object — provides WaRun()
-    this._oscEndpoint = null;  // Module.oscDriver[SC_PORT] — provides receive()
-    this._floatBufOut = null;  // Float32Array views into WASM heap (per channel)
-    this._blockSize = 128;  // Struct default; replaced during _init() from message blockSize, then overwritten again from adFinal.bufSize after callMain
+    this._waDriver = null;
+    this._oscEndpoint = null;
+    this._floatBufOut = null;
+    this._blockSize = 128;
+    this._prevGate = 0;
+    this._currentNodeId = 0;
+    this._synthDefName = '';
 
     this.port.onmessage = (evt) => this._handleMessage(evt.data);
   }
@@ -53,23 +73,25 @@ class DEViLBOXSCProcessor extends AudioWorkletProcessor {
   async _handleMessage(data) {
     switch (data.type) {
       case 'init':
-        await this._init(data.jsCode, data.wasmBinary, data.sampleRate, data.blockSize || 128);
+        this._synthDefName = data.synthDefName || 'mySynth';
+        await this._init(data.jsCode, data.wasmBinary, data.sampleRate, data.blockSize || 128, data.synthDefBinary);
         break;
 
       case 'osc':
-        this._sendOsc(data.data);
+        // Fallback for direct OSC if port messages work (pre-init only)
+        if (this._oscEndpoint) {
+          const bytes = data.data instanceof Uint8Array ? data.data : new Uint8Array(data.data);
+          this._oscEndpoint.receive(0, bytes);
+        }
         break;
 
       case 'dispose':
         this._ready = false;
-        // Note: globalThis.Module is not torn down — a second 'init' message
-        // after dispose would corrupt the onRuntimeInitialized callback chain.
-        // The worklet is designed to be initialized once per AudioContext lifetime.
         break;
     }
   }
 
-  async _init(jsCode, wasmBinary, initSampleRate, blockSize) {
+  async _init(jsCode, wasmBinary, initSampleRate, blockSize, synthDefBinary) {
     try {
       const sr = initSampleRate || sampleRate || 44100;
       this._blockSize = blockSize; // Temporary default; overwritten below from adFinal.bufSize
@@ -389,6 +411,35 @@ class DEViLBOXSCProcessor extends AudioWorkletProcessor {
       }
       this._waDriver = M.audio_driver();
 
+      // ---- CRITICAL: Reinitialize buffers ----
+      // ASM_CONSTS[84155] called WaInitBuffers during callMain, but the WASM heap may have
+      // grown (invalidating Float32Array views) and the buffer pointers may have changed.
+      // Re-call WaInitBuffers with the ACTUAL audioDriver pointers to ensure the C++ side
+      // has correct output buffer locations.
+      const waDriverMethods = Object.getOwnPropertyNames(Object.getPrototypeOf(this._waDriver));
+      this.port.postMessage({ type: 'debug', msg: 'WaDriver methods: ' + waDriverMethods.join(', ') });
+      if (adFinal && typeof this._waDriver.WaInitBuffers === 'function') {
+        const latency = 0;
+        // Rebuild Float32Array views FIRST (WASM heap may have grown during callMain)
+        const bytesPerChan = this._blockSize * 4;
+        for (let ch = 0; ch < adFinal.outChanCount; ch++) {
+          adFinal.floatBufOut[ch] = new Float32Array(M.HEAPU8.buffer, adFinal.bufOutPtr + ch * bytesPerChan, this._blockSize);
+        }
+        for (let ch = 0; ch < adFinal.inChanCount; ch++) {
+          adFinal.floatBufIn[ch] = new Float32Array(M.HEAPU8.buffer, adFinal.bufInPtr + ch * bytesPerChan, this._blockSize);
+        }
+        this._floatBufOut = adFinal.floatBufOut;
+        this._waDriver.WaInitBuffers(
+          adFinal.bufInPtr, adFinal.inChanCount,
+          adFinal.bufOutPtr, adFinal.outChanCount,
+          this._blockSize, sr, latency
+        );
+        this.port.postMessage({ type: 'debug', msg: 'WaInitBuffers called: bufOut=' + adFinal.bufOutPtr +
+          ' outCh=' + adFinal.outChanCount + ' bs=' + this._blockSize + ' sr=' + sr });
+      } else {
+        console.warn('[SC.worklet] WaInitBuffers not available — audio may not work');
+      }
+
       // ---- Set up OSC receive path ----
       // ASM_CONSTS[83188] ran during callMain to set up Module.oscDriver[SC_PORT].
       // The oscDriver entry has a `receive(srcAddr, data)` method that delivers OSC to scsynth.
@@ -400,13 +451,153 @@ class DEViLBOXSCProcessor extends AudioWorkletProcessor {
       }
 
       // ---- Connect audio (ASM_CONSTS[86429] normally does this) ----
-      // Since we bypassed the ScriptProcessor connect, call it manually.
-      // For our AudioWorklet model, "connected" just means WaRun() will be called
-      // from process(). Set the flag.
       if (adFinal) adFinal.connected = true;
+
+      // ---- Load SynthDef binary if provided with init message ----
+      // This MUST happen before _ready=true so the def is loaded before process()
+      // starts calling WaRun(). Port messages are blocked once process() runs.
+      if (synthDefBinary && this._oscEndpoint) {
+        const defBytes = synthDefBinary instanceof Uint8Array ? synthDefBinary : new Uint8Array(synthDefBinary);
+        const addrBytes = [0x2f, 0x64, 0x5f, 0x72, 0x65, 0x63, 0x76, 0x00]; // "/d_recv\0"
+        const typeBytes = [0x2c, 0x62, 0x00, 0x00]; // ",b\0\0"
+        const blobLen = defBytes.byteLength;
+        const paddedLen = (blobLen + 3) & ~3;
+        const oscMsg = new Uint8Array(addrBytes.length + typeBytes.length + 4 + paddedLen);
+        let off = 0;
+        oscMsg.set(addrBytes, off); off += addrBytes.length;
+        oscMsg.set(typeBytes, off); off += typeBytes.length;
+        oscMsg[off++] = (blobLen >>> 24) & 0xff;
+        oscMsg[off++] = (blobLen >>> 16) & 0xff;
+        oscMsg[off++] = (blobLen >>> 8) & 0xff;
+        oscMsg[off++] = blobLen & 0xff;
+        oscMsg.set(defBytes, off);
+        this.port.postMessage({ type: 'debug', msg: 'Loading SynthDef: binary=' + defBytes.byteLength + 'b osc=' + oscMsg.byteLength + 'b defName=' + this._synthDefName });
+        let drecvResult = 'ok';
+        try {
+          this._oscEndpoint.receive(0, oscMsg);
+        } catch (e) {
+          drecvResult = 'ERR:' + (typeof e === 'number' ? 'WASM_PTR:' + e : e.message || e);
+        }
+        for (let i = 0; i < 4; i++) this._waDriver.WaRun();
+        this.port.postMessage({ type: 'debug', msg: 'SynthDef loaded (' + drecvResult + '), ran 4 warm-up blocks' });
+
+        // TEST: Verify byteBuf is on current WASM heap, and test receive path
+        try {
+          const M = globalThis.Module;
+          const ep = this._oscEndpoint;
+          const ad = M.audioDriver;
+          const results = [];
+
+          // Test 1: Verify byteBuf points to current WASM heap
+          const heapBuf = M.HEAPU8.buffer;
+          const epBuf = ep.byteBuf.buffer;
+          const sameHeap = heapBuf === epBuf;
+          results.push('sameHeap=' + sameHeap);
+          results.push('heapSize=' + heapBuf.byteLength);
+          results.push('epBufSize=' + epBuf.byteLength);
+          results.push('bufPtr=' + ep.bufPtr);
+
+          // Test 2: Write marker to byteBuf, read from HEAPU8
+          ep.byteBuf[0] = 0xDE;
+          ep.byteBuf[1] = 0xAD;
+          const readBack0 = M.HEAPU8[ep.bufPtr];
+          const readBack1 = M.HEAPU8[ep.bufPtr + 1];
+          results.push('marker:write=DEAD,read=' +
+            readBack0.toString(16) + readBack1.toString(16));
+
+          // If stale, rebuild the byteBuf
+          if (!sameHeap) {
+            results.push('REBUILDING_BYTEBUF');
+            ep.byteBuf = new Uint8Array(M.HEAPU8.buffer, ep.bufPtr, ep.byteBuf.length);
+            // Re-test
+            ep.byteBuf[0] = 0xBE;
+            ep.byteBuf[1] = 0xEF;
+            const rb0 = M.HEAPU8[ep.bufPtr];
+            const rb1 = M.HEAPU8[ep.bufPtr + 1];
+            results.push('rebuilt:write=BEEF,read=' + rb0.toString(16) + rb1.toString(16));
+          }
+
+          // Test 3: Try send /dumpOSC 1 and check if prints appear
+          const logs = [];
+          const origPrint = M.print;
+          const origPrintErr = M.printErr;
+          M.print = function(t) { logs.push('OUT:' + t); };
+          M.printErr = function(t) { logs.push('ERR:' + t); };
+
+          // Build /dumpOSC 1
+          const enc = new TextEncoder();
+          function oscStr(s) {
+            const raw = enc.encode(s);
+            const padded = new Uint8Array((raw.length + 4) & ~3);
+            padded.set(raw);
+            return padded;
+          }
+          function oscI32(v) {
+            const buf = new ArrayBuffer(4);
+            new DataView(buf).setInt32(0, v, false);
+            return new Uint8Array(buf);
+          }
+          function concatU8(...arrs) {
+            const total = arrs.reduce((a, b) => a + b.byteLength, 0);
+            const msg = new Uint8Array(total);
+            let o = 0;
+            for (const a of arrs) { msg.set(a, o); o += a.byteLength; }
+            return msg;
+          }
+
+          const dumpOscMsg = concatU8(oscStr('/dumpOSC'), oscStr(',i'), oscI32(1));
+          ep.receive(0, dumpOscMsg);
+          for (let i = 0; i < 5; i++) this._waDriver.WaRun();
+          results.push('dumpLogs=' + logs.length + ':' + logs.slice(0, 5).join('|'));
+          logs.length = 0;
+
+          // Test 4: Send /notify 1 (which should produce a /done response)
+          const notifyMsg = concatU8(oscStr('/notify'), oscStr(',i'), oscI32(1));
+          ep.receive(0, notifyMsg);
+          for (let i = 0; i < 5; i++) this._waDriver.WaRun();
+          results.push('notifyLogs=' + logs.length + ':' + logs.slice(0, 5).join('|'));
+          logs.length = 0;
+
+          // Test 5: Check if there's a way to read scsynth's error state
+          // Check if _sc_SetPrintFunc or similar exists
+          const scFuncs = [];
+          for (const k in M) {
+            if (typeof M[k] === 'function' && (k.includes('sc') || k.includes('SC') || k.includes('World') || k.includes('print'))) {
+              scFuncs.push(k);
+            }
+          }
+          results.push('scFuncs=' + scFuncs.slice(0, 10).join(','));
+
+          // Test 6: Try calling WaRun and examine more of the heap around bufOutPtr
+          for (let i = 0; i < 50; i++) this._waDriver.WaRun();
+          const heapF32 = M.HEAPF32;
+          const base = ad.bufOutPtr >>> 2;
+          let maxOut = 0;
+          // Check wider range
+          for (let off = -100; off < 1024; off++) {
+            const v = Math.abs(heapF32[base + off]);
+            if (v > 0.0001 && v < 100) {
+              results.push('nonzero@' + off + '=' + v.toFixed(6));
+              if (results.length > 25) break;
+            }
+            if (v > maxOut && v < 100) maxOut = v;
+          }
+          results.push('maxOut=' + maxOut.toFixed(6));
+
+          M.print = origPrint;
+          M.printErr = origPrintErr;
+
+          this.port.postMessage({ type: 'debug', msg: 'DIAG2: ' + results.join(' | ') });
+        } catch (testErr) {
+          this.port.postMessage({ type: 'debug', msg: 'TEST ERROR: ' + (testErr.message || testErr) });
+        }
+      } else {
+        this.port.postMessage({ type: 'debug', msg: 'NO SynthDef binary: synthDefBinary=' + !!synthDefBinary + ' oscEndpoint=' + !!this._oscEndpoint });
+      }
 
       console.log('[SC.worklet] scsynth initialized. blockSize=' + this._blockSize + ' sr=' + sr);
       this._ready = true;
+      this.port.onmessage = (evt) => this._handleMessage(evt.data);
       this.port.postMessage({ type: 'ready' });
 
     } catch (err) {
@@ -422,63 +613,124 @@ class DEViLBOXSCProcessor extends AudioWorkletProcessor {
   }
 
   /**
-   * Deliver a raw OSC packet to scsynth.
-   *
-   * Module.oscDriver[SC_PORT].receive(srcAddr, data) is the JS side of scsynth's
-   * virtual UDP receive. It copies data into the WASM heap buffer and calls
-   * the C++ WebInPort::Receive(srcAddr, size) to process the OSC message.
-   *
-   * @param {ArrayBuffer|Uint8Array} oscPacket - Raw OSC bytes
+   * Build an OSC /s_new message for scsynth.
+   * Format: "/s_new\0\0" + ",siiisfsf\0\0\0" + defName + nodeId + addAction + targetId + paramPairs
    */
-  _sendOsc(oscPacket) {
-    if (!this._ready || !this._oscEndpoint) {
-      if (typeof console !== 'undefined') {
-        console.warn('[DEViLBOX.SC] OSC packet dropped — worklet not ready:', !this._ready ? 'not ready' : 'no endpoint');
-      }
-      return;
+  _buildNoteOnOsc(defName, nodeId, freq, amp) {
+    // /s_new defName nodeId 0 0 freq <f> amp <a> gate 1.0
+    // ALL param values must be float (type 'f') per scsynth convention
+    const enc = new TextEncoder();
+
+    function oscString(s) {
+      const raw = enc.encode(s);
+      const padded = new Uint8Array((raw.length + 4) & ~3);
+      padded.set(raw);
+      return padded;
     }
-    try {
-      const bytes = oscPacket instanceof Uint8Array ? oscPacket : new Uint8Array(oscPacket);
-      // Log the OSC address pattern (starts after 4-byte bundle marker or directly at offset 0)
-      const addr = String.fromCharCode(...bytes.slice(0, 20)).replace(/\0/g, '').trim();
-      console.log('[SC.worklet] OSC receive', bytes.byteLength, 'bytes, addr:', addr.split('\0')[0]);
-      // receive(srcAddr, data): srcAddr=0 means localhost/self
-      this._oscEndpoint.receive(0, bytes);
-    } catch (e) {
-      console.error('[SC.worklet] OSC send failed:', e);
+    function oscInt(v) {
+      const buf = new ArrayBuffer(4);
+      new DataView(buf).setInt32(0, v, false);
+      return new Uint8Array(buf);
     }
+    function oscFloat(v) {
+      const buf = new ArrayBuffer(4);
+      new DataView(buf).setFloat32(0, v, false);
+      return new Uint8Array(buf);
+    }
+
+    const addr = oscString('/s_new');
+    const tags = oscString(',siiisfsfsf');
+    const parts = [
+      addr, tags,
+      oscString(defName),       // s: defName
+      oscInt(nodeId),            // i: nodeId
+      oscInt(0),                 // i: addAction (0=addToHead)
+      oscInt(0),                 // i: targetId (0=default group)
+      oscString('freq'),         // s: param name
+      oscFloat(freq),            // f: param value
+      oscString('amp'),          // s: param name
+      oscFloat(amp),             // f: param value
+      oscString('gate'),         // s: param name
+      oscFloat(1.0),             // f: gate value (MUST be float)
+    ];
+    const totalLen = parts.reduce((a, b) => a + b.byteLength, 0);
+    const msg = new Uint8Array(totalLen);
+    let off = 0;
+    for (const p of parts) { msg.set(p, off); off += p.byteLength; }
+    return msg;
+  }
+
+  /**
+   * Build an OSC /n_set message to set gate=0 on a node.
+   */
+  _buildNoteOffOsc(nodeId) {
+    const enc = new TextEncoder();
+    function oscString(s) {
+      const raw = enc.encode(s);
+      const padded = new Uint8Array((raw.length + 4) & ~3);
+      padded.set(raw);
+      return padded;
+    }
+    function oscInt(v) {
+      const buf = new ArrayBuffer(4);
+      new DataView(buf).setInt32(0, v, false);
+      return new Uint8Array(buf);
+    }
+    function oscFloat(v) {
+      const buf = new ArrayBuffer(4);
+      new DataView(buf).setFloat32(0, v, false);
+      return new Uint8Array(buf);
+    }
+
+    const addr = oscString('/n_set');
+    const tags = oscString(',isf');
+    const parts = [addr, tags, oscInt(nodeId), oscString('gate'), oscFloat(0.0)];
+    const totalLen = parts.reduce((a, b) => a + b.byteLength, 0);
+    const msg = new Uint8Array(totalLen);
+    let off = 0;
+    for (const p of parts) { msg.set(p, off); off += p.byteLength; }
+    return msg;
   }
 
   /**
    * AudioWorklet process() — called every audio block (128 frames by default).
    *
-   * scsynth writes audio into WASM heap memory at Module.audioDriver.bufOutPtr
-   * (planar layout: all frames for ch0, then ch1, ...).
-   *
-   * We read from Module.HEAPF32 directly rather than using cached Float32Array
-   * views because Emscripten replaces HEAPF32 with a new TypedArray whenever
-   * the WASM heap grows (e.g. after /d_recv loads a SynthDef binary). Cached
-   * views would silently read zeros from the old detached buffer — causing
-   * silence even though WaRun() is producing audio in the new heap region.
+   * Note control is via AudioParams (gate, freq, amp) since port messages
+   * are blocked by WaRun() on the audio thread. When gate transitions
+   * 0→1 we send /s_new OSC, when 1→0 we send /n_set gate=0.
    */
-  process(_inputs, outputs, _params) {
+  process(_inputs, outputs, params) {
     if (!this._ready || !this._waDriver) return true;
 
     try {
-      // Render one audio block into WASM heap
+      const gate = params.gate[0];
+      const freq = params.freq[0];
+      const amp = params.amp[0];
+
+      if (gate > 0.5 && this._prevGate <= 0.5) {
+        this._currentNodeId++;
+        const osc = this._buildNoteOnOsc(this._synthDefName, this._currentNodeId, freq, amp);
+        if (this._oscEndpoint) this._oscEndpoint.receive(0, osc);
+      } else if (gate <= 0.5 && this._prevGate > 0.5) {
+        if (this._currentNodeId > 0) {
+          const osc = this._buildNoteOffOsc(this._currentNodeId);
+          if (this._oscEndpoint) this._oscEndpoint.receive(0, osc);
+        }
+      }
+      this._prevGate = gate;
+
+      // Render audio
       this._waDriver.WaRun();
 
-      // Copy from WASM heap to Web Audio output.
-      // Always dereference Module.HEAPF32 fresh — it may have been replaced by
-      // Emscripten's updateGlobalBufferAndViews() since last call.
+      // Copy output from WASM heap
       const output = outputs[0];
       if (output) {
         const M = globalThis.Module;
         const bufOutPtr = M && M.audioDriver && M.audioDriver.bufOutPtr;
         if (bufOutPtr) {
-          const heapF32 = M.HEAPF32;         // always current after heap growth
+          const heapF32 = M.HEAPF32;
           const bs = this._blockSize;
-          const base = bufOutPtr >>> 2;       // byte offset → float32 index
+          const base = bufOutPtr >>> 2;
           const numCh = Math.min(output.length, NUM_OUT_CHANNELS);
           for (let ch = 0; ch < numCh; ch++) {
             if (output[ch]) {
@@ -488,11 +740,10 @@ class DEViLBOXSCProcessor extends AudioWorkletProcessor {
         }
       }
     } catch (e) {
-      // Don't crash the worklet — log and keep running
       console.error('[SC.worklet] process() error:', e.message || e);
     }
 
-    return true; // Keep processor alive
+    return true;
   }
 }
 

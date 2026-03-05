@@ -31,6 +31,7 @@ import { SunVoxSynth } from './sunvox/SunVoxSynth';
 import { UADESynth } from './uade/UADESynth';
 import { SuperColliderSynth } from './sc/SuperColliderSynth';
 import { MAMESynth } from './MAMESynth';
+import { getDevilboxAudioContext } from '@/utils/audio-context';
 import { FurnaceDispatchSynth, FurnaceDispatchPlatform } from './furnace-dispatch';
 import { BuzzmachineType } from './buzzmachines/BuzzmachineEngine';
 import { VSTBridgeSynth } from './vstbridge/VSTBridgeSynth';
@@ -656,7 +657,7 @@ export class InstrumentFactory {
 
       case 'SuperCollider': {
         const sc = config.superCollider ?? DEFAULT_SUPERCOLLIDER;
-        const audioCtx = Tone.getContext().rawContext as AudioContext;
+        const audioCtx = getDevilboxAudioContext();
         instrument = new SuperColliderSynth(sc, audioCtx);
         break;
       }
