@@ -208,10 +208,13 @@ interface SettingsStore {
   // C64 SID Engine
   sidEngine: SIDEngineType;  // Default SID player engine (websid recommended)
   
-  // ASID Hardware Support
-  asidEnabled: boolean;          // Enable ASID hardware output
+  // SID Hardware Output
+  sidHardwareMode: 'off' | 'asid' | 'webusb';  // Hardware output transport
+  asidEnabled: boolean;          // Enable ASID hardware output (legacy, kept for compat)
   asidDeviceId: string | null;   // Selected MIDI device ID
   asidDeviceAddress: number;     // ASID device address (0x4D for USB-SID-Pico)
+  webusbClockRate: number;       // 0=default, 1=PAL, 2=NTSC, 3=DREAN
+  webusbStereo: boolean;         // Mono (false) or stereo (true)
 
   // Audio Settings
   performanceQuality: 'high' | 'medium' | 'low';
@@ -246,9 +249,12 @@ interface SettingsStore {
   setMasterTuning: (hz: number) => void;
   setFormatEngine: (format: keyof FormatEnginePreferences, engine: FormatEngineChoice | UADEImportMode) => void;
   setSidEngine: (engine: SIDEngineType) => void;
+  setSidHardwareMode: (mode: 'off' | 'asid' | 'webusb') => void;
   setAsidEnabled: (enabled: boolean) => void;
   setAsidDeviceId: (deviceId: string | null) => void;
   setAsidDeviceAddress: (address: number) => void;
+  setWebusbClockRate: (rate: number) => void;
+  setWebusbStereo: (stereo: boolean) => void;
   setPerformanceQuality: (quality: 'high' | 'medium' | 'low') => void;
   setUseBLEP: (enabled: boolean) => void;
   setStereoSeparation: (percent: number) => void;
@@ -427,10 +433,13 @@ export const useSettingsStore = create<SettingsStore>()(
       lensParams: { barrel: 0, chromatic: 0, vignette: 0 },
       renderMode: 'dom' as const,  // Default: DOM rendering (GL UI is experimental)
       
-      // ASID Hardware defaults
+      // SID Hardware defaults
+      sidHardwareMode: 'off' as const,
       asidEnabled: false,
       asidDeviceId: null,
       asidDeviceAddress: 0x4D,  // USB-SID-Pico default address
+      webusbClockRate: 1,       // PAL by default
+      webusbStereo: false,      // Mono by default
 
     // Actions
     setAmigaLimits: (amigaLimits) =>
@@ -458,9 +467,22 @@ export const useSettingsStore = create<SettingsStore>()(
         state.sidEngine = engine;
       }),
       
+    setSidHardwareMode: (sidHardwareMode) =>
+      set((state) => {
+        state.sidHardwareMode = sidHardwareMode;
+        // Keep legacy asidEnabled in sync
+        state.asidEnabled = sidHardwareMode === 'asid';
+      }),
+
     setAsidEnabled: (asidEnabled) =>
       set((state) => {
         state.asidEnabled = asidEnabled;
+        // Sync with new mode field
+        if (asidEnabled && state.sidHardwareMode === 'off') {
+          state.sidHardwareMode = 'asid';
+        } else if (!asidEnabled && state.sidHardwareMode === 'asid') {
+          state.sidHardwareMode = 'off';
+        }
       }),
       
     setAsidDeviceId: (asidDeviceId) =>
@@ -471,6 +493,16 @@ export const useSettingsStore = create<SettingsStore>()(
     setAsidDeviceAddress: (asidDeviceAddress) =>
       set((state) => {
         state.asidDeviceAddress = asidDeviceAddress;
+      }),
+
+    setWebusbClockRate: (webusbClockRate) =>
+      set((state) => {
+        state.webusbClockRate = webusbClockRate;
+      }),
+
+    setWebusbStereo: (webusbStereo) =>
+      set((state) => {
+        state.webusbStereo = webusbStereo;
       }),
 
     setPerformanceQuality: (performanceQuality) =>
