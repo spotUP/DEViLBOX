@@ -84,6 +84,36 @@ export class FurnaceSynth implements DevilboxSynth {
   }
 
   /**
+   * Write a raw register value to the chip emulator for live editing.
+   * This goes directly through chipEngine.write() for immediate audible feedback.
+   */
+  public writeRegister(register: number, value: number): void {
+    if (this.useWasmEngine) {
+      this.chipEngine.write(this.config.chipType as unknown as FurnaceChipType, register, value);
+    }
+  }
+
+  /**
+   * Set a named parameter — dispatches to appropriate register writes.
+   * Used by instrument editors for live parameter tweaking.
+   */
+  public set(param: string, value: number): void {
+    switch (param) {
+      case 'volume':
+        this.setVolumeOffset(value);
+        break;
+      default:
+        // For register-prefixed params like "reg:0x30:42", parse and write
+        if (param.startsWith('reg:')) {
+          const parts = param.split(':');
+          const reg = parseInt(parts[1], 16);
+          if (!isNaN(reg)) this.writeRegister(reg, value & 0xFF);
+        }
+        break;
+    }
+  }
+
+  /**
    * Get the maximum number of channels for a given chip type.
    */
   public static getMaxChannels(chipType: number): number {
@@ -800,6 +830,15 @@ export class FurnaceSynth implements DevilboxSynth {
   public updateParameters(): void {
     // Use the mapper to write all registers based on chip type
     // NOTE: chipType uses FurnaceChipType enum values (0-44)
+    this.remapRegisters(this.config);
+  }
+
+  /**
+   * Re-map registers from a config object. Used for live editing from the UI.
+   * Also updates the internal config reference so subsequent note triggers use updated values.
+   */
+  public remapRegisters(newConfig: FurnaceConfig): void {
+    this.config = newConfig;
     switch (this.config.chipType) {
       // === FM SYNTHESIS CHIPS ===
       case 0: // OPN2/Genesis (FurnaceChipType.OPN2)
