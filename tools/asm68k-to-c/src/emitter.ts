@@ -1,22 +1,53 @@
 import type { AstNode, DataNode, Size } from './ast.js';
 import type { ResolveResult } from './resolver.js';
-import { emitInstruction, emitOperand } from './instr-map.js';
+import { emitInstruction, emitOperand, reconstructAsm } from './instr-map.js';
+
+/* ========================================================================
+ * Preamble -- emitted at the top of every generated C file.
+ *
+ * Provides:
+ *   - 68k register file (D0-D7, A0-A6, SP, PC, flags)
+ *   - Sub-register accessors W(r) and B(r) for word/byte writes
+ *   - Big-endian memory access (READ/WRITE macros with byte-swap)
+ *   - Post-increment and pre-decrement variants for (An)+ / -(An)
+ *   - Rotation helpers ROL32/ROR32
+ * ======================================================================== */
 
 const PREAMBLE = `\
 #include "paula_soft.h"
 #include <stdint.h>
 
-/* Register file */
+/* -- 68k Register File ------------------------------------------------
+ * Data registers D0-D7:  general-purpose 32-bit registers.
+ * Address registers A0-A6: pointer registers (32-bit).
+ * SP (A7): stack pointer.  PC: program counter (unused in transpiled code).
+ * Flags: Z (zero), N (negative), C (carry), V (overflow), X (extend).
+ * -------------------------------------------------------------------- */
 static uint32_t d0,d1,d2,d3,d4,d5,d6,d7;
 static uint32_t a0,a1,a2,a3,a4,a5,a6,sp,pc;
 static int flag_z=0, flag_n=0, flag_c=0, flag_v=0, flag_x=0;
 
-/* Size helpers */
+/* -- Sub-register Accessors -------------------------------------------
+ * W(d0) -- access the low 16 bits of d0 (read/write).
+ * B(d0) -- access the low 8 bits of d0 (read/write).
+ * Example: W(d0) = 0x1234;  // sets d0.w, leaves upper 16 bits unchanged
+ * -------------------------------------------------------------------- */
 #define W(r)  (*((uint16_t*)&(r)))
 #define B(r)  (*((uint8_t*)&(r)))
 
-/* Memory access — 68k is big-endian; byte-swap on little-endian hosts.
- * Uses memcpy for alignment-safe access (68k allows unaligned word/long). */
+/* -- Memory Access (Big-Endian) ---------------------------------------
+ * The 68k is big-endian; these macros byte-swap on little-endian hosts.
+ * Uses memcpy for alignment-safe access (68k allows unaligned word/long).
+ *
+ * READ8(addr)       -- read  byte from address
+ * READ16(addr)      -- read  big-endian word from address
+ * READ32(addr)      -- read  big-endian longword from address
+ * WRITE8(addr,v)    -- write byte to address
+ * WRITE16(addr,v)   -- write big-endian word to address
+ * WRITE32(addr,v)   -- write big-endian longword to address
+ * READ16_POST(reg)  -- read word, then reg += 2  (simulates (An)+ mode)
+ * WRITE16_PRE(reg,v)-- reg -= 2, then write word (simulates -(An) mode)
+ * -------------------------------------------------------------------- */
 #include <string.h>
 #define READ8(addr)   (*((const uint8_t*)(uintptr_t)(addr)))
 #define WRITE8(addr,v)  (*((uint8_t*)(uintptr_t)(addr)) = (uint8_t)(v))
@@ -48,7 +79,10 @@ static inline void _wr32(uintptr_t a,uint32_t v) { memcpy((void*)a,&v,4); }
 #define WRITE16_PRE(r,v)  ({ (r)-=2; WRITE16(r,v); })
 #define WRITE32_PRE(r,v)  ({ (r)-=4; WRITE32(r,v); })
 
-/* Rotation helpers */
+/* -- Rotation Helpers -------------------------------------------------
+ * ROL32(v,n) -- rotate 32-bit value left by n bits
+ * ROR32(v,n) -- rotate 32-bit value right by n bits
+ * -------------------------------------------------------------------- */
 #define ROL32(v,n)  (((v)<<(n))|((v)>>(32-(n))))
 #define ROR32(v,n)  (((v)>>(n))|((v)<<(32-(n))))
 `;
@@ -65,14 +99,14 @@ function emitData(node: DataNode, label: string | undefined, knownLabels: Set<st
   const t = typeStr[node.size ?? 'B'] ?? 'uint8_t';
   const name = label ?? `_data_${node.line}`;
 
-  // DS (Define Storage) — reserve N bytes/words/longs of zero-initialized writable memory.
+  // DS (Define Storage) -- reserve N bytes/words/longs of zero-initialized writable memory.
   // The single value is the element COUNT, not a content value.
   if (node.directive === 'DS') {
     const count = typeof node.values[0] === 'number' ? node.values[0] : 1;
     return `static ${t} ${name}[${count}];`;
   }
 
-  // DC (Define Constant) — emit initializer list.
+  // DC (Define Constant) -- emit initializer list.
   // For DC.B, expand string literals to individual character bytes to avoid
   // "excess elements in char array initializer" warnings.
   const isBytes = node.size === 'B' || node.size === null;
@@ -96,7 +130,7 @@ function emitData(node: DataNode, label: string | undefined, knownLabels: Set<st
 }
 
 /* ========================================================================
- * Packed data section — emits all data labels into a single contiguous
+ * Packed data section -- emits all data labels into a single contiguous
  * uint8_t array with big-endian byte values, matching 68k memory layout.
  * This guarantees correct relative addressing between data symbols.
  * ======================================================================== */
@@ -151,7 +185,7 @@ function collectPackedData(
         const count = typeof dn.values[0] === 'number' ? dn.values[0] : 1;
         for (let j = 0; j < count * elemSize; j++) bytes.push(0);
       } else {
-        // DC values — store in big-endian byte order
+        // DC values -- store in big-endian byte order
         for (const v of dn.values) {
           if (typeof v === 'number') {
             if (elemSize === 1) {
@@ -163,7 +197,7 @@ function collectPackedData(
             }
           } else if (typeof v === 'string') {
             if (C_IDENT.test(v)) {
-              // Label or symbol reference — resolve if possible, otherwise 0
+              // Label or symbol reference -- resolve if possible, otherwise 0
               const resolved = symbols.get(v);
               const numVal = typeof resolved === 'number' ? resolved : 0;
               // Track label references that need runtime patching (address not known at compile time)
@@ -202,7 +236,9 @@ function emitPackedDataSection(
   const lines: string[] = [];
   if (bytes.length === 0) return lines;
 
-  lines.push('/* Packed data section — contiguous byte array matching 68k memory layout */');
+  lines.push('/* -- Packed Data Section -------------------------------------------- */');
+  lines.push('/* All data labels packed into a single contiguous byte array matching');
+  lines.push(' * 68k memory layout. Accessor macros provide typed pointer access. */');
   // Emit the byte array in rows of 16
   lines.push(`static uint8_t _ds[${bytes.length}] = {`);
   for (let i = 0; i < bytes.length; i += 16) {
@@ -303,22 +339,63 @@ function collectUnresolved(ast: AstNode[], resolved: ResolveResult): Set<string>
   return stubs;
 }
 
-export function emit(ast: AstNode[], resolved: ResolveResult): string {
-  const lines: string[] = [PREAMBLE];
+export function emit(ast: AstNode[], resolved: ResolveResult, sourceFile?: string): string {
+  const lines: string[] = [];
 
-  // EQU constants as #defines
-  lines.push('/* EQU constants */');
-  for (const [name, value] of resolved.symbols) {
-    lines.push(`#define ${name} ${value}`);
-  }
+  // File header
+  lines.push('/* ====================================================================');
+  lines.push(' * Auto-generated by asm68k-to-c transpiler');
+  if (sourceFile) lines.push(` * Source: ${sourceFile}`);
+  lines.push(' *');
+  lines.push(' * This file was mechanically translated from Motorola 68000 assembly.');
+  lines.push(' * Original ASM instructions appear as inline comments.');
+  lines.push(' * ==================================================================== */');
   lines.push('');
+  lines.push(PREAMBLE);
+
+  // EQU constants as #defines, grouped by prefix
+  if (resolved.symbols.size > 0) {
+    lines.push('/* -- EQU Constants ------------------------------------------------- */');
+    // Group by common prefix (DTP_, EP_, MI_, UPS_, etc.)
+    const groups = new Map<string, [string, number | string][]>();
+    for (const [name, value] of resolved.symbols) {
+      const m = name.match(/^([A-Za-z]+_)/);
+      const prefix = m ? m[1] : '_other';
+      if (!groups.has(prefix)) groups.set(prefix, []);
+      groups.get(prefix)!.push([name, value]);
+    }
+    for (const [prefix, entries] of groups) {
+      if (groups.size > 1 && entries.length > 1) {
+        lines.push(`/* ${prefix}* */`);
+      }
+      for (const [name, value] of entries) {
+        lines.push(`#define ${name} ${value}`);
+      }
+    }
+    lines.push('');
+  }
 
   // Unresolved symbol stubs (from missing include files)
   const stubs = collectUnresolved(ast, resolved);
   if (stubs.size > 0) {
-    lines.push('/* Unresolved symbol stubs — from include files not available to transpiler */');
+    lines.push('/* -- Unresolved Symbols -------------------------------------------- */');
+    lines.push('/* These symbols come from include files not available to the transpiler.');
+    lines.push(' * They are stubbed as 0 so the generated C compiles. */');
+    // Group stubs by prefix too
+    const stubGroups = new Map<string, string[]>();
     for (const name of stubs) {
-      lines.push(`#ifndef ${name}\n#define ${name} 0 /* unresolved */\n#endif`);
+      const m = name.match(/^([A-Za-z]+_)/);
+      const prefix = m ? m[1] : '_other';
+      if (!stubGroups.has(prefix)) stubGroups.set(prefix, []);
+      stubGroups.get(prefix)!.push(name);
+    }
+    for (const [prefix, names] of stubGroups) {
+      if (stubGroups.size > 1 && names.length > 1) {
+        lines.push(`/* ${prefix}* */`);
+      }
+      for (const name of names) {
+        lines.push(`#ifndef ${name}\n#define ${name} 0\n#endif`);
+      }
     }
     lines.push('');
   }
@@ -366,7 +443,7 @@ export function emit(ast: AstNode[], resolved: ResolveResult): string {
   lines.push(...emitPackedDataSection(packed.bytes, packed.labelOffsets, packed.labelPatches, isFunctionLabel));
 
   // Labels that start real C functions: BSR/JSR call targets + XDEF exports.
-  // Exports are entry points that external code calls directly — they must be functions.
+  // Exports are entry points that external code calls directly -- they must be functions.
   const funcLabels = new Set<string>();
   for (const name of resolved.exports) {
     if (isFunctionLabel.has(name)) funcLabels.add(name);
@@ -440,7 +517,7 @@ export function emit(ast: AstNode[], resolved: ResolveResult): string {
       // Local labels (starting with '.') are scoped per global label in 68k.
       // Multiple functions can have a '.SetVoice' and each one is a different label.
       // Promoting local labels to cross-function C functions causes duplicate definitions.
-      // Skip them — they will remain as inline goto labels within their containing function.
+      // Skip them -- they will remain as inline goto labels within their containing function.
       if (lbl.startsWith('.')) continue;
       if (labelScope.get(lbl) !== scope && !crossFuncGotos.has(lbl)) {
         crossFuncGotos.add(lbl);
@@ -460,12 +537,12 @@ export function emit(ast: AstNode[], resolved: ResolveResult): string {
   const allFwdDecls = new Set([...funcLabels, ...addrRefLabels, ...crossFuncGotos, ...dsInitFuncRefs]);
   const funcFwdDecls = [...allFwdDecls].filter(n => !dataLabelInfo.has(n));
   if (funcFwdDecls.length > 0) {
-    lines.push('/* Forward declarations */');
+    lines.push('/* -- Forward Declarations -------------------------------------------- */');
     for (const name of funcFwdDecls) {
       // Apply sanitizeLabel so local labels (.SetVoice → _SetVoice) are valid C identifiers.
       const safe = sanitizeLabel(name);
       if (!resolved.labels.has(name)) {
-        // Label is not defined in this file — must be from an include file.
+        // Label is not defined in this file -- must be from an include file.
         // Declare as extern so the compiler doesn't expect a local definition.
         lines.push(`extern void ${safe}(void);`);
       } else {
@@ -477,18 +554,33 @@ export function emit(ast: AstNode[], resolved: ResolveResult): string {
   }
 
   // Walk AST
+  lines.push('\n/* ====================================================================');
+  lines.push(' * Code Section -- Transpiled Functions');
+  lines.push(' * ==================================================================== */');
   let inFunction = false;
   let pendingLabel: string | undefined;
   let anonCount = 0;
 
+  // Semantic labels for 68k branch conditions
+  const BRANCH_SEMANTICS: Record<string, string> = {
+    BEQ: 'equal / zero',          BNE: 'not equal / nonzero',
+    BMI: 'minus / negative',      BPL: 'plus / positive',
+    BCS: 'carry set / below',     BCC: 'carry clear / above-or-equal',
+    BVS: 'overflow set',          BVC: 'overflow clear',
+    BGT: 'greater than (signed)', BGE: 'greater or equal (signed)',
+    BLT: 'less than (signed)',    BLE: 'less or equal (signed)',
+    BHI: 'higher (unsigned)',     BLS: 'lower or same (unsigned)',
+  };
+
   // Close the current function. If the last line is a bare goto label (ends with ':'),
-  // a C99/C11 compound statement cannot end on a label — add a null statement first.
+  // a C99/C11 compound statement cannot end on a label -- add a null statement first.
   function closeFunction(): void {
     const last = lines[lines.length - 1];
     if (last && /^[A-Za-z_][A-Za-z0-9_]*:$/.test(last.trimStart())) {
       lines.push('  ;');
     }
     lines.push('}');
+    lines.push('');
     inFunction = false;
   }
 
@@ -510,7 +602,7 @@ export function emit(ast: AstNode[], resolved: ResolveResult): string {
 
       case 'section':
         if (inFunction) { closeFunction(); inFunction = false; }
-        lines.push(`\n/* SECTION ${node.name} */`);
+        lines.push(`\n/* -- SECTION ${node.name} ------------------------------------------ */`);
         break;
 
       case 'data': {
@@ -536,8 +628,15 @@ export function emit(ast: AstNode[], resolved: ResolveResult): string {
             if (inFunction) closeFunction();
             const isExported = resolved.exports.includes(node.name);
             const qualifier = isExported ? '' : 'static ';
-            // sanitizeLabel handles local labels like '.SetVoice' → '_SetVoice'.
-            lines.push(`\n${qualifier}void ${sanitizeLabel(node.name)}(void) {`);
+            const safe = sanitizeLabel(node.name);
+            // Function banner
+            const tags: string[] = [];
+            if (isExported) tags.push('PUBLIC');
+            if (addrRefLabels.has(node.name)) tags.push('address-referenced');
+            if (crossFuncGotos.has(node.name)) tags.push('cross-function goto target');
+            const tagStr = tags.length > 0 ? `  (${tags.join(', ')})` : '';
+            lines.push(`\n/* --- ${safe} ---${tagStr} */`);
+            lines.push(`${qualifier}void ${safe}(void) {`);
             inFunction = true;
           } else {
             // Inline goto label (branch target within current function)
@@ -545,7 +644,7 @@ export function emit(ast: AstNode[], resolved: ResolveResult): string {
           }
           pendingLabel = undefined;
         } else {
-          // Data label or end-of-file label — store for data emission
+          // Data label or end-of-file label -- store for data emission
           pendingLabel = node.name;
         }
         break;
@@ -556,6 +655,9 @@ export function emit(ast: AstNode[], resolved: ResolveResult): string {
           lines.push(`\nstatic void _anon${anonCount++}(void) {`);
           inFunction = true;
         }
+        // Reconstruct original ASM for inline comment
+        const asmComment = `  /* ${reconstructAsm(node)} */`;
+
         // Check if this is a branch to a cross-function goto target.
         // Those labels are now C functions; emit as a function call instead of a goto.
         const COND_BRANCH_CONDS: Record<string, string> = {
@@ -582,16 +684,26 @@ export function emit(ast: AstNode[], resolved: ResolveResult): string {
           if (mn === 'BRA' || mn === 'JMP') {
             c = `${safe}(); return;`;
           } else if (DBRANCH_MNEMS.has(mn)) {
-            // DBRA: decrement counter, if still >= 0 call the target then return.
             c = `if ((int16_t)(--${cnt}) >= 0) { ${safe}(); return; }`;
           } else {
-            // Conditional branch: call target then return, only if condition holds.
             c = `if (${COND_BRANCH_CONDS[mn]}) { ${safe}(); return; }`;
           }
         } else {
           c = emitInstruction(node);
         }
-        lines.push(`  ${c}`);
+        // Add semantic branch comment for conditional branches
+        const sem = BRANCH_SEMANTICS[mn];
+        const branchSuffix = sem ? `  /* ${sem} */` : '';
+        // For multi-line blocks, put ASM comment on the first line
+        if (c.includes('\n')) {
+          const cLines = c.split('\n');
+          lines.push(`  ${cLines[0]}${asmComment}`);
+          for (let k = 1; k < cLines.length; k++) {
+            lines.push(`  ${cLines[k]}`);
+          }
+        } else {
+          lines.push(`  ${c}${branchSuffix}${asmComment}`);
+        }
         break;
       }
     }
