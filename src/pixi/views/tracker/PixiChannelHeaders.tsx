@@ -32,6 +32,15 @@ const BTN_H = 14;
 const BTN_GAP = 2;
 const BTN_R = 3;
 
+// Pre-allocated layout objects to avoid GC pressure and Yoga recalculation
+const LAYOUT_BTN = { width: BTN_W, height: BTN_H, justifyContent: 'center' as const, alignItems: 'center' as const };
+const LAYOUT_BTN_BG = { position: 'absolute' as const, width: BTN_W, height: BTN_H };
+const LAYOUT_EMPTY = {};
+const LAYOUT_ADD_BTN_BG = { position: 'absolute' as const, width: 32, height: BTN_H };
+const LAYOUT_GEN_BADGE_ROW = { height: 12, flexDirection: 'row' as const, alignItems: 'center' as const, paddingLeft: 2, paddingRight: 2 };
+const LAYOUT_NAME_ROW = { height: 18, flexDirection: 'row' as const, alignItems: 'center' as const, paddingLeft: 2, paddingRight: 2 };
+const LAYOUT_BTNS_ROW = { flexDirection: 'row' as const, alignItems: 'center' as const, gap: BTN_GAP, marginLeft: 'auto' as const };
+
 // ─── Hoverable button sub-component ─────────────────────────────────────────
 const HoverableHeaderBtn: React.FC<{
   drawBg: (g: GraphicsType) => void;
@@ -48,9 +57,9 @@ const HoverableHeaderBtn: React.FC<{
       onPointerUp={(e: FederatedPointerEvent) => { e.stopPropagation(); onPress(e); }}
       onPointerOver={() => setHovered(true)}
       onPointerOut={() => setHovered(false)}
-      layout={{ width: BTN_W, height: BTN_H, justifyContent: 'center', alignItems: 'center' }}
+      layout={LAYOUT_BTN}
     >
-      <pixiGraphics draw={hovered ? drawHoverBg : drawBg} eventMode="none" layout={{ position: 'absolute', width: BTN_W, height: BTN_H }} />
+      <pixiGraphics draw={hovered ? drawHoverBg : drawBg} eventMode="none" layout={LAYOUT_BTN_BG} />
       {children}
     </pixiContainer>
   );
@@ -83,13 +92,13 @@ const AddChannelBtn: React.FC<{
         alignItems: 'center',
       }}
     >
-      <pixiGraphics draw={hovered ? drawHoverBg : drawBg} eventMode="none" layout={{ position: 'absolute', width: 32, height: BTN_H }} />
+      <pixiGraphics draw={hovered ? drawHoverBg : drawBg} eventMode="none" layout={LAYOUT_ADD_BTN_BG} />
       <pixiBitmapText
         text="+"
         style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 12, fill: 0xffffff }}
         tint={hovered ? hoverTextColor : textColor}
         eventMode="none"
-        layout={{}}
+        layout={LAYOUT_EMPTY}
       />
     </pixiContainer>
   );
@@ -487,7 +496,7 @@ export const PixiChannelHeaders: React.FC<PixiChannelHeadersProps> = ({
               text={chNum}
               style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 9, fill: 0xffffff }}
               tint={chColor}
-              layout={{}}
+              layout={LAYOUT_EMPTY}
             />
             {/* Expand button */}
             <HoverableHeaderBtn drawBg={drawCollapseBtn} drawHoverBg={drawHoverBtn} onPress={() => onToggleCollapse(ch)}>
@@ -496,7 +505,7 @@ export const PixiChannelHeaders: React.FC<PixiChannelHeadersProps> = ({
                 style={{ fontFamily: PIXI_FONTS.ICONS, fontSize: 10, fill: 0xffffff }}
                 tint={theme.textMuted.color}
                 eventMode="none"
-                layout={{}}
+                layout={LAYOUT_EMPTY}
               />
             </HoverableHeaderBtn>
           </pixiContainer>
@@ -551,10 +560,10 @@ export const PixiChannelHeaders: React.FC<PixiChannelHeadersProps> = ({
               style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 11, fill: 0xffffff }}
               tint={chColor}
               alpha={0.8}
-              layout={{}}
+              layout={LAYOUT_EMPTY}
             />
             {hasSpeed && (
-              <pixiContainer layout={{ height: 12, flexDirection: 'row', alignItems: 'center', paddingLeft: 2, paddingRight: 2 }}>
+              <pixiContainer layout={LAYOUT_GEN_BADGE_ROW}>
                 <pixiGraphics
                   draw={(g: GraphicsType) => {
                     g.clear();
@@ -569,12 +578,12 @@ export const PixiChannelHeaders: React.FC<PixiChannelHeadersProps> = ({
                   text={`S:${channelSpeeds![ch]}`}
                   style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 8, fill: 0xffffff }}
                   tint={0xfbbf24}
-                  layout={{}}
+                  layout={LAYOUT_EMPTY}
                 />
               </pixiContainer>
             )}
             {showChannelNames && editingChannel === ch && (
-              <pixiContainer layout={{ height: 18, flexDirection: 'row', alignItems: 'center', paddingLeft: 2, paddingRight: 2 }}>
+              <pixiContainer layout={LAYOUT_NAME_ROW}>
                 <pixiGraphics
                   draw={(g: GraphicsType) => {
                     g.clear();
@@ -590,7 +599,7 @@ export const PixiChannelHeaders: React.FC<PixiChannelHeadersProps> = ({
                   style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 10, fill: 0xffffff }}
                   tint={0xffffff}
                   alpha={0.9}
-                  layout={{}}
+                  layout={LAYOUT_EMPTY}
                 />
               </pixiContainer>
             )}
@@ -600,13 +609,13 @@ export const PixiChannelHeaders: React.FC<PixiChannelHeadersProps> = ({
                 style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }}
                 tint={channel.name ? theme.text.color : theme.textMuted.color}
                 alpha={channel.name ? 0.8 : 0.4}
-                layout={{}}
+                layout={LAYOUT_EMPTY}
               />
             )}
           </pixiContainer>
 
           {/* Button area */}
-          <pixiContainer layout={{ flexDirection: 'row', alignItems: 'center', gap: BTN_GAP, marginLeft: 'auto' }}>
+          <pixiContainer layout={LAYOUT_BTNS_ROW}>
             {/* Context menu button (three dots) */}
             <HoverableHeaderBtn drawBg={drawContextBtn} drawHoverBg={drawHoverBtn} onPress={(e) => openContextMenu(ch, e)}>
               <pixiBitmapText
@@ -614,7 +623,7 @@ export const PixiChannelHeaders: React.FC<PixiChannelHeadersProps> = ({
                 style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 10, fill: 0xffffff }}
                 tint={theme.textMuted.color}
                 eventMode="none"
-                layout={{}}
+                layout={LAYOUT_EMPTY}
               />
             </HoverableHeaderBtn>
 
@@ -638,7 +647,7 @@ export const PixiChannelHeaders: React.FC<PixiChannelHeadersProps> = ({
                 style={{ fontFamily: PIXI_FONTS.ICONS, fontSize: 10, fill: 0xffffff }}
                 tint={channel.muted ? theme.error.color : theme.textMuted.color}
                 eventMode="none"
-                layout={{}}
+                layout={LAYOUT_EMPTY}
               />
             </HoverableHeaderBtn>
 
@@ -649,7 +658,7 @@ export const PixiChannelHeaders: React.FC<PixiChannelHeadersProps> = ({
                 style={{ fontFamily: PIXI_FONTS.ICONS, fontSize: 10, fill: 0xffffff }}
                 tint={channel.solo ? theme.accent.color : theme.textMuted.color}
                 eventMode="none"
-                layout={{}}
+                layout={LAYOUT_EMPTY}
               />
             </HoverableHeaderBtn>
 
@@ -660,7 +669,7 @@ export const PixiChannelHeaders: React.FC<PixiChannelHeadersProps> = ({
                 style={{ fontFamily: PIXI_FONTS.ICONS, fontSize: 10, fill: 0xffffff }}
                 tint={theme.textMuted.color}
                 eventMode="none"
-                layout={{}}
+                layout={LAYOUT_EMPTY}
               />
             </HoverableHeaderBtn>
           </pixiContainer>
