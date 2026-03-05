@@ -8,7 +8,7 @@
  * Note values: 0=empty, 1-95=C-0..B-7, 0xBE=keyoff, 0xBF=keyon
  */
 
-import React, { useRef, useEffect, useCallback, useMemo } from 'react';
+import React, { useRef, useEffect, useCallback, useMemo, useState } from 'react';
 import { useGTUltraStore } from '../../stores/useGTUltraStore';
 
 // --- Constants ---
@@ -279,33 +279,62 @@ export const GTPatternEditor: React.FC<GTPatternEditorProps> = ({
     }
   }, [moveCursor, setCursor, cursor.channel, channelCount]);
 
-  // Mouse click → set cursor position
-  const handleClick = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+  // Mouse → cursor position helper
+  const hitTest = useCallback((clientX: number, clientY: number) => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    if (!canvas) return null;
     const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-
-    if (y < HEADER_H) return;
-
+    const x = clientX - rect.left;
+    const y = clientY - rect.top;
+    if (y < HEADER_H) return null;
     const row = scrollRow + Math.floor((y - HEADER_H) / ROW_H);
-    if (row > patternLength) return;
-
+    if (row > patternLength) return null;
     const relX = x - ROW_NUM_W;
-    if (relX < 0) return;
-
+    if (relX < 0) return null;
     const channel = Math.floor(relX / (CHANNEL_W + CHAN_GAP));
-    if (channel >= channelCount) return;
-
+    if (channel >= channelCount) return null;
     const inChannel = relX - channel * (CHANNEL_W + CHAN_GAP);
     let column = 0;
     if (inChannel >= NOTE_W + COL_GAP + HEX_W + COL_GAP + HEX_W + COL_GAP) column = 3;
     else if (inChannel >= NOTE_W + COL_GAP + HEX_W + COL_GAP) column = 2;
     else if (inChannel >= NOTE_W + COL_GAP) column = 1;
+    return { channel, row, column };
+  }, [scrollRow, patternLength, channelCount]);
 
-    setCursor({ channel, row, column, digit: 0 });
-  }, [scrollRow, patternLength, channelCount, setCursor]);
+  // Mouse drag selection state
+  const [dragging, setDragging] = useState(false);
+  const setSelection = useGTUltraStore((s) => s.setSelection);
+  const clearSelection = useGTUltraStore((s) => s.clearSelection);
+
+  const handleMouseDown = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+    const hit = hitTest(e.clientX, e.clientY);
+    if (!hit) return;
+    setCursor({ channel: hit.channel, row: hit.row, column: hit.column, digit: 0 });
+    clearSelection();
+    setDragging(true);
+  }, [hitTest, setCursor, clearSelection]);
+
+  useEffect(() => {
+    if (!dragging) return;
+    const handleMouseMove = (e: MouseEvent) => {
+      const hit = hitTest(e.clientX, e.clientY);
+      if (!hit) return;
+      setSelection({
+        active: true,
+        startChannel: cursor.channel,
+        startRow: cursor.row,
+        endChannel: hit.channel,
+        endRow: hit.row,
+      });
+    };
+    const handleMouseUp = () => setDragging(false);
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [dragging, cursor.channel, cursor.row, hitTest, setSelection]);
 
   return (
     <canvas
@@ -315,7 +344,7 @@ export const GTPatternEditor: React.FC<GTPatternEditorProps> = ({
       style={{ width, height, outline: 'none' }}
       tabIndex={0}
       onKeyDown={handleKeyDown}
-      onClick={handleClick}
+      onMouseDown={handleMouseDown}
     />
   );
 };
