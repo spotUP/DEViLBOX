@@ -1,10 +1,12 @@
-import React, { useEffect, useRef, useCallback } from 'react';
+import React, { useEffect, useRef, useCallback, useMemo, useState } from 'react';
 import { EditorView, keymap } from '@codemirror/view';
 import { EditorState, StateEffect, StateField } from '@codemirror/state';
 import { Decoration, type DecorationSet } from '@codemirror/view';
-import { Play, CheckCircle, AlertCircle, Loader, Download, Upload, Plus, X, Copy, RefreshCw } from 'lucide-react';
+import { Play, CheckCircle, AlertCircle, Loader, Download, Upload, Plus, X, Copy, RefreshCw, Layout } from 'lucide-react';
 import type { SuperColliderConfig, SCParam } from '@typedefs/instrument';
 import { superColliderLanguage } from '@engine/sc/scLanguage';
+import { parseSCGui, type SCGuiParseResult } from '@engine/sc/scGuiParser';
+import { SCGuiRenderer } from './SCGuiRenderer';
 
 const API_URL = import.meta.env.VITE_API_URL as string | undefined ?? 'https://devilbox.uprough.net/api';
 
@@ -134,8 +136,12 @@ export const SuperColliderEditor: React.FC<Props> = ({ config, onChange }) => {
   const [status, setStatus] = React.useState<CompileStatus>({ state: 'idle' });
   const [progress, setProgress] = React.useState(0);
   const [showProgress, setShowProgress] = React.useState(false);
+  const [showGui, setShowGui] = useState(false);
   const progressRef = useRef(0);
   const progressIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Parse SC GUI from source
+  const guiResult = useMemo<SCGuiParseResult>(() => parseSCGui(config.source), [config.source]);
 
   const startProgress = useCallback(() => {
     progressRef.current = 0;
@@ -339,6 +345,19 @@ export const SuperColliderEditor: React.FC<Props> = ({ config, onChange }) => {
     });
   }, []);
 
+  // GUI widget action → update the matching param's value
+  const handleGuiParamChange = useCallback((param: string, value: number) => {
+    const cfg = configRef.current;
+    const existingParam = cfg.params.find(p => p.name === param);
+    if (existingParam) {
+      // Update the param value
+      onChangeRef.current({
+        ...cfg,
+        params: cfg.params.map(p => p.name === param ? { ...p, value } : p),
+      });
+    }
+  }, []);
+
   // -------------------------------------------------------------------------
   // Export / Import
   // -------------------------------------------------------------------------
@@ -484,6 +503,21 @@ export const SuperColliderEditor: React.FC<Props> = ({ config, onChange }) => {
             <Download size={11} />
             Export
           </button>
+          {guiResult.hasGui && (
+            <button
+              onClick={() => setShowGui(g => !g)}
+              title={showGui ? 'Hide SC GUI preview' : 'Show SC GUI preview'}
+              className={[
+                'flex items-center gap-1 px-2 py-1 rounded text-xs transition-colors',
+                showGui
+                  ? 'text-accent-primary bg-dark-bgTertiary'
+                  : 'text-text-secondary hover:text-text-primary hover:bg-dark-bgTertiary',
+              ].join(' ')}
+            >
+              <Layout size={11} />
+              GUI
+            </button>
+          )}
         </div>
       </div>
 
@@ -506,7 +540,7 @@ export const SuperColliderEditor: React.FC<Props> = ({ config, onChange }) => {
         />
       </div>
 
-      {/* Body: editor (left) + param panel (right, always visible) */}
+      {/* Body: editor (left) + optional GUI preview + param panel (right) */}
       <div className="flex flex-1 min-h-0 overflow-hidden">
         {/* CodeMirror editor */}
         <div
@@ -514,6 +548,17 @@ export const SuperColliderEditor: React.FC<Props> = ({ config, onChange }) => {
           className="flex-1 overflow-auto min-h-0"
           style={{ minHeight: 0 }}
         />
+
+        {/* SC GUI preview panel */}
+        {showGui && guiResult.hasGui && (
+          <div className="w-64 shrink-0 border-l border-dark-border overflow-y-auto">
+            <SCGuiRenderer
+              gui={guiResult}
+              onParamChange={handleGuiParamChange}
+              className="h-full"
+            />
+          </div>
+        )}
 
         {/* Param panel — always visible */}
         <div className="w-52 shrink-0 border-l border-dark-border bg-dark-bgSecondary overflow-y-auto flex flex-col">
