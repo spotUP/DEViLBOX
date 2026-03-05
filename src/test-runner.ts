@@ -1571,6 +1571,9 @@ async function playPhraseOnce(
             if (hasAR) {
               if (name === 'DrumMachine') {
                 (synthObj.triggerAttackRelease as (n: string, d: number) => void)('C4', step.ms / 1000);
+              } else if (name.startsWith('Buzz')) {
+                // Buzz percussion: triggerAttackRelease(note, duration) signature
+                (synthObj.triggerAttackRelease as (n: string, d: number) => void)('C2', step.ms / 1000);
               } else {
                 (synthObj.triggerAttackRelease as (d: string) => void)('8n');
               }
