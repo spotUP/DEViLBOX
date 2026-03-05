@@ -18,7 +18,7 @@ export function getCategoryForSynth(synthType: SynthType): SynthCategory | undef
 }
 
 // Helper to get synth info (returns fallback for unknown types)
-const UNKNOWN_SYNTH_INFO: SynthInfo = { name: 'Unknown', shortName: '???', icon: 'Music2', color: 'text-gray-400' };
+const UNKNOWN_SYNTH_INFO: SynthInfo = { type: 'Synth' as any, name: 'Unknown', shortName: '???', description: '', bestFor: [], icon: 'Music2', color: 'text-gray-400' };
 export function getSynthInfo(synthType: SynthType): SynthInfo {
   return SYNTH_INFO[synthType] ?? UNKNOWN_SYNTH_INFO;
 }

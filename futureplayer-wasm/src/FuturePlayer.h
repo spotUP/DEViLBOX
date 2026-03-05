@@ -29,3 +29,12 @@ void fp_set_subsong(int subsong);
 
 /* Get sample rate for rendering */
 int fp_get_sample_rate(void);
+
+/* Per-note instrument preview */
+void fp_note_on(uint32_t instr_ptr, int note, int velocity);
+void fp_note_off(void);
+void fp_preview_tick(void);  /* call at 50Hz during preview */
+int fp_is_preview_active(void);
+
+/* Get instrument info: returns sample size in bytes, sets *is_wavetable */
+int fp_get_instrument_info(uint32_t instr_ptr, int* is_wavetable);
