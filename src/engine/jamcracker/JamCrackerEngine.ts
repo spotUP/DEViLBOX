@@ -221,6 +221,16 @@ export class JamCrackerEngine {
     this.workletNode?.port.postMessage({ type: 'pause' });
   }
 
+  /** Trigger a single instrument for preview (0-based instrument index, 1-based note 1-36, velocity 0-64) */
+  noteOn(instrument: number, note: number, velocity: number): void {
+    this.workletNode?.port.postMessage({ type: 'noteOn', instrument, note, velocity });
+  }
+
+  /** Stop preview note */
+  noteOff(): void {
+    this.workletNode?.port.postMessage({ type: 'noteOff' });
+  }
+
   onPositionUpdate(cb: PositionCallback): () => void {
     this._positionCallbacks.add(cb);
     return () => this._positionCallbacks.delete(cb);

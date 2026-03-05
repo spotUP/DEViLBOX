@@ -123,3 +123,139 @@ EXPORT int jc_get_song_length(void) { return (int)g_song_length; }
 EXPORT int jc_get_num_patterns(void) { return (int)g_num_patterns; }
 EXPORT int jc_get_num_instruments(void) { return (int)g_num_instruments; }
 EXPORT int jc_get_sample_rate(void) { return PAULA_RATE_PAL; }
+
+/* ---- Per-note instrument preview ---- */
+
+static int g_preview_active = 0;
+static double g_preview_accum = 0.0;
+
+/**
+ * jc_note_on — trigger a single instrument on voice 0 for preview.
+ * @param instr_index  0-based instrument index
+ * @param note_index   1-based note (1-36, like JamCracker: C-1=1, B-3=36)
+ * @param velocity     0-64 volume
+ *
+ * Sets up voice 0's Paula channel directly, matching what pp_nnt does
+ * when processing a note event, then enables DMA.
+ */
+EXPORT void jc_note_on(int instr_index, int note_index, int velocity) {
+    if (!g_initialized || !g_song_buf) return;
+    if (instr_index < 0 || instr_index >= (int)g_num_instruments) return;
+    if (note_index < 1 || note_index > 36) note_index = 12;
+
+    /* Look up period from pp_periods table (0-based, 2 bytes per entry) */
+    uint16_t period = pp_periods[note_index - 1];
+
+    /* Look up instrument from instable */
+    uint32_t inst_base = READ32((uintptr_t)instable) + (uint32_t)(instr_index * it_sizeof);
+    uint32_t inst_addr = READ32(inst_base + it_address);
+    uint8_t  inst_flags = READ8(inst_base + it_flags);
+    uint32_t inst_size = READ32(inst_base + it_size);
+
+    if (inst_addr == 0) return;  /* empty instrument */
+
+    /* Set up voice 0 (pp_variables + 0*pv_sizeof) */
+    uint8_t *v = pp_variables;  /* voice 0 */
+
+    /* Set period (all 3 arp slots to same value) */
+    WRITE16((uintptr_t)(v + pv_pers), period);
+    WRITE16((uintptr_t)(v + pv_pers + 2), period);
+    WRITE16((uintptr_t)(v + pv_pers + 4), period);
+    WRITE32((uintptr_t)(v + pv_peraddress), (uintptr_t)&pp_periods[note_index - 1]);
+
+    /* Clear portamento and vibrato */
+    WRITE16((uintptr_t)(v + pv_por), 0);
+    WRITE16((uintptr_t)(v + pv_deltapor), 0);
+    WRITE16((uintptr_t)(v + pv_vib), 0);
+    WRITE16((uintptr_t)(v + pv_deltavib), 0);
+    WRITE8((uintptr_t)(v + pv_vibcnt), 0);
+
+    /* Set instrument */
+    uint8_t is_am = (inst_flags & 0x02) ? 1 : 0;
+    if (is_am) {
+        /* AM instrument: waveform is at inst_addr, length is fixed 32 words */
+        WRITE16((uintptr_t)(v + pv_waveoffset), 0);
+        WRITE32((uintptr_t)(v + pv_insaddress), inst_addr);
+        WRITE16((uintptr_t)(v + pv_inslen), 0x20);  /* 32 words */
+    } else {
+        /* PCM instrument */
+        WRITE32((uintptr_t)(v + pv_insaddress), inst_addr);
+        WRITE16((uintptr_t)(v + pv_inslen), (uint16_t)(inst_size >> 1));
+    }
+    WRITE8((uintptr_t)(v + pv_flags), inst_flags);
+
+    /* Set volume */
+    int vol = velocity;
+    if (vol < 0) vol = 0;
+    if (vol > 64) vol = 64;
+    WRITE16((uintptr_t)(v + pv_vol), (uint16_t)vol);
+    WRITE16((uintptr_t)(v + pv_vollevel), (uint16_t)vol);
+    WRITE16((uintptr_t)(v + pv_deltavol), 0);
+
+    /* Clear phase */
+    WRITE16((uintptr_t)(v + pv_phase), 0);
+    WRITE16((uintptr_t)(v + pv_deltaphase), 0);
+    WRITE16((uintptr_t)(v + pv_waveoffset), 0);
+
+    /* Set up Paula channel 0 directly */
+    const int8_t *sample_ptr = (const int8_t *)(uintptr_t)inst_addr;
+    uint16_t sample_len = is_am ? 0x20 : (uint16_t)(inst_size >> 1);
+
+    paula_set_sample_ptr(0, sample_ptr);
+    paula_set_length(0, sample_len);
+    paula_set_period(0, period);
+    paula_set_volume(0, (uint8_t)vol);
+
+    /* Enable DMA for channel 0 */
+    paula_dma_write(0x8001);
+
+    /* Also store the custbase for pp_uvs to find the channel */
+    WRITE32((uintptr_t)(v + pv_custbase), 0xDFF0A0);
+    WRITE16((uintptr_t)(v + pv_dmacon), 0x0001);
+
+    g_preview_active = 1;
+    g_preview_accum = 0.0;
+}
+
+/**
+ * jc_note_off — stop preview on voice 0
+ */
+EXPORT void jc_note_off(void) {
+    paula_dma_write(0x0001);  /* disable DMA for ch0 */
+    paula_set_volume(0, 0);
+    g_preview_active = 0;
+}
+
+/**
+ * jc_render_preview — render audio for preview mode.
+ * Ticks pp_uvs on voice 0 at 50Hz to process AM synthesis / effects.
+ */
+EXPORT int jc_render_preview(float *buf, int frames) {
+    if (!g_preview_active) {
+        memset(buf, 0, frames * 2 * sizeof(float));
+        return frames;
+    }
+
+    float *out = buf;
+    int remaining = frames;
+
+    while (remaining > 0) {
+        double until_tick = g_frames_per_tick - g_preview_accum;
+        int n = (int)until_tick;
+        if (n < 1) n = 1;
+        if (n > remaining) n = remaining;
+
+        int got = paula_render(out, n);
+        out += got * 2;
+        remaining -= got;
+        g_preview_accum += (double)got;
+
+        if (g_preview_accum >= g_frames_per_tick) {
+            g_preview_accum -= g_frames_per_tick;
+            /* Run voice update on voice 0 only for AM synthesis */
+            a1 = (uint32_t)(uintptr_t)pp_variables;
+            pp_uvs();
+        }
+    }
+    return frames;
+}
