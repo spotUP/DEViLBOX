@@ -117,7 +117,9 @@ export class USBSIDPicoDevice {
   private endpointIn = -1;
   private _state: USBSIDState = 'disconnected';
   private _writeCount = 0;
+  private _consecutiveErrors = 0;
   private listeners = new Set<StateChangeCallback>();
+  private disconnectHandler: ((ev: USBConnectionEvent) => void) | null = null;
 
   // Write buffering
   private cycleExact: boolean;
@@ -217,6 +219,11 @@ export class USBSIDPicoDevice {
 
       this.backbufIdx = 1;
       this._writeCount = 0;
+      this._consecutiveErrors = 0;
+
+      // Listen for USB disconnect events
+      this.registerDisconnectHandler();
+
       this.setState('connected');
 
       console.log('[USBSIDPico] Connected:', this.device.productName);
@@ -271,9 +278,44 @@ export class USBSIDPicoDevice {
     throw new Error('No vendor-specific interface found on device');
   }
 
+  /** Register WebUSB disconnect event handler */
+  private registerDisconnectHandler(): void {
+    this.unregisterDisconnectHandler();
+    this.disconnectHandler = (ev: USBConnectionEvent) => {
+      if (ev.device === this.device) {
+        console.warn('[USBSIDPico] Device disconnected (unplugged)');
+        this.handleDisconnect();
+      }
+    };
+    navigator.usb.addEventListener('disconnect', this.disconnectHandler);
+  }
+
+  /** Remove WebUSB disconnect event handler */
+  private unregisterDisconnectHandler(): void {
+    if (this.disconnectHandler) {
+      navigator.usb.removeEventListener('disconnect', this.disconnectHandler);
+      this.disconnectHandler = null;
+    }
+  }
+
+  /** Handle unexpected device disconnect (unplug) */
+  private handleDisconnect(): void {
+    this.device = null;
+    this.interfaceNumber = -1;
+    this.endpointOut = -1;
+    this.endpointIn = -1;
+    this.backbufIdx = 1;
+    this._writeCount = 0;
+    this._consecutiveErrors = 0;
+    this.unregisterDisconnectHandler();
+    this.setState('disconnected');
+  }
+
   /** Close the USB connection */
   async close(): Promise<void> {
     if (!this.device) return;
+
+    this.unregisterDisconnectHandler();
 
     try {
       await this.resetSID();
@@ -288,19 +330,27 @@ export class USBSIDPicoDevice {
     this.endpointOut = -1;
     this.endpointIn = -1;
     this._writeCount = 0;
+    this._consecutiveErrors = 0;
     this.setState('disconnected');
     console.log('[USBSIDPico] Disconnected');
   }
 
   // ─── Low-level USB write ─────────────────────────────────
 
-  /** Send raw bytes to the device */
+  /** Send raw bytes to the device. Auto-disconnects after 5 consecutive errors. */
   private async rawWrite(data: Uint8Array): Promise<void> {
     if (!this.device || this.endpointOut < 0) return;
     try {
       await this.device.transferOut(this.endpointOut, data);
+      this._consecutiveErrors = 0;
     } catch (err) {
-      console.error('[USBSIDPico] Write error:', err);
+      this._consecutiveErrors++;
+      if (this._consecutiveErrors >= 5) {
+        console.error('[USBSIDPico] 5 consecutive write errors — disconnecting');
+        this.handleDisconnect();
+      } else {
+        console.warn(`[USBSIDPico] Write error (${this._consecutiveErrors}/5):`, err);
+      }
     }
   }
 
@@ -440,6 +490,72 @@ export class USBSIDPicoDevice {
   /** Detect connected SID chips */
   detectSIDs(): void {
     this.sendConfig(CFG.DETECT_SIDS);
+  }
+
+  /**
+   * Read a response from the device's IN endpoint.
+   * Returns the raw response bytes, or null on timeout/error.
+   */
+  async readResponse(timeoutMs = 500): Promise<Uint8Array | null> {
+    if (!this.device || this.endpointIn < 0) return null;
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), timeoutMs);
+      const result = await this.device.transferIn(this.endpointIn, BUFFER_SIZE);
+      clearTimeout(timer);
+      if (result.data && result.data.byteLength > 0) {
+        return new Uint8Array(result.data.buffer);
+      }
+    } catch {
+      // Timeout or device error — expected when no response available
+    }
+    return null;
+  }
+
+  /**
+   * Request and read firmware version string from the device.
+   * Returns version string or null if not available.
+   */
+  async getFirmwareVersion(): Promise<string | null> {
+    if (!this.isConnected) return null;
+    this.sendConfig(CFG.USBSID_VERSION);
+    await new Promise(r => setTimeout(r, 100));
+    const resp = await this.readResponse(500);
+    if (!resp || resp.length < 3) return null;
+    // Parse version bytes — format: [cmd, major, minor, patch, ...]
+    // Skip first byte (command echo), remaining are version data
+    const chars: string[] = [];
+    for (let i = 1; i < resp.length; i++) {
+      if (resp[i] === 0) break;
+      chars.push(String.fromCharCode(resp[i]));
+    }
+    return chars.length > 0 ? chars.join('') : null;
+  }
+
+  /**
+   * Request and read SID chip detection results from the device.
+   * Returns array of detected chip info, or null if not available.
+   */
+  async detectSIDChips(): Promise<Array<{ slot: number; detected: boolean; type?: string }> | null> {
+    if (!this.isConnected) return null;
+    this.sendConfig(CFG.DETECT_SIDS);
+    await new Promise(r => setTimeout(r, 500)); // Detection takes time
+    const resp = await this.readResponse(1000);
+    if (!resp || resp.length < 2) return null;
+    // Parse detection response — format varies by firmware
+    // Common: [cmd, sid1_type, sid2_type, sid3_type, sid4_type]
+    // type: 0=not detected, 1=6581, 2=8580
+    const chipTypeNames: Record<number, string> = { 0: 'none', 1: '6581', 2: '8580' };
+    const results: Array<{ slot: number; detected: boolean; type?: string }> = [];
+    for (let i = 1; i < Math.min(resp.length, 5); i++) {
+      const typeCode = resp[i];
+      results.push({
+        slot: i - 1,
+        detected: typeCode > 0,
+        type: chipTypeNames[typeCode] ?? `unknown(${typeCode})`,
+      });
+    }
+    return results;
   }
 }
 

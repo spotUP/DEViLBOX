@@ -31,6 +31,10 @@ export interface SIDHardwareStatus {
   webusbSupported: boolean;
   /** Whether Web MIDI (ASID) is supported by the browser */
   asidSupported: boolean;
+  /** Firmware version string (WebUSB only) */
+  firmwareVersion?: string | null;
+  /** Detected SID chip info (WebUSB only) */
+  detectedChips?: Array<{ slot: number; detected: boolean; type?: string }> | null;
 }
 
 type StatusChangeCallback = (status: SIDHardwareStatus) => void;
@@ -45,6 +49,8 @@ class SIDHardwareManager {
   private lastRegisters = new Map<number, number>(); // global reg → value (for diff writes)
   private _writeCount = 0;
   private unsubUSBState: (() => void) | null = null;
+  private _firmwareVersion: string | null = null;
+  private _detectedChips: Array<{ slot: number; detected: boolean; type?: string }> | null = null;
 
   get mode(): SIDHardwareMode { return this._mode; }
   get writeCount(): number { return this._writeCount; }
@@ -83,6 +89,7 @@ class SIDHardwareManager {
       this.unsubUSBState = pico.onStateChange(() => this.notifyListeners());
       // Try reconnect to previously paired device
       const ok = await pico.reconnect();
+      if (ok) await this.queryDeviceInfo();
       this.notifyListeners();
       return ok;
     }
@@ -104,7 +111,10 @@ class SIDHardwareManager {
       this.unsubUSBState = pico.onStateChange(() => this.notifyListeners());
     }
     const ok = await pico.init();
-    if (ok) this._mode = 'webusb';
+    if (ok) {
+      this._mode = 'webusb';
+      await this.queryDeviceInfo();
+    }
     this.notifyListeners();
     return ok;
   }
@@ -129,6 +139,8 @@ class SIDHardwareManager {
 
     this._mode = 'off';
     this._writeCount = 0;
+    this._firmwareVersion = null;
+    this._detectedChips = null;
     this.lastRegisters.clear();
     this.notifyListeners();
   }
@@ -248,6 +260,26 @@ class SIDHardwareManager {
     if (this._mode === 'webusb') getUSBSIDPico().setAudioMode(stereo);
   }
 
+  // ─── Device Info ──────────────────────────────────────────
+
+  /** Query firmware version and SID chip info from connected WebUSB device */
+  async queryDeviceInfo(): Promise<void> {
+    if (this._mode !== 'webusb') return;
+    const pico = getUSBSIDPico();
+    if (!pico.isConnected) return;
+
+    try {
+      this._firmwareVersion = await pico.getFirmwareVersion();
+      this._detectedChips = await pico.detectSIDChips();
+      this.notifyListeners();
+    } catch (err) {
+      console.warn('[SIDHardwareManager] Device info query failed:', err);
+    }
+  }
+
+  get firmwareVersion(): string | null { return this._firmwareVersion; }
+  get detectedChips() { return this._detectedChips; }
+
   // ─── Status ──────────────────────────────────────────────
 
   getStatus(): SIDHardwareStatus {
@@ -268,6 +300,8 @@ class SIDHardwareManager {
       writeCount: this._writeCount,
       webusbSupported: USBSIDPicoDevice.isSupported(),
       asidSupported: isASIDSupported(),
+      firmwareVersion: this._firmwareVersion,
+      detectedChips: this._detectedChips,
     };
   }
 
@@ -291,6 +325,28 @@ export function getSIDHardwareManager(): SIDHardwareManager {
     instance = new SIDHardwareManager();
   }
   return instance;
+}
+
+/**
+ * Auto-reconnect to USB-SID-Pico if mode was 'webusb' on last session.
+ * Call this once during app startup.
+ */
+export async function initSIDHardwareFromSettings(): Promise<void> {
+  try {
+    const { useSettingsStore } = await import('@stores/useSettingsStore');
+    const mode = useSettingsStore.getState().sidHardwareMode;
+    if (mode === 'webusb' && USBSIDPicoDevice.isSupported()) {
+      console.log('[SIDHardware] Auto-reconnecting WebUSB from saved settings...');
+      const mgr = getSIDHardwareManager();
+      const ok = await mgr.setMode('webusb');
+      console.log(`[SIDHardware] Auto-reconnect ${ok ? 'succeeded' : 'failed (no paired device)'}`);
+    } else if (mode === 'asid') {
+      const mgr = getSIDHardwareManager();
+      await mgr.setMode('asid');
+    }
+  } catch (err) {
+    console.warn('[SIDHardware] Auto-init failed:', err);
+  }
 }
 
 // Re-export for convenience

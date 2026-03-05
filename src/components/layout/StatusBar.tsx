@@ -3,8 +3,9 @@
  * Shows tracker info in tracker/arrangement views, DJ info in DJ view.
  */
 
-import React from 'react';
+import React, { useEffect, useRef, useState as useReactState } from 'react';
 import { useTrackerStore, useCursorStore, useTransportStore, useAudioStore, useMIDIStore, useUIStore } from '@stores';
+import { useSettingsStore } from '@stores/useSettingsStore';
 import { useDJStore } from '@/stores/useDJStore';
 import { useCollaborationStore } from '@/stores/useCollaborationStore';
 import { useShallow } from 'zustand/react/shallow';
@@ -176,6 +177,56 @@ const TrackerStatusContent: React.FC = () => {
   );
 };
 
+// ─── SID Hardware Badge ───────────────────────────────────────────────────────
+
+const SIDHardwareBadge: React.FC = () => {
+  const sidHwMode = useSettingsStore(s => s.sidHardwareMode);
+  const [connected, setConnected] = useReactState(false);
+  const [active, setActive] = useReactState(false);
+  const lastWriteCountRef = useRef(0);
+
+  useEffect(() => {
+    if (sidHwMode === 'off') { setConnected(false); setActive(false); return; }
+    let unsub: (() => void) | undefined;
+    import('@lib/sid/SIDHardwareManager').then(({ getSIDHardwareManager }) => {
+      const mgr = getSIDHardwareManager();
+      const update = () => {
+        const st = mgr.getStatus();
+        setConnected(st.connected);
+        if (st.writeCount !== lastWriteCountRef.current) {
+          lastWriteCountRef.current = st.writeCount;
+          setActive(true);
+        } else {
+          setActive(false);
+        }
+      };
+      update();
+      const iv = setInterval(update, 500);
+      unsub = mgr.onStatusChange(update);
+      return () => { clearInterval(iv); unsub?.(); };
+    });
+    return () => unsub?.();
+  }, [sidHwMode]);
+
+  if (sidHwMode === 'off') return null;
+
+  const label = `SID ${sidHwMode === 'webusb' ? 'USB' : 'ASID'}`;
+  const dotClass = connected
+    ? (active ? 'bg-accent-success animate-pulse' : 'bg-accent-success')
+    : 'bg-accent-error';
+  const textClass = connected ? 'text-accent-success' : 'text-accent-error';
+
+  return (
+    <>
+      <span className={`flex items-center gap-1.5 ${textClass}`}>
+        <span className={`w-2 h-2 rounded-full ${dotClass}`} />
+        <span className="font-bold text-[10px] uppercase">{label}</span>
+      </span>
+      <div className="w-px h-3 bg-border opacity-50" />
+    </>
+  );
+};
+
 // ─── Main StatusBar ───────────────────────────────────────────────────────────
 
 export const StatusBar: React.FC<StatusBarProps> = React.memo(({ onShowTips }) => {
@@ -303,6 +354,9 @@ export const StatusBar: React.FC<StatusBarProps> = React.memo(({ onShowTips }) =
               <div className="w-px h-3 bg-border opacity-50" />
             </>
           )}
+
+          {/* SID hardware badge */}
+          <SIDHardwareBadge />
 
           <span
             className={`flex items-center gap-1.5 ${

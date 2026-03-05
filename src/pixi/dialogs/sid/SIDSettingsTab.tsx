@@ -74,6 +74,7 @@ export const SIDSettingsTab: React.FC<SIDSettingsTabProps> = ({ width, height })
   const setSidEngine = useSettingsStore((s) => s.setSidEngine);
   const asidEnabled = useSettingsStore((s) => s.asidEnabled);
   const setAsidEnabled = useSettingsStore((s) => s.setAsidEnabled);
+  const sidHwMode = useSettingsStore((s) => s.sidHardwareMode);
 
   // Local settings state (not yet persisted in store — extend when ready)
   const [chipModel, setChipModel] = React.useState('auto');
@@ -88,7 +89,7 @@ export const SIDSettingsTab: React.FC<SIDSettingsTabProps> = ({ width, height })
     () =>
       Object.values(SID_ENGINES).map((eng) => ({
         value: eng.id,
-        label: `${eng.name} — ${eng.accuracy}, ${eng.speed}`,
+        label: `${eng.name} — ${eng.accuracy}, ${eng.speed}${eng.features.asidHardware ? ' ★ HW' : ''}`,
       })),
     []
   );
@@ -149,6 +150,14 @@ export const SIDSettingsTab: React.FC<SIDSettingsTabProps> = ({ width, height })
             alpha={0.7}
             layout={{ marginLeft: 102 }}
           />
+          {sidHwMode !== 'off' && !currentEngine.features.asidHardware && (
+            <pixiBitmapText
+              text="This engine does not support hardware SID output. Switch to jsSID."
+              style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 11, fill: 0xffffff }}
+              tint={theme.warning.color}
+              layout={{ width: contentW - 40, marginLeft: 102 }}
+            />
+          )}
         </layoutContainer>
 
         {/* Audio settings */}
