@@ -925,7 +925,7 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
       // Reset smooth scroll when stopped
       if (smoothOffsetRef.current !== 0) {
         smoothOffsetRef.current = 0;
-        if (gridScrollContainerRef.current) gridScrollContainerRef.current.y = 0;
+        if (gridScrollContainerRef.current) gridScrollContainerRef.current.pivot.y = 0;
       }
       prevRowRef.current = -1;
       prevPatternRef.current = -1;
@@ -965,8 +965,10 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
     }
 
     // Always update smooth offset imperatively — NO React setState
+    // Use pivot.y instead of position.y because @pixi/layout may reset position
+    // during layout passes. Pivot is never touched by the layout engine.
     smoothOffsetRef.current = newOffset;
-    if (gridScrollContainerRef.current) gridScrollContainerRef.current.y = -newOffset;
+    if (gridScrollContainerRef.current) gridScrollContainerRef.current.pivot.y = newOffset;
 
     // Only update React state when integer row or pattern changes
     if (newRow !== prevRowRef.current || newPattern !== prevPatternRef.current) {
