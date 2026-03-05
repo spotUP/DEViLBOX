@@ -8,16 +8,18 @@
  *   StatusBar (28px)
  */
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, Component, type ErrorInfo } from 'react';
 import { useApplication } from '@pixi/react';
 import type { Container as ContainerType, Texture } from 'pixi.js';
 import { Rectangle } from 'pixi.js';
 import { usePixiResponsive } from '../hooks/usePixiResponsive';
 import { useUIStore } from '@stores/useUIStore';
 import { useWorkbenchStore } from '@stores/useWorkbenchStore';
+import { drainBindingErrorCount } from '../PixiApp';
 import { PixiNavBar } from './PixiNavBar';
 import { PixiStatusBar } from './PixiStatusBar';
 import { PixiExposeOverlay } from './PixiExposeOverlay';
+import { PIXI_FONTS } from '../fonts';
 import {
   MODERN_NAV_H,
   MODERN_STATUS_BAR_H,
@@ -32,6 +34,67 @@ import { PixiDJView } from '../views/PixiDJView';
 import { PixiVJView } from '../views/PixiVJView';
 import { PixiMixerView } from '../views/PixiMixerView';
 import { WorkbenchContainer } from '../workbench/WorkbenchContainer';
+
+// ─── View Error Boundary ─────────────────────────────────────────────────────
+// Catches render errors in individual views so one broken view doesn't blank
+// the entire app. Shows an error message and a "Reset to Tracker" button.
+
+interface ViewErrorBoundaryProps {
+  viewId: string;
+  children: React.ReactNode;
+}
+
+interface ViewErrorBoundaryState {
+  hasError: boolean;
+  error: Error | null;
+}
+
+class ViewErrorBoundary extends Component<ViewErrorBoundaryProps, ViewErrorBoundaryState> {
+  state: ViewErrorBoundaryState = { hasError: false, error: null };
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    console.error(`[PixiMainLayout] View "${this.props.viewId}" crashed:`, error, info.componentStack);
+  }
+
+  handleReset = () => {
+    // Reset to tracker view and clear error state
+    useUIStore.getState().setActiveView('tracker');
+    this.setState({ hasError: false, error: null });
+  };
+
+  render() {
+    if (this.state.hasError) {
+      // Render a simple error message using PixiJS primitives
+      return (
+        <layoutContainer layout={{ width: '100%' as any, height: '100%' as any, justifyContent: 'center', alignItems: 'center', flexDirection: 'column', gap: 12 }}>
+          <pixiBitmapText
+            text={`View "${this.props.viewId}" failed to render`}
+            style={{ fontFamily: PIXI_FONTS.SANS_SEMIBOLD, fontSize: 16, fill: 0xffffff }}
+            tint={0xef4444}
+          />
+          <pixiBitmapText
+            text={this.state.error?.message?.slice(0, 120) || 'Unknown error'}
+            style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 11, fill: 0xffffff }}
+            tint={0x888888}
+          />
+          <pixiBitmapText
+            text="Click here to reset to Tracker view"
+            style={{ fontFamily: PIXI_FONTS.SANS_SEMIBOLD, fontSize: 13, fill: 0xffffff }}
+            tint={0x60a5fa}
+            eventMode="static"
+            cursor="pointer"
+            onPointerUp={this.handleReset}
+          />
+        </layoutContainer>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 // ─── View router ─────────────────────────────────────────────────────────────
 
@@ -81,6 +144,26 @@ export const PixiMainLayout: React.FC = () => {
   const mainViewH = isFullscreenView
     ? height
     : height - MODERN_NAV_H - MODERN_STATUS_BAR_H;
+
+  // ─── Yoga BindingError recovery ────────────────────────────────────────────
+  // When BindingErrors are suppressed, views can end up with 0×0 computed layout.
+  // Detect this and trigger a size change to force @pixi/layout recalculation.
+  const recoveryRef = useRef(0);
+  useEffect(() => {
+    const timer = setInterval(() => {
+      const errors = drainBindingErrorCount();
+      if (errors > 0) {
+        console.warn(`[PixiMainLayout] ${errors} BindingError(s) detected — triggering layout recovery`);
+        // Force a React re-render which will re-apply layout props
+        recoveryRef.current++;
+        // Trigger a fake resize event so @pixi/layout recalculates the tree
+        if (app?.renderer) {
+          app.renderer.resize(width, height);
+        }
+      }
+    }, 2000);
+    return () => clearInterval(timer);
+  }, [app, width, height]);
 
   // ─── Thumbnail capture for Exposé ──────────────────────────────────────────
 
@@ -233,7 +316,9 @@ export const PixiMainLayout: React.FC = () => {
                   flexDirection: 'column',
                 }}
               >
-                <ViewComponent />
+                <ViewErrorBoundary viewId={viewId}>
+                  <ViewComponent />
+                </ViewErrorBoundary>
               </pixiContainer>
             );
           }
@@ -252,7 +337,9 @@ export const PixiMainLayout: React.FC = () => {
               flexDirection: 'column',
             }}
           >
-            <WorkbenchContainer />
+            <ViewErrorBoundary viewId="studio">
+              <WorkbenchContainer />
+            </ViewErrorBoundary>
           </pixiContainer>
         )}
       </pixiContainer>

@@ -607,6 +607,16 @@ export const useUIStore = create<UIStore>()(
       name: 'devilbox-ui-settings',
       version: 1,
       migrate: (persistedState) => persistedState ?? {},
+      merge: (persisted, current) => {
+        const merged = { ...current, ...(persisted as Record<string, unknown>) };
+        // Validate activeView — reset to 'tracker' if persisted value is invalid
+        const validViews = ['tracker', 'arrangement', 'dj', 'drumpad', 'pianoroll', 'vj', 'mixer', 'studio'];
+        if (merged.activeView && !validViews.includes(merged.activeView as string)) {
+          console.warn(`[useUIStore] Invalid persisted activeView "${merged.activeView}", resetting to "tracker"`);
+          merged.activeView = 'tracker';
+        }
+        return merged;
+      },
       partialize: (state) => ({
         // Only persist layout preferences, not transient UI state
         showPatterns: state.showPatterns,
