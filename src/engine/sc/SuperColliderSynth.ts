@@ -54,6 +54,9 @@ export class SuperColliderSynth implements DevilboxSynth {
     this._audioContext = audioContext;
     this._gainNode = audioContext.createGain();
     this.output = this._gainNode;
+    // Connect to destination temporarily so ScriptProcessor's onaudioprocess fires.
+    // ToneEngine will later route this._gainNode → synthBus → destination.
+    this._gainNode.connect(audioContext.destination);
     this._initEngine();
   }
 
@@ -75,7 +78,12 @@ export class SuperColliderSynth implements DevilboxSynth {
         if (this._disposed) return engine;
         this._engine = engine;
         engine.output.connect(this._gainNode);
-        console.log('[SC:Synth] engine.output → gainNode connected');
+        // Now that audio flows proc→engine.output→_gainNode→(synthBus)→destination,
+        // disconnect ALL temporary direct-to-destination paths so audio is
+        // gain-controlled and goes through the mixer chain only.
+        try { engine.output.disconnect(this._audioContext.destination); } catch { /* ok */ }
+        try { this._gainNode.disconnect(this._audioContext.destination); } catch { /* ok */ }
+        console.log('[SC:Synth] engine.output → gainNode connected, temporary destination paths disconnected');
         return engine;
       })
       .catch(err => {
