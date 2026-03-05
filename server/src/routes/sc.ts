@@ -22,7 +22,7 @@ const router = Router();
 function getSclangPath(): string {
   return process.env.SCLANG_PATH ?? 'sclang';
 }
-const COMPILE_TIMEOUT_MS = 30_000;
+const COMPILE_TIMEOUT_MS = 60_000;
 const MAX_SOURCE_LENGTH = 100_000;
 
 // ---------------------------------------------------------------------------
@@ -106,12 +106,12 @@ function extractSynthDefBlock(source: string): string | null {
     return source;
   }
 
-  // Consume any chained interactive-mode calls after the closing paren:
-  //   .add  .add;  .send(s)  .send(s);  .store  .play  etc.
-  const tail = source.slice(i);
-  const chainMatch = tail.match(/^(\s*\.[a-zA-Z_]\w*(?:\s*\([^)]*\))?\s*;?)+/);
-  if (chainMatch) i += chainMatch[0].length;
-
+  // The SynthDef expression ends here — at the closing paren of SynthDef(...).
+  // Strip any chained calls like .add, .send(s), .store, .play — these are
+  // interactive-mode calls that contact a server or mutate global state.
+  // We replace them with .writeDefFile() in the wrapper, so they must be removed.
+  // (Previously we included them, which broke the expression chain via semicolons
+  // and caused .send(s) to hang waiting for a non-existent server.)
   return source.slice(blockStart, i).trim();
 }
 
@@ -187,6 +187,10 @@ async function runSclang(script: string, scriptPath: string): Promise<string> {
   await fs.writeFile(scriptPath, script, 'utf8');
 
   const sclangPath = getSclangPath();
+  const startTime = Date.now();
+  console.log(`[SC compile] Running sclang: ${sclangPath} ${scriptPath}`);
+  console.log(`[SC compile] Script (${script.length} chars):\n${script.slice(0, 500)}${script.length > 500 ? '...' : ''}`);
+
   return new Promise((resolve, reject) => {
     let proc: ReturnType<typeof spawn>;
     try {
@@ -208,11 +212,20 @@ async function runSclang(script: string, scriptPath: string): Promise<string> {
       return;
     }
 
+    console.log(`[SC compile] sclang spawned, pid=${proc.pid}`);
+
     const chunks: Buffer[] = [];
-    proc.stdout?.on('data', (d: Buffer) => chunks.push(d));
-    proc.stderr?.on('data', (d: Buffer) => chunks.push(d));
+    proc.stdout?.on('data', (d: Buffer) => {
+      chunks.push(d);
+      console.log(`[SC compile] stdout: ${d.toString().trimEnd()}`);
+    });
+    proc.stderr?.on('data', (d: Buffer) => {
+      chunks.push(d);
+      console.log(`[SC compile] stderr: ${d.toString().trimEnd()}`);
+    });
 
     proc.on('error', (err: NodeJS.ErrnoException) => {
+      console.error(`[SC compile] Process error: ${err.message}`);
       if (err.code === 'ENOENT') {
         reject(new SclangNotFoundError(`sclang not found at "${sclangPath}"`));
       } else {
@@ -221,7 +234,9 @@ async function runSclang(script: string, scriptPath: string): Promise<string> {
     });
 
     proc.on('close', (code) => {
+      const elapsed = Date.now() - startTime;
       const output = Buffer.concat(chunks).toString();
+      console.log(`[SC compile] sclang exited code=${code} in ${elapsed}ms (output ${output.length} chars)`);
       if (code !== 0 && code !== null) {
         reject(new SclangCompileError(output));
       } else {
@@ -230,8 +245,11 @@ async function runSclang(script: string, scriptPath: string): Promise<string> {
     });
 
     const timer = setTimeout(() => {
+      console.error(`[SC compile] TIMEOUT after ${COMPILE_TIMEOUT_MS}ms — killing pid=${proc.pid}`);
+      const partialOutput = Buffer.concat(chunks).toString();
+      console.error(`[SC compile] Partial output at timeout:\n${partialOutput.slice(-500)}`);
       proc.kill();
-      reject(new SclangCompileError('sclang timed out'));
+      reject(new SclangCompileError(`sclang timed out after ${COMPILE_TIMEOUT_MS / 1000}s`));
     }, COMPILE_TIMEOUT_MS);
     proc.on('close', () => clearTimeout(timer));
   });
@@ -277,11 +295,16 @@ router.post('/compile', (req: Request, res: Response) => {
       return;
     }
 
+    console.log(`[SC compile] Received source (${source.length} chars)`);
+
     const synthDefName = extractSynthDefName(source);
     if (!synthDefName) {
+      console.log('[SC compile] No SynthDef name found');
       res.json({ success: false, error: 'Could not find SynthDef name in source (expected SynthDef(\\name, ...))' } satisfies CompileFailure);
       return;
     }
+
+    console.log(`[SC compile] SynthDef name: ${synthDefName}`);
 
     const id = randomBytes(8).toString('hex');
     const tmpDir = path.join(os.tmpdir(), `sc_compile_${id}`);
@@ -291,12 +314,14 @@ router.post('/compile', (req: Request, res: Response) => {
 
       // Extract just the SynthDef block so that files containing s.boot, GUI code,
       // sequencers, etc. don't cause sclang to hang waiting for a server connection.
-      // extractSynthDefBlock also strips trailing .add/.send(s)/.store/.play chains.
       const synthDefBlock = extractSynthDefBlock(source);
       if (!synthDefBlock) {
+        console.log('[SC compile] Could not extract SynthDef block');
         res.json({ success: false, error: 'Could not find SynthDef block in source' } satisfies CompileFailure);
         return;
       }
+
+      console.log(`[SC compile] Extracted block (${synthDefBlock.length} chars):\n${synthDefBlock.slice(0, 300)}${synthDefBlock.length > 300 ? '...' : ''}`);
 
       // Wrap the SynthDef expression so it writes the .scsyndef binary.
       // Wrap in (...) so multi-line SynthDef is treated as one expression.
@@ -310,11 +335,13 @@ router.post('/compile', (req: Request, res: Response) => {
         sclangOutput = await runSclang(script, scriptPath);
       } catch (err) {
         if (err instanceof SclangNotFoundError) {
+          console.error('[SC compile] sclang not found');
           res.status(503).json({ success: false, error: 'SuperCollider (sclang) is not installed on the server. Set SCLANG_PATH to the sclang binary.' } satisfies CompileFailure);
           return;
         }
         const output = err instanceof SclangCompileError ? err.sclangOutput : '';
         const { error, line } = parseSclangError(output);
+        console.error(`[SC compile] Compile failed: ${error}${line ? ` (line ${line})` : ''}`);
         res.json({ success: false, error, line, rawOutput: cleanSclangOutput(output) } satisfies CompileFailure);
         return;
       }
@@ -325,9 +352,11 @@ router.post('/compile', (req: Request, res: Response) => {
       try {
         const buf = await fs.readFile(defFile);
         binary = buf.toString('base64');
+        console.log(`[SC compile] Success — ${synthDefName}.scsyndef (${buf.length} bytes)`);
       } catch {
         // File not created despite exit 0 — probably a runtime error
         const { error, line } = parseSclangError(sclangOutput);
+        console.error(`[SC compile] .scsyndef not found after exit 0: ${error}`);
         res.json({ success: false, error, line, rawOutput: cleanSclangOutput(sclangOutput) } satisfies CompileFailure);
         return;
       }
