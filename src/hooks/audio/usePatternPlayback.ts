@@ -42,8 +42,8 @@ export const usePatternPlayback = () => {
     setCurrentRow: s.setCurrentRow,
     setCurrentRowThrottled: s.setCurrentRowThrottled,
   })));
-  const { instruments } = useInstrumentStore();
-  const { masterEffects } = useAudioStore();
+  const { instruments } = useInstrumentStore(useShallow((s) => ({ instruments: s.instruments })));
+  const { masterEffects } = useAudioStore(useShallow((s) => ({ masterEffects: s.masterEffects })));
   const isArrangementMode = useArrangementStore((state) => state.isArrangementMode);
   const loopStart = useArrangementStore((state) => state.view.loopStart);
   const loopEnd = useArrangementStore((state) => state.view.loopEnd);
