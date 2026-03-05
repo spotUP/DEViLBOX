@@ -60,9 +60,49 @@ export const USBSIDWizard: React.FC = () => {
         setDeviceName(null);
         setFirmware(null);
         setChips(null);
+        setNeedsPairing(false);
+        setCheckingPaired(false);
       }
     }
   }, [isOpen, sidHwMode]);
+
+  // Try to auto-connect to already-paired device (no browser picker needed)
+  const [needsPairing, setNeedsPairing] = useState(false);
+  const [checkingPaired, setCheckingPaired] = useState(false);
+
+  const tryAutoConnect = useCallback(async () => {
+    setCheckingPaired(true);
+    setError(null);
+    try {
+      const { getSIDHardwareManager } = await import('@lib/sid/SIDHardwareManager');
+      const mgr = getSIDHardwareManager();
+      // Try reconnect first — uses getDevices() which needs no picker
+      const ok = await mgr.setMode('webusb');
+      if (ok) {
+        setConnected(true);
+        setSidHardwareMode('webusb');
+        const st = mgr.getStatus();
+        setDeviceName(st.deviceName);
+        setFirmware(st.firmwareVersion ?? null);
+        setChips(st.detectedChips ?? null);
+        setStep('engine');
+      } else {
+        // Device not previously paired — need the browser picker
+        setNeedsPairing(true);
+      }
+    } catch {
+      setNeedsPairing(true);
+    } finally {
+      setCheckingPaired(false);
+    }
+  }, [setSidHardwareMode]);
+
+  // Auto-try on entering connect step
+  useEffect(() => {
+    if (step === 'connect' && !connected && !needsPairing && !checkingPaired) {
+      tryAutoConnect();
+    }
+  }, [step]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleConnect = useCallback(async () => {
     setConnecting(true);
@@ -80,7 +120,7 @@ export const USBSIDWizard: React.FC = () => {
         setChips(st.detectedChips ?? null);
         setStep('engine');
       } else {
-        setError('Connection failed or cancelled. Make sure the device is plugged in.');
+        setError('Connection cancelled. Click the button to try again.');
       }
     } catch (err: any) {
       setError(err?.message || 'Connection failed');
@@ -205,22 +245,45 @@ export const USBSIDWizard: React.FC = () => {
                 <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto border ${
                   connected
                     ? 'bg-green-500/10 border-green-500/30'
-                    : 'bg-yellow-500/10 border-yellow-500/30'
+                    : checkingPaired
+                      ? 'bg-blue-500/10 border-blue-500/30'
+                      : 'bg-yellow-500/10 border-yellow-500/30'
                 }`}>
-                  <Usb className={`w-8 h-8 ${connected ? 'text-green-400' : 'text-yellow-400'}`} />
+                  {checkingPaired ? (
+                    <div className="w-8 h-8 border-3 border-blue-400/30 border-t-blue-400 rounded-full animate-spin" />
+                  ) : (
+                    <Usb className={`w-8 h-8 ${connected ? 'text-green-400' : 'text-yellow-400'}`} />
+                  )}
                 </div>
                 <div>
                   <h3 className="text-sm font-semibold text-text-primary">
-                    {connected ? 'Connected!' : 'Pair Your Device'}
+                    {connected ? 'Connected!' : checkingPaired ? 'Connecting...' : 'Pair Your Device'}
                   </h3>
                   <p className="text-xs text-text-muted mt-1">
                     {connected
                       ? `${deviceName || 'USB-SID-Pico'} is ready.`
-                      : 'Click the button below. Your browser will show a USB device picker — select your USB-SID-Pico from the list.'
+                      : checkingPaired
+                        ? 'Checking for previously paired device...'
+                        : 'This is a one-time step. Your browser needs permission to access the USB device.'
                     }
                   </p>
                 </div>
               </div>
+
+              {/* Explain the browser dialog before they see it */}
+              {needsPairing && !connected && !connecting && (
+                <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3 space-y-2">
+                  <p className="text-[10px] text-blue-300 leading-relaxed">
+                    <strong>What happens next:</strong> When you click the button below, your browser will
+                    open a device selection dialog. Select <strong>"USB-SID-Pico"</strong> from the list
+                    and click <strong>"Connect"</strong>.
+                  </p>
+                  <p className="text-[10px] text-text-muted leading-relaxed">
+                    This is a browser security requirement for USB access. You only need to do this once —
+                    next time, DEViLBOX will reconnect automatically.
+                  </p>
+                </div>
+              )}
 
               {connected && firmware && (
                 <div className="bg-dark-bgSecondary/50 border border-green-500/20 rounded-lg p-3 space-y-1">
@@ -242,7 +305,15 @@ export const USBSIDWizard: React.FC = () => {
                 </div>
               )}
 
-              {!connected ? (
+              {connected ? (
+                <button
+                  onClick={() => setStep('engine')}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-green-600 hover:bg-green-500 text-white text-sm font-semibold rounded-lg transition-colors"
+                >
+                  Continue
+                  <ChevronRight size={16} />
+                </button>
+              ) : needsPairing ? (
                 <button
                   onClick={handleConnect}
                   disabled={connecting}
@@ -255,24 +326,16 @@ export const USBSIDWizard: React.FC = () => {
                   {connecting ? (
                     <>
                       <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                      Connecting...
+                      Waiting for browser dialog...
                     </>
                   ) : (
                     <>
                       <Usb size={16} />
-                      Connect USB-SID-Pico
+                      Pair USB-SID-Pico
                     </>
                   )}
                 </button>
-              ) : (
-                <button
-                  onClick={() => setStep('engine')}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-green-600 hover:bg-green-500 text-white text-sm font-semibold rounded-lg transition-colors"
-                >
-                  Continue
-                  <ChevronRight size={16} />
-                </button>
-              )}
+              ) : null}
             </>
           )}
 
