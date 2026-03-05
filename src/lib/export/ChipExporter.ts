@@ -334,7 +334,7 @@ export async function exportChipMusic(
     case 's98':
       data = exportToS98(writes, {
         title: options.title,
-        author: options.author,
+        artist: options.author,
         ...options.s98
       });
       break;
@@ -342,7 +342,7 @@ export async function exportChipMusic(
     case 'sndh':
       data = exportToSNDH(writes, {
         title: options.title,
-        author: options.author,
+        composer: options.author,
         ...options.sndh
       });
       break;

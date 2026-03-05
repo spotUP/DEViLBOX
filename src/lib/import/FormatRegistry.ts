@@ -106,13 +106,6 @@ export interface FormatDefinition {
    * header info for the import dialog preview.
    */
   hasMetadata?: boolean;
-
-  /**
-   * Reference engine for optional native playback of the original file.
-   * When set, users can toggle between Furnace-synthesized and reference playback.
-   * Example: 'gme' for NSF/SPC/GBS/HES/KSS files, 'mdx' for MDX files.
-   */
-  referenceEngine?: 'gme' | 'mdx' | 'sc68' | 'pmd' | 'adplug';
 }
 
 // ─── Registry ───────────────────────────────────────────────────────────────
@@ -1581,7 +1574,6 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
     extRegex: /\.(vgm|vgz)$/i,
     nativeOnly: true,
     nativeParser: { module: '@lib/import/formats/VGMParser', parseFn: 'parseVGMFile' },
-    referenceEngine: 'gme',
   },
   {
     key: 'ym',
@@ -1592,7 +1584,6 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
     extRegex: /\.ym$/i,
     nativeOnly: true,
     nativeParser: { module: '@lib/import/formats/YMParser', parseFn: 'parseYMFile' },
-    referenceEngine: 'gme',
   },
   {
     key: 'nsf',
@@ -1603,7 +1594,6 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
     extRegex: /\.nsfe?$/i,
     nativeOnly: true,
     nativeParser: { module: '@lib/import/formats/NSFParser', parseFn: 'parseNSFFile' },
-    referenceEngine: 'gme',
   },
   {
     key: 'sap',
@@ -1614,7 +1604,6 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
     extRegex: /\.sap$/i,
     nativeOnly: true,
     nativeParser: { module: '@lib/import/formats/SAPParser', parseFn: 'parseSAPFile' },
-    referenceEngine: 'gme',
   },
   {
     key: 'ay',
@@ -1625,7 +1614,6 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
     extRegex: /\.ay$/i,
     nativeOnly: true,
     nativeParser: { module: '@lib/import/formats/AYParser', parseFn: 'parseAYFile' },
-    referenceEngine: 'gme',
   },
   {
     key: 's98',
@@ -1646,7 +1634,6 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
     extRegex: /\.gbs$/i,
     nativeOnly: true,
     nativeParser: { module: '@lib/import/formats/GBSParser', parseFn: 'parseGBSFile' },
-    referenceEngine: 'gme',
   },
   {
     key: 'hes',
@@ -1657,7 +1644,6 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
     extRegex: /\.hes$/i,
     nativeOnly: true,
     nativeParser: { module: '@lib/import/formats/HESParser', parseFn: 'parseHESFile' },
-    referenceEngine: 'gme',
   },
   {
     key: 'kss',
@@ -1668,7 +1654,6 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
     extRegex: /\.kss$/i,
     nativeOnly: true,
     nativeParser: { module: '@lib/import/formats/KSSParser', parseFn: 'parseKSSFile' },
-    referenceEngine: 'gme',
   },
   {
     key: 'spc',
@@ -1679,7 +1664,6 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
     extRegex: /\.spc$/i,
     nativeOnly: true,
     nativeParser: { module: '@lib/import/formats/SPCParser', parseFn: 'parseSPCFile' },
-    referenceEngine: 'gme',
   },
   {
     key: 'mdx',
@@ -1690,7 +1674,6 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
     extRegex: /\.mdx$/i,
     nativeOnly: true,
     nativeParser: { module: '@lib/import/formats/MDXParser', parseFn: 'parseMDXFile' },
-    referenceEngine: 'mdx',
   },
   {
     key: 'sndh',
@@ -1701,7 +1684,6 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
     extRegex: /\.(sndh|sc68)$/i,
     nativeOnly: true,
     nativeParser: { module: '@lib/import/formats/SNDHParser', parseFn: 'parseSNDHFile' },
-    referenceEngine: 'sc68',
   },
   {
     key: 'pmd',
@@ -1712,7 +1694,6 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
     extRegex: /\.(m|m2|mz|pmd)$/i,
     nativeOnly: true,
     nativeParser: { module: '@lib/import/formats/PMDParser', parseFn: 'parsePMDFile' },
-    referenceEngine: 'pmd',
   },
   {
     key: 'adplug',
@@ -1723,7 +1704,6 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
     extRegex: /\.(rad|hsc|cmf|d00|dro|imf|sa2|raw|lds|ksm|sci|got|bam|mus|cff|dtm|mkj|rix|sng|jbm|a2m|amd|xad)$/i,
     nativeOnly: true,
     nativeParser: { module: '@lib/import/formats/AdPlugParser', parseFn: 'parseAdPlugFile' },
-    referenceEngine: 'adplug',
   },
 
   // ═══════════════════════════════════════════════════════════════════════════

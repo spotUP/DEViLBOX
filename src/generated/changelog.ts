@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-03-05T16:30:36.769Z
+ * Generated: 2026-03-05T19:19:47.397Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.2369';
-export const BUILD_NUMBER = '2369';
-export const BUILD_HASH = '1ed9ba86';
+export const BUILD_VERSION = '1.0.2388';
+export const BUILD_NUMBER = '2388';
+export const BUILD_HASH = '243fa3a4';
 export const BUILD_DATE = '2026-03-05';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,81 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.2369',
+    version: '1.0.2388',
     date: '2026-03-05',
     changes: [
+      {
+        type: 'feature',
+        "description": "Add 9 new retro music format parsers, exporters, engines & WASM infrastructure"
+      },
+      {
+        type: 'fix',
+        "description": "Remove double routing for native WASM synths, add native instrument panel"
+      },
+      {
+        type: 'fix',
+        "description": "Correct MIDI-to-native note conversion for FP and JC"
+      },
+      {
+        type: 'feature',
+        "description": "Add FuturePlayerSynth and JamCrackerSynth to synth registry"
+      },
+      {
+        type: 'fix',
+        "description": "Fix SC GUI labels showing raw code instead of label text"
+      },
+      {
+        type: 'fix',
+        "description": "Update instrumentPtr on every cache hit, not just first creation"
+      },
+      {
+        type: 'fix',
+        "description": "Fix silent instrument preview and editor routing"
+      },
+      {
+        type: 'fix',
+        "description": "Fix keyboard shortcuts in CodeMirror editors (paste, copy, undo, etc.)"
+      },
+      {
+        type: 'fix',
+        "description": "Fix SC compile timeout: skip comments in paren tracker"
+      },
+      {
+        type: 'fix',
+        "description": "Fix SC compile: strip .send(s) chain, add logging, increase timeout"
+      },
+      {
+        type: 'feature',
+        "description": "Add per-note instrument preview and extract instrument metadata"
+      },
+      {
+        type: 'improvement',
+        "description": "Chore: update generated changelog"
+      },
+      {
+        type: 'feature',
+        "description": "Integrate FuturePlayer WASM engine into playback pipeline"
+      },
+      {
+        type: 'fix',
+        "description": "Fix crash in EditInstrumentModal for unknown synth types"
+      },
+      {
+        type: 'feature',
+        "description": "Add SC GUI parser and renderer for SuperCollider editor"
+      },
+      {
+        type: 'improvement',
+        "description": "Default to DOM UI, disable GL UI on mobile phones"
+      },
+      {
+        type: 'feature',
+        "description": "Full Future Player binary parser with real note/instrument extraction"
+      },
+      {
+        type: 'fix',
+        "description": "Fix view switcher, console warnings, and TypeScript errors"
+      },
       {
         type: 'fix',
         "description": "Clean up SuperCollider debug diagnostics"
@@ -156,78 +228,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         "description": "JSIDPlay2 fire-and-forget CLOCK loop, non-blocking SET_SAMPLING_RATE, better ScriptNodePlayer teardown in test page"
-      },
-      {
-        type: 'improvement',
-        "description": "Reduce React reconciliation during playback"
-      },
-      {
-        type: 'improvement',
-        "description": "Memoize layout props in PixiPatternEditor"
-      },
-      {
-        type: 'improvement',
-        "description": "Skip VU meter redraw when all levels at zero"
-      },
-      {
-        type: 'improvement',
-        "description": "Skip VJ render loops when layer is not active"
-      },
-      {
-        type: 'improvement',
-        "description": "Lazy-load JSZip to prevent postMessage polyfill overhead"
-      },
-      {
-        type: 'improvement',
-        "description": "Uncap Pixi ticker FPS to match display refresh rate"
-      },
-      {
-        type: 'fix',
-        "description": "Defer ASID MIDI init until enabled in settings"
-      },
-      {
-        type: 'fix',
-        "description": "Fix Buzz3o3/Buzz3o3DF volume normalization"
-      },
-      {
-        type: 'improvement',
-        "description": "Recalibrate volume offsets for 28 Furnace + MAME synths"
-      },
-      {
-        type: 'fix',
-        "description": "Use pivot.y for smooth scroll to avoid layout engine position resets"
-      },
-      {
-        type: 'fix',
-        "description": "Sync smooth scroll with Pixi render via useTick"
-      },
-      {
-        type: 'fix',
-        "description": "Fix 4 silent synths: ModularSynth, ChipSynth, Wavetable, SpaceLaser"
-      },
-      {
-        type: 'fix',
-        "description": "Disable roundPixels to enable sub-pixel smooth scroll in GL tracker"
-      },
-      {
-        type: 'fix',
-        "description": "Fix jsSID crash: guard OPL.create() for missing OPL FM emulator"
-      },
-      {
-        type: 'improvement',
-        "description": "Recalibrate volume normalization offsets for all 23 synths"
-      },
-      {
-        type: 'fix',
-        "description": "GL smooth scroll jitter — cache row duration to prevent oscillation"
-      },
-      {
-        type: 'fix',
-        "description": "Fix hooks ordering violation in GlModal — move hooks before early return"
-      },
-      {
-        type: 'fix',
-        "description": "GL tracker smooth scroll jitter on row transitions"
       }
     ]
   }

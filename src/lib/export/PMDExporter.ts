@@ -309,7 +309,7 @@ function emitTempo(cmds: number[], bpm: number): void {
 function emitVoice(
   cmds: number[],
   ch: number,
-  song: TrackerSong,
+  _song: TrackerSong,
   patterns: Pattern[]
 ): void {
   const instIdx = findFirstInstrument(ch, patterns);
