@@ -389,4 +389,30 @@ router.post('/compile', (req: Request, res: Response) => {
   })();
 });
 
+// ---------------------------------------------------------------------------
+// Preset cache — compile-on-demand for community SC presets
+// ---------------------------------------------------------------------------
+
+const presetCache = new Map<string, CompileSuccess>();
+
+router.get('/presets/:name', (req: Request, res: Response) => {
+  const { name } = req.params;
+  const cached = presetCache.get(name);
+  if (cached) {
+    res.json(cached);
+  } else {
+    res.status(404).json({ success: false, error: `Preset "${name}" not cached. Compile via POST /sc/compile first.` });
+  }
+});
+
+router.post('/presets/cache', (req: Request, res: Response) => {
+  const { name, result } = req.body as { name: string; result: CompileSuccess };
+  if (!name || !result?.success) {
+    res.status(400).json({ success: false, error: 'name and valid result required' });
+    return;
+  }
+  presetCache.set(name, result);
+  res.json({ success: true, cached: presetCache.size });
+});
+
 export default router;
