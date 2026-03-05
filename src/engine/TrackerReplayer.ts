@@ -1364,6 +1364,34 @@ export class TrackerReplayer {
       this.doGlobalPitchSlide(safeTime);
     }
 
+    // VU meters for native-engine formats (SID, HVL, MusicLine, JamCracker):
+    // When _suppressNotes is true, processRow/triggerNote are skipped so no
+    // VU data fires. Read pattern data and trigger meters from note activity.
+    if (this._suppressNotes && readNewNote) {
+      const engine = getToneEngine();
+      if (!this.meterCallbacks) {
+        this.meterCallbacks = [];
+        this.meterStaging = new Float64Array(64);
+        for (let i = 0; i < 64; i++) {
+          const ch = i;
+          this.meterCallbacks[i] = () => {
+            engine.triggerChannelMeter(ch, this.meterStaging[ch]);
+          };
+        }
+      }
+      for (let ch = 0; ch < this.channels.length; ch++) {
+        const row = useNativeAccessor
+          ? this.accessor.getRow(this.songPos, this.pattPos, ch)
+          : pattern?.channels[ch]?.rows[this.pattPos];
+        if (row && row.note > 0 && row.note < 97) {
+          const vol = (row.volume !== undefined && row.volume !== null && row.volume <= 64)
+            ? row.volume / 64 : 0.7;
+          this.meterStaging[ch] = vol;
+          Tone.Draw.schedule(this.meterCallbacks[ch], safeTime);
+        }
+      }
+    }
+
     // Notify tick processing
     if (this.onTickProcess) {
       this.onTickProcess(this.currentTick, this.pattPos);
@@ -3955,6 +3983,23 @@ export class TrackerReplayer {
         }
         this.processMacros(channel, time + (chTick * tickInterval));
         this.processEnvelopesAndVibrato(channel, time + (chTick * tickInterval));
+      }
+
+      // VU meters for per-channel native engines (MusicLine)
+      if (this._suppressNotes && chTick === 0 && row && row.note > 0 && row.note < 97) {
+        const engine = getToneEngine();
+        if (!this.meterCallbacks) {
+          this.meterCallbacks = [];
+          this.meterStaging = new Float64Array(64);
+          for (let i = 0; i < 64; i++) {
+            const c = i;
+            this.meterCallbacks[i] = () => { engine.triggerChannelMeter(c, this.meterStaging[c]); };
+          }
+        }
+        const vol = (row.volume !== undefined && row.volume !== null && row.volume <= 64)
+          ? row.volume / 64 : 0.7;
+        this.meterStaging[ch] = vol;
+        Tone.Draw.schedule(this.meterCallbacks[ch], time);
       }
 
       // Advance this channel's counter; when it overflows, advance its position.
