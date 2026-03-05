@@ -17,6 +17,7 @@ import { PIXI_FONTS } from '../fonts';
 import { usePixiTheme } from '../theme';
 import { usePixiResponsive } from '../hooks/usePixiResponsive';
 import { useUIStore, useAudioStore, useTrackerStore, useTransportStore, useCursorStore } from '@stores';
+import { useSettingsStore } from '@stores/useSettingsStore';
 import { useMIDIStore } from '@/stores/useMIDIStore';
 import { useDJStore } from '@/stores/useDJStore';
 import { useCollaborationStore } from '@/stores/useCollaborationStore';
@@ -432,6 +433,49 @@ const RightSide: React.FC<RightSideProps> = ({
   const [tipsHovered, setTipsHovered] = useState(false);
   const showMIDI = hasMIDIDevice && activeView !== 'dj' && activeView !== 'vj';
 
+  // SID hardware status — poll from settings store
+  const sidHwMode = useSettingsStore(s => s.sidHardwareMode);
+  const [sidHwConnected, setSidHwConnected] = useState(false);
+  const [sidHwWriteCount, setSidHwWriteCount] = useState(0);
+  const lastWriteCountRef = useRef(0);
+  const [sidHwActive, setSidHwActive] = useState(false); // true when writes are flowing
+
+  useEffect(() => {
+    if (sidHwMode === 'off') {
+      setSidHwConnected(false);
+      setSidHwActive(false);
+      return;
+    }
+    let unsub: (() => void) | undefined;
+    import('@lib/sid/SIDHardwareManager').then(({ getSIDHardwareManager }) => {
+      const mgr = getSIDHardwareManager();
+      const update = () => {
+        const st = mgr.getStatus();
+        setSidHwConnected(st.connected);
+        setSidHwWriteCount(st.writeCount);
+      };
+      update();
+      unsub = mgr.onStatusChange(update);
+    });
+    return () => unsub?.();
+  }, [sidHwMode]);
+
+  // Activity detection — pulse when write count changes
+  useEffect(() => {
+    if (sidHwMode === 'off') return;
+    const interval = setInterval(() => {
+      if (sidHwWriteCount !== lastWriteCountRef.current) {
+        lastWriteCountRef.current = sidHwWriteCount;
+        setSidHwActive(true);
+      } else {
+        setSidHwActive(false);
+      }
+    }, 500);
+    return () => clearInterval(interval);
+  }, [sidHwMode, sidHwWriteCount]);
+
+  const showSidHw = sidHwMode !== 'off';
+
   const textLayout = useMemo(() => ({ alignSelf: 'center' as const }), []);
   const audioDotColor = isAudioRunning ? theme.success.color : theme.textMuted.color;
   const audioLabel = isAudioRunning ? 'Audio Active' : 'Audio Off';
@@ -445,6 +489,18 @@ const RightSide: React.FC<RightSideProps> = ({
         <PixiDot color={theme.success.color} />
         <pixiBitmapText text="Collab" style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 12, fill: 0xffffff }} tint={theme.success.color} layout={textLayout} />
         <pixiBitmapText text={collabRoomCode ? ` ${collabRoomCode}` : ''} style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 12, fill: 0xffffff }} tint={theme.textMuted.color} layout={textLayout} />
+        <PixiSep height={10} />
+      </pixiContainer>
+
+      {/* SID hardware badge — always mounted to avoid @pixi/layout BindingError */}
+      <pixiContainer alpha={showSidHw ? 1 : 0} layout={{ flexDirection: 'row', flexShrink: 0 }}>
+        <PixiDot color={sidHwConnected ? (sidHwActive ? 0x00FF88 : theme.success.color) : theme.error.color} />
+        <pixiBitmapText
+          text={`SID ${sidHwMode === 'webusb' ? 'USB' : 'ASID'}`}
+          style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 12, fill: 0xffffff }}
+          tint={sidHwConnected ? theme.success.color : theme.error.color}
+          layout={textLayout}
+        />
         <PixiSep height={10} />
       </pixiContainer>
 

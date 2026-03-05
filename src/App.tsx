@@ -145,6 +145,13 @@ function App() {
   useCloudSync();
   useEffect(() => { setupCloudSyncSubscribers(); }, []);
 
+  // Auto-reconnect SID hardware (WebUSB/ASID) from saved settings
+  useEffect(() => {
+    import('@lib/sid/SIDHardwareManager').then(({ initSIDHardwareFromSettings }) => {
+      initSIDHardwareFromSettings();
+    });
+  }, []);
+
   // Background sample pack download on first run
   useEffect(() => {
     runPrefetchIfNeeded((completed, total) => {

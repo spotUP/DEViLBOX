@@ -20,6 +20,7 @@ type BufferSize = 4096 | 8192 | 16384;
 export const SIDSettingsTab: React.FC<SIDSettingsTabProps> = ({ className }) => {
   const sidEngine = useSettingsStore((s) => s.sidEngine);
   const setSidEngine = useSettingsStore((s) => s.setSidEngine);
+  const sidHwMode = useSettingsStore((s) => s.sidHardwareMode);
 
   const [chipModel, setChipModel] = useState<ChipModelOverride>('auto');
   const [clockSpeed, setClockSpeed] = useState<ClockSpeedOverride>('auto');
@@ -59,13 +60,18 @@ export const SIDSettingsTab: React.FC<SIDSettingsTabProps> = ({ className }) => 
           >
             {Object.values(SID_ENGINES).map((eng) => (
               <option key={eng.id} value={eng.id}>
-                {eng.name} — {eng.accuracy}, {eng.speed} ({eng.size})
+                {eng.name} — {eng.accuracy}, {eng.speed} ({eng.size}){eng.features.asidHardware ? ' ★ HW' : ''}
               </option>
             ))}
           </select>
           <p className="text-[10px] text-text-muted/60 leading-tight">
             {SID_ENGINES[sidEngine].description}
           </p>
+          {sidHwMode !== 'off' && !SID_ENGINES[sidEngine].features.asidHardware && (
+            <p className="text-[10px] text-accent-warning leading-tight mt-1">
+              This engine does not support hardware SID output. Switch to jsSID for hardware playback.
+            </p>
+          )}
         </div>
 
         {/* Chip Model Override */}
