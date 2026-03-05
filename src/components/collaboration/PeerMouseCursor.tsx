@@ -35,22 +35,26 @@ export function PeerMouseCursor() {
     return () => window.removeEventListener('mousemove', onMouseMove);
   }, []);
 
-  // Sync peer position into ref without triggering React re-renders
+  // Sync peer position into ref and track active state for RAF gating
+  const activeRef = useRef(false);
   useEffect(() => {
     const unsub = useCollaborationStore.subscribe((state) => {
+      const active = state.peerMouseActive &&
+        state.status === 'connected' &&
+        state.listenMode === 'shared';
       posRef.current = {
         nx: state.peerMouseNX,
         ny: state.peerMouseNY,
-        active: state.peerMouseActive &&
-          state.status === 'connected' &&
-          state.listenMode === 'shared',
+        active,
       };
+      activeRef.current = active;
     });
     return unsub;
   }, []);
 
-  // RAF drives the cursor position imperatively — no React re-renders
+  // RAF drives the cursor position imperatively — only runs when peer is active
   useEffect(() => {
+    let running = false;
     const tick = () => {
       if (divRef.current) {
         const { nx, ny, active } = posRef.current;
@@ -60,12 +64,25 @@ export function PeerMouseCursor() {
             `translate(${nx * window.innerWidth}px, ${ny * window.innerHeight}px)`;
         } else {
           divRef.current.style.display = 'none';
+          running = false;
+          return; // stop loop when inactive
         }
       }
       rafRef.current = requestAnimationFrame(tick);
     };
-    rafRef.current = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(rafRef.current);
+
+    // Start/restart loop when collaboration becomes active
+    const unsub = useCollaborationStore.subscribe((state) => {
+      const active = state.peerMouseActive &&
+        state.status === 'connected' &&
+        state.listenMode === 'shared';
+      if (active && !running) {
+        running = true;
+        rafRef.current = requestAnimationFrame(tick);
+      }
+    });
+
+    return () => { unsub(); cancelAnimationFrame(rafRef.current); };
   }, []);
 
   return (

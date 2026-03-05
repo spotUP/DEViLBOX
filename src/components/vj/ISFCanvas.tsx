@@ -78,34 +78,33 @@ export const ISFCanvas = React.forwardRef<ISFCanvasHandle, ISFCanvasProps>(
       };
     }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-    // Render loop
+    // Render loop — only runs when visible (stops rAF entirely when hidden)
     useEffect(() => {
-      if (!ready) return;
+      if (!ready || !visible) return;
       const render = () => {
-        if (visibleRef.current) {
-          const engine = engineRef.current;
-          const bus = audioBusRef.current;
-          if (engine) {
-            if (bus) {
-              bus.update();
-              const data = bus.getFrame();
-              const audioUniforms: AudioUniforms = {
-                audio_bass: data.subEnergy * 0.5 + data.bassEnergy * 0.5,
-                audio_mid: data.midEnergy,
-                audio_high: data.highEnergy,
-                audio_level: data.rms,
-                audio_beat: data.beat ? 1.0 : 0.0,
-              };
-              engine.setAudioUniforms(audioUniforms);
-            }
-            engine.draw();
+        if (!visibleRef.current) return; // stop loop if visibility changed mid-frame
+        const engine = engineRef.current;
+        const bus = audioBusRef.current;
+        if (engine) {
+          if (bus) {
+            bus.update();
+            const data = bus.getFrame();
+            const audioUniforms: AudioUniforms = {
+              audio_bass: data.subEnergy * 0.5 + data.bassEnergy * 0.5,
+              audio_mid: data.midEnergy,
+              audio_high: data.highEnergy,
+              audio_level: data.rms,
+              audio_beat: data.beat ? 1.0 : 0.0,
+            };
+            engine.setAudioUniforms(audioUniforms);
           }
+          engine.draw();
         }
         rafRef.current = requestAnimationFrame(render);
       };
       rafRef.current = requestAnimationFrame(render);
       return () => cancelAnimationFrame(rafRef.current);
-    }, [ready]);
+    }, [ready, visible]);
 
     // Resize handling
     useEffect(() => {

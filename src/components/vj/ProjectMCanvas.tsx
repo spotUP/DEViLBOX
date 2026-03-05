@@ -176,30 +176,29 @@ export const ProjectMCanvas = React.forwardRef<VJCanvasHandle, ProjectMCanvasPro
       };
     }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-    // Render loop
+    // Render loop — only runs when visible (stops rAF entirely when hidden)
     useEffect(() => {
-      if (!ready) return;
+      if (!ready || !visible) return;
       const render = () => {
-        if (visibleRef.current) {
-          const engine = engineRef.current;
-          const bus = audioBusRef.current;
-          if (engine && bus) {
-            const frame = bus.update();
-            const waveform = frame.waveform;
-            const stereo = new Float32Array(waveform.length * 2);
-            for (let i = 0; i < waveform.length; i++) {
-              stereo[i * 2] = waveform[i];
-              stereo[i * 2 + 1] = waveform[i];
-            }
-            engine.pushAudio(stereo, waveform.length);
-            engine.renderFrame();
+        if (!visibleRef.current) return; // stop loop if visibility changed mid-frame
+        const engine = engineRef.current;
+        const bus = audioBusRef.current;
+        if (engine && bus) {
+          const frame = bus.update();
+          const waveform = frame.waveform;
+          const stereo = new Float32Array(waveform.length * 2);
+          for (let i = 0; i < waveform.length; i++) {
+            stereo[i * 2] = waveform[i];
+            stereo[i * 2 + 1] = waveform[i];
           }
+          engine.pushAudio(stereo, waveform.length);
+          engine.renderFrame();
         }
         rafRef.current = requestAnimationFrame(render);
       };
       rafRef.current = requestAnimationFrame(render);
       return () => cancelAnimationFrame(rafRef.current);
-    }, [ready]);
+    }, [ready, visible]);
 
     // Resize
     useEffect(() => {
