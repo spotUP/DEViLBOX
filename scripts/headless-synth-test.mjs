@@ -16,6 +16,7 @@ const TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes max
 async function run() {
   const browser = await puppeteer.launch({
     headless: false,
+    protocolTimeout: 300000, // 5 min protocol timeout for heavy WASM synths
     args: [
       '--autoplay-policy=no-user-gesture-required',
       '--no-sandbox',

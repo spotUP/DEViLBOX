@@ -15,6 +15,7 @@ const DEFAULT_CONFIG: DubSirenConfig = {
 export class DubSirenSynth implements DevilboxSynth {
   readonly name = 'DubSirenSynth';
   readonly output: GainNode;
+  readonly ready: Promise<void>;
   private osc: Tone.Oscillator;
   private filter: Tone.Filter;
   private reverb: Tone.Reverb;
@@ -109,6 +110,9 @@ export class DubSirenSynth implements DevilboxSynth {
 
     // Start oscillator immediately (it's gated)
     this.osc.start();
+
+    // Expose reverb readiness — Tone.Reverb passes no audio until its IR is generated
+    this.ready = this.reverb.ready;
   }
 
   /**

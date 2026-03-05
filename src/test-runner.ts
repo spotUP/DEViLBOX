@@ -17,6 +17,8 @@ import {
   DEFAULT_WAM,
   DEFAULT_V2,
   DEFAULT_V2_SPEECH,
+  DEFAULT_CHIP_SYNTH,
+  DEFAULT_WAVETABLE,
 } from './types/instrument';
 import type { EffectConfig } from './types/instrument';
 import { HivelyEngine } from './engine/hively/HivelyEngine';
@@ -145,7 +147,24 @@ const SYNTH_CONFIGS: Record<string, Record<string, unknown>> = {
   'Furnace': { synthType: 'Furnace', volume: -12, furnace: DEFAULT_FURNACE },
 
   // === Modular Synthesis ===
-  'ModularSynth': { synthType: 'ModularSynth', volume: -12 },
+  'ModularSynth': {
+    synthType: 'ModularSynth', volume: -12,
+    modularSynth: {
+      polyphony: 1,
+      viewMode: 'rack',
+      modules: [
+        { id: 'vco1', descriptorId: 'VCO', parameters: { waveform: 1, detune: 0, octave: 0, pulseWidth: 0.5 } },
+        { id: 'adsr1', descriptorId: 'ADSR', parameters: {} },
+        { id: 'vca1', descriptorId: 'VCA', parameters: {} },
+        { id: 'out1', descriptorId: 'Output', parameters: {} },
+      ],
+      connections: [
+        { id: 'c1', source: { moduleId: 'vco1', portId: 'output' }, target: { moduleId: 'vca1', portId: 'input' }, amount: 1 },
+        { id: 'c2', source: { moduleId: 'adsr1', portId: 'output' }, target: { moduleId: 'vca1', portId: 'cv' }, amount: 1 },
+        { id: 'c3', source: { moduleId: 'vca1', portId: 'output' }, target: { moduleId: 'out1', portId: 'input' }, amount: 1 },
+      ],
+    },
+  },
 
   // === Tone.js Core Synths ===
   'Synth':         { synthType: 'Synth', volume: -12 },
@@ -162,7 +181,7 @@ const SYNTH_CONFIGS: Record<string, Record<string, unknown>> = {
   'SuperSaw':      { synthType: 'SuperSaw', volume: -12 },
   'PolySynth':     { synthType: 'PolySynth', volume: -12 },
   'Organ':         { synthType: 'Organ', volume: -12 },
-  'ChipSynth':     { synthType: 'ChipSynth', volume: -12 },
+  'ChipSynth':     { synthType: 'ChipSynth', volume: -12, chipSynth: DEFAULT_CHIP_SYNTH },
   'PWMSynth':      { synthType: 'PWMSynth', volume: -12 },
   'StringMachine': { synthType: 'StringMachine', volume: -12 },
   'FormantSynth':  { synthType: 'FormantSynth', volume: -12 },
@@ -201,7 +220,7 @@ const SYNTH_CONFIGS: Record<string, Record<string, unknown>> = {
       loop: true, loopStart: 0, loopEnd: 0,
     },
   },
-  'Wavetable': { synthType: 'Wavetable', volume: -12 },
+  'Wavetable': { synthType: 'Wavetable', volume: -12, wavetable: DEFAULT_WAVETABLE },
   'DrumKit': {
     synthType: 'DrumKit', volume: -12,
     drumKit: {
@@ -1708,6 +1727,13 @@ async function testVolumeLevels(skipPreWarm = false) {
         } catch {
           wasmInitFailed = true;
           // ignored
+        }
+      } else if (synthObj.ready && typeof (synthObj.ready as Promise<void>).then === 'function') {
+        // Handle .ready as a Promise (e.g., SpaceLaser reverb readiness)
+        try {
+          await initTimeout(synthObj.ready as Promise<void>, 15000);
+        } catch {
+          // ignored — reverb generation timeout is non-fatal
         }
       }
 
