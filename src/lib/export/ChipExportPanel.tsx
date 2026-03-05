@@ -302,7 +302,9 @@ export const ChipExportPanel: React.FC<ChipExportPanelProps> = ({
                 zsm: { supported: false, type: 'none' },
                 sap: { supported: false, type: 'none' },
                 tiuna: { supported: false, type: 'none' },
-              }[fmt];
+                s98: { supported: true, type: 'custom' },
+                sndh: { supported: false, type: 'none' },
+              }[fmt] ?? { supported: false, type: 'none' };
 
               return (
                 <button
@@ -347,7 +349,9 @@ export const ChipExportPanel: React.FC<ChipExportPanelProps> = ({
                   zsm: 'none',
                   sap: 'none',
                   tiuna: 'none',
-                }[chipFormat];
+                  s98: 'custom',
+                  sndh: 'none',
+                }[chipFormat] ?? 'none';
 
                 if (loopType === 'custom') {
                   return (

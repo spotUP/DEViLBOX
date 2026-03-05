@@ -145,6 +145,8 @@ export interface InstrumentMetadata {
     hasLoop: boolean;
     lengthBytes: number;
   };
+  /** FuturePlayer instrument pointer (from .fp import) */
+  fpInstrPtr?: number;
 }
 
 export interface SampleConfig {

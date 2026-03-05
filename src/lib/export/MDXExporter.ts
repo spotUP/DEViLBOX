@@ -300,7 +300,7 @@ function emitTempo(cmds: number[], bpm: number): void {
 function emitVoice(
   cmds: number[],
   ch: number,
-  song: TrackerSong,
+  _song: TrackerSong,
   patterns: Pattern[]
 ): void {
   // Find the first instrument used on this channel

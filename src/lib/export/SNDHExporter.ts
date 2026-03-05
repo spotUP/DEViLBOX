@@ -300,7 +300,7 @@ function build68kStub(frames: Uint8Array[]): Uint8Array {
   return buildStubV2(frames, numFrames, frameDataLen);
 }
 
-function buildStubV2(frames: Uint8Array[], numFrames: number, frameDataLen: number): Uint8Array {
+function buildStubV2(frames: Uint8Array[], _numFrames: number, frameDataLen: number): Uint8Array {
   // Layout:
   //   +00  bra.w _init         (4 bytes)
   //   +04  bra.w _play         (4 bytes)
@@ -363,7 +363,7 @@ function buildStubV2(frames: Uint8Array[], numFrames: number, frameDataLen: numb
   w16(0x0C, 0x41FA); w16(0x0E, FRAME_DATA - 0x0E);     // lea frame_data(pc),a0
   w16(0x10, 0x43FA); w16(0x12, FRAME_PTR - 0x12);       // lea frame_ptr(pc),a1
   w16(0x14, 0x2288);                                      // move.l a0,(a1)
-  const FRAME_DATA_END = FRAME_DATA + frameDataLen;
+  const _FRAME_DATA_END = FRAME_DATA + frameDataLen;
   // lea frame_data_end(pc),a0 — points past last byte of frame data
   // But frame_data_end is beyond our buffer, so we use: lea frame_data(pc),a0 then adda
   // Simpler: store the offset to end. Since it's PC-relative:
