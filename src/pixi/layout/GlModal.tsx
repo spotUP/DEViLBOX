@@ -48,16 +48,15 @@ export const GlModal: React.FC<GlModalProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
 
-  if (!isOpen) return null;
-
+  // Screen dimensions — safe access
   let screenW = 1920, screenH = 1080;
   try { if (app?.screen) { screenW = app.screen.width ?? 1920; screenH = app.screen.height ?? 1080; } } catch { /* renderer not ready */ }
 
-  const drawOverlay = (g: GraphicsType) => {
+  const drawOverlay = useCallback((g: GraphicsType) => {
     g.clear();
     g.rect(0, 0, screenW, screenH);
     g.fill({ color: 0x000000, alpha: 0.6 });
-  };
+  }, [screenW, screenH]);
 
   const handleOverlayClick = useCallback((_e: FederatedPointerEvent) => {
     onClose();
@@ -70,6 +69,8 @@ export const GlModal: React.FC<GlModalProps> = ({
   const blockWheel = useCallback((e: { stopPropagation: () => void }) => {
     e.stopPropagation();
   }, []);
+
+  if (!isOpen) return null;
 
   return (
     <pixiContainer layout={{ position: 'absolute', width: '100%', height: '100%' }}>
