@@ -614,7 +614,6 @@ function oplEventsToPatterns(
 // ── DRO Parser ────────────────────────────────────────────────────────────────
 
 function parseDRO(buf: Uint8Array, filename: string): TrackerSong {
-  const _versionMinor = le16(buf, 8);
   const versionMajor = le16(buf, 10);
 
   if (versionMajor >= 2) return parseDROv2(buf, filename);
@@ -623,7 +622,6 @@ function parseDRO(buf: Uint8Array, filename: string): TrackerSong {
 
 function parseDROv1(buf: Uint8Array, filename: string): TrackerSong {
   const NUM_CH = 9;
-  const _lengthMs = le32(buf, 12);
   const dataLength = le32(buf, 16);
   const hwType = buf[20]; // 0=OPL2, 1=OPL3, 2=dual OPL2
   const numCh = hwType === 1 ? 18 : NUM_CH;
@@ -670,8 +668,6 @@ function parseDROv1(buf: Uint8Array, filename: string): TrackerSong {
 
 function parseDROv2(buf: Uint8Array, filename: string): TrackerSong {
   const totalPairs = le32(buf, 12);
-  const _lengthMs = le32(buf, 16);
-  const _hwType = buf[20];
   const oplFormat = buf[21]; // 0=OPL2, 1=dual OPL2, 2=OPL3
   const shortDelay = buf[23];
   const longDelay = buf[24];
@@ -763,15 +759,12 @@ function parseCMF(buf: Uint8Array, filename: string): TrackerSong {
   const NUM_CH = 9;
   const ROWS = 64;
 
-  const _version = le16(buf, 4);
   const instOffset = le16(buf, 6);
   const musicOffset = le16(buf, 8);
-  const _ticksPerQuarter = le16(buf, 10);
   const ticksPerSecond = le16(buf, 12);
   const titleOffset = le16(buf, 14);
   const authorOffset = le16(buf, 16);
   const numInstruments = le16(buf, 36);
-  const _basicTempo = le16(buf, 38);
 
   // Read title/author strings
   let title = '';
@@ -840,7 +833,6 @@ function parseCMF(buf: Uint8Array, filename: string): TrackerSong {
 
   // Parse MIDI-like event stream → note events
   const tickRate = ticksPerSecond > 0 ? ticksPerSecond : 120;
-  const _msPerTick = 1000 / tickRate;
   // Channel assignment for CMF: channels 0-8 → OPL2 channels
   const channelMap = new Map<number, number>(); // MIDI ch → OPL ch
   let nextOPLCh = 0;

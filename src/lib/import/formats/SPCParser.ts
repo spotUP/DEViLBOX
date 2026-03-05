@@ -214,7 +214,6 @@ export function parseSPCFile(buffer: ArrayBuffer): TrackerSong {
 
   // Read DSP voice registers
   const voices = readDSPVoices(buf);
-  const _dir = readDIR(buf);
 
   // Build 8 SNES instruments
   const instruments = buildInstruments(voices);
