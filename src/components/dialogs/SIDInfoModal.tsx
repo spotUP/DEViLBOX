@@ -65,6 +65,7 @@ export const SIDInfoModal: React.FC<SIDInfoModalProps> = ({ onClose }) => {
 
   const sidEngine = useSettingsStore(s => s.sidEngine);
   const setSidEngine = useSettingsStore(s => s.setSidEngine);
+  const sidHwMode = useSettingsStore(s => s.sidHardwareMode);
 
   const [composer, setComposer] = useState<ComposerData | null>(null);
   const [composerLoading, setComposerLoading] = useState(false);
@@ -302,13 +303,23 @@ export const SIDInfoModal: React.FC<SIDInfoModalProps> = ({ onClose }) => {
                 >
                   {Object.values(SID_ENGINES).map(eng => (
                     <option key={eng.id} value={eng.id}>
-                      {eng.name} — {eng.accuracy}, {eng.speed} ({eng.size})
+                      {eng.name} — {eng.accuracy}, {eng.speed} ({eng.size}){eng.features.asidHardware ? ' ★ HW' : ''}
                     </option>
                   ))}
                 </select>
                 <p className="text-[10px] text-text-muted/60 leading-tight">
                   {SID_ENGINES[sidEngine].description}
                 </p>
+                {sidHwMode !== 'off' && !SID_ENGINES[sidEngine].features.asidHardware && (
+                  <p className="text-[10px] text-yellow-400 leading-tight mt-1">
+                    ⚠ Hardware SID output requires jsSID engine. Select jsSID ★ HW above.
+                  </p>
+                )}
+                {sidHwMode !== 'off' && SID_ENGINES[sidEngine].features.asidHardware && (
+                  <p className="text-[10px] text-green-400 leading-tight mt-1">
+                    ✓ Hardware SID output active via {sidHwMode === 'webusb' ? 'USB-SID-Pico' : 'ASID'}
+                  </p>
+                )}
               </div>
 
               {/* SongDB Album/Year Info */}

@@ -625,6 +625,8 @@ export const useSettingsStore = create<SettingsStore>()(
         lensEnabled: state.lensEnabled,
         lensPreset:  state.lensPreset,
         lensParams:  state.lensParams,
+        sidHardwareMode: state.sidHardwareMode,
+        sidEngine: state.sidEngine,
         // renderMode intentionally not persisted — always start in DOM mode
       }),
     }

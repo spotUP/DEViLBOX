@@ -176,6 +176,7 @@ export const PixiSIDInfoModal: React.FC<PixiSIDInfoModalProps> = ({ isOpen, onCl
 
   const sidEngine = useSettingsStore((s) => s.sidEngine);
   const setSidEngine = useSettingsStore((s) => s.setSidEngine);
+  const sidHwMode = useSettingsStore((s) => s.sidHardwareMode);
 
   const [composer, setComposer] = useState<ComposerData | null>(null);
   const [composerLoading, setComposerLoading] = useState(false);
@@ -311,7 +312,7 @@ export const PixiSIDInfoModal: React.FC<PixiSIDInfoModalProps> = ({ isOpen, onCl
   // Engine select options
   const engineOptions: SelectOption[] = Object.values(SID_ENGINES).map((eng) => ({
     value: eng.id,
-    label: `${eng.name} — ${eng.accuracy}, ${eng.speed}`,
+    label: `${eng.name} — ${eng.accuracy}, ${eng.speed}${eng.features.asidHardware ? ' ★ HW' : ''}`,
   }));
 
   // ── Estimated content height for scroll view ──────────────────────────────
@@ -545,6 +546,20 @@ export const PixiSIDInfoModal: React.FC<PixiSIDInfoModalProps> = ({ isOpen, onCl
                   size="xs"
                   color="textMuted"
                 />
+                {sidHwMode !== 'off' && !SID_ENGINES[sidEngine].features.asidHardware && (
+                  <PixiLabel
+                    text="⚠ Hardware SID output requires jsSID. Select jsSID ★ HW above."
+                    size="xs"
+                    color="warning"
+                  />
+                )}
+                {sidHwMode !== 'off' && SID_ENGINES[sidEngine].features.asidHardware && (
+                  <PixiLabel
+                    text={`✓ Hardware output via ${sidHwMode === 'webusb' ? 'USB-SID-Pico' : 'ASID'}`}
+                    size="xs"
+                    color="success"
+                  />
+                )}
               </layoutContainer>
 
               {/* SongDB Album / Year info — DOM: p-3 rounded-lg */}
