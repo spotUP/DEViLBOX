@@ -299,22 +299,25 @@ export const VJPatternOverlay: React.FC = React.memo(() => {
 
   return (
     <div
-      ref={wrapRef}
-      className="absolute bottom-20 left-1/2 -translate-x-1/2 pointer-events-none"
-      style={{
-        transformStyle: 'preserve-3d',
-        willChange: 'transform, opacity',
-      }}
+      className="absolute inset-0 flex items-center justify-center pointer-events-none"
     >
-      <canvas
-        ref={canvasRef}
-        width={ROW_NUM_W + 4 * CELL_W}
-        height={CANVAS_H}
+      <div
+        ref={wrapRef}
         style={{
-          maxWidth: '90vw',
-          mixBlendMode: 'screen',
+          transformStyle: 'preserve-3d',
+          willChange: 'transform, opacity',
         }}
-      />
+      >
+        <canvas
+          ref={canvasRef}
+          width={ROW_NUM_W + 4 * CELL_W}
+          height={CANVAS_H}
+          style={{
+            maxWidth: '90vw',
+            mixBlendMode: 'screen',
+          }}
+        />
+      </div>
     </div>
   );
 });
