@@ -470,12 +470,11 @@ export class ToneEngine {
       const dispatchEngine = FurnaceDispatchEngine.getInstance();
       if (!dispatchEngine.isInitialized) return;
       engineGain = dispatchEngine.getOrCreateSharedGain();
-    } else if ('output' in instrument && (instrument as any).output instanceof GainNode) {
-      // Generic native GainNode output (UADESynth, HivelySynth, etc.)
-      const synthName = (instrument as any).name || 'NativeWASM';
-      engineKey = synthName;
-      engineGain = (instrument as any).output;
     } else {
+      // DevilboxSynths with GainNode outputs (FP, JC, SA, HivelySynth, UADESynth, etc.)
+      // are routed by buildInstrumentEffectChain — no extra routing needed here.
+      // Only FurnaceSynth/FurnaceDispatchSynth need explicit routing because their
+      // shared engine GainNode is separate from the synth instance's output.
       return;
     }
 
