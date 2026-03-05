@@ -45,7 +45,8 @@ function fmtCell(cell: TrackerCell): string {
 // ── Layout ───────────────────────────────────────────────────────────────────
 const VISIBLE_ROWS = 16;
 const ROW_H = 16;
-const CANVAS_W = 1200;
+const ROW_NUM_W = 28;
+const CELL_W = 120;  // per-channel column width
 const CANVAS_H = (VISIBLE_ROWS * 2 + 3) * ROW_H; // extra rows for smooth scroll headroom
 
 // ── Color helpers ────────────────────────────────────────────────────────────
@@ -123,6 +124,10 @@ export const VJPatternOverlay: React.FC = React.memo(() => {
       const numChannels = channels.length;
       const patLen = pattern.length;
 
+      // Dynamic canvas width based on channel count
+      const canvasW = ROW_NUM_W + numChannels * CELL_W;
+      if (canvas.width !== canvasW) canvas.width = canvasW;
+
       // ── Read audio ─────────────────────────────────────────────────────
       bus.update();
       const frame = bus.getFrame();
@@ -189,13 +194,13 @@ export const VJPatternOverlay: React.FC = React.memo(() => {
       canvas.style.filter = `drop-shadow(0 0 ${glowRadius.toFixed(0)}px ${hsl(glowHue, 80, 60, 0.5 + anim.beatFlash * 0.3)})`;
 
       // ── Draw pattern ──────────────────────────────────────────────────
-      ctx.clearRect(0, 0, CANVAS_W, CANVAS_H);
+      ctx.clearRect(0, 0, canvasW, CANVAS_H);
       ctx.save();
       // Smooth scroll offset
       ctx.translate(0, -anim.scrollOffset);
 
-      const rowNumW = 28;
-      const cellW = Math.min(120, (CANVAS_W - rowNumW) / numChannels);
+      const rowNumW = ROW_NUM_W;
+      const cellW = CELL_W;
       const baseHue = (bandHue(frame) + anim.hueShift) % 360;
 
       // ── Character spacing driven by bass ──────────────────────────────
@@ -217,7 +222,7 @@ export const VJPatternOverlay: React.FC = React.memo(() => {
       ctx.lineWidth = 1 + anim.beatFlash * 2;
       ctx.beginPath();
       ctx.moveTo(0, ROW_H);
-      ctx.lineTo(CANVAS_W, ROW_H);
+      ctx.lineTo(canvasW, ROW_H);
       ctx.stroke();
 
       // ── Rows ──────────────────────────────────────────────────────────
@@ -239,12 +244,12 @@ export const VJPatternOverlay: React.FC = React.memo(() => {
           ctx.fillStyle = isPlaying
             ? hsl(baseHue, 70, 55, flashBright)
             : 'rgba(255,255,255,0.1)';
-          ctx.fillRect(0, y, CANVAS_W, ROW_H);
+          ctx.fillRect(0, y, canvasW, ROW_H);
 
           // Extra glow bar on beat
           if (anim.beatFlash > 0.05) {
             ctx.fillStyle = hsl(baseHue, 90, 80, anim.beatFlash * 0.4);
-            ctx.fillRect(0, y, CANVAS_W, ROW_H);
+            ctx.fillRect(0, y, canvasW, ROW_H);
           }
         }
 
@@ -303,7 +308,7 @@ export const VJPatternOverlay: React.FC = React.memo(() => {
     >
       <canvas
         ref={canvasRef}
-        width={CANVAS_W}
+        width={ROW_NUM_W + 4 * CELL_W}
         height={CANVAS_H}
         style={{
           maxWidth: '90vw',
