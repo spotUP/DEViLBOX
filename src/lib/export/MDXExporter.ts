@@ -30,8 +30,14 @@ const MDX_CMD = {
   SET_VOICE: 0xFD,
   SET_PAN: 0xFC,
   SET_VOLUME: 0xFB,
+  DEC_VOLUME: 0xFA,
+  INC_VOLUME: 0xF9,
   STACCATO: 0xF8,
+  PORTAMENTO: 0xF7,
+  DETUNE: 0xF3,
   KEY_ON_DELAY: 0xF2,
+  LFO: 0xF1,
+  LFO_OFF: 0xF0,
   LOOP_BACK: 0xE9,
   OPM_WRITE: 0xFE,
 } as const;
@@ -323,15 +329,57 @@ function emitPan(cmds: number[], pan: number): void {
 
 /**
  * Map XM effect type + param to MDX MML commands.
- * MDX supports: volume, panning, tempo, staccato, key-on delay.
+ * MDX supports: volume, panning, tempo, staccato, portamento, detune, LFO (vibrato).
  */
 function emitMDXEffect(cmds: number[], effTyp: number, eff: number): void {
   switch (effTyp) {
-    case 0x8: // Set panning (XM: 0=left, 128=center, 255=right → MDX: 0x80=L, 0xC0=center, 0x40=R)
-      if (eff < 64) cmds.push(MDX_CMD.SET_PAN, 0x80);        // Left
-      else if (eff < 192) cmds.push(MDX_CMD.SET_PAN, 0xC0);   // Center
-      else cmds.push(MDX_CMD.SET_PAN, 0x40);                   // Right
+    case 0x1: // Portamento up — use detune (positive semitone offset)
+      if (eff > 0) {
+        const offset = eff * 4; // Scale XM param to MDX detune range
+        cmds.push(MDX_CMD.DETUNE, offset & 0xFF, (offset >> 8) & 0xFF);
+      }
       break;
+    case 0x2: // Portamento down — use detune (negative offset)
+      if (eff > 0) {
+        const offset = -(eff * 4);
+        cmds.push(MDX_CMD.DETUNE, offset & 0xFF, (offset >> 8) & 0xFF);
+      }
+      break;
+    case 0x3: // Tone portamento — MDX portamento (0xF7 + duration + signed16 target)
+      if (eff > 0) {
+        cmds.push(MDX_CMD.PORTAMENTO, Math.max(1, eff >> 2));
+        // Target offset 0 = slide to current note (already played)
+        cmds.push(0x00, 0x00);
+      }
+      break;
+    case 0x4: { // Vibrato — MDX LFO command (0xF1 + delay + speed + type + depth + extra)
+      const speed = (eff >> 4) & 0x0F;
+      const depth = eff & 0x0F;
+      if (speed > 0 || depth > 0) {
+        cmds.push(MDX_CMD.LFO,
+          0,                                // delay (0 = immediate)
+          Math.max(1, 16 - speed),          // speed (invert: higher XM speed = faster)
+          0,                                // type 0 = pitch vibrato
+          Math.max(1, depth * 8),           // depth (scale XM 0-15 → MDX range)
+          0,                                // extra byte
+        );
+      } else {
+        cmds.push(MDX_CMD.LFO_OFF);
+      }
+      break;
+    }
+    case 0x8: // Set panning
+      if (eff < 64) cmds.push(MDX_CMD.SET_PAN, 0x80);
+      else if (eff < 192) cmds.push(MDX_CMD.SET_PAN, 0xC0);
+      else cmds.push(MDX_CMD.SET_PAN, 0x40);
+      break;
+    case 0xA: { // Volume slide
+      const up = (eff >> 4) & 0x0F;
+      const dn = eff & 0x0F;
+      if (up > 0) cmds.push(MDX_CMD.INC_VOLUME);
+      else if (dn > 0) cmds.push(MDX_CMD.DEC_VOLUME);
+      break;
+    }
     case 0xC: { // Set volume (XM: 0-64 → MDX: 0-15)
       const vol = Math.round((Math.min(64, eff) / 64) * 15);
       cmds.push(MDX_CMD.SET_VOLUME, vol);
@@ -339,15 +387,11 @@ function emitMDXEffect(cmds: number[], effTyp: number, eff: number): void {
     }
     case 0xF: // Set speed/tempo
       if (eff > 0 && eff <= 31) {
-        // Speed — use staccato as approximation (shorter gate time)
         cmds.push(MDX_CMD.STACCATO, Math.max(1, Math.min(8, eff)));
       } else if (eff >= 32) {
-        // Tempo in BPM
         cmds.push(MDX_CMD.SET_TEMPO, bpmToTempoByte(eff));
       }
       break;
-    // Effects 0x1-0x4 (portamento, vibrato) have no direct MDX MML equivalent
-    // — they would require LFO register writes, which is too complex for export
   }
 }
 

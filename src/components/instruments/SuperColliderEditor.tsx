@@ -9,6 +9,7 @@ import { superColliderLanguage } from '@engine/sc/scLanguage';
 import { parseSCGui, type SCGuiParseResult } from '@engine/sc/scGuiParser';
 import { SCGuiRenderer } from './SCGuiRenderer';
 import { SC_PRESETS, SC_PRESET_CATEGORIES, type SCPreset } from '@constants/scPresets';
+import { getToneEngine } from '@engine/ToneEngine';
 
 const API_URL = import.meta.env.VITE_API_URL as string | undefined ?? 'https://devilbox.uprough.net/api';
 
@@ -141,6 +142,8 @@ export const SuperColliderEditor: React.FC<Props> = ({ config, onChange }) => {
   const [showGui, setShowGui] = useState(false);
   const [showPresets, setShowPresets] = useState(false);
   const [presetCategory, setPresetCategory] = useState<string>('All');
+  const [presetSearch, setPresetSearch] = useState('');
+  const presetSearchRef = useRef<HTMLInputElement>(null);
   const progressRef = useRef(0);
   const progressIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -349,17 +352,27 @@ export const SuperColliderEditor: React.FC<Props> = ({ config, onChange }) => {
     });
   }, []);
 
-  // GUI widget action → update the matching param's value
+  // GUI widget action → update param + send to live scsynth
   const handleGuiParamChange = useCallback((param: string, value: number) => {
     const cfg = configRef.current;
     const existingParam = cfg.params.find(p => p.name === param);
     if (existingParam) {
-      // Update the param value
       onChangeRef.current({
         ...cfg,
         params: cfg.params.map(p => p.name === param ? { ...p, value } : p),
       });
     }
+    // Send to live scsynth via ToneEngine → SuperColliderSynth.set()
+    try {
+      const instrumentId = useInstrumentStore.getState().currentInstrumentId;
+      if (instrumentId != null) {
+        const engine = getToneEngine();
+        const synth = engine.instruments.get(instrumentId) as any;
+        if (synth && typeof synth.set === 'function') {
+          synth.set(param, value);
+        }
+      }
+    } catch { /* engine not ready or no active synth */ }
   }, []);
 
   // -------------------------------------------------------------------------
@@ -458,9 +471,18 @@ export const SuperColliderEditor: React.FC<Props> = ({ config, onChange }) => {
   }, []);
 
   const filteredPresets = useMemo(() => {
-    if (presetCategory === 'All') return SC_PRESETS;
-    return SC_PRESETS.filter(p => p.category === presetCategory);
-  }, [presetCategory]);
+    let list = presetCategory === 'All' ? SC_PRESETS : SC_PRESETS.filter(p => p.category === presetCategory);
+    if (presetSearch.trim()) {
+      const q = presetSearch.trim().toLowerCase();
+      list = list.filter(p =>
+        p.name.toLowerCase().includes(q) ||
+        p.credit.toLowerCase().includes(q) ||
+        p.category.toLowerCase().includes(q) ||
+        p.tags.some(t => t.toLowerCase().includes(q))
+      );
+    }
+    return list;
+  }, [presetCategory, presetSearch]);
 
   // -------------------------------------------------------------------------
   // Status bar
@@ -617,8 +639,17 @@ export const SuperColliderEditor: React.FC<Props> = ({ config, onChange }) => {
         {/* Preset browser overlay */}
         {showPresets && (
           <div className="absolute inset-0 z-10 bg-dark-bgPrimary/95 backdrop-blur-sm flex flex-col overflow-hidden" style={{ background: 'rgba(10,10,10,0.97)' }}>
-            {/* Category tabs */}
-            <div className="flex flex-wrap gap-1 px-3 py-2 border-b border-dark-border shrink-0">
+            {/* Search + category tabs */}
+            <div className="flex flex-wrap items-center gap-1 px-3 py-2 border-b border-dark-border shrink-0">
+              <input
+                ref={presetSearchRef}
+                type="text"
+                value={presetSearch}
+                onChange={e => setPresetSearch(e.target.value)}
+                placeholder="Search presets..."
+                autoFocus
+                className="w-40 px-2 py-0.5 rounded text-xs bg-dark-bgTertiary border border-dark-border text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent-primary/50 mr-2"
+              />
               <button
                 onClick={() => setPresetCategory('All')}
                 className={`px-2 py-0.5 rounded text-xs transition-colors ${
@@ -672,8 +703,9 @@ export const SuperColliderEditor: React.FC<Props> = ({ config, onChange }) => {
               </div>
             </div>
             {/* Attribution footer */}
-            <div className="shrink-0 px-3 py-1.5 border-t border-dark-border text-[10px] text-text-muted">
-              Community presets from <a href="https://github.com/SCLOrkHub/SCLOrkSynths" target="_blank" rel="noopener noreferrer" className="text-accent-primary hover:underline">SCLOrkSynths</a> (GPL-3.0). Click a preset to load its source, then Compile.
+            <div className="shrink-0 px-3 py-1.5 border-t border-dark-border text-[10px] text-text-muted flex justify-between">
+              <span>Community presets from <a href="https://github.com/SCLOrkHub/SCLOrkSynths" target="_blank" rel="noopener noreferrer" className="text-accent-primary hover:underline">SCLOrkSynths</a> (GPL-3.0). Click a preset to load its source, then Compile.</span>
+              <span>{filteredPresets.length} of {SC_PRESETS.length} presets</span>
             </div>
           </div>
         )}

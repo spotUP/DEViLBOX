@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-03-05T19:31:30.708Z
+ * Generated: 2026-03-05T20:10:22.598Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.2393';
-export const BUILD_NUMBER = '2393';
-export const BUILD_HASH = '2ef4b271';
+export const BUILD_VERSION = '1.0.2402';
+export const BUILD_NUMBER = '2402';
+export const BUILD_HASH = 'd181d4af';
 export const BUILD_DATE = '2026-03-05';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,45 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.2393',
+    version: '1.0.2402',
     date: '2026-03-05',
     changes: [
+      {
+        type: 'feature',
+        "description": "Add 109 community SC SynthDef presets with browser UI"
+      },
+      {
+        type: 'feature',
+        "description": "FC synth/arp chip RAM writes + exporter effect mapping"
+      },
+      {
+        type: 'feature',
+        "description": "Add dedicated JamCracker and Future Player instrument panels"
+      },
+      {
+        type: 'feature',
+        "description": "Add 'Save as Instrument' button to SuperCollider editor"
+      },
+      {
+        type: 'feature',
+        "description": "Implement ADSR chip RAM writes for FC and SoundMon controls"
+      },
+      {
+        type: 'feature',
+        "description": "Add Buzz machine params, JamCracker test data, SC Routine pattern extraction"
+      },
+      {
+        type: 'improvement',
+        "description": "Update ASID_HARDWARE_SUPPORT.md with WebUSB documentation"
+      },
+      {
+        type: 'feature',
+        "description": "Add WebUSB USB-SID-Pico support with unified hardware manager"
+      },
+      {
+        type: 'feature',
+        "description": "Implement chip RAM writes for SidMon1 waveforms + expand synth set() params"
+      },
       {
         type: 'fix',
         "description": "Remove 15 unused variables causing TS6133 errors"
@@ -192,42 +228,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'improvement',
         "description": "SID parser: multi-pattern splitting, speed/BPM detection, IndexedDB cache"
-      },
-      {
-        type: 'feature',
-        "description": "Add per-engine volume normalization and master volume control"
-      },
-      {
-        type: 'improvement',
-        "description": "Clarify UADE as ground truth, waveform 1:1 match goal"
-      },
-      {
-        type: 'improvement',
-        "description": "Add generalized replayer channel debug skill to CLAUDE.md"
-      },
-      {
-        type: 'fix',
-        "description": "Pre-populate ScriptNodePlayer cache to prevent double loadMusicData"
-      },
-      {
-        type: 'feature',
-        "description": "Human-readable C output with inline ASM, formatting, and documentation"
-      },
-      {
-        type: 'fix',
-        "description": "Pass C64 ROM data to WebSIDPlay/WebSID adapters"
-      },
-      {
-        type: 'improvement',
-        "description": "Fix arrow key scroll FPS drop at 120Hz"
-      },
-      {
-        type: 'fix',
-        "description": "Fix FurnaceRF5C68 silence, FurnaceY8950 chipType, add WASM synth fixes"
-      },
-      {
-        type: 'improvement',
-        "description": "Memoize layout objects in PixiChannelHeaders"
       }
     ]
   }
