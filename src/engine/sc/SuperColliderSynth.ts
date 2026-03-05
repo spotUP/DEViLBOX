@@ -83,22 +83,6 @@ export class SuperColliderSynth implements DevilboxSynth {
         // gain-controlled and goes through the mixer chain only.
         try { engine.output.disconnect(this._audioContext.destination); } catch { /* ok */ }
         try { this._gainNode.disconnect(this._audioContext.destination); } catch { /* ok */ }
-        // Debug: verify ScriptProcessor is producing audio after re-routing
-        const proc = (engine as any)._module?.audioDriver?.proc as ScriptProcessorNode | undefined;
-        if (proc) {
-          let checkCount = 0;
-          const origHandler = proc.onaudioprocess;
-          proc.onaudioprocess = (e: AudioProcessingEvent) => {
-            if (origHandler) origHandler.call(proc, e);
-            if (checkCount++ < 5) {
-              const buf = e.outputBuffer.getChannelData(0);
-              let peak = 0;
-              for (let i = 0; i < buf.length; i++) peak = Math.max(peak, Math.abs(buf[i]));
-              console.log(`[SC:Synth] proc output check #${checkCount}: peak=${peak.toFixed(6)} bufLen=${buf.length}`);
-            }
-            if (checkCount === 5) proc.onaudioprocess = origHandler;
-          };
-        }
         console.log('[SC:Synth] engine.output → gainNode connected, temporary destination paths disconnected');
         return engine;
       })
