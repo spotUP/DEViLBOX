@@ -3,12 +3,20 @@
  *
  * GoatTracker tables are 255 entries each with left+right column (ltable/rtable).
  * The user switches between 4 table types via tabs.
+ *
+ * Keyboard:
+ *   Up/Down — navigate rows
+ *   Left/Right — switch between left/right columns
+ *   0-9, A-F — hex entry
+ *   Tab — cycle table tabs
  */
 
 import React, { useRef, useEffect, useCallback, useState } from 'react';
 import { useGTUltraStore } from '../../stores/useGTUltraStore';
 
 type TableType = 'wave' | 'pulse' | 'filter' | 'speed';
+const TABLE_TYPES: TableType[] = ['wave', 'pulse', 'filter', 'speed'];
+const TABLE_TYPE_INDEX: Record<TableType, number> = { wave: 0, pulse: 1, filter: 2, speed: 3 };
 
 const TABLE_COLORS: Record<TableType, string> = {
   wave: '#60e060',
@@ -17,21 +25,29 @@ const TABLE_COLORS: Record<TableType, string> = {
   speed: '#6699ff',
 };
 
+// Wave table left-column special value annotations
+const WAVE_LEFT_ANNOTATIONS: Record<number, string> = {
+  0x00: 'nop', 0x01: 'set', 0x10: 'del+gateoff', 0x11: 'del+gateon',
+  0xE0: 'inaudible', 0xE1: 'noise+', 0xFE: 'rst', 0xFF: 'end',
+};
+
 const ROW_H = 14;
 
 export const GTTableEditor: React.FC<{ width: number; height: number }> = ({ width, height }) => {
   const [activeTable, setActiveTable] = useState<TableType>('wave');
+  const [activeCol, setActiveCol] = useState<0 | 1>(0); // 0=left, 1=right
+  const [hexDigit, setHexDigit] = useState<number | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const tableData = useGTUltraStore((s) => s.tableData);
   const tableCursor = useGTUltraStore((s) => s.tableCursor);
   const setTableCursor = useGTUltraStore((s) => s.setTableCursor);
+  const engine = useGTUltraStore((s) => s.engine);
 
   const tabHeight = 22;
   const headerHeight = 16;
   const contentHeight = height - tabHeight - headerHeight;
   const visibleRows = Math.floor(contentHeight / ROW_H);
 
-  // Get table for active type (ltable + rtable, 255 entries each)
   const table = tableData[activeTable] ?? { left: new Uint8Array(255), right: new Uint8Array(255) };
 
   useEffect(() => {
@@ -55,7 +71,15 @@ export const GTTableEditor: React.FC<{ width: number; height: number }> = ({ wid
     ctx.fillStyle = '#1a1a1a';
     ctx.fillRect(0, 0, width, headerHeight);
     ctx.fillStyle = '#888';
-    ctx.fillText(' IDX  LEFT  RIGHT', 4, 2);
+    ctx.fillText(' IDX', 4, 2);
+    ctx.fillStyle = activeCol === 0 ? '#e0e0e0' : '#555';
+    ctx.fillText('LEFT', 40, 2);
+    ctx.fillStyle = activeCol === 1 ? '#e0e0e0' : '#555';
+    ctx.fillText('RIGHT', 80, 2);
+    if (activeTable === 'wave') {
+      ctx.fillStyle = '#444';
+      ctx.fillText('INFO', 126, 2);
+    }
 
     const scrollTop = Math.max(0, tableCursor - Math.floor(visibleRows / 2));
     const color = TABLE_COLORS[activeTable];
@@ -67,15 +91,19 @@ export const GTTableEditor: React.FC<{ width: number; height: number }> = ({ wid
       const isCursor = idx === tableCursor;
 
       if (isCursor) {
-        ctx.fillStyle = 'rgba(255,255,255,0.1)';
+        ctx.fillStyle = 'rgba(255,255,255,0.08)';
         ctx.fillRect(0, y, width, ROW_H);
-        ctx.strokeStyle = 'rgba(255,255,255,0.6)';
+        // Highlight active column
+        const colX = activeCol === 0 ? 36 : 76;
+        ctx.fillStyle = 'rgba(255,255,255,0.1)';
+        ctx.fillRect(colX, y, 32, ROW_H);
+        ctx.strokeStyle = 'rgba(255,255,255,0.5)';
         ctx.lineWidth = 1;
         ctx.strokeRect(0.5, y + 0.5, width - 1, ROW_H - 1);
       }
 
       // Index
-      ctx.fillStyle = '#666';
+      ctx.fillStyle = '#555';
       ctx.fillText(idx.toString(16).toUpperCase().padStart(2, '0'), 8, y + 1);
 
       // Left value
@@ -88,32 +116,112 @@ export const GTTableEditor: React.FC<{ width: number; height: number }> = ({ wid
       ctx.fillStyle = right === 0 ? '#333' : color;
       ctx.fillText(right.toString(16).toUpperCase().padStart(2, '0'), 80, y + 1);
 
-      // Visual bar for right value (common for wave/pulse tables)
+      // Annotations for wave table left column
+      if (activeTable === 'wave' && left !== 0) {
+        const anno = WAVE_LEFT_ANNOTATIONS[left];
+        if (anno) {
+          ctx.fillStyle = '#555';
+          ctx.fillText(anno, 126, y + 1);
+        }
+      }
+
+      // Visual bar for pulse/filter right value
       if (right > 0 && (activeTable === 'pulse' || activeTable === 'filter')) {
-        const barW = (right / 255) * (width - 120);
-        ctx.fillStyle = color + '33';
-        ctx.fillRect(110, y + 2, barW, ROW_H - 4);
+        const barW = (right / 255) * (width - 170);
+        ctx.fillStyle = color + '22';
+        ctx.fillRect(126, y + 2, barW, ROW_H - 4);
       }
     }
-  }, [width, contentHeight, activeTable, table, tableCursor, visibleRows, headerHeight]);
+  }, [width, contentHeight, activeTable, table, tableCursor, visibleRows, headerHeight, activeCol]);
 
   const handleCanvasClick = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     const rect = canvasRef.current!.getBoundingClientRect();
+    const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
     if (y < headerHeight) return;
     const scrollTop = Math.max(0, tableCursor - Math.floor(visibleRows / 2));
     const idx = scrollTop + Math.floor((y - headerHeight) / ROW_H);
     if (idx < 255) setTableCursor(idx);
+    // Detect column click
+    setActiveCol(x >= 66 && x < 120 ? 1 : 0);
+    setHexDigit(null);
+    canvasRef.current?.focus();
   }, [tableCursor, visibleRows, headerHeight, setTableCursor]);
+
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    const { key } = e;
+    e.stopPropagation();
+
+    // Navigation
+    if (key === 'ArrowUp') { e.preventDefault(); setTableCursor(Math.max(0, tableCursor - 1)); setHexDigit(null); return; }
+    if (key === 'ArrowDown') { e.preventDefault(); setTableCursor(Math.min(254, tableCursor + 1)); setHexDigit(null); return; }
+    if (key === 'ArrowLeft') { e.preventDefault(); setActiveCol(0); setHexDigit(null); return; }
+    if (key === 'ArrowRight') { e.preventDefault(); setActiveCol(1); setHexDigit(null); return; }
+
+    // Tab — cycle table type
+    if (key === 'Tab') {
+      e.preventDefault();
+      const curIdx = TABLE_TYPES.indexOf(activeTable);
+      const next = e.shiftKey
+        ? TABLE_TYPES[(curIdx - 1 + 4) % 4]
+        : TABLE_TYPES[(curIdx + 1) % 4];
+      setActiveTable(next);
+      setHexDigit(null);
+      return;
+    }
+
+    // Page up/down
+    if (key === 'PageUp') { e.preventDefault(); setTableCursor(Math.max(0, tableCursor - visibleRows)); setHexDigit(null); return; }
+    if (key === 'PageDown') { e.preventDefault(); setTableCursor(Math.min(254, tableCursor + visibleRows)); setHexDigit(null); return; }
+    if (key === 'Home') { e.preventDefault(); setTableCursor(0); setHexDigit(null); return; }
+    if (key === 'End') { e.preventDefault(); setTableCursor(254); setHexDigit(null); return; }
+
+    // Hex entry (0-9, A-F)
+    const hexChar = key.toUpperCase();
+    if (/^[0-9A-F]$/.test(hexChar)) {
+      e.preventDefault();
+      const nibble = parseInt(hexChar, 16);
+      if (hexDigit === null) {
+        setHexDigit(nibble);
+      } else {
+        const value = (hexDigit << 4) | nibble;
+        if (engine) {
+          const typeIdx = TABLE_TYPE_INDEX[activeTable];
+          engine.setTableEntry(typeIdx, activeCol, tableCursor, value);
+          useGTUltraStore.getState().refreshAllTables();
+        }
+        setHexDigit(null);
+        setTableCursor(Math.min(254, tableCursor + 1));
+      }
+      return;
+    }
+
+    // Delete — clear current cell
+    if (key === 'Delete') {
+      e.preventDefault();
+      if (engine) {
+        const typeIdx = TABLE_TYPE_INDEX[activeTable];
+        engine.setTableEntry(typeIdx, activeCol, tableCursor, 0);
+        useGTUltraStore.getState().refreshAllTables();
+      }
+      return;
+    }
+
+    // Escape — clear hex entry
+    if (key === 'Escape') {
+      setHexDigit(null);
+      return;
+    }
+  }, [tableCursor, activeTable, activeCol, hexDigit, engine, visibleRows, setTableCursor]);
 
   return (
     <div style={{ width, height, display: 'flex', flexDirection: 'column' }}>
       {/* Tab bar */}
       <div style={{ display: 'flex', height: tabHeight, background: '#1a1a1a' }}>
-        {(['wave', 'pulse', 'filter', 'speed'] as TableType[]).map((t) => (
+        {TABLE_TYPES.map((t) => (
           <button
             key={t}
-            onClick={() => setActiveTable(t)}
+            onClick={() => { setActiveTable(t); setHexDigit(null); }}
             style={{
               flex: 1,
               background: activeTable === t ? '#0d0d0d' : 'transparent',
@@ -135,8 +243,10 @@ export const GTTableEditor: React.FC<{ width: number; height: number }> = ({ wid
       {/* Table content */}
       <canvas
         ref={canvasRef}
-        style={{ width, height: contentHeight }}
+        style={{ width, height: contentHeight, outline: 'none' }}
+        tabIndex={0}
         onClick={handleCanvasClick}
+        onKeyDown={handleKeyDown}
       />
     </div>
   );
