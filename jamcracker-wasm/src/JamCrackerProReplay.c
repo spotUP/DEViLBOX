@@ -2,6 +2,14 @@
 #include "paula_soft.h"
 #include <stdint.h>
 
+#ifdef JC_TRACE
+static int jc_trace_tick = 0;
+static int jc_trace_enabled = 1;
+#define TRACE(...) do { if(jc_trace_enabled && jc_trace_tick <= 14) fprintf(stderr, __VA_ARGS__); } while(0)
+#else
+#define TRACE(...) ((void)0)
+#endif
+
 /* Register file */
 static uint32_t d0,d1,d2,d3,d4,d5,d6,d7;
 static uint32_t a0,a1,a2,a3,a4,a5,a6,sp,pc;
@@ -20,12 +28,15 @@ static inline uint16_t _rd16(uintptr_t a) { if(a>1048576) return 0; uint16_t v; 
 static inline uint32_t _rd32(uintptr_t a) { if(a>1048576) return 0; uint32_t v; memcpy(&v,(void*)a,4); return v; }
 static inline void _wr16(uintptr_t a,uint16_t v) {
   if(a>=0xDFF0A0&&a<=0xDFF0DF){uint16_t n=__builtin_bswap16(v);int ch=(int)((a-0xDFF0A0)>>4);int r=(int)((a-0xDFF0A0)&0xF);
-    if(r==6)paula_set_period(ch,n);else if(r==8)paula_set_volume(ch,(uint8_t)n);else if(r==4)paula_set_length(ch,n);return;}
-  if(a==0xDFF096){paula_dma_write(__builtin_bswap16(v));return;}
+    if(r==6){TRACE("  HW ch%d PER=%d\n",ch,n);paula_set_period(ch,n);}
+    else if(r==8){TRACE("  HW ch%d VOL=%d\n",ch,(uint8_t)n);paula_set_volume(ch,(uint8_t)n);}
+    else if(r==4){TRACE("  HW ch%d LEN=%d\n",ch,n);paula_set_length(ch,n);}return;}
+  if(a==0xDFF096){uint16_t dn=__builtin_bswap16(v);TRACE("  HW DMACON=%04x (%s ch:%d%d%d%d)\n",dn,(dn&0x8000)?"ON":"OFF",(dn>>3)&1,(dn>>2)&1,(dn>>1)&1,dn&1);paula_dma_write(dn);return;}
   if(a>1048576){return;}
   memcpy((void*)a,&v,2); }
 static inline void _wr32(uintptr_t a,uint32_t v) {
   if(a==0xDFF0A0||a==0xDFF0B0||a==0xDFF0C0||a==0xDFF0D0){int ch=(int)((a-0xDFF0A0)>>4);
+    TRACE("  HW ch%d PTR=%u\n",ch,(unsigned)(uintptr_t)__builtin_bswap32(v));
     paula_set_sample_ptr(ch,(const int8_t*)(uintptr_t)__builtin_bswap32(v));return;}
   if(a>1048576){return;}
   memcpy((void*)a,&v,4); }
@@ -203,7 +214,8 @@ _l0:
 _l1:
   { uint32_t _mv=(uint32_t)(a0); WRITE32(a1 + (intptr_t)it_address, _mv); flag_z=((int32_t)(_mv)==0); flag_n=((int32_t)(_mv)<0); flag_v=0; flag_c=0; }
   { uint32_t _mv=(uint32_t)(READ32(a1 + (intptr_t)it_size)); d2 = _mv; flag_z=((int32_t)(_mv)==0); flag_n=((int32_t)(_mv)<0); flag_v=0; flag_c=0; }
-  a0 = (uint32_t)((int32_t)a0 + (int32_t)(int16_t)(d2));
+  /* ASM: add.l d2,a0 — full 32-bit add (instruments can be >32KB) */
+  a0 = (uint32_t)((uint32_t)a0 + d2);
   a1 = (uint32_t)((int32_t)a1 + (int32_t)(int16_t)(it_sizeof));
   if ((int16_t)(--d0) >= 0) goto _l1;
   { uint32_t _mv=(uint32_t)(READ32((uintptr_t)songtable)); WRITE32((uintptr_t)pp_songptr, _mv); flag_z=((int32_t)(_mv)==0); flag_n=((int32_t)(_mv)<0); flag_v=0; flag_c=0; }
@@ -267,6 +279,10 @@ static void pp_end(void) {
 }
 
 static void pp_play(void) {
+#ifdef JC_TRACE
+  jc_trace_tick++;
+  TRACE("=== TICK %d ===\n", jc_trace_tick);
+#endif
   a6 = (uint32_t)0xDFF000;
   { uint8_t _sr=(uint8_t)(READ8((uintptr_t)pp_waitcnt) - 1); WRITE8((uintptr_t)pp_waitcnt, (uint8_t)_sr); flag_z=((int8_t)(_sr)==0); flag_n=((int8_t)(_sr)<0); }
   if (!flag_z) goto _l0;
@@ -280,6 +296,7 @@ _l0:
   a1 = (uint32_t)((uintptr_t)pp_variables + 2*pv_sizeof);
   pp_uvs();
   a1 = (uint32_t)((uintptr_t)pp_variables + 3*pv_sizeof);
+  pp_uvs();  /* ASM: fall-through from pp_play into pp_uvs for voice 3 */
 }
 
 static void pp_uvs(void) {
@@ -317,12 +334,14 @@ _l1e:
   pp_rot();
   { uint16_t _mv=(uint16_t)(READ16(a1 + (intptr_t)pv_deltapor)); W(d0) = (uint16_t)_mv; flag_z=((int16_t)(_mv)==0); flag_n=((int16_t)(_mv)<0); flag_v=0; flag_c=0; }
   { uint16_t _ar=(uint16_t)(READ16(a1 + (intptr_t)pv_por) + W(d0)); WRITE16(a1 + (intptr_t)pv_por, (uint16_t)_ar); flag_z=((int16_t)(_ar)==0); flag_n=((int16_t)(_ar)<0); }
-  { int32_t _lhs=(int32_t)(READ16(a1 + (intptr_t)pv_por)),_rhs=(int32_t)(-1019); int32_t _cmp=_lhs-_rhs; flag_z=(_cmp==0); flag_n=(_cmp<0); flag_c=((uint32_t)_lhs<(uint32_t)_rhs); }
+  /* ASM: cmp.w #-$03FB,pv_por(a1) — signed 16-bit comparison, sign-extend READ16 */
+  { int32_t _lhs=(int32_t)(int16_t)(READ16(a1 + (intptr_t)pv_por)),_rhs=(int32_t)(-1019); int32_t _cmp=_lhs-_rhs; flag_z=(_cmp==0); flag_n=(_cmp<0); flag_c=((uint32_t)_lhs<(uint32_t)_rhs); }
   if (flag_n==flag_v) goto _l3;
   { uint16_t _mv=(uint16_t)(-1019); WRITE16(a1 + (intptr_t)pv_por, _mv); flag_z=((int16_t)(_mv)==0); flag_n=((int16_t)(_mv)<0); flag_v=0; flag_c=0; }
   goto _l5;
 _l3:
-  { int32_t _lhs=(int32_t)(READ16(a1 + (intptr_t)pv_por)),_rhs=(int32_t)(1019); int32_t _cmp=_lhs-_rhs; flag_z=(_cmp==0); flag_n=(_cmp<0); flag_c=((uint32_t)_lhs<(uint32_t)_rhs); }
+  /* ASM: cmp.w #$03FB,pv_por(a1) — signed 16-bit comparison */
+  { int32_t _lhs=(int32_t)(int16_t)(READ16(a1 + (intptr_t)pv_por)),_rhs=(int32_t)(1019); int32_t _cmp=_lhs-_rhs; flag_z=(_cmp==0); flag_n=(_cmp<0); flag_c=((uint32_t)_lhs<(uint32_t)_rhs); }
   if (flag_z||(flag_n!=flag_v)) goto _l5;
   { uint16_t _mv=(uint16_t)(1019); WRITE16(a1 + (intptr_t)pv_por, _mv); flag_z=((int16_t)(_mv)==0); flag_n=((int16_t)(_mv)<0); flag_v=0; flag_c=0; }
 _l5:
@@ -371,7 +390,8 @@ _lb:
   { uint8_t _mv=(uint8_t)(READ8_POST(a3)); B(d2) = (uint8_t)_mv; flag_z=((int8_t)(_mv)==0); flag_n=((int8_t)(_mv)<0); flag_v=0; flag_c=0; }
   W(d2) = (uint32_t)(int32_t)(int16_t)(int8_t)W(d2);
   { uint16_t _ar=(uint16_t)(W(d2) + W(d1)); W(d2) = (uint16_t)((uint16_t)_ar); flag_z=((int16_t)(_ar)==0); flag_n=((int16_t)(_ar)<0); }
-  W(d2) = (uint16_t)((uint32_t)((int32_t)W(d2) >> 1));
+  /* ASM: asr.w #1,d2 — arithmetic shift right of WORD (signed) */
+  W(d2) = (uint16_t)((int16_t)W(d2) >> 1);
   { uint8_t _mv=(uint8_t)(B(d2)); WRITE8_POST(a0, _mv); flag_z=((int8_t)(_mv)==0); flag_n=((int8_t)(_mv)<0); flag_v=0; flag_c=0; }
   if ((int16_t)(--d0) >= 0) goto _lb;
   { uint16_t _mv=(uint16_t)(READ16(a1 + (intptr_t)pv_deltaphase)); W(d0) = (uint16_t)_mv; flag_z=((int16_t)(_mv)==0); flag_n=((int16_t)(_mv)<0); flag_v=0; flag_c=0; }
@@ -417,15 +437,19 @@ _l5:
   WRITE16((uintptr_t)pp_tmpdmacon, 0);
   a1 = (uint32_t)(uintptr_t)pp_variables;
   pp_nnt();
+  TRACE("T%d ROW v0: per=%d vol=%d ins=%u dma=%d\n", jc_trace_tick, READ16(a1 + pv_pers), READ16(a1 + pv_vol), READ32(a1 + pv_insaddress), READ16(a1 + pv_dmacon));
   a0 = (uint32_t)((int32_t)a0 + (int32_t)(int16_t)(nt_sizeof));
   a1 = (uint32_t)((uintptr_t)pp_variables + pv_sizeof);
   pp_nnt();
+  TRACE("T%d ROW v1: per=%d vol=%d ins=%u dma=%d\n", jc_trace_tick, READ16(a1 + pv_pers), READ16(a1 + pv_vol), READ32(a1 + pv_insaddress), READ16(a1 + pv_dmacon));
   a0 = (uint32_t)((int32_t)a0 + (int32_t)(int16_t)(nt_sizeof));
   a1 = (uint32_t)((uintptr_t)pp_variables + 2*pv_sizeof);
   pp_nnt();
+  TRACE("T%d ROW v2: per=%d vol=%d ins=%u dma=%d\n", jc_trace_tick, READ16(a1 + pv_pers), READ16(a1 + pv_vol), READ32(a1 + pv_insaddress), READ16(a1 + pv_dmacon));
   a0 = (uint32_t)((int32_t)a0 + (int32_t)(int16_t)(nt_sizeof));
   a1 = (uint32_t)((uintptr_t)pp_variables + 3*pv_sizeof);
   pp_nnt();
+  TRACE("T%d ROW v3: per=%d vol=%d ins=%u dma=%d\n", jc_trace_tick, READ16(a1 + pv_pers), READ16(a1 + pv_vol), READ32(a1 + pv_insaddress), READ16(a1 + pv_dmacon));
   { uint16_t _mv=(uint16_t)(READ16((uintptr_t)pp_tmpdmacon)); WRITE16(a6 + 150, _mv); flag_z=((int16_t)(_mv)==0); flag_n=((int16_t)(_mv)<0); flag_v=0; flag_c=0; }
   { uint16_t _mv=(uint16_t)((DMAWAIT+-1)); W(d0) = (uint16_t)_mv; flag_z=((int16_t)(_mv)==0); flag_n=((int16_t)(_mv)<0); flag_v=0; flag_c=0; }
 _loop1:
@@ -458,7 +482,7 @@ _loop2:
 
 static void pp_scr(void) {
   { uint16_t _mv=(uint16_t)(READ16((uintptr_t)pp_tmpdmacon)); W(d0) = (uint16_t)_mv; flag_z=((int16_t)(_mv)==0); flag_n=((int16_t)(_mv)<0); flag_v=0; flag_c=0; }
-  W(d0) &= READ16(a1 + (intptr_t)pv_dmacon);
+  { uint16_t _ar = W(d0) & READ16(a1 + (intptr_t)pv_dmacon); W(d0) = _ar; flag_z=(_ar==0); flag_n=((int16_t)(_ar)<0); flag_v=0; flag_c=0; }
   if (flag_z) goto _l5;
   { uint32_t _mv=(uint32_t)(READ32(a1 + (intptr_t)pv_custbase)); a0 = _mv; flag_z=((int32_t)(_mv)==0); flag_n=((int32_t)(_mv)<0); flag_v=0; flag_c=0; }
   { uint32_t _mv=(uint32_t)(READ32(a1 + (intptr_t)pv_insaddress)); WRITE32(a0, _mv); flag_z=((int32_t)(_mv)==0); flag_n=((int32_t)(_mv)<0); flag_v=0; flag_c=0; }
@@ -520,7 +544,8 @@ _l0:
   { uint16_t _mv=(uint16_t)(READ16(a1 + (intptr_t)pv_vollevel)); WRITE16(a1 + (intptr_t)pv_vol, _mv); flag_z=((int16_t)(_mv)==0); flag_n=((int16_t)(_mv)<0); flag_v=0; flag_c=0; }
 _l5:
   { uint8_t _mv=(uint8_t)(READ8(a0 + (intptr_t)nt_speed)); B(d0) = (uint8_t)_mv; flag_z=((int8_t)(_mv)==0); flag_n=((int8_t)(_mv)<0); flag_v=0; flag_c=0; }
-  B(d0) &= (uint8_t)(0x0F);
+  /* ASM: andi.b #$0F,d0 — mask low nibble, sets flags from result */
+  { uint8_t _ar = B(d0) & (uint8_t)(0x0F); B(d0) = _ar; flag_z=(_ar==0); flag_n=((int8_t)(_ar)<0); flag_v=0; flag_c=0; }
   if (flag_z) goto _l6;
   { uint8_t _mv=(uint8_t)(B(d0)); WRITE8((uintptr_t)pp_wait, _mv); flag_z=((int8_t)(_mv)==0); flag_n=((int8_t)(_mv)<0); flag_v=0; flag_c=0; }
 _l6:
@@ -534,16 +559,16 @@ _l6:
   { uint16_t _mv=(uint16_t)(READ16(a2)); WRITE16(a1 + (intptr_t)pv_pers + 4, _mv); flag_z=((int16_t)(_mv)==0); flag_n=((int16_t)(_mv)<0); flag_v=0; flag_c=0; }
   goto _l9;
 _l7:
-  /* Arpeggio: low nibble → slot 2 offset, high nibble → slot 3 offset */
+  /* Arpeggio: ASM low nibble → pv_pers+4 (slot 3), high nibble → pv_pers+2 (slot 2) */
   B(d0) &= (uint8_t)(0x0F);
   { uint8_t _ar=(uint8_t)(B(d0) + B(d0)); B(d0) = (uint8_t)((uint8_t)_ar); flag_z=((int8_t)(_ar)==0); flag_n=((int8_t)(_ar)<0); }
   W(d0) = (uint32_t)(int32_t)(int16_t)(int8_t)W(d0);
-  { uint16_t _mv=(uint16_t)(READ16(a2 + (intptr_t)(int16_t)W(d0))); WRITE16(a1 + (intptr_t)pv_pers + 2, _mv); flag_z=((int16_t)(_mv)==0); flag_n=((int16_t)(_mv)<0); flag_v=0; flag_c=0; }
+  { uint16_t _mv=(uint16_t)(READ16(a2 + (intptr_t)(int16_t)W(d0))); WRITE16(a1 + (intptr_t)pv_pers + 4, _mv); flag_z=((int16_t)(_mv)==0); flag_n=((int16_t)(_mv)<0); flag_v=0; flag_c=0; }
   { uint8_t _mv=(uint8_t)(READ8(a0 + (intptr_t)nt_arpeggio)); B(d0) = (uint8_t)_mv; flag_z=((int8_t)(_mv)==0); flag_n=((int8_t)(_mv)<0); flag_v=0; flag_c=0; }
   B(d0) = (uint8_t)((uint32_t)(B(d0)) >> 4);
   { uint8_t _ar=(uint8_t)(B(d0) + B(d0)); B(d0) = (uint8_t)((uint8_t)_ar); flag_z=((int8_t)(_ar)==0); flag_n=((int8_t)(_ar)<0); }
   W(d0) = (uint32_t)(int32_t)(int16_t)(int8_t)W(d0);
-  { uint16_t _mv=(uint16_t)(READ16(a2 + (intptr_t)(int16_t)W(d0))); WRITE16(a1 + (intptr_t)pv_pers + 4, _mv); flag_z=((int16_t)(_mv)==0); flag_n=((int16_t)(_mv)<0); flag_v=0; flag_c=0; }
+  { uint16_t _mv=(uint16_t)(READ16(a2 + (intptr_t)(int16_t)W(d0))); WRITE16(a1 + (intptr_t)pv_pers + 2, _mv); flag_z=((int16_t)(_mv)==0); flag_n=((int16_t)(_mv)<0); flag_v=0; flag_c=0; }
   { uint16_t _mv=(uint16_t)(READ16(a2)); WRITE16(a1 + (intptr_t)pv_pers, _mv); flag_z=((int16_t)(_mv)==0); flag_n=((int16_t)(_mv)<0); flag_v=0; flag_c=0; }
 _l9:
   { uint8_t _mv=(uint8_t)(READ8(a0 + (intptr_t)nt_vibrato)); B(d0) = (uint8_t)_mv; flag_z=((int8_t)(_mv)==0); flag_n=((int8_t)(_mv)<0); flag_v=0; flag_c=0; }
@@ -591,11 +616,15 @@ _l11:
   flag_z = ((READ8(a0 + (intptr_t)nt_speed) & (1u << 7)) == 0);
   if (flag_z) goto _l12;
 _l11a:
-  { uint8_t _mv=(uint8_t)(B(d0)); WRITE8((uintptr_t)pv_vol, _mv); flag_z=((int8_t)(_mv)==0); flag_n=((int8_t)(_mv)<0); flag_v=0; flag_c=0; }
-  { uint8_t _mv=(uint8_t)(B(d0)); WRITE8((uintptr_t)pv_vollevel, _mv); flag_z=((int8_t)(_mv)==0); flag_n=((int8_t)(_mv)<0); flag_v=0; flag_c=0; }
+  /* ASM: move.b d0,pv_vol+1(a1) — write low byte of volume word */
+  { uint8_t _mv=(uint8_t)(B(d0)); WRITE8(a1 + (intptr_t)pv_vol + 1, _mv); flag_z=((int8_t)(_mv)==0); flag_n=((int8_t)(_mv)<0); flag_v=0; flag_c=0; }
+  /* ASM: move.b d0,pv_vollevel+1(a1) — write low byte of volume level word */
+  { uint8_t _mv=(uint8_t)(B(d0)); WRITE8(a1 + (intptr_t)pv_vollevel + 1, _mv); flag_z=((int8_t)(_mv)==0); flag_n=((int8_t)(_mv)<0); flag_v=0; flag_c=0; }
   WRITE16(a1 + (intptr_t)pv_deltavol, 0);
   goto _l16;
 _l12:
+  /* ASM: bclr #7,d0 — tests bit 7 then clears it. Z=1 if bit was 0. */
+  flag_z = ((d0 & (1u << 7)) == 0);
   d0 = d0 & ~(1u << (7 & 31));
   if (flag_z) goto _l13;
   B(d0) = (uint8_t)(-(int8_t)B(d0));
@@ -619,6 +648,8 @@ _l17:
   B(d0) = (uint8_t)(-(int8_t)B(d0));
   goto _l17c;
 _l17a:
+  /* ASM: bclr #7,d0 — tests bit 7 then clears it. Z=1 if bit was 0. */
+  flag_z = ((d0 & (1u << 7)) == 0);
   d0 = d0 & ~(1u << (7 & 31));
   if (!flag_z) goto _l18;
   B(d0) = (uint8_t)(-(int8_t)B(d0));
