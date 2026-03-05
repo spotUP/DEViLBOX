@@ -366,6 +366,13 @@ export class ScriptNodePlayerEngine {
    */
   dispose(): void {
     this.stop();
+    // Call WASM teardown to reset emulator state for reuse
+    if (this.adapter) {
+      try {
+        const mod = (this.adapter as any).Module;
+        if (mod?._emu_teardown) mod._emu_teardown();
+      } catch { /* ignore */ }
+    }
     this.player = null;
     this.adapter = null;
   }
