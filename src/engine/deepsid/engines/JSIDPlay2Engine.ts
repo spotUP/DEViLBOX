@@ -39,6 +39,7 @@ export class JSIDPlay2Engine {
   private worker: Worker | null = null;
   private audioContext: AudioContext | null = null;
   private scriptNode: ScriptProcessorNode | null = null;
+  private outputNode: AudioNode | null = null;
   private isPlaying = false;
   private subsong = 0;
   private numSubsongs = 1;
@@ -145,7 +146,7 @@ export class JSIDPlay2Engine {
   /**
    * Start playback — create ScriptProcessor and drive CLOCK loop
    */
-  async play(audioContext: AudioContext): Promise<void> {
+  async play(audioContext: AudioContext, outputNode?: AudioNode): Promise<void> {
     if (this.isPlaying) return;
     if (!this.worker) throw new Error('Worker not initialized');
 
@@ -191,7 +192,8 @@ export class JSIDPlay2Engine {
       this.currentTime += outL.length / audioContext.sampleRate;
     };
 
-    this.scriptNode.connect(audioContext.destination);
+    this.outputNode = outputNode ?? audioContext.destination;
+    this.scriptNode.connect(this.outputNode);
     this.isPlaying = true;
 
     // Pre-buffer: fire a burst of CLOCKs to fill the ring buffer before audio starts
@@ -251,7 +253,7 @@ export class JSIDPlay2Engine {
    */
   resume(): void {
     if (this.scriptNode && this.audioContext) {
-      this.scriptNode.connect(this.audioContext.destination);
+      this.scriptNode.connect(this.outputNode ?? this.audioContext.destination);
       if (!this.clockInterval && this.worker) {
         this.clockInterval = setInterval(() => {
           if (this.worker) {

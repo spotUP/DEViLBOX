@@ -141,15 +141,26 @@ export class JSSIDEngine {
   }
 
   /**
-   * Start playback — jsSID manages its own AudioContext and ScriptProcessor
+   * Start playback — jsSID manages its own AudioContext and ScriptProcessor.
+   * Volume is controlled via jsSID.setvolume() since it uses a separate AudioContext.
    */
-  async play(_audioContext: AudioContext): Promise<void> {
+  async play(_audioContext: AudioContext, _outputNode?: AudioNode): Promise<void> {
     if (this.playing) return;
     if (!this.jsSID) throw new Error('jsSID not initialized');
 
     this.jsSID.start(this.subsong);
     this.playing = true;
     console.log('[jsSID] Playback started, subsong:', this.subsong);
+  }
+
+  /**
+   * Set volume (0-1 linear). jsSID uses its own AudioContext so volume
+   * is controlled via its internal setvolume() API.
+   */
+  setVolume(vol: number): void {
+    if (this.jsSID?.setvolume) {
+      this.jsSID.setvolume(Math.max(0, Math.min(1, vol)));
+    }
   }
 
   /**

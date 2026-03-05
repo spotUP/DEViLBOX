@@ -84,6 +84,19 @@ export const useAudioStore = create<AudioStore>()(
         if (engine) {
           engine.setMasterVolume(state.masterVolume);
         }
+
+        // Apply to C64SIDEngine (uses separate audio pipeline)
+        try {
+          // Lazy import to avoid circular deps
+          import('@engine/TrackerReplayer').then(({ getTrackerReplayer }) => {
+            const sidEngine = getTrackerReplayer().getC64SIDEngine();
+            if (sidEngine) {
+              // Convert dB to linear (0-1): -60dB → 0.001, 0dB → 1.0
+              const linear = state.masterVolume <= -60 ? 0 : Math.pow(10, state.masterVolume / 20);
+              sidEngine.setMasterVolume(linear);
+            }
+          }).catch(() => {});
+        } catch { /* TrackerReplayer not loaded yet */ }
       }),
 
     setMasterMuted: (muted) =>
