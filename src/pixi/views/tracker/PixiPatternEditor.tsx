@@ -1046,6 +1046,7 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
     if (gOverlay) renderOverlay(gOverlay, p, cursor, selection, vStart, currentRow,
       peerCursorRef.current, peerSelectionRef.current);
   }, []); // Empty deps — everything read from refs
+  imperativeRedrawRef.current = imperativeRedraw;
 
   // ── Cursor/selection subscription with RAF coalescing ─────────────────────
   const cursorRafRef = useRef(0);
