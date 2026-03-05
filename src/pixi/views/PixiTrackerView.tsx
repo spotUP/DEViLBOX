@@ -27,6 +27,7 @@ import { PixiFurnaceView } from './furnace/PixiFurnaceView';
 import { PixiHivelyView } from './hively/PixiHivelyView';
 import { PixiPitchSlider } from './tracker/PixiPitchSlider';
 import { PixiTB303KnobPanel, TB303_PANEL_COLLAPSED_H, TB303_PANEL_EXPANDED_H } from './tracker/PixiTB303KnobPanel';
+import { PixiSCKnobPanel, SC_PANEL_COLLAPSED_H, SC_PANEL_EXPANDED_H } from './tracker/PixiSCKnobPanel';
 import { PixiMusicLineTrackTable } from './tracker/PixiMusicLineTrackTable';
 import { PixiMusicLinePatternViewer } from './tracker/PixiMusicLinePatternViewer';
 import { PixiPatternEditor } from './tracker/PixiPatternEditor';
@@ -85,7 +86,9 @@ export const PixiTrackerView: React.FC = () => {
   const showAutomation = useUIStore(s => s.showAutomationLanes);
   const showMacroLanes = useUIStore(s => s.showMacroLanes);
   const tb303Collapsed = useUIStore(s => s.tb303Collapsed);
+  const scCollapsed = useUIStore(s => s.scCollapsed ?? true);
   const hasTB303 = useInstrumentStore(s => s.instruments.some(i => i.synthType === 'TB303'));
+  const hasSC = useInstrumentStore(s => s.instruments.some(i => i.synthType === 'SuperCollider' && !!i.superCollider?.binary));
   const patternId     = useTrackerStore(s => s.patterns[s.currentPatternIndex]?.id ?? '');
   const patternLength = useTrackerStore(s => s.patterns[s.currentPatternIndex]?.length ?? 64);
   const channelCount  = useTrackerStore(s => s.patterns[s.currentPatternIndex]?.channels?.length ?? 4);
@@ -118,8 +121,11 @@ export const PixiTrackerView: React.FC = () => {
   const tb303PanelH = hasTB303 && viewMode !== 'tb303' && viewMode !== 'sunvox'
     ? (tb303Collapsed ? TB303_PANEL_COLLAPSED_H : TB303_PANEL_EXPANDED_H)
     : 0;
+  const scPanelH = hasSC && viewMode !== 'tb303' && viewMode !== 'sunvox'
+    ? (scCollapsed ? SC_PANEL_COLLAPSED_H : SC_PANEL_EXPANDED_H)
+    : 0;
   const midiKnobBarH = showKnobBar ? MIDI_KNOB_BAR_H_EXPANDED : MIDI_KNOB_BAR_H_COLLAPSED;
-  const instrumentPanelHeight = contentH - toolbarH - CONTROLS_BAR_H - MACRO_SLOTS_H - tb303PanelH - midiKnobBarH;
+  const instrumentPanelHeight = contentH - toolbarH - CONTROLS_BAR_H - MACRO_SLOTS_H - tb303PanelH - scPanelH - midiKnobBarH;
   const editorWidth = windowWidth - (instrumentPanelVisible ? INSTRUMENT_PANEL_W : 0) - 16; // minus instrument panel and minimap
 
   return (
@@ -136,6 +142,11 @@ export const PixiTrackerView: React.FC = () => {
       {/* TB-303 Knob Panel — shown when a TB-303 instrument is active and not in TB-303/SunVox view */}
       <pixiContainer layout={{ width: '100%', height: tb303PanelH }} alpha={tb303PanelH > 0 ? 1 : 0} renderable={tb303PanelH > 0}>
         <PixiTB303KnobPanel width={windowWidth} />
+      </pixiContainer>
+
+      {/* SuperCollider Knob Panel — shown when an SC instrument with compiled binary is active */}
+      <pixiContainer layout={{ width: '100%', height: scPanelH }} alpha={scPanelH > 0 ? 1 : 0} renderable={scPanelH > 0}>
+        <PixiSCKnobPanel width={windowWidth} />
       </pixiContainer>
 
       {/* Editor controls bar — pure Pixi, no DOM overlay */}
