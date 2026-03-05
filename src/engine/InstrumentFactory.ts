@@ -500,9 +500,16 @@ export class InstrumentFactory {
         break;
       }
 
-      case 'FuturePlayerSynth':
-        instrument = new FuturePlayerSynth();
+      case 'FuturePlayerSynth': {
+        const fpSynth = new FuturePlayerSynth();
+        // Set raw binary instrument pointer from parser metadata
+        const fpPtr = (config.metadata as any)?.fpInstrPtr;
+        if (typeof fpPtr === 'number' && fpPtr > 0) {
+          fpSynth.set('instrumentPtr', fpPtr);
+        }
+        instrument = fpSynth;
         break;
+      }
 
       case 'SoundMonSynth': {
         const smSynth = new SoundMonSynth();

@@ -1409,3 +1409,109 @@ int fp_get_num_subsongs(void) {
 int fp_get_sample_rate(void) {
     return PAULA_RATE_PAL;
 }
+
+/* ======================================================================
+ * Per-note instrument preview API
+ * Uses voice 0 only. Caller provides the instrument pointer (file offset)
+ * and a note value (1-96, matching the period table).
+ * ====================================================================== */
+
+static int preview_active = 0;
+
+void fp_note_on(uint32_t instr_ptr, int note, int velocity) {
+    if (!mod_base || mod_size == 0) return;
+    if (instr_ptr == 0 || instr_ptr >= mod_size) return;
+    if (note < 1) note = 1;
+    if (note > 96) note = 96;
+
+    /* Use voice 0 for preview */
+    uint8_t* v = voice_data[0];
+
+    /* Reset voice state */
+    memset(v, 0, VOICE_SIZE);
+    SET_W(v, VS_DMA_OFF, 0x0001);
+    SET_W(v, VS_DMA_ON, 0x8001);
+    SET_L(v, VS_PAULA_BASE, 0xDFF0A0);
+
+    /* Set instrument */
+    SET_L(v, VS_INSTR_PTR, instr_ptr);
+    SET_L(v, VS_ARP_PTR, default_arp_ptr);
+    SET_W(v, VS_ARP_IDX, 0);
+
+    /* Set note and trigger */
+    SET_B(v, VS_CUR_NOTE, (uint8_t)note);
+    SET_B(v, VS_NOTE_TRIG, (uint8_t)note);
+    SET_B(v, VS_DMA_TRIG, (uint8_t)note);
+    SET_B(v, VS_STATE, 0);
+    SET_B(v, VS_END_FLAG, 0);
+    SET_B(v, VS_ROW_TIMER, 0xFF);  /* long duration */
+
+    /* Set volume (velocity 0-127 → master vol 0-255) */
+    int vol = velocity * 2;
+    if (vol > 255) vol = 255;
+    SET_W(v, VS_MASTER_VOL, (uint16_t)vol);
+
+    /* Init envelope */
+    SET_B(v, VS_ENV_PHASE, 0);
+    uint32_t detail = RD32(instr_ptr + 12);
+    SET_B(v, VS_ENV_LEVEL, RD8(detail + 0x12));  /* attack level */
+
+    /* Clear modulation */
+    SET_W(v, VS_PMOD1_IDX, 0);
+    SET_W(v, VS_PMOD2_IDX, 0);
+    SET_W(v, VS_SMOD1_IDX, 0);
+    SET_W(v, VS_SMOD2_IDX, 0);
+    SET_B(v, VS_PMOD1_DLY, 0);
+    SET_B(v, VS_PMOD2_DLY, 0);
+    SET_B(v, VS_SMOD1_DLY, 0);
+    SET_B(v, VS_SMOD2_DLY, 0);
+    SET_B(v, VS_WAVE_ACTIVE, 0);
+    SET_B(v, VS_TRANSPOSE1, 0);
+    SET_B(v, VS_TRANSPOSE2, 0);
+    SET_W(v, VS_PORTA_RATE, 0);
+    SET_W(v, VS_DETUNE, 0);
+
+    preview_active = 1;
+}
+
+void fp_note_off(void) {
+    if (!preview_active) return;
+    uint8_t* v = voice_data[0];
+    /* Clear note trigger → envelope enters release phase */
+    SET_B(v, VS_NOTE_TRIG, 0);
+    /* Disable DMA */
+    hw_write_dmacon(V_W(v, VS_DMA_OFF));
+    paula_set_volume(0, 0);
+    SET_B(v, VS_STATE, 0x80);
+    preview_active = 0;
+}
+
+void fp_preview_tick(void) {
+    if (!preview_active) return;
+    update_audio(voice_data[0]);
+}
+
+int fp_is_preview_active(void) {
+    return preview_active;
+}
+
+/* Get instrument info for display.
+ * Returns sample length in bytes (0 for wavetable/synth instruments).
+ * Sets *is_wavetable to 1 if instrument uses wavetable mode. */
+int fp_get_instrument_info(uint32_t instr_ptr, int* is_wavetable) {
+    if (!mod_base || mod_size == 0 || instr_ptr == 0 || instr_ptr >= mod_size) {
+        if (is_wavetable) *is_wavetable = 0;
+        return 0;
+    }
+    uint32_t samp_info = RD32(instr_ptr + 8);
+    if (samp_info == 0 || samp_info >= mod_size) {
+        if (is_wavetable) *is_wavetable = 0;
+        return 0;
+    }
+    int wt = (RD8(samp_info + 8) != 0) ? 1 : 0;
+    if (is_wavetable) *is_wavetable = wt;
+    if (wt) return 0;
+    /* PCM: sample data ptr at +10, length at +4 (words) */
+    uint16_t len_words = RD16(samp_info + 4);
+    return (int)len_words * 2;
+}
