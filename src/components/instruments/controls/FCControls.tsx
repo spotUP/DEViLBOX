@@ -81,12 +81,12 @@ export const FCControls: React.FC<FCControlsProps> = ({ config, onChange, uadeCh
    *   3 = vibDepth
    *   4 = vibDelay
    *
-   * TODO: atkLength/atkVolume/decLength/decVolume/sustVolume/relLength require
-   * encoding as FC vol-envelope opcodes (variable-length ADSR sequences) and
-   * writing byte[5..63]. The opcode format is non-trivial; skipped for now.
+   * Note: ADSR params (atkLength/atkVolume/decLength/decVolume/sustVolume/relLength)
+   * require encoding as FC vol-envelope opcodes (variable-length ADSR sequences at
+   * byte[5..63]). The opcode format is non-trivial and not yet implemented.
    *
-   * TODO: arpTable / synthTable changes require writing the separate arp/synth
-   * macro regions (not part of the 64-byte vol macro). Skipped for now.
+   * Note: arpTable/synthTable changes require writing separate arp/synth macro
+   * regions (not part of the 64-byte vol macro) — not yet implemented.
    */
   const updWithChipRam = useCallback(
     (key: keyof FCConfig, value: FCConfig[keyof FCConfig], byteOffset: number) => {

@@ -131,6 +131,26 @@ export class SoundMonSynth implements DevilboxSynth {
           });
         }
         break;
+      case 'vibratoDelay':
+        if (this._playerHandle >= 0) {
+          this.engine.sendMessage({
+            type: 'setParam',
+            handle: this._playerHandle,
+            paramId: 7,
+            value: Math.max(0, Math.min(1, value / 255)),
+          });
+        }
+        break;
+      case 'portamentoSpeed':
+        if (this._playerHandle >= 0) {
+          this.engine.sendMessage({
+            type: 'setParam',
+            handle: this._playerHandle,
+            paramId: 8,
+            value: Math.max(0, Math.min(1, value / 63)),
+          });
+        }
+        break;
     }
   }
 

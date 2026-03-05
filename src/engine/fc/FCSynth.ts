@@ -138,6 +138,26 @@ export class FCSynth implements DevilboxSynth {
           });
         }
         break;
+      case 'vibDelay':
+        if (this._playerHandle >= 0) {
+          this.engine.sendMessage({
+            type: 'setParam',
+            handle: this._playerHandle,
+            paramId: 3,
+            value: Math.max(0, Math.min(1, value / 255)),
+          });
+        }
+        break;
+      case 'synthSpeed':
+        if (this._playerHandle >= 0) {
+          this.engine.sendMessage({
+            type: 'setParam',
+            handle: this._playerHandle,
+            paramId: 4,
+            value: Math.max(0, Math.min(1, value / 15)),
+          });
+        }
+        break;
     }
   }
 

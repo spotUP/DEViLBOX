@@ -131,6 +131,76 @@ export class SidMon1Synth implements DevilboxSynth {
           });
         }
         break;
+      case 'attackSpeed':
+        if (this._playerHandle >= 0) {
+          this.engine.sendMessage({
+            type: 'setParam',
+            handle: this._playerHandle,
+            paramId: 3,
+            value: Math.max(0, Math.min(1, value / 255)),
+          });
+        }
+        break;
+      case 'decaySpeed':
+        if (this._playerHandle >= 0) {
+          this.engine.sendMessage({
+            type: 'setParam',
+            handle: this._playerHandle,
+            paramId: 4,
+            value: Math.max(0, Math.min(1, value / 255)),
+          });
+        }
+        break;
+      case 'releaseSpeed':
+        if (this._playerHandle >= 0) {
+          this.engine.sendMessage({
+            type: 'setParam',
+            handle: this._playerHandle,
+            paramId: 5,
+            value: Math.max(0, Math.min(1, value / 255)),
+          });
+        }
+        break;
+      case 'releaseMin':
+        if (this._playerHandle >= 0) {
+          this.engine.sendMessage({
+            type: 'setParam',
+            handle: this._playerHandle,
+            paramId: 6,
+            value: Math.max(0, Math.min(1, value / 64)),
+          });
+        }
+        break;
+      case 'sustain':
+        if (this._playerHandle >= 0) {
+          this.engine.sendMessage({
+            type: 'setParam',
+            handle: this._playerHandle,
+            paramId: 7,
+            value: Math.max(0, Math.min(1, value / 255)),
+          });
+        }
+        break;
+      case 'phaseShift':
+        if (this._playerHandle >= 0) {
+          this.engine.sendMessage({
+            type: 'setParam',
+            handle: this._playerHandle,
+            paramId: 8,
+            value: Math.max(0, Math.min(1, value / 255)),
+          });
+        }
+        break;
+      case 'phaseSpeed':
+        if (this._playerHandle >= 0) {
+          this.engine.sendMessage({
+            type: 'setParam',
+            handle: this._playerHandle,
+            paramId: 9,
+            value: Math.max(0, Math.min(1, value / 255)),
+          });
+        }
+        break;
     }
   }
 
