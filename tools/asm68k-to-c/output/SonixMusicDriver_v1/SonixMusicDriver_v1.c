@@ -932,9 +932,8 @@ SetBalance:
       flag_v = 0; flag_c = 0;
     }
   a1 = (uint32_t)(uintptr_t)OldVoice1;  /* LEA	OldVoice1(PC),A1 */
-  d1 = (uint32_t)(int32_t)(int8_t)(3);  /* MOVEQ	#3,D1 */
-  a2 = (uint32_t)0xDFF0A0;  /* LEA	$DFF0A0,A2 */
-SetNew:
+    a2 = (uint32_t)0xDFF0A0;  /* LEA	$DFF0A0,A2 */
+for (int _i_d1 = 3; _i_d1 >= 0; _i_d1--) {
   {  /* MOVE.W	(A1)+,D0 */
       uint16_t _mv = (uint16_t)(READ16_POST(a1));
       W(d0) = (uint16_t)_mv;
@@ -944,7 +943,7 @@ SetNew:
     }
   ChangeVolume();  /* BSR.B	ChangeVolume */
   a2 = (uint32_t)(a2 + 16);  /* LEA	16(A2),A2 */
-  if ((int16_t)(--d1) >= 0) goto SetNew;  /* DBF	D1,SetNew */
+}
   return;  /* RTS */
 }
 
@@ -968,7 +967,7 @@ static void ChangeVolume(void) {
       flag_n = (_cmp < 0);
       flag_c = ((uint32_t)_lhs < (uint32_t)_rhs);
     }
-  if (!flag_z) goto NoVoice1;  /* not equal / nonzero */  /* BNE.B	NoVoice1 */
+  if (flag_z) {
   {  /* MOVE.W	D0,OldVoice1 */
       uint16_t _mv = (uint16_t)(W(d0));
       WRITE16((uintptr_t)OldVoice1, _mv);
@@ -1002,7 +1001,7 @@ Voice1On:
       flag_v = 0; flag_c = 0;
     }
   goto SetIt;  /* BRA.B	SetIt */
-NoVoice1:
+  }
   {  /* CMPA.L	#$DFF0B0,A2 */
       int32_t _lhs = (int32_t)(a2);
       int32_t _rhs = (int32_t)(0xDFF0B0);
@@ -1011,7 +1010,7 @@ NoVoice1:
       flag_n = (_cmp < 0);
       flag_c = ((uint32_t)_lhs < (uint32_t)_rhs);
     }
-  if (!flag_z) goto NoVoice2;  /* not equal / nonzero */  /* BNE.B	NoVoice2 */
+  if (flag_z) {
   {  /* MOVE.W	D0,OldVoice2 */
       uint16_t _mv = (uint16_t)(W(d0));
       WRITE16((uintptr_t)OldVoice2, _mv);
@@ -1045,7 +1044,7 @@ Voice2On:
       flag_v = 0; flag_c = 0;
     }
   goto SetIt;  /* BRA.B	SetIt */
-NoVoice2:
+  }
   {  /* CMPA.L	#$DFF0C0,A2 */
       int32_t _lhs = (int32_t)(a2);
       int32_t _rhs = (int32_t)(0xDFF0C0);
@@ -1054,7 +1053,7 @@ NoVoice2:
       flag_n = (_cmp < 0);
       flag_c = ((uint32_t)_lhs < (uint32_t)_rhs);
     }
-  if (!flag_z) goto NoVoice3;  /* not equal / nonzero */  /* BNE.B	NoVoice3 */
+  if (flag_z) {
   {  /* MOVE.W	D0,OldVoice3 */
       uint16_t _mv = (uint16_t)(W(d0));
       WRITE16((uintptr_t)OldVoice3, _mv);
@@ -1088,7 +1087,7 @@ Voice3On:
       flag_v = 0; flag_c = 0;
     }
   goto SetIt;  /* BRA.B	SetIt */
-NoVoice3:
+  }
   {  /* CMPA.L	#$DFF0D0,A2 */
       int32_t _lhs = (int32_t)(a2);
       int32_t _rhs = (int32_t)(0xDFF0D0);
@@ -1097,7 +1096,7 @@ NoVoice3:
       flag_n = (_cmp < 0);
       flag_c = ((uint32_t)_lhs < (uint32_t)_rhs);
     }
-  if (!flag_z) goto SetIt;  /* not equal / nonzero */  /* BNE.B	SetIt */
+  if (flag_z) {
   {  /* MOVE.W	D0,OldVoice4 */
       uint16_t _mv = (uint16_t)(W(d0));
       WRITE16((uintptr_t)OldVoice4, _mv);
@@ -1130,7 +1129,7 @@ Voice4On:
       flag_n = ((int16_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-SetIt:
+  }
   {  /* MOVE.L	(SP)+,A4 */
       uint32_t _mv = (uint32_t)(READ32_POST(sp));
       a4 = _mv;
@@ -1334,11 +1333,11 @@ SetVoices:
       flag_v = 0; flag_c = 0;
     }
   flag_z = ((d0 & (1u << (0 & 31))) == 0);  /* BTST	#0,D0 */
-  if (!flag_z) goto No_Voice1;  /* not equal / nonzero */  /* BNE.B	No_Voice1 */
+  if (flag_z) {
   WRITE16(a0 + -2, 0);  /* CLR.W	-2(A0) */
   paula_set_volume(0, (uint8_t)(0));  /* CLR.W	$DFF0A8 */
   WRITE16(a1 + (intptr_t)UPS_Voice1Vol, 0);  /* CLR.W	UPS_Voice1Vol(A1) */
-No_Voice1:
+  }
   {  /* MOVE.W	D1,(A0)+,Voice2,EQU,#0,setzen */
       uint16_t _mv = (uint16_t)(W(d1));
       WRITE16_POST(a0, _mv);
@@ -1347,11 +1346,11 @@ No_Voice1:
       flag_v = 0; flag_c = 0;
     }
   flag_z = ((d0 & (1u << (1 & 31))) == 0);  /* BTST	#1,D0 */
-  if (!flag_z) goto No_Voice2;  /* not equal / nonzero */  /* BNE.B	No_Voice2 */
+  if (flag_z) {
   WRITE16(a0 + -2, 0);  /* CLR.W	-2(A0) */
   paula_set_volume(1, (uint8_t)(0));  /* CLR.W	$DFF0B8 */
   WRITE16(a1 + (intptr_t)UPS_Voice2Vol, 0);  /* CLR.W	UPS_Voice2Vol(A1) */
-No_Voice2:
+  }
   {  /* MOVE.W	D1,(A0)+,Voice3,EQU,#0,setzen */
       uint16_t _mv = (uint16_t)(W(d1));
       WRITE16_POST(a0, _mv);
@@ -1360,11 +1359,11 @@ No_Voice2:
       flag_v = 0; flag_c = 0;
     }
   flag_z = ((d0 & (1u << (2 & 31))) == 0);  /* BTST	#2,D0 */
-  if (!flag_z) goto No_Voice3;  /* not equal / nonzero */  /* BNE.B	No_Voice3 */
+  if (flag_z) {
   WRITE16(a0 + -2, 0);  /* CLR.W	-2(A0) */
   paula_set_volume(2, (uint8_t)(0));  /* CLR.W	$DFF0C8 */
   WRITE16(a1 + (intptr_t)UPS_Voice3Vol, 0);  /* CLR.W	UPS_Voice3Vol(A1) */
-No_Voice3:
+  }
   {  /* MOVE.W	D1,(A0)+,Voice4,EQU,#0,setzen */
       uint16_t _mv = (uint16_t)(W(d1));
       WRITE16_POST(a0, _mv);
@@ -1373,11 +1372,11 @@ No_Voice3:
       flag_v = 0; flag_c = 0;
     }
   flag_z = ((d0 & (1u << (3 & 31))) == 0);  /* BTST	#3,D0 */
-  if (!flag_z) goto No_Voice4;  /* not equal / nonzero */  /* BNE.B	No_Voice4 */
+  if (flag_z) {
   WRITE16(a0 + -2, 0);  /* CLR.W	-2(A0) */
   paula_set_volume(3, (uint8_t)(0));  /* CLR.W	$DFF0D8 */
   WRITE16(a1 + (intptr_t)UPS_Voice4Vol, 0);  /* CLR.W	UPS_Voice4Vol(A1) */
-No_Voice4:
+  }
   {  /* MOVE.W	D0,UPS_DMACon(A1) */
       uint16_t _mv = (uint16_t)(W(d0));
       WRITE16(a1 + (intptr_t)UPS_DMACon, _mv);
@@ -1431,11 +1430,10 @@ ExtLoad:
     }
   if (flag_z) { TinyLoad(); return; }  /* equal / zero */  /* BEQ.W	TinyLoad */
   a2 = (uint32_t)(a0 + 20);  /* LEA	20(A0),A2 */
-  d1 = (uint32_t)(int32_t)(int8_t)(3);  /* MOVEQ	#3,D1 */
-Dodaj:
+  for (int _i_d1 = 3; _i_d1 >= 0; _i_d1--) {
   a2 = (uint32_t)((int32_t)a2 + (int32_t)(int16_t)(READ32_POST(a0)));  /* ADD.L	(A0)+,A2 */
-  if ((int16_t)(--d1) >= 0) goto Dodaj;  /* DBF	D1,Dodaj */
-LoadNext:
+}
+do {
   LoadFile();  /* BSR.B	LoadFile */
   {  /* TST.L	D0 */
       uint32_t _tst = (uint32_t)(d0);
@@ -1456,7 +1454,7 @@ LoadNext:
       flag_n = ((int8_t)(_tst) < 0);
       flag_c = 0; flag_v = 0;
     }
-  if (!flag_z) goto LoadNext;  /* not equal / nonzero */  /* BNE.B	LoadNext */
+} while (!flag_z);
 ExtError1:
   return;  /* RTS */
 }
@@ -1501,17 +1499,17 @@ static void CopyName(void) {
       flag_n = ((int32_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-loop1:
+do {
   {  /* TST.B	(A0)+ */
       uint8_t _tst = (uint8_t)(READ8_POST(a0));
       flag_z = (_tst == 0);
       flag_n = ((int8_t)(_tst) < 0);
       flag_c = 0; flag_v = 0;
     }
-  if (!flag_z) goto loop1;  /* not equal / nonzero */  /* BNE.S	loop1 */
+} while (!flag_z);
   a0 = (uint32_t)((int32_t)a0 - (int32_t)(int16_t)(1));  /* SUBQ.L	#1,A0 */
   a1 = (uint32_t)(uintptr_t)SamplesPath;  /* LEA	SamplesPath(PC),A1 */
-smp1:
+do {
   {  /* MOVE.B	(A1)+,(A0)+ */
       uint8_t _mv = (uint8_t)(READ8_POST(a1));
       WRITE8_POST(a0, _mv);
@@ -1519,9 +1517,9 @@ smp1:
       flag_n = ((int8_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-  if (!flag_z) goto smp1;  /* not equal / nonzero */  /* BNE.S	smp1 */
+} while (!flag_z);
   a0 = (uint32_t)((int32_t)a0 - (int32_t)(int16_t)(1));  /* SUBQ.L	#1,A0 */
-smp2:
+do {
   {  /* MOVE.B	(A2)+,(A0)+ */
       uint8_t _mv = (uint8_t)(READ8_POST(a2));
       WRITE8_POST(a0, _mv);
@@ -1529,10 +1527,10 @@ smp2:
       flag_n = ((int8_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-  if (!flag_z) goto smp2;  /* not equal / nonzero */  /* BNE.S	smp2 */
+} while (!flag_z);
   a0 = (uint32_t)((int32_t)a0 - (int32_t)(int16_t)(1));  /* SUBQ.L	#1,A0 */
   a1 = (uint32_t)(uintptr_t)Suffix;  /* LEA	Suffix(PC),A1 */
-smp3:
+do {
   {  /* MOVE.B	(A1)+,(A0)+ */
       uint8_t _mv = (uint8_t)(READ8_POST(a1));
       WRITE8_POST(a0, _mv);
@@ -1540,7 +1538,7 @@ smp3:
       flag_n = ((int8_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-  if (!flag_z) goto smp3;  /* not equal / nonzero */  /* BNE.S	smp3 */
+} while (!flag_z);
   return;  /* RTS */
 }
 
@@ -3638,17 +3636,17 @@ static void SetSampleName(void) {
       flag_n = ((int32_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-NoZero:
+do {
   {  /* TST.B	(A0)+ */
       uint8_t _tst = (uint8_t)(READ8_POST(a0));
       flag_z = (_tst == 0);
       flag_n = ((int8_t)(_tst) < 0);
       flag_c = 0; flag_v = 0;
     }
-  if (!flag_z) goto NoZero;  /* not equal / nonzero */  /* BNE.B	NoZero */
+} while (!flag_z);
   a0 = (uint32_t)((int32_t)a0 - (int32_t)(int16_t)(1));  /* SUBQ.L	#1,A0 */
   a1 = (uint32_t)(uintptr_t)SamplesPath;  /* LEA	SamplesPath(PC),A1 */
-CopyPath:
+do {
   {  /* MOVE.B	(A1)+,(A0)+ */
       uint8_t _mv = (uint8_t)(READ8_POST(a1));
       WRITE8_POST(a0, _mv);
@@ -3656,9 +3654,9 @@ CopyPath:
       flag_n = ((int8_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-  if (!flag_z) goto CopyPath;  /* not equal / nonzero */  /* BNE.S	CopyPath */
+} while (!flag_z);
   a0 = (uint32_t)((int32_t)a0 - (int32_t)(int16_t)(1));  /* SUBQ.L	#1,A0 */
-CopyName1:
+do {
   {  /* MOVE.B	(A6)+,(A0)+ */
       uint8_t _mv = (uint8_t)(READ8_POST(a6));
       WRITE8_POST(a0, _mv);
@@ -3666,10 +3664,10 @@ CopyName1:
       flag_n = ((int8_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-  if (!flag_z) goto CopyName1;  /* not equal / nonzero */  /* BNE.B	CopyName1 */
+} while (!flag_z);
   a6 = (uint32_t)(uintptr_t)Suffix2;  /* LEA	Suffix2(PC),A6 */
   a0 = (uint32_t)((int32_t)a0 - (int32_t)(int16_t)(1));  /* SUBQ.L	#1,A0 */
-CopyName2:
+do {
   {  /* MOVE.B	(A6)+,(A0)+ */
       uint8_t _mv = (uint8_t)(READ8_POST(a6));
       WRITE8_POST(a0, _mv);
@@ -3677,7 +3675,7 @@ CopyName2:
       flag_n = ((int8_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-  if (!flag_z) goto CopyName2;  /* not equal / nonzero */  /* BNE.B	CopyName2 */
+} while (!flag_z);
   return;  /* RTS */
 }
 
@@ -3706,7 +3704,7 @@ static void GetSize(void) {
       flag_n = ((int32_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-  if (flag_z) goto Err;  /* equal / zero */  /* BEQ.B	Err */
+  if (!(flag_z)) {
   d2 = (uint32_t)(int32_t)(int8_t)(0);  /* MOVEQ	#0,D2 */
   d3 = (uint32_t)(int32_t)(int8_t)(OFFSET_END);  /* MOVEQ	#OFFSET_END,D3 */
   {  /* MOVE.L	D1,-(SP) */
@@ -3749,7 +3747,7 @@ static void GetSize(void) {
       flag_v = 0; flag_c = 0;
     }
   return;  /* RTS */
-Err:
+  }
   d0 = (uint32_t)(int32_t)(int8_t)(-1);  /* MOVEQ	#-1,D0 */
   return;  /* RTS */
 }
@@ -3779,7 +3777,8 @@ static void ReadFile(void) {
       flag_n = ((int32_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-  WRITE32_PRE(sp, d3); WRITE32_PRE(sp, d0);  /* MOVEM.L	D0,D3,-(SP) */
+  WRITE32_PRE(sp, d3);  /* MOVEM.L	D0,D3,-(SP) */
+    WRITE32_PRE(sp, d0);
   {  /* MOVE.L	D4,D2 */
       uint32_t _mv = (uint32_t)(d4);
       d2 = _mv;
@@ -3795,7 +3794,8 @@ static void ReadFile(void) {
       flag_v = 0; flag_c = 0;
     }
   { uintptr_t _jt=(uintptr_t)(READ32(a6 + (intptr_t)_LVORead)); if(_jt) ((void(*)(void))_jt)(); }  /* JSR	_LVORead(A6) */
-  { uint32_t _mv = READ32_POST(sp); d1 = _mv; } { uint32_t _mv = READ32_POST(sp); d3 = _mv; }  /* MOVEM.L	(SP)+,D1,D3 */
+  d1 = READ32_POST(sp);  /* MOVEM.L	(SP)+,D1,D3 */
+    d3 = READ32_POST(sp);
   { uintptr_t _jt=(uintptr_t)(READ32(a6 + (intptr_t)_LVOClose)); if(_jt) ((void(*)(void))_jt)(); }  /* JSR	_LVOClose(A6) */
   return;  /* RTS */
   /* ************************************************************************** */
@@ -3816,7 +3816,7 @@ EndPlayer:
       flag_n = ((int32_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-  if (flag_z) goto SkipChip;  /* equal / zero */  /* BEQ.B	SkipChip */
+  if (!(flag_z)) {
   {  /* MOVE.L	ChipPtr(PC),A1 */
       uint32_t _mv = (uint32_t)(READ32((uintptr_t)ChipPtr));
       a1 = _mv;
@@ -3825,7 +3825,7 @@ EndPlayer:
       flag_v = 0; flag_c = 0;
     }
   { uintptr_t _jt=(uintptr_t)(READ32(a6 + (intptr_t)_LVOFreeMem)); if(_jt) ((void(*)(void))_jt)(); }  /* JSR	_LVOFreeMem(A6) */
-SkipChip:
+  }
   {  /* MOVE.L	FastLength(PC),D0 */
       uint32_t _mv = (uint32_t)(READ32((uintptr_t)FastLength));
       d0 = _mv;
@@ -3833,7 +3833,7 @@ SkipChip:
       flag_n = ((int32_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-  if (flag_z) goto SkipFast;  /* equal / zero */  /* BEQ.B	SkipFast */
+  if (!(flag_z)) {
   {  /* MOVE.L	FastPtr(PC),A1 */
       uint32_t _mv = (uint32_t)(READ32((uintptr_t)FastPtr));
       a1 = _mv;
@@ -3842,14 +3842,19 @@ SkipChip:
       flag_v = 0; flag_c = 0;
     }
   { uintptr_t _jt=(uintptr_t)(READ32(a6 + (intptr_t)_LVOFreeMem)); if(_jt) ((void(*)(void))_jt)(); }  /* JSR	_LVOFreeMem(A6) */
-SkipFast:
+  }
   a0 = READ32(a5 + (intptr_t)dtg_AudioFree);  /* MOVEA.L	dtg_AudioFree(A5),A0 */
   ((void(*)(void))(uintptr_t)a0)(); return;  /* JMP	(A0) */
   /* ************************************************************************** */
   /* **************************** DTP_Intterrupt ****************************** */
   /* ************************************************************************** */
 Interrupt:
-  WRITE32_PRE(sp, d6); WRITE32_PRE(sp, d5); WRITE32_PRE(sp, d4); WRITE32_PRE(sp, d3); WRITE32_PRE(sp, d2); WRITE32_PRE(sp, d1);  /* MOVEM.L	D1,D2,D3,D4,D5,D6,-(SP) */
+  WRITE32_PRE(sp, d6);  /* MOVEM.L	D1,D2,D3,D4,D5,D6,-(SP) */
+    WRITE32_PRE(sp, d5);
+    WRITE32_PRE(sp, d4);
+    WRITE32_PRE(sp, d3);
+    WRITE32_PRE(sp, d2);
+    WRITE32_PRE(sp, d1);
   a0 = (uint32_t)(uintptr_t)StructAdr;  /* LEA	StructAdr(PC),A0 */
   WRITE8(a0 + (intptr_t)UPS_Enabled, 0xFF);  /* ST	UPS_Enabled(A0) */
   {  /* MOVE.W	#UPSB_Adr,UPSB_Len,UPSB_Per,UPSB_Vol,UPS_Flags(A0) */
@@ -3877,19 +3882,24 @@ Interrupt:
       flag_n = ((int8_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-  if (flag_z) goto Play_SNX;  /* equal / zero */  /* BEQ.B	Play_SNX */
+  if (!(flag_z)) {
   if (flag_n) goto Play_SMUS;  /* minus / negative */  /* BMI.B	Play_SMUS */
   PlayTINY();  /* BSR.W	PlayTINY */
   goto SkipPlay;  /* BRA.B	SkipPlay */
 Play_SMUS:
   PlaySMUS();  /* BSR.W	PlaySMUS */
   goto SkipPlay;  /* BRA.B	SkipPlay */
-Play_SNX:
+  }
   PlaySNX();  /* BSR.W	PlaySNX */
 SkipPlay:
   a0 = (uint32_t)(uintptr_t)StructAdr;  /* LEA	StructAdr(PC),A0 */
   WRITE16(a0 + (intptr_t)UPS_Enabled, 0);  /* CLR.W	UPS_Enabled(A0) */
-  { uint32_t _mv = READ32_POST(sp); d1 = _mv; } { uint32_t _mv = READ32_POST(sp); d2 = _mv; } { uint32_t _mv = READ32_POST(sp); d3 = _mv; } { uint32_t _mv = READ32_POST(sp); d4 = _mv; } { uint32_t _mv = READ32_POST(sp); d5 = _mv; } { uint32_t _mv = READ32_POST(sp); d6 = _mv; }  /* MOVEM.L	(SP)+,D1,D2,D3,D4,D5,D6 */
+  d1 = READ32_POST(sp);  /* MOVEM.L	(SP)+,D1,D2,D3,D4,D5,D6 */
+    d2 = READ32_POST(sp);
+    d3 = READ32_POST(sp);
+    d4 = READ32_POST(sp);
+    d5 = READ32_POST(sp);
+    d6 = READ32_POST(sp);
   d0 = (uint32_t)(int32_t)(int8_t)(0);  /* MOVEQ	#0,D0 */
   return;  /* RTS */
 }
@@ -3897,7 +3907,8 @@ SkipPlay:
 
 /* --- SongEnd --- */
 static void SongEnd(void) {
-  WRITE32_PRE(sp, a5); WRITE32_PRE(sp, a1);  /* MOVEM.L	A1,A5,-(A7) */
+  WRITE32_PRE(sp, a5);  /* MOVEM.L	A1,A5,-(A7) */
+    WRITE32_PRE(sp, a1);
   {  /* MOVE.L	EagleBase(PC),A5 */
       uint32_t _mv = (uint32_t)(READ32((uintptr_t)EagleBase));
       a5 = _mv;
@@ -3913,14 +3924,16 @@ static void SongEnd(void) {
       flag_v = 0; flag_c = 0;
     }
   { uintptr_t _jt=(uintptr_t)(a1); if(_jt) ((void(*)(void))_jt)(); }  /* JSR	(A1) */
-  { uint32_t _mv = READ32_POST(sp); a1 = _mv; } { uint32_t _mv = READ32_POST(sp); a5 = _mv; }  /* MOVEM.L	(A7)+,A1,A5 */
+  a1 = READ32_POST(sp);  /* MOVEM.L	(A7)+,A1,A5 */
+    a5 = READ32_POST(sp);
   return;  /* RTS */
 }
 
 
 /* --- DMAWait --- */
 static void DMAWait(void) {
-  WRITE32_PRE(sp, d1); WRITE32_PRE(sp, d0);  /* MOVEM.L	D0,D1,-(SP) */
+  WRITE32_PRE(sp, d1);  /* MOVEM.L	D0,D1,-(SP) */
+    WRITE32_PRE(sp, d0);
   d0 = (uint32_t)(int32_t)(int8_t)(8);  /* MOVEQ	#8,D0 */
 _dma1:
   {  /* MOVE.B	$DFF006,D1 */
@@ -3930,7 +3943,7 @@ _dma1:
       flag_n = ((int8_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-_dma2:
+do {
   {  /* CMP.B	$DFF006,D1 */
       int32_t _lhs = (int32_t)(B(d1));
       int32_t _rhs = (int32_t)(READ8(0xDFF006));
@@ -3939,9 +3952,10 @@ _dma2:
       flag_n = (_cmp < 0);
       flag_c = ((uint32_t)_lhs < (uint32_t)_rhs);
     }
-  if (flag_z) goto _dma2;  /* equal / zero */  /* BEQ.B	.dma2 */
+} while (flag_z);
   if (!flag_z && (int16_t)(--d0) >= 0) goto _dma1;  /* DBEQ	D0,.dma1 */
-  { uint32_t _mv = READ32_POST(sp); d0 = _mv; } { uint32_t _mv = READ32_POST(sp); d1 = _mv; }  /* MOVEM.L	(SP)+,D0,D1 */
+  d0 = READ32_POST(sp);  /* MOVEM.L	(SP)+,D0,D1 */
+    d1 = READ32_POST(sp);
   return;  /* RTS */
   /* ************************************************************************** */
   /* **************************** DTP_InitSound ******************************* */
@@ -3949,7 +3963,7 @@ _dma2:
 InitSound:
   a0 = (uint32_t)(uintptr_t)StructAdr;  /* LEA	StructAdr(PC),A0 */
   a1 = (uint32_t)(a0 + (intptr_t)UPS_SizeOF);  /* LEA	UPS_SizeOF(A0),A1 */
-ClearUPS:
+do {
   WRITE16_POST(a0, 0);  /* CLR.W	(A0)+ */
   {  /* CMP.L	A0,A1 */
       int32_t _lhs = (int32_t)(a1);
@@ -3959,7 +3973,7 @@ ClearUPS:
       flag_n = (_cmp < 0);
       flag_c = ((uint32_t)_lhs < (uint32_t)_rhs);
     }
-  if (!flag_z) goto ClearUPS;  /* not equal / nonzero */  /* BNE.B	ClearUPS */
+} while (!flag_z);
   a0 = (uint32_t)(uintptr_t)OldVoice1;  /* LEA	OldVoice1(PC),A0 */
   WRITE32_POST(a0, 0);  /* CLR.L	(A0)+ */
   WRITE32(a0, 0);  /* CLR.L	(A0) */
@@ -3970,7 +3984,7 @@ ClearUPS:
       flag_n = ((int32_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-  if (!flag_z) goto Done;  /* not equal / nonzero */  /* BNE.B	Done */
+  if (flag_z) {
   {  /* MOVE.W	dtg_Timer(A5),D7 */
       uint16_t _mv = (uint16_t)(READ16(a5 + (intptr_t)dtg_Timer));
       W(d7) = (uint16_t)_mv;
@@ -3987,7 +4001,7 @@ ClearUPS:
       flag_n = ((int32_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-Done:
+  }
   {  /* MOVE.L	Sonix(PC),A6 */
       uint32_t _mv = (uint32_t)(READ32((uintptr_t)Sonix));
       a6 = _mv;
@@ -4007,11 +4021,11 @@ Done:
       flag_n = ((int8_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-  if (flag_z) goto InitSNX;  /* equal / zero */  /* BEQ.B	InitSNX */
-  if (!flag_n) goto InitTINY;  /* plus / positive */  /* BPL.B	InitTINY */
+  if (!(flag_z)) {
+  if (flag_n) {
   PlaySCORE();  /* BSR.W	PlaySCORE */
   goto SetTimer;  /* BRA.B	SetTimer */
-InitTINY:
+  }
   {  /* MOVE.L	ModulePtr(PC),A0 */
       uint32_t _mv = (uint32_t)(READ32((uintptr_t)ModulePtr));
       a0 = _mv;
@@ -4059,8 +4073,7 @@ SetTimer:
   d7 = (uint32_t)((uint16_t)0x2E9C * (uint16_t)W(d7));  /* MULU.W	#$2E9C,D7 */
   d0 = (uint32_t)(int32_t)(int8_t)(15);  /* MOVEQ	#15,D0 */
   d7 >>= d0;  /* LSR.L	D0,D7 */
-  goto PutTimer;  /* BRA.B	PutTimer */
-InitSNX:
+  } else {
   d4 = (uint32_t)(int32_t)(int8_t)(-1);  /* MOVEQ	#-1,D4 */
   PlayScore();  /* BSR.W	PlayScore */
   {  /* MOVE.L	ModulePtr(PC),A0 */
@@ -4078,7 +4091,7 @@ InitSNX:
       flag_n = (_cmp < 0);
       flag_c = ((uint32_t)_lhs < (uint32_t)_rhs);
     }
-  if (!flag_z) goto NoCom;  /* not equal / nonzero */  /* BNE.B	NoCom */
+  if (flag_z) {
   d1 = (uint32_t)(int32_t)(int8_t)(0);  /* MOVEQ	#0,D1 */
   {  /* MOVE.B	21(A0),D1 */
       uint8_t _mv = (uint8_t)(READ8(a0 + 21));
@@ -4088,7 +4101,7 @@ InitSNX:
       flag_v = 0; flag_c = 0;
     }
   goto Podziel;  /* BRA.B	Podziel */
-NoCom:
+  }
   {  /* MOVE.W	(A6),D1 */
       uint16_t _mv = (uint16_t)(READ16(a6));
       W(d1) = (uint16_t)_mv;
@@ -4102,7 +4115,7 @@ Podziel:
       uint16_t r = (uint16_t)((uint32_t)d7 % (uint16_t)W(d1));
       d7 = ((uint32_t)r << 16) | q;
     }
-PutTimer:
+  }
   {  /* MOVE.W	D7,dtg_Timer(A5) */
       uint16_t _mv = (uint16_t)(W(d7));
       WRITE16(a5 + (intptr_t)dtg_Timer, _mv);
@@ -4372,7 +4385,14 @@ EndSound:
 
 /* --- StartNote --- */
 static void StartNote(void) {
-  WRITE32_PRE(sp, a3); WRITE32_PRE(sp, a2); WRITE32_PRE(sp, a1); WRITE32_PRE(sp, a0); WRITE32_PRE(sp, d4); WRITE32_PRE(sp, d2); WRITE32_PRE(sp, d1); WRITE32_PRE(sp, d0);  /* MOVEM.L	D0,D1,D2,D4,A0,A1,A2,A3,-(SP) */
+  WRITE32_PRE(sp, a3);  /* MOVEM.L	D0,D1,D2,D4,A0,A1,A2,A3,-(SP) */
+    WRITE32_PRE(sp, a2);
+    WRITE32_PRE(sp, a1);
+    WRITE32_PRE(sp, a0);
+    WRITE32_PRE(sp, d4);
+    WRITE32_PRE(sp, d2);
+    WRITE32_PRE(sp, d1);
+    WRITE32_PRE(sp, d0);
   {  /* MOVE.L	A0,D4 */
       uint32_t _mv = (uint32_t)(a0);
       d4 = _mv;
@@ -4470,7 +4490,14 @@ lbC01E192:
       flag_v = 0; flag_c = 0;
     }
 lbC01E1BA:
-  { uint32_t _mv = READ32_POST(sp); d0 = _mv; } { uint32_t _mv = READ32_POST(sp); d1 = _mv; } { uint32_t _mv = READ32_POST(sp); d2 = _mv; } { uint32_t _mv = READ32_POST(sp); d4 = _mv; } { uint32_t _mv = READ32_POST(sp); a0 = _mv; } { uint32_t _mv = READ32_POST(sp); a1 = _mv; } { uint32_t _mv = READ32_POST(sp); a2 = _mv; } { uint32_t _mv = READ32_POST(sp); a3 = _mv; }  /* MOVEM.L	(SP)+,D0,D1,D2,D4,A0,A1,A2,A3 */
+  d0 = READ32_POST(sp);  /* MOVEM.L	(SP)+,D0,D1,D2,D4,A0,A1,A2,A3 */
+    d1 = READ32_POST(sp);
+    d2 = READ32_POST(sp);
+    d4 = READ32_POST(sp);
+    a0 = READ32_POST(sp);
+    a1 = READ32_POST(sp);
+    a2 = READ32_POST(sp);
+    a3 = READ32_POST(sp);
   return;  /* RTS */
   /* RELEASESOUND	MOVE.L	D0,-(SP) */
   /* CLR.L	$4A4(A6) */
@@ -4485,7 +4512,8 @@ lbC01E1BA:
 
 /* --- ReleaseNote --- */
 static void ReleaseNote(void) {
-  WRITE32_PRE(sp, a1); WRITE32_PRE(sp, d0);  /* MOVEM.L	D0,A1,-(SP) */
+  WRITE32_PRE(sp, a1);  /* MOVEM.L	D0,A1,-(SP) */
+    WRITE32_PRE(sp, d0);
   a1 = (uint32_t)(a6 + 522);  /* LEA	522(A6),A1 */
   W(d0) = (uint32_t)(int32_t)(int16_t)(int8_t)W(d0);  /* EXT.W	D0 */
   d0 = (uint32_t)((uint16_t)0x54 * (uint16_t)W(d0));  /* MULU.W	#$54,D0 */
@@ -4499,7 +4527,7 @@ static void ReleaseNote(void) {
       flag_n = (_cmp < 0);
       flag_c = ((uint32_t)_lhs < (uint32_t)_rhs);
     }
-  if (!flag_z) goto lbC01E1F8;  /* not equal / nonzero */  /* BNE.S	lbC01E1F8 */
+  if (flag_z) {
   {  /* MOVE.B	#2,0(A1) */
       uint8_t _mv = (uint8_t)(2);
       WRITE8(a1 + 0, _mv);
@@ -4507,8 +4535,9 @@ static void ReleaseNote(void) {
       flag_n = ((int8_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-lbC01E1F8:
-  { uint32_t _mv = READ32_POST(sp); d0 = _mv; } { uint32_t _mv = READ32_POST(sp); a1 = _mv; }  /* MOVEM.L	(SP)+,D0,A1 */
+  }
+  d0 = READ32_POST(sp);  /* MOVEM.L	(SP)+,D0,A1 */
+    a1 = READ32_POST(sp);
   return;  /* RTS */
   /* STOPSOUND	MOVE.L	D0,-(SP) */
   /* CLR.L	$4A4(A6) */
@@ -4523,7 +4552,10 @@ lbC01E1F8:
 
 /* --- StopNote --- */
 static void StopNote(void) {
-  WRITE32_PRE(sp, a1); WRITE32_PRE(sp, a0); WRITE32_PRE(sp, d7); WRITE32_PRE(sp, d0);  /* MOVEM.L	D0,D7,A0,A1,-(SP) */
+  WRITE32_PRE(sp, a1);  /* MOVEM.L	D0,D7,A0,A1,-(SP) */
+    WRITE32_PRE(sp, a0);
+    WRITE32_PRE(sp, d7);
+    WRITE32_PRE(sp, d0);
   W(d0) = (uint32_t)(int32_t)(int16_t)(int8_t)W(d0);  /* EXT.W	D0 */
   {  /* MOVE.W	D0,D7 */
       uint16_t _mv = (uint16_t)(W(d0));
@@ -4545,7 +4577,7 @@ static void StopNote(void) {
       flag_n = (_cmp < 0);
       flag_c = ((uint32_t)_lhs < (uint32_t)_rhs);
     }
-  if (flag_z) goto lbC01E240;  /* equal / zero */  /* BEQ.S	lbC01E240 */
+  if (!(flag_z)) {
   {  /* MOVE.B	#0,1(A1) */
       uint8_t _mv = (uint8_t)(0);
       WRITE8(a1 + 1, _mv);
@@ -4554,8 +4586,11 @@ static void StopNote(void) {
       flag_v = 0; flag_c = 0;
     }
   lbC01EA46();  /* BSR.L	lbC01EA46 */
-lbC01E240:
-  { uint32_t _mv = READ32_POST(sp); d0 = _mv; } { uint32_t _mv = READ32_POST(sp); d7 = _mv; } { uint32_t _mv = READ32_POST(sp); a0 = _mv; } { uint32_t _mv = READ32_POST(sp); a1 = _mv; }  /* MOVEM.L	(SP)+,D0,D7,A0,A1 */
+  }
+  d0 = READ32_POST(sp);  /* MOVEM.L	(SP)+,D0,D7,A0,A1 */
+    d7 = READ32_POST(sp);
+    a0 = READ32_POST(sp);
+    a1 = READ32_POST(sp);
   return;  /* RTS */
   /* lbC01E246	BSR.L	StealTrack */
   /* BSET	D0,$57(A6) */
@@ -4595,7 +4630,7 @@ static void lbC01E286(void) {
       flag_n = ((int32_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-  if (flag_z) goto lbC01E29E;  /* equal / zero */  /* BEQ.S	lbC01E29E */
+  if (!(flag_z)) {
   WRITE32(a1 + 12, 0);  /* CLR.L	12(A1) */
   {  /* MOVE.W	16(A1),4(A2) */
       uint16_t _mv = (uint16_t)(READ16(a1 + 16));
@@ -4630,7 +4665,7 @@ static void lbC01E286(void) {
   SetPer();  /* BSR.W	SetPer */
   d6 = d6 | (1u << (d7 & 31));  /* BSET	D7,D6 */
   goto lbC01E2B2;  /* BRA.S	lbC01E2B2 */
-lbC01E29E:
+  }
   {  /* MOVE.L	18(A1),D1 */
       uint32_t _mv = (uint32_t)(READ32(a1 + 18));
       d1 = _mv;
@@ -4638,7 +4673,7 @@ lbC01E29E:
       flag_n = ((int32_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-  if (flag_z) goto lbC01E2B2;  /* equal / zero */  /* BEQ.S	lbC01E2B2 */
+  if (!(flag_z)) {
   WRITE32(a1 + 18, 0);  /* CLR.L	18(A1) */
   {  /* MOVE.W	22(A1),4(A2) */
       uint16_t _mv = (uint16_t)(READ16(a1 + 22));
@@ -4658,7 +4693,7 @@ lbC01E29E:
   /* bsr.w	SetAdr */
   /* move.w	$16(A1),D0 */
   /* bsr.w	SetLen */
-lbC01E2B2:
+  }
   {  /* MOVE.W	24(A1),6(A2) */
       uint16_t _mv = (uint16_t)(READ16(a1 + 24));
       WRITE16(a2 + 6, _mv);
@@ -4683,7 +4718,8 @@ lbC01E2B2:
 
 /* --- lbC01E2C0 --- */
 static void lbC01E2C0(void) {
-  WRITE32_PRE(sp, a2); WRITE32_PRE(sp, d2);  /* MOVEM.L	D2,A2,-(SP) */
+  WRITE32_PRE(sp, a2);  /* MOVEM.L	D2,A2,-(SP) */
+    WRITE32_PRE(sp, d2);
   a2 = a0;  /* MOVEA.L	A0,A2 */
   {  /* MOVE.L	D0,D2 */
       uint32_t _mv = (uint32_t)(d0);
@@ -4706,13 +4742,13 @@ static void lbC01E2C0(void) {
       flag_n = ((int32_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-  if (!flag_z) goto lbC01E2DA;  /* not equal / nonzero */  /* BNE.S	lbC01E2DA */
+  if (flag_z) {
   a0 = READ32(a6 + 994);  /* MOVEA.L	994(A6),A0 */
   a0 = (uint32_t)((int32_t)a0 + (int32_t)(int16_t)(0x400));  /* ADDA.W	#$400,A0 */
   d0 = (uint32_t)(int32_t)(int8_t)(8);  /* MOVEQ	#8,D0 */
-lbC01E2DA:
+  }
   flag_z = ((READ32(a1 + 10) & (1u << (0 & 31))) == 0);  /* BTST	#0,10(A1) */
-  if (flag_z) goto lbC01E2E6;  /* equal / zero */  /* BEQ.S	lbC01E2E6 */
+  if (!(flag_z)) {
   a2 = a0;  /* MOVEA.L	A0,A2 */
   {  /* MOVE.L	D0,D2 */
       uint32_t _mv = (uint32_t)(d0);
@@ -4721,14 +4757,14 @@ lbC01E2DA:
       flag_n = ((int32_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-lbC01E2E6:
+  }
   {  /* TST.L	D1 */
       uint32_t _tst = (uint32_t)(d1);
       flag_z = (_tst == 0);
       flag_n = ((int32_t)(_tst) < 0);
       flag_c = 0; flag_v = 0;
     }
-  if (!flag_z) goto lbC01E2EE;  /* not equal / nonzero */  /* BNE.S	lbC01E2EE */
+  if (flag_z) {
   {  /* MOVE.L	D2,28(A1) */
       uint32_t _mv = (uint32_t)(d2);
       WRITE32(a1 + 28, _mv);
@@ -4736,7 +4772,7 @@ lbC01E2E6:
       flag_n = ((int32_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-lbC01E2EE:
+  }
   {  /* MOVE.L	A2,12(A1) */
       uint32_t _mv = (uint32_t)(a2);
       WRITE32(a1 + 12, _mv);
@@ -4767,7 +4803,8 @@ lbC01E2EE:
       flag_n = ((int16_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-  { uint32_t _mv = READ32_POST(sp); d2 = _mv; } { uint32_t _mv = READ32_POST(sp); a2 = _mv; }  /* MOVEM.L	(SP)+,D2,A2 */
+  d2 = READ32_POST(sp);  /* MOVEM.L	(SP)+,D2,A2 */
+    a2 = READ32_POST(sp);
   return;  /* RTS */
 }
 
@@ -4789,14 +4826,14 @@ static void lbC01E308(void) {
       flag_v = 0; flag_c = 0;
     }
   flag_z = ((READ32(a6 + 88) & (1u << (d7 & 31))) == 0);  /* BTST	D7,88(A6) */
-  if (flag_z) goto lbC01E314;  /* equal / zero */  /* BEQ.S	lbC01E314 */
+  if (!(flag_z)) {
   {  /* ADDQ.W	#4,D0 */
       uint16_t _ar = (uint16_t)(W(d0) + 4);
       W(d0) = (uint16_t)((uint16_t)_ar);
       flag_z = ((int16_t)(_ar) == 0);
       flag_n = ((int16_t)(_ar) < 0);
     }
-lbC01E314:
+  }
   {  /* ADD.W	D0,D0 */
       uint16_t _ar = (uint16_t)(W(d0) + W(d0));
       W(d0) = (uint16_t)((uint16_t)_ar);
@@ -4838,7 +4875,9 @@ lbC01E314:
 
 /* --- lbC01E328 --- */
 static void lbC01E328(void) {
-  WRITE32_PRE(sp, a0); WRITE32_PRE(sp, d7); WRITE32_PRE(sp, d1);  /* MOVEM.L	D1,D7,A0,-(SP) */
+  WRITE32_PRE(sp, a0);  /* MOVEM.L	D1,D7,A0,-(SP) */
+    WRITE32_PRE(sp, d7);
+    WRITE32_PRE(sp, d1);
   {  /* ADD.W	D7,D7 */
       uint16_t _ar = (uint16_t)(W(d7) + W(d7));
       W(d7) = (uint16_t)((uint16_t)_ar);
@@ -4858,7 +4897,7 @@ static void lbC01E328(void) {
       flag_n = ((int16_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-  if (flag_z) goto lbC01E33A;  /* equal / zero */  /* BEQ.S	lbC01E33A */
+  if (!(flag_z)) {
   {  /* MOVE.W	D1,D0 */
       uint16_t _mv = (uint16_t)(W(d1));
       W(d0) = (uint16_t)_mv;
@@ -4867,7 +4906,7 @@ static void lbC01E328(void) {
       flag_v = 0; flag_c = 0;
     }
   goto lbC01E356;  /* BRA.S	lbC01E356 */
-lbC01E33A:
+  }
   {  /* MOVE.W	56(A6),D1 */
       uint16_t _mv = (uint16_t)(READ16(a6 + 56));
       W(d1) = (uint16_t)_mv;
@@ -4875,7 +4914,7 @@ lbC01E33A:
       flag_n = ((int16_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-  if (flag_z) goto lbC01E356;  /* equal / zero */  /* BEQ.S	lbC01E356 */
+  if (!(flag_z)) {
   {  /* ADDI.B	#$80,D1 */
       uint8_t _ar = (uint8_t)(B(d1) + 0x80);
       B(d1) = (uint8_t)((uint8_t)_ar);
@@ -4905,15 +4944,18 @@ lbC01E33A:
       flag_n = ((int32_t)(_ar) < 0);
     }
   d0 = (d0 >> 16) | (d0 << 16);  /* SWAP	D0 */
-lbC01E356:
-  { uint32_t _mv = READ32_POST(sp); d1 = _mv; } { uint32_t _mv = READ32_POST(sp); d7 = _mv; } { uint32_t _mv = READ32_POST(sp); a0 = _mv; }  /* MOVEM.L	(SP)+,D1,D7,A0 */
+  }
+  d1 = READ32_POST(sp);  /* MOVEM.L	(SP)+,D1,D7,A0 */
+    d7 = READ32_POST(sp);
+    a0 = READ32_POST(sp);
   return;  /* RTS */
 }
 
 
 /* --- lbC01E35C --- */
 static void lbC01E35C(void) {
-  WRITE32_PRE(sp, d2); WRITE32_PRE(sp, d1);  /* MOVEM.L	D1,D2,-(SP) */
+  WRITE32_PRE(sp, d2);  /* MOVEM.L	D1,D2,-(SP) */
+    WRITE32_PRE(sp, d1);
   {  /* MOVE.L	28(A1),D2 */
       uint32_t _mv = (uint32_t)(READ32(a1 + 28));
       d2 = _mv;
@@ -4921,7 +4963,7 @@ static void lbC01E35C(void) {
       flag_n = ((int32_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-  if (flag_z||(flag_n!=flag_v)) goto lbC01E382;  /* less or equal (signed) */  /* BLE.S	lbC01E382 */
+  if (!(flag_z||(flag_n!=flag_v))) {
   {  /* MOVE.L	#$E90B,D1 */
       uint32_t _mv = (uint32_t)(0xE90B);
       d1 = _mv;
@@ -4959,15 +5001,18 @@ lbC01E37E:
       flag_n = ((int32_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-lbC01E382:
-  { uint32_t _mv = READ32_POST(sp); d1 = _mv; } { uint32_t _mv = READ32_POST(sp); d2 = _mv; }  /* MOVEM.L	(SP)+,D1,D2 */
+  }
+  d1 = READ32_POST(sp);  /* MOVEM.L	(SP)+,D1,D2 */
+    d2 = READ32_POST(sp);
   return;  /* RTS */
 }
 
 
 /* --- lbC01E388 --- */
 static void lbC01E388(void) {
-  WRITE32_PRE(sp, d2); WRITE32_PRE(sp, d1); WRITE32_PRE(sp, d0);  /* MOVEM.L	D0,D1,D2,-(SP) */
+  WRITE32_PRE(sp, d2);  /* MOVEM.L	D0,D1,D2,-(SP) */
+    WRITE32_PRE(sp, d1);
+    WRITE32_PRE(sp, d0);
   W(d0) = (uint32_t)(int32_t)(int16_t)(int8_t)W(d0);  /* EXT.W	D0 */
   {  /* ADD.W	D0,D0 */
       uint16_t _ar = (uint16_t)(W(d0) + W(d0));
@@ -4987,7 +5032,7 @@ static void lbC01E388(void) {
       flag_n = ((int16_t)(_tst) < 0);
       flag_c = 0; flag_v = 0;
     }
-  if (flag_z) goto lbC01E3A0;  /* equal / zero */  /* BEQ.S	lbC01E3A0 */
+  if (!(flag_z)) {
   {  /* MOVE.L	#$369E99,D2 */
       uint32_t _mv = (uint32_t)(0x369E99);
       d2 = _mv;
@@ -5007,7 +5052,7 @@ static void lbC01E388(void) {
       flag_n = ((int16_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-lbC01E3A0:
+  }
   {  /* MOVE.W	D1,72(A6) */
       uint16_t _mv = (uint16_t)(W(d1));
       WRITE16(a6 + 72, _mv);
@@ -5015,7 +5060,9 @@ lbC01E3A0:
       flag_n = ((int16_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-  { uint32_t _mv = READ32_POST(sp); d0 = _mv; } { uint32_t _mv = READ32_POST(sp); d1 = _mv; } { uint32_t _mv = READ32_POST(sp); d2 = _mv; }  /* MOVEM.L	(SP)+,D0,D1,D2 */
+  d0 = READ32_POST(sp);  /* MOVEM.L	(SP)+,D0,D1,D2 */
+    d1 = READ32_POST(sp);
+    d2 = READ32_POST(sp);
   return;  /* RTS */
   /* instr.MSG	dc.b	'.instr',0,0 */
 }
@@ -5040,7 +5087,11 @@ static void InitScore(void) {
   /* BSR.L	lbC01FEDE			; get size + read */
   /* MOVE.L	A0,$6E(A5)			; song ptr */
   /* BEQ.L	lbC01E4F4 */
-  WRITE32_PRE(sp, d6); WRITE32_PRE(sp, d5); WRITE32_PRE(sp, d4); WRITE32_PRE(sp, d3); WRITE32_PRE(sp, d2);  /* MOVEM.L	D2,D3,D4,D5,D6,-(SP) */
+  WRITE32_PRE(sp, d6);  /* MOVEM.L	D2,D3,D4,D5,D6,-(SP) */
+    WRITE32_PRE(sp, d5);
+    WRITE32_PRE(sp, d4);
+    WRITE32_PRE(sp, d3);
+    WRITE32_PRE(sp, d2);
   a5 = (uint32_t)(uintptr_t)Buffer2;  /* LEA	Buffer2,A5 */
   d1 = (uint32_t)(int32_t)(int8_t)(0);  /* MOVEQ	#0,D1 */
   a4 = a0;  /* MOVEA.L	A0,A4 */
@@ -5068,8 +5119,7 @@ static void InitScore(void) {
   a0 = a5;  /* MOVEA.L	A5,A0 */
   a1 = (uint32_t)(a4 + 20);  /* LEA	20(A4),A1 */
   a2 = (uint32_t)(a4 + 0);  /* LEA	0(A4),A2 */
-  d7 = (uint32_t)(int32_t)(int8_t)(3);  /* MOVEQ	#3,D7 */
-lbC01E490:
+  for (int _i_d7 = 3; _i_d7 >= 0; _i_d7--) {
   {  /* MOVE.L	A1,26(A0) */
       uint32_t _mv = (uint32_t)(a1);
       WRITE32(a0 + 26, _mv);
@@ -5085,14 +5135,14 @@ lbC01E490:
       flag_n = (_cmp < 0);
       flag_c = ((uint32_t)_lhs < (uint32_t)_rhs);
     }
-  if (flag_z) goto NoV;  /* equal / zero */  /* BEQ.B	NoV */
+  if (!(flag_z)) {
   {  /* ADDQ.L	#1,D1 */
       uint32_t _ar = (uint32_t)(d1 + 1);
       d1 = (uint32_t)_ar;
       flag_z = ((int32_t)(_ar) == 0);
       flag_n = ((int32_t)(_ar) < 0);
     }
-NoV:
+  }
   a1 = (uint32_t)((int32_t)a1 + (int32_t)(int16_t)(READ32_POST(a2)));  /* ADDA.L	(A2)+,A1 */
   {  /* MOVE.B	#$FF,13(A0) */
       uint8_t _mv = (uint8_t)(0xFF);
@@ -5102,7 +5152,7 @@ NoV:
       flag_v = 0; flag_c = 0;
     }
   a0 = (uint32_t)((int32_t)a0 + (int32_t)(int16_t)(4));  /* ADDQ.L	#4,A0 */
-  if ((int16_t)(--d7) >= 0) goto lbC01E490;  /* DBRA	D7,lbC01E490 */
+}
   {  /* MOVE.L	A1,D0 */
       uint32_t _mv = (uint32_t)(a1);
       d0 = _mv;
@@ -5110,7 +5160,11 @@ NoV:
       flag_n = ((int32_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-  { uint32_t _mv = READ32_POST(sp); d2 = _mv; } { uint32_t _mv = READ32_POST(sp); d3 = _mv; } { uint32_t _mv = READ32_POST(sp); d4 = _mv; } { uint32_t _mv = READ32_POST(sp); d5 = _mv; } { uint32_t _mv = READ32_POST(sp); d6 = _mv; }  /* MOVEM.L	(SP)+,D2,D3,D4,D5,D6 */
+  d2 = READ32_POST(sp);  /* MOVEM.L	(SP)+,D2,D3,D4,D5,D6 */
+    d3 = READ32_POST(sp);
+    d4 = READ32_POST(sp);
+    d5 = READ32_POST(sp);
+    d6 = READ32_POST(sp);
   /* MOVEA.L	A1,A2 */
   /* LEA	$2A(A5),A3			; sample number */
   /* lbC01E4A8	TST.B	(A2) */
@@ -5206,7 +5260,21 @@ NoV:
 
 /* --- PlayScore --- */
 static void PlayScore(void) {
-  WRITE32_PRE(sp, a6); WRITE32_PRE(sp, a5); WRITE32_PRE(sp, a4); WRITE32_PRE(sp, a3); WRITE32_PRE(sp, a2); WRITE32_PRE(sp, a1); WRITE32_PRE(sp, a0); WRITE32_PRE(sp, d7); WRITE32_PRE(sp, d6); WRITE32_PRE(sp, d5); WRITE32_PRE(sp, d4); WRITE32_PRE(sp, d3); WRITE32_PRE(sp, d2); WRITE32_PRE(sp, d1); WRITE32_PRE(sp, d0);  /* MOVEM.L	D0,D1,D2,D3,D4,D5,D6,D7,A0,A1,A2,A3,A4,A5,A6,-(SP) */
+  WRITE32_PRE(sp, a6);  /* MOVEM.L	D0,D1,D2,D3,D4,D5,D6,D7,A0,A1,A2,A3,A4,A5,A6,-(SP) */
+    WRITE32_PRE(sp, a5);
+    WRITE32_PRE(sp, a4);
+    WRITE32_PRE(sp, a3);
+    WRITE32_PRE(sp, a2);
+    WRITE32_PRE(sp, a1);
+    WRITE32_PRE(sp, a0);
+    WRITE32_PRE(sp, d7);
+    WRITE32_PRE(sp, d6);
+    WRITE32_PRE(sp, d5);
+    WRITE32_PRE(sp, d4);
+    WRITE32_PRE(sp, d3);
+    WRITE32_PRE(sp, d2);
+    WRITE32_PRE(sp, d1);
+    WRITE32_PRE(sp, d0);
   {  /* MOVE.W	D2,D7 */
       uint16_t _mv = (uint16_t)(W(d2));
       W(d7) = (uint16_t)_mv;
@@ -5293,7 +5361,21 @@ static void PlayScore(void) {
       flag_v = 0; flag_c = 0;
     }
 lbC01E5F4:
-  { uint32_t _mv = READ32_POST(sp); d0 = _mv; } { uint32_t _mv = READ32_POST(sp); d1 = _mv; } { uint32_t _mv = READ32_POST(sp); d2 = _mv; } { uint32_t _mv = READ32_POST(sp); d3 = _mv; } { uint32_t _mv = READ32_POST(sp); d4 = _mv; } { uint32_t _mv = READ32_POST(sp); d5 = _mv; } { uint32_t _mv = READ32_POST(sp); d6 = _mv; } { uint32_t _mv = READ32_POST(sp); d7 = _mv; } { uint32_t _mv = READ32_POST(sp); a0 = _mv; } { uint32_t _mv = READ32_POST(sp); a1 = _mv; } { uint32_t _mv = READ32_POST(sp); a2 = _mv; } { uint32_t _mv = READ32_POST(sp); a3 = _mv; } { uint32_t _mv = READ32_POST(sp); a4 = _mv; } { uint32_t _mv = READ32_POST(sp); a5 = _mv; } { uint32_t _mv = READ32_POST(sp); a6 = _mv; }  /* MOVEM.L	(SP)+,D0,D1,D2,D3,D4,D5,D6,D7,A0,A1,A2,A3,A4,A5,A6 */
+  d0 = READ32_POST(sp);  /* MOVEM.L	(SP)+,D0,D1,D2,D3,D4,D5,D6,D7,A0,A1,A2,A3,A4,A5,A6 */
+    d1 = READ32_POST(sp);
+    d2 = READ32_POST(sp);
+    d3 = READ32_POST(sp);
+    d4 = READ32_POST(sp);
+    d5 = READ32_POST(sp);
+    d6 = READ32_POST(sp);
+    d7 = READ32_POST(sp);
+    a0 = READ32_POST(sp);
+    a1 = READ32_POST(sp);
+    a2 = READ32_POST(sp);
+    a3 = READ32_POST(sp);
+    a4 = READ32_POST(sp);
+    a5 = READ32_POST(sp);
+    a6 = READ32_POST(sp);
   return;  /* RTS */
 }
 
@@ -5302,7 +5384,8 @@ lbC01E5F4:
 static void StopScore(void) {
   /* CLR.L	$4A4(A6) */
 lbC01E5FE:
-  WRITE32_PRE(sp, a0); WRITE32_PRE(sp, d0);  /* MOVEM.L	D0,A0,-(SP) */
+  WRITE32_PRE(sp, a0);  /* MOVEM.L	D0,A0,-(SP) */
+    WRITE32_PRE(sp, d0);
   /* BCLR	#0,$56(A6) */
   {  /* TST.W	8(A6) */
       uint16_t _tst = (uint16_t)(READ16(a6 + 8));
@@ -5310,7 +5393,7 @@ lbC01E5FE:
       flag_n = ((int16_t)(_tst) < 0);
       flag_c = 0; flag_v = 0;
     }
-  if (flag_z) goto lbC01E62C;  /* equal / zero */  /* BEQ.S	lbC01E62C */
+  if (!(flag_z)) {
   WRITE16(a6 + 8, 0);  /* CLR.W	8(A6) */
   d0 = (uint32_t)(int32_t)(int8_t)(0);  /* MOVEQ	#0,D0 */
 lbC01E614:
@@ -5334,15 +5417,30 @@ lbC01E61E:
     }
   if (!flag_z) goto lbC01E614;  /* not equal / nonzero */  /* BNE.S	lbC01E614 */
   /* ANDI.B	#$F0,$59(A6) */
-lbC01E62C:
-  { uint32_t _mv = READ32_POST(sp); d0 = _mv; } { uint32_t _mv = READ32_POST(sp); a0 = _mv; }  /* MOVEM.L	(SP)+,D0,A0 */
+  }
+  d0 = READ32_POST(sp);  /* MOVEM.L	(SP)+,D0,A0 */
+    a0 = READ32_POST(sp);
   return;  /* RTS */
 }
 
 
 /* --- lbC01E632 --- */
 static void lbC01E632(void) {
-  WRITE32_PRE(sp, a6); WRITE32_PRE(sp, a5); WRITE32_PRE(sp, a4); WRITE32_PRE(sp, a3); WRITE32_PRE(sp, a2); WRITE32_PRE(sp, a1); WRITE32_PRE(sp, a0); WRITE32_PRE(sp, d7); WRITE32_PRE(sp, d6); WRITE32_PRE(sp, d5); WRITE32_PRE(sp, d4); WRITE32_PRE(sp, d3); WRITE32_PRE(sp, d2); WRITE32_PRE(sp, d1); WRITE32_PRE(sp, d0);  /* MOVEM.L	D0,D1,D2,D3,D4,D5,D6,D7,A0,A1,A2,A3,A4,A5,A6,-(SP) */
+  WRITE32_PRE(sp, a6);  /* MOVEM.L	D0,D1,D2,D3,D4,D5,D6,D7,A0,A1,A2,A3,A4,A5,A6,-(SP) */
+    WRITE32_PRE(sp, a5);
+    WRITE32_PRE(sp, a4);
+    WRITE32_PRE(sp, a3);
+    WRITE32_PRE(sp, a2);
+    WRITE32_PRE(sp, a1);
+    WRITE32_PRE(sp, a0);
+    WRITE32_PRE(sp, d7);
+    WRITE32_PRE(sp, d6);
+    WRITE32_PRE(sp, d5);
+    WRITE32_PRE(sp, d4);
+    WRITE32_PRE(sp, d3);
+    WRITE32_PRE(sp, d2);
+    WRITE32_PRE(sp, d1);
+    WRITE32_PRE(sp, d0);
   WRITE16(a6 + 892, 0);  /* CLR.W	892(A6) */
   {  /* MOVE.B	#15,890(A6) */
       uint8_t _mv = (uint8_t)(15);
@@ -5388,7 +5486,7 @@ lbC01E64A:
       flag_n = ((int32_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-lbC01E666:
+do {
   {  /* MOVE.L	A2,4(A1) */
       uint32_t _mv = (uint32_t)(a2);
       WRITE32(a1 + 4, _mv);
@@ -5425,7 +5523,7 @@ lbC01E666:
       flag_n = ((int16_t)(_tst) < 0);
       flag_c = 0; flag_v = 0;
     }
-  if (!flag_n) goto lbC01E666;  /* plus / positive */  /* BPL.S	lbC01E666 */
+} while (!flag_n);
   {  /* CMPI.W	#$8100,D0 */
       int32_t _lhs = (int32_t)(W(d0));
       int32_t _rhs = (int32_t)(0x8100);
@@ -5558,18 +5656,46 @@ lbC01E6CE:
       flag_c = ((uint32_t)_lhs < (uint32_t)_rhs);
     }
   if (!flag_z) goto lbC01E64A;  /* not equal / nonzero */  /* BNE.L	lbC01E64A */
-  { uint32_t _mv = READ32_POST(sp); d0 = _mv; } { uint32_t _mv = READ32_POST(sp); d1 = _mv; } { uint32_t _mv = READ32_POST(sp); d2 = _mv; } { uint32_t _mv = READ32_POST(sp); d3 = _mv; } { uint32_t _mv = READ32_POST(sp); d4 = _mv; } { uint32_t _mv = READ32_POST(sp); d5 = _mv; } { uint32_t _mv = READ32_POST(sp); d6 = _mv; } { uint32_t _mv = READ32_POST(sp); d7 = _mv; } { uint32_t _mv = READ32_POST(sp); a0 = _mv; } { uint32_t _mv = READ32_POST(sp); a1 = _mv; } { uint32_t _mv = READ32_POST(sp); a2 = _mv; } { uint32_t _mv = READ32_POST(sp); a3 = _mv; } { uint32_t _mv = READ32_POST(sp); a4 = _mv; } { uint32_t _mv = READ32_POST(sp); a5 = _mv; } { uint32_t _mv = READ32_POST(sp); a6 = _mv; }  /* MOVEM.L	(SP)+,D0,D1,D2,D3,D4,D5,D6,D7,A0,A1,A2,A3,A4,A5,A6 */
+  d0 = READ32_POST(sp);  /* MOVEM.L	(SP)+,D0,D1,D2,D3,D4,D5,D6,D7,A0,A1,A2,A3,A4,A5,A6 */
+    d1 = READ32_POST(sp);
+    d2 = READ32_POST(sp);
+    d3 = READ32_POST(sp);
+    d4 = READ32_POST(sp);
+    d5 = READ32_POST(sp);
+    d6 = READ32_POST(sp);
+    d7 = READ32_POST(sp);
+    a0 = READ32_POST(sp);
+    a1 = READ32_POST(sp);
+    a2 = READ32_POST(sp);
+    a3 = READ32_POST(sp);
+    a4 = READ32_POST(sp);
+    a5 = READ32_POST(sp);
+    a6 = READ32_POST(sp);
   return;  /* RTS */
 }
 
 
 /* --- lbC01E6E2 --- */
 static void lbC01E6E2(void) {
-  WRITE32_PRE(sp, a6); WRITE32_PRE(sp, a5); WRITE32_PRE(sp, a4); WRITE32_PRE(sp, a3); WRITE32_PRE(sp, a2); WRITE32_PRE(sp, a1); WRITE32_PRE(sp, a0); WRITE32_PRE(sp, d7); WRITE32_PRE(sp, d6); WRITE32_PRE(sp, d5); WRITE32_PRE(sp, d4); WRITE32_PRE(sp, d3); WRITE32_PRE(sp, d2); WRITE32_PRE(sp, d1); WRITE32_PRE(sp, d0);  /* MOVEM.L	D0,D1,D2,D3,D4,D5,D6,D7,A0,A1,A2,A3,A4,A5,A6,-(SP) */
+  WRITE32_PRE(sp, a6);  /* MOVEM.L	D0,D1,D2,D3,D4,D5,D6,D7,A0,A1,A2,A3,A4,A5,A6,-(SP) */
+    WRITE32_PRE(sp, a5);
+    WRITE32_PRE(sp, a4);
+    WRITE32_PRE(sp, a3);
+    WRITE32_PRE(sp, a2);
+    WRITE32_PRE(sp, a1);
+    WRITE32_PRE(sp, a0);
+    WRITE32_PRE(sp, d7);
+    WRITE32_PRE(sp, d6);
+    WRITE32_PRE(sp, d5);
+    WRITE32_PRE(sp, d4);
+    WRITE32_PRE(sp, d3);
+    WRITE32_PRE(sp, d2);
+    WRITE32_PRE(sp, d1);
+    WRITE32_PRE(sp, d0);
   a2 = (uint32_t)(a6 + 890);  /* LEA	890(A6),A2 */
   a1 = (uint32_t)(a6 + 942);  /* LEA	942(A6),A1 */
   d7 = (uint32_t)(int32_t)(int8_t)(0x19);  /* MOVEQ	#$19,D7 */
-lbC01E6F0:
+do {
   {  /* MOVE.W	(A2)+,(A1)+ */
       uint16_t _mv = (uint16_t)(READ16_POST(a2));
       WRITE16_POST(a1, _mv);
@@ -5577,7 +5703,7 @@ lbC01E6F0:
       flag_n = ((int16_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-  if ((int16_t)(--d7) >= 0) goto lbC01E6F0;  /* DBRA	D7,lbC01E6F0 */
+} while ((int16_t)(--d7) >= 0);
   {  /* MOVE.W	944(A6),D0 */
       uint16_t _mv = (uint16_t)(READ16(a6 + 944));
       W(d0) = (uint16_t)_mv;
@@ -5585,7 +5711,7 @@ lbC01E6F0:
       flag_n = ((int16_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-  if (flag_z) goto lbC01E700;  /* equal / zero */  /* BEQ.S	lbC01E700 */
+  if (!(flag_z)) {
   {  /* MOVE.W	D0,0(A6) */
       uint16_t _mv = (uint16_t)(W(d0));
       WRITE16(a6 + 0, _mv);
@@ -5593,7 +5719,7 @@ lbC01E6F0:
       flag_n = ((int16_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-lbC01E700:
+  }
   {  /* MOVE.L	10(A6),14(A6) */
       uint32_t _mv = (uint32_t)(READ32(a6 + 10));
       WRITE32(a6 + 14, _mv);
@@ -5606,7 +5732,7 @@ lbC01E700:
   B(d7) = (uint8_t)(0);  /* CLR.B	D7 */
 lbC01E70C:
   flag_z = ((READ32(a6 + 88) & (1u << (d7 & 31))) == 0);  /* BTST	D7,88(A6) */
-  if (!flag_z) goto lbC01E718;  /* not equal / nonzero */  /* BNE.S	lbC01E718 */
+  if (flag_z) {
   {  /* MOVE.B	D7,D0 */
       uint8_t _mv = (uint8_t)(B(d7));
       B(d0) = (uint8_t)_mv;
@@ -5615,7 +5741,7 @@ lbC01E70C:
       flag_v = 0; flag_c = 0;
     }
   ReleaseNote();  /* BSR.L	ReleaseNote */
-lbC01E718:
+  }
   d0 = 0;  /* CLR.L	D0 */
   {  /* MOVE.W	962(A4),D0 */
       uint16_t _mv = (uint16_t)(READ16(a4 + 962));
@@ -5716,7 +5842,21 @@ lbC01E744:
   if (flag_c) goto lbC01E70C;  /* carry set / below */  /* BCS.S	lbC01E70C */
   /* MOVE.B	$3AE(A6),D0 */
   /* OR.B	D0,$59(A6) */
-  { uint32_t _mv = READ32_POST(sp); d0 = _mv; } { uint32_t _mv = READ32_POST(sp); d1 = _mv; } { uint32_t _mv = READ32_POST(sp); d2 = _mv; } { uint32_t _mv = READ32_POST(sp); d3 = _mv; } { uint32_t _mv = READ32_POST(sp); d4 = _mv; } { uint32_t _mv = READ32_POST(sp); d5 = _mv; } { uint32_t _mv = READ32_POST(sp); d6 = _mv; } { uint32_t _mv = READ32_POST(sp); d7 = _mv; } { uint32_t _mv = READ32_POST(sp); a0 = _mv; } { uint32_t _mv = READ32_POST(sp); a1 = _mv; } { uint32_t _mv = READ32_POST(sp); a2 = _mv; } { uint32_t _mv = READ32_POST(sp); a3 = _mv; } { uint32_t _mv = READ32_POST(sp); a4 = _mv; } { uint32_t _mv = READ32_POST(sp); a5 = _mv; } { uint32_t _mv = READ32_POST(sp); a6 = _mv; }  /* MOVEM.L	(SP)+,D0,D1,D2,D3,D4,D5,D6,D7,A0,A1,A2,A3,A4,A5,A6 */
+  d0 = READ32_POST(sp);  /* MOVEM.L	(SP)+,D0,D1,D2,D3,D4,D5,D6,D7,A0,A1,A2,A3,A4,A5,A6 */
+    d1 = READ32_POST(sp);
+    d2 = READ32_POST(sp);
+    d3 = READ32_POST(sp);
+    d4 = READ32_POST(sp);
+    d5 = READ32_POST(sp);
+    d6 = READ32_POST(sp);
+    d7 = READ32_POST(sp);
+    a0 = READ32_POST(sp);
+    a1 = READ32_POST(sp);
+    a2 = READ32_POST(sp);
+    a3 = READ32_POST(sp);
+    a4 = READ32_POST(sp);
+    a5 = READ32_POST(sp);
+    a6 = READ32_POST(sp);
   return;  /* RTS */
   /* lbW01E76E	dc.w	$64 */
 }
@@ -5742,7 +5882,8 @@ lbC01E782:
 
 /* --- lbC01E798 --- */
 static void lbC01E798(void) {
-  WRITE32_PRE(sp, a0); WRITE32_PRE(sp, d1);  /* MOVEM.L	D1,A0,-(SP) */
+  WRITE32_PRE(sp, a0);  /* MOVEM.L	D1,A0,-(SP) */
+    WRITE32_PRE(sp, d1);
   {  /* CMP.W	48(A6),D0 */
       int32_t _lhs = (int32_t)(W(d0));
       int32_t _rhs = (int32_t)(READ16(a6 + 48));
@@ -5751,7 +5892,7 @@ static void lbC01E798(void) {
       flag_n = (_cmp < 0);
       flag_c = ((uint32_t)_lhs < (uint32_t)_rhs);
     }
-  if (flag_z) goto lbC01E7D4;  /* equal / zero */  /* BEQ.S	lbC01E7D4 */
+  if (!(flag_z)) {
   {  /* MOVE.W	D0,48(A6) */
       uint16_t _mv = (uint16_t)(W(d0));
       WRITE16(a6 + 48, _mv);
@@ -5778,7 +5919,8 @@ static void lbC01E798(void) {
   /* MOVE.B	D1,$100(A0) */
   /* MOVEA.L	$530(A6),A0 */
   /* MOVE.B	#$11,(A0) */
-  WRITE32_PRE(sp, a5); WRITE32_PRE(sp, a1);  /* MOVEM.L	A1,A5,-(SP) */
+  WRITE32_PRE(sp, a5);  /* MOVEM.L	A1,A5,-(SP) */
+    WRITE32_PRE(sp, a1);
   {  /* MOVE.L	EagleBase(PC),A5 */
       uint32_t _mv = (uint32_t)(READ32((uintptr_t)EagleBase));
       a5 = _mv;
@@ -5801,7 +5943,8 @@ static void lbC01E798(void) {
       flag_v = 0; flag_c = 0;
     }
   { uintptr_t _jt=(uintptr_t)(a1); if(_jt) ((void(*)(void))_jt)(); }  /* JSR	(A1) */
-  { uint32_t _mv = READ32_POST(sp); a1 = _mv; } { uint32_t _mv = READ32_POST(sp); a5 = _mv; }  /* MOVEM.L	(SP)+,A1,A5 */
+  a1 = READ32_POST(sp);  /* MOVEM.L	(SP)+,A1,A5 */
+    a5 = READ32_POST(sp);
   {  /* MOVE.L	#$4B0000,D1 */
       uint32_t _mv = (uint32_t)(0x4B0000);
       d1 = _mv;
@@ -5828,8 +5971,9 @@ static void lbC01E798(void) {
       flag_n = ((int16_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-lbC01E7D4:
-  { uint32_t _mv = READ32_POST(sp); d1 = _mv; } { uint32_t _mv = READ32_POST(sp); a0 = _mv; }  /* MOVEM.L	(SP)+,D1,A0 */
+  }
+  d1 = READ32_POST(sp);  /* MOVEM.L	(SP)+,D1,A0 */
+    a0 = READ32_POST(sp);
   return;  /* RTS */
 }
 
@@ -5842,7 +5986,7 @@ static void lbC01E7DA(void) {
       flag_n = ((int16_t)(_tst) < 0);
       flag_c = 0; flag_v = 0;
     }
-  if (flag_z) goto lbC01E7E8;  /* equal / zero */  /* BEQ.S	lbC01E7E8 */
+  if (!(flag_z)) {
   {  /* SUBQ.W	#1,46(A6) */
       uint16_t _sr = (uint16_t)(READ16(a6 + 46) - 1);
       WRITE16(a6 + 46, (uint16_t)_sr);
@@ -5850,7 +5994,7 @@ static void lbC01E7DA(void) {
       flag_n = ((int16_t)(_sr) < 0);
     }
   if (!flag_z) goto lbC01E8CC;  /* not equal / nonzero */  /* BNE.L	lbC01E8CC */
-lbC01E7E8:
+  }
   {  /* MOVE.W	0(A6),D0 */
       uint16_t _mv = (uint16_t)(READ16(a6 + 0));
       W(d0) = (uint16_t)_mv;
@@ -5905,7 +6049,7 @@ lbC01E818:
     }
   if (flag_z) goto lbC01E872;  /* equal / zero */  /* BEQ.S	lbC01E872 */
   a0 = d0;  /* MOVEA.L	D0,A0 */
-lbC01E820:
+do {
   {  /* MOVE.W	(A0)+,D2 */
       uint16_t _mv = (uint16_t)(READ16_POST(a0));
       W(d2) = (uint16_t)_mv;
@@ -5913,7 +6057,7 @@ lbC01E820:
       flag_n = ((int16_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-  if (flag_z) goto lbC01E820;  /* equal / zero */  /* BEQ.S	lbC01E820 */
+} while (flag_z);
   {  /* CMPI.W	#$FFFF,D2 */
       int32_t _lhs = (int32_t)(W(d2));
       int32_t _rhs = (int32_t)(0xFFFF);
@@ -6046,7 +6190,7 @@ lbC01E896:
       flag_n = ((int32_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-  if (!flag_n) goto lbC01E8A4;  /* plus / positive */  /* BPL.S	lbC01E8A4 */
+  if (flag_n) {
   {  /* CMPI.W	#4,D6 */
       int32_t _lhs = (int32_t)(W(d6));
       int32_t _rhs = (int32_t)(4);
@@ -6056,8 +6200,7 @@ lbC01E896:
       flag_c = ((uint32_t)_lhs < (uint32_t)_rhs);
     }
   if (!flag_z) goto lbC01E8CC;  /* not equal / nonzero */  /* BNE.S	lbC01E8CC */
-  goto lbC01E8A8;  /* BRA.S	lbC01E8A8 */
-lbC01E8A4:
+  } else {
   {  /* CMP.L	D1,D0 */
       int32_t _lhs = (int32_t)(d0);
       int32_t _rhs = (int32_t)(d1);
@@ -6067,7 +6210,7 @@ lbC01E8A4:
       flag_c = ((uint32_t)_lhs < (uint32_t)_rhs);
     }
   if (!flag_z) goto lbC01E8CC;  /* not equal / nonzero */  /* BNE.S	lbC01E8CC */
-lbC01E8A8:
+  }
   /* TST.W	8(A6) */
   /* BMI.S	lbC01E8C0 */
   /* SUBQ.W	#1,8(A6) */
@@ -6097,7 +6240,7 @@ lbC01E8E0:
   return;  /* RTS */
 lbC01E8E2:
   flag_z = ((READ32(a6 + 88) & (1u << (d7 & 31))) == 0);  /* BTST	D7,88(A6) */
-  if (!flag_z) goto lbC01E8F2;  /* not equal / nonzero */  /* BNE.S	lbC01E8F2 */
+  if (flag_z) {
   {  /* MOVE.B	D7,D0 */
       uint8_t _mv = (uint8_t)(B(d7));
       B(d0) = (uint8_t)_mv;
@@ -6113,7 +6256,7 @@ lbC01E8E2:
     }
   if (!flag_z) goto lbC01E8F6;  /* not equal / nonzero */  /* BNE.S	lbC01E8F6 */
   ReleaseNote();  /* BSR.L	ReleaseNote */
-lbC01E8F2:
+  }
   goto lbC01E820;  /* BRA.L	lbC01E820 */
 lbC01E8F6:
   {  /* MOVE.L	858(A5),D1 */
@@ -6123,7 +6266,7 @@ lbC01E8F6:
       flag_n = ((int32_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-  if (!flag_z) goto lbC01E902;  /* not equal / nonzero */  /* BNE.S	lbC01E902 */
+  if (flag_z) {
   {  /* MOVE.L	6(A2),D1 */
       uint32_t _mv = (uint32_t)(READ32(a2 + 6));
       d1 = _mv;
@@ -6132,7 +6275,7 @@ lbC01E8F6:
       flag_v = 0; flag_c = 0;
     }
   if (flag_z) goto lbC01E8F2;  /* equal / zero */  /* BEQ.S	lbC01E8F2 */
-lbC01E902:
+  }
   a0 = d1;  /* MOVEA.L	D1,A0 */
   {  /* MOVE.W	4(A2),D1 */
       uint16_t _mv = (uint16_t)(READ16(a2 + 4));
@@ -6205,7 +6348,7 @@ lbC01E938:
       flag_n = ((int8_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-  if (flag_z) goto lbC01E950;  /* equal / zero */  /* BEQ.S	lbC01E950 */
+  if (!(flag_z)) {
   {  /* SUBQ.B	#1,D0 */
       uint8_t _sr = (uint8_t)(B(d0) - (uint8_t)(1));
       B(d0) = (uint8_t)((uint8_t)_sr);
@@ -6220,7 +6363,7 @@ lbC01E938:
       flag_z = ((int32_t)(_ar) == 0);
       flag_n = ((int32_t)(_ar) < 0);
     }
-lbC01E950:
+  }
   {  /* MOVE.L	D0,858(A5) */
       uint32_t _mv = (uint32_t)(d0);
       WRITE32(a5 + 858, _mv);
@@ -6289,7 +6432,7 @@ lbC01E9A2:
       flag_n = ((int8_t)(_tst) < 0);
       flag_c = 0; flag_v = 0;
     }
-  if (!flag_z) goto lbC01E9B0;  /* not equal / nonzero */  /* BNE.S	lbC01E9B0 */
+  if (flag_z) {
   {  /* CMPI.B	#0,1(A1) */
       int32_t _lhs = (int32_t)(READ8(a1 + 1));
       int32_t _rhs = (int32_t)(0);
@@ -6299,7 +6442,7 @@ lbC01E9A2:
       flag_c = ((uint32_t)_lhs < (uint32_t)_rhs);
     }
   if (flag_z) goto lbC01E9E4;  /* equal / zero */  /* BEQ.S	lbC01E9E4 */
-lbC01E9B0:
+  }
   {  /* MOVE.L	4(A1),D0 */
       uint32_t _mv = (uint32_t)(READ32(a1 + 4));
       d0 = _mv;
@@ -6310,9 +6453,13 @@ lbC01E9B0:
   if (flag_z) goto lbC01E9DC;  /* equal / zero */  /* BEQ.S	lbC01E9DC */
   a4 = d0;  /* MOVEA.L	D0,A4 */
   a4 = READ32(a4 + 0);  /* MOVEA.L	0(A4),A4 */
-  WRITE32_PRE(sp, a6); WRITE32_PRE(sp, a1); WRITE32_PRE(sp, d7);  /* MOVEM.L	D7,A1,A6,-(SP) */
+  WRITE32_PRE(sp, a6);  /* MOVEM.L	D7,A1,A6,-(SP) */
+    WRITE32_PRE(sp, a1);
+    WRITE32_PRE(sp, d7);
   { uintptr_t _jt=(uintptr_t)(READ32(a4 + 0)); if(_jt) ((void(*)(void))_jt)(); }  /* JSR	0(A4) */
-  { uint32_t _mv = READ32_POST(sp); d7 = _mv; } { uint32_t _mv = READ32_POST(sp); a1 = _mv; } { uint32_t _mv = READ32_POST(sp); a6 = _mv; }  /* MOVEM.L	(SP)+,D7,A1,A6 */
+  d7 = READ32_POST(sp);  /* MOVEM.L	(SP)+,D7,A1,A6 */
+    a1 = READ32_POST(sp);
+    a6 = READ32_POST(sp);
   d0 = (uint32_t)(int32_t)(int8_t)(1);  /* MOVEQ	#1,D0 */
   {  /* CMPI.B	#1,0(A1) */
       int32_t _lhs = (int32_t)(READ8(a1 + 0));
@@ -6389,11 +6536,11 @@ lbC01EA1A:
       flag_n = (_cmp < 0);
       flag_c = ((uint32_t)_lhs < (uint32_t)_rhs);
     }
-  if (flag_z) goto lbC01EA2E;  /* equal / zero */  /* BEQ.S	lbC01EA2E */
+  if (!(flag_z)) {
   a4 = READ32(a1 + 4);  /* MOVEA.L	4(A1),A4 */
   a4 = READ32(a4 + 0);  /* MOVEA.L	0(A4),A4 */
   { uintptr_t _jt=(uintptr_t)(READ32(a4 + 4)); if(_jt) ((void(*)(void))_jt)(); }  /* JSR	4(A4) */
-lbC01EA2E:
+  }
   a2 = (uint32_t)((int32_t)a2 + (int32_t)(int16_t)(0x10));  /* ADDA.W	#$10,A2 */
   a1 = (uint32_t)((int32_t)a1 + (int32_t)(int16_t)(0x54));  /* ADDA.W	#$54,A1 */
   {  /* ADDQ.W	#1,D7 */
@@ -6463,7 +6610,10 @@ static void lbC01EA46(void) {
 
 /* --- RampVolume --- */
 static void RampVolume(void) {
-  WRITE32_PRE(sp, a5); WRITE32_PRE(sp, d3); WRITE32_PRE(sp, d2); WRITE32_PRE(sp, d1);  /* MOVEM.L	D1,D2,D3,A5,-(SP) */
+  WRITE32_PRE(sp, a5);  /* MOVEM.L	D1,D2,D3,A5,-(SP) */
+    WRITE32_PRE(sp, d3);
+    WRITE32_PRE(sp, d2);
+    WRITE32_PRE(sp, d1);
   W(d1) = (uint16_t)(W(d1) << 8);  /* ASL.W	#8,D1 */
   a5 = a6;  /* MOVEA.L	A6,A5 */
 lbC01EA80:
@@ -6473,7 +6623,7 @@ lbC01EA80:
       flag_n = ((int8_t)(_tst) < 0);
       flag_c = 0; flag_v = 0;
     }
-  if (flag_z) goto lbC01EAB2;  /* equal / zero */  /* BEQ.S	lbC01EAB2 */
+  if (!(flag_z)) {
   B(d2) = (uint8_t)((uint32_t)(B(d2)) >> 1);  /* LSR.B	#1,D2 */
   if (!flag_c) goto lbC01EAA8;  /* carry clear / above-or-equal */  /* BCC.S	lbC01EAA8 */
   d3 = (uint32_t)(int32_t)(int8_t)(0);  /* MOVEQ	#0,D3 */
@@ -6540,8 +6690,11 @@ lbC01EAAC:
       flag_v = 0; flag_c = 0;
     }
   goto lbC01EAA4;  /* BRA.S	lbC01EAA4 */
-lbC01EAB2:
-  { uint32_t _mv = READ32_POST(sp); d1 = _mv; } { uint32_t _mv = READ32_POST(sp); d2 = _mv; } { uint32_t _mv = READ32_POST(sp); d3 = _mv; } { uint32_t _mv = READ32_POST(sp); a5 = _mv; }  /* MOVEM.L	(SP)+,D1,D2,D3,A5 */
+  }
+  d1 = READ32_POST(sp);  /* MOVEM.L	(SP)+,D1,D2,D3,A5 */
+    d2 = READ32_POST(sp);
+    d3 = READ32_POST(sp);
+    a5 = READ32_POST(sp);
   return;  /* RTS */
 }
 
@@ -6549,8 +6702,7 @@ lbC01EAB2:
 /* --- lbC01EAB8 --- */
 static void lbC01EAB8(void) {
   a5 = a6;  /* MOVEA.L	A6,A5 */
-  d7 = (uint32_t)(int32_t)(int8_t)(7);  /* MOVEQ	#7,D7 */
-lbC01EABC:
+  for (int _i_d7 = 7; _i_d7 >= 0; _i_d7--) {
   {  /* MOVE.W	122(A5),D0 */
       uint16_t _mv = (uint16_t)(READ16(a5 + 122));
       W(d0) = (uint16_t)_mv;
@@ -6558,7 +6710,7 @@ lbC01EABC:
       flag_n = ((int16_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-  if (flag_z) goto lbC01EAE8;  /* equal / zero */  /* BEQ.S	lbC01EAE8 */
+  if (!(flag_z)) {
   {  /* MOVE.W	90(A5),D1 */
       uint16_t _mv = (uint16_t)(READ16(a5 + 90));
       W(d1) = (uint16_t)_mv;
@@ -6622,9 +6774,9 @@ lbC01EAE4:
       flag_n = ((int16_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-lbC01EAE8:
+  }
   a5 = (uint32_t)((int32_t)a5 + (int32_t)(int16_t)(2));  /* ADDQ.L	#2,A5 */
-  if ((int16_t)(--d7) >= 0) goto lbC01EABC;  /* DBRA	D7,lbC01EABC */
+}
   /* BTST	#0,$56(A6) */
   /* BEQ.S	lbC01EB08 */
   /* LEA	$5A(A6),A0 */
@@ -6827,10 +6979,10 @@ lbC01EBE8:
       flag_n = ((int8_t)(_tst) < 0);
       flag_c = 0; flag_v = 0;
     }
-  if (flag_z) goto lbC01EC0C;  /* equal / zero */  /* BEQ.S	lbC01EC0C */
+  if (!(flag_z)) {
   WRITE8(a1 + 10, 0);  /* CLR.B	10(A1) */
   d6 = d6 | (1u << (d7 & 31));  /* BSET	D7,D6 */
-lbC01EC0C:
+  }
   return;  /* RTS */
 lbC01EC0E:
   a3 = READ32(a1 + 4);  /* MOVEA.L	4(A1),A3 */
@@ -7151,15 +7303,14 @@ lbC01ED26:
       flag_c = 0; flag_v = 0;
     }
   if (flag_n) goto lbC01ED76;  /* minus / negative */  /* BMI.S	lbC01ED76 */
-  if (flag_z) goto lbC01ED34;  /* equal / zero */  /* BEQ.S	lbC01ED34 */
+  if (!(flag_z)) {
   {  /* SUBQ.W	#1,18(A2) */
       uint16_t _sr = (uint16_t)(READ16(a2 + 18) - 1);
       WRITE16(a2 + 18, (uint16_t)_sr);
       flag_z = ((int16_t)(_sr) == 0);
       flag_n = ((int16_t)(_sr) < 0);
     }
-  goto lbC01ED76;  /* BRA.S	lbC01ED76 */
-lbC01ED34:
+  } else {
   {  /* MOVE.W	16(A2),D0 */
       uint16_t _mv = (uint16_t)(READ16(a2 + 16));
       W(d0) = (uint16_t)_mv;
@@ -7183,7 +7334,7 @@ lbC01ED34:
       flag_n = ((int16_t)(_tst) < 0);
       flag_c = 0; flag_v = 0;
     }
-  if (flag_z||(flag_n!=flag_v)) goto lbC01ED60;  /* less or equal (signed) */  /* BLE.S	lbC01ED60 */
+  if (!(flag_z||(flag_n!=flag_v))) {
   {  /* ADD.W	D1,D0 */
       uint16_t _ar = (uint16_t)(W(d0) + W(d1));
       W(d0) = (uint16_t)((uint16_t)_ar);
@@ -7216,7 +7367,7 @@ lbC01ED54:
       flag_v = 0; flag_c = 0;
     }
   goto lbC01ED62;  /* BRA.S	lbC01ED62 */
-lbC01ED60:
+  }
   {  /* ADD.W	D1,D0 */
       uint16_t _ar = (uint16_t)(W(d0) + W(d1));
       W(d0) = (uint16_t)((uint16_t)_ar);
@@ -7248,7 +7399,7 @@ lbC01ED62:
       flag_n = ((int16_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-lbC01ED76:
+  }
   {  /* MOVE.W	10(A2),D0 */
       uint16_t _mv = (uint16_t)(READ16(a2 + 10));
       W(d0) = (uint16_t)_mv;
@@ -7313,9 +7464,9 @@ lbC01ED76:
       flag_z = ((int32_t)(_sr) == 0);
       flag_n = ((int32_t)(_sr) < 0);
     }
-  if (!flag_n) goto lbC01EDB0;  /* plus / positive */  /* BPL.S	lbC01EDB0 */
+  if (flag_n) {
   d0 = (uint32_t)(-(int32_t)d0);  /* NEG.L	D0 */
-lbC01EDB0:
+  }
   {  /* CMP.L	D3,D0 */
       int32_t _lhs = (int32_t)(d0);
       int32_t _rhs = (int32_t)(d3);
@@ -7324,7 +7475,7 @@ lbC01EDB0:
       flag_n = (_cmp < 0);
       flag_c = ((uint32_t)_lhs < (uint32_t)_rhs);
     }
-  if (!flag_z && (flag_n==flag_v)) goto lbC01EDC8;  /* greater than (signed) */  /* BGT.S	lbC01EDC8 */
+  if (!(!flag_z && (flag_n==flag_v))) {
   {  /* MOVE.L	D1,D2 */
       uint32_t _mv = (uint32_t)(d1);
       d2 = _mv;
@@ -7350,7 +7501,7 @@ lbC01EDC0:
       flag_n = ((int16_t)(_ar) < 0);
     }
   goto lbC01EDD2;  /* BRA.S	lbC01EDD2 */
-lbC01EDC8:
+  }
   {  /* CMP.L	D1,D2 */
       int32_t _lhs = (int32_t)(d2);
       int32_t _rhs = (int32_t)(d1);
@@ -7359,7 +7510,7 @@ lbC01EDC8:
       flag_n = (_cmp < 0);
       flag_c = ((uint32_t)_lhs < (uint32_t)_rhs);
     }
-  if (flag_n!=flag_v) goto lbC01EDD0;  /* less than (signed) */  /* BLT.S	lbC01EDD0 */
+  if (!(flag_n!=flag_v)) {
   {  /* SUB.L	D3,D2 */
       uint32_t _sr = (uint32_t)(d2 - d3);
       d2 = (uint32_t)_sr;
@@ -7367,7 +7518,7 @@ lbC01EDC8:
       flag_n = ((int32_t)(_sr) < 0);
     }
   goto lbC01EDD2;  /* BRA.S	lbC01EDD2 */
-lbC01EDD0:
+  }
   {  /* ADD.L	D3,D2 */
       uint32_t _ar = (uint32_t)(d2 + d3);
       d2 = (uint32_t)_ar;
@@ -7382,9 +7533,9 @@ lbC01EDD2:
       flag_n = ((int32_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-  if (!flag_z) goto lbC01EDDC;  /* not equal / nonzero */  /* BNE.S	lbC01EDDC */
+  if (flag_z) {
   WRITE32(a1 + 28, 0);  /* CLR.L	28(A1) */
-lbC01EDDC:
+  }
   {  /* MOVE.W	0(A2),D0 */
       uint16_t _mv = (uint16_t)(READ16(a2 + 0));
       W(d0) = (uint16_t)_mv;
@@ -7399,7 +7550,7 @@ lbC01EDDC:
       flag_n = ((int16_t)(_tst) < 0);
       flag_c = 0; flag_v = 0;
     }
-  if (flag_z) goto lbC01EDF4;  /* equal / zero */  /* BEQ.S	lbC01EDF4 */
+  if (!(flag_z)) {
   {  /* SUBQ.W	#1,2(A2) */
       uint16_t _sr = (uint16_t)(READ16(a2 + 2) - 1);
       WRITE16(a2 + 2, (uint16_t)_sr);
@@ -7419,7 +7570,7 @@ lbC01EDDC:
       flag_n = ((int16_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-lbC01EDF4:
+  }
   {  /* CMPI.W	#$1AC,D0 */
       int32_t _lhs = (int32_t)(W(d0));
       int32_t _rhs = (int32_t)(0x1AC);
@@ -7428,7 +7579,7 @@ lbC01EDF4:
       flag_n = (_cmp < 0);
       flag_c = ((uint32_t)_lhs < (uint32_t)_rhs);
     }
-  if (flag_z||(flag_n!=flag_v)) goto lbC01EE00;  /* less or equal (signed) */  /* BLE.S	lbC01EE00 */
+  if (!(flag_z||(flag_n!=flag_v))) {
   W(d0) = (uint16_t)((uint32_t)(W(d0)) >> 1);  /* LSR.W	#1,D0 */
   {  /* SUBQ.W	#1,D2 */
       uint16_t _sr = (uint16_t)(W(d2) - (uint16_t)(1));
@@ -7437,7 +7588,7 @@ lbC01EDF4:
       flag_n = ((int16_t)(_sr) < 0);
     }
   goto lbC01EDF4;  /* BRA.S	lbC01EDF4 */
-lbC01EE00:
+  }
   {  /* MOVE.W	D2,8(A2) */
       uint16_t _mv = (uint16_t)(W(d2));
       WRITE16(a2 + 8, _mv);
@@ -7520,7 +7671,7 @@ lbC01EE00:
       flag_n = ((int16_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-  if (flag_z) goto lbC01EE4A;  /* equal / zero */  /* BEQ.S	lbC01EE4A */
+  if (!(flag_z)) {
   {  /* MOVE.W	20(A2),D1 */
       uint16_t _mv = (uint16_t)(READ16(a2 + 20));
       W(d1) = (uint16_t)_mv;
@@ -7537,14 +7688,14 @@ lbC01EE00:
       flag_z = ((int16_t)(_ar) == 0);
       flag_n = ((int16_t)(_ar) < 0);
     }
-lbC01EE4A:
+  }
   {  /* TST.W	430(A3) */
       uint16_t _tst = (uint16_t)(READ16(a3 + 430));
       flag_z = (_tst == 0);
       flag_n = ((int16_t)(_tst) < 0);
       flag_c = 0; flag_v = 0;
     }
-  if (flag_z) goto lbC01EE5C;  /* equal / zero */  /* BEQ.S	lbC01EE5C */
+  if (!(flag_z)) {
   {  /* MOVE.L	12(A2),D1 */
       uint32_t _mv = (uint32_t)(READ32(a2 + 12));
       d1 = _mv;
@@ -7556,7 +7707,7 @@ lbC01EE4A:
   d0 = (uint32_t)((uint16_t)W(d1) * (uint16_t)W(d0));  /* MULU.W	D1,D0 */
   W(d0) = (uint16_t)((uint32_t)(W(d0)) >> 8);  /* LSR.W	#8,D0 */
   goto lbC01EE66;  /* BRA.S	lbC01EE66 */
-lbC01EE5C:
+  }
   {  /* CMPI.W	#6,10(A2) */
       int32_t _lhs = (int32_t)(READ16(a2 + 10));
       int32_t _rhs = (int32_t)(6);
@@ -7565,9 +7716,9 @@ lbC01EE5C:
       flag_n = (_cmp < 0);
       flag_c = ((uint32_t)_lhs < (uint32_t)_rhs);
     }
-  if (!flag_z) goto lbC01EE66;  /* not equal / nonzero */  /* BNE.S	lbC01EE66 */
+  if (flag_z) {
   W(d0) = (uint16_t)(0);  /* CLR.W	D0 */
-lbC01EE66:
+  }
   W(d0) &= (uint16_t)(0xFF);  /* ANDI.W	#$FF,D0 */
   {  /* ADDQ.W	#1,D0 */
       uint16_t _ar = (uint16_t)(W(d0) + 1);
@@ -7670,10 +7821,10 @@ lbC01EE66:
       flag_n = ((int32_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-  if (!flag_z) goto lbC01EEBA;  /* not equal / nonzero */  /* BNE.S	lbC01EEBA */
+  if (flag_z) {
   a0 = (uint32_t)(a3 + 36);  /* LEA	36(A3),A0 */
   W(d0) = (uint16_t)(0);  /* CLR.W	D0 */
-lbC01EEBA:
+  }
   a0 = (uint32_t)((int32_t)a0 + (int32_t)(int16_t)(W(d0)));  /* ADDA.W	D0,A0 */
   {  /* MOVE.W	6(A2),D0 */
       uint16_t _mv = (uint16_t)(READ16(a2 + 6));
@@ -7714,7 +7865,7 @@ lbC01EEBA:
       flag_n = ((int16_t)(_tst) < 0);
       flag_c = 0; flag_v = 0;
     }
-  if (!flag_z) goto lbC01EEFA;  /* not equal / nonzero */  /* BNE.S	lbC01EEFA */
+  if (flag_z) {
   {  /* MOVE.W	8(A2),D3 */
       uint16_t _mv = (uint16_t)(READ16(a2 + 8));
       W(d3) = (uint16_t)_mv;
@@ -7732,7 +7883,7 @@ lbC01EEBA:
       flag_v = 0; flag_c = 0;
     }
   W(d4) = (uint16_t)((uint32_t)(W(d4)) >> W(d3));  /* LSR.W	D3,D4 */
-lbC01EEEE:
+do {
   {  /* MOVE.B	(A0),(A4)+ */
       uint8_t _mv = (uint8_t)(READ8(a0));
       WRITE8_POST(a4, _mv);
@@ -7747,16 +7898,16 @@ lbC01EEEE:
       flag_z = ((int16_t)(_sr) == 0);
       flag_n = ((int16_t)(_sr) < 0);
     }
-  if (!flag_z) goto lbC01EEEE;  /* not equal / nonzero */  /* BNE.S	lbC01EEEE */
+} while (!flag_z);
   goto lbC01EFEE;  /* BRA.L	lbC01EFEE */
-lbC01EEFA:
+  }
   {  /* TST.W	452(A3) */
       uint16_t _tst = (uint16_t)(READ16(a3 + 452));
       flag_z = (_tst == 0);
       flag_n = ((int16_t)(_tst) < 0);
       flag_c = 0; flag_v = 0;
     }
-  if (!flag_z) goto lbC01EF6C;  /* not equal / nonzero */  /* BNE.L	lbC01EF6C */
+  if (flag_z) {
   {  /* MOVE.W	8(A2),D3 */
       uint16_t _mv = (uint16_t)(READ16(a2 + 8));
       W(d3) = (uint16_t)_mv;
@@ -7813,7 +7964,7 @@ lbC01EEFA:
       flag_z = ((int16_t)(_sr) == 0);
       flag_n = ((int16_t)(_sr) < 0);
     }
-lbC01EF32:
+do {
   {  /* MOVE.B	(A0),D0 */
       uint8_t _mv = (uint8_t)(READ8(a0));
       B(d0) = (uint8_t)_mv;
@@ -7846,7 +7997,7 @@ lbC01EF32:
     }
   a0 = (uint32_t)((int32_t)a0 + (int32_t)(int16_t)(W(d1)));  /* ADDA.W	D1,A0 */
   a5 = (uint32_t)((int32_t)a5 + (int32_t)(int16_t)(W(d1)));  /* ADDA.W	D1,A5 */
-  if ((int16_t)(--d2) >= 0) goto lbC01EF32;  /* DBRA	D2,lbC01EF32 */
+} while ((int16_t)(--d2) >= 0);
   a5 = (uint32_t)((int32_t)a5 - (int32_t)(int16_t)(0x80));  /* SUBA.W	#$80,A5 */
   {  /* SUBQ.W	#1,D4 */
       uint16_t _sr = (uint16_t)(W(d4) - (uint16_t)(1));
@@ -7855,7 +8006,7 @@ lbC01EF32:
       flag_n = ((int16_t)(_sr) < 0);
     }
   if (flag_n) goto lbC01EFEE;  /* minus / negative */  /* BMI.L	lbC01EFEE */
-lbC01EF52:
+do {
   {  /* MOVE.B	(A0),D0 */
       uint8_t _mv = (uint8_t)(READ8(a0));
       B(d0) = (uint8_t)_mv;
@@ -7888,9 +8039,9 @@ lbC01EF52:
     }
   a0 = (uint32_t)((int32_t)a0 + (int32_t)(int16_t)(W(d1)));  /* ADDA.W	D1,A0 */
   a5 = (uint32_t)((int32_t)a5 + (int32_t)(int16_t)(W(d1)));  /* ADDA.W	D1,A5 */
-  if ((int16_t)(--d4) >= 0) goto lbC01EF52;  /* DBRA	D4,lbC01EF52 */
+} while ((int16_t)(--d4) >= 0);
   goto lbC01EFEE;  /* BRA.L	lbC01EFEE */
-lbC01EF6C:
+  }
   {  /* MOVE.W	450(A3),D0 */
       uint16_t _mv = (uint16_t)(READ16(a3 + 450));
       W(d0) = (uint16_t)_mv;
@@ -7908,7 +8059,7 @@ lbC01EF6C:
       flag_z = ((int16_t)(_ar) == 0);
       flag_n = ((int16_t)(_ar) < 0);
     }
-  if (!flag_v) goto lbC01EF92;  /* overflow clear */  /* BVC.S	lbC01EF92 */
+  if (flag_v) {
   {  /* CMPI.W	#$8000,D0 */
       int32_t _lhs = (int32_t)(W(d0));
       int32_t _rhs = (int32_t)(0x8000);
@@ -7927,7 +8078,7 @@ lbC01EF6C:
 lbC01EF8C:
   WRITE16(a2 + 24, (uint16_t)(-(int16_t)(READ16(a2 + 24))));  /* NEG.W	24(A2) */
   W(d0) = (uint16_t)(-(int16_t)W(d0));  /* NEG.W	D0 */
-lbC01EF92:
+  }
   {  /* MOVE.W	D0,22(A2) */
       uint16_t _mv = (uint16_t)(W(d0));
       WRITE16(a2 + 22, _mv);
@@ -7984,7 +8135,7 @@ lbC01EF92:
       flag_n = ((int16_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-  if (flag_z) goto lbC01EFCE;  /* equal / zero */  /* BEQ.S	lbC01EFCE */
+  if (!(flag_z)) {
   W(d0) = (uint16_t)(0);  /* CLR.W	D0 */
   W(d1) = (uint16_t)(0);  /* CLR.W	D1 */
   d4 = (uint32_t)(int32_t)(int8_t)(0x40);  /* MOVEQ	#$40,D4 */
@@ -8031,7 +8182,7 @@ lbC01EFC8:
       flag_n = ((int16_t)(_sr) < 0);
     }
   if (!flag_z) goto lbC01EFBE;  /* not equal / nonzero */  /* BNE.S	lbC01EFBE */
-lbC01EFCE:
+  }
   {  /* MOVE.W	D3,D6 */
       uint16_t _mv = (uint16_t)(W(d3));
       W(d6) = (uint16_t)_mv;
@@ -8039,7 +8190,7 @@ lbC01EFCE:
       flag_n = ((int16_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-  if (flag_z) goto lbC01EFEE;  /* equal / zero */  /* BEQ.S	lbC01EFEE */
+  if (!(flag_z)) {
   d0 = (uint32_t)(int32_t)(int8_t)(0x40);  /* MOVEQ	#$40,D0 */
   W(d1) = (uint16_t)(0);  /* CLR.W	D1 */
   d4 = (uint32_t)(int32_t)(int8_t)(0x40);  /* MOVEQ	#$40,D4 */
@@ -8086,14 +8237,28 @@ lbC01EFE8:
       flag_n = ((int16_t)(_sr) < 0);
     }
   if (!flag_z) goto lbC01EFDE;  /* not equal / nonzero */  /* BNE.S	lbC01EFDE */
-lbC01EFEE:
+  }
   return;  /* RTS */
 }
 
 
 /* --- SetFilter --- */
 static void SetFilter(void) {
-  WRITE32_PRE(sp, a6); WRITE32_PRE(sp, a5); WRITE32_PRE(sp, a4); WRITE32_PRE(sp, a3); WRITE32_PRE(sp, a2); WRITE32_PRE(sp, a1); WRITE32_PRE(sp, a0); WRITE32_PRE(sp, d7); WRITE32_PRE(sp, d6); WRITE32_PRE(sp, d5); WRITE32_PRE(sp, d4); WRITE32_PRE(sp, d3); WRITE32_PRE(sp, d2); WRITE32_PRE(sp, d1); WRITE32_PRE(sp, d0);  /* MOVEM.L	D0,D1,D2,D3,D4,D5,D6,D7,A0,A1,A2,A3,A4,A5,A6,-(SP) */
+  WRITE32_PRE(sp, a6);  /* MOVEM.L	D0,D1,D2,D3,D4,D5,D6,D7,A0,A1,A2,A3,A4,A5,A6,-(SP) */
+    WRITE32_PRE(sp, a5);
+    WRITE32_PRE(sp, a4);
+    WRITE32_PRE(sp, a3);
+    WRITE32_PRE(sp, a2);
+    WRITE32_PRE(sp, a1);
+    WRITE32_PRE(sp, a0);
+    WRITE32_PRE(sp, d7);
+    WRITE32_PRE(sp, d6);
+    WRITE32_PRE(sp, d5);
+    WRITE32_PRE(sp, d4);
+    WRITE32_PRE(sp, d3);
+    WRITE32_PRE(sp, d2);
+    WRITE32_PRE(sp, d1);
+    WRITE32_PRE(sp, d0);
   /* MOVEA.L	A0,A1 */
   /* LEA	$8A(A6),A5 */
   /* MOVEQ	#$3F,D7 */
@@ -8189,7 +8354,7 @@ lbC01F0AC:
   d2 = (d2 >> 16) | (d2 << 16);  /* SWAP	D2 */
   W(d1) = (uint16_t)((uint32_t)(W(d1)) >> 1);  /* LSR.W	#1,D1 */
   W(d5) = (uint16_t)(0);  /* CLR.W	D5 */
-lbC01F0BE:
+do {
   {  /* MOVE.B	0(A0),D6 */
       uint8_t _mv = (uint8_t)(READ8(a0 + 0));
       B(d6) = (uint8_t)_mv;
@@ -8246,7 +8411,7 @@ lbC01F0BE:
       flag_n = (_cmp < 0);
       flag_c = ((uint32_t)_lhs < (uint32_t)_rhs);
     }
-  if (flag_c) goto lbC01F0BE;  /* carry set / below */  /* BCS.S	lbC01F0BE */
+} while (flag_c);
   {  /* ADDQ.W	#1,D0 */
       uint16_t _ar = (uint16_t)(W(d0) + 1);
       W(d0) = (uint16_t)((uint16_t)_ar);
@@ -8263,7 +8428,21 @@ lbC01F0BE:
     }
   if (!flag_z) goto lbC01F0AC;  /* not equal / nonzero */  /* BNE.S	lbC01F0AC */
 lbC01F0EE:
-  { uint32_t _mv = READ32_POST(sp); d0 = _mv; } { uint32_t _mv = READ32_POST(sp); d1 = _mv; } { uint32_t _mv = READ32_POST(sp); d2 = _mv; } { uint32_t _mv = READ32_POST(sp); d3 = _mv; } { uint32_t _mv = READ32_POST(sp); d4 = _mv; } { uint32_t _mv = READ32_POST(sp); d5 = _mv; } { uint32_t _mv = READ32_POST(sp); d6 = _mv; } { uint32_t _mv = READ32_POST(sp); d7 = _mv; } { uint32_t _mv = READ32_POST(sp); a0 = _mv; } { uint32_t _mv = READ32_POST(sp); a1 = _mv; } { uint32_t _mv = READ32_POST(sp); a2 = _mv; } { uint32_t _mv = READ32_POST(sp); a3 = _mv; } { uint32_t _mv = READ32_POST(sp); a4 = _mv; } { uint32_t _mv = READ32_POST(sp); a5 = _mv; } { uint32_t _mv = READ32_POST(sp); a6 = _mv; }  /* MOVEM.L	(SP)+,D0,D1,D2,D3,D4,D5,D6,D7,A0,A1,A2,A3,A4,A5,A6 */
+  d0 = READ32_POST(sp);  /* MOVEM.L	(SP)+,D0,D1,D2,D3,D4,D5,D6,D7,A0,A1,A2,A3,A4,A5,A6 */
+    d1 = READ32_POST(sp);
+    d2 = READ32_POST(sp);
+    d3 = READ32_POST(sp);
+    d4 = READ32_POST(sp);
+    d5 = READ32_POST(sp);
+    d6 = READ32_POST(sp);
+    d7 = READ32_POST(sp);
+    a0 = READ32_POST(sp);
+    a1 = READ32_POST(sp);
+    a2 = READ32_POST(sp);
+    a3 = READ32_POST(sp);
+    a4 = READ32_POST(sp);
+    a5 = READ32_POST(sp);
+    a6 = READ32_POST(sp);
   return;  /* RTS */
   /* Synthesis.MSG	dc.b	'Synthesis',0 */
 }
@@ -8604,15 +8783,14 @@ lbC01F368:
       flag_n = ((int16_t)(_tst) < 0);
       flag_c = 0; flag_v = 0;
     }
-  if (flag_z) goto lbC01F376;  /* equal / zero */  /* BEQ.S	lbC01F376 */
+  if (!(flag_z)) {
   {  /* SUBI.W	#1,10(A2) */
       uint16_t _sr = (uint16_t)(READ16(a2 + 10) - 1);
       WRITE16(a2 + 10, (uint16_t)_sr);
       flag_z = ((int16_t)(_sr) == 0);
       flag_n = ((int16_t)(_sr) < 0);
     }
-  goto lbC01F390;  /* BRA.S	lbC01F390 */
-lbC01F376:
+  } else {
   {  /* MOVE.W	8(A2),D0 */
       uint16_t _mv = (uint16_t)(READ16(a2 + 8));
       W(d0) = (uint16_t)_mv;
@@ -8649,7 +8827,7 @@ lbC01F376:
       flag_n = ((int16_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-lbC01F390:
+  }
   {  /* MOVE.W	8(A2),D0 */
       uint16_t _mv = (uint16_t)(READ16(a2 + 8));
       W(d0) = (uint16_t)_mv;
@@ -8665,9 +8843,9 @@ lbC01F390:
       flag_n = ((int16_t)(_ar) < 0);
     }
   flag_z = ((d0 & (1u << (8 & 31))) == 0);  /* BTST	#8,D0 */
-  if (flag_z) goto lbC01F3A4;  /* equal / zero */  /* BEQ.S	lbC01F3A4 */
+  if (!(flag_z)) {
   W(d0) ^= (uint16_t)(0xFF);  /* EORI.W	#$FF,D0 */
-lbC01F3A4:
+  }
   W(d0) ^= (uint16_t)(0x80);  /* EORI.W	#$80,D0 */
   W(d0) = (uint32_t)(int32_t)(int16_t)(int8_t)W(d0);  /* EXT.W	D0 */
   W(d0) = (uint16_t)(-(int16_t)W(d0));  /* NEG.W	D0 */
@@ -8742,9 +8920,9 @@ lbC01F3A4:
       flag_z = ((int32_t)(_sr) == 0);
       flag_n = ((int32_t)(_sr) < 0);
     }
-  if (!flag_n) goto lbC01F3EA;  /* plus / positive */  /* BPL.S	lbC01F3EA */
+  if (flag_n) {
   d0 = (uint32_t)(-(int32_t)d0);  /* NEG.L	D0 */
-lbC01F3EA:
+  }
   {  /* CMP.L	D3,D0 */
       int32_t _lhs = (int32_t)(d0);
       int32_t _rhs = (int32_t)(d3);
@@ -8753,7 +8931,7 @@ lbC01F3EA:
       flag_n = (_cmp < 0);
       flag_c = ((uint32_t)_lhs < (uint32_t)_rhs);
     }
-  if (!flag_z && (flag_n==flag_v)) goto lbC01F400;  /* greater than (signed) */  /* BGT.S	lbC01F400 */
+  if (!(!flag_z && (flag_n==flag_v))) {
   {  /* MOVE.L	D1,D2 */
       uint32_t _mv = (uint32_t)(d1);
       d2 = _mv;
@@ -8777,7 +8955,7 @@ lbC01F3EA:
       flag_n = ((int16_t)(_ar) < 0);
     }
   goto lbC01F40A;  /* BRA.S	lbC01F40A */
-lbC01F400:
+  }
   {  /* CMP.L	D1,D2 */
       int32_t _lhs = (int32_t)(d2);
       int32_t _rhs = (int32_t)(d1);
@@ -8786,7 +8964,7 @@ lbC01F400:
       flag_n = (_cmp < 0);
       flag_c = ((uint32_t)_lhs < (uint32_t)_rhs);
     }
-  if (flag_n!=flag_v) goto lbC01F408;  /* less than (signed) */  /* BLT.S	lbC01F408 */
+  if (!(flag_n!=flag_v)) {
   {  /* SUB.L	D3,D2 */
       uint32_t _sr = (uint32_t)(d2 - d3);
       d2 = (uint32_t)_sr;
@@ -8794,7 +8972,7 @@ lbC01F400:
       flag_n = ((int32_t)(_sr) < 0);
     }
   goto lbC01F40A;  /* BRA.S	lbC01F40A */
-lbC01F408:
+  }
   {  /* ADD.L	D3,D2 */
       uint32_t _ar = (uint32_t)(d2 + d3);
       d2 = (uint32_t)_ar;
@@ -8809,9 +8987,9 @@ lbC01F40A:
       flag_n = ((int32_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-  if (!flag_z) goto lbC01F414;  /* not equal / nonzero */  /* BNE.S	lbC01F414 */
+  if (flag_z) {
   WRITE32(a1 + 28, 0);  /* CLR.L	28(A1) */
-lbC01F414:
+  }
   {  /* MOVE.W	0(A2),D0 */
       uint16_t _mv = (uint16_t)(READ16(a2 + 0));
       W(d0) = (uint16_t)_mv;
@@ -8922,7 +9100,20 @@ static void IFFTech(void) {
 static void InstallIFF(void) {
   /* lbC01F488	CMPI.L	#'AIFF',$47A(A6) */
   /* BEQ.L	lbC01F73E */
-  WRITE32_PRE(sp, a6); WRITE32_PRE(sp, a5); WRITE32_PRE(sp, a4); WRITE32_PRE(sp, a3); WRITE32_PRE(sp, a2); WRITE32_PRE(sp, a1); WRITE32_PRE(sp, d7); WRITE32_PRE(sp, d6); WRITE32_PRE(sp, d5); WRITE32_PRE(sp, d4); WRITE32_PRE(sp, d3); WRITE32_PRE(sp, d2); WRITE32_PRE(sp, d1); WRITE32_PRE(sp, d0);  /* MOVEM.L	D0,D1,D2,D3,D4,D5,D6,D7,A1,A2,A3,A4,A5,A6,-(SP) */
+  WRITE32_PRE(sp, a6);  /* MOVEM.L	D0,D1,D2,D3,D4,D5,D6,D7,A1,A2,A3,A4,A5,A6,-(SP) */
+    WRITE32_PRE(sp, a5);
+    WRITE32_PRE(sp, a4);
+    WRITE32_PRE(sp, a3);
+    WRITE32_PRE(sp, a2);
+    WRITE32_PRE(sp, a1);
+    WRITE32_PRE(sp, d7);
+    WRITE32_PRE(sp, d6);
+    WRITE32_PRE(sp, d5);
+    WRITE32_PRE(sp, d4);
+    WRITE32_PRE(sp, d3);
+    WRITE32_PRE(sp, d2);
+    WRITE32_PRE(sp, d1);
+    WRITE32_PRE(sp, d0);
   /* LEA	$472(A6),A5 */
   /* MOVEQ	#$20,D5 */
   /* MOVE.L	D0,D2 */
@@ -8999,8 +9190,7 @@ static void InstallIFF(void) {
       flag_n = ((int32_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-  d0 = (uint32_t)(int32_t)(int8_t)(4);  /* MOVEQ	#4,D0 */
-CopyVHDR:
+  for (int _i_d0 = 4; _i_d0 >= 0; _i_d0--) {
   {  /* MOVE.L	(A1)+,(A2)+ */
       uint32_t _mv = (uint32_t)(READ32_POST(a1));
       WRITE32_POST(a2, _mv);
@@ -9008,7 +9198,7 @@ CopyVHDR:
       flag_n = ((int32_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-  if ((int16_t)(--d0) >= 0) goto CopyVHDR;  /* DBF	D0,CopyVHDR */
+}
 FindBody:
   {  /* CMP.L	#$424f4459,(A1) */
       int32_t _lhs = (int32_t)(READ32(a1));
@@ -9018,10 +9208,10 @@ FindBody:
       flag_n = (_cmp < 0);
       flag_c = ((uint32_t)_lhs < (uint32_t)_rhs);
     }
-  if (flag_z) goto BodyOK;  /* equal / zero */  /* BEQ.B	BodyOK */
+  if (!(flag_z)) {
   a1 = (uint32_t)((int32_t)a1 + (int32_t)(int16_t)(2));  /* ADDQ.L	#2,A1 */
   goto FindBody;  /* BRA.B	FindBody */
-BodyOK:
+  }
   a1 = (uint32_t)((int32_t)a1 + (int32_t)(int16_t)(8));  /* ADDQ.L	#8,A1 */
   {  /* MOVE.L	A1,58(A3) */
       uint32_t _mv = (uint32_t)(a1);
@@ -9052,7 +9242,7 @@ BodyOK:
       flag_v = 0; flag_c = 0;
     }
   W(d1) = (uint16_t)(0);  /* CLR.W	D1 */
-lbC01F56E:
+do {
   d2 >>= 1;  /* LSR.L	#1,D2 */
   d3 >>= 1;  /* LSR.L	#1,D3 */
   d4 >>= 1;  /* LSR.L	#1,D4 */
@@ -9102,7 +9292,7 @@ lbC01F56E:
       flag_n = (_cmp < 0);
       flag_c = ((uint32_t)_lhs < (uint32_t)_rhs);
     }
-  if (flag_n!=flag_v) goto lbC01F56E;  /* less than (signed) */  /* BLT.S	lbC01F56E */
+} while (flag_n!=flag_v);
 lbC01F594:
   {  /* MOVE.W	D1,56(A3) */
       uint16_t _mv = (uint16_t)(W(d1));
@@ -9113,7 +9303,20 @@ lbC01F594:
     }
   /* MOVEA.L	A3,A0 */
 lbC01F59A:
-  { uint32_t _mv = READ32_POST(sp); d0 = _mv; } { uint32_t _mv = READ32_POST(sp); d1 = _mv; } { uint32_t _mv = READ32_POST(sp); d2 = _mv; } { uint32_t _mv = READ32_POST(sp); d3 = _mv; } { uint32_t _mv = READ32_POST(sp); d4 = _mv; } { uint32_t _mv = READ32_POST(sp); d5 = _mv; } { uint32_t _mv = READ32_POST(sp); d6 = _mv; } { uint32_t _mv = READ32_POST(sp); d7 = _mv; } { uint32_t _mv = READ32_POST(sp); a1 = _mv; } { uint32_t _mv = READ32_POST(sp); a2 = _mv; } { uint32_t _mv = READ32_POST(sp); a3 = _mv; } { uint32_t _mv = READ32_POST(sp); a4 = _mv; } { uint32_t _mv = READ32_POST(sp); a5 = _mv; } { uint32_t _mv = READ32_POST(sp); a6 = _mv; }  /* MOVEM.L	(SP)+,D0,D1,D2,D3,D4,D5,D6,D7,A1,A2,A3,A4,A5,A6 */
+  d0 = READ32_POST(sp);  /* MOVEM.L	(SP)+,D0,D1,D2,D3,D4,D5,D6,D7,A1,A2,A3,A4,A5,A6 */
+    d1 = READ32_POST(sp);
+    d2 = READ32_POST(sp);
+    d3 = READ32_POST(sp);
+    d4 = READ32_POST(sp);
+    d5 = READ32_POST(sp);
+    d6 = READ32_POST(sp);
+    d7 = READ32_POST(sp);
+    a1 = READ32_POST(sp);
+    a2 = READ32_POST(sp);
+    a3 = READ32_POST(sp);
+    a4 = READ32_POST(sp);
+    a5 = READ32_POST(sp);
+    a6 = READ32_POST(sp);
   return;  /* RTS */
   /* lbC01F5A0	MOVEA.L	A4,SP */
   /* MOVEA.L	A3,A0 */
@@ -9468,8 +9671,8 @@ static void lbC01F708(void) {
       flag_n = (_cmp < 0);
       flag_c = ((uint32_t)_lhs < (uint32_t)_rhs);
     }
-  if (flag_z||(flag_n!=flag_v)) goto lbC01F722;  /* less or equal (signed) */  /* BLE.S	lbC01F722 */
-lbC01F714:
+  if (!(flag_z||(flag_n!=flag_v))) {
+do {
   {  /* CMP.L	(A1),D0 */
       int32_t _lhs = (int32_t)(d0);
       int32_t _rhs = (int32_t)(READ32(a1));
@@ -9487,7 +9690,7 @@ lbC01F714:
       flag_n = ((int32_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-  if (!flag_z) goto lbC01F714;  /* not equal / nonzero */  /* BNE.S	lbC01F714 */
+} while (!flag_z);
 lbC01F71E:
   {  /* MOVE.L	(SP)+,D1 */
       uint32_t _mv = (uint32_t)(READ32_POST(sp));
@@ -9497,7 +9700,7 @@ lbC01F71E:
       flag_v = 0; flag_c = 0;
     }
   return;  /* RTS */
-lbC01F722:
+  }
   a1 = (uint32_t)((int32_t)a1 - (int32_t)(int16_t)(a1));  /* SUBA.L	A1,A1 */
   goto lbC01F71E;  /* BRA.S	lbC01F71E */
 }
@@ -9535,9 +9738,9 @@ static void lbC01F726(void) {
       flag_n = (_cmp < 0);
       flag_c = ((uint32_t)_lhs < (uint32_t)_rhs);
     }
-  if (flag_c) goto lbC01F73A;  /* carry set / below */  /* BCS.S	lbC01F73A */
+  if (!(flag_c)) {
   a1 = (uint32_t)((int32_t)a1 - (int32_t)(int16_t)(a1));  /* SUBA.L	A1,A1 */
-lbC01F73A:
+  }
   {  /* MOVE.L	(SP)+,D0 */
       uint32_t _mv = (uint32_t)(READ32_POST(sp));
       d0 = _mv;
@@ -9563,7 +9766,12 @@ static void InstallAIFF(void) {
   /* MOVEA.L	A0,A4 */
   /* MOVE.L	A0,D0 */
   /* BEQ.L	lbC01F7D2 */
-  WRITE32_PRE(sp, d6); WRITE32_PRE(sp, d5); WRITE32_PRE(sp, d4); WRITE32_PRE(sp, d3); WRITE32_PRE(sp, d2); WRITE32_PRE(sp, d1);  /* MOVEM.L	D1,D2,D3,D4,D5,D6,-(SP) */
+  WRITE32_PRE(sp, d6);  /* MOVEM.L	D1,D2,D3,D4,D5,D6,-(SP) */
+    WRITE32_PRE(sp, d5);
+    WRITE32_PRE(sp, d4);
+    WRITE32_PRE(sp, d3);
+    WRITE32_PRE(sp, d2);
+    WRITE32_PRE(sp, d1);
   {  /* MOVE.L	A0,A5 */
       uint32_t _mv = (uint32_t)(a0);
       a5 = _mv;
@@ -9681,7 +9889,12 @@ lbC01F7BE:
   /* MOVEM.L	(SP)+,D1-D7/A1-A3/A5/A6 */
   d0 = (uint32_t)(int32_t)(int8_t)(0);  /* MOVEQ	#0,D0 */
 exit:
-  { uint32_t _mv = READ32_POST(sp); d1 = _mv; } { uint32_t _mv = READ32_POST(sp); d2 = _mv; } { uint32_t _mv = READ32_POST(sp); d3 = _mv; } { uint32_t _mv = READ32_POST(sp); d4 = _mv; } { uint32_t _mv = READ32_POST(sp); d5 = _mv; } { uint32_t _mv = READ32_POST(sp); d6 = _mv; }  /* MOVEM.L	(SP)+,D1,D2,D3,D4,D5,D6 */
+  d1 = READ32_POST(sp);  /* MOVEM.L	(SP)+,D1,D2,D3,D4,D5,D6 */
+    d2 = READ32_POST(sp);
+    d3 = READ32_POST(sp);
+    d4 = READ32_POST(sp);
+    d5 = READ32_POST(sp);
+    d6 = READ32_POST(sp);
   return;  /* RTS */
 lbC01F7D2:
   d0 = (uint32_t)(int32_t)(int8_t)(-1);  /* MOVEQ	#-1,D0 */
@@ -9700,7 +9913,18 @@ lbC01F7D2:
 
 /* --- lbC01F7E8 --- */
 static void lbC01F7E8(void) {
-  WRITE32_PRE(sp, a5); WRITE32_PRE(sp, a4); WRITE32_PRE(sp, a3); WRITE32_PRE(sp, a1); WRITE32_PRE(sp, a0); WRITE32_PRE(sp, d7); WRITE32_PRE(sp, d6); WRITE32_PRE(sp, d5); WRITE32_PRE(sp, d4); WRITE32_PRE(sp, d3); WRITE32_PRE(sp, d2); WRITE32_PRE(sp, d1);  /* MOVEM.L	D1,D2,D3,D4,D5,D6,D7,A0,A1,A3,A4,A5,-(SP) */
+  WRITE32_PRE(sp, a5);  /* MOVEM.L	D1,D2,D3,D4,D5,D6,D7,A0,A1,A3,A4,A5,-(SP) */
+    WRITE32_PRE(sp, a4);
+    WRITE32_PRE(sp, a3);
+    WRITE32_PRE(sp, a1);
+    WRITE32_PRE(sp, a0);
+    WRITE32_PRE(sp, d7);
+    WRITE32_PRE(sp, d6);
+    WRITE32_PRE(sp, d5);
+    WRITE32_PRE(sp, d4);
+    WRITE32_PRE(sp, d3);
+    WRITE32_PRE(sp, d2);
+    WRITE32_PRE(sp, d1);
   a0 = a1;  /* MOVEA.L	A1,A0 */
   a1 = (uint32_t)(a0 + 12);  /* LEA	12(A0),A1 */
   {  /* MOVE.L	#$434f4d4d,D0 */
@@ -9744,7 +9968,7 @@ static void lbC01F7E8(void) {
       flag_n = ((int32_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-  if (!flag_z) goto lbC01F822;  /* not equal / nonzero */  /* BNE.S	lbC01F822 */
+  if (flag_z) {
   {  /* MOVE.L	A1,40(A4) */
       uint32_t _mv = (uint32_t)(a1);
       WRITE32(a4 + 40, _mv);
@@ -9752,8 +9976,7 @@ static void lbC01F7E8(void) {
       flag_n = ((int32_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-  goto lbC01F826;  /* BRA.S	lbC01F826 */
-lbC01F822:
+  } else {
   {  /* MOVE.L	A1,0(A2) */
       uint32_t _mv = (uint32_t)(a1);
       WRITE32(a2 + 0, _mv);
@@ -9761,7 +9984,7 @@ lbC01F822:
       flag_n = ((int32_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-lbC01F826:
+  }
   a2 = a1;  /* MOVEA.L	A1,A2 */
   WRITE32(a2 + 0, 0);  /* CLR.L	0(A2) */
   {  /* MOVE.W	#$400E,D0 */
@@ -9923,7 +10146,18 @@ lbC01F874:
 lbC01F8C2:
   d0 = (uint32_t)(int32_t)(int8_t)(0);  /* MOVEQ	#0,D0 */
 lbC01F8C4:
-  { uint32_t _mv = READ32_POST(sp); d1 = _mv; } { uint32_t _mv = READ32_POST(sp); d2 = _mv; } { uint32_t _mv = READ32_POST(sp); d3 = _mv; } { uint32_t _mv = READ32_POST(sp); d4 = _mv; } { uint32_t _mv = READ32_POST(sp); d5 = _mv; } { uint32_t _mv = READ32_POST(sp); d6 = _mv; } { uint32_t _mv = READ32_POST(sp); d7 = _mv; } { uint32_t _mv = READ32_POST(sp); a0 = _mv; } { uint32_t _mv = READ32_POST(sp); a1 = _mv; } { uint32_t _mv = READ32_POST(sp); a3 = _mv; } { uint32_t _mv = READ32_POST(sp); a4 = _mv; } { uint32_t _mv = READ32_POST(sp); a5 = _mv; }  /* MOVEM.L	(SP)+,D1,D2,D3,D4,D5,D6,D7,A0,A1,A3,A4,A5 */
+  d1 = READ32_POST(sp);  /* MOVEM.L	(SP)+,D1,D2,D3,D4,D5,D6,D7,A0,A1,A3,A4,A5 */
+    d2 = READ32_POST(sp);
+    d3 = READ32_POST(sp);
+    d4 = READ32_POST(sp);
+    d5 = READ32_POST(sp);
+    d6 = READ32_POST(sp);
+    d7 = READ32_POST(sp);
+    a0 = READ32_POST(sp);
+    a1 = READ32_POST(sp);
+    a3 = READ32_POST(sp);
+    a4 = READ32_POST(sp);
+    a5 = READ32_POST(sp);
   return;  /* RTS */
 lbC01F8CA:
   d0 = (uint32_t)(int32_t)(int8_t)(-1);  /* MOVEQ	#-1,D0 */
@@ -9933,7 +10167,9 @@ lbC01F8CA:
 
 /* --- lbC01F8CE --- */
 static void lbC01F8CE(void) {
-  WRITE32_PRE(sp, a1); WRITE32_PRE(sp, d7); WRITE32_PRE(sp, d1);  /* MOVEM.L	D1,D7,A1,-(SP) */
+  WRITE32_PRE(sp, a1);  /* MOVEM.L	D1,D7,A1,-(SP) */
+    WRITE32_PRE(sp, d7);
+    WRITE32_PRE(sp, d1);
   {  /* MOVE.W	8(A1),D7 */
       uint16_t _mv = (uint16_t)(READ16(a1 + 8));
       W(d7) = (uint16_t)_mv;
@@ -9958,7 +10194,7 @@ lbC01F8DA:
       flag_n = (_cmp < 0);
       flag_c = ((uint32_t)_lhs < (uint32_t)_rhs);
     }
-  if (!flag_z) goto lbC01F8EA;  /* not equal / nonzero */  /* BNE.S	lbC01F8EA */
+  if (flag_z) {
   {  /* MOVE.L	2(A1),D0 */
       uint32_t _mv = (uint32_t)(READ32(a1 + 2));
       d0 = _mv;
@@ -9966,8 +10202,7 @@ lbC01F8DA:
       flag_n = ((int32_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-  goto lbC01F8FC;  /* BRA.S	lbC01F8FC */
-lbC01F8EA:
+  } else {
   a1 = (uint32_t)((int32_t)a1 + (int32_t)(int16_t)(6));  /* ADDA.W	#6,A1 */
   {  /* MOVE.B	(A1),D1 */
       uint8_t _mv = (uint8_t)(READ8(a1));
@@ -9987,8 +10222,10 @@ lbC01F8EA:
   goto lbC01F8DA;  /* BRA.S	lbC01F8DA */
 lbC01F8FA:
   d0 = (uint32_t)(int32_t)(int8_t)(-1);  /* MOVEQ	#-1,D0 */
-lbC01F8FC:
-  { uint32_t _mv = READ32_POST(sp); d1 = _mv; } { uint32_t _mv = READ32_POST(sp); d7 = _mv; } { uint32_t _mv = READ32_POST(sp); a1 = _mv; }  /* MOVEM.L	(SP)+,D1,D7,A1 */
+  }
+  d1 = READ32_POST(sp);  /* MOVEM.L	(SP)+,D1,D7,A1 */
+    d7 = READ32_POST(sp);
+    a1 = READ32_POST(sp);
   return;  /* RTS */
 }
 
@@ -10002,7 +10239,7 @@ static void lbC01F902(void) {
       flag_n = ((int32_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-lbC01F904:
+do {
   {  /* CMPI.B	#$20,(A1)+ */
       int32_t _lhs = (int32_t)(READ8_POST(a1));
       int32_t _rhs = (int32_t)(0x20);
@@ -10011,7 +10248,7 @@ lbC01F904:
       flag_n = (_cmp < 0);
       flag_c = ((uint32_t)_lhs < (uint32_t)_rhs);
     }
-  if (flag_z) goto lbC01F904;  /* equal / zero */  /* BEQ.S	lbC01F904 */
+} while (flag_z);
   a1 = (uint32_t)((int32_t)a1 - (int32_t)(int16_t)(1));  /* SUBQ.L	#1,A1 */
   W(d0) = (uint16_t)(0);  /* CLR.W	D0 */
 lbC01F90E:
@@ -10037,7 +10274,7 @@ lbC01F90E:
       flag_n = (_cmp < 0);
       flag_c = ((uint32_t)_lhs < (uint32_t)_rhs);
     }
-  if (!flag_c) goto lbC01F926;  /* carry clear / above-or-equal */  /* BCC.S	lbC01F926 */
+  if (flag_c) {
   d0 = (uint32_t)((uint16_t)10 * (uint16_t)W(d0));  /* MULU.W	#10,D0 */
   {  /* ADD.W	D1,D0 */
       uint16_t _ar = (uint16_t)(W(d0) + W(d1));
@@ -10047,7 +10284,7 @@ lbC01F90E:
     }
   a1 = (uint32_t)((int32_t)a1 + (int32_t)(int16_t)(1));  /* ADDQ.L	#1,A1 */
   goto lbC01F90E;  /* BRA.S	lbC01F90E */
-lbC01F926:
+  }
   {  /* MOVE.L	(SP)+,D1 */
       uint32_t _mv = (uint32_t)(READ32_POST(sp));
       d1 = _mv;
@@ -11218,7 +11455,21 @@ static void lbC01FAEA(void) {
 
 /* --- INITINSTRUMENT --- */
 static void INITINSTRUMENT(void) {
-  WRITE32_PRE(sp, a6); WRITE32_PRE(sp, a5); WRITE32_PRE(sp, a4); WRITE32_PRE(sp, a3); WRITE32_PRE(sp, a2); WRITE32_PRE(sp, a1); WRITE32_PRE(sp, a0); WRITE32_PRE(sp, d7); WRITE32_PRE(sp, d6); WRITE32_PRE(sp, d5); WRITE32_PRE(sp, d4); WRITE32_PRE(sp, d3); WRITE32_PRE(sp, d2); WRITE32_PRE(sp, d1); WRITE32_PRE(sp, d0);  /* MOVEM.L	D0,D1,D2,D3,D4,D5,D6,D7,A0,A1,A2,A3,A4,A5,A6,-(SP) */
+  WRITE32_PRE(sp, a6);  /* MOVEM.L	D0,D1,D2,D3,D4,D5,D6,D7,A0,A1,A2,A3,A4,A5,A6,-(SP) */
+    WRITE32_PRE(sp, a5);
+    WRITE32_PRE(sp, a4);
+    WRITE32_PRE(sp, a3);
+    WRITE32_PRE(sp, a2);
+    WRITE32_PRE(sp, a1);
+    WRITE32_PRE(sp, a0);
+    WRITE32_PRE(sp, d7);
+    WRITE32_PRE(sp, d6);
+    WRITE32_PRE(sp, d5);
+    WRITE32_PRE(sp, d4);
+    WRITE32_PRE(sp, d3);
+    WRITE32_PRE(sp, d2);
+    WRITE32_PRE(sp, d1);
+    WRITE32_PRE(sp, d0);
   {  /* MOVE.L	0(A0),D0 */
       uint32_t _mv = (uint32_t)(READ32(a0 + 0));
       d0 = _mv;
@@ -11232,7 +11483,7 @@ static void INITINSTRUMENT(void) {
       flag_z = ((int32_t)(_sr) == 0);
       flag_n = ((int32_t)(_sr) < 0);
     }
-  if (flag_z) goto lbC00CE6E;  /* equal / zero */  /* BEQ.S	lbC00CE6E */
+  if (!(flag_z)) {
   {  /* SUBQ.L	#1,D0 */
       uint32_t _sr = (uint32_t)(d0 - 1);
       d0 = (uint32_t)_sr;
@@ -11248,9 +11499,23 @@ static void INITINSTRUMENT(void) {
     }
   if (flag_z) goto lbC00CE90;  /* equal / zero */  /* BEQ.S	lbC00CE90 */
 lbC00CE68:
-  { uint32_t _mv = READ32_POST(sp); d0 = _mv; } { uint32_t _mv = READ32_POST(sp); d1 = _mv; } { uint32_t _mv = READ32_POST(sp); d2 = _mv; } { uint32_t _mv = READ32_POST(sp); d3 = _mv; } { uint32_t _mv = READ32_POST(sp); d4 = _mv; } { uint32_t _mv = READ32_POST(sp); d5 = _mv; } { uint32_t _mv = READ32_POST(sp); d6 = _mv; } { uint32_t _mv = READ32_POST(sp); d7 = _mv; } { uint32_t _mv = READ32_POST(sp); a0 = _mv; } { uint32_t _mv = READ32_POST(sp); a1 = _mv; } { uint32_t _mv = READ32_POST(sp); a2 = _mv; } { uint32_t _mv = READ32_POST(sp); a3 = _mv; } { uint32_t _mv = READ32_POST(sp); a4 = _mv; } { uint32_t _mv = READ32_POST(sp); a5 = _mv; } { uint32_t _mv = READ32_POST(sp); a6 = _mv; }  /* MOVEM.L	(SP)+,D0,D1,D2,D3,D4,D5,D6,D7,A0,A1,A2,A3,A4,A5,A6 */
+  d0 = READ32_POST(sp);  /* MOVEM.L	(SP)+,D0,D1,D2,D3,D4,D5,D6,D7,A0,A1,A2,A3,A4,A5,A6 */
+    d1 = READ32_POST(sp);
+    d2 = READ32_POST(sp);
+    d3 = READ32_POST(sp);
+    d4 = READ32_POST(sp);
+    d5 = READ32_POST(sp);
+    d6 = READ32_POST(sp);
+    d7 = READ32_POST(sp);
+    a0 = READ32_POST(sp);
+    a1 = READ32_POST(sp);
+    a2 = READ32_POST(sp);
+    a3 = READ32_POST(sp);
+    a4 = READ32_POST(sp);
+    a5 = READ32_POST(sp);
+    a6 = READ32_POST(sp);
   return;  /* RTS */
-lbC00CE6E:
+  }
   {  /* MOVE.L	A1,4(A0) */
       uint32_t _mv = (uint32_t)(a1);
       WRITE32(a0 + 4, _mv);
@@ -11266,9 +11531,9 @@ lbC00CE6E:
       flag_n = (_cmp < 0);
       flag_c = ((uint32_t)_lhs < (uint32_t)_rhs);
     }
-  if (!flag_z) goto lbC00CE7C;  /* not equal / nonzero */  /* BNE.S	lbC00CE7C */
+  if (flag_z) {
   SETFILTER();  /* BSR.L	SETFILTER */
-lbC00CE7C:
+  }
   a2 = (uint32_t)(uintptr_t)SYNTHTECH;  /* LEA	SYNTHTECH(PC),A2 */
 lbC00CE80:
   {  /* MOVE.L	A2,0(A0) */
@@ -11323,7 +11588,21 @@ lbC00CE90:
 
 /* --- PLAYSCORE --- */
 static void PLAYSCORE(void) {
-  WRITE32_PRE(sp, a6); WRITE32_PRE(sp, a5); WRITE32_PRE(sp, a4); WRITE32_PRE(sp, a3); WRITE32_PRE(sp, a2); WRITE32_PRE(sp, a1); WRITE32_PRE(sp, a0); WRITE32_PRE(sp, d7); WRITE32_PRE(sp, d6); WRITE32_PRE(sp, d5); WRITE32_PRE(sp, d4); WRITE32_PRE(sp, d3); WRITE32_PRE(sp, d2); WRITE32_PRE(sp, d1); WRITE32_PRE(sp, d0);  /* MOVEM.L	D0,D1,D2,D3,D4,D5,D6,D7,A0,A1,A2,A3,A4,A5,A6,-(SP) */
+  WRITE32_PRE(sp, a6);  /* MOVEM.L	D0,D1,D2,D3,D4,D5,D6,D7,A0,A1,A2,A3,A4,A5,A6,-(SP) */
+    WRITE32_PRE(sp, a5);
+    WRITE32_PRE(sp, a4);
+    WRITE32_PRE(sp, a3);
+    WRITE32_PRE(sp, a2);
+    WRITE32_PRE(sp, a1);
+    WRITE32_PRE(sp, a0);
+    WRITE32_PRE(sp, d7);
+    WRITE32_PRE(sp, d6);
+    WRITE32_PRE(sp, d5);
+    WRITE32_PRE(sp, d4);
+    WRITE32_PRE(sp, d3);
+    WRITE32_PRE(sp, d2);
+    WRITE32_PRE(sp, d1);
+    WRITE32_PRE(sp, d0);
   STOPSCORE();  /* BSR.L	STOPSCORE */
   {  /* MOVE.L	A0,D4 */
       uint32_t _mv = (uint32_t)(a0);
@@ -11360,8 +11639,7 @@ static void PLAYSCORE(void) {
     }
   a0 = (uint32_t)(a5 + 32);  /* LEA	32(A5),A0 */
   a1 = (uint32_t)(a6 + 38);  /* LEA	38(A6),A1 */
-  d7 = (uint32_t)(int32_t)(int8_t)(3);  /* MOVEQ	#3,D7 */
-lbC00CF0E:
+  for (int _i_d7 = 3; _i_d7 >= 0; _i_d7--) {
   {  /* MOVE.L	(A0)+,(A1)+ */
       uint32_t _mv = (uint32_t)(READ32_POST(a0));
       WRITE32_POST(a1, _mv);
@@ -11369,7 +11647,7 @@ lbC00CF0E:
       flag_n = ((int32_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-  if ((int16_t)(--d7) >= 0) goto lbC00CF0E;  /* DBRA	D7,lbC00CF0E */
+}
   a0 = a5;  /* MOVEA.L	A5,A0 */
   lbC00CF7A();  /* BSR.L	lbC00CF7A */
   lbC00CFEC();  /* BSR.L	lbC00CFEC */
@@ -11419,7 +11697,21 @@ lbC00CF0E:
       flag_v = 0; flag_c = 0;
     }
 lbC00CF44:
-  { uint32_t _mv = READ32_POST(sp); d0 = _mv; } { uint32_t _mv = READ32_POST(sp); d1 = _mv; } { uint32_t _mv = READ32_POST(sp); d2 = _mv; } { uint32_t _mv = READ32_POST(sp); d3 = _mv; } { uint32_t _mv = READ32_POST(sp); d4 = _mv; } { uint32_t _mv = READ32_POST(sp); d5 = _mv; } { uint32_t _mv = READ32_POST(sp); d6 = _mv; } { uint32_t _mv = READ32_POST(sp); d7 = _mv; } { uint32_t _mv = READ32_POST(sp); a0 = _mv; } { uint32_t _mv = READ32_POST(sp); a1 = _mv; } { uint32_t _mv = READ32_POST(sp); a2 = _mv; } { uint32_t _mv = READ32_POST(sp); a3 = _mv; } { uint32_t _mv = READ32_POST(sp); a4 = _mv; } { uint32_t _mv = READ32_POST(sp); a5 = _mv; } { uint32_t _mv = READ32_POST(sp); a6 = _mv; }  /* MOVEM.L	(SP)+,D0,D1,D2,D3,D4,D5,D6,D7,A0,A1,A2,A3,A4,A5,A6 */
+  d0 = READ32_POST(sp);  /* MOVEM.L	(SP)+,D0,D1,D2,D3,D4,D5,D6,D7,A0,A1,A2,A3,A4,A5,A6 */
+    d1 = READ32_POST(sp);
+    d2 = READ32_POST(sp);
+    d3 = READ32_POST(sp);
+    d4 = READ32_POST(sp);
+    d5 = READ32_POST(sp);
+    d6 = READ32_POST(sp);
+    d7 = READ32_POST(sp);
+    a0 = READ32_POST(sp);
+    a1 = READ32_POST(sp);
+    a2 = READ32_POST(sp);
+    a3 = READ32_POST(sp);
+    a4 = READ32_POST(sp);
+    a5 = READ32_POST(sp);
+    a6 = READ32_POST(sp);
   return;  /* RTS */
 }
 
@@ -11432,14 +11724,15 @@ static void STOPSCORE(void) {
 
 /* --- lbC00CF50 --- */
 static void lbC00CF50(void) {
-  WRITE32_PRE(sp, a0); WRITE32_PRE(sp, d0);  /* MOVEM.L	D0,A0,-(SP) */
+  WRITE32_PRE(sp, a0);  /* MOVEM.L	D0,A0,-(SP) */
+    WRITE32_PRE(sp, d0);
   {  /* TST.W	10(A6) */
       uint16_t _tst = (uint16_t)(READ16(a6 + 10));
       flag_z = (_tst == 0);
       flag_n = ((int16_t)(_tst) < 0);
       flag_c = 0; flag_v = 0;
     }
-  if (flag_z) goto lbC00CF74;  /* equal / zero */  /* BEQ.S	lbC00CF74 */
+  if (!(flag_z)) {
   WRITE16(a6 + 10, 0);  /* CLR.W	10(A6) */
   a0 = (uint32_t)(a6 + 38);  /* LEA	38(A6),A0 */
   B(d0) = (uint8_t)(0);  /* CLR.B	D0 */
@@ -11468,15 +11761,30 @@ lbC00CF6C:
       flag_c = ((uint32_t)_lhs < (uint32_t)_rhs);
     }
   if (!flag_z) goto lbC00CF64;  /* not equal / nonzero */  /* BNE.S	lbC00CF64 */
-lbC00CF74:
-  { uint32_t _mv = READ32_POST(sp); d0 = _mv; } { uint32_t _mv = READ32_POST(sp); a0 = _mv; }  /* MOVEM.L	(SP)+,D0,A0 */
+  }
+  d0 = READ32_POST(sp);  /* MOVEM.L	(SP)+,D0,A0 */
+    a0 = READ32_POST(sp);
   return;  /* RTS */
 }
 
 
 /* --- lbC00CF7A --- */
 static void lbC00CF7A(void) {
-  WRITE32_PRE(sp, a6); WRITE32_PRE(sp, a5); WRITE32_PRE(sp, a4); WRITE32_PRE(sp, a3); WRITE32_PRE(sp, a2); WRITE32_PRE(sp, a1); WRITE32_PRE(sp, a0); WRITE32_PRE(sp, d7); WRITE32_PRE(sp, d6); WRITE32_PRE(sp, d5); WRITE32_PRE(sp, d4); WRITE32_PRE(sp, d3); WRITE32_PRE(sp, d2); WRITE32_PRE(sp, d1); WRITE32_PRE(sp, d0);  /* MOVEM.L	D0,D1,D2,D3,D4,D5,D6,D7,A0,A1,A2,A3,A4,A5,A6,-(SP) */
+  WRITE32_PRE(sp, a6);  /* MOVEM.L	D0,D1,D2,D3,D4,D5,D6,D7,A0,A1,A2,A3,A4,A5,A6,-(SP) */
+    WRITE32_PRE(sp, a5);
+    WRITE32_PRE(sp, a4);
+    WRITE32_PRE(sp, a3);
+    WRITE32_PRE(sp, a2);
+    WRITE32_PRE(sp, a1);
+    WRITE32_PRE(sp, a0);
+    WRITE32_PRE(sp, d7);
+    WRITE32_PRE(sp, d6);
+    WRITE32_PRE(sp, d5);
+    WRITE32_PRE(sp, d4);
+    WRITE32_PRE(sp, d3);
+    WRITE32_PRE(sp, d2);
+    WRITE32_PRE(sp, d1);
+    WRITE32_PRE(sp, d0);
   a3 = a0;  /* MOVEA.L	A0,A3 */
   a1 = (uint32_t)(a6 + 198);  /* LEA	198(A6),A1 */
   {  /* MOVE.L	D0,D6 */
@@ -11513,7 +11821,7 @@ lbC00CF88:
       flag_n = ((int32_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-lbC00CFA0:
+do {
   {  /* MOVE.L	A2,0(A1) */
       uint32_t _mv = (uint32_t)(a2);
       WRITE32(a1 + 0, _mv);
@@ -11535,7 +11843,7 @@ lbC00CFA0:
       flag_n = ((int16_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-  if (flag_z) goto lbC00CFA0;  /* equal / zero */  /* BEQ.S	lbC00CFA0 */
+} while (flag_z);
   {  /* CMPI.W	#$FFFF,D0 */
       int32_t _lhs = (int32_t)(W(d0));
       int32_t _rhs = (int32_t)(0xFFFF);
@@ -11620,18 +11928,45 @@ lbC00CFDA:
       flag_c = ((uint32_t)_lhs < (uint32_t)_rhs);
     }
   if (!flag_z) goto lbC00CF88;  /* not equal / nonzero */  /* BNE.S	lbC00CF88 */
-  { uint32_t _mv = READ32_POST(sp); d0 = _mv; } { uint32_t _mv = READ32_POST(sp); d1 = _mv; } { uint32_t _mv = READ32_POST(sp); d2 = _mv; } { uint32_t _mv = READ32_POST(sp); d3 = _mv; } { uint32_t _mv = READ32_POST(sp); d4 = _mv; } { uint32_t _mv = READ32_POST(sp); d5 = _mv; } { uint32_t _mv = READ32_POST(sp); d6 = _mv; } { uint32_t _mv = READ32_POST(sp); d7 = _mv; } { uint32_t _mv = READ32_POST(sp); a0 = _mv; } { uint32_t _mv = READ32_POST(sp); a1 = _mv; } { uint32_t _mv = READ32_POST(sp); a2 = _mv; } { uint32_t _mv = READ32_POST(sp); a3 = _mv; } { uint32_t _mv = READ32_POST(sp); a4 = _mv; } { uint32_t _mv = READ32_POST(sp); a5 = _mv; } { uint32_t _mv = READ32_POST(sp); a6 = _mv; }  /* MOVEM.L	(SP)+,D0,D1,D2,D3,D4,D5,D6,D7,A0,A1,A2,A3,A4,A5,A6 */
+  d0 = READ32_POST(sp);  /* MOVEM.L	(SP)+,D0,D1,D2,D3,D4,D5,D6,D7,A0,A1,A2,A3,A4,A5,A6 */
+    d1 = READ32_POST(sp);
+    d2 = READ32_POST(sp);
+    d3 = READ32_POST(sp);
+    d4 = READ32_POST(sp);
+    d5 = READ32_POST(sp);
+    d6 = READ32_POST(sp);
+    d7 = READ32_POST(sp);
+    a0 = READ32_POST(sp);
+    a1 = READ32_POST(sp);
+    a2 = READ32_POST(sp);
+    a3 = READ32_POST(sp);
+    a4 = READ32_POST(sp);
+    a5 = READ32_POST(sp);
+    a6 = READ32_POST(sp);
   return;  /* RTS */
 }
 
 
 /* --- lbC00CFEC --- */
 static void lbC00CFEC(void) {
-  WRITE32_PRE(sp, a6); WRITE32_PRE(sp, a5); WRITE32_PRE(sp, a4); WRITE32_PRE(sp, a3); WRITE32_PRE(sp, a2); WRITE32_PRE(sp, a1); WRITE32_PRE(sp, a0); WRITE32_PRE(sp, d7); WRITE32_PRE(sp, d6); WRITE32_PRE(sp, d5); WRITE32_PRE(sp, d4); WRITE32_PRE(sp, d3); WRITE32_PRE(sp, d2); WRITE32_PRE(sp, d1); WRITE32_PRE(sp, d0);  /* MOVEM.L	D0,D1,D2,D3,D4,D5,D6,D7,A0,A1,A2,A3,A4,A5,A6,-(SP) */
+  WRITE32_PRE(sp, a6);  /* MOVEM.L	D0,D1,D2,D3,D4,D5,D6,D7,A0,A1,A2,A3,A4,A5,A6,-(SP) */
+    WRITE32_PRE(sp, a5);
+    WRITE32_PRE(sp, a4);
+    WRITE32_PRE(sp, a3);
+    WRITE32_PRE(sp, a2);
+    WRITE32_PRE(sp, a1);
+    WRITE32_PRE(sp, a0);
+    WRITE32_PRE(sp, d7);
+    WRITE32_PRE(sp, d6);
+    WRITE32_PRE(sp, d5);
+    WRITE32_PRE(sp, d4);
+    WRITE32_PRE(sp, d3);
+    WRITE32_PRE(sp, d2);
+    WRITE32_PRE(sp, d1);
+    WRITE32_PRE(sp, d0);
   a2 = (uint32_t)(a6 + 198);  /* LEA	198(A6),A2 */
   a1 = (uint32_t)(a6 + 230);  /* LEA	230(A6),A1 */
-  d7 = (uint32_t)(int32_t)(int8_t)(7);  /* MOVEQ	#7,D7 */
-lbC00CFFA:
+  for (int _i_d7 = 7; _i_d7 >= 0; _i_d7--) {
   {  /* MOVE.L	(A2)+,(A1)+ */
       uint32_t _mv = (uint32_t)(READ32_POST(a2));
       WRITE32_POST(a1, _mv);
@@ -11639,7 +11974,7 @@ lbC00CFFA:
       flag_n = ((int32_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-  if ((int16_t)(--d7) >= 0) goto lbC00CFFA;  /* DBRA	D7,lbC00CFFA */
+}
   {  /* MOVE.L	12(A6),16(A6) */
       uint32_t _mv = (uint32_t)(READ32(a6 + 12));
       WRITE32(a6 + 16, _mv);
@@ -11656,7 +11991,7 @@ lbC00D00A:
       flag_n = ((int32_t)(_tst) < 0);
       flag_c = 0; flag_v = 0;
     }
-  if (flag_z) goto lbC00D016;  /* equal / zero */  /* BEQ.S	lbC00D016 */
+  if (!(flag_z)) {
   {  /* MOVE.B	D7,D0 */
       uint8_t _mv = (uint8_t)(B(d7));
       B(d0) = (uint8_t)_mv;
@@ -11665,7 +12000,7 @@ lbC00D00A:
       flag_v = 0; flag_c = 0;
     }
   RELEASENOTE();  /* BSR.L	RELEASENOTE */
-lbC00D016:
+  }
   WRITE32(a4 + 166, 0);  /* CLR.L	166(A4) */
   d0 = 0;  /* CLR.L	D0 */
   {  /* MOVE.B	247(A4),D0 */
@@ -11695,7 +12030,7 @@ lbC00D016:
       flag_n = ((int8_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-  if (flag_z) goto lbC00D038;  /* equal / zero */  /* BEQ.S	lbC00D038 */
+  if (!(flag_z)) {
   {  /* SUBQ.B	#1,D0 */
       uint8_t _sr = (uint8_t)(B(d0) - (uint8_t)(1));
       B(d0) = (uint8_t)((uint8_t)_sr);
@@ -11711,7 +12046,7 @@ lbC00D016:
       flag_n = ((int32_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-lbC00D038:
+  }
   {  /* MOVE.L	D0,150(A4) */
       uint32_t _mv = (uint32_t)(d0);
       WRITE32(a4 + 150, _mv);
@@ -11736,7 +12071,21 @@ lbC00D038:
       flag_c = ((uint32_t)_lhs < (uint32_t)_rhs);
     }
   if (flag_c) goto lbC00D00A;  /* carry set / below */  /* BCS.S	lbC00D00A */
-  { uint32_t _mv = READ32_POST(sp); d0 = _mv; } { uint32_t _mv = READ32_POST(sp); d1 = _mv; } { uint32_t _mv = READ32_POST(sp); d2 = _mv; } { uint32_t _mv = READ32_POST(sp); d3 = _mv; } { uint32_t _mv = READ32_POST(sp); d4 = _mv; } { uint32_t _mv = READ32_POST(sp); d5 = _mv; } { uint32_t _mv = READ32_POST(sp); d6 = _mv; } { uint32_t _mv = READ32_POST(sp); d7 = _mv; } { uint32_t _mv = READ32_POST(sp); a0 = _mv; } { uint32_t _mv = READ32_POST(sp); a1 = _mv; } { uint32_t _mv = READ32_POST(sp); a2 = _mv; } { uint32_t _mv = READ32_POST(sp); a3 = _mv; } { uint32_t _mv = READ32_POST(sp); a4 = _mv; } { uint32_t _mv = READ32_POST(sp); a5 = _mv; } { uint32_t _mv = READ32_POST(sp); a6 = _mv; }  /* MOVEM.L	(SP)+,D0,D1,D2,D3,D4,D5,D6,D7,A0,A1,A2,A3,A4,A5,A6 */
+  d0 = READ32_POST(sp);  /* MOVEM.L	(SP)+,D0,D1,D2,D3,D4,D5,D6,D7,A0,A1,A2,A3,A4,A5,A6 */
+    d1 = READ32_POST(sp);
+    d2 = READ32_POST(sp);
+    d3 = READ32_POST(sp);
+    d4 = READ32_POST(sp);
+    d5 = READ32_POST(sp);
+    d6 = READ32_POST(sp);
+    d7 = READ32_POST(sp);
+    a0 = READ32_POST(sp);
+    a1 = READ32_POST(sp);
+    a2 = READ32_POST(sp);
+    a3 = READ32_POST(sp);
+    a4 = READ32_POST(sp);
+    a5 = READ32_POST(sp);
+    a6 = READ32_POST(sp);
   return;  /* RTS */
 }
 
@@ -11766,7 +12115,7 @@ static void lbC00D070(void) {
       flag_n = ((int16_t)(_tst) < 0);
       flag_c = 0; flag_v = 0;
     }
-  if (flag_z) goto lbC00D07E;  /* equal / zero */  /* BEQ.S	lbC00D07E */
+  if (!(flag_z)) {
   {  /* SUBQ.W	#1,30(A6) */
       uint16_t _sr = (uint16_t)(READ16(a6 + 30) - 1);
       WRITE16(a6 + 30, (uint16_t)_sr);
@@ -11774,7 +12123,7 @@ static void lbC00D070(void) {
       flag_n = ((int16_t)(_sr) < 0);
     }
   if (!flag_z) goto lbC00D1DC;  /* not equal / nonzero */  /* BNE.L	lbC00D1DC */
-lbC00D07E:
+  }
   {  /* MOVE.W	2(A6),D0 */
       uint16_t _mv = (uint16_t)(READ16(a6 + 2));
       W(d0) = (uint16_t)_mv;
@@ -11791,7 +12140,7 @@ lbC00D07E:
       flag_n = (_cmp < 0);
       flag_c = ((uint32_t)_lhs < (uint32_t)_rhs);
     }
-  if (flag_z) goto lbC00D0CE;  /* equal / zero */  /* BEQ.S	lbC00D0CE */
+  if (!(flag_z)) {
   {  /* MOVE.W	D0,32(A6) */
       uint16_t _mv = (uint16_t)(W(d0));
       WRITE16(a6 + 32, _mv);
@@ -11847,7 +12196,8 @@ lbC00D07E:
   /* LSR.W	#8,D1 */
   /* MOVE.B	D1,$BFE501 */
   /* MOVE.B	#$11,$BFEE01 */
-  WRITE32_PRE(sp, a5); WRITE32_PRE(sp, a1);  /* MOVEM.L	A1,A5,-(SP) */
+  WRITE32_PRE(sp, a5);  /* MOVEM.L	A1,A5,-(SP) */
+    WRITE32_PRE(sp, a1);
   {  /* MOVE.L	EagleBase(PC),A5 */
       uint32_t _mv = (uint32_t)(READ32((uintptr_t)EagleBase));
       a5 = _mv;
@@ -11870,8 +12220,9 @@ lbC00D07E:
       flag_v = 0; flag_c = 0;
     }
   { uintptr_t _jt=(uintptr_t)(a1); if(_jt) ((void(*)(void))_jt)(); }  /* JSR	(A1) */
-  { uint32_t _mv = READ32_POST(sp); a1 = _mv; } { uint32_t _mv = READ32_POST(sp); a5 = _mv; }  /* MOVEM.L	(SP)+,A1,A5 */
-lbC00D0CE:
+  a1 = READ32_POST(sp);  /* MOVEM.L	(SP)+,A1,A5 */
+    a5 = READ32_POST(sp);
+  }
   {  /* TST.W	10(A6) */
       uint16_t _tst = (uint16_t)(READ16(a6 + 10));
       flag_z = (_tst == 0);
@@ -11899,7 +12250,7 @@ lbC00D0E8:
       flag_n = ((int32_t)(_tst) < 0);
       flag_c = 0; flag_v = 0;
     }
-  if (flag_z) goto lbC00D104;  /* equal / zero */  /* BEQ.S	lbC00D104 */
+  if (!(flag_z)) {
   {  /* SUBQ.L	#1,166(A5) */
       uint32_t _sr = (uint32_t)(READ32(a5 + 166) - 1);
       WRITE32(a5 + 166, (uint32_t)_sr);
@@ -11923,8 +12274,7 @@ lbC00D0E8:
     }
   RELEASENOTE();  /* BSR.L	RELEASENOTE */
 lbC00D100:
-  goto lbC00D19C;  /* BRA.L	lbC00D19C */
-lbC00D104:
+  } else {
   {  /* TST.L	182(A5) */
       uint32_t _tst = (uint32_t)(READ32(a5 + 182));
       flag_z = (_tst == 0);
@@ -11958,7 +12308,7 @@ lbC00D116:
   goto lbC00D100;  /* BRA.S	lbC00D100 */
 lbC00D11A:
   a0 = d0;  /* MOVEA.L	D0,A0 */
-lbC00D11C:
+do {
   {  /* MOVE.W	(A0)+,D2 */
       uint16_t _mv = (uint16_t)(READ16_POST(a0));
       W(d2) = (uint16_t)_mv;
@@ -11966,7 +12316,7 @@ lbC00D11C:
       flag_n = ((int16_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-  if (flag_z) goto lbC00D11C;  /* equal / zero */  /* BEQ.S	lbC00D11C */
+} while (flag_z);
   {  /* CMPI.W	#$FFFF,D2 */
       int32_t _lhs = (int32_t)(W(d2));
       int32_t _rhs = (int32_t)(0xFFFF);
@@ -12137,7 +12487,7 @@ lbC00D198:
       flag_n = ((int16_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-lbC00D19C:
+  }
   a1 = (uint32_t)((int32_t)a1 + (int32_t)(int16_t)(4));  /* ADDQ.L	#4,A1 */
   a5 = (uint32_t)((int32_t)a5 + (int32_t)(int16_t)(4));  /* ADDQ.L	#4,A5 */
   {  /* ADDQ.B	#1,D7 */
@@ -12175,7 +12525,7 @@ lbC00D19C:
       flag_n = ((int32_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-  if (!flag_n) goto lbC00D1C0;  /* plus / positive */  /* BPL.S	lbC00D1C0 */
+  if (flag_n) {
   {  /* CMPI.W	#4,D6 */
       int32_t _lhs = (int32_t)(W(d6));
       int32_t _rhs = (int32_t)(4);
@@ -12185,8 +12535,7 @@ lbC00D19C:
       flag_c = ((uint32_t)_lhs < (uint32_t)_rhs);
     }
   if (!flag_z) goto lbC00D1DC;  /* not equal / nonzero */  /* BNE.S	lbC00D1DC */
-  goto lbC00D1C4;  /* BRA.S	lbC00D1C4 */
-lbC00D1C0:
+  } else {
   {  /* CMP.L	D1,D0 */
       int32_t _lhs = (int32_t)(d0);
       int32_t _rhs = (int32_t)(d1);
@@ -12196,7 +12545,7 @@ lbC00D1C0:
       flag_c = ((uint32_t)_lhs < (uint32_t)_rhs);
     }
   if (!flag_z) goto lbC00D1DC;  /* not equal / nonzero */  /* BNE.S	lbC00D1DC */
-lbC00D1C4:
+  }
   /* TST.W	10(A6) */
   /* BMI.S	lbC00D1D0 */
   /* SUBQ.W	#1,10(A6) */
@@ -12230,7 +12579,7 @@ lbC00D1EA:
       flag_n = ((int8_t)(_tst) < 0);
       flag_c = 0; flag_v = 0;
     }
-  if (!flag_z) goto lbC00D1F8;  /* not equal / nonzero */  /* BNE.S	lbC00D1F8 */
+  if (flag_z) {
   {  /* CMPI.B	#0,1(A1) */
       int32_t _lhs = (int32_t)(READ8(a1 + 1));
       int32_t _rhs = (int32_t)(0);
@@ -12240,7 +12589,7 @@ lbC00D1EA:
       flag_c = ((uint32_t)_lhs < (uint32_t)_rhs);
     }
   if (flag_z) goto lbC00D216;  /* equal / zero */  /* BEQ.S	lbC00D216 */
-lbC00D1F8:
+  }
   {  /* MOVE.L	4(A1),D0 */
       uint32_t _mv = (uint32_t)(READ32(a1 + 4));
       d0 = _mv;
@@ -12251,9 +12600,17 @@ lbC00D1F8:
   if (flag_z) goto lbC00D22A;  /* equal / zero */  /* BEQ.S	lbC00D22A */
   a4 = d0;  /* MOVEA.L	D0,A4 */
   a4 = READ32(a4 + 0);  /* MOVEA.L	0(A4),A4 */
-  WRITE32_PRE(sp, a6); WRITE32_PRE(sp, a1); WRITE32_PRE(sp, a0); WRITE32_PRE(sp, d7); WRITE32_PRE(sp, d6);  /* MOVEM.L	D6,D7,A0,A1,A6,-(SP) */
+  WRITE32_PRE(sp, a6);  /* MOVEM.L	D6,D7,A0,A1,A6,-(SP) */
+    WRITE32_PRE(sp, a1);
+    WRITE32_PRE(sp, a0);
+    WRITE32_PRE(sp, d7);
+    WRITE32_PRE(sp, d6);
   { uintptr_t _jt=(uintptr_t)(READ32(a4 + 0)); if(_jt) ((void(*)(void))_jt)(); }  /* JSR	0(A4) */
-  { uint32_t _mv = READ32_POST(sp); d6 = _mv; } { uint32_t _mv = READ32_POST(sp); d7 = _mv; } { uint32_t _mv = READ32_POST(sp); a0 = _mv; } { uint32_t _mv = READ32_POST(sp); a1 = _mv; } { uint32_t _mv = READ32_POST(sp); a6 = _mv; }  /* MOVEM.L	(SP)+,D6,D7,A0,A1,A6 */
+  d6 = READ32_POST(sp);  /* MOVEM.L	(SP)+,D6,D7,A0,A1,A6 */
+    d7 = READ32_POST(sp);
+    a0 = READ32_POST(sp);
+    a1 = READ32_POST(sp);
+    a6 = READ32_POST(sp);
   {  /* TST.L	D0 */
       uint32_t _tst = (uint32_t)(d0);
       flag_z = (_tst == 0);
@@ -12338,9 +12695,19 @@ lbC00D254:
   if (flag_z) goto lbC00D276;  /* equal / zero */  /* BEQ.S	lbC00D276 */
   a4 = READ32(a1 + 4);  /* MOVEA.L	4(A1),A4 */
   a4 = READ32(a4 + 0);  /* MOVEA.L	0(A4),A4 */
-  WRITE32_PRE(sp, a6); WRITE32_PRE(sp, a2); WRITE32_PRE(sp, a1); WRITE32_PRE(sp, a0); WRITE32_PRE(sp, d7); WRITE32_PRE(sp, d6);  /* MOVEM.L	D6,D7,A0,A1,A2,A6,-(SP) */
+  WRITE32_PRE(sp, a6);  /* MOVEM.L	D6,D7,A0,A1,A2,A6,-(SP) */
+    WRITE32_PRE(sp, a2);
+    WRITE32_PRE(sp, a1);
+    WRITE32_PRE(sp, a0);
+    WRITE32_PRE(sp, d7);
+    WRITE32_PRE(sp, d6);
   { uintptr_t _jt=(uintptr_t)(READ32(a4 + 4)); if(_jt) ((void(*)(void))_jt)(); }  /* JSR	4(A4) */
-  { uint32_t _mv = READ32_POST(sp); d6 = _mv; } { uint32_t _mv = READ32_POST(sp); d7 = _mv; } { uint32_t _mv = READ32_POST(sp); a0 = _mv; } { uint32_t _mv = READ32_POST(sp); a1 = _mv; } { uint32_t _mv = READ32_POST(sp); a2 = _mv; } { uint32_t _mv = READ32_POST(sp); a6 = _mv; }  /* MOVEM.L	(SP)+,D6,D7,A0,A1,A2,A6 */
+  d6 = READ32_POST(sp);  /* MOVEM.L	(SP)+,D6,D7,A0,A1,A2,A6 */
+    d7 = READ32_POST(sp);
+    a0 = READ32_POST(sp);
+    a1 = READ32_POST(sp);
+    a2 = READ32_POST(sp);
+    a6 = READ32_POST(sp);
   {  /* TST.L	D0 */
       uint32_t _tst = (uint32_t)(d0);
       flag_z = (_tst == 0);
@@ -12412,7 +12779,20 @@ static void lbC00D28E(void) {
 
 /* --- STARTNOTE --- */
 static void STARTNOTE(void) {
-  WRITE32_PRE(sp, a6); WRITE32_PRE(sp, a5); WRITE32_PRE(sp, a4); WRITE32_PRE(sp, a3); WRITE32_PRE(sp, a2); WRITE32_PRE(sp, a1); WRITE32_PRE(sp, a0); WRITE32_PRE(sp, d7); WRITE32_PRE(sp, d6); WRITE32_PRE(sp, d5); WRITE32_PRE(sp, d4); WRITE32_PRE(sp, d3); WRITE32_PRE(sp, d2); WRITE32_PRE(sp, d1);  /* MOVEM.L	D1,D2,D3,D4,D5,D6,D7,A0,A1,A2,A3,A4,A5,A6,-(SP) */
+  WRITE32_PRE(sp, a6);  /* MOVEM.L	D1,D2,D3,D4,D5,D6,D7,A0,A1,A2,A3,A4,A5,A6,-(SP) */
+    WRITE32_PRE(sp, a5);
+    WRITE32_PRE(sp, a4);
+    WRITE32_PRE(sp, a3);
+    WRITE32_PRE(sp, a2);
+    WRITE32_PRE(sp, a1);
+    WRITE32_PRE(sp, a0);
+    WRITE32_PRE(sp, d7);
+    WRITE32_PRE(sp, d6);
+    WRITE32_PRE(sp, d5);
+    WRITE32_PRE(sp, d4);
+    WRITE32_PRE(sp, d3);
+    WRITE32_PRE(sp, d2);
+    WRITE32_PRE(sp, d1);
   {  /* MOVE.L	A0,D3 */
       uint32_t _mv = (uint32_t)(a0);
       d3 = _mv;
@@ -12611,7 +12991,20 @@ lbC00D334:
     }
   d0 = (uint32_t)(int32_t)(int16_t)d0;  /* EXT.L	D0 */
 lbC00D34C:
-  { uint32_t _mv = READ32_POST(sp); d1 = _mv; } { uint32_t _mv = READ32_POST(sp); d2 = _mv; } { uint32_t _mv = READ32_POST(sp); d3 = _mv; } { uint32_t _mv = READ32_POST(sp); d4 = _mv; } { uint32_t _mv = READ32_POST(sp); d5 = _mv; } { uint32_t _mv = READ32_POST(sp); d6 = _mv; } { uint32_t _mv = READ32_POST(sp); d7 = _mv; } { uint32_t _mv = READ32_POST(sp); a0 = _mv; } { uint32_t _mv = READ32_POST(sp); a1 = _mv; } { uint32_t _mv = READ32_POST(sp); a2 = _mv; } { uint32_t _mv = READ32_POST(sp); a3 = _mv; } { uint32_t _mv = READ32_POST(sp); a4 = _mv; } { uint32_t _mv = READ32_POST(sp); a5 = _mv; } { uint32_t _mv = READ32_POST(sp); a6 = _mv; }  /* MOVEM.L	(SP)+,D1,D2,D3,D4,D5,D6,D7,A0,A1,A2,A3,A4,A5,A6 */
+  d1 = READ32_POST(sp);  /* MOVEM.L	(SP)+,D1,D2,D3,D4,D5,D6,D7,A0,A1,A2,A3,A4,A5,A6 */
+    d2 = READ32_POST(sp);
+    d3 = READ32_POST(sp);
+    d4 = READ32_POST(sp);
+    d5 = READ32_POST(sp);
+    d6 = READ32_POST(sp);
+    d7 = READ32_POST(sp);
+    a0 = READ32_POST(sp);
+    a1 = READ32_POST(sp);
+    a2 = READ32_POST(sp);
+    a3 = READ32_POST(sp);
+    a4 = READ32_POST(sp);
+    a5 = READ32_POST(sp);
+    a6 = READ32_POST(sp);
   return;  /* RTS */
 lbC00D352:
   d0 = (uint32_t)(int32_t)(int8_t)(-1);  /* MOVEQ	#-1,D0 */
@@ -12628,7 +13021,8 @@ lbC00D352:
 
 /* --- RELEASENOTE --- */
 static void RELEASENOTE(void) {
-  WRITE32_PRE(sp, a1); WRITE32_PRE(sp, d0);  /* MOVEM.L	D0,A1,-(SP) */
+  WRITE32_PRE(sp, a1);  /* MOVEM.L	D0,A1,-(SP) */
+    WRITE32_PRE(sp, d0);
   a1 = (uint32_t)(a6 + 62);  /* LEA	62(A6),A1 */
   W(d0) = (uint32_t)(int32_t)(int16_t)(int8_t)W(d0);  /* EXT.W	D0 */
   d0 = (uint32_t)((uint16_t)0x16 * (uint16_t)W(d0));  /* MULU.W	#$16,D0 */
@@ -12642,7 +13036,7 @@ static void RELEASENOTE(void) {
       flag_n = (_cmp < 0);
       flag_c = ((uint32_t)_lhs < (uint32_t)_rhs);
     }
-  if (!flag_z) goto lbC00D38A;  /* not equal / nonzero */  /* BNE.S	lbC00D38A */
+  if (flag_z) {
   {  /* MOVE.B	#2,0(A1) */
       uint8_t _mv = (uint8_t)(2);
       WRITE8(a1 + 0, _mv);
@@ -12650,8 +13044,9 @@ static void RELEASENOTE(void) {
       flag_n = ((int8_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-lbC00D38A:
-  { uint32_t _mv = READ32_POST(sp); d0 = _mv; } { uint32_t _mv = READ32_POST(sp); a1 = _mv; }  /* MOVEM.L	(SP)+,D0,A1 */
+  }
+  d0 = READ32_POST(sp);  /* MOVEM.L	(SP)+,D0,A1 */
+    a1 = READ32_POST(sp);
   return;  /* RTS */
   /* STOPSOUND	MOVE.L	D0,-(SP) */
   /* CLR.W	10(A6) */
@@ -12665,7 +13060,10 @@ lbC00D38A:
 
 /* --- STOPNOTE --- */
 static void STOPNOTE(void) {
-  WRITE32_PRE(sp, a1); WRITE32_PRE(sp, a0); WRITE32_PRE(sp, d7); WRITE32_PRE(sp, d0);  /* MOVEM.L	D0,D7,A0,A1,-(SP) */
+  WRITE32_PRE(sp, a1);  /* MOVEM.L	D0,D7,A0,A1,-(SP) */
+    WRITE32_PRE(sp, a0);
+    WRITE32_PRE(sp, d7);
+    WRITE32_PRE(sp, d0);
   a0 = READ32(a6 + 6);  /* MOVEA.L	6(A6),A0 */
   a1 = (uint32_t)(a6 + 62);  /* LEA	62(A6),A1 */
   W(d0) = (uint32_t)(int32_t)(int16_t)(int8_t)W(d0);  /* EXT.W	D0 */
@@ -12687,7 +13085,7 @@ static void STOPNOTE(void) {
       flag_n = (_cmp < 0);
       flag_c = ((uint32_t)_lhs < (uint32_t)_rhs);
     }
-  if (flag_z) goto lbC00D3EC;  /* equal / zero */  /* BEQ.S	lbC00D3EC */
+  if (!(flag_z)) {
   {  /* MOVE.B	#3,0(A1) */
       uint8_t _mv = (uint8_t)(3);
       WRITE8(a1 + 0, _mv);
@@ -12703,11 +13101,39 @@ static void STOPNOTE(void) {
       flag_v = 0; flag_c = 0;
     }
   if (flag_z) goto lbC00D3E2;  /* equal / zero */  /* BEQ.S	lbC00D3E2 */
-  WRITE32_PRE(sp, a6); WRITE32_PRE(sp, a5); WRITE32_PRE(sp, a4); WRITE32_PRE(sp, a3); WRITE32_PRE(sp, a2); WRITE32_PRE(sp, a1); WRITE32_PRE(sp, a0); WRITE32_PRE(sp, d7); WRITE32_PRE(sp, d6); WRITE32_PRE(sp, d5); WRITE32_PRE(sp, d4); WRITE32_PRE(sp, d3); WRITE32_PRE(sp, d2); WRITE32_PRE(sp, d1); WRITE32_PRE(sp, d0);  /* MOVEM.L	D0,D1,D2,D3,D4,D5,D6,D7,A0,A1,A2,A3,A4,A5,A6,-(SP) */
+  WRITE32_PRE(sp, a6);  /* MOVEM.L	D0,D1,D2,D3,D4,D5,D6,D7,A0,A1,A2,A3,A4,A5,A6,-(SP) */
+    WRITE32_PRE(sp, a5);
+    WRITE32_PRE(sp, a4);
+    WRITE32_PRE(sp, a3);
+    WRITE32_PRE(sp, a2);
+    WRITE32_PRE(sp, a1);
+    WRITE32_PRE(sp, a0);
+    WRITE32_PRE(sp, d7);
+    WRITE32_PRE(sp, d6);
+    WRITE32_PRE(sp, d5);
+    WRITE32_PRE(sp, d4);
+    WRITE32_PRE(sp, d3);
+    WRITE32_PRE(sp, d2);
+    WRITE32_PRE(sp, d1);
+    WRITE32_PRE(sp, d0);
   a4 = d0;  /* MOVEA.L	D0,A4 */
   a4 = READ32(a4 + 0);  /* MOVEA.L	0(A4),A4 */
   { uintptr_t _jt=(uintptr_t)(READ32(a4 + 0)); if(_jt) ((void(*)(void))_jt)(); }  /* JSR	0(A4) */
-  { uint32_t _mv = READ32_POST(sp); d0 = _mv; } { uint32_t _mv = READ32_POST(sp); d1 = _mv; } { uint32_t _mv = READ32_POST(sp); d2 = _mv; } { uint32_t _mv = READ32_POST(sp); d3 = _mv; } { uint32_t _mv = READ32_POST(sp); d4 = _mv; } { uint32_t _mv = READ32_POST(sp); d5 = _mv; } { uint32_t _mv = READ32_POST(sp); d6 = _mv; } { uint32_t _mv = READ32_POST(sp); d7 = _mv; } { uint32_t _mv = READ32_POST(sp); a0 = _mv; } { uint32_t _mv = READ32_POST(sp); a1 = _mv; } { uint32_t _mv = READ32_POST(sp); a2 = _mv; } { uint32_t _mv = READ32_POST(sp); a3 = _mv; } { uint32_t _mv = READ32_POST(sp); a4 = _mv; } { uint32_t _mv = READ32_POST(sp); a5 = _mv; } { uint32_t _mv = READ32_POST(sp); a6 = _mv; }  /* MOVEM.L	(SP)+,D0,D1,D2,D3,D4,D5,D6,D7,A0,A1,A2,A3,A4,A5,A6 */
+  d0 = READ32_POST(sp);  /* MOVEM.L	(SP)+,D0,D1,D2,D3,D4,D5,D6,D7,A0,A1,A2,A3,A4,A5,A6 */
+    d1 = READ32_POST(sp);
+    d2 = READ32_POST(sp);
+    d3 = READ32_POST(sp);
+    d4 = READ32_POST(sp);
+    d5 = READ32_POST(sp);
+    d6 = READ32_POST(sp);
+    d7 = READ32_POST(sp);
+    a0 = READ32_POST(sp);
+    a1 = READ32_POST(sp);
+    a2 = READ32_POST(sp);
+    a3 = READ32_POST(sp);
+    a4 = READ32_POST(sp);
+    a5 = READ32_POST(sp);
+    a6 = READ32_POST(sp);
 lbC00D3E2:
   {  /* MOVE.B	#0,1(A1) */
       uint8_t _mv = (uint8_t)(0);
@@ -12717,15 +13143,20 @@ lbC00D3E2:
       flag_v = 0; flag_c = 0;
     }
   WRITE8(a1 + 0, 0);  /* CLR.B	0(A1) */
-lbC00D3EC:
-  { uint32_t _mv = READ32_POST(sp); d0 = _mv; } { uint32_t _mv = READ32_POST(sp); d7 = _mv; } { uint32_t _mv = READ32_POST(sp); a0 = _mv; } { uint32_t _mv = READ32_POST(sp); a1 = _mv; }  /* MOVEM.L	(SP)+,D0,D7,A0,A1 */
+  }
+  d0 = READ32_POST(sp);  /* MOVEM.L	(SP)+,D0,D7,A0,A1 */
+    d7 = READ32_POST(sp);
+    a0 = READ32_POST(sp);
+    a1 = READ32_POST(sp);
   return;  /* RTS */
 }
 
 
 /* --- RAMPVOLUME --- */
 static void RAMPVOLUME(void) {
-  WRITE32_PRE(sp, a0); WRITE32_PRE(sp, d2); WRITE32_PRE(sp, d1);  /* MOVEM.L	D1,D2,A0,-(SP) */
+  WRITE32_PRE(sp, a0);  /* MOVEM.L	D1,D2,A0,-(SP) */
+    WRITE32_PRE(sp, d2);
+    WRITE32_PRE(sp, d1);
   a0 = READ32(a6 + 6);  /* MOVEA.L	6(A6),A0 */
   WRITE16(a6 + 60, 0);  /* CLR.W	60(A6) */
   {  /* TST.W	D0 */
@@ -12734,7 +13165,7 @@ static void RAMPVOLUME(void) {
       flag_n = ((int16_t)(_tst) < 0);
       flag_c = 0; flag_v = 0;
     }
-  if (flag_z) goto lbC00D42A;  /* equal / zero */  /* BEQ.S	lbC00D42A */
+  if (!(flag_z)) {
   d2 = (uint32_t)(int32_t)(int8_t)(0);  /* MOVEQ	#0,D2 */
   {  /* MOVE.W	0(A6),D2 */
       uint16_t _mv = (uint16_t)(READ16(a6 + 0));
@@ -12790,9 +13221,11 @@ lbC00D420:
       flag_v = 0; flag_c = 0;
     }
 lbC00D424:
-  { uint32_t _mv = READ32_POST(sp); d1 = _mv; } { uint32_t _mv = READ32_POST(sp); d2 = _mv; } { uint32_t _mv = READ32_POST(sp); a0 = _mv; }  /* MOVEM.L	(SP)+,D1,D2,A0 */
+  d1 = READ32_POST(sp);  /* MOVEM.L	(SP)+,D1,D2,A0 */
+    d2 = READ32_POST(sp);
+    a0 = READ32_POST(sp);
   return;  /* RTS */
-lbC00D42A:
+  }
   {  /* MOVE.W	D1,0(A6) */
       uint16_t _mv = (uint16_t)(W(d1));
       WRITE16(a6 + 0, _mv);
@@ -12813,7 +13246,7 @@ static void lbC00D430(void) {
       flag_n = ((int16_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-  if (flag_z) goto lbC00D462;  /* equal / zero */  /* BEQ.S	lbC00D462 */
+  if (!(flag_z)) {
   d0 = (uint32_t)((uint16_t)READ16(a6 + 34) * (uint16_t)W(d0));  /* MULU.W	34(A6),D0 */
   d0 = d0 << 1;  /* ASL.L	#1,D0 */
   if (flag_c) goto lbC00D464;  /* carry set / below */  /* BCS.S	lbC00D464 */
@@ -12880,7 +13313,7 @@ lbC00D45C:
       flag_n = ((int16_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-lbC00D462:
+  }
   return;  /* RTS */
 lbC00D464:
   {  /* MOVE.W	58(A6),D1 */
@@ -13073,7 +13506,7 @@ lbC00D5D4:
       flag_n = (_cmp < 0);
       flag_c = ((uint32_t)_lhs < (uint32_t)_rhs);
     }
-  if (flag_n==flag_v) goto lbC00D5FC;  /* greater or equal (signed) */  /* BGE.S	lbC00D5FC */
+  if (!(flag_n==flag_v)) {
   {  /* MOVE.L	12(A1),0(A2) */
       uint32_t _mv = (uint32_t)(READ32(a1 + 12));
       WRITE32(a2 + 0, _mv);
@@ -13150,7 +13583,7 @@ lbC00D5D4:
       flag_v = 0; flag_c = 0;
     }
   WRITE16(a1 + 10, 0);  /* CLR.W	10(A1) */
-lbC00D5FC:
+  }
   return;  /* RTS */
 lbC00D5FE:
   {  /* CMPI.W	#4,D7 */
@@ -14020,7 +14453,7 @@ lbC00D89A:
       flag_v = 0; flag_c = 0;
     }
   W(d4) = (uint16_t)((uint32_t)(W(d4)) >> W(d3));  /* LSR.W	D3,D4 */
-lbC00D8D0:
+do {
   {  /* MOVE.B	(A0),(A4)+ */
       uint8_t _mv = (uint8_t)(READ8(a0));
       WRITE8_POST(a4, _mv);
@@ -14035,7 +14468,7 @@ lbC00D8D0:
       flag_z = ((int16_t)(_sr) == 0);
       flag_n = ((int16_t)(_sr) < 0);
     }
-  if (!flag_z) goto lbC00D8D0;  /* not equal / nonzero */  /* BNE.S	lbC00D8D0 */
+} while (!flag_z);
   goto lbC00D9D0;  /* BRA.L	lbC00D9D0 */
 lbC00D8DC:
   {  /* TST.W	424(A3) */
@@ -14101,7 +14534,7 @@ lbC00D8DC:
       flag_z = ((int16_t)(_sr) == 0);
       flag_n = ((int16_t)(_sr) < 0);
     }
-lbC00D914:
+do {
   {  /* MOVE.B	(A0),D0 */
       uint8_t _mv = (uint8_t)(READ8(a0));
       B(d0) = (uint8_t)_mv;
@@ -14134,7 +14567,7 @@ lbC00D914:
     }
   a0 = (uint32_t)((int32_t)a0 + (int32_t)(int16_t)(W(d1)));  /* ADDA.W	D1,A0 */
   a5 = (uint32_t)((int32_t)a5 + (int32_t)(int16_t)(W(d1)));  /* ADDA.W	D1,A5 */
-  if ((int16_t)(--d2) >= 0) goto lbC00D914;  /* DBRA	D2,lbC00D914 */
+} while ((int16_t)(--d2) >= 0);
   a5 = (uint32_t)((int32_t)a5 - (int32_t)(int16_t)(0x80));  /* SUBA.W	#$80,A5 */
   {  /* SUBQ.W	#1,D4 */
       uint16_t _sr = (uint16_t)(W(d4) - (uint16_t)(1));
@@ -14143,7 +14576,7 @@ lbC00D914:
       flag_n = ((int16_t)(_sr) < 0);
     }
   if (flag_n) goto lbC00D9D0;  /* minus / negative */  /* BMI.L	lbC00D9D0 */
-lbC00D934:
+do {
   {  /* MOVE.B	(A0),D0 */
       uint8_t _mv = (uint8_t)(READ8(a0));
       B(d0) = (uint8_t)_mv;
@@ -14176,7 +14609,7 @@ lbC00D934:
     }
   a0 = (uint32_t)((int32_t)a0 + (int32_t)(int16_t)(W(d1)));  /* ADDA.W	D1,A0 */
   a5 = (uint32_t)((int32_t)a5 + (int32_t)(int16_t)(W(d1)));  /* ADDA.W	D1,A5 */
-  if ((int16_t)(--d4) >= 0) goto lbC00D934;  /* DBRA	D4,lbC00D934 */
+} while ((int16_t)(--d4) >= 0);
   goto lbC00D9D0;  /* BRA.L	lbC00D9D0 */
 lbC00D94E:
   {  /* MOVE.W	422(A3),D0 */
@@ -14382,7 +14815,21 @@ lbC00D9D0:
 
 /* --- SETFILTER --- */
 static void SETFILTER(void) {
-  WRITE32_PRE(sp, a6); WRITE32_PRE(sp, a5); WRITE32_PRE(sp, a4); WRITE32_PRE(sp, a3); WRITE32_PRE(sp, a2); WRITE32_PRE(sp, a1); WRITE32_PRE(sp, a0); WRITE32_PRE(sp, d7); WRITE32_PRE(sp, d6); WRITE32_PRE(sp, d5); WRITE32_PRE(sp, d4); WRITE32_PRE(sp, d3); WRITE32_PRE(sp, d2); WRITE32_PRE(sp, d1); WRITE32_PRE(sp, d0);  /* MOVEM.L	D0,D1,D2,D3,D4,D5,D6,D7,A0,A1,A2,A3,A4,A5,A6,-(SP) */
+  WRITE32_PRE(sp, a6);  /* MOVEM.L	D0,D1,D2,D3,D4,D5,D6,D7,A0,A1,A2,A3,A4,A5,A6,-(SP) */
+    WRITE32_PRE(sp, a5);
+    WRITE32_PRE(sp, a4);
+    WRITE32_PRE(sp, a3);
+    WRITE32_PRE(sp, a2);
+    WRITE32_PRE(sp, a1);
+    WRITE32_PRE(sp, a0);
+    WRITE32_PRE(sp, d7);
+    WRITE32_PRE(sp, d6);
+    WRITE32_PRE(sp, d5);
+    WRITE32_PRE(sp, d4);
+    WRITE32_PRE(sp, d3);
+    WRITE32_PRE(sp, d2);
+    WRITE32_PRE(sp, d1);
+    WRITE32_PRE(sp, d0);
   a1 = READ32(a0 + 4);  /* MOVEA.L	4(A0),A1 */
   a0 = (uint32_t)(a0 + 8);  /* LEA	8(A0),A0 */
   OneFilter(); return;  /* BRA.W	OneFilter */
@@ -14503,7 +14950,7 @@ lbC00DAC0:
       flag_n = (_cmp < 0);
       flag_c = ((uint32_t)_lhs < (uint32_t)_rhs);
     }
-  if (flag_n==flag_v) goto lbC00DB08;  /* greater or equal (signed) */  /* BGE.S	lbC00DB08 */
+  if (!(flag_n==flag_v)) {
   {  /* TST.W	10(A1) */
       uint16_t _tst = (uint16_t)(READ16(a1 + 10));
       flag_z = (_tst == 0);
@@ -14517,7 +14964,7 @@ lbC00DAC0:
       flag_z = ((int16_t)(_sr) == 0);
       flag_n = ((int16_t)(_sr) < 0);
     }
-  if (flag_z) goto lbC00DAE4;  /* equal / zero */  /* BEQ.S	lbC00DAE4 */
+  if (!(flag_z)) {
   {  /* MOVE.W	16(A1),4(A2) */
       uint16_t _mv = (uint16_t)(READ16(a1 + 16));
       WRITE16(a2 + 4, _mv);
@@ -14557,8 +15004,7 @@ lbC00DAC0:
     }
   SetPer();  /* BSR.W	SetPer */
   d0 = (uint32_t)(int32_t)(int8_t)(-1);  /* MOVEQ	#-1,D0 */
-  goto lbC00DAFC;  /* BRA.S	lbC00DAFC */
-lbC00DAE4:
+  } else {
   a3 = (uint32_t)(a6 + 370);  /* LEA	370(A6),A3 */
   {  /* MOVE.W	D7,D1 */
       uint16_t _mv = (uint16_t)(W(d7));
@@ -14583,7 +15029,7 @@ lbC00DAE4:
       flag_n = ((int32_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-lbC00DAFC:
+  }
   {  /* MOVE.W	18(A1),6(A2) */
       uint16_t _mv = (uint16_t)(READ16(a1 + 18));
       WRITE16(a2 + 6, _mv);
@@ -14614,7 +15060,7 @@ lbC00DAFC:
       flag_n = ((int32_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-lbC00DB08:
+  }
   return;  /* RTS */
 lbC00DB0A:
   {  /* CMPI.W	#4,D7 */
@@ -14625,10 +15071,10 @@ lbC00DB0A:
       flag_n = (_cmp < 0);
       flag_c = ((uint32_t)_lhs < (uint32_t)_rhs);
     }
-  if (flag_n!=flag_v) goto lbC00DB14;  /* less than (signed) */  /* BLT.S	lbC00DB14 */
+  if (!(flag_n!=flag_v)) {
   d0 = 0;  /* CLR.L	D0 */
   return;  /* RTS */
-lbC00DB14:
+  }
   a3 = READ32(a1 + 4);  /* MOVEA.L	4(A1),A3 */
   a2 = (uint32_t)(a6 + 370);  /* LEA	370(A6),A2 */
   {  /* MOVE.W	D7,D0 */
@@ -14930,7 +15376,7 @@ lbC00DC32:
       flag_n = ((int16_t)(_tst) < 0);
       flag_c = 0; flag_v = 0;
     }
-  if (flag_z) goto lbC00DC40;  /* equal / zero */  /* BEQ.S	lbC00DC40 */
+  if (!(flag_z)) {
   {  /* SUBI.W	#1,16(A2) */
       uint16_t _sr = (uint16_t)(READ16(a2 + 16) - 1);
       WRITE16(a2 + 16, (uint16_t)_sr);
@@ -14938,7 +15384,7 @@ lbC00DC32:
       flag_n = ((int16_t)(_sr) < 0);
     }
   goto lbC00DC5A;  /* BRA.S	lbC00DC5A */
-lbC00DC40:
+  }
   {  /* MOVE.W	14(A2),D0 */
       uint16_t _mv = (uint16_t)(READ16(a2 + 14));
       W(d0) = (uint16_t)_mv;
@@ -14991,9 +15437,9 @@ lbC00DC5A:
       flag_n = ((int16_t)(_ar) < 0);
     }
   flag_z = ((d0 & (1u << (8 & 31))) == 0);  /* BTST	#8,D0 */
-  if (flag_z) goto lbC00DC6E;  /* equal / zero */  /* BEQ.S	lbC00DC6E */
+  if (!(flag_z)) {
   W(d0) ^= (uint16_t)(0xFF);  /* EORI.W	#$FF,D0 */
-lbC00DC6E:
+  }
   W(d0) ^= (uint16_t)(0x80);  /* EORI.W	#$80,D0 */
   W(d0) = (uint32_t)(int32_t)(int16_t)(int8_t)W(d0);  /* EXT.W	D0 */
   W(d0) = (uint16_t)(-(int16_t)W(d0));  /* NEG.W	D0 */
@@ -15068,9 +15514,9 @@ lbC00DC6E:
       flag_z = ((int32_t)(_sr) == 0);
       flag_n = ((int32_t)(_sr) < 0);
     }
-  if (!flag_n) goto lbC00DCB4;  /* plus / positive */  /* BPL.S	lbC00DCB4 */
+  if (flag_n) {
   d0 = (uint32_t)(-(int32_t)d0);  /* NEG.L	D0 */
-lbC00DCB4:
+  }
   {  /* CMP.L	D3,D0 */
       int32_t _lhs = (int32_t)(d0);
       int32_t _rhs = (int32_t)(d3);
@@ -15079,7 +15525,7 @@ lbC00DCB4:
       flag_n = (_cmp < 0);
       flag_c = ((uint32_t)_lhs < (uint32_t)_rhs);
     }
-  if (!flag_z && (flag_n==flag_v)) goto lbC00DCCA;  /* greater than (signed) */  /* BGT.S	lbC00DCCA */
+  if (!(!flag_z && (flag_n==flag_v))) {
   {  /* MOVE.L	D1,D2 */
       uint32_t _mv = (uint32_t)(d1);
       d2 = _mv;
@@ -15103,7 +15549,7 @@ lbC00DCB4:
       flag_n = ((int16_t)(_ar) < 0);
     }
   goto lbC00DCD4;  /* BRA.S	lbC00DCD4 */
-lbC00DCCA:
+  }
   {  /* CMP.L	D1,D2 */
       int32_t _lhs = (int32_t)(d2);
       int32_t _rhs = (int32_t)(d1);
@@ -15112,7 +15558,7 @@ lbC00DCCA:
       flag_n = (_cmp < 0);
       flag_c = ((uint32_t)_lhs < (uint32_t)_rhs);
     }
-  if (flag_n!=flag_v) goto lbC00DCD2;  /* less than (signed) */  /* BLT.S	lbC00DCD2 */
+  if (!(flag_n!=flag_v)) {
   {  /* SUB.L	D3,D2 */
       uint32_t _sr = (uint32_t)(d2 - d3);
       d2 = (uint32_t)_sr;
@@ -15120,7 +15566,7 @@ lbC00DCCA:
       flag_n = ((int32_t)(_sr) < 0);
     }
   goto lbC00DCD4;  /* BRA.S	lbC00DCD4 */
-lbC00DCD2:
+  }
   {  /* ADD.L	D3,D2 */
       uint32_t _ar = (uint32_t)(d2 + d3);
       d2 = (uint32_t)_ar;
@@ -15244,9 +15690,9 @@ lbC00DD24:
       flag_n = (_cmp < 0);
       flag_c = ((uint32_t)_lhs < (uint32_t)_rhs);
     }
-  if (!flag_z) goto lbC00DD30;  /* not equal / nonzero */  /* BNE.S	lbC00DD30 */
+  if (flag_z) {
   d0 = (uint32_t)(int32_t)(int8_t)(-1);  /* MOVEQ	#-1,D0 */
-lbC00DD30:
+  }
   return;  /* RTS */
 }
 
@@ -15265,7 +15711,7 @@ lbC00DD3A:
       flag_n = (_cmp < 0);
       flag_c = ((uint32_t)_lhs < (uint32_t)_rhs);
     }
-  if (flag_n==flag_v) goto lbC00DD86;  /* greater or equal (signed) */  /* BGE.L	lbC00DD86 */
+  if (!(flag_n==flag_v)) {
   {  /* TST.W	10(A1) */
       uint16_t _tst = (uint16_t)(READ16(a1 + 10));
       flag_z = (_tst == 0);
@@ -15279,7 +15725,7 @@ lbC00DD3A:
       flag_z = ((int16_t)(_sr) == 0);
       flag_n = ((int16_t)(_sr) < 0);
     }
-  if (flag_z) goto lbC00DD62;  /* equal / zero */  /* BEQ.S	lbC00DD62 */
+  if (!(flag_z)) {
   {  /* MOVE.W	16(A1),4(A2) */
       uint16_t _mv = (uint16_t)(READ16(a1 + 16));
       WRITE16(a2 + 4, _mv);
@@ -15295,8 +15741,7 @@ lbC00DD3A:
       flag_v = 0; flag_c = 0;
     }
   d0 = (uint32_t)(int32_t)(int8_t)(-1);  /* MOVEQ	#-1,D0 */
-  goto lbC00DD7A;  /* BRA.S	lbC00DD7A */
-lbC00DD62:
+  } else {
   a3 = (uint32_t)(a6 + 450);  /* LEA	450(A6),A3 */
   {  /* MOVE.W	D7,D1 */
       uint16_t _mv = (uint16_t)(W(d7));
@@ -15321,7 +15766,7 @@ lbC00DD62:
       flag_n = ((int32_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-lbC00DD7A:
+  }
   {  /* MOVE.W	18(A1),6(A2) */
       uint16_t _mv = (uint16_t)(READ16(a1 + 18));
       WRITE16(a2 + 6, _mv);
@@ -15336,7 +15781,7 @@ lbC00DD7A:
       flag_n = ((int16_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-lbC00DD86:
+  }
   return;  /* RTS */
 lbC00DD88:
   {  /* CMPI.W	#4,D7 */
@@ -15347,10 +15792,10 @@ lbC00DD88:
       flag_n = (_cmp < 0);
       flag_c = ((uint32_t)_lhs < (uint32_t)_rhs);
     }
-  if (flag_n!=flag_v) goto lbC00DD92;  /* less than (signed) */  /* BLT.S	lbC00DD92 */
+  if (!(flag_n!=flag_v)) {
   d0 = 0;  /* CLR.L	D0 */
   return;  /* RTS */
-lbC00DD92:
+  }
   a3 = READ32(a1 + 4);  /* MOVEA.L	4(A1),A3 */
   a2 = (uint32_t)(a6 + 450);  /* LEA	450(A6),A2 */
   {  /* MOVE.W	D7,D0 */
@@ -15673,9 +16118,9 @@ lbC00DEA4:
       flag_n = (_cmp < 0);
       flag_c = ((uint32_t)_lhs < (uint32_t)_rhs);
     }
-  if (!flag_z) goto lbC00DEB0;  /* not equal / nonzero */  /* BNE.S	lbC00DEB0 */
+  if (flag_z) {
   d0 = (uint32_t)(int32_t)(int8_t)(-1);  /* MOVEQ	#-1,D0 */
-lbC00DEB0:
+  }
   return;  /* RTS */
   /* dc.w	$9D */
   /* dc.w	$FAFB */
@@ -15968,7 +16413,20 @@ lbC00DEB0:
 
 /* --- LoadSCORE --- */
 static void LoadSCORE(void) {
-  WRITE32_PRE(sp, a6); WRITE32_PRE(sp, a5); WRITE32_PRE(sp, a4); WRITE32_PRE(sp, a3); WRITE32_PRE(sp, a2); WRITE32_PRE(sp, a1); WRITE32_PRE(sp, a0); WRITE32_PRE(sp, d7); WRITE32_PRE(sp, d6); WRITE32_PRE(sp, d5); WRITE32_PRE(sp, d4); WRITE32_PRE(sp, d3); WRITE32_PRE(sp, d2); WRITE32_PRE(sp, d1);  /* MOVEM.L	D1,D2,D3,D4,D5,D6,D7,A0,A1,A2,A3,A4,A5,A6,-(SP) */
+  WRITE32_PRE(sp, a6);  /* MOVEM.L	D1,D2,D3,D4,D5,D6,D7,A0,A1,A2,A3,A4,A5,A6,-(SP) */
+    WRITE32_PRE(sp, a5);
+    WRITE32_PRE(sp, a4);
+    WRITE32_PRE(sp, a3);
+    WRITE32_PRE(sp, a2);
+    WRITE32_PRE(sp, a1);
+    WRITE32_PRE(sp, a0);
+    WRITE32_PRE(sp, d7);
+    WRITE32_PRE(sp, d6);
+    WRITE32_PRE(sp, d5);
+    WRITE32_PRE(sp, d4);
+    WRITE32_PRE(sp, d3);
+    WRITE32_PRE(sp, d2);
+    WRITE32_PRE(sp, d1);
   /* MOVE.L	SP,$34E(A6) */
   /* SUBA.L	A5,A5 */
   /* ANDI.B	#$3F,$30(A6) */
@@ -16000,8 +16458,7 @@ static void LoadSCORE(void) {
       flag_v = 0; flag_c = 0;
     }
   a0 = (uint32_t)(a5 + 16);  /* LEA	16(A5),A0 */
-  d7 = (uint32_t)(int32_t)(int8_t)(3);  /* MOVEQ	#3,D7 */
-lbC0002FC:
+  for (int _i_d7 = 3; _i_d7 >= 0; _i_d7--) {
   {  /* MOVE.W	#$FF,2(A0) */
       uint16_t _mv = (uint16_t)(0xFF);
       WRITE16(a0 + 2, _mv);
@@ -16010,7 +16467,7 @@ lbC0002FC:
       flag_v = 0; flag_c = 0;
     }
   a0 = (uint32_t)((int32_t)a0 + (int32_t)(int16_t)(4));  /* ADDQ.L	#4,A0 */
-  if ((int16_t)(--d7) >= 0) goto lbC0002FC;  /* DBRA	D7,lbC0002FC */
+}
   lbC000562();  /* BSR.L	lbC000562 */
   /* CMPI.L	#'FORM',D0 */
   /* BNE.L	lbC000554 */
@@ -16038,7 +16495,7 @@ lbC00032E:
       flag_n = ((int32_t)(_tst) < 0);
       flag_c = 0; flag_v = 0;
     }
-  if (flag_z) goto lbC000526;  /* equal / zero */  /* BEQ.L	lbC000526 */
+  if (!(flag_z)) {
   lbC000562();  /* BSR.L	lbC000562 */
   {  /* MOVE.L	D0,D7 */
       uint32_t _mv = (uint32_t)(d0);
@@ -16164,7 +16621,7 @@ lbC000396:
     }
   a0 = (uint32_t)(uintptr_t)lbW000CAE;  /* LEA	lbW000CAE(PC),A0 */
   W(d0) = (uint16_t)(0);  /* CLR.W	D0 */
-lbC0003A4:
+do {
   {  /* CMP.W	0(A0),D1 */
       int32_t _lhs = (int32_t)(W(d1));
       int32_t _rhs = (int32_t)(READ16(a0 + 0));
@@ -16188,7 +16645,7 @@ lbC0003A4:
       flag_n = (_cmp < 0);
       flag_c = ((uint32_t)_lhs < (uint32_t)_rhs);
     }
-  if (flag_c) goto lbC0003A4;  /* carry set / below */  /* BCS.S	lbC0003A4 */
+} while (flag_c);
   {  /* SUBQ.W	#1,D0 */
       uint16_t _sr = (uint16_t)(W(d0) - (uint16_t)(1));
       W(d0) = (uint16_t)((uint16_t)_sr);
@@ -16278,8 +16735,7 @@ lbC0003EC:
     }
   lbC000562();  /* BSR.L	lbC000562 */
   a0 = (uint32_t)(a5 + 32);  /* LEA	32(A5),A0 */
-  d7 = (uint32_t)(int32_t)(int8_t)(3);  /* MOVEQ	#3,D7 */
-lbC000406:
+  for (int _i_d7 = 3; _i_d7 >= 0; _i_d7--) {
   lbC000562();  /* BSR.L	lbC000562 */
   {  /* MOVE.L	D0,(A0)+ */
       uint32_t _mv = (uint32_t)(d0);
@@ -16288,7 +16744,7 @@ lbC000406:
       flag_n = ((int32_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-  if ((int16_t)(--d7) >= 0) goto lbC000406;  /* DBRA	D7,lbC000406 */
+}
   {  /* SUBI.L	#$18,D6 */
       uint32_t _sr = (uint32_t)(d6 - 0x18);
       d6 = (uint32_t)_sr;
@@ -16382,7 +16838,7 @@ lbC00048A:
       flag_n = ((int32_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-CopyTrack:
+do {
   {  /* MOVE.B	(A2)+,(A1)+ */
       uint8_t _mv = (uint8_t)(READ8_POST(a2));
       WRITE8_POST(a1, _mv);
@@ -16396,7 +16852,7 @@ CopyTrack:
       flag_z = ((int32_t)(_sr) == 0);
       flag_n = ((int32_t)(_sr) < 0);
     }
-  if (!flag_z) goto CopyTrack;  /* not equal / nonzero */  /* BNE.B	CopyTrack */
+} while (!flag_z);
   {  /* MOVE.W	#-1,(A1) */
       uint16_t _mv = (uint16_t)(-1);
       WRITE16(a1, _mv);
@@ -16438,7 +16894,7 @@ lbC0004C4:
       flag_c = ((uint32_t)_lhs < (uint32_t)_rhs);
     }
   if (flag_z) goto lbC000522;  /* equal / zero */  /* BEQ.S	lbC000522 */
-  if (!flag_c) goto lbC0004EE;  /* carry clear / above-or-equal */  /* BCC.S	lbC0004EE */
+  if (flag_c) {
   a1 = (uint32_t)(uintptr_t)lbW0007C2;  /* LEA	lbW0007C2(PC),A1 */
   W(d0) &= (uint16_t)(15);  /* ANDI.W	#15,D0 */
   {  /* MOVE.B	0(A1),D0 */
@@ -16450,8 +16906,7 @@ lbC0004C4:
     }
   if (flag_n) goto lbC000520;  /* minus / negative */  /* BMI.S	lbC000520 */
   W(d0) |= W(d1);  /* OR.W	D1,D0 */
-  goto lbC000522;  /* BRA.S	lbC000522 */
-lbC0004EE:
+  } else {
   {  /* CMPI.W	#$8200,D1 */
       int32_t _lhs = (int32_t)(W(d1));
       int32_t _rhs = (int32_t)(0x8200);
@@ -16515,7 +16970,7 @@ lbC000510:
     }
 lbC000520:
   W(d0) = (uint16_t)(0);  /* CLR.W	D0 */
-lbC000522:
+  }
   {  /* MOVE.W	D0,(A0)+ */
       uint16_t _mv = (uint16_t)(W(d0));
       WRITE16_POST(a0, _mv);
@@ -16524,7 +16979,7 @@ lbC000522:
       flag_v = 0; flag_c = 0;
     }
   goto lbC0004C4;  /* BRA.S	lbC0004C4 */
-lbC000526:
+  }
   /* LEA	$368(A6),A0 */
   /* lbC00052A	MOVE.L	(A0),D0 */
   /* BEQ.S	lbC000536 */
@@ -16537,7 +16992,20 @@ lbC000526:
   /* BSR.L	lbC0000D6 */
   /* CLR.L	$352(A6) */
   /* lbC000546	MOVE.L	A5,D0 */
-  { uint32_t _mv = READ32_POST(sp); d1 = _mv; } { uint32_t _mv = READ32_POST(sp); d2 = _mv; } { uint32_t _mv = READ32_POST(sp); d3 = _mv; } { uint32_t _mv = READ32_POST(sp); d4 = _mv; } { uint32_t _mv = READ32_POST(sp); d5 = _mv; } { uint32_t _mv = READ32_POST(sp); d6 = _mv; } { uint32_t _mv = READ32_POST(sp); d7 = _mv; } { uint32_t _mv = READ32_POST(sp); a0 = _mv; } { uint32_t _mv = READ32_POST(sp); a1 = _mv; } { uint32_t _mv = READ32_POST(sp); a2 = _mv; } { uint32_t _mv = READ32_POST(sp); a3 = _mv; } { uint32_t _mv = READ32_POST(sp); a4 = _mv; } { uint32_t _mv = READ32_POST(sp); a5 = _mv; } { uint32_t _mv = READ32_POST(sp); a6 = _mv; }  /* MOVEM.L	(SP)+,D1,D2,D3,D4,D5,D6,D7,A0,A1,A2,A3,A4,A5,A6 */
+  d1 = READ32_POST(sp);  /* MOVEM.L	(SP)+,D1,D2,D3,D4,D5,D6,D7,A0,A1,A2,A3,A4,A5,A6 */
+    d2 = READ32_POST(sp);
+    d3 = READ32_POST(sp);
+    d4 = READ32_POST(sp);
+    d5 = READ32_POST(sp);
+    d6 = READ32_POST(sp);
+    d7 = READ32_POST(sp);
+    a0 = READ32_POST(sp);
+    a1 = READ32_POST(sp);
+    a2 = READ32_POST(sp);
+    a3 = READ32_POST(sp);
+    a4 = READ32_POST(sp);
+    a5 = READ32_POST(sp);
+    a6 = READ32_POST(sp);
   return;  /* RTS */
   /* lbC00054E	BSET	#6,$30(A6) */
   /* lbC000554	MOVEA.L	$34E(A6),SP */
@@ -16671,7 +17139,21 @@ static void lbC000576(void) {
 
 /* --- PlaySCORE --- */
 static void PlaySCORE(void) {
-  WRITE32_PRE(sp, a6); WRITE32_PRE(sp, a5); WRITE32_PRE(sp, a4); WRITE32_PRE(sp, a3); WRITE32_PRE(sp, a2); WRITE32_PRE(sp, a1); WRITE32_PRE(sp, a0); WRITE32_PRE(sp, d7); WRITE32_PRE(sp, d6); WRITE32_PRE(sp, d5); WRITE32_PRE(sp, d4); WRITE32_PRE(sp, d3); WRITE32_PRE(sp, d2); WRITE32_PRE(sp, d1); WRITE32_PRE(sp, d0);  /* MOVEM.L	D0,D1,D2,D3,D4,D5,D6,D7,A0,A1,A2,A3,A4,A5,A6,-(SP) */
+  WRITE32_PRE(sp, a6);  /* MOVEM.L	D0,D1,D2,D3,D4,D5,D6,D7,A0,A1,A2,A3,A4,A5,A6,-(SP) */
+    WRITE32_PRE(sp, a5);
+    WRITE32_PRE(sp, a4);
+    WRITE32_PRE(sp, a3);
+    WRITE32_PRE(sp, a2);
+    WRITE32_PRE(sp, a1);
+    WRITE32_PRE(sp, a0);
+    WRITE32_PRE(sp, d7);
+    WRITE32_PRE(sp, d6);
+    WRITE32_PRE(sp, d5);
+    WRITE32_PRE(sp, d4);
+    WRITE32_PRE(sp, d3);
+    WRITE32_PRE(sp, d2);
+    WRITE32_PRE(sp, d1);
+    WRITE32_PRE(sp, d0);
   StopSCORE();  /* BSR.L	StopSCORE */
   {  /* MOVE.L	A0,D4 */
       uint32_t _mv = (uint32_t)(a0);
@@ -16708,8 +17190,7 @@ static void PlaySCORE(void) {
     }
   a0 = (uint32_t)(a5 + 32);  /* LEA	32(A5),A0 */
   a1 = (uint32_t)(a6 + 58);  /* LEA	58(A6),A1 */
-  d7 = (uint32_t)(int32_t)(int8_t)(3);  /* MOVEQ	#3,D7 */
-lbC000674:
+  for (int _i_d7 = 3; _i_d7 >= 0; _i_d7--) {
   {  /* MOVE.L	(A0)+,(A1)+ */
       uint32_t _mv = (uint32_t)(READ32_POST(a0));
       WRITE32_POST(a1, _mv);
@@ -16717,7 +17198,7 @@ lbC000674:
       flag_n = ((int32_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-  if ((int16_t)(--d7) >= 0) goto lbC000674;  /* DBRA	D7,lbC000674 */
+}
   a0 = a5;  /* MOVEA.L	A5,A0 */
   lbC0006E4();  /* BSR.L	lbC0006E4 */
   lbC000754();  /* BSR.L	lbC000754 */
@@ -16767,7 +17248,21 @@ lbC000674:
       flag_v = 0; flag_c = 0;
     }
 lbC0006AA:
-  { uint32_t _mv = READ32_POST(sp); d0 = _mv; } { uint32_t _mv = READ32_POST(sp); d1 = _mv; } { uint32_t _mv = READ32_POST(sp); d2 = _mv; } { uint32_t _mv = READ32_POST(sp); d3 = _mv; } { uint32_t _mv = READ32_POST(sp); d4 = _mv; } { uint32_t _mv = READ32_POST(sp); d5 = _mv; } { uint32_t _mv = READ32_POST(sp); d6 = _mv; } { uint32_t _mv = READ32_POST(sp); d7 = _mv; } { uint32_t _mv = READ32_POST(sp); a0 = _mv; } { uint32_t _mv = READ32_POST(sp); a1 = _mv; } { uint32_t _mv = READ32_POST(sp); a2 = _mv; } { uint32_t _mv = READ32_POST(sp); a3 = _mv; } { uint32_t _mv = READ32_POST(sp); a4 = _mv; } { uint32_t _mv = READ32_POST(sp); a5 = _mv; } { uint32_t _mv = READ32_POST(sp); a6 = _mv; }  /* MOVEM.L	(SP)+,D0,D1,D2,D3,D4,D5,D6,D7,A0,A1,A2,A3,A4,A5,A6 */
+  d0 = READ32_POST(sp);  /* MOVEM.L	(SP)+,D0,D1,D2,D3,D4,D5,D6,D7,A0,A1,A2,A3,A4,A5,A6 */
+    d1 = READ32_POST(sp);
+    d2 = READ32_POST(sp);
+    d3 = READ32_POST(sp);
+    d4 = READ32_POST(sp);
+    d5 = READ32_POST(sp);
+    d6 = READ32_POST(sp);
+    d7 = READ32_POST(sp);
+    a0 = READ32_POST(sp);
+    a1 = READ32_POST(sp);
+    a2 = READ32_POST(sp);
+    a3 = READ32_POST(sp);
+    a4 = READ32_POST(sp);
+    a5 = READ32_POST(sp);
+    a6 = READ32_POST(sp);
   return;  /* RTS */
 }
 
@@ -16781,14 +17276,15 @@ static void StopSCORE(void) {
 
 /* --- lbC0006BA --- */
 static void lbC0006BA(void) {
-  WRITE32_PRE(sp, a0); WRITE32_PRE(sp, d0);  /* MOVEM.L	D0,A0,-(SP) */
+  WRITE32_PRE(sp, a0);  /* MOVEM.L	D0,A0,-(SP) */
+    WRITE32_PRE(sp, d0);
   {  /* TST.W	10(A6) */
       uint16_t _tst = (uint16_t)(READ16(a6 + 10));
       flag_z = (_tst == 0);
       flag_n = ((int16_t)(_tst) < 0);
       flag_c = 0; flag_v = 0;
     }
-  if (flag_z) goto lbC0006DE;  /* equal / zero */  /* BEQ.S	lbC0006DE */
+  if (!(flag_z)) {
   WRITE16(a6 + 10, 0);  /* CLR.W	10(A6) */
   a0 = (uint32_t)(a6 + 58);  /* LEA	58(A6),A0 */
   B(d0) = (uint8_t)(0);  /* CLR.B	D0 */
@@ -16817,15 +17313,30 @@ lbC0006D6:
       flag_c = ((uint32_t)_lhs < (uint32_t)_rhs);
     }
   if (!flag_z) goto lbC0006CE;  /* not equal / nonzero */  /* BNE.S	lbC0006CE */
-lbC0006DE:
-  { uint32_t _mv = READ32_POST(sp); d0 = _mv; } { uint32_t _mv = READ32_POST(sp); a0 = _mv; }  /* MOVEM.L	(SP)+,D0,A0 */
+  }
+  d0 = READ32_POST(sp);  /* MOVEM.L	(SP)+,D0,A0 */
+    a0 = READ32_POST(sp);
   return;  /* RTS */
 }
 
 
 /* --- lbC0006E4 --- */
 static void lbC0006E4(void) {
-  WRITE32_PRE(sp, a6); WRITE32_PRE(sp, a5); WRITE32_PRE(sp, a4); WRITE32_PRE(sp, a3); WRITE32_PRE(sp, a2); WRITE32_PRE(sp, a1); WRITE32_PRE(sp, a0); WRITE32_PRE(sp, d7); WRITE32_PRE(sp, d6); WRITE32_PRE(sp, d5); WRITE32_PRE(sp, d4); WRITE32_PRE(sp, d3); WRITE32_PRE(sp, d2); WRITE32_PRE(sp, d1); WRITE32_PRE(sp, d0);  /* MOVEM.L	D0,D1,D2,D3,D4,D5,D6,D7,A0,A1,A2,A3,A4,A5,A6,-(SP) */
+  WRITE32_PRE(sp, a6);  /* MOVEM.L	D0,D1,D2,D3,D4,D5,D6,D7,A0,A1,A2,A3,A4,A5,A6,-(SP) */
+    WRITE32_PRE(sp, a5);
+    WRITE32_PRE(sp, a4);
+    WRITE32_PRE(sp, a3);
+    WRITE32_PRE(sp, a2);
+    WRITE32_PRE(sp, a1);
+    WRITE32_PRE(sp, a0);
+    WRITE32_PRE(sp, d7);
+    WRITE32_PRE(sp, d6);
+    WRITE32_PRE(sp, d5);
+    WRITE32_PRE(sp, d4);
+    WRITE32_PRE(sp, d3);
+    WRITE32_PRE(sp, d2);
+    WRITE32_PRE(sp, d1);
+    WRITE32_PRE(sp, d0);
   a3 = a0;  /* MOVEA.L	A0,A3 */
   a1 = (uint32_t)(a6 + 602);  /* LEA	602(A6),A1 */
   {  /* MOVE.L	D0,D6 */
@@ -16856,7 +17367,7 @@ lbC0006F2:
       flag_n = ((int32_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-lbC000708:
+do {
   {  /* MOVE.L	A2,0(A1) */
       uint32_t _mv = (uint32_t)(a2);
       WRITE32(a1 + 0, _mv);
@@ -16878,7 +17389,7 @@ lbC000708:
       flag_n = ((int16_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-  if (flag_z) goto lbC000708;  /* equal / zero */  /* BEQ.S	lbC000708 */
+} while (flag_z);
   {  /* CMPI.W	#$FFFF,D0 */
       int32_t _lhs = (int32_t)(W(d0));
       int32_t _rhs = (int32_t)(0xFFFF);
@@ -16963,18 +17474,45 @@ lbC000742:
       flag_c = ((uint32_t)_lhs < (uint32_t)_rhs);
     }
   if (!flag_z) goto lbC0006F2;  /* not equal / nonzero */  /* BNE.S	lbC0006F2 */
-  { uint32_t _mv = READ32_POST(sp); d0 = _mv; } { uint32_t _mv = READ32_POST(sp); d1 = _mv; } { uint32_t _mv = READ32_POST(sp); d2 = _mv; } { uint32_t _mv = READ32_POST(sp); d3 = _mv; } { uint32_t _mv = READ32_POST(sp); d4 = _mv; } { uint32_t _mv = READ32_POST(sp); d5 = _mv; } { uint32_t _mv = READ32_POST(sp); d6 = _mv; } { uint32_t _mv = READ32_POST(sp); d7 = _mv; } { uint32_t _mv = READ32_POST(sp); a0 = _mv; } { uint32_t _mv = READ32_POST(sp); a1 = _mv; } { uint32_t _mv = READ32_POST(sp); a2 = _mv; } { uint32_t _mv = READ32_POST(sp); a3 = _mv; } { uint32_t _mv = READ32_POST(sp); a4 = _mv; } { uint32_t _mv = READ32_POST(sp); a5 = _mv; } { uint32_t _mv = READ32_POST(sp); a6 = _mv; }  /* MOVEM.L	(SP)+,D0,D1,D2,D3,D4,D5,D6,D7,A0,A1,A2,A3,A4,A5,A6 */
+  d0 = READ32_POST(sp);  /* MOVEM.L	(SP)+,D0,D1,D2,D3,D4,D5,D6,D7,A0,A1,A2,A3,A4,A5,A6 */
+    d1 = READ32_POST(sp);
+    d2 = READ32_POST(sp);
+    d3 = READ32_POST(sp);
+    d4 = READ32_POST(sp);
+    d5 = READ32_POST(sp);
+    d6 = READ32_POST(sp);
+    d7 = READ32_POST(sp);
+    a0 = READ32_POST(sp);
+    a1 = READ32_POST(sp);
+    a2 = READ32_POST(sp);
+    a3 = READ32_POST(sp);
+    a4 = READ32_POST(sp);
+    a5 = READ32_POST(sp);
+    a6 = READ32_POST(sp);
   return;  /* RTS */
 }
 
 
 /* --- lbC000754 --- */
 static void lbC000754(void) {
-  WRITE32_PRE(sp, a6); WRITE32_PRE(sp, a5); WRITE32_PRE(sp, a4); WRITE32_PRE(sp, a3); WRITE32_PRE(sp, a2); WRITE32_PRE(sp, a1); WRITE32_PRE(sp, a0); WRITE32_PRE(sp, d7); WRITE32_PRE(sp, d6); WRITE32_PRE(sp, d5); WRITE32_PRE(sp, d4); WRITE32_PRE(sp, d3); WRITE32_PRE(sp, d2); WRITE32_PRE(sp, d1); WRITE32_PRE(sp, d0);  /* MOVEM.L	D0,D1,D2,D3,D4,D5,D6,D7,A0,A1,A2,A3,A4,A5,A6,-(SP) */
+  WRITE32_PRE(sp, a6);  /* MOVEM.L	D0,D1,D2,D3,D4,D5,D6,D7,A0,A1,A2,A3,A4,A5,A6,-(SP) */
+    WRITE32_PRE(sp, a5);
+    WRITE32_PRE(sp, a4);
+    WRITE32_PRE(sp, a3);
+    WRITE32_PRE(sp, a2);
+    WRITE32_PRE(sp, a1);
+    WRITE32_PRE(sp, a0);
+    WRITE32_PRE(sp, d7);
+    WRITE32_PRE(sp, d6);
+    WRITE32_PRE(sp, d5);
+    WRITE32_PRE(sp, d4);
+    WRITE32_PRE(sp, d3);
+    WRITE32_PRE(sp, d2);
+    WRITE32_PRE(sp, d1);
+    WRITE32_PRE(sp, d0);
   a2 = (uint32_t)(a6 + 602);  /* LEA	602(A6),A2 */
   a1 = (uint32_t)(a6 + 634);  /* LEA	634(A6),A1 */
-  d7 = (uint32_t)(int32_t)(int8_t)(7);  /* MOVEQ	#7,D7 */
-lbC000762:
+  for (int _i_d7 = 7; _i_d7 >= 0; _i_d7--) {
   {  /* MOVE.L	(A2)+,(A1)+ */
       uint32_t _mv = (uint32_t)(READ32_POST(a2));
       WRITE32_POST(a1, _mv);
@@ -16982,7 +17520,7 @@ lbC000762:
       flag_n = ((int32_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-  if ((int16_t)(--d7) >= 0) goto lbC000762;  /* DBRA	D7,lbC000762 */
+}
   {  /* MOVE.L	12(A6),16(A6) */
       uint32_t _mv = (uint32_t)(READ32(a6 + 12));
       WRITE32(a6 + 16, _mv);
@@ -16999,7 +17537,7 @@ lbC000772:
       flag_n = ((int32_t)(_tst) < 0);
       flag_c = 0; flag_v = 0;
     }
-  if (flag_z) goto lbC00077E;  /* equal / zero */  /* BEQ.S	lbC00077E */
+  if (!(flag_z)) {
   {  /* MOVE.B	D7,D0 */
       uint8_t _mv = (uint8_t)(B(d7));
       B(d0) = (uint8_t)_mv;
@@ -17008,7 +17546,7 @@ lbC000772:
       flag_v = 0; flag_c = 0;
     }
   ReleaseNOTE();  /* BSR.L	ReleaseNOTE */
-lbC00077E:
+  }
   WRITE32(a4 + 570, 0);  /* CLR.L	570(A4) */
   d0 = 0;  /* CLR.L	D0 */
   {  /* MOVE.B	651(A4),D0 */
@@ -17093,7 +17631,21 @@ lbC0007AC:
       flag_c = ((uint32_t)_lhs < (uint32_t)_rhs);
     }
   if (flag_c) goto lbC000772;  /* carry set / below */  /* BCS.S	lbC000772 */
-  { uint32_t _mv = READ32_POST(sp); d0 = _mv; } { uint32_t _mv = READ32_POST(sp); d1 = _mv; } { uint32_t _mv = READ32_POST(sp); d2 = _mv; } { uint32_t _mv = READ32_POST(sp); d3 = _mv; } { uint32_t _mv = READ32_POST(sp); d4 = _mv; } { uint32_t _mv = READ32_POST(sp); d5 = _mv; } { uint32_t _mv = READ32_POST(sp); d6 = _mv; } { uint32_t _mv = READ32_POST(sp); d7 = _mv; } { uint32_t _mv = READ32_POST(sp); a0 = _mv; } { uint32_t _mv = READ32_POST(sp); a1 = _mv; } { uint32_t _mv = READ32_POST(sp); a2 = _mv; } { uint32_t _mv = READ32_POST(sp); a3 = _mv; } { uint32_t _mv = READ32_POST(sp); a4 = _mv; } { uint32_t _mv = READ32_POST(sp); a5 = _mv; } { uint32_t _mv = READ32_POST(sp); a6 = _mv; }  /* MOVEM.L	(SP)+,D0,D1,D2,D3,D4,D5,D6,D7,A0,A1,A2,A3,A4,A5,A6 */
+  d0 = READ32_POST(sp);  /* MOVEM.L	(SP)+,D0,D1,D2,D3,D4,D5,D6,D7,A0,A1,A2,A3,A4,A5,A6 */
+    d1 = READ32_POST(sp);
+    d2 = READ32_POST(sp);
+    d3 = READ32_POST(sp);
+    d4 = READ32_POST(sp);
+    d5 = READ32_POST(sp);
+    d6 = READ32_POST(sp);
+    d7 = READ32_POST(sp);
+    a0 = READ32_POST(sp);
+    a1 = READ32_POST(sp);
+    a2 = READ32_POST(sp);
+    a3 = READ32_POST(sp);
+    a4 = READ32_POST(sp);
+    a5 = READ32_POST(sp);
+    a6 = READ32_POST(sp);
   return;  /* RTS */
 }
 
@@ -17117,7 +17669,9 @@ lbC0007E2:
 
 /* --- lbC0007F2 --- */
 static void lbC0007F2(void) {
-  WRITE32_PRE(sp, a0); WRITE32_PRE(sp, d2); WRITE32_PRE(sp, d1);  /* MOVEM.L	D1,D2,A0,-(SP) */
+  WRITE32_PRE(sp, a0);  /* MOVEM.L	D1,D2,A0,-(SP) */
+    WRITE32_PRE(sp, d2);
+    WRITE32_PRE(sp, d1);
   W(d0) = (uint16_t)((uint32_t)(W(d0)) >> 1);  /* LSR.W	#1,D0 */
   {  /* CMP.W	52(A6),D0 */
       int32_t _lhs = (int32_t)(W(d0));
@@ -17127,7 +17681,7 @@ static void lbC0007F2(void) {
       flag_n = (_cmp < 0);
       flag_c = ((uint32_t)_lhs < (uint32_t)_rhs);
     }
-  if (flag_z) goto lbC000840;  /* equal / zero */  /* BEQ.S	lbC000840 */
+  if (!(flag_z)) {
   {  /* MOVE.W	D0,52(A6) */
       uint16_t _mv = (uint16_t)(W(d0));
       WRITE16(a6 + 52, _mv);
@@ -17185,7 +17739,8 @@ static void lbC0007F2(void) {
   /* MOVE.B	D1,$100(A0) */
   /* MOVEA.L	$3F4(A6),A0 */
   /* MOVE.B	#$11,(A0) */
-  WRITE32_PRE(sp, a5); WRITE32_PRE(sp, a1);  /* MOVEM.L	A1,A5,-(SP) */
+  WRITE32_PRE(sp, a5);  /* MOVEM.L	A1,A5,-(SP) */
+    WRITE32_PRE(sp, a1);
   {  /* MOVE.L	EagleBase(PC),A5 */
       uint32_t _mv = (uint32_t)(READ32((uintptr_t)EagleBase));
       a5 = _mv;
@@ -17208,9 +17763,12 @@ static void lbC0007F2(void) {
       flag_v = 0; flag_c = 0;
     }
   { uintptr_t _jt=(uintptr_t)(a1); if(_jt) ((void(*)(void))_jt)(); }  /* JSR	(A1) */
-  { uint32_t _mv = READ32_POST(sp); a1 = _mv; } { uint32_t _mv = READ32_POST(sp); a5 = _mv; }  /* MOVEM.L	(SP)+,A1,A5 */
-lbC000840:
-  { uint32_t _mv = READ32_POST(sp); d1 = _mv; } { uint32_t _mv = READ32_POST(sp); d2 = _mv; } { uint32_t _mv = READ32_POST(sp); a0 = _mv; }  /* MOVEM.L	(SP)+,D1,D2,A0 */
+  a1 = READ32_POST(sp);  /* MOVEM.L	(SP)+,A1,A5 */
+    a5 = READ32_POST(sp);
+  }
+  d1 = READ32_POST(sp);  /* MOVEM.L	(SP)+,D1,D2,A0 */
+    d2 = READ32_POST(sp);
+    a0 = READ32_POST(sp);
   return;  /* RTS */
 }
 
@@ -17223,7 +17781,7 @@ static void lbC000846(void) {
       flag_n = ((int16_t)(_tst) < 0);
       flag_c = 0; flag_v = 0;
     }
-  if (flag_z) goto lbC000854;  /* equal / zero */  /* BEQ.S	lbC000854 */
+  if (!(flag_z)) {
   {  /* SUBQ.W	#1,50(A6) */
       uint16_t _sr = (uint16_t)(READ16(a6 + 50) - 1);
       WRITE16(a6 + 50, (uint16_t)_sr);
@@ -17231,7 +17789,7 @@ static void lbC000846(void) {
       flag_n = ((int16_t)(_sr) < 0);
     }
   if (!flag_z) goto lbC00097C;  /* not equal / nonzero */  /* BNE.L	lbC00097C */
-lbC000854:
+  }
   {  /* MOVE.W	2(A6),D0 */
       uint16_t _mv = (uint16_t)(READ16(a6 + 2));
       W(d0) = (uint16_t)_mv;
@@ -17267,7 +17825,7 @@ lbC000874:
       flag_n = ((int32_t)(_tst) < 0);
       flag_c = 0; flag_v = 0;
     }
-  if (flag_z) goto lbC000890;  /* equal / zero */  /* BEQ.S	lbC000890 */
+  if (!(flag_z)) {
   {  /* SUBQ.L	#1,570(A5) */
       uint32_t _sr = (uint32_t)(READ32(a5 + 570) - 1);
       WRITE32(a5 + 570, (uint32_t)_sr);
@@ -17291,8 +17849,7 @@ lbC000874:
     }
   ReleaseNOTE();  /* BSR.L	ReleaseNOTE */
 lbC00088C:
-  goto lbC000934;  /* BRA.L	lbC000934 */
-lbC000890:
+  } else {
   {  /* TST.L	586(A5) */
       uint32_t _tst = (uint32_t)(READ32(a5 + 586));
       flag_z = (_tst == 0);
@@ -17326,7 +17883,7 @@ lbC0008A2:
   goto lbC00088C;  /* BRA.S	lbC00088C */
 lbC0008A6:
   a0 = d0;  /* MOVEA.L	D0,A0 */
-lbC0008A8:
+do {
   {  /* MOVE.W	(A0)+,D2 */
       uint16_t _mv = (uint16_t)(READ16_POST(a0));
       W(d2) = (uint16_t)_mv;
@@ -17334,7 +17891,7 @@ lbC0008A8:
       flag_n = ((int16_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-  if (flag_z) goto lbC0008A8;  /* equal / zero */  /* BEQ.S	lbC0008A8 */
+} while (flag_z);
   {  /* CMPI.W	#$FFFF,D2 */
       int32_t _lhs = (int32_t)(W(d2));
       int32_t _rhs = (int32_t)(0xFFFF);
@@ -17520,7 +18077,7 @@ lbC000930:
       flag_n = ((int16_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-lbC000934:
+  }
   a1 = (uint32_t)((int32_t)a1 + (int32_t)(int16_t)(4));  /* ADDQ.L	#4,A1 */
   a5 = (uint32_t)((int32_t)a5 + (int32_t)(int16_t)(4));  /* ADDQ.L	#4,A5 */
   {  /* ADDQ.B	#1,D7 */
@@ -17562,7 +18119,7 @@ lbC000952:
       flag_n = ((int32_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-  if (!flag_n) goto lbC000960;  /* plus / positive */  /* BPL.S	lbC000960 */
+  if (flag_n) {
   {  /* CMPI.W	#4,D6 */
       int32_t _lhs = (int32_t)(W(d6));
       int32_t _rhs = (int32_t)(4);
@@ -17572,8 +18129,7 @@ lbC000952:
       flag_c = ((uint32_t)_lhs < (uint32_t)_rhs);
     }
   if (!flag_z) goto lbC00097C;  /* not equal / nonzero */  /* BNE.S	lbC00097C */
-  goto lbC000964;  /* BRA.S	lbC000964 */
-lbC000960:
+  } else {
   {  /* CMP.L	D1,D0 */
       int32_t _lhs = (int32_t)(d0);
       int32_t _rhs = (int32_t)(d1);
@@ -17583,7 +18139,7 @@ lbC000960:
       flag_c = ((uint32_t)_lhs < (uint32_t)_rhs);
     }
   if (!flag_z) goto lbC00097C;  /* not equal / nonzero */  /* BNE.S	lbC00097C */
-lbC000964:
+  }
   /* TST.W	10(A6) */
   /* BMI.S	lbC000970 */
   /* SUBQ.W	#1,10(A6) */
@@ -17634,7 +18190,7 @@ lbC0009BC:
       flag_n = ((int8_t)(_tst) < 0);
       flag_c = 0; flag_v = 0;
     }
-  if (!flag_z) goto lbC0009CA;  /* not equal / nonzero */  /* BNE.S	lbC0009CA */
+  if (flag_z) {
   {  /* CMPI.B	#0,1(A1) */
       int32_t _lhs = (int32_t)(READ8(a1 + 1));
       int32_t _rhs = (int32_t)(0);
@@ -17644,7 +18200,7 @@ lbC0009BC:
       flag_c = ((uint32_t)_lhs < (uint32_t)_rhs);
     }
   if (flag_z) goto lbC0009E8;  /* equal / zero */  /* BEQ.S	lbC0009E8 */
-lbC0009CA:
+  }
   {  /* MOVE.L	4(A1),D0 */
       uint32_t _mv = (uint32_t)(READ32(a1 + 4));
       d0 = _mv;
@@ -17655,9 +18211,17 @@ lbC0009CA:
   if (flag_z) goto lbC0009FC;  /* equal / zero */  /* BEQ.S	lbC0009FC */
   a4 = d0;  /* MOVEA.L	D0,A4 */
   a4 = READ32(a4 + 0);  /* MOVEA.L	0(A4),A4 */
-  WRITE32_PRE(sp, a6); WRITE32_PRE(sp, a1); WRITE32_PRE(sp, a0); WRITE32_PRE(sp, d7); WRITE32_PRE(sp, d6);  /* MOVEM.L	D6,D7,A0,A1,A6,-(SP) */
+  WRITE32_PRE(sp, a6);  /* MOVEM.L	D6,D7,A0,A1,A6,-(SP) */
+    WRITE32_PRE(sp, a1);
+    WRITE32_PRE(sp, a0);
+    WRITE32_PRE(sp, d7);
+    WRITE32_PRE(sp, d6);
   { uintptr_t _jt=(uintptr_t)(READ32(a4 + 0)); if(_jt) ((void(*)(void))_jt)(); }  /* JSR	0(A4) */
-  { uint32_t _mv = READ32_POST(sp); d6 = _mv; } { uint32_t _mv = READ32_POST(sp); d7 = _mv; } { uint32_t _mv = READ32_POST(sp); a0 = _mv; } { uint32_t _mv = READ32_POST(sp); a1 = _mv; } { uint32_t _mv = READ32_POST(sp); a6 = _mv; }  /* MOVEM.L	(SP)+,D6,D7,A0,A1,A6 */
+  d6 = READ32_POST(sp);  /* MOVEM.L	(SP)+,D6,D7,A0,A1,A6 */
+    d7 = READ32_POST(sp);
+    a0 = READ32_POST(sp);
+    a1 = READ32_POST(sp);
+    a6 = READ32_POST(sp);
   {  /* TST.L	D0 */
       uint32_t _tst = (uint32_t)(d0);
       flag_z = (_tst == 0);
@@ -17742,9 +18306,19 @@ lbC000A26:
   if (flag_z) goto lbC000A48;  /* equal / zero */  /* BEQ.S	lbC000A48 */
   a4 = READ32(a1 + 4);  /* MOVEA.L	4(A1),A4 */
   a4 = READ32(a4 + 0);  /* MOVEA.L	0(A4),A4 */
-  WRITE32_PRE(sp, a6); WRITE32_PRE(sp, a2); WRITE32_PRE(sp, a1); WRITE32_PRE(sp, a0); WRITE32_PRE(sp, d7); WRITE32_PRE(sp, d6);  /* MOVEM.L	D6,D7,A0,A1,A2,A6,-(SP) */
+  WRITE32_PRE(sp, a6);  /* MOVEM.L	D6,D7,A0,A1,A2,A6,-(SP) */
+    WRITE32_PRE(sp, a2);
+    WRITE32_PRE(sp, a1);
+    WRITE32_PRE(sp, a0);
+    WRITE32_PRE(sp, d7);
+    WRITE32_PRE(sp, d6);
   { uintptr_t _jt=(uintptr_t)(READ32(a4 + 4)); if(_jt) ((void(*)(void))_jt)(); }  /* JSR	4(A4) */
-  { uint32_t _mv = READ32_POST(sp); d6 = _mv; } { uint32_t _mv = READ32_POST(sp); d7 = _mv; } { uint32_t _mv = READ32_POST(sp); a0 = _mv; } { uint32_t _mv = READ32_POST(sp); a1 = _mv; } { uint32_t _mv = READ32_POST(sp); a2 = _mv; } { uint32_t _mv = READ32_POST(sp); a6 = _mv; }  /* MOVEM.L	(SP)+,D6,D7,A0,A1,A2,A6 */
+  d6 = READ32_POST(sp);  /* MOVEM.L	(SP)+,D6,D7,A0,A1,A2,A6 */
+    d7 = READ32_POST(sp);
+    a0 = READ32_POST(sp);
+    a1 = READ32_POST(sp);
+    a2 = READ32_POST(sp);
+    a6 = READ32_POST(sp);
   {  /* TST.L	D0 */
       uint32_t _tst = (uint32_t)(d0);
       flag_z = (_tst == 0);
@@ -17816,7 +18390,20 @@ static void lbC000A60(void) {
 
 /* --- StartNOTE --- */
 static void StartNOTE(void) {
-  WRITE32_PRE(sp, a6); WRITE32_PRE(sp, a5); WRITE32_PRE(sp, a4); WRITE32_PRE(sp, a3); WRITE32_PRE(sp, a2); WRITE32_PRE(sp, a1); WRITE32_PRE(sp, a0); WRITE32_PRE(sp, d7); WRITE32_PRE(sp, d6); WRITE32_PRE(sp, d5); WRITE32_PRE(sp, d4); WRITE32_PRE(sp, d3); WRITE32_PRE(sp, d2); WRITE32_PRE(sp, d1);  /* MOVEM.L	D1,D2,D3,D4,D5,D6,D7,A0,A1,A2,A3,A4,A5,A6,-(SP) */
+  WRITE32_PRE(sp, a6);  /* MOVEM.L	D1,D2,D3,D4,D5,D6,D7,A0,A1,A2,A3,A4,A5,A6,-(SP) */
+    WRITE32_PRE(sp, a5);
+    WRITE32_PRE(sp, a4);
+    WRITE32_PRE(sp, a3);
+    WRITE32_PRE(sp, a2);
+    WRITE32_PRE(sp, a1);
+    WRITE32_PRE(sp, a0);
+    WRITE32_PRE(sp, d7);
+    WRITE32_PRE(sp, d6);
+    WRITE32_PRE(sp, d5);
+    WRITE32_PRE(sp, d4);
+    WRITE32_PRE(sp, d3);
+    WRITE32_PRE(sp, d2);
+    WRITE32_PRE(sp, d1);
   {  /* MOVE.L	A0,D3 */
       uint32_t _mv = (uint32_t)(a0);
       d3 = _mv;
@@ -18023,7 +18610,20 @@ lbC000B0E:
     }
   d0 = (uint32_t)(int32_t)(int16_t)d0;  /* EXT.L	D0 */
 lbC000B26:
-  { uint32_t _mv = READ32_POST(sp); d1 = _mv; } { uint32_t _mv = READ32_POST(sp); d2 = _mv; } { uint32_t _mv = READ32_POST(sp); d3 = _mv; } { uint32_t _mv = READ32_POST(sp); d4 = _mv; } { uint32_t _mv = READ32_POST(sp); d5 = _mv; } { uint32_t _mv = READ32_POST(sp); d6 = _mv; } { uint32_t _mv = READ32_POST(sp); d7 = _mv; } { uint32_t _mv = READ32_POST(sp); a0 = _mv; } { uint32_t _mv = READ32_POST(sp); a1 = _mv; } { uint32_t _mv = READ32_POST(sp); a2 = _mv; } { uint32_t _mv = READ32_POST(sp); a3 = _mv; } { uint32_t _mv = READ32_POST(sp); a4 = _mv; } { uint32_t _mv = READ32_POST(sp); a5 = _mv; } { uint32_t _mv = READ32_POST(sp); a6 = _mv; }  /* MOVEM.L	(SP)+,D1,D2,D3,D4,D5,D6,D7,A0,A1,A2,A3,A4,A5,A6 */
+  d1 = READ32_POST(sp);  /* MOVEM.L	(SP)+,D1,D2,D3,D4,D5,D6,D7,A0,A1,A2,A3,A4,A5,A6 */
+    d2 = READ32_POST(sp);
+    d3 = READ32_POST(sp);
+    d4 = READ32_POST(sp);
+    d5 = READ32_POST(sp);
+    d6 = READ32_POST(sp);
+    d7 = READ32_POST(sp);
+    a0 = READ32_POST(sp);
+    a1 = READ32_POST(sp);
+    a2 = READ32_POST(sp);
+    a3 = READ32_POST(sp);
+    a4 = READ32_POST(sp);
+    a5 = READ32_POST(sp);
+    a6 = READ32_POST(sp);
   return;  /* RTS */
 lbC000B2C:
   d0 = (uint32_t)(int32_t)(int8_t)(-1);  /* MOVEQ	#-1,D0 */
@@ -18041,7 +18641,8 @@ lbC000B2C:
 
 /* --- ReleaseNOTE --- */
 static void ReleaseNOTE(void) {
-  WRITE32_PRE(sp, a1); WRITE32_PRE(sp, d0);  /* MOVEM.L	D0,A1,-(SP) */
+  WRITE32_PRE(sp, a1);  /* MOVEM.L	D0,A1,-(SP) */
+    WRITE32_PRE(sp, d0);
   a1 = (uint32_t)(a6 + 466);  /* LEA	466(A6),A1 */
   W(d0) = (uint32_t)(int32_t)(int16_t)(int8_t)W(d0);  /* EXT.W	D0 */
   d0 = (uint32_t)((uint16_t)0x16 * (uint16_t)W(d0));  /* MULU.W	#$16,D0 */
@@ -18055,7 +18656,7 @@ static void ReleaseNOTE(void) {
       flag_n = (_cmp < 0);
       flag_c = ((uint32_t)_lhs < (uint32_t)_rhs);
     }
-  if (!flag_z) goto lbC000B68;  /* not equal / nonzero */  /* BNE.S	lbC000B68 */
+  if (flag_z) {
   {  /* MOVE.B	#2,0(A1) */
       uint8_t _mv = (uint8_t)(2);
       WRITE8(a1 + 0, _mv);
@@ -18063,8 +18664,9 @@ static void ReleaseNOTE(void) {
       flag_n = ((int8_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-lbC000B68:
-  { uint32_t _mv = READ32_POST(sp); d0 = _mv; } { uint32_t _mv = READ32_POST(sp); a1 = _mv; }  /* MOVEM.L	(SP)+,D0,A1 */
+  }
+  d0 = READ32_POST(sp);  /* MOVEM.L	(SP)+,D0,A1 */
+    a1 = READ32_POST(sp);
   return;  /* RTS */
   /* StopSOUND	MOVE.L	D0,-(SP) */
   /* CLR.L	$360(A6) */
@@ -18079,7 +18681,10 @@ lbC000B68:
 
 /* --- StopNOTE --- */
 static void StopNOTE(void) {
-  WRITE32_PRE(sp, a1); WRITE32_PRE(sp, a0); WRITE32_PRE(sp, d7); WRITE32_PRE(sp, d0);  /* MOVEM.L	D0,D7,A0,A1,-(SP) */
+  WRITE32_PRE(sp, a1);  /* MOVEM.L	D0,D7,A0,A1,-(SP) */
+    WRITE32_PRE(sp, a0);
+    WRITE32_PRE(sp, d7);
+    WRITE32_PRE(sp, d0);
   a0 = READ32(a6 + 6);  /* MOVEA.L	6(A6),A0 */
   a1 = (uint32_t)(a6 + 466);  /* LEA	466(A6),A1 */
   W(d0) = (uint32_t)(int32_t)(int16_t)(int8_t)W(d0);  /* EXT.W	D0 */
@@ -18101,7 +18706,7 @@ static void StopNOTE(void) {
       flag_n = (_cmp < 0);
       flag_c = ((uint32_t)_lhs < (uint32_t)_rhs);
     }
-  if (flag_z) goto lbC000BCE;  /* equal / zero */  /* BEQ.S	lbC000BCE */
+  if (!(flag_z)) {
   {  /* MOVE.B	#3,0(A1) */
       uint8_t _mv = (uint8_t)(3);
       WRITE8(a1 + 0, _mv);
@@ -18117,11 +18722,39 @@ static void StopNOTE(void) {
       flag_v = 0; flag_c = 0;
     }
   if (flag_z) goto lbC000BC4;  /* equal / zero */  /* BEQ.S	lbC000BC4 */
-  WRITE32_PRE(sp, a6); WRITE32_PRE(sp, a5); WRITE32_PRE(sp, a4); WRITE32_PRE(sp, a3); WRITE32_PRE(sp, a2); WRITE32_PRE(sp, a1); WRITE32_PRE(sp, a0); WRITE32_PRE(sp, d7); WRITE32_PRE(sp, d6); WRITE32_PRE(sp, d5); WRITE32_PRE(sp, d4); WRITE32_PRE(sp, d3); WRITE32_PRE(sp, d2); WRITE32_PRE(sp, d1); WRITE32_PRE(sp, d0);  /* MOVEM.L	D0,D1,D2,D3,D4,D5,D6,D7,A0,A1,A2,A3,A4,A5,A6,-(SP) */
+  WRITE32_PRE(sp, a6);  /* MOVEM.L	D0,D1,D2,D3,D4,D5,D6,D7,A0,A1,A2,A3,A4,A5,A6,-(SP) */
+    WRITE32_PRE(sp, a5);
+    WRITE32_PRE(sp, a4);
+    WRITE32_PRE(sp, a3);
+    WRITE32_PRE(sp, a2);
+    WRITE32_PRE(sp, a1);
+    WRITE32_PRE(sp, a0);
+    WRITE32_PRE(sp, d7);
+    WRITE32_PRE(sp, d6);
+    WRITE32_PRE(sp, d5);
+    WRITE32_PRE(sp, d4);
+    WRITE32_PRE(sp, d3);
+    WRITE32_PRE(sp, d2);
+    WRITE32_PRE(sp, d1);
+    WRITE32_PRE(sp, d0);
   a4 = d0;  /* MOVEA.L	D0,A4 */
   a4 = READ32(a4 + 0);  /* MOVEA.L	0(A4),A4 */
   { uintptr_t _jt=(uintptr_t)(READ32(a4 + 0)); if(_jt) ((void(*)(void))_jt)(); }  /* JSR	0(A4) */
-  { uint32_t _mv = READ32_POST(sp); d0 = _mv; } { uint32_t _mv = READ32_POST(sp); d1 = _mv; } { uint32_t _mv = READ32_POST(sp); d2 = _mv; } { uint32_t _mv = READ32_POST(sp); d3 = _mv; } { uint32_t _mv = READ32_POST(sp); d4 = _mv; } { uint32_t _mv = READ32_POST(sp); d5 = _mv; } { uint32_t _mv = READ32_POST(sp); d6 = _mv; } { uint32_t _mv = READ32_POST(sp); d7 = _mv; } { uint32_t _mv = READ32_POST(sp); a0 = _mv; } { uint32_t _mv = READ32_POST(sp); a1 = _mv; } { uint32_t _mv = READ32_POST(sp); a2 = _mv; } { uint32_t _mv = READ32_POST(sp); a3 = _mv; } { uint32_t _mv = READ32_POST(sp); a4 = _mv; } { uint32_t _mv = READ32_POST(sp); a5 = _mv; } { uint32_t _mv = READ32_POST(sp); a6 = _mv; }  /* MOVEM.L	(SP)+,D0,D1,D2,D3,D4,D5,D6,D7,A0,A1,A2,A3,A4,A5,A6 */
+  d0 = READ32_POST(sp);  /* MOVEM.L	(SP)+,D0,D1,D2,D3,D4,D5,D6,D7,A0,A1,A2,A3,A4,A5,A6 */
+    d1 = READ32_POST(sp);
+    d2 = READ32_POST(sp);
+    d3 = READ32_POST(sp);
+    d4 = READ32_POST(sp);
+    d5 = READ32_POST(sp);
+    d6 = READ32_POST(sp);
+    d7 = READ32_POST(sp);
+    a0 = READ32_POST(sp);
+    a1 = READ32_POST(sp);
+    a2 = READ32_POST(sp);
+    a3 = READ32_POST(sp);
+    a4 = READ32_POST(sp);
+    a5 = READ32_POST(sp);
+    a6 = READ32_POST(sp);
 lbC000BC4:
   {  /* MOVE.B	#0,1(A1) */
       uint8_t _mv = (uint8_t)(0);
@@ -18131,15 +18764,20 @@ lbC000BC4:
       flag_v = 0; flag_c = 0;
     }
   WRITE8(a1 + 0, 0);  /* CLR.B	0(A1) */
-lbC000BCE:
-  { uint32_t _mv = READ32_POST(sp); d0 = _mv; } { uint32_t _mv = READ32_POST(sp); d7 = _mv; } { uint32_t _mv = READ32_POST(sp); a0 = _mv; } { uint32_t _mv = READ32_POST(sp); a1 = _mv; }  /* MOVEM.L	(SP)+,D0,D7,A0,A1 */
+  }
+  d0 = READ32_POST(sp);  /* MOVEM.L	(SP)+,D0,D7,A0,A1 */
+    d7 = READ32_POST(sp);
+    a0 = READ32_POST(sp);
+    a1 = READ32_POST(sp);
   return;  /* RTS */
 }
 
 
 /* --- RampVOLUME --- */
 static void RampVOLUME(void) {
-  WRITE32_PRE(sp, a0); WRITE32_PRE(sp, d2); WRITE32_PRE(sp, d1);  /* MOVEM.L	D1,D2,A0,-(SP) */
+  WRITE32_PRE(sp, a0);  /* MOVEM.L	D1,D2,A0,-(SP) */
+    WRITE32_PRE(sp, d2);
+    WRITE32_PRE(sp, d1);
   a0 = READ32(a6 + 6);  /* MOVEA.L	6(A6),A0 */
   WRITE16(a6 + 464, 0);  /* CLR.W	464(A6) */
   {  /* TST.W	D0 */
@@ -18148,7 +18786,7 @@ static void RampVOLUME(void) {
       flag_n = ((int16_t)(_tst) < 0);
       flag_c = 0; flag_v = 0;
     }
-  if (flag_z) goto lbC000C0C;  /* equal / zero */  /* BEQ.S	lbC000C0C */
+  if (!(flag_z)) {
   d2 = (uint32_t)(int32_t)(int8_t)(0);  /* MOVEQ	#0,D2 */
   {  /* MOVE.W	0(A6),D2 */
       uint16_t _mv = (uint16_t)(READ16(a6 + 0));
@@ -18204,9 +18842,11 @@ lbC000C02:
       flag_v = 0; flag_c = 0;
     }
 lbC000C06:
-  { uint32_t _mv = READ32_POST(sp); d1 = _mv; } { uint32_t _mv = READ32_POST(sp); d2 = _mv; } { uint32_t _mv = READ32_POST(sp); a0 = _mv; }  /* MOVEM.L	(SP)+,D1,D2,A0 */
+  d1 = READ32_POST(sp);  /* MOVEM.L	(SP)+,D1,D2,A0 */
+    d2 = READ32_POST(sp);
+    a0 = READ32_POST(sp);
   return;  /* RTS */
-lbC000C0C:
+  }
   {  /* MOVE.W	D1,0(A6) */
       uint16_t _mv = (uint16_t)(W(d1));
       WRITE16(a6 + 0, _mv);
@@ -18227,7 +18867,7 @@ static void lbC000C12(void) {
       flag_n = ((int16_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-  if (flag_z) goto lbC000C44;  /* equal / zero */  /* BEQ.S	lbC000C44 */
+  if (!(flag_z)) {
   d0 = (uint32_t)((uint16_t)READ16(a6 + 54) * (uint16_t)W(d0));  /* MULU.W	54(A6),D0 */
   d0 = d0 << 1;  /* ASL.L	#1,D0 */
   if (flag_c) goto lbC000C46;  /* carry set / below */  /* BCS.S	lbC000C46 */
@@ -18294,7 +18934,7 @@ lbC000C3E:
       flag_n = ((int16_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-lbC000C44:
+  }
   return;  /* RTS */
 lbC000C46:
   {  /* MOVE.W	462(A6),D1 */
@@ -18396,7 +19036,7 @@ lbC000E24:
       flag_n = (_cmp < 0);
       flag_c = ((uint32_t)_lhs < (uint32_t)_rhs);
     }
-  if (flag_n==flag_v) goto lbC000E4C;  /* greater or equal (signed) */  /* BGE.S	lbC000E4C */
+  if (!(flag_n==flag_v)) {
   {  /* MOVE.L	12(A1),0(A2) */
       uint32_t _mv = (uint32_t)(READ32(a1 + 12));
       WRITE32(a2 + 0, _mv);
@@ -18473,7 +19113,7 @@ lbC000E24:
       flag_v = 0; flag_c = 0;
     }
   WRITE16(a1 + 10, 0);  /* CLR.W	10(A1) */
-lbC000E4C:
+  }
   return;  /* RTS */
 lbC000E4E:
   {  /* CMPI.W	#4,D7 */
@@ -19350,7 +19990,7 @@ lbC0010EA:
       flag_v = 0; flag_c = 0;
     }
   W(d4) = (uint16_t)((uint32_t)(W(d4)) >> W(d3));  /* LSR.W	D3,D4 */
-lbC001120:
+do {
   {  /* MOVE.B	(A0),(A4)+ */
       uint8_t _mv = (uint8_t)(READ8(a0));
       WRITE8_POST(a4, _mv);
@@ -19365,7 +20005,7 @@ lbC001120:
       flag_z = ((int16_t)(_sr) == 0);
       flag_n = ((int16_t)(_sr) < 0);
     }
-  if (!flag_z) goto lbC001120;  /* not equal / nonzero */  /* BNE.S	lbC001120 */
+} while (!flag_z);
   goto lbC001220;  /* BRA.L	lbC001220 */
 lbC00112C:
   {  /* TST.W	452(A3) */
@@ -19431,7 +20071,7 @@ lbC00112C:
       flag_z = ((int16_t)(_sr) == 0);
       flag_n = ((int16_t)(_sr) < 0);
     }
-lbC001164:
+do {
   {  /* MOVE.B	(A0),D0 */
       uint8_t _mv = (uint8_t)(READ8(a0));
       B(d0) = (uint8_t)_mv;
@@ -19464,7 +20104,7 @@ lbC001164:
     }
   a0 = (uint32_t)((int32_t)a0 + (int32_t)(int16_t)(W(d1)));  /* ADDA.W	D1,A0 */
   a5 = (uint32_t)((int32_t)a5 + (int32_t)(int16_t)(W(d1)));  /* ADDA.W	D1,A5 */
-  if ((int16_t)(--d2) >= 0) goto lbC001164;  /* DBRA	D2,lbC001164 */
+} while ((int16_t)(--d2) >= 0);
   a5 = (uint32_t)((int32_t)a5 - (int32_t)(int16_t)(0x80));  /* SUBA.W	#$80,A5 */
   {  /* SUBQ.W	#1,D4 */
       uint16_t _sr = (uint16_t)(W(d4) - (uint16_t)(1));
@@ -19473,7 +20113,7 @@ lbC001164:
       flag_n = ((int16_t)(_sr) < 0);
     }
   if (flag_n) goto lbC001220;  /* minus / negative */  /* BMI.L	lbC001220 */
-lbC001184:
+do {
   {  /* MOVE.B	(A0),D0 */
       uint8_t _mv = (uint8_t)(READ8(a0));
       B(d0) = (uint8_t)_mv;
@@ -19506,7 +20146,7 @@ lbC001184:
     }
   a0 = (uint32_t)((int32_t)a0 + (int32_t)(int16_t)(W(d1)));  /* ADDA.W	D1,A0 */
   a5 = (uint32_t)((int32_t)a5 + (int32_t)(int16_t)(W(d1)));  /* ADDA.W	D1,A5 */
-  if ((int16_t)(--d4) >= 0) goto lbC001184;  /* DBRA	D4,lbC001184 */
+} while ((int16_t)(--d4) >= 0);
   goto lbC001220;  /* BRA.L	lbC001220 */
 lbC00119E:
   {  /* MOVE.W	450(A3),D0 */
@@ -19958,7 +20598,7 @@ lbC0014AA:
       flag_n = (_cmp < 0);
       flag_c = ((uint32_t)_lhs < (uint32_t)_rhs);
     }
-  if (flag_n==flag_v) goto lbC0014F2;  /* greater or equal (signed) */  /* BGE.S	lbC0014F2 */
+  if (!(flag_n==flag_v)) {
   {  /* TST.W	10(A1) */
       uint16_t _tst = (uint16_t)(READ16(a1 + 10));
       flag_z = (_tst == 0);
@@ -19972,7 +20612,7 @@ lbC0014AA:
       flag_z = ((int16_t)(_sr) == 0);
       flag_n = ((int16_t)(_sr) < 0);
     }
-  if (flag_z) goto lbC0014CE;  /* equal / zero */  /* BEQ.S	lbC0014CE */
+  if (!(flag_z)) {
   {  /* MOVE.W	16(A1),4(A2) */
       uint16_t _mv = (uint16_t)(READ16(a1 + 16));
       WRITE16(a2 + 4, _mv);
@@ -20012,8 +20652,7 @@ lbC0014AA:
     }
   SetPer();  /* BSR.W	SetPer */
   d0 = (uint32_t)(int32_t)(int8_t)(-1);  /* MOVEQ	#-1,D0 */
-  goto lbC0014E6;  /* BRA.S	lbC0014E6 */
-lbC0014CE:
+  } else {
   a3 = (uint32_t)(a6 + 1124);  /* LEA	1124(A6),A3 */
   {  /* MOVE.W	D7,D1 */
       uint16_t _mv = (uint16_t)(W(d7));
@@ -20038,7 +20677,7 @@ lbC0014CE:
       flag_n = ((int32_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-lbC0014E6:
+  }
   {  /* MOVE.W	18(A1),6(A2) */
       uint16_t _mv = (uint16_t)(READ16(a1 + 18));
       WRITE16(a2 + 6, _mv);
@@ -20069,7 +20708,7 @@ lbC0014E6:
       flag_n = ((int32_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-lbC0014F2:
+  }
   return;  /* RTS */
 lbC0014F4:
   {  /* CMPI.W	#4,D7 */
@@ -20080,10 +20719,10 @@ lbC0014F4:
       flag_n = (_cmp < 0);
       flag_c = ((uint32_t)_lhs < (uint32_t)_rhs);
     }
-  if (flag_n!=flag_v) goto lbC0014FE;  /* less than (signed) */  /* BLT.S	lbC0014FE */
+  if (!(flag_n!=flag_v)) {
   d0 = 0;  /* CLR.L	D0 */
   return;  /* RTS */
-lbC0014FE:
+  }
   a3 = READ32(a1 + 4);  /* MOVEA.L	4(A1),A3 */
   a2 = (uint32_t)(a6 + 1124);  /* LEA	1124(A6),A2 */
   {  /* MOVE.W	D7,D0 */
@@ -20385,7 +21024,7 @@ lbC00161C:
       flag_n = ((int16_t)(_tst) < 0);
       flag_c = 0; flag_v = 0;
     }
-  if (flag_z) goto lbC00162A;  /* equal / zero */  /* BEQ.S	lbC00162A */
+  if (!(flag_z)) {
   {  /* SUBI.W	#1,16(A2) */
       uint16_t _sr = (uint16_t)(READ16(a2 + 16) - 1);
       WRITE16(a2 + 16, (uint16_t)_sr);
@@ -20393,7 +21032,7 @@ lbC00161C:
       flag_n = ((int16_t)(_sr) < 0);
     }
   goto lbC001644;  /* BRA.S	lbC001644 */
-lbC00162A:
+  }
   {  /* MOVE.W	14(A2),D0 */
       uint16_t _mv = (uint16_t)(READ16(a2 + 14));
       W(d0) = (uint16_t)_mv;
@@ -20446,9 +21085,9 @@ lbC001644:
       flag_n = ((int16_t)(_ar) < 0);
     }
   flag_z = ((d0 & (1u << (8 & 31))) == 0);  /* BTST	#8,D0 */
-  if (flag_z) goto lbC001658;  /* equal / zero */  /* BEQ.S	lbC001658 */
+  if (!(flag_z)) {
   W(d0) ^= (uint16_t)(0xFF);  /* EORI.W	#$FF,D0 */
-lbC001658:
+  }
   W(d0) ^= (uint16_t)(0x80);  /* EORI.W	#$80,D0 */
   W(d0) = (uint32_t)(int32_t)(int16_t)(int8_t)W(d0);  /* EXT.W	D0 */
   W(d0) = (uint16_t)(-(int16_t)W(d0));  /* NEG.W	D0 */
@@ -20523,9 +21162,9 @@ lbC001658:
       flag_z = ((int32_t)(_sr) == 0);
       flag_n = ((int32_t)(_sr) < 0);
     }
-  if (!flag_n) goto lbC00169E;  /* plus / positive */  /* BPL.S	lbC00169E */
+  if (flag_n) {
   d0 = (uint32_t)(-(int32_t)d0);  /* NEG.L	D0 */
-lbC00169E:
+  }
   {  /* CMP.L	D3,D0 */
       int32_t _lhs = (int32_t)(d0);
       int32_t _rhs = (int32_t)(d3);
@@ -20534,7 +21173,7 @@ lbC00169E:
       flag_n = (_cmp < 0);
       flag_c = ((uint32_t)_lhs < (uint32_t)_rhs);
     }
-  if (!flag_z && (flag_n==flag_v)) goto lbC0016B4;  /* greater than (signed) */  /* BGT.S	lbC0016B4 */
+  if (!(!flag_z && (flag_n==flag_v))) {
   {  /* MOVE.L	D1,D2 */
       uint32_t _mv = (uint32_t)(d1);
       d2 = _mv;
@@ -20558,7 +21197,7 @@ lbC00169E:
       flag_n = ((int16_t)(_ar) < 0);
     }
   goto lbC0016BE;  /* BRA.S	lbC0016BE */
-lbC0016B4:
+  }
   {  /* CMP.L	D1,D2 */
       int32_t _lhs = (int32_t)(d2);
       int32_t _rhs = (int32_t)(d1);
@@ -20567,7 +21206,7 @@ lbC0016B4:
       flag_n = (_cmp < 0);
       flag_c = ((uint32_t)_lhs < (uint32_t)_rhs);
     }
-  if (flag_n!=flag_v) goto lbC0016BC;  /* less than (signed) */  /* BLT.S	lbC0016BC */
+  if (!(flag_n!=flag_v)) {
   {  /* SUB.L	D3,D2 */
       uint32_t _sr = (uint32_t)(d2 - d3);
       d2 = (uint32_t)_sr;
@@ -20575,7 +21214,7 @@ lbC0016B4:
       flag_n = ((int32_t)(_sr) < 0);
     }
   goto lbC0016BE;  /* BRA.S	lbC0016BE */
-lbC0016BC:
+  }
   {  /* ADD.L	D3,D2 */
       uint32_t _ar = (uint32_t)(d2 + d3);
       d2 = (uint32_t)_ar;
@@ -20699,9 +21338,9 @@ lbC00170E:
       flag_n = (_cmp < 0);
       flag_c = ((uint32_t)_lhs < (uint32_t)_rhs);
     }
-  if (!flag_z) goto lbC00171A;  /* not equal / nonzero */  /* BNE.S	lbC00171A */
+  if (flag_z) {
   d0 = (uint32_t)(int32_t)(int8_t)(-1);  /* MOVEQ	#-1,D0 */
-lbC00171A:
+  }
   return;  /* RTS */
   /* SampledSound.MSG	dc.b	'SampledSound',0 */
   /* ss.MSG	dc.b	'.ss',0,0 */
@@ -20851,7 +21490,7 @@ lbC0018B2:
       flag_n = (_cmp < 0);
       flag_c = ((uint32_t)_lhs < (uint32_t)_rhs);
     }
-  if (flag_n==flag_v) goto lbC0018FE;  /* greater or equal (signed) */  /* BGE.L	lbC0018FE */
+  if (!(flag_n==flag_v)) {
   {  /* TST.W	10(A1) */
       uint16_t _tst = (uint16_t)(READ16(a1 + 10));
       flag_z = (_tst == 0);
@@ -20865,7 +21504,7 @@ lbC0018B2:
       flag_z = ((int16_t)(_sr) == 0);
       flag_n = ((int16_t)(_sr) < 0);
     }
-  if (flag_z) goto lbC0018DA;  /* equal / zero */  /* BEQ.S	lbC0018DA */
+  if (!(flag_z)) {
   {  /* MOVE.W	16(A1),4(A2) */
       uint16_t _mv = (uint16_t)(READ16(a1 + 16));
       WRITE16(a2 + 4, _mv);
@@ -20905,8 +21544,7 @@ lbC0018B2:
     }
   SetPer();  /* BSR.W	SetPer */
   d0 = (uint32_t)(int32_t)(int8_t)(-1);  /* MOVEQ	#-1,D0 */
-  goto lbC0018F2;  /* BRA.S	lbC0018F2 */
-lbC0018DA:
+  } else {
   a3 = (uint32_t)(a6 + 1204);  /* LEA	1204(A6),A3 */
   {  /* MOVE.W	D7,D1 */
       uint16_t _mv = (uint16_t)(W(d7));
@@ -20931,7 +21569,7 @@ lbC0018DA:
       flag_n = ((int32_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-lbC0018F2:
+  }
   {  /* MOVE.W	18(A1),6(A2) */
       uint16_t _mv = (uint16_t)(READ16(a1 + 18));
       WRITE16(a2 + 6, _mv);
@@ -20962,7 +21600,7 @@ lbC0018F2:
       flag_n = ((int32_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-lbC0018FE:
+  }
   return;  /* RTS */
 lbC001900:
   {  /* CMPI.W	#4,D7 */
@@ -20973,10 +21611,10 @@ lbC001900:
       flag_n = (_cmp < 0);
       flag_c = ((uint32_t)_lhs < (uint32_t)_rhs);
     }
-  if (flag_n!=flag_v) goto lbC00190A;  /* less than (signed) */  /* BLT.S	lbC00190A */
+  if (!(flag_n!=flag_v)) {
   d0 = 0;  /* CLR.L	D0 */
   return;  /* RTS */
-lbC00190A:
+  }
   a3 = READ32(a1 + 4);  /* MOVEA.L	4(A1),A3 */
   a2 = (uint32_t)(a6 + 1204);  /* LEA	1204(A6),A2 */
   {  /* MOVE.W	D7,D0 */
@@ -21299,9 +21937,9 @@ lbC001A1C:
       flag_n = (_cmp < 0);
       flag_c = ((uint32_t)_lhs < (uint32_t)_rhs);
     }
-  if (!flag_z) goto lbC001A28;  /* not equal / nonzero */  /* BNE.S	lbC001A28 */
+  if (flag_z) {
   d0 = (uint32_t)(int32_t)(int8_t)(-1);  /* MOVEQ	#-1,D0 */
-lbC001A28:
+  }
   return;  /* RTS */
   /* FORM.MSG	dc.b	'FORM',0,0 */
   /* dc.b	$9D */

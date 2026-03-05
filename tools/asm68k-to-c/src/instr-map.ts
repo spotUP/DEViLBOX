@@ -247,10 +247,11 @@ export function emitInstruction(node: InstructionNode): string {
       if (addrOp.mode === 'pre_dec') {
         // MOVEM regs,-(An): push registers (highest first)
         const reversed = [...regs].reverse();
-        return reversed.map(r => `WRITE${bits}_PRE(${stackReg}, ${r});`).join(' ');
+        return reversed.map(r => `WRITE${bits}_PRE(${stackReg}, ${r});`).join('\n  ');
       } else if (addrOp.mode === 'post_inc') {
         // MOVEM (An)+,regs: pop registers (lowest first)
-        return regs.map(r => `{ ${s === 'W' ? 'uint16_t' : 'uint32_t'} _mv = READ${bits}_POST(${stackReg}); ${r} = ${s === 'W' ? '(uint32_t)(int32_t)(int16_t)' : ''}_mv; }`).join(' ');
+        const cast = s === 'W' ? '(uint32_t)(int32_t)(int16_t)' : '';
+        return regs.map(r => `${r} = ${cast}READ${bits}_POST(${stackReg});`).join('\n  ');
       }
       return `/* MOVEM.${s} unhandled mode */`;
     }
