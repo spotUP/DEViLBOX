@@ -4,6 +4,7 @@ import { EditorState, StateEffect, StateField } from '@codemirror/state';
 import { Decoration, type DecorationSet } from '@codemirror/view';
 import { Play, CheckCircle, AlertCircle, Loader, Download, Upload, Plus, X, Copy, RefreshCw, Layout } from 'lucide-react';
 import type { SuperColliderConfig, SCParam } from '@typedefs/instrument';
+import { useInstrumentStore } from '@stores/useInstrumentStore';
 import { superColliderLanguage } from '@engine/sc/scLanguage';
 import { parseSCGui, type SCGuiParseResult } from '@engine/sc/scGuiParser';
 import { SCGuiRenderer } from './SCGuiRenderer';
@@ -413,6 +414,32 @@ export const SuperColliderEditor: React.FC<Props> = ({ config, onChange }) => {
   }, []);
 
   // -------------------------------------------------------------------------
+  // Save as new instrument
+  // -------------------------------------------------------------------------
+  const createInstrument = useInstrumentStore((s) => s.createInstrument);
+  const setCurrentInstrument = useInstrumentStore((s) => s.setCurrentInstrument);
+
+  const handleSaveAsNewInstrument = useCallback(() => {
+    const cfg = configRef.current;
+    if (!cfg.binary) {
+      alert('Compile the SynthDef first before saving as a new instrument.');
+      return;
+    }
+    const name = (cfg.synthDefName || 'SC Synth').slice(0, 22);
+    const newId = createInstrument({
+      name,
+      synthType: 'SuperCollider' as const,
+      superCollider: {
+        synthDefName: cfg.synthDefName,
+        source: cfg.source,
+        binary: cfg.binary,
+        params: cfg.params.map(p => ({ ...p })),
+      },
+    });
+    setCurrentInstrument(newId);
+  }, [createInstrument, setCurrentInstrument]);
+
+  // -------------------------------------------------------------------------
   // Status bar
   // -------------------------------------------------------------------------
   const renderStatus = () => {
@@ -502,6 +529,14 @@ export const SuperColliderEditor: React.FC<Props> = ({ config, onChange }) => {
           >
             <Download size={11} />
             Export
+          </button>
+          <button
+            onClick={handleSaveAsNewInstrument}
+            title="Save as new instrument in the tracker"
+            className="flex items-center gap-1 px-2 py-1 rounded text-xs text-lime-400 hover:text-lime-300 hover:bg-dark-bgTertiary transition-colors"
+          >
+            <Plus size={11} />
+            Save as Instrument
           </button>
           {guiResult.hasGui && (
             <button
