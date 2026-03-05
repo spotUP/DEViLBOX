@@ -46,8 +46,8 @@ export class JamCrackerSynth implements DevilboxSynth {
       } else {
         midiNote = note;
       }
-      // Convert MIDI note to JamCracker note (1-36): MIDI 36=C-1(JC1), 71=B-3(JC36)
-      const jcNote = Math.max(1, Math.min(36, midiNote - 35));
+      // Convert MIDI note to JamCracker note (1-36): JC note 1 = C-1 = MIDI 24
+      const jcNote = Math.max(1, Math.min(36, midiNote - 23));
       const vol = Math.round((velocity ?? 0.8) * 64);
       this.engine.noteOn(this._instrumentIndex, jcNote, vol);
     } else {
