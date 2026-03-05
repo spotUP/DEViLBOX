@@ -188,6 +188,25 @@ export const FurnaceEditor: React.FC<FurnaceEditorProps> = ({ config, instrument
   // selectedOp: 1-indexed op number matching FMAlgorithmDiagram convention (null = none)
   const [selectedOp, setSelectedOp] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const configRef = useRef(config);
+
+  // Keep configRef in sync
+  useEffect(() => { configRef.current = config; }, [config]);
+
+  // Push config changes to live FurnaceSynth via register re-map
+  const pushLiveUpdate = useCallback((updates: Partial<FurnaceConfig>) => {
+    onChange(updates);
+    // Fire-and-forget: re-map registers on the running synth
+    try {
+      const { getToneEngine } = require('@engine/ToneEngine');
+      const engine = getToneEngine();
+      const synth = engine.instruments.get(instrumentId) as any;
+      if (synth?.remapRegisters) {
+        const merged = { ...configRef.current, ...updates };
+        synth.remapRegisters(merged);
+      }
+    } catch { /* engine not ready */ }
+  }, [onChange, instrumentId]);
 
   // Click an operator in the diagram → highlight its card and ensure it's expanded
   const handleDiagramSelect = useCallback((opNum: number) => {
@@ -258,8 +277,8 @@ export const FurnaceEditor: React.FC<FurnaceEditorProps> = ({ config, instrument
   const updateOperator = useCallback((idx: number, updates: Partial<FurnaceOperatorConfig>) => {
     const newOps = [...config.operators];
     newOps[idx] = { ...newOps[idx], ...updates };
-    onChange({ operators: newOps });
-  }, [config.operators, onChange]);
+    pushLiveUpdate({ operators: newOps });
+  }, [config.operators, pushLiveUpdate]);
 
   const toggleOpExpanded = useCallback((idx: number) => {
     setExpandedOps(prev => {
@@ -323,7 +342,7 @@ export const FurnaceEditor: React.FC<FurnaceEditorProps> = ({ config, instrument
             value={config.fms ?? 0}
             min={0}
             max={7}
-            onChange={(v) => onChange({ fms: Math.round(v) })}
+            onChange={(v) => pushLiveUpdate({ fms: Math.round(v) })}
             size="sm"
             color="#8b5cf6"
             formatValue={(v) => String(Math.round(v))}
@@ -333,7 +352,7 @@ export const FurnaceEditor: React.FC<FurnaceEditorProps> = ({ config, instrument
             value={config.ams ?? 0}
             min={0}
             max={3}
-            onChange={(v) => onChange({ ams: Math.round(v) })}
+            onChange={(v) => pushLiveUpdate({ ams: Math.round(v) })}
             size="sm"
             color="#a78bfa"
             formatValue={(v) => String(Math.round(v))}
@@ -384,7 +403,7 @@ export const FurnaceEditor: React.FC<FurnaceEditorProps> = ({ config, instrument
                   value={config.algorithm}
                   min={0}
                   max={7}
-                  onChange={(v) => onChange({ algorithm: Math.round(v) })}
+                  onChange={(v) => pushLiveUpdate({ algorithm: Math.round(v) })}
                   size="md"
                   color="#f59e0b"
                   formatValue={(v) => String(Math.round(v))}
@@ -394,7 +413,7 @@ export const FurnaceEditor: React.FC<FurnaceEditorProps> = ({ config, instrument
                   value={config.feedback}
                   min={0}
                   max={7}
-                  onChange={(v) => onChange({ feedback: Math.round(v) })}
+                  onChange={(v) => pushLiveUpdate({ feedback: Math.round(v) })}
                   size="md"
                   color="#d97706"
                   formatValue={(v) => String(Math.round(v))}
@@ -457,7 +476,7 @@ export const FurnaceEditor: React.FC<FurnaceEditorProps> = ({ config, instrument
                 <label className="text-[10px] text-text-muted font-mono block mb-1">OPLL Preset</label>
                 <select
                   value={config.opllPreset}
-                  onChange={(e) => onChange({ opllPreset: parseInt(e.target.value) })}
+                  onChange={(e) => pushLiveUpdate({ opllPreset: parseInt(e.target.value) })}
                   className="w-full bg-dark-bg border border-dark-border rounded px-2 py-1 text-xs text-white"
                 >
                   {OPLL_PRESETS.map((name, i) => (
@@ -474,7 +493,7 @@ export const FurnaceEditor: React.FC<FurnaceEditorProps> = ({ config, instrument
                   value={config.fms2 ?? 0}
                   min={0}
                   max={7}
-                  onChange={(v) => onChange({ fms2: Math.round(v) })}
+                  onChange={(v) => pushLiveUpdate({ fms2: Math.round(v) })}
                   size="sm"
                   color="#06b6d4"
                   formatValue={(v) => String(Math.round(v))}
@@ -488,22 +507,22 @@ export const FurnaceEditor: React.FC<FurnaceEditorProps> = ({ config, instrument
       {/* CHIP-SPECIFIC PANELS */}
       {/* Game Boy Panel (chipType 5) */}
       {config.chipType === 5 && (
-        <GBPanel config={config} onChange={onChange} />
+        <GBPanel config={config} onChange={pushLiveUpdate} />
       )}
 
       {/* C64/SID Panel (chipType 10) */}
       {config.chipType === 10 && (
-        <C64Panel config={config} onChange={onChange} />
+        <C64Panel config={config} onChange={pushLiveUpdate} />
       )}
 
       {/* SNES Panel (chipType 24) */}
       {config.chipType === 24 && (
-        <SNESPanel config={config} onChange={onChange} />
+        <SNESPanel config={config} onChange={pushLiveUpdate} />
       )}
 
       {/* PSG / PULSE PANEL (for other PSG chips) */}
       {category === "PSG" && ![5, 10, 24].includes(config.chipType) && (
-        <PSGPanel config={config} onChange={onChange} />
+        <PSGPanel config={config} onChange={pushLiveUpdate} />
       )}
 
       {/* WAVETABLE PANEL */}
@@ -559,7 +578,7 @@ export const FurnaceEditor: React.FC<FurnaceEditorProps> = ({ config, instrument
 
       {/* PCM / SAMPLE PANEL */}
       {category === "PCM" && (
-        <PCMPanel config={config} onChange={onChange} />
+        <PCMPanel config={config} onChange={pushLiveUpdate} />
       )}
       </div>
     </ScrollLockContainer>
