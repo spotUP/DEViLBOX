@@ -178,8 +178,11 @@ export const VJPatternOverlay: React.FC = React.memo(() => {
       const orbitY = Math.sin(t * 0.11) * Math.cos(t * 0.17) * 5;
       const bassTilt = frame.bassEnergy * 6;
       const shimmerZ = frame.highEnergy * Math.sin(t * 37) * 1.5;
-      const rx = orbitX + bassTilt + anim.tiltKickX;
-      const ry = orbitY + anim.tiltKickY + shimmerZ;
+      // Dampen 3D tilt when smooth-scrolling to avoid parallax artifacts
+      // (perspective makes left/right edges appear to scroll different directions)
+      const tiltDampen = (anim.scrollOffset > 0.5) ? 0.15 : 1;
+      const rx = (orbitX + bassTilt + anim.tiltKickX) * tiltDampen;
+      const ry = (orbitY + anim.tiltKickY + shimmerZ) * tiltDampen;
       const scale = 2.1 + anim.bassAccum * 0.06 + anim.beatFlash * 0.03;
       const driftX = Math.sin(t * 0.09) * 15 + Math.cos(t * 0.23) * 10;
       const driftY = Math.sin(t * 0.14) * 8 + anim.bounceY;
