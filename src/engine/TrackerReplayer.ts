@@ -388,6 +388,12 @@ export class TrackerReplayer {
   // still allowing the pattern view to follow the scratch position.
   private _suppressNotes = false;
 
+  // Generation counter for play() to detect stale async continuations.
+  // Incremented at the start of every play() call; checked after each await.
+  // If the value changed (another play/stop happened while awaiting), the stale
+  // continuation aborts to prevent ghost schedulers or dead-engine playback.
+  private _playGeneration = 0;
+
   // Per-deck channel mute mask (DJ mode only)
   // Bit N = 1 means channel N is ENABLED, 0 means MUTED.
   // Kept separate from ToneEngine's global mute states so each deck is independent.
@@ -1024,10 +1030,23 @@ export class TrackerReplayer {
   private schedulerTimerId: ReturnType<typeof setInterval> | null = null;
 
   async play(): Promise<void> {
-    if (!this.song || this.playing) return;
+    if (!this.song) return;
+
+    // If already playing (e.g. reload path), stop first so we don't orphan schedulers
+    if (this.playing) {
+      this.stop();
+    }
+
+    // Bump generation so any in-flight async play() from a previous call aborts
+    const gen = ++this._playGeneration;
+
+    // Reset note suppression — startNativeEngines will re-enable if needed for this song
+    this._suppressNotes = false;
 
     await unlockIOSAudio(); // Play silent MP3 + pump AudioContext for iOS
+    if (gen !== this._playGeneration) return; // stale — another play/stop happened
     await Tone.start();
+    if (gen !== this._playGeneration) return;
 
     // CRITICAL: Wait for AudioContext to actually be running
     // Tone.start() may return before context state changes
@@ -1036,11 +1055,13 @@ export class TrackerReplayer {
     const getState = () => rawCtx.state as string;
     if (getState() !== 'running') {
       await Tone.context.resume();
+      if (gen !== this._playGeneration) return;
       // Poll for running state with timeout
       const maxWait = 2000;
       const startTime = Date.now();
       while (getState() !== 'running' && Date.now() - startTime < maxWait) {
         await new Promise(resolve => setTimeout(resolve, 50));
+        if (gen !== this._playGeneration) return;
       }
       if (getState() !== 'running') {
         console.error(`[TrackerReplayer] AudioContext failed to start: ${getState()}`);
@@ -1051,6 +1072,7 @@ export class TrackerReplayer {
     // Ensure WASM synths (Open303, etc.) are initialized before starting playback.
     const engine = getToneEngine();
     await engine.ensureWASMSynthsReady(this.song.instruments);
+    if (gen !== this._playGeneration) return;
 
     // Start all native WASM engines (HVL, JamCracker, SID, MusicLine, UADE routing)
     {
@@ -1061,6 +1083,7 @@ export class TrackerReplayer {
         this._muted,
         this.routedNativeEngines,
       );
+      if (gen !== this._playGeneration) return;
       if (result.suppressNotes) this._suppressNotes = true;
       if (result.c64SidEngine) this.c64SidEngine = result.c64SidEngine;
     }
@@ -1075,12 +1098,14 @@ export class TrackerReplayer {
     // Without this, the first note on each sample-based instrument is dropped because
     // decodeAudioData() hasn't completed by the time the first tick fires.
     await engine.awaitPendingLoads();
+    if (gen !== this._playGeneration) return;
 
     this.startScheduler();
   }
 
   stop(): void {
     this.playing = false;
+    this._playGeneration++; // Invalidate any in-flight async play()
 
     // Clear the scheduler interval
     if (this.schedulerTimerId !== null) {
