@@ -12,9 +12,11 @@
  */
 
 import React, { useRef, useEffect } from 'react';
+import * as Tone from 'tone';
 import { useTrackerStore } from '@stores/useTrackerStore';
 import { useTransportStore } from '@stores/useTransportStore';
 import { AudioDataBus, type VJAudioFrame } from '@engine/vj/AudioDataBus';
+import { getTrackerReplayer } from '@engine/TrackerReplayer';
 import type { TrackerCell } from '@/types/tracker';
 
 const NOTE_NAMES = ['C-', 'C#', 'D-', 'D#', 'E-', 'F-', 'F#', 'G-', 'G#', 'A-', 'A#', 'B-'];
@@ -147,15 +149,28 @@ export const VJPatternOverlay: React.FC = React.memo(() => {
       anim.tiltKickY = decay(anim.tiltKickY, 5);
       anim.bounceY = decay(anim.bounceY, 6);
 
-      // Smooth scroll
-      if (anim.prevRow >= 0 && currentRow !== anim.prevRow) {
-        const rowDelta = currentRow - anim.prevRow;
-        if (Math.abs(rowDelta) <= 2) {
-          anim.scrollOffset += rowDelta * ROW_H;
+      // Smooth scroll — use replayer audio timeline for sub-row interpolation
+      // (same approach as PixiPatternEditor for jitter-free scrolling)
+      const { smoothScrolling } = useTransportStore.getState();
+      if (smoothScrolling && isPlaying) {
+        const replayer = getTrackerReplayer();
+        const audioTime = Tone.now() + 0.01;
+        const audioState = replayer.getStateAtTime(audioTime);
+        if (audioState) {
+          // Compute row duration from replayer or estimate from BPM
+          const nextState = replayer.getStateAtTime(audioTime + 0.5, true);
+          const dur = (nextState && nextState.row !== audioState.row)
+            ? nextState.time - audioState.time
+            : (2.5 / useTransportStore.getState().bpm) * useTransportStore.getState().speed;
+          const progress = Math.min(Math.max((audioTime - audioState.time) / (dur || 0.125), 0), 1);
+          anim.scrollOffset = progress * ROW_H;
+        } else {
+          anim.scrollOffset = 0;
         }
+      } else {
+        anim.scrollOffset = 0;
       }
       anim.prevRow = currentRow;
-      anim.scrollOffset = decay(anim.scrollOffset, 12);
 
       // ── 3D transform ──────────────────────────────────────────────────
       // Lissajous orbit
