@@ -144,6 +144,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
   const [webusbSupported] = useState(() => typeof navigator !== 'undefined' && 'usb' in navigator);
   const [webusbConnected, setWebusbConnected] = useState(false);
   const [webusbDeviceName, setWebusbDeviceName] = useState<string | null>(null);
+  const [webusbFirmware, setWebusbFirmware] = useState<string | null>(null);
+  const [webusbChips, setWebusbChips] = useState<Array<{ slot: number; detected: boolean; type?: string }> | null>(null);
 
   useEffect(() => {
     const handleFullscreenChange = () => {
@@ -1075,10 +1077,17 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                               setSidHardwareMode('off');
                               setWebusbConnected(false);
                               setWebusbDeviceName(null);
+                              setWebusbFirmware(null);
+                              setWebusbChips(null);
                             } else {
                               const ok = await mgr.connectWebUSB();
                               setWebusbConnected(ok);
-                              if (ok) setWebusbDeviceName(mgr.getStatus().deviceName);
+                              if (ok) {
+                                const st = mgr.getStatus();
+                                setWebusbDeviceName(st.deviceName);
+                                setWebusbFirmware(st.firmwareVersion ?? null);
+                                setWebusbChips(st.detectedChips ?? null);
+                              }
                             }
                           }}
                           className={`px-3 py-1 text-[10px] font-mono font-bold border ${
@@ -1133,6 +1142,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                               Stereo output (v1.3+ boards only)
                             </span>
                           </label>
+
+                          {/* Device info */}
+                          {(webusbFirmware || webusbChips) && (
+                            <div className="text-ft2-textDim text-[9px] font-mono leading-relaxed">
+                              {webusbFirmware && <p>Firmware: {webusbFirmware}</p>}
+                              {webusbChips && webusbChips.length > 0 && (
+                                <p>SID chips: {webusbChips.filter(c => c.detected).map(c => `Slot ${c.slot}: ${c.type || 'Unknown'}`).join(', ') || 'None detected'}</p>
+                              )}
+                            </div>
+                          )}
                         </>
                       )}
 

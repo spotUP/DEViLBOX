@@ -243,6 +243,8 @@ export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, on
   const [webusbSupported] = useState(() => typeof navigator !== 'undefined' && 'usb' in navigator);
   const [webusbConnected, setWebusbConnected] = useState(false);
   const [webusbDeviceName, setWebusbDeviceName] = useState<string | null>(null);
+  const [webusbFirmware, setWebusbFirmware] = useState<string | null>(null);
+  const [webusbChips, setWebusbChips] = useState<Array<{ slot: number; detected: boolean; type?: string }> | null>(null);
 
   // Fullscreen change listener
   useEffect(() => {
@@ -983,11 +985,16 @@ export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, on
                           setSidHardwareMode('off');
                           setWebusbConnected(false);
                           setWebusbDeviceName(null);
+                          setWebusbFirmware(null);
+                          setWebusbChips(null);
                         } else {
                           const ok = await mgr.connectWebUSB();
                           setWebusbConnected(ok);
                           if (ok) {
-                            setWebusbDeviceName(mgr.getStatus().deviceName);
+                            const st = mgr.getStatus();
+                            setWebusbDeviceName(st.deviceName);
+                            setWebusbFirmware(st.firmwareVersion ?? null);
+                            setWebusbChips(st.detectedChips ?? null);
                           }
                         }
                       }}
@@ -1026,6 +1033,18 @@ export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, on
                           label={webusbStereo ? 'Stereo' : 'Mono'}
                         />
                       </SettingRow>
+
+                      {/* Device info */}
+                      {(webusbFirmware || webusbChips) && (
+                        <Div className="flex-col gap-1" layout={{ width: CONTENT_W, paddingLeft: 8, paddingRight: 8, paddingTop: 4, paddingBottom: 4 }}>
+                          {webusbFirmware && (
+                            <Txt className="text-[9px] font-mono text-text-muted">{`Firmware: ${webusbFirmware}`}</Txt>
+                          )}
+                          {webusbChips && webusbChips.length > 0 && (
+                            <Txt className="text-[9px] font-mono text-text-muted">{`SID chips: ${webusbChips.filter(c => c.detected).map(c => `Slot ${c.slot}: ${c.type || 'Unknown'}`).join(', ') || 'None detected'}`}</Txt>
+                          )}
+                        </Div>
+                      )}
                     </>
                   )}
 
