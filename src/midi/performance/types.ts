@@ -79,6 +79,7 @@ export interface NKSParameter {
   engineParam?: string;          // Engine routing key (MappableParameter or synth-specific path)
   route?: NKS2ParameterRoute;    // Explicit routing instructions for parameterRouter
   subsection?: string;           // NKS2 subsection hint (e.g., "Osc 1", "Amp Env", "Filter Env")
+  accessibilityName?: string;    // Full unabbreviated name for screen readers / TTS
 }
 
 /**
@@ -366,6 +367,7 @@ export interface NKS2Parameter {
   formatValue?: (value: number) => string;  // Custom value formatter
   ccNumber?: number;                 // MIDI CC number (optional)
   engineParam: string;               // Engine routing key (MappableParameter or synth-specific path)
+  accessibilityName?: string;        // Full unabbreviated name for TTS (SDK Section 5)
 }
 
 /**
