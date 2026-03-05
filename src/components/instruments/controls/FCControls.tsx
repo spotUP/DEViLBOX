@@ -13,7 +13,7 @@
  *   byte[2] = vibSpeed
  *   byte[3] = vibDepth
  *   byte[4] = vibDelay
- *   byte[5..63] = vol envelope opcodes (ADSR — complex, no chip RAM write yet)
+ *   byte[5..63] = vol envelope opcodes (ADSR — written via encodeFCVolEnvelope)
  */
 
 import React, { useRef, useEffect, useCallback, useState } from 'react';
@@ -23,6 +23,7 @@ import { useThemeStore } from '@stores';
 import { EnvelopeVisualization } from '@components/instruments/shared';
 import { UADEChipEditor } from '@/engine/uade/UADEChipEditor';
 import { UADEEngine } from '@/engine/uade/UADEEngine';
+import { encodeFCVolEnvelope } from '@/engine/uade/chipRamEncoders';
 
 interface FCControlsProps {
   config: FCConfig;
@@ -82,8 +83,8 @@ export const FCControls: React.FC<FCControlsProps> = ({ config, onChange, uadeCh
    *   4 = vibDelay
    *
    * Note: ADSR params (atkLength/atkVolume/decLength/decVolume/sustVolume/relLength)
-   * require encoding as FC vol-envelope opcodes (variable-length ADSR sequences at
-   * byte[5..63]). The opcode format is non-trivial and not yet implemented.
+   * are encoded as FC vol-envelope opcodes and written as a block to byte[5..63]
+   * via updADSRWithChipRam(). See encodeFCVolEnvelope() in chipRamEncoders.ts.
    *
    * Note: arpTable/synthTable changes require writing separate arp/synth macro
    * regions (not part of the 64-byte vol macro) — not yet implemented.
@@ -93,6 +94,26 @@ export const FCControls: React.FC<FCControlsProps> = ({ config, onChange, uadeCh
       upd(key as Parameters<typeof upd>[0], value as Parameters<typeof upd>[1]);
       if (uadeChipRam && typeof value === 'number') {
         void getEditor().writeU8(uadeChipRam.instrBase + byteOffset, value & 0xFF);
+      }
+    },
+    [upd, uadeChipRam, getEditor],
+  );
+
+  /**
+   * Update an ADSR parameter and re-encode the full vol-envelope opcode sequence
+   * to chip RAM bytes [5..63]. This is needed because FC ADSR is stored as a
+   * variable-length opcode stream, not individual header bytes.
+   */
+  const updADSRWithChipRam = useCallback(
+    (key: keyof FCConfig, value: number) => {
+      upd(key as Parameters<typeof upd>[0], value as Parameters<typeof upd>[1]);
+      if (uadeChipRam) {
+        const newCfg = { ...configRef.current, [key]: value };
+        const opcodes = encodeFCVolEnvelope(newCfg);
+        // Write opcodes to bytes [5..63] — pad with 0xE1 (end) if shorter than 59
+        const fullBuf = new Array(59).fill(0xE1);
+        for (let i = 0; i < opcodes.length; i++) fullBuf[i] = opcodes[i];
+        void getEditor().writeBlock(uadeChipRam.instrBase + 5, fullBuf);
       }
     },
     [upd, uadeChipRam, getEditor],
@@ -145,31 +166,31 @@ export const FCControls: React.FC<FCControlsProps> = ({ config, onChange, uadeCh
         <div className="grid grid-cols-3 gap-3">
           <div className="flex flex-col items-center gap-2">
             <Knob value={config.atkLength} min={0} max={255} step={1}
-              onChange={(v) => upd('atkLength', Math.round(v))}
+              onChange={(v) => updADSRWithChipRam('atkLength', Math.round(v))}
               label="Atk Len" color={knob} size="sm"
               formatValue={(v) => Math.round(v).toString()} />
             <Knob value={config.atkVolume} min={0} max={64} step={1}
-              onChange={(v) => upd('atkVolume', Math.round(v))}
+              onChange={(v) => updADSRWithChipRam('atkVolume', Math.round(v))}
               label="Atk Vol" color={knob} size="sm"
               formatValue={(v) => Math.round(v).toString()} />
           </div>
           <div className="flex flex-col items-center gap-2">
             <Knob value={config.decLength} min={0} max={255} step={1}
-              onChange={(v) => upd('decLength', Math.round(v))}
+              onChange={(v) => updADSRWithChipRam('decLength', Math.round(v))}
               label="Dec Len" color={knob} size="sm"
               formatValue={(v) => Math.round(v).toString()} />
             <Knob value={config.decVolume} min={0} max={64} step={1}
-              onChange={(v) => upd('decVolume', Math.round(v))}
+              onChange={(v) => updADSRWithChipRam('decVolume', Math.round(v))}
               label="Dec Vol" color={knob} size="sm"
               formatValue={(v) => Math.round(v).toString()} />
           </div>
           <div className="flex flex-col items-center gap-2">
             <Knob value={config.relLength} min={0} max={255} step={1}
-              onChange={(v) => upd('relLength', Math.round(v))}
+              onChange={(v) => updADSRWithChipRam('relLength', Math.round(v))}
               label="Rel Len" color={knob} size="sm"
               formatValue={(v) => Math.round(v).toString()} />
             <Knob value={config.sustVolume} min={0} max={64} step={1}
-              onChange={(v) => upd('sustVolume', Math.round(v))}
+              onChange={(v) => updADSRWithChipRam('sustVolume', Math.round(v))}
               label="Sus Vol" color={knob} size="sm"
               formatValue={(v) => Math.round(v).toString()} />
           </div>
