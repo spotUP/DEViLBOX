@@ -81,12 +81,11 @@ const FLAG_COLORS = {
 
 // Pre-allocated fill style objects to avoid GC pressure in hot render loops
 const FILL_BLACK_045 = { color: 0x000000, alpha: 0.45 };
-const FILL_BLACK_085 = { color: 0x000000, alpha: 0.85 };
 const FILL_WHITE_002 = { color: 0xffffff, alpha: 0.02 };
 const FILL_PURPLE_012 = { color: 0xa855f7, alpha: 0.12 };
 const FILL_PURPLE_045 = { color: 0xa855f7, alpha: 0.45 };
 const FILL_PURPLE_055 = { color: 0xa855f7, alpha: 0.55 };
-const FILL_INDIGO_008 = { color: 0x6366f1, alpha: 0.08 };
+
 
 function probColor(val: number): number {
   if (val >= 75) return 0x4ade80;
@@ -1014,7 +1013,7 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
   const gridContainerLayout = useMemo(() => ({ width, height: gridHeight }), [width, gridHeight]);
   const gridScrollLayout = useMemo(() => ({ position: 'absolute' as const, width, height: gridHeight }), [width, gridHeight]);
   const gridGraphicsLayout = useMemo(() => ({ position: 'absolute' as const, width, height: gridHeight }), [width, gridHeight]);
-  const scrollbarLayout = useMemo(() => ({ display: (allChannelsFit ? 'none' : 'flex') as const, width, height: SCROLLBAR_HEIGHT }), [allChannelsFit, width]);
+  const scrollbarLayout = useMemo(() => ({ display: allChannelsFit ? 'none' as const : 'flex' as const, width, height: SCROLLBAR_HEIGHT }), [allChannelsFit, width]);
   const dragOverlayLayout = useMemo(() => ({ position: 'absolute' as const, width, height: gridHeight, left: 0, top: 0 }), [width, gridHeight]);
 
   // ── Render params ref — captured each React render, read by imperativeRedraw ──

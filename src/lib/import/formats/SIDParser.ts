@@ -114,7 +114,6 @@ function runSIDEmulation(
 
   for (let f = 0; f < FRAMES && totalCycles < MAX_TOTAL_CYCLES; f++) {
     ciaTimerACycles += 20000;
-    const beforePC = cpu.getPC();
     cpu.callSubroutine(effectivePlayAddr);
     totalCycles += 5000; // approximate
 

@@ -44,7 +44,6 @@ export class SuperColliderEngine {
 
   private _module: SCModule | null = null;
   private _disposed = false;
-  private _synthDefName = 'mySynth';
 
   private constructor(module: SCModule, output: GainNode) {
     this._module = module;
@@ -182,7 +181,6 @@ export class SuperColliderEngine {
     // Keep Module on globalThis — scsynth pthreads need it for their lifecycle.
 
     const engine = new SuperColliderEngine(module, output);
-    engine._synthDefName = synthDefName ?? 'mySynth';
 
     // Load SynthDef if provided — then wait for scsynth to process it.
     // The ScriptProcessor callback runs WaRun() which processes the OSC queue.
@@ -248,7 +246,6 @@ export class SuperColliderEngine {
     const oscMsg = _concatU8(addr, tags, blobSize, binary, blobPad);
 
     this._sendOsc(oscMsg);
-    this._synthDefName = defName;
     console.log('[SC:Engine] SynthDef loaded:', defName, 'binary:', binary.byteLength, 'bytes');
   }
 

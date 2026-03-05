@@ -70,6 +70,9 @@ class MIDIManager {
    * Initialize MIDI access
    */
   async init(): Promise<boolean> {
+    // Guard against double init (React StrictMode, multiple components)
+    if (this.midiAccess) return true;
+
     if (!this.isSupported()) {
       console.warn('[MIDIManager] Web MIDI API not supported');
       return false;
