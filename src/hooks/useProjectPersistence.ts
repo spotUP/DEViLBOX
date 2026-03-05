@@ -97,8 +97,10 @@ const safeCancelIdleCallback = cancelIdleCallbackPolyfill;
  *       for passbandCompensation and 0.3 instead of 0.743 for resTracking.
  *       Fixed filterSelect migration (was hardcoding invalid value 1, now 0).
  * - 14: Clean initial state — no default instruments, no song. Tracker starts empty.
+ * - 15: SuperCollider default now includes pre-compiled SynthDef binary so new
+ *       instruments produce sound immediately without requiring sclang compilation.
  */
-const SCHEMA_VERSION = 14;
+const SCHEMA_VERSION = 15;
 
 interface SavedProject {
   version: string;

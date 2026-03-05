@@ -14,27 +14,23 @@ import { SuperColliderEngine } from './SuperColliderEngine';
 // Note conversion helpers
 // ---------------------------------------------------------------------------
 
-/** Map note letter → semitone offset within octave (C=0) */
 const NOTE_SEMITONES: Record<string, number> = {
   C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11,
 };
 
-/** Parse a note name like "C4", "F#3", "Bb2" → MIDI number */
 function noteNameToMidi(name: string): number {
   const m = name.match(/^([A-G])([#b]?)(-?\d+)$/);
-  if (!m) return 69; // fallback A4
+  if (!m) return 69;
   const semitone = NOTE_SEMITONES[m[1]] + (m[2] === '#' ? 1 : m[2] === 'b' ? -1 : 0);
   const octave = parseInt(m[3], 10);
   return (octave + 1) * 12 + semitone;
 }
 
-/** Convert a MIDI note number or note name string to Hz */
 function midiToHz(note: number | string): number {
   const midi = typeof note === 'string' ? noteNameToMidi(note) : note;
   return 440 * Math.pow(2, (midi - 69) / 12);
 }
 
-// Module-level counter so node IDs are unique across all SuperColliderSynth instances.
 let _nextGlobalNodeId = 1000;
 
 // ---------------------------------------------------------------------------
@@ -43,8 +39,6 @@ let _nextGlobalNodeId = 1000;
 
 export class SuperColliderSynth implements DevilboxSynth {
   readonly name = 'SuperCollider';
-
-  /** Web Audio output node — initially a placeholder GainNode, then wired to the engine output */
   readonly output: AudioNode;
 
   private _config: SuperColliderConfig;
@@ -53,38 +47,35 @@ export class SuperColliderSynth implements DevilboxSynth {
   private _enginePromise: Promise<SuperColliderEngine> | null = null;
   private _currentNodeId: number | null = null;
   private _disposed = false;
-  private _gainNode: GainNode; // Placeholder output while engine loads
+  private _gainNode: GainNode;
 
   constructor(config: SuperColliderConfig, audioContext: AudioContext) {
     this._config = config;
     this._audioContext = audioContext;
     this._gainNode = audioContext.createGain();
-    // Expose the gain node as output immediately so callers can connect to the
-    // effect chain before the engine finishes booting.
     this.output = this._gainNode;
     this._initEngine();
   }
 
-  // ---------------------------------------------------------------------------
-  // Private: engine init
-  // ---------------------------------------------------------------------------
-
   private _initEngine(): void {
     console.log('[SC:Synth] _initEngine called, binary length:', this._config.binary?.length ?? 0, 'synthDefName:', this._config.synthDefName);
-    this._enginePromise = SuperColliderEngine.getInstance(this._audioContext)
+
+    // Decode the SynthDef binary to pass during engine init
+    let synthDefBinary: Uint8Array | undefined;
+    if (this._config.binary) {
+      synthDefBinary = Uint8Array.from(atob(this._config.binary), c => c.charCodeAt(0));
+    }
+
+    this._enginePromise = SuperColliderEngine.getInstance(
+      this._audioContext,
+      synthDefBinary,
+      this._config.synthDefName,
+    )
       .then(engine => {
-        if (this._disposed) { console.log('[SC:Synth] _initEngine: disposed, skipping'); return engine; }
+        if (this._disposed) return engine;
         this._engine = engine;
-        // Wire engine output → our gain node so the signal reaches the effect chain.
         engine.output.connect(this._gainNode);
         console.log('[SC:Synth] engine.output → gainNode connected');
-        // Load the SynthDef binary if one is configured.
-        if (this._config.binary) {
-          console.log('[SC:Synth] loading binary into scsynth, length:', this._config.binary.length);
-          this._loadBinary(engine, this._config.binary);
-        } else {
-          console.log('[SC:Synth] no binary to load');
-        }
         return engine;
       })
       .catch(err => {
@@ -93,27 +84,14 @@ export class SuperColliderSynth implements DevilboxSynth {
       });
   }
 
-  private _loadBinary(engine: SuperColliderEngine, base64: string): void {
-    const bytes = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
-    engine.loadSynthDef(bytes);
-  }
-
   // ---------------------------------------------------------------------------
   // DevilboxSynth: note API
   // ---------------------------------------------------------------------------
 
   triggerAttack(note: string | number, time?: number, velocity?: number): void {
-    console.log('[SC:Synth] triggerAttack:', note, '| binary:', this._config.binary ? `${this._config.binary.length}b` : 'EMPTY', '| defName:', this._config.synthDefName || 'NONE', '| engine:', this._engine ? 'ready' : 'pending');
-    // Guard: no compiled binary yet (binary: '') — notes are silently dropped until compiled
-    if (this._disposed || !this._config.binary || !this._config.synthDefName) {
-      console.log('[SC:Synth] triggerAttack DROPPED - disposed:', this._disposed, 'binary:', !!this._config.binary, 'defName:', !!this._config.synthDefName);
-      return;
-    }
-
-    // time parameter is not used — scsynth scheduling is handled internally
+    if (this._disposed || !this._config.binary || !this._config.synthDefName) return;
     void time;
 
-    // Release any still-playing node before starting a new one (monophonic behaviour)
     if (this._currentNodeId != null) {
       this._engine?.noteOff(this._currentNodeId);
       this._currentNodeId = null;
@@ -124,7 +102,6 @@ export class SuperColliderSynth implements DevilboxSynth {
 
     const freq = midiToHz(note);
     const amp = velocity ?? 1;
-
     const params: Record<string, number> = {
       freq,
       amp,
@@ -135,26 +112,19 @@ export class SuperColliderSynth implements DevilboxSynth {
     const defName = this._config.synthDefName;
 
     if (this._engine) {
-      console.log('[SC:Synth] noteOn immediate:', nodeId, defName, 'freq:', params.freq?.toFixed(1));
+      console.log('[SC:Synth] noteOn:', nodeId, defName, 'freq:', params.freq?.toFixed(1));
       this._engine.noteOn(nodeId, defName, params);
     } else {
-      console.log('[SC:Synth] noteOn deferred (engine pending):', nodeId, defName);
       this._enginePromise?.then(engine => {
-        if (!this._disposed) {
-          console.log('[SC:Synth] noteOn deferred fire:', nodeId, defName);
-          engine.noteOn(nodeId, defName, params);
-        }
+        if (!this._disposed) engine.noteOn(nodeId, defName, params);
       });
     }
   }
 
   triggerRelease(note?: string | number, time?: number): void {
-    // note and time parameters are unused — we track the active node by ID
     void note;
     void time;
-
     if (this._currentNodeId == null || this._disposed) return;
-
     const nodeId = this._currentNodeId;
     this._currentNodeId = null;
 
@@ -168,11 +138,9 @@ export class SuperColliderSynth implements DevilboxSynth {
   }
 
   set(param: string, value: number): void {
-    // Update the stored config param so future notes use the new value.
     const p = this._config.params.find(p => p.name === param);
     if (p) p.value = value;
 
-    // Update the currently playing node live, if any.
     if (this._currentNodeId == null || this._disposed) return;
     const nodeId = this._currentNodeId;
 
@@ -187,32 +155,18 @@ export class SuperColliderSynth implements DevilboxSynth {
     }
   }
 
-  // ---------------------------------------------------------------------------
-  // Config update (called by the store when config changes)
-  // ---------------------------------------------------------------------------
-
   updateConfig(config: SuperColliderConfig): void {
-    const binaryChanged = config.binary !== this._config.binary;
     this._config = config;
-    if (binaryChanged && config.binary && this._engine) {
-      this._loadBinary(this._engine, config.binary);
-    }
+    // Note: binary changes require engine reboot (not supported in singleton pattern)
   }
-
-  // ---------------------------------------------------------------------------
-  // DevilboxSynth: cleanup
-  // ---------------------------------------------------------------------------
 
   dispose(): void {
     if (this._disposed) return;
     this._disposed = true;
-
     if (this._currentNodeId != null) {
       this._engine?.noteOff(this._currentNodeId);
       this._currentNodeId = null;
     }
-
     this._gainNode.disconnect();
-    // The engine is a shared singleton — do NOT dispose it here.
   }
 }

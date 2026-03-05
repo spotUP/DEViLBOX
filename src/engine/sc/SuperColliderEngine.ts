@@ -1,28 +1,53 @@
 /**
  * SuperColliderEngine.ts - Singleton scsynth WASM engine wrapper
  *
- * Manages the AudioWorklet node for SuperCollider synthesis. Loads SC.js + SC.wasm
- * into the worklet, then exposes loadSynthDef / noteOn / noteOff / setNodeParams
- * via OSC messages encoded by oscEncoder.ts.
+ * Runs scsynth on the MAIN THREAD using ScriptProcessorNode. SC.wasm is compiled
+ * with Emscripten pthreads which require Web Workers — these are unavailable in
+ * AudioWorkletGlobalScope but work on the main thread.
+ *
+ * Architecture:
+ *   Main thread loads SC.js → callMain() boots scsynth → ScriptProcessor output
+ *   OSC sent directly via Module.oscDriver[57110].receive(0, data)
  *
  * Follows the UADEEngine pattern: static getInstance(AudioContext) with WeakMap caching.
  */
 
-import { oscLoadSynthDef, oscNewSynth, oscSetParams } from './oscEncoder';
+const SC_PORT = 57110;
 
-// One pending-init promise per AudioContext, so concurrent getInstance calls share the same boot.
+// Emscripten Module type (partial — just what we use)
+interface SCModule {
+  callMain(args: string[]): void;
+  audioDriver: {
+    proc: ScriptProcessorNode;
+    bufOutPtr: number;
+    outChanCount: number;
+    connected: boolean;
+    context: AudioContext;
+  };
+  oscDriver: Record<number, {
+    receive: (addr: number, data: Uint8Array) => void;
+  }>;
+  print: (text: string) => void;
+  printErr: (text: string) => void;
+  locateFile?: (path: string) => string;
+  _malloc: (size: number) => number;
+  _free: (ptr: number) => void;
+  HEAPU8: Uint8Array;
+  HEAPF32: Float32Array;
+  noInitialRun: boolean;
+}
+
 const instanceCache = new WeakMap<AudioContext, Promise<SuperColliderEngine>>();
 
 export class SuperColliderEngine {
-  /** Connect this GainNode to ToneEngine's destination. */
   readonly output: GainNode;
 
-  private _node: AudioWorkletNode;
+  private _module: SCModule | null = null;
   private _disposed = false;
+  private _synthDefName = 'mySynth';
 
-  // Private constructor — callers must use getInstance().
-  private constructor(node: AudioWorkletNode, output: GainNode) {
-    this._node = node;
+  private constructor(module: SCModule, output: GainNode) {
+    this._module = module;
     this.output = output;
   }
 
@@ -30,145 +55,249 @@ export class SuperColliderEngine {
   // Singleton factory
   // ---------------------------------------------------------------------------
 
-  /**
-   * Returns (or creates) the SuperColliderEngine for the given AudioContext.
-   * Concurrent calls for the same context share a single init promise.
-   */
-  static getInstance(audioContext: AudioContext): Promise<SuperColliderEngine> {
+  static getInstance(
+    audioContext: AudioContext,
+    synthDefBinary?: Uint8Array,
+    synthDefName?: string,
+  ): Promise<SuperColliderEngine> {
     const cached = instanceCache.get(audioContext);
     if (cached) return cached;
 
-    const promise = SuperColliderEngine._boot(audioContext);
-    // Evict on failure so callers can retry (e.g. on transient network error)
+    const promise = SuperColliderEngine._boot(audioContext, synthDefBinary, synthDefName);
     promise.catch(() => instanceCache.delete(audioContext));
     instanceCache.set(audioContext, promise);
     return promise;
   }
 
-  private static async _boot(audioContext: AudioContext): Promise<SuperColliderEngine> {
-    // 1. Register the AudioWorklet module.
+  private static async _boot(
+    audioContext: AudioContext,
+    synthDefBinary?: Uint8Array,
+    synthDefName?: string,
+  ): Promise<SuperColliderEngine> {
     const baseUrl = import.meta.env.BASE_URL ?? '/';
-    await audioContext.audioWorklet.addModule(`${baseUrl}sc/DEViLBOX.SC.worklet.js`);
+    const jsUrl = `${baseUrl}sc/SC.js`;
+    const wasmUrl = `${baseUrl}sc/SC.wasm`;
+    const workerUrl = `${baseUrl}sc/SC.worker.js`;
 
-    // 2. Fetch SC.js (text) and SC.wasm (binary) in parallel.
-    const [jsResponse, wasmResponse] = await Promise.all([
-      fetch(`${baseUrl}sc/SC.js`),
-      fetch(`${baseUrl}sc/SC.wasm`),
-    ]);
+    console.log('[SC:Engine] Booting scsynth on main thread (pthreads build)...');
 
-    if (!jsResponse.ok) {
-      throw new Error(`[SuperColliderEngine] Failed to fetch SC.js: ${jsResponse.status}`);
-    }
-    if (!wasmResponse.ok) {
-      throw new Error(`[SuperColliderEngine] Failed to fetch SC.wasm: ${wasmResponse.status}`);
-    }
+    // Set up Module config BEFORE loading SC.js
+    const M: Partial<SCModule> & Record<string, unknown> = {
+      noInitialRun: true,
+      // Route scsynth output to console
+      print: (text: string) => console.log('[scsynth]', text),
+      printErr: (text: string) => console.warn('[scsynth]', text),
+      // Tell Emscripten where to find .wasm and .worker.js
+      locateFile: (path: string) => {
+        if (path.endsWith('.wasm')) return wasmUrl;
+        if (path.endsWith('.worker.js')) return workerUrl;
+        return `${baseUrl}sc/${path}`;
+      },
+    };
+    (globalThis as Record<string, unknown>).Module = M;
 
-    const [jsCode, wasmBinary] = await Promise.all([
-      jsResponse.text(),
-      wasmResponse.arrayBuffer(),
-    ]);
+    // Patch AudioContext to return OUR context (scsynth will create ScriptProcessor on it)
+    const OrigAC = globalThis.AudioContext;
+    const origWebkitAC = (globalThis as Record<string, unknown>).webkitAudioContext;
+    globalThis.AudioContext = function() { return audioContext; } as unknown as typeof AudioContext;
+    (globalThis as Record<string, unknown>).webkitAudioContext = globalThis.AudioContext;
 
-    // 3. Create the AudioWorkletNode.
-    const node = new AudioWorkletNode(audioContext, 'devilbox-sc-processor');
-
-    // 4. Create output GainNode and connect.
-    const output = audioContext.createGain();
-    node.connect(output);
-
-    // 5. Send init message and wait for 'ready'.
+    // Load SC.js via script tag
     await new Promise<void>((resolve, reject) => {
-      node.port.onmessage = (event: MessageEvent) => {
-        const data = event.data as { type: string; message?: string };
-        if (data.type === 'ready') {
-          resolve();
-        } else if (data.type === 'error') {
-          reject(new Error(`[SuperColliderEngine] Worklet error: ${data.message ?? '(no message)'}`));
-        }
-      };
-
-      node.port.postMessage(
-        {
-          type: 'init',
-          jsCode,
-          wasmBinary,
-          blockSize: 128,
-          sampleRate: audioContext.sampleRate,
-        },
-        [wasmBinary],
-      );
+      const script = document.createElement('script');
+      script.src = jsUrl;
+      script.onload = () => resolve();
+      script.onerror = () => reject(new Error('[SC:Engine] Failed to load SC.js'));
+      document.head.appendChild(script);
     });
 
-    // After init the port listener is replaced by the instance method below.
-    const engine = new SuperColliderEngine(node, output);
-    engine._attachPortListener();
+    // Wait for WASM compilation to finish
+    const module = (globalThis as Record<string, unknown>).Module as SCModule & {
+      ready?: Promise<unknown>;
+      onRuntimeInitialized?: () => void;
+    };
+
+    // Emscripten provides onRuntimeInitialized callback or we poll for callMain
+    if (module.ready) {
+      await module.ready;
+    } else {
+      await new Promise<void>((resolve, reject) => {
+        // Try onRuntimeInitialized first
+        const origCb = module.onRuntimeInitialized;
+        module.onRuntimeInitialized = () => {
+          if (origCb) origCb();
+          resolve();
+        };
+        // Also poll in case onRuntimeInitialized already fired
+        let tries = 0;
+        const check = () => {
+          if (typeof module.callMain === 'function') return resolve();
+          if (++tries > 200) return reject(new Error('[SC:Engine] Timeout waiting for WASM'));
+          setTimeout(check, 100);
+        };
+        setTimeout(check, 200);
+      });
+    }
+
+    console.log('[SC:Engine] WASM ready, calling callMain...');
+
+    // Boot scsynth with 0 inputs, 2 outputs
+    // AudioContext is still patched so ASM_CONSTS can create ScriptProcessor
+    try {
+      module.callMain(['-u', String(SC_PORT), '-D', '0', '-i', '0', '-o', '2']);
+    } catch (e) {
+      // callMain may throw ExitStatus or pthread-related errors — continue if audio driver exists
+      console.warn('[SC:Engine] callMain threw:', e);
+    }
+
+    // Restore original AudioContext constructor (AFTER callMain)
+    globalThis.AudioContext = OrigAC;
+    if (origWebkitAC) {
+      (globalThis as Record<string, unknown>).webkitAudioContext = origWebkitAC;
+    }
+
+    console.log('[SC:Engine] callMain complete, checking audio driver...');
+
+    // Wait briefly for async init to complete (pthreads may still be starting)
+    await new Promise(r => setTimeout(r, 500));
+
+    // Verify the audio driver was set up
+    if (!module.audioDriver?.proc) {
+      throw new Error('[SC:Engine] scsynth did not create a ScriptProcessor');
+    }
+
+    // Create output GainNode and route ScriptProcessor through it.
+    // Keep proc connected to destination too so onaudioprocess keeps firing.
+    const output = audioContext.createGain();
+    output.gain.value = 1.0;
+    module.audioDriver.proc.connect(output);
+    console.log('[SC:Engine] ScriptProcessor connected to output GainNode');
+
+    // Keep Module on globalThis — scsynth pthreads need it for their lifecycle.
+
+    const engine = new SuperColliderEngine(module, output);
+    engine._synthDefName = synthDefName ?? 'mySynth';
+
+    // Load SynthDef if provided — then wait for scsynth to process it.
+    // The ScriptProcessor callback runs WaRun() which processes the OSC queue.
+    if (synthDefBinary && module.oscDriver?.[SC_PORT]) {
+      engine._loadSynthDefBinary(synthDefBinary, synthDefName ?? 'mySynth');
+      // Wait for several ScriptProcessor cycles (1024 samples / 48kHz ≈ 21ms each)
+      await new Promise(r => setTimeout(r, 1500));
+    }
+
+    console.log('[SC:Engine] Boot complete, SynthDef loaded:', !!synthDefBinary);
     return engine;
   }
 
   // ---------------------------------------------------------------------------
-  // Port message handler (post-ready messages, e.g. future error reporting)
+  // OSC helpers
   // ---------------------------------------------------------------------------
 
-  private _attachPortListener(): void {
-    this._node.port.onmessage = (event: MessageEvent) => {
-      const data = event.data as { type: string; message?: string };
-      if (data.type === 'error') {
-        console.error('[SuperColliderEngine] Worklet error:', data.message);
-      }
-    };
+  private static _oscStr(s: string): Uint8Array {
+    const enc = new TextEncoder();
+    const raw = enc.encode(s);
+    const padded = new Uint8Array((raw.length + 4) & ~3);
+    padded.set(raw);
+    return padded;
+  }
+
+  private static _oscI32(v: number): Uint8Array {
+    const buf = new ArrayBuffer(4);
+    new DataView(buf).setInt32(0, v, false);
+    return new Uint8Array(buf);
+  }
+
+  private static _oscF32(v: number): Uint8Array {
+    const buf = new ArrayBuffer(4);
+    new DataView(buf).setFloat32(0, v, false);
+    return new Uint8Array(buf);
+  }
+
+  private static _concatU8(...arrs: Uint8Array[]): Uint8Array {
+    const total = arrs.reduce((a, b) => a + b.byteLength, 0);
+    const msg = new Uint8Array(total);
+    let off = 0;
+    for (const a of arrs) { msg.set(a, off); off += a.byteLength; }
+    return msg;
+  }
+
+  private _sendOsc(data: Uint8Array): void {
+    if (!this._module?.oscDriver?.[SC_PORT]) return;
+    this._module.oscDriver[SC_PORT].receive(0, data);
   }
 
   // ---------------------------------------------------------------------------
-  // OSC send helper
+  // SynthDef loading
   // ---------------------------------------------------------------------------
 
-  private sendOsc(packet: Uint8Array): void {
-    if (this._disposed) return;
-    // Slice to get a plain ArrayBuffer (packet may be a view into a larger buffer).
-    const buf = packet.buffer.slice(packet.byteOffset, packet.byteOffset + packet.byteLength);
-    this._node.port.postMessage({ type: 'osc', data: buf }, [buf]);
+  private _loadSynthDefBinary(binary: Uint8Array, defName: string): void {
+    // Build /d_recv OSC: [addr][tags][blob-size][blob-data][padding]
+    const { _oscStr, _concatU8 } = SuperColliderEngine;
+    const addr = _oscStr('/d_recv');
+    const tags = _oscStr(',b');
+    const blobSize = new Uint8Array(4);
+    new DataView(blobSize.buffer).setUint32(0, binary.byteLength, false);
+    const blobPad = new Uint8Array((4 - (binary.byteLength % 4)) % 4);
+    const oscMsg = _concatU8(addr, tags, blobSize, binary, blobPad);
+
+    this._sendOsc(oscMsg);
+    this._synthDefName = defName;
+    console.log('[SC:Engine] SynthDef loaded:', defName, 'binary:', binary.byteLength, 'bytes');
   }
 
   // ---------------------------------------------------------------------------
   // Public API
   // ---------------------------------------------------------------------------
 
-  /** Load a compiled SynthDef binary into scsynth (/d_recv). */
-  loadSynthDef(binary: Uint8Array): void {
-    console.log('[SC:Engine] /d_recv binary', binary.byteLength, 'bytes');
-    this.sendOsc(oscLoadSynthDef(binary));
+  loadSynthDef(binary: Uint8Array, defName?: string): void {
+    this._loadSynthDefBinary(binary, defName ?? 'mySynth');
   }
 
-  /**
-   * Create a new synth node (/s_new).
-   * @param nodeId  - Unique node ID (caller is responsible for uniqueness)
-   * @param defName - SynthDef name as compiled into the binary
-   * @param params  - Initial control values (e.g. { freq: 440, gate: 1 })
-   */
   noteOn(nodeId: number, defName: string, params: Record<string, number>): void {
-    console.log('[SC:Engine] /s_new nodeId:', nodeId, 'defName:', defName, 'freq:', params.freq?.toFixed(1));
-    this.sendOsc(oscNewSynth(defName, nodeId, params));
+    const { _oscStr, _oscI32, _oscF32, _concatU8 } = SuperColliderEngine;
+    const freq = params.freq ?? 440;
+    const amp = params.amp ?? 0.5;
+
+    const osc = _concatU8(
+      _oscStr('/s_new'), _oscStr(',siiisfsfsf'),
+      _oscStr(defName),
+      _oscI32(nodeId), _oscI32(0), _oscI32(0),
+      _oscStr('freq'), _oscF32(freq),
+      _oscStr('amp'), _oscF32(amp),
+      _oscStr('gate'), _oscF32(1.0),
+    );
+    this._sendOsc(osc);
+    console.log('[SC:Engine] noteOn:', nodeId, defName, 'freq=', freq.toFixed(1), 'amp=', amp.toFixed(2));
   }
 
-  /**
-   * Release a running synth node by setting gate=0 (/n_set).
-   * The SynthDef is expected to respond to gate≤0 and free itself via EnvGen/doneAction.
-   */
   noteOff(nodeId: number): void {
-    this.sendOsc(oscSetParams(nodeId, { gate: 0 }));
+    const { _oscStr, _oscI32, _oscF32, _concatU8 } = SuperColliderEngine;
+    const osc = _concatU8(
+      _oscStr('/n_set'), _oscStr(',isf'),
+      _oscI32(nodeId),
+      _oscStr('gate'), _oscF32(0.0),
+    );
+    this._sendOsc(osc);
   }
 
-  /**
-   * Update named control parameters on a live synth node (/n_set).
-   */
   setNodeParams(nodeId: number, params: Record<string, number>): void {
-    this.sendOsc(oscSetParams(nodeId, params));
+    const { _oscStr, _oscI32, _oscF32, _concatU8 } = SuperColliderEngine;
+    for (const [key, value] of Object.entries(params)) {
+      const osc = _concatU8(
+        _oscStr('/n_set'), _oscStr(',isf'),
+        _oscI32(nodeId),
+        _oscStr(key), _oscF32(value),
+      );
+      this._sendOsc(osc);
+    }
   }
 
-  /** Disconnect and tear down the worklet. */
   dispose(): void {
     if (this._disposed) return;
     this._disposed = true;
-    this._node.port.postMessage({ type: 'dispose' });
-    this._node.disconnect();
+    if (this._module?.audioDriver?.proc) {
+      try { this._module.audioDriver.proc.disconnect(); } catch { /* ignore */ }
+    }
   }
 }
