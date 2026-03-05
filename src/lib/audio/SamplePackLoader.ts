@@ -2,7 +2,6 @@
  * SamplePackLoader - Utility for loading sample packs from directories or ZIP files
  */
 
-import JSZip from 'jszip';
 import type { SamplePack, SampleInfo, SampleCategory } from '@typedefs/samplePack';
 
 // Known category folder names (case-insensitive)
@@ -250,6 +249,7 @@ export async function loadSamplePackFromZip(file: File): Promise<SamplePack> {
   try {
     // Load and parse ZIP
     console.log('[SamplePackLoader] Starting JSZip.loadAsync...');
+    const JSZip = (await import('jszip')).default;
     const zip = await JSZip.loadAsync(file);
     console.log('[SamplePackLoader] JSZip load complete.');
 
