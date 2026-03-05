@@ -251,8 +251,8 @@ export class GTUltraEngine {
     this.post({ type: 'getPatternData', pattern });
   }
 
-  requestOrderData(channel: number): void {
-    this.post({ type: 'getOrderData', channel });
+  requestOrderData(channel: number, song = 0): void {
+    this.post({ type: 'getOrderData', channel, song });
   }
 
   requestInstrumentData(instrument: number): void {
