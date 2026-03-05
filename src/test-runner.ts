@@ -354,7 +354,7 @@ const SYNTH_CONFIGS: Record<string, Record<string, unknown>> = {
   'MusicLineSynth': { synthType: 'MusicLineSynth', volume: -12 },
   'DeltaMusic1Synth': { synthType: 'DeltaMusic1Synth', volume: -12 },
   'DeltaMusic2Synth': { synthType: 'DeltaMusic2Synth', volume: -12 },
-  'JamCrackerSynth': { synthType: 'JamCrackerSynth', volume: -12 },
+  'JamCrackerSynth': { synthType: 'JamCrackerSynth', volume: -12, songUrl: '/data/songs/jam/analogue vibes.jam', songFilename: 'analogue vibes.jam' },
 };
 
 /* ALL FURNACE SYNTHS - FULL TEST CONFIG (for reference)
@@ -1899,6 +1899,15 @@ async function testVolumeLevels(skipPreWarm = false) {
           console.log(`[Test] UADESynth: loaded MOD from ${config.songUrl}`);
         } catch (err) { console.warn('[Test] UADESynth: failed to load song', err); }
       }
+      if (name === 'JamCrackerSynth' && config.songUrl) {
+        try {
+          const resp = await fetch(config.songUrl as string);
+          const buf = await resp.arrayBuffer();
+          const { JamCrackerEngine } = await import('./engine/jamcracker/JamCrackerEngine');
+          await JamCrackerEngine.getInstance().loadTune(buf);
+          console.log(`[Test] JamCrackerSynth: loaded JAM from ${config.songUrl}`);
+        } catch (err) { console.warn('[Test] JamCrackerSynth: failed to load song', err); }
+      }
 
       // Play the phrase and measure peak level
       const peakDb = await playPhraseOnce(name, synthObj, furnaceNativeMeter, meter);
@@ -2324,6 +2333,15 @@ async function testVolumeInteractive() {
           });
           console.log(`[Test] UADESynth: loaded MOD from ${config.songUrl}`);
         } catch (err) { console.warn('[Test] UADESynth: failed to load song', err); }
+      }
+      if (name === 'JamCrackerSynth' && config.songUrl) {
+        try {
+          const resp = await fetch(config.songUrl as string);
+          const buf = await resp.arrayBuffer();
+          const { JamCrackerEngine } = await import('./engine/jamcracker/JamCrackerEngine');
+          await JamCrackerEngine.getInstance().loadTune(buf);
+          console.log(`[Test] JamCrackerSynth: loaded JAM from ${config.songUrl}`);
+        } catch (err) { console.warn('[Test] JamCrackerSynth: failed to load song', err); }
       }
 
       // Show "playing" indicator row
