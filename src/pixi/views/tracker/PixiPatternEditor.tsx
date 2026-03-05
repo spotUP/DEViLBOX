@@ -79,6 +79,15 @@ const FLAG_COLORS = {
   hammer: 0x22d3ee,
 };
 
+// Pre-allocated fill style objects to avoid GC pressure in hot render loops
+const FILL_BLACK_045 = { color: 0x000000, alpha: 0.45 };
+const FILL_BLACK_085 = { color: 0x000000, alpha: 0.85 };
+const FILL_WHITE_002 = { color: 0xffffff, alpha: 0.02 };
+const FILL_PURPLE_012 = { color: 0xa855f7, alpha: 0.12 };
+const FILL_PURPLE_045 = { color: 0xa855f7, alpha: 0.45 };
+const FILL_PURPLE_055 = { color: 0xa855f7, alpha: 0.55 };
+const FILL_INDIGO_008 = { color: 0x6366f1, alpha: 0.08 };
+
 function probColor(val: number): number {
   if (val >= 75) return 0x4ade80;
   if (val >= 50) return 0xfacc15;
@@ -194,7 +203,7 @@ function renderGrid(g: GraphicsType, p: RenderParams, vStart: number): void {
 
     if (p.channelMuted[ch]) {
       g.rect(colX, 0, chW, p.gridHeight);
-      g.fill({ color: 0x000000, alpha: 0.45 });
+      g.fill(FILL_BLACK_045);
     }
 
     const channelColor = p.displayPattern?.channels[ch]?.color;
@@ -230,7 +239,7 @@ function renderOverlay(
     const colX = p.channelOffsets[cursorCh] - p.scrollLeft;
     const chW = p.channelWidths[cursorCh];
     g.rect(colX, 0, chW, p.gridHeight);
-    g.fill({ color: 0xffffff, alpha: 0.02 });
+    g.fill(FILL_WHITE_002);
   }
 
   // Selection overlay
@@ -262,11 +271,11 @@ function renderOverlay(
       const y1 = p.baseY + (pStartRow - vStart) * p.rowHeight;
       const h = (pEndRow - pStartRow + 1) * p.rowHeight;
       g.rect(colX, y1, chW, h);
-      g.fill({ color: 0xa855f7, alpha: 0.12 });
-      g.rect(colX, y1, chW, 1); g.fill({ color: 0xa855f7, alpha: 0.45 });
-      g.rect(colX, y1 + h - 1, chW, 1); g.fill({ color: 0xa855f7, alpha: 0.45 });
-      g.rect(colX, y1, 1, h); g.fill({ color: 0xa855f7, alpha: 0.45 });
-      g.rect(colX + chW - 1, y1, 1, h); g.fill({ color: 0xa855f7, alpha: 0.45 });
+      g.fill(FILL_PURPLE_012);
+      g.rect(colX, y1, chW, 1); g.fill(FILL_PURPLE_045);
+      g.rect(colX, y1 + h - 1, chW, 1); g.fill(FILL_PURPLE_045);
+      g.rect(colX, y1, 1, h); g.fill(FILL_PURPLE_045);
+      g.rect(colX + chW - 1, y1, 1, h); g.fill(FILL_PURPLE_045);
     }
   }
 
@@ -275,7 +284,7 @@ function renderOverlay(
     const py = p.baseY + (peerCursor.row - vStart) * p.rowHeight;
     const px = p.channelOffsets[peerCursor.channel] - p.scrollLeft + 8;
     g.rect(px, py, CHAR_WIDTH * 3 + 4, p.rowHeight);
-    g.fill({ color: 0xa855f7, alpha: 0.55 });
+    g.fill(FILL_PURPLE_055);
   }
 
   // Cursor caret
