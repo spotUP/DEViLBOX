@@ -213,6 +213,13 @@ async function testScriptNodePlayer(engineId) {
     try {
       if (window.player._tickerNode) window.player._tickerNode.disconnect(0);
     } catch(e) {}
+    // Call WASM teardown for backends that need it
+    try {
+      if (window.player._backendAdapter && window.player._backendAdapter.Module) {
+        const mod = window.player._backendAdapter.Module;
+        if (mod._emu_teardown) mod._emu_teardown();
+      }
+    } catch(e) {}
     window.player = undefined;
   }
 
