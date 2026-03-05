@@ -50,6 +50,12 @@ function isInputElement(e: KeyboardEvent): boolean {
     return true;
   }
 
+  // Check for CodeMirror editors (use div.cm-content, not native textarea)
+  if (target.closest?.('.cm-editor')) {
+    if (e.key === 'Escape') return false;
+    return true;
+  }
+
   // Check for contenteditable
   if (target.isContentEditable) {
     if (e.key === 'Escape') return false;
