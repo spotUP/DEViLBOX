@@ -163,19 +163,18 @@ export const VJCanvas = React.forwardRef<VJCanvasHandle, VJCanvasProps>(
       return () => { cancelled = true; cancelAnimationFrame(initRaf); };
     }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-    // Render loop
+    // Render loop — only runs when visible (stops rAF entirely when hidden)
     useEffect(() => {
-      if (!ready) return;
+      if (!ready || !visible) return;
       const render = () => {
-        if (visibleRef.current) {
-          visualizerRef.current?.render();
-          audioDataBusRef.current?.update();
-        }
+        if (!visibleRef.current) return; // stop loop if visibility changed mid-frame
+        visualizerRef.current?.render();
+        audioDataBusRef.current?.update();
         rafRef.current = requestAnimationFrame(render);
       };
       rafRef.current = requestAnimationFrame(render);
       return () => cancelAnimationFrame(rafRef.current);
-    }, [ready]);
+    }, [ready, visible]);
 
     // Handle resize
     useEffect(() => {
