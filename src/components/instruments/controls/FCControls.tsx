@@ -23,7 +23,7 @@ import { useThemeStore } from '@stores';
 import { EnvelopeVisualization } from '@components/instruments/shared';
 import { UADEChipEditor } from '@/engine/uade/UADEChipEditor';
 import { UADEEngine } from '@/engine/uade/UADEEngine';
-import { encodeFCVolEnvelope } from '@/engine/uade/chipRamEncoders';
+import { encodeFCVolEnvelope, encodeFCFreqMacro } from '@/engine/uade/chipRamEncoders';
 
 interface FCControlsProps {
   config: FCConfig;
@@ -117,6 +117,27 @@ export const FCControls: React.FC<FCControlsProps> = ({ config, onChange, uadeCh
       }
     },
     [upd, uadeChipRam, getEditor],
+  );
+
+  /**
+   * Write the full 64-byte freq macro to chip RAM when synthTable or arpTable changes.
+   * The freq macro address is sections.freqMacros + freqMacroIdx * 64,
+   * where freqMacroIdx is stored in vol macro byte[1].
+   */
+  const writeFreqMacroToChipRam = useCallback(
+    (newCfg: FCConfig) => {
+      if (!uadeChipRam || !uadeChipRam.sections.freqMacros) return;
+      void (async () => {
+        const editor = getEditor();
+        // Read freqMacroIdx from vol macro byte[1]
+        const freqMacroIdxBytes = await editor.readBytes(uadeChipRam.instrBase + 1, 1);
+        const freqMacroIdx = freqMacroIdxBytes[0];
+        const freqMacroAddr = uadeChipRam.sections.freqMacros + freqMacroIdx * 64;
+        const encoded = encodeFCFreqMacro(newCfg.synthTable, newCfg.arpTable);
+        void editor.writeBlock(freqMacroAddr, Array.from(encoded));
+      })();
+    },
+    [uadeChipRam, getEditor],
   );
 
   const SectionLabel: React.FC<{ label: string }> = ({ label }) => (
@@ -225,6 +246,7 @@ export const FCControls: React.FC<FCControlsProps> = ({ config, onChange, uadeCh
         idx === i ? { ...s, [field]: value } : s
       );
       onChange({ synthTable: table });
+      writeFreqMacroToChipRam({ ...configRef.current, synthTable: table });
     };
 
     return (
@@ -313,6 +335,7 @@ export const FCControls: React.FC<FCControlsProps> = ({ config, onChange, uadeCh
                     const arr = [...configRef.current.arpTable];
                     arr[i] = Math.max(-64, Math.min(63, val));
                     upd('arpTable', arr);
+                    writeFreqMacroToChipRam({ ...configRef.current, arpTable: arr });
                   }
                 }}
                 className="text-[10px] font-mono text-center border rounded py-0.5"
