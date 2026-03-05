@@ -28,6 +28,7 @@ import { DavidWhittakerSynth } from './davidwhittaker/DavidWhittakerSynth';
 import { SonicArrangerSynth } from './sonic-arranger/SonicArrangerSynth';
 import { SymphonieSynth } from './symphonie/SymphonieSynth';
 import { SunVoxSynth } from './sunvox/SunVoxSynth';
+import { FuturePlayerSynth } from './futureplayer/FuturePlayerSynth';
 import { UADESynth } from './uade/UADESynth';
 import { SuperColliderSynth } from './sc/SuperColliderSynth';
 import { MAMESynth } from './MAMESynth';
@@ -490,8 +491,17 @@ export class InstrumentFactory {
         instrument = new HivelySynth();
         break;
 
-      case 'JamCrackerSynth':
-        instrument = new JamCrackerSynth();
+      case 'JamCrackerSynth': {
+        const jcSynth = new JamCrackerSynth();
+        // Set 0-based instrument index from config id (which is 1-based)
+        const jcInstrIdx = typeof config.id === 'number' ? config.id - 1 : 0;
+        jcSynth.set('instrumentIndex', jcInstrIdx);
+        instrument = jcSynth;
+        break;
+      }
+
+      case 'FuturePlayerSynth':
+        instrument = new FuturePlayerSynth();
         break;
 
       case 'SoundMonSynth': {
