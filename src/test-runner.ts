@@ -27,7 +27,7 @@ import { FurnaceDispatchEngine } from './engine/furnace-dispatch/FurnaceDispatch
 import { BuzzmachineEngine } from './engine/buzzmachines/BuzzmachineEngine';
 import { MAMEEngine } from './engine/MAMEEngine';
 import { getFirstPresetForSynthType } from './constants/factoryPresets';
-import { setDevilboxAudioContext, getNativeContext } from './utils/audio-context';
+import { setDevilboxAudioContext } from './utils/audio-context';
 
 /** Extend Window with test-runner globals so we avoid `(window as any)` */
 interface TestRunnerWindow {
@@ -817,12 +817,14 @@ function clearResults() {
 }
 
 async function initAudio() {
+  // Create a REAL native AudioContext first (same pattern as ToneEngine),
+  // then hand it to Tone.js. This ensures getDevilboxAudioContext() always
+  // returns a true browser-native context for WASM worklets and native nodes.
+  const nativeCtx = new AudioContext({ latencyHint: 'interactive' });
+  Tone.setContext(nativeCtx);
   await Tone.start();
-  // Extract native AudioContext using robust unwrapping and register it
-  const ctx = Tone.getContext();
-  const nativeCtx = getNativeContext(ctx);
   setDevilboxAudioContext(nativeCtx);
-  log('AudioContext started: ' + Tone.getContext().state, 'pass');
+  log('AudioContext started: ' + nativeCtx.state + ' (native, sampleRate=' + nativeCtx.sampleRate + ')', 'pass');
 }
 
 // ============================================
@@ -1813,6 +1815,19 @@ async function testVolumeLevels(skipPreWarm = false) {
           output.connect(furnaceNativeMeter);
           furnaceNativeMeter.connect(output.context.destination);
           mameOutputNode = output;
+        }
+      }
+
+      // Catch-all for DevilboxSynths that have a native output node but no
+      // Tone.js connect() method (DubSiren, SpaceLaser, Synare, TB303, Sam, etc.)
+      if (!furnaceNativeMeter && synthObj.output && typeof (synthObj.output as AudioNode).connect === 'function') {
+        const output = synthObj.output as AudioNode;
+        if (output.context) {
+          furnaceNativeMeter = output.context.createAnalyser();
+          furnaceNativeMeter.fftSize = 256;
+          output.connect(furnaceNativeMeter);
+          furnaceNativeMeter.connect(output.context.destination);
+          console.log(`[VolumeTest] ${name}: Created native AnalyserNode for DevilboxSynth metering`);
         }
       }
 
