@@ -29,22 +29,22 @@ const CHAN_GAP = 10;
 const HEADER_H = 20;
 const CHANNEL_W = NOTE_W + COL_GAP + HEX_W + COL_GAP + HEX_W + COL_GAP + HEX_W;
 
-// ── Colors ──
-const C_BG         = 0x1a1a2e;
-const C_BG_ALT     = 0x16213e;
-const C_HEADER     = 0x0f3460;
-const C_HEADER_TXT = 0xe94560;
-const C_ROW_NUM    = 0x666688;
-const C_NOTE       = 0xe0e0ff;
+// ── Colors (FT2 neutral dark theme) ──
+const C_BG         = 0x0d0d0d;
+const C_BG_ALT     = 0x141414;
+const C_HEADER     = 0x1a1a1a;
+const C_HEADER_TXT = 0x888888;
+const C_ROW_NUM    = 0x555555;
+const C_NOTE       = 0xe0e0e0;
 const C_INSTR      = 0x60e060;
 const C_CMD        = 0xffcc00;
 const C_DATA       = 0xff8866;
-const C_EMPTY      = 0x333355;
+const C_EMPTY      = 0x333333;
 const C_CURSOR     = 0xffffff;
-const C_CURSOR_BG  = 0x444466;
-const C_PLAY_ROW   = 0x3a1525;
-const C_SEL        = 0x4466aa;
-const C_CHAN_SEP    = 0x333355;
+const C_CURSOR_BG  = 0x333333;
+const C_PLAY_ROW   = 0x2a1520;
+const C_SEL        = 0x3355aa;
+const C_CHAN_SEP    = 0x222222;
 
 // ── Helpers ──
 const NOTE_NAMES = ['C-', 'C#', 'D-', 'D#', 'E-', 'F-', 'F#', 'G-', 'G#', 'A-', 'A#', 'B-'];
@@ -81,6 +81,8 @@ export const PixiGTPatternGrid: React.FC<Props> = ({ width, height }) => {
   const playbackPos = useGTUltraStore((s) => s.playbackPos);
   const playing = useGTUltraStore((s) => s.playing);
   const followPlay = useGTUltraStore((s) => s.followPlay);
+  const recordMode = useGTUltraStore((s) => s.recordMode);
+  const orderCursor = useGTUltraStore((s) => s.orderCursor);
   const sidCount = useGTUltraStore((s) => s.sidCount);
   const channelCount = sidCount * 3;
 
@@ -131,11 +133,19 @@ export const PixiGTPatternGrid: React.FC<Props> = ({ width, height }) => {
     // Header bar
     grid.rect(0, 0, width, HEADER_H).fill({ color: C_HEADER });
 
-    // Header channel labels
+    // Header channel labels with pattern numbers
     labels.push({ x: 2, y: 3, text: 'ROW', color: C_HEADER_TXT, fontFamily });
+    const orderData = orderDataRef.current;
     for (let ch = 0; ch < channelCount; ch++) {
-      const x = ROW_NUM_W + ch * (CHANNEL_W + CHAN_GAP) + CHANNEL_W / 2 - CHAR_W * 1.5;
-      labels.push({ x, y: 3, text: `CH${ch + 1}`, color: C_HEADER_TXT, fontFamily });
+      const patNum = orderData[ch]?.[orderCursor] ?? 0;
+      const label = `CH${ch + 1}:${patNum.toString(16).toUpperCase().padStart(2, '0')}`;
+      const x = ROW_NUM_W + ch * (CHANNEL_W + CHAN_GAP) + CHANNEL_W / 2 - CHAR_W * label.length / 2;
+      labels.push({ x, y: 3, text: label, color: C_HEADER_TXT, fontFamily });
+    }
+
+    // Record mode border
+    if (recordMode) {
+      grid.rect(0, 0, width, height).stroke({ color: 0xef4444, width: 2, alpha: 0.5 });
     }
 
     // Row backgrounds + labels
@@ -246,7 +256,7 @@ export const PixiGTPatternGrid: React.FC<Props> = ({ width, height }) => {
     // Update MegaText
     mega.updateLabels(labels, FONT_SIZE);
   }, [width, height, scrollRow, visibleRows, patternLength, playbackPos, playing,
-      followPlay, selection, channelCount]);
+      followPlay, selection, channelCount, recordMode, orderCursor]);
 
   // Subscribe to pattern/order data changes for redraw
   useEffect(() => {

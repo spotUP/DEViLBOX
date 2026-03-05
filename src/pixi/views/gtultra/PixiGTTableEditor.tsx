@@ -17,14 +17,14 @@ const HEADER_H = 14;
 const ROW_H = 13;
 const FONT_SIZE = 10;
 
-const C_BG      = 0x1a1a2e;
-const C_TAB_BG  = 0x0f3460;
+const C_BG      = 0x0d0d0d;
+const C_TAB_BG  = 0x1a1a1a;
 const C_WAVE    = 0x60e060;
 const C_PULSE   = 0xff8866;
 const C_FILTER  = 0xffcc00;
 const C_SPEED   = 0x6699ff;
-const C_DIM     = 0x333355;
-const C_LABEL   = 0x888899;
+const C_DIM     = 0x333333;
+const C_LABEL   = 0x666666;
 const C_CURSOR  = 0xffffff;
 
 const TABLE_COLORS: Record<TableType, number> = { wave: C_WAVE, pulse: C_PULSE, filter: C_FILTER, speed: C_SPEED };
@@ -76,7 +76,7 @@ export const PixiGTTableEditor: React.FC<Props> = ({ width, height }) => {
         x: tx + tabW / 2 - 12,
         y: 3,
         text: t.toUpperCase(),
-        color: t === activeTable ? TABLE_COLORS[t] : 0x666688,
+        color: t === activeTable ? TABLE_COLORS[t] : 0x555555,
         fontFamily: ff,
       });
     });
@@ -98,7 +98,7 @@ export const PixiGTTableEditor: React.FC<Props> = ({ width, height }) => {
       const isCursor = idx === tableCursor;
 
       if (isCursor) {
-        g.rect(0, y, width, ROW_H).fill({ color: 0x222244 });
+        g.rect(0, y, width, ROW_H).fill({ color: 0x1a1a1a });
         g.rect(0, y, 2, ROW_H).fill({ color: C_CURSOR });
       }
 
@@ -111,6 +111,18 @@ export const PixiGTTableEditor: React.FC<Props> = ({ width, height }) => {
 
       const right = table?.right[idx] ?? 0;
       labels.push({ x: 80, y: y + 1, text: hex(right), color: right === 0 ? C_DIM : color, fontFamily: ff });
+
+      // Wave table annotations
+      if (activeTable === 'wave' && left > 0) {
+        let ann = '';
+        if (left === 0xFF) ann = 'END';
+        else if (left === 0xFE) ann = 'RST';
+        else if (left === 0xE0) ann = 'INAUD';
+        else if (left === 0xE1) ann = 'NOISE+';
+        else if (left === 0x10) ann = 'DEL-GOFF';
+        else if (left === 0x11) ann = 'DEL-GON';
+        if (ann) labels.push({ x: 110, y: y + 1, text: ann, color: C_LABEL, fontFamily: ff });
+      }
 
       // Visual bar for values
       if (right > 0 && (activeTable === 'pulse' || activeTable === 'filter')) {

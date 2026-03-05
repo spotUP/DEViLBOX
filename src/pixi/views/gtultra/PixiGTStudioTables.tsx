@@ -12,15 +12,15 @@ import { PIXI_FONTS } from '@/pixi/fonts';
 import { MegaText, type GlyphLabel } from '@/pixi/utils/MegaText';
 import { useGTUltraStore } from '@/stores/useGTUltraStore';
 
-const C_BG       = 0x16213e;
-const C_BORDER   = 0x333366;
-const C_LABEL    = 0x888899;
-const C_HEADER   = 0xe94560;
+const C_BG       = 0x0d0d0d;
+const C_BORDER   = 0x222222;
+const C_LABEL    = 0x666666;
+const C_HEADER   = 0x888888;
 const C_BAR_WAVE = 0x6699ff;
 const C_BAR_PULSE = 0xff8866;
 const C_BAR_FILTER = 0x2a9d8f;
 const C_BAR_SPEED = 0xffcc00;
-const C_GRID     = 0x1a1a3a;
+const C_GRID     = 0x151515;
 const C_CURSOR   = 0xffffff;
 
 const TABLE_COLORS = [C_BAR_WAVE, C_BAR_PULSE, C_BAR_FILTER, C_BAR_SPEED];

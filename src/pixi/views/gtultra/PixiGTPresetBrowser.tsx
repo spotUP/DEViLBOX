@@ -12,15 +12,15 @@ import { MegaText, type GlyphLabel } from '@/pixi/utils/MegaText';
 import { getPresetCategories, getPresetsByCategory, type GTSIDPreset } from '@/constants/gtultraPresets';
 import { useGTUltraStore } from '@/stores/useGTUltraStore';
 
-const C_BG       = 0x16213e;
-const C_BORDER   = 0x333366;
-const C_LABEL    = 0x888899;
-const C_HEADER   = 0xe94560;
-const C_CAT_BG   = 0x1a1a3a;
-const C_CAT_SEL  = 0x2a3a5a;
-const C_PRESET   = 0xccccdd;
+const C_BG       = 0x0d0d0d;
+const C_BORDER   = 0x222222;
+const C_LABEL    = 0x666666;
+const C_HEADER   = 0x888888;
+const C_CAT_BG   = 0x141414;
+const C_CAT_SEL  = 0x1a2a3a;
+const C_PRESET   = 0xcccccc;
 const C_PRESET_SEL = 0x66aaff;
-const C_HOVER    = 0x222244;
+const C_HOVER    = 0x1a1a1a;
 
 interface Props {
   width: number;

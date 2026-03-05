@@ -13,14 +13,14 @@ const HEADER_H = 18;
 const LINE_H = 14;
 const FONT_SIZE = 10;
 
-const C_BG     = 0x1a1a2e;
-const C_HEADER = 0x0f3460;
-const C_ACCENT = 0xe94560;
-const C_LABEL  = 0x888899;
+const C_BG     = 0x0d0d0d;
+const C_HEADER = 0x1a1a1a;
+const C_ACCENT = 0x888888;
+const C_LABEL  = 0x666666;
 const C_VALUE  = 0x60e060;
 const C_PTR    = 0xffcc00;
-const C_NAME   = 0xe0e0ff;
-const C_SEP    = 0x333355;
+const C_NAME   = 0xe0e0e0;
+const C_SEP    = 0x222222;
 
 interface Props { width: number; height: number }
 
