@@ -66,9 +66,16 @@ async function checkModlandFileWithPatternHash(file: File, patternHash: string |
       showModal(file.name, result.hash);
       console.log('🆕 Unknown module detected (hash: ' + result.hash + ', pattern hash: ' + (patternHash || 'unavailable') + ') - showing contribution modal');
     } else if (result.found && patternHash) {
-      // Found in Modland - could query for remixes using pattern hash here
-      console.log('[Modland] Module found. Pattern hash:', patternHash);
-      // TODO: Query /api/modland/pattern-matches/:pattern_hash for remixes
+      // Found in Modland — query for remixes/variations using pattern hash
+      try {
+        const { findPatternMatches } = await import('@/lib/modlandApi');
+        const matches = await findPatternMatches(parseInt(patternHash, 16) || 0);
+        if (matches && matches.length > 1) {
+          notify.info(`Found ${matches.length - 1} remix${matches.length > 2 ? 'es' : ''} with matching patterns`);
+        }
+      } catch {
+        // Pattern match endpoint may not be deployed yet — silently ignore
+      }
     }
   } catch (error) {
     console.debug('[Modland] Hash check failed:', error);
