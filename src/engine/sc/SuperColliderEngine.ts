@@ -192,6 +192,21 @@ export class SuperColliderEngine {
       await new Promise(r => setTimeout(r, 1500));
     }
 
+    // Debug: check audio driver state
+    const ad = module.audioDriver;
+    console.log('[SC:Engine] audioDriver state:', {
+      bufSize: ad?.bufSize,
+      outChanCount: ad?.outChanCount,
+      inChanCount: ad?.inChanCount,
+      connected: ad?.connected,
+      hasBufOutPtr: !!ad?.bufOutPtr,
+      floatBufOutLength: ad?.floatBufOut?.length,
+      floatBufOut0Detached: ad?.floatBufOut?.[0]?.buffer?.byteLength === 0,
+      floatBufOut0Sample: ad?.floatBufOut?.[0]?.[0],
+      heapByteLength: module.HEAPU8?.buffer?.byteLength,
+      hasAudioDriverFn: typeof (module as any).audio_driver === 'function',
+    });
+
     console.log('[SC:Engine] Boot complete, SynthDef loaded:', !!synthDefBinary);
     return engine;
   }
@@ -274,7 +289,10 @@ export class SuperColliderEngine {
       _oscStr('gate'), _oscF32(1.0),
     );
     this._sendOsc(osc);
-    console.log('[SC:Engine] noteOn:', nodeId, defName, 'freq=', freq.toFixed(1), 'amp=', amp.toFixed(2));
+    console.log('[SC:Engine] noteOn:', nodeId, defName, 'freq=', freq.toFixed(1), 'amp=', amp.toFixed(2),
+      'oscDriverOK:', !!this._module?.oscDriver?.[SC_PORT],
+      'procConnected:', !!this._module?.audioDriver?.connected,
+      'outputGain:', this.output?.gain?.value);
   }
 
   noteOff(nodeId: number): void {
