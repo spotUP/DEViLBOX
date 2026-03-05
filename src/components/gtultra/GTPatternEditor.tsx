@@ -27,9 +27,10 @@ const HEADER_H = ROW_H + 4;
 const NOTE_NAMES = ['C-', 'C#', 'D-', 'D#', 'E-', 'F-', 'F#', 'G-', 'G#', 'A-', 'A#', 'B-'];
 
 function noteToString(note: number): string {
-  if (note === 0) return '...';
+  if (note === 0 || note === 0xBD) return '...'; // 0=empty, 0xBD=REST
   if (note === 0xBE) return '==='; // keyoff
   if (note === 0xBF) return '+++'; // keyon
+  if (note >= 0xC0) return '...'; // ENDPATT and other special values
   const n = note - 1;
   const octave = Math.floor(n / 12);
   const name = NOTE_NAMES[n % 12];
@@ -205,7 +206,7 @@ export const GTPatternEditor: React.FC<GTPatternEditorProps> = ({
 
         // Note
         const noteStr = noteToString(note);
-        ctx.fillStyle = note === 0 ? COLORS.empty : COLORS.note;
+        ctx.fillStyle = (note === 0 || note >= 0xBD) ? COLORS.empty : COLORS.note;
         ctx.fillText(noteStr, colX, y + 1);
         colX += NOTE_W + COL_GAP;
 
