@@ -44,7 +44,7 @@ export class JSIDPlay2Engine {
   private numSubsongs = 1;
   private metadata: any = null;
   private currentTime = 0;
-  private clockRunning = false;
+  private clockInterval: ReturnType<typeof setInterval> | null = null;
 
   // Ring buffer for audio samples from worker
   private sampleBufferL: Float32Array[] = [];
@@ -103,18 +103,7 @@ export class JSIDPlay2Engine {
     await this.workerCall('INITIALISE', {}, 'INITIALISED', 30000);
     console.log('[JSIDPlay2] WASM runtime ready');
 
-    // Configure sample rate
-    if (this.config.sampleRate) {
-      await this.workerCall('SET_SAMPLING_RATE', { samplingRate: this.config.sampleRate }, 'SAMPLING_RATE_SET', 5000);
-    }
-
-    // Force SID model if configured
-    if (this.config.chipModel) {
-      const model = this.config.chipModel === '8580' ? 1 : 0;
-      await this.workerCall('SET_USER_CHIP_MODEL', { sidNum: 0, chipModel: model }, 'USER_CHIP_MODEL_SET', 5000);
-    }
-
-    // Open the SID file
+    // Open the SID file first — WASM internals may not be ready for config before OPEN
     console.log('[JSIDPlay2] Opening SID file (%d bytes)...', this.sidData.byteLength);
     const contents = new Int8Array(this.sidData.buffer, this.sidData.byteOffset, this.sidData.byteLength);
     await this.workerCall('OPEN', {
@@ -128,6 +117,17 @@ export class JSIDPlay2Engine {
       sfxSoundExpanderType: 0,
     }, 'OPENED', 15000);
     console.log('[JSIDPlay2] SID file opened');
+
+    // Fire-and-forget: try setting sample rate (may not be supported)
+    if (this.config.sampleRate && this.worker) {
+      this.worker.postMessage({ eventType: 'SET_SAMPLING_RATE', eventData: { samplingRate: this.config.sampleRate } });
+    }
+
+    // Fire-and-forget: try setting SID model
+    if (this.config.chipModel && this.worker) {
+      const model = this.config.chipModel === '8580' ? 1 : 0;
+      this.worker.postMessage({ eventType: 'SET_USER_CHIP_MODEL', eventData: { sidNum: 0, chipModel: model } });
+    }
 
     // Get tune info
     try {
@@ -194,33 +194,31 @@ export class JSIDPlay2Engine {
     this.scriptNode.connect(audioContext.destination);
     this.isPlaying = true;
 
-    // Start the clock loop — continuously drives C64 emulation
-    this.clockRunning = true;
-    this.runClockLoop();
+    // Pre-buffer: fire a burst of CLOCKs to fill the ring buffer before audio starts
+    for (let i = 0; i < 60; i++) {
+      this.worker!.postMessage({ eventType: 'CLOCK', eventData: {} });
+    }
+
+    // Steady-state: fire CLOCKs at ~4ms interval (fire-and-forget, no await).
+    // The worker processes them sequentially and emits SAMPLES as side effects.
+    // ~250 clocks/sec keeps the ring buffer ahead of audio consumption at 44.1kHz.
+    this.clockInterval = setInterval(() => {
+      if (this.worker) {
+        this.worker.postMessage({ eventType: 'CLOCK', eventData: {} });
+      }
+    }, 4);
 
     console.log('[JSIDPlay2] Playback started, subsong:', this.subsong);
-  }
-
-  /**
-   * Clock loop — repeatedly sends CLOCK to advance C64 emulation
-   */
-  private async runClockLoop(): Promise<void> {
-    while (this.clockRunning && this.worker) {
-      try {
-        await this.workerCall('CLOCK', {}, 'CLOCKED', 5000);
-      } catch {
-        // Timeout or error — try again unless stopped
-        if (!this.clockRunning) break;
-        await new Promise(r => setTimeout(r, 10));
-      }
-    }
   }
 
   /**
    * Stop playback
    */
   stop(): void {
-    this.clockRunning = false;
+    if (this.clockInterval) {
+      clearInterval(this.clockInterval);
+      this.clockInterval = null;
+    }
 
     if (this.scriptNode) {
       this.scriptNode.disconnect();
@@ -239,7 +237,10 @@ export class JSIDPlay2Engine {
    * Pause playback
    */
   pause(): void {
-    this.clockRunning = false;
+    if (this.clockInterval) {
+      clearInterval(this.clockInterval);
+      this.clockInterval = null;
+    }
     if (this.scriptNode) {
       this.scriptNode.disconnect();
     }
@@ -251,8 +252,13 @@ export class JSIDPlay2Engine {
   resume(): void {
     if (this.scriptNode && this.audioContext) {
       this.scriptNode.connect(this.audioContext.destination);
-      this.clockRunning = true;
-      this.runClockLoop();
+      if (!this.clockInterval && this.worker) {
+        this.clockInterval = setInterval(() => {
+          if (this.worker) {
+            this.worker.postMessage({ eventType: 'CLOCK', eventData: {} });
+          }
+        }, 4);
+      }
     }
   }
 

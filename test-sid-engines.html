@@ -199,7 +199,19 @@ async function testScriptNodePlayer(engineId) {
     log(engineId, 'Tearing down existing ScriptNodePlayer instance...', 'warn');
     try { window.player.pause(); } catch(e) {}
     try {
+      if (window.player._producerNode) window.player._producerNode.disconnect(0);
+    } catch(e) {}
+    try {
+      if (window.player._gainNode) window.player._gainNode.disconnect(0);
+    } catch(e) {}
+    try {
+      if (window.player._analyzerNode) window.player._analyzerNode.disconnect(0);
+    } catch(e) {}
+    try {
       if (window.player._bufferSource) window.player._bufferSource.stop(0);
+    } catch(e) {}
+    try {
+      if (window.player._tickerNode) window.player._tickerNode.disconnect(0);
     } catch(e) {}
     window.player = undefined;
   }
@@ -298,10 +310,21 @@ async function testJSIDPlay2() {
     });
   }
 
-  // Collect audio samples
+  // Ring buffer for audio samples from worker
+  const sampleBufferL = [];
+  const sampleBufferR = [];
+  let sampleReadOffset = 0;
   let samplesReceived = 0;
+
   worker.addEventListener('message', (e) => {
-    if (e.data.eventType === 'SAMPLES') samplesReceived++;
+    if (e.data.eventType === 'SAMPLES') {
+      const { left, right, length } = e.data.eventData;
+      if (left && right && length > 0) {
+        sampleBufferL.push(new Float32Array(left));
+        sampleBufferR.push(new Float32Array(right));
+        samplesReceived++;
+      }
+    }
   });
 
   log(id, 'Sending INITIALISE...');
@@ -322,30 +345,82 @@ async function testJSIDPlay2() {
   }, 'OPENED', 15000);
   log(id, 'SID file opened ✓', 'ok');
 
-  log(id, 'Driving CLOCK loop for 3 seconds...');
-  const startTime = Date.now();
-  let clockCount = 0;
-  while (Date.now() - startTime < 3000) {
-    try {
-      await workerCall('CLOCK', {}, 'CLOCKED', 2000);
-      clockCount++;
-    } catch (e) {
-      log(id, `CLOCK ${clockCount} failed: ${e.message}`, 'warn');
-      break;
-    }
+  // Fire-and-forget: try setting sample rate but don't block on it
+  if (audioCtx) {
+    worker.postMessage({ eventType: 'SET_SAMPLING_RATE', eventData: { samplingRate: audioCtx.sampleRate } });
+    log(id, `Sent SET_SAMPLING_RATE (${audioCtx.sampleRate}) — non-blocking`, 'ok');
   }
+
+  // Create ScriptProcessor to play audio from ring buffer
+  const bufferSize = 4096;
+  const scriptNode = audioCtx.createScriptProcessor(bufferSize, 0, 2);
+  scriptNode.onaudioprocess = (event) => {
+    const outL = event.outputBuffer.getChannelData(0);
+    const outR = event.outputBuffer.getChannelData(1);
+    let written = 0;
+
+    while (written < outL.length && sampleBufferL.length > 0) {
+      const srcL = sampleBufferL[0];
+      const srcR = sampleBufferR[0];
+      const available = srcL.length - sampleReadOffset;
+      const needed = outL.length - written;
+      const toCopy = Math.min(available, needed);
+
+      outL.set(srcL.subarray(sampleReadOffset, sampleReadOffset + toCopy), written);
+      outR.set(srcR.subarray(sampleReadOffset, sampleReadOffset + toCopy), written);
+
+      written += toCopy;
+      sampleReadOffset += toCopy;
+
+      if (sampleReadOffset >= srcL.length) {
+        sampleBufferL.shift();
+        sampleBufferR.shift();
+        sampleReadOffset = 0;
+      }
+    }
+
+    if (written < outL.length) {
+      outL.fill(0, written);
+      outR.fill(0, written);
+    }
+  };
+  scriptNode.connect(audioCtx.destination);
+
+  // Pre-buffer: fire a burst of CLOCKs to fill ring buffer
+  log(id, 'Pre-buffering samples...');
+  for (let i = 0; i < 60; i++) {
+    worker.postMessage({ eventType: 'CLOCK', eventData: {} });
+  }
+  // Brief wait for pre-buffer to fill
+  await new Promise(r => setTimeout(r, 300));
+  log(id, `Pre-buffered ${samplesReceived} sample chunks`, 'ok');
+
+  // Drive CLOCK loop for 3 seconds — fire-and-forget at ~4ms interval
+  log(id, 'Playing for 3 seconds...');
+  let clockCount = 0;
+  const clockInterval = setInterval(() => {
+    worker.postMessage({ eventType: 'CLOCK', eventData: {} });
+    clockCount++;
+  }, 4);
+
+  // Wait 3 seconds
+  await new Promise(r => setTimeout(r, 3000));
+  clearInterval(clockInterval);
 
   log(id, `Clocked ${clockCount} times, received ${samplesReceived} sample buffers`, 'ok');
 
-  // If we got samples, wire them to audio
+  // Cleanup
+  scriptNode.disconnect();
+  worker.terminate();
+
+  engineStates[id] = { worker: null, type: 'jsidplay2' };
+
   if (samplesReceived > 0) {
-    log(id, 'Audio samples produced ✓', 'ok');
+    log(id, 'Audio samples produced and played ✓', 'ok');
   } else {
-    log(id, 'No audio samples received (may need more clock cycles)', 'warn');
+    log(id, 'No audio samples received', 'warn');
   }
 
-  worker.terminate();
-  log(id, 'Worker terminated');
   log(id, `JSIDPlay2 test PASSED ✓`, 'ok');
 }
 
