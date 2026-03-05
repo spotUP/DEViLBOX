@@ -242,7 +242,6 @@ const SYNTH_CONFIGS: Record<string, Record<string, unknown>> = {
   'OBXd':   { synthType: 'OBXd', volume: -12 },
   'CZ101':  { synthType: 'CZ101', volume: -12 },
   'Sam':    { synthType: 'Sam', volume: -12 },
-  'V2':       { synthType: 'V2', volume: -12 },
 
   // === Buzzmachine Synths ===
   'BuzzKick':      { synthType: 'BuzzKick', volume: -12 },

@@ -89,7 +89,7 @@ const DRUMNIBUS_808_KIT: KitPreset = {
  * 53 individual scratch sounds — first 16 mapped to pads, all available in SampleBrowser
  */
 const SCRATCH_ORIGINALS_KIT: KitPreset = {
-  id: 'scratch-originals',
+  id: 'scratch-originals-kit',
   name: 'Scratch Originals',
   description: 'Phase scratch sounds — DJ scratch sample pack',
   mappings: [
