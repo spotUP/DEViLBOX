@@ -10,7 +10,7 @@ import type { Application } from 'pixi.js';
 
 // ─── FPS Limiter ────────────────────────────────────────────────────────────
 
-const ACTIVE_FPS = 60;
+const ACTIVE_FPS = 0;  // 0 = uncapped, matches display refresh rate (e.g. 120Hz ProMotion)
 const IDLE_FPS = 10;
 const IDLE_TIMEOUT_MS = 1000; // drop to idle 1 second after last activity
 
