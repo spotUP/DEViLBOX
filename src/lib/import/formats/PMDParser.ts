@@ -157,7 +157,7 @@ function parseChannelStream(
   let pos = offset;
   let tick = 0;
   let defaultLen = 12; // default note length in ticks (quarter note at 48 PPQN)
-  let currentVolume = 100;
+  let _currentVolume = 100;
 
   // Safety limit: don't parse more than 64KB per channel
   const limit = Math.min(buf.length, offset + 65536);
@@ -200,7 +200,7 @@ function parseChannelStream(
         break;
       case CMD_VOLUME:
         if (pos < limit) {
-          currentVolume = buf[pos++];
+          _currentVolume = buf[pos++];
         }
         break;
       case CMD_NOTE_LEN:
