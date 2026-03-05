@@ -59,10 +59,7 @@ export function isHESFormat(buffer: ArrayBuffer): boolean {
 }
 
 export function parseHESFile(buffer: ArrayBuffer, filename?: string): TrackerSong {
-  const buf = new Uint8Array(buffer);
   if (!isHESFormat(buffer)) throw new Error('Not a valid HES file');
-
-  const dv        = new DataView(buffer);
 
   const numCh = 6;
   const instruments = buildPCEInstruments();

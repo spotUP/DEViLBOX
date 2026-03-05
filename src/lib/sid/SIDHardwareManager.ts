@@ -16,8 +16,6 @@ import {
   USBSIDPicoDevice,
   ClockRate,
   type ClockRateValue,
-  type USBSIDState,
-  type USBSIDDeviceInfo,
 } from './USBSIDPico';
 
 export type SIDHardwareMode = 'off' | 'asid' | 'webusb';

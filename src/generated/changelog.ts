@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-03-05T20:10:22.598Z
+ * Generated: 2026-03-05T20:50:38.645Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.2402';
-export const BUILD_NUMBER = '2402';
-export const BUILD_HASH = 'd181d4af';
+export const BUILD_VERSION = '1.0.2409';
+export const BUILD_NUMBER = '2409';
+export const BUILD_HASH = 'e82ec102';
 export const BUILD_DATE = '2026-03-05';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,37 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.2402',
+    version: '1.0.2409',
     date: '2026-03-05',
     changes: [
+      {
+        type: 'feature',
+        "description": "Add SC tracker integration: knob panels, channel badges"
+      },
+      {
+        type: 'feature',
+        "description": "Live Furnace register writes from instrument editor"
+      },
+      {
+        type: 'improvement',
+        "description": "Split SC editor into Script/Controls tabs for DOM and Pixi UIs"
+      },
+      {
+        type: 'improvement',
+        "description": "Chore: uncommitted editor and loader improvements"
+      },
+      {
+        type: 'feature',
+        "description": "Complete USB-SID-Pico integration"
+      },
+      {
+        type: 'feature',
+        "description": "Add SC preset search, two-way GUI sync, routine pattern generation, and preset caching"
+      },
+      {
+        type: 'feature',
+        "description": "SoundMon waveform gen, MDX/PMD advanced effects, GT keyboard nav, SC preset search"
+      },
       {
         type: 'feature',
         "description": "Add 109 community SC SynthDef presets with browser UI"
@@ -200,34 +228,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'improvement',
         "description": "Rename skill to 'Transpile and Debug 68k Replayer Waveform Mismatch'"
-      },
-      {
-        type: 'feature',
-        "description": "Tools: add Puppeteer FPS profiler script"
-      },
-      {
-        type: 'fix',
-        "description": "Jamcracker: add debug render and comparison tools"
-      },
-      {
-        type: 'fix',
-        "description": "Jamcracker: rebuild WASM with bug fixes #7-10"
-      },
-      {
-        type: 'fix',
-        "description": "Fix SID speed detection: analyze note changes, not all register changes"
-      },
-      {
-        type: 'fix',
-        "description": "Fix SuperCollider silence: run scsynth on main thread"
-      },
-      {
-        type: 'fix',
-        "description": "JamCracker: fix bugs #7-10 in transpiled replayer"
-      },
-      {
-        type: 'improvement',
-        "description": "SID parser: multi-pattern splitting, speed/BPM detection, IndexedDB cache"
       }
     ]
   }
