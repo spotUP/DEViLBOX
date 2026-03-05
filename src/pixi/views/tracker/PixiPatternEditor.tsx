@@ -848,6 +848,7 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
   const prevRowRef = useRef(-1);
   const prevPatternRef = useRef(-1);
   const imperativeRedrawRef = useRef<(() => void) | null>(null);
+  const cachedRowDurRef = useRef(0);     // cached row duration — stable for entire row
 
   // ── MegaText — single Graphics object for all pattern text ───────────────
   useEffect(() => {
@@ -942,12 +943,18 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
         newPattern = audioState.pattern;
         newOffset = 0;
         if (smoothScrolling) {
-          const bpm = useTransportStore.getState().bpm;
-          const speed = useTransportStore.getState().speed;
-          const nextState = replayer.getStateAtTime(audioTime + 0.5, true);
-          const dur = (nextState && nextState.row !== audioState.row)
-            ? nextState.time - audioState.time
-            : (2.5 / bpm) * speed;
+          // Cache row duration on row change to prevent frame-to-frame fluctuation.
+          // The peek-ahead can return different future states each frame, causing dur
+          // to oscillate — which, combined with roundPixels, produces visible jitter.
+          if (newRow !== prevRowRef.current || newPattern !== prevPatternRef.current) {
+            const bpm = useTransportStore.getState().bpm;
+            const speed = useTransportStore.getState().speed;
+            const nextState = replayer.getStateAtTime(audioTime + 0.5, true);
+            cachedRowDurRef.current = (nextState && nextState.row !== audioState.row)
+              ? nextState.time - audioState.time
+              : (2.5 / bpm) * speed;
+          }
+          const dur = cachedRowDurRef.current || 0.125; // fallback if not yet set
           const progress = Math.min(Math.max((audioTime - audioState.time) / dur, 0), 1);
           newOffset = progress * rowHeightRef.current;
         }
