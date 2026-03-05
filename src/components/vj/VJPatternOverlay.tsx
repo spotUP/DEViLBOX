@@ -175,7 +175,7 @@ export const VJPatternOverlay: React.FC = React.memo(() => {
       const rx = orbitX + bassTilt + anim.tiltKickX;
       const ry = orbitY + anim.tiltKickY + shimmerZ;
       // Scale: subtle bass breathing
-      const scale = 1.2 + anim.bassAccum * 0.06 + anim.beatFlash * 0.03;
+      const scale = 1.4 + anim.bassAccum * 0.06 + anim.beatFlash * 0.03;
       // Position drift
       const driftX = Math.sin(t * 0.09) * 15 + Math.cos(t * 0.23) * 10;
       const driftY = Math.sin(t * 0.14) * 8 + anim.bounceY;
