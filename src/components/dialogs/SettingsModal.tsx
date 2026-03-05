@@ -114,6 +114,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
     setAsidDeviceId,
     asidDeviceAddress,
     setAsidDeviceAddress,
+    sidHardwareMode,
+    setSidHardwareMode,
+    webusbClockRate,
+    setWebusbClockRate,
+    webusbStereo,
+    setWebusbStereo,
   } = useSettingsStore();
 
   const { sampleBusGain, setSampleBusGain, synthBusGain, setSynthBusGain, autoGain, setAutoGain } = useAudioStore();
@@ -135,6 +141,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
   // ASID device management
   const [asidDevices, setAsidDevices] = useState<Array<{ id: string; name: string }>>([]);
   const [asidSupported, setAsidSupported] = useState(false);
+  const [webusbSupported] = useState(() => typeof navigator !== 'undefined' && 'usb' in navigator);
+  const [webusbConnected, setWebusbConnected] = useState(false);
+  const [webusbDeviceName, setWebusbDeviceName] = useState<string | null>(null);
 
   useEffect(() => {
     const handleFullscreenChange = () => {
@@ -1014,57 +1023,146 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
               </div>
             </div>
             
-            {/* ASID Hardware Support */}
+            {/* SID Hardware Output */}
             <div className="mb-4">
               <h3 className="text-ft2-text text-xs font-bold mb-2 tracking-wide flex items-center gap-2">
                 <Usb size={14} className="text-ft2-highlight" />
-                ASID HARDWARE OUTPUT
+                SID HARDWARE OUTPUT
               </h3>
               <p className="text-ft2-textDim text-[9px] font-mono mb-2 leading-relaxed">
-                Route SID playback to real hardware (USB-SID-Pico, TherapSID) via MIDI for authentic
-                MOS 6581/8580 sound. Requires ASID-compatible device connected via USB.
+                Route SID playback to real MOS 6581/8580 chips via USB-SID-Pico or TherapSID hardware.
               </p>
-              
-              {!asidSupported ? (
-                <div className="p-3 bg-ft2-bg/50 border border-ft2-border/50 rounded">
-                  <div className="text-ft2-textDim text-[9px] font-mono">
-                    <span className="text-accent-error">❌ Not Supported</span>
-                    <p className="mt-1">
-                      Web MIDI API not available in this browser. ASID hardware support requires
-                      Chrome, Edge, or Opera. Firefox and Safari do not support Web MIDI.
-                    </p>
-                  </div>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {/* Enable ASID Toggle */}
-                  <label className="block p-2 border cursor-pointer transition-colors bg-transparent border-ft2-border hover:bg-ft2-rowEven/50">
-                    <div className="flex items-center gap-2">
-                      <Toggle
-                        label=""
-                        value={asidEnabled}
-                        onChange={(enabled) => {
-                          setAsidEnabled(enabled);
-                          if (enabled && asidDevices.length === 1) {
-                            setAsidDeviceId(asidDevices[0].id);
-                            getASIDDeviceManager().selectDevice(asidDevices[0].id);
-                          }
-                        }}
-                        size="sm"
-                      />
-                      <div className="flex-1">
-                        <span className="text-ft2-text text-[10px] font-mono font-bold">
-                          Enable ASID Hardware Output
-                        </span>
-                        <div className="text-ft2-textDim text-[9px] font-mono mt-0.5">
-                          {asidEnabled ? 'SID writes sent to hardware' : 'Software emulation only'}
-                        </div>
+
+              {/* Transport Mode Selection */}
+              <div className="flex flex-col gap-1 mb-2">
+                <label className="text-ft2-text text-[9px] font-mono">Transport:</label>
+                <select
+                  value={sidHardwareMode}
+                  onChange={(e) => {
+                    const mode = e.target.value as 'off' | 'asid' | 'webusb';
+                    setSidHardwareMode(mode);
+                    setAsidEnabled(mode === 'asid');
+                  }}
+                  className="bg-ft2-bg border border-ft2-border text-ft2-text text-[10px] font-mono px-2 py-1 focus:outline-none focus:border-ft2-highlight"
+                >
+                  <option value="off">Off — Software Only</option>
+                  <option value="webusb">WebUSB — Direct USB (recommended)</option>
+                  <option value="asid">ASID — MIDI SysEx (legacy)</option>
+                </select>
+              </div>
+
+              {/* WebUSB Mode */}
+              {sidHardwareMode === 'webusb' && (
+                <div className="pl-2 space-y-2">
+                  {!webusbSupported ? (
+                    <div className="p-3 bg-ft2-bg/50 border border-ft2-border/50 rounded">
+                      <div className="text-ft2-textDim text-[9px] font-mono">
+                        <span className="text-accent-error">WebUSB Not Supported</span>
+                        <p className="mt-1">
+                          WebUSB requires Chrome, Edge, or Opera. Firefox and Safari do not support WebUSB.
+                        </p>
                       </div>
                     </div>
-                  </label>
-                  
-                  {/* Device Selection */}
-                  {asidEnabled && (
+                  ) : (
+                    <>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={async () => {
+                            const { getSIDHardwareManager } = await import('@lib/sid/SIDHardwareManager');
+                            const mgr = getSIDHardwareManager();
+                            if (webusbConnected) {
+                              await mgr.deactivate();
+                              setSidHardwareMode('off');
+                              setWebusbConnected(false);
+                              setWebusbDeviceName(null);
+                            } else {
+                              const ok = await mgr.connectWebUSB();
+                              setWebusbConnected(ok);
+                              if (ok) setWebusbDeviceName(mgr.getStatus().deviceName);
+                            }
+                          }}
+                          className={`px-3 py-1 text-[10px] font-mono font-bold border ${
+                            webusbConnected
+                              ? 'border-accent-error text-accent-error hover:bg-accent-error/10'
+                              : 'border-ft2-highlight text-ft2-highlight hover:bg-ft2-highlight/10'
+                          }`}
+                        >
+                          {webusbConnected ? 'Disconnect' : 'Connect USB-SID-Pico'}
+                        </button>
+                        {webusbConnected && webusbDeviceName && (
+                          <span className="text-ft2-highlight text-[9px] font-mono">
+                            Connected: {webusbDeviceName}
+                          </span>
+                        )}
+                      </div>
+
+                      {webusbConnected && (
+                        <>
+                          <div className="flex flex-col gap-1">
+                            <label className="text-ft2-text text-[9px] font-mono">Clock Rate:</label>
+                            <select
+                              value={webusbClockRate}
+                              onChange={async (e) => {
+                                const rate = parseInt(e.target.value, 10);
+                                setWebusbClockRate(rate);
+                                const { getSIDHardwareManager } = await import('@lib/sid/SIDHardwareManager');
+                                getSIDHardwareManager().setClock(rate);
+                              }}
+                              className="bg-ft2-bg border border-ft2-border text-ft2-text text-[10px] font-mono px-2 py-1 w-48 focus:outline-none focus:border-ft2-highlight"
+                            >
+                              <option value={1}>PAL (985248 Hz)</option>
+                              <option value={2}>NTSC (1022727 Hz)</option>
+                              <option value={3}>DREAN (1023440 Hz)</option>
+                              <option value={0}>Default (1000000 Hz)</option>
+                            </select>
+                          </div>
+
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={webusbStereo}
+                              onChange={async (e) => {
+                                const stereo = e.target.checked;
+                                setWebusbStereo(stereo);
+                                const { getSIDHardwareManager } = await import('@lib/sid/SIDHardwareManager');
+                                getSIDHardwareManager().setAudioMode(stereo);
+                              }}
+                              className="accent-ft2-highlight"
+                            />
+                            <span className="text-ft2-text text-[10px] font-mono">
+                              Stereo output (v1.3+ boards only)
+                            </span>
+                          </label>
+                        </>
+                      )}
+
+                      <div className="text-ft2-textDim text-[8px] font-mono leading-tight bg-ft2-bg/30 rounded p-2">
+                        <p className="font-bold mb-1">About WebUSB:</p>
+                        <p>
+                          Direct USB connection with cycle-exact timing. Register writes include C64 clock cycle
+                          counts so the Pico firmware replays with accurate timing — critical for digi samples,
+                          filter sweeps, and multiplexed effects.
+                        </p>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+
+              {/* ASID Mode */}
+              {sidHardwareMode === 'asid' && (
+                <>
+                  {!asidSupported ? (
+                    <div className="p-3 bg-ft2-bg/50 border border-ft2-border/50 rounded">
+                      <div className="text-ft2-textDim text-[9px] font-mono">
+                        <span className="text-accent-error">Not Supported</span>
+                        <p className="mt-1">
+                          Web MIDI API not available in this browser. ASID hardware support requires
+                          Chrome, Edge, or Opera. Firefox and Safari do not support Web MIDI.
+                        </p>
+                      </div>
+                    </div>
+                  ) : (
                     <div className="pl-2 space-y-2">
                       <div className="flex flex-col gap-1">
                         <label className="text-ft2-text text-[9px] font-mono">MIDI Device:</label>
@@ -1091,7 +1189,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                           )}
                         </select>
                       </div>
-                      
+
                       {asidDevices.length === 0 && (
                         <div className="text-ft2-textDim text-[8px] font-mono leading-tight bg-ft2-bg/30 rounded p-2">
                           <p className="font-bold mb-1">No ASID devices detected.</p>
@@ -1103,8 +1201,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                           </ol>
                         </div>
                       )}
-                      
-                      {/* Device Address */}
+
                       <div className="flex flex-col gap-1">
                         <label className="text-ft2-text text-[9px] font-mono">Device Address:</label>
                         <div className="flex items-center gap-2">
@@ -1123,18 +1220,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                             <span className="text-ft2-highlight text-[9px] font-mono">Default</span>
                           )}
                         </div>
-                        <div className="text-ft2-textDim text-[8px] font-mono">
-                          USB-SID-Pico default: 0x4D (77)
-                        </div>
                       </div>
-                      
-                      {/* Info Box */}
+
                       <div className="text-ft2-textDim text-[8px] font-mono leading-tight bg-ft2-bg/30 rounded p-2">
                         <p className="font-bold mb-1">About ASID:</p>
                         <p>
-                          ASID (Audio over Serial Interface Device) protocol sends SID register writes
-                          via MIDI SysEx to real hardware. Only jsSID engine supports ASID — other engines
-                          will fall back to software emulation.
+                          ASID sends SID register writes via MIDI SysEx. No timing info — writes arrive
+                          as fast as possible. Only jsSID engine supports ASID.
                         </p>
                         <p className="mt-1">
                           Learn more: <a href="https://github.com/LouDnl/USBSID-Pico" target="_blank" rel="noopener noreferrer" className="text-ft2-highlight underline">USB-SID-Pico GitHub</a>
@@ -1142,7 +1234,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                       </div>
                     </div>
                   )}
-                </div>
+                </>
               )}
             </div>
             
