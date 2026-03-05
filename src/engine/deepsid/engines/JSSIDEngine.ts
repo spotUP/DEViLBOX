@@ -6,11 +6,13 @@
  * Features:
  * - No WASM required
  * - ASID hardware support (Web MIDI)
+ * - WebUSB hardware support (USB-SID-Pico, cycle-exact)
  * - OPL/FM chip support (SFX Sound Expander, FM-YAM)
- * - Multi-SID support (2SID/3SID)
+ * - Multi-SID support (2SID/3SID/4SID)
  */
 
 import { getASIDDeviceManager } from '@lib/sid/ASIDDeviceManager';
+import { getUSBSIDPico } from '@lib/sid/USBSIDPico';
 import { useSettingsStore } from '@stores/useSettingsStore';
 
 export interface JSSIDConfig {
@@ -41,6 +43,7 @@ export class JSSIDEngine {
   private subsong = 0;
   private numSubsongs = 1;
   private asidEnabled = false;
+  private webusbEnabled = false;
   private blobUrl: string | null = null;
 
   constructor(sidData: Uint8Array, config: JSSIDConfig = {}) {
@@ -52,15 +55,29 @@ export class JSSIDEngine {
    * Initialize the engine
    */
   async init(module: any): Promise<void> {
-    // Check if ASID hardware is enabled in settings
     const settings = useSettingsStore.getState();
-    const asidEnabled = settings.asidEnabled && this.config.enableASID !== false;
-    
-    // If ASID is enabled, set up MIDI output
-    if (asidEnabled) {
+    const hwMode = settings.sidHardwareMode;
+
+    // WebUSB mode: connect USB-SID-Pico directly
+    if (hwMode === 'webusb') {
+      const pico = getUSBSIDPico();
+      if (pico.isConnected || await pico.reconnect()) {
+        // Bridge our USBSIDPicoDevice to jsSID's global webusb object
+        this.setupWebusbBridge(pico);
+        this.webusbEnabled = true;
+        // Apply clock rate setting
+        const clockRate = settings.webusbClockRate;
+        if (clockRate >= 0 && clockRate <= 3) pico.setClock(clockRate);
+        console.log('[jsSID] WebUSB hardware enabled:', pico.deviceInfo?.productName);
+      } else {
+        console.warn('[jsSID] WebUSB enabled but device not connected, falling back to software');
+      }
+    }
+
+    // ASID mode: set up MIDI output (legacy path)
+    if (hwMode === 'asid' && !this.webusbEnabled) {
       const asidManager = getASIDDeviceManager();
       await asidManager.init();
-      
       const port = asidManager.getSelectedPort();
       if (port) {
         (window as any).selectedMidiOutput = port;
@@ -71,23 +88,58 @@ export class JSSIDEngine {
       }
     }
     
-    // Create jsSID instance — it creates its own AudioContext internally
+    // Create jsSID instance — 4th param enables WebUSB mode in jsSID
     this.jsSID = new module.jsSID(
       this.config.bufferSize || 16384,
       0.0005,
       this.asidEnabled,
-      false
+      this.webusbEnabled
     );
 
-    // Load SID data via blob URL (jsSID.loadinit uses XHR internally)
+    // Load SID data
     await this.loadSIDData();
 
+    const hwStatus = this.webusbEnabled ? 'WebUSB' : this.asidEnabled ? 'ASID' : 'software';
     console.log('[jsSID] Initialized:', {
       title: this.jsSID.gettitle(),
       author: this.jsSID.getauthor(),
       subsongs: this.numSubsongs,
-      asid: this.asidEnabled ? 'ENABLED' : 'disabled',
+      hardware: hwStatus,
     });
+  }
+
+  /**
+   * Bridge our USBSIDPicoDevice to jsSID's global `webusb` object.
+   * jsSID calls `webusb.writeReg([cmd, addr, value])` for each SID write.
+   * We route those to our device which handles USB bulk transfers.
+   */
+  private setupWebusbBridge(pico: InstanceType<typeof import('@lib/sid/USBSIDPico').USBSIDPicoDevice>): void {
+    const win = window as any;
+
+    // jsSID expects a global `webusb` object with writeReg, connect, autoConnect, etc.
+    if (!win.webusb) win.webusb = {};
+
+    // Core write method — jsSID calls this for every SID register write
+    win.webusb.writeReg = (array: number[]) => {
+      if (!pico.isConnected || array.length < 3) return;
+      // array = [cmd_byte, chip_addr | reg, value]
+      // cmd_byte is typically 0x00 (WRITE)
+      // chip_addr = (chip * 0x20) | reg — already calculated by jsSID
+      const addr = array[1];
+      const value = array[2];
+      const chip = (addr >> 5) & 3;
+      const reg = addr & 0x1F;
+      pico.write(chip, reg, value);
+    };
+
+    // autoConnect — jsSID calls this during init if savedport exists
+    win.webusb.autoConnect = () => {
+      // Already connected via our device manager — no-op
+      console.log('[jsSID WebUSB] autoConnect bridged (already connected)');
+    };
+
+    // Mark WebUSB as "connected" for jsSID's internal checks
+    win.webusbconnected = true;
   }
 
   /**
@@ -315,14 +367,26 @@ export class JSSIDEngine {
     if (this.asidEnabled) {
       (window as any).selectedMidiOutput = null;
     }
+
+    if (this.webusbEnabled) {
+      // Flush any remaining buffered writes
+      getUSBSIDPico().flush();
+    }
     
     this.jsSID = null;
   }
   
   /**
-   * Check if ASID hardware is currently active
+   * Check if hardware output is currently active (ASID or WebUSB)
    */
   isASIDActive(): boolean {
-    return this.asidEnabled;
+    return this.asidEnabled || this.webusbEnabled;
+  }
+
+  /**
+   * Check if WebUSB hardware is currently active
+   */
+  isWebusbActive(): boolean {
+    return this.webusbEnabled;
   }
 }

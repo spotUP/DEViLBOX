@@ -206,6 +206,12 @@ export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, on
   const setAsidDeviceId = useSettingsStore((s) => s.setAsidDeviceId);
   const asidDeviceAddress = useSettingsStore((s) => s.asidDeviceAddress);
   const setAsidDeviceAddress = useSettingsStore((s) => s.setAsidDeviceAddress);
+  const sidHardwareMode = useSettingsStore((s) => s.sidHardwareMode);
+  const setSidHardwareMode = useSettingsStore((s) => s.setSidHardwareMode);
+  const webusbClockRate = useSettingsStore((s) => s.webusbClockRate);
+  const setWebusbClockRate = useSettingsStore((s) => s.setWebusbClockRate);
+  const webusbStereo = useSettingsStore((s) => s.webusbStereo);
+  const setWebusbStereo = useSettingsStore((s) => s.setWebusbStereo);
 
   const sampleBusGain = useAudioStore((s) => s.sampleBusGain);
   const setSampleBusGain = useAudioStore((s) => s.setSampleBusGain);
@@ -234,6 +240,9 @@ export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, on
   const [isFullscreen, setIsFullscreen] = useState(!!document.fullscreenElement);
   const [asidDevices, setAsidDevices] = useState<Array<{ id: string; name: string }>>([]);
   const [asidSupported, setAsidSupported] = useState(false);
+  const [webusbSupported] = useState(() => typeof navigator !== 'undefined' && 'usb' in navigator);
+  const [webusbConnected, setWebusbConnected] = useState(false);
+  const [webusbDeviceName, setWebusbDeviceName] = useState<string | null>(null);
 
   // Fullscreen change listener
   useEffect(() => {
@@ -927,36 +936,120 @@ export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, on
             );
           })}
 
-          {/* ═══════ ASID HARDWARE ═══════ */}
-          <SectionHeader text="ASID HARDWARE OUTPUT" />
+          {/* ═══════ SID HARDWARE OUTPUT ═══════ */}
+          <SectionHeader text="SID HARDWARE OUTPUT" />
 
           <Txt className="text-[9px] font-mono text-text-muted" layout={{ width: CONTENT_W }}>
-            {'Route SID playback to real hardware (USB-SID-Pico, TherapSID) via MIDI for authentic MOS 6581/8580 sound.'}
+            {'Route SID playback to real MOS 6581/8580 chips via USB-SID-Pico or TherapSID hardware.'}
           </Txt>
 
-          {!asidSupported ? (
-            <Div className="flex-col gap-1" layout={{ width: CONTENT_W, paddingLeft: 8, paddingRight: 8, paddingTop: 6, paddingBottom: 6, borderWidth: 1, borderColor: theme.border.color, borderRadius: 2 }}>
-              <Txt className="text-[10px] font-mono text-accent-error">Not Supported</Txt>
-              <Txt className="text-[9px] font-mono text-text-muted">
-                {'Web MIDI API not available in this browser. ASID hardware support requires Chrome, Edge, or Opera.'}
-              </Txt>
-            </Div>
-          ) : (
-            <>
-              <SettingRow label="Enable ASID:" description="Route SID to real hardware via MIDI">
-                <PixiCheckbox
-                  checked={asidEnabled}
-                  onChange={(enabled) => {
-                    setAsidEnabled(enabled);
-                    if (enabled && asidDevices.length === 1) {
-                      setAsidDeviceId(asidDevices[0].id);
-                      getASIDDeviceManager().selectDevice(asidDevices[0].id);
-                    }
-                  }}
-                />
-              </SettingRow>
+          <SettingRow label="Transport:" description="WebUSB is recommended (cycle-exact, lower latency)">
+            <PixiSelect
+              options={[
+                { value: 'off', label: 'Off — Software Only' },
+                { value: 'webusb', label: 'WebUSB — Direct USB (recommended)' },
+                { value: 'asid', label: 'ASID — MIDI SysEx (legacy)' },
+              ]}
+              value={sidHardwareMode}
+              onChange={(v) => {
+                const mode = (v || 'off') as 'off' | 'asid' | 'webusb';
+                setSidHardwareMode(mode);
+                setAsidEnabled(mode === 'asid');
+              }}
+              width={260}
+            />
+          </SettingRow>
 
-              {asidEnabled && (
+          {sidHardwareMode === 'webusb' && (
+            <>
+              {!webusbSupported ? (
+                <Div className="flex-col gap-1" layout={{ width: CONTENT_W, paddingLeft: 8, paddingRight: 8, paddingTop: 6, paddingBottom: 6, borderWidth: 1, borderColor: theme.border.color, borderRadius: 2 }}>
+                  <Txt className="text-[10px] font-mono text-accent-error">WebUSB Not Supported</Txt>
+                  <Txt className="text-[9px] font-mono text-text-muted">
+                    {'WebUSB requires Chrome, Edge, or Opera. Firefox and Safari do not support WebUSB.'}
+                  </Txt>
+                </Div>
+              ) : (
+                <>
+                  <SettingRow label="Device:" description={webusbConnected ? `Connected: ${webusbDeviceName}` : 'Click Connect to pair device'}>
+                    <PixiButton
+                      label={webusbConnected ? 'Disconnect' : 'Connect USB-SID-Pico'}
+                      variant={webusbConnected ? 'danger' : 'primary'}
+                      onClick={async () => {
+                        const { getSIDHardwareManager } = await import('@lib/sid/SIDHardwareManager');
+                        const mgr = getSIDHardwareManager();
+                        if (webusbConnected) {
+                          await mgr.deactivate();
+                          setSidHardwareMode('off');
+                          setWebusbConnected(false);
+                          setWebusbDeviceName(null);
+                        } else {
+                          const ok = await mgr.connectWebUSB();
+                          setWebusbConnected(ok);
+                          if (ok) {
+                            setWebusbDeviceName(mgr.getStatus().deviceName);
+                          }
+                        }
+                      }}
+                    />
+                  </SettingRow>
+
+                  {webusbConnected && (
+                    <>
+                      <SettingRow label="Clock Rate:" description="Match your SID chip region">
+                        <PixiSelect
+                          options={[
+                            { value: '1', label: 'PAL (985248 Hz)' },
+                            { value: '2', label: 'NTSC (1022727 Hz)' },
+                            { value: '3', label: 'DREAN (1023440 Hz)' },
+                            { value: '0', label: 'Default (1000000 Hz)' },
+                          ]}
+                          value={String(webusbClockRate)}
+                          onChange={async (v) => {
+                            const rate = parseInt(v || '1', 10);
+                            setWebusbClockRate(rate);
+                            const { getSIDHardwareManager } = await import('@lib/sid/SIDHardwareManager');
+                            getSIDHardwareManager().setClock(rate);
+                          }}
+                          width={200}
+                        />
+                      </SettingRow>
+
+                      <SettingRow label="Audio Output:" description="Stereo requires v1.3+ board">
+                        <PixiCheckbox
+                          checked={webusbStereo}
+                          onChange={async (stereo) => {
+                            setWebusbStereo(stereo);
+                            const { getSIDHardwareManager } = await import('@lib/sid/SIDHardwareManager');
+                            getSIDHardwareManager().setAudioMode(stereo);
+                          }}
+                          label={webusbStereo ? 'Stereo' : 'Mono'}
+                        />
+                      </SettingRow>
+                    </>
+                  )}
+
+                  <Div className="flex-col gap-1" layout={{ width: CONTENT_W, paddingLeft: 8, paddingRight: 8, paddingTop: 6, paddingBottom: 6, borderWidth: 1, borderColor: theme.border.color, borderRadius: 2 }}>
+                    <Txt className="text-[9px] font-bold font-mono text-text-primary">About WebUSB:</Txt>
+                    <Txt className="text-[8px] font-mono text-text-muted">
+                      {'Direct USB connection with cycle-exact timing. Register writes include C64 clock cycle counts so the Pico firmware replays with accurate timing — critical for digi samples, filter sweeps, and multiplexed effects.'}
+                    </Txt>
+                  </Div>
+                </>
+              )}
+            </>
+          )}
+
+          {sidHardwareMode === 'asid' && (
+            <>
+              {!asidSupported ? (
+                <Div className="flex-col gap-1" layout={{ width: CONTENT_W, paddingLeft: 8, paddingRight: 8, paddingTop: 6, paddingBottom: 6, borderWidth: 1, borderColor: theme.border.color, borderRadius: 2 }}>
+                  <Txt className="text-[10px] font-mono text-accent-error">Not Supported</Txt>
+                  <Txt className="text-[9px] font-mono text-text-muted">
+                    {'Web MIDI API not available in this browser. ASID hardware support requires Chrome, Edge, or Opera.'}
+                  </Txt>
+                </Div>
+              ) : (
                 <>
                   <SettingRow label="MIDI Device:">
                     <PixiSelect
@@ -1000,7 +1093,7 @@ export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, on
                   <Div className="flex-col gap-1" layout={{ width: CONTENT_W, paddingLeft: 8, paddingRight: 8, paddingTop: 6, paddingBottom: 6, borderWidth: 1, borderColor: theme.border.color, borderRadius: 2 }}>
                     <Txt className="text-[9px] font-bold font-mono text-text-primary">About ASID:</Txt>
                     <Txt className="text-[8px] font-mono text-text-muted">
-                      {'ASID sends SID register writes via MIDI SysEx to real hardware. Only jsSID engine supports ASID — other engines fall back to software emulation.'}
+                      {'ASID sends SID register writes via MIDI SysEx. No timing info — writes arrive as fast as possible. Works with any MIDI-connected SID hardware. Only jsSID engine supports ASID.'}
                     </Txt>
                   </Div>
                 </>
