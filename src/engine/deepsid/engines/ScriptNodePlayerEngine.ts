@@ -366,10 +366,12 @@ export class ScriptNodePlayerEngine {
    */
   dispose(): void {
     this.stop();
-    // Call WASM teardown to reset emulator state for reuse
-    if (this.adapter) {
+    // Call WASM _emu_teardown to reset emulator state for reuse.
+    // The spp_backend_state_* globals ARE the Emscripten Modules.
+    const stateKey = MODULE_STATE_MAP[this.engineType];
+    if (stateKey) {
       try {
-        const mod = (this.adapter as any).Module;
+        const mod = (window as any)[stateKey];
         if (mod?._emu_teardown) mod._emu_teardown();
       } catch { /* ignore */ }
     }

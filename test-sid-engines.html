@@ -213,15 +213,14 @@ async function testScriptNodePlayer(engineId) {
     try {
       if (window.player._tickerNode) window.player._tickerNode.disconnect(0);
     } catch(e) {}
-    // Call WASM teardown for backends that need it
-    try {
-      if (window.player._backendAdapter && window.player._backendAdapter.Module) {
-        const mod = window.player._backendAdapter.Module;
-        if (mod._emu_teardown) mod._emu_teardown();
-      }
-    } catch(e) {}
     window.player = undefined;
   }
+
+  // Call _emu_teardown on ALL WASM backend modules to reset emulator state.
+  // The spp_backend_state_* globals ARE the Emscripten Modules (passed as Module param to IIFE).
+  ['spp_backend_state_SID', 'spp_backend_state_SIDPlay'].forEach(key => {
+    try { if (window[key] && window[key]._emu_teardown) window[key]._emu_teardown(); } catch(e) {}
+  });
 
   log(engineId, 'Loading scriptprocessor_player.min.js...');
   await loadScript('/deepsid/scriptprocessor_player.min.js');
@@ -393,22 +392,21 @@ async function testJSIDPlay2() {
   };
   scriptNode.connect(audioCtx.destination);
 
-  // Pre-buffer: fire a burst of CLOCKs to fill ring buffer
-  log(id, 'Pre-buffering samples...');
-  for (let i = 0; i < 60; i++) {
+  // Start audio immediately — ScriptProcessor outputs silence until buffer fills
+  log(id, 'Starting audio and clock loop...');
+  
+  // Fire burst of CLOCKs and start the steady-state interval simultaneously
+  for (let i = 0; i < 30; i++) {
     worker.postMessage({ eventType: 'CLOCK', eventData: {} });
   }
-  // Brief wait for pre-buffer to fill
-  await new Promise(r => setTimeout(r, 300));
-  log(id, `Pre-buffered ${samplesReceived} sample chunks`, 'ok');
 
-  // Drive CLOCK loop for 3 seconds — fire-and-forget at ~4ms interval
-  log(id, 'Playing for 3 seconds...');
-  let clockCount = 0;
+  let clockCount = 30;
   const clockInterval = setInterval(() => {
     worker.postMessage({ eventType: 'CLOCK', eventData: {} });
     clockCount++;
   }, 4);
+
+  log(id, 'Playing for 3 seconds...');
 
   // Wait 3 seconds
   await new Promise(r => setTimeout(r, 3000));
