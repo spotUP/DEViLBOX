@@ -454,7 +454,7 @@ export function parseFuturePlayerFile(buffer: ArrayBuffer, filename: string): Tr
     const typeLabel = meta.isWavetable ? 'Synth' : 'Sample';
     const sizeLabel = meta.sampleSize > 0 ? ` (${meta.sampleSize}B)` : '';
     instruments.push({
-      id: `fp-instr-${id}`,
+      id,
       name: `${typeLabel} ${id}${sizeLabel}`,
       type: 'synth' as const,
       synthType: 'FuturePlayerSynth' as const,
@@ -468,7 +468,7 @@ export function parseFuturePlayerFile(buffer: ArrayBuffer, filename: string): Tr
   // If no instruments found, add a default one
   if (instruments.length === 0) {
     instruments.push({
-      id: 'fp-synth-0',
+      id: 1,
       name: 'Future Player',
       type: 'synth' as const,
       synthType: 'FuturePlayerSynth' as const,
