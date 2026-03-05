@@ -198,15 +198,31 @@ export const VJPatternOverlay: React.FC = React.memo(() => {
 
       // ── Draw pattern ──────────────────────────────────────────────────
       ctx.clearRect(0, 0, canvasW, CANVAS_H);
-      ctx.save();
-      ctx.translate(0, -anim.scrollOffset);
 
       const rowNumW = ROW_NUM_W;
       const cellW = CELL_W;
       const baseHue = (bandHue(frame) + anim.hueShift) % 360;
-
       const letterSpacing = anim.bassAccum * 1.5;
       ctx.textBaseline = 'middle';
+
+      // ── Current-row highlight bar (fixed position, no scroll) ────────
+      const barY = ROW_H + VISIBLE_ROWS * ROW_H;
+      if (isPlaying) {
+        const flashBright = 0.4 + anim.beatFlash * 0.5;
+        ctx.fillStyle = hsl(baseHue, 70, 55, flashBright);
+        ctx.fillRect(0, barY, canvasW, ROW_H);
+        if (anim.beatFlash > 0.05) {
+          ctx.fillStyle = hsl(baseHue, 90, 80, anim.beatFlash * 0.4);
+          ctx.fillRect(0, barY, canvasW, ROW_H);
+        }
+      } else {
+        ctx.fillStyle = 'rgba(255,255,255,0.1)';
+        ctx.fillRect(0, barY, canvasW, ROW_H);
+      }
+
+      // ── Scrolled content ────────────────────────────────────────────
+      ctx.save();
+      ctx.translate(0, -anim.scrollOffset);
 
       // Channel headers
       ctx.font = '11px "Berkeley Mono", "JetBrains Mono", "Fira Code", monospace';
@@ -236,19 +252,6 @@ export const VJPatternOverlay: React.FC = React.memo(() => {
         const dist = Math.abs(i) / VISIBLE_ROWS;
         const shimmer = 0.5 + 0.5 * Math.sin(t * 3 + i * 0.4);
         const depthAlpha = (1 - dist * 0.5) * (0.9 + shimmer * 0.1);
-
-        if (isCurrent) {
-          const flashBright = 0.4 + anim.beatFlash * 0.5;
-          ctx.fillStyle = isPlaying
-            ? hsl(baseHue, 70, 55, flashBright)
-            : 'rgba(255,255,255,0.1)';
-          ctx.fillRect(0, y, canvasW, ROW_H);
-
-          if (anim.beatFlash > 0.05) {
-            ctx.fillStyle = hsl(baseHue, 90, 80, anim.beatFlash * 0.4);
-            ctx.fillRect(0, y, canvasW, ROW_H);
-          }
-        }
 
         const rnAlpha = isCurrent ? 1.0 : 0.45 * depthAlpha;
         ctx.fillStyle = isCurrent
