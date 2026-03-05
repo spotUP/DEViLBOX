@@ -326,6 +326,14 @@ export function useModuleImport() {
       setSpeed(song.initialSpeed);
       setMetadata({ name: song.name, author: '', description: `Imported from ${info.file?.name || 'module'}` });
       useTrackerStore.getState().applyEditorMode(song);
+      // For SID files using GT Ultra view, populate GT Ultra store with metadata
+      if (song.c64SidFileData && useTrackerStore.getState().editorMode === 'goattracker') {
+        const gtStore = (await import('@/stores/useGTUltraStore')).useGTUltraStore.getState();
+        const parts = song.name.split(' — ');
+        gtStore.setSongName(parts[0] || song.name);
+        if (parts[1]) gtStore.setSongAuthor(parts[1]);
+        gtStore.setSidCount(song.numChannels > 3 ? 2 : 1);
+      }
       const samplerCount = song.instruments.filter(i => i.synthType === 'Sampler').length;
       if (samplerCount > 0) {
         await getToneEngine().preloadInstruments(song.instruments);
