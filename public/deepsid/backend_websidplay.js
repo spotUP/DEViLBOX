@@ -438,3 +438,6 @@ class SIDPlayBackendAdapter extends EmsHEAP16BackendAdapter {
 		console.log(text);
 	}
 };
+
+// Expose adapter class on window for dynamic lookup by ScriptNodePlayerEngine
+window.SIDPlayBackendAdapter = SIDPlayBackendAdapter;

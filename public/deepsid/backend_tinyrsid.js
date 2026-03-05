@@ -297,3 +297,5 @@ class LegacySIDBackendAdapter extends EmsHEAP16BackendAdapter {
 	}	
 	
 };
+// Expose adapter class on window for dynamic lookup by ScriptNodePlayerEngine
+window.LegacySIDBackendAdapter = LegacySIDBackendAdapter;

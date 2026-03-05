@@ -79,13 +79,22 @@ export class ScriptNodePlayerEngine {
       await this.waitForWASM(win[stateKey]);
     }
 
-    // Get the adapter class from the global scope
+    // Get the adapter class from the global scope.
+    // Class declarations (ES6) don't auto-create window properties — the backend
+    // scripts explicitly assign to window, but poll briefly as a safety net.
     const adapterClassName = ADAPTER_CLASS_MAP[this.engineType];
     if (!adapterClassName) {
       throw new Error(`No adapter class mapped for engine: ${this.engineType}`);
     }
 
-    const AdapterClass = win[adapterClassName];
+    let AdapterClass = win[adapterClassName];
+    if (!AdapterClass) {
+      // Poll for up to 3 seconds in case of timing race
+      for (let i = 0; i < 30 && !AdapterClass; i++) {
+        await new Promise((r) => setTimeout(r, 100));
+        AdapterClass = win[adapterClassName];
+      }
+    }
     if (!AdapterClass) {
       throw new Error(
         `Backend adapter class '${adapterClassName}' not found. ` +
