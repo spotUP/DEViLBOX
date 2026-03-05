@@ -87,23 +87,35 @@ function installFonts(): void {
     { name: PIXI_FONTS.ICONS,         family: 'fontaudio', weight: 'normal', chars: iconChars },
   ];
 
-  for (const fb of fonts) {
-    const cacheKey = `${fb.name}-bitmap`;
-    if (Cache.has(cacheKey)) continue;
-    try {
-      BitmapFontManager.install({
-        name: fb.name,
-        style: {
-          fontFamily: fb.family,
-          fontWeight: fb.weight,
-          fontSize: 48,
-          fill: 0xffffff,
-        },
-        chars: fb.chars,
-        resolution: 2,
-      });
-    } catch {
-      // Font install failed — continue with remaining fonts
+  // Suppress PixiJS Cache warnings during batch font installation.
+  // PixiJS v8 warns about a shared '-bitmap' cache key for each install after the first.
+  const origWarn = console.warn;
+  console.warn = (...args: unknown[]) => {
+    if (typeof args[0] === 'string' && args[0].includes('[Cache] already has key')) return;
+    origWarn.apply(console, args);
+  };
+
+  try {
+    for (const fb of fonts) {
+      const cacheKey = `${fb.name}-bitmap`;
+      if (Cache.has(cacheKey)) continue;
+      try {
+        BitmapFontManager.install({
+          name: fb.name,
+          style: {
+            fontFamily: fb.family,
+            fontWeight: fb.weight,
+            fontSize: 48,
+            fill: 0xffffff,
+          },
+          chars: fb.chars,
+          resolution: 2,
+        });
+      } catch {
+        // Font install failed — continue with remaining fonts
+      }
     }
+  } finally {
+    console.warn = origWarn;
   }
 }

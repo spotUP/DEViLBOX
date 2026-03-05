@@ -506,9 +506,6 @@ export const useInstrumentStore = create<InstrumentStore>()(
       if (synthTypeChanging || isPresetLoad || soundParamsChanging) {
         try {
           const engine = getToneEngine();
-          if (updates.superCollider) {
-            console.log('[SC:Store] invalidateInstrument id:', id, 'binary length:', updates.superCollider.binary?.length ?? 0, 'defName:', updates.superCollider.synthDefName);
-          }
           engine.invalidateInstrument(id);
         } catch (error) {
           console.warn('[InstrumentStore] Could not invalidate instrument:', error);
