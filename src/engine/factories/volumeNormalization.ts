@@ -4,20 +4,21 @@
  */
 
 export const VOLUME_NORMALIZATION_OFFSETS: Record<string, number> = {
-  // Tone.js built-in synths - calibrated 2026-02-04 via browser test runner
-  'Synth': 11,           // Measured: -6.6dB → reduce 3
-  'MonoSynth': 14,       // Measured: -11.9dB → increase 2
-  'DuoSynth': 5,         // Measured: -3.2dB → reduce 7
-  'FMSynth': 16,         // Measured: -9.1dB → reduce 1
-  'AMSynth': 22,         // Measured: -13.2dB → increase 3
-  'PluckSynth': 32,      // Calibrated: measured -18.3dB at 24, target -10dB
-  'MetalSynth': 23,      // Kept (suspect: very short transient, meter may miss peak)
-  'MembraneSynth': 10,   // Measured: +0.4dB → reduce 10
-  'NoiseSynth': 7,       // Measured: -2.9dB → reduce 7
-  'PolySynth': 8,        // Measured: -5.7dB → reduce 4
-  // Custom synths (WASM and specialized engines)
-  'TB303': 15,           // Calibrated: measured -24.9dB at offset 0. Raw peak ~-12.9dB. Target -10dB.
-  'JC303': 15,           // Same engine as TB303
+  // Tone.js built-in synths - recalibrated 2026-03-05 via browser test runner
+  'Synth': 5,            // Measured: -4.3dB → target -10dB
+  'MonoSynth': 2,        // Measured: 1.6dB → target -10dB
+  'DuoSynth': 6,         // Measured: -10.8dB → on target
+  'FMSynth': 16,         // Measured: -9.9dB → on target
+  'AMSynth': 22,         // Measured: -9.8dB → on target
+  'PluckSynth': 19,      // Measured: 3.4dB → target -10dB
+  'MetalSynth': 17,      // Measured: -3.8dB → target -10dB
+  'MembraneSynth': 3,    // Measured: -3.2dB → target -10dB
+  'NoiseSynth': 2,       // Measured: -4.7dB → target -10dB
+  'PolySynth': 8,        // Measured: -10.3dB → on target
+  'HarmonicSynth': -5,   // Measured: -5.5dB → target -10dB
+  // Custom synths (WASM and specialized engines) - recalibrated 2026-03-05
+  'TB303': 1,            // Measured: 4.0dB → target -10dB
+  'JC303': 1,            // Same engine as TB303
   'Buzz3o3': 5,          // Kept (WASM-dependent)
   'Furnace': 0,          // Generic Furnace - WASM dispatcher, no chip-specific output
   // Furnace FM chips - recalibrated 2026-02-13 via browser test runner
@@ -100,19 +101,19 @@ export const VOLUME_NORMALIZATION_OFFSETS: Record<string, number> = {
   'Buzz4FM2F': 7,        // Calibrated with output gain: measured -21.2dB, target -10
   'BuzzFreqBomb': 4,     // Calibrated with output gain: measured -21.3dB, target -10
   'Buzz3o3DF': 8,        // Calibrated with output gain: measured -13.8dB, target -10
-  'Synare': 7,           // Measured: -7.1dB (OK)
-  'DubSiren': 13,        // Measured: -0.5dB → reduce 10 (now uses getNormalizedVolume)
-  'SpaceLaser': 24,      // Measured 2026-02-05: peak 1.2dB at offset 35 → need -11dB delta
+  'Synare': -4,          // Measured: 1.2dB → target -10dB
+  'DubSiren': 7,         // Measured: -4.2dB → target -10dB
+  'SpaceLaser': 24,      // Not reliably measurable - kept from previous calibration
   'V2': 0,               // Reset to 0 - WASM doesn't init in test, was unmeasured guess of 30
-  'Sam': 16,             // Measured: -2.5dB → reduce 7 (now uses getNormalizedVolume)
-  'SuperSaw': 9,         // Measured: -7.8dB (OK)
-  'WobbleBass': 13,      // Measured: -0.4dB → reduce 10 (now uses getNormalizedVolume)
-  'FormantSynth': 9,     // Measured: -7.3dB → reduce 3
-  'StringMachine': 11,   // Measured: -8.6dB → increase 1
-  'PWMSynth': 9,         // Measured: -9.1dB → increase 1
+  'Sam': 8,              // Measured: -2.3dB → target -10dB
+  'SuperSaw': 6,         // Measured: -7.3dB → target -10dB
+  'WobbleBass': 12,      // Measured: -9.4dB → on target
+  'FormantSynth': -1,    // Measured: -0.5dB → target -10dB
+  'StringMachine': 7,    // Measured: -5.8dB → target -10dB
+  'PWMSynth': 4,         // Measured: -4.9dB → target -10dB
   'ChipSynth': 5,        // Measured: -5.1dB → reduce 5
   'Wavetable': 5,        // Calibrated: raw peak ~-3.4dB, gain=-12+5=-7 → target ~-10dB
-  'Organ': 3,            // Measured: -2.8dB → reduce 7
+  'Organ': 3,            // Measured: -10.3dB → on target
   'Sampler': 10,         // Measured: -20.3dB → increase 10
   'Player': 10,          // Measured 2026-02-05: peak -19.6dB → need +10dB delta
   'GranularSynth': -47,  // Measured 2026-02-05: peak +45dB at offset 8 → need -55dB delta (engine runs very hot)
@@ -153,7 +154,7 @@ export const VOLUME_NORMALIZATION_OFFSETS: Record<string, number> = {
   'MAMEC352': 17,        // Measured 2026-02-07: -26.7dB → need +17dB
   'MAMERF5C400': 0,      // Silent (sample-playback chip, needs ROM + mapping)
   'ModularSynth': 0,     // Not yet calibrated
-  'HivelySynth': 0,     // WASM song player — volume managed internally
+  'HivelySynth': 1,     // Measured: -11.0dB → target -10dB
   'JamCrackerSynth': 0, // JamCracker WASM replayer — volume managed internally
   'OctaMEDSynth': 0,   // OctaMED synth instrument — volume managed internally
   'UADESynth': 0,       // UADE exotic Amiga player — volume managed internally
