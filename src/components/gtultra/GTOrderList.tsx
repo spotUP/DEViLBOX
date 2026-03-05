@@ -33,16 +33,16 @@ export const GTOrderList: React.FC<{
     canvas.height = height * dpr;
     ctx.scale(dpr, dpr);
 
-    ctx.fillStyle = '#1a1a2e';
+    ctx.fillStyle = '#0d0d0d';
     ctx.fillRect(0, 0, width, height);
 
     ctx.font = `12px "JetBrains Mono", monospace`;
     ctx.textBaseline = 'top';
 
     // Header
-    ctx.fillStyle = '#0f3460';
+    ctx.fillStyle = '#1a1a1a';
     ctx.fillRect(0, 0, width, 18);
-    ctx.fillStyle = '#e94560';
+    ctx.fillStyle = '#888';
     ctx.fillText('ORDER LIST', 4, 3);
 
     const scrollTop = Math.max(0, orderCursor - Math.floor(visibleRows / 2));
@@ -75,13 +75,16 @@ export const GTOrderList: React.FC<{
 
         if (val === 0xFF) {
           ctx.fillStyle = '#e94560';
-          ctx.fillText('EN', x, y + 2); // End marker
+          ctx.fillText('EN', x, y + 2);
         } else if (val >= 0xD0 && val <= 0xDF) {
           ctx.fillStyle = '#ffcc00';
-          ctx.fillText(`R${(val & 0x0F).toString(16).toUpperCase()}`, x, y + 2); // Repeat
-        } else if (val >= 0x80) {
+          ctx.fillText(`R${(val & 0x0F).toString(16).toUpperCase()}`, x, y + 2);
+        } else if (val >= 0xE0 && val <= 0xEF) {
           ctx.fillStyle = '#ff8866';
-          ctx.fillText(`T${(val & 0x7F).toString(16).toUpperCase().padStart(2, '0')}`, x, y + 2); // Transpose
+          ctx.fillText(`-${(val & 0x0F).toString(16).toUpperCase()}`, x, y + 2);
+        } else if (val >= 0xF0 && val <= 0xFE) {
+          ctx.fillStyle = '#ff8866';
+          ctx.fillText(`+${(val & 0x0F).toString(16).toUpperCase()}`, x, y + 2);
         } else {
           ctx.fillStyle = '#60e060';
           ctx.fillText(val.toString(16).toUpperCase().padStart(2, '0'), x, y + 2);

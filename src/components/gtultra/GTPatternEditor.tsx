@@ -41,23 +41,24 @@ function hexByte(val: number): string {
   return val.toString(16).toUpperCase().padStart(2, '0');
 }
 
-// Colors
+// Colors — FT2 theme
 const COLORS = {
-  bg: '#1a1a2e',
-  bgAlt: '#16213e',
-  headerBg: '#0f3460',
-  headerText: '#e94560',
-  rowNum: '#666688',
-  note: '#e0e0ff',
+  bg: '#0d0d0d',
+  bgAlt: '#141414',
+  headerBg: '#1a1a1a',
+  headerText: '#888',
+  rowNum: '#555',
+  note: '#e0e0e0',
   instrument: '#60e060',
   command: '#ffcc00',
   data: '#ff8866',
-  empty: '#333355',
-  cursor: 'rgba(255, 255, 255, 0.25)',
-  cursorBorder: '#ffffff',
-  selection: 'rgba(100, 149, 237, 0.3)',
-  playRow: 'rgba(233, 69, 96, 0.2)',
-  channelSep: '#333355',
+  empty: '#333',
+  cursor: 'rgba(255, 255, 255, 0.2)',
+  cursorBorder: '#888',
+  selection: 'rgba(100, 149, 237, 0.25)',
+  playRow: 'rgba(233, 69, 96, 0.15)',
+  recordBorder: 'rgba(239, 68, 68, 0.5)',
+  channelSep: '#222',
 };
 
 interface GTPatternEditorProps {
@@ -81,6 +82,9 @@ export const GTPatternEditor: React.FC<GTPatternEditorProps> = ({
   const playbackPos = useGTUltraStore((s) => s.playbackPos);
   const playing = useGTUltraStore((s) => s.playing);
   const followPlay = useGTUltraStore((s) => s.followPlay);
+  const recordMode = useGTUltraStore((s) => s.recordMode);
+  const orderData = useGTUltraStore((s) => s.orderData);
+  const orderCursor = useGTUltraStore((s) => s.orderCursor);
   const moveCursor = useGTUltraStore((s) => s.moveCursor);
   const setCursor = useGTUltraStore((s) => s.setCursor);
 
@@ -121,7 +125,16 @@ export const GTPatternEditor: React.FC<GTPatternEditorProps> = ({
     ctx.fillText('ROW', 2, 4);
     for (let ch = 0; ch < channelCount; ch++) {
       const x = ROW_NUM_W + ch * (CHANNEL_W + CHAN_GAP);
-      ctx.fillText(`CH${ch + 1}`, x + CHANNEL_W / 2 - CHAR_W * 1.5, 4);
+      const patNum = orderData[ch]?.[orderCursor] ?? 0;
+      const label = `CH${ch + 1}:${patNum.toString(16).toUpperCase().padStart(2, '0')}`;
+      ctx.fillText(label, x + CHANNEL_W / 2 - CHAR_W * label.length / 2, 4);
+    }
+
+    // Record mode border
+    if (recordMode) {
+      ctx.strokeStyle = COLORS.recordBorder;
+      ctx.lineWidth = 2;
+      ctx.strokeRect(1, 1, width - 2, height - 2);
     }
 
     // Pattern rows
@@ -231,7 +244,7 @@ export const GTPatternEditor: React.FC<GTPatternEditorProps> = ({
       }
     }
   }, [width, height, cursor, selection, patternLength, playbackPos, playing, followPlay,
-      scrollRow, visibleRows, channelCount, patternData]);
+      scrollRow, visibleRows, channelCount, patternData, recordMode, orderData, orderCursor]);
 
   // Keyboard handler
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
