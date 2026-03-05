@@ -94,6 +94,32 @@ export async function startNativeEngines(
     }
   }
 
+  // Future Player: Load the raw .fp binary into the FuturePlayerEngine WASM.
+  // The WASM replayer (transpiled 68k + Paula emulation) handles all synthesis.
+  if (song.futurePlayerFileData && song.format === 'FuturePlayer') {
+    suppressNotes = true;
+    try {
+      const { FuturePlayerEngine } = await import('@/engine/futureplayer/FuturePlayerEngine');
+      const fpEngine = FuturePlayerEngine.getInstance();
+      await fpEngine.ready();
+      await fpEngine.loadTune(song.futurePlayerFileData.slice(0));
+
+      const firstFP = song.instruments.find(i => i.synthType === 'FuturePlayerSynth');
+      if (firstFP) {
+        engine.getInstrument(firstFP.id, firstFP);
+      }
+
+      if (!muted) {
+        fpEngine.play();
+        console.log('[TrackerReplayer] FuturePlayerEngine tune loaded & playing');
+      } else {
+        console.log('[TrackerReplayer] FuturePlayerEngine tune loaded but skipping play (muted)');
+      }
+    } catch (err) {
+      console.error('[TrackerReplayer] Failed to load FuturePlayer tune into WASM engine:', err);
+    }
+  }
+
   // C64 SID: Load the raw SID file into C64SIDEngine for hardware-accurate playback.
   // Similar to HivelyEngine, the SID engine handles all synthesis.
   if (song.c64SidFileData && song.format === 'SID') {
@@ -158,7 +184,7 @@ export async function startNativeEngines(
   if (!isDJDeck) {
     for (const inst of song.instruments) {
       const st = inst.synthType;
-      if ((st === 'UADESynth' || st === 'HivelySynth' || st === 'MusicLineSynth' || st === 'JamCrackerSynth') && !routedNativeEngines.has(st)) {
+      if ((st === 'UADESynth' || st === 'HivelySynth' || st === 'MusicLineSynth' || st === 'JamCrackerSynth' || st === 'FuturePlayerSynth') && !routedNativeEngines.has(st)) {
         const nativeInput = getNativeAudioNode(separationInputTone as any);
         if (nativeInput) {
           engine.rerouteNativeEngine(st, nativeInput);
@@ -210,6 +236,17 @@ export function stopNativeEngines(
     } catch { /* ignore */ }
   }
 
+  // Stop FuturePlayerEngine if this is a Future Player song
+  if (song?.futurePlayerFileData && song.format === 'FuturePlayer') {
+    try {
+      import('@/engine/futureplayer/FuturePlayerEngine').then(({ FuturePlayerEngine }) => {
+        if (FuturePlayerEngine.hasInstance()) {
+          FuturePlayerEngine.getInstance().stop();
+        }
+      }).catch(() => { /* FuturePlayerEngine may not be loaded */ });
+    } catch { /* ignore */ }
+  }
+
   // Stop MusicLineEngine if this is an ML song
   if (song?.musiclineFileData && song.format === 'ML') {
     try {
@@ -246,6 +283,10 @@ export function pauseNativeEngines(routedNativeEngines: Set<string>): void {
           // Use pause() — not stop() — so the ring buffer is preserved and
           // resume() can restart playback without reloading the tune.
           HivelyEngine.getInstance().pause();
+        } else if (st === 'FuturePlayerSynth') {
+          import('@/engine/futureplayer/FuturePlayerEngine').then(({ FuturePlayerEngine }) => {
+            if (FuturePlayerEngine.hasInstance()) FuturePlayerEngine.getInstance().pause();
+          }).catch(() => {});
         } else {
           engine.stopNativeEngine(st);
         }
@@ -266,6 +307,12 @@ export function resumeNativeEngines(
   // until play() is called after a pause().
   if (routedNativeEngines.has('HivelySynth') && !muted) {
     HivelyEngine.getInstance().play();
+  }
+  // Restart WASM playback for Future Player after pause
+  if (routedNativeEngines.has('FuturePlayerSynth') && !muted) {
+    import('@/engine/futureplayer/FuturePlayerEngine').then(({ FuturePlayerEngine }) => {
+      if (FuturePlayerEngine.hasInstance()) FuturePlayerEngine.getInstance().play();
+    }).catch(() => {});
   }
 }
 
