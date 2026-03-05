@@ -12,6 +12,7 @@
  */
 
 import type { SIDEngineType } from '../DeepSIDEngineManager';
+import { BASIC_ROM, KERNAL_ROM, CHAR_ROM } from '../c64roms';
 
 export interface ScriptNodePlayerConfig {
   chipModel?: '6581' | '8580';
@@ -102,12 +103,14 @@ export class ScriptNodePlayerEngine {
       );
     }
 
-    // Create backend adapter (pass null for optional ROMs)
+    // Create backend adapter
     if (this.engineType === 'tinyrsid') {
       this.adapter = new AdapterClass(); // LegacySIDBackendAdapter takes no args
     } else {
       // SIDBackendAdapter and SIDPlayBackendAdapter take (basicROM, charROM, kernalROM, nextFrameCB, enableMd5)
-      this.adapter = new AdapterClass(null, null, null, undefined, false);
+      // WebSIDPlay (libsidplayfp) REQUIRES C64 ROMs to properly emulate the CPU and play real SID tunes.
+      // Without ROMs, only direct SID register writes work (test beeps), not actual C64 player routines.
+      this.adapter = new AdapterClass(BASIC_ROM, CHAR_ROM, KERNAL_ROM, undefined, false);
     }
 
     // Create ScriptNodePlayer — this sets up the audio pipeline
