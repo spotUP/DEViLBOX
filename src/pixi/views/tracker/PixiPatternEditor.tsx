@@ -998,6 +998,13 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
   const baseY = centerLineTop - topLines * rowHeight;
   const patternLength = displayPattern?.length ?? 64;
 
+  // ── Memoized layout objects — avoids new refs that trigger Yoga relayout ──
+  const gridContainerLayout = useMemo(() => ({ width, height: gridHeight }), [width, gridHeight]);
+  const gridScrollLayout = useMemo(() => ({ position: 'absolute' as const, width, height: gridHeight }), [width, gridHeight]);
+  const gridGraphicsLayout = useMemo(() => ({ position: 'absolute' as const, width, height: gridHeight }), [width, gridHeight]);
+  const scrollbarLayout = useMemo(() => ({ display: (allChannelsFit ? 'none' : 'flex') as const, width, height: SCROLLBAR_HEIGHT }), [allChannelsFit, width]);
+  const dragOverlayLayout = useMemo(() => ({ position: 'absolute' as const, width, height: gridHeight, left: 0, top: 0 }), [width, gridHeight]);
+
   // ── Render params ref — captured each React render, read by imperativeRedraw ──
   const renderParamsRef = useRef<RenderParams>(null!);
   renderParamsRef.current = {
@@ -1456,7 +1463,7 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
         scrollLeft={scrollLeft}
         visible={!allChannelsFit}
         onScrollChange={(v) => { scrollLeftRef.current = v; setScrollLeft(v); }}
-        layout={{ display: allChannelsFit ? 'none' : 'flex', width, height: SCROLLBAR_HEIGHT }}
+        layout={scrollbarLayout}
       />
 
       {/* ─── Channel Header — native GL rendering ─────────────────────── */}
@@ -1500,7 +1507,7 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
       {/* ─── Pattern Grid — native Pixi rendering ────────────────────── */}
       <pixiContainer
         ref={gridContainerRef}
-        layout={{ width, height: gridHeight }}
+        layout={gridContainerLayout}
         eventMode="static"
         cursor={isPlaying ? 'grab' : 'text'}
         onPointerDown={handlePointerDown}
@@ -1512,11 +1519,11 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
         {/* Smooth-scroll layer — y updated imperatively by RAF; eventMode="none" so clicks pass to outer container */}
         <pixiContainer
           ref={gridScrollContainerRef}
-          layout={{ position: 'absolute', width, height: gridHeight }}
+          layout={gridScrollLayout}
           eventMode="none"
         >
-          <pixiGraphics ref={gridGraphicsRef} draw={() => {}} layout={{ position: 'absolute', width, height: gridHeight }} />
-          <pixiGraphics ref={overlayGraphicsRef} draw={() => {}} layout={{ position: 'absolute', width, height: gridHeight }} />
+          <pixiGraphics ref={gridGraphicsRef} draw={() => {}} layout={gridGraphicsLayout} />
+          <pixiGraphics ref={overlayGraphicsRef} draw={() => {}} layout={gridGraphicsLayout} />
 
           {/* MegaText added imperatively to gridScrollContainerRef */}
         </pixiContainer>
@@ -1530,7 +1537,7 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
             g.clear();
             g.rect(0, 0, width, gridHeight).fill({ color: 0x6366f1, alpha: 0.08 });
           }, [width, gridHeight])}
-          layout={{ position: 'absolute', width, height: gridHeight, left: 0, top: 0 }}
+          layout={dragOverlayLayout}
         />
       </pixiContainer>
 
