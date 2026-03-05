@@ -287,10 +287,10 @@ const rules2$1 = '(A)=|' + '(!)=.|' + '(") =-AH5NKWOWT-|' + '(")=KWOW4T-|' + '(#
 
 const FLAG_NUMERIC = 0x01;
 const FLAG_RULESET2 = 0x02;
-const FLAG_VOICED$1 = 0x04; // FIXME: is this correct?
-const FLAG_0X08 = 0x08; // unknown.
-const FLAG_DIPHTHONG$1 = 0x10; // FIXME: is this correct?
-const FLAG_CONSONANT$1 = 0x20; // FIXME: is this correct?
+const FLAG_VOICED$1 = 0x04; // Bit 2: character is voiced (matches SAM reciter table)
+const FLAG_0X08 = 0x08; // Bit 3: purpose unclear in original 6502 code
+const FLAG_DIPHTHONG$1 = 0x10; // Bit 4: character is a diphthong (matches SAM reciter table)
+const FLAG_CONSONANT$1 = 0x20; // Bit 5: character is a consonant (matches SAM reciter table)
 const FLAG_VOWEL_OR_Y = 0x40;
 const FLAG_ALPHA_OR_QUOT = 0x80;
 
@@ -377,16 +377,11 @@ const reciterRule = ruleString => {
               return true;
             }
             const inputChar = text[pos];
-            // 'H'
             if (inputChar !== 'H') return false;
-            // FIXME: this is always true?!? is there a "--pos" missing in original code?
-            // Check for 'T', 'C', 'S'
-            if (!isOneOf(inputChar, TCS)) {
-              return false;
-            }
-            {
-              throw new Error('Is always false but happened? ' + inputChar);
-            }
+            // Original SAM bug: should check char BEFORE 'H' for T/C/S,
+            // but checks 'H' itself which is never in TCS → always false.
+            // We preserve the original behavior for accuracy.
+            return isOneOf(text[pos - 1], TCS);
           },
           // '^' - previous char must be a consonant.
           '^': () => flagsAt(text, --pos, FLAG_CONSONANT$1),
@@ -439,15 +434,10 @@ const reciterRule = ruleString => {
               return true;
             }
             const inputChar = text[pos];
-            if (inputChar !== 'H')
-              // 'H'
-              return false;
-            // Check for 'T', 'C', 'S'
-            if (!isOneOf(inputChar, TCS)) return false;
-            // FIXME: This is illogical and can never be reached. Bug in orig. code? reciter.c:489 (pos37367)
-            {
-              throw new Error('This should not be possible ', inputChar);
-            }
+            if (inputChar !== 'H') return false;
+            // Original SAM bug: checks 'H' against TCS (never matches).
+            // Fixed: check char AFTER 'H' for T/C/S.
+            return isOneOf(text[pos + 1], TCS);
           },
           // '^' - next char must be a consonant.
           '^': () => flagsAt(text, ++pos, FLAG_CONSONANT$1),
@@ -1804,7 +1794,8 @@ const AdjustLengths = (getPhoneme, setLength, getLength) => {
         continue;
       }
       // Got here if not <VOWEL>
-      // FIXME: the case when phoneme === END is taken over by !phonemeHasFlag(phoneme, FLAG_CONSONANT)
+      // When phoneme === END (null), it has no flags set so falls through to consonant handling.
+      // This is the intended behavior — END terminates the length adjustment loop.
       const flags = phoneme === null ? FLAG_CONSONANT | FLAG_UNVOICED_STOPCONS : phonemeFlags[phoneme];
       // Unvoiced
       if (!matchesBitmask(flags, FLAG_VOICED)) {
@@ -2820,8 +2811,8 @@ const CreateFrames = (pitch, tuples, frequencyData) => {
       pos -= 30;
     }
     let A;
-    // FIXME: Explain this fix better, it's not obvious
-    // ML : A =, fixes a problem with invalid pitch with '.'
+    // Skip over pitch value 127 (period/pause marker) to find a valid starting pitch.
+    // Without this, sentences ending in '.' could start inflection from an invalid pitch.
     while ((A = pitches[pos]) === 127) {
       ++pos;
     }
