@@ -112,6 +112,7 @@ export const PixiDOMOverlay: React.FC<PixiDOMOverlayProps> = ({
     let rafId: number;
     let frame = 0;
     let prevX = -1, prevY = -1, prevW = -1, prevH = -1;
+    const ORIGIN = { x: 0, y: 0 }; // pre-allocated to avoid GC pressure
 
     const tick = () => {
       frame++;
@@ -126,7 +127,7 @@ export const PixiDOMOverlay: React.FC<PixiDOMOverlayProps> = ({
             | { width: number; height: number } | undefined;
 
           if (computed && computed.width > 0 && computed.height > 0) {
-            const globalTL = el.toGlobal({ x: 0, y: 0 });
+            const globalTL = el.toGlobal(ORIGIN);
             const globalBR = el.toGlobal({ x: computed.width, y: computed.height });
             const x = Math.round(globalTL.x);
             const y = Math.round(globalTL.y);
