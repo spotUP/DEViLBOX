@@ -139,17 +139,11 @@ export const VJPatternOverlay: React.FC = React.memo(() => {
       if (frame.beat) {
         anim.beatFlash = 1;
         anim.hueShift += 20 + Math.random() * 40;
-        anim.tiltKickX += (Math.random() - 0.5) * 4;
-        anim.tiltKickY += (Math.random() - 0.5) * 3;
-        anim.bounceY = 2 + Math.random() * 2;
       }
 
       // Decay animation values
       anim.beatFlash = decay(anim.beatFlash, 8);
       anim.bassAccum = anim.bassAccum * 0.85 + frame.bassEnergy * 0.15;
-      anim.tiltKickX = decay(anim.tiltKickX, 5);
-      anim.tiltKickY = decay(anim.tiltKickY, 5);
-      anim.bounceY = decay(anim.bounceY, 6);
 
       // Smooth scroll: detect row change, add offset, decay to zero
       if (anim.prevRow >= 0 && currentRow !== anim.prevRow) {
@@ -163,29 +157,12 @@ export const VJPatternOverlay: React.FC = React.memo(() => {
       anim.scrollOffset = decay(anim.scrollOffset, 12);
 
       // ── 3D transform ──────────────────────────────────────────────────
-      const t = anim.time;
-      // Lissajous orbit (irrational ratios → never repeats)
-      const orbitX = Math.sin(t * 0.13) * Math.cos(t * 0.07) * 3;
-      const orbitY = Math.sin(t * 0.11) * Math.cos(t * 0.17) * 2;
-      // Bass sway forward
-      const bassTilt = frame.bassEnergy * 2;
-      // High-freq shimmer
-      const shimmerZ = frame.highEnergy * Math.sin(t * 37) * 0.5;
-      // Combine
-      const rx = orbitX + bassTilt + anim.tiltKickX;
-      const ry = orbitY + anim.tiltKickY + shimmerZ;
       // Scale: subtle bass breathing
       const scale = 2.1 + anim.bassAccum * 0.06 + anim.beatFlash * 0.03;
-      // Position drift
-      const driftX = Math.sin(t * 0.09) * 6 + Math.cos(t * 0.23) * 4;
-      const driftY = Math.sin(t * 0.14) * 3 + anim.bounceY;
       // Overall opacity: base + RMS pulse
       const opacity = 0.85 + frame.rms * 0.15 + anim.beatFlash * 0.1;
 
-      wrap.style.transform =
-        `translate(${driftX.toFixed(1)}px, ${driftY.toFixed(1)}px) ` +
-        `perspective(800px) rotateX(${rx.toFixed(2)}deg) rotateY(${ry.toFixed(2)}deg) ` +
-        `scale(${scale.toFixed(4)})`;
+      wrap.style.transform = `scale(${scale.toFixed(4)})`;
       wrap.style.opacity = Math.min(1, opacity).toFixed(3);
 
       // ── Canvas glow (RMS-driven shadow) ───────────────────────────────
