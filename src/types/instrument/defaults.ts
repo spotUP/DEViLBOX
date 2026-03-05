@@ -181,6 +181,13 @@ export interface SampleConfig {
 
   /** Amiga chip RAM address for UADE enhanced-mode write-back. */
   uadeSamplePtr?: number;
+
+  /** Future Player raw binary instrument pointer (for per-note preview via WASM) */
+  fpInstrPtr?: number;
+  /** Future Player instrument is wavetable (true) or PCM sample (false) */
+  fpIsWavetable?: boolean;
+  /** Future Player PCM sample size in bytes */
+  fpSampleSize?: number;
 }
 
 // ============================================================================
