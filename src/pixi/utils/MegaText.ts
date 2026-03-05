@@ -46,6 +46,9 @@ export function clearMegaTextFontCache(): void {
   fontCache.clear();
 }
 
+// Reusable transform matrix — avoids allocation per updateLabels() call
+const _sharedTransform = new Matrix();
+
 /**
  * MegaText: A Graphics object that renders many text labels in a single draw call.
  *
@@ -80,9 +83,12 @@ export class MegaText extends Graphics {
     const fontScale = fontSize / firstFont.baseMeasurementFontSize;
     const invScale = 1 / fontScale;
 
-    // Single shared transform for all glyph instructions.
-    // Bypasses ctx.texture() which calls _transform.clone() per glyph.
-    const sharedTransform = new Matrix(fontScale, 0, 0, fontScale, 0, 0);
+    // Reuse shared transform — avoids new Matrix() per call
+    const sharedTransform = _sharedTransform;
+    sharedTransform.a = fontScale;
+    sharedTransform.d = fontScale;
+    sharedTransform.b = 0; sharedTransform.c = 0;
+    sharedTransform.tx = 0; sharedTransform.ty = 0;
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const instructions = (ctx as any).instructions as any[];
