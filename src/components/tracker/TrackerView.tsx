@@ -35,6 +35,7 @@ import { EffectPicker } from './EffectPicker';
 import { UndoHistoryPanel } from './UndoHistoryPanel';
 import { FT2Toolbar } from './FT2Toolbar';
 import { TB303KnobPanel } from './TB303KnobPanel';
+import { SCKnobPanel } from './SCKnobPanel';
 import { EditorControlsBar } from './EditorControlsBar';
 import { TB303View } from '@components/demo/TB303View';
 import { MobileTrackerView } from './MobileTrackerView';
@@ -480,6 +481,11 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
           <TB303KnobPanel />
         </div>
       )}
+
+      {/* SuperCollider Live Params - collapsible panel */}
+      <div className="flex-shrink-0">
+        <SCKnobPanel />
+      </div>
 
       {/* Editor Controls Toolbar - Compact & Shrinkable */}
       <EditorControlsBar
