@@ -1431,6 +1431,17 @@ export class ToneEngine {
         this.disposeInstrumentByKey(key);
         // Continue to create new instrument below
       } else {
+        // FP/JC singleton synths: always update the instrument pointer from config
+        // before returning, since all instrument IDs share the same synth instance.
+        if (cached && config.synthType === 'FuturePlayerSynth') {
+          const fpPtr = config.metadata?.fpInstrPtr;
+          if (typeof fpPtr === 'number' && fpPtr > 0) {
+            (cached as any).set('instrumentPtr', fpPtr);
+          }
+        } else if (cached && config.synthType === 'JamCrackerSynth') {
+          const jcIdx = typeof config.id === 'number' ? config.id - 1 : 0;
+          (cached as any).set('instrumentIndex', jcIdx);
+        }
         // Type matches, return cached instrument
         return cached ?? null;
       }
