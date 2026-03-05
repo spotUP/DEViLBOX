@@ -103,7 +103,7 @@ export const VOLUME_NORMALIZATION_OFFSETS: Record<string, number> = {
   'Buzz3o3DF': 8,        // Calibrated with output gain: measured -13.8dB, target -10
   'Synare': -4,          // Measured: 1.2dB → target -10dB
   'DubSiren': 7,         // Measured: -4.2dB → target -10dB
-  'SpaceLaser': 24,      // Not reliably measurable - kept from previous calibration
+  'SpaceLaser': 17,      // Measured: -3.1dB → target -10dB (required reverb .ready await)
   'V2': 0,               // Reset to 0 - WASM doesn't init in test, was unmeasured guess of 30
   'Sam': 8,              // Measured: -2.3dB → target -10dB
   'SuperSaw': 6,         // Measured: -7.3dB → target -10dB
@@ -111,8 +111,8 @@ export const VOLUME_NORMALIZATION_OFFSETS: Record<string, number> = {
   'FormantSynth': -1,    // Measured: -0.5dB → target -10dB
   'StringMachine': 7,    // Measured: -5.8dB → target -10dB
   'PWMSynth': 4,         // Measured: -4.9dB → target -10dB
-  'ChipSynth': 5,        // Measured: -5.1dB → reduce 5
-  'Wavetable': 5,        // Calibrated: raw peak ~-3.4dB, gain=-12+5=-7 → target ~-10dB
+  'ChipSynth': 4,        // Measured: -8.9dB → target -10dB
+  'Wavetable': -3,       // Measured: -2.3dB → target -10dB
   'Organ': 3,            // Measured: -10.3dB → on target
   'Sampler': 10,         // Measured: -20.3dB → increase 10
   'Player': 10,          // Measured 2026-02-05: peak -19.6dB → need +10dB delta
@@ -153,7 +153,7 @@ export const VOLUME_NORMALIZATION_OFFSETS: Record<string, number> = {
   'MAMEK054539': 19,     // Recalibrated 2026-02-28
   'MAMEC352': 17,        // Measured 2026-02-07: -26.7dB → need +17dB
   'MAMERF5C400': 0,      // Silent (sample-playback chip, needs ROM + mapping)
-  'ModularSynth': 0,     // Not yet calibrated
+  'ModularSynth': 6,     // Measured: -15.5dB → target -10dB
   'HivelySynth': 1,     // Measured: -11.0dB → target -10dB
   'JamCrackerSynth': 0, // JamCracker WASM replayer — volume managed internally
   'OctaMEDSynth': 0,   // OctaMED synth instrument — volume managed internally
