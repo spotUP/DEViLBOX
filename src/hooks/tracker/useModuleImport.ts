@@ -23,6 +23,7 @@ import type { InstrumentConfig } from '@typedefs/instrument';
 import { notify } from '@stores/useNotificationStore';
 import { type TrackerSong } from '@engine/TrackerReplayer';
 import { clearExplicitlySaved } from '@hooks/useProjectPersistence';
+import { parseSIDHeader } from '@lib/sid/SIDHeaderParser';
 import type { ModuleInfo } from '@lib/import/ModuleLoader';
 import type { ImportOptions } from '@components/dialogs/ImportModuleDialog';
 import type { SunVoxConfig } from '@/types/instrument/exotic';
@@ -100,8 +101,19 @@ export function useModuleImport() {
           duration_ms: result.subsongs[0]?.duration_ms ?? 0,
         } : null);
       });
+      // Extract C64 SID header metadata if applicable
+      const sidInfo = parseSIDHeader(new Uint8Array(buf));
+      useTrackerStore.getState().setSidMetadata(sidInfo ? {
+        format: sidInfo.format, version: sidInfo.version,
+        title: sidInfo.title, author: sidInfo.author, copyright: sidInfo.copyright,
+        chipModel: sidInfo.chipModel, clockSpeed: sidInfo.clockSpeed,
+        subsongs: sidInfo.subsongs, defaultSubsong: sidInfo.defaultSubsong,
+        currentSubsong: options.subsong ?? sidInfo.defaultSubsong,
+        secondSID: sidInfo.secondSID, thirdSID: sidInfo.thirdSID,
+      } : null);
     } else {
       useTrackerStore.getState().setSongDBInfo(null);
+      useTrackerStore.getState().setSidMetadata(null);
     }
 
     // Always clean up engine state before import

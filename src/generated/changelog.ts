@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-03-05T20:50:38.645Z
+ * Generated: 2026-03-05T21:04:39.210Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.2409';
-export const BUILD_NUMBER = '2409';
-export const BUILD_HASH = 'e82ec102';
+export const BUILD_VERSION = '1.0.2410';
+export const BUILD_NUMBER = '2410';
+export const BUILD_HASH = '7fb345b4';
 export const BUILD_DATE = '2026-03-05';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,13 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.2409',
+    version: '1.0.2410',
     date: '2026-03-05',
     changes: [
+      {
+        type: 'fix',
+        "description": "Resolve all 32 tsc -b --force build errors"
+      },
       {
         type: 'feature',
         "description": "Add SC tracker integration: knob panels, channel badges"
@@ -224,10 +228,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         "description": "Move transpile/debug skill to proper .github/skills/ format"
-      },
-      {
-        type: 'improvement',
-        "description": "Rename skill to 'Transpile and Debug 68k Replayer Waveform Mismatch'"
       }
     ]
   }
