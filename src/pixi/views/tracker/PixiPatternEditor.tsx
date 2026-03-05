@@ -847,6 +847,7 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
   const megaTextRef = useRef<MegaText | null>(null);
   const prevRowRef = useRef(-1);
   const prevPatternRef = useRef(-1);
+  const imperativeRedrawRef = useRef<(() => void) | null>(null);
 
   // ── MegaText — single Graphics object for all pattern text ───────────────
   useEffect(() => {
@@ -964,6 +965,17 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
       if (newRow !== prevRowRef.current || newPattern !== prevPatternRef.current) {
         prevRowRef.current = newRow;
         prevPatternRef.current = newPattern;
+        // Immediately update renderParams + redraw in THIS frame to avoid 1-frame jitter.
+        // Without this, container.y resets to ~0 but the grid is still positioned for the
+        // OLD row until React re-renders next frame → visible upward jump.
+        renderParamsRef.current = {
+          ...renderParamsRef.current,
+          playbackRow: newRow,
+          playbackPatternIdx: newPattern,
+        };
+        fullRedrawRef.current = true;
+        imperativeRedrawRef.current?.();
+        // Queue React state update for any downstream consumers
         setPlaybackRow(newRow);
         setPlaybackPatternIdx(newPattern);
       }

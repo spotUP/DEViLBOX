@@ -27,7 +27,7 @@ import { FurnaceDispatchEngine } from './engine/furnace-dispatch/FurnaceDispatch
 import { BuzzmachineEngine } from './engine/buzzmachines/BuzzmachineEngine';
 import { MAMEEngine } from './engine/MAMEEngine';
 import { getFirstPresetForSynthType } from './constants/factoryPresets';
-import { setDevilboxAudioContext } from './utils/audio-context';
+import { setDevilboxAudioContext, getNativeContext } from './utils/audio-context';
 
 /** Extend Window with test-runner globals so we avoid `(window as any)` */
 interface TestRunnerWindow {
@@ -818,10 +818,9 @@ function clearResults() {
 
 async function initAudio() {
   await Tone.start();
-  // Extract native AudioContext and register it for synths that use getDevilboxAudioContext()
+  // Extract native AudioContext using robust unwrapping and register it
   const ctx = Tone.getContext();
-  const ctxRec = ctx as unknown as Record<string, unknown>;
-  const nativeCtx = (ctxRec.rawContext || ctxRec._context || ctx) as AudioContext;
+  const nativeCtx = getNativeContext(ctx);
   setDevilboxAudioContext(nativeCtx);
   log('AudioContext started: ' + Tone.getContext().state, 'pass');
 }

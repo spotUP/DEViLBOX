@@ -74,6 +74,30 @@ export const PixiNewSongWizard: React.FC = () => {
     [selectedPresetId, close],
   );
 
+  // Screen dimensions — safe access for app.screen getter
+  let screenW = 1920, screenH = 1080;
+  try { if (app?.screen) { screenW = app.screen.width ?? 1920; screenH = app.screen.height ?? 1080; } } catch { /* renderer not ready */ }
+
+  const drawOverlay = useCallback((g: GraphicsType) => {
+    g.clear();
+    g.rect(0, 0, screenW, screenH);
+    g.fill({ color: 0x000000, alpha: 0.7 });
+  }, [screenW, screenH]);
+
+  const handleOverlayClick = useCallback(() => {
+    // inline cancel logic — can't call handleCancel (defined after early return)
+    setStep(1); setStartMode('empty'); setSelectedPresetId('amiga_protracker');
+    setWithPresetInstruments(true); setFilter(''); setScrollY(0); close();
+  }, [close]);
+
+  const handlePanelClick = useCallback((e: FederatedPointerEvent) => {
+    e.stopPropagation();
+  }, []);
+
+  const blockWheel = useCallback((e: { stopPropagation: () => void }) => {
+    e.stopPropagation();
+  }, []);
+
   if (!isOpen) return null;
 
   const selectedPreset: SystemPreset | undefined = SYSTEM_PRESETS.find((p) => p.id === selectedPresetId);
@@ -102,27 +126,6 @@ export const PixiNewSongWizard: React.FC = () => {
 
   const stepCount = startMode === 'preset' ? (hasStarterInstruments ? 3 : 2) : 1;
   const nextLabel = step === 1 ? 'Next' : step === 2 ? (hasStarterInstruments ? 'Next' : 'Finish') : 'Finish';
-
-  let screenW = 1920, screenH = 1080;
-  try { if (app?.screen) { screenW = app.screen.width ?? 1920; screenH = app.screen.height ?? 1080; } } catch { /* renderer not ready */ }
-
-  const drawOverlay = useCallback((g: GraphicsType) => {
-    g.clear();
-    g.rect(0, 0, screenW, screenH);
-    g.fill({ color: 0x000000, alpha: 0.7 });
-  }, [screenW, screenH]);
-
-  const handleOverlayClick = useCallback((_e: FederatedPointerEvent) => {
-    handleCancel();
-  }, [handleCancel]);
-
-  const handlePanelClick = useCallback((e: FederatedPointerEvent) => {
-    e.stopPropagation();
-  }, []);
-
-  const blockWheel = useCallback((e: { stopPropagation: () => void }) => {
-    e.stopPropagation();
-  }, []);
 
   return (
     <pixiContainer layout={{ position: 'absolute', width: '100%', height: '100%' }}>
@@ -331,10 +334,10 @@ const GlStep2: React.FC<GlStep2Props> = ({
   const listHeight = MODAL_H - 52 - 44 - 36; // header + footer + search
   const maxScroll = Math.max(0, totalHeight - listHeight);
 
-  const handleWheel = useCallback((e: FederatedWheelEvent) => {
+  const handleWheel = (e: FederatedWheelEvent) => {
     e.stopPropagation();
     setScrollY((y) => Math.max(0, Math.min(maxScroll, y + e.deltaY)));
-  }, [maxScroll]);
+  };
 
   return (
     <Div className="flex-row flex-1" layout={{ minHeight: 0 }}>
