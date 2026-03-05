@@ -510,6 +510,7 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
                   <p className="text-text-secondary mb-4">
                     This file uses a specialized {editorMode === 'hively' ? 'track-based' : editorMode === 'goattracker' ? 'SID tracker' : 'multi-chip'} pattern editor that's only available in WebGL mode.
                   </p>
+                  {!/iPhone|iPod|Android.*Mobile/i.test(navigator.userAgent) && (
                   <button
                     onClick={() => {
                       useSettingsStore.getState().setRenderMode('webgl');
@@ -519,6 +520,7 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
                   >
                     Switch to WebGL Mode
                   </button>
+                  )}
                   <p className="text-xs text-text-muted mt-4">
                     You can change this anytime in Settings → Display → Render Mode
                   </p>

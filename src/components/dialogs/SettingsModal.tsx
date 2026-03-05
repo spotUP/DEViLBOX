@@ -230,7 +230,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                 </select>
               </div>
 
-              {/* UI Render Mode */}
+              {/* UI Render Mode — hidden on mobile phones where GL UI doesn't work */}
+              {!/iPhone|iPod|Android.*Mobile/i.test(navigator.userAgent) && (
               <div className="flex items-center justify-between">
                 <div className="flex flex-col">
                   <label className="text-ft2-text text-xs font-mono">UI Render Mode:</label>
@@ -245,6 +246,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                   <option value="webgl" className="bg-ft2-bg text-ft2-text">WebGL (PixiJS v8)</option>
                 </select>
               </div>
+              )}
 
               {/* Number Format */}
               <div className="flex items-center justify-between">
