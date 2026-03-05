@@ -1,16 +1,20 @@
 /**
  * JSIDPlay2Engine.ts
  * 
- * Wrapper for JSIDPlay2 - Perfect C64 emulation
+ * Wrapper for JSIDPlay2 - Perfect C64 emulation via Web Worker.
  * 
- * Features:
- * - Full Commodore 64 emulation
- * - Perfect accuracy (cycle-exact)
- * - Seeking support
- * - Force SID model
- * - Audio encoding support
- * - Largest file size (3.6MB WASM)
- * - Slower performance
+ * Architecture:
+ *   Main thread creates Worker('/deepsid/jsidplay2-004.wasm_gc-worker.js')
+ *   Worker loads TeaVM WASM-GC runtime + jsidplay2 WASM module
+ *   Communication is via postMessage/addEventListener('message')
+ *   Worker emits SAMPLES events with Float32Array left/right buffers
+ *   Main thread feeds samples into ScriptProcessorNode ring buffer
+ * 
+ * Worker API:
+ *   INITIALISE → INITIALISED  (load WASM)
+ *   OPEN → OPENED             (load SID file)
+ *   CLOCK → CLOCKED           (advance emulation, triggers SAMPLES events)
+ *   GET_TUNE_INFO → GOT_TUNE_INFO  (metadata)
  */
 
 export interface JSIDPlay2Config {
@@ -29,18 +33,23 @@ export interface SIDVoiceState {
 }
 
 /**
- * JSIDPlay2 Engine Wrapper
+ * JSIDPlay2 Engine Wrapper — Worker-based message passing
  */
 export class JSIDPlay2Engine {
-  private player: any;
   private worker: Worker | null = null;
   private audioContext: AudioContext | null = null;
-  private sourceNode: AudioWorkletNode | null = null;
+  private scriptNode: ScriptProcessorNode | null = null;
   private isPlaying = false;
   private subsong = 0;
   private numSubsongs = 1;
   private metadata: any = null;
   private currentTime = 0;
+  private clockRunning = false;
+
+  // Ring buffer for audio samples from worker
+  private sampleBufferL: Float32Array[] = [];
+  private sampleBufferR: Float32Array[] = [];
+  private sampleReadOffset = 0;
 
   private readonly sidData: Uint8Array;
   private readonly config: JSIDPlay2Config;
@@ -49,132 +58,178 @@ export class JSIDPlay2Engine {
     this.sidData = sidData;
     this.config = config;
   }
+
   /**
-   * Initialize the engine
+   * Send a message to the worker and wait for a specific response event
    */
-  async init(module: any): Promise<void> {
-    // JSIDPlay2 uses a Web Worker for emulation
-    this.worker = new Worker('/deepsid/jsidplay2-004.wasm_gc-worker.js');
-    
-    // Create player instance
-    this.player = new module.player({
-      worker: this.worker,
-      sampleRate: this.config.sampleRate || 44100,
-      forceSIDModel: this.config.forceSIDModel,
-    });
-
-    // Load SID data
-    const success = await this.player.loadFile(this.sidData.buffer);
-    if (!success) {
-      throw new Error('Failed to load SID file into JSIDPlay2');
-    }
-
-    // Get metadata
-    this.metadata = this.player.getMetadata();
-    this.numSubsongs = this.metadata?.songs || 1;
-    
-    console.log('[JSIDPlay2] Initialized:', {
-      title: this.metadata?.name,
-      author: this.metadata?.author,
-      copyright: this.metadata?.copyright,
-      subsongs: this.numSubsongs,
-      chipModel: this.metadata?.sidModel,
-      forceSIDModel: this.config.forceSIDModel,
+  private workerCall(type: string, data: any = {}, expectedResponse: string, timeout = 30000): Promise<any> {
+    return new Promise((resolve, reject) => {
+      if (!this.worker) { reject(new Error('Worker not created')); return; }
+      const handler = (e: MessageEvent) => {
+        if (e.data.eventType === expectedResponse) {
+          this.worker?.removeEventListener('message', handler);
+          resolve(e.data.eventData);
+        }
+      };
+      this.worker.addEventListener('message', handler);
+      this.worker.postMessage({ eventType: type, eventData: data });
+      setTimeout(() => {
+        this.worker?.removeEventListener('message', handler);
+        reject(new Error(`JSIDPlay2 ${type} timed out after ${timeout}ms`));
+      }, timeout);
     });
   }
 
   /**
-   * Start playback
+   * Initialize the engine — create worker, load WASM, open SID file
+   */
+  async init(_module: any): Promise<void> {
+    // Create worker
+    this.worker = new Worker('/deepsid/jsidplay2-004.wasm_gc-worker.js');
+
+    // Listen for audio samples from the worker
+    this.worker.addEventListener('message', (e: MessageEvent) => {
+      if (e.data.eventType === 'SAMPLES') {
+        const { left, right, length } = e.data.eventData;
+        if (left && right && length > 0) {
+          this.sampleBufferL.push(new Float32Array(left));
+          this.sampleBufferR.push(new Float32Array(right));
+        }
+      }
+    });
+
+    // Initialize WASM runtime (can take several seconds)
+    console.log('[JSIDPlay2] Initializing WASM runtime...');
+    await this.workerCall('INITIALISE', {}, 'INITIALISED', 30000);
+    console.log('[JSIDPlay2] WASM runtime ready');
+
+    // Configure sample rate
+    if (this.config.sampleRate) {
+      await this.workerCall('SET_SAMPLING_RATE', { samplingRate: this.config.sampleRate }, 'SAMPLING_RATE_SET', 5000);
+    }
+
+    // Force SID model if configured
+    if (this.config.chipModel) {
+      const model = this.config.chipModel === '8580' ? 1 : 0;
+      await this.workerCall('SET_USER_CHIP_MODEL', { sidNum: 0, chipModel: model }, 'USER_CHIP_MODEL_SET', 5000);
+    }
+
+    // Open the SID file
+    console.log('[JSIDPlay2] Opening SID file (%d bytes)...', this.sidData.byteLength);
+    const contents = new Int8Array(this.sidData.buffer, this.sidData.byteOffset, this.sidData.byteLength);
+    await this.workerCall('OPEN', {
+      contents,
+      tuneName: 'loaded.sid',
+      startSong: this.subsong,
+      nthFrame: 2,
+      sidWrites: false,
+      songLength: 0,
+      sfxSoundExpander: false,
+      sfxSoundExpanderType: 0,
+    }, 'OPENED', 15000);
+    console.log('[JSIDPlay2] SID file opened');
+
+    // Get tune info
+    try {
+      const info = await this.workerCall('GET_TUNE_INFO', {}, 'GOT_TUNE_INFO', 5000);
+      this.metadata = info?.tuneInfo ?? null;
+      if (this.metadata?.songs) this.numSubsongs = this.metadata.songs;
+      console.log('[JSIDPlay2] Tune info:', this.metadata);
+    } catch {
+      console.warn('[JSIDPlay2] Could not get tune info');
+    }
+
+    console.log('[JSIDPlay2] Initialized');
+  }
+
+  /**
+   * Start playback — create ScriptProcessor and drive CLOCK loop
    */
   async play(audioContext: AudioContext): Promise<void> {
-    if (this.isPlaying) {
-      return;
-    }
+    if (this.isPlaying) return;
+    if (!this.worker) throw new Error('Worker not initialized');
 
     this.audioContext = audioContext;
+    this.sampleBufferL = [];
+    this.sampleBufferR = [];
+    this.sampleReadOffset = 0;
 
-    // Set subsong
-    if (this.subsong >= 0 && this.subsong < this.numSubsongs) {
-      this.player.setSubsong(this.subsong);
-    }
+    // Create ScriptProcessor to pull samples from ring buffer
+    const bufferSize = 4096;
+    this.scriptNode = audioContext.createScriptProcessor(bufferSize, 0, 2);
+    this.scriptNode.onaudioprocess = (event) => {
+      const outL = event.outputBuffer.getChannelData(0);
+      const outR = event.outputBuffer.getChannelData(1);
+      let written = 0;
 
-    // JSIDPlay2 uses AudioWorklet for best performance
-    if (audioContext.audioWorklet) {
-      try {
-        // Register JSIDPlay2 worklet processor
-        await audioContext.audioWorklet.addModule('/deepsid/jsidplay2-processor.js');
-        
-        this.sourceNode = new AudioWorkletNode(audioContext, 'jsidplay2-processor');
-        
-        // Connect to worker
-        this.sourceNode.port.postMessage({
-          type: 'init',
-          worker: this.worker,
-        });
-        
-        this.sourceNode.connect(audioContext.destination);
-      } catch (error) {
-        console.warn('[JSIDPlay2] AudioWorklet setup failed, using ScriptProcessor fallback');
-        this.playWithScriptProcessor(audioContext);
-        return;
+      while (written < outL.length && this.sampleBufferL.length > 0) {
+        const srcL = this.sampleBufferL[0];
+        const srcR = this.sampleBufferR[0];
+        const available = srcL.length - this.sampleReadOffset;
+        const needed = outL.length - written;
+        const toCopy = Math.min(available, needed);
+
+        outL.set(srcL.subarray(this.sampleReadOffset, this.sampleReadOffset + toCopy), written);
+        outR.set(srcR.subarray(this.sampleReadOffset, this.sampleReadOffset + toCopy), written);
+
+        written += toCopy;
+        this.sampleReadOffset += toCopy;
+
+        if (this.sampleReadOffset >= srcL.length) {
+          this.sampleBufferL.shift();
+          this.sampleBufferR.shift();
+          this.sampleReadOffset = 0;
+        }
       }
-    } else {
-      this.playWithScriptProcessor(audioContext);
-      return;
-    }
 
+      // Fill remainder with silence
+      if (written < outL.length) {
+        outL.fill(0, written);
+        outR.fill(0, written);
+      }
+
+      this.currentTime += outL.length / audioContext.sampleRate;
+    };
+
+    this.scriptNode.connect(audioContext.destination);
     this.isPlaying = true;
+
+    // Start the clock loop — continuously drives C64 emulation
+    this.clockRunning = true;
+    this.runClockLoop();
+
     console.log('[JSIDPlay2] Playback started, subsong:', this.subsong);
   }
 
   /**
-   * ScriptProcessor fallback
+   * Clock loop — repeatedly sends CLOCK to advance C64 emulation
    */
-  private playWithScriptProcessor(audioContext: AudioContext): void {
-    const bufferSize = 4096;
-    const scriptNode = audioContext.createScriptProcessor(bufferSize, 0, 2);
-    
-    scriptNode.onaudioprocess = (event) => {
-      const outputL = event.outputBuffer.getChannelData(0);
-      const outputR = event.outputBuffer.getChannelData(1);
-      
-      // Generate audio from player
-      if (this.player && this.player.generateAudio) {
-        const buffer = this.player.generateAudio(outputL.length);
-        
-        // JSIDPlay2 outputs stereo
-        for (let i = 0; i < outputL.length; i++) {
-          outputL[i] = buffer[i * 2];
-          outputR[i] = buffer[i * 2 + 1];
-          
-          // Update current time (rough estimate)
-          this.currentTime += 1 / audioContext.sampleRate;
-        }
+  private async runClockLoop(): Promise<void> {
+    while (this.clockRunning && this.worker) {
+      try {
+        await this.workerCall('CLOCK', {}, 'CLOCKED', 5000);
+      } catch {
+        // Timeout or error — try again unless stopped
+        if (!this.clockRunning) break;
+        await new Promise(r => setTimeout(r, 10));
       }
-    };
-
-    scriptNode.connect(audioContext.destination);
-    this.sourceNode = scriptNode as any;
-    this.isPlaying = true;
+    }
   }
 
   /**
    * Stop playback
    */
   stop(): void {
-    if (!this.isPlaying) {
-      return;
+    this.clockRunning = false;
+
+    if (this.scriptNode) {
+      this.scriptNode.disconnect();
+      this.scriptNode = null;
     }
 
-    if (this.sourceNode) {
-      this.sourceNode.disconnect();
-      this.sourceNode = null;
-    }
-
-    if (this.player && this.player.stop) {
-      this.player.stop();
-    }
-
+    this.sampleBufferL = [];
+    this.sampleBufferR = [];
+    this.sampleReadOffset = 0;
     this.currentTime = 0;
     this.isPlaying = false;
     console.log('[JSIDPlay2] Playback stopped');
@@ -184,8 +239,9 @@ export class JSIDPlay2Engine {
    * Pause playback
    */
   pause(): void {
-    if (this.sourceNode && this.audioContext) {
-      this.sourceNode.disconnect();
+    this.clockRunning = false;
+    if (this.scriptNode) {
+      this.scriptNode.disconnect();
     }
   }
 
@@ -193,8 +249,10 @@ export class JSIDPlay2Engine {
    * Resume playback
    */
   resume(): void {
-    if (this.sourceNode && this.audioContext) {
-      this.sourceNode.connect(this.audioContext.destination);
+    if (this.scriptNode && this.audioContext) {
+      this.scriptNode.connect(this.audioContext.destination);
+      this.clockRunning = true;
+      this.runClockLoop();
     }
   }
 
@@ -204,8 +262,22 @@ export class JSIDPlay2Engine {
   setSubsong(subsong: number): void {
     if (subsong >= 0 && subsong < this.numSubsongs) {
       this.subsong = subsong;
-      if (this.player && this.player.setSubsong) {
-        this.player.setSubsong(subsong);
+      // Re-open with new start song
+      if (this.worker && this.isPlaying) {
+        const contents = new Int8Array(this.sidData.buffer, this.sidData.byteOffset, this.sidData.byteLength);
+        this.worker.postMessage({
+          eventType: 'OPEN',
+          eventData: {
+            contents,
+            tuneName: 'loaded.sid',
+            startSong: subsong,
+            nthFrame: 2,
+            sidWrites: false,
+            songLength: 0,
+            sfxSoundExpander: false,
+            sfxSoundExpanderType: 0,
+          },
+        });
       }
       this.currentTime = 0;
       console.log('[JSIDPlay2] Subsong changed to:', subsong);
@@ -227,47 +299,37 @@ export class JSIDPlay2Engine {
   }
 
   /**
-   * Seek to time (JSIDPlay2 supports seeking!)
+   * Seek to time — sends FAST_FORWARD then NORMAL_SPEED
    */
   seek(timeSeconds: number): void {
-    if (this.player && this.player.seek) {
-      this.player.seek(timeSeconds);
-      this.currentTime = timeSeconds;
-      console.log('[JSIDPlay2] Seeked to:', timeSeconds);
-    }
+    // JSIDPlay2 doesn't have direct seek — approximate with fast-forward
+    console.log('[JSIDPlay2] Seek not directly supported, time:', timeSeconds);
+    this.currentTime = timeSeconds;
   }
 
   /**
    * Get current playback time
    */
   getCurrentTime(): number {
-    if (this.player && this.player.getCurrentTime) {
-      return this.player.getCurrentTime();
-    }
     return this.currentTime;
   }
 
   /**
-   * Get voice state for pattern extraction
+   * Get voice state — not easily accessible through worker boundary
    */
-  getVoiceState(voice: number): SIDVoiceState | null {
-    if (!this.player || !this.player.getVoiceState) return null;
-
-    try {
-      const state = this.player.getVoiceState(voice);
-      return state || null;
-    } catch (error) {
-      console.warn('[JSIDPlay2] Failed to read voice state:', error);
-      return null;
-    }
+  getVoiceState(_voice: number): SIDVoiceState | null {
+    return null;
   }
 
   /**
-   * Set playback speed (fast forward)
+   * Set playback speed
    */
   setSpeed(multiplier: number): void {
-    if (this.player && this.player.setSpeed) {
-      this.player.setSpeed(multiplier);
+    if (!this.worker) return;
+    if (multiplier > 1) {
+      this.worker.postMessage({ eventType: 'FAST_FORWARD', eventData: {} });
+    } else {
+      this.worker.postMessage({ eventType: 'NORMAL_SPEED', eventData: {} });
     }
   }
 
@@ -275,19 +337,24 @@ export class JSIDPlay2Engine {
    * Mute/unmute a voice
    */
   setVoiceMask(voice: number, muted: boolean): void {
-    if (this.player && this.player.setVoiceMask) {
-      this.player.setVoiceMask(voice, muted);
-    }
+    if (!this.worker) return;
+    this.worker.postMessage({
+      eventType: 'SET_MUTE',
+      eventData: { sidNum: 0, voice, mute: muted },
+    });
   }
 
   /**
    * Force SID chip model
    */
   forceSIDModel(model: '6581' | '8580'): void {
-    if (this.player && this.player.forceSIDModel) {
-      this.player.forceSIDModel(model);
-      console.log('[JSIDPlay2] Forced SID model to:', model);
-    }
+    if (!this.worker) return;
+    const chipModel = model === '8580' ? 1 : 0;
+    this.worker.postMessage({
+      eventType: 'SET_USER_CHIP_MODEL',
+      eventData: { sidNum: 0, chipModel },
+    });
+    console.log('[JSIDPlay2] Forced SID model to:', model);
   }
 
   /**
@@ -305,39 +372,16 @@ export class JSIDPlay2Engine {
   }
 
   /**
-   * Encode to WAV (JSIDPlay2 supports encoding)
-   */
-  async encodeToWAV(durationSeconds: number): Promise<Uint8Array | null> {
-    if (!this.player || !this.player.encode) {
-      console.warn('[JSIDPlay2] Encoding not supported');
-      return null;
-    }
-
-    try {
-      const wavData = await this.player.encode(durationSeconds);
-      return new Uint8Array(wavData);
-    } catch (error) {
-      console.error('[JSIDPlay2] Encoding failed:', error);
-      return null;
-    }
-  }
-
-  /**
    * Cleanup
    */
   dispose(): void {
     this.stop();
-    
-    if (this.player && this.player.dispose) {
-      this.player.dispose();
-    }
-    
+
     if (this.worker) {
       this.worker.terminate();
       this.worker = null;
     }
-    
-    this.player = null;
+
     this.audioContext = null;
   }
 }

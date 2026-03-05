@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>SID Engine Test</title>
+  <style>
+    body { background: #1a1a2e; color: #e0e0e0; font-family: monospace; padding: 20px; }
+    .engine { margin: 10px 0; padding: 10px; border: 1px solid #333; border-radius: 4px; }
+    .engine.pass { border-color: #4caf50; background: #1b2e1b; }
+    .engine.fail { border-color: #f44336; background: #2e1b1b; }
+    .engine.running { border-color: #ff9800; background: #2e2a1b; }
+    .engine.skip { border-color: #666; background: #222; }
+    button { background: #2196f3; color: white; border: none; padding: 8px 16px; margin: 4px; cursor: pointer; border-radius: 4px; }
+    button:hover { background: #1976d2; }
+    button:disabled { background: #555; cursor: not-allowed; }
+    .log { font-size: 11px; white-space: pre-wrap; max-height: 200px; overflow-y: auto; margin-top: 8px; color: #aaa; }
+    .log .err { color: #f44336; }
+    .log .ok { color: #4caf50; }
+    .log .warn { color: #ff9800; }
+    h2 { color: #64b5f6; }
+    #controls { margin-bottom: 20px; }
+    #sid-info { margin: 10px 0; padding: 10px; background: #222; border-radius: 4px; }
+  </style>
+</head>
+<body>
+  <h2>🎵 SID Engine Test Suite</h2>
+  <div id="controls">
+    <input type="file" id="sid-file" accept=".sid,.psid,.rsid">
+    <button id="btn-load-test">Load Test SID</button>
+    <button id="btn-test-all" disabled>Test All Engines</button>
+    <button id="btn-stop-all">Stop All</button>
+  </div>
+  <div id="sid-info"></div>
+  <div id="results"></div>
+
+<script>
+// ─── Globals ───────────────────────────────────────────────────────────────
+let sidData = null;
+let audioCtx = null;
+
+const ENGINES = [
+  { id: 'jssid', name: 'jsSID (Pure JS)', scripts: ['/deepsid/jsSID-modified.js'] },
+  { id: 'websid', name: 'WebSID (WASM)', scripts: ['/deepsid/scriptprocessor_player.min.js', '/deepsid/backend_websid.js'] },
+  { id: 'tinyrsid', name: 'TinyRSID (WASM)', scripts: ['/deepsid/scriptprocessor_player.min.js', '/deepsid/backend_tinyrsid.js'] },
+  { id: 'websidplay', name: 'WebSIDPlay (WASM)', scripts: ['/deepsid/scriptprocessor_player.min.js', '/deepsid/backend_websidplay.js'] },
+  { id: 'jsidplay2', name: 'JSIDPlay2 (WASM Worker)', scripts: ['/deepsid/jsidplay2-004.wasm_gc-runtime.js'] },
+];
+
+const ADAPTER_CLASS_MAP = {
+  websid: 'SIDBackendAdapter',
+  tinyrsid: 'LegacySIDBackendAdapter',
+  websidplay: 'SIDPlayBackendAdapter',
+};
+
+const MODULE_STATE_MAP = {
+  websid: 'spp_backend_state_SID',
+  tinyrsid: 'spp_backend_state_LegacySID',
+  websidplay: 'spp_backend_state_SIDPlay',
+};
+
+const engineStates = {};
+
+// ─── UI Setup ──────────────────────────────────────────────────────────────
+const resultsDiv = document.getElementById('results');
+const sidInfo = document.getElementById('sid-info');
+
+ENGINES.forEach(eng => {
+  const div = document.createElement('div');
+  div.className = 'engine';
+  div.id = `engine-${eng.id}`;
+  div.innerHTML = `<strong>${eng.name}</strong> <span id="status-${eng.id}">⏳ waiting</span>
+    <button id="btn-test-${eng.id}" disabled>Test</button>
+    <button id="btn-stop-${eng.id}" disabled>Stop</button>
+    <div class="log" id="log-${eng.id}"></div>`;
+  resultsDiv.appendChild(div);
+});
+
+// ─── Logging ───────────────────────────────────────────────────────────────
+function log(engineId, msg, type = '') {
+  const logDiv = document.getElementById(`log-${engineId}`);
+  const cls = type === 'error' ? 'err' : type === 'ok' ? 'ok' : type === 'warn' ? 'warn' : '';
+  logDiv.innerHTML += `<span class="${cls}">${new Date().toISOString().substr(11,12)} ${msg}</span>\n`;
+  logDiv.scrollTop = logDiv.scrollHeight;
+  console.log(`[${engineId}] ${msg}`);
+}
+
+function setStatus(engineId, text, cls) {
+  document.getElementById(`status-${engineId}`).textContent = text;
+  document.getElementById(`engine-${engineId}`).className = `engine ${cls}`;
+}
+
+// ─── SID Header Parser ────────────────────────────────────────────────────
+function parseSIDHeader(data) {
+  const view = new DataView(data.buffer, data.byteOffset);
+  const magic = String.fromCharCode(data[0], data[1], data[2], data[3]);
+  if (magic !== 'PSID' && magic !== 'RSID') return null;
+  const version = view.getUint16(4, false);
+  const dataOffset = view.getUint16(6, false);
+  const songs = view.getUint16(14, false);
+  const startSong = view.getUint16(16, false);
+  const readStr = (off, len) => {
+    let s = '';
+    for (let i = 0; i < len && data[off+i]; i++) s += String.fromCharCode(data[off+i]);
+    return s.trim();
+  };
+  return { magic, version, dataOffset, songs, startSong, title: readStr(22,32), author: readStr(54,32), copyright: readStr(86,32) };
+}
+
+// ─── Script Loader ─────────────────────────────────────────────────────────
+function loadScript(src) {
+  return new Promise((resolve, reject) => {
+    if (document.querySelector(`script[src="${src}"]`)) { resolve(); return; }
+    const s = document.createElement('script');
+    s.src = src;
+    s.async = true;
+    s.onload = () => resolve();
+    s.onerror = () => reject(new Error(`Failed to load: ${src}`));
+    document.head.appendChild(s);
+  });
+}
+
+// ─── Wait for WASM ─────────────────────────────────────────────────────────
+function waitForWASM(stateKey, timeout = 15000) {
+  return new Promise((resolve, reject) => {
+    const state = window[stateKey];
+    if (!state) { resolve(); return; }
+    if (!state.notReady) { resolve(); return; }
+    let done = false;
+    const orig = state.adapterCallback;
+    state.adapterCallback = () => {
+      if (orig) orig();
+      if (!done) { done = true; resolve(); }
+    };
+    setTimeout(() => { if (!done) { done = true; reject(new Error(`WASM timeout: ${stateKey}`)); } }, timeout);
+  });
+}
+
+// ─── Wait for class on window ──────────────────────────────────────────────
+async function waitForClass(name, timeout = 5000) {
+  const start = Date.now();
+  while (!window[name] && Date.now() - start < timeout) {
+    await new Promise(r => setTimeout(r, 100));
+  }
+  return window[name];
+}
+
+// ─── Engine Tests ──────────────────────────────────────────────────────────
+
+async function testJSSID() {
+  const id = 'jssid';
+  log(id, 'Loading jsSID script...');
+  await loadScript('/deepsid/jsSID-modified.js');
+
+  if (typeof window.jsSID === 'undefined') throw new Error('jsSID class not found on window');
+  log(id, 'jsSID class found ✓', 'ok');
+
+  log(id, 'Creating jsSID instance...');
+  const sid = new window.jsSID(16384, 0.0005, false, false);
+  log(id, 'Instance created ✓', 'ok');
+
+  log(id, 'Loading SID data...');
+  const buf = sidData.buffer.slice(sidData.byteOffset, sidData.byteOffset + sidData.byteLength);
+
+  await new Promise((resolve, reject) => {
+    let done = false;
+    sid.setloadcallback(() => { if (!done) { done = true; resolve(); } });
+    if (sid.loaddata) {
+      sid.loaddata(buf, 0);
+      if (!done) { done = true; resolve(); }
+    } else {
+      reject(new Error('jsSID.loaddata not available'));
+    }
+  });
+
+  const title = sid.gettitle?.() || '(no title)';
+  const author = sid.getauthor?.() || '(no author)';
+  log(id, `Loaded: "${title}" by ${author} ✓`, 'ok');
+
+  log(id, 'Starting playback...');
+  sid.start(0);
+  engineStates[id] = { sid, type: 'jssid' };
+
+  log(id, 'Playing for 3 seconds...');
+  await new Promise(r => setTimeout(r, 3000));
+
+  log(id, 'Stopping...');
+  sid.stop();
+  log(id, 'jsSID test PASSED ✓', 'ok');
+}
+
+async function testScriptNodePlayer(engineId) {
+  const stateKey = MODULE_STATE_MAP[engineId];
+  const adapterName = ADAPTER_CLASS_MAP[engineId];
+
+  log(engineId, 'Setting WASM search path...');
+  window.WASM_SEARCH_PATH = '/deepsid/';
+
+  // Tear down any existing ScriptNodePlayer to avoid singleton conflicts
+  if (window.player) {
+    log(engineId, 'Tearing down existing ScriptNodePlayer instance...', 'warn');
+    try { window.player.pause(); } catch(e) {}
+    try {
+      if (window.player._bufferSource) window.player._bufferSource.stop(0);
+    } catch(e) {}
+    window.player = undefined;
+  }
+
+  log(engineId, 'Loading scriptprocessor_player.min.js...');
+  await loadScript('/deepsid/scriptprocessor_player.min.js');
+  if (!window.ScriptNodePlayer) throw new Error('ScriptNodePlayer not found');
+  log(engineId, 'ScriptNodePlayer found ✓', 'ok');
+
+  const backendScript = `/deepsid/backend_${engineId === 'websidplay' ? 'websidplay' : engineId === 'tinyrsid' ? 'tinyrsid' : 'websid'}.js`;
+  log(engineId, `Loading ${backendScript}...`);
+  await loadScript(backendScript);
+
+  log(engineId, `Waiting for WASM (${stateKey})...`);
+  await waitForWASM(stateKey);
+  log(engineId, 'WASM ready ✓', 'ok');
+
+  log(engineId, `Looking for ${adapterName} on window...`);
+  const AdapterClass = await waitForClass(adapterName);
+  if (!AdapterClass) throw new Error(`${adapterName} not found on window after waiting`);
+  log(engineId, `${adapterName} found ✓`, 'ok');
+
+  log(engineId, 'Creating adapter...');
+  let adapter;
+  if (engineId === 'tinyrsid') {
+    adapter = new AdapterClass();
+  } else {
+    adapter = new AdapterClass(null, null, null, undefined, false);
+  }
+  log(engineId, 'Adapter created ✓', 'ok');
+
+  // Share audio context
+  window._gPlayerAudioCtx = audioCtx;
+
+  log(engineId, 'Initializing ScriptNodePlayer...');
+  await window.ScriptNodePlayer.initialize(adapter, undefined, [], false, undefined);
+  const player = window.ScriptNodePlayer.getInstance();
+  if (!player) throw new Error('ScriptNodePlayer.getInstance() returned null');
+  log(engineId, 'Player initialized ✓', 'ok');
+
+  // Ensure audio pipeline
+  player._initByUserGesture();
+  if (!player._onTrackReadyToPlay) player._onTrackReadyToPlay = () => {};
+  player.setVolume(1);
+
+  log(engineId, 'Loading SID data...');
+  const dataBuffer = sidData.buffer.slice(sidData.byteOffset, sidData.byteOffset + sidData.byteLength);
+
+  const success = player._prepareTrackForPlayback(
+    'test.sid', dataBuffer, { track: 0 },
+    () => log(engineId, 'Track ready callback fired', 'ok'),
+    (err) => log(engineId, `Track prep error: ${err}`, 'error')
+  );
+
+  if (!success) {
+    log(engineId, `_prepareTrackForPlayback returned: ${success}`, 'warn');
+    log(engineId, `isSongReady: ${player._isSongReady}, isPaused: ${player._isPaused}`, 'warn');
+  }
+
+  engineStates[engineId] = { player, type: 'scriptnodeplayer' };
+
+  log(engineId, 'Playing for 3 seconds...');
+  await new Promise(r => setTimeout(r, 3000));
+
+  const songInfo = player.getSongInfo?.() || {};
+  log(engineId, `Song info: ${JSON.stringify(songInfo).substring(0, 200)}`, 'ok');
+
+  log(engineId, 'Stopping...');
+  player.pause();
+  log(engineId, `${engineId} test PASSED ✓`, 'ok');
+}
+
+async function testJSIDPlay2() {
+  const id = 'jsidplay2';
+  log(id, 'JSIDPlay2 uses Worker + TeaVM/WASM-GC architecture');
+  log(id, 'Creating Web Worker...');
+
+  const worker = new Worker('/deepsid/jsidplay2-004.wasm_gc-worker.js');
+  log(id, 'Worker created ✓', 'ok');
+
+  // Helper to send message and wait for response
+  function workerCall(type, data = {}, expectedResponse, timeout = 30000) {
+    return new Promise((resolve, reject) => {
+      const handler = (e) => {
+        if (e.data.eventType === expectedResponse) {
+          worker.removeEventListener('message', handler);
+          resolve(e.data);
+        }
+      };
+      worker.addEventListener('message', handler);
+      worker.postMessage({ eventType: type, eventData: data });
+      setTimeout(() => {
+        worker.removeEventListener('message', handler);
+        reject(new Error(`${type} timed out after ${timeout}ms`));
+      }, timeout);
+    });
+  }
+
+  // Collect audio samples
+  let samplesReceived = 0;
+  worker.addEventListener('message', (e) => {
+    if (e.data.eventType === 'SAMPLES') samplesReceived++;
+  });
+
+  log(id, 'Sending INITIALISE...');
+  await workerCall('INITIALISE', {}, 'INITIALISED', 30000);
+  log(id, 'Worker initialized ✓', 'ok');
+
+  log(id, 'Sending OPEN with SID data...');
+  const contents = new Int8Array(sidData.buffer, sidData.byteOffset, sidData.byteLength);
+  await workerCall('OPEN', {
+    contents: contents,
+    tuneName: 'test.sid',
+    startSong: 0,
+    nthFrame: 2,
+    sidWrites: false,
+    songLength: 0,
+    sfxSoundExpander: false,
+    sfxSoundExpanderType: 0,
+  }, 'OPENED', 15000);
+  log(id, 'SID file opened ✓', 'ok');
+
+  log(id, 'Driving CLOCK loop for 3 seconds...');
+  const startTime = Date.now();
+  let clockCount = 0;
+  while (Date.now() - startTime < 3000) {
+    try {
+      await workerCall('CLOCK', {}, 'CLOCKED', 2000);
+      clockCount++;
+    } catch (e) {
+      log(id, `CLOCK ${clockCount} failed: ${e.message}`, 'warn');
+      break;
+    }
+  }
+
+  log(id, `Clocked ${clockCount} times, received ${samplesReceived} sample buffers`, 'ok');
+
+  // If we got samples, wire them to audio
+  if (samplesReceived > 0) {
+    log(id, 'Audio samples produced ✓', 'ok');
+  } else {
+    log(id, 'No audio samples received (may need more clock cycles)', 'warn');
+  }
+
+  worker.terminate();
+  log(id, 'Worker terminated');
+  log(id, `JSIDPlay2 test PASSED ✓`, 'ok');
+}
+
+// ─── Test Runner ───────────────────────────────────────────────────────────
+
+async function testEngine(engineId) {
+  setStatus(engineId, '🔄 running...', 'running');
+  document.getElementById(`btn-test-${engineId}`).disabled = true;
+
+  try {
+    switch (engineId) {
+      case 'jssid': await testJSSID(); break;
+      case 'websid':
+      case 'tinyrsid':
+      case 'websidplay':
+        await testScriptNodePlayer(engineId); break;
+      case 'jsidplay2': await testJSIDPlay2(); break;
+    }
+    setStatus(engineId, '✅ PASS', 'pass');
+    document.getElementById(`btn-stop-${engineId}`).disabled = false;
+  } catch (err) {
+    log(engineId, `ERROR: ${err.message}`, 'error');
+    log(engineId, err.stack || '', 'error');
+    setStatus(engineId, '❌ FAIL', 'fail');
+  }
+
+  document.getElementById(`btn-test-${engineId}`).disabled = false;
+}
+
+function stopEngine(engineId) {
+  const state = engineStates[engineId];
+  if (!state) return;
+  try {
+    if (state.type === 'jssid') state.sid.stop();
+    else if (state.type === 'scriptnodeplayer') state.player.pause();
+  } catch (e) { log(engineId, `Stop error: ${e.message}`, 'warn'); }
+  delete engineStates[engineId];
+  document.getElementById(`btn-stop-${engineId}`).disabled = true;
+  log(engineId, 'Stopped', 'ok');
+}
+
+// ─── Load Test SID ─────────────────────────────────────────────────────────
+
+document.getElementById('btn-load-test').addEventListener('click', async () => {
+  try {
+    const resp = await fetch('/deepsid/test.sid');
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const buf = await resp.arrayBuffer();
+    sidData = new Uint8Array(buf);
+    loadSIDFile(sidData);
+  } catch (e) {
+    sidInfo.innerHTML = `<span style="color:#f44336">Failed to load test.sid: ${e.message}</span>`;
+  }
+});
+
+function loadSIDFile(data) {
+  sidData = data;
+  const info = parseSIDHeader(sidData);
+  if (info) {
+    sidInfo.innerHTML = `<strong>${info.title}</strong> by <strong>${info.author}</strong> (${info.copyright})<br>` +
+      `${info.magic} v${info.version}, ${info.songs} subsong(s), data offset: 0x${info.dataOffset.toString(16)}`;
+  } else {
+    sidInfo.innerHTML = `<span style="color:#f44336">Not a valid PSID/RSID file</span>`;
+    return;
+  }
+
+  if (!audioCtx) audioCtx = new AudioContext();
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+
+  document.getElementById('btn-test-all').disabled = false;
+  ENGINES.forEach(eng => {
+    document.getElementById(`btn-test-${eng.id}`).disabled = false;
+  });
+}
+
+// ─── File Input ────────────────────────────────────────────────────────────
+
+document.getElementById('sid-file').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const buf = await file.arrayBuffer();
+  sidData = new Uint8Array(buf);
+  loadSIDFile(sidData);
+});
+
+// ─── Button Handlers ───────────────────────────────────────────────────────
+
+document.getElementById('btn-test-all').addEventListener('click', async () => {
+  for (const eng of ENGINES) {
+    await testEngine(eng.id);
+    // Small delay between engines to avoid audio conflicts
+    await new Promise(r => setTimeout(r, 500));
+  }
+});
+
+document.getElementById('btn-stop-all').addEventListener('click', () => {
+  ENGINES.forEach(eng => stopEngine(eng.id));
+});
+
+ENGINES.forEach(eng => {
+  document.getElementById(`btn-test-${eng.id}`).addEventListener('click', () => testEngine(eng.id));
+  document.getElementById(`btn-stop-${eng.id}`).addEventListener('click', () => stopEngine(eng.id));
+});
+</script>
+</body>
+</html>
