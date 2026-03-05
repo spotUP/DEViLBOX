@@ -86,13 +86,22 @@ export type TrackerFormat =
   | 'UADE'
   // Chip-dump / CPU-code formats (metadata + stub patterns)
   | 'VGM'  // Video Game Music (OPN2/OPL/SN register dumps)
+  | 'S98'  // S98 FM register dump (PC-88/PC-98/MSX)
   | 'YM'   // Atari ST AY/YM2149 register dumps
   | 'NSF'  // NES Sound Format (2A03 + expansion chips)
   | 'SID'  // Commodore 64 SID (PSID/RSID)
   | 'SAP'  // Atari 8-bit POKEY
+  | 'GBS'  // Game Boy Sound System
   | 'AY'   // ZX Spectrum AY (ZXAYEMUL)
+  | 'KSS'  // MSX KSS (AY/SCC/OPLL/Y8950)
+  | 'SNDH' // Atari ST SNDH/SC68 (YM2149 68000 code)
+  | 'HES'  // PC Engine / TurboGrafx-16 HuC6280
+  | 'SPC'  // Super Nintendo SPC700 sound format
+  | 'MDX'  // Sharp X68000 MDX (YM2151 OPM + ADPCM, native note data)
   | 'JamCracker'       // JamCracker Pro (.jam, .jc)
-  | 'FuturePlayer';    // Future Player (Wanted Team, .fp)
+  | 'FuturePlayer'     // Future Player (Wanted Team, .fp)
+  | 'PMD'              // PC-98 Professional Music Driver (YM2608/OPNA)
+  | 'AdPlug';          // PC AdLib/OPL formats (RAD, HSC, DRO, IMF, CMF)
 
 /**
  * Channel state - all the per-channel data needed for playback
