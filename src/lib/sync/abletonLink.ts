@@ -54,11 +54,97 @@ export class AbletonLinkSync {
   private midiOutputs: MIDIOutput[] = [];
   private animationFrameId: number | null = null;
 
+  // Peer discovery via BroadcastChannel (same-origin tabs)
+  private broadcastChannel: BroadcastChannel | null = null;
+  private peers: Map<string, LinkPeer & { lastSeen: number }> = new Map();
+  private peerId: string = Math.random().toString(36).slice(2, 10);
+  private peerCleanupInterval: ReturnType<typeof setInterval> | null = null;
+
   constructor() {
     // Try to initialize Web MIDI for sync
     this.initializeMIDI().catch(err => {
       console.warn('[AbletonLink] Web MIDI not available:', err);
     });
+
+    // Initialize BroadcastChannel peer discovery (same-origin tabs)
+    this.initializePeerDiscovery();
+  }
+
+  /**
+   * Initialize BroadcastChannel for peer discovery across same-origin tabs.
+   * Peers announce themselves periodically and sync tempo/transport state.
+   */
+  private initializePeerDiscovery(): void {
+    if (typeof BroadcastChannel === 'undefined') return;
+
+    try {
+      this.broadcastChannel = new BroadcastChannel('devilbox-link-sync');
+      this.broadcastChannel.onmessage = (event: MessageEvent) => {
+        const msg = event.data;
+        if (!msg || msg.peerId === this.peerId) return;
+
+        switch (msg.type) {
+          case 'announce':
+          case 'state': {
+            this.peers.set(msg.peerId, {
+              id: msg.peerId,
+              name: msg.name || `DEViLBOX-${msg.peerId.slice(0, 4)}`,
+              bpm: msg.bpm,
+              isPlaying: msg.isPlaying,
+              beatPosition: msg.beatPosition,
+              barPosition: Math.floor(msg.beatPosition / (msg.quantum || 4)),
+              quantum: msg.quantum || 4,
+              lastSeen: Date.now(),
+            });
+            // If peer changed tempo and we should follow, adopt it
+            if (msg.type === 'state' && msg.tempoChanged && this.peers.size > 0) {
+              this.bpm = msg.bpm;
+            }
+            this.notifyListeners();
+            break;
+          }
+          case 'goodbye':
+            this.peers.delete(msg.peerId);
+            this.notifyListeners();
+            break;
+        }
+      };
+
+      // Announce ourselves immediately
+      this.broadcastState('announce');
+
+      // Periodic heartbeat + stale peer cleanup (every 2s)
+      this.peerCleanupInterval = setInterval(() => {
+        this.broadcastState('announce');
+        const now = Date.now();
+        for (const [id, peer] of this.peers) {
+          if (now - peer.lastSeen > 6000) {
+            this.peers.delete(id);
+          }
+        }
+      }, 2000);
+    } catch {
+      console.warn('[AbletonLink] BroadcastChannel not available');
+    }
+  }
+
+  /**
+   * Broadcast current state to all peers.
+   */
+  private broadcastState(type: 'announce' | 'state', tempoChanged = false): void {
+    if (!this.broadcastChannel) return;
+    try {
+      this.broadcastChannel.postMessage({
+        type,
+        peerId: this.peerId,
+        name: `DEViLBOX-${this.peerId.slice(0, 4)}`,
+        bpm: this.bpm,
+        isPlaying: this.isPlaying,
+        beatPosition: this.beatPosition,
+        quantum: this.quantum,
+        tempoChanged,
+      });
+    } catch { /* channel closed */ }
   }
 
   /**
@@ -226,6 +312,7 @@ export class AbletonLinkSync {
     // Update phase continuously
     this.updatePhase();
 
+    this.broadcastState('state');
     this.notifyListeners();
   }
 
@@ -250,6 +337,7 @@ export class AbletonLinkSync {
     // Send MIDI Stop
     this.sendMIDIStop();
 
+    this.broadcastState('state');
     this.notifyListeners();
   }
 
@@ -284,6 +372,7 @@ export class AbletonLinkSync {
     }
 
     this.bpm = bpm;
+    this.broadcastState('state', true);
 
     // Restart clock interval with new tempo
     if (this.isPlaying && this.clockInterval) {
@@ -333,7 +422,7 @@ export class AbletonLinkSync {
       barPosition: Math.floor(this.beatPosition / this.quantum),
       quantum: this.quantum,
       phase: this.phase,
-      peers: [], // TODO: WebRTC peer discovery
+      peers: Array.from(this.peers.values()).map(({ lastSeen: _, ...peer }) => peer),
     };
   }
 
@@ -367,6 +456,20 @@ export class AbletonLinkSync {
   dispose(): void {
     this.stop();
     this.listeners.clear();
+
+    // Announce departure to peers
+    if (this.broadcastChannel) {
+      try {
+        this.broadcastChannel.postMessage({ type: 'goodbye', peerId: this.peerId });
+      } catch { /* already closed */ }
+      this.broadcastChannel.close();
+      this.broadcastChannel = null;
+    }
+    if (this.peerCleanupInterval) {
+      clearInterval(this.peerCleanupInterval);
+      this.peerCleanupInterval = null;
+    }
+    this.peers.clear();
 
     if (this.midiAccess) {
       this.midiAccess.inputs.forEach((input) => {
