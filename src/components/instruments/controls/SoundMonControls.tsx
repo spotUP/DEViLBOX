@@ -43,16 +43,15 @@
  *   waveType       — +1 is the table index pointer; partial overwrite would
  *                    corrupt the waveform table reference
  *   waveSpeed      — purely a SoundMonConfig concept; no chip RAM equivalent
- *   attackVolume   — stored in ADSR table data (variable-length sequence), not
- *   decayVolume      in the fixed instrument header; requires table re-encoding
- *   sustainVolume
- *   releaseVolume
- *   decaySpeed     — no dedicated byte in the instrument header
- *   sustainLength  — no dedicated byte in the instrument header
- *   releaseSpeed   — no dedicated byte in the instrument header
  *   portamentoSpeed — no dedicated byte in the instrument header
  *   arpTable       — stored in separate synth table region; not in instr header
  *   arpSpeed       — no dedicated byte in the instrument header
+ *
+ * Fields written to ADSR table in synth table region (via updADSRWithChipRam):
+ *   attackVolume, decayVolume, sustainVolume, releaseVolume — re-encoded as
+ *   volume sequence in synthTables + (adsrTable << 6) using encodeSoundMonADSR()
+ *   attackSpeed, decaySpeed, sustainLength, releaseSpeed — also encoded into
+ *   the ADSR sequence shape
  */
 
 import React, { useRef, useEffect, useCallback, useState } from 'react';
@@ -67,6 +66,7 @@ import {
 import type { SequencePreset } from '@components/instruments/shared';
 import { UADEChipEditor } from '@/engine/uade/UADEChipEditor';
 import { UADEEngine } from '@/engine/uade/UADEEngine';
+import { encodeSoundMonADSR } from '@/engine/uade/chipRamEncoders';
 
 interface SoundMonControlsProps {
   config: SoundMonConfig;
@@ -180,6 +180,32 @@ export const SoundMonControls: React.FC<SoundMonControlsProps> = ({
     [upd, uadeChipRam, getEditor],
   );
 
+  /**
+   * Update an ADSR volume parameter and re-encode the full ADSR volume sequence
+   * to chip RAM in the synth table region. SoundMon stores ADSR as a flat
+   * sequence of volume bytes at sections.synthTables + (adsrTable << 6).
+   */
+  const updADSRWithChipRam = useCallback(
+    (key: keyof SoundMonConfig, value: number) => {
+      upd(key as Parameters<typeof upd>[0], value as Parameters<typeof upd>[1]);
+      if (uadeChipRam && uadeChipRam.sections.synthTables) {
+        void (async () => {
+          const editor = getEditor();
+          // Read adsrTable index (byte +5, shifted left 6) and adsrLen (uint16 BE at +6)
+          const headerBytes = await editor.readBytes(uadeChipRam.instrBase + 5, 3);
+          const adsrTableOff = headerBytes[0] << 6;
+          const adsrLen = (headerBytes[1] << 8) | headerBytes[2];
+          if (adsrLen <= 0) return;
+          const newCfg = { ...configRef.current, [key]: value };
+          const sequence = encodeSoundMonADSR(newCfg, adsrLen);
+          const addr = uadeChipRam.sections.synthTables + adsrTableOff;
+          void editor.writeBlock(addr, Array.from(sequence));
+        })();
+      }
+    },
+    [upd, uadeChipRam, getEditor],
+  );
+
   const SectionLabel: React.FC<{ label: string }> = ({ label }) => (
     <div className="text-[10px] font-bold uppercase tracking-widest mb-2"
       style={{ color: accent, opacity: 0.7 }}>
@@ -254,53 +280,52 @@ export const SoundMonControls: React.FC<SoundMonControlsProps> = ({
           <div className="flex flex-col items-center gap-2">
             <span className="text-[9px] uppercase tracking-wider" style={{ color: accent, opacity: 0.5 }}>Attack</span>
             <Knob value={config.attackVolume} min={0} max={64} step={1}
-              onChange={(v) => upd('attackVolume', Math.round(v))}
+              onChange={(v) => updADSRWithChipRam('attackVolume', Math.round(v))}
               label="Volume" color={knob} size="sm"
               formatValue={(v) => Math.round(v).toString()} />
-            {/* attackVolume is in the ADSR table opcode data, not the fixed header. */}
             <Knob value={config.attackSpeed} min={0} max={63} step={1}
-              onChange={(v) => updWithChipRam('attackSpeed', Math.round(v), 8)}
+              onChange={(v) => {
+                updADSRWithChipRam('attackSpeed', Math.round(v));
+                // Also write to fixed header byte +8
+                if (uadeChipRam) {
+                  void getEditor().writeU8(uadeChipRam.instrBase + 8, Math.round(v) & 0xFF);
+                }
+              }}
               label="Speed" color={knob} size="sm"
               formatValue={(v) => Math.round(v).toString()} />
           </div>
           <div className="flex flex-col items-center gap-2">
             <span className="text-[9px] uppercase tracking-wider" style={{ color: accent, opacity: 0.5 }}>Decay</span>
             <Knob value={config.decayVolume} min={0} max={64} step={1}
-              onChange={(v) => upd('decayVolume', Math.round(v))}
+              onChange={(v) => updADSRWithChipRam('decayVolume', Math.round(v))}
               label="Volume" color={knob} size="sm"
               formatValue={(v) => Math.round(v).toString()} />
-            {/* decayVolume is in the ADSR table opcode data. */}
             <Knob value={config.decaySpeed} min={0} max={63} step={1}
-              onChange={(v) => upd('decaySpeed', Math.round(v))}
+              onChange={(v) => updADSRWithChipRam('decaySpeed', Math.round(v))}
               label="Speed" color={knob} size="sm"
               formatValue={(v) => Math.round(v).toString()} />
-            {/* decaySpeed has no dedicated byte in the instrument header. */}
           </div>
           <div className="flex flex-col items-center gap-2">
             <span className="text-[9px] uppercase tracking-wider" style={{ color: accent, opacity: 0.5 }}>Sustain</span>
             <Knob value={config.sustainVolume} min={0} max={64} step={1}
-              onChange={(v) => upd('sustainVolume', Math.round(v))}
+              onChange={(v) => updADSRWithChipRam('sustainVolume', Math.round(v))}
               label="Volume" color={knob} size="sm"
               formatValue={(v) => Math.round(v).toString()} />
-            {/* sustainVolume is in the ADSR table opcode data. */}
             <Knob value={config.sustainLength} min={0} max={255} step={1}
-              onChange={(v) => upd('sustainLength', Math.round(v))}
+              onChange={(v) => updADSRWithChipRam('sustainLength', Math.round(v))}
               label="Length" color={knob} size="sm"
               formatValue={(v) => Math.round(v).toString()} />
-            {/* sustainLength has no dedicated byte in the instrument header. */}
           </div>
           <div className="flex flex-col items-center gap-2">
             <span className="text-[9px] uppercase tracking-wider" style={{ color: accent, opacity: 0.5 }}>Release</span>
             <Knob value={config.releaseVolume} min={0} max={64} step={1}
-              onChange={(v) => upd('releaseVolume', Math.round(v))}
+              onChange={(v) => updADSRWithChipRam('releaseVolume', Math.round(v))}
               label="Volume" color={knob} size="sm"
               formatValue={(v) => Math.round(v).toString()} />
-            {/* releaseVolume is in the ADSR table opcode data. */}
             <Knob value={config.releaseSpeed} min={0} max={63} step={1}
-              onChange={(v) => upd('releaseSpeed', Math.round(v))}
+              onChange={(v) => updADSRWithChipRam('releaseSpeed', Math.round(v))}
               label="Speed" color={knob} size="sm"
               formatValue={(v) => Math.round(v).toString()} />
-            {/* releaseSpeed has no dedicated byte in the instrument header. */}
           </div>
         </div>
       </div>
