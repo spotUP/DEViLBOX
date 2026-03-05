@@ -211,6 +211,17 @@ export class ScriptNodePlayerEngine {
 
     console.log(`[${this.engineType}] Loading SID data directly (%d bytes)`, this.sidData.byteLength);
 
+    // Pre-populate ScriptNodePlayer's internal file cache so that when the WASM
+    // requests the file via _fileRequestCallback → _preloadFile, it finds it in
+    // cache and returns immediately (with flag=false, no re-init callback).
+    // Without this, _preloadFile triggers an XHR (404), then calls _initIfNeeded
+    // which runs _loadMusicData (including teardown()) → corrupts emulator state.
+    if (this.player._getCache) {
+      const cacheData = new Uint8Array(dataBuffer);
+      this.player._getCache().setFile(filename, cacheData);
+      this.player._getCache().setFile('/' + filename, cacheData);
+    }
+
     // Feed data directly: _prepareTrackForPlayback → _initIfNeeded → _loadMusicData → WASM
     const success = this.player._prepareTrackForPlayback(
       filename,
