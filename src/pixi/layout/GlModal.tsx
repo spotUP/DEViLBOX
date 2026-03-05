@@ -50,8 +50,8 @@ export const GlModal: React.FC<GlModalProps> = ({
 
   if (!isOpen) return null;
 
-  const screenW = app?.screen?.width ?? 1920;
-  const screenH = app?.screen?.height ?? 1080;
+  let screenW = 1920, screenH = 1080;
+  try { if (app?.screen) { screenW = app.screen.width ?? 1920; screenH = app.screen.height ?? 1080; } } catch { /* renderer not ready */ }
 
   const drawOverlay = (g: GraphicsType) => {
     g.clear();
