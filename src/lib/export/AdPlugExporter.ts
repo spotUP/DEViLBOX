@@ -172,7 +172,8 @@ function encodePatternData(
 
       const hasNote = cell.note > 0 && cell.note <= 97;
       const hasInst = cell.instrument > 0;
-      const hasEffect = cell.effTyp > 0;
+      const radEffect = cell.effTyp > 0 ? mapXmEffectToRAD(cell.effTyp, cell.eff) : null;
+      const hasEffect = radEffect !== null;
 
       if (!hasNote && !hasInst && !hasEffect) continue;
 
@@ -186,12 +187,10 @@ function encodePatternData(
       // Note byte: octave[6:4] | noteNum[3:0]
       if (hasNote) {
         if (cell.note === 97) {
-          // Key-off: note value 0x0F
           rowEvents.push(0x0F);
         } else {
-          // XM note: 1=C-0, 13=C-1, etc. Convert to octave + semitone
-          const semitone = ((cell.note - 1) % 12) + 1; // 1-12
-          const octave = Math.floor((cell.note - 1) / 12); // 0-7
+          const semitone = ((cell.note - 1) % 12) + 1;
+          const octave = Math.floor((cell.note - 1) / 12);
           rowEvents.push(((octave & 0x07) << 4) | (semitone & 0x0F));
         }
       }
@@ -202,11 +201,9 @@ function encodePatternData(
         rowEvents.push(radInst & 0xFF);
       }
 
-      // Effect byte: type[7:4] | param[3:0]
+      // Effect byte (already mapped to RAD format)
       if (hasEffect) {
-        const effType = cell.effTyp & 0x0F;
-        const effParam = cell.eff & 0x0F;
-        rowEvents.push((effType << 4) | effParam);
+        rowEvents.push(radEffect!);
       }
     }
 
@@ -225,6 +222,27 @@ function encodePatternData(
   // End-of-pattern marker
   data.push(0x00);
   return data;
+}
+
+/**
+ * Map XM effect type + param to RAD effect byte (type[7:4] | param[3:0]).
+ * RAD effects: 1=slide up, 2=slide down, 3=tone porta, 5=volslide+porta,
+ * A=volume slide, C=set volume, D=pattern break, F=set speed.
+ * Returns null if no valid mapping exists.
+ */
+function mapXmEffectToRAD(effTyp: number, eff: number): number | null {
+  const param = eff & 0x0F;
+  switch (effTyp) {
+    case 0x1: return (0x1 << 4) | param;          // Portamento up
+    case 0x2: return (0x2 << 4) | param;          // Portamento down
+    case 0x3: return (0x3 << 4) | param;          // Tone portamento
+    case 0x5: return (0x5 << 4) | param;          // Vol slide + tone porta
+    case 0xA: return (0xA << 4) | param;          // Volume slide
+    case 0xC: return (0xC << 4) | (eff >> 2);     // Set volume (scale 0-63 → 0-15)
+    case 0xD: return (0xD << 4) | param;          // Pattern break
+    case 0xF: return (0xF << 4) | Math.min(15, eff); // Set speed
+    default:  return null;                         // Unsupported effect
+  }
 }
 
 /**

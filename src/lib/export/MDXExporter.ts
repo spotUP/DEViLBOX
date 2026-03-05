@@ -229,6 +229,11 @@ function buildChannelData(
         emitVolume(cmds, mdxVol);
       }
 
+      // Effect column → MDX MML commands
+      if (cell.effTyp > 0) {
+        emitMDXEffect(cmds, cell.effTyp, cell.eff);
+      }
+
       // Encode note byte
       const noteVal = xmNoteToMDX(cell.note);
       cmds.push(noteVal);
@@ -314,6 +319,36 @@ function emitVolume(cmds: number[], vol: number): void {
 
 function emitPan(cmds: number[], pan: number): void {
   cmds.push(MDX_CMD.SET_PAN, pan & 0xFF);
+}
+
+/**
+ * Map XM effect type + param to MDX MML commands.
+ * MDX supports: volume, panning, tempo, staccato, key-on delay.
+ */
+function emitMDXEffect(cmds: number[], effTyp: number, eff: number): void {
+  switch (effTyp) {
+    case 0x8: // Set panning (XM: 0=left, 128=center, 255=right → MDX: 0x80=L, 0xC0=center, 0x40=R)
+      if (eff < 64) cmds.push(MDX_CMD.SET_PAN, 0x80);        // Left
+      else if (eff < 192) cmds.push(MDX_CMD.SET_PAN, 0xC0);   // Center
+      else cmds.push(MDX_CMD.SET_PAN, 0x40);                   // Right
+      break;
+    case 0xC: { // Set volume (XM: 0-64 → MDX: 0-15)
+      const vol = Math.round((Math.min(64, eff) / 64) * 15);
+      cmds.push(MDX_CMD.SET_VOLUME, vol);
+      break;
+    }
+    case 0xF: // Set speed/tempo
+      if (eff > 0 && eff <= 31) {
+        // Speed — use staccato as approximation (shorter gate time)
+        cmds.push(MDX_CMD.STACCATO, Math.max(1, Math.min(8, eff)));
+      } else if (eff >= 32) {
+        // Tempo in BPM
+        cmds.push(MDX_CMD.SET_TEMPO, bpmToTempoByte(eff));
+      }
+      break;
+    // Effects 0x1-0x4 (portamento, vibrato) have no direct MDX MML equivalent
+    // — they would require LFO register writes, which is too complex for export
+  }
 }
 
 /** Emit OPM register writes (0xFE) for the FM voice patch on a channel */

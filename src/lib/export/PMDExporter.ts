@@ -228,14 +228,17 @@ function buildChannelData(
       // Volume column (XM 0x10-0x50 → PMD volume)
       if (cell.volume >= 0x10 && cell.volume <= 0x50) {
         if (isFM) {
-          // FM: TL-based volume 0-127
           const vol = Math.round(((cell.volume - 0x10) / 0x40) * 127);
           emitVolume(cmds, vol);
         } else {
-          // SSG: 0-15
           const vol = Math.round(((cell.volume - 0x10) / 0x40) * 15);
           emitVolume(cmds, vol);
         }
+      }
+
+      // Effect column → PMD MML commands
+      if (cell.effTyp > 0) {
+        emitPMDEffect(cmds, cell.effTyp, cell.eff, isFM);
       }
 
       // Encode note
@@ -322,6 +325,31 @@ function emitVolume(cmds: number[], vol: number): void {
 
 function emitPan(cmds: number[], pan: number): void {
   cmds.push(PMD_CMD.SET_PAN, pan & 0xFF);
+}
+
+/**
+ * Map XM effect type + param to PMD MML commands.
+ * PMD supports: volume, panning, tempo via MML commands.
+ */
+function emitPMDEffect(cmds: number[], effTyp: number, eff: number, isFM: boolean): void {
+  switch (effTyp) {
+    case 0x8: // Set panning (XM: 0=left, 128=center, 255=right → OPN: 0xC0=both, 0x80=L, 0x40=R)
+      if (eff < 64) cmds.push(PMD_CMD.SET_PAN, 0x80);
+      else if (eff < 192) cmds.push(PMD_CMD.SET_PAN, 0xC0);
+      else cmds.push(PMD_CMD.SET_PAN, 0x40);
+      break;
+    case 0xC: { // Set volume
+      const maxVol = isFM ? 127 : 15;
+      const vol = Math.round((Math.min(64, eff) / 64) * maxVol);
+      cmds.push(PMD_CMD.SET_VOLUME, vol);
+      break;
+    }
+    case 0xF: // Set speed/tempo
+      if (eff >= 32) {
+        cmds.push(PMD_CMD.SET_TEMPO, bpmToTempoByte(eff));
+      }
+      break;
+  }
 }
 
 /** Emit OPN register writes (0xFE) for the FM voice patch on a channel */

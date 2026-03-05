@@ -198,3 +198,84 @@ export function encodeSoundMonADSR(cfg: SoundMonConfig, maxLen: number): Uint8Ar
 
   return buf;
 }
+
+
+// ── FC Freq-Macro Encoder ──────────────────────────────────────────────────────
+//
+// FC freq macros are 64-byte opcode streams that control waveform selection,
+// transposition, pitch bends, and looping. Each vol macro (instrument) references
+// a freq macro by index (byte[1] of the vol macro).
+//
+// Key opcodes:
+//   0xE0 +off    Loop to offset within this macro
+//   0xE1         End
+//   0xE2 +wave   Set waveform + reset volume position (wave = index + 10)
+//   0xE3 +lo +hi Set transposition offset (signed 16-bit)
+//   0xE4 +wave   Set waveform (no vol reset) (wave = index + 10)
+//   0xE7 +idx    Jump to different freq macro
+//   0xE8 +cnt    Sustain (hold for cnt ticks)
+//   0xEA +spd +dur  Pitch bend
+
+/**
+ * Encode FCConfig synthTable into FC freq macro opcodes (64 bytes).
+ * Each synthTable step maps to an E2 or E4 opcode + waveRef byte.
+ * Arpeggio transpositions are encoded as E3 opcodes between waveform steps.
+ *
+ * @param synthTable — array of { waveNum, transposition, effect } steps
+ * @param arpTable — 16 semitone offsets (signed), encoded as E3 opcodes
+ * @returns 64-byte Uint8Array for the freq macro
+ */
+export function encodeFCFreqMacro(
+  synthTable: FCConfig['synthTable'],
+  arpTable: number[],
+): Uint8Array {
+  const buf = new Uint8Array(64);
+  let pos = 0;
+
+  // Encode synth table steps as waveform selection opcodes
+  for (let i = 0; i < synthTable.length && pos < 60; i++) {
+    const step = synthTable[i];
+
+    // Transposition via E3 opcode (signed 16-bit)
+    if (step.transposition !== 0 && pos + 3 < 62) {
+      buf[pos++] = 0xE3;
+      const t = step.transposition & 0xFFFF;
+      buf[pos++] = t & 0xFF;        // low byte
+      buf[pos++] = (t >> 8) & 0xFF;  // high byte
+    }
+
+    // Waveform selection: E2 (reset vol) or E4 (no reset)
+    if (pos + 2 < 62) {
+      buf[pos++] = step.effect === 1 ? 0xE2 : 0xE4;
+      buf[pos++] = Math.min(56, Math.max(0, step.waveNum)) + 10; // waveRef = index + 10
+    }
+  }
+
+  // Encode arpeggio table as transposition sequence
+  // Only if there are non-zero arp entries and space remains
+  const hasArp = arpTable.some(v => v !== 0);
+  if (hasArp && pos < 58) {
+    const loopStart = pos; // remember position for loop-back
+    for (let i = 0; i < arpTable.length && pos + 3 < 60; i++) {
+      if (arpTable[i] !== 0) {
+        buf[pos++] = 0xE3;
+        const t = arpTable[i] & 0xFFFF;
+        buf[pos++] = t & 0xFF;
+        buf[pos++] = (t >> 8) & 0xFF;
+      }
+    }
+    // Loop back to arp start
+    if (pos + 2 < 62) {
+      buf[pos++] = 0xE0;
+      buf[pos++] = loopStart & 0x3F;
+    }
+  }
+
+  // End marker
+  if (pos < 64) buf[pos++] = 0xE1;
+
+  // Fill remaining with 0xE1
+  while (pos < 64) buf[pos++] = 0xE1;
+
+  return buf;
+}
