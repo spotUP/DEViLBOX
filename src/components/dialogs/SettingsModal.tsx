@@ -609,6 +609,30 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                   })()}
                 </div>
               </div>
+
+              {/* Setup Wizards */}
+              <div className="pt-3 border-t border-ft2-border/30 space-y-2">
+                <button
+                  onClick={() => { onClose(); useUIStore.getState().openModal('midi-wizard'); }}
+                  className="w-full flex items-center gap-2 px-3 py-2 bg-purple-500/10 border border-purple-500/30 rounded text-left hover:bg-purple-500/20 transition-colors"
+                >
+                  <span className="text-purple-400 text-xs">🎛</span>
+                  <div className="flex-1">
+                    <p className="text-xs text-ft2-highlight font-mono">Controller Setup Wizard</p>
+                    <p className="text-[9px] text-ft2-textDim font-mono">Detect, select, and configure your MIDI controller</p>
+                  </div>
+                </button>
+                <button
+                  onClick={() => { onClose(); useUIStore.getState().openModal('nks-wizard'); }}
+                  className="w-full flex items-center gap-2 px-3 py-2 bg-orange-500/10 border border-orange-500/30 rounded text-left hover:bg-orange-500/20 transition-colors"
+                >
+                  <span className="text-orange-400 text-xs">🎹</span>
+                  <div className="flex-1">
+                    <p className="text-xs text-ft2-highlight font-mono">NKS Performance Setup</p>
+                    <p className="text-[9px] text-ft2-textDim font-mono">Parameter pages, preset export, hardware integration</p>
+                  </div>
+                </button>
+              </div>
             </div>
           </section>
 

@@ -9,6 +9,7 @@ import { TrackerView } from '@components/tracker/TrackerView';
 import { StatusBar } from '@components/layout/StatusBar';
 import { useAudioStore, useTrackerStore, useUIStore } from './stores';
 import { useMIDIStore } from './stores/useMIDIStore';
+import { getMIDIManager } from './midi/MIDIManager';
 import { useDJStore } from './stores/useDJStore';
 import { useSettingsStore } from './stores/useSettingsStore';
 import { useHistoryStore } from './stores/useHistoryStore';
@@ -30,6 +31,8 @@ import { PopOutWindow } from '@components/ui/PopOutWindow';
 import { UpdateNotification } from '@components/ui/UpdateNotification';
 import { SynthErrorDialog } from '@components/ui/SynthErrorDialog';
 import { USBSIDWizard } from '@components/dialogs/USBSIDWizard';
+import { MIDIControllerWizard } from '@components/dialogs/MIDIControllerWizard';
+import { NKSSetupWizard } from '@components/dialogs/NKSSetupWizard';
 import { RomUploadDialog } from '@components/ui/RomUploadDialog';
 import { ModlandContributionModal } from '@components/modland/ModlandContributionModal';
 import { PatternMatchModal } from '@components/modland/PatternMatchModal';
@@ -169,6 +172,30 @@ function App() {
     };
     navigator.usb.addEventListener('connect', handleConnect);
     return () => navigator.usb.removeEventListener('connect', handleConnect);
+  }, []);
+
+  // Detect new MIDI controller connection and show setup wizard
+  useEffect(() => {
+    const midiStore = useMIDIStore.getState();
+    if (!midiStore.isInitialized) return;
+
+    const manager = getMIDIManager();
+    let prevInputCount = midiStore.inputDevices.length;
+
+    const unsub = manager.onDeviceChange(() => {
+      const state = useMIDIStore.getState();
+      const newCount = state.inputDevices.length;
+      // Show wizard when a new input device appears (not on disconnect)
+      if (newCount > prevInputCount && newCount > 0) {
+        const ui = useUIStore.getState();
+        if (!ui.modalOpen) {
+          ui.openModal('midi-wizard');
+        }
+      }
+      prevInputCount = newCount;
+    });
+
+    return unsub;
   }, []);
 
   // Background sample pack download on first run
@@ -1230,6 +1257,12 @@ function App() {
 
       {/* USB-SID-Pico Setup Wizard */}
       <USBSIDWizard />
+
+      {/* MIDI Controller Setup Wizard */}
+      <MIDIControllerWizard />
+
+      {/* NKS Performance Setup Wizard */}
+      <NKSSetupWizard />
 
       {/* ROM Upload Dialog - Shows when ROM-dependent synths can't auto-load ROMs */}
       <RomUploadDialog />
