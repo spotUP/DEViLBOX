@@ -180,7 +180,7 @@ export const VJPatternOverlay: React.FC = React.memo(() => {
       const driftX = Math.sin(t * 0.09) * 15 + Math.cos(t * 0.23) * 10;
       const driftY = Math.sin(t * 0.14) * 8 + anim.bounceY;
       // Overall opacity: base + RMS pulse
-      const opacity = 0.55 + frame.rms * 0.35 + anim.beatFlash * 0.15;
+      const opacity = 0.85 + frame.rms * 0.15 + anim.beatFlash * 0.1;
 
       wrap.style.transform =
         `translate(${driftX.toFixed(1)}px, ${driftY.toFixed(1)}px) ` +
@@ -210,7 +210,7 @@ export const VJPatternOverlay: React.FC = React.memo(() => {
       // Channel headers
       ctx.font = '11px "Berkeley Mono", "JetBrains Mono", "Fira Code", monospace';
       if (letterSpacing > 0.1) ctx.letterSpacing = `${letterSpacing.toFixed(1)}px`;
-      ctx.fillStyle = hsl(baseHue, 40, 70, 0.4 + anim.beatFlash * 0.3);
+      ctx.fillStyle = hsl(baseHue, 40, 80, 0.7 + anim.beatFlash * 0.3);
       for (let ch = 0; ch < numChannels; ch++) {
         const x = rowNumW + ch * cellW;
         const name = channels[ch].shortName || channels[ch].name || `CH${ch + 1}`;
@@ -218,7 +218,7 @@ export const VJPatternOverlay: React.FC = React.memo(() => {
       }
 
       // Separator line
-      ctx.strokeStyle = hsl(baseHue, 60, 50, 0.2 + anim.beatFlash * 0.3);
+      ctx.strokeStyle = hsl(baseHue, 60, 50, 0.4 + anim.beatFlash * 0.3);
       ctx.lineWidth = 1 + anim.beatFlash * 2;
       ctx.beginPath();
       ctx.moveTo(0, ROW_H);
@@ -236,11 +236,11 @@ export const VJPatternOverlay: React.FC = React.memo(() => {
         const dist = Math.abs(i) / VISIBLE_ROWS;
         // Row shimmer wave — rolling sine phase
         const shimmer = 0.5 + 0.5 * Math.sin(t * 3 + i * 0.4);
-        const depthAlpha = (1 - dist * 0.7) * (0.85 + shimmer * 0.15);
+        const depthAlpha = (1 - dist * 0.5) * (0.9 + shimmer * 0.1);
 
         // Current row highlight
         if (isCurrent) {
-          const flashBright = 0.25 + anim.beatFlash * 0.6;
+          const flashBright = 0.4 + anim.beatFlash * 0.5;
           ctx.fillStyle = isPlaying
             ? hsl(baseHue, 70, 55, flashBright)
             : 'rgba(255,255,255,0.1)';
@@ -254,7 +254,7 @@ export const VJPatternOverlay: React.FC = React.memo(() => {
         }
 
         // Row number
-        const rnAlpha = isCurrent ? 0.9 : 0.25 * depthAlpha;
+        const rnAlpha = isCurrent ? 1.0 : 0.45 * depthAlpha;
         ctx.fillStyle = isCurrent
           ? hsl(baseHue, 60, 90, 0.9 + anim.beatFlash * 0.1)
           : `rgba(255,255,255,${rnAlpha.toFixed(3)})`;
@@ -276,11 +276,11 @@ export const VJPatternOverlay: React.FC = React.memo(() => {
           } else if (isCurrent) {
             ctx.fillStyle = hsl(baseHue, 30, 80, 0.7);
           } else if (hasNote) {
-            ctx.fillStyle = `rgba(255,255,255,${(0.5 * depthAlpha).toFixed(3)})`;
+            ctx.fillStyle = `rgba(255,255,255,${(0.75 * depthAlpha).toFixed(3)})`;
           } else if (hasData) {
-            ctx.fillStyle = `rgba(255,255,255,${(0.3 * depthAlpha).toFixed(3)})`;
+            ctx.fillStyle = `rgba(255,255,255,${(0.55 * depthAlpha).toFixed(3)})`;
           } else {
-            ctx.fillStyle = `rgba(255,255,255,${(0.15 * depthAlpha).toFixed(3)})`;
+            ctx.fillStyle = `rgba(255,255,255,${(0.3 * depthAlpha).toFixed(3)})`;
           }
           ctx.fillText(fmtCell(cell), x + 2, y + ROW_H * 0.5);
         }
