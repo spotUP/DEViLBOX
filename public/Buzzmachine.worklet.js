@@ -886,6 +886,89 @@ class BuzzmachineProcessor extends AudioWorkletProcessor {
         this.pendingSynthNotePtr = trackValsPtr;
         this.pendingSynthType = '4FM2F';
       }
+    } else if (machineType.includes('MakkM4')) {
+      // Makk M4 synth - 35 global params (all bytes) + 2 track params (Note, Volume)
+      // Global vals (offsets 0-34):
+      //   0:Wave1, 1:PW1, 2:Wave2, 3:PW2, 4:SemiDetune, 5:FineDetune, 6:Sync,
+      //   7:MixType, 8:Mix, 9:SubOscWave, 10:SubOscVol,
+      //   11:PitchAttack, 12:PitchDecay, 13:PitchEnvMod, 14:Glide,
+      //   15:AmpAttack, 16:AmpSustain, 17:AmpRelease,
+      //   18:FilterType, 19:Cutoff, 20:Resonance,
+      //   21:FilterAttack, 22:FilterSustain, 23:FilterRelease, 24:FilterEnvMod,
+      //   25:LFO1Dest, 26:LFO1Wave, 27:LFO1Freq, 28:LFO1Amount, 29:LFO1PhaseDiff,
+      //   30:LFO2Dest, 31:LFO2Wave, 32:LFO2Freq, 33:LFO2Amount, 34:LFO2PhaseDiff
+      // Track vals (offsets 0-1): 0:Note, 1:Volume
+
+      // Initialize global params on first trigger
+      if (!this.makkM4Initialized && this.globalValsPtr) {
+        // Set all global params to NoValue (0xFF) first
+        for (let i = 0; i < 35; i++) {
+          this.writeByte(this.globalValsPtr + i, 0xFF);
+        }
+        // Oscillators
+        this.writeByte(this.globalValsPtr + 0, 0);      // Wave1: Saw
+        this.writeByte(this.globalValsPtr + 1, 0x40);   // PW1
+        this.writeByte(this.globalValsPtr + 2, 0);      // Wave2: Saw
+        this.writeByte(this.globalValsPtr + 3, 0x40);   // PW2
+        this.writeByte(this.globalValsPtr + 4, 0x40);   // SemiDetune (centered)
+        this.writeByte(this.globalValsPtr + 5, 0x50);   // FineDetune
+        this.writeByte(this.globalValsPtr + 6, 0);      // Sync off
+        // Mix
+        this.writeByte(this.globalValsPtr + 7, 0);      // MixType
+        this.writeByte(this.globalValsPtr + 8, 0x40);   // Mix (centered)
+        this.writeByte(this.globalValsPtr + 9, 0);      // SubOscWave
+        this.writeByte(this.globalValsPtr + 10, 0x40);  // SubOscVol
+        // Pitch envelope
+        this.writeByte(this.globalValsPtr + 11, 7);     // PitchAttack
+        this.writeByte(this.globalValsPtr + 12, 0x0b);  // PitchDecay
+        this.writeByte(this.globalValsPtr + 13, 96);    // PitchEnvMod (0x40+32)
+        this.writeByte(this.globalValsPtr + 14, 0);     // Glide off
+        // Amp envelope
+        this.writeByte(this.globalValsPtr + 15, 5);     // AmpAttack (fast)
+        this.writeByte(this.globalValsPtr + 16, 0x10);  // AmpSustain
+        this.writeByte(this.globalValsPtr + 17, 0x20);  // AmpRelease
+        // Filter
+        this.writeByte(this.globalValsPtr + 18, 2);     // FilterType
+        this.writeByte(this.globalValsPtr + 19, 32);    // Cutoff
+        this.writeByte(this.globalValsPtr + 20, 32);    // Resonance
+        this.writeByte(this.globalValsPtr + 21, 7);     // FilterAttack
+        this.writeByte(this.globalValsPtr + 22, 0x0e);  // FilterSustain
+        this.writeByte(this.globalValsPtr + 23, 0x0f);  // FilterRelease
+        this.writeByte(this.globalValsPtr + 24, 96);    // FilterEnvMod
+        // LFO1 (disabled)
+        this.writeByte(this.globalValsPtr + 25, 0);     // LFO1Dest
+        this.writeByte(this.globalValsPtr + 26, 0);     // LFO1Wave
+        this.writeByte(this.globalValsPtr + 27, 0);     // LFO1Freq
+        this.writeByte(this.globalValsPtr + 28, 0);     // LFO1Amount
+        this.writeByte(this.globalValsPtr + 29, 0x40);  // LFO1PhaseDiff
+        // LFO2 (disabled)
+        this.writeByte(this.globalValsPtr + 30, 0);     // LFO2Dest
+        this.writeByte(this.globalValsPtr + 31, 0);     // LFO2Wave
+        this.writeByte(this.globalValsPtr + 32, 0);     // LFO2Freq
+        this.writeByte(this.globalValsPtr + 33, 0);     // LFO2Amount
+        this.writeByte(this.globalValsPtr + 34, 0x40);  // LFO2PhaseDiff
+        this.makkM4Initialized = true;
+        console.log('[BuzzmachineWorklet] MakkM4 initialized with default global params');
+      }
+
+      const trackValsPtr = this.buzzModule._buzz_get_track_vals ?
+        this.buzzModule._buzz_get_track_vals(this.machinePtr, 0) : 0;
+      if (trackValsPtr) {
+        const midiNote = Math.round(12 * Math.log2(this.noteFrequency / 440) + 69);
+        const octave = Math.floor(midiNote / 12);
+        const note = midiNote % 12;
+        const buzzNote = ((octave) << 4) | (note + 1);
+
+        // Set note + volume on track vals
+        this.writeByte(trackValsPtr, Math.max(1, Math.min(0x9C, buzzNote)));
+        const vol = Math.min(127, Math.max(0x40, Math.round(this.triggerVelocity)));
+        this.writeByte(trackValsPtr + 1, vol);
+
+        console.log('[BuzzmachineWorklet] MakkM4 triggered:', { midiNote, buzzNote: buzzNote.toString(16), volume: vol });
+
+        this.pendingSynthNotePtr = trackValsPtr;
+        this.pendingSynthType = 'MakkM4';
+      }
     } else {
       // Generic fallback for unknown generators
       // Try to set track param 0 as a note or trigger
@@ -1047,13 +1130,14 @@ class BuzzmachineProcessor extends AudioWorkletProcessor {
       if (this.buzzModule._buzz_tick) {
         this.buzzModule._buzz_tick(this.machinePtr);
       }
-    } else if (machineType.includes('MakkM3') || machineType.includes('MadBrain')) {
+    } else if (machineType.includes('MakkM3') || machineType.includes('MakkM4') || machineType.includes('MadBrain')) {
       // These synths properly respond to NOTE_OFF
       // In Buzz: NOTE_NO=0 (no change), NOTE_OFF=255 (turn off), NOTE_MIN=1, NOTE_MAX=156
       const trackValsPtr = this.buzzModule._buzz_get_track_vals ?
         this.buzzModule._buzz_get_track_vals(this.machinePtr, 0) : 0;
       if (trackValsPtr) {
         // NOTE_OFF in Buzz is 255, not 0 (0 is NOTE_NO meaning "no change")
+        // M3: note is at track offset 0; M4: note is also at track offset 0
         this.writeByte(trackValsPtr, 255); // NOTE_OFF = 255
         console.log('[BuzzmachineWorklet] Sent NOTE_OFF (255) to', machineType);
       }

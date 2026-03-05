@@ -7,7 +7,7 @@
  */
 
 import React, { useState, useCallback, useMemo, useRef } from 'react';
-import type { SCWidget, SCGuiParseResult, SCColor, SCButtonState } from '@engine/sc/scGuiParser';
+import type { SCWidget, SCGuiParseResult, SCColor, SCButtonState, SCRoutinePattern } from '@engine/sc/scGuiParser';
 
 // ---------------------------------------------------------------------------
 // Props
@@ -231,6 +231,97 @@ const WidgetRenderer: React.FC<WidgetProps> = (props) => {
 };
 
 // ---------------------------------------------------------------------------
+// Routine pattern visualization
+// ---------------------------------------------------------------------------
+
+const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+
+function midiToNoteName(midi: number): string {
+  const oct = Math.floor(midi / 12) - 1;
+  return `${NOTE_NAMES[midi % 12]}${oct}`;
+}
+
+const RoutinePatternView: React.FC<{ routine: SCRoutinePattern }> = ({ routine }) => {
+  const { pitches, gates, steps, bpm, rootNote } = routine;
+  const root = rootNote ?? 60;
+
+  // Find pitch range for bar visualization
+  const midiNotes = pitches.map(p => root + p);
+  const minNote = Math.min(...midiNotes);
+  const maxNote = Math.max(...midiNotes);
+  const noteRange = Math.max(1, maxNote - minNote);
+
+  return (
+    <div style={{
+      marginTop: 8,
+      padding: 8,
+      background: 'rgba(0,0,0,0.3)',
+      borderRadius: 4,
+      border: '1px solid var(--color-border, #333)',
+    }}>
+      <div style={{
+        fontSize: 10,
+        color: 'var(--color-text-secondary, #888)',
+        marginBottom: 6,
+        display: 'flex',
+        justifyContent: 'space-between',
+      }}>
+        <span>Step Sequencer ({steps} steps)</span>
+        <span>
+          {bpm && `${bpm} BPM`}
+          {rootNote != null && ` | Root: ${midiToNoteName(rootNote)}`}
+        </span>
+      </div>
+      <div style={{ display: 'flex', gap: 2, alignItems: 'flex-end', height: 60 }}>
+        {pitches.map((p, i) => {
+          const midi = root + p;
+          const barHeight = noteRange > 0
+            ? 10 + ((midi - minNote) / noteRange) * 44
+            : 30;
+          const gate = gates[i] ?? 1;
+          const isRest = gate < 0.01;
+          return (
+            <div
+              key={i}
+              title={`Step ${i + 1}: ${midiToNoteName(midi)} (${p >= 0 ? '+' : ''}${p})`}
+              style={{
+                flex: 1,
+                minWidth: 6,
+                maxWidth: 24,
+                height: barHeight,
+                borderRadius: 2,
+                background: isRest
+                  ? 'rgba(255,255,255,0.05)'
+                  : gate < 1
+                    ? `rgba(80,160,255,${0.3 + gate * 0.5})`
+                    : 'rgb(80,160,255)',
+                transition: 'height 0.15s',
+              }}
+            />
+          );
+        })}
+      </div>
+      {/* Note labels below bars */}
+      <div style={{ display: 'flex', gap: 2, marginTop: 2 }}>
+        {pitches.map((p, i) => (
+          <div key={i} style={{
+            flex: 1,
+            minWidth: 6,
+            maxWidth: 24,
+            fontSize: 7,
+            textAlign: 'center',
+            color: 'var(--color-text-secondary, #666)',
+            overflow: 'hidden',
+          }}>
+            {i + 1}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+// ---------------------------------------------------------------------------
 // Row grouping: group adjacent labels + controls into rows
 // ---------------------------------------------------------------------------
 
@@ -337,6 +428,9 @@ export const SCGuiRenderer: React.FC<SCGuiRendererProps> = ({
           )}
         </div>
       ))}
+
+      {/* Routine step-sequencer pattern */}
+      {gui.routine && <RoutinePatternView routine={gui.routine} />}
     </div>
   );
 };

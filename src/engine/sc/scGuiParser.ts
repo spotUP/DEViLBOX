@@ -62,6 +62,20 @@ export interface SCWidget {
   children: SCWidget[];
 }
 
+/** Extracted step-sequencer pattern from a Routine */
+export interface SCRoutinePattern {
+  /** Pitch offsets per step (semitones from root, e.g. [0, 12, 0, -12, ...]) */
+  pitches: number[];
+  /** Note-on probability per step (0-1, typically from ~noteOns array) */
+  gates: number[];
+  /** Number of steps */
+  steps: number;
+  /** BPM from ~bpm assignment */
+  bpm?: number;
+  /** Root MIDI note from ~root assignment */
+  rootNote?: number;
+}
+
 export interface SCGuiParseResult {
   /** Top-level window (if found) */
   window?: SCWidget;
@@ -71,6 +85,8 @@ export interface SCGuiParseResult {
   hasGui: boolean;
   /** Extracted variable assignments (arrays, scalars) for context */
   variables: Record<string, unknown>;
+  /** Extracted step-sequencer pattern from Routine blocks */
+  routine?: SCRoutinePattern;
 }
 
 // ---------------------------------------------------------------------------
@@ -476,10 +492,67 @@ export function parseSCGui(source: string): SCGuiParseResult {
     }
   }
 
+  // Extract Routine step-sequencer patterns
+  const routine = extractRoutinePattern(stripped, variables);
+
   return {
     window: windowWidget,
     widgets,
     hasGui: widgets.length > 0,
     variables,
+    routine,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Routine / step-sequencer pattern extraction
+// ---------------------------------------------------------------------------
+
+/**
+ * Detect and extract a step-sequencer pattern from SC Routine blocks.
+ *
+ * Looks for the common pattern:
+ *   ~pitches = [0, 12, 0, -12, ...];
+ *   ~noteOns = Array.fill(16, 1);  (or explicit array)
+ *   ~bpm = 140;
+ *   ~root = 36;
+ *   Routine.new({ loop({ ... ~pitches[~step] ... }) })
+ *
+ * Returns undefined if no sequencer pattern detected.
+ */
+function extractRoutinePattern(
+  source: string,
+  variables: Record<string, unknown>
+): SCRoutinePattern | undefined {
+  // Must have a Routine to qualify
+  if (!/Routine\s*\.\s*new\s*\(/.test(source)) return undefined;
+
+  // Extract pitches array
+  const pitches = variables['pitches'] ?? variables['defaultPitches'];
+  if (!Array.isArray(pitches) || pitches.length === 0) return undefined;
+
+  // Extract gates/note-on probabilities
+  let gates: number[];
+  const noteOns = variables['noteOns'] ?? variables['defaultNoteOns'];
+  if (Array.isArray(noteOns)) {
+    gates = noteOns.map(Number);
+  } else {
+    // Default: all notes on
+    gates = Array(pitches.length).fill(1);
+  }
+
+  // Ensure same length
+  while (gates.length < pitches.length) gates.push(1);
+
+  const steps = pitches.length;
+  const bpm = typeof variables['bpm'] === 'number' ? variables['bpm'] : undefined;
+  const rootNote = typeof variables['root'] === 'number' ? variables['root'] : undefined;
+
+  return {
+    pitches: pitches.map(Number),
+    gates,
+    steps,
+    bpm,
+    rootNote,
   };
 }
