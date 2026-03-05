@@ -308,7 +308,7 @@ const RoutinePatternView: React.FC<{
       </div>
       {/* Note labels below bars */}
       <div style={{ display: 'flex', gap: 2, marginTop: 2 }}>
-        {pitches.map((p, i) => (
+        {pitches.map((_p, i) => (
           <div key={i} style={{
             flex: 1,
             minWidth: 6,

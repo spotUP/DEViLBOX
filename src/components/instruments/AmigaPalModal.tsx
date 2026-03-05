@@ -1017,7 +1017,7 @@ export const AmigaPalModal: React.FC<AmigaPalModalProps> = ({
                             } catch {
                               setStatusMessage(`Failed to process: ${sample.filename}`, true, 2000);
                             }
-                          }}}
+                          }}
                           className="flex-1 bg-ft2-header px-2 py-1 border border-ft2-border hover:border-ft2-highlight hover:text-ft2-highlight transition-colors"
                         >
                           <Shuffle size={12} className="mx-auto" />

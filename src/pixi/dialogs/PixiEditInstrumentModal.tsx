@@ -167,15 +167,6 @@ export const PixiEditInstrumentModal: React.FC<PixiEditInstrumentModalProps> = (
     }
   }, [isOpen, createMode]);
 
-  // Switch to appropriate tab when instrument type changes
-  useEffect(() => {
-    if (currentInstrument?.synthType === 'SuperCollider') {
-      if (activeTab === 'sound') setActiveTab('script');
-    } else {
-      if (activeTab === 'script' || activeTab === 'controls') setActiveTab('sound');
-    }
-  }, [currentInstrument?.synthType]); // eslint-disable-line react-hooks/exhaustive-deps
-
   // ── Escape key to close ────────────────────────────────────────────────
   useEffect(() => {
     if (!isOpen) return;
@@ -193,6 +184,15 @@ export const PixiEditInstrumentModal: React.FC<PixiEditInstrumentModalProps> = (
     () => instruments.find((i) => i.id === currentInstrumentId) ?? instruments[0] ?? null,
     [instruments, currentInstrumentId],
   );
+
+  // Switch to appropriate tab when instrument type changes
+  useEffect(() => {
+    if (currentInstrument?.synthType === 'SuperCollider') {
+      if (activeTab === 'sound') setActiveTab('script');
+    } else {
+      if (activeTab === 'script' || activeTab === 'controls') setActiveTab('sound');
+    }
+  }, [currentInstrument?.synthType]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const instListItems = useMemo(() => instrumentListItems(instruments), [instruments]);
 
@@ -1086,7 +1086,7 @@ const SCControlsPanel: React.FC<{
   return (
     <layoutContainer layout={{ flex: 1, flexDirection: 'column', gap: 8, overflow: 'scroll' }}>
       <layoutContainer layout={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-        <PixiLabel text={`\\${synthDefName}`} size="sm" weight="bold" color="textPrimary" />
+        <PixiLabel text={`\\${synthDefName}`} size="sm" weight="bold" color="text" />
         <PixiLabel text={`${params.length} params`} size="xs" color="textMuted" />
       </layoutContainer>
 
@@ -1297,9 +1297,10 @@ const JamCrackerPanel: React.FC<{
 const FuturePlayerPanel: React.FC<{ instrument: InstrumentConfig }> = ({ instrument }) => {
   const theme = usePixiTheme();
   const meta = instrument.metadata;
-  const isWavetable = meta?.fpIsWavetable ?? false;
-  const sampleSize = meta?.fpSampleSize ?? 0;
-  const instrPtr = meta?.fpInstrPtr;
+  const sample = instrument.sample;
+  const isWavetable = sample?.fpIsWavetable ?? false;
+  const sampleSize = sample?.fpSampleSize ?? 0;
+  const instrPtr = meta?.fpInstrPtr ?? sample?.fpInstrPtr;
 
   return (
     <layoutContainer layout={{ flexDirection: 'column', gap: 8 }}>

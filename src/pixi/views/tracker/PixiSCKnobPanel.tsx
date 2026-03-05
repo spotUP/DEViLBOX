@@ -14,7 +14,6 @@ import { usePixiTheme } from '../../theme';
 import { PixiKnob, PixiButton, PixiLabel } from '../../components';
 import { useInstrumentStore, useUIStore } from '@stores';
 import { useShallow } from 'zustand/react/shallow';
-import type { SuperColliderConfig } from '@typedefs/instrument';
 
 // ─── Heights ─────────────────────────────────────────────────────────────────
 
@@ -130,7 +129,7 @@ export const PixiSCKnobPanel: React.FC<PixiSCKnobPanelProps> = ({ width }) => {
           text={`\\${synthDefName}`}
           size="sm"
           weight="bold"
-          color="textPrimary"
+          color="text"
         />
 
         <PixiLabel
@@ -148,7 +147,7 @@ export const PixiSCKnobPanel: React.FC<PixiSCKnobPanelProps> = ({ width }) => {
             <PixiButton
               label="<"
               variant="ghost"
-              size="xs"
+              size="sm"
               onClick={() => setParamPage(Math.max(0, paramPage - 1))}
               disabled={paramPage === 0}
             />
@@ -160,7 +159,7 @@ export const PixiSCKnobPanel: React.FC<PixiSCKnobPanelProps> = ({ width }) => {
             <PixiButton
               label=">"
               variant="ghost"
-              size="xs"
+              size="sm"
               onClick={() => setParamPage(Math.min(totalPages - 1, paramPage + 1))}
               disabled={paramPage >= totalPages - 1}
             />
@@ -171,7 +170,7 @@ export const PixiSCKnobPanel: React.FC<PixiSCKnobPanelProps> = ({ width }) => {
         <PixiButton
           label={isCollapsed ? '▾' : '▴'}
           variant="ghost"
-          size="xs"
+          size="sm"
           onClick={toggleSCCollapsed}
         />
       </layoutContainer>

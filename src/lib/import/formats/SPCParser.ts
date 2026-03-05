@@ -162,13 +162,6 @@ function readDSPVoices(buf: Uint8Array): VoiceInfo[] {
   return voices;
 }
 
-/** Read the sample directory base address from DSP register 0x5D (DIR). */
-function readDIR(buf: Uint8Array): number {
-  const dspBase = 0x10100;
-  if (buf.length < dspBase + 0x5E) return 0;
-  return buf[dspBase + 0x5D];
-}
-
 // ── Instrument Builder ────────────────────────────────────────────────────────
 
 function buildInstruments(_voices: VoiceInfo[]): InstrumentConfig[] {

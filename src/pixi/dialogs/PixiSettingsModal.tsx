@@ -200,7 +200,6 @@ export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, on
   const resetLensParams = useSettingsStore((s) => s.resetLensParams);
   const sidEngine = useSettingsStore((s) => s.sidEngine);
   const setSidEngine = useSettingsStore((s) => s.setSidEngine);
-  const asidEnabled = useSettingsStore((s) => s.asidEnabled);
   const setAsidEnabled = useSettingsStore((s) => s.setAsidEnabled);
   const asidDeviceId = useSettingsStore((s) => s.asidDeviceId);
   const setAsidDeviceId = useSettingsStore((s) => s.setAsidDeviceId);
@@ -1013,7 +1012,7 @@ export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, on
                           ]}
                           value={String(webusbClockRate)}
                           onChange={async (v) => {
-                            const rate = parseInt(v || '1', 10);
+                            const rate = parseInt(v || '1', 10) as import('@lib/sid/USBSIDPico').ClockRateValue;
                             setWebusbClockRate(rate);
                             const { getSIDHardwareManager } = await import('@lib/sid/SIDHardwareManager');
                             getSIDHardwareManager().setClock(rate);
