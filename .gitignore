@@ -125,3 +125,6 @@ server/data/deepsid.db
 server/data/deepsid-import/
 server/data/deepsid-images/
 pt2-replayer-wasm/build/
+hippel-wasm/build/
+ma-wasm/build/
+pretracker-wasm/build/
