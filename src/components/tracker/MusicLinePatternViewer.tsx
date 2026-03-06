@@ -23,6 +23,21 @@ function instrStr(instr: number): string {
   return instr ? instr.toString(16).toUpperCase().padStart(2, '0') : '--';
 }
 
+function fxStr(typ: number | undefined, par: number | undefined): string {
+  if (!typ && !par) return '\u00B7\u00B7\u00B7';
+  const t = (typ ?? 0).toString(16).toUpperCase();
+  const p = (par ?? 0).toString(16).toUpperCase().padStart(2, '0');
+  return `${t}${p}`;
+}
+
+const FX_KEYS: Array<[string, string]> = [
+  ['effTyp', 'eff'],
+  ['effTyp2', 'eff2'],
+  ['effTyp3', 'eff3'],
+  ['effTyp4', 'eff4'],
+  ['effTyp5', 'eff5'],
+];
+
 const ROW_H = 18; // px per row — must match CSS
 
 export const MusicLinePatternViewer: React.FC = () => {
@@ -54,6 +69,10 @@ export const MusicLinePatternViewer: React.FC = () => {
     const patIdx = table[currentPos] ?? 0;
     return patterns[patIdx] ?? null;
   });
+
+  // Number of effect columns from channelMeta (MusicLine sets 5)
+  const effectCols = channelPatterns[0]?.channels[0]?.channelMeta?.effectCols ?? 2;
+  const chanWidth = 56 + effectCols * 28; // note(28) + instr(20) + padding + fx cols
 
   // All parts are 128 rows
   const numRows = channelPatterns[0]?.length ?? 128;
@@ -98,7 +117,7 @@ export const MusicLinePatternViewer: React.FC = () => {
             <span
               key={chIdx}
               style={{
-                width: 80,
+                width: chanWidth,
                 flexShrink: 0,
                 textAlign: 'center',
                 color: '#aaa',
@@ -153,7 +172,7 @@ export const MusicLinePatternViewer: React.FC = () => {
                 <span
                   key={chIdx}
                   style={{
-                    width: 80,
+                    width: chanWidth,
                     flexShrink: 0,
                     display: 'flex',
                     gap: 2,
@@ -173,6 +192,17 @@ export const MusicLinePatternViewer: React.FC = () => {
                   <span style={{ width: 20, color: hasNote && cell.instrument ? '#ffaa44' : '#333' }}>
                     {cell ? instrStr(cell.instrument) : '--'}
                   </span>
+                  {Array.from({ length: effectCols }, (_, ec) => {
+                    const [typKey, parKey] = FX_KEYS[ec];
+                    const typ = cell ? (cell as unknown as Record<string, number>)[typKey] : undefined;
+                    const par = cell ? (cell as unknown as Record<string, number>)[parKey] : undefined;
+                    const hasFx = typ || par;
+                    return (
+                      <span key={ec} style={{ width: 24, color: hasFx ? '#66aaff' : '#333', fontSize: 10 }}>
+                        {fxStr(typ, par)}
+                      </span>
+                    );
+                  })}
                 </span>
               );
             })}
