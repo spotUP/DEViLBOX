@@ -106,6 +106,22 @@ export const JamCrackerView: React.FC = () => {
     el.scrollLeft = Math.max(0, targetLeft);
   }, [activePos, isPlaying]);
 
+  const handleExport = useCallback(async () => {
+    if (!JamCrackerEngine.hasInstance()) return;
+    const engine = JamCrackerEngine.getInstance();
+    const data = await engine.save();
+    if (data.length === 0) return;
+    const blob = new Blob([data], { type: 'application/octet-stream' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'export.jam';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, []);
+
   if (!jamCrackerFileData) {
     return (
       <div className="flex flex-col flex-1 min-h-0 bg-dark-bgPrimary text-ft2-text font-mono items-center justify-center">
@@ -132,6 +148,11 @@ export const JamCrackerView: React.FC = () => {
         <span className="text-xs font-bold text-yellow-300">JAM</span>
         <span className="text-ft2-textDim">|</span>
         <span className="text-xs text-ft2-textDim">{toolbarInfo}</span>
+        <div className="flex-1" />
+        <button
+          className="px-2 py-0.5 text-xs bg-green-800 hover:bg-green-700 text-green-100 rounded border border-green-600"
+          onClick={handleExport}
+        >Export .jam</button>
       </div>
 
       {/* Song order list */}

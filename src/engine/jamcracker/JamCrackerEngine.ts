@@ -189,6 +189,13 @@ export class JamCrackerEngine {
             this._songStructureResolve = null;
           }
           break;
+
+        case 'save-data':
+          if (this._saveResolve) {
+            this._saveResolve(new Uint8Array(data.data));
+            this._saveResolve = null;
+          }
+          break;
       }
     };
 
@@ -261,6 +268,7 @@ export class JamCrackerEngine {
 
   private _patternCallbacks: Map<string, (data: any) => void> = new Map();
   private _songStructureResolve: ((data: any) => void) | null = null;
+  private _saveResolve: ((data: Uint8Array) => void) | null = null;
   private _requestId = 0;
 
   /** Get pattern data: array of rows, each row has 4 channels with 8 fields */
@@ -294,6 +302,15 @@ export class JamCrackerEngine {
       if (!this.workletNode) { resolve({ songLen: 0, numPats: 0, numInst: 0, entries: [] }); return; }
       this._songStructureResolve = resolve;
       this.workletNode.port.postMessage({ type: 'get-song-structure' });
+    });
+  }
+
+  /** Save the current module state as a .jam binary */
+  save(): Promise<Uint8Array> {
+    return new Promise((resolve) => {
+      if (!this.workletNode) { resolve(new Uint8Array(0)); return; }
+      this._saveResolve = resolve;
+      this.workletNode.port.postMessage({ type: 'save' });
     });
   }
 

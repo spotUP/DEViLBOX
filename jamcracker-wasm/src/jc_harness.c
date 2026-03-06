@@ -304,3 +304,94 @@ EXPORT int jc_get_song_entry(int pos) {
     if (!st) return 0;
     return (int)READ16(st + pos * 2);
 }
+
+/* ---- Save/Export ---- */
+
+/**
+ * jc_save — create a clean copy of the module suitable for saving.
+ * Returns pointer to a malloc'd buffer (caller must free via jc_save_free).
+ * Runtime pointer fields (it_address, pt_address) are zeroed since they
+ * get re-resolved by pp_init at load time.
+ */
+static uint8_t *g_save_buf = NULL;
+static uint32_t g_save_size = 0;
+
+EXPORT uint32_t jc_save(void) {
+    if (!g_initialized || !g_song_buf) return 0;
+
+    /* Calculate total module size by walking the structure */
+    uint32_t pos = 4; /* skip "BeEp" magic */
+    uint16_t noi = (uint16_t)((g_song_buf[pos] << 8) | g_song_buf[pos + 1]);
+    pos += 2;
+
+    /* Skip instrument table */
+    uint32_t inst_table_start = pos;
+    pos += noi * it_sizeof;
+
+    /* Read NOP */
+    uint16_t nop = (uint16_t)((g_song_buf[pos] << 8) | g_song_buf[pos + 1]);
+    pos += 2;
+
+    /* Skip pattern table */
+    uint32_t pat_table_start = pos;
+    pos += nop * pt_sizeof;
+
+    /* Read song length */
+    uint16_t sl = (uint16_t)((g_song_buf[pos] << 8) | g_song_buf[pos + 1]);
+    pos += 2 + sl * 2;
+
+    /* Pattern data: sum up all pattern sizes */
+    for (int i = 0; i < nop; i++) {
+        uint32_t pt_off = pat_table_start + i * pt_sizeof;
+        uint16_t pt_rows = (uint16_t)((g_song_buf[pt_off] << 8) | g_song_buf[pt_off + 1]);
+        pos += pt_rows * nt_sizeof * 4;
+    }
+
+    /* Sample data: sum up all instrument sizes */
+    for (int i = 0; i < noi; i++) {
+        uint32_t it_off = inst_table_start + i * it_sizeof;
+        uint32_t size = (uint32_t)(
+            (g_song_buf[it_off + 32] << 24) |
+            (g_song_buf[it_off + 33] << 16) |
+            (g_song_buf[it_off + 34] << 8)  |
+             g_song_buf[it_off + 35]
+        );
+        pos += size;
+    }
+
+    g_save_size = pos;
+
+    /* Free previous save buffer */
+    if (g_save_buf) { free(g_save_buf); g_save_buf = NULL; }
+
+    g_save_buf = (uint8_t *)malloc(g_save_size);
+    if (!g_save_buf) return 0;
+
+    memcpy(g_save_buf, g_song_buf, g_save_size);
+
+    /* Zero out runtime pointer fields in instrument table */
+    for (int i = 0; i < noi; i++) {
+        uint32_t off = 6 + i * it_sizeof + 36; /* it_address at offset 36 */
+        g_save_buf[off] = 0; g_save_buf[off+1] = 0;
+        g_save_buf[off+2] = 0; g_save_buf[off+3] = 0;
+    }
+
+    /* Zero out runtime pointer fields in pattern table */
+    uint32_t pt_start = 6 + noi * it_sizeof + 2;
+    for (int i = 0; i < nop; i++) {
+        uint32_t off = pt_start + i * pt_sizeof + pt_address;
+        g_save_buf[off] = 0; g_save_buf[off+1] = 0;
+        g_save_buf[off+2] = 0; g_save_buf[off+3] = 0;
+    }
+
+    return g_save_size;
+}
+
+EXPORT uint8_t *jc_save_ptr(void) {
+    return g_save_buf;
+}
+
+EXPORT void jc_save_free(void) {
+    if (g_save_buf) { free(g_save_buf); g_save_buf = NULL; }
+    g_save_size = 0;
+}
