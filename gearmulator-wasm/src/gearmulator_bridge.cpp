@@ -310,4 +310,54 @@ EXPORT uint64_t gm_getDspClockHz(int32_t handle)
     return g_devices[handle]->device->getDspClockHz();
 }
 
+/**
+ * Debug: non-blocking process — push input but don't wait for output.
+ * Returns 1 if input was pushed successfully, 0 otherwise.
+ * Use gm_getAudioOutputSize to poll for output readiness.
+ */
+EXPORT int32_t gm_pushInput(int32_t handle, uint32_t numSamples)
+{
+    if (handle < 0 || handle >= static_cast<int32_t>(g_devices.size()) || !g_devices[handle])
+        return 0;
+
+    auto& gm = *g_devices[handle];
+    auto* virusDev = dynamic_cast<virusLib::Device*>(gm.device.get());
+    if (!virusDev) return 0;
+
+    auto& audio = virusDev->getDSP()->getAudio();
+
+    // Push silence into audio input (non-blocking since ring buffer is huge)
+    for (uint32_t i = 0; i < numSamples; ++i)
+    {
+        if (audio.getAudioInputs().full())
+            break;
+        audio.getAudioInputs().push_back({});
+    }
+    return 1;
+}
+
+/**
+ * Debug: check how many output frames the DSP has produced.
+ */
+EXPORT int32_t gm_getAudioOutputSize(int32_t handle)
+{
+    if (handle < 0 || handle >= static_cast<int32_t>(g_devices.size()) || !g_devices[handle])
+        return -1;
+    auto* virusDev = dynamic_cast<virusLib::Device*>(g_devices[handle]->device.get());
+    if (!virusDev) return -2;
+    return static_cast<int32_t>(virusDev->getDSP()->getAudio().getAudioOutputs().size());
+}
+
+/**
+ * Debug: check how many input frames are queued.
+ */
+EXPORT int32_t gm_getAudioInputSize(int32_t handle)
+{
+    if (handle < 0 || handle >= static_cast<int32_t>(g_devices.size()) || !g_devices[handle])
+        return -1;
+    auto* virusDev = dynamic_cast<virusLib::Device*>(g_devices[handle]->device.get());
+    if (!virusDev) return -2;
+    return static_cast<int32_t>(virusDev->getDSP()->getAudio().getAudioInputs().size());
+}
+
 } // extern "C"
