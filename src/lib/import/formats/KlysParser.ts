@@ -227,10 +227,12 @@ export function parseKlystrack(buf: ArrayBuffer): TrackerSong {
   const instruments: InstrumentConfig[] = [];
   for (let i = 0; i < numInstruments; i++) {
     instruments.push({
+      id: i + 1,
       name: `Inst ${i.toString(16).toUpperCase().padStart(2, '0')}`,
-      type: 'Klystrack',
+      type: 'Klystrack' as InstrumentConfig['type'],
+      synthType: 'KlysSynth',
       volume: -6,
-    });
+    } as InstrumentConfig);
   }
 
   // Song positions (global, maps to first channel's sequence — klystrack doesn't use global positions)
