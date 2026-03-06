@@ -63,16 +63,16 @@ export class PreTrackerEngine implements DevilboxSynth {
       // Set up message event listener
       this.setupMessageListener();
 
-      // Wait for worklet 'ready' signal before sending init
-      await this.waitForMessage('ready');
-
-      // Send init with WASM code + binary
+      // Send init with WASM code + binary, THEN wait for ready
       this.worklet.port.postMessage({
         type: 'init',
         sampleRate: audioContext.sampleRate,
         wasmBinary,
         jsCode,
       });
+
+      // Wait for worklet to finish WASM initialization
+      await this.waitForMessage('ready');
 
       console.log('[PreTrackerEngine] Initialized successfully');
     } catch (error) {
@@ -83,8 +83,8 @@ export class PreTrackerEngine implements DevilboxSynth {
   }
 
   /**
-   * Load a tracker module (e.g., XM, IT, etc.)
-   * @param data ArrayBuffer containing the module data
+   * Load a PreTracker module file
+   * @param data ArrayBuffer containing the PreTracker module data
    */
   async load(data: ArrayBuffer): Promise<void> {
     if (!this.worklet) {

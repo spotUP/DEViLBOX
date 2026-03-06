@@ -63,8 +63,6 @@ struct GmDevice
 {
     std::unique_ptr<synthLib::Device> device;
     GmSynthType type;
-    std::vector<float> outL;
-    std::vector<float> outR;
     std::vector<synthLib::SMidiEvent> midiIn;
     std::vector<synthLib::SMidiEvent> midiOut;
 };
@@ -166,7 +164,7 @@ EXPORT void gm_destroy(int32_t handle)
 }
 
 /**
- * Process audio. Fills outputL and outputR with interleaved float samples.
+ * Process audio. Fills outputL and outputR with float samples (one buffer per channel).
  * @param handle     Device handle
  * @param outputL    Pointer to left channel buffer (numSamples floats)
  * @param outputR    Pointer to right channel buffer (numSamples floats)
@@ -179,18 +177,14 @@ EXPORT void gm_process(int32_t handle, float* outputL, float* outputR, uint32_t 
 
     auto& gm = *g_devices[handle];
 
-    // Ensure buffers are large enough
-    gm.outL.resize(numSamples, 0.0f);
-    gm.outR.resize(numSamples, 0.0f);
-    std::fill(gm.outL.begin(), gm.outL.end(), 0.0f);
-    std::fill(gm.outR.begin(), gm.outR.end(), 0.0f);
+    // Zero output buffers
+    std::memset(outputL, 0, numSamples * sizeof(float));
+    std::memset(outputR, 0, numSamples * sizeof(float));
 
-    // Set up audio I/O pointers
-    // TAudioInputs: L, R, (aux inputs...)
-    // TAudioOutputs: L, R, (aux outputs up to 12 channels)
+    // Process directly into caller's buffers
     const synthLib::TAudioInputs inputs = {nullptr, nullptr, nullptr, nullptr};
     const synthLib::TAudioOutputs outputs = {
-        gm.outL.data(), gm.outR.data(),
+        outputL, outputR,
         nullptr, nullptr, nullptr, nullptr,
         nullptr, nullptr, nullptr, nullptr,
         nullptr, nullptr
@@ -199,10 +193,6 @@ EXPORT void gm_process(int32_t handle, float* outputL, float* outputR, uint32_t 
     gm.midiOut.clear();
     gm.device->process(inputs, outputs, numSamples, gm.midiIn, gm.midiOut);
     gm.midiIn.clear();
-
-    // Copy to output buffers
-    std::memcpy(outputL, gm.outL.data(), numSamples * sizeof(float));
-    std::memcpy(outputR, gm.outR.data(), numSamples * sizeof(float));
 }
 
 /**

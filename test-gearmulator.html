@@ -25,14 +25,14 @@
     <label>ROM:</label>
     <select id="romSelect">
       <option value="roms/gearmulator/extracted/Access Virus B (am29f040b_4v9).BIN" data-type="0">Virus B</option>
-      <option value="roms/gearmulator/extracted/Access Virus C (am29f040b_6v6).BIN" data-type="1">Virus C</option>
+      <option value="roms/gearmulator/extracted/Access Virus C (am29f040b_6v6).BIN" data-type="0">Virus C</option>
     </select>
     <input type="file" id="romFile" accept=".bin,.BIN,.rom,.ROM">
     <label>Type:</label>
     <select id="synthType">
-      <option value="0">Virus A/B (0)</option>
-      <option value="1">Virus C (1)</option>
-      <option value="2">Virus TI (2)</option>
+      <option value="0">Virus A/B/C (0)</option>
+      <option value="1">Virus TI/Snow (1)</option>
+      <option value="2">Waldorf microQ (2)</option>
     </select>
   </div>
 
@@ -229,6 +229,7 @@
         btnChord.disabled = false;
         btnStop.disabled = false;
         startMeter();
+        startSABMonitor();
 
       } catch (err) {
         log(`✗ Init failed: ${err}`, 'error');
@@ -263,6 +264,39 @@
       for (let n = 0; n < 128; n++) sendMidi('noteOff', { note: n, channel: 0 });
       log('All notes off');
     });
+
+    function startSABMonitor() {
+      // Monitor SAB ring buffer from main thread — bypasses worker event loop blocking
+      const sabInt32 = new Int32Array(sab);
+      const sabFloat32 = new Float32Array(sab);
+      let monitorCount = 0;
+      const monitor = setInterval(() => {
+        const writePos = Atomics.load(sabInt32, 0);
+        const readPos = Atomics.load(sabInt32, 1);
+        const bufSize = Atomics.load(sabInt32, 2);
+        let used = writePos - readPos;
+        if (used < 0) used += bufSize;
+
+        // Sample a few floats near writePos to check for non-zero audio
+        let peak = 0;
+        const audioOffset = 4; // HEADER_INTS
+        if (writePos > 0) {
+          const checkStart = ((writePos - 128 + bufSize) % bufSize);
+          for (let i = 0; i < 128; i++) {
+            const frameIdx = (checkStart + i) % bufSize;
+            const idx = audioOffset + frameIdx * 2;
+            const v = Math.abs(sabFloat32[idx]);
+            if (v > peak) peak = v;
+          }
+        }
+
+        const cls = peak > 0.001 ? 'ok' : (used > 0 ? 'warn' : 'error');
+        log(`[SAB] write=${writePos} read=${readPos} used=${used}/${bufSize} peak=${peak.toFixed(6)}`, cls);
+
+        monitorCount++;
+        if (monitorCount > 30) clearInterval(monitor); // stop after ~30s
+      }, 1000);
+    }
 
     function startMeter() {
       const buf = new Uint8Array(analyser.frequencyBinCount);
