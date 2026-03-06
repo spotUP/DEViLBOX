@@ -27,6 +27,21 @@ export interface KlysPositionUpdate {
   speed: number;
 }
 
+export interface KlysSongData {
+  patterns: Array<{ numSteps: number; steps: Array<{ note: number; instrument: number; ctrl: number; volume: number; command: number }> }>;
+  sequences: Array<{ entries: Array<{ position: number; pattern: number; noteOffset: number }> }>;
+  instruments: Array<{
+    name: string; adsr: { a: number; d: number; s: number; r: number };
+    flags: number; cydflags: number; baseNote: number; finetune: number;
+    slideSpeed: number; pw: number; volume: number; progPeriod: number;
+    vibratoSpeed: number; vibratoDepth: number; pwmSpeed: number; pwmDepth: number;
+    cutoff: number; resonance: number; flttype: number; fxBus: number;
+    buzzOffset: number; ringMod: number; syncSource: number; wavetableEntry: number;
+    fmModulation: number; fmFeedback: number; fmHarmonic: number;
+    fmAdsr: { a: number; d: number; s: number; r: number }; program: number[];
+  } | null>;
+}
+
 type PositionCallback = (update: KlysPositionUpdate) => void;
 
 export class KlysEngine {
@@ -47,6 +62,8 @@ export class KlysEngine {
   private _rejectSong: ((err: Error) => void) | null = null;
   private _positionCallbacks: Set<PositionCallback> = new Set();
   private _songEndCallbacks: Set<() => void> = new Set();
+  private _songDataCallbacks: Set<(data: KlysSongData) => void> = new Set();
+  private _lastSongData: KlysSongData | null = null;
   private _disposed = false;
 
   private constructor() {
@@ -189,6 +206,17 @@ export class KlysEngine {
             cb();
           }
           break;
+
+        case 'songData':
+          this._lastSongData = {
+            patterns: data.patterns,
+            sequences: data.sequences,
+            instruments: data.instruments,
+          };
+          for (const cb of this._songDataCallbacks) {
+            cb(this._lastSongData);
+          }
+          break;
       }
     };
 
@@ -251,6 +279,17 @@ export class KlysEngine {
   onSongEnd(cb: () => void): () => void {
     this._songEndCallbacks.add(cb);
     return () => this._songEndCallbacks.delete(cb);
+  }
+
+  onSongData(cb: (data: KlysSongData) => void): () => void {
+    this._songDataCallbacks.add(cb);
+    // If data already received, call immediately
+    if (this._lastSongData) cb(this._lastSongData);
+    return () => this._songDataCallbacks.delete(cb);
+  }
+
+  get lastSongData(): KlysSongData | null {
+    return this._lastSongData;
   }
 
   sendMessage(msg: Record<string, unknown>, transfers?: Transferable[]): void {
