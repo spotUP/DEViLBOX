@@ -358,9 +358,8 @@ export function convertFurnaceNoteValue(cell: FurnacePatternCell): number {
  * Convert Furnace pattern cell to XM-compatible format
  * @param cell The Furnace pattern cell
  * @param isChipSynth If true, skip the -24 octave offset (chip synths use native Furnace octaves)
- * @param grooves Optional groove table — used to resolve 0x09 groove-index → speed value
  */
-export function convertFurnaceCell(cell: FurnacePatternCell, isChipSynth: boolean = false, grooves?: Array<{ len: number; val: number[] }>): ConvertedPatternCell {
+export function convertFurnaceCell(cell: FurnacePatternCell, isChipSynth: boolean = false): ConvertedPatternCell {
   let note = 0;
 
   if (cell.note === NOTE_OFF || cell.note === NOTE_RELEASE || cell.note === MACRO_RELEASE) {
