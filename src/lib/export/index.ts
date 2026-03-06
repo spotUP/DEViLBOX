@@ -9,6 +9,7 @@ export * from './ExportDialog';
 // Tracker format exporters
 export * from './MODExporter';
 export * from './XMExporter';
+export * from './OpenMPTExporter';
 
 // Chip music exporters (Furnace/Hardware capture)
 export * from './VGMExporter';
