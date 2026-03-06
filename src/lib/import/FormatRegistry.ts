@@ -1889,6 +1889,17 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
     nativeParser: { module: '@lib/import/formats/UFOParser', parseFn: 'parseUFOFile', detectFn: 'isUFOFormat' },
     uadeFallback: true,
   },
+  {
+    key: 'kt',
+    label: 'Klystrack',
+    description: 'Klystrack chiptune tracker (.kt)',
+    family: 'amiga-native',
+    matchMode: 'extension',
+    extRegex: /\.(kt|ki)$/i,
+    prefKey: 'kt',
+    nativeParser: { module: '@lib/import/formats/KlysParser', parseFn: 'parseKlystrack', detectFn: 'isKlystrack' },
+    hasMetadata: true,
+  },
 
   // ═══════════════════════════════════════════════════════════════════════════
   // LIBOPENMPT — Standard tracker formats (native parser first, then libopenmpt)
