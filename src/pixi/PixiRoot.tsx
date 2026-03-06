@@ -12,7 +12,7 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { useApplication, useTick } from '@pixi/react';
 import { isRapidScrolling } from './scrollPerf';
-import { useUIStore, useSettingsStore , useFormatStore } from '@stores';
+import { useUIStore, useSettingsStore , useFormatStore, useTrackerStore } from '@stores';
 import { useCollaborationStore } from '@stores/useCollaborationStore';
 import { useInstrumentStore } from '@stores/useInstrumentStore';
 import { useMIDIStore } from '@/stores/useMIDIStore';
@@ -50,6 +50,7 @@ import { PixiGrooveSettingsModal } from './dialogs/PixiGrooveSettingsModal';
 import { PixiFindReplaceDialog } from './dialogs/PixiFindReplaceDialog';
 import { PixiEffectPicker } from './dialogs/PixiEffectPicker';
 import { PixiAdvancedEditModal } from './dialogs/PixiAdvancedEditModal';
+import { PixiRemapInstrumentDialog } from './dialogs/PixiRemapInstrumentDialog';
 import { PixiTipOfTheDay } from './dialogs/PixiTipOfTheDay';
 import { PixiCollaborationModal } from './dialogs/PixiCollaborationModal';
 import { PixiRevisionBrowserDialog } from './dialogs/PixiRevisionBrowserDialog';
@@ -338,6 +339,17 @@ export const PixiRoot: React.FC = () => {
           onClose={closeModal}
           onShowScaleVolume={(scope) => useUIStore.getState().openModal('scaleVolume', { scope })}
           onShowFadeVolume={(scope) => useUIStore.getState().openModal('fadeVolume', { scope })}
+          onShowRemapInstrument={(scope) => useUIStore.getState().openModal('remapInstrument', { scope })}
+        />
+        <PixiRemapInstrumentDialog
+          isOpen={modalOpen === 'remapInstrument'}
+          scope={(modalData?.scope as 'block' | 'track' | 'pattern' | 'song') || 'block'}
+          onConfirm={(source, dest) => {
+            const { remapInstrument } = useTrackerStore.getState();
+            remapInstrument(source, dest, (modalData?.scope as 'block' | 'track' | 'pattern' | 'song') || 'block');
+            closeModal();
+          }}
+          onCancel={closeModal}
         />
         <PixiTipOfTheDay
           isOpen={modalOpen === 'tips'}
