@@ -217,6 +217,7 @@ export type SynthType =
   | 'SonicArrangerSynth' // Sonic Arranger (18-mode wavetable synthesis + ADSR/AMF tables)
   | 'JamCrackerSynth' // JamCracker Pro (transpiled 68k replayer + Paula emulation WASM)
   | 'FuturePlayerSynth' // Future Player (transpiled 68k replayer + Paula emulation WASM)
+  | 'KlysSynth'       // Klystrack chiptune synth (klystron WASM engine)
   // SunVox modular synthesizer
   | 'SunVoxSynth'     // SunVox WASM patch player (.sunsynth / .sunvox)
   // Modular Synthesis

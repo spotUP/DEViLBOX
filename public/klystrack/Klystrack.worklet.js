@@ -151,13 +151,17 @@ class KlystrackProcessor extends AudioWorkletProcessor {
       this.songLoaded = true;
       this.playing = true;
 
+      const channels = this.wasm._klys_get_num_channels();
+      const numPatterns = this.wasm._klys_get_num_patterns();
+      const numInstruments = this.wasm._klys_get_num_instruments();
+
       const meta = {
         type: 'songLoaded',
         title: this.wasm.UTF8ToString(this.wasm._klys_get_title()),
-        channels: this.wasm._klys_get_num_channels(),
+        channels,
         songLength: this.wasm._klys_get_song_length(),
-        numInstruments: this.wasm._klys_get_num_instruments(),
-        numPatterns: this.wasm._klys_get_num_patterns(),
+        numInstruments,
+        numPatterns,
         songSpeed: this.wasm._klys_get_song_speed(),
         songSpeed2: this.wasm._klys_get_song_speed2(),
         songRate: this.wasm._klys_get_song_rate(),
@@ -166,6 +170,9 @@ class KlystrackProcessor extends AudioWorkletProcessor {
         flags: this.wasm._klys_get_flags(),
       };
       this.port.postMessage(meta);
+
+      // Extract pattern data from WASM and send to main thread
+      this.extractAndSendData(numPatterns, channels, numInstruments);
     } else {
       this.port.postMessage({ type: 'error', message: 'Failed to load klystrack song' });
     }
@@ -177,6 +184,123 @@ class KlystrackProcessor extends AudioWorkletProcessor {
       this.songLoaded = false;
       this.playing = false;
     }
+  }
+
+  extractAndSendData(numPatterns, numChannels, numInstruments) {
+    const w = this.wasm;
+    const MAX_STEPS = 256;
+    const STEP_BYTES = 6;
+    const patBufSize = MAX_STEPS * STEP_BYTES;
+    const patPtr = w._malloc(patBufSize);
+
+    // Extract patterns
+    const patterns = [];
+    for (let i = 0; i < numPatterns; i++) {
+      const patLen = w._klys_get_pattern_length(i);
+      const n = w._klys_get_pattern_data(i, patPtr, MAX_STEPS);
+      const raw = new Uint8Array(w.HEAPU8.buffer, patPtr, n * STEP_BYTES);
+      const steps = [];
+      for (let s = 0; s < n; s++) {
+        const off = s * STEP_BYTES;
+        steps.push({
+          note: raw[off],
+          instrument: raw[off + 1],
+          ctrl: raw[off + 2],
+          volume: raw[off + 3],
+          command: raw[off + 4] | (raw[off + 5] << 8),
+        });
+      }
+      patterns.push({ numSteps: patLen, steps });
+    }
+    w._free(patPtr);
+
+    // Extract sequences (per channel)
+    const MAX_SEQ = 512;
+    const SEQ_BYTES = 5;
+    const seqBufSize = MAX_SEQ * SEQ_BYTES;
+    const seqPtr = w._malloc(seqBufSize);
+    const sequences = [];
+    for (let ch = 0; ch < numChannels; ch++) {
+      const n = w._klys_get_sequence_data(ch, seqPtr, MAX_SEQ);
+      const raw = new Uint8Array(w.HEAPU8.buffer, seqPtr, n * SEQ_BYTES);
+      const entries = [];
+      for (let s = 0; s < n; s++) {
+        const off = s * SEQ_BYTES;
+        entries.push({
+          position: raw[off] | (raw[off + 1] << 8),
+          pattern: raw[off + 2] | (raw[off + 3] << 8),
+          noteOffset: raw[off + 4] > 127 ? raw[off + 4] - 256 : raw[off + 4],
+        });
+      }
+      sequences.push({ entries });
+    }
+    w._free(seqPtr);
+
+    // Extract instruments
+    const INST_BUF = 256;
+    const instPtr = w._malloc(INST_BUF);
+    const instruments = [];
+    for (let i = 0; i < numInstruments; i++) {
+      const n = w._klys_get_instrument_data(i, instPtr, INST_BUF);
+      if (n < 32) { instruments.push(null); continue; }
+      const raw = new Uint8Array(w.HEAPU8.buffer, instPtr, n);
+      let p = 0;
+      const adsr = { a: raw[p++], d: raw[p++], s: raw[p++], r: raw[p++] };
+      const flags = raw[p] | (raw[p + 1] << 8); p += 2;
+      const cydflags = raw[p++];
+      const baseNote = raw[p++];
+      const finetune = raw[p++];
+      const slideSpeed = raw[p++];
+      const pw = raw[p] | (raw[p + 1] << 8); p += 2;
+      const volume = raw[p++];
+      const progPeriod = raw[p++];
+      const vibratoSpeed = raw[p++];
+      const vibratoDepth = raw[p++];
+      const pwmSpeed = raw[p++];
+      const pwmDepth = raw[p++];
+      const cutoff = raw[p] | (raw[p + 1] << 8); p += 2;
+      const resonance = raw[p++];
+      const flttype = raw[p++];
+      const fxBus = raw[p++];
+      const buzzOffset = raw[p] | (raw[p + 1] << 8); p += 2;
+      const ringMod = raw[p++];
+      const syncSource = raw[p++];
+      const wavetableEntry = raw[p++];
+      const fmModulation = raw[p++];
+      const fmFeedback = raw[p++];
+      const fmHarmonic = raw[p++];
+      const fmAdsr = { a: raw[p++], d: raw[p++], s: raw[p++], r: raw[p++] };
+
+      // Program (32 steps, 2 bytes each)
+      const program = [];
+      for (let pi = 0; pi < 32 && p + 1 < n; pi++) {
+        program.push(raw[p] | (raw[p + 1] << 8));
+        p += 2;
+      }
+
+      // Name (32 bytes, null-terminated)
+      let name = '';
+      if (p + 32 <= n) {
+        const nameBytes = raw.slice(p, p + 32);
+        const nullIdx = nameBytes.indexOf(0);
+        name = new TextDecoder().decode(nameBytes.slice(0, nullIdx >= 0 ? nullIdx : 32));
+      }
+
+      instruments.push({
+        name, adsr, flags, cydflags, baseNote, finetune, slideSpeed,
+        pw, volume, progPeriod, vibratoSpeed, vibratoDepth, pwmSpeed, pwmDepth,
+        cutoff, resonance, flttype, fxBus, buzzOffset, ringMod, syncSource,
+        wavetableEntry, fmModulation, fmFeedback, fmHarmonic, fmAdsr, program,
+      });
+    }
+    w._free(instPtr);
+
+    this.port.postMessage({
+      type: 'songData',
+      patterns,
+      sequences,
+      instruments,
+    });
   }
 
   process(inputs, outputs, parameters) {

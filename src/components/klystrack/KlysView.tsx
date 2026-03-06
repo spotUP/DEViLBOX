@@ -16,6 +16,9 @@ import { useTrackerStore } from '@stores';
 import { useTransportStore } from '@stores/useTransportStore';
 import { KlysPatternEditor } from './KlysPatternEditor';
 import { KlysPositionEditor } from './KlysPositionEditor';
+import { KlysEngine } from '@/engine/klystrack/KlysEngine';
+import { getTrackerReplayer } from '@engine/TrackerReplayer';
+import { exportAsKlystrack } from '@lib/export/KlysExporter';
 
 const TOOLBAR_H = 36;
 const POSITION_H = 160;
@@ -30,6 +33,17 @@ export const KlysView: React.FC<{ width?: number; height?: number }> = ({ width:
 
   const containerRef = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ w: propW ?? 800, h: propH ?? 600 });
+
+  // Wire KlysEngine position updates to store
+  useEffect(() => {
+    if (!KlysEngine.hasInstance()) return;
+    const engine = KlysEngine.getInstance();
+    const unsub = engine.onPositionUpdate((update) => {
+      useTrackerStore.setState({ currentPositionIndex: update.songPosition });
+      useTransportStore.setState({ currentRow: update.patternPosition });
+    });
+    return unsub;
+  }, []);
 
   useEffect(() => {
     if (propW && propH) { setSize({ w: propW, h: propH }); return; }
@@ -51,6 +65,39 @@ export const KlysView: React.FC<{ width?: number; height?: number }> = ({ width:
     setEditPosition(pos);
     if (!isPlaying) setCurrentPosition(pos);
   }, [isPlaying, setCurrentPosition]);
+
+  const handlePlay = useCallback(() => {
+    if (!KlysEngine.hasInstance()) return;
+    KlysEngine.getInstance().play();
+    useTransportStore.getState().setIsPlaying(true);
+  }, []);
+
+  const handleStop = useCallback(() => {
+    if (!KlysEngine.hasInstance()) return;
+    KlysEngine.getInstance().stop();
+    useTransportStore.getState().setIsPlaying(false);
+  }, []);
+
+  const handleExport = useCallback(() => {
+    const song = getTrackerReplayer().getSong();
+    if (!song) return;
+    try {
+      const result = exportAsKlystrack(song);
+      const url = URL.createObjectURL(result.data);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = result.filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      if (result.warnings.length > 0) {
+        console.warn('[KlysExport]', result.warnings.join('; '));
+      }
+    } catch (err) {
+      console.error('[KlysExport] Failed:', err);
+    }
+  }, []);
 
   if (!nativeData) {
     return (
@@ -79,6 +126,14 @@ export const KlysView: React.FC<{ width?: number; height?: number }> = ({ width:
         <span className="text-ft2-textDim">|</span>
         <span className="text-xs text-ft2-textDim">{toolbarInfo}</span>
         <div className="flex-1" />
+        <button
+          className={`px-2 py-0.5 text-xs rounded border ${isPlaying ? 'bg-red-800 hover:bg-red-700 text-red-100 border-red-600' : 'bg-green-800 hover:bg-green-700 text-green-100 border-green-600'}`}
+          onClick={isPlaying ? handleStop : handlePlay}
+        >{isPlaying ? 'Stop' : 'Play'}</button>
+        <button
+          className="px-2 py-0.5 text-xs bg-blue-800 hover:bg-blue-700 text-blue-100 rounded border border-blue-600"
+          onClick={handleExport}
+        >Export .kt</button>
       </div>
 
       {/* Position editor */}

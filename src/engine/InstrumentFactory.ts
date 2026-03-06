@@ -13,6 +13,7 @@ import {
   DEFAULT_SUPERCOLLIDER,
 } from '@/types/instrument';
 import { HivelySynth } from './hively/HivelySynth';
+import { KlysSynth } from './klystrack/KlysSynth';
 import { JamCrackerSynth } from './jamcracker/JamCrackerSynth';
 import { SoundMonSynth } from './soundmon/SoundMonSynth';
 import { SidMonSynth } from './sidmon/SidMonSynth';
@@ -489,6 +490,10 @@ export class InstrumentFactory {
 
       case 'HivelySynth':
         instrument = new HivelySynth();
+        break;
+
+      case 'KlysSynth':
+        instrument = new KlysSynth();
         break;
 
       case 'JamCrackerSynth': {

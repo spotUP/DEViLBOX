@@ -49,6 +49,16 @@ export async function tryRouteFormat(
     return withNativeDefault('hvl', ctx, (buf: Uint8Array | ArrayBuffer, name: string) => parseHivelyFile(buf as ArrayBuffer, name));
   }
 
+  // ── Klystrack (.kt / .ki) ──────────────────────────────────────────────
+  if (filename.endsWith('.kt') || filename.endsWith('.ki')) {
+    const { parseKlystrack, isKlystrack } = await import('@lib/import/formats/KlysParser');
+    return withNativeDefault('klystrack', ctx, (buf: Uint8Array | ArrayBuffer, name: string) => {
+      const ab = buf instanceof ArrayBuffer ? buf : buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
+      if (!isKlystrack(ab)) throw new Error('Not a valid klystrack file');
+      return parseKlystrack(ab);
+    });
+  }
+
   // ── X-Tracker DMF (.dmf only — magic "DDMF"; version 1–10) ─────────────
   // Must come BEFORE Furnace/DefleMask because both use .dmf extension.
   // DefleMask DMF starts with a different magic; X-Tracker starts with "DDMF".
