@@ -185,34 +185,6 @@ export async function startNativeEngines(
     }
   }
 
-  // PT2 WASM replayer: load raw MOD binary for authentic Paula emulation.
-  if (song.pt2FileData && song.format === 'MOD') {
-    suppressNotes = true;
-    try {
-      const { PT2Engine } = await import('../pt2/PT2Engine');
-      const pt2Engine = PT2Engine.getInstance();
-      await pt2Engine.ready();
-      await pt2Engine.loadModule(song.pt2FileData.slice(0));
-      if (!muted) {
-        pt2Engine.play();
-        console.log('[TrackerReplayer] PT2Engine loaded & playing for MOD format');
-
-        if (!isDJDeck && !routedNativeEngines.has('PT2Synth')) {
-          engine.routeNativeEngineOutput({ name: 'PT2Synth', output: pt2Engine.output } as any);
-          const nativeInput = getNativeAudioNode(separationInputTone as any);
-          if (nativeInput) {
-            engine.rerouteNativeEngine('PT2Synth', nativeInput);
-            routedNativeEngines.add('PT2Synth');
-          }
-        }
-      } else {
-        console.log('[TrackerReplayer] PT2Engine loaded but skipping play (muted for DJ visuals)');
-      }
-    } catch (err) {
-      console.error('[TrackerReplayer] Failed to load MOD into PT2Engine:', err);
-    }
-  }
-
   // Route UADE/Hively native engine output through the stereo separation chain
   // so the Amiga stereo mix (hard-pan LRRL) gets narrowed by stereoSeparation.
   // In DJ mode, DeckEngine.loadSong() handles this; only do it for tracker view.
@@ -291,17 +263,6 @@ export function stopNativeEngines(
     } catch { /* MusicLineEngine may not be loaded */ }
   }
 
-  // Stop PT2Engine if this is a MOD song
-  if (song?.pt2FileData && song.format === 'MOD') {
-    try {
-      import('../pt2/PT2Engine').then(({ PT2Engine }) => {
-        if (PT2Engine.hasInstance()) {
-          PT2Engine.getInstance().stop();
-        }
-      }).catch(() => { /* PT2Engine may not be loaded */ });
-    } catch { /* ignore */ }
-  }
-
   // Stop C64SIDEngine if this is a SID song
   if (c64SidEngine) {
     try {
@@ -333,10 +294,6 @@ export function pauseNativeEngines(routedNativeEngines: Set<string>): void {
           import('@/engine/futureplayer/FuturePlayerEngine').then(({ FuturePlayerEngine }) => {
             if (FuturePlayerEngine.hasInstance()) FuturePlayerEngine.getInstance().pause();
           }).catch(() => {});
-        } else if (st === 'PT2Synth') {
-          import('../pt2/PT2Engine').then(({ PT2Engine }) => {
-            if (PT2Engine.hasInstance()) PT2Engine.getInstance().stop();
-          }).catch(() => {});
         } else {
           engine.stopNativeEngine(st);
         }
@@ -362,12 +319,6 @@ export function resumeNativeEngines(
   if (routedNativeEngines.has('FuturePlayerSynth') && !muted) {
     import('@/engine/futureplayer/FuturePlayerEngine').then(({ FuturePlayerEngine }) => {
       if (FuturePlayerEngine.hasInstance()) FuturePlayerEngine.getInstance().play();
-    }).catch(() => {});
-  }
-  // Restart PT2 WASM playback after pause
-  if (routedNativeEngines.has('PT2Synth') && !muted) {
-    import('../pt2/PT2Engine').then(({ PT2Engine }) => {
-      if (PT2Engine.hasInstance()) PT2Engine.getInstance().play();
     }).catch(() => {});
   }
 }
