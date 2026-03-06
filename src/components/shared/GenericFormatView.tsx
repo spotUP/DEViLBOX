@@ -5,7 +5,8 @@
  * Format-specific logic (position panel, instrument editor) provided via props/slots.
  */
 
-import React, { useRef, useEffect, useState, ReactNode } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
+import type { ReactNode } from 'react';
 import { FormatPatternEditor } from './FormatPatternEditor';
 import type { ColumnDef, FormatChannel, OnCellChange } from './format-editor-types';
 

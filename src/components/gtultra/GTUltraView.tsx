@@ -18,7 +18,8 @@ import * as Tone from 'tone';
 import { useTransportStore } from '@stores/useTransportStore';
 import { useGTUltraStore } from '../../stores/useGTUltraStore';
 import { FormatPatternEditor } from '@/components/shared/FormatPatternEditor';
-import { GTU_COLUMNS, gtuToFormatChannels, parseBinaryPatternData, encodeBinaryPatternData } from './gtuAdapter';
+import type { FormatChannel } from '@/components/shared/format-editor-types';
+import { GTU_COLUMNS, gtuToFormatChannels, parseBinaryPatternData } from './gtuAdapter';
 import { GTToolbar } from './GTToolbar';
 import { GTInstrumentPanel } from './GTInstrumentPanel';
 import { GTOrderList } from './GTOrderList';
@@ -35,8 +36,6 @@ export const GTUltraView: React.FC<{ width?: number; height?: number }> = ({ wid
   const channelCount = sidCount * 3;
   const currentRow = useTransportStore((s) => s.currentRow);
   const isPlaying = useTransportStore((s) => s.isPlaying);
-  const engine = useGTUltraStore((s) => s.engine);
-  const patternLength = useGTUltraStore((s) => s.patternLength);
   const orderData = useGTUltraStore((s) => s.orderData);
   const patternData = useGTUltraStore((s) => s.patternData);
   const playbackPos = useGTUltraStore((s) => s.playbackPos);
@@ -141,27 +140,12 @@ export const GTUltraView: React.FC<{ width?: number; height?: number }> = ({ wid
   }, [channelCount, orderData, patternData, currentOrderPos]);
 
   const handleCellChange = useCallback((channelIdx: number, rowIdx: number, columnKey: string, value: number) => {
-    if (!engine) return;
-
-    const patIdx = orderData[0]?.[currentOrderPos] ?? 0;
-    const patEntry = patternData.get(patIdx);
-    if (!patEntry) return;
-
-    const structured = parseBinaryPatternData(patEntry.data, channelCount, patEntry.length);
-    const channelRows = structured[channelIdx];
-
-    // Update the cell
-    if (columnKey === 'note') channelRows[rowIdx].note = value;
-    else if (columnKey === 'instrument') channelRows[rowIdx].instrument = value;
-    else if (columnKey === 'command') channelRows[rowIdx].command = value;
-    else if (columnKey === 'data') channelRows[rowIdx].data = value;
-
-    // Encode back to binary
-    const newBinary = encodeBinaryPatternData(structured, patEntry.length);
-
-    // Send to engine
-    engine.updatePattern(patIdx, channelIdx, rowIdx, columnKey, value);
-  }, [engine, currentOrderPos, orderData, patternData, channelCount]);
+    // TODO: Wire up pattern editing to engine
+    // For now, this is a display-only pattern editor
+    // Pattern editing requires calling engine methods to update WASM state
+    // and the store will receive updates via the onPatternData callback
+    console.log('Pattern cell changed:', { channelIdx, rowIdx, columnKey, value });
+  }, []);
 
   const sidebarW = Math.min(SIDEBAR_WIDTH, Math.floor(width * 0.35));
   const editorW = width - sidebarW;
