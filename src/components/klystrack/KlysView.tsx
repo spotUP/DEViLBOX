@@ -37,6 +37,55 @@ export const KlysView: React.FC<{ width?: number; height?: number }> = ({ width:
   const containerRef = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ w: propW ?? 800, h: propH ?? 600 });
 
+  const klysFileData = useFormatStore(s => s.klysFileData);
+
+  // Load song into WASM engine and populate native data from WASM extraction
+  useEffect(() => {
+    if (!klysFileData) return;
+    let cancelled = false;
+    let unsubFn: (() => void) | null = null;
+
+    (async () => {
+      const engine = KlysEngine.getInstance();
+      await engine.ready();
+
+      // Subscribe to song data BEFORE loading so we catch the response
+      unsubFn = engine.onSongData((data) => {
+        if (cancelled) return;
+        const current = useFormatStore.getState().klysNative;
+        if (!current) return;
+        // Map WASM instrument data to KlysNativeInstrument shape (nest fm fields)
+        const instruments = data.instruments
+          .filter((i): i is NonNullable<typeof i> => i !== null)
+          .map(({ fmModulation, fmFeedback, fmHarmonic, fmAdsr, ...rest }) => ({
+            ...rest,
+            fm: { modulation: fmModulation, feedback: fmFeedback, harmonic: fmHarmonic, adsr: fmAdsr },
+          }));
+        useFormatStore.setState({
+          klysNative: {
+            ...current,
+            patterns: data.patterns,
+            sequences: data.sequences,
+            instruments,
+          },
+        });
+      });
+
+      if (cancelled) { unsubFn(); return; }
+
+      try {
+        await engine.loadSong(klysFileData.slice(0));
+      } catch (err) {
+        console.error('[KlysView] Failed to load song into WASM:', err);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      unsubFn?.();
+    };
+  }, [klysFileData]);
+
   // Wire KlysEngine position updates to store
   useEffect(() => {
     if (!KlysEngine.hasInstance()) return;
