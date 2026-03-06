@@ -80,7 +80,8 @@ const WebGLModalBridge = lazy(() => import('./pixi/WebGLModalBridge').then(m => 
 const CollaborationSplitView = lazy(() => import('@components/collaboration/CollaborationSplitView').then(m => ({ default: m.CollaborationSplitView })));
 const MixerPanel = lazy(() => import('./components/panels/MixerPanel').then(m => ({ default: m.MixerPanel })));
 const MixerView  = lazy(() => import('./components/panels/MixerPanel').then(m => ({ default: m.MixerView })));
-const StudioView = lazy(() => import('./components/studio/StudioView').then(m => ({ default: m.StudioView })));
+const StudioCanvasView = lazy(() => import('./components/studio/StudioCanvasView').then(m => ({ default: m.StudioCanvasView })));
+const SplitView = lazy(() => import('./components/studio/SplitView').then(m => ({ default: m.SplitView })));
 
 function App() {
   // Check for application updates
@@ -1043,7 +1044,13 @@ function App() {
 
             {activeView === 'studio' && (
               <Suspense fallback={<div className="flex-1 flex items-center justify-center text-text-muted">Loading studio...</div>}>
-                <StudioView />
+                <StudioCanvasView />
+              </Suspense>
+            )}
+
+            {activeView === 'split' && (
+              <Suspense fallback={<div className="flex-1 flex items-center justify-center text-text-muted">Loading split view...</div>}>
+                <SplitView />
               </Suspense>
             )}
           </div>

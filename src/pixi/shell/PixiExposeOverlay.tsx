@@ -23,6 +23,7 @@ const EXPOSE_VIEWS = [
   { id: 'dj',          label: 'DJ',       icon: '◎', color: 0xfb923c },
   { id: 'vj',          label: 'VJ',       icon: '◈', color: 0xf472b6 },
   { id: 'studio',      label: 'Studio',   icon: '⊞', color: 0xfbbf24 },
+  { id: 'split',       label: 'Split',    icon: '⊟', color: 0x94a3b8 },
 ] as const;
 
 const COLS = 4;
