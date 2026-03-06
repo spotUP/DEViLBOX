@@ -9,6 +9,24 @@ function sizeStr(size: Size): string {
   switch (size) { case 'B': return '8'; case 'W': return '16'; default: return '32'; }
 }
 
+/** Cast a label-offset expression to intptr_t.  For compound expressions like
+ *  `label1-label2` or `label1+label2+N`, cast each identifier part individually
+ *  so C can perform pointer arithmetic: `((intptr_t)label1 - (intptr_t)label2)`. */
+function castOffsetExpr(expr: string): string {
+  const validIdent = /^[A-Za-z_][A-Za-z0-9_]*$/;
+  // Split on + and - while keeping the operators
+  const parts = expr.split(/([+\-])/);
+  const hasCompound = parts.length > 1;
+  const result = parts.map(p => {
+    const trimmed = p.trim();
+    if (trimmed === '+' || trimmed === '-') return ` ${trimmed} `;
+    if (validIdent.test(trimmed)) return `(intptr_t)${trimmed}`;
+    // Numeric literal or other expression — leave as-is
+    return trimmed;
+  }).join('');
+  return hasCompound ? `(${result})` : result;
+}
+
 /* ── ASM reconstruction ────────────────────────────────────────────── */
 
 /** Reconstruct an operand back to 68k assembly syntax (best-effort). */
@@ -60,7 +78,13 @@ function immValue(op: { value: number; raw: string }): string {
   if (stripped.startsWith('-%')) return `-0b${stripped.slice(2)}`;
   if (stripped.startsWith('%')) return `0b${stripped.slice(1)}`;
   // Symbolic identifier (e.g. #EPR_CorruptModule) — value is NaN, use the name directly.
-  if (Number.isNaN(op.value)) return stripped;
+  // Compound expressions (#label+16, #label1-label2) need each identifier cast.
+  if (Number.isNaN(op.value)) {
+    if (/[+\-]/.test(stripped) && /[A-Za-z_]/.test(stripped)) {
+      return castOffsetExpr(stripped);
+    }
+    return stripped;
+  }
   return `${op.value}`;
 }
 
@@ -98,7 +122,7 @@ function emitEffectiveAddr(op: Operand): string {
     case 'register': return op.name;
     case 'address': return op.reg;
     case 'disp': {
-      let addr = typeof op.offset === 'number' ? `${op.base} + ${op.offset}` : `${op.base} + (intptr_t)${op.offset}`;
+      let addr = typeof op.offset === 'number' ? `${op.base} + ${op.offset}` : `${op.base} + ${castOffsetExpr(String(op.offset))}`;
       if (op.index) {
         const idxParts = op.index.split('.');
         const idxReg = idxParts[0].toLowerCase();
@@ -139,7 +163,7 @@ export function emitOperand(op: Operand, size: Size = 'L'): string {
     }
     case 'disp': {
       const bits = sizeStr(size);
-      let addr = typeof op.offset === 'number' ? `${op.base} + ${op.offset}` : `${op.base} + (intptr_t)${op.offset}`;
+      let addr = typeof op.offset === 'number' ? `${op.base} + ${op.offset}` : `${op.base} + ${castOffsetExpr(String(op.offset))}`;
       if (op.index) {
         const idxParts = op.index.split('.');
         const idxReg = idxParts[0].toLowerCase();
@@ -191,7 +215,7 @@ function regWrite(op: Operand, value: string, size: Size): string {
     // which patches the MOVEQ immediate. The net effect: Dn.b = val.
     // We approximate this by writing to a scratch variable that has no effect.
     if (op.base === 'pc') return `/* self-modify pc${op.offset}: */ (void)(${value});`;
-    let addr = typeof op.offset === 'number' ? `${op.base} + ${op.offset}` : `${op.base} + (intptr_t)${op.offset}`;
+    let addr = typeof op.offset === 'number' ? `${op.base} + ${op.offset}` : `${op.base} + ${castOffsetExpr(String(op.offset))}`;
     if (op.index) {
       const idxParts = op.index.split('.');
       const idxReg = idxParts[0].toLowerCase();
@@ -364,7 +388,7 @@ export function emitInstruction(node: InstructionNode): string {
       if (op0.kind === 'label_ref') return `${leaDst} = (uint32_t)(uintptr_t)${sanitizeLabel(op0.name)};`;
       if (op0.kind === 'pc_rel') return `${leaDst} = (uint32_t)(uintptr_t)${sanitizeLabel(op0.label)};`;
       if (op0.kind === 'disp') {
-        const offPart = typeof op0.offset === 'number' ? op0.offset : `(intptr_t)${op0.offset}`;
+        const offPart = typeof op0.offset === 'number' ? op0.offset : castOffsetExpr(String(op0.offset));
         let addrExpr = `${op0.base} + ${offPart}`;
         if (op0.index) {
           const idxParts = op0.index.split('.');
@@ -608,7 +632,7 @@ export function emitInstruction(node: InstructionNode): string {
       if (ops[0].kind === 'disp') {
         const addr = typeof ops[0].offset === 'number'
           ? `${ops[0].base} + ${ops[0].offset}`
-          : `${ops[0].base} + (intptr_t)${ops[0].offset}`;
+          : `${ops[0].base} + ${castOffsetExpr(String(ops[0].offset))}`;
         return `((void(*)(void))(uintptr_t)(${addr}))(); return;`;
       }
       // abs_addr or other: can only goto if it happens to be an identifier

@@ -97,6 +97,20 @@ export function parse(tokens: Token[]): AstNode[] {
     const lt = lineTokens;
 
     // Label at start of logical line
+    // Check for LABEL: EQU pattern BEFORE consuming the label as a code label
+    if (lt[j]?.kind === 'LABEL' &&
+        (lt[j + 1]?.kind === 'DIRECTIVE' && lt[j + 1]?.value === 'EQU')) {
+      const name = lt[j].value;
+      const valToken = lt[j + 2];
+      const val =
+        valToken
+          ? valToken.kind === 'NUMBER' || valToken.kind === 'ABS_ADDR'
+            ? parseNumber(valToken.value)
+            : valToken.value
+          : 0;
+      nodes.push({ kind: 'equ', name, value: val, line: startLine });
+      continue;
+    }
     if (lt[j]?.kind === 'LABEL') {
       nodes.push({ kind: 'label', name: lt[j].value, line: startLine });
       j++;
@@ -110,11 +124,16 @@ export function parse(tokens: Token[]): AstNode[] {
 
     const first = lt[j];
 
-    // XDEF / XREF
-    if (first.kind === 'DIRECTIVE' && (first.value === 'XDEF' || first.value === 'XREF')) {
+    // XDEF (export) / XREF (import)
+    if (first.kind === 'DIRECTIVE' && first.value === 'XDEF') {
       j++;
       const name = lt[j]?.value ?? '';
       nodes.push({ kind: 'xdef', name, line: startLine });
+      continue;
+    }
+    if (first.kind === 'DIRECTIVE' && first.value === 'XREF') {
+      // XREF is an external import — skip silently.
+      // The referenced symbol will be detected as unresolved and stubbed.
       continue;
     }
 
@@ -269,6 +288,20 @@ export function parse(tokens: Token[]): AstNode[] {
           }
         }
         if (lt[j].kind === 'RANGE') { j++; continue; } // skip stray RANGE tokens
+        // IMMEDIATE OPERATOR NUMBER/IDENTIFIER: compound immediate (e.g. #lfotable+16)
+        if (lt[j].kind === 'OPERATOR' && operands.length > 0 &&
+            operands[operands.length - 1].kind === 'immediate' &&
+            j + 1 < lt.length && (lt[j + 1].kind === 'NUMBER' || lt[j + 1].kind === 'IDENTIFIER')) {
+          const prev = operands[operands.length - 1] as { kind: 'immediate'; value: number; raw: string };
+          let expr = prev.raw;
+          while (j < lt.length && lt[j]?.kind === 'OPERATOR' &&
+                 j + 1 < lt.length && (lt[j + 1].kind === 'NUMBER' || lt[j + 1].kind === 'IDENTIFIER')) {
+            expr += lt[j].value + lt[j + 1].value;
+            j += 2;
+          }
+          operands[operands.length - 1] = { kind: 'immediate', value: NaN, raw: expr };
+          continue;
+        }
         if (lt[j].kind === 'OPERATOR') { j++; continue; } // skip stray OPERATOR tokens
         // IDENTIFIER OPERATOR IDENTIFIER/NUMBER ... DISP_REG: compound expression
         // e.g. InfoBuffer+Length+2(PC) → IDENT OP IDENT OP NUMBER DISP_REG

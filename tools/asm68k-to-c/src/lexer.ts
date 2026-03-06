@@ -583,7 +583,8 @@ function tokenizeLine(src: string, lineNum: number): Token[] {
     // In instruction context: these get silently dropped (old behavior) or
     // the compound LEA handler picks them up.
     if ((ch === '-' || ch === '+') && !isFirstToken && tokens.length > 0 &&
-        tokens[tokens.length - 1].kind === 'IDENTIFIER') {
+        (tokens[tokens.length - 1].kind === 'IDENTIFIER' ||
+         tokens[tokens.length - 1].kind === 'IMMEDIATE')) {
       advance();
       tokens.push(tok('OPERATOR', ch, col));
       continue;
