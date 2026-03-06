@@ -1845,7 +1845,7 @@ export function convertFurnaceToDevilbox(module: FurnaceModule, subsongIndex = 0
           if (cell.effects.length > 0 && cell.effects.some(e => e.type >= 0)) {
             totalEffects++;
           }
-          const converted = convertFurnaceCell(cell, isChipSynth, module.grooves);
+          const converted = convertFurnaceCell(cell, isChipSynth);
           if (converted.note > 0 && converted.note < 97) {
             totalConvertedNotes++;
           }
@@ -2020,7 +2020,7 @@ export function convertSubsongForPlayback(module: FurnaceModule, subsongIndex: n
         const key = `${subsongIndex}_${ch}_${patIdx}`;
         const pattern = module.patterns.get(key);
         if (pattern && pattern.rows[row]) {
-          rowCells.push(convertFurnaceCell(pattern.rows[row], isChipSynth, module.grooves));
+          rowCells.push(convertFurnaceCell(pattern.rows[row], isChipSynth));
         } else {
           rowCells.push({
             note: 0, instrument: 0, volume: 0,
