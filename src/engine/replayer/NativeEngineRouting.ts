@@ -298,11 +298,17 @@ export async function startNativeEngines(
 
         // Direct routing for engines without a synth in song.instruments
         if (desc.needsDirectRouting && !isDJDeck && !routedNativeEngines.has(desc.synthType)) {
-          toneEngine.routeNativeEngineOutput({ name: desc.synthType, output: instance.output } as any);
           const nativeInput = getNativeAudioNode(separationInputTone as any);
           if (nativeInput) {
-            toneEngine.rerouteNativeEngine(desc.synthType, nativeInput);
+            instance.output.connect(nativeInput);
             routedNativeEngines.add(desc.synthType);
+            console.log(`[NativeEngineRouting] ${desc.key} output → stereo separation`);
+          } else {
+            // Fallback: connect directly to audio context destination
+            const ctx = instance.output.context;
+            instance.output.connect(ctx.destination);
+            routedNativeEngines.add(desc.synthType);
+            console.log(`[NativeEngineRouting] ${desc.key} output → destination (fallback)`);
           }
         }
       } else {
