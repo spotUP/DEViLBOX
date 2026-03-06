@@ -24,11 +24,11 @@ import {
   Activity, LayoutGrid, Cpu, SlidersHorizontal, Zap,
 } from 'lucide-react';
 
-type ViewMode = 'tracker' | 'grid' | 'pianoroll' | 'tb303' | 'sunvox' | 'arrangement' | 'dj' | 'drumpad' | 'vj' | 'mixer' | 'studio';
+import { type TrackerViewMode } from '@stores/useUIStore';
 
 export interface EditorControlsBarProps {
-  viewMode: ViewMode;
-  onViewModeChange: (mode: ViewMode) => void;
+  viewMode: TrackerViewMode;
+  onViewModeChange: (mode: TrackerViewMode) => void;
   gridChannelIndex: number;
   onGridChannelChange: (idx: number) => void;
   /** When provided, renders an "Edit" toggle button in the toolbar */
@@ -103,7 +103,7 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
 
   // ── Handlers ─────────────────────────────────────────────────────────────
   const handleViewModeChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
-    const val = e.target.value as ViewMode;
+    const val = e.target.value as TrackerViewMode;
     if (val === 'arrangement' || val === 'dj' || val === 'drumpad' || val === 'pianoroll' || val === 'vj' || val === 'mixer' || val === 'studio') {
       setActiveView(val);
     } else {

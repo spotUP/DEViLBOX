@@ -300,7 +300,7 @@ export const KlysPatternEditor: React.FC<KlysPatternEditorProps> = ({
   const isHexChar = (k: string): boolean => /^[0-9a-f]$/i.test(k);
   const hexVal = (k: string): number => parseInt(k, 16);
 
-  const writeCell = useCallback((channel: number, row: number, column: number,
+  const writeCell = useCallback((channel: number, row: number, _column: number,
     note: number, instrument: number, ctrl: number, volume: number, command: number) => {
     const cp = channelPatterns[channel];
     if (cp.patternIdx < 0) return;

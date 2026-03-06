@@ -13,7 +13,7 @@
  * └───────────────────────┴────────────────────┘
  */
 
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import * as Tone from 'tone';
 import { useGTUltraStore } from '../../stores/useGTUltraStore';
 import { GTPatternEditor } from './GTPatternEditor';

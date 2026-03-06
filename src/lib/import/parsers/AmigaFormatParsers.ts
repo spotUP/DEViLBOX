@@ -52,8 +52,8 @@ export async function tryRouteFormat(
   // ── Klystrack (.kt / .ki) ──────────────────────────────────────────────
   if (filename.endsWith('.kt') || filename.endsWith('.ki')) {
     const { parseKlystrack, isKlystrack } = await import('@lib/import/formats/KlysParser');
-    return withNativeDefault('klystrack', ctx, (buf: Uint8Array | ArrayBuffer, name: string) => {
-      const ab = buf instanceof ArrayBuffer ? buf : buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
+    return withNativeDefault('kt', ctx, (buf: Uint8Array | ArrayBuffer, _name: string) => {
+      const ab = buf instanceof ArrayBuffer ? buf : (buf.buffer as ArrayBuffer).slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
       if (!isKlystrack(ab)) throw new Error('Not a valid klystrack file');
       return parseKlystrack(ab);
     });
