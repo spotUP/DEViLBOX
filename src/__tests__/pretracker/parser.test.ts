@@ -33,6 +33,6 @@ describe('PreTrackerParser', () => {
   it('should extract filename as song name', async () => {
     const testData = new ArrayBuffer(1024);
     const song = await parsePreTrackerFile(testData, 'my_cool_song.prt');
-    expect(song.name).toBe('my_cool_song');
+    expect(song.name).toBe('my_cool_song [PreTracker]');
   });
 });

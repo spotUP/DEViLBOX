@@ -14,7 +14,7 @@
  */
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
-import type { Pattern, ChannelData, InstrumentConfig } from '@/types';
+import type { InstrumentConfig } from '@/types';
 
 // ── Format detection ──────────────────────────────────────────────────────────
 
@@ -51,54 +51,55 @@ export async function parsePreTrackerFile(
 
   const numChannels = 4;
   const numRows = 64;
+  const baseName = filename.replace(/\.[^.]+$/, '');
 
-  // Create one empty pattern with 4 channels
-  const channels: ChannelData[] = [];
-  for (let ch = 0; ch < numChannels; ch++) {
-    channels.push({
-      cells: Array.from({ length: numRows }, () => ({
-        note: 0,
-        instrument: 0,
-        volume: -1,
-        effectType: 0,
-        effectParam: 0,
-      })),
-    });
-  }
+  const emptyRows = Array.from({ length: numRows }, () => ({
+    note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0,
+  }));
 
-  const pattern: Pattern = {
-    channels,
-    numRows,
-  };
-
-  // Create one stub instrument
-  const instruments: InstrumentConfig[] = [
-    {
-      id: 'pretracker-inst-1',
-      name: 'Instrument 1',
-      synthType: 'Sampler',
-      type: 'sampler',
-      sample: { url: '' },
-    } as InstrumentConfig,
-  ];
-
-  const song: TrackerSong = {
-    name: filename.replace(/\.[^.]+$/, ''),
-    format: 'MOD' as TrackerFormat,
-    numChannels,
-    initialSpeed: 6,
-    initialTempo: 125,
-    patterns: [pattern],
-    songPositions: [0],
-    songLength: 1,
-    instruments,
-    preTrackerFileData: buffer.slice(0),
+  const pattern = {
+    id: 'pattern-0',
+    name: 'Pattern 0',
+    length: numRows,
+    channels: Array.from({ length: numChannels }, (_, ch) => ({
+      id: `channel-${ch}`,
+      name: `Channel ${ch + 1}`,
+      muted: false,
+      solo: false,
+      collapsed: false,
+      volume: 100,
+      pan: ch === 0 || ch === 3 ? -50 : 50,
+      instrumentId: null,
+      color: null,
+      rows: emptyRows,
+    })),
     importMetadata: {
-      sourceFormat: 'PreTracker',
+      sourceFormat: 'MOD' as const,
       sourceFile: filename,
-      importedAt: Date.now(),
+      importedAt: new Date().toISOString(),
+      originalChannelCount: numChannels,
+      originalPatternCount: 1,
+      originalInstrumentCount: 0,
     },
   };
 
-  return song;
+  const instruments: InstrumentConfig[] = [{
+    id: 1, name: 'Sample 1', type: 'synth' as const,
+    synthType: 'Synth' as const, effects: [], volume: 0, pan: 0,
+  } as InstrumentConfig];
+
+  return {
+    name: `${baseName} [PreTracker]`,
+    format: 'MOD' as TrackerFormat,
+    patterns: [pattern],
+    instruments,
+    songPositions: [0],
+    songLength: 1,
+    restartPosition: 0,
+    numChannels,
+    initialSpeed: 6,
+    initialBPM: 125,
+    linearPeriods: false,
+    preTrackerFileData: buffer.slice(0),
+  };
 }

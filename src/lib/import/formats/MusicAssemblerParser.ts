@@ -853,6 +853,6 @@ function parseMusicAssembler(bytes: Uint8Array, filename: string): TrackerSong |
     numChannels:     4,
     initialSpeed:    primarySong.startSpeed || 6,
     initialBPM:      125,
-    maFileData:      bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength),
+    maFileData:      new Uint8Array(bytes).buffer.slice(0) as ArrayBuffer,
   };
 }

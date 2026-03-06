@@ -142,7 +142,7 @@ export const GTUltraView: React.FC<{ width?: number; height?: number }> = ({ wid
     return formatted;
   }, [channelCount, orderData, patternData, currentOrderPos]);
 
-  const handleCellChange = useCallback((channelIdx: number, rowIdx: number, columnKey: string, value: number) => {
+  const handleCellChange = useCallback((_channelIdx: number, rowIdx: number, columnKey: string, value: number) => {
     const engine = useGTUltraStore.getState().engine;
     if (!engine) return;
     const patIdx = orderData[0]?.[currentOrderPos] ?? 0;
