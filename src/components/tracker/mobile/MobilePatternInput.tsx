@@ -5,7 +5,8 @@
  */
 
 import React, { useState, useCallback, useMemo } from 'react';
-import { useTrackerStore, useCursorStore } from '@stores';
+import { useCursorStore } from '@stores';
+import { useEditorStore } from '@stores/useEditorStore';
 import { Piano, Delete, ChevronLeft, ChevronRight, Copy, Scissors, ChevronDown, ChevronUp, HelpCircle } from 'lucide-react';
 import { haptics } from '@/utils/haptics';
 
@@ -33,7 +34,7 @@ export const MobilePatternInput: React.FC<MobilePatternInputProps> = ({
   onCollapseChange,
 }) => {
   const cursor = useCursorStore((s) => s.cursor);
-  const { currentOctave, setCurrentOctave } = useTrackerStore();
+  const { currentOctave, setCurrentOctave } = useEditorStore();
   const [showContextMenu, setShowContextMenu] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
 

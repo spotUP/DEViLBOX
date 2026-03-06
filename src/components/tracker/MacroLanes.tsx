@@ -4,7 +4,7 @@
  */
 
 import React, { useMemo, useCallback, useRef, useState } from 'react';
-import { useTrackerStore } from '@stores';
+import { useTrackerStore, useEditorStore } from '@stores';
 import type { Pattern, TrackerCell } from '@typedefs';
 
 interface MacroLanesProps {
@@ -64,7 +64,7 @@ export const MacroLanes: React.FC<MacroLanesProps> = ({
   channelWidths,
   rowNumWidth: _rowNumWidth,
 }) => {
-  const columnVisibility = useTrackerStore((state) => state.columnVisibility);
+  const columnVisibility = useEditorStore((state) => state.columnVisibility);
   const setCell = useTrackerStore((state) => state.setCell);
   
   const [isDrawing, setIsDrawing] = useState(false);

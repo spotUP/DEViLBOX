@@ -10,6 +10,7 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useTrackerStore, useTransportStore, useInstrumentStore, useAudioStore, useSettingsStore } from '@stores';
+import { useEditorStore } from '@stores/useEditorStore';
 import { useArrangementStore } from '@stores/useArrangementStore';
 import { getToneEngine } from '@engine/ToneEngine';
 import { getTrackerReplayer, type TrackerFormat } from '@engine/TrackerReplayer';
@@ -17,7 +18,7 @@ import { resolveArrangement } from '@lib/arrangement/resolveArrangement';
 import type { UADEEngine } from '@engine/uade/UADEEngine';
 
 export const usePatternPlayback = () => {
-  const { patterns, currentPatternIndex, setCurrentPattern, patternOrder, currentPositionIndex, setCurrentPosition, channelTrackTables, channelSpeeds, channelGrooves, linearPeriods, hivelyNative, hivelyFileData, hivelyMeta, musiclineFileData, c64SidFileData, jamCrackerFileData, futurePlayerFileData } = useTrackerStore(useShallow((s) => ({
+  const { patterns, currentPatternIndex, setCurrentPattern, patternOrder, currentPositionIndex, setCurrentPosition, channelTrackTables, channelSpeeds, channelGrooves, hivelyNative, hivelyFileData, hivelyMeta, musiclineFileData, c64SidFileData, jamCrackerFileData, futurePlayerFileData } = useTrackerStore(useShallow((s) => ({
     patterns: s.patterns,
     currentPatternIndex: s.currentPatternIndex,
     setCurrentPattern: s.setCurrentPattern,
@@ -27,7 +28,6 @@ export const usePatternPlayback = () => {
     channelTrackTables: s.channelTrackTables,
     channelSpeeds: s.channelSpeeds,
     channelGrooves: s.channelGrooves,
-    linearPeriods: s.linearPeriods,
     hivelyNative: s.hivelyNative,
     hivelyFileData: s.hivelyFileData,
     hivelyMeta: s.hivelyMeta,
@@ -36,6 +36,7 @@ export const usePatternPlayback = () => {
     jamCrackerFileData: s.jamCrackerFileData,
     futurePlayerFileData: s.futurePlayerFileData,
   })));
+  const linearPeriods = useEditorStore((s) => s.linearPeriods);
   const { isPlaying, isLooping, bpm, setCurrentRow, setCurrentRowThrottled } = useTransportStore(useShallow((s) => ({
     isPlaying: s.isPlaying,
     isLooping: s.isLooping,

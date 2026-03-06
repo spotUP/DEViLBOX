@@ -7,6 +7,7 @@
 import { useCallback, useMemo, useRef } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useTrackerStore, useCursorStore, useTransportStore } from '@stores';
+import { useEditorStore } from '@stores/useEditorStore';
 import { getToneEngine } from '@engine/ToneEngine';
 import { ALT_TRACK_MAP_1, ALT_TRACK_MAP_2, type TrackerInputRefs } from './inputConstants';
 
@@ -22,8 +23,8 @@ export const useNavigationInput = (refs: TrackerInputRefs) => {
   })));
 
   const setCurrentPattern = useTrackerStore((state) => state.setCurrentPattern);
-  const setPtnJumpPos = useTrackerStore((state) => state.setPtnJumpPos);
-  const getPtnJumpPos = useTrackerStore((state) => state.getPtnJumpPos);
+  const setPtnJumpPos = useEditorStore((state) => state.setPtnJumpPos);
+  const getPtnJumpPos = useEditorStore((state) => state.getPtnJumpPos);
 
   const moveCursor = useCursorStore((state) => state.moveCursor);
   const moveCursorToRow = useCursorStore((state) => state.moveCursorToRow);

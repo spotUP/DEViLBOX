@@ -8,7 +8,6 @@
  */
 
 import React, { useRef, useEffect, useCallback, useMemo, useState } from 'react';
-import { useTrackerStore } from '@stores';
 import { useTransportStore } from '@stores/useTransportStore';
 import type { HivelyNativeData } from '@/types/tracker';
 
@@ -77,7 +76,7 @@ export const HivelyPatternEditor: React.FC<HivelyPatternEditorProps> = ({
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const isPlaying = useTransportStore(s => s.isPlaying);
-  const currentRow = useTrackerStore(s => s.currentRow);
+  const currentRow = useTransportStore(s => s.currentRow);
 
   const [cursor, setCursorState] = useState<CursorPos>({ channel: 0, row: 0, column: 0 });
   const [selection, setSelection] = useState<{

@@ -13,7 +13,7 @@ import type { Container as ContainerType, Graphics as GraphicsType, FederatedWhe
 import { PixiLabel, PixiButton } from '../../components';
 import { usePixiTheme } from '../../theme';
 import { useCollaborationStore } from '@stores/useCollaborationStore';
-import { useTrackerStore } from '@stores';
+import { useTrackerStore, useEditorStore } from '@stores';
 import { useTransportStore } from '@stores/useTransportStore';
 import { MegaText, type GlyphLabel } from '../../utils/MegaText';
 import { PIXI_FONTS } from '../../fonts';
@@ -73,7 +73,7 @@ export const PixiRemotePatternView: React.FC<{ width: number; height: number }> 
   const bpm = useTransportStore(s => s.bpm);
   const speed = useTransportStore(s => s.speed);
 
-  const storeColVis = useTrackerStore(s => s.columnVisibility);
+  const storeColVis = useEditorStore(s => s.columnVisibility);
   const showAcid = storeColVis.flag1 || storeColVis.flag2;
 
   const [showColumns, setShowColumns] = useState<ColumnVisibility>({

@@ -13,7 +13,7 @@ import React, { useRef, useState, useCallback } from 'react';
 import * as Tone from 'tone';
 import { Button } from '@components/ui/Button';
 import { FT2NumericInput } from './FT2NumericInput';
-import { useTrackerStore, useTransportStore, useProjectStore, useInstrumentStore, useAudioStore, useUIStore, useAutomationStore } from '@stores';
+import { useTrackerStore, useTransportStore, useProjectStore, useInstrumentStore, useAudioStore, useUIStore, useAutomationStore, useEditorStore } from '@stores';
 import { useShallow } from 'zustand/react/shallow';
 import { notify } from '@stores/useNotificationStore';
 import { useTapTempo } from '@hooks/useTapTempo';
@@ -175,8 +175,6 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
     patternOrder,
     currentPositionIndex,
     setCurrentPosition,
-    editStep,
-    setEditStep,
     reset: resetTracker,
     duplicatePosition,
     removeFromOrder,
@@ -190,11 +188,17 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
     patternOrder: s.patternOrder,
     currentPositionIndex: s.currentPositionIndex,
     setCurrentPosition: s.setCurrentPosition,
-    editStep: s.editStep,
-    setEditStep: s.setEditStep,
     reset: s.reset,
     duplicatePosition: s.duplicatePosition,
     removeFromOrder: s.removeFromOrder,
+  })));
+
+  const {
+    editStep,
+    setEditStep,
+  } = useEditorStore(useShallow((s) => ({
+    editStep: s.editStep,
+    setEditStep: s.setEditStep,
   })));
 
   const {
