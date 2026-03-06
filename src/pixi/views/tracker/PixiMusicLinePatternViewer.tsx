@@ -23,10 +23,22 @@ import { PIXI_FONTS } from '../../fonts';
 const ROW_H = 18;
 const HEADER_H = ROW_H + 2;
 
-// Column layout (matches DOM MusicLinePatternViewer)
+// Column layout
 const ROW_NUM_W = 36;
-const CHAN_W = 80;
+const NOTE_W = 28;
+const INSTR_W = 20;
+const FX_W = 24; // per effect column: "XYY" format
+const BASE_CHAN_W = NOTE_W + INSTR_W + 8; // note + instr + padding
 const FONT_SIZE = 11;
+
+// Effect field accessor keys
+const FX_KEYS: Array<[string, string]> = [
+  ['effTyp', 'eff'],
+  ['effTyp2', 'eff2'],
+  ['effTyp3', 'eff3'],
+  ['effTyp4', 'eff4'],
+  ['effTyp5', 'eff5'],
+];
 
 // Note helpers (copied 1:1 from DOM source)
 const NOTE_NAMES = ['C-', 'C#', 'D-', 'D#', 'E-', 'F-', 'F#', 'G-', 'G#', 'A-', 'A#', 'B-'];
@@ -42,6 +54,13 @@ function instrStr(instr: number): string {
   return instr ? instr.toString(16).toUpperCase().padStart(2, '0') : '--';
 }
 
+function fxStr(typ: number | undefined, par: number | undefined): string {
+  if (!typ && !par) return '...';
+  const t = (typ ?? 0).toString(16).toUpperCase();
+  const p = (par ?? 0).toString(16).toUpperCase().padStart(2, '0');
+  return `${t}${p}`;
+}
+
 // ── Colors (Pixi hex) ────────────────────────────────────────────────────────
 const C_BG_HEADER    = 0x1a1a1a;
 const C_BG_ODD       = 0x0a0a0a;
@@ -53,6 +72,7 @@ const C_ROW_OTHER    = 0x333333;
 const C_NOTE         = 0xcccccc;
 const C_NOTE_PH      = 0x88ff88;
 const C_INSTR        = 0xffaa44;
+const C_EFFECT       = 0x66aaff;
 const C_EMPTY        = 0x333333;
 const C_CHAN_HEADER  = 0xaaaaaa;
 const C_SCROLLBAR_TRACK = 0x333333;
@@ -101,6 +121,15 @@ export const PixiMusicLinePatternViewer: React.FC<Props> = ({ width, height }) =
   const contentH = numRows * ROW_H;
   const viewH = height - HEADER_H;
   const maxScroll = Math.max(0, contentH - viewH);
+
+  // Determine effect column count from channelMeta (MusicLine sets 5)
+  const effectCols = useMemo(() => {
+    if (!channelPatterns.length) return 0;
+    const ch = channelPatterns[0]?.channels[0];
+    return ch?.channelMeta?.effectCols ?? 2;
+  }, [channelPatterns]);
+
+  const CHAN_W = BASE_CHAN_W + effectCols * FX_W;
   const totalWidth = ROW_NUM_W + numChannels * CHAN_W;
 
   // Wheel scroll handler
@@ -135,7 +164,7 @@ export const PixiMusicLinePatternViewer: React.FC<Props> = ({ width, height }) =
     // Anchor rect to establish Yoga content bounds
     g.rect(0, 0, width, HEADER_H);
     g.fill({ color: 0x000000, alpha: 0 });
-  }, [width, numChannels]);
+  }, [width, numChannels, CHAN_W]);
 
   // ── Draw scrollable content background ──────────────────────────────────
   const drawContent = useCallback((g: GraphicsType) => {
@@ -222,7 +251,7 @@ export const PixiMusicLinePatternViewer: React.FC<Props> = ({ width, height }) =
     }
 
     return out;
-  }, [numChannels, channelTrackTables, currentPos, patterns]);
+  }, [numChannels, channelTrackTables, currentPos, patterns, CHAN_W]);
 
   const contentLabels = useMemo(() => {
     const out: { x: number; y: number; text: string; color: number }[] = [];
@@ -245,7 +274,7 @@ export const PixiMusicLinePatternViewer: React.FC<Props> = ({ width, height }) =
         color: rowNumColor,
       });
 
-      // Each channel cell: note + instrument
+      // Each channel cell: note + instrument + effects
       for (let ch = 0; ch < numChannels; ch++) {
         const pat = channelPatterns[ch];
         const cell = pat?.channels[0]?.rows[rowIdx];
@@ -266,16 +295,30 @@ export const PixiMusicLinePatternViewer: React.FC<Props> = ({ width, height }) =
         });
 
         out.push({
-          x: cellX + 28,
+          x: cellX + NOTE_W,
           y,
           text: cell ? instrStr(cell.instrument) : '--',
           color: instrColor,
         });
+
+        // Effect columns
+        for (let ec = 0; ec < effectCols; ec++) {
+          const [typKey, parKey] = FX_KEYS[ec];
+          const typ = cell ? (cell as unknown as Record<string, number>)[typKey] : undefined;
+          const par = cell ? (cell as unknown as Record<string, number>)[parKey] : undefined;
+          const hasFx = typ || par;
+          out.push({
+            x: cellX + NOTE_W + INSTR_W + ec * FX_W,
+            y,
+            text: fxStr(typ, par),
+            color: hasFx ? C_EFFECT : C_EMPTY,
+          });
+        }
       }
     }
 
     return out;
-  }, [scrollY, numRows, viewH, currentRow, numChannels, channelPatterns]);
+  }, [scrollY, numRows, viewH, currentRow, numChannels, channelPatterns, effectCols, CHAN_W]);
 
   // ── No data guard ────────────────────────────────────────────────────────
   if (!channelTrackTables || channelTrackTables.length === 0) {
