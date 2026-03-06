@@ -640,10 +640,19 @@ function buildPattern(rawData: Uint8Array | undefined, _patIdx: number, partNum:
       // Effects: 5 slots × 2 bytes at bytes 2-11.
       // Slot 0 (bytes 2-3) → cell.effTyp / cell.eff  (XM effect columns)
       // Slot 1 (bytes 4-5) → cell.effTyp2 / cell.eff2
+      // Slot 2 (bytes 6-7) → cell.effTyp3 / cell.eff3
+      // Slot 3 (bytes 8-9) → cell.effTyp4 / cell.eff4
+      // Slot 4 (bytes 10-11) → cell.effTyp5 / cell.eff5
       const eff0Num = rawData[rowBase + 2];
       const eff0Par = rawData[rowBase + 3];
       const eff1Num = rawData[rowBase + 4];
       const eff1Par = rawData[rowBase + 5];
+      const eff2Num = rawData[rowBase + 6];
+      const eff2Par = rawData[rowBase + 7];
+      const eff3Num = rawData[rowBase + 8];
+      const eff3Par = rawData[rowBase + 9];
+      const eff4Num = rawData[rowBase + 10];
+      const eff4Par = rawData[rowBase + 11];
 
       if (eff0Num) {
         const { effTyp, eff } = mapMLEffect(eff0Num, eff0Par);
@@ -655,6 +664,21 @@ function buildPattern(rawData: Uint8Array | undefined, _patIdx: number, partNum:
         cell.effTyp2 = effTyp;
         cell.eff2    = eff;
       }
+      if (eff2Num) {
+        const { effTyp, eff } = mapMLEffect(eff2Num, eff2Par);
+        cell.effTyp3 = effTyp;
+        cell.eff3    = eff;
+      }
+      if (eff3Num) {
+        const { effTyp, eff } = mapMLEffect(eff3Num, eff3Par);
+        cell.effTyp4 = effTyp;
+        cell.eff4    = eff;
+      }
+      if (eff4Num) {
+        const { effTyp, eff } = mapMLEffect(eff4Num, eff4Par);
+        cell.effTyp5 = effTyp;
+        cell.eff5    = eff;
+      }
     }
   }
 
@@ -663,7 +687,7 @@ function buildPattern(rawData: Uint8Array | undefined, _patIdx: number, partNum:
     let lastNonEmpty = -1;
     for (let row = 0; row < PART_ROWS; row++) {
       const c = rows[row];
-      if (c.note || c.instrument || c.effTyp || c.effTyp2) lastNonEmpty = row;
+      if (c.note || c.instrument || c.effTyp || c.effTyp2 || c.effTyp3 || c.effTyp4 || c.effTyp5) lastNonEmpty = row;
     }
     effectiveLength = lastNonEmpty >= 0 ? lastNonEmpty + 1 : PART_ROWS;
   }
@@ -682,6 +706,7 @@ function buildPattern(rawData: Uint8Array | undefined, _patIdx: number, partNum:
     instrumentId: null,
     color:        null,
     rows:         rows.slice(0, effectiveLength),
+    channelMeta:  { importedFromMOD: false, effectCols: 5 },
   };
 
   return {

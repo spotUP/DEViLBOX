@@ -398,8 +398,16 @@ function generateLabels(p: RenderParams, vStart: number, currentRow: number): La
 
       const effectCols = channel.channelMeta?.effectCols ?? 2;
       for (let e = 0; e < effectCols; e++) {
-        const typ = e === 0 ? (cell.effTyp ?? 0) : (cell.effTyp2 ?? 0);
-        const val = e === 0 ? (cell.eff ?? 0) : (cell.eff2 ?? 0);
+        const typ = e === 0 ? (cell.effTyp ?? 0)
+          : e === 1 ? (cell.effTyp2 ?? 0)
+          : e === 2 ? (cell.effTyp3 ?? 0)
+          : e === 3 ? (cell.effTyp4 ?? 0)
+          : (cell.effTyp5 ?? 0);
+        const val = e === 0 ? (cell.eff ?? 0)
+          : e === 1 ? (cell.eff2 ?? 0)
+          : e === 2 ? (cell.eff3 ?? 0)
+          : e === 3 ? (cell.eff4 ?? 0)
+          : (cell.eff5 ?? 0);
         const effText = formatEffect(typ, val, p.useHex);
         if (effText !== '...' || !p.blankEmpty) {
           labels.push({ x: px, y, text: effText, color: (typ > 0 || val > 0) ? p.theme.cellEffect.color : p.theme.cellEmpty.color, fontFamily: PIXI_FONTS.MONO, alpha: isGhost ? 0.35 : undefined });
