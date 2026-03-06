@@ -53,7 +53,10 @@ public/onnx-wasm/
 
 # ROM files and sample libraries (copyrighted material)
 public/roms/Mirage4Amiga/
+public/roms/gearmulator/
 public/roms/**/*.zip
+public/roms/**/*.BIN
+public/roms/**/*.bin
 *.zip
 
 # NDA documents
