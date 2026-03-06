@@ -149,15 +149,13 @@ export const VJPatternOverlay: React.FC = React.memo(() => {
       anim.tiltKickY = decay(anim.tiltKickY, 5);
       anim.bounceY = decay(anim.bounceY, 6);
 
-      // Smooth scroll — use replayer audio timeline for sub-row interpolation
-      // (same approach as PixiPatternEditor for jitter-free scrolling)
-      const { smoothScrolling } = useTransportStore.getState();
-      if (smoothScrolling && isPlaying) {
+      // Smooth scroll — always enabled in VJ view for visual performance
+      // Uses replayer audio timeline for sub-row interpolation
+      if (isPlaying) {
         const replayer = getTrackerReplayer();
         const audioTime = Tone.now() + 0.01;
         const audioState = replayer.getStateAtTime(audioTime);
         if (audioState) {
-          // Compute row duration from replayer or estimate from BPM
           const nextState = replayer.getStateAtTime(audioTime + 0.5, true);
           const dur = (nextState && nextState.row !== audioState.row)
             ? nextState.time - audioState.time
