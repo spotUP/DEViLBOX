@@ -72,13 +72,13 @@ export const KlysView: React.FC<{ width?: number; height?: number }> = ({ width:
   const handlePlay = useCallback(() => {
     if (!KlysEngine.hasInstance()) return;
     KlysEngine.getInstance().play();
-    useTransportStore.getState().setIsPlaying(true);
+    useTransportStore.setState((s) => { s.isPlaying = true; s.isPaused = false; });
   }, []);
 
   const handleStop = useCallback(() => {
     if (!KlysEngine.hasInstance()) return;
     KlysEngine.getInstance().stop();
-    useTransportStore.getState().setIsPlaying(false);
+    useTransportStore.setState((s) => { s.isPlaying = false; s.isPaused = false; });
   }, []);
 
   const handleExport = useCallback(async () => {

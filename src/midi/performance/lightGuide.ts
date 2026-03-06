@@ -10,7 +10,7 @@ import { NKSLightGuideColor } from './types';
 import type { SynthType } from '@typedefs/instrument';
 
 // General MIDI drum map: note → { color, name }
-const GM_DRUM_MAP: Record<number, { color: number; name: string }> = {
+const GM_DRUM_MAP: Record<number, { color: NKSLightGuideColor; name: string }> = {
   35: { color: NKSLightGuideColor.RED, name: 'Acoustic Bass Drum' },
   36: { color: NKSLightGuideColor.RED, name: 'Bass Drum 1' },
   37: { color: NKSLightGuideColor.WARM_YELLOW, name: 'Side Stick' },
@@ -57,7 +57,7 @@ const DRUM_SYNTHS: Set<string> = new Set([
 ]);
 
 // Single-sound drum synths and their primary color
-const SINGLE_DRUM_COLOR: Partial<Record<string, number>> = {
+const SINGLE_DRUM_COLOR: Partial<Record<string, NKSLightGuideColor>> = {
   'BuzzKick': NKSLightGuideColor.RED,
   'BuzzKickXP': NKSLightGuideColor.RED,
   'MembraneSynth': NKSLightGuideColor.RED,

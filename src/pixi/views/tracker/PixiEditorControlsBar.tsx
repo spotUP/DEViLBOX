@@ -12,6 +12,7 @@
 import { useCallback, useMemo } from 'react';
 import type { Graphics as GraphicsType } from 'pixi.js';
 import { useTrackerStore, useTransportStore, useAudioStore, useUIStore, useEditorStore } from '@stores';
+import type { TrackerViewMode } from '@stores/useUIStore';
 import { useShallow } from 'zustand/react/shallow';
 import { useFPSMonitor } from '@/hooks/useFPSMonitor';
 import { SYSTEM_PRESETS, getGroupedPresets } from '@/constants/systemPresets';
@@ -26,11 +27,9 @@ const BAR_H = 36;
 
 // ─── View Mode ───────────────────────────────────────────────────────────────
 
-type ViewMode = 'tracker' | 'grid' | 'pianoroll' | 'tb303' | 'sunvox' | 'arrangement' | 'dj' | 'drumpad' | 'vj' | 'mixer';
-
 export interface PixiEditorControlsBarProps {
-  viewMode: ViewMode;
-  onViewModeChange: (mode: ViewMode) => void;
+  viewMode: TrackerViewMode;
+  onViewModeChange: (mode: TrackerViewMode) => void;
   gridChannelIndex: number;
   onGridChannelChange: (index: number) => void;
 }
@@ -362,7 +361,7 @@ export const PixiEditorControlsBar: React.FC<PixiEditorControlsBarProps> = ({
   const handleViewModeChange = useCallback((val: string) => {
     // Local sub-modes stay in tracker view; global views switch activeView
     if (val === 'tracker' || val === 'grid' || val === 'tb303' || val === 'sunvox') {
-      setTimeout(() => onViewModeChange(val as ViewMode), 0);
+      setTimeout(() => onViewModeChange(val as TrackerViewMode), 0);
     } else {
       setTimeout(() => useUIStore.getState().setActiveView(val as any), 0);
     }
