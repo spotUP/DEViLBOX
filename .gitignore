@@ -48,6 +48,8 @@ digmug-wasm/build/
 fc-wasm/build/
 tfmx-wasm/build/
 robhubbard-wasm/build/
+klystrack-wasm/build/
+gearmulator-wasm/build/
 public/rdpiano/roms/
 public/onnx-wasm/
 
