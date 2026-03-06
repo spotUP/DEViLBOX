@@ -112,7 +112,7 @@ function extractPcm(inst: InstrumentConfig): Uint8Array {
  * Convert a single-voice DEViLBOX Pattern to a 1536-byte raw PART buffer.
  * Reverses buildPattern() + mapMLEffect() from MusicLineParser.ts.
  *
- * Row layout (12 bytes): [note, instr, eff0Num, eff0Par, eff1Num, eff1Par, 0,0,0,0,0,0]
+ * Row layout (12 bytes): [note, instr, eff0Num, eff0Par, eff1Num, eff1Par, eff2Num, eff2Par, eff3Num, eff3Par, eff4Num, eff4Par]
  * Note encoding: mlNote = cell.note + 12  (parser stored cell.note = mlNote - 12)
  */
 function buildPartRawData(pattern: Pattern): Uint8Array {
@@ -136,7 +136,18 @@ function buildPartRawData(pattern: Pattern): Uint8Array {
     const fx1 = unmapMLEffect(cell.effTyp2 ?? 0, cell.eff2 ?? 0);
     raw[base + 4] = fx1.effectNum;
     raw[base + 5] = fx1.effectPar;
-    // bytes 6-11: zero (no extra effect words stored)
+
+    const fx2 = unmapMLEffect(cell.effTyp3 ?? 0, cell.eff3 ?? 0);
+    raw[base + 6] = fx2.effectNum;
+    raw[base + 7] = fx2.effectPar;
+
+    const fx3 = unmapMLEffect(cell.effTyp4 ?? 0, cell.eff4 ?? 0);
+    raw[base + 8] = fx3.effectNum;
+    raw[base + 9] = fx3.effectPar;
+
+    const fx4 = unmapMLEffect(cell.effTyp5 ?? 0, cell.eff5 ?? 0);
+    raw[base + 10] = fx4.effectNum;
+    raw[base + 11] = fx4.effectPar;
   }
   return raw;
 }

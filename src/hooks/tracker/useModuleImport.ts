@@ -8,7 +8,7 @@
  */
 
 import { useCallback } from 'react';
-import { useTrackerStore, useInstrumentStore, useProjectStore, useTransportStore, useUIStore } from '@stores';
+import { useTrackerStore, useInstrumentStore, useProjectStore, useTransportStore, useUIStore , useFormatStore } from '@stores';
 import { useShallow } from 'zustand/react/shallow';
 import { computeSongDBHash, lookupSongDB } from '@lib/songdb';
 import { convertModule, convertXMModule, convertMODModule } from '@lib/import/ModuleConverter';
@@ -33,10 +33,12 @@ export function useModuleImport() {
   const {
     loadPatterns,
     setPatternOrder,
-    setOriginalModuleData,
-  } = useTrackerStore(useShallow((s) => ({
+    } = useTrackerStore(useShallow((s) => ({
     loadPatterns: s.loadPatterns,
     setPatternOrder: s.setPatternOrder,
+    })));
+
+  const { setOriginalModuleData } = useFormatStore(useShallow((s) => ({
     setOriginalModuleData: s.setOriginalModuleData,
   })));
 
@@ -92,7 +94,7 @@ export function useModuleImport() {
     const buf = info.arrayBuffer ?? (info.file ? await info.file.arrayBuffer() : null);
     if (buf) {
       lookupSongDB(computeSongDBHash(buf)).then(result => {
-        useTrackerStore.getState().setSongDBInfo(result ? {
+        useFormatStore.getState().setSongDBInfo(result ? {
           authors: result.authors,
           publishers: result.publishers,
           album: result.album,
@@ -103,7 +105,7 @@ export function useModuleImport() {
       });
       // Extract C64 SID header metadata if applicable
       const sidInfo = parseSIDHeader(new Uint8Array(buf));
-      useTrackerStore.getState().setSidMetadata(sidInfo ? {
+      useFormatStore.getState().setSidMetadata(sidInfo ? {
         format: sidInfo.format, version: sidInfo.version,
         title: sidInfo.title, author: sidInfo.author, copyright: sidInfo.copyright,
         chipModel: sidInfo.chipModel, clockSpeed: sidInfo.clockSpeed,
@@ -112,8 +114,8 @@ export function useModuleImport() {
         secondSID: sidInfo.secondSID, thirdSID: sidInfo.thirdSID,
       } : null);
     } else {
-      useTrackerStore.getState().setSongDBInfo(null);
-      useTrackerStore.getState().setSidMetadata(null);
+      useFormatStore.getState().setSongDBInfo(null);
+      useFormatStore.getState().setSidMetadata(null);
     }
 
     // Always clean up engine state before import
@@ -298,7 +300,7 @@ export function useModuleImport() {
 
       const xmFreqType = importMetadata?.xmData?.frequencyType;
       const linearPeriods = format === 'XM' ? (xmFreqType === 'linear' || xmFreqType === undefined) : false;
-      useTrackerStore.getState().applyEditorMode({ linearPeriods });
+      useFormatStore.getState().applyEditorMode({ linearPeriods });
 
       return;
     }
@@ -325,7 +327,15 @@ export function useModuleImport() {
       setBPM(song.initialBPM);
       setSpeed(song.initialSpeed);
       setMetadata({ name: song.name, author: '', description: `Imported from ${info.file?.name || 'module'}` });
-      useTrackerStore.getState().applyEditorMode(song);
+      useFormatStore.getState().applyEditorMode(song);
+      // For SID files using GT Ultra view, populate GT Ultra store with metadata
+      if (song.c64SidFileData && useFormatStore.getState().editorMode === 'goattracker') {
+        const gtStore = (await import('@/stores/useGTUltraStore')).useGTUltraStore.getState();
+        const parts = song.name.split(' — ');
+        gtStore.setSongName(parts[0] || song.name);
+        if (parts[1]) gtStore.setSongAuthor(parts[1]);
+        gtStore.setSidCount(song.numChannels > 3 ? 2 : 1);
+      }
       const samplerCount = song.instruments.filter(i => i.synthType === 'Sampler').length;
       if (samplerCount > 0) {
         await getToneEngine().preloadInstruments(song.instruments);

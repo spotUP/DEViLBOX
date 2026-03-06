@@ -49,7 +49,7 @@ class GTUltraProcessor extends AudioWorkletProcessor {
           this._getPatternPtr = this.module.cwrap('gt_get_pattern_ptr', 'number', ['number']);
           this._getPatternLength = this.module.cwrap('gt_get_pattern_length', 'number', ['number']);
           this._getNumPatterns = this.module.cwrap('gt_get_num_patterns', 'number', []);
-          this._getOrderPtr = this.module.cwrap('gt_get_order_ptr', 'number', ['number']);
+          this._getOrderPtr = this.module.cwrap('gt_get_order_ptr', 'number', ['number', 'number']);
           this._getInstrumentPtr = this.module.cwrap('gt_get_instrument_ptr', 'number', ['number']);
           this._getNumInstruments = this.module.cwrap('gt_get_num_instruments', 'number', []);
           this._getLTablePtr = this.module.cwrap('gt_get_ltable_ptr', 'number', ['number']);
@@ -62,8 +62,8 @@ class GTUltraProcessor extends AudioWorkletProcessor {
           this._getChannelCount = this.module.cwrap('gt_get_channel_count', 'number', []);
 
           // Editing
-          this._setPatternCell = this.module.cwrap('gt_set_pattern_cell', null, ['number', 'number', 'number', 'number']);
-          this._setOrderEntry = this.module.cwrap('gt_set_order_entry', null, ['number', 'number', 'number']);
+          this._setPatternCell = this.module.cwrap('gt_set_pattern_cell', null, ['number', 'number', 'number', 'number', 'number', 'number']);
+          this._setOrderEntry = this.module.cwrap('gt_set_order_entry', null, ['number', 'number', 'number', 'number']);
           this._setTableEntry = this.module.cwrap('gt_set_table_entry', null, ['number', 'number', 'number', 'number']);
           this._undo = this.module.cwrap('gt_undo', null, []);
           this._redo = this.module.cwrap('gt_redo', null, []);
@@ -74,8 +74,8 @@ class GTUltraProcessor extends AudioWorkletProcessor {
           this._exportSid = this.module.cwrap('gt_export_sid', 'number', ['number', 'number']);
 
           // Instrument editing
-          this._setInstrumentAD = this.module.cwrap('gt_set_instrument_ad', null, ['number', 'number']);
-          this._setInstrumentSR = this.module.cwrap('gt_set_instrument_sr', null, ['number', 'number']);
+          this._setInstrumentAD = this.module.cwrap('gt_set_instrument_ad', null, ['number', 'number', 'number']);
+          this._setInstrumentSR = this.module.cwrap('gt_set_instrument_sr', null, ['number', 'number', 'number']);
           this._setInstrumentFirstwave = this.module.cwrap('gt_set_instrument_firstwave', null, ['number', 'number']);
           this._setInstrumentTablePtr = this.module.cwrap('gt_set_instrument_table_ptr', null, ['number', 'number', 'number']);
           this._setSongName = this.module.cwrap('gt_set_song_name', null, ['string']);
@@ -181,7 +181,8 @@ class GTUltraProcessor extends AudioWorkletProcessor {
       case 'getOrderData': {
         if (!this.ready) return;
         const ch = msg.channel;
-        const ptr = this._getOrderPtr(ch);
+        const song = msg.song || 0;
+        const ptr = this._getOrderPtr(song, ch);
         // Order list is 256 bytes
         const data = new Uint8Array(this.module.HEAPU8.buffer, ptr, 256).slice();
         this.port.postMessage({ type: 'orderData', channel: ch, data: data.buffer }, [data.buffer]);
@@ -248,19 +249,41 @@ class GTUltraProcessor extends AudioWorkletProcessor {
 
       case 'setPatternCell': {
         if (!this.ready) return;
-        this._setPatternCell(msg.pattern, msg.row, msg.col, msg.value);
+        // Read existing cell values, then overwrite the target column
+        const pat = msg.pattern;
+        const row = msg.row;
+        const col = msg.col;
+        const ptr = this._getPatternPtr(pat);
+        if (ptr) {
+          const off = row * 4;
+          const n = this.module.HEAPU8[ptr + off + 0];
+          const i = this.module.HEAPU8[ptr + off + 1];
+          const c = this.module.HEAPU8[ptr + off + 2];
+          const d = this.module.HEAPU8[ptr + off + 3];
+          const vals = [n, i, c, d];
+          vals[col] = msg.value;
+          this._setPatternCell(pat, row, vals[0], vals[1], vals[2], vals[3]);
+        }
         break;
       }
 
       case 'setOrderEntry': {
         if (!this.ready) return;
-        this._setOrderEntry(msg.channel, msg.position, msg.value);
+        this._setOrderEntry(msg.song || 0, msg.channel, msg.position, msg.value);
         break;
       }
 
       case 'setTableEntry': {
         if (!this.ready) return;
-        this._setTableEntry(msg.tableType, msg.side, msg.index, msg.value);
+        // Read existing left/right, modify one side, write both
+        const tType = msg.tableType;
+        const tRow = msg.index;
+        const lPtr = this._getLTablePtr(tType);
+        const rPtr = this._getRTablePtr(tType);
+        let left = lPtr ? this.module.HEAPU8[lPtr + tRow] : 0;
+        let right = rPtr ? this.module.HEAPU8[rPtr + tRow] : 0;
+        if (msg.side === 0) left = msg.value; else right = msg.value;
+        this._setTableEntry(tType, tRow, left, right);
         break;
       }
 
@@ -296,13 +319,15 @@ class GTUltraProcessor extends AudioWorkletProcessor {
 
       case 'setInstrumentAD': {
         if (!this.ready) return;
-        this._setInstrumentAD(msg.instrument, msg.value);
+        // value is combined AD byte: high nibble = attack, low nibble = decay
+        this._setInstrumentAD(msg.instrument, (msg.value >> 4) & 0xF, msg.value & 0xF);
         break;
       }
 
       case 'setInstrumentSR': {
         if (!this.ready) return;
-        this._setInstrumentSR(msg.instrument, msg.value);
+        // value is combined SR byte: high nibble = sustain, low nibble = release
+        this._setInstrumentSR(msg.instrument, (msg.value >> 4) & 0xF, msg.value & 0xF);
         break;
       }
 

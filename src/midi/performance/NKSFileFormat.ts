@@ -8,7 +8,7 @@
  * - 2-byte word alignment per RIFF spec
  */
 
-import type { NKSPreset, NKSPresetMetadata } from './types';
+import type { NKSPreset, NKSPresetMetadata, NKS2Navigation, NKS2PDI } from './types';
 import { NKS_CONSTANTS } from './types';
 import { msgpackEncode, msgpackDecode } from './msgpack';
 
@@ -19,6 +19,7 @@ const FOURCC_NISI = 0x4E495349; // "NISI" - NI Sound Info
 const FOURCC_NICA = 0x4E494341; // "NICA" - NI Controller Assignments
 const FOURCC_PCHK = 0x5043484B; // "PCHK" - Plugin Data Chunk
 const FOURCC_PLID = 0x504C4944; // "PLID" - Plugin Info
+const FOURCC_NKS2 = 0x4E4B5332; // "NKS2" - NKS2 Extended Metadata
 
 // Chunk versions per spec
 const CHUNK_VERSION = 1;
@@ -96,6 +97,8 @@ function parseRIFFNKSF(buffer: ArrayBuffer): NKSPreset {
   const parameters: Record<string, number> = {};
   let pluginBlob: ArrayBuffer | undefined;
   let controllerAssignments: NICAssignment[][] | undefined;
+  let nks2Navigation: NKS2Navigation | undefined;
+  let nks2PDI: NKS2PDI[] | undefined;
 
   // Parse RIFF chunks
   const endOffset = Math.min(8 + fileSize, buffer.byteLength);
@@ -185,6 +188,26 @@ function parseRIFFNKSF(buffer: ArrayBuffer): NKSPreset {
         break;
       }
 
+      case FOURCC_NKS2: {
+        // NKS2 Extended Metadata - msgpack MAP (skip 4-byte chunk version)
+        const msgpackData = new Uint8Array(buffer, offset + 4, chunkSize - 4);
+        try {
+          const decoded = msgpackDecode(msgpackData) as Record<string, unknown>;
+          if (decoded.performance || decoded.editGroups) {
+            nks2Navigation = {
+              performance: Array.isArray(decoded.performance) ? decoded.performance as any[] : [],
+              editGroups: Array.isArray(decoded.editGroups) ? decoded.editGroups as any[] : undefined,
+            };
+          }
+          if (Array.isArray(decoded.parameter_descriptive_info)) {
+            nks2PDI = decoded.parameter_descriptive_info as NKS2PDI[];
+          }
+        } catch (e) {
+          console.warn('[NKS] Failed to decode NKS2 chunk:', e);
+        }
+        break;
+      }
+
       default:
         console.warn(`[NKS] Unknown RIFF chunk: "${fourccToString(chunkId)}"`);
     }
@@ -198,6 +221,8 @@ function parseRIFFNKSF(buffer: ArrayBuffer): NKSPreset {
     metadata: metadata as NKSPresetMetadata,
     parameters,
     blob: pluginBlob,
+    ...(nks2Navigation ? { nks2Navigation } : {}),
+    ...(nks2PDI ? { nks2PDI } : {}),
   };
 }
 
@@ -301,6 +326,12 @@ export function writeNKSF(preset: NKSPreset): ArrayBuffer {
   if (preset.blob) {
     const pchkData = buildPCHKChunk(preset.blob);
     chunks.push(pchkData);
+  }
+
+  // NKS2 chunk - Extended Metadata (navigation + PDI)
+  if (preset.nks2Navigation || preset.nks2PDI) {
+    const nks2Data = buildNKS2Chunk(preset.nks2Navigation, preset.nks2PDI);
+    chunks.push(nks2Data);
   }
 
   // Calculate total RIFF file size (excludes the 8 bytes for "RIFF" + size)
@@ -529,6 +560,50 @@ function buildNICAFromExplicit(pages: NICAssignment[][]): ArrayBuffer {
  */
 function buildPCHKChunk(blob: ArrayBuffer): ArrayBuffer {
   return buildRIFFChunk(FOURCC_PCHK, CHUNK_VERSION, new Uint8Array(blob));
+}
+
+/**
+ * Build NKS2 extended metadata chunk.
+ * Contains msgpack-encoded navigation (performance + edit groups) and PDI data.
+ * Non-NI readers skip unknown RIFF chunks per spec.
+ */
+function buildNKS2Chunk(navigation?: NKS2Navigation, pdi?: NKS2PDI[]): ArrayBuffer {
+  const nks2Map: Record<string, unknown> = { version: 1 };
+
+  if (navigation) {
+    // Serialize performance sections
+    const perfData = navigation.performance.map(s => ({
+      name: s.name,
+      parameters: s.parameters.map(p => ({
+        id: p.id, name: p.name, pdi: p.pdi, defaultValue: p.defaultValue,
+        ...(p.unit ? { unit: p.unit } : {}),
+        ...(p.ccNumber !== undefined ? { ccNumber: p.ccNumber } : {}),
+      })),
+    }));
+    nks2Map.performance = perfData;
+
+    // Serialize edit groups
+    if (navigation.editGroups) {
+      nks2Map.editGroups = navigation.editGroups.map(g => ({
+        name: g.name,
+        sections: g.sections.map(s => ({
+          name: s.name,
+          parameters: s.parameters.map(p => ({
+            id: p.id, name: p.name, pdi: p.pdi, defaultValue: p.defaultValue,
+            ...(p.unit ? { unit: p.unit } : {}),
+            ...(p.ccNumber !== undefined ? { ccNumber: p.ccNumber } : {}),
+          })),
+        })),
+      }));
+    }
+  }
+
+  if (pdi && pdi.length > 0) {
+    nks2Map.parameter_descriptive_info = pdi;
+  }
+
+  const msgpackData = msgpackEncode(nks2Map);
+  return buildRIFFChunk(FOURCC_NKS2, CHUNK_VERSION, msgpackData);
 }
 
 /**

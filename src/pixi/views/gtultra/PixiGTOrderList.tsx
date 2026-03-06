@@ -13,16 +13,16 @@ const ROW_H = 14;
 const HEADER_H = 18;
 const FONT_SIZE = 10;
 
-const C_BG       = 0x1a1a2e;
-const C_HEADER   = 0x0f3460;
-const C_ACCENT   = 0xe94560;
+const C_BG       = 0x0d0d0d;
+const C_HEADER   = 0x1a1a1a;
+const C_ACCENT   = 0x888888;
 const C_ORDER    = 0x60e060;
 const C_END      = 0xe94560;
 const C_REPEAT   = 0xffcc00;
 const C_TRANS    = 0xff8866;
-const C_DIM      = 0x666688;
+const C_DIM      = 0x555555;
 const C_CURSOR   = 0xffffff;
-const C_SEP      = 0x333355;
+const C_SEP      = 0x222222;
 
 interface Props { width: number; height: number }
 
@@ -33,6 +33,7 @@ export const PixiGTOrderList: React.FC<Props> = ({ width, height }) => {
 
   const orderData = useGTUltraStore((s) => s.orderData);
   const orderCursor = useGTUltraStore((s) => s.orderCursor);
+  const orderChannelCol = useGTUltraStore((s) => s.orderChannelCol);
   const playbackPos = useGTUltraStore((s) => s.playbackPos);
   const sidCount = useGTUltraStore((s) => s.sidCount);
   const channelCount = sidCount * 3;
@@ -93,12 +94,19 @@ export const PixiGTOrderList: React.FC<Props> = ({ width, height }) => {
 
         if (val === 0xFF) {
           text = 'EN'; color = C_END;
+        } else if (val >= 0xF0 && val <= 0xFE) {
+          text = `+${(val & 0x0F).toString(16).toUpperCase()}`; color = C_TRANS;
+        } else if (val >= 0xE0 && val <= 0xEF) {
+          text = `-${(val & 0x0F).toString(16).toUpperCase()}`; color = C_TRANS;
         } else if (val >= 0xD0 && val <= 0xDF) {
           text = `R${(val & 0x0F).toString(16).toUpperCase()}`; color = C_REPEAT;
-        } else if (val >= 0x80) {
-          text = `T${(val & 0x7F).toString(16).toUpperCase().padStart(2, '0')}`; color = C_TRANS;
         } else {
           text = val.toString(16).toUpperCase().padStart(2, '0'); color = C_ORDER;
+        }
+
+        // Channel column highlight
+        if (isCursor && ch === orderChannelCol) {
+          g.rect(x - 2, y, colW, ROW_H).fill({ color: 0x1a2a1a });
         }
 
         labels.push({ x, y: y + 1, text, color, fontFamily: ff });
@@ -106,7 +114,7 @@ export const PixiGTOrderList: React.FC<Props> = ({ width, height }) => {
     }
 
     mega.updateLabels(labels, FONT_SIZE);
-  }, [width, height, orderData, orderCursor, playbackPos.position, channelCount, visibleRows, totalLen]);
+  }, [width, height, orderData, orderCursor, orderChannelCol, playbackPos.position, channelCount, visibleRows, totalLen]);
 
   useEffect(() => { redraw(); }, [redraw]);
 
@@ -117,8 +125,13 @@ export const PixiGTOrderList: React.FC<Props> = ({ width, height }) => {
     if (local.y < HEADER_H) return;
     const scrollTop = Math.max(0, orderCursor - Math.floor(visibleRows / 2));
     const idx = scrollTop + Math.floor((local.y - HEADER_H) / ROW_H);
-    if (idx < totalLen) useGTUltraStore.getState().setOrderCursor(idx);
-  }, [orderCursor, visibleRows, totalLen]);
+    const colW = Math.floor((width - 28) / channelCount);
+    const ch = Math.max(0, Math.min(channelCount - 1, Math.floor((local.x - 28) / colW)));
+    if (idx < totalLen) {
+      useGTUltraStore.getState().setOrderCursor(idx);
+      if (local.x >= 28) useGTUltraStore.getState().setOrderChannelCol(ch);
+    }
+  }, [orderCursor, visibleRows, totalLen, width, channelCount]);
 
   return (
     <pixiContainer ref={containerRef} eventMode="static" cursor="default" onPointerUp={handlePointerUp} layout={{ width, height }}>

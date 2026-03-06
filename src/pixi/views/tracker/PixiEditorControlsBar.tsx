@@ -11,7 +11,8 @@
 
 import { useCallback, useMemo } from 'react';
 import type { Graphics as GraphicsType } from 'pixi.js';
-import { useTrackerStore, useTransportStore, useAudioStore, useUIStore } from '@stores';
+import { useTrackerStore, useTransportStore, useAudioStore, useUIStore, useEditorStore , useFormatStore } from '@stores';
+import type { TrackerViewMode } from '@stores/useUIStore';
 import { useShallow } from 'zustand/react/shallow';
 import { useFPSMonitor } from '@/hooks/useFPSMonitor';
 import { SYSTEM_PRESETS, getGroupedPresets } from '@/constants/systemPresets';
@@ -26,11 +27,9 @@ const BAR_H = 36;
 
 // ─── View Mode ───────────────────────────────────────────────────────────────
 
-type ViewMode = 'tracker' | 'grid' | 'pianoroll' | 'tb303' | 'sunvox' | 'arrangement' | 'dj' | 'drumpad' | 'vj' | 'mixer';
-
 export interface PixiEditorControlsBarProps {
-  viewMode: ViewMode;
-  onViewModeChange: (mode: ViewMode) => void;
+  viewMode: TrackerViewMode;
+  onViewModeChange: (mode: TrackerViewMode) => void;
   gridChannelIndex: number;
   onGridChannelChange: (index: number) => void;
 }
@@ -188,9 +187,9 @@ const SubsongSelector: React.FC = () => {
 // ─── SID Subsong Selector + Info Button ──────────────────────────────────────
 
 const SIDSubsongAndInfo: React.FC = () => {
-  const sidMetadata = useTrackerStore(s => s.sidMetadata);
-  const setSidMetadata = useTrackerStore(s => s.setSidMetadata);
-  const songDBInfo = useTrackerStore(s => s.songDBInfo);
+  const sidMetadata = useFormatStore(s => s.sidMetadata);
+  const setSidMetadata = useFormatStore(s => s.setSidMetadata);
+  const songDBInfo = useFormatStore(s => s.songDBInfo);
 
   const hasMultipleSubsongs = sidMetadata && sidMetadata.subsongs > 1;
   const hasInfo = !!(sidMetadata || songDBInfo);
@@ -266,8 +265,8 @@ const SIDSubsongAndInfo: React.FC = () => {
 // ─── Module Info Button (non-SID) ────────────────────────────────────────────
 
 const ModuleInfoButton: React.FC = () => {
-  const sidMetadata = useTrackerStore(s => s.sidMetadata);
-  const songDBInfo = useTrackerStore(s => s.songDBInfo);
+  const sidMetadata = useFormatStore(s => s.sidMetadata);
+  const songDBInfo = useFormatStore(s => s.songDBInfo);
   const patterns = useTrackerStore(s => s.patterns);
 
   // Only show for non-SID modules that have metadata
@@ -322,12 +321,13 @@ export const PixiEditorControlsBar: React.FC<PixiEditorControlsBarProps> = ({
   const {
     recordMode,
     showGhostPatterns,
-    channelCount,
-  } = useTrackerStore(useShallow(s => ({
+  } = useEditorStore(useShallow(s => ({
     recordMode: s.recordMode,
     showGhostPatterns: s.showGhostPatterns,
-    channelCount: s.patterns[s.currentPatternIndex]?.channels?.length || 4,
   })));
+  const channelCount = useTrackerStore(useShallow(s =>
+    s.patterns[s.currentPatternIndex]?.channels?.length || 4
+  ));
 
   // ── Transport store ───────────────────────────────────────────────────────
   const {
@@ -361,7 +361,7 @@ export const PixiEditorControlsBar: React.FC<PixiEditorControlsBarProps> = ({
   const handleViewModeChange = useCallback((val: string) => {
     // Local sub-modes stay in tracker view; global views switch activeView
     if (val === 'tracker' || val === 'grid' || val === 'tb303' || val === 'sunvox') {
-      setTimeout(() => onViewModeChange(val as ViewMode), 0);
+      setTimeout(() => onViewModeChange(val as TrackerViewMode), 0);
     } else {
       setTimeout(() => useUIStore.getState().setActiveView(val as any), 0);
     }
@@ -372,11 +372,11 @@ export const PixiEditorControlsBar: React.FC<PixiEditorControlsBarProps> = ({
   }, [onGridChannelChange]);
 
   const handleToggleRecord = useCallback(() => {
-    useTrackerStore.getState().toggleRecordMode();
+    useEditorStore.getState().toggleRecordMode();
   }, []);
 
   const handleToggleGhosts = useCallback(() => {
-    const s = useTrackerStore.getState();
+    const s = useEditorStore.getState();
     s.setShowGhostPatterns(!s.showGhostPatterns);
   }, []);
 

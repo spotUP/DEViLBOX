@@ -17,13 +17,13 @@ import { PIXI_FONTS } from '@/pixi/fonts';
 import { MegaText, type GlyphLabel } from '@/pixi/utils/MegaText';
 import { useGTUltraStore } from '@/stores/useGTUltraStore';
 
-const C_BG      = 0x0a0a1a;
-const C_GRID    = 0x1a1a3a;
+const C_BG      = 0x080808;
+const C_GRID    = 0x151515;
 const C_WAVE_L  = 0x00ff88;
 const C_WAVE_R  = 0x6699ff;
-const C_CENTER  = 0x333355;
-const C_LABEL   = 0x888899;
-const C_BORDER  = 0x333366;
+const C_CENTER  = 0x222222;
+const C_LABEL   = 0x666666;
+const C_BORDER  = 0x222222;
 
 const FFT_SIZE = 2048;
 

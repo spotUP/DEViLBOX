@@ -2,10 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { useTrackerStore, useInstrumentStore, useProjectStore, notify } from '@stores';
 import { exportAsXM, type XMExportOptions } from './XMExporter';
 import { exportAsMOD, type MODExportOptions } from './MODExporter';
+import { exportWithOpenMPT, type OpenMPTExportOptions } from './OpenMPTExporter';
 
 interface ModuleExportPanelProps {
   handlerRef: React.MutableRefObject<(() => Promise<false | void>) | null>;
-  exportMode: 'xm' | 'mod';
+  exportMode: 'xm' | 'mod' | 'it' | 's3m';
   onClose: () => void;
 }
 
@@ -30,7 +31,34 @@ export const ModuleExportPanel: React.FC<ModuleExportPanelProps> = ({
 
   // Register export handler
   handlerRef.current = async () => {
-    if (exportMode === 'xm') {
+    if (exportMode === 'it' || exportMode === 's3m') {
+      // IT/S3M export via OpenMPT WASM
+      const songPositions = patterns.map((_, i) => i);
+      const opts: OpenMPTExportOptions = {
+        format: exportMode,
+        moduleName: metadata.name || 'DEViLBOX Export',
+        channelLimit: exportMode === 's3m' ? Math.min(xmChannelCount, 32) : xmChannelCount,
+      };
+
+      const result = await exportWithOpenMPT(patterns, instruments, songPositions, opts);
+
+      const url = URL.createObjectURL(result.data);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = result.filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      if (result.warnings.length > 0) {
+        setExportWarnings(result.warnings);
+        notify.warning(`${exportMode.toUpperCase()} exported with ${result.warnings.length} warnings.`);
+      } else {
+        notify.success(`${exportMode.toUpperCase()} file "${result.filename}" exported successfully!`);
+        onClose();
+      }
+    } else if (exportMode === 'xm') {
       const xmOptions: XMExportOptions = {
         channelLimit: xmChannelCount,
         moduleName: metadata.name || 'DEViLBOX Export',
@@ -219,6 +247,58 @@ export const ModuleExportPanel: React.FC<ModuleExportPanelProps> = ({
             </div>
 
             {/* Warnings display */}
+            {exportWarnings.length > 0 && (
+              <div className="bg-orange-500/10 border border-orange-500/30 rounded-lg p-3">
+                <h4 className="text-xs font-mono font-bold text-orange-400 mb-2">
+                  Export Warnings ({exportWarnings.length})
+                </h4>
+                <ul className="text-xs font-mono text-orange-300 space-y-1 max-h-32 overflow-y-auto">
+                  {exportWarnings.map((warning, idx) => (
+                    <li key={idx} className="flex items-start gap-2">
+                      <span className="text-orange-400">•</span>
+                      <span>{warning}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {(exportMode === 'it' || exportMode === 's3m') && (
+        <div className="bg-dark-bgSecondary border border-dark-border rounded-lg p-4 mb-4">
+          <h3 className="text-sm font-mono font-bold text-accent-primary mb-3">
+            {exportMode === 'it' ? 'Impulse Tracker IT Export (.it)' : 'ScreamTracker 3 S3M Export (.s3m)'}
+          </h3>
+          <div className="space-y-3">
+            <div>
+              <label className="block text-xs font-mono text-text-muted mb-1">
+                Channel Count (max {exportMode === 's3m' ? 32 : 64})
+              </label>
+              <input
+                type="number"
+                min={2}
+                max={exportMode === 's3m' ? 32 : 64}
+                value={xmChannelCount}
+                onChange={(e) => setXmChannelCount(Math.min(
+                  exportMode === 's3m' ? 32 : 64,
+                  Math.max(2, Number(e.target.value)),
+                ))}
+                className="input w-full"
+              />
+            </div>
+
+            <div className="text-sm font-mono text-text-secondary space-y-1">
+              <div>Format: <span className="text-accent-primary">
+                {exportMode === 'it' ? 'Impulse Tracker Module' : 'ScreamTracker 3 Module'}
+              </span></div>
+              <div>Engine: <span className="text-accent-primary">OpenMPT CSoundFile (WASM)</span></div>
+              <div>Patterns: <span className="text-accent-primary">{patterns.length}</span></div>
+              <div>Channels: <span className="text-accent-primary">{Math.min(patterns[0]?.channels.length || 8, exportMode === 's3m' ? 32 : 64)}</span></div>
+              <div>Instruments: <span className="text-accent-primary">{instruments.length}</span></div>
+            </div>
+
             {exportWarnings.length > 0 && (
               <div className="bg-orange-500/10 border border-orange-500/30 rounded-lg p-3">
                 <h4 className="text-xs font-mono font-bold text-orange-400 mb-2">

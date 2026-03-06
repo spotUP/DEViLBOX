@@ -12,9 +12,11 @@
  */
 
 import React, { useRef, useEffect } from 'react';
+import * as Tone from 'tone';
 import { useTrackerStore } from '@stores/useTrackerStore';
 import { useTransportStore } from '@stores/useTransportStore';
 import { AudioDataBus, type VJAudioFrame } from '@engine/vj/AudioDataBus';
+import { getTrackerReplayer } from '@engine/TrackerReplayer';
 import type { TrackerCell } from '@/types/tracker';
 
 const NOTE_NAMES = ['C-', 'C#', 'D-', 'D#', 'E-', 'F-', 'F#', 'G-', 'G#', 'A-', 'A#', 'B-'];
@@ -147,15 +149,29 @@ export const VJPatternOverlay: React.FC = React.memo(() => {
       anim.tiltKickY = decay(anim.tiltKickY, 5);
       anim.bounceY = decay(anim.bounceY, 6);
 
-      // Smooth scroll
-      if (anim.prevRow >= 0 && currentRow !== anim.prevRow) {
-        const rowDelta = currentRow - anim.prevRow;
-        if (Math.abs(rowDelta) <= 2) {
-          anim.scrollOffset += rowDelta * ROW_H;
+      // Smooth scroll — always enabled in VJ view for visual performance
+      // Uses replayer audio timeline for sub-row interpolation
+      // Also use replayer's row for rendering to avoid blink from store lag
+      let displayRow = currentRow;
+      if (isPlaying) {
+        const replayer = getTrackerReplayer();
+        const audioTime = Tone.now() + 0.01;
+        const audioState = replayer.getStateAtTime(audioTime);
+        if (audioState) {
+          displayRow = audioState.row;
+          const nextState = replayer.getStateAtTime(audioTime + 0.5, true);
+          const dur = (nextState && nextState.row !== audioState.row)
+            ? nextState.time - audioState.time
+            : (2.5 / useTransportStore.getState().bpm) * useTransportStore.getState().speed;
+          const progress = Math.min(Math.max((audioTime - audioState.time) / (dur || 0.125), 0), 1);
+          anim.scrollOffset = progress * ROW_H;
+        } else {
+          anim.scrollOffset = 0;
         }
+      } else {
+        anim.scrollOffset = 0;
       }
-      anim.prevRow = currentRow;
-      anim.scrollOffset = decay(anim.scrollOffset, 12);
+      anim.prevRow = displayRow;
 
       // ── 3D transform ──────────────────────────────────────────────────
       // Lissajous orbit
@@ -163,8 +179,11 @@ export const VJPatternOverlay: React.FC = React.memo(() => {
       const orbitY = Math.sin(t * 0.11) * Math.cos(t * 0.17) * 5;
       const bassTilt = frame.bassEnergy * 6;
       const shimmerZ = frame.highEnergy * Math.sin(t * 37) * 1.5;
-      const rx = orbitX + bassTilt + anim.tiltKickX;
-      const ry = orbitY + anim.tiltKickY + shimmerZ;
+      // Dampen 3D tilt when smooth-scrolling to avoid parallax artifacts
+      // (perspective makes left/right edges appear to scroll different directions)
+      const tiltDampen = (anim.scrollOffset > 0.5) ? 0.15 : 1;
+      const rx = (orbitX + bassTilt + anim.tiltKickX) * tiltDampen;
+      const ry = (orbitY + anim.tiltKickY + shimmerZ) * tiltDampen;
       const scale = 2.1 + anim.bassAccum * 0.06 + anim.beatFlash * 0.03;
       const driftX = Math.sin(t * 0.09) * 15 + Math.cos(t * 0.23) * 10;
       const driftY = Math.sin(t * 0.14) * 8 + anim.bounceY;
@@ -183,15 +202,31 @@ export const VJPatternOverlay: React.FC = React.memo(() => {
 
       // ── Draw pattern ──────────────────────────────────────────────────
       ctx.clearRect(0, 0, canvasW, CANVAS_H);
-      ctx.save();
-      ctx.translate(0, -anim.scrollOffset);
 
       const rowNumW = ROW_NUM_W;
       const cellW = CELL_W;
       const baseHue = (bandHue(frame) + anim.hueShift) % 360;
-
       const letterSpacing = anim.bassAccum * 1.5;
       ctx.textBaseline = 'middle';
+
+      // ── Current-row highlight bar (fixed position, no scroll) ────────
+      const barY = ROW_H + VISIBLE_ROWS * ROW_H;
+      if (isPlaying) {
+        const flashBright = 0.4 + anim.beatFlash * 0.5;
+        ctx.fillStyle = hsl(baseHue, 70, 55, flashBright);
+        ctx.fillRect(0, barY, canvasW, ROW_H);
+        if (anim.beatFlash > 0.05) {
+          ctx.fillStyle = hsl(baseHue, 90, 80, anim.beatFlash * 0.4);
+          ctx.fillRect(0, barY, canvasW, ROW_H);
+        }
+      } else {
+        ctx.fillStyle = 'rgba(255,255,255,0.1)';
+        ctx.fillRect(0, barY, canvasW, ROW_H);
+      }
+
+      // ── Scrolled content ────────────────────────────────────────────
+      ctx.save();
+      ctx.translate(0, -anim.scrollOffset);
 
       // Channel headers
       ctx.font = '11px "Berkeley Mono", "JetBrains Mono", "Fira Code", monospace';
@@ -213,7 +248,7 @@ export const VJPatternOverlay: React.FC = React.memo(() => {
 
       // ── Rows ──────────────────────────────────────────────────────────
       for (let i = -VISIBLE_ROWS; i <= VISIBLE_ROWS; i++) {
-        const row = currentRow + i;
+        const row = displayRow + i;
         if (row < 0 || row >= patLen) continue;
         const y = ROW_H + (i + VISIBLE_ROWS) * ROW_H;
         const isCurrent = i === 0;
@@ -221,19 +256,6 @@ export const VJPatternOverlay: React.FC = React.memo(() => {
         const dist = Math.abs(i) / VISIBLE_ROWS;
         const shimmer = 0.5 + 0.5 * Math.sin(t * 3 + i * 0.4);
         const depthAlpha = (1 - dist * 0.5) * (0.9 + shimmer * 0.1);
-
-        if (isCurrent) {
-          const flashBright = 0.4 + anim.beatFlash * 0.5;
-          ctx.fillStyle = isPlaying
-            ? hsl(baseHue, 70, 55, flashBright)
-            : 'rgba(255,255,255,0.1)';
-          ctx.fillRect(0, y, canvasW, ROW_H);
-
-          if (anim.beatFlash > 0.05) {
-            ctx.fillStyle = hsl(baseHue, 90, 80, anim.beatFlash * 0.4);
-            ctx.fillRect(0, y, canvasW, ROW_H);
-          }
-        }
 
         const rnAlpha = isCurrent ? 1.0 : 0.45 * depthAlpha;
         ctx.fillStyle = isCurrent

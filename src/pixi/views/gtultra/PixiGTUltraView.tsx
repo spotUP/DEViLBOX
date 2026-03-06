@@ -36,12 +36,12 @@ const TOOLBAR_H = 32;
 const SIDEBAR_W = 280;
 
 // GoatTracker color palette
-const GT_BG        = 0x1a1a2e;
-const GT_TOOLBAR   = 0x0f3460;
+const GT_BG        = 0x0d0d0d;
+const GT_TOOLBAR   = 0x1a1a1a;
 const GT_ACCENT    = 0xe94560;
 const GT_GREEN     = 0x2a9d8f;
-const GT_SEP       = 0x333355;
-const GT_TEXT_DIM  = 0x666688;
+const GT_SEP       = 0x222222;
+const GT_TEXT_DIM  = 0x555555;
 
 interface Props {
   width: number;
@@ -59,6 +59,12 @@ export const PixiGTUltraView: React.FC<Props> = ({ width, height }) => {
   const followPlay = useGTUltraStore((s) => s.followPlay);
   const engine = useGTUltraStore((s) => s.engine);
   const viewMode = useGTUltraStore((s) => s.viewMode);
+  const currentOctave = useGTUltraStore((s) => s.currentOctave);
+  const editStep = useGTUltraStore((s) => s.editStep);
+  const recordMode = useGTUltraStore((s) => s.recordMode);
+  const jamMode = useGTUltraStore((s) => s.jamMode);
+  const currentSong = useGTUltraStore((s) => s.currentSong);
+  const patternLength = useGTUltraStore((s) => s.patternLength);
 
   // Initialize engine on mount (mirrors GTUltraView.tsx logic)
   useEffect(() => {
@@ -150,8 +156,13 @@ export const PixiGTUltraView: React.FC<Props> = ({ width, height }) => {
     const row = playbackPos.row.toString(16).toUpperCase().padStart(2, '0');
     const sid = sidModel === 0 ? '6581' : '8580';
     const ch = sidCount * 3;
-    return `Pos:${pos} Row:${row}  |  ${sid} ${ch}ch  |  Tempo:${tempo}`;
+    return `Pos:${pos} Row:${row} | ${sid} ${ch}ch | Tempo:${tempo}`;
   }, [playbackPos, sidModel, sidCount, tempo]);
+
+  const octaveText = useMemo(() => `Oct:${currentOctave}`, [currentOctave]);
+  const stepText = useMemo(() => `Stp:${editStep}`, [editStep]);
+  const songText = useMemo(() => `Song:${currentSong}`, [currentSong]);
+  const plenText = useMemo(() => `Len:${patternLength.toString(16).toUpperCase()}`, [patternLength]);
 
   const togglePlay = useCallback(() => {
     if (!engine) return;
@@ -172,6 +183,24 @@ export const PixiGTUltraView: React.FC<Props> = ({ width, height }) => {
     const store = useGTUltraStore.getState();
     store.setViewMode(store.viewMode === 'pro' ? 'studio' : 'pro');
   }, []);
+
+  const toggleRecord = useCallback(() => {
+    useGTUltraStore.getState().setRecordMode(!recordMode);
+  }, [recordMode]);
+
+  const toggleJam = useCallback(() => {
+    useGTUltraStore.getState().setJamMode(!jamMode);
+  }, [jamMode]);
+
+  const cycleOctave = useCallback((delta: number) => {
+    const next = Math.max(0, Math.min(7, currentOctave + delta));
+    useGTUltraStore.getState().setCurrentOctave(next);
+  }, [currentOctave]);
+
+  const cycleStep = useCallback((delta: number) => {
+    const next = Math.max(0, Math.min(16, editStep + delta));
+    useGTUltraStore.getState().setEditStep(next);
+  }, [editStep]);
 
   const handleApplyPreset = useCallback((preset: import('@/constants/gtultraPresets').GTSIDPreset) => {
     if (!engine) return;
@@ -260,6 +289,38 @@ export const PixiGTUltraView: React.FC<Props> = ({ width, height }) => {
           style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }}
           tint={GT_TEXT_DIM}
         />
+
+        {/* Octave +/- */}
+        <pixiContainer eventMode="static" cursor="pointer" onPointerUp={() => cycleOctave(-1)}>
+          <pixiBitmapText eventMode="none" text="-" style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }} tint={GT_TEXT_DIM} />
+        </pixiContainer>
+        <pixiBitmapText text={octaveText} style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }} tint={0xe0e0e0} />
+        <pixiContainer eventMode="static" cursor="pointer" onPointerUp={() => cycleOctave(1)}>
+          <pixiBitmapText eventMode="none" text="+" style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }} tint={GT_TEXT_DIM} />
+        </pixiContainer>
+
+        {/* Edit step +/- */}
+        <pixiContainer eventMode="static" cursor="pointer" onPointerUp={() => cycleStep(-1)}>
+          <pixiBitmapText eventMode="none" text="-" style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }} tint={GT_TEXT_DIM} />
+        </pixiContainer>
+        <pixiBitmapText text={stepText} style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }} tint={0xe0e0e0} />
+        <pixiContainer eventMode="static" cursor="pointer" onPointerUp={() => cycleStep(1)}>
+          <pixiBitmapText eventMode="none" text="+" style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }} tint={GT_TEXT_DIM} />
+        </pixiContainer>
+
+        {/* Record mode */}
+        <pixiContainer eventMode="static" cursor="pointer" onPointerUp={toggleRecord}>
+          <pixiBitmapText eventMode="none" text={recordMode ? '[REC]' : '[rec]'} style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }} tint={recordMode ? 0xef4444 : GT_TEXT_DIM} />
+        </pixiContainer>
+
+        {/* Jam mode */}
+        <pixiContainer eventMode="static" cursor="pointer" onPointerUp={toggleJam}>
+          <pixiBitmapText eventMode="none" text={jamMode ? '[JAM]' : '[jam]'} style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }} tint={jamMode ? GT_GREEN : GT_TEXT_DIM} />
+        </pixiContainer>
+
+        {/* Song / Pattern length */}
+        <pixiBitmapText text={songText} style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }} tint={GT_TEXT_DIM} />
+        <pixiBitmapText text={plenText} style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }} tint={GT_TEXT_DIM} />
 
         <pixiContainer layout={{ flex: 1 }} />
 

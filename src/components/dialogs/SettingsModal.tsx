@@ -10,7 +10,7 @@ import { useSettingsStore, type SIDEngineType } from '@stores/useSettingsStore';
 import { LENS_PRESETS, LENS_PRESET_ORDER } from '@/pixi/LensFilter';
 import { SID_ENGINES } from '@engine/deepsid/DeepSIDEngineManager';
 import { useKeyboardStore } from '@stores/useKeyboardStore';
-import { useTrackerStore } from '@stores/useTrackerStore';
+import { useEditorStore } from '@stores/useEditorStore';
 import { useModlandContributionModal } from '@stores/useModlandContributionModal';
 import { Toggle } from '@components/controls/Toggle';
 import { KeyboardShortcutSheet } from '@components/tracker/KeyboardShortcutSheet';
@@ -19,7 +19,6 @@ import { useAudioStore } from '@stores/useAudioStore';
 import { getDJEngineIfActive } from '@engine/dj/DJEngine';
 import { BG_MODES, getBgModeLabel } from '@/components/tracker/TrackerVisualBackground';
 import { getASIDDeviceManager, isASIDSupported } from '@lib/sid/ASIDDeviceManager';
-
 interface CRTSliderProps {
   label: string;
   value: number;
@@ -130,7 +129,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
     recQuantEnabled, setRecQuantEnabled,
     recQuantRes, setRecQuantRes,
     recReleaseEnabled, setRecReleaseEnabled
-  } = useTrackerStore();
+  } = useEditorStore();
 
   const { activeScheme, setActiveScheme, platformOverride, setPlatformOverride } = useKeyboardStore();
 
@@ -636,15 +635,29 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
             </div>
           </section>
 
-          {/* DJ / Scratch Section */}
+          {/* Vinyl Scratch Section */}
           <section>
-            <h3 className="text-ft2-highlight text-xs font-bold mb-3 tracking-wide">DJ / SCRATCH</h3>
+            <h3 className="text-ft2-highlight text-xs font-bold mb-3 tracking-wide">VINYL SCRATCH</h3>
             <div className="space-y-3">
-              {/* Scroll Acceleration */}
+              {/* Always-On Toggle */}
               <div className="flex items-center justify-between">
                 <div className="flex flex-col">
-                  <label className="text-ft2-text text-xs font-mono">Scroll Acceleration:</label>
-                  <span className="text-[9px] text-ft2-textDim font-mono">Smooth scroll-to-scratch (off = raw 1:1)</span>
+                  <label className="text-ft2-text text-xs font-mono">Always On:</label>
+                  <span className="text-[9px] text-ft2-textDim font-mono">Scratch even when playback is stopped</span>
+                </div>
+                <Toggle
+                  label=""
+                  value={useUIStore.getState().scratchEnabled}
+                  onChange={(checked) => useUIStore.getState().setScratchEnabled(checked)}
+                  size="sm"
+                />
+              </div>
+
+              {/* Velocity Curve */}
+              <div className="flex items-center justify-between">
+                <div className="flex flex-col">
+                  <label className="text-ft2-text text-xs font-mono">Velocity Curve:</label>
+                  <span className="text-[9px] text-ft2-textDim font-mono">Smooth momentum (off = direct 1:1 response)</span>
                 </div>
                 <Toggle
                   label=""
@@ -654,15 +667,37 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                 />
               </div>
 
-              {/* Scratch keyboard shortcuts info */}
+              {/* Platter Weight */}
+              <div className="flex items-center justify-between">
+                <div className="flex flex-col">
+                  <label className="text-ft2-text text-xs font-mono">Platter Weight:</label>
+                  <span className="text-[9px] text-ft2-textDim font-mono">Light (CDJ) → Medium (1200) → Heavy</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    value={Math.round(useUIStore.getState().platterMass * 100)}
+                    onChange={(e) => useUIStore.getState().setPlatterMass(parseInt(e.target.value) / 100)}
+                    className="w-20 accent-ft2-cursor"
+                  />
+                  <span className="text-ft2-text text-[10px] font-mono w-8 text-right">
+                    {Math.round(useUIStore.getState().platterMass * 100)}%
+                  </span>
+                </div>
+              </div>
+
+              {/* How to scratch */}
               <div className="pt-2 border-t border-ft2-border/30">
                 <div className="text-ft2-textDim text-[10px] font-mono space-y-1">
-                  <div className="text-ft2-highlight font-bold">Scratch during playback:</div>
-                  <div>Scroll wheel/trackpad controls speed &amp; direction</div>
-                  <div className="mt-1 text-ft2-highlight font-bold">Keyboard (Shift+Alt):</div>
-                  <div>F = Fader cut (hold) &middot; 1 = Trans &middot; 2 = Crab</div>
-                  <div>3 = Flare &middot; 4 = Chirp &middot; 5 = Stab</div>
-                  <div>6 = 8-Finger Crab &middot; 7 = Twiddle &middot; 0 = Stop</div>
+                  <div className="text-ft2-highlight font-bold">How to scratch:</div>
+                  <div>Scroll wheel/trackpad during playback controls speed &amp; direction</div>
+                  <div>Hold <kbd className="px-1 py-0.5 bg-ft2-border text-ft2-text rounded text-[8px]">Z</kbd> = fader cut (mute) &middot; Hold <kbd className="px-1 py-0.5 bg-ft2-border text-ft2-text rounded text-[8px]">X</kbd> = crab scratch</div>
+                  <div>Touch: 2-finger swipe = nudge &middot; 3-finger touch = grab</div>
+                  <div className="mt-1 text-ft2-highlight font-bold">DJ techniques (Shift+Alt):</div>
+                  <div>F = Fader cut &middot; 1 = Trans &middot; 2 = Crab &middot; 3 = Flare</div>
+                  <div>4 = Chirp &middot; 5 = Stab &middot; 6 = 8-Finger &middot; 7 = Twiddle &middot; 0 = Stop</div>
                 </div>
               </div>
             </div>
@@ -840,68 +875,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                       {synthBusGain > 0 ? `+${synthBusGain}` : synthBusGain} dB
                     </span>
                   </div>
-                </div>
-              </div>
-            </div>
-          </section>
-
-          {/* Scratch Section */}
-          <section>
-            <h3 className="text-ft2-highlight text-xs font-bold mb-3 tracking-wide">SCRATCH</h3>
-            <div className="space-y-3">
-              {/* Scratch Toggle */}
-              <div className="flex items-center justify-between">
-                <div className="flex flex-col">
-                  <label className="text-ft2-text text-xs font-mono">Scratch Toggle:</label>
-                  <span className="text-[9px] text-ft2-textDim font-mono">Always enable scratch (OFF = only during playback)</span>
-                </div>
-                <Toggle
-                  label=""
-                  value={useUIStore.getState().scratchEnabled}
-                  onChange={(checked) => useUIStore.getState().setScratchEnabled(checked)}
-                  size="sm"
-                />
-              </div>
-
-              {/* Scroll Acceleration */}
-              <div className="flex items-center justify-between">
-                <div className="flex flex-col">
-                  <label className="text-ft2-text text-xs font-mono">Scroll Acceleration:</label>
-                  <span className="text-[9px] text-ft2-textDim font-mono">Smooth velocity curve vs raw 1:1 scroll</span>
-                </div>
-                <Toggle
-                  label=""
-                  value={useUIStore.getState().scratchAcceleration}
-                  onChange={(checked) => useUIStore.getState().setScratchAcceleration(checked)}
-                  size="sm"
-                />
-              </div>
-              <div className="text-[9px] text-ft2-textDim font-mono leading-tight">
-                Scroll the pattern editor during playback to vinyl scratch.
-                Hold <kbd className="px-1 py-0.5 bg-ft2-border text-ft2-text rounded text-[8px]">Z</kbd> for fader cut (mute),
-                hold <kbd className="px-1 py-0.5 bg-ft2-border text-ft2-text rounded text-[8px]">X</kbd> for crab scratch while scrolling.
-                On touchscreens: 2-finger swipe = nudge, 3-finger touch = grab (hand on record).
-                In DJ view, scratch is always enabled.
-              </div>
-
-              {/* Platter Mass */}
-              <div className="flex items-center justify-between">
-                <div className="flex flex-col">
-                  <label className="text-ft2-text text-xs font-mono">Platter Mass:</label>
-                  <span className="text-[9px] text-ft2-textDim font-mono">CDJ → Technics 1200 → Heavy</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="range"
-                    min="0"
-                    max="100"
-                    value={Math.round(useUIStore.getState().platterMass * 100)}
-                    onChange={(e) => useUIStore.getState().setPlatterMass(parseInt(e.target.value) / 100)}
-                    className="w-20 accent-ft2-cursor"
-                  />
-                  <span className="text-ft2-text text-[10px] font-mono w-8 text-right">
-                    {Math.round(useUIStore.getState().platterMass * 100)}%
-                  </span>
                 </div>
               </div>
             </div>

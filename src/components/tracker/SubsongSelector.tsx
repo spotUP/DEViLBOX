@@ -5,17 +5,22 @@
  */
 
 import React, { useCallback } from 'react';
-import { useTrackerStore, useTransportStore } from '@stores';
+import { useTrackerStore, useTransportStore , useFormatStore } from '@stores';
 import { useShallow } from 'zustand/react/shallow';
 import { Music2 } from 'lucide-react';
 import { notify } from '@stores/useNotificationStore';
 import { getTrackerReplayer } from '@engine/TrackerReplayer';
 
 export const SubsongSelector: React.FC = React.memo(() => {
-  const { loadPatterns, setPatternOrder, furnaceSubsongs, furnaceActiveSubsong, setFurnaceActiveSubsong } = useTrackerStore(
+  const { loadPatterns, setPatternOrder, } = useTrackerStore(
     useShallow((state) => ({
       loadPatterns: state.loadPatterns,
       setPatternOrder: state.setPatternOrder,
+      }))
+  );
+
+  const { furnaceSubsongs, furnaceActiveSubsong, setFurnaceActiveSubsong } = useFormatStore(
+    useShallow((state) => ({
       furnaceSubsongs: state.furnaceSubsongs,
       furnaceActiveSubsong: state.furnaceActiveSubsong,
       setFurnaceActiveSubsong: state.setFurnaceActiveSubsong,

@@ -9,7 +9,7 @@ import type { BitmapText as BitmapTextType, Graphics as GraphicsType } from 'pix
 import { PixiButton, PixiSlider } from '../../components';
 import { usePixiTheme } from '../../theme';
 import { PIXI_FONTS } from '../../fonts';
-import { useTrackerStore } from '@stores/useTrackerStore';
+import { useFormatStore } from '@stores/useFormatStore';
 import { useAudioStore } from '@stores/useAudioStore';
 import { getTrackerReplayer } from '@engine/TrackerReplayer';
 import { isRapidScrolling } from '../../scrollPerf';
@@ -31,7 +31,7 @@ export const SIDTransportBar: React.FC<SIDTransportBarProps> = ({ width, height 
   const theme = usePixiTheme();
 
   // --- Store state ---
-  const sidMeta = useTrackerStore((s) => s.sidMetadata);
+  const sidMeta = useFormatStore((s) => s.sidMetadata);
   const masterVolume = useAudioStore((s) => s.masterVolume);
   const setMasterVolume = useAudioStore((s) => s.setMasterVolume);
 

@@ -743,3 +743,23 @@ int32 hively_get_track_data(int32 trackIdx, uint8 *outBuf) {
     }
     return trkLen * 6;
 }
+
+/*
+ * Set a single step in a track.
+ * Parameters mirror hvl_step fields.
+ */
+EMSCRIPTEN_KEEPALIVE
+void hively_set_track_step(int32 trackIdx, int32 stepIdx,
+                           uint8 note, uint8 instrument,
+                           uint8 fx, uint8 fxParam,
+                           uint8 fxb, uint8 fxbParam) {
+    if (!g_tune || trackIdx < 0 || trackIdx > 255) return;
+    if (stepIdx < 0 || stepIdx >= g_tune->ht_TrackLength) return;
+    struct hvl_step *s = &g_tune->ht_Tracks[trackIdx][stepIdx];
+    s->stp_Note       = note;
+    s->stp_Instrument = instrument;
+    s->stp_FX         = fx;
+    s->stp_FXParam    = fxParam;
+    s->stp_FXb        = fxb;
+    s->stp_FXbParam   = fxbParam;
+}

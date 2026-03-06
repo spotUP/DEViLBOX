@@ -12,7 +12,7 @@ import { TB303KnobPanel } from './TB303KnobPanel';
 import { FT2Toolbar } from './FT2Toolbar';
 import { MobilePatternInput } from './mobile/MobilePatternInput';
 import { Play, Square, ChevronLeft, ChevronRight, Music2, SlidersHorizontal, Cpu } from 'lucide-react';
-import { useTransportStore, useTrackerStore, useCursorStore, useInstrumentStore } from '@stores';
+import { useTransportStore, useTrackerStore, useCursorStore, useInstrumentStore, useEditorStore } from '@stores';
 import { useShallow } from 'zustand/react/shallow';
 import { getGroupedPresets } from '@/constants/systemPresets';
 import { useOrientation } from '@/hooks/useOrientation';
@@ -46,16 +46,18 @@ export const MobileTrackerView: React.FC<MobileTrackerViewProps> = ({
   const cursor = useCursorStore((s) => s.cursor);
   const moveCursor = useCursorStore((s) => s.moveCursor);
   const moveCursorToRow = useCursorStore((s) => s.moveCursorToRow);
-  const { patterns, currentPatternIndex, setCell, recordMode, editStep, copySelection, cutSelection, paste, applySystemPreset } = useTrackerStore(useShallow((s) => ({
+  const { patterns, currentPatternIndex, setCell, copySelection, cutSelection, paste, applySystemPreset } = useTrackerStore(useShallow((s) => ({
     patterns: s.patterns,
     currentPatternIndex: s.currentPatternIndex,
     setCell: s.setCell,
-    recordMode: s.recordMode,
-    editStep: s.editStep,
     copySelection: s.copySelection,
     cutSelection: s.cutSelection,
     paste: s.paste,
     applySystemPreset: s.applySystemPreset,
+  })));
+  const { recordMode, editStep } = useEditorStore(useShallow((s) => ({
+    recordMode: s.recordMode,
+    editStep: s.editStep,
   })));
   const { instruments, currentInstrumentId, setCurrentInstrument } = useInstrumentStore(useShallow((s) => ({
     instruments: s.instruments,

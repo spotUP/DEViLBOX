@@ -612,6 +612,9 @@ export class TrackerGLRenderer {
           let colEff = 0;
           if (ecol === 0) { colEffTyp = cell.effTyp ?? 0; colEff = cell.eff ?? 0; }
           else if (ecol === 1) { colEffTyp = cell.effTyp2 ?? 0; colEff = cell.eff2 ?? 0; }
+          else if (ecol === 2) { colEffTyp = cell.effTyp3 ?? 0; colEff = cell.eff3 ?? 0; }
+          else if (ecol === 3) { colEffTyp = cell.effTyp4 ?? 0; colEff = cell.eff4 ?? 0; }
+          else if (ecol === 4) { colEffTyp = cell.effTyp5 ?? 0; colEff = cell.eff5 ?? 0; }
 
           const hasEff = colEffTyp !== 0 || colEff !== 0;
           if (hasEff) {

@@ -4,7 +4,8 @@
  */
 
 import React, { useEffect, useRef, useState as useReactState } from 'react';
-import { useTrackerStore, useCursorStore, useTransportStore, useAudioStore, useMIDIStore, useUIStore } from '@stores';
+import { useTrackerStore, useCursorStore, useTransportStore, useAudioStore, useMIDIStore, useUIStore, useFormatStore } from '@stores';
+import { useEditorStore } from '@stores/useEditorStore';
 import { useSettingsStore } from '@stores/useSettingsStore';
 import { useDJStore } from '@/stores/useDJStore';
 import { useCollaborationStore } from '@/stores/useCollaborationStore';
@@ -110,15 +111,24 @@ const DJStatusContent: React.FC = () => {
 
 const TrackerStatusContent: React.FC = () => {
   const cursor = useCursorStore((s) => s.cursor);
-  const { currentOctave, insertMode, recordMode, patternLength, songDBInfo } = useTrackerStore(
+  const { currentOctave, insertMode, recordMode } = useEditorStore(
     useShallow((s) => ({
       currentOctave: s.currentOctave,
       insertMode: s.insertMode,
       recordMode: s.recordMode,
+    }))
+  );
+  const { patternLength } = useTrackerStore(
+    useShallow((s) => ({
       patternLength: s.patterns[s.currentPatternIndex]?.length || 64,
+    }))
+  );
+  const { songDBInfo } = useFormatStore(
+    useShallow((s) => ({
       songDBInfo: s.songDBInfo,
     }))
   );
+
   const { isPlaying, currentRow } = useTransportStore(
     useShallow((s) => ({ isPlaying: s.isPlaying, currentRow: s.currentRow }))
   );

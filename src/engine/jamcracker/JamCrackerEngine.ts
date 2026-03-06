@@ -175,6 +175,27 @@ export class JamCrackerEngine {
             cb();
           }
           break;
+
+        case 'pattern-data':
+          if (data.requestId && this._patternCallbacks.has(data.requestId)) {
+            this._patternCallbacks.get(data.requestId)!(data);
+            this._patternCallbacks.delete(data.requestId);
+          }
+          break;
+
+        case 'song-structure':
+          if (this._songStructureResolve) {
+            this._songStructureResolve(data);
+            this._songStructureResolve = null;
+          }
+          break;
+
+        case 'save-data':
+          if (this._saveResolve) {
+            this._saveResolve(new Uint8Array(data.data));
+            this._saveResolve = null;
+          }
+          break;
       }
     };
 
@@ -239,6 +260,58 @@ export class JamCrackerEngine {
   onSongEnd(cb: () => void): () => void {
     this._songEndCallbacks.add(cb);
     return () => this._songEndCallbacks.delete(cb);
+  }
+
+  // --------------------------------------------------------------------------
+  // Pattern data access
+  // --------------------------------------------------------------------------
+
+  private _patternCallbacks: Map<string, (data: any) => void> = new Map();
+  private _songStructureResolve: ((data: any) => void) | null = null;
+  private _saveResolve: ((data: Uint8Array) => void) | null = null;
+  private _requestId = 0;
+
+  /** Get pattern data: array of rows, each row has 4 channels with 8 fields */
+  getPatternData(patIdx: number): Promise<{
+    numRows: number;
+    rows: Array<Array<{
+      period: number; instr: number; speed: number; arpeggio: number;
+      vibrato: number; phase: number; volume: number; porta: number;
+    }>>;
+  }> {
+    return new Promise((resolve) => {
+      if (!this.workletNode) { resolve({ numRows: 0, rows: [] }); return; }
+      const requestId = `jc-pat-${this._requestId++}`;
+      this._patternCallbacks.set(requestId, (data) => resolve(data));
+      this.workletNode.port.postMessage({ type: 'get-pattern-data', patIdx, requestId });
+    });
+  }
+
+  /** Set a single field in a pattern cell */
+  setPatternCell(patIdx: number, row: number, channel: number, field: number, value: number): void {
+    this.workletNode?.port.postMessage({
+      type: 'set-pattern-cell', patIdx, row, channel, field, value,
+    });
+  }
+
+  /** Get song structure: song length, num patterns, num instruments, order list */
+  getSongStructure(): Promise<{
+    songLen: number; numPats: number; numInst: number; entries: number[];
+  }> {
+    return new Promise((resolve) => {
+      if (!this.workletNode) { resolve({ songLen: 0, numPats: 0, numInst: 0, entries: [] }); return; }
+      this._songStructureResolve = resolve;
+      this.workletNode.port.postMessage({ type: 'get-song-structure' });
+    });
+  }
+
+  /** Save the current module state as a .jam binary */
+  save(): Promise<Uint8Array> {
+    return new Promise((resolve) => {
+      if (!this.workletNode) { resolve(new Uint8Array(0)); return; }
+      this._saveResolve = resolve;
+      this.workletNode.port.postMessage({ type: 'save' });
+    });
   }
 
   dispose(): void {
