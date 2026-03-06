@@ -17,7 +17,8 @@ set(GM_SRC  "${GM_ROOT}/source")
 
 if(EMSCRIPTEN)
     # -pthread for SharedArrayBuffer support (AudioWorklet needs it)
-    # -O2 for reasonable performance in interpreter mode
+    # -O2 is the safe max for Emscripten — -O3 causes function signature mismatch
+    # crashes due to aggressive function table compaction with member function pointers
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread -O2")
     set(CMAKE_C_FLAGS   "${CMAKE_C_FLAGS} -pthread -O2")
 
@@ -267,9 +268,10 @@ if(EMSCRIPTEN)
         LINK_FLAGS "\
             -s MODULARIZE=1 \
             -s EXPORT_NAME='createGearmulator' \
-            -s EXPORTED_FUNCTIONS='[\"_gm_create\",\"_gm_destroy\",\"_gm_process\",\"_gm_sendMidi\",\"_gm_sendSysex\",\"_gm_getSamplerate\",\"_gm_isValid\",\"_gm_getState\",\"_gm_setState\",\"_gm_setDspClockPercent\",\"_gm_getDspClockHz\",\"_malloc\",\"_free\"]' \
+            -s EXPORTED_FUNCTIONS='[\"_gm_create\",\"_gm_destroy\",\"_gm_process\",\"_gm_sendMidi\",\"_gm_sendSysex\",\"_gm_getSamplerate\",\"_gm_isValid\",\"_gm_getState\",\"_gm_setState\",\"_gm_setDspClockPercent\",\"_gm_getDspClockHz\",\"_gm_pushAudioInput\",\"_gm_pullAudioOutput\",\"_gm_pushInput\",\"_gm_getAudioOutputSize\",\"_gm_getAudioInputSize\",\"_malloc\",\"_free\"]' \
             -s EXPORTED_RUNTIME_METHODS='[\"ccall\",\"cwrap\",\"HEAPF32\",\"HEAP8\",\"HEAPU8\"]' \
             -s ALLOW_MEMORY_GROWTH=1 \
+            -s ALLOW_TABLE_GROWTH=1 \
             -s INITIAL_MEMORY=67108864 \
             -s MAXIMUM_MEMORY=268435456 \
             -s PTHREAD_POOL_SIZE=4 \
