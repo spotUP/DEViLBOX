@@ -25,6 +25,7 @@ const VIEW_MODE_OPTIONS: SelectOption[] = [
   { value: 'mixer',       label: 'Mixer' },
   { value: 'vj',          label: 'VJ View' },
   { value: 'studio',      label: 'Studio' },
+  { value: 'split',       label: 'Split View' },
 ];
 
 export interface PixiViewHeaderProps {

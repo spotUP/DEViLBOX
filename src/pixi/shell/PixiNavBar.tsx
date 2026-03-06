@@ -36,6 +36,7 @@ const VIEW_TABS = [
   { id: 'dj',          label: 'DJ'  },
   { id: 'vj',          label: 'VJ'  },
   { id: 'studio',      label: 'Studio' },
+  { id: 'split',       label: 'Split' },
 ] as const;
 
 // ─── PixiNavBar ──────────────────────────────────────────────────────────────

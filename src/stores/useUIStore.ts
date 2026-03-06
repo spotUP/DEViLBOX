@@ -9,7 +9,7 @@ import type { PanelType } from '@typedefs/project';
 
 export type PerformanceQuality = 'high' | 'medium' | 'low';
 
-export type TrackerViewMode = 'tracker' | 'grid' | 'pianoroll' | 'tb303' | 'sunvox' | 'arrangement' | 'dj' | 'drumpad' | 'vj' | 'mixer' | 'studio';
+export type TrackerViewMode = 'tracker' | 'grid' | 'pianoroll' | 'tb303' | 'sunvox' | 'arrangement' | 'dj' | 'drumpad' | 'vj' | 'mixer' | 'studio' | 'split';
 
 export type DialogCommand =
   | 'interpolate-volume'
@@ -67,7 +67,7 @@ interface UIStore {
   platterMass: number; // Turntable platter mass 0-1 (0=CDJ light, 0.5=Technics 1200, 1=heavy)
 
   // View switching (tracker vs arrangement vs DJ vs drum pads vs piano roll vs VJ vs studio)
-  activeView: 'tracker' | 'arrangement' | 'dj' | 'drumpad' | 'pianoroll' | 'vj' | 'mixer' | 'studio';
+  activeView: 'tracker' | 'arrangement' | 'dj' | 'drumpad' | 'pianoroll' | 'vj' | 'mixer' | 'studio' | 'split';
 
   // Tracker sub-view state (shared between DOM and GL renderers)
   trackerViewMode: TrackerViewMode;
@@ -135,7 +135,7 @@ interface UIStore {
   setPlatterMass: (mass: number) => void;
 
   // View switching actions
-  setActiveView: (view: 'tracker' | 'arrangement' | 'dj' | 'drumpad' | 'pianoroll' | 'vj' | 'mixer' | 'studio') => void;
+  setActiveView: (view: 'tracker' | 'arrangement' | 'dj' | 'drumpad' | 'pianoroll' | 'vj' | 'mixer' | 'studio' | 'split') => void;
   toggleActiveView: () => void;
 
   // Tracker sub-view actions
@@ -499,7 +499,7 @@ export const useUIStore = create<UIStore>()(
           state.viewExposeActive = !state.viewExposeActive;
           if (state.viewExposeActive) {
             // Pre-select current view when opening
-            const EXPOSE_VIEWS = ['tracker', 'arrangement', 'pianoroll', 'mixer', 'dj', 'vj', 'studio'];
+            const EXPOSE_VIEWS = ['tracker', 'arrangement', 'pianoroll', 'mixer', 'dj', 'vj', 'studio', 'split'];
             const idx = EXPOSE_VIEWS.indexOf(state.activeView);
             state.viewExposeSelectedIdx = idx >= 0 ? idx : 0;
           }
@@ -610,7 +610,7 @@ export const useUIStore = create<UIStore>()(
       merge: (persisted, current) => {
         const merged = { ...current, ...(persisted as Record<string, unknown>) };
         // Validate activeView — reset to 'tracker' if persisted value is invalid
-        const validViews = ['tracker', 'arrangement', 'dj', 'drumpad', 'pianoroll', 'vj', 'mixer', 'studio'];
+        const validViews = ['tracker', 'arrangement', 'dj', 'drumpad', 'pianoroll', 'vj', 'mixer', 'studio', 'split'];
         if (merged.activeView && !validViews.includes(merged.activeView as string)) {
           console.warn(`[useUIStore] Invalid persisted activeView "${merged.activeView}", resetting to "tracker"`);
           merged.activeView = 'tracker';

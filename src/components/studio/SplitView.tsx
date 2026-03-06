@@ -1,8 +1,7 @@
 /**
- * StudioView — DOM multi-panel studio layout.
+ * SplitView — DOM multi-panel split layout.
  *
  * Tiled split view combining tracker, instrument editor, and mixer.
- * DOM equivalent of the GL WorkbenchContainer's "Compose" workspace.
  * Panels are resizable via drag handles.
  */
 
@@ -178,9 +177,9 @@ const Panel: React.FC<PanelProps> = ({ id, collapsed, onToggle, width, children 
   </div>
 );
 
-// ─── StudioView ─────────────────────────────────────────────────────────────
+// ─── SplitView ──────────────────────────────────────────────────────────────
 
-export const StudioView: React.FC = () => {
+export const SplitView: React.FC = () => {
   const openModal = useUIStore(s => s.openModal);
   const [collapsed, setCollapsed] = useState<Record<PanelId, boolean>>({
     tracker: false,
@@ -252,4 +251,4 @@ export const StudioView: React.FC = () => {
   );
 };
 
-export default StudioView;
+export default SplitView;
