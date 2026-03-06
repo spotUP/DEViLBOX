@@ -19,7 +19,7 @@ interface JamCrackerControlsProps {
   onChange: (updates: Partial<JamCrackerConfig>) => void;
 }
 
-/** Draw the AM waveform into a canvas */
+/** Draw the AM waveform into a canvas (DPR-aware) */
 function drawWaveform(
   canvas: HTMLCanvasElement,
   waveformData: Uint8Array | undefined,
@@ -28,8 +28,15 @@ function drawWaveform(
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
 
-  const w = canvas.width;
-  const h = canvas.height;
+  const dpr = window.devicePixelRatio || 1;
+  const cssW = canvas.clientWidth || 320;
+  const cssH = canvas.clientHeight || 120;
+  canvas.width = cssW * dpr;
+  canvas.height = cssH * dpr;
+  ctx.scale(dpr, dpr);
+
+  const w = cssW;
+  const h = cssH;
   const mid = h / 2;
 
   ctx.clearRect(0, 0, w, h);
@@ -104,11 +111,24 @@ export const JamCrackerControls: React.FC<JamCrackerControlsProps> = ({
     configRef.current = config;
   }, [config]);
 
-  // Redraw waveform when config changes
+  // Redraw waveform when config changes or canvas resizes
   useEffect(() => {
-    if (canvasRef.current) {
-      drawWaveform(canvasRef.current, config.waveformData, config.phaseDelta);
-    }
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    // Defer initial draw to after layout so clientWidth > 0
+    const raf = requestAnimationFrame(() => {
+      drawWaveform(canvas, configRef.current.waveformData, configRef.current.phaseDelta);
+    });
+
+    const obs = new ResizeObserver(() => {
+      drawWaveform(canvas, configRef.current.waveformData, configRef.current.phaseDelta);
+    });
+    obs.observe(canvas);
+    return () => {
+      cancelAnimationFrame(raf);
+      obs.disconnect();
+    };
   }, [config.waveformData, config.phaseDelta]);
 
   const updateParam = useCallback((key: keyof JamCrackerConfig, value: number) => {
@@ -149,10 +169,8 @@ export const JamCrackerControls: React.FC<JamCrackerControlsProps> = ({
           </div>
           <canvas
             ref={canvasRef}
-            width={320}
-            height={120}
             className="w-full rounded border border-gray-800 bg-[#0a0e14]"
-            style={{ imageRendering: 'pixelated' }}
+            style={{ height: 120 }}
           />
         </div>
       )}
