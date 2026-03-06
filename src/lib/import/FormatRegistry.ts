@@ -1033,10 +1033,11 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
   {
     key: 'jochenHippelST',
     label: 'Jochen Hippel ST',
-    description: 'Jochen Hippel ST (mdst.* prefix)',
+    description: 'Jochen Hippel ST (.sog, hst.*, mdst.*)',
     family: 'amiga-native',
-    matchMode: 'prefix',
-    prefixes: ['mdst.'],
+    matchMode: 'both',
+    extRegex: /\.sog$/i,
+    prefixes: ['mdst.', 'hst.'],
     prefKey: 'jochenHippelST',
     nativeParser: { module: '@lib/import/formats/JochenHippelSTParser', parseFn: 'parseJochenHippelSTFile', detectFn: 'isJochenHippelSTFormat' },
     uadeFallback: true,
@@ -2028,10 +2029,11 @@ export function isSupportedFormat(filename: string): boolean {
   const lower = filename.toLowerCase();
   const ext = lower.slice(lower.lastIndexOf('.'));
   if (buildExtensionSet().has(ext)) return true;
-  // Check prefix-based formats
+  // Check prefix-based formats (both prefix.name and name.prefix)
   const base = getBasename(lower);
+  const extNoDot = ext.slice(1); // '.sog' → 'sog'
   return FORMAT_REGISTRY.some(fmt =>
-    fmt.prefixes?.some(p => base.startsWith(p))
+    fmt.prefixes?.some(p => base.startsWith(p) || p === `${extNoDot}.`)
   );
 }
 

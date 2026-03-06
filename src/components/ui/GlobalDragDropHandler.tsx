@@ -11,7 +11,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Upload } from 'lucide-react';
-import { getFormatExtensions } from '@lib/import/FormatRegistry';
+import { getFormatExtensions, isSupportedFormat } from '@lib/import/FormatRegistry';
 
 interface GlobalDragDropHandlerProps {
   onFileLoaded: (file: File) => Promise<void>;
@@ -40,8 +40,11 @@ const SUPPORTED_EXTENSIONS = new Set([
 ]);
 
 function isSupportedFile(filename: string): boolean {
-  const ext = filename.toLowerCase().slice(filename.lastIndexOf('.'));
-  return SUPPORTED_EXTENSIONS.has(ext);
+  const lower = filename.toLowerCase();
+  const ext = lower.slice(lower.lastIndexOf('.'));
+  if (SUPPORTED_EXTENSIONS.has(ext)) return true;
+  // Also check prefix-based formats (e.g. sog.*, mcmd.*, hip.*)
+  return isSupportedFormat(lower);
 }
 
 async function readFilesFromEntry(entry: FileSystemEntry): Promise<File[]> {
