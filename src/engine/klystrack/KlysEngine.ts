@@ -65,6 +65,8 @@ export class KlysEngine {
   private _songDataCallbacks: Set<(data: KlysSongData) => void> = new Set();
   private _lastSongData: KlysSongData | null = null;
   private _disposed = false;
+  private _resolveSerialize: ((buf: ArrayBuffer) => void) | null = null;
+  private _rejectSerialize: ((err: Error) => void) | null = null;
 
   private constructor() {
     this.audioContext = getDevilboxAudioContext();
@@ -217,6 +219,18 @@ export class KlysEngine {
             cb(this._lastSongData);
           }
           break;
+
+        case 'serializeSongResult':
+          if (this._resolveSerialize) {
+            if (data.error) {
+              this._rejectSerialize?.(new Error(data.error));
+            } else {
+              this._resolveSerialize(data.data as ArrayBuffer);
+            }
+            this._resolveSerialize = null;
+            this._rejectSerialize = null;
+          }
+          break;
       }
     };
 
@@ -317,6 +331,14 @@ export class KlysEngine {
 
   setInstrumentProgramStep(idx: number, step: number, value: number): void {
     this.sendMessage({ type: 'setInstrumentProgramStep', idx, step, value });
+  }
+
+  serializeSong(): Promise<ArrayBuffer> {
+    return new Promise((resolve, reject) => {
+      this._resolveSerialize = resolve;
+      this._rejectSerialize = reject;
+      this.sendMessage({ type: 'serializeSong' });
+    });
   }
 
   dispose(): void {

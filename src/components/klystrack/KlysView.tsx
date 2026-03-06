@@ -81,11 +81,11 @@ export const KlysView: React.FC<{ width?: number; height?: number }> = ({ width:
     useTransportStore.getState().setIsPlaying(false);
   }, []);
 
-  const handleExport = useCallback(() => {
+  const handleExport = useCallback(async () => {
     const song = getTrackerReplayer().getSong();
     if (!song) return;
     try {
-      const result = exportAsKlystrack(song);
+      const result = await exportAsKlystrack(song);
       const url = URL.createObjectURL(result.data);
       const a = document.createElement('a');
       a.href = url;
