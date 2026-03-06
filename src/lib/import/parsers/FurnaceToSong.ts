@@ -83,6 +83,17 @@ export async function parseFurnaceFile(buffer: ArrayBuffer, _fileName: string, s
     engine.setModuleSamples(result.samples.length > 0 ? result.samples : null);
   }
 
+  // Upload song data to WASM sequencer for native playback
+  if (result.furnaceNative) {
+    try {
+      const { uploadFurnaceToSequencer } = await import('@/lib/export/FurnaceSequencerSerializer');
+      await uploadFurnaceToSequencer(result.furnaceNative, subsong);
+      console.log('[FurnaceToSong] Song uploaded to WASM sequencer');
+    } catch (err) {
+      console.warn('[FurnaceToSong] Failed to upload to WASM sequencer, falling back to TS replayer:', err);
+    }
+  }
+
   // Pre-convert ALL subsongs using the full conversion pipeline so the in-editor
   // subsong selector can switch between them without re-parsing.
   // Instruments/wavetables/samples are module-level (shared) — taken from the primary result.

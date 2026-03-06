@@ -7,7 +7,7 @@
 import { ChiptunePlayer } from './ChiptunePlayer';
 import { parseXM } from './formats/XMParser';
 import { parseMOD } from './formats/MODParser';
-import { parseFurnaceSong, convertFurnaceToDevilbox } from './formats/FurnaceSongParser';
+import { parseFurnaceSong, convertFurnaceToDevilbox, buildFurnaceNativeData } from './formats/FurnaceSongParser';
 import { DefleMaskParser, type DMFModule } from './formats/DefleMaskParser';
 import { isGoatTrackerSong } from './formats/GoatTrackerDetect';
 import { FurnaceDispatchEngine } from '@engine/furnace-dispatch/FurnaceDispatchEngine';
@@ -61,6 +61,12 @@ export interface ModuleInfo {
     importMetadata: ImportMetadata;
     instruments: ParsedInstrument[];
     patterns: unknown[][];  // XMNote[][] or MODNote[][] or converted patterns
+    furnaceNative?: import('@/types').FurnaceNativeData;
+    furnaceSubsongs?: import('@/types').FurnaceSubsongPlayback[];
+    furnaceActiveSubsong?: number;
+    furnaceWavetables?: Array<{ data: number[]; width: number; height: number }>;
+    furnaceSamples?: Array<{ data: Int16Array | Int8Array; rate: number; depth: number;
+      loopStart: number; loopEnd: number; loopMode: number; name: string }>;
   };
   // GoatTracker .sng raw data (loaded by GTUltra WASM engine)
   goatTrackerData?: Uint8Array;
@@ -293,11 +299,17 @@ async function loadWithNativeParser(
         }
       }
 
+      // Build native data for WASM sequencer and format-specific editor
+      const furnaceNative = buildFurnaceNativeData(module);
+
       return {
         format: 'FUR', // Furnace format - patterns already converted
         importMetadata: result.metadata,
         instruments: result.instruments,
         patterns: result.patterns as unknown[][],
+        furnaceNative,
+        furnaceWavetables: result.wavetables.length > 0 ? result.wavetables : undefined,
+        furnaceSamples: result.samples.length > 0 ? result.samples : undefined,
       };
     } else if (ext === '.dmf') {
       console.log('[ModuleLoader] Parsing DefleMask file...');
