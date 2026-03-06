@@ -5,7 +5,7 @@ import { Token, TokenKind } from './token.js';
 // ---------------------------------------------------------------------------
 
 const DIRECTIVES = new Set([
-  'EQU', 'DC', 'DS', 'SECTION', 'INCLUDE', 'MACRO', 'ENDM', 'XDEF', 'XREF',
+  'EQU', 'DC', 'DCB', 'DS', 'SECTION', 'INCLUDE', 'MACRO', 'ENDM', 'XDEF', 'XREF',
   'EVEN', 'CNOP', 'RSRESET', 'RS', 'SET', 'ORG', 'END', 'INCBIN', 'REPT',
   'ENDR', 'IFD', 'IFND', 'IFC', 'IFNC', 'IFEQ', 'IFNE', 'IFLT', 'IFLE',
   'IFGT', 'IFGE', 'ENDC', 'ENDIF', 'ELSE', 'ELSEIF',
@@ -137,11 +137,62 @@ function tokenizeLine(src: string, lineNum: number): Token[] {
     i++; // consume '('
     // read inner content up to matching ')'
     let depth = 1;
+    const innerStart = i;
     while (i < src.length && depth > 0) {
       if (src[i] === '(') depth++;
       else if (src[i] === ')') depth--;
       i++;
     }
+    const innerEnd = i - 1; // before closing ')'
+    const inner = src.slice(innerStart, innerEnd).trim();
+
+    // Check if inner content is a standalone hex literal (absolute address in parens)
+    // e.g. ($DFF000) → ABS_ADDR, but NOT ($A0,A0) which has a comma (displacement+register)
+    const absHexMatch = inner.match(/^\$([0-9A-Fa-f]+)$/);
+    if (absHexMatch && !inner.includes(',')) {
+      // Standalone hex in parens: absolute indirect addressing → treat as ABS_ADDR
+      // Don't consume '+' — absolute addresses don't use post-increment
+      return tok('ABS_ADDR', '$' + absHexMatch[1], col);
+    }
+
+    // Check if inner content is a hex literal with displacement+register: ($A0,A0)
+    // This should be DISP_REG, not ADDRESS
+    const dispRegMatch = inner.match(/^\$([0-9A-Fa-f]+)\s*,\s*(\w+.*)$/);
+    if (dispRegMatch) {
+      // e.g. ($A0,A0) → DISP_REG with value "$A0(A0)"
+      const dispVal = '$' + dispRegMatch[1];
+      const regPart = dispRegMatch[2].trim();
+      return tok('DISP_REG', `${dispVal}(${regPart})`, col);
+    }
+
+    // Check if inner content is register,register: (A4,D4.W) → indexed addressing
+    // 68k registers: D0-D7, A0-A7, SP, PC
+    const regRegMatch = inner.match(/^([ADad][0-7]|[Ss][Pp])\s*,\s*(\w+.*)$/);
+    if (regRegMatch) {
+      const baseReg = regRegMatch[1];
+      const indexPart = regRegMatch[2].trim();
+      // e.g. (A4,D4.W) → DISP_REG with value "0(A4,D4.W)" (zero displacement)
+      return tok('DISP_REG', `0(${baseReg},${indexPart})`, col);
+    }
+
+    // Check if inner content is a label with register: (lbW00054E,PC) or (label,A0)
+    // This is displacement addressing with a symbolic offset
+    const labelRegMatch = inner.match(/^([A-Za-z_]\w*)\s*,\s*(\w+.*)$/);
+    if (labelRegMatch) {
+      const labelPart = labelRegMatch[1];
+      const regPart = labelRegMatch[2].trim();
+      // e.g. (lbW00054E,PC) → DISP_REG with value "lbW00054E(PC)"
+      return tok('DISP_REG', `${labelPart}(${regPart})`, col);
+    }
+
+    // Check if inner content is a decimal with register: (14,A2) or (2,A4)
+    const decRegMatch = inner.match(/^(-?\d+)\s*,\s*(\w+.*)$/);
+    if (decRegMatch) {
+      const decVal = decRegMatch[1];
+      const regPart = decRegMatch[2].trim();
+      return tok('DISP_REG', `${decVal}(${regPart})`, col);
+    }
+
     // optionally consume '+'
     if (i < src.length && src[i] === '+') i++;
     return tok('ADDRESS', src.slice(start, i), col);
@@ -268,7 +319,12 @@ function tokenizeLine(src: string, lineNum: number): Token[] {
         advance();
         immVal += '%' + readBin();
       } else if (peek() === '-' || isDigit(peek())) {
-        if (peek() === '-') { advance(); immVal += '-'; }
+        if (peek() === '-') {
+          advance(); immVal += '-';
+          // After '-', check for hex/binary prefix: #-$8000, #-%1010
+          if (peek() === '$') { advance(); immVal += '$' + readHex(); tokens.push(tok('IMMEDIATE', immVal, col)); isFirstToken = false; continue; }
+          if (peek() === '%') { advance(); immVal += '%' + readBin(); tokens.push(tok('IMMEDIATE', immVal, col)); isFirstToken = false; continue; }
+        }
         immVal += readDecimal();
       } else {
         // #identifier (e.g. #DMACON)

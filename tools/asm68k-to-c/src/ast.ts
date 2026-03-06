@@ -7,7 +7,7 @@ export type Operand =
   | { kind: 'disp'; offset: number | string; base: string; index?: string }
   | { kind: 'abs_addr'; value: number; raw: string; tag?: 'paula' | 'dmacon' | 'cia' | 'other' }
   | { kind: 'label_ref'; name: string }
-  | { kind: 'pc_rel'; label: string };
+  | { kind: 'pc_rel'; label: string; index?: string };
 
 export interface InstructionNode {
   kind: 'instruction';

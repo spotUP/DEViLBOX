@@ -1,5 +1,10 @@
 import type { InstructionNode, Operand, Size } from './ast.js';
 
+/** Check if a name is a 68k register (d0-d7, a0-a7, sp, pc). */
+function is68kReg(name: string): boolean {
+  return /^[da][0-7]$|^sp$|^pc$/i.test(name);
+}
+
 function sizeStr(size: Size): string {
   switch (size) { case 'B': return '8'; case 'W': return '16'; default: return '32'; }
 }
@@ -50,7 +55,9 @@ function maybeParens(v: string): string {
 function immValue(op: { value: number; raw: string }): string {
   // raw is e.g. '#$8200' or '#42' or '$8200' (ABS_ADDR). Strip leading '#' if present.
   const stripped = op.raw.startsWith('#') ? op.raw.slice(1) : op.raw;
+  if (stripped.startsWith('-$')) return `-0x${stripped.slice(2)}`;
   if (stripped.startsWith('$')) return `0x${stripped.slice(1)}`;
+  if (stripped.startsWith('-%')) return `-0b${stripped.slice(2)}`;
   if (stripped.startsWith('%')) return `0b${stripped.slice(1)}`;
   // Symbolic identifier (e.g. #EPR_CorruptModule) — value is NaN, use the name directly.
   if (Number.isNaN(op.value)) return stripped;
@@ -97,7 +104,14 @@ export function emitOperand(op: Operand, size: Size = 'L'): string {
     }
     case 'disp': {
       const bits = sizeStr(size);
-      const addr = typeof op.offset === 'number' ? `${op.base} + ${op.offset}` : `${op.base} + (intptr_t)${op.offset}`;
+      let addr = typeof op.offset === 'number' ? `${op.base} + ${op.offset}` : `${op.base} + (intptr_t)${op.offset}`;
+      if (op.index) {
+        const idxParts = op.index.split('.');
+        const idxReg = idxParts[0].toLowerCase();
+        const idxSize = (idxParts[1] || 'W').toUpperCase();
+        const idxExpr = idxSize === 'L' ? idxReg : `(int16_t)W(${idxReg})`;
+        addr += ` + ${idxExpr}`;
+      }
       return `READ${bits}(${addr})`;
     }
     case 'abs_addr': {
@@ -105,7 +119,16 @@ export function emitOperand(op: Operand, size: Size = 'L'): string {
       return `READ${sizeStr(size)}(${addrC})`;
     }
     case 'label_ref': return sanitizeLabel(op.name);
-    case 'pc_rel': return sanitizeLabel(op.label);
+    case 'pc_rel': {
+      if (op.index) {
+        const idxParts = op.index.split('.');
+        const idxReg = idxParts[0].toLowerCase();
+        const idxSize = (idxParts[1] || 'W').toUpperCase();
+        const idxExpr = idxSize === 'L' ? idxReg : `(int16_t)W(${idxReg})`;
+        return `READ${sizeStr(size)}((uintptr_t)${sanitizeLabel(op.label)} + ${idxExpr})`;
+      }
+      return sanitizeLabel(op.label);
+    }
     default: return '/* unknown_operand */';
   }
 }
@@ -120,7 +143,12 @@ function regWrite(op: Operand, value: string, size: Size): string {
   if (op.kind === 'address') {
     if (op.mode === 'post_inc') return `WRITE${bits}_POST(${op.reg}, ${value});`;
     if (op.mode === 'pre_dec') return `WRITE${bits}_PRE(${op.reg}, ${value});`;
-    return `WRITE${bits}(${op.reg}, ${value});`;
+    // Only use hw_write for actual 68k registers (may point to hardware).
+    // Data labels used in address mode (e.g. (SUBSONG)) use plain WRITE.
+    if (is68kReg(op.reg)) {
+      return `hw_write${bits}(${op.reg}, ${value});`;
+    }
+    return `WRITE${bits}((uintptr_t)${sanitizeLabel(op.reg)}, ${value});`;
   }
   if (op.kind === 'disp') {
     // PC-relative writes are self-modifying code (patching MOVEQ immediates).
@@ -128,7 +156,18 @@ function regWrite(op: Operand, value: string, size: Size): string {
     // which patches the MOVEQ immediate. The net effect: Dn.b = val.
     // We approximate this by writing to a scratch variable that has no effect.
     if (op.base === 'pc') return `/* self-modify pc${op.offset}: */ (void)(${value});`;
-    const addr = typeof op.offset === 'number' ? `${op.base} + ${op.offset}` : `${op.base} + (intptr_t)${op.offset}`;
+    let addr = typeof op.offset === 'number' ? `${op.base} + ${op.offset}` : `${op.base} + (intptr_t)${op.offset}`;
+    if (op.index) {
+      const idxParts = op.index.split('.');
+      const idxReg = idxParts[0].toLowerCase();
+      const idxSize = (idxParts[1] || 'W').toUpperCase();
+      const idxExpr = idxSize === 'L' ? idxReg : `(int16_t)W(${idxReg})`;
+      addr += ` + ${idxExpr}`;
+    }
+    // Only use hw_write when base is a 68k register (may point to hardware)
+    if (is68kReg(op.base)) {
+      return `hw_write${bits}(${addr}, ${value});`;
+    }
     return `WRITE${bits}(${addr}, ${value});`;
   }
   if (op.kind === 'label_ref') {
@@ -170,7 +209,11 @@ function emitPaula(addr: number, value: string, _size: Size): string {
 // Like emitOperand but wraps label_ref/pc_rel in READ (for value access, not address)
 function emitOperandRead(op: Operand, size: Size): string {
   if (op.kind === 'label_ref') return `READ${sizeStr(size)}((uintptr_t)${sanitizeLabel(op.name)})`;
-  if (op.kind === 'pc_rel') return `READ${sizeStr(size)}((uintptr_t)${sanitizeLabel(op.label)})`;
+  if (op.kind === 'pc_rel') {
+    // If index is present, emitOperand already wraps in READ with index arithmetic
+    if (op.index) return emitOperand(op, size);
+    return `READ${sizeStr(size)}((uintptr_t)${sanitizeLabel(op.label)})`;
+  }
   return emitOperand(op, size);
 }
 
@@ -276,12 +319,28 @@ export function emitInstruction(node: InstructionNode): string {
       if (op0.kind === 'pc_rel') return `${leaDst} = (uint32_t)(uintptr_t)${sanitizeLabel(op0.label)};`;
       if (op0.kind === 'disp') {
         const offPart = typeof op0.offset === 'number' ? op0.offset : `(intptr_t)${op0.offset}`;
-        return `${leaDst} = (uint32_t)(${op0.base} + ${offPart});`;
+        let addrExpr = `${op0.base} + ${offPart}`;
+        if (op0.index) {
+          const idxParts = op0.index.split('.');
+          const idxReg = idxParts[0].toLowerCase();
+          const idxSize = (idxParts[1] || 'W').toUpperCase();
+          const idxExpr = idxSize === 'L' ? idxReg : `(int16_t)W(${idxReg})`;
+          addrExpr += ` + ${idxExpr}`;
+        }
+        return `${leaDst} = (uint32_t)(${addrExpr});`;
       }
       // abs_addr: LEA loads the address value itself, not the memory contents
       if (op0.kind === 'abs_addr') {
         const addrC = op0.raw.startsWith('$') ? `0x${op0.raw.slice(1)}` : op0.raw;
         return `${leaDst} = (uint32_t)${addrC};`;
+      }
+      // address (register indirect): LEA (An),Am means Am = An (load the address itself)
+      if (op0.kind === 'address') {
+        if (is68kReg(op0.reg)) {
+          return `${leaDst} = ${op0.reg};`;
+        }
+        // Data label used as address: need cast from pointer to uint32_t
+        return `${leaDst} = (uint32_t)(uintptr_t)${sanitizeLabel(op0.reg)};`;
       }
       return `${leaDst} = (uint32_t)(uintptr_t)(${src});`;
     }
@@ -473,6 +532,15 @@ export function emitInstruction(node: InstructionNode): string {
     case 'BRA': case 'JMP': {
       // Direct branch to a label — always valid as a goto target.
       if (ops[0].kind === 'label_ref') return `goto ${sanitizeLabel(ops[0].name)};`;
+      // PC-relative with index register: JMP label(PC,Dn.W) — jump table pattern
+      // The index register (e.g. D4.W) selects which BRA.W entry to use.
+      // BRA.W is 4 bytes, so entry = index / 4. We emit a marker comment
+      // that the restructure pass can convert to a switch statement.
+      if (ops[0].kind === 'pc_rel' && ops[0].index) {
+        const idxReg = ops[0].index.split('.')[0].toLowerCase();
+        const label = sanitizeLabel(ops[0].label);
+        return `/* JUMPTABLE ${label} ${idxReg} */ goto ${label};`;
+      }
       if (ops[0].kind === 'pc_rel')    return `goto ${sanitizeLabel(ops[0].label)};`;
       // Indirect jump through register: JMP (An) — An IS the target address.
       if (ops[0].kind === 'address') {

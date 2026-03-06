@@ -25,7 +25,9 @@ const PREAMBLE = `\
  * -------------------------------------------------------------------- */
 static uint32_t d0,d1,d2,d3,d4,d5,d6,d7;
 static uint32_t a0,a1,a2,a3,a4,a5,a6,sp,pc;
+#define a7 sp  /* A7 is the stack pointer */
 static int flag_z=0, flag_n=0, flag_c=0, flag_v=0, flag_x=0;
+static uint16_t ccr = 0;  /* condition code register (for MOVE SR/CCR) */
 
 /* -- Sub-register Accessors -------------------------------------------
  * W(d0) -- access the low 16 bits of d0 (read/write).
@@ -85,6 +87,48 @@ static inline void _wr32(uintptr_t a,uint32_t v) { memcpy((void*)a,&v,4); }
  * -------------------------------------------------------------------- */
 #define ROL32(v,n)  (((v)<<(n))|((v)>>(32-(n))))
 #define ROR32(v,n)  (((v)>>(n))|((v)<<(32-(n))))
+
+/* -- Hardware Write Interception --------------------------------------
+ * Many 68k replayers load $DFF000 into a register and then write to
+ * channel offsets (e.g. MOVE.W d0,$A8(a0) for volume on channel 0).
+ * These runtime checks intercept writes to the Paula/DMACON address
+ * range and route them to the paula_soft API instead of memory.
+ * -------------------------------------------------------------------- */
+static inline void hw_write8(uint32_t addr, uint8_t val) {
+  if (addr >= 0xDFF000 && addr < 0xE00000) return; /* ignore byte writes to custom chips */
+  WRITE8(addr, val);
+}
+static inline void hw_write16(uint32_t addr, uint16_t val) {
+  if (addr >= 0xDFF0A0 && addr <= 0xDFF0DF) {
+    int ch = (addr - 0xDFF0A0) >> 4;
+    int reg = (addr & 0x0F);
+    switch (reg) {
+      case 0x06: paula_set_period(ch, val); return;
+      case 0x08: paula_set_volume(ch, (uint8_t)val); return;
+      case 0x04: paula_set_length(ch, val); return;
+      default: return; /* AUDxDAT or unknown */
+    }
+  }
+  if (addr == 0xDFF096) { paula_dma_write(val); return; }
+  if (addr >= 0xDFF000 && addr < 0xE00000) return; /* other custom chip writes */
+  if (addr >= 0xBF0000 && addr < 0xC00000) return; /* CIA writes */
+  WRITE16(addr, val);
+}
+static inline void hw_write32(uint32_t addr, uint32_t val) {
+  if (addr >= 0xDFF0A0 && addr <= 0xDFF0DF) {
+    int ch = (addr - 0xDFF0A0) >> 4;
+    int reg = (addr & 0x0F);
+    if (reg == 0x00) { paula_set_sample_ptr(ch, (const int8_t*)(uintptr_t)val); return; }
+  }
+  if (addr >= 0xDFF000 && addr < 0xE00000) {
+    /* Fallback: treat as two word writes (big-endian high word first) */
+    hw_write16(addr, (uint16_t)(val >> 16));
+    hw_write16(addr + 2, (uint16_t)val);
+    return;
+  }
+  if (addr >= 0xBF0000 && addr < 0xC00000) return; /* CIA writes */
+  WRITE32(addr, val);
+}
 `;
 
 const C_IDENT = /^[A-Za-z_][A-Za-z0-9_]*$/;
@@ -340,6 +384,30 @@ function collectUnresolved(ast: AstNode[], resolved: ResolveResult): Set<string>
 }
 
 export function emit(ast: AstNode[], resolved: ResolveResult, sourceFile?: string): string {
+  // ── Case-normalization pass ─────────────────────────────────────────────
+  // The 68k assembler is case-insensitive, but C is not.  Build a map from
+  // lowercase label/symbol name → actual casing as defined, then rewrite all
+  // operand references to match the definition casing.
+  {
+    const ciMap = new Map<string, string>();
+    for (const name of resolved.labels) ciMap.set(name.toLowerCase(), name);
+    for (const name of resolved.symbols.keys()) ciMap.set(name.toLowerCase(), name);
+
+    for (const node of ast) {
+      if (node.kind !== 'instruction') continue;
+      for (const op of node.operands) {
+        if (op.kind === 'label_ref') {
+          const canon = ciMap.get(op.name.toLowerCase());
+          if (canon && canon !== op.name) op.name = canon;
+        }
+        if (op.kind === 'pc_rel') {
+          const canon = ciMap.get(op.label.toLowerCase());
+          if (canon && canon !== op.label) op.label = canon;
+        }
+      }
+    }
+  }
+
   const lines: string[] = [];
 
   // File header
@@ -475,6 +543,27 @@ export function emit(ast: AstNode[], resolved: ResolveResult, sourceFile?: strin
     }
   }
 
+  // Pre-pass: simulate the emitter's function boundary logic to find labels that
+  // will start functions due to !inFunction (after data/section nodes).  These
+  // implicit function entries must be in funcLabels for cross-function goto detection.
+  {
+    let simInFunc = false;
+    for (let i = 0; i < ast.length; i++) {
+      const node = ast[i];
+      if (node.kind === 'data' || node.kind === 'section') {
+        simInFunc = false;
+        continue;
+      }
+      if (node.kind === 'label' && isFunctionLabel.has(node.name)) {
+        if (!simInFunc && !funcLabels.has(node.name)) {
+          // This label will start a function due to !inFunction
+          funcLabels.add(node.name);
+        }
+        simInFunc = true;
+      }
+    }
+  }
+
   // Detect cross-function goto targets: branch instructions in one C-function scope that
   // target a label defined in a DIFFERENT C-function scope.  These cannot use C `goto`
   // (which requires the label to be in the same function), so we promote the target label
@@ -513,15 +602,25 @@ export function emit(ast: AstNode[], resolved: ResolveResult, sourceFile?: strin
       const lbl = targetOp?.kind === 'label_ref' ? targetOp.name
                 : targetOp?.kind === 'pc_rel'    ? targetOp.label
                 : null;
-      if (!lbl || !labelScope.has(lbl)) continue;
+      if (!lbl) continue;
       // Local labels (starting with '.') are scoped per global label in 68k.
       // Multiple functions can have a '.SetVoice' and each one is a different label.
       // Promoting local labels to cross-function C functions causes duplicate definitions.
       // Skip them -- they will remain as inline goto labels within their containing function.
       if (lbl.startsWith('.')) continue;
-      if (labelScope.get(lbl) !== scope && !crossFuncGotos.has(lbl)) {
+
+      // Case 1: Branch to a non-function label in a different function scope.
+      if (labelScope.has(lbl)) {
+        if (labelScope.get(lbl) !== scope && !crossFuncGotos.has(lbl)) {
+          crossFuncGotos.add(lbl);
+          funcLabels.add(lbl);   // promote to its own C function
+          cfgChanged = true;
+        }
+      }
+      // Case 2: Branch to a label that's already a function (funcLabels).
+      // If it's not the CURRENT function, it's a cross-function goto → must be a call.
+      else if (funcLabels.has(lbl) && lbl !== scope && !crossFuncGotos.has(lbl)) {
         crossFuncGotos.add(lbl);
-        funcLabels.add(lbl);   // promote to its own C function
         cfgChanged = true;
       }
     }
