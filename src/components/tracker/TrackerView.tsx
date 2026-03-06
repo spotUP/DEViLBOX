@@ -5,7 +5,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { PatternEditorCanvas } from './PatternEditorCanvas';
 import { GridSequencer } from '@components/grid/GridSequencer';
-import { useTrackerStore, useCursorStore, useInstrumentStore, useUIStore } from '@stores';
+import { useTrackerStore, useCursorStore, useInstrumentStore, useUIStore , useFormatStore } from '@stores';
 import { useTransportStore } from '@stores/useTransportStore';
 import { useProjectStore } from '@stores/useProjectStore';
 import { useShallow } from 'zustand/react/shallow';
@@ -115,15 +115,14 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
     scaleVolume,
     fadeVolume,
     remapInstrument,
-    editorMode
   } = useTrackerStore(useShallow((state) => ({
     patterns: state.patterns,
     currentPatternIndex: state.currentPatternIndex,
     scaleVolume: state.scaleVolume,
     fadeVolume: state.fadeVolume,
     remapInstrument: state.remapInstrument,
-    editorMode: state.editorMode
   })));
+  const editorMode = useFormatStore((s) => s.editorMode);
   // Fine-grained selector for cursor.channelIndex only — avoids re-rendering
   // the entire TrackerView on every cursor row/column move
   const cursorChannelIndex = useCursorStore((state) => state.cursor.channelIndex);
@@ -172,7 +171,7 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
   const [randomizeChannel, setRandomizeChannel] = useState(0);
   // Pattern order modal
   const [showPatternOrder, setShowPatternOrder] = useState(false);
-  const channelTrackTables = useTrackerStore((state) => state.channelTrackTables);
+  const channelTrackTables = useFormatStore((state) => state.channelTrackTables);
 
   // Mobile swipe handlers for cursor navigation
   const handleSwipeLeft = useCallback(() => {
@@ -200,9 +199,9 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
       numChannels: s.patterns[0]?.channels.length ?? 4,
       initialSpeed: t.speed,
       initialBPM: t.bpm,
-      channelTrackTables: s.channelTrackTables ?? undefined,
-      channelSpeeds: s.channelSpeeds ?? undefined,
-      channelGrooves: s.channelGrooves ?? undefined,
+      channelTrackTables: useFormatStore.getState().channelTrackTables ?? undefined,
+      channelSpeeds: useFormatStore.getState().channelSpeeds ?? undefined,
+      channelGrooves: useFormatStore.getState().channelGrooves ?? undefined,
     };
     const data = exportMusicLineFile(song);
     const blob = new Blob([data.buffer as ArrayBuffer], { type: 'application/octet-stream' });

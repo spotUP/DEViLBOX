@@ -10,11 +10,6 @@ import type {
   Pattern,
   TrackerCell,
   ClipboardData,
-  EditorMode,
-  FurnaceNativeData,
-  HivelyNativeData,
-  KlysNativeData,
-  FurnaceSubsongPlayback,
 } from '@typedefs';
 import { EMPTY_CELL, CHANNEL_COLORS } from '@typedefs';
 import { getToneEngine } from '@engine/ToneEngine';
@@ -26,6 +21,7 @@ import { SYSTEM_PRESETS, DivChanType } from '../constants/systemPresets';
 import { useHistoryStore } from './useHistoryStore';
 import { useCursorStore } from './useCursorStore';
 import { useEditorStore } from './useEditorStore';
+import { useFormatStore } from './useFormatStore';
 
 // Extracted helper modules
 import {
@@ -55,59 +51,6 @@ interface TrackerStore {
   // FT2: Pattern Order List (Song Position List)
   patternOrder: number[]; // Array of pattern indices for song arrangement
   currentPositionIndex: number; // Current position in pattern order (for editing)
-
-  // Original module data for libopenmpt playback (sample-accurate effects)
-  originalModuleData: {
-    base64: string;
-    format: 'MOD' | 'XM' | 'IT' | 'S3M' | 'UNKNOWN';
-    sourceFile?: string;
-  } | null;
-
-  // Multi-format editor support
-  editorMode: EditorMode;
-  furnaceNative: FurnaceNativeData | null;
-  hivelyNative: HivelyNativeData | null;
-  hivelyFileData: ArrayBuffer | null;
-  klysNative: KlysNativeData | null;
-  klysFileData: ArrayBuffer | null;
-  musiclineFileData: Uint8Array | null;
-  c64SidFileData: Uint8Array | null;
-  jamCrackerFileData: ArrayBuffer | null;
-  futurePlayerFileData: ArrayBuffer | null;
-  hivelyMeta: { stereoMode: number; mixGain: number; speedMultiplier: number; version: number } | null;
-  furnaceSubsongs: FurnaceSubsongPlayback[] | null;
-  furnaceActiveSubsong: number;
-  // MusicLine Editor per-channel sequencing data (null for all other formats)
-  channelTrackTables: number[][] | null;
-  channelSpeeds: number[] | null;
-  channelGrooves: number[] | null;
-
-  // SongDB metadata (optional enrichment from audacious-uade-tools database)
-  songDBInfo: {
-    authors: string[];
-    publishers: string[];
-    album: string;
-    year: string;
-    format: string;
-    duration_ms: number;
-  } | null;
-
-  // C64 SID metadata (extracted from SID header during import)
-  sidMetadata: {
-    format: string;
-    version: number;
-    title: string;
-    author: string;
-    copyright: string;
-    chipModel: '6581' | '8580' | 'Unknown';
-    clockSpeed: 'PAL' | 'NTSC' | 'Unknown';
-    subsongs: number;
-    defaultSubsong: number;
-    currentSubsong: number;
-    secondSID: boolean;
-    thirdSID: boolean;
-  } | null;
-  setSidMetadata: (info: TrackerStore['sidMetadata']) => void;
 
   // Actions
   setCurrentPattern: (index: number, fromReplayer?: boolean) => void;
@@ -205,16 +148,6 @@ interface TrackerStore {
   loadPatterns: (patterns: Pattern[]) => void;
   importPattern: (pattern: Pattern) => number;
   setPatternOrder: (order: number[]) => void;
-  setOriginalModuleData: (data: TrackerStore['originalModuleData']) => void;
-
-  // Multi-format editor support
-  setEditorMode: (mode: EditorMode) => void;
-  setFurnaceNative: (data: FurnaceNativeData | null) => void;
-  setFurnaceOrderEntry: (channel: number, position: number, patternIndex: number) => void;
-  setHivelyNative: (data: HivelyNativeData | null) => void;
-  setSongDBInfo: (info: { authors: string[]; publishers: string[]; album: string; year: string; format: string; duration_ms: number } | null) => void;
-  applyEditorMode: (song: { linearPeriods?: boolean; furnaceNative?: FurnaceNativeData; hivelyNative?: HivelyNativeData; hivelyFileData?: ArrayBuffer; klysNative?: KlysNativeData; klysFileData?: ArrayBuffer; musiclineFileData?: Uint8Array; c64SidFileData?: Uint8Array; jamCrackerFileData?: ArrayBuffer; futurePlayerFileData?: ArrayBuffer; hivelyMeta?: { stereoMode: number; mixGain: number; speedMultiplier: number; version: number }; furnaceSubsongs?: FurnaceSubsongPlayback[]; furnaceActiveSubsong?: number; channelTrackTables?: number[][]; channelSpeeds?: number[]; channelGrooves?: number[]; goatTrackerData?: Uint8Array }) => void;
-  setFurnaceActiveSubsong: (index: number) => void;
 
   // Undo/Redo support
   replacePattern: (index: number, pattern: Pattern) => void;
@@ -256,29 +189,6 @@ export const useTrackerStore = create<TrackerStore>()(
     patternOrder: [0], // Start with first pattern in order
     currentPositionIndex: 0, // Start at position 0
 
-    // Original module data for libopenmpt playback
-    originalModuleData: null,
-
-    // Multi-format editor support
-    editorMode: 'classic' as EditorMode,
-    furnaceNative: null,
-    hivelyNative: null,
-    hivelyFileData: null,
-    klysNative: null,
-    klysFileData: null,
-    musiclineFileData: null,
-    c64SidFileData: null,
-    jamCrackerFileData: null,
-    futurePlayerFileData: null,
-    hivelyMeta: null,
-    furnaceSubsongs: null,
-    furnaceActiveSubsong: 0,
-    channelTrackTables: null,
-    channelSpeeds: null,
-    channelGrooves: null,
-
-    songDBInfo: null,
-    sidMetadata: null,
 
     // Actions
     setCurrentPattern: (index, fromReplayer) =>
@@ -1285,180 +1195,6 @@ export const useTrackerStore = create<TrackerStore>()(
         }
       }),
 
-    setOriginalModuleData: (data) =>
-      set((state) => {
-        state.originalModuleData = data;
-      }),
-
-    // Multi-format editor support
-    setEditorMode: (mode) =>
-      set((state) => {
-        state.editorMode = mode;
-      }),
-
-    setFurnaceNative: (data) =>
-      set((state) => {
-        state.furnaceNative = data;
-      }),
-
-    setFurnaceOrderEntry: (channel, position, patternIndex) =>
-      set((state) => {
-        if (!state.furnaceNative) return;
-        const sub = state.furnaceNative.subsongs[state.furnaceNative.activeSubsong];
-        if (!sub) return;
-        if (channel < 0 || channel >= sub.orders.length) return;
-        if (position < 0 || position >= sub.ordersLen) return;
-        sub.orders[channel][position] = patternIndex;
-      }),
-
-    setHivelyNative: (data) =>
-      set((state) => {
-        state.hivelyNative = data;
-      }),
-
-    setSongDBInfo: (info) =>
-      set((state) => {
-        state.songDBInfo = info;
-      }),
-
-    setSidMetadata: (info) =>
-      set((state) => {
-        state.sidMetadata = info;
-      }),
-
-    applyEditorMode: (song) => {
-      // Always store linearPeriods in editor store
-      useEditorStore.getState().setLinearPeriods(song.linearPeriods ?? false);
-      set((state) => {
-        // Always store native file data for C64 SID and JamCracker engines
-        state.c64SidFileData = song.c64SidFileData ?? null;
-        state.jamCrackerFileData = song.jamCrackerFileData ?? null;
-        state.futurePlayerFileData = song.futurePlayerFileData ?? null;
-        if (song.furnaceNative) {
-          state.editorMode = 'furnace';
-          state.furnaceNative = song.furnaceNative;
-          state.hivelyNative = null;
-          state.hivelyFileData = null;
-          state.klysNative = null;
-          state.klysFileData = null;
-          state.musiclineFileData = null;
-          state.hivelyMeta = null;
-          state.furnaceSubsongs = song.furnaceSubsongs ?? null;
-          state.furnaceActiveSubsong = song.furnaceActiveSubsong ?? 0;
-          state.channelTrackTables = null;
-          state.channelSpeeds = null;
-          state.channelGrooves = null;
-        } else if (song.hivelyNative) {
-          state.editorMode = 'hively';
-          state.hivelyNative = song.hivelyNative;
-          state.hivelyFileData = song.hivelyFileData ?? null;
-          state.klysNative = null;
-          state.klysFileData = null;
-          state.musiclineFileData = null;
-          state.hivelyMeta = song.hivelyMeta ?? null;
-          state.furnaceNative = null;
-          state.furnaceSubsongs = null;
-          state.furnaceActiveSubsong = 0;
-          state.channelTrackTables = null;
-          state.channelSpeeds = null;
-          state.channelGrooves = null;
-        } else if (song.klysNative) {
-          state.editorMode = 'klystrack';
-          state.klysNative = song.klysNative;
-          state.klysFileData = song.klysFileData ?? null;
-          state.hivelyNative = null;
-          state.hivelyFileData = null;
-          state.musiclineFileData = null;
-          state.hivelyMeta = null;
-          state.furnaceNative = null;
-          state.furnaceSubsongs = null;
-          state.furnaceActiveSubsong = 0;
-          state.channelTrackTables = null;
-          state.channelSpeeds = null;
-          state.channelGrooves = null;
-        } else if (song.channelTrackTables) {
-          // MusicLine Editor and similar per-channel formats
-          state.editorMode = 'musicline';
-          state.furnaceNative = null;
-          state.hivelyNative = null;
-          state.hivelyFileData = null;
-          state.klysNative = null;
-          state.klysFileData = null;
-          state.musiclineFileData = song.musiclineFileData ?? null;
-          state.hivelyMeta = null;
-          state.furnaceSubsongs = null;
-          state.furnaceActiveSubsong = 0;
-          state.channelTrackTables = song.channelTrackTables;
-          state.channelSpeeds = song.channelSpeeds ?? null;
-          state.channelGrooves = song.channelGrooves ?? null;
-        } else if (song.jamCrackerFileData) {
-          // JamCracker Pro — 4-channel Amiga tracker (.jam files)
-          state.editorMode = 'jamcracker';
-          state.furnaceNative = null;
-          state.hivelyNative = null;
-          state.hivelyFileData = null;
-          state.klysNative = null;
-          state.klysFileData = null;
-          state.musiclineFileData = null;
-          state.hivelyMeta = null;
-          state.furnaceSubsongs = null;
-          state.furnaceActiveSubsong = 0;
-          state.channelTrackTables = null;
-          state.channelSpeeds = null;
-          state.channelGrooves = null;
-        } else if (song.goatTrackerData) {
-          // GoatTracker Ultra SID tracker (.sng files only — requires GT engine)
-          state.editorMode = 'goattracker';
-          state.furnaceNative = null;
-          state.hivelyNative = null;
-          state.hivelyFileData = null;
-          state.klysNative = null;
-          state.klysFileData = null;
-          state.musiclineFileData = null;
-          state.hivelyMeta = null;
-          state.furnaceSubsongs = null;
-          state.furnaceActiveSubsong = 0;
-          state.channelTrackTables = null;
-          state.channelSpeeds = null;
-          state.channelGrooves = null;
-        } else if (song.c64SidFileData) {
-          // C64 .sid files — use GT Ultra view for SID register display
-          state.editorMode = 'goattracker';
-          state.furnaceNative = null;
-          state.hivelyNative = null;
-          state.hivelyFileData = null;
-          state.klysNative = null;
-          state.klysFileData = null;
-          state.musiclineFileData = null;
-          state.hivelyMeta = null;
-          state.furnaceSubsongs = null;
-          state.furnaceActiveSubsong = 0;
-          state.channelTrackTables = null;
-          state.channelSpeeds = null;
-          state.channelGrooves = null;
-        } else {
-          state.editorMode = 'classic';
-          state.furnaceNative = null;
-          state.hivelyNative = null;
-          state.hivelyFileData = null;
-          state.klysNative = null;
-          state.klysFileData = null;
-          state.musiclineFileData = null;
-          state.hivelyMeta = null;
-          state.furnaceSubsongs = null;
-          state.furnaceActiveSubsong = 0;
-          state.channelTrackTables = null;
-          state.channelSpeeds = null;
-          state.channelGrooves = null;
-        }
-      });
-    },
-
-    setFurnaceActiveSubsong: (index) =>
-      set((state) => {
-        state.furnaceActiveSubsong = index;
-      }),
-
     importPattern: (pattern) => {
       const newIndex = get().patterns.length;
       set((state) => {
@@ -1612,6 +1348,7 @@ export const useTrackerStore = create<TrackerStore>()(
         selection: null,
       });
       useEditorStore.getState().reset();
+      useFormatStore.getState().reset();
       set((state) => {
         state.patterns = [createEmptyPattern()];
         state.currentPatternIndex = 0;
@@ -1620,15 +1357,6 @@ export const useTrackerStore = create<TrackerStore>()(
         state.macroSlots = Array.from({ length: 8 }, () => createEmptyMacroSlot());
         state.patternOrder = [0];
         state.currentPositionIndex = 0;
-        state.editorMode = 'classic';
-        state.furnaceNative = null;
-        state.hivelyNative = null;
-        state.klysNative = null;
-        state.klysFileData = null;
-        state.furnaceSubsongs = null;
-        state.furnaceActiveSubsong = 0;
-        state.songDBInfo = null;
-        state.sidMetadata = null;
       });
     },
   }))

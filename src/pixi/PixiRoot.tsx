@@ -12,11 +12,10 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { useApplication, useTick } from '@pixi/react';
 import { isRapidScrolling } from './scrollPerf';
-import { useUIStore, useSettingsStore } from '@stores';
+import { useUIStore, useSettingsStore , useFormatStore } from '@stores';
 import { useCollaborationStore } from '@stores/useCollaborationStore';
 import { useInstrumentStore } from '@stores/useInstrumentStore';
 import { useMIDIStore } from '@/stores/useMIDIStore';
-import { useTrackerStore } from '@stores';
 import { notify } from '@stores/useNotificationStore';
 import { computeSongDBHash, lookupSongDB } from '@lib/songdb';
 import { parseSIDHeader } from '@/lib/sid/SIDHeaderParser';
@@ -149,14 +148,14 @@ export const PixiRoot: React.FC = () => {
       // async race where loadFile() could complete before setSidMetadata runs.
       const buf = info.arrayBuffer ?? await info.file.arrayBuffer();
       lookupSongDB(computeSongDBHash(buf)).then(result => {
-        useTrackerStore.getState().setSongDBInfo(result ? {
+        useFormatStore.getState().setSongDBInfo(result ? {
           authors: result.authors, publishers: result.publishers,
           album: result.album, year: result.year, format: result.format,
           duration_ms: result.subsongs[0]?.duration_ms ?? 0,
         } : null);
       });
       const sidInfo = parseSIDHeader(new Uint8Array(buf));
-      useTrackerStore.getState().setSidMetadata(sidInfo ? {
+      useFormatStore.getState().setSidMetadata(sidInfo ? {
         format: sidInfo.format, version: sidInfo.version,
         title: sidInfo.title, author: sidInfo.author, copyright: sidInfo.copyright,
         chipModel: sidInfo.chipModel, clockSpeed: sidInfo.clockSpeed,

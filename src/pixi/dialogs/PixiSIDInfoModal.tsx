@@ -7,7 +7,7 @@
  */
 
 import React, { useCallback, useEffect, useState } from 'react';
-import { useTrackerStore } from '@stores';
+import { useFormatStore } from '@stores';
 import { useShallow } from 'zustand/react/shallow';
 import { notify } from '@stores/useNotificationStore';
 import { useSettingsStore } from '@stores/useSettingsStore';
@@ -166,7 +166,7 @@ const InfoRow: React.FC<{
 export const PixiSIDInfoModal: React.FC<PixiSIDInfoModalProps> = ({ isOpen, onClose }) => {
   const theme = usePixiTheme();
 
-  const { sidMetadata, setSidMetadata, songDBInfo } = useTrackerStore(
+  const { sidMetadata, setSidMetadata, songDBInfo } = useFormatStore(
     useShallow((state) => ({
       sidMetadata: state.sidMetadata,
       setSidMetadata: state.setSidMetadata,

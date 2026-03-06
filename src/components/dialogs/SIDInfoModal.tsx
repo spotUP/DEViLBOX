@@ -10,7 +10,7 @@ import {
   Star, ExternalLink, Briefcase, Tag, Play, Youtube, ChevronDown, ChevronUp,
   Zap, Download,
 } from 'lucide-react';
-import { useTrackerStore } from '@stores';
+import { useFormatStore } from '@stores';
 import { useShallow } from 'zustand/react/shallow';
 import { notify } from '@stores/useNotificationStore';
 import { useSettingsStore } from '@stores/useSettingsStore';
@@ -55,7 +55,7 @@ interface SIDInfoModalProps {
 }
 
 export const SIDInfoModal: React.FC<SIDInfoModalProps> = ({ onClose }) => {
-  const { sidMetadata, setSidMetadata, songDBInfo } = useTrackerStore(
+  const { sidMetadata, setSidMetadata, songDBInfo } = useFormatStore(
     useShallow((state) => ({
       sidMetadata: state.sidMetadata,
       setSidMetadata: state.setSidMetadata,

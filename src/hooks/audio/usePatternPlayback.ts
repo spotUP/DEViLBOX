@@ -9,7 +9,7 @@
 
 import { useEffect, useMemo, useRef } from 'react';
 import { useShallow } from 'zustand/react/shallow';
-import { useTrackerStore, useTransportStore, useInstrumentStore, useAudioStore, useSettingsStore } from '@stores';
+import { useTrackerStore, useTransportStore, useInstrumentStore, useAudioStore, useSettingsStore , useFormatStore } from '@stores';
 import { useEditorStore } from '@stores/useEditorStore';
 import { useArrangementStore } from '@stores/useArrangementStore';
 import { getToneEngine } from '@engine/ToneEngine';
@@ -18,13 +18,15 @@ import { resolveArrangement } from '@lib/arrangement/resolveArrangement';
 import type { UADEEngine } from '@engine/uade/UADEEngine';
 
 export const usePatternPlayback = () => {
-  const { patterns, currentPatternIndex, setCurrentPattern, patternOrder, currentPositionIndex, setCurrentPosition, channelTrackTables, channelSpeeds, channelGrooves, hivelyNative, hivelyFileData, hivelyMeta, musiclineFileData, c64SidFileData, jamCrackerFileData, futurePlayerFileData } = useTrackerStore(useShallow((s) => ({
+  const { patterns, currentPatternIndex, setCurrentPattern, patternOrder, currentPositionIndex, setCurrentPosition, } = useTrackerStore(useShallow((s) => ({
     patterns: s.patterns,
     currentPatternIndex: s.currentPatternIndex,
     setCurrentPattern: s.setCurrentPattern,
     patternOrder: s.patternOrder,
     currentPositionIndex: s.currentPositionIndex,
     setCurrentPosition: s.setCurrentPosition,
+    })));
+  const { channelTrackTables, channelSpeeds, channelGrooves, hivelyNative, hivelyFileData, hivelyMeta, musiclineFileData, c64SidFileData, jamCrackerFileData, futurePlayerFileData } = useFormatStore(useShallow((s) => ({
     channelTrackTables: s.channelTrackTables,
     channelSpeeds: s.channelSpeeds,
     channelGrooves: s.channelGrooves,

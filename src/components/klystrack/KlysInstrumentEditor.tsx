@@ -6,7 +6,7 @@
  */
 
 import React, { useCallback, useMemo, useState } from 'react';
-import { useTrackerStore } from '@stores';
+import { useFormatStore } from '@stores';
 import { KlysEngine } from '@/engine/klystrack/KlysEngine';
 import type { KlysNativeInstrument } from '@/types/tracker';
 
@@ -52,7 +52,7 @@ interface KlysInstrumentEditorProps {
 }
 
 export const KlysInstrumentEditor: React.FC<KlysInstrumentEditorProps> = ({ instrumentIndex }) => {
-  const nativeData = useTrackerStore(s => s.klysNative);
+  const nativeData = useFormatStore(s => s.klysNative);
   const [showFM, setShowFM] = useState(false);
   const [showProgram, setShowProgram] = useState(false);
 
@@ -84,7 +84,7 @@ export const KlysInstrumentEditor: React.FC<KlysInstrumentEditorProps> = ({ inst
 
     const instruments = [...nativeData.instruments];
     instruments[instrumentIndex] = updated;
-    useTrackerStore.setState({ klysNative: { ...nativeData, instruments } });
+    useFormatStore.setState({ klysNative: { ...nativeData, instruments } });
   }, [inst, nativeData, instrumentIndex]);
 
   const handleProgramStep = useCallback((step: number, value: number) => {
@@ -97,7 +97,7 @@ export const KlysInstrumentEditor: React.FC<KlysInstrumentEditorProps> = ({ inst
     const updated = { ...inst, program };
     const instruments = [...nativeData.instruments];
     instruments[instrumentIndex] = updated;
-    useTrackerStore.setState({ klysNative: { ...nativeData, instruments } });
+    useFormatStore.setState({ klysNative: { ...nativeData, instruments } });
   }, [inst, nativeData, instrumentIndex]);
 
   if (!inst) {

@@ -3,7 +3,7 @@
  */
 
 import React, { useState } from 'react';
-import { useTrackerStore } from '@stores';
+import { useTrackerStore , useFormatStore } from '@stores';
 import { getTrackerReplayer } from '@engine/TrackerReplayer';
 import { notify } from '@stores/useNotificationStore';
 import { Plus, Trash2, X } from 'lucide-react';
@@ -15,7 +15,7 @@ interface PatternOrderModalProps {
 
 export const PatternOrderModal: React.FC<PatternOrderModalProps> = ({ onClose }) => {
   // Reactive: re-renders when a new song with/without per-channel tables is loaded
-  const hasPerChannelTables = useTrackerStore((state) => !!state.channelTrackTables);
+  const hasPerChannelTables = useFormatStore((state) => !!state.channelTrackTables);
 
   const patternOrder = useTrackerStore((state) => state.patternOrder);
   const currentPositionIndex = useTrackerStore((state) => state.currentPositionIndex);
