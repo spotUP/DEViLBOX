@@ -379,6 +379,7 @@ export class TrackerReplayer {
 
   // Callbacks
   public onRowChange: ((row: number, pattern: number, position: number) => void) | null = null;
+  public onChannelRowChange: ((channelRows: number[]) => void) | null = null;
   public onSongEnd: (() => void) | null = null;
   public onTickProcess: ((tick: number, row: number) => void) | null = null;
 
@@ -884,6 +885,7 @@ export class TrackerReplayer {
 
     // Clear stale callbacks from previous song
     this.onRowChange = null;
+    this.onChannelRowChange = null;
     this.onSongEnd = null;
     this.onTickProcess = null;
 
@@ -4051,6 +4053,9 @@ export class TrackerReplayer {
 
     if (this.onTickProcess) {
       this.onTickProcess(this.channelTickCounters[0], this.channelPattPos[0]);
+    }
+    if (this.onChannelRowChange) {
+      this.onChannelRowChange(this.channelPattPos.slice());
     }
     this.totalRowsProcessed++;
   }

@@ -74,42 +74,35 @@ export const HIVELY_COLUMNS: ColumnDef[] = [
 /**
  * Convert HivelyNativeData to FormatChannel[] for pattern editing.
  *
- * Maps the Hively track pool to individual channels with note transpose applied.
+ * Hively stores a pool of reusable tracks. Each position entry references
+ * one track per channel with an optional transpose value.
  */
 export function hivelyToFormatChannels(
   nativeData: HivelyNativeData,
   currentPosition: number
 ): FormatChannel[] {
   const result: FormatChannel[] = [];
+  const numCh = nativeData.channels || 4;
 
-  // Get current song and positions
-  const songIdx = 0; // Assuming single song for now
-  const song = nativeData.songs?.[songIdx];
-  if (!song) return result;
+  // Get current position entry
+  const posEntry = nativeData.positions?.[currentPosition];
 
-  for (let ch = 0; ch < Math.min(nativeData.numChannels || 4, 8); ch++) {
-    // Get the track for this channel at current position
-    let trackIdx = -1;
-    let transpose = 0;
+  for (let ch = 0; ch < Math.min(numCh, 8); ch++) {
+    const trackIdx = posEntry?.track?.[ch] ?? -1;
+    const transpose = posEntry?.transpose?.[ch] ?? 0;
 
-    // Find the position entry
-    if (song.positionTable && currentPosition < song.positionTable.length) {
-      const posEntry = song.positionTable[currentPosition];
-      if (posEntry && ch < posEntry.tracks.length) {
-        trackIdx = posEntry.tracks[ch].trackIdx;
-        transpose = posEntry.tracks[ch].transpose || 0;
-      }
-    }
-
-    // Build rows from track data
+    // Build rows from track's steps array
     const rows: FormatCell[] = [];
     if (trackIdx >= 0 && trackIdx < nativeData.tracks.length) {
       const track = nativeData.tracks[trackIdx];
-      for (let rowIdx = 0; rowIdx < (track?.numRows || 64); rowIdx++) {
-        const note = track?.notes?.[rowIdx] || 0;
-        const ins = track?.instruments?.[rowIdx] || 0;
-        const fx1 = track?.fx1?.[rowIdx] || 0;
-        const fx2 = track?.fx2?.[rowIdx] || 0;
+      const steps = track?.steps ?? [];
+      for (let rowIdx = 0; rowIdx < steps.length; rowIdx++) {
+        const step = steps[rowIdx];
+        const note = step?.note ?? 0;
+        const ins = step?.instrument ?? 0;
+        // Pack fx + fxParam into a single value for the 3-digit hex column
+        const fx1 = step ? ((step.fx & 0xF) << 8) | (step.fxParam & 0xFF) : 0;
+        const fx2 = step ? ((step.fxb & 0xF) << 8) | (step.fxbParam & 0xFF) : 0;
         rows.push({ note, instrument: ins, fx1, fx2 });
       }
     }
