@@ -13,6 +13,7 @@ typedef struct {
 
 static PaulaChannel s_ch[PAULA_CHANNELS];
 static float        s_paula_clock = PAULA_CLOCK_PAL;
+static float        s_output_rate = (float)PAULA_RATE_PAL;
 
 void paula_reset(void) {
     memset(s_ch, 0, sizeof(s_ch));
@@ -20,6 +21,10 @@ void paula_reset(void) {
 
 void paula_set_clock(float clock) {
     s_paula_clock = clock;
+}
+
+void paula_set_output_rate(float rate) {
+    if (rate > 0.0f) s_output_rate = rate;
 }
 
 void paula_set_sample_ptr(int ch, const int8_t* data) {
@@ -37,7 +42,7 @@ void paula_set_period(int ch, uint16_t period) {
     if (ch < 0 || ch >= PAULA_CHANNELS || period == 0) return;
     // freq = paula_clock / period
     // step = freq / output_rate = paula_clock / (period * PAULA_RATE_PAL)
-    s_ch[ch].step = s_paula_clock / ((float)period * (float)PAULA_RATE_PAL);
+    s_ch[ch].step = s_paula_clock / ((float)period * s_output_rate);
 }
 
 void paula_set_volume(int ch, uint8_t vol) {

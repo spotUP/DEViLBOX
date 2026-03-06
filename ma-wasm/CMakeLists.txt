@@ -17,7 +17,7 @@ target_link_libraries(${OUTPUT_NAME} m)
 if(EMSCRIPTEN)
     set(EXPORTED_FUNCTIONS
         "_malloc" "_free"
-        "_player_init" "_player_render" "_player_stop"
+        "_player_init" "_player_render" "_player_stop" "_player_set_sample_rate"
         "_player_is_finished" "_player_get_subsong_count" "_player_set_subsong"
         "_player_get_title" "_player_detect_duration"
     )
