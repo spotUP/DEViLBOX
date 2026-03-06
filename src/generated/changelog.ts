@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-03-06T13:15:25.611Z
+ * Generated: 2026-03-06T22:53:44.191Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.2476';
-export const BUILD_NUMBER = '2476';
-export const BUILD_HASH = 'cdaea4db1';
+export const BUILD_VERSION = '1.0.2513';
+export const BUILD_NUMBER = '2513';
+export const BUILD_HASH = 'b329c69de';
 export const BUILD_DATE = '2026-03-06';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,153 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.2476',
+    version: '1.0.2513',
     date: '2026-03-06',
     changes: [
+      {
+        type: 'fix',
+        "description": "68k-to-C transpiler — PEA, jump tables, label arithmetic, compound expressions"
+      },
+      {
+        type: 'fix',
+        "description": "68k-to-C transpiler — 6 fixes for cross-function gotos, case sensitivity, addressing modes"
+      },
+      {
+        type: 'fix',
+        "description": "Remove unused grooves param from convertFurnaceCell"
+      },
+      {
+        type: 'fix',
+        "description": "Remove duplicate case 0x9 that caused silent Furnace playback"
+      },
+      {
+        type: 'fix',
+        "description": "4 Furnace playback bugs — speed, effects, dual-processing, grooves"
+      },
+      {
+        type: 'fix',
+        "description": "Connect WASM engine output to audio graph for direct-routed engines"
+      },
+      {
+        type: 'feature',
+        "description": "Accept both prefix and extension forms for all Amiga formats"
+      },
+      {
+        type: 'fix',
+        "description": "Dynamic import resolution and worklet stereo buffer layout"
+      },
+      {
+        type: 'fix',
+        "description": "Resolve TypeScript errors in PreTracker parser, MA parser, and tests"
+      },
+      {
+        type: 'feature',
+        "description": "Per-channel playhead in MusicLine, delete dead GTPatternEditor"
+      },
+      {
+        type: 'feature',
+        "description": "Integrate Music-Assembler and Hippel ST WASM engines"
+      },
+      {
+        type: 'feature',
+        "description": "Wire GT Ultra editing and per-channel playback rows"
+      },
+      {
+        type: 'feature',
+        "description": "Test: add PreTracker integration tests verifying parser-to-engine pipeline"
+      },
+      {
+        type: 'feature',
+        "description": "Integrate PreTracker into engine routing and import pipeline"
+      },
+      {
+        type: 'fix',
+        "description": "Audit PreTracker code — deadlock, wrong types, wrong location"
+      },
+      {
+        type: 'fix',
+        "description": "Audit cleanup of Haiku-written refactoring code"
+      },
+      {
+        type: 'fix',
+        "description": "Address code quality issues in PreTrackerParser"
+      },
+      {
+        type: 'feature',
+        "description": "Add per-channel playback row support to FormatPatternEditor"
+      },
+      {
+        type: 'fix',
+        "description": "Correct PreTrackerParser to match spec (TrackerModule structure)"
+      },
+      {
+        type: 'fix',
+        "description": "Build errors in refactored pattern editors and adapters"
+      },
+      {
+        type: 'feature',
+        "description": "Add diagnostic printf output for audio queue sizes"
+      },
+      {
+        type: 'feature',
+        "description": "Add PreTrackerParser for module metadata extraction"
+      },
+      {
+        type: 'feature',
+        "description": "Simplify Gearmulator ESAI initialization for snapshot loading"
+      },
+      {
+        type: 'improvement',
+        "description": "Remove unused GTPatternEditor export"
+      },
+      {
+        type: 'improvement',
+        "description": "Replace GTPatternEditor with FormatPatternEditor in GTUltraView"
+      },
+      {
+        type: 'feature',
+        "description": "Create PreTrackerEngine for playback control"
+      },
+      {
+        type: 'improvement',
+        "description": "JamCrackerView to use FormatPatternEditor"
+      },
+      {
+        type: 'fix',
+        "description": "Rewrite PreTracker worklet following DB303 pattern"
+      },
+      {
+        type: 'feature',
+        "description": "Add PreTracker AudioWorklet bridge to WASM"
+      },
+      {
+        type: 'fix',
+        "description": "Skip sendInitControlCommands for snapshot-loaded devices"
+      },
+      {
+        type: 'fix',
+        "description": "Ensure microcontroller init commands execute for snapshot-loaded devices"
+      },
+      {
+        type: 'improvement',
+        "description": "Build: create WASM modules for pretracker, ma, and hippel replayers"
+      },
+      {
+        type: 'feature',
+        "description": "Rebuild Gearmulator WASM with ESAI audio fix and snapshot loading"
+      },
+      {
+        type: 'improvement',
+        "description": "Add klystrack adapter reference pattern"
+      },
+      {
+        type: 'feature',
+        "description": "Add format adapters for Hively, GT Ultra, and JamCracker"
+      },
+      {
+        type: 'improvement',
+        "description": "Implement format-agnostic pattern editor"
+      },
       {
         type: 'improvement',
         "description": "Comprehensive completion summary for all format integration phases"
@@ -84,154 +228,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'improvement',
         "description": "Extract format state from useTrackerStore into useFormatStore"
-      },
-      {
-        type: 'feature',
-        "description": "Add pattern editing for JamCracker and MusicLine formats"
-      },
-      {
-        type: 'feature',
-        "description": "Add Virus C Trancy hardware skin assets"
-      },
-      {
-        type: 'improvement',
-        "description": "Chore: gitignore build artifacts, remove tracked build dirs, update changelog"
-      },
-      {
-        type: 'feature',
-        "description": "Gearmulator hardware skin UI integration"
-      },
-      {
-        type: 'feature',
-        "description": "Add MusicLine effect display and Pixi export button"
-      },
-      {
-        type: 'fix',
-        "description": "Resolve 11 TypeScript strict-mode errors in gearmulator components"
-      },
-      {
-        type: 'improvement',
-        "description": "Remove dead ProTrackerPlayer.ts (1092 lines)"
-      },
-      {
-        type: 'feature',
-        "description": "Add JamCracker and FuturePlayer binary exporters"
-      },
-      {
-        type: 'improvement',
-        "description": "Support all 5 MusicLine effect columns in parser, exporter, and renderers"
-      },
-      {
-        type: 'feature',
-        "description": "Add Hively pattern editing with note input and hex entry"
-      },
-      {
-        type: 'feature',
-        "description": "Add MusicLine .ml export button to DOM tracker view"
-      },
-      {
-        type: 'fix',
-        "description": "Resolve all 30 TypeScript strict-mode errors"
-      },
-      {
-        type: 'fix',
-        "description": "Fix JamCrackerView: correct transport store field and Uint8Array blob type"
-      },
-      {
-        type: 'improvement',
-        "description": "Extract editor state from useTrackerStore into useEditorStore"
-      },
-      {
-        type: 'feature',
-        "description": "Implement full .kt file serialization with bitpacking"
-      },
-      {
-        type: 'feature',
-        "description": "Add JamCracker save/export functionality"
-      },
-      {
-        type: 'feature',
-        "description": "Klystrack: add full editing stack (pattern input, instrument editor, WASM setters)"
-      },
-      {
-        type: 'feature',
-        "description": "Add JamCracker pattern viewer and wire editorMode routing"
-      },
-      {
-        type: 'feature',
-        "description": "Add pattern editing bridge to MusicLine and JamCracker WASM engines"
-      },
-      {
-        type: 'feature',
-        "description": "IT/S3M export via OpenMPT WASM, proper effect mapping"
-      },
-      {
-        type: 'fix',
-        "description": "OpenMPT effect mapping, sample extraction, type identification"
-      },
-      {
-        type: 'improvement',
-        "description": "Klystrack: wire up full integration pipeline"
-      },
-      {
-        type: 'feature',
-        "description": "OpenMPT soundlib WASM, Gearmulator port, new synth presets"
-      },
-      {
-        type: 'feature',
-        "description": "Add klystrack (.kt/.ki) format support via Emscripten WASM"
-      },
-      {
-        type: 'improvement',
-        "description": "Revert PT2 WASM integration hooks — modplug will handle MOD/XM playback"
-      },
-      {
-        type: 'feature',
-        "description": "Add PT2 WASM replayer for authentic ProTracker MOD playback"
-      },
-      {
-        type: 'feature',
-        "description": "Add DOM Studio view with resizable tracker/instrument/mixer panels"
-      },
-      {
-        type: 'feature',
-        "description": "Add DOM Hively/AHX pattern editor and wire into TrackerView"
-      },
-      {
-        type: 'fix',
-        "description": "Use replayer row for rendering to eliminate note blinking"
-      },
-      {
-        type: 'fix',
-        "description": "Always smooth-scroll in VJ view regardless of preference"
-      },
-      {
-        type: 'fix',
-        "description": "Fix GT Ultra pattern editor showing REST bytes as notes"
-      },
-      {
-        type: 'fix',
-        "description": "Dampen 3D tilt during smooth scroll to prevent parallax"
-      },
-      {
-        type: 'fix',
-        "description": "Draw highlight bar at fixed position, scroll data underneath"
-      },
-      {
-        type: 'fix',
-        "description": "Replace broken scroll with replayer-based interpolation"
-      },
-      {
-        type: 'fix',
-        "description": "Fix GT Ultra WASM bridge: mismatched cwrap arg counts causing wrong data"
-      },
-      {
-        type: 'fix',
-        "description": "Remove await in sync createInstrument for Gearmulator case"
-      },
-      {
-        type: 'improvement',
-        "description": "Route C64 .sid files to GT Ultra view instead of classic editor"
       }
     ]
   }
