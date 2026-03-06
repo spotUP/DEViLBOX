@@ -89,7 +89,42 @@ function sizedSrc(op: Operand, size: Size): string {
     return v;
   }
   if (op.kind === 'register') return emitRegSized(op.name, size);
-  return emitOperand(op, size); // memory reads already return correctly-sized values
+  return emitOperandRead(op, size); // label_ref/pc_rel need READ wrapping
+}
+
+/** Compute the effective address of an operand (for LEA, PEA, etc.) without reading memory. */
+function emitEffectiveAddr(op: Operand): string {
+  switch (op.kind) {
+    case 'register': return op.name;
+    case 'address': return op.reg;
+    case 'disp': {
+      let addr = typeof op.offset === 'number' ? `${op.base} + ${op.offset}` : `${op.base} + (intptr_t)${op.offset}`;
+      if (op.index) {
+        const idxParts = op.index.split('.');
+        const idxReg = idxParts[0].toLowerCase();
+        const idxSize = (idxParts[1] || 'W').toUpperCase();
+        const idxExpr = idxSize === 'L' ? idxReg : `(int16_t)W(${idxReg})`;
+        addr += ` + ${idxExpr}`;
+      }
+      return addr;
+    }
+    case 'abs_addr': {
+      return op.raw.startsWith('$') ? `0x${op.raw.slice(1)}` : op.raw;
+    }
+    case 'label_ref': return `(uint32_t)(uintptr_t)${sanitizeLabel(op.name)}`;
+    case 'pc_rel': {
+      let addr = `(uint32_t)(uintptr_t)${sanitizeLabel(op.label)}`;
+      if (op.index) {
+        const idxParts = op.index.split('.');
+        const idxReg = idxParts[0].toLowerCase();
+        const idxSize = (idxParts[1] || 'W').toUpperCase();
+        const idxExpr = idxSize === 'L' ? idxReg : `(int16_t)W(${idxReg})`;
+        addr += ` + ${idxExpr}`;
+      }
+      return addr;
+    }
+    default: return '/* unknown_ea */';
+  }
 }
 
 export function emitOperand(op: Operand, size: Size = 'L'): string {
@@ -245,7 +280,13 @@ export function emitInstruction(node: InstructionNode): string {
         moveVal = `READ${sizeStr(s)}((uintptr_t)${src})`;
       }
       // MOVEA does NOT affect condition codes.
-      if (mnemonic === 'MOVEA') return regWrite(dst, moveVal, s);
+      // For immediate label addresses (#label → load address), cast pointer to uint32_t.
+      if (mnemonic === 'MOVEA') {
+        if (ops[0].kind === 'immediate' && Number.isNaN(ops[0].value)) {
+          moveVal = `(uint32_t)(uintptr_t)${moveVal}`;
+        }
+        return regWrite(dst, moveVal, s);
+      }
       // 68k MOVE sets N and Z flags based on the moved value; clears V and C.
       // Capture src in a temp to avoid double-evaluation of side-effect macros.
       const mvType = s === 'B' ? 'uint8_t' : s === 'W' ? 'uint16_t' : 'uint32_t';
@@ -304,13 +345,18 @@ export function emitInstruction(node: InstructionNode): string {
       // Compound source: "StructAdr+UPS_Voice1Adr(PC),A1" or "Buffer2+132,A1" tokenizes as
       // [label_ref, pc_rel|immediate, register] — lexer splits on '+', drops it.
       if (ops.length >= 3 && ops[0].kind === 'label_ref' &&
-          (ops[1].kind === 'pc_rel' || ops[1].kind === 'immediate')) {
+          (ops[1].kind === 'pc_rel' || ops[1].kind === 'immediate' ||
+           (ops[1].kind === 'disp' && ops[1].base === 'pc'))) {
         const realDst = ops[ops.length - 1];
         const leaDst2 = realDst.kind === 'register' ? realDst.name : emitOperand(realDst, 'L');
-        const offsetExpr = ops[1].kind === 'immediate'
-          ? immValue(ops[1] as { value: number; raw: string })
-          : ops[1].label;
-        return `${leaDst2} = (uint32_t)((uintptr_t)${ops[0].name} + ${offsetExpr});`;
+        let offsetExpr: string;
+        if (ops[1].kind === 'immediate')
+          offsetExpr = immValue(ops[1] as { value: number; raw: string });
+        else if (ops[1].kind === 'disp' && ops[1].base === 'pc')
+          offsetExpr = `${ops[1].offset}`;
+        else
+          offsetExpr = (ops[1] as any).label;
+        return `${leaDst2} = (uint32_t)((uintptr_t)${sanitizeLabel(ops[0].name)} + ${offsetExpr});`;
       }
       const leaDst = dst.kind === 'register' ? dst.name : emitOperand(dst, 'L');
       const op0 = ops[0];
@@ -346,7 +392,7 @@ export function emitInstruction(node: InstructionNode): string {
     }
 
     case 'PEA':
-      return `sp -= 4; WRITE32(sp, (uint32_t)(uintptr_t)&${src});`;
+      return `sp -= 4; WRITE32(sp, ${emitEffectiveAddr(ops[0])});`;
 
     case 'ADD':  case 'ADDA':  case 'ADDI': case 'ADDQ': {
       if (!dst) return '';
@@ -482,17 +528,29 @@ export function emitInstruction(node: InstructionNode): string {
     case 'SWAP': return `${src} = (${src} >> 16) | (${src} << 16);`;
 
     case 'LSL':
-      if (!dst) return `${src} <<= 1;`;
+      if (!dst) {
+        if (ops[0].kind === 'register') return `${src} <<= 1;`;
+        return regWrite(ops[0], `${emitOperandRead(ops[0], s)} << 1`, s);
+      }
       return regWrite(dst, `${emitOperandRead(dst, s)} << ${src}`, s);
     case 'LSR':
-      if (!dst) return `${src} >>= 1;`;
+      if (!dst) {
+        if (ops[0].kind === 'register') return `${src} >>= 1;`;
+        return regWrite(ops[0], `(uint32_t)(${emitOperandRead(ops[0], s)}) >> 1`, s);
+      }
       if (dst.kind === 'register' && s === 'L') return `${dst.name} >>= ${src};`;
       return regWrite(dst, `(uint32_t)(${emitOperandRead(dst, s)}) >> ${src}`, s);
     case 'ASL':
-      if (!dst) return `${src} <<= 1;`;
+      if (!dst) {
+        if (ops[0].kind === 'register') return `${src} <<= 1;`;
+        return regWrite(ops[0], `${emitOperandRead(ops[0], s)} << 1`, s);
+      }
       return regWrite(dst, `${emitOperandRead(dst, s)} << ${src}`, s);
     case 'ASR':
-      if (!dst) return `${src} = (uint32_t)((int32_t)${src} >> 1);`;
+      if (!dst) {
+        if (ops[0].kind === 'register') return `${src} = (uint32_t)((int32_t)${src} >> 1);`;
+        return regWrite(ops[0], `(uint32_t)((int32_t)${emitOperandRead(ops[0], s)} >> 1)`, s);
+      }
       if (dst.kind === 'register' && s === 'L') return `${dst.name} = (uint32_t)((int32_t)${dst.name} >> ${src});`;
       return regWrite(dst, `(uint32_t)((int32_t)${emitOperandRead(dst, s)} >> ${src})`, s);
     case 'ROL': return dst ? regWrite(dst, `ROL32(${emitOperandRead(dst, s)}, ${src})`, s) : ``;
