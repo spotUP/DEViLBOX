@@ -23,7 +23,7 @@ import { useSettingsStore, type SIDEngineType, type CRTParams } from '@stores/us
 import { LENS_PRESETS, LENS_PRESET_ORDER } from '../LensFilter';
 import { SID_ENGINES } from '@engine/deepsid/DeepSIDEngineManager';
 import { useKeyboardStore } from '@stores/useKeyboardStore';
-import { useTrackerStore } from '@stores/useTrackerStore';
+import { useEditorStore } from '@stores/useEditorStore';
 import { useAudioStore } from '@stores/useAudioStore';
 import { useModlandContributionModal } from '@stores/useModlandContributionModal';
 import { getTrackerReplayer } from '@engine/TrackerReplayer';
@@ -219,16 +219,16 @@ export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, on
   const autoGain = useAudioStore((s) => s.autoGain);
   const setAutoGain = useAudioStore((s) => s.setAutoGain);
 
-  const editStep = useTrackerStore((s) => s.editStep);
-  const setEditStep = useTrackerStore((s) => s.setEditStep);
-  const insertMode = useTrackerStore((s) => s.insertMode);
-  const toggleInsertMode = useTrackerStore((s) => s.toggleInsertMode);
-  const recQuantEnabled = useTrackerStore((s) => s.recQuantEnabled);
-  const setRecQuantEnabled = useTrackerStore((s) => s.setRecQuantEnabled);
-  const recQuantRes = useTrackerStore((s) => s.recQuantRes);
-  const setRecQuantRes = useTrackerStore((s) => s.setRecQuantRes);
-  const recReleaseEnabled = useTrackerStore((s) => s.recReleaseEnabled);
-  const setRecReleaseEnabled = useTrackerStore((s) => s.setRecReleaseEnabled);
+  const editStep = useEditorStore((s) => s.editStep);
+  const setEditStep = useEditorStore((s) => s.setEditStep);
+  const insertMode = useEditorStore((s) => s.insertMode);
+  const toggleInsertMode = useEditorStore((s) => s.toggleInsertMode);
+  const recQuantEnabled = useEditorStore((s) => s.recQuantEnabled);
+  const setRecQuantEnabled = useEditorStore((s) => s.setRecQuantEnabled);
+  const recQuantRes = useEditorStore((s) => s.recQuantRes);
+  const setRecQuantRes = useEditorStore((s) => s.setRecQuantRes);
+  const recReleaseEnabled = useEditorStore((s) => s.recReleaseEnabled);
+  const setRecReleaseEnabled = useEditorStore((s) => s.setRecReleaseEnabled);
 
   const activeScheme = useKeyboardStore((s) => s.activeScheme);
   const setActiveScheme = useKeyboardStore((s) => s.setActiveScheme);

@@ -16,7 +16,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { PIXI_FONTS } from '../fonts';
 import { usePixiTheme } from '../theme';
 import { usePixiResponsive } from '../hooks/usePixiResponsive';
-import { useUIStore, useAudioStore, useTrackerStore, useTransportStore, useCursorStore } from '@stores';
+import { useUIStore, useAudioStore, useTrackerStore, useTransportStore, useCursorStore, useEditorStore } from '@stores';
 import { useSettingsStore } from '@stores/useSettingsStore';
 import { useMIDIStore } from '@/stores/useMIDIStore';
 import { useDJStore } from '@/stores/useDJStore';
@@ -147,11 +147,15 @@ const DJStatusContent: React.FC<{ barHeight: number }> = ({ barHeight }) => {
 const TrackerStatusContent: React.FC<{ barHeight: number }> = ({ barHeight }) => {
   const theme = usePixiTheme();
 
-  const { currentOctave, insertMode, recordMode, patternLength, songDBInfo, sidMetadata } = useTrackerStore(
+  const { currentOctave, insertMode, recordMode } = useEditorStore(
     useShallow((s) => ({
       currentOctave: s.currentOctave,
       insertMode: s.insertMode,
       recordMode: s.recordMode,
+    }))
+  );
+  const { patternLength, songDBInfo, sidMetadata } = useTrackerStore(
+    useShallow((s) => ({
       patternLength: s.patterns[s.currentPatternIndex]?.length || 64,
       songDBInfo: s.songDBInfo,
       sidMetadata: s.sidMetadata,

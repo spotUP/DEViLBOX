@@ -9,7 +9,7 @@
  */
 
 import React, { useState, useCallback, useEffect } from 'react';
-import { useTrackerStore, useTransportStore, useAudioStore, useUIStore } from '@stores';
+import { useTrackerStore, useTransportStore, useAudioStore, useUIStore, useEditorStore } from '@stores';
 import { useShallow } from 'zustand/react/shallow';
 import { useFPSMonitor } from '@hooks/useFPSMonitor';
 import { GROOVE_TEMPLATES } from '@typedefs/audio';
@@ -56,12 +56,16 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
     showGhostPatterns,
     channelCount,
     applySystemPreset,
-  } = useTrackerStore(useShallow(s => ({
-    recordMode: s.recordMode,
-    showGhostPatterns: s.showGhostPatterns,
-    channelCount: s.patterns[s.currentPatternIndex]?.channels?.length || 4,
-    applySystemPreset: s.applySystemPreset,
-  })));
+  } = {
+    ...useTrackerStore(useShallow(s => ({
+      channelCount: s.patterns[s.currentPatternIndex]?.channels?.length || 4,
+      applySystemPreset: s.applySystemPreset,
+    }))),
+    ...useEditorStore(useShallow(s => ({
+      recordMode: s.recordMode,
+      showGhostPatterns: s.showGhostPatterns,
+    }))),
+  };
 
   const {
     grooveTemplateId,
@@ -108,12 +112,12 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
   }, [setActiveView, onViewModeChange]);
 
   const handleToggleGhosts = useCallback(() => {
-    const s = useTrackerStore.getState();
+    const s = useEditorStore.getState();
     s.setShowGhostPatterns(!s.showGhostPatterns);
   }, []);
 
   const handleToggleRecord = useCallback(() => {
-    useTrackerStore.getState().toggleRecordMode();
+    useEditorStore.getState().toggleRecordMode();
   }, []);
 
   const handleToggleMute = useCallback(() => {

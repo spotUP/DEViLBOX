@@ -199,10 +199,10 @@ export const useInstrumentStore = create<InstrumentStore>()(
       });
       // Auto-enable 303 flag columns when selecting a TB-303/Buzz3o3 instrument
       if (inst.synthType === 'TB303' || inst.synthType === 'Buzz3o3') {
-        import('./useTrackerStore').then(({ useTrackerStore }) => {
-          const vis = useTrackerStore.getState().columnVisibility;
+        import('./useEditorStore').then(({ useEditorStore }) => {
+          const vis = useEditorStore.getState().columnVisibility;
           if (!vis.flag1 || !vis.flag2) {
-            useTrackerStore.getState().setColumnVisibility({ flag1: true, flag2: true });
+            useEditorStore.getState().setColumnVisibility({ flag1: true, flag2: true });
           }
         }).catch(() => { /* ignore if store not ready */ });
       }

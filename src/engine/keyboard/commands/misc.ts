@@ -3,6 +3,7 @@
  */
 
 import { useTrackerStore } from '@stores/useTrackerStore';
+import { useEditorStore } from '@stores/useEditorStore';
 import { useCursorStore } from '@/stores/useCursorStore';
 import { useUIStore } from '@stores/useUIStore';
 import { useWorkbenchStore } from '@stores/useWorkbenchStore';
@@ -14,8 +15,8 @@ import { saveProjectToStorage } from '@hooks/useProjectPersistence';
 // ====== REAL IMPLEMENTATIONS (kept from original) ======
 
 export function toggleEditMode(): boolean {
-  useTrackerStore.getState().toggleRecordMode();
-  const newMode = useTrackerStore.getState().recordMode;
+  useEditorStore.getState().toggleRecordMode();
+  const newMode = useEditorStore.getState().recordMode;
   useUIStore.getState().setStatusMessage(`Edit mode ${newMode ? 'ON' : 'OFF'}`, false, 1000);
   return true;
 }
@@ -38,8 +39,8 @@ export function escapeCommand(): boolean {
 }
 
 export function toggleRecording(): boolean {
-  useTrackerStore.getState().toggleRecordMode();
-  const recorded = useTrackerStore.getState().recordMode;
+  useEditorStore.getState().toggleRecordMode();
+  const recorded = useEditorStore.getState().recordMode;
   useUIStore.getState().setStatusMessage(`Recording ${recorded ? 'ON' : 'OFF'}`, false, 1000);
   return true;
 }

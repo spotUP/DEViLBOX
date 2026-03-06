@@ -9,6 +9,7 @@
 import React, { useMemo } from 'react';
 import { useCollaborationStore } from '@stores/useCollaborationStore';
 import { useTrackerStore } from '@stores/useTrackerStore';
+import { useEditorStore } from '@stores/useEditorStore';
 import { useTransportStore } from '@stores/useTransportStore';
 import { ReadOnlyPatternCanvas } from '@components/tracker/ReadOnlyPatternCanvas';
 import { Users, Lock } from 'lucide-react';
@@ -30,7 +31,7 @@ const ROField: React.FC<{ label: string; value: number }> = ({ label, value }) =
 export const RemotePatternView: React.FC = () => {
   const peerPatternIndex = useCollaborationStore((s) => s.peerPatternIndex);
   const patterns = useTrackerStore((s) => s.patterns);
-  const columnVisibility = useTrackerStore((s) => s.columnVisibility);
+  const columnVisibility = useEditorStore((s) => s.columnVisibility);
   const patternOrder = useTrackerStore((s) => s.patternOrder);
   const currentPositionIndex = useTrackerStore((s) => s.currentPositionIndex);
   const isPlaying = useTransportStore((s) => s.isPlaying);
