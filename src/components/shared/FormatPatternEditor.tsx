@@ -41,13 +41,16 @@ interface FormatPatternEditorProps {
   height: number;
   columns: ColumnDef[];
   channels: FormatChannel[];
+  /** Single playback row for all channels (backward compat). */
   currentRow: number;
+  /** Per-channel playback rows. When provided, overrides currentRow for highlighting. */
+  currentRowPerChannel?: number[];
   isPlaying: boolean;
   onCellChange?: OnCellChange;
 }
 
 export const FormatPatternEditor: React.FC<FormatPatternEditorProps> = ({
-  width, height, columns, channels, currentRow, isPlaying, onCellChange,
+  width, height, columns, channels, currentRow, currentRowPerChannel, isPlaying, onCellChange,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -116,15 +119,18 @@ export const FormatPatternEditor: React.FC<FormatPatternEditorProps> = ({
       ctx.fillText(channels[ch].label, x, 4);
     }
 
+    // Per-channel play rows: use per-channel array if provided, else broadcast single row
+    const perChRows = currentRowPerChannel ?? null;
+
     // Rows
     for (let vi = 0; vi < visibleRows; vi++) {
       const row = scrollRow + vi;
       if (row >= trackLength) break;
       const y = HEADER_H + vi * ROW_H;
-      const isPlayRow = isPlaying && row === currentRow;
       const isCursorRow = row === cursor.row;
 
-      if (isPlayRow) {
+      // Full-width play row highlight (only when all channels share same row)
+      if (isPlaying && !perChRows && row === currentRow) {
         ctx.fillStyle = COLORS.playRow;
         ctx.fillRect(0, y, width, ROW_H);
       } else if (row % 8 === 0) {
@@ -166,6 +172,12 @@ export const FormatPatternEditor: React.FC<FormatPatternEditorProps> = ({
         const baseX = ROW_NUM_W + ch * (channelWidth + CHAN_GAP);
         const cell = channels[ch].rows[row];
 
+        // Per-channel play row highlight
+        if (isPlaying && perChRows && perChRows[ch] === row) {
+          ctx.fillStyle = COLORS.playRow;
+          ctx.fillRect(baseX, y, channelWidth, ROW_H);
+        }
+
         let colX = baseX;
 
         for (let colIdx = 0; colIdx < columns.length; colIdx++) {
@@ -190,7 +202,7 @@ export const FormatPatternEditor: React.FC<FormatPatternEditorProps> = ({
         }
       }
     }
-  }, [width, height, cursor, selection, currentRow, isPlaying,
+  }, [width, height, cursor, selection, currentRow, currentRowPerChannel, isPlaying,
       scrollRow, visibleRows, numChannels, trackLength, channels, columns, columnWidths, channelWidth]);
 
   // Piano keyboard mapping: Z-M = octave N, Q-P = octave N+1
