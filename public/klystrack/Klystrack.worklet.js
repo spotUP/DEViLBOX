@@ -94,6 +94,31 @@ class KlystrackProcessor extends AudioWorkletProcessor {
         this.wasm._klys_set_instrument_program_step(progIdx, step, progVal);
         break;
       }
+
+      case 'serializeSong': {
+        if (!this.wasm) {
+          this.port.postMessage({ type: 'serializeSongResult', error: 'WASM not loaded' });
+          break;
+        }
+        try {
+          // First call to get required size
+          const needed = this.wasm._klys_save_song(0, 0);
+          if (needed <= 0) {
+            this.port.postMessage({ type: 'serializeSongResult', error: 'No song loaded' });
+            break;
+          }
+          // Allocate buffer and serialize
+          const ptr = this.wasm._malloc(needed);
+          const written = this.wasm._klys_save_song(ptr, needed);
+          const bytes = new Uint8Array(written);
+          bytes.set(new Uint8Array(this.wasm.HEAPU8.buffer, ptr, written));
+          this.wasm._free(ptr);
+          this.port.postMessage({ type: 'serializeSongResult', data: bytes.buffer }, [bytes.buffer]);
+        } catch (e) {
+          this.port.postMessage({ type: 'serializeSongResult', error: e.message });
+        }
+        break;
+      }
     }
   }
 
