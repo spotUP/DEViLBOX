@@ -344,12 +344,14 @@ class KlystrackProcessor extends AudioWorkletProcessor {
         p += 2;
       }
 
-      // Name (32 bytes, null-terminated)
+      // Name (32 bytes, null-terminated) — no TextDecoder in AudioWorklet
       let name = '';
       if (p + 32 <= n) {
-        const nameBytes = raw.slice(p, p + 32);
-        const nullIdx = nameBytes.indexOf(0);
-        name = new TextDecoder().decode(nameBytes.slice(0, nullIdx >= 0 ? nullIdx : 32));
+        const end = Math.min(p + 32, n);
+        for (let ci = p; ci < end; ci++) {
+          if (raw[ci] === 0) break;
+          name += String.fromCharCode(raw[ci]);
+        }
       }
 
       instruments.push({
