@@ -26,15 +26,17 @@ function parseOperand(t: Token): Operand {
     }
     case 'ADDRESS': {
       if (t.value.startsWith('-')) {
-        const reg = (t.value.match(/\((\w+)\)/)?.[1] ?? 'sp').toLowerCase();
+        const rawReg = t.value.match(/\((\w+)\)/)?.[1] ?? 'sp';
+        const reg = /^[da][0-7]$|^sp$|^pc$/i.test(rawReg) ? rawReg.toLowerCase() : rawReg;
         return { kind: 'address', mode: 'pre_dec', reg };
       }
-      const reg = (t.value.match(/\((\w+)\)/)?.[1] ?? 'a0').toLowerCase();
+      const rawReg = t.value.match(/\((\w+)\)/)?.[1] ?? 'a0';
+      const reg = /^[da][0-7]$|^sp$|^pc$/i.test(rawReg) ? rawReg.toLowerCase() : rawReg;
       const mode = t.value.endsWith('+') ? 'post_inc' : 'indirect';
       return { kind: 'address', mode, reg };
     }
     case 'DISP_REG': {
-      const m = t.value.match(/^(-?[^(]+)\((\w+)(?:,(\w+\.\w+))?\)$/);
+      const m = t.value.match(/^(-?[^(]+)\((\w+)(?:,(\w+(?:\.\w+)?))?\)$/);
       if (m) {
         const rawOff = m[1];
         const offset: number | string =
@@ -42,9 +44,9 @@ function parseOperand(t: Token): Operand {
           /^\$[0-9A-Fa-f]+$/.test(rawOff) ? parseInt(rawOff.slice(1), 16) :
           /^-\$[0-9A-Fa-f]+$/.test(rawOff) ? -parseInt(rawOff.slice(2), 16) :
           rawOff;
-        // PC-relative addressing: label(PC) → pc_rel node
+        // PC-relative addressing: label(PC) or label(PC,D4.W) → pc_rel node
         if (m[2].toUpperCase() === 'PC' && typeof offset === 'string') {
-          return { kind: 'pc_rel', label: offset };
+          return { kind: 'pc_rel', label: offset, index: m[3] };
         }
         return { kind: 'disp', offset, base: m[2].toLowerCase(), index: m[3] };
       }
@@ -167,6 +169,34 @@ export function parse(tokens: Token[]): AstNode[] {
       j++;
       const name = lt[j]?.value ?? '';
       nodes.push({ kind: 'section', name, line: startLine });
+      continue;
+    }
+
+    // DCB (define constant block): DCB.L 6,0 → 6 copies of 0
+    if (first.kind === 'DIRECTIVE' && first.value === 'DCB') {
+      j++; // advance past DCB
+      const sizeToken = lt[j];
+      const rawSize = sizeToken?.kind === 'SIZE' ? sizeToken.value.slice(1) : 'W';
+      const size: Size = (rawSize === 'B' || rawSize === 'W' || rawSize === 'L' || rawSize === 'S') ? rawSize : 'W';
+      if (sizeToken?.kind === 'SIZE') j++;
+      // Parse count
+      let count = 1;
+      if (j < lt.length && lt[j].kind !== 'COMMA' && lt[j].kind !== 'COMMENT') {
+        count = parseNumber(lt[j].value);
+        if (Number.isNaN(count)) count = 1;
+        j++;
+      }
+      // Skip comma
+      if (j < lt.length && lt[j].kind === 'COMMA') j++;
+      // Parse fill value
+      let fillVal = 0;
+      if (j < lt.length && lt[j].kind !== 'COMMENT') {
+        const n = parseNumber(lt[j].value);
+        fillVal = Number.isNaN(n) ? 0 : n;
+        j++;
+      }
+      const values: number[] = Array(count).fill(fillVal);
+      nodes.push({ kind: 'data', directive: 'DC', size, values, line: startLine });
       continue;
     }
 
