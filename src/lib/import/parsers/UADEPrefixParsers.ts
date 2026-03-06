@@ -72,8 +72,9 @@ export async function tryUADEPrefixParse(
 ): Promise<TrackerSong | null> {
   const base = getBasename(filename);
 
-  // ── UADE-only prefix formats ─────────────────────────────────────────────
-  if (UADE_ONLY_PREFIXES.some(p => base.startsWith(p))) {
+  // ── UADE-only prefix formats (matches both prefix.name and name.prefix) ──
+  const ext = base.slice(base.lastIndexOf('.') + 1);
+  if (UADE_ONLY_PREFIXES.some(p => base.startsWith(p) || p === `${ext}.`)) {
     const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
     return parseUADEFile(buffer, originalFileName, prefs.uade ?? 'enhanced', subsong, preScannedMeta);
   }

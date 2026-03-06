@@ -21,6 +21,16 @@ import { tryChipDumpParse } from './ChipDumpParsers';
 import { tryUADEPrefixParse } from './UADEPrefixParsers';
 import { tryPCTrackerParse } from './PCTrackerParsers';
 
+/**
+ * Check if a basename matches a prefix in either direction:
+ * 'hst.mysong' (prefix form) or 'mysong.hst' (extension form)
+ */
+function matchesPrefix(base: string, prefix: string): boolean {
+  if (base.startsWith(prefix)) return true;
+  const ext = base.slice(base.lastIndexOf('.') + 1);
+  return prefix === `${ext}.`;
+}
+
 /** Check if a filename matches Future Composer extensions */
 function isFCFormat(filename: string): boolean {
   return /\.(fc|fc2|fc3|fc4|fc13|fc14|sfc|smod|bfc|bsi)$/.test(filename);
@@ -538,7 +548,7 @@ export async function tryRouteFormat(
   // Compiled 68k Amiga music format. Magic: Amiga HUNK header at offset 0.
   {
     const _bdBase = getBasename(filename);
-    if (_bdBase.startsWith('bd.')) {
+    if (matchesPrefix(_bdBase, 'bd.')) {
       if (prefs.benDaglish === 'native') {
         try {
           const { isBenDaglishFormat, parseBenDaglishFile } = await import('@lib/import/formats/BenDaglishParser');
@@ -1156,7 +1166,7 @@ export async function tryRouteFormat(
     const _rjpBase = (filename.split('/').pop() ?? filename).toLowerCase();
     const _mightBeRJP =
       /\.rjp$/i.test(filename) ||
-      _rjpBase.startsWith('rjp.') ||
+      matchesPrefix(_rjpBase, 'rjp.') ||
       (/\.sng$/i.test(filename) && buffer.byteLength >= 16 &&
         new Uint8Array(buffer)[0] === 0x52 &&   // 'R'
         new Uint8Array(buffer)[1] === 0x4a &&   // 'J'
@@ -1228,7 +1238,7 @@ export async function tryRouteFormat(
   // by opcode patterns at offsets 0/4/8.
   {
     const _dlBase = (filename.split('/').pop() ?? filename).toLowerCase();
-    const _mightBeDL = /\.dl$/i.test(filename) || /\.dl_deli$/i.test(filename) || _dlBase.startsWith('dl.');
+    const _mightBeDL = /\.dl$/i.test(filename) || /\.dl_deli$/i.test(filename) || matchesPrefix(_dlBase, 'dl.');
     if (_mightBeDL) {
             if (prefs.daveLowe === 'native') {
         try {
@@ -1254,7 +1264,7 @@ export async function tryRouteFormat(
   // Amiga 4-channel format (Leggless Music Editor). Magic: "LME" at offset 0.
   {
     const _lmeBase = (filename.split('/').pop() ?? filename).split('\\').pop() ?? filename;
-    const _mightBeLME = /\.lme$/i.test(filename) || _lmeBase.toLowerCase().startsWith('lme.');
+    const _mightBeLME = /\.lme$/i.test(filename) || matchesPrefix(_lmeBase.toLowerCase(), 'lme.');
     if (_mightBeLME) {
       const { isLMEFormat, parseLMEFile } = await import('@lib/import/formats/LMEParser');
       return withNativeThenUADE('lme', ctx,
@@ -1283,7 +1293,7 @@ export async function tryRouteFormat(
   // New/Medium (601A + 48E780F0), and Rare (4DFA + DFF000 hardware register).
   {
     const _mcBase = getBasename(filename);
-    const _mightBeMC = _mcBase.startsWith('mc.') || _mcBase.startsWith('mcr.') || _mcBase.startsWith('mco.');
+    const _mightBeMC = matchesPrefix(_mcBase, 'mc.') || matchesPrefix(_mcBase, 'mcr.') || matchesPrefix(_mcBase, 'mco.');
     if (_mightBeMC) {
       if (prefs.markCooksey === 'native') {
         try {
@@ -1303,7 +1313,7 @@ export async function tryRouteFormat(
   // Detection: scan first 40 bytes for 0x02390001 + structural checks.
   {
     const _jtBase = getBasename(filename);
-    const _mightBeJT = _jtBase.startsWith('jt.') || _jtBase.startsWith('mon_old.');
+    const _mightBeJT = matchesPrefix(_jtBase, 'jt.') || matchesPrefix(_jtBase, 'mon_old.');
     if (_mightBeJT) {
       if (prefs.jeroenTel === 'native') {
         try {
@@ -1321,7 +1331,7 @@ export async function tryRouteFormat(
   // ── Quartet / Quartet PSG / Quartet ST (qpa.* / sqt.* / qts.* prefix) ──────
   {
     const _qBase = getBasename(filename);
-    const _mightBeQuartet = _qBase.startsWith('qpa.') || _qBase.startsWith('sqt.') || _qBase.startsWith('qts.');
+    const _mightBeQuartet = matchesPrefix(_qBase, 'qpa.') || matchesPrefix(_qBase, 'sqt.') || matchesPrefix(_qBase, 'qts.');
     if (_mightBeQuartet) {
       if (prefs.quartet === 'native') {
         try {
@@ -1340,9 +1350,9 @@ export async function tryRouteFormat(
   {
     const _smBase = getBasename(filename);
     const _mightBeSM =
-      _smBase.startsWith('sm.') || _smBase.startsWith('sm1.') ||
-      _smBase.startsWith('sm2.') || _smBase.startsWith('sm3.') ||
-      _smBase.startsWith('smpro.');
+      matchesPrefix(_smBase, 'sm.') || matchesPrefix(_smBase, 'sm1.') ||
+      matchesPrefix(_smBase, 'sm2.') || matchesPrefix(_smBase, 'sm3.') ||
+      matchesPrefix(_smBase, 'smpro.');
     if (_mightBeSM) {
       if (prefs.soundMaster === 'native') {
         try {
@@ -1364,7 +1374,7 @@ export async function tryRouteFormat(
   // Detection: computed offset from bytes[0..1], then "df?:" or "?amp" tag check.
   {
     const _zBase = getBasename(filename);
-    if (_zBase.startsWith('sng.') || _zBase.endsWith('.sng')) {
+    if (matchesPrefix(_zBase, 'sng.') || _zBase.endsWith('.sng')) {
       if (prefs.zoundMonitor === 'native') {
         try {
           const { isZoundMonitorFormat, parseZoundMonitorFile } = await import('@lib/import/formats/ZoundMonitorParser');
@@ -1393,7 +1403,7 @@ export async function tryRouteFormat(
   // ── TCB Tracker (tcb.*) ──────────────────────────────────────────────────────
   {
     const _tcbBase = getBasename(filename);
-    if (_tcbBase.startsWith('tcb.')) {
+    if (matchesPrefix(_tcbBase, 'tcb.')) {
       if (prefs.tcbTracker === 'native') {
         try {
           const { isTCBTrackerFormat, parseTCBTrackerFile } = await import('@lib/import/formats/TCBTrackerParser');
@@ -1412,9 +1422,9 @@ export async function tryRouteFormat(
   {
     const _jpBase = (filename.split('/').pop() ?? filename).split('\\').pop() ?? filename;
     const _mightBeJP =
-      _jpBase.toLowerCase().startsWith('jpn.') ||
-      _jpBase.toLowerCase().startsWith('jpnd.') ||
-      _jpBase.toLowerCase().startsWith('jp.');
+      matchesPrefix(_jpBase.toLowerCase(), 'jpn.') ||
+      matchesPrefix(_jpBase.toLowerCase(), 'jpnd.') ||
+      matchesPrefix(_jpBase.toLowerCase(), 'jp.');
     if (_mightBeJP) {
             if (prefs.jasonPage === 'native') {
         try {
@@ -1432,7 +1442,7 @@ export async function tryRouteFormat(
   // ── MMDC / MED Packer (mmdc.*) ───────────────────────────────────────────────
   {
     const _mmdcBase = getBasename(filename);
-    if (_mmdcBase.startsWith('mmdc.')) {
+    if (matchesPrefix(_mmdcBase, 'mmdc.')) {
       if (prefs.mmdc === 'native') {
         try {
           const { isMMDCFormat, parseMMDCFile } = await import('@lib/import/formats/MMDCParser');
@@ -1449,7 +1459,7 @@ export async function tryRouteFormat(
   // ── Professional Sound Artists (psa.*) ───────────────────────────────────────
   {
     const _psaBase = getBasename(filename);
-    if (_psaBase.startsWith('psa.')) {
+    if (matchesPrefix(_psaBase, 'psa.')) {
       if (prefs.psa === 'native') {
         try {
           const { isPSAFormat, parsePSAFile } = await import('@lib/import/formats/PSAParser');
@@ -1466,7 +1476,7 @@ export async function tryRouteFormat(
   // ── Steve Turner (jpo.* / jpold.*) ───────────────────────────────────────────
   {
     const _jpoBase = getBasename(filename);
-    if (_jpoBase.startsWith('jpo.') || _jpoBase.startsWith('jpold.')) {
+    if (matchesPrefix(_jpoBase, 'jpo.') || matchesPrefix(_jpoBase, 'jpold.')) {
       if (prefs.steveTurner === 'native') {
         try {
           const { isSteveTurnerFormat, parseSteveTurnerFile } = await import('@lib/import/formats/SteveTurnerParser');
@@ -1483,7 +1493,7 @@ export async function tryRouteFormat(
   // ── TME (.tme / TME.*) ───────────────────────────────────────────────────────
   {
     const _tmeBase = getBasename(filename);
-    if (/\.tme$/i.test(filename) || _tmeBase.startsWith('tme.')) {
+    if (/\.tme$/i.test(filename) || matchesPrefix(_tmeBase, 'tme.')) {
       if (prefs.tme === 'native') {
         try {
           const { isTMEFormat, parseTMEFile } = await import('@lib/import/formats/TMEParser');
@@ -1548,7 +1558,7 @@ export async function tryRouteFormat(
   // Amiga format by BrainWasher & FireBlade. UADE prefix: TMK.
   {
     const _tmkBase = getBasename(filename);
-    if (_tmkBase.startsWith('tmk.')) {
+    if (matchesPrefix(_tmkBase, 'tmk.')) {
       const { isTimeTrackerFormat, parseTimeTrackerFile } = await import('@lib/import/formats/TimeTrackerParser');
       return withNativeThenUADE('timeTracker', ctx,
         (buf: Uint8Array | ArrayBuffer, name: string) => { if (isTimeTrackerFormat(buf as ArrayBuffer)) return parseTimeTrackerFile(buf as ArrayBuffer, name); return null; },
@@ -1560,7 +1570,7 @@ export async function tryRouteFormat(
   // Amiga format identified by 'KRIS' at offset 952. UADE prefix: KRIS.
   {
     const _krisBase = getBasename(filename);
-    if (_krisBase.startsWith('kris.')) {
+    if (matchesPrefix(_krisBase, 'kris.')) {
             if (prefs.kris === 'native') {
         try {
           const { isKRISFormat, parseKRISFile } = await import('@lib/import/formats/KRISParser');
@@ -1578,7 +1588,7 @@ export async function tryRouteFormat(
   // Amiga format with 'IBLK'+'ASEQ' magic. UADE prefix: CIN.
   {
     const _cinBase = getBasename(filename);
-    if (_cinBase.startsWith('cin.')) {
+    if (matchesPrefix(_cinBase, 'cin.')) {
       const { isCinemawareFormat, parseCinemawareFile } = await import('@lib/import/formats/CinemawareParser');
       return withNativeThenUADE('cinemaware', ctx,
         (buf: Uint8Array | ArrayBuffer, name: string) => { if (isCinemawareFormat(buf as ArrayBuffer)) return parseCinemawareFile(buf as ArrayBuffer, name); return null; },
@@ -1590,7 +1600,7 @@ export async function tryRouteFormat(
   // Amiga chunked format: MODU/BODY/SAMP chunks. UADE prefix: NTP.
   {
     const _ntpBase = getBasename(filename);
-    if (_ntpBase.startsWith('ntp.')) {
+    if (matchesPrefix(_ntpBase, 'ntp.')) {
       const { isNovoTradePackerFormat, parseNovoTradePackerFile } = await import('@lib/import/formats/NovoTradePackerParser');
       return withNativeThenUADE('novoTradePacker', ctx,
         (buf: Uint8Array | ArrayBuffer, name: string) => { if (isNovoTradePackerFormat(buf as ArrayBuffer)) return parseNovoTradePackerFile(buf as ArrayBuffer, name); return null; },
@@ -1602,7 +1612,7 @@ export async function tryRouteFormat(
   // Amiga format with 'PAn\x10' magic. UADE prefix: ALP.
   {
     const _alpBase = getBasename(filename);
-    if (_alpBase.startsWith('alp.')) {
+    if (matchesPrefix(_alpBase, 'alp.')) {
       const { isAlcatrazPackerFormat, parseAlcatrazPackerFile } = await import('@lib/import/formats/AlcatrazPackerParser');
       return withNativeThenUADE('alcatrazPacker', ctx,
         (buf: Uint8Array | ArrayBuffer, name: string) => { if (isAlcatrazPackerFormat(buf as ArrayBuffer)) return parseAlcatrazPackerFile(buf as ArrayBuffer, name); return null; },
@@ -1614,7 +1624,7 @@ export async function tryRouteFormat(
   // Amiga 8-channel format with 0x538F4E47 magic. UADE prefix: UDS.
   {
     const _udsBase = getBasename(filename);
-    if (_udsBase.startsWith('uds.')) {
+    if (matchesPrefix(_udsBase, 'uds.')) {
       const { isBladePackerFormat, parseBladePackerFile } = await import('@lib/import/formats/BladePackerParser');
       return withNativeThenUADE('bladePacker', ctx,
         (buf: Uint8Array | ArrayBuffer, name: string) => { if (isBladePackerFormat(buf as ArrayBuffer)) return parseBladePackerFile(buf as ArrayBuffer, name); return null; },
@@ -1626,7 +1636,7 @@ export async function tryRouteFormat(
   // Amiga format with size-based structural detection. UADE prefix: SG.
   {
     const _sgBase = getBasename(filename);
-    if (_sgBase.startsWith('sg.')) {
+    if (matchesPrefix(_sgBase, 'sg.')) {
       const { isTomyTrackerFormat, parseTomyTrackerFile } = await import('@lib/import/formats/TomyTrackerParser');
       return withNativeThenUADE('tomyTracker', ctx,
         (buf: Uint8Array | ArrayBuffer, name: string) => { if (isTomyTrackerFormat(buf as ArrayBuffer)) return parseTomyTrackerFile(buf as ArrayBuffer, name); return null; },
@@ -1639,7 +1649,7 @@ export async function tryRouteFormat(
   // Note: .ims extension files are handled earlier with native IMSParser.
   {
     const _imspBase = getBasename(filename);
-    if (_imspBase.startsWith('ims.')) {
+    if (matchesPrefix(_imspBase, 'ims.')) {
       const { isImagesMusicSystemFormat, parseImagesMusicSystemFile } = await import('@lib/import/formats/ImagesMusicSystemParser');
       return withNativeThenUADE('imagesMusicSystem', ctx,
         (buf: Uint8Array | ArrayBuffer, name: string) => { if (isImagesMusicSystemFormat(buf as ArrayBuffer)) return parseImagesMusicSystemFile(buf as ArrayBuffer, name); return null; },
@@ -1650,7 +1660,7 @@ export async function tryRouteFormat(
   // ── Fashion Tracker (EX.* prefix) ────────────────────────────────────────
   {
     const _exBase = getBasename(filename);
-    if (_exBase.startsWith('ex.')) {
+    if (matchesPrefix(_exBase, 'ex.')) {
       const { isFashionTrackerFormat, parseFashionTrackerFile } = await import('@lib/import/formats/FashionTrackerParser');
       return withNativeThenUADE('fashionTracker', ctx,
         (buf: Uint8Array | ArrayBuffer, name: string) => { if (isFashionTrackerFormat(buf as ArrayBuffer)) return parseFashionTrackerFile(buf as ArrayBuffer, name); return null; },
@@ -1661,7 +1671,7 @@ export async function tryRouteFormat(
   // ── MultiMedia Sound (MMS.* / SFX20.* prefix) ────────────────────────────
   {
     const _mmsBase = getBasename(filename);
-    if (_mmsBase.startsWith('mms.') || _mmsBase.startsWith('sfx20.')) {
+    if (matchesPrefix(_mmsBase, 'mms.') || matchesPrefix(_mmsBase, 'sfx20.')) {
       const { isMultiMediaSoundFormat, parseMultiMediaSoundFile } = await import('@lib/import/formats/MultiMediaSoundParser');
       return withNativeThenUADE('multiMediaSound', ctx,
         (buf: Uint8Array | ArrayBuffer, name: string) => { if (isMultiMediaSoundFormat(buf as ArrayBuffer)) return parseMultiMediaSoundFile(buf as ArrayBuffer, name); return null; },
@@ -1673,7 +1683,7 @@ export async function tryRouteFormat(
   // Compiled 68k Amiga music. Three detection paths with specific 68k opcodes + scan.
   {
     const _scrBase = getBasename(filename);
-    if (_scrBase.startsWith('scr.')) {
+    if (matchesPrefix(_scrBase, 'scr.')) {
             if (prefs.seanConran === 'native') {
         try {
           const { isSeanConranFormat, parseSeanConranFile } = await import('@lib/import/formats/SeanConranParser');
@@ -1692,7 +1702,7 @@ export async function tryRouteFormat(
   // Compiled 68k Amiga music. Relocation table structure with arithmetic checks.
   {
     const _thmBase = getBasename(filename);
-    if (_thmBase.startsWith('thm.')) {
+    if (matchesPrefix(_thmBase, 'thm.')) {
             if (prefs.thomasHermann === 'native') {
         try {
           const { isThomasHermannFormat, parseThomasHermannFile } = await import('@lib/import/formats/ThomasHermannParser');
@@ -1711,7 +1721,7 @@ export async function tryRouteFormat(
   // Amiga packed music format. Detection: 128 words at offset 180 (even, non-zero).
   {
     const _titsBase = getBasename(filename);
-    if (_titsBase.startsWith('tits.')) {
+    if (matchesPrefix(_titsBase, 'tits.')) {
       const { isTitanicsPackerFormat, parseTitanicsPackerFile } = await import('@lib/import/formats/TitanicsPackerParser');
       return withNativeThenUADE('titanicsPacker', ctx,
         (buf: Uint8Array | ArrayBuffer, name: string) => { if (isTitanicsPackerFormat(buf as ArrayBuffer)) return parseTitanicsPackerFile(buf as ArrayBuffer, name); return null; },
@@ -1723,7 +1733,7 @@ export async function tryRouteFormat(
   // Compiled 68k Amiga music. Fixed-offset pattern with 0x000003F3 header.
   {
     const _khBase = getBasename(filename);
-    if (_khBase.startsWith('kh.')) {
+    if (matchesPrefix(_khBase, 'kh.')) {
       const { isKrisHatlelidFormat, parseKrisHatlelidFile } = await import('@lib/import/formats/KrisHatlelidParser');
       return withNativeThenUADE('krisHatlelid', ctx,
         (buf: Uint8Array | ArrayBuffer, name: string) => { if (isKrisHatlelidFormat(buf as ArrayBuffer)) return parseKrisHatlelidFile(buf as ArrayBuffer, name); return null; },
@@ -1735,7 +1745,7 @@ export async function tryRouteFormat(
   // Amiga 2-file packed format. Magic: 'SPNT' at offset 0 + non-zero at offset 4.
   {
     const _twoBase = getBasename(filename);
-    if (_twoBase.startsWith('two.')) {
+    if (matchesPrefix(_twoBase, 'two.')) {
       const { isNTSPFormat, parseNTSPFile } = await import('@lib/import/formats/NTSPParser');
       return withNativeThenUADE('ntsp', ctx,
         (buf: Uint8Array | ArrayBuffer, name: string) => { if (isNTSPFormat(buf as ArrayBuffer)) return parseNTSPFile(buf as ArrayBuffer, name); return null; },
@@ -1747,7 +1757,7 @@ export async function tryRouteFormat(
   // IFF-based 4-channel Amiga format. FORM+DDAT+BODY+CHAN structure.
   {
     const _ufoBase = getBasename(filename);
-    if (_ufoBase.startsWith('mus.') || _ufoBase.startsWith('ufo.')) {
+    if (matchesPrefix(_ufoBase, 'mus.') || matchesPrefix(_ufoBase, 'ufo.')) {
       const { isUFOFormat, parseUFOFile } = await import('@lib/import/formats/UFOParser');
       return withNativeThenUADE('ufo', ctx,
         (buf: Uint8Array | ArrayBuffer, name: string) => { if (isUFOFormat(buf as ArrayBuffer)) return parseUFOFile(buf as ArrayBuffer, name); return null; },
@@ -1759,7 +1769,7 @@ export async function tryRouteFormat(
   // SoundTracker-compatible Amiga packed format. 31 sample headers + M.K. at 378.
   {
     const _moshBase = getBasename(filename);
-    if (_moshBase.startsWith('mosh.')) {
+    if (matchesPrefix(_moshBase, 'mosh.')) {
       const { isMoshPackerFormat, parseMoshPackerFile } = await import('@lib/import/formats/MoshPackerParser');
       return withNativeThenUADE('moshPacker', ctx,
         (buf: Uint8Array | ArrayBuffer, name: string) => { if (isMoshPackerFormat(buf as ArrayBuffer)) return parseMoshPackerFile(buf as ArrayBuffer, name); return null; },
@@ -1771,7 +1781,7 @@ export async function tryRouteFormat(
   // Same format as .mug/.dmu — " MUGICIAN/SOFTEYES 1990" signature at offset 0.
   {
     const _mugBase = getBasename(filename);
-    if (_mugBase.startsWith('mug.')) {
+    if (matchesPrefix(_mugBase, 'mug.')) {
       const { parseDigitalMugicianFile } = await import('@lib/import/formats/DigitalMugicianParser');
       return withNativeThenUADE('mugician', ctx, (buf: Uint8Array | ArrayBuffer, name: string) => parseDigitalMugicianFile(buf as ArrayBuffer, name), 'DigitalMugicianParser');
     }
@@ -1781,7 +1791,7 @@ export async function tryRouteFormat(
   // Same format as .mug2/.dmu2 — " MUGICIAN2/SOFTEYES 1990" signature at offset 0.
   {
     const _mug2Base = getBasename(filename);
-    if (_mug2Base.startsWith('mug2.')) {
+    if (matchesPrefix(_mug2Base, 'mug2.')) {
       const { parseDigitalMugicianFile } = await import('@lib/import/formats/DigitalMugicianParser');
       return withNativeThenUADE('mugician', ctx, (buf: Uint8Array | ArrayBuffer, name: string) => parseDigitalMugicianFile(buf as ArrayBuffer, name), 'DigitalMugicianParser');
     }
@@ -1790,7 +1800,7 @@ export async function tryRouteFormat(
   // ── Core Design (CORE.* prefix) ───────────────────────────────────────────
   {
     const _coreBase = getBasename(filename);
-    if (_coreBase.startsWith('core.')) {
+    if (matchesPrefix(_coreBase, 'core.')) {
       const { isCoreDesignFormat, parseCoreDesignFile } = await import('@lib/import/formats/CoreDesignParser');
       return withNativeThenUADE('coreDesign', ctx,
         (buf: Uint8Array | ArrayBuffer, name: string) => { if (isCoreDesignFormat(buf as ArrayBuffer)) return parseCoreDesignFile(buf as ArrayBuffer, name); return null; },
@@ -1801,7 +1811,7 @@ export async function tryRouteFormat(
   // ── Janko Mrsic-Flogel (JMF.* prefix) ────────────────────────────────────
   {
     const _jmfBase = getBasename(filename);
-    if (_jmfBase.startsWith('jmf.')) {
+    if (matchesPrefix(_jmfBase, 'jmf.')) {
       const { isJankoMrsicFlogelFormat, parseJankoMrsicFlogelFile } = await import('@lib/import/formats/JankoMrsicFlogelParser');
       return withNativeThenUADE('jankoMrsicFlogel', ctx,
         (buf: Uint8Array | ArrayBuffer, name: string) => { if (isJankoMrsicFlogelFormat(buf as ArrayBuffer)) return parseJankoMrsicFlogelFile(buf as ArrayBuffer, name); return null; },
@@ -1812,7 +1822,7 @@ export async function tryRouteFormat(
   // ── Special FX (JD.* prefix) ──────────────────────────────────────────────
   {
     const _jdBase = getBasename(filename);
-    if (_jdBase.startsWith('jd.')) {
+    if (matchesPrefix(_jdBase, 'jd.')) {
       const { isSpecialFXFormat, parseSpecialFXFile } = await import('@lib/import/formats/SpecialFXParser');
       return withNativeThenUADE('specialFX', ctx,
         (buf: Uint8Array | ArrayBuffer, name: string) => { if (isSpecialFXFormat(buf as ArrayBuffer)) return parseSpecialFXFile(buf as ArrayBuffer, name); return null; },
@@ -1823,7 +1833,7 @@ export async function tryRouteFormat(
   // ── Sound Player / Steve Barrett (SJS.* prefix) ───────────────────────────
   {
     const _sjsBase = getBasename(filename);
-    if (_sjsBase.startsWith('sjs.')) {
+    if (matchesPrefix(_sjsBase, 'sjs.')) {
       const { isSoundPlayerFormat, parseSoundPlayerFile } = await import('@lib/import/formats/SoundPlayerParser');
       return withNativeThenUADE('soundPlayer', ctx,
         (buf: Uint8Array | ArrayBuffer, name: string) => { if (isSoundPlayerFormat(buf as ArrayBuffer)) return parseSoundPlayerFile(buf as ArrayBuffer, name); return null; },
@@ -1834,7 +1844,7 @@ export async function tryRouteFormat(
   // ── Nick Pelling Packer (NPP.* prefix) ────────────────────────────────────
   {
     const _nppBase = getBasename(filename);
-    if (_nppBase.startsWith('npp.')) {
+    if (matchesPrefix(_nppBase, 'npp.')) {
       const { isNickPellingPackerFormat, parseNickPellingPackerFile } = await import('@lib/import/formats/NickPellingPackerParser');
       return withNativeThenUADE('nickPellingPacker', ctx,
         (buf: Uint8Array | ArrayBuffer, name: string) => { if (isNickPellingPackerFormat(buf as ArrayBuffer)) return parseNickPellingPackerFile(buf as ArrayBuffer, name); return null; },
@@ -1845,7 +1855,7 @@ export async function tryRouteFormat(
   // ── Peter Verswyvelen Packer (PVP.* prefix) ───────────────────────────────
   {
     const _pvpBase = getBasename(filename);
-    if (_pvpBase.startsWith('pvp.')) {
+    if (matchesPrefix(_pvpBase, 'pvp.')) {
       const { isPeterVerswyvelenPackerFormat, parsePeterVerswyvelenPackerFile } = await import('@lib/import/formats/PeterVerswyvelenPackerParser');
       return withNativeThenUADE('peterVerswyvelenPacker', ctx,
         (buf: Uint8Array | ArrayBuffer, name: string) => { if (isPeterVerswyvelenPackerFormat(buf as ArrayBuffer)) return parsePeterVerswyvelenPackerFile(buf as ArrayBuffer, name); return null; },
@@ -1856,7 +1866,7 @@ export async function tryRouteFormat(
   // ── Wally Beben (WB.* prefix) ─────────────────────────────────────────────
   {
     const _wbBase = getBasename(filename);
-    if (_wbBase.startsWith('wb.')) {
+    if (matchesPrefix(_wbBase, 'wb.')) {
       const { isWallyBebenFormat, parseWallyBebenFile } = await import('@lib/import/formats/WallyBebenParser');
       return withNativeThenUADE('wallyBeben', ctx,
         (buf: Uint8Array | ArrayBuffer, name: string) => { if (isWallyBebenFormat(buf as ArrayBuffer)) return parseWallyBebenFile(buf as ArrayBuffer, name); return null; },
@@ -1867,7 +1877,7 @@ export async function tryRouteFormat(
   // ── Steve Barrett (SB.* prefix) ───────────────────────────────────────────
   {
     const _sbBase = getBasename(filename);
-    if (_sbBase.startsWith('sb.')) {
+    if (matchesPrefix(_sbBase, 'sb.')) {
       const { isSteveBarrettFormat, parseSteveBarrettFile } = await import('@lib/import/formats/SteveBarrettParser');
       return withNativeThenUADE('steveBarrett', ctx,
         (buf: Uint8Array | ArrayBuffer, name: string) => { if (isSteveBarrettFormat(buf as ArrayBuffer)) return parseSteveBarrettFile(buf as ArrayBuffer, name); return null; },
@@ -1878,7 +1888,7 @@ export async function tryRouteFormat(
   // ── Paul Summers (SNK.* prefix) ───────────────────────────────────────────
   {
     const _snkBase = getBasename(filename);
-    if (_snkBase.startsWith('snk.')) {
+    if (matchesPrefix(_snkBase, 'snk.')) {
       const { isPaulSummersFormat, parsePaulSummersFile } = await import('@lib/import/formats/PaulSummersParser');
       return withNativeThenUADE('paulSummers', ctx,
         (buf: Uint8Array | ArrayBuffer, name: string) => { if (isPaulSummersFormat(buf as ArrayBuffer)) return parsePaulSummersFile(buf as ArrayBuffer, name); return null; },
@@ -1890,7 +1900,7 @@ export async function tryRouteFormat(
   // Amiga 4-channel format with specific 68k opcode pattern. UADE prefix: DSR.
   {
     const _dsrBase = getBasename(filename);
-    if (_dsrBase.startsWith('dsr.')) {
+    if (matchesPrefix(_dsrBase, 'dsr.')) {
       const { isDesireFormat, parseDesireFile } = await import('@lib/import/formats/DesireParser');
       return withNativeThenUADE('desire', ctx,
         (buf: Uint8Array | ArrayBuffer, name: string) => { if (isDesireFormat(buf as ArrayBuffer)) return parseDesireFile(buf as ArrayBuffer, name); return null; },
@@ -1902,7 +1912,7 @@ export async function tryRouteFormat(
   // New-style Dave Lowe Amiga format with table-based detection. UADE prefix: DLN.
   {
     const _dlnBase = getBasename(filename);
-    if (_dlnBase.startsWith('dln.')) {
+    if (matchesPrefix(_dlnBase, 'dln.')) {
       const { isDaveLoweNewFormat, parseDaveLoweNewFile } = await import('@lib/import/formats/DaveLoweNewParser');
       return withNativeThenUADE('daveLowe', ctx,
         (buf: Uint8Array | ArrayBuffer, name: string) => { if (isDaveLoweNewFormat(buf as ArrayBuffer)) return parseDaveLoweNewFile(buf as ArrayBuffer, name); return null; },
@@ -1914,7 +1924,7 @@ export async function tryRouteFormat(
   // Amiga 5-variant format. UADE prefixes: avp, mw (different from .avp/.mw extensions).
   {
     const _mwBase = getBasename(filename);
-    if (_mwBase.startsWith('avp.') || _mwBase.startsWith('mw.')) {
+    if (matchesPrefix(_mwBase, 'avp.') || matchesPrefix(_mwBase, 'mw.')) {
       const { isMartinWalkerFormat, parseMartinWalkerFile } = await import('@lib/import/formats/MartinWalkerParser');
       return withNativeThenUADE('martinWalker', ctx,
         (buf: Uint8Array | ArrayBuffer, name: string) => { if (isMartinWalkerFormat(buf as ArrayBuffer)) return parseMartinWalkerFile(buf as ArrayBuffer, name); return null; },
@@ -1926,7 +1936,7 @@ export async function tryRouteFormat(
   // Amiga 3-variant format with zero-prefix header. UADE prefix: ps.
   {
     const _psBase = getBasename(filename);
-    if (_psBase.startsWith('ps.')) {
+    if (matchesPrefix(_psBase, 'ps.')) {
       const { isPaulShieldsFormat, parsePaulShieldsFile } = await import('@lib/import/formats/PaulShieldsParser');
       return withNativeThenUADE('paulShields', ctx,
         (buf: Uint8Array | ArrayBuffer, name: string) => { if (isPaulShieldsFormat(buf as ArrayBuffer)) return parsePaulShieldsFile(buf as ArrayBuffer, name); return null; },
@@ -1938,7 +1948,7 @@ export async function tryRouteFormat(
   // Amiga format with structured pointer table. UADE prefix: dat.
   {
     const _datBase = getBasename(filename);
-    if (_datBase.startsWith('dat.')) {
+    if (matchesPrefix(_datBase, 'dat.')) {
       const { isPaulRobothamFormat, parsePaulRobothamFile } = await import('@lib/import/formats/PaulRobothamParser');
       return withNativeThenUADE('paulRobotham', ctx,
         (buf: Uint8Array | ArrayBuffer, name: string) => { if (isPaulRobothamFormat(buf as ArrayBuffer)) return parsePaulRobothamFile(buf as ArrayBuffer, name); return null; },
@@ -1950,7 +1960,7 @@ export async function tryRouteFormat(
   // Amiga format with 4-word offset header. UADE prefix: pap.
   {
     const _papBase = getBasename(filename);
-    if (_papBase.startsWith('pap.')) {
+    if (matchesPrefix(_papBase, 'pap.')) {
       const { isPierreAdaneFormat, parsePierreAdaneFile } = await import('@lib/import/formats/PierreAdaneParser');
       return withNativeThenUADE('pierreAdane', ctx,
         (buf: Uint8Array | ArrayBuffer, name: string) => { if (isPierreAdaneFormat(buf as ArrayBuffer)) return parsePierreAdaneFile(buf as ArrayBuffer, name); return null; },
@@ -1962,7 +1972,7 @@ export async function tryRouteFormat(
   // Amiga 3-chunk format (mpl/mdt/msm). UADE prefix: hot.
   {
     const _hotBase = getBasename(filename);
-    if (_hotBase.startsWith('hot.')) {
+    if (matchesPrefix(_hotBase, 'hot.')) {
             if (prefs.anders0land === 'native') {
         try {
           const { isAnders0landFormat, parseAnders0landFile } = await import('@lib/import/formats/Anders0landParser');
@@ -1980,7 +1990,7 @@ export async function tryRouteFormat(
   // Amiga format with 'BANK' magic + chip-RAM pointer table. UADE prefix: bye.
   {
     const _byeBase = getBasename(filename);
-    if (_byeBase.startsWith('bye.')) {
+    if (matchesPrefix(_byeBase, 'bye.')) {
             if (prefs.andrewParton === 'native') {
         try {
           const { isAndrewPartonFormat, parseAndrewPartonFile } = await import('@lib/import/formats/AndrewPartonParser');
@@ -1998,7 +2008,7 @@ export async function tryRouteFormat(
   // Amiga format with BRA/JMP opcode detection. UADE prefixes: cm, rk, rkb.
   {
     const _cmBase = getBasename(filename);
-    if (_cmBase.startsWith('cm.') || _cmBase.startsWith('rk.') || _cmBase.startsWith('rkb.')) {
+    if (matchesPrefix(_cmBase, 'cm.') || matchesPrefix(_cmBase, 'rk.') || matchesPrefix(_cmBase, 'rkb.')) {
             if (prefs.customMade === 'native') {
         try {
           const { isCustomMadeFormat, parseCustomMadeFile } = await import('@lib/import/formats/CustomMadeParser');
@@ -2016,7 +2026,7 @@ export async function tryRouteFormat(
   // Amiga HUNK-based SID-style 3-voice format. UADE prefix: BDS.
   {
     const _bdsBase = getBasename(filename);
-    if (_bdsBase.startsWith('bds.')) {
+    if (matchesPrefix(_bdsBase, 'bds.')) {
             if (prefs.benDaglishSID === 'native') {
         try {
           const { isBenDaglishSIDFormat, parseBenDaglishSIDFile } = await import('@lib/import/formats/BenDaglishSIDParser');
@@ -2034,7 +2044,7 @@ export async function tryRouteFormat(
   // Amiga format with sample-table structural detection. UADE prefix: DSC.
   {
     const _dscBase = getBasename(filename);
-    if (_dscBase.startsWith('dsc.')) {
+    if (matchesPrefix(_dscBase, 'dsc.')) {
       const { isDscFormat, parseDscFile } = await import('@lib/import/formats/DigitalSonixChromeParser');
       return withNativeThenUADE('digitalSonixChrome', ctx,
         (buf: Uint8Array | ArrayBuffer, name: string) => { if (isDscFormat(buf as ArrayBuffer)) return parseDscFile(buf as ArrayBuffer, name); return null; },
@@ -2048,7 +2058,7 @@ export async function tryRouteFormat(
   // the binary SNX and TINY sub-formats which IffSmusParser cannot detect.
   {
     const _sonixBase = getBasename(filename);
-    if (_sonixBase.startsWith('smus.') || _sonixBase.startsWith('snx.') || _sonixBase.startsWith('tiny.')) {
+    if (matchesPrefix(_sonixBase, 'smus.') || matchesPrefix(_sonixBase, 'snx.') || matchesPrefix(_sonixBase, 'tiny.')) {
             if (prefs.iffSmus === 'native') {
         try {
           const { isIffSmusFormat, parseIffSmusFile } = await import('@lib/import/formats/IffSmusParser');
@@ -2074,7 +2084,7 @@ export async function tryRouteFormat(
   // Amiga format with jump-table detection and two sub-variants. UADE prefix: JO.
   {
     const _joBase = getBasename(filename);
-    if (_joBase.startsWith('jo.')) {
+    if (matchesPrefix(_joBase, 'jo.')) {
       const { isJesperOlsenFormat, parseJesperOlsenFile } = await import('@lib/import/formats/JesperOlsenParser');
       return withNativeThenUADE('jesperOlsen', ctx,
         (buf: Uint8Array | ArrayBuffer, name: string) => { if (isJesperOlsenFormat(buf as ArrayBuffer)) return parseJesperOlsenFile(buf as ArrayBuffer, name); return null; },
@@ -2086,7 +2096,7 @@ export async function tryRouteFormat(
   // Amiga format with multi-opcode scan detection. UADE prefix: KIM.
   {
     const _kimBase = getBasename(filename);
-    if (_kimBase.startsWith('kim.')) {
+    if (matchesPrefix(_kimBase, 'kim.')) {
       const { isKimChristensenFormat, parseKimChristensenFile } = await import('@lib/import/formats/KimChristensenParser');
       return withNativeThenUADE('kimChristensen', ctx,
         (buf: Uint8Array | ArrayBuffer, name: string) => { if (isKimChristensenFormat(buf as ArrayBuffer)) return parseKimChristensenFile(buf as ArrayBuffer, name); return null; },
@@ -2097,7 +2107,7 @@ export async function tryRouteFormat(
   // ── Ashley Hogg (ASH.* prefix) ────────────────────────────────────────────
   {
     const _ashBase = getBasename(filename);
-    if (_ashBase.startsWith('ash.')) {
+    if (matchesPrefix(_ashBase, 'ash.')) {
       const { isAshleyHoggFormat, parseAshleyHoggFile } = await import('@lib/import/formats/AshleyHoggParser');
       return withNativeThenUADE('ashleyHogg', ctx,
         (buf: Uint8Array | ArrayBuffer, name: string) => { if (isAshleyHoggFormat(buf as ArrayBuffer)) return parseAshleyHoggFile(buf as ArrayBuffer, name); return null; },
@@ -2108,7 +2118,7 @@ export async function tryRouteFormat(
   // ── ADPCM Mono (ADPCM.* prefix) ───────────────────────────────────────────
   {
     const _adpcmBase = getBasename(filename);
-    if (_adpcmBase.startsWith('adpcm.')) {
+    if (matchesPrefix(_adpcmBase, 'adpcm.')) {
             if (prefs.adpcmMono === 'native') {
         try {
           const { isADPCMmonoFormat, parseADPCMmonoFile } = await import('@lib/import/formats/ADPCMmonoParser');
@@ -2125,7 +2135,7 @@ export async function tryRouteFormat(
   // ── Janne Salmijarvi Optimizer (JS.* prefix) ──────────────────────────────
   {
     const _jsBase = getBasename(filename);
-    if (_jsBase.startsWith('js.')) {
+    if (matchesPrefix(_jsBase, 'js.')) {
       const { isJanneSalmijarviFormat, parseJanneSalmijarviFile } = await import('@lib/import/formats/JanneSalmijarviParser');
       return withNativeThenUADE('janneSalmijarvi', ctx,
         (buf: Uint8Array | ArrayBuffer, name: string) => { if (isJanneSalmijarviFormat(buf as ArrayBuffer)) return parseJanneSalmijarviFile(buf as ArrayBuffer, name); return null; },
@@ -2136,7 +2146,7 @@ export async function tryRouteFormat(
   // ── Jochen Hippel 7V (HIP7.* / S7G.* prefix) ─────────────────────────────
   {
     const _hip7Base = getBasename(filename);
-    if (_hip7Base.startsWith('hip7.') || _hip7Base.startsWith('s7g.')) {
+    if (matchesPrefix(_hip7Base, 'hip7.') || matchesPrefix(_hip7Base, 's7g.')) {
       const { isJochenHippel7VFormat, parseJochenHippel7VFile } = await import('@lib/import/formats/JochenHippel7VParser');
       return withNativeThenUADE('jochenHippel7V', ctx,
         (buf: Uint8Array | ArrayBuffer, name: string) => { if (isJochenHippel7VFormat(buf as ArrayBuffer)) return parseJochenHippel7VFile(buf as ArrayBuffer, name); return null; },
@@ -2144,10 +2154,16 @@ export async function tryRouteFormat(
     }
   }
 
-  // ── Jochen Hippel ST (HST.* prefix) ───────────────────────────────────────
+  // ── Jochen Hippel ST (.sog extension or HST.* prefix) ────────────────────
+  if (/\.sog$/i.test(filename)) {
+    const { isJochenHippelSTFormat, parseJochenHippelSTFile } = await import('@lib/import/formats/JochenHippelSTParser');
+    return withNativeThenUADE('jochenHippelST', ctx,
+      (buf: Uint8Array | ArrayBuffer, name: string) => { if (isJochenHippelSTFormat(buf as ArrayBuffer)) return parseJochenHippelSTFile(buf as ArrayBuffer, name); return null; },
+      'JochenHippelSTParser');
+  }
   {
     const _hstBase = getBasename(filename);
-    if (_hstBase.startsWith('hst.')) {
+    if (matchesPrefix(_hstBase, 'hst.')) {
       const { isJochenHippelSTFormat, parseJochenHippelSTFile } = await import('@lib/import/formats/JochenHippelSTParser');
       return withNativeThenUADE('jochenHippelST', ctx,
         (buf: Uint8Array | ArrayBuffer, name: string) => { if (isJochenHippelSTFormat(buf as ArrayBuffer)) return parseJochenHippelSTFile(buf as ArrayBuffer, name); return null; },
@@ -2159,7 +2175,7 @@ export async function tryRouteFormat(
   {
     const _maxBase = getBasename(filename);
     const _maxExt  = _maxBase.split('.').pop() ?? '';
-    if (_maxBase.startsWith('max.') || _maxExt === 'mxtx') {
+    if (matchesPrefix(_maxBase, 'max.') || _maxExt === 'mxtx') {
       const { isMaximumEffectFormat, parseMaximumEffectFile } = await import('@lib/import/formats/MaximumEffectParser');
       return withNativeThenUADE('maximumEffect', ctx,
         (buf: Uint8Array | ArrayBuffer, name: string) => { if (isMaximumEffectFormat(buf as ArrayBuffer)) return parseMaximumEffectFile(buf as ArrayBuffer, name); return null; },
@@ -2170,7 +2186,7 @@ export async function tryRouteFormat(
   // ── MIDI Loriciel (MIDI.* prefix) ─────────────────────────────────────────
   {
     const _midiBase = getBasename(filename);
-    if (_midiBase.startsWith('midi.')) {
+    if (matchesPrefix(_midiBase, 'midi.')) {
       const { isMIDILoricielFormat, parseMIDILoricielFile } = await import('@lib/import/formats/MIDILoricielParser');
       return withNativeThenUADE('midiLoriciel', ctx,
         (buf: Uint8Array | ArrayBuffer, name: string) => { if (isMIDILoricielFormat(buf as ArrayBuffer)) return parseMIDILoricielFile(buf as ArrayBuffer, name); return null; },
@@ -2181,7 +2197,7 @@ export async function tryRouteFormat(
   // ── onEscapee (ONE.* prefix) ──────────────────────────────────────────────
   {
     const _oneBase = getBasename(filename);
-    if (_oneBase.startsWith('one.')) {
+    if (matchesPrefix(_oneBase, 'one.')) {
       const { isOnEscapeeFormat, parseOnEscapeeFile } = await import('@lib/import/formats/OnEscapeeParser');
       return withNativeThenUADE('onEscapee', ctx,
         (buf: Uint8Array | ArrayBuffer, name: string) => { if (isOnEscapeeFormat(buf as ArrayBuffer)) return parseOnEscapeeFile(buf as ArrayBuffer, name); return null; },
@@ -2192,7 +2208,7 @@ export async function tryRouteFormat(
   // ── Paul Tonge (PAT.* prefix) ─────────────────────────────────────────────
   {
     const _patBase = getBasename(filename);
-    if (_patBase.startsWith('pat.')) {
+    if (matchesPrefix(_patBase, 'pat.')) {
       const { isPaulTongeFormat, parsePaulTongeFile } = await import('@lib/import/formats/PaulTongeParser');
       return withNativeThenUADE('paulTonge', ctx,
         (buf: Uint8Array | ArrayBuffer, name: string) => { if (isPaulTongeFormat(buf as ArrayBuffer)) return parsePaulTongeFile(buf as ArrayBuffer, name); return null; },
@@ -2203,7 +2219,7 @@ export async function tryRouteFormat(
   // ── Rob Hubbard ST (RHO.* prefix) ─────────────────────────────────────────
   {
     const _rhoBase = getBasename(filename);
-    if (_rhoBase.startsWith('rho.')) {
+    if (matchesPrefix(_rhoBase, 'rho.')) {
       const { isRobHubbardSTFormat, parseRobHubbardSTFile } = await import('@lib/import/formats/RobHubbardSTParser');
       return withNativeThenUADE('robHubbardST', ctx,
         (buf: Uint8Array | ArrayBuffer, name: string) => { if (isRobHubbardSTFormat(buf as ArrayBuffer)) return parseRobHubbardSTFile(buf as ArrayBuffer, name); return null; },
@@ -2214,7 +2230,7 @@ export async function tryRouteFormat(
   // ── Rob Hubbard (RH.* prefix) ─────────────────────────────────────────────
   {
     const _rhBase = getBasename(filename);
-    if (_rhBase.startsWith('rh.')) {
+    if (matchesPrefix(_rhBase, 'rh.')) {
             if (prefs.robHubbard === 'native') {
         try {
           const { isRobHubbardFormat, parseRobHubbardFile } = await import('@lib/import/formats/RobHubbardParser');
@@ -2232,7 +2248,7 @@ export async function tryRouteFormat(
   // eagleplayer.conf: AM-Composer  prefixes=amc
   {
     const _amcBase = getBasename(filename);
-    if (_amcBase.startsWith('amc.')) {
+    if (matchesPrefix(_amcBase, 'amc.')) {
       const { parseUADEFile: parseUADE_amc } = await import('@lib/import/formats/UADEParser');
       return parseUADE_amc(buffer, originalFileName, prefs.uade ?? 'enhanced', subsong, preScannedMeta);
     }
@@ -2243,7 +2259,7 @@ export async function tryRouteFormat(
   // (mug.* and mug2.* are already handled above; these cover the dmu.* variants)
   {
     const _dmuBase = getBasename(filename);
-    if (_dmuBase.startsWith('dmu.')) {
+    if (matchesPrefix(_dmuBase, 'dmu.')) {
       const { parseDigitalMugicianFile } = await import('@lib/import/formats/DigitalMugicianParser');
       return withNativeThenUADE('mugician', ctx, (buf: Uint8Array | ArrayBuffer, name: string) => parseDigitalMugicianFile(buf as ArrayBuffer, name), 'DigitalMugicianParser');
     }
@@ -2252,7 +2268,7 @@ export async function tryRouteFormat(
   // ── Mugician II prefix (DMU2.* prefix) ───────────────────────────────────
   {
     const _dmu2Base = getBasename(filename);
-    if (_dmu2Base.startsWith('dmu2.')) {
+    if (matchesPrefix(_dmu2Base, 'dmu2.')) {
       const { parseDigitalMugicianFile } = await import('@lib/import/formats/DigitalMugicianParser');
       return withNativeThenUADE('mugician', ctx, (buf: Uint8Array | ArrayBuffer, name: string) => parseDigitalMugicianFile(buf as ArrayBuffer, name), 'DigitalMugicianParser');
     }
@@ -2263,7 +2279,7 @@ export async function tryRouteFormat(
   // Magic: scan first 256 bytes for Hippel-ST opcode signature.
   {
     const _mdstBase = getBasename(filename);
-    if (_mdstBase.startsWith('mdst.')) {
+    if (matchesPrefix(_mdstBase, 'mdst.')) {
       const { isJochenHippelSTFormat, parseJochenHippelSTFile } = await import('@lib/import/formats/JochenHippelSTParser');
       return withNativeThenUADE('jochenHippelST', ctx,
         (buf: Uint8Array | ArrayBuffer, name: string) => { if (isJochenHippelSTFormat(buf as ArrayBuffer)) return parseJochenHippelSTFile(buf as ArrayBuffer, name); return null; },
@@ -2275,7 +2291,7 @@ export async function tryRouteFormat(
   // Amiga compiled music format ("Special FX" by Special FX). Magic: "SWTD" tag.
   {
     const _dodaBase = getBasename(filename);
-    if (_dodaBase.startsWith('doda.')) {
+    if (matchesPrefix(_dodaBase, 'doda.')) {
       const { isSpecialFXFormat, parseSpecialFXFile } = await import('@lib/import/formats/SpecialFXParser');
       return withNativeThenUADE('specialFX', ctx,
         (buf: Uint8Array | ArrayBuffer, name: string) => { if (isSpecialFXFormat(buf as ArrayBuffer)) return parseSpecialFXFile(buf as ArrayBuffer, name); return null; },
@@ -2288,7 +2304,7 @@ export async function tryRouteFormat(
   // Magic: "OBISYNTHPACK" at byte offset 0.
   {
     const _ospBase = getBasename(filename);
-    if (_ospBase.startsWith('osp.')) {
+    if (matchesPrefix(_ospBase, 'osp.')) {
       if (prefs.synthPack === 'native') {
         try {
           const { isSynthPackFormat, parseSynthPackFile } = await import('@lib/import/formats/SynthPackParser');
@@ -2307,7 +2323,7 @@ export async function tryRouteFormat(
   // Magic: "FREDGRAY" at byte offset 0x24.
   {
     const _grayBase = getBasename(filename);
-    if (_grayBase.startsWith('gray.')) {
+    if (matchesPrefix(_grayBase, 'gray.')) {
       if (prefs.fredGray === 'native') {
         try {
           const { isFredGrayFormat, parseFredGrayFile } = await import('@lib/import/formats/FredGrayParser');
@@ -2325,7 +2341,7 @@ export async function tryRouteFormat(
   // eagleplayer.conf: JasonBrooke  prefixes=jcbo,jcb,jb
   {
     const _jbBase = getBasename(filename);
-    const _mightBeJB = _jbBase.startsWith('jcbo.') || _jbBase.startsWith('jcb.') || _jbBase.startsWith('jb.');
+    const _mightBeJB = matchesPrefix(_jbBase, 'jcbo.') || matchesPrefix(_jbBase, 'jcb.') || matchesPrefix(_jbBase, 'jb.');
     if (_mightBeJB) {
       if (prefs.jasonBrooke === 'native') {
         try {
@@ -2345,7 +2361,7 @@ export async function tryRouteFormat(
   // pt.* is shared with ProTracker MOD; LaxityParser handles disambiguation.
   {
     const _laxBase = getBasename(filename);
-    const _mightBeLaxity = _laxBase.startsWith('powt.') || _laxBase.startsWith('pt.');
+    const _mightBeLaxity = matchesPrefix(_laxBase, 'powt.') || matchesPrefix(_laxBase, 'pt.');
     if (_mightBeLaxity) {
       if (prefs.laxity === 'native') {
         try {
@@ -2364,7 +2380,7 @@ export async function tryRouteFormat(
   // eagleplayer.conf: MusicMaker_4V  prefixes=mm4,sdata
   {
     const _mm4Base = getBasename(filename);
-    const _mightBeMM4 = _mm4Base.startsWith('mm4.') || _mm4Base.startsWith('sdata.');
+    const _mightBeMM4 = matchesPrefix(_mm4Base, 'mm4.') || matchesPrefix(_mm4Base, 'sdata.');
     if (_mightBeMM4) {
       if (prefs.musicMaker4V === 'native') {
         try {
@@ -2383,7 +2399,7 @@ export async function tryRouteFormat(
   // eagleplayer.conf: MusicMaker_8V  prefixes=mm8
   {
     const _mm8Base = getBasename(filename);
-    if (_mm8Base.startsWith('mm8.')) {
+    if (matchesPrefix(_mm8Base, 'mm8.')) {
       if (prefs.musicMaker8V === 'native') {
         try {
           const { isMusicMaker8VFormat, parseMusicMaker8VFile } = await import('@lib/import/formats/MusicMakerParser');
@@ -2402,7 +2418,7 @@ export async function tryRouteFormat(
   // mon_old.* is handled above by the JeroenTel block.
   {
     const _monBase = getBasename(filename);
-    if (_monBase.startsWith('mon.') && !_monBase.startsWith('mon_old.')) {
+    if (matchesPrefix(_monBase, 'mon.') && !matchesPrefix(_monBase, 'mon_old.')) {
       if (prefs.maniacsOfNoise === 'native') {
         try {
           const { isManiacsOfNoiseFormat, parseManiacsOfNoiseFile } = await import('@lib/import/formats/ManiacsOfNoiseParser');
