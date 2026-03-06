@@ -25,10 +25,18 @@
 
 // Synth-specific device headers
 #include "virusLib/device.h"
+#ifndef GM_NO_WALDORF_MQ
 #include "mqLib/device.h"
+#endif
+#ifndef GM_NO_WALDORF_XT
 #include "xtLib/xtDevice.h"
+#endif
+#ifndef GM_NO_NORD
 #include "nord/n2x/n2xLib/n2xdevice.h"
+#endif
+#ifndef GM_NO_JP8000
 #include "ronaldo/je8086/jeLib/device.h"
+#endif
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten/emscripten.h>
@@ -97,18 +105,26 @@ EXPORT int32_t gm_create(const uint8_t* romData, uint32_t romSize, int32_t synth
             params.customData = static_cast<uint32_t>(virusLib::DeviceModel::TI);
             device = std::make_unique<virusLib::Device>(params);
             break;
+#ifndef GM_NO_WALDORF_MQ
         case GM_WALDORF_MQ:
             device = std::make_unique<mqLib::Device>(params);
             break;
+#endif
+#ifndef GM_NO_WALDORF_XT
         case GM_WALDORF_XT:
-            device = std::make_unique<xtLib::Device>(params);
+            device = std::make_unique<xt::Device>(params);
             break;
+#endif
+#ifndef GM_NO_NORD
         case GM_NORD_LEAD_2X:
             device = std::make_unique<n2x::Device>(params);
             break;
+#endif
+#ifndef GM_NO_JP8000
         case GM_ROLAND_JP8K:
             device = std::make_unique<jeLib::Device>(params);
             break;
+#endif
         default:
             return -1;
         }
