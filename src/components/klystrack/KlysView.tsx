@@ -47,10 +47,8 @@ export const KlysView: React.FC<{ width?: number; height?: number }> = ({ width:
     let unsubPos: (() => void) | null = null;
 
     (async () => {
-      console.log('[KlysView] Loading song into WASM engine...');
       const engine = KlysEngine.getInstance();
       await engine.ready();
-      console.log('[KlysView] Engine ready');
 
       if (cancelled) return;
 
@@ -66,7 +64,6 @@ export const KlysView: React.FC<{ width?: number; height?: number }> = ({ width:
 
       // Subscribe to song data BEFORE loading so we catch the response
       unsubData = engine.onSongData((data) => {
-        console.log('[KlysView] Received songData:', data.patterns.length, 'patterns,', data.sequences.length, 'sequences,', data.instruments.length, 'instruments');
         if (cancelled) return;
         const current = useFormatStore.getState().klysNative;
         if (!current) return;
@@ -85,12 +82,10 @@ export const KlysView: React.FC<{ width?: number; height?: number }> = ({ width:
             instruments,
           },
         });
-        console.log('[KlysView] Store updated with WASM data');
       });
 
       try {
-        const info = await engine.loadSong(klysFileData.slice(0));
-        console.log('[KlysView] Song loaded:', info.title, info.numPatterns, 'patterns,', info.channels, 'channels');
+        await engine.loadSong(klysFileData.slice(0));
       } catch (err) {
         console.error('[KlysView] Failed to load song into WASM:', err);
       }

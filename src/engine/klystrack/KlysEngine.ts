@@ -112,18 +112,14 @@ export class KlysEngine {
 
     const initPromise = (async () => {
       const baseUrl = import.meta.env.BASE_URL || '/';
-      console.log('[KlysEngine] ensureInitialized: loading worklet module...');
 
       try {
         await context.audioWorklet.addModule(`${baseUrl}klystrack/Klystrack.worklet.js`);
-        console.log('[KlysEngine] Worklet module added successfully');
-      } catch (e) {
-        console.warn('[KlysEngine] addModule warning:', e);
+      } catch {
         // Module might already be registered
       }
 
       if (!this.wasmBinary || !this.jsCode) {
-        console.log('[KlysEngine] Fetching WASM binary and JS code...');
         const [wasmResponse, jsResponse] = await Promise.all([
           fetch(`${baseUrl}klystrack/Klystrack.wasm`),
           fetch(`${baseUrl}klystrack/Klystrack.js`),
@@ -131,9 +127,6 @@ export class KlysEngine {
 
         if (wasmResponse.ok) {
           this.wasmBinary = await wasmResponse.arrayBuffer();
-          console.log('[KlysEngine] WASM binary:', this.wasmBinary.byteLength, 'bytes');
-        } else {
-          console.error('[KlysEngine] WASM fetch failed:', wasmResponse.status);
         }
         if (jsResponse.ok) {
           let code = await jsResponse.text();
@@ -147,9 +140,6 @@ export class KlysEngine {
             code += '\n// Factory is already named createKlystrack via EXPORT_NAME';
           }
           this.jsCode = code;
-          console.log('[KlysEngine] JS code patched:', code.length, 'chars');
-        } else {
-          console.error('[KlysEngine] JS fetch failed:', jsResponse.status);
         }
       }
 
@@ -162,19 +152,16 @@ export class KlysEngine {
 
   private createNode(): void {
     const ctx = this.audioContext;
-    console.log('[KlysEngine] Creating AudioWorkletNode...');
 
     this.workletNode = new AudioWorkletNode(ctx, 'klystrack-processor', {
       outputChannelCount: [2],
       numberOfOutputs: 1,
     });
-    console.log('[KlysEngine] AudioWorkletNode created, sending init message...');
 
     this.workletNode.port.onmessage = (event) => {
       const data = event.data;
       switch (data.type) {
         case 'ready':
-          console.log('[KlysEngine] WASM ready');
           if (this._resolveInit) {
             this._resolveInit();
             this._resolveInit = null;
