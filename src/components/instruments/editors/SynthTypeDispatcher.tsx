@@ -17,6 +17,7 @@ import {
   DEFAULT_OCTAMED, DEFAULT_SIDMON1, DEFAULT_HIPPEL_COSO, DEFAULT_ROB_HUBBARD, DEFAULT_DAVID_WHITTAKER,
   DEFAULT_SONIC_ARRANGER,
   DEFAULT_SUPERCOLLIDER,
+  DEFAULT_WOBBLE_BASS,
 } from '@typedefs/instrument';
 import { deepMerge } from '../../../lib/migration';
 import { EditorHeader, type VizMode } from '../shared/EditorHeader';
@@ -95,6 +96,8 @@ const SonicArrangerControls = lazy(() =>
   import('../controls/SonicArrangerControls').then(m => ({ default: m.SonicArrangerControls }))
 );
 const SuperColliderEditor = lazy(() => import('../SuperColliderEditor').then(m => ({ default: m.SuperColliderEditor })));
+const GearmulatorEditor = lazy(() => import('../GearmulatorEditor').then(m => ({ default: m.GearmulatorEditor })));
+const WobbleBassControls = lazy(() => import('../controls/WobbleBassControls').then(m => ({ default: m.WobbleBassControls })));
 
 // Lazy-loaded hardware UI components
 const HivelyHardware = lazy(() => import('../hardware/HivelyHardware').then(m => ({ default: m.HivelyHardware })));
@@ -115,7 +118,7 @@ const WavetableListEditor = lazy(() => import('./WavetableEditor').then(m => ({ 
 
 
 // Types
-export type EditorMode = 'generic' | 'tb303' | 'furnace' | 'buzzmachine' | 'sample' | 'dubsiren' | 'spacelaser' | 'v2' | 'sam' | 'synare' | 'mame' | 'mamechip' | 'dexed' | 'obxd' | 'wam' | 'tonewheelOrgan' | 'melodica' | 'vital' | 'odin2' | 'surge' | 'vstbridge' | 'harmonicsynth' | 'modular' | 'hively' | 'jamcracker' | 'soundmon' | 'sidmon' | 'digmug' | 'fc' | 'deltamusic1' | 'deltamusic2' | 'fred' | 'tfmx' | 'octamed' | 'sidmon1' | 'hippelcoso' | 'robhubbard' | 'davidwhittaker' | 'sonic-arranger' | 'musicline' | 'supercollider';
+export type EditorMode = 'generic' | 'tb303' | 'furnace' | 'buzzmachine' | 'sample' | 'dubsiren' | 'spacelaser' | 'v2' | 'sam' | 'synare' | 'mame' | 'mamechip' | 'dexed' | 'obxd' | 'wam' | 'tonewheelOrgan' | 'melodica' | 'vital' | 'odin2' | 'surge' | 'vstbridge' | 'harmonicsynth' | 'modular' | 'hively' | 'jamcracker' | 'soundmon' | 'sidmon' | 'digmug' | 'fc' | 'deltamusic1' | 'deltamusic2' | 'fred' | 'tfmx' | 'octamed' | 'sidmon1' | 'hippelcoso' | 'robhubbard' | 'davidwhittaker' | 'sonic-arranger' | 'musicline' | 'supercollider' | 'gearmulator' | 'wobblebass';
 
 export interface SynthTypeDispatcherProps {
   editorMode: EditorMode;
@@ -1180,6 +1183,62 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
             <SuperColliderEditor
               config={scConfig}
               onChange={(sc) => handleChange({ superCollider: sc })}
+            />
+          </Suspense>
+        </div>
+      </div>
+    );
+  }
+
+  // ============================================================================
+  // GEARMULATOR EDITOR
+  // ============================================================================
+  if (editorMode === 'gearmulator') {
+    const gmSynthTypeMap: Record<string, number> = {
+      GearmulatorVirus: 0, GearmulatorVirusTI: 1, GearmulatorMicroQ: 2,
+      GearmulatorXT: 3, GearmulatorNord: 4, GearmulatorJP8000: 5,
+    };
+    const gmConfig = instrument.gearmulator ?? {
+      synthType: gmSynthTypeMap[instrument.synthType] ?? 0,
+    };
+    return (
+      <div className="synth-editor-container bg-gradient-to-b from-[#1a1a2e] to-[#0a0a1a]">
+        <EditorHeader
+          instrument={instrument}
+          onChange={handleChange}
+          vizMode={vizMode}
+          onVizModeChange={setVizMode}
+        />
+        <div className="flex-1 min-h-0 overflow-hidden">
+          <Suspense fallback={<LoadingControls />}>
+            <GearmulatorEditor
+              config={gmConfig}
+              onChange={(gm) => handleChange({ gearmulator: gm })}
+            />
+          </Suspense>
+        </div>
+      </div>
+    );
+  }
+
+  // ============================================================================
+  // WOBBLE BASS EDITOR
+  // ============================================================================
+  if (editorMode === 'wobblebass') {
+    const wbConfig = instrument.wobbleBass ?? DEFAULT_WOBBLE_BASS;
+    return (
+      <div className="synth-editor-container bg-gradient-to-b from-[#1a1a2e] to-[#0a0a1a]">
+        <EditorHeader
+          instrument={instrument}
+          onChange={handleChange}
+          vizMode={vizMode}
+          onVizModeChange={setVizMode}
+        />
+        <div className="flex-1 min-h-0 overflow-y-auto">
+          <Suspense fallback={<LoadingControls />}>
+            <WobbleBassControls
+              config={wbConfig}
+              onChange={(wb) => handleChange({ wobbleBass: wb })}
             />
           </Suspense>
         </div>

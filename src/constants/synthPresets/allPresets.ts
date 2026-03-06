@@ -11,6 +11,15 @@ import { FORMANT_SYNTH_PRESETS } from './formantSynth';
 import { DUB_SIREN_PRESETS } from './dubSiren';
 import { SPACE_LASER_PRESETS } from './spaceLaser';
 import { POLYSYNTH_PRESETS } from './polySynth';
+import { MONO_SYNTH_PRESETS } from './monoSynth';
+import { FM_SYNTH_PRESETS } from './fmSynth';
+import { AM_SYNTH_PRESETS } from './amSynth';
+import { WOBBLE_BASS_PRESETS } from './wobbleBass';
+import { HARMONIC_SYNTH_PRESETS } from './harmonicSynth';
+import { SYNARE_PRESETS } from './synare';
+import { V2_PRESETS } from './v2';
+import { WAVETABLE_PRESETS } from './wavetable';
+import { GEARMULATOR_PRESETS } from './gearmulator';
 
 export function getPresetsForSynthType(synthType: SynthType): SynthPreset[] {
   switch (synthType) {
@@ -36,6 +45,29 @@ export function getPresetsForSynthType(synthType: SynthType): SynthPreset[] {
       return DUB_SIREN_PRESETS;
     case 'SpaceLaser':
       return SPACE_LASER_PRESETS;
+    case 'MonoSynth':
+      return MONO_SYNTH_PRESETS;
+    case 'FMSynth':
+      return FM_SYNTH_PRESETS;
+    case 'AMSynth':
+      return AM_SYNTH_PRESETS;
+    case 'WobbleBass':
+      return WOBBLE_BASS_PRESETS;
+    case 'HarmonicSynth':
+      return HARMONIC_SYNTH_PRESETS;
+    case 'Synare':
+      return SYNARE_PRESETS;
+    case 'V2':
+      return V2_PRESETS;
+    case 'Wavetable':
+      return WAVETABLE_PRESETS;
+    case 'GearmulatorVirus':
+    case 'GearmulatorVirusTI':
+    case 'GearmulatorMicroQ':
+    case 'GearmulatorXT':
+    case 'GearmulatorNord':
+    case 'GearmulatorJP8000':
+      return GEARMULATOR_PRESETS;
     default:
       return [];
   }
@@ -53,4 +85,18 @@ export const ALL_PRESETS: Record<string, SynthPreset[]> = {
   PolySynth: POLYSYNTH_PRESETS,
   DubSiren: DUB_SIREN_PRESETS,
   SpaceLaser: SPACE_LASER_PRESETS,
+  MonoSynth: MONO_SYNTH_PRESETS,
+  FMSynth: FM_SYNTH_PRESETS,
+  AMSynth: AM_SYNTH_PRESETS,
+  WobbleBass: WOBBLE_BASS_PRESETS,
+  HarmonicSynth: HARMONIC_SYNTH_PRESETS,
+  Synare: SYNARE_PRESETS,
+  V2: V2_PRESETS,
+  Wavetable: WAVETABLE_PRESETS,
+  GearmulatorVirus: GEARMULATOR_PRESETS,
+  GearmulatorVirusTI: GEARMULATOR_PRESETS,
+  GearmulatorMicroQ: GEARMULATOR_PRESETS,
+  GearmulatorXT: GEARMULATOR_PRESETS,
+  GearmulatorNord: GEARMULATOR_PRESETS,
+  GearmulatorJP8000: GEARMULATOR_PRESETS,
 };

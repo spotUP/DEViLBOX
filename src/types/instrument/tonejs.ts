@@ -85,6 +85,20 @@ export interface SCParam {
   max: number;
 }
 
+/** Gearmulator DSP56300 VA synth config */
+export interface GearmulatorConfig {
+  /** Synth device type: 0=Virus A/B/C, 1=Virus TI, 2=Waldorf microQ, 3=Waldorf XT, 4=Nord Lead 2x, 5=Roland JP-8000 */
+  synthType: number;
+  /** ROM data key in IndexedDB (user-provided firmware ROM) */
+  romKey?: string;
+  /** Current preset/bank state as base64 (from gm_getState) */
+  stateBase64?: string;
+  /** DSP clock percentage (100 = full speed, lower = reduced CPU) */
+  clockPercent?: number;
+  /** MIDI channel (0-15) */
+  channel?: number;
+}
+
 export interface SuperColliderConfig {
   synthDefName: string;   // Name declared in SynthDef(\name, ...)
   source: string;         // SC source code (for display/editing)
