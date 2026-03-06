@@ -10,6 +10,7 @@
 import type { InstrumentConfig } from '@/types/instrument';
 import type { Pattern } from '@/types';
 import { useTrackerStore } from '@/stores/useTrackerStore';
+import { useFormatStore } from '@/stores/useFormatStore';
 import { useInstrumentStore } from '@/stores/useInstrumentStore';
 import { useTransportStore } from '@/stores/useTransportStore';
 import { useProjectStore } from '@/stores/useProjectStore';
@@ -171,7 +172,8 @@ async function loadSongFile(file: File, options: FileLoadOptions): Promise<FileL
   // Loading an external song — prevent auto-save from overwriting user's saved project
   clearExplicitlySaved();
 
-  const { loadPatterns, setPatternOrder, setCurrentPattern, applyEditorMode } = useTrackerStore.getState();
+  const { loadPatterns, setPatternOrder, setCurrentPattern } = useTrackerStore.getState();
+  const { applyEditorMode } = useFormatStore.getState();
   const { loadInstruments, addInstrument, reset: resetInstruments } = useInstrumentStore.getState();
   const { setBPM, setSpeed, setGrooveTemplate, reset: resetTransport, isPlaying, stop: stopTransport } = useTransportStore.getState();
   const { setMetadata } = useProjectStore.getState();

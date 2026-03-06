@@ -5,6 +5,7 @@
 
 export { useSamplePackStore, useAllSamplePacks } from './useSamplePackStore';
 export { useTrackerStore } from './useTrackerStore';
+export { useFormatStore } from './useFormatStore';
 export { useEditorStore } from './useEditorStore';
 export { useCursorStore } from './useCursorStore';
 export { useTransportStore } from './useTransportStore';

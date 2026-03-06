@@ -31,6 +31,7 @@ import {
   useAutomationStore,
   useAudioStore,
   notify,
+  useFormatStore,
 } from '@stores';
 import { useUIStore } from '@stores/useUIStore';
 import { useArrangementStore } from '@stores/useArrangementStore';
@@ -127,7 +128,8 @@ export const PixiExportDialog: React.FC<PixiExportDialogProps> = ({ isOpen, onCl
   const theme = usePixiTheme();
 
   // ── Store hooks ────────────────────────────────────────────────────────────
-  const { patterns, currentPatternIndex, originalModuleData, importPattern, setCurrentPattern, loadPatterns } = useTrackerStore();
+  const { patterns, currentPatternIndex, importPattern, setCurrentPattern, loadPatterns } = useTrackerStore();
+  const { originalModuleData } = useFormatStore();
   const { instruments, currentInstrumentId, addInstrument, setCurrentInstrument, loadInstruments } = useInstrumentStore();
   const { metadata, setMetadata } = useProjectStore();
   const { bpm, setBPM, isPlaying, stop, currentRow } = useTransportStore();

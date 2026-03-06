@@ -12,7 +12,7 @@
  */
 
 import React, { useRef, useEffect, useState, useCallback } from 'react';
-import { useTrackerStore } from '@stores';
+import { useTrackerStore , useFormatStore } from '@stores';
 import { useTransportStore } from '@stores/useTransportStore';
 import { getTrackerReplayer } from '@engine/TrackerReplayer';
 import { exportAsHively } from '@lib/export/HivelyExporter';
@@ -23,7 +23,7 @@ const TOOLBAR_H = 36;
 const POSITION_H = 160;
 
 export const HivelyView: React.FC<{ width?: number; height?: number }> = ({ width: propW, height: propH }) => {
-  const nativeData = useTrackerStore(s => s.hivelyNative);
+  const nativeData = useFormatStore(s => s.hivelyNative);
   const currentPositionIndex = useTrackerStore(s => s.currentPositionIndex);
   const setCurrentPosition = useTrackerStore(s => s.setCurrentPosition);
   const isPlaying = useTransportStore(s => s.isPlaying);

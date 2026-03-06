@@ -39,7 +39,7 @@ import { PixiPianoRollView } from './PixiPianoRollView';
 import { PixiGTUltraView } from './gtultra/PixiGTUltraView';
 import { useTrackerInput } from '@/hooks/tracker/useTrackerInput';
 import { useBlockOperations } from '@/hooks/tracker/BlockOperations';
-import { useTrackerStore, useUIStore, useInstrumentStore } from '@stores';
+import { useTrackerStore, useUIStore, useInstrumentStore , useFormatStore } from '@stores';
 import { useWorkbenchStore } from '@stores/useWorkbenchStore';
 import { useMIDIStore } from '@stores/useMIDIStore';
 import { useTransportStore } from '@stores/useTransportStore';
@@ -66,7 +66,7 @@ export const PixiTrackerView: React.FC = () => {
   const setGridChannelIndex = useUIStore(s => s.setGridChannelIndex);
   const modalOpen = useUIStore(s => s.modalOpen);
   const closeModal = useUIStore(s => s.closeModal);
-  const editorMode = useTrackerStore(s => s.editorMode);
+  const editorMode = useFormatStore(s => s.editorMode);
   const showMacroSlots = useUIStore(s => s.showMacroSlots);
   const showKnobBar = useMIDIStore(s => s.showKnobBar);
   const showInstrumentPanel = useUIStore(s => s.showInstrumentPanel);
@@ -137,6 +137,7 @@ export const PixiTrackerView: React.FC = () => {
   // MusicLine export handler
   const handleExportML = useCallback(() => {
     const s = useTrackerStore.getState();
+    const f = useFormatStore.getState();
     const t = useTransportStore.getState();
     const song: TrackerSong = {
       name: useProjectStore.getState().metadata.name || 'MusicLine Song',
@@ -149,9 +150,9 @@ export const PixiTrackerView: React.FC = () => {
       numChannels: s.patterns[0]?.channels.length ?? 4,
       initialSpeed: t.speed,
       initialBPM: t.bpm,
-      channelTrackTables: s.channelTrackTables ?? undefined,
-      channelSpeeds: s.channelSpeeds ?? undefined,
-      channelGrooves: s.channelGrooves ?? undefined,
+      channelTrackTables: f.channelTrackTables ?? undefined,
+      channelSpeeds: f.channelSpeeds ?? undefined,
+      channelGrooves: f.channelGrooves ?? undefined,
     };
     const data = exportMusicLineFile(song);
     const blob = new Blob([data.buffer as ArrayBuffer], { type: 'application/octet-stream' });

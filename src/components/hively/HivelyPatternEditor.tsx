@@ -10,7 +10,7 @@
 
 import React, { useRef, useEffect, useCallback, useMemo, useState } from 'react';
 import { useTransportStore } from '@stores/useTransportStore';
-import { useTrackerStore } from '@stores';
+import { useFormatStore } from '@stores';
 import { useEditorStore } from '@stores/useEditorStore';
 import { HivelyEngine } from '@/engine/hively/HivelyEngine';
 import type { HivelyNativeData } from '@/types/tracker';
@@ -274,7 +274,7 @@ export const HivelyPatternEditor: React.FC<HivelyPatternEditorProps> = ({
     }
 
     // Force store re-render
-    useTrackerStore.setState((s) => {
+    useFormatStore.setState((s) => {
       if (s.hivelyNative) {
         s.hivelyNative = { ...s.hivelyNative };
       }

@@ -5,14 +5,14 @@
  */
 
 import React, { useCallback, useState } from 'react';
-import { useTrackerStore } from '@stores';
+import { useFormatStore } from '@stores';
 import { useShallow } from 'zustand/react/shallow';
 import { Cpu, Info } from 'lucide-react';
 import { notify } from '@stores/useNotificationStore';
 import { SIDInfoModal } from '@components/dialogs/SIDInfoModal';
 
 export const SIDSubsongSelector: React.FC = React.memo(() => {
-  const { sidMetadata, setSidMetadata } = useTrackerStore(
+  const { sidMetadata, setSidMetadata } = useFormatStore(
     useShallow((state) => ({
       sidMetadata: state.sidMetadata,
       setSidMetadata: state.setSidMetadata,

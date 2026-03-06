@@ -4,13 +4,13 @@
  */
 
 import React, { useState } from 'react';
-import { useTrackerStore } from '@stores';
+import { useTrackerStore , useFormatStore } from '@stores';
 import { Info } from 'lucide-react';
 import { ModuleInfoModal } from '@components/dialogs/ModuleInfoModal';
 
 export const ModuleInfoButton: React.FC = React.memo(() => {
-  const sidMetadata = useTrackerStore((s) => s.sidMetadata);
-  const songDBInfo = useTrackerStore((s) => s.songDBInfo);
+  const sidMetadata = useFormatStore((s) => s.sidMetadata);
+  const songDBInfo = useFormatStore((s) => s.songDBInfo);
   const patterns = useTrackerStore((s) => s.patterns);
   const [showInfo, setShowInfo] = useState(false);
 
