@@ -62,3 +62,17 @@ export type OnCellChange = (
   columnKey: string,
   value: number
 ) => void;
+
+/**
+ * Per-channel playback row tracking.
+ *
+ * Some formats (e.g. MusicLine) play channels at independent speeds,
+ * so each channel may be at a different row during playback.
+ *
+ * - `number[]` — per-channel rows (index = channel index)
+ * - `number`   — single row applied to all channels (backward compat)
+ *
+ * When `FormatPatternEditor` receives a `number[]`, it highlights
+ * each channel's current row independently during playback.
+ */
+export type CurrentRowSpec = number | number[];
