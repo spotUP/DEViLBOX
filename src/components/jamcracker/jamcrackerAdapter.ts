@@ -17,10 +17,6 @@ function hex2(val: number): string {
   return val ? val.toString(16).toUpperCase().padStart(2, '0') : '--';
 }
 
-function hex1(val: number): string {
-  return val ? val.toString(16).toUpperCase() : '-';
-}
-
 // Column definitions for JamCracker
 // Main columns: Period | Instr | Speed | Arpeggio | Vibrato | Volume | Porta
 // (Phase is typically internal, Porta is portamento/slide)

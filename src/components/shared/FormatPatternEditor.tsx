@@ -6,7 +6,7 @@
  */
 
 import React, { useRef, useEffect, useCallback, useMemo, useState } from 'react';
-import type { ColumnDef, FormatCell, FormatChannel, OnCellChange } from './format-editor-types';
+import type { ColumnDef, FormatChannel, OnCellChange } from './format-editor-types';
 
 const CHAR_W = 8;
 const CHAR_H = 14;

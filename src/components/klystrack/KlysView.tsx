@@ -22,7 +22,6 @@ import { KlysEngine } from '@/engine/klystrack/KlysEngine';
 import { getTrackerReplayer } from '@engine/TrackerReplayer';
 import { exportAsKlystrack } from '@lib/export/KlysExporter';
 
-const TOOLBAR_H = 36;
 const POSITION_H = 160;
 
 export const KlysView: React.FC<{ width?: number; height?: number }> = ({ width: propW, height: propH }) => {

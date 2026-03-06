@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-03-06T13:01:02.610Z
+ * Generated: 2026-03-06T15:45:56.157Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.2473';
-export const BUILD_NUMBER = '2473';
-export const BUILD_HASH = '57bec63c5';
+export const BUILD_VERSION = '1.0.2485';
+export const BUILD_NUMBER = '2485';
+export const BUILD_HASH = '333ca8908';
 export const BUILD_DATE = '2026-03-06';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,57 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.2473',
+    version: '1.0.2485',
     date: '2026-03-06',
     changes: [
+      {
+        type: 'improvement',
+        "description": "Remove unused GTPatternEditor export"
+      },
+      {
+        type: 'improvement',
+        "description": "Replace GTPatternEditor with FormatPatternEditor in GTUltraView"
+      },
+      {
+        type: 'improvement',
+        "description": "JamCrackerView to use FormatPatternEditor"
+      },
+      {
+        type: 'fix',
+        "description": "Ensure microcontroller init commands execute for snapshot-loaded devices"
+      },
+      {
+        type: 'improvement',
+        "description": "Build: create WASM modules for pretracker, ma, and hippel replayers"
+      },
+      {
+        type: 'feature',
+        "description": "Rebuild Gearmulator WASM with ESAI audio fix and snapshot loading"
+      },
+      {
+        type: 'improvement',
+        "description": "Add klystrack adapter reference pattern"
+      },
+      {
+        type: 'feature',
+        "description": "Add format adapters for Hively, GT Ultra, and JamCracker"
+      },
+      {
+        type: 'improvement',
+        "description": "Implement format-agnostic pattern editor"
+      },
+      {
+        type: 'improvement',
+        "description": "Comprehensive completion summary for all format integration phases"
+      },
+      {
+        type: 'improvement',
+        "description": "Add klystrack pattern data debug guide and test helper"
+      },
+      {
+        type: 'fix',
+        "description": "Debug: add comprehensive logging to klystrack pattern data extraction"
+      },
       {
         type: 'improvement',
         "description": "Chore: clean up diagnostic logging from klystrack engine"
@@ -184,60 +232,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'feature',
         "description": "Add DOM Hively/AHX pattern editor and wire into TrackerView"
-      },
-      {
-        type: 'fix',
-        "description": "Use replayer row for rendering to eliminate note blinking"
-      },
-      {
-        type: 'fix',
-        "description": "Always smooth-scroll in VJ view regardless of preference"
-      },
-      {
-        type: 'fix',
-        "description": "Fix GT Ultra pattern editor showing REST bytes as notes"
-      },
-      {
-        type: 'fix',
-        "description": "Dampen 3D tilt during smooth scroll to prevent parallax"
-      },
-      {
-        type: 'fix',
-        "description": "Draw highlight bar at fixed position, scroll data underneath"
-      },
-      {
-        type: 'fix',
-        "description": "Replace broken scroll with replayer-based interpolation"
-      },
-      {
-        type: 'fix',
-        "description": "Fix GT Ultra WASM bridge: mismatched cwrap arg counts causing wrong data"
-      },
-      {
-        type: 'fix',
-        "description": "Remove await in sync createInstrument for Gearmulator case"
-      },
-      {
-        type: 'improvement',
-        "description": "Route C64 .sid files to GT Ultra view instead of classic editor"
-      },
-      {
-        type: 'fix',
-        "description": "Fix GT Ultra pattern data not displaying in both DOM and WebGL views"
-      }
-    ]
-  },
-  {
-    version: '2026-03-05',
-    date: '2026-03-05',
-    changes: [
-      {
-        type: 'improvement',
-        "description": "Polish WebGL GT Ultra: FT2 neutral palette, toolbar controls, pattern headers, order list enhancements, table annotations"
-      },
-      {
-        type: 'feature',
-        "description": "Phase 5 — Preview generation with LUFS normalization"
       }
     ]
   }

@@ -14,9 +14,8 @@
 import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react';
 import { useTrackerStore , useFormatStore } from '@stores';
 import { useTransportStore } from '@stores/useTransportStore';
-import { useEditorStore } from '@stores/useEditorStore';
 import { FormatPatternEditor } from '@/components/shared/FormatPatternEditor';
-import { jamcrackerToFormatChannels, JAMCRACKER_COLUMNS } from './jamcrackerAdapter';
+import { JAMCRACKER_COLUMNS } from './jamcrackerAdapter';
 import { JamCrackerEngine } from '@engine/jamcracker/JamCrackerEngine';
 
 const TOOLBAR_H = 36;
@@ -80,13 +79,7 @@ export const JamCrackerView: React.FC = () => {
     engine.getPatternData(patIdx).then(setPatternData);
   }, [songInfo, activePos]);
 
-  // Auto-scroll pattern to current row
-  useEffect(() => {
-    if (!scrollRef.current || !isPlaying) return;
-    const el = scrollRef.current;
-    const targetScrollTop = currentRow * ROW_H - el.clientHeight / 2 + ROW_H / 2;
-    el.scrollTop = Math.max(0, targetScrollTop);
-  }, [currentRow, isPlaying]);
+  // FormatPatternEditor handles its own scrolling during playback
 
   // Measure container size
   useEffect(() => {
