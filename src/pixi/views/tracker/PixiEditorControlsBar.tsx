@@ -11,7 +11,7 @@
 
 import { useCallback, useMemo } from 'react';
 import type { Graphics as GraphicsType } from 'pixi.js';
-import { useTrackerStore, useTransportStore, useAudioStore, useUIStore } from '@stores';
+import { useTrackerStore, useTransportStore, useAudioStore, useUIStore, useEditorStore } from '@stores';
 import { useShallow } from 'zustand/react/shallow';
 import { useFPSMonitor } from '@/hooks/useFPSMonitor';
 import { SYSTEM_PRESETS, getGroupedPresets } from '@/constants/systemPresets';
@@ -322,12 +322,13 @@ export const PixiEditorControlsBar: React.FC<PixiEditorControlsBarProps> = ({
   const {
     recordMode,
     showGhostPatterns,
-    channelCount,
-  } = useTrackerStore(useShallow(s => ({
+  } = useEditorStore(useShallow(s => ({
     recordMode: s.recordMode,
     showGhostPatterns: s.showGhostPatterns,
-    channelCount: s.patterns[s.currentPatternIndex]?.channels?.length || 4,
   })));
+  const channelCount = useTrackerStore(useShallow(s =>
+    s.patterns[s.currentPatternIndex]?.channels?.length || 4
+  ));
 
   // ── Transport store ───────────────────────────────────────────────────────
   const {
@@ -372,11 +373,11 @@ export const PixiEditorControlsBar: React.FC<PixiEditorControlsBarProps> = ({
   }, [onGridChannelChange]);
 
   const handleToggleRecord = useCallback(() => {
-    useTrackerStore.getState().toggleRecordMode();
+    useEditorStore.getState().toggleRecordMode();
   }, []);
 
   const handleToggleGhosts = useCallback(() => {
-    const s = useTrackerStore.getState();
+    const s = useEditorStore.getState();
     s.setShowGhostPatterns(!s.showGhostPatterns);
   }, []);
 

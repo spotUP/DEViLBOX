@@ -32,11 +32,11 @@ import { usePianoRollData } from '../../hooks/pianoroll/usePianoRollData';
 import { useTransportStore } from '../../stores';
 import { useHistoryStore } from '../../stores/useHistoryStore';
 import { useTrackerStore } from '../../stores';
+import { useEditorStore } from '../../stores/useEditorStore';
 import { useInstrumentStore } from '../../stores';
 import { getToneEngine } from '../../engine/ToneEngine';
 import type { Pattern } from '../../types/tracker';
-import type { PianoRollNote } from '../../types/pianoRoll';
-import { NOTE_LENGTH_PRESETS, getNoteNameFromMidi } from '../../types/pianoRoll';
+import type { PianoRollNote } from '../../types/pianoRoll';import { NOTE_LENGTH_PRESETS, getNoteNameFromMidi } from '../../types/pianoRoll';
 import { SCALES, getScaleNotes } from '../../lib/scales';
 import { AcidPatternGeneratorDialog } from '@components/dialogs/AcidPatternGeneratorDialog';
 import {
@@ -909,7 +909,7 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ channelIndex }) => {
         const noteOffset = QWERTY_NOTE_MAP[keyLower];
         if (noteOffset !== undefined) {
           e.preventDefault();
-          const currentOctave = useTrackerStore.getState().currentOctave || 4;
+          const currentOctave = useEditorStore.getState().currentOctave || 4;
           const midiNote = snapToScale((currentOctave * 12) + noteOffset);
           const row = Math.floor(view.scrollX);
           const duration = getEffectiveNoteLength();

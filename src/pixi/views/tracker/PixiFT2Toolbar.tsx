@@ -27,7 +27,7 @@ import { PixiButton, PixiNumericInput } from '../../components';
 import { PixiPureTextInput } from '../../input/PixiPureTextInput';
 import { PixiFXSearchReplace } from '../../components/PixiFXSearchReplace';
 import { PixiVisualizer } from './PixiVisualizer';
-import { useTransportStore, useTrackerStore, useUIStore, useInstrumentStore, useProjectStore, useAudioStore, useAutomationStore } from '@stores';
+import { useTransportStore, useTrackerStore, useUIStore, useInstrumentStore, useProjectStore, useAudioStore, useAutomationStore, useEditorStore } from '@stores';
 import { exportSong } from '@lib/export/exporters';
 import { useShallow } from 'zustand/react/shallow';
 import { useTapTempo } from '@hooks/useTapTempo';
@@ -120,11 +120,8 @@ export const PixiFT2Toolbar: React.FC = () => {
     currentPatternIndex, setCurrentPattern,
     patternOrder, setPatternOrder,
     currentPositionIndex, setCurrentPosition,
-    editStep, setEditStep,
-    currentOctave, setCurrentOctave,
     duplicatePosition, removeFromOrder,
     resizePattern, updatePatternName,
-    toggleRecordMode, recordMode,
   } = useTrackerStore(useShallow(s => ({
     patterns: s.patterns,
     currentPatternIndex: s.currentPatternIndex,
@@ -133,17 +130,18 @@ export const PixiFT2Toolbar: React.FC = () => {
     setPatternOrder: s.setPatternOrder,
     currentPositionIndex: s.currentPositionIndex,
     setCurrentPosition: s.setCurrentPosition,
-    editStep: s.editStep,
-    setEditStep: s.setEditStep,
-    currentOctave: s.currentOctave,
-    setCurrentOctave: s.setCurrentOctave,
     duplicatePosition: s.duplicatePosition,
     removeFromOrder: s.removeFromOrder,
     resizePattern: s.resizePattern,
     updatePatternName: s.updatePatternName,
-    toggleRecordMode: s.toggleRecordMode,
-    recordMode: s.recordMode,
   })));
+
+  const editStep = useEditorStore(s => s.editStep);
+  const setEditStep = useEditorStore(s => s.setEditStep);
+  const currentOctave = useEditorStore(s => s.currentOctave);
+  const setCurrentOctave = useEditorStore(s => s.setCurrentOctave);
+  const toggleRecordMode = useEditorStore(s => s.toggleRecordMode);
+  const recordMode = useEditorStore(s => s.recordMode);
 
 
 

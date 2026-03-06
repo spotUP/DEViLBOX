@@ -134,6 +134,7 @@ import {
 } from '@engine/keyboard/commands/trackerScratch';
 
 import { useTrackerStore } from '@stores/useTrackerStore';
+import { useEditorStore } from '@stores/useEditorStore';
 import { useCursorStore } from '@stores/useCursorStore';
 import { useUIStore } from '@stores/useUIStore';
 import { getToneEngine } from '@engine/ToneEngine';
@@ -663,7 +664,7 @@ function initializeRegistry() {
 
     // === MULTI-CHANNEL MODE ===
     { name: 'toggle_multichannel_mode', contexts: ['global'], handler: () => {
-      const { multiChannelRecord, toggleMultiChannelRecord } = useTrackerStore.getState();
+      const { multiChannelRecord, toggleMultiChannelRecord } = useEditorStore.getState();
       toggleMultiChannelRecord();
       useUIStore.getState().setStatusMessage(`Multi-channel: ${!multiChannelRecord ? 'ON' : 'OFF'}`, false, 1000);
       return true;

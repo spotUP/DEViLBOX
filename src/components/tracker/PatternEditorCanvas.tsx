@@ -6,7 +6,7 @@
  */
 
 import React, { useRef, useEffect, useCallback, useState, useMemo } from 'react';
-import { useTrackerStore, useCursorStore, useTransportStore, useThemeStore, useInstrumentStore } from '@stores';
+import { useTrackerStore, useCursorStore, useTransportStore, useThemeStore, useInstrumentStore, useEditorStore } from '@stores';
 import { AutomationLanes } from './AutomationLanes';
 import { MacroLanes } from './MacroLanes';
 import { useUIStore } from '@stores/useUIStore';
@@ -130,8 +130,6 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     copyTrack,
     cutTrack,
     pasteTrack,
-    showGhostPatterns,
-    columnVisibility
   } = useTrackerStore(useShallow((state) => ({
     pattern: state.patterns[state.currentPatternIndex],
     patterns: state.patterns,
@@ -146,9 +144,10 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     copyTrack: state.copyTrack,
     cutTrack: state.cutTrack,
     pasteTrack: state.pasteTrack,
-    showGhostPatterns: state.showGhostPatterns,
-    columnVisibility: state.columnVisibility,
   })));
+
+  const showGhostPatterns = useEditorStore(s => s.showGhostPatterns);
+  const columnVisibility = useEditorStore(s => s.columnVisibility);
 
   const cursor = useCursorStore((s) => s.cursor);
   const selection = useCursorStore((s) => s.selection);
@@ -842,14 +841,14 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   const snapshotUI = useCallback((): UIStateSnapshot => {
     const ui = useUIStore.getState();
     const settings = useSettingsStore.getState();
-    const tracker = useTrackerStore.getState();
+    const editor = useEditorStore.getState();
     return {
       useHex:             ui.useHexNumbers,
       blankEmpty:         ui.blankEmptyCells,
-      showGhostPatterns:  tracker.showGhostPatterns,
-      columnVisibility:   tracker.columnVisibility,
+      showGhostPatterns:  editor.showGhostPatterns,
+      columnVisibility:   editor.columnVisibility,
       trackerVisualBg:    settings.trackerVisualBg,
-      recordMode:         tracker.recordMode,
+      recordMode:         editor.recordMode,
       rowHeight:          Math.round(24 * (ui.trackerZoom / 100)),
       rowHighlightInterval: ui.rowHighlightInterval,
       showBeatLabels:     ui.showBeatLabels,
@@ -1173,6 +1172,11 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       if (s.patterns !== prev.patterns || s.currentPatternIndex !== prev.currentPatternIndex) {
         b.post({ type: 'patterns', patterns: snapshotPatterns(), currentPatternIndex: s.currentPatternIndex });
       }
+    });
+
+    const unsubEditor = useEditorStore.subscribe((s, prev) => {
+      const b = bridgeRef.current;
+      if (!b) return;
       if (s.columnVisibility !== prev.columnVisibility || s.showGhostPatterns !== prev.showGhostPatterns || s.recordMode !== prev.recordMode) {
         b.post({ type: 'uiState', uiState: snapshotUI() });
       }
@@ -1224,6 +1228,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       cancelAnimationFrame(initRafId);
       clearTimeout(readyTimeoutId);
       unsubTracker();
+      unsubEditor();
       unsubCursor();
       unsubUI();
       unsubSettings();

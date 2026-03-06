@@ -7,6 +7,7 @@
 import { useCallback, useMemo } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useTrackerStore, useCursorStore, useTransportStore } from '@stores';
+import { useEditorStore } from '@stores/useEditorStore';
 import {
   HEX_DIGITS_ALL,
   VOL1_KEY_MAP,
@@ -20,14 +21,13 @@ export const useEffectInput = (refs: TrackerInputRefs) => {
   const {
     patterns,
     currentPatternIndex,
-    recordMode,
-    editStep,
   } = useTrackerStore(useShallow((state) => ({
     patterns: state.patterns,
     currentPatternIndex: state.currentPatternIndex,
-    recordMode: state.recordMode,
-    editStep: state.editStep,
   })));
+
+  const recordMode = useEditorStore((state) => state.recordMode);
+  const editStep = useEditorStore((state) => state.editStep);
 
   const setCell = useTrackerStore((state) => state.setCell);
   const moveCursorToRow = useCursorStore((state) => state.moveCursorToRow);

@@ -5,6 +5,7 @@
 import { useEffect } from 'react';
 import { getButtonMapManager } from '../../midi/ButtonMapManager';
 import { useTransportStore, useTrackerStore, useCursorStore } from '../../stores';
+import { useEditorStore } from '../../stores/useEditorStore';
 import { useMIDIStore } from '../../stores/useMIDIStore';
 
 /**
@@ -18,9 +19,11 @@ export function useButtonMappings(): void {
     currentPatternIndex,
     patterns,
     setCurrentPattern,
+  } = useTrackerStore();
+  const {
     currentOctave,
     setCurrentOctave,
-  } = useTrackerStore();
+  } = useEditorStore();
 
   useEffect(() => {
     const manager = getButtonMapManager();

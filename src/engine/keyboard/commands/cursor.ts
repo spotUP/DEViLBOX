@@ -5,6 +5,7 @@
  */
 
 import { useTrackerStore } from '@stores/useTrackerStore';
+import { useEditorStore } from '@stores/useEditorStore';
 import { useCursorStore } from '@/stores/useCursorStore';
 
 /**
@@ -203,7 +204,7 @@ export function cursorRowEnd(): boolean {
  * Increase edit spacing (skip rows)
  */
 export function increaseSpacing(): boolean {
-  const { editStep, setEditStep } = useTrackerStore.getState();
+  const { editStep, setEditStep } = useEditorStore.getState();
   const newStep = Math.min(16, editStep + 1);
   setEditStep(newStep);
   // Status message handled by edit.ts setStep functions
@@ -214,7 +215,7 @@ export function increaseSpacing(): boolean {
  * Decrease edit spacing
  */
 export function decreaseSpacing(): boolean {
-  const { editStep, setEditStep } = useTrackerStore.getState();
+  const { editStep, setEditStep } = useEditorStore.getState();
   const newStep = Math.max(0, editStep - 1);
   setEditStep(newStep);
   return true;
@@ -224,7 +225,7 @@ export function decreaseSpacing(): boolean {
  * Set skip rows (OpenMPT-style spacing)
  */
 export function setSpacing(spacing: number): boolean {
-  useTrackerStore.getState().setEditStep(spacing);
+  useEditorStore.getState().setEditStep(spacing);
   return true;
 }
 

@@ -10,7 +10,7 @@ import { useSettingsStore, type SIDEngineType } from '@stores/useSettingsStore';
 import { LENS_PRESETS, LENS_PRESET_ORDER } from '@/pixi/LensFilter';
 import { SID_ENGINES } from '@engine/deepsid/DeepSIDEngineManager';
 import { useKeyboardStore } from '@stores/useKeyboardStore';
-import { useTrackerStore } from '@stores/useTrackerStore';
+import { useEditorStore } from '@stores/useEditorStore';
 import { useModlandContributionModal } from '@stores/useModlandContributionModal';
 import { Toggle } from '@components/controls/Toggle';
 import { KeyboardShortcutSheet } from '@components/tracker/KeyboardShortcutSheet';
@@ -19,7 +19,6 @@ import { useAudioStore } from '@stores/useAudioStore';
 import { getDJEngineIfActive } from '@engine/dj/DJEngine';
 import { BG_MODES, getBgModeLabel } from '@/components/tracker/TrackerVisualBackground';
 import { getASIDDeviceManager, isASIDSupported } from '@lib/sid/ASIDDeviceManager';
-
 interface CRTSliderProps {
   label: string;
   value: number;
@@ -130,7 +129,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
     recQuantEnabled, setRecQuantEnabled,
     recQuantRes, setRecQuantRes,
     recReleaseEnabled, setRecReleaseEnabled
-  } = useTrackerStore();
+  } = useEditorStore();
 
   const { activeScheme, setActiveScheme, platformOverride, setPlatformOverride } = useKeyboardStore();
 

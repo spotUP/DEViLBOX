@@ -3,6 +3,7 @@
  */
 
 import { useTrackerStore } from '@stores/useTrackerStore';
+import { useEditorStore } from '@stores/useEditorStore';
 import { useCursorStore } from '@/stores/useCursorStore';
 import { useUIStore } from '@stores/useUIStore';
 
@@ -42,9 +43,9 @@ export function insertRow(): boolean {
  * Toggle edit/record mode
  */
 export function toggleEditMode(): boolean {
-  const store = useTrackerStore.getState();
+  const store = useEditorStore.getState();
   store.toggleRecordMode();
-  const newMode = useTrackerStore.getState().recordMode;
+  const newMode = useEditorStore.getState().recordMode;
   useUIStore.getState().setStatusMessage(newMode ? 'Edit mode ON' : 'Edit mode OFF', false, 1000);
   return true;
 }
@@ -75,7 +76,7 @@ export function clearChannel(): boolean {
  */
 function createSetOctaveCommand(octave: number) {
   return function(): boolean {
-    useTrackerStore.getState().setCurrentOctave(octave);
+    useEditorStore.getState().setCurrentOctave(octave);
     useUIStore.getState().setStatusMessage(`Octave ${octave}`, false, 1000);
     return true;
   };
@@ -97,7 +98,7 @@ export const setOctave9 = createSetOctaveCommand(9);
  */
 function createSetStepCommand(step: number) {
   return function(): boolean {
-    useTrackerStore.getState().setEditStep(step);
+    useEditorStore.getState().setEditStep(step);
     useUIStore.getState().setStatusMessage(`Edit step ${step}`, false, 1000);
     return true;
   };
@@ -125,7 +126,7 @@ export const setStep16 = createSetStepCommand(16);
  * Increase edit step by 1
  */
 export function increaseStep(): boolean {
-  const { editStep, setEditStep } = useTrackerStore.getState();
+  const { editStep, setEditStep } = useEditorStore.getState();
   const newStep = Math.min(16, editStep + 1);
   setEditStep(newStep);
   useUIStore.getState().setStatusMessage(`Edit step ${newStep}`, false, 1000);
@@ -136,7 +137,7 @@ export function increaseStep(): boolean {
  * Decrease edit step by 1
  */
 export function decreaseStep(): boolean {
-  const { editStep, setEditStep } = useTrackerStore.getState();
+  const { editStep, setEditStep } = useEditorStore.getState();
   const newStep = Math.max(0, editStep - 1);
   setEditStep(newStep);
   useUIStore.getState().setStatusMessage(`Edit step ${newStep}`, false, 1000);
@@ -147,9 +148,9 @@ export function decreaseStep(): boolean {
  * Toggle insert mode (IT-style: insert vs overwrite)
  */
 export function toggleInsertMode(): boolean {
-  const store = useTrackerStore.getState();
+  const store = useEditorStore.getState();
   store.toggleInsertMode();
-  const newMode = useTrackerStore.getState().insertMode;
+  const newMode = useEditorStore.getState().insertMode;
   useUIStore.getState().setStatusMessage(newMode ? 'INSERT mode' : 'OVERWRITE mode', false, 1000);
   return true;
 }

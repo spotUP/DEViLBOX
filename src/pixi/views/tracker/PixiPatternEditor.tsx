@@ -24,7 +24,7 @@ import type { Graphics as GraphicsType, FederatedPointerEvent, Container as Cont
 import { usePixiTheme, type PixiTheme } from '../../theme';
 import { PIXI_FONTS } from '../../fonts';
 import { MegaText, type GlyphLabel } from '../../utils/MegaText';
-import { useTrackerStore, useTransportStore, useUIStore, useCursorStore } from '@stores';
+import { useTrackerStore, useTransportStore, useUIStore, useCursorStore, useEditorStore } from '@stores';
 import { useShallow } from 'zustand/react/shallow';
 import { useSettingsStore } from '@/stores/useSettingsStore';
 import { useCollaborationStore, getCollabClient } from '@stores/useCollaborationStore';
@@ -451,9 +451,6 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
     pattern,
     patterns,
     currentPatternIndex,
-    showGhostPatterns,
-    columnVisibility,
-    recordMode,
     addChannel,
     toggleChannelMute,
     toggleChannelSolo,
@@ -468,9 +465,6 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
     pattern: s.patterns[s.currentPatternIndex],
     patterns: s.patterns,
     currentPatternIndex: s.currentPatternIndex,
-    showGhostPatterns: s.showGhostPatterns,
-    columnVisibility: s.columnVisibility,
-    recordMode: s.recordMode,
     addChannel: s.addChannel,
     toggleChannelMute: s.toggleChannelMute,
     toggleChannelSolo: s.toggleChannelSolo,
@@ -482,6 +476,10 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
     cutTrack: s.cutTrack,
     pasteTrack: s.pasteTrack,
   })));
+
+  const showGhostPatterns = useEditorStore(s => s.showGhostPatterns);
+  const columnVisibility = useEditorStore(s => s.columnVisibility);
+  const recordMode = useEditorStore(s => s.recordMode);
   // Derived boolean arrays — must NOT live inside the useShallow object above.
   // .map() always creates a new array reference; inside a useShallow object,
   // Zustand compares with Object.is (reference equality), so the new array is
