@@ -1,3 +1,0 @@
-/Users/spot/Code/DEViLBOX/klystrack-wasm/build/CMakeFiles/Klystrack.dir
-/Users/spot/Code/DEViLBOX/klystrack-wasm/build/CMakeFiles/edit_cache.dir
-/Users/spot/Code/DEViLBOX/klystrack-wasm/build/CMakeFiles/rebuild_cache.dir
