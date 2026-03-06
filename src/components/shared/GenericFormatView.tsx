@@ -5,7 +5,8 @@
  * Format-specific logic (position panel, instrument editor) provided via props/slots.
  */
 
-import React, { useRef, useEffect, useState, ReactNode } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
+import type { ReactNode } from 'react';
 import { FormatPatternEditor } from './FormatPatternEditor';
 import type { ColumnDef, FormatChannel, OnCellChange } from './format-editor-types';
 
@@ -32,6 +33,8 @@ interface GenericFormatViewProps {
   columns: ColumnDef[];
   channels: FormatChannel[];
   currentRow: number;
+  /** Per-channel playback rows for formats with independent channel speeds. */
+  currentRowPerChannel?: number[];
   onCellChange?: OnCellChange;
 
   // Optional side panel (instrument editor, etc.)
@@ -42,7 +45,7 @@ interface GenericFormatViewProps {
 export const GenericFormatView: React.FC<GenericFormatViewProps> = ({
   formatLabel, toolbarInfo, isPlaying, onPlay, onStop, toolbarSlot,
   positionEditor, positionEditorHeight = 160,
-  columns, channels, currentRow, onCellChange,
+  columns, channels, currentRow, currentRowPerChannel, onCellChange,
   sidePanel, sidePanelWidth = 280,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -158,6 +161,7 @@ export const GenericFormatView: React.FC<GenericFormatViewProps> = ({
             columns={columns}
             channels={channels}
             currentRow={currentRow}
+            currentRowPerChannel={currentRowPerChannel}
             isPlaying={isPlaying}
             onCellChange={onCellChange}
           />

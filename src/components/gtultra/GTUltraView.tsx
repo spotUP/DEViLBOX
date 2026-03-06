@@ -13,10 +13,13 @@
  * └───────────────────────┴────────────────────┘
  */
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState, useMemo } from 'react';
 import * as Tone from 'tone';
+import { useTransportStore } from '@stores/useTransportStore';
 import { useGTUltraStore } from '../../stores/useGTUltraStore';
-import { GTPatternEditor } from './GTPatternEditor';
+import { FormatPatternEditor } from '@/components/shared/FormatPatternEditor';
+import type { FormatChannel } from '@/components/shared/format-editor-types';
+import { GTU_COLUMNS, gtuToFormatChannels, parseBinaryPatternData } from './gtuAdapter';
 import { GTToolbar } from './GTToolbar';
 import { GTInstrumentPanel } from './GTInstrumentPanel';
 import { GTOrderList } from './GTOrderList';
@@ -31,6 +34,11 @@ export const GTUltraView: React.FC<{ width?: number; height?: number }> = ({ wid
   const setEngine = useGTUltraStore((s) => s.setEngine);
   const sidCount = useGTUltraStore((s) => s.sidCount);
   const channelCount = sidCount * 3;
+  const currentRow = useTransportStore((s) => s.currentRow);
+  const isPlaying = useTransportStore((s) => s.isPlaying);
+  const orderData = useGTUltraStore((s) => s.orderData);
+  const patternData = useGTUltraStore((s) => s.patternData);
+  const playbackPos = useGTUltraStore((s) => s.playbackPos);
 
   // Measure container if no explicit dimensions
   const containerRef = useRef<HTMLDivElement>(null);
@@ -108,6 +116,40 @@ export const GTUltraView: React.FC<{ width?: number; height?: number }> = ({ wid
     };
   }, [setEngine]);
 
+  const orderCursor = useGTUltraStore((s) => s.orderCursor);
+  const currentOrderPos = isPlaying ? playbackPos.songPos : orderCursor;
+
+  const channels = useMemo(() => {
+    const result: FormatChannel[] = [];
+
+    // GT Ultra stores pattern data per-pattern (not per-channel). Each pattern contains
+    // all channels' data in a single binary blob (channelCount * patternLength * 4 bytes).
+    // We use channel 0's order list to determine which pattern to display.
+    // TODO: If GT Ultra supports per-channel patterns at different order positions,
+    // this needs to look up each channel's pattern independently.
+    const patIdx = orderData[0]?.[currentOrderPos] ?? 0;
+    const patEntry = patternData.get(patIdx);
+
+    if (!patEntry) {
+      for (let ch = 0; ch < channelCount; ch++) {
+        result.push({ label: `CH${(ch + 1).toString().padStart(2, '0')}`, patternLength: 64, rows: [] });
+      }
+      return result;
+    }
+
+    const structured = parseBinaryPatternData(patEntry.data, channelCount, patEntry.length);
+    const formatted = gtuToFormatChannels(structured, channelCount, patEntry.length);
+    return formatted;
+  }, [channelCount, orderData, patternData, currentOrderPos]);
+
+  const handleCellChange = useCallback((channelIdx: number, rowIdx: number, columnKey: string, value: number) => {
+    // TODO: Wire up pattern editing to engine
+    // For now, this is a display-only pattern editor
+    // Pattern editing requires calling engine methods to update WASM state
+    // and the store will receive updates via the onPatternData callback
+    console.log('Pattern cell changed:', { channelIdx, rowIdx, columnKey, value });
+  }, []);
+
   const sidebarW = Math.min(SIDEBAR_WIDTH, Math.floor(width * 0.35));
   const editorW = width - sidebarW;
 
@@ -119,10 +161,14 @@ export const GTUltraView: React.FC<{ width?: number; height?: number }> = ({ wid
       {/* Main content */}
       <div className="flex flex-1 min-h-0 overflow-hidden">
         {/* Pattern editor */}
-        <GTPatternEditor
+        <FormatPatternEditor
           width={editorW}
           height={height - 36}
-          channelCount={channelCount}
+          columns={GTU_COLUMNS}
+          channels={channels}
+          currentRow={currentRow}
+          isPlaying={isPlaying}
+          onCellChange={handleCellChange}
         />
 
         {/* Sidebar */}
