@@ -2,7 +2,7 @@
  * JamCracker adapter — Maps JamCracker pattern data to format-agnostic FormatChannel[].
  */
 
-import type { ColumnDef, FormatCell, FormatChannel } from '@/components/shared/format-editor-types';
+import type { ColumnDef } from '@/components/shared/format-editor-types';
 
 const NOTE_NAMES = ['C-', 'C#', 'D-', 'D#', 'E-', 'F-', 'F#', 'G-', 'G#', 'A-', 'A#', 'B-'];
 
@@ -99,58 +99,3 @@ export const JAMCRACKER_COLUMNS: ColumnDef[] = [
   },
 ];
 
-/**
- * Convert JamCracker pattern data to FormatChannel[].
- *
- * JamCracker has 4 channels with 32 rows per pattern.
- */
-export function jamcrackerToFormatChannels(
-  patterns: Array<any>, // Pattern data from engine
-  numRows: number = 32,
-  currentPatternIndices: number[] = [0, 0, 0, 0]
-): FormatChannel[] {
-  const result: FormatChannel[] = [];
-  const CHANNELS = 4;
-
-  for (let ch = 0; ch < CHANNELS; ch++) {
-    const patIdx = currentPatternIndices[ch] || 0;
-    const pattern = patterns?.[patIdx];
-    const rows: FormatCell[] = [];
-
-    if (pattern?.rows && pattern.rows[ch]) {
-      for (let rowIdx = 0; rowIdx < numRows; rowIdx++) {
-        const row = pattern.rows[ch][rowIdx];
-        if (row) {
-          rows.push({
-            period: row.period || 0,
-            instrument: row.instr || 0,
-            speed: row.speed || 0,
-            arpeggio: row.arpeggio || 0,
-            vibrato: row.vibrato || 0,
-            volume: row.volume || 0,
-            porta: row.porta || 0,
-          });
-        } else {
-          rows.push({
-            period: 0,
-            instrument: 0,
-            speed: 0,
-            arpeggio: 0,
-            vibrato: 0,
-            volume: 0,
-            porta: 0,
-          });
-        }
-      }
-    }
-
-    const label = `CH${(ch + 1).toString().padStart(2, '0')}:P${patIdx.toString().padStart(2, '0')}`;
-    result.push({
-      label,
-      patternLength: rows.length || numRows,
-      rows,
-    });
-  }
-
-  return result;
-}

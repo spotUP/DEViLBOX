@@ -145,25 +145,3 @@ export function parseBinaryPatternData(
   return patterns;
 }
 
-/**
- * Encode structured cell data back to binary format for WASM.
- */
-export function encodeBinaryPatternData(
-  patterns: Array<Array<{ note: number; instrument: number; command: number; data: number }>>,
-  patternLength: number
-): Uint8Array {
-  const binaryData = new Uint8Array(patterns.length * patternLength * 4);
-
-  for (let ch = 0; ch < patterns.length; ch++) {
-    for (let row = 0; row < patternLength; row++) {
-      const cell = patterns[ch][row];
-      const offset = (ch * patternLength + row) * 4;
-      binaryData[offset] = cell.note;
-      binaryData[offset + 1] = cell.instrument;
-      binaryData[offset + 2] = cell.command;
-      binaryData[offset + 3] = cell.data;
-    }
-  }
-
-  return binaryData;
-}
