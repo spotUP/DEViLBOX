@@ -6,6 +6,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { PatternEditorCanvas } from './PatternEditorCanvas';
 import { GridSequencer } from '@components/grid/GridSequencer';
 import { useTrackerStore, useCursorStore, useInstrumentStore, useUIStore } from '@stores';
+import { useTransportStore } from '@stores/useTransportStore';
+import { useProjectStore } from '@stores/useProjectStore';
 import { useShallow } from 'zustand/react/shallow';
 import { useTrackerInput } from '@hooks/tracker/useTrackerInput';
 import { useBlockOperations } from '@hooks/tracker/BlockOperations';
@@ -41,9 +43,10 @@ import { MobileTrackerView } from './MobileTrackerView';
 import { useResponsive } from '@hooks/useResponsive';
 import { Music2, Activity } from 'lucide-react';
 import { InstrumentList } from '@components/instruments/InstrumentList';
-import { getTrackerReplayer } from '@engine/TrackerReplayer';
+import { getTrackerReplayer, type TrackerSong } from '@engine/TrackerReplayer';
 import { MusicLineTrackTableEditor } from './MusicLineTrackTableEditor';
 import { MusicLinePatternViewer } from './MusicLinePatternViewer';
+import { exportMusicLineFile } from '@lib/export/MusicLineExporter';
 import { downloadPattern } from '@lib/export/PatternExport';
 import { downloadTrack } from '@lib/export/TrackExport';
 import { DJPitchSlider } from '@components/transport/DJPitchSlider';
@@ -181,6 +184,37 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
     if (!isMobile) return;
     useCursorStore.getState().moveCursor('right');
   }, [isMobile]);
+
+  // MusicLine export handler
+  const handleExportML = useCallback(() => {
+    const s = useTrackerStore.getState();
+    const t = useTransportStore.getState();
+    const song: TrackerSong = {
+      name: useProjectStore.getState().metadata.name || 'MusicLine Song',
+      format: 'ML',
+      patterns: s.patterns,
+      instruments: useInstrumentStore.getState().instruments,
+      songPositions: s.patternOrder,
+      songLength: s.patternOrder.length,
+      restartPosition: 0,
+      numChannels: s.patterns[0]?.channels.length ?? 4,
+      initialSpeed: t.speed,
+      initialBPM: t.bpm,
+      channelTrackTables: s.channelTrackTables ?? undefined,
+      channelSpeeds: s.channelSpeeds ?? undefined,
+      channelGrooves: s.channelGrooves ?? undefined,
+    };
+    const data = exportMusicLineFile(song);
+    const blob = new Blob([data.buffer as ArrayBuffer], { type: 'application/octet-stream' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${song.name.replace(/[^a-zA-Z0-9_\-]/g, '_')}.ml`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, []);
 
   // Use external or internal import state
   const showImportModule = externalShowImportModule ?? internalShowImportModule;
@@ -523,9 +557,13 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
                     <span className="text-xs text-accent-primary bg-accent-primary/10 px-1.5 py-0.5 rounded border border-accent-primary/30">
                       per-channel
                     </span>
-                    <span className="text-xs text-ft2-textDim ml-auto">
+                    <span className="text-xs text-ft2-textDim ml-auto mr-2">
                       {channelTrackTables?.length ?? 0} channels · {patterns.length} parts
                     </span>
+                    <button
+                      className="px-2 py-0.5 text-xs bg-green-800 hover:bg-green-700 text-green-100 rounded border border-green-600"
+                      onClick={handleExportML}
+                    >Export .ml</button>
                   </div>
                   <div className="px-3 pb-3">
                     <MusicLineTrackTableEditor
