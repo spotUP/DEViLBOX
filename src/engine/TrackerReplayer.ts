@@ -254,6 +254,8 @@ export interface TrackerSong {
   jamCrackerFileData?: ArrayBuffer;
   /** Raw Future Player .fp binary for loading into the FuturePlayerEngine WASM */
   futurePlayerFileData?: ArrayBuffer;
+  /** Raw PreTracker .prt binary for loading into the PreTrackerEngine WASM */
+  preTrackerFileData?: ArrayBuffer;
   // Native format data (preserved for format-specific editors)
   furnaceNative?: FurnaceNativeData;
   hivelyNative?: HivelyNativeData;

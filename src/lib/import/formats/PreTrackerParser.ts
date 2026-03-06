@@ -92,6 +92,7 @@ export async function parsePreTrackerFile(
     songPositions: [0],
     songLength: 1,
     instruments,
+    preTrackerFileData: buffer.slice(0),
     importMetadata: {
       sourceFormat: 'PreTracker',
       sourceFile: filename,

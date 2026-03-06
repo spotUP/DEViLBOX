@@ -26,7 +26,7 @@ export const usePatternPlayback = () => {
     currentPositionIndex: s.currentPositionIndex,
     setCurrentPosition: s.setCurrentPosition,
     })));
-  const { channelTrackTables, channelSpeeds, channelGrooves, hivelyNative, hivelyFileData, hivelyMeta, musiclineFileData, c64SidFileData, jamCrackerFileData, futurePlayerFileData } = useFormatStore(useShallow((s) => ({
+  const { channelTrackTables, channelSpeeds, channelGrooves, hivelyNative, hivelyFileData, hivelyMeta, musiclineFileData, c64SidFileData, jamCrackerFileData, futurePlayerFileData, preTrackerFileData } = useFormatStore(useShallow((s) => ({
     channelTrackTables: s.channelTrackTables,
     channelSpeeds: s.channelSpeeds,
     channelGrooves: s.channelGrooves,
@@ -37,6 +37,7 @@ export const usePatternPlayback = () => {
     c64SidFileData: s.c64SidFileData,
     jamCrackerFileData: s.jamCrackerFileData,
     futurePlayerFileData: s.futurePlayerFileData,
+    preTrackerFileData: s.preTrackerFileData,
   })));
   const linearPeriods = useEditorStore((s) => s.linearPeriods);
   const { isPlaying, isLooping, bpm, setCurrentRow, setCurrentRowThrottled } = useTransportStore(useShallow((s) => ({
@@ -336,6 +337,7 @@ export const usePatternPlayback = () => {
           // JamCracker raw binary (required for JamCrackerEngine WASM)
           jamCrackerFileData: jamCrackerFileData ?? undefined,
           futurePlayerFileData: futurePlayerFileData ?? undefined,
+          preTrackerFileData: preTrackerFileData ?? undefined,
           // Furnace-specific timing data (only set for .fur imports)
           speed2: furnaceData?.speed2,
           hz: furnaceData?.hz,

@@ -30,6 +30,7 @@ interface FormatStore {
   c64SidFileData: Uint8Array | null;
   jamCrackerFileData: ArrayBuffer | null;
   futurePlayerFileData: ArrayBuffer | null;
+  preTrackerFileData: ArrayBuffer | null;
   hivelyMeta: { stereoMode: number; mixGain: number; speedMultiplier: number; version: number } | null;
   furnaceSubsongs: FurnaceSubsongPlayback[] | null;
   furnaceActiveSubsong: number;
@@ -47,7 +48,7 @@ interface FormatStore {
   setSongDBInfo: (info: FormatStore['songDBInfo']) => void;
   setSidMetadata: (info: FormatStore['sidMetadata']) => void;
   setOriginalModuleData: (data: FormatStore['originalModuleData']) => void;
-  applyEditorMode: (song: { linearPeriods?: boolean; furnaceNative?: FurnaceNativeData; hivelyNative?: HivelyNativeData; hivelyFileData?: ArrayBuffer; klysNative?: KlysNativeData; klysFileData?: ArrayBuffer; musiclineFileData?: Uint8Array; c64SidFileData?: Uint8Array; jamCrackerFileData?: ArrayBuffer; futurePlayerFileData?: ArrayBuffer; hivelyMeta?: { stereoMode: number; mixGain: number; speedMultiplier: number; version: number }; furnaceSubsongs?: FurnaceSubsongPlayback[]; furnaceActiveSubsong?: number; channelTrackTables?: number[][]; channelSpeeds?: number[]; channelGrooves?: number[]; goatTrackerData?: Uint8Array }) => void;
+  applyEditorMode: (song: { linearPeriods?: boolean; furnaceNative?: FurnaceNativeData; hivelyNative?: HivelyNativeData; hivelyFileData?: ArrayBuffer; klysNative?: KlysNativeData; klysFileData?: ArrayBuffer; musiclineFileData?: Uint8Array; c64SidFileData?: Uint8Array; jamCrackerFileData?: ArrayBuffer; futurePlayerFileData?: ArrayBuffer; preTrackerFileData?: ArrayBuffer; hivelyMeta?: { stereoMode: number; mixGain: number; speedMultiplier: number; version: number }; furnaceSubsongs?: FurnaceSubsongPlayback[]; furnaceActiveSubsong?: number; channelTrackTables?: number[][]; channelSpeeds?: number[]; channelGrooves?: number[]; goatTrackerData?: Uint8Array }) => void;
   setFurnaceActiveSubsong: (index: number) => void;
   reset: () => void;
 }
@@ -79,6 +80,7 @@ export const useFormatStore = create<FormatStore>()(
     c64SidFileData: null,
     jamCrackerFileData: null,
     futurePlayerFileData: null,
+    preTrackerFileData: null,
     hivelyMeta: null,
     furnaceSubsongs: null,
     furnaceActiveSubsong: 0,
@@ -110,6 +112,7 @@ export const useFormatStore = create<FormatStore>()(
         state.c64SidFileData = song.c64SidFileData ?? null;
         state.jamCrackerFileData = song.jamCrackerFileData ?? null;
         state.futurePlayerFileData = song.futurePlayerFileData ?? null;
+        state.preTrackerFileData = song.preTrackerFileData ?? null;
         if (song.furnaceNative) {
           state.editorMode = 'furnace';
           clearNative(state);
@@ -155,6 +158,7 @@ export const useFormatStore = create<FormatStore>()(
       state.c64SidFileData = null;
       state.jamCrackerFileData = null;
       state.futurePlayerFileData = null;
+      state.preTrackerFileData = null;
       state.originalModuleData = null;
       state.songDBInfo = null;
       state.sidMetadata = null;
