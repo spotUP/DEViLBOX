@@ -14,6 +14,7 @@ import type {
   EditorMode,
   FurnaceNativeData,
   HivelyNativeData,
+  KlysNativeData,
   FurnaceSubsongPlayback,
 } from '@typedefs';
 import { DEFAULT_COLUMN_VISIBILITY, EMPTY_CELL, CHANNEL_COLORS } from '@typedefs';
@@ -107,6 +108,8 @@ interface TrackerStore {
   furnaceNative: FurnaceNativeData | null;
   hivelyNative: HivelyNativeData | null;
   hivelyFileData: ArrayBuffer | null;
+  klysNative: KlysNativeData | null;
+  klysFileData: ArrayBuffer | null;
   musiclineFileData: Uint8Array | null;
   c64SidFileData: Uint8Array | null;
   jamCrackerFileData: ArrayBuffer | null;
@@ -286,7 +289,7 @@ interface TrackerStore {
   setFurnaceOrderEntry: (channel: number, position: number, patternIndex: number) => void;
   setHivelyNative: (data: HivelyNativeData | null) => void;
   setSongDBInfo: (info: { authors: string[]; publishers: string[]; album: string; year: string; format: string; duration_ms: number } | null) => void;
-  applyEditorMode: (song: { linearPeriods?: boolean; furnaceNative?: FurnaceNativeData; hivelyNative?: HivelyNativeData; hivelyFileData?: ArrayBuffer; musiclineFileData?: Uint8Array; c64SidFileData?: Uint8Array; jamCrackerFileData?: ArrayBuffer; futurePlayerFileData?: ArrayBuffer; hivelyMeta?: { stereoMode: number; mixGain: number; speedMultiplier: number; version: number }; furnaceSubsongs?: FurnaceSubsongPlayback[]; furnaceActiveSubsong?: number; channelTrackTables?: number[][]; channelSpeeds?: number[]; channelGrooves?: number[]; goatTrackerData?: Uint8Array }) => void;
+  applyEditorMode: (song: { linearPeriods?: boolean; furnaceNative?: FurnaceNativeData; hivelyNative?: HivelyNativeData; hivelyFileData?: ArrayBuffer; klysNative?: KlysNativeData; klysFileData?: ArrayBuffer; musiclineFileData?: Uint8Array; c64SidFileData?: Uint8Array; jamCrackerFileData?: ArrayBuffer; futurePlayerFileData?: ArrayBuffer; hivelyMeta?: { stereoMode: number; mixGain: number; speedMultiplier: number; version: number }; furnaceSubsongs?: FurnaceSubsongPlayback[]; furnaceActiveSubsong?: number; channelTrackTables?: number[][]; channelSpeeds?: number[]; channelGrooves?: number[]; goatTrackerData?: Uint8Array }) => void;
   setFurnaceActiveSubsong: (index: number) => void;
 
   // Undo/Redo support
@@ -366,6 +369,8 @@ export const useTrackerStore = create<TrackerStore>()(
     furnaceNative: null,
     hivelyNative: null,
     hivelyFileData: null,
+    klysNative: null,
+    klysFileData: null,
     musiclineFileData: null,
     c64SidFileData: null,
     jamCrackerFileData: null,
@@ -1624,6 +1629,8 @@ export const useTrackerStore = create<TrackerStore>()(
           state.furnaceNative = song.furnaceNative;
           state.hivelyNative = null;
           state.hivelyFileData = null;
+          state.klysNative = null;
+          state.klysFileData = null;
           state.musiclineFileData = null;
           state.hivelyMeta = null;
           state.furnaceSubsongs = song.furnaceSubsongs ?? null;
@@ -1635,8 +1642,24 @@ export const useTrackerStore = create<TrackerStore>()(
           state.editorMode = 'hively';
           state.hivelyNative = song.hivelyNative;
           state.hivelyFileData = song.hivelyFileData ?? null;
+          state.klysNative = null;
+          state.klysFileData = null;
           state.musiclineFileData = null;
           state.hivelyMeta = song.hivelyMeta ?? null;
+          state.furnaceNative = null;
+          state.furnaceSubsongs = null;
+          state.furnaceActiveSubsong = 0;
+          state.channelTrackTables = null;
+          state.channelSpeeds = null;
+          state.channelGrooves = null;
+        } else if (song.klysNative) {
+          state.editorMode = 'klystrack';
+          state.klysNative = song.klysNative;
+          state.klysFileData = song.klysFileData ?? null;
+          state.hivelyNative = null;
+          state.hivelyFileData = null;
+          state.musiclineFileData = null;
+          state.hivelyMeta = null;
           state.furnaceNative = null;
           state.furnaceSubsongs = null;
           state.furnaceActiveSubsong = 0;
@@ -1649,6 +1672,8 @@ export const useTrackerStore = create<TrackerStore>()(
           state.furnaceNative = null;
           state.hivelyNative = null;
           state.hivelyFileData = null;
+          state.klysNative = null;
+          state.klysFileData = null;
           state.musiclineFileData = song.musiclineFileData ?? null;
           state.hivelyMeta = null;
           state.furnaceSubsongs = null;
@@ -1662,6 +1687,8 @@ export const useTrackerStore = create<TrackerStore>()(
           state.furnaceNative = null;
           state.hivelyNative = null;
           state.hivelyFileData = null;
+          state.klysNative = null;
+          state.klysFileData = null;
           state.musiclineFileData = null;
           state.hivelyMeta = null;
           state.furnaceSubsongs = null;
@@ -1675,6 +1702,8 @@ export const useTrackerStore = create<TrackerStore>()(
           state.furnaceNative = null;
           state.hivelyNative = null;
           state.hivelyFileData = null;
+          state.klysNative = null;
+          state.klysFileData = null;
           state.musiclineFileData = null;
           state.hivelyMeta = null;
           state.furnaceSubsongs = null;
@@ -1687,6 +1716,8 @@ export const useTrackerStore = create<TrackerStore>()(
           state.furnaceNative = null;
           state.hivelyNative = null;
           state.hivelyFileData = null;
+          state.klysNative = null;
+          state.klysFileData = null;
           state.musiclineFileData = null;
           state.hivelyMeta = null;
           state.furnaceSubsongs = null;
@@ -1873,6 +1904,8 @@ export const useTrackerStore = create<TrackerStore>()(
         state.editorMode = 'classic';
         state.furnaceNative = null;
         state.hivelyNative = null;
+        state.klysNative = null;
+        state.klysFileData = null;
         state.furnaceSubsongs = null;
         state.furnaceActiveSubsong = 0;
         state.songDBInfo = null;
