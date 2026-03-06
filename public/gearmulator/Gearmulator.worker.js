@@ -39,8 +39,6 @@ let sabFloat32 = null;
 
 // Internal render buffer
 const RENDER_BLOCK = 128; // match WebAudio quantum
-let renderBufL = null;
-let renderBufR = null;
 let outputPtrL = 0;
 let outputPtrR = 0;
 
@@ -150,8 +148,8 @@ async function initSynth(data) {
     synthType, sampleRate: sr, hasSab: !!sab,
   });
 
-  if (!jsCode || !wasmBinary || !romData) {
-    throw new Error('Missing jsCode, wasmBinary, or romData');
+  if (!wasmBinary || !romData) {
+    throw new Error('Missing wasmBinary or romData');
   }
 
   // Set up SharedArrayBuffer views
@@ -191,8 +189,6 @@ async function initSynth(data) {
   // Allocate render buffers in WASM heap
   outputPtrL = module._malloc(RENDER_BLOCK * 4);
   outputPtrR = module._malloc(RENDER_BLOCK * 4);
-  renderBufL = new Float32Array(RENDER_BLOCK);
-  renderBufR = new Float32Array(RENDER_BLOCK);
 
   // Load ROM and create device
   console.log('[Gearmulator Worker] Loading ROM into WASM heap...');
