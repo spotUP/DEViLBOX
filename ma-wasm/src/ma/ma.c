@@ -47,16 +47,70 @@ static inline uint16_t _rd16(uintptr_t a) { uint16_t v; memcpy(&v,(void*)a,2); r
 static inline uint32_t _rd32(uintptr_t a) { uint32_t v; memcpy(&v,(void*)a,4); return v; }
 static inline void _wr16(uintptr_t a,uint16_t v) { memcpy((void*)a,&v,2); }
 static inline void _wr32(uintptr_t a,uint32_t v) { memcpy((void*)a,&v,4); }
+
+/* -- Amiga custom chip write interception --------------------------------
+ * Intercept writes to the $dff000-$dff1ff range and route audio register
+ * writes to paula_soft functions. Without this, the transpiled replayer
+ * writes to raw memory and Paula never receives any DMA/sample data.
+ * ----------------------------------------------------------------------- */
+static inline void _custom_write16(uint32_t addr, uint16_t val) {
+    if (addr >= 0xdff000 && addr < 0xdff200) {
+        uint32_t reg = addr - 0xdff000;
+        switch (reg) {
+            /* Audio channel 0 */
+            case 0xa0: /* aud0lc hi */ break; /* handled as 32-bit via 0xa0 */
+            case 0xa4: paula_set_length(0, val); return;
+            case 0xa6: paula_set_period(0, val); return;
+            case 0xa8: paula_set_volume(0, (uint8_t)val); return;
+            /* Audio channel 1 */
+            case 0xb0: break;
+            case 0xb4: paula_set_length(1, val); return;
+            case 0xb6: paula_set_period(1, val); return;
+            case 0xb8: paula_set_volume(1, (uint8_t)val); return;
+            /* Audio channel 2 */
+            case 0xc0: break;
+            case 0xc4: paula_set_length(2, val); return;
+            case 0xc6: paula_set_period(2, val); return;
+            case 0xc8: paula_set_volume(2, (uint8_t)val); return;
+            /* Audio channel 3 */
+            case 0xd0: break;
+            case 0xd4: paula_set_length(3, val); return;
+            case 0xd6: paula_set_period(3, val); return;
+            case 0xd8: paula_set_volume(3, (uint8_t)val); return;
+            /* DMA control */
+            case 0x96: paula_dma_write(val); return;
+            default: return; /* ignore other custom registers */
+        }
+    }
+    _wr16(addr, __builtin_bswap16(val));
+}
+
+static inline void _custom_write32(uint32_t addr, uint32_t val) {
+    if (addr >= 0xdff000 && addr < 0xdff200) {
+        uint32_t reg = addr - 0xdff000;
+        /* 32-bit writes to audio pointer registers (aud*lc) */
+        if (reg == 0xa0) { paula_set_sample_ptr(0, (const int8_t*)(uintptr_t)val); return; }
+        if (reg == 0xb0) { paula_set_sample_ptr(1, (const int8_t*)(uintptr_t)val); return; }
+        if (reg == 0xc0) { paula_set_sample_ptr(2, (const int8_t*)(uintptr_t)val); return; }
+        if (reg == 0xd0) { paula_set_sample_ptr(3, (const int8_t*)(uintptr_t)val); return; }
+        /* 32-bit write to other regs: split into two 16-bit writes */
+        _custom_write16(addr, (uint16_t)(val >> 16));
+        _custom_write16(addr + 2, (uint16_t)(val & 0xffff));
+        return;
+    }
+    _wr32(addr, __builtin_bswap32(val));
+}
+
 #if defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
 #define READ16(addr)  _rd16((uintptr_t)(addr))
 #define READ32(addr)  _rd32((uintptr_t)(addr))
-#define WRITE16(addr,v) _wr16((uintptr_t)(addr),(uint16_t)(v))
-#define WRITE32(addr,v) _wr32((uintptr_t)(addr),(uint32_t)(v))
+#define WRITE16(addr,v) _custom_write16((uint32_t)(addr),(uint16_t)(v))
+#define WRITE32(addr,v) _custom_write32((uint32_t)(addr),(uint32_t)(v))
 #else
 #define READ16(addr)  __builtin_bswap16(_rd16((uintptr_t)(addr)))
 #define READ32(addr)  __builtin_bswap32(_rd32((uintptr_t)(addr)))
-#define WRITE16(addr,v) _wr16((uintptr_t)(addr),__builtin_bswap16((uint16_t)(v)))
-#define WRITE32(addr,v) _wr32((uintptr_t)(addr),__builtin_bswap32((uint32_t)(v)))
+#define WRITE16(addr,v) _custom_write16((uint32_t)(addr),(uint16_t)(v))
+#define WRITE32(addr,v) _custom_write32((uint32_t)(addr),(uint32_t)(v))
 #endif
 #define READ8_POST(r)   ({ uint32_t _r=(r); (r)+=1; READ8(_r); })
 #define READ16_POST(r)  ({ uint32_t _r=(r); (r)+=2; READ16(_r); })
@@ -100,21 +154,16 @@ static inline void _wr32(uintptr_t a,uint32_t v) { memcpy((void*)a,&v,4); }
 #ifndef all
 #define all 0
 #endif
-#ifndef aud0vol
-#define aud0vol 0
-#endif
-#ifndef aud1vol
-#define aud1vol 0
-#endif
-#ifndef aud2vol
-#define aud2vol 0
-#endif
-#ifndef aud3vol
-#define aud3vol 0
-#endif
-#ifndef dmacon
-#define dmacon 0
-#endif
+/* Amiga custom chip register offsets from $DFF000 base */
+#define aud0    0xa0
+#define aud0vol 0xa8
+#define aud1    0xb0
+#define aud1vol 0xb8
+#define aud2    0xc0
+#define aud2vol 0xc8
+#define aud3    0xd0
+#define aud3vol 0xd8
+#define dmacon  0x96
 /* DTP_* */
 #ifndef DTP_PlayerName
 #define DTP_PlayerName 0
@@ -613,6 +662,7 @@ static double g_frames_per_tick = 0.0;
 static double g_accum = 0.0;
 static uint8_t *g_song_buf = NULL;
 static uint32_t g_tick_count = 0;
+static double g_output_rate = (double)PAULA_RATE_PAL;
 
 #define VBLANK_HZ 50.0
 
@@ -620,7 +670,7 @@ EXPORT int player_init(const uint8_t *module_data, uint32_t module_size) {
     paula_reset();
     g_accum = 0.0;
     g_tick_count = 0;
-    g_frames_per_tick = (double)PAULA_RATE_PAL / VBLANK_HZ;
+    g_frames_per_tick = g_output_rate / VBLANK_HZ;
 
     if (g_song_buf) { free(g_song_buf); g_song_buf = NULL; }
 
@@ -668,6 +718,12 @@ EXPORT void player_stop(void) {
         if (g_song_buf) { free(g_song_buf); g_song_buf = NULL; }
         g_initialized = 0;
     }
+}
+
+EXPORT void player_set_sample_rate(int rate) {
+    g_output_rate = (double)rate;
+    paula_set_output_rate((float)rate);
+    g_frames_per_tick = g_output_rate / VBLANK_HZ;
 }
 
 EXPORT int player_is_finished(void) { return 0; }

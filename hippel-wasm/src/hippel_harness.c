@@ -19,6 +19,7 @@ static double g_frames_per_tick = 0.0;
 static double g_accum = 0.0;
 static uint8_t *g_song_buf = NULL;
 static uint32_t g_tick_count = 0;
+static double g_output_rate = (double)PAULA_RATE_PAL;
 
 #define VBLANK_HZ 50.0
 
@@ -26,7 +27,7 @@ EXPORT int player_init(const uint8_t *module_data, uint32_t module_size) {
     paula_reset();
     g_accum = 0.0;
     g_tick_count = 0;
-    g_frames_per_tick = (double)PAULA_RATE_PAL / VBLANK_HZ;
+    g_frames_per_tick = g_output_rate / VBLANK_HZ;
 
     if (g_song_buf) { free(g_song_buf); g_song_buf = NULL; }
 
@@ -74,6 +75,12 @@ EXPORT void player_stop(void) {
         if (g_song_buf) { free(g_song_buf); g_song_buf = NULL; }
         g_initialized = 0;
     }
+}
+
+EXPORT void player_set_sample_rate(int rate) {
+    g_output_rate = (double)rate;
+    paula_set_output_rate((float)rate);
+    g_frames_per_tick = g_output_rate / VBLANK_HZ;
 }
 
 EXPORT int player_is_finished(void) { return 0; }

@@ -23,6 +23,8 @@ void paula_reset(void);
 // Configure clock (call before render; default: PAL)
 void paula_set_clock(float paula_clock);
 
-// Render frames of F32 stereo interleaved audio at PAULA_RATE_PAL
-// Returns number of frames written
+// Set output sample rate (default: PAULA_RATE_PAL = 28150)
+void paula_set_output_rate(float rate);
+
+// Render frames of F32 stereo interleaved audio
 int paula_render(float* buffer, int frames);
