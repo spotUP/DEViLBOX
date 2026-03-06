@@ -65,8 +65,16 @@ export const KlysView: React.FC<{ width?: number; height?: number }> = ({ width:
       // Subscribe to song data BEFORE loading so we catch the response
       unsubData = engine.onSongData((data) => {
         if (cancelled) return;
+        console.log('[KlysView] songData received:', {
+          patterns: data.patterns.length,
+          sequences: data.sequences.length,
+          instruments: data.instruments.length,
+        });
         const current = useFormatStore.getState().klysNative;
-        if (!current) return;
+        if (!current) {
+          console.warn('[KlysView] klysNative not found in store');
+          return;
+        }
         // Map WASM instrument data to KlysNativeInstrument shape (nest fm fields)
         const instruments = data.instruments
           .filter((i): i is NonNullable<typeof i> => i !== null)
@@ -74,6 +82,7 @@ export const KlysView: React.FC<{ width?: number; height?: number }> = ({ width:
             ...rest,
             fm: { modulation: fmModulation, feedback: fmFeedback, harmonic: fmHarmonic, adsr: fmAdsr },
           }));
+        console.log('[KlysView] updating klysNative with', instruments.length, 'instruments');
         useFormatStore.setState({
           klysNative: {
             ...current,

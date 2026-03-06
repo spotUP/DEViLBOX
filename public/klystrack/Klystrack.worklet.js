@@ -193,11 +193,13 @@ class KlystrackProcessor extends AudioWorkletProcessor {
     if (!this.wasm || !this.initialized) return;
 
     const data = new Uint8Array(buffer);
+    console.log('[Klystrack Worklet] loadSong: buffer size:', data.length);
     const ptr = this.wasm._malloc(data.length);
     const heap = new Uint8Array(this.wasm.HEAPU8.buffer, ptr, data.length);
     heap.set(data);
 
     const ok = this.wasm._klys_load_song(ptr, data.length);
+    console.log('[Klystrack Worklet] _klys_load_song returned:', ok);
     this.wasm._free(ptr);
 
     if (ok) {
@@ -207,6 +209,7 @@ class KlystrackProcessor extends AudioWorkletProcessor {
       const channels = this.wasm._klys_get_num_channels();
       const numPatterns = this.wasm._klys_get_num_patterns();
       const numInstruments = this.wasm._klys_get_num_instruments();
+      console.log('[Klystrack Worklet] Song loaded - channels:', channels, 'patterns:', numPatterns, 'instruments:', numInstruments);
 
       const meta = {
         type: 'songLoaded',
@@ -241,6 +244,7 @@ class KlystrackProcessor extends AudioWorkletProcessor {
 
   extractAndSendData(numPatterns, numChannels, numInstruments) {
     try {
+    console.log('[Klystrack Worklet] extractAndSendData:', { numPatterns, numChannels, numInstruments });
     const w = this.wasm;
     const MAX_STEPS = 256;
     const STEP_BYTES = 6;
@@ -252,6 +256,7 @@ class KlystrackProcessor extends AudioWorkletProcessor {
     for (let i = 0; i < numPatterns; i++) {
       const patLen = w._klys_get_pattern_length(i);
       const n = w._klys_get_pattern_data(i, patPtr, MAX_STEPS);
+      console.log(`[Klystrack Worklet] Pattern ${i}: length=${patLen}, steps=${n}`);
       const raw = new Uint8Array(w.HEAPU8.buffer, patPtr, n * STEP_BYTES);
       const steps = [];
       for (let s = 0; s < n; s++) {
@@ -351,12 +356,18 @@ class KlystrackProcessor extends AudioWorkletProcessor {
     }
     w._free(instPtr);
 
+    console.log('[Klystrack Worklet] Sending songData:', {
+      patterns: patterns.length,
+      sequences: sequences.length,
+      instruments: instruments.length,
+    });
     this.port.postMessage({
       type: 'songData',
       patterns,
       sequences,
       instruments,
     });
+    console.log('[Klystrack Worklet] songData message posted');
     } catch (err) {
       console.error('[Klystrack Worklet] extractAndSendData failed:', err);
       this.port.postMessage({ type: 'error', message: 'extractAndSendData: ' + (err.message || String(err)) });

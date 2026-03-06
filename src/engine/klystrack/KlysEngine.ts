@@ -219,6 +219,12 @@ export class KlysEngine {
           break;
 
         case 'songData':
+          console.log('[KlysEngine] songData message received:', {
+            patterns: data.patterns?.length,
+            sequences: data.sequences?.length,
+            instruments: data.instruments?.length,
+            callbacks: this._songDataCallbacks.size,
+          });
           this._lastSongData = {
             patterns: data.patterns,
             sequences: data.sequences,

@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-03-06T10:11:46.725Z
+ * Generated: 2026-03-06T13:01:02.610Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.2460';
-export const BUILD_NUMBER = '2460';
-export const BUILD_HASH = '4acd81224';
+export const BUILD_VERSION = '1.0.2473';
+export const BUILD_NUMBER = '2473';
+export const BUILD_HASH = '57bec63c5';
 export const BUILD_DATE = '2026-03-06';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,61 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.2460',
+    version: '1.0.2473',
     date: '2026-03-06',
     changes: [
+      {
+        type: 'improvement',
+        "description": "Chore: clean up diagnostic logging from klystrack engine"
+      },
+      {
+        type: 'feature',
+        "description": "Add DEViLBOX integration phases (9-13) to 68k transpile skill"
+      },
+      {
+        type: 'fix',
+        "description": "Replace TextDecoder with manual ASCII decode in klystrack worklet"
+      },
+      {
+        type: 'fix',
+        "description": "Klystrack WASM init robustness and diagnostic logging"
+      },
+      {
+        type: 'feature',
+        "description": "Add PixiRemapInstrumentDialog for GL/DOM parity"
+      },
+      {
+        type: 'feature',
+        "description": "GL/DOM parity — acid pattern dialog + Modland/HVSC browser panels"
+      },
+      {
+        type: 'fix',
+        "description": "Load klystrack song into WASM engine and populate pattern data"
+      },
+      {
+        type: 'feature',
+        "description": "Add Pixi GL views for JamCracker and Klystrack formats"
+      },
+      {
+        type: 'fix',
+        "description": "Add KlysSynth to ToneEngine switch cases"
+      },
+      {
+        type: 'improvement',
+        "description": "Extract format state from useTrackerStore into useFormatStore"
+      },
+      {
+        type: 'feature',
+        "description": "Add pattern editing for JamCracker and MusicLine formats"
+      },
+      {
+        type: 'feature',
+        "description": "Add Virus C Trancy hardware skin assets"
+      },
+      {
+        type: 'improvement',
+        "description": "Chore: gitignore build artifacts, remove tracked build dirs, update changelog"
+      },
       {
         type: 'feature',
         "description": "Gearmulator hardware skin UI integration"
@@ -186,58 +238,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'feature',
         "description": "Phase 5 — Preview generation with LUFS normalization"
-      },
-      {
-        type: 'feature',
-        "description": "Effect taxonomy mappings and accessibility names (phases 8-9)"
-      },
-      {
-        type: 'feature',
-        "description": "Implement NKS2 SDK v2.0.2 compliance (phases 1-4, 6-7)"
-      },
-      {
-        type: 'feature',
-        "description": "Add interactive editing to GT Ultra DOM components"
-      },
-      {
-        type: 'improvement',
-        "description": "Polish GT Ultra DOM UI with FT2 theme and wire into TrackerView"
-      },
-      {
-        type: 'improvement',
-        "description": "Allow Hively songs to display in DOM pattern editor"
-      },
-      {
-        type: 'feature',
-        "description": "Add MIDI Controller and NKS setup wizards"
-      },
-      {
-        type: 'improvement',
-        "description": "Allow Furnace songs to display in DOM mode pattern editor"
-      },
-      {
-        type: 'improvement',
-        "description": "Route C64SIDEngine through synthBus for master FX + pitch control"
-      },
-      {
-        type: 'fix',
-        "description": "Handle unhandled promise rejections in USB write path"
-      },
-      {
-        type: 'fix',
-        "description": "Improve wizard connect flow with auto-pair and browser dialog guidance"
-      },
-      {
-        type: 'feature',
-        "description": "Setup wizard and hardware UX improvements"
-      },
-      {
-        type: 'fix',
-        "description": "SAM speech flags, add Link peer sync, wire Modland remix query"
-      },
-      {
-        type: 'fix',
-        "description": "Add view error boundaries and Yoga BindingError recovery"
       }
     ]
   }
