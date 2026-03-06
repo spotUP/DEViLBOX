@@ -163,6 +163,11 @@ file(GLOB VIRUSLIB_SRC "${GM_SRC}/virusLib/*.cpp")
 add_library(virusLib STATIC ${VIRUSLIB_SRC})
 target_include_directories(virusLib PUBLIC "${GM_SRC}")
 target_link_libraries(virusLib PUBLIC synthLib hardwareLib mc68k)
+if(EMSCRIPTEN)
+    # Pre-boot snapshot: skip 20+ min DSP boot, load memory dump directly
+    target_compile_definitions(virusLib PRIVATE GM_USE_SNAPSHOT=1)
+    target_include_directories(virusLib PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
+endif()
 
 # ──────────────────────────────────────────────────────────────────────────────
 # wLib — shared Waldorf library
