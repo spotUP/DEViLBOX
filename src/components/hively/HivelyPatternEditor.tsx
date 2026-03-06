@@ -5,10 +5,14 @@
  * Each channel shows: Note | Instrument | FX1+Param | FX2+Param
  *
  * Note values: 0=empty, 1-60 (C-0 to B-4). Per-channel transpose applied.
+ * Supports editing: note input, hex entry for instrument/fx, delete/backspace.
  */
 
 import React, { useRef, useEffect, useCallback, useMemo, useState } from 'react';
 import { useTransportStore } from '@stores/useTransportStore';
+import { useTrackerStore } from '@stores';
+import { useEditorStore } from '@stores/useEditorStore';
+import { HivelyEngine } from '@/engine/hively/HivelyEngine';
 import type { HivelyNativeData } from '@/types/tracker';
 
 // --- Constants ---
@@ -56,7 +60,20 @@ const COLORS = {
   selection: 'rgba(100, 149, 237, 0.25)',
   playRow: 'rgba(233, 69, 96, 0.15)',
   channelSep: '#222',
+  recording: 'rgba(233, 69, 96, 0.35)',
 };
+
+// FT2-style note input: key → semitone offset from octave base
+const LOWER_OCTAVE: Record<string, number> = {
+  z: 0, s: 1, x: 2, d: 3, c: 4, v: 5, g: 6, b: 7, h: 8, n: 9, j: 10, m: 11,
+};
+const UPPER_OCTAVE: Record<string, number> = {
+  q: 0, '2': 1, w: 2, '3': 3, e: 4, r: 5, '5': 6, t: 7, '6': 8, y: 9, '7': 10, u: 11,
+  i: 12, '9': 13, o: 14, '0': 15, p: 16,
+};
+
+function isHexChar(k: string): boolean { return /^[0-9a-f]$/i.test(k); }
+function hexVal(k: string): number { return parseInt(k, 16); }
 
 interface CursorPos {
   channel: number;
@@ -77,8 +94,12 @@ export const HivelyPatternEditor: React.FC<HivelyPatternEditorProps> = ({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const isPlaying = useTransportStore(s => s.isPlaying);
   const currentRow = useTransportStore(s => s.currentRow);
+  const recordMode = useEditorStore(s => s.recordMode);
+  const editStep = useEditorStore(s => s.editStep);
+  const currentOctave = useEditorStore(s => s.currentOctave);
 
   const [cursor, setCursorState] = useState<CursorPos>({ channel: 0, row: 0, column: 0 });
+  const [hexDigit, setHexDigit] = useState(0); // tracks digit position within hex columns
   const [selection, setSelection] = useState<{
     active: boolean; startChannel: number; startRow: number; endChannel: number; endRow: number;
   }>({ active: false, startChannel: 0, startRow: 0, endChannel: 0, endRow: 0 });
@@ -219,28 +240,71 @@ export const HivelyPatternEditor: React.FC<HivelyPatternEditorProps> = ({
           case 2: colOffset = NOTE_W + COL_GAP + INS_W + COL_GAP; colWidth = FX_W; break;
           case 3: colOffset = NOTE_W + COL_GAP + INS_W + COL_GAP + FX_W + COL_GAP; colWidth = FX_W; break;
         }
-        ctx.fillStyle = COLORS.cursor;
+        ctx.fillStyle = recordMode ? COLORS.recording : COLORS.cursor;
         ctx.fillRect(cx + colOffset, y, colWidth, ROW_H);
-        ctx.strokeStyle = COLORS.cursorBorder;
+        ctx.strokeStyle = recordMode ? '#e94560' : COLORS.cursorBorder;
         ctx.lineWidth = 1;
         ctx.strokeRect(cx + colOffset + 0.5, y + 0.5, colWidth - 1, ROW_H - 1);
       }
     }
-  }, [width, height, cursor, selection, currentRow, isPlaying,
+  }, [width, height, cursor, selection, currentRow, isPlaying, recordMode,
       scrollRow, visibleRows, numChannels, trackLength, position, nativeData]);
+
+  // Write a step to WASM and update store
+  const writeStep = useCallback((channel: number, row: number,
+    note: number, instrument: number, fx: number, fxParam: number, fxb: number, fxbParam: number) => {
+    if (!position) return;
+    const trackIdx = position.track[channel];
+    if (trackIdx === undefined) return;
+    const track = nativeData.tracks[trackIdx];
+    if (!track || row >= track.steps.length) return;
+
+    // Update store
+    const step = track.steps[row];
+    step.note = note;
+    step.instrument = instrument;
+    step.fx = fx;
+    step.fxParam = fxParam;
+    step.fxb = fxb;
+    step.fxbParam = fxbParam;
+
+    // Update WASM
+    if (HivelyEngine.hasInstance()) {
+      HivelyEngine.getInstance().setTrackStep(trackIdx, row, note, instrument, fx, fxParam, fxb, fxbParam);
+    }
+
+    // Force store re-render
+    useTrackerStore.setState((s) => {
+      if (s.hivelyNative) {
+        s.hivelyNative = { ...s.hivelyNative };
+      }
+    });
+  }, [position, nativeData]);
+
+  // Advance cursor by editStep rows
+  const advanceCursor = useCallback(() => {
+    if (editStep > 0) {
+      setCursorState(c => ({ ...c, row: Math.min(trackLength - 1, c.row + editStep) }));
+    }
+  }, [editStep, trackLength]);
 
   // Keyboard
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     const { key, shiftKey } = e;
+    const k = key.toLowerCase();
+
+    // Navigation keys (always active)
     switch (key) {
       case 'ArrowUp':
         e.preventDefault();
         setCursorState(c => ({ ...c, row: Math.max(0, c.row - 1) }));
-        break;
+        setHexDigit(0);
+        return;
       case 'ArrowDown':
         e.preventDefault();
         setCursorState(c => ({ ...c, row: Math.min(trackLength - 1, c.row + 1) }));
-        break;
+        setHexDigit(0);
+        return;
       case 'ArrowLeft':
         e.preventDefault();
         setCursorState(c => {
@@ -248,7 +312,8 @@ export const HivelyPatternEditor: React.FC<HivelyPatternEditorProps> = ({
           if (c.channel > 0) return { ...c, channel: c.channel - 1, column: 3 };
           return c;
         });
-        break;
+        setHexDigit(0);
+        return;
       case 'ArrowRight':
         e.preventDefault();
         setCursorState(c => {
@@ -256,32 +321,142 @@ export const HivelyPatternEditor: React.FC<HivelyPatternEditorProps> = ({
           if (c.channel < numChannels - 1) return { ...c, channel: c.channel + 1, column: 0 };
           return c;
         });
-        break;
+        setHexDigit(0);
+        return;
       case 'Tab':
         e.preventDefault();
         setCursorState(c => {
           if (shiftKey) return { ...c, channel: Math.max(0, c.channel - 1), column: 0 };
           return { ...c, channel: Math.min(numChannels - 1, c.channel + 1), column: 0 };
         });
-        break;
+        setHexDigit(0);
+        return;
       case 'PageUp':
         e.preventDefault();
         setCursorState(c => ({ ...c, row: Math.max(0, c.row - 16) }));
-        break;
+        setHexDigit(0);
+        return;
       case 'PageDown':
         e.preventDefault();
         setCursorState(c => ({ ...c, row: Math.min(trackLength - 1, c.row + 16) }));
-        break;
+        setHexDigit(0);
+        return;
       case 'Home':
         e.preventDefault();
         setCursorState(c => ({ ...c, row: 0 }));
-        break;
+        setHexDigit(0);
+        return;
       case 'End':
         e.preventDefault();
         setCursorState(c => ({ ...c, row: trackLength - 1 }));
-        break;
+        setHexDigit(0);
+        return;
     }
-  }, [trackLength, numChannels]);
+
+    // Editing keys (only when record mode is on and not playing)
+    if (!recordMode || isPlaying) return;
+    if (!position) return;
+
+    const trackIdx = position.track[cursor.channel];
+    if (trackIdx === undefined) return;
+    const track = nativeData.tracks[trackIdx];
+    if (!track) return;
+    const step = track.steps[cursor.row];
+    if (!step) return;
+
+    // Delete / Backspace — clear current cell
+    if (key === 'Delete' || key === 'Backspace') {
+      e.preventDefault();
+      if (cursor.column === 0) {
+        writeStep(cursor.channel, cursor.row, 0, step.instrument, step.fx, step.fxParam, step.fxb, step.fxbParam);
+      } else if (cursor.column === 1) {
+        writeStep(cursor.channel, cursor.row, step.note, 0, step.fx, step.fxParam, step.fxb, step.fxbParam);
+      } else if (cursor.column === 2) {
+        writeStep(cursor.channel, cursor.row, step.note, step.instrument, 0, 0, step.fxb, step.fxbParam);
+      } else {
+        writeStep(cursor.channel, cursor.row, step.note, step.instrument, step.fx, step.fxParam, 0, 0);
+      }
+      setHexDigit(0);
+      if (key === 'Backspace') {
+        setCursorState(c => ({ ...c, row: Math.max(0, c.row - 1) }));
+      } else {
+        advanceCursor();
+      }
+      return;
+    }
+
+    // Note column input
+    if (cursor.column === 0) {
+      const lowerSemi = LOWER_OCTAVE[k];
+      const upperSemi = UPPER_OCTAVE[k];
+      if (lowerSemi !== undefined) {
+        e.preventDefault();
+        const noteVal = (currentOctave - 1) * 12 + lowerSemi + 1;
+        if (noteVal >= 1 && noteVal <= 60) {
+          writeStep(cursor.channel, cursor.row, noteVal, step.instrument, step.fx, step.fxParam, step.fxb, step.fxbParam);
+          advanceCursor();
+        }
+        return;
+      }
+      if (upperSemi !== undefined) {
+        e.preventDefault();
+        const noteVal = currentOctave * 12 + upperSemi + 1;
+        if (noteVal >= 1 && noteVal <= 60) {
+          writeStep(cursor.channel, cursor.row, noteVal, step.instrument, step.fx, step.fxParam, step.fxb, step.fxbParam);
+          advanceCursor();
+        }
+        return;
+      }
+      return;
+    }
+
+    // Hex input for instrument/fx columns
+    if (!isHexChar(k)) return;
+    e.preventDefault();
+    const hv = hexVal(k);
+
+    if (cursor.column === 1) {
+      // Instrument: 2 hex digits (00-3F)
+      const oldVal = step.instrument;
+      let newVal: number;
+      if (hexDigit === 0) {
+        newVal = (hv << 4) | (oldVal & 0x0F);
+        setHexDigit(1);
+      } else {
+        newVal = (oldVal & 0xF0) | hv;
+        setHexDigit(0);
+        advanceCursor();
+      }
+      writeStep(cursor.channel, cursor.row, step.note, newVal & 0x3F, step.fx, step.fxParam, step.fxb, step.fxbParam);
+    } else if (cursor.column === 2) {
+      // FX1: 3 hex digits — type (0-F) + param (00-FF)
+      if (hexDigit === 0) {
+        writeStep(cursor.channel, cursor.row, step.note, step.instrument, hv, step.fxParam, step.fxb, step.fxbParam);
+        setHexDigit(1);
+      } else if (hexDigit === 1) {
+        writeStep(cursor.channel, cursor.row, step.note, step.instrument, step.fx, (hv << 4) | (step.fxParam & 0x0F), step.fxb, step.fxbParam);
+        setHexDigit(2);
+      } else {
+        writeStep(cursor.channel, cursor.row, step.note, step.instrument, step.fx, (step.fxParam & 0xF0) | hv, step.fxb, step.fxbParam);
+        setHexDigit(0);
+        advanceCursor();
+      }
+    } else {
+      // FX2: 3 hex digits
+      if (hexDigit === 0) {
+        writeStep(cursor.channel, cursor.row, step.note, step.instrument, step.fx, step.fxParam, hv, step.fxbParam);
+        setHexDigit(1);
+      } else if (hexDigit === 1) {
+        writeStep(cursor.channel, cursor.row, step.note, step.instrument, step.fx, step.fxParam, step.fxb, (hv << 4) | (step.fxbParam & 0x0F));
+        setHexDigit(2);
+      } else {
+        writeStep(cursor.channel, cursor.row, step.note, step.instrument, step.fx, step.fxParam, step.fxb, (step.fxbParam & 0xF0) | hv);
+        setHexDigit(0);
+        advanceCursor();
+      }
+    }
+  }, [trackLength, numChannels, recordMode, isPlaying, position, nativeData,
+      cursor, currentOctave, editStep, hexDigit, writeStep, advanceCursor]);
 
   // Mouse hit test
   const hitTest = useCallback((clientX: number, clientY: number) => {
