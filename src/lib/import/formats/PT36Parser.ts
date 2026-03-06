@@ -568,6 +568,7 @@ function parseMODBuffer(
     initialSpeed,
     initialBPM,
     linearPeriods:   false,
+    pt2FileData:     buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength),
   };
 }
 
