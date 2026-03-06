@@ -68,20 +68,22 @@ async function getModule(): Promise<WasmModule> {
   if (loadPromise) return loadPromise;
 
   loadPromise = (async () => {
-    // Load the factory function via script tag injection
+    // The Emscripten JS glue uses IIFE / CommonJS — inject via <script> tag
+    // so `createOpenMPTSoundlib` lands on globalThis.
     const scriptUrl = '/openmpt/OpenMPTSoundlib.js';
-    const response = await fetch(scriptUrl);
-    const jsText = await response.text();
 
-    // Execute the module factory code
-    const blob = new Blob([jsText], { type: 'application/javascript' });
-    const blobUrl = URL.createObjectURL(blob);
+    await new Promise<void>((resolve, reject) => {
+      const script = document.createElement('script');
+      script.src = scriptUrl;
+      script.onload = () => resolve();
+      script.onerror = () => reject(new Error('Failed to load OpenMPTSoundlib.js'));
+      document.head.appendChild(script);
+    });
 
-    // Dynamic import of the WASM factory
-    const mod = await import(/* @vite-ignore */ blobUrl);
-    URL.revokeObjectURL(blobUrl);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const factory = (globalThis as any).createOpenMPTSoundlib;
+    if (!factory) throw new Error('createOpenMPTSoundlib not found after script load');
 
-    const factory = mod.default || mod.createOpenMPTSoundlib || mod;
     wasmInstance = await factory({
       locateFile: (path: string) => `/openmpt/${path}`,
     });
