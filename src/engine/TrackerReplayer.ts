@@ -14,7 +14,7 @@
  */
 
 import * as Tone from 'tone';
-import type { Pattern, TrackerCell, FurnaceNativeData, HivelyNativeData, FurnaceSubsongPlayback } from '@/types';
+import type { Pattern, TrackerCell, FurnaceNativeData, HivelyNativeData, KlysNativeData, FurnaceSubsongPlayback } from '@/types';
 import type { InstrumentConfig, FurnaceMacro } from '@/types/instrument';
 import { FurnaceMacroType } from '@/types/instrument';
 import { PatternAccessor } from './PatternAccessor';
@@ -101,7 +101,8 @@ export type TrackerFormat =
   | 'JamCracker'       // JamCracker Pro (.jam, .jc)
   | 'FuturePlayer'     // Future Player (Wanted Team, .fp)
   | 'PMD'              // PC-98 Professional Music Driver (YM2608/OPNA)
-  | 'AdPlug';          // PC AdLib/OPL formats (RAD, HSC, DRO, IMF, CMF)
+  | 'AdPlug'           // PC AdLib/OPL formats (RAD, HSC, DRO, IMF, CMF)
+  | 'KT';              // Klystrack chiptune tracker (.kt)
 
 /**
  * Channel state - all the per-channel data needed for playback
@@ -253,11 +254,13 @@ export interface TrackerSong {
   jamCrackerFileData?: ArrayBuffer;
   /** Raw Future Player .fp binary for loading into the FuturePlayerEngine WASM */
   futurePlayerFileData?: ArrayBuffer;
-  /** Raw MOD binary for loading into the PT2Engine WASM (authentic Paula emulation) */
-  pt2FileData?: ArrayBuffer;
   // Native format data (preserved for format-specific editors)
   furnaceNative?: FurnaceNativeData;
   hivelyNative?: HivelyNativeData;
+  /** Native klystrack data for the klystrack pattern editor */
+  klysNative?: KlysNativeData;
+  /** Raw klystrack .kt binary for loading into the KlysEngine WASM */
+  klysFileData?: ArrayBuffer;
   // Pre-converted subsong data for in-editor subsong switching
   furnaceSubsongs?: FurnaceSubsongPlayback[];
   furnaceActiveSubsong?: number;
