@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Gearmulator WASM Test</title>
+  <style>
+    body { font-family: monospace; background: #1a1a2e; color: #e0e0e0; padding: 20px; }
+    h1 { color: #0ff; }
+    .controls { display: flex; gap: 10px; align-items: center; margin: 10px 0; flex-wrap: wrap; }
+    button { background: #333; color: #0ff; border: 1px solid #0ff; padding: 6px 14px; cursor: pointer; font-family: monospace; }
+    button:disabled { opacity: 0.4; cursor: not-allowed; }
+    button:hover:not(:disabled) { background: #0ff; color: #000; }
+    select, input[type=file] { background: #222; color: #e0e0e0; border: 1px solid #555; padding: 4px; font-family: monospace; }
+    #log { background: #0a0a1a; border: 1px solid #333; padding: 10px; height: 400px; overflow-y: auto; white-space: pre-wrap; font-size: 12px; }
+    .ok { color: #0f0; } .warn { color: #ff0; } .error { color: #f44; }
+    #meter { width: 300px; height: 20px; background: #111; border: 1px solid #333; }
+    #meterFill { height: 100%; background: linear-gradient(90deg, #0f0, #ff0, #f00); width: 0%; transition: width 50ms; }
+    label { color: #888; }
+  </style>
+</head>
+<body>
+  <h1>Gearmulator WASM Test</h1>
+
+  <div class="controls">
+    <label>ROM:</label>
+    <select id="romSelect">
+      <option value="roms/gearmulator/extracted/Access Virus B (am29f040b_4v9).BIN" data-type="0">Virus B</option>
+      <option value="roms/gearmulator/extracted/Access Virus C (am29f040b_6v6).BIN" data-type="1">Virus C</option>
+    </select>
+    <input type="file" id="romFile" accept=".bin,.BIN,.rom,.ROM">
+    <label>Type:</label>
+    <select id="synthType">
+      <option value="0">Virus A/B (0)</option>
+      <option value="1">Virus C (1)</option>
+      <option value="2">Virus TI (2)</option>
+    </select>
+  </div>
+
+  <div class="controls">
+    <button id="btnInit">Initialize</button>
+    <span id="initStatus"></span>
+    <button id="btnNote" disabled>Play C4</button>
+    <button id="btnChord" disabled>Play Chord</button>
+    <button id="btnStop" disabled>All Notes Off</button>
+  </div>
+
+  <div class="controls">
+    <label>Volume:</label>
+    <input type="range" id="volSlider" min="-40" max="6" value="0" step="1">
+    <span id="volLabel">0 dB</span>
+    <div id="meter"><div id="meterFill"></div></div>
+  </div>
+
+  <div id="log"></div>
+
+  <script>
+    const SAB_HEADER = 16;
+    const RING_FRAMES = 8192;
+    const SAB_SIZE = SAB_HEADER + RING_FRAMES * 2 * 4;
+
+    const logEl = document.getElementById('log');
+    const romSelect = document.getElementById('romSelect');
+    const romFile = document.getElementById('romFile');
+    const synthType = document.getElementById('synthType');
+    const btnInit = document.getElementById('btnInit');
+    const initStatus = document.getElementById('initStatus');
+    const btnNote = document.getElementById('btnNote');
+    const btnChord = document.getElementById('btnChord');
+    const btnStop = document.getElementById('btnStop');
+    const volSlider = document.getElementById('volSlider');
+    const volLabel = document.getElementById('volLabel');
+    const meterFill = document.getElementById('meterFill');
+
+    let audioCtx = null;
+    let workletNode = null;
+    let gainNode = null;
+    let analyser = null;
+    let dspWorker = null;
+    let sab = null;
+    let wasmBinary = null;
+    let jsCode = null;
+    let romData = null;
+    let ready = false;
+
+    // Auto-select synth type from ROM dropdown
+    romSelect.addEventListener('change', () => {
+      const opt = romSelect.options[romSelect.selectedIndex];
+      if (opt.dataset.type) synthType.value = opt.dataset.type;
+    });
+
+    volSlider.addEventListener('input', () => {
+      const db = parseFloat(volSlider.value);
+      volLabel.textContent = db + ' dB';
+      if (gainNode) gainNode.gain.value = Math.pow(10, db / 20);
+    });
+
+    function log(msg, cls) {
+      const ts = new Date().toLocaleTimeString('en-US', { hour12: false, fractionalSecondDigits: 3 });
+      const line = document.createElement('div');
+      if (cls) line.className = cls;
+      line.textContent = `[${ts}] ${msg}`;
+      logEl.appendChild(line);
+      logEl.scrollTop = logEl.scrollHeight;
+      console.log(`[Gearmulator Test] ${msg}`);
+    }
+
+    async function loadWasmAssets() {
+      log('Fetching gearmulator_wasm.wasm...');
+      const t0 = performance.now();
+      const [wasmResp, jsResp] = await Promise.all([
+        fetch('/gearmulator/gearmulator_wasm.wasm'),
+        fetch('/gearmulator/gearmulator_wasm.js'),
+      ]);
+      if (!wasmResp.ok) throw new Error(`WASM fetch failed: ${wasmResp.status}`);
+      if (!jsResp.ok) throw new Error(`JS fetch failed: ${jsResp.status}`);
+
+      wasmBinary = await wasmResp.arrayBuffer();
+      let code = await jsResp.text();
+      // Transform for Worker scope — strip ESM export if present
+      code = code
+        .replace(/import\.meta\.url/g, "'.'")
+        .replace(/export\s+default\s+\w+;?/g, '');
+      jsCode = code;
+      log(`WASM assets loaded in ${(performance.now()-t0).toFixed(0)}ms (${(wasmBinary.byteLength/1024).toFixed(0)}KB)`, 'ok');
+    }
+
+    async function loadRom() {
+      if (romFile.files.length > 0) {
+        log(`Loading ROM from file: ${romFile.files[0].name}`);
+        romData = await romFile.files[0].arrayBuffer();
+      } else if (romSelect.value) {
+        log(`Fetching ROM: ${romSelect.value}...`);
+        const resp = await fetch(`/${romSelect.value}`);
+        if (!resp.ok) throw new Error(`ROM fetch failed: ${resp.status}`);
+        romData = await resp.arrayBuffer();
+      } else {
+        throw new Error('No ROM selected');
+      }
+      log(`ROM loaded: ${(romData.byteLength/1024).toFixed(0)}KB`, 'ok');
+    }
+
+    // Initialize — Worker + SAB + Worklet architecture
+    btnInit.addEventListener('click', async () => {
+      try {
+        btnInit.disabled = true;
+        initStatus.textContent = '⏳ Loading...';
+
+        await loadWasmAssets();
+        await loadRom();
+
+        log('Creating AudioContext...');
+        audioCtx = new AudioContext({ sampleRate: 44100 });
+        if (audioCtx.state === 'suspended') await audioCtx.resume();
+
+        // Create SharedArrayBuffer for audio ring buffer
+        sab = new SharedArrayBuffer(SAB_SIZE);
+        log(`SharedArrayBuffer created: ${(SAB_SIZE/1024).toFixed(0)}KB (${RING_FRAMES} frames)`);
+
+        log('Loading AudioWorklet module...');
+        await audioCtx.audioWorklet.addModule('/gearmulator/Gearmulator.worklet.js');
+
+        log('Creating worklet node (SAB reader)...');
+        workletNode = new AudioWorkletNode(audioCtx, 'gearmulator-processor', {
+          outputChannelCount: [2],
+        });
+
+        gainNode = audioCtx.createGain();
+        gainNode.gain.value = Math.pow(10, parseFloat(volSlider.value) / 20);
+
+        analyser = audioCtx.createAnalyser();
+        analyser.fftSize = 2048;
+
+        workletNode.connect(gainNode);
+        gainNode.connect(analyser);
+        analyser.connect(audioCtx.destination);
+
+        // Send SAB to worklet
+        workletNode.port.postMessage({ type: 'setSAB', sab });
+        workletNode.port.onmessage = (e) => {
+          if (e.data.type === 'underrun' && e.data.count % 200 === 1) {
+            log(`Audio underrun #${e.data.count} (avail=${e.data.available}, need=${e.data.needed})`, 'warn');
+          }
+        };
+
+        // Create DSP Worker
+        log('Creating DSP Worker (WASM + pthreads)...');
+        dspWorker = new Worker('/gearmulator/Gearmulator.worker.js');
+
+        const readyPromise = new Promise((resolve, reject) => {
+          const timeout = setTimeout(() => reject(new Error('Init timeout (60s)')), 60000);
+          dspWorker.onmessage = (e) => {
+            console.log('[Main] Worker message:', e.data);
+            if (e.data.type === 'ready') {
+              clearTimeout(timeout);
+              resolve(e.data);
+            } else if (e.data.type === 'error') {
+              clearTimeout(timeout);
+              log(`✗ Worker error: ${e.data.message}`, 'error');
+              reject(new Error(e.data.message));
+            }
+          };
+          dspWorker.onerror = (e) => {
+            clearTimeout(timeout);
+            log(`✗ Worker onerror: ${e.message}`, 'error');
+            reject(new Error(`Worker error: ${e.message}`));
+          };
+        });
+
+        const st = parseInt(synthType.value);
+        log(`Sending init to DSP Worker — synthType=${st}, sampleRate=${audioCtx.sampleRate}...`);
+        const initStart = performance.now();
+
+        dspWorker.postMessage({
+          type: 'init',
+          sampleRate: audioCtx.sampleRate,
+          wasmBinary,
+          jsCode,
+          romData,
+          synthType: st,
+          sab,
+        });
+
+        const result = await readyPromise;
+        const elapsed = ((performance.now() - initStart) / 1000).toFixed(1);
+        log(`✓ Device ready! sampleRate=${result.sampleRate}, handle=${result.handle} (${elapsed}s)`, 'ok');
+        ready = true;
+        initStatus.textContent = '✅ Ready';
+        btnNote.disabled = false;
+        btnChord.disabled = false;
+        btnStop.disabled = false;
+        startMeter();
+
+      } catch (err) {
+        log(`✗ Init failed: ${err}`, 'error');
+        initStatus.textContent = '❌ Failed';
+        btnInit.disabled = false;
+      }
+    });
+
+    function sendMidi(type, data) {
+      if (dspWorker) dspWorker.postMessage({ type, ...data });
+    }
+
+    btnNote.addEventListener('click', () => {
+      sendMidi('noteOn', { note: 60, velocity: 100, channel: 0 });
+      log('Note On: C4 (60) vel=100');
+      setTimeout(() => {
+        sendMidi('noteOff', { note: 60, channel: 0 });
+        log('Note Off: C4');
+      }, 1000);
+    });
+
+    btnChord.addEventListener('click', () => {
+      [60, 64, 67].forEach(n => sendMidi('noteOn', { note: n, velocity: 100, channel: 0 }));
+      log('Chord: C4 E4 G4');
+      setTimeout(() => {
+        [60, 64, 67].forEach(n => sendMidi('noteOff', { note: n, channel: 0 }));
+        log('Chord off');
+      }, 2000);
+    });
+
+    btnStop.addEventListener('click', () => {
+      for (let n = 0; n < 128; n++) sendMidi('noteOff', { note: n, channel: 0 });
+      log('All notes off');
+    });
+
+    function startMeter() {
+      const buf = new Uint8Array(analyser.frequencyBinCount);
+      function tick() {
+        analyser.getByteTimeDomainData(buf);
+        let peak = 0;
+        for (let i = 0; i < buf.length; i++) {
+          const s = Math.abs(buf[i] - 128) / 128;
+          if (s > peak) peak = s;
+        }
+        meterFill.style.width = (peak * 100) + '%';
+        if (ready) requestAnimationFrame(tick);
+      }
+      tick();
+    }
+  </script>
+</body>
+</html>
