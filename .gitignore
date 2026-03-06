@@ -119,3 +119,4 @@ public/modland/modland_hash.db
 server/data/deepsid.db
 server/data/deepsid-import/
 server/data/deepsid-images/
+pt2-replayer-wasm/build/
