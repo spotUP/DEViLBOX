@@ -35,6 +35,12 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
     this.tickAccumulator = 0;
     this.samplesPerTick = 0;
 
+    // Sequencer state
+    this.sequencerActive = false;
+    this._lastSeqOrder = 0;
+    this._lastSeqRow = 0;
+    this._posFrameCount = 0;
+
     // Oscilloscope readback
     this.oscSendCounter = 0;
     this.oscSendInterval = 12; // ~30fps at 128-sample frames (12 * 128/48000 ≈ 32ms)
@@ -268,6 +274,10 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
         for (const chip of this.chips.values()) {
           if (this.wasm) this.wasm.setTickRate(chip.handle, this.tickRate);
         }
+        // Also update sequencer divider if active
+        if (this.sequencerActive && this.wasm) {
+          this.wasm.seqSetDivider(this.tickRate);
+        }
         break;
 
       case 'mute': {
@@ -291,6 +301,81 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
         if (chip && this.wasm) {
           this.wasm.forceIns(chip.handle);
         }
+        break;
+      }
+
+      // ── Sequencer messages ──────────────────────────────
+      case 'seqLoadSong': {
+        if (!this.wasm) break;
+        // Reset sequencer state before loading (avoids stale dispatch handle crashes)
+        this.sequencerActive = false;
+        this.wasm.seqLoadSong(data.numChannels, data.patLen, data.ordersLen);
+        // Link sequencer to first chip's dispatch handle
+        if (this.chips.size > 0) {
+          const firstChip = this.chips.values().next().value;
+          this.wasm.seqSetDispatchHandle(firstChip.handle);
+        }
+        this.wasm.seqSetSampleRate(sampleRate);
+        this.wasm.seqSetDivider(this.tickRate);
+        this.sequencerActive = true;
+        this.port.postMessage({ type: 'seqLoaded', result: 0 });
+        break;
+      }
+      case 'seqSetEffectCols': {
+        if (this.wasm) this.wasm.seqSetEffectCols(data.ch, data.effectCols);
+        break;
+      }
+      case 'seqPlay': {
+        if (this.wasm) this.wasm.seqPlay(data.order || 0, data.row || 0);
+        break;
+      }
+      case 'seqStop': {
+        if (this.wasm && this.sequencerActive) this.wasm.seqStop();
+        break;
+      }
+      case 'seqSeek': {
+        if (this.wasm) this.wasm.seqSeek(data.order, data.row);
+        break;
+      }
+      case 'seqSetCell': {
+        if (this.wasm) this.wasm.seqSetCell(data.ch, data.pat, data.row, data.col, data.val);
+        break;
+      }
+      case 'seqSetOrder': {
+        if (this.wasm) this.wasm.seqSetOrder(data.ch, data.pos, data.patIdx);
+        break;
+      }
+      case 'seqSetSpeed': {
+        if (this.wasm) this.wasm.seqSetSpeed(data.speed1, data.speed2);
+        break;
+      }
+      case 'seqSetTempo': {
+        if (this.wasm) this.wasm.seqSetTempo(data.virtualN || 150, data.virtualD || 150);
+        break;
+      }
+      case 'seqSetCompatFlags': {
+        if (this.wasm) this.wasm.seqSetCompatFlags(data.flags || 0, data.flagsExt || 0, data.pitchSlideSpeed || 4);
+        break;
+      }
+      case 'seqSetGrooveEntry': {
+        if (this.wasm && this.module && data.values && data.values.length > 0) {
+          // Allocate temp buffer in WASM memory for the groove values
+          const len = Math.min(data.len || data.values.length, 16);
+          const ptr = this.module._malloc(len * 2); // uint16_t
+          for (let i = 0; i < len; i++) {
+            this.module.HEAPU16[(ptr >> 1) + i] = data.values[i] || 6;
+          }
+          this.wasm.seqSetGrooveEntry(data.index || 0, ptr, len);
+          this.module._free(ptr);
+        }
+        break;
+      }
+      case 'seqSetChannelChip': {
+        if (this.wasm) this.wasm.seqSetChannelChip(data.channel || 0, data.chipId || 0, data.subIdx || 0);
+        break;
+      }
+      case 'seqSetRepeatPattern': {
+        if (this.wasm) this.wasm.seqSetRepeatPattern(data.repeat ? 1 : 0);
         break;
       }
 
@@ -423,6 +508,30 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
         // Compatibility flags
         setCompatFlags: this.module._furnace_dispatch_set_compat_flags,
         resetCompatFlags: this.module._furnace_dispatch_reset_compat_flags,
+        // Sequencer API
+        seqLoadSong: this.module._furnace_seq_load_song,
+        seqSetCell: this.module._furnace_seq_set_cell,
+        seqSetOrder: this.module._furnace_seq_set_order,
+        seqSetEffectCols: this.module._furnace_seq_set_effect_cols,
+        seqPlay: this.module._furnace_seq_play,
+        seqStop: this.module._furnace_seq_stop,
+        seqSeek: this.module._furnace_seq_seek,
+        seqSetSpeed: this.module._furnace_seq_set_speed,
+        seqSetTempo: this.module._furnace_seq_set_tempo,
+        seqSetGroove: this.module._furnace_seq_set_groove,
+        seqSetGrooveEntry: this.module._furnace_seq_set_groove_entry,
+        seqSetRepeatPattern: this.module._furnace_seq_set_repeat_pattern,
+        seqSetCompatFlags: this.module._furnace_seq_set_compat_flags,
+        seqSetChannelChip: this.module._furnace_seq_set_channel_chip,
+        seqSetPatLen: this.module._furnace_seq_set_pat_len,
+        seqSetDispatchHandle: this.module._furnace_seq_set_dispatch_handle,
+        seqSetSampleRate: this.module._furnace_seq_set_sample_rate,
+        seqSetDivider: this.module._furnace_seq_set_divider,
+        seqSetMute: this.module._furnace_seq_set_mute,
+        seqTick: this.module._furnace_seq_tick,
+        seqGetOrder: this.module._furnace_seq_get_order,
+        seqGetRow: this.module._furnace_seq_get_row,
+        seqIsPlaying: this.module._furnace_seq_is_playing,
       };
 
       // Allocate audio output buffers in WASM memory (shared scratch for render)
@@ -699,6 +808,13 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
       // (Furnace pattern: for (i=0; i<systemLen; i++) disCont[i].dispatch->tick())
       this.tickAccumulator += numSamples;
       while (this.tickAccumulator >= this.samplesPerTick) {
+        if (this.sequencerActive && this.wasm.seqIsPlaying && this.wasm.seqIsPlaying()) {
+          // WASM sequencer drives everything — calls dispatch_cmd() internally
+          const pos = this.wasm.seqTick();
+          this._lastSeqOrder = (pos >> 16) & 0xFFFF;
+          this._lastSeqRow = pos & 0xFFFF;
+        }
+        // Always tick chips for macro processing and audio generation
         for (const chip of this.chips.values()) {
           this.wasm.tick(chip.handle);
         }
@@ -726,6 +842,19 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
       if (this.oscSendCounter >= this.oscSendInterval) {
         this.oscSendCounter = 0;
         this.readOscilloscopeData();
+      }
+
+      // Sequencer position callback (~60fps)
+      if (this.sequencerActive && this.wasm.seqIsPlaying && this.wasm.seqIsPlaying()) {
+        this._posFrameCount++;
+        if (this._posFrameCount >= 12) {
+          this._posFrameCount = 0;
+          this.port.postMessage({
+            type: 'seqPosition',
+            order: this._lastSeqOrder,
+            row: this._lastSeqRow
+          });
+        }
       }
     } catch (e) {
       if (!this._errorReported) {
