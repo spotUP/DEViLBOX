@@ -230,6 +230,7 @@ export const useInstrumentStore = create<InstrumentStore>()(
         updates.envelope ||
         updates.filter ||
         updates.filterEnvelope ||
+        updates.pitchEnvelope ||
         updates.superSaw ||
         updates.polySynth ||
         updates.organ ||
@@ -239,6 +240,7 @@ export const useInstrumentStore = create<InstrumentStore>()(
         updates.stringMachine ||
         updates.formantSynth ||
         updates.wavetable ||
+        updates.harmonicSynth ||
         updates.granular ||
         updates.furnace ||
         updates.dubSiren ||
@@ -248,8 +250,36 @@ export const useInstrumentStore = create<InstrumentStore>()(
         updates.tb303 ||
         updates.buzzmachine ||
         updates.spaceLaser ||
+        updates.wobbleBass ||
         updates.v2 ||
         updates.wam ||
+        updates.mame ||
+        updates.dexed ||
+        updates.obxd ||
+        updates.rdpiano ||
+        updates.drumKit ||
+        updates.chiptuneModule ||
+        updates.hively ||
+        updates.jamCracker ||
+        updates.uade ||
+        updates.soundMon ||
+        updates.sidMon ||
+        updates.digMug ||
+        updates.fc ||
+        updates.deltaMusic1 ||
+        updates.deltaMusic2 ||
+        updates.sonicArranger ||
+        updates.fred ||
+        updates.tfmx ||
+        updates.hippelCoso ||
+        updates.robHubbard ||
+        updates.sidmon1 ||
+        updates.octamed ||
+        updates.davidWhittaker ||
+        updates.symphonie ||
+        updates.sunvox ||
+        updates.modularSynth ||
+        updates.gearmulator ||
         updates.parameters ||
         updates.sample ||
         updates.superCollider
@@ -474,17 +504,11 @@ export const useInstrumentStore = create<InstrumentStore>()(
               return; // Handled
             }
 
-            // Handle complex synths with applyConfig pattern
-            const complexSynthTypes = ['SuperSaw', 'WobbleBass', 'Organ', 'ChipSynth', 'PWMSynth', 'StringMachine', 'FormantSynth'];
-            if (complexSynthTypes.includes(updatedInstrument.synthType)) {
-              // Find the config key for this synth type (e.g. 'superSaw' for 'SuperSaw')
-              const configKey = updatedInstrument.synthType.charAt(0).toLowerCase() + updatedInstrument.synthType.slice(1);
-              const config = (updatedInstrument as unknown as Record<string, unknown>)[configKey];
-              if (config && (updates as unknown as Record<string, unknown>)[configKey]) {
-                engine.updateComplexSynthParameters(id, config);
-                return; // Handled
-              }
-            }
+            // Complex factory synths (SuperSaw, Organ, ChipSynth, PWMSynth,
+            // StringMachine, FormantSynth, WobbleBass) have partial applyConfig
+            // methods that only cover a subset of their parameters. Rather than
+            // silently swallowing unhandled param changes, we fall through to
+            // invalidateInstrument which recreates the synth with the full new config.
 
             // Standard Tone.js synths: update in-place instead of recreating
             const toneJsSynthTypes = ['Synth', 'FMSynth', 'AMSynth', 'MonoSynth', 'DuoSynth', 'PluckSynth',

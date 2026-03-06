@@ -215,6 +215,13 @@ export const useTrackerStore = create<TrackerStore>()(
         setCellInPattern(state.patterns[state.currentPatternIndex], channelIndex, rowIndex, cellUpdate);
       });
       useHistoryStore.getState().pushAction('EDIT_CELL', 'Edit cell', patternIndex, beforePattern, get().patterns[patternIndex]);
+      // Sync edit to WASM sequencer if active (Furnace formats)
+      try {
+        const replayer = getTrackerReplayer();
+        if (replayer.isWasmSequencerActive) {
+          replayer.syncCellToWasmSequencer(channelIndex, patternIndex, rowIndex, cellUpdate);
+        }
+      } catch { /* replayer not initialized yet */ }
     },
 
     clearCell: (channelIndex, rowIndex) => {
@@ -224,6 +231,16 @@ export const useTrackerStore = create<TrackerStore>()(
         clearCellInPattern(state.patterns[state.currentPatternIndex], channelIndex, rowIndex);
       });
       useHistoryStore.getState().pushAction('CLEAR_CELL', 'Clear cell', patternIndex, beforePattern, get().patterns[patternIndex]);
+      // Sync cleared cell to WASM sequencer if active (Furnace formats)
+      // Send -1 for all fields to mark them as empty in the sequencer
+      try {
+        const replayer = getTrackerReplayer();
+        if (replayer.isWasmSequencerActive) {
+          replayer.syncCellToWasmSequencer(channelIndex, patternIndex, rowIndex, {
+            note: -1, instrument: -1, volume: -1, effTyp: -1, eff: -1, effTyp2: -1, eff2: -1,
+          });
+        }
+      } catch { /* replayer not initialized yet */ }
     },
 
     clearChannel: (channelIndex) => {

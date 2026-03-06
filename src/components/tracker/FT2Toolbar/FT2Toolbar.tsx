@@ -551,6 +551,10 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
       if (initialBPM) setBPM(initialBPM);
       const initialSpeed = moduleInfo.nativeData?.importMetadata.modData?.initialSpeed;
       if (initialSpeed) setSpeed(initialSpeed);
+      // Set editor mode (Furnace native data for WASM sequencer, etc.)
+      useFormatStore.getState().applyEditorMode({
+        furnaceNative: moduleInfo.nativeData?.furnaceNative,
+      });
       notify.success(`Imported ${moduleInfo.metadata.type}: ${moduleInfo.metadata.title}`, 3000);
       await engine.preloadInstruments(instruments);
     } catch {

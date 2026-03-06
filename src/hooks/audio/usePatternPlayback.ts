@@ -26,7 +26,7 @@ export const usePatternPlayback = () => {
     currentPositionIndex: s.currentPositionIndex,
     setCurrentPosition: s.setCurrentPosition,
     })));
-  const { channelTrackTables, channelSpeeds, channelGrooves, hivelyNative, hivelyFileData, hivelyMeta, musiclineFileData, c64SidFileData, jamCrackerFileData, futurePlayerFileData, preTrackerFileData, maFileData, hippelFileData } = useFormatStore(useShallow((s) => ({
+  const { channelTrackTables, channelSpeeds, channelGrooves, hivelyNative, hivelyFileData, hivelyMeta, musiclineFileData, c64SidFileData, jamCrackerFileData, futurePlayerFileData, preTrackerFileData, maFileData, hippelFileData, furnaceNative, furnaceActiveSubsong } = useFormatStore(useShallow((s) => ({
     channelTrackTables: s.channelTrackTables,
     channelSpeeds: s.channelSpeeds,
     channelGrooves: s.channelGrooves,
@@ -40,6 +40,8 @@ export const usePatternPlayback = () => {
     preTrackerFileData: s.preTrackerFileData,
     maFileData: s.maFileData,
     hippelFileData: s.hippelFileData,
+    furnaceNative: s.furnaceNative,
+    furnaceActiveSubsong: s.furnaceActiveSubsong,
   })));
   const linearPeriods = useEditorStore((s) => s.linearPeriods);
   const { isPlaying, isLooping, bpm, setCurrentRow, setCurrentRowThrottled } = useTransportStore(useShallow((s) => ({
@@ -349,6 +351,9 @@ export const usePatternPlayback = () => {
           virtualTempoD: furnaceData?.virtualTempoD,
           compatFlags: furnaceData?.compatFlags as any,
           grooves: furnaceData?.grooves,
+          // Furnace native data (required for WASM sequencer bypass)
+          furnaceNative: furnaceNative ?? undefined,
+          furnaceActiveSubsong: furnaceActiveSubsong ?? undefined,
         });
 
         // Apply Furnace compat flags to the dispatch engine (if this is a .fur song)
