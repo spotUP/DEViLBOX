@@ -9,7 +9,7 @@
  */
 
 import React, { useState, useCallback, useEffect } from 'react';
-import { useTrackerStore, useTransportStore, useAudioStore, useUIStore } from '@stores';
+import { useTrackerStore, useTransportStore, useAudioStore, useUIStore, useEditorStore } from '@stores';
 import { useShallow } from 'zustand/react/shallow';
 import { useFPSMonitor } from '@hooks/useFPSMonitor';
 import { GROOVE_TEMPLATES } from '@typedefs/audio';
@@ -24,11 +24,11 @@ import {
   Activity, LayoutGrid, Cpu, SlidersHorizontal, Zap,
 } from 'lucide-react';
 
-type ViewMode = 'tracker' | 'grid' | 'pianoroll' | 'tb303' | 'sunvox' | 'arrangement' | 'dj' | 'drumpad' | 'vj' | 'mixer';
+import { type TrackerViewMode } from '@stores/useUIStore';
 
 export interface EditorControlsBarProps {
-  viewMode: ViewMode;
-  onViewModeChange: (mode: ViewMode) => void;
+  viewMode: TrackerViewMode;
+  onViewModeChange: (mode: TrackerViewMode) => void;
   gridChannelIndex: number;
   onGridChannelChange: (idx: number) => void;
   /** When provided, renders an "Edit" toggle button in the toolbar */
@@ -56,12 +56,16 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
     showGhostPatterns,
     channelCount,
     applySystemPreset,
-  } = useTrackerStore(useShallow(s => ({
-    recordMode: s.recordMode,
-    showGhostPatterns: s.showGhostPatterns,
-    channelCount: s.patterns[s.currentPatternIndex]?.channels?.length || 4,
-    applySystemPreset: s.applySystemPreset,
-  })));
+  } = {
+    ...useTrackerStore(useShallow(s => ({
+      channelCount: s.patterns[s.currentPatternIndex]?.channels?.length || 4,
+      applySystemPreset: s.applySystemPreset,
+    }))),
+    ...useEditorStore(useShallow(s => ({
+      recordMode: s.recordMode,
+      showGhostPatterns: s.showGhostPatterns,
+    }))),
+  };
 
   const {
     grooveTemplateId,
@@ -99,8 +103,8 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
 
   // ── Handlers ─────────────────────────────────────────────────────────────
   const handleViewModeChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
-    const val = e.target.value as ViewMode;
-    if (val === 'arrangement' || val === 'dj' || val === 'drumpad' || val === 'pianoroll' || val === 'vj' || val === 'mixer') {
+    const val = e.target.value as TrackerViewMode;
+    if (val === 'arrangement' || val === 'dj' || val === 'drumpad' || val === 'pianoroll' || val === 'vj' || val === 'mixer' || val === 'studio') {
       setActiveView(val);
     } else {
       onViewModeChange(val);
@@ -108,12 +112,12 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
   }, [setActiveView, onViewModeChange]);
 
   const handleToggleGhosts = useCallback(() => {
-    const s = useTrackerStore.getState();
+    const s = useEditorStore.getState();
     s.setShowGhostPatterns(!s.showGhostPatterns);
   }, []);
 
   const handleToggleRecord = useCallback(() => {
-    useTrackerStore.getState().toggleRecordMode();
+    useEditorStore.getState().toggleRecordMode();
   }, []);
 
   const handleToggleMute = useCallback(() => {
@@ -174,6 +178,7 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
             <option value="drumpad">Drum Pads</option>
             <option value="vj">VJ View</option>
             <option value="mixer">Mixer</option>
+            <option value="studio">Studio</option>
           </select>
         </div>
 

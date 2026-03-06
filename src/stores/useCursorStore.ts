@@ -15,6 +15,7 @@ import { getTrackerReplayer } from '@engine/TrackerReplayer';
 // Safe because both stores are initialized at module load time, and
 // getTrackerState() is only called at action invocation time.
 import { useTrackerStore } from './useTrackerStore';
+import { useEditorStore } from './useEditorStore';
 import { notifyScrollEvent } from '../pixi/scrollPerf';
 
 // Define column order for range selection
@@ -62,6 +63,10 @@ function getTrackerState() {
   return useTrackerStore.getState();
 }
 
+function getEditorState() {
+  return useEditorStore.getState();
+}
+
 export const useCursorStore = create<CursorStore>()((set, get) => ({
   cursor: { channelIndex: 0, rowIndex: 0, columnType: 'note', digitIndex: 0 },
   selection: null,
@@ -86,7 +91,7 @@ export const useCursorStore = create<CursorStore>()((set, get) => ({
       case 'left': {
         if (currentDigits > 0 && digitIndex > 0) { digitIndex--; break; }
 
-        const vis = ts.columnVisibility;
+        const vis = getEditorState().columnVisibility;
         const cols: CursorPosition['columnType'][] = ['note'];
         if (vis.instrument) cols.push('instrument');
         if (vis.volume) cols.push('volume');
@@ -120,7 +125,7 @@ export const useCursorStore = create<CursorStore>()((set, get) => ({
       case 'right': {
         if (currentDigits > 0 && digitIndex < currentDigits - 1) { digitIndex++; break; }
 
-        const vis = ts.columnVisibility;
+        const vis = getEditorState().columnVisibility;
         const cols: CursorPosition['columnType'][] = ['note'];
         if (vis.instrument) cols.push('instrument');
         if (vis.volume) cols.push('volume');

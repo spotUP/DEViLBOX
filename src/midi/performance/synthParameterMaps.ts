@@ -5,7 +5,7 @@
  * This enables hardware control via Komplete Kontrol, Maschine, etc.
  */
 
-import type { NKSParameter, NKSPage, NKS2PDI, NKS2Parameter, NKS2PerformanceSection, NKS2SynthProfile, NKS2Navigation } from './types';
+import type { NKSParameter, NKSPage, NKS2PDI, NKS2Parameter, NKS2PerformanceSection, NKS2EditGroup, NKS2EditSection, NKS2SynthProfile, NKS2Navigation } from './types';
 import { NKSParameterType, NKSSection } from './types';
 import type { SynthType } from '@typedefs/instrument';
 
@@ -14,21 +14,21 @@ import type { SynthType } from '@typedefs/instrument';
 // ============================================================================
 export const TB303_NKS_PARAMETERS: NKSParameter[] = [
   // Page 0: Filter & Synthesis
-  { id: 'tb303.cutoff', name: 'Cutoff', section: NKSSection.FILTER, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.5, unit: '%', formatString: '%.0f%%', page: 0, index: 0, ccNumber: 74, isAutomatable: true },
-  { id: 'tb303.resonance', name: 'Resonance', section: NKSSection.FILTER, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.5, unit: '%', formatString: '%.0f%%', page: 0, index: 1, ccNumber: 71, isAutomatable: true },
-  { id: 'tb303.envMod', name: 'Env Mod', section: NKSSection.FILTER, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.5, unit: '%', formatString: '%.0f%%', page: 0, index: 2, ccNumber: 102, isAutomatable: true },
-  { id: 'tb303.decay', name: 'Decay', section: NKSSection.ENVELOPE, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.5, unit: '%', formatString: '%.0f%%', page: 0, index: 3, ccNumber: 103, isAutomatable: true },
-  { id: 'tb303.accent', name: 'Accent', section: NKSSection.SYNTHESIS, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.5, unit: '%', formatString: '%.0f%%', page: 0, index: 4, ccNumber: 104, isAutomatable: true },
-  { id: 'tb303.tuning', name: 'Tuning', section: NKSSection.SYNTHESIS, type: NKSParameterType.FLOAT, min: -1, max: 1, defaultValue: 0, unit: 'semi', formatString: '%.1f', page: 0, index: 5, ccNumber: 105, isAutomatable: true },
-  { id: 'tb303.waveform', name: 'Waveform', section: NKSSection.SYNTHESIS, type: NKSParameterType.SELECTOR, min: 0, max: 1, defaultValue: 0, valueStrings: ['Saw', 'Square'], page: 0, index: 6, ccNumber: 106, isAutomatable: true },
-  { id: 'tb303.volume', name: 'Volume', section: NKSSection.OUTPUT, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.7, unit: 'dB', formatString: '%.1f', page: 0, index: 7, ccNumber: 7, isAutomatable: true },
+  { id: 'tb303.cutoff', name: 'Cutoff', section: NKSSection.FILTER, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.5, unit: '%', formatString: '%.0f%%', page: 0, index: 0, ccNumber: 74, isAutomatable: true, accessibilityName: 'Filter Cutoff Frequency' },
+  { id: 'tb303.resonance', name: 'Resonance', section: NKSSection.FILTER, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.5, unit: '%', formatString: '%.0f%%', page: 0, index: 1, ccNumber: 71, isAutomatable: true, accessibilityName: 'Filter Resonance' },
+  { id: 'tb303.envMod', name: 'Env Mod', section: NKSSection.FILTER, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.5, unit: '%', formatString: '%.0f%%', page: 0, index: 2, ccNumber: 102, isAutomatable: true, accessibilityName: 'Filter Envelope Modulation Depth' },
+  { id: 'tb303.decay', name: 'Decay', section: NKSSection.ENVELOPE, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.5, unit: '%', formatString: '%.0f%%', page: 0, index: 3, ccNumber: 103, isAutomatable: true, accessibilityName: 'Filter Envelope Decay Time' },
+  { id: 'tb303.accent', name: 'Accent', section: NKSSection.SYNTHESIS, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.5, unit: '%', formatString: '%.0f%%', page: 0, index: 4, ccNumber: 104, isAutomatable: true, accessibilityName: 'Accent Amount' },
+  { id: 'tb303.tuning', name: 'Tuning', section: NKSSection.SYNTHESIS, type: NKSParameterType.FLOAT, min: -1, max: 1, defaultValue: 0, unit: 'semi', formatString: '%.1f', page: 0, index: 5, ccNumber: 105, isAutomatable: true, accessibilityName: 'Master Tuning' },
+  { id: 'tb303.waveform', name: 'Waveform', section: NKSSection.SYNTHESIS, type: NKSParameterType.SELECTOR, min: 0, max: 1, defaultValue: 0, valueStrings: ['Saw', 'Square'], page: 0, index: 6, ccNumber: 106, isAutomatable: true, accessibilityName: 'Oscillator Waveform' },
+  { id: 'tb303.volume', name: 'Volume', section: NKSSection.OUTPUT, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.7, unit: 'dB', formatString: '%.1f', page: 0, index: 7, ccNumber: 7, isAutomatable: true, accessibilityName: 'Master Volume' },
   // Page 1: Effects
-  { id: 'tb303.distortion', name: 'Distortion', section: NKSSection.EFFECTS, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0, unit: '%', formatString: '%.0f%%', page: 1, index: 0, ccNumber: 94, isAutomatable: true },
-  { id: 'tb303.delay.time', name: 'Delay Time', section: NKSSection.EFFECTS, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.375, unit: 'ms', formatString: '%.0f', page: 1, index: 1, ccNumber: 85, isAutomatable: true },
-  { id: 'tb303.delay.feedback', name: 'Delay Fdbk', section: NKSSection.EFFECTS, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.4, unit: '%', formatString: '%.0f%%', page: 1, index: 2, ccNumber: 86, isAutomatable: true },
-  { id: 'tb303.delay.mix', name: 'Delay Mix', section: NKSSection.EFFECTS, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.3, unit: '%', formatString: '%.0f%%', page: 1, index: 3, ccNumber: 87, isAutomatable: true },
-  { id: 'tb303.reverb.size', name: 'Reverb Size', section: NKSSection.EFFECTS, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.5, unit: '%', formatString: '%.0f%%', page: 1, index: 4, ccNumber: 91, isAutomatable: true },
-  { id: 'tb303.reverb.mix', name: 'Reverb Mix', section: NKSSection.EFFECTS, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.2, unit: '%', formatString: '%.0f%%', page: 1, index: 5, ccNumber: 92, isAutomatable: true },
+  { id: 'tb303.distortion', name: 'Distortion', section: NKSSection.EFFECTS, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0, unit: '%', formatString: '%.0f%%', page: 1, index: 0, ccNumber: 94, isAutomatable: true, accessibilityName: 'Distortion Amount' },
+  { id: 'tb303.delay.time', name: 'Delay Time', section: NKSSection.EFFECTS, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.375, unit: 'ms', formatString: '%.0f', page: 1, index: 1, ccNumber: 85, isAutomatable: true, accessibilityName: 'Delay Time' },
+  { id: 'tb303.delay.feedback', name: 'Delay Fdbk', section: NKSSection.EFFECTS, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.4, unit: '%', formatString: '%.0f%%', page: 1, index: 2, ccNumber: 86, isAutomatable: true, accessibilityName: 'Delay Feedback Amount' },
+  { id: 'tb303.delay.mix', name: 'Delay Mix', section: NKSSection.EFFECTS, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.3, unit: '%', formatString: '%.0f%%', page: 1, index: 3, ccNumber: 87, isAutomatable: true, accessibilityName: 'Delay Wet Dry Mix' },
+  { id: 'tb303.reverb.size', name: 'Reverb Size', section: NKSSection.EFFECTS, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.5, unit: '%', formatString: '%.0f%%', page: 1, index: 4, ccNumber: 91, isAutomatable: true, accessibilityName: 'Reverb Room Size' },
+  { id: 'tb303.reverb.mix', name: 'Reverb Mix', section: NKSSection.EFFECTS, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.2, unit: '%', formatString: '%.0f%%', page: 1, index: 5, ccNumber: 92, isAutomatable: true, accessibilityName: 'Reverb Wet Dry Mix' },
 ];
 
 // ============================================================================
@@ -36,14 +36,14 @@ export const TB303_NKS_PARAMETERS: NKSParameter[] = [
 // ============================================================================
 export const DEXED_NKS_PARAMETERS: NKSParameter[] = [
   // Page 0: Algorithm & Global
-  { id: 'dexed.algorithm', name: 'Algorithm', section: NKSSection.SYNTHESIS, type: NKSParameterType.INT, min: 0, max: 31, defaultValue: 0, page: 0, index: 0, isAutomatable: true },
-  { id: 'dexed.feedback', name: 'Feedback', section: NKSSection.SYNTHESIS, type: NKSParameterType.INT, min: 0, max: 7, defaultValue: 0, page: 0, index: 1, isAutomatable: true },
-  { id: 'dexed.lfoSpeed', name: 'LFO Speed', section: NKSSection.LFO, type: NKSParameterType.INT, min: 0, max: 99, defaultValue: 35, page: 0, index: 2, isAutomatable: true },
-  { id: 'dexed.lfoPitchModDepth', name: 'LFO Pitch', section: NKSSection.LFO, type: NKSParameterType.INT, min: 0, max: 99, defaultValue: 0, page: 0, index: 3, isAutomatable: true },
-  { id: 'dexed.lfoAmpModDepth', name: 'LFO Amp', section: NKSSection.LFO, type: NKSParameterType.INT, min: 0, max: 99, defaultValue: 0, page: 0, index: 4, isAutomatable: true },
-  { id: 'dexed.lfoWave', name: 'LFO Wave', section: NKSSection.LFO, type: NKSParameterType.SELECTOR, min: 0, max: 5, defaultValue: 0, valueStrings: ['Triangle', 'Saw Down', 'Saw Up', 'Square', 'Sine', 'S&H'], page: 0, index: 5, isAutomatable: true },
-  { id: 'dexed.transpose', name: 'Transpose', section: NKSSection.SYNTHESIS, type: NKSParameterType.INT, min: -24, max: 24, defaultValue: 0, unit: 'semi', page: 0, index: 6, isAutomatable: true },
-  { id: 'dexed.oscSync', name: 'Osc Sync', section: NKSSection.SYNTHESIS, type: NKSParameterType.BOOLEAN, min: 0, max: 1, defaultValue: 1, page: 0, index: 7, isAutomatable: true },
+  { id: 'dexed.algorithm', name: 'Algorithm', section: NKSSection.SYNTHESIS, type: NKSParameterType.INT, min: 0, max: 31, defaultValue: 0, page: 0, index: 0, isAutomatable: true, accessibilityName: 'FM Algorithm' },
+  { id: 'dexed.feedback', name: 'Feedback', section: NKSSection.SYNTHESIS, type: NKSParameterType.INT, min: 0, max: 7, defaultValue: 0, page: 0, index: 1, isAutomatable: true, accessibilityName: 'Operator Feedback Amount' },
+  { id: 'dexed.lfoSpeed', name: 'LFO Speed', section: NKSSection.LFO, type: NKSParameterType.INT, min: 0, max: 99, defaultValue: 35, page: 0, index: 2, isAutomatable: true, accessibilityName: 'LFO Speed' },
+  { id: 'dexed.lfoPitchModDepth', name: 'LFO Pitch', section: NKSSection.LFO, type: NKSParameterType.INT, min: 0, max: 99, defaultValue: 0, page: 0, index: 3, isAutomatable: true, accessibilityName: 'LFO Pitch Modulation Depth' },
+  { id: 'dexed.lfoAmpModDepth', name: 'LFO Amp', section: NKSSection.LFO, type: NKSParameterType.INT, min: 0, max: 99, defaultValue: 0, page: 0, index: 4, isAutomatable: true, accessibilityName: 'LFO Amplitude Modulation Depth' },
+  { id: 'dexed.lfoWave', name: 'LFO Wave', section: NKSSection.LFO, type: NKSParameterType.SELECTOR, min: 0, max: 5, defaultValue: 0, valueStrings: ['Triangle', 'Saw Down', 'Saw Up', 'Square', 'Sine', 'S&H'], page: 0, index: 5, isAutomatable: true, accessibilityName: 'LFO Waveform' },
+  { id: 'dexed.transpose', name: 'Transpose', section: NKSSection.SYNTHESIS, type: NKSParameterType.INT, min: -24, max: 24, defaultValue: 0, unit: 'semi', page: 0, index: 6, isAutomatable: true, accessibilityName: 'Global Transpose' },
+  { id: 'dexed.oscSync', name: 'Osc Sync', section: NKSSection.SYNTHESIS, type: NKSParameterType.BOOLEAN, min: 0, max: 1, defaultValue: 1, page: 0, index: 7, isAutomatable: true, accessibilityName: 'Oscillator Key Sync' },
   // Page 1-6: Operators 1-6 (each has Level, Coarse, Fine, Detune, R1, R2, R3, R4)
   ...generateDexedOperatorPages(),
 ];
@@ -71,41 +71,41 @@ function generateDexedOperatorPages(): NKSParameter[] {
 // ============================================================================
 export const OBXD_NKS_PARAMETERS: NKSParameter[] = [
   // Page 0: Oscillators
-  { id: 'obxd.osc1Waveform', name: 'Osc1 Wave', section: NKSSection.SYNTHESIS, type: NKSParameterType.SELECTOR, min: 0, max: 3, defaultValue: 0, valueStrings: ['Saw', 'Pulse', 'Triangle', 'Noise'], page: 0, index: 0, isAutomatable: true },
-  { id: 'obxd.osc1Octave', name: 'Osc1 Oct', section: NKSSection.SYNTHESIS, type: NKSParameterType.INT, min: -2, max: 2, defaultValue: 0, page: 0, index: 1, isAutomatable: true },
-  { id: 'obxd.osc1PulseWidth', name: 'Osc1 PW', section: NKSSection.SYNTHESIS, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.5, unit: '%', formatString: '%.0f%%', page: 0, index: 2, isAutomatable: true },
-  { id: 'obxd.osc1Level', name: 'Osc1 Level', section: NKSSection.SYNTHESIS, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 1, unit: '%', formatString: '%.0f%%', page: 0, index: 3, isAutomatable: true },
-  { id: 'obxd.osc2Waveform', name: 'Osc2 Wave', section: NKSSection.SYNTHESIS, type: NKSParameterType.SELECTOR, min: 0, max: 3, defaultValue: 0, valueStrings: ['Saw', 'Pulse', 'Triangle', 'Noise'], page: 0, index: 4, isAutomatable: true },
-  { id: 'obxd.osc2Octave', name: 'Osc2 Oct', section: NKSSection.SYNTHESIS, type: NKSParameterType.INT, min: -2, max: 2, defaultValue: 0, page: 0, index: 5, isAutomatable: true },
-  { id: 'obxd.osc2Detune', name: 'Osc2 Detune', section: NKSSection.SYNTHESIS, type: NKSParameterType.FLOAT, min: -1, max: 1, defaultValue: 0.1, unit: 'semi', formatString: '%.2f', page: 0, index: 6, isAutomatable: true },
-  { id: 'obxd.osc2Level', name: 'Osc2 Level', section: NKSSection.SYNTHESIS, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.7, unit: '%', formatString: '%.0f%%', page: 0, index: 7, isAutomatable: true },
+  { id: 'obxd.osc1Waveform', name: 'Osc1 Wave', section: NKSSection.SYNTHESIS, type: NKSParameterType.SELECTOR, min: 0, max: 3, defaultValue: 0, valueStrings: ['Saw', 'Pulse', 'Triangle', 'Noise'], page: 0, index: 0, isAutomatable: true, accessibilityName: 'Oscillator 1 Waveform' },
+  { id: 'obxd.osc1Octave', name: 'Osc1 Oct', section: NKSSection.SYNTHESIS, type: NKSParameterType.INT, min: -2, max: 2, defaultValue: 0, page: 0, index: 1, isAutomatable: true, accessibilityName: 'Oscillator 1 Octave' },
+  { id: 'obxd.osc1PulseWidth', name: 'Osc1 PW', section: NKSSection.SYNTHESIS, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.5, unit: '%', formatString: '%.0f%%', page: 0, index: 2, isAutomatable: true, accessibilityName: 'Oscillator 1 Pulse Width' },
+  { id: 'obxd.osc1Level', name: 'Osc1 Level', section: NKSSection.SYNTHESIS, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 1, unit: '%', formatString: '%.0f%%', page: 0, index: 3, isAutomatable: true, accessibilityName: 'Oscillator 1 Level' },
+  { id: 'obxd.osc2Waveform', name: 'Osc2 Wave', section: NKSSection.SYNTHESIS, type: NKSParameterType.SELECTOR, min: 0, max: 3, defaultValue: 0, valueStrings: ['Saw', 'Pulse', 'Triangle', 'Noise'], page: 0, index: 4, isAutomatable: true, accessibilityName: 'Oscillator 2 Waveform' },
+  { id: 'obxd.osc2Octave', name: 'Osc2 Oct', section: NKSSection.SYNTHESIS, type: NKSParameterType.INT, min: -2, max: 2, defaultValue: 0, page: 0, index: 5, isAutomatable: true, accessibilityName: 'Oscillator 2 Octave' },
+  { id: 'obxd.osc2Detune', name: 'Osc2 Detune', section: NKSSection.SYNTHESIS, type: NKSParameterType.FLOAT, min: -1, max: 1, defaultValue: 0.1, unit: 'semi', formatString: '%.2f', page: 0, index: 6, isAutomatable: true, accessibilityName: 'Oscillator 2 Detune' },
+  { id: 'obxd.osc2Level', name: 'Osc2 Level', section: NKSSection.SYNTHESIS, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.7, unit: '%', formatString: '%.0f%%', page: 0, index: 7, isAutomatable: true, accessibilityName: 'Oscillator 2 Level' },
   // Page 1: Filter
-  { id: 'obxd.filterCutoff', name: 'Cutoff', section: NKSSection.FILTER, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.7, unit: '%', formatString: '%.0f%%', page: 1, index: 0, isAutomatable: true },
-  { id: 'obxd.filterResonance', name: 'Resonance', section: NKSSection.FILTER, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.3, unit: '%', formatString: '%.0f%%', page: 1, index: 1, isAutomatable: true },
-  { id: 'obxd.filterEnvAmount', name: 'Env Amount', section: NKSSection.FILTER, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.5, unit: '%', formatString: '%.0f%%', page: 1, index: 2, isAutomatable: true },
-  { id: 'obxd.filterKeyTrack', name: 'Key Track', section: NKSSection.FILTER, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0, unit: '%', formatString: '%.0f%%', page: 1, index: 3, isAutomatable: true },
-  { id: 'obxd.filterAttack', name: 'Flt Attack', section: NKSSection.ENVELOPE, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.01, unit: 's', formatString: '%.2f', page: 1, index: 4, isAutomatable: true },
-  { id: 'obxd.filterDecay', name: 'Flt Decay', section: NKSSection.ENVELOPE, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.3, unit: 's', formatString: '%.2f', page: 1, index: 5, isAutomatable: true },
-  { id: 'obxd.filterSustain', name: 'Flt Sustain', section: NKSSection.ENVELOPE, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.3, unit: '%', formatString: '%.0f%%', page: 1, index: 6, isAutomatable: true },
-  { id: 'obxd.filterRelease', name: 'Flt Release', section: NKSSection.ENVELOPE, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.3, unit: 's', formatString: '%.2f', page: 1, index: 7, isAutomatable: true },
+  { id: 'obxd.filterCutoff', name: 'Cutoff', section: NKSSection.FILTER, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.7, unit: '%', formatString: '%.0f%%', page: 1, index: 0, isAutomatable: true, accessibilityName: 'Filter Cutoff Frequency' },
+  { id: 'obxd.filterResonance', name: 'Resonance', section: NKSSection.FILTER, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.3, unit: '%', formatString: '%.0f%%', page: 1, index: 1, isAutomatable: true, accessibilityName: 'Filter Resonance' },
+  { id: 'obxd.filterEnvAmount', name: 'Env Amount', section: NKSSection.FILTER, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.5, unit: '%', formatString: '%.0f%%', page: 1, index: 2, isAutomatable: true, accessibilityName: 'Filter Envelope Amount' },
+  { id: 'obxd.filterKeyTrack', name: 'Key Track', section: NKSSection.FILTER, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0, unit: '%', formatString: '%.0f%%', page: 1, index: 3, isAutomatable: true, accessibilityName: 'Filter Keyboard Tracking' },
+  { id: 'obxd.filterAttack', name: 'Flt Attack', section: NKSSection.ENVELOPE, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.01, unit: 's', formatString: '%.2f', page: 1, index: 4, isAutomatable: true, accessibilityName: 'Filter Envelope Attack Time' },
+  { id: 'obxd.filterDecay', name: 'Flt Decay', section: NKSSection.ENVELOPE, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.3, unit: 's', formatString: '%.2f', page: 1, index: 5, isAutomatable: true, accessibilityName: 'Filter Envelope Decay Time' },
+  { id: 'obxd.filterSustain', name: 'Flt Sustain', section: NKSSection.ENVELOPE, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.3, unit: '%', formatString: '%.0f%%', page: 1, index: 6, isAutomatable: true, accessibilityName: 'Filter Envelope Sustain Level' },
+  { id: 'obxd.filterRelease', name: 'Flt Release', section: NKSSection.ENVELOPE, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.3, unit: 's', formatString: '%.2f', page: 1, index: 7, isAutomatable: true, accessibilityName: 'Filter Envelope Release Time' },
   // Page 2: Amp Envelope & Global
-  { id: 'obxd.ampAttack', name: 'Amp Attack', section: NKSSection.ENVELOPE, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.01, unit: 's', formatString: '%.2f', page: 2, index: 0, isAutomatable: true },
-  { id: 'obxd.ampDecay', name: 'Amp Decay', section: NKSSection.ENVELOPE, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.2, unit: 's', formatString: '%.2f', page: 2, index: 1, isAutomatable: true },
-  { id: 'obxd.ampSustain', name: 'Amp Sustain', section: NKSSection.ENVELOPE, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.7, unit: '%', formatString: '%.0f%%', page: 2, index: 2, isAutomatable: true },
-  { id: 'obxd.ampRelease', name: 'Amp Release', section: NKSSection.ENVELOPE, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.3, unit: 's', formatString: '%.2f', page: 2, index: 3, isAutomatable: true },
-  { id: 'obxd.masterVolume', name: 'Volume', section: NKSSection.OUTPUT, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.7, unit: '%', formatString: '%.0f%%', page: 2, index: 4, isAutomatable: true },
-  { id: 'obxd.portamento', name: 'Portamento', section: NKSSection.SYNTHESIS, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0, unit: 's', formatString: '%.2f', page: 2, index: 5, isAutomatable: true },
-  { id: 'obxd.unison', name: 'Unison', section: NKSSection.SYNTHESIS, type: NKSParameterType.BOOLEAN, min: 0, max: 1, defaultValue: 0, page: 2, index: 6, isAutomatable: true },
-  { id: 'obxd.unisonDetune', name: 'Uni Detune', section: NKSSection.SYNTHESIS, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.1, unit: '%', formatString: '%.0f%%', page: 2, index: 7, isAutomatable: true },
+  { id: 'obxd.ampAttack', name: 'Amp Attack', section: NKSSection.ENVELOPE, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.01, unit: 's', formatString: '%.2f', page: 2, index: 0, isAutomatable: true, accessibilityName: 'Amplifier Envelope Attack Time' },
+  { id: 'obxd.ampDecay', name: 'Amp Decay', section: NKSSection.ENVELOPE, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.2, unit: 's', formatString: '%.2f', page: 2, index: 1, isAutomatable: true, accessibilityName: 'Amplifier Envelope Decay Time' },
+  { id: 'obxd.ampSustain', name: 'Amp Sustain', section: NKSSection.ENVELOPE, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.7, unit: '%', formatString: '%.0f%%', page: 2, index: 2, isAutomatable: true, accessibilityName: 'Amplifier Envelope Sustain Level' },
+  { id: 'obxd.ampRelease', name: 'Amp Release', section: NKSSection.ENVELOPE, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.3, unit: 's', formatString: '%.2f', page: 2, index: 3, isAutomatable: true, accessibilityName: 'Amplifier Envelope Release Time' },
+  { id: 'obxd.masterVolume', name: 'Volume', section: NKSSection.OUTPUT, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.7, unit: '%', formatString: '%.0f%%', page: 2, index: 4, isAutomatable: true, accessibilityName: 'Master Volume' },
+  { id: 'obxd.portamento', name: 'Portamento', section: NKSSection.SYNTHESIS, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0, unit: 's', formatString: '%.2f', page: 2, index: 5, isAutomatable: true, accessibilityName: 'Portamento Time' },
+  { id: 'obxd.unison', name: 'Unison', section: NKSSection.SYNTHESIS, type: NKSParameterType.BOOLEAN, min: 0, max: 1, defaultValue: 0, page: 2, index: 6, isAutomatable: true, accessibilityName: 'Unison Enable' },
+  { id: 'obxd.unisonDetune', name: 'Uni Detune', section: NKSSection.SYNTHESIS, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.1, unit: '%', formatString: '%.0f%%', page: 2, index: 7, isAutomatable: true, accessibilityName: 'Unison Detune Amount' },
   // Page 3: LFO
-  { id: 'obxd.lfoRate', name: 'LFO Rate', section: NKSSection.LFO, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.2, unit: 'Hz', formatString: '%.1f', page: 3, index: 0, isAutomatable: true },
-  { id: 'obxd.lfoWaveform', name: 'LFO Wave', section: NKSSection.LFO, type: NKSParameterType.SELECTOR, min: 0, max: 4, defaultValue: 0, valueStrings: ['Sine', 'Triangle', 'Saw', 'Square', 'S&H'], page: 3, index: 1, isAutomatable: true },
-  { id: 'obxd.lfoOscAmount', name: 'LFO>Pitch', section: NKSSection.LFO, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0, unit: '%', formatString: '%.0f%%', page: 3, index: 2, isAutomatable: true },
-  { id: 'obxd.lfoFilterAmount', name: 'LFO>Filter', section: NKSSection.LFO, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0, unit: '%', formatString: '%.0f%%', page: 3, index: 3, isAutomatable: true },
-  { id: 'obxd.lfoAmpAmount', name: 'LFO>Amp', section: NKSSection.LFO, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0, unit: '%', formatString: '%.0f%%', page: 3, index: 4, isAutomatable: true },
-  { id: 'obxd.lfoPwAmount', name: 'LFO>PW', section: NKSSection.LFO, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0, unit: '%', formatString: '%.0f%%', page: 3, index: 5, isAutomatable: true },
-  { id: 'obxd.oscSync', name: 'Osc Sync', section: NKSSection.SYNTHESIS, type: NKSParameterType.BOOLEAN, min: 0, max: 1, defaultValue: 0, page: 3, index: 6, isAutomatable: true },
-  { id: 'obxd.oscXor', name: 'Ring Mod', section: NKSSection.SYNTHESIS, type: NKSParameterType.BOOLEAN, min: 0, max: 1, defaultValue: 0, page: 3, index: 7, isAutomatable: true },
+  { id: 'obxd.lfoRate', name: 'LFO Rate', section: NKSSection.LFO, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.2, unit: 'Hz', formatString: '%.1f', page: 3, index: 0, isAutomatable: true, accessibilityName: 'LFO Rate' },
+  { id: 'obxd.lfoWaveform', name: 'LFO Wave', section: NKSSection.LFO, type: NKSParameterType.SELECTOR, min: 0, max: 4, defaultValue: 0, valueStrings: ['Sine', 'Triangle', 'Saw', 'Square', 'S&H'], page: 3, index: 1, isAutomatable: true, accessibilityName: 'LFO Waveform' },
+  { id: 'obxd.lfoOscAmount', name: 'LFO>Pitch', section: NKSSection.LFO, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0, unit: '%', formatString: '%.0f%%', page: 3, index: 2, isAutomatable: true, accessibilityName: 'LFO to Pitch Amount' },
+  { id: 'obxd.lfoFilterAmount', name: 'LFO>Filter', section: NKSSection.LFO, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0, unit: '%', formatString: '%.0f%%', page: 3, index: 3, isAutomatable: true, accessibilityName: 'LFO to Filter Amount' },
+  { id: 'obxd.lfoAmpAmount', name: 'LFO>Amp', section: NKSSection.LFO, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0, unit: '%', formatString: '%.0f%%', page: 3, index: 4, isAutomatable: true, accessibilityName: 'LFO to Amplitude Amount' },
+  { id: 'obxd.lfoPwAmount', name: 'LFO>PW', section: NKSSection.LFO, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0, unit: '%', formatString: '%.0f%%', page: 3, index: 5, isAutomatable: true, accessibilityName: 'LFO to Pulse Width Amount' },
+  { id: 'obxd.oscSync', name: 'Osc Sync', section: NKSSection.SYNTHESIS, type: NKSParameterType.BOOLEAN, min: 0, max: 1, defaultValue: 0, page: 3, index: 6, isAutomatable: true, accessibilityName: 'Oscillator Sync Enable' },
+  { id: 'obxd.oscXor', name: 'Ring Mod', section: NKSSection.SYNTHESIS, type: NKSParameterType.BOOLEAN, min: 0, max: 1, defaultValue: 0, page: 3, index: 7, isAutomatable: true, accessibilityName: 'Ring Modulation Enable' },
 ];
 
 // ============================================================================
@@ -183,32 +183,32 @@ export const SYNARE_NKS_PARAMETERS: NKSParameter[] = [
 // ============================================================================
 export const V2_NKS_PARAMETERS: NKSParameter[] = [
   // Page 0: Oscillators
-  { id: 'v2.osc1.mode', name: 'Osc1 Mode', section: NKSSection.SYNTHESIS, type: NKSParameterType.SELECTOR, min: 0, max: 7, defaultValue: 1, valueStrings: ['Off', 'Saw/Tri', 'Pulse', 'Sin', 'Noise', 'XX', 'AuxA', 'AuxB'], page: 0, index: 0, isAutomatable: true },
-  { id: 'v2.osc1.transpose', name: 'Osc1 Trans', section: NKSSection.SYNTHESIS, type: NKSParameterType.INT, min: -64, max: 63, defaultValue: 0, unit: 'semi', page: 0, index: 1, isAutomatable: true },
-  { id: 'v2.osc1.color', name: 'Osc1 Color', section: NKSSection.SYNTHESIS, type: NKSParameterType.INT, min: 0, max: 127, defaultValue: 64, page: 0, index: 2, isAutomatable: true },
-  { id: 'v2.osc1.level', name: 'Osc1 Level', section: NKSSection.SYNTHESIS, type: NKSParameterType.INT, min: 0, max: 127, defaultValue: 127, page: 0, index: 3, isAutomatable: true },
-  { id: 'v2.osc2.mode', name: 'Osc2 Mode', section: NKSSection.SYNTHESIS, type: NKSParameterType.SELECTOR, min: 0, max: 7, defaultValue: 0, valueStrings: ['!Off', 'Tri', 'Pulse', 'Sin', 'Noise', 'FM', 'AuxA', 'AuxB'], page: 0, index: 4, isAutomatable: true },
-  { id: 'v2.osc2.transpose', name: 'Osc2 Trans', section: NKSSection.SYNTHESIS, type: NKSParameterType.INT, min: -64, max: 63, defaultValue: 0, unit: 'semi', page: 0, index: 5, isAutomatable: true },
-  { id: 'v2.osc2.detune', name: 'Osc2 Detune', section: NKSSection.SYNTHESIS, type: NKSParameterType.INT, min: -64, max: 63, defaultValue: 10, page: 0, index: 6, isAutomatable: true },
-  { id: 'v2.osc2.level', name: 'Osc2 Level', section: NKSSection.SYNTHESIS, type: NKSParameterType.INT, min: 0, max: 127, defaultValue: 0, page: 0, index: 7, isAutomatable: true },
+  { id: 'v2.osc1.mode', name: 'Osc1 Mode', section: NKSSection.SYNTHESIS, type: NKSParameterType.SELECTOR, min: 0, max: 7, defaultValue: 1, valueStrings: ['Off', 'Saw/Tri', 'Pulse', 'Sin', 'Noise', 'XX', 'AuxA', 'AuxB'], page: 0, index: 0, isAutomatable: true, accessibilityName: 'Oscillator 1 Mode', subsection: 'Osc 1' },
+  { id: 'v2.osc1.transpose', name: 'Osc1 Trans', section: NKSSection.SYNTHESIS, type: NKSParameterType.INT, min: -64, max: 63, defaultValue: 0, unit: 'semi', page: 0, index: 1, isAutomatable: true, accessibilityName: 'Oscillator 1 Transpose', subsection: 'Osc 1' },
+  { id: 'v2.osc1.color', name: 'Osc1 Color', section: NKSSection.SYNTHESIS, type: NKSParameterType.INT, min: 0, max: 127, defaultValue: 64, page: 0, index: 2, isAutomatable: true, accessibilityName: 'Oscillator 1 Color', subsection: 'Osc 1' },
+  { id: 'v2.osc1.level', name: 'Osc1 Level', section: NKSSection.SYNTHESIS, type: NKSParameterType.INT, min: 0, max: 127, defaultValue: 127, page: 0, index: 3, isAutomatable: true, accessibilityName: 'Oscillator 1 Level', subsection: 'Osc 1' },
+  { id: 'v2.osc2.mode', name: 'Osc2 Mode', section: NKSSection.SYNTHESIS, type: NKSParameterType.SELECTOR, min: 0, max: 7, defaultValue: 0, valueStrings: ['!Off', 'Tri', 'Pulse', 'Sin', 'Noise', 'FM', 'AuxA', 'AuxB'], page: 0, index: 4, isAutomatable: true, accessibilityName: 'Oscillator 2 Mode', subsection: 'Osc 2' },
+  { id: 'v2.osc2.transpose', name: 'Osc2 Trans', section: NKSSection.SYNTHESIS, type: NKSParameterType.INT, min: -64, max: 63, defaultValue: 0, unit: 'semi', page: 0, index: 5, isAutomatable: true, accessibilityName: 'Oscillator 2 Transpose', subsection: 'Osc 2' },
+  { id: 'v2.osc2.detune', name: 'Osc2 Detune', section: NKSSection.SYNTHESIS, type: NKSParameterType.INT, min: -64, max: 63, defaultValue: 10, page: 0, index: 6, isAutomatable: true, accessibilityName: 'Oscillator 2 Detune', subsection: 'Osc 2' },
+  { id: 'v2.osc2.level', name: 'Osc2 Level', section: NKSSection.SYNTHESIS, type: NKSParameterType.INT, min: 0, max: 127, defaultValue: 0, page: 0, index: 7, isAutomatable: true, accessibilityName: 'Oscillator 2 Level', subsection: 'Osc 2' },
   // Page 1: Filter
-  { id: 'v2.filter1.mode', name: 'Flt1 Mode', section: NKSSection.FILTER, type: NKSParameterType.SELECTOR, min: 0, max: 7, defaultValue: 1, valueStrings: ['Off', 'Low', 'Band', 'High', 'Notch', 'All', 'MoogL', 'MoogH'], page: 1, index: 0, isAutomatable: true },
-  { id: 'v2.filter1.cutoff', name: 'Flt1 Cutoff', section: NKSSection.FILTER, type: NKSParameterType.INT, min: 0, max: 127, defaultValue: 127, page: 1, index: 1, isAutomatable: true },
-  { id: 'v2.filter1.resonance', name: 'Flt1 Reso', section: NKSSection.FILTER, type: NKSParameterType.INT, min: 0, max: 127, defaultValue: 0, page: 1, index: 2, isAutomatable: true },
-  { id: 'v2.filter2.mode', name: 'Flt2 Mode', section: NKSSection.FILTER, type: NKSParameterType.SELECTOR, min: 0, max: 7, defaultValue: 0, valueStrings: ['Off', 'Low', 'Band', 'High', 'Notch', 'All', 'MoogL', 'MoogH'], page: 1, index: 3, isAutomatable: true },
-  { id: 'v2.filter2.cutoff', name: 'Flt2 Cutoff', section: NKSSection.FILTER, type: NKSParameterType.INT, min: 0, max: 127, defaultValue: 127, page: 1, index: 4, isAutomatable: true },
-  { id: 'v2.filter2.resonance', name: 'Flt2 Reso', section: NKSSection.FILTER, type: NKSParameterType.INT, min: 0, max: 127, defaultValue: 0, page: 1, index: 5, isAutomatable: true },
-  { id: 'v2.routing.mode', name: 'Routing', section: NKSSection.FILTER, type: NKSParameterType.SELECTOR, min: 0, max: 2, defaultValue: 0, valueStrings: ['Single', 'Serial', 'Parallel'], page: 1, index: 6, isAutomatable: true },
-  { id: 'v2.routing.balance', name: 'Balance', section: NKSSection.FILTER, type: NKSParameterType.INT, min: 0, max: 127, defaultValue: 64, page: 1, index: 7, isAutomatable: true },
+  { id: 'v2.filter1.mode', name: 'Flt1 Mode', section: NKSSection.FILTER, type: NKSParameterType.SELECTOR, min: 0, max: 7, defaultValue: 1, valueStrings: ['Off', 'Low', 'Band', 'High', 'Notch', 'All', 'MoogL', 'MoogH'], page: 1, index: 0, isAutomatable: true, accessibilityName: 'Filter 1 Mode', subsection: 'Filter 1' },
+  { id: 'v2.filter1.cutoff', name: 'Flt1 Cutoff', section: NKSSection.FILTER, type: NKSParameterType.INT, min: 0, max: 127, defaultValue: 127, page: 1, index: 1, isAutomatable: true, accessibilityName: 'Filter 1 Cutoff Frequency', subsection: 'Filter 1' },
+  { id: 'v2.filter1.resonance', name: 'Flt1 Reso', section: NKSSection.FILTER, type: NKSParameterType.INT, min: 0, max: 127, defaultValue: 0, page: 1, index: 2, isAutomatable: true, accessibilityName: 'Filter 1 Resonance', subsection: 'Filter 1' },
+  { id: 'v2.filter2.mode', name: 'Flt2 Mode', section: NKSSection.FILTER, type: NKSParameterType.SELECTOR, min: 0, max: 7, defaultValue: 0, valueStrings: ['Off', 'Low', 'Band', 'High', 'Notch', 'All', 'MoogL', 'MoogH'], page: 1, index: 3, isAutomatable: true, accessibilityName: 'Filter 2 Mode', subsection: 'Filter 2' },
+  { id: 'v2.filter2.cutoff', name: 'Flt2 Cutoff', section: NKSSection.FILTER, type: NKSParameterType.INT, min: 0, max: 127, defaultValue: 127, page: 1, index: 4, isAutomatable: true, accessibilityName: 'Filter 2 Cutoff Frequency', subsection: 'Filter 2' },
+  { id: 'v2.filter2.resonance', name: 'Flt2 Reso', section: NKSSection.FILTER, type: NKSParameterType.INT, min: 0, max: 127, defaultValue: 0, page: 1, index: 5, isAutomatable: true, accessibilityName: 'Filter 2 Resonance', subsection: 'Filter 2' },
+  { id: 'v2.routing.mode', name: 'Routing', section: NKSSection.FILTER, type: NKSParameterType.SELECTOR, min: 0, max: 2, defaultValue: 0, valueStrings: ['Single', 'Serial', 'Parallel'], page: 1, index: 6, isAutomatable: true, accessibilityName: 'Filter Routing Mode' },
+  { id: 'v2.routing.balance', name: 'Balance', section: NKSSection.FILTER, type: NKSParameterType.INT, min: 0, max: 127, defaultValue: 64, page: 1, index: 7, isAutomatable: true, accessibilityName: 'Filter Routing Balance' },
   // Page 2: Envelope
-  { id: 'v2.envelope.attack', name: 'Amp Attack', section: NKSSection.ENVELOPE, type: NKSParameterType.INT, min: 0, max: 127, defaultValue: 0, page: 2, index: 0, isAutomatable: true },
-  { id: 'v2.envelope.decay', name: 'Amp Decay', section: NKSSection.ENVELOPE, type: NKSParameterType.INT, min: 0, max: 127, defaultValue: 64, page: 2, index: 1, isAutomatable: true },
-  { id: 'v2.envelope.sustain', name: 'Amp Sustain', section: NKSSection.ENVELOPE, type: NKSParameterType.INT, min: 0, max: 127, defaultValue: 127, page: 2, index: 2, isAutomatable: true },
-  { id: 'v2.envelope.release', name: 'Amp Release', section: NKSSection.ENVELOPE, type: NKSParameterType.INT, min: 0, max: 127, defaultValue: 32, page: 2, index: 3, isAutomatable: true },
-  { id: 'v2.envelope2.attack', name: 'Env2 Attack', section: NKSSection.ENVELOPE, type: NKSParameterType.INT, min: 0, max: 127, defaultValue: 0, page: 2, index: 4, isAutomatable: true },
-  { id: 'v2.envelope2.decay', name: 'Env2 Decay', section: NKSSection.ENVELOPE, type: NKSParameterType.INT, min: 0, max: 127, defaultValue: 64, page: 2, index: 5, isAutomatable: true },
-  { id: 'v2.lfo1.rate', name: 'LFO Rate', section: NKSSection.LFO, type: NKSParameterType.INT, min: 0, max: 127, defaultValue: 64, page: 2, index: 6, isAutomatable: true },
-  { id: 'v2.lfo1.depth', name: 'LFO Depth', section: NKSSection.LFO, type: NKSParameterType.INT, min: 0, max: 127, defaultValue: 0, page: 2, index: 7, isAutomatable: true },
+  { id: 'v2.envelope.attack', name: 'Amp Attack', section: NKSSection.ENVELOPE, type: NKSParameterType.INT, min: 0, max: 127, defaultValue: 0, page: 2, index: 0, isAutomatable: true, accessibilityName: 'Amplifier Envelope Attack Time', subsection: 'Amp Env' },
+  { id: 'v2.envelope.decay', name: 'Amp Decay', section: NKSSection.ENVELOPE, type: NKSParameterType.INT, min: 0, max: 127, defaultValue: 64, page: 2, index: 1, isAutomatable: true, accessibilityName: 'Amplifier Envelope Decay Time', subsection: 'Amp Env' },
+  { id: 'v2.envelope.sustain', name: 'Amp Sustain', section: NKSSection.ENVELOPE, type: NKSParameterType.INT, min: 0, max: 127, defaultValue: 127, page: 2, index: 2, isAutomatable: true, accessibilityName: 'Amplifier Envelope Sustain Level', subsection: 'Amp Env' },
+  { id: 'v2.envelope.release', name: 'Amp Release', section: NKSSection.ENVELOPE, type: NKSParameterType.INT, min: 0, max: 127, defaultValue: 32, page: 2, index: 3, isAutomatable: true, accessibilityName: 'Amplifier Envelope Release Time', subsection: 'Amp Env' },
+  { id: 'v2.envelope2.attack', name: 'Env2 Attack', section: NKSSection.ENVELOPE, type: NKSParameterType.INT, min: 0, max: 127, defaultValue: 0, page: 2, index: 4, isAutomatable: true, accessibilityName: 'Modulation Envelope Attack Time', subsection: 'Mod Env' },
+  { id: 'v2.envelope2.decay', name: 'Env2 Decay', section: NKSSection.ENVELOPE, type: NKSParameterType.INT, min: 0, max: 127, defaultValue: 64, page: 2, index: 5, isAutomatable: true, accessibilityName: 'Modulation Envelope Decay Time', subsection: 'Mod Env' },
+  { id: 'v2.lfo1.rate', name: 'LFO Rate', section: NKSSection.LFO, type: NKSParameterType.INT, min: 0, max: 127, defaultValue: 64, page: 2, index: 6, isAutomatable: true, accessibilityName: 'LFO Rate' },
+  { id: 'v2.lfo1.depth', name: 'LFO Depth', section: NKSSection.LFO, type: NKSParameterType.INT, min: 0, max: 127, defaultValue: 0, page: 2, index: 7, isAutomatable: true, accessibilityName: 'LFO Depth' },
 ];
 
 // ============================================================================
@@ -1028,6 +1028,53 @@ export function getNKSParametersForSynth(synthType: SynthType): NKSParameter[] {
   return SYNTH_PARAMETER_MAPS[synthType] || GENERIC_NKS_PARAMETERS;
 }
 
+// ============================================================================
+// NKS2 PRODUCT VISUAL IDENTITY
+// Per-synth color, shortname, and control color for NI hardware display
+// ============================================================================
+
+export interface SynthVisualIdentity {
+  color: string;         // Background color (hex)
+  controlColor: number;  // NI display accent color (0xRRGGBB)
+  shortName: string;     // Max 12 chars per SDK spec
+}
+
+export const SYNTH_VISUAL_IDENTITY: Partial<Record<SynthType, SynthVisualIdentity>> = {
+  'TB303':        { color: '#FF6600', controlColor: 0xFF6600, shortName: 'TB303' },
+  'Dexed':        { color: '#3366FF', controlColor: 0x3366FF, shortName: 'Dexed' },
+  'OBXd':         { color: '#CC3333', controlColor: 0xCC3333, shortName: 'OB-Xd' },
+  'V2':           { color: '#8833CC', controlColor: 0x8833CC, shortName: 'V2 Synth' },
+  'MonoSynth':    { color: '#00CC66', controlColor: 0x00CC66, shortName: 'MonoSynth' },
+  'DuoSynth':     { color: '#009999', controlColor: 0x009999, shortName: 'DuoSynth' },
+  'PolySynth':    { color: '#6633CC', controlColor: 0x6633CC, shortName: 'PolySynth' },
+  'FMSynth':      { color: '#CC6600', controlColor: 0xCC6600, shortName: 'FM Synth' },
+  'AMSynth':      { color: '#CC9900', controlColor: 0xCC9900, shortName: 'AM Synth' },
+  'SuperSaw':     { color: '#FF3366', controlColor: 0xFF3366, shortName: 'SuperSaw' },
+  'Organ':        { color: '#996633', controlColor: 0x996633, shortName: 'Organ' },
+  'DrumMachine':  { color: '#CC0033', controlColor: 0xCC0033, shortName: 'DrumMachine' },
+  'ChipSynth':    { color: '#33CC33', controlColor: 0x33CC33, shortName: 'ChipSynth' },
+  'WobbleBass':   { color: '#FF0066', controlColor: 0xFF0066, shortName: 'WobbleBass' },
+  'StringMachine': { color: '#663399', controlColor: 0x663399, shortName: 'StringMach' },
+  'GranularSynth': { color: '#339999', controlColor: 0x339999, shortName: 'Granular' },
+  'Wavetable':    { color: '#3399CC', controlColor: 0x3399CC, shortName: 'Wavetable' },
+  'DubSiren':     { color: '#FF3300', controlColor: 0xFF3300, shortName: 'DubSiren' },
+  'SpaceLaser':   { color: '#00CCFF', controlColor: 0x00CCFF, shortName: 'SpaceLaser' },
+  'Synare':       { color: '#FF6633', controlColor: 0xFF6633, shortName: 'Synare' },
+  'Vital':        { color: '#FF00CC', controlColor: 0xFF00CC, shortName: 'Vital' },
+  'Odin2':        { color: '#6600CC', controlColor: 0x6600CC, shortName: 'Odin2' },
+  'Surge':        { color: '#0066CC', controlColor: 0x0066CC, shortName: 'Surge' },
+  'Monique':      { color: '#CC0066', controlColor: 0xCC0066, shortName: 'Monique' },
+  'Sam':          { color: '#66CC00', controlColor: 0x66CC00, shortName: 'Sam' },
+};
+
+const DEFAULT_VISUAL_IDENTITY: SynthVisualIdentity = {
+  color: '#1A1A2E', controlColor: 0x00DDFF, shortName: 'DEViLBOX',
+};
+
+export function getSynthVisualIdentity(synthType: SynthType): SynthVisualIdentity {
+  return SYNTH_VISUAL_IDENTITY[synthType] || DEFAULT_VISUAL_IDENTITY;
+}
+
 /**
  * Build NKS pages from parameters
  */
@@ -1120,29 +1167,86 @@ export function formatNKSValue(param: NKSParameter, value: number): string {
  * Infer NKS2 PDI from an NKS1 parameter definition.
  * This allows existing parameter maps to work with NKS2 without rewriting.
  */
+// SDK-standard waveform display_values that trigger hardware icons on Kontrol MK3
+const WAVEFORM_VALUE_MAP: Record<string, string> = {
+  'saw': 'saw', 'sawtooth': 'saw', 'ramp': 'saw',
+  'square': 'square', 'pulse': 'square', 'pwm': 'pwm',
+  'triangle': 'triangle', 'tri': 'triangle',
+  'sine': 'sine', 'sin': 'sine',
+  'noise': 'noise', 's&h': 'noise', 'random': 'noise',
+  'wavetable': 'wavetable', 'wt': 'wavetable',
+  'fm': 'complex', 'complex': 'complex',
+  'off': 'default',
+};
+
+// SDK-standard filter type display_values
+const FILTER_VALUE_MAP: Record<string, string> = {
+  'low': 'lo_pass', 'lowpass': 'lo_pass', 'lp': 'lo_pass', 'lpf': 'lo_pass', 'moogl': 'lo_pass',
+  'high': 'hi_pass', 'highpass': 'hi_pass', 'hp': 'hi_pass', 'hpf': 'hi_pass', 'moogh': 'hi_pass',
+  'band': 'band_pass', 'bandpass': 'band_pass', 'bp': 'band_pass', 'bpf': 'band_pass',
+  'notch': 'band_reject', 'bandreject': 'band_reject', 'br': 'band_reject',
+  'all': 'all_pass', 'allpass': 'all_pass', 'ap': 'all_pass',
+  'comb': 'comb',
+  'off': 'default',
+};
+
+/**
+ * Map raw valueStrings to SDK-standard display_values for hardware icon rendering.
+ */
+function mapDisplayValues(valueStrings: string[], mapping: Record<string, string>): string[] {
+  return valueStrings.map(v => {
+    const key = v.toLowerCase().replace(/[^a-z0-9&]/g, '');
+    return mapping[key] || 'default';
+  });
+}
+
 export function inferNKS2PDI(param: NKSParameter): NKS2PDI {
   // If param already has explicit PDI, use it
   if (param.pdi) return param.pdi;
 
   switch (param.type) {
-    case NKSParameterType.BOOLEAN:
+    case NKSParameterType.BOOLEAN: {
+      // Detect tempo sync toggles
+      const lowerName = param.name.toLowerCase();
+      if (lowerName.includes('sync') || lowerName.includes('tempo')) {
+        return { type: 'toggle', style: 'temposync' };
+      }
       return { type: 'toggle', style: 'power' };
+    }
 
     case NKSParameterType.SELECTOR: {
       const count = param.valueStrings?.length ?? Math.round(param.max - param.min + 1);
-      // Detect waveform and filter type selectors by name
       const lowerName = param.name.toLowerCase();
-      let style: NKS2PDI['style'] = 'menu';
-      if (lowerName.includes('wave') || lowerName.includes('osc type') || lowerName.includes('waveform')) {
+      let style: NKS2PDI['style'] = count > 20 ? 'menuXL' : 'menu';
+      let display_values = param.valueStrings;
+
+      // Detect waveform selectors
+      if (lowerName.includes('wave') || lowerName.includes('osc type') || lowerName.includes('waveform')
+        || lowerName.includes('shape') || (lowerName.includes('osc') && lowerName.includes('mode'))) {
         style = 'waveform';
-      } else if (lowerName.includes('filter') && (lowerName.includes('mode') || lowerName.includes('type'))) {
+        if (param.valueStrings) {
+          display_values = mapDisplayValues(param.valueStrings, WAVEFORM_VALUE_MAP);
+        }
+      // Detect filter type selectors
+      } else if ((lowerName.includes('filt') || lowerName.includes('flt'))
+        && (lowerName.includes('mode') || lowerName.includes('type') || lowerName.includes('select'))) {
         style = 'filterType';
+        if (param.valueStrings) {
+          display_values = mapDisplayValues(param.valueStrings, FILTER_VALUE_MAP);
+        }
+      // Detect LFO waveform selectors
+      } else if (lowerName.includes('lfo') && (lowerName.includes('wave') || lowerName.includes('shape'))) {
+        style = 'waveform';
+        if (param.valueStrings) {
+          display_values = mapDisplayValues(param.valueStrings, WAVEFORM_VALUE_MAP);
+        }
       }
+
       return {
         type: 'discrete',
         style,
         value_count: count,
-        display_values: param.valueStrings,
+        display_values,
       };
     }
 
@@ -1284,42 +1388,176 @@ export function toNKS2Parameter(param: NKSParameter): NKS2Parameter {
     unit: param.unit,
     ccNumber: param.ccNumber,
     engineParam: getEngineParam(param),
+    ...(param.accessibilityName ? { accessibilityName: param.accessibilityName } : {}),
   };
+}
+
+// NKS2 Edit Group ordering — maps NKSSection to a display order and group name
+const SECTION_GROUP_ORDER: Record<string, { order: number; groupName: string }> = {
+  [NKSSection.SYNTHESIS]: { order: 0, groupName: 'Oscillator' },
+  [NKSSection.FILTER]: { order: 1, groupName: 'Filter' },
+  [NKSSection.ENVELOPE]: { order: 2, groupName: 'Envelope' },
+  [NKSSection.LFO]: { order: 3, groupName: 'LFO' },
+  [NKSSection.MODULATION]: { order: 4, groupName: 'Modulation' },
+  [NKSSection.EFFECTS]: { order: 5, groupName: 'Effects' },
+  [NKSSection.SEQUENCER]: { order: 6, groupName: 'Sequencer' },
+  [NKSSection.ARP]: { order: 7, groupName: 'Arpeggiator' },
+  [NKSSection.MACRO]: { order: 8, groupName: 'Macro' },
+  [NKSSection.MIXER]: { order: 9, groupName: 'Mixer' },
+  [NKSSection.OUTPUT]: { order: 10, groupName: 'Output' },
+};
+
+/**
+ * Build proper hierarchical NKS2 Edit Groups from NKS1 parameters.
+ * Groups params by NKSSection, then subdivides into subsections using
+ * the param's `subsection` hint or auto-detected clusters (e.g., "Osc 1" vs "Osc 2",
+ * "Amp Env" vs "Filter Env"). Enforces SDK limit of 48 params per group.
+ */
+export function buildNKS2EditGroups(nks1Params: NKSParameter[]): NKS2EditGroup[] {
+  // Group params by their NKSSection
+  const sectionMap = new Map<string, NKSParameter[]>();
+  for (const param of nks1Params) {
+    if (param.isAutomatable === false) continue;
+    const key = param.section;
+    if (!sectionMap.has(key)) sectionMap.set(key, []);
+    sectionMap.get(key)!.push(param);
+  }
+
+  const editGroups: NKS2EditGroup[] = [];
+
+  for (const [sectionKey, params] of sectionMap.entries()) {
+    const groupInfo = SECTION_GROUP_ORDER[sectionKey] || { order: 99, groupName: sectionKey };
+
+    // Subdivide into subsections by explicit `subsection` hint or auto-detect
+    const subsectionMap = new Map<string, NKSParameter[]>();
+    for (const param of params) {
+      const sub = param.subsection || inferSubsection(param, sectionKey);
+      if (!subsectionMap.has(sub)) subsectionMap.set(sub, []);
+      subsectionMap.get(sub)!.push(param);
+    }
+
+    // Build sections preserving original param order (by page, then index)
+    const sections: NKS2EditSection[] = [];
+    for (const [subName, subParams] of subsectionMap.entries()) {
+      subParams.sort((a, b) => a.page !== b.page ? a.page - b.page : a.index - b.index);
+      sections.push({
+        name: subName,
+        parameters: subParams.map(toNKS2Parameter),
+      });
+    }
+
+    // Enforce SDK limit: max 48 params per group. If over, split into numbered groups.
+    const totalParams = sections.reduce((sum, s) => sum + s.parameters.length, 0);
+    if (totalParams <= 48) {
+      editGroups.push({ name: groupInfo.groupName, sections, _order: groupInfo.order } as NKS2EditGroup & { _order: number });
+    } else {
+      // Split sections into chunks that fit within 48 params
+      let chunk: NKS2EditSection[] = [];
+      let chunkCount = 0;
+      let groupNum = 1;
+      for (const section of sections) {
+        if (chunkCount + section.parameters.length > 48 && chunk.length > 0) {
+          editGroups.push({ name: `${groupInfo.groupName} ${groupNum}`, sections: chunk, _order: groupInfo.order + (groupNum - 1) * 0.01 } as NKS2EditGroup & { _order: number });
+          groupNum++;
+          chunk = [];
+          chunkCount = 0;
+        }
+        chunk.push(section);
+        chunkCount += section.parameters.length;
+      }
+      if (chunk.length > 0) {
+        const name = groupNum > 1 ? `${groupInfo.groupName} ${groupNum}` : groupInfo.groupName;
+        editGroups.push({ name, sections: chunk, _order: groupInfo.order + (groupNum - 1) * 0.01 } as NKS2EditGroup & { _order: number });
+      }
+    }
+  }
+
+  // Sort by synth-logical order (Osc → Filter → Env → LFO → FX → Output)
+  editGroups.sort((a, b) => ((a as any)._order ?? 99) - ((b as any)._order ?? 99));
+
+  // Strip internal _order property
+  return editGroups.map(({ name, sections }) => ({ name, sections }));
+}
+
+/**
+ * Auto-detect subsection from param name patterns when no explicit hint is set.
+ * E.g., "Osc1 Wave" → "Osc 1", "Amp Attack" → "Amp Env", "Flt1 Cutoff" → "Filter 1"
+ */
+function inferSubsection(param: NKSParameter, sectionKey: string): string {
+  const name = param.name;
+
+  // Oscillator subsections: Osc1/Osc2 patterns
+  if (sectionKey === NKSSection.SYNTHESIS) {
+    if (/\bOsc\s*1\b/i.test(name)) return 'Osc 1';
+    if (/\bOsc\s*2\b/i.test(name)) return 'Osc 2';
+    if (/\bOsc\s*3\b/i.test(name)) return 'Osc 3';
+  }
+
+  // Filter subsections: Flt1/Flt2 or Filter 1/2
+  if (sectionKey === NKSSection.FILTER) {
+    if (/\bFlt\s*1\b/i.test(name) || /\bFilter\s*1\b/i.test(name)) return 'Filter 1';
+    if (/\bFlt\s*2\b/i.test(name) || /\bFilter\s*2\b/i.test(name)) return 'Filter 2';
+  }
+
+  // Envelope subsections: Amp vs Filter envelopes
+  if (sectionKey === NKSSection.ENVELOPE) {
+    if (/\bAmp\b/i.test(name)) return 'Amp Env';
+    if (/\bFlt\b/i.test(name) || /\bFilter\b/i.test(name) || /\bFil\b/i.test(name)) return 'Filter Env';
+    if (/\bEnv\s*2\b/i.test(name) || /\bMod\s*Env\b/i.test(name)) return 'Mod Env';
+    if (/\bEnv\s*3\b/i.test(name)) return 'Env 3';
+  }
+
+  // Effects subsections: Delay, Reverb, Distortion, Chorus, etc.
+  if (sectionKey === NKSSection.EFFECTS) {
+    if (/\bDelay\b/i.test(name)) return 'Delay';
+    if (/\bReverb\b/i.test(name)) return 'Reverb';
+    if (/\bDist\b/i.test(name) || /\bDrive\b/i.test(name)) return 'Distortion';
+    if (/\bChorus\b/i.test(name)) return 'Chorus';
+    if (/\bPhaser\b/i.test(name)) return 'Phaser';
+    if (/\bFlanger\b/i.test(name)) return 'Flanger';
+  }
+
+  // LFO subsections
+  if (sectionKey === NKSSection.LFO) {
+    if (/\bLFO\s*1\b/i.test(name)) return 'LFO 1';
+    if (/\bLFO\s*2\b/i.test(name)) return 'LFO 2';
+    if (/\bLFO\s*3\b/i.test(name)) return 'LFO 3';
+  }
+
+  // Default: use the group name itself as subsection
+  const groupInfo = SECTION_GROUP_ORDER[sectionKey];
+  return groupInfo?.groupName || sectionKey;
 }
 
 /**
  * Build an NKS2 synth profile from an NKS1 parameter array.
- * Performance mode uses page 0 (first 8 params).
- * Additional pages become additional performance sections or edit groups.
+ * Performance mode uses pages 0-1 (first 8-16 most important params).
+ * Edit mode uses hierarchical groups organized by NKSSection with subsections.
  */
 export function buildNKS2Profile(synthType: SynthType): NKS2SynthProfile {
   const nks1Params = getNKSParametersForSynth(synthType);
-  const nks2Params = nks1Params.map(toNKS2Parameter);
+  const nks2Params = nks1Params.filter(p => p.isAutomatable !== false).map(toNKS2Parameter);
 
-  // Build performance sections from NKS1 pages
+  // Build performance sections from NKS1 pages 0-1 (max 16 params)
   const pages = buildNKSPages(nks1Params);
   const performance: NKS2PerformanceSection[] = pages.slice(0, 2).map(page => ({
     name: page.name,
     parameters: page.parameters.map(toNKS2Parameter),
   }));
 
-  // Remaining pages become edit groups (if any)
-  const editGroups = pages.length > 2
-    ? pages.slice(2).map(page => ({
-        name: page.name,
-        sections: [{ name: page.name, parameters: page.parameters.map(toNKS2Parameter) }],
-      }))
-    : undefined;
+  // Build proper hierarchical edit groups from all params
+  const editGroups = buildNKS2EditGroups(nks1Params);
 
   const navigation: NKS2Navigation = {
     performance,
-    editGroups,
+    editGroups: editGroups.length > 0 ? editGroups : undefined,
   };
 
   return {
     synthType,
     parameters: nks2Params,
     navigation,
+    controlColor: getSynthVisualIdentity(synthType).controlColor,
   };
 }
 

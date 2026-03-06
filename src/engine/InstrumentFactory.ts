@@ -13,6 +13,7 @@ import {
   DEFAULT_SUPERCOLLIDER,
 } from '@/types/instrument';
 import { HivelySynth } from './hively/HivelySynth';
+import { KlysSynth } from './klystrack/KlysSynth';
 import { JamCrackerSynth } from './jamcracker/JamCrackerSynth';
 import { SoundMonSynth } from './soundmon/SoundMonSynth';
 import { SidMonSynth } from './sidmon/SidMonSynth';
@@ -491,6 +492,10 @@ export class InstrumentFactory {
         instrument = new HivelySynth();
         break;
 
+      case 'KlysSynth':
+        instrument = new KlysSynth();
+        break;
+
       case 'JamCrackerSynth': {
         const jcSynth = new JamCrackerSynth();
         // Set 0-based instrument index from config id (which is 1-based)
@@ -689,6 +694,26 @@ export class InstrumentFactory {
         const scVolDb = (config.volume ?? -12) + scOffset;
         (scSynth.output as GainNode).gain.value = Math.pow(10, scVolDb / 20);
         instrument = scSynth;
+        break;
+      }
+
+      case 'GearmulatorVirus':
+      case 'GearmulatorVirusTI':
+      case 'GearmulatorMicroQ':
+      case 'GearmulatorXT':
+      case 'GearmulatorNord':
+      case 'GearmulatorJP8000': {
+        // Lazy-load gearmulator module; returns a placeholder synth that
+        // initialises asynchronously once the WASM module is ready.
+        const gmConfig = config.gearmulator ?? { synthType: 0 };
+        const gmVolDb = config.volume ?? -12;
+        const placeholder = createToneJSBasicSynth(config);
+        import('./gearmulator/GearmulatorSynth').then(({ createGearmulatorSynth }) => {
+          createGearmulatorSynth(gmConfig, gmVolDb).catch((err: unknown) => {
+            console.error('[InstrumentFactory] Gearmulator init failed:', err);
+          });
+        });
+        instrument = placeholder;
         break;
       }
 

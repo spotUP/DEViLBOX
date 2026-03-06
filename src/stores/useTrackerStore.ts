@@ -10,13 +10,8 @@ import type {
   Pattern,
   TrackerCell,
   ClipboardData,
-  ColumnVisibility,
-  EditorMode,
-  FurnaceNativeData,
-  HivelyNativeData,
-  FurnaceSubsongPlayback,
 } from '@typedefs';
-import { DEFAULT_COLUMN_VISIBILITY, EMPTY_CELL, CHANNEL_COLORS } from '@typedefs';
+import { EMPTY_CELL, CHANNEL_COLORS } from '@typedefs';
 import { getToneEngine } from '@engine/ToneEngine';
 import { getTrackerReplayer } from '@engine/TrackerReplayer';
 import { useTransportStore } from './useTransportStore';
@@ -25,6 +20,8 @@ import { DEFAULT_PATTERN_LENGTH, DEFAULT_NUM_CHANNELS, MAX_PATTERN_LENGTH, MAX_C
 import { SYSTEM_PRESETS, DivChanType } from '../constants/systemPresets';
 import { useHistoryStore } from './useHistoryStore';
 import { useCursorStore } from './useCursorStore';
+import { useEditorStore } from './useEditorStore';
+import { useFormatStore } from './useFormatStore';
 
 // Extracted helper modules
 import {
@@ -44,107 +41,16 @@ import {
   writeMacroSlotHelper, readMacroSlotHelper, findBestChannelHelper,
 } from './tracker/multiRecordActions';
 
-// FT2-style bitwise mask system for copy/paste/transpose operations
-const MASK_NOTE = 1 << 0;      // 0b00001
-const MASK_INSTRUMENT = 1 << 1; // 0b00010
-const MASK_VOLUME = 1 << 2;     // 0b00100
-const MASK_EFFECT = 1 << 3;     // 0b01000
-const MASK_EFFECT2 = 1 << 4;    // 0b10000
-const MASK_ALL = 0b11111;       // All columns
-
-const hasMaskBit = (mask: number, bit: number): boolean => (mask & bit) !== 0;
-const toggleMaskBit = (mask: number, bit: number): number => mask ^ bit;
-
 interface TrackerStore {
   // State
   patterns: Pattern[];
   currentPatternIndex: number;
   clipboard: ClipboardData | null;
   trackClipboard: TrackerCell[] | null; // FT2: Single-channel clipboard
-  followPlayback: boolean;
-  showGhostPatterns: boolean; // Show previous/next patterns as ghosts
-  columnVisibility: ColumnVisibility;
-  // FT2-style bitwise masks for selective operations
-  copyMask: number;      // 5-bit: which columns to copy
-  pasteMask: number;     // 5-bit: which columns to paste
-  transposeMask: number; // 5-bit: which columns to transpose
   macroSlots: MacroSlot[]; // FT2: 8 quick-entry slots
-  insertMode: boolean;   // FT2: Insert vs overwrite mode
-  currentOctave: number; // FT2: F1-F7 selects octave 1-7
-  recordMode: boolean; // When true, entering notes advances cursor by editStep
-  editStep: number; // Rows to advance after entering a note (0-16)
-  // FT2: Multi-channel recording features
-  multiRecEnabled: boolean;    // FT2: Distribute notes across enabled channels during recording
-  multiEditEnabled: boolean;   // FT2: Distribute notes across enabled channels during edit
-  multiRecChannels: boolean[]; // FT2: Per-channel recording enable (max 32 channels)
-  multiKeyJazz: boolean;       // FT2: Multi-channel jamming when not editing
-  recQuantEnabled: boolean;    // FT2: Quantize notes to row boundaries during recording
-  recQuantRes: number;         // FT2: Quantization resolution (1, 2, 4, 8, 16 rows)
-  recReleaseEnabled: boolean;  // FT2: Record note-off when keys are released
-  keyOnTab: number[];          // FT2: Track which note (XM) is playing on each channel
-  keyOffTime: number[];        // FT2: Track keyoff timing for channel allocation
-  keyOffCounter: number;       // FT2: Global counter for keyOffTime allocation
-  ptnJumpPos: number[];        // 10 stored jump positions (0-9); first 4 map to F9-F12
-  wrapMode: boolean;           // Cursor wraps at pattern boundaries
-  recordQuantize: boolean;     // Quantize recorded notes to step grid
-  autoRecord: boolean;         // Auto-record notes while playing
-  multiChannelRecord: boolean; // Record to multiple channels simultaneously
-  bookmarks: number[];         // Row bookmarks in current pattern
   // FT2: Pattern Order List (Song Position List)
   patternOrder: number[]; // Array of pattern indices for song arrangement
   currentPositionIndex: number; // Current position in pattern order (for editing)
-
-  // Original module data for libopenmpt playback (sample-accurate effects)
-  originalModuleData: {
-    base64: string;
-    format: 'MOD' | 'XM' | 'IT' | 'S3M' | 'UNKNOWN';
-    sourceFile?: string;
-  } | null;
-
-  // Multi-format editor support
-  editorMode: EditorMode;
-  linearPeriods: boolean; // true = XM/IT/FTM linear frequency table; false = Amiga periods
-  furnaceNative: FurnaceNativeData | null;
-  hivelyNative: HivelyNativeData | null;
-  hivelyFileData: ArrayBuffer | null;
-  musiclineFileData: Uint8Array | null;
-  c64SidFileData: Uint8Array | null;
-  jamCrackerFileData: ArrayBuffer | null;
-  futurePlayerFileData: ArrayBuffer | null;
-  hivelyMeta: { stereoMode: number; mixGain: number; speedMultiplier: number; version: number } | null;
-  furnaceSubsongs: FurnaceSubsongPlayback[] | null;
-  furnaceActiveSubsong: number;
-  // MusicLine Editor per-channel sequencing data (null for all other formats)
-  channelTrackTables: number[][] | null;
-  channelSpeeds: number[] | null;
-  channelGrooves: number[] | null;
-
-  // SongDB metadata (optional enrichment from audacious-uade-tools database)
-  songDBInfo: {
-    authors: string[];
-    publishers: string[];
-    album: string;
-    year: string;
-    format: string;
-    duration_ms: number;
-  } | null;
-
-  // C64 SID metadata (extracted from SID header during import)
-  sidMetadata: {
-    format: string;
-    version: number;
-    title: string;
-    author: string;
-    copyright: string;
-    chipModel: '6581' | '8580' | 'Unknown';
-    clockSpeed: 'PAL' | 'NTSC' | 'Unknown';
-    subsongs: number;
-    defaultSubsong: number;
-    currentSubsong: number;
-    secondSID: boolean;
-    thirdSID: boolean;
-  } | null;
-  setSidMetadata: (info: TrackerStore['sidMetadata']) => void;
 
   // Actions
   setCurrentPattern: (index: number, fromReplayer?: boolean) => void;
@@ -154,44 +60,8 @@ interface TrackerStore {
   clearPattern: () => void;
   insertRow: (channelIndex: number, rowIndex: number) => void;
   deleteRow: (channelIndex: number, rowIndex: number) => void;
-  setFollowPlayback: (enabled: boolean) => void;
-  setShowGhostPatterns: (enabled: boolean) => void;
-  setColumnVisibility: (visibility: Partial<ColumnVisibility>) => void;
-  // FT2-style mask operations
-  setCopyMask: (mask: number) => void;
-  setPasteMask: (mask: number) => void;
-  setTransposeMask: (mask: number) => void;
-  toggleMaskBit: (maskType: 'copy' | 'paste' | 'transpose', bit: number) => void;
-  setCurrentOctave: (octave: number) => void;
-  toggleRecordMode: () => void;
-  setEditStep: (step: number) => void;
-  toggleInsertMode: () => void;
-  // FT2: Multi-channel recording actions
-  setMultiRecEnabled: (enabled: boolean) => void;
-  setMultiEditEnabled: (enabled: boolean) => void;
-  toggleMultiRecChannel: (channelIndex: number) => void;
-  setMultiKeyJazz: (enabled: boolean) => void;
-  setRecQuantEnabled: (enabled: boolean) => void;
-  setRecQuantRes: (res: number) => void;
-  setRecReleaseEnabled: (enabled: boolean) => void;
-  // FT2: Key tracking for multi-channel recording
-  setKeyOn: (channelIndex: number, noteNum: number) => void;
-  setKeyOff: (channelIndex: number) => void;
-  findBestChannel: () => number; // Find least-recently-used channel for note allocation
-  resetKeyTracking: () => void;
-  // FT2: Jump position storage
-  setPtnJumpPos: (index: number, row: number) => void;
-  getPtnJumpPos: (index: number) => number;
-
-  // Feature toggles
-  toggleWrapMode: () => void;
-  toggleRecordQuantize: () => void;
-  toggleAutoRecord: () => void;
-  toggleMultiChannelRecord: () => void;
-  toggleBookmark: (row: number) => void;
-  clearBookmarks: () => void;
-  nextBookmark: () => void;
-  prevBookmark: () => void;
+  // Multi-channel recording (cross-store: reads from useEditorStore)
+  findBestChannel: () => number;
 
   // Advanced editing
   amplifySelection: (factor: number) => void;
@@ -278,16 +148,6 @@ interface TrackerStore {
   loadPatterns: (patterns: Pattern[]) => void;
   importPattern: (pattern: Pattern) => number;
   setPatternOrder: (order: number[]) => void;
-  setOriginalModuleData: (data: TrackerStore['originalModuleData']) => void;
-
-  // Multi-format editor support
-  setEditorMode: (mode: EditorMode) => void;
-  setFurnaceNative: (data: FurnaceNativeData | null) => void;
-  setFurnaceOrderEntry: (channel: number, position: number, patternIndex: number) => void;
-  setHivelyNative: (data: HivelyNativeData | null) => void;
-  setSongDBInfo: (info: { authors: string[]; publishers: string[]; album: string; year: string; format: string; duration_ms: number } | null) => void;
-  applyEditorMode: (song: { linearPeriods?: boolean; furnaceNative?: FurnaceNativeData; hivelyNative?: HivelyNativeData; hivelyFileData?: ArrayBuffer; musiclineFileData?: Uint8Array; c64SidFileData?: Uint8Array; jamCrackerFileData?: ArrayBuffer; futurePlayerFileData?: ArrayBuffer; hivelyMeta?: { stereoMode: number; mixGain: number; speedMultiplier: number; version: number }; furnaceSubsongs?: FurnaceSubsongPlayback[]; furnaceActiveSubsong?: number; channelTrackTables?: number[][]; channelSpeeds?: number[]; channelGrooves?: number[]; goatTrackerData?: Uint8Array }) => void;
-  setFurnaceActiveSubsong: (index: number) => void;
 
   // Undo/Redo support
   replacePattern: (index: number, pattern: Pattern) => void;
@@ -324,61 +184,11 @@ export const useTrackerStore = create<TrackerStore>()(
     currentPatternIndex: 0,
     clipboard: null,
     trackClipboard: null, // FT2: Single-channel clipboard
-    followPlayback: false,
-    showGhostPatterns: true, // Show ghost patterns by default
-    columnVisibility: { ...DEFAULT_COLUMN_VISIBILITY },
-    // FT2-style bitwise masks (all columns enabled by default)
-    copyMask: MASK_ALL,
-    pasteMask: MASK_ALL,
-    transposeMask: MASK_NOTE, // Only transpose notes by default
     macroSlots: Array.from({ length: 8 }, () => createEmptyMacroSlot()), // FT2: 8 macro slots
-    insertMode: false, // FT2: Start in overwrite mode
-    currentOctave: 4, // Default octave (F4)
-    recordMode: false, // Start with record mode off
-    editStep: 1, // Default edit step (advance 1 row after note entry)
-    // FT2: Multi-channel recording features
-    multiRecEnabled: false,
-    multiEditEnabled: false,
-    multiRecChannels: Array(MAX_CHANNELS).fill(true), // All channels enabled by default
-    multiKeyJazz: false,
-    recQuantEnabled: false,
-    recQuantRes: 16, // Default quantization: 16 rows (1 beat at speed 6)
-    recReleaseEnabled: false,
-    keyOnTab: Array(MAX_CHANNELS).fill(0), // 0 = no note playing
-    keyOffTime: Array(MAX_CHANNELS).fill(0),
-    keyOffCounter: 0,
-    ptnJumpPos: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0], // 10 stored jump positions (0-9)
-    wrapMode: false,
-    recordQuantize: false,
-    autoRecord: false,
-    multiChannelRecord: false,
-    bookmarks: [],
     // FT2: Pattern Order List (Song Position List)
     patternOrder: [0], // Start with first pattern in order
     currentPositionIndex: 0, // Start at position 0
 
-    // Original module data for libopenmpt playback
-    originalModuleData: null,
-
-    // Multi-format editor support
-    editorMode: 'classic' as EditorMode,
-    linearPeriods: false,
-    furnaceNative: null,
-    hivelyNative: null,
-    hivelyFileData: null,
-    musiclineFileData: null,
-    c64SidFileData: null,
-    jamCrackerFileData: null,
-    futurePlayerFileData: null,
-    hivelyMeta: null,
-    furnaceSubsongs: null,
-    furnaceActiveSubsong: 0,
-    channelTrackTables: null,
-    channelSpeeds: null,
-    channelGrooves: null,
-
-    songDBInfo: null,
-    sidMetadata: null,
 
     // Actions
     setCurrentPattern: (index, fromReplayer) =>
@@ -452,157 +262,13 @@ export const useTrackerStore = create<TrackerStore>()(
       useHistoryStore.getState().pushAction('DELETE_ROW', 'Delete row', patternIndex, beforePattern, get().patterns[patternIndex]);
     },
 
-    setFollowPlayback: (enabled) =>
-      set((state) => {
-        state.followPlayback = enabled;
-      }),
-
-    setShowGhostPatterns: (enabled) =>
-      set((state) => {
-        state.showGhostPatterns = enabled;
-      }),
-
-    setColumnVisibility: (visibility) =>
-      set((state) => {
-        Object.assign(state.columnVisibility, visibility);
-      }),
-
-    // FT2-style mask operations
-    setCopyMask: (mask) =>
-      set((state) => {
-        state.copyMask = mask & MASK_ALL; // Ensure only valid bits
-      }),
-
-    setPasteMask: (mask) =>
-      set((state) => {
-        state.pasteMask = mask & MASK_ALL;
-      }),
-
-    setTransposeMask: (mask) =>
-      set((state) => {
-        state.transposeMask = mask & MASK_ALL;
-      }),
-
-    toggleMaskBit: (maskType, bit) =>
-      set((state) => {
-        if (maskType === 'copy') {
-          state.copyMask = toggleMaskBit(state.copyMask, bit);
-        } else if (maskType === 'paste') {
-          state.pasteMask = toggleMaskBit(state.pasteMask, bit);
-        } else if (maskType === 'transpose') {
-          state.transposeMask = toggleMaskBit(state.transposeMask, bit);
-        }
-      }),
-
-    setCurrentOctave: (octave) =>
-      set((state) => {
-        // Clamp octave to valid range 1-7 (FT2 style)
-        state.currentOctave = Math.max(1, Math.min(7, octave));
-      }),
-
-    toggleRecordMode: () =>
-      set((state) => {
-        state.recordMode = !state.recordMode;
-      }),
-
-    setEditStep: (step) =>
-      set((state) => {
-        // Clamp edit step to valid range 0-16
-        state.editStep = Math.max(0, Math.min(16, step));
-      }),
-
-    toggleInsertMode: () =>
-      set((state) => {
-        state.insertMode = !state.insertMode;
-      }),
-
-    // FT2: Multi-channel recording actions
-    setMultiRecEnabled: (enabled) =>
-      set((state) => {
-        state.multiRecEnabled = enabled;
-      }),
-
-    setMultiEditEnabled: (enabled) =>
-      set((state) => {
-        state.multiEditEnabled = enabled;
-      }),
-
-    toggleMultiRecChannel: (channelIndex) =>
-      set((state) => {
-        if (channelIndex >= 0 && channelIndex < state.multiRecChannels.length) {
-          state.multiRecChannels[channelIndex] = !state.multiRecChannels[channelIndex];
-        }
-      }),
-
-    setMultiKeyJazz: (enabled) =>
-      set((state) => {
-        state.multiKeyJazz = enabled;
-      }),
-
-    setRecQuantEnabled: (enabled) =>
-      set((state) => {
-        state.recQuantEnabled = enabled;
-      }),
-
-    setRecQuantRes: (res) =>
-      set((state) => {
-        // Valid values: 1, 2, 4, 8, 16
-        if ([1, 2, 4, 8, 16].includes(res)) {
-          state.recQuantRes = res;
-        }
-      }),
-
-    setRecReleaseEnabled: (enabled) =>
-      set((state) => {
-        state.recReleaseEnabled = enabled;
-      }),
-
-    // FT2: Key tracking for multi-channel recording
-    setKeyOn: (channelIndex, noteNum) =>
-      set((state) => {
-        if (channelIndex >= 0 && channelIndex < state.keyOnTab.length) {
-          state.keyOnTab[channelIndex] = noteNum;
-        }
-      }),
-
-    setKeyOff: (channelIndex) =>
-      set((state) => {
-        if (channelIndex >= 0 && channelIndex < state.keyOnTab.length) {
-          state.keyOffCounter++;
-          state.keyOnTab[channelIndex] = 0;
-          state.keyOffTime[channelIndex] = state.keyOffCounter;
-        }
-      }),
-
     findBestChannel: () => {
       const state = get();
+      const editorState = useEditorStore.getState();
       const pattern = state.patterns[state.currentPatternIndex];
       const numChannels = pattern?.channels.length || 1;
       const cursorChannel = useCursorStore.getState().cursor.channelIndex;
-      return findBestChannelHelper(state, numChannels, cursorChannel);
-    },
-
-    resetKeyTracking: () =>
-      set((state) => {
-        state.keyOnTab = state.keyOnTab.map(() => 0);
-        state.keyOffTime = state.keyOffTime.map(() => 0);
-        state.keyOffCounter = 0;
-      }),
-
-    // FT2: Jump position storage
-    setPtnJumpPos: (index, row) =>
-      set((state) => {
-        if (index >= 0 && index < 10) {
-          state.ptnJumpPos[index] = row;
-        }
-      }),
-
-    getPtnJumpPos: (index) => {
-      const state = get();
-      if (index >= 0 && index < 10) {
-        return state.ptnJumpPos[index];
-      }
-      return 0;
+      return findBestChannelHelper(editorState, numChannels, cursorChannel);
     },
 
     copySelection: () =>
@@ -637,7 +303,7 @@ export const useTrackerStore = create<TrackerStore>()(
         if (!state.clipboard) return;
         const pattern = state.patterns[state.currentPatternIndex];
         const cursor = useCursorStore.getState().cursor;
-        pasteHelper(pattern, cursor, state.clipboard, state.pasteMask);
+        pasteHelper(pattern, cursor, state.clipboard, useEditorStore.getState().pasteMask);
       });
       useHistoryStore.getState().pushAction('PASTE', 'Paste', patternIndex, beforePattern, get().patterns[patternIndex]);
     },
@@ -651,7 +317,7 @@ export const useTrackerStore = create<TrackerStore>()(
         if (!state.clipboard) return;
         const pattern = state.patterns[state.currentPatternIndex];
         const cursor = useCursorStore.getState().cursor;
-        pasteMixHelper(pattern, cursor, state.clipboard, state.pasteMask);
+        pasteMixHelper(pattern, cursor, state.clipboard, useEditorStore.getState().pasteMask);
       });
       useHistoryStore.getState().pushAction('PASTE_MIX', 'Mix paste', patternIndex, beforePattern, get().patterns[patternIndex]);
     },
@@ -665,7 +331,7 @@ export const useTrackerStore = create<TrackerStore>()(
         if (!state.clipboard) return;
         const pattern = state.patterns[state.currentPatternIndex];
         const cursor = useCursorStore.getState().cursor;
-        pasteFloodHelper(pattern, cursor, state.clipboard, state.pasteMask);
+        pasteFloodHelper(pattern, cursor, state.clipboard, useEditorStore.getState().pasteMask);
       });
       useHistoryStore.getState().pushAction('PASTE_FLOOD', 'Flood paste', patternIndex, beforePattern, get().patterns[patternIndex]);
     },
@@ -679,7 +345,7 @@ export const useTrackerStore = create<TrackerStore>()(
         if (!state.clipboard) return;
         const pattern = state.patterns[state.currentPatternIndex];
         const cursor = useCursorStore.getState().cursor;
-        pastePushForwardHelper(pattern, cursor, state.clipboard, state.pasteMask);
+        pastePushForwardHelper(pattern, cursor, state.clipboard, useEditorStore.getState().pasteMask);
       });
       useHistoryStore.getState().pushAction('PASTE_PUSH_FORWARD', 'Push-forward paste', patternIndex, beforePattern, get().patterns[patternIndex]);
     },
@@ -710,7 +376,7 @@ export const useTrackerStore = create<TrackerStore>()(
       set((state) => {
         if (!state.trackClipboard) return;
         const p = state.patterns[state.currentPatternIndex];
-        pasteTrackHelper(p, channelIndex, state.trackClipboard, state.pasteMask);
+        pasteTrackHelper(p, channelIndex, state.trackClipboard, useEditorStore.getState().pasteMask);
       });
       useHistoryStore.getState().pushAction('PASTE_TRACK', 'Paste track', patternIndex, beforePattern, get().patterns[patternIndex]);
     },
@@ -733,7 +399,7 @@ export const useTrackerStore = create<TrackerStore>()(
         const macro = state.macroSlots[slotIndex];
         const pattern = state.patterns[state.currentPatternIndex];
         const cursor = useCursorStore.getState().cursor;
-        readMacroSlotHelper(pattern, cursor, macro, state.pasteMask, state.insertMode);
+        readMacroSlotHelper(pattern, cursor, macro, useEditorStore.getState().pasteMask, useEditorStore.getState().insertMode);
       });
       useHistoryStore.getState().pushAction('READ_MACRO', 'Apply macro', patternIndex, beforePattern, get().patterns[patternIndex]);
     },
@@ -850,47 +516,6 @@ export const useTrackerStore = create<TrackerStore>()(
         fadeVolumeHelper(pattern, scope, startVol, endVol, selection, cursor);
       });
       useHistoryStore.getState().pushAction('FADE_VOLUME', 'Fade volume', patternIndex, beforePattern, get().patterns[patternIndex]);
-    },
-
-    // Feature toggles
-    toggleWrapMode: () =>
-      set((state) => { state.wrapMode = !state.wrapMode; }),
-
-    toggleRecordQuantize: () =>
-      set((state) => { state.recordQuantize = !state.recordQuantize; }),
-
-    toggleAutoRecord: () =>
-      set((state) => { state.autoRecord = !state.autoRecord; }),
-
-    toggleMultiChannelRecord: () =>
-      set((state) => { state.multiChannelRecord = !state.multiChannelRecord; }),
-
-    toggleBookmark: (row) =>
-      set((state) => {
-        const idx = state.bookmarks.indexOf(row);
-        if (idx === -1) {
-          state.bookmarks.push(row);
-          state.bookmarks.sort((a, b) => a - b);
-        } else {
-          state.bookmarks.splice(idx, 1);
-        }
-      }),
-
-    clearBookmarks: () =>
-      set((state) => { state.bookmarks = []; }),
-
-    nextBookmark: () => {
-      const sorted = [...get().bookmarks].sort((a, b) => a - b);
-      const curRow = useCursorStore.getState().cursor.rowIndex;
-      const after = sorted.find(r => r > curRow);
-      if (after !== undefined) useCursorStore.getState().moveCursorToRow(after);
-    },
-
-    prevBookmark: () => {
-      const sorted = [...get().bookmarks].sort((a, b) => a - b);
-      const curRow = useCursorStore.getState().cursor.rowIndex;
-      const before = [...sorted].reverse().find(r => r < curRow);
-      if (before !== undefined) useCursorStore.getState().moveCursorToRow(before);
     },
 
     // Advanced editing methods
@@ -1570,125 +1195,6 @@ export const useTrackerStore = create<TrackerStore>()(
         }
       }),
 
-    setOriginalModuleData: (data) =>
-      set((state) => {
-        state.originalModuleData = data;
-      }),
-
-    // Multi-format editor support
-    setEditorMode: (mode) =>
-      set((state) => {
-        state.editorMode = mode;
-      }),
-
-    setFurnaceNative: (data) =>
-      set((state) => {
-        state.furnaceNative = data;
-      }),
-
-    setFurnaceOrderEntry: (channel, position, patternIndex) =>
-      set((state) => {
-        if (!state.furnaceNative) return;
-        const sub = state.furnaceNative.subsongs[state.furnaceNative.activeSubsong];
-        if (!sub) return;
-        if (channel < 0 || channel >= sub.orders.length) return;
-        if (position < 0 || position >= sub.ordersLen) return;
-        sub.orders[channel][position] = patternIndex;
-      }),
-
-    setHivelyNative: (data) =>
-      set((state) => {
-        state.hivelyNative = data;
-      }),
-
-    setSongDBInfo: (info) =>
-      set((state) => {
-        state.songDBInfo = info;
-      }),
-
-    setSidMetadata: (info) =>
-      set((state) => {
-        state.sidMetadata = info;
-      }),
-
-    applyEditorMode: (song) =>
-      set((state) => {
-        // Always store linearPeriods — affects period→Hz math for XM, IT, FTM, XTracker etc.
-        state.linearPeriods = song.linearPeriods ?? false;
-        // Always store native file data for C64 SID and JamCracker engines
-        state.c64SidFileData = song.c64SidFileData ?? null;
-        state.jamCrackerFileData = song.jamCrackerFileData ?? null;
-        state.futurePlayerFileData = song.futurePlayerFileData ?? null;
-        if (song.furnaceNative) {
-          state.editorMode = 'furnace';
-          state.furnaceNative = song.furnaceNative;
-          state.hivelyNative = null;
-          state.hivelyFileData = null;
-          state.musiclineFileData = null;
-          state.hivelyMeta = null;
-          state.furnaceSubsongs = song.furnaceSubsongs ?? null;
-          state.furnaceActiveSubsong = song.furnaceActiveSubsong ?? 0;
-          state.channelTrackTables = null;
-          state.channelSpeeds = null;
-          state.channelGrooves = null;
-        } else if (song.hivelyNative) {
-          state.editorMode = 'hively';
-          state.hivelyNative = song.hivelyNative;
-          state.hivelyFileData = song.hivelyFileData ?? null;
-          state.musiclineFileData = null;
-          state.hivelyMeta = song.hivelyMeta ?? null;
-          state.furnaceNative = null;
-          state.furnaceSubsongs = null;
-          state.furnaceActiveSubsong = 0;
-          state.channelTrackTables = null;
-          state.channelSpeeds = null;
-          state.channelGrooves = null;
-        } else if (song.channelTrackTables) {
-          // MusicLine Editor and similar per-channel formats
-          state.editorMode = 'musicline';
-          state.furnaceNative = null;
-          state.hivelyNative = null;
-          state.hivelyFileData = null;
-          state.musiclineFileData = song.musiclineFileData ?? null;
-          state.hivelyMeta = null;
-          state.furnaceSubsongs = null;
-          state.furnaceActiveSubsong = 0;
-          state.channelTrackTables = song.channelTrackTables;
-          state.channelSpeeds = song.channelSpeeds ?? null;
-          state.channelGrooves = song.channelGrooves ?? null;
-        } else if (song.goatTrackerData) {
-          // GoatTracker Ultra SID tracker (.sng files only — requires GT engine)
-          state.editorMode = 'goattracker';
-          state.furnaceNative = null;
-          state.hivelyNative = null;
-          state.hivelyFileData = null;
-          state.musiclineFileData = null;
-          state.hivelyMeta = null;
-          state.furnaceSubsongs = null;
-          state.furnaceActiveSubsong = 0;
-          state.channelTrackTables = null;
-          state.channelSpeeds = null;
-          state.channelGrooves = null;
-        } else {
-          state.editorMode = 'classic';
-          state.furnaceNative = null;
-          state.hivelyNative = null;
-          state.hivelyFileData = null;
-          state.musiclineFileData = null;
-          state.hivelyMeta = null;
-          state.furnaceSubsongs = null;
-          state.furnaceActiveSubsong = 0;
-          state.channelTrackTables = null;
-          state.channelSpeeds = null;
-          state.channelGrooves = null;
-        }
-      }),
-
-    setFurnaceActiveSubsong: (index) =>
-      set((state) => {
-        state.furnaceActiveSubsong = index;
-      }),
-
     importPattern: (pattern) => {
       const newIndex = get().patterns.length;
       set((state) => {
@@ -1841,34 +1347,21 @@ export const useTrackerStore = create<TrackerStore>()(
         cursor: { channelIndex: 0, rowIndex: 0, columnType: 'note', digitIndex: 0 },
         selection: null,
       });
+      useEditorStore.getState().reset();
+      useFormatStore.getState().reset();
       set((state) => {
         state.patterns = [createEmptyPattern()];
         state.currentPatternIndex = 0;
         state.clipboard = null;
         state.trackClipboard = null;
-        state.currentOctave = 4;
-        state.recordMode = false;
-        state.editStep = 1;
-        state.insertMode = false;
-        state.columnVisibility = { ...DEFAULT_COLUMN_VISIBILITY };
-        state.copyMask = MASK_ALL;
-        state.pasteMask = MASK_ALL;
-        state.transposeMask = MASK_NOTE;
         state.macroSlots = Array.from({ length: 8 }, () => createEmptyMacroSlot());
         state.patternOrder = [0];
         state.currentPositionIndex = 0;
-        state.editorMode = 'classic';
-        state.furnaceNative = null;
-        state.hivelyNative = null;
-        state.furnaceSubsongs = null;
-        state.furnaceActiveSubsong = 0;
-        state.songDBInfo = null;
-        state.sidMetadata = null;
       });
     },
   }))
 );
 
-// Export mask constants for use in other modules
-export { MASK_NOTE, MASK_INSTRUMENT, MASK_VOLUME, MASK_EFFECT, MASK_EFFECT2, MASK_ALL, hasMaskBit, toggleMaskBit };
+// Export mask constants for use in other modules (re-export from useEditorStore for backward compat)
+export { MASK_NOTE, MASK_INSTRUMENT, MASK_VOLUME, MASK_EFFECT, MASK_EFFECT2, MASK_ALL } from './useEditorStore';
 export type { MacroSlot };

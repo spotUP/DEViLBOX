@@ -6,7 +6,7 @@
 
 import { useCallback, useMemo, useRef, useState } from 'react';
 import type { Graphics as GraphicsType, FederatedPointerEvent } from 'pixi.js';
-import { useTrackerStore } from '@stores';
+import { useTrackerStore, useEditorStore } from '@stores';
 import type { TrackerCell } from '@typedefs/tracker';
 
 const LANE_WIDTH = 14;
@@ -34,7 +34,7 @@ export const PixiMacroLanes: React.FC<PixiMacroLanesProps> = ({
   rowHeight,
   channelCount,
 }) => {
-  const columnVisibility = useTrackerStore(s => s.columnVisibility);
+  const columnVisibility = useEditorStore(s => s.columnVisibility);
   const patterns = useTrackerStore(s => s.patterns);
   const currentPatternIndex = useTrackerStore(s => s.currentPatternIndex);
   const setCell = useTrackerStore(s => s.setCell);

@@ -57,6 +57,12 @@ interface MIDIStore {
   nksKnobTotalPages: number;              // Total pages for current synth
   nksActiveSynthType: string | null;       // Synth type currently driving knobs
 
+  // NKS2 Navigation & Light Guide
+  nks2Mode: 'performance' | 'edit';       // Current NKS2 display mode
+  nks2EditGroupIndex: number;             // Active edit group (0-indexed)
+  nks2ScrollOffset: number;               // Scroll position within edit group
+  lightGuide: import('../midi/performance/types').NKSKeyLight[];  // Per-key colors
+
   // MIDI Note Transpose
   midiOctaveOffset: number;  // Octave offset for MIDI notes (-4 to +4)
 
@@ -106,6 +112,12 @@ interface MIDIStore {
   nextKnobPage: () => void;
   prevKnobPage: () => void;
   setKnobPage: (page: number) => void;
+
+  // NKS2 Navigation actions
+  setNKS2Mode: (mode: 'performance' | 'edit') => void;
+  setNKS2EditGroup: (index: number) => void;
+  scrollNKS2: (direction: -1 | 1) => void;
+  setLightGuide: (keys: import('../midi/performance/types').NKSKeyLight[]) => void;
 
   // DJ Knob Paging actions
   setDJKnobPage: (page: number) => void;
@@ -194,6 +206,10 @@ export const useMIDIStore = create<MIDIStore>()(
             nksKnobPage: 0,
             nksKnobTotalPages: 0,
             nksActiveSynthType: null,
+            nks2Mode: 'performance' as const,
+            nks2EditGroupIndex: 0,
+            nks2ScrollOffset: 0,
+            lightGuide: [],
             midiOctaveOffset: 0,
         // Default: no octave transpose
       djKnobPage: 0,
@@ -778,6 +794,34 @@ export const useMIDIStore = create<MIDIStore>()(
         });
         const displayParams = assignments.map(a => ({ id: a.param, name: a.label }) as NKSParameter);
         updateNKSDisplay(nksActiveSynthType, page, nksKnobTotalPages, displayParams);
+      },
+
+      // NKS2 Navigation Actions
+      setNKS2Mode: (mode: 'performance' | 'edit') => {
+        set((state) => {
+          state.nks2Mode = mode;
+          state.nks2EditGroupIndex = 0;
+          state.nks2ScrollOffset = 0;
+        });
+      },
+
+      setNKS2EditGroup: (index: number) => {
+        set((state) => {
+          state.nks2EditGroupIndex = index;
+          state.nks2ScrollOffset = 0;
+        });
+      },
+
+      scrollNKS2: (direction: -1 | 1) => {
+        set((state) => {
+          state.nks2ScrollOffset = Math.max(0, state.nks2ScrollOffset + direction);
+        });
+      },
+
+      setLightGuide: (keys: import('../midi/performance/types').NKSKeyLight[]) => {
+        set((state) => {
+          state.lightGuide = keys;
+        });
       },
 
       // DJ Knob Paging

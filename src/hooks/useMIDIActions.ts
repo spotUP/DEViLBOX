@@ -8,6 +8,7 @@
 import { useEffect, useCallback } from 'react';
 import { getCCMapManager } from '../midi/CCMapManager';
 import { useTrackerStore, useTransportStore, useInstrumentStore } from '../stores';
+import { useEditorStore } from '../stores/useEditorStore';
 import { useHistoryStore } from '../stores/useHistoryStore';
 import { getToneEngine } from '../engine/ToneEngine';
 
@@ -22,9 +23,11 @@ export function useMIDIActions() {
         patterns,
         currentPatternIndex,
         setCurrentPattern,
+      } = useTrackerStore.getState();
+      const {
         currentOctave,
         setCurrentOctave,
-      } = useTrackerStore.getState();
+      } = useEditorStore.getState();
 
       const {
         isPlaying,

@@ -16,6 +16,7 @@ import { PixiIcon } from '../components/PixiIcon';
 import { PixiPureTextInput } from '../input/PixiPureTextInput';
 import { useFileNavigation, isTrackerModule, type FileSource, getLastFileSource, setLastFileSource } from '@/components/dialogs/useFileNavigation';
 import { hasElectronFS } from '@utils/electron';
+import { PixiModlandPanel, PixiHVSCPanel } from './PixiRemoteBrowserPanels';
 
 // ---------------------------------------------------------------------------
 // Layout constants
@@ -271,15 +272,22 @@ export const PixiFileBrowser: React.FC<PixiFileBrowserProps> = ({
       )}
 
       {/* Content area */}
-      {isModlandOrHvsc ? (
-        /* Modland/HVSC panels are DOM-only; show placeholder */
-        <Div className="flex-1 items-center justify-center" layout={{ padding: 16 }}>
-          <Txt className="text-sm text-text-muted">
-            {fileSource === 'modland'
-              ? 'Modland browser is available in the DOM file browser.'
-              : 'HVSC browser is available in the DOM file browser.'}
-          </Txt>
-        </Div>
+      {fileSource === 'modland' && onLoadTrackerModule ? (
+        <PixiModlandPanel
+          isOpen={isOpen}
+          width={MODAL_W}
+          height={MODAL_H - HEADER_H - TABS_H - FOOTER_H}
+          onLoadTrackerModule={async (buf, fn) => { onLoadTrackerModule(buf, fn); }}
+          onClose={onClose}
+        />
+      ) : fileSource === 'hvsc' && onLoadTrackerModule ? (
+        <PixiHVSCPanel
+          isOpen={isOpen}
+          width={MODAL_W}
+          height={MODAL_H - HEADER_H - TABS_H - FOOTER_H}
+          onLoadTrackerModule={async (buf, fn) => { onLoadTrackerModule(buf, fn); }}
+          onClose={onClose}
+        />
       ) : (
         <Div layout={{ flex: 1, padding: LIST_PAD, minHeight: 0 }}>
           {nav.error && (

@@ -48,12 +48,17 @@ digmug-wasm/build/
 fc-wasm/build/
 tfmx-wasm/build/
 robhubbard-wasm/build/
+klystrack-wasm/build/
+gearmulator-wasm/build/
 public/rdpiano/roms/
 public/onnx-wasm/
 
 # ROM files and sample libraries (copyrighted material)
 public/roms/Mirage4Amiga/
+public/roms/gearmulator/
 public/roms/**/*.zip
+public/roms/**/*.BIN
+public/roms/**/*.bin
 *.zip
 
 # NDA documents
@@ -119,3 +124,4 @@ public/modland/modland_hash.db
 server/data/deepsid.db
 server/data/deepsid-import/
 server/data/deepsid-images/
+pt2-replayer-wasm/build/

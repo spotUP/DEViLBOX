@@ -12,7 +12,7 @@
 import { useEffect, useRef, useMemo } from 'react';
 import type { Graphics as GraphicsType } from 'pixi.js';
 
-import { useTransportStore, useTrackerStore } from '@stores';
+import { useTransportStore, useTrackerStore, useEditorStore } from '@stores';
 import { useShallow } from 'zustand/react/shallow';
 import { getToneEngine } from '@engine/ToneEngine';
 
@@ -51,10 +51,8 @@ interface PixiChannelVUMetersProps {
 }
 
 export const PixiChannelVUMeters: React.FC<PixiChannelVUMetersProps> = ({ width, height }) => {
-  const { pattern, columnVisibility } = useTrackerStore(useShallow(s => ({
-    pattern: s.patterns[s.currentPatternIndex],
-    columnVisibility: s.columnVisibility,
-  })));
+  const pattern = useTrackerStore(useShallow(s => s.patterns[s.currentPatternIndex]));
+  const columnVisibility = useEditorStore(s => s.columnVisibility);
   const numChannels = pattern?.channels.length || 4;
 
   // Compute channel offsets/widths matching PixiPatternEditor layout

@@ -14,7 +14,7 @@
  */
 
 import React from 'react';
-import { useTrackerStore } from '@stores';
+import { useTrackerStore , useFormatStore } from '@stores';
 import { useTransportStore } from '@stores/useTransportStore';
 
 // Layout constants — matches PixiHivelyPositionEditor
@@ -37,8 +37,8 @@ interface MusicLineTrackTableEditorProps {
 }
 
 export const MusicLineTrackTableEditor: React.FC<MusicLineTrackTableEditorProps> = ({ onSeek }) => {
-  const channelTrackTables = useTrackerStore((state) => state.channelTrackTables);
-  const channelSpeeds = useTrackerStore((state) => state.channelSpeeds);
+  const channelTrackTables = useFormatStore((state) => state.channelTrackTables);
+  const channelSpeeds = useFormatStore((state) => state.channelSpeeds);
   const currentPos = useTrackerStore((state) => state.currentPositionIndex);
   const initialSpeed = useTransportStore((state) => state.speed);
 

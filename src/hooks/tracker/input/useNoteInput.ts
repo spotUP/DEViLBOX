@@ -7,6 +7,7 @@
 import { useCallback, useMemo, useRef } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useTrackerStore, useCursorStore, useTransportStore, useInstrumentStore } from '@stores';
+import { useEditorStore } from '@stores/useEditorStore';
 import { useSettingsStore } from '@stores/useSettingsStore';
 import { useUIStore } from '@stores/useUIStore';
 import { getToneEngine } from '@engine/ToneEngine';
@@ -22,6 +23,12 @@ export const useNoteInput = (refs: TrackerInputRefs) => {
   const {
     patterns,
     currentPatternIndex,
+  } = useTrackerStore(useShallow((state) => ({
+    patterns: state.patterns,
+    currentPatternIndex: state.currentPatternIndex,
+  })));
+
+  const {
     currentOctave,
     recordMode,
     editStep,
@@ -29,9 +36,7 @@ export const useNoteInput = (refs: TrackerInputRefs) => {
     multiRecEnabled,
     multiEditEnabled,
     recReleaseEnabled,
-  } = useTrackerStore(useShallow((state) => ({
-    patterns: state.patterns,
-    currentPatternIndex: state.currentPatternIndex,
+  } = useEditorStore(useShallow((state) => ({
     currentOctave: state.currentOctave,
     recordMode: state.recordMode,
     editStep: state.editStep,
@@ -42,13 +47,13 @@ export const useNoteInput = (refs: TrackerInputRefs) => {
   })));
 
   const setCell = useTrackerStore((state) => state.setCell);
-  const setCurrentOctave = useTrackerStore((state) => state.setCurrentOctave);
-  const setEditStep = useTrackerStore((state) => state.setEditStep);
-  const setKeyOn = useTrackerStore((state) => state.setKeyOn);
-  const setKeyOff = useTrackerStore((state) => state.setKeyOff);
+  const setCurrentOctave = useEditorStore((state) => state.setCurrentOctave);
+  const setEditStep = useEditorStore((state) => state.setEditStep);
+  const setKeyOn = useEditorStore((state) => state.setKeyOn);
+  const setKeyOff = useEditorStore((state) => state.setKeyOff);
   const findBestChannel = useTrackerStore((state) => state.findBestChannel);
   const insertRow = useTrackerStore((state) => state.insertRow);
-  const setColumnVisibility = useTrackerStore((state) => state.setColumnVisibility);
+  const setColumnVisibility = useEditorStore((state) => state.setColumnVisibility);
 
   const moveCursorToRow = useCursorStore((state) => state.moveCursorToRow);
   const moveCursorToChannel = useCursorStore((state) => state.moveCursorToChannel);
@@ -204,7 +209,7 @@ export const useNoteInput = (refs: TrackerInputRefs) => {
       if (currentInstrumentId !== null) {
         const inst = instruments.find((i) => i.id === currentInstrumentId);
         if (inst && (inst.synthType === 'TB303' || inst.synthType === 'Buzz3o3')) {
-          const vis = useTrackerStore.getState().columnVisibility;
+          const vis = useEditorStore.getState().columnVisibility;
           if (!vis.flag1 || !vis.flag2) {
             setColumnVisibility({ flag1: true, flag2: true });
           }

@@ -15,6 +15,7 @@
 import React, { useCallback, useState } from 'react';
 import type { Graphics as GraphicsType } from 'pixi.js';
 import { useTrackerStore } from '@/stores/useTrackerStore';
+import { useFormatStore } from '@/stores/useFormatStore';
 import { useTransportStore } from '@/stores/useTransportStore';
 import { usePixiTheme } from '@/pixi/theme';
 import { PIXI_FONTS } from '@/pixi/fonts';
@@ -31,10 +32,10 @@ interface FurnaceViewProps {
 
 export const PixiFurnaceView: React.FC<FurnaceViewProps> = ({ width, height }) => {
   const theme = usePixiTheme();
-  const nativeData = useTrackerStore(s => s.furnaceNative);
+  const nativeData = useFormatStore(s => s.furnaceNative);
   const currentPositionIndex = useTrackerStore(s => s.currentPositionIndex);
   const setCurrentPosition = useTrackerStore(s => s.setCurrentPosition);
-  const setFurnaceOrderEntry = useTrackerStore(s => s.setFurnaceOrderEntry);
+  const setFurnaceOrderEntry = useFormatStore(s => s.setFurnaceOrderEntry);
   const isPlaying = useTransportStore(s => s.isPlaying);
   const displayRow = useTransportStore(s => s.currentRow);
 

@@ -26,10 +26,10 @@ const C_CTRL    = 0xffcc00;  // Control (waveform/gate/sync/ring)
 const C_ADSR    = 0x60e060;  // ADSR
 const C_FILTER  = 0xe94560;  // Filter
 const C_VOL     = 0xffffff;  // Volume
-const C_LABEL   = 0x888899;
-const C_DIM     = 0x444466;
-const C_BG      = 0x1a1a2e;
-const C_HEADER  = 0x0f3460;
+const C_LABEL   = 0x666666;
+const C_DIM     = 0x333333;
+const C_BG      = 0x0d0d0d;
+const C_HEADER  = 0x1a1a1a;
 
 // SID register layout (offset → name, color)
 const VOICE_REGS = [

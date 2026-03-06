@@ -2,13 +2,13 @@
  * Follow Commands - Follow song, loop pattern, continuous scroll modes
  */
 
-import { useTrackerStore } from '@stores/useTrackerStore';
+import { useEditorStore } from '@stores/useEditorStore';
 import { useTransportStore } from '@stores/useTransportStore';
 import { useUIStore } from '@stores/useUIStore';
 import { muteChannel, soloChannel } from './channel';
 
 export function toggleFollowSong(): boolean {
-  const { followPlayback, setFollowPlayback } = useTrackerStore.getState();
+  const { followPlayback, setFollowPlayback } = useEditorStore.getState();
   setFollowPlayback(!followPlayback);
   useUIStore.getState().setStatusMessage(`Follow: ${!followPlayback ? 'ON' : 'OFF'}`, false, 1000);
   return true;
@@ -48,7 +48,7 @@ export function toggleMidiInput(): boolean {
 }
 
 export function toggleRecordQuantize(): boolean {
-  const { recordQuantize, toggleRecordQuantize: toggle } = useTrackerStore.getState();
+  const { recordQuantize, toggleRecordQuantize: toggle } = useEditorStore.getState();
   toggle();
   useUIStore.getState().setStatusMessage(`Record quantize: ${!recordQuantize ? 'ON' : 'OFF'}`, false, 1000);
   return true;
@@ -62,21 +62,21 @@ export function toggleChordMode(): boolean {
 }
 
 export function toggleWrapMode(): boolean {
-  const { wrapMode, toggleWrapMode: toggle } = useTrackerStore.getState();
+  const { wrapMode, toggleWrapMode: toggle } = useEditorStore.getState();
   toggle();
   useUIStore.getState().setStatusMessage(`Wrap mode: ${!wrapMode ? 'ON' : 'OFF'}`, false, 1000);
   return true;
 }
 
 export function toggleAutoRecord(): boolean {
-  const { autoRecord, toggleAutoRecord: toggle } = useTrackerStore.getState();
+  const { autoRecord, toggleAutoRecord: toggle } = useEditorStore.getState();
   toggle();
   useUIStore.getState().setStatusMessage(`Auto-record: ${!autoRecord ? 'ON' : 'OFF'}`, false, 1000);
   return true;
 }
 
 export function toggleMultiChannelRecord(): boolean {
-  const { multiChannelRecord, toggleMultiChannelRecord: toggle } = useTrackerStore.getState();
+  const { multiChannelRecord, toggleMultiChannelRecord: toggle } = useEditorStore.getState();
   toggle();
   useUIStore.getState().setStatusMessage(`Multi-ch record: ${!multiChannelRecord ? 'ON' : 'OFF'}`, false, 1000);
   return true;

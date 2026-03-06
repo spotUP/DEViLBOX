@@ -5,8 +5,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { PatternEditorCanvas } from './PatternEditorCanvas';
 import { GridSequencer } from '@components/grid/GridSequencer';
-import { useTrackerStore, useCursorStore, useInstrumentStore, useUIStore } from '@stores';
-import { useSettingsStore } from '@stores/useSettingsStore';
+import { useTrackerStore, useCursorStore, useInstrumentStore, useUIStore , useFormatStore } from '@stores';
+import { useTransportStore } from '@stores/useTransportStore';
+import { useProjectStore } from '@stores/useProjectStore';
 import { useShallow } from 'zustand/react/shallow';
 import { useTrackerInput } from '@hooks/tracker/useTrackerInput';
 import { useBlockOperations } from '@hooks/tracker/BlockOperations';
@@ -42,16 +43,20 @@ import { MobileTrackerView } from './MobileTrackerView';
 import { useResponsive } from '@hooks/useResponsive';
 import { Music2, Activity } from 'lucide-react';
 import { InstrumentList } from '@components/instruments/InstrumentList';
-import { notify } from '@stores/useNotificationStore';
-import { getTrackerReplayer } from '@engine/TrackerReplayer';
+import { getTrackerReplayer, type TrackerSong } from '@engine/TrackerReplayer';
 import { MusicLineTrackTableEditor } from './MusicLineTrackTableEditor';
 import { MusicLinePatternViewer } from './MusicLinePatternViewer';
+import { exportMusicLineFile } from '@lib/export/MusicLineExporter';
 import { downloadPattern } from '@lib/export/PatternExport';
 import { downloadTrack } from '@lib/export/TrackExport';
 import { DJPitchSlider } from '@components/transport/DJPitchSlider';
 import { PatternMinimap } from './PatternMinimap';
 import { PianoRoll } from '../pianoroll';
 import { AutomationPanel } from '@components/automation/AutomationPanel';
+import { GTUltraView } from '@components/gtultra/GTUltraView';
+import { HivelyView } from '@components/hively/HivelyView';
+import { KlysView } from '@components/klystrack/KlysView';
+import { JamCrackerView } from '@components/jamcracker/JamCrackerView';
 
 interface TrackerViewProps {
   onShowExport?: () => void;
@@ -110,15 +115,14 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
     scaleVolume,
     fadeVolume,
     remapInstrument,
-    editorMode
   } = useTrackerStore(useShallow((state) => ({
     patterns: state.patterns,
     currentPatternIndex: state.currentPatternIndex,
     scaleVolume: state.scaleVolume,
     fadeVolume: state.fadeVolume,
     remapInstrument: state.remapInstrument,
-    editorMode: state.editorMode
   })));
+  const editorMode = useFormatStore((s) => s.editorMode);
   // Fine-grained selector for cursor.channelIndex only — avoids re-rendering
   // the entire TrackerView on every cursor row/column move
   const cursorChannelIndex = useCursorStore((state) => state.cursor.channelIndex);
@@ -167,7 +171,7 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
   const [randomizeChannel, setRandomizeChannel] = useState(0);
   // Pattern order modal
   const [showPatternOrder, setShowPatternOrder] = useState(false);
-  const channelTrackTables = useTrackerStore((state) => state.channelTrackTables);
+  const channelTrackTables = useFormatStore((state) => state.channelTrackTables);
 
   // Mobile swipe handlers for cursor navigation
   const handleSwipeLeft = useCallback(() => {
@@ -179,6 +183,37 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
     if (!isMobile) return;
     useCursorStore.getState().moveCursor('right');
   }, [isMobile]);
+
+  // MusicLine export handler
+  const handleExportML = useCallback(() => {
+    const s = useTrackerStore.getState();
+    const t = useTransportStore.getState();
+    const song: TrackerSong = {
+      name: useProjectStore.getState().metadata.name || 'MusicLine Song',
+      format: 'ML',
+      patterns: s.patterns,
+      instruments: useInstrumentStore.getState().instruments,
+      songPositions: s.patternOrder,
+      songLength: s.patternOrder.length,
+      restartPosition: 0,
+      numChannels: s.patterns[0]?.channels.length ?? 4,
+      initialSpeed: t.speed,
+      initialBPM: t.bpm,
+      channelTrackTables: useFormatStore.getState().channelTrackTables ?? undefined,
+      channelSpeeds: useFormatStore.getState().channelSpeeds ?? undefined,
+      channelGrooves: useFormatStore.getState().channelGrooves ?? undefined,
+    };
+    const data = exportMusicLineFile(song);
+    const blob = new Blob([data.buffer as ArrayBuffer], { type: 'application/octet-stream' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${song.name.replace(/[^a-zA-Z0-9_\-]/g, '_')}.ml`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, []);
 
   // Use external or internal import state
   const showImportModule = externalShowImportModule ?? internalShowImportModule;
@@ -504,31 +539,14 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
         {/* Pattern Editor / Grid Sequencer / Piano Roll / TB-303 Editor - Flex item 1 */}
         <div className="flex-1 min-w-0 min-h-0 flex flex-col overflow-hidden">
           {viewMode === 'tracker' ? (
-            (editorMode === 'hively' || editorMode === 'goattracker') ? (
-              <div className="flex-1 flex flex-col items-center justify-center bg-dark-bgPrimary p-8 text-center">
-                <div className="max-w-md space-y-4">
-                  <h2 className="text-xl font-bold text-text-primary mb-2">
-                    {editorMode === 'hively' ? 'HivelyTracker/AHX' : 'GoatTracker Ultra'} Editor Mode
-                  </h2>
-                  <p className="text-text-secondary mb-4">
-                    This file uses a specialized {editorMode === 'hively' ? 'track-based' : 'SID tracker'} pattern editor that's only available in WebGL mode.
-                  </p>
-                  {!/iPhone|iPod|Android.*Mobile/i.test(navigator.userAgent) && (
-                  <button
-                    onClick={() => {
-                      useSettingsStore.getState().setRenderMode('webgl');
-                      notify.success('Switched to WebGL mode');
-                    }}
-                    className="px-6 py-3 bg-accent-primary hover:bg-accent-primary/80 text-white font-semibold rounded-lg transition-colors"
-                  >
-                    Switch to WebGL Mode
-                  </button>
-                  )}
-                  <p className="text-xs text-text-muted mt-4">
-                    You can change this anytime in Settings → Display → Render Mode
-                  </p>
-                </div>
-              </div>
+            editorMode === 'goattracker' ? (
+              <GTUltraView />
+            ) : editorMode === 'hively' ? (
+              <HivelyView />
+            ) : editorMode === 'klystrack' ? (
+              <KlysView />
+            ) : editorMode === 'jamcracker' ? (
+              <JamCrackerView />
             ) : editorMode === 'musicline' ? (
               <div className="flex-1 flex flex-col min-h-0 bg-dark-bgPrimary">
                 {/* Per-channel track table matrix */}
@@ -538,9 +556,13 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
                     <span className="text-xs text-accent-primary bg-accent-primary/10 px-1.5 py-0.5 rounded border border-accent-primary/30">
                       per-channel
                     </span>
-                    <span className="text-xs text-ft2-textDim ml-auto">
+                    <span className="text-xs text-ft2-textDim ml-auto mr-2">
                       {channelTrackTables?.length ?? 0} channels · {patterns.length} parts
                     </span>
+                    <button
+                      className="px-2 py-0.5 text-xs bg-green-800 hover:bg-green-700 text-green-100 rounded border border-green-600"
+                      onClick={handleExportML}
+                    >Export .ml</button>
                   </div>
                   <div className="px-3 pb-3">
                     <MusicLineTrackTableEditor

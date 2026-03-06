@@ -23,7 +23,7 @@ import { useSettingsStore, type SIDEngineType, type CRTParams } from '@stores/us
 import { LENS_PRESETS, LENS_PRESET_ORDER } from '../LensFilter';
 import { SID_ENGINES } from '@engine/deepsid/DeepSIDEngineManager';
 import { useKeyboardStore } from '@stores/useKeyboardStore';
-import { useTrackerStore } from '@stores/useTrackerStore';
+import { useEditorStore } from '@stores/useEditorStore';
 import { useAudioStore } from '@stores/useAudioStore';
 import { useModlandContributionModal } from '@stores/useModlandContributionModal';
 import { getTrackerReplayer } from '@engine/TrackerReplayer';
@@ -219,16 +219,16 @@ export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, on
   const autoGain = useAudioStore((s) => s.autoGain);
   const setAutoGain = useAudioStore((s) => s.setAutoGain);
 
-  const editStep = useTrackerStore((s) => s.editStep);
-  const setEditStep = useTrackerStore((s) => s.setEditStep);
-  const insertMode = useTrackerStore((s) => s.insertMode);
-  const toggleInsertMode = useTrackerStore((s) => s.toggleInsertMode);
-  const recQuantEnabled = useTrackerStore((s) => s.recQuantEnabled);
-  const setRecQuantEnabled = useTrackerStore((s) => s.setRecQuantEnabled);
-  const recQuantRes = useTrackerStore((s) => s.recQuantRes);
-  const setRecQuantRes = useTrackerStore((s) => s.setRecQuantRes);
-  const recReleaseEnabled = useTrackerStore((s) => s.recReleaseEnabled);
-  const setRecReleaseEnabled = useTrackerStore((s) => s.setRecReleaseEnabled);
+  const editStep = useEditorStore((s) => s.editStep);
+  const setEditStep = useEditorStore((s) => s.setEditStep);
+  const insertMode = useEditorStore((s) => s.insertMode);
+  const toggleInsertMode = useEditorStore((s) => s.toggleInsertMode);
+  const recQuantEnabled = useEditorStore((s) => s.recQuantEnabled);
+  const setRecQuantEnabled = useEditorStore((s) => s.setRecQuantEnabled);
+  const recQuantRes = useEditorStore((s) => s.recQuantRes);
+  const setRecQuantRes = useEditorStore((s) => s.setRecQuantRes);
+  const recReleaseEnabled = useEditorStore((s) => s.recReleaseEnabled);
+  const setRecReleaseEnabled = useEditorStore((s) => s.setRecReleaseEnabled);
 
   const activeScheme = useKeyboardStore((s) => s.activeScheme);
   const setActiveScheme = useKeyboardStore((s) => s.setActiveScheme);
@@ -714,20 +714,44 @@ export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, on
             />
           </Div>
 
-          {/* ═══════ DJ / SCRATCH ═══════ */}
-          <SectionHeader text="DJ / SCRATCH" />
+          {/* ═══════ VINYL SCRATCH ═══════ */}
+          <SectionHeader text="VINYL SCRATCH" />
 
-          <SettingRow label="Scroll Acceleration:" description="Smooth scroll-to-scratch (off = raw 1:1)">
+          <SettingRow label="Always On:" description="Scratch even when playback is stopped">
+            <PixiCheckbox checked={scratchEnabled} onChange={setScratchEnabled} />
+          </SettingRow>
+
+          <SettingRow label="Velocity Curve:" description="Smooth momentum (off = direct 1:1 response)">
             <PixiCheckbox checked={scratchAcceleration} onChange={setScratchAcceleration} />
           </SettingRow>
 
+          <SettingRow label="Platter Weight:" description="Light (CDJ) → Medium (1200) → Heavy">
+            <Div className="flex-row items-center gap-2">
+              <PixiSlider
+                value={Math.round(platterMass * 100)}
+                min={0}
+                max={100}
+                step={1}
+                onChange={(v) => setPlatterMass(v / 100)}
+                orientation="horizontal"
+                length={120}
+                thickness={4}
+                handleWidth={10}
+                handleHeight={10}
+                color={theme.accent.color}
+              />
+              <Txt className="text-[10px] font-mono text-text-primary">{`${Math.round(platterMass * 100)}%`}</Txt>
+            </Div>
+          </SettingRow>
+
           <Div className="flex-col gap-1" layout={{ width: CONTENT_W, borderTopWidth: 1, borderColor: theme.border.color, paddingTop: 6 }}>
-            <Txt className="text-[9px] font-bold font-mono text-accent-primary">Scratch during playback:</Txt>
-            <Txt className="text-[9px] font-mono text-text-muted">Scroll wheel/trackpad controls speed &amp; direction</Txt>
-            <Txt className="text-[9px] font-bold font-mono text-accent-primary" layout={{ paddingTop: 4 }}>Keyboard (Shift+Alt):</Txt>
-            <Txt className="text-[9px] font-mono text-text-muted">F = Fader cut (hold) · 1 = Trans · 2 = Crab</Txt>
-            <Txt className="text-[9px] font-mono text-text-muted">3 = Flare · 4 = Chirp · 5 = Stab</Txt>
-            <Txt className="text-[9px] font-mono text-text-muted">6 = 8-Finger Crab · 7 = Twiddle · 0 = Stop</Txt>
+            <Txt className="text-[9px] font-bold font-mono text-accent-primary">How to scratch:</Txt>
+            <Txt className="text-[9px] font-mono text-text-muted">Scroll wheel/trackpad during playback controls speed &amp; direction</Txt>
+            <Txt className="text-[9px] font-mono text-text-muted">Hold Z = fader cut · Hold X = crab scratch</Txt>
+            <Txt className="text-[9px] font-mono text-text-muted">Touch: 2-finger swipe = nudge · 3-finger = grab</Txt>
+            <Txt className="text-[9px] font-bold font-mono text-accent-primary" layout={{ paddingTop: 4 }}>DJ techniques (Shift+Alt):</Txt>
+            <Txt className="text-[9px] font-mono text-text-muted">F = Fader cut · 1 = Trans · 2 = Crab · 3 = Flare</Txt>
+            <Txt className="text-[9px] font-mono text-text-muted">4 = Chirp · 5 = Stab · 6 = 8-Finger · 7 = Twiddle · 0 = Stop</Txt>
           </Div>
 
           {/* ═══════ ENGINE ═══════ */}
@@ -841,40 +865,6 @@ export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, on
               <Txt className="text-[10px] font-mono text-text-primary">
                 {`${synthBusGain > 0 ? '+' : ''}${synthBusGain} dB`}
               </Txt>
-            </Div>
-          </SettingRow>
-
-          {/* ═══════ SCRATCH ═══════ */}
-          <SectionHeader text="SCRATCH" />
-
-          <SettingRow label="Scratch Toggle:" description="Always enable scratch (OFF = only during playback)">
-            <PixiCheckbox checked={scratchEnabled} onChange={setScratchEnabled} />
-          </SettingRow>
-
-          <SettingRow label="Scroll Acceleration:" description="Smooth velocity curve vs raw 1:1 scroll">
-            <PixiCheckbox checked={scratchAcceleration} onChange={setScratchAcceleration} />
-          </SettingRow>
-
-          <Txt className="text-[9px] font-mono text-text-muted" layout={{ width: CONTENT_W }}>
-            {'Scroll the pattern editor during playback to vinyl scratch. Hold Z for fader cut, hold X for crab scratch. On touchscreens: 2-finger swipe = nudge, 3-finger touch = grab.'}
-          </Txt>
-
-          <SettingRow label="Platter Mass:" description="CDJ → Technics 1200 → Heavy">
-            <Div className="flex-row items-center gap-2">
-              <PixiSlider
-                value={Math.round(platterMass * 100)}
-                min={0}
-                max={100}
-                step={1}
-                onChange={(v) => setPlatterMass(v / 100)}
-                orientation="horizontal"
-                length={120}
-                thickness={4}
-                handleWidth={10}
-                handleHeight={10}
-                color={theme.accent.color}
-              />
-              <Txt className="text-[10px] font-mono text-text-primary">{`${Math.round(platterMass * 100)}%`}</Txt>
             </Div>
           </SettingRow>
 

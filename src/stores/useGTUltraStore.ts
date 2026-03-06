@@ -133,6 +133,7 @@ export interface GTUltraState {
 
   // Order list cursor
   orderCursor: number;
+  orderChannelCol: number;
   // Table cursor
   tableCursor: number;
 
@@ -159,6 +160,7 @@ export interface GTUltraState {
   setJamMode: (jam: boolean) => void;
   setCurrentSong: (song: number) => void;
   setOrderCursor: (idx: number) => void;
+  setOrderChannelCol: (col: number) => void;
   setTableCursor: (idx: number) => void;
   setSongName: (name: string) => void;
   setSongAuthor: (author: string) => void;
@@ -254,6 +256,7 @@ export const useGTUltraStore = create<GTUltraState>()((set, get) => ({
   patternData: new Map(),
   sidRegisters: [new Uint8Array(25), new Uint8Array(25)],
   orderCursor: 0,
+  orderChannelCol: 0,
   tableCursor: 0,
 
   // --- Actions ---
@@ -351,6 +354,7 @@ export const useGTUltraStore = create<GTUltraState>()((set, get) => ({
   setJamMode: (jamMode) => set({ jamMode }),
   setCurrentSong: (currentSong) => set({ currentSong: Math.max(0, Math.min(31, currentSong)) }),
   setOrderCursor: (orderCursor) => set({ orderCursor }),
+  setOrderChannelCol: (orderChannelCol: number) => set({ orderChannelCol }),
   setTableCursor: (tableCursor) => set({ tableCursor }),
   setSongName: (songName) => set({ songName }),
   setSongAuthor: (songAuthor) => set({ songAuthor }),

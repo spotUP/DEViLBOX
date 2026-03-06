@@ -333,3 +333,49 @@ export function validateCharacterTags(tags: string[]): string[] {
     ) || tag
   );
 }
+
+// ============================================================================
+// NKS2 Effect Type Mapping
+// Maps DEViLBOX effect names to official NKS effect taxonomy
+// ============================================================================
+
+export interface NKSEffectMapping {
+  type: NKSEffectType;
+  subType?: string;
+  characters?: string[];
+}
+
+export const EFFECT_TYPE_TO_NKS: Record<string, NKSEffectMapping> = {
+  'SpaceEcho':     { type: 'Delay', subType: 'Analog', characters: ['Synth', 'Keys'] },
+  'TapeEcho':      { type: 'Delay', subType: 'Tape', characters: ['Guitar', 'Synth'] },
+  'Delay':         { type: 'Delay', subType: 'Digital', characters: ['Synth'] },
+  'PingPongDelay': { type: 'Delay', subType: 'Creative', characters: ['Synth'] },
+  'Reverb':        { type: 'Reverb', subType: 'Room', characters: ['Synth', 'Vocal'] },
+  'PlateReverb':   { type: 'Reverb', subType: 'Plate', characters: ['Synth', 'Vocal'] },
+  'HallReverb':    { type: 'Reverb', subType: 'Hall', characters: ['Strings', 'Pads'] },
+  'Distortion':    { type: 'Distortion', subType: 'Distortion', characters: ['Guitar', 'Synth'] },
+  'Overdrive':     { type: 'Distortion', subType: 'Overdrive', characters: ['Guitar', 'Bass'] },
+  'Bitcrusher':    { type: 'Distortion', subType: 'Bitcrusher', characters: ['Drums', 'Synth'] },
+  'Filter':        { type: 'Filter', subType: 'Multimode', characters: ['Synth', 'Bass'] },
+  'AutoFilter':    { type: 'Filter', subType: 'Modulated', characters: ['Synth', 'Bass'] },
+  'WahWah':        { type: 'Filter', subType: 'Wah-Wah', characters: ['Guitar'] },
+  'Chorus':        { type: 'Modulation', subType: 'Chorus', characters: ['Synth', 'Strings'] },
+  'Phaser':        { type: 'Modulation', subType: 'Phaser', characters: ['Synth', 'Guitar'] },
+  'Flanger':       { type: 'Modulation', subType: 'Flanger', characters: ['Synth', 'Guitar'] },
+  'Tremolo':       { type: 'Modulation', subType: 'Tremolo', characters: ['Guitar', 'Keys'] },
+  'Vibrato':       { type: 'Modulation', subType: 'Chorus', characters: ['Synth'] },
+  'Compressor':    { type: 'Dynamics', subType: 'Compressor', characters: ['Drums', 'Mixbus'] },
+  'Limiter':       { type: 'Dynamics', subType: 'Limiter', characters: ['Mastering'] },
+  'Gate':          { type: 'Dynamics', subType: 'Gate', characters: ['Drums'] },
+  'EQ':            { type: 'EQ', subType: 'Classic', characters: ['Mixbus'] },
+  'EQ3':           { type: 'EQ', subType: 'Classic', characters: ['Mixbus'] },
+  'PitchShift':    { type: 'Pitch', subType: 'Pitch Shift', characters: ['Synth', 'Vocal'] },
+  'Vocoder':       { type: 'Pitch', subType: 'Vocoder', characters: ['Vocal', 'Synth'] },
+};
+
+/**
+ * Get NKS effect type info for a DEViLBOX effect.
+ */
+export function getNKSEffectType(effectName: string): NKSEffectMapping {
+  return EFFECT_TYPE_TO_NKS[effectName] || { type: 'Multi FX', subType: 'Creative' };
+}

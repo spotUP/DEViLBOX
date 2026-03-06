@@ -11,7 +11,7 @@
 import type { InstrumentConfig, SynthType } from '@typedefs/instrument';
 import type { NKSPreset, NKSPresetMetadata, NKSParameter } from './types';
 import { NKS_CONSTANTS } from './types';
-import { getNKSParametersForSynth } from './synthParameterMaps';
+import { getNKSParametersForSynth, getNKS2Profile } from './synthParameterMaps';
 import { writeNKSF, parseNKSF } from './NKSFileFormat';
 import type { UserPreset, PresetCategory } from '@/stores/usePresetStore';
 import {
@@ -231,10 +231,15 @@ export function instrumentConfigToNKSPreset(
   // Store the full config as a JSON blob for roundtrip
   const configBlob = new TextEncoder().encode(JSON.stringify(config));
 
+  // Build NKS2 profile for hierarchical navigation + PDI
+  const nks2Profile = getNKS2Profile(synthType);
+
   return {
     metadata,
     parameters: parameterValues,
     blob: configBlob.buffer,
+    nks2Navigation: nks2Profile.navigation,
+    nks2PDI: nks2Profile.parameters.map(p => p.pdi),
   };
 }
 
@@ -468,6 +473,7 @@ export function downloadAsNKSF(
     comment?: string;
     category?: PresetCategory;
     tags?: string[];
+    includePreview?: boolean;
   }
 ): void {
   const nksPreset = instrumentConfigToNKSPreset(config, options);
@@ -476,7 +482,8 @@ export function downloadAsNKSF(
   const blob = new Blob([buffer], { type: 'application/octet-stream' });
   const url = URL.createObjectURL(blob);
 
-  const filename = `${options?.name || config.name || 'preset'}.nksf`;
+  const presetName = options?.name || config.name || 'preset';
+  const filename = `${presetName}.nksf`;
 
   const a = document.createElement('a');
   a.href = url;
@@ -484,6 +491,18 @@ export function downloadAsNKSF(
   a.click();
 
   URL.revokeObjectURL(url);
+
+  // Generate and download preview audio alongside the .nksf
+  if (options?.includePreview) {
+    import('./previewGenerator').then(({ generatePreview, downloadPreview, getPreviewPattern }) => {
+      const pattern = getPreviewPattern(config.synthType, options?.category);
+      generatePreview(config, { pattern }).then((result) => {
+        downloadPreview(result, presetName);
+      }).catch((err) => {
+        console.warn('Preview generation failed:', err);
+      });
+    });
+  }
 }
 
 /**

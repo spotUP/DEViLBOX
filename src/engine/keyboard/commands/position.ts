@@ -3,19 +3,20 @@
  */
 
 import { useTrackerStore } from '@stores/useTrackerStore';
+import { useEditorStore } from '@stores/useEditorStore';
 import { useCursorStore } from '@/stores/useCursorStore';
 import { useUIStore } from '@stores/useUIStore';
 
 function savePosition(index: number): boolean {
   const { cursor } = useCursorStore.getState();
-  const { setPtnJumpPos } = useTrackerStore.getState();
+  const { setPtnJumpPos } = useEditorStore.getState();
   setPtnJumpPos(index, cursor.rowIndex);
   useUIStore.getState().setStatusMessage(`Position ${index} saved (row ${cursor.rowIndex})`, false, 1000);
   return true;
 }
 
 function gotoPosition(index: number): boolean {
-  const { getPtnJumpPos } = useTrackerStore.getState();
+  const { getPtnJumpPos } = useEditorStore.getState();
   const { moveCursorToRow } = useCursorStore.getState();
   const row = getPtnJumpPos(index);
   moveCursorToRow(row);
@@ -107,14 +108,14 @@ export function gotoTime(): boolean {
 }
 
 export function jumpToNextBookmark(): boolean {
-  useTrackerStore.getState().nextBookmark();
+  useEditorStore.getState().nextBookmark();
   const { cursor } = useCursorStore.getState();
   useUIStore.getState().setStatusMessage(`Bookmark: row ${cursor.rowIndex}`, false, 800);
   return true;
 }
 
 export function jumpToPrevBookmark(): boolean {
-  useTrackerStore.getState().prevBookmark();
+  useEditorStore.getState().prevBookmark();
   const { cursor } = useCursorStore.getState();
   useUIStore.getState().setStatusMessage(`Bookmark: row ${cursor.rowIndex}`, false, 800);
   return true;
@@ -122,15 +123,15 @@ export function jumpToPrevBookmark(): boolean {
 
 export function toggleBookmark(): boolean {
   const { cursor } = useCursorStore.getState();
-  const { toggleBookmark: toggle } = useTrackerStore.getState();
+  const { toggleBookmark: toggle } = useEditorStore.getState();
   toggle(cursor.rowIndex);
-  const added = useTrackerStore.getState().bookmarks.includes(cursor.rowIndex);
+  const added = useEditorStore.getState().bookmarks.includes(cursor.rowIndex);
   useUIStore.getState().setStatusMessage(`Bookmark row ${cursor.rowIndex}: ${added ? 'set' : 'cleared'}`, false, 1000);
   return true;
 }
 
 export function clearAllBookmarks(): boolean {
-  useTrackerStore.getState().clearBookmarks();
+  useEditorStore.getState().clearBookmarks();
   useUIStore.getState().setStatusMessage('Bookmarks cleared', false, 1000);
   return true;
 }
