@@ -135,6 +135,17 @@ class HivelyProcessor extends AudioWorkletProcessor {
           this.wasm._hively_player_note_off(data.handle);
         }
         break;
+
+      case 'setTrackStep':
+        if (this.wasm) {
+          this.wasm._hively_set_track_step(
+            data.trackIdx, data.stepIdx,
+            data.note, data.instrument,
+            data.fx, data.fxParam,
+            data.fxb, data.fxbParam
+          );
+        }
+        break;
     }
   }
 
