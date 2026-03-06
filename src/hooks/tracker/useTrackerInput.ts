@@ -7,6 +7,7 @@
 import { useEffect, useCallback, useRef } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useTrackerStore, useCursorStore, useTransportStore } from '@stores';
+import { useEditorStore } from '@stores/useEditorStore';
 import { useUIStore } from '@stores/useUIStore';
 import { useHistoryStore } from '@stores/useHistoryStore';
 import { getToneEngine } from '@engine/ToneEngine';
@@ -36,14 +37,13 @@ export const useTrackerInput = () => {
   const {
     patterns,
     currentPatternIndex,
-    recordMode,
-    editStep,
   } = useTrackerStore(useShallow((state) => ({
     patterns: state.patterns,
     currentPatternIndex: state.currentPatternIndex,
-    recordMode: state.recordMode,
-    editStep: state.editStep,
   })));
+
+  const recordMode = useEditorStore((state) => state.recordMode);
+  const editStep = useEditorStore((state) => state.editStep);
 
   const moveCursor = useCursorStore((state) => state.moveCursor);
   const moveCursorToRow = useCursorStore((state) => state.moveCursorToRow);
@@ -58,10 +58,10 @@ export const useTrackerInput = () => {
   const pasteFlood = useTrackerStore((state) => state.pasteFlood);
   const pastePushForward = useTrackerStore((state) => state.pastePushForward);
   const transposeSelection = useTrackerStore((state) => state.transposeSelection);
-  const toggleRecordMode = useTrackerStore((state) => state.toggleRecordMode);
+  const toggleRecordMode = useEditorStore((state) => state.toggleRecordMode);
   const writeMacroSlot = useTrackerStore((state) => state.writeMacroSlot);
   const readMacroSlot = useTrackerStore((state) => state.readMacroSlot);
-  const toggleInsertMode = useTrackerStore((state) => state.toggleInsertMode);
+  const toggleInsertMode = useEditorStore((state) => state.toggleInsertMode);
   const insertRow = useTrackerStore((state) => state.insertRow);
   const deleteRow = useTrackerStore((state) => state.deleteRow);
   const interpolateSelection = useTrackerStore((state) => state.interpolateSelection);
@@ -512,7 +512,7 @@ export const useTrackerInput = () => {
             return;
           }
           toggleRecordMode();
-          const isRec = useTrackerStore.getState().recordMode;
+          const isRec = useEditorStore.getState().recordMode;
           useUIStore.getState().setStatusMessage(isRec ? 'RECORD ON' : 'RECORD OFF');
         }
         return;

@@ -5,7 +5,7 @@
  */
 
 import React, { useMemo } from 'react';
-import { useTrackerStore } from '@stores';
+import { useTrackerStore, useFormatStore } from '@stores';
 import { useProjectStore } from '@stores/useProjectStore';
 import { useModlandResultStore } from '@stores/useModlandResultStore';
 import { useInstrumentStore } from '@stores/useInstrumentStore';
@@ -75,11 +75,13 @@ const SectionHeader: React.FC<{ icon: string; title: string }> = ({ icon, title 
 
 export const PixiModuleInfoModal: React.FC<Props> = ({ isOpen, onClose }) => {
 
-  const { songDBInfo, sidMetadata, patterns } = useTrackerStore(
+  const { patterns } = useTrackerStore(
+    useShallow((s) => ({ patterns: s.patterns }))
+  );
+  const { songDBInfo, sidMetadata } = useFormatStore(
     useShallow((s) => ({
       songDBInfo: s.songDBInfo,
       sidMetadata: s.sidMetadata,
-      patterns: s.patterns,
     }))
   );
 

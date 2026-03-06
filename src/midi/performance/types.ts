@@ -78,6 +78,8 @@ export interface NKSParameter {
   pdi?: NKS2PDI;                 // NKS2 Parameter Display Info
   engineParam?: string;          // Engine routing key (MappableParameter or synth-specific path)
   route?: NKS2ParameterRoute;    // Explicit routing instructions for parameterRouter
+  subsection?: string;           // NKS2 subsection hint (e.g., "Osc 1", "Amp Env", "Filter Env")
+  accessibilityName?: string;    // Full unabbreviated name for screen readers / TTS
 }
 
 /**
@@ -132,6 +134,8 @@ export interface NKSPreset {
   metadata: NKSPresetMetadata;
   parameters: Record<string, number>;  // Parameter ID -> value
   blob?: ArrayBuffer;                  // Raw plugin state (optional)
+  nks2Navigation?: NKS2Navigation;     // NKS2 hierarchical navigation (optional)
+  nks2PDI?: NKS2PDI[];                 // NKS2 parameter display info (optional)
 }
 
 /**
@@ -363,6 +367,7 @@ export interface NKS2Parameter {
   formatValue?: (value: number) => string;  // Custom value formatter
   ccNumber?: number;                 // MIDI CC number (optional)
   engineParam: string;               // Engine routing key (MappableParameter or synth-specific path)
+  accessibilityName?: string;        // Full unabbreviated name for TTS (SDK Section 5)
 }
 
 /**

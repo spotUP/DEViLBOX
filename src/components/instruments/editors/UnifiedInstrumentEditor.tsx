@@ -172,6 +172,8 @@ function getEditorMode(synthType: SynthType): EditorMode {
   if (synthType === 'Odin2') return 'odin2';
   if (synthType === 'Surge') return 'surge';
   if (synthType === 'SuperCollider') return 'supercollider';
+  if (synthType === 'WobbleBass') return 'wobblebass';
+  if (synthType.startsWith('Gearmulator')) return 'gearmulator';
   if (SYNTH_REGISTRY.has(synthType)) return 'vstbridge';
   return 'generic';
 }

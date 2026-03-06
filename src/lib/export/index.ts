@@ -9,6 +9,11 @@ export * from './ExportDialog';
 // Tracker format exporters
 export * from './MODExporter';
 export * from './XMExporter';
+export * from './OpenMPTExporter';
+
+// Amiga format exporters
+export * from './JamCrackerExporter';
+export * from './FuturePlayerExporter';
 
 // Chip music exporters (Furnace/Hardware capture)
 export * from './VGMExporter';

@@ -372,6 +372,19 @@ export const SYNTH_CATEGORIES: SynthCategory[] = [
     ],
   },
   {
+    id: 'gearmulator',
+    name: '🔧 Gearmulator (ROM)',
+    description: 'DSP56300 emulations of classic VA synths — requires user-provided firmware ROMs',
+    synths: [
+      SYNTH_INFO.GearmulatorVirus,
+      SYNTH_INFO.GearmulatorVirusTI,
+      SYNTH_INFO.GearmulatorMicroQ,
+      SYNTH_INFO.GearmulatorXT,
+      SYNTH_INFO.GearmulatorNord,
+      SYNTH_INFO.GearmulatorJP8000,
+    ],
+  },
+  {
     id: 'vstbridge',
     name: '🔌 VST Bridge',
     description: 'Open-source synths ported via the generic VSTBridge framework',

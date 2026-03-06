@@ -335,4 +335,145 @@ void ml_preview_stop() {
     }
 }
 
+// ============================================================================
+// Pattern Data Access API
+// ============================================================================
+
+/**
+ * ml_get_num_parts() -> number of allocated parts (patterns).
+ */
+int ml_get_num_parts() {
+    if (!s_song) return 0;
+    MLModule* mod = s_song->get_module();
+    if (!mod) return 0;
+    int count = 0;
+    for (int i = 0; i < 1025; i++) {
+        if (mod->m_PartList[i]) count++;
+    }
+    return count;
+}
+
+/**
+ * ml_get_num_channels() -> number of channels in the loaded song.
+ */
+int ml_get_num_channels() {
+    if (!s_song) return 0;
+    MLModule* mod = s_song->get_module();
+    if (!mod || !mod->m_TuneList[0]) return 0;
+    return mod->m_TuneList[0]->Channels;
+}
+
+/**
+ * ml_get_part_note(partIdx, row) -> note (0=rest, 1-60=musical note).
+ * PartSize is always 128 rows.
+ */
+int ml_get_part_note(int partIdx, int row) {
+    if (!s_song || partIdx < 0 || partIdx >= 1025 || row < 0 || row >= PartSize) return 0;
+    MLModule* mod = s_song->get_module();
+    if (!mod || !mod->m_PartList[partIdx]) return 0;
+    return mod->m_PartList[partIdx]->Data[row].Note;
+}
+
+/**
+ * ml_get_part_inst(partIdx, row) -> instrument number (0=no change, 1-based).
+ */
+int ml_get_part_inst(int partIdx, int row) {
+    if (!s_song || partIdx < 0 || partIdx >= 1025 || row < 0 || row >= PartSize) return 0;
+    MLModule* mod = s_song->get_module();
+    if (!mod || !mod->m_PartList[partIdx]) return 0;
+    return mod->m_PartList[partIdx]->Data[row].Inst;
+}
+
+/**
+ * ml_get_part_fx(partIdx, row, fxIdx) -> effect word (0-4, MAX_FX_CHANGES_PER_LINE=5).
+ */
+int ml_get_part_fx(int partIdx, int row, int fxIdx) {
+    if (!s_song || partIdx < 0 || partIdx >= 1025 || row < 0 || row >= PartSize) return 0;
+    if (fxIdx < 0 || fxIdx >= MAX_FX_CHANGES_PER_LINE) return 0;
+    MLModule* mod = s_song->get_module();
+    if (!mod || !mod->m_PartList[partIdx]) return 0;
+    return mod->m_PartList[partIdx]->Data[row].Fx[fxIdx];
+}
+
+/**
+ * ml_set_part_note(partIdx, row, note) -> 1 on success, 0 on error.
+ */
+int ml_set_part_note(int partIdx, int row, int note) {
+    if (!s_song || partIdx < 0 || partIdx >= 1025 || row < 0 || row >= PartSize) return 0;
+    MLModule* mod = s_song->get_module();
+    if (!mod || !mod->m_PartList[partIdx]) return 0;
+    mod->m_PartList[partIdx]->Data[row].Note = static_cast<u8>(note);
+    return 1;
+}
+
+/**
+ * ml_set_part_inst(partIdx, row, inst) -> 1 on success, 0 on error.
+ */
+int ml_set_part_inst(int partIdx, int row, int inst) {
+    if (!s_song || partIdx < 0 || partIdx >= 1025 || row < 0 || row >= PartSize) return 0;
+    MLModule* mod = s_song->get_module();
+    if (!mod || !mod->m_PartList[partIdx]) return 0;
+    mod->m_PartList[partIdx]->Data[row].Inst = static_cast<u8>(inst);
+    return 1;
+}
+
+/**
+ * ml_set_part_fx(partIdx, row, fxIdx, value) -> 1 on success, 0 on error.
+ */
+int ml_set_part_fx(int partIdx, int row, int fxIdx, int value) {
+    if (!s_song || partIdx < 0 || partIdx >= 1025 || row < 0 || row >= PartSize) return 0;
+    if (fxIdx < 0 || fxIdx >= MAX_FX_CHANGES_PER_LINE) return 0;
+    MLModule* mod = s_song->get_module();
+    if (!mod || !mod->m_PartList[partIdx]) return 0;
+    mod->m_PartList[partIdx]->Data[row].Fx[fxIdx] = static_cast<u16>(value);
+    return 1;
+}
+
+/**
+ * ml_get_tune_entry(tuneIdx, channel, position) -> raw ChnlLine.Fx u16 value.
+ * The tune table maps positions to parts (pattern indices + transpose).
+ */
+int ml_get_tune_entry(int tuneIdx, int channel, int position) {
+    if (!s_song || tuneIdx < 0 || tuneIdx >= MAX_TUNES) return 0;
+    if (channel < 0 || channel >= MAXCHANS || position < 0 || position >= 256) return 0;
+    MLModule* mod = s_song->get_module();
+    if (!mod || !mod->m_TuneList[tuneIdx]) return 0;
+    Chnl* chnl = mod->m_TuneList[tuneIdx]->ChPtrs[channel];
+    if (!chnl) return 0;
+    return chnl->Data[position].Fx;
+}
+
+/**
+ * ml_get_tune_length(tuneIdx) -> effective length of tune (first END command or 256).
+ */
+int ml_get_tune_length(int tuneIdx) {
+    if (!s_song || tuneIdx < 0 || tuneIdx >= MAX_TUNES) return 0;
+    MLModule* mod = s_song->get_module();
+    if (!mod || !mod->m_TuneList[tuneIdx]) return 0;
+    Tune* tune = mod->m_TuneList[tuneIdx];
+    // Scan channel 0 for end command or empty
+    Chnl* chnl = tune->ChPtrs[0];
+    if (!chnl) return 0;
+    for (int i = 0; i < 256; i++) {
+        u16 fx = chnl->Data[i].Fx;
+        // Check if this is an END command (iscom=1, command bits indicate end)
+        if (fx == 0) return i;
+    }
+    return 256;
+}
+
+/**
+ * ml_get_num_instruments() -> number of allocated instruments.
+ */
+int ml_get_num_instruments() {
+    if (!s_song) return 0;
+    MLModule* mod = s_song->get_module();
+    if (!mod) return 0;
+    int count = 0;
+    for (int i = 1; i < MAX_INSTURUMENTS; i++) {
+        if (mod->m_InstList[i]) count++;
+    }
+    return count;
+}
+
 } // extern "C"

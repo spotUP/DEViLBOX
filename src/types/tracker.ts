@@ -492,7 +492,7 @@ export const NOTE_OFF: TrackerCell = {
 };
 
 // ── Editor Mode ─────────────────────────────────
-export type EditorMode = 'classic' | 'furnace' | 'hively' | 'musicline' | 'goattracker';
+export type EditorMode = 'classic' | 'furnace' | 'hively' | 'musicline' | 'goattracker' | 'klystrack' | 'jamcracker';
 
 // ── Furnace Native Data ─────────────────────────
 export interface FurnaceNativeData {
@@ -571,4 +571,75 @@ export interface HivelyNativeStep {
 export interface HivelyNativePosition {
   track: number[];      // track index per channel
   transpose: number[];  // signed transpose per channel (-128 to +127)
+}
+
+// ── Klystrack Native Data ──────────────────────────────────────────────────
+
+export interface KlysNativeData {
+  channels: number;
+  songLength: number;
+  loopPoint: number;
+  songSpeed: number;
+  songSpeed2: number;
+  songRate: number;
+  masterVolume: number;
+  flags: number;
+  patterns: KlysNativePattern[];
+  sequences: KlysNativeSequence[];  // per-channel
+  instruments: KlysNativeInstrument[];
+}
+
+export interface KlysNativePattern {
+  numSteps: number;
+  steps: KlysNativeStep[];
+}
+
+export interface KlysNativeStep {
+  note: number;        // 0=empty, 1-96 (C-0 to B-7), 97=note-off
+  instrument: number;  // 0xFF=empty, 0-254
+  ctrl: number;        // bitfield: legato, slide, vibrato
+  volume: number;      // 0-128 or special values
+  command: number;     // 16-bit effect command (type << 8 | param)
+}
+
+export interface KlysNativeSequence {
+  entries: KlysNativeSeqEntry[];
+}
+
+export interface KlysNativeSeqEntry {
+  position: number;    // tick position in the arrangement
+  pattern: number;     // pattern index
+  noteOffset: number;  // signed transpose
+}
+
+export interface KlysNativeInstrument {
+  name: string;
+  adsr: { a: number; d: number; s: number; r: number };
+  flags: number;
+  cydflags: number;
+  baseNote: number;
+  finetune: number;
+  slideSpeed: number;
+  pw: number;
+  volume: number;
+  progPeriod: number;
+  vibratoSpeed: number;
+  vibratoDepth: number;
+  pwmSpeed: number;
+  pwmDepth: number;
+  cutoff: number;
+  resonance: number;
+  flttype: number;
+  fxBus: number;
+  buzzOffset: number;
+  ringMod: number;
+  syncSource: number;
+  wavetableEntry: number;
+  fm: {
+    modulation: number;
+    feedback: number;
+    harmonic: number;
+    adsr: { a: number; d: number; s: number; r: number };
+  };
+  program: number[];  // 32 entries
 }

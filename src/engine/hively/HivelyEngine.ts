@@ -297,6 +297,17 @@ export class HivelyEngine {
     });
   }
 
+  /** Set a single step in a track (for pattern editing) */
+  setTrackStep(trackIdx: number, stepIdx: number,
+               note: number, instrument: number,
+               fx: number, fxParam: number,
+               fxb: number, fxbParam: number): void {
+    this.workletNode?.port.postMessage({
+      type: 'setTrackStep',
+      trackIdx, stepIdx, note, instrument, fx, fxParam, fxb, fxbParam,
+    });
+  }
+
   dispose(): void {
     this._disposed = true;
     this.workletNode?.port.postMessage({ type: 'dispose' });

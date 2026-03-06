@@ -8,7 +8,7 @@
  * Note values: 0=empty, 1-95=C-0..B-7, 0xBE=keyoff, 0xBF=keyon
  */
 
-import React, { useRef, useEffect, useCallback, useMemo } from 'react';
+import React, { useRef, useEffect, useCallback, useMemo, useState } from 'react';
 import { useGTUltraStore } from '../../stores/useGTUltraStore';
 
 // --- Constants ---
@@ -27,9 +27,10 @@ const HEADER_H = ROW_H + 4;
 const NOTE_NAMES = ['C-', 'C#', 'D-', 'D#', 'E-', 'F-', 'F#', 'G-', 'G#', 'A-', 'A#', 'B-'];
 
 function noteToString(note: number): string {
-  if (note === 0) return '...';
+  if (note === 0 || note === 0xBD) return '...'; // 0=empty, 0xBD=REST
   if (note === 0xBE) return '==='; // keyoff
   if (note === 0xBF) return '+++'; // keyon
+  if (note >= 0xC0) return '...'; // ENDPATT and other special values
   const n = note - 1;
   const octave = Math.floor(n / 12);
   const name = NOTE_NAMES[n % 12];
@@ -41,37 +42,35 @@ function hexByte(val: number): string {
   return val.toString(16).toUpperCase().padStart(2, '0');
 }
 
-// Colors
+// Colors — FT2 theme
 const COLORS = {
-  bg: '#1a1a2e',
-  bgAlt: '#16213e',
-  headerBg: '#0f3460',
-  headerText: '#e94560',
-  rowNum: '#666688',
-  note: '#e0e0ff',
+  bg: '#0d0d0d',
+  bgAlt: '#141414',
+  headerBg: '#1a1a1a',
+  headerText: '#888',
+  rowNum: '#555',
+  note: '#e0e0e0',
   instrument: '#60e060',
   command: '#ffcc00',
   data: '#ff8866',
-  empty: '#333355',
-  cursor: 'rgba(255, 255, 255, 0.25)',
-  cursorBorder: '#ffffff',
-  selection: 'rgba(100, 149, 237, 0.3)',
-  playRow: 'rgba(233, 69, 96, 0.2)',
-  channelSep: '#333355',
+  empty: '#333',
+  cursor: 'rgba(255, 255, 255, 0.2)',
+  cursorBorder: '#888',
+  selection: 'rgba(100, 149, 237, 0.25)',
+  playRow: 'rgba(233, 69, 96, 0.15)',
+  recordBorder: 'rgba(239, 68, 68, 0.5)',
+  channelSep: '#222',
 };
 
 interface GTPatternEditorProps {
   width: number;
   height: number;
-  /** Pattern data as flat Uint8Array (rows * channels * 4 bytes) */
-  patternData: Uint8Array[];  // one per channel, each MAX_PATTROWS*4 bytes
   channelCount: number;
 }
 
 export const GTPatternEditor: React.FC<GTPatternEditorProps> = ({
   width,
   height,
-  patternData,
   channelCount,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -81,6 +80,10 @@ export const GTPatternEditor: React.FC<GTPatternEditorProps> = ({
   const playbackPos = useGTUltraStore((s) => s.playbackPos);
   const playing = useGTUltraStore((s) => s.playing);
   const followPlay = useGTUltraStore((s) => s.followPlay);
+  const recordMode = useGTUltraStore((s) => s.recordMode);
+  const orderData = useGTUltraStore((s) => s.orderData);
+  const orderCursor = useGTUltraStore((s) => s.orderCursor);
+  const patternData = useGTUltraStore((s) => s.patternData);
   const moveCursor = useGTUltraStore((s) => s.moveCursor);
   const setCursor = useGTUltraStore((s) => s.setCursor);
 
@@ -121,7 +124,16 @@ export const GTPatternEditor: React.FC<GTPatternEditorProps> = ({
     ctx.fillText('ROW', 2, 4);
     for (let ch = 0; ch < channelCount; ch++) {
       const x = ROW_NUM_W + ch * (CHANNEL_W + CHAN_GAP);
-      ctx.fillText(`CH${ch + 1}`, x + CHANNEL_W / 2 - CHAR_W * 1.5, 4);
+      const patNum = orderData[ch]?.[orderCursor] ?? 0;
+      const label = `CH${ch + 1}:${patNum.toString(16).toUpperCase().padStart(2, '0')}`;
+      ctx.fillText(label, x + CHANNEL_W / 2 - CHAR_W * label.length / 2, 4);
+    }
+
+    // Record mode border
+    if (recordMode) {
+      ctx.strokeStyle = COLORS.recordBorder;
+      ctx.lineWidth = 2;
+      ctx.strokeRect(1, 1, width - 2, height - 2);
     }
 
     // Pattern rows
@@ -176,20 +188,25 @@ export const GTPatternEditor: React.FC<GTPatternEditorProps> = ({
       // Cell data per channel
       for (let ch = 0; ch < channelCount; ch++) {
         const baseX = ROW_NUM_W + ch * (CHANNEL_W + CHAN_GAP);
-        const data = patternData[ch];
-        if (!data) continue;
 
-        const offset = row * 4;
-        const note = data[offset];
-        const instr = data[offset + 1];
-        const cmd = data[offset + 2];
-        const param = data[offset + 3];
+        // Look up which pattern this channel is playing from order data
+        const patIdx = orderData[ch]?.[orderCursor] ?? 0;
+        const pat = patternData.get(patIdx);
+
+        let note = 0, instr = 0, cmd = 0, param = 0;
+        if (pat && row < pat.length) {
+          const offset = row * 4;
+          note = pat.data[offset];
+          instr = pat.data[offset + 1];
+          cmd = pat.data[offset + 2];
+          param = pat.data[offset + 3];
+        }
 
         let colX = baseX;
 
         // Note
         const noteStr = noteToString(note);
-        ctx.fillStyle = note === 0 ? COLORS.empty : COLORS.note;
+        ctx.fillStyle = (note === 0 || note >= 0xBD) ? COLORS.empty : COLORS.note;
         ctx.fillText(noteStr, colX, y + 1);
         colX += NOTE_W + COL_GAP;
 
@@ -231,7 +248,7 @@ export const GTPatternEditor: React.FC<GTPatternEditorProps> = ({
       }
     }
   }, [width, height, cursor, selection, patternLength, playbackPos, playing, followPlay,
-      scrollRow, visibleRows, channelCount, patternData]);
+      scrollRow, visibleRows, channelCount, patternData, recordMode, orderData, orderCursor]);
 
   // Keyboard handler
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
@@ -266,33 +283,62 @@ export const GTPatternEditor: React.FC<GTPatternEditorProps> = ({
     }
   }, [moveCursor, setCursor, cursor.channel, channelCount]);
 
-  // Mouse click → set cursor position
-  const handleClick = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+  // Mouse → cursor position helper
+  const hitTest = useCallback((clientX: number, clientY: number) => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    if (!canvas) return null;
     const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-
-    if (y < HEADER_H) return;
-
+    const x = clientX - rect.left;
+    const y = clientY - rect.top;
+    if (y < HEADER_H) return null;
     const row = scrollRow + Math.floor((y - HEADER_H) / ROW_H);
-    if (row > patternLength) return;
-
+    if (row > patternLength) return null;
     const relX = x - ROW_NUM_W;
-    if (relX < 0) return;
-
+    if (relX < 0) return null;
     const channel = Math.floor(relX / (CHANNEL_W + CHAN_GAP));
-    if (channel >= channelCount) return;
-
+    if (channel >= channelCount) return null;
     const inChannel = relX - channel * (CHANNEL_W + CHAN_GAP);
     let column = 0;
     if (inChannel >= NOTE_W + COL_GAP + HEX_W + COL_GAP + HEX_W + COL_GAP) column = 3;
     else if (inChannel >= NOTE_W + COL_GAP + HEX_W + COL_GAP) column = 2;
     else if (inChannel >= NOTE_W + COL_GAP) column = 1;
+    return { channel, row, column };
+  }, [scrollRow, patternLength, channelCount]);
 
-    setCursor({ channel, row, column, digit: 0 });
-  }, [scrollRow, patternLength, channelCount, setCursor]);
+  // Mouse drag selection state
+  const [dragging, setDragging] = useState(false);
+  const setSelection = useGTUltraStore((s) => s.setSelection);
+  const clearSelection = useGTUltraStore((s) => s.clearSelection);
+
+  const handleMouseDown = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+    const hit = hitTest(e.clientX, e.clientY);
+    if (!hit) return;
+    setCursor({ channel: hit.channel, row: hit.row, column: hit.column, digit: 0 });
+    clearSelection();
+    setDragging(true);
+  }, [hitTest, setCursor, clearSelection]);
+
+  useEffect(() => {
+    if (!dragging) return;
+    const handleMouseMove = (e: MouseEvent) => {
+      const hit = hitTest(e.clientX, e.clientY);
+      if (!hit) return;
+      setSelection({
+        active: true,
+        startChannel: cursor.channel,
+        startRow: cursor.row,
+        endChannel: hit.channel,
+        endRow: hit.row,
+      });
+    };
+    const handleMouseUp = () => setDragging(false);
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [dragging, cursor.channel, cursor.row, hitTest, setSelection]);
 
   return (
     <canvas
@@ -302,7 +348,7 @@ export const GTPatternEditor: React.FC<GTPatternEditorProps> = ({
       style={{ width, height, outline: 'none' }}
       tabIndex={0}
       onKeyDown={handleKeyDown}
-      onClick={handleClick}
+      onMouseDown={handleMouseDown}
     />
   );
 };

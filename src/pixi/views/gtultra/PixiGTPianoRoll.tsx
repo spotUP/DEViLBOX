@@ -15,12 +15,12 @@ import { MegaText, type GlyphLabel } from '@/pixi/utils/MegaText';
 import { useGTUltraStore } from '@/stores/useGTUltraStore';
 
 const C_BG       = 0x0e1525;
-const C_BORDER   = 0x333366;
-const C_KEY_WHITE = 0x1a2640;
-const C_KEY_BLACK = 0x0d1420;
-const C_KEY_LABEL = 0x556677;
-const C_GRID     = 0x182030;
-const C_GRIDBEAT = 0x223040;
+const C_BORDER   = 0x222222;
+const C_KEY_WHITE = 0x141414;
+const C_KEY_BLACK = 0x0a0a0a;
+const C_KEY_LABEL = 0x444444;
+const C_GRID     = 0x111111;
+const C_GRIDBEAT = 0x1a1a1a;
 const C_PLAYHEAD = 0xe94560;
 const C_CURSOR_ROW = 0xffffff;
 

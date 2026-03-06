@@ -15,7 +15,7 @@
 
 import React, { useCallback, useMemo } from 'react';
 import type { Graphics as GraphicsType, FederatedPointerEvent } from 'pixi.js';
-import { useTrackerStore } from '@stores';
+import { useTrackerStore , useFormatStore } from '@stores';
 import { useTransportStore } from '@stores/useTransportStore';
 import { usePixiTheme } from '../../theme';
 import { PIXI_FONTS } from '../../fonts';
@@ -47,8 +47,8 @@ interface Props {
 export const PixiMusicLineTrackTable: React.FC<Props> = ({ width, height, onSeek }) => {
   usePixiTheme(); // subscribe to theme updates
 
-  const channelTrackTables = useTrackerStore((s) => s.channelTrackTables);
-  const channelSpeeds = useTrackerStore((s) => s.channelSpeeds);
+  const channelTrackTables = useFormatStore((s) => s.channelTrackTables);
+  const channelSpeeds = useFormatStore((s) => s.channelSpeeds);
   const currentPos = useTrackerStore((s) => s.currentPositionIndex);
   const initialSpeed = useTransportStore((s) => s.speed);
 

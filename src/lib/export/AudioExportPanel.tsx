@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useTrackerStore, useInstrumentStore, useProjectStore, useTransportStore, notify } from '@stores';
+import { useTrackerStore, useInstrumentStore, useProjectStore, useTransportStore, notify , useFormatStore } from '@stores';
 import { useArrangementStore } from '@/stores/useArrangementStore';
 import { exportPatternAsWav, exportSongAsWav, getUADEInstrument, exportUADEAsWav } from './audioExport';
 
@@ -26,7 +26,8 @@ export const AudioExportPanel: React.FC<AudioExportPanelProps> = ({
   setRenderProgress,
   initialScope,
 }) => {
-  const { patterns, originalModuleData } = useTrackerStore();
+  const { patterns } = useTrackerStore();
+  const { originalModuleData } = useFormatStore();
   const { instruments } = useInstrumentStore();
   const { metadata } = useProjectStore();
   const { bpm } = useTransportStore();

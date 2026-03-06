@@ -25,10 +25,18 @@
 
 // Synth-specific device headers
 #include "virusLib/device.h"
+#ifndef GM_NO_WALDORF_MQ
 #include "mqLib/device.h"
+#endif
+#ifndef GM_NO_WALDORF_XT
 #include "xtLib/xtDevice.h"
+#endif
+#ifndef GM_NO_NORD
 #include "nord/n2x/n2xLib/n2xdevice.h"
+#endif
+#ifndef GM_NO_JP8000
 #include "ronaldo/je8086/jeLib/device.h"
+#endif
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten/emscripten.h>
@@ -97,18 +105,26 @@ EXPORT int32_t gm_create(const uint8_t* romData, uint32_t romSize, int32_t synth
             params.customData = static_cast<uint32_t>(virusLib::DeviceModel::TI);
             device = std::make_unique<virusLib::Device>(params);
             break;
+#ifndef GM_NO_WALDORF_MQ
         case GM_WALDORF_MQ:
             device = std::make_unique<mqLib::Device>(params);
             break;
+#endif
+#ifndef GM_NO_WALDORF_XT
         case GM_WALDORF_XT:
-            device = std::make_unique<xtLib::Device>(params);
+            device = std::make_unique<xt::Device>(params);
             break;
+#endif
+#ifndef GM_NO_NORD
         case GM_NORD_LEAD_2X:
             device = std::make_unique<n2x::Device>(params);
             break;
+#endif
+#ifndef GM_NO_JP8000
         case GM_ROLAND_JP8K:
             device = std::make_unique<jeLib::Device>(params);
             break;
+#endif
         default:
             return -1;
         }
@@ -292,6 +308,56 @@ EXPORT uint64_t gm_getDspClockHz(int32_t handle)
     if (handle < 0 || handle >= static_cast<int32_t>(g_devices.size()) || !g_devices[handle])
         return 0;
     return g_devices[handle]->device->getDspClockHz();
+}
+
+/**
+ * Debug: non-blocking process — push input but don't wait for output.
+ * Returns 1 if input was pushed successfully, 0 otherwise.
+ * Use gm_getAudioOutputSize to poll for output readiness.
+ */
+EXPORT int32_t gm_pushInput(int32_t handle, uint32_t numSamples)
+{
+    if (handle < 0 || handle >= static_cast<int32_t>(g_devices.size()) || !g_devices[handle])
+        return 0;
+
+    auto& gm = *g_devices[handle];
+    auto* virusDev = dynamic_cast<virusLib::Device*>(gm.device.get());
+    if (!virusDev) return 0;
+
+    auto& audio = virusDev->getDSP()->getAudio();
+
+    // Push silence into audio input (non-blocking since ring buffer is huge)
+    for (uint32_t i = 0; i < numSamples; ++i)
+    {
+        if (audio.getAudioInputs().full())
+            break;
+        audio.getAudioInputs().push_back({});
+    }
+    return 1;
+}
+
+/**
+ * Debug: check how many output frames the DSP has produced.
+ */
+EXPORT int32_t gm_getAudioOutputSize(int32_t handle)
+{
+    if (handle < 0 || handle >= static_cast<int32_t>(g_devices.size()) || !g_devices[handle])
+        return -1;
+    auto* virusDev = dynamic_cast<virusLib::Device*>(g_devices[handle]->device.get());
+    if (!virusDev) return -2;
+    return static_cast<int32_t>(virusDev->getDSP()->getAudio().getAudioOutputs().size());
+}
+
+/**
+ * Debug: check how many input frames are queued.
+ */
+EXPORT int32_t gm_getAudioInputSize(int32_t handle)
+{
+    if (handle < 0 || handle >= static_cast<int32_t>(g_devices.size()) || !g_devices[handle])
+        return -1;
+    auto* virusDev = dynamic_cast<virusLib::Device*>(g_devices[handle]->device.get());
+    if (!virusDev) return -2;
+    return static_cast<int32_t>(virusDev->getDSP()->getAudio().getAudioInputs().size());
 }
 
 } // extern "C"

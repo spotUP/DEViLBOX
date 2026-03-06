@@ -25,7 +25,7 @@ import { MidiExportPanel } from './MidiExportPanel';
 import { ModuleExportPanel } from './ModuleExportPanel';
 import { ChipExportPanel } from './ChipExportPanel';
 
-type ExportMode = 'song' | 'sfx' | 'instrument' | 'audio' | 'midi' | 'xm' | 'mod' | 'chip' | 'nano';
+type ExportMode = 'song' | 'sfx' | 'instrument' | 'audio' | 'midi' | 'xm' | 'mod' | 'it' | 's3m' | 'chip' | 'nano';
 type DialogMode = 'export' | 'import';
 
 interface ExportDialogProps {
@@ -161,7 +161,9 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
         }
 
         case 'xm':
-        case 'mod': {
+        case 'mod':
+        case 'it':
+        case 's3m': {
           if (await moduleHandlerRef.current?.() === false) return;
           break;
         }
@@ -200,7 +202,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
       }
 
       // Only close if no warnings (warnings will show in dialog)
-      if (exportMode !== 'xm' && exportMode !== 'mod') {
+      if (exportMode !== 'xm' && exportMode !== 'mod' && exportMode !== 'it' && exportMode !== 's3m') {
         onClose();
       }
     } catch (error) {
@@ -459,6 +461,32 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                     <div className="font-mono text-sm font-semibold">MOD</div>
                   </button>
                   <button
+                    onClick={() => setExportMode('it')}
+                    className={`
+                      p-4 rounded-lg border-2 transition-all text-center
+                      ${exportMode === 'it'
+                        ? 'bg-accent-primary text-text-inverse border-accent-primary glow-sm'
+                        : 'bg-dark-bgSecondary text-text-primary border-dark-border hover:border-dark-borderLight'
+                      }
+                    `}
+                  >
+                    <FileMusic size={24} className="mx-auto mb-2" />
+                    <div className="font-mono text-sm font-semibold">IT</div>
+                  </button>
+                  <button
+                    onClick={() => setExportMode('s3m')}
+                    className={`
+                      p-4 rounded-lg border-2 transition-all text-center
+                      ${exportMode === 's3m'
+                        ? 'bg-accent-primary text-text-inverse border-accent-primary glow-sm'
+                        : 'bg-dark-bgSecondary text-text-primary border-dark-border hover:border-dark-borderLight'
+                      }
+                    `}
+                  >
+                    <FileMusic size={24} className="mx-auto mb-2" />
+                    <div className="font-mono text-sm font-semibold">S3M</div>
+                  </button>
+                  <button
                     onClick={() => setExportMode('chip')}
                     className={`
                       p-4 rounded-lg border-2 transition-all text-center
@@ -600,10 +628,10 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                 />
               )}
 
-              {(exportMode === 'xm' || exportMode === 'mod') && (
+              {(exportMode === 'xm' || exportMode === 'mod' || exportMode === 'it' || exportMode === 's3m') && (
                 <ModuleExportPanel
                   handlerRef={moduleHandlerRef}
-                  exportMode={exportMode as 'xm' | 'mod'}
+                  exportMode={exportMode as 'xm' | 'mod' | 'it' | 's3m'}
                   onClose={onClose}
                 />
               )}
@@ -752,6 +780,8 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                   : exportMode === 'midi' ? '.mid'
                   : exportMode === 'xm' ? '.xm'
                   : exportMode === 'mod' ? '.mod'
+                  : exportMode === 'it' ? '.it'
+                  : exportMode === 's3m' ? '.s3m'
                   : exportMode === 'chip' ? `.${chipExtension}`
                   : exportMode === 'nano' ? '.dbn'
                   : `.${exportMode}.json`

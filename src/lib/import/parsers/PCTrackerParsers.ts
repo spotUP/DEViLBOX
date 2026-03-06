@@ -1,19 +1,20 @@
 /**
  * PCTrackerParsers — Standard PC tracker format dispatchers (S3M, IT, XM, MOD)
  *
- * These formats have native parsers with libopenmpt as a fallback.
- * Each parser tries magic-byte detection first; if it fails, the caller
- * falls through to the libopenmpt catch-all in parseModuleToSong.
+ * Primary path: OpenMPT CSoundFile WASM (reference C++ implementation, 56+ formats)
+ * Fallback: TypeScript native parsers → libopenmpt worklet
  */
 
 import type { TrackerSong } from '@/engine/TrackerReplayer';
 import type { FormatEnginePreferences } from '@/stores/useSettingsStore';
 import type { UADEMetadata } from '@/engine/uade/UADEEngine';
 
+/** Formats handled by OpenMPT soundlib WASM */
+const OPENMPT_EXTENSIONS = /\.(s3m|it|mptm|xm|mod|m15|669|amf|ams|c67|cba|dbm|digi|dmf|dsm|dsym|dtm|far|fmt|ftm|gdm|gmc|gt2|ice|imf|ims|itp|kris|mdl|med|mo3|mt2|mtm|mus|nst|okt|plm|psm|ptm|rtm|sfx|sfx2|stk|stm|stp|stx|ult|wow)$/i;
+
 /**
- * Try to parse a standard PC tracker format natively.
- * Returns TrackerSong or null if not matched / native parse failed.
- * Caller should fall back to libopenmpt on null for known extensions.
+ * Try to parse a tracker module using OpenMPT WASM soundlib (reference implementation).
+ * Falls back to TypeScript parsers on failure.
  */
 export async function tryPCTrackerParse(
   buffer: ArrayBuffer,
@@ -24,7 +25,19 @@ export async function tryPCTrackerParse(
   _preScannedMeta?: UADEMetadata,
 ): Promise<TrackerSong | null> {
 
-  // ── S3M (ScreamTracker 3) ─────────────────────────────────────────────────
+  // ── Primary path: OpenMPT WASM soundlib ──────────────────────────────────
+  if (OPENMPT_EXTENSIONS.test(filename)) {
+    try {
+      const { parseWithOpenMPT } = await import('@lib/import/wasm/OpenMPTConverter');
+      return await parseWithOpenMPT(buffer, originalFileName);
+    } catch (err) {
+      console.warn(`[OpenMPT WASM] Parse failed for ${filename}, falling back to TS parser:`, err);
+    }
+  }
+
+  // ── Fallback: TypeScript native parsers ──────────────────────────────────
+
+  // S3M (ScreamTracker 3)
   if (/\.s3m$/i.test(filename)) {
     try {
       const { isS3MFormat, parseS3MFile } = await import('@lib/import/formats/S3MParser');
@@ -34,7 +47,7 @@ export async function tryPCTrackerParse(
     }
   }
 
-  // ── IT / MPTM (Impulse Tracker / OpenMPT) ─────────────────────────────────
+  // IT / MPTM (Impulse Tracker / OpenMPT)
   if (/\.(it|mptm)$/i.test(filename)) {
     try {
       const { isITFormat, parseITFile } = await import('@lib/import/formats/ITParser');
@@ -44,7 +57,7 @@ export async function tryPCTrackerParse(
     }
   }
 
-  // ── XM (FastTracker II) ───────────────────────────────────────────────────
+  // XM (FastTracker II)
   if (/\.xm$/i.test(filename)) {
     try {
       const { isXMFormat, parseXMFile } = await import('@lib/import/formats/XMParser');
@@ -54,7 +67,7 @@ export async function tryPCTrackerParse(
     }
   }
 
-  // ── MOD (ProTracker / compatible) ────────────────────────────────────────
+  // MOD (ProTracker / compatible)
   if (/\.(mod|m15)$/i.test(filename)) {
     try {
       const { isMODFormat, parseMODFile } = await import('@lib/import/formats/MODParser');

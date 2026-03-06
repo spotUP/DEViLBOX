@@ -8,7 +8,7 @@ import { PixiModal, PixiModalHeader, PixiButton, PixiLabel } from '../components
 import { PixiScrollView } from '../components/PixiScrollView';
 import { usePixiTheme } from '../theme';
 import { PIXI_FONTS } from '../fonts';
-import { useTrackerStore } from '@stores';
+import { useTrackerStore , useFormatStore } from '@stores';
 import { getTrackerReplayer } from '@engine/TrackerReplayer';
 import { notify } from '@stores/useNotificationStore';
 
@@ -37,7 +37,7 @@ export const PixiPatternOrderModal: React.FC<PixiPatternOrderModalProps> = ({
 }) => {
   const theme = usePixiTheme();
 
-  const hasPerChannelTables = useTrackerStore((s) => !!s.channelTrackTables);
+  const hasPerChannelTables = useFormatStore((s) => !!s.channelTrackTables);
   const patternOrder = useTrackerStore((s) => s.patternOrder);
   const currentPositionIndex = useTrackerStore((s) => s.currentPositionIndex);
   const currentPatternIndex = useTrackerStore((s) => s.currentPatternIndex);
