@@ -445,13 +445,26 @@ export function emit(ast: AstNode[], resolved: ResolveResult, sourceFile?: strin
 
   // Unresolved symbol stubs (from missing include files)
   const stubs = collectUnresolved(ast, resolved);
-  if (stubs.size > 0) {
+  // Split stubs: BSR/JSR targets become no-op function stubs, rest become #define 0.
+  const callTargets = new Set<string>();
+  for (const node of ast) {
+    if (node.kind !== 'instruction') continue;
+    if (node.mnemonic !== 'BSR' && node.mnemonic !== 'JSR') continue;
+    const t = node.operands[0];
+    if (t?.kind === 'label_ref' && stubs.has(t.name)) callTargets.add(t.name);
+    if (t?.kind === 'pc_rel' && stubs.has(t.label)) callTargets.add(t.label);
+  }
+  const valueStubs = new Set([...stubs].filter(n => !callTargets.has(n)));
+  if (valueStubs.size > 0 || callTargets.size > 0) {
     lines.push('/* -- Unresolved Symbols -------------------------------------------- */');
-    lines.push('/* These symbols come from include files not available to the transpiler.');
-    lines.push(' * They are stubbed as 0 so the generated C compiles. */');
-    // Group stubs by prefix too
+    lines.push('/* These symbols come from include files not available to the transpiler. */');
+    // Function stubs (BSR/JSR targets)
+    for (const name of callTargets) {
+      lines.push(`static inline void ${name}(void) {} /* unresolved BSR target — no-op */`);
+    }
+    // Value stubs
     const stubGroups = new Map<string, string[]>();
-    for (const name of stubs) {
+    for (const name of valueStubs) {
       const m = name.match(/^([A-Za-z]+_)/);
       const prefix = m ? m[1] : '_other';
       if (!stubGroups.has(prefix)) stubGroups.set(prefix, []);
@@ -540,6 +553,14 @@ export function emit(ast: AstNode[], resolved: ResolveResult, sourceFile?: strin
         addrRefLabels.add(t.label);
         funcLabels.add(t.label);  // promote to full C function
       }
+      // #label (immediate address) also takes the address of a code label
+      if (t.kind === 'immediate' && Number.isNaN(t.value)) {
+        const name = t.raw.startsWith('#') ? t.raw.slice(1) : t.raw;
+        if (isFunctionLabel.has(name) && !funcLabels.has(name)) {
+          addrRefLabels.add(name);
+          funcLabels.add(name);
+        }
+      }
     }
   }
 
@@ -606,12 +627,17 @@ export function emit(ast: AstNode[], resolved: ResolveResult, sourceFile?: strin
       // Local labels (starting with '.') are scoped per global label in 68k.
       // Multiple functions can have a '.SetVoice' and each one is a different label.
       // Promoting local labels to cross-function C functions causes duplicate definitions.
-      // Skip them -- they will remain as inline goto labels within their containing function.
-      if (lbl.startsWith('.')) continue;
+      // Skip them ONLY if the label name appears more than once in the file.
+      if (lbl.startsWith('.')) {
+        const count = ast.filter(n => n.kind === 'label' && n.name === lbl).length;
+        if (count > 1) continue;
+      }
 
       // Case 1: Branch to a non-function label in a different function scope.
+      // Only promote labels that are code labels (in isFunctionLabel).
+      // Data labels (dc.w, dc.l, etc.) cannot become functions.
       if (labelScope.has(lbl)) {
-        if (labelScope.get(lbl) !== scope && !crossFuncGotos.has(lbl)) {
+        if (labelScope.get(lbl) !== scope && !crossFuncGotos.has(lbl) && isFunctionLabel.has(lbl)) {
           crossFuncGotos.add(lbl);
           funcLabels.add(lbl);   // promote to its own C function
           cfgChanged = true;
@@ -786,6 +812,37 @@ export function emit(ast: AstNode[], resolved: ResolveResult, sourceFile?: strin
             c = `if ((int16_t)(--${cnt}) >= 0) { ${safe}(); return; }`;
           } else {
             c = `if (${COND_BRANCH_CONDS[mn]}) { ${safe}(); return; }`;
+          }
+        } else if (mn === 'JMP' && node.operands[0]?.kind === 'pc_rel' &&
+                   (node.operands[0] as any).index && !isFunctionLabel.has(node.operands[0].label)) {
+          // JMP label(PC,Dn.W) where label is a data label — dc.w offset jump table.
+          // Resolve the table entries from the AST and emit a switch statement.
+          const jtLabel = node.operands[0].label;
+          const jtIndex = ((node.operands[0] as any).index as string).split('.')[0].toLowerCase();
+          const targets: string[] = [];
+          let inTable = false;
+          for (const n of ast) {
+            if (n.kind === 'label' && n.name === jtLabel) { inTable = true; continue; }
+            if (inTable) {
+              if (n.kind === 'data' && n.directive === 'DC' && n.size === 'W') {
+                for (const v of n.values) {
+                  // dc.w target-table_label → extract target name
+                  const vstr = String(v);
+                  const dashIdx = vstr.indexOf('-');
+                  if (dashIdx > 0) {
+                    targets.push(sanitizeLabel(vstr.slice(0, dashIdx)));
+                  }
+                }
+              } else if (n.kind === 'label' || (n.kind === 'data' && !(n.directive === 'DC' && n.size === 'W'))) {
+                break; // end of table
+              }
+            }
+          }
+          if (targets.length > 0) {
+            const cases = targets.map((t, i) => `    case ${i}: goto ${t};`).join('\n');
+            c = `switch ((uint16_t)(${jtIndex}) / 2) {\n${cases}\n  }`;
+          } else {
+            c = emitInstruction(node);  // fallback
           }
         } else {
           c = emitInstruction(node);

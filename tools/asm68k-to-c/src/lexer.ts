@@ -326,6 +326,41 @@ function tokenizeLine(src: string, lineNum: number): Token[] {
           if (peek() === '%') { advance(); immVal += '%' + readBin(); tokens.push(tok('IMMEDIATE', immVal, col)); isFirstToken = false; continue; }
         }
         immVal += readDecimal();
+      } else if (peek() === '(') {
+        // Parenthesized arithmetic expression: #(709379-3)/64
+        // Read the full expression (including trailing operators) and evaluate it.
+        const exprStart = i;
+        let depth = 0;
+        while (i < src.length && (depth > 0 || src[i] === '(' || /[0-9+\-*/]/.test(src[i]))) {
+          if (src[i] === '(') depth++;
+          else if (src[i] === ')') { depth--; if (depth < 0) break; }
+          i++;
+          // After closing paren, continue reading operators and numbers
+          if (depth === 0 && i < src.length && /[+\-*/]/.test(src[i])) continue;
+          if (depth === 0 && i < src.length && !/[0-9+\-*/]/.test(src[i])) break;
+        }
+        const exprStr = src.slice(exprStart, i);
+        try {
+          // Safe evaluation: only allow digits and arithmetic operators
+          if (/^[0-9+\-*/() ]+$/.test(exprStr)) {
+            const result = Math.trunc(Function(`"use strict"; return (${exprStr})`)());
+            immVal += result.toString();
+          } else {
+            immVal += exprStr; // Can't evaluate, pass through
+          }
+        } catch {
+          immVal += exprStr;
+        }
+      } else if (peek() === '`') {
+        // Backtick-quoted 4-character constant: #`AmBk` → 0x416D426B
+        advance(); // consume opening backtick
+        let fourcc = 0;
+        while (i < src.length && src[i] !== '`') {
+          fourcc = (fourcc << 8) | src[i].charCodeAt(0);
+          i++;
+        }
+        if (i < src.length) i++; // consume closing backtick
+        immVal = `#$${(fourcc >>> 0).toString(16).toUpperCase()}`;
       } else {
         // #identifier (e.g. #DMACON)
         immVal += readIdent();
@@ -540,6 +575,52 @@ function tokenizeLine(src: string, lineNum: number): Token[] {
     if (ch === '-' && !isFirstToken && tokens.length > 0 && tokens[tokens.length - 1].kind === 'REGISTER') {
       advance();
       tokens.push(tok('RANGE', '-', col));
+      continue;
+    }
+
+    // -- Minus/Plus between identifiers: emit OPERATOR token for data expression joining --
+    // In dc.w context: pt_filteronoff-pt_table2 → IDENT OPERATOR IDENT → parser joins
+    // In instruction context: these get silently dropped (old behavior) or
+    // the compound LEA handler picks them up.
+    if ((ch === '-' || ch === '+') && !isFirstToken && tokens.length > 0 &&
+        tokens[tokens.length - 1].kind === 'IDENTIFIER') {
+      advance();
+      tokens.push(tok('OPERATOR', ch, col));
+      continue;
+    }
+
+    // -- Numeric arithmetic in operands: 42+6(a3) → combine into single number --
+    if ((ch === '+' || ch === '-') && !isFirstToken && tokens.length > 0 &&
+        tokens[tokens.length - 1].kind === 'NUMBER') {
+      // Peek ahead: if followed by digit or $hex, combine arithmetic
+      if (i + 1 < src.length && (isDigit(src[i + 1]) || src[i + 1] === '$')) {
+        const prevTok = tokens[tokens.length - 1];
+        const pv = prevTok.value;
+        const prevVal = pv.startsWith('$') ? parseInt(pv.slice(1), 16) : parseInt(pv);
+        const sign = ch;
+        advance(); // consume '+' or '-'
+        const nextT = readNumericOrDisp('', col);
+        if (nextT.kind === 'NUMBER') {
+          const nv = nextT.value;
+          const nextVal = nv.startsWith('$') ? parseInt(nv.slice(1), 16) : parseInt(nv);
+          const result = sign === '+' ? prevVal + nextVal : prevVal - nextVal;
+          prevTok.value = `${result}`;
+          continue;
+        } else if (nextT.kind === 'DISP_REG') {
+          // e.g. 42+6(a3) → combine prefix into DISP_REG
+          const m = nextT.value.match(/^(-?\d+)/);
+          const nextVal = m ? parseInt(m[1]) : 0;
+          const result = sign === '+' ? prevVal + nextVal : prevVal - nextVal;
+          tokens.pop(); // remove previous NUMBER
+          tokens.push(tok('DISP_REG', nextT.value.replace(/^-?\d+/, `${result}`), prevTok.col));
+          continue;
+        }
+        // Fallback: push as separate tokens
+        tokens.push(nextT);
+        continue;
+      }
+      // Not followed by a number — skip
+      advance();
       continue;
     }
 

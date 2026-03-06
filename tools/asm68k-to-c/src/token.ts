@@ -12,6 +12,7 @@ export type TokenKind =
   | 'STRING'       // "hello" string literal in DC.B
   | 'COMMA'
   | 'RANGE'        // "-" between registers in MOVEM register list
+  | 'OPERATOR'     // "+", "-" in data expressions (e.g. dc.w target-table_base)
   | 'NEWLINE'
   | 'DIRECTIVE'    // "EQU", "DC", "DS", "SECTION", "INCLUDE", "MACRO", "ENDM", "XDEF", "XREF"
   | 'COMMENT'      // "; ..." or "* ..."

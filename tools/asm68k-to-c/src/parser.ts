@@ -212,15 +212,26 @@ export function parse(tokens: Token[]): AstNode[] {
       while (j < lt.length && lt[j]?.kind !== 'COMMENT') {
         if (lt[j].kind === 'COMMA') { j++; continue; }
         const v = lt[j].value;
-        if (lt[j].kind === 'STRING' || lt[j].kind === 'IDENTIFIER') {
-          // String literals and symbolic references stored as strings
+        if (lt[j].kind === 'STRING') {
           values.push(v);
+          j++;
+        } else if (lt[j].kind === 'IDENTIFIER' || lt[j].kind === 'OPERATOR') {
+          // Identifier (may include label arithmetic combined by lexer: target-table_base)
+          // Also handle any remaining OPERATOR tokens by joining with adjacent identifiers
+          let expr = v;
+          j++;
+          while (j < lt.length && lt[j]?.kind === 'OPERATOR' && j + 1 < lt.length &&
+                 (lt[j + 1].kind === 'IDENTIFIER' || lt[j + 1].kind === 'NUMBER')) {
+            expr += lt[j].value + lt[j + 1].value;
+            j += 2;
+          }
+          values.push(expr);
         } else {
           const n = parseNumber(v);
           // Non-numeric tokens (e.g. label refs not caught above) → keep as string
           values.push(Number.isNaN(n) ? v : n);
+          j++;
         }
-        j++;
       }
       nodes.push({ kind: 'data', directive, size, values, line: startLine });
       continue;
@@ -258,6 +269,44 @@ export function parse(tokens: Token[]): AstNode[] {
           }
         }
         if (lt[j].kind === 'RANGE') { j++; continue; } // skip stray RANGE tokens
+        if (lt[j].kind === 'OPERATOR') { j++; continue; } // skip stray OPERATOR tokens
+        // IDENTIFIER OPERATOR IDENTIFIER/NUMBER ... DISP_REG: compound expression
+        // e.g. InfoBuffer+Length+2(PC) → IDENT OP IDENT OP NUMBER DISP_REG
+        if (lt[j].kind === 'IDENTIFIER' && lt[j + 1]?.kind === 'OPERATOR') {
+          // Scan ahead to find the end of the expression chain
+          let expr = lt[j].value;
+          let k = j + 1;
+          while (k < lt.length && lt[k]?.kind === 'OPERATOR' &&
+                 k + 1 < lt.length && (lt[k + 1].kind === 'IDENTIFIER' || lt[k + 1].kind === 'NUMBER')) {
+            expr += lt[k].value + lt[k + 1].value;
+            k += 2;
+          }
+          // If followed by OPERATOR + DISP_REG (e.g. "+2(PC)"), include the DISP_REG
+          let hadOp = false;
+          if (lt[k]?.kind === 'OPERATOR' && lt[k + 1]?.kind === 'DISP_REG') {
+            expr += lt[k].value;
+            k++;
+            hadOp = true;
+          }
+          // If followed by DISP_REG (e.g. "(PC)" or "2(PC)"), combine into pc_rel or disp
+          if (lt[k]?.kind === 'DISP_REG') {
+            const dispRaw = lt[k].value;
+            const dm = dispRaw.match(/^(-?[^(]*)\((.+)\)$/);
+            if (dm) {
+              const base = dm[2].toLowerCase();
+              if (dm[1]) expr += (hadOp ? '' : (dm[1].startsWith('-') || dm[1].startsWith('+') ? '' : '+')) + dm[1];
+              if (base === 'pc') {
+                operands.push({ kind: 'pc_rel', label: expr });
+              } else {
+                operands.push({ kind: 'disp', offset: expr, base });
+              }
+              j = k + 1;
+              continue;
+            }
+          }
+          // If NOT followed by DISP_REG, just push IDENTIFIER and let OPERATOR tokens
+          // be handled individually (they'll be skipped or handled by other cases)
+        }
         // NUMBER + DISP_REG: combine displacement arithmetic, e.g. 12-12(A4) → 0(A4)
         if ((lt[j].kind === 'NUMBER' || lt[j].kind === 'IMMEDIATE') && lt[j + 1]?.kind === 'DISP_REG') {
           const numVal = parseNumber(lt[j].value.replace(/^#/, ''));
