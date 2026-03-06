@@ -23,10 +23,15 @@ export class PreTrackerParser {
    * @returns TrackerModule with minimal metadata
    */
   static parse(data: ArrayBuffer): TrackerModule {
-    // PreTracker file structure (simplified):
-    // Offset 0: Magic/header
-    // Offset varies: Pattern data, sample metadata
-    //
+    // Basic validation: PreTracker modules need at least a header
+    // (magic bytes + song title + reserved = 36 bytes minimum)
+    const MIN_SIZE = 36;
+    if (data.byteLength < MIN_SIZE) {
+      throw new Error(
+        `Invalid PreTracker file: too small (${data.byteLength} bytes, minimum ${MIN_SIZE})`
+      );
+    }
+
     // For Phase 10, create minimal module structure.
     // Full format parsing deferred to Phase 12.
 
@@ -51,7 +56,7 @@ export class PreTrackerParser {
    * @param data ArrayBuffer
    * @returns Array of instruments
    */
-  private static extractInstruments(data: ArrayBuffer): Instrument[] {
+  private static extractInstruments(_data: ArrayBuffer): Instrument[] {
     // PreTracker instruments are minimal (mostly just sample references)
     // For Phase 10, create stubs; full extraction in Phase 12
     return [
@@ -70,7 +75,7 @@ export class PreTrackerParser {
    * @param data ArrayBuffer
    * @returns Array of samples
    */
-  private static extractSamples(data: ArrayBuffer): Sample[] {
+  private static extractSamples(_data: ArrayBuffer): Sample[] {
     // PreTracker samples are mostly just pointers in the module
     // For now, stub; full extraction deferred to Phase 12
     return [];
