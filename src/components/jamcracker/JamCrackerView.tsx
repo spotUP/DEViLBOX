@@ -15,6 +15,7 @@ import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react'
 import { useTrackerStore , useFormatStore } from '@stores';
 import { useTransportStore } from '@stores/useTransportStore';
 import { FormatPatternEditor } from '@/components/shared/FormatPatternEditor';
+import type { FormatChannel, FormatCell } from '@/components/shared/format-editor-types';
 import { JAMCRACKER_COLUMNS } from './jamcrackerAdapter';
 import { JamCrackerEngine } from '@engine/jamcracker/JamCrackerEngine';
 
@@ -109,21 +110,20 @@ export const JamCrackerView: React.FC = () => {
   // Compute format channels from pattern data
   const channels = useMemo(() => {
     if (!patternData) return [];
-    // Convert JamCracker pattern rows to FormatChannel[]
     const patternArray = patternData.rows || [];
-    const result = [];
+    const result: FormatChannel[] = [];
     for (let ch = 0; ch < 4; ch++) {
-      const rows = [];
+      const rows: FormatCell[] = [];
       if (patternArray[ch]) {
         for (const cell of patternArray[ch]) {
           rows.push({
-            period: cell?.period || 0,
-            instrument: cell?.instr || 0,
-            speed: cell?.speed || 0,
-            arpeggio: cell?.arpeggio || 0,
-            vibrato: cell?.vibrato || 0,
-            volume: cell?.volume || 0,
-            porta: cell?.porta || 0,
+            period: cell?.period ?? 0,
+            instrument: cell?.instr ?? 0,
+            speed: cell?.speed ?? 0,
+            arpeggio: cell?.arpeggio ?? 0,
+            vibrato: cell?.vibrato ?? 0,
+            volume: cell?.volume ?? 0,
+            porta: cell?.porta ?? 0,
           });
         }
       }
