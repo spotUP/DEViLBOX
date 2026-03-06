@@ -1681,6 +1681,21 @@ export const useTrackerStore = create<TrackerStore>()(
           state.channelTrackTables = song.channelTrackTables;
           state.channelSpeeds = song.channelSpeeds ?? null;
           state.channelGrooves = song.channelGrooves ?? null;
+        } else if (song.jamCrackerFileData) {
+          // JamCracker Pro — 4-channel Amiga tracker (.jam files)
+          state.editorMode = 'jamcracker';
+          state.furnaceNative = null;
+          state.hivelyNative = null;
+          state.hivelyFileData = null;
+          state.klysNative = null;
+          state.klysFileData = null;
+          state.musiclineFileData = null;
+          state.hivelyMeta = null;
+          state.furnaceSubsongs = null;
+          state.furnaceActiveSubsong = 0;
+          state.channelTrackTables = null;
+          state.channelSpeeds = null;
+          state.channelGrooves = null;
         } else if (song.goatTrackerData) {
           // GoatTracker Ultra SID tracker (.sng files only — requires GT engine)
           state.editorMode = 'goattracker';
