@@ -59,6 +59,7 @@ export const MusicLinePatternViewer: React.FC = () => {
   const patterns = useTrackerStore((s) => s.patterns);
   const currentPos = useTrackerStore((s) => s.currentPositionIndex);
   const currentRow = useTransportStore((s) => s.currentRow);
+  const currentRowPerChannel = useTransportStore((s) => s.currentRowPerChannel);
   const isPlaying = useTransportStore((s) => s.isPlaying);
 
   const recordMode = useEditorStore((s) => s.recordMode);
@@ -417,7 +418,9 @@ export const MusicLinePatternViewer: React.FC = () => {
 
       {/* Pattern rows */}
       {rows.map((rowIdx) => {
-        const isPlayhead = rowIdx === currentRow;
+        // Per-channel rows: highlight per-channel, not full row
+        const hasPerChRows = isPlaying && currentRowPerChannel.length > 0;
+        const isPlayhead = !hasPerChRows && isPlaying && rowIdx === currentRow;
         const isEvenGroup = Math.floor(rowIdx / 4) % 2 === 0;
         const isCursorRow = rowIdx === cursor.row;
         return (
@@ -454,6 +457,9 @@ export const MusicLinePatternViewer: React.FC = () => {
               const cell = pat?.channels[0]?.rows[rowIdx];
               const hasNote = cell && cell.note > 0;
               const isCursorCh = isCursorRow && chIdx === cursor.channel;
+              const isChPlayhead = hasPerChRows
+                ? rowIdx === currentRowPerChannel[chIdx]
+                : isPlayhead;
               return (
                 <span
                   key={chIdx}
@@ -465,8 +471,9 @@ export const MusicLinePatternViewer: React.FC = () => {
                     paddingLeft: 4,
                     paddingRight: 4,
                     borderLeft: '1px solid #1e1e1e',
+                    backgroundColor: isChPlayhead ? '#1a3a1a' : undefined,
                     color: hasNote
-                      ? isPlayhead
+                      ? isChPlayhead
                         ? '#88ff88'
                         : '#cccccc'
                       : '#333',
