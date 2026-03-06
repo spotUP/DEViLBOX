@@ -397,7 +397,8 @@ export function convertFurnaceCell(cell: FurnacePatternCell, isChipSynth: boolea
     let t = mapFurnaceEffect(fx.type);
     if (t < 0) t = fx.type; // Preserve Furnace-native effects for WASM dispatch routing
     let p = fx.value & 0xFF;
-    // Groove effect 0x09: param is groove index — preserved as-is for replayer groove activation
+    // Groove effect 0x09: param is groove index, mapped to 0x0F (set speed).
+    // Replayer checks song.grooves to distinguish groove activation from direct speed set.
     // Split composite XM extended effects (E1x-EFx)
     // mapFurnaceEffect returns e.g. 0xE9 for retrigger; replayer expects
     // effectType=0x0E with sub-command in param high nibble: param = 0x9y
@@ -449,7 +450,7 @@ export function mapFurnaceEffect(furEffect: number): number {
     0x06: 0x05, // Vol slide + porta
     0x07: 0x07, // Tremolo
     0x08: 0x08, // Panning (4-bit split)
-    0x09: 0x09, // Groove/speed — preserve for groove table activation in replayer
+    0x09: 0x0F, // Groove/speed → set speed (groove activation handled in replayer via song.grooves)
     0x0A: 0x0A, // Volume slide
     0x0B: 0x0B, // Position jump
     0x0C: 0xE9, // Retrigger → XM extended retrigger (E9x)

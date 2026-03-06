@@ -2137,24 +2137,17 @@ export class TrackerReplayer {
         this.processExtendedEffect0(chIndex, ch, x, y, time);
         break;
 
-      case 0x9: // Furnace groove / set speed
-        // 09xx: activate groove table xx, or set speed if no groove table exists
-        if (this.song?.grooves && param < this.song.grooves.length && this.song.grooves[param]?.length > 0) {
-          this.activeGroove = this.song.grooves[param];
-          this.groovePos = 0;
-          this.speed = this.activeGroove[0];
-          this.speed2 = null; // Groove replaces speed alternation
-        } else {
-          // No groove table — treat as set speed (legacy behavior)
-          this.speed = param || this.speed;
-        }
-        break;
-
-      case 0xF: // Set speed/tempo
+      case 0xF: // Set speed/tempo (also handles Furnace groove activation via 09xx→0Fxx mapping)
         if (param === 0) {
           // F00 = stop in some trackers
         } else if (param < 0x20) {
-          if (this.speed !== param) {
+          // Check if this speed value matches a Furnace groove table
+          if (this.song?.grooves && param < this.song.grooves.length && this.song.grooves[param]?.length > 0) {
+            this.activeGroove = this.song.grooves[param];
+            this.groovePos = 0;
+            this.speed = this.activeGroove[0];
+            this.speed2 = null; // Groove replaces speed alternation
+          } else if (this.speed !== param) {
             this.speed = param;
             // Fxx disables Furnace speed alternation and groove
             if (this.speed2 !== null) {
