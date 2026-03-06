@@ -253,6 +253,8 @@ export interface TrackerSong {
   jamCrackerFileData?: ArrayBuffer;
   /** Raw Future Player .fp binary for loading into the FuturePlayerEngine WASM */
   futurePlayerFileData?: ArrayBuffer;
+  /** Raw MOD binary for loading into the PT2Engine WASM (authentic Paula emulation) */
+  pt2FileData?: ArrayBuffer;
   // Native format data (preserved for format-specific editors)
   furnaceNative?: FurnaceNativeData;
   hivelyNative?: HivelyNativeData;

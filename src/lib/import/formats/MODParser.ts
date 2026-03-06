@@ -572,5 +572,6 @@ export async function parseMODFile(buffer: ArrayBuffer, filename: string): Promi
     initialSpeed,
     initialBPM,
     linearPeriods:   false, // MOD always uses Amiga periods
+    pt2FileData:     buffer.slice(0), // Preserve raw MOD for PT2Engine WASM
   };
 }
