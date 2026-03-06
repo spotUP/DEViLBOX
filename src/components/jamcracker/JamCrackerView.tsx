@@ -61,7 +61,7 @@ export const JamCrackerView: React.FC = () => {
   const jamCrackerFileData = useTrackerStore(s => s.jamCrackerFileData);
   const currentPos = useTrackerStore(s => s.currentPositionIndex);
   const currentRow = useTransportStore(s => s.currentRow);
-  const speed = useTransportStore(s => s.currentSpeed);
+  const speed = useTransportStore(s => s.speed);
   const isPlaying = useTransportStore(s => s.isPlaying);
 
   const [songInfo, setSongInfo] = useState<JCSongInfo | null>(null);
@@ -111,7 +111,7 @@ export const JamCrackerView: React.FC = () => {
     const engine = JamCrackerEngine.getInstance();
     const data = await engine.save();
     if (data.length === 0) return;
-    const blob = new Blob([data], { type: 'application/octet-stream' });
+    const blob = new Blob([data.buffer as ArrayBuffer], { type: 'application/octet-stream' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
