@@ -924,6 +924,11 @@ export class FurnaceDispatchEngine {
   // Effect router for translating tracker effects to dispatch commands
   private effectRouter = new FurnaceEffectRouter();
 
+  // Sequencer state
+  private _seqLoadResolve: (() => void) | null = null;
+  private _seqLoadReject: ((err: Error) => void) | null = null;
+  private _seqPositionCallbacks: Set<(order: number, row: number) => void> = new Set();
+
   // Module-level wavetable/sample data from .fur file import
   // Stored here so FurnaceDispatchSynth can upload to each platform during chip init
   private _moduleWavetables: Array<{ data: number[]; width: number; height: number }> | null = null;
@@ -1230,6 +1235,22 @@ export class FurnaceDispatchEngine {
           this._wasmReadyReject(new Error(data.message as string));
           this._wasmReadyReject = null;
           this._wasmReadyResolve = null;
+        }
+        break;
+
+      case 'seqLoaded':
+        console.log('[FurnaceDispatch] Sequencer song loaded, result:', data.result);
+        if (this._seqLoadResolve) {
+          if (data.result === 0) this._seqLoadResolve();
+          else if (this._seqLoadReject) this._seqLoadReject(new Error(`seqLoadSong failed: ${data.result}`));
+          this._seqLoadResolve = null;
+          this._seqLoadReject = null;
+        }
+        break;
+
+      case 'seqPosition':
+        for (const cb of this._seqPositionCallbacks) {
+          cb(data.order as number, data.row as number);
         }
         break;
 
@@ -1805,6 +1826,62 @@ export class FurnaceDispatchEngine {
    */
   getEffectRouter(): FurnaceEffectRouter {
     return this.effectRouter;
+  }
+
+  // ─── Sequencer API ─────────────────────────────────
+
+  /** Initialize the WASM sequencer with song dimensions */
+  async seqLoadSong(numChannels: number, patLen: number, ordersLen: number): Promise<void> {
+    if (!this.workletNode) throw new Error('Worklet not initialized');
+    return new Promise((resolve, reject) => {
+      this._seqLoadResolve = resolve;
+      this._seqLoadReject = reject;
+      this.workletNode!.port.postMessage({
+        type: 'seqLoadSong',
+        numChannels, patLen, ordersLen
+      });
+    });
+  }
+
+  /** Send a raw message to the worklet */
+  seqPostMessage(msg: Record<string, unknown>): void {
+    this.workletNode?.port.postMessage(msg);
+  }
+
+  /** Set effect columns for a channel */
+  seqSetEffectCols(ch: number, effectCols: number): void {
+    this.workletNode?.port.postMessage({ type: 'seqSetEffectCols', ch, effectCols });
+  }
+
+  /** Start sequencer playback from given position */
+  seqPlay(order = 0, row = 0): void {
+    this.workletNode?.port.postMessage({ type: 'seqPlay', order, row });
+  }
+
+  /** Stop sequencer playback */
+  seqStop(): void {
+    this.workletNode?.port.postMessage({ type: 'seqStop' });
+  }
+
+  /** Seek to position without starting playback */
+  seqSeek(order: number, row: number): void {
+    this.workletNode?.port.postMessage({ type: 'seqSeek', order, row });
+  }
+
+  /** Update a single pattern cell (incremental edit sync) */
+  seqSetCell(ch: number, pat: number, row: number, col: number, val: number): void {
+    this.workletNode?.port.postMessage({ type: 'seqSetCell', ch, pat, row, col, val });
+  }
+
+  /** Update an order table entry */
+  seqSetOrder(ch: number, pos: number, patIdx: number): void {
+    this.workletNode?.port.postMessage({ type: 'seqSetOrder', ch, pos, patIdx });
+  }
+
+  /** Register callback for sequencer position updates */
+  onSeqPosition(callback: (order: number, row: number) => void): () => void {
+    this._seqPositionCallbacks.add(callback);
+    return () => { this._seqPositionCallbacks.delete(callback); };
   }
 
   /**
