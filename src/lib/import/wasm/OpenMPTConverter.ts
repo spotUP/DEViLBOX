@@ -251,12 +251,12 @@ export async function parseWithOpenMPT(
           // Convert PCM to ArrayBuffer (always 16-bit mono for playback)
           let audioBuffer: ArrayBuffer;
           if (data instanceof Int16Array && data.length > 0) {
-            audioBuffer = data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength);
+            audioBuffer = (data.buffer as ArrayBuffer).slice(data.byteOffset, data.byteOffset + data.byteLength);
           } else if (data instanceof Int8Array && data.length > 0) {
             // Upscale 8-bit → 16-bit
             const pcm16 = new Int16Array(data.length);
             for (let s = 0; s < data.length; s++) pcm16[s] = data[s] << 8;
-            audioBuffer = pcm16.buffer;
+            audioBuffer = pcm16.buffer as ArrayBuffer;
           } else {
             audioBuffer = new ArrayBuffer(0);
           }

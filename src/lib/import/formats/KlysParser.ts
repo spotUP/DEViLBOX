@@ -10,35 +10,11 @@
  */
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
-import type { Pattern, TrackerCell, InstrumentConfig, KlysNativeData } from '@/types';
+import type { Pattern, TrackerCell, ChannelData, InstrumentConfig, KlysNativeData } from '@/types';
 
 const SONG_SIG = 'cyd!song';
 const INST_SIG = 'cyd!inst';
 const MUS_VERSION = 27;
-
-// Step constants
-const MUS_NOTE_NONE = 0xFF;
-const MUS_NOTE_NO_INSTRUMENT = 0xFF;
-const MUS_NOTE_NO_VOLUME = 0xFF;
-
-// Pack bits
-const MUS_PAK_BIT_NOTE = 1;
-const MUS_PAK_BIT_INST = 2;
-const MUS_PAK_BIT_CTRL = 4;
-const MUS_PAK_BIT_CMD = 8;
-const MUS_PAK_BIT_VOLUME = 128;
-
-// Note names for display
-const NOTE_NAMES = ['C-', 'C#', 'D-', 'D#', 'E-', 'F-', 'F#', 'G-', 'G#', 'A-', 'A#', 'B-'];
-
-function noteToString(note: number): string {
-  if (note === MUS_NOTE_NONE || note === 0) return '---';
-  if (note === 0xFE) return '==='; // note-off
-  const n = note - 1;
-  const octave = Math.floor(n / 12);
-  const semitone = n % 12;
-  return `${NOTE_NAMES[semitone]}${octave}`;
-}
 
 /** Check if a buffer is a valid klystrack song */
 export function isKlystrack(buf: ArrayBuffer): boolean {
@@ -148,13 +124,12 @@ export function parseKlystrack(buf: ArrayBuffer): TrackerSong {
     numChannels = version > 3 ? 4 : 3;
   }
 
-  // Time signature
-  const timeSignature = r.readU8();
+  // Time signature (advance read position)
+  r.readU8();
 
   // Sequence step (tick subdivision)
-  let sequenceStep = 0;
   if (version >= 17) {
-    sequenceStep = r.readU8();
+    r.readU8();
   }
 
   // Instrument/pattern/sequence counts
@@ -179,11 +154,11 @@ export function parseKlystrack(buf: ArrayBuffer): TrackerSong {
   let flags = 0;
   if (version > 2) flags = r.readU16LE();
 
-  let multiplexPeriod = 3;
-  if (version >= 9) multiplexPeriod = r.readU8();
+  // Multiplex period (advance read position)
+  if (version >= 9) r.readU8();
 
-  let pitchInaccuracy = 0;
-  if (version >= 16) pitchInaccuracy = r.readU8();
+  // Pitch inaccuracy (advance read position)
+  if (version >= 16) r.readU8();
 
   // Title
   let titleLen = 17; // old default
@@ -196,11 +171,8 @@ export function parseKlystrack(buf: ArrayBuffer): TrackerSong {
   }
 
   // FX buses (skip for now — complex and version-dependent)
-  let nFx = 0;
   if (version >= 10) {
-    nFx = r.readU8();
-  } else if (flags & 1) { // MUS_ENABLE_REVERB
-    nFx = 1;
+    r.readU8(); // nFx
   }
   // Skip FX data — it's loaded by WASM
   // We can't easily skip it without parsing, so we'll stop header parsing here
@@ -213,15 +185,26 @@ export function parseKlystrack(buf: ArrayBuffer): TrackerSong {
   const patterns: Pattern[] = [];
   const defaultSteps = 64;
   for (let i = 0; i < numPatterns; i++) {
-    const cells: TrackerCell[][] = [];
-    for (let row = 0; row < defaultSteps; row++) {
-      const rowCells: TrackerCell[] = [];
-      for (let ch = 0; ch < numChannels; ch++) {
-        rowCells.push({ note: 0, instrument: -1, volume: -1, effects: [] });
+    const channels: ChannelData[] = [];
+    for (let ch = 0; ch < numChannels; ch++) {
+      const rows: TrackerCell[] = [];
+      for (let row = 0; row < defaultSteps; row++) {
+        rows.push({ note: 0, instrument: -1, volume: -1, effect: '', effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 });
       }
-      cells.push(rowCells);
+      channels.push({
+        id: `p${i}-ch${ch}`,
+        name: `Ch ${ch + 1}`,
+        rows,
+        muted: false,
+        solo: false,
+        collapsed: false,
+        volume: 100,
+        pan: 0,
+        instrumentId: null,
+        color: null,
+      });
     }
-    patterns.push({ rows: defaultSteps, channels: numChannels, cells });
+    patterns.push({ id: `pat-${i}`, name: `Pattern ${i}`, length: defaultSteps, channels });
   }
 
   const instruments: InstrumentConfig[] = [];
