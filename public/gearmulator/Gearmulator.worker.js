@@ -232,8 +232,14 @@ function startRenderLoop(sampleRate) {
   const intervalMs = Math.max(1, Math.floor((RENDER_BLOCK / sampleRate) * 1000 * 0.5));
 
   // Diagnostic: check ESAI status after first render
+  console.log('[Gearmulator Worker] Diagnostic timer starting (2s interval)...');
   const diagTimer = setInterval(() => {
-    if (!module || handle < 0) { clearInterval(diagTimer); return; }
+    console.log('[Gearmulator Worker DIAG] Timer fired');
+    if (!module || handle < 0) {
+      console.log('[Gearmulator Worker DIAG] Timer cleared: module=' + !!module + ', handle=' + handle);
+      clearInterval(diagTimer);
+      return;
+    }
     const inSize = module._gm_getAudioInputSize(handle);
     const outSize = module._gm_getAudioOutputSize(handle);
     console.log(`[Gearmulator Worker DIAG] audioIn=${inSize}, audioOut=${outSize}`);
