@@ -256,6 +256,10 @@ export interface TrackerSong {
   futurePlayerFileData?: ArrayBuffer;
   /** Raw PreTracker .prt binary for loading into the PreTrackerEngine WASM */
   preTrackerFileData?: ArrayBuffer;
+  /** Raw Music-Assembler .ma binary for loading into the MaEngine WASM */
+  maFileData?: ArrayBuffer;
+  /** Raw Jochen Hippel ST binary for loading into the HippelEngine WASM */
+  hippelFileData?: ArrayBuffer;
   // Native format data (preserved for format-specific editors)
   furnaceNative?: FurnaceNativeData;
   hivelyNative?: HivelyNativeData;
