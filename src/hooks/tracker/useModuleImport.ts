@@ -300,7 +300,11 @@ export function useModuleImport() {
 
       const xmFreqType = importMetadata?.xmData?.frequencyType;
       const linearPeriods = format === 'XM' ? (xmFreqType === 'linear' || xmFreqType === undefined) : false;
-      useFormatStore.getState().applyEditorMode({ linearPeriods });
+      useFormatStore.getState().applyEditorMode({
+        linearPeriods,
+        // Pass Furnace native data for WASM sequencer and format-specific editor
+        furnaceNative: info.nativeData.furnaceNative,
+      });
 
       return;
     }

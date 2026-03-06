@@ -498,6 +498,9 @@ export type EditorMode = 'classic' | 'furnace' | 'hively' | 'musicline' | 'goatt
 export interface FurnaceNativeData {
   subsongs: FurnaceSubsong[];
   activeSubsong: number;
+  chipIds: number[];  // Furnace system IDs (= FurnaceDispatchPlatform values) for each chip
+  compatFlags?: Record<string, unknown>;  // Furnace compat flags (passed to WASM sequencer)
+  grooves?: Array<{ len: number; val: number[] }>;  // Groove patterns for 09xx effect
 }
 
 export interface FurnaceSubsong {

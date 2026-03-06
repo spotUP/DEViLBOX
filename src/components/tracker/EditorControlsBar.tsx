@@ -104,7 +104,7 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
   // ── Handlers ─────────────────────────────────────────────────────────────
   const handleViewModeChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
     const val = e.target.value as TrackerViewMode;
-    if (val === 'arrangement' || val === 'dj' || val === 'drumpad' || val === 'pianoroll' || val === 'vj' || val === 'mixer' || val === 'studio') {
+    if (val === 'arrangement' || val === 'dj' || val === 'drumpad' || val === 'pianoroll' || val === 'vj' || val === 'mixer' || val === 'studio' || val === 'split') {
       setActiveView(val);
     } else {
       onViewModeChange(val);
@@ -179,6 +179,7 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
             <option value="vj">VJ View</option>
             <option value="mixer">Mixer</option>
             <option value="studio">Studio</option>
+            <option value="split">Split View</option>
           </select>
         </div>
 

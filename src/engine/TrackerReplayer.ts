@@ -422,6 +422,12 @@ export class TrackerReplayer {
   // continuation aborts to prevent ghost schedulers or dead-engine playback.
   private _playGeneration = 0;
 
+  // WASM sequencer bypass (Furnace formats): when true, the WASM sequencer in
+  // the AudioWorklet drives all tick processing and chip dispatch directly.
+  // The TS scheduler does NOT run; position updates come from worklet messages.
+  private useWasmSequencer = false;
+  private _seqPositionUnsub: (() => void) | null = null;
+
   // Per-deck channel mute mask (DJ mode only)
   // Bit N = 1 means channel N is ENABLED, 0 means MUTED.
   // Kept separate from ToneEngine's global mute states so each deck is independent.
@@ -592,6 +598,36 @@ export class TrackerReplayer {
    */
   setSuppressNotes(suppress: boolean): void {
     this._suppressNotes = suppress;
+  }
+
+  // ==========================================================================
+  // WASM SEQUENCER CELL SYNC
+  // ==========================================================================
+
+  /** Whether the WASM sequencer is actively driving playback */
+  get isWasmSequencerActive(): boolean {
+    return this.useWasmSequencer;
+  }
+
+  /**
+   * Sync a pattern cell edit to the WASM sequencer (fire-and-forget).
+   * Called from the tracker store when cells are edited during Furnace playback.
+   * Maps TrackerCell fields to WASM sequencer column indices:
+   *   col 0 = note, col 1 = instrument, col 2 = volume,
+   *   col 3+fx*2 = effect cmd, col 4+fx*2 = effect val
+   */
+  syncCellToWasmSequencer(ch: number, patIdx: number, row: number, cell: Partial<import('@/types/tracker').TrackerCell>): void {
+    if (!this.useWasmSequencer) return;
+    import('@engine/furnace-dispatch/FurnaceDispatchEngine').then(({ FurnaceDispatchEngine }) => {
+      const engine = FurnaceDispatchEngine.getInstance();
+      if (cell.note !== undefined)       engine.seqSetCell(ch, patIdx, row, 0, cell.note);
+      if (cell.instrument !== undefined) engine.seqSetCell(ch, patIdx, row, 1, cell.instrument);
+      if (cell.volume !== undefined)     engine.seqSetCell(ch, patIdx, row, 2, cell.volume);
+      if (cell.effTyp !== undefined)     engine.seqSetCell(ch, patIdx, row, 3, cell.effTyp);
+      if (cell.eff !== undefined)        engine.seqSetCell(ch, patIdx, row, 4, cell.eff);
+      if (cell.effTyp2 !== undefined)    engine.seqSetCell(ch, patIdx, row, 5, cell.effTyp2);
+      if (cell.eff2 !== undefined)       engine.seqSetCell(ch, patIdx, row, 6, cell.eff2);
+    }).catch(() => {});
   }
 
   // ==========================================================================
@@ -1134,12 +1170,121 @@ export class TrackerReplayer {
     await engine.awaitPendingLoads();
     if (gen !== this._playGeneration) return;
 
+    // WASM sequencer path: if Furnace native data exists, upload it to the WASM sequencer
+    // (which lives in the AudioWorklet) and delegate all tick processing there.
+    // Must happen AFTER ensureWASMSynthsReady() so the dispatch engine worklet exists.
+    console.log('[TrackerReplayer] WASM seq check: furnaceNative =', !!this.song.furnaceNative,
+      'subsongs:', this.song.furnaceNative?.subsongs?.length,
+      'channels:', this.song.furnaceNative?.subsongs?.[0]?.channels?.length);
+    if (this.song.furnaceNative) {
+      try {
+        console.log('[TrackerReplayer] WASM seq: importing FurnaceDispatchEngine...');
+        const { FurnaceDispatchEngine } = await import('@engine/furnace-dispatch/FurnaceDispatchEngine');
+        if (gen !== this._playGeneration) { console.log('[TrackerReplayer] WASM seq: gen mismatch after import'); return; }
+        const dispatchEngine = FurnaceDispatchEngine.getInstance();
+
+        // Ensure the dispatch engine worklet is initialized.
+        // ensureWASMSynthsReady only inits it if a Furnace* synthType instrument exists,
+        // but many .fur songs use generic 'ChipSynth' instruments. We need the worklet
+        // for the WASM sequencer regardless of instrument types.
+        if (!dispatchEngine.isInitialized) {
+          console.log('[TrackerReplayer] WASM seq: dispatch engine not initialized, initializing...');
+          const { getDevilboxAudioContext } = await import('@/utils/audio-context');
+          const ctx = getDevilboxAudioContext();
+          await dispatchEngine.init(ctx as unknown as Record<string, unknown>);
+          if (gen !== this._playGeneration) return;
+        } else if (!dispatchEngine.getWorkletNode() && (dispatchEngine as any)._initPromise) {
+          console.log('[TrackerReplayer] WASM seq: waiting for dispatch engine init...');
+          await (dispatchEngine as any)._initPromise;
+          if (gen !== this._playGeneration) return;
+        }
+        const workletNode = dispatchEngine.getWorkletNode();
+        console.log('[TrackerReplayer] WASM seq: workletNode =', !!workletNode);
+        if (!workletNode) {
+          throw new Error('FurnaceDispatchEngine worklet not initialized');
+        }
+
+        // Ensure at least the primary chip is created so the sequencer has a dispatch handle.
+        // The worklet's seqLoadSong links to the first chip — if no chip exists, commands go nowhere.
+        const chipIds = this.song.furnaceNative.chipIds;
+        if (chipIds && chipIds.length > 0 && !dispatchEngine.hasChip(chipIds[0])) {
+          console.log('[TrackerReplayer] WASM seq: creating chip for platform', chipIds[0]);
+          await dispatchEngine.createChip(chipIds[0]);
+          if (gen !== this._playGeneration) return;
+        }
+
+        // Ensure the dispatch engine audio output is routed to speakers.
+        // Normally routeNativeEngineOutput() handles this when a FurnaceDispatchSynth
+        // is created, but in the WASM sequencer path we may not have one.
+        if (!dispatchEngine.audioRouted) {
+          const sharedGain = dispatchEngine.getOrCreateSharedGain();
+          if (sharedGain) {
+            const { getNativeAudioNode } = await import('@/utils/audio-context');
+            const nativeSynthBus = getNativeAudioNode(engine.synthBus as any);
+            if (nativeSynthBus) {
+              sharedGain.connect(nativeSynthBus);
+              (dispatchEngine as any)._audioRouted = true;
+              console.log('[TrackerReplayer] WASM seq: routed dispatch engine audio → synthBus');
+            }
+          }
+        }
+
+        // Upload song data to the WASM sequencer in the worklet
+        console.log('[TrackerReplayer] WASM seq: uploading song data...');
+        const { uploadFurnaceToSequencer } = await import('@/lib/export/FurnaceSequencerSerializer');
+        if (gen !== this._playGeneration) { console.log('[TrackerReplayer] WASM seq: gen mismatch after serializer import'); return; }
+        await uploadFurnaceToSequencer(this.song.furnaceNative, this.song.furnaceActiveSubsong ?? 0);
+        if (gen !== this._playGeneration) { console.log('[TrackerReplayer] WASM seq: gen mismatch after upload'); return; }
+
+        this.useWasmSequencer = true;
+        console.log('[TrackerReplayer] WASM seq: upload complete, subscribing to position updates...');
+
+        // Subscribe to position updates from the WASM sequencer (~60fps)
+        this._seqPositionUnsub = dispatchEngine.onSeqPosition((order, row) => {
+          if (!this.playing || !this.song) return;
+          this.songPos = order;
+          this.pattPos = row;
+          const patternNum = this.song.songPositions[order] ?? 0;
+
+          // Fire row change callback for UI (pattern editor, transport store)
+          if (this.onRowChange) {
+            this.onRowChange(row, patternNum, order);
+          }
+        });
+
+        // Start WASM sequencer from current position
+        console.log('[TrackerReplayer] WASM seq: calling seqPlay(%d, %d)', this.songPos, this.pattPos);
+        dispatchEngine.seqPlay(this.songPos, this.pattPos);
+        console.log('[TrackerReplayer] Using WASM sequencer for Furnace playback');
+        return;
+      } catch (err) {
+        console.warn('[TrackerReplayer] WASM sequencer failed, falling back to TS replayer:', err);
+        this.useWasmSequencer = false;
+        this._seqPositionUnsub = null;
+      }
+    }
+
     this.startScheduler();
   }
 
   stop(): void {
     this.playing = false;
     this._playGeneration++; // Invalidate any in-flight async play()
+
+    // Stop WASM sequencer if active
+    if (this.useWasmSequencer) {
+      this.useWasmSequencer = false;
+      if (this._seqPositionUnsub) {
+        this._seqPositionUnsub();
+        this._seqPositionUnsub = null;
+      }
+      try {
+        // Dynamic import is cached — this resolves synchronously after first load
+        import('@engine/furnace-dispatch/FurnaceDispatchEngine').then(({ FurnaceDispatchEngine }) => {
+          FurnaceDispatchEngine.getInstance().seqStop();
+        });
+      } catch { /* ignored */ }
+    }
 
     // Clear the scheduler interval
     if (this.schedulerTimerId !== null) {
@@ -1188,6 +1333,13 @@ export class TrackerReplayer {
     }
     this.playing = false;
 
+    // Pause WASM sequencer
+    if (this.useWasmSequencer) {
+      import('@engine/furnace-dispatch/FurnaceDispatchEngine').then(({ FurnaceDispatchEngine }) => {
+        FurnaceDispatchEngine.getInstance().seqStop();
+      }).catch(() => {});
+    }
+
     // Pause routed native engines (UADE/Hively) on pause
     pauseNativeEngines(this.routedNativeEngines);
   }
@@ -1195,6 +1347,14 @@ export class TrackerReplayer {
   resume(): void {
     if (this.song && !this.playing) {
       this.playing = true;
+
+      // Resume WASM sequencer from current position
+      if (this.useWasmSequencer) {
+        import('@engine/furnace-dispatch/FurnaceDispatchEngine').then(({ FurnaceDispatchEngine }) => {
+          FurnaceDispatchEngine.getInstance().seqPlay(this.songPos, this.pattPos);
+        }).catch(() => {});
+        return;
+      }
 
       // Restart WASM playback for HVL/AHX
       resumeNativeEngines(this.routedNativeEngines, this._muted);
@@ -2027,23 +2187,27 @@ export class TrackerReplayer {
     const x = (param >> 4) & 0x0F;
     const y = param & 0x0F;
 
-    // Route effects to Furnace synths (if applicable)
-    // Global effects (position jump, pattern break, speed/tempo) are still processed below
+    // Route effects to Furnace dispatch synths.
+    // Global effects (position jump, pattern break, speed/tempo) are processed by TS below.
+    // Chip-specific effects are forwarded to WASM and then we skip TS-side processing
+    // to avoid double volume/panning/pitch changes.
     if (ch.instrument?.synthType?.startsWith('Furnace')) {
-      const engine = getToneEngine();
-      // Route chip-specific effects to Furnace engine
-      // Skip ONLY global effects that affect playback state, not the chip:
-      // 0x0B = Position jump, 0x0D = Pattern break, 0x0F = Set speed/tempo
-      // Note: 0x10+ are platform-specific in Furnace (FM LFO, TL, etc.) - NOT global
       const isGlobalEffect = effect === 0x0B || effect === 0x0D || effect === 0x0F;
       if (!isGlobalEffect) {
+        const engine = getToneEngine();
         if (effect === 0x0E) {
-          // Extended effects use Exy format
           engine.applyFurnaceExtendedEffect(ch.instrument.id, x, y, chIndex);
         } else {
           engine.applyFurnaceEffect(ch.instrument.id, effect, param, chIndex);
         }
+        // Skip TS-side effect processing for chip effects (same as ticks 1+).
+        // Only store parameter memory that the replayer needs for its own state.
+        if (effect === 0x1 && param !== 0) { ch.portaSpeed = param; ch.portaUpSpeed = param; }
+        if (effect === 0x2 && param !== 0) { ch.portaSpeed = param; ch.portaDownSpeed = param; }
+        if (effect === 0x3 && param !== 0) { ch.tonePortaSpeed = this.useXMPeriods ? param * 4 : param; }
+        return;
       }
+      // Fall through for global effects (0x0B, 0x0D, 0x0F) — TS must handle these
     }
 
     switch (effect) {
@@ -2119,9 +2283,10 @@ export class TrackerReplayer {
         break;
 
       case 0xD: // Pattern break
-        // MOD and XM both use BCD (binary-coded decimal): 0x15 = row 15
-        // IT/S3M use hex, Furnace uses hex
-        if (this.song?.format === 'MOD' || this.song?.format === 'XM') {
+        // MOD and XM use BCD (binary-coded decimal): 0x15 = row 15
+        // IT/S3M and Furnace use hex: 0x15 = row 21
+        // Furnace songs are loaded as format 'XM' but need hex decoding
+        if ((this.song?.format === 'MOD' || this.song?.format === 'XM') && this.accessor.getMode() !== 'furnace') {
           this.pBreakPos = x * 10 + y; // BCD decode
           if (this.pBreakPos > 63) this.pBreakPos = 0;
         } else {
