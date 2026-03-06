@@ -13,10 +13,12 @@
  * └───────────────────────┴────────────────────┘
  */
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState, useMemo } from 'react';
 import * as Tone from 'tone';
+import { useTransportStore } from '@stores/useTransportStore';
 import { useGTUltraStore } from '../../stores/useGTUltraStore';
-import { GTPatternEditor } from './GTPatternEditor';
+import { FormatPatternEditor } from '@/components/shared/FormatPatternEditor';
+import { GTU_COLUMNS, gtuToFormatChannels, parseBinaryPatternData, encodeBinaryPatternData } from './gtuAdapter';
 import { GTToolbar } from './GTToolbar';
 import { GTInstrumentPanel } from './GTInstrumentPanel';
 import { GTOrderList } from './GTOrderList';
@@ -31,6 +33,13 @@ export const GTUltraView: React.FC<{ width?: number; height?: number }> = ({ wid
   const setEngine = useGTUltraStore((s) => s.setEngine);
   const sidCount = useGTUltraStore((s) => s.sidCount);
   const channelCount = sidCount * 3;
+  const currentRow = useTransportStore((s) => s.currentRow);
+  const isPlaying = useTransportStore((s) => s.isPlaying);
+  const engine = useGTUltraStore((s) => s.engine);
+  const patternLength = useGTUltraStore((s) => s.patternLength);
+  const orderData = useGTUltraStore((s) => s.orderData);
+  const patternData = useGTUltraStore((s) => s.patternData);
+  const playbackPos = useGTUltraStore((s) => s.playbackPos);
 
   // Measure container if no explicit dimensions
   const containerRef = useRef<HTMLDivElement>(null);
@@ -108,6 +117,52 @@ export const GTUltraView: React.FC<{ width?: number; height?: number }> = ({ wid
     };
   }, [setEngine]);
 
+  const orderCursor = useGTUltraStore((s) => s.orderCursor);
+  const currentOrderPos = isPlaying ? playbackPos.songPos : orderCursor;
+
+  const channels = useMemo(() => {
+    const result: FormatChannel[] = [];
+
+    // Get the pattern index from the first channel's order list at current position
+    // (All channels should display the same pattern for now)
+    const patIdx = orderData[0]?.[currentOrderPos] ?? 0;
+    const patEntry = patternData.get(patIdx);
+
+    if (!patEntry) {
+      for (let ch = 0; ch < channelCount; ch++) {
+        result.push({ label: `CH${(ch + 1).toString().padStart(2, '0')}`, patternLength: 64, rows: [] });
+      }
+      return result;
+    }
+
+    const structured = parseBinaryPatternData(patEntry.data, channelCount, patEntry.length);
+    const formatted = gtuToFormatChannels(structured, channelCount, patEntry.length);
+    return formatted;
+  }, [channelCount, orderData, patternData, currentOrderPos]);
+
+  const handleCellChange = useCallback((channelIdx: number, rowIdx: number, columnKey: string, value: number) => {
+    if (!engine) return;
+
+    const patIdx = orderData[0]?.[currentOrderPos] ?? 0;
+    const patEntry = patternData.get(patIdx);
+    if (!patEntry) return;
+
+    const structured = parseBinaryPatternData(patEntry.data, channelCount, patEntry.length);
+    const channelRows = structured[channelIdx];
+
+    // Update the cell
+    if (columnKey === 'note') channelRows[rowIdx].note = value;
+    else if (columnKey === 'instrument') channelRows[rowIdx].instrument = value;
+    else if (columnKey === 'command') channelRows[rowIdx].command = value;
+    else if (columnKey === 'data') channelRows[rowIdx].data = value;
+
+    // Encode back to binary
+    const newBinary = encodeBinaryPatternData(structured, patEntry.length);
+
+    // Send to engine
+    engine.updatePattern(patIdx, channelIdx, rowIdx, columnKey, value);
+  }, [engine, currentOrderPos, orderData, patternData, channelCount]);
+
   const sidebarW = Math.min(SIDEBAR_WIDTH, Math.floor(width * 0.35));
   const editorW = width - sidebarW;
 
@@ -119,10 +174,14 @@ export const GTUltraView: React.FC<{ width?: number; height?: number }> = ({ wid
       {/* Main content */}
       <div className="flex flex-1 min-h-0 overflow-hidden">
         {/* Pattern editor */}
-        <GTPatternEditor
+        <FormatPatternEditor
           width={editorW}
           height={height - 36}
-          channelCount={channelCount}
+          columns={GTU_COLUMNS}
+          channels={channels}
+          currentRow={currentRow}
+          isPlaying={isPlaying}
+          onCellChange={handleCellChange}
         />
 
         {/* Sidebar */}
