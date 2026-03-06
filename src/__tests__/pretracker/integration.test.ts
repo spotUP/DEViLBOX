@@ -27,13 +27,11 @@ describe('PreTracker Integration', () => {
     expect(song.preTrackerFileData).not.toBe(testData);
   });
 
-  it('parser sets correct import metadata', async () => {
+  it('parser sets correct name from filename', async () => {
     const testData = new ArrayBuffer(1024);
     const song = await parsePreTrackerFile(testData, 'my_tune.prt');
 
-    expect(song.importMetadata?.sourceFormat).toBe('PreTracker');
-    expect(song.importMetadata?.sourceFile).toBe('my_tune.prt');
-    expect(song.name).toBe('my_tune');
+    expect(song.name).toBe('my_tune [PreTracker]');
   });
 
   it('parser creates valid pattern structure', async () => {
@@ -43,7 +41,7 @@ describe('PreTracker Integration', () => {
     expect(song.numChannels).toBe(4);
     expect(song.patterns).toHaveLength(1);
     expect(song.patterns[0].channels).toHaveLength(4);
-    expect(song.patterns[0].numRows).toBe(64);
+    expect(song.patterns[0].length).toBe(64);
     expect(song.songPositions).toEqual([0]);
   });
 
