@@ -151,11 +151,14 @@ export const VJPatternOverlay: React.FC = React.memo(() => {
 
       // Smooth scroll — always enabled in VJ view for visual performance
       // Uses replayer audio timeline for sub-row interpolation
+      // Also use replayer's row for rendering to avoid blink from store lag
+      let displayRow = currentRow;
       if (isPlaying) {
         const replayer = getTrackerReplayer();
         const audioTime = Tone.now() + 0.01;
         const audioState = replayer.getStateAtTime(audioTime);
         if (audioState) {
+          displayRow = audioState.row;
           const nextState = replayer.getStateAtTime(audioTime + 0.5, true);
           const dur = (nextState && nextState.row !== audioState.row)
             ? nextState.time - audioState.time
@@ -168,7 +171,7 @@ export const VJPatternOverlay: React.FC = React.memo(() => {
       } else {
         anim.scrollOffset = 0;
       }
-      anim.prevRow = currentRow;
+      anim.prevRow = displayRow;
 
       // ── 3D transform ──────────────────────────────────────────────────
       // Lissajous orbit
@@ -245,7 +248,7 @@ export const VJPatternOverlay: React.FC = React.memo(() => {
 
       // ── Rows ──────────────────────────────────────────────────────────
       for (let i = -VISIBLE_ROWS; i <= VISIBLE_ROWS; i++) {
-        const row = currentRow + i;
+        const row = displayRow + i;
         if (row < 0 || row >= patLen) continue;
         const y = ROW_H + (i + VISIBLE_ROWS) * ROW_H;
         const isCurrent = i === 0;
