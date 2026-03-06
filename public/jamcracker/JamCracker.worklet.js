@@ -116,6 +116,19 @@ class JamCrackerProcessor extends AudioWorkletProcessor {
         this.port.postMessage({ type: 'song-structure', songLen, numPats, numInst, entries });
         break;
       }
+
+      case 'save': {
+        if (!this.wasm || !this.tuneLoaded) break;
+        const saveSize = this.wasm._jc_save();
+        if (saveSize > 0) {
+          const ptr = this.wasm._jc_save_ptr();
+          const data = new Uint8Array(saveSize);
+          data.set(new Uint8Array(this.wasm.HEAPU8.buffer, ptr, saveSize));
+          this.wasm._jc_save_free();
+          this.port.postMessage({ type: 'save-data', data: data.buffer }, [data.buffer]);
+        }
+        break;
+      }
     }
   }
 
