@@ -55,6 +55,7 @@ import { AutomationPanel } from '@components/automation/AutomationPanel';
 import { GTUltraView } from '@components/gtultra/GTUltraView';
 import { HivelyView } from '@components/hively/HivelyView';
 import { KlysView } from '@components/klystrack/KlysView';
+import { JamCrackerView } from '@components/jamcracker/JamCrackerView';
 
 interface TrackerViewProps {
   onShowExport?: () => void;
@@ -513,6 +514,8 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
               <HivelyView />
             ) : editorMode === 'klystrack' ? (
               <KlysView />
+            ) : editorMode === 'jamcracker' ? (
+              <JamCrackerView />
             ) : editorMode === 'musicline' ? (
               <div className="flex-1 flex flex-col min-h-0 bg-dark-bgPrimary">
                 {/* Per-channel track table matrix */}
