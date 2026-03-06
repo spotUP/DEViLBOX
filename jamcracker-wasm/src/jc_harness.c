@@ -259,3 +259,48 @@ EXPORT int jc_render_preview(float *buf, int frames) {
     }
     return frames;
 }
+
+/* ---- Pattern data access ---- */
+
+EXPORT int jc_get_pattern_rows(int patIdx) {
+    if (!g_initialized || patIdx < 0 || patIdx >= (int)g_num_patterns) return 0;
+    uint32_t pt_base = READ32((uintptr_t)patttable);
+    if (!pt_base) return 0;
+    uint16_t size_bytes = READ16(pt_base + patIdx * pt_sizeof + pt_size);
+    return (int)(size_bytes / (nt_sizeof * 4));
+}
+
+EXPORT int jc_get_pattern_cell(int patIdx, int row, int channel, int field) {
+    if (!g_initialized || patIdx < 0 || patIdx >= (int)g_num_patterns) return 0;
+    if (channel < 0 || channel >= 4) return 0;
+    if (field < 0 || field >= nt_sizeof) return 0;
+    uint32_t pt_base = READ32((uintptr_t)patttable);
+    if (!pt_base) return 0;
+    uint16_t size_bytes = READ16(pt_base + patIdx * pt_sizeof + pt_size);
+    int num_rows = (int)(size_bytes / (nt_sizeof * 4));
+    if (row < 0 || row >= num_rows) return 0;
+    uint32_t pat_addr = READ32(pt_base + patIdx * pt_sizeof + pt_address);
+    if (!pat_addr) return 0;
+    return (int)READ8(pat_addr + (row * 4 + channel) * nt_sizeof + field);
+}
+
+EXPORT void jc_set_pattern_cell(int patIdx, int row, int channel, int field, int value) {
+    if (!g_initialized || patIdx < 0 || patIdx >= (int)g_num_patterns) return;
+    if (channel < 0 || channel >= 4) return;
+    if (field < 0 || field >= nt_sizeof) return;
+    uint32_t pt_base = READ32((uintptr_t)patttable);
+    if (!pt_base) return;
+    uint16_t size_bytes = READ16(pt_base + patIdx * pt_sizeof + pt_size);
+    int num_rows = (int)(size_bytes / (nt_sizeof * 4));
+    if (row < 0 || row >= num_rows) return;
+    uint32_t pat_addr = READ32(pt_base + patIdx * pt_sizeof + pt_address);
+    if (!pat_addr) return;
+    WRITE8(pat_addr + (row * 4 + channel) * nt_sizeof + field, (uint8_t)value);
+}
+
+EXPORT int jc_get_song_entry(int pos) {
+    if (!g_initialized || pos < 0 || pos >= (int)g_song_length) return 0;
+    uint32_t st = READ32((uintptr_t)songtable);
+    if (!st) return 0;
+    return (int)READ16(st + pos * 2);
+}
