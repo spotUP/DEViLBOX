@@ -344,6 +344,30 @@ function emitDsInit(
   return lines;
 }
 
+/** Resolve dc.w offset jump table targets for a JMP label(PC,Dn) instruction.
+ *  Scans AST for dc.w entries after the table label and extracts target names. */
+function resolveJumpTableTargets(ast: AstNode[], tableLabel: string): string[] {
+  const targets: string[] = [];
+  let inTable = false;
+  for (const n of ast) {
+    if (n.kind === 'label' && n.name === tableLabel) { inTable = true; continue; }
+    if (inTable) {
+      if (n.kind === 'data' && n.directive === 'DC' && n.size === 'W') {
+        for (const v of n.values) {
+          const vstr = String(v);
+          const dashIdx = vstr.indexOf('-');
+          if (dashIdx > 0) {
+            targets.push(vstr.slice(0, dashIdx));
+          }
+        }
+      } else if (n.kind === 'label' || (n.kind === 'data' && !(n.directive === 'DC' && n.size === 'W'))) {
+        break;
+      }
+    }
+  }
+  return targets;
+}
+
 /** Collect every string-valued operand reference that is not already a known symbol or label.
  *  These come from include files not available to the transpiler; emit as zero-valued stubs
  *  so the generated C compiles (values are wrong but the structure is correct). */
@@ -352,31 +376,38 @@ function collectUnresolved(ast: AstNode[], resolved: ResolveResult): Set<string>
   const known = new Set([...resolved.symbols.keys(), ...resolved.labels, ...resolved.exports]);
   const stubs = new Set<string>();
   const validIdent = /^[A-Za-z_][A-Za-z0-9_]*$/;
+
+  // Check a string that may be a simple ident or a compound expression (A+B-C).
+  // Stub each unknown identifier part individually.
+  const checkAndStub = (s: string) => {
+    if (validIdent.test(s)) {
+      if (!known.has(s)) stubs.add(s);
+    } else {
+      // Split compound expression on +/- and check each identifier part
+      const parts = s.split(/[+\-]/);
+      for (const p of parts) {
+        const trimmed = p.trim();
+        if (trimmed && validIdent.test(trimmed) && !known.has(trimmed)) {
+          stubs.add(trimmed);
+        }
+      }
+    }
+  };
+
   for (const node of ast) {
     if (node.kind === 'instruction') {
       for (const op of node.operands) {
-        if (op.kind === 'label_ref' && !known.has(op.name) && validIdent.test(op.name)) {
-          stubs.add(op.name);
-        }
-        if (op.kind === 'pc_rel' && !known.has(op.label) && validIdent.test(op.label)) {
-          stubs.add(op.label);
-        }
-        if (op.kind === 'disp' && typeof op.offset === 'string' && !known.has(op.offset) && validIdent.test(op.offset)) {
-          stubs.add(op.offset);
-        }
+        if (op.kind === 'label_ref') checkAndStub(op.name);
+        if (op.kind === 'pc_rel') checkAndStub(op.label);
+        if (op.kind === 'disp' && typeof op.offset === 'string') checkAndStub(op.offset);
         if (op.kind === 'immediate' && op.raw.startsWith('#') && !op.raw.slice(1).match(/^[\$%0-9-]/)) {
-          const name = op.raw.slice(1);
-          if (!known.has(name) && validIdent.test(name)) stubs.add(name);
+          checkAndStub(op.raw.slice(1));
         }
       }
     }
     if (node.kind === 'data') {
-      // Identifier values in data arrays (e.g. dc.l DTP_InitSound, InitSound)
-      // Labels (functions) are already declared; only stub truly unknown constants.
       for (const v of node.values) {
-        if (typeof v === 'string' && validIdent.test(v) && !known.has(v)) {
-          stubs.add(v);
-        }
+        if (typeof v === 'string') checkAndStub(v);
       }
     }
   }
@@ -649,6 +680,65 @@ export function emit(ast: AstNode[], resolved: ResolveResult, sourceFile?: strin
         crossFuncGotos.add(lbl);
         cfgChanged = true;
       }
+
+      // Case 3: JMP label(PC,Dn.W) — indexed jump through dc.w offset table.
+      // The table entries target labels that may be in other function scopes.
+      if (node.mnemonic === 'JMP' && node.operands[0]?.kind === 'pc_rel' &&
+          (node.operands[0] as any).index && !isFunctionLabel.has(node.operands[0].label)) {
+        const jtTargets = resolveJumpTableTargets(ast, node.operands[0].label);
+        for (const t of jtTargets) {
+          if (labelScope.has(t) && labelScope.get(t) !== scope && !crossFuncGotos.has(t) && isFunctionLabel.has(t)) {
+            crossFuncGotos.add(t);
+            funcLabels.add(t);
+            cfgChanged = true;
+          } else if (funcLabels.has(t) && t !== scope && !crossFuncGotos.has(t)) {
+            crossFuncGotos.add(t);
+            cfgChanged = true;
+          }
+        }
+      }
+    }
+  }
+
+  // Orphan labels: labels in the ASM that are referenced but have no C definition.
+  // These typically come from INCBIN directives (external binary data includes) that
+  // the transpiler skips.  Emit as uint8_t* NULL pointers so the code compiles;
+  // the host must set them to point at the actual data before calling the replayer.
+  {
+    const referencedLabels = new Set<string>();
+    for (const node of ast) {
+      if (node.kind !== 'instruction') continue;
+      for (const op of node.operands) {
+        if (op.kind === 'label_ref') referencedLabels.add(op.name);
+        if (op.kind === 'pc_rel') referencedLabels.add(op.label);
+      }
+    }
+    // Collect BSR/JSR call targets so we don't orphan-stub them
+    const bsrTargets = new Set<string>();
+    for (const node of ast) {
+      if (node.kind !== 'instruction') continue;
+      if (node.mnemonic !== 'BSR' && node.mnemonic !== 'JSR') continue;
+      const t = node.operands[0];
+      if (t?.kind === 'label_ref') bsrTargets.add(t.name);
+      if (t?.kind === 'pc_rel') bsrTargets.add(t.label);
+    }
+    const orphans: string[] = [];
+    for (const lbl of referencedLabels) {
+      if (!resolved.labels.has(lbl)) continue;  // not a label in this file
+      if (funcLabels.has(lbl)) continue;         // will get a function definition
+      if (packedLabels.has(lbl)) continue;       // will get a data #define
+      if (resolved.symbols.has(lbl)) continue;   // EQU constant
+      if (crossFuncGotos.has(lbl)) continue;     // promoted to function
+      if (bsrTargets.has(lbl)) continue;         // called as function — stub as no-op fn instead
+      orphans.push(lbl);
+    }
+    if (orphans.length > 0) {
+      lines.push('/* -- External Data Placeholders (INCBIN / external data) ------------- */');
+      lines.push('/* Host must set these pointers to actual module data before playback. */');
+      for (const name of orphans) {
+        lines.push(`static uint8_t* ${sanitizeLabel(name)} = NULL;`);
+      }
+      lines.push('');
     }
   }
 
@@ -816,30 +906,14 @@ export function emit(ast: AstNode[], resolved: ResolveResult, sourceFile?: strin
         } else if (mn === 'JMP' && node.operands[0]?.kind === 'pc_rel' &&
                    (node.operands[0] as any).index && !isFunctionLabel.has(node.operands[0].label)) {
           // JMP label(PC,Dn.W) where label is a data label — dc.w offset jump table.
-          // Resolve the table entries from the AST and emit a switch statement.
           const jtLabel = node.operands[0].label;
           const jtIndex = ((node.operands[0] as any).index as string).split('.')[0].toLowerCase();
-          const targets: string[] = [];
-          let inTable = false;
-          for (const n of ast) {
-            if (n.kind === 'label' && n.name === jtLabel) { inTable = true; continue; }
-            if (inTable) {
-              if (n.kind === 'data' && n.directive === 'DC' && n.size === 'W') {
-                for (const v of n.values) {
-                  // dc.w target-table_label → extract target name
-                  const vstr = String(v);
-                  const dashIdx = vstr.indexOf('-');
-                  if (dashIdx > 0) {
-                    targets.push(sanitizeLabel(vstr.slice(0, dashIdx)));
-                  }
-                }
-              } else if (n.kind === 'label' || (n.kind === 'data' && !(n.directive === 'DC' && n.size === 'W'))) {
-                break; // end of table
-              }
-            }
-          }
+          const targets = resolveJumpTableTargets(ast, jtLabel).map(t => sanitizeLabel(t));
           if (targets.length > 0) {
-            const cases = targets.map((t, i) => `    case ${i}: goto ${t};`).join('\n');
+            const cases = targets.map((t, i) => {
+              if (crossFuncGotos.has(t)) return `    case ${i}: ${t}(); return;`;
+              return `    case ${i}: goto ${t};`;
+            }).join('\n');
             c = `switch ((uint16_t)(${jtIndex}) / 2) {\n${cases}\n  }`;
           } else {
             c = emitInstruction(node);  // fallback
