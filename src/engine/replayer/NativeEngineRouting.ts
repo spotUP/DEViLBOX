@@ -107,10 +107,10 @@ const WASM_ENGINES: NativeEngineDescriptor[] = [
       const klys = instance as any;
       if (typeof klys.onSongData === 'function') {
         klys.onSongData((songData: any) => {
-          import('@stores').then(({ useTrackerStore }) => {
-            const state = useTrackerStore.getState();
+          import('@stores').then(({ useFormatStore }) => {
+            const state = useFormatStore.getState();
             if (state.klysNative) {
-              useTrackerStore.setState({
+              useFormatStore.setState({
                 klysNative: {
                   ...state.klysNative,
                   patterns: songData.patterns,

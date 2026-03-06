@@ -13,7 +13,7 @@ import React, { useRef, useState, useCallback } from 'react';
 import * as Tone from 'tone';
 import { Button } from '@components/ui/Button';
 import { FT2NumericInput } from './FT2NumericInput';
-import { useTrackerStore, useTransportStore, useProjectStore, useInstrumentStore, useAudioStore, useUIStore, useAutomationStore, useEditorStore } from '@stores';
+import { useTrackerStore, useTransportStore, useProjectStore, useInstrumentStore, useAudioStore, useUIStore, useAutomationStore, useEditorStore , useFormatStore } from '@stores';
 import { useShallow } from 'zustand/react/shallow';
 import { notify } from '@stores/useNotificationStore';
 import { useTapTempo } from '@hooks/useTapTempo';
@@ -405,7 +405,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
     const songBuf = moduleInfo.arrayBuffer ?? (moduleInfo.file ? await moduleInfo.file.arrayBuffer() : null);
     if (songBuf) {
       lookupSongDB(computeSongDBHash(songBuf)).then(result => {
-        useTrackerStore.getState().setSongDBInfo(result ? {
+        useFormatStore.getState().setSongDBInfo(result ? {
           authors: result.authors, publishers: result.publishers,
           album: result.album, year: result.year, format: result.format,
           duration_ms: result.subsongs[0]?.duration_ms ?? 0,
@@ -414,7 +414,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
       // Extract C64 SID header metadata if applicable
       const sidInfo = parseSIDHeader(new Uint8Array(songBuf));
       if (sidInfo) {
-        useTrackerStore.getState().setSidMetadata({
+        useFormatStore.getState().setSidMetadata({
           format: sidInfo.format,
           version: sidInfo.version,
           title: sidInfo.title,
@@ -429,11 +429,11 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
           thirdSID: sidInfo.thirdSID,
         });
       } else {
-        useTrackerStore.getState().setSidMetadata(null);
+        useFormatStore.getState().setSidMetadata(null);
       }
     } else {
-      useTrackerStore.getState().setSongDBInfo(null);
-      useTrackerStore.getState().setSidMetadata(null);
+      useFormatStore.getState().setSongDBInfo(null);
+      useFormatStore.getState().setSidMetadata(null);
     }
 
     // Always clean up before import to prevent stale state from previous imports
@@ -520,7 +520,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
         setBPM(song.initialBPM);
         setSpeed(song.initialSpeed);
         setMetadata({ name: song.name, author: '', description: `Imported from ${moduleInfo.metadata.title || 'module'}` });
-        useTrackerStore.getState().applyEditorMode(song);
+        useFormatStore.getState().applyEditorMode(song);
         await engine.preloadInstruments(song.instruments);
         notify.success(`Imported: ${song.name} — ${song.instruments.length} instrument(s)`, 3000);
         return;
@@ -1274,7 +1274,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
               setBPM(song.initialBPM);
               setSpeed(song.initialSpeed);
               setMetadata({ name: song.name, author: '', description: `Imported from ${filename}` });
-              useTrackerStore.getState().applyEditorMode(song);
+              useFormatStore.getState().applyEditorMode(song);
               await engine.preloadInstruments(song.instruments);
               notify.success(`Imported: ${song.name} — ${song.instruments.length} instrument(s)`, 3000);
             } finally {

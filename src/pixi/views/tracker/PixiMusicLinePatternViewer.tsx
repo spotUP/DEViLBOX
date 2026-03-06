@@ -14,7 +14,7 @@
 
 import React, { useCallback, useMemo, useState, useEffect, useRef } from 'react';
 import type { Graphics as GraphicsType, FederatedWheelEvent } from 'pixi.js';
-import { useTrackerStore } from '@stores';
+import { useTrackerStore , useFormatStore } from '@stores';
 import { useTransportStore } from '@stores/useTransportStore';
 import { usePixiTheme } from '../../theme';
 import { PIXI_FONTS } from '../../fonts';
@@ -87,7 +87,7 @@ interface Props {
 export const PixiMusicLinePatternViewer: React.FC<Props> = ({ width, height }) => {
   usePixiTheme(); // subscribe to theme (unused colors kept for future theming parity)
 
-  const channelTrackTables = useTrackerStore((s) => s.channelTrackTables);
+  const channelTrackTables = useFormatStore((s) => s.channelTrackTables);
   const patterns = useTrackerStore((s) => s.patterns);
   const currentPos = useTrackerStore((s) => s.currentPositionIndex);
   const currentRow = useTransportStore((s) => s.currentRow);

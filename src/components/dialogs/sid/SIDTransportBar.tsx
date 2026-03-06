@@ -7,7 +7,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Play, Pause, Square, SkipBack, SkipForward, Repeat, Volume2,
 } from 'lucide-react';
-import { useTrackerStore } from '@stores';
+import { useFormatStore } from '@stores';
 import { useShallow } from 'zustand/react/shallow';
 import { useAudioStore } from '@stores/useAudioStore';
 
@@ -16,7 +16,7 @@ interface SIDTransportBarProps {
 }
 
 export const SIDTransportBar: React.FC<SIDTransportBarProps> = ({ className }) => {
-  const { sidMetadata, setSidMetadata } = useTrackerStore(
+  const { sidMetadata, setSidMetadata } = useFormatStore(
     useShallow((s) => ({ sidMetadata: s.sidMetadata, setSidMetadata: s.setSidMetadata }))
   );
   const masterVolume = useAudioStore((s) => s.masterVolume);

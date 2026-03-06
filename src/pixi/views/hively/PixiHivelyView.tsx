@@ -14,6 +14,7 @@
 import React, { useCallback, useState } from 'react';
 import type { Graphics as GraphicsType } from 'pixi.js';
 import { useTrackerStore } from '@/stores/useTrackerStore';
+import { useFormatStore } from '@/stores/useFormatStore';
 import { useTransportStore } from '@/stores/useTransportStore';
 import { getTrackerReplayer } from '@engine/TrackerReplayer';
 import { exportAsHively } from '@lib/export/HivelyExporter';
@@ -37,7 +38,7 @@ interface HivelyViewProps {
 
 export const PixiHivelyView: React.FC<HivelyViewProps> = ({ width, height }) => {
   const theme = usePixiTheme();
-  const nativeData = useTrackerStore(s => s.hivelyNative);
+  const nativeData = useFormatStore(s => s.hivelyNative);
   const currentPositionIndex = useTrackerStore(s => s.currentPositionIndex);
   const setCurrentPosition = useTrackerStore(s => s.setCurrentPosition);
   const isPlaying = useTransportStore(s => s.isPlaying);

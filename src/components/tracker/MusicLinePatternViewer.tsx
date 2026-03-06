@@ -10,7 +10,7 @@
  */
 
 import React, { useRef, useEffect, useState, useCallback } from 'react';
-import { useTrackerStore } from '@stores';
+import { useTrackerStore , useFormatStore } from '@stores';
 import { useTransportStore } from '@stores/useTransportStore';
 import { useEditorStore } from '@stores/useEditorStore';
 import { MusicLineEngine } from '@/engine/musicline/MusicLineEngine';
@@ -55,7 +55,7 @@ const UPPER_KEY_MAP: Record<string, number> = {
 const HEX_CHARS = '0123456789abcdef';
 
 export const MusicLinePatternViewer: React.FC = () => {
-  const channelTrackTables = useTrackerStore((s) => s.channelTrackTables);
+  const channelTrackTables = useFormatStore((s) => s.channelTrackTables);
   const patterns = useTrackerStore((s) => s.patterns);
   const currentPos = useTrackerStore((s) => s.currentPositionIndex);
   const currentRow = useTransportStore((s) => s.currentRow);

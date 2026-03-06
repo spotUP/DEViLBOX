@@ -11,7 +11,7 @@
 
 import { useCallback, useMemo } from 'react';
 import type { Graphics as GraphicsType } from 'pixi.js';
-import { useTrackerStore, useTransportStore, useAudioStore, useUIStore, useEditorStore } from '@stores';
+import { useTrackerStore, useTransportStore, useAudioStore, useUIStore, useEditorStore , useFormatStore } from '@stores';
 import type { TrackerViewMode } from '@stores/useUIStore';
 import { useShallow } from 'zustand/react/shallow';
 import { useFPSMonitor } from '@/hooks/useFPSMonitor';
@@ -187,9 +187,9 @@ const SubsongSelector: React.FC = () => {
 // ─── SID Subsong Selector + Info Button ──────────────────────────────────────
 
 const SIDSubsongAndInfo: React.FC = () => {
-  const sidMetadata = useTrackerStore(s => s.sidMetadata);
-  const setSidMetadata = useTrackerStore(s => s.setSidMetadata);
-  const songDBInfo = useTrackerStore(s => s.songDBInfo);
+  const sidMetadata = useFormatStore(s => s.sidMetadata);
+  const setSidMetadata = useFormatStore(s => s.setSidMetadata);
+  const songDBInfo = useFormatStore(s => s.songDBInfo);
 
   const hasMultipleSubsongs = sidMetadata && sidMetadata.subsongs > 1;
   const hasInfo = !!(sidMetadata || songDBInfo);
@@ -265,8 +265,8 @@ const SIDSubsongAndInfo: React.FC = () => {
 // ─── Module Info Button (non-SID) ────────────────────────────────────────────
 
 const ModuleInfoButton: React.FC = () => {
-  const sidMetadata = useTrackerStore(s => s.sidMetadata);
-  const songDBInfo = useTrackerStore(s => s.songDBInfo);
+  const sidMetadata = useFormatStore(s => s.sidMetadata);
+  const songDBInfo = useFormatStore(s => s.songDBInfo);
   const patterns = useTrackerStore(s => s.patterns);
 
   // Only show for non-SID modules that have metadata

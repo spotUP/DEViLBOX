@@ -4,7 +4,7 @@
  */
 
 import React, { useEffect, useRef, useState as useReactState } from 'react';
-import { useTrackerStore, useCursorStore, useTransportStore, useAudioStore, useMIDIStore, useUIStore } from '@stores';
+import { useTrackerStore, useCursorStore, useTransportStore, useAudioStore, useMIDIStore, useUIStore, useFormatStore } from '@stores';
 import { useEditorStore } from '@stores/useEditorStore';
 import { useSettingsStore } from '@stores/useSettingsStore';
 import { useDJStore } from '@/stores/useDJStore';
@@ -118,12 +118,17 @@ const TrackerStatusContent: React.FC = () => {
       recordMode: s.recordMode,
     }))
   );
-  const { patternLength, songDBInfo } = useTrackerStore(
+  const { patternLength } = useTrackerStore(
     useShallow((s) => ({
       patternLength: s.patterns[s.currentPatternIndex]?.length || 64,
+    }))
+  );
+  const { songDBInfo } = useFormatStore(
+    useShallow((s) => ({
       songDBInfo: s.songDBInfo,
     }))
   );
+
   const { isPlaying, currentRow } = useTransportStore(
     useShallow((s) => ({ isPlaying: s.isPlaying, currentRow: s.currentRow }))
   );

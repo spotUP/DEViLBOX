@@ -12,7 +12,7 @@
  */
 
 import React, { useRef, useEffect, useState, useCallback } from 'react';
-import { useTrackerStore } from '@stores';
+import { useTrackerStore , useFormatStore } from '@stores';
 import { useTransportStore } from '@stores/useTransportStore';
 import { useEditorStore } from '@stores/useEditorStore';
 import { JamCrackerEngine } from '@engine/jamcracker/JamCrackerEngine';
@@ -67,7 +67,7 @@ interface JCPatternData {
 }
 
 export const JamCrackerView: React.FC = () => {
-  const jamCrackerFileData = useTrackerStore(s => s.jamCrackerFileData);
+  const jamCrackerFileData = useFormatStore(s => s.jamCrackerFileData);
   const currentPos = useTrackerStore(s => s.currentPositionIndex);
   const currentRow = useTransportStore(s => s.currentRow);
   const speed = useTransportStore(s => s.speed);

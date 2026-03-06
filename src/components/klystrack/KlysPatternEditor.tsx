@@ -12,7 +12,7 @@
 
 import React, { useRef, useEffect, useCallback, useMemo, useState } from 'react';
 import { useTransportStore } from '@stores/useTransportStore';
-import { useTrackerStore } from '@stores';
+import { useFormatStore } from '@stores';
 import type { KlysNativeData } from '@/types/tracker';
 import { KlysEngine } from '@/engine/klystrack/KlysEngine';
 
@@ -332,9 +332,9 @@ export const KlysPatternEditor: React.FC<KlysPatternEditorProps> = ({
     }
 
     // Force re-render by touching klysNative
-    const state = useTrackerStore.getState();
+    const state = useFormatStore.getState();
     if (state.klysNative) {
-      useTrackerStore.setState({ klysNative: { ...state.klysNative } });
+      useFormatStore.setState({ klysNative: { ...state.klysNative } });
     }
   }, [channelPatterns, nativeData]);
 
