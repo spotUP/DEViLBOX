@@ -643,3 +643,42 @@ export interface KlysNativeInstrument {
   };
   program: number[];  // 32 entries
 }
+
+// ── Parser Return Types (for import/export) ──────────────────
+
+/**
+ * Generic instrument for parser output
+ */
+export interface Instrument {
+  id: number;
+  name: string;
+  type: 'sample' | 'synth';
+  sample: number; // Sample index
+}
+
+/**
+ * Generic sample for parser output
+ */
+export interface Sample {
+  id: number;
+  name: string;
+  data: ArrayBuffer;
+  length: number;
+  sampleRate: number;
+}
+
+/**
+ * Generic tracker module for parser output
+ * Minimal structure for Phase 1 format imports
+ */
+export interface TrackerModule {
+  title: string;
+  format: string; // 'pretracker', 'hippel', etc.
+  bpm: number;
+  ticksPerLine: number;
+  channels: number;
+  orders: number[]; // Song position array
+  patterns: Pattern[]; // Empty in Phase 10
+  instruments: Instrument[];
+  samples: Sample[];
+}
