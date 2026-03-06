@@ -187,7 +187,7 @@
         dspWorker = new Worker('/gearmulator/Gearmulator.worker.js');
 
         const readyPromise = new Promise((resolve, reject) => {
-          const timeout = setTimeout(() => reject(new Error('Init timeout (60s)')), 60000);
+          const timeout = setTimeout(() => reject(new Error('Init timeout (30min)')), 30 * 60 * 1000);
           dspWorker.onmessage = (e) => {
             console.log('[Main] Worker message:', e.data);
             if (e.data.type === 'ready') {
@@ -243,12 +243,8 @@
     }
 
     btnNote.addEventListener('click', () => {
-      sendMidi('noteOn', { note: 60, velocity: 100, channel: 0 });
-      log('Note On: C4 (60) vel=100');
-      setTimeout(() => {
-        sendMidi('noteOff', { note: 60, channel: 0 });
-        log('Note Off: C4');
-      }, 1000);
+      sendMidi('noteOn', { note: 60, velocity: 127, channel: 0 });
+      log('Note On: C4 (60) vel=127 — NO auto note-off (use All Notes Off)');
     });
 
     btnChord.addEventListener('click', () => {

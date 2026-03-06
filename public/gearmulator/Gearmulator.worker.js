@@ -213,6 +213,13 @@ async function initSynth(data) {
   const actualRate = module._gm_getSamplerate(handle);
   console.log(`[Gearmulator Worker] Device ready — handle=${handle}, sampleRate=${actualRate}, type=${synthType}`);
 
+  // Reduce DSP clock for WASM interpreter performance
+  // 10% → cyclesPerSample=115 (enough for ISR handlers, ~334Hz timer rate)
+  // Lower values cause ESAI transmit underruns (ISR can't complete in time)
+  const clockPercent = 10;
+  module._gm_setDspClockPercent(handle, clockPercent);
+  console.log(`[Gearmulator Worker] DSP clock set to ${clockPercent}% (cyclesPerSample ~${Math.round(1152 * clockPercent / 100)})`);
+
   initialized = true;
 
   self.postMessage({ type: 'ready', sampleRate: actualRate, handle: handle });
@@ -223,35 +230,18 @@ async function initSynth(data) {
 }
 
 function startRenderLoop(sampleRate) {
-  // Target: keep ring buffer ~50% full
-  // Render in RENDER_BLOCK chunks, check frequently
-  const intervalMs = Math.max(1, Math.floor((RENDER_BLOCK / sampleRate) * 1000 * 0.5));
+  // Use blocking gm_process() — the standard Device::process() path that handles
+  // all DSP thread synchronization internally. Render small chunks with setTimeout
+  // to let the worker event loop breathe for message handling.
+  console.log('[Gearmulator Worker] Starting blocking render loop (gm_process)...');
 
-  // Diagnostic: check ESAI status after first render
-  console.log('[Gearmulator Worker] Diagnostic timer starting (2s interval)...');
-  const diagTimer = setInterval(() => {
-    console.log('[Gearmulator Worker DIAG] Timer fired');
-    if (!module || handle < 0) {
-      console.log('[Gearmulator Worker DIAG] Timer cleared: module=' + !!module + ', handle=' + handle);
-      clearInterval(diagTimer);
-      return;
-    }
-    const inSize = module._gm_getAudioInputSize(handle);
-    const outSize = module._gm_getAudioOutputSize(handle);
-    console.log(`[Gearmulator Worker DIAG] audioIn=${inSize}, audioOut=${outSize}`);
-    if (outSize > 0) {
-      console.log('[Gearmulator Worker DIAG] ✓ ESAI producing output!');
-    }
-  }, 2000); // Every 2 seconds during first 10 seconds
-  setTimeout(() => clearInterval(diagTimer), 10000);
-
-  renderTimer = setInterval(() => {
+  function renderTick() {
     if (!initialized || handle < 0 || !module || disposed) return;
     fillRingBuffer();
-  }, intervalMs);
-
-  // Also do an initial fill
-  fillRingBuffer();
+    // Use setTimeout(0) to yield to the event loop between render passes
+    renderTimer = setTimeout(renderTick, 0);
+  }
+  renderTick();
 }
 
 function fillRingBuffer() {
@@ -259,42 +249,35 @@ function fillRingBuffer() {
   let writePos = Atomics.load(sabInt32, 0);
   let readPos = Atomics.load(sabInt32, 1);
 
-  // How many frames are available (free space)?
   let used = writePos - readPos;
   if (used < 0) used += bufSize;
-  let free = bufSize - used - 1; // -1 to distinguish full from empty
+  let free = bufSize - used - 1;
 
-  // Render until buffer is at least 75% full or no more free space
-  const target = Math.floor(bufSize * 0.75);
-  let rendered = 0;
+  // Render up to 16 blocks per tick (2048 samples) to reduce setTimeout overhead
+  // With clock at 10%, each block is much faster so we can batch more
+  const maxBlocks = Math.min(16, Math.floor(free / RENDER_BLOCK));
 
-  while (used + rendered < target && free > RENDER_BLOCK) {
-    // Render one block
-    if (renderDebugCounter < 3) {
-      console.log(`[Gearmulator Worker] Calling _gm_process #${renderDebugCounter} (${RENDER_BLOCK} samples)...`);
-    }
+  for (let b = 0; b < maxBlocks; b++) {
     module._gm_process(handle, outputPtrL, outputPtrR, RENDER_BLOCK);
-    if (renderDebugCounter < 3) {
-      console.log(`[Gearmulator Worker] _gm_process #${renderDebugCounter} returned`);
-    }
 
-    // Read from WASM heap
     const heapF32 = module.HEAPF32;
     const offL = outputPtrL >> 2;
     const offR = outputPtrR >> 2;
 
-    // Debug: check for non-zero audio (log occasionally)
+    // Debug: log peak every 500 blocks
     if (renderDebugCounter++ % 500 === 0) {
       let peak = 0;
       for (let i = 0; i < RENDER_BLOCK; i++) {
         const v = Math.abs(heapF32[offL + i]);
         if (v > peak) peak = v;
+        const vr = Math.abs(heapF32[offR + i]);
+        if (vr > peak) peak = vr;
       }
-      console.log(`[Gearmulator Worker] render #${renderDebugCounter}: peak=${peak.toFixed(6)}, writePos=${writePos}, readPos=${readPos}, used=${used}, free=${free}`);
+      console.log(`[Gearmulator Worker] render #${renderDebugCounter}: peak=${peak.toFixed(6)}, writePos=${writePos}, used=${used}, free=${free}`);
     }
 
     // Write interleaved L/R into ring buffer
-    const audioOffset = HEADER_INTS; // Float32 offset for audio data start
+    const audioOffset = HEADER_INTS;
     for (let i = 0; i < RENDER_BLOCK; i++) {
       const frameIdx = (writePos + i) % bufSize;
       const idx = audioOffset + frameIdx * 2;
@@ -304,9 +287,51 @@ function fillRingBuffer() {
 
     writePos = (writePos + RENDER_BLOCK) % bufSize;
     Atomics.store(sabInt32, 0, writePos);
+  }
+}
 
-    rendered += RENDER_BLOCK;
-    free -= RENDER_BLOCK;
+// Non-blocking version: push input and pull any available output
+function fillRingBufferNonBlocking() {
+  const bufSize = Atomics.load(sabInt32, 2);
+  let writePos = Atomics.load(sabInt32, 0);
+  let readPos = Atomics.load(sabInt32, 1);
+
+  let used = writePos - readPos;
+  if (used < 0) used += bufSize;
+  let free = bufSize - used - 1;
+
+  // Push input to keep DSP fed (non-blocking)
+  const inputToPush = Math.min(RENDER_BLOCK * 4, 1024);
+  const pushed = module._gm_pushAudioInput(handle, inputToPush);
+
+  // Pull any available output (non-blocking)
+  let totalRead = 0;
+  while (free > RENDER_BLOCK) {
+    const read = module._gm_pullAudioOutput(handle, outputPtrL, outputPtrR, RENDER_BLOCK);
+    if (read <= 0) break;
+
+    // Write to SAB ring buffer
+    const heapF32 = module.HEAPF32;
+    const offL = outputPtrL >> 2;
+    const offR = outputPtrR >> 2;
+    const audioOffset = HEADER_INTS;
+
+    for (let i = 0; i < read; i++) {
+      const frameIdx = (writePos + i) % bufSize;
+      const idx = audioOffset + frameIdx * 2;
+      sabFloat32[idx] = heapF32[offL + i];
+      sabFloat32[idx + 1] = heapF32[offR + i];
+    }
+
+    writePos = (writePos + read) % bufSize;
+    Atomics.store(sabInt32, 0, writePos);
+
+    totalRead += read;
+    free -= read;
+  }
+
+  if (renderDebugCounter++ % 500 === 0) {
+    console.log(`[Gearmulator Worker NB] pushed=${pushed}, pulled=${totalRead}, writePos=${writePos}, free=${free}`);
   }
 }
 

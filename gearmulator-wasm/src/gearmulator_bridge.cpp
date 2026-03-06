@@ -22,6 +22,7 @@
 #include "synthLib/deviceTypes.h"
 #include "synthLib/audioTypes.h"
 #include "synthLib/midiTypes.h"
+#include "dsp56kEmu/audio.h"
 
 // Synth-specific device headers
 #include "virusLib/device.h"
@@ -96,7 +97,7 @@ EXPORT int32_t gm_create(const uint8_t* romData, uint32_t romSize, int32_t synth
         switch (static_cast<GmSynthType>(synthType))
         {
         case GM_VIRUS_ABC:
-            params.customData = 0; // DeviceModel::ABC
+            params.customData = static_cast<uint32_t>(virusLib::DeviceModel::ABC); // ABC = C = 2
             device = std::make_unique<virusLib::Device>(params);
             break;
         case GM_VIRUS_TI:
@@ -190,9 +191,96 @@ EXPORT void gm_process(int32_t handle, float* outputL, float* outputR, uint32_t 
         nullptr, nullptr
     };
 
+    size_t midiCount = gm.midiIn.size();
     gm.midiOut.clear();
     gm.device->process(inputs, outputs, numSamples, gm.midiIn, gm.midiOut);
     gm.midiIn.clear();
+
+    // Minimal diagnostic: only first 5 calls and MIDI events (printf is expensive in WASM)
+    static int callCount = 0;
+    ++callCount;
+    if (callCount <= 5 || midiCount > 0)
+    {
+        float peak = 0.0f;
+        for (uint32_t i = 0; i < numSamples; ++i)
+        {
+            float v = outputL[i] < 0 ? -outputL[i] : outputL[i];
+            if (v > peak) peak = v;
+            v = outputR[i] < 0 ? -outputR[i] : outputR[i];
+            if (v > peak) peak = v;
+        }
+        printf("[EM] gm_process #%d: peak=%.6f, midiIn=%zu, midiOut=%zu\n",
+            callCount, peak, midiCount, gm.midiOut.size());
+    }
+}
+
+/**
+ * Non-blocking: push audio input only, don't wait for output.
+ * Returns number of input frames successfully pushed.
+ */
+EXPORT int32_t gm_pushAudioInput(int32_t handle, uint32_t numSamples)
+{
+    if (handle < 0 || handle >= static_cast<int32_t>(g_devices.size()) || !g_devices[handle])
+        return -1;
+
+    auto* virusDev = dynamic_cast<virusLib::Device*>(g_devices[handle]->device.get());
+    if (!virusDev) return -2;
+
+    auto& audio = virusDev->getDSP()->getAudio();
+    auto& inputs = audio.getAudioInputs();
+
+    uint32_t pushed = 0;
+    for (uint32_t i = 0; i < numSamples && !inputs.full(); ++i)
+    {
+        inputs.push_back({});
+        ++pushed;
+    }
+    return static_cast<int32_t>(pushed);
+}
+
+/**
+ * Non-blocking: pull audio output if available.
+ * Returns number of frames actually read (may be less than requested).
+ */
+EXPORT int32_t gm_pullAudioOutput(int32_t handle, float* outputL, float* outputR, uint32_t numSamples)
+{
+    if (handle < 0 || handle >= static_cast<int32_t>(g_devices.size()) || !g_devices[handle])
+        return -1;
+
+    auto* virusDev = dynamic_cast<virusLib::Device*>(g_devices[handle]->device.get());
+    if (!virusDev) return -2;
+
+    auto& audio = virusDev->getDSP()->getAudio();
+    auto& outputs = audio.getAudioOutputs();
+
+    uint32_t read = 0;
+    while (read < numSamples && !outputs.empty())
+    {
+        outputs.pop_front([&](dsp56k::Audio::TxFrame& frame)
+        {
+            // Frame contains slots; slot 0 has TX0-TX5 (6 channels)
+            // TX0 = L, TX1 = R for main stereo pair
+            if (!frame.empty())
+            {
+                auto& slot = frame[0];
+                // DSP56k 24-bit signed → float conversion
+                auto toFloat = [](dsp56k::TWord w) -> float
+                {
+                    int32_t s = static_cast<int32_t>(w << 8) >> 8;
+                    return static_cast<float>(s) / 8388608.0f;
+                };
+                if (outputL) outputL[read] = toFloat(slot[0]);
+                if (outputR) outputR[read] = toFloat(slot[1]);
+            }
+            else
+            {
+                if (outputL) outputL[read] = 0.0f;
+                if (outputR) outputR[read] = 0.0f;
+            }
+        });
+        ++read;
+    }
+    return static_cast<int32_t>(read);
 }
 
 /**
