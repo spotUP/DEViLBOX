@@ -79,6 +79,11 @@ if(EMSCRIPTEN)
         "_klys_get_instrument_data"
         "_klys_get_track_status"
         "_klys_is_playing"
+        "_klys_set_pattern_step"
+        "_klys_set_sequence_entry"
+        "_klys_set_instrument_param"
+        "_klys_set_instrument_program_step"
+        "_klys_save_song"
     )
 
     string(JOIN "," EXPORTED_FUNCTIONS_STR ${EXPORTED_FUNCTIONS})
