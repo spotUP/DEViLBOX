@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-03-05T21:04:39.210Z
+ * Generated: 2026-03-06T10:11:46.725Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,10 +19,10 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.2410';
-export const BUILD_NUMBER = '2410';
-export const BUILD_HASH = '7fb345b4';
-export const BUILD_DATE = '2026-03-05';
+export const BUILD_VERSION = '1.0.2460';
+export const BUILD_NUMBER = '2460';
+export const BUILD_HASH = '4acd81224';
+export const BUILD_DATE = '2026-03-06';
 
 // Full version (patch IS the build number, so no need to append)
 export const FULL_VERSION = BUILD_VERSION;
@@ -30,204 +30,214 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.2410',
+    version: '1.0.2460',
+    date: '2026-03-06',
+    changes: [
+      {
+        type: 'feature',
+        "description": "Gearmulator hardware skin UI integration"
+      },
+      {
+        type: 'feature',
+        "description": "Add MusicLine effect display and Pixi export button"
+      },
+      {
+        type: 'fix',
+        "description": "Resolve 11 TypeScript strict-mode errors in gearmulator components"
+      },
+      {
+        type: 'improvement',
+        "description": "Remove dead ProTrackerPlayer.ts (1092 lines)"
+      },
+      {
+        type: 'feature',
+        "description": "Add JamCracker and FuturePlayer binary exporters"
+      },
+      {
+        type: 'improvement',
+        "description": "Support all 5 MusicLine effect columns in parser, exporter, and renderers"
+      },
+      {
+        type: 'feature',
+        "description": "Add Hively pattern editing with note input and hex entry"
+      },
+      {
+        type: 'feature',
+        "description": "Add MusicLine .ml export button to DOM tracker view"
+      },
+      {
+        type: 'fix',
+        "description": "Resolve all 30 TypeScript strict-mode errors"
+      },
+      {
+        type: 'fix',
+        "description": "Fix JamCrackerView: correct transport store field and Uint8Array blob type"
+      },
+      {
+        type: 'improvement',
+        "description": "Extract editor state from useTrackerStore into useEditorStore"
+      },
+      {
+        type: 'feature',
+        "description": "Implement full .kt file serialization with bitpacking"
+      },
+      {
+        type: 'feature',
+        "description": "Add JamCracker save/export functionality"
+      },
+      {
+        type: 'feature',
+        "description": "Klystrack: add full editing stack (pattern input, instrument editor, WASM setters)"
+      },
+      {
+        type: 'feature',
+        "description": "Add JamCracker pattern viewer and wire editorMode routing"
+      },
+      {
+        type: 'feature',
+        "description": "Add pattern editing bridge to MusicLine and JamCracker WASM engines"
+      },
+      {
+        type: 'feature',
+        "description": "IT/S3M export via OpenMPT WASM, proper effect mapping"
+      },
+      {
+        type: 'fix',
+        "description": "OpenMPT effect mapping, sample extraction, type identification"
+      },
+      {
+        type: 'improvement',
+        "description": "Klystrack: wire up full integration pipeline"
+      },
+      {
+        type: 'feature',
+        "description": "OpenMPT soundlib WASM, Gearmulator port, new synth presets"
+      },
+      {
+        type: 'feature',
+        "description": "Add klystrack (.kt/.ki) format support via Emscripten WASM"
+      },
+      {
+        type: 'improvement',
+        "description": "Revert PT2 WASM integration hooks — modplug will handle MOD/XM playback"
+      },
+      {
+        type: 'feature',
+        "description": "Add PT2 WASM replayer for authentic ProTracker MOD playback"
+      },
+      {
+        type: 'feature',
+        "description": "Add DOM Studio view with resizable tracker/instrument/mixer panels"
+      },
+      {
+        type: 'feature',
+        "description": "Add DOM Hively/AHX pattern editor and wire into TrackerView"
+      },
+      {
+        type: 'fix',
+        "description": "Use replayer row for rendering to eliminate note blinking"
+      },
+      {
+        type: 'fix',
+        "description": "Always smooth-scroll in VJ view regardless of preference"
+      },
+      {
+        type: 'fix',
+        "description": "Fix GT Ultra pattern editor showing REST bytes as notes"
+      },
+      {
+        type: 'fix',
+        "description": "Dampen 3D tilt during smooth scroll to prevent parallax"
+      },
+      {
+        type: 'fix',
+        "description": "Draw highlight bar at fixed position, scroll data underneath"
+      },
+      {
+        type: 'fix',
+        "description": "Replace broken scroll with replayer-based interpolation"
+      },
+      {
+        type: 'fix',
+        "description": "Fix GT Ultra WASM bridge: mismatched cwrap arg counts causing wrong data"
+      },
+      {
+        type: 'fix',
+        "description": "Remove await in sync createInstrument for Gearmulator case"
+      },
+      {
+        type: 'improvement',
+        "description": "Route C64 .sid files to GT Ultra view instead of classic editor"
+      },
+      {
+        type: 'fix',
+        "description": "Fix GT Ultra pattern data not displaying in both DOM and WebGL views"
+      }
+    ]
+  },
+  {
+    version: '2026-03-05',
     date: '2026-03-05',
     changes: [
       {
-        type: 'fix',
-        "description": "Resolve all 32 tsc -b --force build errors"
+        type: 'improvement',
+        "description": "Polish WebGL GT Ultra: FT2 neutral palette, toolbar controls, pattern headers, order list enhancements, table annotations"
       },
       {
         type: 'feature',
-        "description": "Add SC tracker integration: knob panels, channel badges"
+        "description": "Phase 5 — Preview generation with LUFS normalization"
       },
       {
         type: 'feature',
-        "description": "Live Furnace register writes from instrument editor"
+        "description": "Effect taxonomy mappings and accessibility names (phases 8-9)"
+      },
+      {
+        type: 'feature',
+        "description": "Implement NKS2 SDK v2.0.2 compliance (phases 1-4, 6-7)"
+      },
+      {
+        type: 'feature',
+        "description": "Add interactive editing to GT Ultra DOM components"
       },
       {
         type: 'improvement',
-        "description": "Split SC editor into Script/Controls tabs for DOM and Pixi UIs"
+        "description": "Polish GT Ultra DOM UI with FT2 theme and wire into TrackerView"
       },
       {
         type: 'improvement',
-        "description": "Chore: uncommitted editor and loader improvements"
+        "description": "Allow Hively songs to display in DOM pattern editor"
       },
       {
         type: 'feature',
-        "description": "Complete USB-SID-Pico integration"
-      },
-      {
-        type: 'feature',
-        "description": "Add SC preset search, two-way GUI sync, routine pattern generation, and preset caching"
-      },
-      {
-        type: 'feature',
-        "description": "SoundMon waveform gen, MDX/PMD advanced effects, GT keyboard nav, SC preset search"
-      },
-      {
-        type: 'feature',
-        "description": "Add 109 community SC SynthDef presets with browser UI"
-      },
-      {
-        type: 'feature',
-        "description": "FC synth/arp chip RAM writes + exporter effect mapping"
-      },
-      {
-        type: 'feature',
-        "description": "Add dedicated JamCracker and Future Player instrument panels"
-      },
-      {
-        type: 'feature',
-        "description": "Add 'Save as Instrument' button to SuperCollider editor"
-      },
-      {
-        type: 'feature',
-        "description": "Implement ADSR chip RAM writes for FC and SoundMon controls"
-      },
-      {
-        type: 'feature',
-        "description": "Add Buzz machine params, JamCracker test data, SC Routine pattern extraction"
+        "description": "Add MIDI Controller and NKS setup wizards"
       },
       {
         type: 'improvement',
-        "description": "Update ASID_HARDWARE_SUPPORT.md with WebUSB documentation"
-      },
-      {
-        type: 'feature',
-        "description": "Add WebUSB USB-SID-Pico support with unified hardware manager"
-      },
-      {
-        type: 'feature',
-        "description": "Implement chip RAM writes for SidMon1 waveforms + expand synth set() params"
-      },
-      {
-        type: 'fix',
-        "description": "Remove 15 unused variables causing TS6133 errors"
-      },
-      {
-        type: 'fix',
-        "description": "Unused variable warnings in HES/PMD/SPC parsers"
-      },
-      {
-        type: 'fix',
-        "description": "Unused variable warnings in AdPlugParser"
+        "description": "Allow Furnace songs to display in DOM mode pattern editor"
       },
       {
         type: 'improvement',
-        "description": "Cleanup: remove dead WASM scaffold, worklets, and engine classes"
+        "description": "Route C64SIDEngine through synthBus for master FX + pitch control"
+      },
+      {
+        type: 'fix',
+        "description": "Handle unhandled promise rejections in USB write path"
+      },
+      {
+        type: 'fix',
+        "description": "Improve wizard connect flow with auto-pair and browser dialog guidance"
       },
       {
         type: 'feature',
-        "description": "Add referenceEngine field to FormatRegistry + export barrel updates"
-      },
-      {
-        type: 'feature',
-        "description": "Add 9 new retro music format parsers, exporters, engines & WASM infrastructure"
+        "description": "Setup wizard and hardware UX improvements"
       },
       {
         type: 'fix',
-        "description": "Remove double routing for native WASM synths, add native instrument panel"
+        "description": "SAM speech flags, add Link peer sync, wire Modland remix query"
       },
       {
         type: 'fix',
-        "description": "Correct MIDI-to-native note conversion for FP and JC"
-      },
-      {
-        type: 'feature',
-        "description": "Add FuturePlayerSynth and JamCrackerSynth to synth registry"
-      },
-      {
-        type: 'fix',
-        "description": "Fix SC GUI labels showing raw code instead of label text"
-      },
-      {
-        type: 'fix',
-        "description": "Update instrumentPtr on every cache hit, not just first creation"
-      },
-      {
-        type: 'fix',
-        "description": "Fix silent instrument preview and editor routing"
-      },
-      {
-        type: 'fix',
-        "description": "Fix keyboard shortcuts in CodeMirror editors (paste, copy, undo, etc.)"
-      },
-      {
-        type: 'fix',
-        "description": "Fix SC compile timeout: skip comments in paren tracker"
-      },
-      {
-        type: 'fix',
-        "description": "Fix SC compile: strip .send(s) chain, add logging, increase timeout"
-      },
-      {
-        type: 'feature',
-        "description": "Add per-note instrument preview and extract instrument metadata"
-      },
-      {
-        type: 'improvement',
-        "description": "Chore: update generated changelog"
-      },
-      {
-        type: 'feature',
-        "description": "Integrate FuturePlayer WASM engine into playback pipeline"
-      },
-      {
-        type: 'fix',
-        "description": "Fix crash in EditInstrumentModal for unknown synth types"
-      },
-      {
-        type: 'feature',
-        "description": "Add SC GUI parser and renderer for SuperCollider editor"
-      },
-      {
-        type: 'improvement',
-        "description": "Default to DOM UI, disable GL UI on mobile phones"
-      },
-      {
-        type: 'feature',
-        "description": "Full Future Player binary parser with real note/instrument extraction"
-      },
-      {
-        type: 'fix',
-        "description": "Fix view switcher, console warnings, and TypeScript errors"
-      },
-      {
-        type: 'fix',
-        "description": "Clean up SuperCollider debug diagnostics"
-      },
-      {
-        type: 'feature',
-        "description": "Add restructure pass with for/do-while/if-else detection"
-      },
-      {
-        type: 'feature',
-        "description": "Add VU meter triggers for native engine formats (SID, HVL, MusicLine)"
-      },
-      {
-        type: 'fix',
-        "description": "Chore: add SuperCollider audio driver debug logging"
-      },
-      {
-        type: 'feature',
-        "description": "Add Future Player 68k replayer transpiled to C/WASM"
-      },
-      {
-        type: 'fix',
-        "description": "Fix silent playback bug: play() race condition and stale state"
-      },
-      {
-        type: 'fix',
-        "description": "Fix SuperCollider volume normalization and audio routing"
-      },
-      {
-        type: 'fix',
-        "description": "Fix Buzz percussion trigger in test runner"
-      },
-      {
-        type: 'fix',
-        "description": "Move transpile/debug skill to proper .github/skills/ format"
+        "description": "Add view error boundaries and Yoga BindingError recovery"
       }
     ]
   }
