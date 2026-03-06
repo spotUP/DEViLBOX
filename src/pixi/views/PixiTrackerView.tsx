@@ -10,6 +10,7 @@
  * are hooked here — they only attach window event listeners, no DOM rendering.
  */
 
+import React, { useCallback } from 'react';
 import { usePixiTheme } from '../theme';
 import { PIXI_FONTS } from '../fonts';
 import { PixiFT2Toolbar, FT2_TOOLBAR_HEIGHT } from './tracker/PixiFT2Toolbar';
@@ -41,8 +42,13 @@ import { useBlockOperations } from '@/hooks/tracker/BlockOperations';
 import { useTrackerStore, useUIStore, useInstrumentStore } from '@stores';
 import { useWorkbenchStore } from '@stores/useWorkbenchStore';
 import { useMIDIStore } from '@stores/useMIDIStore';
+import { useTransportStore } from '@stores/useTransportStore';
+import { useProjectStore } from '@stores/useProjectStore';
 import { TITLE_H } from '../workbench/workbenchLayout';
 import { getTrackerReplayer } from '@engine/TrackerReplayer';
+import { PixiButton } from '../components/PixiButton';
+import { exportMusicLineFile } from '@lib/export/MusicLineExporter';
+import type { TrackerSong } from '@engine/TrackerReplayer';
 
 
 const MUSICLINE_MATRIX_HEIGHT = 220;
@@ -128,6 +134,37 @@ export const PixiTrackerView: React.FC = () => {
   const instrumentPanelHeight = contentH - toolbarH - CONTROLS_BAR_H - MACRO_SLOTS_H - tb303PanelH - scPanelH - midiKnobBarH;
   const editorWidth = windowWidth - (instrumentPanelVisible ? INSTRUMENT_PANEL_W : 0) - 16; // minus instrument panel and minimap
 
+  // MusicLine export handler
+  const handleExportML = useCallback(() => {
+    const s = useTrackerStore.getState();
+    const t = useTransportStore.getState();
+    const song: TrackerSong = {
+      name: useProjectStore.getState().metadata.name || 'MusicLine Song',
+      format: 'ML',
+      patterns: s.patterns,
+      instruments: useInstrumentStore.getState().instruments,
+      songPositions: s.patternOrder,
+      songLength: s.patternOrder.length,
+      restartPosition: 0,
+      numChannels: s.patterns[0]?.channels.length ?? 4,
+      initialSpeed: t.speed,
+      initialBPM: t.bpm,
+      channelTrackTables: s.channelTrackTables ?? undefined,
+      channelSpeeds: s.channelSpeeds ?? undefined,
+      channelGrooves: s.channelGrooves ?? undefined,
+    };
+    const data = exportMusicLineFile(song);
+    const blob = new Blob([data.buffer as ArrayBuffer], { type: 'application/octet-stream' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${song.name.replace(/[^a-zA-Z0-9_\-]/g, '_')}.ml`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, []);
+
   return (
     <pixiContainer
       layout={{
@@ -191,7 +228,23 @@ export const PixiTrackerView: React.FC = () => {
               <PixiHivelyView width={Math.max(100, editorWidth)} height={Math.max(100, instrumentPanelHeight)} />
             )}
             {viewMode === 'tracker' && editorMode === 'musicline' && (
-              <pixiContainer>
+              <pixiContainer layout={{ width: Math.max(100, editorWidth), height: instrumentPanelHeight, flexDirection: 'column' }}>
+                {/* MusicLine toolbar */}
+                <pixiContainer layout={{ width: '100%', height: 28, flexDirection: 'row', alignItems: 'center', paddingLeft: 4, gap: 6 }}>
+                  <pixiBitmapText
+                    text="MusicLine"
+                    style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 11, fill: 0xffffff }}
+                    tint={0x888888}
+                  />
+                  <pixiContainer layout={{ flex: 1, height: 28 }} />
+                  <PixiButton
+                    label="Export .ml"
+                    variant="ft2"
+                    size="sm"
+                    color="green"
+                    onClick={handleExportML}
+                  />
+                </pixiContainer>
                 <PixiMusicLineTrackTable
                   width={Math.max(100, editorWidth)}
                   height={MUSICLINE_MATRIX_HEIGHT}
@@ -202,7 +255,7 @@ export const PixiTrackerView: React.FC = () => {
                 />
                 <PixiMusicLinePatternViewer
                   width={Math.max(100, editorWidth)}
-                  height={Math.max(50, instrumentPanelHeight - MUSICLINE_MATRIX_HEIGHT)}
+                  height={Math.max(50, instrumentPanelHeight - MUSICLINE_MATRIX_HEIGHT - 28)}
                 />
               </pixiContainer>
             )}
