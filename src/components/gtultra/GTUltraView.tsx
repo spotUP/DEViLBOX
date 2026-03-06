@@ -143,12 +143,16 @@ export const GTUltraView: React.FC<{ width?: number; height?: number }> = ({ wid
   }, [channelCount, orderData, patternData, currentOrderPos]);
 
   const handleCellChange = useCallback((channelIdx: number, rowIdx: number, columnKey: string, value: number) => {
-    // TODO: Wire up pattern editing to engine
-    // For now, this is a display-only pattern editor
-    // Pattern editing requires calling engine methods to update WASM state
-    // and the store will receive updates via the onPatternData callback
-    console.log('Pattern cell changed:', { channelIdx, rowIdx, columnKey, value });
-  }, []);
+    const engine = useGTUltraStore.getState().engine;
+    if (!engine) return;
+    const patIdx = orderData[0]?.[currentOrderPos] ?? 0;
+    // GT Ultra binary layout: col 0=note, 1=instrument, 2=command, 3=data
+    const colMap: Record<string, number> = { note: 0, instrument: 1, command: 2, data: 3 };
+    const col = colMap[columnKey];
+    if (col === undefined) return;
+    // setPatternCell writes to WASM; the onPatternData callback will refresh store
+    engine.setPatternCell(patIdx, rowIdx, col, value);
+  }, [orderData, currentOrderPos]);
 
   const sidebarW = Math.min(SIDEBAR_WIDTH, Math.floor(width * 0.35));
   const editorW = width - sidebarW;
