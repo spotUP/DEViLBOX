@@ -107,7 +107,7 @@ export async function parseTrackerModule(buffer: ArrayBuffer, fileName: string):
   const xmFreqType = result.patterns[0]?.importMetadata?.xmData?.frequencyType;
   const linearPeriods = format === 'XM' ? (xmFreqType === 'linear' || xmFreqType === undefined) : false;
 
-  const song: TrackerSong = {
+  return {
     name: moduleInfo.metadata.title || fileName.replace(/\.[^/.]+$/, ''),
     format,
     patterns: result.patterns,
@@ -120,13 +120,6 @@ export async function parseTrackerModule(buffer: ArrayBuffer, fileName: string):
     initialBPM: modData?.initialBPM ?? 125,
     linearPeriods,
   };
-
-  // Preserve raw MOD binary for PT2Engine WASM (authentic Paula emulation)
-  if (format === 'MOD') {
-    song.pt2FileData = buffer.slice(0);
-  }
-
-  return song;
 }
 
 export function createFallbackInstruments(patterns: Pattern[], instrumentNames: string[]): InstrumentConfig[] {
