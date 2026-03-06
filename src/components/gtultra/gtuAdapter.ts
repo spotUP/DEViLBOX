@@ -115,3 +115,55 @@ export function gtuToFormatChannels(
 
   return result;
 }
+
+/**
+ * Parse binary pattern data from WASM into structured cell format.
+ *
+ * GT Ultra stores patterns as Uint8Array with 4 bytes per cell: [note, instr, cmd, data]
+ */
+export function parseBinaryPatternData(
+  binaryData: Uint8Array,
+  channelCount: number,
+  patternLength: number
+): Array<Array<{ note: number; instrument: number; command: number; data: number }>> {
+  const patterns: Array<Array<{ note: number; instrument: number; command: number; data: number }>> = [];
+
+  for (let ch = 0; ch < channelCount; ch++) {
+    const channel: Array<{ note: number; instrument: number; command: number; data: number }> = [];
+    for (let row = 0; row < patternLength; row++) {
+      const offset = (ch * patternLength + row) * 4;
+      channel.push({
+        note: binaryData[offset] ?? 0,
+        instrument: binaryData[offset + 1] ?? 0,
+        command: binaryData[offset + 2] ?? 0,
+        data: binaryData[offset + 3] ?? 0,
+      });
+    }
+    patterns.push(channel);
+  }
+
+  return patterns;
+}
+
+/**
+ * Encode structured cell data back to binary format for WASM.
+ */
+export function encodeBinaryPatternData(
+  patterns: Array<Array<{ note: number; instrument: number; command: number; data: number }>>,
+  patternLength: number
+): Uint8Array {
+  const binaryData = new Uint8Array(patterns.length * patternLength * 4);
+
+  for (let ch = 0; ch < patterns.length; ch++) {
+    for (let row = 0; row < patternLength; row++) {
+      const cell = patterns[ch][row];
+      const offset = (ch * patternLength + row) * 4;
+      binaryData[offset] = cell.note;
+      binaryData[offset + 1] = cell.instrument;
+      binaryData[offset + 2] = cell.command;
+      binaryData[offset + 3] = cell.data;
+    }
+  }
+
+  return binaryData;
+}
