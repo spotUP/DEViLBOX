@@ -1,3 +1,0 @@
-/Users/spot/Code/DEViLBOX/sonic-arranger-wasm/build/CMakeFiles/SonicArranger.dir
-/Users/spot/Code/DEViLBOX/sonic-arranger-wasm/build/CMakeFiles/edit_cache.dir
-/Users/spot/Code/DEViLBOX/sonic-arranger-wasm/build/CMakeFiles/rebuild_cache.dir
