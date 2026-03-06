@@ -16,7 +16,7 @@ if(EMSCRIPTEN)
     "SHELL:-s WASM=1"
     "SHELL:-s MODULARIZE=1"
     "SHELL:-s EXPORT_NAME='createJamCracker'"
-    "SHELL:-s EXPORTED_FUNCTIONS=['_jc_init','_jc_render','_jc_stop','_jc_get_song_pos','_jc_get_row','_jc_get_speed','_jc_get_tick','_jc_get_song_length','_jc_get_num_patterns','_jc_get_num_instruments','_jc_get_sample_rate','_malloc','_free']"
+    "SHELL:-s EXPORTED_FUNCTIONS=['_jc_init','_jc_render','_jc_stop','_jc_get_song_pos','_jc_get_row','_jc_get_speed','_jc_get_tick','_jc_get_song_length','_jc_get_num_patterns','_jc_get_num_instruments','_jc_get_sample_rate','_jc_get_pattern_rows','_jc_get_pattern_cell','_jc_set_pattern_cell','_jc_get_song_entry','_jc_note_on','_jc_note_off','_jc_render_preview','_malloc','_free']"
     "SHELL:-s EXPORTED_RUNTIME_METHODS=['ccall','cwrap','HEAPU8','HEAPF32']"
     "SHELL:-s ALLOW_MEMORY_GROWTH=1"
     "SHELL:-s INITIAL_MEMORY=4194304"

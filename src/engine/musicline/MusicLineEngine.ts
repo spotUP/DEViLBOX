@@ -173,6 +173,12 @@ export class MusicLineEngine {
             this._rejectLoad = null;
           }
           break;
+
+        case 'pattern-data':
+          if (data.requestId && this._patternCallbacks.has(data.requestId)) {
+            this._patternCallbacks.get(data.requestId)!(data);
+          }
+          break;
       }
     };
 
@@ -268,6 +274,53 @@ export class MusicLineEngine {
   onEnded(cb: () => void): () => void {
     this._endedCallbacks.add(cb);
     return () => this._endedCallbacks.delete(cb);
+  }
+
+  // --------------------------------------------------------------------------
+  // Pattern data access (read/write via WASM bridge)
+  // --------------------------------------------------------------------------
+
+  private _patternCallbacks: Map<string, (data: any) => void> = new Map();
+  private _requestId = 0;
+
+  /** Get pattern data for a specific part index. Returns array of 128 rows. */
+  getPatternData(partIdx: number): Promise<Array<{ note: number; inst: number; fx: number[] }>> {
+    return new Promise((resolve) => {
+      if (!this.workletNode) { resolve([]); return; }
+      const requestId = `pat-${this._requestId++}`;
+      this._patternCallbacks.set(requestId, (data) => {
+        this._patternCallbacks.delete(requestId);
+        resolve(data.rows);
+      });
+      this.workletNode.port.postMessage({ type: 'get-pattern-data', partIdx, requestId });
+    });
+  }
+
+  /** Set a single cell in a pattern. Only provided fields are updated. */
+  setPatternCell(partIdx: number, row: number, cell: { note?: number; inst?: number; fx?: number[] }): void {
+    this.workletNode?.port.postMessage({
+      type: 'set-pattern-cell',
+      partIdx,
+      row,
+      note: cell.note,
+      inst: cell.inst,
+      fx: cell.fx,
+    });
+  }
+
+  /** Request song info (numParts, numChannels, numInstruments). */
+  getSongInfo(): Promise<{ numParts: number; numChannels: number; numInstruments: number }> {
+    return new Promise((resolve) => {
+      if (!this.workletNode) { resolve({ numParts: 0, numChannels: 0, numInstruments: 0 }); return; }
+      const handler = (event: MessageEvent) => {
+        if (event.data.type === 'song-info') {
+          this.workletNode!.port.removeEventListener('message', handler);
+          resolve(event.data);
+        }
+      };
+      this.workletNode.port.addEventListener('message', handler);
+      this.workletNode.port.postMessage({ type: 'get-song-info' });
+    });
   }
 
   dispose(): void {
