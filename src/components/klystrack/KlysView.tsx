@@ -11,12 +11,13 @@
  * └──────────────────────────────────────────────────┘
  */
 
-import React, { useRef, useEffect, useState, useCallback } from 'react';
+import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react';
 import { useTrackerStore , useFormatStore } from '@stores';
 import { useTransportStore } from '@stores/useTransportStore';
-import { KlysPatternEditor } from './KlysPatternEditor';
+import { GenericFormatView } from '@/components/shared/GenericFormatView';
 import { KlysPositionEditor } from './KlysPositionEditor';
 import { KlysInstrumentEditor } from './KlysInstrumentEditor';
+import { klysToFormatChannels, KLYS_COLUMNS } from './klysAdapter';
 import { KlysEngine } from '@/engine/klystrack/KlysEngine';
 import { getTrackerReplayer } from '@engine/TrackerReplayer';
 import { exportAsKlystrack } from '@lib/export/KlysExporter';
@@ -29,6 +30,7 @@ export const KlysView: React.FC<{ width?: number; height?: number }> = ({ width:
   const currentPositionIndex = useTrackerStore(s => s.currentPositionIndex);
   const setCurrentPosition = useTrackerStore(s => s.setCurrentPosition);
   const isPlaying = useTransportStore(s => s.isPlaying);
+  const currentRow = useTransportStore(s => s.currentRow);
 
   const [editPosition, setEditPosition] = useState(0);
   const [selectedInstrument, setSelectedInstrument] = useState(0);
@@ -123,10 +125,59 @@ export const KlysView: React.FC<{ width?: number; height?: number }> = ({ width:
   const { w: width, h: height } = size;
   const activePosition = isPlaying ? currentPositionIndex : editPosition;
 
+  // Compute format channels from native data
+  const channels = useMemo(() => {
+    if (!nativeData) return [];
+    return klysToFormatChannels(nativeData, activePosition);
+  }, [nativeData, activePosition]);
+
   const handlePositionChange = useCallback((pos: number) => {
     setEditPosition(pos);
     if (!isPlaying) setCurrentPosition(pos);
   }, [isPlaying, setCurrentPosition]);
+
+  // Handle pattern cell edits
+  const handleCellChange = useCallback((channelIdx: number, rowIdx: number, columnKey: string, value: number) => {
+    if (!nativeData) return;
+    const seq = nativeData.sequences[channelIdx];
+    if (!seq) return;
+
+    // Find pattern at current position
+    let patternIdx = -1;
+    for (const entry of seq.entries) {
+      if (entry.position <= activePosition) {
+        patternIdx = entry.pattern;
+      }
+    }
+
+    if (patternIdx < 0 || patternIdx >= nativeData.patterns.length) return;
+    const pattern = nativeData.patterns[patternIdx];
+    if (rowIdx >= pattern.numSteps) return;
+
+    const step = pattern.steps[rowIdx];
+    if (!step) return;
+
+    // Update the appropriate field
+    (step as any)[columnKey] = value;
+
+    // Send to WASM engine
+    if (KlysEngine.hasInstance()) {
+      // Decode 16-bit command field
+      const cmdLow = (step.command & 0xFF);
+      const cmdHigh = (step.command >> 8) & 0xFF;
+      KlysEngine.getInstance().setPatternStep(
+        patternIdx, rowIdx,
+        step.note, step.instrument, step.ctrl, step.volume,
+        cmdLow, cmdHigh
+      );
+    }
+
+    // Trigger re-render
+    const state = useFormatStore.getState();
+    if (state.klysNative) {
+      useFormatStore.setState({ klysNative: { ...state.klysNative } });
+    }
+  }, [nativeData, activePosition]);
 
   const handlePlay = useCallback(() => {
     if (!KlysEngine.hasInstance()) return;
@@ -178,73 +229,73 @@ export const KlysView: React.FC<{ width?: number; height?: number }> = ({ width:
     `${activePosition.toString().padStart(3, '0')}/${nativeData.songLength.toString().padStart(3, '0')}`,
   ].join('  |  ');
 
-  const editorH = height - TOOLBAR_H - POSITION_H;
+  // Build instrument editor side panel
+  const sidePanelContent = showInstEditor ? (
+    <div className="flex flex-col h-full">
+      <div className="flex items-center gap-1 px-2 py-1 bg-[#1a1a1a] border-b border-[#222]">
+        <span className="text-[10px] text-gray-500">Inst:</span>
+        <select
+          className="flex-1 bg-[#111] text-xs text-gray-200 border border-[#333] rounded px-1"
+          value={selectedInstrument}
+          onChange={e => setSelectedInstrument(parseInt(e.target.value, 10))}
+        >
+          {nativeData.instruments.map((inst, i) => (
+            <option key={i} value={i}>
+              {i.toString(16).toUpperCase().padStart(2, '0')}: {inst.name || 'Unnamed'}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div className="flex-1 overflow-y-auto">
+        <KlysInstrumentEditor instrumentIndex={selectedInstrument} />
+      </div>
+    </div>
+  ) : undefined;
+
+  // Build toolbar slot with Export and Inst buttons
+  const toolbarSlot = (
+    <>
+      <button
+        className="px-2 py-0.5 text-xs bg-blue-800 hover:bg-blue-700 text-blue-100 rounded border border-blue-600"
+        onClick={handleExport}
+      >Export .kt</button>
+      <button
+        className={`px-2 py-0.5 text-xs rounded border ${showInstEditor ? 'bg-purple-700 text-purple-100 border-purple-500' : 'bg-gray-700 hover:bg-gray-600 text-gray-200 border-gray-500'}`}
+        onClick={() => setShowInstEditor(!showInstEditor)}
+      >Inst</button>
+    </>
+  );
 
   return (
-    <div ref={containerRef} className="flex flex-col flex-1 min-h-0 bg-dark-bgPrimary text-ft2-text font-mono" style={propW ? { width, height } : undefined}>
-      {/* Toolbar */}
-      <div className="flex items-center gap-2 px-3 border-b border-ft2-border bg-dark-bgSecondary" style={{ height: TOOLBAR_H }}>
-        <span className="text-xs font-bold text-cyan-300">KT</span>
-        <span className="text-ft2-textDim">|</span>
-        <span className="text-xs text-ft2-textDim">{toolbarInfo}</span>
-        <div className="flex-1" />
-        <button
-          className={`px-2 py-0.5 text-xs rounded border ${isPlaying ? 'bg-red-800 hover:bg-red-700 text-red-100 border-red-600' : 'bg-green-800 hover:bg-green-700 text-green-100 border-green-600'}`}
-          onClick={isPlaying ? handleStop : handlePlay}
-        >{isPlaying ? 'Stop' : 'Play'}</button>
-        <button
-          className="px-2 py-0.5 text-xs bg-blue-800 hover:bg-blue-700 text-blue-100 rounded border border-blue-600"
-          onClick={handleExport}
-        >Export .kt</button>
-        <button
-          className={`px-2 py-0.5 text-xs rounded border ${showInstEditor ? 'bg-purple-700 text-purple-100 border-purple-500' : 'bg-gray-700 hover:bg-gray-600 text-gray-200 border-gray-500'}`}
-          onClick={() => setShowInstEditor(!showInstEditor)}
-        >Inst</button>
-      </div>
-
-      {/* Position editor */}
-      <div className="border-b border-ft2-border" style={{ height: POSITION_H }}>
-        <KlysPositionEditor
-          width={width}
-          height={POSITION_H}
-          nativeData={nativeData}
-          currentPosition={activePosition}
-          onPositionChange={handlePositionChange}
-        />
-      </div>
-
-      {/* Pattern editor + optional instrument editor side panel */}
-      <div className="flex flex-1 min-h-0">
-        <div className="flex-1 min-h-0">
-          <KlysPatternEditor
-            width={showInstEditor ? width - 280 : width}
-            height={Math.max(100, editorH)}
+    <div
+      ref={containerRef}
+      className="flex flex-col flex-1 min-h-0 bg-dark-bgPrimary text-ft2-text font-mono"
+      style={propW ? { width, height } : undefined}
+    >
+      <GenericFormatView
+        formatLabel="KT"
+        toolbarInfo={toolbarInfo}
+        isPlaying={isPlaying}
+        onPlay={handlePlay}
+        onStop={handleStop}
+        toolbarSlot={toolbarSlot}
+        positionEditor={
+          <KlysPositionEditor
+            width={width}
+            height={POSITION_H}
             nativeData={nativeData}
             currentPosition={activePosition}
+            onPositionChange={handlePositionChange}
           />
-        </div>
-        {showInstEditor && (
-          <div className="flex flex-col border-l border-ft2-border" style={{ width: 280 }}>
-            <div className="flex items-center gap-1 px-2 py-1 bg-[#1a1a1a] border-b border-ft2-border">
-              <span className="text-[10px] text-gray-500">Inst:</span>
-              <select
-                className="flex-1 bg-[#111] text-xs text-gray-200 border border-[#333] rounded px-1"
-                value={selectedInstrument}
-                onChange={e => setSelectedInstrument(parseInt(e.target.value, 10))}
-              >
-                {nativeData.instruments.map((inst, i) => (
-                  <option key={i} value={i}>
-                    {i.toString(16).toUpperCase().padStart(2, '0')}: {inst.name || 'Unnamed'}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="flex-1 overflow-y-auto">
-              <KlysInstrumentEditor instrumentIndex={selectedInstrument} />
-            </div>
-          </div>
-        )}
-      </div>
+        }
+        positionEditorHeight={POSITION_H}
+        columns={KLYS_COLUMNS}
+        channels={channels}
+        currentRow={currentRow}
+        onCellChange={handleCellChange}
+        sidePanel={sidePanelContent}
+        sidePanelWidth={280}
+      />
     </div>
   );
 };
