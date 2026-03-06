@@ -166,6 +166,11 @@ class MaProcessor extends AudioWorkletProcessor {
         }
       }
 
+      // Set output sample rate to match AudioContext (default is 28150 Hz PAL)
+      if (typeof this.module._player_set_sample_rate === 'function') {
+        this.module._player_set_sample_rate(sampleRate);
+      }
+
       this.updateBufferViews();
       this.initialized = true;
       this.initializing = false;
