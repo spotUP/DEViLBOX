@@ -340,14 +340,17 @@ export function convertFurnaceNoteValue(cell: FurnacePatternCell): number {
   if (cell.note === 180 || cell.note === 100) return 253; // Note off
   if (cell.note === 181 || cell.note === 101) return 254; // Release
   if (cell.note === 182 || cell.note === 102) return 255; // Macro release
-  // Normal note: octave * 12 + (note - 1) for old format, or direct for new format
+  // Normal note: Furnace stores notes as 1-12 (C#, D, D#, ..., B, C) + octave.
+  // Furnace C++ uses: flat = note + octave * 12 + 60.
+  // We store WITHOUT the +60 offset; convertFurnaceRow adds +1 for XM mapping.
+  // So our flat value = note + octave * 12, where C-0 = 0, C#0 = 1, ..., B-7 = 95.
   if (cell.note >= 1 && cell.note <= 12) {
-    // Old format: note 1-12 = C#..C, octave is separate (signed byte: 255=-1, 254=-2)
     const octave = cell.octave > 127 ? cell.octave - 256 : cell.octave;
-    const val = octave * 12 + (cell.note - 1);
+    const val = octave * 12 + cell.note;
     return Math.max(0, Math.min(179, val));
   }
-  // New format note values (0-179)
+  // New format note values (0-179) — already decomposed via lookup tables
+  // and will be recomposed through this same path
   if (cell.note >= 0 && cell.note < 180) {
     return cell.note;
   }

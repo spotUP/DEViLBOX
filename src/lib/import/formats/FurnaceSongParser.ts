@@ -1800,7 +1800,7 @@ export function convertFurnaceToDevilbox(module: FurnaceModule, subsongIndex = 0
   const patterns: ConvertedPatternCell[][][] = [];
   const subsong = module.subsongs[subsongIndex] || module.subsongs[0];
   if (!subsong) {
-    return { instruments, patterns: [], metadata: createMetadata(module, subsongIndex), wavetables: [], samples: [], furnaceNative: { subsongs: [], activeSubsong: subsongIndex } };
+    return { instruments, patterns: [], metadata: createMetadata(module, subsongIndex), wavetables: [], samples: [], furnaceNative: { subsongs: [], activeSubsong: subsongIndex, chipIds: module.systems.slice(0, module.systemLen) } };
   }
 
   // Debug: Log pattern map keys
@@ -1934,7 +1934,7 @@ export function convertFurnaceToDevilbox(module: FurnaceModule, subsongIndex = 0
  * Build FurnaceNativeData from parsed module for the format-specific editor.
  * Preserves per-channel pattern pools and 2D order matrix.
  */
-function buildFurnaceNativeData(module: FurnaceModule): FurnaceNativeData {
+export function buildFurnaceNativeData(module: FurnaceModule): FurnaceNativeData {
   const subsongs: FurnaceSubsong[] = module.subsongs.map((sub, subIdx) => {
     const channels: FurnaceChannelData[] = [];
 
@@ -1987,6 +1987,9 @@ function buildFurnaceNativeData(module: FurnaceModule): FurnaceNativeData {
   return {
     subsongs,
     activeSubsong: 0,
+    chipIds: module.systems.slice(0, module.systemLen),
+    compatFlags: module.compatFlags,
+    grooves: module.grooves.length > 0 ? module.grooves : undefined,
   };
 }
 
