@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Klystrack Debug Test</title>
+  <style>
+    body { font-family: monospace; padding: 20px; background: #111; color: #0f0; }
+    h1 { color: #0ff; }
+    .instructions { margin-bottom: 20px; padding: 10px; border: 1px solid #0f0; }
+    .console {
+      border: 1px solid #0f0;
+      padding: 10px;
+      height: 400px;
+      overflow-y: auto;
+      background: #000;
+      margin-top: 20px;
+    }
+    .log { padding: 2px 0; }
+    .log.error { color: #f00; }
+    .log.warn { color: #ff0; }
+    .log.info { color: #0f0; }
+  </style>
+</head>
+<body>
+  <h1>Klystrack Pattern Data Debug Test</h1>
+  <div class="instructions">
+    <h3>Steps:</h3>
+    <ol>
+      <li>Use the file input below to select a .kt file</li>
+      <li>Check the console output below</li>
+      <li>Open browser DevTools (F12) to see additional messages</li>
+      <li>Look for these log sequences:
+        <ul>
+          <li>[Klystrack Worklet] loadSong: buffer size: ...</li>
+          <li>[Klystrack Worklet] _klys_load_song returned: 1 (or 0)</li>
+          <li>[Klystrack Worklet] Song loaded - channels: ...</li>
+          <li>[Klystrack Worklet] extractAndSendData: ...</li>
+          <li>[Klystrack Worklet] Pattern X: length=Y, steps=Z</li>
+          <li>[Klystrack Worklet] Sending songData: ...</li>
+        </ul>
+      </li>
+    </ol>
+  </div>
+
+  <input type="file" id="fileInput" accept=".kt,.ki" />
+  <button id="loadBtn">Load &amp; Test</button>
+
+  <div class="console" id="console"></div>
+
+  <script>
+    const consoleEl = document.getElementById('console');
+    const fileInput = document.getElementById('fileInput');
+    const loadBtn = document.getElementById('loadBtn');
+
+    function log(level, msg) {
+      const div = document.createElement('div');
+      div.className = `log ${level}`;
+      div.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+      consoleEl.appendChild(div);
+      consoleEl.scrollTop = consoleEl.scrollHeight;
+      console.log(`[${level.toUpperCase()}]`, msg);
+    }
+
+    // Intercept console methods
+    const originalLog = console.log;
+    const originalError = console.error;
+    const originalWarn = console.warn;
+
+    console.log = (...args) => {
+      originalLog(...args);
+      const msg = args.join(' ');
+      log('info', msg);
+    };
+
+    console.error = (...args) => {
+      originalError(...args);
+      const msg = args.join(' ');
+      log('error', msg);
+    };
+
+    console.warn = (...args) => {
+      originalWarn(...args);
+      const msg = args.join(' ');
+      log('warn', msg);
+    };
+
+    loadBtn.addEventListener('click', async () => {
+      const file = fileInput.files[0];
+      if (!file) {
+        log('warn', 'No file selected');
+        return;
+      }
+
+      log('info', `Loading file: ${file.name} (${file.size} bytes)`);
+      const buffer = await file.arrayBuffer();
+      log('info', 'File loaded into buffer, ready for testing');
+      log('info', 'Now open the DEViLBOX app and load this file to see the pattern data extraction logs');
+    });
+
+    log('info', 'Ready to test klystrack pattern data extraction');
+    log('info', 'Open browser DevTools (F12) console to see all logging');
+  </script>
+</body>
+</html>
