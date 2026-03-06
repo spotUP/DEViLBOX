@@ -45,6 +45,7 @@ import type {
   RdPianoConfig,
   MAMEConfig,
   SuperColliderConfig,
+  GearmulatorConfig,
 } from './tonejs';
 import { VOWEL_FORMANTS } from './tonejs';
 import type {
@@ -271,6 +272,8 @@ export interface InstrumentConfig {
   modularSynth?: import('../modular').ModularPatchConfig;
   // SuperCollider scripted synthesis
   superCollider?: SuperColliderConfig;
+  // Gearmulator DSP56300 VA synths (Access Virus, Waldorf, Nord, Roland)
+  gearmulator?: GearmulatorConfig;
   // Sampler config
   sample?: SampleConfig;
   effects: EffectConfig[];

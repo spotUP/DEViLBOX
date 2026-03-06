@@ -541,10 +541,58 @@ export const SuperColliderEditor: React.FC<Props> = ({ config, onChange }) => {
           return;
         }
       }
-    } catch { /* no cache, user will need to compile */ }
+    } catch { /* no cache — fall through to auto-compile */ }
 
-    setStatus({ state: 'idle' });
-  }, []);
+    // Not cached — auto-compile the preset source
+    setStatus({ state: 'compiling' });
+    startProgress();
+    try {
+      const res = await fetch(`${API_URL}/sc/compile`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ source: preset.source }),
+      });
+      const data = await res.json() as CompileResponse;
+      if (data.success) {
+        const newParams: SCParam[] = data.params.map((p) => ({
+          name: p.name,
+          default: p.default,
+          min: p.min,
+          max: p.max,
+          value: p.default,
+        }));
+        onChangeRef.current({
+          ...configRef.current,
+          source: preset.source,
+          synthDefName: data.synthDefName,
+          binary: data.binary,
+          params: newParams,
+        });
+        finishProgress(true);
+        setStatus({ state: 'compiled' });
+        // Cache for next time
+        fetch(`${API_URL}/sc/presets/cache`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: data.synthDefName, result: data }),
+        }).catch(() => {});
+      } else {
+        finishProgress(false);
+        setStatus({ state: 'error', message: data.error, line: data.line, rawOutput: data.rawOutput });
+      }
+    } catch (err) {
+      finishProgress(false);
+      const raw = err instanceof Error ? err.message : 'Network error';
+      const isConnectionError = raw === 'Failed to fetch' || raw.toLowerCase().includes('networkerror');
+      setStatus({
+        state: 'error',
+        message: isConnectionError ? 'Compile server unreachable' : raw,
+        rawOutput: isConnectionError
+          ? `Could not connect to the compile server:\n  ${API_URL}/sc/compile\n\nStart the backend with:\n  cd server && npm run dev`
+          : undefined,
+      });
+    }
+  }, [startProgress, finishProgress]);
 
   const filteredPresets = useMemo(() => {
     let list = presetCategory === 'All' ? SC_PRESETS : SC_PRESETS.filter(p => p.category === presetCategory);

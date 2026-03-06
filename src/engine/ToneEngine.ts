@@ -2112,7 +2112,14 @@ export class ToneEngine {
       case 'DavidWhittakerSynth':
       case 'SonicArrangerSynth':
       // SunVox WASM patch player
-      case 'SunVoxSynth': {
+      case 'SunVoxSynth':
+      // Gearmulator DSP56300 VA synths
+      case 'GearmulatorVirus':
+      case 'GearmulatorVirusTI':
+      case 'GearmulatorMicroQ':
+      case 'GearmulatorXT':
+      case 'GearmulatorNord':
+      case 'GearmulatorJP8000': {
         instrument = InstrumentFactory.createInstrument(config);
         break;
       }

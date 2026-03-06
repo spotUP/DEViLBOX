@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.15)
-project(gearmulator_wasm VERSION 1.0.0 LANGUAGES CXX)
+project(gearmulator_wasm VERSION 1.0.0 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -48,6 +48,12 @@ set(gearmulator_SYNTH_JE8086 ON CACHE BOOL "" FORCE)
 file(GLOB DSP56K_BASE_SRC "${GM_SRC}/dsp56300/source/dsp56kBase/*.cpp")
 add_library(dsp56kBase STATIC ${DSP56K_BASE_SRC})
 target_include_directories(dsp56kBase PUBLIC "${GM_SRC}/dsp56300/source")
+# Emscripten doesn't have execinfo.h — define ANDROID to skip backtrace code
+if(EMSCRIPTEN)
+    # Emscripten doesn't have execinfo.h — define ANDROID to skip backtrace code
+    # Define PRIO_THREAD so threadtools.cpp uses setpriority() instead of syscall(SYS_gettid)
+    target_compile_definitions(dsp56kBase PRIVATE ANDROID=1 PRIO_THREAD=1)
+endif()
 
 # ──────────────────────────────────────────────────────────────────────────────
 # asmjit (stub — needed for compile but JIT won't run on WASM)
@@ -58,12 +64,22 @@ target_include_directories(dsp56kBase PUBLIC "${GM_SRC}/dsp56300/source")
 set(ASMJIT_STATIC TRUE)
 set(ASMJIT_NO_INSTALL TRUE)
 add_subdirectory("${GM_SRC}/dsp56300/source/asmjit" asmjit_build)
+if(EMSCRIPTEN)
+    # Stub out __builtin___clear_cache which is unsupported on WASM
+    target_compile_options(asmjit PRIVATE "-include${CMAKE_CURRENT_SOURCE_DIR}/src/wasm_cache_stub.h")
+endif()
 
 # ──────────────────────────────────────────────────────────────────────────────
 # dsp56kEmu — the core DSP56300 emulator
 # ──────────────────────────────────────────────────────────────────────────────
 
 file(GLOB DSP56K_EMU_SRC "${GM_SRC}/dsp56300/source/dsp56kEmu/*.cpp")
+if(EMSCRIPTEN)
+    # Remove JIT .cpp files — WASM is 32-bit, JIT code has x86_64 static_asserts
+    # The jit.h and jittypes.h headers are patched with #ifdef __EMSCRIPTEN__ guards
+    file(GLOB DSP56K_JIT_SRC "${GM_SRC}/dsp56300/source/dsp56kEmu/jit*.cpp")
+    list(REMOVE_ITEM DSP56K_EMU_SRC ${DSP56K_JIT_SRC})
+endif()
 add_library(dsp56kEmu STATIC ${DSP56K_EMU_SRC})
 target_include_directories(dsp56kEmu PUBLIC "${GM_SRC}/dsp56300/source")
 target_link_libraries(dsp56kEmu PUBLIC dsp56kBase asmjit)
@@ -91,7 +107,10 @@ configure_file(
     "${CMAKE_CURRENT_SOURCE_DIR}/src/synthlib_buildconfig.h.in"
     "${CMAKE_BINARY_DIR}/generated/synthLib/buildconfig.h"
 )
-target_include_directories(synthLib PUBLIC "${CMAKE_BINARY_DIR}/generated")
+target_include_directories(synthLib PUBLIC
+    "${CMAKE_BINARY_DIR}/generated/synthLib"
+    "${CMAKE_BINARY_DIR}/generated"
+)
 
 # ──────────────────────────────────────────────────────────────────────────────
 # libresample — sample rate conversion
@@ -185,26 +204,29 @@ target_link_libraries(nordLib PUBLIC synthLib hardwareLib dsp56kEmu)
 # rLib — Roland common library (needed by jeLib)
 # ──────────────────────────────────────────────────────────────────────────────
 
-add_library(rLib STATIC "${GM_SRC}/ronaldo/common/storage.cpp")
-target_include_directories(rLib PUBLIC "${GM_SRC}/ronaldo/common/.." "${GM_SRC}")
+# JE-8086 (Roland JP-8000) excluded from WASM — ESP JIT has no interpreter fallback
+if(NOT EMSCRIPTEN)
+    add_library(rLib STATIC "${GM_SRC}/ronaldo/common/storage.cpp")
+    target_include_directories(rLib PUBLIC "${GM_SRC}/ronaldo/common/.." "${GM_SRC}")
 
-# ──────────────────────────────────────────────────────────────────────────────
-# esp — Roland ESP DSP (JIT stubs for WASM)
-# ──────────────────────────────────────────────────────────────────────────────
+    # ──────────────────────────────────────────────────────────────────────────────
+    # esp — Roland ESP DSP (JIT-only, not available on WASM)
+    # ──────────────────────────────────────────────────────────────────────────────
 
-file(GLOB ESP_SRC "${GM_SRC}/ronaldo/esp/*.cpp")
-add_library(esp STATIC ${ESP_SRC})
-target_include_directories(esp PUBLIC "${GM_SRC}/ronaldo/esp/.." "${GM_SRC}")
-target_link_libraries(esp PUBLIC asmjit)
+    file(GLOB ESP_SRC "${GM_SRC}/ronaldo/esp/*.cpp")
+    add_library(esp STATIC ${ESP_SRC})
+    target_include_directories(esp PUBLIC "${GM_SRC}/ronaldo/esp/.." "${GM_SRC}")
+    target_link_libraries(esp PUBLIC asmjit)
 
-# ──────────────────────────────────────────────────────────────────────────────
-# ronaldo — Roland JP-8000 (JE-8086 / jeLib)
-# ──────────────────────────────────────────────────────────────────────────────
+    # ──────────────────────────────────────────────────────────────────────────────
+    # ronaldo — Roland JP-8000 (JE-8086 / jeLib)
+    # ──────────────────────────────────────────────────────────────────────────────
 
-file(GLOB RONALDO_SRC "${GM_SRC}/ronaldo/je8086/jeLib/*.cpp")
-add_library(ronaldoLib STATIC ${RONALDO_SRC})
-target_include_directories(ronaldoLib PUBLIC "${GM_SRC}" "${GM_SRC}/ronaldo/je8086/jeLib/..")
-target_link_libraries(ronaldoLib PUBLIC synthLib hardwareLib rLib esp)
+    file(GLOB RONALDO_SRC "${GM_SRC}/ronaldo/je8086/jeLib/*.cpp")
+    add_library(ronaldoLib STATIC ${RONALDO_SRC})
+    target_include_directories(ronaldoLib PUBLIC "${GM_SRC}" "${GM_SRC}/ronaldo/je8086/jeLib/..")
+    target_link_libraries(ronaldoLib PUBLIC synthLib hardwareLib rLib esp)
+endif()
 
 # ──────────────────────────────────────────────────────────────────────────────
 # WASM Bridge — our entry point
@@ -212,11 +234,27 @@ target_link_libraries(ronaldoLib PUBLIC synthLib hardwareLib rLib esp)
 
 add_executable(gearmulator_wasm src/gearmulator_bridge.cpp)
 
-target_link_libraries(gearmulator_wasm PRIVATE
-    virusLib mqLib xtLib nordLib ronaldoLib
-    synthLib hardwareLib baseLib dsp56kEmu dsp56kBase
-    mc68k rLib esp asmjit libresample
-)
+if(EMSCRIPTEN)
+    # Build Virus only for now — other synths with mc68k have duplicate symbol conflicts
+    # (each synth defines global m68k_read/write callbacks for Musashi, can't coexist in one binary)
+    target_link_libraries(gearmulator_wasm PRIVATE
+        virusLib
+        synthLib hardwareLib baseLib dsp56kEmu dsp56kBase
+        mc68k asmjit libresample
+    )
+    target_compile_definitions(gearmulator_wasm PRIVATE
+        GM_NO_JP8000=1
+        GM_NO_WALDORF_MQ=1
+        GM_NO_WALDORF_XT=1
+        GM_NO_NORD=1
+    )
+else()
+    target_link_libraries(gearmulator_wasm PRIVATE
+        virusLib mqLib xtLib nordLib ronaldoLib
+        synthLib hardwareLib baseLib dsp56kEmu dsp56kBase
+        mc68k rLib esp asmjit libresample
+    )
+endif()
 
 if(EMSCRIPTEN)
     set_target_properties(gearmulator_wasm PROPERTIES

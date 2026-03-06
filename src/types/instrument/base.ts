@@ -222,7 +222,14 @@ export type SynthType =
   // Modular Synthesis
   | 'ModularSynth'    // Modular synthesizer with patch editor
   // SuperCollider scripted synthesis
-  | 'SuperCollider';  // SuperCollider SynthDef (scsynth WASM)
+  | 'SuperCollider'  // SuperCollider SynthDef (scsynth WASM)
+  // Gearmulator DSP56300 VA synths (Access Virus, Waldorf, Nord, Roland)
+  | 'GearmulatorVirus'   // Access Virus A/B/C
+  | 'GearmulatorVirusTI' // Access Virus TI/TI2/Snow
+  | 'GearmulatorMicroQ'  // Waldorf microQ
+  | 'GearmulatorXT'      // Waldorf Microwave II/XT
+  | 'GearmulatorNord'    // Nord Lead 2x
+  | 'GearmulatorJP8000'; // Roland JP-8000
 
 export type WaveformType = 'sine' | 'square' | 'sawtooth' | 'triangle' | 'noise';
 
