@@ -124,6 +124,8 @@ class KlystrackProcessor extends AudioWorkletProcessor {
 
   async initWasm(sr, wasmBinary, jsCode) {
     try {
+      console.log('[Klystrack Worklet] initWasm called, sr=' + sr + ', wasmBinary=' + (wasmBinary ? wasmBinary.byteLength + ' bytes' : 'null') + ', jsCode=' + (jsCode ? jsCode.length + ' chars' : 'null'));
+
       // Polyfill document for Emscripten in worker context
       if (typeof globalThis.document === 'undefined') {
         globalThis.document = {
@@ -149,9 +151,11 @@ class KlystrackProcessor extends AudioWorkletProcessor {
 
       // Execute Emscripten JS via Function constructor
       if (jsCode && !globalThis.createKlystrack) {
+        console.log('[Klystrack Worklet] Executing Emscripten JS via Function constructor...');
         const wrappedCode = jsCode + '\nreturn createKlystrack;';
         const factory = new Function(wrappedCode);
         const result = factory();
+        console.log('[Klystrack Worklet] Factory result type:', typeof result);
         if (typeof result === 'function') {
           globalThis.createKlystrack = result;
         }
@@ -161,9 +165,11 @@ class KlystrackProcessor extends AudioWorkletProcessor {
         throw new Error('createKlystrack factory not available');
       }
 
+      console.log('[Klystrack Worklet] Calling createKlystrack...');
       this.wasm = await globalThis.createKlystrack({
         wasmBinary: wasmBinary,
       });
+      console.log('[Klystrack Worklet] WASM module ready, calling _klys_init...');
 
       this.wasm._klys_init(Math.floor(sr));
 
@@ -171,6 +177,7 @@ class KlystrackProcessor extends AudioWorkletProcessor {
       this.ensureDecodeBuffers(128);
 
       this.initialized = true;
+      console.log('[Klystrack Worklet] Init complete, sending ready');
       this.port.postMessage({ type: 'ready' });
     } catch (err) {
       console.error('[Klystrack Worklet] Init failed:', err);
@@ -190,6 +197,7 @@ class KlystrackProcessor extends AudioWorkletProcessor {
   }
 
   loadSong(buffer) {
+    console.log('[Klystrack Worklet] loadSong called, buffer size:', buffer.byteLength, 'initialized:', this.initialized, 'wasm:', !!this.wasm);
     if (!this.wasm || !this.initialized) return;
 
     const data = new Uint8Array(buffer);
@@ -199,6 +207,7 @@ class KlystrackProcessor extends AudioWorkletProcessor {
 
     const ok = this.wasm._klys_load_song(ptr, data.length);
     this.wasm._free(ptr);
+    console.log('[Klystrack Worklet] _klys_load_song returned:', ok);
 
     if (ok) {
       this.songLoaded = true;
@@ -207,6 +216,7 @@ class KlystrackProcessor extends AudioWorkletProcessor {
       const channels = this.wasm._klys_get_num_channels();
       const numPatterns = this.wasm._klys_get_num_patterns();
       const numInstruments = this.wasm._klys_get_num_instruments();
+      console.log('[Klystrack Worklet] Song info: channels=' + channels + ', patterns=' + numPatterns + ', instruments=' + numInstruments);
 
       const meta = {
         type: 'songLoaded',
@@ -225,7 +235,9 @@ class KlystrackProcessor extends AudioWorkletProcessor {
       this.port.postMessage(meta);
 
       // Extract pattern data from WASM and send to main thread
+      console.log('[Klystrack Worklet] Calling extractAndSendData...');
       this.extractAndSendData(numPatterns, channels, numInstruments);
+      console.log('[Klystrack Worklet] extractAndSendData complete');
     } else {
       this.port.postMessage({ type: 'error', message: 'Failed to load klystrack song' });
     }
@@ -240,6 +252,7 @@ class KlystrackProcessor extends AudioWorkletProcessor {
   }
 
   extractAndSendData(numPatterns, numChannels, numInstruments) {
+    try {
     const w = this.wasm;
     const MAX_STEPS = 256;
     const STEP_BYTES = 6;
@@ -348,12 +361,17 @@ class KlystrackProcessor extends AudioWorkletProcessor {
     }
     w._free(instPtr);
 
+    console.log('[Klystrack Worklet] Sending songData:', patterns.length, 'patterns,', sequences.length, 'sequences,', instruments.length, 'instruments');
     this.port.postMessage({
       type: 'songData',
       patterns,
       sequences,
       instruments,
     });
+    } catch (err) {
+      console.error('[Klystrack Worklet] extractAndSendData failed:', err);
+      this.port.postMessage({ type: 'error', message: 'extractAndSendData: ' + (err.message || String(err)) });
+    }
   }
 
   process(inputs, outputs, parameters) {
