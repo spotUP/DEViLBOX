@@ -345,7 +345,9 @@ EXPORT int32_t gm_getAudioOutputSize(int32_t handle)
         return -1;
     auto* virusDev = dynamic_cast<virusLib::Device*>(g_devices[handle]->device.get());
     if (!virusDev) return -2;
-    return static_cast<int32_t>(virusDev->getDSP()->getAudio().getAudioOutputs().size());
+    auto size = static_cast<int32_t>(virusDev->getDSP()->getAudio().getAudioOutputs().size());
+    printf("[EM] gm_getAudioOutputSize: %d samples in queue\n", size);
+    return size;
 }
 
 /**
@@ -357,7 +359,9 @@ EXPORT int32_t gm_getAudioInputSize(int32_t handle)
         return -1;
     auto* virusDev = dynamic_cast<virusLib::Device*>(g_devices[handle]->device.get());
     if (!virusDev) return -2;
-    return static_cast<int32_t>(virusDev->getDSP()->getAudio().getAudioInputs().size());
+    auto size = static_cast<int32_t>(virusDev->getDSP()->getAudio().getAudioInputs().size());
+    printf("[EM] gm_getAudioInputSize: %d samples in queue\n", size);
+    return size;
 }
 
 } // extern "C"
