@@ -335,6 +335,10 @@ export class TrackerReplayer {
   private speed2: number | null = null;  // null = no alternation (XM/MOD mode)
   private speedAB = false;               // false = use speed1 next, true = use speed2 next
 
+  // Furnace groove (variable tick count per row, replaces speed alternation when active)
+  private activeGroove: number[] | null = null; // null = no groove active
+  private groovePos = 0;                        // current position within groove table
+
   // Per-channel independent sequencing (MusicLine Editor and similar formats)
   // Each channel has its own tick counter and position, advancing at its own speed.
   private channelTickCounters: number[] = [];   // Per-channel tick counter (0 .. effectiveSpeed-1)
@@ -896,11 +900,16 @@ export class TrackerReplayer {
     // Furnace speed alternation: if speed2 differs from speed1, enable alternation
     if (song.speed2 !== undefined && song.speed2 !== song.initialSpeed) {
       this.speed2 = song.speed2;
-      this.speedAB = true; // true = after row 0 (speed1), next will be speed2
+      this.speedAB = false; // false = row 0 uses speed1; after advance, alternates to speed2
     } else {
       this.speed2 = null;
       this.speedAB = false;
     }
+
+    // Furnace groove: initialized to null, activated at runtime via effect 09xx.
+    // Grooves replace speed alternation — each row uses a different tick count from the groove table.
+    this.activeGroove = null;
+    this.groovePos = 0;
 
     // Per-channel sequencing state (MusicLine Editor and similar formats)
     if (song.channelTrackTables) {
@@ -1427,8 +1436,13 @@ export class TrackerReplayer {
     if (this.currentTick >= this.speed) {
       this.currentTick = 0;
 
+      // Furnace groove: cycle through groove table tick counts per row
+      if (this.activeGroove !== null) {
+        this.groovePos = (this.groovePos + 1) % this.activeGroove.length;
+        this.speed = this.activeGroove[this.groovePos];
+      }
       // Furnace speed alternation: alternate between speed1 and speed2 each row
-      if (this.speed2 !== null) {
+      else if (this.speed2 !== null) {
         if (this.speedAB) {
           this.speed = this.speed2;
           this.speedAB = false;
@@ -2123,16 +2137,31 @@ export class TrackerReplayer {
         this.processExtendedEffect0(chIndex, ch, x, y, time);
         break;
 
+      case 0x9: // Furnace groove / set speed
+        // 09xx: activate groove table xx, or set speed if no groove table exists
+        if (this.song?.grooves && param < this.song.grooves.length && this.song.grooves[param]?.length > 0) {
+          this.activeGroove = this.song.grooves[param];
+          this.groovePos = 0;
+          this.speed = this.activeGroove[0];
+          this.speed2 = null; // Groove replaces speed alternation
+        } else {
+          // No groove table — treat as set speed (legacy behavior)
+          this.speed = param || this.speed;
+        }
+        break;
+
       case 0xF: // Set speed/tempo
         if (param === 0) {
           // F00 = stop in some trackers
         } else if (param < 0x20) {
           if (this.speed !== param) {
             this.speed = param;
-            // Fxx disables Furnace speed alternation (sets both speeds to same value)
+            // Fxx disables Furnace speed alternation and groove
             if (this.speed2 !== null) {
               this.speed2 = null;
             }
+            this.activeGroove = null;
+            this.groovePos = 0;
             // Update UI to reflect the speed change from the module
             useTransportStore.getState().setSpeed(param);
           }
@@ -2481,8 +2510,10 @@ export class TrackerReplayer {
 
     // Route continuous effects to Furnace dispatch engine (ticks 1+)
     // The dispatch engine needs per-tick commands for pitch slides, vibrato, etc.
+    // Skip TS-side effect processing for FurnaceDispatch — WASM handles these natively.
     if (ch.instrument?.synthType?.startsWith('Furnace')) {
       this.forwardEffectToFurnace(ch, chIndex, effect, param, x, y);
+      return;
     }
 
     switch (effect) {
@@ -2622,8 +2653,10 @@ export class TrackerReplayer {
     const y = param & 0x0F;
 
     // Route continuous effects to Furnace dispatch engine (ticks 1+)
+    // Skip TS-side processing for FurnaceDispatch — WASM handles these natively.
     if (ch.instrument?.synthType?.startsWith('Furnace')) {
       this.forwardEffectToFurnace(ch, chIndex, effect, param, x, y);
+      return;
     }
 
     switch (effect) {
