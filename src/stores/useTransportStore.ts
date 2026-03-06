@@ -41,6 +41,9 @@ interface TransportStore extends TransportState {
   // Arrangement timeline position
   currentGlobalRow: number;
 
+  // Per-channel playback rows (for formats with independent channel speeds, e.g. MusicLine)
+  currentRowPerChannel: number[];
+
   // Global pitch shift (DJ pitch slider / W effect)
   globalPitch: number; // Semitones (-16 to +16)
 
@@ -75,6 +78,7 @@ interface TransportStore extends TransportState {
   getGrooveTemplate: () => GrooveTemplate;
   setCurrentGlobalRow: (row: number) => void;
   seekToGlobalRow: (row: number) => void;
+  setCurrentRowPerChannel: (rows: number[]) => void;
   cancelPendingRowUpdate: () => void; // Clear pending throttle timer on seek
   reset: () => void;
 }
@@ -119,6 +123,7 @@ export const useTransportStore = create<TransportStore>()(
     jitter: 0,
     useMpcScale: false,
     currentGlobalRow: 0,
+    currentRowPerChannel: [],
     globalPitch: 0, // Default to no pitch shift
     countInEnabled: false,
 
@@ -386,6 +391,11 @@ export const useTransportStore = create<TransportStore>()(
         state.currentGlobalRow = Math.max(0, row);
       }),
 
+    setCurrentRowPerChannel: (rows) =>
+      set((state) => {
+        state.currentRowPerChannel = rows;
+      }),
+
     // Cancel pending throttle timer (call on seek to prevent old row values reverting)
     cancelPendingRowUpdate: () => {
       cancelPendingRowUpdate();
@@ -411,6 +421,7 @@ export const useTransportStore = create<TransportStore>()(
         state.jitter = 0;
         state.useMpcScale = false;
         state.currentGlobalRow = 0;
+        state.currentRowPerChannel = [];
       }),
   }))
 );

@@ -409,6 +409,10 @@ export const usePatternPlayback = () => {
           }
         };
 
+        replayer.onChannelRowChange = (channelRows) => {
+          useTransportStore.getState().setCurrentRowPerChannel(channelRows);
+        };
+
         replayer.onSongEnd = () => {
           console.log('[Playback] Song ended');
         };
