@@ -65,6 +65,17 @@ if(EMSCRIPTEN)
         "_ml_preview_note_off"
         "_ml_preview_render"
         "_ml_preview_stop"
+        "_ml_get_num_parts"
+        "_ml_get_num_channels"
+        "_ml_get_part_note"
+        "_ml_get_part_inst"
+        "_ml_get_part_fx"
+        "_ml_set_part_note"
+        "_ml_set_part_inst"
+        "_ml_set_part_fx"
+        "_ml_get_tune_entry"
+        "_ml_get_tune_length"
+        "_ml_get_num_instruments"
     )
 
     string(JOIN "," EXPORTED_FUNCTIONS_STR ${EXPORTED_FUNCTIONS})

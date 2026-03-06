@@ -103,6 +103,51 @@ class MusicLineProcessor extends AudioWorkletProcessor {
         }
         break;
 
+      // Pattern data access — read/write forwarded to WASM bridge
+      case 'get-pattern-data': {
+        if (!this.wasm || !this.songLoaded) break;
+        const { partIdx, requestId } = data;
+        const rows = [];
+        for (let r = 0; r < 128; r++) {
+          const note = this.wasm._ml_get_part_note(partIdx, r);
+          const inst = this.wasm._ml_get_part_inst(partIdx, r);
+          const fx = [];
+          for (let f = 0; f < 5; f++) {
+            fx.push(this.wasm._ml_get_part_fx(partIdx, r, f));
+          }
+          rows.push({ note, inst, fx });
+        }
+        this.port.postMessage({ type: 'pattern-data', requestId, partIdx, rows });
+        break;
+      }
+
+      case 'set-pattern-cell': {
+        if (!this.wasm || !this.songLoaded) break;
+        const { partIdx: pi, row: rw, note: nt, inst: ins, fx: fxArr } = data;
+        if (nt !== undefined) this.wasm._ml_set_part_note(pi, rw, nt);
+        if (ins !== undefined) this.wasm._ml_set_part_inst(pi, rw, ins);
+        if (fxArr) {
+          for (let f = 0; f < fxArr.length && f < 5; f++) {
+            if (fxArr[f] !== undefined) this.wasm._ml_set_part_fx(pi, rw, f, fxArr[f]);
+          }
+        }
+        break;
+      }
+
+      case 'get-song-info': {
+        if (!this.wasm || !this.songLoaded) break;
+        const numParts = this.wasm._ml_get_num_parts();
+        const numChannels = this.wasm._ml_get_num_channels();
+        const numInstruments = this.wasm._ml_get_num_instruments();
+        this.port.postMessage({
+          type: 'song-info',
+          numParts,
+          numChannels,
+          numInstruments,
+        });
+        break;
+      }
+
       default:
         break;
     }

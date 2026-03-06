@@ -70,6 +70,52 @@ class JamCrackerProcessor extends AudioWorkletProcessor {
       case 'noteOff':
         this.handleNoteOff();
         break;
+
+      // Pattern data access
+      case 'get-pattern-data': {
+        if (!this.wasm || !this.tuneLoaded) break;
+        const { patIdx, requestId } = data;
+        const numRows = this.wasm._jc_get_pattern_rows(patIdx);
+        const rows = [];
+        for (let r = 0; r < numRows; r++) {
+          const channels = [];
+          for (let ch = 0; ch < 4; ch++) {
+            channels.push({
+              period:   this.wasm._jc_get_pattern_cell(patIdx, r, ch, 0),
+              instr:    this.wasm._jc_get_pattern_cell(patIdx, r, ch, 1),
+              speed:    this.wasm._jc_get_pattern_cell(patIdx, r, ch, 2),
+              arpeggio: this.wasm._jc_get_pattern_cell(patIdx, r, ch, 3),
+              vibrato:  this.wasm._jc_get_pattern_cell(patIdx, r, ch, 4),
+              phase:    this.wasm._jc_get_pattern_cell(patIdx, r, ch, 5),
+              volume:   this.wasm._jc_get_pattern_cell(patIdx, r, ch, 6),
+              porta:    this.wasm._jc_get_pattern_cell(patIdx, r, ch, 7),
+            });
+          }
+          rows.push(channels);
+        }
+        this.port.postMessage({ type: 'pattern-data', requestId, patIdx, numRows, rows });
+        break;
+      }
+
+      case 'set-pattern-cell': {
+        if (!this.wasm || !this.tuneLoaded) break;
+        const { patIdx: pi, row: rw, channel: ch, field: fld, value: val } = data;
+        this.wasm._jc_set_pattern_cell(pi, rw, ch, fld, val);
+        break;
+      }
+
+      case 'get-song-structure': {
+        if (!this.wasm || !this.tuneLoaded) break;
+        const songLen = this.wasm._jc_get_song_length();
+        const numPats = this.wasm._jc_get_num_patterns();
+        const numInst = this.wasm._jc_get_num_instruments();
+        const entries = [];
+        for (let i = 0; i < songLen; i++) {
+          entries.push(this.wasm._jc_get_song_entry(i));
+        }
+        this.port.postMessage({ type: 'song-structure', songLen, numPats, numInst, entries });
+        break;
+      }
     }
   }
 
