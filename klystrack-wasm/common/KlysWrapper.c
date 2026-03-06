@@ -499,3 +499,86 @@ int klys_is_playing(void)
 {
     return g_playing;
 }
+
+/* ---- Setter functions for editing ---- */
+
+EMSCRIPTEN_KEEPALIVE
+int klys_set_pattern_step(int patIdx, int stepIdx, int note, int instrument, int ctrl, int volume, int cmdLo, int cmdHi)
+{
+    if (!g_song_loaded || patIdx < 0 || patIdx >= g_song.num_patterns) return 0;
+    MusPattern *pat = &g_song.pattern[patIdx];
+    if (stepIdx < 0 || stepIdx >= pat->num_steps) return 0;
+
+    MusStep *s = &pat->step[stepIdx];
+    s->note = (Uint8)note;
+    s->instrument = (Uint8)instrument;
+    s->ctrl = (Uint8)ctrl;
+    s->volume = (Uint8)volume;
+    s->command = (Uint16)((cmdHi << 8) | (cmdLo & 0xFF));
+    return 1;
+}
+
+EMSCRIPTEN_KEEPALIVE
+int klys_set_sequence_entry(int chan, int pos, int position, int pattern, int noteOffset)
+{
+    if (!g_song_loaded || chan < 0 || chan >= g_song.num_channels) return 0;
+    if (pos < 0 || pos >= g_song.num_sequences[chan]) return 0;
+
+    MusSeqPattern *seq = &g_song.sequence[chan][pos];
+    seq->position = (Uint16)position;
+    seq->pattern = (Uint16)pattern;
+    seq->note_offset = (Sint8)noteOffset;
+    return 1;
+}
+
+EMSCRIPTEN_KEEPALIVE
+int klys_set_instrument_param(int idx, int paramId, int value)
+{
+    if (!g_song_loaded || idx < 0 || idx >= g_song.num_instruments) return 0;
+    MusInstrument *inst = &g_song.instrument[idx];
+
+    switch (paramId) {
+        case 0: inst->adsr.a = (Uint8)value; break;
+        case 1: inst->adsr.d = (Uint8)value; break;
+        case 2: inst->adsr.s = (Uint8)value; break;
+        case 3: inst->adsr.r = (Uint8)value; break;
+        case 4: inst->flags = (Uint32)value; break;
+        case 5: inst->cydflags = (Uint8)value; break;
+        case 6: inst->base_note = (Uint8)value; break;
+        case 7: inst->finetune = (Uint8)value; break;
+        case 8: inst->slide_speed = (Uint8)value; break;
+        case 9: inst->pw = (Uint16)value; break;
+        case 10: inst->volume = (Uint8)value; break;
+        case 11: inst->prog_period = (Uint8)value; break;
+        case 12: inst->vibrato_speed = (Uint8)value; break;
+        case 13: inst->vibrato_depth = (Uint8)value; break;
+        case 14: inst->pwm_speed = (Uint8)value; break;
+        case 15: inst->pwm_depth = (Uint8)value; break;
+        case 16: inst->cutoff = (Uint16)value; break;
+        case 17: inst->resonance = (Uint8)value; break;
+        case 18: inst->flttype = (Uint8)value; break;
+        case 19: inst->fx_bus = (Uint8)value; break;
+        case 20: inst->buzz_offset = (Sint16)value; break;
+        case 21: inst->ring_mod = (Uint8)value; break;
+        case 22: inst->sync_source = (Uint8)value; break;
+        case 23: inst->wavetable_entry = (Uint8)value; break;
+        case 24: inst->fm_modulation = (Uint8)value; break;
+        case 25: inst->fm_feedback = (Uint8)value; break;
+        case 26: inst->fm_harmonic = (Uint8)value; break;
+        case 27: inst->fm_adsr.a = (Uint8)value; break;
+        case 28: inst->fm_adsr.d = (Uint8)value; break;
+        case 29: inst->fm_adsr.s = (Uint8)value; break;
+        case 30: inst->fm_adsr.r = (Uint8)value; break;
+        default: return 0;
+    }
+    return 1;
+}
+
+EMSCRIPTEN_KEEPALIVE
+int klys_set_instrument_program_step(int idx, int step, int value)
+{
+    if (!g_song_loaded || idx < 0 || idx >= g_song.num_instruments) return 0;
+    if (step < 0 || step >= MUS_PROG_LEN) return 0;
+    g_song.instrument[idx].program[step] = (Uint16)value;
+    return 1;
+}

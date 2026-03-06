@@ -301,6 +301,24 @@ export class KlysEngine {
     }
   }
 
+  // ---- Editing methods ----
+
+  setPatternStep(patIdx: number, stepIdx: number, note: number, instrument: number, ctrl: number, volume: number, cmdLo: number, cmdHi: number): void {
+    this.sendMessage({ type: 'setPatternStep', patIdx, stepIdx, note, instrument, ctrl, volume, cmdLo, cmdHi });
+  }
+
+  setSequenceEntry(chan: number, pos: number, position: number, pattern: number, noteOffset: number): void {
+    this.sendMessage({ type: 'setSequenceEntry', chan, pos, position, pattern, noteOffset });
+  }
+
+  setInstrumentParam(idx: number, paramId: number, value: number): void {
+    this.sendMessage({ type: 'setInstrumentParam', idx, paramId, value });
+  }
+
+  setInstrumentProgramStep(idx: number, step: number, value: number): void {
+    this.sendMessage({ type: 'setInstrumentProgramStep', idx, step, value });
+  }
+
   dispose(): void {
     this._disposed = true;
     this.workletNode?.port.postMessage({ type: 'dispose' });

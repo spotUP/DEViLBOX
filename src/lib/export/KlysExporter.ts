@@ -21,8 +21,10 @@ export function exportAsKlystrack(song: TrackerSong): KlysExportResult {
     throw new Error('No klystrack file data available for export');
   }
 
-  // For now, export the original binary data
-  // Future: serialize from WASM state to capture edits
+  // Export original binary — edits via WASM are in-memory only.
+  // Full save would require porting klystrack's bitpack serializer.
+  warnings.push('Exports original file. In-session edits are not persisted to the .kt binary.');
+
   const data = new Blob([song.klysFileData], { type: 'application/octet-stream' });
 
   const baseName = (song.name || 'untitled').replace(/[^a-zA-Z0-9_-]/g, '_');

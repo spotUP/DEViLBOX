@@ -12,7 +12,9 @@
 
 import React, { useRef, useEffect, useCallback, useMemo, useState } from 'react';
 import { useTransportStore } from '@stores/useTransportStore';
+import { useTrackerStore } from '@stores';
 import type { KlysNativeData } from '@/types/tracker';
+import { KlysEngine } from '@/engine/klystrack/KlysEngine';
 
 const CHAR_W = 8;
 const CHAR_H = 14;
@@ -283,18 +285,74 @@ export const KlysPatternEditor: React.FC<KlysPatternEditorProps> = ({
   }, [width, height, cursor, selection, currentRow, isPlaying,
       scrollRow, visibleRows, numChannels, trackLength, channelPatterns, nativeData]);
 
+  // Note input keyboard map: Z-M = octave N, Q-P = octave N+1
+  // Current octave tracked in state
+  const [octave, setOctave] = useState(3);
+
+  const KEY_TO_NOTE: Record<string, number> = useMemo(() => ({
+    'z': 0, 's': 1, 'x': 2, 'd': 3, 'c': 4, 'v': 5,
+    'g': 6, 'b': 7, 'h': 8, 'n': 9, 'j': 10, 'm': 11,
+    'q': 12, '2': 13, 'w': 14, '3': 15, 'e': 16, 'r': 17,
+    '5': 18, 't': 19, '6': 20, 'y': 21, '7': 22, 'u': 23,
+    'i': 24, '9': 25, 'o': 26, '0': 27, 'p': 28,
+  }), []);
+
+  const isHexChar = (k: string): boolean => /^[0-9a-f]$/i.test(k);
+  const hexVal = (k: string): number => parseInt(k, 16);
+
+  const writeCell = useCallback((channel: number, row: number, column: number,
+    note: number, instrument: number, ctrl: number, volume: number, command: number) => {
+    const cp = channelPatterns[channel];
+    if (cp.patternIdx < 0) return;
+    const pat = nativeData.patterns[cp.patternIdx];
+    if (!pat || row >= pat.numSteps) return;
+    const step = pat.steps[row];
+    if (!step) return;
+
+    const newNote = note >= 0 ? note : step.note;
+    const newInst = instrument >= 0 ? instrument : step.instrument;
+    const newCtrl = ctrl >= 0 ? ctrl : step.ctrl;
+    const newVol = volume >= 0 ? volume : step.volume;
+    const newCmd = command >= 0 ? command : step.command;
+
+    // Update store
+    step.note = newNote;
+    step.instrument = newInst;
+    step.ctrl = newCtrl;
+    step.volume = newVol;
+    step.command = newCmd;
+
+    // Send to WASM engine
+    if (KlysEngine.hasInstance()) {
+      KlysEngine.getInstance().setPatternStep(
+        cp.patternIdx, row,
+        newNote, newInst, newCtrl, newVol,
+        newCmd & 0xFF, (newCmd >> 8) & 0xFF
+      );
+    }
+
+    // Force re-render by touching klysNative
+    const state = useTrackerStore.getState();
+    if (state.klysNative) {
+      useTrackerStore.setState({ klysNative: { ...state.klysNative } });
+    }
+  }, [channelPatterns, nativeData]);
+
   // Keyboard
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     const { key, shiftKey } = e;
+    const lk = key.toLowerCase();
+
+    // Navigation keys
     switch (key) {
       case 'ArrowUp':
         e.preventDefault();
         setCursorState(c => ({ ...c, row: Math.max(0, c.row - 1) }));
-        break;
+        return;
       case 'ArrowDown':
         e.preventDefault();
         setCursorState(c => ({ ...c, row: Math.min(trackLength - 1, c.row + 1) }));
-        break;
+        return;
       case 'ArrowLeft':
         e.preventDefault();
         setCursorState(c => {
@@ -302,7 +360,7 @@ export const KlysPatternEditor: React.FC<KlysPatternEditorProps> = ({
           if (c.channel > 0) return { ...c, channel: c.channel - 1, column: NUM_COLUMNS - 1 };
           return c;
         });
-        break;
+        return;
       case 'ArrowRight':
         e.preventDefault();
         setCursorState(c => {
@@ -310,32 +368,113 @@ export const KlysPatternEditor: React.FC<KlysPatternEditorProps> = ({
           if (c.channel < numChannels - 1) return { ...c, channel: c.channel + 1, column: 0 };
           return c;
         });
-        break;
+        return;
       case 'Tab':
         e.preventDefault();
         setCursorState(c => {
           if (shiftKey) return { ...c, channel: Math.max(0, c.channel - 1), column: 0 };
           return { ...c, channel: Math.min(numChannels - 1, c.channel + 1), column: 0 };
         });
-        break;
+        return;
       case 'PageUp':
         e.preventDefault();
         setCursorState(c => ({ ...c, row: Math.max(0, c.row - 16) }));
-        break;
+        return;
       case 'PageDown':
         e.preventDefault();
         setCursorState(c => ({ ...c, row: Math.min(trackLength - 1, c.row + 16) }));
-        break;
+        return;
       case 'Home':
         e.preventDefault();
         setCursorState(c => ({ ...c, row: 0 }));
-        break;
+        return;
       case 'End':
         e.preventDefault();
         setCursorState(c => ({ ...c, row: trackLength - 1 }));
-        break;
+        return;
+      case 'Delete':
+      case 'Backspace':
+        e.preventDefault();
+        switch (cursor.column) {
+          case 0: writeCell(cursor.channel, cursor.row, 0, 0xFF, -1, -1, -1, -1); break;
+          case 1: writeCell(cursor.channel, cursor.row, 1, -1, 0xFF, -1, -1, -1); break;
+          case 2: writeCell(cursor.channel, cursor.row, 2, -1, -1, 0, -1, -1); break;
+          case 3: writeCell(cursor.channel, cursor.row, 3, -1, -1, -1, 0xFF, -1); break;
+          case 4: writeCell(cursor.channel, cursor.row, 4, -1, -1, -1, -1, 0); break;
+        }
+        setCursorState(c => ({ ...c, row: Math.min(trackLength - 1, c.row + 1) }));
+        return;
     }
-  }, [trackLength, numChannels, NUM_COLUMNS]);
+
+    // Octave change: [ and ] or numpad +/-
+    if (key === '[' || key === '-') {
+      e.preventDefault();
+      setOctave(o => Math.max(0, o - 1));
+      return;
+    }
+    if (key === ']' || key === '=') {
+      e.preventDefault();
+      setOctave(o => Math.min(7, o + 1));
+      return;
+    }
+
+    // Note-off: ` or 1
+    if (key === '`' || key === '1') {
+      if (cursor.column === 0) {
+        e.preventDefault();
+        writeCell(cursor.channel, cursor.row, 0, 0xFE, -1, -1, -1, -1);
+        setCursorState(c => ({ ...c, row: Math.min(trackLength - 1, c.row + 1) }));
+        return;
+      }
+    }
+
+    // Note column: piano keyboard input
+    if (cursor.column === 0 && KEY_TO_NOTE[lk] !== undefined) {
+      e.preventDefault();
+      const noteVal = KEY_TO_NOTE[lk] + octave * 12;
+      if (noteVal >= 0 && noteVal <= 95) {
+        writeCell(cursor.channel, cursor.row, 0, noteVal, -1, -1, -1, -1);
+        setCursorState(c => ({ ...c, row: Math.min(trackLength - 1, c.row + 1) }));
+      }
+      return;
+    }
+
+    // Hex entry for inst/ctrl/vol/cmd columns
+    if (isHexChar(lk) && cursor.column >= 1) {
+      e.preventDefault();
+      const h = hexVal(lk);
+      const cp = channelPatterns[cursor.channel];
+      if (cp.patternIdx < 0) return;
+      const pat = nativeData.patterns[cp.patternIdx];
+      if (!pat) return;
+      const step = pat.steps[cursor.row];
+      if (!step) return;
+
+      switch (cursor.column) {
+        case 1: { // Instrument (2 hex digits)
+          const old = step.instrument === 0xFF ? 0 : step.instrument;
+          writeCell(cursor.channel, cursor.row, 1, -1, ((old & 0x0F) << 4) | h, -1, -1, -1);
+          break;
+        }
+        case 2: { // Ctrl (single hex digit)
+          writeCell(cursor.channel, cursor.row, 2, -1, -1, h, -1, -1);
+          break;
+        }
+        case 3: { // Volume (2 hex digits)
+          const old = step.volume === 0xFF ? 0 : step.volume;
+          writeCell(cursor.channel, cursor.row, 3, -1, -1, -1, ((old & 0x0F) << 4) | h, -1);
+          break;
+        }
+        case 4: { // Command (4 hex digits)
+          const old = step.command;
+          writeCell(cursor.channel, cursor.row, 4, -1, -1, -1, -1, ((old & 0x0FFF) << 4) | h);
+          break;
+        }
+      }
+      setCursorState(c => ({ ...c, row: Math.min(trackLength - 1, c.row + 1) }));
+      return;
+    }
+  }, [trackLength, numChannels, NUM_COLUMNS, cursor, octave, KEY_TO_NOTE, writeCell, channelPatterns, nativeData]);
 
   // Mouse hit test
   const hitTest = useCallback((clientX: number, clientY: number) => {

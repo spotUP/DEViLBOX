@@ -66,6 +66,34 @@ class KlystrackProcessor extends AudioWorkletProcessor {
         this.playing = false;
         this.initialized = false;
         break;
+
+      case 'setPatternStep': {
+        if (!this.wasm) break;
+        const { patIdx, stepIdx, note, instrument, ctrl, volume, cmdLo, cmdHi } = data;
+        this.wasm._klys_set_pattern_step(patIdx, stepIdx, note, instrument, ctrl, volume, cmdLo, cmdHi);
+        break;
+      }
+
+      case 'setSequenceEntry': {
+        if (!this.wasm) break;
+        const { chan, pos, position, pattern, noteOffset } = data;
+        this.wasm._klys_set_sequence_entry(chan, pos, position, pattern, noteOffset);
+        break;
+      }
+
+      case 'setInstrumentParam': {
+        if (!this.wasm) break;
+        const { idx, paramId, value } = data;
+        this.wasm._klys_set_instrument_param(idx, paramId, value);
+        break;
+      }
+
+      case 'setInstrumentProgramStep': {
+        if (!this.wasm) break;
+        const { idx: progIdx, step, value: progVal } = data;
+        this.wasm._klys_set_instrument_program_step(progIdx, step, progVal);
+        break;
+      }
     }
   }
 
