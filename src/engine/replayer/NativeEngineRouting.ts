@@ -63,10 +63,12 @@ interface NativeEngineDescriptor {
   needsDirectRouting: boolean;
   /** Static ref for statically-imported engines (null = use dynamic import) */
   staticRef: WASMSingletonStatic | null;
-  /** Dynamic import path (used when staticRef is null) */
+  /** Dynamic import path (used when staticRef is null) — DEPRECATED, use dynamicResolver */
   dynamicImport?: string;
-  /** Export name from dynamic import */
+  /** Export name from dynamic import — DEPRECATED, use dynamicResolver */
   dynamicExportName?: string;
+  /** Dynamic resolver function (preferred over dynamicImport for Vite compatibility) */
+  dynamicResolver?: () => Promise<WASMSingletonStatic>;
   /** Optional post-start hook for engine-specific setup (e.g., Klys onSongData) */
   onStarted?: (instance: WASMSingletonEngine, song: TrackerSong) => void;
 }
@@ -100,8 +102,7 @@ const WASM_ENGINES: NativeEngineDescriptor[] = [
     supportsResume: true,
     needsDirectRouting: false,
     staticRef: null,
-    dynamicImport: '@/engine/klystrack/KlysEngine',
-    dynamicExportName: 'KlysEngine',
+    dynamicResolver: async () => (await import('@/engine/klystrack/KlysEngine')).KlysEngine as unknown as WASMSingletonStatic,
     onStarted: (instance, _song) => {
       // Listen for extracted song data from WASM and update store
       const klys = instance as any;
@@ -139,8 +140,7 @@ const WASM_ENGINES: NativeEngineDescriptor[] = [
     supportsResume: false,
     needsDirectRouting: false,
     staticRef: null,
-    dynamicImport: '@/engine/jamcracker/JamCrackerEngine',
-    dynamicExportName: 'JamCrackerEngine',
+    dynamicResolver: async () => (await import('@/engine/jamcracker/JamCrackerEngine')).JamCrackerEngine as unknown as WASMSingletonStatic,
   },
   {
     key: 'FuturePlayer',
@@ -153,8 +153,7 @@ const WASM_ENGINES: NativeEngineDescriptor[] = [
     supportsResume: true,
     needsDirectRouting: false,
     staticRef: null,
-    dynamicImport: '@/engine/futureplayer/FuturePlayerEngine',
-    dynamicExportName: 'FuturePlayerEngine',
+    dynamicResolver: async () => (await import('@/engine/futureplayer/FuturePlayerEngine')).FuturePlayerEngine as unknown as WASMSingletonStatic,
   },
   {
     key: 'PreTracker',
@@ -167,8 +166,7 @@ const WASM_ENGINES: NativeEngineDescriptor[] = [
     supportsResume: false,
     needsDirectRouting: true,
     staticRef: null,
-    dynamicImport: '@/engine/pretracker/PreTrackerEngine',
-    dynamicExportName: 'PreTrackerEngine',
+    dynamicResolver: async () => (await import('@/engine/pretracker/PreTrackerEngine')).PreTrackerEngine as unknown as WASMSingletonStatic,
   },
   {
     key: 'MusicAssembler',
@@ -181,8 +179,7 @@ const WASM_ENGINES: NativeEngineDescriptor[] = [
     supportsResume: false,
     needsDirectRouting: true,
     staticRef: null,
-    dynamicImport: '@/engine/ma/MaEngine',
-    dynamicExportName: 'MaEngine',
+    dynamicResolver: async () => (await import('@/engine/ma/MaEngine')).MaEngine as unknown as WASMSingletonStatic,
   },
   {
     key: 'Hippel',
@@ -195,8 +192,7 @@ const WASM_ENGINES: NativeEngineDescriptor[] = [
     supportsResume: false,
     needsDirectRouting: true,
     staticRef: null,
-    dynamicImport: '@/engine/hippel/HippelEngine',
-    dynamicExportName: 'HippelEngine',
+    dynamicResolver: async () => (await import('@/engine/hippel/HippelEngine')).HippelEngine as unknown as WASMSingletonStatic,
   },
   {
     key: 'MusicLine',
@@ -223,6 +219,7 @@ const ROUTABLE_SYNTH_TYPES = new Set(
 
 async function resolveEngine(desc: NativeEngineDescriptor): Promise<WASMSingletonStatic> {
   if (desc.staticRef) return desc.staticRef;
+  if (desc.dynamicResolver) return desc.dynamicResolver();
   const mod = await import(/* @vite-ignore */ desc.dynamicImport!);
   return mod[desc.dynamicExportName!] as WASMSingletonStatic;
 }

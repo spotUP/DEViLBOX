@@ -1,17 +1,16 @@
 /**
  * Hippel.worklet.js - AudioWorklet processor for Jochen Hippel WASM synth
  *
- * Follows the PreTracker/DB303 worklet pattern with heap growth detection.
+ * The WASM player_render() writes interleaved stereo (LRLRLR...) into a
+ * single float buffer. We deinterleave into the WebAudio output channels.
  */
 
 class HippelProcessor extends AudioWorkletProcessor {
   constructor() {
     super();
     this.module = null;
-    this.outputPtrL = 0;
-    this.outputPtrR = 0;
-    this.outputBufferL = null;
-    this.outputBufferR = null;
+    this.interleavedPtr = 0;
+    this.interleavedBuf = null;
     this.initialized = false;
     this.bufferSize = 128;
     this.lastHeapBuffer = null;
@@ -157,12 +156,12 @@ class HippelProcessor extends AudioWorkletProcessor {
         this.module.wasmMemory = capturedMemory;
       }
 
+      // Allocate interleaved stereo buffer: frames * 2 channels * 4 bytes per float
       const malloc = this.module._malloc || this.module.malloc;
       if (malloc) {
-        this.outputPtrL = malloc(this.bufferSize * 4);
-        this.outputPtrR = malloc(this.bufferSize * 4);
-        if (!this.outputPtrL || !this.outputPtrR) {
-          this.port.postMessage({ type: 'error', message: 'malloc failed for output buffers' });
+        this.interleavedPtr = malloc(this.bufferSize * 2 * 4);
+        if (!this.interleavedPtr) {
+          this.port.postMessage({ type: 'error', message: 'malloc failed for output buffer' });
           return;
         }
       }
@@ -178,22 +177,19 @@ class HippelProcessor extends AudioWorkletProcessor {
   }
 
   updateBufferViews() {
-    if (!this.module || !this.outputPtrL) return;
+    if (!this.module || !this.interleavedPtr) return;
     const heapF32 = this.module.HEAPF32 || (this.module.wasmMemory && new Float32Array(this.module.wasmMemory.buffer));
     if (!heapF32) return;
     if (this.lastHeapBuffer !== heapF32.buffer) {
-      this.outputBufferL = new Float32Array(heapF32.buffer, this.outputPtrL, this.bufferSize);
-      this.outputBufferR = new Float32Array(heapF32.buffer, this.outputPtrR, this.bufferSize);
+      this.interleavedBuf = new Float32Array(heapF32.buffer, this.interleavedPtr, this.bufferSize * 2);
       this.lastHeapBuffer = heapF32.buffer;
     }
   }
 
   cleanup() {
     const free = this.module?._free || this.module?.free;
-    if (free && this.outputPtrL) { free(this.outputPtrL); this.outputPtrL = 0; }
-    if (free && this.outputPtrR) { free(this.outputPtrR); this.outputPtrR = 0; }
-    this.outputBufferL = null;
-    this.outputBufferR = null;
+    if (free && this.interleavedPtr) { free(this.interleavedPtr); this.interleavedPtr = 0; }
+    this.interleavedBuf = null;
     this.module = null;
     this.initialized = false;
     this.lastHeapBuffer = null;
@@ -211,12 +207,13 @@ class HippelProcessor extends AudioWorkletProcessor {
 
     if (typeof this.module._player_render === 'function') {
       this.updateBufferViews();
-      if (this.outputBufferL && this.outputBufferR) {
-        const rendered = this.module._player_render(this.outputPtrL, this.outputPtrR, numSamples);
+      if (this.interleavedBuf) {
+        const rendered = this.module._player_render(this.interleavedPtr, numSamples);
         if (rendered > 0) {
+          // Deinterleave LRLRLR... into separate L and R channels
           for (let i = 0; i < rendered; i++) {
-            outputL[i] = this.outputBufferL[i];
-            outputR[i] = this.outputBufferR[i];
+            outputL[i] = this.interleavedBuf[i * 2];
+            outputR[i] = this.interleavedBuf[i * 2 + 1];
           }
         }
       }
