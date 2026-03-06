@@ -2098,6 +2098,8 @@ export class ToneEngine {
       case 'MusicLineSynth':
       case 'JamCrackerSynth':
       case 'FuturePlayerSynth':
+      // Klystrack chiptune synth
+      case 'KlysSynth':
       // UADE format-specific synths (per-note WASM synthesis)
       case 'SoundMonSynth':
       case 'SidMonSynth':
