@@ -1,227 +1,176 @@
-import type { DevilboxSynth } from '@/types/synth';
-
 /**
- * PreTrackerEngine - TypeScript layer for PreTracker WASM playback
+ * PreTrackerEngine.ts - Singleton WASM engine wrapper for PreTracker replayer
  *
- * Bridges the AudioWorklet to the TypeScript/React UI layer.
- * Handles WASM module initialization, module loading, and playback control.
+ * Manages the AudioWorklet node for PreTracker module playback.
+ * Follows the JamCrackerEngine/FCEngine singleton pattern.
  */
-export class PreTrackerEngine implements DevilboxSynth {
-  private worklet: AudioWorkletNode | null = null;
-  private audioContext: AudioContext | null = null;
-  private moduleData: ArrayBuffer | null = null;
-  private isPlaying = false;
-  private currentSubsong = 0;
-  private _output: AudioNode | null = null;
-  private messageHandlers: Map<string, Set<(data: any) => void>> = new Map();
 
-  readonly name = 'PreTracker';
+import { getDevilboxAudioContext } from '@/utils/audio-context';
 
-  get output(): AudioNode {
-    if (!this._output) {
-      throw new Error('PreTrackerEngine not initialized. Call init() first.');
-    }
-    return this._output;
+export class PreTrackerEngine {
+  private static instance: PreTrackerEngine | null = null;
+  private static wasmBinary: ArrayBuffer | null = null;
+  private static jsCode: string | null = null;
+  private static loadedContexts: WeakSet<AudioContext> = new WeakSet();
+  private static initPromises: WeakMap<AudioContext, Promise<void>> = new WeakMap();
+
+  private audioContext: AudioContext;
+  private workletNode: AudioWorkletNode | null = null;
+  readonly output: GainNode;
+
+  private _initPromise: Promise<void>;
+  private _resolveInit: (() => void) | null = null;
+  private _disposed = false;
+
+  private constructor() {
+    this.audioContext = getDevilboxAudioContext();
+    this.output = this.audioContext.createGain();
+
+    this._initPromise = new Promise<void>((resolve) => {
+      this._resolveInit = resolve;
+    });
+
+    this.initialize();
   }
 
-  /**
-   * Initialize the PreTrackerEngine
-   * @param audioContext The AudioContext instance
-   */
-  async init(audioContext: AudioContext): Promise<void> {
-    this.audioContext = audioContext;
+  static getInstance(): PreTrackerEngine {
+    if (!PreTrackerEngine.instance || PreTrackerEngine.instance._disposed) {
+      PreTrackerEngine.instance = new PreTrackerEngine();
+    }
+    return PreTrackerEngine.instance;
+  }
 
+  static hasInstance(): boolean {
+    return !!PreTrackerEngine.instance && !PreTrackerEngine.instance._disposed;
+  }
+
+  private async initialize(): Promise<void> {
     try {
-      // Load PreTracker WASM JS code
-      const jsResponse = await fetch('/pretracker/Pretracker.js');
-      if (!jsResponse.ok) {
-        throw new Error(`Failed to fetch Pretracker.js: ${jsResponse.statusText}`);
-      }
-      const jsCode = await jsResponse.text();
+      await PreTrackerEngine.ensureInitialized(this.audioContext);
+      this.createNode();
+    } catch (err) {
+      console.error('[PreTrackerEngine] Initialization failed:', err);
+    }
+  }
 
-      // Load PreTracker WASM binary
-      const wasmResponse = await fetch('/pretracker/Pretracker.wasm');
-      if (!wasmResponse.ok) {
-        throw new Error(`Failed to fetch Pretracker.wasm: ${wasmResponse.statusText}`);
-      }
-      const wasmBinary = new Uint8Array(await wasmResponse.arrayBuffer());
+  private static async ensureInitialized(context: AudioContext): Promise<void> {
+    if (this.loadedContexts.has(context)) return;
 
-      // Register AudioWorklet processor
+    const existingPromise = this.initPromises.get(context);
+    if (existingPromise) return existingPromise;
+
+    const initPromise = (async () => {
+      const baseUrl = import.meta.env.BASE_URL || '/';
+
       try {
-        await audioContext.audioWorklet.addModule('/pretracker/PreTracker.worklet.js');
-      } catch (error) {
-        console.error('Failed to load AudioWorklet module:', error);
-        throw error;
+        await context.audioWorklet.addModule(`${baseUrl}pretracker/PreTracker.worklet.js`);
+      } catch {
+        // Module might already be registered
       }
 
-      // Create AudioWorkletNode
-      this.worklet = new AudioWorkletNode(audioContext, 'pretracker-processor', {
-        processorOptions: { sampleRate: audioContext.sampleRate },
-      });
-      this._output = this.worklet;
+      if (!this.wasmBinary || !this.jsCode) {
+        const [wasmResponse, jsResponse] = await Promise.all([
+          fetch(`${baseUrl}pretracker/Pretracker.wasm`),
+          fetch(`${baseUrl}pretracker/Pretracker.js`),
+        ]);
 
-      // Set up message event listener
-      this.setupMessageListener();
-
-      // Send init with WASM code + binary, THEN wait for ready
-      this.worklet.port.postMessage({
-        type: 'init',
-        sampleRate: audioContext.sampleRate,
-        wasmBinary,
-        jsCode,
-      });
-
-      // Wait for worklet to finish WASM initialization
-      await this.waitForMessage('ready');
-
-      console.log('[PreTrackerEngine] Initialized successfully');
-    } catch (error) {
-      console.error('[PreTrackerEngine] Initialization failed:', error);
-      this.dispose();
-      throw error;
-    }
-  }
-
-  /**
-   * Load a PreTracker module file
-   * @param data ArrayBuffer containing the PreTracker module data
-   */
-  async load(data: ArrayBuffer): Promise<void> {
-    if (!this.worklet) {
-      throw new Error('Engine not initialized. Call init() first.');
-    }
-
-    this.moduleData = data;
-
-    // Send loadModule message
-    this.worklet.port.postMessage({ type: 'loadModule', moduleData: data });
-
-    // Wait for moduleLoaded confirmation
-    await this.waitForMessage('moduleLoaded');
-
-    console.log('[PreTrackerEngine] Module loaded successfully');
-  }
-
-  /**
-   * Start playback
-   */
-  play(): void {
-    if (this.audioContext?.state === 'suspended') {
-      this.audioContext.resume();
-    }
-    this.isPlaying = true;
-    console.log('[PreTrackerEngine] Playing');
-  }
-
-  /**
-   * Stop playback
-   */
-  stop(): void {
-    if (!this.worklet) return;
-    this.worklet.port.postMessage({ type: 'stop' });
-    this.isPlaying = false;
-    console.log('[PreTrackerEngine] Stopped');
-  }
-
-  /**
-   * Switch to a different subsong
-   * @param index The subsong index
-   */
-  setSubsong(index: number): void {
-    if (!this.worklet) return;
-    this.currentSubsong = index;
-    this.worklet.port.postMessage({ type: 'setSubsong', subsong: index });
-    console.log('[PreTrackerEngine] Subsong set to:', index);
-  }
-
-  /**
-   * Check if currently playing
-   */
-  getIsPlaying(): boolean {
-    return this.isPlaying;
-  }
-
-  /**
-   * Get current subsong index
-   */
-  getCurrentSubsong(): number {
-    return this.currentSubsong;
-  }
-
-  /**
-   * Dispose and clean up all resources
-   */
-  dispose(): void {
-    if (this.worklet) {
-      try {
-        this.worklet.port.postMessage({ type: 'dispose' });
-        this.worklet.disconnect();
-      } catch (error) {
-        console.warn('[PreTrackerEngine] Error during dispose:', error);
-      }
-      this.worklet = null;
-    }
-    this._output = null;
-    this.messageHandlers.clear();
-    this.audioContext = null;
-    this.moduleData = null;
-    this.isPlaying = false;
-    console.log('[PreTrackerEngine] Disposed');
-  }
-
-  /**
-   * Set up message listener on the worklet port
-   */
-  private setupMessageListener(): void {
-    if (!this.worklet) return;
-
-    this.worklet.port.onmessage = (event: MessageEvent) => {
-      const { type, ...data } = event.data;
-
-      // Handle error messages
-      if (type === 'error') {
-        console.error('[PreTrackerEngine] Worklet error:', data.message);
-        return;
-      }
-
-      // Trigger handlers for this message type
-      if (this.messageHandlers.has(type)) {
-        const handlers = this.messageHandlers.get(type)!;
-        for (const handler of handlers) {
-          handler(data);
+        if (wasmResponse.ok) {
+          this.wasmBinary = await wasmResponse.arrayBuffer();
         }
+        if (jsResponse.ok) {
+          let code = await jsResponse.text();
+          code = code
+            .replace(/import\.meta\.url/g, "'.'")
+            .replace(/export\s+default\s+\w+;?/g, '')
+            .replace(/var\s+wasmBinary;/, 'var wasmBinary = Module["wasmBinary"];')
+            .replace(/HEAPU8=new Uint8Array\(b\);/, 'HEAPU8=new Uint8Array(b);Module["HEAPU8"]=HEAPU8;')
+            .replace(/HEAPF32=new Float32Array\(b\);/, 'HEAPF32=new Float32Array(b);Module["HEAPF32"]=HEAPF32;');
+          this.jsCode = code;
+        }
+      }
+
+      this.loadedContexts.add(context);
+    })();
+
+    this.initPromises.set(context, initPromise);
+    return initPromise;
+  }
+
+  private createNode(): void {
+    const ctx = this.audioContext;
+
+    this.workletNode = new AudioWorkletNode(ctx, 'pretracker-processor', {
+      outputChannelCount: [2],
+      numberOfOutputs: 1,
+    });
+
+    this.workletNode.port.onmessage = (event) => {
+      const data = event.data;
+      switch (data.type) {
+        case 'ready':
+          console.log('[PreTrackerEngine] WASM ready');
+          if (this._resolveInit) {
+            this._resolveInit();
+            this._resolveInit = null;
+          }
+          break;
+
+        case 'moduleLoaded':
+          console.log('[PreTrackerEngine] Module loaded');
+          break;
+
+        case 'error':
+          console.error('[PreTrackerEngine]', data.message);
+          break;
       }
     };
+
+    this.workletNode.port.postMessage({
+      type: 'init',
+      sampleRate: ctx.sampleRate,
+      wasmBinary: PreTrackerEngine.wasmBinary,
+      jsCode: PreTrackerEngine.jsCode,
+    });
+
+    this.workletNode.connect(this.output);
   }
 
-  /**
-   * Wait for a specific message type from the worklet
-   * @param messageType The message type to wait for
-   * @param timeout Maximum wait time in milliseconds (default: 5000)
-   */
-  private waitForMessage(messageType: string, timeout = 5000): Promise<any> {
-    return new Promise((resolve, reject) => {
-      const timer = setTimeout(() => {
-        if (this.messageHandlers.has(messageType)) {
-          const handlers = this.messageHandlers.get(messageType)!;
-          handlers.delete(handler);
-        }
-        reject(new Error(`Timeout waiting for message type: ${messageType}`));
-      }, timeout);
+  async ready(): Promise<void> {
+    return this._initPromise;
+  }
 
-      const handler = (data: any) => {
-        clearTimeout(timer);
-        if (this.messageHandlers.has(messageType)) {
-          const handlers = this.messageHandlers.get(messageType)!;
-          handlers.delete(handler);
-        }
-        resolve(data);
-      };
+  async loadTune(buffer: ArrayBuffer): Promise<void> {
+    await this._initPromise;
+    if (!this.workletNode) throw new Error('PreTrackerEngine not initialized');
 
-      if (!this.messageHandlers.has(messageType)) {
-        this.messageHandlers.set(messageType, new Set());
-      }
-      this.messageHandlers.get(messageType)!.add(handler);
-    });
+    this.workletNode.port.postMessage(
+      { type: 'loadModule', moduleData: buffer },
+    );
+  }
+
+  play(): void {
+    this.workletNode?.port.postMessage({ type: 'play' });
+  }
+
+  stop(): void {
+    this.workletNode?.port.postMessage({ type: 'stop' });
+  }
+
+  pause(): void {
+    this.workletNode?.port.postMessage({ type: 'stop' });
+  }
+
+  setSubsong(index: number): void {
+    this.workletNode?.port.postMessage({ type: 'setSubsong', subsong: index });
+  }
+
+  dispose(): void {
+    this._disposed = true;
+    this.workletNode?.port.postMessage({ type: 'dispose' });
+    this.workletNode?.disconnect();
+    this.workletNode = null;
+    if (PreTrackerEngine.instance === this) {
+      PreTrackerEngine.instance = null;
+    }
   }
 }
