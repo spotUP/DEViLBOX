@@ -16,6 +16,7 @@ import type {
   HivelyNativeStep,
 } from '@/types';
 import { EMPTY_CELL } from '@/types';
+import { mapFurnaceEffect } from '@/lib/import/formats/furnace';
 
 export type AccessorMode = 'classic' | 'furnace' | 'hively';
 
@@ -187,11 +188,19 @@ export class PatternAccessor {
     const fRow = patData.rows[row];
     if (!fRow) return { ...EMPTY_CELL };
 
-    return this.convertFurnaceRow(fRow);
+    const cell = this.convertFurnaceRow(fRow);
+    // Debug: log first few rows to verify conversion
+    if (typeof window !== 'undefined' && (window as any).FURNACE_DEBUG && row < 4 && channel < 2) {
+      console.log(`[FurnaceRow] pos=${position} row=${row} ch=${channel}`,
+        `raw: note=${fRow.note} ins=${fRow.ins} vol=${fRow.vol} fx=[${fRow.effects.map(e => `${e.cmd.toString(16)}/${e.val.toString(16)}`).join(',')}]`,
+        `→ cell: note=${cell.note} ins=${cell.instrument} vol=${cell.volume} eff=${cell.effTyp.toString(16)}/${cell.eff.toString(16)} eff2=${cell.effTyp2.toString(16)}/${cell.eff2.toString(16)}`);
+    }
+    return cell;
   }
 
   /**
    * Convert a FurnaceRow to TrackerCell for the replayer.
+   * Maps Furnace-native note/effect values to XM-compatible format.
    */
   private convertFurnaceRow(fRow: FurnaceRow): TrackerCell {
     // Map Furnace note values to XM note values
@@ -203,8 +212,8 @@ export class PatternAccessor {
     } else if (fRow.note === 254 || fRow.note === 255) {
       note = 97; // Release / macro-release → treat as note off for now
     } else if (fRow.note >= 0 && fRow.note < 180) {
-      // Furnace note: octave * 12 + semitone
-      // XM note: (octave * 12) + semitone + 1, range 1-96
+      // Furnace note: octave * 12 + semitone (flat value 0-179)
+      // XM note: flat + 1, range 1-96
       note = Math.min(96, Math.max(1, fRow.note + 1));
     }
 
@@ -218,19 +227,49 @@ export class PatternAccessor {
       volume = 0x10 + Math.round((fRow.vol / 127) * 64);
     }
 
-    // Map effects (up to 2 effect pairs for XM compatibility)
-    const eff0 = fRow.effects[0];
-    const eff1 = fRow.effects[1];
+    // Map ALL effect slots (up to 8) through mapFurnaceEffect, matching
+    // the conversion in convertFurnaceCell. Raw Furnace effect types must be
+    // mapped to XM-compatible types, and extended effects (0xE0-0xEF) must be
+    // split into 0x0E + sub-command in param high nibble.
+    const convertedEffects: Array<{ type: number; param: number }> = [];
+    for (let i = 0; i < Math.min(8, fRow.effects.length); i++) {
+      const fx = fRow.effects[i];
+      if (!fx) continue;
+      let t = mapFurnaceEffect(fx.cmd);
+      if (t < 0) t = fx.cmd; // Preserve Furnace-native effects for WASM dispatch routing
+      let p = fx.val & 0xFF;
+      // Split composite XM extended effects (E1x-EFx)
+      // mapFurnaceEffect returns e.g. 0xE9 for retrigger; replayer expects
+      // effectType=0x0E with sub-command in param high nibble: param = 0x9y
+      if (t >= 0xE0 && t <= 0xEF) {
+        const subCmd = t & 0x0F;
+        t = 0x0E;
+        p = (subCmd << 4) | (p & 0x0F);
+      }
+      convertedEffects.push({ type: t, param: p });
+    }
 
-    return {
+    const e = (i: number) => convertedEffects[i] ?? { type: 0, param: 0 };
+
+    const result: TrackerCell = {
       note,
       instrument,
       volume,
-      effTyp: eff0?.cmd ?? 0,
-      eff: eff0?.val ?? 0,
-      effTyp2: eff1?.cmd ?? 0,
-      eff2: eff1?.val ?? 0,
+      effTyp: e(0).type,
+      eff: e(0).param,
+      effTyp2: e(1).type,
+      eff2: e(1).param,
     };
+
+    // Populate extra effect slots 3-8 (replayer already processes these)
+    if (convertedEffects.length > 2) { result.effTyp3 = e(2).type; result.eff3 = e(2).param; }
+    if (convertedEffects.length > 3) { result.effTyp4 = e(3).type; result.eff4 = e(3).param; }
+    if (convertedEffects.length > 4) { result.effTyp5 = e(4).type; result.eff5 = e(4).param; }
+    if (convertedEffects.length > 5) { result.effTyp6 = e(5).type; result.eff6 = e(5).param; }
+    if (convertedEffects.length > 6) { result.effTyp7 = e(6).type; result.eff7 = e(6).param; }
+    if (convertedEffects.length > 7) { result.effTyp8 = e(7).type; result.eff8 = e(7).param; }
+
+    return result;
   }
 
   // ── Hively Access ─────────────────────────────
