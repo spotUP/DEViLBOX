@@ -87,7 +87,13 @@ export async function uploadFurnaceToSequencer(
   }
 
   // 5. Configuration
-  engine.seqPostMessage({ type: 'seqSetSpeed', speed1: sub.speed1, speed2: sub.speed2 });
+  // Use full speed pattern if available (supports len > 2 groove-style initial speeds)
+  const subAny = sub as any;
+  if (subAny.speedPattern && subAny.speedPattern.length > 2) {
+    engine.seqPostMessage({ type: 'seqSetSpeedPattern', values: subAny.speedPattern });
+  } else {
+    engine.seqPostMessage({ type: 'seqSetSpeed', speed1: sub.speed1, speed2: sub.speed2 });
+  }
   // Set virtual tempo (N/D ratio controls row advancement per tick)
   engine.seqPostMessage({
     type: 'seqSetTempo',
@@ -177,6 +183,7 @@ function packCompatFlags(cf: Record<string, unknown>): { flags: number; flagsExt
   if (cf.noVolSlideReset)       flags |= (1 << 26);
   if (cf.resetArpPhaseOnNewNote) flags |= (1 << 27);
   if (cf.oldAlwaysSetVolume)     flags |= (1 << 28);
+  if (cf.preNoteNoEffect)        flags |= (1 << 29);
 
   // Extended flags: multi-bit values packed into uint32
   let flagsExt = 0;

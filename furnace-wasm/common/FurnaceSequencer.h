@@ -85,6 +85,7 @@
 #define SEQ_COMPAT_NO_VOL_SLIDE_RESET    (1u << 26)
 #define SEQ_COMPAT_RESET_ARP_PHASE_ON_NEW_NOTE (1u << 27)
 #define SEQ_COMPAT_OLD_ALWAYS_SET_VOLUME      (1u << 28)
+#define SEQ_COMPAT_PRE_NOTE_NO_EFFECT         (1u << 29)
 
 // Extended compat flags (second word) for fields needing >1 bit
 // linearPitch (0-2), pitchSlideSpeed (0-2), loopModality (0-2),
@@ -183,6 +184,7 @@ struct SeqChannelState {
   bool sampleOffSet;
   bool wentThroughNote;
   bool goneThroughNote;
+  bool midiAftertouch;
 
   void reset() {
     note = -1;
@@ -246,6 +248,7 @@ struct SeqChannelState {
     sampleOffSet = false;
     wentThroughNote = false;
     goneThroughNote = false;
+    midiAftertouch = false;
   }
 };
 
@@ -343,7 +346,7 @@ struct FurnaceSequencer {
   double  sampleRate;           // audio sample rate (e.g. 44100)
 
   // --- Groove state ---
-  int  groovePos;               // current position in groove pattern
+  // groovePos removed — groove cycling uses curSpeed to index speeds.val[]
   bool useGroove;               // true if speeds is a groove pattern (len>1)
 
   // --- Groove bank (for 09xx effect) ---
@@ -379,6 +382,9 @@ struct FurnaceSequencer {
   // --- Per-channel playback state ---
   SeqChannelState chan[SEQ_MAX_CHANNELS];
   bool isMuted[SEQ_MAX_CHANNELS];
+
+  // --- Key hit flags (one-frame pulse for GUI visualizers) ---
+  bool keyHit[SEQ_MAX_CHANNELS];
 
   // --- Per-channel chip type (for platform-specific behavior) ---
   // Furnace DIV_SYSTEM_* enum values, set via furnace_seq_set_channel_chip().
@@ -417,7 +423,7 @@ struct FurnaceSequencer {
     divider = 60.0;
     sampleRate = 44100.0;
 
-    groovePos = 0;
+    // groovePos removed
     useGroove = false;
     numGrooves = 0;
     repeatPattern = false;
@@ -439,6 +445,7 @@ struct FurnaceSequencer {
     for (int i = 0; i < SEQ_MAX_CHANNELS; i++) {
       chan[i].reset();
       isMuted[i] = false;
+      keyHit[i] = false;
       chanPool[i].init();
       chanChipId[i] = 0;
       chanSubIdx[i] = 0;
@@ -538,6 +545,10 @@ int furnace_seq_tick(void);
 int furnace_seq_get_order(void);
 int furnace_seq_get_row(void);
 bool furnace_seq_is_playing(void);
+
+// Query key-hit flag for a channel (one-frame pulse, set on note-on/retrigger).
+// Returns true once per note trigger, then auto-clears on next tick.
+bool furnace_seq_get_key_hit(int channel);
 
 #ifdef __cplusplus
 } // extern "C"

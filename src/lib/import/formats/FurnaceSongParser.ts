@@ -371,6 +371,7 @@ export interface FurnaceSubSong {
   timeBase: number;
   speed1: number;
   speed2: number;
+  speedPattern?: number[];   // Full speed pattern (len 1-16), for groove-style initial speeds
   arpLen: number;
   hz: number;
   patLen: number;
@@ -1130,6 +1131,8 @@ async function parseOldFormat(
     // Override subsong speed with the groove/speed values
     if (speedsLen >= 1) subsong.speed1 = speedVals[0] || subsong.speed1;
     if (speedsLen >= 2) subsong.speed2 = speedVals[1] || subsong.speed2;
+    // Store full speed pattern for groove-style initial speeds (len > 2)
+    if (speedsLen > 0) subsong.speedPattern = speedVals.slice(0, speedsLen);
 
     // Named groove patterns (1-byte values per entry)
     const grooveCount = reader.readUint8();
@@ -1289,6 +1292,7 @@ function parseSubSong(reader: BinaryReader, chans: number, version: number): Fur
     }
     subsong.speed1 = speeds[0] || 6;
     subsong.speed2 = speedLen > 1 ? speeds[1] : subsong.speed1;
+    if (speedLen > 0) subsong.speedPattern = speeds.slice(0, speedLen);
 
     subsong.name = readString(reader);
     subsong.comment = readString(reader);

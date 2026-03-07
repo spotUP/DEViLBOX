@@ -100,6 +100,8 @@ enum {
   DIV_CMD_FM_EXTCH = 57,
   DIV_CMD_FM_AM_DEPTH = 58,
   DIV_CMD_FM_PM_DEPTH = 59,
+  DIV_CMD_FM_LFO2 = 60,
+  DIV_CMD_FM_LFO2_WAVE = 61,
 
   // Standard PSG commands
   DIV_CMD_STD_NOISE_FREQ = 62,
@@ -145,8 +147,31 @@ enum {
   DIV_CMD_AMIGA_AM = 97,
   DIV_CMD_AMIGA_PM = 98,
 
+  // FDS
+  DIV_CMD_FDS_MOD_DEPTH = 90,
+  DIV_CMD_FDS_MOD_HIGH = 91,
+  DIV_CMD_FDS_MOD_LOW = 92,
+  DIV_CMD_FDS_MOD_POS = 93,
+  DIV_CMD_FDS_MOD_WAVE = 94,
+
   // Lynx
   DIV_CMD_LYNX_LFSR_LOAD = 99,
+
+  // QSound
+  DIV_CMD_QSOUND_ECHO_FEEDBACK = 100,
+  DIV_CMD_QSOUND_ECHO_DELAY = 101,
+  DIV_CMD_QSOUND_ECHO_LEVEL = 102,
+  DIV_CMD_QSOUND_SURROUND = 103,
+
+  // N163
+  DIV_CMD_N163_WAVE_POSITION = 113,
+  DIV_CMD_N163_WAVE_LENGTH = 114,
+  DIV_CMD_N163_CHANNEL_LIMIT = 120,
+  DIV_CMD_N163_GLOBAL_WAVE_LOAD = 121,
+  DIV_CMD_N163_GLOBAL_WAVE_LOADPOS = 122,
+
+  // ADPCM-A
+  DIV_CMD_ADPCMA_GLOBAL_VOLUME = 131,
 
   // SNES commands
   DIV_CMD_SNES_ECHO = 132,
@@ -192,7 +217,16 @@ enum {
   DIV_CMD_C64_AD = 167,
   DIV_CMD_C64_SR = 168,
 
+  // ESFM
+  DIV_CMD_ESFM_OP_PANNING = 169,
+  DIV_CMD_ESFM_OUTLVL = 170,
+  DIV_CMD_ESFM_MODIN = 171,
+  DIV_CMD_ESFM_ENV_DELAY = 172,
+
   DIV_CMD_MACRO_RESTART = 173,
+
+  // FDS extra
+  DIV_CMD_FDS_MOD_AUTO = 184,
 
   // FM extra
   DIV_CMD_FM_OPMASK = 185,
@@ -205,6 +239,8 @@ enum {
   DIV_CMD_FM_ALG = 222,
   DIV_CMD_FM_FMS = 223,
   DIV_CMD_FM_AMS = 224,
+  DIV_CMD_FM_FMS2 = 225,
+  DIV_CMD_FM_AMS2 = 226,
 };
 
 // Special note value for null note (retrigger without changing pitch)
@@ -246,7 +282,24 @@ enum {
 #define SEQ_CHIP_YM2610B_CSM  91
 #define SEQ_CHIP_YM2203_CSM   92
 #define SEQ_CHIP_YM2608_CSM   93
+#define SEQ_CHIP_ARCADE       13   // YM2151 (OPM)
+#define SEQ_CHIP_YM2151       19   // YM2151 standalone
+#define SEQ_CHIP_VRC7         48
+#define SEQ_CHIP_YM2610B      49
+#define SEQ_CHIP_OPZ          44   // TX81Z / OPZ
+#define SEQ_CHIP_OPL_DRUMS    54
+#define SEQ_CHIP_OPL2_DRUMS   55
+#define SEQ_CHIP_OPL3_DRUMS   56
+#define SEQ_CHIP_YM2610_FULL  57
+#define SEQ_CHIP_OPLL_DRUMS   59
+#define SEQ_CHIP_YM2612_DUALPCM 80
 #define SEQ_CHIP_SID2         108
+#define SEQ_CHIP_FDS          29
+#define SEQ_CHIP_N163         31
+#define SEQ_CHIP_SCC          53
+#define SEQ_CHIP_SCC_PLUS     72
+#define SEQ_CHIP_QSOUND       61
+#define SEQ_CHIP_ESFM         100
 
 // ============================================================
 // Per-platform helper functions
@@ -314,6 +367,21 @@ static bool getKeyOffAffectsArp(int chipId, int subIdx) {
       return (subIdx >= 6); // PSG channels
     default:
       return true; // Furnace default: most platforms return true
+  }
+}
+
+// getLegacyAlwaysSetVolume: platforms that override to return false
+// (base DivDispatch returns true; only PSG-like chips return false)
+static bool getLegacyAlwaysSetVolume(int chipId) {
+  switch (chipId) {
+    case SEQ_CHIP_SMS:
+    case SEQ_CHIP_AY8910:
+    case SEQ_CHIP_AY8930:
+    case SEQ_CHIP_SAA1099:
+    case SEQ_CHIP_LYNX:
+      return false;
+    default:
+      return true; // FM chips and most others return true
   }
 }
 
@@ -472,6 +540,17 @@ static bool seqPerSystemPreEffect(int ch, int effect, int effectVal) {
       }
       break;
 
+    // OPL/OPLL drum variants: fmOPLDrumsEffectHandlerMap (0x18 = drum mode toggle)
+    case SEQ_CHIP_OPL_DRUMS:
+    case SEQ_CHIP_OPL2_DRUMS:
+    case SEQ_CHIP_OPL3_DRUMS:
+    case SEQ_CHIP_OPLL_DRUMS:
+      switch (effect) {
+        case 0x18: dispatchCmd(DIV_CMD_FM_EXTCH, ch, effectVal); return true;
+        case 0x30: dispatchCmd(DIV_CMD_FM_HARD_RESET, ch, effectVal); return true;
+      }
+      break;
+
     default:
       break;
   }
@@ -568,14 +647,20 @@ static bool seqPerSystemEffect(int ch, int effect, int effectVal) {
     case SEQ_CHIP_YM2203_EXT:
     case SEQ_CHIP_YM2608:
     case SEQ_CHIP_YM2608_EXT:
+    case SEQ_CHIP_YM2610_FULL:
     case SEQ_CHIP_YM2610_FULL_EXT:
+    case SEQ_CHIP_YM2610B:
     case SEQ_CHIP_YM2610B_EXT:
+    case SEQ_CHIP_YM2612_DUALPCM:
     case SEQ_CHIP_YM2612_DUALPCM_EXT:
     case SEQ_CHIP_YM2612_CSM:
     case SEQ_CHIP_YM2610_CSM:
     case SEQ_CHIP_YM2610B_CSM:
     case SEQ_CHIP_YM2203_CSM:
     case SEQ_CHIP_YM2608_CSM:
+    case SEQ_CHIP_ARCADE:
+    case SEQ_CHIP_YM2151:
+    case SEQ_CHIP_OPZ:
       switch (effect) {
         case 0x30: dispatchCmd(DIV_CMD_FM_HARD_RESET, ch, effectVal); return true;
         case 0xdf: dispatchCmd(DIV_CMD_SAMPLE_DIR, ch, effectVal); return true;
@@ -586,6 +671,11 @@ static bool seqPerSystemEffect(int ch, int effect, int effectVal) {
     case SEQ_CHIP_OPL2:
     case SEQ_CHIP_OPL3:
     case SEQ_CHIP_OPLL:
+    case SEQ_CHIP_OPL_DRUMS:
+    case SEQ_CHIP_OPL2_DRUMS:
+    case SEQ_CHIP_OPL3_DRUMS:
+    case SEQ_CHIP_OPLL_DRUMS:
+    case SEQ_CHIP_VRC7:
       switch (effect) {
         case 0x30: dispatchCmd(DIV_CMD_FM_HARD_RESET, ch, effectVal); return true;
       }
@@ -639,6 +729,51 @@ static bool seqPerSystemEffect(int ch, int effect, int effectVal) {
         case 0x37: dispatchCmd(DIV_CMD_SNES_ECHO_FIR, ch, 7, effectVal); return true;
       }
       break;
+
+    // --- FDS: waveOnlyEffectHandlerMap ---
+    case SEQ_CHIP_FDS:
+      switch (effect) {
+        case 0x10: dispatchCmd(DIV_CMD_WAVE, ch, effectVal); return true;
+      }
+      break;
+
+    // --- SCC / SCC+: waveOnlyEffectHandlerMap ---
+    case SEQ_CHIP_SCC:
+    case SEQ_CHIP_SCC_PLUS:
+      switch (effect) {
+        case 0x10: dispatchCmd(DIV_CMD_WAVE, ch, effectVal); return true;
+      }
+      break;
+
+    // --- N163: effectHandlers ---
+    case SEQ_CHIP_N163:
+      switch (effect) {
+        case 0x18: dispatchCmd(DIV_CMD_N163_CHANNEL_LIMIT, ch, effectVal); return true;
+        case 0x20: dispatchCmd(DIV_CMD_N163_GLOBAL_WAVE_LOAD, ch, effectVal); return true;
+        case 0x21: dispatchCmd(DIV_CMD_N163_GLOBAL_WAVE_LOADPOS, ch, effectVal); return true;
+      }
+      break;
+
+    // --- QSound: effectHandlers ---
+    case SEQ_CHIP_QSOUND:
+      switch (effect) {
+        case 0x10: dispatchCmd(DIV_CMD_QSOUND_ECHO_FEEDBACK, ch, effectVal); return true;
+        case 0x11: dispatchCmd(DIV_CMD_QSOUND_ECHO_LEVEL, ch, effectVal); return true;
+        case 0x12: dispatchCmd(DIV_CMD_QSOUND_SURROUND, ch, effectVal); return true;
+      }
+      if (effect >= 0x30 && effect <= 0x3f) {
+        // 3xxx: echo delay (12-bit value across 16 effect codes)
+        dispatchCmd(DIV_CMD_QSOUND_ECHO_DELAY, ch, ((effect & 0x0f) << 8) | effectVal);
+        return true;
+      }
+      break;
+
+    // --- ESFM: effectHandlers (0x2E only) ---
+    case SEQ_CHIP_ESFM:
+      switch (effect) {
+        case 0x2e: dispatchCmd(DIV_CMD_FM_HARD_RESET, ch, effectVal); return true;
+      }
+      break;
   }
   return false;
 }
@@ -659,19 +794,43 @@ static bool seqPerSystemPostEffect(int ch, int effect, int effectVal) {
     case SEQ_CHIP_YM2203_EXT:
     case SEQ_CHIP_YM2608:
     case SEQ_CHIP_YM2608_EXT:
+    case SEQ_CHIP_YM2610_FULL:
     case SEQ_CHIP_YM2610_FULL_EXT:
+    case SEQ_CHIP_YM2610B:
     case SEQ_CHIP_YM2610B_EXT:
+    case SEQ_CHIP_YM2612_DUALPCM:
     case SEQ_CHIP_YM2612_DUALPCM_EXT:
     case SEQ_CHIP_YM2612_CSM:
     case SEQ_CHIP_YM2610_CSM:
     case SEQ_CHIP_YM2610B_CSM:
     case SEQ_CHIP_YM2203_CSM:
     case SEQ_CHIP_YM2608_CSM: {
-      // Only FM channels use FM post-effects; PSG channels on Genesis use SMS-like
+      // Only FM channels use FM post-effects; PSG channels use AY/SMS-like effects
       int sub = g_seq.chanSubIdx[ch];
-      if (sub >= 6) {
-        // Genesis PSG channels: only noise mode (same as SMS)
-        if (effect == 0x20) { dispatchCmd(DIV_CMD_STD_NOISE_MODE, ch, effectVal); return true; }
+      // Determine PSG channel threshold based on chip type
+      int psgStart = 6; // Genesis: channels 6+ are PSG
+      if (chipId == SEQ_CHIP_YM2203 || chipId == SEQ_CHIP_YM2203_EXT ||
+          chipId == SEQ_CHIP_YM2203_CSM) {
+        psgStart = 3; // YM2203: 3 FM + 3 PSG
+      } else if (chipId == SEQ_CHIP_YM2608 || chipId == SEQ_CHIP_YM2608_EXT ||
+                 chipId == SEQ_CHIP_YM2608_CSM) {
+        psgStart = 6; // YM2608: 6 FM + 3 PSG (+ ADPCM)
+      }
+      if (sub >= psgStart) {
+        // PSG channels on OPN chips: full AY effect set
+        switch (effect) {
+          case 0x20: dispatchCmd(DIV_CMD_STD_NOISE_MODE, ch, effectVal); return true;
+          case 0x21: dispatchCmd(DIV_CMD_STD_NOISE_FREQ, ch, effectVal); return true;
+          case 0x22: dispatchCmd(DIV_CMD_AY_ENVELOPE_SET, ch, effectVal); return true;
+          case 0x23: dispatchCmd(DIV_CMD_AY_ENVELOPE_LOW, ch, effectVal); return true;
+          case 0x24: dispatchCmd(DIV_CMD_AY_ENVELOPE_HIGH, ch, effectVal); return true;
+          case 0x25: dispatchCmd(DIV_CMD_AY_ENVELOPE_SLIDE, ch, -(int)effectVal); return true;
+          case 0x26: dispatchCmd(DIV_CMD_AY_ENVELOPE_SLIDE, ch, effectVal); return true;
+          case 0x29: dispatchCmd(DIV_CMD_AY_AUTO_ENVELOPE, ch, effectVal); return true;
+          case 0x2c: dispatchCmd(DIV_CMD_AY_AUTO_PWM, ch, effectVal); return true;
+          case 0x2e: dispatchCmd(DIV_CMD_AY_IO_WRITE, ch, 0, effectVal); return true;
+          case 0x2f: dispatchCmd(DIV_CMD_AY_IO_WRITE, ch, 1, effectVal); return true;
+        }
         break;
       }
       switch (effect) {
@@ -707,6 +866,127 @@ static bool seqPerSystemPostEffect(int ch, int effect, int effectVal) {
         case 0x61: dispatchCmd(DIV_CMD_FM_ALG, ch, effectVal); return true;
         case 0x62: dispatchCmd(DIV_CMD_FM_FMS, ch, effectVal); return true;
         case 0x63: dispatchCmd(DIV_CMD_FM_AMS, ch, effectVal); return true;
+        // YM2608/OPNA-specific: ADPCM-A global volume
+        case 0x1f:
+          if (chipId == SEQ_CHIP_YM2608 || chipId == SEQ_CHIP_YM2608_EXT || chipId == SEQ_CHIP_YM2608_CSM ||
+              chipId == SEQ_CHIP_YM2610_CRAP_EXT || chipId == SEQ_CHIP_YM2610_FULL_EXT ||
+              chipId == SEQ_CHIP_YM2610_FULL || chipId == SEQ_CHIP_YM2610B_EXT ||
+              chipId == SEQ_CHIP_YM2610_CSM || chipId == SEQ_CHIP_YM2610B_CSM) {
+            dispatchCmd(DIV_CMD_ADPCMA_GLOBAL_VOLUME, ch, effectVal); return true;
+          }
+          break;
+      }
+      break;
+    }
+
+    // --- YM2151/ARCADE (OPM): fmOPMPostEffectHandlerMap ---
+    case SEQ_CHIP_ARCADE:
+    case SEQ_CHIP_YM2151: {
+      switch (effect) {
+        // OPN base effects
+        case 0x11: dispatchCmd(DIV_CMD_FM_FB, ch, effectVal); return true;
+        case 0x12: dispatchCmd(DIV_CMD_FM_TL, ch, 0, effectVal); return true;
+        case 0x13: dispatchCmd(DIV_CMD_FM_TL, ch, 1, effectVal); return true;
+        case 0x14: dispatchCmd(DIV_CMD_FM_TL, ch, 2, effectVal); return true;
+        case 0x15: dispatchCmd(DIV_CMD_FM_TL, ch, 3, effectVal); return true;
+        case 0x16: { int o = opValNZ(effectVal, 4); if (o == -999) break; dispatchCmd(DIV_CMD_FM_MULT, ch, o, effectVal & 15); return true; }
+        case 0x19: dispatchCmd(DIV_CMD_FM_AR, ch, -1, effectVal & 31); return true;
+        case 0x1a: dispatchCmd(DIV_CMD_FM_AR, ch, 0, effectVal & 31); return true;
+        case 0x1b: dispatchCmd(DIV_CMD_FM_AR, ch, 1, effectVal & 31); return true;
+        case 0x1c: dispatchCmd(DIV_CMD_FM_AR, ch, 2, effectVal & 31); return true;
+        case 0x1d: dispatchCmd(DIV_CMD_FM_AR, ch, 3, effectVal & 31); return true;
+        case 0x50: { int o = opVal(effectVal, 4); if (o < -1) break; dispatchCmd(DIV_CMD_FM_AM, ch, o, effectVal & 1); return true; }
+        case 0x51: { int o = opVal(effectVal, 4); if (o < -1) break; dispatchCmd(DIV_CMD_FM_SL, ch, o, effectVal & 15); return true; }
+        case 0x52: { int o = opVal(effectVal, 4); if (o < -1) break; dispatchCmd(DIV_CMD_FM_RR, ch, o, effectVal & 15); return true; }
+        case 0x53: { int o = opVal(effectVal, 4); if (o < -1) break; dispatchCmd(DIV_CMD_FM_DT, ch, o, effectVal & 7); return true; }
+        case 0x54: { int o = opVal(effectVal, 4); if (o < -1) break; dispatchCmd(DIV_CMD_FM_RS, ch, o, effectVal & 3); return true; }
+        case 0x56: dispatchCmd(DIV_CMD_FM_DR, ch, -1, effectVal & 31); return true;
+        case 0x57: dispatchCmd(DIV_CMD_FM_DR, ch, 0, effectVal & 31); return true;
+        case 0x58: dispatchCmd(DIV_CMD_FM_DR, ch, 1, effectVal & 31); return true;
+        case 0x59: dispatchCmd(DIV_CMD_FM_DR, ch, 2, effectVal & 31); return true;
+        case 0x5a: dispatchCmd(DIV_CMD_FM_DR, ch, 3, effectVal & 31); return true;
+        case 0x5b: dispatchCmd(DIV_CMD_FM_D2R, ch, -1, effectVal & 31); return true;
+        case 0x5c: dispatchCmd(DIV_CMD_FM_D2R, ch, 0, effectVal & 31); return true;
+        case 0x5d: dispatchCmd(DIV_CMD_FM_D2R, ch, 1, effectVal & 31); return true;
+        case 0x5e: dispatchCmd(DIV_CMD_FM_D2R, ch, 2, effectVal & 31); return true;
+        case 0x5f: dispatchCmd(DIV_CMD_FM_D2R, ch, 3, effectVal & 31); return true;
+        case 0x61: dispatchCmd(DIV_CMD_FM_ALG, ch, effectVal); return true;
+        case 0x62: dispatchCmd(DIV_CMD_FM_FMS, ch, effectVal); return true;
+        case 0x63: dispatchCmd(DIV_CMD_FM_AMS, ch, effectVal); return true;
+        // OPM-specific
+        case 0x10: dispatchCmd(DIV_CMD_STD_NOISE_FREQ, ch, effectVal); return true;
+        case 0x17: dispatchCmd(DIV_CMD_FM_LFO, ch, effectVal); return true;
+        case 0x18: dispatchCmd(DIV_CMD_FM_LFO_WAVE, ch, effectVal); return true;
+        case 0x1e: dispatchCmd(DIV_CMD_FM_AM_DEPTH, ch, effectVal & 127); return true;
+        case 0x1f: dispatchCmd(DIV_CMD_FM_PM_DEPTH, ch, effectVal & 127); return true;
+        case 0x55: { int o = opVal(effectVal, 4); if (o < -1) break; dispatchCmd(DIV_CMD_FM_DT2, ch, o, effectVal & 3); return true; }
+        case 0x60: dispatchCmd(DIV_CMD_FM_OPMASK, ch, effectVal); return true;
+      }
+      break;
+    }
+
+    // --- OPZ (TX81Z): fmOPZPostEffectHandlerMap (extends OPM) ---
+    case SEQ_CHIP_OPZ: {
+      switch (effect) {
+        // OPN base effects (inherited through OPM)
+        case 0x11: dispatchCmd(DIV_CMD_FM_FB, ch, effectVal); return true;
+        case 0x12: dispatchCmd(DIV_CMD_FM_TL, ch, 0, effectVal); return true;
+        case 0x13: dispatchCmd(DIV_CMD_FM_TL, ch, 1, effectVal); return true;
+        case 0x14: dispatchCmd(DIV_CMD_FM_TL, ch, 2, effectVal); return true;
+        case 0x15: dispatchCmd(DIV_CMD_FM_TL, ch, 3, effectVal); return true;
+        case 0x16: { int o = opValNZ(effectVal, 4); if (o == -999) break; dispatchCmd(DIV_CMD_FM_MULT, ch, o, effectVal & 15); return true; }
+        case 0x19: dispatchCmd(DIV_CMD_FM_AR, ch, -1, effectVal & 31); return true;
+        case 0x1a: dispatchCmd(DIV_CMD_FM_AR, ch, 0, effectVal & 31); return true;
+        case 0x1b: dispatchCmd(DIV_CMD_FM_AR, ch, 1, effectVal & 31); return true;
+        case 0x1c: dispatchCmd(DIV_CMD_FM_AR, ch, 2, effectVal & 31); return true;
+        case 0x1d: dispatchCmd(DIV_CMD_FM_AR, ch, 3, effectVal & 31); return true;
+        case 0x50: { int o = opVal(effectVal, 4); if (o < -1) break; dispatchCmd(DIV_CMD_FM_AM, ch, o, effectVal & 1); return true; }
+        case 0x51: { int o = opVal(effectVal, 4); if (o < -1) break; dispatchCmd(DIV_CMD_FM_SL, ch, o, effectVal & 15); return true; }
+        case 0x52: { int o = opVal(effectVal, 4); if (o < -1) break; dispatchCmd(DIV_CMD_FM_RR, ch, o, effectVal & 15); return true; }
+        case 0x53: { int o = opVal(effectVal, 4); if (o < -1) break; dispatchCmd(DIV_CMD_FM_DT, ch, o, effectVal & 7); return true; }
+        case 0x54: { int o = opVal(effectVal, 4); if (o < -1) break; dispatchCmd(DIV_CMD_FM_RS, ch, o, effectVal & 3); return true; }
+        case 0x56: dispatchCmd(DIV_CMD_FM_DR, ch, -1, effectVal & 31); return true;
+        case 0x57: dispatchCmd(DIV_CMD_FM_DR, ch, 0, effectVal & 31); return true;
+        case 0x58: dispatchCmd(DIV_CMD_FM_DR, ch, 1, effectVal & 31); return true;
+        case 0x59: dispatchCmd(DIV_CMD_FM_DR, ch, 2, effectVal & 31); return true;
+        case 0x5a: dispatchCmd(DIV_CMD_FM_DR, ch, 3, effectVal & 31); return true;
+        case 0x5b: dispatchCmd(DIV_CMD_FM_D2R, ch, -1, effectVal & 31); return true;
+        case 0x5c: dispatchCmd(DIV_CMD_FM_D2R, ch, 0, effectVal & 31); return true;
+        case 0x5d: dispatchCmd(DIV_CMD_FM_D2R, ch, 1, effectVal & 31); return true;
+        case 0x5e: dispatchCmd(DIV_CMD_FM_D2R, ch, 2, effectVal & 31); return true;
+        case 0x5f: dispatchCmd(DIV_CMD_FM_D2R, ch, 3, effectVal & 31); return true;
+        case 0x61: dispatchCmd(DIV_CMD_FM_ALG, ch, effectVal); return true;
+        case 0x62: dispatchCmd(DIV_CMD_FM_FMS, ch, effectVal); return true;
+        case 0x63: dispatchCmd(DIV_CMD_FM_AMS, ch, effectVal); return true;
+        // OPM-specific (inherited)
+        case 0x10: dispatchCmd(DIV_CMD_STD_NOISE_FREQ, ch, effectVal); return true;
+        case 0x17: dispatchCmd(DIV_CMD_FM_LFO, ch, effectVal); return true;
+        case 0x18: dispatchCmd(DIV_CMD_FM_LFO_WAVE, ch, effectVal); return true;
+        case 0x1e: dispatchCmd(DIV_CMD_FM_AM_DEPTH, ch, effectVal & 127); return true;
+        case 0x1f: dispatchCmd(DIV_CMD_FM_PM_DEPTH, ch, effectVal & 127); return true;
+        case 0x55: { int o = opVal(effectVal, 4); if (o < -1) break; dispatchCmd(DIV_CMD_FM_DT2, ch, o, effectVal & 3); return true; }
+        case 0x60: dispatchCmd(DIV_CMD_FM_OPMASK, ch, effectVal); return true;
+        // OPZ-specific
+        case 0x24: dispatchCmd(DIV_CMD_FM_LFO2, ch, effectVal); return true;
+        case 0x25: dispatchCmd(DIV_CMD_FM_LFO2_WAVE, ch, effectVal); return true;
+        case 0x26: dispatchCmd(DIV_CMD_FM_AM2_DEPTH, ch, effectVal & 127); return true;
+        case 0x27: dispatchCmd(DIV_CMD_FM_PM2_DEPTH, ch, effectVal & 127); return true;
+        case 0x28: { int o = opVal(effectVal, 4); if (o < -1) break; dispatchCmd(DIV_CMD_FM_REV, ch, o, effectVal & 7); return true; }
+        case 0x2a: { int o = opVal(effectVal, 4); if (o < -1) break; dispatchCmd(DIV_CMD_FM_WS, ch, o, effectVal & 7); return true; }
+        case 0x2b: { int o = opVal(effectVal, 4); if (o < -1) break; dispatchCmd(DIV_CMD_FM_EG_SHIFT, ch, o, effectVal & 3); return true; }
+        case 0x2c: { int o = opVal(effectVal, 4); if (o < -1) break; dispatchCmd(DIV_CMD_FM_FINE, ch, o, effectVal & 15); return true; }
+        // OPZ fixed frequency (0x30-0x4f)
+        case 0x30: case 0x31: case 0x32: case 0x33: case 0x34: case 0x35: case 0x36: case 0x37:
+          dispatchCmd(DIV_CMD_FM_FIXFREQ, ch, 0, ((effect & 7) << 8) | effectVal); return true;
+        case 0x38: case 0x39: case 0x3a: case 0x3b: case 0x3c: case 0x3d: case 0x3e: case 0x3f:
+          dispatchCmd(DIV_CMD_FM_FIXFREQ, ch, 1, ((effect & 7) << 8) | effectVal); return true;
+        case 0x40: case 0x41: case 0x42: case 0x43: case 0x44: case 0x45: case 0x46: case 0x47:
+          dispatchCmd(DIV_CMD_FM_FIXFREQ, ch, 2, ((effect & 7) << 8) | effectVal); return true;
+        case 0x48: case 0x49: case 0x4a: case 0x4b: case 0x4c: case 0x4d: case 0x4e: case 0x4f:
+          dispatchCmd(DIV_CMD_FM_FIXFREQ, ch, 3, ((effect & 7) << 8) | effectVal); return true;
+        // OPZ-specific: FMS2/AMS2
+        case 0x64: dispatchCmd(DIV_CMD_FM_FMS2, ch, effectVal); return true;
+        case 0x65: dispatchCmd(DIV_CMD_FM_AMS2, ch, effectVal); return true;
       }
       break;
     }
@@ -715,6 +995,9 @@ static bool seqPerSystemPostEffect(int ch, int effect, int effectVal) {
     case SEQ_CHIP_OPL:
     case SEQ_CHIP_OPL2:
     case SEQ_CHIP_OPL3:
+    case SEQ_CHIP_OPL_DRUMS:
+    case SEQ_CHIP_OPL2_DRUMS:
+    case SEQ_CHIP_OPL3_DRUMS:
       switch (effect) {
         case 0x10: dispatchCmd(DIV_CMD_FM_LFO, ch, effectVal & 1); return true;
         case 0x11: dispatchCmd(DIV_CMD_FM_FB, ch, effectVal); return true;
@@ -747,6 +1030,8 @@ static bool seqPerSystemPostEffect(int ch, int effect, int effectVal) {
 
     // --- OPLL: fmOPLLPostEffectHandlerMap ---
     case SEQ_CHIP_OPLL:
+    case SEQ_CHIP_OPLL_DRUMS:
+    case SEQ_CHIP_VRC7:
       switch (effect) {
         case 0x10: dispatchCmd(DIV_CMD_WAVE, ch, effectVal); return true;
         case 0x11: dispatchCmd(DIV_CMD_FM_FB, ch, effectVal); return true;
@@ -845,6 +1130,34 @@ static bool seqPerSystemPostEffect(int ch, int effect, int effectVal) {
       }
       break;
 
+    // --- SID2: SID2PostEffectHandlerMap ---
+    case SEQ_CHIP_SID2:
+      switch (effect) {
+        case 0x10: dispatchCmd(DIV_CMD_WAVE, ch, effectVal); return true;
+        case 0x11: dispatchCmd(DIV_CMD_C64_RESONANCE, ch, effectVal); return true;
+        case 0x12: dispatchCmd(DIV_CMD_C64_FILTER_MODE, ch, effectVal); return true;
+        case 0x13: dispatchCmd(DIV_CMD_C64_RESET_MASK, ch, effectVal); return true;
+        case 0x14: dispatchCmd(DIV_CMD_C64_FILTER_RESET, ch, effectVal); return true;
+        case 0x15: dispatchCmd(DIV_CMD_C64_DUTY_RESET, ch, effectVal); return true;
+        case 0x16: dispatchCmd(DIV_CMD_C64_EXTENDED, ch, effectVal); return true;
+        case 0x17: dispatchCmd(DIV_CMD_C64_PW_SLIDE, ch, effectVal, 1); return true;
+        case 0x18: dispatchCmd(DIV_CMD_C64_PW_SLIDE, ch, effectVal, -1); return true;
+        case 0x19: dispatchCmd(DIV_CMD_C64_CUTOFF_SLIDE, ch, effectVal, 1); return true;
+        case 0x1a: dispatchCmd(DIV_CMD_C64_CUTOFF_SLIDE, ch, effectVal, -1); return true;
+      }
+      // SID2: 0x30-0x3F = fine duty (12-bit), 0x40-0x4F = fine cutoff (11-bit)
+      if (effect >= 0x30 && effect <= 0x3f) {
+        int val = ((effect & 0x0f) << 8) | effectVal;
+        dispatchCmd(DIV_CMD_C64_FINE_DUTY, ch, val);
+        return true;
+      }
+      if (effect >= 0x40 && effect <= 0x4f) {
+        int val = ((effect & 0x0f) << 8) | effectVal;
+        dispatchCmd(DIV_CMD_C64_FINE_CUTOFF, ch, val);
+        return true;
+      }
+      break;
+
     // PCE effects are all pre-effects (handled in seqPerSystemEffect)
     case SEQ_CHIP_PCE:
       break;
@@ -888,6 +1201,83 @@ static bool seqPerSystemPostEffect(int ch, int effect, int effectVal) {
         return true;
       }
       break;
+
+    // --- FDS: postEffectHandlers ---
+    case SEQ_CHIP_FDS:
+      switch (effect) {
+        case 0x11: dispatchCmd(DIV_CMD_FDS_MOD_DEPTH, ch, effectVal); return true;
+        case 0x12: dispatchCmd(DIV_CMD_FDS_MOD_HIGH, ch, effectVal); return true;
+        case 0x13: dispatchCmd(DIV_CMD_FDS_MOD_LOW, ch, effectVal); return true;
+        case 0x14: dispatchCmd(DIV_CMD_FDS_MOD_POS, ch, effectVal); return true;
+        case 0x15: dispatchCmd(DIV_CMD_FDS_MOD_WAVE, ch, effectVal); return true;
+        case 0x16: dispatchCmd(DIV_CMD_FDS_MOD_AUTO, ch, effectVal); return true;
+      }
+      break;
+
+    // --- N163: postEffectHandlers ---
+    case SEQ_CHIP_N163:
+      switch (effect) {
+        case 0x10: dispatchCmd(DIV_CMD_WAVE, ch, effectVal); return true;
+        case 0x11: dispatchCmd(DIV_CMD_N163_WAVE_POSITION, ch, effectVal, 1); return true;
+        case 0x12: dispatchCmd(DIV_CMD_N163_WAVE_LENGTH, ch, effectVal, 1); return true;
+        case 0x15: dispatchCmd(DIV_CMD_N163_WAVE_POSITION, ch, effectVal, 2); return true;
+        case 0x16: dispatchCmd(DIV_CMD_N163_WAVE_LENGTH, ch, effectVal, 2); return true;
+        case 0x1a: dispatchCmd(DIV_CMD_N163_WAVE_POSITION, ch, effectVal, 3); return true;
+        case 0x1b: dispatchCmd(DIV_CMD_N163_WAVE_LENGTH, ch, effectVal, 3); return true;
+      }
+      break;
+
+    // --- ESFM: postEffectHandlers (fmESFMPostEffectHandlerMap) ---
+    case SEQ_CHIP_ESFM: {
+      switch (effect) {
+        case 0x10: { int o = opVal(effectVal, 4); dispatchCmd(DIV_CMD_FM_AM_DEPTH, ch, o, effectVal & 1); return true; }
+        case 0x12: dispatchCmd(DIV_CMD_FM_TL, ch, 0, effectVal); return true;
+        case 0x13: dispatchCmd(DIV_CMD_FM_TL, ch, 1, effectVal); return true;
+        case 0x14: dispatchCmd(DIV_CMD_FM_TL, ch, 2, effectVal); return true;
+        case 0x15: dispatchCmd(DIV_CMD_FM_TL, ch, 3, effectVal); return true;
+        case 0x16: { int o = opValNZ(effectVal, 4); if (o < -1) break; dispatchCmd(DIV_CMD_FM_MULT, ch, o, effectVal & 15); return true; }
+        case 0x17: { int o = opVal(effectVal, 4); dispatchCmd(DIV_CMD_FM_PM_DEPTH, ch, o, effectVal & 1); return true; }
+        case 0x19: dispatchCmd(DIV_CMD_FM_AR, ch, -1, effectVal & 15); return true;
+        case 0x1a: dispatchCmd(DIV_CMD_FM_AR, ch, 0, effectVal & 15); return true;
+        case 0x1b: dispatchCmd(DIV_CMD_FM_AR, ch, 1, effectVal & 15); return true;
+        case 0x1c: dispatchCmd(DIV_CMD_FM_AR, ch, 2, effectVal & 15); return true;
+        case 0x1d: dispatchCmd(DIV_CMD_FM_AR, ch, 3, effectVal & 15); return true;
+        case 0x20: dispatchCmd(DIV_CMD_ESFM_OP_PANNING, ch, 0, effectVal); return true;
+        case 0x21: dispatchCmd(DIV_CMD_ESFM_OP_PANNING, ch, 1, effectVal); return true;
+        case 0x22: dispatchCmd(DIV_CMD_ESFM_OP_PANNING, ch, 2, effectVal); return true;
+        case 0x23: dispatchCmd(DIV_CMD_ESFM_OP_PANNING, ch, 3, effectVal); return true;
+        case 0x24: { int o = opVal(effectVal, 4); dispatchCmd(DIV_CMD_ESFM_OUTLVL, ch, o, effectVal & 7); return true; }
+        case 0x25: { int o = opVal(effectVal, 4); dispatchCmd(DIV_CMD_ESFM_MODIN, ch, o, effectVal & 7); return true; }
+        case 0x26: { int o = opVal(effectVal, 4); dispatchCmd(DIV_CMD_ESFM_ENV_DELAY, ch, o, effectVal & 7); return true; }
+        case 0x27: dispatchCmd(DIV_CMD_STD_NOISE_MODE, ch, effectVal & 3); return true;
+        case 0x2a: { int o = opVal(effectVal, 4); dispatchCmd(DIV_CMD_FM_WS, ch, o, effectVal & 7); return true; }
+        case 0x2f: { int o = opValNZ(effectVal, 4); if (o < -1) break; dispatchCmd(DIV_CMD_FM_FIXFREQ, ch, o, effectVal & 7); return true; }
+        case 0x40: dispatchCmd(DIV_CMD_FM_DT, ch, 0, effectVal); return true;
+        case 0x41: dispatchCmd(DIV_CMD_FM_DT, ch, 1, effectVal); return true;
+        case 0x42: dispatchCmd(DIV_CMD_FM_DT, ch, 2, effectVal); return true;
+        case 0x43: dispatchCmd(DIV_CMD_FM_DT, ch, 3, effectVal); return true;
+        case 0x50: { int o = opVal(effectVal, 4); dispatchCmd(DIV_CMD_FM_AM, ch, o, effectVal & 1); return true; }
+        case 0x51: { int o = opVal(effectVal, 4); dispatchCmd(DIV_CMD_FM_SL, ch, o, effectVal & 15); return true; }
+        case 0x52: { int o = opVal(effectVal, 4); dispatchCmd(DIV_CMD_FM_RR, ch, o, effectVal & 15); return true; }
+        case 0x53: { int o = opVal(effectVal, 4); dispatchCmd(DIV_CMD_FM_VIB, ch, o, effectVal & 1); return true; }
+        case 0x54: { int o = opVal(effectVal, 4); dispatchCmd(DIV_CMD_FM_RS, ch, o, effectVal & 3); return true; }
+        case 0x55: { int o = opVal(effectVal, 4); dispatchCmd(DIV_CMD_FM_SUS, ch, o, effectVal & 1); return true; }
+        case 0x56: dispatchCmd(DIV_CMD_FM_DR, ch, -1, effectVal & 15); return true;
+        case 0x57: dispatchCmd(DIV_CMD_FM_DR, ch, 0, effectVal & 15); return true;
+        case 0x58: dispatchCmd(DIV_CMD_FM_DR, ch, 1, effectVal & 15); return true;
+        case 0x59: dispatchCmd(DIV_CMD_FM_DR, ch, 2, effectVal & 15); return true;
+        case 0x5a: dispatchCmd(DIV_CMD_FM_DR, ch, 3, effectVal & 15); return true;
+        case 0x5b: { int o = opVal(effectVal, 4); dispatchCmd(DIV_CMD_FM_KSR, ch, o, effectVal & 1); return true; }
+      }
+      // 0x30-0x3f: fixed frequency F-num (op determined by high nibble of effect code)
+      if (effect >= 0x30 && effect <= 0x3f) {
+        int opBlock = (effect & 0x0c) >> 2; // 0x30-33→op0, 0x34-37→op1, etc.
+        int fNum = ((effect & 0x03) << 8) | effectVal;
+        dispatchCmd(DIV_CMD_FM_FIXFREQ, ch, 4 + opBlock, fNum);
+        return true;
+      }
+      break;
+    }
   }
 
   return false;
@@ -925,7 +1315,7 @@ static void seqProcessRow(int i, bool afterDelay) {
           }
           break;
         case 0x0f: // speed
-          if (g_seq.speeds.len == 2 && !g_seq.useGroove) {
+          if (g_seq.speeds.len == 2 && g_seq.numGrooves == 0) {
             if (effectVal > 0) g_seq.speeds.val[1] = effectVal;
           } else {
             if (effectVal > 0) g_seq.speeds.val[0] = effectVal;
@@ -1027,15 +1417,15 @@ static void seqProcessRow(int i, bool afterDelay) {
       if (ch.stopOnOff) {
         ch.portaNote = -1;
         ch.portaSpeed = -1;
+        HINT_PORTA(i, ch.portaNote, ch.portaSpeed);
         ch.stopOnOff = false;
       }
+      if (getKeyOffAffectsPorta(g_seq.chanChipId[i], g_seq.chanSubIdx[i])) {
+        ch.portaNote = -1;
+        ch.portaSpeed = -1;
+        HINT_PORTA(i, ch.portaNote, ch.portaSpeed);
+      }
       ch.scheduledSlideReset = true;
-    }
-    // Per-platform: some chips reset portamento on note-off regardless of compat flag
-    if (getKeyOffAffectsPorta(g_seq.chanChipId[i], g_seq.chanSubIdx[i])) {
-      ch.portaNote = -1;
-      ch.portaSpeed = -1;
-      HINT_PORTA(i, ch.portaNote, ch.portaSpeed);
     }
 
     dispatchCmd(DIV_CMD_NOTE_OFF, i);
@@ -1047,15 +1437,15 @@ static void seqProcessRow(int i, bool afterDelay) {
       if (ch.stopOnOff) {
         ch.portaNote = -1;
         ch.portaSpeed = -1;
+        HINT_PORTA(i, ch.portaNote, ch.portaSpeed);
         ch.stopOnOff = false;
       }
+      if (getKeyOffAffectsPorta(g_seq.chanChipId[i], g_seq.chanSubIdx[i])) {
+        ch.portaNote = -1;
+        ch.portaSpeed = -1;
+        HINT_PORTA(i, ch.portaNote, ch.portaSpeed);
+      }
       ch.scheduledSlideReset = true;
-    }
-    // Per-platform: some chips reset portamento on note-off regardless of compat flag
-    if (getKeyOffAffectsPorta(g_seq.chanChipId[i], g_seq.chanSubIdx[i])) {
-      ch.portaNote = -1;
-      ch.portaSpeed = -1;
-      HINT_PORTA(i, ch.portaNote, ch.portaSpeed);
     }
 
     dispatchCmd(DIV_CMD_NOTE_OFF_ENV, i);
@@ -1102,7 +1492,12 @@ static void seqProcessRow(int i, bool afterDelay) {
   short volVal = getPatCell(i, whatOrder, whatRow, SEQ_PAT_VOL);
   if (volVal != -1 && !noApplyVolume) {
     // COMPAT FLAG: oldAlwaysSetVolume — in legacy mode, only set volume if it changed
-    if (!COMPAT(SEQ_COMPAT_OLD_ALWAYS_SET_VOLUME) || (MIN(ch.volMax, ch.volume) >> 8) != volVal) {
+    // getLegacyAlwaysSetVolume() overrides: FM chips always set volume even with compat flag
+    if (!COMPAT(SEQ_COMPAT_OLD_ALWAYS_SET_VOLUME) || getLegacyAlwaysSetVolume(g_seq.chanChipId[i]) || (MIN(ch.volMax, ch.volume) >> 8) != volVal) {
+      // Let dispatchCmd know we can do MIDI aftertouch if there isn't a note
+      if (noteVal == -1) {
+        ch.midiAftertouch = true;
+      }
       ch.volume = volVal << 8;
       dispatchCmd(DIV_CMD_VOLUME, i, ch.volume >> 8);
       dispatchCmd(DIV_CMD_HINT_VOLUME, i, ch.volume >> 8);
@@ -1227,7 +1622,7 @@ static void seqProcessRow(int i, bool afterDelay) {
           ch.inPorta = false;
           if (!COMPAT(SEQ_COMPAT_ARP_NON_PORTA)) dispatchCmd(DIV_CMD_PRE_PORTA, i, false, 0);
         } else {
-          ch.portaNote = COMPAT(SEQ_COMPAT_LIMIT_SLIDES) ? getPortaFloor(g_seq.chanChipId[i], g_seq.chanSubIdx[i]) - 60 : -60;
+          ch.portaNote = (COMPAT(SEQ_COMPAT_LIMIT_SLIDES) && g_seq.chanChipId[i] != 0) ? getPortaFloor(g_seq.chanChipId[i], g_seq.chanSubIdx[i]) - 60 : -60;
           ch.portaSpeed = effectVal;
           ch.portaStop = true;
           ch.stopOnOff = false;
@@ -1242,19 +1637,23 @@ static void seqProcessRow(int i, bool afterDelay) {
         if (effectVal == 0) {
           ch.portaNote = -1;
           ch.portaSpeed = -1;
+          HINT_PORTA(i, ch.portaNote, ch.portaSpeed);
           ch.inPorta = false;
           dispatchCmd(DIV_CMD_PRE_PORTA, i, false, 0);
-        } else if (ch.note == ch.oldNote && !ch.inPorta && COMPAT(SEQ_COMPAT_BUGGY_PORTA_AFTER_SLIDE)) {
-          // COMPAT FLAG: buggy portamento after sliding
-          ch.portaNote = ch.note;
-          ch.portaSpeed = -1;
         } else {
           ch.lastPorta = effectVal;
           calledPorta = true;
-          ch.portaNote = ch.note;
-          ch.portaSpeed = effectVal;
-          ch.inPorta = true;
-          ch.wasShorthandPorta = false;
+          // COMPAT FLAG: buggy portamento after sliding
+          if (ch.note == ch.oldNote && !ch.inPorta && COMPAT(SEQ_COMPAT_BUGGY_PORTA_AFTER_SLIDE)) {
+            ch.portaNote = ch.note;
+            ch.portaSpeed = -1;
+          } else {
+            ch.portaNote = ch.note;
+            ch.portaSpeed = effectVal;
+            ch.inPorta = true;
+            ch.wasShorthandPorta = false;
+          }
+          HINT_PORTA(i, ch.portaNote, ch.portaSpeed);
           ch.portaStop = true;
           if (ch.keyOn) ch.doNote = false;
           ch.stopOnOff = COMPAT(SEQ_COMPAT_STOP_PORTA_ON_NOTE_OFF) ? true : false;
@@ -1262,7 +1661,6 @@ static void seqProcessRow(int i, bool afterDelay) {
           dispatchCmd(DIV_CMD_PRE_PORTA, i, true, 1);
           lastSlide = 0x1337;
         }
-        HINT_PORTA(i, ch.portaNote, ch.portaSpeed);
         break;
 
       // --- Vibrato ---
@@ -1303,18 +1701,22 @@ static void seqProcessRow(int i, bool afterDelay) {
         if (effectVal == 0 || ch.lastPorta == 0) {
           ch.portaNote = -1;
           ch.portaSpeed = -1;
+          HINT_PORTA(i, ch.portaNote, ch.portaSpeed);
           ch.inPorta = false;
           dispatchCmd(DIV_CMD_PRE_PORTA, i, false, 0);
-        } else if (ch.note == ch.oldNote && !ch.inPorta && COMPAT(SEQ_COMPAT_BUGGY_PORTA_AFTER_SLIDE)) {
-          // COMPAT FLAG: buggy portamento after sliding (also affects 06xy)
-          ch.portaNote = ch.note;
-          ch.portaSpeed = -1;
         } else {
           calledPorta = true;
-          ch.portaNote = ch.note;
-          ch.portaSpeed = ch.lastPorta;
-          ch.inPorta = true;
-          ch.wasShorthandPorta = false;
+          // COMPAT FLAG: buggy portamento after sliding (also affects 06xy)
+          if (ch.note == ch.oldNote && !ch.inPorta && COMPAT(SEQ_COMPAT_BUGGY_PORTA_AFTER_SLIDE)) {
+            ch.portaNote = ch.note;
+            ch.portaSpeed = -1;
+          } else {
+            ch.portaNote = ch.note;
+            ch.portaSpeed = ch.lastPorta;
+            ch.inPorta = true;
+            ch.wasShorthandPorta = false;
+          }
+          HINT_PORTA(i, ch.portaNote, ch.portaSpeed);
           ch.portaStop = true;
           if (ch.keyOn) ch.doNote = false;
           ch.stopOnOff = COMPAT(SEQ_COMPAT_STOP_PORTA_ON_NOTE_OFF) ? true : false;
@@ -1334,7 +1736,6 @@ static void seqProcessRow(int i, bool afterDelay) {
           ch.volSpeed = 0;
         }
         ch.volSpeedTarget = -1;
-        HINT_PORTA(i, ch.portaNote, ch.portaSpeed);
         dispatchCmd(DIV_CMD_HINT_VOL_SLIDE, i, ch.volSpeed);
         break;
       case 0x07: // tremolo
@@ -1644,7 +2045,8 @@ static void seqProcessRow(int i, bool afterDelay) {
     dispatchCmd(DIV_CMD_HINT_PANNING, i, ch.panL, ch.panR);
   }
   if (surroundPanChanged) {
-    dispatchCmd(DIV_CMD_SURROUND_PANNING, i, ch.panRL, ch.panRR);
+    dispatchCmd(DIV_CMD_SURROUND_PANNING, i, 2, ch.panRL);
+    dispatchCmd(DIV_CMD_SURROUND_PANNING, i, 3, ch.panRR);
   }
 
   // Instrument change during portamento
@@ -1670,12 +2072,15 @@ static void seqProcessRow(int i, bool afterDelay) {
         // COMPAT FLAG: E1xy/E2xy stop on same note
         if (COMPAT(SEQ_COMPAT_E1E2_STOP_ON_SAME_NOTE) && ch.wasShorthandPorta) {
           ch.portaSpeed = -1;
-          ch.inPorta = false;
+          HINT_PORTA(i, ch.portaNote, ch.portaSpeed);
           if (!COMPAT(SEQ_COMPAT_BROKEN_SHORTCUT_SLIDES)) dispatchCmd(DIV_CMD_PRE_PORTA, i, false, 0);
           ch.wasShorthandPorta = false;
+          ch.inPorta = false;
+        } else {
+          // otherwise we change the portamento target
+          ch.portaNote = ch.note;
+          HINT_PORTA(i, ch.portaNote, ch.portaSpeed);
         }
-        // Portamento target update
-        ch.portaNote = ch.note;
       } else if (!ch.noteOnInhibit) {
         // PRE_NOTE for platforms that need it (C64/SID2)
         if (getWantPreNote(g_seq.chanChipId[i])) {
@@ -1685,6 +2090,7 @@ static void seqProcessRow(int i, bool afterDelay) {
         ch.releasing = false;
         ch.goneThroughNote = true;
         ch.wentThroughNote = true;
+        g_seq.keyHit[i] = true;
         // COMPAT FLAG: reset arp phase on new note
         if (COMPAT(SEQ_COMPAT_RESET_ARP_PHASE_ON_NEW_NOTE)) {
           ch.arpStage = 0xff; // -1 as unsigned
@@ -1737,7 +2143,7 @@ static void seqProcessRow(int i, bool afterDelay) {
         if (!COMPAT(SEQ_COMPAT_ARP_NON_PORTA)) dispatchCmd(DIV_CMD_PRE_PORTA, i, false, 0);
         break;
       case 0xf2: // single pitch slide down
-        ch.portaNote = COMPAT(SEQ_COMPAT_LIMIT_SLIDES) ? getPortaFloor(g_seq.chanChipId[i], g_seq.chanSubIdx[i]) - 60 : -60;
+        ch.portaNote = (COMPAT(SEQ_COMPAT_LIMIT_SLIDES) && g_seq.chanChipId[i] != 0) ? getPortaFloor(g_seq.chanChipId[i], g_seq.chanSubIdx[i]) - 60 : -60;
         ch.portaSpeed = effectVal;
         ch.portaStop = true;
         ch.stopOnOff = false;
@@ -1799,11 +2205,11 @@ static void seqNextRow() {
     if (g_seq.haltOn == 1) g_seq.halted = true;
   } else if (g_seq.playing) {
     if (++g_seq.curRow >= g_seq.patLen) {
-      if (g_seq.repeatPattern) {
+      if (shallStopSched) {
+        g_seq.curRow = g_seq.patLen - 1;
+      } else if (g_seq.repeatPattern) {
         g_seq.curRow = 0;
         g_seq.changeOrd = -1;
-      } else if (shallStopSched) {
-        g_seq.curRow = g_seq.patLen - 1;
       } else {
         seqNextOrder();
       }
@@ -1824,6 +2230,7 @@ static void seqNextRow() {
   if (g_seq.haltOn == 2) g_seq.halted = true;
 
   // Speed alternation
+  g_seq.prevSpeed = g_seq.nextSpeed;
   // COMPAT FLAG: broken speed selection (DefleMask)
   if (COMPAT(SEQ_COMPAT_BROKEN_SPEED_SEL)) {
     uint16_t speed1 = g_seq.speeds.val[0];
@@ -1836,7 +2243,6 @@ static void seqNextRow() {
       g_seq.nextSpeed = (g_seq.curRow & 1) ? speed2 : speed1;
     }
   } else {
-    g_seq.prevSpeed = g_seq.nextSpeed;
     g_seq.ticks = g_seq.speeds.val[g_seq.curSpeed];
     g_seq.curSpeed++;
     if (g_seq.curSpeed >= g_seq.speeds.len) g_seq.curSpeed = 0;
@@ -1849,10 +2255,41 @@ static void seqNextRow() {
     bool wantPreNote = getWantPreNote(g_seq.chanChipId[i]);
 
     // PRE_NOTE dispatch for C64/SID2 (gate timing from post-row path)
-    if (wantPreNote) {
+    if (wantPreNote && !g_seq.chan[i].legato) {
       short noteVal = getPatCell(i, g_seq.curOrder, g_seq.curRow, SEQ_PAT_NOTE);
       if (noteVal != -1 && noteVal != SEQ_NOTE_OFF && noteVal != SEQ_NOTE_RELEASE && noteVal != SEQ_NOTE_MACRO_RELEASE) {
-        dispatchCmd(DIV_CMD_PRE_NOTE, i, g_seq.ticks);
+        bool doPreparePreNote = true;
+        int addition = 0;
+        int effectCols = g_seq.chanPool[i].effectCols;
+
+        for (int j = 0; j < effectCols; j++) {
+          short effect = getPatCell(i, g_seq.curOrder, g_seq.curRow, SEQ_PAT_FX(j));
+          short effectVal = getPatCell(i, g_seq.curOrder, g_seq.curRow, SEQ_PAT_FXVAL(j));
+          if (effectVal == -1) effectVal = 0;
+          effectVal &= 255;
+
+          if (!COMPAT(SEQ_COMPAT_PRE_NOTE_NO_EFFECT)) {
+            // Portamento cancels PRE_NOTE
+            if ((effect == 0x03 || effect == 0x06) && effectVal != 0) {
+              doPreparePreNote = false;
+              break;
+            }
+            // Legato cancels PRE_NOTE
+            if (effect == 0xea && effectVal > 0) {
+              doPreparePreNote = false;
+              break;
+            }
+          }
+          // Delay shifts PRE_NOTE timing
+          if (effect == 0xed && effectVal > 0) {
+            addition = effectVal;
+            break;
+          }
+        }
+
+        if (doPreparePreNote) {
+          dispatchCmd(DIV_CMD_PRE_NOTE, i, g_seq.ticks + addition);
+        }
       }
     }
 
@@ -1901,6 +2338,11 @@ static void seqNextRow() {
 static bool seqNextTick() {
   bool ret = false;
 
+  // Clear key-hit flags at the start of each tick (reference: engine.cpp playSub)
+  for (int i = 0; i < g_seq.numChannels; i++) {
+    g_seq.keyHit[i] = false;
+  }
+
   if (g_seq.divider < 1) g_seq.divider = 1;
 
   // Process delayed rows
@@ -1940,11 +2382,20 @@ static bool seqNextTick() {
                 g_seq.chan[c].vibratoFine = 4;
               }
             }
+            // Reset sequencer state (matches playSub(true) → reset() path)
+            g_seq.curOrder = 0;
+            g_seq.curRow = 0;
+            g_seq.prevOrder = 0;
+            g_seq.prevRow = 0;
             g_seq.curSpeed = 0;
+            g_seq.ticks = 1;
             g_seq.tempoAccum = 0;
             g_arpLen = 1;
             // Re-initialize nextSpeed from speed table (matches playSub reset)
             g_seq.nextSpeed = g_seq.speeds.val[0];
+            g_seq.prevSpeed = g_seq.nextSpeed;
+            // Clear walked array so loop detection starts fresh
+            memset(g_seq.walked, 0, sizeof(g_seq.walked));
           }
           // Track loop count
           if (g_seq.remainingLoops > 0) {
@@ -1981,6 +2432,7 @@ static bool seqNextTick() {
         if (--ch.retrigTick < 0) {
           ch.retrigTick = ch.retrigSpeed - 1;
           dispatchCmd(DIV_CMD_NOTE_ON, i, DIV_NOTE_NULL);
+          g_seq.keyHit[i] = true;
         }
       }
 
@@ -2016,9 +2468,9 @@ static bool seqNextTick() {
                 ch.volSpeed = 0;
                 ch.volSpeedTarget = -1;
               }
-              dispatchCmd(DIV_CMD_HINT_VOL_SLIDE, i, 0);
               dispatchCmd(DIV_CMD_HINT_VOLUME, i, ch.volume >> 8);
               dispatchCmd(DIV_CMD_VOLUME, i, ch.volume >> 8);
+              dispatchCmd(DIV_CMD_HINT_VOL_SLIDE, i, 0);
             }
           }
 
@@ -2029,25 +2481,24 @@ static bool seqNextTick() {
               ch.volSpeed = 0;
               ch.volSpeedTarget = -1;
             }
-            dispatchCmd(DIV_CMD_HINT_VOL_SLIDE, i, 0);
             dispatchCmd(DIV_CMD_HINT_VOLUME, i, ch.volume >> 8);
             dispatchCmd(DIV_CMD_VOLUME, i, ch.volume >> 8);
+            dispatchCmd(DIV_CMD_HINT_VOL_SLIDE, i, 0);
           } else if (ch.volume < 0) {
             if (!COMPAT(SEQ_COMPAT_NO_VOL_SLIDE_RESET)) {
               ch.volSpeed = 0;
               ch.volSpeedTarget = -1;
             }
+            dispatchCmd(DIV_CMD_HINT_VOL_SLIDE, i, 0);
             if (COMPAT(SEQ_COMPAT_LEGACY_VOLUME_SLIDES)) {
               ch.volume = ch.volMax + 1;
             } else {
               ch.volume = 0;
             }
-            dispatchCmd(DIV_CMD_HINT_VOL_SLIDE, i, 0);
             dispatchCmd(DIV_CMD_VOLUME, i, ch.volume >> 8);
             dispatchCmd(DIV_CMD_HINT_VOLUME, i, ch.volume >> 8);
           } else {
             dispatchCmd(DIV_CMD_VOLUME, i, ch.volume >> 8);
-            dispatchCmd(DIV_CMD_HINT_VOL_SLIDE, i, ch.volSpeed);
           }
         } else if (ch.tremoloDepth > 0) {
           ch.tremoloPos += ch.tremoloRate;
@@ -2205,17 +2656,18 @@ static bool seqNextTick() {
               if (ch.stopOnOff) {
                 ch.portaNote = -1;
                 ch.portaSpeed = -1;
+                HINT_PORTA(i, ch.portaNote, ch.portaSpeed);
                 ch.stopOnOff = false;
               }
+              // Per-platform: some chips reset portamento on note-off
+              if (getKeyOffAffectsPorta(g_seq.chanChipId[i], g_seq.chanSubIdx[i])) {
+                ch.portaNote = -1;
+                ch.portaSpeed = -1;
+                HINT_PORTA(i, ch.portaNote, ch.portaSpeed);
+              }
+              dispatchCmd(DIV_CMD_PRE_PORTA, i, false, 0);
               ch.scheduledSlideReset = true;
             }
-            // Per-platform: some chips reset portamento on note-off
-            if (getKeyOffAffectsPorta(g_seq.chanChipId[i], g_seq.chanSubIdx[i])) {
-              ch.portaNote = -1;
-              ch.portaSpeed = -1;
-              HINT_PORTA(i, ch.portaNote, ch.portaSpeed);
-            }
-            dispatchCmd(DIV_CMD_PRE_PORTA, i, false, 0);
             if (ch.cutType == 1) {
               dispatchCmd(DIV_CMD_NOTE_OFF_ENV, i);
             } else {
@@ -2439,6 +2891,18 @@ void furnace_seq_set_speed(int speed1, int speed2) {
 }
 
 EMSCRIPTEN_KEEPALIVE
+void furnace_seq_set_speed_pattern(const uint16_t* values, int len) {
+  if (len < 1) len = 1;
+  if (len > 16) len = 16;
+  g_seq.speeds.len = len;
+  for (int i = 0; i < len; i++) {
+    g_seq.speeds.val[i] = values[i] > 0 ? values[i] : 6;
+  }
+  g_seq.curSpeed = 0;
+  g_seq.nextSpeed = g_seq.speeds.val[0];
+}
+
+EMSCRIPTEN_KEEPALIVE
 void furnace_seq_set_tempo(int tempoN, int tempoD) {
   g_seq.virtualTempoN = tempoN > 0 ? tempoN : 150;
   g_seq.virtualTempoD = tempoD > 0 ? tempoD : 150;
@@ -2452,7 +2916,6 @@ void furnace_seq_set_groove(const uint16_t* values, int len) {
     g_seq.speeds.val[i] = values[i];
   }
   g_seq.useGroove = (len > 1);
-  g_seq.groovePos = 0;
   g_seq.curSpeed = 0;
   g_seq.nextSpeed = g_seq.speeds.val[0];
 }
@@ -2538,6 +3001,12 @@ int furnace_seq_get_row(void) {
 EMSCRIPTEN_KEEPALIVE
 bool furnace_seq_is_playing(void) {
   return g_seq.playing;
+}
+
+EMSCRIPTEN_KEEPALIVE
+bool furnace_seq_get_key_hit(int channel) {
+  if (channel < 0 || channel >= SEQ_MAX_CHANNELS) return false;
+  return g_seq.keyHit[channel];
 }
 
 } // extern "C"
