@@ -2,7 +2,7 @@
  * GearmulatorSynth — DSP56300-based VA synth engine (Access Virus, Waldorf, etc.)
  *
  * Loads original firmware ROMs via DSP56300 interpreter emulation in WASM.
- * Audio processing runs in an AudioWorklet with pthreads for the DSP thread.
+ * DSP runs in a Web Worker (with pthreads), audio flows via SAB to an AudioWorklet.
  */
 
 import type { DevilboxSynth } from '@/types/synth';
@@ -31,20 +31,25 @@ export const GM_SYNTH_NAMES: Record<number, string> = {
 const DB_NAME = 'devilbox-gearmulator-roms';
 const STORE_NAME = 'roms';
 
+/** SAB ring buffer layout constants — must match Gearmulator.worker.js and worklet */
+const HEADER_BYTES = 16;
+const RING_FRAMES = 8192;
+
 export class GearmulatorSynth implements DevilboxSynth {
   readonly name = 'GearmulatorSynth';
   readonly output: GainNode;
 
   private workletNode: AudioWorkletNode | null = null;
+  private worker: Worker | null = null;
   private static loadedContexts: WeakSet<AudioContext> = new WeakSet();
   private static initPromises: WeakMap<AudioContext, Promise<void>> = new WeakMap();
   private static wasmBinary: ArrayBuffer | null = null;
-  private static jsCode: string | null = null;
 
   public audioContext: AudioContext;
   private _disposed = false;
   private _ready = false;
   private _resolveInit: (() => void) | null = null;
+  private _stateResolve: ((data: ArrayBuffer | null) => void) | null = null;
   private config: GearmulatorConfig;
   private channel: number;
 
@@ -76,24 +81,10 @@ export class GearmulatorSynth implements DevilboxSynth {
         // Module might already be loaded
       }
 
-      if (!this.wasmBinary || !this.jsCode) {
-        const [wasmResponse, jsResponse] = await Promise.all([
-          fetch(`${baseUrl}gearmulator/gearmulator_wasm.wasm`),
-          fetch(`${baseUrl}gearmulator/gearmulator_wasm.js`)
-        ]);
-
+      if (!this.wasmBinary) {
+        const wasmResponse = await fetch(`${baseUrl}gearmulator/gearmulator_wasm.wasm`);
         if (wasmResponse.ok) {
           this.wasmBinary = await wasmResponse.arrayBuffer();
-        }
-        if (jsResponse.ok) {
-          let code = await jsResponse.text();
-          // Transform Emscripten module for AudioWorklet scope
-          code = code
-            .replace(/import\.meta\.url/g, "'.'")
-            .replace(/export\s+default\s+\w+;?/g, '')
-            .replace(/if\s*\(ENVIRONMENT_IS_NODE\)\s*\{[^}]*await\s+import\([^)]*\)[^}]*\}/g, '')
-            .replace(/var\s+wasmBinary;/, 'var wasmBinary = Module["wasmBinary"];');
-          this.jsCode = code;
         }
       }
 
@@ -114,15 +105,26 @@ export class GearmulatorSynth implements DevilboxSynth {
 
     const ctx = this.audioContext;
 
+    // Create SharedArrayBuffer for Worker → Worklet audio transfer
+    const sabSize = HEADER_BYTES + RING_FRAMES * 2 * 4; // header + interleaved L/R float32
+    const sab = new SharedArrayBuffer(sabSize);
+
+    // Create AudioWorkletNode (SAB reader → audio output)
     this.workletNode = new AudioWorkletNode(ctx, 'gearmulator-processor', {
       outputChannelCount: [2],
     });
+    this.workletNode.port.postMessage({ type: 'setSAB', sab });
+    this.workletNode.connect(this.output);
+
+    // Create Web Worker (runs DSP56300 emulator, writes to SAB)
+    const baseUrl = import.meta.env.BASE_URL || '/';
+    this.worker = new Worker(`${baseUrl}gearmulator/Gearmulator.worker.js`);
 
     const readyPromise = new Promise<void>((resolve) => {
       this._resolveInit = resolve;
     });
 
-    this.workletNode.port.onmessage = (event) => {
+    this.worker.onmessage = (event) => {
       const data = event.data;
       if (data.type === 'ready') {
         console.log(`[Gearmulator] Device ready — ${GM_SYNTH_NAMES[this.config.synthType]}, sampleRate=${data.sampleRate}`);
@@ -132,23 +134,32 @@ export class GearmulatorSynth implements DevilboxSynth {
           this._resolveInit = null;
         }
       } else if (data.type === 'error') {
-        console.error('[Gearmulator] Worklet error:', data.message);
+        console.error('[Gearmulator] Worker error:', data.message);
       } else if (data.type === 'state') {
-        // State data received (for save)
+        if (this._stateResolve) {
+          this._stateResolve(data.data);
+          this._stateResolve = null;
+        }
       }
     };
+    this.worker.onerror = (e) => {
+      console.error('[Gearmulator] Worker crashed:', e.message);
+    };
 
-    // Send init with ROM data
-    this.workletNode.port.postMessage({
+    // Send init to worker with ROM, WASM binary, and SAB
+    // ROM from IndexedDB may be Uint8Array or ArrayBuffer — normalize to ArrayBuffer for transfer
+    const wasmCopy = GearmulatorSynth.wasmBinary!.slice(0);
+    const romBuffer = romData instanceof ArrayBuffer ? romData.slice(0)
+      : (romData as Uint8Array).buffer.slice(0);
+    this.worker.postMessage({
       type: 'init',
       sampleRate: ctx.sampleRate,
-      wasmBinary: GearmulatorSynth.wasmBinary,
-      jsCode: GearmulatorSynth.jsCode,
-      romData: romData,
+      wasmBinary: wasmCopy,
+      jsCode: null,
+      romData: romBuffer,
       synthType: this.config.synthType,
-    });
-
-    this.workletNode.connect(this.output);
+      sab,
+    }, [wasmCopy, romBuffer]);
 
     // Wait for ready signal (with timeout)
     const timeout = new Promise<void>((_, reject) =>
@@ -161,25 +172,25 @@ export class GearmulatorSynth implements DevilboxSynth {
       const binary = atob(this.config.stateBase64);
       const bytes = new Uint8Array(binary.length);
       for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-      this.workletNode.port.postMessage({ type: 'setState', data: bytes.buffer }, [bytes.buffer]);
+      this.worker.postMessage({ type: 'setState', data: bytes.buffer }, [bytes.buffer]);
     }
 
     // Set clock percent if configured
     if (this.config.clockPercent && this.config.clockPercent !== 100) {
-      this.workletNode.port.postMessage({ type: 'setClockPercent', percent: this.config.clockPercent });
+      this.worker.postMessage({ type: 'setClockPercent', percent: this.config.clockPercent });
     }
   }
 
   // ─── ROM Management (IndexedDB) ────────────────────────────────────────────
 
-  private async loadROM(): Promise<ArrayBuffer | null> {
+  private async loadROM(): Promise<ArrayBuffer | Uint8Array | null> {
     const key = this.config.romKey;
     if (!key) return null;
 
     return GearmulatorSynth.loadROMFromDB(key);
   }
 
-  static async loadROMFromDB(key: string): Promise<ArrayBuffer | null> {
+  static async loadROMFromDB(key: string): Promise<ArrayBuffer | Uint8Array | null> {
     return new Promise((resolve) => {
       const request = indexedDB.open(DB_NAME, 1);
       request.onupgradeneeded = () => {
@@ -259,9 +270,9 @@ export class GearmulatorSynth implements DevilboxSynth {
   // ─── MIDI API ──────────────────────────────────────────────────────────────
 
   triggerAttack(note: string | number, _time?: number, velocity?: number): void {
-    if (!this._ready || !this.workletNode) return;
+    if (!this._ready || !this.worker) return;
     const midi = typeof note === 'string' ? noteToMidi(note) : note;
-    this.workletNode.port.postMessage({
+    this.worker.postMessage({
       type: 'noteOn',
       note: midi,
       velocity: velocity ?? 100,
@@ -270,9 +281,9 @@ export class GearmulatorSynth implements DevilboxSynth {
   }
 
   triggerRelease(note?: string | number, _time?: number): void {
-    if (!this._ready || !this.workletNode) return;
+    if (!this._ready || !this.worker) return;
     const midi = note != null ? (typeof note === 'string' ? noteToMidi(note) : note) : 60;
-    this.workletNode.port.postMessage({
+    this.worker.postMessage({
       type: 'noteOff',
       note: midi,
       channel: this.channel,
@@ -287,8 +298,8 @@ export class GearmulatorSynth implements DevilboxSynth {
 
   /** Send a MIDI CC message */
   sendCC(cc: number, value: number): void {
-    if (!this._ready || !this.workletNode) return;
-    this.workletNode.port.postMessage({
+    if (!this._ready || !this.worker) return;
+    this.worker.postMessage({
       type: 'cc',
       cc,
       value,
@@ -298,8 +309,8 @@ export class GearmulatorSynth implements DevilboxSynth {
 
   /** Send a program change */
   sendProgramChange(program: number): void {
-    if (!this._ready || !this.workletNode) return;
-    this.workletNode.port.postMessage({
+    if (!this._ready || !this.worker) return;
+    this.worker.postMessage({
       type: 'programChange',
       program,
       channel: this.channel,
@@ -308,30 +319,29 @@ export class GearmulatorSynth implements DevilboxSynth {
 
   /** Send a raw sysex message */
   sendSysex(data: Uint8Array): void {
-    if (!this._ready || !this.workletNode) return;
+    if (!this._ready || !this.worker) return;
     const copy = new Uint8Array(data);
-    this.workletNode.port.postMessage({ type: 'sysex', data: copy.buffer }, [copy.buffer]);
+    this.worker.postMessage({ type: 'sysex', data: copy.buffer }, [copy.buffer]);
   }
 
   /** Set DSP clock percentage for performance tuning */
   setClockPercent(percent: number): void {
-    if (!this._ready || !this.workletNode) return;
-    this.workletNode.port.postMessage({ type: 'setClockPercent', percent });
+    if (!this._ready || !this.worker) return;
+    this.worker.postMessage({ type: 'setClockPercent', percent });
   }
 
   /** Request current state (returned via onState callback) */
   async getState(): Promise<ArrayBuffer | null> {
-    if (!this._ready || !this.workletNode) return null;
+    if (!this._ready || !this.worker) return null;
     return new Promise((resolve) => {
-      const handler = (event: MessageEvent) => {
-        if (event.data.type === 'state') {
-          this.workletNode?.port.removeEventListener('message', handler);
-          resolve(event.data.data);
+      this._stateResolve = resolve;
+      this.worker!.postMessage({ type: 'getState' });
+      setTimeout(() => {
+        if (this._stateResolve === resolve) {
+          this._stateResolve = null;
+          resolve(null);
         }
-      };
-      this.workletNode!.port.addEventListener('message', handler);
-      this.workletNode!.port.postMessage({ type: 'getState' });
-      setTimeout(() => resolve(null), 5000);
+      }, 5000);
     });
   }
 
@@ -350,8 +360,13 @@ export class GearmulatorSynth implements DevilboxSynth {
     this._disposed = true;
     this._ready = false;
 
+    if (this.worker) {
+      this.worker.postMessage({ type: 'dispose' });
+      this.worker.terminate();
+      this.worker = null;
+    }
+
     if (this.workletNode) {
-      this.workletNode.port.postMessage({ type: 'dispose' });
       this.workletNode.disconnect();
       this.workletNode = null;
     }

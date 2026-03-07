@@ -38,6 +38,7 @@ import { FurnaceDispatchSynth, FurnaceDispatchPlatform } from './furnace-dispatc
 import { BuzzmachineType } from './buzzmachines/BuzzmachineEngine';
 import { VSTBridgeSynth } from './vstbridge/VSTBridgeSynth';
 import { SYNTH_REGISTRY } from './vstbridge/synth-registry';
+import { GearmulatorSynth } from './gearmulator/GearmulatorSynth';
 import { SynthRegistry } from './registry/SynthRegistry';
 
 // Sub-factory imports
@@ -703,17 +704,15 @@ export class InstrumentFactory {
       case 'GearmulatorXT':
       case 'GearmulatorNord':
       case 'GearmulatorJP8000': {
-        // Lazy-load gearmulator module; returns a placeholder synth that
-        // initialises asynchronously once the WASM module is ready.
         const gmConfig = config.gearmulator ?? { synthType: 0 };
         const gmVolDb = config.volume ?? -12;
-        const placeholder = createToneJSBasicSynth(config);
-        import('./gearmulator/GearmulatorSynth').then(({ createGearmulatorSynth }) => {
-          createGearmulatorSynth(gmConfig, gmVolDb).catch((err: unknown) => {
-            console.error('[InstrumentFactory] Gearmulator init failed:', err);
-          });
+        const gmSynth = new GearmulatorSynth(gmConfig);
+        gmSynth.output.gain.value = Math.pow(10, gmVolDb / 20);
+        // Fire-and-forget async init — audio starts once WASM is ready
+        gmSynth.ensureInitialized().catch((err: unknown) => {
+          console.error('[InstrumentFactory] Gearmulator init failed:', err);
         });
-        instrument = placeholder;
+        instrument = gmSynth;
         break;
       }
 
