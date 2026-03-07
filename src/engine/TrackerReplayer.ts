@@ -262,6 +262,20 @@ export interface TrackerSong {
   hippelFileData?: ArrayBuffer;
   /** Raw Sonix Music Driver binary for loading into the SonixEngine WASM */
   sonixFileData?: ArrayBuffer;
+  /** Raw PxTone Collage binary for loading into the PxtoneEngine WASM */
+  pxtoneFileData?: ArrayBuffer;
+  /** Raw Organya (.org) binary for loading into the OrganyaEngine WASM */
+  organyaFileData?: ArrayBuffer;
+  /** Raw FM Towns EUP binary for loading into the EupminiEngine WASM */
+  eupFileData?: ArrayBuffer;
+  /** Raw IXS binary for loading into the IxalanceEngine WASM */
+  ixsFileData?: ArrayBuffer;
+  /** Raw Psycle (.psy) binary for loading into the CpsycleEngine WASM */
+  psycleFileData?: ArrayBuffer;
+  /** Raw ZXTune binary for loading into the ZxtuneEngine WASM */
+  zxtuneFileData?: ArrayBuffer;
+  /** Raw SC68/SNDH binary for loading into the Sc68Engine WASM */
+  sc68FileData?: ArrayBuffer;
   // Native format data (preserved for format-specific editors)
   furnaceNative?: FurnaceNativeData;
   hivelyNative?: HivelyNativeData;

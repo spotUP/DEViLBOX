@@ -34,6 +34,13 @@ interface FormatStore {
   maFileData: ArrayBuffer | null;
   hippelFileData: ArrayBuffer | null;
   sonixFileData: ArrayBuffer | null;
+  pxtoneFileData: ArrayBuffer | null;
+  organyaFileData: ArrayBuffer | null;
+  eupFileData: ArrayBuffer | null;
+  ixsFileData: ArrayBuffer | null;
+  psycleFileData: ArrayBuffer | null;
+  sc68FileData: ArrayBuffer | null;
+  zxtuneFileData: ArrayBuffer | null;
   hivelyMeta: { stereoMode: number; mixGain: number; speedMultiplier: number; version: number } | null;
   furnaceSubsongs: FurnaceSubsongPlayback[] | null;
   furnaceActiveSubsong: number;
@@ -51,7 +58,7 @@ interface FormatStore {
   setSongDBInfo: (info: FormatStore['songDBInfo']) => void;
   setSidMetadata: (info: FormatStore['sidMetadata']) => void;
   setOriginalModuleData: (data: FormatStore['originalModuleData']) => void;
-  applyEditorMode: (song: { linearPeriods?: boolean; furnaceNative?: FurnaceNativeData; hivelyNative?: HivelyNativeData; hivelyFileData?: ArrayBuffer; klysNative?: KlysNativeData; klysFileData?: ArrayBuffer; musiclineFileData?: Uint8Array; c64SidFileData?: Uint8Array; jamCrackerFileData?: ArrayBuffer; futurePlayerFileData?: ArrayBuffer; preTrackerFileData?: ArrayBuffer; maFileData?: ArrayBuffer; hippelFileData?: ArrayBuffer; hivelyMeta?: { stereoMode: number; mixGain: number; speedMultiplier: number; version: number }; furnaceSubsongs?: FurnaceSubsongPlayback[]; furnaceActiveSubsong?: number; channelTrackTables?: number[][]; channelSpeeds?: number[]; channelGrooves?: number[]; goatTrackerData?: Uint8Array }) => void;
+  applyEditorMode: (song: { linearPeriods?: boolean; furnaceNative?: FurnaceNativeData; hivelyNative?: HivelyNativeData; hivelyFileData?: ArrayBuffer; klysNative?: KlysNativeData; klysFileData?: ArrayBuffer; musiclineFileData?: Uint8Array; c64SidFileData?: Uint8Array; jamCrackerFileData?: ArrayBuffer; futurePlayerFileData?: ArrayBuffer; preTrackerFileData?: ArrayBuffer; maFileData?: ArrayBuffer; hippelFileData?: ArrayBuffer; sonixFileData?: ArrayBuffer; pxtoneFileData?: ArrayBuffer; organyaFileData?: ArrayBuffer; eupFileData?: ArrayBuffer; ixsFileData?: ArrayBuffer; psycleFileData?: ArrayBuffer; sc68FileData?: ArrayBuffer; zxtuneFileData?: ArrayBuffer; hivelyMeta?: { stereoMode: number; mixGain: number; speedMultiplier: number; version: number }; furnaceSubsongs?: FurnaceSubsongPlayback[]; furnaceActiveSubsong?: number; channelTrackTables?: number[][]; channelSpeeds?: number[]; channelGrooves?: number[]; goatTrackerData?: Uint8Array }) => void;
   setFurnaceActiveSubsong: (index: number) => void;
   reset: () => void;
 }
@@ -87,6 +94,13 @@ export const useFormatStore = create<FormatStore>()(
     maFileData: null,
     hippelFileData: null,
     sonixFileData: null,
+    pxtoneFileData: null,
+    organyaFileData: null,
+    eupFileData: null,
+    ixsFileData: null,
+    psycleFileData: null,
+    sc68FileData: null,
+    zxtuneFileData: null,
     hivelyMeta: null,
     furnaceSubsongs: null,
     furnaceActiveSubsong: 0,
@@ -122,6 +136,13 @@ export const useFormatStore = create<FormatStore>()(
         state.maFileData = song.maFileData ?? null;
         state.hippelFileData = song.hippelFileData ?? null;
         state.sonixFileData = song.sonixFileData ?? null;
+        state.pxtoneFileData = song.pxtoneFileData ?? null;
+        state.organyaFileData = song.organyaFileData ?? null;
+        state.eupFileData = song.eupFileData ?? null;
+        state.ixsFileData = song.ixsFileData ?? null;
+        state.psycleFileData = song.psycleFileData ?? null;
+        state.sc68FileData = song.sc68FileData ?? null;
+        state.zxtuneFileData = song.zxtuneFileData ?? null;
         if (song.furnaceNative) {
           state.editorMode = 'furnace';
           clearNative(state);
@@ -171,6 +192,13 @@ export const useFormatStore = create<FormatStore>()(
       state.maFileData = null;
       state.hippelFileData = null;
       state.sonixFileData = null;
+      state.pxtoneFileData = null;
+      state.organyaFileData = null;
+      state.eupFileData = null;
+      state.ixsFileData = null;
+      state.psycleFileData = null;
+      state.sc68FileData = null;
+      state.zxtuneFileData = null;
       state.originalModuleData = null;
       state.songDBInfo = null;
       state.sidMetadata = null;

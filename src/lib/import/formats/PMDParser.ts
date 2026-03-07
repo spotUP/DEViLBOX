@@ -66,6 +66,22 @@ const CMD_PAN         = 0xF4;
 const CMD_PORTAMENTO  = 0xF3;
 const CMD_REST        = 0x80;
 
+// ── Format detection ─────────────────────────────────────────────────────────
+
+/**
+ * Detect if a buffer is a PMD file.
+ * PMD files have byte[1] == 0x18 or 0x1A (data offset marker),
+ * and the channel offset table should contain plausible pointers.
+ */
+export function isPMDFormat(data: ArrayBuffer): boolean {
+  if (data.byteLength < MAX_OFFSETS * 2) return false;
+  const buf = new Uint8Array(data);
+  // RetrovertApp uses byte[1] == 0x18 or 0x1A as a header marker
+  if (buf[1] !== 0x18 && buf[1] !== 0x1A) return false;
+  // Validate that at least one channel offset is a plausible pointer
+  return parseHeader(buf) !== null;
+}
+
 // ── Channel Offset Validation ─────────────────────────────────────────────────
 
 interface PMDHeader {
