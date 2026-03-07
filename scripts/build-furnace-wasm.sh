@@ -38,12 +38,12 @@ echo -e "${YELLOW}Emscripten version:${NC}"
 emcc --version | head -1
 
 # Check for Furnace source
-FURNACE_ROOT="$PROJECT_ROOT/Reference Code/furnace-master"
+FURNACE_ROOT="$PROJECT_ROOT/third-party/furnace-master"
 if [ ! -d "$FURNACE_ROOT/src/engine/platform" ]; then
     echo -e "${RED}Error: Furnace source not found!${NC}"
     echo ""
     echo "Expected at: $FURNACE_ROOT"
-    echo "Please ensure the Furnace source tree is at 'Reference Code/furnace-master/'"
+    echo "Please ensure the Furnace source tree is at 'third-party/furnace-master/'"
     echo ""
     exit 1
 fi

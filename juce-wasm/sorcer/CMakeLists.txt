@@ -9,7 +9,7 @@
 cmake_minimum_required(VERSION 3.15)
 project(SorcerWASM VERSION 1.0.0)
 
-set(SORCER_ROOT "${CMAKE_SOURCE_DIR}/../../Reference Code/sorcer-master")
+set(SORCER_ROOT "${CMAKE_SOURCE_DIR}/../../third-party/sorcer-master")
 
 add_executable(SorcerWASMBuild
     "${CMAKE_SOURCE_DIR}/SorcerWASM.cpp"

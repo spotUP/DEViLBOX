@@ -5,7 +5,7 @@ set(CMAKE_CXX_STANDARD 17)
 
 # CMAKE_SOURCE_DIR is the musicline-wasm/ directory (where this CMakeLists.txt lives).
 # The repo root is one level up; Reference Code is a sibling of musicline-wasm/.
-set(ML_SRC "${CMAKE_SOURCE_DIR}/../Reference Code/musicline_playback-main/musicline")
+set(ML_SRC "${CMAKE_SOURCE_DIR}/../third-party/musicline_playback-main/musicline")
 
 # Replayer .cpp files (all that exist in the musicline/ root + mline_backend)
 set(ML_SOURCES

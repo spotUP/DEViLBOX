@@ -12,7 +12,7 @@
 cmake_minimum_required(VERSION 3.15)
 project(SurgeWASM VERSION 1.4.0)
 
-set(SURGE_ROOT "${CMAKE_SOURCE_DIR}/../../Reference Code/surge-xt")
+set(SURGE_ROOT "${CMAKE_SOURCE_DIR}/../../third-party/surge-xt")
 set(SURGE_SRC "${SURGE_ROOT}/src/common")
 set(SURGE_LIBS "${SURGE_ROOT}/libs")
 set(SURGE_SOURCE_DIR "${SURGE_ROOT}")

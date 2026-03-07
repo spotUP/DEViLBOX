@@ -9,7 +9,7 @@
 cmake_minimum_required(VERSION 3.15)
 project(OBXfWASM VERSION 1.0.0)
 
-set(OBXF_ROOT "${CMAKE_SOURCE_DIR}/../../Reference Code/OB-Xf-main")
+set(OBXF_ROOT "${CMAKE_SOURCE_DIR}/../../third-party/OB-Xf-main")
 
 add_executable(OBXfWASMBuild
     "${CMAKE_SOURCE_DIR}/OBXfWASM.cpp"

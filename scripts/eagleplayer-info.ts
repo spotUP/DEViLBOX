@@ -2,7 +2,7 @@
 /**
  * eagleplayer-info.ts — UADE Eagleplayer.conf Lookup Tool
  *
- * Parses Reference Code/uade-3.05/eagleplayer.conf and looks up player
+ * Parses third-party/uade-3.05/eagleplayer.conf and looks up player
  * information by format name, extension, or lists all players.
  *
  * Usage:
@@ -16,8 +16,8 @@ import { readFileSync, statSync, existsSync } from 'fs';
 import { join } from 'path';
 
 const ROOT = process.cwd();
-const CONF_PATH = join(ROOT, 'Reference Code/uade-3.05/eagleplayer.conf');
-const PLAYERS_DIR = join(ROOT, 'Reference Code/uade-3.05/players');
+const CONF_PATH = join(ROOT, 'third-party/uade-3.05/eagleplayer.conf');
+const PLAYERS_DIR = join(ROOT, 'third-party/uade-3.05/players');
 
 // ── Data types ────────────────────────────────────────────────────────────────
 

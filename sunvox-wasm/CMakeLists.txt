@@ -3,8 +3,8 @@ project(SunVox CXX)
 
 set(CMAKE_CXX_STANDARD 11)
 
-set(SUNVOX_SRC "${CMAKE_SOURCE_DIR}/../Reference Code/sunvox_sources-master/sunvox_engine")
-set(SUNDOG_SRC "${CMAKE_SOURCE_DIR}/../Reference Code/sunvox_sources-master/sundog_engine")
+set(SUNVOX_SRC "${CMAKE_SOURCE_DIR}/../third-party/sunvox_sources-master/sunvox_engine")
+set(SUNDOG_SRC "${CMAKE_SOURCE_DIR}/../third-party/sunvox_sources-master/sundog_engine")
 
 set(SOURCES
     src/SunVoxWrapper.cpp
@@ -39,7 +39,7 @@ add_executable(${OUTPUT_NAME} ${SOURCES})
 
 target_include_directories(${OUTPUT_NAME} PRIVATE
     src
-    "${CMAKE_SOURCE_DIR}/../Reference Code/sunvox_sources-master"
+    "${CMAKE_SOURCE_DIR}/../third-party/sunvox_sources-master"
     "${SUNVOX_SRC}"
     "${SUNDOG_SRC}"
 )

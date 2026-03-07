@@ -9,7 +9,7 @@
 cmake_minimum_required(VERSION 3.15)
 project(HelmWASM VERSION 1.0.0)
 
-set(HELM_ROOT "${CMAKE_SOURCE_DIR}/../../Reference Code/helm-master")
+set(HELM_ROOT "${CMAKE_SOURCE_DIR}/../../third-party/helm-master")
 set(MOPO_SRC "${HELM_ROOT}/mopo/src")
 set(SYNTH_SRC "${HELM_ROOT}/src/synthesis")
 set(COMMON_SRC "${HELM_ROOT}/src/common")

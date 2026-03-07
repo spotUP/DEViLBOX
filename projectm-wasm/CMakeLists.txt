@@ -2,7 +2,7 @@
 #
 # Two-step build:
 #   Step 1 (run build.sh or manually):
-#     cd /path/to/Reference Code/projectm-master
+#     cd /path/to/third-party/projectm-master
 #     mkdir -p build-em && cd build-em
 #     emcmake cmake .. -G "Unix Makefiles" \
 #       -DCMAKE_INSTALL_PREFIX=$PWD/../install-em \
@@ -23,7 +23,7 @@ project(ProjectMBridge C)
 set(CMAKE_C_STANDARD 11)
 
 # ── Paths ────────────────────────────────────────────────────
-set(PROJECTM_SRC     "${CMAKE_SOURCE_DIR}/../Reference Code/projectm-master")
+set(PROJECTM_SRC     "${CMAKE_SOURCE_DIR}/../third-party/projectm-master")
 set(PROJECTM_INSTALL "${PROJECTM_SRC}/install-em")
 set(OUTPUT_DIR       "${CMAKE_SOURCE_DIR}/../public/projectm")
 file(MAKE_DIRECTORY ${OUTPUT_DIR})

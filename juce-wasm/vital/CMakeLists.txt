@@ -11,7 +11,7 @@
 cmake_minimum_required(VERSION 3.15)
 project(VitalWASM VERSION 1.0.0)
 
-set(VITAL_ROOT "${CMAKE_SOURCE_DIR}/../../Reference Code/vital-main")
+set(VITAL_ROOT "${CMAKE_SOURCE_DIR}/../../third-party/vital-main")
 set(VITAL_SRC "${VITAL_ROOT}/src")
 set(VITAL_THIRD_PARTY "${VITAL_ROOT}/third_party")
 

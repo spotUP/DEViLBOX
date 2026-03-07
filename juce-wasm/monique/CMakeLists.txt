@@ -11,7 +11,7 @@
 cmake_minimum_required(VERSION 3.15)
 project(MoniqueWASM VERSION 1.1.0)
 
-set(MONIQUE_ROOT "${CMAKE_SOURCE_DIR}/../../Reference Code/monique-monosynth")
+set(MONIQUE_ROOT "${CMAKE_SOURCE_DIR}/../../third-party/monique-monosynth")
 set(MONIQUE_SRC "${MONIQUE_ROOT}/src")
 set(MONIQUE_CORE "${MONIQUE_SRC}/core")
 
