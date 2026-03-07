@@ -123,6 +123,11 @@ EXPORT void jc_set_channel_gain(int ch, float gain) {
     paula_set_channel_gain(ch, gain);
 }
 
+/* Per-channel peak levels (call after render, resets peaks) */
+EXPORT void jc_get_channel_levels(float *out4) {
+    paula_get_channel_levels(out4);
+}
+
 /* Module metadata */
 EXPORT int jc_get_song_length(void) { return (int)g_song_length; }
 EXPORT int jc_get_num_patterns(void) { return (int)g_num_patterns; }

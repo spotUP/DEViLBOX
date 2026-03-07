@@ -84,6 +84,10 @@ EXPORT void fp_wasm_stop(void) {
     if (module_copy) { free(module_copy); module_copy = NULL; }
 }
 
+EXPORT void fp_wasm_get_channel_levels(float *out4) {
+    paula_get_channel_levels(out4);
+}
+
 EXPORT int fp_wasm_get_sample_rate(void) {
     return fp_get_sample_rate();
 }
