@@ -228,7 +228,7 @@ export const PixiSunVoxChannelView: React.FC<PixiSunVoxChannelViewProps> = ({
       const noteColor = cell.note === 97
         ? theme.cellEffect.color
         : (cell.note > 0 && cell.note < 97)
-          ? (isActiveRow ? 0xffffff : theme.cellNote.color)
+          ? (isActiveRow ? theme.currentRowText.color : theme.cellNote.color)
           : theme.cellEmpty.color;
       labels.push({ x: px, y, text: noteStr, color: noteColor });
       px += NOTE_W;

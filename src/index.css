@@ -2563,6 +2563,11 @@ html[data-theme="cyan-lineart"] #root > * {
   .synth-editor-content > * {
     break-inside: avoid;
   }
+  /* Sample editor needs full width for the waveform canvas — never split to columns */
+  .synth-editor-content.synth-editor-content--no-columns {
+    columns: unset !important;
+    column-count: auto !important;
+  }
 }
 
 .synth-editor-header {

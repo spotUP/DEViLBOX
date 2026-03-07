@@ -43,6 +43,9 @@ export interface PixiTheme {
   cellAccent: PixiColor;
   cellSlide: PixiColor;
   cellEmpty: PixiColor;
+  playbackCursor: PixiColor;
+  currentRowText: PixiColor;
+  panelShadow: PixiColor;
 }
 
 /**
@@ -96,11 +99,13 @@ function themeColorsToPixi(colors: ThemeColors): PixiTheme {
 
 /**
  * React hook: subscribes to useThemeStore and returns a reactive PixiTheme.
- * Memoized — only recomputes when the theme ID changes.
+ * Memoized — recomputes when the theme ID or custom colors change.
  */
 export function usePixiTheme(): PixiTheme {
   const theme = useThemeStore(state => state.getCurrentTheme());
-  return useMemo(() => themeColorsToPixi(theme.colors), [theme.id]);
+  const customThemeColors = useThemeStore(state => state.customThemeColors);
+  // For custom themes, include customThemeColors in the memo dep so color edits trigger re-render
+  return useMemo(() => themeColorsToPixi(theme.colors), [theme.id, customThemeColors]);
 }
 
 /** Returns the current theme ID string for conditional logic */

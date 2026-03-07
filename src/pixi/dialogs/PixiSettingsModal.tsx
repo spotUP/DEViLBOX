@@ -20,6 +20,7 @@ import { Div, Txt } from '../layout';
 import { useUIStore } from '@stores/useUIStore';
 import { useThemeStore, themes } from '@stores/useThemeStore';
 import { useSettingsStore, type SIDEngineType, type CRTParams } from '@stores/useSettingsStore';
+import { pickFile } from '../services/glFilePicker';
 import { LENS_PRESETS, LENS_PRESET_ORDER } from '../LensFilter';
 import { SID_ENGINES } from '@engine/deepsid/DeepSIDEngineManager';
 import { useKeyboardStore } from '@stores/useKeyboardStore';
@@ -51,7 +52,10 @@ const KEYBOARD_SCHEMES = [
 
 const KEYBOARD_SCHEME_OPTIONS: SelectOption[] = KEYBOARD_SCHEMES.map(s => ({ value: s.value, label: s.label }));
 
-const THEME_OPTIONS: SelectOption[] = themes.map((t) => ({ value: t.id, label: t.name }));
+// Built dynamically since themes list can change when custom theme is added
+function getThemeOptions(): SelectOption[] {
+  return themes.map((t) => ({ value: t.id, label: t.name }));
+}
 
 const RENDER_MODE_OPTIONS: SelectOption[] = [
   { value: 'dom', label: 'DOM (React + Tailwind)' },
@@ -85,6 +89,11 @@ const PLATFORM_OPTIONS: SelectOption[] = [
 const STEREO_MODE_OPTIONS: SelectOption[] = [
   { value: 'pt2', label: 'PT2-Clone' },
   { value: 'modplug', label: 'ModPlug' },
+];
+
+const VU_MODE_OPTIONS: SelectOption[] = [
+  { value: 'trigger', label: 'Trigger' },
+  { value: 'realtime', label: 'Realtime' },
 ];
 
 // CRT slider definitions — labels match DOM SettingsModal 1:1
@@ -165,6 +174,11 @@ export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, on
 
   const currentThemeId = useThemeStore((s) => s.currentThemeId);
   const setTheme = useThemeStore((s) => s.setTheme);
+  const customThemeColors = useThemeStore((s) => s.customThemeColors);
+  const copyThemeToCustom = useThemeStore((s) => s.copyThemeToCustom);
+
+  const customBannerImage = useSettingsStore((s) => s.customBannerImage);
+  const setCustomBannerImage = useSettingsStore((s) => s.setCustomBannerImage);
 
   const amigaLimits = useSettingsStore((s) => s.amigaLimits);
   const setAmigaLimits = useSettingsStore((s) => s.setAmigaLimits);
@@ -180,6 +194,12 @@ export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, on
   const setModplugSeparation = useSettingsStore((s) => s.setModplugSeparation);
   const midiPolyphonic = useSettingsStore((s) => s.midiPolyphonic);
   const setMidiPolyphonic = useSettingsStore((s) => s.setMidiPolyphonic);
+  const vuMeterMode = useSettingsStore((s) => s.vuMeterMode);
+  const setVuMeterMode = useSettingsStore((s) => s.setVuMeterMode);
+  const vuMeterSwing = useSettingsStore((s) => s.vuMeterSwing);
+  const setVuMeterSwing = useSettingsStore((s) => s.setVuMeterSwing);
+  const wobbleWindows = useSettingsStore((s) => s.wobbleWindows);
+  const setWobbleWindows = useSettingsStore((s) => s.setWobbleWindows);
   const trackerVisualBg = useSettingsStore((s) => s.trackerVisualBg);
   const setTrackerVisualBg = useSettingsStore((s) => s.setTrackerVisualBg);
   const trackerVisualMode = useSettingsStore((s) => s.trackerVisualMode);
@@ -454,11 +474,56 @@ export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, on
 
           <SettingRow label="Theme:">
             <PixiSelect
-              options={THEME_OPTIONS}
+              options={getThemeOptions()}
               value={currentThemeId}
               onChange={setTheme}
               width={180}
             />
+          </SettingRow>
+
+          {currentThemeId === 'custom' && customThemeColors && (
+            <SettingRow label="" description="Edit colors in DOM mode (Settings > Theme)">
+              <Div className="flex-row gap-1">
+                {themes.filter(t => t.id !== 'custom').map(t => (
+                  <PixiButton
+                    key={t.id}
+                    label={t.name}
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => copyThemeToCustom(t.id)}
+                  />
+                ))}
+              </Div>
+            </SettingRow>
+          )}
+
+          <SettingRow label="Custom Banner:" description="Shows after logo animation in visualizer">
+            <Div className="flex-row gap-1">
+              <PixiButton
+                label="Upload"
+                variant="ghost"
+                size="sm"
+                onClick={async () => {
+                  const file = await pickFile({ accept: 'image/*' });
+                  if (!file) return;
+                  if (file.size > 512 * 1024) {
+                    alert('Image must be under 512KB');
+                    return;
+                  }
+                  const reader = new FileReader();
+                  reader.onload = () => setCustomBannerImage(reader.result as string);
+                  reader.readAsDataURL(file);
+                }}
+              />
+              {customBannerImage && (
+                <PixiButton
+                  label="Remove"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setCustomBannerImage(null)}
+                />
+              )}
+            </Div>
           </SettingRow>
 
           <SettingRow label="UI Render Mode:" description="Switch between DOM and WebGL rendering">
@@ -767,6 +832,24 @@ export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, on
 
           <SettingRow label="BLEP Synthesis:" description="Band-limited (reduces aliasing)">
             <PixiCheckbox checked={useBLEP} onChange={setUseBLEP} />
+          </SettingRow>
+
+          {/* VU Meter Mode */}
+          <SettingRow label="VU Meters:" description={vuMeterMode === 'realtime' ? 'Continuous audio levels' : 'Triggered on note-on'}>
+            <PixiSelect
+              options={VU_MODE_OPTIONS}
+              value={vuMeterMode}
+              onChange={(v: string) => setVuMeterMode(v as 'trigger' | 'realtime')}
+              width={130}
+            />
+          </SettingRow>
+
+          <SettingRow label="VU Swing:" description="Sine wave sway animation">
+            <PixiCheckbox checked={vuMeterSwing} onChange={setVuMeterSwing} />
+          </SettingRow>
+
+          <SettingRow label="Wobble Windows:" description="Compiz-style wobbly windows (GL UI)">
+            <PixiCheckbox checked={wobbleWindows} onChange={setWobbleWindows} />
           </SettingRow>
 
           {/* Stereo Separation */}

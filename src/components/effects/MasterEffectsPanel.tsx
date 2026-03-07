@@ -22,26 +22,25 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import type { EffectConfig, AudioEffectType as EffectType } from '../../types/instrument';
 import { useAudioStore } from '@stores/useAudioStore';
-import { Settings, Volume2, X, GripVertical, Power, Sliders, ChevronDown, Save } from 'lucide-react';
+import { Settings, Volume2, X, ChevronDown, Save } from 'lucide-react';
 import { MASTER_FX_PRESETS, type MasterFxPreset } from '@constants/masterFxPresets';
 import { AVAILABLE_EFFECTS, type AvailableEffect } from '@constants/unifiedEffects';
 import { GUITARML_MODEL_REGISTRY } from '@constants/guitarMLRegistry';
 import { getDefaultEffectParameters } from '@engine/InstrumentFactory';
-import { MiniOutputMeter } from './EffectVisualizer';
-import { useEffectAnalyser } from '@hooks/useEffectAnalyser';
+import { VisualEffectEditorWrapper, ENCLOSURE_COLORS, DEFAULT_ENCLOSURE } from './VisualEffectEditors';
 
 // Dynamics effects have no wet/dry mixing — default to 100 to avoid misleading UI
 const DYNAMICS_EFFECTS = new Set<string>(['Compressor', 'EQ3']);
 
-interface SortableEffectItemProps {
+interface SortableVisualEffectProps {
   effect: EffectConfig;
   onToggle: () => void;
   onRemove: () => void;
-  onEdit: () => void;
+  onUpdateParameter: (key: string, value: number | string) => void;
   onWetChange: (wet: number) => void;
 }
 
-function SortableEffectItem({ effect, onToggle, onRemove, onEdit, onWetChange }: SortableEffectItemProps) {
+function SortableVisualEffect({ effect, onToggle, onRemove, onUpdateParameter, onWetChange }: SortableVisualEffectProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: effect.id,
   });
@@ -52,104 +51,62 @@ function SortableEffectItem({ effect, onToggle, onRemove, onEdit, onWetChange }:
     opacity: isDragging ? 0.5 : 1,
   };
 
-  const { pre, post } = useEffectAnalyser(effect.id, 'waveform');
-  const isGrMode = effect.type === 'Compressor' || effect.type === 'SidechainCompressor';
-
   return (
     <div
       ref={setNodeRef}
       style={style}
-      className={`
-        bg-dark-bgSecondary border border-dark-border rounded-lg p-3 mb-2
-        ${isDragging ? 'shadow-lg ring-2 ring-accent-primary' : ''}
-        ${!effect.enabled ? 'opacity-60' : ''}
-      `}
+      className={`relative group mb-3 ${isDragging ? 'ring-2 ring-accent-primary rounded-xl' : ''}`}
     >
-      <div className="flex items-center gap-3">
-        {/* Drag Handle */}
-        <button
-          {...attributes}
-          {...listeners}
-          className="text-text-muted hover:text-accent-primary cursor-grab active:cursor-grabbing p-1"
-          title="Drag to reorder"
-        >
-          <GripVertical size={16} />
-        </button>
+      {/* Drag handle bar */}
+      <div
+        {...attributes}
+        {...listeners}
+        className="flex items-center justify-center h-4 cursor-grab active:cursor-grabbing rounded-t-lg"
+        style={{ background: 'rgba(255,255,255,0.03)' }}
+        title="Drag to reorder"
+      >
+        <div className="w-8 h-0.5 rounded bg-white/10" />
+      </div>
 
-        {/* Effect Name */}
-        <div className="flex-1">
-          <div className="font-medium text-sm text-text-primary">{effect.type}</div>
-          <div className="text-xs text-text-muted">
-            {effect.enabled ? 'Active' : 'Bypassed'}
-          </div>
-        </div>
+      {/* Remove button */}
+      <button
+        onClick={onRemove}
+        className="absolute top-2 right-2 z-10 p-1 rounded-lg opacity-0 group-hover:opacity-100
+                 transition-opacity hover:bg-white/10"
+        style={{ color: '#ff5050' }}
+        title="Remove effect"
+      >
+        <X size={14} />
+      </button>
 
-        {/* Live output meter */}
-        <MiniOutputMeter
-          post={post}
-          pre={isGrMode ? pre : undefined}
-          grMode={isGrMode}
+      {/* Toggle button */}
+      <button
+        onClick={onToggle}
+        className="absolute top-2 right-10 z-10 p-1 rounded-lg opacity-0 group-hover:opacity-100
+                 transition-opacity hover:bg-white/10"
+        style={{ color: effect.enabled ? '#10b981' : 'rgba(255,255,255,0.2)' }}
+        title={effect.enabled ? 'Disable' : 'Enable'}
+      >
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+          <path d="M18.36 6.64a9 9 0 1 1-12.73 0" />
+          <line x1="12" y1="2" x2="12" y2="12" />
+        </svg>
+      </button>
+
+      {/* Visual pedal enclosure */}
+      <div style={{ opacity: effect.enabled ? 1 : 0.45, transition: 'opacity 0.2s' }}>
+        <VisualEffectEditorWrapper
+          effect={effect}
+          onUpdateParameter={onUpdateParameter}
+          onUpdateWet={onWetChange}
         />
-
-        {/* Wet/Dry Control */}
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-text-muted">WET</span>
-          <input
-            type="range"
-            min="0"
-            max="100"
-            value={effect.wet}
-            onChange={(e) => onWetChange(Number(e.target.value))}
-            className="w-16 h-1 bg-dark-bg rounded-lg appearance-none cursor-pointer
-                     [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3
-                     [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-accent-primary
-                     [&::-moz-range-thumb]:w-3 [&::-moz-range-thumb]:h-3
-                     [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-accent-primary [&::-moz-range-thumb]:border-0"
-          />
-          <span className="text-xs text-accent-primary font-mono w-8 text-right">
-            {effect.wet}%
-          </span>
-        </div>
-
-        {/* Edit Button */}
-        <button
-          onClick={onEdit}
-          className="p-1.5 rounded text-text-muted hover:text-accent-primary hover:bg-dark-bgHover transition-colors"
-          title="Edit parameters"
-        >
-          <Sliders size={14} />
-        </button>
-
-        {/* On/Off Toggle */}
-        <button
-          onClick={onToggle}
-          className={`
-            p-1.5 rounded transition-colors
-            ${effect.enabled
-              ? 'text-accent-success bg-accent-success/10 hover:bg-accent-success/20'
-              : 'text-text-muted hover:text-accent-error hover:bg-accent-error/10'
-            }
-          `}
-          title={effect.enabled ? 'Disable' : 'Enable'}
-        >
-          <Power size={14} />
-        </button>
-
-        {/* Remove Button */}
-        <button
-          onClick={onRemove}
-          className="p-1.5 rounded text-text-muted hover:text-accent-error hover:bg-accent-error/10 transition-colors"
-          title="Remove effect"
-        >
-          <X size={14} />
-        </button>
       </div>
     </div>
   );
 }
 
 interface MasterEffectsPanelProps {
-  onEditEffect?: (effect: EffectConfig) => void;
+  /* no props required — reads from useAudioStore */
 }
 
 // User preset storage key
@@ -160,7 +117,7 @@ interface UserMasterFxPreset {
   effects: EffectConfig[];
 }
 
-export const MasterEffectsPanel: React.FC<MasterEffectsPanelProps> = ({ onEditEffect }) => {
+export const MasterEffectsPanel: React.FC<MasterEffectsPanelProps> = () => {
   const [showAddMenu, setShowAddMenu] = useState(false);
   const [showPresetMenu, setShowPresetMenu] = useState(false);
   const [showSaveDialog, setShowSaveDialog] = useState(false);
@@ -324,9 +281,12 @@ export const MasterEffectsPanel: React.FC<MasterEffectsPanelProps> = ({ onEditEf
     updateMasterEffect(effectId, { wet });
   };
 
-  const handleEdit = (effect: EffectConfig) => {
-    if (onEditEffect) {
-      onEditEffect(effect);
+  const handleUpdateParameter = (effectId: string, key: string, value: number | string) => {
+    const effect = masterEffects.find(fx => fx.id === effectId);
+    if (effect) {
+      updateMasterEffect(effectId, {
+        parameters: { ...effect.parameters, [key]: value },
+      });
     }
   };
 
@@ -477,17 +437,23 @@ export const MasterEffectsPanel: React.FC<MasterEffectsPanelProps> = ({ onEditEf
               <div key={category}>
                 <div className="text-xs text-text-muted mb-1.5 uppercase tracking-wide">{category}</div>
                 <div className="flex flex-wrap gap-1">
-                  {effects.map((effect) => (
-                    <button
-                      key={effect.type ?? `neural-${effect.neuralModelIndex}`}
-                      onClick={() => handleAddEffect(effect)}
-                      className="px-2 py-1 text-xs rounded border border-dark-border bg-dark-bg
-                               hover:bg-accent-primary hover:text-white hover:border-accent-primary
-                               transition-colors"
-                    >
-                      {effect.label}
-                    </button>
-                  ))}
+                  {effects.map((effect) => {
+                    const enc = ENCLOSURE_COLORS[effect.type ?? ''] || DEFAULT_ENCLOSURE;
+                    return (
+                      <button
+                        key={effect.type ?? `neural-${effect.neuralModelIndex}`}
+                        onClick={() => handleAddEffect(effect)}
+                        className="px-2 py-1 text-[10px] rounded border transition-colors hover:text-white"
+                        style={{
+                          borderColor: enc.border,
+                          background: enc.bg,
+                          color: enc.accent,
+                        }}
+                      >
+                        {effect.label}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             ))}
@@ -519,8 +485,8 @@ export const MasterEffectsPanel: React.FC<MasterEffectsPanelProps> = ({ onEditEf
         </div>
       </div>
 
-      {/* Effects List */}
-      <div className="p-4">
+      {/* Effects Chain — visual pedal enclosures */}
+      <div className="p-3">
         {masterEffects.length === 0 ? (
           <div className="p-8 text-center text-text-muted text-sm border border-dashed border-dark-border rounded-lg">
             No master effects. All audio passes through unchanged.
@@ -529,26 +495,18 @@ export const MasterEffectsPanel: React.FC<MasterEffectsPanelProps> = ({ onEditEf
           <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
             <SortableContext items={masterEffects.map((fx) => fx.id)} strategy={verticalListSortingStrategy}>
               {masterEffects.map((effect) => (
-                <SortableEffectItem
+                <SortableVisualEffect
                   key={effect.id}
                   effect={effect}
                   onToggle={() => handleToggle(effect.id)}
                   onRemove={() => handleRemove(effect.id)}
-                  onEdit={() => handleEdit(effect)}
+                  onUpdateParameter={(key, value) => handleUpdateParameter(effect.id, key, value)}
                   onWetChange={(wet) => handleWetChange(effect.id, wet)}
                 />
               ))}
             </SortableContext>
           </DndContext>
         )}
-      </div>
-
-      {/* Info */}
-      <div className="px-4 pb-4">
-        <div className="text-xs text-text-muted p-3 bg-dark-bgSecondary rounded border border-dark-border">
-          <strong>Tip:</strong> Drag effects to reorder the signal chain.
-          Order matters: compression before reverb sounds different than reverb before compression.
-        </div>
       </div>
     </div>
   );

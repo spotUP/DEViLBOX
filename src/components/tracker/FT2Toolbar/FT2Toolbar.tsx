@@ -26,6 +26,7 @@ import { VisualizerFrame } from '@components/visualization/VisualizerFrame';
 import { Oscilloscope } from '@components/visualization/Oscilloscope';
 import { ChannelLevelsCompact } from '@components/visualization/ChannelLevelsCompact';
 import { LogoAnimation } from '@components/visualization/LogoAnimation';
+import { CustomBanner } from '@components/visualization/CustomBanner';
 import { CircularVU } from '@components/visualization/CircularVU';
 import { FrequencyBars } from '@components/visualization/FrequencyBars';
 import { ParticleField } from '@components/visualization/ParticleField';
@@ -260,7 +261,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
   const folderInputRef = useRef<HTMLInputElement>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [pendingCompanions, setPendingCompanions] = useState<File[]>([]);
-  type VizMode = 'waveform' | 'spectrum' | 'channels' | 'logo' | 'circular' | 'bars' | 'particles' | 'chanWaves' | 'chanActivity' | 'chanSpectrum' | 'chanCircular' | 'chanParticles' | 'chanRings' | 'chanTunnel' | 'chanRadar' | 'chanNibbles' | 'sineScroll' | 'amLED' | 'amBars' | 'amMirror' | 'amRadial' | 'amGraph' | 'amRadialGraph' | 'amDualStereo' | 'amLumi' | 'amAlpha' | 'amOutline' | 'amDualV' | 'amDualOverlay' | 'amBark' | 'amMel' | 'amOctave' | 'amNotes' | 'amMirrorReflex' | 'amRadialInvert' | 'amRadialLED' | 'amLinear' | 'amAWeight' | 'amLumiMirror';
+  type VizMode = 'waveform' | 'spectrum' | 'channels' | 'logo' | 'customBanner' | 'circular' | 'bars' | 'particles' | 'chanWaves' | 'chanActivity' | 'chanSpectrum' | 'chanCircular' | 'chanParticles' | 'chanRings' | 'chanTunnel' | 'chanRadar' | 'chanNibbles' | 'sineScroll' | 'amLED' | 'amBars' | 'amMirror' | 'amRadial' | 'amGraph' | 'amRadialGraph' | 'amDualStereo' | 'amLumi' | 'amAlpha' | 'amOutline' | 'amDualV' | 'amDualOverlay' | 'amBark' | 'amMel' | 'amOctave' | 'amNotes' | 'amMirrorReflex' | 'amRadialInvert' | 'amRadialLED' | 'amLinear' | 'amAWeight' | 'amLumiMirror';
   const [vizMode, setVizMode] = useState<VizMode>('logo');
 
   // Tap Tempo
@@ -309,11 +310,13 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
 
   // PERF: Memoize logo animation complete callback to prevent re-renders
   const handleLogoAnimationComplete = useCallback(() => {
-    // Auto-cycle to next visualizer after logo animation completes
-    const modes: Array<'waveform' | 'spectrum' | 'channels' | 'logo' | 'circular' | 'bars' | 'particles' | 'chanWaves' | 'chanActivity' | 'chanSpectrum' | 'chanCircular' | 'chanParticles' | 'chanRings' | 'chanTunnel' | 'chanRadar' | 'chanNibbles' | 'sineScroll'> = ['waveform', 'spectrum', 'channels', 'logo', 'circular', 'bars', 'particles', 'chanWaves', 'chanActivity', 'chanSpectrum', 'chanCircular', 'chanParticles', 'chanRings', 'chanTunnel', 'chanRadar', 'chanNibbles', 'sineScroll'];
-    const currentIndex = modes.indexOf('logo');
-    const nextIndex = (currentIndex + 1) % modes.length;
-    setVizMode(modes[nextIndex]);
+    // Show custom banner after logo if one is set, otherwise cycle to next visualizer
+    const hasBanner = useSettingsStore.getState().customBannerImage;
+    if (hasBanner) {
+      setVizMode('customBanner');
+    } else {
+      setVizMode('circular');
+    }
   }, []);
 
   // Handle fullscreen changes from keyboard (F11) or other sources
@@ -551,9 +554,13 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
       if (initialBPM) setBPM(initialBPM);
       const initialSpeed = moduleInfo.nativeData?.importMetadata.modData?.initialSpeed;
       if (initialSpeed) setSpeed(initialSpeed);
-      // Set editor mode (Furnace native data for WASM sequencer, etc.)
+      // Set editor mode (Furnace native data for WASM sequencer, libopenmpt file data, etc.)
+      const xmFreqType = moduleInfo.nativeData?.importMetadata?.xmData?.frequencyType;
+      const format = moduleInfo.nativeData?.format;
       useFormatStore.getState().applyEditorMode({
+        linearPeriods: format === 'XM' ? (xmFreqType === 'linear' || xmFreqType === undefined) : false,
         furnaceNative: moduleInfo.nativeData?.furnaceNative,
+        libopenmptFileData: options.useLibopenmpt ? moduleInfo.arrayBuffer : undefined,
       });
       notify.success(`Imported ${moduleInfo.metadata.type}: ${moduleInfo.metadata.title}`, 3000);
       await engine.preloadInstruments(instruments);
@@ -845,7 +852,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
 
         <VisualizerFrame variant="compact" className="min-w-[120px] max-w-[350px] flex-shrink-0 border-l border-dark-border cursor-pointer group ml-auto" style={{ display: 'flex', alignItems: 'stretch', justifyContent: 'center' }}>
         <div className="relative w-full h-full flex items-center justify-center" onClick={() => {
-          const modes: Array<VizMode> = ['waveform', 'spectrum', 'channels', 'logo', 'circular', 'bars', 'particles', 'chanWaves', 'chanActivity', 'chanSpectrum', 'chanCircular', 'chanParticles', 'chanRings', 'chanTunnel', 'chanRadar', 'chanNibbles', 'sineScroll', 'amLED', 'amBars', 'amMirror', 'amRadial', 'amGraph', 'amRadialGraph', 'amDualStereo', 'amLumi', 'amAlpha', 'amOutline', 'amDualV', 'amDualOverlay', 'amBark', 'amMel', 'amOctave', 'amNotes', 'amMirrorReflex', 'amRadialInvert', 'amRadialLED', 'amLinear', 'amAWeight', 'amLumiMirror'];
+          const modes: Array<VizMode> = ['waveform', 'spectrum', 'channels', 'logo', 'customBanner', 'circular', 'bars', 'particles', 'chanWaves', 'chanActivity', 'chanSpectrum', 'chanCircular', 'chanParticles', 'chanRings', 'chanTunnel', 'chanRadar', 'chanNibbles', 'sineScroll', 'amLED', 'amBars', 'amMirror', 'amRadial', 'amGraph', 'amRadialGraph', 'amDualStereo', 'amLumi', 'amAlpha', 'amOutline', 'amDualV', 'amDualOverlay', 'amBark', 'amMel', 'amOctave', 'amNotes', 'amMirrorReflex', 'amRadialInvert', 'amRadialLED', 'amLinear', 'amAWeight', 'amLumiMirror'];
           const currentIndex = modes.indexOf(vizMode);
           const nextIndex = (currentIndex + 1) % modes.length;
           setVizMode(modes[nextIndex]);
@@ -876,6 +883,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
               {(vizMode === 'waveform' || vizMode === 'spectrum') && <Oscilloscope width="auto" height={100} mode={vizMode} />}
               {vizMode === 'channels' && <ChannelLevelsCompact height={100} />}
               {vizMode === 'logo' && <LogoAnimation height={100} onComplete={handleLogoAnimationComplete} />}
+              {vizMode === 'customBanner' && <CustomBanner height={100} onComplete={() => setVizMode('circular')} />}
               {vizMode === 'circular' && <CircularVU height={100} />}
               {vizMode === 'bars' && <FrequencyBars height={100} />}
               {vizMode === 'particles' && <ParticleField height={100} />}
@@ -891,7 +899,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
                 <NibblesGame 
                   height={100} 
                   onExit={() => {
-                    const modes: Array<VizMode> = ['waveform', 'spectrum', 'channels', 'logo', 'circular', 'bars', 'particles', 'chanWaves', 'chanActivity', 'chanSpectrum', 'chanCircular', 'chanParticles', 'chanRings', 'chanTunnel', 'chanRadar', 'chanNibbles', 'sineScroll', 'amLED', 'amBars', 'amMirror', 'amRadial', 'amGraph', 'amRadialGraph', 'amDualStereo', 'amLumi', 'amAlpha', 'amOutline', 'amDualV', 'amDualOverlay', 'amBark', 'amMel', 'amOctave', 'amNotes', 'amMirrorReflex', 'amRadialInvert', 'amRadialLED', 'amLinear', 'amAWeight', 'amLumiMirror'];
+                    const modes: Array<VizMode> = ['waveform', 'spectrum', 'channels', 'logo', 'customBanner', 'circular', 'bars', 'particles', 'chanWaves', 'chanActivity', 'chanSpectrum', 'chanCircular', 'chanParticles', 'chanRings', 'chanTunnel', 'chanRadar', 'chanNibbles', 'sineScroll', 'amLED', 'amBars', 'amMirror', 'amRadial', 'amGraph', 'amRadialGraph', 'amDualStereo', 'amLumi', 'amAlpha', 'amOutline', 'amDualV', 'amDualOverlay', 'amBark', 'amMel', 'amOctave', 'amNotes', 'amMirrorReflex', 'amRadialInvert', 'amRadialLED', 'amLinear', 'amAWeight', 'amLumiMirror'];
                     const currentIndex = modes.indexOf('chanNibbles');
                     const nextIndex = (currentIndex + 1) % modes.length;
                     setVizMode(modes[nextIndex]);

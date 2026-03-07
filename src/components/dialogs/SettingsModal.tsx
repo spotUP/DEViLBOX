@@ -5,7 +5,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Maximize2, Keyboard, Usb } from 'lucide-react';
 import { useUIStore } from '@stores/useUIStore';
-import { useThemeStore, themes } from '@stores/useThemeStore';
+import { useThemeStore, themes, THEME_TOKEN_GROUPS } from '@stores/useThemeStore';
 import { useSettingsStore, type SIDEngineType } from '@stores/useSettingsStore';
 import { LENS_PRESETS, LENS_PRESET_ORDER } from '@/pixi/LensFilter';
 import { SID_ENGINES } from '@engine/deepsid/DeepSIDEngineManager';
@@ -19,6 +19,26 @@ import { useAudioStore } from '@stores/useAudioStore';
 import { getDJEngineIfActive } from '@engine/dj/DJEngine';
 import { BG_MODES, getBgModeLabel } from '@/components/tracker/TrackerVisualBackground';
 import { getASIDDeviceManager, isASIDSupported } from '@lib/sid/ASIDDeviceManager';
+/** Normalize any CSS color to #RRGGBB for <input type="color"> */
+function normalizeToHex6(color: string): string {
+  const s = color.trim();
+  // Handle rgba(r,g,b,a) or rgb(r,g,b)
+  const rgbaMatch = s.match(/^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/);
+  if (rgbaMatch) {
+    const r = parseInt(rgbaMatch[1], 10);
+    const g = parseInt(rgbaMatch[2], 10);
+    const b = parseInt(rgbaMatch[3], 10);
+    return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+  }
+  // Handle #RRGGBBAA -> #RRGGBB
+  if (s.startsWith('#') && s.length === 9) return s.slice(0, 7);
+  // Handle #RGB -> #RRGGBB
+  if (s.startsWith('#') && s.length === 4) return `#${s[1]}${s[1]}${s[2]}${s[2]}${s[3]}${s[3]}`;
+  // Already #RRGGBB or close enough
+  if (s.startsWith('#')) return s.slice(0, 7);
+  return '#000000';
+}
+
 interface CRTSliderProps {
   label: string;
   value: number;
@@ -71,7 +91,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
     setOscilloscopeVisible,
   } = useUIStore();
 
-  const { currentThemeId, setTheme } = useThemeStore();
+  const { currentThemeId, setTheme, customThemeColors, setCustomColor, resetCustomTheme, copyThemeToCustom } = useThemeStore();
   const {
     amigaLimits,
     setAmigaLimits,
@@ -119,6 +139,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
     setWebusbClockRate,
     webusbStereo,
     setWebusbStereo,
+    vuMeterMode,
+    setVuMeterMode,
+    vuMeterSwing,
+    setVuMeterSwing,
+    customBannerImage,
+    setCustomBannerImage,
+    wobbleWindows,
+    setWobbleWindows,
   } = useSettingsStore();
 
   const { sampleBusGain, setSampleBusGain, synthBusGain, setSynthBusGain, autoGain, setAutoGain } = useAudioStore();
@@ -239,6 +267,52 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                   ))}
                 </select>
               </div>
+
+              {/* Custom Theme Editor */}
+              {currentThemeId === 'custom' && customThemeColors && (
+                <div className="border border-ft2-border rounded p-2 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[9px] text-ft2-textDim font-mono">Copy colors from:</span>
+                    <div className="flex gap-1">
+                      {themes.filter(t => t.id !== 'custom').map(t => (
+                        <button
+                          key={t.id}
+                          onClick={() => copyThemeToCustom(t.id)}
+                          className="text-[8px] font-mono px-1.5 py-0.5 rounded border border-ft2-border text-ft2-textDim hover:border-ft2-text hover:text-ft2-text transition-colors"
+                        >
+                          {t.name}
+                        </button>
+                      ))}
+                      <button
+                        onClick={resetCustomTheme}
+                        className="text-[8px] font-mono px-1.5 py-0.5 rounded border border-ft2-border text-ft2-textDim hover:border-red-400 hover:text-red-400 transition-colors"
+                      >
+                        Reset
+                      </button>
+                    </div>
+                  </div>
+                  <div className="max-h-[200px] overflow-y-auto scrollbar-ft2 space-y-2">
+                    {THEME_TOKEN_GROUPS.map(group => (
+                      <div key={group.label}>
+                        <span className="text-[9px] text-ft2-highlight font-mono font-bold">{group.label}</span>
+                        <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 mt-0.5">
+                          {group.tokens.map(({ key, label }) => (
+                            <div key={key} className="flex items-center gap-1.5">
+                              <input
+                                type="color"
+                                value={normalizeToHex6(customThemeColors[key])}
+                                onChange={(e) => setCustomColor(key, e.target.value)}
+                                className="w-5 h-4 border border-ft2-border rounded cursor-pointer bg-transparent [&::-webkit-color-swatch-wrapper]:p-0 [&::-webkit-color-swatch]:border-none"
+                              />
+                              <span className="text-[8px] text-ft2-textDim font-mono truncate">{label}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* UI Render Mode — hidden on mobile phones where GL UI doesn't work */}
               {!/iPhone|iPod|Android.*Mobile/i.test(navigator.userAgent) && (
@@ -747,6 +821,108 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                   onChange={setUseBLEP}
                   size="sm"
                 />
+              </div>
+
+              {/* VU Meter Mode */}
+              <div className="flex items-center justify-between">
+                <div className="flex flex-col">
+                  <label className="text-ft2-text text-xs font-mono">VU Meters:</label>
+                  <span className="text-[9px] text-ft2-textDim font-mono">
+                    {vuMeterMode === 'realtime' ? 'Continuous audio output levels' : 'Triggered on note-on / volume commands'}
+                  </span>
+                </div>
+                <div className="flex gap-1">
+                  {(['trigger', 'realtime'] as const).map((m) => (
+                    <button
+                      key={m}
+                      onClick={() => setVuMeterMode(m)}
+                      className={[
+                        'text-[9px] font-mono px-2 py-0.5 rounded border transition-colors',
+                        vuMeterMode === m
+                          ? 'bg-ft2-cursor border-ft2-cursor text-black'
+                          : 'bg-transparent border-ft2-border text-ft2-textDim hover:border-ft2-text',
+                      ].join(' ')}
+                    >
+                      {m === 'trigger' ? 'Trigger' : 'Realtime'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* VU Meter Swing */}
+              <div className="flex items-center justify-between">
+                <div className="flex flex-col">
+                  <label className="text-ft2-text text-xs font-mono">VU Swing:</label>
+                  <span className="text-[9px] text-ft2-textDim font-mono">Sine wave sway animation</span>
+                </div>
+                <Toggle
+                  label=""
+                  value={vuMeterSwing}
+                  onChange={setVuMeterSwing}
+                  size="sm"
+                />
+              </div>
+
+              {/* Wobble Windows */}
+              <div className="flex items-center justify-between">
+                <div className="flex flex-col">
+                  <label className="text-ft2-text text-xs font-mono">Wobble Windows:</label>
+                  <span className="text-[9px] text-ft2-textDim font-mono">Compiz-style wobbly windows (GL UI)</span>
+                </div>
+                <Toggle
+                  label=""
+                  value={wobbleWindows}
+                  onChange={setWobbleWindows}
+                  size="sm"
+                />
+              </div>
+
+              {/* Custom Banner Image */}
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex flex-col">
+                    <label className="text-ft2-text text-xs font-mono">Custom Banner:</label>
+                    <span className="text-[9px] text-ft2-textDim font-mono">Shows after logo animation in visualizer</span>
+                  </div>
+                  <div className="flex gap-1">
+                    <label className="text-[9px] font-mono px-2 py-0.5 rounded border bg-transparent border-ft2-border text-ft2-textDim hover:border-ft2-text cursor-pointer transition-colors">
+                      Upload
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          // Limit to 512KB to stay within localStorage limits
+                          if (file.size > 512 * 1024) {
+                            alert('Image must be under 512KB');
+                            return;
+                          }
+                          const reader = new FileReader();
+                          reader.onload = () => {
+                            setCustomBannerImage(reader.result as string);
+                          };
+                          reader.readAsDataURL(file);
+                          e.target.value = '';
+                        }}
+                      />
+                    </label>
+                    {customBannerImage && (
+                      <button
+                        onClick={() => setCustomBannerImage(null)}
+                        className="text-[9px] font-mono px-2 py-0.5 rounded border bg-transparent border-ft2-border text-red-400 hover:border-red-400 transition-colors"
+                      >
+                        Remove
+                      </button>
+                    )}
+                  </div>
+                </div>
+                {customBannerImage && (
+                  <div className="flex items-center justify-center bg-black/30 rounded p-1" style={{ maxHeight: 48 }}>
+                    <img src={customBannerImage} alt="Banner preview" style={{ maxHeight: 40, maxWidth: '100%', objectFit: 'contain' }} />
+                  </div>
+                )}
               </div>
 
               {/* Stereo Separation */}

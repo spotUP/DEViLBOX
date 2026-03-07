@@ -304,6 +304,8 @@ export function useModuleImport() {
         linearPeriods,
         // Pass Furnace native data for WASM sequencer and format-specific editor
         furnaceNative: info.nativeData.furnaceNative,
+        // Pass raw ArrayBuffer for libopenmpt WASM playback
+        libopenmptFileData: useLibopenmpt ? info.arrayBuffer : undefined,
       });
 
       return;

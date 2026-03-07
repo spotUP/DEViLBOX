@@ -179,6 +179,12 @@ interface WorkbenchStore {
   activeWindowId: string | null;
   setActiveWindowId: (id: string | null) => void;
 
+  /** Multi-selection of windows (Shift+click or rectangle select). */
+  selectedWindowIds: string[];
+  toggleWindowSelection: (id: string) => void;
+  setSelectedWindowIds: (ids: string[]) => void;
+  clearSelection: () => void;
+
   /** Reset all windows to defaults and camera to origin. */
   resetLayout: () => void;
 }
@@ -199,6 +205,7 @@ export const useWorkbenchStore = create<WorkbenchStore>()(
       exposeActive: false,
       preExposeCam: null,
       activeWindowId: null,
+      selectedWindowIds: [],
 
       // ─── Camera ────────────────────────────────────────────────────────────
 
@@ -396,6 +403,19 @@ export const useWorkbenchStore = create<WorkbenchStore>()(
 
       setActiveWindowId: (id) =>
         set((state) => { state.activeWindowId = id; }),
+
+      toggleWindowSelection: (id) =>
+        set((state) => {
+          const idx = state.selectedWindowIds.indexOf(id);
+          if (idx >= 0) state.selectedWindowIds.splice(idx, 1);
+          else state.selectedWindowIds.push(id);
+        }),
+
+      setSelectedWindowIds: (ids) =>
+        set((state) => { state.selectedWindowIds = ids; }),
+
+      clearSelection: () =>
+        set((state) => { state.selectedWindowIds = []; }),
 
       resetLayout: () =>
         set((state) => {

@@ -1,7 +1,7 @@
 /**
  * PixiExportDialog — GL-native version of the DOM ExportDialog.
  *
- * Provides export for Song, SFX, Instrument, Audio, MIDI, XM, MOD, Chip, and Nano
+ * Provides export for Song, SFX, Instrument, Audio, MIDI, XM, MOD, IT, S3M, Chip, and Nano
  * formats using PixiJS layout components.  Import is handled via a file picker.
  *
  * DOM reference: src/lib/export/ExportDialog.tsx
@@ -51,7 +51,7 @@ import type { AutomationCurve } from '@typedefs/automation';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
-type ExportMode = 'song' | 'sfx' | 'instrument' | 'audio' | 'midi' | 'xm' | 'mod' | 'chip' | 'nano';
+type ExportMode = 'song' | 'sfx' | 'instrument' | 'audio' | 'midi' | 'xm' | 'mod' | 'it' | 's3m' | 'chip' | 'nano';
 type DialogMode = 'export' | 'import';
 
 interface PixiExportDialogProps {
@@ -73,6 +73,8 @@ const MODE_OPTIONS: SelectOption[] = [
   { value: 'midi', label: 'MIDI (.mid)' },
   { value: 'xm', label: 'XM Module (.xm)' },
   { value: 'mod', label: 'MOD Module (.mod)' },
+  { value: 'it', label: 'IT Module (.it)' },
+  { value: 's3m', label: 'S3M Module (.s3m)' },
   { value: 'chip', label: 'Chip (.vgm/.nsf/...)' },
   { value: 'nano', label: 'Nano Binary (.dbn)' },
 ];
@@ -85,6 +87,8 @@ const FORMAT_EXTENSIONS: Record<ExportMode, string> = {
   midi: '.mid',
   xm: '.xm',
   mod: '.mod',
+  it: '.it',
+  s3m: '.s3m',
   chip: '.vgm',
   nano: '.dbn',
 };
@@ -416,6 +420,26 @@ export const PixiExportDialog: React.FC<PixiExportDialogProps> = ({ isOpen, onCl
             notify.warning(`MOD exported with ${result.warnings.length} warnings`);
           } else {
             notify.success('MOD module exported!');
+            onClose();
+          }
+          break;
+        }
+
+        case 'it':
+        case 's3m': {
+          const { exportWithOpenMPT } = await import('@lib/export/OpenMPTExporter');
+          const songPositions = patterns.map((_: unknown, i: number) => i);
+          const result = await exportWithOpenMPT(patterns, instruments, songPositions, {
+            format: exportMode,
+            moduleName: metadata.name || 'song',
+            channelLimit: exportMode === 's3m' ? Math.min(xmChannels, 32) : xmChannels,
+          });
+          downloadFile(result.data, result.filename);
+          if (result.warnings?.length) {
+            setExportWarnings(result.warnings);
+            notify.warning(`${exportMode.toUpperCase()} exported with ${result.warnings.length} warnings`);
+          } else {
+            notify.success(`${exportMode.toUpperCase()} module exported!`);
             onClose();
           }
           break;
@@ -926,6 +950,46 @@ export const PixiExportDialog: React.FC<PixiExportDialogProps> = ({ isOpen, onCl
                 <PixiLabel text={`Format: ProTracker (${modChannels === 4 ? 'M.K.' : modChannels === 6 ? '6CHN' : '8CHN'}) · Max Samples: 31 · Max Rows: 64 · Notes: C-0 to B-3`} size="xs" font="mono" color="textMuted" />
 
                 {/* Warnings display */}
+                {exportWarnings.length > 0 && (
+                  <layoutContainer layout={{ flexDirection: 'column', gap: 4, padding: 8, borderRadius: 4, borderWidth: 1, borderColor: 0xff8800, backgroundColor: 0x332200, width: CONTENT_W - 24, maxHeight: 100 }}>
+                    <PixiLabel text={`Export Warnings (${exportWarnings.length})`} size="xs" weight="bold" color="custom" customColor={0xff8800} />
+                    {exportWarnings.map((w, i) => (
+                      <PixiLabel key={i} text={`• ${w}`} size="xs" color="textMuted" layout={{ maxWidth: CONTENT_W - 44 }} />
+                    ))}
+                  </layoutContainer>
+                )}
+              </layoutContainer>
+            )}
+
+            {/* ── IT/S3M export panel ────────────────────────────────────── */}
+            {(exportMode === 'it' || exportMode === 's3m') && (
+              <layoutContainer
+                layout={{
+                  flexDirection: 'column',
+                  gap: 8,
+                  padding: 10,
+                  borderRadius: 6,
+                  borderWidth: 1,
+                  backgroundColor: theme.bgSecondary.color,
+                  borderColor: theme.border.color,
+                  width: CONTENT_W,
+                }}
+              >
+                <PixiLabel text={exportMode === 'it' ? 'Impulse Tracker IT Export' : 'ScreamTracker 3 S3M Export'} size="sm" weight="bold" color="accent" />
+
+                <layoutContainer layout={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: CONTENT_W - 24 }}>
+                  <PixiLabel text={`Channels (max ${exportMode === 's3m' ? 32 : 64})`} size="xs" color="textMuted" />
+                  <PixiNumericInput
+                    value={xmChannels}
+                    min={2}
+                    max={exportMode === 's3m' ? 32 : 64}
+                    onChange={(v) => setXmChannels(v)}
+                    width={80}
+                  />
+                </layoutContainer>
+
+                <PixiLabel text={`Format: ${exportMode === 'it' ? 'Impulse Tracker' : 'ScreamTracker 3'} · Engine: OpenMPT CSoundFile (WASM) · ${patterns.length} patterns · ${instruments.length} instruments`} size="xs" font="mono" color="textMuted" />
+
                 {exportWarnings.length > 0 && (
                   <layoutContainer layout={{ flexDirection: 'column', gap: 4, padding: 8, borderRadius: 4, borderWidth: 1, borderColor: 0xff8800, backgroundColor: 0x332200, width: CONTENT_W - 24, maxHeight: 100 }}>
                     <PixiLabel text={`Export Warnings (${exportWarnings.length})`} size="xs" weight="bold" color="custom" customColor={0xff8800} />

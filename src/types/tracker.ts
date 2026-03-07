@@ -249,6 +249,7 @@ export interface FurnaceInstrumentData {
     ams?: number;
     ops?: number;
     opllPreset?: number;
+    block?: number;
     operators: Array<{
       enabled: boolean;
       mult: number;
@@ -397,6 +398,8 @@ export interface ImportMetadata {
     systemName?: string;
     channelShortNames?: string[];
     effectColumns?: number[];
+    chipFlags?: string[];
+    tuning?: number;
   };
 }
 
@@ -501,6 +504,8 @@ export interface FurnaceNativeData {
   chipIds: number[];  // Furnace system IDs (= FurnaceDispatchPlatform values) for each chip
   compatFlags?: Record<string, unknown>;  // Furnace compat flags (passed to WASM sequencer)
   grooves?: Array<{ len: number; val: number[] }>;  // Groove patterns for 09xx effect
+  chipFlags?: string[];  // Per-chip flag strings (key=value\n format) for clock/model selection
+  tuning?: number;  // A-4 tuning in Hz (default 440.0)
 }
 
 export interface FurnaceSubsong {
