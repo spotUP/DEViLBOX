@@ -2,8 +2,8 @@
 
 **Date:** 2026-02-16  
 **Files Audited:**
-- `/Reference Code/furnace-master/src/engine/dispatch.h` - Command definitions
-- `/Reference Code/furnace-master/src/engine/platform/*.cpp` - Chip implementations
+- `/third-party/furnace-master/src/engine/dispatch.h` - Command definitions
+- `/third-party/furnace-master/src/engine/platform/*.cpp` - Chip implementations
 - `/src/engine/furnace-dispatch/FurnaceDispatchEngine.ts` - DEViLBOX commands
 - `/src/engine/furnace-dispatch/FurnaceEffectRouter.ts` - Effect routing
 - `/furnace-wasm/common/FurnaceDispatchWrapper.cpp` - WASM wrapper

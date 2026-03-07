@@ -2,7 +2,7 @@
 
 **Date:** February 16, 2026 (Completed)  
 **Status:** ✅ 1:1 SOURCE COMPATIBILITY ACHIEVED  
-**Source Truth:** /Users/spot/Code/DEViLBOX/Reference Code/furnace-master/
+**Source Truth:** /Users/spot/Code/DEViLBOX/third-party/furnace-master/
 
 ---
 

@@ -78,7 +78,7 @@
 
 **Evidence:**
 - [FurnaceSongParser.ts](src/lib/import/formats/FurnaceSongParser.ts) — No mention of `compatFlags`
-- [Reference Code song.h:187-250](Reference Code/furnace-master/src/engine/song.h#L187-L250) — 50+ flags exist:
+- [Reference Code song.h:187-250](third-party/furnace-master/src/engine/song.h#L187-L250) — 50+ flags exist:
   - `limitSlides`, `linearPitch`, `pitchSlideSpeed`
   - `loopModality`, `delayBehavior`, `jumpTreatment`
   - `properNoiseLayout`, `waveDutyIsVol`, `resetMacroOnPorta`
