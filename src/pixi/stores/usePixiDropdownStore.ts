@@ -21,6 +21,7 @@ interface SelectDropdown {
   options: SelectOption[];
   onSelect: (value: string) => void;
   onClose: () => void;
+  searchable?: boolean;
 }
 
 interface MenuDropdown {

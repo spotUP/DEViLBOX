@@ -6,11 +6,12 @@
  * PixiGlobalDropdownLayer (in PixiRoot) renders them at zIndex 9999 — outside
  * every PixiWindow mask — so they always appear on top.
  */
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { FederatedPointerEvent, FederatedWheelEvent, Container as ContainerType } from 'pixi.js';
 import { PIXI_FONTS } from '../fonts';
 import { usePixiTheme } from '../theme';
 import { usePixiDropdownStore } from '../stores/usePixiDropdownStore';
+import { PixiPureTextInput } from '../input/PixiPureTextInput';
 
 export interface SelectOption {
   value: string;
@@ -28,6 +29,7 @@ interface PixiDropdownPanelProps {
   maxItems?: number;
   itemHeight?: number;
   layout?: Record<string, unknown>;
+  searchable?: boolean;
 }
 
 const ITEM_H = 22;
@@ -42,18 +44,28 @@ export const PixiDropdownPanel: React.FC<PixiDropdownPanelProps> = ({
   maxItems = 20,
   itemHeight = ITEM_H,
   layout: layoutProp,
+  searchable = false,
 }) => {
   const theme = usePixiTheme();
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const [scrollOffset, setScrollOffset] = useState(0);
+  const [searchFilter, setSearchFilter] = useState('');
 
-  const visibleCount = Math.min(options.length, maxItems);
-  const panelH = visibleCount * itemHeight + PANEL_PADDING * 2;
-  const needsScroll = options.length > maxItems;
-  const maxScroll = Math.max(0, options.length - maxItems);
+  // Filter options when searchable
+  const filteredOptions = useMemo(() => {
+    if (!searchable || !searchFilter) return options;
+    const lower = searchFilter.toLowerCase();
+    return options.filter(o => o.label.toLowerCase().includes(lower) || o.value === '');
+  }, [options, searchFilter, searchable]);
 
-  // Reset scroll when options change
-  useEffect(() => { setScrollOffset(0); }, [options]);
+  const visibleCount = Math.min(filteredOptions.length, maxItems);
+  const searchInputH = searchable ? 28 : 0;
+  const panelH = visibleCount * itemHeight + PANEL_PADDING * 2 + searchInputH;
+  const needsScroll = filteredOptions.length > maxItems;
+  const maxScroll = Math.max(0, filteredOptions.length - maxItems);
+
+  // Reset scroll when options or filter change
+  useEffect(() => { setScrollOffset(0); }, [options, searchFilter]);
 
   const handleWheel = useCallback((e: FederatedWheelEvent) => {
     if (!needsScroll) return;
@@ -62,8 +74,8 @@ export const PixiDropdownPanel: React.FC<PixiDropdownPanelProps> = ({
   }, [needsScroll, maxScroll]);
 
   const visibleOptions = needsScroll
-    ? options.slice(scrollOffset, scrollOffset + maxItems)
-    : options;
+    ? filteredOptions.slice(scrollOffset, scrollOffset + maxItems)
+    : filteredOptions;
 
   return (
     <layoutContainer
@@ -86,6 +98,18 @@ export const PixiDropdownPanel: React.FC<PixiDropdownPanelProps> = ({
       onPointerDown={(e: FederatedPointerEvent) => e.stopPropagation()}
       onWheel={handleWheel}
     >
+      {/* Search filter input */}
+      {searchable && (
+        <PixiPureTextInput
+          value={searchFilter}
+          onChange={setSearchFilter}
+          placeholder="Filter..."
+          width={width - PANEL_PADDING * 2}
+          height={22}
+          fontSize={11}
+          layout={{ marginBottom: 4 }}
+        />
+      )}
       {/* Scroll-up indicator */}
       {needsScroll && scrollOffset > 0 && (
         <layoutContainer layout={{ width: width - PANEL_PADDING * 2, height: 2, backgroundColor: theme.accent.color, borderRadius: 1 }} />
@@ -138,6 +162,7 @@ interface PixiSelectProps {
   placeholder?: string;
   disabled?: boolean;
   layout?: Record<string, unknown>;
+  searchable?: boolean;
 }
 
 let _selectIdCounter = 0;
@@ -151,6 +176,7 @@ export const PixiSelect: React.FC<PixiSelectProps> = ({
   placeholder = 'Select...',
   disabled = false,
   layout: layoutProp,
+  searchable = false,
 }) => {
   const theme = usePixiTheme();
   const [open, setOpen] = useState(false);
@@ -192,9 +218,10 @@ export const PixiSelect: React.FC<PixiSelectProps> = ({
         options,
         onSelect: (v) => { onChangeRef.current(v); closeDropdown(); },
         onClose: closeDropdown,
+        searchable,
       });
     });
-  }, [open, height, dropdownWidth, options, closeDropdown]);
+  }, [open, height, dropdownWidth, options, closeDropdown, searchable]);
 
   // If options or other props change while open, update the store entry
   useEffect(() => {
@@ -211,9 +238,10 @@ export const PixiSelect: React.FC<PixiSelectProps> = ({
       options,
       onSelect: (v) => { onChangeRef.current(v); closeDropdown(); },
       onClose: closeDropdown,
+      searchable,
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [options, dropdownWidth]);
+  }, [options, dropdownWidth, searchable]);
 
   // Clean up store entry on unmount
   useEffect(() => {
