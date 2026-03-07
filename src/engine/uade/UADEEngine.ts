@@ -12,6 +12,7 @@
  */
 
 import { getDevilboxAudioContext } from '@/utils/audio-context';
+import { getToneEngine } from '@engine/ToneEngine';
 
 export interface UADEScanRow {
   period: number;
@@ -306,6 +307,16 @@ export class UADEEngine {
           for (const cb of this._channelCallbacks) {
             cb(data.channels, data.totalFrames);
           }
+          break;
+
+        case 'chLevels':
+          try {
+            const engine = getToneEngine();
+            const levels: number[] = data.levels;
+            for (let i = 0; i < levels.length; i++) {
+              engine.triggerChannelMeter(i, levels[i]);
+            }
+          } catch { /* ToneEngine not ready */ }
           break;
 
         case 'songEnd':

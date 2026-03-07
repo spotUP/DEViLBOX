@@ -8,6 +8,7 @@
 import type { DevilboxSynth } from '@/types/synth';
 import type { GearmulatorConfig } from '@typedefs/instrument';
 import { getDevilboxAudioContext, noteToMidi, audioNow } from '@/utils/audio-context';
+import { getToneEngine } from '@engine/ToneEngine';
 
 /** Gearmulator synth device types */
 export const GM_SYNTH_TYPES = {
@@ -48,10 +49,12 @@ export class GearmulatorSynth implements DevilboxSynth {
   public audioContext: AudioContext;
   private _disposed = false;
   private _ready = false;
+  private _initFailed = false;
   private _resolveInit: (() => void) | null = null;
   private _stateResolve: ((data: ArrayBuffer | null) => void) | null = null;
   private config: GearmulatorConfig;
   private channel: number;
+  private _pendingNotes: Array<{ type: 'on' | 'off'; note: number; velocity: number }> = [];
 
   constructor(config: GearmulatorConfig) {
     this.audioContext = getDevilboxAudioContext();
@@ -100,7 +103,9 @@ export class GearmulatorSynth implements DevilboxSynth {
 
     const romData = await this.loadROM();
     if (!romData) {
-      throw new Error(`No ROM loaded for ${GM_SYNTH_NAMES[this.config.synthType] || 'unknown synth'}`);
+      this._initFailed = true;
+      this._pendingNotes = [];
+      throw new Error(`No ROM loaded for ${GM_SYNTH_NAMES[this.config.synthType] || 'unknown synth'}. Upload a ROM file in the instrument editor.`);
     }
 
     const ctx = this.audioContext;
@@ -114,6 +119,18 @@ export class GearmulatorSynth implements DevilboxSynth {
       outputChannelCount: [2],
     });
     this.workletNode.port.postMessage({ type: 'setSAB', sab });
+    this.workletNode.port.onmessage = (event) => {
+      const data = event.data;
+      if (data.type === 'chLevels') {
+        try {
+          const engine = getToneEngine();
+          const levels: number[] = data.levels;
+          for (let i = 0; i < levels.length; i++) {
+            engine.triggerChannelMeter(i, levels[i]);
+          }
+        } catch { /* ToneEngine not ready */ }
+      }
+    };
     this.workletNode.connect(this.output);
 
     // Create Web Worker (runs DSP56300 emulator, writes to SAB)
@@ -129,12 +146,29 @@ export class GearmulatorSynth implements DevilboxSynth {
       if (data.type === 'ready') {
         console.log(`[Gearmulator] Device ready — ${GM_SYNTH_NAMES[this.config.synthType]}, sampleRate=${data.sampleRate}`);
         this._ready = true;
+
+        // Tell worklet about sample rate ratio for resampling
+        const dspRate = data.sampleRate as number;
+        const ctxRate = this.audioContext.sampleRate;
+        if (dspRate && Math.abs(dspRate - ctxRate) > 1) {
+          const ratio = dspRate / ctxRate;
+          console.log(`[Gearmulator] Sample rate mismatch: DSP=${dspRate}, ctx=${ctxRate}, ratio=${ratio.toFixed(4)}`);
+          this.workletNode?.port.postMessage({ type: 'setResampleRatio', ratio });
+        }
+
         if (this._resolveInit) {
           this._resolveInit();
           this._resolveInit = null;
         }
+
+        // Flush any notes queued during init
+        this.flushPendingNotes();
+      } else if (data.type === 'booting') {
+        console.log(`[Gearmulator] ${GM_SYNTH_NAMES[this.config.synthType] || 'Synth'} booting... (${data.elapsed ? (data.elapsed / 1000).toFixed(0) + 's' : 'started'})`);
       } else if (data.type === 'error') {
         console.error('[Gearmulator] Worker error:', data.message);
+        this._initFailed = true;
+        this._pendingNotes = [];
       } else if (data.type === 'state') {
         if (this._stateResolve) {
           this._stateResolve(data.data);
@@ -161,9 +195,14 @@ export class GearmulatorSynth implements DevilboxSynth {
       sab,
     }, [wasmCopy, romBuffer]);
 
-    // Wait for ready signal (with timeout)
+    // Wait for ready signal — slow-booting synths (microQ, XT, Nord) use async boot
+    // and can take 10+ minutes in WASM interpreter mode
+    const isSlowBoot = this.config.synthType === GM_SYNTH_TYPES.WALDORF_MQ
+      || this.config.synthType === GM_SYNTH_TYPES.WALDORF_XT
+      || this.config.synthType === GM_SYNTH_TYPES.NORD_LEAD_2X;
+    const timeoutMs = isSlowBoot ? 15 * 60 * 1000 : 120000; // 15 min for slow synths
     const timeout = new Promise<void>((_, reject) =>
-      setTimeout(() => reject(new Error('Gearmulator init timeout (30s)')), 30000)
+      setTimeout(() => reject(new Error(`Gearmulator init timeout (${timeoutMs / 1000}s)`)), timeoutMs)
     );
     await Promise.race([readyPromise, timeout]);
 
@@ -270,8 +309,13 @@ export class GearmulatorSynth implements DevilboxSynth {
   // ─── MIDI API ──────────────────────────────────────────────────────────────
 
   triggerAttack(note: string | number, _time?: number, velocity?: number): void {
-    if (!this._ready || !this.worker) return;
     const midi = typeof note === 'string' ? noteToMidi(note) : note;
+    if (!this._ready || !this.worker) {
+      if (!this._initFailed) {
+        this._pendingNotes.push({ type: 'on', note: midi, velocity: velocity ?? 100 });
+      }
+      return;
+    }
     this.worker.postMessage({
       type: 'noteOn',
       note: midi,
@@ -281,13 +325,39 @@ export class GearmulatorSynth implements DevilboxSynth {
   }
 
   triggerRelease(note?: string | number, _time?: number): void {
-    if (!this._ready || !this.worker) return;
     const midi = note != null ? (typeof note === 'string' ? noteToMidi(note) : note) : 60;
+    if (!this._ready || !this.worker) {
+      if (!this._initFailed) {
+        this._pendingNotes.push({ type: 'off', note: midi, velocity: 0 });
+      }
+      return;
+    }
     this.worker.postMessage({
       type: 'noteOff',
       note: midi,
       channel: this.channel,
     });
+  }
+
+  private flushPendingNotes(): void {
+    if (!this._ready || !this.worker) return;
+    for (const pending of this._pendingNotes) {
+      if (pending.type === 'on') {
+        this.worker.postMessage({
+          type: 'noteOn',
+          note: pending.note,
+          velocity: pending.velocity,
+          channel: this.channel,
+        });
+      } else {
+        this.worker.postMessage({
+          type: 'noteOff',
+          note: pending.note,
+          channel: this.channel,
+        });
+      }
+    }
+    this._pendingNotes = [];
   }
 
   triggerAttackRelease(note: string | number, duration: number, time?: number, velocity?: number): void {

@@ -1689,6 +1689,25 @@ export class FurnaceDispatchEngine {
     this.workletNode.port.postMessage({ type: 'setTickRate', hz });
   }
 
+  /**
+   * Set chip-specific flags (clock selection, chip model, etc.)
+   * @param flagsStr - key=value string (newline-separated)
+   * @param platformType - which chip to set flags on
+   */
+  setChipFlags(flagsStr: string, platformType?: number): void {
+    if (!this.workletNode) return;
+    this.workletNode.port.postMessage({ type: 'setChipFlags', flagsStr, platformType });
+  }
+
+  /**
+   * Set A-4 tuning frequency for all chips.
+   * @param tuning - tuning in Hz (default 440.0)
+   */
+  setTuning(tuning: number, platformType?: number): void {
+    if (!this.workletNode) return;
+    this.workletNode.port.postMessage({ type: 'setTuning', tuning, platformType });
+  }
+
   reset(platformType?: number): void {
     if (!this.workletNode) return;
     this.workletNode.port.postMessage({ type: 'reset', platformType });
