@@ -337,7 +337,7 @@ export const SynareControls: React.FC<SynareControlsProps> = ({
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="synth-controls-flow flex-1 overflow-y-auto">
         {activeTab === 'main' ? renderMainTab() : renderModTab()}
       </div>
     </div>

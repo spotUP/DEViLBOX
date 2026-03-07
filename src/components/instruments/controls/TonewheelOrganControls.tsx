@@ -139,7 +139,7 @@ export const TonewheelOrganControls: React.FC<TonewheelOrganControlsProps> = ({
     : 'bg-[#1a1a1a] border-amber-900/30';
 
   return (
-    <div className="flex flex-col gap-4 p-4 overflow-y-auto">
+    <div className="synth-controls-flow flex flex-col gap-4 p-4 overflow-y-auto">
       {/* ═══ DRAWBARS ═══ */}
       <div className={`p-4 rounded-xl border ${panelBg}`}>
         <h3

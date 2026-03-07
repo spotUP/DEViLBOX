@@ -380,7 +380,7 @@ export const DubSirenControls: React.FC<DubSirenControlsProps> = ({
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="synth-controls-flow flex-1 overflow-y-auto">
         {activeTab === 'main' ? renderMainTab() : renderFXTab()}
       </div>
     </div>

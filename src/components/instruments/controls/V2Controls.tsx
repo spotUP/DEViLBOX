@@ -592,7 +592,7 @@ export const V2Controls: React.FC<V2ControlsProps> = ({
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="synth-controls-flow flex-1 overflow-y-auto">
         {activeTab === 'osc' ? renderOscTab() : 
          activeTab === 'filter' ? renderFilterTab() : 
          activeTab === 'env' ? renderEnvTab() :

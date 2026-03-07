@@ -136,7 +136,7 @@ export const JamCrackerControls: React.FC<JamCrackerControlsProps> = ({
   }, [onChange]);
 
   return (
-    <div className="p-4 space-y-4">
+    <div className="p-4 space-y-4 synth-controls-flow">
       {/* Header */}
       <div className="flex items-center gap-3 text-sm">
         <span className="text-cyan-400 font-mono font-bold">JamCracker Pro</span>

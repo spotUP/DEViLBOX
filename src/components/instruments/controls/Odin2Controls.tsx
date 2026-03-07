@@ -269,7 +269,7 @@ export const Odin2Controls: React.FC<Odin2ControlsProps> = ({
   ];
 
   return (
-    <div className="flex flex-col gap-4 p-4 overflow-y-auto">
+    <div className="synth-controls-flow flex flex-col gap-4 p-4 overflow-y-auto">
       {/* ═══ MASTER ═══ */}
       <Section title="Master" panelBg={panelBg} accentColor={accentColor}>
         <div className="flex gap-4 justify-center flex-wrap">

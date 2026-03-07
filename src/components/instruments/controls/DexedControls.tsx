@@ -365,7 +365,7 @@ export const DexedControls: React.FC<DexedControlsProps> = ({
         )}
 
       {/* Tab Content */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="synth-controls-flow flex-1 overflow-y-auto">
         {activeTab === 'global' && renderGlobalTab()}
         {activeTab === 'op1' && renderOperatorTab(0)}
         {activeTab === 'op2' && renderOperatorTab(1)}

@@ -145,7 +145,7 @@ export const HivelyControls: React.FC<HivelyControlsProps> = ({
 
   // ── MAIN TAB ──
   const renderMainTab = () => (
-    <div className="flex flex-col gap-4 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
+    <div className="flex flex-col gap-4 p-3 overflow-y-auto synth-controls-flow" style={{ maxHeight: 'calc(100vh - 280px)' }}>
       {/* Volume & Wave Length */}
       <div className={`rounded-lg border p-3 ${panelBg}`}>
         <SectionLabel label="Volume & Wave" />

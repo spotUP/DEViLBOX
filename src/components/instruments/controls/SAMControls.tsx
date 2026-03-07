@@ -64,7 +64,7 @@ export const SAMControls: React.FC<SAMControlsProps> = ({
 
   return (
     <ScrollLockContainer>
-      <div className="flex flex-col gap-4 p-4 h-full overflow-y-auto scrollbar-modern">
+      <div className="synth-controls-flow flex flex-col gap-4 p-4 h-full overflow-y-auto scrollbar-modern">
       {/* Speech Text Section */}
       <div className={`p-4 rounded-xl border ${panelBg}`}>
         <div className="flex items-center justify-between mb-4">
