@@ -59,20 +59,19 @@ const PANEL_MIN_W = 200;
 const PANEL_MIN_H = 150;
 
 function computeDefaultPanels(viewW: number, viewH: number): Record<StudioPanelId, PanelLayout> {
-  const pad = 10; // outer padding
-  const usableW = viewW - pad * 2;
-  const usableH = viewH - pad * 2;
+  const pad = 10;
 
-  // Top row: tracker (55%) | instrument (45%), bottom row: mixer (full width)
-  const mixerH = Math.max(PANEL_MIN_H, Math.round(usableH * 0.3));
-  const topH = usableH - mixerH - GAP;
-  const trackerW = Math.max(PANEL_MIN_W, Math.round(usableW * 0.55));
-  const instrW = Math.max(PANEL_MIN_W, usableW - trackerW - GAP);
+  // Content-appropriate sizes — panels can extend beyond viewport (canvas is pannable)
+  const trackerW = Math.max(900, Math.round(viewW * 0.55));
+  const instrW = Math.max(560, Math.round(viewW * 0.42));
+  const totalW = trackerW + instrW + GAP;
+  const topH = Math.max(500, Math.round(viewH * 0.68));
+  const mixerH = Math.max(220, Math.round(viewH * 0.28));
 
   return {
-    tracker:    { x: pad, y: pad, w: trackerW, h: Math.max(PANEL_MIN_H, topH) },
-    instrument: { x: pad + trackerW + GAP, y: pad, w: instrW, h: Math.max(PANEL_MIN_H, topH) },
-    mixer:      { x: pad, y: pad + topH + GAP, w: usableW, h: mixerH },
+    tracker:    { x: pad, y: pad, w: trackerW, h: topH },
+    instrument: { x: pad + trackerW + GAP, y: pad, w: instrW, h: topH },
+    mixer:      { x: pad, y: pad + topH + GAP, w: totalW, h: mixerH },
   };
 }
 
@@ -175,7 +174,7 @@ const InstrumentPanelContent: React.FC = () => {
           <ChevronRight size={12} />
         </button>
       </div>
-      <div className="flex-1 min-h-0 overflow-auto">
+      <div className="flex-1 min-h-0 overflow-auto" style={{ containerType: 'inline-size' }}>
         <Suspense fallback={<div className="flex items-center justify-center text-text-muted text-xs p-4">Loading...</div>}>
           <UnifiedInstrumentEditor
             instrument={current}
@@ -321,7 +320,7 @@ export const StudioCanvasView: React.FC = () => {
   const [zOrder, setZOrder] = useState<StudioPanelId[]>(['mixer', 'instrument', 'tracker']); // last = frontmost
   const initializedRef = useRef(false);
 
-  // Auto-size panels to fill viewport on first mount
+  // Auto-size panels and fit-to-view on first mount
   useLayoutEffect(() => {
     if (initializedRef.current || !containerRef.current) return;
     initializedRef.current = true;
@@ -329,8 +328,17 @@ export const StudioCanvasView: React.FC = () => {
     if (rect.width > 0 && rect.height > 0) {
       const fitted = computeDefaultPanels(rect.width, rect.height);
       setPanels(fitted);
-      cameraRef.current = { x: 0, y: 0, zoom: 1 };
-      setCamera({ x: 0, y: 0, zoom: 1 });
+
+      // Compute bounding box of all panels and zoom to fit
+      let maxX = 0, maxY = 0;
+      for (const p of Object.values(fitted)) {
+        maxX = Math.max(maxX, p.x + p.w);
+        maxY = Math.max(maxY, p.y + p.h);
+      }
+      const margin = 20;
+      const zoom = clampZoom(Math.min(rect.width / (maxX + margin), rect.height / (maxY + margin)));
+      cameraRef.current = { x: 0, y: 0, zoom };
+      setCamera({ x: 0, y: 0, zoom });
     }
   });
 
@@ -354,6 +362,9 @@ export const StudioCanvasView: React.FC = () => {
     if (!el) return;
 
     const handleWheel = (e: WheelEvent) => {
+      // Only zoom when scrolling on the canvas background, not inside panels
+      const target = e.target as HTMLElement;
+      if (target.closest('[data-studio-panel]')) return;
       e.preventDefault();
       const rect = el.getBoundingClientRect();
       const mx = e.clientX - rect.left;
