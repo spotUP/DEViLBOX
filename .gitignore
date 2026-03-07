@@ -50,6 +50,7 @@ tfmx-wasm/build/
 robhubbard-wasm/build/
 klystrack-wasm/build/
 gearmulator-wasm/build/
+gearmulator-wasm/build-native/
 public/rdpiano/roms/
 public/onnx-wasm/
 
