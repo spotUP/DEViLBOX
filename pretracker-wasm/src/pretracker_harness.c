@@ -91,6 +91,10 @@ EXPORT void player_set_channel_gain(int ch, float gain) {
     paula_set_channel_gain(ch, gain);
 }
 
+EXPORT void player_get_channel_levels(float *out4) {
+    paula_get_channel_levels(out4);
+}
+
 EXPORT int player_is_finished(void) { return 0; }
 EXPORT int player_get_subsong_count(void) { return 1; }
 EXPORT void player_set_subsong(int n) { (void)n; }

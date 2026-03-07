@@ -235,6 +235,25 @@ int klys_get_num_channels(void)
 }
 
 EMSCRIPTEN_KEEPALIVE
+void klys_get_channel_levels(float *out, int maxCh)
+{
+    if (!g_initialized || !g_song_loaded) {
+        for (int i = 0; i < maxCh; i++) out[i] = 0.0f;
+        return;
+    }
+    int nch = g_song.num_channels;
+    if (nch > maxCh) nch = maxCh;
+    for (int i = 0; i < nch; i++) {
+        /* adsr.volume is 0-128, envelope is 0-0x00ffffff */
+        Uint8 vol = g_cyd.channel[i].adsr.volume;
+        /* Check if channel is active (flags bit 0 = CYD_CHN_ENABLE_GATE) */
+        int active = (g_cyd.channel[i].flags & 1) ? 1 : 0;
+        out[i] = active ? (float)vol / 128.0f : 0.0f;
+    }
+    for (int i = nch; i < maxCh; i++) out[i] = 0.0f;
+}
+
+EMSCRIPTEN_KEEPALIVE
 int klys_get_song_length(void)
 {
     if (!g_song_loaded) return 0;
