@@ -15,6 +15,8 @@ class MaProcessor extends AudioWorkletProcessor {
     this.bufferSize = 128;
     this.lastHeapBuffer = null;
     this.initializing = false;
+    this.levelsPtr = 0;
+    this.processCount = 0;
 
     this.port.onmessage = (event) => {
       this.handleMessage(event.data);
@@ -172,6 +174,11 @@ class MaProcessor extends AudioWorkletProcessor {
         }
       }
 
+      // Allocate 4-float buffer for channel levels
+      if (malloc) {
+        this.levelsPtr = malloc(4 * 4);
+      }
+
       // Set output sample rate to match AudioContext (default is 28150 Hz PAL)
       if (typeof this.module._player_set_sample_rate === 'function') {
         this.module._player_set_sample_rate(sampleRate);
@@ -201,6 +208,7 @@ class MaProcessor extends AudioWorkletProcessor {
   cleanup() {
     const free = this.module?._free || this.module?.free;
     if (free && this.interleavedPtr) { free(this.interleavedPtr); this.interleavedPtr = 0; }
+    if (free && this.levelsPtr) { free(this.levelsPtr); this.levelsPtr = 0; }
     this.interleavedBuf = null;
     this.module = null;
     this.initialized = false;
@@ -222,7 +230,6 @@ class MaProcessor extends AudioWorkletProcessor {
       if (this.interleavedBuf) {
         const rendered = this.module._player_render(this.interleavedPtr, numSamples);
         if (rendered > 0) {
-          // Deinterleave LRLRLR... into separate L and R channels
           for (let i = 0; i < rendered; i++) {
             outputL[i] = this.interleavedBuf[i * 2];
             outputR[i] = this.interleavedBuf[i * 2 + 1];
@@ -230,6 +237,17 @@ class MaProcessor extends AudioWorkletProcessor {
         }
       }
     }
+
+    if (++this.processCount >= 8 && this.levelsPtr && typeof this.module._player_get_channel_levels === 'function') {
+      this.processCount = 0;
+      this.module._player_get_channel_levels(this.levelsPtr);
+      const heapF32 = this.module.HEAPF32 || (this.module.wasmMemory && new Float32Array(this.module.wasmMemory.buffer));
+      if (heapF32) {
+        const off = this.levelsPtr >> 2;
+        this.port.postMessage({ type: 'chLevels', levels: [heapF32[off], heapF32[off+1], heapF32[off+2], heapF32[off+3]] });
+      }
+    }
+
     return true;
   }
 }

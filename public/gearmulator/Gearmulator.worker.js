@@ -24,7 +24,7 @@
  *   Float32[HEADER_INTS .. HEADER_INTS + bufferSize*2] = interleaved L/R audio
  */
 
-const HEADER_BYTES = 16; // 4 Int32s (writePos, readPos, bufferSize, flags)
+const HEADER_BYTES = 16; // 4 Int32s (writePos, readPos, bufferSize, peakx1000)
 const HEADER_INTS = HEADER_BYTES / 4;
 const RING_FRAMES = 8192; // ~186ms at 44100Hz — enough to absorb jitter
 
@@ -44,6 +44,11 @@ let outputPtrR = 0;
 
 // DSP render loop interval
 let renderTimer = null;
+
+// Diagnostics
+let totalFramesRendered = 0;
+let firstAudioTime = 0;
+let peakSeen = 0;
 
 // Catch unhandled errors
 self.onerror = function(e) {
@@ -68,6 +73,7 @@ self.onmessage = async function (e) {
       if (handle >= 0 && module) {
         const status = 0x90 | ((data.channel || 0) & 0x0f);
         module._gm_sendMidi(handle, status, data.note & 0x7f, (data.velocity || 100) & 0x7f);
+        console.log(`[Gearmulator Worker] MIDI NoteOn ch=${data.channel||0} note=${data.note} vel=${data.velocity||100}`);
       }
       break;
 
@@ -167,12 +173,20 @@ async function initSynth(data) {
       if (path.endsWith('.wasm')) return '/gearmulator/gearmulator_wasm.wasm';
       return path;
     },
-    // Suppress Emscripten's verbose stdout/stderr
-    print: (text) => { if (!text.includes('TSMB') && !text.includes('ESSI')) console.log('[EM]', text); },
-    printErr: (text) => { if (!text.includes('TSMB') && !text.includes('ESSI')) console.warn('[EM]', text); },
+    // Suppress Emscripten's verbose stdout/stderr but show important messages
+    print: (text) => {
+      if (text.includes('Factory reset') || text.includes('boot') || text.includes('ERROR') || text.includes('error'))
+        console.log('[EM]', text);
+    },
+    printErr: (text) => {
+      if (!text.includes('TSMB') && !text.includes('ESSI'))
+        console.warn('[EM]', text);
+    },
   };
 
+  console.log(`[Gearmulator Worker] Creating Emscripten module (WASM=${(wasmBinary.byteLength/1024).toFixed(0)}KB)...`);
   module = await createGearmulator(config);
+  console.log('[Gearmulator Worker] Emscripten module ready.');
 
   // Allocate render buffers in WASM heap
   outputPtrL = module._malloc(RENDER_BLOCK * 4);
@@ -182,11 +196,69 @@ async function initSynth(data) {
   const romPtr = module._malloc(rom.length);
   module.HEAPU8.set(rom, romPtr);
 
-  handle = module._gm_create(romPtr, rom.length, synthType || 0, sr || 44100);
-  module._free(romPtr);
+  // JP-8000 (type 5): pre-load factory reset RAM dump to skip slow WASM factory reset
+  if ((synthType || 0) === 5) {
+    try {
+      console.log('[Gearmulator Worker] Loading JP-8000 RAM dump...');
+      const ramResp = await fetch('/gearmulator/jp8000_ram_dump.bin');
+      if (ramResp.ok) {
+        const ramBuf = new Uint8Array(await ramResp.arrayBuffer());
+        const ramPtr = module._malloc(ramBuf.length);
+        module.HEAPU8.set(ramBuf, ramPtr);
+        module._gm_loadJP8kRam(ramPtr, ramBuf.length);
+        module._free(ramPtr);
+        console.log('[Gearmulator Worker] JP-8000 RAM dump loaded:', ramBuf.length, 'bytes');
+      } else {
+        console.warn('[Gearmulator Worker] JP-8000 RAM dump not found, factory reset will run (slow!)');
+      }
+    } catch (e) {
+      console.warn('[Gearmulator Worker] Failed to load JP-8000 RAM dump:', e);
+    }
+  }
+
+  console.log(`[Gearmulator Worker] gm_create(romSize=${rom.length}, type=${synthType}, rate=${sr||44100})...`);
+  const t0 = performance.now();
+
+  // XT (3) and Nord (4) take 10+ min in WASM interpreter mode. Use async boot
+  // so the Worker stays responsive. microQ (2) has pre-boot snapshot — fast sync boot.
+  const useAsyncBoot = (synthType === 3 || synthType === 4);
+
+  if (useAsyncBoot) {
+    module._gm_create_async(romPtr, rom.length, synthType, sr || 44100);
+    module._free(romPtr);
+
+    console.log('[Gearmulator Worker] Async boot started — polling for completion...');
+    self.postMessage({ type: 'booting', synthType });
+
+    // Poll every 500ms until boot completes
+    let pollCount = 0;
+    await new Promise((resolve, reject) => {
+      const poll = () => {
+        if (disposed) { reject(new Error('Disposed during boot')); return; }
+        if (module._gm_is_boot_done()) {
+          handle = module._gm_get_async_result();
+          if (handle < 0) reject(new Error(`Async boot failed (type=${synthType})`));
+          else resolve();
+        } else {
+          pollCount++;
+          if (pollCount % 60 === 0) { // Log every 30s
+            console.log(`[Gearmulator Worker] Still booting... (${(pollCount * 0.5).toFixed(0)}s)`);
+            self.postMessage({ type: 'booting', synthType, elapsed: pollCount * 500 });
+          }
+          setTimeout(poll, 500);
+        }
+      };
+      poll();
+    });
+  } else {
+    handle = module._gm_create(romPtr, rom.length, synthType || 0, sr || 44100);
+    module._free(romPtr);
+  }
+
+  const createMs = (performance.now() - t0).toFixed(0);
 
   if (handle < 0) {
-    throw new Error(`Failed to create synth device (type=${synthType})`);
+    throw new Error(`Failed to create synth device (type=${synthType}) — gm_create returned ${handle}`);
   }
 
   const valid = module._gm_isValid(handle);
@@ -195,13 +267,15 @@ async function initSynth(data) {
   }
 
   const actualRate = module._gm_getSamplerate(handle);
+  console.log(`[Gearmulator Worker] Device created in ${createMs}ms — handle=${handle}, rate=${actualRate}, valid=${valid}`);
 
-  // Reduce DSP clock for WASM interpreter performance
-  // 10% → cyclesPerSample=115 (enough for ISR handlers, ~334Hz timer rate)
-  // Lower values cause ESAI transmit underruns (ISR can't complete in time)
+  // Full speed for WASM interpreter
   module._gm_setDspClockPercent(handle, 100);
 
   initialized = true;
+  totalFramesRendered = 0;
+  peakSeen = 0;
+  firstAudioTime = 0;
 
   self.postMessage({ type: 'ready', sampleRate: actualRate, handle: handle });
 
@@ -212,9 +286,21 @@ function startRenderLoop(sampleRate) {
   // Use blocking gm_process() — the standard Device::process() path that handles
   // all DSP thread synchronization internally. Render small chunks with setTimeout
   // to let the worker event loop breathe for message handling.
+  let renderCount = 0;
+
   function renderTick() {
     if (!initialized || handle < 0 || !module || disposed) return;
+
+    const t0 = performance.now();
     fillRingBuffer();
+    const elapsed = performance.now() - t0;
+
+    renderCount++;
+    // Log first few renders and periodic stats
+    if (renderCount <= 3 || (renderCount % 1000 === 0)) {
+      console.log(`[Gearmulator Worker] render #${renderCount}: ${elapsed.toFixed(1)}ms, total=${totalFramesRendered} frames, peak=${peakSeen.toFixed(6)}`);
+    }
+
     // Use setTimeout(0) to yield to the event loop between render passes
     renderTimer = setTimeout(renderTick, 0);
   }
@@ -231,7 +317,6 @@ function fillRingBuffer() {
   let free = bufSize - used - 1;
 
   // Render up to 16 blocks per tick (2048 samples) to reduce setTimeout overhead
-  // With clock at 10%, each block is much faster so we can batch more
   const maxBlocks = Math.min(16, Math.floor(free / RENDER_BLOCK));
 
   for (let b = 0; b < maxBlocks; b++) {
@@ -246,61 +331,37 @@ function fillRingBuffer() {
     for (let i = 0; i < RENDER_BLOCK; i++) {
       const frameIdx = (writePos + i) % bufSize;
       const idx = audioOffset + frameIdx * 2;
-      sabFloat32[idx] = heapF32[offL + i];
-      sabFloat32[idx + 1] = heapF32[offR + i];
+      const sL = heapF32[offL + i];
+      const sR = heapF32[offR + i];
+      sabFloat32[idx] = sL;
+      sabFloat32[idx + 1] = sR;
+
+      // Track peak for diagnostics
+      const absL = sL < 0 ? -sL : sL;
+      const absR = sR < 0 ? -sR : sR;
+      if (absL > peakSeen) peakSeen = absL;
+      if (absR > peakSeen) peakSeen = absR;
+      if ((absL > 0.0001 || absR > 0.0001) && firstAudioTime === 0) {
+        firstAudioTime = performance.now();
+        console.log(`[Gearmulator Worker] First non-zero audio at frame ${totalFramesRendered + i} (${(firstAudioTime / 1000).toFixed(1)}s after worker start)`);
+      }
     }
 
     writePos = (writePos + RENDER_BLOCK) % bufSize;
     Atomics.store(sabInt32, 0, writePos);
-  }
-}
-
-// Non-blocking version: push input and pull any available output
-function fillRingBufferNonBlocking() {
-  const bufSize = Atomics.load(sabInt32, 2);
-  let writePos = Atomics.load(sabInt32, 0);
-  let readPos = Atomics.load(sabInt32, 1);
-
-  let used = writePos - readPos;
-  if (used < 0) used += bufSize;
-  let free = bufSize - used - 1;
-
-  // Push input to keep DSP fed (non-blocking)
-  const inputToPush = Math.min(RENDER_BLOCK * 4, 1024);
-  const pushed = module._gm_pushAudioInput(handle, inputToPush);
-
-  // Pull any available output (non-blocking)
-  let totalRead = 0;
-  while (free > RENDER_BLOCK) {
-    const read = module._gm_pullAudioOutput(handle, outputPtrL, outputPtrR, RENDER_BLOCK);
-    if (read <= 0) break;
-
-    // Write to SAB ring buffer
-    const heapF32 = module.HEAPF32;
-    const offL = outputPtrL >> 2;
-    const offR = outputPtrR >> 2;
-    const audioOffset = HEADER_INTS;
-
-    for (let i = 0; i < read; i++) {
-      const frameIdx = (writePos + i) % bufSize;
-      const idx = audioOffset + frameIdx * 2;
-      sabFloat32[idx] = heapF32[offL + i];
-      sabFloat32[idx + 1] = heapF32[offR + i];
-    }
-
-    writePos = (writePos + read) % bufSize;
-    Atomics.store(sabInt32, 0, writePos);
-
-    totalRead += read;
-    free -= read;
+    totalFramesRendered += RENDER_BLOCK;
   }
 
+  // Store running peak (x1000, as integer) in SAB slot 3 for test page visibility
+  if (peakSeen > 0) {
+    Atomics.store(sabInt32, 3, Math.round(peakSeen * 1000));
+  }
 }
 
 function dispose() {
   disposed = true;
   if (renderTimer) {
-    clearInterval(renderTimer);
+    clearTimeout(renderTimer);
     renderTimer = null;
   }
   if (handle >= 0 && module) {
@@ -316,4 +377,5 @@ function dispose() {
     outputPtrR = 0;
   }
   initialized = false;
+  console.log(`[Gearmulator Worker] Disposed. Total frames rendered: ${totalFramesRendered}, peak: ${peakSeen.toFixed(6)}`);
 }

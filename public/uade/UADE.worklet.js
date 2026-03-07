@@ -1781,6 +1781,14 @@ class UADEProcessor extends AudioWorkletProcessor {
           channels,
           totalFrames: this._wasm._uade_wasm_get_total_frames()
         });
+
+        // Post per-channel VU levels derived from Paula volume registers
+        const levels = new Float32Array(4);
+        for (let i = 0; i < 4; i++) {
+          levels[i] = channels[i].dma ? channels[i].volume / 64.0 : 0;
+        }
+        this.port.postMessage({ type: 'chLevels', levels });
+
         this._lastChannelPost = currentTime;
       }
     } catch (err) {
