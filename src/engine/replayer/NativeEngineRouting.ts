@@ -16,8 +16,12 @@ import { getNativeAudioNode } from '@utils/audio-context';
 import { HivelyEngine } from '../hively/HivelyEngine';
 import { MusicLineEngine } from '../musicline/MusicLineEngine';
 import { C64SIDEngine } from '../C64SIDEngine';
+import { SilenceDetector } from './SilenceDetector';
 
 export { C64SIDEngine };
+
+/** Active silence detectors keyed by engine synthType */
+const activeSilenceDetectors = new Map<string, SilenceDetector>();
 
 // ---------------------------------------------------------------------------
 // Engine registry types
@@ -208,6 +212,97 @@ const WASM_ENGINES: NativeEngineDescriptor[] = [
     dynamicResolver: async () => (await import('@/engine/sonix/SonixEngine')).SonixEngine as unknown as WASMSingletonStatic,
   },
   {
+    key: 'Pxtone',
+    synthType: 'PxtoneSynth',
+    suppressNotes: true,
+    fileDataKey: 'pxtoneFileData',
+    formats: ['PxTone'],
+    loadMethod: 'loadTune',
+    supportsPause: false,
+    supportsResume: false,
+    needsDirectRouting: true,
+    staticRef: null,
+    dynamicResolver: async () => (await import('@/engine/pxtone/PxtoneEngine')).PxtoneEngine as unknown as WASMSingletonStatic,
+  },
+  {
+    key: 'Organya',
+    synthType: 'OrganyaSynth',
+    suppressNotes: true,
+    fileDataKey: 'organyaFileData',
+    formats: ['Organya'],
+    loadMethod: 'loadTune',
+    supportsPause: false,
+    supportsResume: false,
+    needsDirectRouting: true,
+    staticRef: null,
+    dynamicResolver: async () => (await import('@/engine/organya/OrganyaEngine')).OrganyaEngine as unknown as WASMSingletonStatic,
+  },
+  {
+    key: 'Eupmini',
+    synthType: 'EupminiSynth',
+    suppressNotes: true,
+    fileDataKey: 'eupFileData',
+    formats: ['EUP'],
+    loadMethod: 'loadTune',
+    supportsPause: false,
+    supportsResume: false,
+    needsDirectRouting: true,
+    staticRef: null,
+    dynamicResolver: async () => (await import('@/engine/eupmini/EupminiEngine')).EupminiEngine as unknown as WASMSingletonStatic,
+  },
+  {
+    key: 'Ixalance',
+    synthType: 'IxalanceSynth',
+    suppressNotes: true,
+    fileDataKey: 'ixsFileData',
+    formats: ['IXS'],
+    loadMethod: 'loadTune',
+    supportsPause: false,
+    supportsResume: false,
+    needsDirectRouting: true,
+    staticRef: null,
+    dynamicResolver: async () => (await import('@/engine/ixalance/IxalanceEngine')).IxalanceEngine as unknown as WASMSingletonStatic,
+  },
+  {
+    key: 'Cpsycle',
+    synthType: 'CpsycleSynth',
+    suppressNotes: true,
+    fileDataKey: 'psycleFileData',
+    formats: ['Psycle'],
+    loadMethod: 'loadTune',
+    supportsPause: false,
+    supportsResume: false,
+    needsDirectRouting: true,
+    staticRef: null,
+    dynamicResolver: async () => (await import('@/engine/cpsycle/CpsycleEngine')).CpsycleEngine as unknown as WASMSingletonStatic,
+  },
+  {
+    key: 'Sc68',
+    synthType: 'Sc68Synth',
+    suppressNotes: true,
+    fileDataKey: 'sc68FileData',
+    formats: null,
+    loadMethod: 'loadTune',
+    supportsPause: false,
+    supportsResume: false,
+    needsDirectRouting: true,
+    staticRef: null,
+    dynamicResolver: async () => (await import('@/engine/sc68/Sc68Engine')).Sc68Engine as unknown as WASMSingletonStatic,
+  },
+  {
+    key: 'Zxtune',
+    synthType: 'ZxtuneSynth',
+    suppressNotes: true,
+    fileDataKey: 'zxtuneFileData',
+    formats: ['ZXTune'],
+    loadMethod: 'loadTune',
+    supportsPause: false,
+    supportsResume: false,
+    needsDirectRouting: true,
+    staticRef: null,
+    dynamicResolver: async () => (await import('@/engine/zxtune/ZxtuneEngine')).ZxtuneEngine as unknown as WASMSingletonStatic,
+  },
+  {
     key: 'MusicLine',
     synthType: 'MusicLineSynth',
     suppressNotes: true,
@@ -324,6 +419,15 @@ export async function startNativeEngines(
             console.log(`[NativeEngineRouting] ${desc.key} output → destination (fallback)`);
           }
         }
+        // Start silence detection for looping formats
+        if (desc.needsDirectRouting) {
+          const detector = new SilenceDetector(instance.output.context);
+          detector.start(instance.output, instance.output, () => {
+            console.log(`[NativeEngineRouting] ${desc.key} silence detected — stopping`);
+            try { instance.stop(); } catch { /* ignored */ }
+          });
+          activeSilenceDetectors.set(desc.synthType, detector);
+        }
       } else {
         console.log(`[NativeEngineRouting] ${desc.key} loaded but skipping play (muted)`);
       }
@@ -385,6 +489,12 @@ export function stopNativeEngines(
   routedNativeEngines: Set<string>,
   c64SidEngine: C64SIDEngine | null,
 ): C64SIDEngine | null {
+  // Stop silence detectors
+  for (const [, detector] of activeSilenceDetectors) {
+    detector.dispose();
+  }
+  activeSilenceDetectors.clear();
+
   // Stop routed native engines via ToneEngine
   if (routedNativeEngines.size > 0) {
     const toneEngine = getToneEngine();

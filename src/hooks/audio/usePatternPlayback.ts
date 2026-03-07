@@ -26,7 +26,7 @@ export const usePatternPlayback = () => {
     currentPositionIndex: s.currentPositionIndex,
     setCurrentPosition: s.setCurrentPosition,
     })));
-  const { channelTrackTables, channelSpeeds, channelGrooves, hivelyNative, hivelyFileData, hivelyMeta, musiclineFileData, c64SidFileData, jamCrackerFileData, futurePlayerFileData, preTrackerFileData, maFileData, hippelFileData, sonixFileData, furnaceNative, furnaceActiveSubsong } = useFormatStore(useShallow((s) => ({
+  const { channelTrackTables, channelSpeeds, channelGrooves, hivelyNative, hivelyFileData, hivelyMeta, musiclineFileData, c64SidFileData, jamCrackerFileData, futurePlayerFileData, preTrackerFileData, maFileData, hippelFileData, sonixFileData, pxtoneFileData, organyaFileData, eupFileData, ixsFileData, psycleFileData, sc68FileData, zxtuneFileData, furnaceNative, furnaceActiveSubsong } = useFormatStore(useShallow((s) => ({
     channelTrackTables: s.channelTrackTables,
     channelSpeeds: s.channelSpeeds,
     channelGrooves: s.channelGrooves,
@@ -41,6 +41,13 @@ export const usePatternPlayback = () => {
     maFileData: s.maFileData,
     hippelFileData: s.hippelFileData,
     sonixFileData: s.sonixFileData,
+    pxtoneFileData: s.pxtoneFileData,
+    organyaFileData: s.organyaFileData,
+    eupFileData: s.eupFileData,
+    ixsFileData: s.ixsFileData,
+    psycleFileData: s.psycleFileData,
+    sc68FileData: s.sc68FileData,
+    zxtuneFileData: s.zxtuneFileData,
     furnaceNative: s.furnaceNative,
     furnaceActiveSubsong: s.furnaceActiveSubsong,
   })));
@@ -346,6 +353,13 @@ export const usePatternPlayback = () => {
           maFileData: maFileData ?? undefined,
           hippelFileData: hippelFileData ?? undefined,
           sonixFileData: sonixFileData ?? undefined,
+          pxtoneFileData: pxtoneFileData ?? undefined,
+          organyaFileData: organyaFileData ?? undefined,
+          eupFileData: eupFileData ?? undefined,
+          ixsFileData: ixsFileData ?? undefined,
+          psycleFileData: psycleFileData ?? undefined,
+          sc68FileData: sc68FileData ?? undefined,
+          zxtuneFileData: zxtuneFileData ?? undefined,
           // Furnace-specific timing data (only set for .fur imports)
           speed2: furnaceData?.speed2,
           hz: furnaceData?.hz,
@@ -400,10 +414,12 @@ export const usePatternPlayback = () => {
           const currentPatterns = patternsRef.current;
           setCurrentRowThrottled(row, currentPatterns[patternNum]?.length ?? 64, isJump);
 
+          // Always track global row so arrangement view has current position
+          // even when switching from another view mid-playback
+          const globalRow = position * 64 + row;
+          useTransportStore.getState().setCurrentGlobalRow(globalRow);
           if (arrangement.isArrangementMode) {
-            const globalRow = position * 64 + row;
             useArrangementStore.getState().setPlaybackRow(globalRow);
-            useTransportStore.getState().setCurrentGlobalRow(globalRow);
           }
 
           if (row === 0 && (patternNum !== lastPatternNum || position !== lastPosition)) {
