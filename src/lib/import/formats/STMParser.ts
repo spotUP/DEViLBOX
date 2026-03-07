@@ -47,6 +47,8 @@
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, ChannelData, TrackerCell, InstrumentConfig } from '@/types';
 import { createSamplerInstrument } from './AmigaUtils';
+import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
+import { encodeSTMCell } from '@/engine/uade/encoders/STMEncoder';
 
 // Binary helpers
 
@@ -436,6 +438,17 @@ export async function parseSTMFile(
     );
   });
 
+  const uadePatternLayout: UADEPatternLayout = {
+    formatId: 'stm',
+    patternDataFileOffset: patternDataStart,
+    bytesPerCell: 4,
+    rowsPerPattern: ROWS_PER_PATTERN,
+    numChannels: NUM_CHANNELS,
+    numPatterns,
+    moduleSize: buffer.byteLength,
+    encodeCell: encodeSTMCell,
+  };
+
   return {
     name:            songName.replace(/\0/g, '').trim() || filename.replace(/\.[^/.]+$/, ''),
     format:          'MOD' as TrackerFormat,
@@ -448,5 +461,6 @@ export async function parseSTMFile(
     initialSpeed,
     initialBPM,
     linearPeriods:   false,
+    uadePatternLayout,
   };
 }
