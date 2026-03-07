@@ -117,6 +117,12 @@ class JamCrackerProcessor extends AudioWorkletProcessor {
         break;
       }
 
+      case 'setChannelGain':
+        if (this.wasm && typeof this.wasm._jc_set_channel_gain === 'function') {
+          this.wasm._jc_set_channel_gain(data.channel, data.gain);
+        }
+        break;
+
       case 'save': {
         if (!this.wasm || !this.tuneLoaded) break;
         const saveSize = this.wasm._jc_save();

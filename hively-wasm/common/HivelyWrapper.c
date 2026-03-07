@@ -126,6 +126,17 @@ int hively_is_song_end(void) {
     return g_tune->ht_SongEndReached ? 1 : 0;
 }
 
+/* ---- Per-channel mixer gain ---- */
+EMSCRIPTEN_KEEPALIVE
+void hively_set_channel_gain(int ch, float gain) {
+    if (!g_tune || ch < 0 || ch >= MAX_CHANNELS) return;
+    /* Map 0.0-1.0 float to 0-256 integer gain */
+    int32 g = (int32)(gain * 256.0f);
+    if (g < 0) g = 0;
+    if (g > 256) g = 256;
+    g_tune->ht_ChannelGain[ch] = g;
+}
+
 /* ---- Transport Getters ---- */
 
 EMSCRIPTEN_KEEPALIVE

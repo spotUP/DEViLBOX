@@ -280,6 +280,10 @@ export class KlysEngine {
     return this._songPromise;
   }
 
+  setChannelGain(channel: number, gain: number): void {
+    this.workletNode?.port.postMessage({ type: 'setChannelGain', channel, gain });
+  }
+
   play(): void {
     this.workletNode?.port.postMessage({ type: 'play' });
   }

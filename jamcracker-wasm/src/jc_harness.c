@@ -118,6 +118,11 @@ EXPORT uint32_t jc_get_tick(void) {
     return g_tick_count;
 }
 
+/* Per-channel mixer gain (0.0 = mute, 1.0 = unity) */
+EXPORT void jc_set_channel_gain(int ch, float gain) {
+    paula_set_channel_gain(ch, gain);
+}
+
 /* Module metadata */
 EXPORT int jc_get_song_length(void) { return (int)g_song_length; }
 EXPORT int jc_get_num_patterns(void) { return (int)g_num_patterns; }

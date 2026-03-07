@@ -14,13 +14,15 @@ interface OscilloscopeState {
   numChannels: number;
   /** Platform type currently active */
   platformType: number;
+  /** Semantic channel names (e.g. "PU1", "NOI", "Paula 0") */
+  channelNames: string[];
   /** Whether oscilloscope is receiving data */
   isActive: boolean;
 
   /** Update oscilloscope data for all channels */
   updateChannelData: (channels: (Int16Array | null)[]) => void;
-  /** Set the number of channels and platform */
-  setChipInfo: (numChannels: number, platformType: number) => void;
+  /** Set the number of channels, platform, and optional channel names */
+  setChipInfo: (numChannels: number, platformType: number, channelNames?: string[]) => void;
   /** Clear all data */
   clear: () => void;
 }
@@ -29,6 +31,7 @@ export const useOscilloscopeStore = create<OscilloscopeState>((set) => ({
   channelData: [],
   numChannels: 0,
   platformType: 0,
+  channelNames: [],
   isActive: false,
 
   updateChannelData: (channels) => set({
@@ -36,9 +39,10 @@ export const useOscilloscopeStore = create<OscilloscopeState>((set) => ({
     isActive: true,
   }),
 
-  setChipInfo: (numChannels, platformType) => set({
+  setChipInfo: (numChannels, platformType, channelNames) => set({
     numChannels,
     platformType,
+    channelNames: channelNames ?? Array.from({ length: numChannels }, (_, i) => `CH${i + 1}`),
     channelData: new Array(numChannels).fill(null),
   }),
 
@@ -46,6 +50,7 @@ export const useOscilloscopeStore = create<OscilloscopeState>((set) => ({
     channelData: [],
     numChannels: 0,
     platformType: 0,
+    channelNames: [],
     isActive: false,
   }),
 }));

@@ -199,6 +199,7 @@ struct hvl_tune
   int32                  ht_defpanleft;
   int32                  ht_defpanright;
   int32                  ht_mixgain;
+  int32                  ht_ChannelGain[MAX_CHANNELS]; // Mixer gain per channel (0-256, 256=unity)
   uint8                  ht_Version;
 };
 
