@@ -5,7 +5,7 @@
  * Implements chip-specific parameter ranges, FM envelope visualization,
  * algorithm diagrams, and accurate operator controls.
  *
- * Research reference: /Users/spot/Code/DEViLBOX/Reference Code/furnace-master/src/gui/insEdit.cpp
+ * Research reference: /Users/spot/Code/DEViLBOX/third-party/furnace-master/src/gui/insEdit.cpp
  */
 
 import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';

@@ -64,6 +64,43 @@ export function fitAllWindows(
 }
 
 /**
+ * Compute the camera state that fits a specific set of windows into the viewport.
+ * Falls back to fitAllWindows if no IDs are provided.
+ */
+export function fitWindows(
+  windowIds: string[],
+  windows: Record<string, WindowState>,
+  screenW: number,
+  screenH: number,
+  padding = 0.05,
+): CameraState {
+  if (windowIds.length === 0) return fitAllWindows(windows, screenW, screenH, padding);
+  const subset = windowIds
+    .map((id) => windows[id])
+    .filter((w): w is WindowState => !!w && w.visible && !w.minimized);
+  if (subset.length === 0) return fitAllWindows(windows, screenW, screenH, padding);
+
+  const rect = boundingRect(subset);
+  if (!rect) return { x: 0, y: 0, scale: 1 };
+
+  const padX = screenW * padding;
+  const padY = screenH * padding;
+  const availW = screenW - padX * 2;
+  const availH = screenH - padY * 2;
+
+  const scaleX = availW / rect.w;
+  const scaleY = availH / rect.h;
+  const scale = Math.min(scaleX, scaleY, 2);
+
+  const worldCentreX = rect.x + rect.w / 2;
+  const worldCentreY = rect.y + rect.h / 2;
+  const x = screenW / 2 - worldCentreX * scale;
+  const y = screenH / 2 - worldCentreY * scale;
+
+  return { x, y, scale };
+}
+
+/**
  * Compute the camera state that centres a single window and fits it
  * at targetFill fraction of the smaller screen dimension (default 85%).
  */

@@ -222,6 +222,35 @@ export const useTrackerStore = create<TrackerStore>()(
           replayer.syncCellToWasmSequencer(channelIndex, patternIndex, rowIndex, cellUpdate);
         }
       } catch { /* replayer not initialized yet */ }
+      // Sync edit to OpenMPT soundlib if loaded (MOD/XM/IT/S3M)
+      try {
+        const fullCell = get().patterns[patternIndex]?.channels[channelIndex]?.rows[rowIndex];
+        if (fullCell) {
+          import('@engine/libopenmpt/OpenMPTEditBridge').then(bridge => {
+            if (bridge.isActive()) {
+              bridge.syncCellEdit(patternIndex, channelIndex, rowIndex, cellUpdate, fullCell);
+            }
+          });
+        }
+      } catch { /* bridge not available */ }
+      // Sync edit to UADE chip RAM if format has a pattern layout
+      try {
+        const replayer = getTrackerReplayer();
+        const song = replayer.getSong();
+        if (song?.uadePatternLayout) {
+          const fullCell = get().patterns[patternIndex]?.channels[channelIndex]?.rows[rowIndex];
+          if (fullCell) {
+            import('@engine/uade/UADEChipEditor').then(({ UADEChipEditor }) => {
+              import('@engine/uade/UADEEngine').then(({ UADEEngine }) => {
+                if (UADEEngine.hasInstance()) {
+                  const editor = new UADEChipEditor(UADEEngine.getInstance());
+                  editor.patchPatternCell(song.uadePatternLayout!, patternIndex, rowIndex, channelIndex, fullCell);
+                }
+              });
+            });
+          }
+        }
+      } catch { /* UADE not active */ }
     },
 
     clearCell: (channelIndex, rowIndex) => {
@@ -241,6 +270,32 @@ export const useTrackerStore = create<TrackerStore>()(
           });
         }
       } catch { /* replayer not initialized yet */ }
+      // Sync clear to OpenMPT soundlib if loaded (MOD/XM/IT/S3M)
+      try {
+        import('@engine/libopenmpt/OpenMPTEditBridge').then(bridge => {
+          if (bridge.isActive()) {
+            bridge.syncCellClear(patternIndex, channelIndex, rowIndex);
+          }
+        });
+      } catch { /* bridge not available */ }
+      // Sync clear to UADE chip RAM if format has a pattern layout
+      try {
+        const replayer = getTrackerReplayer();
+        const song = replayer.getSong();
+        if (song?.uadePatternLayout) {
+          const clearedCell = get().patterns[patternIndex]?.channels[channelIndex]?.rows[rowIndex];
+          if (clearedCell) {
+            import('@engine/uade/UADEChipEditor').then(({ UADEChipEditor }) => {
+              import('@engine/uade/UADEEngine').then(({ UADEEngine }) => {
+                if (UADEEngine.hasInstance()) {
+                  const editor = new UADEChipEditor(UADEEngine.getInstance());
+                  editor.patchPatternCell(song.uadePatternLayout!, patternIndex, rowIndex, channelIndex, clearedCell);
+                }
+              });
+            });
+          }
+        }
+      } catch { /* UADE not active */ }
     },
 
     clearChannel: (channelIndex) => {

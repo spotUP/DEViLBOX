@@ -210,7 +210,7 @@ export const PixiKlysView: React.FC<Props> = ({ width, height }) => {
     }
     patternLines.push(line);
     lineColors.push(
-      isPlaying && rowIdx === currentRow ? 0xffffff :
+      isPlaying && rowIdx === currentRow ? theme.currentRowText.color :
       rowIdx % 8 === 0 ? 0xaaccaa : 0x888888
     );
   }

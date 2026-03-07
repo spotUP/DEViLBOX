@@ -8,13 +8,15 @@ import React, { useCallback, useRef, useState, useEffect } from 'react';
 export interface GmKnobProps {
   /** Spritesheet image URL (e.g., knob_1_128_page0.png) */
   src: string;
-  /** Frame size in pixels */
+  /** Frame size in pixels (at display scale) */
   frameWidth: number;
   frameHeight: number;
   /** Number of columns in the spritesheet grid */
   cols: number;
   /** Total number of frames (typically 128) */
   totalFrames?: number;
+  /** Number of rows in the spritesheet grid (auto-calculated if not provided) */
+  rows?: number;
   /** Current value 0..1 */
   value: number;
   /** Called when user drags to change value */
@@ -30,9 +32,10 @@ export interface GmKnobProps {
 }
 
 export const GmKnob: React.FC<GmKnobProps> = ({
-  src, frameWidth, frameHeight, cols, totalFrames = 128,
+  src, frameWidth, frameHeight, cols, totalFrames = 128, rows: rowsProp,
   value, onChange, style, paramName, bipolar, className
 }) => {
+  const rows = rowsProp ?? Math.ceil(totalFrames / cols);
   const [dragging, setDragging] = useState(false);
   const dragStart = useRef({ y: 0, startValue: 0 });
   const elRef = useRef<HTMLDivElement>(null);
@@ -82,6 +85,7 @@ export const GmKnob: React.FC<GmKnobProps> = ({
         height: frameHeight,
         backgroundImage: `url(${src})`,
         backgroundPosition: `${bgX}px ${bgY}px`,
+        backgroundSize: `${cols * frameWidth}px ${rows * frameHeight}px`,
         backgroundRepeat: 'no-repeat',
         cursor: dragging ? 'ns-resize' : 'pointer',
         ...style,

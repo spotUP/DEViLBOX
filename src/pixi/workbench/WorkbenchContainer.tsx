@@ -23,6 +23,7 @@ import { PixiWindow, TITLE_H } from './PixiWindow';
 import { usePixiResponsive } from '../hooks/usePixiResponsive';
 import {
   fitAllWindows,
+  fitWindows,
   springCameraTo,
   BUILTIN_WORKSPACES,
   type CameraSpringHandle,
@@ -142,8 +143,11 @@ export const WorkbenchContainer: React.FC = () => {
   const zoomCamera        = useWorkbenchStore((s) => s.zoomCamera);
   const isTilted          = useWorkbenchStore((s) => s.isTilted);
   const tiltPreset        = useWorkbenchStore((s) => s.tiltPreset);
-  const setActiveWindowId = useWorkbenchStore((s) => s.setActiveWindowId);
-  const activeWindowId    = useWorkbenchStore((s) => s.activeWindowId);
+  const setActiveWindowId    = useWorkbenchStore((s) => s.setActiveWindowId);
+  const activeWindowId       = useWorkbenchStore((s) => s.activeWindowId);
+  const toggleWindowSelection = useWorkbenchStore((s) => s.toggleWindowSelection);
+  const setSelectedWindowIds = useWorkbenchStore((s) => s.setSelectedWindowIds);
+  const clearSelection       = useWorkbenchStore((s) => s.clearSelection);
 
   // World container ref (camera transform applied here)
   const worldRef = useRef<ContainerType>(null);
@@ -170,6 +174,10 @@ export const WorkbenchContainer: React.FC = () => {
   const snapLinesRef = useRef<SnapLine[]>([]);
   const snapAlphaRef = useRef<number>(0);
   const snapFadeRaf  = useRef<number>(0);
+
+  // Rectangle selection state
+  const selRectRef = useRef<{ startX: number; startY: number; curX: number; curY: number } | null>(null);
+  const selGfxRef  = useRef<GraphicsType>(null);
 
   // Active camera spring
   const springRef = useRef<CameraSpringHandle | null>(null);
@@ -297,7 +305,17 @@ export const WorkbenchContainer: React.FC = () => {
   // ─── Control bar actions ────────────────────────────────────────────────────
 
   const handleFitAll = useCallback(() => {
-    startSpring(fitAllWindows(useWorkbenchStore.getState().windows, width, workbenchH));
+    const s = useWorkbenchStore.getState();
+    // If there's a single active window and no multi-selection, fit that window
+    // If there's a multi-selection, fit those windows
+    // Otherwise fit all
+    if (s.selectedWindowIds.length > 0) {
+      startSpring(fitWindows(s.selectedWindowIds, s.windows, width, workbenchH));
+    } else if (s.activeWindowId) {
+      startSpring(fitWindows([s.activeWindowId], s.windows, width, workbenchH));
+    } else {
+      startSpring(fitAllWindows(s.windows, width, workbenchH));
+    }
   }, [width, workbenchH, startSpring]);
 
   const handleResetCamera = useCallback(() => {
@@ -314,6 +332,10 @@ export const WorkbenchContainer: React.FC = () => {
     cancelSpring();
     zoomCamera(delta, width / 2, workbenchH / 2);
   }, [zoomCamera, cancelSpring, width, workbenchH]);
+
+  const handleWindowSelect = useCallback((id: string) => {
+    toggleWindowSelection(id);
+  }, [toggleWindowSelection]);
 
   const handleLoadWorkspace = useCallback((name: string) => {
     const preset = BUILTIN_WORKSPACES[name];
@@ -414,6 +436,68 @@ export const WorkbenchContainer: React.FC = () => {
   const handleBgPointerDown = useCallback((e: FederatedPointerEvent) => {
     setActiveWindowId(null);
     cancelSpring();
+
+    const nativeEvent = e.nativeEvent as PointerEvent;
+
+    // Shift+drag on background → rectangle selection
+    if (nativeEvent.shiftKey) {
+      const cam = useWorkbenchStore.getState().camera;
+      const worldX = (e.globalX - cam.x) / cam.scale;
+      const worldY = (e.globalY - cam.y) / cam.scale;
+      selRectRef.current = { startX: worldX, startY: worldY, curX: worldX, curY: worldY };
+      document.body.style.cursor = 'crosshair';
+
+      const onMove = (me: PointerEvent) => {
+        if (!selRectRef.current) return;
+        const cam2 = useWorkbenchStore.getState().camera;
+        selRectRef.current.curX = (me.clientX - cam2.x) / cam2.scale;
+        selRectRef.current.curY = (me.clientY - cam2.y) / cam2.scale;
+        // Redraw selection rectangle
+        const g = selGfxRef.current;
+        if (g) {
+          const r = selRectRef.current;
+          const rx = Math.min(r.startX, r.curX);
+          const ry = Math.min(r.startY, r.curY);
+          const rw = Math.abs(r.curX - r.startX);
+          const rh = Math.abs(r.curY - r.startY);
+          g.clear();
+          g.rect(rx, ry, rw, rh);
+          g.fill({ color: 0x4a9eff, alpha: 0.08 });
+          g.stroke({ color: 0x4a9eff, alpha: 0.5, width: Math.max(0.5, 1 / cam2.scale) });
+        }
+        // Compute which windows intersect
+        const wins = useWorkbenchStore.getState().windows;
+        const r = selRectRef.current;
+        const rx = Math.min(r.startX, r.curX);
+        const ry = Math.min(r.startY, r.curY);
+        const rw = Math.abs(r.curX - r.startX);
+        const rh = Math.abs(r.curY - r.startY);
+        const ids: string[] = [];
+        for (const [wId, w] of Object.entries(wins)) {
+          if (!w.visible || w.minimized) continue;
+          // Intersect check
+          if (w.x + w.width > rx && w.x < rx + rw && w.y + w.height > ry && w.y < ry + rh) {
+            ids.push(wId);
+          }
+        }
+        setSelectedWindowIds(ids);
+      };
+
+      const onUp = () => {
+        selRectRef.current = null;
+        selGfxRef.current?.clear();
+        document.body.style.cursor = '';
+        document.removeEventListener('pointermove', onMove);
+        document.removeEventListener('pointerup', onUp);
+      };
+
+      document.addEventListener('pointermove', onMove);
+      document.addEventListener('pointerup', onUp);
+      return;
+    }
+
+    // Normal click on background: clear selection and pan
+    clearSelection();
     panDragRef.current = { lastX: e.globalX, lastY: e.globalY };
     document.body.style.cursor = 'grabbing';
 
@@ -435,7 +519,7 @@ export const WorkbenchContainer: React.FC = () => {
 
     document.addEventListener('pointermove', onMove);
     document.addEventListener('pointerup', onUp);
-  }, [panCamera, cancelSpring, setActiveWindowId]);
+  }, [panCamera, cancelSpring, setActiveWindowId, clearSelection, setSelectedWindowIds]);
 
   // ─── Wheel zoom ────────────────────────────────────────────────────────────
 
@@ -669,6 +753,7 @@ export const WorkbenchContainer: React.FC = () => {
                     screenH={height}
                     onFocus={focusWindow}
                     onMount={handleWindowMount}
+                    onSelect={handleWindowSelect}
                   >
                     <pixiContainer
                       layout={{
@@ -686,6 +771,13 @@ export const WorkbenchContainer: React.FC = () => {
               </pixiContainer>
             );
           })}
+
+          {/* Selection rectangle — drawn imperatively during Shift+drag */}
+          <pixiGraphics
+            ref={selGfxRef}
+            draw={() => {}}
+            zIndex={9998}
+          />
 
           {/* Snap guide lines — drawn imperatively, always on top */}
           <pixiGraphics

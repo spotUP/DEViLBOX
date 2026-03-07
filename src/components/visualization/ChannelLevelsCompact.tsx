@@ -4,7 +4,7 @@
  */
 
 import React, { useEffect, useRef } from 'react';
-import { useTrackerStore, useTransportStore, useThemeStore } from '@stores';
+import { useTrackerStore, useTransportStore, useThemeStore, useSettingsStore } from '@stores';
 import { getToneEngine } from '@engine/ToneEngine';
 import { useShallow } from 'zustand/react/shallow';
 
@@ -144,10 +144,18 @@ export const ChannelLevelsCompact: React.FC<ChannelLevelsCompactProps> = ({
       }
 
       // Update levels with smoothing
+      const isRealtime = useSettingsStore.getState().vuMeterMode === 'realtime';
       for (let i = 0; i < nc; i++) {
-        const isNewTrigger = triggerGens[i] !== lastGensRef.current[i];
-        const trigger = isNewTrigger ? (triggerLevels[i] || 0) : 0;
-        if (isNewTrigger) lastGensRef.current[i] = triggerGens[i];
+        let trigger: number;
+        if (isRealtime) {
+          // Realtime mode: always use latest level
+          trigger = triggerLevels[i] || 0;
+        } else {
+          // Trigger mode: only use level on NEW trigger
+          const isNewTrigger = triggerGens[i] !== lastGensRef.current[i];
+          trigger = isNewTrigger ? (triggerLevels[i] || 0) : 0;
+          if (isNewTrigger) lastGensRef.current[i] = triggerGens[i];
+        }
         const current = levelStatesRef.current[i] || 0;
 
         if (trigger > current) {

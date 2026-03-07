@@ -231,6 +231,10 @@ interface SettingsStore {
   trackerVisualBg: boolean;  // Enable WebGL visual background behind tracker pattern
   trackerVisualMode: number; // Current visualizer mode index (0-5)
   vjPatternOverlay: boolean; // Show pattern data overlay on VJ view
+  vuMeterMode: 'trigger' | 'realtime'; // VU meter mode: trigger=note-on, realtime=continuous audio levels
+  vuMeterSwing: boolean; // Enable sine wave swing animation on VU meters
+  customBannerImage: string | null; // Base64 data URL for custom banner image
+  wobbleWindows: boolean; // Compiz-style wobbly windows in GL UI
 
   // CRT Shader
   crtEnabled: boolean;
@@ -265,6 +269,10 @@ interface SettingsStore {
   setTrackerVisualBg: (enabled: boolean) => void;
   setTrackerVisualMode: (mode: number) => void;
   setVjPatternOverlay: (enabled: boolean) => void;
+  setVuMeterMode: (mode: 'trigger' | 'realtime') => void;
+  setVuMeterSwing: (enabled: boolean) => void;
+  setCustomBannerImage: (dataUrl: string | null) => void;
+  setWobbleWindows: (enabled: boolean) => void;
   setRenderMode: (mode: 'dom' | 'webgl') => void;
   setCrtEnabled:  (enabled: boolean) => void;
   setCrtParam:    (param: keyof CRTParams, value: number) => void;
@@ -428,6 +436,10 @@ export const useSettingsStore = create<SettingsStore>()(
       trackerVisualBg: false,  // Default: off
       trackerVisualMode: 0,    // Default: spectrum bars
       vjPatternOverlay: false, // Default: off
+      vuMeterMode: 'trigger' as const,  // Default: trigger-based VU (note-on)
+      vuMeterSwing: true,  // Default: sine wave swing enabled
+      customBannerImage: null,  // No custom banner by default
+      wobbleWindows: false,  // Wobbly windows disabled by default
       crtEnabled: false,
       crtParams:  { ...CRT_DEFAULT_PARAMS },
       lensEnabled: false,
@@ -552,6 +564,26 @@ export const useSettingsStore = create<SettingsStore>()(
           state.vjPatternOverlay = vjPatternOverlay;
         }),
 
+      setVuMeterMode: (vuMeterMode) =>
+        set((state) => {
+          state.vuMeterMode = vuMeterMode;
+        }),
+
+      setVuMeterSwing: (vuMeterSwing) =>
+        set((state) => {
+          state.vuMeterSwing = vuMeterSwing;
+        }),
+
+      setCustomBannerImage: (customBannerImage) =>
+        set((state) => {
+          state.customBannerImage = customBannerImage;
+        }),
+
+      setWobbleWindows: (wobbleWindows) =>
+        set((state) => {
+          state.wobbleWindows = wobbleWindows;
+        }),
+
       setRenderMode: (renderMode) =>
         set((state) => {
           // Block WebGL mode on mobile phones — GL UI doesn't work on mobile
@@ -622,6 +654,10 @@ export const useSettingsStore = create<SettingsStore>()(
         trackerVisualBg: state.trackerVisualBg,
         trackerVisualMode: state.trackerVisualMode,
         vjPatternOverlay: state.vjPatternOverlay,
+        vuMeterMode: state.vuMeterMode,
+        vuMeterSwing: state.vuMeterSwing,
+        customBannerImage: state.customBannerImage,
+        wobbleWindows: state.wobbleWindows,
         crtEnabled: state.crtEnabled,
         crtParams:  state.crtParams,
         lensEnabled: state.lensEnabled,
