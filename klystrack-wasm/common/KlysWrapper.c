@@ -852,6 +852,13 @@ int klys_set_instrument_param(int idx, int paramId, int value)
 }
 
 EMSCRIPTEN_KEEPALIVE
+void klys_set_channel_gain(int ch, float gain)
+{
+    extern void cyd_set_channel_gain(int ch, float gain);
+    cyd_set_channel_gain(ch, gain);
+}
+
+EMSCRIPTEN_KEEPALIVE
 int klys_set_instrument_program_step(int idx, int step, int value)
 {
     if (!g_song_loaded || idx < 0 || idx >= g_song.num_instruments) return 0;

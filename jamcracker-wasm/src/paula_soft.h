@@ -23,6 +23,9 @@ void paula_reset(void);
 // Configure clock (call before render; default: PAL)
 void paula_set_clock(float paula_clock);
 
+// Mixer: per-channel gain (0.0 = mute, 1.0 = unity). Applied on top of replayer volume.
+void paula_set_channel_gain(int ch, float gain);
+
 // Render frames of F32 stereo interleaved audio at PAULA_RATE_PAL
 // Returns number of frames written
 int paula_render(float* buffer, int frames);

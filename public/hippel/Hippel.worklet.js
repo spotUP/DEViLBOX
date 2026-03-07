@@ -80,6 +80,12 @@ class HippelProcessor extends AudioWorkletProcessor {
         }
         break;
 
+      case 'setChannelGain':
+        if (this.module && typeof this.module._player_set_channel_gain === 'function') {
+          this.module._player_set_channel_gain(data.channel, data.gain);
+        }
+        break;
+
       case 'dispose':
         this.cleanup();
         break;

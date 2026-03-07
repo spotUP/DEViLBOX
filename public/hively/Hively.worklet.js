@@ -136,6 +136,12 @@ class HivelyProcessor extends AudioWorkletProcessor {
         }
         break;
 
+      case 'setChannelGain':
+        if (this.wasm && typeof this.wasm._hively_set_channel_gain === 'function') {
+          this.wasm._hively_set_channel_gain(data.channel, data.gain);
+        }
+        break;
+
       case 'setTrackStep':
         if (this.wasm) {
           this.wasm._hively_set_track_step(

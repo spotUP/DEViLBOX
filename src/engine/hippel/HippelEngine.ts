@@ -39,6 +39,10 @@ export class HippelEngine {
     return !!HippelEngine.instance && !HippelEngine.instance._disposed;
   }
 
+  setChannelGain(channel: number, gain: number): void {
+    this.workletNode?.port.postMessage({ type: 'setChannelGain', channel, gain });
+  }
+
   private async initialize(): Promise<void> {
     try {
       await HippelEngine.ensureInitialized(this.audioContext);

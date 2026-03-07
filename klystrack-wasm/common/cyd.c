@@ -49,6 +49,24 @@ OTHER DEALINGS IN THE SOFTWARE.
 
 #endif
 
+/* Per-channel mixer gain (0 = mute, 256 = unity). Applied in cyd_output(). */
+static int cyd_channel_gain[CYD_MAX_CHANNELS];
+static int cyd_channel_gain_inited = 0;
+static void cyd_init_channel_gain(void) {
+	if (!cyd_channel_gain_inited) {
+		for (int i = 0; i < CYD_MAX_CHANNELS; ++i) cyd_channel_gain[i] = 256;
+		cyd_channel_gain_inited = 1;
+	}
+}
+void cyd_set_channel_gain(int ch, float gain) {
+	cyd_init_channel_gain();
+	if (ch < 0 || ch >= CYD_MAX_CHANNELS) return;
+	int g = (int)(gain * 256.0f);
+	if (g < 0) g = 0;
+	if (g > 256) g = 256;
+	cyd_channel_gain[ch] = g;
+}
+
 #define envspd(cyd,slope) (slope!=0?(((Uint64)0xff0000 / ((slope) * (slope) * 256 / (ENVELOPE_SCALE * ENVELOPE_SCALE))) * CYD_BASE_FREQ / cyd->sample_rate):((Uint64)0xff0000 * CYD_BASE_FREQ / cyd->sample_rate))
 
 // used lfsr-generator <http://lfsr-generator.sourceforge.net/> for this:
@@ -641,7 +659,9 @@ static Sint32 cyd_output(CydEngine *cyd)
 #endif
 
 #ifdef STEREOOUTPUT
-			Sint32 ol = o * chn->gain_left / CYD_STEREO_GAIN, or = o * chn->gain_right / CYD_STEREO_GAIN;
+			cyd_init_channel_gain();
+			Sint32 ol = o * chn->gain_left / CYD_STEREO_GAIN * cyd_channel_gain[i] / 256;
+			Sint32 or = o * chn->gain_right / CYD_STEREO_GAIN * cyd_channel_gain[i] / 256;
 #endif
 
 			if (chn->flags & CYD_CHN_ENABLE_FX)

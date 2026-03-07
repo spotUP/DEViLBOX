@@ -436,6 +436,7 @@ struct hvl_tune *hvl_load_ahx( uint8 *buf, uint32 buflen, uint32 defstereo, uint
   ht->ht_defpanleft      = stereopan_left[ht->ht_defstereo];
   ht->ht_defpanright     = stereopan_right[ht->ht_defstereo];
   ht->ht_mixgain         = (defgain[ht->ht_defstereo]*256)/100;
+  for( i=0; i<MAX_CHANNELS; i++ ) ht->ht_ChannelGain[i] = 256;
   
   if( ht->ht_Restart >= ht->ht_PositionNr )
     ht->ht_Restart = ht->ht_PositionNr-1;
@@ -672,6 +673,7 @@ struct hvl_tune *hvl_reset( uint8 *buf, uint32 buflen, uint32 defstereo, uint32 
   ht->ht_InstrumentNr    = insn;
   ht->ht_SubsongNr       = ssn;
   ht->ht_mixgain         = (buf[14]<<8)/100;
+  for( i=0; i<MAX_CHANNELS; i++ ) ht->ht_ChannelGain[i] = 256;
   ht->ht_defstereo       = buf[15];
   ht->ht_defpanleft      = stereopan_left[ht->ht_defstereo];
   ht->ht_defpanright     = stereopan_right[ht->ht_defstereo];
@@ -2006,6 +2008,7 @@ void hvl_mixchunk( struct hvl_tune *ht, uint32 samples, int8 *buf1, int8 *buf2, 
         
 //        if( abs( j ) > vu[i] ) vu[i] = abs( j );
 
+        j = (j * ht->ht_ChannelGain[i]) >> 8;
         a += (j * panl[i]) >> 7;
         b += (j * panr[i]) >> 7;
         pos[i] += delta[i];
@@ -2121,11 +2124,12 @@ int32 hvl_mix_findloudest( struct hvl_tune *ht, uint32 samples )
         } else {
           j = src[i][pos[i]>>16]*vol[i];
         }
+        j = (j * ht->ht_ChannelGain[i]) >> 8;
         a += (j * panl[i]) >> 7;
         b += (j * panr[i]) >> 7;
         pos[i] += delta[i];
       }
-      
+
 //      a = (a*ht->ht_mixgain)>>8;
 //      b = (b*ht->ht_mixgain)>>8;
       a = abs( a );
