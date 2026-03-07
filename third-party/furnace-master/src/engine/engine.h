@@ -56,8 +56,8 @@ class DivWorkPool;
 
 #define DIV_UNSTABLE
 
-#define DIV_VERSION "dev244"
-#define DIV_ENGINE_VERSION 244
+#define DIV_VERSION "dev245"
+#define DIV_ENGINE_VERSION 245
 // for imports
 #define DIV_VERSION_MOD 0xff01
 #define DIV_VERSION_FC 0xff02
@@ -641,6 +641,8 @@ class DivEngine {
     SafeWriter* saveFur(bool notPrimary=false);
     // return a ROM exporter.
     DivROMExport* buildROM(DivROMExportOptions sys);
+    // compile instruments.
+    SafeWriter* compileAllIns(int insType);
     // dump to VGM.
     // set trailingTicks to:
     // - 0 to add one tick of trailing

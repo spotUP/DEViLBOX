@@ -394,6 +394,7 @@ int DivPlatformC64::dispatch(DivCommand c) {
   switch (c.cmd) {
     case DIV_CMD_NOTE_ON: {
       DivInstrument* ins=parent->getIns(chan[c.chan].ins,DIV_INS_C64);
+
       if (chan[c.chan].pcm || c.chan>2) {
         if (skipRegisterWrites) break;
         if (c.value!=DIV_NOTE_NULL) {
