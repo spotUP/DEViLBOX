@@ -148,6 +148,9 @@ export class PatternScheduler {
       c64Engine.setPlaybackRate(playbackRate);
     }
 
+    // Apply pitch to WASM/native engine bus (Hively, JamCracker, FC, etc.)
+    engine.setSynthBusPitchRate(playbackRate);
+
     // Debounce BPM updates - only update when slider hasn't moved for 200ms
     // This prevents scheduler breakage during active drag
     if (this.bpmUpdateTimer) {

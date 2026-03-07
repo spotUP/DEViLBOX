@@ -17,10 +17,15 @@ set(GM_SRC  "${GM_ROOT}/source")
 
 if(EMSCRIPTEN)
     # -pthread for SharedArrayBuffer support (AudioWorklet needs it)
-    # -O2 is the safe max for Emscripten — -O3 causes function signature mismatch
-    # crashes due to aggressive function table compaction with member function pointers
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread -O2")
-    set(CMAKE_C_FLAGS   "${CMAKE_C_FLAGS} -pthread -O2")
+    # -O3 for maximum interpreter performance
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread -O3")
+    set(CMAKE_C_FLAGS   "${CMAKE_C_FLAGS} -pthread -O3")
+
+    # Enable C++ exception catching — DSP56300 throws std::out_of_range in
+    # hybridcontainer.h and RingBuffer during interrupt injection. Without this,
+    # Emscripten's default DISABLE_EXCEPTION_CATCHING=1 causes "Uncaught unwind"
+    # which corrupts the pthread stack and triggers "function signature mismatch".
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fwasm-exceptions")
 
     # Increase constexpr step limit for DSP56300's compile-time tables
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fconstexpr-steps=10000000")

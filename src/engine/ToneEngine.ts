@@ -157,6 +157,8 @@ export class ToneEngine {
   // - DevilboxSynths → synthBus ───────────────────────→ masterEffectsInput → [master fx?] → blepInput → [BLEP?] → masterChannel → destination
   public masterInput: Tone.Gain; // Where tracker instruments connect
   public synthBus: Tone.Gain; // Bypass bus for DevilboxSynths (skips AmigaFilter)
+  private synthBusMeter: Tone.Meter; // Level meter on synthBus for WASM engine metering
+  private pitchResamplerNode: AudioWorkletNode | null = null; // Pitch resampler for WASM engines
   public masterEffectsInput: Tone.Gain; // Merge point for master effects (both paths feed in here)
   private blepInput: Tone.Gain; // BLEP insertion point — isolates BLEP routing from effects chain rebuilds
   public masterChannel: Tone.Channel; // Final output with volume/pan
@@ -371,7 +373,16 @@ export class ToneEngine {
 
     // Synth bus bypasses AmigaFilter for native synths (DB303, Vital, etc.)
     this.synthBus = new Tone.Gain(1);
+    // PitchResampler inserted async between synthBus and masterEffectsInput (see initPitchResampler)
     this.synthBus.connect(this.masterEffectsInput);
+
+    // Meter on synthBus for WASM engine level metering (per-channel meters
+    // don't work for WASM engines since they mix internally)
+    this.synthBusMeter = new Tone.Meter({ normalRange: true });
+    this.synthBus.connect(this.synthBusMeter);
+
+    // Init pitch resampler for WASM engine pitch shifting (async — falls back to direct connection)
+    this.initPitchResampler();
 
     // Instrument map
     this.instruments = new Map();
@@ -1205,6 +1216,47 @@ export class ToneEngine {
    */
   public getGlobalPlaybackRate(): number {
     return this.globalPlaybackRate;
+  }
+
+  /**
+   * Initialize the PitchResampler AudioWorklet between synthBus and masterEffectsInput.
+   * All WASM/native DevilboxSynths feed through synthBus — the resampler pitch-shifts
+   * their audio for the DJ pitch slider without per-engine modifications.
+   */
+  private async initPitchResampler(): Promise<void> {
+    try {
+      const nativeCtx = (Tone.getContext().rawContext as AudioContext);
+      await nativeCtx.audioWorklet.addModule('/pitch-resampler/PitchResampler.worklet.js');
+
+      const resampler = new AudioWorkletNode(nativeCtx, 'pitch-resampler', {
+        numberOfInputs: 1,
+        numberOfOutputs: 1,
+        outputChannelCount: [2],
+      });
+
+      // Re-route: synthBus → resampler → masterEffectsInput (instead of synthBus → masterEffectsInput)
+      const nativeSynthBus = getNativeAudioNode(this.synthBus as any);
+      const nativeMasterFxIn = getNativeAudioNode(this.masterEffectsInput as any);
+      if (nativeSynthBus && nativeMasterFxIn) {
+        nativeSynthBus.disconnect(nativeMasterFxIn);
+        nativeSynthBus.connect(resampler);
+        resampler.connect(nativeMasterFxIn);
+        this.pitchResamplerNode = resampler;
+        console.log('[ToneEngine] PitchResampler worklet inserted: synthBus → resampler → masterEffectsInput');
+      }
+    } catch (e) {
+      console.warn('[ToneEngine] PitchResampler worklet failed to load, WASM pitch shifting unavailable:', e);
+    }
+  }
+
+  /**
+   * Set pitch rate for WASM/native synth bus (DJ pitch slider).
+   * Rate 1.0 = normal, 2.0 = octave up, 0.5 = octave down.
+   */
+  public setSynthBusPitchRate(rate: number): void {
+    if (this.pitchResamplerNode) {
+      this.pitchResamplerNode.port.postMessage({ type: 'set-rate', rate });
+    }
   }
 
   /**
@@ -4495,6 +4547,8 @@ export class ToneEngine {
   public isChannelMuted(channelIndex: number): boolean { return _isChannelMuted(this._channelCtx, channelIndex); }
   private disposeChannelOutputs(): void { _disposeChannelOutputs(this._channelCtx); }
   public getChannelLevels(numChannels: number): number[] { return _getChannelLevels(this._channelCtx, numChannels); }
+  /** Get the synthBus level (0-1) for WASM engines that bypass per-channel routing */
+  public getSynthBusLevel(): number { return this.synthBusMeter.getValue() as number; }
 
   // Channel metering — delegated to ChannelMeterState
   public triggerChannelMeter(channelIndex: number, velocity: number): void { _triggerChannelMeter(this.channelMeter, channelIndex, velocity); }
