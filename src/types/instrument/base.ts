@@ -230,7 +230,11 @@ export type SynthType =
   | 'GearmulatorMicroQ'  // Waldorf microQ
   | 'GearmulatorXT'      // Waldorf Microwave II/XT
   | 'GearmulatorNord'    // Nord Lead 2x
-  | 'GearmulatorJP8000'; // Roland JP-8000
+  | 'GearmulatorJP8000' // Roland JP-8000
+  // SC68/SNDH Atari ST replayer
+  | 'Sc68Synth'         // SC68/SNDH (Atari ST YM2149 + 68000 replayer)
+  // ZXTune ZX Spectrum replayer
+  | 'ZxtuneSynth';      // ZXTune (AY-3-8910 / YM2149 ZX Spectrum formats)
 
 export type WaveformType = 'sine' | 'square' | 'sawtooth' | 'triangle' | 'noise';
 

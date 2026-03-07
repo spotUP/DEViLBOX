@@ -2432,6 +2432,62 @@ export async function tryRouteFormat(
     }
   }
 
+  // ── PxTone Collage / Tune (.ptcop, .pttune) ────────────────────────────
+  if (/\.(ptcop|pttune)$/i.test(filename)) {
+    const { isPxtoneFormat, parsePxtoneFile } = await import('@lib/import/formats/PxtoneParser');
+    if (isPxtoneFormat(buffer)) {
+      return parsePxtoneFile(originalFileName, buffer);
+    }
+  }
+
+  // ── Organya / Cave Story (.org) ─────────────────────────────────────────
+  if (/\.org$/i.test(filename)) {
+    const { isOrganyaFormat, parseOrganyaFile } = await import('@lib/import/formats/OrganyaParser');
+    if (isOrganyaFormat(buffer)) {
+      return parseOrganyaFile(buffer, originalFileName);
+    }
+  }
+
+  // ── FM Towns EUP (.eup) ─────────────────────────────────────────────────
+  if (/\.eup$/i.test(filename)) {
+    const { isEupFormat, parseEupFile } = await import('@lib/import/formats/EupminiParser');
+    if (isEupFormat(buffer)) {
+      return parseEupFile(originalFileName, buffer);
+    }
+  }
+
+  // ── Ixalance IXS (.ixs) ──────────────────────────────────────────────────
+  if (/\.ixs$/i.test(filename)) {
+    const { isIxsFormat, parseIxsFile } = await import('@lib/import/formats/IxalanceParser');
+    if (isIxsFormat(buffer)) {
+      return parseIxsFile(originalFileName, buffer);
+    }
+  }
+
+  // ── Psycle (.psy) ───────────────────────────────────────────────────────
+  if (/\.psy$/i.test(filename)) {
+    const { isPsycleFormat, parsePsycleFile } = await import('@lib/import/formats/CpsycleParser');
+    if (isPsycleFormat(buffer)) {
+      return parsePsycleFile(buffer, originalFileName);
+    }
+  }
+
+  // ── SC68 / SNDH (.sc68, .sndh, .snd) ──────────────────────────────────────
+  if (/\.(sc68|sndh|snd)$/i.test(filename)) {
+    const { isSc68Format, parseSc68File } = await import('@lib/import/formats/Sc68Parser');
+    if (isSc68Format(buffer)) {
+      return parseSc68File(originalFileName, buffer);
+    }
+  }
+
+  // ── ZXTune formats (.pt3, .pt2, .stc, .stp, .vtx, .psg, .sqt, .psc, .asc, .psm, .gtr, .ftc, .ayc, .ts) ──
+  if (/\.(pt3|pt2|pt1|stc|st1|st3|stp|vtx|psg|psm|sqt|psc|asc|gtr|ftc|ayc|ts|cop|tfc|tfd|tf0|pdt|chi|str|dst|dmm|et1)$/i.test(filename)) {
+    const { isZxtuneFormat, parseZxtuneFile } = await import('@lib/import/formats/ZxtuneParser');
+    if (isZxtuneFormat(buffer)) {
+      return parseZxtuneFile(originalFileName, buffer);
+    }
+  }
+
   // ── UADE-only prefix formats + catch-all ─────────────────────────────────
   { const uadeResult = await tryUADEPrefixParse(buffer, filename, originalFileName, prefs, subsong, preScannedMeta);
     if (uadeResult) return uadeResult; }
