@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-03-06T22:53:44.191Z
+ * Generated: 2026-03-07T07:46:54.079Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,10 +19,10 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.2513';
-export const BUILD_NUMBER = '2513';
-export const BUILD_HASH = 'b329c69de';
-export const BUILD_DATE = '2026-03-06';
+export const BUILD_VERSION = '1.0.2546';
+export const BUILD_NUMBER = '2546';
+export const BUILD_HASH = '156d3a2e9';
+export const BUILD_DATE = '2026-03-07';
 
 // Full version (patch IS the build number, so no need to append)
 export const FULL_VERSION = BUILD_VERSION;
@@ -30,7 +30,137 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.2513',
+    version: '1.0.2546',
+    date: '2026-03-07',
+    changes: [
+      {
+        type: 'feature',
+        "description": "Chore: update pxtone harness and add CMakeLists.txt"
+      },
+      {
+        type: 'fix',
+        "description": "TrackerView merge resolution"
+      },
+      {
+        type: 'improvement',
+        "description": "Chore: update gm-o2-test script"
+      },
+      {
+        type: 'feature',
+        "description": "Add Organya, Sonix, and MusicLine editor modes to TrackerView"
+      },
+      {
+        type: 'feature',
+        "description": "Add pxtone WASM engine source (Pixel music format)"
+      },
+      {
+        type: 'fix',
+        "description": "Update gearmulator CMake and TrackerView routing"
+      },
+      {
+        type: 'feature',
+        "description": "Add eupmini WASM build config and compiled output"
+      },
+      {
+        type: 'fix',
+        "description": "Update useUIStore for split view mode"
+      },
+      {
+        type: 'feature',
+        "description": "Add eupmini WASM engine (FM Towns EUP music format)"
+      },
+      {
+        type: 'improvement',
+        "description": "Chore: update gearmulator O2 test script"
+      },
+      {
+        type: 'feature',
+        "description": "Add PitchResampler worklet for sample-based engines"
+      },
+      {
+        type: 'feature',
+        "description": "Add Organya WASM engine (Cave Story music format)"
+      },
+      {
+        type: 'feature',
+        "description": "Add Sonix Music Driver format parser"
+      },
+      {
+        type: 'feature',
+        "description": "Engine and store updates for Sonix format and routing"
+      },
+      {
+        type: 'feature',
+        "description": "Update FurnaceEditor, MixerPanel, and StudioCanvasView"
+      },
+      {
+        type: 'improvement',
+        "description": "Add synth-controls-flow class to all instrument control panels"
+      },
+      {
+        type: 'improvement',
+        "description": "Add debug investigation notes and test scripts"
+      },
+      {
+        type: 'feature',
+        "description": "Chore: add sonix-wasm/build to .gitignore"
+      },
+      {
+        type: 'feature',
+        "description": "Chore: rebuild gearmulator WASM and add test helpers"
+      },
+      {
+        type: 'feature',
+        "description": "Add Sonix WASM engine (transpiled 68k replayer)"
+      },
+      {
+        type: 'feature',
+        "description": "Enhance StudioCanvasView and TrackerReplayer"
+      },
+      {
+        type: 'fix',
+        "description": "Improve JamCracker controls layout"
+      },
+      {
+        type: 'improvement',
+        "description": "Chore: update generated changelog"
+      },
+      {
+        type: 'improvement',
+        "description": "Split StudioView into StudioCanvasView and SplitView"
+      },
+      {
+        type: 'feature',
+        "description": "Tracker engine improvements for Furnace format playback"
+      },
+      {
+        type: 'fix',
+        "description": "Furnace import parser type fixes and pattern data improvements"
+      },
+      {
+        type: 'feature',
+        "description": "Furnace WASM sequencer with per-system effects and compat flags"
+      },
+      {
+        type: 'feature',
+        "description": "Improve gearmulator WASM bridge and worker"
+      },
+      {
+        type: 'feature',
+        "description": "Improve 68k replayer WASM engines (hippel, ma, pretracker)"
+      },
+      {
+        type: 'feature',
+        "description": "Chore: add 68k replayer build dirs to .gitignore"
+      },
+      {
+        type: 'fix',
+        "description": "68k-to-C transpiler — compound expressions, XREF, EQU, orphan labels, jump tables"
+      }
+    ]
+  },
+  {
+    version: '2026-03-06',
     date: '2026-03-06',
     changes: [
       {
@@ -100,134 +230,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         "description": "Address code quality issues in PreTrackerParser"
-      },
-      {
-        type: 'feature',
-        "description": "Add per-channel playback row support to FormatPatternEditor"
-      },
-      {
-        type: 'fix',
-        "description": "Correct PreTrackerParser to match spec (TrackerModule structure)"
-      },
-      {
-        type: 'fix',
-        "description": "Build errors in refactored pattern editors and adapters"
-      },
-      {
-        type: 'feature',
-        "description": "Add diagnostic printf output for audio queue sizes"
-      },
-      {
-        type: 'feature',
-        "description": "Add PreTrackerParser for module metadata extraction"
-      },
-      {
-        type: 'feature',
-        "description": "Simplify Gearmulator ESAI initialization for snapshot loading"
-      },
-      {
-        type: 'improvement',
-        "description": "Remove unused GTPatternEditor export"
-      },
-      {
-        type: 'improvement',
-        "description": "Replace GTPatternEditor with FormatPatternEditor in GTUltraView"
-      },
-      {
-        type: 'feature',
-        "description": "Create PreTrackerEngine for playback control"
-      },
-      {
-        type: 'improvement',
-        "description": "JamCrackerView to use FormatPatternEditor"
-      },
-      {
-        type: 'fix',
-        "description": "Rewrite PreTracker worklet following DB303 pattern"
-      },
-      {
-        type: 'feature',
-        "description": "Add PreTracker AudioWorklet bridge to WASM"
-      },
-      {
-        type: 'fix',
-        "description": "Skip sendInitControlCommands for snapshot-loaded devices"
-      },
-      {
-        type: 'fix',
-        "description": "Ensure microcontroller init commands execute for snapshot-loaded devices"
-      },
-      {
-        type: 'improvement',
-        "description": "Build: create WASM modules for pretracker, ma, and hippel replayers"
-      },
-      {
-        type: 'feature',
-        "description": "Rebuild Gearmulator WASM with ESAI audio fix and snapshot loading"
-      },
-      {
-        type: 'improvement',
-        "description": "Add klystrack adapter reference pattern"
-      },
-      {
-        type: 'feature',
-        "description": "Add format adapters for Hively, GT Ultra, and JamCracker"
-      },
-      {
-        type: 'improvement',
-        "description": "Implement format-agnostic pattern editor"
-      },
-      {
-        type: 'improvement',
-        "description": "Comprehensive completion summary for all format integration phases"
-      },
-      {
-        type: 'improvement',
-        "description": "Add klystrack pattern data debug guide and test helper"
-      },
-      {
-        type: 'fix',
-        "description": "Debug: add comprehensive logging to klystrack pattern data extraction"
-      },
-      {
-        type: 'improvement',
-        "description": "Chore: clean up diagnostic logging from klystrack engine"
-      },
-      {
-        type: 'feature',
-        "description": "Add DEViLBOX integration phases (9-13) to 68k transpile skill"
-      },
-      {
-        type: 'fix',
-        "description": "Replace TextDecoder with manual ASCII decode in klystrack worklet"
-      },
-      {
-        type: 'fix',
-        "description": "Klystrack WASM init robustness and diagnostic logging"
-      },
-      {
-        type: 'feature',
-        "description": "Add PixiRemapInstrumentDialog for GL/DOM parity"
-      },
-      {
-        type: 'feature',
-        "description": "GL/DOM parity — acid pattern dialog + Modland/HVSC browser panels"
-      },
-      {
-        type: 'fix',
-        "description": "Load klystrack song into WASM engine and populate pattern data"
-      },
-      {
-        type: 'feature',
-        "description": "Add Pixi GL views for JamCracker and Klystrack formats"
-      },
-      {
-        type: 'fix',
-        "description": "Add KlysSynth to ToneEngine switch cases"
-      },
-      {
-        type: 'improvement',
-        "description": "Extract format state from useTrackerStore into useFormatStore"
       }
     ]
   }
