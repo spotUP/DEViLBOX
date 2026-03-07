@@ -713,6 +713,16 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
                 </div>
               )}
 
+              {formatCapabilities && formatCapabilities.isEditable && formatCapabilities.isNativeExportable && (
+                <div className="flex items-start gap-2 p-3 bg-green-500/10 border border-green-500/30 rounded text-xs text-green-400">
+                  <Info size={14} className="shrink-0 mt-0.5" />
+                  <div>
+                    <span className="font-semibold">Editable and exportable.</span>
+                    {' '}Pattern edits will play back via libopenmpt and can be saved to MOD/XM/IT/S3M.
+                  </div>
+                </div>
+              )}
+
               {formatCapabilities && formatCapabilities.isEditable && !formatCapabilities.isNativeExportable && (
                 <div className="flex items-start gap-2 p-3 bg-amber-500/10 border border-amber-500/30 rounded text-xs text-amber-400">
                   <Info size={14} className="shrink-0 mt-0.5" />

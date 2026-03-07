@@ -6,7 +6,7 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { GmKnob } from './GmKnob';
-import { GmButton, makeButtonSprites } from './GmButton';
+import { GmButton } from './GmButton';
 import { GmCombo } from './GmCombo';
 import { GmLabel } from './GmLabel';
 import { GmParameterMap } from './GmParameterMap';
@@ -27,19 +27,21 @@ interface KnobStyle {
 }
 
 // Virus Trancy skin knob styles
+// knob_1_128_page0.png: 375x2025 → 75x75 frames → 5 cols x 27 rows = 135 (128 used)
+// knob_2_128_page0.png: 220x2035 → 55x55 frames → 4 cols x 37 rows = 148 (128 used)
 const VIRUS_TRANCY_KNOBS: Record<string, KnobStyle> = {
   knob_1: {
     src: '/gearmulator/skins/virus-trancy/knob_1_128_page0.png',
     frameWidth: 75,
     frameHeight: 75,
-    cols: 27,
+    cols: 5,
     totalFrames: 128,
   },
   knob_2: {
     src: '/gearmulator/skins/virus-trancy/knob_2_128_page0.png',
     frameWidth: 55,
     frameHeight: 55,
-    cols: 37,
+    cols: 4,
     totalFrames: 128,
   },
 };
@@ -68,6 +70,19 @@ export interface GmSkinRendererProps {
 /** Convert RML dp units to pixels */
 function dpToPx(dpStr: string): number {
   return parseFloat(dpStr.replace('dp', '').replace('px', ''));
+}
+
+/** Parse inline style string → object */
+function parseInlineStyle(styleStr: string): Record<string, string> {
+  const result: Record<string, string> = {};
+  if (!styleStr) return result;
+  for (const part of styleStr.split(';')) {
+    const [key, ...valueParts] = part.split(':');
+    if (key && valueParts.length) {
+      result[key.trim()] = valueParts.join(':').trim();
+    }
+  }
+  return result;
 }
 
 export const GmSkinRenderer: React.FC<GmSkinRendererProps> = ({
@@ -101,9 +116,13 @@ export const GmSkinRenderer: React.FC<GmSkinRendererProps> = ({
   }, [elements]);
 
   // Tab state
-  const [activeTab, _setActiveTab] = useState(0);
-  void _setActiveTab; // will be used when tab switching is wired
+  const [activeTab, setActiveTab] = useState(0);
   const pageIds = useMemo(() => Object.keys(pageElements).sort(), [pageElements]);
+
+  // Handle tab button clicks
+  const handleTabClick = useCallback((tabIndex: number) => {
+    setActiveTab(tabIndex);
+  }, []);
 
   // Render a single control
   const renderControl = useCallback((ctrl: GmSkinControlDef) => {
@@ -148,12 +167,12 @@ export const GmSkinRenderer: React.FC<GmSkinRendererProps> = ({
       }
 
       case 'button': {
-        const btnSheet = spritesheets[ctrl.buttonStyle ?? ''];
-        const btnSrc = btnSheet ? `${skinBase}/${btnSheet.src}` : '';
-        const frames = btnSheet?.frames ?? {};
         const prefix = ctrl.buttonStyle ?? 'btn_1';
+        const btnSheet = spritesheets[prefix];
+        const btnSrc = btnSheet ? `${skinBase}/${btnSheet.src}` : `${skinBase}/${prefix}.png`;
+        const frames = btnSheet?.frames ?? {};
         const defFrame = frames[`${prefix}_default`] ?? { x: 0, y: 0, w: 36, h: 68 };
-        const chkFrame = frames[`${prefix}_checked`] ?? { x: 0, y: 68, w: 36, h: 68 };
+        const chkFrame = frames[`${prefix}_checked`] ?? defFrame;
 
         const isChecked = ctrl.valueOn !== undefined
           ? rawValue === ctrl.valueOn
@@ -162,15 +181,21 @@ export const GmSkinRenderer: React.FC<GmSkinRendererProps> = ({
         return (
           <GmButton
             key={`${ctrl.pageId ?? 'g'}-${ctrl.param ?? ctrl.id}`}
-            sprites={makeButtonSprites(
-              btnSrc,
-              defFrame.w * s, defFrame.h * s,
-              defFrame.y * s, chkFrame.y * s
-            )}
-            checked={isChecked}
+            sprites={{
+              src: btnSrc,
+              default: { x: defFrame.x * s, y: defFrame.y * s, w: defFrame.w * s, h: defFrame.h * s },
+              hover: { x: (frames[`${prefix}_hover`]?.x ?? defFrame.x) * s, y: (frames[`${prefix}_hover`]?.y ?? defFrame.y) * s, w: defFrame.w * s, h: defFrame.h * s },
+              active: { x: (frames[`${prefix}_active`]?.x ?? defFrame.x) * s, y: (frames[`${prefix}_active`]?.y ?? defFrame.y) * s, w: defFrame.w * s, h: defFrame.h * s },
+              checked: { x: chkFrame.x * s, y: chkFrame.y * s, w: chkFrame.w * s, h: chkFrame.h * s },
+              checkedHover: { x: (frames[`${prefix}_checked-hover`]?.x ?? chkFrame.x) * s, y: (frames[`${prefix}_checked-hover`]?.y ?? chkFrame.y) * s, w: chkFrame.w * s, h: chkFrame.h * s },
+              checkedActive: { x: (frames[`${prefix}_checked-active`]?.x ?? chkFrame.x) * s, y: (frames[`${prefix}_checked-active`]?.y ?? chkFrame.y) * s, w: chkFrame.w * s, h: chkFrame.h * s },
+            }}
+            checked={ctrl.tabButton !== undefined ? activeTab === ctrl.tabButton : isChecked}
             isToggle={ctrl.isToggle}
             onChange={(checked) => {
-              if (ctrl.param) {
+              if (ctrl.tabButton !== undefined) {
+                handleTabClick(ctrl.tabButton);
+              } else if (ctrl.param) {
                 const val = ctrl.valueOn !== undefined
                   ? (checked ? ctrl.valueOn : 0)
                   : (checked ? (paramDesc?.max ?? 1) : (paramDesc?.min ?? 0));
@@ -178,7 +203,7 @@ export const GmSkinRenderer: React.FC<GmSkinRendererProps> = ({
               }
             }}
             style={posStyle}
-            paramName={ctrl.param}
+            paramName={ctrl.tabButton !== undefined ? `Tab ${ctrl.tabButton}` : ctrl.param}
           />
         );
       }
@@ -224,7 +249,7 @@ export const GmSkinRenderer: React.FC<GmSkinRendererProps> = ({
       default:
         return null;
     }
-  }, [skinScale, paramValues, paramMap, onParamChange, spritesheets, skinBase]);
+  }, [skinScale, paramValues, paramMap, onParamChange, spritesheets, skinBase, activeTab, handleTabClick]);
 
   return (
     <div
@@ -248,22 +273,30 @@ export const GmSkinRenderer: React.FC<GmSkinRendererProps> = ({
       {/* Tab buttons */}
       {/* Tab buttons are already rendered via globalElements */}
 
-      {/* Tab pages */}
-      {pageIds.map((pageId, i) => (
-        <div
-          key={pageId}
-          style={{
-            display: i === activeTab ? 'block' : 'none',
-            position: 'absolute',
-            left: 0,
-            top: 0,
-            width: '100%',
-            height: '100%',
-          }}
-        >
-          {pageElements[pageId]?.map(renderControl)}
-        </div>
-      ))}
+      {/* Tab pages with panel backgrounds */}
+      {pageIds.map((pageId, i) => {
+        // Extract panel position/size from RML page element
+        const pageMatch = rmlContent.match(new RegExp(`<img\\s+id="${pageId}"[^>]*style="([^"]*)"[^>]*src="([^"]*)"`, 'i'));
+        const pageStyle = pageMatch ? parseInlineStyle(pageMatch[1]) : {};
+        const panelSrc = pageMatch?.[2];
+        return (
+          <div
+            key={pageId}
+            style={{
+              display: i === activeTab ? 'block' : 'none',
+              position: 'absolute',
+              left: dpToPx(pageStyle['left'] ?? '100dp') * skinScale,
+              top: dpToPx(pageStyle['top'] ?? '122dp') * skinScale,
+              width: dpToPx(pageStyle['width'] ?? '2300dp') * skinScale,
+              height: dpToPx(pageStyle['height'] ?? '995dp') * skinScale,
+              backgroundImage: panelSrc ? `url(${skinBase}/${panelSrc})` : undefined,
+              backgroundSize: '100% 100%',
+            }}
+          >
+            {pageElements[pageId]?.map(renderControl)}
+          </div>
+        );
+      })}
     </div>
   );
 };

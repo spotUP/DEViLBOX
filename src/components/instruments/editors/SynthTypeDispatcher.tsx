@@ -5,7 +5,7 @@
  * Contains all synth-specific change handlers and the editor mode dispatch logic.
  */
 
-import React, { useCallback, lazy, Suspense } from 'react';
+import React, { useCallback, useState, lazy, Suspense } from 'react';
 import type { InstrumentConfig, EffectConfig } from '@typedefs/instrument';
 import {
   DEFAULT_FURNACE, DEFAULT_DUB_SIREN, DEFAULT_SPACE_LASER, DEFAULT_V2, DEFAULT_V2_SPEECH, DEFAULT_SYNARE,
@@ -37,6 +37,7 @@ import { isFurnaceWaveType } from '../hardware/FurnaceWaveHardware';
 import { isFurnacePCMType } from '../hardware/FurnacePCMHardware';
 import { isFurnaceInsEdType } from '../hardware/FurnaceInsEdHardware';
 import { SpaceLaserHeader, V2Header, DubSirenHeader, SynareHeader, type SynthHeaderProps } from './InstrumentPresetManager';
+import type { GearmulatorSynth } from '@engine/gearmulator/GearmulatorSynth';
 
 // ============================================================================
 // LAZY-LOADED CONTROL COMPONENTS
@@ -97,6 +98,7 @@ const SonicArrangerControls = lazy(() =>
 );
 const SuperColliderEditor = lazy(() => import('../SuperColliderEditor').then(m => ({ default: m.SuperColliderEditor })));
 const GearmulatorEditor = lazy(() => import('../GearmulatorEditor').then(m => ({ default: m.GearmulatorEditor })));
+const GearmulatorHardware = lazy(() => import('../gearmulator/GearmulatorHardware').then(m => ({ default: m.GearmulatorHardware })));
 const WobbleBassControls = lazy(() => import('../controls/WobbleBassControls').then(m => ({ default: m.WobbleBassControls })));
 
 // Lazy-loaded hardware UI components
@@ -119,6 +121,120 @@ const WavetableListEditor = lazy(() => import('./WavetableEditor').then(m => ({ 
 
 // Types
 export type EditorMode = 'generic' | 'tb303' | 'furnace' | 'buzzmachine' | 'sample' | 'dubsiren' | 'spacelaser' | 'v2' | 'sam' | 'synare' | 'mame' | 'mamechip' | 'dexed' | 'obxd' | 'wam' | 'tonewheelOrgan' | 'melodica' | 'vital' | 'odin2' | 'surge' | 'vstbridge' | 'harmonicsynth' | 'modular' | 'hively' | 'jamcracker' | 'soundmon' | 'sidmon' | 'digmug' | 'fc' | 'deltamusic1' | 'deltamusic2' | 'fred' | 'tfmx' | 'octamed' | 'sidmon1' | 'hippelcoso' | 'robhubbard' | 'davidwhittaker' | 'sonic-arranger' | 'musicline' | 'supercollider' | 'gearmulator' | 'wobblebass';
+
+// ============================================================================
+// GEARMULATOR EDITOR SECTION
+// Shows hardware skin UI when ROM is loaded, with collapsible config panel.
+// ============================================================================
+
+/** Map synth type string to GM numeric type and skin name (if available) */
+const GM_SYNTH_TYPE_MAP: Record<string, number> = {
+  GearmulatorVirus: 0, GearmulatorVirusTI: 1, GearmulatorMicroQ: 2,
+  GearmulatorXT: 3, GearmulatorNord: 4, GearmulatorJP8000: 5,
+};
+
+/** Map GM numeric synth type to skin name. Only Virus A/B/C has a skin currently. */
+const GM_SKIN_MAP: Record<number, string> = {
+  0: 'virus-trancy',
+  // Future: 1: 'virus-ti', 2: 'microq', etc.
+};
+
+interface GearmulatorEditorSectionProps {
+  instrument: InstrumentConfig;
+  handleChange: (updates: Partial<InstrumentConfig>) => void;
+  vizMode: VizMode;
+  setVizMode: (mode: VizMode) => void;
+}
+
+const GearmulatorEditorSection: React.FC<GearmulatorEditorSectionProps> = ({
+  instrument, handleChange, vizMode, setVizMode,
+}) => {
+  const [showConfig, setShowConfig] = useState(false);
+  const [containerWidth, setContainerWidth] = useState(0);
+
+  const gmConfig = instrument.gearmulator ?? {
+    synthType: GM_SYNTH_TYPE_MAP[instrument.synthType] ?? 0,
+  };
+
+  const hasRom = !!gmConfig.romKey;
+  const skinName = GM_SKIN_MAP[gmConfig.synthType];
+  const showHardwareUI = hasRom && !!skinName;
+
+  // Get the live GearmulatorSynth instance for sysex
+  const handleSendSysex = useCallback((data: Uint8Array) => {
+    try {
+      const engine = getToneEngine();
+      // Shared WASM synths use channelIndex=-1 (0xFFFF) in the composite key
+      const key = engine.getInstrumentKey(instrument.id, -1);
+      const synth = engine.instruments.get(key);
+      if (synth && 'sendSysex' in synth) {
+        (synth as GearmulatorSynth).sendSysex(data);
+      }
+    } catch {
+      // Engine not initialized yet
+    }
+  }, [instrument.id]);
+
+  // Measure container width for auto-scaling
+  const containerRef = useCallback((node: HTMLDivElement | null) => {
+    if (node) {
+      const observer = new ResizeObserver((entries) => {
+        for (const entry of entries) {
+          setContainerWidth(entry.contentRect.width);
+        }
+      });
+      observer.observe(node);
+      setContainerWidth(node.clientWidth);
+      return () => observer.disconnect();
+    }
+  }, []);
+
+  return (
+    <div className="synth-editor-container bg-gradient-to-b from-[#1a1a2e] to-[#0a0a1a]">
+      <EditorHeader
+        instrument={instrument}
+        onChange={handleChange}
+        vizMode={vizMode}
+        onVizModeChange={setVizMode}
+      />
+      <div className="flex-1 min-h-0 overflow-y-auto">
+        {/* Hardware skin UI (shown when ROM loaded and skin available) */}
+        {showHardwareUI && (
+          <div ref={containerRef} className="w-full">
+            <Suspense fallback={<LoadingControls />}>
+              <GearmulatorHardware
+                skinName={skinName}
+                part={gmConfig.channel ?? 0}
+                onSendSysex={handleSendSysex}
+                containerWidth={containerWidth}
+              />
+            </Suspense>
+          </div>
+        )}
+
+        {/* Config panel: always shown when no skin, collapsible when skin is active */}
+        {showHardwareUI && (
+          <button
+            className="w-full px-4 py-2 text-xs text-gray-400 hover:text-gray-200 bg-[#0d0d1a] border-t border-gray-800 flex items-center gap-2 transition-colors"
+            onClick={() => setShowConfig(!showConfig)}
+          >
+            <span className={`transition-transform ${showConfig ? 'rotate-90' : ''}`}>&#9654;</span>
+            ROM &amp; Configuration
+          </button>
+        )}
+
+        {(!showHardwareUI || showConfig) && (
+          <Suspense fallback={<LoadingControls />}>
+            <GearmulatorEditor
+              config={gmConfig}
+              onChange={(gm) => handleChange({ gearmulator: gm })}
+            />
+          </Suspense>
+        )}
+      </div>
+    </div>
+  );
+};
 
 export interface SynthTypeDispatcherProps {
   editorMode: EditorMode;
@@ -680,7 +796,7 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
         />
 
         {/* Sample Controls — hardware or simple */}
-        <div className="synth-editor-content overflow-y-auto p-4">
+        <div className="synth-editor-content synth-editor-content--no-columns overflow-y-auto p-4">
           {uiMode === 'hardware' ? (
             /* Detect bit depth: use PT2 for 8-bit, FT2 for 16-bit/default */
             (instrument.metadata?.modPlayback?.usePeriodPlayback &&
@@ -1194,30 +1310,13 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
   // GEARMULATOR EDITOR
   // ============================================================================
   if (editorMode === 'gearmulator') {
-    const gmSynthTypeMap: Record<string, number> = {
-      GearmulatorVirus: 0, GearmulatorVirusTI: 1, GearmulatorMicroQ: 2,
-      GearmulatorXT: 3, GearmulatorNord: 4, GearmulatorJP8000: 5,
-    };
-    const gmConfig = instrument.gearmulator ?? {
-      synthType: gmSynthTypeMap[instrument.synthType] ?? 0,
-    };
     return (
-      <div className="synth-editor-container bg-gradient-to-b from-[#1a1a2e] to-[#0a0a1a]">
-        <EditorHeader
-          instrument={instrument}
-          onChange={handleChange}
-          vizMode={vizMode}
-          onVizModeChange={setVizMode}
-        />
-        <div className="flex-1 min-h-0 overflow-hidden">
-          <Suspense fallback={<LoadingControls />}>
-            <GearmulatorEditor
-              config={gmConfig}
-              onChange={(gm) => handleChange({ gearmulator: gm })}
-            />
-          </Suspense>
-        </div>
-      </div>
+      <GearmulatorEditorSection
+        instrument={instrument}
+        handleChange={handleChange}
+        vizMode={vizMode}
+        setVizMode={setVizMode}
+      />
     );
   }
 

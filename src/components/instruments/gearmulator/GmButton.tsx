@@ -70,6 +70,7 @@ export const GmButton: React.FC<GmButtonProps> = ({
         height: state.h,
         backgroundImage: `url(${sprites.src})`,
         backgroundPosition: `-${state.x}px -${state.y}px`,
+        backgroundSize: 'auto',
         backgroundRepeat: 'no-repeat',
         cursor: 'pointer',
         ...style,

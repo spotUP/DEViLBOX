@@ -12,7 +12,7 @@
 import { useEffect, useRef, useMemo } from 'react';
 import type { Graphics as GraphicsType } from 'pixi.js';
 
-import { useTransportStore, useTrackerStore, useEditorStore } from '@stores';
+import { useTransportStore, useTrackerStore, useEditorStore, useSettingsStore } from '@stores';
 import { useShallow } from 'zustand/react/shallow';
 import { getToneEngine } from '@engine/ToneEngine';
 
@@ -180,18 +180,31 @@ export const PixiChannelVUMeters: React.FC<PixiChannelVUMetersProps> = ({ width,
       }
 
       // Update levels and check if any meter is active
+      const isRealtime = useSettingsStore.getState().vuMeterMode === 'realtime';
       let anyActive = false;
       for (let i = 0; i < nc; i++) {
         const meter = metersRef.current[i];
         if (!meter) continue;
-        const isNewTrigger = triggerGens[i] !== lastGensRef.current[i];
         const staggerOffset = i * 0.012;
-        if (isNewTrigger && triggerLevels[i] > 0) {
-          meter.level = triggerLevels[i];
-          lastGensRef.current[i] = triggerGens[i];
+        if (isRealtime) {
+          // Realtime mode: always use latest level, smooth toward it
+          const target = triggerLevels[i] || 0;
+          if (target > meter.level) {
+            meter.level = target; // instant attack
+          } else {
+            meter.level *= (DECAY_RATE - staggerOffset);
+            if (meter.level < 0.01) meter.level = 0;
+          }
         } else {
-          meter.level *= (DECAY_RATE - staggerOffset);
-          if (meter.level < 0.01) meter.level = 0;
+          // Trigger mode: only jump on NEW trigger (generation-gated)
+          const isNewTrigger = triggerGens[i] !== lastGensRef.current[i];
+          if (isNewTrigger && triggerLevels[i] > 0) {
+            meter.level = triggerLevels[i];
+            lastGensRef.current[i] = triggerGens[i];
+          } else {
+            meter.level *= (DECAY_RATE - staggerOffset);
+            if (meter.level < 0.01) meter.level = 0;
+          }
         }
         if (meter.level > 0) anyActive = true;
       }
@@ -216,8 +229,8 @@ export const PixiChannelVUMeters: React.FC<PixiChannelVUMetersProps> = ({ width,
         if (meter.level < 0.01) continue;
 
         // Swing position — global time-based sine wave with per-channel phase offset.
-        // All channels share one clock so they move as a synced staggered wave.
-        const swingPos = meter.level > 0.02
+        const swingEnabled = useSettingsStore.getState().vuMeterSwing;
+        const swingPos = swingEnabled && meter.level > 0.02
           ? Math.sin(performance.now() * SWING_FREQ + i * SWING_PHASE_STEP) * SWING_RANGE
           : 0;
 

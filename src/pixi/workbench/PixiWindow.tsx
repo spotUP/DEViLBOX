@@ -29,6 +29,13 @@ import {
   applyEdgeBounce,
   type MomentumState,
 } from './springPhysics';
+import {
+  createWobbleState,
+  wobbleDragUpdate,
+  wobbleDragEnd,
+  wobbleStep,
+} from './wobblePhysics';
+import { useSettingsStore } from '@stores/useSettingsStore';
 import { useSetSnapLines } from './WorkbenchContainer';
 import { computeSnap } from './windowSnap';
 import { playWindowOpen, playWindowClose, playSnap } from './workbenchSounds';
@@ -120,11 +127,13 @@ interface PixiWindowProps {
   onFocus?: (id: string) => void;
   /** Called with the outer Container on mount, null on unmount */
   onMount?: (id: string, container: ContainerType | null) => void;
+  /** Called on Shift+click to toggle selection */
+  onSelect?: (id: string) => void;
   children?: React.ReactNode;
 }
 
 export const PixiWindow: React.FC<PixiWindowProps> = ({
-  id, title, camera, screenW, screenH, onFocus, onMount, children,
+  id, title, camera, screenW, screenH, onFocus, onMount, onSelect, children,
 }) => {
   const theme = usePixiTheme();
   const winState = useWorkbenchStore((s) => s.windows[id]);
@@ -141,6 +150,8 @@ export const PixiWindow: React.FC<PixiWindowProps> = ({
   const setSnapLines      = useSetSnapLines();
 
   const focused = activeWindowId === id;
+  const selected = useWorkbenchStore((s) => s.selectedWindowIds.includes(id));
+  const [hovered, setHovered] = useState(false);
   const [animVisible, setAnimVisible] = useState(winState?.visible ?? false);
 
   // Ref to the outer container for direct Pixi manipulation
@@ -180,6 +191,10 @@ export const PixiWindow: React.FC<PixiWindowProps> = ({
   // Velocity tracker for throw
   const velocityTrackerRef = useRef(new VelocityTracker());
 
+  // Wobble physics state
+  const wobbleRef = useRef(createWobbleState());
+  const wobblePrevTimeRef = useRef(0);
+
   // Momentum RAF handle
   const momentumRafRef = useRef<number>(0);
 
@@ -205,41 +220,57 @@ export const PixiWindow: React.FC<PixiWindowProps> = ({
   // not on every render. All state is read from refs — empty dep array is correct.
   const tickSpring = useCallback(() => {
     const spring = springStateRef.current;
-    if (!spring) return;
+    if (spring) {
+      const elapsed = performance.now() - spring.startTime;
+      const t = Math.min(1, elapsed / SPRING_DURATION);
 
-    const elapsed = performance.now() - spring.startTime;
-    const t = Math.min(1, elapsed / SPRING_DURATION);
+      let progress = spring.dir === 'open'
+        ? springEase(t)
+        : 1 - springEase(1 - t, 8, 6);
+      progress = Math.max(0, progress);
 
-    let progress = spring.dir === 'open'
-      ? springEase(t)
-      : 1 - springEase(1 - t, 8, 6);
-    progress = Math.max(0, progress);
+      const sq = squashStretch(spring.dir === 'open' ? t : 1 - t);
+      const sx = progress * sq.scaleX;
+      const sy = progress * sq.scaleY;
 
-    const sq = squashStretch(spring.dir === 'open' ? t : 1 - t);
-    const sx = progress * sq.scaleX;
-    const sy = progress * sq.scaleY;
+      const el = outerRef.current;
+      if (el) {
+        el.scale.x = sx;
+        el.scale.y = sy;
+        const ww = storeRef.current.winState?.width  ?? 400;
+        const wh = storeRef.current.winState?.height ?? 300;
+        el.pivot.set(ww / 2, wh / 2);
+        el.x = (storeRef.current.winState?.x ?? 0) + ww / 2;
+        el.y = (storeRef.current.winState?.y ?? 0) + wh / 2;
+      }
 
-    const el = outerRef.current;
-    if (el) {
-      el.scale.x = sx;
-      el.scale.y = sy;
-      const ww = storeRef.current.winState?.width  ?? 400;
-      const wh = storeRef.current.winState?.height ?? 300;
-      el.pivot.set(ww / 2, wh / 2);
-      el.x = (storeRef.current.winState?.x ?? 0) + ww / 2;
-      el.y = (storeRef.current.winState?.y ?? 0) + wh / 2;
+      if (t >= 1) {
+        if (el) {
+          el.scale.set(1);
+          el.pivot.set(0, 0);
+          el.x = storeRef.current.winState?.x ?? 0;
+          el.y = storeRef.current.winState?.y ?? 0;
+        }
+        if (spring.dir === 'close') setAnimVisible(false);
+        spring.onDone?.();
+        springStateRef.current = null;
+      }
     }
 
-    if (t >= 1) {
-      if (el) {
-        el.scale.set(1);
-        el.pivot.set(0, 0);
-        el.x = storeRef.current.winState?.x ?? 0;
-        el.y = storeRef.current.winState?.y ?? 0;
+    // Wobble physics — apply skew deformation during/after drag
+    const wobble = wobbleRef.current;
+    if (wobble.skewX !== 0 || wobble.skewY !== 0 || wobble.vSkewX !== 0 || wobble.vSkewY !== 0
+        || wobble.dragging) {
+      const now = performance.now();
+      const dt = wobblePrevTimeRef.current ? (now - wobblePrevTimeRef.current) / 1000 : 0.016;
+      wobblePrevTimeRef.current = now;
+      wobbleStep(wobble, dt);
+
+      const el = outerRef.current;
+      if (el && !springStateRef.current) {
+        el.skew.x = wobble.skewX;
+        el.skew.y = wobble.skewY;
       }
-      if (spring.dir === 'close') setAnimVisible(false);
-      spring.onDone?.();
-      springStateRef.current = null;
     }
   }, []);
 
@@ -296,6 +327,13 @@ export const PixiWindow: React.FC<PixiWindowProps> = ({
     bringToFront(id);
     setActiveWindowId(id);
 
+    // Shift+click → toggle selection (no drag)
+    const nativeEvent = e.nativeEvent as PointerEvent;
+    if (nativeEvent.shiftKey) {
+      onSelect?.(id);
+      return;
+    }
+
     // Double-click on title bar → toggle maximize (same as the ◎ focus button)
     const now = Date.now();
     if (now - titleDblClickTimeRef.current < 300) {
@@ -323,6 +361,9 @@ export const PixiWindow: React.FC<PixiWindowProps> = ({
     velocityTrackerRef.current.push(e.globalX, e.globalY);
 
     let wasSnapped = false; // track snap state to play sound only on first snap
+    let prevMoveX = e.globalX;
+    let prevMoveY = e.globalY;
+    let prevMoveTime = performance.now();
 
     const onMove = (me: PointerEvent) => {
       if (!dragRef.current?.active) return;
@@ -344,6 +385,20 @@ export const PixiWindow: React.FC<PixiWindowProps> = ({
       if (snapResult.snapped && !wasSnapped) playSnap();
       wasSnapped = snapResult.snapped;
       velocityTrackerRef.current.push(me.clientX, me.clientY);
+
+      // Feed wobble physics
+      if (useSettingsStore.getState().wobbleWindows) {
+        const now = performance.now();
+        const moveDt = (now - prevMoveTime) / 1000;
+        if (moveDt > 0.001) {
+          const dragVx = ((me.clientX - prevMoveX) / cam.scale) / moveDt;
+          const dragVy = ((me.clientY - prevMoveY) / cam.scale) / moveDt;
+          wobbleDragUpdate(wobbleRef.current, dragVx, dragVy);
+        }
+        prevMoveX = me.clientX;
+        prevMoveY = me.clientY;
+        prevMoveTime = now;
+      }
     };
 
     const onUp = (me: PointerEvent) => {
@@ -353,6 +408,11 @@ export const PixiWindow: React.FC<PixiWindowProps> = ({
       document.removeEventListener('pointerup', onUp);
       // Clear snap guide lines (triggers 300ms fade-out)
       storeRef.current.setSnapLines([]);
+
+      // Release wobble — spring back to rest
+      if (useSettingsStore.getState().wobbleWindows) {
+        wobbleDragEnd(wobbleRef.current);
+      }
 
       // Compute throw velocity
       velocityTrackerRef.current.push(me.clientX, me.clientY);
@@ -400,7 +460,7 @@ export const PixiWindow: React.FC<PixiWindowProps> = ({
 
     document.addEventListener('pointermove', onMove);
     document.addEventListener('pointerup', onUp);
-  }, [id, bringToFront, setActiveWindowId, getViewportBounds]);
+  }, [id, bringToFront, setActiveWindowId, getViewportBounds, onSelect]);
 
   // ─── Resize ────────────────────────────────────────────────────────────────
 
@@ -500,21 +560,40 @@ export const PixiWindow: React.FC<PixiWindowProps> = ({
     const el = chromeVisualRef.current;
     if (!el) return;
     el.updateCacheTexture();
-  }, [w, h, focused, theme]);
+  }, [w, h, focused, selected, hovered, theme]);
 
   const drawFrame = useCallback((g: GraphicsType) => {
     g.clear();
     g.rect(0, 0, w, h);
     g.fill({ color: 0x12121c, alpha: 0.96 });
-    const borderColor = focused ? theme.accent.color : theme.border.color;
-    const borderAlpha = focused ? 0.8 : 0.4;
+    // Border: focused > selected > hovered > normal
+    let borderColor: number;
+    let borderAlpha: number;
+    let borderWidth: number;
+    if (focused) {
+      borderColor = theme.accent.color;
+      borderAlpha = 0.9;
+      borderWidth = 2;
+    } else if (selected) {
+      borderColor = 0x4a9eff; // bright blue selection
+      borderAlpha = 0.8;
+      borderWidth = 2;
+    } else if (hovered) {
+      borderColor = theme.accent.color;
+      borderAlpha = 0.45;
+      borderWidth = 1;
+    } else {
+      borderColor = theme.border.color;
+      borderAlpha = 0.4;
+      borderWidth = 1;
+    }
     g.rect(0, 0, w, h);
-    g.stroke({ color: borderColor, alpha: borderAlpha, width: 1 });
+    g.stroke({ color: borderColor, alpha: borderAlpha, width: borderWidth });
     g.rect(0, 0, w, TITLE_H);
-    g.fill({ color: focused ? 0x1c1c30 : 0x16161f });
+    g.fill({ color: focused ? 0x1c1c30 : selected ? 0x1a1a2e : 0x16161f });
     g.rect(0, TITLE_H - 1, w, 1);
     g.fill({ color: theme.border.color, alpha: 0.5 });
-  }, [w, h, focused, theme]);
+  }, [w, h, focused, selected, hovered, theme]);
 
   const drawMinimizedFrame = useCallback((g: GraphicsType) => {
     g.clear();
@@ -604,6 +683,8 @@ export const PixiWindow: React.FC<PixiWindowProps> = ({
       y={winState.y}
       eventMode="static"
       onPointerDown={handlePointerDownWindow}
+      onPointerEnter={() => setHovered(true)}
+      onPointerLeave={() => setHovered(false)}
     >
       {/* Chrome visuals — cached as texture. Only redrawn on resize/focus/theme. */}
       <pixiContainer

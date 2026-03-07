@@ -47,6 +47,7 @@ export interface GmSkinControlDef {
   isToggle?: boolean;
   valueOn?: number;
   pageId?: string; // which tab page this control belongs to
+  tabButton?: number; // if this is a tab button, which tab index it activates
   style: Record<string, string>;
   text?: string;
   src?: string;
@@ -146,7 +147,7 @@ export function parseRml(rmlContent: string): {
         type: 'knob',
         id: attrs['id'] ?? '',
         param: attrs['param'],
-        knobStyle: attrs['class']?.includes('knob2') ? 'knob_2' : 'knob_1',
+        knobStyle: attrs['class']?.includes('knob1') ? 'knob_2' : 'knob_1',
         pageId: currentPageId,
         style: parseInlineStyle(attrs['style'] ?? ''),
       });
@@ -163,6 +164,7 @@ export function parseRml(rmlContent: string): {
         buttonStyle: extractButtonStyle(attrs['class'] ?? ''),
         isToggle: attrs['isToggle'] === '1',
         valueOn: attrs['valueOn'] ? parseInt(attrs['valueOn']) : undefined,
+        tabButton: attrs['tabbutton'] !== undefined ? parseInt(attrs['tabbutton']) : undefined,
         pageId: currentPageId,
         style: parseInlineStyle(attrs['style'] ?? ''),
       });

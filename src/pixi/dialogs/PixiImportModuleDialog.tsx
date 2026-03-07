@@ -30,6 +30,7 @@ import { isUADEFormat } from '@/lib/import/formats/UADEParser';
 import { getNativeFormatMetadata } from '@/lib/import/NativeFormatMetadata';
 import { useSettingsStore, type FormatEnginePreferences } from '@/stores/useSettingsStore';
 import { detectFormat, getLibopenmptPlayableKeys, type FormatDefinition } from '@/lib/import/FormatRegistry';
+import { getFormatCapabilities, type FormatCapabilityInfo } from '@/lib/import/FormatCapabilities';
 import type { UADEMetadata } from '@/engine/uade/UADEEngine';
 import { computeSongDBHash, lookupSongDB, type SongDBResult } from '@/lib/songdb';
 import { parseSIDHeader, type SIDHeaderInfo } from '@/lib/sid/SIDHeaderParser';
@@ -132,6 +133,14 @@ export const PixiImportModuleDialog: React.FC<PixiImportModuleDialogProps> = ({
     nativeFmt !== null &&
     MULTI_FILE_FORMAT_KEYS.has(nativeFmt.key) &&
     activeCompanions.length === 0;
+
+  const formatCapabilities: FormatCapabilityInfo | null = moduleInfo
+    ? getFormatCapabilities(
+        uadeMetadata ? (uadeMetadata.formatName || 'UADE') : moduleInfo.metadata.type,
+        loadedFileName,
+        nativeFmt?.family,
+      )
+    : null;
 
   // ── File loading (matches DOM logic) ─────────────────────────────────────
 
@@ -543,6 +552,25 @@ export const PixiImportModuleDialog: React.FC<PixiImportModuleDialogProps> = ({
                 {songDBInfo.format && !uadeMetadata && (
                   <MetaRow label="Format" value={songDBInfo.format} />
                 )}
+              </layoutContainer>
+            )}
+
+            {/* Format capability warnings */}
+            {formatCapabilities && !formatCapabilities.isEditable && (
+              <layoutContainer layout={{ flexDirection: 'row', gap: 6, padding: 8, borderRadius: 4, borderWidth: 1, borderColor: 0xcc4444, backgroundColor: blendColor(theme.bg.color, 0xcc4444, 0.1), width: CONTENT_W, marginTop: 4 }}>
+                <PixiLabel text="Playback only — not editable. This format cannot be edited in the pattern editor." size="xs" color="custom" customColor={0xcc6666} layout={{ maxWidth: CONTENT_W - 24 }} />
+              </layoutContainer>
+            )}
+
+            {formatCapabilities && formatCapabilities.isEditable && !formatCapabilities.isNativeExportable && (
+              <layoutContainer layout={{ flexDirection: 'row', gap: 6, padding: 8, borderRadius: 4, borderWidth: 1, borderColor: 0xcc8800, backgroundColor: blendColor(theme.bg.color, 0xcc8800, 0.1), width: CONTENT_W, marginTop: 4 }}>
+                <PixiLabel text="No native export. This format can be edited but only saved as a DEViLBOX project (.dbx)." size="xs" color="custom" customColor={0xcc9944} layout={{ maxWidth: CONTENT_W - 24 }} />
+              </layoutContainer>
+            )}
+
+            {formatCapabilities && formatCapabilities.isEditable && formatCapabilities.isNativeExportable && (
+              <layoutContainer layout={{ flexDirection: 'row', gap: 6, padding: 8, borderRadius: 4, borderWidth: 1, borderColor: 0x44aa44, backgroundColor: blendColor(theme.bg.color, 0x44aa44, 0.1), width: CONTENT_W, marginTop: 4 }}>
+                <PixiLabel text="Editable and exportable. Pattern edits will play back via libopenmpt and can be saved to MOD/XM/IT/S3M." size="xs" color="custom" customColor={0x66cc66} layout={{ maxWidth: CONTENT_W - 24 }} />
               </layoutContainer>
             )}
 

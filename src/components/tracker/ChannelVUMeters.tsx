@@ -9,7 +9,7 @@
  */
 
 import React, { useEffect, useRef, memo } from 'react';
-import { useTrackerStore } from '@stores';
+import { useTrackerStore, useSettingsStore } from '@stores';
 import { useShallow } from 'zustand/react/shallow';
 import { getToneEngine } from '@engine/ToneEngine';
 import { useTransportStore } from '@stores/useTransportStore';
@@ -131,6 +131,8 @@ export const ChannelVUMeters: React.FC<ChannelVUMetersProps> = memo(({ channelOf
         for (let j = 0; j < old.length; j++) lastGensRef.current[j] = old[j];
       }
 
+      const isRealtime = useSettingsStore.getState().vuMeterMode === 'realtime';
+
       for (let i = 0; i < nc; i++) {
         const meter = meterStates.current[i];
         if (!meter) continue;
@@ -138,26 +140,36 @@ export const ChannelVUMeters: React.FC<ChannelVUMetersProps> = memo(({ channelOf
         // Skip collapsed channels
         if (widths[i] && widths[i] < 20) continue;
 
-        // Detect NEW trigger by comparing generation counter
-        const isNewTrigger = triggerGens[i] !== lastGensRef.current[i];
         const staggerOffset = i * 0.012;
 
-        // Update level - instant jump on NEW trigger, smooth decay otherwise
         // When playback is stopped, kill meters instantly (no lingering bounce)
         if (!useTransportStore.getState().isPlaying) {
           meter.level = 0;
-        } else if (isNewTrigger && triggerLevels[i] > 0) {
-          meter.level = triggerLevels[i];
-          lastGensRef.current[i] = triggerGens[i];
+        } else if (isRealtime) {
+          // Realtime mode: always use latest level, smooth toward it
+          const target = triggerLevels[i] || 0;
+          if (target > meter.level) {
+            meter.level = target; // instant attack
+          } else {
+            meter.level = meter.level * (DECAY_RATE - staggerOffset);
+            if (meter.level < 0.01) meter.level = 0;
+          }
         } else {
-          const decayRate = DECAY_RATE - staggerOffset;
-          meter.level = meter.level * decayRate;
-          if (meter.level < 0.01) meter.level = 0;
+          // Trigger mode: only jump on NEW trigger (generation-gated)
+          const isNewTrigger = triggerGens[i] !== lastGensRef.current[i];
+          if (isNewTrigger && triggerLevels[i] > 0) {
+            meter.level = triggerLevels[i];
+            lastGensRef.current[i] = triggerGens[i];
+          } else {
+            const decayRate = DECAY_RATE - staggerOffset;
+            meter.level = meter.level * decayRate;
+            if (meter.level < 0.01) meter.level = 0;
+          }
         }
 
         // Swing position — global time-based sine wave with per-channel phase offset.
-        // All channels share one clock so they move as a synced staggered wave.
-        const swingPos = meter.level > 0.02
+        const swingEnabled = useSettingsStore.getState().vuMeterSwing;
+        const swingPos = swingEnabled && meter.level > 0.02
           ? Math.sin(performance.now() * SWING_FREQ + i * SWING_PHASE_STEP) * SWING_RANGE
           : 0;
 

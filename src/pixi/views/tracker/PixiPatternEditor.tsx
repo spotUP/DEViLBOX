@@ -372,7 +372,7 @@ function generateLabels(p: RenderParams, vStart: number, currentRow: number): La
       const noteColor = cell.note === 97
         ? p.theme.cellEffect.color
         : (cell.note > 0 && cell.note < 97)
-          ? (isCurrentRow ? 0xffffff : p.theme.cellNote.color)
+          ? (isCurrentRow ? p.theme.currentRowText.color : p.theme.cellNote.color)
           : p.theme.cellEmpty.color;
       if (noteText !== '---' || !p.blankEmpty) {
         labels.push({ x: baseX, y, text: noteText, color: noteColor, fontFamily: PIXI_FONTS.MONO, alpha: isGhost ? 0.35 : undefined });

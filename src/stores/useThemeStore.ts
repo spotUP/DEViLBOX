@@ -48,6 +48,11 @@ export interface ThemeColors {
   cellAccent: string;
   cellSlide: string;
   cellEmpty: string;
+
+  // Playback / UI chrome
+  playbackCursor: string;   // Playback position line (default: cyan)
+  currentRowText: string;   // Text color on the active playback row
+  panelShadow: string;      // FT2 panel inset shadow
 }
 
 export interface Theme {
@@ -90,6 +95,9 @@ const neoDarkTheme: Theme = {
     cellAccent: '#00d4aa',
     cellSlide: '#a78bfa',
     cellEmpty: '#404048',
+    playbackCursor: '#00ffff',
+    currentRowText: '#ffffff',
+    panelShadow: '#282830',
   },
 };
 
@@ -140,6 +148,9 @@ const cyanLineartTheme: Theme = {
     cellAccent: '#00ffff',    // Accent bright
     cellSlide: '#00a0a0',     // Slide dimmer
     cellEmpty: '#003838',     // Empty very dim
+    playbackCursor: '#00ffff',
+    currentRowText: '#ffffff',
+    panelShadow: '#021010',
   },
 };
 
@@ -177,6 +188,9 @@ const devilboxTheme: Theme = {
     cellAccent: '#ef4444',
     cellSlide: '#fb7185',
     cellEmpty: '#484040',
+    playbackCursor: '#ef4444',
+    currentRowText: '#ffffff',
+    panelShadow: '#1a0808',
   },
 };
 
@@ -227,15 +241,116 @@ const modernTheme: Theme = {
     cellAccent: '#fbbf24',
     cellSlide: '#a0a0a0',
     cellEmpty: '#404040',
+    playbackCursor: '#f59e0b',
+    currentRowText: '#ffffff',
+    panelShadow: '#111111',
   },
 };
 
-export const themes: Theme[] = [devilboxTheme, neoDarkTheme, cyanLineartTheme, modernTheme];
+// Built-in themes (immutable)
+const builtinThemes: Theme[] = [devilboxTheme, neoDarkTheme, cyanLineartTheme, modernTheme];
+
+// Placeholder custom theme (uses NeoDark colors until user customizes)
+const defaultCustomTheme: Theme = { id: 'custom', name: 'Custom', colors: { ...neoDarkTheme.colors } };
+
+// Exported themes list — always includes Custom
+export let themes: Theme[] = [...builtinThemes, defaultCustomTheme];
+
+/** Rebuild the exported themes array when custom theme changes */
+function rebuildThemesList(customColors: ThemeColors | null) {
+  const customTheme: Theme = { id: 'custom', name: 'Custom', colors: customColors || { ...neoDarkTheme.colors } };
+  themes = [...builtinThemes, customTheme];
+}
+
+/** Default custom theme — clone of NeoDark as starting point */
+export function getDefaultCustomColors(): ThemeColors {
+  return { ...neoDarkTheme.colors };
+}
+
+/** Labels for each ThemeColors token, grouped for UI display */
+export const THEME_TOKEN_GROUPS: { label: string; tokens: { key: keyof ThemeColors; label: string }[] }[] = [
+  {
+    label: 'Backgrounds',
+    tokens: [
+      { key: 'bg', label: 'Primary' },
+      { key: 'bgSecondary', label: 'Secondary' },
+      { key: 'bgTertiary', label: 'Tertiary' },
+      { key: 'bgHover', label: 'Hover' },
+      { key: 'bgActive', label: 'Active' },
+    ],
+  },
+  {
+    label: 'Borders',
+    tokens: [
+      { key: 'border', label: 'Border' },
+      { key: 'borderLight', label: 'Border Light' },
+    ],
+  },
+  {
+    label: 'Accent',
+    tokens: [
+      { key: 'accent', label: 'Primary' },
+      { key: 'accentSecondary', label: 'Secondary' },
+      { key: 'accentGlow', label: 'Glow' },
+    ],
+  },
+  {
+    label: 'Text',
+    tokens: [
+      { key: 'text', label: 'Primary' },
+      { key: 'textSecondary', label: 'Secondary' },
+      { key: 'textMuted', label: 'Muted' },
+      { key: 'textInverse', label: 'Inverse' },
+    ],
+  },
+  {
+    label: 'Status',
+    tokens: [
+      { key: 'error', label: 'Error' },
+      { key: 'success', label: 'Success' },
+      { key: 'warning', label: 'Warning' },
+    ],
+  },
+  {
+    label: 'Tracker Rows',
+    tokens: [
+      { key: 'trackerRowEven', label: 'Even' },
+      { key: 'trackerRowOdd', label: 'Odd' },
+      { key: 'trackerRowHighlight', label: 'Highlight' },
+      { key: 'trackerRowCurrent', label: 'Current' },
+      { key: 'trackerRowCursor', label: 'Cursor' },
+    ],
+  },
+  {
+    label: 'Cell Colors',
+    tokens: [
+      { key: 'cellNote', label: 'Note' },
+      { key: 'cellInstrument', label: 'Instrument' },
+      { key: 'cellVolume', label: 'Volume' },
+      { key: 'cellEffect', label: 'Effect' },
+      { key: 'cellAccent', label: 'Accent' },
+      { key: 'cellSlide', label: 'Slide' },
+      { key: 'cellEmpty', label: 'Empty' },
+    ],
+  },
+  {
+    label: 'Playback / Chrome',
+    tokens: [
+      { key: 'playbackCursor', label: 'Playback Cursor' },
+      { key: 'currentRowText', label: 'Current Row Text' },
+      { key: 'panelShadow', label: 'Panel Shadow' },
+    ],
+  },
+];
 
 interface ThemeStore {
   currentThemeId: string;
+  customThemeColors: ThemeColors | null;
   setTheme: (themeId: string) => void;
   getCurrentTheme: () => Theme;
+  setCustomColor: (key: keyof ThemeColors, value: string) => void;
+  resetCustomTheme: () => void;
+  copyThemeToCustom: (themeId: string) => void;
 }
 
 // Apply theme to CSS variables
@@ -275,14 +390,29 @@ const applyTheme = (theme: Theme) => {
   root.style.setProperty('--color-cell-accent', colors.cellAccent);
   root.style.setProperty('--color-cell-slide', colors.cellSlide);
   root.style.setProperty('--color-cell-empty', colors.cellEmpty);
+  root.style.setProperty('--color-tracker-cursor', colors.playbackCursor);
+  root.style.setProperty('--ft2-shadow', colors.panelShadow);
 };
 
 export const useThemeStore = create<ThemeStore>()(
   persist(
     (set, get) => ({
       currentThemeId: 'devilbox', // DEViLBOX is the default
+      customThemeColors: null,
 
       setTheme: (themeId: string) => {
+        if (themeId === 'custom') {
+          // Initialize custom colors if not yet created
+          const { customThemeColors } = get();
+          if (!customThemeColors) {
+            const colors = getDefaultCustomColors();
+            rebuildThemesList(colors);
+            set({ customThemeColors: colors, currentThemeId: 'custom' });
+            const customTheme = themes.find(t => t.id === 'custom');
+            if (customTheme) applyTheme(customTheme);
+            return;
+          }
+        }
         const theme = themes.find(t => t.id === themeId);
         if (theme) {
           applyTheme(theme);
@@ -294,10 +424,48 @@ export const useThemeStore = create<ThemeStore>()(
         const { currentThemeId } = get();
         return themes.find(t => t.id === currentThemeId) || devilboxTheme;
       },
+
+      setCustomColor: (key: keyof ThemeColors, value: string) => {
+        const { customThemeColors, currentThemeId } = get();
+        const colors = customThemeColors ? { ...customThemeColors } : getDefaultCustomColors();
+        colors[key] = value;
+        rebuildThemesList(colors);
+        set({ customThemeColors: colors });
+        // Live-update if currently viewing custom theme
+        if (currentThemeId === 'custom') {
+          const customTheme = themes.find(t => t.id === 'custom');
+          if (customTheme) applyTheme(customTheme);
+        }
+      },
+
+      resetCustomTheme: () => {
+        const colors = getDefaultCustomColors();
+        rebuildThemesList(colors);
+        set({ customThemeColors: colors });
+        const { currentThemeId } = get();
+        if (currentThemeId === 'custom') {
+          const customTheme = themes.find(t => t.id === 'custom');
+          if (customTheme) applyTheme(customTheme);
+        }
+      },
+
+      copyThemeToCustom: (themeId: string) => {
+        const source = builtinThemes.find(t => t.id === themeId);
+        if (!source) return;
+        const colors = { ...source.colors };
+        rebuildThemesList(colors);
+        set({ customThemeColors: colors, currentThemeId: 'custom' });
+        const customTheme = themes.find(t => t.id === 'custom');
+        if (customTheme) applyTheme(customTheme);
+      },
     }),
     {
       name: 'devilbox-theme',
       onRehydrateStorage: () => (state) => {
+        // Rebuild themes list from persisted custom colors
+        if (state?.customThemeColors) {
+          rebuildThemesList(state.customThemeColors);
+        }
         // Apply theme after rehydration
         if (state) {
           const theme = themes.find(t => t.id === state.currentThemeId) || devilboxTheme;
@@ -312,14 +480,17 @@ export const useThemeStore = create<ThemeStore>()(
 if (typeof window !== 'undefined') {
   const stored = localStorage.getItem('devilbox-theme');
   let themeId = 'devilbox';
+  let customColors: ThemeColors | null = null;
   if (stored) {
     try {
       const parsed = JSON.parse(stored);
       themeId = parsed.state?.currentThemeId || 'devilbox';
+      customColors = parsed.state?.customThemeColors || null;
     } catch {
       // Use default
     }
   }
+  if (customColors) rebuildThemesList(customColors);
   const theme = themes.find(t => t.id === themeId) || devilboxTheme;
   applyTheme(theme);
 }

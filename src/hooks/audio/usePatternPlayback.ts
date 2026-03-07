@@ -26,7 +26,7 @@ export const usePatternPlayback = () => {
     currentPositionIndex: s.currentPositionIndex,
     setCurrentPosition: s.setCurrentPosition,
     })));
-  const { channelTrackTables, channelSpeeds, channelGrooves, hivelyNative, hivelyFileData, hivelyMeta, musiclineFileData, c64SidFileData, jamCrackerFileData, futurePlayerFileData, preTrackerFileData, maFileData, hippelFileData, sonixFileData, pxtoneFileData, organyaFileData, eupFileData, ixsFileData, psycleFileData, sc68FileData, zxtuneFileData, furnaceNative, furnaceActiveSubsong } = useFormatStore(useShallow((s) => ({
+  const { channelTrackTables, channelSpeeds, channelGrooves, hivelyNative, hivelyFileData, hivelyMeta, musiclineFileData, c64SidFileData, jamCrackerFileData, futurePlayerFileData, preTrackerFileData, maFileData, hippelFileData, sonixFileData, pxtoneFileData, organyaFileData, eupFileData, ixsFileData, psycleFileData, sc68FileData, zxtuneFileData, libopenmptFileData, furnaceNative, furnaceActiveSubsong } = useFormatStore(useShallow((s) => ({
     channelTrackTables: s.channelTrackTables,
     channelSpeeds: s.channelSpeeds,
     channelGrooves: s.channelGrooves,
@@ -48,6 +48,7 @@ export const usePatternPlayback = () => {
     psycleFileData: s.psycleFileData,
     sc68FileData: s.sc68FileData,
     zxtuneFileData: s.zxtuneFileData,
+    libopenmptFileData: s.libopenmptFileData,
     furnaceNative: s.furnaceNative,
     furnaceActiveSubsong: s.furnaceActiveSubsong,
   })));
@@ -360,6 +361,7 @@ export const usePatternPlayback = () => {
           psycleFileData: psycleFileData ?? undefined,
           sc68FileData: sc68FileData ?? undefined,
           zxtuneFileData: zxtuneFileData ?? undefined,
+          libopenmptFileData: libopenmptFileData ?? undefined,
           // Furnace-specific timing data (only set for .fur imports)
           speed2: furnaceData?.speed2,
           hz: furnaceData?.hz,
@@ -372,10 +374,33 @@ export const usePatternPlayback = () => {
           furnaceActiveSubsong: furnaceActiveSubsong ?? undefined,
         });
 
-        // Apply Furnace compat flags to the dispatch engine (if this is a .fur song)
-        if (furnaceData?.compatFlags && Object.keys(furnaceData.compatFlags).length > 0) {
+        // Apply Furnace compat flags, chip flags, and tuning to the dispatch engine
+        const hasCompatFlags = furnaceData?.compatFlags && Object.keys(furnaceData.compatFlags).length > 0;
+        const hasChipFlags = furnaceData?.chipFlags && furnaceData.chipFlags.some(f => f && f.length > 0);
+        const hasTuning = furnaceData?.tuning !== undefined;
+        if (hasCompatFlags || hasChipFlags || hasTuning) {
           import('@engine/furnace-dispatch/FurnaceDispatchEngine').then(({ FurnaceDispatchEngine }) => {
-            FurnaceDispatchEngine.getInstance().setCompatFlags(furnaceData.compatFlags as any);
+            const engine = FurnaceDispatchEngine.getInstance();
+
+            if (hasCompatFlags) {
+              engine.setCompatFlags(furnaceData!.compatFlags as any);
+            }
+
+            // Apply per-chip flags (clock selection, chip model, etc.)
+            if (hasChipFlags) {
+              for (let i = 0; i < furnaceData!.chipFlags!.length; i++) {
+                const flagStr = furnaceData!.chipFlags![i];
+                if (flagStr && flagStr.length > 0) {
+                  const chipId = furnaceNative?.chipIds?.[i];
+                  engine.setChipFlags(flagStr, chipId);
+                }
+              }
+            }
+
+            // Apply tuning (A-4 frequency)
+            if (hasTuning) {
+              engine.setTuning(furnaceData!.tuning!);
+            }
           });
         }
 
