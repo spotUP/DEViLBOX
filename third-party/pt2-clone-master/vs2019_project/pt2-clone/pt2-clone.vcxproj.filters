@@ -1,0 +1,291 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="gfx">
+      <UniqueIdentifier>{f7b38265-f2ea-42ed-b3ac-34f72cedbbe1}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="headers">
+      <UniqueIdentifier>{d92546b9-e457-49e3-83c0-5826b29679ee}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="modloaders">
+      <UniqueIdentifier>{4edd2c33-3edd-4892-ad94-f40d3fadc82a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="smploaders">
+      <UniqueIdentifier>{962f7c81-1341-453b-a297-c8364806f7f6}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="libflac">
+      <UniqueIdentifier>{5d2aea95-3dd5-40ab-8051-220433bcd953}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\src\pt2_audio.h">
+      <Filter>headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\pt2_blep.h">
+      <Filter>headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\pt2_config.h">
+      <Filter>headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\pt2_diskop.h">
+      <Filter>headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\pt2_edit.h">
+      <Filter>headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\pt2_header.h">
+      <Filter>headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\pt2_helpers.h">
+      <Filter>headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\pt2_keyboard.h">
+      <Filter>headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\pt2_mouse.h">
+      <Filter>headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\pt2_palette.h">
+      <Filter>headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\pt2_sampler.h">
+      <Filter>headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\pt2_scopes.h">
+      <Filter>headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\pt2_tables.h">
+      <Filter>headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\pt2_textout.h">
+      <Filter>headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\pt2_unicode.h">
+      <Filter>headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\pt2_visuals.h">
+      <Filter>headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\pt2_mod2wav.h">
+      <Filter>headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\pt2_pat2smp.h">
+      <Filter>headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\pt2_structs.h">
+      <Filter>headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\pt2_bmp.h">
+      <Filter>headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\pt2_sample_loader.h">
+      <Filter>headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\pt2_sample_saver.h">
+      <Filter>headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\pt2_module_loader.h">
+      <Filter>headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\pt2_pattern_viewer.h">
+      <Filter>headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\pt2_module_saver.h">
+      <Filter>headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\pt2_sampling.h">
+      <Filter>headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\pt2_visuals_sync.h">
+      <Filter>headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\pt2_rcfilters.h">
+      <Filter>headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\pt2_chordmaker.h">
+      <Filter>headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\pt2_downsample2x.h">
+      <Filter>headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\pt2_hpc.h">
+      <Filter>headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\pt2_askbox.h">
+      <Filter>headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\pt2_replayer.h">
+      <Filter>headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\pt2_paula.h">
+      <Filter>headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\modloaders\pt2_pp_unpack.h">
+      <Filter>modloaders</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\modloaders\pt2_xpk_unpack.h">
+      <Filter>modloaders</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\modloaders\pt2_load_mod31.h">
+      <Filter>modloaders</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\modloaders\pt2_load_mod15.h">
+      <Filter>modloaders</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\pt2_posed.h">
+      <Filter>headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\pt2_textedit.h">
+      <Filter>headers</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\src\pt2_audio.c" />
+    <ClCompile Include="..\..\src\pt2_blep.c" />
+    <ClCompile Include="..\..\src\pt2_config.c" />
+    <ClCompile Include="..\..\src\pt2_diskop.c" />
+    <ClCompile Include="..\..\src\pt2_edit.c" />
+    <ClCompile Include="..\..\src\pt2_helpers.c" />
+    <ClCompile Include="..\..\src\pt2_keyboard.c" />
+    <ClCompile Include="..\..\src\pt2_main.c" />
+    <ClCompile Include="..\..\src\pt2_mouse.c" />
+    <ClCompile Include="..\..\src\pt2_palette.c" />
+    <ClCompile Include="..\..\src\pt2_sampler.c" />
+    <ClCompile Include="..\..\src\pt2_scopes.c" />
+    <ClCompile Include="..\..\src\pt2_tables.c" />
+    <ClCompile Include="..\..\src\pt2_textout.c" />
+    <ClCompile Include="..\..\src\pt2_unicode.c" />
+    <ClCompile Include="..\..\src\pt2_visuals.c" />
+    <ClCompile Include="..\..\src\gfx\pt2_gfx_aboutscreen.c">
+      <Filter>gfx</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\gfx\pt2_gfx_diskop.c">
+      <Filter>gfx</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\gfx\pt2_gfx_editop.c">
+      <Filter>gfx</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\gfx\pt2_gfx_font.c">
+      <Filter>gfx</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\gfx\pt2_gfx_icon.c">
+      <Filter>gfx</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\gfx\pt2_gfx_loop_pins.c">
+      <Filter>gfx</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\gfx\pt2_gfx_mute_buttons.c">
+      <Filter>gfx</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\gfx\pt2_gfx_patcursor.c">
+      <Filter>gfx</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\gfx\pt2_gfx_pointer.c">
+      <Filter>gfx</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\gfx\pt2_gfx_posed.c">
+      <Filter>gfx</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\gfx\pt2_gfx_sampler.c">
+      <Filter>gfx</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\gfx\pt2_gfx_spectrum.c">
+      <Filter>gfx</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\gfx\pt2_gfx_tracker.c">
+      <Filter>gfx</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\gfx\pt2_gfx_vumeter.c">
+      <Filter>gfx</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\pt2_mod2wav.c" />
+    <ClCompile Include="..\..\src\pt2_pat2smp.c" />
+    <ClCompile Include="..\..\src\pt2_structs.c" />
+    <ClCompile Include="..\..\src\pt2_bmp.c" />
+    <ClCompile Include="..\..\src\pt2_sample_saver.c" />
+    <ClCompile Include="..\..\src\pt2_sample_loader.c" />
+    <ClCompile Include="..\..\src\pt2_module_loader.c" />
+    <ClCompile Include="..\..\src\pt2_pattern_viewer.c" />
+    <ClCompile Include="..\..\src\pt2_module_saver.c" />
+    <ClCompile Include="..\..\src\pt2_replayer.c" />
+    <ClCompile Include="..\..\src\pt2_sampling.c" />
+    <ClCompile Include="..\..\src\pt2_visuals_sync.c" />
+    <ClCompile Include="..\..\src\pt2_rcfilters.c" />
+    <ClCompile Include="..\..\src\pt2_chordmaker.c" />
+    <ClCompile Include="..\..\src\pt2_downsample2x.c" />
+    <ClCompile Include="..\..\src\pt2_hpc.c" />
+    <ClCompile Include="..\..\src\pt2_askbox.c" />
+    <ClCompile Include="..\..\src\pt2_paula.c" />
+    <ClCompile Include="..\..\src\modloaders\pt2_pp_unpack.c">
+      <Filter>modloaders</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\modloaders\pt2_xpk_unpack.c">
+      <Filter>modloaders</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\modloaders\pt2_load_mod15.c">
+      <Filter>modloaders</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\modloaders\pt2_load_mod31.c">
+      <Filter>modloaders</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\smploaders\pt2_load_iff.c">
+      <Filter>smploaders</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\smploaders\pt2_load_raw.c">
+      <Filter>smploaders</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\smploaders\pt2_load_aiff.c">
+      <Filter>smploaders</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\smploaders\pt2_load_wav.c">
+      <Filter>smploaders</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\smploaders\pt2_load_flac.c">
+      <Filter>smploaders</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\libflac\bitmath.c">
+      <Filter>libflac</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\libflac\bitreader.c">
+      <Filter>libflac</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\libflac\crc.c">
+      <Filter>libflac</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\libflac\fixed.c">
+      <Filter>libflac</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\libflac\format.c">
+      <Filter>libflac</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\libflac\lpc.c">
+      <Filter>libflac</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\libflac\md5.c">
+      <Filter>libflac</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\libflac\memory.c">
+      <Filter>libflac</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\libflac\metadata_iterators.c">
+      <Filter>libflac</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\libflac\metadata_object.c">
+      <Filter>libflac</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\libflac\stream_decoder.c">
+      <Filter>libflac</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\libflac\window.c">
+      <Filter>libflac</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\libflac\windows_unicode_filenames.c">
+      <Filter>libflac</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\pt2_posed.c" />
+    <ClCompile Include="..\..\src\pt2_textedit.c" />
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="..\..\src\pt2-clone.rc" />
+  </ItemGroup>
+</Project>

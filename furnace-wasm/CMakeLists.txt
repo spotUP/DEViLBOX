@@ -10,7 +10,7 @@ if(NOT EMSCRIPTEN)
 endif()
 
 # Furnace source tree location
-set(FURNACE_ROOT "${CMAKE_SOURCE_DIR}/../Reference Code/furnace-master")
+set(FURNACE_ROOT "${CMAKE_SOURCE_DIR}/../third-party/furnace-master")
 set(FURNACE_SRC "${FURNACE_ROOT}/src")
 set(FURNACE_ENGINE "${FURNACE_SRC}/engine")
 set(FURNACE_PLATFORM "${FURNACE_ENGINE}/platform")

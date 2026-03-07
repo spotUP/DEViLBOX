@@ -1,0 +1,259 @@
+trigger:
+- master
+- devel
+- cmake_azure
+  
+jobs:
+
+- job: Build
+  timeoutInMinutes: 120
+  strategy:
+    matrix:
+      Windows:
+        imageName: 'windows-2019'
+        isWindows: True
+      Mac:
+        imageName: 'macOS-latest'
+        isMac: True
+      Linux:
+        imageName: 'ubuntu-22.04'
+        isLinux: True
+
+  pool:
+    vmImage: '$(imageName)'
+
+  steps:
+
+  - bash: |
+      git submodule update --init --recursive
+    displayName: "Git Submodules"
+
+#! ██     ██ ██ ███    ██ ██████   ██████  ██     ██ ███████ 
+#! ██     ██ ██ ████   ██ ██   ██ ██    ██ ██     ██ ██      
+#! ██  █  ██ ██ ██ ██  ██ ██   ██ ██    ██ ██  █  ██ ███████ 
+#! ██ ███ ██ ██ ██  ██ ██ ██   ██ ██    ██ ██ ███ ██      ██ 
+#!  ███ ███  ██ ██   ████ ██████   ██████   ███ ███  ███████
+
+  - bash: |
+      nuget install innosetup
+    displayName: 'Windows: Install Prerequisites'
+    condition: variables.isWindows
+
+  - script: |
+      mkdir build
+      cmake -B build -D CMAKE_BUILD_TYPE=Release
+    displayName: 'Windows: CMake'
+    condition: variables.isWindows
+
+  - script: |
+      cmake --build build --config Release
+    displayName: "Windows: Build"
+    condition: variables.isWindows
+
+  - bash: |
+      iscc installers/windows/win_installer.iss
+      cd installers/windows/Output
+      echo ""
+      echo "Results"
+      [[ $(find Odin2.exe -type f -size +30000000c 2>/dev/null) ]] && echo "Windows installer built successfully" || exit 1
+
+      export PROJ_VERSION=$(cat ../../../CMakeLists.txt | grep "VERSION \"" | awk '{print $2}' | tr -d '"')
+      echo "Odin Project Version: $PROJ_VERSION"
+      mv "Odin2.exe" "Odin${PROJ_VERSION}WinInstaller.exe"
+      ls -la
+    displayName: 'Windows: Build Installer'
+    condition: variables.isWindows
+
+  - task: PublishPipelineArtifact@0
+    inputs:
+      artifactName: 'WINDOWS_BUILD'
+      targetPath: 'installers/windows/Output'
+    displayName: 'Windows: Publish Installer'
+    condition: variables.isWindows
+
+#! ███    ███  █████   ██████ 
+#! ████  ████ ██   ██ ██      
+#! ██ ████ ██ ███████ ██      
+#! ██  ██  ██ ██   ██ ██      
+#! ██      ██ ██   ██  ██████
+
+  - script: |
+      function installdmg {
+        set -x
+        tempd=$(mktemp -d)
+        curl $1 > $tempd/pkg.dmg
+        listing=$(hdiutil attach $tempd/pkg.dmg | grep Volumes)
+        volume=$(echo "$listing" | cut -f 3)
+        if [ -e "$volume"/*.app ]; then
+          cp -rf "$volume"/*.app /Applications
+        elif [ -e "$volume"/*.pkg ]; then
+          package=$(ls -1 "$volume" | grep .pkg | head -1)
+          sudo installer -verbose -pkg "$volume"/"$package" -target /
+        fi
+        sudo hdiutil detach "$(echo "$listing" | cut -f 1)"
+        rm -rf $tempd
+        set +x
+      }
+      installdmg http://s.sudre.free.fr/Software/files/Packages.dmg
+      #echo "Download and install Packages packaging tool"
+      #curl http://s.sudre.free.fr/Software/files/Packages.dmg -o Packages.dmg
+      #echo "Install Packages packaging tool"
+      ls -l /usr/local/bin | grep packagesbuild
+
+    displayName: 'Mac: Install Prerequisites'
+    condition: variables.isMac
+
+  - script: |
+      mkdir build
+      cmake -B build -D CMAKE_BUILD_TYPE=Release -D"CMAKE_OSX_ARCHITECTURES=arm64;x86_64"
+      find .
+    displayName: 'Mac: CMake'
+    condition: variables.isMac
+
+  - script: |
+      cmake --build build --config Release
+      find .
+    displayName: "Mac: Build"
+    condition: variables.isMac
+
+  - script: |
+      cd installers/mac
+      /usr/local/bin/packagesbuild Odin2MacInstaller.pkgproj
+      echo ""
+      echo "The final product:"
+      ls -lh build
+      pwd
+
+      [[ $(find build/Odin2MacInstaller.pkg -type f -size +50000000c 2>/dev/null) ]] && echo "Mac Package Built Successfully" || exit 1
+
+      export PROJ_VERSION=$(cat ../../CMakeLists.txt | grep "VERSION \"" | awk '{print $2}' | tr -d '"')
+      echo "Odin Project Version: $PROJ_VERSION"
+      mv "build/Odin2MacInstaller.pkg" "build/Odin${PROJ_VERSION}MacInstaller.pkg"
+
+      ls -la build
+
+    displayName: 'Mac: Package Odin'
+    condition: variables.isMac
+
+  - task: PublishPipelineArtifact@0
+    inputs:
+      artifactName: 'MACOS_BUILD'
+      targetPath: 'installers/mac/build'
+    displayName: 'Mac: Publish Installer'
+    condition: variables.isMac
+
+#! ██      ██ ███    ██ ██    ██ ██   ██ 
+#! ██      ██ ████   ██ ██    ██  ██ ██  
+#! ██      ██ ██ ██  ██ ██    ██   ███   
+#! ██      ██ ██  ██ ██ ██    ██  ██ ██  
+#! ███████ ██ ██   ████  ██████  ██   ██
+
+  - script: |
+      sudo apt-get update
+      sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.0 libcurl4-openssl-dev alsa alsa-tools libasound2-dev libjack-dev libfreetype6-dev libxinerama-dev libxcb-xinerama0 libxinerama1 x11proto-xinerama-dev libxrandr-dev libgl1-mesa-dev libxcursor-dev libxcursor1 libxcb-cursor-dev libxcb-cursor0 xvfb lv2-dev
+      sudo apt-get install -y --fix-missing
+      apt list --installed
+    displayName: 'Linux: Install Prerequisites'
+    condition: variables.isLinux
+
+  - script: |
+      mkdir build
+      cmake -B build -D CMAKE_BUILD_TYPE=Release
+      find .
+    displayName: 'Linux: CMake'
+    condition: variables.isLinux
+
+  - script: |
+      cmake --build build --config Release
+      find .
+    displayName: "Linux: Build"
+    condition: variables.isLinux
+
+  - script: |
+      export PROJECT_VERSION=$(cat CMakeLists.txt | grep "VERSION \"" | awk '{print $2}' | tr -d '"')
+      echo "Odin Project Version: $PROJECT_VERSION"
+      IFS='.' read -ra ADDR <<< "$PROJECT_VERSION"
+      export DEBIAN_PROJECT_STRING="${ADDR[0]}.${ADDR[1]}-${ADDR[2]}"
+      echo "Debian package String: $DEBIAN_PROJECT_STRING"
+      cd installers/linux
+      ./create_installers.sh $DEBIAN_PROJECT_STRING
+      ls -lh | grep Odin
+
+      export DEB_NAME="Odin2-synth_$DEBIAN_PROJECT_STRING.deb"
+      echo "Debian name should be: $DEB_NAME"
+
+      echo "RESULTS:"
+      [[ $(find Odin2_linux_x64.zip -type f -size +50000000c 2>/dev/null) ]] && echo "Generic Zip Built sucessfully!" || exit 1
+      [[ $(find $DEB_NAME -type f -size +50000000c 2>/dev/null) ]] && echo "Debian package built successfully!" || exit 1
+
+      echo "Rename Linux Zip"
+      mkdir build
+      mv Odin* build/
+      echo "Odin Project Version: $PROJECT_VERSION"
+      mv "build/Odin2_linux_x64.zip" "build/Odin${PROJECT_VERSION}Linux.zip"
+      
+    displayName: 'Linux: Build Odin2 Packages'
+    condition: variables.isLinux
+
+  - task: PublishPipelineArtifact@0
+    inputs:
+      artifactName: 'LINUX_BUILD'
+      targetPath: 'installers/linux/build'
+    displayName: 'Linux: Publish Installer'
+    condition: variables.isLinux
+
+#!==============================================================================
+#!==============================================================================
+#!==============================================================================
+#!==============================================================================
+#!==============================================================================
+#!==============================================================================
+#!==============================================================================
+
+
+- job: NightlyDevelUpdate
+  pool:
+    vmImage: 'ubuntu-latest'
+  dependsOn: Build
+  condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/devel'))
+
+  steps:
+  - task: DownloadPipelineArtifact@0
+    inputs:
+      artifactName: 'MACOS_BUILD'
+      targetPath: $(Build.ArtifactStagingDirectory)
+
+  - task: DownloadPipelineArtifact@0
+    inputs:
+      artifactName: 'WINDOWS_BUILD'
+      targetPath: $(Build.ArtifactStagingDirectory)
+
+  - task: DownloadPipelineArtifact@0
+    inputs:
+      artifactName: 'LINUX_BUILD'
+      targetPath: $(Build.ArtifactStagingDirectory)
+
+  - bash: |
+     scripts/nightly-devel-notes.sh > $(Build.ArtifactStagingDirectory)/ReleaseNotes.md
+     ls $(Build.ArtifactStagingDirectory)
+     
+    displayName: Create Release Notes
+
+
+  - task: GitHubRelease@0
+    displayName: "Create New Github Release"
+    inputs:
+      gitHubConnection: TheWaveWardenOdin2AzureConnection2025
+      repositoryName: TheWaveWarden/odin2
+      action: 'edit'
+      tag: NightlyDevel
+      target: '$(Build.SourceVersion)'
+      addChangeLog: false
+      assetUploadMode: 'delete'
+      releaseNotesFile: $(Build.ArtifactStagingDirectory)/ReleaseNotes.md
+      assets: $(Build.ArtifactStagingDirectory)/*.*
+
+
+
+
+
