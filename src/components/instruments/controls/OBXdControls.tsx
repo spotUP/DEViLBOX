@@ -643,7 +643,7 @@ export const OBXdControls: React.FC<OBXdControlsProps> = ({
       </div>
 
       {/* Tab Content */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="synth-controls-flow flex-1 overflow-y-auto">
         {activeTab === 'osc' && renderOscillatorTab()}
         {activeTab === 'filter' && renderFilterTab()}
         {activeTab === 'env' && renderEnvelopeTab()}
