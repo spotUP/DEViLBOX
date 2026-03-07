@@ -19,7 +19,7 @@ const puppeteer = require('puppeteer');
       return;
     console.log('[B]', text);
   });
-  page.on('pageerror', err => console.log('[PAGE ERROR]', err.message));
+  page.on('pageerror', err => console.log('[PAGE ERROR]', err?.message || String(err)));
 
   console.log('Opening test-gearmulator.html...');
   await page.goto('http://localhost:5173/test-gearmulator.html', { waitUntil: 'networkidle0', timeout: 30000 });
