@@ -41,7 +41,8 @@ import { EditorControlsBar } from './EditorControlsBar';
 import { TB303View } from '@components/demo/TB303View';
 import { MobileTrackerView } from './MobileTrackerView';
 import { useResponsive } from '@hooks/useResponsive';
-import { Music2, Activity } from 'lucide-react';
+import { Music2, Activity, ExternalLink, Undo2 } from 'lucide-react';
+import { PopOutWindow } from '@components/ui/PopOutWindow';
 import { InstrumentList } from '@components/instruments/InstrumentList';
 import { getTrackerReplayer, type TrackerSong } from '@engine/TrackerReplayer';
 import { MusicLineTrackTableEditor } from './MusicLineTrackTableEditor';
@@ -138,6 +139,8 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
   const setPendingSunVoxFile = useUIStore((state) => state.setPendingSunVoxFile);
   const dialogOpen = useUIStore((state) => state.dialogOpen);
   const closeDialogCommand = useUIStore((state) => state.closeDialogCommand);
+  const patternEditorPoppedOut = useUIStore((state) => state.patternEditorPoppedOut);
+  const setPatternEditorPoppedOut = useUIStore((state) => state.setPatternEditorPoppedOut);
 
   // Import handlers (extracted to hook)
   const { handleModuleImport, handleTD3Import, handleSunVoxImport } = useModuleImport();
