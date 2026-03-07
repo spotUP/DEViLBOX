@@ -5,7 +5,7 @@
  * compiled to WebAssembly via Emscripten.  Provides bidirectional parameter
  * sync with the host React application through EM_JS callbacks.
  *
- * Layout reference: gui.c from Reference Code/hivelytracker-master/
+ * Layout reference: gui.c from third-party/hivelytracker-master/
  * All Y coordinates are bg_insed-relative (original Y minus 120).
  */
 

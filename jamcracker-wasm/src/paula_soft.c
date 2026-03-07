@@ -17,6 +17,7 @@ typedef struct {
 static PaulaChannel s_ch[PAULA_CHANNELS];
 static float        s_paula_clock = PAULA_CLOCK_PAL;
 static float        s_channel_gain[PAULA_CHANNELS] = {1.0f, 1.0f, 1.0f, 1.0f};
+static float        s_channel_peaks[PAULA_CHANNELS] = {0};
 
 void paula_reset(void) {
     memset(s_ch, 0, sizeof(s_ch));
@@ -110,16 +111,25 @@ static float sample_channel(PaulaChannel* ch) {
 }
 
 int paula_render(float* buffer, int frames) {
-    int i;
+    int i, c;
     for (i = 0; i < frames; i++) {
+        float ch_out[PAULA_CHANNELS];
+        for (c = 0; c < PAULA_CHANNELS; c++) {
+            ch_out[c] = sample_channel(&s_ch[c]) * s_channel_gain[c];
+            float absv = ch_out[c] < 0 ? -ch_out[c] : ch_out[c];
+            if (absv > s_channel_peaks[c]) s_channel_peaks[c] = absv;
+        }
         // Amiga hard panning: ch0,3 -> left; ch1,2 -> right
-        // Per-channel mixer gain applied before stereo sum
-        float left  = sample_channel(&s_ch[0]) * s_channel_gain[0]
-                    + sample_channel(&s_ch[3]) * s_channel_gain[3];
-        float right = sample_channel(&s_ch[1]) * s_channel_gain[1]
-                    + sample_channel(&s_ch[2]) * s_channel_gain[2];
-        buffer[i * 2 + 0] = left  * 0.5f;
-        buffer[i * 2 + 1] = right * 0.5f;
+        buffer[i * 2 + 0] = (ch_out[0] + ch_out[3]) * 0.5f;
+        buffer[i * 2 + 1] = (ch_out[1] + ch_out[2]) * 0.5f;
     }
     return frames;
+}
+
+void paula_get_channel_levels(float* out4) {
+    int c;
+    for (c = 0; c < PAULA_CHANNELS; c++) {
+        out4[c] = s_channel_peaks[c];
+        s_channel_peaks[c] = 0.0f;
+    }
 }

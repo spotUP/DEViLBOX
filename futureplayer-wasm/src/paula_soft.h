@@ -26,3 +26,7 @@ void paula_set_clock(float paula_clock);
 // Render frames of F32 stereo interleaved audio at PAULA_RATE_PAL
 // Returns number of frames written
 int paula_render(float* buffer, int frames);
+
+// Per-channel peak levels (0.0-1.0). Updated during paula_render().
+// Call paula_get_channel_levels() to read and reset peaks.
+void paula_get_channel_levels(float* out4);

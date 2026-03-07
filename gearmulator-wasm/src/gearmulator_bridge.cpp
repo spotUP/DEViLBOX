@@ -13,13 +13,18 @@
  *   5 = Roland JP-8000 (JE-8086)
  */
 
+#include <algorithm>
+#include <atomic>
 #include <cstdint>
 #include <cstring>
+#include <iostream>
+#include <thread>
 #include <vector>
 #include <memory>
 
 #include "synthLib/device.h"
 #include "synthLib/deviceTypes.h"
+#include "synthLib/deviceException.h"
 #include "synthLib/audioTypes.h"
 #include "synthLib/midiTypes.h"
 #include "dsp56kEmu/audio.h"
@@ -39,6 +44,9 @@
 #endif
 #ifndef GM_NO_JP8000
 #include "ronaldo/je8086/jeLib/device.h"
+#ifdef __EMSCRIPTEN__
+namespace jeLib { extern std::vector<uint8_t> g_cachedRam; }
+#endif
 #endif
 
 #ifdef __EMSCRIPTEN__
@@ -72,10 +80,77 @@ struct GmDevice
 
 static std::vector<std::unique_ptr<GmDevice>> g_devices;
 
+// ─── ROM pre-processing helpers ─────────────────────────────────────────────
+
+/**
+ * Byte-swap 16-bit words in ROM data.
+ * Some EPROM dumps store data in big-endian 16-bit words, but the microQ
+ * firmware expects little-endian byte order (e.g., "2.23" at offset 0).
+ */
+static void byteSwap16(std::vector<uint8_t>& data)
+{
+    for (size_t i = 0; i + 1 < data.size(); i += 2)
+        std::swap(data[i], data[i + 1]);
+}
+
+/**
+ * Pre-process microQ ROM: detect byte-swapped EPROM dumps.
+ * A valid microQ ROM starts with "2.23" (ASCII). Byte-swapped dumps
+ * start with ".232" instead — swap 16-bit words to fix.
+ */
+static void preprocessMicroQRom(std::vector<uint8_t>& romData)
+{
+    if (romData.size() < 4)
+        return;
+    // Already valid? ("2.23" at offset 0)
+    if (romData[0] == '2' && romData[1] == '.' && romData[2] == '2' && romData[3] == '3')
+        return;
+    // Byte-swapped? (".232" at offset 0 → swap to get "2.23")
+    if (romData[0] == '.' && romData[1] == '2' && romData[2] == '3' && romData[3] == '2')
+    {
+        std::cerr << "gm_create: microQ ROM is byte-swapped, fixing...\n";
+        byteSwap16(romData);
+    }
+}
+
+/**
+ * Pre-process Nord Lead 2x ROM: fix case mismatch in firmware identifier.
+ * Some ROM dumps have "Nr2\0NL2\0" (uppercase N) but the n2x validation
+ * expects "nr2\0nL2\0" (lowercase n). Patch in-place.
+ */
+static void preprocessNordRom(std::vector<uint8_t>& romData)
+{
+    constexpr uint8_t upper[] = {'N', 'r', '2', 0, 'N', 'L', '2', 0};
+    constexpr uint8_t lower[] = {'n', 'r', '2', 0, 'n', 'L', '2', 0};
+
+    auto it = std::search(romData.begin(), romData.end(), std::begin(upper), std::end(upper));
+    if (it != romData.end())
+    {
+        std::cerr << "gm_create: Nord ROM has uppercase identifiers, patching...\n";
+        std::copy(std::begin(lower), std::end(lower), it);
+    }
+}
+
 // ─── C API ───────────────────────────────────────────────────────────────────
 
 extern "C"
 {
+
+/**
+ * Pre-load JP-8000 RAM dump data (factory reset state).
+ * Must be called before gm_create with synthType=5 to avoid slow WASM factory reset.
+ * @param ramData  Pointer to 256KB RAM dump
+ * @param ramSize  Size (must be 262144 = 256*1024)
+ */
+EXPORT void gm_loadJP8kRam(const uint8_t* ramData, uint32_t ramSize)
+{
+#ifndef GM_NO_JP8000
+#ifdef __EMSCRIPTEN__
+    if (ramData && ramSize == 256 * 1024)
+        jeLib::g_cachedRam.assign(ramData, ramData + ramSize);
+#endif
+#endif
+}
 
 /**
  * Create a new synth device from a ROM file.
@@ -89,8 +164,15 @@ EXPORT int32_t gm_create(const uint8_t* romData, uint32_t romSize, int32_t synth
 {
     synthLib::DeviceCreateParams params;
     params.romData.assign(romData, romData + romSize);
+    params.romName = "rom.bin"; // Must be non-empty — Nord RomData uses filename emptiness as validity check
     params.hostSamplerate = sampleRate;
     params.preferredSamplerate = sampleRate;
+
+    // Pre-process ROM data for synths that need it
+    if (synthType == GM_WALDORF_MQ || synthType == GM_WALDORF_XT)
+        preprocessMicroQRom(params.romData);
+    else if (synthType == GM_NORD_LEAD_2X)
+        preprocessNordRom(params.romData);
 
     std::unique_ptr<synthLib::Device> device;
 
@@ -108,7 +190,9 @@ EXPORT int32_t gm_create(const uint8_t* romData, uint32_t romSize, int32_t synth
             break;
 #ifndef GM_NO_WALDORF_MQ
         case GM_WALDORF_MQ:
+            printf("[EM] gm_create: creating microQ device...\n");
             device = std::make_unique<mqLib::Device>(params);
+            printf("[EM] gm_create: microQ device created!\n");
             break;
 #endif
 #ifndef GM_NO_WALDORF_XT
@@ -130,8 +214,19 @@ EXPORT int32_t gm_create(const uint8_t* romData, uint32_t romSize, int32_t synth
             return -1;
         }
     }
+    catch (const synthLib::DeviceException& e)
+    {
+        std::cerr << "gm_create: DeviceException: " << e.what() << '\n';
+        return -1;
+    }
+    catch (const std::exception& e)
+    {
+        std::cerr << "gm_create: exception: " << e.what() << '\n';
+        return -1;
+    }
     catch (...)
     {
+        std::cerr << "gm_create: unknown exception\n";
         return -1;
     }
 
@@ -420,6 +515,44 @@ EXPORT int32_t gm_getAudioInputSize(int32_t handle)
     auto* virusDev = dynamic_cast<virusLib::Device*>(g_devices[handle]->device.get());
     if (!virusDev) return -2;
     return static_cast<int32_t>(virusDev->getDSP()->getAudio().getAudioInputs().size());
+}
+
+// ─── Async Boot API ─────────────────────────────────────────────────────────
+// For synths with long boot times (microQ, XT, Nord), gm_create blocks for
+// 10+ minutes in WASM interpreter mode. These functions let the Worker run
+// boot in a background thread so it stays responsive for status messages.
+
+static std::atomic<int32_t> g_asyncResult{-2};  // -2 = not started
+static std::atomic<bool> g_asyncDone{false};
+
+/**
+ * Start device creation asynchronously in a background thread.
+ * Poll gm_is_boot_done() and retrieve result with gm_get_async_result().
+ */
+EXPORT void gm_create_async(const uint8_t* romData, uint32_t romSize, int32_t synthType, float sampleRate)
+{
+    auto rom = new std::vector<uint8_t>(romData, romData + romSize);
+    g_asyncDone = false;
+    g_asyncResult = -2;
+
+    std::thread([rom, synthType, sampleRate]() {
+        int32_t h = gm_create(rom->data(), static_cast<uint32_t>(rom->size()), synthType, sampleRate);
+        delete rom;
+        g_asyncResult.store(h);
+        g_asyncDone.store(true);
+    }).detach();
+}
+
+/** Returns 1 when async boot is complete, 0 while still booting. */
+EXPORT int32_t gm_is_boot_done()
+{
+    return g_asyncDone.load() ? 1 : 0;
+}
+
+/** Returns the device handle from async boot (>= 0 success, -1 failure). */
+EXPORT int32_t gm_get_async_result()
+{
+    return g_asyncResult.load();
 }
 
 } // extern "C"
