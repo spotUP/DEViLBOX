@@ -5,6 +5,7 @@
  */
 
 import { getDevilboxAudioContext } from '@/utils/audio-context';
+import { getToneEngine } from '@engine/ToneEngine';
 
 export class MaEngine {
   private static instance: MaEngine | null = null;
@@ -100,6 +101,15 @@ export class MaEngine {
           break;
         case 'moduleLoaded':
           console.log('[MaEngine] Module loaded');
+          break;
+        case 'chLevels':
+          try {
+            const engine = getToneEngine();
+            const levels: number[] = data.levels;
+            for (let i = 0; i < levels.length; i++) {
+              engine.triggerChannelMeter(i, levels[i]);
+            }
+          } catch { /* ToneEngine not ready */ }
           break;
         case 'error':
           console.error('[MaEngine]', data.message);

@@ -6,6 +6,7 @@
  */
 
 import { getDevilboxAudioContext } from '@/utils/audio-context';
+import { getToneEngine } from '@engine/ToneEngine';
 
 export interface KlysSongInfo {
   title: string;
@@ -245,6 +246,16 @@ export class KlysEngine {
             this._resolveSerialize = null;
             this._rejectSerialize = null;
           }
+          break;
+
+        case 'chLevels':
+          try {
+            const engine = getToneEngine();
+            const levels: number[] = data.levels;
+            for (let i = 0; i < levels.length; i++) {
+              engine.triggerChannelMeter(i, levels[i]);
+            }
+          } catch { /* ToneEngine not ready */ }
           break;
       }
     };

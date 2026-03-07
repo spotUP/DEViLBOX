@@ -7,6 +7,9 @@
  */
 
 import type { UADEEngine } from './UADEEngine';
+import type { UADEPatternLayout } from './UADEPatternEncoder';
+import { getCellChipRamAddr } from './UADEPatternEncoder';
+import type { TrackerCell } from '@/types';
 
 export class UADEChipEditor {
   private readonly engine: UADEEngine;
@@ -69,6 +72,57 @@ export class UADEChipEditor {
    */
   readModule(moduleBase: number, moduleSize: number): Promise<Uint8Array> {
     return this.engine.readMemory(moduleBase, moduleSize);
+  }
+
+  // ── UADE Module Base Address ──────────────────────────────────────────────
+
+  /** Cached module base address (chip RAM address where module binary starts) */
+  private _moduleBase: number | null = null;
+
+  /**
+   * Read the module base address from chip RAM.
+   * UADE stores modaddr as a big-endian u32 at address 0x100 (SCORE_MODULE_ADDR).
+   * Cached after first read since it doesn't change during playback.
+   */
+  async getModuleBase(): Promise<number> {
+    if (this._moduleBase !== null) return this._moduleBase;
+    this._moduleBase = await this.readU32(0x100);
+    return this._moduleBase;
+  }
+
+  /** Clear the cached module base (call on new module load) */
+  clearModuleBaseCache(): void {
+    this._moduleBase = null;
+  }
+
+  // ── Pattern Cell Patching ──────────────────────────────────────────────────
+
+  /**
+   * Write a single edited pattern cell back to chip RAM.
+   * The 68k replayer reads pattern data from chip RAM on the fly,
+   * so this edit takes effect on the next tick that reads this cell.
+   */
+  async patchPatternCell(
+    layout: UADEPatternLayout,
+    pattern: number,
+    row: number,
+    channel: number,
+    cell: TrackerCell,
+  ): Promise<void> {
+    const moduleBase = await this.getModuleBase();
+    const addr = getCellChipRamAddr(layout, moduleBase, pattern, row, channel);
+    const bytes = layout.encodeCell(cell);
+    await this.writeBytes(addr, bytes);
+  }
+
+  /**
+   * Export the module with all chip RAM edits applied.
+   * Since pattern edits were written to chip RAM in-place,
+   * the exported file automatically includes all modifications.
+   */
+  async exportEditedModule(layout: UADEPatternLayout, filename: string): Promise<void> {
+    const moduleBase = await this.getModuleBase();
+    await this.exportModule(moduleBase, layout.moduleSize, filename);
   }
 
   /**
