@@ -2,7 +2,7 @@
  * FurnaceEffectRouter - Maps tracker effect commands to Furnace DivCmd dispatch calls
  *
  * Effect code → DivCmd mappings derived directly from Furnace source:
- *   Reference Code/furnace-master/src/engine/sysDef.cpp
+ *   third-party/furnace-master/src/engine/sysDef.cpp
  *
  * Each chip has its own effectHandlerMap (pre-note-on) and postEffectHandlerMap
  * (post-note-on). Currently DEViLBOX processes all effects together.

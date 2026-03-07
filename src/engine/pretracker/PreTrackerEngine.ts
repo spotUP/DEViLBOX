@@ -6,6 +6,7 @@
  */
 
 import { getDevilboxAudioContext } from '@/utils/audio-context';
+import { getToneEngine } from '@engine/ToneEngine';
 
 export class PreTrackerEngine {
   private static instance: PreTrackerEngine | null = null;
@@ -117,6 +118,16 @@ export class PreTrackerEngine {
 
         case 'moduleLoaded':
           console.log('[PreTrackerEngine] Module loaded');
+          break;
+
+        case 'chLevels':
+          try {
+            const engine = getToneEngine();
+            const levels: number[] = data.levels;
+            for (let i = 0; i < levels.length; i++) {
+              engine.triggerChannelMeter(i, levels[i]);
+            }
+          } catch { /* ToneEngine not ready */ }
           break;
 
         case 'error':

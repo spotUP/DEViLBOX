@@ -37,4 +37,24 @@ export function newSong(): boolean { return doNew(); }
 export function loadSong(): boolean { return openFileBrowser(); }
 export function saveSong(): boolean { return doSave(); }
 export function loadModule(): boolean { return openFileBrowser(); }
-export function saveModule(): boolean { return doSave(); }
+export function saveModule(): boolean {
+  // If a UADE format with pattern layout is loaded, also export native format
+  void (async () => {
+    try {
+      const { getTrackerReplayer } = await import('@engine/TrackerReplayer');
+      const replayer = getTrackerReplayer();
+      const song = replayer.getSong();
+      if (song?.uadePatternLayout) {
+        const { UADEChipEditor } = await import('@engine/uade/UADEChipEditor');
+        const { UADEEngine } = await import('@engine/uade/UADEEngine');
+        if (UADEEngine.hasInstance()) {
+          const editor = new UADEChipEditor(UADEEngine.getInstance());
+          const filename = (song.name || 'module') + '.' + song.uadePatternLayout.formatId;
+          await editor.exportEditedModule(song.uadePatternLayout, filename);
+          useUIStore.getState().setStatusMessage('Module exported', false, 1500);
+        }
+      }
+    } catch { /* replayer not initialized */ }
+  })();
+  return doSave();
+}

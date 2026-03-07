@@ -276,6 +276,8 @@ export interface TrackerSong {
   zxtuneFileData?: ArrayBuffer;
   /** Raw SC68/SNDH binary for loading into the Sc68Engine WASM */
   sc68FileData?: ArrayBuffer;
+  /** Raw module binary for libopenmpt WASM playback (MOD/XM/IT/S3M) */
+  libopenmptFileData?: ArrayBuffer;
   // Native format data (preserved for format-specific editors)
   furnaceNative?: FurnaceNativeData;
   hivelyNative?: HivelyNativeData;
@@ -286,6 +288,11 @@ export interface TrackerSong {
   // Pre-converted subsong data for in-editor subsong switching
   furnaceSubsongs?: FurnaceSubsongPlayback[];
   furnaceActiveSubsong?: number;
+
+  /** UADE pattern layout — enables live chip RAM patching for editable UADE formats.
+   *  When present, pattern edits are written back to the module binary in UADE's
+   *  emulated chip RAM, making the 68k replayer play the edited data in real-time. */
+  uadePatternLayout?: import('./uade/UADEPatternEncoder').UADEPatternLayout;
 
   // Per-channel independent sequencing (MusicLine Editor and similar formats)
   // When present, each channel uses its own pattern sequence instead of the global songPositions.
@@ -443,6 +450,10 @@ export class TrackerReplayer {
   // The TS scheduler does NOT run; position updates come from worklet messages.
   private useWasmSequencer = false;
   private _seqPositionUnsub: (() => void) | null = null;
+
+  // libopenmpt playback: when active, audio comes from the libopenmpt worklet
+  // and TrackerReplayer only forwards position updates to the UI.
+  private useLibopenmptPlayback = false;
 
   // Per-deck channel mute mask (DJ mode only)
   // Bit N = 1 means channel N is ENABLED, 0 means MUTED.
@@ -813,6 +824,10 @@ export class TrackerReplayer {
     // Restore any native engines rerouted to separation chain (UADE/Hively)
     restoreNativeRouting(this.routedNativeEngines);
 
+    // Reset the OpenMPT edit bridge — it will be re-activated by parseWithOpenMPT
+    // if the new song is a MOD/XM/IT/S3M loaded via the soundlib
+    import('@engine/libopenmpt/OpenMPTEditBridge').then(b => b.reset()).catch(() => {});
+
     this.song = song;
 
 
@@ -834,7 +849,8 @@ export class TrackerReplayer {
     // immediately on song load rather than lazily on first note trigger.
     // Without this, the first note fired per instrument is always dropped while
     // decodeAudioData() runs asynchronously.
-    {
+    // Skip when libopenmpt will handle playback — no need for ToneEngine samples.
+    if (!song.libopenmptFileData) {
       const engine = getToneEngine();
       for (const inst of song.instruments) {
         if (inst.synthType === 'Sampler' && inst.sample?.audioBuffer && !engine.getDecodedBuffer(inst.id)) {
@@ -1280,6 +1296,94 @@ export class TrackerReplayer {
       }
     }
 
+    // libopenmpt playback: if we have raw module data, use the libopenmpt WASM worklet
+    // for audio and forward position updates to the UI. Falls back to ToneEngine if unavailable.
+    if (this.song.libopenmptFileData && !this.useWasmSequencer) {
+      console.log('[TrackerReplayer] libopenmpt path: fileData size =', this.song.libopenmptFileData.byteLength);
+      try {
+        const { LibopenmptEngine } = await import('@engine/libopenmpt/LibopenmptEngine');
+        if (gen !== this._playGeneration) return;
+
+        const mptEngine = LibopenmptEngine.getInstance();
+        await mptEngine.ready();
+        if (gen !== this._playGeneration) return;
+
+        console.log('[TrackerReplayer] libopenmpt available:', mptEngine.isAvailable());
+        if (mptEngine.isAvailable()) {
+          // If edits have been made, re-serialize from the soundlib to get updated module data
+          let tuneData = this.song.libopenmptFileData;
+          const bridge = await import('@engine/libopenmpt/OpenMPTEditBridge');
+          if (bridge.isActive() && bridge.isDirty()) {
+            const serialized = await bridge.serialize();
+            if (serialized) {
+              tuneData = serialized;
+              // Update the stored file data so subsequent plays don't re-serialize
+              this.song.libopenmptFileData = serialized;
+            }
+          }
+
+          console.log('[TrackerReplayer] libopenmpt: loading tune, size =', tuneData.byteLength);
+          await mptEngine.loadTune(tuneData);
+
+          // Route audio through stereo separation chain
+          if (!this.isDJDeck && !this.routedNativeEngines.has('LibopenmptSynth')) {
+            const { getNativeAudioNode } = await import('@/utils/audio-context');
+            const nativeInput = getNativeAudioNode(this.separationNode.inputTone as any);
+            console.log('[TrackerReplayer] libopenmpt: routing audio, nativeInput =', !!nativeInput,
+              'output ctx state =', mptEngine.output.context.state);
+            if (nativeInput) {
+              mptEngine.output.connect(nativeInput);
+            } else {
+              console.warn('[TrackerReplayer] libopenmpt: no native input, connecting to destination');
+              mptEngine.output.connect(mptEngine.output.context.destination);
+            }
+            this.routedNativeEngines.add('LibopenmptSynth');
+          }
+
+          // Subscribe to position updates from libopenmpt (~344 times/sec at 44.1kHz)
+          // Throttle to only fire onRowChange when the row actually changes.
+          let lastRow = -1;
+          let lastOrder = -1;
+          mptEngine.onPosition = (order, pattern, row) => {
+            if (!this.playing || !this.song) return;
+            if (row === lastRow && order === lastOrder) return;
+            lastRow = row;
+            lastOrder = order;
+            this.songPos = order;
+            this.pattPos = row;
+            const patternNum = this.song.songPositions[order] ?? pattern;
+            if (this.onRowChange) {
+              this.onRowChange(row, patternNum, order);
+            }
+          };
+
+          mptEngine.onEnded = () => {
+            if (this.onSongEnd) this.onSongEnd();
+          };
+
+          this.useLibopenmptPlayback = true;
+          this._suppressNotes = true;
+
+          if (!this._muted) {
+            console.log('[TrackerReplayer] libopenmpt: calling play(), muted =', this._muted);
+            mptEngine.play();
+            // Seek to current position if not at start
+            if (this.songPos > 0 || this.pattPos > 0) {
+              mptEngine.seekTo(this.songPos, this.pattPos);
+            }
+          } else {
+            console.log('[TrackerReplayer] libopenmpt: SKIPPING play() because muted');
+          }
+
+          console.log('[TrackerReplayer] Using libopenmpt for playback, suppressNotes =', this._suppressNotes);
+          return;
+        }
+      } catch (err) {
+        console.warn('[TrackerReplayer] libopenmpt failed, falling back to ToneEngine:', err);
+        this.useLibopenmptPlayback = false;
+      }
+    }
+
     this.startScheduler();
   }
 
@@ -1298,6 +1402,21 @@ export class TrackerReplayer {
         // Dynamic import is cached — this resolves synchronously after first load
         import('@engine/furnace-dispatch/FurnaceDispatchEngine').then(({ FurnaceDispatchEngine }) => {
           FurnaceDispatchEngine.getInstance().seqStop();
+        });
+      } catch { /* ignored */ }
+    }
+
+    // Stop libopenmpt playback if active
+    if (this.useLibopenmptPlayback) {
+      this.useLibopenmptPlayback = false;
+      try {
+        import('@engine/libopenmpt/LibopenmptEngine').then(({ LibopenmptEngine }) => {
+          if (LibopenmptEngine.hasInstance()) {
+            const engine = LibopenmptEngine.getInstance();
+            engine.onPosition = null;
+            engine.onEnded = null;
+            engine.stop();
+          }
         });
       } catch { /* ignored */ }
     }
@@ -1356,6 +1475,13 @@ export class TrackerReplayer {
       }).catch(() => {});
     }
 
+    // Pause libopenmpt
+    if (this.useLibopenmptPlayback) {
+      import('@engine/libopenmpt/LibopenmptEngine').then(({ LibopenmptEngine }) => {
+        if (LibopenmptEngine.hasInstance()) LibopenmptEngine.getInstance().pause();
+      }).catch(() => {});
+    }
+
     // Pause routed native engines (UADE/Hively) on pause
     pauseNativeEngines(this.routedNativeEngines);
   }
@@ -1368,6 +1494,14 @@ export class TrackerReplayer {
       if (this.useWasmSequencer) {
         import('@engine/furnace-dispatch/FurnaceDispatchEngine').then(({ FurnaceDispatchEngine }) => {
           FurnaceDispatchEngine.getInstance().seqPlay(this.songPos, this.pattPos);
+        }).catch(() => {});
+        return;
+      }
+
+      // Resume libopenmpt playback
+      if (this.useLibopenmptPlayback) {
+        import('@engine/libopenmpt/LibopenmptEngine').then(({ LibopenmptEngine }) => {
+          if (LibopenmptEngine.hasInstance()) LibopenmptEngine.getInstance().resume();
         }).catch(() => {});
         return;
       }
@@ -4406,6 +4540,16 @@ export class TrackerReplayer {
       this.songPos = Math.max(0, Math.min(songPos, this.song.songLength - 1));
       this.pattPos = Math.max(0, pattPos);
       this.currentTick = 0;
+
+      // Forward seek to libopenmpt worklet
+      if (this.useLibopenmptPlayback) {
+        import('@engine/libopenmpt/LibopenmptEngine').then(({ LibopenmptEngine }) => {
+          if (LibopenmptEngine.hasInstance()) {
+            LibopenmptEngine.getInstance().seekTo(this.songPos, this.pattPos);
+          }
+        }).catch(() => {});
+        return;
+      }
 
       // Per-channel seek: all channels jump to the requested position
       if (this.song.channelTrackTables) {

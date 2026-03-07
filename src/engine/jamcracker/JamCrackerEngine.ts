@@ -6,6 +6,7 @@
  */
 
 import { getDevilboxAudioContext } from '@/utils/audio-context';
+import { getToneEngine } from '@engine/ToneEngine';
 
 export interface JamCrackerTuneInfo {
   songLength: number;
@@ -195,6 +196,16 @@ export class JamCrackerEngine {
             this._saveResolve(new Uint8Array(data.data));
             this._saveResolve = null;
           }
+          break;
+
+        case 'chLevels':
+          try {
+            const engine = getToneEngine();
+            const levels: number[] = data.levels;
+            for (let i = 0; i < levels.length; i++) {
+              engine.triggerChannelMeter(i, levels[i]);
+            }
+          } catch { /* ToneEngine not ready */ }
           break;
       }
     };

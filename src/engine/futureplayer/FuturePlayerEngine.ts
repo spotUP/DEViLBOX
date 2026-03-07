@@ -6,6 +6,7 @@
  */
 
 import { getDevilboxAudioContext } from '@/utils/audio-context';
+import { getToneEngine } from '@engine/ToneEngine';
 
 export interface FuturePlayerTuneInfo {
   numSubsongs: number;
@@ -141,6 +142,16 @@ export class FuturePlayerEngine {
             this._resolveTune = null;
             this._rejectTune = null;
           }
+          break;
+
+        case 'chLevels':
+          try {
+            const engine = getToneEngine();
+            const levels: number[] = data.levels;
+            for (let i = 0; i < levels.length; i++) {
+              engine.triggerChannelMeter(i, levels[i]);
+            }
+          } catch { /* ToneEngine not ready */ }
           break;
       }
     };

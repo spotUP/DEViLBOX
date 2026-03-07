@@ -5,6 +5,7 @@
  */
 
 import { getDevilboxAudioContext } from '@/utils/audio-context';
+import { getToneEngine } from '@engine/ToneEngine';
 
 export class HippelEngine {
   private static instance: HippelEngine | null = null;
@@ -100,6 +101,15 @@ export class HippelEngine {
           break;
         case 'moduleLoaded':
           console.log('[HippelEngine] Module loaded');
+          break;
+        case 'chLevels':
+          try {
+            const engine = getToneEngine();
+            const levels: number[] = data.levels;
+            for (let i = 0; i < levels.length; i++) {
+              engine.triggerChannelMeter(i, levels[i]);
+            }
+          } catch { /* ToneEngine not ready */ }
           break;
         case 'error':
           console.error('[HippelEngine]', data.message);
