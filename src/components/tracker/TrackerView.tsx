@@ -542,53 +542,130 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
         {/* Pattern Editor / Grid Sequencer / Piano Roll / TB-303 Editor - Flex item 1 */}
         <div className="flex-1 min-w-0 min-h-0 flex flex-col overflow-hidden">
           {viewMode === 'tracker' ? (
-            editorMode === 'goattracker' ? (
-              <GTUltraView />
-            ) : editorMode === 'hively' ? (
-              <HivelyView />
-            ) : editorMode === 'klystrack' ? (
-              <KlysView />
-            ) : editorMode === 'jamcracker' ? (
-              <JamCrackerView />
-            ) : editorMode === 'musicline' ? (
-              <div className="flex-1 flex flex-col min-h-0 bg-dark-bgPrimary">
-                {/* Per-channel track table matrix */}
-                <div className="flex-shrink-0 border-b border-dark-border" style={{ maxHeight: 220, overflowY: 'auto' }}>
-                  <div className="px-3 pt-3 pb-1 flex items-center gap-2">
-                    <span className="text-sm font-bold text-ft2-text">MusicLine Editor</span>
-                    <span className="text-xs text-accent-primary bg-accent-primary/10 px-1.5 py-0.5 rounded border border-accent-primary/30">
-                      per-channel
-                    </span>
-                    <span className="text-xs text-ft2-textDim ml-auto mr-2">
-                      {channelTrackTables?.length ?? 0} channels · {patterns.length} parts
-                    </span>
+            (() => {
+              // Determine if this is a custom format editor that can be popped out
+              const isCustomFormat = ['goattracker', 'hively', 'klystrack', 'jamcracker', 'musicline'].includes(editorMode);
+              const formatLabels: Record<string, string> = {
+                goattracker: 'GoatTracker', hively: 'AHX / Hively', klystrack: 'Klystrack',
+                jamcracker: 'JamCracker', musicline: 'MusicLine',
+              };
+
+              // Build the editor content
+              const editorContent = editorMode === 'goattracker' ? (
+                <GTUltraView />
+              ) : editorMode === 'hively' ? (
+                <HivelyView />
+              ) : editorMode === 'klystrack' ? (
+                <KlysView />
+              ) : editorMode === 'jamcracker' ? (
+                <JamCrackerView />
+              ) : editorMode === 'musicline' ? (
+                <div className="flex-1 flex flex-col min-h-0 bg-dark-bgPrimary">
+                  {/* Per-channel track table matrix */}
+                  <div className="flex-shrink-0 border-b border-dark-border" style={{ maxHeight: 220, overflowY: 'auto' }}>
+                    <div className="px-3 pt-3 pb-1 flex items-center gap-2">
+                      <span className="text-sm font-bold text-ft2-text">MusicLine Editor</span>
+                      <span className="text-xs text-accent-primary bg-accent-primary/10 px-1.5 py-0.5 rounded border border-accent-primary/30">
+                        per-channel
+                      </span>
+                      <span className="text-xs text-ft2-textDim ml-auto mr-2">
+                        {channelTrackTables?.length ?? 0} channels · {patterns.length} parts
+                      </span>
+                      <button
+                        className="px-2 py-0.5 text-xs bg-green-800 hover:bg-green-700 text-green-100 rounded border border-green-600"
+                        onClick={handleExportML}
+                      >Export .ml</button>
+                    </div>
+                    <div className="px-3 pb-3">
+                      <MusicLineTrackTableEditor
+                        onSeek={(pos) => {
+                          useTrackerStore.getState().setCurrentPosition(pos);
+                          getTrackerReplayer().jumpToPosition(pos, 0);
+                        }}
+                      />
+                    </div>
+                  </div>
+                  {/* Multi-channel note viewer */}
+                  <div className="flex-1 min-h-0">
+                    <MusicLinePatternViewer />
+                  </div>
+                </div>
+              ) : (
+                <PatternEditorCanvas
+                  onAcidGenerator={handleAcidGenerator}
+                  onRandomize={handleRandomize}
+                  onSwipeLeft={handleSwipeLeft}
+                  onSwipeRight={handleSwipeRight}
+                />
+              );
+
+              // Custom format: support pop-out
+              if (isCustomFormat && patternEditorPoppedOut) {
+                return (
+                  <>
+                    <PopOutWindow
+                      isOpen={true}
+                      onClose={() => setPatternEditorPoppedOut(false)}
+                      title={`DEViLBOX — ${formatLabels[editorMode] || editorMode} Editor`}
+                      width={1100}
+                      height={700}
+                    >
+                      <div className="flex flex-col h-screen w-screen bg-dark-bgPrimary">
+                        <div className="flex items-center gap-2 px-3 py-1 bg-dark-bgSecondary border-b border-dark-border shrink-0">
+                          <span className="text-xs font-bold text-accent-primary">{formatLabels[editorMode]}</span>
+                          <span className="text-xs text-ft2-textDim">Pattern Editor — Popped Out</span>
+                          <div className="flex-1" />
+                          <button
+                            className="flex items-center gap-1 px-2 py-0.5 text-xs bg-dark-bg hover:bg-dark-bgTertiary text-text-muted hover:text-text-primary rounded border border-dark-border transition-colors"
+                            onClick={() => setPatternEditorPoppedOut(false)}
+                            title="Restore to main window"
+                          >
+                            <Undo2 size={12} />
+                            Restore
+                          </button>
+                        </div>
+                        <div className="flex-1 min-h-0">
+                          {editorContent}
+                        </div>
+                      </div>
+                    </PopOutWindow>
+
+                    {/* Placeholder in main window */}
+                    <div className="flex-1 flex items-center justify-center bg-dark-bgPrimary">
+                      <div className="text-center">
+                        <ExternalLink size={32} className="mx-auto mb-2 text-accent-primary opacity-50" />
+                        <p className="text-sm text-ft2-textDim">{formatLabels[editorMode]} Editor — Popped Out</p>
+                        <button
+                          className="mt-2 px-3 py-1 text-xs bg-dark-bgSecondary hover:bg-dark-bgTertiary text-text-primary rounded border border-dark-border transition-colors"
+                          onClick={() => setPatternEditorPoppedOut(false)}
+                        >
+                          Restore
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                );
+              }
+
+              // Custom format: show with pop-out button overlay
+              if (isCustomFormat) {
+                return (
+                  <div className="relative flex-1 min-h-0 flex flex-col">
+                    {editorContent}
                     <button
-                      className="px-2 py-0.5 text-xs bg-green-800 hover:bg-green-700 text-green-100 rounded border border-green-600"
-                      onClick={handleExportML}
-                    >Export .ml</button>
+                      className="absolute top-1 right-1 z-50 p-1 rounded bg-dark-bg/80 hover:bg-dark-bgTertiary text-text-muted hover:text-accent-primary border border-dark-border/50 transition-colors"
+                      onClick={() => setPatternEditorPoppedOut(true)}
+                      title="Pop out editor to separate window"
+                    >
+                      <ExternalLink size={14} />
+                    </button>
                   </div>
-                  <div className="px-3 pb-3">
-                    <MusicLineTrackTableEditor
-                      onSeek={(pos) => {
-                        useTrackerStore.getState().setCurrentPosition(pos);
-                        getTrackerReplayer().jumpToPosition(pos, 0);
-                      }}
-                    />
-                  </div>
-                </div>
-                {/* Multi-channel note viewer */}
-                <div className="flex-1 min-h-0">
-                  <MusicLinePatternViewer />
-                </div>
-              </div>
-            ) : (
-              <PatternEditorCanvas
-                onAcidGenerator={handleAcidGenerator}
-                onRandomize={handleRandomize}
-                onSwipeLeft={handleSwipeLeft}
-                onSwipeRight={handleSwipeRight}
-              />
-            )
+                );
+              }
+
+              // Standard format (PatternEditorCanvas)
+              return editorContent;
+            })()
           ) : viewMode === 'grid' ? (
             <GridSequencer channelIndex={gridChannelIndex} />
           ) : viewMode === 'pianoroll' ? (
