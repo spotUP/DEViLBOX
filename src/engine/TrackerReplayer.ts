@@ -260,6 +260,8 @@ export interface TrackerSong {
   maFileData?: ArrayBuffer;
   /** Raw Jochen Hippel ST binary for loading into the HippelEngine WASM */
   hippelFileData?: ArrayBuffer;
+  /** Raw Sonix Music Driver binary for loading into the SonixEngine WASM */
+  sonixFileData?: ArrayBuffer;
   // Native format data (preserved for format-specific editors)
   furnaceNative?: FurnaceNativeData;
   hivelyNative?: HivelyNativeData;
