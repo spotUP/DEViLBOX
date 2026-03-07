@@ -146,10 +146,11 @@ export const PixiModlandPanel: React.FC<ModlandPanelProps> = ({
     }
   }, [onLoadTrackerModule, onClose]);
 
-  // Format options for select
+  // Format options for select — sorted alphabetically
   const formatOptions: SelectOption[] = useMemo(() => {
     const opts: SelectOption[] = [{ value: '', label: 'All formats' }];
-    formats.forEach(f => opts.push({ value: f.format, label: `${f.format} (${f.count.toLocaleString()})` }));
+    const sorted = [...formats].sort((a, b) => a.format.localeCompare(b.format));
+    sorted.forEach(f => opts.push({ value: f.format, label: `${f.format} (${f.count.toLocaleString()})` }));
     return opts;
   }, [formats]);
 
@@ -210,8 +211,9 @@ export const PixiModlandPanel: React.FC<ModlandPanelProps> = ({
           options={formatOptions}
           value={format}
           onChange={setFormat}
-          width={160}
+          width={200}
           height={26}
+          searchable
         />
       </Div>
 
