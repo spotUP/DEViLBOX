@@ -23,7 +23,7 @@ import { execSync } from 'child_process';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const SONIX_PATH = path.resolve(
   __dirname,
-  '../../../../Reference Code/sonix-music-driver/SonixMusicDriver_v1.asm'
+  '../../../../third-party/sonix-music-driver/SonixMusicDriver_v1.asm'
 );
 const RUNTIME_DIR = path.resolve(__dirname, '../../runtime');
 

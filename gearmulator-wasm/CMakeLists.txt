@@ -8,7 +8,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # Paths to the gearmulator reference source tree
 # ──────────────────────────────────────────────────────────────────────────────
 
-set(GM_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../Reference Code/gearmulator-main")
+set(GM_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../third-party/gearmulator-main")
 set(GM_SRC  "${GM_ROOT}/source")
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -18,7 +18,8 @@ set(GM_SRC  "${GM_ROOT}/source")
 if(EMSCRIPTEN)
     # -pthread for SharedArrayBuffer support (AudioWorklet needs it)
     # -O3 for maximum interpreter performance
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread -O3")
+    # -fexceptions so C++ try/catch works (needed for ROM validation errors)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread -O3 -fexceptions")
     set(CMAKE_C_FLAGS   "${CMAKE_C_FLAGS} -pthread -O3")
 
     # Increase constexpr step limit for DSP56300's compile-time tables
@@ -187,6 +188,10 @@ file(GLOB MQLIB_SRC "${GM_SRC}/mqLib/*.cpp")
 add_library(mqLib STATIC ${MQLIB_SRC})
 target_include_directories(mqLib PUBLIC "${GM_SRC}")
 target_link_libraries(mqLib PUBLIC wLib)
+if(EMSCRIPTEN)
+    target_compile_definitions(mqLib PRIVATE GM_USE_SNAPSHOT=1)
+    target_include_directories(mqLib PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
+endif()
 
 # ──────────────────────────────────────────────────────────────────────────────
 # xtLib — Waldorf Microwave II/XT
@@ -207,56 +212,75 @@ target_include_directories(nordLib PUBLIC "${GM_SRC}" "${GM_SRC}/nord/n2x/n2xLib
 target_link_libraries(nordLib PUBLIC synthLib hardwareLib dsp56kEmu)
 
 # ──────────────────────────────────────────────────────────────────────────────
+# Unified Musashi dispatch (WASM only)
+# ──────────────────────────────────────────────────────────────────────────────
+# When linking multiple MC68K-based synth libs into one binary, each would
+# define its own extern "C" Musashi callbacks via musashiEntry.h, causing
+# duplicate symbols. GM_MUSASHI_VIRTUAL_DISPATCH suppresses the per-lib
+# definitions; musashi_unified.cpp provides a single set using virtual dispatch.
+
+# Suppress per-lib Musashi callbacks; musashi_unified.cpp provides unified dispatch
+target_compile_definitions(mqLib PRIVATE GM_MUSASHI_VIRTUAL_DISPATCH=1)
+target_compile_definitions(xtLib PRIVATE GM_MUSASHI_VIRTUAL_DISPATCH=1)
+target_compile_definitions(nordLib PRIVATE GM_MUSASHI_VIRTUAL_DISPATCH=1)
+
+# ──────────────────────────────────────────────────────────────────────────────
 # rLib — Roland common library (needed by jeLib)
 # ──────────────────────────────────────────────────────────────────────────────
 
-# JE-8086 (Roland JP-8000) excluded from WASM — ESP JIT has no interpreter fallback
-if(NOT EMSCRIPTEN)
-    add_library(rLib STATIC "${GM_SRC}/ronaldo/common/storage.cpp")
-    target_include_directories(rLib PUBLIC "${GM_SRC}/ronaldo/common/.." "${GM_SRC}")
+add_library(rLib STATIC "${GM_SRC}/ronaldo/common/storage.cpp")
+target_include_directories(rLib PUBLIC "${GM_SRC}/ronaldo/common/.." "${GM_SRC}")
 
-    # ──────────────────────────────────────────────────────────────────────────────
-    # esp — Roland ESP DSP (JIT-only, not available on WASM)
-    # ──────────────────────────────────────────────────────────────────────────────
+# ──────────────────────────────────────────────────────────────────────────────
+# esp — Roland ESP DSP
+# On native: full JIT optimizer (asmjit-based .cpp files)
+# On WASM: header-only interpreter (esp.hpp) + stub optimizer (esp_opt.hpp)
+# ──────────────────────────────────────────────────────────────────────────────
 
+if(EMSCRIPTEN)
+    # ESP is header-only on WASM — interpreter in esp.hpp, stub in esp_opt.hpp
+    add_library(esp INTERFACE)
+    target_include_directories(esp INTERFACE "${GM_SRC}/ronaldo/esp/.." "${GM_SRC}")
+else()
     file(GLOB ESP_SRC "${GM_SRC}/ronaldo/esp/*.cpp")
     add_library(esp STATIC ${ESP_SRC})
     target_include_directories(esp PUBLIC "${GM_SRC}/ronaldo/esp/.." "${GM_SRC}")
     target_link_libraries(esp PUBLIC asmjit)
-
-    # ──────────────────────────────────────────────────────────────────────────────
-    # ronaldo — Roland JP-8000 (JE-8086 / jeLib)
-    # ──────────────────────────────────────────────────────────────────────────────
-
-    file(GLOB RONALDO_SRC "${GM_SRC}/ronaldo/je8086/jeLib/*.cpp")
-    add_library(ronaldoLib STATIC ${RONALDO_SRC})
-    target_include_directories(ronaldoLib PUBLIC "${GM_SRC}" "${GM_SRC}/ronaldo/je8086/jeLib/..")
-    target_link_libraries(ronaldoLib PUBLIC synthLib hardwareLib rLib esp)
 endif()
+
+# ──────────────────────────────────────────────────────────────────────────────
+# ronaldo — Roland JP-8000 (JE-8086 / jeLib)
+# ──────────────────────────────────────────────────────────────────────────────
+
+file(GLOB RONALDO_SRC "${GM_SRC}/ronaldo/je8086/jeLib/*.cpp")
+add_library(ronaldoLib STATIC ${RONALDO_SRC})
+target_include_directories(ronaldoLib PUBLIC
+    "${GM_SRC}"
+    "${GM_SRC}/ronaldo/je8086/jeLib/.."
+    "${GM_SRC}/ronaldo/h8s/.."
+)
+target_link_libraries(ronaldoLib PUBLIC synthLib hardwareLib rLib esp)
 
 # ──────────────────────────────────────────────────────────────────────────────
 # WASM Bridge — our entry point
 # ──────────────────────────────────────────────────────────────────────────────
 
-add_executable(gearmulator_wasm src/gearmulator_bridge.cpp)
-
 if(EMSCRIPTEN)
-    # Virus + one Musashi-based synth per binary (Musashi callbacks are extern "C"
-    # with link-time specialization via MC68K_CLASS — can't link multiple synth libs
-    # that each include musashiEntry.h). XT and Nord would need separate WASM binaries.
-    target_link_libraries(gearmulator_wasm PRIVATE
-        virusLib mqLib wLib
-        synthLib hardwareLib baseLib dsp56kEmu dsp56kBase
-        mc68k asmjit libresample
+    # All synths (DSP56300 + Roland ESP) in one binary
+    add_executable(gearmulator_wasm
+        src/gearmulator_bridge.cpp
+        src/musashi_unified.cpp
     )
-    target_compile_definitions(gearmulator_wasm PRIVATE
-        GM_NO_JP8000=1
-        GM_NO_WALDORF_XT=1
-        GM_NO_NORD=1
+    target_link_libraries(gearmulator_wasm PRIVATE
+        virusLib mqLib xtLib nordLib ronaldoLib wLib
+        synthLib hardwareLib baseLib dsp56kEmu dsp56kBase
+        mc68k rLib esp asmjit libresample
     )
 else()
-    target_link_libraries(gearmulator_wasm PRIVATE
-        virusLib mqLib xtLib nordLib ronaldoLib
+    # Native snapshot dumper tool
+    add_executable(snapshot_dumper src/snapshot_dumper.cpp src/musashi_unified.cpp)
+    target_link_libraries(snapshot_dumper PRIVATE
+        virusLib mqLib xtLib nordLib ronaldoLib wLib
         synthLib hardwareLib baseLib dsp56kEmu dsp56kBase
         mc68k rLib esp asmjit libresample
     )
@@ -268,13 +292,14 @@ if(EMSCRIPTEN)
         LINK_FLAGS "\
             -s MODULARIZE=1 \
             -s EXPORT_NAME='createGearmulator' \
-            -s EXPORTED_FUNCTIONS='[\"_gm_create\",\"_gm_destroy\",\"_gm_process\",\"_gm_sendMidi\",\"_gm_sendSysex\",\"_gm_getSamplerate\",\"_gm_isValid\",\"_gm_getState\",\"_gm_setState\",\"_gm_setDspClockPercent\",\"_gm_getDspClockHz\",\"_gm_pushAudioInput\",\"_gm_pullAudioOutput\",\"_gm_pushInput\",\"_gm_getAudioOutputSize\",\"_gm_getAudioInputSize\",\"_malloc\",\"_free\"]' \
+            -s EXPORTED_FUNCTIONS='[\"_gm_create\",\"_gm_create_async\",\"_gm_is_boot_done\",\"_gm_get_async_result\",\"_gm_destroy\",\"_gm_process\",\"_gm_sendMidi\",\"_gm_sendSysex\",\"_gm_getSamplerate\",\"_gm_isValid\",\"_gm_getState\",\"_gm_setState\",\"_gm_setDspClockPercent\",\"_gm_getDspClockHz\",\"_gm_pushAudioInput\",\"_gm_pullAudioOutput\",\"_gm_pushInput\",\"_gm_getAudioOutputSize\",\"_gm_getAudioInputSize\",\"_gm_loadJP8kRam\",\"_malloc\",\"_free\"]' \
             -s EXPORTED_RUNTIME_METHODS='[\"ccall\",\"cwrap\",\"HEAPF32\",\"HEAP8\",\"HEAPU8\"]' \
             -s ALLOW_MEMORY_GROWTH=1 \
             -s ALLOW_TABLE_GROWTH=1 \
-            -s INITIAL_MEMORY=67108864 \
+            -s DISABLE_EXCEPTION_CATCHING=0 \
+            -s INITIAL_MEMORY=134217728 \
             -s MAXIMUM_MEMORY=536870912 \
-            -s PTHREAD_POOL_SIZE=4 \
+            -s PTHREAD_POOL_SIZE=6 \
             -s WASM=1 \
             -pthread \
             --no-entry \

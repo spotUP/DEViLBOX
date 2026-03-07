@@ -5,7 +5,7 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_C_STANDARD 11)
 
 # Path to openmpt source
-set(OPENMPT_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../Reference Code/openmpt-master")
+set(OPENMPT_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../third-party/openmpt-master")
 
 # ─── Build flags ────────────────────────────────────────────────────────────
 add_compile_definitions(

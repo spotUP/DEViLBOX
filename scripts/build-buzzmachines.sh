@@ -17,7 +17,7 @@ set +e
 echo "🚀 Starting Buzzmachines build..."
 
 # 1. Define paths
-BUZZ_BASE="Reference Code/buzzmachines-master"
+BUZZ_BASE="third-party/buzzmachines-master"
 OUTPUT_DIR="public/buzzmachines"
 WRAPPER_SRC="src/engine/buzzmachines"
 

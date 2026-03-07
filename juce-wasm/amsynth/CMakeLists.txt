@@ -9,7 +9,7 @@
 cmake_minimum_required(VERSION 3.15)
 project(AmsynthWASM VERSION 1.0.0)
 
-set(AMSYNTH_ROOT "${CMAKE_SOURCE_DIR}/../../Reference Code/amsynth-master")
+set(AMSYNTH_ROOT "${CMAKE_SOURCE_DIR}/../../third-party/amsynth-master")
 set(SYNTH_SRC "${AMSYNTH_ROOT}/src/core/synth")
 set(FREEVERB_SRC "${AMSYNTH_ROOT}/external/freeverb")
 
