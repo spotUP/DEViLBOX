@@ -9,9 +9,9 @@ set -e
 echo "🚀 Starting Furnace Chips build..."
 
 # 1. Define paths
-BASE_DIR="Reference Code/furnace-master/extern"
-SOUND_DIR="Reference Code/furnace-master/src/engine/platform/sound"
-VGSOUND_BASE="Reference Code/furnace-master/extern/vgsound_emu-modified/vgsound_emu/src"
+BASE_DIR="third-party/furnace-master/extern"
+SOUND_DIR="third-party/furnace-master/src/engine/platform/sound"
+VGSOUND_BASE="third-party/furnace-master/extern/vgsound_emu-modified/vgsound_emu/src"
 OUTPUT_DIR="public"
 TEMP_BUILD_DIR="src/engine/chips/build"
 
@@ -107,12 +107,12 @@ emcc src/engine/chips/FurnaceChips.cpp \
     -I "$SOUND_DIR/c64_d" \
     -I "$SOUND_DIR/ymfm" \
     -I "$VGSOUND_BASE" \
-    -I "Reference Code/furnace-master/extern/vgsound_emu-modified/vgsound_emu" \
+    -I "third-party/furnace-master/extern/vgsound_emu-modified/vgsound_emu" \
     -I "$BASE_DIR/blip_buf" \
     -I "$BASE_DIR/fmt/include" \
     -I "src/engine/chips/include" \
-    -I "Reference Code/furnace-master/src/engine" \
-    -I "Reference Code/furnace-master/src" \
+    -I "third-party/furnace-master/src/engine" \
+    -I "third-party/furnace-master/src" \
     -O3 \
     -s WASM=1 \
     -s EXPORTED_FUNCTIONS='["_furnace_init_chips", "_furnace_chip_write", "_furnace_chip_render", "_furnace_set_wavetable", "_furnace_upload_sample", "_furnace_set_logging", "_furnace_get_log_size", "_furnace_get_log_data", "_malloc", "_free"]' \

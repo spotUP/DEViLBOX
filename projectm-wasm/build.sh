@@ -5,7 +5,7 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-PROJECTM_SRC="$REPO_ROOT/Reference Code/projectm-master"
+PROJECTM_SRC="$REPO_ROOT/third-party/projectm-master"
 PROJECTM_INSTALL="$PROJECTM_SRC/install-em"
 NPROC=$(sysctl -n hw.ncpu 2>/dev/null || nproc 2>/dev/null || echo 4)
 

@@ -4,7 +4,7 @@
 # Prerequisites:
 #   - Emscripten (emcc) in PATH
 #   - Native C compiler (cc) for build tools
-#   - UADE source at ../Reference Code/uade-3.05/
+#   - UADE source at ../third-party/uade-3.05/
 #
 # Output:
 #   ../public/uade/UADE.js
@@ -16,7 +16,7 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-UADE_SRC="$SCRIPT_DIR/../Reference Code/uade-3.05"
+UADE_SRC="$SCRIPT_DIR/../third-party/uade-3.05"
 OUT_DIR="$SCRIPT_DIR/../public/uade"
 GEN_DIR="$SCRIPT_DIR/generated"   # Generated CPU tables
 

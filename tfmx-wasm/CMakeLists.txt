@@ -14,7 +14,7 @@ execute_process(
   OUTPUT_STRIP_TRAILING_WHITESPACE
 )
 cmake_path(GET GIT_COMMON_DIR PARENT_PATH GIT_ROOT)
-set(TFMXLIB_ROOT "${GIT_ROOT}/Reference Code/libtfmxaudiodecoder-main/src")
+set(TFMXLIB_ROOT "${GIT_ROOT}/third-party/libtfmxaudiodecoder-main/src")
 
 set(TFMXLIB_SOURCES
   "${TFMXLIB_ROOT}/tfmxaudiodecoder.cpp"

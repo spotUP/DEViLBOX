@@ -103,6 +103,14 @@ log "Building AssemblyScript (DevilboxDSP.wasm)..."
 npm run asbuild
 ok "AssemblyScript built."
 
+# ── Regression tests ──────────────────────────────────────────────────────────
+log "Running regression tests..."
+if ! npx vitest run; then
+  err "Regression tests failed — fix them before starting the dev server."
+  exit 1
+fi
+ok "Regression tests passed."
+
 # ── Logs (backend and collab only — Vite runs in foreground) ─────────────────
 mkdir -p logs
 : > logs/backend.log

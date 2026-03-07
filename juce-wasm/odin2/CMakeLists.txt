@@ -12,7 +12,7 @@
 cmake_minimum_required(VERSION 3.15)
 project(Odin2WASM VERSION 2.4.1)
 
-set(ODIN2_ROOT "${CMAKE_SOURCE_DIR}/../../Reference Code/odin2-master")
+set(ODIN2_ROOT "${CMAKE_SOURCE_DIR}/../../third-party/odin2-master")
 set(ODIN2_SRC "${ODIN2_ROOT}/Source")
 
 # --- Odin2 Audio DSP Sources ---
