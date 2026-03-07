@@ -102,6 +102,11 @@ export const ArrangementView: React.FC = () => {
   useEffect(() => {
     if (!isPlaying || !isArrangementMode) return;
 
+    // Immediately sync playback row on mount/view-switch so the playhead
+    // doesn't stay stale until the next replayer row-change fires.
+    const initialGlobalRow = useTransportStore.getState().currentGlobalRow;
+    useArrangementStore.getState().setPlaybackRow(initialGlobalRow);
+
     const rafId = requestAnimationFrame(function updatePlayback() {
       // Read current global row from store state (not reactive — avoids 50Hz re-renders)
       const globalRow = useTransportStore.getState().currentGlobalRow;
