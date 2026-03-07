@@ -314,6 +314,7 @@ void DivPlatformMSM6258::reset() {
   msmClock=chipClock;
   msmDivider=2;
   msmDividerCount=0;
+  msmClock=0;
   msmClockCount=0;
   msmPan=0;
   rateSel=2;
