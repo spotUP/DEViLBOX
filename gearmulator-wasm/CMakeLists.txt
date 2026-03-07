@@ -21,12 +21,6 @@ if(EMSCRIPTEN)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread -O3")
     set(CMAKE_C_FLAGS   "${CMAKE_C_FLAGS} -pthread -O3")
 
-    # Enable C++ exception catching — DSP56300 throws std::out_of_range in
-    # hybridcontainer.h and RingBuffer during interrupt injection. Without this,
-    # Emscripten's default DISABLE_EXCEPTION_CATCHING=1 causes "Uncaught unwind"
-    # which corrupts the pthread stack and triggers "function signature mismatch".
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fwasm-exceptions")
-
     # Increase constexpr step limit for DSP56300's compile-time tables
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fconstexpr-steps=10000000")
 endif()
@@ -277,8 +271,10 @@ if(EMSCRIPTEN)
             -s EXPORTED_RUNTIME_METHODS='[\"ccall\",\"cwrap\",\"HEAPF32\",\"HEAP8\",\"HEAPU8\"]' \
             -s ALLOW_MEMORY_GROWTH=1 \
             -s ALLOW_TABLE_GROWTH=1 \
-            -s INITIAL_MEMORY=67108864 \
-            -s MAXIMUM_MEMORY=268435456 \
+            -s INITIAL_MEMORY=268435456 \
+            -s MAXIMUM_MEMORY=536870912 \
+            -s DISABLE_EXCEPTION_CATCHING=0 \
+            -s ASSERTIONS=1 \
             -s PTHREAD_POOL_SIZE=4 \
             -s WASM=1 \
             -pthread \
