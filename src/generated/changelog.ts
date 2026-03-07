@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-03-07T07:46:54.079Z
+ * Generated: 2026-03-07T13:26:10.296Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.2546';
-export const BUILD_NUMBER = '2546';
-export const BUILD_HASH = '156d3a2e9';
+export const BUILD_VERSION = '1.0.2554';
+export const BUILD_NUMBER = '2554';
+export const BUILD_HASH = '7cc955472';
 export const BUILD_DATE = '2026-03-07';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,41 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.2546',
+    version: '1.0.2554',
     date: '2026-03-07',
     changes: [
+      {
+        type: 'fix',
+        "description": "Sync arrangement playhead on view switch and update changelog"
+      },
+      {
+        type: 'feature',
+        "description": "Add searchable filter to PixiSelect dropdown"
+      },
+      {
+        type: 'feature',
+        "description": "Import dialog format capabilities, warnings, and metadata"
+      },
+      {
+        type: 'feature',
+        "description": "Add 7 new WASM format engines"
+      },
+      {
+        type: 'feature',
+        "description": "Extend furnace sequencer with FDS, QSound, N163, ESFM commands"
+      },
+      {
+        type: 'feature',
+        "description": "Refactor gearmulator to Worker+SAB audio architecture"
+      },
+      {
+        type: 'feature',
+        "description": "Add per-channel mixer gain to WASM Amiga engines"
+      },
+      {
+        type: 'fix',
+        "description": "Chore: remove temporary diagnostic/debug files and update .gitignore"
+      },
       {
         type: 'feature',
         "description": "Chore: update pxtone harness and add CMakeLists.txt"
@@ -202,34 +234,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'feature',
         "description": "Per-channel playhead in MusicLine, delete dead GTPatternEditor"
-      },
-      {
-        type: 'feature',
-        "description": "Integrate Music-Assembler and Hippel ST WASM engines"
-      },
-      {
-        type: 'feature',
-        "description": "Wire GT Ultra editing and per-channel playback rows"
-      },
-      {
-        type: 'feature',
-        "description": "Test: add PreTracker integration tests verifying parser-to-engine pipeline"
-      },
-      {
-        type: 'feature',
-        "description": "Integrate PreTracker into engine routing and import pipeline"
-      },
-      {
-        type: 'fix',
-        "description": "Audit PreTracker code — deadlock, wrong types, wrong location"
-      },
-      {
-        type: 'fix',
-        "description": "Audit cleanup of Haiku-written refactoring code"
-      },
-      {
-        type: 'fix',
-        "description": "Address code quality issues in PreTrackerParser"
       }
     ]
   }
