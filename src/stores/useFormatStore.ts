@@ -33,6 +33,7 @@ interface FormatStore {
   preTrackerFileData: ArrayBuffer | null;
   maFileData: ArrayBuffer | null;
   hippelFileData: ArrayBuffer | null;
+  sonixFileData: ArrayBuffer | null;
   hivelyMeta: { stereoMode: number; mixGain: number; speedMultiplier: number; version: number } | null;
   furnaceSubsongs: FurnaceSubsongPlayback[] | null;
   furnaceActiveSubsong: number;
@@ -85,6 +86,7 @@ export const useFormatStore = create<FormatStore>()(
     preTrackerFileData: null,
     maFileData: null,
     hippelFileData: null,
+    sonixFileData: null,
     hivelyMeta: null,
     furnaceSubsongs: null,
     furnaceActiveSubsong: 0,
@@ -119,6 +121,7 @@ export const useFormatStore = create<FormatStore>()(
         state.preTrackerFileData = song.preTrackerFileData ?? null;
         state.maFileData = song.maFileData ?? null;
         state.hippelFileData = song.hippelFileData ?? null;
+        state.sonixFileData = song.sonixFileData ?? null;
         if (song.furnaceNative) {
           state.editorMode = 'furnace';
           clearNative(state);
@@ -167,6 +170,7 @@ export const useFormatStore = create<FormatStore>()(
       state.preTrackerFileData = null;
       state.maFileData = null;
       state.hippelFileData = null;
+      state.sonixFileData = null;
       state.originalModuleData = null;
       state.songDBInfo = null;
       state.sidMetadata = null;
