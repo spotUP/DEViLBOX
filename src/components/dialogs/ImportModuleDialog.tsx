@@ -15,13 +15,15 @@ import {
   type ModuleInfo,
 } from '@lib/import/ModuleLoader';
 import { isUADEFormat } from '@lib/import/formats/UADEParser';
-import { getNativeFormatMetadata } from '@lib/import/NativeFormatMetadata';
+import { getNativeFormatMetadata, getNativeFormatExtendedMetadata } from '@lib/import/NativeFormatMetadata';
 import { useSettingsStore, type FormatEnginePreferences } from '@/stores/useSettingsStore';
 import { detectFormat, getLibopenmptPlayableKeys, type FormatDefinition } from '@lib/import/FormatRegistry';
 import type { UADEMetadata } from '@engine/uade/UADEEngine';
 import { computeSongDBHash, lookupSongDB, type SongDBResult } from '@lib/songdb';
 import { parseSIDHeader, type SIDHeaderInfo } from '@/lib/sid/SIDHeaderParser';
 import { SIDInfoPanel } from './SIDInfoPanel';
+import { getFormatCapabilities, type FormatCapabilityInfo } from '@lib/import/FormatCapabilities';
+import { Info } from 'lucide-react';
 
 export interface ImportOptions {
   useLibopenmpt: boolean;     // Use libopenmpt for sample-accurate playback
@@ -100,6 +102,15 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
   // Derived format state
   const nativeFmt  = detectNativeFormat(loadedFileName);
   const isNativeOnly = !!(nativeFmt?.nativeOnly);
+
+  // Format capability warnings
+  const formatCapabilities: FormatCapabilityInfo | null = moduleInfo
+    ? getFormatCapabilities(
+        uadeMetadata ? (uadeMetadata.formatName || 'UADE') : moduleInfo.metadata.type,
+        loadedFileName,
+        nativeFmt?.family,
+      )
+    : null;
 
   // Formats that require companion files (e.g. external Instruments/ folder)
   // Shown as a warning when none were loaded alongside the module.
@@ -204,9 +215,18 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
           ? getNativeFormatMetadata(nativeFmtForFile.key, buf)
           : { channels: -1, patterns: -1, orders: -1, instruments: -1, samples: -1 };
 
+        // Extended metadata (title, composer, year) for formats that support it
+        const extMeta = nativeFmtForFile
+          ? getNativeFormatExtendedMetadata(nativeFmtForFile.key, buf)
+          : null;
+
+        // Build title: prefer extMeta title, then SID title, then filename
+        let displayTitle = sidInfo?.title || extMeta?.title || file.name.replace(/\.[^/.]+$/, '');
+        if (extMeta?.composer) displayTitle += ` — ${extMeta.composer}`;
+
         setModuleInfo({
           metadata: {
-            title: sidInfo?.title || file.name.replace(/\.[^/.]+$/, ''),
+            title: displayTitle,
             type: isFurnace ? 'Furnace' : nativeFmtForFile!.label,
             channels:    meta.channels,
             patterns:    meta.patterns,
@@ -214,6 +234,7 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
             instruments: meta.instruments,
             samples:     meta.samples,
             duration: 0,
+            message: extMeta?.year ? `Year: ${extMeta.year}` : undefined,
           },
           arrayBuffer: buf,
           file,
@@ -501,37 +522,73 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
                     </div>
                   </>
                 ) : (
-                  // Standard libopenmpt metadata (or native format with header-extracted counts)
-                  // -1 is the sentinel for "not available" — show '--' instead of a number
+                  // Standard metadata — use local header extraction, fall back to songDB
                   <>
+                    {/* Channels: local metadata, or songDB channels */}
                     <div className="flex justify-between text-text-muted">
                       <span>Channels:</span>
-                      <span className="text-text-primary font-mono">{moduleInfo.metadata.channels < 0 ? '--' : moduleInfo.metadata.channels}</span>
+                      <span className="text-text-primary font-mono">
+                        {moduleInfo.metadata.channels >= 0
+                          ? moduleInfo.metadata.channels
+                          : songDBInfo?.channels != null
+                            ? songDBInfo.channels
+                            : '--'}
+                      </span>
                     </div>
-                    <div className="flex justify-between text-text-muted">
-                      <span>Patterns:</span>
-                      <span className="text-text-primary font-mono">{moduleInfo.metadata.patterns < 0 ? '--' : moduleInfo.metadata.patterns}</span>
-                    </div>
-                    <div className="flex justify-between text-text-muted">
-                      <span>Instruments:</span>
-                      <span className="text-text-primary font-mono">{moduleInfo.metadata.instruments < 0 ? '--' : moduleInfo.metadata.instruments}</span>
-                    </div>
-                    <div className="flex justify-between text-text-muted">
-                      <span>Samples:</span>
-                      <span className="text-text-primary font-mono">{moduleInfo.metadata.samples < 0 ? '--' : moduleInfo.metadata.samples}</span>
-                    </div>
-                    <div className="flex justify-between text-text-muted">
-                      <span>Orders:</span>
-                      <span className="text-text-primary font-mono">{moduleInfo.metadata.orders < 0 ? '--' : moduleInfo.metadata.orders}</span>
-                    </div>
-                    {moduleInfo.metadata.duration > 0 && (
+                    {/* Format from songDB (when local label is generic) */}
+                    {songDBInfo?.format && moduleInfo.metadata.type !== songDBInfo.format && (
+                      <div className="flex justify-between text-text-muted">
+                        <span>Engine:</span>
+                        <span className="text-text-primary font-mono truncate ml-2">{songDBInfo.format}</span>
+                      </div>
+                    )}
+                    {moduleInfo.metadata.patterns >= 0 && (
+                      <div className="flex justify-between text-text-muted">
+                        <span>Patterns:</span>
+                        <span className="text-text-primary font-mono">{moduleInfo.metadata.patterns}</span>
+                      </div>
+                    )}
+                    {moduleInfo.metadata.instruments >= 0 && (
+                      <div className="flex justify-between text-text-muted">
+                        <span>Instruments:</span>
+                        <span className="text-text-primary font-mono">{moduleInfo.metadata.instruments}</span>
+                      </div>
+                    )}
+                    {moduleInfo.metadata.samples >= 0 && (
+                      <div className="flex justify-between text-text-muted">
+                        <span>Samples:</span>
+                        <span className="text-text-primary font-mono">{moduleInfo.metadata.samples}</span>
+                      </div>
+                    )}
+                    {moduleInfo.metadata.orders >= 0 && (
+                      <div className="flex justify-between text-text-muted">
+                        <span>Orders:</span>
+                        <span className="text-text-primary font-mono">{moduleInfo.metadata.orders}</span>
+                      </div>
+                    )}
+                    {/* Subsong count from songDB */}
+                    {songDBInfo && songDBInfo.subsongs.length > 1 && (
+                      <div className="flex justify-between text-text-muted">
+                        <span>Subsongs:</span>
+                        <span className="text-text-primary font-mono">{songDBInfo.subsongs.length}</span>
+                      </div>
+                    )}
+                    {/* Duration from songDB when no local duration */}
+                    {moduleInfo.metadata.duration > 0 ? (
                       <div className="flex justify-between text-text-muted">
                         <span>Duration:</span>
                         <span className="text-text-primary font-mono">
                           {Math.floor(moduleInfo.metadata.duration / 60)}:{String(Math.floor(moduleInfo.metadata.duration % 60)).padStart(2, '0')}
                         </span>
                       </div>
-                    )}
+                    ) : songDBInfo?.subsongs?.[0]?.duration_ms ? (
+                      <div className="flex justify-between text-text-muted">
+                        <span>Duration:</span>
+                        <span className="text-text-primary font-mono">
+                          {Math.floor(songDBInfo.subsongs[0].duration_ms / 60000)}:{String(Math.floor((songDBInfo.subsongs[0].duration_ms % 60000) / 1000)).padStart(2, '0')}
+                        </span>
+                      </div>
+                    ) : null}
                   </>
                 )}
               </div>
@@ -556,9 +613,9 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
                     </div>
                   )}
                   {songDBInfo.album && (
-                    <div className="flex justify-between text-text-muted">
+                    <div className="flex justify-between text-text-muted col-span-2">
                       <span>Album:</span>
-                      <span className="text-text-primary">{songDBInfo.album}</span>
+                      <span className="text-text-primary truncate ml-2">{songDBInfo.album}</span>
                     </div>
                   )}
                   {songDBInfo.year && (
@@ -570,21 +627,7 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
                   {songDBInfo.publishers.length > 0 && (
                     <div className="flex justify-between text-text-muted col-span-2">
                       <span>Group:</span>
-                      <span className="text-text-primary">{songDBInfo.publishers.join(', ')}</span>
-                    </div>
-                  )}
-                  {songDBInfo.subsongs.length > 0 && !moduleInfo.metadata.duration && (
-                    <div className="flex justify-between text-text-muted">
-                      <span>Duration:</span>
-                      <span className="text-text-primary font-mono">
-                        {Math.floor(songDBInfo.subsongs[0].duration_ms / 60000)}:{String(Math.floor((songDBInfo.subsongs[0].duration_ms % 60000) / 1000)).padStart(2, '0')}
-                      </span>
-                    </div>
-                  )}
-                  {songDBInfo.format && !uadeMetadata && (
-                    <div className="flex justify-between text-text-muted">
-                      <span>Format:</span>
-                      <span className="text-text-primary">{songDBInfo.format}</span>
+                      <span className="text-text-primary truncate ml-2">{songDBInfo.publishers.join(', ')}</span>
                     </div>
                   )}
                 </div>
@@ -648,6 +691,45 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
                     {' '}folder next to this module. Drop the parent folder or use{' '}
                     <span className="font-semibold">📁 Pick Folder</span>
                     {' '}below to load them.
+                  </div>
+                </div>
+              )}
+
+              {/* Format capability warnings */}
+              {formatCapabilities && !formatCapabilities.isEditable && (
+                <div className="flex items-start gap-2 p-3 bg-red-500/10 border border-red-500/30 rounded text-xs text-red-400">
+                  <AlertCircle size={14} className="shrink-0 mt-0.5" />
+                  <div>
+                    <span className="font-semibold">Playback only — not editable.</span>
+                    {' '}This format will play back via a dedicated engine but cannot be edited in the pattern editor.
+                    {formatCapabilities.furnaceAlternative && (
+                      <>
+                        {' '}To create editable music for this platform, use{' '}
+                        <span className="font-semibold text-accent-primary">{formatCapabilities.furnaceAlternative.chipName}</span>
+                        {' '}in a new Furnace project.
+                      </>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {formatCapabilities && formatCapabilities.isEditable && !formatCapabilities.isNativeExportable && (
+                <div className="flex items-start gap-2 p-3 bg-amber-500/10 border border-amber-500/30 rounded text-xs text-amber-400">
+                  <Info size={14} className="shrink-0 mt-0.5" />
+                  <div>
+                    <span className="font-semibold">No native export.</span>
+                    {' '}This format can be edited but only saved as a DEViLBOX project (.dbx).
+                    Native format export is not available.
+                  </div>
+                </div>
+              )}
+
+              {formatCapabilities && !formatCapabilities.hasPatternData && (
+                <div className="flex items-start gap-2 p-3 bg-blue-500/10 border border-blue-500/30 rounded text-xs text-blue-400">
+                  <Info size={14} className="shrink-0 mt-0.5" />
+                  <div>
+                    <span className="font-semibold">No pattern display.</span>
+                    {' '}This format does not have extractable pattern data. The song will play back but no notes or effects are shown in the editor.
                   </div>
                 </div>
               )}

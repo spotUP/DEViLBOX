@@ -506,6 +506,92 @@ export function getNativeFormatMetadata(key: string, buffer: ArrayBuffer): Nativ
     case 'tfmx':     return tfmxMeta(buf);
     case 'sonicArranger': return sonicArrangerMeta(buf);
     case 'c64sid':       return c64SidMeta(buf);
+    case 'sndh':         return sndhMeta(buf);
     default:         return { ...UNKNOWN };
   }
+}
+
+// ── Extended metadata (title, composer, etc.) ────────────────────────────────
+
+export interface NativeFormatExtendedMeta extends NativeFormatMeta {
+  title?: string;
+  composer?: string;
+  year?: string;
+  subsongCount?: number;
+}
+
+/** SNDH / SC68 metadata — extract title, composer, year from SNDH tags or SC68 chunks */
+function sndhMeta(buf: Uint8Array): NativeFormatMeta {
+  // YM2149 always has 3 channels
+  return { channels: 3, patterns: -1, orders: -1, instruments: -1, samples: -1 };
+}
+
+/** Extract extended metadata from SNDH tags (title, composer, year, subsongs). */
+function parseSNDHExtended(buf: Uint8Array): NativeFormatExtendedMeta {
+  const base: NativeFormatExtendedMeta = { channels: 3, patterns: -1, orders: -1, instruments: -1, samples: -1 };
+
+  // SC68 container: "SC68" at offset 0
+  if (buf.length >= 4 && str(buf, 0, 4) === 'SC68') {
+    // Walk chunks for NM (title) and AN (author)
+    let off = 4;
+    while (off < buf.length && buf[off] !== 0x0A) off++;
+    off++;
+    while (off + 6 <= buf.length) {
+      const id = str(buf, off, 2);
+      const size = u32BE(buf, off + 2);
+      const dataOff = off + 6;
+      if (dataOff + size > buf.length) break;
+      if (id === 'NM') base.title = readNullTerm(buf, dataOff, size);
+      else if (id === 'AN') base.composer = readNullTerm(buf, dataOff, size);
+      off = dataOff + size;
+    }
+    return base;
+  }
+
+  // SNDH: "SNDH" at offset 12
+  if (buf.length >= 16 && str(buf, 12, 4) === 'SNDH') {
+    const scanLimit = Math.min(buf.length, 2060);
+    let off = 16; // past "SNDH"
+    while (off < scanLimit - 3) {
+      if (str(buf, off, 4) === 'HDNS') break;
+      if (str(buf, off, 4) === 'TITL') { const r = readStrAdv(buf, off + 4); base.title = r.text; off = r.next; continue; }
+      if (str(buf, off, 4) === 'COMM') { const r = readStrAdv(buf, off + 4); base.composer = r.text; off = r.next; continue; }
+      if (str(buf, off, 4) === 'YEAR') { const r = readStrAdv(buf, off + 4); base.year = r.text; off = r.next; continue; }
+      if (buf[off] === 0x23 && buf[off + 1] === 0x23) {
+        const tens = buf[off + 2] - 0x30;
+        const ones = buf[off + 3] - 0x30;
+        if (tens >= 0 && tens <= 9 && ones >= 0 && ones <= 9) base.subsongCount = tens * 10 + ones;
+        off += 4; continue;
+      }
+      off++;
+    }
+    return base;
+  }
+
+  return base;
+}
+
+function readNullTerm(buf: Uint8Array, off: number, maxLen: number): string {
+  let s = '';
+  const end = Math.min(off + maxLen, buf.length);
+  for (let i = off; i < end && buf[i] !== 0; i++) s += String.fromCharCode(buf[i]);
+  return s;
+}
+
+function readStrAdv(buf: Uint8Array, off: number): { text: string; next: number } {
+  let s = '';
+  let i = off;
+  const end = Math.min(off + 256, buf.length);
+  while (i < end && buf[i] !== 0) s += String.fromCharCode(buf[i++]);
+  return { text: s, next: i + 1 };
+}
+
+/**
+ * Extract extended metadata for formats that support it.
+ * Returns title, composer, year, subsong count when available.
+ */
+export function getNativeFormatExtendedMetadata(key: string, buffer: ArrayBuffer): NativeFormatExtendedMeta | null {
+  const buf = new Uint8Array(buffer);
+  if (key === 'sndh') return parseSNDHExtended(buf);
+  return null;
 }

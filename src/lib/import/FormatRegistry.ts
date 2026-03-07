@@ -1685,6 +1685,7 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
     extRegex: /\.(sndh|sc68)$/i,
     nativeOnly: true,
     nativeParser: { module: '@lib/import/formats/SNDHParser', parseFn: 'parseSNDHFile' },
+    hasMetadata: true,
   },
   {
     key: 'pmd',
@@ -1694,7 +1695,7 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
     matchMode: 'extension',
     extRegex: /\.(m|m2|mz|pmd)$/i,
     nativeOnly: true,
-    nativeParser: { module: '@lib/import/formats/PMDParser', parseFn: 'parsePMDFile' },
+    nativeParser: { module: '@lib/import/formats/PMDParser', parseFn: 'parsePMDFile', detectFn: 'isPMDFormat' },
   },
   {
     key: 'adplug',
@@ -1705,6 +1706,65 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
     extRegex: /\.(rad|hsc|cmf|d00|dro|imf|sa2|raw|lds|ksm|sci|got|bam|mus|cff|dtm|mkj|rix|sng|jbm|a2m|amd|xad)$/i,
     nativeOnly: true,
     nativeParser: { module: '@lib/import/formats/AdPlugParser', parseFn: 'parseAdPlugFile' },
+  },
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // WASM-ONLY REPLAY — Extension registration for formats handled by
+  // AmigaFormatParsers (no native parser reference — routing is in AmigaFormatParsers)
+  // ═══════════════════════════════════════════════════════════════════════════
+  {
+    key: 'pxtone',
+    label: 'PxTone',
+    description: 'PxTone Collage / Tune by Studio Pixel',
+    family: 'chip-dump',
+    matchMode: 'extension',
+    extRegex: /\.(ptcop|pttune)$/i,
+    nativeOnly: true,
+  },
+  {
+    key: 'organya',
+    label: 'Organya',
+    description: 'Organya (Cave Story) music format',
+    family: 'chip-dump',
+    matchMode: 'extension',
+    extRegex: /\.org$/i,
+    nativeOnly: true,
+  },
+  {
+    key: 'eupmini',
+    label: 'EUP',
+    description: 'FM Towns EUP music (YM2612 + SSG + ADPCM)',
+    family: 'chip-dump',
+    matchMode: 'extension',
+    extRegex: /\.eup$/i,
+    nativeOnly: true,
+  },
+  {
+    key: 'ixalance',
+    label: 'IXS',
+    description: 'Impulse Tracker variant (IXS/Ixalance)',
+    family: 'chip-dump',
+    matchMode: 'extension',
+    extRegex: /\.ixs$/i,
+    nativeOnly: true,
+  },
+  {
+    key: 'cpsycle',
+    label: 'Psycle',
+    description: 'Psycle modular tracker',
+    family: 'chip-dump',
+    matchMode: 'extension',
+    extRegex: /\.psy$/i,
+    nativeOnly: true,
+  },
+  {
+    key: 'zxtune',
+    label: 'ZXTune',
+    description: 'ZX Spectrum / AY-3-8910 chiptune formats',
+    family: 'chip-dump',
+    matchMode: 'extension',
+    extRegex: /\.(pt3|pt2|pt1|stc|st1|st3|stp|vtx|psg|psm|sqt|psc|asc|gtr|ftc|ayc|cop|tfc|tfd|tf0|pdt|chi|str|dst|dmm|et1)$/i,
+    nativeOnly: true,
   },
 
   // ═══════════════════════════════════════════════════════════════════════════
