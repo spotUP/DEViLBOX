@@ -349,6 +349,18 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
         if (this.wasm) this.wasm.seqSetSpeed(data.speed1, data.speed2);
         break;
       }
+      case 'seqSetSpeedPattern': {
+        if (this.wasm && this.module && data.values && data.values.length > 0) {
+          const len = Math.min(data.values.length, 16);
+          const ptr = this.module._malloc(len * 2); // uint16_t
+          for (let i = 0; i < len; i++) {
+            this.module.HEAPU16[(ptr >> 1) + i] = data.values[i];
+          }
+          this.wasm.seqSetSpeedPattern(ptr, len);
+          this.module._free(ptr);
+        }
+        break;
+      }
       case 'seqSetTempo': {
         if (this.wasm) this.wasm.seqSetTempo(data.virtualN || 150, data.virtualD || 150);
         break;
@@ -517,6 +529,7 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
         seqStop: this.module._furnace_seq_stop,
         seqSeek: this.module._furnace_seq_seek,
         seqSetSpeed: this.module._furnace_seq_set_speed,
+        seqSetSpeedPattern: this.module._furnace_seq_set_speed_pattern,
         seqSetTempo: this.module._furnace_seq_set_tempo,
         seqSetGroove: this.module._furnace_seq_set_groove,
         seqSetGrooveEntry: this.module._furnace_seq_set_groove_entry,

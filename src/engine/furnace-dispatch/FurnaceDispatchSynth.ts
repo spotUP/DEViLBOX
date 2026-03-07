@@ -379,7 +379,7 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
       // Wire oscilloscope data to the store
       const oscStore = useOscilloscopeStore.getState();
       const channelNames = this.getChannelNames();
-      oscStore.setChipInfo(channelNames.length, this.platformType);
+      oscStore.setChipInfo(channelNames.length, this.platformType, channelNames);
 
       this.engine.onOscData((channels) => {
         useOscilloscopeStore.getState().updateChannelData(channels);
