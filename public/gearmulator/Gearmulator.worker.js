@@ -175,7 +175,7 @@ async function initSynth(data) {
     },
     // Suppress Emscripten's verbose stdout/stderr but show important messages
     print: (text) => {
-      if (text.includes('Factory reset') || text.includes('boot') || text.includes('ERROR') || text.includes('error'))
+      if (text.includes('[EM]') || text.includes('Factory reset') || text.includes('boot') || text.includes('ERROR') || text.includes('error') || text.includes('snapshot') || text.includes('ESAI') || text.includes('MIPS'))
         console.log('[EM]', text);
     },
     printErr: (text) => {
