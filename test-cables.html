@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Patch Cable Rendering Test</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #1a1a2e; overflow: hidden; font-family: 'Segoe UI', sans-serif; }
+  #controls {
+    position: fixed; top: 12px; left: 12px; z-index: 10;
+    background: rgba(0,0,0,0.7); border-radius: 8px; padding: 14px 18px;
+    color: #ccc; font-size: 13px; backdrop-filter: blur(8px);
+    border: 1px solid rgba(255,255,255,0.08);
+  }
+  #controls label { display: block; margin: 6px 0 2px; color: #999; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
+  #controls input[type=range] { width: 180px; accent-color: #e94560; }
+  #controls .val { color: #e94560; float: right; font-variant-numeric: tabular-nums; }
+  #controls h3 { color: #e94560; margin-bottom: 8px; font-size: 14px; font-weight: 600; }
+  #controls .hint { color: #666; font-size: 10px; margin-top: 10px; line-height: 1.5; }
+  #info {
+    position: fixed; bottom: 12px; left: 12px; z-index: 10;
+    background: rgba(0,0,0,0.6); border-radius: 6px; padding: 8px 14px;
+    color: #666; font-size: 11px; backdrop-filter: blur(4px);
+  }
+</style>
+</head>
+<body>
+<div id="controls">
+  <h3>Cable Rendering Test</h3>
+  <label>Tension <span class="val" id="tensionVal">0.50</span></label>
+  <input type="range" id="tension" min="0" max="100" value="50">
+  <label>Thickness <span class="val" id="thicknessVal">7</span></label>
+  <input type="range" id="thickness" min="2" max="16" value="7">
+  <label>Opacity <span class="val" id="opacityVal">0.60</span></label>
+  <input type="range" id="opacity" min="10" max="100" value="60">
+  <label>Shadow Offset <span class="val" id="shadowVal">25</span></label>
+  <input type="range" id="shadow" min="0" max="60" value="25">
+  <label>Segments <span class="val" id="segVal">30</span></label>
+  <input type="range" id="segments" min="5" max="60" value="30">
+  <div class="hint">
+    Drag the colored circles to move cable endpoints.<br>
+    Hover cables to highlight them.
+  </div>
+</div>
+<div id="info">
+  PixiJS v8 | MeshRope + Quadratic Bezier (VCV Rack algorithm) | <span id="fps">--</span> FPS | <span id="cableCount">--</span> cables
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/pixi.js@8.6.6/dist/pixi.min.js"></script>
+<script>
+(async () => {
+  const app = new PIXI.Application();
+  await app.init({
+    resizeTo: window,
+    antialias: true,
+    backgroundColor: 0x1a1a2e,
+    resolution: window.devicePixelRatio || 1,
+    autoDensity: true,
+  });
+  document.body.appendChild(app.canvas);
+
+  // --- Settings ---
+  let tension = 0.5;
+  let thickness = 7;
+  let cableOpacity = 0.6;
+  let shadowOffset = 25;
+  let numSegments = 30;
+
+  const tensionSlider = document.getElementById('tension');
+  const thicknessSlider = document.getElementById('thickness');
+  const opacitySlider = document.getElementById('opacity');
+  const shadowSlider = document.getElementById('shadow');
+  const segSlider = document.getElementById('segments');
+
+  tensionSlider.oninput = () => { tension = tensionSlider.value / 100; document.getElementById('tensionVal').textContent = tension.toFixed(2); };
+  thicknessSlider.oninput = () => { thickness = +thicknessSlider.value; document.getElementById('thicknessVal').textContent = thickness; };
+  opacitySlider.oninput = () => { cableOpacity = opacitySlider.value / 100; document.getElementById('opacityVal').textContent = cableOpacity.toFixed(2); };
+  shadowSlider.oninput = () => { shadowOffset = +shadowSlider.value; document.getElementById('shadowVal').textContent = shadowOffset; };
+  segSlider.oninput = () => { numSegments = +segSlider.value; document.getElementById('segVal').textContent = numSegments; };
+
+  // --- Cable texture generation ---
+  // Creates a small texture with baked-in 3D highlight/shadow
+  function createCableTexture(width, height) {
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+
+    // Draw a vertical gradient simulating a 3D cylinder cross-section
+    // Top = highlight, middle = base color (white, will be tinted), bottom = shadow
+    for (let y = 0; y < height; y++) {
+      const t = y / (height - 1); // 0 = top, 1 = bottom
+      // Cylinder shading: bright at top, dark at bottom
+      // Using a shifted cosine for smooth rolloff
+      const angle = t * Math.PI;
+      const brightness = 0.45 + 0.55 * Math.cos(angle - 0.3);
+      const r = Math.round(brightness * 255);
+      const g = Math.round(brightness * 255);
+      const b = Math.round(brightness * 255);
+      ctx.fillStyle = `rgb(${r},${g},${b})`;
+      ctx.fillRect(0, y, width, 1);
+    }
+
+    // Add a specular highlight near the top
+    const specGrad = ctx.createLinearGradient(0, 0, 0, height);
+    specGrad.addColorStop(0.0, 'rgba(255,255,255,0.0)');
+    specGrad.addColorStop(0.15, 'rgba(255,255,255,0.35)');
+    specGrad.addColorStop(0.35, 'rgba(255,255,255,0.0)');
+    specGrad.addColorStop(1.0, 'rgba(255,255,255,0.0)');
+    ctx.fillStyle = specGrad;
+    ctx.fillRect(0, 0, width, height);
+
+    return PIXI.Texture.from(canvas);
+  }
+
+  const cableTexture = createCableTexture(32, 16);
+
+  // --- Quadratic Bezier helper (VCV Rack algorithm) ---
+  function getSlumpPoint(p1x, p1y, p2x, p2y, t) {
+    const dx = p2x - p1x;
+    const dy = p2y - p1y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    const midX = (p1x + p2x) / 2;
+    const midY = (p1y + p2y) / 2 + (1 - t) * (100 + dist * 0.5);
+    return { x: midX, y: midY };
+  }
+
+  function tessellateQuadBezier(x1, y1, cx, cy, x2, y2, segs) {
+    const pts = [];
+    for (let i = 0; i <= segs; i++) {
+      const t = i / segs;
+      const mt = 1 - t;
+      pts.push(new PIXI.Point(
+        mt * mt * x1 + 2 * mt * t * cx + t * t * x2,
+        mt * mt * y1 + 2 * mt * t * cy + t * t * y2
+      ));
+    }
+    return pts;
+  }
+
+  // --- Layers ---
+  const shadowLayer = new PIXI.Container();
+  const cableLayer = new PIXI.Container();
+  const outlineLayer = new PIXI.Container();
+  const handleLayer = new PIXI.Container();
+  app.stage.addChild(shadowLayer, cableLayer, outlineLayer, handleLayer);
+
+  // --- Cable colors (VCV Rack style palette) ---
+  const CABLE_COLORS = [
+    0xe94560, // Red
+    0xf5a623, // Orange
+    0x50c878, // Emerald
+    0x4da6ff, // Blue
+    0xc084fc, // Purple
+    0xff6b9d, // Pink
+    0x00d4aa, // Teal
+    0xffd700, // Gold
+  ];
+
+  // --- Port positions (simulated module layout) ---
+  const W = window.innerWidth;
+  const H = window.innerHeight;
+
+  // Create a grid of "ports" — left column outputs, right column inputs
+  const cables = [];
+
+  function createCable(x1, y1, x2, y2, colorIdx) {
+    const color = CABLE_COLORS[colorIdx % CABLE_COLORS.length];
+
+    // Shadow rope
+    const shadowPts = tessellateQuadBezier(x1, y1, (x1+x2)/2, (y1+y2)/2+200, x2, y2, numSegments);
+    const shadowRope = new PIXI.MeshRope({ texture: cableTexture, points: shadowPts, textureScale: 0 });
+    shadowRope.tint = 0x000000;
+    shadowRope.alpha = 0.12;
+    shadowLayer.addChild(shadowRope);
+
+    // Outline rope (slightly wider, darker)
+    const outlinePts = tessellateQuadBezier(x1, y1, (x1+x2)/2, (y1+y2)/2+200, x2, y2, numSegments);
+    const outlineRope = new PIXI.MeshRope({ texture: cableTexture, points: outlinePts, textureScale: 0 });
+    outlineRope.tint = darkenColor(color, 0.5);
+    outlineRope.alpha = cableOpacity;
+    outlineLayer.addChild(outlineRope);
+
+    // Main cable rope
+    const cablePts = tessellateQuadBezier(x1, y1, (x1+x2)/2, (y1+y2)/2+200, x2, y2, numSegments);
+    const cableRope = new PIXI.MeshRope({ texture: cableTexture, points: cablePts, textureScale: 0 });
+    cableRope.tint = color;
+    cableRope.alpha = cableOpacity;
+    cableLayer.addChild(cableRope);
+
+    // Draggable endpoint handles
+    const h1 = createHandle(x1, y1, color);
+    const h2 = createHandle(x2, y2, color);
+    handleLayer.addChild(h1, h2);
+
+    const cable = {
+      x1, y1, x2, y2, color, colorIdx,
+      shadowRope, shadowPts,
+      outlineRope, outlinePts,
+      cableRope, cablePts,
+      h1, h2,
+      highlighted: false,
+    };
+
+    // Make handles draggable
+    setupDrag(h1, cable, 'start');
+    setupDrag(h2, cable, 'end');
+
+    // Hover detection on the cable
+    cableRope.eventMode = 'static';
+    cableRope.cursor = 'pointer';
+    cableRope.on('pointerover', () => { cable.highlighted = true; });
+    cableRope.on('pointerout', () => { cable.highlighted = false; });
+
+    cables.push(cable);
+    return cable;
+  }
+
+  function darkenColor(color, factor) {
+    const r = ((color >> 16) & 0xff) * factor;
+    const g = ((color >> 8) & 0xff) * factor;
+    const b = (color & 0xff) * factor;
+    return (Math.round(r) << 16) | (Math.round(g) << 8) | Math.round(b);
+  }
+
+  function createHandle(x, y, color) {
+    const g = new PIXI.Graphics();
+    // Outer ring
+    g.circle(0, 0, 11);
+    g.fill({ color: 0x2a2a3e });
+    g.stroke({ width: 2.5, color: color });
+    // Inner dot
+    g.circle(0, 0, 4);
+    g.fill({ color: color });
+    g.position.set(x, y);
+    g.eventMode = 'static';
+    g.cursor = 'grab';
+    return g;
+  }
+
+  function setupDrag(handle, cable, which) {
+    let dragging = false;
+    handle.on('pointerdown', (e) => {
+      dragging = true;
+      handle.cursor = 'grabbing';
+      handle.alpha = 0.9;
+      e.stopPropagation();
+    });
+    app.stage.eventMode = 'static';
+    app.stage.on('pointermove', (e) => {
+      if (!dragging) return;
+      const pos = e.global;
+      handle.position.set(pos.x, pos.y);
+      if (which === 'start') { cable.x1 = pos.x; cable.y1 = pos.y; }
+      else { cable.x2 = pos.x; cable.y2 = pos.y; }
+    });
+    app.stage.on('pointerup', () => {
+      if (dragging) {
+        dragging = false;
+        handle.cursor = 'grab';
+        handle.alpha = 1;
+      }
+    });
+  }
+
+  function updateCable(cable) {
+    const { x1, y1, x2, y2 } = cable;
+    const slump = getSlumpPoint(x1, y1, x2, y2, tension);
+    const segs = numSegments;
+
+    // Update main cable points
+    const newPts = tessellateQuadBezier(x1, y1, slump.x, slump.y, x2, y2, segs);
+
+    // Resize point arrays if segment count changed
+    function syncPoints(arr, src) {
+      while (arr.length > src.length) arr.pop();
+      while (arr.length < src.length) arr.push(new PIXI.Point(0, 0));
+      for (let i = 0; i < src.length; i++) { arr[i].x = src[i].x; arr[i].y = src[i].y; }
+    }
+
+    syncPoints(cable.cablePts, newPts);
+    syncPoints(cable.outlinePts, newPts);
+
+    // Shadow is offset downward
+    const shadowPts = newPts.map(p => new PIXI.Point(p.x, p.y + shadowOffset));
+    syncPoints(cable.shadowPts, shadowPts);
+
+    // Visual properties
+    const alpha = cable.highlighted ? 1.0 : cableOpacity;
+    const w = cable.highlighted ? thickness + 2 : thickness;
+
+    cable.cableRope.alpha = alpha;
+    cable.cableRope.size = w;
+    cable.outlineRope.alpha = alpha;
+    cable.outlineRope.size = w + 2;
+    cable.shadowRope.alpha = cable.highlighted ? 0.2 : 0.12;
+    cable.shadowRope.size = w;
+  }
+
+  // --- Create demo cables ---
+  // Left-side ports
+  const leftX = W * 0.3;
+  const rightX = W * 0.7;
+  const startY = H * 0.15;
+  const spacing = 65;
+
+  for (let i = 0; i < 8; i++) {
+    const y1 = startY + i * spacing;
+    // Connect to various right-side positions (some crossing for realism)
+    const targetIdx = [5, 2, 7, 0, 6, 1, 4, 3][i];
+    const y2 = startY + targetIdx * spacing;
+    createCable(leftX, y1, rightX, y2, i);
+  }
+
+  // A few extra cables with different start/end positions for variety
+  createCable(leftX - 80, startY + 2 * spacing, rightX + 60, startY + 4 * spacing, 3);
+  createCable(leftX + 40, startY + 5 * spacing, rightX - 30, startY + 1 * spacing, 6);
+
+  document.getElementById('cableCount').textContent = cables.length;
+
+  // --- FPS counter ---
+  let frameCount = 0;
+  let lastFpsTime = performance.now();
+  const fpsEl = document.getElementById('fps');
+
+  // --- Main loop ---
+  app.ticker.add(() => {
+    for (const cable of cables) {
+      updateCable(cable);
+    }
+
+    // FPS
+    frameCount++;
+    const now = performance.now();
+    if (now - lastFpsTime >= 500) {
+      fpsEl.textContent = Math.round(frameCount / ((now - lastFpsTime) / 1000));
+      frameCount = 0;
+      lastFpsTime = now;
+    }
+  });
+
+  // --- Resize ---
+  window.addEventListener('resize', () => {
+    app.renderer.resize(window.innerWidth, window.innerHeight);
+  });
+
+})();
+</script>
+</body>
+</html>
