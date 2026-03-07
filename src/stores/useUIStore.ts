@@ -87,6 +87,7 @@ interface UIStore {
   oscilloscopePoppedOut: boolean;
   arrangementPoppedOut: boolean;
   vjPoppedOut: boolean;
+  patternEditorPoppedOut: boolean;
 
   // Transient UI state (not persisted)
   statusMessage: string;
@@ -158,6 +159,7 @@ interface UIStore {
   setOscilloscopePoppedOut: (v: boolean) => void;
   setArrangementPoppedOut: (v: boolean) => void;
   setVJPoppedOut: (v: boolean) => void;
+  setPatternEditorPoppedOut: (v: boolean) => void;
 
   // Module import actions
   setPendingModuleFile: (file: File | null) => void;
@@ -249,6 +251,7 @@ export const useUIStore = create<UIStore>()(
       oscilloscopePoppedOut: false,
       arrangementPoppedOut: false,
       vjPoppedOut: false,
+      patternEditorPoppedOut: false,
 
       // Transient state
       statusMessage: 'All Right',
@@ -550,6 +553,11 @@ export const useUIStore = create<UIStore>()(
       setVJPoppedOut: (v) =>
         set((state) => {
           state.vjPoppedOut = v;
+        }),
+
+      setPatternEditorPoppedOut: (v) =>
+        set((state) => {
+          state.patternEditorPoppedOut = v;
         }),
 
       // Module import actions
