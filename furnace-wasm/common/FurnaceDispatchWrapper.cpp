@@ -22,7 +22,6 @@ extern "C" {
   void engine_set_instrument(int index, DivInstrument* ins);
   void engine_set_wavetable(int index, DivWavetable* wave);
   void engine_set_sample(int index, DivSample* sample);
-  void engine_register_instrument_set_callback(void (*cb)(int, DivInstrument*));
 }
 
 // ============================================================
@@ -238,432 +237,7 @@ enum DivSystemLocal {
 // ============================================================
 // Macro Interpreter (ported from Furnace macroInt.h/cpp)
 // ============================================================
-#define MACRO_MAX_LENGTH 256
 #define MAX_CHANNELS 32
-#define MAX_MACROS_PER_INS 128
-
-// Individual macro state
-struct MacroState {
-  int pos;        // Current position in macro
-  int lastPos;    // Last position (for ADSR state)
-  int lfoPos;     // LFO position
-  int delay;      // Delay counter
-  int val;        // Current output value
-  bool has;       // Macro is active
-  bool had;       // Macro had value this tick
-  bool finished;  // Macro just finished
-  bool released;  // Note-off triggered
-  bool masked;    // Macro is masked/disabled
-  unsigned char mode; // 0=sequence, 1=ADSR, 2=LFO
-
-  void init() {
-    pos = lastPos = lfoPos = delay = 0;
-    val = 0;
-    has = had = finished = released = masked = false;
-  }
-};
-
-// Stored macro data (parsed from binary)
-struct MacroData {
-  int val[MACRO_MAX_LENGTH];  // Macro values
-  int len;                     // Length
-  int loop;                    // Loop point (-1 = no loop)
-  int rel;                     // Release point (-1 = no release)
-  unsigned char speed;         // Speed/delay
-  unsigned char delay;         // Initial delay
-  unsigned char mode;          // 0=sequence, 1=ADSR, 2=LFO
-  unsigned char open;          // Flags (bit 3 = active release)
-  unsigned char macroType;     // DIV_MACRO_* type
-  bool valid;
-
-  MacroData(): len(0), loop(-1), rel(-1), speed(1), delay(0), mode(0), open(0), macroType(0), valid(false) {
-    memset(val, 0, sizeof(val));
-  }
-};
-
-// Per-instrument macro collection
-struct InstrumentMacros {
-  MacroData vol, arp, duty, wave, pitch;
-  MacroData ex1, ex2, ex3, ex4, ex5, ex6, ex7, ex8, ex9, ex10;
-  MacroData alg, fb, fms, ams;
-  MacroData panL, panR, phaseReset;
-
-  // FM operator macros (4 operators x 20 params each)
-  MacroData opMacros[4][20]; // [op][param]
-
-  bool valid;
-
-  InstrumentMacros(): valid(false) {}
-
-  MacroData* getByType(unsigned char type) {
-    if (type >= 0x20) {
-      // Operator macro
-      unsigned char op = ((type >> 5) - 1) & 3;
-      unsigned char param = type & 0x1f;
-      if (param < 20) return &opMacros[op][param];
-      return nullptr;
-    }
-    switch (type) {
-      case 0: return &vol;
-      case 1: return &arp;
-      case 2: return &duty;
-      case 3: return &wave;
-      case 4: return &pitch;
-      case 5: return &ex1;
-      case 6: return &ex2;
-      case 7: return &ex3;
-      case 8: return &alg;
-      case 9: return &fb;
-      case 10: return &fms;
-      case 11: return &ams;
-      case 12: return &panL;
-      case 13: return &panR;
-      case 14: return &phaseReset;
-      case 15: return &ex4;
-      case 16: return &ex5;
-      case 17: return &ex6;
-      case 18: return &ex7;
-      case 19: return &ex8;
-      case 20: return &ex9;
-      case 21: return &ex10;
-      default: return nullptr;
-    }
-  }
-};
-
-// Per-channel macro interpreter
-struct ChannelMacroState {
-  MacroState vol, arp, duty, wave, pitch;
-  MacroState ex1, ex2, ex3;
-  MacroState alg, fb, fms, ams;
-  MacroState panL, panR, phaseReset;
-  MacroState ex4, ex5, ex6, ex7, ex8, ex9, ex10;  // C64 uses ex4=special, ex5-ex8=ADSR
-  MacroState opMacros[4][20]; // Per-operator
-
-  int insIndex;       // Current instrument
-  int baseNote;       // Base note for arpeggio
-  int lastVolume;     // Track last volume for changes
-  int lastArpVal;     // Track last arp value
-  int lastPitch;      // Track last pitch
-  bool active;        // Channel is active
-  bool noteReleased;  // Note-off received
-
-  ChannelMacroState(): insIndex(-1), baseNote(0), lastVolume(-1), lastArpVal(0),
-                       lastPitch(0), active(false), noteReleased(false) {
-    initAll();
-  }
-
-  void initAll() {
-    vol.init(); arp.init(); duty.init(); wave.init(); pitch.init();
-    ex1.init(); ex2.init(); ex3.init();
-    alg.init(); fb.init(); fms.init(); ams.init();
-    panL.init(); panR.init(); phaseReset.init();
-    ex4.init(); ex5.init(); ex6.init(); ex7.init();
-    ex8.init(); ex9.init(); ex10.init();
-    for (int o = 0; o < 4; o++) {
-      for (int p = 0; p < 20; p++) {
-        opMacros[o][p].init();
-      }
-    }
-    lastVolume = -1;
-    lastArpVal = 0;
-    lastPitch = 0;
-  }
-
-  MacroState* getByType(unsigned char type) {
-    if (type >= 0x20) {
-      unsigned char op = ((type >> 5) - 1) & 3;
-      unsigned char param = type & 0x1f;
-      if (param < 20) return &opMacros[op][param];
-      return nullptr;
-    }
-    switch (type) {
-      case 0: return &vol;
-      case 1: return &arp;
-      case 2: return &duty;
-      case 3: return &wave;
-      case 4: return &pitch;
-      case 5: return &ex1;
-      case 6: return &ex2;
-      case 7: return &ex3;
-      case 8: return &alg;
-      case 9: return &fb;
-      case 10: return &fms;
-      case 11: return &ams;
-      case 12: return &panL;
-      case 13: return &panR;
-      case 14: return &phaseReset;
-      case 15: return &ex4;
-      case 16: return &ex5;
-      case 17: return &ex6;
-      case 18: return &ex7;
-      case 19: return &ex8;
-      case 20: return &ex9;
-      case 21: return &ex10;
-      default: return nullptr;
-    }
-  }
-};
-
-// ADSR macro value accessors
-#define ADSR_LOW(m)  ((m).val[0])
-#define ADSR_HIGH(m) ((m).val[1])
-#define ADSR_AR(m)   ((m).val[2])
-#define ADSR_HT(m)   ((m).val[3])
-#define ADSR_DR(m)   ((m).val[4])
-#define ADSR_SL(m)   ((m).val[5])
-#define ADSR_ST(m)   ((m).val[6])
-#define ADSR_SR(m)   ((m).val[7])
-#define ADSR_RR(m)   ((m).val[8])
-#define LFO_SPEED(m) ((m).val[11])
-#define LFO_WAVE(m)  ((m).val[12])
-#define LFO_PHASE(m) ((m).val[13])
-
-// Process one macro tick
-void doMacroTick(MacroState& state, MacroData& source, bool released) {
-  if (!state.has || state.masked) {
-    state.had = false;
-    return;
-  }
-
-  // Handle release point jump
-  if (released && source.mode == 0 && state.pos < source.rel &&
-      source.rel < source.len && (source.open & 8)) {
-    state.delay = 0;
-    state.pos = source.rel;
-  }
-
-  // ADSR release handling
-  if (released && source.mode == 1 && state.lastPos < 3) {
-    state.delay = 0;
-    state.lastPos = 3;
-  }
-
-  // Delay handling
-  if (state.delay > 0) {
-    state.delay--;
-    return;
-  }
-  state.delay = source.speed - 1;
-
-  state.had = true;
-
-  if (source.mode == 0) {
-    // Sequence mode
-    state.lastPos = state.pos;
-    if (state.pos < source.len) {
-      state.val = source.val[state.pos++];
-    }
-
-    // Handle loop before release
-    if (!released && state.pos > source.rel && source.rel >= 0) {
-      if (source.loop >= 0 && source.loop < source.len && source.loop < source.rel) {
-        state.pos = source.loop;
-      } else {
-        state.pos--;
-      }
-    }
-
-    // Handle end of macro
-    if (state.pos >= source.len) {
-      if (source.loop >= 0 && source.loop < source.len) {
-        state.pos = source.loop;
-      } else {
-        state.has = false;
-        state.finished = true;
-      }
-    }
-  } else if (source.mode == 1) {
-    // ADSR mode
-    switch (state.lastPos) {
-      case 0: // Attack
-        state.pos += ADSR_AR(source);
-        if (state.pos > 255) {
-          state.pos = 255;
-          state.lastPos = 1;
-          state.delay = ADSR_HT(source);
-        }
-        break;
-      case 1: // Decay
-        state.pos -= ADSR_DR(source);
-        if (state.pos <= ADSR_SL(source)) {
-          state.pos = ADSR_SL(source);
-          state.lastPos = 2;
-          state.delay = ADSR_ST(source);
-        }
-        break;
-      case 2: // Sustain
-        state.pos -= ADSR_SR(source);
-        if (state.pos < 0) {
-          state.pos = 0;
-          state.lastPos = 4;
-        }
-        break;
-      case 3: // Release
-        state.pos -= ADSR_RR(source);
-        if (state.pos < 0) {
-          state.pos = 0;
-          state.lastPos = 4;
-        }
-        break;
-      case 4: // End
-        state.pos = 0;
-        state.has = false;
-        break;
-    }
-
-    // Calculate ADSR output value
-    if (ADSR_HIGH(source) > ADSR_LOW(source)) {
-      state.val = ADSR_LOW(source) + ((state.pos * (ADSR_HIGH(source) - ADSR_LOW(source))) >> 8);
-    } else {
-      state.val = ADSR_HIGH(source) + (((255 - state.pos) * (ADSR_LOW(source) - ADSR_HIGH(source))) >> 8);
-    }
-  } else if (source.mode == 2) {
-    // LFO mode
-    state.lfoPos += LFO_SPEED(source);
-    state.lfoPos &= 1023;
-
-    int lfoOut = 0;
-    switch (LFO_WAVE(source) & 3) {
-      case 0: // Triangle
-        lfoOut = ((state.lfoPos & 512) ? (1023 - state.lfoPos) : state.lfoPos) >> 1;
-        break;
-      case 1: // Saw
-        lfoOut = state.lfoPos >> 2;
-        break;
-      case 2: // Pulse
-        lfoOut = (state.lfoPos & 512) ? 255 : 0;
-        break;
-    }
-
-    if (ADSR_HIGH(source) > ADSR_LOW(source)) {
-      state.val = ADSR_LOW(source) + ((lfoOut * (ADSR_HIGH(source) - ADSR_LOW(source))) >> 8);
-    } else {
-      state.val = ADSR_HIGH(source) + (((255 - lfoOut) * (ADSR_LOW(source) - ADSR_HIGH(source))) >> 8);
-    }
-  }
-}
-
-// Initialize macro state from macro data
-void initMacroState(MacroState& state, MacroData& source) {
-  state.init();
-  if (source.valid && source.len > 0) {
-    state.has = true;
-    state.mode = source.mode;
-    state.delay = source.delay;
-    if (source.mode == 2) {
-      state.lfoPos = LFO_PHASE(source);
-    }
-  }
-}
-
-// Global storage for instrument macros
-static std::map<int, InstrumentMacros> g_instrumentMacros;
-
-/**
- * Copy a single DivInstrumentMacro to our MacroData format.
- */
-static void copyMacroFromIns(MacroData& md, const DivInstrumentMacro& src, unsigned char macroType) {
-  md.macroType = macroType;
-  md.mode = src.mode;
-  md.open = src.open;
-  md.len = src.len;
-  md.delay = src.delay;
-  md.speed = (src.speed > 0) ? src.speed : 1;
-  md.loop = src.loop;
-  md.rel = src.rel;
-  md.valid = (src.len > 0);
-  for (int i = 0; i < src.len && i < MACRO_MAX_LENGTH; i++) {
-    md.val[i] = src.val[i];
-  }
-}
-
-/**
- * Copy all macros from a DivInstrument to g_instrumentMacros.
- * This enables our macro processor to use macros uploaded via set_instrument_full.
- * Note: This is registered as a callback in engine_set_instrument, so it's called
- * automatically whenever ANY instrument is set via any upload path.
- */
-void syncMacrosFromInstrument(int insIndex, DivInstrument* ins) {
-  if (!ins) return;
-  
-  InstrumentMacros& im = g_instrumentMacros[insIndex];
-  im.valid = true;
-  
-  // Copy standard macros (index matches our getByType switch)
-  copyMacroFromIns(im.vol, ins->std.volMacro, 0);
-  copyMacroFromIns(im.arp, ins->std.arpMacro, 1);
-  copyMacroFromIns(im.duty, ins->std.dutyMacro, 2);
-  copyMacroFromIns(im.wave, ins->std.waveMacro, 3);
-  copyMacroFromIns(im.pitch, ins->std.pitchMacro, 4);
-  copyMacroFromIns(im.ex1, ins->std.ex1Macro, 5);
-  copyMacroFromIns(im.ex2, ins->std.ex2Macro, 6);
-  copyMacroFromIns(im.ex3, ins->std.ex3Macro, 7);
-  copyMacroFromIns(im.alg, ins->std.algMacro, 8);
-  copyMacroFromIns(im.fb, ins->std.fbMacro, 9);
-  copyMacroFromIns(im.fms, ins->std.fmsMacro, 10);
-  copyMacroFromIns(im.ams, ins->std.amsMacro, 11);
-  copyMacroFromIns(im.panL, ins->std.panLMacro, 12);
-  copyMacroFromIns(im.panR, ins->std.panRMacro, 13);
-  copyMacroFromIns(im.phaseReset, ins->std.phaseResetMacro, 14);
-  copyMacroFromIns(im.ex4, ins->std.ex4Macro, 15);
-  copyMacroFromIns(im.ex5, ins->std.ex5Macro, 16);
-  copyMacroFromIns(im.ex6, ins->std.ex6Macro, 17);
-  copyMacroFromIns(im.ex7, ins->std.ex7Macro, 18);
-  copyMacroFromIns(im.ex8, ins->std.ex8Macro, 19);
-  copyMacroFromIns(im.ex9, ins->std.ex9Macro, 20);
-  copyMacroFromIns(im.ex10, ins->std.ex10Macro, 21);
-  
-  // Copy FM operator macros (4 operators x 20 params)
-  // Operator macro type encoding: (op << 5) | param
-  // where op = 0-3 and param = 0-19
-  for (int op = 0; op < 4; op++) {
-    const DivInstrumentSTD::OpMacro& srcOp = ins->std.opMacros[op];
-    // Map each operator macro to its param index (matching Furnace's DIV_MACRO_OP_* order)
-    const DivInstrumentMacro* srcMacros[20] = {
-      &srcOp.amMacro,    // 0: AM
-      &srcOp.arMacro,    // 1: AR
-      &srcOp.drMacro,    // 2: DR
-      &srcOp.multMacro,  // 3: MULT
-      &srcOp.rrMacro,    // 4: RR
-      &srcOp.slMacro,    // 5: SL
-      &srcOp.tlMacro,    // 6: TL
-      &srcOp.dt2Macro,   // 7: DT2
-      &srcOp.rsMacro,    // 8: RS
-      &srcOp.dtMacro,    // 9: DT
-      &srcOp.d2rMacro,   // 10: D2R
-      &srcOp.ssgMacro,   // 11: SSG
-      &srcOp.damMacro,   // 12: DAM
-      &srcOp.dvbMacro,   // 13: DVB
-      &srcOp.egtMacro,   // 14: EGT
-      &srcOp.kslMacro,   // 15: KSL
-      &srcOp.susMacro,   // 16: SUS
-      &srcOp.vibMacro,   // 17: VIB
-      &srcOp.wsMacro,    // 18: WS
-      &srcOp.ksrMacro    // 19: KSR
-    };
-    for (int p = 0; p < 20; p++) {
-      unsigned char macroType = ((op + 1) << 5) | p;  // Operator macro encoding
-      copyMacroFromIns(im.opMacros[op][p], *srcMacros[p], macroType);
-    }
-  }
-  
-  // Log if wave macro has data (important for C64 debugging)
-  if (im.wave.valid) {
-    printf("[FurnaceDispatch] syncMacros: ins %d wave macro len=%d vals=[", insIndex, im.wave.len);
-    for (int i = 0; i < im.wave.len && i < 8; i++) {
-      printf("%d%s", im.wave.val[i], i < im.wave.len - 1 ? "," : "");
-    }
-    printf("]\n");
-  }
-}
-
-// Register the macro sync callback at startup
-static struct MacroCallbackRegistrar {
-  MacroCallbackRegistrar() {
-    engine_register_instrument_set_callback(syncMacrosFromInstrument);
-  }
-} g_macroCallbackRegistrar;
 
 // ============================================================
 // Instance management
@@ -693,10 +267,6 @@ struct DispatchInstance {
   bool bbInitialized;
   int renderCount;
 
-  // Macro state per channel
-  ChannelMacroState chanMacros[MAX_CHANNELS];
-  bool macrosEnabled;
-
   DispatchInstance():
     dispatch(nullptr),
     platformType(0),
@@ -711,8 +281,7 @@ struct DispatchInstance {
     useDirect(false),
     chipOuts(1),
     bbInitialized(false),
-    renderCount(0),
-    macrosEnabled(true) {
+    renderCount(0) {
     for (int i = 0; i < 2; i++) {
       bb[i] = nullptr;
       bbIn[i] = nullptr;
@@ -1386,17 +955,8 @@ void furnace_dispatch_reset(int handle) {
   }
 }
 
-// Track current instrument per channel for macro initialization
-static int g_channelInstrument[MAX_CHANNELS] = {0};
-
-// Forward declarations for macro functions
-static void initChannelMacros(DispatchInstance* inst, int chan, int insIndex, int note);
-static void releaseChannelMacros(DispatchInstance* inst, int chan);
-static void processChannelMacros(DispatchInstance* inst, int chan);
-
 /**
  * Send a command to the dispatch.
- * Hooks into NOTE_ON, NOTE_OFF, and INSTRUMENT for macro processing.
  */
 EMSCRIPTEN_KEEPALIVE
 int furnace_dispatch_cmd(int handle, int cmd, int chan, int val1, int val2) {
@@ -1408,429 +968,23 @@ int furnace_dispatch_cmd(int handle, int cmd, int chan, int val1, int val2) {
 
   DispatchInstance* inst = it->second;
 
-  // Debug: log NOTE_ON and INSTRUMENT commands
-  if (cmd == DIV_CMD_NOTE_ON) {
-    printf("[furnace_dispatch_cmd] NOTE_ON: handle=%d chan=%d note=%d platform=%d\n", handle, chan, val1, inst->platformType);
-  } else if (cmd == DIV_CMD_INSTRUMENT) {
-    printf("[furnace_dispatch_cmd] INSTRUMENT: handle=%d chan=%d insIndex=%d force=%d\n", handle, chan, val1, val2);
-  }
-
-  // Hook into commands for macro processing
-  if (inst->macrosEnabled && chan >= 0 && chan < MAX_CHANNELS) {
-    switch ((DivDispatchCmds)cmd) {
-      case DIV_CMD_NOTE_ON:
-        // Initialize macros when note starts
-        initChannelMacros(inst, chan, g_channelInstrument[chan], val1);
-        break;
-
-      case DIV_CMD_NOTE_OFF:
-      case DIV_CMD_NOTE_OFF_ENV:
-      case DIV_CMD_ENV_RELEASE:
-        // Trigger macro release
-        releaseChannelMacros(inst, chan);
-        break;
-
-      case DIV_CMD_INSTRUMENT:
-        // Track current instrument for this channel
-        g_channelInstrument[chan] = val1;
-        break;
-
-      default:
-        break;
-    }
-  }
-
   DivCommand dc((DivDispatchCmds)cmd, (unsigned char)chan, val1, val2);
   return inst->dispatch->dispatch(dc);
 }
 
-/**
- * Process macros for a channel and apply values via dispatch commands.
- */
-static void processChannelMacros(DispatchInstance* inst, int chan) {
-  ChannelMacroState& cms = inst->chanMacros[chan];
-  if (!cms.active || cms.insIndex < 0) return;
-
-  auto macroIt = g_instrumentMacros.find(cms.insIndex);
-  if (macroIt == g_instrumentMacros.end() || !macroIt->second.valid) return;
-
-  InstrumentMacros& im = macroIt->second;
-  DivDispatch* d = inst->dispatch;
-
-  // Process volume macro
-  if (im.vol.valid) {
-    doMacroTick(cms.vol, im.vol, cms.noteReleased);
-    if (cms.vol.had && cms.vol.val != cms.lastVolume) {
-      d->dispatch(DivCommand(DIV_CMD_VOLUME, chan, cms.vol.val));
-      cms.lastVolume = cms.vol.val;
-    }
-  }
-
-  // Process arpeggio macro
-  if (im.arp.valid) {
-    doMacroTick(cms.arp, im.arp, cms.noteReleased);
-    if (cms.arp.had) {
-      int arpVal = cms.arp.val;
-      // Arpeggio mode: check if absolute or relative
-      // Mode stored in high bits of val or macro flags
-      // For now, treat as relative semitone offset
-      if (arpVal != cms.lastArpVal) {
-        // Send note with arpeggio offset
-        int newNote = cms.baseNote + arpVal;
-        if (newNote >= 0 && newNote < 128) {
-          d->dispatch(DivCommand(DIV_CMD_NOTE_ON, chan, newNote));
-        }
-        cms.lastArpVal = arpVal;
-      }
-    }
-  }
-
-  // Process pitch macro
-  if (im.pitch.valid) {
-    doMacroTick(cms.pitch, im.pitch, cms.noteReleased);
-    if (cms.pitch.had && cms.pitch.val != cms.lastPitch) {
-      d->dispatch(DivCommand(DIV_CMD_PITCH, chan, cms.pitch.val));
-      cms.lastPitch = cms.pitch.val;
-    }
-  }
-
-  // Process duty/noise macro
-  if (im.duty.valid) {
-    doMacroTick(cms.duty, im.duty, cms.noteReleased);
-    if (cms.duty.had) {
-      // DIV_CMD_STD_NOISE_MODE or chip-specific duty command
-      // For GB: duty is wave duty, for C64: pulse width, etc.
-      d->dispatch(DivCommand(DIV_CMD_WAVE, chan, cms.duty.val));
-    }
-  }
-
-  // Process wave macro
-  if (im.wave.valid) {
-    doMacroTick(cms.wave, im.wave, cms.noteReleased);
-    if (cms.wave.had) {
-      d->dispatch(DivCommand(DIV_CMD_WAVE, chan, cms.wave.val));
-    }
-  }
-
-  // Process panning macros
-  if (im.panL.valid || im.panR.valid) {
-    bool panChanged = false;
-    int panLVal = 127, panRVal = 127;
-
-    if (im.panL.valid) {
-      doMacroTick(cms.panL, im.panL, cms.noteReleased);
-      if (cms.panL.had) {
-        panLVal = cms.panL.val;
-        panChanged = true;
-      }
-    }
-    if (im.panR.valid) {
-      doMacroTick(cms.panR, im.panR, cms.noteReleased);
-      if (cms.panR.had) {
-        panRVal = cms.panR.val;
-        panChanged = true;
-      }
-    }
-    if (panChanged) {
-      d->dispatch(DivCommand(DIV_CMD_PANNING, chan, panLVal, panRVal));
-    }
-  }
-
-  // Process phase reset macro
-  if (im.phaseReset.valid) {
-    doMacroTick(cms.phaseReset, im.phaseReset, cms.noteReleased);
-    if (cms.phaseReset.had && cms.phaseReset.val != 0) {
-      d->dispatch(DivCommand(DIV_CMD_NOTE_PORTA, chan, 0x8000)); // Phase reset via special command
-    }
-  }
-
-  // Process FM algorithm macro
-  if (im.alg.valid) {
-    doMacroTick(cms.alg, im.alg, cms.noteReleased);
-    if (cms.alg.had) {
-      d->dispatch(DivCommand(DIV_CMD_FM_ALG, chan, cms.alg.val));
-    }
-  }
-
-  // Process FM feedback macro
-  if (im.fb.valid) {
-    doMacroTick(cms.fb, im.fb, cms.noteReleased);
-    if (cms.fb.had) {
-      d->dispatch(DivCommand(DIV_CMD_FM_FB, chan, cms.fb.val));
-    }
-  }
-
-  // Process FM modulation sensitivity macros
-  if (im.fms.valid) {
-    doMacroTick(cms.fms, im.fms, cms.noteReleased);
-    if (cms.fms.had) {
-      d->dispatch(DivCommand(DIV_CMD_FM_FMS, chan, cms.fms.val));
-    }
-  }
-  if (im.ams.valid) {
-    doMacroTick(cms.ams, im.ams, cms.noteReleased);
-    if (cms.ams.had) {
-      d->dispatch(DivCommand(DIV_CMD_FM_AMS, chan, cms.ams.val));
-    }
-  }
-
-  // Process FM operator macros
-  for (int op = 0; op < 4; op++) {
-    // TL (Total Level / volume)
-    MacroData& tlMacro = im.opMacros[op][6]; // TL is index 6
-    if (tlMacro.valid) {
-      MacroState& tlState = cms.opMacros[op][6];
-      doMacroTick(tlState, tlMacro, cms.noteReleased);
-      if (tlState.had) {
-        d->dispatch(DivCommand(DIV_CMD_FM_TL, chan, op, tlState.val));
-      }
-    }
-
-    // AR (Attack Rate)
-    MacroData& arMacro = im.opMacros[op][1];
-    if (arMacro.valid) {
-      MacroState& arState = cms.opMacros[op][1];
-      doMacroTick(arState, arMacro, cms.noteReleased);
-      if (arState.had) {
-        d->dispatch(DivCommand(DIV_CMD_FM_AR, chan, op, arState.val));
-      }
-    }
-
-    // DR (Decay Rate)
-    MacroData& drMacro = im.opMacros[op][2];
-    if (drMacro.valid) {
-      MacroState& drState = cms.opMacros[op][2];
-      doMacroTick(drState, drMacro, cms.noteReleased);
-      if (drState.had) {
-        d->dispatch(DivCommand(DIV_CMD_FM_DR, chan, op, drState.val));
-      }
-    }
-
-    // MULT (Multiplier)
-    MacroData& multMacro = im.opMacros[op][3];
-    if (multMacro.valid) {
-      MacroState& multState = cms.opMacros[op][3];
-      doMacroTick(multState, multMacro, cms.noteReleased);
-      if (multState.had) {
-        d->dispatch(DivCommand(DIV_CMD_FM_MULT, chan, op, multState.val));
-      }
-    }
-
-    // RR (Release Rate)
-    MacroData& rrMacro = im.opMacros[op][4];
-    if (rrMacro.valid) {
-      MacroState& rrState = cms.opMacros[op][4];
-      doMacroTick(rrState, rrMacro, cms.noteReleased);
-      if (rrState.had) {
-        d->dispatch(DivCommand(DIV_CMD_FM_RR, chan, op, rrState.val));
-      }
-    }
-
-    // SL (Sustain Level)
-    MacroData& slMacro = im.opMacros[op][5];
-    if (slMacro.valid) {
-      MacroState& slState = cms.opMacros[op][5];
-      doMacroTick(slState, slMacro, cms.noteReleased);
-      if (slState.had) {
-        d->dispatch(DivCommand(DIV_CMD_FM_SL, chan, op, slState.val));
-      }
-    }
-
-    // DT (Detune)
-    MacroData& dtMacro = im.opMacros[op][9];
-    if (dtMacro.valid) {
-      MacroState& dtState = cms.opMacros[op][9];
-      doMacroTick(dtState, dtMacro, cms.noteReleased);
-      if (dtState.had) {
-        d->dispatch(DivCommand(DIV_CMD_FM_DT, chan, op, dtState.val));
-      }
-    }
-
-    // SSG-EG
-    MacroData& ssgMacro = im.opMacros[op][11];
-    if (ssgMacro.valid) {
-      MacroState& ssgState = cms.opMacros[op][11];
-      doMacroTick(ssgState, ssgMacro, cms.noteReleased);
-      if (ssgState.had) {
-        d->dispatch(DivCommand(DIV_CMD_FM_SSG, chan, op, ssgState.val));
-      }
-    }
-  }
-
-  // Process extended macros (ex1-ex3 are chip-specific)
-  if (im.ex1.valid) {
-    doMacroTick(cms.ex1, im.ex1, cms.noteReleased);
-    if (cms.ex1.had) {
-      // ex1: For C64 = filter control (LP/BP/HP/3off flags), AY = noise mode, etc.
-      d->dispatch(DivCommand(DIV_CMD_C64_FILTER_MODE, chan, cms.ex1.val & 15));
-    }
-  }
-  if (im.ex2.valid) {
-    doMacroTick(cms.ex2, im.ex2, cms.noteReleased);
-    if (cms.ex2.had) {
-      // ex2: For C64 = filter resonance
-      d->dispatch(DivCommand(DIV_CMD_C64_RESONANCE, chan, cms.ex2.val & 15));
-    }
-  }
-  if (im.ex3.valid) {
-    doMacroTick(cms.ex3, im.ex3, cms.noteReleased);
-    if (cms.ex3.had) {
-      // ex3: For C64 = filter on/off for this channel
-      d->dispatch(DivCommand(DIV_CMD_C64_FILTER_RESET, chan, cms.ex3.val & 1, 0));
-    }
-  }
-
-  // Process C64-specific ADSR macros (ex4-ex8)
-  // Reference: furnace-master/src/engine/platform/c64.cpp lines 310-335, 684-696
-  // ex4 = special flags (gate/sync/ring/test packed in bits 0-3)
-  // ex5 = attack (0-15), ex6 = decay (0-15), ex7 = sustain (0-15), ex8 = release (0-15)
-  if (im.ex4.valid) {
-    doMacroTick(cms.ex4, im.ex4, cms.noteReleased);
-    if (cms.ex4.had) {
-      // ex4 bits: 0=gate, 1=sync, 2=ring, 3=test
-      // Use DIV_CMD_C64_EXTENDED: 0x4X=ring, 0x5X=sync
-      int val = cms.ex4.val;
-      // Ring modulation (bit 2)
-      d->dispatch(DivCommand(DIV_CMD_C64_EXTENDED, chan, 0x40 | ((val >> 2) & 1)));
-      // Sync (bit 1)  
-      d->dispatch(DivCommand(DIV_CMD_C64_EXTENDED, chan, 0x50 | ((val >> 1) & 1)));
-    }
-  }
-  
-  // Combine attack/decay macros for DIV_CMD_C64_AD
-  bool adsrChanged = false;
-  int attack = 0, decay = 0, sustain = 0, release = 0;
-  
-  if (im.ex5.valid) {
-    doMacroTick(cms.ex5, im.ex5, cms.noteReleased);
-    if (cms.ex5.had) {
-      attack = cms.ex5.val & 15;
-      adsrChanged = true;
-    }
-  }
-  if (im.ex6.valid) {
-    doMacroTick(cms.ex6, im.ex6, cms.noteReleased);
-    if (cms.ex6.had) {
-      decay = cms.ex6.val & 15;
-      adsrChanged = true;
-    }
-  }
-  if (adsrChanged && (im.ex5.valid || im.ex6.valid)) {
-    // DIV_CMD_C64_AD: value = (attack<<4) | decay
-    d->dispatch(DivCommand(DIV_CMD_C64_AD, chan, (attack << 4) | decay));
-  }
-  
-  // Combine sustain/release macros for DIV_CMD_C64_SR
-  adsrChanged = false;
-  if (im.ex7.valid) {
-    doMacroTick(cms.ex7, im.ex7, cms.noteReleased);
-    if (cms.ex7.had) {
-      sustain = cms.ex7.val & 15;
-      adsrChanged = true;
-    }
-  }
-  if (im.ex8.valid) {
-    doMacroTick(cms.ex8, im.ex8, cms.noteReleased);
-    if (cms.ex8.had) {
-      release = cms.ex8.val & 15;
-      adsrChanged = true;
-    }
-  }
-  if (adsrChanged && (im.ex7.valid || im.ex8.valid)) {
-    // DIV_CMD_C64_SR: value = (sustain<<4) | release
-    d->dispatch(DivCommand(DIV_CMD_C64_SR, chan, (sustain << 4) | release));
-  }
-  
-  // ex9 and ex10 are reserved for future use
-  if (im.ex9.valid) {
-    doMacroTick(cms.ex9, im.ex9, cms.noteReleased);
-  }
-  if (im.ex10.valid) {
-    doMacroTick(cms.ex10, im.ex10, cms.noteReleased);
-  }
-}
+// NOTE: The wrapper's custom macro engine (processChannelMacros, initChannelMacros,
+// releaseChannelMacros) was removed. Platforms handle macros natively via macroInit()
+// on NOTE_ON and std.next() in tick(). The wrapper's engine conflicted with platform
+// macro processing. See: thoughts/shared/research/2026-03-07_furnace-dual-macro-engine-bug.md
 
 /**
- * Initialize macros for a channel when a note is triggered.
- */
-static void initChannelMacros(DispatchInstance* inst, int chan, int insIndex, int note) {
-  if (chan < 0 || chan >= MAX_CHANNELS) return;
-
-  ChannelMacroState& cms = inst->chanMacros[chan];
-  cms.initAll();
-  cms.insIndex = insIndex;
-  cms.baseNote = note;
-  cms.active = true;
-  cms.noteReleased = false;
-
-  auto macroIt = g_instrumentMacros.find(insIndex);
-  if (macroIt == g_instrumentMacros.end() || !macroIt->second.valid) return;
-
-  InstrumentMacros& im = macroIt->second;
-
-  // Initialize all macro states from macro data
-  if (im.vol.valid) initMacroState(cms.vol, im.vol);
-  if (im.arp.valid) initMacroState(cms.arp, im.arp);
-  if (im.duty.valid) initMacroState(cms.duty, im.duty);
-  if (im.wave.valid) initMacroState(cms.wave, im.wave);
-  if (im.pitch.valid) initMacroState(cms.pitch, im.pitch);
-  if (im.panL.valid) initMacroState(cms.panL, im.panL);
-  if (im.panR.valid) initMacroState(cms.panR, im.panR);
-  if (im.phaseReset.valid) initMacroState(cms.phaseReset, im.phaseReset);
-  if (im.alg.valid) initMacroState(cms.alg, im.alg);
-  if (im.fb.valid) initMacroState(cms.fb, im.fb);
-  if (im.fms.valid) initMacroState(cms.fms, im.fms);
-  if (im.ams.valid) initMacroState(cms.ams, im.ams);
-  if (im.ex1.valid) initMacroState(cms.ex1, im.ex1);
-  if (im.ex2.valid) initMacroState(cms.ex2, im.ex2);
-  if (im.ex3.valid) initMacroState(cms.ex3, im.ex3);
-  if (im.ex4.valid) initMacroState(cms.ex4, im.ex4);
-  if (im.ex5.valid) initMacroState(cms.ex5, im.ex5);
-  if (im.ex6.valid) initMacroState(cms.ex6, im.ex6);
-  if (im.ex7.valid) initMacroState(cms.ex7, im.ex7);
-  if (im.ex8.valid) initMacroState(cms.ex8, im.ex8);
-  if (im.ex9.valid) initMacroState(cms.ex9, im.ex9);
-  if (im.ex10.valid) initMacroState(cms.ex10, im.ex10);
-
-  // Initialize operator macros
-  for (int op = 0; op < 4; op++) {
-    for (int p = 0; p < 20; p++) {
-      if (im.opMacros[op][p].valid) {
-        initMacroState(cms.opMacros[op][p], im.opMacros[op][p]);
-      }
-    }
-  }
-
-  printf("[FurnaceDispatch] Macros initialized for chan %d, ins %d, note %d\n", chan, insIndex, note);
-}
-
-/**
- * Release macros for a channel (note off).
- */
-static void releaseChannelMacros(DispatchInstance* inst, int chan) {
-  if (chan < 0 || chan >= MAX_CHANNELS) return;
-  inst->chanMacros[chan].noteReleased = true;
-}
-
-/**
- * Advance one tick - process macros and dispatch tick.
+ * Advance one tick. Platforms handle macros natively via macroInit()/std.next().
  */
 EMSCRIPTEN_KEEPALIVE
 void furnace_dispatch_tick(int handle) {
   auto it = g_instances.find(handle);
   if (it == g_instances.end()) return;
-
-  DispatchInstance* inst = it->second;
-
-  // Process macros for all active channels
-  if (inst->macrosEnabled) {
-    for (int chan = 0; chan < inst->numChannels && chan < MAX_CHANNELS; chan++) {
-      processChannelMacros(inst, chan);
-    }
-  }
-
-  // Standard dispatch tick (sysTick=true: every tick is a real tick in WASM, no sub-ticks)
-  inst->dispatch->tick(true);
+  it->second->dispatch->tick(true);
 }
 
 /**
@@ -2015,6 +1169,26 @@ void furnace_dispatch_set_tuning(int handle, float tuning) {
   if (it != g_instances.end()) {
     it->second->engine.song.tuning = tuning;
   }
+}
+
+/**
+ * Set chip flags from a key=value string.
+ * Parses the string into DivConfig and calls dispatch->setFlags().
+ * This sets clock selection, chip model, and other per-chip parameters.
+ */
+EMSCRIPTEN_KEEPALIVE
+void furnace_dispatch_set_flags(int handle, const char* flagsStr, int len) {
+  auto it = g_instances.find(handle);
+  if (it == g_instances.end() || !it->second->dispatch) return;
+
+  DivConfig flags;
+  if (flagsStr && len > 0) {
+    // Make a null-terminated copy
+    std::string str(flagsStr, len);
+    flags.loadFromMemory(str.c_str());
+  }
+
+  it->second->dispatch->setFlags(flags);
 }
 
 /**
@@ -3742,114 +2916,8 @@ void furnace_dispatch_set_5e01_instrument(int handle, int insIndex, unsigned cha
 }
 
 // ============================================================
-// MACRO SYSTEM
+// INSTRUMENT UPLOAD
 // ============================================================
-
-/**
- * Set a macro on an instrument.
- * Binary format:
- *   [0] macroType (1 byte) - DivMacroType enum value
- *   [1] mode (1 byte) - 0=sequence, 1=ADSR, 2=LFO
- *   [2] open (1 byte) - flags (bit 3 = active release)
- *   [3] len (1 byte)
- *   [4] delay (1 byte)
- *   [5] speed (1 byte)
- *   [6] loop (1 byte) - 0xFF = no loop
- *   [7] rel (release point, 1 byte) - 0xFF = no release
- *   [8-...] val[] (4 bytes per value × len, little-endian signed int32)
- */
-EMSCRIPTEN_KEEPALIVE
-void furnace_dispatch_set_macro(int handle, int insIndex, unsigned char* data, int dataLen) {
-  if (dataLen < 8) return;
-
-  unsigned char macroType = data[0];
-  unsigned char mode = data[1];
-  unsigned char open = data[2];
-  unsigned char len = data[3];
-  unsigned char delay = data[4];
-  unsigned char speed = data[5];
-  signed char loop = (data[6] == 0xFF) ? -1 : (signed char)data[6];
-  signed char rel = (data[7] == 0xFF) ? -1 : (signed char)data[7];
-
-  // Validate length
-  int expectedSize = 8 + (len * 4);
-  if (dataLen < expectedSize || len > MACRO_MAX_LENGTH) {
-    printf("[FurnaceDispatch] set_macro: invalid size, expected %d got %d\n", expectedSize, dataLen);
-    return;
-  }
-
-  // Get or create instrument macros
-  InstrumentMacros& im = g_instrumentMacros[insIndex];
-  im.valid = true;
-
-  // Get macro data slot by type
-  MacroData* md = im.getByType(macroType);
-  if (!md) {
-    printf("[FurnaceDispatch] set_macro: unknown macro type %d\n", macroType);
-    return;
-  }
-
-  // Fill macro data
-  md->macroType = macroType;
-  md->mode = mode;
-  md->open = open;
-  md->len = len;
-  md->delay = delay;
-  md->speed = (speed > 0) ? speed : 1;
-  md->loop = loop;
-  md->rel = rel;
-  md->valid = (len > 0);
-
-  // Parse values (little-endian signed int32)
-  for (int i = 0; i < len && i < MACRO_MAX_LENGTH; i++) {
-    int offset = 8 + (i * 4);
-    int32_t val = (int32_t)(
-      data[offset] |
-      (data[offset + 1] << 8) |
-      (data[offset + 2] << 16) |
-      (data[offset + 3] << 24)
-    );
-    md->val[i] = val;
-  }
-
-  printf("[FurnaceDispatch] set_macro: ins %d, type %d, len %d, loop %d, rel %d, mode %d\n",
-         insIndex, macroType, len, loop, rel, mode);
-}
-
-/**
- * Enable or disable macro processing for a dispatch instance.
- */
-EMSCRIPTEN_KEEPALIVE
-void furnace_dispatch_set_macros_enabled(int handle, int enabled) {
-  auto it = g_instances.find(handle);
-  if (it != g_instances.end()) {
-    it->second->macrosEnabled = (enabled != 0);
-    printf("[FurnaceDispatch] Macros %s\n", enabled ? "enabled" : "disabled");
-  }
-}
-
-/**
- * Clear all macros for an instrument.
- */
-EMSCRIPTEN_KEEPALIVE
-void furnace_dispatch_clear_macros(int handle, int insIndex) {
-  auto macroIt = g_instrumentMacros.find(insIndex);
-  if (macroIt != g_instrumentMacros.end()) {
-    g_instrumentMacros.erase(macroIt);
-    printf("[FurnaceDispatch] Cleared macros for ins %d\n", insIndex);
-  }
-}
-
-/**
- * Manually trigger macro release for a channel (note-off without DIV_CMD_NOTE_OFF).
- */
-EMSCRIPTEN_KEEPALIVE
-void furnace_dispatch_release_macros(int handle, int chan) {
-  auto it = g_instances.find(handle);
-  if (it != g_instances.end() && chan >= 0 && chan < MAX_CHANNELS) {
-    releaseChannelMacros(it->second, chan);
-  }
-}
 
 /**
  * Set a complete instrument with all data including macros.
@@ -3908,11 +2976,12 @@ void furnace_dispatch_set_instrument_full(int handle, int insIndex, unsigned cha
     ins->fm.ams2 = fm[5];
     ins->fm.ops = fm[6];
     ins->fm.opllPreset = fm[7];
+    ins->fm.block = fm[8] & 0x0F;
 
-    // Parse operators (starting at fm+8)
+    // Parse operators (starting at fm+9)
     int opSize = 24;
-    for (int i = 0; i < 4 && fmOffset + 8 + (i + 1) * opSize <= (unsigned int)dataLen; i++) {
-      unsigned char* op = fm + 8 + i * opSize;
+    for (int i = 0; i < 4 && fmOffset + 9 + (i + 1) * opSize <= (unsigned int)dataLen; i++) {
+      unsigned char* op = fm + 9 + i * opSize;
       ins->fm.op[i].enable = op[0] != 0;
       ins->fm.op[i].am = op[1];
       ins->fm.op[i].ar = op[2];
@@ -4110,6 +3179,82 @@ void furnace_dispatch_set_instrument_full(int handle, int insIndex, unsigned cha
         ins->snes.d2 = chip[8];
         break;
 
+      case DIV_INS_ES5506:
+        if (chipOffset + 13 <= (unsigned int)dataLen) {
+          ins->es5506.filter.mode = (DivInstrumentES5506::Filter::FilterMode)chip[0];
+          ins->es5506.filter.k1 = *(unsigned short*)(chip + 1);
+          ins->es5506.filter.k2 = *(unsigned short*)(chip + 3);
+          ins->es5506.envelope.ecount = *(unsigned short*)(chip + 5);
+          ins->es5506.envelope.lVRamp = (signed char)chip[7];
+          ins->es5506.envelope.rVRamp = (signed char)chip[8];
+          ins->es5506.envelope.k1Ramp = (signed char)chip[9];
+          ins->es5506.envelope.k2Ramp = (signed char)chip[10];
+          ins->es5506.envelope.k1Slow = chip[11] != 0;
+          ins->es5506.envelope.k2Slow = chip[12] != 0;
+        }
+        break;
+
+      case DIV_INS_MULTIPCM:
+        if (chipOffset + 10 <= (unsigned int)dataLen) {
+          ins->multipcm.ar = chip[0];
+          ins->multipcm.d1r = chip[1];
+          ins->multipcm.dl = chip[2];
+          ins->multipcm.d2r = chip[3];
+          ins->multipcm.rr = chip[4];
+          ins->multipcm.rc = chip[5];
+          ins->multipcm.lfo = chip[6];
+          ins->multipcm.vib = chip[7];
+          ins->multipcm.am = chip[8];
+          ins->multipcm.damp = (chip[9] & 1) != 0;
+          ins->multipcm.pseudoReverb = (chip[9] & 2) != 0;
+          ins->multipcm.lfoReset = (chip[9] & 4) != 0;
+          ins->multipcm.levelDirect = (chip[9] & 8) != 0;
+        }
+        break;
+
+      case DIV_INS_SU: {
+        ins->su.switchRoles = chip[0] != 0;
+        int suSeqLen = chip[1];
+        ins->su.hwSeqLen = suSeqLen;
+        for (int i = 0; i < suSeqLen && i < 256 && chipOffset + 2 + i * 5 + 4 < (unsigned int)dataLen; i++) {
+          unsigned char* entry = chip + 2 + i * 5;
+          ins->su.hwSeq[i].cmd = entry[0];
+          ins->su.hwSeq[i].bound = entry[1];
+          ins->su.hwSeq[i].val = entry[2];
+          ins->su.hwSeq[i].speed = *(unsigned short*)(entry + 3);
+        }
+        break;
+      }
+
+      case DIV_INS_ESFM: {
+        ins->esfm.noise = chip[0] & 3;
+        for (int i = 0; i < 4 && chipOffset + 1 + (i + 1) * 4 <= (unsigned int)dataLen; i++) {
+          unsigned char* opData = chip + 1 + i * 4;
+          ins->esfm.op[i].delay = (opData[0] >> 5) & 7;
+          ins->esfm.op[i].outLvl = (opData[0] >> 2) & 7;
+          ins->esfm.op[i].right = (opData[0] >> 1) & 1;
+          ins->esfm.op[i].left = opData[0] & 1;
+          ins->esfm.op[i].modIn = opData[1] & 7;
+          ins->esfm.op[i].fixed = (opData[1] >> 3) & 1;
+          ins->esfm.op[i].ct = (signed char)opData[2];
+          ins->esfm.op[i].dt = (signed char)opData[3];
+        }
+        break;
+      }
+
+      case DIV_INS_POWERNOISE:
+      case DIV_INS_POWERNOISE_SLOPE:
+        ins->powernoise.octave = chip[0];
+        break;
+
+      case DIV_INS_SID2: {
+        unsigned char s2byte = chip[0];
+        ins->sid2.volume = s2byte & 0x0F;
+        ins->sid2.mixMode = (s2byte >> 4) & 0x03;
+        ins->sid2.noiseMode = (s2byte >> 6) & 0x03;
+        break;
+      }
+
       default:
         break;
     }
@@ -4137,7 +3282,6 @@ void furnace_dispatch_set_instrument_full(int handle, int insIndex, unsigned cha
   }
 
   engine_set_instrument(insIndex, ins);
-  // Note: syncMacrosFromInstrument is called automatically via callback in engine_set_instrument
   printf("[FurnaceDispatch] Loaded full instrument %d: %s (type %d)\n",
          insIndex, ins->name.c_str(), ins->type);
 }

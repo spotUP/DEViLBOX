@@ -280,6 +280,39 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
         }
         break;
 
+      case 'setChipFlags': {
+        const chip = this.getChip(data.platformType);
+        if (chip && this.wasm && data.flagsStr) {
+          const heapBuffer = this.getHeapBuffer();
+          if (heapBuffer) {
+            const encoder = new TextEncoder();
+            const encoded = encoder.encode(data.flagsStr);
+            const dataPtr = this.module._malloc(encoded.length + 1);
+            const heap = new Uint8Array(heapBuffer, dataPtr, encoded.length + 1);
+            heap.set(encoded);
+            heap[encoded.length] = 0; // null terminate
+            this.wasm.setFlags(chip.handle, dataPtr, encoded.length);
+            this.module._free(dataPtr);
+          }
+        }
+        break;
+      }
+
+      case 'setTuning': {
+        if (this.wasm && data.tuning !== undefined) {
+          if (data.platformType !== undefined) {
+            const chip = this.getChip(data.platformType);
+            if (chip) this.wasm.setTuning(chip.handle, data.tuning);
+          } else {
+            // Apply to all chips (tuning is a song-level setting)
+            for (const chip of this.chips.values()) {
+              this.wasm.setTuning(chip.handle, data.tuning);
+            }
+          }
+        }
+        break;
+      }
+
       case 'mute': {
         const chip = this.getChip(data.platformType);
         if (chip && this.wasm) {
@@ -493,6 +526,7 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
         setCompatFlag: this.module._furnace_dispatch_set_compat_flag,
         setTickRate: this.module._furnace_dispatch_set_tick_rate,
         setTuning: this.module._furnace_dispatch_set_tuning,
+        setFlags: this.module._furnace_dispatch_set_flags,
         setGBInstrument: this.module._furnace_dispatch_set_gb_instrument,
         setWavetable: this.module._furnace_dispatch_set_wavetable,
         forceIns: this.module._furnace_dispatch_force_ins,

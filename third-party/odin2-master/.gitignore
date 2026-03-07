@@ -1,0 +1,10 @@
+Builds/
+.vscode/
+JuceLibraryCode/
+benchmark/build
+patches_listen
+Source/GitCommitId.h
+ignore
+cmake-build-*
+.idea/
+build/

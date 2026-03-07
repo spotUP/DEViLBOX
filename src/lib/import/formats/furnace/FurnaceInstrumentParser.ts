@@ -35,6 +35,30 @@ export interface FurnaceFDSData {
   modSpeed: number; modDepth: number; initModTableWithFirstWave: boolean;
   modTable: number[];
 }
+export interface FurnaceES5506Data {
+  filter: { mode: number; k1: number; k2: number };
+  envelope: { ecount: number; lVRamp: number; rVRamp: number; k1Ramp: number; k2Ramp: number; k1Slow: boolean; k2Slow: boolean };
+}
+export interface FurnaceMultiPCMData {
+  ar: number; d1r: number; dl: number; d2r: number; rr: number; rc: number;
+  lfo: number; vib: number; am: number;
+  damp: boolean; pseudoReverb: boolean; lfoReset: boolean; levelDirect: boolean;
+}
+export interface FurnaceSoundUnitData {
+  switchRoles: boolean;
+  hwSeqLen: number;
+  hwSeq: Array<{ cmd: number; bound: number; val: number; speed: number }>;
+}
+export interface FurnaceESFMData {
+  noise: number;
+  operators: Array<{ delay: number; outLvl: number; modIn: number; left: number; right: number; fixed: number; ct: number; dt: number }>;
+}
+export interface FurnacePowerNoiseData {
+  octave: number;
+}
+export interface FurnaceSID2Data {
+  volume: number; mixMode: number; noiseMode: number;
+}
 
 // Macro
 export interface FurnaceMacro {
@@ -64,6 +88,12 @@ export interface FurnaceInstrument {
   snes?: FurnaceSNESData;
   n163?: FurnaceN163Data;
   fds?: FurnaceFDSData;
+  es5506?: FurnaceES5506Data;
+  multipcm?: FurnaceMultiPCMData;
+  soundUnit?: FurnaceSoundUnitData;
+  esfm?: FurnaceESFMData;
+  powerNoise?: FurnacePowerNoiseData;
+  sid2?: FurnaceSID2Data;
   amiga?: {
     initSample: number;
     useNoteMap: boolean;
@@ -299,19 +329,109 @@ export function parseInstrument(reader: BinaryReader): FurnaceInstrument {
           console.log(`[FurnaceParser] Parsed ${featCode} (operator ${opIndex} macros): ${inst.opMacroArrays[opIndex].length} macros`);
           break;
         }
+        case 'MP': {
+          // MultiPCM — Reference: instrument.cpp:2558-2580
+          const mpAr = reader.readUint8();
+          const mpD1r = reader.readUint8();
+          const mpDl = reader.readUint8();
+          const mpD2r = reader.readUint8();
+          const mpRr = reader.readUint8();
+          const mpRc = reader.readUint8();
+          const mpLfo = reader.readUint8();
+          const mpVib = reader.readUint8();
+          const mpAm = reader.readUint8();
+          let mpDamp = false, mpPseudoReverb = false, mpLfoReset = false, mpLevelDirect = true;
+          if (reader.getOffset() < featEnd) {
+            const mpFlags = reader.readUint8();
+            mpDamp = !!(mpFlags & 1);
+            mpPseudoReverb = !!(mpFlags & 2);
+            mpLfoReset = !!(mpFlags & 4);
+            mpLevelDirect = !!(mpFlags & 8);
+          }
+          inst.multipcm = {
+            ar: mpAr, d1r: mpD1r, dl: mpDl, d2r: mpD2r, rr: mpRr, rc: mpRc,
+            lfo: mpLfo, vib: mpVib, am: mpAm,
+            damp: mpDamp, pseudoReverb: mpPseudoReverb, lfoReset: mpLfoReset, levelDirect: mpLevelDirect,
+          };
+          break;
+        }
+        case 'SU': {
+          // Sound Unit — Reference: instrument.cpp:2582-2598
+          const suSwitch = reader.readUint8() !== 0;
+          const suHwSeqLen = reader.getOffset() < featEnd ? reader.readUint8() : 0;
+          const suHwSeq: Array<{ cmd: number; bound: number; val: number; speed: number }> = [];
+          for (let i = 0; i < suHwSeqLen && reader.getOffset() < featEnd; i++) {
+            suHwSeq.push({
+              cmd: reader.readUint8(),
+              bound: reader.readUint8(),
+              val: reader.readUint8(),
+              speed: reader.readInt16(),
+            });
+          }
+          inst.soundUnit = { switchRoles: suSwitch, hwSeqLen: suHwSeqLen, hwSeq: suHwSeq };
+          break;
+        }
+        case 'ES': {
+          // ES5506 — Reference: instrument.cpp:2600-2614
+          const esFilterMode = reader.readUint8();
+          const esK1 = reader.readUint16();
+          const esK2 = reader.readUint16();
+          const esEcount = reader.readUint16();
+          const esLVRamp = reader.readInt8();
+          const esRVRamp = reader.readInt8();
+          const esK1Ramp = reader.readInt8();
+          const esK2Ramp = reader.readInt8();
+          const esK1Slow = reader.readUint8() !== 0;
+          const esK2Slow = reader.readUint8() !== 0;
+          inst.es5506 = {
+            filter: { mode: esFilterMode, k1: esK1, k2: esK2 },
+            envelope: { ecount: esEcount, lVRamp: esLVRamp, rVRamp: esRVRamp, k1Ramp: esK1Ramp, k2Ramp: esK2Ramp, k1Slow: esK1Slow, k2Slow: esK2Slow },
+          };
+          break;
+        }
+        case 'EF': {
+          // ESFM — Reference: instrument.cpp:2640-2664
+          const efNoiseByte = reader.readUint8();
+          const efNoise = efNoiseByte & 3;
+          const efOps: Array<{ delay: number; outLvl: number; modIn: number; left: number; right: number; fixed: number; ct: number; dt: number }> = [];
+          for (let i = 0; i < 4; i++) {
+            const efByte1 = reader.readUint8();
+            const efByte2 = reader.readUint8();
+            efOps.push({
+              delay: (efByte1 >> 5) & 7,
+              outLvl: (efByte1 >> 2) & 7,
+              right: (efByte1 >> 1) & 1,
+              left: efByte1 & 1,
+              modIn: efByte2 & 7,
+              fixed: (efByte2 >> 3) & 1,
+              ct: reader.readInt8(),
+              dt: reader.readInt8(),
+            });
+          }
+          inst.esfm = { noise: efNoise, operators: efOps };
+          break;
+        }
+        case 'PN': {
+          // PowerNoise — Reference: instrument.cpp:2666-2672
+          inst.powerNoise = { octave: reader.readUint8() };
+          break;
+        }
+        case 'S2': {
+          // SID2 — Reference: instrument.cpp:2674-2684
+          const s2Byte = reader.readUint8();
+          inst.sid2 = {
+            volume: s2Byte & 0x0F,
+            mixMode: (s2Byte >> 4) & 0x03,
+            noiseMode: (s2Byte >> 6) & 0x03,
+          };
+          break;
+        }
         case 'LD': // OPL drums (fixedDrums, kickFreq, snareHatFreq, tomTopFreq)
         case 'WS': // WaveSynth
-        case 'MP': // MultiPCM
-        case 'SU': // Sound Unit
-        case 'ES': // ES5506 filter/envelope
         case 'X1': // X1-010 bank slot
         case 'NE': // NES DPCM note map
-        case 'EF': // ESFM per-operator extras
-        case 'PN': // PowerNoise octave
-        case 'S2': // SID2
         case 'S3': // SID3 (enhanced C64 SID)
-          // All chip-specific feature blocks are preserved in rawBinaryData.
-          // The FurnaceInsEdHardware WASM reads them natively; no TS parsing needed.
+          // Preserved in rawBinaryData; no TS parsing needed yet.
           break;
         default:
           // Unknown feature, skip (reader.seek(featEnd) handles it)
@@ -567,6 +687,490 @@ export function parseInstrument(reader: BinaryReader): FurnaceInstrument {
     }
 
     console.log(`[FurnaceParser] INST parsed ${inst.macros.length} macros, waveMacro: len=${waveMacroLen} vals=[${waveMacroVals.slice(0, 5).join(',')}${waveMacroLen > 5 ? '...' : ''}]`);
+
+    // ========================================================================
+    // FM macros (v29+) — Reference: instrument.cpp:3050-3161
+    // ========================================================================
+    if (instVersion >= 29) {
+      const algMacroLen = reader.readInt32();
+      const fbMacroLen = reader.readInt32();
+      const fmsMacroLen = reader.readInt32();
+      const amsMacroLen = reader.readInt32();
+
+      const algMacroLoop = reader.readInt32();
+      const fbMacroLoop = reader.readInt32();
+      const fmsMacroLoop = reader.readInt32();
+      const amsMacroLoop = reader.readInt32();
+
+      // Open flags for all macros (vol, arp, duty, wave, pitch, ex1-3, alg, fb, fms, ams)
+      // We read them but only use open flags for FM macros (alg/fb/fms/ams)
+      reader.readUint8(); // volMacro.open
+      reader.readUint8(); // arpMacro.open
+      reader.readUint8(); // dutyMacro.open
+      reader.readUint8(); // waveMacro.open
+      reader.readUint8(); // pitchMacro.open
+      reader.readUint8(); // ex1Macro.open
+      reader.readUint8(); // ex2Macro.open
+      reader.readUint8(); // ex3Macro.open
+      reader.readUint8(); // algMacro.open
+      reader.readUint8(); // fbMacro.open
+      reader.readUint8(); // fmsMacro.open
+      reader.readUint8(); // amsMacro.open
+
+      // FM macro values (int32 each)
+      const algMacroVals = readMacroVals(algMacroLen);
+      const fbMacroVals = readMacroVals(fbMacroLen);
+      const fmsMacroVals = readMacroVals(fmsMacroLen);
+      const amsMacroVals = readMacroVals(amsMacroLen);
+
+      if (algMacroLen > 0) {
+        inst.macros.push({ code: 8, length: algMacroLen, loop: algMacroLoop, release: -1, mode: 0, type: 0, delay: 0, speed: 1, data: algMacroVals });
+      }
+      if (fbMacroLen > 0) {
+        inst.macros.push({ code: 9, length: fbMacroLen, loop: fbMacroLoop, release: -1, mode: 0, type: 0, delay: 0, speed: 1, data: fbMacroVals });
+      }
+      if (fmsMacroLen > 0) {
+        inst.macros.push({ code: 10, length: fmsMacroLen, loop: fmsMacroLoop, release: -1, mode: 0, type: 0, delay: 0, speed: 1, data: fmsMacroVals });
+      }
+      if (amsMacroLen > 0) {
+        inst.macros.push({ code: 11, length: amsMacroLen, loop: amsMacroLoop, release: -1, mode: 0, type: 0, delay: 0, speed: 1, data: amsMacroVals });
+      }
+
+      // Per-operator macros: 4 operators × 12 macro types (AM, AR, DR, MULT, RR, SL, TL, DT2, RS, DT, D2R, SSG)
+      // Reference: instrument.cpp:3078-3160
+      // OP_MACRO_NAMES: am, ar, dr, mult, rr, sl, tl, dt2, rs, dt, d2r, ssg
+      if (!inst.opMacroArrays) inst.opMacroArrays = [[], [], [], []];
+
+      // Read lengths for all 4 operators
+      const opMacroLens: number[][] = [];
+      for (let op = 0; op < 4; op++) {
+        const lens: number[] = [];
+        for (let m = 0; m < 12; m++) lens.push(reader.readInt32());
+        opMacroLens.push(lens);
+      }
+      // Read loops for all 4 operators
+      const opMacroLoops: number[][] = [];
+      for (let op = 0; op < 4; op++) {
+        const loops: number[] = [];
+        for (let m = 0; m < 12; m++) loops.push(reader.readInt32());
+        opMacroLoops.push(loops);
+      }
+      // Read open flags for all 4 operators
+      for (let op = 0; op < 4; op++) {
+        for (let m = 0; m < 12; m++) reader.readUint8();
+      }
+
+      // Read values (low 8 bits, unsigned char) for all 4 operators
+      // Reference: instrument.cpp:3121-3160
+      for (let op = 0; op < 4; op++) {
+        for (let m = 0; m < 12; m++) {
+          const len = opMacroLens[op][m];
+          const vals: number[] = [];
+          for (let j = 0; j < len; j++) vals.push(reader.readUint8());
+          if (len > 0) {
+            inst.opMacroArrays[op].push({
+              code: m, length: len, loop: opMacroLoops[op][m], release: -1,
+              mode: 0, type: 0, delay: 0, speed: 1, data: vals,
+            });
+          }
+        }
+      }
+    }
+
+    // ========================================================================
+    // Release points (v44+) — Reference: instrument.cpp:3163-3194
+    // ========================================================================
+    if (instVersion >= 44) {
+      // Standard macro release points
+      const relVol = reader.readInt32();
+      const relArp = reader.readInt32();
+      const relDuty = reader.readInt32();
+      const relWave = reader.readInt32();
+      const relPitch = reader.readInt32();
+      const relEx1 = reader.readInt32();
+      const relEx2 = reader.readInt32();
+      const relEx3 = reader.readInt32();
+      const relAlg = reader.readInt32();
+      const relFb = reader.readInt32();
+      const relFms = reader.readInt32();
+      const relAms = reader.readInt32();
+
+      // Apply release points to existing macros
+      const relMap: Record<number, number> = {
+        0: relVol, 1: relArp, 2: relDuty, 3: relWave,
+        4: relPitch, 5: relEx1, 6: relEx2, 7: relEx3,
+        8: relAlg, 9: relFb, 10: relFms, 11: relAms,
+      };
+      for (const macro of inst.macros) {
+        if (relMap[macro.code] !== undefined) {
+          macro.release = relMap[macro.code];
+        }
+      }
+
+      // Per-operator release points: 4 ops × 12 params
+      for (let op = 0; op < 4; op++) {
+        const opRels: number[] = [];
+        for (let m = 0; m < 12; m++) opRels.push(reader.readInt32());
+        if (inst.opMacroArrays && inst.opMacroArrays[op]) {
+          for (const opMacro of inst.opMacroArrays[op]) {
+            if (opMacro.code < 12 && opRels[opMacro.code] !== undefined) {
+              opMacro.release = opRels[opMacro.code];
+            }
+          }
+        }
+      }
+    }
+
+    // ========================================================================
+    // Extended operator macros (v61+) — Reference: instrument.cpp:3196-3265
+    // 4 operators × 8 additional macros: DAM, DVB, EGT, KSL, SUS, VIB, WS, KSR
+    // ========================================================================
+    if (instVersion >= 61) {
+      if (!inst.opMacroArrays) inst.opMacroArrays = [[], [], [], []];
+
+      // Extended op macro codes start at 12 (after the 12 base op macros)
+      const extOpMacroLens: number[][] = [];
+      const extOpMacroLoops: number[][] = [];
+      const extOpMacroRels: number[][] = [];
+
+      for (let op = 0; op < 4; op++) {
+        const lens: number[] = [];
+        for (let m = 0; m < 8; m++) lens.push(reader.readInt32());
+        extOpMacroLens.push(lens);
+      }
+      for (let op = 0; op < 4; op++) {
+        const loops: number[] = [];
+        for (let m = 0; m < 8; m++) loops.push(reader.readInt32());
+        extOpMacroLoops.push(loops);
+      }
+      for (let op = 0; op < 4; op++) {
+        const rels: number[] = [];
+        for (let m = 0; m < 8; m++) rels.push(reader.readInt32());
+        extOpMacroRels.push(rels);
+      }
+      // Open flags
+      for (let op = 0; op < 4; op++) {
+        for (let m = 0; m < 8; m++) reader.readUint8();
+      }
+
+      // Values (unsigned char)
+      for (let op = 0; op < 4; op++) {
+        for (let m = 0; m < 8; m++) {
+          const len = extOpMacroLens[op][m];
+          const vals: number[] = [];
+          for (let j = 0; j < len; j++) vals.push(reader.readUint8());
+          if (len > 0) {
+            inst.opMacroArrays[op].push({
+              code: 12 + m, length: len, loop: extOpMacroLoops[op][m],
+              release: extOpMacroRels[op][m], mode: 0, type: 0, delay: 0, speed: 1, data: vals,
+            });
+          }
+        }
+      }
+    }
+
+    // ========================================================================
+    // OPL drum data (v63+) — Reference: instrument.cpp:3267-3274
+    // ========================================================================
+    if (instVersion >= 63) {
+      const fixedDrums = reader.readUint8();
+      reader.readUint8(); // reserved
+      const kickFreq = reader.readInt16();
+      const snareHatFreq = reader.readInt16();
+      const tomTopFreq = reader.readInt16();
+      if (inst.fm) {
+        (inst.fm as any).fixedDrums = !!fixedDrums;
+        (inst.fm as any).kickFreq = kickFreq;
+        (inst.fm as any).snareHatFreq = snareHatFreq;
+        (inst.fm as any).tomTopFreq = tomTopFreq;
+      }
+    }
+
+    // ========================================================================
+    // Sample map (v67+) — Reference: instrument.cpp:3290-3307
+    // ========================================================================
+    if (instVersion >= 67) {
+      const useNoteMap = reader.readUint8() !== 0;
+      if (inst.amiga) inst.amiga.useNoteMap = useNoteMap;
+      if (useNoteMap) {
+        const noteFreqs: number[] = [];
+        for (let note = 0; note < 120; note++) noteFreqs.push(reader.readInt32());
+        const noteMaps: number[] = [];
+        for (let note = 0; note < 120; note++) noteMaps.push(reader.readInt16());
+
+        if (inst.amiga) {
+          inst.amiga.noteMap = [];
+          const seenSamples = new Set(inst.samples);
+          for (let note = 0; note < 120; note++) {
+            // v152+: noteFreqs are actual freqs; <152: overwritten with note index
+            const freq = instVersion < 152 ? note : noteFreqs[note];
+            const map = noteMaps[note];
+            inst.amiga.noteMap.push({ freq, map });
+            if (map >= 0 && !seenSamples.has(map)) {
+              seenSamples.add(map);
+              inst.samples.push(map);
+            }
+          }
+        }
+      }
+    }
+
+    // ========================================================================
+    // N163 (v73+) — Reference: instrument.cpp:3309-3316
+    // ========================================================================
+    if (instVersion >= 73) {
+      const n163wave = reader.readInt32();
+      const n163wavePos = reader.readUint8();
+      const n163waveLen = reader.readUint8();
+      const n163waveMode = reader.readUint8();
+      reader.readUint8(); // reserved
+      inst.n163 = { wave: n163wave, wavePos: n163wavePos, waveLen: n163waveLen, waveMode: n163waveMode };
+    }
+
+    // ========================================================================
+    // Extended macros (v76+) — Reference: instrument.cpp:3318-3363
+    // panL, panR, phaseReset, ex4, ex5, ex6, ex7, ex8
+    // ========================================================================
+    if (instVersion >= 76) {
+      const extMacroNames = [
+        { code: 12, name: 'panL' }, { code: 13, name: 'panR' },
+        { code: 14, name: 'phaseReset' }, { code: 15, name: 'ex4' },
+        { code: 16, name: 'ex5' }, { code: 17, name: 'ex6' },
+        { code: 18, name: 'ex7' }, { code: 19, name: 'ex8' },
+      ];
+
+      // Lengths
+      const extLens: number[] = [];
+      for (let i = 0; i < 8; i++) extLens.push(reader.readInt32());
+      // Loops
+      const extLoops: number[] = [];
+      for (let i = 0; i < 8; i++) extLoops.push(reader.readInt32());
+      // Release points
+      const extRels: number[] = [];
+      for (let i = 0; i < 8; i++) extRels.push(reader.readInt32());
+      // Open flags
+      for (let i = 0; i < 8; i++) reader.readUint8();
+
+      // Values (int32 each, READ_MACRO_VALS)
+      for (let i = 0; i < 8; i++) {
+        const vals = readMacroVals(extLens[i]);
+        if (extLens[i] > 0) {
+          inst.macros.push({
+            code: extMacroNames[i].code, length: extLens[i], loop: extLoops[i],
+            release: extRels[i], mode: 0, type: 0, delay: 0, speed: 1, data: vals,
+          });
+        }
+      }
+
+      // FDS data — Reference: instrument.cpp:3365-3373
+      const fdsModSpeed = reader.readInt32();
+      const fdsModDepth = reader.readInt32();
+      const fdsInitMod = reader.readUint8() !== 0;
+      reader.readUint8(); // reserved
+      reader.readUint8(); // reserved
+      reader.readUint8(); // reserved
+      const fdsModTable: number[] = [];
+      for (let i = 0; i < 32; i++) fdsModTable.push(reader.readInt8());
+      inst.fds = { modSpeed: fdsModSpeed, modDepth: fdsModDepth, initModTableWithFirstWave: fdsInitMod, modTable: fdsModTable };
+    }
+
+    // ========================================================================
+    // OPZ data (v77+) — Reference: instrument.cpp:3376-3379
+    // ========================================================================
+    if (instVersion >= 77) {
+      const fms2 = reader.readUint8();
+      const ams2 = reader.readUint8();
+      if (inst.fm) {
+        inst.fm.fms2 = fms2;
+        inst.fm.ams2 = ams2;
+      }
+    }
+
+    // ========================================================================
+    // Wave Synth (v79+) — Reference: instrument.cpp:3381-3394
+    // ========================================================================
+    if (instVersion >= 79) {
+      reader.readInt32();  // ws.wave1
+      reader.readInt32();  // ws.wave2
+      reader.readUint8();  // ws.rateDivider
+      reader.readUint8();  // ws.effect
+      reader.readUint8();  // ws.enabled
+      reader.readUint8();  // ws.global
+      reader.readUint8();  // ws.speed
+      reader.readUint8();  // ws.param1
+      reader.readUint8();  // ws.param2
+      reader.readUint8();  // ws.param3
+      reader.readUint8();  // ws.param4
+    }
+
+    // ========================================================================
+    // Macro modes (v84+) — Reference: instrument.cpp:3396-3417
+    // ========================================================================
+    if (instVersion >= 84) {
+      // 19 mode bytes: vol, duty, wave, pitch, ex1-3, alg, fb, fms, ams, panL, panR, phaseReset, ex4-8
+      const macroModes: { code: number; mode: number }[] = [
+        { code: 0, mode: reader.readUint8() },   // vol
+        { code: 2, mode: reader.readUint8() },   // duty
+        { code: 3, mode: reader.readUint8() },   // wave
+        { code: 4, mode: reader.readUint8() },   // pitch
+        { code: 5, mode: reader.readUint8() },   // ex1
+        { code: 6, mode: reader.readUint8() },   // ex2
+        { code: 7, mode: reader.readUint8() },   // ex3
+        { code: 8, mode: reader.readUint8() },   // alg
+        { code: 9, mode: reader.readUint8() },   // fb
+        { code: 10, mode: reader.readUint8() },  // fms
+        { code: 11, mode: reader.readUint8() },  // ams
+        { code: 12, mode: reader.readUint8() },  // panL
+        { code: 13, mode: reader.readUint8() },  // panR
+        { code: 14, mode: reader.readUint8() },  // phaseReset
+        { code: 15, mode: reader.readUint8() },  // ex4
+        { code: 16, mode: reader.readUint8() },  // ex5
+        { code: 17, mode: reader.readUint8() },  // ex6
+        { code: 18, mode: reader.readUint8() },  // ex7
+        { code: 19, mode: reader.readUint8() },  // ex8
+      ];
+      for (const mm of macroModes) {
+        const macro = inst.macros.find(m => m.code === mm.code);
+        if (macro) macro.mode = mm.mode;
+      }
+    }
+
+    // ========================================================================
+    // C64 noTest (v89+) — Reference: instrument.cpp:3419-3422
+    // ========================================================================
+    if (instVersion >= 89) {
+      const noTest = reader.readUint8() !== 0;
+      if (inst.c64) inst.c64.noTest = noTest;
+    }
+
+    // ========================================================================
+    // MultiPCM (v93+) — Reference: instrument.cpp:3424-3437
+    // ========================================================================
+    if (instVersion >= 93) {
+      // 9 parameter bytes + 23 reserved = 32 bytes total
+      for (let k = 0; k < 32; k++) reader.readUint8();
+    }
+
+    // ========================================================================
+    // Sound Unit (v104+) — Reference: instrument.cpp:3439-3443
+    // ========================================================================
+    if (instVersion >= 104) {
+      const useSample = reader.readUint8() !== 0;
+      reader.readUint8(); // su.switchRoles
+      if (inst.amiga) inst.amiga.useSample = useSample;
+    }
+
+    // ========================================================================
+    // GB hardware sequence (v105+) — Reference: instrument.cpp:3445-3452
+    // ========================================================================
+    if (instVersion >= 105) {
+      const gbHwSeqLen = reader.readUint8();
+      const gbHwSeq: Array<{ cmd: number; data: number }> = [];
+      for (let i = 0; i < gbHwSeqLen; i++) {
+        const cmd = reader.readUint8();
+        const data = reader.readInt16();
+        gbHwSeq.push({ cmd, data });
+      }
+      if (inst.gb) {
+        inst.gb.hwSeqLen = gbHwSeqLen;
+        inst.gb.hwSeq = gbHwSeq;
+      }
+    }
+
+    // ========================================================================
+    // GB additional flags (v106+) — Reference: instrument.cpp:3454-3458
+    // ========================================================================
+    if (instVersion >= 106) {
+      const gbSoftEnv = reader.readUint8() !== 0;
+      const gbAlwaysInit = reader.readUint8() !== 0;
+      if (inst.gb) {
+        inst.gb.softEnv = gbSoftEnv;
+        inst.gb.alwaysInit = gbAlwaysInit;
+      }
+    }
+
+    // ========================================================================
+    // ES5506 (v107+) — Reference: instrument.cpp:3460-3472
+    // ========================================================================
+    if (instVersion >= 107) {
+      // filter mode(1) + k1(2) + k2(2) + ecount(2) + lVRamp(1) + rVRamp(1) + k1Ramp(1) + k2Ramp(1) + k1Slow(1) + k2Slow(1) = 13 bytes
+      for (let k = 0; k < 13; k++) reader.readUint8();
+    }
+
+    // ========================================================================
+    // SNES (v109+) — Reference: instrument.cpp:3474-3491
+    // ========================================================================
+    if (instVersion >= 109) {
+      const snesUseEnv = reader.readUint8() !== 0;
+      if (instVersion < 118) {
+        reader.readUint8(); // reserved
+        reader.readUint8(); // reserved
+      } else {
+        const snesGainMode = reader.readUint8();
+        const snesGain = reader.readUint8();
+        if (inst.snes) {
+          inst.snes.gainMode = snesGainMode;
+          inst.snes.gain = snesGain;
+        }
+      }
+      const snesA = reader.readUint8();
+      const snesD = reader.readUint8();
+      const snesS = reader.readUint8();
+      const snesSus = (snesS & 8) ? 1 : 0;
+      const snesSClean = snesS & 7;
+      const snesR = reader.readUint8();
+      inst.snes = {
+        a: snesA, d: snesD, s: snesSClean, r: snesR,
+        useEnv: snesUseEnv, sus: snesSus,
+        gainMode: inst.snes?.gainMode ?? 0,
+        gain: inst.snes?.gain ?? 0,
+        d2: 0,
+      };
+    }
+
+    // ========================================================================
+    // Macro speed/delay (v111+) — Reference: instrument.cpp:3493-3583
+    // ========================================================================
+    if (instVersion >= 111) {
+      // Speed bytes for standard macros (20 bytes)
+      const speedCodes = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19];
+      const speeds: number[] = [];
+      for (let i = 0; i < 20; i++) speeds.push(reader.readUint8());
+
+      // Delay bytes for standard macros (20 bytes)
+      const delays: number[] = [];
+      for (let i = 0; i < 20; i++) delays.push(reader.readUint8());
+
+      // Apply speed/delay to existing macros
+      for (let i = 0; i < 20; i++) {
+        const macro = inst.macros.find(m => m.code === speedCodes[i]);
+        if (macro) {
+          macro.speed = speeds[i];
+          macro.delay = delays[i];
+        }
+      }
+
+      // Op macro speed/delay: 4 operators × 20 macros each (12 base + 8 extended)
+      // Reference: instrument.cpp:3537-3582
+      for (let op = 0; op < 4; op++) {
+        const opSpeeds: number[] = [];
+        for (let m = 0; m < 20; m++) opSpeeds.push(reader.readUint8());
+        const opDelays: number[] = [];
+        for (let m = 0; m < 20; m++) opDelays.push(reader.readUint8());
+
+        if (inst.opMacroArrays && inst.opMacroArrays[op]) {
+          for (const opMacro of inst.opMacroArrays[op]) {
+            const idx = opMacro.code;
+            if (idx < 20) {
+              opMacro.speed = opSpeeds[idx];
+              opMacro.delay = opDelays[idx];
+            }
+          }
+        }
+      }
+    }
+
+    console.log(`[FurnaceParser] INST old format complete: ${inst.macros.length} macros, ${inst.opMacroArrays ? inst.opMacroArrays.map(a => a.length).join('/') : '0/0/0/0'} op macros`);
   } else {
     throw new Error(`Unknown instrument format: "${magic}"`);
   }
@@ -608,6 +1212,10 @@ export function parseFMData(reader: BinaryReader): FurnaceConfig {
   config.ams2 = (llPatchAm2 >> 6) & 0x03;
   // ops is set from flags byte above (opCount), this byte has a 4/2 mode flag at bit 5
   config.opllPreset = llPatchAm2 & 0x1F;
+
+  // Reference: instrument.cpp:1766-1769 — block field (v224+, always present in new format writer)
+  const blockByte = reader.readUint8();
+  config.block = blockByte & 0x0F;
 
   // Read operators
   for (let i = 0; i < opCount; i++) {

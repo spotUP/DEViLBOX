@@ -217,6 +217,42 @@ export interface FurnaceESFMConfig {
   noise: number;         // Noise mode
 }
 
+// MultiPCM (DIV_INS_MULTIPCM)
+export interface FurnaceMultiPCMConfig {
+  ar: number;            // Attack rate
+  d1r: number;           // Decay 1 rate
+  dl: number;            // Decay level
+  d2r: number;           // Decay 2 rate
+  rr: number;            // Release rate
+  rc: number;            // Rate correction
+  lfo: number;           // LFO frequency
+  vib: number;           // Vibrato depth
+  am: number;            // AM depth
+  damp: boolean;         // Damp
+  pseudoReverb: boolean; // Pseudo reverb
+  lfoReset: boolean;     // LFO reset
+  levelDirect: boolean;  // Level direct
+}
+
+// Sound Unit (DIV_INS_SU)
+export interface FurnaceSoundUnitConfig {
+  switchRoles: boolean;
+  hwSeqLen: number;
+  hwSeq: Array<{
+    cmd: number;
+    bound: number;
+    val: number;
+    speed: number;
+  }>;
+}
+
+// SID2 (DIV_INS_SID2)
+export interface FurnaceSID2Config {
+  volume: number;        // 0-15
+  mixMode: number;       // 0-3
+  noiseMode: number;     // 0-3
+}
+
 // ES5506 (DIV_INS_ES5506)
 export interface FurnaceES5506Config {
   filter: {
@@ -252,6 +288,7 @@ export interface FurnaceConfig {
   ams2?: number;         // Secondary AM sensitivity (OPZ)
   ops?: number;          // Number of operators (2 or 4)
   opllPreset?: number;   // OPLL preset patch 0-15
+  block?: number;        // Block/octave 0-7 (ESFM/OPL)
   fixedDrums?: boolean;  // OPLL fixed drum mode
   kickFreq?: number;     // OPL drum kick frequency
   snareHatFreq?: number; // OPL drum snare/hi-hat frequency
@@ -282,6 +319,9 @@ export interface FurnaceConfig {
   snes?: FurnaceSNESConfig;
   esfm?: FurnaceESFMConfig;
   es5506?: FurnaceES5506Config;
+  multipcm?: FurnaceMultiPCMConfig;
+  soundUnit?: FurnaceSoundUnitConfig;
+  sid2?: FurnaceSID2Config;
 
   // Simple chip-specific fields (from feature blocks)
   x1BankSlot?: number;     // X1-010 bank slot
