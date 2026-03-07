@@ -76,6 +76,7 @@ export const PixiGlobalDropdownLayer: React.FC = () => {
             onSelect={dropdown.onSelect}
             onClose={dropdown.onClose}
             width={dropdown.width}
+            searchable={dropdown.searchable}
           />
         </pixiContainer>
       )}

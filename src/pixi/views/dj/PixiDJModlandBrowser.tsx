@@ -93,8 +93,9 @@ export const PixiDJModlandBrowser: React.FC<PixiDJModlandBrowserProps> = ({
 
   // ── Format options for PixiSelect ────────────────────────────────────────
   const formatOptions = useMemo<SelectOption[]>(() => {
+    const sorted = [...formats].sort((a, b) => a.format.localeCompare(b.format));
     const opts: SelectOption[] = [{ value: '', label: 'All formats' }];
-    for (const f of formats) {
+    for (const f of sorted) {
       opts.push({ value: f.format, label: `${f.format} (${f.count.toLocaleString()})` });
     }
     return opts;
@@ -352,8 +353,9 @@ export const PixiDJModlandBrowser: React.FC<PixiDJModlandBrowserProps> = ({
           options={formatOptions}
           value={format}
           onChange={setFormat}
-          width={156}
+          width={200}
           height={SEARCH_ROW_H}
+          searchable
         />
       </layoutContainer>
 
