@@ -592,7 +592,9 @@ export async function parseSonixFile(
   if (subFormat === 'smus') {
     // IFF SMUS: full implementation in IffSmusParser
     const { parseIffSmusFile } = await import('./IffSmusParser');
-    return parseIffSmusFile(buffer, filename);
+    const song = await parseIffSmusFile(buffer, filename);
+    song.sonixFileData = buffer.slice(0);
+    return song;
   }
 
   if (subFormat === 'tiny') {
@@ -605,5 +607,7 @@ export async function parseSonixFile(
   }
 
   // SNX binary format: parse note streams, placeholder instruments
-  return parseSnxBinary(buf, filename);
+  const song = parseSnxBinary(buf, filename);
+  song.sonixFileData = buffer.slice(0);
+  return song;
 }
