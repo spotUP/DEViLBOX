@@ -35,6 +35,8 @@
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, ChannelData, TrackerCell, InstrumentConfig } from '@/types';
 import { createSamplerInstrument } from './AmigaUtils';
+import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
+import { encode669Cell } from '@/engine/uade/encoders/Composer667Encoder';
 
 // -- Binary helpers -----------------------------------------------------------
 
@@ -367,6 +369,17 @@ export async function parse669File(
 
   const effectiveRestart = restartPos < rawOrders.length ? restartPos : 0;
 
+  const uadePatternLayout: UADEPatternLayout = {
+    formatId: 'format669',
+    patternDataFileOffset: patternDataBase,
+    bytesPerCell: BYTES_PER_CELL,
+    rowsPerPattern: ROWS_PER_PATTERN,
+    numChannels: NUM_CHANNELS,
+    numPatterns,
+    moduleSize: buffer.byteLength,
+    encodeCell: encode669Cell,
+  };
+
   return {
     name:            songName || filename.replace(/\.[^/.]+$/, ''),
     format:          'MOD' as TrackerFormat,
@@ -379,5 +392,6 @@ export async function parse669File(
     initialSpeed:    4,
     initialBPM:      125,
     linearPeriods:   false,
+    uadePatternLayout,
   };
 }
