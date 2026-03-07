@@ -26,5 +26,8 @@ void paula_set_clock(float paula_clock);
 // Set output sample rate (default: PAULA_RATE_PAL = 28150)
 void paula_set_output_rate(float rate);
 
+// Mixer: per-channel gain (0.0 = mute, 1.0 = unity). Applied on top of replayer volume.
+void paula_set_channel_gain(int ch, float gain);
+
 // Render frames of F32 stereo interleaved audio
 int paula_render(float* buffer, int frames);

@@ -87,6 +87,10 @@ EXPORT void player_set_sample_rate(int rate) {
     g_frames_per_tick = g_output_rate / VBLANK_HZ;
 }
 
+EXPORT void player_set_channel_gain(int ch, float gain) {
+    paula_set_channel_gain(ch, gain);
+}
+
 EXPORT int player_is_finished(void) { return 0; }
 EXPORT int player_get_subsong_count(void) { return 1; }
 EXPORT void player_set_subsong(int n) { (void)n; }

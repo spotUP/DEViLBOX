@@ -61,6 +61,7 @@ if(EMSCRIPTEN)
         "_hively_player_note_off"
         "_hively_player_render"
         "_hively_set_track_step"
+        "_hively_set_channel_gain"
     )
 
     # Join exported functions into a comma-separated list

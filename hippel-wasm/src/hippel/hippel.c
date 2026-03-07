@@ -1478,3 +1478,6 @@ EXPORT int player_get_subsong_count(void) { return 1; }
 EXPORT void player_set_subsong(int n) { (void)n; }
 EXPORT const char* player_get_title(void) { return "Jochen Hippel"; }
 EXPORT double player_detect_duration(void) { return 0.0; }
+EXPORT void player_set_channel_gain(int ch, float gain) {
+    paula_set_channel_gain(ch, gain);
+}

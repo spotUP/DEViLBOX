@@ -1,10 +1,119 @@
 /**
  * Mixer Store — 16-channel + master volume/pan/mute/solo state
+ *
+ * For WASM engines, per-channel audio routing doesn't exist — they output a
+ * single mixed stream. We forward channel gain/mute to the active WASM engine:
+ * - Furnace: per-channel mute via furnace_dispatch_mute()
+ * - Hively, Klystrack, JamCracker, PreTracker, MA, Hippel: per-channel gain
  */
 
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
 import { getToneEngine } from '../engine/ToneEngine';
+import { useFormatStore } from './useFormatStore';
+
+// Lazy references to WASM engines to avoid circular imports
+let _furnaceDispatchEngine: any = null;
+function getFurnaceDispatchEngine(): any {
+  if (!_furnaceDispatchEngine) {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    _furnaceDispatchEngine = require('../engine/furnace-dispatch/FurnaceDispatchEngine').FurnaceDispatchEngine;
+  }
+  return _furnaceDispatchEngine;
+}
+
+/**
+ * Get the active WASM engine instance that supports setChannelGain, if any.
+ * Returns null if no gain-capable WASM engine is currently active.
+ */
+function getActiveGainEngine(): { setChannelGain(ch: number, gain: number): void } | null {
+  const fmt = useFormatStore.getState();
+  try {
+    if (fmt.editorMode === 'hively') {
+      const { HivelyEngine } = require('../engine/hively/HivelyEngine');
+      if (HivelyEngine.hasInstance()) return HivelyEngine.getInstance();
+    } else if (fmt.editorMode === 'klystrack') {
+      const { KlysEngine } = require('../engine/klystrack/KlysEngine');
+      if (KlysEngine.hasInstance()) return KlysEngine.getInstance();
+    } else if (fmt.editorMode === 'jamcracker') {
+      const { JamCrackerEngine } = require('../engine/jamcracker/JamCrackerEngine');
+      if (JamCrackerEngine.hasInstance()) return JamCrackerEngine.getInstance();
+    } else if (fmt.preTrackerFileData) {
+      const { PreTrackerEngine } = require('../engine/pretracker/PreTrackerEngine');
+      if (PreTrackerEngine.hasInstance()) return PreTrackerEngine.getInstance();
+    } else if (fmt.maFileData) {
+      const { MaEngine } = require('../engine/ma/MaEngine');
+      if (MaEngine.hasInstance()) return MaEngine.getInstance();
+    } else if (fmt.hippelFileData) {
+      const { HippelEngine } = require('../engine/hippel/HippelEngine');
+      if (HippelEngine.hasInstance()) return HippelEngine.getInstance();
+    }
+  } catch {
+    // Engine not ready
+  }
+  return null;
+}
+
+/**
+ * Forward effective channel gain to the active WASM engine.
+ * Computes gain from volume + mute/solo state and sends to the engine.
+ */
+function forwardWasmChannelGain(ch: number, channels: MixerChannelState[], isSoloing: boolean): void {
+  const fmt = useFormatStore.getState();
+
+  // Furnace uses mute API (binary on/off)
+  if (fmt.editorMode === 'furnace') {
+    try {
+      const engine = getFurnaceDispatchEngine().getInstance();
+      const c = channels[ch];
+      const effectiveMute = isSoloing ? !c.soloed : (c.muted || c.volume <= 0);
+      engine.mute(ch, effectiveMute);
+    } catch {
+      // Engine not ready
+    }
+    return;
+  }
+
+  // Other WASM engines use gain API (0.0 - 1.0)
+  const gainEngine = getActiveGainEngine();
+  if (gainEngine) {
+    const c = channels[ch];
+    const effectiveMute = isSoloing ? !c.soloed : c.muted;
+    const gain = effectiveMute ? 0 : c.volume;
+    gainEngine.setChannelGain(ch, gain);
+  }
+}
+
+/**
+ * Forward all channel gains/mutes to the active WASM engine.
+ */
+function forwardAllWasmChannelGains(channels: MixerChannelState[], isSoloing: boolean): void {
+  const fmt = useFormatStore.getState();
+
+  // Furnace uses mute API
+  if (fmt.editorMode === 'furnace') {
+    try {
+      const engine = getFurnaceDispatchEngine().getInstance();
+      channels.forEach((c, i) => {
+        const effectiveMute = isSoloing ? !c.soloed : (c.muted || c.volume <= 0);
+        engine.mute(i, effectiveMute);
+      });
+    } catch {
+      // Engine not ready
+    }
+    return;
+  }
+
+  // Other WASM engines use gain API
+  const gainEngine = getActiveGainEngine();
+  if (gainEngine) {
+    channels.forEach((c, i) => {
+      const effectiveMute = isSoloing ? !c.soloed : c.muted;
+      const gain = effectiveMute ? 0 : c.volume;
+      gainEngine.setChannelGain(i, gain);
+    });
+  }
+}
 
 export interface MixerChannelState {
   volume: number;   // 0–1, 1 = unity (0 dB)
@@ -84,6 +193,9 @@ export const useMixerStore = create<MixerStore>()(
       applyToEngine(() => {
         getToneEngine().setMixerChannelVolume(ch, toDb(vol));
       });
+      // Forward gain to active WASM engine
+      const { channels, isSoloing } = get();
+      forwardWasmChannelGain(ch, channels, isSoloing);
     },
 
     setChannelPan(ch: number, pan: number): void {
@@ -102,6 +214,8 @@ export const useMixerStore = create<MixerStore>()(
       applyToEngine(() => {
         getToneEngine().setChannelMute(ch, muted);
       });
+      const { channels: chans, isSoloing: soloing } = get();
+      forwardWasmChannelGain(ch, chans, soloing);
     },
 
     setChannelSolo(ch: number, soloed: boolean): void {
@@ -112,13 +226,14 @@ export const useMixerStore = create<MixerStore>()(
       });
 
       // Recompute effective mutes for all channels based on solo state
+      const { channels, isSoloing } = get();
       applyToEngine(() => {
-        const { channels, isSoloing } = get();
         channels.forEach((c, i) => {
           const effectiveMute = isSoloing ? !c.soloed : c.muted;
           getToneEngine().setChannelMute(i, effectiveMute);
         });
       });
+      forwardAllWasmChannelGains(channels, isSoloing);
     },
 
     setChannelEffect(ch: number, slot: 0 | 1, type: string | null): void {

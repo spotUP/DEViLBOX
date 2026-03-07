@@ -160,6 +160,10 @@ export class PreTrackerEngine {
     this.workletNode?.port.postMessage({ type: 'stop' });
   }
 
+  setChannelGain(channel: number, gain: number): void {
+    this.workletNode?.port.postMessage({ type: 'setChannelGain', channel, gain });
+  }
+
   setSubsong(index: number): void {
     this.workletNode?.port.postMessage({ type: 'setSubsong', subsong: index });
   }
