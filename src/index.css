@@ -2542,6 +2542,29 @@ html[data-theme="cyan-lineart"] #root > * {
   overflow: hidden;
 }
 
+/* Responsive two-column control modules when instrument panel is wide (Studio canvas view).
+   Header + viz stay full-width at top; only the scrollable control sections reflow.
+   Editors add .synth-controls-flow to their scrollable section wrapper. */
+@container (min-width: 700px) {
+  .synth-controls-flow {
+    display: block !important;   /* override flex-col to enable CSS columns */
+    columns: 2;
+    column-gap: 12px;
+  }
+  .synth-controls-flow > * {
+    break-inside: avoid;
+    margin-bottom: 12px;
+  }
+  /* Generic editor content also reflows */
+  .synth-editor-content {
+    columns: 2;
+    column-gap: 12px;
+  }
+  .synth-editor-content > * {
+    break-inside: avoid;
+  }
+}
+
 .synth-editor-header {
   flex-shrink: 0;
   border-bottom: 1px solid var(--color-border);

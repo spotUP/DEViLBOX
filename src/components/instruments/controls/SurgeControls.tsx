@@ -193,7 +193,7 @@ export const SurgeControls: React.FC<SurgeControlsProps> = ({
   const tabBarBg = isCyanTheme ? 'bg-[#061818]' : 'bg-[#111]';
 
   return (
-    <div className="flex flex-col gap-0 overflow-y-auto">
+    <div className="synth-controls-flow flex flex-col gap-0 overflow-y-auto">
       {/* Scene selector + Tab bar */}
       <div className={`flex items-center gap-3 px-4 py-2 ${tabBarBg} border-b border-gray-800`}>
         {/* Scene buttons */}
