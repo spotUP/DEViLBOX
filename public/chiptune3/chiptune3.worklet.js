@@ -84,17 +84,18 @@ class MPT extends AudioWorkletProcessor {
 			order: libopenmpt._openmpt_module_get_current_order(this.modulePtr),
 			pattern: libopenmpt._openmpt_module_get_current_pattern(this.modulePtr),
 			row: libopenmpt._openmpt_module_get_current_row(this.modulePtr),
-			// channel volumes
-			//chVol: [], // ch0Left, ch0Right, ch1Left, ...
 		}
-		/*
-		for (let i = 0; i < this.channels; i++) {
-			msg.chVol.push( {
-				left: libopenmpt._openmpt_module_get_current_channel_vu_left(this.modulePtr, i),
-				right: libopenmpt._openmpt_module_get_current_channel_vu_right(this.modulePtr, i),
-			})
+
+		// Per-channel VU levels (mono max of L/R)
+		if (this.channels > 0) {
+			const chLevels = new Float32Array(this.channels)
+			for (let i = 0; i < this.channels; i++) {
+				const l = libopenmpt._openmpt_module_get_current_channel_vu_left(this.modulePtr, i)
+				const r = libopenmpt._openmpt_module_get_current_channel_vu_right(this.modulePtr, i)
+				chLevels[i] = Math.max(l, r)
+			}
+			msg.chLevels = chLevels
 		}
-		*/
 
 		this.port.postMessage( msg )
 
@@ -263,7 +264,7 @@ class MPT extends AudioWorkletProcessor {
 		}
 		// channels
 		const chNum = libopenmpt._openmpt_module_get_num_channels(this.modulePtr)
-		this.channel = chNum
+		this.channels = chNum
 		for (let i = 0; i < chNum; i++) {
 			song.channels.push( libopenmpt.UTF8ToString(libopenmpt._openmpt_module_get_channel_name(this.modulePtr, i)) )
 		}
