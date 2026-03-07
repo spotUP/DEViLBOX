@@ -7,6 +7,7 @@
 
 #include "pxtone/pxtnService.h"
 
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <new>
@@ -46,9 +47,9 @@ static bool pxtone_io_write(void *user, const void *p_src, int32_t size, int32_t
 static bool pxtone_io_seek(void *user, int32_t mode, int32_t val) {
     auto *mf = (PxToneMemFile *)user;
     switch (mode) {
-        case pxtnSEEK_set: mf->pos = val; break;
-        case pxtnSEEK_cur: mf->pos += val; break;
-        case pxtnSEEK_end: mf->pos = mf->size + val; break;
+        case SEEK_SET: mf->pos = val; break;
+        case SEEK_CUR: mf->pos += val; break;
+        case SEEK_END: mf->pos = mf->size + val; break;
         default: return false;
     }
     return true;
@@ -63,6 +64,8 @@ static bool pxtone_io_pos(void *user, int32_t *p_pos) {
 /* ---- State ---- */
 
 static pxtnService *g_pxtn = nullptr;
+static PxToneMemFile g_memfile;
+static uint8_t *g_file_data = nullptr;
 static bool g_playing = false;
 
 /* Temporary buffer for S16 -> F32 conversion */
@@ -74,42 +77,65 @@ static int16_t g_s16buf[CONV_BUF_FRAMES * PXTONE_CHANNELS];
 EXPORT int pxtone_init(const uint8_t *data, uint32_t size) {
     /* Clean up previous */
     if (g_pxtn) {
+        g_pxtn->clear();
         delete g_pxtn;
         g_pxtn = nullptr;
+    }
+    if (g_file_data) {
+        free(g_file_data);
+        g_file_data = nullptr;
     }
     g_playing = false;
 
+    /* Copy file data (caller's buffer may be freed) */
+    g_file_data = (uint8_t *)malloc(size);
+    if (!g_file_data) return -1;
+    memcpy(g_file_data, data, size);
+
+    g_memfile.data = g_file_data;
+    g_memfile.size = (int32_t)size;
+    g_memfile.pos = 0;
+
     g_pxtn = new (std::nothrow) pxtnService(pxtone_io_read, pxtone_io_write, pxtone_io_seek, pxtone_io_pos);
-    if (!g_pxtn) return -1;
+    if (!g_pxtn) return -2;
 
-    PxToneMemFile memfile = { data, (int32_t)size, 0 };
-
-    pxtnERR err = g_pxtn->read(&memfile);
+    pxtnERR err = g_pxtn->init();
     if (err != pxtnERR_VOID) {
-        delete g_pxtn;
-        g_pxtn = nullptr;
-        return -2;
-    }
-
-    if (!g_pxtn->tones_ready()) {
         delete g_pxtn;
         g_pxtn = nullptr;
         return -3;
     }
 
+    err = g_pxtn->read(&g_memfile);
+    if (err != pxtnERR_VOID) {
+        delete g_pxtn;
+        g_pxtn = nullptr;
+        return -4;
+    }
+
+    err = g_pxtn->tones_ready();
+    if (err != pxtnERR_VOID) {
+        delete g_pxtn;
+        g_pxtn = nullptr;
+        return -5;
+    }
+
+    if (!g_pxtn->set_destination_quality(PXTONE_CHANNELS, PXTONE_SAMPLE_RATE)) {
+        delete g_pxtn;
+        g_pxtn = nullptr;
+        return -6;
+    }
+
     pxtnVOMITPREPARATION prep;
     memset(&prep, 0, sizeof(prep));
-    prep.flags = 0;
-    prep.sps = PXTONE_SAMPLE_RATE;
-    prep.ch_num = PXTONE_CHANNELS;
-    prep.bps = 16;
+    prep.flags = pxtnVOMITPREPFLAG_loop;
     prep.start_pos_float = 0;
     prep.master_volume = 0.8f;
 
     if (!g_pxtn->moo_preparation(&prep)) {
         delete g_pxtn;
         g_pxtn = nullptr;
-        return -4;
+        return -7;
     }
 
     g_playing = true;
@@ -118,8 +144,13 @@ EXPORT int pxtone_init(const uint8_t *data, uint32_t size) {
 
 EXPORT void pxtone_stop(void) {
     if (g_pxtn) {
+        g_pxtn->clear();
         delete g_pxtn;
         g_pxtn = nullptr;
+    }
+    if (g_file_data) {
+        free(g_file_data);
+        g_file_data = nullptr;
     }
     g_playing = false;
 }
