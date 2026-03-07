@@ -25,7 +25,7 @@
  * UADE handles actual audio playback. This parser extracts metadata only.
  *
  * Reference:
- *   Reference Code/uade-3.05/amigasrc/players/wanted_team/BennDaglish/Benn Daglishv3.asm
+ *   third-party/uade-3.05/amigasrc/players/wanted_team/BennDaglish/Benn Daglishv3.asm
  * Reference parsers: JeroenTelParser.ts, JasonPageParser.ts
  */
 

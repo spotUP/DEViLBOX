@@ -17,7 +17,7 @@
  * 4 channels (standard Amiga Paula).
  * This parser extracts basic metadata; UADE handles actual audio playback.
  *
- * Reference: Reference Code/uade-3.05/amigasrc/players/wanted_team/LME/src/LMEv3.asm
+ * Reference: third-party/uade-3.05/amigasrc/players/wanted_team/LME/src/LMEv3.asm
  */
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';

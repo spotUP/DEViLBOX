@@ -14,7 +14,7 @@
  * File prefix: "NPP."
  * Actual audio playback is delegated to UADE.
  *
- * Reference: Reference Code/uade-3.05/amigasrc/players/wanted_team/NickPellingPacker/Nick Pelling Packer_v1.asm
+ * Reference: third-party/uade-3.05/amigasrc/players/wanted_team/NickPellingPacker/Nick Pelling Packer_v1.asm
  */
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';

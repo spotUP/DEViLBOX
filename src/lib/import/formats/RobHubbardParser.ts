@@ -43,8 +43,8 @@
  *
  * Single-file format: player code + music data in one binary blob.
  *
- * Reference: Reference Code/uade-3.05/amigasrc/players/wanted_team/RobHubbard/src/Rob Hubbard_v7.asm
- * Reference: Reference Code/uade-3.05/amigasrc/players/wanted_team/RobHubbard/src/Rob Hubbard.s
+ * Reference: third-party/uade-3.05/amigasrc/players/wanted_team/RobHubbard/src/Rob Hubbard_v7.asm
+ * Reference: third-party/uade-3.05/amigasrc/players/wanted_team/RobHubbard/src/Rob Hubbard.s
  * Reference parsers: JeroenTelParser.ts, JasonPageParser.ts
  */
 

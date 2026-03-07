@@ -24,7 +24,7 @@
  * Single-file format: player code + music data + samples all in one binary blob.
  * This parser extracts metadata only; UADE handles actual audio playback.
  *
- * Reference: Reference Code/uade-3.05/amigasrc/players/wanted_team/Desire/src/Desire_v1.asm
+ * Reference: third-party/uade-3.05/amigasrc/players/wanted_team/Desire/src/Desire_v1.asm
  * Reference parsers: DaveLoweParser.ts, JeroenTelParser.ts
  */
 

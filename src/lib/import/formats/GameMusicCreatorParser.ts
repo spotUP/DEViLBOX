@@ -34,7 +34,7 @@
  *   0x08 → set speed (Fxx)
  *
  * References:
- *   Reference Code/openmpt-master/soundlib/Load_gmc.cpp (primary)
+ *   third-party/openmpt-master/soundlib/Load_gmc.cpp (primary)
  *   thoughts/shared/research/nostalgicplayer/sources/GameMusicCreator/ (secondary)
  */
 

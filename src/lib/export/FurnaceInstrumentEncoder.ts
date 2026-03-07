@@ -40,7 +40,12 @@ const DIV_INS_OPM = 33;
 const DIV_INS_OPLL = 13;
 const DIV_INS_OPL = 14;
 const DIV_INS_FDS = 15;
+const DIV_INS_ES5506 = 27;
+const DIV_INS_MULTIPCM = 28;
+const DIV_INS_SU = 30;
 const DIV_INS_ESFM = 55;
+const DIV_INS_POWERNOISE = 56;
+const DIV_INS_SID2 = 63;
 
 /** All FM-based instrument types that have operator data */
 const FM_INSTRUMENT_TYPES = new Set([
@@ -143,6 +148,11 @@ function resolveInsType(config: FurnaceConfig): number {
   if (config.fds) return DIV_INS_FDS;        // 15
   if (config.snes) return DIV_INS_SNES;      // 29
   if (config.esfm) return DIV_INS_ESFM;      // 55
+  if (config.es5506) return DIV_INS_ES5506;  // 27
+  if (config.multipcm) return DIV_INS_MULTIPCM; // 28
+  if (config.soundUnit) return DIV_INS_SU;   // 30
+  if (config.sid2) return DIV_INS_SID2;      // 63
+  if (config.powerNoiseOctave !== undefined) return DIV_INS_POWERNOISE; // 56
   // Map internal chipType to DivInstrumentType for FM and other types
   const mapped = CHIPTYPE_TO_DIV_INS[config.chipType];
   if (mapped !== undefined) return mapped;
@@ -188,8 +198,8 @@ export function encodeFurnaceInstrument(config: FurnaceConfig, name: string = 'I
 
   // === FM data ===
   // Reference: FurnaceDispatchWrapper.cpp:3654-3692
-  // C++ reads: fm[0]=alg, fm[1]=fb, fm[2]=fms, fm[3]=ams, fm[4]=fms2, fm[5]=ams2, fm[6]=ops, fm[7]=opllPreset
-  // Then operators at fm+8, 24 bytes each:
+  // C++ reads: fm[0]=alg, fm[1]=fb, fm[2]=fms, fm[3]=ams, fm[4]=fms2, fm[5]=ams2, fm[6]=ops, fm[7]=opllPreset, fm[8]=block
+  // Then operators at fm+9, 24 bytes each:
   //   [0]=enable [1]=am [2]=ar [3]=dr [4]=mult [5]=rr [6]=sl [7]=tl
   //   [8]=dt2 [9]=rs [10]=dt(signed) [11]=d2r [12]=ssgEnv [13]=dam [14]=dvb [15]=egt
   //   [16]=ksl [17]=sus [18]=vib [19]=ws [20]=ksr [21]=kvs [22-23]=pad
@@ -205,6 +215,7 @@ export function encodeFurnaceInstrument(config: FurnaceConfig, name: string = 'I
     writer.writeUint8(config.ams2 || 0);
     writer.writeUint8(config.ops || 4);
     writer.writeUint8(config.opllPreset || 0);
+    writer.writeUint8(config.block || 0);         // [8]  block/octave
 
     // Write 4 operators (24 bytes each)
     for (let i = 0; i < 4; i++) {
@@ -481,6 +492,93 @@ export function encodeFurnaceInstrument(config: FurnaceConfig, name: string = 'I
     writer.writeUint8(snes.s || 0);
     writer.writeUint8(snes.r || 0);
     writer.writeUint8(snes.d2 ?? 0);
+  }
+
+  if (insType === DIV_INS_ES5506 && config.es5506) {
+    chipOffset = writer.getPosition();
+    const es = config.es5506;
+    writer.writeUint8(es.filter.mode || 0);
+    writer.writeUint16(es.filter.k1 || 0);
+    writer.writeUint16(es.filter.k2 || 0);
+    writer.writeUint16(es.envelope.ecount || 0);
+    writer.writeInt8(es.envelope.lVRamp || 0);
+    writer.writeInt8(es.envelope.rVRamp || 0);
+    writer.writeInt8(es.envelope.k1Ramp || 0);
+    writer.writeInt8(es.envelope.k2Ramp || 0);
+    writer.writeUint8(es.envelope.k1Slow ? 1 : 0);
+    writer.writeUint8(es.envelope.k2Slow ? 1 : 0);
+  }
+
+  if (insType === DIV_INS_MULTIPCM && config.multipcm) {
+    chipOffset = writer.getPosition();
+    const mp = config.multipcm;
+    writer.writeUint8(mp.ar || 0);
+    writer.writeUint8(mp.d1r || 0);
+    writer.writeUint8(mp.dl || 0);
+    writer.writeUint8(mp.d2r || 0);
+    writer.writeUint8(mp.rr || 0);
+    writer.writeUint8(mp.rc || 0);
+    writer.writeUint8(mp.lfo || 0);
+    writer.writeUint8(mp.vib || 0);
+    writer.writeUint8(mp.am || 0);
+    let mpFlags = 0;
+    if (mp.damp) mpFlags |= 1;
+    if (mp.pseudoReverb) mpFlags |= 2;
+    if (mp.lfoReset) mpFlags |= 4;
+    if (mp.levelDirect) mpFlags |= 8;
+    writer.writeUint8(mpFlags);
+  }
+
+  if (insType === DIV_INS_SU && config.soundUnit) {
+    chipOffset = writer.getPosition();
+    const su = config.soundUnit;
+    writer.writeUint8(su.switchRoles ? 1 : 0);
+    writer.writeUint8(su.hwSeqLen || 0);
+    if (su.hwSeq) {
+      for (let i = 0; i < su.hwSeqLen; i++) {
+        const entry = su.hwSeq[i];
+        writer.writeUint8(entry.cmd);
+        writer.writeUint8(entry.bound);
+        writer.writeUint8(entry.val);
+        writer.writeUint16(entry.speed);
+      }
+    }
+  }
+
+  if (insType === DIV_INS_ESFM && config.esfm) {
+    chipOffset = writer.getPosition();
+    const esfm = config.esfm;
+    writer.writeUint8(esfm.noise & 0x03);
+    for (let i = 0; i < 4; i++) {
+      const op = esfm.operators[i];
+      writer.writeUint8(
+        ((op.delay & 0x07) << 5) |
+        ((op.outLvl & 0x07) << 2) |
+        ((op.right ? 1 : 0) << 1) |
+        (op.left ? 1 : 0)
+      );
+      writer.writeUint8(
+        (op.modIn & 0x07) |
+        ((op.fixed ? 1 : 0) << 3)
+      );
+      writer.writeInt8(op.ct || 0);
+      writer.writeInt8(op.dt || 0);
+    }
+  }
+
+  if (insType === DIV_INS_POWERNOISE && config.powerNoiseOctave !== undefined) {
+    chipOffset = writer.getPosition();
+    writer.writeUint8(config.powerNoiseOctave);
+  }
+
+  if (insType === DIV_INS_SID2 && config.sid2) {
+    chipOffset = writer.getPosition();
+    const sid2 = config.sid2;
+    writer.writeUint8(
+      (sid2.volume & 0x0F) |
+      ((sid2.mixMode & 0x03) << 4) |
+      ((sid2.noiseMode & 0x03) << 6)
+    );
   }
 
   // === Sample/amiga data ===

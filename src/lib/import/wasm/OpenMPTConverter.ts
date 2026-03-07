@@ -9,6 +9,7 @@
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, ChannelData, TrackerCell } from '@/types/tracker';
 import type { InstrumentConfig, SampleConfig } from '@/types/instrument';
+import { createWavFile, arrayBufferToBase64 } from '../InstrumentConverter';
 import * as osl from './OpenMPTSoundlib';
 
 /** Map OpenMPT type string → TrackerFormat */
@@ -248,22 +249,29 @@ export async function parseWithOpenMPT(
         if (smpInfo && smpInfo.length > 0) {
           const { data } = await osl.getSampleData(sampleIdx);
 
-          // Convert PCM to ArrayBuffer (always 16-bit mono for playback)
+          // Convert PCM to WAV-wrapped ArrayBuffer for decodeAudioData()
           let audioBuffer: ArrayBuffer;
+          const c5Speed = smpInfo.c5Speed || 8363;
+          const loopWav = smpInfo.hasLoop ? { start: smpInfo.loopStart, end: smpInfo.loopEnd } : undefined;
           if (data instanceof Int16Array && data.length > 0) {
-            audioBuffer = (data.buffer as ArrayBuffer).slice(data.byteOffset, data.byteOffset + data.byteLength);
+            audioBuffer = createWavFile(data, c5Speed, loopWav);
           } else if (data instanceof Int8Array && data.length > 0) {
             // Upscale 8-bit → 16-bit
             const pcm16 = new Int16Array(data.length);
             for (let s = 0; s < data.length; s++) pcm16[s] = data[s] << 8;
-            audioBuffer = pcm16.buffer as ArrayBuffer;
+            audioBuffer = createWavFile(pcm16, c5Speed, loopWav);
           } else {
             audioBuffer = new ArrayBuffer(0);
           }
 
+          // Generate data URL from WAV for URL-based loading path
+          const sampleUrl = audioBuffer.byteLength > 0
+            ? `data:audio/wav;base64,${arrayBufferToBase64(audioBuffer)}`
+            : '';
+
           sampleConfig = {
             audioBuffer,
-            url: '',
+            url: sampleUrl,
             baseNote: 'C-4',
             detune: smpInfo.fineTune || 0,
             loop: smpInfo.hasLoop,
@@ -316,9 +324,15 @@ export async function parseWithOpenMPT(
       linearPeriods: info.linearSlides,
     };
 
+    // Activate the edit bridge so pattern edits sync to the soundlib
+    const saveFormatMap: Record<string, 'mod' | 'xm' | 'it' | 's3m'> = {
+      MOD: 'mod', XM: 'xm', IT: 'it', S3M: 's3m', MPTM: 'it',
+    };
+    const { markLoaded } = await import('@engine/libopenmpt/OpenMPTEditBridge');
+    markLoaded(saveFormatMap[format] || 'it');
+
     return song;
   } finally {
-    // Don't destroy — keep loaded for sample access and saving
-    // Caller can call destroyModule() when done
+    // Don't destroy — keep loaded for sample access, editing, and saving
   }
 }

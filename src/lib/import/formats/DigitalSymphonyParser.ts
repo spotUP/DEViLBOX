@@ -5,7 +5,7 @@
  * Hexadecimal Software, ca. 1993. Despite the RISC OS origins, it plays back on
  * Amiga hardware via Paula. Files are identified by the extension ".dsym".
  *
- * Reference: Reference Code/openmpt-master/soundlib/Load_dsym.cpp (authoritative)
+ * Reference: third-party/openmpt-master/soundlib/Load_dsym.cpp (authoritative)
  *            DSym_Info format documentation (noted in OpenMPT comments)
  *            Sigma-delta decompression from TimPlayer
  *

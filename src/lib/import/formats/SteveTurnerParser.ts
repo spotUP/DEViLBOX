@@ -19,7 +19,7 @@
  * Single-file format: compiled 68k executable.
  * Actual audio playback is delegated to UADE.
  *
- * Reference: Reference Code/uade-3.05/amigasrc/players/wanted_team/SteveTurner/src/Steve Turner_v4.asm
+ * Reference: third-party/uade-3.05/amigasrc/players/wanted_team/SteveTurner/src/Steve Turner_v4.asm
  */
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';

@@ -17,7 +17,7 @@
  * Two-file format: song data (.dum) + external sample data (.dum.set).
  * Actual audio playback is delegated to UADE.
  *
- * Reference: Reference Code/uade-3.05/amigasrc/players/infogrames/Infogrames.asm
+ * Reference: third-party/uade-3.05/amigasrc/players/infogrames/Infogrames.asm
  */
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';

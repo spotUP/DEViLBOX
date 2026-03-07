@@ -18,7 +18,7 @@
  * Built-in waveforms: 42 hardcoded 32-sample waveforms (indices 10-51, all looping).
  *
  * References:
- *   Reference Code/openmpt-master/soundlib/Load_puma.cpp (primary)
+ *   third-party/openmpt-master/soundlib/Load_puma.cpp (primary)
  */
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';

@@ -37,7 +37,7 @@
  * UADE handles actual audio playback. This parser extracts metadata only.
  *
  * Reference:
- *   Reference Code/uade-3.05/amigasrc/players/wanted_team/JasonPage/src/Jason Page_v5.s
+ *   third-party/uade-3.05/amigasrc/players/wanted_team/JasonPage/src/Jason Page_v5.s
  *   (DTP_Check2 routine, line 198; EP_SampleInit, line 115; InfoBuffer, line 282)
  * Reference parsers: JeroenTelParser.ts, MarkCookseyParser.ts
  */

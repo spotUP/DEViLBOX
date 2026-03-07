@@ -5,7 +5,7 @@
  * Symphonie Pro is an enhanced version with additional stereo/sample-boost features.
  * Files are identified by the 4-byte magic "SymM" at offset 0.
  *
- * Reference: Reference Code/openmpt-master/soundlib/Load_symmod.cpp (authoritative)
+ * Reference: third-party/openmpt-master/soundlib/Load_symmod.cpp (authoritative)
  *
  * File layout:
  *   Header (16 bytes):

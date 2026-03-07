@@ -9,8 +9,8 @@ import type { TrackerSong } from '@/engine/TrackerReplayer';
 import type { FormatEnginePreferences } from '@/stores/useSettingsStore';
 import type { UADEMetadata } from '@/engine/uade/UADEEngine';
 
-/** Formats handled by OpenMPT soundlib WASM */
-const OPENMPT_EXTENSIONS = /\.(s3m|it|mptm|xm|mod|m15|669|amf|ams|c67|cba|dbm|digi|dmf|dsm|dsym|dtm|far|fmt|ftm|gdm|gmc|gt2|ice|imf|ims|itp|kris|mdl|med|mo3|mt2|mtm|mus|nst|okt|plm|psm|ptm|rtm|sfx|sfx2|stk|stm|stp|stx|ult|wow)$/i;
+/** Formats handled by OpenMPT soundlib WASM (56 loaders compiled into the bridge) */
+const OPENMPT_EXTENSIONS = /\.(s3m|it|mptm|xm|mod|m15|667|669|amf|ams|c67|cba|dbm|digi|dmf|dsm|dsym|dtm|etx|far|fmt|ftm|gdm|gmc|gt2|ice|imf|ims|itp|j2b|kris|mdl|med|mo3|mt2|mtm|mus|nru|nst|okt|plm|psm|pt36|ptm|puma|rtm|sfx|sfx2|ss|stk|stm|stp|stx|symmod|tcb|uax|ult|unic|wow|xmf)$/i;
 
 /**
  * Try to parse a tracker module using OpenMPT WASM soundlib (reference implementation).

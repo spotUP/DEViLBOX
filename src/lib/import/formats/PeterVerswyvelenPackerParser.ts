@@ -21,7 +21,7 @@
  * File prefix: "PVP."
  * Actual audio playback is delegated to UADE.
  *
- * Reference: Reference Code/uade-3.05/amigasrc/players/wanted_team/PeterVerswyvelenPacker/Peter Verswyvelen Packer_2.asm
+ * Reference: third-party/uade-3.05/amigasrc/players/wanted_team/PeterVerswyvelenPacker/Peter Verswyvelen Packer_2.asm
  */
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';

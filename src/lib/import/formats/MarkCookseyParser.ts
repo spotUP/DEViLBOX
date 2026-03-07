@@ -26,9 +26,9 @@
  * UADE handles actual audio playback. This parser extracts metadata only.
  *
  * References:
- *   Reference Code/uade-3.05/amigasrc/players/wanted_team/Mark_Cooksey_Don_Adan/
+ *   third-party/uade-3.05/amigasrc/players/wanted_team/Mark_Cooksey_Don_Adan/
  *     Mark Cooksey_v2.asm  (DTP_Check2, EP_SampleInit, DTP_InitPlayer routines)
- *   Reference Code/uade-3.05/eagleplayer.conf
+ *   third-party/uade-3.05/eagleplayer.conf
  *     Mark_Cooksey     prefixes=mc,mcr
  *     Mark_Cooksey_Old prefixes=mco
  */
