@@ -12,7 +12,7 @@
  * - Keyboard: F to fit all, R to reset
  */
 
-import React, { useCallback, useRef, useEffect, useState, lazy, Suspense } from 'react';
+import React, { useCallback, useRef, useEffect, useLayoutEffect, useState, lazy, Suspense } from 'react';
 import { useInstrumentStore } from '@stores/useInstrumentStore';
 import { useUIStore } from '@stores/useUIStore';
 import { ChevronLeft, ChevronRight, ZoomIn, ZoomOut, Maximize, RotateCcw } from 'lucide-react';
@@ -54,11 +54,30 @@ interface PanelLayout {
   h: number;
 }
 
-const DEFAULT_PANELS: Record<StudioPanelId, PanelLayout> = {
-  tracker:    { x: 0,   y: 0,   w: 720, h: 700 },
-  instrument: { x: 740, y: 0,   w: 480, h: 700 },
-  mixer:      { x: 0,   y: 720, w: 1220, h: 300 },
-};
+const GAP = 8; // px gap between panels
+const PANEL_MIN_W = 200;
+const PANEL_MIN_H = 150;
+
+function computeDefaultPanels(viewW: number, viewH: number): Record<StudioPanelId, PanelLayout> {
+  const pad = 10; // outer padding
+  const usableW = viewW - pad * 2;
+  const usableH = viewH - pad * 2;
+
+  // Top row: tracker (55%) | instrument (45%), bottom row: mixer (full width)
+  const mixerH = Math.max(PANEL_MIN_H, Math.round(usableH * 0.3));
+  const topH = usableH - mixerH - GAP;
+  const trackerW = Math.max(PANEL_MIN_W, Math.round(usableW * 0.55));
+  const instrW = Math.max(PANEL_MIN_W, usableW - trackerW - GAP);
+
+  return {
+    tracker:    { x: pad, y: pad, w: trackerW, h: Math.max(PANEL_MIN_H, topH) },
+    instrument: { x: pad + trackerW + GAP, y: pad, w: instrW, h: Math.max(PANEL_MIN_H, topH) },
+    mixer:      { x: pad, y: pad + topH + GAP, w: usableW, h: mixerH },
+  };
+}
+
+// Fallback before container is measured
+const DEFAULT_PANELS: Record<StudioPanelId, PanelLayout> = computeDefaultPanels(1280, 800);
 
 const PANEL_LABELS: Record<StudioPanelId, string> = {
   tracker: 'TRACKER',
@@ -67,13 +86,11 @@ const PANEL_LABELS: Record<StudioPanelId, string> = {
 };
 
 const PANEL_COLORS: Record<StudioPanelId, string> = {
-  tracker: 'border-blue-500/40',
-  instrument: 'border-purple-500/40',
-  mixer: 'border-green-500/40',
+  tracker: 'border-2 border-blue-500/40',
+  instrument: 'border-2 border-purple-500/40',
+  mixer: 'border-2 border-green-500/40',
 };
 
-const PANEL_MIN_W = 200;
-const PANEL_MIN_H = 150;
 const EDGE_SIZE = 6; // px — hit area for edge resize handles
 
 // Resize edge/corner directions
@@ -197,12 +214,18 @@ const EdgeHandles: React.FC<EdgeHandlesProps> = ({ onEdgeDown }) => {
 
 // ─── Draggable Panel ────────────────────────────────────────────────────────
 
+const COLLAPSED_H = 28; // title bar height when collapsed
+
 interface DraggablePanelProps {
   id: StudioPanelId;
   layout: PanelLayout;
   camera: CameraState;
+  collapsed: boolean;
+  zIndex: number;
   onDragStart: (id: StudioPanelId, e: React.PointerEvent) => void;
   onEdgeResizeStart: (id: StudioPanelId, edge: ResizeEdge, e: React.PointerEvent) => void;
+  onBringToFront: (id: StudioPanelId) => void;
+  onToggleCollapse: (id: StudioPanelId) => void;
   children: React.ReactNode;
 }
 
@@ -210,44 +233,57 @@ interface DraggablePanelProps {
 // per-panel) instead of using a CSS `transform` wrapper. This avoids creating a
 // new containing block that would trap `position: fixed` dialogs rendered inside
 // child components like TrackerView.
-const DraggablePanel: React.FC<DraggablePanelProps> = ({ id, layout, camera, onDragStart, onEdgeResizeStart, children }) => {
+const DraggablePanel: React.FC<DraggablePanelProps> = ({ id, layout, camera, collapsed, zIndex, onDragStart, onEdgeResizeStart, onBringToFront, onToggleCollapse, children }) => {
   const handleEdgeDown = useCallback((edge: ResizeEdge, e: React.PointerEvent) => {
     onEdgeResizeStart(id, edge, e);
   }, [id, onEdgeResizeStart]);
 
+  const displayH = collapsed ? COLLAPSED_H : layout.h * camera.zoom;
+
   return (
     <div
-      className={`absolute bg-dark-bg border ${PANEL_COLORS[id]} rounded-lg shadow-xl overflow-visible flex flex-col`}
+      data-studio-panel
+      className="absolute overflow-visible"
       style={{
         left: camera.x + layout.x * camera.zoom,
         top: camera.y + layout.y * camera.zoom,
         width: layout.w * camera.zoom,
-        height: layout.h * camera.zoom,
+        height: displayH,
+        zIndex,
       }}
-      onMouseDown={(e) => e.stopPropagation()}
+      onMouseDown={() => onBringToFront(id)}
     >
-      {/* Edge resize handles (invisible hit areas) */}
-      <EdgeHandles onEdgeDown={handleEdgeDown} />
+      {/* Edge resize handles (only when not collapsed) */}
+      {!collapsed && <EdgeHandles onEdgeDown={handleEdgeDown} />}
 
-      {/* Title bar — drag handle */}
-      <div
-        className="flex items-center px-2 py-1 bg-dark-bgSecondary border-b border-dark-border cursor-move shrink-0 select-none relative z-20"
-        onPointerDown={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          onDragStart(id, e);
-        }}
-      >
-        <span className="text-[10px] font-mono text-text-muted tracking-widest flex-1 pointer-events-none">
-          {PANEL_LABELS[id]}
-        </span>
-        <span className="text-[9px] font-mono text-text-muted opacity-50 pointer-events-none">
-          {Math.round(layout.w)}x{Math.round(layout.h)}
-        </span>
-      </div>
-      {/* Content — clips overflow, fills remaining height */}
-      <div className="flex-1 min-h-0 overflow-hidden flex flex-col relative z-0">
-        {children}
+      {/* Inner wrapper — clips content to rounded corners */}
+      <div className={`w-full h-full rounded-lg ${PANEL_COLORS[id]} shadow-xl bg-dark-bg overflow-hidden flex flex-col`}>
+        {/* Title bar — drag handle, double-click to collapse */}
+        <div
+          className="flex items-center px-2 py-1 bg-dark-bgSecondary border-b border-dark-border cursor-move shrink-0 select-none"
+          onPointerDown={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onDragStart(id, e);
+          }}
+          onDoubleClick={(e) => {
+            e.stopPropagation();
+            onToggleCollapse(id);
+          }}
+        >
+          <span className="text-[10px] font-mono text-text-muted tracking-widest flex-1 pointer-events-none">
+            {PANEL_LABELS[id]}
+          </span>
+          <span className="text-[9px] font-mono text-text-muted opacity-50 pointer-events-none">
+            {collapsed ? 'collapsed' : `${Math.round(layout.w)}x${Math.round(layout.h)}`}
+          </span>
+        </div>
+        {/* Content — hidden when collapsed */}
+        {!collapsed && (
+          <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
+            {children}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -281,6 +317,22 @@ export const StudioCanvasView: React.FC = () => {
 
   // Panel layouts
   const [panels, setPanels] = useState<Record<StudioPanelId, PanelLayout>>({ ...DEFAULT_PANELS });
+  const [collapsed, setCollapsed] = useState<Record<StudioPanelId, boolean>>({ tracker: false, instrument: false, mixer: false });
+  const [zOrder, setZOrder] = useState<StudioPanelId[]>(['mixer', 'instrument', 'tracker']); // last = frontmost
+  const initializedRef = useRef(false);
+
+  // Auto-size panels to fill viewport on first mount
+  useLayoutEffect(() => {
+    if (initializedRef.current || !containerRef.current) return;
+    initializedRef.current = true;
+    const rect = containerRef.current.getBoundingClientRect();
+    if (rect.width > 0 && rect.height > 0) {
+      const fitted = computeDefaultPanels(rect.width, rect.height);
+      setPanels(fitted);
+      cameraRef.current = { x: 0, y: 0, zoom: 1 };
+      setCamera({ x: 0, y: 0, zoom: 1 });
+    }
+  });
 
   // Interaction state
   const isPanning = useRef(false);
@@ -410,9 +462,11 @@ export const StudioCanvasView: React.FC = () => {
     if (!el) return;
 
     const handleDown = (e: MouseEvent) => {
-      // Only pan if clicking directly on the container or canvas layer (not on a panel)
+      // Only pan when clicking the canvas background or grid SVG — not inside panels
+      const target = e.target as HTMLElement;
+      const isBackground = target === el || target.tagName === 'svg' || target.tagName === 'rect' || target.tagName === 'circle' || target.tagName === 'pattern';
+      if (!isBackground) return;
       if (e.button === 1 || e.button === 0) {
-        // Skip if a drag or resize is already active (started by panel handlers)
         if (dragRef.current || resizeRef.current) return;
         e.preventDefault();
         isPanning.current = true;
@@ -429,8 +483,9 @@ export const StudioCanvasView: React.FC = () => {
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
       if (e.key === 'r' && !e.ctrlKey && !e.metaKey && !e.altKey) {
-        updateCamera(() => ({ x: 40, y: 40, zoom: 1 }));
-        setPanels({ ...DEFAULT_PANELS });
+        updateCamera(() => ({ x: 0, y: 0, zoom: 1 }));
+        const rect = containerRef.current?.getBoundingClientRect();
+        setPanels(rect && rect.width > 0 ? computeDefaultPanels(rect.width, rect.height) : { ...DEFAULT_PANELS });
       }
       if (e.key === 'f' && !e.ctrlKey && !e.metaKey && !e.altKey) {
         if (!containerRef.current) return;
@@ -500,9 +555,23 @@ export const StudioCanvasView: React.FC = () => {
   }, [updateCamera]);
 
   const handleReset = useCallback(() => {
-    updateCamera(() => ({ x: 40, y: 40, zoom: 1 }));
-    setPanels({ ...DEFAULT_PANELS });
+    updateCamera(() => ({ x: 0, y: 0, zoom: 1 }));
+    const rect = containerRef.current?.getBoundingClientRect();
+    setPanels(rect && rect.width > 0 ? computeDefaultPanels(rect.width, rect.height) : { ...DEFAULT_PANELS });
   }, [updateCamera]);
+
+  // ── Collapse / z-order handlers ──────────────────────────────────────────
+
+  const handleBringToFront = useCallback((id: StudioPanelId) => {
+    setZOrder(prev => {
+      const without = prev.filter(p => p !== id);
+      return [...without, id];
+    });
+  }, []);
+
+  const handleToggleCollapse = useCallback((id: StudioPanelId) => {
+    setCollapsed(prev => ({ ...prev, [id]: !prev[id] }));
+  }, []);
 
   const handleFitAll = useCallback(() => {
     if (!containerRef.current) return;
@@ -533,7 +602,7 @@ export const StudioCanvasView: React.FC = () => {
 
       {/* Panels — positioned directly in screen-space (no CSS transform wrapper,
            so position:fixed dialogs inside children render correctly) */}
-      <DraggablePanel id="tracker" layout={panels.tracker} camera={camera} onDragStart={handleDragStart} onEdgeResizeStart={handleEdgeResizeStart}>
+      <DraggablePanel id="tracker" layout={panels.tracker} camera={camera} collapsed={collapsed.tracker} zIndex={zOrder.indexOf('tracker')} onDragStart={handleDragStart} onEdgeResizeStart={handleEdgeResizeStart} onBringToFront={handleBringToFront} onToggleCollapse={handleToggleCollapse}>
         <Suspense fallback={<div className="flex-1 flex items-center justify-center text-text-muted text-xs">Loading tracker...</div>}>
           <TrackerView
             onShowExport={() => openModal('export')}
@@ -549,11 +618,11 @@ export const StudioCanvasView: React.FC = () => {
         </Suspense>
       </DraggablePanel>
 
-      <DraggablePanel id="instrument" layout={panels.instrument} camera={camera} onDragStart={handleDragStart} onEdgeResizeStart={handleEdgeResizeStart}>
+      <DraggablePanel id="instrument" layout={panels.instrument} camera={camera} collapsed={collapsed.instrument} zIndex={zOrder.indexOf('instrument')} onDragStart={handleDragStart} onEdgeResizeStart={handleEdgeResizeStart} onBringToFront={handleBringToFront} onToggleCollapse={handleToggleCollapse}>
         <InstrumentPanelContent />
       </DraggablePanel>
 
-      <DraggablePanel id="mixer" layout={panels.mixer} camera={camera} onDragStart={handleDragStart} onEdgeResizeStart={handleEdgeResizeStart}>
+      <DraggablePanel id="mixer" layout={panels.mixer} camera={camera} collapsed={collapsed.mixer} zIndex={zOrder.indexOf('mixer')} onDragStart={handleDragStart} onEdgeResizeStart={handleEdgeResizeStart} onBringToFront={handleBringToFront} onToggleCollapse={handleToggleCollapse}>
         <Suspense fallback={<div className="flex-1 flex items-center justify-center text-text-muted text-xs">Loading mixer...</div>}>
           <MixerContent />
         </Suspense>
