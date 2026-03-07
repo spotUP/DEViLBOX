@@ -67,7 +67,7 @@ Reference: Furnace tx81z.cpp lines 109-115 (hScale), 429-430 (freq write), 403 (
 - `/src/lib/import/formats/FurnaceRegisterMapper.ts` - Chip-specific register config
 - `/src/lib/import/formats/FurnacePitchUtils.ts` - Frequency conversion functions
 - `/src/engine/chips/FurnaceChipEngine.ts` - WASM interface
-- Reference: `/Users/spot/Code/DEViLBOX/Reference Code/furnace-master/src/engine/platform/`
+- Reference: `/Users/spot/Code/DEViLBOX/third-party/furnace-master/src/engine/platform/`
 
 ## Testing Pattern
 1. Select chip type in DEViLBOX

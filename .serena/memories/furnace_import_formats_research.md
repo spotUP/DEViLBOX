@@ -18,7 +18,7 @@ Furnace is a multi-system tracker/sequencer that imports other TRACKER formats (
 ## Furnace's Import Pipeline
 
 ### File Loading Entry Point
-- **File**: `/Users/spot/Code/DEViLBOX/Reference Code/furnace-master/src/engine/fileOps/fileOpsCommon.cpp:22`
+- **File**: `/Users/spot/Code/DEViLBOX/third-party/furnace-master/src/engine/fileOps/fileOpsCommon.cpp:22`
 - **Function**: `bool DivEngine::load(unsigned char* f, size_t slen, const char* nameHint)`
 
 ### Load Process (3 Steps)

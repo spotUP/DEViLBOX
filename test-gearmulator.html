@@ -24,24 +24,34 @@
   <div class="controls">
     <label>ROM:</label>
     <select id="romSelect">
-      <option value="roms/gearmulator/extracted/Access Virus B (am29f040b_4v9).BIN" data-type="0">Virus B</option>
-      <option value="roms/gearmulator/extracted/Access Virus C (am29f040b_6v6).BIN" data-type="0">Virus C</option>
+      <option value="dist/roms/gearmulator/extracted/Access Virus B (am29f040b_4v9).BIN" data-type="0">Virus B (v4.9)</option>
+      <option value="dist/roms/gearmulator/extracted/Access Virus C (am29f040b_6v6).BIN" data-type="0">Virus C (v6.6)</option>
+      <option value="dist/roms/gearmulator/extracted/Virus_TI2_FW.bin" data-type="1">Virus TI2</option>
+      <option value="dist/roms/gearmulator/extracted/microQ223.BIN" data-type="2">Waldorf microQ (v2.23)</option>
+      <option value="xt-interleaved" data-type="3">Waldorf Microwave II/XT (Am29F010 interleaved)</option>
+      <option value="dist/roms/gearmulator/extracted/nord-lead-2-27c4001-v104.bin" data-type="4">Nord Lead 2x (v1.04)</option>
+      <option value="dist/roms/gearmulator/extracted/jp8000_v1.05.bin" data-type="5">Roland JP-8000 (v1.05)</option>
     </select>
-    <input type="file" id="romFile" accept=".bin,.BIN,.rom,.ROM">
+    <input type="file" id="romFile" accept=".bin,.BIN,.rom,.ROM,.syx,.SYX">
     <label>Type:</label>
     <select id="synthType">
       <option value="0">Virus A/B/C (0)</option>
       <option value="1">Virus TI/Snow (1)</option>
       <option value="2">Waldorf microQ (2)</option>
+      <option value="3">Waldorf XT (3)</option>
+      <option value="4">Nord Lead 2x (4)</option>
+      <option value="5">Roland JP-8000 (5)</option>
     </select>
   </div>
 
   <div class="controls">
     <button id="btnInit">Initialize</button>
+    <button id="btnDispose">Dispose</button>
     <span id="initStatus"></span>
     <button id="btnNote" disabled>Play C4</button>
     <button id="btnChord" disabled>Play Chord</button>
     <button id="btnStop" disabled>All Notes Off</button>
+    <button id="btnTestAll">Test All Synths</button>
   </div>
 
   <div class="controls">
@@ -128,6 +138,26 @@
       if (romFile.files.length > 0) {
         log(`Loading ROM from file: ${romFile.files[0].name}`);
         romData = await romFile.files[0].arrayBuffer();
+      } else if (romSelect.value === 'xt-interleaved') {
+        // Waldorf XT needs two 128K half-ROMs interleaved into one 256K ROM
+        // lower_Am29F010 = HalfRomA (starts C0 00), upper_Am29F010 = HalfRomB (starts DE 00)
+        // Interleave: byte from A, byte from B → full ROM starts with C0 DE
+        log('Fetching Waldorf XT half-ROMs (Am29F010) and interleaving...');
+        const [respA, respB] = await Promise.all([
+          fetch('/dist/roms/gearmulator/extracted/lower_Am29F010.bin'),
+          fetch('/dist/roms/gearmulator/extracted/upper_Am29F010.bin'),
+        ]);
+        if (!respA.ok || !respB.ok) throw new Error('XT ROM fetch failed');
+        const halfA = new Uint8Array(await respA.arrayBuffer());
+        const halfB = new Uint8Array(await respB.arrayBuffer());
+        log(`Half-ROMs: A(lower)=${halfA.byteLength/1024}KB, B(upper)=${halfB.byteLength/1024}KB`);
+        const full = new Uint8Array(halfA.length + halfB.length);
+        for (let i = 0; i < halfA.length; i++) {
+          full[i * 2] = halfA[i];
+          full[i * 2 + 1] = halfB[i];
+        }
+        log(`Interleaved ROM: ${full.byteLength/1024}KB, header: ${full[0].toString(16)} ${full[1].toString(16)}`, 'ok');
+        romData = full.buffer;
       } else if (romSelect.value) {
         log(`Fetching ROM: ${romSelect.value}...`);
         const resp = await fetch(`/${romSelect.value}`);
@@ -187,7 +217,7 @@
         dspWorker = new Worker('/gearmulator/Gearmulator.worker.js');
 
         const readyPromise = new Promise((resolve, reject) => {
-          const timeout = setTimeout(() => reject(new Error('Init timeout (30min)')), 30 * 60 * 1000);
+          const timeout = setTimeout(() => reject(new Error('Init timeout (60min)')), 60 * 60 * 1000);
           dspWorker.onmessage = (e) => {
             console.log('[Main] Worker message:', e.data);
             if (e.data.type === 'ready') {
@@ -259,6 +289,157 @@
     btnStop.addEventListener('click', () => {
       for (let n = 0; n < 128; n++) sendMidi('noteOff', { note: n, channel: 0 });
       log('All notes off');
+    });
+
+    // Dispose current synth
+    document.getElementById('btnDispose').addEventListener('click', () => {
+      if (dspWorker) {
+        dspWorker.postMessage({ type: 'dispose' });
+        dspWorker.terminate();
+        dspWorker = null;
+      }
+      if (workletNode) { workletNode.disconnect(); workletNode = null; }
+      if (gainNode) { gainNode.disconnect(); gainNode = null; }
+      if (analyser) { analyser.disconnect(); analyser = null; }
+      if (audioCtx) { audioCtx.close(); audioCtx = null; }
+      ready = false;
+      btnInit.disabled = false;
+      btnNote.disabled = true;
+      btnChord.disabled = true;
+      btnStop.disabled = true;
+      initStatus.textContent = '';
+      log('Disposed.', 'warn');
+    });
+
+    // Test All Synths — sequential test of each synth type
+    document.getElementById('btnTestAll').addEventListener('click', async () => {
+      const synths = [
+        { name: 'Virus B', rom: 'dist/roms/gearmulator/extracted/Access Virus B (am29f040b_4v9).BIN', type: 0 },
+        // TI2 and XT skipped — dual-DSP/MC68K boot too slow in interpreter mode (5-10+ min)
+        // { name: 'Virus TI2', rom: 'dist/roms/gearmulator/extracted/Virus_TI2_FW.bin', type: 1 },
+        // XT/Nord boot takes 30+ min in WASM interpreter mode (need pre-boot snapshots)
+        // microQ has snapshot — should boot fast now
+        { name: 'Waldorf microQ', rom: 'dist/roms/gearmulator/extracted/microQ223.BIN', type: 2 },
+        // { name: 'Waldorf XT', rom: 'xt-interleaved', type: 3 },
+        // { name: 'Nord Lead 2x', rom: 'dist/roms/gearmulator/extracted/nord-lead-2-27c4001-v104.bin', type: 4 },
+        { name: 'Roland JP-8000', rom: 'dist/roms/gearmulator/extracted/jp8000_v1.05.bin', type: 5 },
+      ];
+
+      log('=== TEST ALL SYNTHS ===', 'ok');
+
+      for (const s of synths) {
+        log(`\n--- Testing ${s.name} (type=${s.type}) ---`);
+        let w = null, wn = null, gn = null, ctx = null;
+        try {
+          // Load ROM (handle XT interleaving specially)
+          let rom;
+          if (s.rom === 'xt-interleaved') {
+            const [respA, respB] = await Promise.all([
+              fetch('/dist/roms/gearmulator/extracted/lower_Am29F010.bin'),
+              fetch('/dist/roms/gearmulator/extracted/upper_Am29F010.bin'),
+            ]);
+            if (!respA.ok || !respB.ok) { log('XT ROM fetch failed', 'error'); continue; }
+            const halfA = new Uint8Array(await respA.arrayBuffer());
+            const halfB = new Uint8Array(await respB.arrayBuffer());
+            const full = new Uint8Array(halfA.length + halfB.length);
+            for (let i = 0; i < halfA.length; i++) {
+              full[i * 2] = halfA[i];
+              full[i * 2 + 1] = halfB[i];
+            }
+            rom = full.buffer;
+            log(`ROM: interleaved ${halfA.length/1024}K + ${halfB.length/1024}K = ${full.length/1024}KB`);
+          } else {
+            const resp = await fetch('/' + s.rom);
+            if (!resp.ok) { log(`ROM fetch failed: ${resp.status}`, 'error'); continue; }
+            rom = await resp.arrayBuffer();
+          }
+          log(`ROM: ${(rom.byteLength/1024).toFixed(0)}KB`);
+
+          // Load WASM if not cached
+          if (!wasmBinary) await loadWasmAssets();
+
+          // Create audio context
+          ctx = new AudioContext({ sampleRate: 44100 });
+          if (ctx.state === 'suspended') await ctx.resume();
+
+          const testSab = new SharedArrayBuffer(SAB_SIZE);
+          await ctx.audioWorklet.addModule('/gearmulator/Gearmulator.worklet.js');
+          wn = new AudioWorkletNode(ctx, 'gearmulator-processor', { outputChannelCount: [2] });
+          wn.port.postMessage({ type: 'setSAB', sab: testSab });
+
+          gn = ctx.createGain();
+          wn.connect(gn);
+          gn.connect(ctx.destination);
+
+          w = new Worker('/gearmulator/Gearmulator.worker.js');
+
+          const result = await new Promise((resolve, reject) => {
+            const initTimeoutMs = (s.type === 2 || s.type === 3 || s.type === 4) ? 900000 : 60000; // 15 min for slow synths
+            const to = setTimeout(() => reject(new Error(`Init timeout (${initTimeoutMs/1000}s)`)), initTimeoutMs);
+            w.onmessage = (e) => {
+              if (e.data.type === 'ready') { clearTimeout(to); resolve(e.data); }
+              else if (e.data.type === 'booting') { log(`Booting... (${e.data.elapsed ? (e.data.elapsed/1000).toFixed(0) + 's' : 'started'})`, 'warn'); }
+              else if (e.data.type === 'error') { clearTimeout(to); reject(new Error(e.data.message)); }
+            };
+            w.onerror = (e) => { clearTimeout(to); reject(new Error(e.message)); };
+            w.postMessage({ type: 'init', sampleRate: 44100, wasmBinary, romData: rom, synthType: s.type, sab: testSab });
+          });
+
+          log(`INIT OK: sampleRate=${result.sampleRate}, handle=${result.handle}`, 'ok');
+
+          // Send a note and wait for audio
+          w.postMessage({ type: 'noteOn', note: 60, velocity: 127, channel: 0 });
+          log('Sent Note On C4 vel=127');
+
+          // Wait 5 seconds and check SAB for non-zero audio
+          await new Promise(r => setTimeout(r, 5000));
+
+          const testF32 = new Float32Array(testSab);
+          const testI32 = new Int32Array(testSab);
+          const wp = Atomics.load(testI32, 0);
+          const rp = Atomics.load(testI32, 1);
+          let used = wp - rp; if (used < 0) used += RING_FRAMES;
+
+          // Check ring buffer data for current non-zero audio
+          let ringPeak = 0;
+          for (let i = 4; i < testF32.length; i++) {
+            const v = Math.abs(testF32[i]);
+            if (v > ringPeak) ringPeak = v;
+          }
+
+          // Also read the worker's running peak from SAB slot 3 (stored as int * 1000)
+          const workerPeakInt = Atomics.load(testI32, 3);
+          const workerPeak = workerPeakInt / 1000;
+          const peak = Math.max(ringPeak, workerPeak);
+
+          if (peak > 0.001) {
+            log(`AUDIO OK: peak=${peak.toFixed(6)} (ring=${ringPeak.toFixed(6)}, worker=${workerPeak.toFixed(3)}), used=${used} frames`, 'ok');
+          } else if (wp > 0) {
+            log(`AUDIO SILENT: write=${wp} read=${rp}, ringPeak=${ringPeak.toFixed(6)}, workerPeak=${workerPeak.toFixed(3)}`, 'warn');
+          } else {
+            log(`NO AUDIO: writePos=${wp}, buffer empty`, 'error');
+          }
+
+          // Cleanup success path
+          w.postMessage({ type: 'noteOff', note: 60, channel: 0 });
+          await new Promise(r => setTimeout(r, 200));
+          w.postMessage({ type: 'dispose' });
+          log(`${s.name} test complete.`);
+
+        } catch (err) {
+          log(`${s.name} FAILED: ${err}`, 'error');
+        } finally {
+          // Always clean up resources — especially important on timeout
+          try { if (w) w.terminate(); } catch {}
+          try { if (wn) wn.disconnect(); } catch {}
+          try { if (gn) gn.disconnect(); } catch {}
+          try { if (ctx) await ctx.close(); } catch {}
+          w = null; wn = null; gn = null; ctx = null;
+          // Brief pause to let resources be freed
+          await new Promise(r => setTimeout(r, 500));
+        }
+      }
+      log('\n=== ALL TESTS COMPLETE ===', 'ok');
     });
 
     function startSABMonitor() {
