@@ -68,7 +68,7 @@
  * Amiga LRRL stereo panning: channels 0,3 → -50, channels 1,2 → +50
  * (repeating for channel indices modulo 4).
  *
- * Reference: Reference Code/openmpt-master/soundlib/Load_dbm.cpp (authoritative)
+ * Reference: third-party/openmpt-master/soundlib/Load_dbm.cpp (authoritative)
  */
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';

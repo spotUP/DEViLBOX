@@ -16,7 +16,7 @@
  *
  * Single-file format: actual audio playback is delegated to UADE.
  *
- * Reference: Reference Code/uade-3.05/amigasrc/players/wanted_team/Cinemaware/Cinemaware.asm
+ * Reference: third-party/uade-3.05/amigasrc/players/wanted_team/Cinemaware/Cinemaware.asm
  */
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';

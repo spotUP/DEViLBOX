@@ -23,8 +23,8 @@
  * Actual audio playback is delegated to UADE.
  *
  * References:
- *   Reference Code/uade-3.05/src/frontends/common/amifilemagic.c (line 83)
- *   Reference Code/uade-3.05/amigasrc/players/medley/Medley.s (lines 39-52)
+ *   third-party/uade-3.05/src/frontends/common/amifilemagic.c (line 83)
+ *   third-party/uade-3.05/amigasrc/players/medley/Medley.s (lines 39-52)
  */
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';

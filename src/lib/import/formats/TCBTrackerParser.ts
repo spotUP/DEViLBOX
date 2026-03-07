@@ -55,7 +55,7 @@
  * MI_MaxSamples = 16 (from InfoBuffer in TCB Tracker_V2.asm)
  *
  * Reference: OpenMPT soundlib/Load_tcb.cpp
- * Reference: Reference Code/uade-3.05/amigasrc/players/wanted_team/TCB Tracker/src/TCB Tracker_V2.asm
+ * Reference: third-party/uade-3.05/amigasrc/players/wanted_team/TCB Tracker/src/TCB Tracker_V2.asm
  * Reference parsers: JeroenTelParser.ts, JasonPageParser.ts
  */
 

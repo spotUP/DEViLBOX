@@ -41,10 +41,10 @@
  * entirely to UADE.
  *
  * References:
- *   Reference Code/uade-3.05/amigasrc/players/wanted_team/Quartet/Quartet_v1.asm
- *   Reference Code/uade-3.05/amigasrc/players/wanted_team/Quartet_PSG/Quartet PSG.asm
- *   Reference Code/uade-3.05/amigasrc/players/wanted_team/QuartetST/Quartet ST_v1.asm
- *   Reference Code/uade-3.05/eagleplayer.conf  (prefix mappings)
+ *   third-party/uade-3.05/amigasrc/players/wanted_team/Quartet/Quartet_v1.asm
+ *   third-party/uade-3.05/amigasrc/players/wanted_team/Quartet_PSG/Quartet PSG.asm
+ *   third-party/uade-3.05/amigasrc/players/wanted_team/QuartetST/Quartet ST_v1.asm
+ *   third-party/uade-3.05/eagleplayer.conf  (prefix mappings)
  */
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';

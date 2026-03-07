@@ -30,7 +30,7 @@
  * UADE handles actual audio playback. This parser extracts metadata only.
  *
  * Reference:
- *   Reference Code/uade-3.05/amigasrc/players/wanted_team/Andrew Parton/SRC_AndrewParton/Andrew Parton_v2.asm
+ *   third-party/uade-3.05/amigasrc/players/wanted_team/Andrew Parton/SRC_AndrewParton/Andrew Parton_v2.asm
  * Reference parsers: BenDaglishParser.ts
  */
 

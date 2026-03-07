@@ -18,7 +18,7 @@
  * Single-file format: music data binary.
  * Actual audio playback is delegated to UADE.
  *
- * Reference: Reference Code/uade-3.05/amigasrc/players/wanted_team/MultiMedia_Sound/MultiMedia Sound_V1.asm
+ * Reference: third-party/uade-3.05/amigasrc/players/wanted_team/MultiMedia_Sound/MultiMedia Sound_V1.asm
  */
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';

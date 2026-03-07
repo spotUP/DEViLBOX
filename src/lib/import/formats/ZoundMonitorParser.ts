@@ -35,7 +35,7 @@
  *
  * Reference: docs/formats/Replayers/ZoundMon/Zound.c (structs)
  * Reference: docs/formats/Replayers/ZoundMon/Player.c (replayer)
- * Reference: Reference Code/uade-3.05/amigasrc/players/wanted_team/ZoundMonitor/src/ZoundMonitor_v1.asm
+ * Reference: third-party/uade-3.05/amigasrc/players/wanted_team/ZoundMonitor/src/ZoundMonitor_v1.asm
  */
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';

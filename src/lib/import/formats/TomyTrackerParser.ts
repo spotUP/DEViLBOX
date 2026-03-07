@@ -14,7 +14,7 @@
  *
  * Single-file format. Actual audio playback is delegated to UADE.
  *
- * Reference: Reference Code/uade-3.05/amigasrc/players/wanted_team/TomyTracker/src/Tomy Tracker_v2.asm
+ * Reference: third-party/uade-3.05/amigasrc/players/wanted_team/TomyTracker/src/Tomy Tracker_v2.asm
  */
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';

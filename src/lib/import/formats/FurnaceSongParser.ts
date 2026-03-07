@@ -148,11 +148,6 @@ function mapFurnaceInstrumentType(furType: number): SynthType {
 // Import types from sub-parser for internal use
 import type {
   FurnaceInstrument,
-  FurnaceGBData,
-  FurnaceC64Data,
-  FurnaceSNESData,
-  FurnaceN163Data,
-  FurnaceFDSData,
 } from './furnace/FurnaceInstrumentParser';
 import type { FurnacePattern, ConvertedPatternCell } from './furnace/FurnacePatternParser';
 
@@ -222,6 +217,575 @@ const CHIP_ID_TO_ENGINE_CHIP: Record<number, number> = {
   0x98: 22,   // OPZ → OPZ
   0xa0: 0,    // YM2612 ext → OPN2
 };
+
+/**
+ * Convert old-format uint32 chip flags to key=value string.
+ * 1:1 port of Furnace fur.cpp::convertOldFlags().
+ * Takes file-format chip ID, converts to DivSystem enum internally.
+ */
+function convertOldChipFlags(oldFlags: number, fileChipId: number): string {
+  const sys = FILE_ID_TO_ENUM[fileChipId] ?? 0;
+  const parts: string[] = [];
+  const set = (key: string, val: number | boolean | string) => {
+    parts.push(`${key}=${typeof val === 'boolean' ? (val ? 'true' : 'false') : val}`);
+  };
+
+  switch (sys) {
+    case 4: // DIV_SYSTEM_SMS
+      switch (oldFlags & 0xff03) {
+        case 0x0000: set('clockSel', 0); break;
+        case 0x0001: set('clockSel', 1); break;
+        case 0x0002: set('clockSel', 2); break;
+        case 0x0003: set('clockSel', 3); break;
+        case 0x0100: set('clockSel', 4); break;
+        case 0x0101: set('clockSel', 5); break;
+        case 0x0102: set('clockSel', 6); break;
+      }
+      switch (oldFlags & 0xcc) {
+        case 0x00: set('chipType', 0); break;
+        case 0x04: set('chipType', 1); break;
+        case 0x08: set('chipType', 2); break;
+        case 0x0c: set('chipType', 3); break;
+        case 0x40: set('chipType', 4); break;
+        case 0x44: set('chipType', 5); break;
+        case 0x48: set('chipType', 6); break;
+        case 0x4c: set('chipType', 7); break;
+        case 0x80: set('chipType', 8); break;
+        case 0x84: set('chipType', 9); break;
+      }
+      if (oldFlags & 16) set('noPhaseReset', true);
+      break;
+
+    case 6: // DIV_SYSTEM_GB
+      set('chipType', oldFlags & 3);
+      if (oldFlags & 8) set('noAntiClick', true);
+      break;
+
+    case 7: // DIV_SYSTEM_PCE
+      set('clockSel', oldFlags & 1);
+      set('chipType', (oldFlags & 4) ? 1 : 0);
+      if (oldFlags & 8) set('noAntiClick', true);
+      break;
+
+    case 8:  // DIV_SYSTEM_NES
+    case 27: // DIV_SYSTEM_VRC6
+    case 29: // DIV_SYSTEM_FDS
+    case 30: // DIV_SYSTEM_MMC5
+    case 22: // DIV_SYSTEM_SAA1099
+    case 44: // DIV_SYSTEM_OPZ
+      switch (oldFlags) {
+        case 0: set('clockSel', 0); break;
+        case 1: set('clockSel', 1); break;
+        case 2: set('clockSel', 2); break;
+      }
+      break;
+
+    case 11: // DIV_SYSTEM_C64_6581
+    case 12: // DIV_SYSTEM_C64_8580
+      switch (oldFlags & 15) {
+        case 0: set('clockSel', 0); break;
+        case 1: set('clockSel', 1); break;
+        case 2: set('clockSel', 2); break;
+      }
+      break;
+
+    case 15: // DIV_SYSTEM_YM2610_CRAP
+    case 16: // DIV_SYSTEM_YM2610_CRAP_EXT
+    case 57: // DIV_SYSTEM_YM2610_FULL
+    case 58: // DIV_SYSTEM_YM2610_FULL_EXT
+    case 49: // DIV_SYSTEM_YM2610B
+    case 63: // DIV_SYSTEM_YM2610B_EXT
+    case 90: // DIV_SYSTEM_YM2610_CSM
+    case 91: // DIV_SYSTEM_YM2610B_CSM
+      switch (oldFlags & 0xff) {
+        case 0: set('clockSel', 0); break;
+        case 1: set('clockSel', 1); break;
+      }
+      break;
+
+    case 17: // DIV_SYSTEM_AY8910
+    case 23: // DIV_SYSTEM_AY8930
+      switch (oldFlags & 15) {
+        case 0: set('clockSel', 0); break;
+        case 1: set('clockSel', 1); break;
+        case 2: set('clockSel', 2); break;
+        case 3: set('clockSel', 3); break;
+        case 4: set('clockSel', 4); break;
+        case 5: set('clockSel', 5); break;
+        case 6: set('clockSel', 6); break;
+        case 7: set('clockSel', 7); break;
+        case 8: set('clockSel', 8); break;
+        case 9: set('clockSel', 9); break;
+        case 10: set('clockSel', 10); break;
+        case 11: set('clockSel', 11); break;
+        case 12: set('clockSel', 12); break;
+        case 13: if (sys === 17) set('clockSel', 13); break;
+        case 14: if (sys === 17) set('clockSel', 14); break;
+      }
+      if (sys === 17) {
+        switch ((oldFlags >> 4) & 3) {
+          case 0: set('chipType', 0); break;
+          case 1: set('chipType', 1); break;
+          case 2: set('chipType', 2); break;
+          case 3: set('chipType', 3); break;
+        }
+      }
+      if (oldFlags & 64) set('stereo', true);
+      if (oldFlags & 128) set('halfClock', true);
+      set('stereoSep', (oldFlags >> 8) & 255);
+      break;
+
+    case 18: // DIV_SYSTEM_AMIGA
+      if (oldFlags & 1) set('clockSel', 1);
+      if (oldFlags & 2) set('chipType', 1);
+      if (oldFlags & 4) set('bypassLimits', true);
+      set('stereoSep', (oldFlags >> 8) & 127);
+      break;
+
+    case 19: // DIV_SYSTEM_YM2151
+      switch (oldFlags & 255) {
+        case 0: set('clockSel', 0); break;
+        case 1: set('clockSel', 1); break;
+        case 2: set('clockSel', 2); break;
+      }
+      break;
+
+    case 20: // DIV_SYSTEM_YM2612
+    case 52: // DIV_SYSTEM_YM2612_EXT
+    case 80: // DIV_SYSTEM_YM2612_DUALPCM
+    case 81: // DIV_SYSTEM_YM2612_DUALPCM_EXT
+    case 89: // DIV_SYSTEM_YM2612_CSM
+      switch (oldFlags & 0x7fffffff) {
+        case 0: set('clockSel', 0); break;
+        case 1: set('clockSel', 1); break;
+        case 2: set('clockSel', 2); break;
+        case 3: set('clockSel', 3); break;
+        case 4: set('clockSel', 4); break;
+      }
+      if (oldFlags & 0x80000000) set('ladderEffect', true);
+      break;
+
+    case 21: // DIV_SYSTEM_TIA
+      set('clockSel', oldFlags & 1);
+      switch ((oldFlags >> 1) & 3) {
+        case 0: set('mixingType', 0); break;
+        case 1: set('mixingType', 1); break;
+        case 2: set('mixingType', 2); break;
+      }
+      break;
+
+    case 24: // DIV_SYSTEM_VIC20
+      set('clockSel', oldFlags & 1);
+      break;
+
+    case 26: // DIV_SYSTEM_SNES
+      set('volScaleL', oldFlags & 127);
+      set('volScaleR', (oldFlags >> 8) & 127);
+      break;
+
+    case 28: // DIV_SYSTEM_OPLL
+    case 59: // DIV_SYSTEM_OPLL_DRUMS
+      switch (oldFlags & 15) {
+        case 0: set('clockSel', 0); break;
+        case 1: set('clockSel', 1); break;
+        case 2: set('clockSel', 2); break;
+        case 3: set('clockSel', 3); break;
+      }
+      switch (oldFlags >> 4) {
+        case 0: set('patchSet', 0); break;
+        case 1: set('patchSet', 1); break;
+        case 2: set('patchSet', 2); break;
+        case 3: set('patchSet', 3); break;
+      }
+      break;
+
+    case 31: // DIV_SYSTEM_N163
+      switch (oldFlags & 15) {
+        case 0: set('clockSel', 0); break;
+        case 1: set('clockSel', 1); break;
+        case 2: set('clockSel', 2); break;
+      }
+      set('channels', (oldFlags >> 4) & 7);
+      if (oldFlags & 128) set('multiplex', true);
+      break;
+
+    case 32: // DIV_SYSTEM_YM2203
+    case 33: // DIV_SYSTEM_YM2203_EXT
+    case 92: // DIV_SYSTEM_YM2203_CSM
+      switch (oldFlags & 31) {
+        case 0: set('clockSel', 0); break;
+        case 1: set('clockSel', 1); break;
+        case 2: set('clockSel', 2); break;
+        case 3: set('clockSel', 3); break;
+        case 4: set('clockSel', 4); break;
+        case 5: set('clockSel', 5); break;
+      }
+      switch ((oldFlags >> 5) & 3) {
+        case 0: set('prescale', 0); break;
+        case 1: set('prescale', 1); break;
+        case 2: set('prescale', 2); break;
+      }
+      break;
+
+    case 34: // DIV_SYSTEM_YM2608
+    case 35: // DIV_SYSTEM_YM2608_EXT
+    case 93: // DIV_SYSTEM_YM2608_CSM
+      switch (oldFlags & 31) {
+        case 0: set('clockSel', 0); break;
+        case 1: set('clockSel', 1); break;
+      }
+      switch ((oldFlags >> 5) & 3) {
+        case 0: set('prescale', 0); break;
+        case 1: set('prescale', 1); break;
+        case 2: set('prescale', 2); break;
+      }
+      break;
+
+    case 36: // DIV_SYSTEM_OPL
+    case 37: // DIV_SYSTEM_OPL2
+    case 70: // DIV_SYSTEM_Y8950
+    case 54: // DIV_SYSTEM_OPL_DRUMS
+    case 55: // DIV_SYSTEM_OPL2_DRUMS
+    case 71: // DIV_SYSTEM_Y8950_DRUMS
+    case 76: // DIV_SYSTEM_YMZ280B
+      switch (oldFlags & 0xff) {
+        case 0: set('clockSel', 0); break;
+        case 1: set('clockSel', 1); break;
+        case 2: set('clockSel', 2); break;
+        case 3: set('clockSel', 3); break;
+        case 4: set('clockSel', 4); break;
+        case 5: set('clockSel', 5); break;
+      }
+      break;
+
+    case 38: // DIV_SYSTEM_OPL3
+    case 56: // DIV_SYSTEM_OPL3_DRUMS
+      switch (oldFlags & 0xff) {
+        case 0: set('clockSel', 0); break;
+        case 1: set('clockSel', 1); break;
+        case 2: set('clockSel', 2); break;
+        case 3: set('clockSel', 3); break;
+        case 4: set('clockSel', 4); break;
+      }
+      break;
+
+    case 40: // DIV_SYSTEM_PCSPKR
+      set('speakerType', oldFlags & 3);
+      break;
+
+    case 42: // DIV_SYSTEM_RF5C68
+      switch (oldFlags & 15) {
+        case 0: set('clockSel', 0); break;
+        case 1: set('clockSel', 1); break;
+        case 2: set('clockSel', 2); break;
+      }
+      switch (oldFlags >> 4) {
+        case 0: set('chipType', 0); break;
+        case 1: set('chipType', 1); break;
+      }
+      break;
+
+    case 48: // DIV_SYSTEM_VRC7
+      switch (oldFlags & 15) {
+        case 0: set('clockSel', 0); break;
+        case 1: set('clockSel', 1); break;
+        case 2: set('clockSel', 2); break;
+        case 3: set('clockSel', 3); break;
+      }
+      break;
+
+    case 50: // DIV_SYSTEM_SFX_BEEPER
+    case 51: // DIV_SYSTEM_SFX_BEEPER_QUADTONE
+      set('clockSel', oldFlags & 1);
+      break;
+
+    case 53: // DIV_SYSTEM_SCC
+    case 72: // DIV_SYSTEM_SCC_PLUS
+      switch (oldFlags & 63) {
+        case 0: set('clockSel', 0); break;
+        case 1: set('clockSel', 1); break;
+        case 2: set('clockSel', 2); break;
+        case 3: set('clockSel', 3); break;
+      }
+      break;
+
+    case 61: // DIV_SYSTEM_QSOUND
+      set('echoDelay', oldFlags & 0xfff);
+      set('echoFeedback', (oldFlags >> 12) & 255);
+      break;
+
+    case 65: // DIV_SYSTEM_X1_010
+      switch (oldFlags & 15) {
+        case 0: set('clockSel', 0); break;
+        case 1: set('clockSel', 1); break;
+      }
+      if (oldFlags & 16) set('stereo', true);
+      break;
+
+    case 67: // DIV_SYSTEM_OPL4
+    case 68: // DIV_SYSTEM_OPL4_DRUMS
+      switch (oldFlags & 0xff) {
+        case 0: set('clockSel', 0); break;
+        case 1: set('clockSel', 1); break;
+        case 2: set('clockSel', 2); break;
+      }
+      break;
+
+    case 73: // DIV_SYSTEM_SOUND_UNIT
+      set('clockSel', oldFlags & 1);
+      if (oldFlags & 4) set('echo', true);
+      if (oldFlags & 8) set('swapEcho', true);
+      set('sampleMemSize', (oldFlags >> 4) & 1);
+      if (oldFlags & 32) set('pdm', true);
+      set('echoDelay', (oldFlags >> 8) & 63);
+      set('echoFeedback', (oldFlags >> 16) & 15);
+      set('echoResolution', (oldFlags >> 20) & 15);
+      set('echoVol', (oldFlags >> 24) & 255);
+      break;
+
+    case 74: // DIV_SYSTEM_MSM6295
+      switch (oldFlags & 63) {
+        case 0: set('clockSel', 0); break;
+        case 1: set('clockSel', 1); break;
+        case 2: set('clockSel', 2); break;
+        case 3: set('clockSel', 3); break;
+        case 4: set('clockSel', 4); break;
+        case 5: set('clockSel', 5); break;
+        case 6: set('clockSel', 6); break;
+        case 7: set('clockSel', 7); break;
+        case 8: set('clockSel', 8); break;
+        case 9: set('clockSel', 9); break;
+        case 10: set('clockSel', 10); break;
+        case 11: set('clockSel', 11); break;
+        case 12: set('clockSel', 12); break;
+        case 13: set('clockSel', 13); break;
+        case 14: set('clockSel', 14); break;
+      }
+      if (oldFlags & 128) set('rateSel', true);
+      break;
+
+    case 75: // DIV_SYSTEM_MSM6258
+      switch (oldFlags) {
+        case 0: set('clockSel', 0); break;
+        case 1: set('clockSel', 1); break;
+        case 2: set('clockSel', 2); break;
+        case 3: set('clockSel', 3); break;
+      }
+      break;
+
+    case 86: // DIV_SYSTEM_PCM_DAC
+      {
+        const flags = oldFlags || (0x1f0000 | 44099);
+        set('rate', (flags & 0xffff) + 1);
+        set('outDepth', (flags >> 16) & 15);
+        if (flags & 0x100000) set('stereo', true);
+      }
+      break;
+
+    case 41: // DIV_SYSTEM_POKEY
+      switch (oldFlags & 15) {
+        case 0: set('clockSel', 0); break;
+        case 1: set('clockSel', 1); break;
+        case 2: set('clockSel', 2); break;
+      }
+      break;
+
+    default:
+      break;
+  }
+
+  return parts.join('\n');
+}
+
+/**
+ * Apply version-specific compat flags to chip flags.
+ * Matches Furnace fur.cpp:2150-2400 — after convertOldFlags, additional flags
+ * are set on systemFlags[] based on the file format version number.
+ *
+ * @param version - .fur file format version
+ * @param systems - array of file-format chip IDs (e.g. 0x83 = YM2612)
+ * @param chipFlags - mutable array of key=value\n flag strings per chip
+ */
+function applyVersionCompatFlags(version: number, systems: number[], chipFlags: string[]): void {
+  // Helper: append a flag to a chip's flag string
+  const setFlag = (i: number, key: string, value: string | number | boolean) => {
+    chipFlags[i] = (chipFlags[i] || '') + `${key}=${value}\n`;
+  };
+
+  // Helper: check if a flag is already set in a chip's flag string
+  const hasFlag = (i: number, key: string): boolean => {
+    const str = chipFlags[i] || '';
+    return str.includes(`${key}=`);
+  };
+
+  // Convert file IDs to DivSystem enum values for matching
+  const sysEnums = systems.map(id => FILE_ID_TO_ENUM[id] ?? id);
+
+  for (let i = 0; i < systems.length; i++) {
+    const sys = sysEnums[i];
+
+    // ExtCh compat flags (fur.cpp:2150-2170)
+    if (sys === 52 || // YM2612_EXT
+        sys === 81 || // YM2612_DUALPCM_EXT
+        sys === 58 || // YM2610_FULL_EXT
+        sys === 63 || // YM2610B_EXT
+        sys === 33 || // YM2203_EXT
+        sys === 35 || // YM2608_EXT
+        sys === 89 || // YM2612_CSM
+        sys === 92 || // YM2203_CSM
+        sys === 93 || // YM2608_CSM
+        sys === 90 || // YM2610_CSM
+        sys === 91) { // YM2610B_CSM
+      if (version < 125) {
+        setFlag(i, 'noExtMacros', true);
+      }
+      if (version < 133) {
+        setFlag(i, 'fbAllOps', true);
+      }
+    }
+
+    // SN noise compat (fur.cpp:2172-2180)
+    if (version < 128) {
+      if (sys === 4 || // SMS
+          sys === 83) { // T6W28
+        setFlag(i, 'noEasyNoise', true);
+      }
+    }
+
+    // OPL3 pan compat (fur.cpp:2182-2190)
+    if (version < 134) {
+      if (sys === 38 || // OPL3
+          sys === 56) { // OPL3_DRUMS
+        setFlag(i, 'compatPan', true);
+      }
+    }
+
+    // Namco C30 noise compat (fur.cpp:2218-2225)
+    if (version < 145) {
+      if (sys === 79) { // NAMCO_CUS30
+        setFlag(i, 'newNoise', false);
+      }
+    }
+
+    // SegaPCM slide compat (fur.cpp:2227-2234)
+    if (version < 153) {
+      if (sys === 46) { // SEGAPCM
+        setFlag(i, 'oldSlides', true);
+      }
+    }
+
+    // NES PCM compat (fur.cpp:2236-2243)
+    if (version < 154) {
+      if (sys === 8) { // NES
+        setFlag(i, 'dpcmMode', false);
+      }
+    }
+
+    // C64 key priority compat (fur.cpp:2245-2252)
+    if (version < 160) {
+      if (sys === 12 || // C64_8580
+          sys === 11) { // C64_6581
+        setFlag(i, 'keyPriority', false);
+      }
+    }
+
+    // Namco 163 pitch compensation compat (fur.cpp:2254-2261)
+    if (version < 165) {
+      if (sys === 31) { // N163
+        setFlag(i, 'lenCompensate', true);
+      }
+    }
+
+    // OPM/OPZ slide compat (fur.cpp:2263-2271)
+    if (version < 176) {
+      if (sys === 19 || // YM2151
+          sys === 44) { // OPZ
+        setFlag(i, 'brokenPitch', true);
+      }
+    }
+
+    // C64 1Exy compat (fur.cpp:2273-2280)
+    if (version < 186) {
+      if (sys === 12 || // C64_8580
+          sys === 11) { // C64_6581
+        setFlag(i, 'no1EUpdate', true);
+      }
+    }
+
+    // C64 original reset time and multiply relative (fur.cpp:2282-2290)
+    if (version < 187) {
+      if (sys === 12 || // C64_8580
+          sys === 11) { // C64_6581
+        setFlag(i, 'initResetTime', 1);
+        setFlag(i, 'multiplyRel', true);
+      }
+    }
+
+    // OPLL fixedAll compat (fur.cpp:2292-2302)
+    if (version < 194) {
+      if (sys === 28 || // OPLL
+          sys === 59) { // OPLL_DRUMS
+        if (!hasFlag(i, 'fixedAll')) {
+          setFlag(i, 'fixedAll', false);
+        }
+      }
+    }
+
+    // C64 macro race (fur.cpp:2304-2311)
+    if (version < 195) {
+      if (sys === 12 || // C64_8580
+          sys === 11) { // C64_6581
+        setFlag(i, 'macroRace', true);
+      }
+    }
+
+    // VERA old chip revision / TIA old tuning (fur.cpp:2313-2336)
+    if (version < 213) {
+      if (sys === 62) { // VERA
+        setFlag(i, 'chipType', 0);
+      }
+      if (sys === 21) { // TIA
+        setFlag(i, 'oldPitch', true);
+      }
+    } else if (version < 217) {
+      if (sys === 62) { // VERA
+        setFlag(i, 'chipType', 1);
+      }
+    } else if (version < 229) {
+      if (sys === 62) { // VERA
+        setFlag(i, 'chipType', 2);
+      }
+    }
+
+    // SNES no anti-click (fur.cpp:2338-2345)
+    if (version < 220) {
+      if (sys === 26) { // SNES
+        setFlag(i, 'antiClick', false);
+      }
+    }
+
+    // Y8950 broken ADPCM pitch (fur.cpp:2347-2354)
+    if (version < 223) {
+      if (sys === 70 || // Y8950
+          sys === 71) { // Y8950_DRUMS
+        setFlag(i, 'compatYPitch', true);
+      }
+    }
+
+    // YM2612 chip type (fur.cpp:2356-2370)
+    if (version < 231) {
+      if (sys === 20 || // YM2612
+          sys === 52 || // YM2612_EXT
+          sys === 80 || // YM2612_DUALPCM
+          sys === 81 || // YM2612_DUALPCM_EXT
+          sys === 89) { // YM2612_CSM
+        if (!hasFlag(i, 'chipType') && !hasFlag(i, 'ladderEffect')) {
+          setFlag(i, 'chipType', 0);
+        }
+      }
+    }
+  }
+}
 
 /**
  * Chip file ID → default instrument type (DIV_INS_*)
@@ -364,6 +928,125 @@ const CHIP_CHANNELS: Record<number, number> = {
   0xfd: 8,    // Dummy
 };
 
+/**
+ * Map Furnace file format IDs → C++ DivSystem enum values.
+ * The .fur file stores its own ID scheme (e.g. 0x83 = YM2612),
+ * but the WASM dispatch wrapper expects the C++ enum value (e.g. 20 = YM2612).
+ * Built from Furnace sysDef.cpp: sysDefs[ENUM]->id = FILE_ID.
+ */
+const FILE_ID_TO_ENUM: Record<number, number> = {
+  0x01: 1,    // YMU759
+  0x02: 2,    // GENESIS (compound)
+  0x42: 3,    // GENESIS_EXT (compound)
+  0x03: 4,    // SMS
+  0x43: 5,    // SMS_OPLL (compound)
+  0x04: 6,    // GB
+  0x05: 7,    // PCE
+  0x06: 8,    // NES
+  0x46: 9,    // NES_VRC7 (compound)
+  0x47: 11,   // C64_6581
+  0x07: 12,   // C64_8580
+  0x08: 13,   // ARCADE (compound)
+  0x09: 15,   // YM2610_CRAP
+  0x49: 16,   // YM2610_CRAP_EXT
+  0x80: 17,   // AY8910
+  0x81: 18,   // AMIGA
+  0x82: 19,   // YM2151
+  0x83: 20,   // YM2612
+  0x84: 21,   // TIA
+  0x97: 22,   // SAA1099
+  0x9a: 23,   // AY8930
+  0x85: 24,   // VIC20
+  0x86: 25,   // PET
+  0x87: 26,   // SNES
+  0x88: 27,   // VRC6
+  0x89: 28,   // OPLL
+  0x8a: 29,   // FDS
+  0x8b: 30,   // MMC5
+  0x8c: 31,   // N163
+  0x8d: 32,   // YM2203
+  0xb6: 33,   // YM2203_EXT
+  0x8e: 34,   // YM2608
+  0xb7: 35,   // YM2608_EXT
+  0x8f: 36,   // OPL
+  0x90: 37,   // OPL2
+  0x91: 38,   // OPL3
+  0x92: 39,   // MULTIPCM
+  0x93: 40,   // PCSPKR
+  0x94: 41,   // POKEY
+  0x95: 42,   // RF5C68
+  0x96: 43,   // SWAN
+  0x98: 44,   // OPZ
+  0x99: 45,   // POKEMINI
+  0x9b: 46,   // SEGAPCM
+  0x9c: 47,   // VBOY
+  0x9d: 48,   // VRC7
+  0x9e: 49,   // YM2610B
+  0x9f: 50,   // SFX_BEEPER
+  0xca: 51,   // SFX_BEEPER_QUADTONE
+  0xa0: 52,   // YM2612_EXT
+  0xa1: 53,   // SCC
+  0xa2: 54,   // OPL_DRUMS
+  0xa3: 55,   // OPL2_DRUMS
+  0xa4: 56,   // OPL3_DRUMS
+  0xa5: 57,   // YM2610_FULL
+  0xa6: 58,   // YM2610_FULL_EXT
+  0xa7: 59,   // OPLL_DRUMS
+  0xa8: 60,   // LYNX
+  0xe0: 61,   // QSOUND
+  0xac: 62,   // VERA
+  0xde: 63,   // YM2610B_EXT
+  0xa9: 64,   // SEGAPCM_COMPAT
+  0xb0: 65,   // X1_010
+  0xad: 66,   // BUBSYS_WSG
+  0xae: 67,   // OPL4
+  0xaf: 68,   // OPL4_DRUMS
+  0xb1: 69,   // ES5506
+  0xb2: 70,   // Y8950
+  0xb3: 71,   // Y8950_DRUMS
+  0xb4: 72,   // SCC_PLUS
+  0xb5: 73,   // SOUND_UNIT
+  0xaa: 74,   // MSM6295
+  0xab: 75,   // MSM6258
+  0xb8: 76,   // YMZ280B
+  0xb9: 77,   // NAMCO
+  0xba: 78,   // NAMCO_15XX
+  0xbb: 79,   // NAMCO_CUS30
+  0xbe: 80,   // YM2612_DUALPCM
+  0xbd: 81,   // YM2612_DUALPCM_EXT
+  0xbc: 82,   // MSM5232
+  0xbf: 83,   // T6W28
+  0xc6: 84,   // K007232
+  0xc7: 85,   // GA20
+  0xc0: 86,   // PCM_DAC
+  0xfc: 87,   // PONG
+  0xfd: 88,   // DUMMY
+  0xc1: 89,   // YM2612_CSM
+  0xc2: 90,   // YM2610_CSM
+  0xc5: 91,   // YM2610B_CSM
+  0xc3: 92,   // YM2203_CSM
+  0xc4: 93,   // YM2608_CSM
+  0xc8: 94,   // SM8521
+  0xcb: 95,   // PV1000
+  0xcc: 96,   // K053260
+  0xcd: 97,   // TED
+  0xce: 98,   // C140
+  0xcf: 99,   // C219
+  0xd1: 100,  // ESFM
+  0xd4: 101,  // POWERNOISE
+  0xd5: 102,  // DAVE
+  0xd6: 103,  // NDS
+  0xd7: 104,  // GBA_DMA
+  0xd8: 105,  // GBA_MINMOD
+  0xf1: 106,  // 5E01
+  0xd9: 107,  // BIFURCATOR
+  0xf0: 108,  // SID2
+  0xe3: 109,  // SUPERVISION
+  0xe5: 110,  // UPD1771C
+  0xf5: 111,  // SID3
+  0xe2: 112,  // C64_PCM
+};
+
 // SubSong (kept here — used by orchestrator and module type)
 export interface FurnaceSubSong {
   name: string;
@@ -450,6 +1133,9 @@ export interface FurnaceModule {
 
   // Groove patterns (each entry is an array of speed values, length from groove.len)
   grooves: Array<{ len: number; val: number[] }>;
+
+  // Per-chip flag strings (key=value\n format for clock/model selection)
+  chipFlags?: string[];
 }
 
 /**
@@ -595,6 +1281,7 @@ async function parseNewFormat(
   const patPtr: number[] = [];
   let commentPtr = 0;
   const groovePtrs: number[] = [];
+  const chipFlagPtrs: number[] = [];
 
   // Read elements
   let hasElement = true;
@@ -614,7 +1301,9 @@ async function parseNewFormat(
       }
       case DIV_ELEMENT_CHIP_FLAGS: {
         const count = reader.readUint32();
-        reader.skip(count * 4); // Skip flag pointers
+        for (let i = 0; i < count; i++) {
+          chipFlagPtrs.push(reader.readUint32());
+        }
         break;
       }
       case DIV_ELEMENT_ASSET_DIR: {
@@ -685,6 +1374,32 @@ async function parseNewFormat(
       for (let i = 0; i < 16; i++) val.push(reader.readUint16());
       module.grooves.push({ len, val });
     }
+  }
+
+  // Parse chip flags from FLAG blocks (v>=119)
+  if (chipFlagPtrs.length > 0) {
+    module.chipFlags = [];
+    for (let i = 0; i < chipFlagPtrs.length; i++) {
+      const ptr = chipFlagPtrs[i];
+      if (ptr === 0) {
+        module.chipFlags.push('');
+        continue;
+      }
+      reader.seek(ptr);
+      const magic = reader.readMagic(4);
+      if (magic === 'FLAG') {
+        reader.readUint32(); // block size
+        const flagStr = readString(reader);
+        module.chipFlags.push(flagStr);
+      } else {
+        module.chipFlags.push('');
+      }
+    }
+  }
+
+  // Apply version-specific compat flags (fur.cpp:2150-2400)
+  if (module.chipFlags && module.chipFlags.length > 0) {
+    applyVersionCompatFlags(version, module.systems.slice(0, module.systemLen), module.chipFlags);
   }
 
   // Parse subsongs
@@ -904,13 +1619,22 @@ async function parseOldFormat(
     }
   }
 
-  // Chip flags (128 bytes) - skip for now
+  // Chip flags (128 bytes = 32 × uint32)
   if (version >= 119) {
-    // Pointers to chip flags
+    // In new format, these are pointers to FLAG blocks (read later via element table)
+    // Just skip — chipFlagPtrs from element table are used instead
     reader.skip(128);
   } else {
-    // Direct flags
-    reader.skip(128);
+    // Old format: direct uint32 flag values per chip, convert to key=value strings
+    module.chipFlags = [];
+    for (let i = 0; i < 32; i++) {
+      const oldFlags = reader.readUint32();
+      if (i < module.systemLen) {
+        module.chipFlags.push(convertOldChipFlags(oldFlags, module.systems[i]));
+      }
+    }
+    // Apply version-specific compat flags (fur.cpp:2150-2400)
+    applyVersionCompatFlags(version, module.systems.slice(0, module.systemLen), module.chipFlags);
   }
 
   // Song name and author
@@ -1738,6 +2462,7 @@ export function convertFurnaceToDevilbox(module: FurnaceModule, subsongIndex = 0
         ams: inst.fm.ams,
         ops: inst.fm.ops,
         opllPreset: inst.fm.opllPreset,
+        block: inst.fm.block,
         operators: inst.fm.operators.map((op: FurnaceOperatorConfig) => ({
           enabled: op.enabled,
           mult: op.mult,
@@ -1778,12 +2503,18 @@ export function convertFurnaceToDevilbox(module: FurnaceModule, subsongIndex = 0
     }
 
     // Pass through chip-specific data
-    const chipConfig: Record<string, FurnaceGBData | FurnaceC64Data | FurnaceSNESData | FurnaceN163Data | FurnaceFDSData> = {};
+    const chipConfig: Record<string, unknown> = {};
     if (inst.gb) chipConfig.gb = inst.gb;
     if (inst.c64) chipConfig.c64 = inst.c64;
     if (inst.snes) chipConfig.snes = inst.snes;
     if (inst.n163) chipConfig.n163 = inst.n163;
     if (inst.fds) chipConfig.fds = inst.fds;
+    if (inst.es5506) chipConfig.es5506 = inst.es5506;
+    if (inst.multipcm) chipConfig.multipcm = inst.multipcm;
+    if (inst.soundUnit) chipConfig.soundUnit = inst.soundUnit;
+    if (inst.esfm) chipConfig.esfm = inst.esfm;
+    if (inst.powerNoise) chipConfig.powerNoise = inst.powerNoise;
+    if (inst.sid2) chipConfig.sid2 = inst.sid2;
     if (Object.keys(chipConfig).length > 0) {
       furnaceData.chipConfig = chipConfig;
     }
@@ -1804,7 +2535,7 @@ export function convertFurnaceToDevilbox(module: FurnaceModule, subsongIndex = 0
   const patterns: ConvertedPatternCell[][][] = [];
   const subsong = module.subsongs[subsongIndex] || module.subsongs[0];
   if (!subsong) {
-    return { instruments, patterns: [], metadata: createMetadata(module, subsongIndex), wavetables: [], samples: [], furnaceNative: { subsongs: [], activeSubsong: subsongIndex, chipIds: module.systems.slice(0, module.systemLen) } };
+    return { instruments, patterns: [], metadata: createMetadata(module, subsongIndex), wavetables: [], samples: [], furnaceNative: { subsongs: [], activeSubsong: subsongIndex, chipIds: module.systems.slice(0, module.systemLen).map(id => FILE_ID_TO_ENUM[id] ?? id) } };
   }
 
   // Debug: Log pattern map keys
@@ -1991,9 +2722,11 @@ export function buildFurnaceNativeData(module: FurnaceModule): FurnaceNativeData
   return {
     subsongs,
     activeSubsong: 0,
-    chipIds: module.systems.slice(0, module.systemLen),
+    chipIds: module.systems.slice(0, module.systemLen).map(id => FILE_ID_TO_ENUM[id] ?? id),
     compatFlags: module.compatFlags,
     grooves: module.grooves.length > 0 ? module.grooves : undefined,
+    chipFlags: module.chipFlags?.slice(0, module.systemLen),
+    tuning: module.tuning !== 440.0 ? module.tuning : undefined,
   };
 }
 
@@ -2116,6 +2849,8 @@ function createMetadata(module: FurnaceModule, subsongIndex = 0): ImportMetadata
       grooves: module.grooves.length > 0
         ? module.grooves.map(g => g.val.slice(0, g.len))
         : undefined,
+      chipFlags: module.chipFlags?.slice(0, module.systemLen),
+      tuning: module.tuning !== 440.0 ? module.tuning : undefined,
     },
   };
 }

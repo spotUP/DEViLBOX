@@ -31,7 +31,7 @@
  * UADE handles actual audio playback. This parser extracts metadata only.
  *
  * References:
- *   Reference Code/uade-3.05/amigasrc/players/wanted_team/SeanConran/
+ *   third-party/uade-3.05/amigasrc/players/wanted_team/SeanConran/
  *     src/Sean Conran_v3.asm  (DTP_Check2 routine)
  */
 

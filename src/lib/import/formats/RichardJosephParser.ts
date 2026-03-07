@@ -27,11 +27,11 @@
  *   [12+S+4+skip] u32 BE  subsong_table_size = num_subsongs × 4
  *
  * References:
- *   Reference Code/uade-3.05/amigasrc/players/wanted_team/RichardJosephPlayer/
+ *   third-party/uade-3.05/amigasrc/players/wanted_team/RichardJosephPlayer/
  *     src/Richard Joseph Player_v2.asm  (Check2, InitPlayer, SampleInit routines)
- *   Reference Code/uade-3.05/amigasrc/players/wanted_team/RichardJosephPlayer/
+ *   third-party/uade-3.05/amigasrc/players/wanted_team/RichardJosephPlayer/
  *     src/Richard Joseph Player.s       (EagleRipper FindMax)
- *   Reference Code/uade-3.05/amigasrc/players/wanted_team/Richard Joseph/
+ *   third-party/uade-3.05/amigasrc/players/wanted_team/Richard Joseph/
  *     EP_RJoseph.readme                 (format history notes)
  */
 

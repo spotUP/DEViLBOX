@@ -53,6 +53,8 @@ import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, TrackerCell, InstrumentConfig } from '@/types';
 import { createSamplerInstrument } from './AmigaUtils';
 import type { UADEChipRamInfo } from '@/types/instrument';
+import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
+import { encodeAONCell } from '@/engine/uade/encoders/ArtOfNoiseEncoder';
 
 // ── Constants ─────────────────────────────────────────────────────────────
 
@@ -317,6 +319,7 @@ export function parseArtOfNoiseFile(bytes: Uint8Array, filename: string): Tracke
   let arpeggios: number[][] | null = null;
   let positionList: number[] | null = null;
   let patterns: AonPattern[] | null = null;
+  let patternChunkOffset = 0;
   let instruments: AonInstrument[] | null = null;
   let waveForms: Int8Array[] | null = null;
 
@@ -382,6 +385,7 @@ export function parseArtOfNoiseFile(bytes: Uint8Array, filename: string): Tracke
       case 'PATT': {
         // numPatterns × 64rows × numChannels × 4 bytes
         const numPatterns = Math.floor(chunkSize / (4 * numberOfChannels * 64));
+        patternChunkOffset = off;
         patterns = [];
         let pOff = off;
         for (let p = 0; p < numPatterns; p++) {
@@ -741,6 +745,17 @@ export function parseArtOfNoiseFile(bytes: Uint8Array, filename: string): Tracke
 
   const moduleName = (songName || filename).replace(/\.[^/.]+$/, '');
 
+  const uadePatternLayout: UADEPatternLayout | undefined = patternChunkOffset > 0 ? {
+    formatId: 'aon',
+    patternDataFileOffset: patternChunkOffset,
+    bytesPerCell: 4,
+    rowsPerPattern: 64,
+    numChannels: numberOfChannels,
+    numPatterns: patterns?.length ?? 0,
+    moduleSize: bytes.length,
+    encodeCell: encodeAONCell,
+  } : undefined;
+
   return {
     name:             moduleName,
     format:           'AON' as TrackerFormat,
@@ -753,6 +768,7 @@ export function parseArtOfNoiseFile(bytes: Uint8Array, filename: string): Tracke
     initialSpeed:     6,
     initialBPM:       125,
     linearPeriods:    false,
+    uadePatternLayout,
   };
 }
 

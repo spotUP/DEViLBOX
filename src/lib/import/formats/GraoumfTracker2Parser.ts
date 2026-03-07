@@ -30,7 +30,7 @@
  *     XCOM — extended comment
  *     ENDC — end of chunks
  *
- * Reference: Reference Code/openmpt-master/soundlib/Load_gt2.cpp (authoritative)
+ * Reference: third-party/openmpt-master/soundlib/Load_gt2.cpp (authoritative)
  */
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';

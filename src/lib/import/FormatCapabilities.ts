@@ -22,14 +22,14 @@ const EDITABLE_FORMAT_LABELS = new Set([
 
 /** Format families (from FormatRegistry) that are always editable */
 const EDITABLE_FAMILIES = new Set([
-  'libopenmpt', 'furnace',
+  'libopenmpt', 'furnace', 'pc-tracker',
 ]);
 
 // ── Exportable format labels ─────────────────────────────────────────────────
 // Formats that can be exported to their native binary format (beyond .dbx).
 
 const NATIVE_EXPORTABLE_LABELS = new Set([
-  'MOD', 'XM',
+  'MOD', 'XM', 'IT', 'S3M',
   'HivelyTracker',
   'Furnace',
   'Oktalyzer', 'OctaMED', 'DigiBooster', 'DigiBooster Pro',
@@ -38,6 +38,11 @@ const NATIVE_EXPORTABLE_LABELS = new Set([
   'Klystrack',
   'MusicLine Editor',
   // Chip export formats (VGM/NSF/etc.) are always available regardless of import format
+]);
+
+/** Format families that can export via OpenMPT WASM (to IT/S3M) */
+const NATIVE_EXPORTABLE_FAMILIES = new Set([
+  'pc-tracker', 'libopenmpt',
 ]);
 
 // ── WASM-only replay format labels ───────────────────────────────────────────
@@ -154,7 +159,9 @@ export function getFormatCapabilities(
     !NOT_EDITABLE_EXTENSIONS.has(ext);
 
   // Exportable to native format?
-  const isNativeExportable = NATIVE_EXPORTABLE_LABELS.has(formatLabel);
+  const isNativeExportable =
+    NATIVE_EXPORTABLE_LABELS.has(formatLabel) ||
+    (formatFamily != null && NATIVE_EXPORTABLE_FAMILIES.has(formatFamily));
 
   // Has pattern data to display?
   const hasPatternData =

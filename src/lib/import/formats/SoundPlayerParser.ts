@@ -19,7 +19,7 @@
  * File prefix: "SJS."
  * Actual audio playback is delegated to UADE.
  *
- * Reference: Reference Code/uade-3.05/amigasrc/players/wanted_team/SoundPlayer/SoundPlayer_v1.asm
+ * Reference: third-party/uade-3.05/amigasrc/players/wanted_team/SoundPlayer/SoundPlayer_v1.asm
  */
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';

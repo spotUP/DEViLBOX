@@ -897,9 +897,10 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
   {
     key: 'tcbTracker',
     label: 'TCB Tracker',
-    description: 'TCB Tracker (tcb.* prefix)',
+    description: 'TCB Tracker (tcb.* prefix or .tcb extension)',
     family: 'amiga-native',
-    matchMode: 'prefix',
+    matchMode: 'both',
+    extRegex: /\.tcb$/i,
     prefixes: ['tcb.'],
     prefKey: 'tcbTracker',
     nativeParser: { module: '@lib/import/formats/TCBTrackerParser', parseFn: 'parseTCBTrackerFile', detectFn: 'isTCBTrackerFormat' },
@@ -1763,7 +1764,7 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
     description: 'ZX Spectrum / AY-3-8910 chiptune formats',
     family: 'chip-dump',
     matchMode: 'extension',
-    extRegex: /\.(pt3|pt2|pt1|stc|st1|st3|stp|vtx|psg|psm|sqt|psc|asc|gtr|ftc|ayc|cop|tfc|tfd|tf0|pdt|chi|str|dst|dmm|et1)$/i,
+    extRegex: /\.(pt3|pt2|pt1|stc|st1|st3|vtx|psg|sqt|psc|asc|gtr|ftc|ayc|cop|tfc|tfd|tf0|pdt|chi|str|dst|dmm|et1)$/i,
     nativeOnly: true,
   },
 
@@ -1938,6 +1939,21 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
   },
   {
     key: 'amf',       label: 'Advanced Music Format', description: 'Advanced Music Format', family: 'pc-tracker', matchMode: 'extension', extRegex: /\.amf$/i,  nativeParser: { module: '@lib/import/formats/AMFParser', parseFn: 'parseAMFFile', detectFn: 'isAMFFormat' }, libopenmptFallback: true,
+  },
+  {
+    key: 'j2b',       label: 'Galaxy Sound System',   description: 'Galaxy Sound System (MASI)', family: 'pc-tracker', matchMode: 'extension', extRegex: /\.j2b$/i, libopenmptFallback: true, libopenmptPlayable: true,
+  },
+  {
+    key: 'mo3',       label: 'MO3 Compressed',        description: 'MO3 Compressed Module (MOD/XM/IT/S3M)', family: 'pc-tracker', matchMode: 'extension', extRegex: /\.mo3$/i, libopenmptFallback: true, libopenmptPlayable: true,
+  },
+  {
+    key: 'itp',       label: 'IT Project',             description: 'Impulse Tracker Project', family: 'pc-tracker', matchMode: 'extension', extRegex: /\.itp$/i, libopenmptFallback: true, libopenmptPlayable: true,
+  },
+  {
+    key: 'nst',       label: 'NoiseTracker',           description: 'NoiseTracker (15-instrument MOD)', family: 'pc-tracker', matchMode: 'extension', extRegex: /\.nst$/i, libopenmptFallback: true, libopenmptPlayable: true,
+  },
+  {
+    key: 'wow',       label: "Mod's Grave WOW",        description: "Mod's Grave WOW (8-channel MOD)", family: 'pc-tracker', matchMode: 'extension', extRegex: /\.wow$/i, libopenmptFallback: true, libopenmptPlayable: true,
   },
   {
     key: 'ufo',

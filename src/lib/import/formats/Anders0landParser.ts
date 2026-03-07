@@ -35,7 +35,7 @@
  * UADE handles actual audio playback. This parser extracts metadata only.
  *
  * Reference:
- *   Reference Code/uade-3.05/amigasrc/players/wanted_team/Anders0land/SRC_Anders0land/Anders 0land_v1.asm
+ *   third-party/uade-3.05/amigasrc/players/wanted_team/Anders0land/SRC_Anders0land/Anders 0land_v1.asm
  * Reference parsers: BenDaglishParser.ts
  */
 

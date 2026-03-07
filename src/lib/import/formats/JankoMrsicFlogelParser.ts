@@ -19,7 +19,7 @@
  * Single-file format: music data binary.
  * Actual audio playback is delegated to UADE.
  *
- * Reference: Reference Code/uade-3.05/amigasrc/players/wanted_team/JankoMrsicFlogel/...
+ * Reference: third-party/uade-3.05/amigasrc/players/wanted_team/JankoMrsicFlogel/...
  */
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
