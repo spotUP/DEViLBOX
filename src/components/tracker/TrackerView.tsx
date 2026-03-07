@@ -222,6 +222,11 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
   const showImportModule = externalShowImportModule ?? internalShowImportModule;
   const setShowImportModule = onShowImportModule ?? setInternalShowImportModule;
 
+  // Close pattern editor pop-out when editor mode changes
+  useEffect(() => {
+    setPatternEditorPoppedOut(false);
+  }, [editorMode, setPatternEditorPoppedOut]);
+
   // Instrument panel state (shared with GL via store)
   const showInstrumentPanel = useUIStore((s) => s.showInstrumentPanel);
   const setShowInstrumentPanel = useUIStore((s) => s.setShowInstrumentPanel);
