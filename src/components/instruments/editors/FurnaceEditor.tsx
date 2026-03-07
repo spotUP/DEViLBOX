@@ -301,7 +301,7 @@ export const FurnaceEditor: React.FC<FurnaceEditorProps> = ({ config, instrument
 
   return (
     <ScrollLockContainer>
-      <div className="space-y-4">
+      <div className="synth-controls-flow space-y-4">
       {/* Chip Header */}
       <div className="flex items-center justify-between bg-dark-bgSecondary p-3 rounded-lg border border-dark-border/50">
         <div className="flex items-center gap-3">

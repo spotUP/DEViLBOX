@@ -9,6 +9,7 @@
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useMixerStore } from '../../stores/useMixerStore';
+import { useTrackerStore } from '../../stores/useTrackerStore';
 import { getToneEngine } from '../../engine/ToneEngine';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -222,7 +223,21 @@ function useMixerState() {
     mountedRef.current = true;
     const tick = () => {
       if (!mountedRef.current) return;
-      try { setLevels(getToneEngine().getChannelLevels(NUM_CHANNELS)); } catch { /* not ready */ }
+      try {
+        const engine = getToneEngine();
+        const chLevels = engine.getChannelLevels(NUM_CHANNELS);
+        // If all per-channel levels are 0 (WASM engines bypass channel routing),
+        // fall back to synthBus level on active channels only
+        const hasSignal = chLevels.some(l => l > 0);
+        if (!hasSignal) {
+          const busLevel = engine.getSynthBusLevel();
+          if (busLevel > 0) {
+            const activeChannels = useTrackerStore.getState().patterns[0]?.channels.length ?? 4;
+            for (let i = 0; i < Math.min(activeChannels, chLevels.length); i++) chLevels[i] = busLevel;
+          }
+        }
+        setLevels(chLevels);
+      } catch { /* not ready */ }
       rafRef.current = requestAnimationFrame(tick);
     };
     rafRef.current = requestAnimationFrame(tick);

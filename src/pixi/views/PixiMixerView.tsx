@@ -3,6 +3,7 @@
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useMixerStore } from '../../stores/useMixerStore';
+import { useTrackerStore } from '@stores/useTrackerStore';
 import { getToneEngine } from '@engine/ToneEngine';
 import { PixiMixerChannelStrip } from '../mixer/PixiMixerChannelStrip';
 import { PixiLabel } from '../components/PixiLabel';
@@ -70,7 +71,17 @@ export const PixiMixerView: React.FC = () => {
       if (!mountedRef.current) return;
 
       try {
-        const channelLevels = getToneEngine().getChannelLevels(NUM_CHANNELS);
+        const engine = getToneEngine();
+        const channelLevels = engine.getChannelLevels(NUM_CHANNELS);
+        // Fallback for WASM engines that bypass per-channel routing
+        const hasSignal = channelLevels.some(l => l > 0);
+        if (!hasSignal) {
+          const busLevel = engine.getSynthBusLevel();
+          if (busLevel > 0) {
+            const activeChannels = useTrackerStore.getState().patterns[0]?.channels.length ?? 4;
+            for (let i = 0; i < Math.min(activeChannels, channelLevels.length); i++) channelLevels[i] = busLevel;
+          }
+        }
         levelsRef.current = channelLevels;
         masterLevelRef.current = Math.max(...channelLevels);
       } catch {
