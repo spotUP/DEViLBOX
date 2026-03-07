@@ -138,3 +138,8 @@ zxtune-wasm/build/
 cpsycle-wasm/build/
 ixalance-wasm/build/
 jamcracker-wasm/build/
+test-data/
+
+# Third-party reference sources (not needed for builds, available via Reference Code symlink)
+third-party/fast tracker 2/
+third-party/pt2-clone-master/
