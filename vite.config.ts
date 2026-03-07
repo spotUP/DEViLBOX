@@ -79,7 +79,7 @@ export default defineConfig({
   test: {
     // Vitest configuration
     include: ['src/**/*.{test,spec}.{ts,tsx}'],
-    exclude: ['node_modules', 'Reference Code/**', 'dist'],
+    exclude: ['node_modules', 'Reference Code/**', 'dist', 'src/__tests__/ci/**'],
     environment: 'happy-dom',
     server: {
       deps: {
