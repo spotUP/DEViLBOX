@@ -35,6 +35,10 @@ class JamCrackerProcessor extends AudioWorkletProcessor {
     this.reportInterval = 8;
     this.previewActive = false;
 
+    // Channel levels
+    this.levelsPtr = 0;
+    this.levelsCounter = 0;
+
     this.port.onmessage = (event) => this.handleMessage(event.data);
   }
 
@@ -146,6 +150,9 @@ class JamCrackerProcessor extends AudioWorkletProcessor {
 
       // Allocate decode buffer (stereo interleaved float32)
       this.decodeBufPtr = this.wasm._malloc(this.decodeBufSize * 2 * 4);
+
+      // Allocate 4-float buffer for channel levels
+      this.levelsPtr = this.wasm._malloc(4 * 4);
 
       this.initialized = true;
       this.port.postMessage({ type: 'ready' });
@@ -316,6 +323,14 @@ class JamCrackerProcessor extends AudioWorkletProcessor {
           tick: this.wasm._jc_get_tick(),
         });
       }
+    }
+
+    // Post per-channel levels every 8 process() calls
+    if (++this.levelsCounter >= 8 && this.levelsPtr && typeof this.wasm._jc_get_channel_levels === 'function') {
+      this.levelsCounter = 0;
+      this.wasm._jc_get_channel_levels(this.levelsPtr);
+      const off = this.levelsPtr >> 2;
+      this.port.postMessage({ type: 'chLevels', levels: [this.wasm.HEAPF32[off], this.wasm.HEAPF32[off+1], this.wasm.HEAPF32[off+2], this.wasm.HEAPF32[off+3]] });
     }
 
     return true;
