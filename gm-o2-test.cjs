@@ -10,44 +10,81 @@ const puppeteer = require('puppeteer');
     ]
   });
   const page = await browser.newPage();
-  
-  // Collect all console messages
-  const allMessages = [];
+
   page.on('console', msg => {
     const text = msg.text();
-    allMessages.push(text);
-    // Only log important messages
-    if (text.includes('Gearmulator') || text.includes('gm_') || text.includes('render #') || 
-        text.includes('ERROR') || text.includes('error') || text.includes('RuntimeError') ||
-        text.includes('ESAI') || text.includes('peak=') || text.includes('SAB'))
-      console.log('[B]', text);
+    if (text.includes('HDI08 readRX') || text.includes('HDI08 writeRX') || text.includes('HDI08 inject'))
+      return;
+    if (text.includes('Audio underrun'))
+      return;
+    console.log('[B]', text);
   });
   page.on('pageerror', err => console.log('[PAGE ERROR]', err.message));
 
-  console.log('Navigating...');
-  await page.goto('http://localhost:5173', { waitUntil: 'networkidle0', timeout: 30000 });
-  await new Promise(r => setTimeout(r, 3000));
+  console.log('Opening test-gearmulator.html...');
+  await page.goto('http://localhost:5173/test-gearmulator.html', { waitUntil: 'networkidle0', timeout: 30000 });
+  await new Promise(r => setTimeout(r, 2000));
 
-  // Find all buttons and their text
-  const buttons = await page.evaluate(() => {
-    return [...document.querySelectorAll('button')].map(b => ({
-      text: b.textContent.trim().substring(0, 50),
-      visible: b.offsetParent !== null
-    }));
-  });
-  console.log('Available buttons:', JSON.stringify(buttons.filter(b => b.visible).slice(0, 20)));
+  // Click Initialize
+  console.log('Clicking Initialize...');
+  await page.click('#btnInit');
 
-  // Look for Gearmulator / Virus in the UI — might need to select it as an instrument
-  const hasGearmulator = await page.evaluate(() => {
-    const all = document.body.innerText;
-    return {
-      hasVirus: all.includes('Virus'),
-      hasGearmulator: all.includes('Gearmulator') || all.includes('gearmulator'),
-      hasInit: all.includes('Initialize'),
-      textSample: all.substring(0, 500)
-    };
+  // Wait for Ready
+  let ready = false;
+  for (let i = 0; i < 30; i++) {
+    await new Promise(r => setTimeout(r, 1000));
+    const status = await page.evaluate(() => document.getElementById('initStatus')?.textContent || '');
+    if (status.includes('Ready') || status.includes('✓')) {
+      ready = true;
+      console.log(`Status: ${status}`);
+      break;
+    }
+    if (i % 5 === 0) console.log(`Waiting for init... (${i}s) status="${status}"`);
+  }
+
+  if (!ready) {
+    console.log('TIMEOUT waiting for Ready');
+    await browser.close();
+    process.exit(1);
+  }
+
+  console.log('DSP ready, waiting 5s...');
+  await new Promise(r => setTimeout(r, 5000));
+
+  // Send a note
+  console.log('Clicking Play C4...');
+  await page.click('#btnNote');
+
+  // Monitor for 20 seconds after note
+  let crashed = false;
+  for (let i = 0; i < 20; i++) {
+    await new Promise(r => setTimeout(r, 1000));
+  }
+
+  // Check for errors
+  const errors = await page.evaluate(() => {
+    const logEl = document.getElementById('log');
+    const lines = logEl ? logEl.textContent : '';
+    return lines.split('\n').filter(l =>
+      l.includes('error') || l.includes('Error') || l.includes('unwind') || l.includes('RuntimeError') || l.includes('CRASHED')
+    ).slice(0, 10);
   });
-  console.log('Page state:', JSON.stringify(hasGearmulator));
+
+  const sabInfo = await page.evaluate(() => {
+    const logEl = document.getElementById('log');
+    const lines = logEl ? logEl.textContent : '';
+    return lines.split('\n').filter(l => l.includes('SAB')).slice(-3);
+  });
+
+  if (errors.length > 0) {
+    console.log('ERRORS:');
+    errors.forEach(e => console.log('  ', e));
+    crashed = true;
+  } else {
+    console.log('No errors detected!');
+  }
+  console.log('SAB status:', sabInfo);
 
   await browser.close();
+  process.exit(crashed ? 1 : 0);
 })();
