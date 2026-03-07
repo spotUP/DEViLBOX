@@ -12,7 +12,7 @@
  *    Magic: "PSM\xFE" at offset 0.
  *    Used in older Epic MegaGames productions.
  *
- * Reference: Reference Code/openmpt-master/soundlib/Load_psm.cpp (authoritative)
+ * Reference: third-party/openmpt-master/soundlib/Load_psm.cpp (authoritative)
  *
  * ── New PSM layout ────────────────────────────────────────────────────────────
  *   PSMFileHeader (12 bytes):

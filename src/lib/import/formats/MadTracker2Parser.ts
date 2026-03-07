@@ -4,7 +4,7 @@
  * MadTracker 2 was a Windows tracker by Yannick Delwiche.
  * Files are identified by the 4-byte magic "MT20" at offset 0.
  *
- * Reference: Reference Code/openmpt-master/soundlib/Load_mt2.cpp (authoritative)
+ * Reference: third-party/openmpt-master/soundlib/Load_mt2.cpp (authoritative)
  *
  * File layout:
  *   MT2FileHeader (126 bytes):

@@ -29,6 +29,8 @@
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, ChannelData, TrackerCell, InstrumentConfig } from '@/types';
 import { createSamplerInstrument } from './AmigaUtils';
+import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
+import { encodeIMSCell } from '@/engine/uade/encoders/IMSEncoder';
 
 // ── Binary helpers ────────────────────────────────────────────────────────────
 
@@ -351,6 +353,17 @@ export async function parseIMSFile(
 
   // ── Assemble TrackerSong ───────────────────────────────────────────────────
 
+  const uadePatternLayout: UADEPatternLayout = {
+    formatId: 'ims',
+    patternDataFileOffset: HEADER_SIZE,
+    bytesPerCell: 3,
+    rowsPerPattern: ROWS_PER_PATTERN,
+    numChannels: NUM_CHANNELS,
+    numPatterns,
+    moduleSize: buffer.byteLength,
+    encodeCell: encodeIMSCell,
+  };
+
   return {
     name:            songName,
     format:          'MOD' as TrackerFormat,
@@ -363,5 +376,6 @@ export async function parseIMSFile(
     initialSpeed:    6,
     initialBPM:      125,
     linearPeriods:   false,
+    uadePatternLayout,
   };
 }

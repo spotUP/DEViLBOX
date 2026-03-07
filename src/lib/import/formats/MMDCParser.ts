@@ -16,7 +16,7 @@
  * Single-file format: packer wraps music data in a MMDC container.
  * Actual audio playback is delegated to UADE.
  *
- * Reference: Reference Code/uade-3.05/amigasrc/players/wanted_team/MMDC/src/MMDC_v3.asm
+ * Reference: third-party/uade-3.05/amigasrc/players/wanted_team/MMDC/src/MMDC_v3.asm
  */
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';

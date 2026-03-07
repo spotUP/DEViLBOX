@@ -166,6 +166,7 @@ function convertFurnaceInstrument(
     ams: furnaceData.fm?.ams ?? 0,
     ops: furnaceData.fm?.ops ?? 4,
     opllPreset: furnaceData.fm?.opllPreset ?? 0,
+    block: furnaceData.fm?.block ?? 0,
 
     // Operators (provide empty array if no FM)
     operators: furnaceData.fm?.operators?.map(op => ({
@@ -321,6 +322,58 @@ function convertFurnaceInstrument(
         modTable: [...fds.modTable],
         initModTableWithFirstWave: fds.initModTableWithFirstWave,
       };
+    }
+
+    // ES5506
+    if (cc.es5506) {
+      const es = cc.es5506 as { filter: { mode: number; k1: number; k2: number }; envelope: { ecount: number; lVRamp: number; rVRamp: number; k1Ramp: number; k2Ramp: number; k1Slow: boolean; k2Slow: boolean } };
+      furnaceConfig.es5506 = {
+        filter: { mode: es.filter.mode, k1: es.filter.k1, k2: es.filter.k2 },
+        envelope: { ...es.envelope },
+      };
+    }
+
+    // MultiPCM
+    if (cc.multipcm) {
+      const mp = cc.multipcm as { ar: number; d1r: number; dl: number; d2r: number; rr: number; rc: number; lfo: number; vib: number; am: number; damp: boolean; pseudoReverb: boolean; lfoReset: boolean; levelDirect: boolean };
+      furnaceConfig.multipcm = { ...mp };
+    }
+
+    // Sound Unit
+    if (cc.soundUnit) {
+      const su = cc.soundUnit as { switchRoles: boolean; hwSeqLen: number; hwSeq: Array<{ cmd: number; bound: number; val: number; speed: number }> };
+      furnaceConfig.soundUnit = {
+        switchRoles: su.switchRoles,
+        hwSeqLen: su.hwSeqLen,
+        hwSeq: su.hwSeq.map(e => ({ ...e })),
+      };
+    }
+
+    // ESFM
+    if (cc.esfm) {
+      const esfm = cc.esfm as { noise: number; operators: Array<{ delay: number; outLvl: number; modIn: number; left: number; right: number; fixed: number; ct: number; dt: number }> };
+      furnaceConfig.esfm = {
+        noise: esfm.noise,
+        operators: esfm.operators.map(op => ({
+          ...({} as import('../../types/instrument').FurnaceOperatorConfig),
+          enabled: true, mult: 0, tl: 0, ar: 0, dr: 0, d2r: 0, sl: 0, rr: 0, dt: op.dt,
+          delay: op.delay, outLvl: op.outLvl, modIn: op.modIn,
+          left: op.left !== 0, right: op.right !== 0,
+          ct: op.ct, fixed: op.fixed !== 0, fixedFreq: 0,
+        })),
+      };
+    }
+
+    // PowerNoise
+    if (cc.powerNoise) {
+      const pn = cc.powerNoise as { octave: number };
+      furnaceConfig.powerNoiseOctave = pn.octave;
+    }
+
+    // SID2
+    if (cc.sid2) {
+      const sid2 = cc.sid2 as { volume: number; mixMode: number; noiseMode: number };
+      furnaceConfig.sid2 = { ...sid2 };
     }
   }
 
@@ -571,7 +624,7 @@ function convertPCMToAudioBuffer(sample: ParsedSample): { audioBuffer: ArrayBuff
  * Create a WAV file directly from 16-bit samples
  * This bypasses OfflineAudioContext which has sample rate limitations
  */
-function createWavFile(samples: Int16Array, sampleRate: number, loopInfo?: { start: number; end: number }): ArrayBuffer {
+export function createWavFile(samples: Int16Array, sampleRate: number, loopInfo?: { start: number; end: number }): ArrayBuffer {
   const numberOfChannels = 1;
   const dataLength = samples.length * 2; // 16-bit = 2 bytes per sample
 
@@ -640,7 +693,7 @@ function createWavFile(samples: Int16Array, sampleRate: number, loopInfo?: { sta
 /**
  * Convert ArrayBuffer to base64 string
  */
-function arrayBufferToBase64(buffer: ArrayBuffer): string {
+export function arrayBufferToBase64(buffer: ArrayBuffer): string {
   const bytes = new Uint8Array(buffer);
   let binary = '';
   for (let i = 0; i < bytes.byteLength; i++) {

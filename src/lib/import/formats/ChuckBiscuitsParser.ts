@@ -48,6 +48,8 @@
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, ChannelData, TrackerCell, InstrumentConfig } from '@/types';
+import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
+import { encodeCBACell } from '@/engine/uade/encoders/ChuckBiscuitsEncoder';
 import { createSamplerInstrument } from './AmigaUtils';
 
 // ── Binary helpers ────────────────────────────────────────────────────────────
@@ -488,6 +490,17 @@ function _parse(bytes: Uint8Array, filename: string): TrackerSong | null {
   const songPositions = patterns.map((_, i) => i);
   const songName      = title.trim() || filename.replace(/\.[^/.]+$/, '');
 
+  const uadePatternLayout: UADEPatternLayout = {
+    formatId: 'chuckBiscuits',
+    patternDataFileOffset: patternDataOffset,
+    bytesPerCell: BYTES_PER_CELL,
+    rowsPerPattern: ROWS_PER_PATTERN,
+    numChannels,
+    numPatterns,
+    moduleSize: bytes.length,
+    encodeCell: encodeCBACell,
+  };
+
   return {
     name:            songName,
     format:          'MOD' as TrackerFormat,
@@ -500,5 +513,6 @@ function _parse(bytes: Uint8Array, filename: string): TrackerSong | null {
     initialSpeed:    speed,
     initialBPM:      tempo,
     linearPeriods:   false,
+    uadePatternLayout,
   };
 }

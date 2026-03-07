@@ -43,6 +43,8 @@ import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, TrackerCell, InstrumentConfig } from '@/types';
 import { createSamplerInstrument } from './AmigaUtils';
 import type { UADEChipRamInfo } from '@/types/instrument';
+import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
+import { encodeDSSCell } from '@/engine/uade/encoders/DSSEncoder';
 
 // ── Constants ──────────────────────────────────────────────────────────────
 
@@ -552,6 +554,17 @@ export function parseDigitalSoundStudioFile(bytes: Uint8Array, filename: string)
 
     const moduleName = filename.replace(/\.[^/.]+$/, '');
 
+    const uadePatternLayout: UADEPatternLayout = {
+      formatId: 'dss',
+      patternDataFileOffset: PATTERN_DATA_OFF,
+      bytesPerCell: BYTES_PER_CELL,
+      rowsPerPattern: ROWS_PER_PATTERN,
+      numChannels: CHANNELS,
+      numPatterns,
+      moduleSize: bytes.length,
+      encodeCell: encodeDSSCell,
+    };
+
     return {
       name: moduleName,
       format: 'DSS' as TrackerFormat,
@@ -564,6 +577,7 @@ export function parseDigitalSoundStudioFile(bytes: Uint8Array, filename: string)
       initialSpeed,
       initialBPM,
       linearPeriods: false,
+      uadePatternLayout,
     };
   } catch {
     return null;

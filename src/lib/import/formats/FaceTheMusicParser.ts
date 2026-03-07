@@ -53,7 +53,7 @@
  *     0     → no note change
  *
  * References:
- *   Reference Code/openmpt-master/soundlib/Load_ftm.cpp (primary)
+ *   third-party/openmpt-master/soundlib/Load_ftm.cpp (primary)
  *   thoughts/shared/research/nostalgicplayer/sources/FaceTheMusic/ (secondary)
  */
 

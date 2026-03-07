@@ -16,7 +16,7 @@
  * Single-file format: player code + music data in one binary.
  * Actual audio playback is delegated to UADE.
  *
- * Reference: Reference Code/uade-3.05/amigasrc/players/wanted_team/PSA/PSA_v2.asm
+ * Reference: third-party/uade-3.05/amigasrc/players/wanted_team/PSA/PSA_v2.asm
  */
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';

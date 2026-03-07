@@ -29,7 +29,7 @@
  * UADE handles actual audio playback. This parser extracts metadata only.
  *
  * Reference:
- *   Reference Code/uade-3.05/amigasrc/players/wanted_team/CustomMade/CustomMade_v1.asm
+ *   third-party/uade-3.05/amigasrc/players/wanted_team/CustomMade/CustomMade_v1.asm
  * Reference parsers: BenDaglishParser.ts, RonKlarenParser.ts
  */
 

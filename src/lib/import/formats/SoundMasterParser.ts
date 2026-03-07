@@ -24,7 +24,7 @@
  * blob. This parser extracts metadata only; UADE handles actual audio playback.
  *
  * Reference:
- *   Reference Code/uade-3.05/amigasrc/players/wanted_team/SoundMaster/Sound Master_v1.asm
+ *   third-party/uade-3.05/amigasrc/players/wanted_team/SoundMaster/Sound Master_v1.asm
  * Reference parsers: JeroenTelParser.ts, JasonPageParser.ts
  */
 

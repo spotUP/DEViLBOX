@@ -521,7 +521,7 @@ export interface NativeFormatExtendedMeta extends NativeFormatMeta {
 }
 
 /** SNDH / SC68 metadata — extract title, composer, year from SNDH tags or SC68 chunks */
-function sndhMeta(buf: Uint8Array): NativeFormatMeta {
+function sndhMeta(_buf: Uint8Array): NativeFormatMeta {
   // YM2149 always has 3 channels
   return { channels: 3, patterns: -1, orders: -1, instruments: -1, samples: -1 };
 }

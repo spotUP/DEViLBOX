@@ -68,6 +68,8 @@
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, ChannelData, TrackerCell, InstrumentConfig } from '@/types';
 import { createSamplerInstrument } from './AmigaUtils';
+import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
+import { encodeAMFCell } from '@/engine/uade/encoders/AMFEncoder';
 
 // ── Binary helpers ─────────────────────────────────────────────────────────────
 
@@ -350,6 +352,17 @@ function parseAsylumAMF(v: DataView, raw: Uint8Array, filename: string): Tracker
   const maxPat = Math.max(0, patterns.length - 1);
   const finalPositions = songPositions.map(p => Math.min(p, maxPat));
 
+  const uadePatternLayout: UADEPatternLayout = {
+    formatId: 'amf',
+    patternDataFileOffset: 2662,
+    bytesPerCell: 4,
+    rowsPerPattern: 64,
+    numChannels: NUM_CHANNELS,
+    numPatterns,
+    moduleSize: buffer.byteLength,
+    encodeCell: encodeAMFCell,
+  };
+
   return {
     name:            filename.replace(/\.[^/.]+$/i, ''),
     format:          'MOD' as TrackerFormat,
@@ -362,6 +375,7 @@ function parseAsylumAMF(v: DataView, raw: Uint8Array, filename: string): Tracker
     initialSpeed:    Math.max(1, defaultSpeed),
     initialBPM:      Math.max(1, defaultTempo),
     linearPeriods:   false,
+    uadePatternLayout,
   };
 }
 

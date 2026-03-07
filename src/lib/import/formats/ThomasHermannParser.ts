@@ -29,7 +29,7 @@
  * UADE handles actual audio playback. This parser extracts metadata only.
  *
  * References:
- *   Reference Code/uade-3.05/amigasrc/players/wanted_team/ThomasHermann/
+ *   third-party/uade-3.05/amigasrc/players/wanted_team/ThomasHermann/
  *     src/Thomas Hermann_v2.asm  (DTP_Check2 routine)
  */
 

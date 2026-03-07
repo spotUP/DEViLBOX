@@ -19,7 +19,7 @@
  * Single-file format: compiled 68k executable.
  * Actual audio playback is delegated to UADE.
  *
- * Reference: Reference Code/uade-3.05/amigasrc/players/wanted_team/FashionTracker-v1.0/FashionTracker.asm
+ * Reference: third-party/uade-3.05/amigasrc/players/wanted_team/FashionTracker-v1.0/FashionTracker.asm
  */
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
