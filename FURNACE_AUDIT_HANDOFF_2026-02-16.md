@@ -10,7 +10,7 @@
 
 **CRITICAL:** All implementations must match exactly:
 ```
-/Users/spot/Code/DEViLBOX/Reference Code/furnace-master/src/engine/
+/Users/spot/Code/DEViLBOX/third-party/furnace-master/src/engine/
 ```
 
 Key reference files:
@@ -404,10 +404,10 @@ Current state: **Compiles cleanly** after the 4 completed fixes.
 
 Search for patterns in Furnace source:
 ```bash
-grep -rn "PATTERN_HERE" "Reference Code/furnace-master/src/engine/"
+grep -rn "PATTERN_HERE" "third-party/furnace-master/src/engine/"
 ```
 
 Check specific reference file:
 ```bash
-cat "Reference Code/furnace-master/src/engine/playback.cpp" | head -100
+cat "third-party/furnace-master/src/engine/playback.cpp" | head -100
 ```

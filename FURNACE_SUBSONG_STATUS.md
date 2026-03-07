@@ -447,7 +447,7 @@ npm run type-check
 ## 📚 Reference Documentation
 
 ### Furnace Source Files
-Located in: `/Users/spot/Code/DEViLBOX/Reference Code/furnace-master/`
+Located in: `/Users/spot/Code/DEViLBOX/third-party/furnace-master/`
 
 **Relevant files:**
 - `src/engine/song.h` - SubSong structure (lines 187-250)

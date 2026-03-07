@@ -47,7 +47,7 @@ DEViLBOX now implements **~90-95%** of Furnace's feature set (up from 75-80%). W
 ## 1. Platform Coverage Gaps
 
 ### 1.1 Furnace Systems (113 total)
-Source: `Reference Code/furnace-master/src/engine/sysDef.h`
+Source: `third-party/furnace-master/src/engine/sysDef.h`
 
 **DEViLBOX FurnaceDispatchPlatform enum has ~85 entries** (src/engine/furnace-dispatch/FurnaceDispatchEngine.ts)
 
@@ -98,7 +98,7 @@ The following platforms from Furnace's `DivSystem` enum may be missing or incomp
 - BIFURCATOR (107)
 
 **Action Required:**
-- Read `Reference Code/furnace-master/src/engine/sysDef.cpp` completely
+- Read `third-party/furnace-master/src/engine/sysDef.cpp` completely
 - Extract channel definitions for each missing system
 - Add SystemPreset entries to systemPresets.ts for all missing platforms
 
@@ -210,7 +210,7 @@ The following platforms from Furnace's `DivSystem` enum may be missing or incomp
 ## 5. DIV_CMD Dispatch Coverage
 
 ### 5.1 Furnace DIV_CMD Inventory
-Source: `Reference Code/furnace-master/src/engine/dispatch.h` (lines 45-330)
+Source: `third-party/furnace-master/src/engine/dispatch.h` (lines 45-330)
 
 **Total Commands:** ~200+ DIV_CMD_* entries
 
@@ -505,7 +505,7 @@ Source: `src/engine/furnace-dispatch/FurnaceEffectRouter.ts`
    - Implements MacroState (doMacro, doSequence, doADSR, doLFO)
    - Implements MacroEngine with 20+ macro types (vol, arp, duty, wave, pitch, ex1-8, panL, panR)
    - Supports all 3 modes: SEQUENCE, ADSR, LFO
-   - Reference: `Reference Code/furnace-master/src/engine/macroInt.cpp`
+   - Reference: `third-party/furnace-master/src/engine/macroInt.cpp`
    
 2. ✅ **Integrate macros into TrackerReplayer** (Section 6)
    - Files modified: `src/engine/TrackerReplayer.ts`
@@ -609,7 +609,7 @@ Create test suite with Furnace songs that exercise:
 
 ## 16. References
 
-### Furnace Source Files (Reference Code/furnace-master/)
+### Furnace Source Files (third-party/furnace-master/)
 - `src/engine/sysDef.h` - Platform enum (113 systems)
 - `src/engine/sysDef.cpp` - System definitions (channel names, volume max, etc.)
 - `src/engine/dispatch.h` - DIV_CMD enum (200+ commands)

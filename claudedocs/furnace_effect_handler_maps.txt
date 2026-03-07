@@ -1,6 +1,6 @@
 FURNACE TRACKER - EFFECT HANDLER MAPS BY PLATFORM
 ===================================================
-Extracted from: Reference Code/furnace-master/src/engine/sysDef.cpp
+Extracted from: third-party/furnace-master/src/engine/sysDef.cpp
 Date: 2026-02-16
 
 KEY:

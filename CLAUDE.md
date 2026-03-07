@@ -116,9 +116,11 @@ const handleChange = useCallback((key, value) => {
 
 When debugging or implementing Furnace chip synths, instruments, or imports:
 
-1. **ALWAYS reference the Furnace tracker sources** at `/Users/spot/Code/DEViLBOX/Reference Code/furnace-master/`
+1. **ALWAYS reference the CLEAN upstream Furnace sources** at `/Users/spot/Code/Reference Code/furnace-master/`
    - Platform implementations: `src/engine/platform/` (e.g., `gb.cpp`, `nes.cpp`, `rf5c68.cpp`)
-   - WASM wrapper: `/Users/spot/Code/DEViLBOX/furnace-wasm/common/FurnaceDispatchWrapper.cpp`
+   - WASM wrapper (our code): `/Users/spot/Code/DEViLBOX/furnace-wasm/common/FurnaceDispatchWrapper.cpp`
+   - Build sources (may have local modifications): `/Users/spot/Code/DEViLBOX/third-party/furnace-master/`
+   - **NEVER read from `third-party/` as reference** — it may contain local modifications
 2. **NEVER guess** - Always reference the actual Furnace source code
 3. **Get proof/evidence** - Read the relevant platform file
 4. **Implement 1:1** - Match the Furnace source exactly, including:
@@ -128,7 +130,7 @@ When debugging or implementing Furnace chip synths, instruments, or imports:
    - Frequency calculations
    - Key-on/key-off sequences
 
-Reference code location: `/Users/spot/Code/DEViLBOX/Reference Code/furnace-master/src/engine/platform/`
+Reference code location: `/Users/spot/Code/Reference Code/furnace-master/src/engine/platform/`
 
 *** IMPORTANT ***
 
@@ -464,7 +466,7 @@ cd <module>/build && emcmake cmake .. && emmake make
 ### Critical Rules
 
 - **NEVER let an agent generate binary data arrays** (font bitmaps, sprite data). Always `cp` from reference:
-  - `cp "Reference Code/pt2-clone-master/src/gfx/pt2_gfx_font.c" pt2-sampled-wasm/src/`
+  - `cp "third-party/pt2-clone-master/src/gfx/pt2_gfx_font.c" pt2-sampled-wasm/src/`
   - Agent-generated binary data renders silently garbled (e.g., "FWk RACHT" instead of "ALL RIGHT")
 - `EM_JS` and `EMSCRIPTEN_KEEPALIVE` macros produce false IDE errors — they are NOT real build errors
 - Mouse `mouseup`/`mousemove` events go on `document`, not canvas, to handle drag-outside-canvas
@@ -484,12 +486,12 @@ dst[off] = src[off+2]; dst[off+1] = src[off+1]; dst[off+2] = src[off]; dst[off+3
 - Framebuffer: 320×255. Sampler occupies rows 121–254 (SAMPLER_Y=121, SAMPLER_H=134)
 - Output: `public/pt2/PT2SampEd.js` + `.wasm`
 - Config buffer: 11 bytes `[volume, finetune, loopStart(4 LE), loopLength(4 LE), loopType]`
-- Source: `pt2-sampled-wasm/src/` — extracted from `Reference Code/pt2-clone-master/`
+- Source: `pt2-sampled-wasm/src/` — extracted from `third-party/pt2-clone-master/`
 
 ### FT2 Module
 
 - Framebuffer: 632×400. Sample editor occupies most of the screen.
 - Output: `public/ft2/FT2SampEd.js` + `.wasm`
-- Source: `ft2-sampled-wasm/src/` — extracted from `Reference Code/fast tracker 2/`
+- Source: `ft2-sampled-wasm/src/` — extracted from `third-party/fast tracker 2/`
 
 ---

@@ -19,7 +19,7 @@ status: implemented
 - Result: Audio subsystem disabled, no output
 
 ## Fix Deployed
-Location: `Reference Code/gearmulator-main/source/virusLib/device.cpp:65-111`
+Location: `third-party/gearmulator-main/source/virusLib/device.cpp:65-111`
 ```cpp
 // After loading snapshot memory, re-apply ESAI registers
 esai.writeTransmitControlRegister(tcr);   // enables TX
