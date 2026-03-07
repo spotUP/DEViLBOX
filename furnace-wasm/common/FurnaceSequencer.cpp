@@ -2082,10 +2082,6 @@ static void seqProcessRow(int i, bool afterDelay) {
           HINT_PORTA(i, ch.portaNote, ch.portaSpeed);
         }
       } else if (!ch.noteOnInhibit) {
-        // PRE_NOTE for platforms that need it (C64/SID2)
-        if (getWantPreNote(g_seq.chanChipId[i])) {
-          dispatchCmd(DIV_CMD_PRE_NOTE, i, ch.note);
-        }
         dispatchCmd(DIV_CMD_NOTE_ON, i, ch.note, ch.volume >> 8);
         ch.releasing = false;
         ch.goneThroughNote = true;
@@ -2632,12 +2628,12 @@ static bool seqNextTick() {
           int portaResult = dispatchCmd(DIV_CMD_NOTE_PORTA, i, ch.portaSpeed * (linearPitch ? pitchSlideSpeed : 1), ch.portaNote);
           if (portaResult == 2 && ch.portaStop && COMPAT(SEQ_COMPAT_TARGET_RESETS_SLIDES)) {
             ch.portaSpeed = 0;
+            HINT_PORTA(i, ch.portaNote, ch.portaSpeed);
             ch.oldNote = ch.note;
             ch.note = ch.portaNote;
             ch.inPorta = false;
             dispatchCmd(DIV_CMD_LEGATO, i, ch.note);
             dispatchCmd(DIV_CMD_HINT_LEGATO, i, ch.note);
-            HINT_PORTA(i, ch.portaNote, ch.portaSpeed);
           }
         }
       }

@@ -1,0 +1,15 @@
+*.o
+*.so
+*.a
+*.dylib
+*.dSYM
+libuade.pc
+Makefile
+*~
+*#
+song.conf
+uade.conf
+build
+dist
+uade.egg-info
+__pycache__

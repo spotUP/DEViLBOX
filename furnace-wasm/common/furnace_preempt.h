@@ -242,7 +242,37 @@ public:
     return std::vector<String>(fallback);
   }
   const std::map<String,String>& configMap() { return conf; }
-  bool loadFromMemory(const char* buf) { return false; }
+  bool loadFromMemory(const char* buf) {
+    String line;
+    const char* readPos = buf;
+    while (*readPos) {
+      line += *readPos;
+      readPos++;
+      if ((*readPos) == '\n' || (*readPos) == 0) {
+        // parseLine inline
+        String key;
+        String value;
+        bool keyOrValue = false;
+        for (const char* c = line.c_str(); *c; c++) {
+          if (*c == '\r' || *c == '\n') continue;
+          if (keyOrValue) {
+            value += *c;
+          } else {
+            if (*c == '=') {
+              keyOrValue = true;
+            } else {
+              key += *c;
+            }
+          }
+        }
+        if (keyOrValue) {
+          conf[key] = value;
+        }
+        line = "";
+      }
+    }
+    return true;
+  }
   bool loadFromBase64(const char* buf) { return false; }
   bool loadFromFile(const char* path, bool createOnFail=true, bool redundancy=false) { return false; }
   String toString() { return ""; }
