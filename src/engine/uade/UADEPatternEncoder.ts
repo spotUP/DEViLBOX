@@ -45,13 +45,21 @@ export interface UADEPatternLayout {
    * Returns a Uint8Array of exactly `bytesPerCell` length.
    */
   encodeCell: (cell: TrackerCell) => Uint8Array;
+
+  /**
+   * Optional custom offset calculation for formats with non-standard layouts
+   * (e.g., track indirection, IFF chunks with per-pattern offsets).
+   * If provided, overrides the default row-major offset calculation.
+   * Returns the file byte offset for the given cell.
+   */
+  getCellFileOffset?: (pattern: number, row: number, channel: number) => number;
 }
 
 // ─── Cell Offset Calculation ──────────────────────────────────────────────────
 
 /**
  * Compute the file byte offset of a specific cell within the pattern data.
- * Assumes row-major layout: for each row, iterate all channels.
+ * Uses custom offset function if provided, otherwise assumes row-major layout.
  */
 export function getCellFileOffset(
   layout: UADEPatternLayout,
@@ -59,6 +67,9 @@ export function getCellFileOffset(
   row: number,
   channel: number,
 ): number {
+  if (layout.getCellFileOffset) {
+    return layout.getCellFileOffset(pattern, row, channel);
+  }
   const patternByteSize = layout.rowsPerPattern * layout.numChannels * layout.bytesPerCell;
   return layout.patternDataFileOffset
     + pattern * patternByteSize
