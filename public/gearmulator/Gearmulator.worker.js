@@ -44,7 +44,6 @@ let outputPtrR = 0;
 
 // DSP render loop interval
 let renderTimer = null;
-let renderDebugCounter = 0;
 
 // Catch unhandled errors
 self.onerror = function(e) {
@@ -141,13 +140,6 @@ self.onmessage = async function (e) {
 async function initSynth(data) {
   const { sampleRate: sr, wasmBinary, jsCode, romData, synthType, sab } = data;
 
-  console.log('[Gearmulator Worker] initSynth called', {
-    hasJsCode: !!jsCode, jsCodeLen: jsCode?.length,
-    hasWasmBinary: !!wasmBinary, wasmSize: wasmBinary?.byteLength,
-    hasRomData: !!romData, romSize: romData?.byteLength,
-    synthType, sampleRate: sr, hasSab: !!sab,
-  });
-
   if (!wasmBinary || !romData) {
     throw new Error('Missing wasmBinary or romData');
   }
@@ -162,9 +154,7 @@ async function initSynth(data) {
   // Load Emscripten JS directly from server URL so pthreads sub-workers
   // can re-load it using the same URL (mainScriptUrlOrBlob)
   const emscriptenUrl = '/gearmulator/gearmulator_wasm.js';
-  console.log('[Gearmulator Worker] importScripts from server URL...');
   importScripts(emscriptenUrl);
-  console.log('[Gearmulator Worker] importScripts done, typeof createGearmulator =', typeof createGearmulator);
 
   if (typeof createGearmulator !== 'function') {
     throw new Error('createGearmulator not found after importScripts — check Emscripten JS glue');
@@ -182,21 +172,16 @@ async function initSynth(data) {
     printErr: (text) => { if (!text.includes('TSMB') && !text.includes('ESSI')) console.warn('[EM]', text); },
   };
 
-  console.log('[Gearmulator Worker] Creating Emscripten module (await)...');
   module = await createGearmulator(config);
-  console.log('[Gearmulator Worker] Emscripten module READY');
 
   // Allocate render buffers in WASM heap
   outputPtrL = module._malloc(RENDER_BLOCK * 4);
   outputPtrR = module._malloc(RENDER_BLOCK * 4);
 
-  // Load ROM and create device
-  console.log('[Gearmulator Worker] Loading ROM into WASM heap...');
   const rom = new Uint8Array(romData);
   const romPtr = module._malloc(rom.length);
   module.HEAPU8.set(rom, romPtr);
 
-  console.log('[Gearmulator Worker] Creating device (type=' + synthType + ', sr=' + sr + ')...');
   handle = module._gm_create(romPtr, rom.length, synthType || 0, sr || 44100);
   module._free(romPtr);
 
@@ -205,27 +190,21 @@ async function initSynth(data) {
   }
 
   const valid = module._gm_isValid(handle);
-  console.log('[Gearmulator Worker] Device handle=' + handle + ', valid=' + valid);
   if (!valid) {
     throw new Error('Device created but not valid — check ROM data');
   }
 
   const actualRate = module._gm_getSamplerate(handle);
-  console.log(`[Gearmulator Worker] Device ready — handle=${handle}, sampleRate=${actualRate}, type=${synthType}`);
 
   // Reduce DSP clock for WASM interpreter performance
   // 10% → cyclesPerSample=115 (enough for ISR handlers, ~334Hz timer rate)
   // Lower values cause ESAI transmit underruns (ISR can't complete in time)
-  const clockPercent = 10;
-  module._gm_setDspClockPercent(handle, clockPercent);
-  console.log(`[Gearmulator Worker] DSP clock set to ${clockPercent}% (cyclesPerSample ~${Math.round(1152 * clockPercent / 100)})`);
+  module._gm_setDspClockPercent(handle, 100);
 
   initialized = true;
 
   self.postMessage({ type: 'ready', sampleRate: actualRate, handle: handle });
 
-  // Start rendering audio to SAB ring buffer
-  console.log('[Gearmulator Worker] Starting render loop...');
   startRenderLoop(actualRate);
 }
 
@@ -233,8 +212,6 @@ function startRenderLoop(sampleRate) {
   // Use blocking gm_process() — the standard Device::process() path that handles
   // all DSP thread synchronization internally. Render small chunks with setTimeout
   // to let the worker event loop breathe for message handling.
-  console.log('[Gearmulator Worker] Starting blocking render loop (gm_process)...');
-
   function renderTick() {
     if (!initialized || handle < 0 || !module || disposed) return;
     fillRingBuffer();
@@ -263,18 +240,6 @@ function fillRingBuffer() {
     const heapF32 = module.HEAPF32;
     const offL = outputPtrL >> 2;
     const offR = outputPtrR >> 2;
-
-    // Debug: log peak every 500 blocks
-    if (renderDebugCounter++ % 500 === 0) {
-      let peak = 0;
-      for (let i = 0; i < RENDER_BLOCK; i++) {
-        const v = Math.abs(heapF32[offL + i]);
-        if (v > peak) peak = v;
-        const vr = Math.abs(heapF32[offR + i]);
-        if (vr > peak) peak = vr;
-      }
-      console.log(`[Gearmulator Worker] render #${renderDebugCounter}: peak=${peak.toFixed(6)}, writePos=${writePos}, used=${used}, free=${free}`);
-    }
 
     // Write interleaved L/R into ring buffer
     const audioOffset = HEADER_INTS;
@@ -330,9 +295,6 @@ function fillRingBufferNonBlocking() {
     free -= read;
   }
 
-  if (renderDebugCounter++ % 500 === 0) {
-    console.log(`[Gearmulator Worker NB] pushed=${pushed}, pulled=${totalRead}, writePos=${writePos}, free=${free}`);
-  }
 }
 
 function dispose() {

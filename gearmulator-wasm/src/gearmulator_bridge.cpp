@@ -23,6 +23,8 @@
 #include "synthLib/audioTypes.h"
 #include "synthLib/midiTypes.h"
 #include "dsp56kEmu/audio.h"
+#include "dsp56kEmu/dsp.h"
+#include "virusLib/dspSingle.h"
 
 // Synth-specific device headers
 #include "virusLib/device.h"
@@ -191,27 +193,9 @@ EXPORT void gm_process(int32_t handle, float* outputL, float* outputR, uint32_t 
         nullptr, nullptr
     };
 
-    size_t midiCount = gm.midiIn.size();
     gm.midiOut.clear();
     gm.device->process(inputs, outputs, numSamples, gm.midiIn, gm.midiOut);
     gm.midiIn.clear();
-
-    // Minimal diagnostic: only first 5 calls and MIDI events (printf is expensive in WASM)
-    static int callCount = 0;
-    ++callCount;
-    if (callCount <= 5 || midiCount > 0)
-    {
-        float peak = 0.0f;
-        for (uint32_t i = 0; i < numSamples; ++i)
-        {
-            float v = outputL[i] < 0 ? -outputL[i] : outputL[i];
-            if (v > peak) peak = v;
-            v = outputR[i] < 0 ? -outputR[i] : outputR[i];
-            if (v > peak) peak = v;
-        }
-        printf("[EM] gm_process #%d: peak=%.6f, midiIn=%zu, midiOut=%zu\n",
-            callCount, peak, midiCount, gm.midiOut.size());
-    }
 }
 
 /**
@@ -423,9 +407,7 @@ EXPORT int32_t gm_getAudioOutputSize(int32_t handle)
         return -1;
     auto* virusDev = dynamic_cast<virusLib::Device*>(g_devices[handle]->device.get());
     if (!virusDev) return -2;
-    auto size = static_cast<int32_t>(virusDev->getDSP()->getAudio().getAudioOutputs().size());
-    printf("[EM] gm_getAudioOutputSize: %d samples in queue\n", size);
-    return size;
+    return static_cast<int32_t>(virusDev->getDSP()->getAudio().getAudioOutputs().size());
 }
 
 /**
@@ -437,9 +419,7 @@ EXPORT int32_t gm_getAudioInputSize(int32_t handle)
         return -1;
     auto* virusDev = dynamic_cast<virusLib::Device*>(g_devices[handle]->device.get());
     if (!virusDev) return -2;
-    auto size = static_cast<int32_t>(virusDev->getDSP()->getAudio().getAudioInputs().size());
-    printf("[EM] gm_getAudioInputSize: %d samples in queue\n", size);
-    return size;
+    return static_cast<int32_t>(virusDev->getDSP()->getAudio().getAudioInputs().size());
 }
 
 } // extern "C"

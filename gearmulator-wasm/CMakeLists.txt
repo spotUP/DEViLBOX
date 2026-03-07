@@ -146,6 +146,7 @@ set(MC68K_SRC
     "${GM_SRC}/mc68k/gpt.cpp"
     "${GM_SRC}/mc68k/port.cpp"
     "${GM_SRC}/mc68k/peripheralBase.cpp"
+    "${GM_SRC}/mc68k/hdi08.cpp"
     "${GM_SRC}/mc68k/Musashi/m68kcpu.c"
     "${GM_SRC}/mc68k/Musashi/m68kdasm.c"
     "${GM_SRC}/mc68k/Musashi/m68kfpu.c"
@@ -240,16 +241,16 @@ endif()
 add_executable(gearmulator_wasm src/gearmulator_bridge.cpp)
 
 if(EMSCRIPTEN)
-    # Build Virus only for now — other synths with mc68k have duplicate symbol conflicts
-    # (each synth defines global m68k_read/write callbacks for Musashi, can't coexist in one binary)
+    # Virus + one Musashi-based synth per binary (Musashi callbacks are extern "C"
+    # with link-time specialization via MC68K_CLASS — can't link multiple synth libs
+    # that each include musashiEntry.h). XT and Nord would need separate WASM binaries.
     target_link_libraries(gearmulator_wasm PRIVATE
-        virusLib
+        virusLib mqLib wLib
         synthLib hardwareLib baseLib dsp56kEmu dsp56kBase
         mc68k asmjit libresample
     )
     target_compile_definitions(gearmulator_wasm PRIVATE
         GM_NO_JP8000=1
-        GM_NO_WALDORF_MQ=1
         GM_NO_WALDORF_XT=1
         GM_NO_NORD=1
     )
@@ -271,10 +272,8 @@ if(EMSCRIPTEN)
             -s EXPORTED_RUNTIME_METHODS='[\"ccall\",\"cwrap\",\"HEAPF32\",\"HEAP8\",\"HEAPU8\"]' \
             -s ALLOW_MEMORY_GROWTH=1 \
             -s ALLOW_TABLE_GROWTH=1 \
-            -s INITIAL_MEMORY=268435456 \
+            -s INITIAL_MEMORY=67108864 \
             -s MAXIMUM_MEMORY=536870912 \
-            -s DISABLE_EXCEPTION_CATCHING=0 \
-            -s ASSERTIONS=1 \
             -s PTHREAD_POOL_SIZE=4 \
             -s WASM=1 \
             -pthread \
