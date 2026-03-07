@@ -1829,8 +1829,8 @@ void furnace_dispatch_tick(int handle) {
     }
   }
 
-  // Standard dispatch tick
-  inst->dispatch->tick(false);
+  // Standard dispatch tick (sysTick=true: every tick is a real tick in WASM, no sub-ticks)
+  inst->dispatch->tick(true);
 }
 
 /**
