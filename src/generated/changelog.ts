@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-03-08T11:35:33.477Z
+ * Generated: 2026-03-08T11:57:57.126Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.2573';
-export const BUILD_NUMBER = '2573';
-export const BUILD_HASH = 'dae8986cb';
+export const BUILD_VERSION = '1.0.2580';
+export const BUILD_NUMBER = '2580';
+export const BUILD_HASH = 'c0adabbce';
 export const BUILD_DATE = '2026-03-08';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,37 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.2573',
+    version: '1.0.2580',
     date: '2026-03-08',
     changes: [
+      {
+        type: 'feature',
+        "description": "Integrate ArtOfNoise/PumaTracker engines and debounced WASM re-export"
+      },
+      {
+        type: 'feature',
+        "description": "Add Digital Symphony and PumaTracker native format exporters"
+      },
+      {
+        type: 'improvement',
+        "description": "Chore: update Gearmulator WASM bridge and snapshot dumper"
+      },
+      {
+        type: 'feature',
+        "description": "Update Furnace dispatch wrapper, sequencer, and effect router"
+      },
+      {
+        type: 'feature',
+        "description": "Add ArtOfNoise and PumaTracker WASM engines"
+      },
+      {
+        type: 'feature',
+        "description": "Add UADE pattern encoders for 30 formats and uadePatternLayout support"
+      },
+      {
+        type: 'fix',
+        "description": "Resolve build errors and remove regression tests from dev.sh"
+      },
       {
         type: 'fix',
         "description": "Resolve TypeScript errors in MCP bridge handlers and SonicArrangerEncoder"
@@ -206,34 +234,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'feature',
         "description": "Update FurnaceEditor, MixerPanel, and StudioCanvasView"
-      },
-      {
-        type: 'improvement',
-        "description": "Add synth-controls-flow class to all instrument control panels"
-      },
-      {
-        type: 'improvement',
-        "description": "Add debug investigation notes and test scripts"
-      },
-      {
-        type: 'feature',
-        "description": "Chore: add sonix-wasm/build to .gitignore"
-      },
-      {
-        type: 'feature',
-        "description": "Chore: rebuild gearmulator WASM and add test helpers"
-      },
-      {
-        type: 'feature',
-        "description": "Add Sonix WASM engine (transpiled 68k replayer)"
-      },
-      {
-        type: 'feature',
-        "description": "Enhance StudioCanvasView and TrackerReplayer"
-      },
-      {
-        type: 'fix',
-        "description": "Improve JamCracker controls layout"
       }
     ]
   }
