@@ -497,6 +497,32 @@ const VOL_SETPITCH  = 248;
  * Also calls parseSymphonieForPlayback() to attach SymphoniePlaybackData to
  * the first instrument so InstrumentFactory can instantiate SymphonieSynth.
  */
+/** Convert Float32Array PCM to a minimal mono WAV ArrayBuffer */
+function float32ToWav(samples: Float32Array, sampleRate: number): ArrayBuffer {
+  const numSamples = samples.length;
+  const buffer = new ArrayBuffer(44 + numSamples * 2);
+  const view = new DataView(buffer);
+  const writeStr = (off: number, s: string) => { for (let i = 0; i < s.length; i++) view.setUint8(off + i, s.charCodeAt(i)); };
+  writeStr(0, 'RIFF');
+  view.setUint32(4, 36 + numSamples * 2, true);
+  writeStr(8, 'WAVE');
+  writeStr(12, 'fmt ');
+  view.setUint32(16, 16, true);       // chunk size
+  view.setUint16(20, 1, true);        // PCM
+  view.setUint16(22, 1, true);        // mono
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * 2, true); // byte rate
+  view.setUint16(32, 2, true);        // block align
+  view.setUint16(34, 16, true);       // bits per sample
+  writeStr(36, 'data');
+  view.setUint32(40, numSamples * 2, true);
+  for (let i = 0; i < numSamples; i++) {
+    const s = Math.max(-1, Math.min(1, samples[i]));
+    view.setInt16(44 + i * 2, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+  }
+  return buffer;
+}
+
 export async function parseSymphonieProFile(
   bytes: Uint8Array,
   filename: string,
@@ -508,13 +534,38 @@ export async function parseSymphonieProFile(
     // Store original file data for export
     song.symphonieFileData = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
 
-    // Attach playback data to the first instrument so InstrumentFactory
-    // can instantiate SymphonieSynth for native playback.
+    // Parse playback data (decoded instruments + patterns) for the AudioWorklet engine
     try {
       const playbackData = await parseSymphonieForPlayback(bytes.buffer as ArrayBuffer, filename);
+
+      // Attach playback data to the first instrument so InstrumentFactory
+      // can instantiate SymphonieSynth for native playback.
       if (song.instruments.length > 0) {
         (song.instruments[0] as unknown as Record<string, unknown>)['synthType'] = 'SymphonieSynth';
         (song.instruments[0] as unknown as Record<string, unknown>)['symphonie'] = playbackData;
+      }
+
+      // Populate each instrument with its decoded PCM sample data so instruments
+      // display properly in the instrument list with waveforms and metadata.
+      for (let i = 0; i < playbackData.instruments.length && i < song.instruments.length; i++) {
+        const si = playbackData.instruments[i];
+        const inst = song.instruments[i] as unknown as Record<string, unknown>;
+        if (si.samples && si.samples.length > 0) {
+          const sampleRate = si.sampledFrequency > 0 ? si.sampledFrequency : 8363;
+          // Convert Float32Array to mono WAV ArrayBuffer for the instrument's audioBuffer
+          inst['sample'] = {
+            audioBuffer: float32ToWav(si.samples, sampleRate),
+            sampleRate,
+            baseNote: 48 + si.tune, // C-4 + tune offset
+            loop: si.type === 4 || si.type === 8, // Loop or Sustain
+            loopType: si.type === 4 ? 'forward' : (si.type === 8 ? 'forward' : 'off'),
+            // Loop points: Symphonie uses percentage × 65536 encoding
+            loopStart: Math.floor((si.loopStart / (100 * 65536)) * si.samples.length),
+            loopEnd: Math.floor(((si.loopStart + si.loopLen) / (100 * 65536)) * si.samples.length),
+          };
+          inst['name'] = si.name || `Instrument ${i + 1}`;
+          inst['volume'] = si.volume > 0 ? -12 + (si.volume / 100) * 12 : -60;
+        }
       }
     } catch (err) {
       console.warn('[SymphonieProParser] parseSymphonieForPlayback failed; playback will be silent:', err);
