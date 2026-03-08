@@ -37,7 +37,8 @@ export type PlatformFamily =
   | 'fm_opn2'    // YM2612 (Genesis/Mega Drive) — fmOPN2PostEffectHandlerMap
   | 'fm_opn'     // YM2203, YM2608, YM2610 (with AY PSG) — fmOPNPostEffectHandlerMap
   | 'fm_opm'     // YM2151, TX81Z (Arcade) — fmOPMPostEffectHandlerMap
-  | 'fm_opl'     // OPL, OPL2, OPL3, ESFM — fmOPLPostEffectHandlerMap
+  | 'fm_opl'     // OPL, OPL2, OPL3 — fmOPLPostEffectHandlerMap
+  | 'fm_esfm'    // ESFM — fmESFMPostEffectHandlerMap
   | 'fm_opll'    // OPLL, VRC7 — fmOPLLPostEffectHandlerMap
   | 'psg'        // AY-3-8910, AY8930 — ayPostEffectHandlerMap
   | 'sms'        // SN76489, T6W28
@@ -111,7 +112,7 @@ export function getPlatformFamily(platform: number): PlatformFamily {
     case FurnaceDispatchPlatform.Y8950:
     case FurnaceDispatchPlatform.Y8950_DRUMS:
     case FurnaceDispatchPlatform.ESFM:
-      return 'fm_opl';
+      return 'fm_esfm';
 
     // FM OPLL
     case FurnaceDispatchPlatform.OPLL:
@@ -345,25 +346,42 @@ export class FurnaceEffectRouter {
 
       case 0x05: // Vibrato + volume slide
         commands.push({ cmd: DivCmd.HINT_VIBRATO, chan, val1: 0, val2: 0 });
-        commands.push({ cmd: DivCmd.HINT_VOL_SLIDE, chan, val1: x, val2: y });
+        // Upstream: volSpeed = y!=0 ? -(y*64) : x*64 (playback.cpp:1120-1124)
+        if (param !== 0) {
+          const volSpeed = y !== 0 ? -(y * 64) : x * 64;
+          commands.push({ cmd: DivCmd.HINT_VOL_SLIDE, chan, val1: volSpeed, val2: 0 });
+        }
         break;
 
       case 0x06: // Portamento + volume slide
         commands.push({ cmd: DivCmd.HINT_PORTA, chan, val1: 0, val2: 0 });
-        commands.push({ cmd: DivCmd.HINT_VOL_SLIDE, chan, val1: x, val2: y });
+        if (param !== 0) {
+          const volSpeed = y !== 0 ? -(y * 64) : x * 64;
+          commands.push({ cmd: DivCmd.HINT_VOL_SLIDE, chan, val1: volSpeed, val2: 0 });
+        }
         break;
 
       case 0x07: // Tremolo
         commands.push({ cmd: DivCmd.HINT_TREMOLO, chan, val1: x, val2: y });
         break;
 
-      case 0x08: // Panning
-        commands.push({ cmd: DivCmd.PANNING, chan, val1: param, val2: param });
-        commands.push({ cmd: DivCmd.HINT_PANNING, chan, val1: param, val2: param });
+      case 0x08: // Panning (split 4-bit: high nibble = left, low nibble = right)
+        // Upstream: panL = (val>>4)|(val&0xf0), panR = (val&15)|((val&15)<<4)
+        // Maps 0-F nibble to 0x00, 0x11, 0x22, ... 0xFF
+        {
+          const panL = (param >> 4) | (param & 0xf0);
+          const panR = (param & 15) | ((param & 15) << 4);
+          commands.push({ cmd: DivCmd.PANNING, chan, val1: panL, val2: panR });
+          commands.push({ cmd: DivCmd.HINT_PANNING, chan, val1: panL, val2: panR });
+        }
         break;
 
       case 0x0A: // Volume slide
-        commands.push({ cmd: DivCmd.HINT_VOL_SLIDE, chan, val1: x, val2: y });
+        // Upstream: volSpeed = y!=0 ? -(y*64) : x*64 (playback.cpp:1206-1211)
+        if (param !== 0) {
+          const volSpeed = y !== 0 ? -(y * 64) : x * 64;
+          commands.push({ cmd: DivCmd.HINT_VOL_SLIDE, chan, val1: volSpeed, val2: 0 });
+        }
         break;
 
       case 0x0B: // Position jump — handled by sequencer, no chip dispatch
@@ -377,9 +395,9 @@ export class FurnaceEffectRouter {
       case 0x0D: // Pattern break — handled by sequencer, no chip dispatch
         break;
 
-      case 0x0E: // Extended effects (Exy)
-        commands.push(...this.routeExtendedEffect(this.platformType, chan, x, y));
-        break;
+      // Note: 0x0E is NOT used in Furnace (no MOD-style Exy sub-effects).
+      // Effects like E1y, EAy etc. don't exist in Furnace's effect space.
+      // The routeExtendedEffect() method exists for explicit API callers only.
 
       // Platform-specific effects (0x10+)
       default:
@@ -418,11 +436,11 @@ export class FurnaceEffectRouter {
       case 0x9: // E9y - Retrigger note
         commands.push({ cmd: DivCmd.NOTE_ON, chan, val1: -1, val2: y });
         break;
-      case 0xA: // EAy - Fine volume slide up
+      case 0xA: // EAy - Fine volume slide up (no ×64 multiplier)
         commands.push({ cmd: DivCmd.HINT_VOL_SLIDE, chan, val1: y, val2: 0 });
         break;
-      case 0xB: // EBy - Fine volume slide down
-        commands.push({ cmd: DivCmd.HINT_VOL_SLIDE, chan, val1: 0, val2: y });
+      case 0xB: // EBy - Fine volume slide down (no ×64 multiplier)
+        commands.push({ cmd: DivCmd.HINT_VOL_SLIDE, chan, val1: -y, val2: 0 });
         break;
       case 0xC: // ECy - Note cut after y ticks
         commands.push({ cmd: DivCmd.NOTE_OFF, chan, val1: y, val2: 0 });
@@ -452,6 +470,7 @@ export class FurnaceEffectRouter {
       case 'fm_opn':   return this.routeOPNEffect(chan, effect, param);
       case 'fm_opm':   return this.routeOPMEffect(chan, effect, param);
       case 'fm_opl':   return this.routeOPLEffect(chan, effect, param);
+      case 'fm_esfm':  return this.routeESFMEffect(chan, effect, param);
       case 'fm_opll':  return this.routeOPLLEffect(chan, effect, param);
       case 'psg':      return this.routePSGEffect(chan, effect, param);
       case 'sms':      return this.routeSMSEffect(chan, effect, param);
@@ -881,6 +900,146 @@ export class FurnaceEffectRouter {
       default:
         // Base FM effects (excluding OPL-overridden codes which are handled above)
         commands.push(...this.routeBaseFMEffect(chan, effect, param));
+        break;
+    }
+
+    return commands;
+  }
+
+  /**
+   * ESFM (ESS ES1xxx series)
+   * Has its own effect map distinct from OPL (upstream: fmESFMPostEffectHandlerMap in sysDef.cpp)
+   */
+  private routeESFMEffect(chan: number, effect: number, param: number): DispatchCommand[] {
+    const commands: DispatchCommand[] = [];
+    const op = (param >> 4);
+    const val = param & 0x0F;
+
+    switch (effect) {
+      // Pre-effects (shared with FM)
+      case 0x2e:
+        commands.push({ cmd: DivCmd.FM_HARD_RESET, chan, val1: param, val2: 0 });
+        break;
+
+      // ESFM-specific post-effects
+      case 0x10: { // AM depth (x: op 1-4 or 0=all; y: depth 0/1)
+        const amOp = op === 0 ? -1 : op - 1;
+        commands.push({ cmd: DivCmd.FM_AM_DEPTH, chan, val1: amOp, val2: val & 1 });
+        break;
+      }
+      case 0x12: commands.push({ cmd: DivCmd.FM_TL, chan, val1: 0, val2: param }); break;
+      case 0x13: commands.push({ cmd: DivCmd.FM_TL, chan, val1: 1, val2: param }); break;
+      case 0x14: commands.push({ cmd: DivCmd.FM_TL, chan, val1: 2, val2: param }); break;
+      case 0x15: commands.push({ cmd: DivCmd.FM_TL, chan, val1: 3, val2: param }); break;
+      case 0x16: { // Set multiplier (x: op 1-4; y: mult)
+        if (op >= 1 && op <= 4) {
+          commands.push({ cmd: DivCmd.FM_MULT, chan, val1: op - 1, val2: val });
+        }
+        break;
+      }
+      case 0x17: { // Vibrato depth (x: op 1-4 or 0=all; y: depth 0/1)
+        const vibOp = op === 0 ? -1 : op - 1;
+        commands.push({ cmd: DivCmd.FM_PM_DEPTH, chan, val1: vibOp, val2: val & 1 });
+        break;
+      }
+      case 0x19: commands.push({ cmd: DivCmd.FM_AR, chan, val1: -1, val2: param & 0x0F }); break;
+      case 0x1a: commands.push({ cmd: DivCmd.FM_AR, chan, val1: 0, val2: param & 0x0F }); break;
+      case 0x1b: commands.push({ cmd: DivCmd.FM_AR, chan, val1: 1, val2: param & 0x0F }); break;
+      case 0x1c: commands.push({ cmd: DivCmd.FM_AR, chan, val1: 2, val2: param & 0x0F }); break;
+      case 0x1d: commands.push({ cmd: DivCmd.FM_AR, chan, val1: 3, val2: param & 0x0F }); break;
+
+      // ESFM-unique: operator panning
+      case 0x20: commands.push({ cmd: DivCmd.ESFM_OP_PANNING, chan, val1: 0, val2: param }); break;
+      case 0x21: commands.push({ cmd: DivCmd.ESFM_OP_PANNING, chan, val1: 1, val2: param }); break;
+      case 0x22: commands.push({ cmd: DivCmd.ESFM_OP_PANNING, chan, val1: 2, val2: param }); break;
+      case 0x23: commands.push({ cmd: DivCmd.ESFM_OP_PANNING, chan, val1: 3, val2: param }); break;
+
+      // ESFM-unique: output level, mod input, envelope delay
+      case 0x24: { // Output level (x: op 1-4 or 0=all; y: level 0-7)
+        const olOp = op === 0 ? -1 : op - 1;
+        commands.push({ cmd: DivCmd.ESFM_OUTLVL, chan, val1: olOp, val2: val & 7 });
+        break;
+      }
+      case 0x25: { // Modulation input level (x: op 1-4 or 0=all; y: level 0-7)
+        const miOp = op === 0 ? -1 : op - 1;
+        commands.push({ cmd: DivCmd.ESFM_MODIN, chan, val1: miOp, val2: val & 7 });
+        break;
+      }
+      case 0x26: { // Envelope delay (x: op 1-4 or 0=all; y: delay 0-7)
+        const edOp = op === 0 ? -1 : op - 1;
+        commands.push({ cmd: DivCmd.ESFM_ENV_DELAY, chan, val1: edOp, val2: val & 7 });
+        break;
+      }
+      case 0x27: // Noise mode for operator 4
+        commands.push({ cmd: DivCmd.STD_NOISE_MODE, chan, val1: param & 3, val2: 0 });
+        break;
+      case 0x2a: { // Waveform select (x: op 1-4 or 0=all; y: wave 0-7)
+        const wsOp = op === 0 ? -1 : op - 1;
+        commands.push({ cmd: DivCmd.FM_WS, chan, val1: wsOp, val2: val & 7 });
+        break;
+      }
+      case 0x2f: { // Fixed frequency block (x: op 1-4; y: octave 0-7)
+        if (op >= 1 && op <= 4) {
+          commands.push({ cmd: DivCmd.FM_FIXFREQ, chan, val1: op - 1, val2: val & 7 });
+        }
+        break;
+      }
+
+      // Detune (per-operator)
+      case 0x40: commands.push({ cmd: DivCmd.FM_DT, chan, val1: 0, val2: param }); break;
+      case 0x41: commands.push({ cmd: DivCmd.FM_DT, chan, val1: 1, val2: param }); break;
+      case 0x42: commands.push({ cmd: DivCmd.FM_DT, chan, val1: 2, val2: param }); break;
+      case 0x43: commands.push({ cmd: DivCmd.FM_DT, chan, val1: 3, val2: param }); break;
+
+      // Shared FM operator effects
+      case 0x50: { // AM (x: op 1-4 or 0=all; y: enabled)
+        const amOp2 = op === 0 ? -1 : op - 1;
+        commands.push({ cmd: DivCmd.FM_AM, chan, val1: amOp2, val2: val & 1 });
+        break;
+      }
+      case 0x51: { // Sustain level
+        const slOp = op === 0 ? -1 : op - 1;
+        commands.push({ cmd: DivCmd.FM_SL, chan, val1: slOp, val2: val });
+        break;
+      }
+      case 0x52: { // Release
+        const rrOp = op === 0 ? -1 : op - 1;
+        commands.push({ cmd: DivCmd.FM_RR, chan, val1: rrOp, val2: val });
+        break;
+      }
+      case 0x53: { // Vibrato
+        const vibOp2 = op === 0 ? -1 : op - 1;
+        commands.push({ cmd: DivCmd.FM_VIB, chan, val1: vibOp2, val2: val & 1 });
+        break;
+      }
+      case 0x54: { // Envelope scale
+        const rsOp = op === 0 ? -1 : op - 1;
+        commands.push({ cmd: DivCmd.FM_RS, chan, val1: rsOp, val2: val & 3 });
+        break;
+      }
+      case 0x55: { // Envelope sustain
+        const susOp = op === 0 ? -1 : op - 1;
+        commands.push({ cmd: DivCmd.FM_SUS, chan, val1: susOp, val2: val & 1 });
+        break;
+      }
+      case 0x56: commands.push({ cmd: DivCmd.FM_DR, chan, val1: -1, val2: param & 0x0F }); break;
+      case 0x57: commands.push({ cmd: DivCmd.FM_DR, chan, val1: 0, val2: param & 0x0F }); break;
+      case 0x58: commands.push({ cmd: DivCmd.FM_DR, chan, val1: 1, val2: param & 0x0F }); break;
+      case 0x59: commands.push({ cmd: DivCmd.FM_DR, chan, val1: 2, val2: param & 0x0F }); break;
+      case 0x5a: commands.push({ cmd: DivCmd.FM_DR, chan, val1: 3, val2: param & 0x0F }); break;
+      case 0x5b: { // KSR
+        const ksrOp = op === 0 ? -1 : op - 1;
+        commands.push({ cmd: DivCmd.FM_KSR, chan, val1: ksrOp, val2: val & 1 });
+        break;
+      }
+
+      // Fixed frequency F-num (0x30-0x3F)
+      default:
+        if (effect >= 0x30 && effect <= 0x3f) {
+          const fOp = Math.floor((effect - 0x30) / 4) + 4; // op offset 4-7 for F-num
+          const fVal = ((effect - 0x30) % 4) << 8 | param; // 10-bit value
+          commands.push({ cmd: DivCmd.FM_FIXFREQ, chan, val1: fOp, val2: fVal });
+        }
         break;
     }
 
