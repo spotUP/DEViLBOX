@@ -3000,6 +3000,16 @@ bool furnace_seq_is_playing(void) {
 }
 
 EMSCRIPTEN_KEEPALIVE
+void furnace_seq_set_remaining_loops(int loops) {
+  g_seq.remainingLoops = loops;
+}
+
+EMSCRIPTEN_KEEPALIVE
+int furnace_seq_get_total_loops(void) {
+  return g_seq.totalLoops;
+}
+
+EMSCRIPTEN_KEEPALIVE
 bool furnace_seq_get_key_hit(int channel) {
   if (channel < 0 || channel >= SEQ_MAX_CHANNELS) return false;
   return g_seq.keyHit[channel];
