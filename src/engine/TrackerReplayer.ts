@@ -1276,6 +1276,23 @@ export class TrackerReplayer {
           }
         }
 
+        // Pre-upload ALL instruments to the global WASM table before sequencer starts.
+        // The sequencer references instruments by index (0, 1, 2...) via DIV_CMD_INSTRUMENT.
+        // Each instrument must be in the global table or the dispatch returns a default (silence).
+        if (this.song.instruments.length > 0) {
+          let uploaded = 0;
+          for (let i = 0; i < this.song.instruments.length; i++) {
+            const inst = this.song.instruments[i];
+            const rawData = inst.rawBinaryData;
+            if (rawData && rawData.length > 4 &&
+                rawData[0] === 0x49 && rawData[1] === 0x4E && rawData[2] === 0x53 && rawData[3] === 0x32) {
+              dispatchEngine.loadIns2(i, rawData instanceof Uint8Array ? rawData : new Uint8Array(rawData));
+              uploaded++;
+            }
+          }
+          console.log(`[TrackerReplayer] WASM seq: pre-uploaded ${uploaded}/${this.song.instruments.length} instruments via INS2`);
+        }
+
         // Upload song data to the WASM sequencer in the worklet
         console.log('[TrackerReplayer] WASM seq: uploading song data...');
         const { uploadFurnaceToSequencer } = await import('@/lib/export/FurnaceSequencerSerializer');
