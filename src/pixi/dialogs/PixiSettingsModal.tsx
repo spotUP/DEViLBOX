@@ -8,7 +8,7 @@
  */
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import type { FederatedPointerEvent, Graphics as GraphicsType } from 'pixi.js';
+import type { FederatedPointerEvent, FederatedWheelEvent, Graphics as GraphicsType } from 'pixi.js';
 import { useApplication } from '@pixi/react';
 import { PixiButton, PixiCheckbox, PixiSlider, PixiNumericInput, PixiIcon } from '../components';
 import { PixiSelect, type SelectOption } from '../components/PixiSelect';
@@ -394,11 +394,15 @@ export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, on
 
   const handleOverlayClick = (_e: FederatedPointerEvent) => { onClose(); };
   const handlePanelClick = (e: FederatedPointerEvent) => { e.stopPropagation(); };
-  const blockWheel = useCallback((e: { stopPropagation: () => void }) => { e.stopPropagation(); }, []);
+  const blockWheel = useCallback((e: FederatedWheelEvent) => {
+    e.stopPropagation();
+    (e.nativeEvent as WheelEvent | undefined)?.preventDefault?.();
+    (e.nativeEvent as WheelEvent | undefined)?.stopImmediatePropagation?.();
+  }, []);
 
   return (
-    <pixiContainer visible={isOpen} layout={{ position: 'absolute', width: '100%', height: '100%' }}>
-      {isOpen && (<>
+    <pixiContainer renderable={isOpen} eventMode={isOpen ? 'static' : 'none'} layout={{ position: 'absolute', width: '100%', height: '100%' }}>
+      {/* Always mount structure to avoid addChild → Yoga BindingError */}
       <pixiGraphics
         draw={drawOverlay}
         eventMode="static"
@@ -466,8 +470,9 @@ export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, on
           height={scrollAreaH}
           contentHeight={contentH}
           direction="vertical"
+          bgColor={theme.bg.color}
         >
-          <Div className="flex-col gap-3 p-4" layout={{ width: CONTENT_W }}>
+          <Div className="flex-col gap-3 p-4" layout={{ width: CONTENT_W, backgroundColor: theme.bg.color }}>
 
           {/* ═══════ DISPLAY ═══════ */}
           <SectionHeader text="DISPLAY" />
@@ -1268,7 +1273,6 @@ export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, on
         <PixiButton label="CLOSE" variant="primary" width={80} onClick={onClose} />
       </layoutContainer>
       </layoutContainer>
-      </>)}
     </pixiContainer>
   );
 };
