@@ -873,6 +873,7 @@ export class ToneEngine {
     // Speech synths need async rendering (SAM and V2 with v2Speech)
     const speechConfigs = configs.filter((c) => c.synthType === 'Sam' || (c.synthType === 'V2' && c.v2Speech));
     const otherConfigs = configs.filter((c) =>
+      c.synthType &&
       c.synthType !== 'Sampler' &&
       c.synthType !== 'Player' &&
       c.synthType !== 'Sam' &&
