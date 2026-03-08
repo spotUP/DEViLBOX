@@ -17,6 +17,10 @@
 #include <iostream>
 #include <vector>
 #include <chrono>
+#include <cmath>
+
+#include "dsp56kEmu/types.h"
+#include "synthLib/midiTypes.h"
 
 // microQ
 #include "mqLib/microq.h"
@@ -259,6 +263,25 @@ static int dumpMicroQ(const std::vector<uint8_t>& romData, const std::string& ou
     // The microQ only uses external SRAM from 0x080000, so scan up to 0x100000.
     constexpr uint32_t xyScanSize = 0x100000; // 1M words — covers all used range
 
+    // Print ESAI peripheral register values for snapshot restore
+    auto& periph = mqDsp.getPeriph();
+    auto& esai = periph.getEsai();
+    std::cerr << "=== ESAI Register State ===\n";
+    std::cerr << "  TCCR = 0x" << std::hex << esai.readTransmitClockControlRegister() << "\n";
+    std::cerr << "  RCCR = 0x" << esai.readReceiveClockControlRegister() << "\n";
+    std::cerr << "  TCR  = 0x" << esai.readTransmitControlRegister() << "\n";
+    std::cerr << "  RCR  = 0x" << esai.readReceiveControlRegister() << "\n";
+    std::cerr << "  TSMA = 0x" << esai.readTSMA() << "\n";
+    std::cerr << "  TSMB = 0x" << esai.readTSMB() << "\n";
+    std::cerr << std::dec;
+
+    // Print HDI08 register state
+    auto& hdi = periph.getHDI08();
+    std::cerr << "=== HDI08 Register State ===\n";
+    std::cerr << "  HCR  = 0x" << std::hex << hdi.readControlRegister() << "\n";
+    std::cerr << "  HPCR = 0x" << hdi.readPortControlRegister() << "\n";
+    std::cerr << std::dec;
+
     std::cerr << "Dumping DSP 0 memory...\n";
     dumpDSP(out, "mq_", dsp, pSize, xyScanSize);
 
@@ -269,6 +292,75 @@ static int dumpMicroQ(const std::vector<uint8_t>& romData, const std::string& ou
     std::ifstream check(outputPath, std::ios::ate);
     auto fileSize = check.tellg();
     std::cerr << "Output file size: " << (fileSize / 1024) << " KB\n";
+
+    return 0;
+}
+
+// ─── microQ MIDI protocol sniffer ────────────────────────────────────────────
+
+static int sniffMicroQMidi(const std::vector<uint8_t>& romData)
+{
+    std::cerr << "Creating microQ for MIDI sniffing...\n";
+
+    mqLib::MicroQ mq(mqLib::BootMode::Default, romData, "rom.bin");
+
+    mq.setButton(mqLib::Buttons::ButtonType::Play, true);
+    while (!mq.isBootCompleted())
+        mq.process(8);
+    mq.setButton(mqLib::Buttons::ButtonType::Play, false);
+
+    std::cerr << "Boot completed.\n";
+
+    // Stabilize
+    for (int i = 0; i < 4; ++i)
+        mq.process(256);
+
+    auto* hw = mq.getHardware();
+    hw->resetMidiCounter();
+
+    // Install intercept on HDI08 writeRX to log MC68K → DSP traffic
+    auto& mqDsp = hw->getDSP(0);
+    std::vector<std::pair<uint32_t, uint32_t>> hdiLog; // (hostFlags, word)
+
+    // Capture host flags before each transfer
+    auto origCallback = [&](const uint32_t _word)
+    {
+        // Read current host flags (HF0/HF1) from MC68K-side ICR
+        uint32_t hf = 0; // We'll log the word
+        hdiLog.push_back({0, _word});
+        // Still forward to DSP
+        mqDsp.hdi08().writeRX(const_cast<dsp56k::TWord*>(&_word), 1);
+    };
+
+    // We can't easily intercept writeRX — instead, let's log from the
+    // hdiTransferUCtoDSP path. Let me just enable the LOG macro.
+
+    // Actually, let's just send MIDI and then read what the MC68K state is.
+    // Send note-on: channel 0, note 60, velocity 127
+    std::cerr << "\n=== Sending MIDI Note-On (ch0, note 60, vel 127) ===\n";
+
+    synthLib::SMidiEvent noteOn;
+    noteOn.a = 0x90; // Note-on channel 0
+    noteOn.b = 60;   // Middle C
+    noteOn.c = 127;  // Velocity
+    mq.sendMidiEvent(noteOn);
+
+    // Process frames to let MIDI flow through MC68K → DSP
+    std::cerr << "Processing 512 frames...\n";
+    for (int i = 0; i < 4; ++i)
+        mq.process(128);
+
+    std::cerr << "Done. Check HDI08 debug output above.\n";
+
+    // Send note-off
+    synthLib::SMidiEvent noteOff;
+    noteOff.a = 0x80;
+    noteOff.b = 60;
+    noteOff.c = 0;
+    mq.sendMidiEvent(noteOff);
+
+    for (int i = 0; i < 4; ++i)
+        mq.process(128);
 
     return 0;
 }
@@ -348,6 +440,78 @@ static int dumpNord(const std::vector<uint8_t>& romData, const std::string& outp
     return 1;
 }
 
+// ─── microQ Snapshot Boot Test ──────────────────────────────────────────────
+
+static int testMicroQSnapshotBoot(const std::vector<uint8_t>& romData)
+{
+    std::cerr << "Testing microQ SNAPSHOT boot...\n";
+    auto t0 = std::chrono::steady_clock::now();
+
+    mqLib::MicroQ mq(mqLib::BootMode::Snapshot, romData, "rom.bin");
+
+    if (!mq.isValid())
+    {
+        std::cerr << "microQ not valid after construction\n";
+        return 1;
+    }
+
+    std::cerr << "Constructor returned, polling isBootCompleted()...\n";
+
+    // Drive audio processing while waiting for MC68K boot
+    int pollCount = 0;
+    while (!mq.isBootCompleted())
+    {
+        mq.process(128);
+        ++pollCount;
+        if (pollCount % 100 == 0)
+        {
+            auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+                std::chrono::steady_clock::now() - t0).count();
+            std::cerr << "  Still booting... (" << elapsed << "ms, " << pollCount << " process calls)\n";
+        }
+        if (pollCount > 100000)
+        {
+            std::cerr << "  Boot timeout after " << pollCount << " process calls\n";
+            return 1;
+        }
+    }
+
+    auto t1 = std::chrono::steady_clock::now();
+    auto bootMs = std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count();
+    std::cerr << "Snapshot boot completed in " << bootMs << "ms (" << pollCount << " process calls)\n";
+
+    // Send a MIDI note and check for audio output
+    synthLib::SMidiEvent noteOn;
+    noteOn.a = 0x90; // note on channel 0
+    noteOn.b = 60;   // C4
+    noteOn.c = 127;  // velocity
+    mq.sendMidiEvent(noteOn);
+
+    std::cerr << "Sent MIDI note on, processing 4096 frames...\n";
+    float peak = 0;
+    auto& outs = mq.getAudioOutputs();
+    for (int i = 0; i < 32; ++i)
+    {
+        mq.process(128);
+        for (size_t ch = 0; ch < outs.size(); ++ch)
+        {
+            for (int s = 0; s < 128; ++s)
+            {
+                float v = std::abs(dsp56k::dsp2sample<float>(outs[ch][s]));
+                if (v > peak) peak = v;
+            }
+        }
+    }
+
+    std::cerr << "Audio peak after note: " << peak << "\n";
+    if (peak > 0.001f)
+        std::cerr << "SUCCESS: Audio output detected!\n";
+    else
+        std::cerr << "FAIL: No audio output (peak=" << peak << ")\n";
+
+    return peak > 0.001f ? 0 : 1;
+}
+
 // ─── main ───────────────────────────────────────────────────────────────────
 
 int main(int argc, char** argv)
@@ -373,7 +537,7 @@ int main(int argc, char** argv)
     std::cerr << "ROM loaded: " << romData.size() << " bytes\n";
 
     // Preprocess
-    if (synthType == 2 || synthType == 3)
+    if (synthType == 2 || synthType == 3 || synthType == 12 || synthType == 22)
         preprocessMicroQRom(romData);
     else if (synthType == 4)
         preprocessNordRom(romData);
@@ -383,6 +547,8 @@ int main(int argc, char** argv)
     case 2: return dumpMicroQ(romData, outputPath);
     case 3: return dumpXT(romData, outputPath);
     case 4: return dumpNord(romData, outputPath);
+    case 12: return sniffMicroQMidi(romData); // 12 = sniff mode for microQ
+    case 22: return testMicroQSnapshotBoot(romData); // 22 = test snapshot boot
     default:
         std::cerr << "Unsupported synth type: " << synthType << "\n";
         return 1;
