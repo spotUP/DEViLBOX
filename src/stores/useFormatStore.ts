@@ -41,6 +41,8 @@ interface FormatStore {
   psycleFileData: ArrayBuffer | null;
   sc68FileData: ArrayBuffer | null;
   zxtuneFileData: ArrayBuffer | null;
+  pumaTrackerFileData: ArrayBuffer | null;
+  artOfNoiseFileData: ArrayBuffer | null;
   libopenmptFileData: ArrayBuffer | null;
   hivelyMeta: { stereoMode: number; mixGain: number; speedMultiplier: number; version: number } | null;
   furnaceSubsongs: FurnaceSubsongPlayback[] | null;
@@ -59,7 +61,7 @@ interface FormatStore {
   setSongDBInfo: (info: FormatStore['songDBInfo']) => void;
   setSidMetadata: (info: FormatStore['sidMetadata']) => void;
   setOriginalModuleData: (data: FormatStore['originalModuleData']) => void;
-  applyEditorMode: (song: { linearPeriods?: boolean; furnaceNative?: FurnaceNativeData; hivelyNative?: HivelyNativeData; hivelyFileData?: ArrayBuffer; klysNative?: KlysNativeData; klysFileData?: ArrayBuffer; musiclineFileData?: Uint8Array; c64SidFileData?: Uint8Array; jamCrackerFileData?: ArrayBuffer; futurePlayerFileData?: ArrayBuffer; preTrackerFileData?: ArrayBuffer; maFileData?: ArrayBuffer; hippelFileData?: ArrayBuffer; sonixFileData?: ArrayBuffer; pxtoneFileData?: ArrayBuffer; organyaFileData?: ArrayBuffer; eupFileData?: ArrayBuffer; ixsFileData?: ArrayBuffer; psycleFileData?: ArrayBuffer; sc68FileData?: ArrayBuffer; zxtuneFileData?: ArrayBuffer; libopenmptFileData?: ArrayBuffer; hivelyMeta?: { stereoMode: number; mixGain: number; speedMultiplier: number; version: number }; furnaceSubsongs?: FurnaceSubsongPlayback[]; furnaceActiveSubsong?: number; channelTrackTables?: number[][]; channelSpeeds?: number[]; channelGrooves?: number[]; goatTrackerData?: Uint8Array }) => void;
+  applyEditorMode: (song: { linearPeriods?: boolean; furnaceNative?: FurnaceNativeData; hivelyNative?: HivelyNativeData; hivelyFileData?: ArrayBuffer; klysNative?: KlysNativeData; klysFileData?: ArrayBuffer; musiclineFileData?: Uint8Array; c64SidFileData?: Uint8Array; jamCrackerFileData?: ArrayBuffer; futurePlayerFileData?: ArrayBuffer; preTrackerFileData?: ArrayBuffer; maFileData?: ArrayBuffer; hippelFileData?: ArrayBuffer; sonixFileData?: ArrayBuffer; pxtoneFileData?: ArrayBuffer; organyaFileData?: ArrayBuffer; eupFileData?: ArrayBuffer; ixsFileData?: ArrayBuffer; psycleFileData?: ArrayBuffer; sc68FileData?: ArrayBuffer; zxtuneFileData?: ArrayBuffer; pumaTrackerFileData?: ArrayBuffer; artOfNoiseFileData?: ArrayBuffer; libopenmptFileData?: ArrayBuffer; hivelyMeta?: { stereoMode: number; mixGain: number; speedMultiplier: number; version: number }; furnaceSubsongs?: FurnaceSubsongPlayback[]; furnaceActiveSubsong?: number; channelTrackTables?: number[][]; channelSpeeds?: number[]; channelGrooves?: number[]; goatTrackerData?: Uint8Array }) => void;
   setFurnaceActiveSubsong: (index: number) => void;
   reset: () => void;
 }
@@ -102,6 +104,8 @@ export const useFormatStore = create<FormatStore>()(
     psycleFileData: null,
     sc68FileData: null,
     zxtuneFileData: null,
+    pumaTrackerFileData: null,
+    artOfNoiseFileData: null,
     libopenmptFileData: null,
     hivelyMeta: null,
     furnaceSubsongs: null,
@@ -145,6 +149,8 @@ export const useFormatStore = create<FormatStore>()(
         state.psycleFileData = song.psycleFileData ?? null;
         state.sc68FileData = song.sc68FileData ?? null;
         state.zxtuneFileData = song.zxtuneFileData ?? null;
+        state.pumaTrackerFileData = (song as any).pumaTrackerFileData ?? null;
+        state.artOfNoiseFileData = (song as any).artOfNoiseFileData ?? null;
         state.libopenmptFileData = (song as any).libopenmptFileData ?? null;
         if (song.furnaceNative) {
           state.editorMode = 'furnace';
@@ -202,6 +208,8 @@ export const useFormatStore = create<FormatStore>()(
       state.psycleFileData = null;
       state.sc68FileData = null;
       state.zxtuneFileData = null;
+      state.pumaTrackerFileData = null;
+      state.artOfNoiseFileData = null;
       state.libopenmptFileData = null;
       state.originalModuleData = null;
       state.songDBInfo = null;

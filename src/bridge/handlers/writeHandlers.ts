@@ -460,9 +460,10 @@ export function setProjectMetadata(params: Record<string, unknown>): Record<stri
 export function undo(): Record<string, unknown> {
   const restored = useHistoryStore.getState().undo();
   if (restored) {
-    const trackerState = useTrackerStore.getState();
-    const patternIndex = trackerState.currentPatternIndex;
-    trackerState.patterns[patternIndex] = restored;
+    const patternIndex = useTrackerStore.getState().currentPatternIndex;
+    useTrackerStore.setState((state) => {
+      state.patterns[patternIndex] = restored;
+    });
     return { ok: true };
   }
   return { ok: false, error: 'Nothing to undo' };
@@ -471,9 +472,10 @@ export function undo(): Record<string, unknown> {
 export function redo(): Record<string, unknown> {
   const restored = useHistoryStore.getState().redo();
   if (restored) {
-    const trackerState = useTrackerStore.getState();
-    const patternIndex = trackerState.currentPatternIndex;
-    trackerState.patterns[patternIndex] = restored;
+    const patternIndex = useTrackerStore.getState().currentPatternIndex;
+    useTrackerStore.setState((state) => {
+      state.patterns[patternIndex] = restored;
+    });
     return { ok: true };
   }
   return { ok: false, error: 'Nothing to redo' };
