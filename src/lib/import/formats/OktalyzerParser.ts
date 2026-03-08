@@ -22,6 +22,8 @@
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, ChannelData, TrackerCell, InstrumentConfig } from '@/types';
+import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
+import { encodeOktalyzerCell } from '@/engine/uade/encoders/OktalyzerEncoder';
 import { amigaNoteToXM, createSamplerInstrument } from './AmigaUtils';
 
 const TEXT_DECODER = new TextDecoder('iso-8859-1');
@@ -77,6 +79,7 @@ export function parseOktalyzerFile(buffer: ArrayBuffer, filename: string): Track
   let patternCount = 0;
   const sequence: number[] = [];
   const patterns: OKTPattern[] = [];
+  const patternFileOffsets: number[] = []; // file offset of cell data (after numRows u16) per PBOD
   const samplePcmQueue: Uint8Array[] = [];
 
   while (offset + 8 <= fileSize) {
@@ -139,6 +142,7 @@ export function parseOktalyzerFile(buffer: ArrayBuffer, filename: string): Track
       case 'PBOD': {
         // Pattern body: 2-byte numRows, then rows * 8 channels * 4 bytes
         const numRows = readU16BE(buf, dataStart);
+        patternFileOffsets.push(dataStart + 2); // cell data starts after numRows
         const numChans = 8; // Oktalyzer always has 8 channels
         const cells: number[][] = [];
 
@@ -249,6 +253,22 @@ export function parseOktalyzerFile(buffer: ArrayBuffer, filename: string): Track
   // Build song order
   const songPositions = sequence.slice(0, songLength);
 
+  const uadePatternLayout: UADEPatternLayout = {
+    formatId: 'oktalyzer',
+    patternDataFileOffset: 0, // overridden by getCellFileOffset
+    bytesPerCell: 4,
+    rowsPerPattern: 64,
+    numChannels: 8,
+    numPatterns: trackerPatterns.length,
+    moduleSize: buffer.byteLength,
+    encodeCell: encodeOktalyzerCell,
+    getCellFileOffset: (pattern: number, row: number, channel: number): number => {
+      const cellDataStart = patternFileOffsets[pattern];
+      if (cellDataStart === undefined) return 0;
+      return cellDataStart + row * 8 * 4 + channel * 4;
+    },
+  };
+
   return {
     name: filename.replace(/\.[^/.]+$/, ''),
     format: 'OKT' as TrackerFormat,
@@ -261,6 +281,7 @@ export function parseOktalyzerFile(buffer: ArrayBuffer, filename: string): Track
     initialSpeed: speed,
     initialBPM: 125,
     linearPeriods: false,
+    uadePatternLayout,
   };
 }
 

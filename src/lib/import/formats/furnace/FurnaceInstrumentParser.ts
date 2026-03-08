@@ -651,6 +651,13 @@ export function parseInstrument(reader: BinaryReader): FurnaceInstrument {
     const dutyMacroVals = readMacroVals(dutyMacroLen);
     const waveMacroVals = readMacroVals(waveMacroLen);
 
+    // AY/AY8930 wave macro correction for pre-v193 files (upstream instrument.cpp:3596-3601)
+    if (instVersion < 193 && (inst.type === 6 /* DIV_INS_AY */ || inst.type === 7 /* DIV_INS_AY8930 */)) {
+      for (let j = 0; j < waveMacroVals.length; j++) {
+        waveMacroVals[j]++;
+      }
+    }
+
     if (instVersion >= 17) {
       const pitchMacroVals = readMacroVals(pitchMacroLen);
       const ex1MacroVals = readMacroVals(ex1MacroLen);
@@ -741,23 +748,19 @@ export function parseInstrument(reader: BinaryReader): FurnaceInstrument {
       // OP_MACRO_NAMES: am, ar, dr, mult, rr, sl, tl, dt2, rs, dt, d2r, ssg
       if (!inst.opMacroArrays) inst.opMacroArrays = [[], [], [], []];
 
-      // Read lengths for all 4 operators
+      // Upstream reads per-operator: 12 lens, 12 loops, 12 opens (interleaved)
+      // Reference: instrument.cpp:3648-3692
       const opMacroLens: number[][] = [];
+      const opMacroLoops: number[][] = [];
       for (let op = 0; op < 4; op++) {
         const lens: number[] = [];
         for (let m = 0; m < 12; m++) lens.push(reader.readInt32());
-        opMacroLens.push(lens);
-      }
-      // Read loops for all 4 operators
-      const opMacroLoops: number[][] = [];
-      for (let op = 0; op < 4; op++) {
         const loops: number[] = [];
         for (let m = 0; m < 12; m++) loops.push(reader.readInt32());
-        opMacroLoops.push(loops);
-      }
-      // Read open flags for all 4 operators
-      for (let op = 0; op < 4; op++) {
+        // Open flags (12 bytes per operator)
         for (let m = 0; m < 12; m++) reader.readUint8();
+        opMacroLens.push(lens);
+        opMacroLoops.push(loops);
       }
 
       // Read values (low 8 bits, unsigned char) for all 4 operators
@@ -828,7 +831,8 @@ export function parseInstrument(reader: BinaryReader): FurnaceInstrument {
     if (instVersion >= 61) {
       if (!inst.opMacroArrays) inst.opMacroArrays = [[], [], [], []];
 
-      // Extended op macro codes start at 12 (after the 12 base op macros)
+      // Upstream reads per-operator: 8 lens, 8 loops, 8 rels, 8 opens
+      // Reference: instrument.cpp:3767-3808
       const extOpMacroLens: number[][] = [];
       const extOpMacroLoops: number[][] = [];
       const extOpMacroRels: number[][] = [];
@@ -836,24 +840,19 @@ export function parseInstrument(reader: BinaryReader): FurnaceInstrument {
       for (let op = 0; op < 4; op++) {
         const lens: number[] = [];
         for (let m = 0; m < 8; m++) lens.push(reader.readInt32());
-        extOpMacroLens.push(lens);
-      }
-      for (let op = 0; op < 4; op++) {
         const loops: number[] = [];
         for (let m = 0; m < 8; m++) loops.push(reader.readInt32());
-        extOpMacroLoops.push(loops);
-      }
-      for (let op = 0; op < 4; op++) {
         const rels: number[] = [];
         for (let m = 0; m < 8; m++) rels.push(reader.readInt32());
+        // Open flags (8 bytes per operator)
+        for (let m = 0; m < 8; m++) reader.readUint8();
+        extOpMacroLens.push(lens);
+        extOpMacroLoops.push(loops);
         extOpMacroRels.push(rels);
       }
-      // Open flags
-      for (let op = 0; op < 4; op++) {
-        for (let m = 0; m < 8; m++) reader.readUint8();
-      }
 
-      // Values (unsigned char)
+      // Values (unsigned char) — read per-operator, per-macro
+      // Reference: instrument.cpp:3810-3845
       for (let op = 0; op < 4; op++) {
         for (let m = 0; m < 8; m++) {
           const len = extOpMacroLens[op][m];

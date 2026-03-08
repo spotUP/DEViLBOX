@@ -769,6 +769,7 @@ export function parseArtOfNoiseFile(bytes: Uint8Array, filename: string): Tracke
     initialBPM:       125,
     linearPeriods:    false,
     uadePatternLayout,
+    artOfNoiseFileData: new Uint8Array(bytes).buffer as ArrayBuffer,
   };
 }
 

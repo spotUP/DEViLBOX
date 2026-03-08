@@ -17,6 +17,8 @@
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, ChannelData, TrackerCell, InstrumentConfig } from '@/types';
+import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
+import { encodeQCCell } from '@/engine/uade/encoders/QuadraComposerEncoder';
 import { createSamplerInstrument } from './AmigaUtils';
 
 // -- Binary helpers -----------------------------------------------------------
@@ -363,6 +365,31 @@ export async function parseQuadraComposerFile(
 
   if (songPositions.length === 0) songPositions.push(0);
 
+  // ── Build pattern byte offsets for variable-length patterns ───────────────
+  const patternByteOffsets: number[] = [];
+  {
+    let off = pattStart >= 0 ? pattStart : 0;
+    for (const pi of patternInfos) {
+      patternByteOffsets.push(off);
+      off += pi.rows * 4 * 4;  // rows * channels * bytesPerCell
+    }
+  }
+
+  const uadePatternLayout: UADEPatternLayout = {
+    formatId: 'quadraComposer',
+    patternDataFileOffset: pattStart >= 0 ? pattStart : 0,
+    bytesPerCell: 4,
+    rowsPerPattern: 64,  // nominal; actual rows vary per pattern
+    numChannels: 4,
+    numPatterns: patternInfos.length,
+    moduleSize: buffer.byteLength,
+    encodeCell: encodeQCCell,
+    getCellFileOffset: (pattern: number, row: number, channel: number): number => {
+      const base = patternByteOffsets[pattern] ?? 0;
+      return base + (row * 4 + channel) * 4;
+    },
+  };
+
   return {
     name: songName,
     format: 'MOD' as TrackerFormat,
@@ -375,5 +402,6 @@ export async function parseQuadraComposerFile(
     initialSpeed: 6,
     initialBPM: Math.max(32, Math.min(255, initialBPM || 125)),
     linearPeriods: false,
+    uadePatternLayout,
   };
 }

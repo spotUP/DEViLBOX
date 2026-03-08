@@ -52,6 +52,7 @@
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, ChannelData, TrackerCell, InstrumentConfig } from '@/types';
+import { encodeMODCell } from '@/engine/uade/encoders/MODEncoder';
 import { createSamplerInstrument, periodToNoteIndex, amigaNoteToXM } from './AmigaUtils';
 
 // ── IFF chunk ID constants (big-endian uint32) ────────────────────────────────
@@ -157,6 +158,7 @@ export async function parsePT36File(
   // we subtract 4 from rawSize before processing the first chunk.
 
   let ptdtBuf:   Uint8Array | null = null;
+  let ptdtFileOffset = 0;  // absolute file offset where PTDT data begins
   let infoChunk: Uint8Array | null = null;
   let commentBuf: Uint8Array | null = null;
   let versionStr = '3.6';
@@ -209,6 +211,7 @@ export async function parsePT36File(
         // Per OpenMPT: some PT36 files report too-small PTDT chunk sizes when
         // samples exceed 64 KiB. Since PTDT is always last, we extend to EOF.
         ptdtBuf = buf.subarray(dataStart, buf.byteLength);
+        ptdtFileOffset = dataStart;
         break;
       }
 
@@ -253,6 +256,18 @@ export async function parsePT36File(
 
   // ── Parse PTDT as ProTracker MOD ──────────────────────────────────────────
   const song = parseMODBuffer(ptdtBuf, filename, infoSongName, infoVolume, infoTempo, useCIA);
+
+  // ── Attach pattern layout for UADE chip RAM editing ─────────────────────
+  song.uadePatternLayout = {
+    formatId: 'pt36',
+    patternDataFileOffset: ptdtFileOffset + MOD_PATTERN_DATA_OFF,
+    bytesPerCell: 4,
+    rowsPerPattern: MOD_ROWS_PER_PATTERN,
+    numChannels: MOD_CHANNELS,
+    numPatterns: song.patterns.length,
+    moduleSize: buffer.byteLength,
+    encodeCell: encodeMODCell,
+  };
 
   console.log(
     `[PT36Parser] Loaded "${song.name}" — ProTracker ${versionStr}` +

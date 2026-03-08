@@ -40,6 +40,8 @@
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, TrackerCell, InstrumentConfig } from '@/types';
 import { createSamplerInstrument } from './AmigaUtils';
+import { encodeSynthesisCell } from '@/engine/uade/encoders/SynthesisEncoder';
+import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
 
 // ── Constants ─────────────────────────────────────────────────────────────
 
@@ -283,6 +285,7 @@ function parseSynthesis(bytes: Uint8Array, filename: string): TrackerSong | null
   // ── Track rows: (NOR + 64) × 4 bytes ───────────────────────────────────
   // byte1: note, byte2: instrument, byte3: (arpHi<<4)|effect, byte4: effectArg
   const totalRows = NOR + 64;
+  const trackRowDataOffset = off; // capture offset for uadePatternLayout
   interface SynTrackLine {
     note: number;
     instrument: number;
@@ -526,6 +529,17 @@ function parseSynthesis(bytes: Uint8Array, filename: string): TrackerSong | null
 
   const baseName = filename.replace(/\.[^/.]+$/, '');
 
+  const uadePatternLayout: UADEPatternLayout = {
+    formatId: 'synthesis',
+    patternDataFileOffset: trackRowDataOffset,
+    bytesPerCell: 4,
+    rowsPerPattern: totalRows,
+    numChannels: 4,
+    numPatterns: NOP,
+    moduleSize: bytes.length,
+    encodeCell: encodeSynthesisCell,
+  };
+
   return {
     name:            moduleName || baseName,
     format:          'XM' as TrackerFormat,
@@ -537,5 +551,6 @@ function parseSynthesis(bytes: Uint8Array, filename: string): TrackerSong | null
     numChannels:     4,
     initialSpeed:    song.startSpeed || 6,
     initialBPM:      125,
+    uadePatternLayout,
   };
 }

@@ -38,6 +38,8 @@
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, ChannelData, TrackerCell, InstrumentConfig } from '@/types';
+import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
+import { encodeMODCell } from '@/engine/uade/encoders/MODEncoder';
 import { createSamplerInstrument } from './AmigaUtils';
 
 // ── Binary helpers ────────────────────────────────────────────────────────────
@@ -533,6 +535,17 @@ export async function parseSTKFile(
     );
   }
 
+  const uadePatternLayout: UADEPatternLayout = {
+    formatId: 'stk',
+    patternDataFileOffset: HEADER_BLOCK_SIZE,
+    bytesPerCell: 4,
+    rowsPerPattern: ROWS_PER_PATTERN,
+    numChannels: NUM_CHANNELS,
+    numPatterns,
+    moduleSize: buffer.byteLength,
+    encodeCell: encodeMODCell,
+  };
+
   return {
     name:            songName || filename.replace(/\.[^/.]+$/, ''),
     format:          'MOD' as TrackerFormat,
@@ -545,5 +558,6 @@ export async function parseSTKFile(
     initialSpeed,
     initialBPM,
     linearPeriods:   false,
+    uadePatternLayout,
   };
 }

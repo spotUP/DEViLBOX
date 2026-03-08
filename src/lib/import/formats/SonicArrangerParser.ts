@@ -55,6 +55,8 @@ import type { Pattern, ChannelData, TrackerCell, InstrumentConfig } from '@/type
 import { createSamplerInstrument } from './AmigaUtils';
 import type { UADEChipRamInfo, SonicArrangerConfig } from '@/types/instrument';
 import { DEFAULT_SONIC_ARRANGER } from '@/types/instrument';
+import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
+import { encodeSonicArrangerCell } from '@/engine/uade/encoders/SonicArrangerEncoder';
 
 // -- Binary helpers -----------------------------------------------------------
 
@@ -320,6 +322,7 @@ export async function parseSonicArrangerFile(
     pos += 4;
     numTrackRows = u32(v, pos); pos += 4;
   }
+  const ntblDataOffset = pos;  // file offset of first 4-byte track row in NTBL
   const trackLines: SARow[] = [];
   for (let i = 0; i < numTrackRows; i++) {
     const b0 = u8(v, pos);
@@ -895,6 +898,26 @@ export async function parseSonicArrangerFile(
 
   const moduleName = filename.replace(/\.[^/.]+$/, '');
 
+  // Build uadePatternLayout with getCellFileOffset for NTBL track indirection
+  const uadePatternLayout: UADEPatternLayout = {
+    formatId: 'sonicArranger',
+    patternDataFileOffset: ntblDataOffset,
+    bytesPerCell: 4,
+    rowsPerPattern: defaultRowsPerTrack,
+    numChannels: 4,
+    numPatterns: builtPatterns.length,
+    moduleSize: buffer.byteLength,
+    encodeCell: encodeSonicArrangerCell,
+    getCellFileOffset: (pattern: number, row: number, channel: number): number => {
+      const posEntry = positions[pattern];
+      if (!posEntry) return 0;
+      const startRow = posEntry[channel].startTrackRow;
+      const rowIdx = startRow + row;
+      if (rowIdx < 0 || rowIdx >= numTrackRows) return 0;
+      return ntblDataOffset + rowIdx * 4;
+    },
+  };
+
   return {
     name:            moduleName,
     format:          'MOD' as TrackerFormat,
@@ -907,5 +930,6 @@ export async function parseSonicArrangerFile(
     initialSpeed:    Math.max(1, song.startSpeed),
     initialBPM,
     linearPeriods:   false,
+    uadePatternLayout,
   };
 }

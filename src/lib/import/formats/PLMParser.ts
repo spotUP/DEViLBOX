@@ -56,6 +56,8 @@
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, ChannelData, TrackerCell, InstrumentConfig } from '@/types';
 import { createSamplerInstrument } from './AmigaUtils';
+import { encodePLMCell } from '@/engine/uade/encoders/PLMEncoder';
+import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
 
 // ── Binary helpers ────────────────────────────────────────────────────────────
 
@@ -566,6 +568,17 @@ export async function parsePLMFile(
 
   // ── Assemble TrackerSong ───────────────────────────────────────────────────
 
+  const uadePatternLayout: UADEPatternLayout = {
+    formatId: 'plm',
+    patternDataFileOffset: patternOffsets.length > 0 ? patternOffsets[0] + 32 : 0,
+    bytesPerCell: 5,
+    rowsPerPattern: ROWS_PER_PAT,
+    numChannels,
+    numPatterns,
+    moduleSize: buffer.byteLength,
+    encodeCell: encodePLMCell,
+  };
+
   return {
     name:            songName,
     format:          'MOD' as TrackerFormat,
@@ -578,6 +591,7 @@ export async function parsePLMFile(
     initialSpeed:    speed || 6,
     initialBPM:      tempo || 125,
     linearPeriods:   false,
+    uadePatternLayout,
   };
 }
 

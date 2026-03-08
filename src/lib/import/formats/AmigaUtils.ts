@@ -68,7 +68,16 @@ export function pcm8ToWAV(
   _loopStart: number = 0,
   _loopEnd: number = 0
 ): ArrayBuffer {
-  const numSamples = pcm.length;
+  // Chrome's decodeAudioData rejects WAV files shorter than ~128 samples.
+  // For short looping waveforms (e.g. IS20 synth instruments), repeat the
+  // waveform data to reach the minimum. This is semantically correct for
+  // looping samples and harmless for one-shots.
+  const MIN_SAMPLES = 512;
+  const srcLen = pcm.length;
+  const numSamples = srcLen < MIN_SAMPLES && srcLen > 0
+    ? Math.ceil(MIN_SAMPLES / srcLen) * srcLen
+    : srcLen;
+
   const dataSize = numSamples * 2;   // 16-bit output
   const fileSize = 44 + dataSize;
   const buf = new ArrayBuffer(fileSize);
@@ -94,10 +103,11 @@ export function pcm8ToWAV(
   view.setUint32(40, dataSize, true);
 
   // Convert 8-bit signed (two's complement) → 16-bit signed
+  // Wraps around source data for padded samples
   let offset = 44;
   for (let i = 0; i < numSamples; i++) {
     // Reinterpret unsigned byte as signed
-    const s8 = (pcm[i] < 128) ? pcm[i] : pcm[i] - 256;
+    const s8 = (pcm[i % srcLen] < 128) ? pcm[i % srcLen] : pcm[i % srcLen] - 256;
     view.setInt16(offset, s8 * 256, true);
     offset += 2;
   }

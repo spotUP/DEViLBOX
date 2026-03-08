@@ -26,6 +26,8 @@
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, ChannelData, TrackerCell, InstrumentConfig } from '@/types';
+import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
+import { encodeDigiBoosterCell } from '@/engine/uade/encoders/DigiBoosterEncoder';
 import { createSamplerInstrument } from './AmigaUtils';
 
 const TEXT_DECODER = new TextDecoder('iso-8859-1');
@@ -94,7 +96,7 @@ export function parseDigiBoosterFile(buffer: ArrayBuffer, filename: string): Tra
 
   const dbInstruments: DBInstrument[] = [];
   const dbSamples: DBSample[] = [];
-  const dbPatterns: Array<{ rows: number; channels: number; data: Uint8Array }> = [];
+  const dbPatterns: Array<{ rows: number; channels: number; data: Uint8Array; fileDataOffset: number }> = [];
 
   while (offset + 8 < buf.length) {
     const chunkId = str4(buf, offset);
@@ -207,9 +209,10 @@ export function parseDigiBoosterFile(buffer: ArrayBuffer, filename: string): Tra
           const chans = u16(buf, poff + 2);
           poff += 4;
           const dataBytes = rows * chans * 4;
+          const patDataOff = poff;
           const data = buf.slice(poff, poff + dataBytes);
           poff += dataBytes;
-          dbPatterns.push({ rows, channels: chans, data });
+          dbPatterns.push({ rows, channels: chans, data, fileDataOffset: patDataOff });
           if (dbPatterns.length >= numPatterns) break;
         }
         break;
@@ -310,6 +313,22 @@ export function parseDigiBoosterFile(buffer: ArrayBuffer, filename: string): Tra
     };
   });
 
+  const uadePatternLayout: UADEPatternLayout = {
+    formatId: 'digiBooster',
+    patternDataFileOffset: 0, // overridden by getCellFileOffset
+    bytesPerCell: 4,
+    rowsPerPattern: 64,
+    numChannels,
+    numPatterns: trackerPatterns.length,
+    moduleSize: buffer.byteLength,
+    encodeCell: encodeDigiBoosterCell,
+    getCellFileOffset: (pattern: number, row: number, channel: number): number => {
+      const pat = dbPatterns[pattern];
+      if (!pat) return 0;
+      return pat.fileDataOffset + (row * pat.channels + channel) * 4;
+    },
+  };
+
   return {
     name: moduleName,
     format: 'DIGI' as TrackerFormat,
@@ -322,6 +341,7 @@ export function parseDigiBoosterFile(buffer: ArrayBuffer, filename: string): Tra
     initialSpeed: speed,
     initialBPM: bpm,
     linearPeriods: false,
+    uadePatternLayout,
   };
 }
 

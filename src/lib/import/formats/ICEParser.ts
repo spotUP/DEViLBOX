@@ -24,6 +24,8 @@
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, ChannelData, TrackerCell, InstrumentConfig } from '@/types';
 import type { UADEChipRamInfo } from '@/types/instrument';
+import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
+import { encodeMODCell } from '@/engine/uade/encoders/MODEncoder';
 import { createSamplerInstrument, periodToNoteIndex, amigaNoteToXM } from './AmigaUtils';
 
 // ── Constants ─────────────────────────────────────────────────────────────
@@ -314,6 +316,22 @@ export async function parseICEFile(buffer: ArrayBuffer, filename: string): Promi
   // ── Song positions (one per order, pointing to matching pattern index) ────
   const songPositions = Array.from({ length: numOrders }, (_, i) => i);
 
+  const uadePatternLayout: UADEPatternLayout = {
+    formatId: 'ice',
+    patternDataFileOffset: OFFSET_TRACK_DATA,
+    bytesPerCell: 4,
+    rowsPerPattern: ROWS_PER_TRACK,
+    numChannels: NUM_CHANNELS,
+    numPatterns: trackerPatterns.length,
+    moduleSize: buffer.byteLength,
+    encodeCell: encodeMODCell,
+    getCellFileOffset: (pattern: number, row: number, channel: number): number => {
+      const trackIdx = trackRefs[pattern * 4 + channel];
+      if (trackIdx === undefined || trackIdx >= numTracks) return 0;
+      return OFFSET_TRACK_DATA + trackIdx * BYTES_PER_TRACK + row * 4;
+    },
+  };
+
   return {
     name: songName,
     format: 'MOD' as TrackerFormat,
@@ -326,5 +344,6 @@ export async function parseICEFile(buffer: ArrayBuffer, filename: string): Promi
     initialSpeed: 6,
     initialBPM: 125,
     linearPeriods: false,
+    uadePatternLayout,
   };
 }
