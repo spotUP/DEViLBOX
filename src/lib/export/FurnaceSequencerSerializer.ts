@@ -89,7 +89,7 @@ export async function uploadFurnaceToSequencer(
   // 5. Configuration
   // Use full speed pattern if available (supports len > 2 groove-style initial speeds)
   const subAny = sub as any;
-  if (subAny.speedPattern && subAny.speedPattern.length > 2) {
+  if (subAny.speedPattern && subAny.speedPattern.length > 0) {
     engine.seqPostMessage({ type: 'seqSetSpeedPattern', values: subAny.speedPattern });
   } else {
     engine.seqPostMessage({ type: 'seqSetSpeed', speed1: sub.speed1, speed2: sub.speed2 });
@@ -125,19 +125,22 @@ export async function uploadFurnaceToSequencer(
     console.log(`[FurnaceSequencer] Uploaded ${native.grooves.length} groove patterns`);
   }
 
-  // 8. Upload per-channel chip type for platform-specific effect handling
+  // 8. Upload per-channel chip type + dispatch handle for multi-chip routing
   if (native.chipIds && native.chipIds.length > 0) {
-    // Build channel → (chipId, subIdx) mapping from chip channel counts
+    // Build channel → (chipId, subIdx, handle) mapping from chip channel counts
     // Each chip owns N sequential channels; subIdx is the channel's index within its chip
     let chanOffset = 0;
     for (const chipId of native.chipIds) {
       const chipChans = engine.getChannelCount(chipId);
+      // Get the dispatch handle for this chip (used for multi-chip command routing)
+      const chipHandle = engine.getChipHandle(chipId);
       for (let subIdx = 0; subIdx < chipChans && (chanOffset + subIdx) < numChannels; subIdx++) {
         engine.seqPostMessage({
           type: 'seqSetChannelChip',
           channel: chanOffset + subIdx,
           chipId,
           subIdx,
+          handle: chipHandle,
         });
       }
       chanOffset += chipChans;

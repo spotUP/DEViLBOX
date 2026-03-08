@@ -1312,8 +1312,9 @@ static int uade_play_internal(struct uade_file *module, int subsong,
 	song->state = UADE_STATE_INVALID;
 
 	/* TODO: Fix this, passing module == NULL makes no sense */
-	if (module == NULL)
+	if (module == NULL) {
 		return -1;
+	}
 
 	song->recordsongtime = 1;
 	song->recordsubsongtime = 1;
@@ -1343,8 +1344,9 @@ static int uade_play_internal(struct uade_file *module, int subsong,
 	uade_lookup_song(module, state);
 
 	ep = get_eagleplayer(module, state);
-	if (ep == NULL)
+	if (ep == NULL) {
 		return 0;
+	}
 
 	uade_debug(state, "Player candidate: %s\n", ep->playername);
 

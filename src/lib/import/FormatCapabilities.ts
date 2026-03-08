@@ -3,21 +3,45 @@
  *
  * Used by the import dialog to show warnings about read-only formats,
  * non-exportable formats, and formats without pattern display.
+ *
+ * Keep these lists in sync with:
+ *   - src/engine/uade/encoders/  (UADE chip RAM encoders → editable + exportable)
+ *   - src/lib/export/            (native format exporters → exportable)
+ *   - src/lib/import/FormatRegistry.ts  (format labels must match exactly)
  */
 
 // ── Editable format labels ───────────────────────────────────────────────────
-// Format labels (from FormatRegistry/moduleInfo.metadata.type) that have pattern editors.
+// Format labels (from FormatRegistry) that have pattern editors.
+// Must match FormatRegistry label strings exactly.
 
 const EDITABLE_FORMAT_LABELS = new Set([
-  // libopenmpt standard
+  // ── libopenmpt standard ──
   'MOD', 'XM', 'IT', 'S3M',
-  // Native editors
-  'HivelyTracker', 'Oktalyzer', 'OctaMED', 'DigiBooster', 'DigiBooster Pro',
-  'Future Composer', 'SoundFX', 'JamCracker Pro',
-  'MusicLine Editor', 'Klystrack',
-  'GoatTracker',
-  // Furnace
+  'ProTracker MOD', 'FastTracker II XM', 'Impulse Tracker', 'ScreamTracker 3',
+
+  // ── Furnace ──
   'Furnace', 'DefleMask / X-Tracker',
+
+  // ── Native editors (non-UADE) ──
+  'HivelyTracker', 'Klystrack', 'GoatTracker', 'MusicLine Editor',
+
+  // ── Amiga native with UADE chip RAM editing ──
+  'Oktalyzer', 'OctaMED', 'DigiBooster', 'DigiBooster Pro',
+  'Future Composer', 'Sound-FX', 'JamCracker Pro',
+  'SoundMon', 'SidMon 1', 'Quadra Composer', 'Sonic Arranger',
+  'InStereo! 2', 'InStereo! 1', 'InStereo!',
+  'Digital Mugician', 'Art of Noise',
+  'Graoumf Tracker 2', 'Synthesis',
+  'Digital Sound Studio', 'Chuck Biscuits',
+  "Image's Music System", 'IceTracker',
+  'Game Music Creator', 'Sound Control',
+  'KRIS / ChipTracker', 'Delta Music', 'Delta Music 2',
+  'Magnetic Fields Packer', 'ProTracker 3.6',
+  'Zound Monitor', 'TCB Tracker', 'XMF', 'Composer 667',
+  'TFMX',
+
+  // ── Non-UADE with own WASM engine + edit/export ──
+  'Digital Symphony', 'Puma Tracker', 'Symphonie Pro',
 ]);
 
 /** Format families (from FormatRegistry) that are always editable */
@@ -27,20 +51,39 @@ const EDITABLE_FAMILIES = new Set([
 
 // ── Exportable format labels ─────────────────────────────────────────────────
 // Formats that can be exported to their native binary format (beyond .dbx).
+// UADE formats with encoders export via chip RAM dump (UADEChipEditor).
 
 const NATIVE_EXPORTABLE_LABELS = new Set([
+  // ── libopenmpt standard ──
   'MOD', 'XM', 'IT', 'S3M',
-  'HivelyTracker',
+  'ProTracker MOD', 'FastTracker II XM', 'Impulse Tracker', 'ScreamTracker 3',
+
+  // ── Furnace ──
   'Furnace',
+
+  // ── Native editors with dedicated exporters ──
+  'HivelyTracker', 'Klystrack', 'MusicLine Editor', 'JamCracker Pro',
+
+  // ── Amiga native with UADE chip RAM export ──
   'Oktalyzer', 'OctaMED', 'DigiBooster', 'DigiBooster Pro',
-  'Future Composer',
-  'JamCracker Pro',
-  'Klystrack',
-  'MusicLine Editor',
-  // Chip export formats (VGM/NSF/etc.) are always available regardless of import format
+  'Future Composer', 'Sound-FX',
+  'SoundMon', 'SidMon 1', 'Quadra Composer', 'Sonic Arranger',
+  'InStereo! 2', 'InStereo! 1', 'InStereo!',
+  'Digital Mugician', 'Art of Noise',
+  'Graoumf Tracker 2', 'Synthesis',
+  'Digital Sound Studio', 'Chuck Biscuits',
+  "Image's Music System", 'IceTracker',
+  'Game Music Creator', 'Sound Control',
+  'KRIS / ChipTracker', 'Delta Music', 'Delta Music 2',
+  'Magnetic Fields Packer', 'ProTracker 3.6',
+  'Zound Monitor', 'TCB Tracker', 'XMF', 'Composer 667',
+  'TFMX',
+
+  // ── Non-UADE with dedicated exporters ──
+  'Digital Symphony', 'Puma Tracker', 'Symphonie Pro',
 ]);
 
-/** Format families that can export via OpenMPT WASM (to IT/S3M) */
+/** Format families that can export via libopenmpt WASM (to IT/S3M) */
 const NATIVE_EXPORTABLE_FAMILIES = new Set([
   'pc-tracker', 'libopenmpt',
 ]);
@@ -53,7 +96,7 @@ const NO_PATTERN_DISPLAY_LABELS = new Set([
   'PMD',             // PC-98
   'MDX',             // X68000
   // Not in FormatRegistry — matched by extension fallback:
-  'PreTracker', 'Music Assembler', 'Hippel ST', 'Sonix Music Driver',
+  'PreTracker', 'Music Assembler', 'Ben Daglish', 'Hippel ST', 'Sonix Music Driver',
   'PxTone', 'Organya', 'EUP', 'IXS', 'Psycle',
   'ZXTune',
 ]);
@@ -66,13 +109,6 @@ const NO_PATTERN_DISPLAY_EXTENSIONS = new Set([
   '.cop', '.tfc', '.tfd', '.tf0', '.pdt', '.chi', '.str', '.dst', '.dmm', '.et1',
   '.sndh', '.sc68',
   '.mdx', '.pmd',
-]);
-
-/** Extensions of formats that are NOT editable */
-const NOT_EDITABLE_EXTENSIONS = new Set([
-  ...NO_PATTERN_DISPLAY_EXTENSIONS,
-  // UADE-only formats that have pattern data but no dedicated editor:
-  // (These are played via UADE as read-only)
 ]);
 
 // ── Furnace chip alternatives ────────────────────────────────────────────────
@@ -153,10 +189,15 @@ export function getFormatCapabilities(
   const ext = filename.slice(filename.lastIndexOf('.')).toLowerCase();
 
   // Editable?
+  // 1. Explicitly listed label
+  // 2. Editable family (libopenmpt, furnace, pc-tracker)
+  // 3. Fallback: editable if has pattern data and not a WASM-only or uade-only format
   const isEditable =
     EDITABLE_FORMAT_LABELS.has(formatLabel) ||
     (formatFamily != null && EDITABLE_FAMILIES.has(formatFamily)) ||
-    !NOT_EDITABLE_EXTENSIONS.has(ext);
+    (formatFamily !== 'uade-only' &&
+     !NO_PATTERN_DISPLAY_LABELS.has(formatLabel) &&
+     !NO_PATTERN_DISPLAY_EXTENSIONS.has(ext));
 
   // Exportable to native format?
   const isNativeExportable =

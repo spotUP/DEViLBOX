@@ -19,6 +19,31 @@ interface GlobalDragDropHandlerProps {
   children: React.ReactNode;
 }
 
+/**
+ * Map of filename prefix patterns that require companion files.
+ * key = main file prefix (lowercase), value = companion prefix.
+ */
+const COMPANION_PREFIX_MAP: Record<string, string> = {
+  'mdat.': 'smpl.',   // TFMX: mdat.songname → smpl.songname
+  'mfp.':  'smp.',    // MFP:  mfp.songname  → smp.songname
+};
+
+/**
+ * Check if a filename matches a known multi-file pattern and return the
+ * expected companion filename, or null if no companion is needed.
+ */
+function getExpectedCompanionName(filename: string): string | null {
+  const basename = (filename.split('/').pop() ?? filename).split('\\').pop() ?? filename;
+  const lower = basename.toLowerCase();
+  for (const [prefix, companionPrefix] of Object.entries(COMPANION_PREFIX_MAP)) {
+    if (lower.startsWith(prefix)) {
+      // Preserve original casing of the suffix part
+      return companionPrefix + basename.slice(prefix.length);
+    }
+  }
+  return null;
+}
+
 // All supported file extensions — module formats from ModuleLoader + app-specific
 const SUPPORTED_EXTENSIONS = new Set([
   // DEViLBOX projects
@@ -140,6 +165,52 @@ export const GlobalDragDropHandler: React.FC<GlobalDragDropHandlerProps> = ({
       if (!file) {
         console.warn('[DragDrop] No supported files found');
         return;
+      }
+
+      // For multi-file formats (e.g. TFMX mdat.* + smpl.*), try to auto-load
+      // the companion from the same directory using the File System Access API.
+      // This avoids prompting the user with a manual file picker.
+      const expectedCompanion = getExpectedCompanionName(file.name);
+      if (expectedCompanion && onFolderLoadedRef.current) {
+        // Try File System Access API (Chrome 86+) to get the parent directory
+        const fileItem = fileItems.find(item => {
+          const f = item.getAsFile();
+          return f && f.name === file.name;
+        });
+        const handle = fileItem && 'getAsFileSystemHandle' in fileItem
+          ? await (fileItem as DataTransferItem & { getAsFileSystemHandle(): Promise<FileSystemHandle> }).getAsFileSystemHandle().catch(() => null)
+          : null;
+
+        if (handle) {
+          try {
+            // showDirectoryPicker with startIn opens at the same directory as the dropped file.
+            // The user just confirms the folder — no hunting for files needed.
+            const dirHandle = await (window as unknown as { showDirectoryPicker(opts?: Record<string, unknown>): Promise<FileSystemDirectoryHandle> })
+              .showDirectoryPicker({ startIn: handle, mode: 'read' });
+            // Read the companion file from the directory
+            const companionHandle = await dirHandle.getFileHandle(expectedCompanion).catch(() => null)
+              // Case-insensitive fallback: scan directory for matching name
+              || await (async () => {
+                const lowerExpected = expectedCompanion.toLowerCase();
+                for await (const [entryName, entryHandle] of dirHandle as unknown as AsyncIterable<[string, FileSystemHandle]>) {
+                  if (entryName.toLowerCase() === lowerExpected && entryHandle.kind === 'file') {
+                    return entryHandle as FileSystemFileHandle;
+                  }
+                }
+                return null;
+              })();
+            if (companionHandle) {
+              const companionFile = await companionHandle.getFile();
+              await onFolderLoadedRef.current(file, [companionFile]);
+              return;
+            }
+          } catch {
+            // User cancelled directory picker or API not fully supported — fall through
+          }
+        }
+
+        // Fallback: proceed without companion (UADE will try to find it in MEMFS
+        // or fail gracefully with native parser fallback)
       }
 
       try {

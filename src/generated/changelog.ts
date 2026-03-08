@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-03-08T11:57:57.126Z
+ * Generated: 2026-03-08T18:52:32.322Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.2580';
-export const BUILD_NUMBER = '2580';
-export const BUILD_HASH = 'c0adabbce';
+export const BUILD_VERSION = '1.0.2586';
+export const BUILD_NUMBER = '2586';
+export const BUILD_HASH = '9c9a90e13';
 export const BUILD_DATE = '2026-03-08';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,33 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.2580',
+    version: '1.0.2586',
     date: '2026-03-08',
     changes: [
+      {
+        type: 'fix',
+        "description": "Symphonie Pro broken audio — suppress notes and fix instrument types"
+      },
+      {
+        type: 'fix',
+        "description": "Symphonie Pro silent playback and missing instrument samples"
+      },
+      {
+        type: 'fix',
+        "description": "Reduce MCP bridge reconnect spam and fix Symphonie type errors"
+      },
+      {
+        type: 'improvement',
+        "description": "Chore: gitignore artofnoise/pumatracker build dirs and update changelog"
+      },
+      {
+        type: 'feature',
+        "description": "Chore: add Furnace audit tools for parser testing and DEViLBOX rendering"
+      },
+      {
+        type: 'fix',
+        "description": "Pixi UI improvements for modals, scroll views, and settings"
+      },
       {
         type: 'feature',
         "description": "Integrate ArtOfNoise/PumaTracker engines and debounced WASM re-export"
@@ -210,30 +234,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'feature',
         "description": "Add eupmini WASM engine (FM Towns EUP music format)"
-      },
-      {
-        type: 'improvement',
-        "description": "Chore: update gearmulator O2 test script"
-      },
-      {
-        type: 'feature',
-        "description": "Add PitchResampler worklet for sample-based engines"
-      },
-      {
-        type: 'feature',
-        "description": "Add Organya WASM engine (Cave Story music format)"
-      },
-      {
-        type: 'feature',
-        "description": "Add Sonix Music Driver format parser"
-      },
-      {
-        type: 'feature',
-        "description": "Engine and store updates for Sonix format and routing"
-      },
-      {
-        type: 'feature',
-        "description": "Update FurnaceEditor, MixerPanel, and StudioCanvasView"
       }
     ]
   }

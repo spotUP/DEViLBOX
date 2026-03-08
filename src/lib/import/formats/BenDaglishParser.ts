@@ -73,11 +73,11 @@ export function isBenDaglishFormat(buffer: ArrayBuffer, filename?: string): bool
   const buf = new Uint8Array(buffer);
 
   // ── Extension check (optional fast-reject) ───────────────────────────────
-  // UADE eagleplayer.conf lists these with a "bd" prefix convention, but in
-  // practice the reference files use a ".bd" suffix (e.g. "corporation.bd").
+  // UADE eagleplayer.conf uses "bd." prefix (bd.corporation); modland uses
+  // ".bd" suffix (corporation.bd). Accept both conventions.
   if (filename !== undefined) {
     const base = (filename.split('/').pop() ?? filename).toLowerCase();
-    if (!base.endsWith('.bd')) return false;
+    if (!base.endsWith('.bd') && !base.startsWith('bd.')) return false;
   }
 
   // Need at least 14 bytes for the header checks (through offset 12 + 2).
@@ -138,15 +138,11 @@ export async function parseBenDaglishFile(
   buffer: ArrayBuffer,
   filename: string,
 ): Promise<TrackerSong> {
-  if (!isBenDaglishFormat(buffer, filename)) {
-    throw new Error('Not a Ben Daglish module');
-  }
-
   // ── Module name from filename ─────────────────────────────────────────────
 
   const baseName = filename.split('/').pop() ?? filename;
-  // Strip ".bd" suffix (case-insensitive)
-  const moduleName = baseName.replace(/\.bd$/i, '') || baseName;
+  // Strip ".bd" suffix or "bd." prefix (case-insensitive)
+  const moduleName = baseName.replace(/\.bd$/i, '').replace(/^bd\./i, '') || baseName;
 
   // ── Instrument placeholders ───────────────────────────────────────────────
   //
@@ -217,5 +213,6 @@ export async function parseBenDaglishFile(
     initialSpeed: 6,
     initialBPM: 125,
     linearPeriods: false,
+    bdFileData: buffer.slice(0),
   };
 }

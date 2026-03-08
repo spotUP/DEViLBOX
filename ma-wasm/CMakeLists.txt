@@ -1,17 +1,17 @@
 cmake_minimum_required(VERSION 3.13)
 project(Ma C)
 
-set(CMAKE_C_STANDARD 99)
+set(CMAKE_C_STANDARD 11)
 set(OUTPUT_NAME "Ma")
 set(OUTPUT_DIR  "${CMAKE_SOURCE_DIR}/../public/ma")
 file(MAKE_DIRECTORY ${OUTPUT_DIR})
 
 add_executable(${OUTPUT_NAME}
-    src/ma/ma.c
-    src/ma/paula_soft.c
+    src/ma_harness.c
+    src/ma/music_assembler.c
 )
 
-target_include_directories(${OUTPUT_NAME} PRIVATE src/ma)
+target_include_directories(${OUTPUT_NAME} PRIVATE src/ma src)
 target_link_libraries(${OUTPUT_NAME} m)
 
 if(EMSCRIPTEN)

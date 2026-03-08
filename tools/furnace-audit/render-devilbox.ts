@@ -12,7 +12,7 @@
  * Output: test-data/furnace-devilbox/<category>/<name>.wav
  */
 
-import { readFileSync, writeFileSync, mkdirSync, readdirSync, existsSync, statSync, unlinkSync } from 'fs';
+import { readFileSync, writeFileSync, mkdirSync, readdirSync, existsSync, statSync, unlinkSync, rmSync } from 'fs';
 import { join, basename, dirname, relative } from 'path';
 import { createRequire } from 'module';
 
@@ -40,7 +40,7 @@ interface WasmModule {
   _furnace_dispatch_get_num_channels(handle: number): number;
   _furnace_dispatch_set_tick_rate(handle: number, rate: number): void;
   _furnace_dispatch_set_compat_flag(handle: number, flag: number, val: number): void;
-  _furnace_dispatch_set_compat_flags(handle: number, flags: number, flagsExt: number): void;
+  _furnace_dispatch_set_compat_flags(handle: number, dataPtr: number, dataLen: number): void;
   _furnace_dispatch_set_flags(handle: number, flagsPtr: number, len: number): void;
   _furnace_dispatch_set_gb_instrument(handle: number, insIndex: number, dataPtr: number, dataLen: number): void;
   _furnace_dispatch_set_wavetable(handle: number, waveIndex: number, dataPtr: number, dataLen: number): void;
@@ -67,15 +67,21 @@ interface WasmModule {
   _furnace_seq_set_compat_flags(flags: number, flagsExt: number, pitchSlideSpeed: number): void;
   _furnace_seq_set_groove_entry(index: number, valuesPtr: number, len: number): void;
   _furnace_seq_set_channel_chip(channel: number, chipId: number, subIdx: number): void;
+  _furnace_seq_set_channel_dispatch(channel: number, handle: number): void;
   _furnace_seq_set_mute(channel: number, mute: number): void;
   _furnace_seq_is_playing(): number;
   _furnace_seq_get_order(): number;
   _furnace_seq_get_row(): number;
   _furnace_seq_set_remaining_loops(loops: number): void;
   _furnace_seq_get_total_loops(): number;
+  // Command log API
+  _furnace_cmd_log_enable(enable: number): void;
+  _furnace_cmd_log_count(): number;
+  _furnace_cmd_log_get(): number; // returns pointer to int array
   _malloc(size: number): number;
   _free(ptr: number): void;
   HEAPU8: Uint8Array;
+  HEAP32: Int32Array;
   HEAPF32: Float32Array;
   HEAP32: Int32Array;
 }
@@ -282,6 +288,40 @@ const CHIP_CHANNELS: Record<number, number> = {
   0xff: 4, // System
 };
 
+// ── Per-Platform getPostAmp() ────────────────────────────────────────────────
+// From Furnace source: each platform can override getPostAmp() for volume scaling.
+// Default is 1.0. These values match upstream Furnace exactly.
+const POST_AMP: Record<number, number> = {
+  0x02: 1.5,  // SMS / SN76489
+  0x89: 1.5,  // SMS variant
+  0xa3: 1.5,  // T6W28 (SMS derivative)
+  0xe5: 1.5,  // OPLL (YM2413)
+  0xa0: 1.5,  // OPLL drum
+  0x96: 1.5,  // OPLL (VRC7)
+  0x05: 2.0,  // NES
+  0xd5: 2.0,  // 5E01 (NES variant)
+  0x01: 2.0,  // Genesis / YM2612
+  0x81: 2.0,  // YM2612 ext
+  0x9b: 2.0,  // YM2612 DualPCM
+  0xb7: 2.0,  // YM2612 CSM
+  0xcb: 2.0,  // OPN2 ext
+  0xb9: 2.0,  // POKEY
+  0xc1: 2.0,  // FDS (useNP default)
+  0xaa: 3.0,  // C140
+  0xfd: 3.0,  // C219
+  0xac: 3.0,  // MSM6295
+  0x9c: 4.0,  // X1-010
+  0xae: 4.0,  // YMZ280B
+  0x95: 4.0,  // VERA
+  0xf5: 6.0,  // VSU / Virtual Boy
+  0xe1: 64.0, // MMC5
+  0x97: 0.5,  // TIA
+};
+
+function getPostAmp(chipId: number): number {
+  return POST_AMP[chipId] ?? 1.0;
+}
+
 // ── Instrument Encoder ───────────────────────────────────────────────────────
 
 async function encodeInstrumentForWasm(
@@ -375,14 +415,14 @@ async function renderFurFile(furPath: string, outPath: string): Promise<RenderRe
     const chipIds = native.chipIds || [];
     if (chipIds.length === 0) throw new Error('No chip IDs');
 
-    const chipHandles: Map<number, number> = new Map();
+    // Each entry: { handle, chipId } — one per system slot (duplicates allowed)
+    const chipInstances: Array<{ handle: number; chipId: number }> = [];
     let totalChannels = 0;
 
     for (const chipId of chipIds) {
-      if (chipHandles.has(chipId)) continue;
       const handle = wasm._furnace_dispatch_create(chipId, SAMPLE_RATE);
       if (handle <= 0) throw new Error(`Failed to create chip 0x${chipId.toString(16)}`);
-      chipHandles.set(chipId, handle);
+      chipInstances.push({ handle, chipId });
       wasm._furnace_dispatch_set_tick_rate(handle, sub.hz || 60);
       // Set linear pitch
       wasm._furnace_dispatch_set_compat_flag(handle, 0, native.compatFlags?.linearPitch ?? 2);
@@ -390,21 +430,24 @@ async function renderFurFile(furPath: string, outPath: string): Promise<RenderRe
     }
 
     // Link first chip to sequencer
-    const firstHandle = chipHandles.values().next().value!;
+    const firstHandle = chipInstances[0].handle;
 
     // 4. Upload chip flags if available
     if (native.chipFlags) {
       for (let i = 0; i < chipIds.length; i++) {
         const flagStr = native.chipFlags[i];
         if (!flagStr) continue;
-        const handle = chipHandles.get(chipIds[i]);
-        if (!handle) continue;
+        const handle = chipInstances[i]?.handle;
+        if (handle == null) continue;
         const flagBytes = new TextEncoder().encode(flagStr);
         const flagPtr = wasm._malloc(flagBytes.length + 1);
         wasm.HEAPU8.set(flagBytes, flagPtr);
         wasm.HEAPU8[flagPtr + flagBytes.length] = 0; // null-terminate
         wasm._furnace_dispatch_set_flags(handle, flagPtr, flagBytes.length);
         wasm._free(flagPtr);
+        // Reset dispatch after setFlags() so APU re-inits with new model/clock
+        // (matches Furnace: init() does setFlags() then reset() atomically)
+        wasm._furnace_dispatch_reset(handle);
       }
     }
 
@@ -435,7 +478,7 @@ async function renderFurFile(furPath: string, outPath: string): Promise<RenderRe
       const wt = wavetables[i];
       if (!wt.data || wt.data.length === 0) continue;
       const wtLen = wt.data.length;
-      const wtMax = wt.max ?? 15; // GB wavetables are 0-15
+      const wtMax = wt.height ?? wt.max ?? 15; // Parser stores as 'height', not 'max'
       // Pack header + data
       const packed = new Int32Array(2 + wtLen);
       packed[0] = wtLen;
@@ -487,7 +530,7 @@ async function renderFurFile(furPath: string, outPath: string): Promise<RenderRe
     }
 
     // Render samples in chip
-    for (const handle of chipHandles.values()) {
+    for (const { handle } of chipInstances) {
       try {
         wasm._furnace_dispatch_render_samples(handle);
       } catch (e) {
@@ -555,32 +598,42 @@ async function renderFurFile(furPath: string, outPath: string): Promise<RenderRe
       }
     }
 
-    // Speed/tempo
-    const subAny = sub as any;
-    if (subAny.speedPattern && subAny.speedPattern.length > 2) {
-      const len = Math.min(subAny.speedPattern.length, 16);
+    // Speed/tempo — use speedPattern from parsed module (not nativeData which lacks it)
+    const parsedSub = module.subsongs?.[0] as any;
+    const speedPattern = parsedSub?.speedPattern;
+    if (speedPattern && speedPattern.length > 0) {
+      const len = Math.min(speedPattern.length, 16);
       const spPtr = wasm._malloc(len * 2); // uint16_t = 2 bytes
       updateHeapViews(wasm);
       const heap16 = new Uint16Array(wasm.HEAPU8.buffer, spPtr, len);
-      for (let i = 0; i < len; i++) heap16[i] = subAny.speedPattern[i];
+      for (let i = 0; i < len; i++) heap16[i] = speedPattern[i];
       wasm._furnace_seq_set_speed_pattern(spPtr, len);
       wasm._free(spPtr);
+      console.log(`[render] Speed pattern: [${speedPattern.join(',')}] (len=${len})`);
     } else {
       wasm._furnace_seq_set_speed(sub.speed1, sub.speed2);
+      console.log(`[render] Speed: ${sub.speed1}/${sub.speed2}`);
     }
     wasm._furnace_seq_set_tempo(sub.virtualTempoN || 150, sub.virtualTempoD || 150);
 
-    // Compat flags
+    // Compat flags — sequencer flags (bitmask) + dispatch flags (binary struct)
     if (native.compatFlags) {
       const { flags, flagsExt, pitchSlideSpeed } = packCompatFlags(native.compatFlags);
       wasm._furnace_seq_set_compat_flags(flags, flagsExt, pitchSlideSpeed);
 
-      // Set linearPitch on each chip via the individual flag API
-      // _furnace_dispatch_set_compat_flags takes (handle, ptr, len) not integers
-      const linearPitch = (native.compatFlags.linearPitch as number) ?? 2;
-      for (const handle of chipHandles.values()) {
-        wasm._furnace_dispatch_set_compat_flag(handle, 0, linearPitch); // flag 0 = linearPitch
+      // Send ALL compat flags to each dispatch instance (matches DivCompatFlags struct order)
+      const flagBytes = packDispatchCompatFlags(native.compatFlags);
+      const flagPtr = wasm._malloc(flagBytes.length);
+      updateHeapViews(wasm);
+      wasm.HEAPU8.set(flagBytes, flagPtr);
+      for (const { handle } of chipInstances) {
+        wasm._furnace_dispatch_set_compat_flags(handle, flagPtr, flagBytes.length);
       }
+      wasm._free(flagPtr);
+      console.log(`[render] Dispatch compat flags: ${flagBytes.length} bytes sent to ${chipInstances.length} chip(s)`);
+      // Log key flags for debugging
+      const cf = native.compatFlags as Record<string, unknown>;
+      console.log(`[render]   gbInsAffectsEnvelope=${cf.gbInsAffectsEnvelope}, newVolumeScaling=${cf.newVolumeScaling}, brokenOutVol=${cf.brokenOutVol}, brokenOutVol2=${cf.brokenOutVol2}, oldAlwaysSetVolume=${cf.oldAlwaysSetVolume}`);
     }
 
     // Grooves
@@ -597,22 +650,23 @@ async function renderFurFile(furPath: string, outPath: string): Promise<RenderRe
       }
     }
 
-    // Channel → chip mapping
-    if (chipIds.length > 0) {
+    // Channel → chip mapping + per-channel dispatch handle for multi-chip routing
+    if (chipInstances.length > 0) {
       let chanOffset = 0;
-      for (const chipId of chipIds) {
-        const handle = chipHandles.get(chipId)!;
+      for (const { handle, chipId } of chipInstances) {
         const chipChans = wasm._furnace_dispatch_get_num_channels(handle);
         for (let subIdx = 0; subIdx < chipChans && (chanOffset + subIdx) < numChannels; subIdx++) {
           wasm._furnace_seq_set_channel_chip(chanOffset + subIdx, chipId, subIdx);
+          wasm._furnace_seq_set_channel_dispatch(chanOffset + subIdx, handle);
         }
         chanOffset += chipChans;
       }
     }
 
-    // 9. Force instrument state into all chips (Furnace does this before play())
-    for (const handle of chipHandles.values()) {
-      wasm._furnace_dispatch_force_ins(handle);
+    // 9. Reset all dispatches before play (matches Furnace playSub→reset→dispatch->reset())
+    // Note: forceIns() is NOT called here — Furnace only calls it when seeking to non-zero position
+    for (const { handle } of chipInstances) {
+      wasm._furnace_dispatch_reset(handle);
     }
 
     // 10. Allocate output buffers
@@ -620,18 +674,24 @@ async function renderFurFile(furPath: string, outPath: string): Promise<RenderRe
     const outPtrR = wasm._malloc(BUFFER_SIZE * 4);
 
     // 11. Start playback and render
-    console.log(`[render] Volume: masterVol=${module.masterVol}, systemVol=[${module.systemVol.join(',')}], systemPan=[${module.systemPan.join(',')}]`);
+    const postAmps = chipInstances.map(c => getPostAmp(c.chipId));
+    console.log(`[render] Volume: masterVol=${module.masterVol}, systemVol=[${module.systemVol.join(',')}], postAmp=[${postAmps.join(',')}], systemPan=[${module.systemPan.join(',')}]`);
     console.log(`[render] Starting playback: ${numChannels}ch, patLen=${patLen}, orders=${ordersLen}, speed=${sub.speed1}/${sub.speed2}, hz=${sub.hz}, vTempoN=${sub.virtualTempoN}, vTempoD=${sub.virtualTempoD}`);
+    // Enable command logging if --cmdlog flag is present
+    const cmdLogEnabled = process.argv.includes('--cmdlog');
+    if (cmdLogEnabled) {
+      wasm._furnace_cmd_log_enable(1);
+    }
+
     // Set remaining loops to 1: play through once, stop at first loop detection
+    // Note: Furnace CLI `-loops 0` also does exportLoopCount=1, stops after first loop
     wasm._furnace_seq_set_remaining_loops(1);
     wasm._furnace_seq_play(0, 0);
 
     const tickRate = sub.hz || 60;
-    const samplesPerTick = SAMPLE_RATE / tickRate;
-    let tickAccumulator = 0;
     const maxSamples = MAX_RENDER_SECONDS * SAMPLE_RATE;
 
-    console.log(`[render] samplesPerTick=${samplesPerTick.toFixed(2)}, tickRate=${tickRate}`);
+    console.log(`[render] samplesPerTick=${(SAMPLE_RATE / tickRate).toFixed(2)}, tickRate=${tickRate}`);
 
     // Collect all rendered samples
     const outputChunks: Float32Array[] = [];
@@ -644,80 +704,112 @@ async function renderFurFile(furPath: string, outPath: string): Promise<RenderRe
     // Track if we've seen the song loop (order goes back to 0 after reaching end)
     let maxOrderSeen = 0;
 
-    while (totalRenderedSamples < maxSamples && !songEnded) {
-      // Advance tick accumulator
-      tickAccumulator += BUFFER_SIZE;
-      while (tickAccumulator >= samplesPerTick) {
-        try {
-          if (wasm._furnace_seq_is_playing()) {
-            const pos = wasm._furnace_seq_tick();
-            const currentOrder = (pos >> 16) & 0xFFFF;
-            const currentRow = pos & 0xFFFF;
+    // Pre-compute per-chip volume/pan (constant for the render)
+    const chipVolL: number[] = [];
+    const chipVolR: number[] = [];
+    for (let ci = 0; ci < chipInstances.length; ci++) {
+      const sysVol = module.systemVol[ci] ?? 1.0;
+      const postAmp = getPostAmp(chipInstances[ci].chipId);
+      const baseVol = sysVol * postAmp * (module.masterVol ?? 1.0);
+      const pan = module.systemPan?.[ci] ?? 0.0;
+      const panFR = module.systemPanFR?.[ci] ?? 0.0;
+      chipVolL.push(baseVol * Math.min(1.0, 1.0 - pan) * Math.min(1.0, 1.0 + panFR));
+      chipVolR.push(baseVol * Math.min(1.0, 1.0 + pan) * Math.min(1.0, 1.0 + panFR));
+    }
 
-            // Log order transitions, and full detail for order 3
-            if (tickCount < 20 || (currentRow === 0 && currentOrder !== lastOrder) ||
-                (currentOrder === 3 && currentRow <= 3) || (currentOrder === 3 && currentRow >= 110)) {
-              console.log(`[render] tick ${tickCount}: order=${currentOrder} row=${currentRow}`);
-            }
-            tickCount++;
+    // Integer tick accumulator with clockDrift (matches Furnace playback.cpp:2004-2025)
+    // cycles = samples until next tick; clockDrift accumulates fractional remainder
+    let cycles = 0; // 0 means tick fires immediately on first iteration (matches Furnace)
+    const divider = tickRate;
+    let clockDrift = 0.0;
 
-            // Detect loop: order resets to 0 after advancing past the max
-            if (currentOrder > maxOrderSeen) {
-              maxOrderSeen = currentOrder;
-            } else if (currentOrder === 0 && maxOrderSeen > 0 && currentRow === 0) {
-              songEnded = true;
-              console.log(`[render] Song looped at tick ${tickCount}, maxOrder=${maxOrderSeen}`);
-              break;
-            }
-            lastOrder = currentOrder;
-          } else {
-            songEnded = true;
-            console.log(`[render] Sequencer stopped at tick ${tickCount}`);
-            break;
-          }
-          // Tick all chips
-          for (const handle of chipHandles.values()) {
-            wasm._furnace_dispatch_tick(handle);
-          }
-        } catch (e) {
-          throw new Error(`Tick crashed at order=${lastOrder} sample=${totalRenderedSamples}: ${(e as Error).message}`);
+    // Helper: process one tick (sequencer + all chips)
+    function doTick(): boolean {
+      try {
+        if (!wasm._furnace_seq_is_playing()) {
+          console.log(`[render] Sequencer stopped at tick ${tickCount}`);
+          return false;
         }
-        tickAccumulator -= samplesPerTick;
+        const pos = wasm._furnace_seq_tick();
+        const currentOrder = (pos >> 16) & 0xFFFF;
+        const currentRow = pos & 0xFFFF;
+
+        if (currentRow === 0 && currentOrder !== lastOrder) {
+          console.log(`[render] tick ${tickCount}: order=${currentOrder} row=${currentRow}`);
+        }
+        tickCount++;
+
+        if (currentOrder > maxOrderSeen) {
+          maxOrderSeen = currentOrder;
+        }
+        lastOrder = currentOrder;
+
+        for (const { handle } of chipInstances) {
+          wasm._furnace_dispatch_tick(handle);
+        }
+        return true;
+      } catch (e) {
+        throw new Error(`Tick crashed at order=${lastOrder} sample=${totalRenderedSamples}: ${(e as Error).message}`);
       }
+    }
 
-      if (songEnded) break;
-
-      // Render each chip and mix with volume/pan scaling (mirrors Furnace nextBuf patchbay)
-      const chunkL = new Float32Array(BUFFER_SIZE);
-      const chunkR = new Float32Array(BUFFER_SIZE);
-
-      let chipIdx = 0;
-      for (const handle of chipHandles.values()) {
-        wasm._furnace_dispatch_render(handle, outPtrL, outPtrR, BUFFER_SIZE);
-        // Read output from WASM heap (refresh views after potential growth)
+    // Helper: render exactly `count` samples from all chips, mix into output arrays at `offset`
+    function renderSamples(chunkL: Float32Array, chunkR: Float32Array, offset: number, count: number) {
+      for (let ci = 0; ci < chipInstances.length; ci++) {
+        wasm._furnace_dispatch_render(chipInstances[ci].handle, outPtrL, outPtrR, count);
         updateHeapViews(wasm);
         const heapF32 = wasm.HEAPF32;
         const offL = outPtrL >> 2;
         const offR = outPtrR >> 2;
-
-        // Volume: systemVol * masterVol (getPostAmp=1.0, refPlayerVol=1.0)
-        const sysVol = module.systemVol[chipIdx] ?? 1.0;
-        const baseVol = sysVol * (module.masterVol ?? 1.0);
-        // Pan: systemPan [-1..+1], systemPanFR [-1..+1]
-        const pan = module.systemPan?.[chipIdx] ?? 0.0;
-        const panFR = module.systemPanFR?.[chipIdx] ?? 0.0;
-        const volL = baseVol * Math.min(1.0, 1.0 - pan) * Math.min(1.0, 1.0 + panFR);
-        const volR = baseVol * Math.min(1.0, 1.0 + pan) * Math.min(1.0, 1.0 + panFR);
-
-        for (let i = 0; i < BUFFER_SIZE; i++) {
-          chunkL[i] += heapF32[offL + i] * volL;
-          chunkR[i] += heapF32[offR + i] * volR;
+        const vL = chipVolL[ci];
+        const vR = chipVolR[ci];
+        for (let i = 0; i < count; i++) {
+          chunkL[offset + i] += heapF32[offL + i] * vL;
+          chunkR[offset + i] += heapF32[offR + i] * vR;
         }
-        chipIdx++;
+      }
+    }
+
+    // Main render loop: sample-accurate tick-render interleaving
+    // Mirrors Furnace playback.cpp:3079-3237 — render between tick boundaries
+    while (totalRenderedSamples < maxSamples && !songEnded) {
+      const chunkL = new Float32Array(BUFFER_SIZE);
+      const chunkR = new Float32Array(BUFFER_SIZE);
+      let samplesLeft = BUFFER_SIZE;
+      let chunkOffset = 0;
+
+      while (samplesLeft > 0) {
+        // If cycles exhausted, fire a tick
+        if (cycles <= 0) {
+          if (!doTick()) {
+            songEnded = true;
+            // Render remaining samples before breaking
+            if (chunkOffset > 0) {
+              // Already have some rendered samples in this chunk
+            }
+            break;
+          }
+          // Compute samples until next tick (integer + clockDrift, matches Furnace)
+          cycles = Math.floor(SAMPLE_RATE / divider);
+          clockDrift += SAMPLE_RATE % divider;
+          if (clockDrift >= divider) {
+            clockDrift -= divider;
+            cycles++;
+          }
+        }
+
+        // Render min(cycles, samplesLeft) samples
+        const toRender = Math.min(cycles, samplesLeft);
+        renderSamples(chunkL, chunkR, chunkOffset, toRender);
+        chunkOffset += toRender;
+        samplesLeft -= toRender;
+        cycles -= toRender;
       }
 
+      if (chunkOffset === 0 && songEnded) break;
+
       // Track max amplitude
-      for (let i = 0; i < BUFFER_SIZE; i++) {
+      for (let i = 0; i < chunkOffset; i++) {
         const absL = Math.abs(chunkL[i]);
         const absR = Math.abs(chunkR[i]);
         if (absL > maxAmplitude) maxAmplitude = absL;
@@ -725,7 +817,7 @@ async function renderFurFile(furPath: string, outPath: string): Promise<RenderRe
       }
 
       // Log audio levels periodically (every ~1 second)
-      if (totalRenderedSamples > 0 && totalRenderedSamples % (SAMPLE_RATE) < BUFFER_SIZE) {
+      if (totalRenderedSamples > 0 && totalRenderedSamples % SAMPLE_RATE < BUFFER_SIZE) {
         const secNum = Math.floor(totalRenderedSamples / SAMPLE_RATE);
         if (secNum <= 5) {
           console.log(`[render] @${secNum}s: maxAmp=${maxAmplitude.toFixed(6)}, ticks=${tickCount}`);
@@ -733,13 +825,13 @@ async function renderFurFile(furPath: string, outPath: string): Promise<RenderRe
       }
 
       // Interleave L/R
-      const interleaved = new Float32Array(BUFFER_SIZE * 2);
-      for (let i = 0; i < BUFFER_SIZE; i++) {
+      const interleaved = new Float32Array(chunkOffset * 2);
+      for (let i = 0; i < chunkOffset; i++) {
         interleaved[i * 2] = chunkL[i];
         interleaved[i * 2 + 1] = chunkR[i];
       }
       outputChunks.push(interleaved);
-      totalRenderedSamples += BUFFER_SIZE;
+      totalRenderedSamples += chunkOffset;
     }
 
     console.log(`[render] Done: ${tickCount} ticks, maxAmp=${maxAmplitude.toFixed(6)}, ${(totalRenderedSamples/SAMPLE_RATE).toFixed(1)}s`);
@@ -755,10 +847,34 @@ async function renderFurFile(furPath: string, outPath: string): Promise<RenderRe
 
     writeWav(outPath, allSamples, SAMPLE_RATE, 2);
 
+    // Dump command log if enabled
+    if (cmdLogEnabled) {
+      const logCount = wasm._furnace_cmd_log_count();
+      if (logCount > 0) {
+        const logPtr = wasm._furnace_cmd_log_get();
+        const logData = new Int32Array(wasm.HEAP32.buffer, logPtr, logCount * 6);
+        const logPath = outPath.replace('.wav', '.cmdlog.txt');
+        const lines: string[] = [`# tick cmd chan val1 val2 ret (${logCount} entries)`];
+        for (let i = 0; i < Math.min(logCount, 5000); i++) {
+          const tick = logData[i * 6 + 0];
+          const cmd = logData[i * 6 + 1];
+          const chan = logData[i * 6 + 2];
+          const val1 = logData[i * 6 + 3];
+          const val2 = logData[i * 6 + 4];
+          const ret = logData[i * 6 + 5];
+          lines.push(`${tick}\t${cmd}\t${chan}\t${val1}\t${val2}\t${ret}`);
+        }
+        writeFileSync(logPath, lines.join('\n'));
+        console.log(`[render] Command log: ${logCount} entries written to ${logPath}`);
+        wasm._free(logPtr);
+      }
+      wasm._furnace_cmd_log_enable(0);
+    }
+
     // Cleanup
     wasm._free(outPtrL);
     wasm._free(outPtrR);
-    for (const handle of chipHandles.values()) {
+    for (const { handle } of chipInstances) {
       wasm._furnace_dispatch_destroy(handle);
     }
 
@@ -774,6 +890,74 @@ async function renderFurFile(furPath: string, outPath: string): Promise<RenderRe
 }
 
 // ── Compat Flags Packer (mirrors FurnaceSequencerSerializer.ts) ─────────────
+
+/**
+ * Pack compat flags into binary format for furnace_dispatch_set_compat_flags().
+ * Each byte corresponds to a flag value, order matches DivCompatFlags struct
+ * as consumed in FurnaceDispatchWrapper.cpp:1275-1332.
+ */
+function packDispatchCompatFlags(cf: Record<string, unknown>): Uint8Array {
+  const flags = new Uint8Array(55); // plenty of room for all flags
+  let i = 0;
+  flags[i++] = (cf.limitSlides as number) || 0;
+  flags[i++] = (cf.linearPitch as number) ?? 2;
+  flags[i++] = (cf.pitchSlideSpeed as number) || 4;
+  flags[i++] = (cf.loopModality as number) || 0;
+  flags[i++] = (cf.delayBehavior as number) || 0;
+  flags[i++] = (cf.jumpTreatment as number) || 0;
+  flags[i++] = (cf.properNoiseLayout as number) || 0;
+  flags[i++] = (cf.waveDutyIsVol as number) || 0;
+  flags[i++] = (cf.resetMacroOnPorta as number) || 0;
+  flags[i++] = (cf.legacyVolumeSlides as number) || 0;
+  flags[i++] = (cf.compatibleArpeggio as number) || 0;
+  flags[i++] = (cf.noteOffResetsSlides as number) || 0;
+  flags[i++] = (cf.targetResetsSlides as number) || 0;
+  flags[i++] = (cf.arpNonPorta as number) || 0;
+  flags[i++] = (cf.algMacroBehavior as number) || 0;
+  flags[i++] = (cf.brokenShortcutSlides as number) || 0;
+  flags[i++] = (cf.ignoreDuplicateSlides as number) || 0;
+  flags[i++] = (cf.stopPortaOnNoteOff as number) || 0;
+  flags[i++] = (cf.continuousVibrato as number) || 0;
+  flags[i++] = (cf.brokenDACMode as number) || 0;
+  flags[i++] = (cf.oneTickCut as number) || 0;
+  flags[i++] = (cf.newInsTriggersInPorta as number) || 0;
+  flags[i++] = (cf.arp0Reset as number) || 0;
+  flags[i++] = (cf.brokenSpeedSel as number) || 0;
+  flags[i++] = (cf.noSlidesOnFirstTick as number) || 0;
+  flags[i++] = (cf.rowResetsArpPos as number) || 0;
+  flags[i++] = (cf.ignoreJumpAtEnd as number) || 0;
+  flags[i++] = (cf.buggyPortaAfterSlide as number) || 0;
+  flags[i++] = (cf.gbInsAffectsEnvelope as number) || 0;
+  flags[i++] = (cf.sharedExtStat as number) || 0;
+  flags[i++] = (cf.ignoreDACModeOutsideIntendedChannel as number) || 0;
+  flags[i++] = (cf.e1e2AlsoTakePriority as number) || 0;
+  flags[i++] = (cf.newSegaPCM as number) || 0;
+  flags[i++] = (cf.fbPortaPause as number) || 0;
+  flags[i++] = (cf.snDutyReset as number) || 0;
+  flags[i++] = (cf.pitchMacroIsLinear as number) || 0;
+  flags[i++] = (cf.oldOctaveBoundary as number) || 0;
+  flags[i++] = (cf.noOPN2Vol as number) || 0;
+  flags[i++] = (cf.newVolumeScaling as number) || 0;
+  flags[i++] = (cf.volMacroLinger as number) || 0;
+  flags[i++] = (cf.brokenOutVol as number) || 0;
+  flags[i++] = (cf.brokenOutVol2 as number) || 0;
+  flags[i++] = (cf.e1e2StopOnSameNote as number) || 0;
+  flags[i++] = (cf.brokenPortaArp as number) || 0;
+  flags[i++] = (cf.snNoLowPeriods as number) || 0;
+  flags[i++] = (cf.disableSampleMacro as number) || 0;
+  flags[i++] = (cf.oldArpStrategy as number) || 0;
+  flags[i++] = (cf.brokenPortaLegato as number) || 0;
+  flags[i++] = (cf.brokenFMOff as number) || 0;
+  flags[i++] = (cf.preNoteNoEffect as number) || 0;
+  flags[i++] = (cf.oldDPCM as number) || 0;
+  flags[i++] = (cf.resetArpPhaseOnNewNote as number) || 0;
+  flags[i++] = (cf.ceilVolumeScaling as number) || 0;
+  flags[i++] = (cf.oldAlwaysSetVolume as number) || 0;
+  flags[i++] = (cf.oldSampleOffset as number) || 0;
+  flags[i++] = (cf.oldCenterRate as number) || 0;
+  flags[i++] = (cf.noVolSlideReset as number) || 0;
+  return flags.subarray(0, i);
+}
 
 function packCompatFlags(cf: Record<string, unknown>): { flags: number; flagsExt: number; pitchSlideSpeed: number } {
   let flags = 0;
@@ -831,7 +1015,21 @@ async function main() {
     console.log('Usage:');
     console.log('  npx tsx tools/furnace-audit/render-devilbox.ts <file.fur> [output.wav]');
     console.log('  npx tsx tools/furnace-audit/render-devilbox.ts --batch [category]');
+    console.log('  npx tsx tools/furnace-audit/render-devilbox.ts --cleanup [category]');
     process.exit(1);
+  }
+
+  if (args[0] === '--cleanup') {
+    // Manual cleanup: delete all WAVs in output dir (or specific category)
+    const category = args[1];
+    const dir = category ? join(OUTPUT_DIR, category) : OUTPUT_DIR;
+    if (existsSync(dir)) {
+      rmSync(dir, { recursive: true });
+      console.log(`Cleaned up: ${dir}`);
+    } else {
+      console.log(`Nothing to clean: ${dir}`);
+    }
+    return;
   }
 
   if (args[0] === '--batch') {
@@ -852,6 +1050,48 @@ async function main() {
   }
 }
 
+/**
+ * Remove stale WAVs from the output directory that weren't produced in this run.
+ * If rendering a specific category, only cleans that category's subdirectory.
+ */
+function cleanupStaleWavs(renderedPaths: Set<string>, category?: string) {
+  const dirsToClean = category
+    ? [join(OUTPUT_DIR, category)]
+    : existsSync(OUTPUT_DIR)
+      ? readdirSync(OUTPUT_DIR)
+          .map(d => join(OUTPUT_DIR, d))
+          .filter(d => { try { return statSync(d).isDirectory(); } catch { return false; } })
+      : [];
+
+  let removed = 0;
+  let freedBytes = 0;
+
+  for (const dir of dirsToClean) {
+    if (!existsSync(dir)) continue;
+    const files = readdirSync(dir).filter(f => f.endsWith('.wav'));
+    for (const f of files) {
+      const fullPath = join(dir, f);
+      if (!renderedPaths.has(fullPath)) {
+        try {
+          const size = statSync(fullPath).size;
+          unlinkSync(fullPath);
+          removed++;
+          freedBytes += size;
+        } catch { /* ignore */ }
+      }
+    }
+    // Remove empty category dirs
+    try {
+      const remaining = readdirSync(dir);
+      if (remaining.length === 0) rmSync(dir);
+    } catch { /* ignore */ }
+  }
+
+  if (removed > 0) {
+    console.log(`  Cleaned up ${removed} stale WAV(s), freed ${(freedBytes / 1048576).toFixed(1)}MB`);
+  }
+}
+
 async function runBatch(category?: string) {
   // Find all .fur files in demos dir
   const categories = category
@@ -862,6 +1102,7 @@ async function runBatch(category?: string) {
 
   let pass = 0, fail = 0, total = 0;
   const failures: RenderResult[] = [];
+  const renderedPaths = new Set<string>();
 
   for (const cat of categories) {
     const catDir = join(DEMOS_DIR, cat);
@@ -882,6 +1123,7 @@ async function runBatch(category?: string) {
 
       if (result.success) {
         pass++;
+        renderedPaths.add(outPath);
         const dur = (result.duration || 0).toFixed(1).padStart(5);
         const size = ((result.wavSize || 0) / 1048576).toFixed(0).padStart(3);
         console.log(`\x1b[32mOK\x1b[0m (${dur}s, ${size}M)`);
@@ -892,6 +1134,9 @@ async function runBatch(category?: string) {
       }
     }
   }
+
+  // Auto-cleanup stale WAVs from previous runs
+  cleanupStaleWavs(renderedPaths, category);
 
   console.log('');
   console.log('═'.repeat(70));
