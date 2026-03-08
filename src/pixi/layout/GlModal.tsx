@@ -12,7 +12,7 @@
  */
 
 import React, { useCallback, useEffect } from 'react';
-import type { FederatedPointerEvent, Graphics as GraphicsType } from 'pixi.js';
+import type { FederatedPointerEvent, FederatedWheelEvent, Graphics as GraphicsType } from 'pixi.js';
 import { useApplication } from '@pixi/react';
 import { usePixiTheme } from '../theme';
 import { Div } from './Div';
@@ -66,14 +66,20 @@ export const GlModal: React.FC<GlModalProps> = ({
     e.stopPropagation();
   }, []);
 
-  const blockWheel = useCallback((e: { stopPropagation: () => void }) => {
+  const blockWheel = useCallback((e: FederatedWheelEvent) => {
     e.stopPropagation();
+    (e.nativeEvent as WheelEvent | undefined)?.preventDefault?.();
+    (e.nativeEvent as WheelEvent | undefined)?.stopImmediatePropagation?.();
   }, []);
 
-  if (!isOpen) return null;
-
+  // Always mount structure — use renderable to hide. Returning null or using
+  // {isOpen && ...} causes addChild → Yoga BindingError on open.
   return (
-    <pixiContainer layout={{ position: 'absolute', width: '100%', height: '100%' }}>
+    <pixiContainer
+      renderable={isOpen}
+      eventMode={isOpen ? 'static' : 'none'}
+      layout={{ position: 'absolute', width: '100%', height: '100%' }}
+    >
       {/* Backdrop overlay */}
       <pixiGraphics
         draw={drawOverlay}

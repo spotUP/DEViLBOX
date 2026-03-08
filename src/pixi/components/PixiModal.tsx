@@ -5,7 +5,7 @@
  */
 
 import { useCallback, useEffect, useState } from 'react';
-import type { Graphics as GraphicsType, FederatedPointerEvent } from 'pixi.js';
+import type { Graphics as GraphicsType, FederatedPointerEvent, FederatedWheelEvent } from 'pixi.js';
 import { useApplication } from '@pixi/react';
 import { PIXI_FONTS } from '../fonts';
 import { usePixiTheme } from '../theme';
@@ -84,28 +84,37 @@ export const PixiModal: React.FC<PixiModalProps> = ({
   }, []);
 
   // Block wheel events on overlay to prevent scroll-through to content behind modal
-  const blockWheel = useCallback((e: { stopPropagation: () => void }) => {
+  const blockWheel = useCallback((e: FederatedWheelEvent) => {
     e.stopPropagation();
+    (e.nativeEvent as WheelEvent | undefined)?.preventDefault?.();
+    (e.nativeEvent as WheelEvent | undefined)?.stopImmediatePropagation?.();
   }, []);
 
   // Always render a persistent pixiContainer so pixi-react never does
   // a null→tree insertion at the parent level. The custom reconciler can
   // silently fail when inserting new display objects among many null siblings.
   // When closed, this is an invisible empty container (costs nothing).
+  //
+  // IMPORTANT: Use renderable (not visible) to hide. @pixi/layout's
+  // sort-children skips !visible nodes from the Yoga tree. If visible=false
+  // on mount, the Yoga node never gets inserted, so when visible later
+  // becomes true the container gets 0×0 computed layout and stays invisible.
+  // renderable=false prevents drawing and hit-testing without affecting Yoga.
   return (
     <pixiContainer
-      visible={isOpen}
+      renderable={isOpen}
+      eventMode={isOpen ? 'static' : 'none'}
       layout={{ position: 'absolute', width: '100%', height: '100%' }}
     >
-      {isOpen && (
-        <>
-          <pixiGraphics
-            draw={drawOverlay}
-            eventMode="static"
-            onPointerUp={handleOverlayClick}
-            onWheel={blockWheel}
-            layout={{ position: 'absolute', width: screenW, height: screenH }}
-          />
+      {/* Always mount overlay + panel structure to avoid addChild → Yoga BindingError.
+          The outer container's renderable={isOpen} controls visibility. */}
+      <pixiGraphics
+        draw={drawOverlay}
+        eventMode="static"
+        onPointerUp={handleOverlayClick}
+        onWheel={blockWheel}
+        layout={{ position: 'absolute', width: screenW, height: screenH }}
+      />
 
       {/* Centered panel — matches DOM: bg-dark-bg, border, rounded-lg, shadow-xl */}
       <layoutContainer
@@ -135,8 +144,6 @@ export const PixiModal: React.FC<PixiModalProps> = ({
           {children}
         </layoutContainer>
       </layoutContainer>
-      </>
-      )}
     </pixiContainer>
   );
 };
