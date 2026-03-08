@@ -490,29 +490,42 @@ export async function startNativeEngines(
   }
 
   // --- Symphonie Pro (special case: song loaded via InstrumentFactory → SymphonieSynth.load()) ---
-  // The SymphonieEngine manages its own AudioWorklet sequencer. InstrumentFactory calls
-  // symphSynth.load() (fire-and-forget), so we need to ensure the engine exists and
-  // call play() to start the worklet's internal sequencer.
+  // The SymphonieEngine manages its own AudioWorklet sequencer — suppress normal notes.
   if (song.symphonieFileData) {
     suppressNotes = true;
     try {
       const { SymphonieEngine } = await import('../symphonie/SymphonieEngine');
-      if (SymphonieEngine.hasInstance()) {
-        const symphEngine = SymphonieEngine.getInstance();
-        // Wait for the worklet node to be ready (load() may still be in progress)
-        const maxWait = 3000;
-        const start = Date.now();
-        while (!symphEngine.getNode() && Date.now() - start < maxWait) {
-          await new Promise(r => setTimeout(r, 50));
-        }
-        if (!muted && symphEngine.getNode()) {
+      // SymphonieEngine singleton is created by ensureWASMSynthsReady → SymphonieSynth constructor.
+      // If it doesn't exist yet, create it and load the song data ourselves.
+      const symphEngine = SymphonieEngine.getInstance();
+      console.log('[NativeEngineRouting] SymphonieEngine: hasNode=', !!symphEngine.getNode());
+
+      // Wait for the worklet node to be ready (load() may still be in progress from InstrumentFactory)
+      const maxWait = 5000;
+      const start = Date.now();
+      while (!symphEngine.getNode() && Date.now() - start < maxWait) {
+        await new Promise(r => setTimeout(r, 50));
+      }
+
+      if (symphEngine.getNode()) {
+        if (!muted) {
           symphEngine.play();
           console.log('[NativeEngineRouting] SymphonieEngine playing');
-        } else if (!symphEngine.getNode()) {
-          console.warn('[NativeEngineRouting] SymphonieEngine worklet not ready after timeout');
         }
       } else {
-        console.warn('[NativeEngineRouting] SymphonieEngine not initialized');
+        // Worklet didn't load in time — try loading manually
+        console.warn('[NativeEngineRouting] SymphonieEngine worklet not ready, attempting manual load');
+        const firstInst = song.instruments.find(i => i.synthType === 'SymphonieSynth');
+        if (firstInst && (firstInst as any).symphonie) {
+          const { getDevilboxAudioContext } = await import('@/utils/audio-context');
+          await symphEngine.loadSong(getDevilboxAudioContext(), (firstInst as any).symphonie);
+          if (!muted) {
+            symphEngine.play();
+            console.log('[NativeEngineRouting] SymphonieEngine playing (manual load)');
+          }
+        } else {
+          console.error('[NativeEngineRouting] No SymphonieSynth instrument found');
+        }
       }
     } catch (err) {
       console.error('[NativeEngineRouting] Failed to start SymphonieEngine:', err);
