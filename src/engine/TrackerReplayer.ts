@@ -276,6 +276,10 @@ export interface TrackerSong {
   zxtuneFileData?: ArrayBuffer;
   /** Raw SC68/SNDH binary for loading into the Sc68Engine WASM */
   sc68FileData?: ArrayBuffer;
+  /** Raw PumaTracker .puma binary for loading into the PumaTrackerEngine WASM */
+  pumaTrackerFileData?: ArrayBuffer;
+  /** Raw Art of Noise (.aon) binary for ArtOfNoiseEngine WASM playback */
+  artOfNoiseFileData?: ArrayBuffer;
   /** Raw module binary for libopenmpt WASM playback (MOD/XM/IT/S3M) */
   libopenmptFileData?: ArrayBuffer;
   // Native format data (preserved for format-specific editors)
@@ -403,6 +407,7 @@ export class TrackerReplayer {
   private bufferCache: Map<number, Tone.ToneAudioBuffer> = new Map();
   // Cache for multi-sample decoded AudioBuffers (keyed by "instId:sampleIdx")
   private multiSampleBufferCache: Map<string, AudioBuffer> = new Map();
+  private _warnedOnce?: Set<string>;
   private _warnedMissingInstruments: Set<number> | undefined;
 
   // Instrument lookup map (keyed by instrument ID) — avoids linear scan per note
@@ -829,7 +834,7 @@ export class TrackerReplayer {
     import('@engine/libopenmpt/OpenMPTEditBridge').then(b => b.reset()).catch(() => {});
 
     this.song = song;
-
+    this._warnedOnce = undefined;
 
     // Configure format-dispatching pattern accessor
     if (song.furnaceNative) {
@@ -3898,7 +3903,13 @@ export class TrackerReplayer {
       if (sample?.url) {
         engine.getInstrument(ch.instrument.id, ch.instrument);
       }
-      console.warn('[TrackerReplayer] No decoded buffer for instrument:', ch.instrument.id, ch.instrument.name);
+      // Only warn once per instrument to avoid flooding console during playback
+      const warnKey = `no-buffer-${ch.instrument.id}`;
+      if (!this._warnedOnce?.has(warnKey)) {
+        if (!this._warnedOnce) this._warnedOnce = new Set<string>();
+        this._warnedOnce.add(warnKey);
+        console.warn('[TrackerReplayer] No decoded buffer for instrument:', ch.instrument.id, ch.instrument.name);
+      }
       return;
     }
 

@@ -755,16 +755,9 @@ export class ToneEngine {
       await ToneEngine.itFilterWorkletPromise;
     }
 
-    // Pre-initialize Furnace WASM chip engine
-    // This ensures the WASM is ready before any Furnace synths are created
-    try {
-      const furnaceEngine = FurnaceChipEngine.getInstance();
-      // Pass Tone.js context - the engine will extract the native AudioContext
-      await furnaceEngine.init(Tone.getContext());
-      console.warn('[ToneEngine] Furnace WASM chip engine initialized');
-    } catch (error) {
-      console.warn('[ToneEngine] Furnace WASM init failed:', error);
-    }
+    // Furnace WASM chip engine is initialized lazily — only when a Furnace
+    // synth instrument is first created (via ensureWASMSynthsReady or getInstrument).
+    // No reason to load 347KB of chip emulation for non-Furnace formats.
 
     // Initialize BLEP processor (non-blocking, loads in background)
     this.blepManager.init().then(() => {
