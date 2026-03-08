@@ -43,6 +43,11 @@ interface FormatStore {
   zxtuneFileData: ArrayBuffer | null;
   pumaTrackerFileData: ArrayBuffer | null;
   artOfNoiseFileData: ArrayBuffer | null;
+  bdFileData: ArrayBuffer | null;
+  sd2FileData: ArrayBuffer | null;
+  symphonieFileData: ArrayBuffer | null;
+  uadeEditableFileData: ArrayBuffer | null;
+  uadeEditableFileName: string | null;
   libopenmptFileData: ArrayBuffer | null;
   hivelyMeta: { stereoMode: number; mixGain: number; speedMultiplier: number; version: number } | null;
   furnaceSubsongs: FurnaceSubsongPlayback[] | null;
@@ -61,7 +66,7 @@ interface FormatStore {
   setSongDBInfo: (info: FormatStore['songDBInfo']) => void;
   setSidMetadata: (info: FormatStore['sidMetadata']) => void;
   setOriginalModuleData: (data: FormatStore['originalModuleData']) => void;
-  applyEditorMode: (song: { linearPeriods?: boolean; furnaceNative?: FurnaceNativeData; hivelyNative?: HivelyNativeData; hivelyFileData?: ArrayBuffer; klysNative?: KlysNativeData; klysFileData?: ArrayBuffer; musiclineFileData?: Uint8Array; c64SidFileData?: Uint8Array; jamCrackerFileData?: ArrayBuffer; futurePlayerFileData?: ArrayBuffer; preTrackerFileData?: ArrayBuffer; maFileData?: ArrayBuffer; hippelFileData?: ArrayBuffer; sonixFileData?: ArrayBuffer; pxtoneFileData?: ArrayBuffer; organyaFileData?: ArrayBuffer; eupFileData?: ArrayBuffer; ixsFileData?: ArrayBuffer; psycleFileData?: ArrayBuffer; sc68FileData?: ArrayBuffer; zxtuneFileData?: ArrayBuffer; pumaTrackerFileData?: ArrayBuffer; artOfNoiseFileData?: ArrayBuffer; libopenmptFileData?: ArrayBuffer; hivelyMeta?: { stereoMode: number; mixGain: number; speedMultiplier: number; version: number }; furnaceSubsongs?: FurnaceSubsongPlayback[]; furnaceActiveSubsong?: number; channelTrackTables?: number[][]; channelSpeeds?: number[]; channelGrooves?: number[]; goatTrackerData?: Uint8Array }) => void;
+  applyEditorMode: (song: { linearPeriods?: boolean; furnaceNative?: FurnaceNativeData; hivelyNative?: HivelyNativeData; hivelyFileData?: ArrayBuffer; klysNative?: KlysNativeData; klysFileData?: ArrayBuffer; musiclineFileData?: Uint8Array; c64SidFileData?: Uint8Array; jamCrackerFileData?: ArrayBuffer; futurePlayerFileData?: ArrayBuffer; preTrackerFileData?: ArrayBuffer; maFileData?: ArrayBuffer; hippelFileData?: ArrayBuffer; sonixFileData?: ArrayBuffer; pxtoneFileData?: ArrayBuffer; organyaFileData?: ArrayBuffer; eupFileData?: ArrayBuffer; ixsFileData?: ArrayBuffer; psycleFileData?: ArrayBuffer; sc68FileData?: ArrayBuffer; zxtuneFileData?: ArrayBuffer; pumaTrackerFileData?: ArrayBuffer; artOfNoiseFileData?: ArrayBuffer; bdFileData?: ArrayBuffer; sd2FileData?: ArrayBuffer; symphonieFileData?: ArrayBuffer; uadeEditableFileData?: ArrayBuffer; uadeEditableFileName?: string; libopenmptFileData?: ArrayBuffer; hivelyMeta?: { stereoMode: number; mixGain: number; speedMultiplier: number; version: number }; furnaceSubsongs?: FurnaceSubsongPlayback[]; furnaceActiveSubsong?: number; channelTrackTables?: number[][]; channelSpeeds?: number[]; channelGrooves?: number[]; goatTrackerData?: Uint8Array }) => void;
   setFurnaceActiveSubsong: (index: number) => void;
   reset: () => void;
 }
@@ -106,6 +111,11 @@ export const useFormatStore = create<FormatStore>()(
     zxtuneFileData: null,
     pumaTrackerFileData: null,
     artOfNoiseFileData: null,
+    bdFileData: null,
+    sd2FileData: null,
+    symphonieFileData: null,
+    uadeEditableFileData: null,
+    uadeEditableFileName: null,
     libopenmptFileData: null,
     hivelyMeta: null,
     furnaceSubsongs: null,
@@ -151,6 +161,11 @@ export const useFormatStore = create<FormatStore>()(
         state.zxtuneFileData = song.zxtuneFileData ?? null;
         state.pumaTrackerFileData = (song as any).pumaTrackerFileData ?? null;
         state.artOfNoiseFileData = (song as any).artOfNoiseFileData ?? null;
+        state.bdFileData = (song as any).bdFileData ?? null;
+        state.sd2FileData = (song as any).sd2FileData ?? null;
+        state.symphonieFileData = (song as any).symphonieFileData ?? null;
+        state.uadeEditableFileData = (song as any).uadeEditableFileData ?? null;
+        state.uadeEditableFileName = (song as any).uadeEditableFileName ?? null;
         state.libopenmptFileData = (song as any).libopenmptFileData ?? null;
         if (song.furnaceNative) {
           state.editorMode = 'furnace';
@@ -210,6 +225,11 @@ export const useFormatStore = create<FormatStore>()(
       state.zxtuneFileData = null;
       state.pumaTrackerFileData = null;
       state.artOfNoiseFileData = null;
+      state.bdFileData = null;
+      state.sd2FileData = null;
+      state.symphonieFileData = null;
+      state.uadeEditableFileData = null;
+      state.uadeEditableFileName = null;
       state.libopenmptFileData = null;
       state.originalModuleData = null;
       state.songDBInfo = null;

@@ -44,9 +44,33 @@ function getActiveGainEngine(): { setChannelGain(ch: number, gain: number): void
     } else if (fmt.maFileData) {
       const { MaEngine } = require('../engine/ma/MaEngine');
       if (MaEngine.hasInstance()) return MaEngine.getInstance();
+    } else if (fmt.bdFileData) {
+      const { BdEngine } = require('../engine/bd/BdEngine');
+      if (BdEngine.hasInstance()) return BdEngine.getInstance();
+    } else if (fmt.sd2FileData) {
+      const { Sd2Engine } = require('../engine/sidmon2/Sd2Engine');
+      if (Sd2Engine.hasInstance()) return Sd2Engine.getInstance();
     } else if (fmt.hippelFileData) {
       const { HippelEngine } = require('../engine/hippel/HippelEngine');
       if (HippelEngine.hasInstance()) return HippelEngine.getInstance();
+    } else if (fmt.ixsFileData) {
+      const { IxalanceEngine } = require('../engine/ixalance/IxalanceEngine');
+      if (IxalanceEngine.hasInstance()) return IxalanceEngine.getInstance();
+    } else if (fmt.psycleFileData) {
+      const { CpsycleEngine } = require('../engine/cpsycle/CpsycleEngine');
+      if (CpsycleEngine.hasInstance()) return CpsycleEngine.getInstance();
+    } else if (fmt.sc68FileData) {
+      const { Sc68Engine } = require('../engine/sc68/Sc68Engine');
+      if (Sc68Engine.hasInstance()) return Sc68Engine.getInstance();
+    } else if (fmt.zxtuneFileData) {
+      const { ZxtuneEngine } = require('../engine/zxtune/ZxtuneEngine');
+      if (ZxtuneEngine.hasInstance()) return ZxtuneEngine.getInstance();
+    } else if (fmt.pumaTrackerFileData) {
+      const { PumaTrackerEngine } = require('../engine/pumatracker/PumaTrackerEngine');
+      if (PumaTrackerEngine.hasInstance()) return PumaTrackerEngine.getInstance();
+    } else if (fmt.artOfNoiseFileData) {
+      const { ArtOfNoiseEngine } = require('../engine/artofnoise/ArtOfNoiseEngine');
+      if (ArtOfNoiseEngine.hasInstance()) return ArtOfNoiseEngine.getInstance();
     }
   } catch {
     // Engine not ready

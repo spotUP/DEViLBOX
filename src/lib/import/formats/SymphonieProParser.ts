@@ -546,8 +546,13 @@ export async function parseSymphonieProFile(
       // Attach playback data to the first instrument so InstrumentFactory
       // can instantiate SymphonieSynth for native playback.
       if (song.instruments.length > 0) {
-        (song.instruments[0] as unknown as Record<string, unknown>)['synthType'] = 'SymphonieSynth';
         (song.instruments[0] as unknown as Record<string, unknown>)['symphonie'] = playbackData;
+      }
+
+      // Set synthType on ALL instruments so the instrument list shows
+      // "Symphonie" badge instead of "???" for every entry.
+      for (let i = 0; i < song.instruments.length; i++) {
+        (song.instruments[i] as unknown as Record<string, unknown>)['synthType'] = 'SymphonieSynth';
       }
 
       // Populate each instrument with its decoded PCM sample data so instruments
@@ -774,7 +779,7 @@ function _parseSymphonieProFile(bytes: Uint8Array, filename: string): TrackerSon
   const instruments: InstrumentConfig[] = cappedInstruments.length > 0
     ? cappedInstruments.map((si, i) => ({
         id:        i + 1,
-        name:      si.name || songTitle,
+        name:      si.name || `Instrument ${i + 1}`,
         type:      'sample' as const,
         effects:   [],
         volume:    si.volume ?? 0,
@@ -1142,11 +1147,110 @@ function _decodeDelta16(bytes: Uint8Array): Float32Array {
   return out;
 }
 
+/**
+ * Extract PCM from a CHUNK_SAMPLE_FILE.
+ * The data may be an IFF 8SVX file (FORM...8SVX with BODY chunk),
+ * a WAV file, or raw signed 8-bit PCM.
+ * OpenMPT tries IFF → WAV → AIFF → raw (Load_symmod.cpp:1158).
+ */
 function _decodeRaw8(bytes: Uint8Array): Float32Array {
+  // Detect IFF 8SVX: starts with "FORM" and contains "8SVX"
+  if (bytes.length >= 12 &&
+      bytes[0] === 0x46 && bytes[1] === 0x4F && bytes[2] === 0x52 && bytes[3] === 0x4D && // "FORM"
+      bytes[8] === 0x38 && bytes[9] === 0x53 && bytes[10] === 0x56 && bytes[11] === 0x58) { // "8SVX"
+    return _decodeIFF8SVX(bytes);
+  }
+  // Detect WAV: starts with "RIFF"
+  if (bytes.length >= 12 &&
+      bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46) { // "RIFF"
+    return _decodeWAV(bytes);
+  }
+  // Fallback: raw signed 8-bit PCM
   const out = new Float32Array(bytes.length);
   for (let i = 0; i < bytes.length; i++) {
     const b = bytes[i];
     out[i] = (b < 128 ? b : b - 256) / 128.0;
+  }
+  return out;
+}
+
+/** Parse IFF 8SVX and extract BODY chunk as signed 8-bit mono PCM. */
+function _decodeIFF8SVX(bytes: Uint8Array): Float32Array {
+  // Skip FORM header (4 type + 4 size + 4 "8SVX" = 12 bytes)
+  let pos = 12;
+  while (pos + 8 <= bytes.length) {
+    const id = String.fromCharCode(bytes[pos], bytes[pos+1], bytes[pos+2], bytes[pos+3]);
+    const size = (bytes[pos+4] << 24) | (bytes[pos+5] << 16) | (bytes[pos+6] << 8) | bytes[pos+7];
+    pos += 8;
+    if (id === 'BODY') {
+      const bodyLen = Math.min(size, bytes.length - pos);
+      const out = new Float32Array(bodyLen);
+      for (let i = 0; i < bodyLen; i++) {
+        const b = bytes[pos + i];
+        out[i] = (b < 128 ? b : b - 256) / 128.0;
+      }
+      return out;
+    }
+    // Skip chunk (IFF chunks are word-aligned)
+    pos += size + (size & 1);
+  }
+  // No BODY found — treat as raw
+  const out = new Float32Array(bytes.length);
+  for (let i = 0; i < bytes.length; i++) {
+    out[i] = (bytes[i] < 128 ? bytes[i] : bytes[i] - 256) / 128.0;
+  }
+  return out;
+}
+
+/** Parse WAV and extract PCM data chunk. Handles 8-bit unsigned and 16-bit signed. */
+function _decodeWAV(bytes: Uint8Array): Float32Array {
+  // RIFF header: "RIFF" + size + "WAVE"
+  if (bytes.length < 44) {
+    // Too small for valid WAV, treat as raw
+    return _decodeRawFallback(bytes);
+  }
+  let pos = 12; // skip "RIFF" + size + "WAVE"
+  let bitsPerSample = 8;
+  let numChannels = 1;
+  while (pos + 8 <= bytes.length) {
+    const id = String.fromCharCode(bytes[pos], bytes[pos+1], bytes[pos+2], bytes[pos+3]);
+    const size = bytes[pos+4] | (bytes[pos+5] << 8) | (bytes[pos+6] << 16) | (bytes[pos+7] << 24);
+    pos += 8;
+    if (id === 'fmt ') {
+      if (size >= 16) {
+        numChannels = bytes[pos+2] | (bytes[pos+3] << 8);
+        bitsPerSample = bytes[pos+14] | (bytes[pos+15] << 8);
+      }
+      pos += size;
+    } else if (id === 'data') {
+      const dataLen = Math.min(size, bytes.length - pos);
+      if (bitsPerSample === 16) {
+        const numSamples = Math.floor(dataLen / 2);
+        const out = new Float32Array(numSamples);
+        for (let i = 0; i < numSamples; i++) {
+          const raw = bytes[pos + i*2] | (bytes[pos + i*2 + 1] << 8);
+          out[i] = (raw > 32767 ? raw - 65536 : raw) / 32768.0;
+        }
+        return out;
+      } else {
+        // 8-bit WAV is unsigned (0-255, center at 128)
+        const out = new Float32Array(dataLen);
+        for (let i = 0; i < dataLen; i++) {
+          out[i] = (bytes[pos + i] - 128) / 128.0;
+        }
+        return out;
+      }
+    } else {
+      pos += size + (size & 1);
+    }
+  }
+  return _decodeRawFallback(bytes);
+}
+
+function _decodeRawFallback(bytes: Uint8Array): Float32Array {
+  const out = new Float32Array(bytes.length);
+  for (let i = 0; i < bytes.length; i++) {
+    out[i] = (bytes[i] < 128 ? bytes[i] : bytes[i] - 256) / 128.0;
   }
   return out;
 }
@@ -1386,19 +1490,22 @@ export async function parseSymphonieForPlayback(
 
   const INST_SIZE = 256;
 
-  // Assign PCM to instruments in order; instruments with type -8 (Silent)
-  // or -4 (Kill) receive no sample data. Type 0 (Normal) = non-looping sample,
-  // type 4 (Loop) = looping sample, type 8 (Sustain) = sustain-looping sample.
-  // Only -8 and -4 are sample-less.
+  // Sample chunks map to instruments. Two possible file layouts:
+  // (a) 1:1 — every instrument has a sample chunk (Silent/Kill get EMPTY_SAMPLE).
+  //     sampleIndex == numInstruments. Use rawSampleData[i] directly.
+  // (b) PCM-only — only instruments with type 0/4/8 have sample chunks.
+  //     sampleIndex < numInstruments. Use a separate pcmIdx counter.
+  // Auto-detect by comparing sampleIndex to numInstruments.
 
-  // We need a second sampleIndex pass that mirrors the chunk walk.
-  // However, since we already collected rawSampleData[] indexed by sampleIndex
-  // during the chunk walk, we just need to know which instruments have PCM.
-  // Instruments whose type is -8 or -4 have no PCM; all others (0, 4, 8) have PCM.
-  // Sample chunks map 1:1 with instruments (same as OpenMPT's Load_symmod.cpp).
-  // Silent (-8) and Kill (-4) instruments get EMPTY_SAMPLE chunks in the file,
-  // so rawSampleData[i] aligns with instrument index i, not a separate counter.
+  let numPCM = 0;
+  for (let i = 0; i < numInstruments; i++) {
+    if (symInstrumentsRaw[i].type !== -8 && symInstrumentsRaw[i].type !== -4) numPCM++;
+  }
+  const oneToOne = (sampleIndex >= numInstruments);
+  // Log for debugging
+  console.log(`[SymphonieParser] sampleIndex=${sampleIndex} numInstruments=${numInstruments} numPCM=${numPCM} mapping=${oneToOne ? '1:1' : 'pcm-only'}`);
 
+  let pcmIdx = 0;
   const instruments: SymphonieInstrumentData[] = [];
 
   for (let i = 0; i < numInstruments; i++) {
@@ -1434,7 +1541,9 @@ export async function parseSymphonieForPlayback(
 
     let samples: Float32Array | null = null;
     if (hasPCM) {
-      const entry = rawSampleData[i]; // Direct instrument index, not separate counter
+      // Use 1:1 mapping (rawSampleData[i]) or pcm-only mapping (rawSampleData[pcmIdx])
+      const smpIdx = oneToOne ? i : pcmIdx;
+      const entry = rawSampleData[smpIdx];
       if (entry) {
         if (entry.kind === 'raw8') {
           samples = _decodeRaw8(entry.bytes);
@@ -1444,6 +1553,7 @@ export async function parseSymphonieForPlayback(
           samples = _decodeDelta16(entry.bytes);
         }
       }
+      pcmIdx++;
     }
 
     instruments.push({

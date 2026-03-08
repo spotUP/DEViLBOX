@@ -284,48 +284,6 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
     }
   }, [initialFile, isOpen, handleFileSelect]);
 
-  // Auto-prompt for companion file when a two-file format is loaded without one
-  const companionPromptedRef = useRef(false);
-  useEffect(() => {
-    if (!moduleInfo || isLoading || activeCompanions.length > 0) return;
-    if (companionPromptedRef.current) return;
-
-    const companion = getExpectedCompanion(loadedFileName);
-    if (!companion) return;
-
-    companionPromptedRef.current = true;
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = '*';
-    input.style.display = 'none';
-    input.onchange = async () => {
-      const file = input.files?.[0];
-      input.remove();
-      if (!file) return;
-      try {
-        const buf = await file.arrayBuffer();
-        const { UADEEngine } = await import('@engine/uade/UADEEngine');
-        const engine = UADEEngine.getInstance();
-        await engine.ready();
-        await engine.addCompanionFile(file.name, buf);
-        setActiveCompanions([file]);
-      } catch (err) {
-        console.warn('[ImportModuleDialog] Failed to register companion file:', err);
-      }
-    };
-    document.body.appendChild(input);
-    input.click();
-    // Cleanup if cancelled
-    window.addEventListener('focus', () => {
-      setTimeout(() => { if (!input.files?.length) input.remove(); }, 300);
-    }, { once: true });
-  }, [moduleInfo, isLoading, activeCompanions, loadedFileName]);
-
-  // Reset companion prompt flag when dialog closes or file changes
-  useEffect(() => {
-    companionPromptedRef.current = false;
-  }, [loadedFileName, isOpen]);
-
   // Native format keys where libopenmpt can successfully preview the file (from FormatRegistry).
   const LIBOPENMPT_PLAYABLE_NATIVE_KEYS = getLibopenmptPlayableKeys();
 
@@ -748,8 +706,8 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
                       const comp = getExpectedCompanion(loadedFileName);
                       if (comp) return (
                         <span>
-                          <span className="font-semibold">Waiting for {comp.description}.</span>
-                          {' '}Pick the companion file to continue.
+                          <span className="font-semibold">Missing {comp.description}.</span>
+                          {' '}Drop the containing folder or both files together to include samples.
                         </span>
                       );
                       return (
@@ -790,7 +748,7 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
                   <Info size={14} className="shrink-0 mt-0.5" />
                   <div>
                     <span className="font-semibold">Editable and exportable.</span>
-                    {' '}Pattern edits will play back via libopenmpt and can be saved to MOD/XM/IT/S3M.
+                    {' '}Pattern edits play back in real-time and can be exported to native format.
                   </div>
                 </div>
               )}

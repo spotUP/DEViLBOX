@@ -31,9 +31,27 @@ function matchesPrefix(base: string, prefix: string): boolean {
   return prefix === `${ext}.`;
 }
 
+/**
+ * Check if a filename matches a list of extensions, either as suffix (.ext) or prefix (ext.).
+ * Handles Amiga naming convention where 'mdat.songname' and 'songname.mdat' are equivalent.
+ */
+function matchesExt(filename: string, exts: string[]): boolean {
+  const lower = filename.toLowerCase();
+  const base = getBasename(lower);
+  // Check suffix: .ext at end of filename
+  for (const ext of exts) {
+    if (lower.endsWith('.' + ext)) return true;
+  }
+  // Check prefix: ext. at start of basename
+  for (const ext of exts) {
+    if (base.startsWith(ext + '.')) return true;
+  }
+  return false;
+}
+
 /** Check if a filename matches Future Composer extensions */
 function isFCFormat(filename: string): boolean {
-  return /\.(fc|fc2|fc3|fc4|fc13|fc14|sfc|smod|bfc|bsi)$/.test(filename);
+  return matchesExt(filename, ['fc', 'fc2', 'fc3', 'fc4', 'fc13', 'fc14', 'sfc', 'smod', 'bfc', 'bsi']);
 }
 
 /**
@@ -138,13 +156,13 @@ export async function tryRouteFormat(
   }
 
   // ── SoundMon (Brian Postma) ─────────────────────────────────────────────
-  if (/\.(bp|bp3|sndmon)$/.test(filename)) {
+  if (matchesExt(filename, ['bp', 'bp3', 'sndmon'])) {
     const { parseSoundMonFile } = await import('@lib/import/formats/SoundMonParser');
     return withNativeThenUADE('soundmon', ctx, (buf: Uint8Array | ArrayBuffer, name: string) => parseSoundMonFile(buf as ArrayBuffer, name), 'SoundMonParser');
   }
 
   // ── SidMon 1.0 / SidMon II (.smn can be either) ─────────────────────────
-  if (/\.smn$/.test(filename)) {
+  if (matchesExt(filename, ['smn'])) {
         // Try SidMon1 magic first
     if (prefs.sidmon1 !== 'uade') {
       try {
@@ -156,39 +174,34 @@ export async function tryRouteFormat(
         console.warn(`[SidMon1Parser] Native parse failed for ${filename}, falling back:`, err);
       }
     }
-    // Then try SidMon2
-    if (prefs.sidmon2 === 'native') {
-      try {
-        const { parseSidMon2File } = await import('@lib/import/formats/SidMon2Parser');
-        return parseSidMon2File(buffer, originalFileName);
-      } catch (err) {
-        console.warn(`[SidMon2Parser] Native parse failed for ${filename}, falling back to UADE:`, err);
-      }
+    // Then try SidMon2 — dedicated Sd2Engine WASM replayer handles playback
+    {
+      const { parseSidMon2File } = await import('@lib/import/formats/SidMon2Parser');
+      return parseSidMon2File(buffer, originalFileName);
     }
-    const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
-    return parseUADEFile(buffer, originalFileName, prefs.uade ?? 'enhanced', subsong, preScannedMeta);
   }
 
   // ── SidMon II (.sid2 — unambiguous SidMon 2) ─────────────────────────────
-  if (/\.sid2$/.test(filename)) {
+  // Dedicated Sd2Engine WASM replayer handles playback; native parser provides patterns.
+  if (matchesExt(filename, ['sid2'])) {
     const { parseSidMon2File } = await import('@lib/import/formats/SidMon2Parser');
-    return withNativeThenUADE('sidmon2', ctx, (buf: Uint8Array | ArrayBuffer, name: string) => parseSidMon2File(buf as ArrayBuffer, name), 'SidMon2Parser');
+    return parseSidMon2File(buffer, originalFileName);
   }
 
   // ── Fred Editor ───────────────────────────────────────────────────────────
-  if (/\.fred$/.test(filename)) {
+  if (matchesExt(filename, ['fred'])) {
     const { parseFredEditorFile } = await import('@lib/import/formats/FredEditorParser');
     return withNativeThenUADE('fred', ctx, (buf: Uint8Array | ArrayBuffer, name: string) => parseFredEditorFile(buf as ArrayBuffer, name), 'FredEditorParser');
   }
 
   // ── Sound-FX ──────────────────────────────────────────────────────────────
-  if (/\.(sfx|sfx2|sfx13)$/.test(filename)) {
+  if (matchesExt(filename, ['sfx', 'sfx2', 'sfx13'])) {
     const { parseSoundFXFile } = await import('@lib/import/formats/SoundFXParser');
     return withNativeThenUADE('soundfx', ctx, (buf: Uint8Array | ArrayBuffer, name: string) => parseSoundFXFile(buf as ArrayBuffer, name), 'SoundFXParser');
   }
 
   // ── JamCracker ────────────────────────────────────────────────────────────
-  if (/\.(jam|jc)$/.test(filename)) {
+  if (matchesExt(filename, ['jam', 'jc'])) {
     try {
       const { isJamCrackerFormat, parseJamCrackerFile } = await import('@lib/import/formats/JamCrackerParser');
       if (isJamCrackerFormat(buffer)) {
@@ -202,7 +215,7 @@ export async function tryRouteFormat(
   }
 
   // ── Quadra Composer ───────────────────────────────────────────────────────
-  if (/\.(emod|qc)$/.test(filename)) {
+  if (matchesExt(filename, ['emod', 'qc'])) {
     try {
       const { isQuadraComposerFormat, parseQuadraComposerFile } = await import('@lib/import/formats/QuadraComposerParser');
       if (isQuadraComposerFormat(buffer)) {
@@ -216,7 +229,7 @@ export async function tryRouteFormat(
   }
 
   // ── AMOS Music Bank ───────────────────────────────────────────────────────
-  if (/\.abk$/.test(filename)) {
+  if (matchesExt(filename, ['abk'])) {
     try {
       const { isAMOSMusicBankFormat, parseAMOSMusicBankFile } = await import('@lib/import/formats/AMOSMusicBankParser');
       if (isAMOSMusicBankFormat(buffer)) {
@@ -231,7 +244,7 @@ export async function tryRouteFormat(
 
   // ── Sonic Arranger ────────────────────────────────────────────────────────
   // Magic "SOARV1.0" at offset 0. "@OARV1.0" is LH-compressed — falls to UADE.
-  if (/\.(sa|sonic)$/.test(filename)) {
+  if (matchesExt(filename, ['sa', 'sonic'])) {
         if (prefs.sonicArranger === 'native') {
       try {
         const { isSonicArrangerFormat, parseSonicArrangerFile } = await import('@lib/import/formats/SonicArrangerParser');
@@ -249,7 +262,7 @@ export async function tryRouteFormat(
 
   // ── InStereo! 2.0 (.is20 — unambiguous) ──────────────────────────────────
   // Magic "IS20DF10" at offset 0.
-  if (/\.is20$/.test(filename)) {
+  if (matchesExt(filename, ['is20'])) {
     const { isInStereo2Format, parseInStereo2File } = await import('@lib/import/formats/InStereo2Parser');
     return withNativeThenUADE('inStereo2', ctx,
       (bytes: Uint8Array | ArrayBuffer, name: string) => parseInStereo2File(bytes as Uint8Array, name),
@@ -258,7 +271,7 @@ export async function tryRouteFormat(
 
   // ── InStereo! 1.0 (.is10 — unambiguous) ──────────────────────────────────
   // Magic "ISM!V1.2" at offset 0.
-  if (/\.is10$/.test(filename)) {
+  if (matchesExt(filename, ['is10'])) {
     const { isInStereo1Format, parseInStereo1File } = await import('@lib/import/formats/InStereo1Parser');
     return withNativeThenUADE('inStereo1', ctx,
       (bytes: Uint8Array | ArrayBuffer, name: string) => parseInStereo1File(bytes as Uint8Array, name),
@@ -266,7 +279,7 @@ export async function tryRouteFormat(
   }
 
   // ── InStereo! (.is — ambiguous: detect by magic) ─────────────────────────
-  if (/\.is$/.test(filename)) {
+  if (matchesExt(filename, ['is'])) {
         const bytes = new Uint8Array(buffer);
     if (prefs.inStereo2 === 'native') {
       try {
@@ -295,7 +308,7 @@ export async function tryRouteFormat(
   }
 
   // ── PreTracker ───────────────────────────────────────────────────────────
-  if (/\.prt$/.test(filename)) {
+  if (matchesExt(filename, ['prt'])) {
     try {
       const { isPreTrackerFormat, parsePreTrackerFile } = await import('@lib/import/formats/PreTrackerParser');
       if (isPreTrackerFormat(buffer)) {
@@ -309,7 +322,7 @@ export async function tryRouteFormat(
   }
 
   // ── Jochen Hippel CoSo ────────────────────────────────────────────────────
-  if (/\.(hipc|soc|coso)$/.test(filename)) {
+  if (matchesExt(filename, ['hipc', 'soc', 'coso'])) {
         if (prefs.hippelCoso !== 'uade') {
       try {
         const { isHippelCoSoFormat, parseHippelCoSoFile } = await import('@lib/import/formats/HippelCoSoParser');
@@ -327,27 +340,30 @@ export async function tryRouteFormat(
   // ── Rob Hubbard ───────────────────────────────────────────────────────────
   // RobHubbardParser is metadata-only (compiled 68k executable, no parseable
   // instrument data). UADE always handles audio; native parse is not used.
-  if (/\.(rh|rhp)$/.test(filename)) {
+  if (matchesExt(filename, ['rh', 'rhp'])) {
     const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
     return parseUADEFile(buffer, originalFileName, prefs.uade ?? 'enhanced', subsong, preScannedMeta);
   }
 
   // ── TFMX (Jochen Hippel) ─────────────────────────────────────────────────
-  if (/\.(tfmx|mdat|tfx)$/.test(filename)) {
-        if (prefs.tfmx === 'native') {
-      try {
-        const { parseTFMXFile } = await import('@lib/import/formats/TFMXParser');
-        return parseTFMXFile(buffer, originalFileName, subsong);
-      } catch (err) {
-        console.warn(`[TFMXParser] Native parse failed for ${filename}, falling back to UADE:`, err);
-      }
+  // TFMX requires UADE for audio (complex macro/trackstep system).
+  // The enhanced UADE scan calls TFMXParser internally for pattern data.
+  // Companion files (smpl.*) must be registered with UADE before loading.
+  // If UADE fails (e.g. missing smpl.* companion), fall back to native parser
+  // for pattern display + editing only (no audio).
+  if (matchesExt(filename, ['tfmx', 'mdat', 'tfx'])) {
+    try {
+      const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
+      return await parseUADEFile(buffer, originalFileName, prefs.uade ?? 'enhanced', subsong, preScannedMeta, companionFiles);
+    } catch (err) {
+      console.warn(`[TFMX] UADE failed (missing smpl.* companion?), falling back to native parser for display:`, err);
+      const { parseTFMXFile } = await import('@lib/import/formats/TFMXParser');
+      return parseTFMXFile(buffer, originalFileName, subsong);
     }
-    const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
-    return parseUADEFile(buffer, originalFileName, prefs.uade ?? 'enhanced', subsong, preScannedMeta);
   }
 
   // ── Digital Mugician ──────────────────────────────────────────────────────
-  if (/\.(dmu|dmu2|mug|mug2)$/.test(filename)) {
+  if (matchesExt(filename, ['dmu', 'dmu2', 'mug', 'mug2'])) {
     const { parseDigitalMugicianFile } = await import('@lib/import/formats/DigitalMugicianParser');
     return withNativeThenUADE('mugician', ctx, (buf: Uint8Array | ArrayBuffer, name: string) => parseDigitalMugicianFile(buf as ArrayBuffer, name), 'DigitalMugicianParser');
   }
@@ -358,7 +374,7 @@ export async function tryRouteFormat(
 
   // ── SidMon 1.0 (.sid1) ───────────────────────────────────────────────────
   // .sid1 files may be SidMon 1.0 or Commodore 64 SID — try magic detection first.
-  if (/\.sid1$/.test(filename)) {
+  if (matchesExt(filename, ['sid1'])) {
     if (prefs.sidmon1 !== 'uade') {
       try {
         const { isSidMon1Format, parseSidMon1File } = await import('@lib/import/formats/SidMon1Parser');
@@ -376,7 +392,7 @@ export async function tryRouteFormat(
 
   // ── SID files (.sid) — Ambiguous: could be SidMon 1.0 (Amiga) or C64 PSID/RSID
   // Try magic detection: C64 SID has "PSID"/"RSID" at offset 0, SidMon has signature string
-  if (/\.sid$/.test(filename)) {
+  if (matchesExt(filename, ['sid'])) {
     // First check if it's C64 SID (PSID/RSID magic at offset 0)
     const { isSIDFormat, parseSIDFile } = await import('@lib/import/formats/SIDParser');
     if (isSIDFormat(buffer)) {
@@ -402,7 +418,7 @@ export async function tryRouteFormat(
   }
 
   // ── David Whittaker (.dw / .dwold) ───────────────────────────────────────
-  if (/\.(dw|dwold)$/.test(filename)) {
+  if (matchesExt(filename, ['dw', 'dwold'])) {
         if (prefs.davidWhittaker !== 'uade') {
       try {
         const { parseDavidWhittakerFile } = await import('@lib/import/formats/DavidWhittakerParser');
@@ -417,7 +433,7 @@ export async function tryRouteFormat(
 
   // ── Art of Noise ──────────────────────────────────────────────────────────
   // AON4 (.aon) and AON8 (.aon8) — identified by "AON4"/"AON8" magic bytes at offset 0.
-  if (/\.(aon|aon8)$/.test(filename)) {
+  if (matchesExt(filename, ['aon', 'aon8'])) {
     const { isArtOfNoiseFormat, parseArtOfNoiseFile } = await import('@lib/import/formats/ArtOfNoiseParser');
     return withNativeThenUADE('artOfNoise', ctx,
       (bytes: Uint8Array | ArrayBuffer, name: string) => parseArtOfNoiseFile(bytes as Uint8Array, name),
@@ -426,7 +442,7 @@ export async function tryRouteFormat(
 
   // ── Digital Symphony ──────────────────────────────────────────────────────
   // .dsym files — identified by 8-byte magic \x02\x01\x13\x13\x14\x12\x01\x0B at offset 0.
-  if (/\.dsym$/.test(filename)) {
+  if (matchesExt(filename, ['dsym'])) {
     const { isDigitalSymphonyFormat, parseDigitalSymphonyFile } = await import('@lib/import/formats/DigitalSymphonyParser');
     return withNativeThenUADE('digitalSymphony', ctx,
       (bytes: Uint8Array | ArrayBuffer, name: string) => parseDigitalSymphonyFile(bytes as Uint8Array, name),
@@ -435,7 +451,7 @@ export async function tryRouteFormat(
 
   // ── Graoumf Tracker 1/2 ───────────────────────────────────────────────────
   // .gt2 files (GT2 format) and .gtk files (GTK format) — identified by "GT2" / "GTK" magic.
-  if (/\.(gt2|gtk)$/.test(filename)) {
+  if (matchesExt(filename, ['gt2', 'gtk'])) {
     const { isGraoumfTracker2Format, parseGraoumfTracker2File } = await import('@lib/import/formats/GraoumfTracker2Parser');
     return withNativeThenUADE('graoumfTracker2', ctx,
       (bytes: Uint8Array | ArrayBuffer, name: string) => parseGraoumfTracker2File(bytes as Uint8Array, name),
@@ -444,7 +460,7 @@ export async function tryRouteFormat(
 
   // ── Symphonie Pro ─────────────────────────────────────────────────────────
   // .symmod files — identified by "SymM" magic at offset 0.
-  if (/\.symmod$/i.test(filename)) {
+  if (matchesExt(filename, ['symmod'])) {
         if (prefs.symphoniePro === 'native') {
       try {
         const { isSymphonieProFormat, parseSymphonieProFile } = await import('@lib/import/formats/SymphonieProParser');
@@ -464,7 +480,7 @@ export async function tryRouteFormat(
   // ── DigiBooster Pro ───────────────────────────────────────────────────────
   // .dbm files — identified by "DBM0" magic at offset 0.
   // NOTE: .digi (DigiBooster 1.x) is handled separately above; this is DBM Pro only.
-  if (/\.dbm$/i.test(filename)) {
+  if (matchesExt(filename, ['dbm'])) {
     const { isDigiBoosterProFormat, parseDigiBoosterProFile } = await import('@lib/import/formats/DigiBoosterProParser');
     return withNativeThenUADE('digiBoosterPro', ctx,
       (bytes: Uint8Array | ArrayBuffer, name: string) => parseDigiBoosterProFile(bytes as Uint8Array, name),
@@ -473,7 +489,7 @@ export async function tryRouteFormat(
 
   // ── PumaTracker ───────────────────────────────────────────────────────────
   // .puma files — no magic bytes; heuristic header validation (mirrors OpenMPT).
-  if (/\.puma$/.test(filename)) {
+  if (matchesExt(filename, ['puma'])) {
         if (prefs.pumaTracker === 'native') {
       try {
         const { isPumaTrackerFormat, parsePumaTrackerFile } = await import('@lib/import/formats/PumaTrackerParser');
@@ -490,7 +506,7 @@ export async function tryRouteFormat(
 
   // ── Synthesis ─────────────────────────────────────────────────────────────
   // .syn files — identified by "Synth4.0" at offset 0 or "Synth4.2" at 0x1f0e.
-  if (/\.syn$/.test(filename)) {
+  if (matchesExt(filename, ['syn'])) {
     const { isSynthesisFormat, parseSynthesisFile } = await import('@lib/import/formats/SynthesisParser');
     return withNativeThenUADE('synthesis', ctx,
       (bytes: Uint8Array | ArrayBuffer, name: string) => parseSynthesisFile(bytes as Uint8Array, name),
@@ -499,7 +515,7 @@ export async function tryRouteFormat(
 
   // ── Digital Sound Studio ──────────────────────────────────────────────────
   // .dss files — identified by "MMU2" magic at offset 0.
-  if (/\.dss$/.test(filename)) {
+  if (matchesExt(filename, ['dss'])) {
     const { isDigitalSoundStudioFormat, parseDigitalSoundStudioFile } = await import('@lib/import/formats/DigitalSoundStudioParser');
     return withNativeThenUADE('digitalSoundStudio', ctx,
       (bytes: Uint8Array | ArrayBuffer, name: string) => parseDigitalSoundStudioFile(bytes as Uint8Array, name),
@@ -508,7 +524,7 @@ export async function tryRouteFormat(
 
   // ── Music Assembler ────────────────────────────────────────────────────────
   // .ma files — identified by M68k player bytecode scanning (no magic bytes).
-  if (/\.ma$/.test(filename)) {
+  if (matchesExt(filename, ['ma'])) {
     const { isMusicAssemblerFormat, parseMusicAssemblerFile } = await import('@lib/import/formats/MusicAssemblerParser');
     return withNativeThenUADE('musicAssembler', ctx,
       (bytes: Uint8Array | ArrayBuffer, name: string) => parseMusicAssemblerFile(bytes as Uint8Array, name),
@@ -519,7 +535,7 @@ export async function tryRouteFormat(
   // ── Composer 667 (.667) ───────────────────────────────────────────────────
   // OPL FM tracker (PC format). No PCM samples; instruments are FM patches.
   // Falls through to libopenmpt on failure. (UADE is Amiga-only, cannot play OPL.)
-  if (/\.667$/.test(filename)) {
+  if (matchesExt(filename, ['667'])) {
     if (prefs.composer667 === 'native') {
       try {
         const { isComposer667Format, parseComposer667File } = await import('@lib/import/formats/Composer667Parser');
@@ -537,33 +553,26 @@ export async function tryRouteFormat(
 
   // ── Chuck Biscuits / Black Artist ────────────────────────────────────────
   // .cba files — identified by 'CBA\xF9' magic at offset 0.
-  if (/\.cba$/.test(filename)) {
+  if (matchesExt(filename, ['cba'])) {
     const { isChuckBiscuitsFormat, parseChuckBiscuitsFile } = await import('@lib/import/formats/ChuckBiscuitsParser');
     return withNativeThenUADE('chuckBiscuits', ctx,
       (bytes: Uint8Array | ArrayBuffer, name: string) => parseChuckBiscuitsFile(bytes as Uint8Array, name),
       'ChuckBiscuitsParser', { isFormat: isChuckBiscuitsFormat, usesBytes: true });
   }
 
-  // ── Ben Daglish (bd.* prefix) ────────────────────────────────────────────
-  // Compiled 68k Amiga music format. Magic: Amiga HUNK header at offset 0.
+  // ── Ben Daglish (bd.* prefix or .bd extension) ─────────────────────────
+  // Dedicated BD WASM engine — always use native parser (UADE can't play BD).
+  // Native parser sets bdFileData which triggers BdEngine via NativeEngineRouting.
   {
     const _bdBase = getBasename(filename);
-    if (matchesPrefix(_bdBase, 'bd.')) {
-      if (prefs.benDaglish === 'native') {
-        try {
-          const { isBenDaglishFormat, parseBenDaglishFile } = await import('@lib/import/formats/BenDaglishParser');
-          if (isBenDaglishFormat(buffer, originalFileName)) return await parseBenDaglishFile(buffer, originalFileName);
-        } catch (err) {
-          console.warn(`[BenDaglishParser] Native parse failed for ${filename}, falling back to UADE:`, err);
-        }
-      }
-      const { parseUADEFile: parseUADE_bd } = await import('@lib/import/formats/UADEParser');
-      return parseUADE_bd(buffer, originalFileName, prefs.uade ?? 'enhanced', subsong, preScannedMeta);
+    if (matchesPrefix(_bdBase, 'bd.') || matchesExt(filename, ['bd'])) {
+      const { parseBenDaglishFile } = await import('@lib/import/formats/BenDaglishParser');
+      return await parseBenDaglishFile(buffer, originalFileName);
     }
   }
 
   // ── Images Music System (.ims) ────────────────────────────────────────────
-  if (/\.ims$/.test(filename)) {
+  if (matchesExt(filename, ['ims'])) {
     try {
       const { isIMSFormat, parseIMSFile } = await import('@lib/import/formats/IMSParser');
       if (isIMSFormat(buffer)) return parseIMSFile(buffer, originalFileName);
@@ -575,7 +584,7 @@ export async function tryRouteFormat(
   }
 
   // ── ICE Tracker / SoundTracker 2.6 (.ice) ────────────────────────────────
-  if (/\.ice$/.test(filename)) {
+  if (matchesExt(filename, ['ice'])) {
     try {
       const { isICEFormat, parseICEFile } = await import('@lib/import/formats/ICEParser');
       if (isICEFormat(buffer)) return parseICEFile(buffer, originalFileName);
@@ -587,7 +596,7 @@ export async function tryRouteFormat(
   }
 
   // ── ChipTracker (.kris) ───────────────────────────────────────────────────
-  if (/\.kris$/.test(filename)) {
+  if (matchesExt(filename, ['kris'])) {
     try {
       const { isKRISFormat, parseKRISFile } = await import('@lib/import/formats/KRISParser');
       if (isKRISFormat(buffer)) return parseKRISFile(buffer, originalFileName);
@@ -600,7 +609,7 @@ export async function tryRouteFormat(
 
   // ── MusicLine Editor (.ml) ───────────────────────────────────────────────
   // Magic "MLEDMODL" at offset 0. Falls through to Medley handler if magic doesn't match.
-  if (/\.ml$/i.test(filename)) {
+  if (matchesExt(filename, ['ml'])) {
     const bytes = new Uint8Array(buffer);
     try {
       const { isMusicLineFile, parseMusicLineFile } = await import('@lib/import/formats/MusicLineParser');
@@ -618,7 +627,7 @@ export async function tryRouteFormat(
   // No magic bytes — identified by structural heuristics (mirrors OpenMPT).
   // GMCParser is the OpenMPT-faithful implementation; GameMusicCreatorParser
   // is the legacy alternative — both extract PCM, try GMC first.
-  if (/\.gmc$/.test(filename)) {
+  if (matchesExt(filename, ['gmc'])) {
         if (prefs.gameMusicCreator === 'native') {
       try {
         const { isGMCFormat, parseGMCFile } = await import('@lib/import/formats/GMCParser');
@@ -643,7 +652,7 @@ export async function tryRouteFormat(
 
   // ── Face The Music (.ftm) ─────────────────────────────────────────────────
   // Magic "FTMN" at offset 0; embedded-sample variant only.
-  if (/\.ftm$/.test(filename)) {
+  if (matchesExt(filename, ['ftm'])) {
     const { isFaceTheMusicFormat, parseFaceTheMusicFile } = await import('@lib/import/formats/FaceTheMusicParser');
     return withNativeThenUADE('faceTheMusic', ctx,
       (bytes: Uint8Array | ArrayBuffer, name: string) => parseFaceTheMusicFile(bytes as Uint8Array, name),
@@ -652,7 +661,7 @@ export async function tryRouteFormat(
 
   // ── Sawteeth (.st — magic "SWTD" required to disambiguate) ───────────────
   // Fully synthesized format (no PCM samples). Native parser available (metadata only).
-  if (/\.st$/.test(filename)) {
+  if (matchesExt(filename, ['st'])) {
         if (prefs.sawteeth === 'native') {
       try {
         const { isSawteethFormat, parseSawteethFile } = await import('@lib/import/formats/SawteethParser');
@@ -670,7 +679,7 @@ export async function tryRouteFormat(
   }
 
   // ── Sound Control (.sc, .sct) ─────────────────────────────────────────────
-  if (/\.(sc|sct)$/.test(filename)) {
+  if (matchesExt(filename, ['sc', 'sct'])) {
     const { isSoundControlFormat, parseSoundControlFile } = await import('@lib/import/formats/SoundControlParser');
     return withNativeThenUADE('soundControl', ctx,
       (bytes: Uint8Array | ArrayBuffer, name: string) => parseSoundControlFile(bytes as Uint8Array, name),
@@ -678,7 +687,7 @@ export async function tryRouteFormat(
   }
 
   // ── Sound Factory (.psf) ──────────────────────────────────────────────────
-  if (/\.psf$/.test(filename)) {
+  if (matchesExt(filename, ['psf'])) {
     const { isSoundFactoryFormat, parseSoundFactoryFile } = await import('@lib/import/formats/SoundFactoryParser');
     return withNativeThenUADE('soundFactory', ctx,
       (bytes: Uint8Array | ArrayBuffer, name: string) => parseSoundFactoryFile(bytes as Uint8Array, name),
@@ -687,7 +696,7 @@ export async function tryRouteFormat(
 
   // ── Actionamics (.act) ────────────────────────────────────────────────────
   // Identified by "ACTIONAMICS SOUND TOOL" signature at offset 62.
-  if (/\.act$/.test(filename)) {
+  if (matchesExt(filename, ['act'])) {
     const { isActionamicsFormat, parseActionamicsFile } = await import('@lib/import/formats/ActionamicsParser');
     return withNativeThenUADE('actionamics', ctx,
       (bytes: Uint8Array | ArrayBuffer, name: string) => parseActionamicsFile(bytes as Uint8Array, name),
@@ -696,7 +705,7 @@ export async function tryRouteFormat(
 
   // ── Activision Pro / Martin Walker (.avp, .mw) ────────────────────────────
   // Identified by scanning first 4096 bytes for M68k init pattern (0x48 0xe7 0xfc 0xfe).
-  if (/\.(avp|mw)$/.test(filename)) {
+  if (matchesExt(filename, ['avp', 'mw'])) {
     const { isActivisionProFormat, parseActivisionProFile } = await import('@lib/import/formats/ActivisionProParser');
     return withNativeThenUADE('activisionPro', ctx,
       (bytes: Uint8Array | ArrayBuffer, name: string) => parseActivisionProFile(bytes as Uint8Array, name),
@@ -705,7 +714,7 @@ export async function tryRouteFormat(
 
   // ── Ron Klaren (.rk, .rkb) ────────────────────────────────────────────────
   // Identified by Amiga HUNK magic (0x3F3) at offset 0 and "RON_KLAREN_SOUNDMODULE!" at offset 40.
-  if (/\.(rk|rkb)$/.test(filename)) {
+  if (matchesExt(filename, ['rk', 'rkb'])) {
     const { isRonKlarenFormat, parseRonKlarenFile } = await import('@lib/import/formats/RonKlarenParser');
     return withNativeThenUADE('ronKlaren', ctx,
       (bytes: Uint8Array | ArrayBuffer, name: string) => parseRonKlarenFile(bytes as Uint8Array, name),
@@ -713,7 +722,7 @@ export async function tryRouteFormat(
   }
 
   // ── UNIC Tracker (.unic) ─────────────────────────────────────────────────
-  if (/\.unic$/.test(filename)) {
+  if (matchesExt(filename, ['unic'])) {
     try {
       const { isUNICFormat, parseUNICFile } = await import('@lib/import/formats/UNICParser');
       if (isUNICFormat(buffer)) return parseUNICFile(buffer, originalFileName);
@@ -724,7 +733,7 @@ export async function tryRouteFormat(
   }
 
   // ── MultiTracker (.mtm) ──────────────────────────────────────────────────
-  if (/\.mtm$/.test(filename)) {
+  if (matchesExt(filename, ['mtm'])) {
     try {
       const { isMTMFormat, parseMTMFile } = await import('@lib/import/formats/MTMParser');
       if (isMTMFormat(buffer)) return parseMTMFile(buffer, originalFileName);
@@ -735,7 +744,7 @@ export async function tryRouteFormat(
   }
 
   // ── Composer 669 (.669) ──────────────────────────────────────────────────
-  if (/\.669$/.test(filename)) {
+  if (matchesExt(filename, ['669'])) {
     try {
       const { is669Format, parse669File } = await import('@lib/import/formats/Format669Parser');
       if (is669Format(buffer)) return parse669File(buffer, originalFileName);
@@ -746,7 +755,7 @@ export async function tryRouteFormat(
   }
 
   // ── Farandole Composer (.far) ─────────────────────────────────────────────
-  if (/\.far$/.test(filename)) {
+  if (matchesExt(filename, ['far'])) {
     try {
       const { isFARFormat, parseFARFile } = await import('@lib/import/formats/FARParser');
       if (isFARFormat(buffer)) return parseFARFile(buffer, originalFileName);
@@ -757,7 +766,7 @@ export async function tryRouteFormat(
   }
 
   // ── Disorder Tracker 2 (.plm) ─────────────────────────────────────────────
-  if (/\.plm$/.test(filename)) {
+  if (matchesExt(filename, ['plm'])) {
     try {
       const { isPLMFormat, parsePLMFile } = await import('@lib/import/formats/PLMParser');
       if (isPLMFormat(buffer)) return parsePLMFile(buffer, originalFileName);
@@ -768,7 +777,7 @@ export async function tryRouteFormat(
   }
 
   // ── Ultra Tracker (.ult) ──────────────────────────────────────────────────
-  if (/\.ult$/.test(filename)) {
+  if (matchesExt(filename, ['ult'])) {
     try {
       const { isULTFormat, parseULTFile } = await import('@lib/import/formats/ULTParser');
       if (isULTFormat(buffer)) return parseULTFile(buffer, originalFileName);
@@ -779,7 +788,7 @@ export async function tryRouteFormat(
   }
 
   // ── Reality Tracker (.rtm) ────────────────────────────────────────────────
-  if (/\.rtm$/.test(filename)) {
+  if (matchesExt(filename, ['rtm'])) {
     try {
       const { isRTMFormat, parseRTMFile } = await import('@lib/import/formats/RTMParser');
       if (isRTMFormat(buffer)) return parseRTMFile(buffer, originalFileName);
@@ -790,7 +799,7 @@ export async function tryRouteFormat(
   }
 
   // ── DSIK Sound Module (.dsm) ──────────────────────────────────────────────
-  if (/\.dsm$/.test(filename)) {
+  if (matchesExt(filename, ['dsm'])) {
     try {
       const { isDSMFormat, parseDSMFile } = await import('@lib/import/formats/DSMParser');
       if (isDSMFormat(buffer)) return parseDSMFile(buffer, originalFileName);
@@ -801,7 +810,7 @@ export async function tryRouteFormat(
   }
 
   // ── Digital Tracker (.dtm) ────────────────────────────────────────────────
-  if (/\.dtm$/.test(filename)) {
+  if (matchesExt(filename, ['dtm'])) {
     try {
       const { isDTMFormat, parseDTMFile } = await import('@lib/import/formats/DTMParser');
       if (isDTMFormat(buffer)) return parseDTMFile(buffer, originalFileName);
@@ -812,7 +821,7 @@ export async function tryRouteFormat(
   }
 
   // ── ScreamTracker 2 (.stm) ────────────────────────────────────────────────
-  if (/\.stm$/.test(filename)) {
+  if (matchesExt(filename, ['stm'])) {
     try {
       const { isSTMFormat, parseSTMFile } = await import('@lib/import/formats/STMParser');
       if (isSTMFormat(buffer)) return parseSTMFile(buffer, originalFileName);
@@ -823,7 +832,7 @@ export async function tryRouteFormat(
   }
 
   // ── ScreamTracker STMIK (.stx) ────────────────────────────────────────────
-  if (/\.stx$/i.test(filename)) {
+  if (matchesExt(filename, ['stx'])) {
     try {
       const { isSTXFormat, parseSTXFile } = await import('@lib/import/formats/STXParser');
       if (isSTXFormat(buffer)) return parseSTXFile(buffer, originalFileName);
@@ -834,7 +843,7 @@ export async function tryRouteFormat(
   }
 
   // ── NoiseRunner (.nru) ────────────────────────────────────────────────────
-  if (/\.nru$/.test(filename)) {
+  if (matchesExt(filename, ['nru'])) {
     try {
       const { isNRUFormat, parseNRUFile } = await import('@lib/import/formats/NRUParser');
       if (isNRUFormat(buffer)) return parseNRUFile(buffer, originalFileName);
@@ -845,7 +854,7 @@ export async function tryRouteFormat(
   }
 
   // ── PolyTracker (.ptm) ────────────────────────────────────────────────────
-  if (/\.ptm$/.test(filename)) {
+  if (matchesExt(filename, ['ptm'])) {
     try {
       const { isPTMFormat, parsePTMFile } = await import('@lib/import/formats/PTMParser');
       if (isPTMFormat(buffer)) return parsePTMFile(buffer, originalFileName);
@@ -856,7 +865,7 @@ export async function tryRouteFormat(
   }
 
   // ── General DigiMusic (.gdm) ──────────────────────────────────────────────
-  if (/\.gdm$/.test(filename)) {
+  if (matchesExt(filename, ['gdm'])) {
     try {
       const { isGDMFormat, parseGDMFile } = await import('@lib/import/formats/GDMParser');
       if (isGDMFormat(buffer)) return parseGDMFile(buffer, originalFileName);
@@ -867,7 +876,7 @@ export async function tryRouteFormat(
   }
 
   // ── Ultimate SoundTracker (.stk) ──────────────────────────────────────────
-  if (/\.stk$/.test(filename)) {
+  if (matchesExt(filename, ['stk'])) {
     try {
       const { isSTKFormat, parseSTKFile } = await import('@lib/import/formats/STKParser');
       if (isSTKFormat(buffer)) return parseSTKFile(buffer, originalFileName);
@@ -878,7 +887,7 @@ export async function tryRouteFormat(
   }
 
   // ── SoundTracker Pro II (.stp) ─────────────────────────────────────────────
-  if (/\.stp$/.test(filename)) {
+  if (matchesExt(filename, ['stp'])) {
     try {
       const { isSTPFormat, parseSTPFile } = await import('@lib/import/formats/STPParser');
       if (isSTPFormat(buffer)) return parseSTPFile(buffer, originalFileName);
@@ -889,7 +898,7 @@ export async function tryRouteFormat(
   }
 
   // ── DigiTrakker (.mdl) ────────────────────────────────────────────────────
-  if (/\.mdl$/i.test(filename)) {
+  if (matchesExt(filename, ['mdl'])) {
     try {
       const { isMDLFormat, parseMDLFile } = await import('@lib/import/formats/MDLParser');
       if (isMDLFormat(buffer)) return parseMDLFile(buffer, originalFileName);
@@ -900,7 +909,7 @@ export async function tryRouteFormat(
   }
 
   // ── Advanced Music Format (.amf) ──────────────────────────────────────────
-  if (/\.amf$/i.test(filename)) {
+  if (matchesExt(filename, ['amf'])) {
     try {
       const { isAMFFormat, parseAMFFile } = await import('@lib/import/formats/AMFParser');
       if (isAMFFormat(buffer)) return parseAMFFile(buffer, originalFileName);
@@ -911,7 +920,7 @@ export async function tryRouteFormat(
   }
 
   // ── Imago Orpheus (.imf) ──────────────────────────────────────────────────
-  if (/\.imf$/.test(filename)) {
+  if (matchesExt(filename, ['imf'])) {
     if (prefs.imagoOrpheus === 'native') {
       try {
         const { isImagoOrpheusFormat, parseImagoOrpheusFile } = await import('@lib/import/formats/ImagoOrpheusParser');
@@ -928,7 +937,7 @@ export async function tryRouteFormat(
   }
 
   // ── CDFM Composer 670 (.c67) ──────────────────────────────────────────────
-  if (/\.c67$/.test(filename)) {
+  if (matchesExt(filename, ['c67'])) {
     if (prefs.cdfm67 === 'native') {
       try {
         const { isCDFM67Format, parseCDFM67File } = await import('@lib/import/formats/CDFM67Parser');
@@ -945,7 +954,7 @@ export async function tryRouteFormat(
   }
 
   // ── EasyTrax (.etx) ──────────────────────────────────────────────────────
-  if (/\.etx$/.test(filename)) {
+  if (matchesExt(filename, ['etx'])) {
     if (prefs.easyTrax === 'native') {
       try {
         const { isEasyTraxFormat, parseEasyTraxFile } = await import('@lib/import/formats/EasyTraxParser');
@@ -963,7 +972,7 @@ export async function tryRouteFormat(
 
   // ── Karl Morton Music Format (.mus) ───────────────────────────────────────
   // Note: .mus is also used by UFO/MicroProse format (DDAT magic, checked later).
-  if (/\.mus$/.test(filename) && prefs.karlMorton === 'native') {
+  if (matchesExt(filename, ['mus']) && prefs.karlMorton === 'native') {
     try {
       const { isKarlMortonFormat, parseKarlMortonFile } = await import('@lib/import/formats/KarlMortonParser');
       const bytes = new Uint8Array(buffer);
@@ -980,7 +989,7 @@ export async function tryRouteFormat(
   // ── UFO / MicroProse (.ufo, .mus with DDAT magic) ─────────────────────────
   // IFF-based 4-channel Amiga format from UFO: Enemy Unknown (1994).
   // Magic: "DDAT" at offset 0 (IFF-like chunk marker).
-  if (/\.(ufo|mus)$/i.test(filename)) {
+  if (matchesExt(filename, ['ufo', 'mus'])) {
     const { isUFOFormat, parseUFOFile } = await import('@lib/import/formats/UFOParser');
     return withNativeThenUADE('ufo', ctx,
       (buf: Uint8Array | ArrayBuffer, name: string) => { if (isUFOFormat(buf as ArrayBuffer)) return parseUFOFile(buf as ArrayBuffer, name); return null; },
@@ -988,7 +997,7 @@ export async function tryRouteFormat(
   }
 
   // ── Astroidea XMF / Imperium Galactica (.xmf) ────────────────────────────
-  if (/\.xmf$/i.test(filename)) {
+  if (matchesExt(filename, ['xmf'])) {
     if (prefs.xmf === 'native') {
       try {
         const { isXMFFormat, parseXMFFile } = await import('@lib/import/formats/XMFParser');
@@ -1005,7 +1014,7 @@ export async function tryRouteFormat(
   }
 
   // ── Unreal Audio Package (.uax) ───────────────────────────────────────────
-  if (/\.uax$/i.test(filename)) {
+  if (matchesExt(filename, ['uax'])) {
     if (prefs.uax === 'native') {
       try {
         const { isUAXFormat, parseUAXFile } = await import('@lib/import/formats/UAXParser');
@@ -1023,7 +1032,7 @@ export async function tryRouteFormat(
 
   // ── FM Tracker (.fmt) ─────────────────────────────────────────────────────
   // PC format — OPL-based tracker, magic "FMT" at offset 0. Falls through to libopenmpt.
-  if (/\.fmt$/i.test(filename)) {
+  if (matchesExt(filename, ['fmt'])) {
     if (prefs.fmTracker === 'native') {
       try {
         const { isFMTrackerFormat, parseFMTrackerFile } = await import('@lib/import/formats/FMTrackerParser');
@@ -1041,7 +1050,7 @@ export async function tryRouteFormat(
 
   // ── MadTracker 2 (.mt2) ───────────────────────────────────────────────────
   // PC format — identified by "MT20" magic at offset 0. Falls through to libopenmpt.
-  if (/\.mt2$/i.test(filename)) {
+  if (matchesExt(filename, ['mt2'])) {
     if (prefs.madTracker2 === 'native') {
       try {
         const { isMadTracker2Format, parseMadTracker2File } = await import('@lib/import/formats/MadTracker2Parser');
@@ -1060,7 +1069,7 @@ export async function tryRouteFormat(
   // ── PSM / PSM16 (Epic MegaGames MASI) (.psm) ─────────────────────────────
   // Handles both new PSM ("PSM " magic) and PSM16 ("PSM\xFE" magic).
   // Falls through to libopenmpt on failure.
-  if (/\.psm$/i.test(filename)) {
+  if (matchesExt(filename, ['psm'])) {
     if (prefs.psm === 'native') {
       try {
         const { isPSMFormat, parsePSMFile } = await import('@lib/import/formats/PSMParser');
@@ -1080,7 +1089,7 @@ export async function tryRouteFormat(
   // PC format — no UADE fallback.  Two magic variants:
   //   "Extreme"    → AMS 1.x (Extreme's Tracker)
   //   "AMShdr\x1A" → AMS 2.x (Velvet Studio 2.00–2.02)
-  if (/\.ams$/i.test(filename)) {
+  if (matchesExt(filename, ['ams'])) {
     if (prefs.ams === 'native') {
       try {
         const { isAMSFormat, parseAMSFile } = await import('@lib/import/formats/AMSParser');
@@ -1101,7 +1110,7 @@ export async function tryRouteFormat(
   // ── IFF SMUS / Sonix Music Driver (.smus, .snx, .tiny) ───────────────────
   // IFF SMUS format: "FORM" + "SMUS" IFF structure. Binary SNX/TINY sub-formats
   // are handled by SonixMusicDriverParser when IffSmusParser does not detect IFF.
-  if (/\.(smus|snx|tiny)$/i.test(filename)) {
+  if (matchesExt(filename, ['smus', 'snx', 'tiny'])) {
         if (prefs.iffSmus === 'native') {
       try {
         const { isIffSmusFormat, parseIffSmusFile } = await import('@lib/import/formats/IffSmusParser');
@@ -1123,7 +1132,7 @@ export async function tryRouteFormat(
   // ── Magnetic Fields Packer (.mfp / mfp.*) ────────────────────────────────
   // Two-file format: song data in .mfp, PCM samples in companion smp.* file.
   // Native parser extracts structure; UADE provides full audio with samples.
-  if (/\.mfp$/i.test(filename) || /^mfp\./i.test((filename.split('/').pop() ?? filename).split('\\').pop() ?? filename)) {
+  if (matchesExt(filename, ['mfp'])) {
         if (prefs.magneticFieldsPacker === 'native') {
       try {
         const { isMFPFormat, parseMFPFile } = await import('@lib/import/formats/MFPParser');
@@ -1143,7 +1152,7 @@ export async function tryRouteFormat(
   }
 
   // ── Delta Music 1.0 (.dm, .dm1) — identified by "ALL " magic ──────────────
-  if (/\.dm1?$/i.test(filename)) {
+  if (matchesExt(filename, ['dm', 'dm1'])) {
         if (prefs.deltaMusic1 === 'native') {
       try {
         const { isDeltaMusic1Format, parseDeltaMusic1File } = await import('@lib/import/formats/DeltaMusic1Parser');
@@ -1205,7 +1214,7 @@ export async function tryRouteFormat(
   // ── SpeedySystem / SoundSmith (.ss) ───────────────────────────────────────
   // Apple IIgs SoundSmith/MegaTracker. External DOC RAM samples required;
   // UADE is preferred (bundles samples in module archives), but native is available.
-  if (/\.ss$/i.test(filename)) {
+  if (matchesExt(filename, ['ss'])) {
         if (prefs.speedySystem === 'native') {
       try {
         const { isSpeedySystemFormat, parseSpeedySystemFile } = await import('@lib/import/formats/SpeedySystemParser');
@@ -1220,7 +1229,7 @@ export async function tryRouteFormat(
 
   // ── Tronic (.trc/.dp/.tro/.tronic) ───────────────────────────────────────
   // Amiga tracker by Stefan Hartmann. Native parser available.
-  if (/\.(trc|dp|tro|tronic)$/i.test(filename)) {
+  if (matchesExt(filename, ['trc', 'dp', 'tro', 'tronic'])) {
         if (prefs.tronic === 'native') {
       try {
         const { isTronicFormat, parseTronicFile } = await import('@lib/import/formats/TronicParser');
@@ -1275,7 +1284,7 @@ export async function tryRouteFormat(
 
   // ── Medley (.ml) ─────────────────────────────────────────────────────────
   // Amiga 4-channel format (Medley tracker). Magic: "MSOB" at bytes[0..3].
-  if (/\.ml$/i.test(filename)) {
+  if (matchesExt(filename, ['ml'])) {
     if (prefs.medley === 'native') {
       try {
         const { isMedleyFormat, parseMedleyFile } = await import('@lib/import/formats/MedleyParser');
@@ -1492,8 +1501,7 @@ export async function tryRouteFormat(
 
   // ── TME (.tme / TME.*) ───────────────────────────────────────────────────────
   {
-    const _tmeBase = getBasename(filename);
-    if (/\.tme$/i.test(filename) || matchesPrefix(_tmeBase, 'tme.')) {
+    if (matchesExt(filename, ['tme'])) {
       if (prefs.tme === 'native') {
         try {
           const { isTMEFormat, parseTMEFile } = await import('@lib/import/formats/TMEParser');
@@ -1510,7 +1518,7 @@ export async function tryRouteFormat(
   // ── Infogrames DUM (.dum) ────────────────────────────────────────────────────
   // Infogrames music format used in Gobliins, Ween, etc. Two-file format
   // with external .dum.set sample data. Detection: header offset at u16BE(0).
-  if (/\.dum$/i.test(filename)) {
+  if (matchesExt(filename, ['dum'])) {
     const { isInfogramesFormat, parseInfogramesFile } = await import('@lib/import/formats/InfogramesParser');
     return withNativeThenUADE('infogrames', ctx,
       (buf: Uint8Array | ArrayBuffer, name: string) => { if (isInfogramesFormat(buf as ArrayBuffer)) return parseInfogramesFile(buf as ArrayBuffer, name); return null; },
@@ -2155,7 +2163,7 @@ export async function tryRouteFormat(
   }
 
   // ── Jochen Hippel ST (.sog extension or HST.* prefix) ────────────────────
-  if (/\.sog$/i.test(filename)) {
+  if (matchesExt(filename, ['sog'])) {
     const { isJochenHippelSTFormat, parseJochenHippelSTFile } = await import('@lib/import/formats/JochenHippelSTParser');
     return withNativeThenUADE('jochenHippelST', ctx,
       (buf: Uint8Array | ArrayBuffer, name: string) => { if (isJochenHippelSTFormat(buf as ArrayBuffer)) return parseJochenHippelSTFile(buf as ArrayBuffer, name); return null; },
@@ -2433,7 +2441,7 @@ export async function tryRouteFormat(
   }
 
   // ── PxTone Collage / Tune (.ptcop, .pttune) ────────────────────────────
-  if (/\.(ptcop|pttune)$/i.test(filename)) {
+  if (matchesExt(filename, ['ptcop', 'pttune'])) {
     const { isPxtoneFormat, parsePxtoneFile } = await import('@lib/import/formats/PxtoneParser');
     if (isPxtoneFormat(buffer)) {
       return parsePxtoneFile(originalFileName, buffer);
@@ -2441,7 +2449,7 @@ export async function tryRouteFormat(
   }
 
   // ── Organya / Cave Story (.org) ─────────────────────────────────────────
-  if (/\.org$/i.test(filename)) {
+  if (matchesExt(filename, ['org'])) {
     const { isOrganyaFormat, parseOrganyaFile } = await import('@lib/import/formats/OrganyaParser');
     if (isOrganyaFormat(buffer)) {
       return parseOrganyaFile(buffer, originalFileName);
@@ -2449,7 +2457,7 @@ export async function tryRouteFormat(
   }
 
   // ── FM Towns EUP (.eup) ─────────────────────────────────────────────────
-  if (/\.eup$/i.test(filename)) {
+  if (matchesExt(filename, ['eup'])) {
     const { isEupFormat, parseEupFile } = await import('@lib/import/formats/EupminiParser');
     if (isEupFormat(buffer)) {
       return parseEupFile(originalFileName, buffer);
@@ -2457,7 +2465,7 @@ export async function tryRouteFormat(
   }
 
   // ── Ixalance IXS (.ixs) ──────────────────────────────────────────────────
-  if (/\.ixs$/i.test(filename)) {
+  if (matchesExt(filename, ['ixs'])) {
     const { isIxsFormat, parseIxsFile } = await import('@lib/import/formats/IxalanceParser');
     if (isIxsFormat(buffer)) {
       return parseIxsFile(originalFileName, buffer);
@@ -2465,7 +2473,7 @@ export async function tryRouteFormat(
   }
 
   // ── Psycle (.psy) ───────────────────────────────────────────────────────
-  if (/\.psy$/i.test(filename)) {
+  if (matchesExt(filename, ['psy'])) {
     const { isPsycleFormat, parsePsycleFile } = await import('@lib/import/formats/CpsycleParser');
     if (isPsycleFormat(buffer)) {
       return parsePsycleFile(buffer, originalFileName);
@@ -2473,7 +2481,7 @@ export async function tryRouteFormat(
   }
 
   // ── SC68 / SNDH (.sc68, .sndh, .snd) ──────────────────────────────────────
-  if (/\.(sc68|sndh|snd)$/i.test(filename)) {
+  if (matchesExt(filename, ['sc68', 'sndh', 'snd'])) {
     const { isSc68Format, parseSc68File } = await import('@lib/import/formats/Sc68Parser');
     if (isSc68Format(buffer)) {
       return parseSc68File(originalFileName, buffer);
@@ -2481,7 +2489,7 @@ export async function tryRouteFormat(
   }
 
   // ── ZXTune formats (.pt3, .pt2, .stc, .stp, .vtx, .psg, .sqt, .psc, .asc, .psm, .gtr, .ftc, .ayc, .ts) ──
-  if (/\.(pt3|pt2|pt1|stc|st1|st3|stp|vtx|psg|psm|sqt|psc|asc|gtr|ftc|ayc|ts|cop|tfc|tfd|tf0|pdt|chi|str|dst|dmm|et1)$/i.test(filename)) {
+  if (matchesExt(filename, ['pt3', 'pt2', 'pt1', 'stc', 'st1', 'st3', 'stp', 'vtx', 'psg', 'psm', 'sqt', 'psc', 'asc', 'gtr', 'ftc', 'ayc', 'ts', 'cop', 'tfc', 'tfd', 'tf0', 'pdt', 'chi', 'str', 'dst', 'dmm', 'et1'])) {
     const { isZxtuneFormat, parseZxtuneFile } = await import('@lib/import/formats/ZxtuneParser');
     if (isZxtuneFormat(buffer)) {
       return parseZxtuneFile(originalFileName, buffer);

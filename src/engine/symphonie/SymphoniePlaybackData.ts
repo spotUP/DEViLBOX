@@ -2,7 +2,7 @@
 
 export interface SymphonieInstrumentData {
   name: string;
-  type: number;              // 0=None, 4=Loop, 8=Sustain, -4=Kill, -8=Silent
+  type: number;              // 0=Normal (one-shot), 4=Loop, 8=Sustain, -4=Kill, -8=Silent
   volume: number;            // 0-100
   tune: number;              // signed semitone offset (already includes downsample correction)
   fineTune: number;          // signed fine tune

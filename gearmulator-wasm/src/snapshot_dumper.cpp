@@ -45,6 +45,7 @@
 #include "dsp56kEmu/peripherals.h"
 
 #include "baseLib/filesystem.h"
+#include "dsp56kBase/logging.h"
 
 // ROM preprocessing (same as bridge)
 static void byteSwap16(std::vector<uint8_t>& data)
@@ -210,8 +211,44 @@ static int dumpMicroQ(const std::vector<uint8_t>& romData, const std::string& ou
 
     // Press play to resume boot (OS update ROM needs this)
     mq.setButton(mqLib::Buttons::ButtonType::Play, true);
+    uint64_t bootLoops = 0;
     while (!mq.isBootCompleted())
-        mq.process(8);
+    {
+        mq.process(64);  // larger batch size, matches mqPerformanceTest
+        ++bootLoops;
+        if (bootLoops % 10000 == 0)
+        {
+            auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(
+                std::chrono::steady_clock::now() - t0).count();
+            std::cerr << "  Boot progress: " << elapsed << "s, " << bootLoops << " loops\n";
+            if (elapsed > 600)  // 10 minute timeout
+            {
+                std::cerr << "ERROR: Boot timeout after " << elapsed << "s\n";
+                // Still dump DMA state even if boot didn't complete
+                auto* hw = mq.getHardware();
+                if (hw)
+                {
+                    auto& periph = hw->getDSP(0).getPeriph();
+                    auto& dma = periph.getDMA();
+                    std::cerr << "=== DMA Register State (timeout) ===\n";
+                    for (int ch = 0; ch < 6; ++ch)
+                    {
+                        auto dcr = dma.getDCR(ch);
+                        auto dco = dma.getDCO(ch);
+                        auto ddr = dma.getDDR(ch);
+                        auto dsr = dma.getDSR(ch);
+                        std::cerr << "  CH" << ch << ": DCR=0x" << std::hex << dcr
+                                  << " DCO=0x" << dco
+                                  << " DDR=0x" << ddr
+                                  << " DSR=0x" << dsr << "\n";
+                    }
+                    std::cerr << "  DSTR=0x" << std::hex << dma.getDSTR() << "\n";
+                    std::cerr << std::dec;
+                }
+                return 1;
+            }
+        }
+    }
     mq.setButton(mqLib::Buttons::ButtonType::Play, false);
 
     auto t1 = std::chrono::steady_clock::now();
@@ -280,6 +317,27 @@ static int dumpMicroQ(const std::vector<uint8_t>& romData, const std::string& ou
     std::cerr << "=== HDI08 Register State ===\n";
     std::cerr << "  HCR  = 0x" << std::hex << hdi.readControlRegister() << "\n";
     std::cerr << "  HPCR = 0x" << hdi.readPortControlRegister() << "\n";
+    std::cerr << std::dec;
+
+    // Print DMA register state for all 6 channels
+    auto& dma = periph.getDMA();
+    std::cerr << "=== DMA Register State ===\n";
+    for (int ch = 0; ch < 6; ++ch)
+    {
+        auto dcr = dma.getDCR(ch);
+        auto dco = dma.getDCO(ch);
+        auto ddr = dma.getDDR(ch);
+        auto dsr = dma.getDSR(ch);
+        // Only print channels that appear configured (DCR non-zero)
+        if (dcr || dco || ddr || dsr)
+        {
+            std::cerr << "  CH" << ch << ": DCR=0x" << std::hex << dcr
+                      << " DCO=0x" << dco
+                      << " DDR=0x" << ddr
+                      << " DSR=0x" << dsr << "\n";
+        }
+    }
+    std::cerr << "  DSTR=0x" << std::hex << dma.getDSTR() << "\n";
     std::cerr << std::dec;
 
     std::cerr << "Dumping DSP 0 memory...\n";
@@ -458,20 +516,37 @@ static int testMicroQSnapshotBoot(const std::vector<uint8_t>& romData)
     std::cerr << "Constructor returned, polling isBootCompleted()...\n";
 
     // Drive audio processing while waiting for MC68K boot
+    auto* hw = mq.getHardware();
+    auto& mqDsp = hw->getDSP(0);
+    auto& dsp = mqDsp.dsp();
+
     int pollCount = 0;
     while (!mq.isBootCompleted())
     {
         mq.process(128);
         ++pollCount;
-        if (pollCount % 100 == 0)
+        if (pollCount % 500 == 0)
         {
             auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
                 std::chrono::steady_clock::now() - t0).count();
-            std::cerr << "  Still booting... (" << elapsed << "ms, " << pollCount << " process calls)\n";
+            auto& esai = mqDsp.getPeriph().getEsai();
+            std::cerr << "  Still booting... (" << elapsed << "ms, " << pollCount << " calls)"
+                      << " dsp_instr=" << dsp.getInstructionCounter()
+                      << " dsp_pc=0x" << std::hex << dsp.readRegs().pc.var << std::dec
+                      << " esai_in=" << esai.getAudioInputs().size()
+                      << " esai_out=" << esai.getAudioOutputs().size()
+                      << "\n";
         }
         if (pollCount > 100000)
         {
             std::cerr << "  Boot timeout after " << pollCount << " process calls\n";
+            // Print final diagnostics
+            auto& esai = mqDsp.getPeriph().getEsai();
+            std::cerr << "  Final: dsp_instr=" << dsp.getInstructionCounter()
+                      << " dsp_pc=0x" << std::hex << dsp.readRegs().pc.var << std::dec
+                      << " esai_in=" << esai.getAudioInputs().size()
+                      << " esai_out=" << esai.getAudioOutputs().size()
+                      << "\n";
             return 1;
         }
     }
@@ -480,27 +555,38 @@ static int testMicroQSnapshotBoot(const std::vector<uint8_t>& romData)
     auto bootMs = std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count();
     std::cerr << "Snapshot boot completed in " << bootMs << "ms (" << pollCount << " process calls)\n";
 
-    // Send a MIDI note and check for audio output
-    synthLib::SMidiEvent noteOn;
-    noteOn.a = 0x90; // note on channel 0
-    noteOn.b = 60;   // C4
-    noteOn.c = 127;  // velocity
-    mq.sendMidiEvent(noteOn);
-
-    std::cerr << "Sent MIDI note on, processing 4096 frames...\n";
-    float peak = 0;
+    // Let MC68K finish patch dump to DSP (takes several seconds)
     auto& outs = mq.getAudioOutputs();
-    for (int i = 0; i < 32; ++i)
+    std::cerr << "Processing 10 seconds to let MC68K finish patch dump...\n";
+    for (int sec = 0; sec < 10; ++sec)
     {
-        mq.process(128);
-        for (size_t ch = 0; ch < outs.size(); ++ch)
+        for (int i = 0; i < 345; ++i)
+            mq.process(128);
+        std::cerr << "  " << (sec+1) << "s: dsp_instr=" << dsp.getInstructionCounter() << "\n";
+    }
+
+    // Now send MIDI note
+    synthLib::SMidiEvent noteOn;
+    noteOn.a = 0x90;
+    noteOn.b = 60;
+    noteOn.c = 127;
+    mq.sendMidiEvent(noteOn);
+    std::cerr << "Sent MIDI note-on, processing 2 seconds...\n";
+
+    float peak = 0;
+    for (int sec = 0; sec < 2; ++sec)
+    {
+        for (int i = 0; i < 345; ++i)
         {
-            for (int s = 0; s < 128; ++s)
-            {
-                float v = std::abs(dsp56k::dsp2sample<float>(outs[ch][s]));
-                if (v > peak) peak = v;
-            }
+            mq.process(128);
+            for (size_t ch = 0; ch < outs.size(); ++ch)
+                for (int s = 0; s < 128; ++s)
+                {
+                    float v = std::abs(dsp56k::dsp2sample<float>(outs[ch][s]));
+                    if (v > peak) peak = v;
+                }
         }
+        std::cerr << "  " << (sec+1) << "s: peak=" << peak << "\n";
     }
 
     std::cerr << "Audio peak after note: " << peak << "\n";
@@ -522,6 +608,10 @@ int main(int argc, char** argv)
         std::cerr << "  synthType: 2=microQ, 3=XT, 4=Nord\n";
         return 1;
     }
+
+    // Suppress all LOG() output — the ESAI underrun LOG fires 44K times/sec
+    // with JIT and fills disk in seconds
+    Logging::setLogFunc([](const std::string&) {});
 
     const int synthType = std::stoi(argv[1]);
     const std::string romPath = argv[2];

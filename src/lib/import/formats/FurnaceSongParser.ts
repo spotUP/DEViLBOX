@@ -2750,6 +2750,7 @@ export function buildFurnaceNativeData(module: FurnaceModule): FurnaceNativeData
       channels,
       speed1: sub.speed1,
       speed2: sub.speed2,
+      speedPattern: sub.speedPattern,
       hz: sub.hz,
       virtualTempoN: sub.virtualTempo,
       virtualTempoD: sub.virtualTempoD,
