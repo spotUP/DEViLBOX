@@ -489,6 +489,36 @@ export async function startNativeEngines(
     }
   }
 
+  // --- Symphonie Pro (special case: song loaded via InstrumentFactory → SymphonieSynth.load()) ---
+  // The SymphonieEngine manages its own AudioWorklet sequencer. InstrumentFactory calls
+  // symphSynth.load() (fire-and-forget), so we need to ensure the engine exists and
+  // call play() to start the worklet's internal sequencer.
+  if (song.symphonieFileData) {
+    suppressNotes = true;
+    try {
+      const { SymphonieEngine } = await import('../symphonie/SymphonieEngine');
+      if (SymphonieEngine.hasInstance()) {
+        const symphEngine = SymphonieEngine.getInstance();
+        // Wait for the worklet node to be ready (load() may still be in progress)
+        const maxWait = 3000;
+        const start = Date.now();
+        while (!symphEngine.getNode() && Date.now() - start < maxWait) {
+          await new Promise(r => setTimeout(r, 50));
+        }
+        if (!muted && symphEngine.getNode()) {
+          symphEngine.play();
+          console.log('[NativeEngineRouting] SymphonieEngine playing');
+        } else if (!symphEngine.getNode()) {
+          console.warn('[NativeEngineRouting] SymphonieEngine worklet not ready after timeout');
+        }
+      } else {
+        console.warn('[NativeEngineRouting] SymphonieEngine not initialized');
+      }
+    } catch (err) {
+      console.error('[NativeEngineRouting] Failed to start SymphonieEngine:', err);
+    }
+  }
+
   // --- Route native engine outputs through the stereo separation chain ---
   // In DJ mode, DeckEngine.loadSong() handles routing.
   if (!isDJDeck) {

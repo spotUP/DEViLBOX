@@ -64,6 +64,25 @@ function debouncedWasmEngineReexport(): void {
             console.warn('[TrackerStore] PumaTracker re-export failed:', err);
           }
         })();
+      } else if (sourceFormat === 'Symphonie' && song.symphonieFileData) {
+        void (async () => {
+          try {
+            const { exportSymphonieProFile } = await import('@/lib/export/SymphonieProExporter');
+            const { SymphonieEngine } = await import('@/engine/symphonie/SymphonieEngine');
+            if (!SymphonieEngine.hasInstance()) return;
+            const data = exportSymphonieProFile(song);
+            // Update the stored file data so subsequent edits build on this export
+            song.symphonieFileData = data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) as ArrayBuffer;
+            // Re-parse and reload into the engine
+            const { parseSymphonieForPlayback } = await import('@/lib/import/formats/SymphonieProParser');
+            const playbackData = await parseSymphonieForPlayback(song.symphonieFileData, song.name || 'module');
+            const engine = SymphonieEngine.getInstance();
+            const { getDevilboxAudioContext } = await import('@/utils/audio-context');
+            await engine.loadSong(getDevilboxAudioContext(), playbackData);
+          } catch (err) {
+            console.warn('[TrackerStore] Symphonie re-export failed:', err);
+          }
+        })();
       }
     } catch { /* replayer not initialized */ }
   }, 300); // 300ms debounce
