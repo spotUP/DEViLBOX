@@ -268,6 +268,24 @@ EXPORT void gm_destroy(int32_t handle)
  * @param outputR    Pointer to right channel buffer (numSamples floats)
  * @param numSamples Number of samples to generate
  */
+// Scratch buffers for unused input/output channels (avoids null pointer deref in MicroQ)
+static std::vector<float> g_dummyIn;
+static std::vector<float> g_dummyOut;
+
+static void ensureDummyBuffers(uint32_t numSamples)
+{
+    if (g_dummyIn.size() < numSamples)
+    {
+        g_dummyIn.resize(numSamples, 0.0f);
+        g_dummyOut.resize(numSamples, 0.0f);
+    }
+    else
+    {
+        std::memset(g_dummyIn.data(), 0, numSamples * sizeof(float));
+        std::memset(g_dummyOut.data(), 0, numSamples * sizeof(float));
+    }
+}
+
 EXPORT void gm_process(int32_t handle, float* outputL, float* outputR, uint32_t numSamples)
 {
     if (handle < 0 || handle >= static_cast<int32_t>(g_devices.size()) || !g_devices[handle])
@@ -279,18 +297,47 @@ EXPORT void gm_process(int32_t handle, float* outputL, float* outputR, uint32_t 
     std::memset(outputL, 0, numSamples * sizeof(float));
     std::memset(outputR, 0, numSamples * sizeof(float));
 
-    // Process directly into caller's buffers
-    const synthLib::TAudioInputs inputs = {nullptr, nullptr, nullptr, nullptr};
+    // Ensure dummy buffers for unused channels (microQ reads 2 inputs, writes 6 outputs)
+    ensureDummyBuffers(numSamples);
+    float* dummy = g_dummyOut.data();
+    float* dummyIn = g_dummyIn.data();
+
+    const synthLib::TAudioInputs inputs = {dummyIn, dummyIn, dummyIn, dummyIn};
     const synthLib::TAudioOutputs outputs = {
         outputL, outputR,
-        nullptr, nullptr, nullptr, nullptr,
-        nullptr, nullptr, nullptr, nullptr,
-        nullptr, nullptr
+        dummy, dummy, dummy, dummy,
+        dummy, dummy, dummy, dummy,
+        dummy, dummy
     };
 
     gm.midiOut.clear();
+    const bool hadMidi = !gm.midiIn.empty();
+    if (hadMidi) {
+        printf("[EM] gm_process: %zu MIDI events queued before process\n", gm.midiIn.size());
+        for (const auto& ev : gm.midiIn) {
+            printf("[EM]   MIDI: status=0x%02X data1=0x%02X data2=0x%02X offset=%u sysex=%zu\n",
+                ev.a, ev.b, ev.c, ev.offset, ev.sysex.size());
+        }
+    }
     gm.device->process(inputs, outputs, numSamples, gm.midiIn, gm.midiOut);
     gm.midiIn.clear();
+
+    // Track output peak for diagnostics
+    static uint32_t processCallCount = 0;
+    static float maxPeakEver = 0;
+    ++processCallCount;
+    float peak = 0;
+    for (uint32_t i = 0; i < numSamples; ++i) {
+        float absL = outputL[i] < 0 ? -outputL[i] : outputL[i];
+        float absR = outputR[i] < 0 ? -outputR[i] : outputR[i];
+        if (absL > peak) peak = absL;
+        if (absR > peak) peak = absR;
+    }
+    if (peak > maxPeakEver) maxPeakEver = peak;
+    if (hadMidi || processCallCount <= 3 || (processCallCount % 500 == 0)) {
+        printf("[EM] gm_process #%u: peak=%.6f (max=%.6f) frames=%u\n",
+            processCallCount, peak, maxPeakEver, numSamples);
+    }
 }
 
 /**
@@ -553,6 +600,33 @@ EXPORT int32_t gm_is_boot_done()
 EXPORT int32_t gm_get_async_result()
 {
     return g_asyncResult.load();
+}
+
+/**
+ * Check if MC68K firmware boot has completed for snapshot-booted synths.
+ * For synths that use hybrid snapshot+MC68K boot (microQ, XT), the DSP starts
+ * immediately from snapshot but MIDI won't work until the MC68K firmware finishes
+ * initializing. Returns 1 when boot is complete, 0 while still booting.
+ * For non-snapshot synths, always returns 1 (boot completed during gm_create).
+ */
+EXPORT int32_t gm_isBootCompleted(int32_t handle)
+{
+    if (handle < 0 || handle >= static_cast<int32_t>(g_devices.size()) || !g_devices[handle])
+        return 0;
+
+    auto& dev = g_devices[handle];
+
+#ifndef GM_NO_WALDORF_MQ
+    if (dev->type == GM_WALDORF_MQ)
+    {
+        auto* mqDev = dynamic_cast<mqLib::Device*>(dev->device.get());
+        if (mqDev)
+            return mqDev->isMc68kReady() ? 1 : 0;
+    }
+#endif
+
+    // Non-snapshot synths are always "boot completed" after gm_create returns
+    return 1;
 }
 
 } // extern "C"

@@ -188,10 +188,8 @@ file(GLOB MQLIB_SRC "${GM_SRC}/mqLib/*.cpp")
 add_library(mqLib STATIC ${MQLIB_SRC})
 target_include_directories(mqLib PUBLIC "${GM_SRC}")
 target_link_libraries(mqLib PUBLIC wLib)
-if(EMSCRIPTEN)
-    target_compile_definitions(mqLib PRIVATE GM_USE_SNAPSHOT=1)
-    target_include_directories(mqLib PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
-endif()
+target_compile_definitions(mqLib PRIVATE GM_USE_SNAPSHOT=1)
+target_include_directories(mqLib PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
 
 # ──────────────────────────────────────────────────────────────────────────────
 # xtLib — Waldorf Microwave II/XT
@@ -279,6 +277,8 @@ if(EMSCRIPTEN)
 else()
     # Native snapshot dumper tool
     add_executable(snapshot_dumper src/snapshot_dumper.cpp src/musashi_unified.cpp)
+    target_compile_definitions(snapshot_dumper PRIVATE GM_MQ_SNIFF_HDI08=1)
+    target_compile_definitions(mqLib PRIVATE GM_MQ_SNIFF_HDI08=1)
     target_link_libraries(snapshot_dumper PRIVATE
         virusLib mqLib xtLib nordLib ronaldoLib wLib
         synthLib hardwareLib baseLib dsp56kEmu dsp56kBase
@@ -292,7 +292,7 @@ if(EMSCRIPTEN)
         LINK_FLAGS "\
             -s MODULARIZE=1 \
             -s EXPORT_NAME='createGearmulator' \
-            -s EXPORTED_FUNCTIONS='[\"_gm_create\",\"_gm_create_async\",\"_gm_is_boot_done\",\"_gm_get_async_result\",\"_gm_destroy\",\"_gm_process\",\"_gm_sendMidi\",\"_gm_sendSysex\",\"_gm_getSamplerate\",\"_gm_isValid\",\"_gm_getState\",\"_gm_setState\",\"_gm_setDspClockPercent\",\"_gm_getDspClockHz\",\"_gm_pushAudioInput\",\"_gm_pullAudioOutput\",\"_gm_pushInput\",\"_gm_getAudioOutputSize\",\"_gm_getAudioInputSize\",\"_gm_loadJP8kRam\",\"_malloc\",\"_free\"]' \
+            -s EXPORTED_FUNCTIONS='[\"_gm_create\",\"_gm_create_async\",\"_gm_is_boot_done\",\"_gm_get_async_result\",\"_gm_destroy\",\"_gm_process\",\"_gm_sendMidi\",\"_gm_sendSysex\",\"_gm_getSamplerate\",\"_gm_isValid\",\"_gm_isBootCompleted\",\"_gm_getState\",\"_gm_setState\",\"_gm_setDspClockPercent\",\"_gm_getDspClockHz\",\"_gm_pushAudioInput\",\"_gm_pullAudioOutput\",\"_gm_pushInput\",\"_gm_getAudioOutputSize\",\"_gm_getAudioInputSize\",\"_gm_loadJP8kRam\",\"_malloc\",\"_free\"]' \
             -s EXPORTED_RUNTIME_METHODS='[\"ccall\",\"cwrap\",\"HEAPF32\",\"HEAP8\",\"HEAPU8\"]' \
             -s ALLOW_MEMORY_GROWTH=1 \
             -s ALLOW_TABLE_GROWTH=1 \

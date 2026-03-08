@@ -277,9 +277,50 @@ async function initSynth(data) {
   peakSeen = 0;
   firstAudioTime = 0;
 
+  // For snapshot-booted synths (microQ=2), the DSP is running but MC68K firmware
+  // is still initializing in the background. Start the render loop immediately
+  // (DSP produces silence until boot completes), but wait for boot completion
+  // before reporting 'ready' so the caller knows MIDI will actually work.
+  const needsBootWait = (synthType === 2);
+
+  if (needsBootWait) {
+    // Start render loop first — DSP needs processAudio calls to make progress
+    startRenderLoop(actualRate);
+
+    console.log('[Gearmulator Worker] Waiting for MC68K firmware boot to complete...');
+    self.postMessage({ type: 'booting', synthType });
+
+    let bootPollCount = 0;
+    const maxBootPollCount = 600; // 5 minutes max (600 * 500ms)
+    await new Promise((resolve) => {
+      const pollBoot = () => {
+        if (disposed) { resolve(); return; }
+        if (module._gm_isBootCompleted(handle)) {
+          const bootMs = (performance.now() - t0).toFixed(0);
+          console.log(`[Gearmulator Worker] MC68K boot completed in ${bootMs}ms`);
+          resolve();
+        } else if (bootPollCount >= maxBootPollCount) {
+          console.warn(`[Gearmulator Worker] MC68K boot timeout after ${(maxBootPollCount * 0.5).toFixed(0)}s — proceeding anyway`);
+          resolve();
+        } else {
+          bootPollCount++;
+          if (bootPollCount % 10 === 0) {
+            const elapsed = (bootPollCount * 0.5).toFixed(0);
+            console.log(`[Gearmulator Worker] MC68K still booting... (${elapsed}s)`);
+            self.postMessage({ type: 'booting', synthType, elapsed: bootPollCount * 500 });
+          }
+          setTimeout(pollBoot, 500);
+        }
+      };
+      pollBoot();
+    });
+  }
+
   self.postMessage({ type: 'ready', sampleRate: actualRate, handle: handle });
 
-  startRenderLoop(actualRate);
+  if (!needsBootWait) {
+    startRenderLoop(actualRate);
+  }
 }
 
 function startRenderLoop(sampleRate) {
