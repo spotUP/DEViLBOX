@@ -179,6 +179,23 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
         }
         break;
 
+      case 'loadIns2':
+        if (this.initialized && this.module && this.wasm?.loadIns2) {
+          const insData = data.insData;
+          if (insData && insData.length > 0) {
+            const heapBuffer = this.getHeapBuffer();
+            if (heapBuffer) {
+              const dataPtr = this.module._malloc(insData.length);
+              const heap = new Uint8Array(heapBuffer, dataPtr, insData.length);
+              heap.set(insData);
+              this.wasm.loadIns2(data.insIndex, dataPtr, insData.length);
+              this.module._free(dataPtr);
+              console.log('[FurnaceDispatch Worklet] loadIns2 index:', data.insIndex, 'size:', insData.length);
+            }
+          }
+        }
+        break;
+
       case 'setMacro':
         if (this.initialized && this.module) {
           const chip = this.getChip(data.platformType);
@@ -386,8 +403,12 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
         if (this.wasm && this.module && data.values && data.values.length > 0) {
           const len = Math.min(data.values.length, 16);
           const ptr = this.module._malloc(len * 2); // uint16_t
+          // Use getHeapBuffer() — HEAPU8 may be undefined after memory growth
+          const heapBuf = this.getHeapBuffer();
+          if (!heapBuf) break;
+          const heap16 = new Uint16Array(heapBuf);
           for (let i = 0; i < len; i++) {
-            this.module.HEAPU16[(ptr >> 1) + i] = data.values[i];
+            heap16[(ptr >> 1) + i] = data.values[i];
           }
           this.wasm.seqSetSpeedPattern(ptr, len);
           this.module._free(ptr);
@@ -407,8 +428,12 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
           // Allocate temp buffer in WASM memory for the groove values
           const len = Math.min(data.len || data.values.length, 16);
           const ptr = this.module._malloc(len * 2); // uint16_t
+          // Use getHeapBuffer() — HEAPU8 may be undefined after memory growth
+          const heapBuf = this.getHeapBuffer();
+          if (!heapBuf) { this.module._free(ptr); break; }
+          const heap16 = new Uint16Array(heapBuf);
           for (let i = 0; i < len; i++) {
-            this.module.HEAPU16[(ptr >> 1) + i] = data.values[i] || 6;
+            heap16[(ptr >> 1) + i] = data.values[i] || 6;
           }
           this.wasm.seqSetGrooveEntry(data.index || 0, ptr, len);
           this.module._free(ptr);
@@ -416,7 +441,13 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
         break;
       }
       case 'seqSetChannelChip': {
-        if (this.wasm) this.wasm.seqSetChannelChip(data.channel || 0, data.chipId || 0, data.subIdx || 0);
+        if (this.wasm) {
+          this.wasm.seqSetChannelChip(data.channel || 0, data.chipId || 0, data.subIdx || 0);
+          // Set per-channel dispatch handle for multi-chip routing
+          if (data.handle && this.wasm.seqSetChannelDispatch) {
+            this.wasm.seqSetChannelDispatch(data.channel || 0, data.handle);
+          }
+        }
         break;
       }
       case 'seqSetRepeatPattern': {
@@ -545,6 +576,7 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
         setWaveSynth: this.module._furnace_dispatch_set_wavesynth,
         setMacro: this.module._furnace_dispatch_set_macro,
         setInstrumentFull: this.module._furnace_dispatch_set_instrument_full,
+        loadIns2: this.module._furnace_dispatch_load_ins2,
         setSample: this.module._furnace_dispatch_set_sample,
         renderSamples: this.module._furnace_dispatch_render_samples,
         // Macro control functions
@@ -570,6 +602,7 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
         seqSetRepeatPattern: this.module._furnace_seq_set_repeat_pattern,
         seqSetCompatFlags: this.module._furnace_seq_set_compat_flags,
         seqSetChannelChip: this.module._furnace_seq_set_channel_chip,
+        seqSetChannelDispatch: this.module._furnace_seq_set_channel_dispatch,
         seqSetPatLen: this.module._furnace_seq_set_pat_len,
         seqSetDispatchHandle: this.module._furnace_seq_set_dispatch_handle,
         seqSetSampleRate: this.module._furnace_seq_set_sample_rate,
