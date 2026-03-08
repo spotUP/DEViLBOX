@@ -23,6 +23,52 @@ import { useCursorStore } from './useCursorStore';
 import { useEditorStore } from './useEditorStore';
 import { useFormatStore } from './useFormatStore';
 
+// ── Debounced WASM engine re-export on cell edit ────────────────────────────
+// For non-UADE WASM engines (MusicLine, PumaTracker), edits require
+// re-exporting the TrackerSong to native format and reloading the engine.
+let _wasmReexportTimer: ReturnType<typeof setTimeout> | null = null;
+
+function debouncedWasmEngineReexport(): void {
+  if (_wasmReexportTimer) clearTimeout(_wasmReexportTimer);
+  _wasmReexportTimer = setTimeout(() => {
+    _wasmReexportTimer = null;
+    try {
+      const replayer = getTrackerReplayer();
+      const song = replayer.getSong();
+      if (!song) return;
+      const sourceFormat = song.patterns[0]?.importMetadata?.sourceFormat;
+
+      if (sourceFormat === 'MusicLine') {
+        void (async () => {
+          try {
+            const { exportMusicLineFile } = await import('@/lib/export/MusicLineExporter');
+            const { MusicLineEngine } = await import('@/engine/musicline/MusicLineEngine');
+            if (!MusicLineEngine.hasInstance()) return;
+            const data = exportMusicLineFile(song);
+            const engine = MusicLineEngine.getInstance();
+            await engine.loadSong(data);
+          } catch (err) {
+            console.warn('[TrackerStore] MusicLine re-export failed:', err);
+          }
+        })();
+      } else if (sourceFormat === 'PumaTracker' && song.pumaTrackerFileData) {
+        void (async () => {
+          try {
+            const { exportPumaTrackerFile } = await import('@/lib/export/PumaTrackerExporter');
+            const { PumaTrackerEngine } = await import('@/engine/pumatracker/PumaTrackerEngine');
+            if (!PumaTrackerEngine.hasInstance()) return;
+            const data = exportPumaTrackerFile(song);
+            const engine = PumaTrackerEngine.getInstance();
+            await engine.loadTune(data.buffer as ArrayBuffer);
+          } catch (err) {
+            console.warn('[TrackerStore] PumaTracker re-export failed:', err);
+          }
+        })();
+      }
+    } catch { /* replayer not initialized */ }
+  }, 300); // 300ms debounce
+}
+
 // Extracted helper modules
 import {
   setCellInPattern, clearCellInPattern, clearChannelInPattern, clearPatternCells,
@@ -251,6 +297,8 @@ export const useTrackerStore = create<TrackerStore>()(
           }
         }
       } catch { /* UADE not active */ }
+      // Sync edit to MusicLine WASM engine (debounced re-export)
+      debouncedWasmEngineReexport();
     },
 
     clearCell: (channelIndex, rowIndex) => {
@@ -296,6 +344,8 @@ export const useTrackerStore = create<TrackerStore>()(
           }
         }
       } catch { /* UADE not active */ }
+      // Sync clear to MusicLine WASM engine (debounced re-export)
+      debouncedWasmEngineReexport();
     },
 
     clearChannel: (channelIndex) => {

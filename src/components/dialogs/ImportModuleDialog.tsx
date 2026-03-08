@@ -69,6 +69,22 @@ const isChipDumpFormat = (filename: string): boolean => {
   return fmt?.family === 'chip-dump' || fmt?.family === 'c64-chip';
 };
 
+/**
+ * For two-file Amiga formats, derive the expected companion filename from the main file.
+ * TFMX: mdat.songname → smpl.songname, MFP: mfp.songname → smp.songname
+ */
+function getExpectedCompanion(filename: string): { expectedPrefix: string; description: string } | null {
+  const basename = (filename.split('/').pop() ?? filename).split('\\').pop() ?? filename;
+  const lower = basename.toLowerCase();
+  if (lower.startsWith('mdat.')) {
+    return { expectedPrefix: 'smpl.', description: 'TFMX sample data (smpl.*)' };
+  }
+  if (lower.startsWith('mfp.')) {
+    return { expectedPrefix: 'smp.', description: 'MFP sample data (smp.*)' };
+  }
+  return null;
+}
+
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
@@ -116,9 +132,10 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
   // Shown as a warning when none were loaded alongside the module.
   const MULTI_FILE_FORMAT_KEYS = new Set<string>(['iffSmus']);
   const needsCompanionFiles =
-    nativeFmt !== null &&
-    MULTI_FILE_FORMAT_KEYS.has(nativeFmt.key) &&
-    activeCompanions.length === 0;
+    activeCompanions.length === 0 && (
+      (nativeFmt !== null && MULTI_FILE_FORMAT_KEYS.has(nativeFmt.key)) ||
+      getExpectedCompanion(loadedFileName) !== null
+    );
 
   const handleFileSelect = useCallback(async (file: File, overrideCompanions?: File[]) => {
     if (!isSupportedModule(file.name)) {
@@ -266,6 +283,48 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
       handleFileSelect(initialFile);
     }
   }, [initialFile, isOpen, handleFileSelect]);
+
+  // Auto-prompt for companion file when a two-file format is loaded without one
+  const companionPromptedRef = useRef(false);
+  useEffect(() => {
+    if (!moduleInfo || isLoading || activeCompanions.length > 0) return;
+    if (companionPromptedRef.current) return;
+
+    const companion = getExpectedCompanion(loadedFileName);
+    if (!companion) return;
+
+    companionPromptedRef.current = true;
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '*';
+    input.style.display = 'none';
+    input.onchange = async () => {
+      const file = input.files?.[0];
+      input.remove();
+      if (!file) return;
+      try {
+        const buf = await file.arrayBuffer();
+        const { UADEEngine } = await import('@engine/uade/UADEEngine');
+        const engine = UADEEngine.getInstance();
+        await engine.ready();
+        await engine.addCompanionFile(file.name, buf);
+        setActiveCompanions([file]);
+      } catch (err) {
+        console.warn('[ImportModuleDialog] Failed to register companion file:', err);
+      }
+    };
+    document.body.appendChild(input);
+    input.click();
+    // Cleanup if cancelled
+    window.addEventListener('focus', () => {
+      setTimeout(() => { if (!input.files?.length) input.remove(); }, 300);
+    }, { once: true });
+  }, [moduleInfo, isLoading, activeCompanions, loadedFileName]);
+
+  // Reset companion prompt flag when dialog closes or file changes
+  useEffect(() => {
+    companionPromptedRef.current = false;
+  }, [loadedFileName, isOpen]);
 
   // Native format keys where libopenmpt can successfully preview the file (from FormatRegistry).
   const LIBOPENMPT_PLAYABLE_NATIVE_KEYS = getLibopenmptPlayableKeys();
@@ -685,12 +744,25 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
                 <div className="flex items-start gap-2 p-3 bg-amber-500/10 border border-amber-500/30 rounded text-xs text-amber-400">
                   <AlertCircle size={14} className="shrink-0 mt-0.5" />
                   <div>
-                    <span className="font-semibold">Audio requires companion files.</span>
-                    {' '}Samples live in an{' '}
-                    <span className="font-mono bg-dark-bg px-1 rounded">Instruments/</span>
-                    {' '}folder next to this module. Drop the parent folder or use{' '}
-                    <span className="font-semibold">📁 Pick Folder</span>
-                    {' '}below to load them.
+                    {(() => {
+                      const comp = getExpectedCompanion(loadedFileName);
+                      if (comp) return (
+                        <span>
+                          <span className="font-semibold">Waiting for {comp.description}.</span>
+                          {' '}Pick the companion file to continue.
+                        </span>
+                      );
+                      return (
+                        <span>
+                          <span className="font-semibold">Audio requires companion files.</span>
+                          {' '}Samples live in an{' '}
+                          <span className="font-mono bg-dark-bg px-1 rounded">Instruments/</span>
+                          {' '}folder next to this module. Drop the parent folder or use{' '}
+                          <span className="font-semibold">Pick Folder</span>
+                          {' '}below to load them.
+                        </span>
+                      );
+                    })()}
                   </div>
                 </div>
               )}

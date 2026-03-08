@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-03-07T13:26:10.296Z
+ * Generated: 2026-03-08T11:35:33.477Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,10 +19,10 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.2554';
-export const BUILD_NUMBER = '2554';
-export const BUILD_HASH = '7cc955472';
-export const BUILD_DATE = '2026-03-07';
+export const BUILD_VERSION = '1.0.2573';
+export const BUILD_NUMBER = '2573';
+export const BUILD_HASH = 'dae8986cb';
+export const BUILD_DATE = '2026-03-08';
 
 // Full version (patch IS the build number, so no need to append)
 export const FULL_VERSION = BUILD_VERSION;
@@ -30,9 +30,91 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.2554',
+    version: '1.0.2573',
+    date: '2026-03-08',
+    changes: [
+      {
+        type: 'fix',
+        "description": "Resolve TypeScript errors in MCP bridge handlers and SonicArrangerEncoder"
+      },
+      {
+        type: 'feature',
+        "description": "Add MCP server with 116 tools for full tracker control and audio debugging"
+      }
+    ]
+  },
+  {
+    version: '2026-03-07',
     date: '2026-03-07',
     changes: [
+      {
+        type: 'improvement',
+        "description": "Chore: gitignore local Reference Code/Music symlinks"
+      },
+      {
+        type: 'improvement',
+        "description": "Chore: update gearmulator WASM JS and UADE pattern encoder"
+      },
+      {
+        type: 'fix',
+        "description": "Patch Furnace platform sources for WASM dispatch compatibility"
+      },
+      {
+        type: 'feature',
+        "description": "Chore: add serena memories and furnace audit tools"
+      },
+      {
+        type: 'feature',
+        "description": "Add gearmulator JP-8000 RAM dump and MicroQ snapshot tools"
+      },
+      {
+        type: 'feature',
+        "description": "Add new components, engines, and UADE format encoders"
+      },
+      {
+        type: 'improvement',
+        "description": "Update audit reports, CLAUDE.md, and project metadata"
+      },
+      {
+        type: 'improvement',
+        "description": "Chore: move regression tests to CI-only and update build config"
+      },
+      {
+        type: 'feature',
+        "description": "UI improvements — theme editor, custom banner, settings modal"
+      },
+      {
+        type: 'feature',
+        "description": "Update engines with improved playback and format handling"
+      },
+      {
+        type: 'feature',
+        "description": "Expand import format support and update parsers"
+      },
+      {
+        type: 'improvement',
+        "description": "Chore: update WASM C/C++ sources for harness and paula_soft improvements"
+      },
+      {
+        type: 'improvement',
+        "description": "Chore: rebuild WASM modules and update worklets"
+      },
+      {
+        type: 'improvement',
+        "description": "Chore: update build paths for third-party directory restructure"
+      },
+      {
+        type: 'improvement',
+        "description": "Chore: remove unneeded third-party reference sources from git"
+      },
+      {
+        type: 'feature',
+        "description": "Implement complete Furnace chip flags pipeline with version compat"
+      },
+      {
+        type: 'feature',
+        "description": "Chore: add gearmulator build-native to gitignore"
+      },
       {
         type: 'fix',
         "description": "Sync arrangement playhead on view switch and update changelog"
@@ -152,88 +234,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         "description": "Improve JamCracker controls layout"
-      },
-      {
-        type: 'improvement',
-        "description": "Chore: update generated changelog"
-      },
-      {
-        type: 'improvement',
-        "description": "Split StudioView into StudioCanvasView and SplitView"
-      },
-      {
-        type: 'feature',
-        "description": "Tracker engine improvements for Furnace format playback"
-      },
-      {
-        type: 'fix',
-        "description": "Furnace import parser type fixes and pattern data improvements"
-      },
-      {
-        type: 'feature',
-        "description": "Furnace WASM sequencer with per-system effects and compat flags"
-      },
-      {
-        type: 'feature',
-        "description": "Improve gearmulator WASM bridge and worker"
-      },
-      {
-        type: 'feature',
-        "description": "Improve 68k replayer WASM engines (hippel, ma, pretracker)"
-      },
-      {
-        type: 'feature',
-        "description": "Chore: add 68k replayer build dirs to .gitignore"
-      },
-      {
-        type: 'fix',
-        "description": "68k-to-C transpiler — compound expressions, XREF, EQU, orphan labels, jump tables"
-      }
-    ]
-  },
-  {
-    version: '2026-03-06',
-    date: '2026-03-06',
-    changes: [
-      {
-        type: 'fix',
-        "description": "68k-to-C transpiler — PEA, jump tables, label arithmetic, compound expressions"
-      },
-      {
-        type: 'fix',
-        "description": "68k-to-C transpiler — 6 fixes for cross-function gotos, case sensitivity, addressing modes"
-      },
-      {
-        type: 'fix',
-        "description": "Remove unused grooves param from convertFurnaceCell"
-      },
-      {
-        type: 'fix',
-        "description": "Remove duplicate case 0x9 that caused silent Furnace playback"
-      },
-      {
-        type: 'fix',
-        "description": "4 Furnace playback bugs — speed, effects, dual-processing, grooves"
-      },
-      {
-        type: 'fix',
-        "description": "Connect WASM engine output to audio graph for direct-routed engines"
-      },
-      {
-        type: 'feature',
-        "description": "Accept both prefix and extension forms for all Amiga formats"
-      },
-      {
-        type: 'fix',
-        "description": "Dynamic import resolution and worklet stereo buffer layout"
-      },
-      {
-        type: 'fix',
-        "description": "Resolve TypeScript errors in PreTracker parser, MA parser, and tests"
-      },
-      {
-        type: 'feature',
-        "description": "Per-channel playhead in MusicLine, delete dead GTPatternEditor"
       }
     ]
   }

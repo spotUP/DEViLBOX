@@ -26,7 +26,7 @@ export const usePatternPlayback = () => {
     currentPositionIndex: s.currentPositionIndex,
     setCurrentPosition: s.setCurrentPosition,
     })));
-  const { channelTrackTables, channelSpeeds, channelGrooves, hivelyNative, hivelyFileData, hivelyMeta, musiclineFileData, c64SidFileData, jamCrackerFileData, futurePlayerFileData, preTrackerFileData, maFileData, hippelFileData, sonixFileData, pxtoneFileData, organyaFileData, eupFileData, ixsFileData, psycleFileData, sc68FileData, zxtuneFileData, libopenmptFileData, furnaceNative, furnaceActiveSubsong } = useFormatStore(useShallow((s) => ({
+  const { channelTrackTables, channelSpeeds, channelGrooves, hivelyNative, hivelyFileData, hivelyMeta, musiclineFileData, c64SidFileData, jamCrackerFileData, futurePlayerFileData, preTrackerFileData, maFileData, hippelFileData, sonixFileData, pxtoneFileData, organyaFileData, eupFileData, ixsFileData, psycleFileData, sc68FileData, zxtuneFileData, pumaTrackerFileData, artOfNoiseFileData, libopenmptFileData, furnaceNative, furnaceActiveSubsong } = useFormatStore(useShallow((s) => ({
     channelTrackTables: s.channelTrackTables,
     channelSpeeds: s.channelSpeeds,
     channelGrooves: s.channelGrooves,
@@ -48,6 +48,8 @@ export const usePatternPlayback = () => {
     psycleFileData: s.psycleFileData,
     sc68FileData: s.sc68FileData,
     zxtuneFileData: s.zxtuneFileData,
+    pumaTrackerFileData: s.pumaTrackerFileData,
+    artOfNoiseFileData: s.artOfNoiseFileData,
     libopenmptFileData: s.libopenmptFileData,
     furnaceNative: s.furnaceNative,
     furnaceActiveSubsong: s.furnaceActiveSubsong,
@@ -361,6 +363,8 @@ export const usePatternPlayback = () => {
           psycleFileData: psycleFileData ?? undefined,
           sc68FileData: sc68FileData ?? undefined,
           zxtuneFileData: zxtuneFileData ?? undefined,
+          pumaTrackerFileData: pumaTrackerFileData ?? undefined,
+          artOfNoiseFileData: artOfNoiseFileData ?? undefined,
           libopenmptFileData: libopenmptFileData ?? undefined,
           // Furnace-specific timing data (only set for .fur imports)
           speed2: furnaceData?.speed2,
