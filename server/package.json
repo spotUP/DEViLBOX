@@ -12,6 +12,7 @@
     "collab:watch": "tsx watch collab-server.ts"
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.27.1",
     "adm-zip": "^0.5.16",
     "bcrypt": "^5.1.1",
     "better-sqlite3": "^12.6.2",
