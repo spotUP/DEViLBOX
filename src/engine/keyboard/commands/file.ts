@@ -44,6 +44,8 @@ export function saveModule(): boolean {
       const { getTrackerReplayer } = await import('@engine/TrackerReplayer');
       const replayer = getTrackerReplayer();
       const song = replayer.getSong();
+
+      // UADE chip RAM export (all UADE formats with encoder)
       if (song?.uadePatternLayout) {
         const { UADEChipEditor } = await import('@engine/uade/UADEChipEditor');
         const { UADEEngine } = await import('@engine/uade/UADEEngine');
@@ -52,6 +54,45 @@ export function saveModule(): boolean {
           const filename = (song.name || 'module') + '.' + song.uadePatternLayout.formatId;
           await editor.exportEditedModule(song.uadePatternLayout, filename);
           useUIStore.getState().setStatusMessage('Module exported', false, 1500);
+          return;
+        }
+      }
+
+      // Non-UADE native format exports
+      if (song) {
+        const sourceFormat = song.patterns[0]?.importMetadata?.sourceFormat;
+
+        // Digital Symphony (.dsym) export via LZW compressor
+        if (sourceFormat === 'DigitalSymphony') {
+          const { exportDigitalSymphony } = await import('@/lib/export/DigitalSymphonyExporter');
+          const { saveAs } = await import('file-saver');
+          const buf = exportDigitalSymphony(song);
+          const filename = (song.name || 'module').replace(/\.[^/.]+$/, '') + '.dsym';
+          saveAs(new Blob([buf]), filename);
+          useUIStore.getState().setStatusMessage('Digital Symphony exported', false, 1500);
+          return;
+        }
+
+        // MusicLine (.ml) export
+        if (sourceFormat === 'MusicLine') {
+          const { exportMusicLineFile } = await import('@/lib/export/MusicLineExporter');
+          const { saveAs } = await import('file-saver');
+          const data = exportMusicLineFile(song);
+          const filename = (song.name || 'module').replace(/\.[^/.]+$/, '') + '.ml';
+          saveAs(new Blob([data as BlobPart]), filename);
+          useUIStore.getState().setStatusMessage('MusicLine exported', false, 1500);
+          return;
+        }
+
+        // PumaTracker (.puma) export
+        if (sourceFormat === 'PumaTracker' && song.pumaTrackerFileData) {
+          const { exportPumaTrackerFile } = await import('@/lib/export/PumaTrackerExporter');
+          const { saveAs } = await import('file-saver');
+          const data = exportPumaTrackerFile(song);
+          const filename = (song.name || 'module').replace(/\.[^/.]+$/, '') + '.puma';
+          saveAs(new Blob([data as BlobPart]), filename);
+          useUIStore.getState().setStatusMessage('PumaTracker exported', false, 1500);
+          return;
         }
       }
     } catch { /* replayer not initialized */ }

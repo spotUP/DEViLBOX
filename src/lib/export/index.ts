@@ -14,6 +14,7 @@ export * from './OpenMPTExporter';
 // Amiga format exporters
 export * from './JamCrackerExporter';
 export * from './FuturePlayerExporter';
+export * from './DigitalSymphonyExporter';
 
 // Chip music exporters (Furnace/Hardware capture)
 export * from './VGMExporter';
