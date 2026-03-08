@@ -962,6 +962,10 @@ export class FurnaceDispatchEngine {
   hasChip(platformType: number): boolean {
     return this.chips.has(platformType);
   }
+  /** Get the dispatch handle for a specific platform type */
+  getChipHandle(platformType: number): number {
+    return this.chips.get(platformType)?.handle ?? 0;
+  }
 
   /** Whether audio is already routed from the worklet to destination */
   get audioRouted(): boolean { return this._audioRouted; }
@@ -1472,6 +1476,17 @@ export class FurnaceDispatchEngine {
   setInstrumentFull(insIndex: number, insData: Uint8Array, platformType?: number): void {
     if (!this.workletNode) return;
     this.workletNode.port.postMessage({ type: 'setInstrumentFull', insIndex, insData, platformType });
+  }
+
+  /**
+   * Upload a Furnace instrument in native INS2 format.
+   * This is the format used in .fur files — the WASM dispatch parses feature blocks directly.
+   * Unlike setInstrumentFull (which uses our custom 0xF0B1 format), this uses furnace_dispatch_load_ins2
+   * which stores instruments globally (not per-dispatch-handle).
+   */
+  loadIns2(insIndex: number, insData: Uint8Array): void {
+    if (!this.workletNode) return;
+    this.workletNode.port.postMessage({ type: 'loadIns2', insIndex, insData });
   }
 
   setSample(sampleIndex: number, sampleData: Uint8Array, platformType?: number): void {

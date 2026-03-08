@@ -313,11 +313,32 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
 
     console.log(`[FurnaceDispatchSynth] Encoding and uploading instrument ${this.furnaceInstrumentIndex} "${name}" to platform ${this.platformType}`);
 
+    const configFurnace = config as unknown as FurnaceConfig;
+
+    // If we have rawBinaryData from a .fur file, use it directly.
+    // This is the native INS2 format that the WASM dispatch already knows how to parse.
+    // It contains the correct macros for ALL platforms (Lynx duty, GB envelope, etc.)
+    // and bypasses our TS encoder which may have bugs or skip non-FM platforms.
+    const rawData = (configFurnace as Record<string, unknown>).rawBinaryData as Uint8Array | undefined;
+    if (rawData && rawData.length > 4 &&
+        rawData[0] === 0x49 && rawData[1] === 0x4E && rawData[2] === 0x53 && rawData[3] === 0x32) { // "INS2"
+      console.log(`[FurnaceDispatchSynth] Using rawBinaryData INS2 (${rawData.length} bytes) for instrument ${this.furnaceInstrumentIndex}`);
+      this.engine.loadIns2(this.furnaceInstrumentIndex, rawData);
+
+      this._pendingUploadConfig = null;
+
+      const numCh = this.engine.getChannelCount(this.platformType) || 3;
+      for (let ch = 0; ch < numCh; ch++) {
+        this.engine.setInstrument(ch, this.furnaceInstrumentIndex, this.platformType, true);
+      }
+      return;
+    }
+
     // Skip FM instrument upload for non-FM platforms (sample/wavetable/PSG chips).
+    // This only applies when we DON'T have rawBinaryData (user-created instruments).
     // initPlatform already sets up the correct instrument (sample, wavetable, etc.).
     // Uploading an FM instrument would overwrite it, causing silence.
     const correctChipType = PLATFORM_TO_CHIPTYPE[this.platformType];
-    const configFurnace = config as unknown as FurnaceConfig;
     if (correctChipType === undefined && configFurnace.operators && configFurnace.operators.length > 0) {
       console.log(`[FurnaceDispatchSynth] Skipping FM instrument upload for non-FM platform ${this.platformType}`);
       this._pendingUploadConfig = null;
