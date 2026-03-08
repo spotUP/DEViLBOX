@@ -64,6 +64,14 @@ export function startRelay(): void {
     });
   });
 
+  server.on('error', (err: NodeJS.ErrnoException) => {
+    if (err.code === 'EADDRINUSE') {
+      console.error(`[mcp-bridge] Port ${PORT} already in use, relay disabled`);
+    } else {
+      console.error('[mcp-bridge] Server error:', err.message);
+    }
+  });
+
   server.listen(PORT, () => {
     console.error(`[mcp-bridge] WebSocket relay listening on ws://localhost:${PORT}`);
   });
