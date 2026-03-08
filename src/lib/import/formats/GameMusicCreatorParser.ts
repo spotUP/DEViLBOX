@@ -41,6 +41,8 @@
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, ChannelData, TrackerCell, InstrumentConfig, UADEChipRamInfo } from '@/types';
 import { createSamplerInstrument } from './AmigaUtils';
+import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
+import { encodeGameMusicCreatorCell } from '@/engine/uade/encoders/GameMusicCreatorEncoder';
 
 // ── Binary helpers ─────────────────────────────────────────────────────────────
 
@@ -479,6 +481,18 @@ export function parseGameMusicCreatorFile(bytes: Uint8Array, filename: string): 
 
   const name = filename.replace(/\.[^/.]+$/, '');
 
+  // Build uadePatternLayout — contiguous layout (4 bytes/cell, 4 channels, 64 rows)
+  const uadePatternLayout: UADEPatternLayout = {
+    formatId: 'gameMusicCreator',
+    patternDataFileOffset: HEADER_SIZE,
+    bytesPerCell: 4,
+    rowsPerPattern: NUM_ROWS,
+    numChannels: NUM_CHANNELS,
+    numPatterns,
+    moduleSize: bytes.byteLength,
+    encodeCell: encodeGameMusicCreatorCell,
+  };
+
   return {
     name,
     format:          'MOD' as TrackerFormat,
@@ -491,5 +505,6 @@ export function parseGameMusicCreatorFile(bytes: Uint8Array, filename: string): 
     initialSpeed:    6,
     initialBPM:      125,
     linearPeriods:   false,
+    uadePatternLayout,
   };
 }

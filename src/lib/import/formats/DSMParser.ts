@@ -20,6 +20,8 @@
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, ChannelData, TrackerCell, InstrumentConfig } from '@/types';
+import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
+import { encodeDSMDynCell } from '@/engine/uade/encoders/DSMDynEncoder';
 import { createSamplerInstrument } from './AmigaUtils';
 
 // ── Binary helpers ────────────────────────────────────────────────────────────
@@ -713,6 +715,7 @@ function parseDynamicStudioDSm(v: DataView, bytes: Uint8Array, filename: string)
 
   // ── Patterns ───────────────────────────────────────────────────────────────
   // numPatterns × numChannels × 64 rows × 4 bytes/cell (fixed layout)
+  const patternDataOffset = cur; // file offset of pattern data section (for uadePatternLayout)
   const patternDataSize = numPatterns * numChannels * ROWS_PER_PATTERN * 4;
   if (cur + patternDataSize > fileLen) {
     throw new Error('DSMParser(DSm): file truncated at pattern data');
@@ -892,6 +895,23 @@ function parseDynamicStudioDSm(v: DataView, bytes: Uint8Array, filename: string)
   // Global volume: 0–100 → scale to 0–256
   const globalVolScaled = Math.round(globalVol * 256 / 100);
 
+  // Build uadePatternLayout for DSm variant (fixed 4-byte cells, row-major order)
+  const uadePatternLayout: UADEPatternLayout = {
+    formatId: 'dsm_dyn',
+    patternDataFileOffset: patternDataOffset,
+    bytesPerCell: 4,
+    rowsPerPattern: ROWS_PER_PATTERN,
+    numChannels,
+    numPatterns,
+    moduleSize: v.byteLength,
+    encodeCell: encodeDSMDynCell,
+    getCellFileOffset: (pattern: number, row: number, channel: number): number => {
+      // DSm stores data row-major: pattern × (numChannels × 64) + row × numChannels + ch
+      return patternDataOffset
+        + (pattern * numChannels * ROWS_PER_PATTERN + row * numChannels + channel) * 4;
+    },
+  };
+
   return {
     name:            hdr.title || filename.replace(/\.[^/.]+$/, ''),
     format:          'MOD' as TrackerFormat,
@@ -908,6 +928,7 @@ function parseDynamicStudioDSm(v: DataView, bytes: Uint8Array, filename: string)
     compatFlags: {
       globalVolume: globalVolScaled,
     },
+    uadePatternLayout,
   };
 }
 

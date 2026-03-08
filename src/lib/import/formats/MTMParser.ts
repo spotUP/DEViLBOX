@@ -33,6 +33,8 @@
  */
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, ChannelData, TrackerCell, InstrumentConfig } from '@/types';
+import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
+import { encodeMTMCell } from '@/engine/uade/encoders/MTMEncoder';
 import { createSamplerInstrument } from './AmigaUtils';
 
 // -- Binary helpers -----------------------------------------------------------
@@ -330,6 +332,36 @@ export async function parseMTMFile(
       return createSamplerInstrument(id, name, pcm, info.volume, SAMPLE_RATE, loopStart, loopEnd);
     }
   });
+  // Build pattern table lookup for getCellFileOffset
+  // patTrackTable[pat][ch] = trackRef (1-based, 0 = empty)
+  const patTrackTable: number[][] = [];
+  for (let pat = 0; pat < numPatterns; pat++) {
+    const patBase = patTableOffset + pat * MAX_CHANNELS_IN_PAT * 2;
+    const refs: number[] = [];
+    for (let ch = 0; ch < MAX_CHANNELS_IN_PAT; ch++) {
+      refs.push(u16le(v, patBase + ch * 2));
+    }
+    patTrackTable.push(refs);
+  }
+
+  const uadePatternLayout: UADEPatternLayout = {
+    formatId: 'mtm',
+    patternDataFileOffset: trackDataOffset,
+    bytesPerCell: 3,
+    rowsPerPattern: rowsPerPattern,
+    numChannels,
+    numPatterns,
+    moduleSize: buffer.byteLength,
+    encodeCell: encodeMTMCell,
+    getCellFileOffset: (pattern: number, row: number, channel: number): number => {
+      const refs = patTrackTable[pattern];
+      if (!refs) return 0;
+      const trackRef = refs[channel] ?? 0;
+      if (trackRef === 0 || trackRef > numTracks) return 0;
+      return trackDataOffset + (trackRef - 1) * TRACK_BLOCK_SIZE + row * BYTES_PER_TRACK_ROW;
+    },
+  };
+
   return {
     name:            songName || filename.replace(/\.[^/.]+$/, ''),
     format:          'MOD' as TrackerFormat,
@@ -342,5 +374,6 @@ export async function parseMTMFile(
     initialSpeed:    6,
     initialBPM:      125,
     linearPeriods:   false,
+    uadePatternLayout,
   };
 }

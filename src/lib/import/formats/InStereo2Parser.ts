@@ -37,6 +37,8 @@
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, TrackerCell, InstrumentConfig } from '@/types';
+import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
+import { encodeInStereo2Cell } from '@/engine/uade/encoders/InStereo2Encoder';
 import { createSamplerInstrument } from './AmigaUtils';
 import type { UADEChipRamInfo } from '@/types/instrument';
 
@@ -224,6 +226,7 @@ export function parseInStereo2File(bytes: Uint8Array, filename: string): Tracker
   off += 4;
 
   const numberOfTrackRows = u32BE(bytes, off); off += 4;
+  const trackRowDataOffset = off; // file offset of track row data (for uadePatternLayout)
   const trackLines: IS20TrackLine[] = [];
   for (let i = 0; i < numberOfTrackRows; i++) {
     if (off + 4 > bytes.length) {
@@ -584,6 +587,27 @@ export function parseInStereo2File(bytes: Uint8Array, filename: string): Tracker
   const moduleName = filename.replace(/\.[^/.]+$/, '');
   const tempo = song.tempo > 0 ? song.tempo : 50;
 
+  // Build uadePatternLayout with getCellFileOffset for track row indirection
+  const uadePatternLayout: UADEPatternLayout = {
+    formatId: 'inStereo2',
+    patternDataFileOffset: trackRowDataOffset,
+    bytesPerCell: 4,
+    rowsPerPattern: rowsPerTrack,
+    numChannels: 4,
+    numPatterns: trackerPatterns.length,
+    moduleSize: bytes.length,
+    encodeCell: encodeInStereo2Cell,
+    getCellFileOffset: (pattern: number, row: number, channel: number): number => {
+      // Each pattern maps to a position; each channel has a startTrackRow offset
+      const posIdx = firstPos + pattern;
+      if (posIdx >= positions.length) return 0;
+      const pos = positions[posIdx][channel];
+      if (!pos) return 0;
+      const lineIdx = pos.startTrackRow + row;
+      return trackRowDataOffset + lineIdx * 4;
+    },
+  };
+
   return {
     name: moduleName,
     format: 'IS20' as TrackerFormat,
@@ -596,6 +620,7 @@ export function parseInStereo2File(bytes: Uint8Array, filename: string): Tracker
     initialSpeed: Math.max(1, song.startSpeed),
     initialBPM: tempo,
     linearPeriods: false,
+    uadePatternLayout,
   };
 }
 

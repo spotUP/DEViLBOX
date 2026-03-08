@@ -54,6 +54,8 @@
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, ChannelData, TrackerCell, InstrumentConfig } from '@/types';
+import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
+import { encodeSTPCell } from '@/engine/uade/encoders/STPEncoder';
 import { createSamplerInstrument } from './AmigaUtils';
 
 // ── Binary helpers ─────────────────────────────────────────────────────────────
@@ -296,6 +298,9 @@ export async function parseSTPFile(
 
   const patternArray: Pattern[] = [];
   const patIdxToArrayIdx = new Map<number, number>();
+  const patternFileOffsets: number[] = [];  // absolute file offset per pattern
+  const patternRowCounts: number[] = [];    // rows per pattern
+  const patternChCounts: number[] = [];     // channels per pattern
   let numChannels = 4;
 
   if (version === 0) {
@@ -311,6 +316,9 @@ export async function parseSTPFile(
       const bytesNeeded = numChannels * patLen * 4;
       if (cursor + bytesNeeded > buffer.byteLength) break;
 
+      patternFileOffsets.push(cursor);
+      patternRowCounts.push(patLen);
+      patternChCounts.push(numChannels);
       const channels = parsePatternChannels(v, cursor, numChannels, patLen, filename, pat, numPatterns, maxSampleIndex);
       cursor += bytesNeeded;
 
@@ -365,6 +373,9 @@ export async function parseSTPFile(
       const bytesNeeded = patCh * patLen * 4;
       if (cursor + bytesNeeded > buffer.byteLength) break;
 
+      patternFileOffsets.push(cursor);
+      patternRowCounts.push(patLen);
+      patternChCounts.push(patCh);
       const channels = parsePatternChannels(v, cursor, patCh, patLen, filename, actualPat, 128, maxSampleIndex);
       cursor += bytesNeeded;
       totalPatterns++;
@@ -466,6 +477,22 @@ export async function parseSTPFile(
     );
   }
 
+  const uadePatternLayout: UADEPatternLayout = {
+    formatId: 'stp',
+    patternDataFileOffset: patternFileOffsets[0] ?? 0,
+    bytesPerCell: 4,
+    rowsPerPattern: defaultPatLen > 0 ? defaultPatLen : 64,  // nominal; actual rows vary
+    numChannels,
+    numPatterns: patternArray.length,
+    moduleSize: buffer.byteLength,
+    encodeCell: encodeSTPCell,
+    getCellFileOffset: (pattern: number, row: number, channel: number): number => {
+      const base = patternFileOffsets[pattern] ?? 0;
+      const ch = patternChCounts[pattern] ?? numChannels;
+      return base + (row * ch + channel) * 4;
+    },
+  };
+
   return {
     name:            filename.replace(/\.[^/.]+$/, ''),
     format:          'MOD' as TrackerFormat,
@@ -478,6 +505,7 @@ export async function parseSTPFile(
     initialSpeed,
     initialBPM,
     linearPeriods:   false,
+    uadePatternLayout,
   };
 }
 

@@ -20,6 +20,8 @@
 import type { TrackerSong } from '@/engine/TrackerReplayer';
 import type { Pattern, ChannelData, TrackerCell, InstrumentConfig } from '@/types';
 import { createSamplerInstrument } from './AmigaUtils';
+import { encodeFARCell } from '@/engine/uade/encoders/FAREncoder';
+import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
 
 // ── Binary helpers (little-endian) ────────────────────────────────────────────
 
@@ -321,6 +323,9 @@ export async function parseFARFile(
   // ── Patterns ───────────────────────────────────────────────────────────────
 
   const patterns: Pattern[] = new Array(MAX_PATTERNS).fill(null);
+  // Track the cell data start offset and row count for each pattern (for getCellFileOffset)
+  const patternCellOffsets: number[] = new Array(MAX_PATTERNS).fill(0);
+  const patternRowCounts: number[] = new Array(MAX_PATTERNS).fill(0);
 
   for (let pat = 0; pat < MAX_PATTERNS; pat++) {
     const chunkSize = patternSizes[pat];
@@ -342,6 +347,10 @@ export async function parseFARFile(
     // Read break row (1 byte) + unused (1 byte)
     const breakRow = u8(v, cursor);
     cursor += 2;
+
+    // Record cell data start for this pattern (after the 2-byte break row header)
+    patternCellOffsets[pat] = cursor;
+    patternRowCounts[pat] = numRows;
 
     // Apply OpenMPT's breakRow adjustment:
     // if breakRow > 0 && breakRow < numRows - 2 → breakRow++ (effective break at next row)
@@ -464,6 +473,24 @@ export async function parseFARFile(
 
   }
 
+  // ── UADE Pattern Layout ──────────────────────────────────────────────────
+
+  const uadePatternLayout: UADEPatternLayout = {
+    formatId: 'far',
+    patternDataFileOffset: headerLength, // patterns start at headerLength
+    bytesPerCell: 4,
+    rowsPerPattern: 64, // variable per pattern, but this is the nominal value
+    numChannels: NUM_CHANNELS,
+    numPatterns: MAX_PATTERNS,
+    moduleSize: buffer.byteLength,
+    encodeCell: encodeFARCell,
+    getCellFileOffset: (pattern: number, row: number, channel: number): number => {
+      const cellDataStart = patternCellOffsets[pattern];
+      if (cellDataStart === 0) return 0; // pattern doesn't exist
+      return cellDataStart + (row * NUM_CHANNELS + channel) * 4;
+    },
+  };
+
   // ── Samples ────────────────────────────────────────────────────────────────
 
   // sampleMap[8]: 64-bit bitmask, one bit per sample (bit i of byte i>>3)
@@ -471,7 +498,7 @@ export async function parseFARFile(
     // No samples — build empty instruments
     return assembleSong(
       songName, orderList, restartPos, patterns, [],
-      initialSpeed, NUM_CHANNELS,
+      initialSpeed, NUM_CHANNELS, uadePatternLayout,
     );
   }
 
@@ -582,7 +609,7 @@ export async function parseFARFile(
 
   return assembleSong(
     songName, orderList, restartPos, patterns, instruments,
-    initialSpeed, NUM_CHANNELS,
+    initialSpeed, NUM_CHANNELS, uadePatternLayout,
   );
 }
 
@@ -596,6 +623,7 @@ function assembleSong(
   instruments:  InstrumentConfig[],
   initialSpeed: number,
   numChannels:  number,
+  uadeLayout?:  UADEPatternLayout,
 ): TrackerSong {
   // Compact the pattern array: only include non-null patterns
   // Use orderList entries to determine which patterns exist; keep all non-null slots.
@@ -613,5 +641,6 @@ function assembleSong(
     initialSpeed,
     initialBPM:      INITIAL_BPM,
     linearPeriods:   false,   // FAR uses Amiga-style periods
+    ...(uadeLayout ? { uadePatternLayout: uadeLayout } : {}),
   };
 }

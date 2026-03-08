@@ -50,6 +50,8 @@
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, ChannelData, TrackerCell, InstrumentConfig } from '@/types';
 import { createSamplerInstrument } from './AmigaUtils';
+import { encodeXMFCell } from '@/engine/uade/encoders/XMFEncoder';
+import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
 
 // ── Binary helpers ─────────────────────────────────────────────────────────
 
@@ -524,6 +526,17 @@ function _parse(bytes: Uint8Array, filename: string): TrackerSong | null {
   // Imperium Galactica files (type 3) have quieter sample pre-amp in OpenMPT,
   // but that's a playback concern we don't model here.
 
+  const uadePatternLayout: UADEPatternLayout = {
+    formatId: 'xmf',
+    patternDataFileOffset: patternStart,
+    bytesPerCell: CELL_SIZE,
+    rowsPerPattern: ROWS_PER_PATTERN,
+    numChannels,
+    numPatterns,
+    moduleSize: bytes.length,
+    encodeCell: encodeXMFCell,
+  };
+
   return {
     name:            songName,
     format:          'MOD' as TrackerFormat,
@@ -536,5 +549,6 @@ function _parse(bytes: Uint8Array, filename: string): TrackerSong | null {
     initialSpeed:    6,
     initialBPM:      125,
     linearPeriods:   false,
+    uadePatternLayout,
   };
 }

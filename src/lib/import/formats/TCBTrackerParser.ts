@@ -60,8 +60,10 @@
  */
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
-import type { InstrumentConfig, UADEChipRamInfo } from '@/types';
+import type { InstrumentConfig, TrackerCell, Pattern, UADEChipRamInfo } from '@/types';
 import { createSamplerInstrument } from './AmigaUtils';
+import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
+import { encodeTCBTrackerCell } from '@/engine/uade/encoders/TCBTrackerEncoder';
 
 // ── Constants ───────────────────────────────────────────────────────────────
 
@@ -294,44 +296,132 @@ export async function parseTCBTrackerFile(
     instruments.push(instr);
   }
 
-  // ── Pattern stub ─────────────────────────────────────────────────────────
+  // ── Pattern data decode ──────────────────────────────────────────────────
+  // Each pattern: 64 rows × 4 channels × 2 bytes = 512 bytes
+  // Cell format (2 bytes):
+  //   byte 0: note (0=empty, 0x10-0x3B = valid: high nibble=octave, low nibble=semitone)
+  //   byte 1: (instrument << 4) | (effectType & 0x0F)
 
-  const emptyRows = Array.from({ length: 64 }, () => ({
-    note: 0, instrument: 0, volume: 0,
-    effTyp: 0, eff: 0, effTyp2: 0, eff2: 0,
-  }));
+  const PANNING = [-50, 50, 50, -50] as const;
+  const patterns: Pattern[] = [];
 
-  const pattern = {
-    id: 'pattern-0',
-    name: 'Pattern 0',
-    length: 64,
-    channels: Array.from({ length: 4 }, (_, ch) => ({
-      id: `channel-${ch}`,
-      name: `Channel ${ch + 1}`,
-      muted: false, solo: false, collapsed: false,
-      volume: 100,
-      pan: ch === 0 || ch === 3 ? -50 : 50,
-      instrumentId: null, color: null,
-      rows: emptyRows,
-    })),
-    importMetadata: {
-      sourceFormat: 'MOD' as const,
-      sourceFile: filename,
-      importedAt: new Date().toISOString(),
-      originalChannelCount: 4,
-      originalPatternCount: numPatterns,
-      originalInstrumentCount: instruments.length,
-    },
-  };
+  for (let pat = 0; pat < numPatterns; pat++) {
+    const patOffset = pattBase + pat * 512;
+    const channelRows: TrackerCell[][] = [[], [], [], []];
+
+    for (let row = 0; row < 64; row++) {
+      for (let ch = 0; ch < 4; ch++) {
+        const cellOff = patOffset + row * 8 + ch * 2; // 4 channels × 2 bytes = 8 bytes/row
+        if (cellOff + 2 > buf.length) {
+          channelRows[ch].push({ note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 });
+          continue;
+        }
+
+        const noteByte = u8(buf, cellOff);
+        const instrEffect = u8(buf, cellOff + 1);
+
+        const rawInstr = (instrEffect >> 4) + 1; // 1-based instrument
+        const effectType = instrEffect & 0x0F;
+
+        // Note decoding: high nibble = octave (1-3), low nibble = semitone (0-11)
+        let xmNote = 0;
+        if (noteByte >= 0x10 && noteByte <= 0x3B) {
+          const octave = noteByte >> 4;
+          const semitone = noteByte & 0x0F;
+          if (semitone < 12) {
+            xmNote = octave * 12 + semitone + 1;
+          }
+        }
+
+        // Effect mapping
+        let effTyp = 0;
+        let eff = 0;
+        if (effectType === 0x0D) {
+          effTyp = 0x0D; // pattern break
+          eff = 0;
+        }
+        // Effects 0x01-0x0A are pitch bends using specialValues (format 2 only)
+        // Not mapped here as they require runtime context
+
+        channelRows[ch].push({
+          note: xmNote,
+          instrument: xmNote > 0 || effectType > 0 ? rawInstr : 0,
+          volume: 0,
+          effTyp,
+          eff,
+          effTyp2: 0,
+          eff2: 0,
+        });
+      }
+    }
+
+    patterns.push({
+      id: `pattern-${pat}`,
+      name: `Pattern ${pat}`,
+      length: 64,
+      channels: channelRows.map((rows, ch) => ({
+        id: `channel-${ch}`,
+        name: `Channel ${ch + 1}`,
+        muted: false, solo: false, collapsed: false,
+        volume: 100,
+        pan: PANNING[ch],
+        instrumentId: null, color: null,
+        rows,
+      })),
+      importMetadata: {
+        sourceFormat: 'MOD' as const,
+        sourceFile: filename,
+        importedAt: new Date().toISOString(),
+        originalChannelCount: 4,
+        originalPatternCount: numPatterns,
+        originalInstrumentCount: instruments.length,
+      },
+    });
+  }
+
+  // Fallback: at least one empty pattern
+  if (patterns.length === 0) {
+    patterns.push({
+      id: 'pattern-0', name: 'Pattern 0', length: 64,
+      channels: Array.from({ length: 4 }, (_, ch) => ({
+        id: `channel-${ch}`, name: `Channel ${ch + 1}`,
+        muted: false, solo: false, collapsed: false,
+        volume: 100, pan: PANNING[ch], instrumentId: null, color: null,
+        rows: Array.from({ length: 64 }, (): TrackerCell => ({
+          note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0,
+        })),
+      })),
+      importMetadata: {
+        sourceFormat: 'MOD' as const, sourceFile: filename,
+        importedAt: new Date().toISOString(),
+        originalChannelCount: 4, originalPatternCount: 0, originalInstrumentCount: 0,
+      },
+    });
+  }
 
   // Build order list from the header's order table (bytes 14-141, length numOrders)
   const orderCount = Math.max(1, numOrders);
-  const songPositions = Array.from({ length: orderCount }, (_, i) => buf[14 + i] || 0);
+  const songPositions = Array.from({ length: orderCount }, (_, i) => {
+    const patIdx = buf[14 + i] || 0;
+    return Math.min(patIdx, patterns.length - 1);
+  });
+
+  // Build uadePatternLayout — contiguous layout (2 bytes/cell, 4 channels, 64 rows)
+  const uadePatternLayout: UADEPatternLayout = {
+    formatId: 'tcbTracker',
+    patternDataFileOffset: pattBase,
+    bytesPerCell: 2,
+    rowsPerPattern: 64,
+    numChannels: 4,
+    numPatterns,
+    moduleSize: buf.length,
+    encodeCell: encodeTCBTrackerCell,
+  };
 
   return {
     name:            `${moduleName} [TCB Tracker]`,
     format:          'MOD' as TrackerFormat,
-    patterns:        [pattern],
+    patterns,
     instruments,
     songPositions,
     songLength:      orderCount,
@@ -340,5 +430,6 @@ export async function parseTCBTrackerFile(
     initialSpeed:    16 - tempo,   // OpenMPT: Order().SetDefaultSpeed(16 - fileHeader.tempo)
     initialBPM:      125,
     linearPeriods:   false,
+    uadePatternLayout,
   };
 }

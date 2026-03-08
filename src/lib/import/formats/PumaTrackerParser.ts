@@ -635,7 +635,7 @@ export async function parsePumaTrackerFile(
 
   return {
     name,
-    format:          'MOD' as TrackerFormat,
+    format:          'PumaTracker' as TrackerFormat,
     patterns,
     instruments,
     songPositions,
@@ -645,5 +645,6 @@ export async function parsePumaTrackerFile(
     initialSpeed:    6,
     initialBPM:      125,
     linearPeriods:   false,
+    pumaTrackerFileData: buffer.slice(0),
   };
 }

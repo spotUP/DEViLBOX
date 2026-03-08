@@ -47,6 +47,8 @@
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, TrackerCell, InstrumentConfig } from '@/types';
 import type { DeltaMusic2Config, DeltaMusic2VolEntry, DeltaMusic2VibEntry, UADEChipRamInfo } from '@/types/instrument';
+import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
+import { encodeDeltaMusic2Cell } from '@/engine/uade/encoders/DeltaMusic2Encoder';
 import { createSamplerInstrument } from './AmigaUtils';
 
 // ── Constants ─────────────────────────────────────────────────────────────
@@ -199,6 +201,7 @@ export function parseDeltaMusic2File(bytes: Uint8Array, filename: string): Track
   if (off + 4 > bytes.length) return null;
   const blockDataLen = u32BE(bytes, off);
   off += 4;
+  const blockDataOffset = off; // file offset of block data section (for uadePatternLayout)
   const numBlocks = Math.floor(blockDataLen / 64);
   const blocks: DM2BlockLine[][] = [];
 
@@ -630,6 +633,36 @@ export function parseDeltaMusic2File(bytes: Uint8Array, filename: string): Track
 
   const moduleName = filename.replace(/\.[^/.]+$/, '');
 
+  // Build uadePatternLayout with getCellFileOffset for block indirection
+  const uadePatternLayout: UADEPatternLayout = {
+    formatId: 'deltaMusic2',
+    patternDataFileOffset: blockDataOffset,
+    bytesPerCell: 4,
+    rowsPerPattern: 16,
+    numChannels: 4,
+    numPatterns: trackerPatterns.length,
+    moduleSize: bytes.length,
+    encodeCell: encodeDeltaMusic2Cell,
+    getCellFileOffset: (pattern: number, row: number, channel: number): number => {
+      // Resolve track position with loop wrapping (same logic as pattern build)
+      const trackEntries = tracks[channel]?.entries;
+      if (!trackEntries || trackEntries.length === 0) return 0;
+      let trackPos = pattern;
+      const tLen = trackEntries.length;
+      if (trackPos >= tLen) {
+        const loopStart = tracks[channel].loopPosition < tLen ? tracks[channel].loopPosition : 0;
+        const loopSpan = tLen - loopStart;
+        trackPos = loopSpan > 0
+          ? loopStart + ((pattern - loopStart) % loopSpan)
+          : tLen - 1;
+      }
+      const entry = trackEntries[trackPos];
+      if (!entry || entry.blockNumber >= numBlocks) return 0;
+      // Each block = 64 bytes (16 rows × 4 bytes); blocks are single-channel
+      return blockDataOffset + entry.blockNumber * 64 + row * 4;
+    },
+  };
+
   return {
     name: moduleName,
     format: 'DM2' as TrackerFormat,
@@ -642,5 +675,6 @@ export function parseDeltaMusic2File(bytes: Uint8Array, filename: string): Track
     initialSpeed: speed,
     initialBPM: 125,
     linearPeriods: false,
+    uadePatternLayout,
   };
 }

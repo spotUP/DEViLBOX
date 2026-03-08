@@ -24,6 +24,8 @@
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, ChannelData, TrackerCell, InstrumentConfig } from '@/types';
 import type { OctaMEDConfig, UADEChipRamInfo } from '@/types/instrument';
+import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
+import { encodeMED4Cell, encodeMED3Cell } from '@/engine/uade/encoders/MEDEncoder';
 import { createSamplerInstrument } from './AmigaUtils';
 
 const TEXT_DECODER = new TextDecoder('iso-8859-1');
@@ -163,6 +165,8 @@ export function parseMEDFile(buffer: ArrayBuffer, filename: string): TrackerSong
 
   // ── Parse patterns ───────────────────────────────────────────────────────
   const trackerPatterns: Pattern[] = [];
+  // Track per-pattern data offsets for uadePatternLayout
+  const blockDataOffsets: Array<{ dataStart: number; nTracks: number; nLines: number }> = [];
 
   for (let patIdx = 0; patIdx < blockPtrs.length; patIdx++) {
     const bptr = blockPtrs[patIdx];
@@ -184,6 +188,9 @@ export function parseMEDFile(buffer: ArrayBuffer, filename: string): TrackerSong
 
     // For MMD0: 3 bytes/cell; for MMD1+: variable (usually 4 bytes/cell)
     const bytesPerCell = isMMD1Plus ? 4 : 3;
+
+    // Record block data offset for uadePatternLayout
+    blockDataOffsets.push({ dataStart, nTracks, nLines });
 
     const channels: ChannelData[] = Array.from({ length: nTracks }, (_, ch) => {
       const rows: TrackerCell[] = [];
@@ -499,6 +506,23 @@ export function parseMEDFile(buffer: ArrayBuffer, filename: string): TrackerSong
   // ── Build output ─────────────────────────────────────────────────────────
   const songPositions = playseq.slice(0, Math.max(1, songLen));
 
+  const medBytesPerCell = isMMD1Plus ? 4 : 3;
+  const uadePatternLayout: UADEPatternLayout = {
+    formatId: isMMD1Plus ? 'med_mmd1' : 'med_mmd0',
+    patternDataFileOffset: 0, // overridden by getCellFileOffset
+    bytesPerCell: medBytesPerCell,
+    rowsPerPattern: 64,
+    numChannels,
+    numPatterns: trackerPatterns.length,
+    moduleSize: buffer.byteLength,
+    encodeCell: isMMD1Plus ? encodeMED4Cell : encodeMED3Cell,
+    getCellFileOffset: (pattern: number, row: number, channel: number): number => {
+      const info = blockDataOffsets[pattern];
+      if (!info) return 0;
+      return info.dataStart + (row * info.nTracks + channel) * medBytesPerCell;
+    },
+  };
+
   return {
     name: filename.replace(/\.[^/.]+$/, ''),
     format: magic as TrackerFormat,
@@ -511,6 +535,7 @@ export function parseMEDFile(buffer: ArrayBuffer, filename: string): TrackerSong
     initialSpeed: tempo2 || 6,
     initialBPM: defTempo || 125,
     linearPeriods: false,
+    uadePatternLayout,
   };
 }
 

@@ -872,6 +872,7 @@ const CHIP_CHANNELS: Record<number, number> = {
   0xa6: 17,   // Neo Geo extended
   0xa7: 11,   // OPLL drums
   0xa8: 4,    // Lynx
+  0xa9: 5,    // SegaPCM (compat 5ch mode)
   0xaa: 4,    // MSM6295
   0xab: 1,    // MSM6258
   0xac: 17,   // VERA
@@ -1571,6 +1572,9 @@ async function parseOldFormat(
     channelShortNames: [],
   };
 
+  // Chip flag pointers (populated when reading system props section for v119+)
+  const chipFlagPtrs: number[] = [];
+
   // Timing
   subsong.timeBase = reader.readUint8();
   subsong.speed1 = reader.readUint8();
@@ -1595,13 +1599,16 @@ async function parseOldFormat(
   console.log(`[FurnaceSongParser] Old format header: insLen=${insLen}, waveLen=${waveLen}, sampleLen=${sampleLen}, numberOfPats=${numberOfPats}, patLen=${subsong.patLen}, ordersLen=${subsong.ordersLen}, hz=${subsong.hz}, speed1=${subsong.speed1}, speed2=${subsong.speed2}`);
 
   // Sound chips (32 bytes)
-  const chips: number[] = [];
+  // Reference: fur.cpp:1148-1160 — systemLen = last non-NULL index + 1
+  const rawChips: number[] = [];
+  let lastNonNull = -1;
   for (let i = 0; i < 32; i++) {
     const chip = reader.readUint8();
-    if (chip !== 0) chips.push(chip);
+    rawChips.push(chip);
+    if (chip !== 0) lastNonNull = i;
   }
-  module.systems = chips.filter(c => c !== 0);
-  module.systemLen = module.systems.length;
+  module.systemLen = lastNonNull + 1;
+  module.systems = rawChips.slice(0, module.systemLen);
 
   // Chip volumes (32 bytes)
   for (let i = 0; i < 32; i++) {
@@ -1619,22 +1626,32 @@ async function parseOldFormat(
     }
   }
 
-  // Chip flags (128 bytes = 32 × uint32)
-  if (version >= 119) {
-    // In new format, these are pointers to FLAG blocks (read later via element table)
-    // Just skip — chipFlagPtrs from element table are used instead
-    reader.skip(128);
-  } else {
-    // Old format: direct uint32 flag values per chip, convert to key=value strings
-    module.chipFlags = [];
+  // Chip flags / system props (128 bytes = 32 × uint32)
+  // In old format (version < 240), this section contains either:
+  //   - version >= 119: pointers to FLAG blocks (key=value strings)
+  //   - version < 119: direct uint32 flag values (converted via convertOldChipFlags)
+  // In new format (version >= 240), chipFlagPtrs come from element table instead.
+  {
+    const sysFlagPtrs: number[] = [];
     for (let i = 0; i < 32; i++) {
-      const oldFlags = reader.readUint32();
-      if (i < module.systemLen) {
-        module.chipFlags.push(convertOldChipFlags(oldFlags, module.systems[i]));
-      }
+      sysFlagPtrs.push(reader.readUint32());
     }
-    // Apply version-specific compat flags (fur.cpp:2150-2400)
-    applyVersionCompatFlags(version, module.systems.slice(0, module.systemLen), module.chipFlags);
+
+    if (version >= 119 && chipFlagPtrs.length === 0) {
+      // Old header format with FLAG block pointers — follow them (fur.cpp:1745-1770)
+      // Only do this if the element table didn't already provide chipFlagPtrs
+      for (let i = 0; i < module.systemLen; i++) {
+        chipFlagPtrs.push(sysFlagPtrs[i]);
+      }
+    } else if (version < 119) {
+      // Pre-119: direct uint32 flag values
+      module.chipFlags = [];
+      for (let i = 0; i < module.systemLen; i++) {
+        module.chipFlags.push(convertOldChipFlags(sysFlagPtrs[i], module.systems[i]));
+      }
+      applyVersionCompatFlags(version, module.systems.slice(0, module.systemLen), module.chipFlags);
+    }
+    // chipFlagPtrs will be read as FLAG blocks after the header is fully parsed
   }
 
   // Song name and author
@@ -1704,9 +1721,10 @@ async function parseOldFormat(
   for (let i = 0; i < numberOfPats; i++) {
     patPtr.push(reader.readUint32());
   }
-  console.log(`[FurnaceSongParser] Old format: ${numberOfPats} pattern pointers read`);
+  console.log(`[FurnaceSongParser] Old format: ${numberOfPats} pattern pointers read, offset=${reader.getOffset()}`);
 
-  // Orders
+  // Orders — upstream reads ordersLen entries per channel
+  // Reference: fur.cpp:1367-1370
   subsong.orders = [];
   for (let ch = 0; ch < module.chans; ch++) {
     const channelOrders: number[] = [];
@@ -1721,6 +1739,7 @@ async function parseOldFormat(
   for (let ch = 0; ch < module.chans; ch++) {
     subsong.effectColumns.push(reader.readUint8());
   }
+
 
   // Reference: fur.cpp:1383-1414
   // Channel show, collapse, names, short names, and song notes are gated on v39+
@@ -1813,11 +1832,13 @@ async function parseOldFormat(
     readString(reader); // categoryJ
   }
 
-  // System output config
+  // System output config — float32 values OVERRIDE the old int8 values
   // Reference: fur.cpp:1582-1596
   if (version >= 135) {
-    for (let i = 0; i < module.systems.length; i++) {
-      reader.skip(12); // systemVol(f32) + systemPan(f32) + systemPanFR(f32)
+    for (let i = 0; i < module.systemLen; i++) {
+      module.systemVol[i] = reader.readFloat32();
+      module.systemPan[i] = reader.readFloat32();
+      module.systemPanFR[i] = reader.readFloat32();
     }
     // Patchbay connections
     const patchbayConns = reader.readUint32();
@@ -1875,6 +1896,30 @@ async function parseOldFormat(
   }
 
   module.subsongs.push(subsong);
+
+  // Parse chip flags from FLAG blocks (v119-239)
+  if (chipFlagPtrs.length > 0) {
+    module.chipFlags = [];
+    for (let i = 0; i < chipFlagPtrs.length; i++) {
+      const ptr = chipFlagPtrs[i];
+      if (ptr === 0) {
+        module.chipFlags.push('');
+        continue;
+      }
+      const savedPos = reader.getOffset();
+      reader.seek(ptr);
+      const flagMagic = reader.readMagic(4);
+      if (flagMagic === 'FLAG') {
+        reader.readUint32(); // block size
+        const flagStr = readString(reader);
+        module.chipFlags.push(flagStr);
+      } else {
+        module.chipFlags.push('');
+      }
+      reader.seek(savedPos);
+    }
+    applyVersionCompatFlags(version, module.systems.slice(0, module.systemLen), module.chipFlags);
+  }
 
   // Parse instruments
   for (let i = 0; i < insPtr.length; i++) {
@@ -2123,7 +2168,8 @@ function parseSample(reader: BinaryReader, version: number): FurnaceSample {
     sample.compatRate = reader.readUint32();
     sample.c4Rate = reader.readUint32();
     sample.depth = reader.readUint8();
-    sample.loopDirection = version >= 123 ? reader.readUint8() : 0;
+    const rawLoopMode = reader.readUint8(); // always consume the byte
+    sample.loopDirection = version >= 123 ? rawLoopMode : 0;
     reader.readUint8(); // flags
     reader.readUint8(); // flags2
     sample.loopStart = reader.readInt32();
@@ -2631,15 +2677,6 @@ export function convertFurnaceToDevilbox(module: FurnaceModule, subsongIndex = 0
   // Log all pattern keys for debugging
   console.log(`[FurnaceParser] Pattern map keys:`, [...module.patterns.keys()].slice(0, 30));
   
-  // Debug: Show first pattern's raw channel data BEFORE conversion
-  if (patterns.length > 0) {
-    const pat0 = patterns[0];
-    console.log(`[FurnaceParser] DEBUG Pattern 0 RAW: ${pat0.length} rows, first row has ${pat0[0]?.length} channels`);
-    console.log(`[FurnaceParser] DEBUG Pattern 0 row 0:`, pat0[0]?.map((c,i) => `ch${i}:note=${c.note}`).join(' '));
-    console.log(`[FurnaceParser] DEBUG Pattern 0 row 2:`, pat0[2]?.map((c,i) => `ch${i}:note=${c.note}`).join(' '));
-    console.log(`[FurnaceParser] DEBUG Pattern 0 row 4:`, pat0[4]?.map((c,i) => `ch${i}:note=${c.note}`).join(' '));
-  }
-
   // Build native Furnace data for format-specific editor
   const furnaceNative = buildFurnaceNativeData(module);
 
