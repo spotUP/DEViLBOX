@@ -333,6 +333,7 @@ struct DispatchInstance {
       bb[i] = blip_new(32768);
       if (bb[i]) {
         blip_set_rates(bb[i], (double)chipRate, (double)sampleRate);
+        blip_set_dc(bb[i], 1); // Enable DC offset high-pass filter (matches Furnace default)
       }
     }
 
@@ -951,8 +952,68 @@ EMSCRIPTEN_KEEPALIVE
 void furnace_dispatch_reset(int handle) {
   auto it = g_instances.find(handle);
   if (it != g_instances.end()) {
-    it->second->dispatch->reset();
+    DispatchInstance* inst = it->second;
+    inst->dispatch->reset();
+    // Also clear blip buffers + delta tracking (matches Furnace DivDispatchContainer::clear())
+    for (int i = 0; i < 2; i++) {
+      if (inst->bb[i]) blip_clear(inst->bb[i]);
+      inst->bbTemp[i] = 0;
+      inst->bbPrevSample[i] = 0;
+    }
   }
+}
+
+/**
+ * Command log for audit/debugging.
+ * Each entry: { tick, cmd, chan, val1, val2, retVal }
+ */
+struct CmdLogEntry {
+  int tick;
+  int cmd;
+  int chan;
+  int val1;
+  int val2;
+  int retVal;
+};
+
+static std::vector<CmdLogEntry> g_cmdLog;
+static bool g_cmdLogEnabled = false;
+static int g_cmdLogTick = 0;
+
+EMSCRIPTEN_KEEPALIVE
+void furnace_cmd_log_enable(int enable) {
+  g_cmdLogEnabled = (enable != 0);
+  if (enable) {
+    g_cmdLog.clear();
+    g_cmdLogTick = 0;
+  }
+}
+
+EMSCRIPTEN_KEEPALIVE
+void furnace_cmd_log_tick() {
+  g_cmdLogTick++;
+}
+
+EMSCRIPTEN_KEEPALIVE
+int furnace_cmd_log_count() {
+  return (int)g_cmdLog.size();
+}
+
+// Returns pointer to flat int array: [tick, cmd, chan, val1, val2, retVal, ...]
+// Caller must free the returned pointer.
+EMSCRIPTEN_KEEPALIVE
+int* furnace_cmd_log_get() {
+  int count = (int)g_cmdLog.size();
+  int* buf = (int*)malloc(count * 6 * sizeof(int));
+  for (int i = 0; i < count; i++) {
+    buf[i * 6 + 0] = g_cmdLog[i].tick;
+    buf[i * 6 + 1] = g_cmdLog[i].cmd;
+    buf[i * 6 + 2] = g_cmdLog[i].chan;
+    buf[i * 6 + 3] = g_cmdLog[i].val1;
+    buf[i * 6 + 4] = g_cmdLog[i].val2;
+    buf[i * 6 + 5] = g_cmdLog[i].retVal;
+  }
+  return buf;
 }
 
 /**
@@ -969,7 +1030,13 @@ int furnace_dispatch_cmd(int handle, int cmd, int chan, int val1, int val2) {
   DispatchInstance* inst = it->second;
 
   DivCommand dc((DivDispatchCmds)cmd, (unsigned char)chan, val1, val2);
-  return inst->dispatch->dispatch(dc);
+  int ret = inst->dispatch->dispatch(dc);
+
+  if (g_cmdLogEnabled && g_cmdLog.size() < 100000) {
+    g_cmdLog.push_back({g_cmdLogTick, cmd, chan, val1, val2, ret});
+  }
+
+  return ret;
 }
 
 // NOTE: The wrapper's custom macro engine (processChannelMacros, initChannelMacros,
@@ -3572,59 +3639,85 @@ void furnace_dispatch_load_ins2(int insIndex, unsigned char* data, int dataLen) 
     }
     // ── FM: FM operator data ──
     else if (fc0 == 'F' && fc1 == 'M') {
-      if (featLen >= 9) {
-        ins->fm.alg = data[pos];
-        ins->fm.fb = data[pos + 1];
-        ins->fm.fms = data[pos + 2];
-        ins->fm.ams = data[pos + 3];
-        ins->fm.ops = data[pos + 4];
-        ins->fm.opllPreset = data[pos + 5];
-        // data[pos+6..8] = fms2, ams2, block/flags
+      // Upstream readFeatureFM: heavily bit-packed format
+      int p = pos;
 
-        if (version >= 241) {
-          ins->fm.fms2 = data[pos + 6];
-          ins->fm.ams2 = data[pos + 7];
-          ins->fm.block = data[pos + 8] & 0x0F;
-        }
+      if (p + 4 > featEnd) { pos = featEnd; continue; }
 
-        int opStart = pos + 9;
-        for (int i = 0; i < ins->fm.ops && i < 4; i++) {
-          int o = opStart + i * 13;
-          if (o + 13 > featEnd) break;
-          ins->fm.op[i].am = data[o] & 1;
-          ins->fm.op[i].ar = data[o + 1];
-          ins->fm.op[i].dr = data[o + 2];
-          ins->fm.op[i].mult = data[o + 3];
-          ins->fm.op[i].rr = data[o + 4];
-          ins->fm.op[i].sl = data[o + 5];
-          ins->fm.op[i].tl = data[o + 6];
-          ins->fm.op[i].dt2 = data[o + 7];
-          ins->fm.op[i].rs = data[o + 8];
-          ins->fm.op[i].dt = (signed char)data[o + 9];
-          ins->fm.op[i].d2r = data[o + 10];
-          ins->fm.op[i].ssgEnv = data[o + 11];
-          unsigned char flags = data[o + 12];
-          ins->fm.op[i].dam = flags & 1;
-          ins->fm.op[i].dvb = (flags >> 1) & 1;
-          ins->fm.op[i].egt = (flags >> 2) & 1;
-          ins->fm.op[i].ksl = (flags >> 3) & 3;
-          ins->fm.op[i].sus = (flags >> 5) & 1;
-          ins->fm.op[i].vib = (flags >> 6) & 1;
-          ins->fm.op[i].ws = 0;
-          ins->fm.op[i].ksr = (flags >> 7) & 1;
-          ins->fm.op[i].enable = true;
-        }
+      // Byte 0: opCount (low nibble) + operator enable flags (high nibble)
+      unsigned char opCountByte = data[p++];
+      ins->fm.op[0].enable = (opCountByte & 16) ? 1 : 0;
+      ins->fm.op[1].enable = (opCountByte & 32) ? 1 : 0;
+      ins->fm.op[2].enable = (opCountByte & 64) ? 1 : 0;
+      ins->fm.op[3].enable = (opCountByte & 128) ? 1 : 0;
+      int opCount = opCountByte & 15;
 
-        // Extended op data (ws, etc.) - after the 4-op block
-        int extStart = opStart + ins->fm.ops * 13;
-        for (int i = 0; i < ins->fm.ops && i < 4; i++) {
-          int o = extStart + i * 6;
-          if (o + 6 > featEnd) break;
-          ins->fm.op[i].kvs = data[o];
-          ins->fm.op[i].ws = data[o + 1];
-          // data[o+2..5] = ksr2, ws2, etc. for OPZ
-        }
+      // Byte 1: alg(bits 6-4) + fb(bits 2-0)
+      unsigned char next = data[p++];
+      ins->fm.alg = (next >> 4) & 7;
+      ins->fm.fb = next & 7;
+
+      // Byte 2: fms2(bits 7-5) + ams(bits 4-3) + fms(bits 2-0)
+      next = data[p++];
+      ins->fm.fms2 = (next >> 5) & 7;
+      ins->fm.ams = (next >> 3) & 3;
+      ins->fm.fms = next & 7;
+
+      // Byte 3: ams2(bits 7-6) + ops(bit 5: 4 if set, 2 if clear) + opllPreset(bits 4-0)
+      next = data[p++];
+      ins->fm.ams2 = (next >> 6) & 3;
+      ins->fm.ops = (next & 32) ? 4 : 2;
+      ins->fm.opllPreset = next & 31;
+
+      // Byte 4 (version >= 224): block(bits 3-0)
+      if (version >= 224 && p < featEnd) {
+        next = data[p++];
+        ins->fm.block = next & 15;
       }
+
+      // Read operators: 8 bytes each, bit-packed
+      for (int i = 0; i < opCount && i < 4; i++) {
+        if (p + 8 > featEnd) break;
+        DivInstrumentFM::Operator& op = ins->fm.op[i];
+
+        next = data[p++]; // ksr(7) + dt(6-4) + mult(3-0)
+        op.ksr = (next & 128) ? 1 : 0;
+        op.dt = (next >> 4) & 7;
+        op.mult = next & 15;
+
+        next = data[p++]; // sus(7) + tl(6-0)
+        op.sus = (next & 128) ? 1 : 0;
+        op.tl = next & 127;
+
+        next = data[p++]; // rs(7-6) + vib(5) + ar(4-0)
+        op.rs = (next >> 6) & 3;
+        op.vib = (next & 32) ? 1 : 0;
+        op.ar = next & 31;
+
+        next = data[p++]; // am(7) + ksl(6-5) + dr(4-0)
+        op.am = (next & 128) ? 1 : 0;
+        op.ksl = (next >> 5) & 3;
+        op.dr = next & 31;
+
+        next = data[p++]; // egt(7) + kvs(6-5) + d2r(4-0)
+        op.egt = (next & 128) ? 1 : 0;
+        op.kvs = (next >> 5) & 3;
+        op.d2r = next & 31;
+
+        next = data[p++]; // sl(7-4) + rr(3-0)
+        op.sl = (next >> 4) & 15;
+        op.rr = next & 15;
+
+        next = data[p++]; // dvb(7-4) + ssgEnv(3-0)
+        op.dvb = (next >> 4) & 15;
+        op.ssgEnv = next & 15;
+
+        next = data[p++]; // dam(7-5) + dt2(4-3) + ws(2-0)
+        op.dam = (next >> 5) & 7;
+        op.dt2 = (next >> 3) & 3;
+        op.ws = next & 7;
+      }
+
       pos = featEnd;
     }
     // ── MA: Macros ──
@@ -3741,44 +3834,84 @@ void furnace_dispatch_load_ins2(int insIndex, unsigned char* data, int dataLen) 
     }
     // ── 64: C64 SID ──
     else if (fc0 == '6' && fc1 == '4') {
-      if (featLen >= 8) {
-        unsigned char wave = data[pos];
-        ins->c64.triOn = wave & 1;
-        ins->c64.sawOn = (wave >> 1) & 1;
-        ins->c64.pulseOn = (wave >> 2) & 1;
-        ins->c64.noiseOn = (wave >> 3) & 1;
-        ins->c64.a = data[pos + 1];
-        ins->c64.d = data[pos + 2];
-        ins->c64.s = data[pos + 3];
-        ins->c64.r = data[pos + 4];
-        ins->c64.duty = *(unsigned short*)(data + pos + 5);
-        unsigned char flags1 = data[pos + 7];
-        ins->c64.ringMod = flags1 & 1;
-        ins->c64.oscSync = (flags1 >> 1) & 1;
-        ins->c64.toFilter = (flags1 >> 2) & 1;
-        ins->c64.initFilter = (flags1 >> 3) & 1;
-        // More C64 fields follow...
-        if (featLen >= 12) {
-          ins->c64.res = data[pos + 8];
-          ins->c64.cut = *(unsigned short*)(data + pos + 9);
-          unsigned char filt = data[pos + 11];
-          ins->c64.lp = filt & 1;
-          ins->c64.bp = (filt >> 1) & 1;
-          ins->c64.hp = (filt >> 2) & 1;
-          ins->c64.ch3off = (filt >> 3) & 1;
+      // Upstream readFeature64: bit-packed format
+      int p = pos;
+      if (p + 8 > featEnd) { pos = featEnd; continue; }
+
+      // Byte 0: dutyIsAbs(7) + initFilter(6) + volIsCutoff(5) + toFilter(4) +
+      //         noiseOn(3) + pulseOn(2) + sawOn(1) + triOn(0)
+      unsigned char next = data[p++];
+      ins->c64.dutyIsAbs = (next & 128) ? 1 : 0;
+      ins->c64.initFilter = (next & 64) ? 1 : 0;
+      // volIsCutoff = next & 32; // used by song, stored elsewhere
+      ins->c64.toFilter = (next & 16) ? 1 : 0;
+      ins->c64.noiseOn = (next & 8) ? 1 : 0;
+      ins->c64.pulseOn = (next & 4) ? 1 : 0;
+      ins->c64.sawOn = (next & 2) ? 1 : 0;
+      ins->c64.triOn = next & 1;
+
+      // Byte 1: oscSync(7) + ringMod(6) + noTest(5) + filterIsAbs(4) +
+      //         ch3off(3) + bp(2) + hp(1) + lp(0)
+      next = data[p++];
+      ins->c64.oscSync = (next & 128) ? 1 : 0;
+      ins->c64.ringMod = (next & 64) ? 1 : 0;
+      ins->c64.noTest = (next & 32) ? 1 : 0;
+      ins->c64.filterIsAbs = (next & 16) ? 1 : 0;
+      ins->c64.ch3off = (next & 8) ? 1 : 0;
+      ins->c64.bp = (next & 4) ? 1 : 0;
+      ins->c64.hp = (next & 2) ? 1 : 0;
+      ins->c64.lp = next & 1;
+
+      // Byte 2: A(7-4) + D(3-0) — nibble-packed
+      next = data[p++];
+      ins->c64.a = (next >> 4) & 15;
+      ins->c64.d = next & 15;
+
+      // Byte 3: S(7-4) + R(3-0) — nibble-packed
+      next = data[p++];
+      ins->c64.s = (next >> 4) & 15;
+      ins->c64.r = next & 15;
+
+      // Bytes 4-5: duty (16-bit LE, masked to 12 bits)
+      ins->c64.duty = (*(unsigned short*)(data + p)) & 4095;
+      p += 2;
+
+      // Bytes 6-7: cut(11-0) + res(15-12)
+      unsigned short cr = *(unsigned short*)(data + p);
+      p += 2;
+      ins->c64.cut = cr & 4095;
+      ins->c64.res = cr >> 12;
+
+      // Version >= 199: extended resonance byte
+      if (version >= 199 && p < featEnd) {
+        next = data[p++];
+        ins->c64.res |= (next & 15) << 4;
+        if (version >= 222) {
+          ins->c64.resetDuty = (next & 0x10) ? 1 : 0;
         }
       }
+
       pos = featEnd;
     }
     // ── SM: Sample mapping ──
     else if (fc0 == 'S' && fc1 == 'M') {
-      if (featLen >= 3) {
+      // Upstream readFeatureSM:
+      // short initSample, byte flags(useWave=bit2, useSample=bit1, useNoteMap=bit0), byte waveLen
+      if (featLen >= 4) {
         ins->amiga.initSample = *(short*)(data + pos);
         unsigned char flags = data[pos + 2];
-        ins->amiga.useWave = flags & 4;
-        ins->amiga.waveLen = (flags >> 4) & 3;
-        // Note map follows if present — skip for now (noteMap is in amiga sub-struct)
-        // The note map is not critical for basic playback
+        ins->amiga.useWave = (flags & 4) ? 1 : 0;
+        ins->amiga.useSample = (flags & 2) ? 1 : 0;
+        ins->amiga.useNoteMap = flags & 1;
+        ins->amiga.waveLen = data[pos + 3];  // separate byte, not bit-packed
+
+        if (ins->amiga.useNoteMap && featLen >= 4 + 120 * 4) {
+          for (int note = 0; note < 120; note++) {
+            int off = pos + 4 + note * 4;
+            ins->amiga.noteMap[note].freq = *(short*)(data + off);
+            ins->amiga.noteMap[note].map = *(short*)(data + off + 2);
+          }
+        }
       }
       pos = featEnd;
     }
@@ -3866,33 +3999,57 @@ void furnace_dispatch_load_ins2(int insIndex, unsigned char* data, int dataLen) 
     }
     // ── WS: WaveSynth ──
     else if (fc0 == 'W' && fc1 == 'S') {
+      // WS feature: wave1(4) wave2(4) rateDivider(1) effect(1) enabled(1) global(1) speed(1) param1(1) param2(1) param3(1) param4(1)
       if (featLen >= 11) {
         ins->ws.wave1 = *(int*)(data + pos);
         ins->ws.wave2 = *(int*)(data + pos + 4);
         ins->ws.rateDivider = data[pos + 8];
         ins->ws.effect = data[pos + 9];
-        ins->ws.enabled = data[pos + 10] & 1;
-        ins->ws.global = (data[pos + 10] >> 1) & 1;
-        if (featLen >= 15) {
-          ins->ws.speed = data[pos + 11];
-          ins->ws.param1 = *(unsigned short*)(data + pos + 12);
-          ins->ws.param2 = *(unsigned short*)(data + pos + 14);
+        ins->ws.enabled = data[pos + 10];
+        ins->ws.global = data[pos + 11];
+        ins->ws.speed = data[pos + 12];
+        ins->ws.param1 = data[pos + 13];
+        ins->ws.param2 = data[pos + 14];
+        if (featLen >= 17) {
+          ins->ws.param3 = data[pos + 15];
+          ins->ws.param4 = data[pos + 16];
         }
       }
       pos = featEnd;
     }
     // ── SN: SNES ──
     else if (fc0 == 'S' && fc1 == 'N') {
-      if (featLen >= 13) {
-        ins->snes.useEnv = data[pos] & 1;
-        ins->snes.sus = (data[pos] >> 3) & 3;
-        ins->snes.gainMode = (DivInstrumentSNES::GainMode)((data[pos] >> 5) & 7);
-        ins->snes.gain = data[pos + 1];
-        ins->snes.a = data[pos + 2];
-        ins->snes.d = data[pos + 3];
-        ins->snes.s = data[pos + 4];
-        ins->snes.r = data[pos + 5];
-        ins->snes.d2 = data[pos + 6];
+      // Upstream readFeatureSN: bit-packed format
+      if (featLen >= 4) {
+        int p = pos;
+        // Byte 0: d(6-4) + a(3-0)
+        unsigned char next = data[p++];
+        ins->snes.d = (next >> 4) & 7;
+        ins->snes.a = next & 15;
+
+        // Byte 1: s(7-5) + r(4-0)
+        next = data[p++];
+        ins->snes.s = (next >> 5) & 7;
+        ins->snes.r = next & 31;
+
+        // Byte 2: useEnv(4) + sus(3) + gainMode(2-0)
+        next = data[p++];
+        ins->snes.useEnv = (next & 16) ? 1 : 0;
+        ins->snes.sus = (next & 8) ? 1 : 0;
+        ins->snes.gainMode = (DivInstrumentSNES::GainMode)(next & 7);
+        if (ins->snes.gainMode == 1 || ins->snes.gainMode == 2 || ins->snes.gainMode == 3) {
+          ins->snes.gainMode = DivInstrumentSNES::GAIN_MODE_DIRECT;
+        }
+
+        // Byte 3: gain
+        ins->snes.gain = data[p++];
+
+        // Version >= 131: sus(6-5) + d2(4-0)
+        if (version >= 131 && p < featEnd) {
+          next = data[p++];
+          ins->snes.sus = (next >> 5) & 3;
+          ins->snes.d2 = next & 31;
+        }
       }
       pos = featEnd;
     }
@@ -3909,14 +4066,16 @@ void furnace_dispatch_load_ins2(int insIndex, unsigned char* data, int dataLen) 
     }
     // ── FD: FDS ──
     else if (fc0 == 'F' && fc1 == 'D') {
-      if (featLen >= 5) {
+      // Upstream readFeatureFD:
+      // int modSpeed (4), int modDepth (4), byte initModTableWithFirstWave (1), 32 bytes modTable
+      if (featLen >= 9) {
         ins->fds.modSpeed = *(int*)(data + pos);
-        ins->fds.modDepth = data[pos + 4];
-        if (featLen >= 6) ins->fds.initModTableWithFirstWave = data[pos + 5] & 1;
-        // Mod table follows
-        if (featLen >= 38) {
+        ins->fds.modDepth = *(int*)(data + pos + 4);  // 4 bytes, not 1
+        ins->fds.initModTableWithFirstWave = data[pos + 8];
+        // Mod table follows at pos+9
+        if (featLen >= 41) {
           for (int i = 0; i < 32; i++) {
-            ins->fds.modTable[i] = (signed char)data[pos + 6 + i];
+            ins->fds.modTable[i] = (signed char)data[pos + 9 + i];
           }
         }
       }
