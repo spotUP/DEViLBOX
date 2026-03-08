@@ -76,6 +76,25 @@ const CONTENT_W = MODAL_W - 34;
 const ROW_H = 18;
 const MULTI_FILE_FORMAT_KEYS = new Set<string>(['iffSmus']);
 
+/**
+ * For two-file Amiga formats, derive the expected companion filename from the main file.
+ * Returns { expectedName, description } or null if not a two-file format.
+ *
+ * TFMX:  mdat.songname → smpl.songname
+ * MFP:   mfp.songname  → smp.songname
+ */
+function getExpectedCompanion(filename: string): { expectedPrefix: string; description: string } | null {
+  const basename = (filename.split('/').pop() ?? filename).split('\\').pop() ?? filename;
+  const lower = basename.toLowerCase();
+  if (lower.startsWith('mdat.')) {
+    return { expectedPrefix: 'smpl.', description: 'TFMX sample data (smpl.*)' };
+  }
+  if (lower.startsWith('mfp.')) {
+    return { expectedPrefix: 'smp.', description: 'MFP sample data (smp.*)' };
+  }
+  return null;
+}
+
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 function fmtDuration(seconds: number): string {
@@ -130,9 +149,10 @@ export const PixiImportModuleDialog: React.FC<PixiImportModuleDialogProps> = ({
   const nativeFmt = detectNativeFormat(loadedFileName);
   const isNativeOnly = !!(nativeFmt?.nativeOnly);
   const needsCompanionFiles =
-    nativeFmt !== null &&
-    MULTI_FILE_FORMAT_KEYS.has(nativeFmt.key) &&
-    activeCompanions.length === 0;
+    activeCompanions.length === 0 && (
+      (nativeFmt !== null && MULTI_FILE_FORMAT_KEYS.has(nativeFmt.key)) ||
+      getExpectedCompanion(loadedFileName) !== null
+    );
 
   const formatCapabilities: FormatCapabilityInfo | null = moduleInfo
     ? getFormatCapabilities(
@@ -261,6 +281,40 @@ export const PixiImportModuleDialog: React.FC<PixiImportModuleDialogProps> = ({
       handleFileSelect(initialFile);
     }
   }, [initialFile, isOpen, handleFileSelect]);
+
+  // Auto-prompt for companion file when a two-file format is loaded without one
+  const companionPromptedRef = useRef(false);
+  useEffect(() => {
+    if (!moduleInfo || isLoading || activeCompanions.length > 0) return;
+    if (companionPromptedRef.current) return;
+
+    const companion = getExpectedCompanion(loadedFileName);
+    if (!companion) return;
+
+    companionPromptedRef.current = true;
+    // Auto-open file picker for the companion file
+    void (async () => {
+      const file = await pickFile({ accept: '*' });
+      if (file) {
+        // Register companion in UADE's virtual FS
+        try {
+          const buf = await file.arrayBuffer();
+          const { UADEEngine } = await import('@/engine/uade/UADEEngine');
+          const engine = UADEEngine.getInstance();
+          await engine.ready();
+          await engine.addCompanionFile(file.name, buf);
+          setActiveCompanions([file]);
+        } catch (err) {
+          console.warn('[PixiImportModuleDialog] Failed to register companion file:', err);
+        }
+      }
+    })();
+  }, [moduleInfo, isLoading, activeCompanions, loadedFileName]);
+
+  // Reset companion prompt flag when dialog closes or file changes
+  useEffect(() => {
+    companionPromptedRef.current = false;
+  }, [loadedFileName, isOpen]);
 
   // ── Preview controls ───────────────────────────────────────────────────────
 
@@ -654,7 +708,11 @@ export const PixiImportModuleDialog: React.FC<PixiImportModuleDialogProps> = ({
                 }}
               >
                 <PixiLabel
-                  text="⚠ Audio requires companion files. Use Pick Files to load them."
+                  text={(() => {
+                    const comp = getExpectedCompanion(loadedFileName);
+                    if (comp) return `Waiting for ${comp.description} — pick file to continue`;
+                    return 'Audio requires companion files. Use Pick Files to load them.';
+                  })()}
                   size="sm"
                   color="warning"
                 />

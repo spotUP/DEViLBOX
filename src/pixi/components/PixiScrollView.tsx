@@ -20,6 +20,8 @@ interface PixiScrollViewProps {
   direction?: 'vertical' | 'horizontal' | 'both';
   /** Show scrollbar track */
   showScrollbar?: boolean;
+  /** Background color for the clip mask (should match parent bg to avoid visual artifacts) */
+  bgColor?: number;
   children?: React.ReactNode;
   layout?: Record<string, unknown>;
 }
@@ -31,6 +33,7 @@ export const PixiScrollView: React.FC<PixiScrollViewProps> = ({
   contentWidth = width,
   direction = 'vertical',
   showScrollbar = true,
+  bgColor,
   children,
   layout: layoutProp,
 }) => {
@@ -46,9 +49,11 @@ export const PixiScrollView: React.FC<PixiScrollViewProps> = ({
   const canScrollV = direction !== 'horizontal' && maxScrollY > 0;
   const canScrollH = direction !== 'vertical' && maxScrollX > 0;
 
-  // Mouse wheel scrolling
+  // Mouse wheel scrolling — also block native event to prevent background content from scrolling
   const handleWheel = useCallback((e: FederatedWheelEvent) => {
     e.stopPropagation();
+    (e as unknown as { nativeEvent?: WheelEvent }).nativeEvent?.preventDefault?.();
+    (e as unknown as { nativeEvent?: WheelEvent }).nativeEvent?.stopImmediatePropagation?.();
     if (canScrollV) {
       setScrollY(prev => Math.max(0, Math.min(maxScrollY, prev + e.deltaY)));
     }
@@ -97,12 +102,28 @@ export const PixiScrollView: React.FC<PixiScrollViewProps> = ({
     }
   }, [width, height, contentHeight, contentWidth, scrollY, scrollX, maxScrollY, maxScrollX, canScrollV, canScrollH, showScrollbar, theme]);
 
-  // Clipping mask
+  // Clip mask — PixiJS stencil mask for proper content clipping.
+  // @pixi/layout's overflow:hidden does NOT create a real PixiJS mask,
+  // so we need to set container.mask manually.
+  const maskRef = useRef<GraphicsType>(null);
+
   const drawMask = useCallback((g: GraphicsType) => {
     g.clear();
     g.rect(0, 0, width, height);
-    g.fill({ color: 0xffffff });
-  }, [width, height]);
+    g.fill({ color: bgColor ?? 0x000000 });
+  }, [width, height, bgColor]);
+
+  // Apply the mask to the content container after both refs are set
+  useEffect(() => {
+    if (contentRef.current && maskRef.current) {
+      contentRef.current.mask = maskRef.current;
+    }
+    return () => {
+      if (contentRef.current) {
+        contentRef.current.mask = null;
+      }
+    };
+  });
 
   return (
     <pixiContainer
@@ -111,15 +132,15 @@ export const PixiScrollView: React.FC<PixiScrollViewProps> = ({
       layout={{
         width,
         height,
-        overflow: 'hidden',
         ...layoutProp,
       }}
     >
-      {/* Clipping mask */}
-      <pixiGraphics draw={drawMask} layout={{ position: 'absolute' }} />
+      {/* Stencil mask for content clipping — must be renderable for PixiJS stencil system.
+          Uses bgColor prop to match parent background so it's visually seamless. */}
+      <pixiGraphics ref={maskRef} draw={drawMask} />
 
-      {/* Scrollable content */}
-      <pixiContainer ref={contentRef}>
+      {/* Scrollable content — clipped by mask */}
+      <pixiContainer ref={contentRef} eventMode="auto">
         {children}
       </pixiContainer>
 

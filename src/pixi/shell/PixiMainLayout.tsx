@@ -101,22 +101,23 @@ class ViewErrorBoundary extends Component<ViewErrorBoundaryProps, ViewErrorBound
 type MainViewId = 'tracker' | 'arrangement' | 'pianoroll' | 'dj' | 'vj' | 'mixer' | 'studio';
 
 // Views that are always mounted (hidden when inactive) to avoid @pixi/layout BindingError.
-// WorkbenchContainer is excluded — it contains its own copies of these views inside
-// PixiWindows, so always-mounting it would cause duplicate Yoga node conflicts.
-type AlwaysMountedViewId = Exclude<MainViewId, 'studio'>;
+// WorkbenchContainer and VJ are excluded — WorkbenchContainer contains its own copies
+// of views inside PixiWindows (duplicate Yoga conflicts); VJ creates separate WebGL
+// contexts (ProjectM/butterchurn/Three.js) that waste GPU and can interfere with PixiJS
+// when always-mounted.
+type AlwaysMountedViewId = Exclude<MainViewId, 'studio' | 'vj'>;
 
 const ALWAYS_MOUNTED_VIEWS: Record<AlwaysMountedViewId, React.ComponentType> = {
   tracker: PixiTrackerView,
   arrangement: PixiArrangementView,
   pianoroll: PixiPianoRollView,
   dj: PixiDJView,
-  vj: PixiVJView,
   mixer: PixiMixerView,
 };
 
 // Map UIStore activeView to our MainViewId (some views map to tracker)
 function resolveMainView(activeView: string): MainViewId {
-  if (activeView === 'studio') return 'studio';
+  if (activeView === 'studio' || activeView === 'vj') return activeView as MainViewId;
   if (activeView in ALWAYS_MOUNTED_VIEWS) return activeView as MainViewId;
   // 'drumpad' or any unknown → default to tracker
   return 'tracker';
@@ -339,6 +340,26 @@ export const PixiMainLayout: React.FC = () => {
           >
             <ViewErrorBoundary viewId="studio">
               <WorkbenchContainer />
+            </ViewErrorBoundary>
+          </pixiContainer>
+        )}
+        {/* VJ — conditionally mounted (creates separate WebGL contexts for
+            ProjectM/butterchurn/Three.js that waste GPU when always-mounted) */}
+        {mainViewId === 'vj' && (
+          <pixiContainer
+            key="vj"
+            ref={(c: ContainerType | null) => { viewRefsMap.current['vj'] = c; }}
+            visible
+            eventMode="auto"
+            layout={{
+              position: 'absolute',
+              width,
+              height: Math.max(100, mainViewH),
+              flexDirection: 'column',
+            }}
+          >
+            <ViewErrorBoundary viewId="vj">
+              <PixiVJView />
             </ViewErrorBoundary>
           </pixiContainer>
         )}

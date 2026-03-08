@@ -85,12 +85,15 @@ const FRAG = /* glsl */ `#version 300 es
   void main() {
     vec2 uv = vTextureCoord / vUVScale;
 
+    float edgeFade = 1.0;
     if (abs(uBarrel) > 0.001) {
       uv = barrelDistort(uv, uBarrel);
-      if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) {
-        fragColor = vec4(0.0, 0.0, 0.0, 1.0);
-        return;
-      }
+      // Smooth fade at distortion edges instead of hard black cutoff.
+      // Compute how far outside [0,1] the UV went before clamping.
+      vec2 overshoot = max(vec2(0.0), max(-uv, uv - 1.0));
+      float overshootDist = length(overshoot);
+      edgeFade = 1.0 - smoothstep(0.0, 0.05, overshootDist);
+      uv = clamp(uv, 0.0, 1.0);
     }
 
     vec2 sampleUV = uv * vUVScale;
@@ -117,6 +120,7 @@ const FRAG = /* glsl */ `#version 300 es
       pixel.rgb *= 1.0 - dist * uVignette;
     }
 
+    pixel.rgb *= edgeFade;
     fragColor = pixel;
   }
 `;

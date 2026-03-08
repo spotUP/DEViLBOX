@@ -307,7 +307,7 @@ export const PixiRoot: React.FC = () => {
       <PixiGlobalTooltipLayer />
 
       {/* GL-native modals — inside scene graph so CRT shader catches them */}
-      <pixiContainer zIndex={300} layout={{ position: 'absolute', width, height }}>
+      <pixiContainer zIndex={300} layout={{ position: 'absolute', left: 0, top: 0, width, height }}>
         <PixiNewSongWizard />
         <PixiInterpolateDialog isOpen={modalOpen === 'interpolate'} onClose={closeModal} />
         <PixiHumanizeDialog isOpen={modalOpen === 'humanize'} onClose={closeModal} />
