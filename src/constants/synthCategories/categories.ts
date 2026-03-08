@@ -250,6 +250,9 @@ export const SYNTH_CATEGORIES: SynthCategory[] = [
       SYNTH_INFO.TFMXSynth,
       SYNTH_INFO.OctaMEDSynth,
       SYNTH_INFO.SymphonieSynth,
+      SYNTH_INFO.C64SID,
+      SYNTH_INFO.KlysSynth,
+      SYNTH_INFO.Sc68Synth,
     ],
   },
   {
