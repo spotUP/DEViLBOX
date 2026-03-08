@@ -2172,8 +2172,9 @@ export class ToneEngine {
         break;
       }
 
-      // C64 SID: audio handled entirely by C64SIDEngine — no synth needed
+      // C64 SID / SC68: audio handled entirely by their WASM engines — no synth needed
       case 'C64SID':
+      case 'Sc68Synth':
         return null;
 
       default: {

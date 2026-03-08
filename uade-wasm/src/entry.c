@@ -46,6 +46,7 @@ static int s_playing = 0;
 static int s_paused  = 0;
 static int s_looping = 0;
 static int s_total_frames = 0;  /* Total frames rendered (for position tracking) */
+static char s_last_vpath[512] = "/uade/song";  /* Last module VFS path (for loop/subsong) */
 
 /* Sample rate for the WASM module (set at init) */
 static int s_sample_rate = 44100;
@@ -241,9 +242,6 @@ int uade_wasm_init(int sample_rate) {
     }
     free(cfg);
 
-    fprintf(stderr, "[uade-wasm] After uade_new_state: IPC state=%d, in_fd=%d, out_fd=%d\n",
-            s_state->ipc.state, s_state->ipc.in_fd, s_state->ipc.out_fd);
-
     s_playing = 0;
     s_paused  = 0;
     return 0;
@@ -263,8 +261,11 @@ int uade_wasm_load(const uint8_t *data, size_t len, const char *filename_hint) {
     s_total_frames = 0;
     g_uade_tick_count = 0;
 
-    /* Write the file to MEMFS so UADE can open it */
-    const char *vpath = "/uade/song";
+    /* Write the file to MEMFS using the original filename so UADE can
+     * identify the format by filename pattern (e.g. TFMX needs "mdat.*").
+     * The file is placed in /uade/ alongside any companion files. */
+    char vpath[512];
+    snprintf(vpath, sizeof(vpath), "/uade/%s", filename_hint);
     FILE *f = fopen(vpath, "wb");
     if (!f) {
         fprintf(stderr, "[uade-wasm] Cannot write to MEMFS: %s\n", vpath);
@@ -272,6 +273,7 @@ int uade_wasm_load(const uint8_t *data, size_t len, const char *filename_hint) {
     }
     fwrite(data, 1, len, f);
     fclose(f);
+    strlcpy(s_last_vpath, vpath, sizeof(s_last_vpath));
 
     /* ── Reset IPC state for clean load ──
      *
@@ -311,13 +313,14 @@ int uade_wasm_load(const uint8_t *data, size_t len, const char *filename_hint) {
                                  &s_state->ipc) != 0) {
                 fprintf(stderr, "[uade-wasm] Failed to re-send CONFIG\n");
             }
-            fprintf(stderr, "[uade-wasm] First load: sent CONFIG, core phase=1\n");
         } else {
-            fprintf(stderr, "[uade-wasm] Reload: hw initialized, core phase=2\n");
         }
     }
 
-    /* Start playback from the MEMFS file (exit-guarded) */
+    /* Start playback from the MEMFS file (exit-guarded).
+     * Set CWD to /uade/ so that eagleplayers requesting companion files
+     * via relative paths (e.g. TFMX "smpl.xxx") resolve correctly. */
+    chdir("/uade");
     int ret = guarded_play(vpath, -1);
     if (ret <= 0) {
         /* Try from buffer directly */
@@ -411,7 +414,7 @@ void uade_wasm_set_subsong(int subsong) {
         }
     }
 
-    s_playing = (guarded_play("/uade/song", subsong) > 0);
+    s_playing = (guarded_play(s_last_vpath, subsong) > 0);
 }
 
 EMSCRIPTEN_KEEPALIVE
@@ -454,7 +457,7 @@ static int restart_for_loop(void) {
             uade_send_string(UADE_COMMAND_CONFIG, uaerc_path, &s_state->ipc);
         }
     }
-    return (guarded_play("/uade/song", -1) > 0) ? 1 : 0;
+    return (guarded_play(s_last_vpath, -1) > 0) ? 1 : 0;
 }
 
 /*
@@ -960,20 +963,20 @@ int uade_wasm_read_string(uint32_t addr, char *out, int maxlen) {
 }
 
 /*
- * Write a companion file into MEMFS root ("/") so UADE can find it when
- * the Amiga-side player requests it as a relative path.
+ * Write a companion file into MEMFS /uade/ directory so UADE can find it
+ * when the Amiga-side player requests it as a relative path.
  *
  * TFMX-Pro uses two files: mdat.* (module) and smpl.* (samples).
- * The eagleplayer requests "smpl.filename" as a relative path, which
- * uade_find_amiga_file resolves via "./smpl.filename" (CWD = "/").
- * Writing the file here as "/filename" makes it findable.
+ * The eagleplayer resolves companion files relative to the module's directory.
+ * Since the module is written to /uade/<filename>, companions must also be
+ * in /uade/ for relative path resolution to work.
  *
  * Returns 0 on success, -1 on failure.
  */
 EMSCRIPTEN_KEEPALIVE
 int uade_wasm_add_extra_file(const char *filename, const uint8_t *data, size_t len) {
     char path[512];
-    snprintf(path, sizeof(path), "/%s", filename);
+    snprintf(path, sizeof(path), "/uade/%s", filename);
 
     FILE *f = fopen(path, "wb");
     if (!f) {

@@ -280,6 +280,16 @@ export interface TrackerSong {
   pumaTrackerFileData?: ArrayBuffer;
   /** Raw Art of Noise (.aon) binary for ArtOfNoiseEngine WASM playback */
   artOfNoiseFileData?: ArrayBuffer;
+  /** Raw Ben Daglish (.bd) binary for BdEngine WASM playback */
+  bdFileData?: ArrayBuffer;
+  /** Raw SidMon 2.0 (.sid2) binary for Sd2Engine WASM playback */
+  sd2FileData?: ArrayBuffer;
+  /** Raw file binary for UADE playback of editable formats (native parser provides patterns, UADE provides audio) */
+  uadeEditableFileData?: ArrayBuffer;
+  /** Original filename hint for UADE format detection */
+  uadeEditableFileName?: string;
+  /** Raw Symphonie Pro (.symmod) binary for SymphonieEngine playback + export */
+  symphonieFileData?: ArrayBuffer;
   /** Raw module binary for libopenmpt WASM playback (MOD/XM/IT/S3M) */
   libopenmptFileData?: ArrayBuffer;
   // Native format data (preserved for format-specific editors)

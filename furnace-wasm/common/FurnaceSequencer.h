@@ -392,10 +392,12 @@ struct FurnaceSequencer {
   // Sub-channel index within the chip (e.g., Genesis ch 0-5 = FM, 6-8 = PSG)
   uint8_t chanSubIdx[SEQ_MAX_CHANNELS];
 
-  // --- Dispatch handle ---
-  // Opaque pointer to the FurnaceDispatch instance for issuing commands.
-  // Set via furnace_seq_set_dispatch_handle().
-  void* dispatchHandle;
+  // --- Dispatch handles ---
+  // Per-channel dispatch handle for multi-chip routing.
+  // Set via furnace_seq_set_channel_dispatch().
+  // Falls back to dispatchHandle for channels without a per-channel handle.
+  void* dispatchHandle;                        // legacy single handle
+  int chanDispatchHandle[SEQ_MAX_CHANNELS];    // per-channel dispatch handle (0 = use legacy)
 
   // --- Reset all state ---
   void reset() {
@@ -452,6 +454,7 @@ struct FurnaceSequencer {
     }
 
     dispatchHandle = nullptr;
+    memset(chanDispatchHandle, 0, sizeof(chanDispatchHandle));
   }
 };
 
@@ -518,6 +521,9 @@ void furnace_seq_set_repeat_pattern(bool repeat);
 
 // Set per-channel chip type and sub-channel index.
 void furnace_seq_set_channel_chip(int channel, int chipId, int subIdx);
+
+// Set per-channel dispatch handle for multi-chip routing.
+void furnace_seq_set_channel_dispatch(int channel, int handle);
 
 // Set pattern length (rows per pattern).
 void furnace_seq_set_pat_len(int patLen);

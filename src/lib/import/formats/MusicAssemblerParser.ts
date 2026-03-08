@@ -379,10 +379,21 @@ function loadSingleTrack(bytes: Uint8Array, off: number): Uint8Array | null {
 
 interface MATrackRow {
   note: number;       // MA note index (0 = no note)
-  instrument: number; // instrument index (1-based, 0 = none)
-  speed: number;      // new speed (0 = no change)
+  instrument: number; // instrument index (0-based, -1 = no change)
+  release: boolean;   // key-off event
+  delay: number;      // row delay counter (from last byte read)
 }
 
+/**
+ * Decode track events matching the C replayer's ma_get_next_row_in_track() exactly.
+ *
+ * Three event types based on high bits of first byte:
+ *   (b0 & 0x80) == 0:             Note event (no instrument change)
+ *   (b0 & 0x80) != 0, (b0 & 0x40) == 0:  Release event
+ *   (b0 & 0x80) != 0, (b0 & 0x40) != 0:  Instrument + note event
+ *
+ * The last byte read in each event becomes the row delay counter.
+ */
 function decodeTrack(track: Uint8Array): MATrackRow[] {
   const rows: MATrackRow[] = [];
   let off = 0;
@@ -392,45 +403,56 @@ function decodeTrack(track: Uint8Array): MATrackRow[] {
     if (b0 === 0xff) break;
 
     let note = 0;
-    let instrument = 0;
-    let speed = 0;
+    let instrument = -1;
+    let release = false;
+    let lastByte = b0;
 
-    if ((b0 & 0x80) !== 0) {
-      if ((b0 & 0x40) !== 0) {
-        // 3-byte or 4-byte event
-        // b0 has note encoded in lower bits
-        note = b0 & 0x3f;
-        if (off >= track.length) break;
-        const b1 = track[off++]; // instrument
-        instrument = b1 & 0x7f;
-        if (off >= track.length) break;
-        const b2 = track[off++]; // flags / speed
-        if ((b2 & 0x80) !== 0) {
-          // 4th byte
-          if (off >= track.length) break;
-          const b3 = track[off++];
-          speed = b3;
-        }
-        // b2 low bits may encode additional info (ignored for static import)
-        void b2;
-      } else {
-        // 1-byte event: just delay / empty row marker
-        // no note, no instrument
-      }
-    } else {
-      // 2-byte or 3-byte event
+    if ((b0 & 0x80) === 0) {
+      // ── Note event (no instrument change) ──
+      // b0 bits 5-0 = note index
+      // b0 bit 6: if 0, retrigger; if 1, legato (both still set note)
       note = b0 & 0x3f;
+
       if (off >= track.length) break;
       const b1 = track[off++];
-      instrument = b1 & 0x7f;
+      lastByte = b1;
+
       if ((b1 & 0x80) !== 0) {
-        // 3rd byte: speed
+        // Portamento/vibrato: strip high bit, read one more byte
+        lastByte = b1 & 0x7f;
         if (off >= track.length) break;
-        speed = track[off++];
+        // portamento_or_vibrato_value (skip for display)
+        off++;
+      }
+    } else if ((b0 & 0x40) === 0) {
+      // ── Release event ──
+      // b0 bits 5-0 used as delay directly (lastByte = b0 & 0x3f)
+      release = true;
+      lastByte = b0 & 0x3f;
+    } else {
+      // ── Instrument + note event ──
+      // b0 bits 5-0 = instrument index
+      instrument = b0 & 0x3f;
+
+      if (off >= track.length) break;
+      const b1 = track[off++];
+      // b1 bits 5-0 = note index
+      note = b1 & 0x3f;
+
+      if (off >= track.length) break;
+      const b2 = track[off++];
+      lastByte = b2;
+
+      if ((b2 & 0x80) !== 0) {
+        // Portamento/vibrato: strip high bit, read one more byte
+        lastByte = b2 & 0x7f;
+        if (off >= track.length) break;
+        // portamento_or_vibrato_value (skip for display)
+        off++;
       }
     }
 
-    rows.push({ note, instrument, speed });
+    rows.push({ note, instrument, release, delay: (lastByte << 24) >> 24 });
   }
 
   return rows;
@@ -778,32 +800,33 @@ function parseMusicAssembler(bytes: Uint8Array, filename: string): TrackerSong |
       const trackRows = decodedTracks[trackIdx];
       const transpose = entry.transpose;
 
+      let lastInstrument = 0;
       for (let row = 0; row < Math.min(trackRows.length, patternLen); row++) {
         const tr = trackRows[row];
 
+        // Track instrument across events (instrument -1 = no change)
+        if (tr.instrument >= 0) {
+          lastInstrument = tr.instrument + 1; // convert 0-based to 1-based
+        }
+
         let xmNote = 0;
-        if (tr.note !== 0) {
-          // Apply transpose (unsigned byte added to note index)
+        if (tr.release) {
+          xmNote = 97; // XM key-off
+        } else if (tr.note !== 0) {
+          // Apply transpose (signed byte added to note index)
           const rawNote = tr.note + transpose;
           const clamped = Math.max(0, Math.min(MA_PERIODS.length - 1, rawNote));
           xmNote = maNoteToXM(clamped);
         }
 
-        let effTyp = 0;
-        let eff    = 0;
-        if (tr.speed !== 0) {
-          effTyp = 0x0F;
-          eff    = tr.speed;
-        }
-
         cells[row][v] = {
           note:       xmNote,
-          instrument: tr.instrument,
+          instrument: tr.note !== 0 || tr.release ? lastInstrument : 0,
           volume:     0,
-          effTyp,
-          eff,
-          effTyp2: 0,
-          eff2:    0,
+          effTyp:     0,
+          eff:        0,
+          effTyp2:    0,
+          eff2:       0,
         };
       }
     }

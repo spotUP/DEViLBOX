@@ -177,13 +177,26 @@ const WASM_ENGINES: NativeEngineDescriptor[] = [
     synthType: 'MusicAssemblerSynth',
     suppressNotes: true,
     fileDataKey: 'maFileData',
-    formats: ['MusicAssembler'],
+    formats: null,  // activate whenever maFileData exists
     loadMethod: 'loadTune',
     supportsPause: false,
     supportsResume: false,
     needsDirectRouting: true,
     staticRef: null,
     dynamicResolver: async () => (await import('@/engine/ma/MaEngine')).MaEngine as unknown as WASMSingletonStatic,
+  },
+  {
+    key: 'BenDaglish',
+    synthType: 'BenDaglishSynth',
+    suppressNotes: true,
+    fileDataKey: 'bdFileData',
+    formats: null,  // activate whenever bdFileData exists
+    loadMethod: 'loadTune',
+    supportsPause: false,
+    supportsResume: false,
+    needsDirectRouting: true,
+    staticRef: null,
+    dynamicResolver: async () => (await import('@/engine/bd/BdEngine')).BdEngine as unknown as WASMSingletonStatic,
   },
   {
     key: 'Hippel',
@@ -329,6 +342,19 @@ const WASM_ENGINES: NativeEngineDescriptor[] = [
     dynamicResolver: async () => (await import('@/engine/artofnoise/ArtOfNoiseEngine')).ArtOfNoiseEngine as unknown as WASMSingletonStatic,
   },
   {
+    key: 'SidMon2',
+    synthType: 'SidMon2Synth',
+    suppressNotes: true,
+    fileDataKey: 'sd2FileData',
+    formats: null,  // activate whenever sd2FileData exists
+    loadMethod: 'loadTune',
+    supportsPause: false,
+    supportsResume: false,
+    needsDirectRouting: true,
+    staticRef: null,
+    dynamicResolver: async () => (await import('@/engine/sidmon2/Sd2Engine')).Sd2Engine as unknown as WASMSingletonStatic,
+  },
+  {
     key: 'MusicLine',
     synthType: 'MusicLineSynth',
     suppressNotes: true,
@@ -339,6 +365,19 @@ const WASM_ENGINES: NativeEngineDescriptor[] = [
     supportsResume: false,
     needsDirectRouting: true,
     staticRef: MusicLineEngine as unknown as WASMSingletonStatic,
+  },
+  {
+    key: 'UADEEditable',
+    synthType: 'UADEEditableSynth',
+    suppressNotes: true,
+    fileDataKey: 'uadeEditableFileData',
+    formats: null, // activate whenever uadeEditableFileData exists
+    loadMethod: 'loadTune',
+    supportsPause: false,
+    supportsResume: false,
+    needsDirectRouting: true,
+    staticRef: null,
+    dynamicResolver: async () => (await import('@/engine/uade/UADEEngine')).UADEEngine as unknown as WASMSingletonStatic,
   },
 ];
 
@@ -489,43 +528,56 @@ export async function startNativeEngines(
     }
   }
 
-  // --- Symphonie Pro (special case: song loaded via InstrumentFactory → SymphonieSynth.load()) ---
-  // The SymphonieEngine manages its own AudioWorklet sequencer — suppress normal notes.
+  // --- Symphonie Pro — parse file data and load directly into WASM engine ---
   if (song.symphonieFileData) {
     suppressNotes = true;
     try {
       const { SymphonieEngine } = await import('../symphonie/SymphonieEngine');
-      // SymphonieEngine singleton is created by ensureWASMSynthsReady → SymphonieSynth constructor.
-      // If it doesn't exist yet, create it and load the song data ourselves.
+      const { parseSymphonieForPlayback } = await import('@/lib/import/formats/SymphonieProParser');
+      const { getDevilboxAudioContext } = await import('@/utils/audio-context');
+
       const symphEngine = SymphonieEngine.getInstance();
-      console.log('[NativeEngineRouting] SymphonieEngine: hasNode=', !!symphEngine.getNode());
+      const ctx = getDevilboxAudioContext();
 
-      // Wait for the worklet node to be ready (load() may still be in progress from InstrumentFactory)
-      const maxWait = 5000;
-      const start = Date.now();
-      while (!symphEngine.getNode() && Date.now() - start < maxWait) {
-        await new Promise(r => setTimeout(r, 50));
-      }
+      // Parse the raw file data into playback format
+      console.log('[NativeEngineRouting] Symphonie: parsing file data...');
+      const playbackData = await parseSymphonieForPlayback(
+        song.symphonieFileData,
+        song.name || 'unknown.symmod'
+      );
+      console.log('[NativeEngineRouting] Symphonie: parsed OK —',
+        playbackData.instruments.length, 'instruments,',
+        playbackData.patterns.length, 'patterns,',
+        playbackData.orderList.length, 'orders,',
+        playbackData.numChannels, 'channels');
 
-      if (symphEngine.getNode()) {
-        if (!muted) {
-          symphEngine.play();
-          console.log('[NativeEngineRouting] SymphonieEngine playing');
-        }
-      } else {
-        // Worklet didn't load in time — try loading manually
-        console.warn('[NativeEngineRouting] SymphonieEngine worklet not ready, attempting manual load');
-        const firstInst = song.instruments.find(i => i.synthType === 'SymphonieSynth');
-        if (firstInst && (firstInst as any).symphonie) {
-          const { getDevilboxAudioContext } = await import('@/utils/audio-context');
-          await symphEngine.loadSong(getDevilboxAudioContext(), (firstInst as any).symphonie);
-          if (!muted) {
-            symphEngine.play();
-            console.log('[NativeEngineRouting] SymphonieEngine playing (manual load)');
+      // Load song into WASM engine (creates worklet + sends data)
+      await symphEngine.loadSong(ctx, playbackData);
+      const node = symphEngine.getNode();
+      console.log('[NativeEngineRouting] Symphonie: loadSong complete, node=', !!node);
+
+      // Connect worklet node to audio output
+      if (node) {
+        if (!isDJDeck) {
+          const nativeInput = getNativeAudioNode(separationInputTone as any);
+          if (nativeInput) {
+            node.connect(nativeInput);
+            routedNativeEngines.add('SymphonieSynth');
+            console.log('[NativeEngineRouting] Symphonie output → stereo separation');
+          } else {
+            node.connect(ctx.destination);
+            routedNativeEngines.add('SymphonieSynth');
+            console.log('[NativeEngineRouting] Symphonie output → destination (fallback)');
           }
         } else {
-          console.error('[NativeEngineRouting] No SymphonieSynth instrument found');
+          node.connect(ctx.destination);
+          routedNativeEngines.add('SymphonieSynth');
         }
+      }
+
+      if (!muted) {
+        symphEngine.play();
+        console.log('[NativeEngineRouting] SymphonieEngine playing');
       }
     } catch (err) {
       console.error('[NativeEngineRouting] Failed to start SymphonieEngine:', err);
@@ -586,6 +638,18 @@ export function stopNativeEngines(
         }).catch(() => {});
       }
     }
+  }
+
+  // Stop SymphonieEngine if active
+  if (song?.symphonieFileData) {
+    import('../symphonie/SymphonieEngine').then(({ SymphonieEngine }) => {
+      if (SymphonieEngine.hasInstance()) {
+        const engine = SymphonieEngine.getInstance();
+        engine.stop();
+        const node = engine.getNode();
+        if (node) { try { node.disconnect(); } catch { /* ignored */ } }
+      }
+    }).catch(() => {});
   }
 
   // Stop C64SIDEngine (instance-based)

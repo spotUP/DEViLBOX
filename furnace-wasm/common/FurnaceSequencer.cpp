@@ -434,18 +434,28 @@ static bool shallStopSched = false;
 
 // Defined in FurnaceDispatchWrapper.cpp
 extern "C" int furnace_dispatch_cmd(int handle, int cmd, int chan, int val1, int val2);
+extern "C" void furnace_cmd_log_tick();
 
 static int dispatchHandle = 0;
 
 static int dispatchCmd(int cmd, int chan, int val1 = 0, int val2 = 0) {
-  if (dispatchHandle <= 0) return -1;
+  if (chan < 0 || chan >= g_seq.numChannels) return -1;
   if (g_seq.isMuted[chan]) {
     // Still allow certain commands through even when muted
     // (volume, note off, instrument) for state tracking
     // But block note-on
     if (cmd == DIV_CMD_NOTE_ON) return 0;
   }
-  return furnace_dispatch_cmd(dispatchHandle, cmd, chan, val1, val2);
+  // Multi-chip routing: use per-channel handle and sub-channel index
+  int handle = g_seq.chanDispatchHandle[chan];
+  int subChan = (int)g_seq.chanSubIdx[chan];
+  if (handle <= 0) {
+    // Fallback to legacy single handle (for single-chip songs)
+    handle = dispatchHandle;
+    subChan = chan; // Use global channel index
+  }
+  if (handle <= 0) return -1;
+  return furnace_dispatch_cmd(handle, cmd, subChan, val1, val2);
 }
 
 // ============================================================
@@ -2370,10 +2380,11 @@ static bool seqNextTick() {
               g_seq.chan[c].reset();
               int vm = dispatchCmd(DIV_CMD_GET_VOLMAX, c);
               if (vm > 0) {
-                g_seq.chan[c].volMax = vm << 8;
+                g_seq.chan[c].volMax = (vm << 8) | 0xff;
               } else {
                 g_seq.chan[c].volMax = 0x7f00;
               }
+              g_seq.chan[c].volume = g_seq.chan[c].volMax;
               if (!getLinearPitch()) {
                 g_seq.chan[c].vibratoFine = 4;
               }
@@ -2802,6 +2813,12 @@ void furnace_seq_set_channel_chip(int channel, int chipId, int subIdx) {
 }
 
 EMSCRIPTEN_KEEPALIVE
+void furnace_seq_set_channel_dispatch(int channel, int handle) {
+  if (channel < 0 || channel >= g_seq.numChannels) return;
+  g_seq.chanDispatchHandle[channel] = handle;
+}
+
+EMSCRIPTEN_KEEPALIVE
 void furnace_seq_play(int order, int row) {
   initTables();
 
@@ -2827,13 +2844,14 @@ void furnace_seq_play(int order, int row) {
   // Reset channel state
   for (int i = 0; i < g_seq.numChannels; i++) {
     g_seq.chan[i].reset();
-    // Query volMax from dispatch
+    // Query volMax from dispatch (matches Furnace engine.cpp:2194-2196)
     int vm = dispatchCmd(DIV_CMD_GET_VOLMAX, i);
     if (vm > 0) {
-      g_seq.chan[i].volMax = vm << 8;
+      g_seq.chan[i].volMax = (vm << 8) | 0xff;
     } else {
       g_seq.chan[i].volMax = 0x7f00;  // Default
     }
+    g_seq.chan[i].volume = g_seq.chan[i].volMax;
     // Non-linear pitch uses smaller vibrato range (matches Furnace engine.cpp:2197)
     if (!getLinearPitch()) {
       g_seq.chan[i].vibratoFine = 4;
@@ -2976,6 +2994,7 @@ EMSCRIPTEN_KEEPALIVE
 int furnace_seq_tick(void) {
   if (!g_seq.playing || g_seq.halted) return (g_seq.curOrder << 16) | g_seq.curRow;
 
+  furnace_cmd_log_tick();
   seqNextTick();
 
   // halt engine if requested (debug menu)

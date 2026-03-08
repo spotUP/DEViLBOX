@@ -94,6 +94,17 @@ export function saveModule(): boolean {
           useUIStore.getState().setStatusMessage('PumaTracker exported', false, 1500);
           return;
         }
+
+        // Symphonie Pro (.symmod) export
+        if (sourceFormat === 'Symphonie' && song.symphonieFileData) {
+          const { exportSymphonieProFile } = await import('@/lib/export/SymphonieProExporter');
+          const { saveAs } = await import('file-saver');
+          const data = exportSymphonieProFile(song);
+          const filename = (song.name || 'module').replace(/\.[^/.]+$/, '') + '.symmod';
+          saveAs(new Blob([data as BlobPart]), filename);
+          useUIStore.getState().setStatusMessage('Symphonie exported', false, 1500);
+          return;
+        }
       }
     } catch { /* replayer not initialized */ }
   })();

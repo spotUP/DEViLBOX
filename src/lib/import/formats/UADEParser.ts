@@ -400,6 +400,7 @@ export async function parseUADEFile(
   mode: 'enhanced' | 'classic' = 'enhanced',
   subsong = 0,
   preScannedMeta?: UADEMetadata,
+  companionFiles?: Map<string, ArrayBuffer>,
 ): Promise<TrackerSong> {
   const { UADEEngine } = await import('@engine/uade/UADEEngine');
   const { periodToNoteIndex } = await import('@engine/effects/PeriodTables');
@@ -411,6 +412,14 @@ export async function parseUADEFile(
   // (avoids a second full scan which can take several seconds per file)
   const engine = UADEEngine.getInstance();
   await engine.ready();
+
+  // Register companion files (e.g. TFMX smpl.* samples) into UADE's virtual FS
+  // BEFORE loading the main module so the 68k replayer can find them.
+  if (companionFiles) {
+    for (const [cfName, cfBuf] of companionFiles) {
+      await engine.addCompanionFile(cfName, cfBuf);
+    }
+  }
 
   // Enable CIA tick snapshot capture BEFORE the scan so snapshots are accumulated
   // during UADE's internal enhanced scan playback.
@@ -570,21 +579,22 @@ export async function parseUADEFile(
       // NOTE: TFMX loads at chip RAM address 0 — no scanMemoryForMagic needed.
       // UADE may report the format as 'TFMX', 'TFMX-Pro', 'TFMX Pro', or 'TFMX 7-Voices'.
       // All variants use the same mdat file layout and are handled by parseTFMXFile.
+      // TFMX needs UADE for audio (complex macro system) — augment native result with UADESynth.
       'TFMX': async () => {
         const { parseTFMXFile } = await import('./TFMXParser');
-        return parseTFMXFile(buffer, filename);
+        return augmentWithUADEAudio(parseTFMXFile(buffer, filename), filename, buffer, metadata);
       },
       'TFMX-Pro': async () => {
         const { parseTFMXFile } = await import('./TFMXParser');
-        return parseTFMXFile(buffer, filename);
+        return augmentWithUADEAudio(parseTFMXFile(buffer, filename), filename, buffer, metadata);
       },
       'TFMX Pro': async () => {
         const { parseTFMXFile } = await import('./TFMXParser');
-        return parseTFMXFile(buffer, filename);
+        return augmentWithUADEAudio(parseTFMXFile(buffer, filename), filename, buffer, metadata);
       },
       'TFMX 7-Voices': async () => {
         const { parseTFMXFile } = await import('./TFMXParser');
-        return parseTFMXFile(buffer, filename);
+        return augmentWithUADEAudio(parseTFMXFile(buffer, filename), filename, buffer, metadata);
       },
       // NOTE: GMC loads at chip RAM address 0 — no scanMemoryForMagic needed.
       // UADE format name is 'GameMusicCreator'; 'GMC' is included as a fallback
@@ -1824,6 +1834,51 @@ function buildEnhancedSong(
     numChannels: 4,
     initialSpeed: enhanced.speed || 6,
     initialBPM: enhanced.bpm || 125,
+  };
+}
+
+/**
+ * Augment a native parser's TrackerSong with UADE audio playback.
+ * Used for formats like TFMX where the native parser provides pattern data
+ * but UADE is needed for audio (complex macro/synthesis system).
+ * Adds a UADESynth instrument and sets format to 'UADE'.
+ */
+function augmentWithUADEAudio(
+  nativeSong: TrackerSong,
+  filename: string,
+  buffer: ArrayBuffer,
+  metadata: UADEMetadata,
+): TrackerSong {
+  const uadeConfig: UADEConfig = {
+    type: 'uade',
+    filename,
+    fileData: buffer,
+    subsongCount: metadata.subsongCount,
+    currentSubsong: 0,
+    metadata: {
+      player: metadata.player,
+      formatName: metadata.formatName || 'TFMX',
+      minSubsong: metadata.minSubsong,
+      maxSubsong: metadata.maxSubsong,
+    },
+  };
+
+  // Prepend a UADESynth instrument (id=0) for audio playback
+  const uadeInstr: InstrumentConfig = {
+    id: 0,
+    name: 'UADE Audio',
+    type: 'synth' as const,
+    synthType: 'UADESynth' as const,
+    effects: [],
+    volume: -6,
+    pan: 0,
+    uade: uadeConfig,
+  };
+
+  return {
+    ...nativeSong,
+    format: 'UADE' as TrackerFormat,
+    instruments: [uadeInstr, ...nativeSong.instruments],
   };
 }
 

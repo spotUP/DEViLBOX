@@ -36,6 +36,18 @@ async function callUADE(ctx: FallbackContext): Promise<TrackerSong> {
 }
 
 /**
+ * If a native parser result has uadePatternLayout, inject the raw file binary
+ * so UADE can handle playback while the native parser provides pattern display.
+ */
+function injectUADEPlayback(result: TrackerSong, ctx: FallbackContext): TrackerSong {
+  if ((result as any).uadePatternLayout && !(result as any).uadeEditableFileData) {
+    (result as any).uadeEditableFileData = ctx.buffer.slice(0);
+    (result as any).uadeEditableFileName = ctx.originalFileName;
+  }
+  return result;
+}
+
+/**
  * Format where native parser is the DEFAULT (most common: HVL, OKT, MED, DIGI).
  * If user sets pref to 'uade', uses UADE instead.
  */
@@ -45,7 +57,7 @@ export async function withNativeDefault(
   nativeParse: NativeParser,
 ): Promise<TrackerSong> {
   if (ctx.prefs[prefKey] === 'uade') return callUADE(ctx);
-  return nativeParse(ctx.buffer, ctx.originalFileName);
+  return injectUADEPlayback(await nativeParse(ctx.buffer, ctx.originalFileName), ctx);
 }
 
 /**
@@ -72,7 +84,7 @@ export async function withNativeThenUADE(
       }
       const input = (opts?.usesBytes || opts?.isFormat) ? bytes! : ctx.buffer;
       const result = await (nativeParse as NativeParserWithBytes)(input as any, ctx.originalFileName);
-      if (result) return result;
+      if (result) return injectUADEPlayback(result, ctx);
     } catch (err) {
       console.warn(`[${parserName}] Native parse failed for ${ctx.originalFileName}, falling back to UADE:`, err);
     }

@@ -514,6 +514,16 @@ export class UADEEngine {
   }
 
   /**
+   * loadTune(buffer) — WASM engine registry compatible wrapper for load().
+   * Reads the filename hint from the format store's uadeEditableFileName field.
+   */
+  async loadTune(buffer: ArrayBuffer): Promise<void> {
+    const { useFormatStore } = await import('@/stores/useFormatStore');
+    const fileName = useFormatStore.getState().uadeEditableFileName || 'module.mod';
+    await this.load(buffer, fileName);
+  }
+
+  /**
    * Write a companion file into the WASM virtual filesystem before loading.
    * Required for multi-file formats like TFMX (mdat.* + smpl.*).
    * Must be called BEFORE load() for the companion to be available.

@@ -381,9 +381,15 @@ export async function parseSidMon2File(
   const patternDataLen = readUint(data, 50);
   const patternRows: S2Row[] = [];
   let rowIdx = 0;
-  let pointerJ = 1;
+  let pointerJ = 0;
 
   for (let i = 0; i < patternDataLen; /* i incremented inside */) {
+    // Resolve any pointers that match the current byte position (before decoding)
+    while (pointerJ < numPointers && (patternDataStart + pointers[pointerJ]) === pos) {
+      pointers[pointerJ] = rowIdx;
+      pointerJ++;
+    }
+
     const row: S2Row = { note: 0, sample: 0, effect: 0, param: 0, speed: 0 };
     const value = readByte(data, pos); pos++; i++;
 
@@ -424,14 +430,12 @@ export async function parseSidMon2File(
     }
 
     patternRows[rowIdx++] = row;
-
-    // Check if the current stream position matches the next pointer offset
-    if (pointerJ < numPointers && (patternDataStart + pointers[pointerJ]) === pos) {
-      pointers[pointerJ] = rowIdx;
-      pointerJ++;
-    }
   }
-  pointers[pointerJ] = patternRows.length;
+
+  // Resolve any remaining unresolved pointers to the end of the data
+  for (let k = pointerJ; k <= numPointers; k++) {
+    pointers[k] = patternRows.length;
+  }
 
   // Align to word boundary after pattern data
   if ((pos & 1) !== 0) pos++;
@@ -540,9 +544,11 @@ export async function parseSidMon2File(
 
   // -- Simulate playback to extract pattern data ------------------------------
   // We walk through the track sequence and pattern data, simulating the
-  // S2Player's process() loop to produce 64-row patterns for the TrackerSong.
+  // S2Player's process() loop to produce patterns for the TrackerSong.
+  // Pattern length defaults to 64 but can be changed by effect 0x76.
 
-  const PATTERN_LEN = 64; // SidMon II default pattern length
+  const MAX_PATTERN_LEN = 256; // Safety bound
+  let currentPatternLen = 64;  // SidMon II default, can be changed by effect 0x76
   const trackerPatterns: Pattern[] = [];
 
   // Voice state for simulation
@@ -575,7 +581,7 @@ export async function parseSidMon2File(
   for (let trackPos = 0; trackPos < songLength; trackPos++) {
     const channelRows: TrackerCell[][] = [[], [], [], []];
 
-    for (let patRow = 0; patRow < PATTERN_LEN; patRow++) {
+    for (let patRow = 0; patRow < MAX_PATTERN_LEN && patRow < currentPatternLen; patRow++) {
       for (let ch = 0; ch < 4; ch++) {
         const voice = voiceStates[ch];
 
@@ -615,10 +621,12 @@ export async function parseSidMon2File(
 
               if (rowData.sample > 0) {
                 voice.instrument = rowData.sample;
+                // TS instruments[] is 1-based (instruments[0] = empty, instruments[1] = first real)
+                // C replayer subtracts 1 because its array is 0-based, but we don't need to
                 const instrIdx = voice.instrument + soundTranspose;
                 if (instrIdx >= 0 && instrIdx < numInstruments) {
                   voice.instr = instruments[instrIdx];
-                  instrId = instrIdx; // S2Instrument index = TrackerSong instrument ID
+                  instrId = instrIdx; // matches TrackerSong instrument IDs (1-based)
                 }
               }
 
@@ -661,8 +669,9 @@ export async function parseSidMon2File(
                   // No direct XM equivalent -- skip
                   break;
                 case 0x76: // Set pattern length
-                  // This modifies internal patternLen; we handle it at song level
-                  // Could map to pattern break, but skip for simplicity
+                  if (param !== 0) {
+                    currentPatternLen = param;
+                  }
                   break;
                 case 0x7C: // Set volume
                   effectType = 0x0C; // XM set volume
@@ -753,7 +762,7 @@ export async function parseSidMon2File(
     trackerPatterns.push({
       id: `pattern-${trackPos}`,
       name: `Pattern ${trackPos}`,
-      length: PATTERN_LEN,
+      length: channelRows[0].length, // Use actual row count (may differ from 64 due to 0x76 effect)
       channels: channelRows.map((rows, ch) => ({
         id: `channel-${ch}`,
         name: `Channel ${ch + 1}`,
@@ -782,7 +791,7 @@ export async function parseSidMon2File(
     trackerPatterns.push({
       id: 'pattern-0',
       name: 'Pattern 0',
-      length: PATTERN_LEN,
+      length: 64,
       channels: Array.from({ length: 4 }, (_, ch) => ({
         id: `channel-${ch}`,
         name: `Channel ${ch + 1}`,
@@ -793,7 +802,7 @@ export async function parseSidMon2File(
         pan: (ch === 0 || ch === 3) ? -50 : 50,
         instrumentId: null,
         color: null,
-        rows: Array.from({ length: PATTERN_LEN }, (): TrackerCell => ({
+        rows: Array.from({ length: 64 }, (): TrackerCell => ({
           note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0,
         })),
       })),
@@ -822,5 +831,6 @@ export async function parseSidMon2File(
     initialSpeed: speedDef || 6,
     initialBPM: 125,
     linearPeriods: false,
+    sd2FileData: buffer.slice(0),
   };
 }

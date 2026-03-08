@@ -282,40 +282,6 @@ export const PixiImportModuleDialog: React.FC<PixiImportModuleDialogProps> = ({
     }
   }, [initialFile, isOpen, handleFileSelect]);
 
-  // Auto-prompt for companion file when a two-file format is loaded without one
-  const companionPromptedRef = useRef(false);
-  useEffect(() => {
-    if (!moduleInfo || isLoading || activeCompanions.length > 0) return;
-    if (companionPromptedRef.current) return;
-
-    const companion = getExpectedCompanion(loadedFileName);
-    if (!companion) return;
-
-    companionPromptedRef.current = true;
-    // Auto-open file picker for the companion file
-    void (async () => {
-      const file = await pickFile({ accept: '*' });
-      if (file) {
-        // Register companion in UADE's virtual FS
-        try {
-          const buf = await file.arrayBuffer();
-          const { UADEEngine } = await import('@/engine/uade/UADEEngine');
-          const engine = UADEEngine.getInstance();
-          await engine.ready();
-          await engine.addCompanionFile(file.name, buf);
-          setActiveCompanions([file]);
-        } catch (err) {
-          console.warn('[PixiImportModuleDialog] Failed to register companion file:', err);
-        }
-      }
-    })();
-  }, [moduleInfo, isLoading, activeCompanions, loadedFileName]);
-
-  // Reset companion prompt flag when dialog closes or file changes
-  useEffect(() => {
-    companionPromptedRef.current = false;
-  }, [loadedFileName, isOpen]);
-
   // ── Preview controls ───────────────────────────────────────────────────────
 
   const LIBOPENMPT_PLAYABLE_NATIVE_KEYS = getLibopenmptPlayableKeys();
@@ -388,12 +354,14 @@ export const PixiImportModuleDialog: React.FC<PixiImportModuleDialogProps> = ({
     }
     setFormatEngine('uade', 'enhanced');
     let companionMap: Map<string, ArrayBuffer> | undefined;
+    console.log('[PixiImportModuleDialog] activeCompanions:', activeCompanions.length, activeCompanions.map(f => f.name));
     if (activeCompanions.length > 0) {
       companionMap = new Map();
       for (const f of activeCompanions) {
         companionMap.set(f.name, await f.arrayBuffer());
       }
     }
+    console.log('[PixiImportModuleDialog] companionMap:', companionMap ? [...companionMap.keys()] : 'undefined');
     onImport(moduleInfo, {
       useLibopenmpt: true,
       subsong: selectedSubsong,
@@ -624,7 +592,7 @@ export const PixiImportModuleDialog: React.FC<PixiImportModuleDialogProps> = ({
 
             {formatCapabilities && formatCapabilities.isEditable && formatCapabilities.isNativeExportable && (
               <layoutContainer layout={{ flexDirection: 'row', gap: 6, padding: 8, borderRadius: 4, borderWidth: 1, borderColor: 0x44aa44, backgroundColor: blendColor(theme.bg.color, 0x44aa44, 0.1), width: CONTENT_W, marginTop: 4 }}>
-                <PixiLabel text="Editable and exportable. Pattern edits will play back via libopenmpt and can be saved to MOD/XM/IT/S3M." size="xs" color="custom" customColor={0x66cc66} layout={{ maxWidth: CONTENT_W - 24 }} />
+                <PixiLabel text="Editable and exportable. Pattern edits play back in real-time and can be exported to native format." size="xs" color="custom" customColor={0x66cc66} layout={{ maxWidth: CONTENT_W - 24 }} />
               </layoutContainer>
             )}
 
@@ -710,7 +678,7 @@ export const PixiImportModuleDialog: React.FC<PixiImportModuleDialogProps> = ({
                 <PixiLabel
                   text={(() => {
                     const comp = getExpectedCompanion(loadedFileName);
-                    if (comp) return `Waiting for ${comp.description} — pick file to continue`;
+                    if (comp) return `Missing ${comp.description} — drop folder or both files together`;
                     return 'Audio requires companion files. Use Pick Files to load them.';
                   })()}
                   size="sm"

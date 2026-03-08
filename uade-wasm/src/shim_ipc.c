@@ -314,6 +314,8 @@ int uade_find_amiga_file(char *realname, size_t maxlen, const char *aname,
     FILE *file;
     size_t strip_offset;
 
+    fprintf(stderr, "[uade-wasm] uade_find_amiga_file: aname='%s', playerdir='%s'\n", aname, playerdir);
+
     if (strlcpy(copy, aname, sizeof(copy)) >= sizeof(copy)) {
         uade_warning("error: amiga tried to open a very long filename.\n");
         return -1;
@@ -376,13 +378,17 @@ int uade_find_amiga_file(char *realname, size_t maxlen, const char *aname,
         return -1;
     }
 
+    fprintf(stderr, "[uade-wasm] uade_find_amiga_file: resolved dir_name='%s', ptr='%s'\n", dir_name, ptr);
     file = fopen(dir_name, "rb");
-    if (file == NULL)
+    if (file == NULL) {
+        fprintf(stderr, "[uade-wasm] uade_find_amiga_file: fopen FAILED for '%s'\n", dir_name);
         return -1;
+    }
     fclose(file);
 
     strip_offset = (strncmp(dir_name, "./", 2) == 0) ? 2 : 0;
     strlcpy(realname, dir_name + strip_offset, maxlen);
+    fprintf(stderr, "[uade-wasm] uade_find_amiga_file: SUCCESS realname='%s'\n", realname);
     return 0;
 }
 

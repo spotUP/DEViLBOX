@@ -140,6 +140,9 @@ ixalance-wasm/build/
 jamcracker-wasm/build/
 artofnoise-wasm/build/
 pumatracker-wasm/build/
+bd-wasm/build/
+sidmon2-wasm/build/
+symphonie-wasm/build/
 test-data/
 
 # Third-party reference sources (not needed for builds, available via Reference Code symlink)
