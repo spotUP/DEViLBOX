@@ -505,6 +505,9 @@ export async function parseSymphonieProFile(
     const song = _parseSymphonieProFile(bytes, filename);
     if (!song) return null;
 
+    // Store original file data for export
+    song.symphonieFileData = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
+
     // Attach playback data to the first instrument so InstrumentFactory
     // can instantiate SymphonieSynth for native playback.
     try {

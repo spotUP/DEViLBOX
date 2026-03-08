@@ -130,7 +130,7 @@ import {
 } from './handlers/writeHandlers';
 
 const WS_URL = 'ws://localhost:4003';
-const MAX_BACKOFF_MS = 4000;
+const MAX_BACKOFF_MS = 30000;
 
 type Handler = (params: Record<string, unknown>) => unknown | Promise<unknown>;
 
@@ -303,6 +303,7 @@ let ws: WebSocket | null = null;
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 let backoffMs = 1000;
 let disposed = false;
+let connectAttempts = 0;
 
 function send(msg: BridgeResponse): void {
   if (ws && ws.readyState === WebSocket.OPEN) {
@@ -347,6 +348,7 @@ function connect(): void {
   ws.onopen = () => {
     console.log('[mcp-bridge] Connected to MCP relay');
     backoffMs = 1000;
+    connectAttempts = 0;
   };
 
   ws.onmessage = (event) => {
@@ -354,7 +356,10 @@ function connect(): void {
   };
 
   ws.onclose = () => {
-    console.log('[mcp-bridge] Disconnected from MCP relay');
+    connectAttempts++;
+    if (connectAttempts <= 2) {
+      console.log('[mcp-bridge] MCP relay not available, will retry in background');
+    }
     ws = null;
     scheduleReconnect();
   };
