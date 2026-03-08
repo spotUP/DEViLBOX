@@ -8,7 +8,7 @@
 
 import type { UADEEngine } from './UADEEngine';
 import type { UADEPatternLayout } from './UADEPatternEncoder';
-import { getCellChipRamAddr } from './UADEPatternEncoder';
+import { getCellFileOffset } from './UADEPatternEncoder';
 import type { TrackerCell } from '@/types';
 
 export class UADEChipEditor {
@@ -110,7 +110,9 @@ export class UADEChipEditor {
     cell: TrackerCell,
   ): Promise<void> {
     const moduleBase = await this.getModuleBase();
-    const addr = getCellChipRamAddr(layout, moduleBase, pattern, row, channel);
+    const fileOffset = getCellFileOffset(layout, pattern, row, channel);
+    if (fileOffset < 0) return; // non-editable cell (e.g., wait row in variable-length format)
+    const addr = moduleBase + fileOffset;
     const bytes = layout.encodeCell(cell);
     await this.writeBytes(addr, bytes);
   }

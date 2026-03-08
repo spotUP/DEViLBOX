@@ -19,6 +19,8 @@
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, TrackerCell, InstrumentConfig } from '@/types';
 import type { SidMon1Config, UADEChipRamInfo } from '@/types/instrument';
+import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
+import { encodeSidMon1Cell } from '@/engine/uade/encoders/SidMon1Encoder';
 
 // ── Binary read helpers ───────────────────────────────────────────────────────
 
@@ -514,6 +516,27 @@ export function parseSidMon1File(buffer: ArrayBuffer, filename: string, moduleBa
 
   const moduleName = filename.replace(/\.[^/.]+$/, '');
 
+  // Build uadePatternLayout with track indirection
+  const uadePatternLayout: UADEPatternLayout = {
+    formatId: 'sidMon1',
+    patternDataFileOffset: patDataOffset,
+    bytesPerCell: 5,
+    rowsPerPattern: ROWS_PER_PATTERN,
+    numChannels: CHANNELS,
+    numPatterns: trackerPatterns.length,
+    moduleSize: buffer.byteLength,
+    encodeCell: encodeSidMon1Cell,
+    getCellFileOffset: (pattern: number, row: number, channel: number): number => {
+      const trackIdx = pattern * CHANNELS + channel;
+      const track = tracks[trackIdx];
+      if (!track) return 0;
+      const patPtr = patternPtrs[track.pattern] ?? 0;
+      const rowIdx = patPtr + row;
+      if (rowIdx < 0 || rowIdx >= numPatRows) return 0;
+      return patDataOffset + rowIdx * 5;
+    },
+  };
+
   return {
     name: `${moduleName} [SidMon 1.0]`,
     format: 'MOD' as TrackerFormat,
@@ -526,6 +549,7 @@ export function parseSidMon1File(buffer: ArrayBuffer, filename: string, moduleBa
     initialSpeed: 6,
     initialBPM: 125,
     linearPeriods: false,
+    uadePatternLayout,
   };
 }
 

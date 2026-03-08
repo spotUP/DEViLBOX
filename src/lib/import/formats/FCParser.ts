@@ -16,8 +16,10 @@
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, TrackerCell, InstrumentConfig } from '@/types';
+import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
 import type { FCConfig, UADEChipRamInfo } from '@/types/instrument';
 import { createSamplerInstrument } from './AmigaUtils';
+import { createFCEncoder } from '@/engine/uade/encoders/FCEncoder';
 
 // ── Utility functions ─────────────────────────────────────────────────────
 
@@ -1188,6 +1190,30 @@ export function parseFCFile(buffer: ArrayBuffer, filename: string, moduleBase = 
 
   const moduleName = filename.replace(/\.[^/.]+$/, '');
 
+  // ── Build reverse instrument map for encoder ──────────────────────────────
+  const instrReverseMap = new Map<number, number>();
+  for (const [macroIdx, instrId] of macroToInstrument) instrReverseMap.set(instrId, macroIdx);
+  for (const [waveIdx, instrId] of waveToInstrument) instrReverseMap.set(instrId, waveIdx);
+
+  // ── Build uadePatternLayout for chip RAM editing ──────────────────────────
+  const uadePatternLayout: UADEPatternLayout = {
+    formatId: 'futureComposer',
+    patternDataFileOffset: patPtr,
+    bytesPerCell: 2,
+    rowsPerPattern: 32,
+    numChannels: 4,
+    numPatterns: numFCPatterns,
+    moduleSize: buffer.byteLength,
+    encodeCell: createFCEncoder(instrReverseMap),
+    getCellFileOffset: (pattern, row, channel) => {
+      // TrackerSong pattern = sequence index, channel maps to FC pattern via seq.pat[ch]
+      const seq = sequences[pattern];
+      if (!seq) return 0;
+      const fcPatIdx = seq.pat[channel];
+      return patPtr + fcPatIdx * 64 + row * 2;
+    },
+  };
+
   return {
     name: moduleName,
     format: 'FC' as TrackerFormat,
@@ -1200,5 +1226,6 @@ export function parseFCFile(buffer: ArrayBuffer, filename: string, moduleBase = 
     initialSpeed: sequences.length > 0 && sequences[0].speed > 0 ? sequences[0].speed : 3,
     initialBPM: 125,
     linearPeriods: false,
+    uadePatternLayout,
   };
 }

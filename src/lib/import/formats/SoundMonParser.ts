@@ -25,6 +25,8 @@
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, TrackerCell, InstrumentConfig } from '@/types';
 import type { SoundMonConfig, UADEChipRamInfo } from '@/types/instrument';
+import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
+import { encodeSoundMonCell } from '@/engine/uade/encoders/SoundMonEncoder';
 import { createSamplerInstrument } from './AmigaUtils';
 
 // ── Utility functions ─────────────────────────────────────────────────────
@@ -709,6 +711,24 @@ export async function parseSoundMonFile(
   const moduleName = title.trim() || filename.replace(/\.[^/.]+$/, '');
   const versionStr = version === BPSOUNDMON_V1 ? 'V1' : version === BPSOUNDMON_V2 ? 'V2' : 'V3';
 
+  // Build uadePatternLayout with getCellFileOffset for track indirection
+  const uadePatternLayout: UADEPatternLayout = {
+    formatId: 'soundMon',
+    patternDataFileOffset: patternDataOffset,
+    bytesPerCell: 3,
+    rowsPerPattern: 16,
+    numChannels: 4,
+    numPatterns: trackerPatterns.length,
+    moduleSize: buffer.byteLength,
+    encodeCell: encodeSoundMonCell,
+    getCellFileOffset: (pattern: number, row: number, channel: number): number => {
+      const step = tracks[pattern * 4 + channel];
+      if (!step || step.pattern === 0) return 0;
+      const rowIdx = ((step.pattern - 1) * 16) + row;
+      return patternDataOffset + rowIdx * 3;
+    },
+  };
+
   return {
     name: `${moduleName} [SoundMon ${versionStr}]`,
     format: 'MOD' as TrackerFormat,
@@ -721,6 +741,7 @@ export async function parseSoundMonFile(
     initialSpeed: 6,
     initialBPM: 125,
     linearPeriods: false,
+    uadePatternLayout,
   };
 }
 

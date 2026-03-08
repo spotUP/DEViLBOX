@@ -40,6 +40,8 @@
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, ChannelData, TrackerCell, InstrumentConfig } from '@/types';
+import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
+import { encodeZoundMonitorCell } from '@/engine/uade/encoders/ZoundMonitorEncoder';
 import { createSamplerInstrument } from './AmigaUtils';
 
 // ── Constants ───────────────────────────────────────────────────────────────
@@ -577,6 +579,28 @@ export async function parseZoundMonitorFile(
     .replace(/\.sng$/i, '')     // strip ".sng" extension
     || baseName;
 
+  // Build uadePatternLayout with getCellFileOffset for part-based indirection
+  const uadePatternLayout: UADEPatternLayout = {
+    formatId: 'zoundMonitor',
+    patternDataFileOffset: partDataStart,
+    bytesPerCell: 4,
+    rowsPerPattern: ROWS_PER_PART,
+    numChannels: 4,
+    numPatterns: builtPatterns.length,
+    moduleSize: buffer.byteLength,
+    encodeCell: encodeZoundMonitorCell,
+    getCellFileOffset: (pattern: number, row: number, channel: number): number => {
+      // Each pattern = one table entry; each channel references a part via table[pattern][channel].partno
+      if (pattern >= table.length) return 0;
+      const tabRow = table[pattern];
+      const tabEntry = tabRow[channel];
+      if (!tabEntry) return 0;
+      const partIdx = Math.min(tabEntry.partno, numParts - 1);
+      // Each part = 128 bytes (32 rows × 4 bytes)
+      return partDataStart + partIdx * 128 + row * 4;
+    },
+  };
+
   return {
     name:            moduleName,
     format:          'MOD' as TrackerFormat,
@@ -589,5 +613,6 @@ export async function parseZoundMonitorFile(
     initialSpeed:    speed,
     initialBPM,
     linearPeriods:   false,
+    uadePatternLayout,
   };
 }

@@ -51,6 +51,8 @@
  */
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
+import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
+import { encodeSoundControl40Cell, encodeSoundControl3xCell } from '@/engine/uade/encoders/SoundControlEncoder';
 import type { Pattern, TrackerCell, InstrumentConfig } from '@/types';
 import { createSamplerInstrument } from './AmigaUtils';
 
@@ -179,6 +181,7 @@ interface SCTrackRow {
   isNote: boolean;
   isEnd: boolean;
   isWait: boolean;
+  fileOffset: number; // absolute byte offset in module file (for note events)
 }
 
 interface SCSample {
@@ -256,17 +259,18 @@ export function parseSoundControlFile(bytes: Uint8Array, filename: string): Trac
 
     for (;;) {
       if (off + 2 > bytes.length) break;
+      const eventOff = off; // record offset before reading
       const dat1 = u8(bytes, off++);
       const dat2 = u8(bytes, off++);
 
       if (dat1 === 0xff) {
-        rows.push({ wait: 0, note: 0, sampleOrInstr: 0, volume: 0, isNote: false, isEnd: true, isWait: false });
+        rows.push({ wait: 0, note: 0, sampleOrInstr: 0, volume: 0, isNote: false, isEnd: true, isWait: false, fileOffset: eventOff });
         break;
       }
 
       if (dat1 === 0x00) {
         // Wait: xx ticks
-        rows.push({ wait: dat2, note: 0, sampleOrInstr: 0, volume: 0, isNote: false, isEnd: false, isWait: true });
+        rows.push({ wait: dat2, note: 0, sampleOrInstr: 0, volume: 0, isNote: false, isEnd: false, isWait: true, fileOffset: eventOff });
       } else {
         // Note row: nn xx yy zz (4 bytes, dat1=nn already read)
         if (off + 2 > bytes.length) break;
@@ -285,6 +289,7 @@ export function parseSoundControlFile(bytes: Uint8Array, filename: string): Trac
           isNote: true,
           isEnd: false,
           isWait: false,
+          fileOffset: eventOff,
         });
 
         void yy; // yy is unused per spec ("ignored")
@@ -395,14 +400,23 @@ export function parseSoundControlFile(bytes: Uint8Array, filename: string): Trac
   // ── Convert tracks to flat row arrays ────────────────────────────────
   // Each track is a list of row events. We convert to flat rows with tick-based timing.
   // Each note row = 1 pattern row; wait rows add empty rows.
+  // Also builds a per-row file offset map for chip RAM patching.
+
+  // trackRowFileOffsets[trackNum][expandedRowIdx] = file byte offset (or -1 for non-editable wait rows)
+  const trackRowFileOffsets = new Map<number, number[]>();
+
   function trackToRows(trackNum: number): TrackerCell[] {
     const track = tracks[trackNum];
     if (!track) return [emptyCell()];
     const cells: TrackerCell[] = [];
+    const rowOffsets: number[] = [];
     for (const row of track) {
       if (row.isEnd) break;
       if (row.isWait) {
-        for (let w = 0; w < Math.max(1, row.wait); w++) cells.push(emptyCell());
+        for (let w = 0; w < Math.max(1, row.wait); w++) {
+          cells.push(emptyCell());
+          rowOffsets.push(-1); // wait rows are not directly editable
+        }
         continue;
       }
       if (row.isNote) {
@@ -420,9 +434,14 @@ export function parseSoundControlFile(bytes: Uint8Array, filename: string): Trac
           effTyp2: 0,
           eff2: 0,
         });
+        rowOffsets.push(row.fileOffset);
       }
     }
-    if (cells.length === 0) cells.push(emptyCell());
+    if (cells.length === 0) {
+      cells.push(emptyCell());
+      rowOffsets.push(-1);
+    }
+    trackRowFileOffsets.set(trackNum, rowOffsets);
     return cells;
   }
 
@@ -482,6 +501,29 @@ export function parseSoundControlFile(bytes: Uint8Array, filename: string): Trac
 
   void instrLen; // used for 4.0+ instruments section validation (not parsed here)
 
+  // ── Build uadePatternLayout for chip RAM patching ────────────────────
+  // Sound Control uses variable-length track events with track indirection.
+  // Only note events (4 bytes) are editable in-place; wait rows return -1.
+  const encodeCell = is40orHigher ? encodeSoundControl40Cell : encodeSoundControl3xCell;
+  const uadePatternLayout: UADEPatternLayout = {
+    formatId: 'soundControl',
+    patternDataFileOffset: tracksBase, // tracks section starts at offset 64
+    bytesPerCell: 4,
+    rowsPerPattern: 64, // nominal (actual varies per track)
+    numChannels,
+    numPatterns: trackerPatterns.length,
+    moduleSize: bytes.byteLength,
+    encodeCell,
+    getCellFileOffset: (pattern: number, row: number, channel: number): number => {
+      const pos = positions[pattern];
+      if (!pos) return -1;
+      const trackNum = pos[channel] ?? 0;
+      const offsets = trackRowFileOffsets.get(trackNum);
+      if (!offsets || row >= offsets.length) return -1;
+      return offsets[row]; // -1 for non-editable wait rows
+    },
+  };
+
   return {
     name: songName,
     format: 'SC' as TrackerFormat,
@@ -494,6 +536,7 @@ export function parseSoundControlFile(bytes: Uint8Array, filename: string): Trac
     initialSpeed: speed,
     initialBPM: 125,
     linearPeriods: false,
+    uadePatternLayout,
   };
 }
 

@@ -26,6 +26,9 @@
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, ChannelData, TrackerCell, InstrumentConfig } from '@/types';
+import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
+import { encodeMODCell } from '@/engine/uade/encoders/MODEncoder';
+import { encodeDTM204Cell } from '@/engine/uade/encoders/DTMEncoder';
 import { createSamplerInstrument, periodToNoteIndex, amigaNoteToXM } from './AmigaUtils';
 
 // ── Binary helpers (big-endian throughout) ────────────────────────────────────
@@ -565,6 +568,8 @@ export async function parseDTMFile(
 
   // Collect all DAPT chunks, keyed by patNum
   const patternMap = new Map<number, Pattern>();
+  // Track per-pattern data offsets and row counts for uadePatternLayout
+  const patternDataOffsets = new Map<number, { dataStart: number; numRows: number }>();
 
   for (const chunk of findAllChunks(CHUNK_DAPT)) {
     if (chunk.length < 8) continue;
@@ -580,6 +585,9 @@ export async function parseDTMFile(
     }
 
     if (patNum > 255 || numRows === 0) continue;
+
+    // Record data offset for this pattern (pos points to first cell byte)
+    patternDataOffsets.set(patNum, { dataStart: pos, numRows });
 
     // Build channel rows array
     const channels: ChannelData[] = Array.from(
@@ -708,6 +716,24 @@ export async function parseDTMFile(
 
   // ── Assemble TrackerSong ───────────────────────────────────────────────────
 
+  // Choose encoder based on pattern format variant
+  const isPT = patternFormat === DTM_PT_FORMAT;
+  const uadePatternLayout: UADEPatternLayout = {
+    formatId: isPT ? 'dtm_pt' : 'dtm_204',
+    patternDataFileOffset: 0, // overridden by getCellFileOffset
+    bytesPerCell: 4,
+    rowsPerPattern: 64,
+    numChannels,
+    numPatterns: patterns.length,
+    moduleSize: buffer.byteLength,
+    encodeCell: isPT ? encodeMODCell : encodeDTM204Cell,
+    getCellFileOffset: (pattern: number, row: number, channel: number): number => {
+      const info = patternDataOffsets.get(pattern);
+      if (!info) return 0;
+      return info.dataStart + (row * numChannels + channel) * 4;
+    },
+  };
+
   return {
     name:            songName,
     format:          'MOD' as TrackerFormat,
@@ -720,5 +746,6 @@ export async function parseDTMFile(
     initialSpeed,
     initialBPM,
     linearPeriods:   false,
+    uadePatternLayout,
   };
 }

@@ -359,7 +359,7 @@ function parseAsylumAMF(v: DataView, raw: Uint8Array, filename: string): Tracker
     rowsPerPattern: 64,
     numChannels: NUM_CHANNELS,
     numPatterns,
-    moduleSize: buffer.byteLength,
+    moduleSize: v.byteLength,
     encodeCell: encodeAMFCell,
   };
 

@@ -36,6 +36,8 @@
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, TrackerCell, InstrumentConfig } from '@/types';
+import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
+import { encodeMODCell } from '@/engine/uade/encoders/MODEncoder';
 import { periodToNoteIndex, amigaNoteToXM } from './AmigaUtils';
 
 // -- Utility functions -------------------------------------------------------
@@ -330,6 +332,41 @@ export async function parseMFPFile(
   const baseName = filename.split('/').pop() ?? filename;
   const moduleName = baseName.replace(/\..*$/, '') || baseName;
 
+  // Build uadePatternLayout with getCellFileOffset that replicates MFP's
+  // 4-level indirect addressing: row = k*16 + x*4 + y
+  const uadePatternLayout: UADEPatternLayout = {
+    formatId: 'mfp',
+    patternDataFileOffset: patAddr,
+    bytesPerCell: 4,
+    rowsPerPattern: 64,
+    numChannels: 4,
+    numPatterns: trackerPatterns.length,
+    moduleSize: buffer.byteLength,
+    encodeCell: encodeMODCell,
+    getCellFileOffset: (pattern: number, row: number, channel: number): number => {
+      const chanOff = patAddr + (patTable[pattern]?.[channel] ?? 0);
+      const chanEnd = Math.min(chanOff + 1024, buf.length);
+      const chanLen = chanEnd > chanOff ? chanEnd - chanOff : 0;
+      if (chanLen === 0) return 0;
+
+      // Decompose row (0-63) into k, x, y
+      const k = Math.floor(row / 16);
+      const rem = row % 16;
+      const x = Math.floor(rem / 4);
+      const y = rem % 4;
+
+      const l1 = k;
+      if (l1 >= chanLen) return 0;
+      const l2 = buf[chanOff + l1] + x;
+      if (l2 >= chanLen) return 0;
+      const l3 = buf[chanOff + l2] + y;
+      if (l3 >= chanLen) return 0;
+      const eventBase = buf[chanOff + l3] * 2;
+      if (eventBase + 4 > chanLen) return 0;
+      return chanOff + eventBase;
+    },
+  };
+
   return {
     name: moduleName + ' [Magnetic Fields Packer]',
     format: 'MOD' as TrackerFormat,
@@ -342,6 +379,7 @@ export async function parseMFPFile(
     initialSpeed: 6,
     initialBPM: 125,
     linearPeriods: false,
+    uadePatternLayout,
   };
 }
 

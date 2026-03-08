@@ -35,8 +35,10 @@
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, ChannelData, TrackerCell, InstrumentConfig } from '@/types';
+import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
 import { createSamplerInstrument } from './AmigaUtils';
 import type { UADEChipRamInfo } from '@/types/instrument';
+import { encodeGTK4Cell, encodeGTK5Cell, encodeGT2Cell } from '@/engine/uade/encoders/GraoumfTracker2Encoder';
 
 // ── Binary helpers ────────────────────────────────────────────────────────────
 
@@ -338,6 +340,7 @@ function parseGTKFile(buf: Uint8Array, filename: string): TrackerSong | null {
   // ── Pattern data ──────────────────────────────────────────────────────────
   const eventSize = fileVersion < 4 ? 4 : 5;
   const isGTK = true;
+  const patternDataFileOffset = pos;
 
   // We parse all numPatterns patterns in sequence
   // GTK stores pattern data sequentially (not by order), one pattern after another
@@ -505,6 +508,26 @@ function parseGTKFile(buf: Uint8Array, filename: string): TrackerSong | null {
     patterns.push(makeEmptyPattern(numChannels, numRows, filename, 0, 0));
   }
 
+  // ── Build uadePatternLayout for chip RAM editing ─────────────────────────
+  const uadePatternLayout: UADEPatternLayout = {
+    formatId: eventSize === 4 ? 'graoumfTracker2_gtk4' : 'graoumfTracker2_gtk5',
+    patternDataFileOffset,
+    bytesPerCell: eventSize,
+    rowsPerPattern: numRows,
+    numChannels,
+    numPatterns,
+    moduleSize: buf.length,
+    encodeCell: eventSize === 4 ? encodeGTK4Cell : encodeGTK5Cell,
+    getCellFileOffset: (pattern, row, channel) => {
+      // TrackerSong pattern index maps through orders to raw pattern index
+      const patIdx = orders[pattern] ?? 0;
+      return patternDataFileOffset
+        + patIdx * numRows * numChannels * eventSize
+        + row * numChannels * eventSize
+        + channel * eventSize;
+    },
+  };
+
   return {
     name:            songName || filename.replace(/\.[^/.]+$/, ''),
     format:          'MOD' as TrackerFormat,
@@ -517,6 +540,7 @@ function parseGTKFile(buf: Uint8Array, filename: string): TrackerSong | null {
     initialSpeed:    6,
     initialBPM:      125,
     linearPeriods:   false,
+    uadePatternLayout,
   };
 }
 
@@ -925,6 +949,8 @@ function parseGT2File(buf: Uint8Array, filename: string): TrackerSong | null {
 
   const numOrderPatterns  = orders.length > 0 ? Math.max(...orders) + 1 : 0;
   const rawPatterns: Map<number, TrackerCell[][]> = new Map();
+  /** Map patNum → { cellsFileOffset, numTracks, numRows } for getCellFileOffset */
+  const patdOffsets = new Map<number, { cellsFileOffset: number; numTracks: number; numRows: number }>();
 
   for (const patChunk of findAllChunks(chunks, CHUNK_PATD)) {
     if (patChunk.length < 24) continue;
@@ -940,6 +966,8 @@ function parseGT2File(buf: Uint8Array, filename: string): TrackerSong | null {
 
     const cellsNeeded = numRows * numTracks * 5;
     if (patChunk.length < 24 + cellsNeeded) continue;
+
+    patdOffsets.set(patNum, { cellsFileOffset: b + 24, numTracks, numRows });
 
     const cells: TrackerCell[][] = [];
     for (let row = 0; row < numRows; row++) {
@@ -1057,6 +1085,26 @@ function parseGT2File(buf: Uint8Array, filename: string): TrackerSong | null {
     patterns.push(makeEmptyPattern(numChannels, defaultRows, filename, 0, 0));
   }
 
+  // ── Build uadePatternLayout for chip RAM editing ─────────────────────────
+  const gt2PatternLayout: UADEPatternLayout = {
+    formatId: 'graoumfTracker2_gt2',
+    patternDataFileOffset: 0, // GT2 uses IFF chunks; getCellFileOffset handles offsets
+    bytesPerCell: 5,
+    rowsPerPattern: defaultRows,
+    numChannels,
+    numPatterns: numOrderPatterns,
+    moduleSize: buf.length,
+    encodeCell: encodeGT2Cell,
+    getCellFileOffset: (pattern, row, channel) => {
+      // TrackerSong pattern index maps through orders to raw pattern number
+      const patIdx = orders[pattern] ?? 0;
+      const patInfo = patdOffsets.get(patIdx);
+      if (!patInfo) return 0;
+      return patInfo.cellsFileOffset
+        + (row * patInfo.numTracks + channel) * 5;
+    },
+  };
+
   return {
     name:            songName || filename.replace(/\.[^/.]+$/, ''),
     format:          'MOD' as TrackerFormat,
@@ -1069,6 +1117,7 @@ function parseGT2File(buf: Uint8Array, filename: string): TrackerSong | null {
     initialSpeed,
     initialBPM,
     linearPeriods:   false,
+    uadePatternLayout: gt2PatternLayout,
   };
 }
 

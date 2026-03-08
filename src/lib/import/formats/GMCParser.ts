@@ -28,6 +28,8 @@
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, ChannelData, TrackerCell, InstrumentConfig } from '@/types';
+import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
+import { encodeMODCell } from '@/engine/uade/encoders/MODEncoder';
 import { createSamplerInstrument, periodToNoteIndex, amigaNoteToXM } from './AmigaUtils';
 
 // ── Binary helpers ────────────────────────────────────────────────────────────
@@ -321,6 +323,17 @@ export async function parseGMCFile(
     );
   });
 
+  const uadePatternLayout: UADEPatternLayout = {
+    formatId: 'gmc',
+    patternDataFileOffset: HEADER_SIZE,
+    bytesPerCell: 4,
+    rowsPerPattern: ROWS_PER_PATTERN,
+    numChannels: NUM_CHANNELS,
+    numPatterns,
+    moduleSize: buffer.byteLength,
+    encodeCell: encodeMODCell,
+  };
+
   return {
     name: filename.replace(/\.[^/.]+$/, ''),
     format: 'MOD' as TrackerFormat,
@@ -333,5 +346,6 @@ export async function parseGMCFile(
     initialSpeed: 6,
     initialBPM: 125,
     linearPeriods: false,
+    uadePatternLayout,
   };
 }

@@ -31,6 +31,8 @@
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, ChannelData, TrackerCell, InstrumentConfig } from '@/types';
+import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
+import { encodeKRISCell } from '@/engine/uade/encoders/KRISEncoder';
 import { createSamplerInstrument, periodToNoteIndex, amigaNoteToXM } from './AmigaUtils';
 
 // ── Binary helpers ────────────────────────────────────────────────────────────
@@ -319,6 +321,24 @@ export async function parseKRISFile(
     );
   });
 
+  const uadePatternLayout: UADEPatternLayout = {
+    formatId: 'kris',
+    patternDataFileOffset: tracksOffset,
+    bytesPerCell: 4,
+    rowsPerPattern: ROWS_PER_TRACK,
+    numChannels: NUM_CHANNELS,
+    numPatterns: patterns.length,
+    moduleSize: buffer.byteLength,
+    encodeCell: encodeKRISCell,
+    getCellFileOffset: (pattern: number, row: number, channel: number): number => {
+      const refs = trackRefs[pattern];
+      if (!refs) return 0;
+      const ref = refs[channel];
+      if (!ref) return 0;
+      return tracksOffset + ref.trackIdx * BYTES_PER_TRACK + row * 4;
+    },
+  };
+
   return {
     name: songName,
     format: 'MOD' as TrackerFormat,
@@ -331,6 +351,7 @@ export async function parseKRISFile(
     initialSpeed: 6,
     initialBPM: 125,
     linearPeriods: false,
+    uadePatternLayout,
   };
 }
 

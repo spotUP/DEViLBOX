@@ -18,6 +18,8 @@
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, ChannelData, TrackerCell, InstrumentConfig } from '@/types';
 import type { UADEChipRamInfo } from '@/types/instrument';
+import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
+import { encodeSoundFXCell } from '@/engine/uade/encoders/SoundFXEncoder';
 import { createSamplerInstrument, periodToNoteIndex } from './AmigaUtils';
 
 // -- SoundFX period table (from FlodJS FXPlayer.PERIODS) ---------------------
@@ -610,6 +612,17 @@ export async function parseSoundFXFile(
 
   const moduleName = filename.replace(/\.[^/.]+$/, '');
 
+  const uadePatternLayout: UADEPatternLayout = {
+    formatId: 'soundfx',
+    patternDataFileOffset: patternDataOffset,
+    bytesPerCell: 4,
+    rowsPerPattern: 64,
+    numChannels: 4,
+    numPatterns: highestPosition + 1,
+    moduleSize: buffer.byteLength,
+    encodeCell: encodeSoundFXCell,
+  };
+
   return {
     name: moduleName,
     format: 'MOD' as TrackerFormat,
@@ -622,5 +635,6 @@ export async function parseSoundFXFile(
     initialSpeed: 6,
     initialBPM: Math.max(32, Math.min(255, initialBPM || 125)),
     linearPeriods: false,
+    uadePatternLayout,
   };
 }
