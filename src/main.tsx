@@ -25,6 +25,11 @@ import './utils/synthTester'
 import { installIOSAudioUnlock } from './utils/ios-audio-unlock'
 installIOSAudioUnlock();
 
+// MCP Bridge: Connect to MCP server for programmatic tracker control (dev only)
+if (import.meta.env.DEV) {
+  import('./bridge/MCPBridge').then(({ initMCPBridge }) => initMCPBridge());
+}
+
 // Global error handlers for uncaught errors
 window.addEventListener('error', (event) => {
   // Suppress Tone.js PolySynth disposal errors - these happen when scheduled events

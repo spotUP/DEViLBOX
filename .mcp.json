@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "devilbox-tracker": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["tsx", "server/src/mcp/index.ts"],
+      "cwd": "/Users/spot/Code/DEViLBOX"
+    }
+  }
+}
