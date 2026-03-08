@@ -117,37 +117,103 @@ const PLATFORM_CHANNELS: Record<number, string[]> = {
 };
 
 /** Platform volume maximums (matching Furnace GET_VOLMAX per chip) */
+// volMax values from upstream Furnace GET_VOLMAX dispatch (per-platform .cpp files).
+// Some platforms have per-channel volMax (e.g. YM2608 FM=127, PSG=15, ADPCM-A=31, ADPCM-B=255).
+// For those, we use the FM channel volMax since that's the primary channel for live play.
+// The WASM sequencer handles per-channel volMax correctly for .fur playback.
 const PLATFORM_VOL_MAX: Record<number, number> = {
+  // PSG / simple chips (4-bit volume = 15)
   [FurnaceDispatchPlatform.GB]: 15,
   [FurnaceDispatchPlatform.SMS]: 15,
   [FurnaceDispatchPlatform.NES]: 15,
+  [FurnaceDispatchPlatform.AY]: 15,
   [FurnaceDispatchPlatform.C64_6581]: 15,
   [FurnaceDispatchPlatform.C64_8580]: 15,
-  [FurnaceDispatchPlatform.AY]: 15,
-  [FurnaceDispatchPlatform.AY8930]: 15,
   [FurnaceDispatchPlatform.SAA1099]: 15,
   [FurnaceDispatchPlatform.SCC]: 15,
   [FurnaceDispatchPlatform.SCC_PLUS]: 15,
-  [FurnaceDispatchPlatform.PCE]: 31,       // 5-bit volume
   [FurnaceDispatchPlatform.VIC20]: 15,
   [FurnaceDispatchPlatform.TIA]: 15,
   [FurnaceDispatchPlatform.POKEY]: 15,
-  [FurnaceDispatchPlatform.PV1000]: 15,
-  [FurnaceDispatchPlatform.POKEMINI]: 3,   // 2-bit volume
-  [FurnaceDispatchPlatform.PONG]: 1,       // on/off
-  [FurnaceDispatchPlatform.PCSPKR]: 1,     // on/off
-  [FurnaceDispatchPlatform.SFX_BEEPER]: 15,
-  [FurnaceDispatchPlatform.TED]: 8,        // 3-bit volume
-  [FurnaceDispatchPlatform.VRC6]: 15,
   [FurnaceDispatchPlatform.MMC5]: 15,
   [FurnaceDispatchPlatform.SWAN]: 15,
-  [FurnaceDispatchPlatform.LYNX]: 127,     // 7-bit volume
-  [FurnaceDispatchPlatform.VERA]: 63,      // 6-bit volume (PSG channels)
-  [FurnaceDispatchPlatform.SNES]: 127,     // 7-bit volume (SPC700)
-  [FurnaceDispatchPlatform.NDS]: 127,      // 7-bit volume
-  [FurnaceDispatchPlatform.GBA_DMA]: 255,  // 8-bit volume
-  [FurnaceDispatchPlatform.RF5C68]: 255,   // 8-bit volume
-  [FurnaceDispatchPlatform.GA20]: 255,     // 8-bit volume
+  [FurnaceDispatchPlatform.VRC6]: 15,        // pulse=15, saw=63 (per-channel)
+  [FurnaceDispatchPlatform.VBOY]: 15,
+  [FurnaceDispatchPlatform.N163]: 15,
+  [FurnaceDispatchPlatform.OPLL]: 15,
+  [FurnaceDispatchPlatform.T6W28]: 15,
+  [FurnaceDispatchPlatform.NAMCO]: 15,
+  [FurnaceDispatchPlatform.NAMCO_15XX]: 15,
+  [FurnaceDispatchPlatform.NAMCO_CUS30]: 15,
+  [FurnaceDispatchPlatform.BUBSYS_WSG]: 15,
+  [FurnaceDispatchPlatform.X1_010]: 15,
+  [FurnaceDispatchPlatform.K007232]: 15,
+  [FurnaceDispatchPlatform.POWERNOISE]: 15,
+  [FurnaceDispatchPlatform.SID2]: 15,
+  [FurnaceDispatchPlatform.SUPERVISION]: 15,
+  // 5-bit volume = 31
+  [FurnaceDispatchPlatform.AY8930]: 31,
+  [FurnaceDispatchPlatform.PCE]: 31,
+  [FurnaceDispatchPlatform.SM8521]: 31,
+  // 6-bit volume = 63
+  [FurnaceDispatchPlatform.ESFM]: 63,
+  [FurnaceDispatchPlatform.DAVE]: 63,
+  [FurnaceDispatchPlatform.VERA]: 63,
+  // Special small volumes
+  [FurnaceDispatchPlatform.FDS]: 32,
+  [FurnaceDispatchPlatform.TED]: 8,
+  [FurnaceDispatchPlatform.MSM6258]: 8,
+  [FurnaceDispatchPlatform.MSM6295]: 8,
+  [FurnaceDispatchPlatform.POKEMINI]: 2,
+  [FurnaceDispatchPlatform.GBA_DMA]: 2,       // upstream gbadma.cpp returns 2
+  [FurnaceDispatchPlatform.SFX_BEEPER]: 1,
+  [FurnaceDispatchPlatform.SFX_BEEPER_QUADTONE]: 2,
+  [FurnaceDispatchPlatform.PCSPKR]: 1,
+  [FurnaceDispatchPlatform.PONG]: 1,
+  [FurnaceDispatchPlatform.PV1000]: 1,
+  [FurnaceDispatchPlatform.PET]: 1,
+  // Sample-based (8-bit volume = 255)
+  [FurnaceDispatchPlatform.QSOUND]: 255,
+  [FurnaceDispatchPlatform.RF5C68]: 255,
+  [FurnaceDispatchPlatform.GA20]: 255,
+  [FurnaceDispatchPlatform.C140]: 255,
+  [FurnaceDispatchPlatform.C219]: 255,
+  [FurnaceDispatchPlatform.YMZ280B]: 255,
+  [FurnaceDispatchPlatform.BIFURCATOR]: 255,
+  [FurnaceDispatchPlatform.SID3]: 255,
+  [FurnaceDispatchPlatform.GBA_MINMOD]: 255,
+  // 7-bit volume = 127
+  [FurnaceDispatchPlatform.SNES]: 127,
+  [FurnaceDispatchPlatform.NDS]: 127,
+  [FurnaceDispatchPlatform.LYNX]: 127,
+  [FurnaceDispatchPlatform.GENESIS]: 127,
+  [FurnaceDispatchPlatform.YM2612]: 127,
+  [FurnaceDispatchPlatform.YM2612_EXT]: 127,
+  [FurnaceDispatchPlatform.YM2612_DUALPCM]: 127,
+  [FurnaceDispatchPlatform.YM2612_DUALPCM_EXT]: 127,
+  [FurnaceDispatchPlatform.YM2612_CSM]: 127,
+  [FurnaceDispatchPlatform.YM2151]: 127,
+  [FurnaceDispatchPlatform.TX81Z]: 127,
+  [FurnaceDispatchPlatform.ARCADE]: 127,
+  [FurnaceDispatchPlatform.YM2203]: 127,      // FM=127, PSG=15 (per-channel)
+  [FurnaceDispatchPlatform.YM2203_EXT]: 127,
+  [FurnaceDispatchPlatform.YM2203_CSM]: 127,
+  [FurnaceDispatchPlatform.YM2608]: 127,      // FM=127, PSG=15, ADPCM-A=31, ADPCM-B=255
+  [FurnaceDispatchPlatform.YM2608_EXT]: 127,
+  [FurnaceDispatchPlatform.YM2608_CSM]: 127,
+  [FurnaceDispatchPlatform.YM2610_FULL]: 127,  // FM=127, PSG=15, ADPCM-A=31, ADPCM-B=255
+  [FurnaceDispatchPlatform.YM2610_FULL_EXT]: 127,
+  [FurnaceDispatchPlatform.YM2610_CSM]: 127,
+  [FurnaceDispatchPlatform.YM2610B]: 127,
+  [FurnaceDispatchPlatform.YM2610B_EXT]: 127,
+  [FurnaceDispatchPlatform.YM2610B_CSM]: 127,
+  [FurnaceDispatchPlatform.SEGAPCM]: 127,
+  [FurnaceDispatchPlatform.K053260]: 127,
+  [FurnaceDispatchPlatform.MSM5232]: 127,
+  [FurnaceDispatchPlatform.MULTIPCM]: 127,
+  [FurnaceDispatchPlatform.SOUND_UNIT]: 127,
+  // Amiga (6-bit + sign = 64)
+  [FurnaceDispatchPlatform.AMIGA]: 64,
 };
 
 function getMaxVolume(platform: number): number {
@@ -1057,9 +1123,9 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
     const vol = Math.round(velocity * maxVol);
     this.engine.setVolume(chan, vol, pt, _time);
 
-    // Furnace dispatch uses (midiNote - 12) as the note value
-    // The dispatch expects 12 = C-1, so MIDI 60 (C4) = note 60
-    this.engine.noteOn(chan, midiNote, pt, _time);
+    // Furnace dispatch note 0 = C-0, which is MIDI note 12.
+    // So dispatch note = midiNote - 12.
+    this.engine.noteOn(chan, midiNote - 12, pt, _time);
 
     // Track active note
     this.activeNotes.set(midiNote, chan);

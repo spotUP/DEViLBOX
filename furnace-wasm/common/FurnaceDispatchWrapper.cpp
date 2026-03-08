@@ -3518,6 +3518,450 @@ void furnace_dispatch_render_samples(int handle) {
 }
 
 /**
+ * Load instrument from raw INS2 feature-block data.
+ * Accepts the binary data from a Furnace .fur file's INS2 block.
+ * Format: "INS2" + blockLen(4) + version(2) + type(1) + reserved(1) + features...
+ * Each feature: code(2) + len(2) + data... "EN" marks end.
+ *
+ * This avoids the need for SafeReader and the full instrument.cpp dependency.
+ */
+EMSCRIPTEN_KEEPALIVE
+void furnace_dispatch_load_ins2(int insIndex, unsigned char* data, int dataLen) {
+  if (dataLen < 8) return;
+
+  // Check magic "INS2"
+  if (data[0] != 'I' || data[1] != 'N' || data[2] != 'S' || data[3] != '2') {
+    printf("[FurnaceDispatch] load_ins2: invalid magic\n");
+    return;
+  }
+
+  int blockLen = *(int*)(data + 4);
+  short version = *(short*)(data + 8);
+  unsigned char insType = data[10];
+  // data[11] is reserved
+
+  DivInstrument* ins = new DivInstrument();
+  ins->type = (DivInstrumentType)insType;
+
+  int pos = 12; // Start of feature blocks
+
+  while (pos + 2 <= dataLen) {
+    unsigned char fc0 = data[pos];
+    unsigned char fc1 = data[pos + 1];
+    pos += 2;
+
+    // End marker
+    if (fc0 == 'E' && fc1 == 'N') break;
+
+    // Read feature length
+    if (pos + 2 > dataLen) break;
+    unsigned short featLen = *(unsigned short*)(data + pos);
+    pos += 2;
+
+    int featEnd = pos + featLen;
+    if (featEnd > dataLen) break;
+
+    // ── NA: Name ──
+    if (fc0 == 'N' && fc1 == 'A') {
+      unsigned short nameLen = *(unsigned short*)(data + pos);
+      pos += 2;
+      if (nameLen > 0 && pos + nameLen <= featEnd) {
+        ins->name = String((char*)(data + pos), nameLen);
+      }
+      pos = featEnd;
+    }
+    // ── FM: FM operator data ──
+    else if (fc0 == 'F' && fc1 == 'M') {
+      if (featLen >= 9) {
+        ins->fm.alg = data[pos];
+        ins->fm.fb = data[pos + 1];
+        ins->fm.fms = data[pos + 2];
+        ins->fm.ams = data[pos + 3];
+        ins->fm.ops = data[pos + 4];
+        ins->fm.opllPreset = data[pos + 5];
+        // data[pos+6..8] = fms2, ams2, block/flags
+
+        if (version >= 241) {
+          ins->fm.fms2 = data[pos + 6];
+          ins->fm.ams2 = data[pos + 7];
+          ins->fm.block = data[pos + 8] & 0x0F;
+        }
+
+        int opStart = pos + 9;
+        for (int i = 0; i < ins->fm.ops && i < 4; i++) {
+          int o = opStart + i * 13;
+          if (o + 13 > featEnd) break;
+          ins->fm.op[i].am = data[o] & 1;
+          ins->fm.op[i].ar = data[o + 1];
+          ins->fm.op[i].dr = data[o + 2];
+          ins->fm.op[i].mult = data[o + 3];
+          ins->fm.op[i].rr = data[o + 4];
+          ins->fm.op[i].sl = data[o + 5];
+          ins->fm.op[i].tl = data[o + 6];
+          ins->fm.op[i].dt2 = data[o + 7];
+          ins->fm.op[i].rs = data[o + 8];
+          ins->fm.op[i].dt = (signed char)data[o + 9];
+          ins->fm.op[i].d2r = data[o + 10];
+          ins->fm.op[i].ssgEnv = data[o + 11];
+          unsigned char flags = data[o + 12];
+          ins->fm.op[i].dam = flags & 1;
+          ins->fm.op[i].dvb = (flags >> 1) & 1;
+          ins->fm.op[i].egt = (flags >> 2) & 1;
+          ins->fm.op[i].ksl = (flags >> 3) & 3;
+          ins->fm.op[i].sus = (flags >> 5) & 1;
+          ins->fm.op[i].vib = (flags >> 6) & 1;
+          ins->fm.op[i].ws = 0;
+          ins->fm.op[i].ksr = (flags >> 7) & 1;
+          ins->fm.op[i].enable = true;
+        }
+
+        // Extended op data (ws, etc.) - after the 4-op block
+        int extStart = opStart + ins->fm.ops * 13;
+        for (int i = 0; i < ins->fm.ops && i < 4; i++) {
+          int o = extStart + i * 6;
+          if (o + 6 > featEnd) break;
+          ins->fm.op[i].kvs = data[o];
+          ins->fm.op[i].ws = data[o + 1];
+          // data[o+2..5] = ksr2, ws2, etc. for OPZ
+        }
+      }
+      pos = featEnd;
+    }
+    // ── MA: Macros ──
+    else if (fc0 == 'M' && fc1 == 'A') {
+      unsigned short macroHeaderLen = *(unsigned short*)(data + pos);
+      pos += 2;
+
+      if (macroHeaderLen == 0) {
+        pos = featEnd;
+        continue;
+      }
+
+      while (pos < featEnd) {
+        int macroHeaderEnd = pos + macroHeaderLen;
+        if (macroHeaderEnd > featEnd) break;
+
+        unsigned char macroCode = data[pos];
+        if (macroCode == 255) break; // end of macro list
+
+        DivInstrumentMacro* target = NULL;
+        switch (macroCode) {
+          case 0: target = &ins->std.volMacro; break;
+          case 1: target = &ins->std.arpMacro; break;
+          case 2: target = &ins->std.dutyMacro; break;
+          case 3: target = &ins->std.waveMacro; break;
+          case 4: target = &ins->std.pitchMacro; break;
+          case 5: target = &ins->std.ex1Macro; break;
+          case 6: target = &ins->std.ex2Macro; break;
+          case 7: target = &ins->std.ex3Macro; break;
+          case 8: target = &ins->std.algMacro; break;
+          case 9: target = &ins->std.fbMacro; break;
+          case 10: target = &ins->std.fmsMacro; break;
+          case 11: target = &ins->std.amsMacro; break;
+          case 12: target = &ins->std.panLMacro; break;
+          case 13: target = &ins->std.panRMacro; break;
+          case 14: target = &ins->std.phaseResetMacro; break;
+          case 15: target = &ins->std.ex4Macro; break;
+          case 16: target = &ins->std.ex5Macro; break;
+          case 17: target = &ins->std.ex6Macro; break;
+          case 18: target = &ins->std.ex7Macro; break;
+          case 19: target = &ins->std.ex8Macro; break;
+          case 20: target = &ins->std.ex9Macro; break;
+          case 21: target = &ins->std.ex10Macro; break;
+          default: break;
+        }
+
+        if (target) {
+          target->macroType = (DivMacroType)macroCode;
+          target->len = data[pos + 1];
+          target->loop = data[pos + 2];
+          target->rel = data[pos + 3];
+          target->mode = data[pos + 4];
+          unsigned char wordSizeByte = data[pos + 5];
+          target->open = wordSizeByte & 15;
+          int wordSize = wordSizeByte >> 6;
+          target->delay = data[pos + 6];
+          target->speed = data[pos + 7];
+        }
+
+        pos = macroHeaderEnd;
+
+        // Read macro values
+        if (target && target->len > 0 && target->len <= 256) {
+          int wordSize = (data[macroHeaderEnd - macroHeaderLen + 5] >> 6) & 3;
+          switch (wordSize) {
+            case 0: // unsigned byte
+              for (int i = 0; i < target->len && pos < featEnd; i++) {
+                target->val[i] = (unsigned char)data[pos++];
+              }
+              break;
+            case 1: // signed byte
+              for (int i = 0; i < target->len && pos < featEnd; i++) {
+                target->val[i] = (signed char)data[pos++];
+              }
+              break;
+            case 2: // short
+              for (int i = 0; i < target->len && pos + 2 <= featEnd; i++) {
+                target->val[i] = *(short*)(data + pos);
+                pos += 2;
+              }
+              break;
+            default: // int
+              for (int i = 0; i < target->len && pos + 4 <= featEnd; i++) {
+                target->val[i] = *(int*)(data + pos);
+                pos += 4;
+              }
+              break;
+          }
+        }
+      }
+      pos = featEnd;
+    }
+    // ── GB: Game Boy ──
+    else if (fc0 == 'G' && fc1 == 'B') {
+      if (featLen >= 4) {
+        unsigned char next = data[pos];
+        ins->gb.envLen = (next >> 5) & 7;
+        ins->gb.envDir = (next & 16) ? 1 : 0;
+        ins->gb.envVol = next & 15;
+        ins->gb.soundLen = data[pos + 1];
+        unsigned char flags = data[pos + 2];
+        if (version >= 196) ins->gb.doubleWave = flags & 4;
+        ins->gb.alwaysInit = flags & 2;
+        ins->gb.softEnv = flags & 1;
+        ins->gb.hwSeqLen = data[pos + 3];
+        for (int i = 0; i < ins->gb.hwSeqLen && i < 256; i++) {
+          int seqOff = pos + 4 + i * 3;
+          if (seqOff + 3 > featEnd) break;
+          ins->gb.hwSeq[i].cmd = data[seqOff];
+          ins->gb.hwSeq[i].data = *(short*)(data + seqOff + 1);
+        }
+      }
+      pos = featEnd;
+    }
+    // ── 64: C64 SID ──
+    else if (fc0 == '6' && fc1 == '4') {
+      if (featLen >= 8) {
+        unsigned char wave = data[pos];
+        ins->c64.triOn = wave & 1;
+        ins->c64.sawOn = (wave >> 1) & 1;
+        ins->c64.pulseOn = (wave >> 2) & 1;
+        ins->c64.noiseOn = (wave >> 3) & 1;
+        ins->c64.a = data[pos + 1];
+        ins->c64.d = data[pos + 2];
+        ins->c64.s = data[pos + 3];
+        ins->c64.r = data[pos + 4];
+        ins->c64.duty = *(unsigned short*)(data + pos + 5);
+        unsigned char flags1 = data[pos + 7];
+        ins->c64.ringMod = flags1 & 1;
+        ins->c64.oscSync = (flags1 >> 1) & 1;
+        ins->c64.toFilter = (flags1 >> 2) & 1;
+        ins->c64.initFilter = (flags1 >> 3) & 1;
+        // More C64 fields follow...
+        if (featLen >= 12) {
+          ins->c64.res = data[pos + 8];
+          ins->c64.cut = *(unsigned short*)(data + pos + 9);
+          unsigned char filt = data[pos + 11];
+          ins->c64.lp = filt & 1;
+          ins->c64.bp = (filt >> 1) & 1;
+          ins->c64.hp = (filt >> 2) & 1;
+          ins->c64.ch3off = (filt >> 3) & 1;
+        }
+      }
+      pos = featEnd;
+    }
+    // ── SM: Sample mapping ──
+    else if (fc0 == 'S' && fc1 == 'M') {
+      if (featLen >= 3) {
+        ins->amiga.initSample = *(short*)(data + pos);
+        unsigned char flags = data[pos + 2];
+        ins->amiga.useWave = flags & 4;
+        ins->amiga.waveLen = (flags >> 4) & 3;
+        // Note map follows if present — skip for now (noteMap is in amiga sub-struct)
+        // The note map is not critical for basic playback
+      }
+      pos = featEnd;
+    }
+    // ── Ox: Operator macros ──
+    else if (fc0 == 'O' && (fc1 >= '1' && fc1 <= '4')) {
+      int opIdx = fc1 - '1';
+      unsigned short opMacroHeaderLen = *(unsigned short*)(data + pos);
+      pos += 2;
+
+      if (opMacroHeaderLen == 0) {
+        pos = featEnd;
+        continue;
+      }
+
+      while (pos < featEnd) {
+        int macroHeaderEnd = pos + opMacroHeaderLen;
+        if (macroHeaderEnd > featEnd) break;
+
+        unsigned char macroCode = data[pos];
+        if (macroCode == 255) break;
+
+        DivInstrumentMacro* target = NULL;
+        switch (macroCode) {
+          case 0: target = &ins->std.opMacros[opIdx].amMacro; break;
+          case 1: target = &ins->std.opMacros[opIdx].arMacro; break;
+          case 2: target = &ins->std.opMacros[opIdx].drMacro; break;
+          case 3: target = &ins->std.opMacros[opIdx].multMacro; break;
+          case 4: target = &ins->std.opMacros[opIdx].rrMacro; break;
+          case 5: target = &ins->std.opMacros[opIdx].slMacro; break;
+          case 6: target = &ins->std.opMacros[opIdx].tlMacro; break;
+          case 7: target = &ins->std.opMacros[opIdx].dt2Macro; break;
+          case 8: target = &ins->std.opMacros[opIdx].rsMacro; break;
+          case 9: target = &ins->std.opMacros[opIdx].dtMacro; break;
+          case 10: target = &ins->std.opMacros[opIdx].d2rMacro; break;
+          case 11: target = &ins->std.opMacros[opIdx].ssgMacro; break;
+          case 12: target = &ins->std.opMacros[opIdx].damMacro; break;
+          case 13: target = &ins->std.opMacros[opIdx].dvbMacro; break;
+          case 14: target = &ins->std.opMacros[opIdx].egtMacro; break;
+          case 15: target = &ins->std.opMacros[opIdx].kslMacro; break;
+          case 16: target = &ins->std.opMacros[opIdx].susMacro; break;
+          case 17: target = &ins->std.opMacros[opIdx].vibMacro; break;
+          case 18: target = &ins->std.opMacros[opIdx].wsMacro; break;
+          case 19: target = &ins->std.opMacros[opIdx].ksrMacro; break;
+          default: break;
+        }
+
+        if (target) {
+          target->len = data[pos + 1];
+          target->loop = data[pos + 2];
+          target->rel = data[pos + 3];
+          target->mode = data[pos + 4];
+          unsigned char wordSizeByte = data[pos + 5];
+          target->open = wordSizeByte & 15;
+          target->delay = data[pos + 6];
+          target->speed = data[pos + 7];
+        }
+
+        pos = macroHeaderEnd;
+
+        if (target && target->len > 0 && target->len <= 256) {
+          int wordSize = (data[macroHeaderEnd - opMacroHeaderLen + 5] >> 6) & 3;
+          switch (wordSize) {
+            case 0:
+              for (int i = 0; i < target->len && pos < featEnd; i++)
+                target->val[i] = (unsigned char)data[pos++];
+              break;
+            case 1:
+              for (int i = 0; i < target->len && pos < featEnd; i++)
+                target->val[i] = (signed char)data[pos++];
+              break;
+            case 2:
+              for (int i = 0; i < target->len && pos + 2 <= featEnd; i++) {
+                target->val[i] = *(short*)(data + pos); pos += 2;
+              }
+              break;
+            default:
+              for (int i = 0; i < target->len && pos + 4 <= featEnd; i++) {
+                target->val[i] = *(int*)(data + pos); pos += 4;
+              }
+              break;
+          }
+        }
+      }
+      pos = featEnd;
+    }
+    // ── WS: WaveSynth ──
+    else if (fc0 == 'W' && fc1 == 'S') {
+      if (featLen >= 11) {
+        ins->ws.wave1 = *(int*)(data + pos);
+        ins->ws.wave2 = *(int*)(data + pos + 4);
+        ins->ws.rateDivider = data[pos + 8];
+        ins->ws.effect = data[pos + 9];
+        ins->ws.enabled = data[pos + 10] & 1;
+        ins->ws.global = (data[pos + 10] >> 1) & 1;
+        if (featLen >= 15) {
+          ins->ws.speed = data[pos + 11];
+          ins->ws.param1 = *(unsigned short*)(data + pos + 12);
+          ins->ws.param2 = *(unsigned short*)(data + pos + 14);
+        }
+      }
+      pos = featEnd;
+    }
+    // ── SN: SNES ──
+    else if (fc0 == 'S' && fc1 == 'N') {
+      if (featLen >= 13) {
+        ins->snes.useEnv = data[pos] & 1;
+        ins->snes.sus = (data[pos] >> 3) & 3;
+        ins->snes.gainMode = (DivInstrumentSNES::GainMode)((data[pos] >> 5) & 7);
+        ins->snes.gain = data[pos + 1];
+        ins->snes.a = data[pos + 2];
+        ins->snes.d = data[pos + 3];
+        ins->snes.s = data[pos + 4];
+        ins->snes.r = data[pos + 5];
+        ins->snes.d2 = data[pos + 6];
+      }
+      pos = featEnd;
+    }
+    // ── N1: N163 ──
+    else if (fc0 == 'N' && fc1 == '1') {
+      if (featLen >= 8) {
+        ins->n163.wave = *(int*)(data + pos);
+        ins->n163.wavePos = data[pos + 4];
+        ins->n163.waveLen = data[pos + 5];
+        ins->n163.waveMode = data[pos + 6];
+        ins->n163.perChanPos = data[pos + 7] & 1;
+      }
+      pos = featEnd;
+    }
+    // ── FD: FDS ──
+    else if (fc0 == 'F' && fc1 == 'D') {
+      if (featLen >= 5) {
+        ins->fds.modSpeed = *(int*)(data + pos);
+        ins->fds.modDepth = data[pos + 4];
+        if (featLen >= 6) ins->fds.initModTableWithFirstWave = data[pos + 5] & 1;
+        // Mod table follows
+        if (featLen >= 38) {
+          for (int i = 0; i < 32; i++) {
+            ins->fds.modTable[i] = (signed char)data[pos + 6 + i];
+          }
+        }
+      }
+      pos = featEnd;
+    }
+    // ── LD: OPL drums ──
+    else if (fc0 == 'L' && fc1 == 'D') {
+      if (featLen >= 4) {
+        ins->fm.fixedDrums = data[pos] & 1;
+        ins->fm.kickFreq = *(unsigned short*)(data + pos + 1);
+        ins->fm.snareHatFreq = *(unsigned short*)(data + pos + 3);
+        ins->fm.tomTopFreq = *(unsigned short*)(data + pos + 5);
+      }
+      pos = featEnd;
+    }
+    // ── EF: ESFM ──
+    else if (fc0 == 'E' && fc1 == 'F') {
+      // Read ESFM operator data
+      for (int i = 0; i < 4 && pos + 7 <= featEnd; i++) {
+        ins->esfm.op[i].delay = data[pos];
+        ins->esfm.op[i].outLvl = data[pos + 1];
+        ins->esfm.op[i].modIn = data[pos + 2];
+        unsigned char flags = data[pos + 3];
+        ins->esfm.op[i].left = flags & 1;
+        ins->esfm.op[i].right = (flags >> 1) & 1;
+        ins->esfm.op[i].fixed = (flags >> 2) & 1;
+        ins->esfm.op[i].ct = data[pos + 4];
+        ins->esfm.op[i].dt = data[pos + 5];
+        pos += 6;
+      }
+      pos = featEnd;
+    }
+    // ── Unknown feature: skip ──
+    else {
+      pos = featEnd;
+    }
+  }
+
+  // Register instrument in global table
+  engine_set_instrument(insIndex, ins);
+  printf("[FurnaceDispatch] Loaded INS2 instrument %d: \"%s\" type=%d\n",
+         insIndex, ins->name.c_str(), ins->type);
+}
+
+/**
  * Initialize (called once at startup).
  */
 EMSCRIPTEN_KEEPALIVE
