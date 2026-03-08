@@ -768,8 +768,11 @@ function _parseSymphonieProFile(bytes: Uint8Array, filename: string): TrackerSon
   // Don't set synthType here — parseSymphonieProFile will set 'SymphonieSynth' on
   // instrument 0 and 'Sampler' only on instruments that have decoded PCM sample data.
   // Instruments without samples must NOT be 'Sampler' or ToneEngine will log errors.
-  const instruments: InstrumentConfig[] = symInstruments.length > 0
-    ? symInstruments.map((si, i) => ({
+  // Cap at 128 instruments — InstrumentStore clamps IDs to 1-128 range,
+  // and instruments beyond 128 would all get duplicate ID 1.
+  const cappedInstruments = symInstruments.slice(0, 128);
+  const instruments: InstrumentConfig[] = cappedInstruments.length > 0
+    ? cappedInstruments.map((si, i) => ({
         id:        i + 1,
         name:      si.name || songTitle,
         type:      'sample' as const,
