@@ -197,7 +197,7 @@ export function getChannelColumn(params: Record<string, unknown>): Record<string
       case 'instrument': values.push(cell.instrument); break;
       case 'volume': values.push(cell.volume); break;
       case 'effect': values.push(cell.effTyp ? `${formatHex(cell.effTyp, 1)}${formatHex(cell.eff)}` : null); break;
-      default: values.push((cell as Record<string, unknown>)[column] ?? null);
+      default: values.push((cell as unknown as Record<string, unknown>)[column] ?? null);
     }
   }
 
@@ -670,7 +670,7 @@ export function getArrangementState(): Record<string, unknown> {
       id: m.id,
       row: m.row,
       type: m.type,
-      label: m.label,
+      name: m.name,
     })),
     selectedClipIds: Array.from(arr.selectedClipIds),
   };
@@ -684,9 +684,8 @@ export function getClipboardState(): Record<string, unknown> {
   if (!clipboard) return { hasClipboard: false };
   return {
     hasClipboard: true,
-    width: clipboard.width,
-    height: clipboard.height,
-    channelCount: clipboard.channels.length,
+    channels: clipboard.channels,
+    rows: clipboard.rows,
   };
 }
 
@@ -937,7 +936,7 @@ export function getSynthConfig(params: Record<string, unknown>): Record<string, 
   ] as const;
 
   for (const key of configKeys) {
-    const val = (inst as Record<string, unknown>)[key];
+    const val = (inst as unknown as Record<string, unknown>)[key];
     if (val !== undefined && val !== null) {
       try {
         result[key] = JSON.parse(JSON.stringify(val, (_k, v) => {

@@ -500,14 +500,14 @@ export function executeCommand(params: Record<string, unknown>): Record<string, 
 export function insertRow(params: Record<string, unknown>): Record<string, unknown> {
   const channel = params.channel as number;
   const row = params.row as number;
-  useTrackerStore.getState().insertRowInChannel(channel, row);
+  useTrackerStore.getState().insertRow(channel, row);
   return { ok: true };
 }
 
 export function deleteRow(params: Record<string, unknown>): Record<string, unknown> {
   const channel = params.channel as number;
   const row = params.row as number;
-  useTrackerStore.getState().deleteRowInChannel(channel, row);
+  useTrackerStore.getState().deleteRow(channel, row);
   return { ok: true };
 }
 
@@ -575,13 +575,13 @@ export function writeNoteSequence(params: Record<string, unknown>): Record<strin
 export function copySelection(): Record<string, unknown> {
   useTrackerStore.getState().copySelection();
   const clipboard = useTrackerStore.getState().clipboard;
-  return { ok: true, width: clipboard?.width ?? 0, height: clipboard?.height ?? 0 };
+  return { ok: true, channels: clipboard?.channels ?? 0, rows: clipboard?.rows ?? 0 };
 }
 
 export function cutSelection(): Record<string, unknown> {
   useTrackerStore.getState().cutSelection();
   const clipboard = useTrackerStore.getState().clipboard;
-  return { ok: true, width: clipboard?.width ?? 0, height: clipboard?.height ?? 0 };
+  return { ok: true, channels: clipboard?.channels ?? 0, rows: clipboard?.rows ?? 0 };
 }
 
 export function pasteClipboard(params: Record<string, unknown>): Record<string, unknown> {
@@ -714,7 +714,7 @@ export function updateSynthConfig(params: Record<string, unknown>): Record<strin
 
   // Build the update with the sub-config key
   const instrumentUpdate: Record<string, unknown> = {};
-  const currentSubConfig = (inst as Record<string, unknown>)[configKey] ?? {};
+  const currentSubConfig = (inst as unknown as Record<string, unknown>)[configKey] ?? {};
   instrumentUpdate[configKey] = { ...(currentSubConfig as Record<string, unknown>), ...updates };
 
   useInstrumentStore.getState().updateInstrument(id, instrumentUpdate);
