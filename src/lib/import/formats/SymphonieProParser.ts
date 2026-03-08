@@ -436,7 +436,12 @@ function readSymInstruments(data: Uint8Array): SymInstrumentRaw[] {
     // Check if this is a virtual instrument (first 4 bytes = "ViRT")
     const isVirt = nameOrHeader[0] === 0x56 && nameOrHeader[1] === 0x69
                 && nameOrHeader[2] === 0x52 && nameOrHeader[3] === 0x54;
-    const name = isVirt ? 'Virtual' : readAmigaString(nameOrHeader, 0, 128);
+    // Strip Amiga device/path prefix (e.g. "HD3:Samples/Sample7" → "Sample7")
+    const rawName = isVirt ? 'Virtual' : readAmigaString(nameOrHeader, 0, 128);
+    const slashIdx = rawName.lastIndexOf('/');
+    const colonIdx = rawName.lastIndexOf(':');
+    const stripIdx = Math.max(slashIdx, colonIdx);
+    const name = stripIdx >= 0 ? rawName.substring(stripIdx + 1) : rawName;
 
     insts.push({ nameOrHeader, type, volume, channel, instFlags, transpose, name });
   }
@@ -1205,7 +1210,7 @@ export async function parseSymphonieForPlayback(
   let instrumentData  = new Uint8Array(0);
   let infoText        = '';
 
-  // Instruments with type -8 (Silent) or -4 (Kill) or 0 (None) have no PCM.
+  // Instruments with type -8 (Silent) or -4 (Kill) have no PCM.
   // Sample chunks arrive in instrument order; we collect them into this array
   // indexed by sampleIndex, then merge with instrument metadata later.
   const rawSampleData: Array<{ kind: 'raw8' | 'delta8' | 'delta16'; bytes: Uint8Array }> = [];
@@ -1378,18 +1383,19 @@ export async function parseSymphonieForPlayback(
 
   const INST_SIZE = 256;
 
-  // Assign PCM to instruments in order; instruments with type <=0 that are
-  // -8 (Silent), -4 (Kill), or 0 (None) receive no sample data — they still
-  // advance sampleIndex in the chunk loop above (via CHUNK_EMPTY_SAMPLE).
-  // Instruments with type > 0 (4=Loop, 8=Sustain) or undefined have PCM.
+  // Assign PCM to instruments in order; instruments with type -8 (Silent)
+  // or -4 (Kill) receive no sample data. Type 0 (Normal) = non-looping sample,
+  // type 4 (Loop) = looping sample, type 8 (Sustain) = sustain-looping sample.
+  // Only -8 and -4 are sample-less.
 
   // We need a second sampleIndex pass that mirrors the chunk walk.
   // However, since we already collected rawSampleData[] indexed by sampleIndex
   // during the chunk walk, we just need to know which instruments have PCM.
-  // Instruments whose type is -8, -4, or 0 have no PCM; all others may have PCM.
-  // We assign rawSampleData entries in instrument order, skipping no-PCM ones.
+  // Instruments whose type is -8 or -4 have no PCM; all others (0, 4, 8) have PCM.
+  // Sample chunks map 1:1 with instruments (same as OpenMPT's Load_symmod.cpp).
+  // Silent (-8) and Kill (-4) instruments get EMPTY_SAMPLE chunks in the file,
+  // so rawSampleData[i] aligns with instrument index i, not a separate counter.
 
-  let pcmIdx = 0;
   const instruments: SymphonieInstrumentData[] = [];
 
   for (let i = 0; i < numInstruments; i++) {
@@ -1421,11 +1427,11 @@ export async function parseSymphonieForPlayback(
     const loopLen   = loopLenHigh   * 65536;
 
     // Determine whether this instrument has PCM
-    const hasPCM = si.type !== -8 && si.type !== -4 && si.type !== 0;
+    const hasPCM = si.type !== -8 && si.type !== -4;
 
     let samples: Float32Array | null = null;
     if (hasPCM) {
-      const entry = rawSampleData[pcmIdx];
+      const entry = rawSampleData[i]; // Direct instrument index, not separate counter
       if (entry) {
         if (entry.kind === 'raw8') {
           samples = _decodeRaw8(entry.bytes);
@@ -1435,7 +1441,6 @@ export async function parseSymphonieForPlayback(
           samples = _decodeDelta16(entry.bytes);
         }
       }
-      pcmIdx++;
     }
 
     instruments.push({
