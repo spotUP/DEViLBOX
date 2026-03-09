@@ -6,8 +6,15 @@
  */
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { z } from 'zod';
+// MCP SDK expects Zod 3 schemas (._parse). Root zod is v4 which lacks ._parse.
+// Resolve zod from the SDK's own node_modules to get the compatible version.
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const { z } = require('@modelcontextprotocol/sdk/node_modules/zod') as typeof import('zod');
+import { readFile } from 'fs/promises';
+import { basename } from 'path';
 import { callBrowser } from './wsRelay';
+
+const API_BASE = `http://localhost:${process.env.PORT || 3001}`;
 
 // Helper: wrap callBrowser result as MCP text content
 function textResult(data: unknown) {
@@ -341,7 +348,14 @@ export function createMcpServer(): McpServer {
   // TRANSPORT — Playback Control
   // ═══════════════════════════════════════════════════════════════════════════════
 
-  server.tool('play', 'Start playback (requires prior AudioContext unlock by user gesture)', {}, () => call('play'));
+  server.tool(
+    'play',
+    'Start playback (requires prior AudioContext unlock by user gesture). Default mode is "song" which plays through all patterns in order. Use "pattern" to loop the current pattern.',
+    {
+      mode: z.enum(['song', 'pattern']).optional().describe('Playback mode: "song" plays through all patterns (default), "pattern" loops current pattern'),
+    },
+    (p) => call('play', p),
+  );
   server.tool('stop', 'Stop playback and reset position', {}, () => call('stop'));
   server.tool('pause', 'Pause playback (resume with play)', {}, () => call('pause'));
 
@@ -978,7 +992,7 @@ export function createMcpServer(): McpServer {
     {
       id: z.number().int().min(0).describe('Instrument ID'),
       configKey: z.string().describe('Sub-config key (e.g., "tb303", "envelope", "filter", "oscillator", "furnace")'),
-      updates: z.record(z.unknown()).describe('Key-value pairs to merge into the sub-config'),
+      updates: z.record(z.string(), z.any()).describe('Key-value pairs to merge into the sub-config'),
     },
     (p) => call('update_synth_config', p),
   );
@@ -1082,7 +1096,7 @@ export function createMcpServer(): McpServer {
     'Update parameters of a master effect',
     {
       effectId: z.string().describe('Effect ID (from get_audio_state)'),
-      updates: z.record(z.unknown()).describe('Parameter updates (e.g., { "wet": 50, "parameters": { "decay": 2.5 } })'),
+      updates: z.record(z.string(), z.any()).describe('Parameter updates (e.g., { "wet": 50, "parameters": { "decay": 2.5 } })'),
     },
     (p) => call('update_master_effect', p),
   );
@@ -1117,6 +1131,760 @@ export function createMcpServer(): McpServer {
     'Set the synth/chip bus gain offset in dB',
     { gain: z.number().min(-60).max(12).describe('Gain in dB') },
     (p) => call('set_synth_bus_gain', p),
+  );
+
+  // ═══════════════════════════════════════════════════════════════════════════════
+  // FILE LOADING & AUDIO MEASUREMENT
+  // ═══════════════════════════════════════════════════════════════════════════════
+
+  server.tool(
+    'load_file',
+    'Load a music file into DEViLBOX from disk. Supports all 188+ formats (MOD, XM, IT, S3M, FUR, HVL, SID, VGM, TFMX, etc.). The file is read server-side and sent to the browser for parsing and import.',
+    {
+      path: z.string().describe('Absolute path to the music file on disk'),
+      subsong: z.number().optional().describe('Subsong index for multi-song formats (default 0)'),
+      useLibopenmpt: z.boolean().optional().describe('Force libopenmpt playback for PC tracker formats'),
+    },
+    async (p) => {
+      try {
+        const fileData = await readFile(p.path);
+        const base64 = fileData.toString('base64');
+        const filename = basename(p.path);
+        return textResult(await callBrowser('load_file', {
+          filename,
+          data: base64,
+          subsong: p.subsong,
+          useLibopenmpt: p.useLibopenmpt,
+        }));
+      } catch (e) {
+        return textResult({ error: `Failed to read file: ${(e as Error).message}` });
+      }
+    },
+  );
+
+  server.tool(
+    'get_audio_level',
+    'Measure audio output level over a time window. Returns RMS average/max, peak max, and whether audio is silent. Useful for verifying a loaded file produces sound.',
+    {
+      durationMs: z.number().optional().describe('Measurement duration in milliseconds (default 2000)'),
+    },
+    (p) => call('get_audio_level', p),
+  );
+
+  server.tool(
+    'wait_for_audio',
+    'Wait until audio output is detected (non-silent) or timeout. Polls the audio bus until RMS exceeds threshold. Useful after play() to confirm audio is actually playing.',
+    {
+      timeoutMs: z.number().optional().describe('Maximum wait time in milliseconds (default 5000)'),
+      thresholdRms: z.number().optional().describe('RMS threshold to consider as "audio detected" (default 0.001)'),
+    },
+    (p) => call('wait_for_audio', p),
+  );
+
+  // ═══════════════════════════════════════════════════════════════════════════════
+  // SONG ANALYSIS & AI COMPOSITION
+  // ═══════════════════════════════════════════════════════════════════════════════
+
+  server.tool(
+    'analyze_song',
+    'Analyze the loaded song musically: detect key/scale (Krumhansl-Schmuckler algorithm), identify chord progressions, classify channel roles (bass/lead/chord/percussion), compute note distribution and density per channel. Returns comprehensive musical analysis.',
+    {},
+    () => call('analyze_song'),
+  );
+
+  server.tool(
+    'generate_pattern',
+    'Generate musical content in a pattern channel. Supports: bass (root-heavy, low octave), drums (kick/snare/hihat), arpeggio (chord tone cycling), chord (stacked chord tones on beats), melody (scale-aware random walk), euclidean (Bjorklund rhythm). Auto-detects key/scale from existing song if not specified.',
+    {
+      type: z.enum(['bass', 'drums', 'arpeggio', 'chord', 'melody', 'fill', 'euclidean']).describe('Generator type'),
+      channel: z.number().optional().describe('Target channel index (default 0)'),
+      patternIndex: z.number().optional().describe('Target pattern index (default 0)'),
+      instrument: z.number().optional().describe('Instrument number to use (default 1)'),
+      key: z.string().optional().describe('Root note (e.g., "C", "F#"). Auto-detected if omitted.'),
+      scale: z.string().optional().describe('Scale type: major, minor, dorian, phrygian, lydian, mixolydian, pentatonic, pentatonicMinor, blues, chromatic (default: minor)'),
+      octave: z.number().optional().describe('Base octave (default 3)'),
+      density: z.number().optional().describe('Note density 0-1 (default 0.5, higher = more notes)'),
+      params: z.record(z.string(), z.number()).optional().describe('Algorithm-specific params: drums={kick,snare,hihat,rowsPerBeat}, arpeggio={rate}, euclidean={steps,pulses}'),
+    },
+    (p) => call('generate_pattern', p),
+  );
+
+  server.tool(
+    'transform_pattern',
+    'Apply musical transformations to a channel: transpose (shift semitones), reverse (flip note order), rotate (circular shift), invert (mirror around pivot), retrograde (reverse pitch keep rhythm), augment (double durations), diminish (halve durations), humanize (random velocity variation).',
+    {
+      patternIndex: z.number().optional().describe('Pattern index (default 0)'),
+      channel: z.number().optional().describe('Channel index (default 0)'),
+      operation: z.enum(['transpose', 'reverse', 'rotate', 'invert', 'retrograde', 'augment', 'diminish', 'humanize']).describe('Transformation type'),
+      params: z.record(z.string(), z.number()).optional().describe('Transform params: transpose={semitones}, rotate={amount}, invert={pivot}, humanize={amount 0-1}'),
+    },
+    (p) => call('transform_pattern', p),
+  );
+
+  // ═══════════════════════════════════════════════════════════════════════════════
+  // SYNTH PROGRAMMING ASSISTANT
+  // ═══════════════════════════════════════════════════════════════════════════════
+
+  server.tool(
+    'analyze_instrument_spectrum',
+    'Trigger a note on an instrument, capture FFT data, and compute spectral metrics: fundamental frequency, harmonics, spectral centroid, brightness, RMS level, and envelope shape. Essential for iterative sound design — adjust parameters, re-analyze, compare.',
+    {
+      instrumentId: z.number().describe('Instrument index to analyze'),
+      note: z.string().optional().describe('Note to play (default "C-3"). Format: "C-3", "F#4", "A-2"'),
+      durationMs: z.number().optional().describe('Note duration in ms (default 1000)'),
+      captureDelayMs: z.number().optional().describe('Delay before starting FFT capture to skip initial transient (default 100ms)'),
+    },
+    (p) => call('analyze_instrument_spectrum', p),
+  );
+
+  server.tool(
+    'sweep_parameter',
+    'Sweep a synth parameter across a range of values, triggering a note at each step and measuring spectral response (centroid, brightness, RMS). Returns an array of measurements. Use this to find sweet spots for cutoff, resonance, envMod, etc.',
+    {
+      instrumentId: z.number().describe('Instrument index'),
+      parameter: z.string().describe('Parameter name to sweep (e.g., "cutoff", "resonance", "envMod", "decay", "filterInputDrive")'),
+      from: z.number().optional().describe('Start value (default 0)'),
+      to: z.number().optional().describe('End value (default 1)'),
+      steps: z.number().optional().describe('Number of steps (default 10)'),
+      note: z.string().optional().describe('Note to play at each step (default "C-3")'),
+      noteDurationMs: z.number().optional().describe('Duration of each test note in ms (default 500)'),
+      settleMs: z.number().optional().describe('Settle time after parameter change before playing note (default 100ms)'),
+    },
+    (p) => call('sweep_parameter', p),
+  );
+
+  // ═══════════════════════════════════════════════════════════════════════════════
+  // LIVE PERFORMANCE AGENT
+  // ═══════════════════════════════════════════════════════════════════════════════
+
+  server.tool(
+    'start_monitoring',
+    'Start the audio monitoring ring buffer. Captures audio snapshots (RMS, peak, band energy, beat detection) at regular intervals. Use get_monitoring_data to read the buffer. Stop with stop_monitoring.',
+    {
+      bufferSize: z.number().optional().describe('Number of snapshots to keep (default 120 = ~30s at 250ms interval)'),
+      intervalMs: z.number().optional().describe('Capture interval in milliseconds (default 250)'),
+    },
+    (p) => call('start_monitoring', p),
+  );
+
+  server.tool(
+    'get_monitoring_data',
+    'Get current audio monitoring data: energy profile (band breakdown), estimated BPM from beat detection, and a time-series of audio snapshots. Monitor must be running (start_monitoring first).',
+    {},
+    () => call('get_monitoring_data'),
+  );
+
+  server.tool(
+    'stop_monitoring',
+    'Stop the audio monitoring ring buffer',
+    {},
+    () => call('stop_monitoring'),
+  );
+
+  server.tool(
+    'auto_mix',
+    'Apply reactive mixer adjustments based on current audio analysis. Modes: "balance" (equalize channel loudness), "duck_bass" (duck non-bass channels when bass is heavy), "emphasize_melody" (boost mid-range channels), "reset" (restore default volumes/pans).',
+    {
+      mode: z.enum(['balance', 'duck_bass', 'emphasize_melody', 'reset']).describe('Mixing strategy'),
+      intensity: z.number().optional().describe('Effect intensity 0-1 (default 0.5)'),
+      channels: z.array(z.number()).optional().describe('Channel indices to affect (default: all)'),
+    },
+    (p) => call('auto_mix', p),
+  );
+
+  server.tool(
+    'set_auto_effect',
+    'Set up an audio-reactive modulation on a master effect parameter. The parameter will be continuously modulated by an audio source (RMS, peak, bass, mid, high, sub, beat) mapped to a value range. Use cancel_auto_effect to stop.',
+    {
+      effectId: z.string().describe('Master effect ID (from get_audio_state)'),
+      parameter: z.string().describe('Effect parameter to modulate (e.g., "wet", "decay", "frequency")'),
+      source: z.enum(['rms', 'peak', 'bass', 'mid', 'high', 'sub', 'beat']).optional().describe('Audio source for modulation (default "rms")'),
+      min: z.number().optional().describe('Output minimum value (default 0)'),
+      max: z.number().optional().describe('Output maximum value (default 100)'),
+      smoothing: z.number().optional().describe('Smoothing factor 0-1, higher = smoother (default 0.5)'),
+    },
+    (p) => call('set_auto_effect', p),
+  );
+
+  server.tool(
+    'cancel_auto_effect',
+    'Cancel an active audio-reactive effect modulation',
+    {
+      key: z.string().describe('The cancelKey from the set_auto_effect response'),
+    },
+    (p) => call('cancel_auto_effect', p),
+  );
+
+  // ═══════════════════════════════════════════════════════════════════════════════
+  // MODAL CONTROL
+  // ═══════════════════════════════════════════════════════════════════════════════
+
+  server.tool(
+    'dismiss_modal',
+    'Dismiss any open modal/dialog in the DEViLBOX UI. Call this after loading a file or on startup to clear the welcome dialog.',
+    {},
+    () => call('dismiss_modal'),
+  );
+
+  server.tool(
+    'get_modal_state',
+    'Check if any modal/dialog is currently open and what type it is',
+    {},
+    () => call('get_modal_state'),
+  );
+
+  // ═══════════════════════════════════════════════════════════════════════════════
+  // MODLAND SEARCH & BROWSE
+  // ═══════════════════════════════════════════════════════════════════════════════
+
+  server.tool(
+    'search_modland',
+    'Search the Modland archive (190K+ tracker modules from ftp.modland.com). Returns matching files with format, author, filename, and download path. Use load_modland to play a result.',
+    {
+      query: z.string().optional().describe('Search text (matches filename, author, format). Prefix-matching supported.'),
+      format: z.string().optional().describe('Filter by format name (e.g., "Protracker", "Future Composer 1.4", "TFMX"). Use get_modland_formats to see available formats.'),
+      author: z.string().optional().describe('Filter by author/composer name'),
+      limit: z.number().optional().describe('Max results (default 20, max 100)'),
+      offset: z.number().optional().describe('Pagination offset (default 0)'),
+    },
+    async (p) => {
+      try {
+        const params = new URLSearchParams();
+        if (p.query) params.set('q', p.query);
+        if (p.format) params.set('format', p.format);
+        if (p.author) params.set('author', p.author);
+        params.set('limit', String(p.limit ?? 20));
+        params.set('offset', String(p.offset ?? 0));
+
+        const resp = await fetch(`${API_BASE}/api/modland/search?${params}`);
+        if (!resp.ok) return textResult({ error: `Search API returned ${resp.status}` });
+        return textResult(await resp.json());
+      } catch (e) {
+        return textResult({ error: `search_modland failed: ${(e as Error).message}` });
+      }
+    },
+  );
+
+  server.tool(
+    'get_modland_formats',
+    'List all available Modland formats with file counts. Use format names to filter search_modland results.',
+    {},
+    async () => {
+      try {
+        const resp = await fetch(`${API_BASE}/api/modland/formats`);
+        if (!resp.ok) return textResult({ error: `Formats API returned ${resp.status}` });
+        return textResult(await resp.json());
+      } catch (e) {
+        return textResult({ error: `get_modland_formats failed: ${(e as Error).message}` });
+      }
+    },
+  );
+
+  server.tool(
+    'load_modland',
+    'Download a module from Modland and load it into DEViLBOX for playback. Use search_modland first to find the full_path. The file is downloaded (with server-side caching), then sent to the browser for parsing and import.',
+    {
+      full_path: z.string().describe('The full_path from a search_modland result (e.g., "pub/modules/Future Composer 1.4/Blaizer/horizon v2.fc")'),
+      subsong: z.number().optional().describe('Subsong index for multi-song formats (default 0)'),
+      autoplay: z.boolean().optional().describe('Automatically start playback after loading (default true)'),
+    },
+    async (p) => {
+      try {
+        const remotePath = p.full_path.trim();
+        if (!remotePath.startsWith('pub/modules/')) {
+          return textResult({ error: 'Invalid path — must start with pub/modules/' });
+        }
+
+        // Download via the server's download proxy (handles caching + rate limiting)
+        const downloadResp = await fetch(`${API_BASE}/api/modland/download?path=${encodeURIComponent(remotePath)}`);
+        if (!downloadResp.ok) {
+          const errBody = await downloadResp.text();
+          return textResult({ error: `Download failed (${downloadResp.status}): ${errBody}` });
+        }
+
+        const buffer = Buffer.from(await downloadResp.arrayBuffer());
+        const filename = remotePath.split('/').pop() || 'download';
+        const base64 = buffer.toString('base64');
+
+        // Send to browser for loading
+        const loadResult = await callBrowser('load_file', {
+          filename,
+          data: base64,
+          subsong: p.subsong,
+        });
+
+        // Auto-play in song mode unless explicitly disabled
+        if (p.autoplay !== false) {
+          try {
+            await callBrowser('play', { mode: 'song' });
+          } catch { /* ignore play errors */ }
+        }
+
+        return textResult({
+          ...((typeof loadResult === 'object' && loadResult !== null) ? loadResult : { result: loadResult }),
+          source: 'modland',
+          path: remotePath,
+          filename,
+          autoplay: p.autoplay !== false,
+        });
+      } catch (e) {
+        return textResult({ error: `load_modland failed: ${(e as Error).message}` });
+      }
+    },
+  );
+
+  // ═══════════════════════════════════════════════════════════════════════════════
+  // HVSC (HIGH VOLTAGE SID COLLECTION) — C64 SID TUNES
+  // ═══════════════════════════════════════════════════════════════════════════════
+
+  server.tool(
+    'search_hvsc',
+    'Search the High Voltage SID Collection (80K+ C64 SID tunes) via the DeepSID database. Matches filename, author, path, and copyright. Returns SID metadata including author, SID model (6581/8580), subtune count, and download path. Use load_hvsc to play a result.',
+    {
+      query: z.string().describe('Search text (matches filename, author, HVSC path, copyright)'),
+      limit: z.number().optional().describe('Max results (default 20, max 100)'),
+      offset: z.number().optional().describe('Pagination offset (default 0)'),
+    },
+    async (p) => {
+      try {
+        const params = new URLSearchParams();
+        params.set('q', p.query);
+        params.set('limit', String(p.limit ?? 20));
+        params.set('offset', String(p.offset ?? 0));
+
+        const resp = await fetch(`${API_BASE}/api/hvsc/search?${params}`);
+        if (!resp.ok) return textResult({ error: `HVSC search API returned ${resp.status}` });
+        return textResult(await resp.json());
+      } catch (e) {
+        return textResult({ error: `search_hvsc failed: ${(e as Error).message}` });
+      }
+    },
+  );
+
+  server.tool(
+    'get_hvsc_featured',
+    'Get a curated list of classic C64 SID tunes (Rob Hubbard, Martin Galway, Jeroen Tel). Good starting point for exploring the HVSC.',
+    {},
+    async () => {
+      try {
+        const resp = await fetch(`${API_BASE}/api/hvsc/featured`);
+        if (!resp.ok) return textResult({ error: `HVSC featured API returned ${resp.status}` });
+        return textResult(await resp.json());
+      } catch (e) {
+        return textResult({ error: `get_hvsc_featured failed: ${(e as Error).message}` });
+      }
+    },
+  );
+
+  server.tool(
+    'browse_hvsc',
+    'Browse the HVSC directory tree. Start with no path for root (DEMOS, GAMES, MUSICIANS), then drill into subdirectories. For finding specific tunes, use search_hvsc instead.',
+    {
+      path: z.string().optional().describe('HVSC directory path (e.g., "MUSICIANS/H/Hubbard_Rob"). Empty for root.'),
+    },
+    async (p) => {
+      try {
+        const params = new URLSearchParams();
+        if (p.path) params.set('path', p.path);
+
+        const resp = await fetch(`${API_BASE}/api/hvsc/browse?${params}`);
+        if (!resp.ok) return textResult({ error: `HVSC browse API returned ${resp.status}` });
+        return textResult(await resp.json());
+      } catch (e) {
+        return textResult({ error: `browse_hvsc failed: ${(e as Error).message}` });
+      }
+    },
+  );
+
+  server.tool(
+    'load_hvsc',
+    'Download a SID tune from HVSC mirrors and load it into DEViLBOX for playback. Use search_hvsc first to find the path. The server proxies the download (HVSC mirrors block CORS), caches for 24h, then sends to the browser.',
+    {
+      path: z.string().describe('HVSC path from a search_hvsc result (e.g., "MUSICIANS/H/Hubbard_Rob/Commando.sid")'),
+      subsong: z.number().optional().describe('Subtune index (default 0). Many SID files contain multiple tunes.'),
+      autoplay: z.boolean().optional().describe('Automatically start playback after loading (default true)'),
+    },
+    async (p) => {
+      try {
+        const sidPath = p.path.trim();
+
+        // Download via the server's HVSC proxy (handles mirrors + caching + rate limiting)
+        const downloadResp = await fetch(`${API_BASE}/api/hvsc/download?path=${encodeURIComponent(sidPath)}`);
+        if (!downloadResp.ok) {
+          const errBody = await downloadResp.text();
+          return textResult({ error: `HVSC download failed (${downloadResp.status}): ${errBody}` });
+        }
+
+        const buffer = Buffer.from(await downloadResp.arrayBuffer());
+        const filename = sidPath.split('/').pop() || 'tune.sid';
+        const base64 = buffer.toString('base64');
+
+        // Send to browser for loading
+        const loadResult = await callBrowser('load_file', {
+          filename,
+          data: base64,
+          subsong: p.subsong,
+        });
+
+        // Auto-play in song mode unless explicitly disabled
+        if (p.autoplay !== false) {
+          try {
+            await callBrowser('play', { mode: 'song' });
+          } catch { /* ignore play errors */ }
+        }
+
+        return textResult({
+          ...((typeof loadResult === 'object' && loadResult !== null) ? loadResult : { result: loadResult }),
+          source: 'hvsc',
+          path: sidPath,
+          filename,
+          autoplay: p.autoplay !== false,
+        });
+      } catch (e) {
+        return textResult({ error: `load_hvsc failed: ${(e as Error).message}` });
+      }
+    },
+  );
+
+  // ═══════════════════════════════════════════════════════════════════════════════
+  // HELP & BATCH OPERATIONS
+  // ═══════════════════════════════════════════════════════════════════════════════
+
+  server.tool(
+    'get_mcp_help',
+    'List all available MCP tools grouped by category with brief descriptions. Use this to discover what DEViLBOX can do. Optionally filter by category.',
+    {
+      category: z.string().optional().describe('Filter by category name (e.g., "transport", "mixer", "pattern", "synth", "modland", "hvsc", "performance")'),
+    },
+    async (p) => {
+      const categories: Record<string, Array<{ tool: string; description: string }>> = {
+        'Song & Project': [
+          { tool: 'get_song_info', description: 'Song state: BPM, speed, channels, patterns, order' },
+          { tool: 'get_full_state', description: 'Comprehensive dump of ALL tracker state' },
+          { tool: 'get_project_metadata', description: 'Project name, author, comments' },
+          { tool: 'set_project_metadata', description: 'Update project name, author, comments' },
+        ],
+        'Pattern Editing': [
+          { tool: 'get_pattern', description: 'Get pattern data (notes, instruments, effects)' },
+          { tool: 'get_pattern_list', description: 'List all patterns with metadata' },
+          { tool: 'get_cell', description: 'Get a single cell value' },
+          { tool: 'get_channel_column', description: 'Get all cells in a channel column' },
+          { tool: 'set_cell', description: 'Set a cell (note, instrument, volume, effects)' },
+          { tool: 'set_cells', description: 'Set multiple cells atomically' },
+          { tool: 'clear_cell', description: 'Clear a cell' },
+          { tool: 'clear_pattern', description: 'Clear an entire pattern' },
+          { tool: 'clear_channel', description: 'Clear a channel in a pattern' },
+          { tool: 'fill_range', description: 'Fill a range with values' },
+          { tool: 'write_note_sequence', description: 'Write a note sequence string' },
+          { tool: 'add_pattern', description: 'Add a new empty pattern' },
+          { tool: 'duplicate_pattern', description: 'Duplicate an existing pattern' },
+          { tool: 'resize_pattern', description: 'Change pattern row count' },
+          { tool: 'insert_row', description: 'Insert a row, shifting others down' },
+          { tool: 'delete_row', description: 'Delete a row, shifting others up' },
+          { tool: 'swap_channels', description: 'Swap two channels' },
+          { tool: 'render_pattern_text', description: 'Render pattern as ASCII text' },
+          { tool: 'validate_pattern', description: 'Check pattern for issues' },
+          { tool: 'search_pattern', description: 'Search for notes/values in a pattern' },
+          { tool: 'get_pattern_stats', description: 'Pattern statistics (note density, etc.)' },
+          { tool: 'diff_patterns', description: 'Diff two patterns' },
+        ],
+        'Pattern Order': [
+          { tool: 'get_pattern_order', description: 'Get the song arrangement order' },
+          { tool: 'set_pattern_order', description: 'Set the full pattern order' },
+          { tool: 'add_to_order', description: 'Add a pattern to the order' },
+          { tool: 'remove_from_order', description: 'Remove a position from the order' },
+        ],
+        'Transport': [
+          { tool: 'play', description: 'Start playback' },
+          { tool: 'stop', description: 'Stop playback' },
+          { tool: 'pause', description: 'Pause playback' },
+          { tool: 'set_bpm', description: 'Set tempo (BPM)' },
+          { tool: 'set_speed', description: 'Set tracker speed' },
+          { tool: 'set_swing', description: 'Set swing amount' },
+          { tool: 'set_global_pitch', description: 'Set global pitch offset' },
+          { tool: 'toggle_metronome', description: 'Toggle metronome click' },
+          { tool: 'set_looping', description: 'Enable/disable pattern looping' },
+          { tool: 'seek_to', description: 'Seek to a position' },
+          { tool: 'get_playback_state', description: 'Get playback state (playing, position, BPM)' },
+        ],
+        'Mixer': [
+          { tool: 'get_mixer_state', description: 'Get all channel volumes, pans, mutes, solos' },
+          { tool: 'set_master_volume', description: 'Set master volume' },
+          { tool: 'set_master_mute', description: 'Mute/unmute master' },
+          { tool: 'set_channel_volume', description: 'Set a channel volume' },
+          { tool: 'set_channel_pan', description: 'Set a channel pan' },
+          { tool: 'set_channel_mute', description: 'Mute/unmute a channel' },
+          { tool: 'set_channel_solo', description: 'Solo/unsolo a channel' },
+          { tool: 'solo_channel', description: 'Solo one channel, muting others' },
+          { tool: 'mute_all_channels', description: 'Mute all channels' },
+          { tool: 'unmute_all_channels', description: 'Unmute all channels' },
+          { tool: 'set_sample_bus_gain', description: 'Set sample bus gain (dB)' },
+          { tool: 'set_synth_bus_gain', description: 'Set synth bus gain (dB)' },
+        ],
+        'Master Effects': [
+          { tool: 'add_master_effect', description: 'Add effect to master chain' },
+          { tool: 'update_master_effect', description: 'Update effect parameters' },
+          { tool: 'remove_master_effect', description: 'Remove effect from chain' },
+          { tool: 'toggle_master_effect', description: 'Toggle effect on/off' },
+        ],
+        'Instruments': [
+          { tool: 'get_instruments_list', description: 'List all instruments' },
+          { tool: 'get_instrument', description: 'Get instrument details' },
+          { tool: 'get_current_instrument', description: 'Get currently selected instrument' },
+          { tool: 'select_instrument', description: 'Select an instrument' },
+          { tool: 'create_instrument', description: 'Create a new instrument' },
+          { tool: 'update_instrument', description: 'Update instrument properties' },
+          { tool: 'delete_instrument', description: 'Delete an instrument' },
+          { tool: 'clone_instrument', description: 'Clone an instrument' },
+        ],
+        'Synth & Sound Design': [
+          { tool: 'get_synth_config', description: 'Get synth sub-configs (TB303, envelope, etc.)' },
+          { tool: 'update_synth_config', description: 'Update synth sub-config' },
+          { tool: 'set_synth_param', description: 'Set real-time synth parameter' },
+          { tool: 'get_loaded_synths', description: 'List active synth instances' },
+          { tool: 'trigger_note', description: 'Trigger a note for preview' },
+          { tool: 'release_note', description: 'Release a held note' },
+          { tool: 'release_all_notes', description: 'Release all notes' },
+          { tool: 'analyze_instrument_spectrum', description: 'Capture FFT spectrum of a note' },
+          { tool: 'sweep_parameter', description: 'Sweep param range, measuring spectral response' },
+        ],
+        'Samples': [
+          { tool: 'get_sample_info', description: 'Sample metadata: loops, rate, slices' },
+          { tool: 'get_sample_waveform', description: 'Downsampled waveform for display' },
+        ],
+        'AI Composition': [
+          { tool: 'analyze_song', description: 'Detect key, scale, chords, channel roles' },
+          { tool: 'generate_pattern', description: 'Generate bass/drums/arpeggio/melody/chords' },
+          { tool: 'transform_pattern', description: 'Transform: transpose, reverse, invert, rotate, etc.' },
+        ],
+        'Live Performance': [
+          { tool: 'start_monitoring', description: 'Start audio monitoring ring buffer' },
+          { tool: 'get_monitoring_data', description: 'Get energy profile, BPM, snapshots' },
+          { tool: 'stop_monitoring', description: 'Stop audio monitoring' },
+          { tool: 'auto_mix', description: 'Reactive mixer: balance, duck, emphasize, reset' },
+          { tool: 'set_auto_effect', description: 'Audio-reactive effect parameter modulation' },
+          { tool: 'cancel_auto_effect', description: 'Cancel an auto-effect modulation' },
+        ],
+        'Audio Analysis': [
+          { tool: 'get_audio_analysis', description: 'RMS, peak, FFT, band energy, beat detection' },
+          { tool: 'get_audio_context_info', description: 'Web Audio context state' },
+          { tool: 'get_voice_state', description: 'Voice allocation state' },
+          { tool: 'get_instrument_level', description: 'Per-instrument audio level' },
+          { tool: 'get_audio_state', description: 'Audio engine diagnostics' },
+          { tool: 'get_audio_level', description: 'Measure audio output level over time' },
+          { tool: 'wait_for_audio', description: 'Wait until audio output is detected' },
+        ],
+        'File Loading': [
+          { tool: 'load_file', description: 'Load a music file from disk (188+ formats)' },
+        ],
+        'Modland Archive': [
+          { tool: 'search_modland', description: 'Search 190K+ tracker modules' },
+          { tool: 'get_modland_formats', description: 'List available formats' },
+          { tool: 'load_modland', description: 'Download & play a Modland module' },
+        ],
+        'HVSC (C64 SID)': [
+          { tool: 'search_hvsc', description: 'Search 80K+ SID tunes' },
+          { tool: 'get_hvsc_featured', description: 'Curated classic SID tunes' },
+          { tool: 'browse_hvsc', description: 'Browse HVSC directory tree' },
+          { tool: 'load_hvsc', description: 'Download & play a SID tune' },
+        ],
+        'Editor & UI': [
+          { tool: 'get_cursor', description: 'Current cursor position' },
+          { tool: 'get_selection', description: 'Current selection range' },
+          { tool: 'get_editor_state', description: 'Editor settings (octave, step, record mode)' },
+          { tool: 'get_ui_state', description: 'UI state (active view, zoom, status)' },
+          { tool: 'get_channel_state', description: 'Channel visibility and naming' },
+          { tool: 'move_cursor', description: 'Move cursor position' },
+          { tool: 'select_range', description: 'Select a range of cells' },
+          { tool: 'select_all', description: 'Select all cells in pattern' },
+          { tool: 'clear_selection', description: 'Clear the selection' },
+          { tool: 'set_octave', description: 'Set editor octave' },
+          { tool: 'set_edit_step', description: 'Set edit step (row advance)' },
+          { tool: 'toggle_record_mode', description: 'Toggle record/edit mode' },
+          { tool: 'set_follow_playback', description: 'Follow playback cursor' },
+          { tool: 'set_active_view', description: 'Switch UI view' },
+          { tool: 'set_status_message', description: 'Show status bar message' },
+          { tool: 'set_tracker_zoom', description: 'Set tracker zoom level' },
+          { tool: 'set_column_visibility', description: 'Show/hide tracker columns' },
+          { tool: 'toggle_bookmark', description: 'Toggle row bookmark' },
+        ],
+        'Transforms': [
+          { tool: 'transpose_selection', description: 'Transpose selection by semitones' },
+          { tool: 'interpolate_selection', description: 'Interpolate values in selection' },
+          { tool: 'humanize_selection', description: 'Add random velocity variation' },
+          { tool: 'scale_volume', description: 'Scale volume in selection' },
+          { tool: 'fade_volume', description: 'Fade volume across selection' },
+        ],
+        'Clipboard': [
+          { tool: 'copy_selection', description: 'Copy selection to clipboard' },
+          { tool: 'cut_selection', description: 'Cut selection to clipboard' },
+          { tool: 'paste', description: 'Paste clipboard at cursor' },
+          { tool: 'get_clipboard_state', description: 'Clipboard state' },
+        ],
+        'History': [
+          { tool: 'undo', description: 'Undo last edit' },
+          { tool: 'redo', description: 'Redo last undone edit' },
+          { tool: 'get_history_state', description: 'Undo/redo stack info' },
+        ],
+        'Diagnostics': [
+          { tool: 'get_synth_errors', description: 'Get synth error log' },
+          { tool: 'dismiss_errors', description: 'Dismiss error notifications' },
+          { tool: 'get_format_state', description: 'Format-specific state' },
+          { tool: 'get_midi_state', description: 'MIDI device state' },
+          { tool: 'get_oscilloscope_info', description: 'Oscilloscope state' },
+          { tool: 'get_arrangement_state', description: 'Arrangement timeline state' },
+          { tool: 'get_command_list', description: 'All keyboard commands' },
+          { tool: 'execute_command', description: 'Execute a named command' },
+        ],
+        'Testing': [
+          { tool: 'run_format_test', description: 'Load→play→measure single file, return pass/fail' },
+          { tool: 'run_regression_suite', description: 'Batch test multiple files, return pass rate' },
+        ],
+        'Export': [
+          { tool: 'export_wav', description: 'Render pattern/song to WAV (base64)' },
+          { tool: 'export_pattern_text', description: 'Export pattern as tracker text or CSV' },
+          { tool: 'export_midi', description: 'Export pattern/song to MIDI (base64)' },
+        ],
+        'Utility': [
+          { tool: 'get_mcp_help', description: 'This help listing' },
+          { tool: 'batch', description: 'Execute multiple tool calls atomically' },
+        ],
+      };
+
+      const filter = p.category?.toLowerCase();
+      let result: Record<string, Array<{ tool: string; description: string }>>;
+
+      if (filter) {
+        result = {};
+        for (const [cat, tools] of Object.entries(categories)) {
+          if (cat.toLowerCase().includes(filter)) {
+            result[cat] = tools;
+          }
+        }
+        if (Object.keys(result).length === 0) {
+          return textResult({
+            error: `No category matching "${p.category}". Available: ${Object.keys(categories).join(', ')}`,
+          });
+        }
+      } else {
+        result = categories;
+      }
+
+      // Add summary
+      const totalTools = Object.values(result).reduce((sum, tools) => sum + tools.length, 0);
+      return textResult({
+        totalTools,
+        categories: Object.keys(result).length,
+        tools: result,
+      });
+    },
+  );
+
+  // ═══════════════════════════════════════════════════════════════════════════════
+  // FORMAT REGRESSION TESTING
+  // ═══════════════════════════════════════════════════════════════════════════════
+
+  server.tool(
+    'run_format_test',
+    'Load a single music file, play it, measure audio output, and return pass/fail with metrics. The file must be base64-encoded. Returns: load time, audio detection time, RMS levels, and pass/fail.',
+    {
+      filename: z.string().describe('Filename with extension (e.g. "test.mod")'),
+      data: z.string().describe('Base64-encoded file data'),
+      subsong: z.number().optional().describe('Subsong index (default 0)'),
+      playDurationMs: z.number().optional().describe('How long to play before measuring (default 3000ms)'),
+      measureDurationMs: z.number().optional().describe('How long to measure audio levels (default 2000ms)'),
+      audioTimeoutMs: z.number().optional().describe('Max wait for audio to start (default 5000ms)'),
+    },
+    (p) => call('run_format_test', p),
+  );
+
+  server.tool(
+    'run_regression_suite',
+    'Run a batch of format tests. Pass an array of files, each with filename + base64 data. Returns per-file pass/fail results and overall pass rate.',
+    {
+      files: z.array(z.object({
+        filename: z.string().describe('Filename with extension'),
+        data: z.string().describe('Base64-encoded file data'),
+        subsong: z.number().optional().describe('Subsong index'),
+      })).describe('Array of files to test'),
+      playDurationMs: z.number().optional().describe('Play duration per file (default 2000ms)'),
+      measureDurationMs: z.number().optional().describe('Measure duration per file (default 1000ms)'),
+    },
+    (p) => call('run_regression_suite', p as Record<string, unknown>),
+  );
+
+  // ═══════════════════════════════════════════════════════════════════════════════
+  // EXPORT TOOLS
+  // ═══════════════════════════════════════════════════════════════════════════════
+
+  server.tool(
+    'export_wav',
+    'Render current pattern or full song to WAV audio. Returns base64-encoded WAV data. For Tone.js synth-based songs only (not UADE/WASM engine formats).',
+    {
+      scope: z.enum(['pattern', 'song']).optional().describe('Export scope: "pattern" (default) or "song" (all patterns in order)'),
+      patternIndex: z.number().optional().describe('Pattern index to export (default: current pattern). Only used when scope="pattern".'),
+    },
+    (p) => call('export_wav', p),
+  );
+
+  server.tool(
+    'export_pattern_text',
+    'Export a pattern as formatted text (tracker ASCII view or CSV). Useful for analysis, documentation, or piping to other tools.',
+    {
+      patternIndex: z.number().optional().describe('Pattern index (default: current)'),
+      format: z.enum(['tracker', 'csv']).optional().describe('"tracker" (ASCII tracker view, default) or "csv" (row,channel,note,instrument,volume,effectType,effectValue)'),
+    },
+    (p) => call('export_pattern_text', p),
+  );
+
+  server.tool(
+    'export_midi',
+    'Export current pattern or full song to Standard MIDI File. Returns base64-encoded MIDI data.',
+    {
+      scope: z.enum(['pattern', 'song']).optional().describe('Export scope: "pattern" (default) or "song"'),
+      patternIndex: z.number().optional().describe('Pattern index (default: current). Only used when scope="pattern".'),
+    },
+    (p) => call('export_midi', p),
+  );
+
+  server.tool(
+    'batch',
+    'Execute multiple tool calls in sequence, returning all results. Useful for atomic multi-step operations (e.g., set multiple cells then play). Stops on first error unless continueOnError is true.',
+    {
+      operations: z.array(z.object({
+        tool: z.string().describe('Tool name to call'),
+        args: z.record(z.string(), z.any()).optional().describe('Tool arguments'),
+      })).describe('List of operations to execute in order'),
+      continueOnError: z.boolean().optional().describe('Continue executing after an error (default false)'),
+    },
+    async (p) => {
+      const results: Array<{ tool: string; success: boolean; result?: unknown; error?: string }> = [];
+
+      for (const op of p.operations) {
+        try {
+          const result = await callBrowser(op.tool, op.args ?? {});
+          results.push({ tool: op.tool, success: true, result });
+        } catch (e) {
+          const error = (e as Error).message;
+          results.push({ tool: op.tool, success: false, error });
+          if (!p.continueOnError) {
+            return textResult({
+              completed: results.length,
+              total: p.operations.length,
+              stoppedOnError: true,
+              results,
+            });
+          }
+        }
+      }
+
+      return textResult({
+        completed: results.length,
+        total: p.operations.length,
+        allSucceeded: results.every(r => r.success),
+        results,
+      });
+    },
   );
 
   return server;

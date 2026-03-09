@@ -20,6 +20,11 @@ import { useOscilloscopeStore } from '../../stores/useOscilloscopeStore';
 import { useSynthErrorStore } from '../../stores/useSynthErrorStore';
 import { useMIDIStore } from '../../stores/useMIDIStore';
 import { useArrangementStore } from '../../stores/useArrangementStore';
+import { getGlobalRegistry } from '../../hooks/useGlobalKeyboardHandler';
+import { getTrackerReplayer } from '../../engine/TrackerReplayer';
+import { getToneEngine } from '../../engine/ToneEngine';
+import * as Tone from 'tone';
+import { AudioDataBus } from '../../engine/vj/AudioDataBus';
 
 // ─── Note Helpers ──────────────────────────────────────────────────────────────
 
@@ -208,12 +213,29 @@ export function getChannelColumn(params: Record<string, unknown>): Record<string
 
 export function getInstrumentsList(): Record<string, unknown>[] {
   const instruments = useInstrumentStore.getState().instruments;
-  return instruments.map((inst) => ({
-    id: inst.id,
-    name: inst.name,
-    type: inst.type,
-    synthType: inst.synthType,
-  }));
+  if (instruments.length > 0) {
+    return instruments.map((inst) => ({
+      id: inst.id,
+      name: inst.name,
+      type: inst.type,
+      synthType: inst.synthType,
+    }));
+  }
+  // Fallback: check TrackerReplayer song for imported module instruments
+  try {
+    // getTrackerReplayer imported at top level
+    const replayer = getTrackerReplayer();
+    const song = replayer?.getSong();
+    if (song?.instruments?.length) {
+      return song.instruments.map((inst: { id: number; name: string; type?: string; synthType?: string }) => ({
+        id: inst.id,
+        name: inst.name,
+        type: inst.type ?? 'sample',
+        synthType: inst.synthType ?? 'TrackerSample',
+      }));
+    }
+  } catch { /* replayer not available */ }
+  return [];
 }
 
 export function getInstrument(params: Record<string, unknown>): Record<string, unknown> {
@@ -696,22 +718,21 @@ export function getClipboardState(): Record<string, unknown> {
 
 export function getCommandList(): Record<string, unknown> {
   try {
-    const { getGlobalRegistry } = require('../../hooks/useGlobalKeyboardHandler');
+    // getGlobalRegistry imported at top level
     const registry = getGlobalRegistry();
     if (!registry) return { error: 'Command registry not initialized' };
 
     const commands = registry.getAllCommands();
     return {
       count: commands.length,
-      commands: commands.map((cmd: { name: string; label: string; shortcut?: string; contexts: string[] }) => ({
+      commands: commands.map((cmd) => ({
         name: cmd.name,
-        label: cmd.label,
-        shortcut: cmd.shortcut,
+        description: cmd.description,
         contexts: cmd.contexts,
       })),
     };
-  } catch {
-    return { error: 'Command registry not available' };
+  } catch (e) {
+    return { error: `Command registry not available: ${(e as Error).message}` };
   }
 }
 
@@ -848,8 +869,7 @@ export function getSampleInfo(params: Record<string, unknown>): Record<string, u
 
   // Add decoded buffer info from ToneEngine
   try {
-    const { ToneEngine } = require('../../engine/ToneEngine');
-    const engine = ToneEngine.getInstance();
+    const engine = getToneEngine();
     const decoded = engine.getDecodedBuffer(id);
     if (decoded) {
       result.decodedBuffer = {
@@ -870,8 +890,7 @@ export function getSampleWaveform(params: Record<string, unknown>): Record<strin
   const resolution = (params.resolution as number) ?? 256; // number of points
 
   try {
-    const { ToneEngine } = require('../../engine/ToneEngine');
-    const engine = ToneEngine.getInstance();
+    const engine = getToneEngine();
     const decoded = engine.getDecodedBuffer(id);
     if (!decoded) return { error: `No decoded buffer for instrument ${id}` };
 
@@ -976,13 +995,11 @@ export function getSynthConfig(params: Record<string, unknown>): Record<string, 
 /** Get real-time audio analysis: FFT, RMS, peak, band energy, beat detection */
 export function getAudioAnalysis(): Record<string, unknown> {
   try {
-    const { AudioDataBus } = require('../../engine/vj/AudioDataBus');
-    const bus = AudioDataBus.getInstance?.();
-    if (!bus) return { error: 'AudioDataBus not initialized. Play some audio first.' };
+    const bus = AudioDataBus.getShared();
 
     // Force an update to get fresh data
     bus.update();
-    const frame = bus.getFrame?.() ?? bus;
+    const frame = bus.getFrame();
 
     const result: Record<string, unknown> = {
       rms: +(frame.rms ?? 0).toFixed(4),
@@ -1029,18 +1046,20 @@ export function getAudioAnalysis(): Record<string, unknown> {
     }
 
     return result;
-  } catch {
-    return { error: 'Audio analysis not available' };
+  } catch (e) {
+    return { error: `Audio analysis not available: ${(e as Error).message}` };
   }
 }
 
 /** Get AudioContext properties: sampleRate, latency, state */
 export function getAudioContextInfo(): Record<string, unknown> {
   try {
-    const { ToneEngine } = require('../../engine/ToneEngine');
-    const engine = ToneEngine.getInstance();
-    const ctx = engine.nativeContext as AudioContext;
-    if (!ctx) return { error: 'AudioContext not initialized' };
+    // Try Tone.js context (available after user gesture)
+    const toneCtx = Tone.getContext();
+    const ctx = ((toneCtx as unknown as { rawContext?: AudioContext }).rawContext
+      ?? (toneCtx as unknown as { _context?: AudioContext })._context
+      ?? (toneCtx as unknown as AudioContext)) as AudioContext;
+    if (!ctx?.sampleRate) return { error: 'AudioContext not initialized' };
 
     return {
       sampleRate: ctx.sampleRate,
@@ -1049,20 +1068,19 @@ export function getAudioContextInfo(): Record<string, unknown> {
       baseLatency: ctx.baseLatency ?? null,
       outputLatency: (ctx as { outputLatency?: number }).outputLatency ?? null,
     };
-  } catch {
-    return { error: 'AudioContext not available' };
+  } catch (e) {
+    return { error: `AudioContext not available: ${(e as Error).message}` };
   }
 }
 
 /** Get voice allocation state: active voices, utilization, details */
 export function getVoiceState(): Record<string, unknown> {
   try {
-    const { ToneEngine } = require('../../engine/ToneEngine');
-    const engine = ToneEngine.getInstance();
+    const engine = getToneEngine();
 
-    if (engine.voiceAllocator) {
-      const stats = engine.voiceAllocator.getStats();
-      const voices = engine.voiceAllocator.getAllActiveVoices();
+    if ((engine as any).voiceAllocator) {
+      const stats = (engine as any).voiceAllocator.getStats();
+      const voices = (engine as any).voiceAllocator.getAllActiveVoices();
       return {
         ...stats,
         voices: voices.map((v: { channelIndex: number; note: string; instrumentId: number; velocity: number; isReleasing: boolean; startTime: number }) => ({
@@ -1077,8 +1095,8 @@ export function getVoiceState(): Record<string, unknown> {
     }
 
     return { activeVoices: 0, freeVoices: 0, maxVoices: 0, utilizationPercent: 0, voices: [] };
-  } catch {
-    return { error: 'Voice allocator not available' };
+  } catch (e) {
+    return { error: `Voice allocator not available: ${(e as Error).message}` };
   }
 }
 
@@ -1086,8 +1104,7 @@ export function getVoiceState(): Record<string, unknown> {
 export function getInstrumentLevel(params: Record<string, unknown>): Record<string, unknown> {
   const id = params.id as number;
   try {
-    const { ToneEngine } = require('../../engine/ToneEngine');
-    const engine = ToneEngine.getInstance();
+    const engine = getToneEngine();
     const analyser = engine.getInstrumentAnalyser(id);
     if (!analyser) return { instrumentId: id, level: 0, peak: 0, active: false };
 
@@ -1105,8 +1122,9 @@ export function getInstrumentLevel(params: Record<string, unknown>): Record<stri
 /** List all loaded synth instances in the engine */
 export function getLoadedSynths(): Record<string, unknown> {
   try {
-    const { ToneEngine } = require('../../engine/ToneEngine');
-    const engine = ToneEngine.getInstance();
+    const engine = getToneEngine();
+    if (!engine) return { count: 0, synths: [] };
+
     const instruments = engine.instruments as Map<number, unknown>;
     const list: Record<string, unknown>[] = [];
 
@@ -1118,7 +1136,6 @@ export function getLoadedSynths(): Record<string, unknown> {
         synthType: inst?.synthType ?? 'unknown',
       };
 
-      // Check if it's a DevilboxSynth (has .name property on the synth itself)
       if (synth && typeof synth === 'object' && 'name' in synth) {
         entry.engineName = (synth as { name: string }).name;
       }
@@ -1127,8 +1144,8 @@ export function getLoadedSynths(): Record<string, unknown> {
     });
 
     return { count: list.length, synths: list };
-  } catch {
-    return { error: 'Engine not available' };
+  } catch (e) {
+    return { error: `Engine not available: ${(e as Error).message}` };
   }
 }
 

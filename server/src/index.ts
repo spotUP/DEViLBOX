@@ -15,10 +15,12 @@ import hvscRoutes from './routes/hvsc';
 import songdbRoutes from './routes/songdb';
 import scRoutes from './routes/sc';
 import deepsidRoutes from './routes/deepsid';
+import aiRoutes from './routes/ai';
 import { initDatabase } from './db/database';
 import { initDataDirectories } from './utils/fileSystem';
 import { initModlandIndex, scheduleModlandUpdates } from './services/modlandIndexer';
 import { initSongDB, scheduleSongDBUpdates } from './services/songdbIndexer';
+import { startRelay as startMcpRelay } from './mcp/wsRelay';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -85,6 +87,7 @@ app.use('/api/hvsc', hvscRoutes);
 app.use('/api/songdb', songdbRoutes);
 app.use('/api/sc', scRoutes);
 app.use('/api/deepsid', deepsidRoutes);
+app.use('/api/ai', aiRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
@@ -167,6 +170,9 @@ initSongDB().catch((err) => {
   console.error('[SongDB] Init failed:', err);
 });
 scheduleSongDBUpdates();
+
+// Start MCP WebSocket relay (port 4003) so the AI panel can control any browser
+startMcpRelay();
 
 // Start server
 app.listen(PORT, () => {

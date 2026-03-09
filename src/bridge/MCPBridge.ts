@@ -127,9 +127,30 @@ import {
   toggleMasterEffect,
   setSampleBusGain,
   setSynthBusGain,
+  loadFile,
+  getAudioLevel,
+  waitForAudio,
+  analyzeInstrumentSpectrum,
+  sweepParameter,
+  startMonitoring,
+  getMonitoringData,
+  stopMonitoring,
+  autoMix,
+  setAutoEffect,
+  cancelAutoEffect,
+  dismissModal,
+  getModalState,
+  runFormatTest,
+  runRegressionSuite,
+  exportWav,
+  exportPatternText,
+  exportMidi,
 } from './handlers/writeHandlers';
+import { analyzeSongHandler } from './handlers/analysisHandlers';
+import { generatePattern, transformPattern } from './handlers/generatorHandlers';
 
 const WS_URL = 'ws://localhost:4003';
+const INITIAL_BACKOFF_MS = 2000;
 const MAX_BACKOFF_MS = 30000;
 
 type Handler = (params: Record<string, unknown>) => unknown | Promise<unknown>;
@@ -297,11 +318,46 @@ const handlers: Record<string, Handler> = {
   // ─── Write: Bus Gains ─────────────────────────────────────────────────────
   set_sample_bus_gain: setSampleBusGain,
   set_synth_bus_gain: setSynthBusGain,
+
+  // ─── File Loading & Audio Measurement ───────────────────────────────────
+  load_file: loadFile,
+  get_audio_level: getAudioLevel,
+  wait_for_audio: waitForAudio,
+
+  // ─── Analysis & Composition ─────────────────────────────────────────────
+  analyze_song: analyzeSongHandler,
+  generate_pattern: generatePattern,
+  transform_pattern: transformPattern,
+
+  // ─── Synth Programming ──────────────────────────────────────────────────────
+  analyze_instrument_spectrum: analyzeInstrumentSpectrum,
+  sweep_parameter: sweepParameter,
+
+  // ─── Live Performance ─────────────────────────────────────────────────────
+  start_monitoring: startMonitoring,
+  get_monitoring_data: getMonitoringData,
+  stop_monitoring: stopMonitoring,
+  auto_mix: autoMix,
+  set_auto_effect: setAutoEffect,
+  cancel_auto_effect: cancelAutoEffect,
+
+  // ─── Modal Control ────────────────────────────────────────────────────────
+  dismiss_modal: dismissModal,
+  get_modal_state: getModalState,
+
+  // ─── Format Regression Testing ──────────────────────────────────────────
+  run_format_test: runFormatTest,
+  run_regression_suite: runRegressionSuite,
+
+  // ─── Export Tools ───────────────────────────────────────────────────────
+  export_wav: exportWav,
+  export_pattern_text: exportPatternText,
+  export_midi: exportMidi,
 };
 
 let ws: WebSocket | null = null;
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
-let backoffMs = 1000;
+let backoffMs = INITIAL_BACKOFF_MS;
 let disposed = false;
 let connectAttempts = 0;
 
@@ -347,8 +403,11 @@ function connect(): void {
 
   ws.onopen = () => {
     console.log('[mcp-bridge] Connected to MCP relay');
-    backoffMs = 1000;
+    backoffMs = INITIAL_BACKOFF_MS;
     connectAttempts = 0;
+
+    // Auto-dismiss the welcome modal so MCP agents can work immediately
+    try { dismissModal(); } catch { /* ignore if store not ready */ }
   };
 
   ws.onmessage = (event) => {
