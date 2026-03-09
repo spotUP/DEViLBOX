@@ -20,9 +20,26 @@
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, TrackerCell, InstrumentConfig } from '@/types';
 import type { SidMonConfig, UADEChipRamInfo } from '@/types/instrument';
+import { arrayBufferToBase64 } from '@/lib/import/InstrumentConverter';
 
 // -- SidMon II period table (from S2Player.js) --------------------------------
 // Index 0 is unused (0). Indices 1-72 cover 6 octaves (C-1 to B-6).
+
+/** Convert signed 8-bit PCM to a WAV data URL for the sample editor */
+function pcm8ToWavDataUrl(pcm: Uint8Array, sampleRate = 8363): string {
+  const n = pcm.length;
+  const buf = new ArrayBuffer(44 + n);
+  const v = new DataView(buf);
+  const w = (off: number, s: string) => { for (let i = 0; i < s.length; i++) v.setUint8(off + i, s.charCodeAt(i)); };
+  w(0, 'RIFF'); v.setUint32(4, 36 + n, true); w(8, 'WAVE');
+  w(12, 'fmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+  v.setUint32(24, sampleRate, true); v.setUint32(28, sampleRate, true);
+  v.setUint16(32, 1, true); v.setUint16(34, 8, true);
+  w(36, 'data'); v.setUint32(40, n, true);
+  const dst = new Uint8Array(buf, 44);
+  for (let i = 0; i < n; i++) dst[i] = (pcm[i] + 128) & 0xFF;
+  return `data:audio/wav;base64,${arrayBufferToBase64(buf)}`;
+}
 
 const PERIODS = [
   0,
@@ -529,6 +546,10 @@ export async function parseSidMon2File(
       },
     };
 
+    // Attach sample data for the sample editor when PCM is available
+    const sampleUrl = pcm && pcm.length > 0 ? pcm8ToWavDataUrl(pcm) : undefined;
+    const loopEnabled = loopLength > 2 && loopStart >= 0;
+
     trackerInstruments.push({
       id: i,
       name: smp?.name || `Instrument ${i}`,
@@ -539,6 +560,21 @@ export async function parseSidMon2File(
       effects: [],
       volume: -6,
       pan: 0,
+      ...(sampleUrl ? {
+        sample: {
+          url: sampleUrl,
+          sampleRate: 8363,
+          baseNote: 'C-4',
+          detune: 0,
+          loop: loopEnabled,
+          loopType: loopEnabled ? 'forward' as const : 'off' as const,
+          loopStart,
+          loopEnd: loopEnabled ? loopStart + loopLength : 0,
+          reverse: false,
+          playbackRate: 1.0,
+        },
+        parameters: { sampleUrl },
+      } : {}),
     } as InstrumentConfig);
   }
 
