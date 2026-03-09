@@ -95,6 +95,55 @@ export function saveModule(): boolean {
           return;
         }
 
+        // AMOS Music Bank (.abk) export
+        if (sourceFormat === 'AMOSMusicBank') {
+          const { exportAMOSMusicBank } = await import('@/lib/export/AMOSMusicBankExporter');
+          const { saveAs } = await import('file-saver');
+          const buf = exportAMOSMusicBank(song);
+          const filename = (song.name || 'module').replace(/\.[^/.]+$/, '') + '.abk';
+          saveAs(new Blob([buf]), filename);
+          useUIStore.getState().setStatusMessage('AMOS Music Bank exported', false, 1500);
+          return;
+        }
+
+        // FuturePlayer (.fp) export with shadow array edits
+        if (sourceFormat === 'FuturePlayer' && song.futurePlayerFileData) {
+          const { exportAsFuturePlayer } = await import('@/lib/export/FuturePlayerExporter');
+          const { saveAs } = await import('file-saver');
+          const result = await exportAsFuturePlayer(song);
+          saveAs(result.data, result.filename);
+          // Also save sidecar if present
+          if (result.sidecar) {
+            saveAs(result.sidecar.data, result.sidecar.filename);
+          }
+          const msg = result.warnings.length > 0
+            ? `FuturePlayer exported — ${result.warnings[0]}`
+            : 'FuturePlayer exported';
+          useUIStore.getState().setStatusMessage(msg, false, 2500);
+          return;
+        }
+
+        // SidMon II (.sd2) export
+        if (sourceFormat === 'SIDMON2' && song.sd2FileData) {
+          const { exportSidMon2File } = await import('@/lib/export/SidMon2Exporter');
+          const { saveAs } = await import('file-saver');
+          const data = await exportSidMon2File(song);
+          const filename = (song.name || 'module').replace(/\.[^/.]+$/, '') + '.sd2';
+          saveAs(new Blob([data as BlobPart]), filename);
+          useUIStore.getState().setStatusMessage('SidMon II exported', false, 1500);
+          return;
+        }
+
+        // Music Assembler (.ma) export
+        if (sourceFormat === 'MusicAssembler' && song.maFileData) {
+          const { exportAsMusicAssembler } = await import('@/lib/export/MusicAssemblerExporter');
+          const { saveAs } = await import('file-saver');
+          const result = await exportAsMusicAssembler(song);
+          saveAs(result.data, result.filename);
+          useUIStore.getState().setStatusMessage('Music Assembler exported', false, 1500);
+          return;
+        }
+
         // Symphonie Pro (.symmod) export
         if (sourceFormat === 'Symphonie' && song.symphonieFileData) {
           const { exportSymphonieProFile } = await import('@/lib/export/SymphonieProExporter');

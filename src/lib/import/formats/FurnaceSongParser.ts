@@ -44,7 +44,7 @@ import {
   convertFurnaceCell,
   convertFurnaceNoteValue,
 } from './furnace/FurnacePatternParser';
-import { parseInstrument } from './furnace/FurnaceInstrumentParser';
+import { parseInstrument, encodeInstrumentAsINS2 } from './furnace/FurnaceInstrumentParser';
 
 // Re-export sub-parser types so existing consumers keep working
 export type {
@@ -141,7 +141,7 @@ const FURNACE_TYPE_MAP: Record<number, SynthType> = {
 /**
  * Map Furnace instrument type to SynthType
  */
-function mapFurnaceInstrumentType(furType: number): SynthType {
+export function mapFurnaceInstrumentType(furType: number): SynthType {
   return FURNACE_TYPE_MAP[furType] || 'ChipSynth';
 }
 
@@ -1938,7 +1938,16 @@ async function parseOldFormat(
       reader.seek(startOffset);
       const rawData = reader.readBytes(rawDataSize);
       inst.rawBinaryData = rawData;
-      console.log(`[FurnaceParser OLD] Inst ${i} rawBinaryData captured: ${inst.rawBinaryData?.length ?? 0} bytes, first 4 bytes: ${Array.from(inst.rawBinaryData.slice(0, 4)).map(b => String.fromCharCode(b)).join('')}`);
+
+      // If raw data is old INST format, re-encode as INS2 for the WASM loader
+      const rawMagic = String.fromCharCode(rawData[0], rawData[1], rawData[2], rawData[3]);
+      if (rawMagic === 'INST') {
+        const ins2Data = encodeInstrumentAsINS2(inst, version);
+        inst.rawBinaryData = ins2Data;
+        console.log(`[FurnaceParser OLD] Inst ${i} "${inst.name}": INST→INS2 re-encoded (${rawData.length} → ${ins2Data.length} bytes)`);
+      } else {
+        console.log(`[FurnaceParser OLD] Inst ${i} rawBinaryData captured: ${inst.rawBinaryData?.length ?? 0} bytes, first 4 bytes: ${rawMagic}`);
+      }
       
       module.instruments.push(inst);
     } catch (e) {
@@ -2176,7 +2185,7 @@ function parseSample(reader: BinaryReader, version: number): FurnaceSample {
     sample.loopEnd = reader.readInt32();
     reader.skip(16); // Sample presence bitfields
 
-    // Read sample data
+    // Read sample data — byte count depends on depth (matches Furnace sample.cpp initInternal)
     if (sample.depth === 16) {
       const data = new Int16Array(sample.length);
       for (let i = 0; i < sample.length; i++) {
@@ -2190,8 +2199,50 @@ function parseSample(reader: BinaryReader, version: number): FurnaceSample {
       }
       sample.data = data;
     } else {
-      // Other depths - read as bytes
-      sample.data = reader.readBytes(sample.length);
+      // Non-trivial depths: calculate byte count from frame count
+      // Must match Furnace sample.cpp initInternal() / getCurBufLen()
+      const count = sample.length;
+      let byteCount: number;
+      switch (sample.depth) {
+        case 0:  // DIV_SAMPLE_DEPTH_1BIT
+          byteCount = Math.floor((count + 7) / 8);
+          break;
+        case 1:  // DIV_SAMPLE_DEPTH_1BIT_DPCM (NES DPCM)
+          byteCount = count > 0 ? 1 + ((Math.floor((count - 1) / 8) + 15) & ~15) : 0;
+          break;
+        case 3:  // DIV_SAMPLE_DEPTH_YMZ_ADPCM
+        case 4:  // DIV_SAMPLE_DEPTH_QSOUND_ADPCM
+        case 9:  // DIV_SAMPLE_DEPTH_VOX
+        case 12: // DIV_SAMPLE_DEPTH_4BIT
+          byteCount = Math.floor((count + 1) / 2);
+          break;
+        case 5:  // DIV_SAMPLE_DEPTH_ADPCM_A
+          byteCount = Math.floor((count + 1) / 2);
+          break;
+        case 6:  // DIV_SAMPLE_DEPTH_ADPCM_B
+          byteCount = Math.floor((count + 1) / 2);
+          break;
+        case 10: // DIV_SAMPLE_DEPTH_MULAW
+          byteCount = count;
+          break;
+        case 11: // DIV_SAMPLE_DEPTH_C219
+          byteCount = Math.floor((count + 1) & ~1); // padded to even
+          break;
+        case 13: // DIV_SAMPLE_DEPTH_IMA_ADPCM
+          byteCount = 4 + Math.floor((count + 1) / 2);
+          break;
+        case 14: // DIV_SAMPLE_DEPTH_12BIT
+          byteCount = Math.floor((count * 3 + 1) / 2);
+          break;
+        case 7:  // DIV_SAMPLE_DEPTH_BRR
+          byteCount = 9 * Math.ceil(count / 16);
+          break;
+        default:
+          // Unknown depth — assume 1 byte per sample as fallback
+          byteCount = count;
+          break;
+      }
+      sample.data = reader.readBytes(byteCount);
     }
   } else if (magic === 'SMPL') {
     // Old sample format
@@ -2345,8 +2396,8 @@ export function convertFurnaceToDevilbox(module: FurnaceModule, subsongIndex = 0
   /** Module-level wavetables for WASM dispatch upload */
   wavetables: Array<{ data: number[]; width: number; height: number }>;
   /** Module-level samples for WASM dispatch upload */
-  samples: Array<{ data: Int16Array | Int8Array; rate: number; depth: number;
-    loopStart: number; loopEnd: number; loopMode: number; name: string }>;
+  samples: Array<{ data: Int16Array | Int8Array | Uint8Array; rate: number; depth: number;
+    samples: number; loopStart: number; loopEnd: number; loopMode: number; name: string }>;
   /** Native Furnace data for format-specific editor */
   furnaceNative: FurnaceNativeData;
 } {
@@ -2690,9 +2741,10 @@ export function convertFurnaceToDevilbox(module: FurnaceModule, subsongIndex = 0
       height: wt.height,
     })),
     samples: module.samples.map(s => ({
-      data: s.data as Int16Array | Int8Array,
+      data: s.data as Int16Array | Int8Array | Uint8Array,
       rate: s.c4Rate,
       depth: s.depth,
+      samples: s.length,
       loopStart: s.loopStart,
       loopEnd: s.loopEnd,
       loopMode: s.loopDirection ?? 0,

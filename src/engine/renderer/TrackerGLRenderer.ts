@@ -112,12 +112,13 @@ function linkProgram(gl: WebGL2RenderingContext, vert: string, frag: string): We
   return prog;
 }
 
-function noteToString(note: number): string {
+function noteToString(note: number, displayOffset = 0): string {
   if (note === 0) return '---';
   if (note === 97) return 'OFF';
+  const adjusted = note + displayOffset;
   const NOTE_NAMES = ['C-', 'C#', 'D-', 'D#', 'E-', 'F-', 'F#', 'G-', 'G#', 'A-', 'A#', 'B-'];
-  const noteIndex = (note - 1) % 12;
-  const octave = Math.floor((note - 1) / 12);
+  const noteIndex = ((adjusted - 1) % 12 + 12) % 12;
+  const octave = Math.floor((adjusted - 1) / 12);
   return `${NOTE_NAMES[noteIndex]}${octave}`;
 }
 
@@ -559,7 +560,7 @@ export class TrackerGLRenderer {
 
         if (isCollapsed) {
           // Just note column
-          const noteStr = noteToString(cell.note ?? 0);
+          const noteStr = noteToString(cell.note ?? 0, ui.noteDisplayOffset);
           const nc = cell.note === 0 ? colors.textMuted : colors.textNote;
           this.addGlyphString(noteStr, x, gy, atlas,
             [nc[0], nc[1], nc[2], nc[3] * ghostAlpha]);
@@ -573,7 +574,7 @@ export class TrackerGLRenderer {
           const nc = cellNote === 0 ? colors.textMuted
                    : cellNote === 97 ? colors.textEffect
                    : (isCurrentPlayingRow && cellNote > 0 ? colors.textNoteActive : colors.textNote);
-          this.addGlyphString(noteToString(cellNote), x, gy, atlas,
+          this.addGlyphString(noteToString(cellNote, ui.noteDisplayOffset), x, gy, atlas,
             [nc[0], nc[1], nc[2], nc[3] * ghostAlpha]);
         }
 
@@ -755,7 +756,7 @@ export class TrackerGLRenderer {
         const di  = cursor.digitIndex;
         let charStr = '';
         if (col === 'note') {
-          charStr = noteToString(caretCell.note ?? 0);
+          charStr = noteToString(caretCell.note ?? 0, ui.noteDisplayOffset);
         } else if (col === 'instrument') {
           const s = (caretCell.instrument ?? 0) === 0 ? '..' : hexByte(caretCell.instrument ?? 0);
           charStr = s[di] ?? '.';

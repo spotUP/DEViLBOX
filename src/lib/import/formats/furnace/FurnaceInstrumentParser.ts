@@ -684,7 +684,21 @@ export function parseInstrument(reader: BinaryReader): FurnaceInstrument {
       inst.macros.push({ code: 0, length: volMacroLen, loop: volMacroLoop, release: -1, mode: 0, type: 0, delay: 0, speed: 1, data: volMacroVals });
     }
     if (arpMacroLen > 0) {
-      inst.macros.push({ code: 1, length: arpMacroLen, loop: arpMacroLoop, release: -1, mode: arpMode, type: 0, delay: 0, speed: 1, data: arpMacroVals });
+      // Version < 112: convert old fixed-arp format — XOR values with 0x40000000, reset mode
+      // Reference: instrument.cpp:4155-4165
+      let finalArpMode = arpMode;
+      const finalArpVals = [...arpMacroVals];
+      if (instVersion < 112 && arpMode) {
+        finalArpMode = 0;
+        for (let j = 0; j < arpMacroLen; j++) {
+          finalArpVals[j] = (finalArpVals[j] ^ 0x40000000) | 0;
+        }
+        // Add trailing zero if loop/release go past end
+        if ((arpMacroLoop >= arpMacroLen) && arpMacroLen < 255) {
+          finalArpVals.push(0);
+        }
+      }
+      inst.macros.push({ code: 1, length: finalArpVals.length, loop: arpMacroLoop, release: -1, mode: finalArpMode, type: 0, delay: 0, speed: 1, data: finalArpVals });
     }
     if (dutyMacroLen > 0) {
       inst.macros.push({ code: 2, length: dutyMacroLen, loop: dutyMacroLoop, release: -1, mode: 0, type: 0, delay: 0, speed: 1, data: dutyMacroVals });
@@ -1260,9 +1274,451 @@ export function parseFMData(reader: BinaryReader): FurnaceConfig {
 }
 
 /**
+ * Encode a parsed FurnaceInstrument back into INS2 binary format.
+ *
+ * The C++ loader at FurnaceDispatchWrapper.cpp::furnace_dispatch_load_ins2() expects:
+ *   Magic "INS2" (4 bytes) + blockLen (4 bytes, uint32) + version (2 bytes, uint16)
+ *   + insType (1 byte) + reserved (1 byte) + feature blocks + "EN" terminator.
+ *
+ * Each feature block: 2-char code + 2-byte length + data.
+ */
+export function encodeInstrumentAsINS2(inst: FurnaceInstrument, formatVersion: number): Uint8Array {
+  // Pre-allocate generous buffer; we'll slice at the end
+  const buf = new ArrayBuffer(65536);
+  const view = new DataView(buf);
+  const u8 = new Uint8Array(buf);
+  let pos = 0;
+
+  // Helper: write bytes
+  const writeUint8 = (v: number) => { view.setUint8(pos, v & 0xFF); pos += 1; };
+  const writeInt8 = (v: number) => { view.setInt8(pos, v); pos += 1; };
+  const writeUint16 = (v: number) => { view.setUint16(pos, v & 0xFFFF, true); pos += 2; };
+  const writeInt16 = (v: number) => { view.setInt16(pos, v, true); pos += 2; };
+  const writeUint32 = (v: number) => { view.setUint32(pos, v >>> 0, true); pos += 4; };
+  const writeInt32 = (v: number) => { view.setInt32(pos, v, true); pos += 4; };
+  const writeAscii = (s: string) => { for (let i = 0; i < s.length; i++) { u8[pos++] = s.charCodeAt(i); } };
+
+  // Helper: start a feature block, returns position of the length field to patch later
+  const startFeature = (code: string): number => {
+    writeAscii(code);
+    const lenPos = pos;
+    writeUint16(0); // placeholder for length
+    return lenPos;
+  };
+  // Helper: finish a feature block by patching its length
+  const endFeature = (lenPos: number) => {
+    const featDataStart = lenPos + 2;
+    const featLen = pos - featDataStart;
+    view.setUint16(lenPos, featLen, true);
+  };
+
+  // ── Header ──
+  // Magic "INS2"
+  writeAscii('INS2');
+  const blockLenPos = pos;
+  writeUint32(0); // placeholder for block length (patched at end)
+  // Version — use the provided formatVersion (clamped to uint16)
+  const version = Math.min(formatVersion, 65535);
+  writeUint16(version);
+  // Instrument type
+  writeUint8(inst.type & 0xFF);
+  // Reserved
+  writeUint8(0);
+
+  // ── NA: Name ──
+  if (inst.name && inst.name.length > 0) {
+    const lenPos = startFeature('NA');
+    // Name: uint16 length + string bytes (no null terminator)
+    const nameBytes = new TextEncoder().encode(inst.name);
+    writeUint16(nameBytes.length);
+    u8.set(nameBytes, pos);
+    pos += nameBytes.length;
+    endFeature(lenPos);
+  }
+
+  // ── FM: FM operator data ──
+  if (inst.fm) {
+    const fm = inst.fm;
+    const lenPos = startFeature('FM');
+
+    const opCount = fm.operators.length;
+    // Byte 0: opCount (low nibble) + operator enable flags (high nibble)
+    let opCountByte = opCount & 0x0F;
+    for (let i = 0; i < Math.min(opCount, 4); i++) {
+      if (fm.operators[i].enabled) opCountByte |= (1 << (i + 4));
+    }
+    writeUint8(opCountByte);
+
+    // Byte 1: alg(bits 6-4) + fb(bits 2-0)
+    writeUint8(((fm.algorithm & 7) << 4) | (fm.feedback & 7));
+
+    // Byte 2: fms2(bits 7-5) + ams(bits 4-3) + fms(bits 2-0)
+    writeUint8((((fm.fms2 ?? 0) & 7) << 5) | (((fm.ams ?? 0) & 3) << 3) | ((fm.fms ?? 0) & 7));
+
+    // Byte 3: ams2(bits 7-6) + ops(bit 5: 4 if set, 2 if clear) + opllPreset(bits 4-0)
+    const opsFlag = (fm.ops ?? opCount) >= 4 ? 32 : 0;
+    writeUint8((((fm.ams2 ?? 0) & 3) << 6) | opsFlag | ((fm.opllPreset ?? 0) & 31));
+
+    // Byte 4 (version >= 224): block(bits 3-0)
+    // Always emit for safety since we're writing a modern version
+    writeUint8((fm.block ?? 0) & 0x0F);
+
+    // Operators: 8 bytes each, bit-packed (matching C++ reader exactly)
+    for (let i = 0; i < opCount && i < 4; i++) {
+      const op = fm.operators[i];
+      // Byte 0: ksr(7) + dt(6-4) + mult(3-0)
+      writeUint8(((op.ksr ? 1 : 0) << 7) | (((op.dt ?? 0) & 7) << 4) | ((op.mult ?? 0) & 0x0F));
+      // Byte 1: sus(7) + tl(6-0)
+      writeUint8(((op.sus ? 1 : 0) << 7) | ((op.tl ?? 0) & 0x7F));
+      // Byte 2: rs(7-6) + vib(5) + ar(4-0)
+      writeUint8((((op.rs ?? 0) & 3) << 6) | ((op.vib ? 1 : 0) << 5) | ((op.ar ?? 0) & 0x1F));
+      // Byte 3: am(7) + ksl(6-5) + dr(4-0)
+      writeUint8(((op.am ? 1 : 0) << 7) | (((op.ksl ?? 0) & 3) << 5) | ((op.dr ?? 0) & 0x1F));
+      // Byte 4: egt(7) + kvs(6-5) + d2r(4-0)
+      writeUint8(((op.egt ? 1 : 0) << 7) | (((op.kvs ?? 0) & 3) << 5) | ((op.d2r ?? 0) & 0x1F));
+      // Byte 5: sl(7-4) + rr(3-0)
+      writeUint8((((op.sl ?? 0) & 0x0F) << 4) | ((op.rr ?? 0) & 0x0F));
+      // Byte 6: dvb(7-4) + ssgEnv(3-0)
+      writeUint8((((op.dvb ?? 0) & 0x0F) << 4) | ((op.ssg ?? 0) & 0x0F));
+      // Byte 7: dam(7-5) + dt2(4-3) + ws(2-0)
+      writeUint8((((op.dam ?? 0) & 7) << 5) | (((op.dt2 ?? 0) & 3) << 3) | ((op.ws ?? 0) & 7));
+    }
+
+    endFeature(lenPos);
+  }
+
+  // ── MA: Macros ──
+  if (inst.macros.length > 0) {
+    const lenPos = startFeature('MA');
+
+    // Header length = 8 (code, len, loop, rel, mode, wordSize|open, delay, speed)
+    const macroHeaderLen = 8;
+    writeUint16(macroHeaderLen);
+
+    for (const macro of inst.macros) {
+      // Determine word size for this macro's values
+      const wordSize = getWordSizeForMacro(macro);
+
+      // Header: code(1), len(1), loop(1), rel(1), mode(1), (wordSize<<6|open)(1), delay(1), speed(1)
+      writeUint8(macro.code);
+      writeUint8(Math.min(macro.length, 255));
+      writeUint8(macro.loop & 0xFF);
+      writeUint8(macro.release & 0xFF);
+      writeUint8(macro.mode & 0xFF);
+      // The 'type' field from parsing stores raw (wordSize<<6 | open) byte.
+      // If we have the original type field, use the open bits from it; otherwise default open=1.
+      const openBits = (macro.type & 0x0F) || 1; // open flags (low nibble)
+      writeUint8((wordSize << 6) | (openBits & 0x0F));
+      writeUint8(macro.delay & 0xFF);
+      writeUint8(macro.speed & 0xFF);
+
+      // Values
+      const len = Math.min(macro.length, macro.data.length);
+      for (let i = 0; i < len; i++) {
+        const val = macro.data[i];
+        switch (wordSize) {
+          case 0: writeUint8(val & 0xFF); break;          // unsigned byte
+          case 1: writeInt8(val); break;                    // signed byte
+          case 2: writeInt16(val); break;                   // signed short
+          default: writeInt32(val); break;                  // signed int
+        }
+      }
+    }
+
+    endFeature(lenPos);
+  }
+
+  // ── Ox: Operator macros ──
+  if (inst.opMacroArrays) {
+    for (let opIdx = 0; opIdx < 4; opIdx++) {
+      const opMacros = inst.opMacroArrays[opIdx];
+      if (!opMacros || opMacros.length === 0) continue;
+
+      const code = 'O' + String.fromCharCode('1'.charCodeAt(0) + opIdx);
+      const lenPos = startFeature(code);
+
+      const macroHeaderLen = 8;
+      writeUint16(macroHeaderLen);
+
+      for (const macro of opMacros) {
+        const wordSize = getWordSizeForMacro(macro);
+        writeUint8(macro.code);
+        writeUint8(Math.min(macro.length, 255));
+        writeUint8(macro.loop & 0xFF);
+        writeUint8(macro.release & 0xFF);
+        writeUint8(macro.mode & 0xFF);
+        const openBits = (macro.type & 0x0F) || 1;
+        writeUint8((wordSize << 6) | (openBits & 0x0F));
+        writeUint8(macro.delay & 0xFF);
+        writeUint8(macro.speed & 0xFF);
+
+        const len = Math.min(macro.length, macro.data.length);
+        for (let i = 0; i < len; i++) {
+          const val = macro.data[i];
+          switch (wordSize) {
+            case 0: writeUint8(val & 0xFF); break;
+            case 1: writeInt8(val); break;
+            case 2: writeInt16(val); break;
+            default: writeInt32(val); break;
+          }
+        }
+      }
+
+      endFeature(lenPos);
+    }
+  }
+
+  // ── GB: Game Boy ──
+  if (inst.gb) {
+    const gb = inst.gb;
+    const lenPos = startFeature('GB');
+    // Byte 0: envLen(7-5) + envDir(4) + envVol(3-0)
+    writeUint8(((gb.envLen & 7) << 5) | ((gb.envDir ? 1 : 0) << 4) | (gb.envVol & 0x0F));
+    // Byte 1: soundLen
+    writeUint8(gb.soundLen & 0xFF);
+    // Byte 2: flags — doubleWave(2) + alwaysInit(1) + softEnv(0)
+    writeUint8((gb.doubleWave ? 4 : 0) | (gb.alwaysInit ? 2 : 0) | (gb.softEnv ? 1 : 0));
+    // Byte 3: hwSeqLen
+    writeUint8(gb.hwSeqLen & 0xFF);
+    // Hardware sequence: cmd(1) + data(2) per entry
+    for (let i = 0; i < gb.hwSeqLen && i < gb.hwSeq.length; i++) {
+      writeUint8(gb.hwSeq[i].cmd);
+      writeInt16(gb.hwSeq[i].data);
+    }
+    endFeature(lenPos);
+  }
+
+  // ── 64: C64 SID ──
+  if (inst.c64) {
+    const c = inst.c64;
+    const lenPos = startFeature('64');
+    // Byte 0: dutyIsAbs(7) + initFilter(6) + 0(5) + toFilter(4) + noiseOn(3) + pulseOn(2) + sawOn(1) + triOn(0)
+    writeUint8(
+      (c.dutyIsAbs ? 128 : 0) | (c.initFilter ? 64 : 0) |
+      (c.toFilter ? 16 : 0) | (c.noiseOn ? 8 : 0) |
+      (c.pulseOn ? 4 : 0) | (c.sawOn ? 2 : 0) | (c.triOn ? 1 : 0)
+    );
+    // Byte 1: oscSync(7) + ringMod(6) + noTest(5) + filterIsAbs(4) + ch3off(3) + bp(2) + hp(1) + lp(0)
+    writeUint8(
+      (c.oscSync ? 128 : 0) | (c.ringMod ? 64 : 0) | (c.noTest ? 32 : 0) |
+      (c.filterIsAbs ? 16 : 0) | (c.ch3off ? 8 : 0) |
+      (c.bp ? 4 : 0) | (c.hp ? 2 : 0) | (c.lp ? 1 : 0)
+    );
+    // Byte 2: A(7-4) + D(3-0)
+    writeUint8(((c.a & 0x0F) << 4) | (c.d & 0x0F));
+    // Byte 3: S(7-4) + R(3-0)
+    writeUint8(((c.s & 0x0F) << 4) | (c.r & 0x0F));
+    // Bytes 4-5: duty (16-bit LE, masked to 12 bits)
+    writeUint16(c.duty & 0xFFF);
+    // Bytes 6-7: cut(11-0) + res(15-12)
+    writeUint16((c.cut & 0xFFF) | ((c.res & 0x0F) << 12));
+    // Extra byte (v199+): high res bits + resetDuty flag
+    writeUint8(((c.res >> 4) & 0x0F) | (c.resetDuty ? 0x10 : 0));
+    endFeature(lenPos);
+  }
+
+  // ── SN: SNES ──
+  if (inst.snes) {
+    const s = inst.snes;
+    const lenPos = startFeature('SN');
+    // Byte 0: d(6-4) + a(3-0)
+    writeUint8(((s.d & 7) << 4) | (s.a & 0x0F));
+    // Byte 1: s(7-5) + r(4-0)
+    writeUint8(((s.s & 7) << 5) | (s.r & 0x1F));
+    // Byte 2: useEnv(4) + sus(3) + gainMode(2-0)
+    writeUint8((s.useEnv ? 16 : 0) | ((s.sus & 1) << 3) | (s.gainMode & 7));
+    // Byte 3: gain
+    writeUint8(s.gain & 0xFF);
+    // Byte 4 (v131+): sus(6-5) + d2(4-0)
+    writeUint8(((s.sus & 3) << 5) | (s.d2 & 0x1F));
+    endFeature(lenPos);
+  }
+
+  // ── N1: N163 ──
+  if (inst.n163) {
+    const n = inst.n163;
+    const lenPos = startFeature('N1');
+    writeInt32(n.wave);
+    writeUint8(n.wavePos);
+    writeUint8(n.waveLen);
+    writeUint8(n.waveMode);
+    writeUint8(n.perChanPos ? 1 : 0);
+    endFeature(lenPos);
+  }
+
+  // ── FD: FDS ──
+  if (inst.fds) {
+    const f = inst.fds;
+    const lenPos = startFeature('FD');
+    writeInt32(f.modSpeed);
+    writeInt32(f.modDepth);
+    writeUint8(f.initModTableWithFirstWave ? 1 : 0);
+    for (let i = 0; i < 32; i++) {
+      writeInt8(f.modTable[i] ?? 0);
+    }
+    endFeature(lenPos);
+  }
+
+  // ── SM: Sample mapping ──
+  if (inst.amiga && (inst.amiga.useSample || inst.amiga.useWave)) {
+    const a = inst.amiga;
+    const lenPos = startFeature('SM');
+    // initSample (int16)
+    writeInt16(a.initSample);
+    // flags: useWave(2) + useSample(1) + useNoteMap(0)
+    writeUint8((a.useWave ? 4 : 0) | (a.useSample ? 2 : 0) | (a.useNoteMap ? 1 : 0));
+    // waveLen
+    writeUint8(a.waveLen & 0xFF);
+    // Note map: 120 entries × (freq:int16 + map:int16)
+    if (a.useNoteMap && a.noteMap) {
+      for (let note = 0; note < 120; note++) {
+        const entry = a.noteMap[note];
+        writeInt16(entry?.freq ?? note);
+        writeInt16(entry?.map ?? -1);
+      }
+    }
+    endFeature(lenPos);
+  }
+
+  // ── ES: ES5506 ──
+  if (inst.es5506) {
+    const e = inst.es5506;
+    const lenPos = startFeature('ES');
+    writeUint8(e.filter.mode);
+    writeUint16(e.filter.k1);
+    writeUint16(e.filter.k2);
+    writeUint16(e.envelope.ecount);
+    writeInt8(e.envelope.lVRamp);
+    writeInt8(e.envelope.rVRamp);
+    writeInt8(e.envelope.k1Ramp);
+    writeInt8(e.envelope.k2Ramp);
+    writeUint8(e.envelope.k1Slow ? 1 : 0);
+    writeUint8(e.envelope.k2Slow ? 1 : 0);
+    endFeature(lenPos);
+  }
+
+  // ── MP: MultiPCM ──
+  if (inst.multipcm) {
+    const m = inst.multipcm;
+    const lenPos = startFeature('MP');
+    writeUint8(m.ar); writeUint8(m.d1r); writeUint8(m.dl); writeUint8(m.d2r);
+    writeUint8(m.rr); writeUint8(m.rc); writeUint8(m.lfo); writeUint8(m.vib); writeUint8(m.am);
+    writeUint8((m.damp ? 1 : 0) | (m.pseudoReverb ? 2 : 0) | (m.lfoReset ? 4 : 0) | (m.levelDirect ? 8 : 0));
+    endFeature(lenPos);
+  }
+
+  // ── SU: Sound Unit ──
+  if (inst.soundUnit) {
+    const su = inst.soundUnit;
+    const lenPos = startFeature('SU');
+    writeUint8(su.switchRoles ? 1 : 0);
+    writeUint8(su.hwSeqLen);
+    for (let i = 0; i < su.hwSeqLen && i < su.hwSeq.length; i++) {
+      writeUint8(su.hwSeq[i].cmd);
+      writeUint8(su.hwSeq[i].bound);
+      writeUint8(su.hwSeq[i].val);
+      writeInt16(su.hwSeq[i].speed);
+    }
+    endFeature(lenPos);
+  }
+
+  // ── EF: ESFM ──
+  if (inst.esfm) {
+    const ef = inst.esfm;
+    const lenPos = startFeature('EF');
+    writeUint8(ef.noise & 3);
+    for (let i = 0; i < 4 && i < ef.operators.length; i++) {
+      const op = ef.operators[i];
+      // Byte 0: delay(7-5) + outLvl(4-2) + right(1) + left(0)
+      writeUint8(((op.delay & 7) << 5) | ((op.outLvl & 7) << 2) | ((op.right & 1) << 1) | (op.left & 1));
+      // Byte 1: fixed(3) + modIn(2-0)
+      writeUint8(((op.fixed & 1) << 3) | (op.modIn & 7));
+      writeInt8(op.ct);
+      writeInt8(op.dt);
+    }
+    endFeature(lenPos);
+  }
+
+  // ── PN: PowerNoise ──
+  if (inst.powerNoise) {
+    const lenPos = startFeature('PN');
+    writeUint8(inst.powerNoise.octave);
+    endFeature(lenPos);
+  }
+
+  // ── S2: SID2 ──
+  if (inst.sid2) {
+    const s = inst.sid2;
+    const lenPos = startFeature('S2');
+    writeUint8((s.volume & 0x0F) | ((s.mixMode & 3) << 4) | ((s.noiseMode & 3) << 6));
+    endFeature(lenPos);
+  }
+
+  // ── WS: WaveSynth (encode from raw type field if present on fm) ──
+  // WaveSynth data is preserved in rawBinaryData for INS2 instruments;
+  // for INST instruments it's parsed but not stored on the FurnaceInstrument interface.
+  // If needed in the future, add ws?: FurnaceWaveSynthData to the interface.
+
+  // ── EN: End marker ──
+  writeAscii('EN');
+
+  // Patch block length: everything after the 8-byte header (magic + blockLen)
+  const blockLen = pos - 8;
+  view.setUint32(blockLenPos, blockLen >>> 0, true);
+
+  return new Uint8Array(buf, 0, pos);
+}
+
+/**
+ * Determine the appropriate word size for encoding a macro's values.
+ *
+ * Word sizes (matching C++ reader):
+ *   0 = unsigned byte (0-255)
+ *   1 = signed byte (-128 to 127)
+ *   2 = signed short (-32768 to 32767)
+ *   3 = signed int32
+ *
+ * For macros parsed from INS2 format, the original word size is stored in macro.type bits 6-7.
+ * For macros parsed from old INST format (where values were int32), we need to determine
+ * the smallest word size that fits all values.
+ *
+ * Macro codes that typically need signed values: arp(1), pitch(4).
+ */
+function getWordSizeForMacro(macro: FurnaceMacro): number {
+  // If the type field already has word size bits set from INS2 parsing, use them
+  const storedWordSize = (macro.type >> 6) & 3;
+  // If storedWordSize is non-zero, it was explicitly set during parsing — trust it
+  if (storedWordSize !== 0) return storedWordSize;
+
+  // For macros from old INST format (all values were int32), determine best fit
+  if (macro.data.length === 0) return 0;
+
+  let minVal = 0;
+  let maxVal = 0;
+  for (const v of macro.data) {
+    if (v < minVal) minVal = v;
+    if (v > maxVal) maxVal = v;
+  }
+
+  // Signed macros: arp(1), pitch(4) — these commonly have negative values
+  const signedCodes = new Set([1, 4]);
+  const needsSigned = signedCodes.has(macro.code) || minVal < 0;
+
+  if (needsSigned) {
+    if (minVal >= -128 && maxVal <= 127) return 1;       // signed byte
+    if (minVal >= -32768 && maxVal <= 32767) return 2;    // signed short
+    return 3;                                              // signed int32
+  } else {
+    if (maxVal <= 255) return 0;                           // unsigned byte
+    if (maxVal <= 32767) return 2;                         // signed short (fits unsigned 0-32767)
+    return 3;                                              // signed int32
+  }
+}
+
+/**
  * Parse macro data
  * Reference: instrument.cpp:1816 readFeatureMA
- * 
+ *
  * macroHeaderLen is the size of each macro entry's HEADER (not counting data).
  * We read macros until featEnd, using macroHeaderLen to skip any extra header bytes.
  */

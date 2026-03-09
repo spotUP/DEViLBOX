@@ -30,16 +30,25 @@ function mapFormat(type: string): TrackerFormat {
   }
 }
 
-/** Map OpenMPT note value (1-120) to DEViLBOX note value (1-96, 97=keyoff) */
-function mapNote(openmptNote: number): number {
+/**
+ * Map OpenMPT note value (1-120) to DEViLBOX note value (1-96, 97=keyoff).
+ *
+ * OpenMPT adds an internal offset when loading each format:
+ *   MOD: period table lookup adds +36 vs DEViLBOX's ProTracker convention
+ *   XM:  note byte + 12 (OpenMPT C-5 = 61 vs FT2/DEViLBOX C-4 = 49)
+ *   S3M/IT: packed octave formula adds +12
+ * We subtract the offset to match each format's native note display.
+ */
+function mapNote(openmptNote: number, _format: TrackerFormat): number {
   if (openmptNote === 0) return 0;         // Empty
   if (openmptNote === 255) return 97;      // Note Off → XM note-off
   if (openmptNote === 254) return 97;      // Note Cut → treat as note-off
   if (openmptNote === 253) return 97;      // Fade → treat as note-off
   if (openmptNote >= 1 && openmptNote <= 120) {
-    // OpenMPT: C-1=1..B-9=120. DEViLBOX/XM: C-0=1..B-7=96
-    // OpenMPT's note 1 = C-1 corresponds to XM note 1 = C-0
-    return Math.min(openmptNote, 96);
+    // Apply format-specific offset to match native tracker display conventions
+    const offset = 12;
+    const adjusted = openmptNote - offset;
+    return Math.max(1, Math.min(adjusted, 96));
   }
   return 0;
 }
@@ -123,6 +132,7 @@ function buildChannelData(
   channelIdx: number,
   rows: osl.PatternCell[][],
   numRows: number,
+  format: TrackerFormat,
 ): ChannelData {
   const cells: TrackerCell[] = [];
 
@@ -138,7 +148,7 @@ function buildChannelData(
 
     const fx = mapEffect(cell.command, cell.param);
     cells.push({
-      note: mapNote(cell.note),
+      note: mapNote(cell.note, format),
       instrument: cell.instrument,
       volume: mapVolumeColumn(cell.volcmd, cell.vol),
       effTyp: fx.effTyp,
@@ -214,7 +224,7 @@ export async function parseWithOpenMPT(
       const cellData = await osl.getPatternData(p);
       const channels: ChannelData[] = [];
       for (let c = 0; c < numChannels; c++) {
-        channels.push(buildChannelData(c, cellData, numRows));
+        channels.push(buildChannelData(c, cellData, numRows, format));
       }
 
       patterns.push({
@@ -322,6 +332,8 @@ export async function parseWithOpenMPT(
       initialSpeed: info.initialSpeed || 6,
       initialBPM: info.initialBPM || 125,
       linearPeriods: info.linearSlides,
+      // MOD period table adds +24 extra vs other formats; compensate in display only
+      noteDisplayOffset: format === 'MOD' ? -12 : 0,
     };
 
     // Activate the edit bridge so pattern edits sync to the soundlib

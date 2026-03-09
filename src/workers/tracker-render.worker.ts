@@ -49,6 +49,7 @@ let ui: UIStateSnapshot = {
   rowHeight: 24,
   rowHighlightInterval: 4,
   showBeatLabels: false,
+  noteDisplayOffset: 0,
 };
 let layout: ChannelLayoutSnapshot = { offsets: [], widths: [], totalWidth: 0 };
 let playback = { row: 0, smoothOffset: 0, patternIndex: 0, isPlaying: false };

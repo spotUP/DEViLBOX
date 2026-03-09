@@ -13,6 +13,20 @@ export interface FuturePlayerTuneInfo {
   sampleRate: number;
 }
 
+export interface FPCellData {
+  note: number;
+  instrument: number;
+  effect: number;
+  param: number;
+}
+
+export interface FPPatternData {
+  patIdx: number;
+  numRows: number;
+  totalRows: number;
+  rows: FPCellData[][];  // rows[row][channel]
+}
+
 export class FuturePlayerEngine {
   private static instance: FuturePlayerEngine | null = null;
   private static wasmBinary: ArrayBuffer | null = null;
@@ -30,6 +44,7 @@ export class FuturePlayerEngine {
   private _resolveTune: ((info: FuturePlayerTuneInfo) => void) | null = null;
   private _rejectTune: ((err: Error) => void) | null = null;
   private _disposed = false;
+  private _requestId = 0;
 
   private constructor() {
     this.audioContext = getDevilboxAudioContext();
@@ -153,6 +168,38 @@ export class FuturePlayerEngine {
             }
           } catch { /* ToneEngine not ready */ }
           break;
+
+        case 'pattern-data': {
+          const resolve = this._patternResolves.get(data.requestId);
+          if (resolve) {
+            this._patternResolves.delete(data.requestId);
+            resolve({
+              patIdx: data.patIdx,
+              numRows: data.numRows,
+              totalRows: data.totalRows,
+              rows: data.rows,
+            });
+          }
+          break;
+        }
+
+        case 'voice-lengths': {
+          const resolve = this._voiceLengthsResolves.get(data.requestId);
+          if (resolve) {
+            this._voiceLengthsResolves.delete(data.requestId);
+            resolve(data.lengths);
+          }
+          break;
+        }
+
+        case 'all-shadow-data': {
+          const resolve = this._shadowDataResolves.get(data.requestId);
+          if (resolve) {
+            this._shadowDataResolves.delete(data.requestId);
+            resolve(data.voices);
+          }
+          break;
+        }
       }
     };
 
@@ -210,6 +257,60 @@ export class FuturePlayerEngine {
   /** Stop preview note */
   noteOff(): void {
     this.workletNode?.port.postMessage({ type: 'noteOff' });
+  }
+
+  // ── Pattern editing (shadow array) ──────────────────────────────────
+
+  private _patternResolves = new Map<number, (data: FPPatternData) => void>();
+  private _voiceLengthsResolves = new Map<number, (lengths: number[]) => void>();
+  private _shadowDataResolves = new Map<number, (voices: FPCellData[][]) => void>();
+
+  /** Get pattern data from the WASM shadow array.
+   *  patIdx = 0-based pattern index, rowsPerPattern = rows per pattern (default 64). */
+  getPatternData(patIdx: number, rowsPerPattern = 64): Promise<FPPatternData> {
+    if (!this.workletNode) return Promise.reject(new Error('not initialized'));
+
+    const requestId = ++this._requestId;
+    return new Promise<FPPatternData>((resolve) => {
+      this._patternResolves.set(requestId, resolve);
+      this.workletNode!.port.postMessage({
+        type: 'get-pattern-data', patIdx, rowsPerPattern, requestId,
+      });
+    });
+  }
+
+  /** Set a single cell in the shadow array.
+   *  voice = 0-3, row = absolute row index. */
+  setPatternCell(voice: number, row: number, note: number, instrument: number, effect: number, param: number): void {
+    this.workletNode?.port.postMessage({
+      type: 'set-pattern-cell', voice, row, note, instrument, effect, param,
+    });
+  }
+
+  /** Get the linearized row count for each voice. */
+  getVoiceLengths(): Promise<number[]> {
+    if (!this.workletNode) return Promise.reject(new Error('not initialized'));
+
+    const requestId = ++this._requestId;
+    return new Promise<number[]>((resolve) => {
+      this._voiceLengthsResolves.set(requestId, resolve);
+      this.workletNode!.port.postMessage({
+        type: 'get-voice-lengths', requestId,
+      });
+    });
+  }
+
+  /** Get the full shadow array data for all 4 voices (for export). */
+  getShadowData(): Promise<FPCellData[][]> {
+    if (!this.workletNode) return Promise.reject(new Error('not initialized'));
+
+    const requestId = ++this._requestId;
+    return new Promise<FPCellData[][]>((resolve) => {
+      this._shadowDataResolves.set(requestId, resolve);
+      this.workletNode!.port.postMessage({
+        type: 'get-all-shadow-data', requestId,
+      });
+    });
   }
 
   dispose(): void {

@@ -98,6 +98,7 @@ export interface UIStateSnapshot {
   rowHeight: number;           // Derived from trackerZoom (80-200%)
   rowHighlightInterval: number; // Every N rows gets a highlight color
   showBeatLabels: boolean;     // Show beat.tick format in line number gutter
+  noteDisplayOffset: number;   // Semitones to add to note for display (e.g. -12 for MOD)
 }
 
 // ─── Channel layout ───────────────────────────────────────────────────────────

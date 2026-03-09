@@ -88,9 +88,8 @@ export async function uploadFurnaceToSequencer(
 
   // 5. Configuration
   // Use full speed pattern if available (supports len > 2 groove-style initial speeds)
-  const subAny = sub as any;
-  if (subAny.speedPattern && subAny.speedPattern.length > 0) {
-    engine.seqPostMessage({ type: 'seqSetSpeedPattern', values: subAny.speedPattern });
+  if (sub.speedPattern && sub.speedPattern.length > 0) {
+    engine.seqPostMessage({ type: 'seqSetSpeedPattern', values: sub.speedPattern });
   } else {
     engine.seqPostMessage({ type: 'seqSetSpeed', speed1: sub.speed1, speed2: sub.speed2 });
   }
@@ -106,7 +105,17 @@ export async function uploadFurnaceToSequencer(
 
   // 6. Upload compat flags to the WASM sequencer
   if (native.compatFlags) {
-    const { flags, flagsExt, pitchSlideSpeed } = packCompatFlags(native.compatFlags);
+    let flags: number, flagsExt: number, pitchSlideSpeed: number;
+    if ((native.compatFlags as Record<string, unknown>)._packed) {
+      // Pre-packed by FurnaceFileOps WASM — use directly, no TS repacking needed
+      const cf = native.compatFlags as Record<string, unknown>;
+      flags = cf._flags as number;
+      flagsExt = cf._flagsExt as number;
+      pitchSlideSpeed = cf._pitchSlideSpeed as number;
+    } else {
+      // Fallback: TS parser path — pack from individual fields
+      ({ flags, flagsExt, pitchSlideSpeed } = packCompatFlags(native.compatFlags as Record<string, unknown>));
+    }
     engine.seqPostMessage({ type: 'seqSetCompatFlags', flags, flagsExt, pitchSlideSpeed });
     console.log(`[FurnaceSequencer] Compat flags: 0x${flags.toString(16)}, ext: 0x${flagsExt.toString(16)}, pitchSlideSpeed: ${pitchSlideSpeed}`);
   }

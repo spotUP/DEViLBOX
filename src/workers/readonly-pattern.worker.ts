@@ -150,6 +150,7 @@ function renderFrame(): void {
       rowHeight: 24,
       rowHighlightInterval: 4,
       showBeatLabels: false,
+      noteDisplayOffset: 0,
     },
     layout,
     dragOver: null,

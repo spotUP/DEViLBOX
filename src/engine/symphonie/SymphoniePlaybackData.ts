@@ -46,6 +46,8 @@ export interface SymphoniePlaybackData {
   cycle: number;           // rows per pattern tick (1-8 typical)
   numChannels: number;
   orderList: number[];     // indices into patterns[]
+  orderSpeeds: number[];   // per-position speed (parallel to orderList)
+  orderTranspose: number[]; // per-position transpose (parallel to orderList)
   patterns: SymphoniePattern[];
   instruments: SymphonieInstrumentData[];
   globalDspType: number;   // song-level DSP type (0-4) from header
