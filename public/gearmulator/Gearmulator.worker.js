@@ -37,8 +37,8 @@ let disposed = false;
 let sabInt32 = null;
 let sabFloat32 = null;
 
-// Internal render buffer
-const RENDER_BLOCK = 128; // match WebAudio quantum
+// Internal render buffer — small blocks for non-blocking DSP (microQ runs at ~1/17 real-time)
+const RENDER_BLOCK = 64;
 let outputPtrL = 0;
 let outputPtrR = 0;
 
@@ -391,9 +391,9 @@ function fillRingBuffer() {
   if (used < 0) used += bufSize;
   let free = bufSize - used - 1;
 
-  // Render up to 4 blocks per tick (512 samples). Reduced from 16 because
-  // microQ's inline processAudio blocks while DSP produces each block.
-  const maxBlocks = Math.min(4, Math.floor(free / RENDER_BLOCK));
+  // Render up to 32 blocks per tick (2048 samples). Non-blocking DSP path
+  // returns partial data (zeros for frames DSP hasn't produced yet).
+  const maxBlocks = Math.min(32, Math.floor(free / RENDER_BLOCK));
 
   for (let b = 0; b < maxBlocks; b++) {
     module._gm_process(handle, outputPtrL, outputPtrR, RENDER_BLOCK);
