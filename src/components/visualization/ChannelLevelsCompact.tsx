@@ -133,8 +133,10 @@ export const ChannelLevelsCompact: React.FC<ChannelLevelsCompactProps> = ({
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
       const engine = getToneEngine();
+      const isRealtime = useSettingsStore.getState().vuMeterMode === 'realtime';
       const triggerLevels = engine.getChannelTriggerLevels(nc);
       const triggerGens = engine.getChannelTriggerGenerations(nc);
+      const realtimeLevels = isRealtime ? engine.getChannelLevels(nc) : null;
 
       // Grow lastGens if needed
       if (lastGensRef.current.length < nc) {
@@ -144,12 +146,11 @@ export const ChannelLevelsCompact: React.FC<ChannelLevelsCompactProps> = ({
       }
 
       // Update levels with smoothing
-      const isRealtime = useSettingsStore.getState().vuMeterMode === 'realtime';
       for (let i = 0; i < nc; i++) {
         let trigger: number;
-        if (isRealtime) {
-          // Realtime mode: always use latest level
-          trigger = triggerLevels[i] || 0;
+        if (isRealtime && realtimeLevels) {
+          // Realtime mode: use actual audio levels from AnalyserNode
+          trigger = realtimeLevels[i] || 0;
         } else {
           // Trigger mode: only use level on NEW trigger
           const isNewTrigger = triggerGens[i] !== lastGensRef.current[i];

@@ -12,13 +12,11 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { useApplication, useTick } from '@pixi/react';
 import { isRapidScrolling } from './scrollPerf';
-import { useUIStore, useSettingsStore , useFormatStore, useTrackerStore } from '@stores';
+import { useUIStore, useSettingsStore, useTrackerStore } from '@stores';
 import { useCollaborationStore } from '@stores/useCollaborationStore';
 import { useInstrumentStore } from '@stores/useInstrumentStore';
 import { useMIDIStore } from '@/stores/useMIDIStore';
 import { notify } from '@stores/useNotificationStore';
-import { computeSongDBHash, lookupSongDB } from '@lib/songdb';
-import { parseSIDHeader } from '@/lib/sid/SIDHeaderParser';
 import type { ModuleInfo } from '@/lib/import/ModuleLoader';
 import type { ImportOptions } from '@/components/dialogs/ImportModuleDialog';
 import { usePixiResponsive } from './hooks/usePixiResponsive';
@@ -80,6 +78,7 @@ import { PixiEditInstrumentModal } from './dialogs/PixiEditInstrumentModal';
 import { PixiMasterEffectsModal } from './dialogs/PixiMasterEffectsModal';
 import { PixiInstrumentEffectsModal } from './dialogs/PixiInstrumentEffectsModal';
 import { PixiNonEditableDialog } from './dialogs/PixiNonEditableDialog';
+import { PixiAIPanel } from './dialogs/PixiAIPanel';
 import { clearExplicitlySaved } from '@hooks/useProjectPersistence';
 
 export const PixiRoot: React.FC = () => {
@@ -144,37 +143,9 @@ export const PixiRoot: React.FC = () => {
   // Handler for ImportModuleDialog (module/furnace/midi)
   const handleModuleImportGL = useCallback(async (info: ModuleInfo, options: ImportOptions) => {
     setPendingModuleFile(null);
-    if (info.file) {
-      // Use the already-available ArrayBuffer (read by import dialog) — avoids
-      // async race where loadFile() could complete before setSidMetadata runs.
-      const buf = info.arrayBuffer ?? await info.file.arrayBuffer();
-      lookupSongDB(computeSongDBHash(buf)).then(result => {
-        useFormatStore.getState().setSongDBInfo(result ? {
-          authors: result.authors, publishers: result.publishers,
-          album: result.album, year: result.year, format: result.format,
-          duration_ms: result.subsongs[0]?.duration_ms ?? 0,
-        } : null);
-      });
-      const sidInfo = parseSIDHeader(new Uint8Array(buf));
-      useFormatStore.getState().setSidMetadata(sidInfo ? {
-        format: sidInfo.format, version: sidInfo.version,
-        title: sidInfo.title, author: sidInfo.author, copyright: sidInfo.copyright,
-        chipModel: sidInfo.chipModel, clockSpeed: sidInfo.clockSpeed,
-        subsongs: sidInfo.subsongs, defaultSubsong: sidInfo.defaultSubsong,
-        currentSubsong: options.subsong ?? sidInfo.defaultSubsong,
-        secondSID: sidInfo.secondSID, thirdSID: sidInfo.thirdSID,
-      } : null);
-    }
     try {
-      const { loadFile } = await import('@lib/file/UnifiedFileLoader');
-      const result = await loadFile(info.file, {
-        subsong: options.subsong,
-        uadeMetadata: options.uadeMetadata,
-        midiOptions: options.midiOptions,
-        companionFiles: options.companionFiles,
-      });
-      if (result.success === true) notify.success(result.message);
-      else if (result.success === false) notify.error(result.error);
+      const { importTrackerModule } = await import('@lib/file/UnifiedFileLoader');
+      await importTrackerModule(info, options);
     } catch (error) {
       console.error('[PixiRoot] Module import failed:', error);
       notify.error('Failed to import file');
@@ -204,13 +175,18 @@ export const PixiRoot: React.FC = () => {
       const { loadFile } = await import('@lib/file/UnifiedFileLoader');
       const file = new File([buffer], filename);
       const result = await loadFile(file);
-      if (result.success === true) notify.success(result.message);
-      else if (result.success === false) notify.error(result.error);
+      if (result.success === 'pending-import') {
+        setPendingModuleFile(result.file);
+      } else if (result.success === true) {
+        notify.success(result.message);
+      } else if (result.success === false) {
+        notify.error(result.error);
+      }
     } catch (error) {
       console.error('Failed to load tracker module:', error);
       notify.error('Failed to load file');
     }
-  }, []);
+  }, [setPendingModuleFile]);
 
   const { app } = useApplication();
   const crtEnabled  = useSettingsStore((s) => s.crtEnabled);
@@ -448,6 +424,7 @@ export const PixiRoot: React.FC = () => {
         <PixiSynthErrorDialog />
         <PixiNonEditableDialog />
         <PixiArrangementContextMenu />
+        <PixiAIPanel />
       </pixiContainer>
 
       {/* Collaboration split view — overlays tracker area */}

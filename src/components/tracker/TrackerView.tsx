@@ -58,6 +58,7 @@ import { GTUltraView } from '@components/gtultra/GTUltraView';
 import { HivelyView } from '@components/hively/HivelyView';
 import { KlysView } from '@components/klystrack/KlysView';
 import { JamCrackerView } from '@components/jamcracker/JamCrackerView';
+import { Sc68Visualizer } from './Sc68Visualizer';
 
 interface TrackerViewProps {
   onShowExport?: () => void;
@@ -564,6 +565,8 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
                 <KlysView />
               ) : editorMode === 'jamcracker' ? (
                 <JamCrackerView />
+              ) : editorMode === 'sc68' ? (
+                <Sc68Visualizer />
               ) : editorMode === 'musicline' ? (
                 <div className="flex-1 flex flex-col min-h-0 bg-dark-bgPrimary">
                   {/* Per-channel track table matrix */}

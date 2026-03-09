@@ -22,6 +22,7 @@ import { useWorkbenchStore } from '@stores/useWorkbenchStore';
 import { useCollaborationStore } from '@stores/useCollaborationStore';
 import { useAuthStore } from '@stores/useAuthStore';
 import { useMIDIStore } from '@stores/useMIDIStore';
+import { useAIStore } from '@stores/useAIStore';
 import { MODERN_NAV_H } from '../workbench/workbenchLayout';
 import { serializeProjectToBlob } from '@hooks/useProjectPersistence';
 import { PixiTransportBar } from './PixiTransportBar';
@@ -68,6 +69,10 @@ export const PixiNavBar: React.FC = () => {
 
   // MIDI store
   const hasMIDI = useMIDIStore((s) => s.isInitialized && s.inputDevices.length > 0);
+
+  // AI store
+  const aiPanelOpen = useAIStore((s) => s.isOpen);
+  const toggleAI = useAIStore((s) => s.toggle);
 
   // Exposé state
   const isStudio = activeView === 'studio';
@@ -257,6 +262,16 @@ export const PixiNavBar: React.FC = () => {
           active={exposeActive}
           onClick={handleExpose}
           width={56}
+        />
+
+        {/* AI Assistant */}
+        <PixiButton
+          label="AI"
+          variant={aiPanelOpen ? 'ft2' : 'ghost'}
+          size="sm"
+          active={aiPanelOpen}
+          onClick={toggleAI}
+          width={28}
         />
 
         <PixiButton label="THEME" variant="ghost" size="sm" onClick={handleThemeCycle} width={52} />

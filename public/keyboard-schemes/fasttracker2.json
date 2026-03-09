@@ -162,7 +162,8 @@
       "Shift+Space": "power_cut_stop",
       "Ctrl+=": "zoom_in",
       "Ctrl+-": "zoom_out",
-      "Ctrl+0": "fit_to_window"
+      "Ctrl+0": "fit_to_window",
+      "Ctrl+L": "show_command_palette"
     },
     "mac": {
       "Space": "play_stop_toggle",
@@ -326,7 +327,8 @@
       "Cmd+=": "zoom_in",
       "Cmd+-": "zoom_out",
       "Cmd+0": "fit_to_window",
-      "Cmd+1": "reset_zoom"
+      "Cmd+1": "reset_zoom",
+      "Ctrl+L": "show_command_palette"
     }
   }
 }

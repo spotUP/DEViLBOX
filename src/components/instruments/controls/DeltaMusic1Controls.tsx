@@ -2,8 +2,8 @@
  * DeltaMusic1Controls.tsx — Delta Music 1.0 instrument editor
  *
  * Exposes all DeltaMusic1Config parameters: volume, ADSR envelope, vibrato,
- * portamento, arpeggio table, and (for synth instruments) a read-only
- * preview of the 48-byte sound table.
+ * portamento, arpeggio table, and (for synth instruments) an editable
+ * 48-byte sound table.
  *
  * When loaded via UADE (uadeChipRam present), scalar params that have a
  * direct byte equivalent in the DM1 instrument header are written to chip
@@ -31,8 +31,7 @@
  *   +24-25 sampleLength — NOT written (structural, determines PCM extent)
  *   +26-27 repeatStart  — NOT written (structural, determines loop point)
  *   +28-29 repeatLength — NOT written (structural, determines loop length)
- *   [+30-77 table[48]]  — NOT written (synth-only; re-encoding requires
- *                         full segment index recalculation)
+ *   +30-77 table[48]     ✓ written (48 × uint8, synth-only sound table)
  */
 
 import React, { useRef, useEffect, useCallback, useState } from 'react';
@@ -62,6 +61,7 @@ const OFF_PORTAMENTO     = 13;
 // +14 isSample  — NOT written (structural)
 const OFF_TABLE_DELAY    = 15;
 const OFF_ARPEGGIO       = 16; // 8 × uint8 at +16..+23
+const OFF_TABLE          = 30; // 48 × uint8 at +30..+77
 // +24-29 sample lengths — NOT written (structural)
 
 // ── Arpeggio presets ────────────────────────────────────────────────────────
@@ -95,6 +95,7 @@ export const DeltaMusic1Controls: React.FC<DeltaMusic1ControlsProps> = ({
   uadeChipRam,
 }) => {
   const [activeTab, setActiveTab] = useState<DM1Tab>('envelope');
+  const [editingCell, setEditingCell] = useState<number | null>(null);
 
   // configRef pattern: prevents stale closures in callbacks
   const configRef = useRef(config);
@@ -161,6 +162,20 @@ export const DeltaMusic1Controls: React.FC<DeltaMusic1ControlsProps> = ({
     },
     [onChange, uadeChipRam, getEditor],
   );
+
+  /**
+   * Update a single byte in the synth sound table and write it to chip RAM.
+   */
+  const updateTableEntry = useCallback((index: number, value: number) => {
+    if (!configRef.current.table) return;
+    const clamped = Math.max(0, Math.min(255, Math.round(value))) & 0xFF;
+    const newTable = [...configRef.current.table];
+    newTable[index] = clamped;
+    onChange({ table: newTable });
+    if (uadeChipRam) {
+      void getEditor().writeU8(uadeChipRam.instrBase + OFF_TABLE + index, clamped);
+    }
+  }, [onChange, uadeChipRam, getEditor]);
 
   const SectionLabel: React.FC<{ label: string }> = ({ label }) => (
     <div className="text-[10px] font-bold uppercase tracking-widest mb-2"
@@ -401,7 +416,7 @@ export const DeltaMusic1Controls: React.FC<DeltaMusic1ControlsProps> = ({
     );
   };
 
-  // ── SOUND TABLE TAB (synth only, read-only preview) ───────────────────────
+  // ── SOUND TABLE TAB (synth only, editable) ──────────────────────────────
 
   const renderTable = () => {
     if (config.isSample || !config.table) {
@@ -414,48 +429,71 @@ export const DeltaMusic1Controls: React.FC<DeltaMusic1ControlsProps> = ({
 
     const table = config.table;
 
+    /** Decode a byte into its display label. */
+    const decodeLabel = (entry: number): string => {
+      if (entry === 0xFF) return 'LP';
+      if (entry >= 0x80) return `D${entry & 0x7F}`;
+      return `W${entry}`;
+    };
+
+    /** Get cell colors based on byte value. */
+    const cellStyle = (entry: number): { bg: string; text: string } => {
+      if (entry === 0xFF) return { bg: '#1a0000', text: '#884444' };
+      if (entry >= 0x80) return { bg: '#1a1400', text: '#888822' };
+      if (entry < 0x80)  return { bg: accent + '1a', text: accent };
+      return { bg: '#0a0e14', text: '#555' };
+    };
+
     return (
       <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
         <div className={`rounded-lg border p-3 ${panelBg}`}>
-          <SectionLabel label="Sound Table (48-byte sequence, read-only)" />
+          <SectionLabel label="Sound Table (48-byte sequence)" />
           <div className="grid grid-cols-8 gap-1">
             {table.map((entry, idx) => {
-              const isDelay  = entry >= 0x80 && entry !== 0xFF;
-              const isLoop   = entry === 0xFF;
-              const isWave   = entry < 0x80;
-
-              let bg = '#0a0e14';
-              let textColor = '#555';
-              let label = '';
-
-              if (isWave) {
-                bg = accent + '1a';
-                textColor = accent;
-                label = `W${entry}`;
-              } else if (isDelay) {
-                bg = '#1a1400';
-                textColor = '#888822';
-                label = `D${entry & 0x7F}`;
-              } else if (isLoop) {
-                bg = '#1a0000';
-                textColor = '#884444';
-                label = 'LP';
-              }
+              const { bg, text } = cellStyle(entry);
+              const label = decodeLabel(entry);
+              const isEditing = editingCell === idx;
 
               return (
                 <div key={idx}
-                  className="flex flex-col items-center py-1 rounded text-[8px] font-mono"
-                  style={{ background: bg, border: `1px solid ${textColor}44` }}>
-                  <span style={{ color: textColor, opacity: 0.5 }}>{idx}</span>
-                  <span style={{ color: textColor }}>{label || '--'}</span>
+                  className="flex flex-col items-center py-1 rounded text-[8px] font-mono cursor-pointer select-none"
+                  style={{ background: bg, border: `1px solid ${isEditing ? accent : text + '44'}` }}
+                  onClick={() => { if (!isEditing) setEditingCell(idx); }}
+                >
+                  <span style={{ color: text, opacity: 0.5 }}>{idx}</span>
+                  {isEditing ? (
+                    <input
+                      type="number"
+                      min={0} max={255} step={1}
+                      defaultValue={entry}
+                      autoFocus
+                      className="w-[32px] text-center text-[9px] font-mono bg-transparent outline-none"
+                      style={{ color: text, caretColor: accent, border: 'none' }}
+                      onBlur={(e) => {
+                        const v = parseInt(e.currentTarget.value, 10);
+                        if (!isNaN(v)) updateTableEntry(idx, v);
+                        setEditingCell(null);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          const v = parseInt(e.currentTarget.value, 10);
+                          if (!isNaN(v)) updateTableEntry(idx, v);
+                          setEditingCell(null);
+                        } else if (e.key === 'Escape') {
+                          setEditingCell(null);
+                        }
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                  ) : (
+                    <span style={{ color: text }}>{label}</span>
+                  )}
                 </div>
               );
             })}
           </div>
           <div className="mt-2 flex flex-col gap-1 text-[9px]" style={{ color: accent, opacity: 0.6 }}>
-            <span>W## = play waveform segment at offset ##×32 in sample data</span>
-            <span>D## = set table delay to ## ticks, advance</span>
-            <span>LP  = loop back to entry 0xFF+1</span>
+            <span>Click a cell to edit. W## = waveform segment (0-127), D## = delay (128-254), LP = loop (255)</span>
           </div>
         </div>
       </div>

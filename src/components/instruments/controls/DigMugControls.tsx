@@ -93,8 +93,14 @@ export const DigMugControls: React.FC<DigMugControlsProps> = ({
    * is active. byteOffset is relative to instrBase.
    *
    * Chip RAM layout for DigMug 16-byte instrument struct:
-   *   +2  volume (uint8, 0-63)
-   *   +14 effectSpeed / arpSpeed (uint8; arpSpeed 0-15 → stored as ×17, 0-255)
+   *   +0  wave         (uint8, waveform index — wavetable[0])
+   *   +2  volume       (uint8, 0-64)
+   *   +5  pitch        (uint8, pitch envelope table index — vibSpeed)
+   *   +6  effectStep   (uint8, wavetable effect position — waveBlend)
+   *   +7  pitchDelay   (uint8, pitch envelope delay — vibDepth)
+   *   +12 source1      (uint8, effect source wave 1 — wavetable[2])
+   *   +13 source2      (uint8, effect source wave 2 — wavetable[3])
+   *   +14 effectSpeed  (uint8, wavetable effect speed — arpSpeed 0-15 → ×17)
    */
   const updWithChipRam = useCallback(
     (key: keyof DigMugConfig, value: number, byteOffset: number) => {
@@ -128,7 +134,16 @@ export const DigMugControls: React.FC<DigMugControlsProps> = ({
     const wt: [number, number, number, number] = [...configRef.current.wavetable] as [number, number, number, number];
     wt[slot] = value;
     onChange({ wavetable: wt });
-  }, [onChange]);
+
+    // Write to chip RAM: slot 0 → +0 (wave), slot 2 → +12 (source1), slot 3 → +13 (source2)
+    // Slot 1 has no direct chip RAM byte in the 16-byte DM instrument struct.
+    if (uadeChipRam) {
+      const byteOffset = slot === 0 ? 0 : slot === 2 ? 12 : slot === 3 ? 13 : -1;
+      if (byteOffset >= 0) {
+        void getEditor().writeU8(uadeChipRam.instrBase + byteOffset, value & 0xFF);
+      }
+    }
+  }, [onChange, uadeChipRam, getEditor]);
 
   // ── MAIN TAB ──────────────────────────────────────────────────────────────
   const renderMain = () => (
@@ -176,11 +191,11 @@ export const DigMugControls: React.FC<DigMugControlsProps> = ({
         {/* Blend + Morph controls */}
         <div className="flex gap-4">
           <Knob value={config.waveBlend} min={0} max={63} step={1}
-            onChange={(v) => upd('waveBlend', Math.round(v))}
+            onChange={(v) => updWithChipRam('waveBlend', Math.round(v), 6)}
             label="Blend Pos" color={knob} size="sm"
             formatValue={(v) => Math.round(v).toString()} />
           <Knob value={config.waveSpeed} min={0} max={63} step={1}
-            onChange={(v) => upd('waveSpeed', Math.round(v))}
+            onChange={(v) => updWithChipRam('waveSpeed', Math.round(v), 14)}
             label="Morph Spd" color={knob} size="sm"
             formatValue={(v) => Math.round(v).toString()} />
         </div>
@@ -206,11 +221,11 @@ export const DigMugControls: React.FC<DigMugControlsProps> = ({
             label="Volume" color={knob} size="md"
             formatValue={(v) => Math.round(v).toString()} />
           <Knob value={config.vibSpeed} min={0} max={63} step={1}
-            onChange={(v) => upd('vibSpeed', Math.round(v))}
+            onChange={(v) => updWithChipRam('vibSpeed', Math.round(v), 5)}
             label="Vib Speed" color={knob} size="sm"
             formatValue={(v) => Math.round(v).toString()} />
           <Knob value={config.vibDepth} min={0} max={63} step={1}
-            onChange={(v) => upd('vibDepth', Math.round(v))}
+            onChange={(v) => updWithChipRam('vibDepth', Math.round(v), 7)}
             label="Vib Depth" color={knob} size="sm"
             formatValue={(v) => Math.round(v).toString()} />
         </div>
