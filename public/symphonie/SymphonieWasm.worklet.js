@@ -51,6 +51,12 @@ class SymphonieWasmProcessor extends AudioWorkletProcessor {
         this.masterVolume = data.value;
         break;
 
+      case 'setInterpMode':
+        if (this.module && this.module._player_set_interp_mode) {
+          this.module._player_set_interp_mode(data.mode);
+        }
+        break;
+
       case 'setPatternStep':
         if (this.module && this.module._player_set_pattern_step) {
           this.module._player_set_pattern_step(
@@ -141,6 +147,11 @@ class SymphonieWasmProcessor extends AudioWorkletProcessor {
       // Init player
       this.module._player_init(sr || sampleRate);
 
+      // Default to cubic interpolation for modern playback quality
+      if (this.module._player_set_interp_mode) {
+        this.module._player_set_interp_mode(2);
+      }
+
       // Allocate render buffer (128 stereo frames = 128*2*4 bytes)
       const malloc = this.module._malloc || this.module.malloc;
       if (malloc) {
@@ -199,6 +210,9 @@ class SymphonieWasmProcessor extends AudioWorkletProcessor {
 
           const heap16 = new Int16Array(this.getMemoryBuffer(), bufPtr, numSamples);
           for (let s = 0; s < numSamples; s++) {
+            // Store samples at full 16-bit precision — both delta8 and delta16 formats
+            // are normalized to Float32 [-1,1] by the parser. The C mixer's output
+            // divisor (numPairs * 32768) handles the level correctly.
             heap16[s] = Math.max(-32768, Math.min(32767, Math.round(inst.samples[s] * 32767)));
           }
           m._player_set_instrument_sample(i, bufPtr, numSamples);
@@ -253,7 +267,13 @@ class SymphonieWasmProcessor extends AudioWorkletProcessor {
 
         if (pat.events) {
           for (const ev of pat.events) {
-            if (ev.channel < numTrackChannels) {
+            // ASM pattern layout: channels are interleaved [L0,R0,L1,R1,...].
+            // Only process L channels (even indices) and map to pair indices.
+            // R channels are handled by the C player's stereo pair logic.
+            if (ev.channel % 2 === 0) {
+              const pairIdx = ev.channel >> 1;
+              if (pairIdx >= numTrackChannels) continue;
+
               // The WASM SymNote.volume byte is dual-purpose:
               //   - For note-on (cmd=0): actual volume (0-100, or volume command 242-254)
               //   - For effects (cmd>0): effect parameter value
@@ -263,11 +283,11 @@ class SymphonieWasmProcessor extends AudioWorkletProcessor {
                 : (ev.volume !== undefined && ev.volume !== 255 ? ev.volume : 0);
 
               m._player_set_pattern_note(
-                patIdx, ev.row, ev.channel,
+                patIdx, ev.row, pairIdx,
                 ev.cmd || 0,
                 ev.note > 0 ? ev.note - 1 : 0xFF,
                 volOrParam,
-                ev.instrument > 0 ? ev.instrument - 1 : 0
+                ev.instrument > 0 ? ev.instrument - 1 : 0xFF
               );
             }
           }
@@ -275,14 +295,15 @@ class SymphonieWasmProcessor extends AudioWorkletProcessor {
       }
     }
 
-    // Load positions from orderList
+    // Load positions from orderList with per-position speed and transpose
     if (data.orderList) {
       for (let i = 0; i < data.orderList.length; i++) {
         const patIdx = data.orderList[i];
         const pat = data.patterns ? data.patterns[patIdx] : null;
         const numRows = pat ? pat.numRows : 64;
-        const spd = data.cycle || 6;
-        m._player_set_position(i, patIdx, 0, numRows, spd, 0, 1);
+        const spd = (data.orderSpeeds && data.orderSpeeds[i]) || data.cycle || 6;
+        const tune = (data.orderTranspose && data.orderTranspose[i]) || 0;
+        m._player_set_position(i, patIdx, 0, numRows, spd, tune, 1);
       }
     }
 

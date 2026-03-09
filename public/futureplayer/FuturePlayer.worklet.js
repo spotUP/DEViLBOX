@@ -80,6 +80,87 @@ class FuturePlayerProcessor extends AudioWorkletProcessor {
       case 'getInstrumentInfo':
         this.handleGetInstrumentInfo(data.instrPtr, data.requestId);
         break;
+
+      // Pattern editing — shadow array access
+      case 'get-pattern-data': {
+        if (!this.wasm || !this.tuneLoaded) break;
+        const { patIdx, rowsPerPattern, requestId } = data;
+        const rpp = rowsPerPattern || 64;
+        const startRow = patIdx * rpp;
+        const rows = [];
+        for (let r = 0; r < rpp; r++) {
+          const channels = [];
+          for (let ch = 0; ch < 4; ch++) {
+            const voiceLen = this.wasm._fp_wasm_get_voice_length(ch);
+            const absRow = startRow + r;
+            if (absRow < voiceLen) {
+              const packed = this.wasm._fp_wasm_get_cell(ch, absRow);
+              channels.push({
+                note:       (packed >>> 24) & 0xFF,
+                instrument: (packed >>> 16) & 0xFF,
+                effect:     (packed >>> 8)  & 0xFF,
+                param:       packed         & 0xFF,
+              });
+            } else {
+              channels.push({ note: 0, instrument: 0, effect: 0, param: 0 });
+            }
+          }
+          rows.push(channels);
+        }
+        // Get total rows (max across all voices)
+        let totalRows = 0;
+        for (let ch = 0; ch < 4; ch++) {
+          const vl = this.wasm._fp_wasm_get_voice_length(ch);
+          if (vl > totalRows) totalRows = vl;
+        }
+        this.port.postMessage({
+          type: 'pattern-data', requestId, patIdx,
+          numRows: Math.min(rpp, Math.max(0, totalRows - startRow)),
+          totalRows, rows,
+        });
+        break;
+      }
+
+      case 'set-pattern-cell': {
+        if (!this.wasm || !this.tuneLoaded) break;
+        const { voice, row, note, instrument, effect, param } = data;
+        this.wasm._fp_wasm_set_cell(voice, row, note, instrument, effect, param);
+        break;
+      }
+
+      case 'get-voice-lengths': {
+        if (!this.wasm || !this.tuneLoaded) break;
+        const lengths = [];
+        for (let ch = 0; ch < 4; ch++) {
+          lengths.push(this.wasm._fp_wasm_get_voice_length(ch));
+        }
+        this.port.postMessage({ type: 'voice-lengths', requestId: data.requestId, lengths });
+        break;
+      }
+
+      case 'get-all-shadow-data': {
+        if (!this.wasm || !this.tuneLoaded) {
+          this.port.postMessage({ type: 'all-shadow-data', requestId: data.requestId, voices: [] });
+          break;
+        }
+        const voices = [];
+        for (let ch = 0; ch < 4; ch++) {
+          const voiceLen = this.wasm._fp_wasm_get_voice_length(ch);
+          const cells = [];
+          for (let r = 0; r < voiceLen; r++) {
+            const packed = this.wasm._fp_wasm_get_cell(ch, r);
+            cells.push({
+              note:       (packed >>> 24) & 0xFF,
+              instrument: (packed >>> 16) & 0xFF,
+              effect:     (packed >>> 8)  & 0xFF,
+              param:       packed         & 0xFF,
+            });
+          }
+          voices.push(cells);
+        }
+        this.port.postMessage({ type: 'all-shadow-data', requestId: data.requestId, voices });
+        break;
+      }
     }
   }
 

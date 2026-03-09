@@ -38,3 +38,10 @@ int fp_is_preview_active(void);
 
 /* Get instrument info: returns sample size in bytes, sets *is_wavetable */
 int fp_get_instrument_info(uint32_t instr_ptr, int* is_wavetable);
+
+/* Pattern editing — shadow array access.
+ * The shadow array must be built after fp_init() via fp_build_shadow().
+ * get/set operate on the linearized pattern data, not the original bytecode. */
+int fp_get_module_data(const uint8_t** out_base, uint32_t* out_size);
+int fp_get_voice_seq_start(int subsong, int voice);
+int fp_get_tick_speed(int subsong);

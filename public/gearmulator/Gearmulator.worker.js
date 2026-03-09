@@ -284,36 +284,55 @@ async function initSynth(data) {
   const needsBootWait = (synthType === 2);
 
   if (needsBootWait) {
-    // Start render loop first — DSP needs processAudio calls to make progress
+    // Check if boot is already complete (FullSnapshot mode completes during gm_create)
+    let alreadyBooted = false;
+    try {
+      alreadyBooted = !!module._gm_isBootCompleted(handle);
+      console.log(`[Gearmulator Worker] Initial boot check: ${alreadyBooted ? 'already complete' : 'still booting'}`);
+    } catch (e) {
+      console.error('[Gearmulator Worker] gm_isBootCompleted threw:', e);
+    }
+
+    // Start render loop — DSP needs processAudio calls to produce output
     startRenderLoop(actualRate);
 
-    console.log('[Gearmulator Worker] Waiting for MC68K firmware boot to complete...');
-    self.postMessage({ type: 'booting', synthType });
+    if (!alreadyBooted) {
+      console.log('[Gearmulator Worker] Waiting for MC68K firmware boot to complete...');
+      self.postMessage({ type: 'booting', synthType });
 
-    let bootPollCount = 0;
-    const maxBootPollCount = 600; // 5 minutes max (600 * 500ms)
-    await new Promise((resolve) => {
-      const pollBoot = () => {
-        if (disposed) { resolve(); return; }
-        if (module._gm_isBootCompleted(handle)) {
-          const bootMs = (performance.now() - t0).toFixed(0);
-          console.log(`[Gearmulator Worker] MC68K boot completed in ${bootMs}ms`);
-          resolve();
-        } else if (bootPollCount >= maxBootPollCount) {
-          console.warn(`[Gearmulator Worker] MC68K boot timeout after ${(maxBootPollCount * 0.5).toFixed(0)}s — proceeding anyway`);
-          resolve();
-        } else {
-          bootPollCount++;
-          if (bootPollCount % 10 === 0) {
-            const elapsed = (bootPollCount * 0.5).toFixed(0);
-            console.log(`[Gearmulator Worker] MC68K still booting... (${elapsed}s)`);
-            self.postMessage({ type: 'booting', synthType, elapsed: bootPollCount * 500 });
+      let bootPollCount = 0;
+      const maxBootPollCount = 600; // 5 minutes max (600 * 500ms)
+      await new Promise((resolve) => {
+        const pollBoot = () => {
+          if (disposed) { resolve(); return; }
+          try {
+            if (module._gm_isBootCompleted(handle)) {
+              const bootMs = (performance.now() - t0).toFixed(0);
+              console.log(`[Gearmulator Worker] MC68K boot completed in ${bootMs}ms`);
+              resolve();
+              return;
+            }
+          } catch (e) {
+            console.error('[Gearmulator Worker] gm_isBootCompleted poll error:', e);
           }
-          setTimeout(pollBoot, 500);
-        }
-      };
-      pollBoot();
-    });
+          if (bootPollCount >= maxBootPollCount) {
+            console.warn(`[Gearmulator Worker] MC68K boot timeout after ${(maxBootPollCount * 0.5).toFixed(0)}s — proceeding anyway`);
+            resolve();
+          } else {
+            bootPollCount++;
+            if (bootPollCount % 10 === 0) {
+              const elapsed = (bootPollCount * 0.5).toFixed(0);
+              console.log(`[Gearmulator Worker] MC68K still booting... (${elapsed}s)`);
+              self.postMessage({ type: 'booting', synthType, elapsed: bootPollCount * 500 });
+            }
+            setTimeout(pollBoot, 500);
+          }
+        };
+        pollBoot();
+      });
+    } else {
+      console.log('[Gearmulator Worker] FullSnapshot boot — skipping wait');
+    }
   }
 
   self.postMessage({ type: 'ready', sampleRate: actualRate, handle: handle });
@@ -323,29 +342,44 @@ async function initSynth(data) {
   }
 }
 
+let ucTimer = null;
+let hasUcProcessing = false;
+
 function startRenderLoop(sampleRate) {
-  // Use blocking gm_process() — the standard Device::process() path that handles
-  // all DSP thread synchronization internally. Render small chunks with setTimeout
-  // to let the worker event loop breathe for message handling.
   let renderCount = 0;
+  hasUcProcessing = !!(module._gm_processUc);
 
   function renderTick() {
     if (!initialized || handle < 0 || !module || disposed) return;
 
     const t0 = performance.now();
     fillRingBuffer();
-    const elapsed = performance.now() - t0;
+    const renderMs = performance.now() - t0;
 
-    renderCount++;
-    // Log first few renders and periodic stats
-    if (renderCount <= 3 || (renderCount % 1000 === 0)) {
-      console.log(`[Gearmulator Worker] render #${renderCount}: ${elapsed.toFixed(1)}ms, total=${totalFramesRendered} frames, peak=${peakSeen.toFixed(6)}`);
+    // After rendering audio, run a small burst of MC68K cycles for MIDI processing.
+    // This ensures audio always gets priority and UC gets remaining time budget.
+    if (hasUcProcessing) {
+      try {
+        // Run 32 MC68K cycles with 1ms time limit — just enough to process
+        // queued MIDI without starving the render loop
+        module._gm_processUc(handle, 32, 1);
+      } catch (e) {
+        console.error('[Gearmulator Worker] ucTick error:', e);
+        hasUcProcessing = false;
+      }
     }
 
-    // Use setTimeout(0) to yield to the event loop between render passes
+    const totalMs = performance.now() - t0;
+    renderCount++;
+    if (renderCount <= 5 || (renderCount % 1000 === 0)) {
+      console.log(`[Gearmulator Worker] tick #${renderCount}: render=${renderMs.toFixed(1)}ms total=${totalMs.toFixed(1)}ms frames=${totalFramesRendered} peak=${peakSeen.toFixed(6)}`);
+    }
+
+    // Use setTimeout(0) to yield to the event loop between passes
     renderTimer = setTimeout(renderTick, 0);
   }
-  renderTick();
+  // Schedule first tick async so startRenderLoop returns immediately
+  renderTimer = setTimeout(renderTick, 0);
 }
 
 function fillRingBuffer() {
@@ -357,8 +391,9 @@ function fillRingBuffer() {
   if (used < 0) used += bufSize;
   let free = bufSize - used - 1;
 
-  // Render up to 16 blocks per tick (2048 samples) to reduce setTimeout overhead
-  const maxBlocks = Math.min(16, Math.floor(free / RENDER_BLOCK));
+  // Render up to 4 blocks per tick (512 samples). Reduced from 16 because
+  // microQ's inline processAudio blocks while DSP produces each block.
+  const maxBlocks = Math.min(4, Math.floor(free / RENDER_BLOCK));
 
   for (let b = 0; b < maxBlocks; b++) {
     module._gm_process(handle, outputPtrL, outputPtrR, RENDER_BLOCK);

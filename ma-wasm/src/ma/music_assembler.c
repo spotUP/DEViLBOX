@@ -1914,3 +1914,139 @@ void ma_set_channel_mask(MaModule* module, uint32_t mask) {
 
     module->player->config.channel_enable_mask = mask;
 }
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+size_t ma_track_count(const MaModule* module) {
+    if (module == nullptr) return 0;
+    return module->track_count;
+}
+
+const uint8_t* ma_track_data(const MaModule* module, size_t trackIdx, size_t* out_length) {
+    if (module == nullptr || trackIdx >= module->track_count) {
+        if (out_length) *out_length = 0;
+        return nullptr;
+    }
+    if (out_length) *out_length = module->tracks[trackIdx].length;
+    return module->tracks[trackIdx].data;
+}
+
+void ma_track_replace_data(MaModule* module, size_t trackIdx, uint8_t* newdata, size_t newlen) {
+    if (module == nullptr || trackIdx >= module->track_count) return;
+    free(module->tracks[trackIdx].data);
+    module->tracks[trackIdx].data = newdata;
+    module->tracks[trackIdx].length = newlen;
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+int ma_instrument_count(const MaModule* module) {
+    if (module == nullptr) return 0;
+    return (int)module->instrument_count;
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+void ma_note_on(MaModule* module, int instrument, int note, int velocity) {
+    if (module == nullptr || module->player == nullptr) return;
+    if (instrument < 0 || instrument >= (int)module->instrument_count) return;
+    if (note < 0 || note >= 48) note = 12;  /* default to C-3 */
+
+    const Instrument* instr = &module->instruments[instrument];
+    MaPlayer* player = module->player;
+
+    /* Use voice 0 for preview */
+    VoiceInfo* voice = &player->voices[0];
+    memset(voice, 0, sizeof(*voice));
+
+    voice->channel_number = 0;
+    voice->current_instrument = instr;
+    voice->current_note = (uint8_t)note;
+
+    /* Set up volume from velocity (0-64 range) */
+    int vol = velocity;
+    if (vol < 0) vol = 0;
+    if (vol > 64) vol = 64;
+    voice->volume = (uint8_t)vol;
+
+    /* Look up sample */
+    if (instr->sample_number >= module->sample_count) return;
+    const Sample* sample = &module->samples[instr->sample_number];
+
+    /* Determine period */
+    uint8_t clamped_note = (uint8_t)note;
+    if (clamped_note >= 48) clamped_note = 47;
+    uint16_t period = s_periods[clamped_note];
+    voice->current_period = period;
+
+    /* Set up sample playback */
+    voice->sample_data = sample->sample_data;
+    voice->sample_start_offset = 0;
+    voice->sample_length = sample->length;
+
+    /* Handle synthesis (short wavetable) vs PCM */
+    if (sample->length <= 128 && sample->sample_data != s_empty_sample) {
+        voice->flag |= VoiceFlag_Synthesis;
+        voice->sample_start_offset = instr->key_wave_rate;
+        voice->sample_length = sample->loop_length;
+        if (voice->sample_length == 0) voice->sample_length = 1;
+    }
+
+    /* Trigger retrig + setup via the normal voice processing path */
+    voice->flag |= VoiceFlag_Retrig;
+    voice->muted = true;
+    voice->active = false;
+
+    /* Immediately run one voice processing step to set up pending sample */
+    ma_setup_sample(module, instr, voice);
+
+    /* Apply pending sample to start playback */
+    ma_apply_pending_sample(voice);
+
+    /* Compute sample step */
+    if (period < 127) period = 127;
+    uint32_t frequency = 3546895u / (uint32_t)period;
+    voice->sample_step_fp = ((uint64_t)frequency << SAMPLE_FRAC_BITS) / (uint64_t)player->config.sample_rate;
+
+    /* Set volume */
+    voice->current_volume = (uint16_t)vol;
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+void ma_note_off(MaModule* module) {
+    if (module == nullptr || module->player == nullptr) return;
+
+    VoiceInfo* voice = &module->player->voices[0];
+    voice->active = false;
+    voice->muted = true;
+    voice->current_volume = 0;
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+size_t ma_render_preview(MaModule* module, float* interleaved_stereo, size_t frames) {
+    if (module == nullptr || module->player == nullptr || interleaved_stereo == nullptr) return 0;
+
+    MaPlayer* player = module->player;
+    VoiceInfo* voice = &player->voices[0];
+
+    for (size_t frame = 0; frame < frames; frame++) {
+        float sample_val = 0.0f;
+
+        if (voice->active && !voice->muted && voice->play_data != nullptr && voice->play_length_words > 0) {
+            if (ma_voice_prepare_current(voice)) {
+                sample_val = ma_voice_sample(voice);
+                float volume = (float)voice->current_volume / 64.0f;
+                sample_val *= volume;
+                ma_voice_advance(voice);
+            }
+        }
+
+        /* Output mono to both channels */
+        interleaved_stereo[frame * 2 + 0] = sample_val;
+        interleaved_stereo[frame * 2 + 1] = sample_val;
+    }
+
+    return frames;
+}

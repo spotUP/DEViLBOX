@@ -89,6 +89,74 @@ class PumaTrackerProcessor extends AudioWorkletProcessor {
         }
         break;
 
+      case 'getNumPatterns':
+        if (this.module && typeof this.module._player_get_num_patterns === 'function') {
+          const count = this.module._player_get_num_patterns();
+          this.port.postMessage({ type: 'numPatterns', count, requestId: data.requestId });
+        }
+        break;
+
+      case 'getCell':
+        if (this.module && typeof this.module._player_get_cell === 'function') {
+          const packed = this.module._player_get_cell(data.patternIdx, data.row, data.channel);
+          this.port.postMessage({
+            type: 'cellData',
+            patternIdx: data.patternIdx,
+            row: data.row,
+            channel: data.channel,
+            noteX2: (packed >> 16) & 0xFF,
+            instrEffect: (packed >> 8) & 0xFF,
+            param: packed & 0xFF,
+            requestId: data.requestId,
+          });
+        }
+        break;
+
+      case 'setCell':
+        if (this.module && typeof this.module._player_set_cell === 'function') {
+          this.module._player_set_cell(
+            data.patternIdx, data.row, data.channel,
+            data.noteX2, data.instrEffect, data.param
+          );
+        }
+        break;
+
+      case 'noteOn':
+        if (this.module && typeof this.module._player_note_on === 'function') {
+          this.module._player_note_on(data.instrument, data.note, data.velocity || 127);
+        }
+        break;
+
+      case 'noteOff':
+        if (this.module && typeof this.module._player_note_off === 'function') {
+          this.module._player_note_off();
+        }
+        break;
+
+      case 'getPatternData':
+        if (this.module && typeof this.module._player_get_cell === 'function' &&
+            typeof this.module._player_get_num_patterns === 'function') {
+          const numPat = this.module._player_get_num_patterns();
+          if (data.patternIdx >= 0 && data.patternIdx < numPat) {
+            const cells = [];
+            for (let row = 0; row < 32; row++) {
+              const p = this.module._player_get_cell(data.patternIdx, row, 0);
+              cells.push({
+                noteX2: (p >> 16) & 0xFF,
+                instrEffect: (p >> 8) & 0xFF,
+                param: p & 0xFF,
+              });
+            }
+            this.port.postMessage({
+              type: 'patternData',
+              patternIdx: data.patternIdx,
+              cells,
+              requestId: data.requestId,
+            });
+          }
+        }
+        break;
+
       case 'dispose':
         this.cleanup();
         break;

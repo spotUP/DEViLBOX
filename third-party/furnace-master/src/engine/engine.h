@@ -336,6 +336,7 @@ struct DivEffectContainer {
 extern const char* cmdName[];
 
 class DivEngine {
+  friend class DivEngineAccess;  // WASM file ops access
   DivDispatchContainer disCont[DIV_MAX_CHIPS];
   TAAudio* output;
   TAAudioDesc want, got;

@@ -1515,3 +1515,33 @@ int fp_get_instrument_info(uint32_t instr_ptr, int* is_wavetable) {
     uint16_t len_words = RD16(samp_info + 4);
     return (int)len_words * 2;
 }
+
+/* ======================================================================
+ * Module data accessors for the harness shadow-array builder
+ * ====================================================================== */
+
+int fp_get_module_data(const uint8_t** out_base, uint32_t* out_size) {
+    if (!mod_base || mod_size == 0) return -1;
+    *out_base = mod_base;
+    *out_size = mod_size;
+    return 0;
+}
+
+int fp_get_voice_seq_start(int subsong, int voice) {
+    if (subsong < 0 || subsong >= num_subsongs) return 0;
+    if (voice < 0 || voice >= 4) return 0;
+    uint32_t entry = song_ptr + subsong * 8;
+    uint32_t song_data = RD32(entry);
+    uint32_t block_ptr = RD32(song_data + 8 + voice * 4);
+    if (block_ptr == 0 || block_ptr + 8 >= mod_size) return 0;
+    return (int)RD32(block_ptr + 8);
+}
+
+int fp_get_tick_speed(int subsong) {
+    if (subsong < 0 || subsong >= num_subsongs) return 4;
+    uint32_t entry = song_ptr + subsong * 8;
+    uint32_t song_data = RD32(entry);
+    uint8_t spd = RD8(song_data + 0x18) & 7;
+    if (spd == 0) spd = 8;
+    return (int)spd;
+}

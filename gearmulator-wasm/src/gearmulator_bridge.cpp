@@ -311,33 +311,8 @@ EXPORT void gm_process(int32_t handle, float* outputL, float* outputR, uint32_t 
     };
 
     gm.midiOut.clear();
-    const bool hadMidi = !gm.midiIn.empty();
-    if (hadMidi) {
-        printf("[EM] gm_process: %zu MIDI events queued before process\n", gm.midiIn.size());
-        for (const auto& ev : gm.midiIn) {
-            printf("[EM]   MIDI: status=0x%02X data1=0x%02X data2=0x%02X offset=%u sysex=%zu\n",
-                ev.a, ev.b, ev.c, ev.offset, ev.sysex.size());
-        }
-    }
     gm.device->process(inputs, outputs, numSamples, gm.midiIn, gm.midiOut);
     gm.midiIn.clear();
-
-    // Track output peak for diagnostics
-    static uint32_t processCallCount = 0;
-    static float maxPeakEver = 0;
-    ++processCallCount;
-    float peak = 0;
-    for (uint32_t i = 0; i < numSamples; ++i) {
-        float absL = outputL[i] < 0 ? -outputL[i] : outputL[i];
-        float absR = outputR[i] < 0 ? -outputR[i] : outputR[i];
-        if (absL > peak) peak = absL;
-        if (absR > peak) peak = absR;
-    }
-    if (peak > maxPeakEver) maxPeakEver = peak;
-    if (hadMidi || processCallCount <= 3 || (processCallCount % 500 == 0)) {
-        printf("[EM] gm_process #%u: peak=%.6f (max=%.6f) frames=%u\n",
-            processCallCount, peak, maxPeakEver, numSamples);
-    }
 }
 
 /**
@@ -627,6 +602,36 @@ EXPORT int32_t gm_isBootCompleted(int32_t handle)
 
     // Non-snapshot synths are always "boot completed" after gm_create returns
     return 1;
+}
+
+/**
+ * Run MC68K cycles for inline-processing synths (microQ FullSnapshot).
+ * Called from a separate setTimeout loop in the Worker, decoupled from audio.
+ * Runs up to _maxCycles MC68K instructions or _timeLimitMs milliseconds,
+ * whichever comes first. Returns number of cycles actually executed.
+ */
+EXPORT int32_t gm_processUc(int32_t handle, int32_t _maxCycles, int32_t _timeLimitMs)
+{
+    if (handle < 0 || handle >= static_cast<int32_t>(g_devices.size()) || !g_devices[handle])
+        return 0;
+
+#ifndef GM_NO_WALDORF_MQ
+    auto& dev = g_devices[handle];
+    if (dev->type == GM_WALDORF_MQ)
+    {
+        auto* mqDev = dynamic_cast<mqLib::Device*>(dev->device.get());
+        if (mqDev)
+        {
+            auto* hw = mqDev->getHardware();
+            if (hw)
+            {
+                hw->processUcCyclesInline(static_cast<uint32_t>(_maxCycles));
+                return _maxCycles;
+            }
+        }
+    }
+#endif
+    return 0;
 }
 
 } // extern "C"

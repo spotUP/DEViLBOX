@@ -15,6 +15,7 @@ class Sd2Processor extends AudioWorkletProcessor {
     this.bufferSize = 128;
     this.lastHeapBuffer = null;
     this.initializing = false;
+    this.previewActive = false;
 
     this.port.onmessage = (event) => {
       this.handleMessage(event.data);
@@ -85,6 +86,99 @@ class Sd2Processor extends AudioWorkletProcessor {
           this.module._player_set_channel_gain(data.channel, data.gain);
         }
         break;
+
+      case 'getNumTracks':
+        if (this.module && typeof this.module._sd2_bridge_get_num_tracks === 'function') {
+          const count = this.module._sd2_bridge_get_num_tracks();
+          this.port.postMessage({ type: 'numTracks', count, requestId: data.requestId });
+        }
+        break;
+
+      case 'getTrackLength':
+        if (this.module && typeof this.module._sd2_bridge_get_track_length === 'function') {
+          const length = this.module._sd2_bridge_get_track_length(data.trackIdx);
+          this.port.postMessage({ type: 'trackLength', trackIdx: data.trackIdx, length, requestId: data.requestId });
+        }
+        break;
+
+      case 'getCell':
+        if (this.module && typeof this.module._sd2_bridge_get_cell === 'function') {
+          const packed = this.module._sd2_bridge_get_cell(data.trackIdx, data.row);
+          this.port.postMessage({
+            type: 'cellData',
+            trackIdx: data.trackIdx,
+            row: data.row,
+            note: (packed >>> 24) & 0xFF,
+            instrument: (packed >>> 16) & 0xFF,
+            effect: (packed >>> 8) & 0xFF,
+            param: packed & 0xFF,
+            requestId: data.requestId,
+          });
+        }
+        break;
+
+      case 'setCell':
+        if (this.module && typeof this.module._sd2_bridge_set_cell === 'function') {
+          this.module._sd2_bridge_set_cell(data.trackIdx, data.row, data.note, data.instrument, data.effect, data.param);
+          this.port.postMessage({ type: 'cellSet', trackIdx: data.trackIdx, row: data.row, requestId: data.requestId });
+        }
+        break;
+
+      case 'getTrackData':
+        if (this.module &&
+            typeof this.module._sd2_bridge_get_track_length === 'function' &&
+            typeof this.module._sd2_bridge_get_cell === 'function') {
+          const trackIdx = data.trackIdx;
+          const len = this.module._sd2_bridge_get_track_length(trackIdx);
+          const cells = [];
+          for (let r = 0; r < len; r++) {
+            const p = this.module._sd2_bridge_get_cell(trackIdx, r);
+            cells.push({
+              note: (p >>> 24) & 0xFF,
+              instrument: (p >>> 16) & 0xFF,
+              effect: (p >>> 8) & 0xFF,
+              param: p & 0xFF,
+            });
+          }
+          this.port.postMessage({ type: 'trackData', trackIdx, cells, requestId: data.requestId });
+        }
+        break;
+
+      case 'noteOn':
+        if (this.module && typeof this.module._sd2_note_on === 'function') {
+          this.module._sd2_note_on(data.instrument, data.note, data.velocity);
+          this.previewActive = true;
+        }
+        break;
+
+      case 'noteOff':
+        if (this.module && typeof this.module._sd2_note_off === 'function') {
+          this.module._sd2_note_off();
+          this.previewActive = false;
+        }
+        break;
+
+      case 'save': {
+        if (this.module && typeof this.module._sd2_save === 'function') {
+          const size = this.module._sd2_save();
+          if (size > 0 && typeof this.module._sd2_save_ptr === 'function') {
+            const ptr = this.module._sd2_save_ptr();
+            const heapU8 = this.module.HEAPU8 || (this.module.wasmMemory && new Uint8Array(this.module.wasmMemory.buffer));
+            if (heapU8 && ptr) {
+              const savedData = heapU8.slice(ptr, ptr + size);
+              if (typeof this.module._sd2_save_free === 'function') {
+                this.module._sd2_save_free();
+              }
+              this.port.postMessage({ type: 'saveData', data: savedData.buffer, requestId: data.requestId }, [savedData.buffer]);
+            } else {
+              this.port.postMessage({ type: 'saveData', data: null, requestId: data.requestId });
+            }
+          } else {
+            this.port.postMessage({ type: 'saveData', data: null, requestId: data.requestId });
+          }
+        }
+        break;
+      }
 
       case 'dispose':
         this.cleanup();
@@ -216,10 +310,15 @@ class Sd2Processor extends AudioWorkletProcessor {
 
     const numSamples = Math.min(outputL.length, this.bufferSize);
 
-    if (typeof this.module._player_render === 'function') {
+    // Choose render function: preview or normal playback
+    const renderFn = this.previewActive
+      ? this.module._sd2_render_preview
+      : this.module._player_render;
+
+    if (typeof renderFn === 'function') {
       this.updateBufferViews();
       if (this.interleavedBuf) {
-        const rendered = this.module._player_render(this.interleavedPtr, numSamples);
+        const rendered = renderFn(this.interleavedPtr, numSamples);
         if (rendered > 0) {
           for (let i = 0; i < rendered; i++) {
             outputL[i] = this.interleavedBuf[i * 2];
