@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-03-09T16:54:18.648Z
+ * Generated: 2026-03-09T19:36:21.349Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.2593';
-export const BUILD_NUMBER = '2593';
-export const BUILD_HASH = 'f2aa3dee6';
+export const BUILD_VERSION = '1.0.2599';
+export const BUILD_NUMBER = '2599';
+export const BUILD_HASH = '9dfda375f';
 export const BUILD_DATE = '2026-03-09';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,7 +30,37 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.2593',
+    version: '1.0.2599',
+    date: '2026-03-09',
+    changes: [
+      {
+        type: 'feature',
+        "description": "Chore: add Claude slash commands, update MCP config and CLAUDE.md"
+      },
+      {
+        type: 'feature',
+        "description": "AI chat panel, SC68 visualizer, VU meters, and UI improvements"
+      },
+      {
+        type: 'fix',
+        "description": "Symphonie Pro delta16 decoding and sample editor for native formats"
+      },
+      {
+        type: 'feature',
+        "description": "Engine improvements, new exporters, and format support updates"
+      },
+      {
+        type: 'feature',
+        "description": "Add AI chat, music analysis, and MCP bridge improvements"
+      },
+      {
+        type: 'feature',
+        "description": "Update WASM engine builds and add Furnace FileOps module"
+      }
+    ]
+  },
+  {
+    version: '2026-03-08',
     date: '2026-03-08',
     changes: [
       {
@@ -214,30 +244,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'feature',
         "description": "Extend furnace sequencer with FDS, QSound, N163, ESFM commands"
-      },
-      {
-        type: 'feature',
-        "description": "Refactor gearmulator to Worker+SAB audio architecture"
-      },
-      {
-        type: 'feature',
-        "description": "Add per-channel mixer gain to WASM Amiga engines"
-      },
-      {
-        type: 'fix',
-        "description": "Chore: remove temporary diagnostic/debug files and update .gitignore"
-      },
-      {
-        type: 'feature',
-        "description": "Chore: update pxtone harness and add CMakeLists.txt"
-      },
-      {
-        type: 'fix',
-        "description": "TrackerView merge resolution"
-      },
-      {
-        type: 'improvement',
-        "description": "Chore: update gm-o2-test script"
       }
     ]
   }

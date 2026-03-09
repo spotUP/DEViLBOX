@@ -152,3 +152,24 @@ third-party/pt2-clone-master/
 # Local symlinks to reference directories (machine-specific)
 Reference Code
 Reference Music
+
+# Furnace FileOps WASM build artifacts
+furnace-fileops-wasm/build/
+
+# Serena memories (MCP tool working data)
+.serena/
+
+# FuturePlayer WASM build
+futureplayer-wasm/build/
+
+# Stray junk files from CLI tools
+--cleanup
+--cmdlog
+file
+
+# Test music files (not part of the project)
+public/test-*
+test-claude-cli.sh
+
+# ProjectM third-party (large, not needed for builds)
+third-party/projectm-master/
