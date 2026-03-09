@@ -13,7 +13,7 @@ import React, { useRef, useState, useCallback } from 'react';
 import * as Tone from 'tone';
 import { Button } from '@components/ui/Button';
 import { FT2NumericInput } from './FT2NumericInput';
-import { useTrackerStore, useTransportStore, useProjectStore, useInstrumentStore, useAudioStore, useUIStore, useAutomationStore, useEditorStore , useFormatStore } from '@stores';
+import { useTrackerStore, useTransportStore, useProjectStore, useInstrumentStore, useAudioStore, useUIStore, useAutomationStore, useEditorStore } from '@stores';
 import { useShallow } from 'zustand/react/shallow';
 import { notify } from '@stores/useNotificationStore';
 import { useTapTempo } from '@hooks/useTapTempo';
@@ -47,100 +47,20 @@ import { ImportModuleDialog, type ImportOptions } from '@components/dialogs/Impo
 import { FileBrowser } from '@components/dialogs/FileBrowser';
 import { importSong, exportSong } from '@lib/export/exporters';
 import { isSupportedModule, getSupportedExtensions, type ModuleInfo } from '@lib/import/ModuleLoader';
-import { computeSongDBHash, lookupSongDB } from '@lib/songdb';
-import { parseSIDHeader } from '@/lib/sid/SIDHeaderParser';
-import { convertModule, convertXMModule, convertMODModule } from '@lib/import/ModuleConverter';
-import type { XMNote } from '@lib/import/formats/XMParser';
-import type { MODNote } from '@lib/import/formats/MODParser';
-import { convertToInstrument } from '@lib/import/InstrumentConverter';
+import { useModuleImport } from '@hooks/tracker/useModuleImport';
 import { importMIDIFile, isMIDIFile, getSupportedMIDIExtensions } from '@lib/import/MIDIImporter';
 import { clearSavedProject, clearExplicitlySaved } from '@hooks/useProjectPersistence';
 import { parseDb303Pattern, exportCurrentPatternToDb303 } from '@lib/import/Db303PatternConverter';
 import { getASIDDeviceManager } from '@lib/sid/ASIDDeviceManager';
 import { useSettingsStore } from '@stores/useSettingsStore';
-import type { InstrumentConfig, TB303Config } from '@typedefs/instrument';
-import { DEFAULT_OSCILLATOR, DEFAULT_ENVELOPE, DEFAULT_FILTER } from '@typedefs/instrument';
+import { useAIStore } from '@stores/useAIStore';
+import type { TB303Config } from '@typedefs/instrument';
 import type { Pattern } from '@typedefs';
 
 import { CURRENT_VERSION } from '@generated/changelog';
 
 // Build accept string for file input
 const ACCEPTED_FORMATS = ['.json', '.dbx', '.xml', ...getSupportedExtensions(), ...getSupportedMIDIExtensions()].join(',');
-
-// Create instruments for imported module
-function createInstrumentsForModule(
-  patterns: Pattern[],
-  instrumentNames: string[],
-  sampleUrls?: Map<number, string>
-): InstrumentConfig[] {
-  const usedInstruments = new Set<number>();
-  for (const pattern of patterns) {
-    for (const channel of pattern.channels) {
-      for (const cell of channel.rows) {
-        if (cell.instrument !== null && cell.instrument > 0) {
-          usedInstruments.add(cell.instrument);
-        }
-      }
-    }
-  }
-
-  const instruments: InstrumentConfig[] = [];
-  const oscillatorTypes: Array<'sine' | 'square' | 'sawtooth' | 'triangle'> =
-    ['sawtooth', 'square', 'triangle', 'sine'];
-
-  for (const instNum of Array.from(usedInstruments).sort((a, b) => a - b)) {
-    const name = instrumentNames[instNum - 1] || `Instrument ${instNum}`;
-    const sampleUrl = sampleUrls?.get(instNum);
-
-    if (sampleUrl) {
-      instruments.push({
-        id: instNum,
-        name: name.trim() || `Sample ${instNum}`,
-        type: 'sample' as const,
-        synthType: 'Sampler',
-        effects: [],
-        volume: -6,
-        pan: 0,
-        parameters: { sampleUrl },
-      });
-    } else {
-      const oscType = oscillatorTypes[(instNum - 1) % oscillatorTypes.length];
-      instruments.push({
-        id: instNum,
-        name: name.trim() || `Instrument ${instNum}`,
-        type: 'synth' as const,
-        synthType: 'Synth',
-        oscillator: { ...DEFAULT_OSCILLATOR, type: oscType },
-        envelope: { ...DEFAULT_ENVELOPE },
-        filter: { ...DEFAULT_FILTER },
-        effects: [],
-        volume: -6,
-        pan: 0,
-      });
-    }
-  }
-
-  // Ensure default instruments exist
-  for (const defaultId of [0, 1]) {
-    if (!usedInstruments.has(defaultId)) {
-      instruments.push({
-        id: defaultId,
-        name: defaultId === 0 ? 'Default' : 'Instrument 01',
-        type: 'synth' as const,
-        synthType: 'Synth',
-        oscillator: { ...DEFAULT_OSCILLATOR, type: 'sawtooth' },
-        envelope: { ...DEFAULT_ENVELOPE },
-        filter: { ...DEFAULT_FILTER },
-        effects: [],
-        volume: -6,
-        pan: 0,
-      });
-    }
-  }
-
-  instruments.sort((a, b) => a.id - b.id);
-  return instruments;
-}
 
 interface FT2ToolbarProps {
   onShowPatterns?: () => void;
@@ -256,6 +176,8 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
   })));
 
 
+  const { handleModuleImport: importModule } = useModuleImport();
+
   const engine = getToneEngine();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
@@ -307,6 +229,8 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
   const [showFileBrowser, setShowFileBrowser] = useState(false);
   const [showClearModal, setShowClearModal] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(!!document.fullscreenElement);
+  const aiOpen = useAIStore((s) => s.isOpen);
+  const toggleAI = useAIStore((s) => s.toggle);
 
   // PERF: Memoize logo animation complete callback to prevent re-renders
   const handleLogoAnimationComplete = useCallback(() => {
@@ -402,168 +326,9 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
   };
 
   const handleModuleImport = async (moduleInfo: ModuleInfo, options: ImportOptions = { useLibopenmpt: true }) => {
-    // Loading an external module — prevent auto-save from overwriting user's saved project
-    clearExplicitlySaved();
-    // Fire-and-forget SongDB metadata lookup (non-blocking)
-    const songBuf = moduleInfo.arrayBuffer ?? (moduleInfo.file ? await moduleInfo.file.arrayBuffer() : null);
-    if (songBuf) {
-      lookupSongDB(computeSongDBHash(songBuf)).then(result => {
-        useFormatStore.getState().setSongDBInfo(result ? {
-          authors: result.authors, publishers: result.publishers,
-          album: result.album, year: result.year, format: result.format,
-          duration_ms: result.subsongs[0]?.duration_ms ?? 0,
-        } : null);
-      });
-      // Extract C64 SID header metadata if applicable
-      const sidInfo = parseSIDHeader(new Uint8Array(songBuf));
-      if (sidInfo) {
-        useFormatStore.getState().setSidMetadata({
-          format: sidInfo.format,
-          version: sidInfo.version,
-          title: sidInfo.title,
-          author: sidInfo.author,
-          copyright: sidInfo.copyright,
-          chipModel: sidInfo.chipModel,
-          clockSpeed: sidInfo.clockSpeed,
-          subsongs: sidInfo.subsongs,
-          defaultSubsong: sidInfo.defaultSubsong,
-          currentSubsong: options.subsong ?? sidInfo.defaultSubsong,
-          secondSID: sidInfo.secondSID,
-          thirdSID: sidInfo.thirdSID,
-        });
-      } else {
-        useFormatStore.getState().setSidMetadata(null);
-      }
-    } else {
-      useFormatStore.getState().setSongDBInfo(null);
-      useFormatStore.getState().setSidMetadata(null);
-    }
-
-    // Always clean up before import to prevent stale state from previous imports
-    if (isPlaying) stop();
-    engine.releaseAll();
-
-    // Reset all stores to prevent stale data from previous imports
-    resetAutomation();
-    resetTransport();
-    resetInstruments();
-
-    // Dispose ALL existing engine instruments (not just matching IDs)
-    engine.disposeAllInstruments();
-
     setIsLoading(true);
     try {
-      let result;
-      if (moduleInfo.nativeData?.patterns) {
-        const { format, patterns: nativePatterns, importMetadata, instruments: nativeInstruments } = moduleInfo.nativeData;
-        const channelCount = importMetadata.originalChannelCount;
-        const instrumentNames = nativeInstruments?.map(i => i.name) || [];
-        if (format === 'XM') {
-          result = convertXMModule(nativePatterns as XMNote[][][], channelCount, importMetadata, instrumentNames, moduleInfo.arrayBuffer);
-        } else if (format === 'MOD') {
-          result = convertMODModule(nativePatterns as MODNote[][][], channelCount, importMetadata, instrumentNames, moduleInfo.arrayBuffer);
-        } else if (format === 'FUR' || format === 'DMF') {
-          // Furnace and DefleMask patterns are already converted
-          // Pattern data is [pattern][row][channel], need to convert to [pattern].channels[channel].rows[row]
-          const patternOrder = importMetadata.modData?.patternOrderTable || [];
-          const patLen = nativePatterns[0]?.length || 64;
-          const numChannels = importMetadata.originalChannelCount || (nativePatterns[0]?.[0] as unknown[] | undefined)?.length || 4;
-          console.log(`[Import] ${format} pattern structure: ${nativePatterns.length} patterns, ${patLen} rows, ${numChannels} channels`);
-
-          result = {
-            patterns: (nativePatterns as Record<string, unknown>[][][]).map((pat, idx) => ({
-              id: `pattern-${idx}`,
-              name: `Pattern ${idx}`,
-              length: patLen,
-              importMetadata,
-              channels: Array.from({ length: numChannels }, (_, ch) => ({
-                id: `channel-${ch}`,
-                name: `Channel ${ch + 1}`,
-                muted: false,
-                solo: false,
-                collapsed: false,
-                volume: 100,
-                pan: 0,
-                instrumentId: null,
-                color: null,
-                rows: pat.map((row: Record<string, unknown>[]) => {
-                  const cell = (row[ch] || {}) as Record<string, number>;
-                  return {
-                    note: cell.note || 0,
-                    instrument: cell.instrument || 0,
-                    volume: cell.volume || 0,
-                    effTyp: cell.effectType || 0,
-                    eff: cell.effectParam || 0,
-                    effTyp2: cell.effectType2 || 0,
-                    eff2: cell.effectParam2 || 0,
-                  };
-                }),
-              })),
-            })),
-            order: patternOrder.length > 0 ? patternOrder : [0],
-            instrumentNames,
-          };
-        } else {
-          notify.error(`Unsupported native format: ${format}`);
-          return;
-        }
-      } else if (moduleInfo.metadata.song) {
-        result = convertModule(moduleInfo.metadata.song);
-      } else {
-        // UADE-exclusive or native-parser-only format (no libopenmpt data available).
-        // Delegate to parseModuleToSong which routes to UADEParser, FCParser, etc.
-        // based on format engine prefs, passing the pre-scanned UADE metadata if present.
-        const { parseModuleToSong } = await import('@lib/import/parseModuleToSong');
-        const file = moduleInfo.file || new File([moduleInfo.arrayBuffer], moduleInfo.metadata.title || 'track');
-        const song = await parseModuleToSong(file, options.subsong ?? 0, options.uadeMetadata, undefined, options.companionFiles);
-        loadInstruments(song.instruments);
-        loadPatterns(song.patterns);
-        setCurrentPattern(0);
-        if (song.songPositions.length > 0) setPatternOrder(song.songPositions);
-        setBPM(song.initialBPM);
-        setSpeed(song.initialSpeed);
-        setMetadata({ name: song.name, author: '', description: `Imported from ${moduleInfo.metadata.title || 'module'}` });
-        useFormatStore.getState().applyEditorMode(song);
-        await engine.preloadInstruments(song.instruments);
-        notify.success(`Imported: ${song.name} — ${song.instruments.length} instrument(s)`, 3000);
-        return;
-      }
-      let instruments: InstrumentConfig[];
-      if (moduleInfo.nativeData?.instruments) {
-        const parsedInstruments = moduleInfo.nativeData.instruments;
-        const format = moduleInfo.nativeData.format;
-        // Track next available ID to avoid duplicates when multi-sample instruments expand
-        let nextId = 1;
-        instruments = [];
-        for (const parsed of parsedInstruments) {
-          const converted = convertToInstrument(parsed, nextId, format);
-          instruments.push(...converted);
-          nextId += converted.length; // Advance ID by number of instruments created
-        }
-      } else {
-        instruments = createInstrumentsForModule(result.patterns, result.instrumentNames, undefined);
-      }
-      loadInstruments(instruments);
-      loadPatterns(result.patterns);
-      if (result.order && result.order.length > 0) {
-        setPatternOrder(result.order);
-        setCurrentPattern(result.order[0]);
-      }
-      setMetadata({ name: moduleInfo.metadata.title, author: '', description: `Imported from ${moduleInfo.metadata.type}` });
-      const initialBPM = moduleInfo.nativeData?.importMetadata.modData?.initialBPM;
-      if (initialBPM) setBPM(initialBPM);
-      const initialSpeed = moduleInfo.nativeData?.importMetadata.modData?.initialSpeed;
-      if (initialSpeed) setSpeed(initialSpeed);
-      // Set editor mode (Furnace native data for WASM sequencer, libopenmpt file data, etc.)
-      const xmFreqType = moduleInfo.nativeData?.importMetadata?.xmData?.frequencyType;
-      const format = moduleInfo.nativeData?.format;
-      useFormatStore.getState().applyEditorMode({
-        linearPeriods: format === 'XM' ? (xmFreqType === 'linear' || xmFreqType === undefined) : false,
-        furnaceNative: moduleInfo.nativeData?.furnaceNative,
-        libopenmptFileData: options.useLibopenmpt ? moduleInfo.arrayBuffer : undefined,
-      });
-      notify.success(`Imported ${moduleInfo.metadata.type}: ${moduleInfo.metadata.title}`, 3000);
-      await engine.preloadInstruments(instruments);
+      await importModule(moduleInfo, options);
     } catch {
       notify.error(`Failed to import module`);
     } finally {
@@ -956,6 +721,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
         <Button variant="ghost" size="sm" onClick={onShowDrumpads}>Pads</Button>                        
         <Button variant={showMasterFX ? 'primary' : 'ghost'} size="sm" onClick={onShowMasterFX}>Master FX</Button>
         
+        <Button variant={aiOpen ? 'primary' : 'ghost'} size="sm" onClick={toggleAI}>AI</Button>
         <Button variant="ghost" size="sm" onClick={() => onShowHelp?.('chip-effects')}>Reference</Button>
         <Button variant="ghost" size="sm" onClick={() => onShowHelp?.('shortcuts')}>Help</Button>
         <Button variant="ghost" size="sm" onClick={() => setShowSettings(true)}>Settings</Button>
@@ -1174,126 +940,17 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
           notify.success(`Loaded: ${proj.metadata?.name || filename}`);
         } catch { notify.error('Failed to load file'); }
       }} onLoadTrackerModule={async (buffer: ArrayBuffer, filename: string) => {
-        // Loading from file browser — prevent auto-save from overwriting user's saved project
-        clearExplicitlySaved();
-        if (isPlaying) { stop(); engine.releaseAll(); }
-        try {
-          const lower = filename.toLowerCase();
-          if (lower.endsWith('.sqs') || lower.endsWith('.seq')) {
-            // Behringer TD-3 / Synthtribe pattern file
-            const { parseTD3File } = await import('@lib/import/TD3PatternLoader');
-            const { td3StepsToTrackerCells } = await import('@/midi/sysex/TD3PatternTranslator');
-            const { loadPatterns, setCurrentPattern, setPatternOrder } = useTrackerStore.getState();
-            const { instruments, addInstrument: addInst } = useInstrumentStore.getState();
-
-            let tb303Instrument = instruments.find(inst => inst.synthType === 'TB303');
-            if (!tb303Instrument) {
-              const { createDefaultTB303Instrument } = await import('@lib/instrumentFactory');
-              const newInst = createDefaultTB303Instrument();
-              addInst(newInst);
-              tb303Instrument = newInst;
-            }
-
-            const td3File = await parseTD3File(buffer);
-            if (td3File.patterns.length === 0) {
-              notify.error('No patterns found in file');
-              return;
-            }
-
-            // Get 1-based instrument index for tracker display
-            const currentInstruments = useInstrumentStore.getState().instruments;
-            const instrumentIndex = currentInstruments.findIndex(i => i.id === tb303Instrument!.id) + 1 || 1;
-
-            const importedPatterns = td3File.patterns.map((td3Pattern, idx) => {
-              const cells = td3StepsToTrackerCells(td3Pattern.steps, 2);
-              const patternLength = td3Pattern.length || 16;
-              const patternId = `td3-${Date.now()}-${idx}`;
-              return {
-                id: patternId,
-                name: td3Pattern.name || `TD-3 Pattern ${idx + 1}`,
-                length: patternLength,
-                channels: [{
-                  id: `ch-${tb303Instrument!.id}-${idx}`,
-                  name: 'TB-303',
-                  muted: false,
-                  solo: false,
-                  collapsed: false,
-                  volume: 100,
-                  pan: 0,
-                  instrumentId: tb303Instrument!.id,
-                  color: '#ec4899',
-                  rows: cells.slice(0, patternLength).map(cell => ({
-                    ...cell,
-                    instrument: cell.note ? instrumentIndex : 0
-                  }))
-                }]
-              };
-            });
-
-            loadPatterns(importedPatterns);
-            setCurrentPattern(0);
-            setPatternOrder(importedPatterns.map((_, i) => i));
-            notify.success(`Imported ${importedPatterns.length} TD-3 pattern(s)`);
-          } else if (isMIDIFile(lower)) {
-            // Standard MIDI file (.mid/.midi)
-            const result = await importMIDIFile(new File([buffer], filename), { mergeChannels: true });
-            if (result.patterns.length === 0) {
-              notify.error('No patterns found in MIDI file');
-              return;
-            }
-            resetAutomation();
-            resetTransport();
-            resetInstruments();
-            engine.disposeAllInstruments();
-            loadPatterns(result.patterns);
-            if (result.instruments.length > 0) {
-              loadInstruments(result.instruments);
-            }
-            setPatternOrder(result.patterns.map((_, i) => i));
-            setCurrentPattern(0);
-            setBPM(result.bpm);
-            setMetadata({
-              name: result.metadata.name,
-              author: '',
-              description: `Imported from MIDI (${result.metadata.tracks} track${result.metadata.tracks !== 1 ? 's' : ''})`,
-            });
-            notify.success(
-              `Imported: ${result.metadata.name} — ${result.instruments.length} instrument(s), BPM: ${result.bpm}`
-            );
-          } else {
-            // For supported tracker modules, show the import dialog so the user
-            // can choose the engine (native parser / UADE enhanced / UADE classic).
-            if (isSupportedModule(filename)) {
-              setPendingFile(new File([buffer], filename));
-              setShowImportDialog(true);
-              return;
-            }
-            // Unsupported extension — try parseModuleToSong as a last resort
-            // (UADE can detect some formats by magic bytes regardless of extension).
-            const { parseModuleToSong } = await import('@lib/import/parseModuleToSong');
-            engine.releaseAll();
-            resetAutomation();
-            resetTransport();
-            resetInstruments();
-            engine.disposeAllInstruments();
-            setIsLoading(true);
-            try {
-              const song = await parseModuleToSong(new File([buffer], filename));
-              loadInstruments(song.instruments);
-              loadPatterns(song.patterns);
-              setCurrentPattern(0);
-              if (song.songPositions.length > 0) setPatternOrder(song.songPositions);
-              setBPM(song.initialBPM);
-              setSpeed(song.initialSpeed);
-              setMetadata({ name: song.name, author: '', description: `Imported from ${filename}` });
-              useFormatStore.getState().applyEditorMode(song);
-              await engine.preloadInstruments(song.instruments);
-              notify.success(`Imported: ${song.name} — ${song.instruments.length} instrument(s)`, 3000);
-            } finally {
-              setIsLoading(false);
-            }
-          }
-        } catch { notify.error('Failed to load file'); }
+        const { loadFile } = await import('@lib/file/UnifiedFileLoader');
+        const file = new File([buffer], filename);
+        const result = await loadFile(file);
+        if (result.success === 'pending-import') {
+          setPendingFile(result.file);
+          setShowImportDialog(true);
+        } else if (result.success === true) {
+          notify.success(result.message);
+        } else if (result.success === false) {
+          notify.error(result.error);
+        }
       }} />
 
       {/* Clear Modal */}

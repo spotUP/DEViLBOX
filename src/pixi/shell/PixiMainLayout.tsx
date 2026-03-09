@@ -14,6 +14,7 @@ import type { Container as ContainerType, Texture } from 'pixi.js';
 import { Rectangle } from 'pixi.js';
 import { usePixiResponsive } from '../hooks/usePixiResponsive';
 import { useUIStore } from '@stores/useUIStore';
+import { useAIStore } from '@stores/useAIStore';
 import { useWorkbenchStore } from '@stores/useWorkbenchStore';
 import { drainBindingErrorCount } from '../PixiApp';
 import { PixiNavBar } from './PixiNavBar';
@@ -126,10 +127,14 @@ function resolveMainView(activeView: string): MainViewId {
 // ─── PixiMainLayout ──────────────────────────────────────────────────────────
 
 export const PixiMainLayout: React.FC = () => {
-  const { width, height } = usePixiResponsive();
+  const { width: rawWidth, height } = usePixiResponsive();
   const { app } = useApplication();
   const activeView = useUIStore((s) => s.activeView);
   const viewExposeActive = useUIStore((s) => s.viewExposeActive);
+  const aiPanelOpen = useAIStore((s) => s.isOpen);
+
+  // Shrink main content when AI panel is open
+  const width = aiPanelOpen ? Math.max(400, rawWidth - 380) : rawWidth;
 
   // Refs to view containers for thumbnail capture
   const viewRefsMap = useRef<Record<string, ContainerType | null>>({});

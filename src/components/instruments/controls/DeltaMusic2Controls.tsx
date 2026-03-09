@@ -4,11 +4,12 @@
  * Exposes all DeltaMusic2Config parameters: 5-entry volume table
  * (speed/level/sustain), 5-entry vibrato table (speed/delay/sustain),
  * pitch bend, and (for synth instruments) a read-only 48-byte sequence
- * preview.
+ * preview.  The wavetable sequence is editable: clicking a cell lets you
+ * type a new value (0-254 for waveform, 255 for loop/end).
  *
- * When loaded via UADE (uadeChipRam present), scalar params that have a
- * direct byte equivalent in the DM2 instrument header are written to chip
- * RAM so UADE picks them up on the next note trigger.
+ * When loaded via UADE (uadeChipRam present), all params including
+ * individual table entries are written to chip RAM so UADE picks them up
+ * on the next note trigger.
  *
  * DM2 instrument header byte layout (offset from instrBase):
  *
@@ -21,7 +22,7 @@
  *   +36-37      pitchBend            ✓ written (uint16 BE)
  *   +38         isSample             — NOT written (structural)
  *   +39         sampleNum            — NOT written (structural)
- *   +40-87      table                — read-only preview (use writeBlock for bulk)
+ *   +40-87      table                ✓ written (uint8 per entry)
  */
 
 import React, { useRef, useEffect, useCallback, useState } from 'react';
@@ -39,6 +40,8 @@ const OFF_VOL_TABLE = 6;
 const OFF_VIB_TABLE = 21;
 /** Pitch bend: uint16 BE at +36. */
 const OFF_PITCH_BEND = 36;
+/** Wavetable sequence starts at +40; 48 bytes. */
+const OFF_TABLE = 40;
 
 // ── Tab type ────────────────────────────────────────────────────────────────
 
@@ -156,6 +159,21 @@ export const DeltaMusic2Controls: React.FC<DeltaMusic2ControlsProps> = ({
     [onChange, uadeChipRam, getEditor],
   );
 
+  // ── Wavetable entry updater ───────────────────────────────────────────
+
+  const updateTableEntry = useCallback(
+    (index: number, value: number) => {
+      if (!configRef.current.table) return;
+      const newTable = new Uint8Array(configRef.current.table);
+      newTable[index] = value & 0xFF;
+      onChange({ table: newTable });
+      if (uadeChipRam) {
+        void getEditor().writeU8(uadeChipRam.instrBase + OFF_TABLE + index, value & 0xFF);
+      }
+    },
+    [onChange, uadeChipRam, getEditor],
+  );
+
   // ── ENVELOPE TAB (volume table) ───────────────────────────────────────────
 
   const renderEnvelope = () => (
@@ -252,7 +270,7 @@ export const DeltaMusic2Controls: React.FC<DeltaMusic2ControlsProps> = ({
     </div>
   );
 
-  // ── SOUND TABLE TAB (synth only, read-only preview) ───────────────────────
+  // ── SOUND TABLE TAB (synth only, editable) ────────────────────────────
 
   const renderTable = () => {
     if (config.isSample || !config.table) {
@@ -268,7 +286,7 @@ export const DeltaMusic2Controls: React.FC<DeltaMusic2ControlsProps> = ({
     return (
       <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
         <div className={`rounded-lg border p-3 ${panelBg}`}>
-          <SectionLabel label="Wavetable Sequence (48-byte, read-only)" />
+          <SectionLabel label="Wavetable Sequence (48 bytes)" />
           <div className="grid grid-cols-8 gap-1">
             {Array.from(table).map((entry, idx) => {
               const isLoop  = entry === 0xFF;
@@ -276,31 +294,54 @@ export const DeltaMusic2Controls: React.FC<DeltaMusic2ControlsProps> = ({
 
               let bg = '#0a0e14';
               let textColor = '#555';
-              let label = '';
 
               if (isWave) {
                 bg = accent + '1a';
                 textColor = accent;
-                label = `W${entry}`;
               } else if (isLoop) {
                 bg = '#1a0000';
                 textColor = '#884444';
-                label = 'LP';
               }
 
               return (
                 <div key={idx}
                   className="flex flex-col items-center py-1 rounded text-[8px] font-mono"
-                  style={{ background: bg, border: `1px solid ${textColor}44` }}>
+                  style={{ background: bg, border: `1px solid ${textColor}44` }}
+                  title={`Byte ${idx}: ${entry} (0x${entry.toString(16).padStart(2, '0').toUpperCase()})`}>
                   <span style={{ color: textColor, opacity: 0.5 }}>{idx}</span>
-                  <span style={{ color: textColor }}>{label || '--'}</span>
+                  <input
+                    type="number"
+                    min={0}
+                    max={255}
+                    value={entry}
+                    onChange={(e) => {
+                      const v = parseInt(e.target.value, 10);
+                      if (!isNaN(v) && v >= 0 && v <= 255) {
+                        updateTableEntry(idx, v);
+                      }
+                    }}
+                    onBlur={(e) => {
+                      const v = parseInt(e.target.value, 10);
+                      if (isNaN(v)) {
+                        updateTableEntry(idx, 0);
+                      } else {
+                        updateTableEntry(idx, Math.max(0, Math.min(255, v)));
+                      }
+                    }}
+                    className="w-full text-center bg-transparent border-none outline-none text-[9px] font-mono"
+                    style={{
+                      color: textColor,
+                      MozAppearance: 'textfield',
+                      WebkitAppearance: 'none',
+                    } as React.CSSProperties}
+                  />
                 </div>
               );
             })}
           </div>
           <div className="mt-2 flex flex-col gap-1 text-[9px]" style={{ color: accent, opacity: 0.6 }}>
-            <span>W## = waveform index (0-254)</span>
-            <span>LP  = 0xFF loop/end marker</span>
+            <span>0-254 = waveform index  ·  255 = loop/end marker (LP)</span>
+            <span>Click any cell to edit its value</span>
           </div>
         </div>
       </div>

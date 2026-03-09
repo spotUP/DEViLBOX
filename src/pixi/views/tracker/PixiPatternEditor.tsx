@@ -52,11 +52,11 @@ const V_SCROLL_THRESHOLD = 30; // Vertical scroll accumulator — absorbs trackp
 // ─── Note formatting ─────────────────────────────────────────────────────────
 const NOTE_NAMES = ['C-', 'C#', 'D-', 'D#', 'E-', 'F-', 'F#', 'G-', 'G#', 'A-', 'A#', 'B-'];
 
-function noteToString(note: number): string {
+function noteToString(note: number, displayOffset = 0): string {
   if (note === 0) return '---';
   if (note === 97) return 'OFF';
-  const n = note - 1;
-  const semitone = n % 12;
+  const n = note + displayOffset - 1;
+  const semitone = ((n % 12) + 12) % 12;
   const octave = Math.floor(n / 12);
   return `${NOTE_NAMES[semitone]}${octave}`;
 }
@@ -164,6 +164,7 @@ interface RenderParams {
   currentPatternIndex: number;
   playbackRow: number;
   playbackPatternIdx: number;
+  noteDisplayOffset: number;
 }
 
 /** Static grid layer — backgrounds, separators, gutter. */
@@ -222,15 +223,13 @@ function renderGrid(g: GraphicsType, p: RenderParams, vStart: number): void {
 /** Cursor/selection overlay — active channel, caret, selection, peer cursors. */
 function renderOverlay(
   g: GraphicsType, p: RenderParams, cursor: CursorPosition, selection: BlockSelection | null,
-  vStart: number, currentRow: number,
+  vStart: number, _currentRow: number,
   peerCursor: PeerCursorData, peerSel: PeerSelectionData | null,
 ): void {
   g.clear();
 
-  // Center-line highlight (current row) — drawn here to avoid grid Graphics rebuild during scrolling
-  const centerY = p.baseY + (currentRow - vStart) * p.rowHeight;
-  g.rect(0, centerY, p.width, p.rowHeight);
-  g.fill({ color: p.theme.accentGlow.color, alpha: p.trackerVisualBg ? 0.5 : p.theme.accentGlow.alpha });
+  // Center-line highlight is now drawn in a separate fixed Graphics element
+  // outside the scroll container, so it doesn't move with pivot.y during smooth scrolling.
 
   // Active channel highlight
   const cursorCh = cursor.channelIndex;
@@ -368,7 +367,7 @@ function generateLabels(p: RenderParams, vStart: number, currentRow: number): La
       const isCurrentRow = rowNum === currentRow;
       const baseX = colX + 8;
 
-      const noteText = noteToString(cell.note ?? 0);
+      const noteText = noteToString(cell.note ?? 0, p.noteDisplayOffset);
       const noteColor = cell.note === 97
         ? p.theme.cellEffect.color
         : (cell.note > 0 && cell.note < 97)
@@ -857,6 +856,7 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
   const gridScrollContainerRef = useRef<ContainerType | null>(null); // inner scroll container
   const gridGraphicsRef = useRef<GraphicsType | null>(null);
   const overlayGraphicsRef = useRef<GraphicsType | null>(null);
+  const highlightGraphicsRef = useRef<GraphicsType | null>(null);   // fixed center-line highlight (outside scroll container)
   const dragOverlayRef = useRef<GraphicsType | null>(null);
   const megaTextRef = useRef<MegaText | null>(null);
   const prevRowRef = useRef(-1);
@@ -956,17 +956,23 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
       newPattern = audioState.pattern;
       newOffset = 0;
       if (smooth) {
-        if (newRow !== prevRowRef.current || newPattern !== prevPatternRef.current) {
-          const bpm = useTransportStore.getState().bpm;
-          const speed = useTransportStore.getState().speed;
+        // Recalculate row duration on row change OR when cached value is 0 (first frame)
+        if (cachedRowDurRef.current === 0 || newRow !== prevRowRef.current || newPattern !== prevPatternRef.current) {
           const nextState = replayer.getStateAtTime(audioTime + 0.5, true);
-          cachedRowDurRef.current = (nextState && nextState.row !== audioState.row)
-            ? nextState.time - audioState.time
-            : (2.5 / bpm) * speed;
+          if (nextState && nextState.row !== audioState.row) {
+            cachedRowDurRef.current = nextState.time - audioState.time;
+          } else {
+            // Compute from BPM/speed — use replayer's actual values for accuracy
+            const bpm = useTransportStore.getState().bpm;
+            const speed = useTransportStore.getState().speed;
+            cachedRowDurRef.current = (2.5 / bpm) * speed;
+          }
         }
-        const dur = cachedRowDurRef.current || 0.125;
-        const progress = Math.min(Math.max((audioTime - audioState.time) / dur, 0), 1);
-        newOffset = progress * rowHeightRef.current;
+        const dur = cachedRowDurRef.current;
+        if (dur > 0) {
+          const progress = Math.min(Math.max((audioTime - audioState.time) / dur, 0), 1);
+          newOffset = progress * rowHeightRef.current;
+        }
       }
     } else {
       newRow = useTransportStore.getState().currentRow;
@@ -978,6 +984,18 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
     if (gridScrollContainerRef.current) gridScrollContainerRef.current.pivot.y = newOffset;
 
     if (newRow !== prevRowRef.current || newPattern !== prevPatternRef.current) {
+      // Debug: log row timing to detect visual groove/swing
+      if (typeof window !== 'undefined' && (window as any).SCROLL_DEBUG && audioState) {
+        const now = performance.now();
+        const lastTime = (window as any)._lastRowTime || now;
+        const delta = now - lastTime;
+        (window as any)._lastRowTime = now;
+        const stateTime = audioState.time;
+        const lastStateTime = (window as any)._lastStateTime || stateTime;
+        const stateDelta = (stateTime - lastStateTime) * 1000;
+        (window as any)._lastStateTime = stateTime;
+        console.log(`[Scroll] row=${newRow} wallΔ=${delta.toFixed(1)}ms stateΔ=${stateDelta.toFixed(1)}ms stateT=${stateTime.toFixed(4)} audioT=${audioTime.toFixed(4)}`);
+      }
       const patternChanged = newPattern !== prevPatternRef.current;
       prevRowRef.current = newRow;
       prevPatternRef.current = newPattern;
@@ -1031,6 +1049,7 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
     scrollLeft: scrollLeftRef.current, rowHeight, rowHighlightInterval,
     channelMuted, channelSolo, useHex, blankEmpty, showBeatLabels, columnVisibility,
     currentPatternIndex, playbackRow: playbackRowRef.current, playbackPatternIdx,
+    noteDisplayOffset: getTrackerReplayer().getSong()?.noteDisplayOffset ?? 0,
   };
 
   // ── Imperative redraw — called from subscription (cursor) and useEffect (other deps) ──
@@ -1061,6 +1080,16 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
     const gOverlay = overlayGraphicsRef.current;
     if (gOverlay) renderOverlay(gOverlay, p, cursor, selection, vStart, currentRow,
       peerCursorRef.current, peerSelectionRef.current);
+
+    // Fixed center-line highlight — drawn outside the scroll container so it stays
+    // fixed during smooth scrolling while content scrolls via pivot.y
+    const gHighlight = highlightGraphicsRef.current;
+    if (gHighlight) {
+      gHighlight.clear();
+      const centerY = p.baseY + (currentRow - vStart) * p.rowHeight;
+      gHighlight.rect(0, centerY, p.width, p.rowHeight);
+      gHighlight.fill({ color: p.theme.accentGlow.color, alpha: p.trackerVisualBg ? 0.5 : p.theme.accentGlow.alpha });
+    }
   }, []); // Empty deps — everything read from refs
   imperativeRedrawRef.current = imperativeRedraw;
 
@@ -1544,6 +1573,9 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
 
           {/* MegaText added imperatively to gridScrollContainerRef */}
         </pixiContainer>
+
+        {/* Fixed center-line highlight — outside scroll container so it stays fixed during smooth scrolling */}
+        <pixiGraphics ref={highlightGraphicsRef} draw={() => {}} layout={gridGraphicsLayout} eventMode="none" />
 
         {/* Drag-and-drop highlight overlay — pure GL, visible during instrument drag */}
         <pixiGraphics

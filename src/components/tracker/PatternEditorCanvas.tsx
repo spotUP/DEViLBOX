@@ -852,6 +852,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       rowHeight:          Math.round(24 * (ui.trackerZoom / 100)),
       rowHighlightInterval: ui.rowHighlightInterval,
       showBeatLabels:     ui.showBeatLabels,
+      noteDisplayOffset:  getTrackerReplayer().getSong()?.noteDisplayOffset ?? 0,
     };
   }, []);
 
@@ -1177,6 +1178,8 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       if (!b) return;
       if (s.patterns !== prev.patterns || s.currentPatternIndex !== prev.currentPatternIndex) {
         b.post({ type: 'patterns', patterns: snapshotPatterns(), currentPatternIndex: s.currentPatternIndex });
+        // Re-send uiState when song changes — noteDisplayOffset may differ per format
+        b.post({ type: 'uiState', uiState: snapshotUI() });
       }
     });
 
@@ -1257,9 +1260,6 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   // to update overlay DOM positions (macroLanes) synchronously with audio.
   useEffect(() => {
     let rafId: number;
-    const audioBpm = useTransportStore.getState().bpm;
-    const audioSpeed = useTransportStore.getState().speed;
-
     // PERF: Dedup playback messages — only post when values change
     let prevRow = -1;
     let prevSmooth = -1;
@@ -1289,9 +1289,11 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
             const nextState = replayer.getStateAtTime(audioTime + 0.5, true);
             const effectiveDuration = (nextState && nextState.row !== audioState.row)
               ? nextState.time - audioState.time
-              : (2.5 / audioBpm) * audioSpeed;
-            const progress = Math.min(Math.max((audioTime - audioState.time) / effectiveDuration, 0), 1);
-            smoothOffset = progress * rowHeightRef.current;
+              : (2.5 / transportState.bpm) * transportState.speed;
+            if (effectiveDuration > 0) {
+              const progress = Math.min(Math.max((audioTime - audioState.time) / effectiveDuration, 0), 1);
+              smoothOffset = progress * rowHeightRef.current;
+            }
           }
         } else {
           // UADE / opaque playback: replayer has no state, use transport store row
@@ -1907,17 +1909,19 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
           }}
         />
 
-        {/* VU Meters overlay - moved AFTER canvas and added z-30 */}
+        {/* VU Meters overlay — temporarily disabled for scroll stutter testing */}
+        {/*
         <div
           className="absolute right-0 pointer-events-none z-30 overflow-hidden"
           style={{ top: 0, left: LINE_NUMBER_WIDTH, height: `calc(50% - ${rowHeight / 2}px)` }}
         >
-          <ChannelVUMeters 
-            channelOffsets={channelOffsets} 
-            channelWidths={channelWidths} 
-            scrollLeft={scrollLeft} 
+          <ChannelVUMeters
+            channelOffsets={channelOffsets}
+            channelWidths={channelWidths}
+            scrollLeft={scrollLeft}
           />
         </div>
+        */}
 
         {/* Cell context menu */}
         <CellContextMenu
