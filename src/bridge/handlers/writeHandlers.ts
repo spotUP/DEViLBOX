@@ -14,6 +14,12 @@ import { useAudioStore } from '../../stores/useAudioStore';
 import { useMixerStore } from '../../stores/useMixerStore';
 import { useInstrumentStore } from '../../stores/useInstrumentStore';
 import { useProjectStore } from '../../stores/useProjectStore';
+import { useSynthErrorStore } from '../../stores/useSynthErrorStore';
+import { getGlobalRegistry } from '../../hooks/useGlobalKeyboardHandler';
+import { getToneEngine } from '../../engine/ToneEngine';
+import * as Tone from 'tone';
+import { AudioDataBus } from '../../engine/vj/AudioDataBus';
+import { getAudioMonitor, disposeAudioMonitor } from '../monitoring/AudioMonitor';
 
 // ─── Note Parsing ──────────────────────────────────────────────────────────────
 
@@ -176,9 +182,20 @@ export function setSpeed(params: Record<string, unknown>): Record<string, unknow
   return { ok: true };
 }
 
-export async function play(): Promise<Record<string, unknown>> {
-  await useTransportStore.getState().play();
-  return { ok: true };
+export async function play(params: Record<string, unknown> = {}): Promise<Record<string, unknown>> {
+  const mode = (params.mode as string) || 'song';
+  const store = useTransportStore.getState();
+
+  if (mode === 'song') {
+    // Song mode: disable looping so playback advances through all patterns
+    store.setIsLooping(false);
+  } else {
+    // Pattern mode: enable looping to repeat current pattern
+    store.setIsLooping(true);
+  }
+
+  await store.play();
+  return { ok: true, mode };
 }
 
 export function stop(): Record<string, unknown> {
@@ -486,11 +503,10 @@ export function redo(): Record<string, unknown> {
 export function executeCommand(params: Record<string, unknown>): Record<string, unknown> {
   const commandName = params.command as string;
   try {
-    const { getGlobalRegistry } = require('../../hooks/useGlobalKeyboardHandler');
     const registry = getGlobalRegistry();
     if (!registry) return { error: 'Command registry not initialized' };
 
-    const success = registry.execute(commandName, 'tracker');
+    const success = registry.execute(commandName, 'global');
     return success ? { ok: true, command: commandName } : { error: `Command '${commandName}' failed or not found` };
   } catch (e) {
     return { error: `Command execution failed: ${(e as Error).message}` };
@@ -600,7 +616,6 @@ export function pasteClipboard(params: Record<string, unknown>): Record<string, 
 // ─── Dismiss Errors ────────────────────────────────────────────────────────────
 
 export function dismissErrors(): Record<string, unknown> {
-  const { useSynthErrorStore } = require('../../stores/useSynthErrorStore');
   useSynthErrorStore.getState().dismissAll();
   return { ok: true };
 }
@@ -608,7 +623,6 @@ export function dismissErrors(): Record<string, unknown> {
 // ─── Column Visibility ─────────────────────────────────────────────────────────
 
 export function setColumnVisibility(params: Record<string, unknown>): Record<string, unknown> {
-  const { useEditorStore } = require('../../stores/useEditorStore');
   useEditorStore.getState().setColumnVisibility(params);
   return { ok: true };
 }
@@ -616,7 +630,6 @@ export function setColumnVisibility(params: Record<string, unknown>): Record<str
 // ─── Bookmarks ─────────────────────────────────────────────────────────────────
 
 export function toggleBookmark(params: Record<string, unknown>): Record<string, unknown> {
-  const { useEditorStore } = require('../../stores/useEditorStore');
   useEditorStore.getState().toggleBookmark(params.row as number);
   return { ok: true };
 }
@@ -630,8 +643,7 @@ export function setSynthParam(params: Record<string, unknown>): Record<string, u
   const value = params.value as number;
 
   try {
-    const { ToneEngine } = require('../../engine/ToneEngine');
-    const engine = ToneEngine.getInstance();
+    const engine = getToneEngine();
     const config = useInstrumentStore.getState().getInstrument(id);
     if (!config) return { error: `Instrument ${id} not found` };
 
@@ -664,13 +676,15 @@ export function triggerNote(params: Record<string, unknown>): Record<string, unk
   const duration = params.duration as number | undefined;
 
   try {
-    const { ToneEngine } = require('../../engine/ToneEngine');
-    const engine = ToneEngine.getInstance();
+    const engine = getToneEngine();
 
+    const config = (engine as any).getInstrumentConfig?.(id) ?? {};
+    const now = Tone.now();
     if (duration) {
-      engine.triggerNoteAttackRelease(id, note, duration, undefined, velocity / 127);
+      engine.triggerNoteAttack(id, note, now, velocity / 127, config);
+      engine.triggerNoteRelease(id, note, now + duration, config);
     } else {
-      engine.triggerNoteAttack(id, note, velocity / 127);
+      engine.triggerNoteAttack(id, note, now, velocity / 127, config);
     }
     return { ok: true, instrumentId: id, note, velocity };
   } catch (e) {
@@ -684,9 +698,9 @@ export function releaseNote(params: Record<string, unknown>): Record<string, unk
   const note = params.note as string;
 
   try {
-    const { ToneEngine } = require('../../engine/ToneEngine');
-    const engine = ToneEngine.getInstance();
-    engine.triggerNoteRelease(id, note);
+    const engine = getToneEngine();
+    const config = (engine as any).getInstrumentConfig?.(id) ?? {};
+    engine.triggerNoteRelease(id, note, Tone.now(), config);
     return { ok: true, instrumentId: id, note };
   } catch (e) {
     return { error: `releaseNote failed: ${(e as Error).message}` };
@@ -696,8 +710,7 @@ export function releaseNote(params: Record<string, unknown>): Record<string, unk
 /** Release all active notes */
 export function releaseAllNotes(): Record<string, unknown> {
   try {
-    const { ToneEngine } = require('../../engine/ToneEngine');
-    const engine = ToneEngine.getInstance();
+    const engine = getToneEngine();
     engine.releaseAll();
     return { ok: true };
   } catch (e) {
@@ -765,4 +778,985 @@ export function setSampleBusGain(params: Record<string, unknown>): Record<string
 export function setSynthBusGain(params: Record<string, unknown>): Record<string, unknown> {
   useAudioStore.getState().setSynthBusGain(params.gain as number);
   return { ok: true };
+}
+
+// ─── File Loading ──────────────────────────────────────────────────────────────
+
+/** Load a file into the tracker from base64-encoded data */
+export async function loadFile(params: Record<string, unknown>): Promise<Record<string, unknown>> {
+  const filename = params.filename as string;
+  const base64Data = params.data as string;
+
+  if (!filename || !base64Data) {
+    return { error: 'Missing required params: filename, data (base64)' };
+  }
+
+  try {
+    // Decode base64 to ArrayBuffer
+    const binaryStr = atob(base64Data);
+    const bytes = new Uint8Array(binaryStr.length);
+    for (let i = 0; i < binaryStr.length; i++) {
+      bytes[i] = binaryStr.charCodeAt(i);
+    }
+    const arrayBuffer = bytes.buffer;
+
+    // Create a File object (browser API)
+    const file = new File([arrayBuffer], filename, { type: 'application/octet-stream' });
+
+    // Use the same import pipeline as the UI
+    const { importTrackerModule } = await import('../../lib/file/UnifiedFileLoader');
+    const { loadModuleFile } = await import('../../lib/import/ModuleLoader');
+    const { detectFormat } = await import('../../lib/import/FormatRegistry');
+
+    // Detect format
+    const format = detectFormat(filename);
+
+    // Try ModuleLoader first (handles native parsing for XM/MOD/FUR/DMF)
+    let moduleInfo;
+    try {
+      moduleInfo = await loadModuleFile(file);
+    } catch {
+      // If ModuleLoader fails, create minimal ModuleInfo for parseModuleToSong path
+      moduleInfo = {
+        metadata: {
+          title: filename,
+          type: format?.label || 'Unknown',
+          channels: 0,
+          patterns: 0,
+          orders: 0,
+          instruments: 0,
+          samples: 0,
+          duration: 0,
+          song: null,
+        },
+        arrayBuffer,
+        file,
+      };
+    }
+
+    // Ensure arrayBuffer is always available (needed by OpenMPT/native parsers)
+    if (!moduleInfo.arrayBuffer) {
+      moduleInfo.arrayBuffer = arrayBuffer;
+    }
+
+    // Import with default options (no yields — keeps state transition atomic
+    // so React doesn't render empty intermediate state causing stutter)
+    const subsong = (params.subsong as number) ?? 0;
+    const useLibopenmpt = (params.useLibopenmpt as boolean) ?? false;
+    await importTrackerModule(moduleInfo as any, {
+      useLibopenmpt,
+      subsong,
+    });
+
+    // Read back the result from stores
+    const trackerState = useTrackerStore.getState();
+    const instrumentState = useInstrumentStore.getState();
+    const formatState = (await import('../../stores/useFormatStore')).useFormatStore.getState();
+
+    return {
+      ok: true,
+      format: format?.label || 'Unknown',
+      editorMode: formatState.editorMode,
+      channels: trackerState.patterns[0]?.channels?.length || 0,
+      patterns: trackerState.patterns.length,
+      instruments: instrumentState.instruments.length,
+      filename,
+    };
+  } catch (e) {
+    return { error: `loadFile failed: ${(e as Error).message}` };
+  }
+}
+
+// ─── Audio Measurement ─────────────────────────────────────────────────────────
+
+/** Measure audio output level over a time window */
+export function getAudioLevel(params: Record<string, unknown>): Promise<Record<string, unknown>> {
+  const durationMs = (params.durationMs as number) ?? 2000;
+
+  return new Promise((resolve) => {
+    try {
+      const bus = AudioDataBus.getShared();
+
+      let framesAnalyzed = 0;
+      let rmsSum = 0;
+      let rmsMax = 0;
+      let peakMax = 0;
+
+      const startTime = performance.now();
+
+      function sample() {
+        const frame = bus.update();
+        framesAnalyzed++;
+        rmsSum += frame.rms;
+        if (frame.rms > rmsMax) rmsMax = frame.rms;
+        if (frame.peak > peakMax) peakMax = frame.peak;
+
+        if (performance.now() - startTime < durationMs) {
+          requestAnimationFrame(sample);
+        } else {
+          const rmsAvg = framesAnalyzed > 0 ? rmsSum / framesAnalyzed : 0;
+          resolve({
+            rmsAvg: +rmsAvg.toFixed(6),
+            rmsMax: +rmsMax.toFixed(6),
+            peakMax: +peakMax.toFixed(6),
+            framesAnalyzed,
+            durationMs: Math.round(performance.now() - startTime),
+            silent: rmsMax < 0.001,
+          });
+        }
+      }
+
+      requestAnimationFrame(sample);
+    } catch (e) {
+      resolve({ error: `getAudioLevel failed: ${(e as Error).message}` });
+    }
+  });
+}
+
+/** Wait until audio is playing (non-silent) or timeout */
+export function waitForAudio(params: Record<string, unknown>): Promise<Record<string, unknown>> {
+  const timeoutMs = (params.timeoutMs as number) ?? 5000;
+  const thresholdRms = (params.thresholdRms as number) ?? 0.001;
+
+  return new Promise((resolve) => {
+    try {
+      const bus = AudioDataBus.getShared();
+
+      const startTime = performance.now();
+
+      function check() {
+        const frame = bus.update();
+        const elapsed = performance.now() - startTime;
+
+        if (frame.rms > thresholdRms) {
+          resolve({
+            detected: true,
+            rms: +frame.rms.toFixed(6),
+            peak: +frame.peak.toFixed(6),
+            waitedMs: Math.round(elapsed),
+          });
+        } else if (elapsed >= timeoutMs) {
+          resolve({
+            detected: false,
+            rms: +frame.rms.toFixed(6),
+            peak: +frame.peak.toFixed(6),
+            waitedMs: Math.round(elapsed),
+          });
+        } else {
+          requestAnimationFrame(check);
+        }
+      }
+
+      requestAnimationFrame(check);
+    } catch (e) {
+      resolve({ error: `waitForAudio failed: ${(e as Error).message}` });
+    }
+  });
+}
+
+// ─── Synth Programming: Spectral Analysis ────────────────────────────────────
+
+/** Trigger a note on an instrument, capture FFT frames, compute spectral metrics */
+export async function analyzeInstrumentSpectrum(params: Record<string, unknown>): Promise<Record<string, unknown>> {
+  const instrumentId = (params.instrumentId as number) ?? 0;
+  const note = (params.note as string) || 'C-3';
+  const durationMs = (params.durationMs as number) ?? 1000;
+  const captureDelayMs = (params.captureDelayMs as number) ?? 100; // wait for attack phase
+
+  try {
+    const engine = getToneEngine();
+    const config = (engine as any).getInstrumentConfig?.(instrumentId) ?? {};
+    const instrumentConfig = useInstrumentStore.getState().getInstrument(instrumentId);
+    if (!instrumentConfig) return { error: `Instrument ${instrumentId} not found` };
+
+    const bus = AudioDataBus.getShared();
+    const now = Tone.now();
+    const durationSec = durationMs / 1000;
+
+    // Trigger the note
+    engine.triggerNoteAttack(instrumentId, note, now, 0.8, config);
+    engine.triggerNoteRelease(instrumentId, note, now + durationSec, config);
+
+    // Wait for attack + collect FFT frames
+    return new Promise((resolve) => {
+      const startTime = performance.now();
+      const fftFrames: Float32Array[] = [];
+      const rmsValues: number[] = [];
+      let collecting = false;
+
+      function capture() {
+        const elapsed = performance.now() - startTime;
+
+        if (elapsed >= captureDelayMs) collecting = true;
+
+        if (collecting) {
+          bus.update();
+          const frame = bus.getFrame();
+          if (frame.fft && frame.fft.length > 0) {
+            fftFrames.push(new Float32Array(frame.fft));
+          }
+          rmsValues.push(frame.rms ?? 0);
+        }
+
+        if (elapsed < durationMs + 50) {
+          requestAnimationFrame(capture);
+        } else {
+          // Compute spectral metrics from collected frames
+          resolve(computeSpectralMetrics(fftFrames, rmsValues, note, instrumentId));
+        }
+      }
+
+      requestAnimationFrame(capture);
+    });
+  } catch (e) {
+    return { error: `analyzeInstrumentSpectrum failed: ${(e as Error).message}` };
+  }
+}
+
+function computeSpectralMetrics(
+  fftFrames: Float32Array[],
+  rmsValues: number[],
+  note: string,
+  instrumentId: number,
+): Record<string, unknown> {
+  if (fftFrames.length === 0) {
+    return { error: 'No FFT data captured — is the instrument producing audio?', instrumentId, note };
+  }
+
+  // Average FFT across all frames
+  const binCount = fftFrames[0].length;
+  const avgFft = new Float32Array(binCount);
+  for (const frame of fftFrames) {
+    for (let i = 0; i < binCount; i++) {
+      avgFft[i] += frame[i] / fftFrames.length;
+    }
+  }
+
+  // Assume 44100Hz sample rate, FFT size = binCount * 2
+  const sampleRate = 44100;
+  const fftSize = binCount * 2;
+  const binHz = sampleRate / fftSize;
+
+  // Find fundamental (peak bin)
+  let peakBin = 0;
+  let peakValue = -Infinity;
+  for (let i = 1; i < binCount; i++) {
+    if (avgFft[i] > peakValue) {
+      peakValue = avgFft[i];
+      peakBin = i;
+    }
+  }
+  const fundamentalHz = peakBin * binHz;
+
+  // Harmonics: find peaks at 2x, 3x, 4x, 5x, 6x, 7x, 8x fundamental
+  const harmonics: number[] = [];
+  for (let h = 2; h <= 8; h++) {
+    const targetBin = Math.round(peakBin * h);
+    if (targetBin >= binCount) break;
+    // Search +/- 2 bins around target
+    let maxVal = -Infinity;
+    for (let j = Math.max(0, targetBin - 2); j <= Math.min(binCount - 1, targetBin + 2); j++) {
+      if (avgFft[j] > maxVal) maxVal = avgFft[j];
+    }
+    // Normalize relative to fundamental
+    harmonics.push(peakValue > -100 ? +((maxVal - peakValue)).toFixed(1) : 0);
+  }
+
+  // Spectral centroid (brightness indicator)
+  let weightedSum = 0;
+  let totalEnergy = 0;
+  for (let i = 0; i < binCount; i++) {
+    const linearMag = Math.pow(10, avgFft[i] / 20);
+    weightedSum += i * binHz * linearMag;
+    totalEnergy += linearMag;
+  }
+  const spectralCentroid = totalEnergy > 0 ? weightedSum / totalEnergy : 0;
+
+  // Brightness: ratio of energy above 2kHz vs total
+  const cutoffBin = Math.floor(2000 / binHz);
+  let highEnergy = 0;
+  let totalE = 0;
+  for (let i = 1; i < binCount; i++) {
+    const lin = Math.pow(10, avgFft[i] / 20);
+    totalE += lin;
+    if (i >= cutoffBin) highEnergy += lin;
+  }
+  const brightness = totalE > 0 ? highEnergy / totalE : 0;
+
+  // RMS stats
+  const rmsAvg = rmsValues.length > 0
+    ? rmsValues.reduce((s, v) => s + v, 0) / rmsValues.length
+    : 0;
+  const rmsMax = rmsValues.length > 0 ? Math.max(...rmsValues) : 0;
+
+  // Envelope estimation: find attack (time to peak RMS) and decay shape
+  let peakRmsIdx = 0;
+  let peakRms = 0;
+  for (let i = 0; i < rmsValues.length; i++) {
+    if (rmsValues[i] > peakRms) { peakRms = rmsValues[i]; peakRmsIdx = i; }
+  }
+  const msPerFrame = rmsValues.length > 1 ? 1000 / 60 : 16.67; // ~60fps
+  const attackMs = peakRmsIdx * msPerFrame;
+
+  // Sustain level: average of last 30% of frames
+  const sustainStart = Math.floor(rmsValues.length * 0.7);
+  const sustainFrames = rmsValues.slice(sustainStart);
+  const sustainLevel = sustainFrames.length > 0
+    ? sustainFrames.reduce((s, v) => s + v, 0) / sustainFrames.length
+    : 0;
+
+  // Downsample FFT to 32 bins for response
+  const fftSummary: number[] = [];
+  const step = Math.max(1, Math.floor(binCount / 32));
+  for (let i = 0; i < binCount; i += step) {
+    let max = -Infinity;
+    for (let j = i; j < Math.min(i + step, binCount); j++) {
+      if (avgFft[j] > max) max = avgFft[j];
+    }
+    fftSummary.push(+max.toFixed(1));
+  }
+
+  return {
+    instrumentId,
+    note,
+    framesAnalyzed: fftFrames.length,
+    fundamental: +fundamentalHz.toFixed(1),
+    fundamentalDb: +peakValue.toFixed(1),
+    harmonicsDb: harmonics,
+    spectralCentroid: +spectralCentroid.toFixed(1),
+    brightness: +brightness.toFixed(3),
+    rmsAvg: +rmsAvg.toFixed(4),
+    rmsMax: +rmsMax.toFixed(4),
+    envelope: {
+      attackMs: +attackMs.toFixed(0),
+      sustainLevel: +sustainLevel.toFixed(4),
+    },
+    fftSummary,
+  };
+}
+
+/** Sweep a synth parameter across a range, measuring spectral response at each step */
+export async function sweepParameter(params: Record<string, unknown>): Promise<Record<string, unknown>> {
+  const instrumentId = (params.instrumentId as number) ?? 0;
+  const parameter = params.parameter as string;
+  const from = (params.from as number) ?? 0;
+  const to = (params.to as number) ?? 1;
+  const steps = (params.steps as number) ?? 10;
+  const note = (params.note as string) || 'C-3';
+  const noteDurationMs = (params.noteDurationMs as number) ?? 500;
+  const settleMs = (params.settleMs as number) ?? 100;
+
+  if (!parameter) return { error: 'parameter is required' };
+
+  try {
+    const engine = getToneEngine();
+    const instrumentConfig = useInstrumentStore.getState().getInstrument(instrumentId);
+    if (!instrumentConfig) return { error: `Instrument ${instrumentId} not found` };
+
+    const synth = engine.getInstrument(instrumentId, instrumentConfig);
+    if (!synth) return { error: `No active synth for instrument ${instrumentId}` };
+
+    const hasSetter = typeof synth === 'object' && 'set' in synth && typeof (synth as any).set === 'function';
+    if (!hasSetter) return { error: `Synth for instrument ${instrumentId} does not support parameter setting` };
+
+    const bus = AudioDataBus.getShared();
+    const config = (engine as any).getInstrumentConfig?.(instrumentId) ?? {};
+    const results: Array<Record<string, unknown>> = [];
+
+    for (let i = 0; i <= steps; i++) {
+      const value = from + (to - from) * (i / steps);
+
+      // Set parameter
+      (synth as any).set(parameter, value);
+
+      // Brief settle time
+      await new Promise(r => setTimeout(r, settleMs));
+
+      // Trigger note
+      const now = Tone.now();
+      engine.triggerNoteAttack(instrumentId, note, now, 0.8, config);
+
+      // Collect FFT frames during note
+      const fftFrames: Float32Array[] = [];
+      const rmsValues: number[] = [];
+
+      await new Promise<void>((resolve) => {
+        const startTime = performance.now();
+        function capture() {
+          bus.update();
+          const frame = bus.getFrame();
+          if (frame.fft && frame.fft.length > 0) {
+            fftFrames.push(new Float32Array(frame.fft));
+          }
+          rmsValues.push(frame.rms ?? 0);
+
+          if (performance.now() - startTime < noteDurationMs) {
+            requestAnimationFrame(capture);
+          } else {
+            resolve();
+          }
+        }
+        // Wait 50ms for attack before capturing
+        setTimeout(() => requestAnimationFrame(capture), 50);
+      });
+
+      // Release note
+      engine.triggerNoteRelease(instrumentId, note, Tone.now(), config);
+
+      // Wait for release tail
+      await new Promise(r => setTimeout(r, 100));
+
+      // Compute metrics for this step
+      if (fftFrames.length > 0) {
+        const binCount = fftFrames[0].length;
+        const avgFft = new Float32Array(binCount);
+        for (const frame of fftFrames) {
+          for (let j = 0; j < binCount; j++) avgFft[j] += frame[j] / fftFrames.length;
+        }
+
+        const sampleRate = 44100;
+        const binHz = sampleRate / (binCount * 2);
+
+        // Spectral centroid
+        let weightedSum = 0;
+        let totalEnergy = 0;
+        for (let j = 0; j < binCount; j++) {
+          const lin = Math.pow(10, avgFft[j] / 20);
+          weightedSum += j * binHz * lin;
+          totalEnergy += lin;
+        }
+        const centroid = totalEnergy > 0 ? weightedSum / totalEnergy : 0;
+
+        // Brightness
+        const cutBin = Math.floor(2000 / binHz);
+        let highE = 0, totE = 0;
+        for (let j = 1; j < binCount; j++) {
+          const lin = Math.pow(10, avgFft[j] / 20);
+          totE += lin;
+          if (j >= cutBin) highE += lin;
+        }
+
+        const rmsAvg = rmsValues.reduce((s, v) => s + v, 0) / rmsValues.length;
+
+        results.push({
+          value: +value.toFixed(3),
+          spectralCentroid: +centroid.toFixed(1),
+          brightness: +(totE > 0 ? highE / totE : 0).toFixed(3),
+          rmsAvg: +rmsAvg.toFixed(4),
+          rmsMax: +Math.max(...rmsValues).toFixed(4),
+          frames: fftFrames.length,
+        });
+      } else {
+        results.push({ value: +value.toFixed(3), error: 'no FFT data', rmsAvg: 0 });
+      }
+    }
+
+    return {
+      ok: true,
+      instrumentId,
+      parameter,
+      from,
+      to,
+      steps,
+      note,
+      results,
+    };
+  } catch (e) {
+    return { error: `sweepParameter failed: ${(e as Error).message}` };
+  }
+}
+
+// ─── Live Performance: Audio Monitoring ──────────────────────────────────────
+
+/** Start the audio monitor ring buffer */
+export function startMonitoring(params: Record<string, unknown>): Record<string, unknown> {
+  const bufferSize = (params.bufferSize as number) ?? 120;
+  const intervalMs = (params.intervalMs as number) ?? 250;
+
+  // Dispose existing and create fresh
+  disposeAudioMonitor();
+  // getAudioMonitor uses default params; for custom params we'd need a factory override.
+  // For now, use the defaults — the ring buffer size/interval are sensible.
+  const monitor = getAudioMonitor();
+  monitor.start();
+  return { ok: true, bufferSize, intervalMs, status: 'started' };
+}
+
+/** Get current monitoring data */
+export function getMonitoringData(): Record<string, unknown> {
+  const monitor = getAudioMonitor();
+  if (!monitor.isRunning()) {
+    return { error: 'Monitor is not running. Call start_monitoring first.' };
+  }
+  return monitor.getData();
+}
+
+/** Stop the audio monitor */
+export function stopMonitoring(): Record<string, unknown> {
+  const monitor = getAudioMonitor();
+  monitor.stop();
+  return { ok: true, status: 'stopped' };
+}
+
+/** Auto-mix: Apply reactive mixing rules based on current audio analysis */
+export function autoMix(params: Record<string, unknown>): Record<string, unknown> {
+  try {
+    const mode = (params.mode as string) || 'balance';
+    const intensity = (params.intensity as number) ?? 0.5;
+    const targetChannels = params.channels as number[] | undefined;
+
+    const { patterns, currentPatternIndex } = useTrackerStore.getState();
+    const pattern = patterns[currentPatternIndex];
+    if (!pattern) return { error: 'No current pattern' };
+
+    const mixer = useMixerStore.getState();
+    const bus = AudioDataBus.getShared();
+    bus.update();
+    const frame = bus.getFrame();
+
+    const channels = targetChannels ?? Array.from({ length: pattern.channels.length }, (_, i) => i);
+    const adjustments: Array<{ channel: number; action: string; value: number }> = [];
+
+    switch (mode) {
+      case 'balance': {
+        // Balance all channels to similar perceived loudness
+        const mixerChannels = mixer.channels;
+        const targetRms = frame.rms > 0 ? frame.rms / channels.length : 0.1;
+        for (const ch of channels) {
+          const currentVol = mixerChannels[ch]?.volume ?? 1;
+          // Nudge toward target — scaled by intensity (volume is 0-1)
+          const adjustment = (targetRms > 0.001 ? 0 : 0.05) * intensity;
+          if (Math.abs(adjustment) > 0.01) {
+            const newVol = Math.max(0, Math.min(1, currentVol + adjustment));
+            mixer.setChannelVolume(ch, newVol);
+            adjustments.push({ channel: ch, action: 'volume', value: +newVol.toFixed(3) });
+          }
+        }
+        break;
+      }
+
+      case 'duck_bass': {
+        // Duck non-bass channels when bass energy is high
+        const mixerChannels2 = mixer.channels;
+        const bassThreshold = 0.3 * intensity;
+        if (frame.bassEnergy > bassThreshold) {
+          const duckAmount = Math.min(0.3, frame.bassEnergy * 0.5 * intensity);
+          for (const ch of channels.slice(1)) { // Skip first channel (assumed bass)
+            const currentVol = mixerChannels2[ch]?.volume ?? 1;
+            const newVol = Math.max(0, currentVol - duckAmount);
+            mixer.setChannelVolume(ch, newVol);
+            adjustments.push({ channel: ch, action: 'duck', value: +newVol.toFixed(3) });
+          }
+        }
+        break;
+      }
+
+      case 'emphasize_melody': {
+        // Boost channels with high mid/high energy (likely melody)
+        const mixerChannels3 = mixer.channels;
+        const boost = 0.1 * intensity;
+        for (const ch of channels) {
+          const currentVol = mixerChannels3[ch]?.volume ?? 1;
+          // If overall mid energy is dominant, boost this channel slightly
+          if (frame.midEnergy > frame.bassEnergy && frame.midEnergy > 0.2) {
+            const newVol = Math.min(1, currentVol + boost);
+            mixer.setChannelVolume(ch, newVol);
+            adjustments.push({ channel: ch, action: 'boost_melody', value: +newVol.toFixed(3) });
+          }
+        }
+        break;
+      }
+
+      case 'reset': {
+        // Reset all channels to default volume (1 = unity), center pan (0), unmuted
+        for (const ch of channels) {
+          mixer.setChannelVolume(ch, 1);
+          mixer.setChannelPan(ch, 0);
+          mixer.setChannelMute(ch, false);
+          adjustments.push({ channel: ch, action: 'reset', value: 1 });
+        }
+        break;
+      }
+
+      default:
+        return { error: `Unknown auto_mix mode: ${mode}` };
+    }
+
+    return {
+      ok: true,
+      mode,
+      intensity,
+      adjustments,
+      audioState: {
+        rms: +frame.rms.toFixed(4),
+        bass: +frame.bassEnergy.toFixed(3),
+        mid: +frame.midEnergy.toFixed(3),
+        high: +frame.highEnergy.toFixed(3),
+      },
+    };
+  } catch (e) {
+    return { error: `autoMix failed: ${(e as Error).message}` };
+  }
+}
+
+/** Set an auto-effect that modulates based on audio reactivity */
+export function setAutoEffect(params: Record<string, unknown>): Record<string, unknown> {
+  try {
+    const effectId = params.effectId as string;
+    const parameter = params.parameter as string;
+    const source = (params.source as string) || 'rms';
+    const min = (params.min as number) ?? 0;
+    const max = (params.max as number) ?? 100;
+    const smoothing = (params.smoothing as number) ?? 0.5;
+
+    if (!effectId) return { error: 'effectId is required' };
+    if (!parameter) return { error: 'parameter is required' };
+
+    // Validate source
+    const validSources = ['rms', 'peak', 'bass', 'mid', 'high', 'sub', 'beat'];
+    if (!validSources.includes(source)) {
+      return { error: `Invalid source: ${source}. Valid: ${validSources.join(', ')}` };
+    }
+
+    // Set up a modulation loop using requestAnimationFrame
+    const bus = AudioDataBus.getShared();
+    let active = true;
+    let smoothedValue = 0;
+    const alpha = 1 - smoothing;
+
+    // Store cleanup in a global map so we can cancel later
+    const key = `${effectId}:${parameter}`;
+    if ((globalThis as any).__autoEffects?.[key]) {
+      (globalThis as any).__autoEffects[key]();
+    }
+    if (!(globalThis as any).__autoEffects) (globalThis as any).__autoEffects = {};
+
+    function modulate() {
+      if (!active) return;
+      bus.update();
+      const frame = bus.getFrame();
+
+      let rawValue: number;
+      switch (source) {
+        case 'rms': rawValue = frame.rms; break;
+        case 'peak': rawValue = frame.peak; break;
+        case 'bass': rawValue = frame.bassEnergy; break;
+        case 'mid': rawValue = frame.midEnergy; break;
+        case 'high': rawValue = frame.highEnergy; break;
+        case 'sub': rawValue = frame.subEnergy; break;
+        case 'beat': rawValue = frame.beat ? 1 : 0; break;
+        default: rawValue = 0;
+      }
+
+      smoothedValue = smoothedValue * (1 - alpha) + rawValue * alpha;
+      const mapped = min + smoothedValue * (max - min);
+
+      // Apply to master effect via the audio store
+      const audioStore = useAudioStore.getState();
+      const effects = audioStore.masterEffects || [];
+      const effect = effects.find((e) => e.id === effectId);
+      if (effect) {
+        try {
+          if (parameter === 'wet') {
+            audioStore.updateMasterEffect(effectId, { wet: mapped });
+          } else {
+            audioStore.updateMasterEffect(effectId, {
+              parameters: { ...effect.parameters, [parameter]: mapped },
+            });
+          }
+        } catch { /* parameter may not exist */ }
+      }
+
+      requestAnimationFrame(modulate);
+    }
+
+    (globalThis as any).__autoEffects[key] = () => { active = false; };
+    requestAnimationFrame(modulate);
+
+    return {
+      ok: true,
+      effectId,
+      parameter,
+      source,
+      range: [min, max],
+      smoothing,
+      status: 'active',
+      cancelKey: key,
+    };
+  } catch (e) {
+    return { error: `setAutoEffect failed: ${(e as Error).message}` };
+  }
+}
+
+/** Cancel an auto-effect modulation */
+export function cancelAutoEffect(params: Record<string, unknown>): Record<string, unknown> {
+  const key = params.key as string;
+  if (!key) return { error: 'key is required (from set_auto_effect response cancelKey)' };
+
+  const effects = (globalThis as any).__autoEffects;
+  if (effects?.[key]) {
+    effects[key]();
+    delete effects[key];
+    return { ok: true, cancelled: key };
+  }
+  return { error: `No active auto-effect with key: ${key}` };
+}
+
+// ─── Modal Control ───────────────────────────────────────────────────────────
+
+/** Dismiss any open modal */
+export function dismissModal(): Record<string, unknown> {
+  const modalOpen = useUIStore.getState().modalOpen;
+  if (modalOpen) {
+    useUIStore.getState().closeModal();
+    return { ok: true, dismissed: modalOpen };
+  }
+  return { ok: true, dismissed: null, message: 'No modal was open' };
+}
+
+/** Get current modal state */
+export function getModalState(): Record<string, unknown> {
+  const { modalOpen, modalData } = useUIStore.getState();
+  return { modalOpen: modalOpen ?? null, modalData: modalData ?? null };
+}
+
+// ─── Format Regression Testing ──────────────────────────────────────────────
+
+/** Run a single format test: load file → play → measure audio → stop → return results */
+export async function runFormatTest(params: Record<string, unknown>): Promise<Record<string, unknown>> {
+  const filename = params.filename as string;
+  const base64Data = params.data as string;
+  const playDurationMs = (params.playDurationMs as number) ?? 3000;
+  const measureDurationMs = (params.measureDurationMs as number) ?? 2000;
+  const audioTimeoutMs = (params.audioTimeoutMs as number) ?? 5000;
+  const subsong = (params.subsong as number) ?? 0;
+
+  if (!filename || !base64Data) {
+    return { error: 'Missing required params: filename, data (base64)' };
+  }
+
+  const startTime = performance.now();
+  const result: Record<string, unknown> = { filename, subsong };
+
+  try {
+    // 1. Load the file
+    const loadResult = await loadFile({ filename, data: base64Data, subsong });
+    if (loadResult.error) {
+      return { ...result, pass: false, stage: 'load', error: loadResult.error };
+    }
+    result.format = loadResult.format;
+    result.editorMode = loadResult.editorMode;
+    result.channels = loadResult.channels;
+    result.patterns = loadResult.patterns;
+    result.instruments = loadResult.instruments;
+    result.loadTimeMs = Math.round(performance.now() - startTime);
+
+    // 2. Start playback
+    const transport = useTransportStore.getState();
+    transport.play();
+
+    // 3. Wait for audio
+    const waitResult = await waitForAudio({ timeoutMs: audioTimeoutMs, thresholdRms: 0.001 });
+    if (!waitResult.detected) {
+      transport.stop();
+      return { ...result, pass: false, stage: 'audio_wait', error: 'No audio detected within timeout', waitResult };
+    }
+    result.audioDetectedMs = waitResult.waitedMs;
+
+    // 4. Let it play for the specified duration
+    await new Promise(r => setTimeout(r, playDurationMs));
+
+    // 5. Measure audio levels
+    const levelResult = await getAudioLevel({ durationMs: measureDurationMs });
+    result.audioLevel = levelResult;
+
+    // 6. Stop playback
+    transport.stop();
+
+    // 7. Determine pass/fail
+    const rmsAvg = (levelResult.rmsAvg as number) ?? 0;
+    const silent = (levelResult.silent as boolean) ?? true;
+    result.pass = !silent && rmsAvg > 0.001;
+    result.totalTimeMs = Math.round(performance.now() - startTime);
+
+    return result;
+  } catch (e) {
+    // Ensure playback stops on error
+    try { useTransportStore.getState().stop(); } catch { /* ignore */ }
+    return { ...result, pass: false, stage: 'exception', error: (e as Error).message, totalTimeMs: Math.round(performance.now() - startTime) };
+  }
+}
+
+/** Run a regression suite across multiple files */
+export async function runRegressionSuite(params: Record<string, unknown>): Promise<Record<string, unknown>> {
+  const files = params.files as Array<{ filename: string; data: string; subsong?: number }>;
+  const playDurationMs = (params.playDurationMs as number) ?? 2000;
+  const measureDurationMs = (params.measureDurationMs as number) ?? 1000;
+
+  if (!files || !Array.isArray(files) || files.length === 0) {
+    return { error: 'Missing required param: files (array of {filename, data, subsong?})' };
+  }
+
+  const results: Array<Record<string, unknown>> = [];
+  let passed = 0;
+  let failed = 0;
+  const suiteStartTime = performance.now();
+
+  for (const file of files) {
+    const testResult = await runFormatTest({
+      filename: file.filename,
+      data: file.data,
+      subsong: file.subsong ?? 0,
+      playDurationMs,
+      measureDurationMs,
+    });
+    results.push(testResult);
+    if (testResult.pass) passed++;
+    else failed++;
+
+    // Brief pause between tests to let audio settle
+    await new Promise(r => setTimeout(r, 500));
+  }
+
+  return {
+    total: files.length,
+    passed,
+    failed,
+    passRate: files.length > 0 ? `${Math.round((passed / files.length) * 100)}%` : '0%',
+    totalTimeMs: Math.round(performance.now() - suiteStartTime),
+    results,
+  };
+}
+
+// ─── Export Tools ────────────────────────────────────────────────────────────
+
+/** Export current pattern or song to WAV, returning base64-encoded WAV data */
+export async function exportWav(params: Record<string, unknown>): Promise<Record<string, unknown>> {
+  try {
+    const scope = (params.scope as string) || 'pattern'; // 'pattern' or 'song'
+    const patternIndex = params.patternIndex as number | undefined;
+
+    const tracker = useTrackerStore.getState();
+    const instruments = useInstrumentStore.getState().instruments;
+    const transport = useTransportStore.getState();
+    const bpm = transport.bpm;
+
+    const { renderPatternToAudio, audioBufferToWav } = await import('../../lib/export/audioExport');
+
+    if (scope === 'song') {
+      // Render all patterns in order
+      const sequence = tracker.patternOrder;
+      const buffers: AudioBuffer[] = [];
+      for (const idx of sequence) {
+        const pattern = tracker.patterns[idx];
+        if (!pattern) continue;
+        const buf = await renderPatternToAudio(pattern, instruments, bpm);
+        buffers.push(buf);
+      }
+      if (buffers.length === 0) return { error: 'No patterns in sequence to export' };
+
+      // Concatenate
+      const totalLength = buffers.reduce((s, b) => s + b.length, 0);
+      const sampleRate = buffers[0].sampleRate;
+      const numChannels = buffers[0].numberOfChannels;
+      const offlineCtx = new OfflineAudioContext(numChannels, totalLength, sampleRate);
+      const combined = offlineCtx.createBuffer(numChannels, totalLength, sampleRate);
+      let offset = 0;
+      for (const buf of buffers) {
+        for (let ch = 0; ch < numChannels; ch++) {
+          combined.getChannelData(ch).set(buf.getChannelData(ch), offset);
+        }
+        offset += buf.length;
+      }
+
+      const wavBlob = audioBufferToWav(combined);
+      const arrayBuf = await wavBlob.arrayBuffer();
+      const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuf)));
+      return { ok: true, scope: 'song', patterns: sequence.length, sampleRate, durationSec: +(totalLength / sampleRate).toFixed(2), sizeBytes: arrayBuf.byteLength, wavBase64: base64 };
+    } else {
+      // Single pattern
+      const idx = patternIndex ?? tracker.currentPatternIndex;
+      const pattern = tracker.patterns[idx];
+      if (!pattern) return { error: `Pattern ${idx} not found` };
+
+      const audioBuffer = await renderPatternToAudio(pattern, instruments, bpm);
+      const wavBlob = audioBufferToWav(audioBuffer);
+      const arrayBuf = await wavBlob.arrayBuffer();
+      const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuf)));
+      return { ok: true, scope: 'pattern', patternIndex: idx, sampleRate: audioBuffer.sampleRate, durationSec: +(audioBuffer.length / audioBuffer.sampleRate).toFixed(2), sizeBytes: arrayBuf.byteLength, wavBase64: base64 };
+    }
+  } catch (e) {
+    return { error: `exportWav failed: ${(e as Error).message}` };
+  }
+}
+
+/** Export pattern as formatted text */
+export async function exportPatternText(params: Record<string, unknown>): Promise<Record<string, unknown>> {
+  try {
+    const patternIndex = params.patternIndex as number | undefined;
+    const format = (params.format as string) || 'tracker'; // 'tracker' or 'csv'
+
+    const tracker = useTrackerStore.getState();
+    const idx = patternIndex ?? tracker.currentPatternIndex;
+    const pattern = tracker.patterns[idx];
+    if (!pattern) return { error: `Pattern ${idx} not found` };
+
+    if (format === 'csv') {
+      // CSV format: row, channel, note, instrument, volume, effectType, effectValue
+      const lines: string[] = ['row,channel,note,instrument,volume,effectType,effectValue'];
+      for (let row = 0; row < pattern.length; row++) {
+        for (let ch = 0; ch < pattern.channels.length; ch++) {
+          const cell = pattern.channels[ch].rows[row];
+          if (cell.note || cell.instrument !== null || cell.volume !== 0 || cell.effTyp || cell.eff) {
+            lines.push(`${row},${ch},${cell.note ?? 0},${cell.instrument ?? ''},${cell.volume ?? 0},${cell.effTyp ?? ''},${cell.eff ?? 0}`);
+          }
+        }
+      }
+      return { ok: true, patternIndex: idx, format: 'csv', lineCount: lines.length, text: lines.join('\n') };
+    }
+
+    // Use the existing render_pattern_text handler for tracker format
+    const { renderPatternText } = await import('./readHandlers');
+    const result = renderPatternText({ patternIndex: idx });
+    return { ok: true, patternIndex: idx, format: 'tracker', ...result };
+  } catch (e) {
+    return { error: `exportPatternText failed: ${(e as Error).message}` };
+  }
+}
+
+/** Export song/pattern to MIDI, returning base64-encoded MIDI data */
+export async function exportMidi(params: Record<string, unknown>): Promise<Record<string, unknown>> {
+  try {
+    const scope = (params.scope as string) || 'pattern';
+    const patternIndex = params.patternIndex as number | undefined;
+
+    const tracker = useTrackerStore.getState();
+    const transport = useTransportStore.getState();
+    const bpm = transport.bpm;
+    const timeSignature: [number, number] = [4, 4];
+
+    const { exportPatternToMIDI, exportSongToMIDI } = await import('../../lib/export/midiExport');
+
+    if (scope === 'song') {
+      const midiData = exportSongToMIDI(
+        tracker.patterns,
+        tracker.patternOrder.map(i => tracker.patterns[i]?.id).filter(Boolean) as string[],
+        bpm,
+        timeSignature,
+        [], // No automation curves via MCP for now
+      );
+      const base64 = btoa(String.fromCharCode(...midiData));
+      return { ok: true, scope: 'song', sizeBytes: midiData.byteLength, midiBase64: base64 };
+    } else {
+      const idx = patternIndex ?? tracker.currentPatternIndex;
+      const pattern = tracker.patterns[idx];
+      if (!pattern) return { error: `Pattern ${idx} not found` };
+
+      const midiData = exportPatternToMIDI(pattern, bpm, timeSignature);
+      const base64 = btoa(String.fromCharCode(...midiData));
+      return { ok: true, scope: 'pattern', patternIndex: idx, sizeBytes: midiData.byteLength, midiBase64: base64 };
+    }
+  } catch (e) {
+    return { error: `exportMidi failed: ${(e as Error).message}` };
+  }
 }
