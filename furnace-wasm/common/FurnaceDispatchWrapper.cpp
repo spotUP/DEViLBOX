@@ -444,6 +444,7 @@ int furnace_dispatch_create(int platformType, int sampleRate) {
     // === NES Expansion ===
     case DIV_SYSTEM_FDS:
       inst->dispatch = new DivPlatformFDS();
+      ((DivPlatformFDS*)inst->dispatch)->setNSFPlay(true); // Match Furnace render default (fdsCoreRender=1)
       inst->numChannels = 1;
       break;
     case DIV_SYSTEM_MMC5:
@@ -461,9 +462,15 @@ int furnace_dispatch_create(int platformType, int sampleRate) {
 
     // === Commodore ===
     case DIV_SYSTEM_C64_6581:
+      inst->dispatch = new DivPlatformC64();
+      ((DivPlatformC64*)inst->dispatch)->setCore(1); // Use reSIDfp (more accurate, better noise)
+      ((DivPlatformC64*)inst->dispatch)->setChipModel(true); // 6581 model
+      inst->numChannels = 3;
+      break;
     case DIV_SYSTEM_C64_8580:
       inst->dispatch = new DivPlatformC64();
       ((DivPlatformC64*)inst->dispatch)->setCore(1); // Use reSIDfp (more accurate, better noise)
+      ((DivPlatformC64*)inst->dispatch)->setChipModel(false); // 8580 model
       inst->numChannels = 3;
       break;
     case DIV_SYSTEM_PET:
@@ -861,8 +868,10 @@ int furnace_dispatch_create(int platformType, int sampleRate) {
       break;
     case DIV_SYSTEM_C64_PCM:
       inst->dispatch = new DivPlatformC64();
+      ((DivPlatformC64*)inst->dispatch)->setCore(1);
+      ((DivPlatformC64*)inst->dispatch)->setChipModel(true); // 6581 for PCM mode
+      ((DivPlatformC64*)inst->dispatch)->setSoftPCM(true);
       inst->numChannels = 3;
-      // C64 with PCM mode
       break;
 
     // === Watara Supervision ===
@@ -953,7 +962,21 @@ void furnace_dispatch_reset(int handle) {
   auto it = g_instances.find(handle);
   if (it != g_instances.end()) {
     DispatchInstance* inst = it->second;
+    int oldRate = inst->dispatch->rate;
     inst->dispatch->reset();
+
+    // If reset changed the chip clock (e.g., after setFlags), update blip buffer rates
+    int newRate = inst->dispatch->rate;
+    if (newRate != oldRate && newRate > 0 && inst->bbInitialized) {
+      printf("[FurnaceDispatch] reset: chip rate changed %d → %d, updating blip buffers\n",
+             oldRate, newRate);
+      for (int i = 0; i < inst->chipOuts; i++) {
+        if (inst->bb[i]) {
+          blip_set_rates(inst->bb[i], (double)newRate, (double)inst->sampleRate);
+        }
+      }
+    }
+
     // Also clear blip buffers + delta tracking (matches Furnace DivDispatchContainer::clear())
     for (int i = 0; i < 2; i++) {
       if (inst->bb[i]) blip_clear(inst->bb[i]);
@@ -1255,7 +1278,21 @@ void furnace_dispatch_set_flags(int handle, const char* flagsStr, int len) {
     flags.loadFromMemory(str.c_str());
   }
 
-  it->second->dispatch->setFlags(flags);
+  DispatchInstance* inst = it->second;
+  int oldRate = inst->dispatch->rate;
+  inst->dispatch->setFlags(flags);
+
+  // If setFlags changed the chip clock (e.g., NTSC→PAL), update blip buffer rates
+  int newRate = inst->dispatch->rate;
+  if (newRate != oldRate && newRate > 0 && inst->bbInitialized) {
+    printf("[FurnaceDispatch] setFlags: chip rate changed %d → %d, updating blip buffers\n",
+           oldRate, newRate);
+    for (int i = 0; i < inst->chipOuts; i++) {
+      if (inst->bb[i]) {
+        blip_set_rates(inst->bb[i], (double)newRate, (double)inst->sampleRate);
+      }
+    }
+  }
 }
 
 /**
@@ -3808,6 +3845,16 @@ void furnace_dispatch_load_ins2(int insIndex, unsigned char* data, int dataLen) 
           }
         }
       }
+
+      // Version < 193: AY/AY8930 wave macro values need +1 adjustment
+      if (version < 193) {
+        if (ins->type == (DivInstrumentType)6 || ins->type == (DivInstrumentType)7) { // DIV_INS_AY=6, DIV_INS_AY8930=7
+          for (int j = 0; j < ins->std.waveMacro.len; j++) {
+            ins->std.waveMacro.val[j]++;
+          }
+        }
+      }
+
       pos = featEnd;
     }
     // ── GB: Game Boy ──
@@ -3911,6 +3958,12 @@ void furnace_dispatch_load_ins2(int insIndex, unsigned char* data, int dataLen) 
             ins->amiga.noteMap[note].freq = *(short*)(data + off);
             ins->amiga.noteMap[note].map = *(short*)(data + off + 2);
           }
+          // Version < 152: reset freq to sequential note indices
+          if (version < 152) {
+            for (int note = 0; note < 120; note++) {
+              ins->amiga.noteMap[note].freq = note;
+            }
+          }
         }
       }
       pos = featEnd;
@@ -3992,6 +4045,19 @@ void furnace_dispatch_load_ins2(int insIndex, unsigned char* data, int dataLen) 
                 target->val[i] = *(int*)(data + pos); pos += 4;
               }
               break;
+          }
+        }
+
+        // <167 TL macro compat
+        if (target && macroCode == 6 && version < 167) {
+          if (target->open & 6) {
+            for (int j = 0; j < 2; j++) {
+              target->val[j] ^= 0x7f;
+            }
+          } else {
+            for (int j = 0; j < target->len; j++) {
+              target->val[j] ^= 0x7f;
+            }
           }
         }
       }
@@ -4105,6 +4171,23 @@ void furnace_dispatch_load_ins2(int insIndex, unsigned char* data, int dataLen) 
         ins->esfm.op[i].ct = data[pos + 4];
         ins->esfm.op[i].dt = data[pos + 5];
         pos += 6;
+      }
+      pos = featEnd;
+    }
+    // ── NE: NES DPCM mapping ──
+    else if (fc0 == 'N' && fc1 == 'E') {
+      // Upstream readFeatureNE: useNoteMap flag, then 120 × (dpcmFreq, dpcmDelta)
+      if (featLen >= 1) {
+        unsigned char neUseNoteMap = data[pos];
+        // NE sets useNoteMap independently (may override SM's value)
+        ins->amiga.useNoteMap = neUseNoteMap;
+        if (neUseNoteMap && featLen >= 1 + 120 * 2) {
+          for (int note = 0; note < 120; note++) {
+            int off = pos + 1 + note * 2;
+            ins->amiga.noteMap[note].dpcmFreq = (signed char)data[off];
+            ins->amiga.noteMap[note].dpcmDelta = (signed char)data[off + 1];
+          }
+        }
       }
       pos = featEnd;
     }

@@ -17,6 +17,7 @@ class MaProcessor extends AudioWorkletProcessor {
     this.initializing = false;
     this.levelsPtr = 0;
     this.processCount = 0;
+    this.previewActive = false;
 
     this.port.onmessage = (event) => {
       this.handleMessage(event.data);
@@ -85,6 +86,91 @@ class MaProcessor extends AudioWorkletProcessor {
       case 'setChannelGain':
         if (this.module && typeof this.module._player_set_channel_gain === 'function') {
           this.module._player_set_channel_gain(data.channel, data.gain);
+        }
+        break;
+
+      case 'getTrackLength':
+        if (this.module && typeof this.module._ma_get_track_length === 'function') {
+          const len = this.module._ma_get_track_length(data.trackIdx);
+          this.port.postMessage({ type: 'trackLength', requestId: data.requestId, length: len });
+        }
+        break;
+
+      case 'getCell':
+        if (this.module && typeof this.module._ma_get_cell === 'function') {
+          const packed = this.module._ma_get_cell(data.trackIdx, data.eventIdx);
+          const note = (packed >>> 24) & 0xff;
+          const instr = (packed >>> 16) & 0xff;
+          const release = (packed >>> 8) & 0xff;
+          const delay = (packed << 24) >> 24; // sign-extend
+          this.port.postMessage({
+            type: 'cellData', requestId: data.requestId,
+            note, instrument: instr === 0xff ? -1 : instr, release, delay
+          });
+        }
+        break;
+
+      case 'getPatternData':
+        if (this.module && typeof this.module._ma_get_track_length === 'function'
+            && typeof this.module._ma_get_cell === 'function') {
+          const trackIdx = data.trackIdx;
+          const numEvents = this.module._ma_get_track_length(trackIdx);
+          const events = [];
+          for (let i = 0; i < numEvents; i++) {
+            const p = this.module._ma_get_cell(trackIdx, i);
+            const n = (p >>> 24) & 0xff;
+            const ins = (p >>> 16) & 0xff;
+            const rel = (p >>> 8) & 0xff;
+            const d = (p << 24) >> 24;
+            events.push({ note: n, instrument: ins === 0xff ? -1 : ins, release: rel, delay: d });
+          }
+          this.port.postMessage({ type: 'patternData', requestId: data.requestId, trackIdx, events });
+        }
+        break;
+
+      case 'setCell':
+        if (this.module && typeof this.module._ma_set_cell === 'function') {
+          this.module._ma_set_cell(data.trackIdx, data.eventIdx, data.note, data.instrument, data.release, data.delay);
+          this.port.postMessage({ type: 'cellSet', requestId: data.requestId });
+        }
+        break;
+
+      case 'getNumTracks':
+        if (this.module && typeof this.module._ma_get_num_tracks === 'function') {
+          const n = this.module._ma_get_num_tracks();
+          this.port.postMessage({ type: 'numTracks', requestId: data.requestId, count: n });
+        }
+        break;
+
+      case 'noteOn':
+        if (this.module && typeof this.module._ma_note_on_preview === 'function') {
+          this.module._ma_note_on_preview(data.instrument, data.note, data.velocity);
+          this.previewActive = true;
+        }
+        break;
+
+      case 'noteOff':
+        if (this.module && typeof this.module._ma_note_off_preview === 'function') {
+          this.module._ma_note_off_preview();
+          this.previewActive = false;
+        }
+        break;
+
+      case 'save':
+        if (this.module && typeof this.module._ma_save === 'function') {
+          const saveSize = this.module._ma_save();
+          if (saveSize > 0) {
+            const ptr = this.module._ma_save_ptr();
+            const heapU8 = this.module.HEAPU8 || (this.module.wasmMemory && new Uint8Array(this.module.wasmMemory.buffer));
+            if (heapU8) {
+              const saveData = new Uint8Array(saveSize);
+              saveData.set(heapU8.subarray(ptr, ptr + saveSize));
+              this.module._ma_save_free();
+              this.port.postMessage({ type: 'save-data', requestId: data.requestId, data: saveData.buffer }, [saveData.buffer]);
+            }
+          } else {
+            this.port.postMessage({ type: 'save-data', requestId: data.requestId, data: null });
+          }
         }
         break;
 
@@ -225,15 +311,18 @@ class MaProcessor extends AudioWorkletProcessor {
 
     const numSamples = Math.min(outputL.length, this.bufferSize);
 
-    if (typeof this.module._player_render === 'function') {
-      this.updateBufferViews();
-      if (this.interleavedBuf) {
-        const rendered = this.module._player_render(this.interleavedPtr, numSamples);
-        if (rendered > 0) {
-          for (let i = 0; i < rendered; i++) {
-            outputL[i] = this.interleavedBuf[i * 2];
-            outputR[i] = this.interleavedBuf[i * 2 + 1];
-          }
+    this.updateBufferViews();
+    if (this.interleavedBuf) {
+      let rendered = 0;
+      if (this.previewActive && typeof this.module._ma_render_preview_buf === 'function') {
+        rendered = this.module._ma_render_preview_buf(this.interleavedPtr, numSamples);
+      } else if (typeof this.module._player_render === 'function') {
+        rendered = this.module._player_render(this.interleavedPtr, numSamples);
+      }
+      if (rendered > 0) {
+        for (let i = 0; i < rendered; i++) {
+          outputL[i] = this.interleavedBuf[i * 2];
+          outputR[i] = this.interleavedBuf[i * 2 + 1];
         }
       }
     }

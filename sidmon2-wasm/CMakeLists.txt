@@ -20,6 +20,10 @@ if(EMSCRIPTEN)
         "_player_init" "_player_render" "_player_stop" "_player_set_sample_rate"
         "_player_is_finished" "_player_get_subsong_count" "_player_set_subsong"
         "_player_get_title" "_player_detect_duration" "_player_set_channel_gain"
+        "_sd2_bridge_get_num_tracks" "_sd2_bridge_get_track_length"
+        "_sd2_bridge_get_cell" "_sd2_bridge_set_cell"
+        "_sd2_note_on" "_sd2_note_off" "_sd2_render_preview"
+        "_sd2_save" "_sd2_save_ptr" "_sd2_save_free"
     )
     string(JOIN "," EXPORT_STR ${EXPORTED_FUNCTIONS})
     target_link_options(${OUTPUT_NAME} PRIVATE
