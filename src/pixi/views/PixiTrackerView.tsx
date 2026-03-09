@@ -15,7 +15,6 @@ import { usePixiTheme } from '../theme';
 import { PIXI_FONTS } from '../fonts';
 import { PixiFT2Toolbar, FT2_TOOLBAR_HEIGHT } from './tracker/PixiFT2Toolbar';
 import { PixiInstrumentPanel } from './tracker/PixiInstrumentPanel';
-import { PixiChannelVUMeters } from './tracker/PixiChannelVUMeters';
 import { PixiPatternMinimap } from './tracker/PixiPatternMinimap';
 import { PixiAutomationLanes } from './tracker/PixiAutomationLanes';
 import { PixiMacroLanes } from './tracker/PixiMacroLanes';
@@ -39,6 +38,7 @@ import { PixiTB303View } from './tracker/PixiTB303View';
 import { PixiSunVoxChannelView } from './sunvox/PixiSunVoxChannelView';
 import { PixiPianoRollView } from './PixiPianoRollView';
 import { PixiGTUltraView } from './gtultra/PixiGTUltraView';
+import { PixiSc68View } from './sc68/PixiSc68View';
 import { useTrackerInput } from '@/hooks/tracker/useTrackerInput';
 import { useBlockOperations } from '@/hooks/tracker/BlockOperations';
 import { useTrackerStore, useUIStore, useInstrumentStore , useFormatStore } from '@stores';
@@ -280,6 +280,12 @@ export const PixiTrackerView: React.FC = () => {
                 height={Math.max(100, instrumentPanelHeight)}
               />
             )}
+            {viewMode === 'tracker' && editorMode === 'sc68' && (
+              <PixiSc68View
+                width={Math.max(100, editorWidth)}
+                height={Math.max(100, instrumentPanelHeight)}
+              />
+            )}
           </pixiContainer>
 
           {/* Overlays — ALWAYS mounted to avoid @pixi/layout Yoga BindingErrors.
@@ -300,7 +306,8 @@ export const PixiTrackerView: React.FC = () => {
             const vuHeight = Math.max(50, Math.floor((gridH - PE_ROW) / 2));
             return (
               <pixiContainer alpha={viewMode === 'tracker' && editorMode === 'classic' ? 1 : 0} renderable={viewMode === 'tracker' && editorMode === 'classic'} eventMode={viewMode === 'tracker' && editorMode === 'classic' ? 'static' : 'none'} layout={{ position: 'absolute', top: HEADER_OFFSET, width: Math.max(100, editorWidth), height: vuHeight }}>
-                <PixiChannelVUMeters width={Math.max(100, editorWidth)} height={vuHeight} />
+                {/* VU meters temporarily disabled for scroll stutter testing */}
+                {/* <PixiChannelVUMeters width={Math.max(100, editorWidth)} height={vuHeight} /> */}
               </pixiContainer>
             );
           })()}

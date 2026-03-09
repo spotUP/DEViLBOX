@@ -152,7 +152,8 @@
       "Shift+Alt+B": "tracker_spinback",
       "Shift+Space": "power_cut_stop",
       "Ctrl+=": "zoom_in",
-      "Ctrl+-": "zoom_out"
+      "Ctrl+-": "zoom_out",
+      "Ctrl+L": "show_command_palette"
     },
     "mac": {
       "Space": "toggle_edit_mode",
@@ -302,7 +303,8 @@
       "Shift+Space": "power_cut_stop",
       "Cmd+=": "zoom_in",
       "Cmd+-": "zoom_out",
-      "Ctrl+1": "reset_zoom"
+      "Ctrl+1": "reset_zoom",
+      "Ctrl+L": "show_command_palette"
     }
   }
 }

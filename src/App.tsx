@@ -27,6 +27,7 @@ import { getToneEngine } from '@engine/ToneEngine';
 import type { EffectConfig } from './types/instrument';
 import { Zap, Music, Sliders, Download, List } from 'lucide-react';
 import { ToastNotification } from '@components/ui/ToastNotification';
+import { AIPanel } from '@components/ai/AIPanel';
 import { PopOutWindow } from '@components/ui/PopOutWindow';
 import { UpdateNotification } from '@components/ui/UpdateNotification';
 import { SynthErrorDialog } from '@components/ui/SynthErrorDialog';
@@ -683,6 +684,7 @@ function App() {
           <WebGLModalBridge />
           <PeerMouseCursor />
           <PeerVideoWindow />
+          <AIPanel />
 
           {/* Effect Parameter Editor Modal */}
           <Suspense fallback={null}>
@@ -1262,6 +1264,9 @@ function App() {
 
       {/* Floating video chat window — visible when collaboration is connected */}
       <PeerVideoWindow />
+
+      {/* AI Assistant Panel */}
+      <AIPanel />
 
       {/* Toast Notifications */}
       <ToastNotification />

@@ -161,10 +161,15 @@ export const PixiChannelVUMeters: React.FC<PixiChannelVUMetersProps> = ({ width,
       const offsets = channelOffsetsRef.current;
       const widths = channelWidthsRef.current;
 
+      const isRealtime = useSettingsStore.getState().vuMeterMode === 'realtime';
       let triggerLevels: number[];
       let triggerGens: number[];
+      let realtimeLevels: number[] | null = null;
       try {
         const engine = getToneEngine();
+        if (isRealtime) {
+          realtimeLevels = engine.getChannelLevels(nc);
+        }
         triggerLevels = engine.getChannelTriggerLevels(nc);
         triggerGens = engine.getChannelTriggerGenerations(nc);
       } catch {
@@ -180,15 +185,14 @@ export const PixiChannelVUMeters: React.FC<PixiChannelVUMetersProps> = ({ width,
       }
 
       // Update levels and check if any meter is active
-      const isRealtime = useSettingsStore.getState().vuMeterMode === 'realtime';
       let anyActive = false;
       for (let i = 0; i < nc; i++) {
         const meter = metersRef.current[i];
         if (!meter) continue;
         const staggerOffset = i * 0.012;
-        if (isRealtime) {
-          // Realtime mode: always use latest level, smooth toward it
-          const target = triggerLevels[i] || 0;
+        if (isRealtime && realtimeLevels) {
+          // Realtime mode: use actual audio levels from AnalyserNode
+          const target = realtimeLevels[i] || 0;
           if (target > meter.level) {
             meter.level = target; // instant attack
           } else {

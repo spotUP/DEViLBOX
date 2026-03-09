@@ -118,8 +118,10 @@ export const ChannelVUMeters: React.FC<ChannelVUMetersProps> = memo(({ channelOf
 
       const engine = getToneEngine();
       const nc = numChannelsRef.current;
+      const isRealtime = useSettingsStore.getState().vuMeterMode === 'realtime';
       const triggerLevels = engine.getChannelTriggerLevels(nc);
       const triggerGens = engine.getChannelTriggerGenerations(nc);
+      const realtimeLevels = isRealtime ? engine.getChannelLevels(nc) : null;
       const sl = scrollLeftRef.current;
       const offsets = channelOffsetsRef.current;
       const widths = channelWidthsRef.current;
@@ -130,8 +132,6 @@ export const ChannelVUMeters: React.FC<ChannelVUMetersProps> = memo(({ channelOf
         lastGensRef.current = new Array(nc).fill(0);
         for (let j = 0; j < old.length; j++) lastGensRef.current[j] = old[j];
       }
-
-      const isRealtime = useSettingsStore.getState().vuMeterMode === 'realtime';
 
       for (let i = 0; i < nc; i++) {
         const meter = meterStates.current[i];
@@ -145,9 +145,9 @@ export const ChannelVUMeters: React.FC<ChannelVUMetersProps> = memo(({ channelOf
         // When playback is stopped, kill meters instantly (no lingering bounce)
         if (!useTransportStore.getState().isPlaying) {
           meter.level = 0;
-        } else if (isRealtime) {
-          // Realtime mode: always use latest level, smooth toward it
-          const target = triggerLevels[i] || 0;
+        } else if (isRealtime && realtimeLevels) {
+          // Realtime mode: use actual audio levels from AnalyserNode
+          const target = realtimeLevels[i] || 0;
           if (target > meter.level) {
             meter.level = target; // instant attack
           } else {
