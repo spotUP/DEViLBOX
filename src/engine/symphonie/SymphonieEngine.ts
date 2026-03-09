@@ -133,15 +133,7 @@ export class SymphonieEngine {
       };
     });
 
-    // Collect transferable ArrayBuffers from instrument sample data
-    const transfers: Transferable[] = [];
-    for (const inst of data.instruments) {
-      if (inst.samples !== null) {
-        transfers.push(inst.samples.buffer);
-      }
-    }
-
-    this.workletNode.port.postMessage({ type: 'load', playbackData: data }, transfers);
+    this.workletNode.port.postMessage({ type: 'load', playbackData: data });
 
     await readyPromise;
   }
@@ -156,6 +148,11 @@ export class SymphonieEngine {
 
   setVolume(v: number): void {
     this.workletNode?.port.postMessage({ type: 'volume', value: v });
+  }
+
+  /** Set interpolation mode: 0=none (original), 1=linear, 2=cubic */
+  setInterpMode(mode: number): void {
+    this.workletNode?.port.postMessage({ type: 'setInterpMode', mode });
   }
 
   getNode(): AudioWorkletNode | null {
