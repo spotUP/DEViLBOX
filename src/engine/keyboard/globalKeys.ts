@@ -57,6 +57,10 @@ export const GLOBAL_KEY_COMBOS = new Set([
   'Ctrl+Shift+V', // Toggle VJ view
   'Ctrl+Shift+T', // Toggle tracker view
   'Ctrl+Shift+A', // Toggle arrangement view
+
+  // AI assistant
+  'Ctrl+L',       // Toggle AI panel
+  'Meta+L',       // Toggle AI panel (Mac)
 ]);
 
 /**

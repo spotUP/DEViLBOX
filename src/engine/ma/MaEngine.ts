@@ -21,6 +21,8 @@ export class MaEngine {
   private _initPromise: Promise<void>;
   private _resolveInit: (() => void) | null = null;
   private _disposed = false;
+  private _requestId = 0;
+  private _pendingRequests = new Map<number, (data: any) => void>();
 
   private constructor() {
     this.audioContext = getDevilboxAudioContext();
@@ -111,6 +113,19 @@ export class MaEngine {
             }
           } catch { /* ToneEngine not ready */ }
           break;
+        case 'trackLength':
+        case 'cellData':
+        case 'patternData':
+        case 'cellSet':
+        case 'numTracks':
+        case 'save-data': {
+          const resolve = this._pendingRequests.get(data.requestId);
+          if (resolve) {
+            this._pendingRequests.delete(data.requestId);
+            resolve(data);
+          }
+          break;
+        }
         case 'error':
           console.error('[MaEngine]', data.message);
           break;
@@ -135,6 +150,67 @@ export class MaEngine {
   play(): void { this.workletNode?.port.postMessage({ type: 'play' }); }
   stop(): void { this.workletNode?.port.postMessage({ type: 'stop' }); }
   pause(): void { this.workletNode?.port.postMessage({ type: 'stop' }); }
+
+  /**
+   * Trigger instrument preview (0-based instrument index, 0-47 note index, 0-64 velocity).
+   * Note index: 12 = C-3 (period 856). Uses MA period table directly.
+   */
+  noteOn(instrument: number, note: number, velocity: number): void {
+    this.workletNode?.port.postMessage({ type: 'noteOn', instrument, note, velocity });
+  }
+
+  /** Stop instrument preview */
+  noteOff(): void {
+    this.workletNode?.port.postMessage({ type: 'noteOff' });
+  }
+
+  /** Save/export the module binary */
+  async save(): Promise<Uint8Array> {
+    await this._initPromise;
+    const data = await this._sendRequest<{ data: ArrayBuffer | null }>({ type: 'save' });
+    if (!data.data) return new Uint8Array(0);
+    return new Uint8Array(data.data);
+  }
+
+  private _sendRequest<T>(msg: Record<string, unknown>): Promise<T> {
+    const requestId = ++this._requestId;
+    return new Promise<T>((resolve) => {
+      this._pendingRequests.set(requestId, resolve as (data: any) => void);
+      this.workletNode?.port.postMessage({ ...msg, requestId });
+    });
+  }
+
+  /** Get number of tracks in the loaded module */
+  async getNumTracks(): Promise<number> {
+    await this._initPromise;
+    const data = await this._sendRequest<{ count: number }>({ type: 'getNumTracks' });
+    return data.count;
+  }
+
+  /** Get number of events in a track */
+  async getTrackLength(trackIdx: number): Promise<number> {
+    await this._initPromise;
+    const data = await this._sendRequest<{ length: number }>({ type: 'getTrackLength', trackIdx });
+    return data.length;
+  }
+
+  /** Get full pattern data for a track: array of decoded events */
+  async getPatternData(trackIdx: number): Promise<{
+    trackIdx: number;
+    events: Array<{ note: number; instrument: number; release: number; delay: number }>;
+  }> {
+    await this._initPromise;
+    return this._sendRequest({ type: 'getPatternData', trackIdx });
+  }
+
+  /** Set a single cell in a track */
+  async setPatternCell(
+    trackIdx: number, eventIdx: number,
+    note: number, instrument: number, release: number, delay: number,
+  ): Promise<void> {
+    await this._initPromise;
+    await this._sendRequest({ type: 'setCell', trackIdx, eventIdx, note, instrument, release, delay });
+  }
 
   dispose(): void {
     this._disposed = true;

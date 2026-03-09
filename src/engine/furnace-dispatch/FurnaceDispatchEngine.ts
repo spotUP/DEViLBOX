@@ -933,7 +933,7 @@ export class FurnaceDispatchEngine {
   // Stored here so FurnaceDispatchSynth can upload to each platform during chip init
   private _moduleWavetables: Array<{ data: number[]; width: number; height: number }> | null = null;
   private _moduleSamples: Array<{ data: Int16Array | Int8Array | Uint8Array; rate: number; depth: number;
-    loopStart: number; loopEnd: number; loopMode: number; name: string }> | null = null;
+    samples?: number; loopStart: number; loopEnd: number; loopMode: number; name: string }> | null = null;
 
   private constructor() {}
 
@@ -1513,7 +1513,7 @@ export class FurnaceDispatchEngine {
    * Store module-level sample data from a .fur file.
    */
   setModuleSamples(samples: Array<{ data: Int16Array | Int8Array | Uint8Array; rate: number; depth: number;
-    loopStart: number; loopEnd: number; loopMode: number; name: string }> | null): void {
+    samples?: number; loopStart: number; loopEnd: number; loopMode: number; name: string }> | null): void {
     this._moduleSamples = samples;
   }
 
@@ -1559,16 +1559,21 @@ export class FurnaceDispatchEngine {
     for (let i = 0; i < this._moduleSamples.length; i++) {
       const s = this._moduleSamples[i];
       const headerSize = 32;
-      // Determine sample count based on depth and data type
+      // Determine sample count (frame count) and PCM byte size
+      // For compressed formats (DPCM, ADPCM, BRR), data.length is BYTE count, not frame count
       let sampleCount: number;
       let pcmBytes: number;
       if (s.depth === 16) {
         // 16-bit: Int16Array has 1 element per sample, Uint8Array has 2 bytes per sample
         sampleCount = s.data instanceof Int16Array ? s.data.length : Math.floor(s.data.length / 2);
         pcmBytes = sampleCount * 2;
-      } else {
-        // 8-bit or other: 1 byte per sample
+      } else if (s.depth === 8) {
+        // 8-bit: 1 byte per sample
         sampleCount = s.data.length;
+        pcmBytes = s.data.length;
+      } else {
+        // Compressed format: use explicit frame count if available, else data.length
+        sampleCount = (s as any).samples || s.data.length;
         pcmBytes = s.data.length;
       }
       const data = new Uint8Array(headerSize + pcmBytes);
@@ -1683,6 +1688,16 @@ export class FurnaceDispatchEngine {
     flagArray[56] = flags.noVolSlideReset ? 1 : 0;
 
     this.workletNode.port.postMessage({ type: 'setCompatFlags', flags: flagArray, platformType });
+  }
+
+  /**
+   * Send raw DivCompatFlags struct bytes to ALL chip dispatch instances.
+   * Used by the WASM parser path which extracts the struct directly from C++.
+   */
+  setCompatFlagsRaw(flagBytes: Uint8Array): void {
+    if (!this.workletNode) return;
+    // Send to all chips — no platformType means worklet will apply to all
+    this.workletNode.port.postMessage({ type: 'setCompatFlags', flags: flagBytes });
   }
 
   setCompatFlag(flagIndex: number, value: number, platformType?: number): void {

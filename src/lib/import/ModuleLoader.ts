@@ -309,7 +309,10 @@ async function loadWithNativeParser(
         patterns: result.patterns as unknown[][],
         furnaceNative,
         furnaceWavetables: result.wavetables.length > 0 ? result.wavetables : undefined,
-        furnaceSamples: result.samples.length > 0 ? result.samples : undefined,
+        furnaceSamples: result.samples.length > 0 ? result.samples.map(s => ({
+          ...s,
+          data: s.data instanceof Uint8Array ? new Int8Array(s.data.buffer, s.data.byteOffset, s.data.byteLength) : s.data,
+        })) : undefined,
       };
     } else if (ext === '.dmf') {
       console.log('[ModuleLoader] Parsing DefleMask file...');

@@ -261,6 +261,7 @@ export function parseSNDHFile(buffer: ArrayBuffer): TrackerSong {
       numChannels: 3,
       initialSpeed: 6,
       initialBPM: 125,
+      sc68FileData: buffer.slice(0),
     };
   }
 
@@ -281,6 +282,7 @@ export function parseSNDHFile(buffer: ArrayBuffer): TrackerSong {
       numChannels: 3,
       initialSpeed: 6,
       initialBPM: 125,
+      sc68FileData: buffer.slice(0),
     };
   }
 
@@ -303,5 +305,6 @@ export function parseSNDHFile(buffer: ArrayBuffer): TrackerSong {
     numChannels: 3,
     initialSpeed: 6,
     initialBPM: 125,
+    sc68FileData: buffer.slice(0),
   };
 }

@@ -19,10 +19,13 @@ import { useAudioStore } from '@/stores/useAudioStore';
 import { getToneEngine } from '@/engine/ToneEngine';
 import { notify } from '@/stores/useNotificationStore';
 import { isSupportedFormat } from '@/lib/import/FormatRegistry';
-import { isSupportedModule } from '@/lib/import/ModuleLoader';
+import { isSupportedModule, type ModuleInfo } from '@/lib/import/ModuleLoader';
+import type { ImportOptions } from '@/components/dialogs/ImportModuleDialog';
 import type { UADEMetadata } from '@engine/uade/UADEEngine';
 import { checkModlandFile } from '@/lib/modland/ModlandDetector';
 import { useModlandContributionModal } from '@/stores/useModlandContributionModal';
+import { parseSIDHeader } from '@/lib/sid/SIDHeaderParser';
+import { computeSongDBHash, lookupSongDB } from '@/lib/songdb';
 
 import { clearExplicitlySaved } from '@hooks/useProjectPersistence';
 
@@ -48,10 +51,279 @@ export interface FileLoadOptions {
   replacePatterns?: boolean;
 }
 
-export type FileLoadResult = 
+export type FileLoadResult =
   | { success: true; message: string }
   | { success: false; error: string }
-  | { success: 'pending-confirmation'; file: File };
+  | { success: 'pending-confirmation'; file: File }
+  | { success: 'pending-import'; file: File };
+
+// ─── Unified Tracker Module Import ─────────────────────────────────────────
+// THE single import function for all tracker modules (MOD/XM/IT/S3M/FUR/DMF/
+// Amiga/UADE/etc.). Called by ImportModuleDialog's onImport callback from both
+// DOM and Pixi views. All other import paths are dead — this is the one.
+
+export async function importTrackerModule(
+  info: ModuleInfo,
+  options: ImportOptions,
+): Promise<void> {
+  clearExplicitlySaved();
+
+  const { useLibopenmpt } = options;
+  let format = info.metadata.type;
+
+  // Fire-and-forget SongDB metadata lookup (non-blocking)
+  const buf = info.arrayBuffer ?? (info.file ? await info.file.arrayBuffer() : null);
+  if (buf) {
+    lookupSongDB(computeSongDBHash(buf)).then(result => {
+      useFormatStore.getState().setSongDBInfo(result ? {
+        authors: result.authors, publishers: result.publishers,
+        album: result.album, year: result.year, format: result.format,
+        duration_ms: result.subsongs[0]?.duration_ms ?? 0,
+      } : null);
+    });
+    const sidInfo = parseSIDHeader(new Uint8Array(buf));
+    useFormatStore.getState().setSidMetadata(sidInfo ? {
+      format: sidInfo.format, version: sidInfo.version,
+      title: sidInfo.title, author: sidInfo.author, copyright: sidInfo.copyright,
+      chipModel: sidInfo.chipModel, clockSpeed: sidInfo.clockSpeed,
+      subsongs: sidInfo.subsongs, defaultSubsong: sidInfo.defaultSubsong,
+      currentSubsong: options.subsong ?? sidInfo.defaultSubsong,
+      secondSID: sidInfo.secondSID, thirdSID: sidInfo.thirdSID,
+    } : null);
+  } else {
+    useFormatStore.getState().setSongDBInfo(null);
+    useFormatStore.getState().setSidMetadata(null);
+  }
+
+  // Full state reset
+  const { loadPatterns, setPatternOrder, setCurrentPattern } = useTrackerStore.getState();
+  const { loadInstruments, reset: resetInstruments } = useInstrumentStore.getState();
+  const { setBPM, setSpeed, stop, reset: resetTransport } = useTransportStore.getState();
+  const { setMetadata } = useProjectStore.getState();
+  const { reset: resetAutomation } = useAutomationStore.getState();
+  const { setOriginalModuleData, applyEditorMode } = useFormatStore.getState();
+  const engine = getToneEngine();
+
+  stop();
+  engine.releaseAll();
+  resetAutomation();
+  resetTransport();
+  resetInstruments();
+  engine.disposeAllInstruments();
+
+  // ── Try OpenMPT WASM soundlib for PC tracker formats ──
+  const isOpenMPTFormat = /^(MOD|XM|IT|S3M)$/i.test(format) || /\.(mod|xm|it|s3m|mptm|mo3)$/i.test(info.file?.name || '');
+  if (info.arrayBuffer && isOpenMPTFormat) {
+    try {
+      const { parseWithOpenMPT } = await import('@lib/import/wasm/OpenMPTConverter');
+      const song = await parseWithOpenMPT(info.arrayBuffer, info.file?.name || 'module');
+      console.log(`[Import] OpenMPT parsed: ${song.patterns.length} patterns, ${song.instruments.length} instruments, format=${song.format}`);
+      loadInstruments(song.instruments);
+      loadPatterns(song.patterns);
+      setCurrentPattern(0);
+      if (song.songPositions.length > 0) setPatternOrder(song.songPositions);
+      setOriginalModuleData(null);
+      setBPM(song.initialBPM);
+      setSpeed(song.initialSpeed);
+      setMetadata({ name: song.name, author: '', description: `Imported from ${info.file?.name || 'module'}` });
+      applyEditorMode({
+        linearPeriods: song.linearPeriods,
+        libopenmptFileData: useLibopenmpt ? info.arrayBuffer : undefined,
+      });
+      const samplerCount = song.instruments.filter(i => i.synthType === 'Sampler').length;
+      if (samplerCount > 0) {
+        await engine.preloadInstruments(song.instruments);
+      }
+      notify.success(`Imported "${song.name}" — ${song.patterns.length} patterns, ${song.instruments.length} instruments`);
+      if (info.file) checkModlandFileWithPatternHash(info.file, null);
+      return;
+    } catch (err) {
+      console.warn('[Import] OpenMPT WASM parse failed, falling back:', err);
+    }
+  }
+
+  // ── Native TS parser data (XM/MOD/FUR/DMF from ModuleLoader) ──
+  if (info.nativeData) {
+    const { convertXMModule, convertMODModule } = await import('@lib/import/ModuleConverter');
+    const { convertToInstrument } = await import('@lib/import/InstrumentConverter');
+    const { format: nativeFormat, importMetadata, instruments: parsedInstruments, patterns } = info.nativeData;
+    format = nativeFormat;
+
+    // Warn if an OpenMPT-compatible format fell through to the old TS parser
+    if (isOpenMPTFormat) {
+      console.warn(`[Import] WARNING: ${format} file using OLD native TS parser instead of OpenMPT WASM!`);
+      notify.warning(`OLD IMPORT PATH: "${info.file?.name || 'module'}" used legacy ${format} parser instead of OpenMPT. Report this!`);
+    }
+
+    console.log(`[Import] Using native ${format} parser: ${parsedInstruments.length} instruments, ${patterns.length} patterns`);
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let result: any;
+    if (format === 'XM') {
+      result = convertXMModule(
+        patterns as any, importMetadata.originalChannelCount,
+        importMetadata, parsedInstruments.map(i => i.name),
+        useLibopenmpt ? info.arrayBuffer : undefined,
+      );
+    } else if (format === 'MOD') {
+      result = convertMODModule(
+        patterns as any, importMetadata.originalChannelCount,
+        importMetadata, parsedInstruments.map(i => i.name),
+        useLibopenmpt ? info.arrayBuffer : undefined,
+      );
+    } else if (format === 'FUR' || format === 'DMF') {
+      const { getChannelMetadataFromFurnace } = await import('@components/tracker/trackerImportHelpers');
+      const patternOrder = importMetadata.modData?.patternOrderTable || [];
+      const patLen = patterns[0]?.length || 64;
+      const numChannels = importMetadata.originalChannelCount || (patterns[0]?.[0] as unknown[] | undefined)?.length || 4;
+      const furnaceData = importMetadata.furnaceData;
+      const channelMetadata = (furnaceData?.systems && furnaceData?.systemChans)
+        ? getChannelMetadataFromFurnace(furnaceData.systems, furnaceData.systemChans, numChannels, furnaceData.channelShortNames, furnaceData.effectColumns)
+        : null;
+      result = {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        patterns: (patterns as any[]).map((pat: any[][], idx: number) => ({
+          id: `pattern-${idx}`, name: `Pattern ${idx}`, length: patLen, importMetadata,
+          channels: Array.from({ length: numChannels }, (_, ch) => {
+            const meta = channelMetadata?.[ch];
+            return {
+              id: `channel-${ch}`, name: meta?.name || `Channel ${ch + 1}`,
+              shortName: meta?.shortName, muted: false, solo: false, collapsed: false,
+              volume: 100, pan: 0, instrumentId: null, color: meta?.color || null,
+              channelMeta: meta?.channelMeta,
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              rows: pat.map((row: any[]) => {
+                const cell = row[ch] || {};
+                return {
+                  note: cell.note || 0, instrument: cell.instrument || 0,
+                  volume: cell.volume || 0, effTyp: cell.effectType || 0,
+                  eff: cell.effectParam || 0, effTyp2: cell.effectType2 || 0,
+                  eff2: cell.effectParam2 || 0,
+                  effects: cell.effects?.map((e: { type: number; param: number }) => ({ type: e.type, param: e.param })),
+                };
+              }),
+            };
+          }),
+        })),
+        order: patternOrder.length > 0 ? patternOrder : [0],
+        instrumentNames: parsedInstruments.map(i => i.name),
+      };
+    } else {
+      result = convertMODModule(
+        patterns as any, importMetadata.originalChannelCount,
+        importMetadata, parsedInstruments.map(i => i.name),
+        useLibopenmpt ? info.arrayBuffer : undefined,
+      );
+    }
+
+    if (!result.patterns.length) {
+      notify.error(`Module "${info.metadata.title}" contains no patterns to import.`);
+      return;
+    }
+
+    const instruments: InstrumentConfig[] = [];
+    let nextId = 1;
+    for (const parsed of parsedInstruments) {
+      const converted = convertToInstrument(parsed, nextId, format as any);
+      instruments.push(...converted);
+      nextId += converted.length;
+    }
+
+    loadInstruments(instruments);
+    loadPatterns(result.patterns);
+    setCurrentPattern(0);
+    if (result.order?.length > 0) setPatternOrder(result.order);
+    if (result.originalModuleData) setOriginalModuleData(result.originalModuleData);
+    else setOriginalModuleData(null);
+    setMetadata({ name: info.metadata.title, author: '', description: `Imported from ${info.file?.name || 'module'} (${format})` });
+    setBPM(importMetadata.modData?.initialBPM || 125);
+    setSpeed(importMetadata.modData?.initialSpeed || 6);
+
+    const xmFreqType = importMetadata?.xmData?.frequencyType;
+    const linearPeriods = format === 'XM' ? (xmFreqType === 'linear' || xmFreqType === undefined) : false;
+    applyEditorMode({
+      linearPeriods,
+      furnaceNative: info.nativeData.furnaceNative,
+      libopenmptFileData: useLibopenmpt ? info.arrayBuffer : undefined,
+    });
+
+    const samplerCount = instruments.filter(i => i.synthType === 'Sampler').length;
+    if (samplerCount > 0) await engine.preloadInstruments(instruments);
+    notify.success(`Imported "${info.metadata.title}" — ${result.patterns.length} patterns, ${instruments.length} instruments`);
+    if (info.file) checkModlandFileWithPatternHash(info.file, null);
+    return;
+  }
+
+  // ── UADE / exotic Amiga / parseModuleToSong path ──
+  if (!info.metadata.song) {
+    if (!info.file) {
+      notify.error('File reference lost — cannot import');
+      return;
+    }
+    const { parseModuleToSong } = await import('@lib/import/parseModuleToSong');
+    const song = await parseModuleToSong(info.file, options.subsong ?? 0, options.uadeMetadata, options.midiOptions, options.companionFiles);
+    loadInstruments(song.instruments);
+    loadPatterns(song.patterns);
+    setCurrentPattern(0);
+    if (song.songPositions.length > 0) setPatternOrder(song.songPositions);
+    setOriginalModuleData(null);
+    setBPM(song.initialBPM);
+    setSpeed(song.initialSpeed);
+    setMetadata({ name: song.name, author: '', description: `Imported from ${info.file?.name || 'module'}` });
+    applyEditorMode(song);
+    if (song.c64SidFileData && useFormatStore.getState().editorMode === 'goattracker') {
+      const gtStore = (await import('@/stores/useGTUltraStore')).useGTUltraStore.getState();
+      const parts = song.name.split(' — ');
+      gtStore.setSongName(parts[0] || song.name);
+      if (parts[1]) gtStore.setSongAuthor(parts[1]);
+      gtStore.setSidCount(song.numChannels > 3 ? 2 : 1);
+    }
+    const samplerCount = song.instruments.filter(i => i.synthType === 'Sampler').length;
+    if (samplerCount > 0) await engine.preloadInstruments(song.instruments);
+    notify.success(`Imported "${song.name}" — ${song.patterns.length} patterns, ${song.instruments.length} instruments`);
+    if (info.file) checkModlandFileWithPatternHash(info.file, null);
+    return;
+  }
+
+  // ── Fallback: libopenmpt metadata-based import ──
+  const { convertModule } = await import('@lib/import/ModuleConverter');
+  const { extractSamples, canExtractSamples } = await import('@lib/import/SampleExtractor');
+  const { encodeWav } = await import('@lib/import/WavEncoder');
+  const { createInstrumentsForModule } = await import('@components/tracker/trackerImportHelpers');
+
+  const result = convertModule(info.metadata.song);
+  if (!result.patterns.length) {
+    notify.error(`Module "${info.metadata.title}" contains no patterns to import.`);
+    return;
+  }
+
+  let sampleUrls: Map<number, string> | undefined;
+  if (info.file && canExtractSamples(info.file.name)) {
+    try {
+      const extraction = await extractSamples(info.file);
+      sampleUrls = new Map();
+      for (let i = 0; i < extraction.samples.length; i++) {
+        const sample = extraction.samples[i];
+        if (sample.pcmData.length > 0) sampleUrls.set(i + 1, encodeWav(sample));
+      }
+    } catch (err) {
+      console.warn('[Import] Could not extract samples:', err);
+    }
+  }
+
+  const instruments = createInstrumentsForModule(result.patterns, result.instrumentNames, sampleUrls);
+  loadInstruments(instruments);
+  loadPatterns(result.patterns);
+  setCurrentPattern(0);
+  if (result.order?.length > 0) setPatternOrder(result.order);
+  setMetadata({ name: info.metadata.title, author: '', description: `Imported from ${info.file?.name || 'module'}` });
+  setBPM(125);
+
+  const samplerCount = instruments.filter(i => i.synthType === 'Sampler').length;
+  if (samplerCount > 0) await engine.preloadInstruments(instruments);
+  notify.success(`Imported "${info.metadata.title}" — ${result.patterns.length} patterns, ${instruments.length} instruments`);
+  if (info.file) checkModlandFileWithPatternHash(info.file, null);
+}
 
 /**
  * Check Modland with optional pattern hash (from parseModuleToSong)
@@ -175,7 +447,7 @@ async function loadSongFile(file: File, options: FileLoadOptions): Promise<FileL
   const { loadPatterns, setPatternOrder, setCurrentPattern } = useTrackerStore.getState();
   const { applyEditorMode } = useFormatStore.getState();
   const { loadInstruments, addInstrument, reset: resetInstruments } = useInstrumentStore.getState();
-  const { setBPM, setSpeed, setGrooveTemplate, reset: resetTransport, isPlaying, stop: stopTransport } = useTransportStore.getState();
+  const { setBPM, setGrooveTemplate, reset: resetTransport, isPlaying, stop: stopTransport } = useTransportStore.getState();
   const { setMetadata } = useProjectStore.getState();
   const { reset: resetAutomation } = useAutomationStore.getState();
   const engine = getToneEngine();
@@ -568,42 +840,9 @@ async function loadSongFile(file: File, options: FileLoadOptions): Promise<FileL
   // (GoatTracker .sng is handled above, before the state reset, to avoid
   //  clearing instruments/patterns during the async gap.)
 
-  // === All other tracker/module formats ===
+  // === All other tracker/module formats → show import dialog ===
   if (isSupportedModule(filename)) {
-    const { parseModuleToSong, getLastPatternHash } = await import('@lib/import/parseModuleToSong');
-    let song: Awaited<ReturnType<typeof parseModuleToSong>>;
-    try {
-      song = await parseModuleToSong(file, options.subsong ?? 0, options.uadeMetadata, options.midiOptions, options.companionFiles);
-    } catch (err) {
-      return {
-        success: false,
-        error: `Failed to parse ${file.name}: ${err instanceof Error ? err.message : String(err)}`,
-      };
-    }
-
-    // After parsing, check Modland (now with pattern hash from parseModuleToSong)
-    const patternHash = getLastPatternHash();
-    checkModlandFileWithPatternHash(file, patternHash).catch(() => {});
-
-    loadInstruments(song.instruments);
-    loadPatterns(song.patterns);
-    setCurrentPattern(0);
-    if (song.songPositions.length > 0) setPatternOrder(song.songPositions);
-    setBPM(song.initialBPM);
-    if (song.initialSpeed !== 6) setSpeed(song.initialSpeed);
-    setMetadata({
-      name: song.name,
-      author: '',
-      description: `Imported from ${file.name}`,
-    });
-
-    // Set editor mode based on native data availability
-    applyEditorMode(song);
-
-    return {
-      success: true,
-      message: `Imported ${file.name}: ${song.patterns.length} patterns, ${song.instruments.length} instruments`
-    };
+    return { success: 'pending-import', file };
   }
 
   return { success: false, error: `Unsupported song format: ${file.name}` };

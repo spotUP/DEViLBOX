@@ -395,7 +395,14 @@ export const usePatternPlayback = () => {
             const engine = FurnaceDispatchEngine.getInstance();
 
             if (hasCompatFlags) {
-              engine.setCompatFlags(furnaceData!.compatFlags as any);
+              const cf = furnaceData!.compatFlags as Record<string, unknown>;
+              if (cf._packed && cf._dispatchFlags) {
+                // WASM-parsed: send raw dispatch compat flag bytes to ALL chips
+                engine.setCompatFlagsRaw(cf._dispatchFlags as Uint8Array);
+              } else {
+                // TS-parsed: send named flags (legacy path)
+                engine.setCompatFlags(furnaceData!.compatFlags as any);
+              }
             }
 
             // Apply per-chip flags (clock selection, chip model, etc.)

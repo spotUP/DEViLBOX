@@ -290,32 +290,49 @@ const CHIP_CHANNELS: Record<number, number> = {
 
 // ── Per-Platform getPostAmp() ────────────────────────────────────────────────
 // From Furnace source: each platform can override getPostAmp() for volume scaling.
-// Default is 1.0. These values match upstream Furnace exactly.
+// Default is 1.0. Keys are DivSystem enum values (matching FurnaceDispatchWrapper.cpp).
 const POST_AMP: Record<number, number> = {
-  0x02: 1.5,  // SMS / SN76489
-  0x89: 1.5,  // SMS variant
-  0xa3: 1.5,  // T6W28 (SMS derivative)
-  0xe5: 1.5,  // OPLL (YM2413)
-  0xa0: 1.5,  // OPLL drum
-  0x96: 1.5,  // OPLL (VRC7)
-  0x05: 2.0,  // NES
-  0xd5: 2.0,  // 5E01 (NES variant)
-  0x01: 2.0,  // Genesis / YM2612
-  0x81: 2.0,  // YM2612 ext
-  0x9b: 2.0,  // YM2612 DualPCM
-  0xb7: 2.0,  // YM2612 CSM
-  0xcb: 2.0,  // OPN2 ext
-  0xb9: 2.0,  // POKEY
-  0xc1: 2.0,  // FDS (useNP default)
-  0xaa: 3.0,  // C140
-  0xfd: 3.0,  // C219
-  0xac: 3.0,  // MSM6295
-  0x9c: 4.0,  // X1-010
-  0xae: 4.0,  // YMZ280B
-  0x95: 4.0,  // VERA
-  0xf5: 6.0,  // VSU / Virtual Boy
-  0xe1: 64.0, // MMC5
-  0x97: 0.5,  // TIA
+  // SMS / SN76489 family — 1.5
+  4: 1.5,   // DIV_SYSTEM_SMS
+  5: 1.5,   // DIV_SYSTEM_SMS_OPLL (compound)
+  83: 1.5,  // DIV_SYSTEM_T6W28 (SMS derivative)
+  // OPLL family — 1.5
+  29: 1.5,  // DIV_SYSTEM_OPLL
+  48: 1.5,  // DIV_SYSTEM_VRC7
+  59: 1.5,  // DIV_SYSTEM_OPLL_DRUMS
+  // NES — 2.0
+  8: 2.0,   // DIV_SYSTEM_NES
+  106: 2.0, // DIV_SYSTEM_5E01 (NES variant)
+  // Genesis / YM2612 — 2.0
+  2: 2.0,   // DIV_SYSTEM_GENESIS (compound)
+  3: 2.0,   // DIV_SYSTEM_GENESIS_EXT
+  20: 2.0,  // DIV_SYSTEM_YM2612
+  52: 2.0,  // DIV_SYSTEM_YM2612_EXT
+  80: 2.0,  // DIV_SYSTEM_YM2612_DUALPCM
+  81: 2.0,  // DIV_SYSTEM_YM2612_DUALPCM_EXT
+  89: 2.0,  // DIV_SYSTEM_YM2612_CSM
+  // POKEY — 2.0
+  42: 2.0,  // DIV_SYSTEM_POKEY
+  // FDS — 2.0 (useNP default)
+  30: 2.0,  // DIV_SYSTEM_FDS
+  // C64 — 3.0 (reSIDfp core)
+  11: 3.0,  // DIV_SYSTEM_C64_6581
+  12: 3.0,  // DIV_SYSTEM_C64_8580
+  // C140/C219 — 3.0
+  98: 3.0,  // DIV_SYSTEM_C140
+  99: 3.0,  // DIV_SYSTEM_C219
+  // MSM6295 — 3.0
+  74: 3.0,  // DIV_SYSTEM_MSM6295
+  // X1-010, YMZ280B, VERA — 4.0
+  65: 4.0,  // DIV_SYSTEM_X1_010
+  76: 4.0,  // DIV_SYSTEM_YMZ280B
+  62: 4.0,  // DIV_SYSTEM_VERA
+  // VSU / Virtual Boy — 6.0
+  47: 6.0,  // DIV_SYSTEM_VBOY
+  // MMC5 — 64.0
+  31: 64.0, // DIV_SYSTEM_MMC5
+  // TIA — 0.5
+  21: 0.5,  // DIV_SYSTEM_TIA
 };
 
 function getPostAmp(chipId: number): number {
@@ -451,6 +468,13 @@ async function renderFurFile(furPath: string, outPath: string): Promise<RenderRe
       }
     }
 
+    // 4b. Apply tuning if non-standard
+    if (native.tuning !== undefined && native.tuning !== 440.0) {
+      for (const chip of chipInstances) {
+        wasm._furnace_dispatch_set_tuning(chip.handle, native.tuning);
+      }
+    }
+
     // 5. Upload instruments using raw INS2 binary data
     updateHeapViews(wasm);
     const instruments = parsed.instruments || [];
@@ -489,7 +513,11 @@ async function renderFurFile(furPath: string, outPath: string): Promise<RenderRe
       updateHeapViews(wasm);
       wasm.HEAPU8.set(new Uint8Array(packed.buffer), wtPtr);
       try {
-        wasm._furnace_dispatch_set_wavetable(firstHandle, i, wtPtr, packed.byteLength);
+        // Sync wavetable to ALL chip instances (not just first) — multi-chip songs
+        // need wavetables on every dispatch (e.g., FDS needs its own engine.song.wave)
+        for (const { handle } of chipInstances) {
+          wasm._furnace_dispatch_set_wavetable(handle, i, wtPtr, packed.byteLength);
+        }
       } catch (e) {
         console.error(`[render] Wavetable ${i} upload crashed: ${(e as Error).message}`);
       }
@@ -497,32 +525,71 @@ async function renderFurFile(furPath: string, outPath: string): Promise<RenderRe
     }
 
     // 7. Upload samples (Game Boy has no samples, so this is typically empty for GB)
+    // Header format must match FurnaceDispatchEngine.ts uploadModuleSamples() and
+    // FurnaceDispatchWrapper.cpp furnace_dispatch_set_sample() — 32-byte header:
+    //   [0-3]   samples (uint32, frame count)
+    //   [4-7]   loopStart (int32)
+    //   [8-11]  loopEnd (int32)
+    //   [12]    depth (DIV_SAMPLE_DEPTH)
+    //   [13]    loopMode
+    //   [16-19] centerRate (uint32)
+    //   [22]    loop enabled flag
+    //   [32+]   sample data
     const samples = parsed.samples || [];
     for (let i = 0; i < samples.length; i++) {
       const smp = samples[i];
       if (!smp.data || smp.data.length === 0) continue;
-      const smpData = smp.data instanceof Int16Array
-        ? new Uint8Array(smp.data.buffer, smp.data.byteOffset, smp.data.byteLength)
-        : new Uint8Array(smp.data.buffer, smp.data.byteOffset, smp.data.byteLength);
-      const headerLen = 4 + 1 + 4 + 4 + 1 + 4; // 18 bytes
-      const totalLen = headerLen + smpData.byteLength;
+
+      // Determine sample count (frame count) and PCM byte size
+      // For compressed formats (DPCM, ADPCM, BRR), data.length is BYTE count, not frame count
+      // Use smp.samples (frame count from parser) when available
+      let sampleCount: number;
+      let pcmBytes: number;
+      if ((smp.depth || 16) === 16) {
+        sampleCount = smp.data instanceof Int16Array ? smp.data.length : Math.floor(smp.data.length / 2);
+        pcmBytes = sampleCount * 2;
+      } else if ((smp.depth || 16) === 8) {
+        sampleCount = smp.data.length;
+        pcmBytes = smp.data.length;
+      } else {
+        // Compressed format: frame count != byte count
+        // FurnaceSample uses 'length' for frame count; module samples use 'samples'
+        sampleCount = (smp as any).samples || (smp as any).length || smp.data.length;
+        pcmBytes = smp.data.length;
+      }
+
+      const headerSize = 32;
+      const totalLen = headerSize + pcmBytes;
       const blob = new Uint8Array(totalLen);
       const view = new DataView(blob.buffer);
-      let off = 0;
-      view.setUint32(off, smp.rate || SAMPLE_RATE, true); off += 4;
-      view.setUint8(off, smp.depth || 16); off += 1;
-      view.setUint32(off, smp.loopStart || 0, true); off += 4;
-      view.setUint32(off, smp.loopEnd || 0, true); off += 4;
-      view.setUint8(off, smp.loopMode || 0); off += 1;
-      view.setUint32(off, smpData.byteLength, true); off += 4;
-      blob.set(smpData, off);
+      view.setUint32(0, sampleCount, true);                   // samples (frame count)
+      view.setInt32(4, smp.loopStart || 0, true);             // loopStart
+      view.setInt32(8, smp.loopEnd || 0, true);               // loopEnd
+      view.setUint8(12, smp.depth || 16);                     // depth
+      view.setUint8(13, smp.loopMode || 0);                   // loopMode
+      view.setUint32(16, smp.rate || SAMPLE_RATE, true);      // centerRate
+      view.setUint8(22, (smp.loopEnd || 0) > (smp.loopStart || 0) ? 1 : 0); // loop flag
+
+      // Copy PCM data after header
+      if (smp.data instanceof Int16Array) {
+        const pcmView = new DataView(blob.buffer, headerSize);
+        for (let j = 0; j < smp.data.length; j++) {
+          pcmView.setInt16(j * 2, smp.data[j], true);
+        }
+      } else {
+        blob.set(new Uint8Array(smp.data.buffer, smp.data.byteOffset, smp.data.byteLength), headerSize);
+      }
 
       updateHeapViews(wasm);
       const smpPtr = wasm._malloc(totalLen);
       updateHeapViews(wasm);
       wasm.HEAPU8.set(blob, smpPtr);
       try {
-        wasm._furnace_dispatch_set_sample(firstHandle, i, smpPtr, totalLen);
+        // Sync sample to ALL chip instances (not just first) — multi-chip songs
+        // need samples on every dispatch that references them
+        for (const { handle } of chipInstances) {
+          wasm._furnace_dispatch_set_sample(handle, i, smpPtr, totalLen);
+        }
       } catch (e) {
         console.error(`[render] Sample ${i} upload crashed: ${(e as Error).message}`);
       }
@@ -855,7 +922,7 @@ async function renderFurFile(furPath: string, outPath: string): Promise<RenderRe
         const logData = new Int32Array(wasm.HEAP32.buffer, logPtr, logCount * 6);
         const logPath = outPath.replace('.wav', '.cmdlog.txt');
         const lines: string[] = [`# tick cmd chan val1 val2 ret (${logCount} entries)`];
-        for (let i = 0; i < Math.min(logCount, 5000); i++) {
+        for (let i = 0; i < Math.min(logCount, 50000); i++) {
           const tick = logData[i * 6 + 0];
           const cmd = logData[i * 6 + 1];
           const chan = logData[i * 6 + 2];
@@ -897,7 +964,7 @@ async function renderFurFile(furPath: string, outPath: string): Promise<RenderRe
  * as consumed in FurnaceDispatchWrapper.cpp:1275-1332.
  */
 function packDispatchCompatFlags(cf: Record<string, unknown>): Uint8Array {
-  const flags = new Uint8Array(55); // plenty of room for all flags
+  const flags = new Uint8Array(57); // 57 flags total (indices 0-56)
   let i = 0;
   flags[i++] = (cf.limitSlides as number) || 0;
   flags[i++] = (cf.linearPitch as number) ?? 2;

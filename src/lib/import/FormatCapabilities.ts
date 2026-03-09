@@ -42,6 +42,10 @@ const EDITABLE_FORMAT_LABELS = new Set([
 
   // ── Non-UADE with own WASM engine + edit/export ──
   'Digital Symphony', 'Puma Tracker', 'Symphonie Pro',
+  'Future Player', 'SidMon II', 'Music Assembler',
+
+  // ── Native parsers with dedicated encoders ──
+  'AMOS Music Bank',
 ]);
 
 /** Format families (from FormatRegistry) that are always editable */
@@ -81,6 +85,10 @@ const NATIVE_EXPORTABLE_LABELS = new Set([
 
   // ── Non-UADE with dedicated exporters ──
   'Digital Symphony', 'Puma Tracker', 'Symphonie Pro',
+  'Future Player', 'SidMon II', 'Music Assembler',
+
+  // ── Native parsers with dedicated exporters ──
+  'AMOS Music Bank',
 ]);
 
 /** Format families that can export via libopenmpt WASM (to IT/S3M) */
@@ -96,7 +104,7 @@ const NO_PATTERN_DISPLAY_LABELS = new Set([
   'PMD',             // PC-98
   'MDX',             // X68000
   // Not in FormatRegistry — matched by extension fallback:
-  'PreTracker', 'Music Assembler', 'Ben Daglish', 'Hippel ST', 'Sonix Music Driver',
+  'PreTracker', 'Ben Daglish', 'Hippel ST', 'Sonix Music Driver',
   'PxTone', 'Organya', 'EUP', 'IXS', 'Psycle',
   'ZXTune',
 ]);

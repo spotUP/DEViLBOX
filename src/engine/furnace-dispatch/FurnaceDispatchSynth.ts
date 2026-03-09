@@ -319,7 +319,7 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
     // This is the native INS2 format that the WASM dispatch already knows how to parse.
     // It contains the correct macros for ALL platforms (Lynx duty, GB envelope, etc.)
     // and bypasses our TS encoder which may have bugs or skip non-FM platforms.
-    const rawData = (configFurnace as Record<string, unknown>).rawBinaryData as Uint8Array | undefined;
+    const rawData = (configFurnace as unknown as Record<string, unknown>).rawBinaryData as Uint8Array | undefined;
     if (rawData && rawData.length > 4 &&
         rawData[0] === 0x49 && rawData[1] === 0x4E && rawData[2] === 0x53 && rawData[3] === 0x32) { // "INS2"
       console.log(`[FurnaceDispatchSynth] Using rawBinaryData INS2 (${rawData.length} bytes) for instrument ${this.furnaceInstrumentIndex}`);

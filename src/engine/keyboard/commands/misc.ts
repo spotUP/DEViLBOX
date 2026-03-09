@@ -11,6 +11,7 @@ import { useTransportStore } from '@stores/useTransportStore';
 import { getToneEngine } from '@engine/ToneEngine';
 import { getTrackerReplayer } from '@engine/TrackerReplayer';
 import { saveProjectToStorage } from '@hooks/useProjectPersistence';
+import { useAIStore } from '@stores/useAIStore';
 
 // ====== REAL IMPLEMENTATIONS (kept from original) ======
 
@@ -350,6 +351,6 @@ export function showContextMenu(): boolean {
   return true;
 }
 export function showCommandPalette(): boolean {
-  useUIStore.getState().setStatusMessage('Command palette: not yet available', false, 1500);
+  useAIStore.getState().toggle();
   return true;
 }
