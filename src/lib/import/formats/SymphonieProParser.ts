@@ -93,6 +93,7 @@
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, ChannelData, TrackerCell, InstrumentConfig, UADEChipRamInfo } from '@/types';
+import { arrayBufferToBase64 } from '@/lib/import/InstrumentConverter';
 import type {
   SymphoniePlaybackData,
   SymphonieInstrumentData,
@@ -549,32 +550,42 @@ export async function parseSymphonieProFile(
         (song.instruments[0] as unknown as Record<string, unknown>)['symphonie'] = playbackData;
       }
 
-      // Set synthType on ALL instruments so the instrument list shows
-      // "Symphonie" badge instead of "???" for every entry.
+      // Set synthType on ALL instruments — keeps WASM engine routing working.
       for (let i = 0; i < song.instruments.length; i++) {
         (song.instruments[i] as unknown as Record<string, unknown>)['synthType'] = 'SymphonieSynth';
       }
 
-      // Populate each instrument with its decoded PCM sample data so instruments
-      // display properly in the instrument list with waveforms and metadata.
+      // Populate each instrument with decoded PCM sample data.
+      // The sample editor will show when sample data is present (see isSampleType).
       for (let i = 0; i < playbackData.instruments.length && i < song.instruments.length; i++) {
         const si = playbackData.instruments[i];
         const inst = song.instruments[i] as unknown as Record<string, unknown>;
         if (si.samples && si.samples.length > 0) {
           const sampleRate = si.sampledFrequency > 0 ? si.sampledFrequency : 8363;
-          // Convert Float32Array to mono WAV ArrayBuffer for the instrument's audioBuffer
-          inst['sample'] = {
-            audioBuffer: float32ToWav(si.samples, sampleRate),
-            sampleRate,
-            baseNote: 48 + si.tune, // C-4 + tune offset
-            loop: si.type === 4 || si.type === 8, // Loop or Sustain
-            loopType: si.type === 4 ? 'forward' : (si.type === 8 ? 'forward' : 'off'),
-            // Loop points: Symphonie uses percentage × 65536 encoding
-            loopStart: Math.floor((si.loopStart / (100 * 65536)) * si.samples.length),
-            loopEnd: Math.floor(((si.loopStart + si.loopLen) / (100 * 65536)) * si.samples.length),
-          };
+          const wavBuffer = float32ToWav(si.samples, sampleRate);
+          const dataUrl = `data:audio/wav;base64,${arrayBufferToBase64(wavBuffer)}`;
+          const loopEnabled = si.type === 4 || si.type === 8;
+          const loopStart = Math.floor((si.loopStart / (100 * 65536)) * si.samples.length);
+          const loopEnd = Math.floor(((si.loopStart + si.loopLen) / (100 * 65536)) * si.samples.length);
+
           inst['name'] = si.name || `Instrument ${i + 1}`;
           inst['volume'] = si.volume > 0 ? -12 + (si.volume / 100) * 12 : -60;
+          inst['sample'] = {
+            audioBuffer: wavBuffer,
+            url: dataUrl,
+            sampleRate,
+            baseNote: 'C-4',
+            detune: 0,
+            loop: loopEnabled,
+            loopType: loopEnabled ? 'forward' : 'off',
+            loopStart,
+            loopEnd,
+            reverse: false,
+            playbackRate: 1.0,
+          };
+          inst['parameters'] = {
+            sampleUrl: dataUrl,
+          };
         }
       }
     } catch (err) {
@@ -633,6 +644,7 @@ function _parseSymphonieProFile(bytes: Uint8Array, filename: string): TrackerSon
   let instrumentData = new Uint8Array(0);
   let infoText       = '';
   let instrumentChunkFileOffset = 0;  // file offset of INSTRUMENT_LIST chunk payload start
+  let displaySampleCount = 0;  // count sample chunks to trim trailing empty instruments
 
   while (r.canRead(4)) {
     const chunkType = r.s32be();
@@ -693,10 +705,12 @@ function _parseSymphonieProFile(bytes: Uint8Array, filename: string): TrackerSon
       case CHUNK_SAMPLE_PACKED16:
         // Skip sample data — we don't do playback, just pattern visualization
         if (r.canRead(4)) { const l = r.u32be(); r.skip(l); }
+        displaySampleCount++;
         break;
 
       case CHUNK_EMPTY_SAMPLE:
         // No data; just marks an empty sample slot
+        displaySampleCount++;
         break;
 
       case CHUNK_PATTERN_EVENTS:
@@ -770,12 +784,13 @@ function _parseSymphonieProFile(bytes: Uint8Array, filename: string): TrackerSon
   // SymphoniePlaybackData (and set synthType = 'SymphonieSynth') to index 0.
   const songTitle = infoText || filename.replace(/\.symmod$/i, '');
   const SYMMOD_INST_SIZE = 256;
-  // Don't set synthType here — parseSymphonieProFile will set 'SymphonieSynth' on
-  // instrument 0 and 'Sampler' only on instruments that have decoded PCM sample data.
-  // Instruments without samples must NOT be 'Sampler' or ToneEngine will log errors.
-  // Cap at 128 instruments — InstrumentStore clamps IDs to 1-128 range,
-  // and instruments beyond 128 would all get duplicate ID 1.
-  const cappedInstruments = symInstruments.slice(0, 128);
+  // Trim to real instrument count: max of sample chunk count and last named instrument
+  let realCount = displaySampleCount;
+  for (let i = symInstruments.length - 1; i >= realCount; i--) {
+    if (symInstruments[i].name) { realCount = i + 1; break; }
+  }
+  // Cap at 128 instruments — InstrumentStore clamps IDs to 1-128 range
+  const cappedInstruments = symInstruments.slice(0, Math.min(realCount, 128));
   const instruments: InstrumentConfig[] = cappedInstruments.length > 0
     ? cappedInstruments.map((si, i) => ({
         id:        i + 1,
@@ -1023,8 +1038,8 @@ function _convertEvent(
           if (n > 0) cell.note = n;
         }
 
-        if (ev.inst > 0 && ev.inst < numInstruments) {
-          cell.instrument = ev.inst + 1; // 1-based
+        if (ev.inst < numInstruments) {
+          cell.instrument = ev.inst + 1; // 0-based file → 1-based TrackerCell
         }
 
         if (ev.param > 0 && ev.param <= 100) {
@@ -1123,48 +1138,102 @@ function _decodeDelta8(bytes: Uint8Array): Float32Array {
 }
 
 function _decodeDelta16(bytes: Uint8Array): Float32Array {
+  // ASM reference: Proc16ModBlk calls UnPackDelta16 in ≤4096-byte blocks.
+  // UnPackDelta16 = UnpackD162 (delta-decode bytes) + PD16preUncode (interleave).
+  //
+  // CRITICAL: Delta16 chunks store the ENTIRE original sample FILE (WAV/IFF/AIFF),
+  // not raw PCM. The Amiga save routine reads sample files from disk, splits 16-bit
+  // words into LSB/MSB byte halves, then delta-encodes the byte stream.
+  // On load: delta-unpack → reassemble words → reconstruct file → parse container.
   const BLOCK_BYTES = 4096;
-  const BLOCK_SAMPLES = BLOCK_BYTES / 2; // 2048 samples per block
-  const numBlocks = Math.floor(bytes.length / BLOCK_BYTES);
-  const out = new Float32Array(numBlocks * BLOCK_SAMPLES);
-  const lsbBuf = new Uint8Array(BLOCK_SAMPLES);
+  const totalBytes = bytes.length;
 
-  for (let block = 0; block < numBlocks; block++) {
-    const offset = block * BLOCK_BYTES;
-    let lastVal = 0;
-    // Decode LSBs (first half of block)
-    for (let i = 0; i < BLOCK_SAMPLES; i++) {
-      lastVal = (lastVal + bytes[offset + i]) & 0xFF;
-      lsbBuf[i] = lastVal;
+  // Reconstruct the original file bytes
+  const fileBytes = new Uint8Array(totalBytes);
+  let outIdx = 0;
+  let srcOffset = 0;
+  let remaining = totalBytes;
+
+  while (remaining > 0) {
+    const blockSize = Math.min(remaining, BLOCK_BYTES);
+    const halfBlock = blockSize >> 1;
+
+    // Step 1: Delta-decode blockSize bytes (first byte = seed)
+    const decoded = new Uint8Array(blockSize);
+    let acc = bytes[srcOffset];
+    decoded[0] = acc;
+    for (let i = 1; i < blockSize; i++) {
+      acc = (acc + bytes[srcOffset + i]) & 0xFF;
+      decoded[i] = acc;
     }
-    // Decode MSBs (second half of block), continuing lastVal
-    for (let i = 0; i < BLOCK_SAMPLES; i++) {
-      lastVal = (lastVal + bytes[offset + BLOCK_SAMPLES + i]) & 0xFF;
-      const raw = (lastVal << 8) | lsbBuf[i];
-      out[block * BLOCK_SAMPLES + i] = (raw > 32767 ? raw - 65536 : raw) / 32768.0;
+
+    // Step 2: Reassemble interleaved halves back into original file bytes.
+    // First half = LSBs (odd bytes), second half = MSBs (even bytes) of 16-bit words.
+    // Amiga big-endian: word in memory is [MSB, LSB], so file byte order is MSB first.
+    for (let i = 0; i < halfBlock; i++) {
+      const lsb = decoded[i];
+      const msb = decoded[halfBlock + i];
+      fileBytes[outIdx++] = msb;
+      fileBytes[outIdx++] = lsb;
+    }
+
+    // Handle odd-length blocks (last byte has no pair)
+    if (blockSize & 1) {
+      fileBytes[outIdx++] = decoded[blockSize - 1];
+    }
+
+    srcOffset += blockSize;
+    remaining -= blockSize;
+  }
+
+  const reconstructed = fileBytes.subarray(0, outIdx);
+
+  // Step 3: Parse the reconstructed file through the container format parser.
+  // _decodeRaw8 handles RIFF/WAV, IFF 8SVX, AIFF, MAESTRO, 16BT formats.
+  if (reconstructed.length >= 4) {
+    const magic4 = String.fromCharCode(reconstructed[0], reconstructed[1], reconstructed[2], reconstructed[3]);
+    if (magic4 === 'RIFF' || magic4 === 'FORM' || magic4 === '16BT' ||
+        (reconstructed.length >= 8 && magic4 === 'MAES')) {
+      return _decodeRaw8(reconstructed);
     }
   }
-  return out;
+
+  // No recognized container: treat as raw 16-bit big-endian signed PCM (Amiga native)
+  return _decode16bitBE(reconstructed, 0, false);
 }
 
 /**
  * Extract PCM from a CHUNK_SAMPLE_FILE.
- * The data may be an IFF 8SVX file (FORM...8SVX with BODY chunk),
- * a WAV file, or raw signed 8-bit PCM.
- * OpenMPT tries IFF → WAV → AIFF → raw (Load_symmod.cpp:1158).
+ * Matches OpenMPT detection order: IFF → WAV → AIFF → raw (MAESTRO/16BT/8-bit).
+ * See Load_symmod.cpp:1158 and ReadRawSymSample().
  */
 function _decodeRaw8(bytes: Uint8Array): Float32Array {
-  // Detect IFF 8SVX: starts with "FORM" and contains "8SVX"
-  if (bytes.length >= 12 &&
-      bytes[0] === 0x46 && bytes[1] === 0x4F && bytes[2] === 0x52 && bytes[3] === 0x4D && // "FORM"
-      bytes[8] === 0x38 && bytes[9] === 0x53 && bytes[10] === 0x56 && bytes[11] === 0x58) { // "8SVX"
-    return _decodeIFF8SVX(bytes);
+  if (bytes.length < 4) return _decodeRawFallback(bytes);
+
+  const magic4 = String.fromCharCode(bytes[0], bytes[1], bytes[2], bytes[3]);
+
+  // IFF containers: "FORM" + size + type
+  if (magic4 === 'FORM' && bytes.length >= 12) {
+    const formType = String.fromCharCode(bytes[8], bytes[9], bytes[10], bytes[11]);
+    if (formType === '8SVX') return _decodeIFF8SVX(bytes);
+    if (formType === 'AIFF') return _decodeAIFF(bytes);
   }
-  // Detect WAV: starts with "RIFF"
-  if (bytes.length >= 12 &&
-      bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46) { // "RIFF"
-    return _decodeWAV(bytes);
+  // WAV: "RIFF"
+  if (magic4 === 'RIFF') return _decodeWAV(bytes);
+
+  // MAESTRO\0 → 16-bit big-endian signed, data at offset 24
+  if (bytes.length >= 24 &&
+      bytes[0] === 0x4D && bytes[1] === 0x41 && bytes[2] === 0x45 && bytes[3] === 0x53 &&
+      bytes[4] === 0x54 && bytes[5] === 0x52 && bytes[6] === 0x4F && bytes[7] === 0x00) {
+    const isStereo = (bytes[12] | bytes[13] | bytes[14] | bytes[15]) === 0;
+    return _decode16bitBE(bytes, 24, isStereo);
   }
+
+  // 16BT → 16-bit big-endian signed (first 4 bytes are anti-click nulls)
+  if (magic4 === '16BT') {
+    return _decode16bitBE(bytes, 0, false);
+  }
+
   // Fallback: raw signed 8-bit PCM
   const out = new Float32Array(bytes.length);
   for (let i = 0; i < bytes.length; i++) {
@@ -1174,9 +1243,33 @@ function _decodeRaw8(bytes: Uint8Array): Float32Array {
   return out;
 }
 
+/** Decode 16-bit big-endian signed PCM starting at `offset`. */
+function _decode16bitBE(bytes: Uint8Array, offset: number, stereo: boolean): Float32Array {
+  const bytesPerFrame = stereo ? 4 : 2;
+  const numSamples = Math.floor((bytes.length - offset) / bytesPerFrame);
+  if (stereo) {
+    const out = new Float32Array(numSamples);
+    for (let i = 0; i < numSamples; i++) {
+      const p = offset + i * 4;
+      const rawL = (bytes[p] << 8) | bytes[p + 1];
+      const rawR = (bytes[p + 2] << 8) | bytes[p + 3];
+      const sL = rawL > 32767 ? rawL - 65536 : rawL;
+      const sR = rawR > 32767 ? rawR - 65536 : rawR;
+      out[i] = ((sL + sR) / 2) / 32768.0;
+    }
+    return out;
+  }
+  const out = new Float32Array(numSamples);
+  for (let i = 0; i < numSamples; i++) {
+    const p = offset + i * 2;
+    const raw = (bytes[p] << 8) | bytes[p + 1];
+    out[i] = (raw > 32767 ? raw - 65536 : raw) / 32768.0;
+  }
+  return out;
+}
+
 /** Parse IFF 8SVX and extract BODY chunk as signed 8-bit mono PCM. */
 function _decodeIFF8SVX(bytes: Uint8Array): Float32Array {
-  // Skip FORM header (4 type + 4 size + 4 "8SVX" = 12 bytes)
   let pos = 12;
   while (pos + 8 <= bytes.length) {
     const id = String.fromCharCode(bytes[pos], bytes[pos+1], bytes[pos+2], bytes[pos+3]);
@@ -1191,34 +1284,63 @@ function _decodeIFF8SVX(bytes: Uint8Array): Float32Array {
       }
       return out;
     }
-    // Skip chunk (IFF chunks are word-aligned)
     pos += size + (size & 1);
   }
-  // No BODY found — treat as raw
-  const out = new Float32Array(bytes.length);
-  for (let i = 0; i < bytes.length; i++) {
-    out[i] = (bytes[i] < 128 ? bytes[i] : bytes[i] - 256) / 128.0;
+  return _decodeRawFallback(bytes);
+}
+
+/** Parse AIFF (FORM...AIFF) and extract SSND chunk as signed PCM. */
+function _decodeAIFF(bytes: Uint8Array): Float32Array {
+  let pos = 12;
+  let numCh = 1;
+  let bits = 8;
+  while (pos + 8 <= bytes.length) {
+    const id = String.fromCharCode(bytes[pos], bytes[pos+1], bytes[pos+2], bytes[pos+3]);
+    const size = (bytes[pos+4] << 24) | (bytes[pos+5] << 16) | (bytes[pos+6] << 8) | bytes[pos+7];
+    pos += 8;
+    if (id === 'COMM' && size >= 8) {
+      numCh = (bytes[pos] << 8) | bytes[pos+1];
+      bits = (bytes[pos+6] << 8) | bytes[pos+7];
+      pos += size + (size & 1);
+    } else if (id === 'SSND') {
+      const ssndOff = (bytes[pos] << 24) | (bytes[pos+1] << 16) | (bytes[pos+2] << 8) | bytes[pos+3];
+      const dataStart = pos + 8 + ssndOff;
+      const dataLen = Math.min(size - 8 - ssndOff, bytes.length - dataStart);
+      if (bits === 16) {
+        const n = Math.floor(dataLen / (2 * numCh));
+        const out = new Float32Array(n);
+        for (let i = 0; i < n; i++) {
+          const p = dataStart + i * 2 * numCh;
+          const raw = (bytes[p] << 8) | bytes[p + 1];
+          out[i] = (raw > 32767 ? raw - 65536 : raw) / 32768.0;
+        }
+        return out;
+      }
+      const n = Math.floor(dataLen / numCh);
+      const out = new Float32Array(n);
+      for (let i = 0; i < n; i++) {
+        const b = bytes[dataStart + i * numCh];
+        out[i] = (b < 128 ? b : b - 256) / 128.0;
+      }
+      return out;
+    } else {
+      pos += size + (size & 1);
+    }
   }
-  return out;
+  return _decodeRawFallback(bytes);
 }
 
 /** Parse WAV and extract PCM data chunk. Handles 8-bit unsigned and 16-bit signed. */
 function _decodeWAV(bytes: Uint8Array): Float32Array {
-  // RIFF header: "RIFF" + size + "WAVE"
-  if (bytes.length < 44) {
-    // Too small for valid WAV, treat as raw
-    return _decodeRawFallback(bytes);
-  }
-  let pos = 12; // skip "RIFF" + size + "WAVE"
+  if (bytes.length < 44) return _decodeRawFallback(bytes);
+  let pos = 12;
   let bitsPerSample = 8;
-  let numChannels = 1;
   while (pos + 8 <= bytes.length) {
     const id = String.fromCharCode(bytes[pos], bytes[pos+1], bytes[pos+2], bytes[pos+3]);
     const size = bytes[pos+4] | (bytes[pos+5] << 8) | (bytes[pos+6] << 16) | (bytes[pos+7] << 24);
     pos += 8;
     if (id === 'fmt ') {
       if (size >= 16) {
-        numChannels = bytes[pos+2] | (bytes[pos+3] << 8);
         bitsPerSample = bytes[pos+14] | (bytes[pos+15] << 8);
       }
       pos += size;
@@ -1232,14 +1354,12 @@ function _decodeWAV(bytes: Uint8Array): Float32Array {
           out[i] = (raw > 32767 ? raw - 65536 : raw) / 32768.0;
         }
         return out;
-      } else {
-        // 8-bit WAV is unsigned (0-255, center at 128)
-        const out = new Float32Array(dataLen);
-        for (let i = 0; i < dataLen; i++) {
-          out[i] = (bytes[pos + i] - 128) / 128.0;
-        }
-        return out;
       }
+      const out = new Float32Array(dataLen);
+      for (let i = 0; i < dataLen; i++) {
+        out[i] = (bytes[pos + i] - 128) / 128.0;
+      }
+      return out;
     } else {
       pos += size + (size & 1);
     }
@@ -1490,22 +1610,26 @@ export async function parseSymphonieForPlayback(
 
   const INST_SIZE = 256;
 
-  // Sample chunks map to instruments. Two possible file layouts:
-  // (a) 1:1 — every instrument has a sample chunk (Silent/Kill get EMPTY_SAMPLE).
-  //     sampleIndex == numInstruments. Use rawSampleData[i] directly.
-  // (b) PCM-only — only instruments with type 0/4/8 have sample chunks.
-  //     sampleIndex < numInstruments. Use a separate pcmIdx counter.
-  // Auto-detect by comparing sampleIndex to numInstruments.
-
-  let numPCM = 0;
+  // Sample chunk → instrument mapping (from ASM WriteModuleSamples / LoadHunkSAMPLE):
+  //
+  // The file saves one chunk per instrument slot, iterated in order, EXCEPT:
+  //   - StereoR (channel=2): NO chunk written — shares StereoL's sample data
+  //   - Kill (type=-4), Silent (type=-8), LineSrc (channel=3), empty name,
+  //     zero-length file: EMPTYSAMPLE chunk (just a marker, no data)
+  //   - All others: SAMPLE / DELTASAMPLE / DELTA16 chunk with PCM data
+  //
+  // The load side uses MoveNextMonoInstrument which skips StereoR slots after
+  // loading each chunk. So chunks map 1:1 to instruments, minus StereoR slots.
+  //
+  // Count how many chunks we expect (instruments minus StereoR):
+  let numStereoR = 0;
   for (let i = 0; i < numInstruments; i++) {
-    if (symInstrumentsRaw[i].type !== -8 && symInstrumentsRaw[i].type !== -4) numPCM++;
+    if (symInstrumentsRaw[i].channel === 2) numStereoR++;
   }
-  const oneToOne = (sampleIndex >= numInstruments);
-  // Log for debugging
-  console.log(`[SymphonieParser] sampleIndex=${sampleIndex} numInstruments=${numInstruments} numPCM=${numPCM} mapping=${oneToOne ? '1:1' : 'pcm-only'}`);
+  const expectedChunks = numInstruments - numStereoR;
+  console.log(`[SymphonieParser] sampleIndex=${sampleIndex} numInstruments=${numInstruments} stereoR=${numStereoR} expectedChunks=${expectedChunks}`);
 
-  let pcmIdx = 0;
+  let chunkIdx = 0;  // indexes into rawSampleData (skips StereoR)
   const instruments: SymphonieInstrumentData[] = [];
 
   for (let i = 0; i < numInstruments; i++) {
@@ -1531,19 +1655,22 @@ export async function parseSymphonieForPlayback(
     // newLoopSystem: bit 4 of lineSampleFlags
     const newLoopSystem = (lineSampleFlags & 0x10) !== 0;
 
-    // loopStart = loopStartHigh * 65536  (percentage × 65536)
-    // loopLen   = loopLenHigh   * 65536  (percentage × 65536)
-    const loopStart = loopStartHigh * 65536;
-    const loopLen   = loopLenHigh   * 65536;
+    // Loop points: high byte at offsets 129/130, low word at offsets 150-151/152-153
+    // Full 24-bit value: (highByte << 16) + lowWord
+    const loopStartLo = base + 151 < instrumentData.length
+      ? (instrumentData[base + 150] << 8) | instrumentData[base + 151] : 0;
+    const loopLenLo = base + 153 < instrumentData.length
+      ? (instrumentData[base + 152] << 8) | instrumentData[base + 153] : 0;
+    const loopStart = loopStartHigh * 65536 + loopStartLo;
+    const loopLen   = loopLenHigh   * 65536 + loopLenLo;
 
-    // Determine whether this instrument has PCM
-    const hasPCM = si.type !== -8 && si.type !== -4;
+    // StereoR instruments share the StereoL's sample — no chunk in file
+    const isStereoR = (si.channel === 2);
 
     let samples: Float32Array | null = null;
-    if (hasPCM) {
-      // Use 1:1 mapping (rawSampleData[i]) or pcm-only mapping (rawSampleData[pcmIdx])
-      const smpIdx = oneToOne ? i : pcmIdx;
-      const entry = rawSampleData[smpIdx];
+    if (!isStereoR) {
+      // This instrument has a chunk in the file (data or EMPTYSAMPLE)
+      const entry = rawSampleData[chunkIdx];
       if (entry) {
         if (entry.kind === 'raw8') {
           samples = _decodeRaw8(entry.bytes);
@@ -1553,7 +1680,10 @@ export async function parseSymphonieForPlayback(
           samples = _decodeDelta16(entry.bytes);
         }
       }
-      pcmIdx++;
+      chunkIdx++;
+    } else {
+      // StereoR: find preceding StereoL and share its sample data
+      // (For now, leave null — the replayer handles stereo pairs internally)
     }
 
     instruments.push({
@@ -1571,6 +1701,13 @@ export async function parseSymphonieForPlayback(
       samples,
       sampledFrequency: 0,  // unknown → worklet assumes 8363 Hz
     });
+  }
+
+  // Trim trailing empty instruments (no sample data, no name, Silent/Kill type)
+  while (instruments.length > 0) {
+    const last = instruments[instruments.length - 1];
+    if (last.samples !== null || (last.type >= 0 && last.name !== `Instrument ${instruments.length}`)) break;
+    instruments.pop();
   }
 
   // ── Extract initial cycle (speed) from first played position ─────────────
@@ -1606,6 +1743,8 @@ export async function parseSymphonieForPlayback(
   const patternMap = new Map<string, number>();
   const patterns: SymphoniePattern[] = [];
   const orderList: number[] = [];
+  const orderSpeeds: number[] = [];
+  const orderTranspose: number[] = [];
 
   for (const seq of symSequences) {
     if (seq.info === 1) continue;
@@ -1655,6 +1794,17 @@ export async function parseSymphonieForPlayback(
                 feedback: ev.inst,
                 bufLen:   ev.param,
               });
+              // Also add as a regular event so the C player processes it
+              // (fx_dsp_echo uses pitch=type, volume=bufLen, instr=feedback)
+              events.push({
+                row,
+                channel: ch,
+                note:       (ev.note >= 0 && ev.note <= 255) ? ev.note + 1 : 0,
+                instrument: ev.inst + 1,
+                volume:     255,
+                cmd:        ev.command,
+                param:      ev.param,
+              });
             } else {
               // Regular pattern event
               let note       = 0;
@@ -1663,25 +1813,26 @@ export async function parseSymphonieForPlayback(
 
               if (ev.command === CMD_KEYON) {
                 if (ev.note >= 0 && ev.note <= 84) {
-                  note = clampNote(ev.note + 25 + effectiveTranspose);
+                  // Raw pitch for WASM (0-84), no display offset
+                  note = ev.note + 1; // 1-based (0=no note)
                 }
-                if (ev.inst > 0 && ev.inst <= numInstruments) {
-                  instrument = ev.inst; // keep 1-based
+                if (ev.inst < numInstruments) {
+                  instrument = ev.inst + 1; // 0-based file → 1-based for worklet
                 }
-                if (ev.param <= 100 && ev.param > 0) {
+                // Volume commands (>100) need to be forwarded for the WASM player
+                if (ev.param > 0 && ev.param <= 100) {
                   volume = ev.param;
+                } else if (ev.param > 200) {
+                  volume = ev.param; // volume command (242-254)
                 } else if (ev.param === 0) {
                   volume = 255; // no explicit volume
                 }
-              } else if (ev.command === CMD_ADD_HALFTONE) {
-                if (ev.note >= 0 && ev.note <= 84) {
-                  note = clampNote(ev.note + 25 + effectiveTranspose);
-                }
               } else {
-                // All other commands: pass raw note field as 0, carry cmd/param
-                if (ev.note >= 0 && ev.note <= 84) {
-                  // Some commands encode note
-                }
+                // All other commands: note and inst bytes are effect parameters
+                // (e.g. vibrato speed, filter reso, retrig interval, emphasis values)
+                // Pass them through raw so the C player receives correct values.
+                note = (ev.note >= 0 && ev.note <= 255) ? ev.note + 1 : 0;
+                instrument = ev.inst + 1; // 1-based encoding, worklet subtracts 1
               }
 
               events.push({
@@ -1704,6 +1855,8 @@ export async function parseSymphonieForPlayback(
       const loopCount = Math.max(pos.loopNum, 1);
       for (let lp = 0; lp < loopCount; lp++) {
         orderList.push(patIdx);
+        orderSpeeds.push(pos.speed > 0 ? pos.speed : initialCycle);
+        orderTranspose.push(effectiveTranspose);
       }
     }
   }
@@ -1724,6 +1877,8 @@ export async function parseSymphonieForPlayback(
     cycle:            initialCycle,
     numChannels,
     orderList,
+    orderSpeeds,
+    orderTranspose,
     patterns,
     instruments,
     globalDspType:     0,

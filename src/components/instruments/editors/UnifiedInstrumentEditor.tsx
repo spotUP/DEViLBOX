@@ -234,7 +234,10 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
 
   const editorMode = instrument.metadata?.mlSynthConfig
     ? 'musicline'
-    : getEditorMode(instrument.synthType);
+    // Native WASM synths with sample data attached get the sample editor
+    : (instrument.sample?.url || (instrument.parameters as Record<string, unknown>)?.sampleUrl)
+      ? 'sample'
+      : getEditorMode(instrument.synthType);
 
   // Auto-switch tabs when synth type changes
   useEffect(() => {

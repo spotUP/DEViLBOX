@@ -21,6 +21,26 @@ import type { Pattern, TrackerCell, InstrumentConfig } from '@/types';
 import type { DigMugConfig, UADEChipRamInfo } from '@/types/instrument';
 import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
 import { encodeDigitalMugicianCell } from '@/engine/uade/encoders/DigitalMugicianEncoder';
+import { arrayBufferToBase64 } from '@/lib/import/InstrumentConverter';
+
+// -- WAV helper for sample editor ------------------------------------------
+
+/** Convert signed 8-bit PCM to a WAV data URL for the sample editor */
+function pcm8ToWavDataUrl(pcm: Uint8Array, sampleRate = 8363): string {
+  const n = pcm.length;
+  const buf = new ArrayBuffer(44 + n);
+  const v = new DataView(buf);
+  const w = (off: number, s: string) => { for (let i = 0; i < s.length; i++) v.setUint8(off + i, s.charCodeAt(i)); };
+  w(0, 'RIFF'); v.setUint32(4, 36 + n, true); w(8, 'WAVE');
+  w(12, 'fmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+  v.setUint32(24, sampleRate, true); v.setUint32(28, sampleRate, true);
+  v.setUint16(32, 1, true); v.setUint16(34, 8, true);
+  w(36, 'data'); v.setUint32(40, n, true);
+  const dst = new Uint8Array(buf, 44);
+  // Amiga signed 8-bit → WAV unsigned 8-bit (center at 128)
+  for (let i = 0; i < n; i++) dst[i] = (pcm[i] + 128) & 0xFF;
+  return `data:audio/wav;base64,${arrayBufferToBase64(buf)}`;
+}
 
 // -- Binary reading helpers (Big Endian) ------------------------------------
 
@@ -557,6 +577,10 @@ export async function parseDigitalMugicianFile(
         loopLength: sample.repeat > 0 ? sample.repeat : 0,
       };
 
+      // Build sample data for the sample editor
+      const sampleUrl = pcm && pcm.length > 0 ? pcm8ToWavDataUrl(pcm) : undefined;
+      const loopEnabled = sample.repeat > 0 && sample.loopOffset >= 0;
+
       instruments.push({
         id,
         name: sample.name || `PCM ${sampleIdx}`,
@@ -567,6 +591,21 @@ export async function parseDigitalMugicianFile(
         volume: -6,
         pan: 0,
         uadeChipRam: chipRam,
+        ...(sampleUrl ? {
+          sample: {
+            url: sampleUrl,
+            sampleRate: 8363,
+            baseNote: 'C-4',
+            detune: 0,
+            loop: loopEnabled,
+            loopType: loopEnabled ? 'forward' as const : 'off' as const,
+            loopStart: sample.loopOffset,
+            loopEnd: loopEnabled ? sample.loopOffset + sample.repeat : 0,
+            reverse: false,
+            playbackRate: 1.0,
+          },
+          parameters: { sampleUrl },
+        } : {}),
       } as InstrumentConfig);
 
     } else if (sample.wave < 32) {

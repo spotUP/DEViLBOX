@@ -118,6 +118,7 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
   const minimapRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const playerRef = useRef<Tone.Player | null>(null);
+  const playerBlobUrlRef = useRef<string | null>(null);
   const animationRef = useRef<number | null>(null);
   const isFileDraggingRef = useRef(false);
   const selectionDragStart = useRef<number>(-1);
@@ -349,7 +350,13 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
         }
 
         if (playerRef.current) playerRef.current.dispose();
-        playerRef.current = new Tone.Player(sampleUrl).toDestination();
+        if (playerBlobUrlRef.current) URL.revokeObjectURL(playerBlobUrlRef.current);
+        // Create a Blob URL from the raw WAV bytes for Tone.Player —
+        // more efficient than re-fetching large base64 data URLs
+        const blob = new Blob([arrayBuffer.slice(0)], { type: 'audio/wav' });
+        const blobUrl = URL.createObjectURL(blob);
+        playerBlobUrlRef.current = blobUrl;
+        playerRef.current = new Tone.Player(blobUrl).toDestination();
       } catch (err) {
         console.error('[SampleEditor] Failed to load audio:', err);
         setError('Failed to load audio file');
@@ -363,6 +370,10 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
       if (playerRef.current) {
         playerRef.current.dispose();
         playerRef.current = null;
+      }
+      if (playerBlobUrlRef.current) {
+        URL.revokeObjectURL(playerBlobUrlRef.current);
+        playerBlobUrlRef.current = null;
       }
       if (animationRef.current) cancelAnimationFrame(animationRef.current);
     };
