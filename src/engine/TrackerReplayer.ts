@@ -226,6 +226,8 @@ export interface TrackerSong {
   initialBPM: number;
   // XM frequency mode: true = linear periods (most XMs), false = amiga periods
   linearPeriods?: boolean;
+  // Display-only note offset (semitones) — adjusts note display without affecting playback
+  noteDisplayOffset?: number;
   // Furnace-specific timing/compat (optional)
   speed2?: number;
   hz?: number;
@@ -1310,6 +1312,8 @@ export class TrackerReplayer {
           this.pattPos = row;
           const patternNum = this.song.songPositions[order] ?? 0;
 
+          // Queue display state with current audio time for smooth scrolling interpolation
+          this.queueDisplayState(Tone.now(), row, patternNum, order, 0);
           // Fire row change callback for UI (pattern editor, transport store)
           if (this.onRowChange) {
             this.onRowChange(row, patternNum, order);
@@ -1374,6 +1378,7 @@ export class TrackerReplayer {
 
           // Subscribe to position updates from libopenmpt (~344 times/sec at 44.1kHz)
           // Throttle to only fire onRowChange when the row actually changes.
+          // Also queue display states so smooth scrolling can interpolate between rows.
           let lastRow = -1;
           let lastOrder = -1;
           mptEngine.onPosition = (order, pattern, row) => {
@@ -1384,6 +1389,8 @@ export class TrackerReplayer {
             this.songPos = order;
             this.pattPos = row;
             const patternNum = this.song.songPositions[order] ?? pattern;
+            // Queue display state with current audio time for smooth scrolling interpolation
+            this.queueDisplayState(Tone.now(), row, patternNum, order, 0);
             if (this.onRowChange) {
               this.onRowChange(row, patternNum, order);
             }

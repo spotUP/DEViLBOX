@@ -64,7 +64,10 @@ let sharedRefCount = 0;
 
 function acquireAnalysers(): { waveform: AnalyserNode; fft: AnalyserNode } {
   if (sharedRefCount === 0 || !sharedWaveformAnalyser || !sharedFFTAnalyser) {
-    const ctx = Tone.getContext().rawContext as AudioContext;
+    const toneCtx = Tone.getContext();
+    const ctx = ((toneCtx as unknown as { rawContext?: AudioContext }).rawContext
+      ?? (toneCtx as unknown as { _context?: AudioContext })._context
+      ?? (toneCtx as unknown as AudioContext)) as AudioContext;
 
     // Tone.Destination wraps a GainNode → AudioContext.destination.
     // All audio (tracker masterChannel, DJ limiter, synths) connects to this GainNode.
@@ -265,5 +268,17 @@ export class AudioDataBus {
   /** Get the last computed frame without recalculating. */
   getFrame(): VJAudioFrame {
     return this.frame;
+  }
+
+  // ─── Global shared instance for MCP / non-VJ consumers ─────────────────────
+  private static _shared: AudioDataBus | null = null;
+
+  /** Get or create a shared global AudioDataBus instance. */
+  static getShared(): AudioDataBus {
+    if (!AudioDataBus._shared) {
+      AudioDataBus._shared = new AudioDataBus();
+      AudioDataBus._shared.enable();
+    }
+    return AudioDataBus._shared;
   }
 }

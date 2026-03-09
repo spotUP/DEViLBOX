@@ -26,7 +26,7 @@ function getFurnaceDispatchEngine(): any {
  * Get the active WASM engine instance that supports setChannelGain, if any.
  * Returns null if no gain-capable WASM engine is currently active.
  */
-function getActiveGainEngine(): { setChannelGain(ch: number, gain: number): void } | null {
+export function getActiveGainEngine(): { setChannelGain(ch: number, gain: number): void } | null {
   const fmt = useFormatStore.getState();
   try {
     if (fmt.editorMode === 'hively') {

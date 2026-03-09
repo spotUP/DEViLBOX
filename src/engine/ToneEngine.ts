@@ -1927,7 +1927,7 @@ export class ToneEngine {
 
         // If still no instrument created, create empty sampler (will be silent)
         if (!instrument) {
-          console.warn(`[ToneEngine] Sampler ${instrumentId} has no valid sample source`);
+          console.debug(`[ToneEngine] Sampler ${instrumentId} has no valid sample source`);
           instrument = new Tone.Sampler({
             volume: config.volume || -12,
           });

@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-03-08T18:52:32.322Z
+ * Generated: 2026-03-09T16:54:18.648Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,10 +19,10 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.2586';
-export const BUILD_NUMBER = '2586';
-export const BUILD_HASH = '9c9a90e13';
-export const BUILD_DATE = '2026-03-08';
+export const BUILD_VERSION = '1.0.2593';
+export const BUILD_NUMBER = '2593';
+export const BUILD_HASH = 'f2aa3dee6';
+export const BUILD_DATE = '2026-03-09';
 
 // Full version (patch IS the build number, so no need to append)
 export const FULL_VERSION = BUILD_VERSION;
@@ -30,9 +30,37 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.2586',
+    version: '1.0.2593',
     date: '2026-03-08',
     changes: [
+      {
+        type: 'fix',
+        "description": "Pre-upload all Furnace instruments before sequencer playback"
+      },
+      {
+        type: 'feature',
+        "description": "Add Ben Daglish, SidMon2, Symphonie Pro WASM engines and improvements"
+      },
+      {
+        type: 'fix',
+        "description": "Furnace INS2 instrument upload for all non-FM platforms"
+      },
+      {
+        type: 'fix',
+        "description": "Furnace C64 SID crash — HEAPU8 undefined after WASM memory growth"
+      },
+      {
+        type: 'fix',
+        "description": "Register missing C64SID, KlysSynth, Sc68Synth in SYNTH_INFO"
+      },
+      {
+        type: 'fix',
+        "description": "Cap Symphonie instruments at 128 to prevent duplicate React keys"
+      },
+      {
+        type: 'fix',
+        "description": "Symphonie Pro mix clipping and sample-to-instrument mapping"
+      },
       {
         type: 'fix',
         "description": "Symphonie Pro broken audio — suppress notes and fix instrument types"
@@ -210,30 +238,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'improvement',
         "description": "Chore: update gm-o2-test script"
-      },
-      {
-        type: 'feature',
-        "description": "Add Organya, Sonix, and MusicLine editor modes to TrackerView"
-      },
-      {
-        type: 'feature',
-        "description": "Add pxtone WASM engine source (Pixel music format)"
-      },
-      {
-        type: 'fix',
-        "description": "Update gearmulator CMake and TrackerView routing"
-      },
-      {
-        type: 'feature',
-        "description": "Add eupmini WASM build config and compiled output"
-      },
-      {
-        type: 'fix',
-        "description": "Update useUIStore for split view mode"
-      },
-      {
-        type: 'feature',
-        "description": "Add eupmini WASM engine (FM Towns EUP music format)"
       }
     ]
   }

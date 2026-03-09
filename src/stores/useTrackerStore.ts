@@ -23,6 +23,58 @@ import { useCursorStore } from './useCursorStore';
 import { useEditorStore } from './useEditorStore';
 import { useFormatStore } from './useFormatStore';
 
+// ── WASM mute forwarding ─────────────────────────────────────────────────────
+// Forward mute/solo states to WASM engines.
+// ToneEngine path only handles DOM synths — WASM engines need direct mute/gain.
+let _furnaceDispatchEngine: { getInstance(): { mute(ch: number, m: boolean): void } } | null = null;
+
+// Lazy import of getActiveGainEngine from useMixerStore (avoid circular at module level)
+let _getActiveGainEngine: (() => { setChannelGain(ch: number, gain: number): void } | null) | null = null;
+function getGainEngine(): { setChannelGain(ch: number, gain: number): void } | null {
+  if (!_getActiveGainEngine) {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const mod = require('./useMixerStore');
+    _getActiveGainEngine = mod.getActiveGainEngine;
+  }
+  return _getActiveGainEngine!();
+}
+
+function forwardWasmMuteStates(channels: { muted: boolean; solo: boolean }[]): void {
+  const editorMode = useFormatStore.getState().editorMode;
+  const anySolo = channels.some(ch => ch.solo);
+
+  // Furnace uses binary mute API
+  if (editorMode === 'furnace') {
+    try {
+      if (!_furnaceDispatchEngine) {
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        _furnaceDispatchEngine = require('../engine/furnace-dispatch/FurnaceDispatchEngine').FurnaceDispatchEngine;
+      }
+      const engine = _furnaceDispatchEngine!.getInstance();
+      channels.forEach((ch, i) => {
+        const effectiveMute = anySolo ? !ch.solo : ch.muted;
+        engine.mute(i, effectiveMute);
+      });
+    } catch {
+      // Engine not ready
+    }
+    return;
+  }
+
+  // Other WASM engines use gain API (0 = muted, 1 = unmuted)
+  try {
+    const gainEngine = getGainEngine();
+    if (gainEngine) {
+      channels.forEach((ch, i) => {
+        const effectiveMute = anySolo ? !ch.solo : ch.muted;
+        gainEngine.setChannelGain(i, effectiveMute ? 0 : 1);
+      });
+    }
+  } catch {
+    // Engine not ready
+  }
+}
+
 // ── Debounced WASM engine re-export on cell edit ────────────────────────────
 // For non-UADE WASM engines (MusicLine, PumaTracker), edits require
 // re-exporting the TrackerSong to native format and reloading the engine.
@@ -1041,6 +1093,8 @@ export const useTrackerStore = create<TrackerStore>()(
       if (pattern) {
         const engine = getToneEngine();
         engine.updateMuteStates(pattern.channels.map(ch => ({ muted: ch.muted, solo: ch.solo })));
+        // Forward to Furnace WASM dispatch if in Furnace mode
+        forwardWasmMuteStates(pattern.channels);
       }
       // Add status message
       if (typeof window !== 'undefined') {
@@ -1074,6 +1128,8 @@ export const useTrackerStore = create<TrackerStore>()(
       if (pattern) {
         const engine = getToneEngine();
         engine.updateMuteStates(pattern.channels.map(ch => ({ muted: ch.muted, solo: ch.solo })));
+        // Forward to Furnace WASM dispatch if in Furnace mode
+        forwardWasmMuteStates(pattern.channels);
       }
       // Add status message
       if (typeof window !== 'undefined') {

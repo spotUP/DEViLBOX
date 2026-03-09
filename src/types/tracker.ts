@@ -495,7 +495,7 @@ export const NOTE_OFF: TrackerCell = {
 };
 
 // ── Editor Mode ─────────────────────────────────
-export type EditorMode = 'classic' | 'furnace' | 'hively' | 'musicline' | 'goattracker' | 'klystrack' | 'jamcracker';
+export type EditorMode = 'classic' | 'furnace' | 'hively' | 'musicline' | 'goattracker' | 'klystrack' | 'jamcracker' | 'sc68';
 
 // ── Furnace Native Data ─────────────────────────
 export interface FurnaceNativeData {
@@ -519,6 +519,7 @@ export interface FurnaceSubsong {
   hz: number;
   virtualTempoN: number;
   virtualTempoD: number;
+  speedPattern?: number[];           // Groove-style speed pattern (1-16 entries)
 }
 
 export interface FurnaceChannelData {

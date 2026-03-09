@@ -433,6 +433,12 @@ export async function startNativeEngines(
   let suppressNotes = false;
   let c64SidEngine: C64SIDEngine | null = null;
 
+  // Clean up any leftover silence detectors from a previous session
+  for (const [, detector] of activeSilenceDetectors) {
+    detector.dispose();
+  }
+  activeSilenceDetectors.clear();
+
   // --- Singleton WASM engines (registry-driven) ---
   for (const desc of WASM_ENGINES) {
     if (!shouldActivate(desc, song)) continue;

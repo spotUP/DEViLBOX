@@ -197,6 +197,9 @@ export const useFormatStore = create<FormatStore>()(
         } else if (song.goatTrackerData || song.c64SidFileData) {
           state.editorMode = 'goattracker';
           clearNative(state);
+        } else if (song.sc68FileData) {
+          state.editorMode = 'sc68';
+          clearNative(state);
         } else {
           state.editorMode = 'classic';
           clearNative(state);

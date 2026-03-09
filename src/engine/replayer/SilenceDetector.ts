@@ -100,5 +100,7 @@ export class SilenceDetector {
 
   dispose(): void {
     this.stop();
+    this.onSilence = null;  // Prevent pending setTimeout callbacks from firing
+    this.gainNode = null;
   }
 }
