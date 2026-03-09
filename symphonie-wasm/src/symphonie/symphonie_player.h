@@ -177,7 +177,7 @@ typedef struct {
     int16_t  status;           /* 0=pending, 1=in use */
     int16_t  volume;           /* channel volume (8.8 fixed: 0-25600) */
     int8_t   endReached;       /* TRUE when sample ends */
-    int8_t   declick;          /* -1 = do declick crossfade */
+    int8_t   declick;          /* >0 = remaining crossfade steps */
     int8_t   fadeout;          /* -1 = do fadeout */
     int16_t  lastSample;       /* last rendered sample value */
 
@@ -239,6 +239,12 @@ typedef struct {
 
     /* Last note data (for FX_ADD_HALFTONE) */
     uint32_t lastNote;         /* packed NOTE data */
+
+    /* Per-tick computed values (set by process_voice_tick, used by render inner loop) */
+    int16_t  tickVolume;       /* volume after vibrato/emphasis (8.8 fixed) */
+    int32_t  tickFreq;         /* frequency after pitch effects (16.16 fixed) */
+    int16_t  tickVolFactor;    /* pre-computed vol * 256 / 100 for inner loop */
+    int16_t  declickCount;     /* countdown for declick crossfade */
 } SymVoice;
 
 /* DSP ring buffer */
@@ -299,6 +305,7 @@ typedef struct {
     int16_t  balance;          /* 0-100, 50 = center */
 
     /* Mixing */
+    int      interpMode;       /* 0=none (original), 1=linear, 2=cubic */
     float    outputRate;       /* output sample rate (e.g. 44100) */
     float    tickRate;         /* ticks per second */
     float    samplesPerTick;   /* output samples per tick */

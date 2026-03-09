@@ -23,6 +23,8 @@ if(EMSCRIPTEN)
         "_player_is_finished" "_player_get_subsong_count" "_player_set_subsong"
         "_player_get_title" "_player_detect_duration"
         "_player_get_channel_levels" "_player_set_channel_gain"
+        "_player_get_num_patterns" "_player_get_cell" "_player_set_cell"
+        "_player_note_on" "_player_note_off"
     )
     string(JOIN "," EXPORT_STR ${EXPORTED_FUNCTIONS})
     target_link_options(${OUTPUT_NAME} PRIVATE

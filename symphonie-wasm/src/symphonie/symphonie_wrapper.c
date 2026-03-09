@@ -57,6 +57,12 @@ void player_set_master_volume(int vol) {
     s_song.masterVolume = vol;
 }
 
+EMSCRIPTEN_KEEPALIVE
+void player_set_interp_mode(int mode) {
+    /* 0=none (original), 1=linear, 2=cubic */
+    s_song.interpMode = (mode < 0) ? 0 : (mode > 2) ? 2 : mode;
+}
+
 /* ---- Instrument setup ---- */
 
 EMSCRIPTEN_KEEPALIVE

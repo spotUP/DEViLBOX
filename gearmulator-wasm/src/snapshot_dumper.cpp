@@ -29,6 +29,7 @@
 #include "mqLib/mqtypes.h"
 #include "mqLib/rom.h"
 #include "mqLib/buttons.h"
+#include "mqLib/mqstate.h"
 
 // XT
 #include "xtLib/xt.h"
@@ -43,6 +44,9 @@
 #include "dsp56kEmu/dsp.h"
 #include "dsp56kEmu/memory.h"
 #include "dsp56kEmu/peripherals.h"
+
+#include "mc68k/peripheralBase.h"
+#include "mc68k/hdi08.h"
 
 #include "baseLib/filesystem.h"
 #include "dsp56kBase/logging.h"
@@ -598,6 +602,394 @@ static int testMicroQSnapshotBoot(const std::vector<uint8_t>& romData)
     return peak > 0.001f ? 0 : 1;
 }
 
+// ─── Helper: write byte array to C header ────────────────────────────────────
+
+static void writeByteArray(std::ofstream& out, const std::string& name,
+                           const uint8_t* data, size_t size)
+{
+    out << "static const uint8_t " << name << "[] = {\n    ";
+    for (size_t i = 0; i < size; ++i)
+    {
+        out << "0x" << std::hex << std::uppercase
+            << std::setw(2) << std::setfill('0')
+            << static_cast<unsigned>(data[i]);
+        if (i + 1 < size) out << ", ";
+        if ((i + 1) % 16 == 0 && i + 1 < size) out << "\n    ";
+    }
+    out << std::dec << "\n};\n";
+    out << "static const uint32_t " << name << "_size = " << size << ";\n\n";
+}
+
+// ─── microQ Full System Snapshot ─────────────────────────────────────────────
+// Mode 32: Full boot → verify audio → dump DSP + MC68K state
+
+static int dumpMicroQFullSnapshot(const std::vector<uint8_t>& romData, const std::string& outputPath)
+{
+    std::cerr << "=== FULL SYSTEM SNAPSHOT — microQ ===\n";
+    std::cerr << "Booting normally (this takes ~30 min with JIT for microQ)...\n";
+    auto t0 = std::chrono::steady_clock::now();
+
+    mqLib::MicroQ mq(mqLib::BootMode::Default, romData, "rom.bin");
+
+    mq.setButton(mqLib::Buttons::ButtonType::Play, true);
+    uint64_t bootLoops = 0;
+    while (!mq.isBootCompleted())
+    {
+        mq.process(64);
+        ++bootLoops;
+        if (bootLoops % 10000 == 0)
+        {
+            auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(
+                std::chrono::steady_clock::now() - t0).count();
+            std::cerr << "  Boot progress: " << elapsed << "s\n";
+            if (elapsed > 3600)
+            {
+                std::cerr << "ERROR: Boot timeout (60 min)\n";
+                return 1;
+            }
+        }
+    }
+    mq.setButton(mqLib::Buttons::ButtonType::Play, false);
+
+    auto t1 = std::chrono::steady_clock::now();
+    auto bootMs = std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count();
+    std::cerr << "Boot completed in " << bootMs << "ms\n";
+
+    // Dump DMA register state after boot
+    {
+        auto& dma = mq.getHardware()->getDSP(0).getPeriph().getDMA();
+        auto& hdi = mq.getHardware()->getDSP(0).getPeriph().getHDI08();
+        auto& esai = mq.getHardware()->getDSP(0).getPeriph().getEsai();
+        std::cerr << "=== Post-boot peripheral state ===\n";
+        std::cerr << "  HDI08 HCR=0x" << std::hex << hdi.readControlRegister()
+                  << " HPCR=0x" << hdi.readPortControlRegister() << std::dec << "\n";
+        std::cerr << "  ESAI TCR=0x" << std::hex << esai.readTransmitControlRegister()
+                  << " TCCR=0x" << esai.readTransmitClockControlRegister() << std::dec << "\n";
+        for (int ch = 0; ch < 6; ++ch)
+        {
+            auto dcr = dma.getDCR(ch);
+            if (dcr == 0) continue;  // skip unconfigured channels
+            fprintf(stderr, "  DMA CH%d: DCR=0x%06X DSR=0x%06X DDR=0x%06X DCO=0x%06X\n",
+                ch, dcr, dma.getDSR(ch), dma.getDDR(ch), dma.getDCO(ch));
+        }
+        std::cerr << "=================================\n";
+    }
+
+    // Initialize state (like device.cpp does) — loads preset/instrument selection
+    std::cerr << "Initializing synth state (createInitState)...\n";
+    mqLib::State state(mq);
+    state.createInitState();
+
+    auto* hwInit = mq.getHardware();
+    hwInit->resetMidiCounter();
+    std::cerr << "State initialized.\n";
+
+    // Stabilize: process several seconds of audio
+    std::cerr << "Stabilizing (5 seconds)...\n";
+    auto* hwDbg = mq.getHardware();
+    auto& esaiDbg = hwDbg->getDSP(0).getPeriph().getEsai();
+    std::cerr << "  ESAI output queue before stabilize: " << esaiDbg.getAudioOutputs().size() << "\n";
+    for (int sec = 0; sec < 5; ++sec)
+    {
+        for (int i = 0; i < 345; ++i)
+            mq.process(128);
+        std::cerr << "  After sec " << sec << ": esaiOutputQ=" << esaiDbg.getAudioOutputs().size() << "\n";
+    }
+
+    // Check raw ESAI frame index
+    std::cerr << "ESAI frame index after stabilize: " << hwDbg->getEsaiFrameIndex() << "\n";
+
+    // Diagnostic: check raw ESAI output queue data for non-zero values
+    {
+        auto& esaiQ = esaiDbg.getAudioOutputs();
+        std::cerr << "  ESAI output queue size: " << esaiQ.size() << "\n";
+        if (!esaiQ.empty())
+        {
+            // Peek at the front frame — it's a Slot (std::array<TWord, channelCount>)
+            const auto& front = esaiQ.front();
+            std::cerr << "  ESAI front frame:";
+            // Access raw data through pointer to avoid type issues
+            const auto* rawPtr = reinterpret_cast<const uint32_t*>(&front);
+            for (size_t i = 0; i < 6; ++i)
+                fprintf(stderr, " 0x%06X", rawPtr[i]);
+            std::cerr << "\n";
+        }
+    }
+
+    // Diagnostic: check m_audioOutputs raw values after one process call
+    {
+        auto& outs = mq.getAudioOutputs();
+        std::cerr << "  audioOutputs channel count: " << outs.size() << "\n";
+        mq.process(128);
+        std::cerr << "  After process(128), audioOutputs[0].size()=" << outs[0].size() << "\n";
+        uint32_t nz = 0;
+        for (size_t ch = 0; ch < outs.size(); ++ch)
+            for (size_t s = 0; s < outs[ch].size() && s < 128; ++s)
+                if (outs[ch][s] != 0) ++nz;
+        std::cerr << "  Raw non-zero DSP words in audioOutputs: " << nz << "\n";
+        if (nz > 0)
+        {
+            // Print first non-zero value
+            for (size_t ch = 0; ch < outs.size(); ++ch)
+                for (size_t s = 0; s < outs[ch].size() && s < 128; ++s)
+                    if (outs[ch][s] != 0)
+                    {
+                        std::cerr << "    First non-zero: ch=" << ch << " s=" << s << " val=0x" << std::hex << outs[ch][s] << std::dec
+                                  << " float=" << dsp56k::dsp2sample<float>(outs[ch][s]) << "\n";
+                        goto done_nz;
+                    }
+            done_nz:;
+        }
+    }
+
+    // Approach 1: Try demo mode playback (proven to work in mqPerformanceTest)
+    std::cerr << "Trying demo mode playback (Multimode+Peek buttons)...\n";
+    mq.setButton(mqLib::Buttons::ButtonType::Multimode, true);
+    for (int i = 0; i < 500; ++i) mq.process(64);
+    mq.setButton(mqLib::Buttons::ButtonType::Peek, true);
+    for (int i = 0; i < 500; ++i) mq.process(64);
+    mq.setButton(mqLib::Buttons::ButtonType::Peek, false);
+    mq.setButton(mqLib::Buttons::ButtonType::Multimode, false);
+    for (int i = 0; i < 500; ++i) mq.process(64);
+    mq.setButton(mqLib::Buttons::ButtonType::Play, true);
+    for (int i = 0; i < 500; ++i) mq.process(64);
+
+    // Check audio from demo mode
+    {
+        auto& outs = mq.getAudioOutputs();
+        float demoPeak = 0;
+        uint32_t demoNz = 0;
+        for (int sec = 0; sec < 5; ++sec)
+        {
+            for (int i = 0; i < 345; ++i)
+            {
+                mq.process(128);
+                for (size_t ch = 0; ch < outs.size(); ++ch)
+                    for (int s = 0; s < 128; ++s)
+                    {
+                        if (outs[ch][s] != 0) ++demoNz;
+                        float v = std::abs(dsp56k::dsp2sample<float>(outs[ch][s]));
+                        if (v > demoPeak) demoPeak = v;
+                    }
+            }
+            std::cerr << "  Demo sec " << sec << ": peak=" << demoPeak << " nonZeroDSPWords=" << demoNz << "\n";
+        }
+        mq.setButton(mqLib::Buttons::ButtonType::Play, false);
+
+        if (demoPeak >= 0.001f)
+        {
+            std::cerr << "Demo mode audio verified: peak=" << demoPeak << "\n";
+            // Process a bit more to let it settle
+            for (int i = 0; i < 345; ++i) mq.process(128);
+            goto audio_ok;
+        }
+        std::cerr << "Demo mode also silent.\n";
+    }
+
+    // Approach 2: Try MIDI note-on on all 16 channels
+    std::cerr << "Trying MIDI note-on on all 16 channels...\n";
+    for (int ch = 0; ch < 16; ++ch)
+    {
+        synthLib::SMidiEvent noteOn;
+        noteOn.a = static_cast<uint8_t>(0x90 | ch);
+        noteOn.b = 60;
+        noteOn.c = 127;
+        mq.sendMidiEvent(noteOn);
+    }
+
+    {
+        auto& outs = mq.getAudioOutputs();
+        float peak = 0;
+        uint32_t nonZeroSamples = 0;
+        for (int sec = 0; sec < 3; ++sec)
+        {
+            for (int i = 0; i < 345; ++i)
+            {
+                mq.process(128);
+                for (size_t ch = 0; ch < outs.size(); ++ch)
+                    for (int s = 0; s < 128; ++s)
+                    {
+                        if (outs[ch][s] != 0) ++nonZeroSamples;
+                        float v = std::abs(dsp56k::dsp2sample<float>(outs[ch][s]));
+                        if (v > peak) peak = v;
+                    }
+            }
+            std::cerr << "  MIDI all-ch sec " << sec << ": peak=" << peak << " nonZeroDSPWords=" << nonZeroSamples << "\n";
+        }
+
+        // Stop all notes
+        for (int ch = 0; ch < 16; ++ch)
+        {
+            synthLib::SMidiEvent noteOff;
+            noteOff.a = static_cast<uint8_t>(0x80 | ch);
+            noteOff.b = 60;
+            noteOff.c = 0;
+            mq.sendMidiEvent(noteOff);
+        }
+        for (int i = 0; i < 345; ++i) mq.process(128);
+
+        if (peak >= 0.001f)
+        {
+            std::cerr << "MIDI audio verified: peak=" << peak << "\n";
+            goto audio_ok;
+        }
+    }
+
+    std::cerr << "ERROR: No audio output from any method. Cannot create snapshot.\n";
+    return 1;
+
+audio_ok:
+
+    // Now pause everything and take the snapshot
+    auto* hw = mq.getHardware();
+    if (!hw)
+    {
+        std::cerr << "Failed to get hardware\n";
+        return 1;
+    }
+
+    auto& mqDsp = hw->getDSP(0);
+    auto& dsp = mqDsp.dsp();
+    auto& uc = hw->getUC();
+
+    // Open output file
+    std::ofstream out(outputPath);
+    if (!out.is_open())
+    {
+        std::cerr << "Failed to open output: " << outputPath << "\n";
+        return 1;
+    }
+
+    out << "// Auto-generated microQ FULL SYSTEM snapshot — do not edit\n";
+    out << "// Boot time: " << bootMs << "ms\n";
+    out << "// ROM size: " << romData.size() << " bytes\n";
+    out << "// Audio: verified\n";
+    out << "#pragma once\n";
+    out << "#include <cstdint>\n\n";
+    out << "#define MQ_FULL_SNAPSHOT 1\n\n";
+    out << "struct SnapshotMemBlock { uint32_t startAddr; uint32_t count; const uint32_t* data; };\n\n";
+
+    // ─── DSP State ───────────────────────────────────────────────────────
+    std::cerr << "Dumping DSP state...\n";
+    constexpr uint32_t pSize = mqLib::MqDsp::g_pMemSize;    // 0x2000
+    constexpr uint32_t xyScanSize = 0x100000;
+
+    dumpDSP(out, "mq_", dsp, pSize, xyScanSize);
+
+    // DSP peripheral state (ESAI, HDI08, DMA)
+    auto& periph = mqDsp.getPeriph();
+    auto& esai = periph.getEsai();
+    auto& hdi = periph.getHDI08();
+    auto& dma = periph.getDMA();
+
+    out << "// DSP ESAI register values\n";
+    out << "static const uint32_t mq_esai_tccr = 0x" << std::hex << esai.readTransmitClockControlRegister() << ";\n";
+    out << "static const uint32_t mq_esai_rccr = 0x" << esai.readReceiveClockControlRegister() << ";\n";
+    out << "static const uint32_t mq_esai_tcr  = 0x" << esai.readTransmitControlRegister() << ";\n";
+    out << "static const uint32_t mq_esai_rcr  = 0x" << esai.readReceiveControlRegister() << ";\n";
+    out << "static const uint32_t mq_esai_tsma = 0x" << esai.readTSMA() << ";\n";
+    out << "static const uint32_t mq_esai_tsmb = 0x" << esai.readTSMB() << ";\n";
+    out << std::dec << "\n";
+
+    out << "// DSP HDI08 register values\n";
+    out << "static const uint32_t mq_hdi08_hcr  = 0x" << std::hex << hdi.readControlRegister() << ";\n";
+    out << "static const uint32_t mq_hdi08_hpcr = 0x" << hdi.readPortControlRegister() << ";\n";
+    out << std::dec << "\n";
+
+    out << "// DSP DMA register values\n";
+    for (int ch = 0; ch < 6; ++ch)
+    {
+        auto dcr = dma.getDCR(ch);
+        auto dco = dma.getDCO(ch);
+        auto ddr = dma.getDDR(ch);
+        auto dsr = dma.getDSR(ch);
+        out << "static const uint32_t mq_dma_ch" << ch << "_dcr = 0x" << std::hex << dcr << ";\n";
+        out << "static const uint32_t mq_dma_ch" << ch << "_dco = 0x" << std::hex << dco << ";\n";
+        out << "static const uint32_t mq_dma_ch" << ch << "_ddr = 0x" << std::hex << ddr << ";\n";
+        out << "static const uint32_t mq_dma_ch" << ch << "_dsr = 0x" << std::hex << dsr << ";\n";
+    }
+    out << std::dec << "\n";
+
+    // ─── MC68K State ─────────────────────────────────────────────────────
+    std::cerr << "Dumping MC68K state...\n";
+
+    // CPU state (600 bytes — Musashi core state including all registers)
+    writeByteArray(out, "mq_cpu_state", uc.getCpuStateBuf(), mc68k::Mc68k::CpuStateSize);
+
+    // CPU cycle counter
+    out << "static const uint64_t mq_cpu_cycles = " << uc.getCycles() << "ULL;\n\n";
+
+    // RAM (256KB)
+    std::cerr << "  RAM: " << uc.getMemory().size() << " bytes\n";
+    writeByteArray(out, "mq_ram", uc.getMemory().data(), uc.getMemory().size());
+
+    // ROM runtime data (flash state — may differ from original ROM)
+    std::cerr << "  ROM runtime: " << uc.getRomRuntimeData().size() << " bytes\n";
+    // Check if it differs from original ROM
+    bool romDiffers = (uc.getRomRuntimeData().size() != romData.size()) ||
+        std::memcmp(uc.getRomRuntimeData().data(), romData.data(),
+                    std::min(uc.getRomRuntimeData().size(), romData.size())) != 0;
+    out << "static const bool mq_rom_modified = " << (romDiffers ? "true" : "false") << ";\n";
+    if (romDiffers)
+    {
+        std::cerr << "  ROM was modified during boot (flash writes)\n";
+        writeByteArray(out, "mq_rom_runtime", uc.getRomRuntimeData().data(), uc.getRomRuntimeData().size());
+    }
+    else
+    {
+        std::cerr << "  ROM unchanged — will use original ROM on restore\n";
+        out << "static const uint8_t* mq_rom_runtime = nullptr;\n";
+        out << "static const uint32_t mq_rom_runtime_size = 0;\n\n";
+    }
+
+    // MC68K peripheral register buffers
+    std::cerr << "  Peripheral registers...\n";
+    auto& gpt = uc.getGPT();
+    auto& sim = uc.getSim();
+    auto& qsm = uc.getQSM();
+
+    writeByteArray(out, "mq_gpt_regs", gpt.getBufferData(), gpt.getBufferSize());
+    writeByteArray(out, "mq_sim_regs", sim.getBufferData(), sim.getBufferSize());
+    writeByteArray(out, "mq_qsm_regs", qsm.getBufferData(), qsm.getBufferSize());
+
+    // Port state
+    out << "// MC68K Port state\n";
+    out << "static const uint8_t mq_port_e_dir = 0x" << std::hex
+        << static_cast<unsigned>(uc.getPortE().getDirection()) << ";\n";
+    out << "static const uint8_t mq_port_f_dir = 0x"
+        << static_cast<unsigned>(uc.getPortF().getDirection()) << ";\n";
+    out << "static const uint8_t mq_port_gp_dir = 0x"
+        << static_cast<unsigned>(uc.getPortGP().getDirection()) << ";\n";
+    out << "static const uint8_t mq_port_qs_dir = 0x"
+        << static_cast<unsigned>(uc.getPortQS().getDirection()) << ";\n";
+    out << std::dec << "\n";
+
+    // HDI08 (MC68K side) register state
+    auto& hdi08a = uc.getHdi08A().getHdi08();
+    writeByteArray(out, "mq_uc_hdi08a_regs", hdi08a.getBufferData(), hdi08a.getBufferSize());
+
+    // Boot flags
+    out << "// Boot state flags\n";
+    out << "static const bool mq_boot_completed = " << (hw->isBootCompleted() ? "true" : "false") << ";\n";
+    out << "static const uint32_t mq_esai_frame_index = " << hw->getEsaiFrameIndex() << ";\n";
+    out << "static const bool mq_dsp_reset_request = " << (uc.getDspResetRequest() ? "true" : "false") << ";\n";
+    out << "static const bool mq_dsp_reset_completed = " << (uc.getDspResetCompleted() ? "true" : "false") << ";\n\n";
+
+    out.close();
+
+    // Report
+    std::ifstream check(outputPath, std::ios::ate);
+    auto fileSize = check.tellg();
+    std::cerr << "\nFull system snapshot written to: " << outputPath << "\n";
+    std::cerr << "Output file size: " << (fileSize / 1024) << " KB\n";
+
+    auto t2 = std::chrono::steady_clock::now();
+    auto totalMs = std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t0).count();
+    std::cerr << "Total time: " << totalMs << "ms\n";
+
+    return 0;
+}
+
 // ─── main ───────────────────────────────────────────────────────────────────
 
 int main(int argc, char** argv)
@@ -627,7 +1019,7 @@ int main(int argc, char** argv)
     std::cerr << "ROM loaded: " << romData.size() << " bytes\n";
 
     // Preprocess
-    if (synthType == 2 || synthType == 3 || synthType == 12 || synthType == 22)
+    if (synthType == 2 || synthType == 3 || synthType == 12 || synthType == 22 || synthType == 32)
         preprocessMicroQRom(romData);
     else if (synthType == 4)
         preprocessNordRom(romData);
@@ -639,6 +1031,7 @@ int main(int argc, char** argv)
     case 4: return dumpNord(romData, outputPath);
     case 12: return sniffMicroQMidi(romData); // 12 = sniff mode for microQ
     case 22: return testMicroQSnapshotBoot(romData); // 22 = test snapshot boot
+    case 32: return dumpMicroQFullSnapshot(romData, outputPath); // 32 = full system snapshot
     default:
         std::cerr << "Unsupported synth type: " << synthType << "\n";
         return 1;

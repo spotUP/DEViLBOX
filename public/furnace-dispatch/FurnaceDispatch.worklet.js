@@ -12,6 +12,39 @@
  * The WASM module JS is passed as a string and executed via Function constructor.
  */
 
+// Per-platform getPostAmp() — matches upstream Furnace exactly.
+// Default is 1.0. Keys are DivSystem enum values (matching FurnaceDispatchWrapper.cpp).
+const POST_AMP = {
+  4: 1.5,   // SMS
+  5: 1.5,   // SMS_OPLL
+  83: 1.5,  // T6W28
+  29: 1.5,  // OPLL
+  48: 1.5,  // VRC7
+  59: 1.5,  // OPLL_DRUMS
+  8: 2.0,   // NES
+  106: 2.0, // 5E01
+  2: 2.0,   // GENESIS
+  3: 2.0,   // GENESIS_EXT
+  20: 2.0,  // YM2612
+  52: 2.0,  // YM2612_EXT
+  80: 2.0,  // YM2612_DUALPCM
+  81: 2.0,  // YM2612_DUALPCM_EXT
+  89: 2.0,  // YM2612_CSM
+  42: 2.0,  // POKEY
+  30: 2.0,  // FDS
+  11: 3.0,  // C64_6581 (reSIDfp)
+  12: 3.0,  // C64_8580 (reSIDfp)
+  98: 3.0,  // C140
+  99: 3.0,  // C219
+  74: 3.0,  // MSM6295
+  65: 4.0,  // X1_010
+  76: 4.0,  // YMZ280B
+  62: 4.0,  // VERA
+  47: 6.0,  // VBOY
+  31: 64.0, // MMC5
+  21: 0.5,  // TIA
+};
+
 class FurnaceDispatchProcessor extends AudioWorkletProcessor {
   constructor() {
     super();
@@ -251,17 +284,25 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
         break;
       }
 
-      // Compatibility flags
+      // Compatibility flags — send to ALL chips when no platformType specified
       case 'setCompatFlags': {
-        const chip = this.getChip(data.platformType);
-        if (chip && this.wasm && data.flags) {
+        if (this.wasm && data.flags) {
           const heapBuffer = this.getHeapBuffer();
           if (heapBuffer) {
             const flags = data.flags instanceof Uint8Array ? data.flags : new Uint8Array(data.flags);
             const dataPtr = this.module._malloc(flags.length);
             const heap = new Uint8Array(heapBuffer, dataPtr, flags.length);
             heap.set(flags);
-            this.wasm.setCompatFlags(chip.handle, dataPtr, flags.length);
+            if (data.platformType !== undefined) {
+              // Send to specific chip
+              const chip = this.getChip(data.platformType);
+              if (chip) this.wasm.setCompatFlags(chip.handle, dataPtr, flags.length);
+            } else {
+              // Send to ALL chips
+              for (const chip of this.chips.values()) {
+                this.wasm.setCompatFlags(chip.handle, dataPtr, flags.length);
+              }
+            }
             this.module._free(dataPtr);
           }
         }
@@ -334,6 +375,10 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
         const chip = this.getChip(data.platformType);
         if (chip && this.wasm) {
           this.wasm.mute(chip.handle, data.chan, data.mute ? 1 : 0);
+          // Also mute in sequencer to block NOTE_ON retriggering
+          if (this.wasm.seqSetMute) {
+            this.wasm.seqSetMute(data.chan, data.mute ? 1 : 0);
+          }
         }
         break;
       }
@@ -905,15 +950,16 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
       outputL.fill(0);
       outputR.fill(0);
 
-      // Render each chip and mix into output
-      // (Furnace pattern: each disCont[] renders to its own buffer, then mixed)
+      // Render each chip and mix into output with postAmp scaling
+      // (Furnace pattern: each disCont[] renders to its own buffer, scaled by getPostAmp(), then mixed)
       for (const chip of this.chips.values()) {
         this.wasm.render(chip.handle, this.outputPtrL, this.outputPtrR, numSamples);
 
+        const amp = POST_AMP[chip.platformType] || 1.0;
         // Mix this chip's output into the main output
         for (let i = 0; i < numSamples; i++) {
-          outputL[i] += this.outputBufferL[i];
-          outputR[i] += this.outputBufferR[i];
+          outputL[i] += this.outputBufferL[i] * amp;
+          outputR[i] += this.outputBufferR[i] * amp;
         }
       }
 

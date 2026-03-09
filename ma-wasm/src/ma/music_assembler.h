@@ -25,6 +25,17 @@ bool ma_has_ended(const MaModule* module);
 
 void ma_set_channel_mask(MaModule* module, uint32_t mask);
 
+/* Track data access for pattern editing */
+size_t ma_track_count(const MaModule* module);
+const uint8_t* ma_track_data(const MaModule* module, size_t trackIdx, size_t* out_length);
+void ma_track_replace_data(MaModule* module, size_t trackIdx, uint8_t* newdata, size_t newlen);
+
+/* Instrument preview */
+void ma_note_on(MaModule* module, int instrument, int note, int velocity);
+void ma_note_off(MaModule* module);
+size_t ma_render_preview(MaModule* module, float* interleaved_stereo, size_t frames);
+int ma_instrument_count(const MaModule* module);
+
 #ifdef __cplusplus
 }
 #endif

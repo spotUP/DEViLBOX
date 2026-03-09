@@ -2744,6 +2744,15 @@ extern "C" {
 EMSCRIPTEN_KEEPALIVE
 void furnace_seq_load_song(int numChannels, int patLen, int ordersLen) {
   initTables();
+
+  // Send NOTE_OFF to all active channels before resetting to prevent stale audio
+  if (g_seq.playing || g_seq.numChannels > 0) {
+    for (int i = 0; i < g_seq.numChannels; i++) {
+      dispatchCmd(DIV_CMD_NOTE_OFF, i);
+    }
+    g_seq.playing = false;
+  }
+
   g_seq.reset();
 
   g_seq.numChannels = CLAMP(numChannels, 0, SEQ_MAX_CHANNELS);

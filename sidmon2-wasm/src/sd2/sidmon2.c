@@ -1643,3 +1643,679 @@ bool sd2_has_ended(const Sd2Module* mod) {
     }
     return mod->ended;
 }
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Track editing API
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// Decoded cell for internal use
+typedef struct DecodedCell {
+    uint8_t note;        // 0 = empty, 1-72 = note
+    uint8_t instrument;  // 0 = none
+    uint8_t effect;      // 0 = none
+    uint8_t param;       // 0 = none
+} DecodedCell;
+
+// Decode an entire track into a fixed-size cell array.
+// Returns the number of rows decoded.
+static int decode_track(const Track* trk, DecodedCell* cells, int max_rows) {
+    if (trk == nullptr || trk->track_data == nullptr || trk->length == 0) {
+        return 0;
+    }
+
+    const uint8_t* data = trk->track_data;
+    const uint32_t len = trk->length;
+    uint32_t pos = 0;
+    int row = 0;
+    int empty_counter = 0;
+
+    while (pos < len && row < max_rows) {
+        if (empty_counter > 0) {
+            // Still counting down empty rows
+            cells[row].note = 0;
+            cells[row].instrument = 0;
+            cells[row].effect = 0;
+            cells[row].param = 0;
+            row++;
+            empty_counter--;
+            continue;
+        }
+
+        int8_t v = (int8_t)data[pos++];
+
+        if (v == 0) {
+            // Effect-only row (no note): next 2 bytes are effect + param
+            cells[row].note = 0;
+            cells[row].instrument = 0;
+            if (pos + 1 < len) {
+                cells[row].effect = data[pos++];
+                cells[row].param = data[pos++];
+            } else {
+                cells[row].effect = 0;
+                cells[row].param = 0;
+            }
+            row++;
+        } else if (v > 0) {
+            if (v >= 0x70) {
+                // Effect byte (>= 112), no note
+                cells[row].note = 0;
+                cells[row].instrument = 0;
+                cells[row].effect = (uint8_t)v;
+                cells[row].param = (pos < len) ? data[pos++] : 0;
+                row++;
+            } else {
+                // Note (1-0x6F)
+                cells[row].note = (uint8_t)v;
+                cells[row].instrument = 0;
+                cells[row].effect = 0;
+                cells[row].param = 0;
+
+                // Matches get_note2() logic exactly:
+                // After note, read next byte as int8_t
+                if (pos < len) {
+                    int8_t next = (int8_t)data[pos++];
+                    if (next >= 0) {
+                        if (next >= 0x70) {
+                            // Effect follows note (no instrument)
+                            cells[row].effect = (uint8_t)next;
+                            cells[row].param = (pos < len) ? data[pos++] : 0;
+                        } else {
+                            // Instrument follows note (0 = instrument 0)
+                            cells[row].instrument = (uint8_t)next;
+
+                            // Check for effect after instrument
+                            if (pos < len) {
+                                int8_t next2 = (int8_t)data[pos++];
+                                if (next2 >= 0) {
+                                    cells[row].effect = (uint8_t)next2;
+                                    cells[row].param = (pos < len) ? data[pos++] : 0;
+                                } else {
+                                    // Negative = empty counter
+                                    empty_counter = (int)(~(int)next2);
+                                }
+                            }
+                        }
+                    } else {
+                        // Negative after note = empty counter
+                        empty_counter = (int)(~(int)next);
+                    }
+                }
+                row++;
+            }
+        } else {
+            // Negative byte: empty row + set counter for subsequent empty rows
+            cells[row].note = 0;
+            cells[row].instrument = 0;
+            cells[row].effect = 0;
+            cells[row].param = 0;
+            empty_counter = (int)(~(int)v);
+            row++;
+        }
+    }
+
+    // Fill remaining rows from empty_counter
+    while (empty_counter > 0 && row < max_rows) {
+        cells[row].note = 0;
+        cells[row].instrument = 0;
+        cells[row].effect = 0;
+        cells[row].param = 0;
+        row++;
+        empty_counter--;
+    }
+
+    return row;
+}
+
+// Encode cells back to variable-length track format matching get_note2() decoder.
+// Returns the number of bytes written.
+//
+// After note + instrument with no effect, the decoder reads the next byte as
+// effect (if >= 0) or empty_counter (if < 0). To prevent the next row's first byte
+// from being consumed as effect, we interpose a 0xFF separator (-1 as int8_t,
+// giving empty_counter = ~(-1) = 0, consuming the byte harmlessly).
+static uint32_t encode_track(const DecodedCell* cells, int num_rows, uint8_t* out, uint32_t out_capacity) {
+    uint32_t pos = 0;
+    int row = 0;
+
+    while (row < num_rows && pos < out_capacity) {
+        // Count consecutive empty rows
+        int empty_run = 0;
+        int scan = row;
+        while (scan < num_rows &&
+               cells[scan].note == 0 && cells[scan].instrument == 0 &&
+               cells[scan].effect == 0 && cells[scan].param == 0) {
+            empty_run++;
+            scan++;
+        }
+
+        if (empty_run > 0) {
+            // Negative byte v: current row empty, empty_counter = ~v for subsequent rows.
+            // For N empty rows: v = ~(N-1). Max N=128 per byte (v = -128).
+            while (empty_run > 0 && pos < out_capacity) {
+                int chunk = (empty_run > 128) ? 128 : empty_run;
+                out[pos++] = (uint8_t)(int8_t)(~(chunk - 1));
+                empty_run -= chunk;
+                row += chunk;
+            }
+            continue;
+        }
+
+        const DecodedCell* c = &cells[row];
+
+        if (c->note == 0) {
+            // Effect-only row
+            if (c->effect >= 0x70) {
+                if (pos + 1 >= out_capacity) break;
+                out[pos++] = c->effect;
+                out[pos++] = c->param;
+            } else {
+                if (pos + 2 >= out_capacity) break;
+                out[pos++] = 0;
+                out[pos++] = c->effect;
+                out[pos++] = c->param;
+            }
+        } else {
+            // Note row
+            if (pos >= out_capacity) break;
+            out[pos++] = c->note;
+
+            if (c->effect >= 0x70 && c->instrument == 0) {
+                // Effect >= 0x70 directly after note (decoder reads as effect, not instrument)
+                if (pos + 1 >= out_capacity) break;
+                out[pos++] = c->effect;
+                out[pos++] = c->param;
+            } else {
+                // Emit instrument (always, decoder consumes next byte as instrument if < 0x70)
+                if (pos >= out_capacity) break;
+                out[pos++] = c->instrument;
+
+                if (c->effect != 0) {
+                    if (pos + 1 >= out_capacity) break;
+                    out[pos++] = c->effect;
+                    out[pos++] = c->param;
+                } else if (row + 1 < num_rows && pos < out_capacity) {
+                    // No effect: decoder will consume next byte as effect/empty_counter.
+                    // Interpose 0xFF separator so next row's data isn't eaten.
+                    out[pos++] = 0xFF;
+                }
+            }
+        }
+
+        row++;
+    }
+
+    return pos;
+}
+
+int sd2_get_num_tracks(const Sd2Module* mod) {
+    if (mod == nullptr) return 0;
+    return mod->track_count;
+}
+
+int sd2_get_track_length(const Sd2Module* mod, int track_idx) {
+    if (mod == nullptr || track_idx < 0 || track_idx >= mod->track_count) return 0;
+    DecodedCell cells[256];
+    return decode_track(&mod->tracks[track_idx], cells, 256);
+}
+
+uint32_t sd2_get_cell(const Sd2Module* mod, int track_idx, int row) {
+    if (mod == nullptr || track_idx < 0 || track_idx >= mod->track_count) return 0;
+    DecodedCell cells[256];
+    int num_rows = decode_track(&mod->tracks[track_idx], cells, 256);
+    if (row < 0 || row >= num_rows) return 0;
+    return ((uint32_t)cells[row].note << 24) |
+           ((uint32_t)cells[row].instrument << 16) |
+           ((uint32_t)cells[row].effect << 8) |
+           (uint32_t)cells[row].param;
+}
+
+void sd2_set_cell(Sd2Module* mod, int track_idx, int row,
+                  int note, int instrument, int effect, int param) {
+    if (mod == nullptr || track_idx < 0 || track_idx >= mod->track_count) return;
+
+    Track* trk = &mod->tracks[track_idx];
+    DecodedCell cells[256];
+    int num_rows = decode_track(trk, cells, 256);
+
+    // Extend with empty rows if needed
+    if (row >= num_rows && row < 256) {
+        for (int i = num_rows; i <= row; i++) {
+            cells[i].note = 0;
+            cells[i].instrument = 0;
+            cells[i].effect = 0;
+            cells[i].param = 0;
+        }
+        num_rows = row + 1;
+    }
+    if (row < 0 || row >= num_rows) return;
+
+    cells[row].note = (uint8_t)note;
+    cells[row].instrument = (uint8_t)instrument;
+    cells[row].effect = (uint8_t)effect;
+    cells[row].param = (uint8_t)param;
+
+    // Re-encode: worst case is 4 bytes per row (note + instr + effect + param)
+    uint8_t encoded[1024];
+    uint32_t encoded_len = encode_track(cells, num_rows, encoded, sizeof(encoded));
+
+    // Replace track data
+    uint8_t* new_data = (uint8_t*)malloc(encoded_len);
+    if (new_data == nullptr) return;
+    memcpy(new_data, encoded, encoded_len);
+    free(trk->track_data);
+    trk->track_data = new_data;
+    trk->length = encoded_len;
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Instrument preview API
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+int sd2_get_instrument_count(const Sd2Module* mod) {
+    if (mod == nullptr) return 0;
+    return mod->instrument_count;
+}
+
+void sd2_preview_note_on(Sd2Module* mod, int instrument, int note, int velocity) {
+    if (mod == nullptr) return;
+    if (instrument < 0 || instrument >= mod->instrument_count) return;
+    if (note < 1 || note >= (int)PERIODS_COUNT) return;
+
+    VoiceInfo* vi = &mod->voices[0];
+    VoiceRender* vr = &mod->voice_render[0];
+
+    // Reset voice state for preview
+    vi->sample_volume = 0;
+    vi->wave_list_delay = 0;
+    vi->wave_list_offset = 0;
+    vi->arpeggio_delay = 0;
+    vi->arpeggio_offset = 0;
+    vi->vibrato_delay = 0;
+    vi->vibrato_offset = 0;
+    vi->pitch_bend_counter = 0;
+    vi->pitch_bend_value = 0;
+    vi->note_slide_speed = 0;
+    vi->envelope_state = EnvelopeState_Attack;
+    vi->sustain_counter = 0;
+    vi->current_note = (uint16_t)note;
+    vi->current_instrument = (uint16_t)(instrument + 1); // 1-based for play_voice
+    vi->current_effect = 0;
+    vi->current_effect_arg = 0;
+
+    // Set instrument
+    vi->instrument = &mod->instruments[instrument];
+    Instrument* inst = vi->instrument;
+
+    // Look up sample from waveform list
+    if (inst->waveform_list_number < mod->waveform_count) {
+        uint8_t* waveform_list = mod->waveform_info[inst->waveform_list_number];
+        vi->current_sample = waveform_list[0];
+
+        if (vi->current_sample < (uint16_t)mod->sample_count) {
+            Sample* smp = &mod->samples[vi->current_sample];
+            vi->sample_data = smp->sample_data;
+            vi->sample_length = smp->length;
+            vi->loop_sample = smp->sample_data;
+            vi->loop_offset = smp->loop_start;
+            vi->loop_length = smp->loop_length;
+        }
+    }
+
+    // Set period from note + arpeggio offset
+    if (inst->arpeggio_number < mod->arpeggio_count) {
+        int8_t* arpeggio = mod->arpeggios[inst->arpeggio_number];
+        int final_note = note + arpeggio[0];
+        if (final_note >= 0 && final_note < (int)PERIODS_COUNT) {
+            vi->original_note = (uint16_t)final_note;
+            vi->sample_period = s_periods[final_note];
+        }
+    } else {
+        vi->original_note = (uint16_t)note;
+        vi->sample_period = s_periods[note];
+    }
+
+    // Scale volume by velocity (0-127 mapped to multiplier)
+    (void)velocity; // Volume is handled by ADSR envelope, velocity unused in SidMon II
+
+    // Start sample playback on voice render
+    if (vi->sample_length != 0) {
+        voice_render_play_sample(vr, vi->sample_data, 0, vi->sample_length);
+        if (vi->loop_length > 2) {
+            voice_render_set_loop(vr, vi->loop_sample, vi->loop_offset, vi->loop_length);
+        }
+    }
+
+    update_period(vr, vi->sample_period, mod->sample_rate);
+}
+
+void sd2_preview_note_off(Sd2Module* mod) {
+    if (mod == nullptr) return;
+    VoiceInfo* vi = &mod->voices[0];
+    VoiceRender* vr = &mod->voice_render[0];
+
+    // Force release state
+    vi->envelope_state = EnvelopeState_Release;
+
+    // Mute immediately
+    vr->volume = 0;
+    vi->sample_volume = 0;
+    voice_render_mute(vr);
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Serialize module to binary
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+static void write_u8(uint8_t* buf, uint32_t* pos, uint8_t val) {
+    buf[(*pos)++] = val;
+}
+
+static void write_be16(uint8_t* buf, uint32_t* pos, uint16_t val) {
+    buf[(*pos)++] = (uint8_t)(val >> 8);
+    buf[(*pos)++] = (uint8_t)(val & 0xFF);
+}
+
+static void write_be32(uint8_t* buf, uint32_t* pos, uint32_t val) {
+    buf[(*pos)++] = (uint8_t)(val >> 24);
+    buf[(*pos)++] = (uint8_t)((val >> 16) & 0xFF);
+    buf[(*pos)++] = (uint8_t)((val >> 8) & 0xFF);
+    buf[(*pos)++] = (uint8_t)(val & 0xFF);
+}
+
+uint32_t sd2_serialize(const Sd2Module* mod, uint8_t** out_data) {
+    if (mod == nullptr || out_data == nullptr) return 0;
+
+    // Calculate sizes of each block
+    uint32_t num_pos = (uint32_t)mod->num_positions;
+    uint32_t pos_table_len = num_pos * 4; // 4 channels * num_positions per channel
+
+    // Block 0-2: sequence data (position, noteTranspose, instrumentTranspose)
+    uint32_t seq_block_len = pos_table_len; // same for all 3 passes
+
+    // Block 3: instruments (32 bytes each, instrument 0 excluded from file)
+    uint32_t instr_count = (uint32_t)(mod->instrument_count > 0 ? mod->instrument_count - 1 : 0);
+    uint32_t instr_block_len = instr_count * 32;
+
+    // Block 4: waveform lists (16 bytes each)
+    uint32_t wave_block_len = (uint32_t)mod->waveform_count * 16;
+
+    // Block 5: arpeggios (16 bytes each)
+    uint32_t arp_block_len = (uint32_t)mod->arpeggio_count * 16;
+
+    // Block 6: vibratoes (16 bytes each)
+    uint32_t vib_block_len = (uint32_t)mod->vibrato_count * 16;
+
+    // Block 7: sample info (64 bytes each)
+    uint32_t sample_info_len = (uint32_t)mod->sample_count * 64;
+
+    // Block 8: track offset table (2 bytes per track)
+    uint32_t track_table_len = (uint32_t)mod->track_count * 2;
+
+    // Block 9: track data (re-encode all tracks)
+    // First pass: compute track data sizes
+    uint32_t* track_sizes = (uint32_t*)calloc((uint32_t)mod->track_count, sizeof(uint32_t));
+    uint8_t** track_encoded = (uint8_t**)calloc((uint32_t)mod->track_count, sizeof(uint8_t*));
+    uint32_t tracks_total_len = 0;
+
+    for (int i = 0; i < mod->track_count; i++) {
+        // Use existing track data directly (already encoded)
+        track_sizes[i] = mod->tracks[i].length;
+        track_encoded[i] = mod->tracks[i].track_data;
+        tracks_total_len += track_sizes[i];
+    }
+
+    // ID string
+    const char* id_str = "SIDMON II - THE MIDI VERSION";
+    uint32_t id_len = 28;
+
+    // song_length block: 2 bytes
+    uint32_t song_len_block = 2;
+
+    // Header: 2 (midi) + 1 (numPos) + 1 (speed) + 2 (numSamples) + 12*4 (block lengths) = 54 bytes
+    // Then id_str, then song_length, then blocks
+    // Actual header: 58 bytes (positions 0-57), then id_str starts at 58
+    // Wait - looking at the parser: pos=2 reads numPos at offset 2, speed at 3, numSamples at 4-5
+    // Block lengths at 6-57 (13 uint32s: idLen, songLenLen, then 10 blocks = 12 total)
+    // Actually: pos=6 reads id_length, pos=10 reads song_len_length, then pos=14..53 reads 10 block lengths
+    // That's 6 + 4 + 4 + 40 = 54 bytes of header... but id_str is at offset 58
+
+    // Let me re-derive from the parser:
+    // offset 0-1: MIDI mode (2 bytes)
+    // offset 2: num_positions (1 byte)
+    // offset 3: speed (1 byte)
+    // offset 4-5: num_samples * 64 (2 bytes BE)
+    // offset 6-9: id_length (4 bytes BE)
+    // offset 10-13: song_length_length (4 bytes BE)
+    // offset 14-53: 10 block lengths (40 bytes)
+    // offset 54-57: padding? Actually 6+4+4+40 = 54. But id_str is at 58.
+    // That means there are 4 more bytes. Looking at the parse function:
+    // pos starts at 6, reads id_length (4 bytes), song_len_length (4 bytes), then 10 block_lengths (40 bytes)
+    // 6 + 4 + 4 + 40 = 54. Then offset = 58 + id_length + song_len_length.
+    // So header is 58 bytes (0-57 are header data).
+    // But pos only goes from 6 to 54 (block_lengths[9] ends at offset 6+4+4+40=54).
+    // Offsets 54-57 must be something else. Let me check...
+    // The parser reads: offset 14 = trackDataLen (4 bytes), offset 26 = waveDataLen (4 bytes)
+    // offset 30 = arpeggioDataLen, offset 34 = vibratoDataLen, offset 50 = patternDataLen
+    // So the 10 block lengths are at offsets 14, 18, 22, 26, 30, 34, 38, 42, 46, 50
+    // That's 14 + 40 = 54. So offsets 54-57 are unused? No:
+    // Actually wait, let me re-read. pos starts at 6.
+    // read_be32 at pos 6 → id_length (offsets 6-9)
+    // read_be32 at pos 10 → song_len_length (offsets 10-13)
+    // Then 10 × read_be32: offsets 14-17, 18-21, 22-25, 26-29, 30-33, 34-37, 38-41, 42-45, 46-49, 50-53
+    // So header ends at offset 54 (exclusive), i.e., 53 is last header byte.
+    // But offset = 58. So there are 4 bytes between the header and the first data block.
+    // Actually looking again: the initial offset is set to 58 BEFORE adding id_length and song_len_length.
+    // This means the raw file has: bytes 0-57 = header + meta, then id_str at 58, then song_length at 58+id_length.
+    // So the id_str IS part of the data blocks. The 58 is a fixed header size.
+    // Let me verify: id_str "SIDMON II - THE MIDI VERSION" is 28 bytes, id_length=28 in the file.
+    // offset=58, then offset += 28 → 86, then offset += song_len_length → 86+2=88 (typically).
+    // Then block data starts at offset 88.
+
+    uint32_t header_size = 58;
+    // Total data size after header:
+    uint32_t total_data = id_len + song_len_block
+        + seq_block_len * 3     // blocks 0, 1, 2
+        + instr_block_len       // block 3
+        + wave_block_len        // block 4
+        + arp_block_len         // block 5
+        + vib_block_len         // block 6
+        + sample_info_len       // block 7
+        + track_table_len       // block 8
+        + tracks_total_len;     // block 9
+
+    // Sample PCM data
+    uint32_t sample_pcm_total = 0;
+    for (int i = 0; i < mod->sample_count; i++) {
+        sample_pcm_total += mod->samples[i].length;
+    }
+
+    // Word-align after track data if needed
+    uint32_t padding = 0;
+    uint32_t after_tracks = header_size + total_data;
+    if (after_tracks & 1) padding = 1;
+
+    uint32_t total_size = header_size + total_data + padding + sample_pcm_total;
+
+    uint8_t* buf = (uint8_t*)calloc(total_size, 1);
+    if (buf == nullptr) {
+        free(track_sizes);
+        free(track_encoded);
+        return 0;
+    }
+
+    uint32_t p = 0;
+
+    // -- Header (58 bytes) --
+    // MIDI mode (2 bytes) - write 0
+    write_be16(buf, &p, 0);
+    // num_positions (1 byte) - stored decremented
+    write_u8(buf, &p, (uint8_t)(mod->num_positions - 1));
+    // speed (1 byte)
+    write_u8(buf, &p, mod->start_speed);
+    // num_samples * 64 (2 bytes BE)
+    write_be16(buf, &p, (uint16_t)(mod->sample_count * 64));
+
+    // Block lengths (id_length, song_len_length, then 10 block lengths)
+    write_be32(buf, &p, id_len);           // id_length
+    write_be32(buf, &p, song_len_block);   // song_len_length
+
+    // 10 block lengths:
+    // 0: positionTable, 1: noteTranspose, 2: instrumentTranspose
+    // 3: instruments, 4: waveformList, 5: arpeggios
+    // 6: vibratoes, 7: sampleInfo, 8: trackTable, 9: tracks
+    write_be32(buf, &p, seq_block_len);    // block 0: positionTable
+    write_be32(buf, &p, seq_block_len);    // block 1: noteTranspose
+    write_be32(buf, &p, seq_block_len);    // block 2: instrumentTranspose
+    write_be32(buf, &p, instr_block_len);  // block 3: instruments
+    write_be32(buf, &p, wave_block_len);   // block 4: waveformList
+    write_be32(buf, &p, arp_block_len);    // block 5: arpeggios
+    write_be32(buf, &p, vib_block_len);    // block 6: vibratoes
+    write_be32(buf, &p, sample_info_len);  // block 7: sampleInfo
+    write_be32(buf, &p, track_table_len);  // block 8: trackTable
+    write_be32(buf, &p, tracks_total_len); // block 9: tracks
+
+    // Pad to offset 58 (header has: 2+1+1+2 + 4+4 + 10*4 = 54 bytes, need 4 more)
+    while (p < header_size) {
+        write_u8(buf, &p, 0);
+    }
+
+    // -- ID string --
+    memcpy(buf + p, id_str, id_len);
+    p += id_len;
+
+    // -- Song length block (2 bytes) --
+    // Not entirely clear what goes here; the parser skips it. Write 0.
+    write_be16(buf, &p, 0);
+
+    // -- Block 0: position table --
+    for (int ch = 0; ch < 4; ch++) {
+        for (int j = 0; j < (int)num_pos; j++) {
+            int idx = ch * (int)num_pos + j;
+            write_u8(buf, &p, mod->sequences[idx].track_number);
+        }
+    }
+
+    // -- Block 1: note transpose --
+    for (int ch = 0; ch < 4; ch++) {
+        for (int j = 0; j < (int)num_pos; j++) {
+            int idx = ch * (int)num_pos + j;
+            write_u8(buf, &p, (uint8_t)mod->sequences[idx].note_transpose);
+        }
+    }
+
+    // -- Block 2: instrument transpose --
+    for (int ch = 0; ch < 4; ch++) {
+        for (int j = 0; j < (int)num_pos; j++) {
+            int idx = ch * (int)num_pos + j;
+            write_u8(buf, &p, (uint8_t)mod->sequences[idx].instrument_transpose);
+        }
+    }
+
+    // -- Block 3: instruments (32 bytes each, skip instrument 0) --
+    for (int i = 1; i < mod->instrument_count; i++) {
+        Instrument* inst = &mod->instruments[i];
+        write_u8(buf, &p, inst->waveform_list_number);
+        write_u8(buf, &p, inst->waveform_list_length);
+        write_u8(buf, &p, inst->waveform_list_speed);
+        write_u8(buf, &p, inst->waveform_list_delay);
+        write_u8(buf, &p, inst->arpeggio_number);
+        write_u8(buf, &p, inst->arpeggio_length);
+        write_u8(buf, &p, inst->arpeggio_speed);
+        write_u8(buf, &p, inst->arpeggio_delay);
+        write_u8(buf, &p, inst->vibrato_number);
+        write_u8(buf, &p, inst->vibrato_length);
+        write_u8(buf, &p, inst->vibrato_speed);
+        write_u8(buf, &p, inst->vibrato_delay);
+        write_u8(buf, &p, (uint8_t)inst->pitch_bend_speed);
+        write_u8(buf, &p, inst->pitch_bend_delay);
+        write_u8(buf, &p, 0); // skip byte
+        write_u8(buf, &p, 0); // skip byte
+        write_u8(buf, &p, inst->attack_max);
+        write_u8(buf, &p, inst->attack_speed);
+        write_u8(buf, &p, inst->decay_min);
+        write_u8(buf, &p, inst->decay_speed);
+        write_u8(buf, &p, inst->sustain_time);
+        write_u8(buf, &p, inst->release_min);
+        write_u8(buf, &p, inst->release_speed);
+        // 9 padding bytes
+        for (int j = 0; j < 9; j++) write_u8(buf, &p, 0);
+    }
+
+    // -- Block 4: waveform lists (16 bytes each) --
+    for (int i = 0; i < mod->waveform_count; i++) {
+        memcpy(buf + p, mod->waveform_info[i], 16);
+        p += 16;
+    }
+
+    // -- Block 5: arpeggios (16 bytes each) --
+    for (int i = 0; i < mod->arpeggio_count; i++) {
+        memcpy(buf + p, mod->arpeggios[i], 16);
+        p += 16;
+    }
+
+    // -- Block 6: vibratoes (16 bytes each) --
+    for (int i = 0; i < mod->vibrato_count; i++) {
+        memcpy(buf + p, mod->vibratoes[i], 16);
+        p += 16;
+    }
+
+    // -- Block 7: sample info (64 bytes each) --
+    uint32_t running_sample_offset = 0;
+    for (int i = 0; i < mod->sample_count; i++) {
+        Sample* smp = &mod->samples[i];
+        SampleNegateInfo* ni = &mod->sample_negate_info[i];
+
+        write_be32(buf, &p, 0); // sample data pointer (unused in file)
+        write_be16(buf, &p, (uint16_t)(smp->length / 2));
+        write_be16(buf, &p, (uint16_t)(smp->loop_start / 2));
+        write_be16(buf, &p, (uint16_t)(smp->loop_length / 2));
+
+        // Negate info
+        write_be16(buf, &p, (uint16_t)(ni->start_offset / 2));
+        write_be16(buf, &p, (uint16_t)(ni->end_offset / 2));
+        write_be16(buf, &p, ni->loop_index);
+        write_be16(buf, &p, ni->status);
+        write_be16(buf, &p, (uint16_t)ni->speed);
+        write_be32(buf, &p, (uint32_t)ni->position);
+        write_be16(buf, &p, ni->index);
+        write_be16(buf, &p, (uint16_t)ni->do_negation);
+
+        write_be32(buf, &p, 0); // skip 4 bytes
+        // Name: 32 bytes of zeros (names not stored in Sd2Module)
+        for (int j = 0; j < 32; j++) write_u8(buf, &p, 0);
+
+        running_sample_offset += smp->length;
+    }
+
+    // -- Block 8: track offset table --
+    uint32_t running_offset = 0;
+    for (int i = 0; i < mod->track_count; i++) {
+        write_be16(buf, &p, (uint16_t)running_offset);
+        running_offset += track_sizes[i];
+    }
+
+    // -- Block 9: track data --
+    for (int i = 0; i < mod->track_count; i++) {
+        if (track_encoded[i] != nullptr && track_sizes[i] > 0) {
+            memcpy(buf + p, track_encoded[i], track_sizes[i]);
+            p += track_sizes[i];
+        }
+    }
+
+    // Padding for word alignment
+    if (padding) write_u8(buf, &p, 0);
+
+    // -- Sample PCM data --
+    for (int i = 0; i < mod->sample_count; i++) {
+        if (mod->samples[i].length > 0 && mod->samples[i].sample_data != nullptr) {
+            memcpy(buf + p, mod->samples[i].sample_data, mod->samples[i].length);
+            p += mod->samples[i].length;
+        }
+    }
+
+    free(track_sizes);
+    free(track_encoded);
+
+    *out_data = buf;
+    return p;
+}
