@@ -37,6 +37,71 @@ data loss must NEVER happen again.
 
 ---
 
+## MCP Server — Live Tracker Control
+
+DEViLBOX has an MCP server that gives Claude **full programmatic control** of the running tracker app via ~130 tools. It can read/write patterns, control playback, analyze audio, search music archives, and more.
+
+### Prerequisites
+
+1. **Dev server running:** `npm run dev` (starts Vite on :5173 + Express on :3001)
+2. **Browser open:** Navigate to `http://localhost:5173` — the MCP bridge auto-connects in dev mode
+3. **Click in the browser** to unlock the AudioContext (required for audio tools)
+
+### Architecture
+
+```
+Claude Code ←stdio→ MCP Server (Node.js) ←WS:4003→ Browser SPA
+```
+
+The `.mcp.json` at project root configures auto-start. If it doesn't connect, restart Claude Code.
+
+### Quick Start — Use `get_mcp_help` First
+
+Call `get_mcp_help` to see all ~130 tools grouped by category. Optionally filter: `get_mcp_help(category: "transport")`.
+
+### Key Tool Categories
+
+| Category | Examples | What For |
+|----------|----------|----------|
+| **Song/Pattern** | `get_song_info`, `get_pattern`, `set_cell`, `render_pattern_text` | Read/write tracker data |
+| **Transport** | `play`, `stop`, `set_bpm`, `seek_to` | Playback control |
+| **Mixer** | `set_channel_volume`, `set_channel_mute`, `solo_channel` | Mix control |
+| **Instruments** | `get_instruments_list`, `get_synth_config`, `update_synth_config` | Synth programming |
+| **Audio Analysis** | `get_audio_analysis`, `get_audio_level`, `wait_for_audio` | Debugging audio |
+| **AI Composition** | `analyze_song`, `generate_pattern`, `transform_pattern` | Music generation |
+| **Modland** | `search_modland`, `load_modland` | Search & play 190K+ tracker modules |
+| **HVSC** | `search_hvsc`, `load_hvsc` | Search & play 80K+ C64 SID tunes |
+| **File Loading** | `load_file` | Load any of 188+ music formats from disk |
+| **Batch** | `batch` | Execute multiple tools atomically in sequence |
+
+### Common Patterns
+
+```
+# Orient yourself
+get_song_info → BPM, channels, patterns, editor mode
+
+# Debug silence
+get_audio_state → check initialized, contextState, masterMuted
+get_synth_errors → check for WASM crashes
+get_playback_state → check isPlaying
+
+# Search and play music
+search_modland(query: "commando") → get full_path
+load_modland(full_path: "pub/modules/...") → downloads + auto-plays
+
+search_hvsc(query: "hubbard") → get path
+load_hvsc(path: "MUSICIANS/H/Hubbard_Rob/Commando.sid") → plays
+
+# Multi-step operations
+batch(operations: [{tool: "set_bpm", args: {bpm: 140}}, {tool: "play", args: {}}])
+```
+
+### Full Documentation
+
+See `docs/MCP_DEBUGGING_GUIDE.md` for complete tool reference, debugging workflows, and architecture details.
+
+---
+
 ## CRITICAL: Knob/Control Handling Pattern
 
 **!!! ALWAYS USE THIS PATTERN FOR CONTROLS !!!**
