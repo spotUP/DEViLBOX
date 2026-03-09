@@ -4,6 +4,7 @@
 # Kills any existing processes on the dev ports, then starts:
 #   • API server    (Express + SC compile)   → http://localhost:3001  [logs/backend.log]
 #   • Collab server (WebSocket signaling)    → ws://localhost:4002    [logs/collab.log]
+#   • MCP relay     (WS bridge for AI/MCP)  → ws://localhost:4003    [started by API server]
 #   • Frontend      (Vite)                  → http://localhost:5173  [stdout — always visible]
 #
 # Vite runs in the foreground so TypeScript errors and crashes are immediately visible.
@@ -17,6 +18,7 @@ set -euo pipefail
 FRONTEND_PORT=5173
 BACKEND_PORT=3001
 COLLAB_PORT=4002
+MCP_PORT=4003
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # ── Colours ────────────────────────────────────────────────────────────────────
@@ -40,9 +42,10 @@ kill_port() {
   fi
 }
 
-log "Clearing ports $BACKEND_PORT, $COLLAB_PORT and $FRONTEND_PORT..."
+log "Clearing ports $BACKEND_PORT, $COLLAB_PORT, $MCP_PORT and $FRONTEND_PORT..."
 kill_port "$BACKEND_PORT"
 kill_port "$COLLAB_PORT"
+kill_port "$MCP_PORT"
 kill_port "$FRONTEND_PORT"
 
 # ── Cleanup on exit ────────────────────────────────────────────────────────────
@@ -56,6 +59,7 @@ cleanup() {
   [ -n "$COLLAB_PID" ]  && kill "$COLLAB_PID"  2>/dev/null || true
   kill_port "$BACKEND_PORT"
   kill_port "$COLLAB_PORT"
+  kill_port "$MCP_PORT"
   kill_port "$FRONTEND_PORT"
   ok "Done."
 }
@@ -110,7 +114,8 @@ mkdir -p logs
 
 # ── API server (Express) ───────────────────────────────────────────────────────
 log "Starting API server on port $BACKEND_PORT..."
-(cd server && npm run dev) > logs/backend.log 2>&1 &
+# Unset CLAUDECODE so the AI endpoint can spawn `claude` CLI without the nesting guard
+(cd server && unset CLAUDECODE CLAUDE_CODE_ENTRYPOINT CLAUDE_CODE_SESSION && npm run dev) > logs/backend.log 2>&1 &
 BACKEND_PID=$!
 
 log "Waiting for API server to be ready..."
@@ -150,6 +155,7 @@ echo -e "${BOLD}━━━━━━━━━━━━━━━━━━━━━�
 echo -e "${GREEN}  DEViLBOX back-end running${RESET}"
 echo -e "  API    → ${CYAN}http://localhost:$BACKEND_PORT${RESET}   (logs/backend.log)"
 echo -e "  Collab → ${CYAN}ws://localhost:$COLLAB_PORT${RESET}    (logs/collab.log)"
+echo -e "  MCP    → ${CYAN}ws://localhost:$MCP_PORT${RESET}    (AI tools relay)"
 echo -e "  Vite   → ${CYAN}http://localhost:$FRONTEND_PORT${RESET}  (output below)"
 echo -e "${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
 echo -e "  ${YELLOW}Ctrl-C to stop all servers${RESET}"

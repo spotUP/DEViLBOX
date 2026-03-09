@@ -2,9 +2,12 @@
   "mcpServers": {
     "devilbox-tracker": {
       "type": "stdio",
-      "command": "npx",
-      "args": ["tsx", "server/src/mcp/index.ts"],
-      "cwd": "/Users/spot/Code/DEViLBOX"
+      "command": "/opt/homebrew/bin/node",
+      "args": [
+        "/Users/spot/Code/DEViLBOX/server/node_modules/tsx/dist/cli.mjs",
+        "/Users/spot/Code/DEViLBOX/server/src/mcp/index.ts"
+      ],
+      "cwd": "/Users/spot/Code/DEViLBOX/server"
     }
   }
 }
