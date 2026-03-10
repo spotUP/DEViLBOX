@@ -407,6 +407,11 @@ export async function loadFile(
       return await loadAudioSample(file);
     }
 
+    // .v2m - Farbrausch V2M synth music (playback only)
+    if (filename.endsWith('.v2m')) {
+      return await loadV2MFile(file);
+    }
+
     return { success: false, error: `Unsupported file format: ${file.name}` };
 
   } catch (error) {
@@ -1005,6 +1010,33 @@ async function loadAudioSample(file: File): Promise<FileLoadResult> {
       success: true,
       message: `Recognized audio sample: ${file.name} (manual import required)`
     };
+  }
+}
+
+/**
+ * Load and play a V2M (Farbrausch V2 Synthesizer Music) file.
+ * V2M is a playback-only demoscene synth format.
+ */
+async function loadV2MFile(file: File): Promise<FileLoadResult> {
+  try {
+    const { getV2MPlayer } = await import('@/lib/import/V2MPlayer');
+    const player = getV2MPlayer();
+    
+    const arrayBuffer = await file.arrayBuffer();
+    
+    // play() internally calls ensureInitialized() and waits
+    await player.play(arrayBuffer);
+    
+    notify.success(`Playing V2M: ${file.name}`);
+    
+    return {
+      success: true,
+      message: `Playing V2M: ${file.name}`
+    };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    notify.error(`Failed to load V2M: ${errorMessage}`);
+    return { success: false, error: `Failed to load V2M: ${errorMessage}` };
   }
 }
 

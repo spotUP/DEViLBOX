@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-03-09T19:36:21.349Z
+ * Generated: 2026-03-10T20:13:30.270Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,10 +19,10 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.2599';
-export const BUILD_NUMBER = '2599';
-export const BUILD_HASH = '9dfda375f';
-export const BUILD_DATE = '2026-03-09';
+export const BUILD_VERSION = '1.0.2601';
+export const BUILD_NUMBER = '2601';
+export const BUILD_HASH = 'fd7039315';
+export const BUILD_DATE = '2026-03-10';
 
 // Full version (patch IS the build number, so no need to append)
 export const FULL_VERSION = BUILD_VERSION;
@@ -30,9 +30,23 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.2599',
+    version: '1.0.2601',
+    date: '2026-03-10',
+    changes: [
+      {
+        type: 'fix',
+        "description": "Fix bulk pattern edits not syncing to playback engines"
+      }
+    ]
+  },
+  {
+    version: '2026-03-09',
     date: '2026-03-09',
     changes: [
+      {
+        type: 'improvement',
+        "description": "Chore: update gitignore, gearmulator build, and changelog"
+      },
       {
         type: 'feature',
         "description": "Chore: add Claude slash commands, update MCP config and CLAUDE.md"
@@ -236,14 +250,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'feature',
         "description": "Import dialog format capabilities, warnings, and metadata"
-      },
-      {
-        type: 'feature',
-        "description": "Add 7 new WASM format engines"
-      },
-      {
-        type: 'feature',
-        "description": "Extend furnace sequencer with FDS, QSound, N163, ESFM commands"
       }
     ]
   }

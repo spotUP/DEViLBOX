@@ -53,6 +53,7 @@ import { runPrefetchIfNeeded } from '@/lib/SamplePackPrefetcher';
 import { useCollaborationStore } from '@stores/useCollaborationStore';
 import { PeerMouseCursor } from '@components/collaboration/PeerMouseCursor';
 import { PeerVideoWindow } from '@components/collaboration/PeerVideoWindow';
+import { ExposeOverlay } from '@components/ui/ExposeOverlay';
 
 // Lazy-loaded components for better startup performance
 const HelpModal = lazy(() => import('./components/help/HelpModal').then(m => ({ default: m.HelpModal })));
@@ -1308,6 +1309,9 @@ function App() {
           />
         </Suspense>
       )}
+
+      {/* DOM Expose Overlay — view switcher (Mission Control style) */}
+      <ExposeOverlay />
     </AppLayout>
     </GlobalDragDropHandler>
   );

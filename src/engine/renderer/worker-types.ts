@@ -187,6 +187,7 @@ export interface DeckColorsExt extends DeckColors {
 export type TurntableMsg =
   | { type: 'init'; canvas: OffscreenCanvas; dpr: number; width: number; height: number; colors: DeckColorsExt; deckId: 'A' | 'B' | 'C'; isPlaying: boolean; effectiveBPM: number }
   | { type: 'playback'; isPlaying: boolean; effectiveBPM: number }
+  | { type: 'position'; posSec: number }
   | { type: 'velocity'; v: number }
   | { type: 'scratchActive'; active: boolean }
   | { type: 'resize'; w: number; h: number; dpr: number }
@@ -224,11 +225,24 @@ export interface SerializedCuePoint {
   name: string;
 }
 
+/** Overview state embedded in the combined waveform display */
+export interface WaveformOverviewState {
+  frequencyPeaks: number[][] | null;
+  loopActive: boolean;
+  patternLoopStart: number;
+  patternLoopEnd: number;
+  cuePoint: number;
+  totalPositions: number;
+  colors: DeckColors;
+}
+
 export type WaveformMsg =
-  | { type: 'init'; canvas: OffscreenCanvas; dpr: number; width: number; height: number; waveformPeaks: number[] | null; durationMs: number; audioPosition: number; cuePoints: SerializedCuePoint[] }
+  | { type: 'init'; canvas: OffscreenCanvas; dpr: number; width: number; height: number; waveformPeaks: number[] | null; durationMs: number; audioPosition: number; cuePoints: SerializedCuePoint[]; overview: WaveformOverviewState }
   | { type: 'waveformPeaks'; peaks: number[] | null; durationMs: number }
   | { type: 'position'; audioPosition: number }
   | { type: 'cuePoints'; cuePoints: SerializedCuePoint[] }
+  | { type: 'overview'; overview: WaveformOverviewState }
+  | { type: 'otherDeck'; peaks: number[] | null; durationMs: number; audioPosition: number }
   | { type: 'resize'; w: number; h: number; dpr: number };
 
 // ─── Beat Grid ───────────────────────────────────────────────────────────────

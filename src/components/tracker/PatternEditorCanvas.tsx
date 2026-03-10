@@ -12,6 +12,7 @@ import { MacroLanes } from './MacroLanes';
 import { useUIStore } from '@stores/useUIStore';
 import { useShallow } from 'zustand/react/shallow';
 import { ChannelVUMeter } from './ChannelVUMeter';
+import { ChannelVUMeters } from './ChannelVUMeters';
 import { ChannelColorPicker } from './ChannelColorPicker';
 import { ChannelContextMenu } from './ChannelContextMenu';
 import { CellContextMenu, useCellContextMenu } from './CellContextMenu';
@@ -89,6 +90,9 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   const visibleStartRef = useRef(0);
   const macroOverlayRef = useRef<HTMLDivElement>(null);
   const peerCursorDivRef = useRef<HTMLDivElement>(null);
+  // PERF: Track cursor/selection in ref to avoid re-renders on every cursor move (30-50 fps drop!)
+  const cursorRef = useRef(useCursorStore.getState().cursor);
+  const selectionRef = useRef(useCursorStore.getState().selection);
   // Ref-tracked peer cursor so the RAF loop can read it without React re-renders
   const peerCursorRef = useRef({ row: 0, channel: 0, active: false, patternIndex: -1 });
   // Peer selection overlay
@@ -148,10 +152,18 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   const showGhostPatterns = useEditorStore(s => s.showGhostPatterns);
   const columnVisibility = useEditorStore(s => s.columnVisibility);
 
-  const cursor = useCursorStore((s) => s.cursor);
-  const selection = useCursorStore((s) => s.selection);
+  // PERF: Read cursor imperatively to avoid re-render on every cursor move (30-50 fps drop!)
+  // Subscribe to cursor changes and update refs (no React re-render)
+  useEffect(() => {
+    const unsub = useCursorStore.subscribe((state) => {
+      cursorRef.current = state.cursor;
+      selectionRef.current = state.selection;
+    });
+    return unsub;
+  }, []);
+  
   const moveCursorToChannelAndColumn = useCursorStore((s) => s.moveCursorToChannelAndColumn);
-  const mobileChannelIndex = cursor.channelIndex;
+  const mobileChannelIndex = cursorRef.current.channelIndex;
 
   const { instruments } = useInstrumentStore(useShallow((state) => ({
     instruments: state.instruments
@@ -276,15 +288,17 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   // Vertical swipes move the cursor up/down
   const handleSwipeUp = useCallback(() => {
     if (!pattern || !isMobile) return;
+    const cursor = cursorRef.current;
     const newRow = Math.max(0, cursor.rowIndex - 4); // Move up 4 rows
     useCursorStore.getState().moveCursorToRow(newRow);
-  }, [pattern, isMobile, cursor.rowIndex]);
+  }, [pattern, isMobile]);
 
   const handleSwipeDown = useCallback(() => {
     if (!pattern || !isMobile) return;
+    const cursor = cursorRef.current;
     const newRow = Math.min(pattern.length - 1, cursor.rowIndex + 4); // Move down 4 rows
     useCursorStore.getState().moveCursorToRow(newRow);
-  }, [pattern, isMobile, cursor.rowIndex]);
+  }, [pattern, isMobile]);
 
   // Continuous scroll handler for drag scrolling
   const handleScroll = useCallback((deltaY: number) => {
@@ -308,10 +322,11 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     const rowDelta = Math.round(deltaY / rowHeightRef.current);
 
     if (Math.abs(rowDelta) > 0) {
+      const cursor = cursorRef.current;
       const newRow = Math.max(0, Math.min(pattern.length + 31, cursor.rowIndex + rowDelta));
       useCursorStore.getState().moveCursorToRow(newRow);
     }
-  }, [pattern, isMobile, cursor.rowIndex]);
+  }, [pattern, isMobile]);
 
   // Ref to accumulate horizontal scroll distance
   const horizontalAccumulatorRef = useRef(0);
@@ -350,6 +365,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     const rowOffset = Math.floor((relativeY - centerLineTop) / rowHeightRef.current);
     
     const transportState = useTransportStore.getState();
+    const cursor = cursorRef.current;
     const currentRow = transportState.isPlaying ? transportState.currentRow : cursor.rowIndex;
     const rowIndex = currentRow + rowOffset;
 
@@ -403,7 +419,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       channelIndex,
       columnType
     };
-  }, [pattern, dimensions.height, scrollLeft, cursor.rowIndex, channelOffsets, channelWidths, numChannels]);
+  }, [pattern, dimensions.height, scrollLeft, channelOffsets, channelWidths, numChannels]);
 
   const [isDragging, setIsDragging] = useState(false);
   const isScratchDragRef = useRef(false);
@@ -635,7 +651,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       cursorStore.moveCursorToRow(validRow);
       cursorStore.moveCursorToChannelAndColumn(channelIndex, columnType as any);
     }
-  }, [pattern, isMobile, mobileChannelIndex, cursor.columnType, moveCursorToChannelAndColumn]);
+  }, [pattern, isMobile, moveCursorToChannelAndColumn]);
 
   const handleWheel = useCallback((e: React.WheelEvent) => {
     if (!containerRef.current) return;
@@ -644,15 +660,19 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
       const rows = Math.round(e.deltaY / 20);
       if (rows !== 0) {
+        const cursor = cursorRef.current;
         const newRow = Math.max(0, Math.min(pattern.length - 1, cursor.rowIndex + rows));
         useCursorStore.getState().moveCursorToRow(newRow);
       }
     }
-  }, [pattern.length, cursor.rowIndex]);
+  }, [pattern.length]);
 
   // Mobile swipe handlers for pattern data (column navigation)
   const handleDataSwipeLeft = useCallback(() => {
     if (!pattern || !isMobile) return;
+    
+    const cursor = cursorRef.current;
+    const mobileChannelIndex = cursor.channelIndex;
     
     const columnOrder: CursorPosition['columnType'][] = [
       'note', 'instrument', 'volume', 'effTyp', 'effParam', 'effTyp2', 'effParam2'
@@ -679,10 +699,13 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
         moveCursorToChannelAndColumn(nextChannel, 'note');
       }
     }
-  }, [pattern, isMobile, mobileChannelIndex, cursor.columnType, moveCursorToChannelAndColumn]);
+  }, [pattern, isMobile, moveCursorToChannelAndColumn]);
 
   const handleDataSwipeRight = useCallback(() => {
     if (!pattern || !isMobile) return;
+    
+    const cursor = cursorRef.current;
+    const mobileChannelIndex = cursor.channelIndex;
     
     const columnOrder: CursorPosition['columnType'][] = [
       'note', 'instrument', 'volume', 'effTyp', 'effParam', 'effTyp2', 'effParam2'
@@ -714,7 +737,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
         moveCursorToChannelAndColumn(prevChannel, lastCol);
       }
     }
-  }, [pattern, isMobile, mobileChannelIndex, cursor.columnType, moveCursorToChannelAndColumn]);
+  }, [pattern, isMobile, moveCursorToChannelAndColumn]);
 
   // Mobile swipe handlers for channel header (direct channel jump)
   const handleHeaderSwipeLeft = useCallback(() => {
@@ -772,6 +795,8 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   // Handler for opening parameter editor from context menu
   const handleOpenParameterEditor = useCallback((field: 'volume' | 'effect' | 'effectParam') => {
     if (!pattern) return;
+    const cursor = cursorRef.current;
+    const selection = useCursorStore.getState().selection;
     const channelIdx = cellContextMenu.cellInfo?.channelIndex ?? cursor.channelIndex;
     // Use selection if available, otherwise use 16 rows from current position
     const start = selection?.startRow ?? cursor.rowIndex;
@@ -785,7 +810,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       endRow: end,
     });
     cellContextMenu.closeMenu();
-  }, [cellContextMenu, cursor, selection, pattern]);
+  }, [cellContextMenu, cellContextMenu.cellInfo, cellContextMenu.cellInfo?.channelIndex, pattern]);
 
   // Notify worker when theme changes
   useEffect(() => {
@@ -1004,6 +1029,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
 
   // B/D Animation handler wrappers - use full channel or selection range
   const getBDAnimationOptions = useCallback((channelIndex: number) => {
+    const selection = selectionRef.current;
     const startRow = selection
       ? Math.min(selection.startRow, selection.endRow)
       : 0;
@@ -1016,7 +1042,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       startRow,
       endRow,
     };
-  }, [selection, currentPatternIndex, pattern?.length]);
+  }, [currentPatternIndex, pattern?.length]);
 
   const handleReverseVisual = useCallback((channelIndex: number) => {
     bdAnimations.applyReverseVisual(getBDAnimationOptions(channelIndex));
@@ -1255,25 +1281,29 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
 
 
   // ─── Thin overlay RAF (updates macroOverlayRef + posts playback state) ─────
-  // This replaces the heavy Canvas 2D render loop. It runs on the main thread
-  // to update overlay DOM positions (macroLanes) synchronously with audio.
+  // This runs on the main thread to update overlay DOM positions (macroLanes)
+  // synchronously with audio. The worker computes its own smooth scrolling.
   useEffect(() => {
     let rafId: number;
-    // PERF: Dedup playback messages — only post when values change
+    // PERF: Dedup playback messages — only post row/pattern when they change
     let prevRow = -1;
-    let prevSmooth = -1;
     let prevPattern = -1;
     let prevPlaying = false;
 
     const tick = () => {
       const transportState = useTransportStore.getState();
-      const trackerState   = useTrackerStore.getState();
       const isPlaying      = transportState.isPlaying;
-      const smoothScrolling = transportState.smoothScrolling;
 
+      // PERF: When idle, skip expensive store reads and DOM updates
+      if (!isPlaying && !prevPlaying) {
+        rafId = requestAnimationFrame(tick);
+        return;
+      }
+
+      const trackerState   = useTrackerStore.getState();
       let currentRow   = useCursorStore.getState().cursor.rowIndex;
-      let smoothOffset = 0;
       let activePatternIdx = trackerState.currentPatternIndex;
+      let smoothOffset = 0;
 
       if (isPlaying) {
         const replayer  = getTrackerReplayer();
@@ -1283,8 +1313,9 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
         if (audioState) {
           currentRow       = audioState.row;
           activePatternIdx = audioState.pattern;
-
-          if (smoothScrolling) {
+          
+          // Compute smooth offset for worker rendering
+          if (transportState.smoothScrolling) {
             const nextState = replayer.getStateAtTime(audioTime + 0.5, true);
             const effectiveDuration = (nextState && nextState.row !== audioState.row)
               ? nextState.time - audioState.time
@@ -1300,24 +1331,31 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
         }
       }
 
-      // PERF: Only post playback message when values actually change
-      // Reduces 60 msgs/sec → ~15-20 msgs/sec during playback
-      if (currentRow !== prevRow || activePatternIdx !== prevPattern ||
-          isPlaying !== prevPlaying || Math.abs(smoothOffset - prevSmooth) > 0.5) {
+      // Send playback state to worker EVERY frame during playback
+      // The main thread has accurate replayer state, worker just renders it
+      const shouldSendUpdate = isPlaying || 
+        currentRow !== prevRow || 
+        activePatternIdx !== prevPattern || 
+        isPlaying !== prevPlaying;
+        
+      if (shouldSendUpdate) {
         prevRow = currentRow;
-        prevSmooth = smoothOffset;
         prevPattern = activePatternIdx;
         prevPlaying = isPlaying;
         bridgeRef.current?.post({
           type:         'playback',
           row:          currentRow,
-          smoothOffset,
+          smoothOffset, // Send the accurately computed offset
           patternIndex: activePatternIdx,
           isPlaying,
-        });
+          bpm:          transportState.bpm,
+          speed:        transportState.speed,
+          smoothScrolling: transportState.smoothScrolling,
+        } as any);
       }
 
-      // Update overlay positions (macroLanes) — same math as the old render loop
+      // Update overlay positions (macroLanes) — uses same smoothOffset as worker
+
       const h = dimensions.height;
       const rh = rowHeightRef.current;
       const visibleLines = Math.ceil(h / rh) + 2;
@@ -1830,6 +1868,19 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
         onDrop={handleDrop}
         {...patternGestures}
       >
+        {/* VU Meters overlay — full height, segments extrude from edit row (behind everything) */}
+        <div
+          className="absolute right-0 pointer-events-none overflow-hidden"
+          style={{ top: 0, left: LINE_NUMBER_WIDTH, bottom: 0, zIndex: 0 }}
+        >
+          <ChannelVUMeters
+            channelOffsets={channelOffsets}
+            channelWidths={channelWidths}
+            scrollLeft={scrollLeft}
+            editRowY={dimensions.height / 2}
+          />
+        </div>
+
         {/* Canvas is created imperatively in useEffect to support OffscreenCanvas transfer */}
 
         {/* Automation Lanes Overlay */}
@@ -1907,20 +1958,6 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
             boxSizing: 'border-box',
           }}
         />
-
-        {/* VU Meters overlay — temporarily disabled for scroll stutter testing */}
-        {/*
-        <div
-          className="absolute right-0 pointer-events-none z-30 overflow-hidden"
-          style={{ top: 0, left: LINE_NUMBER_WIDTH, height: `calc(50% - ${rowHeight / 2}px)` }}
-        >
-          <ChannelVUMeters
-            channelOffsets={channelOffsets}
-            channelWidths={channelWidths}
-            scrollLeft={scrollLeft}
-          />
-        </div>
-        */}
 
         {/* Cell context menu */}
         <CellContextMenu

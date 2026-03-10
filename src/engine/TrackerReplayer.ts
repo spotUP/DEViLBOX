@@ -1376,6 +1376,15 @@ export class TrackerReplayer {
             this.routedNativeEngines.add('LibopenmptSynth');
           }
 
+          // Apply stored stereo separation setting to libopenmpt
+          {
+            const settings = (await import('@stores/useSettingsStore')).useSettingsStore.getState();
+            const sep = settings.stereoSeparationMode === 'pt2'
+              ? settings.stereoSeparation * 2  // PT2 0-100 → libopenmpt 0-200
+              : settings.modplugSeparation;     // ModPlug already 0-200
+            mptEngine.setStereoSeparation(sep);
+          }
+
           // Subscribe to position updates from libopenmpt (~344 times/sec at 44.1kHz)
           // Throttle to only fire onRowChange when the row actually changes.
           // Also queue display states so smooth scrolling can interpolate between rows.

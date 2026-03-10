@@ -112,23 +112,48 @@ function linkProgram(gl: WebGL2RenderingContext, vert: string, frag: string): We
   return prog;
 }
 
-function noteToString(note: number, displayOffset = 0): string {
-  if (note === 0) return '---';
-  if (note === 97) return 'OFF';
-  const adjusted = note + displayOffset;
-  const NOTE_NAMES = ['C-', 'C#', 'D-', 'D#', 'E-', 'F-', 'F#', 'G-', 'G#', 'A-', 'A#', 'B-'];
-  const noteIndex = ((adjusted - 1) % 12 + 12) % 12;
-  const octave = Math.floor((adjusted - 1) / 12);
-  return `${NOTE_NAMES[noteIndex]}${octave}`;
+// ─── Pre-computed lookup tables (zero-alloc in hot path) ──────────────────────
+
+const NOTE_NAMES = ['C-', 'C#', 'D-', 'D#', 'E-', 'F-', 'F#', 'G-', 'G#', 'A-', 'A#', 'B-'];
+
+// Pre-compute all 256 hex byte strings
+const HEX_TABLE: string[] = new Array(256);
+const DEC_TABLE: string[] = new Array(256);
+for (let i = 0; i < 256; i++) {
+  HEX_TABLE[i] = i.toString(16).toUpperCase().padStart(2, '0');
+  DEC_TABLE[i] = i.toString(10).padStart(2, '0');
 }
 
-function hexByte(v: number): string {
-  return v.toString(16).toUpperCase().padStart(2, '0');
+// Pre-compute note strings for all 98 notes × range of display offsets (-24 to +24)
+const NOTE_CACHE = new Map<number, string[]>();
+function getNoteTable(displayOffset: number): string[] {
+  let table = NOTE_CACHE.get(displayOffset);
+  if (table) return table;
+  table = new Array(98);
+  table[0] = '---';
+  for (let n = 1; n < 97; n++) {
+    const adjusted = n + displayOffset;
+    const noteIndex = ((adjusted - 1) % 12 + 12) % 12;
+    const octave = Math.floor((adjusted - 1) / 12);
+    table[n] = `${NOTE_NAMES[noteIndex]}${octave}`;
+  }
+  table[97] = 'OFF';
+  NOTE_CACHE.set(displayOffset, table);
+  return table;
 }
 
-function decByte(v: number): string {
-  return v.toString(10).padStart(2, '0');
-}
+// Effect type char lookup (0-35 → '0'-'9','A'-'Z')
+const EFFECT_CHARS: string[] = new Array(36);
+for (let i = 0; i < 10; i++) EFFECT_CHARS[i] = i.toString();
+for (let i = 10; i < 36; i++) EFFECT_CHARS[i] = String.fromCharCode(55 + i);
+
+// Pre-parsed probability colors
+const PROB_COLORS: [number, number, number, number][] = [
+  parseColor('#f87171'),  // 0-24
+  parseColor('#fb923c'),  // 25-49
+  parseColor('#facc15'),  // 50-74
+  parseColor('#4ade80'),  // 75-99
+];
 
 // ─── Instance data arrays (pre-allocated, grown as needed) ───────────────────
 
@@ -176,6 +201,36 @@ export class TrackerGLRenderer {
   private width = 1;
   private height = 1;
   private dpr = 1;
+
+  // Cached parsed theme colors — only re-parsed when theme object changes
+  private cachedTheme: ThemeSnapshot | null = null;
+  private colors = {
+    bg:                  [0,0,0,1] as [number,number,number,number],
+    rowNormal:           [0,0,0,1] as [number,number,number,number],
+    rowHighlight:        [0,0,0,1] as [number,number,number,number],
+    centerLine:          [0,0,0,1] as [number,number,number,number],
+    cursor:              [0,0,0,1] as [number,number,number,number],
+    cursorSecondary:     [0,0,0,1] as [number,number,number,number],
+    text:                [0,0,0,1] as [number,number,number,number],
+    textMuted:           [0,0,0,1] as [number,number,number,number],
+    textNote:            [0,0,0,1] as [number,number,number,number],
+    textNoteActive:      [0,0,0,1] as [number,number,number,number],
+    textInstrument:      [0,0,0,1] as [number,number,number,number],
+    textVolume:          [0,0,0,1] as [number,number,number,number],
+    textEffect:          [0,0,0,1] as [number,number,number,number],
+    border:              [0,0,0,1] as [number,number,number,number],
+    lineNumber:          [0,0,0,1] as [number,number,number,number],
+    lineNumberHighlight: [0,0,0,1] as [number,number,number,number],
+    selection:           [0,0,0,1] as [number,number,number,number],
+    accent:              [0,0,0,1] as [number,number,number,number],
+    flagAccent:          [0.961, 0.620, 0.044, 1.0] as [number,number,number,number],
+    flagSlide:           [0.024, 0.714, 0.831, 1.0] as [number,number,number,number],
+    flagMute:            [0.980, 0.800, 0.082, 1.0] as [number,number,number,number],
+    flagHammer:          [0.133, 0.827, 0.933, 1.0] as [number,number,number,number],
+  };
+
+  // Reusable color tuple to avoid per-cell allocations
+  private readonly tmpColor: [number, number, number, number] = [0, 0, 0, 1];
 
   constructor(canvas: OffscreenCanvas) {
     const gl = canvas.getContext('webgl2', {
@@ -333,30 +388,29 @@ export class TrackerGLRenderer {
     const { width, height } = this;
     const { offsets: channelOffsets, widths: channelWidths } = layout;
 
-    const colors = {
-      bg:                  parseColor(theme.bg),
-      rowNormal:           parseColor(theme.rowNormal),
-      rowHighlight:        parseColor(theme.rowHighlight),
-      centerLine:          parseRgba(theme.accentGlow),
-      cursor:              parseColor(theme.accent),
-      cursorSecondary:     parseColor(theme.accentSecondary),
-      text:                parseColor(theme.textNote),
-      textMuted:           parseColor(theme.textMuted),
-      textNote:            parseColor(theme.textNote),
-      textNoteActive:      parseColor(theme.textNoteActive),
-      textInstrument:      parseColor(theme.textInstrument),
-      textVolume:          parseColor(theme.textVolume),
-      textEffect:          parseColor(theme.textEffect),
-      border:              parseColor(theme.border),
-      lineNumber:          parseColor(theme.lineNumber),
-      lineNumberHighlight: parseColor(theme.lineNumberHighlight),
-      selection:           parseRgba(theme.selection),
-      accent:              parseColor(theme.accent),
-      flagAccent:          [0.961, 0.620, 0.044, 1.0] as [number, number, number, number], // #f59e0b
-      flagSlide:           [0.024, 0.714, 0.831, 1.0] as [number, number, number, number], // #06b6d4
-      flagMute:            [0.980, 0.800, 0.082, 1.0] as [number, number, number, number], // #facc15
-      flagHammer:          [0.133, 0.827, 0.933, 1.0] as [number, number, number, number], // #22d3ee
-    };
+    // Re-parse theme colors only when theme reference changes
+    if (theme !== this.cachedTheme) {
+      this.cachedTheme = theme;
+      this.colors.bg                  = parseColor(theme.bg);
+      this.colors.rowNormal           = parseColor(theme.rowNormal);
+      this.colors.rowHighlight        = parseColor(theme.rowHighlight);
+      this.colors.centerLine          = parseRgba(theme.accentGlow);
+      this.colors.cursor              = parseColor(theme.accent);
+      this.colors.cursorSecondary     = parseColor(theme.accentSecondary);
+      this.colors.text                = parseColor(theme.textNote);
+      this.colors.textMuted           = parseColor(theme.textMuted);
+      this.colors.textNote            = parseColor(theme.textNote);
+      this.colors.textNoteActive      = parseColor(theme.textNoteActive);
+      this.colors.textInstrument      = parseColor(theme.textInstrument);
+      this.colors.textVolume          = parseColor(theme.textVolume);
+      this.colors.textEffect          = parseColor(theme.textEffect);
+      this.colors.border              = parseColor(theme.border);
+      this.colors.lineNumber          = parseColor(theme.lineNumber);
+      this.colors.lineNumberHighlight = parseColor(theme.lineNumberHighlight);
+      this.colors.selection           = parseRgba(theme.selection);
+      this.colors.accent              = parseColor(theme.accent);
+    }
+    const colors = this.colors;
 
     // Current row
     const currentRow = isPlaying ? playRow : cursor.rowIndex;
@@ -378,6 +432,7 @@ export class TrackerGLRenderer {
     const visibleEnd = vStart + visibleLines;
     const centerLineTop = Math.floor(height / 2) - rowH / 2;
     const baseY = centerLineTop - topLines * rowH - smoothOffset;
+    const hlInterval = ui.rowHighlightInterval ?? 4;
 
     // ── Clear ─────────────────────────────────────────────────────────────────
     if (ui.trackerVisualBg) {
@@ -455,7 +510,6 @@ export class TrackerGLRenderer {
       if (y + rowH < 0 || y > height) continue;
 
       if (!ui.trackerVisualBg) {
-        const hlInterval = ui.rowHighlightInterval ?? 4;
         const isHL = rowIndex % hlInterval === 0;
         const bgColor = isHL ? colors.rowHighlight : colors.rowNormal;
         const alpha = isGhostRow ? bgColor[3] * 0.35 : bgColor[3];
@@ -494,6 +548,9 @@ export class TrackerGLRenderer {
     // PASS 2 — Glyphs (all visible cell text)
     // ═══════════════════════════════════════════════════════════════════════════
 
+    // Pre-compute note lookup table outside the loop
+    const noteTable = getNoteTable(ui.noteDisplayOffset);
+
     for (let i = vStart; i < visibleEnd; i++) {
       let rowIndex: number;
       let isGhostRow = false;
@@ -525,23 +582,21 @@ export class TrackerGLRenderer {
       if (y + rowH < 0 || y > height) continue;
 
       const ghostAlpha = isGhostRow ? 0.35 : 1.0;
-      const hlInterval = ui.rowHighlightInterval ?? 4;
       const isHL = rowIndex % hlInterval === 0;
 
-      // Line number
+      // Line number — use pre-computed hex/dec tables
       let lineNumStr: string;
       if (ui.showBeatLabels) {
         const beat = Math.floor(rowIndex / hlInterval) + 1;
         const tick = (rowIndex % hlInterval) + 1;
         lineNumStr = `${beat}.${tick}`;
       } else {
-        lineNumStr = ui.useHex
-          ? rowIndex.toString(16).toUpperCase().padStart(2, '0')
-          : rowIndex.toString(10).padStart(2, '0');
+        lineNumStr = ui.useHex ? HEX_TABLE[rowIndex & 0xFF] : DEC_TABLE[rowIndex & 0xFF];
       }
       const lnColor = isHL ? colors.lineNumberHighlight : colors.lineNumber;
+      this.setTmpColor(lnColor, ghostAlpha);
       this.addGlyphString(lineNumStr, 4, y + (rowH - atlas.glyphLogicalHeight) / 2,
-        atlas, [lnColor[0], lnColor[1], lnColor[2], lnColor[3] * ghostAlpha]);
+        atlas, this.tmpColor);
 
       // Each channel
       for (let ch = 0; ch < numChannels; ch++) {
@@ -559,55 +614,52 @@ export class TrackerGLRenderer {
         const gy = y + (rowH - atlas.glyphLogicalHeight) / 2;
 
         if (isCollapsed) {
-          // Just note column
-          const noteStr = noteToString(cell.note ?? 0, ui.noteDisplayOffset);
+          // Just note column — use pre-computed note table
           const nc = cell.note === 0 ? colors.textMuted : colors.textNote;
-          this.addGlyphString(noteStr, x, gy, atlas,
-            [nc[0], nc[1], nc[2], nc[3] * ghostAlpha]);
+          this.setTmpColor(nc, ghostAlpha);
+          this.addGlyphString(noteTable[cell.note ?? 0] ?? '---', x, gy, atlas, this.tmpColor);
           continue;
         }
 
-        // Note
+        // Note — use pre-computed note table
         const isCurrentPlayingRow = isPlaying && !isGhostRow && rowIndex === currentRow;
         const cellNote = cell.note ?? 0;
         if (!ui.blankEmpty || cellNote !== 0) {
           const nc = cellNote === 0 ? colors.textMuted
                    : cellNote === 97 ? colors.textEffect
                    : (isCurrentPlayingRow && cellNote > 0 ? colors.textNoteActive : colors.textNote);
-          this.addGlyphString(noteToString(cellNote, ui.noteDisplayOffset), x, gy, atlas,
-            [nc[0], nc[1], nc[2], nc[3] * ghostAlpha]);
+          this.setTmpColor(nc, ghostAlpha);
+          this.addGlyphString(noteTable[cellNote] ?? '---', x, gy, atlas, this.tmpColor);
         }
 
         // Parameters
         let px = x + noteWidth + 4;
         const effectCols = chData.effectCols ?? 2;
 
-        // Instrument
+        // Instrument — use HEX_TABLE lookup
         const inst = cell.instrument ?? 0;
         if (inst !== 0) {
-          const ic = colors.textInstrument;
-          this.addGlyphString(hexByte(inst), px, gy, atlas,
-            [ic[0], ic[1], ic[2], ic[3] * ghostAlpha]);
+          this.setTmpColor(colors.textInstrument, ghostAlpha);
+          this.addGlyphString(HEX_TABLE[inst & 0xFF], px, gy, atlas, this.tmpColor);
         } else if (!ui.blankEmpty) {
-          const mc = colors.textMuted;
-          this.addGlyphString('..', px, gy, atlas, [mc[0], mc[1], mc[2], mc[3] * ghostAlpha]);
+          this.setTmpColor(colors.textMuted, ghostAlpha);
+          this.addGlyphString('..', px, gy, atlas, this.tmpColor);
         }
         px += CHAR_WIDTH * 2 + 4;
 
-        // Volume
+        // Volume — use HEX_TABLE lookup
         const vol = cell.volume ?? 0;
         const hasVol = vol >= 0x10 && vol <= 0x50;
         if (hasVol) {
-          const vc = colors.textVolume;
-          this.addGlyphString(hexByte(vol), px, gy, atlas,
-            [vc[0], vc[1], vc[2], vc[3] * ghostAlpha]);
+          this.setTmpColor(colors.textVolume, ghostAlpha);
+          this.addGlyphString(HEX_TABLE[vol & 0xFF], px, gy, atlas, this.tmpColor);
         } else if (!ui.blankEmpty) {
-          const mc = colors.textMuted;
-          this.addGlyphString('..', px, gy, atlas, [mc[0], mc[1], mc[2], mc[3] * ghostAlpha]);
+          this.setTmpColor(colors.textMuted, ghostAlpha);
+          this.addGlyphString('..', px, gy, atlas, this.tmpColor);
         }
         px += CHAR_WIDTH * 2 + 4;
 
-        // Effect columns (variable)
+        // Effect columns (variable) — use EFFECT_CHARS and HEX_TABLE lookups
         for (let ecol = 0; ecol < effectCols; ecol++) {
           let colEffTyp = 0;
           let colEff = 0;
@@ -619,13 +671,11 @@ export class TrackerGLRenderer {
 
           const hasEff = colEffTyp !== 0 || colEff !== 0;
           if (hasEff) {
-            const ec = colors.textEffect;
-            const effChar = colEffTyp < 10 ? colEffTyp.toString() : String.fromCharCode(55 + colEffTyp);
-            this.addGlyphString(effChar + hexByte(colEff), px, gy, atlas,
-              [ec[0], ec[1], ec[2], ec[3] * ghostAlpha]);
+            this.setTmpColor(colors.textEffect, ghostAlpha);
+            this.addGlyphString((EFFECT_CHARS[colEffTyp] ?? '?') + HEX_TABLE[colEff & 0xFF], px, gy, atlas, this.tmpColor);
           } else if (!ui.blankEmpty) {
-            const mc = colors.textMuted;
-            this.addGlyphString('...', px, gy, atlas, [mc[0], mc[1], mc[2], mc[3] * ghostAlpha]);
+            this.setTmpColor(colors.textMuted, ghostAlpha);
+            this.addGlyphString('...', px, gy, atlas, this.tmpColor);
           }
           px += CHAR_WIDTH * 3 + 4;
         }
@@ -641,7 +691,8 @@ export class TrackerGLRenderer {
             else if (flagVal === 3) { flagStr = 'M'; fc = colors.flagMute; }
             else if (flagVal === 4) { flagStr = 'H'; fc = colors.flagHammer; }
             if (flagVal || !ui.blankEmpty) {
-              this.addGlyphString(flagStr, fx, gy, atlas, [fc[0], fc[1], fc[2], fc[3] * ghostAlpha]);
+              this.setTmpColor(fc, ghostAlpha);
+              this.addGlyphString(flagStr, fx, gy, atlas, this.tmpColor);
             }
           };
           drawFlag(cell.flag1, px);
@@ -650,13 +701,13 @@ export class TrackerGLRenderer {
           px += CHAR_WIDTH + 4;
         }
 
-        // Probability
+        // Probability — use pre-parsed PROB_COLORS instead of parseColor() in hot loop
         if (cell.probability !== undefined && cell.probability > 0) {
           const p = Math.min(99, Math.max(0, cell.probability));
-          const probHex = p >= 75 ? '#4ade80' : p >= 50 ? '#facc15' : p >= 25 ? '#fb923c' : '#f87171';
-          const pc = parseColor(probHex);
-          const probStr = ui.useHex ? hexByte(p) : decByte(p);
-          this.addGlyphString(probStr, px, gy, atlas, [pc[0], pc[1], pc[2], pc[3] * ghostAlpha]);
+          const pc = p >= 75 ? PROB_COLORS[3] : p >= 50 ? PROB_COLORS[2] : p >= 25 ? PROB_COLORS[1] : PROB_COLORS[0];
+          const probStr = ui.useHex ? HEX_TABLE[p] : DEC_TABLE[p];
+          this.setTmpColor(pc, ghostAlpha);
+          this.addGlyphString(probStr, px, gy, atlas, this.tmpColor);
         }
 
         // Selection highlight (rect pass would be cleaner but we need to do it here per row)
@@ -756,27 +807,27 @@ export class TrackerGLRenderer {
         const di  = cursor.digitIndex;
         let charStr = '';
         if (col === 'note') {
-          charStr = noteToString(caretCell.note ?? 0, ui.noteDisplayOffset);
+          charStr = noteTable[caretCell.note ?? 0] ?? '---';
         } else if (col === 'instrument') {
-          const s = (caretCell.instrument ?? 0) === 0 ? '..' : hexByte(caretCell.instrument ?? 0);
+          const s = (caretCell.instrument ?? 0) === 0 ? '..' : HEX_TABLE[(caretCell.instrument ?? 0) & 0xFF];
           charStr = s[di] ?? '.';
         } else if (col === 'volume') {
           const v = caretCell.volume ?? 0;
-          const s = (v >= 0x10 && v <= 0x50) ? hexByte(v) : '..';
+          const s = (v >= 0x10 && v <= 0x50) ? HEX_TABLE[v & 0xFF] : '..';
           charStr = s[di] ?? '.';
         } else if (col === 'effTyp') {
           const et = caretCell.effTyp ?? 0; const ep = caretCell.eff ?? 0;
-          charStr = (et !== 0 || ep !== 0) ? et.toString(16).toUpperCase() : '.';
+          charStr = (et !== 0 || ep !== 0) ? (EFFECT_CHARS[et] ?? '?') : '.';
         } else if (col === 'effParam') {
           const et = caretCell.effTyp ?? 0; const ep = caretCell.eff ?? 0;
-          const s = (et !== 0 || ep !== 0) ? hexByte(ep) : '..';
+          const s = (et !== 0 || ep !== 0) ? HEX_TABLE[ep & 0xFF] : '..';
           charStr = s[di] ?? '.';
         } else if (col === 'effTyp2') {
           const et2 = caretCell.effTyp2 ?? 0; const ep2 = caretCell.eff2 ?? 0;
-          charStr = (et2 !== 0 || ep2 !== 0) ? et2.toString(16).toUpperCase() : '.';
+          charStr = (et2 !== 0 || ep2 !== 0) ? (EFFECT_CHARS[et2] ?? '?') : '.';
         } else if (col === 'effParam2') {
           const et2 = caretCell.effTyp2 ?? 0; const ep2 = caretCell.eff2 ?? 0;
-          const s = (et2 !== 0 || ep2 !== 0) ? hexByte(ep2) : '..';
+          const s = (et2 !== 0 || ep2 !== 0) ? HEX_TABLE[ep2 & 0xFF] : '..';
           charStr = s[di] ?? '.';
         } else if (col === 'flag1') {
           charStr = caretCell.flag1 === 1 ? 'A' : caretCell.flag1 === 2 ? 'S' : '.';
@@ -784,7 +835,7 @@ export class TrackerGLRenderer {
           charStr = caretCell.flag2 === 1 ? 'A' : caretCell.flag2 === 2 ? 'S' : '.';
         } else if (col === 'probability') {
           const p = caretCell.probability ?? 0;
-          const s = p > 0 ? (ui.useHex ? hexByte(p) : decByte(p)) : '..';
+          const s = p > 0 ? (ui.useHex ? HEX_TABLE[p & 0xFF] : DEC_TABLE[p & 0xFF]) : '..';
           charStr = s[di] ?? '.';
         }
 
@@ -850,6 +901,14 @@ export class TrackerGLRenderer {
     this.glyphCount++;
   }
 
+  /** Set tmpColor to base color × alpha multiplier (avoids allocating new arrays) */
+  private setTmpColor(base: [number,number,number,number], alphaMul: number): void {
+    this.tmpColor[0] = base[0];
+    this.tmpColor[1] = base[1];
+    this.tmpColor[2] = base[2];
+    this.tmpColor[3] = base[3] * alphaMul;
+  }
+
   private addGlyphString(
     str: string,
     x: number,
@@ -858,8 +917,9 @@ export class TrackerGLRenderer {
     color: [number,number,number,number],
   ): void {
     let cx = x;
-    for (const ch of str) {
-      const info = atlas.lookup.get(ch);
+    // Index-based iteration avoids creating a string iterator object
+    for (let si = 0; si < str.length; si++) {
+      const info = atlas.lookup.get(str[si]);
       if (info) {
         this.addGlyph(cx, y, info, color);
         cx += info.logicalWidth;

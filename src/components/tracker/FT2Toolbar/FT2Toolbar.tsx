@@ -167,8 +167,9 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
   const { masterEffects } = useAudioStore(useShallow((s) => ({
     masterEffects: s.masterEffects,
   })));
-  const { oscilloscopeVisible } = useUIStore(useShallow((s) => ({
+  const { oscilloscopeVisible, modalOpen } = useUIStore(useShallow((s) => ({
     oscilloscopeVisible: s.oscilloscopeVisible,
+    modalOpen: s.modalOpen,
   })));
   const { curves, reset: resetAutomation } = useAutomationStore(useShallow((s) => ({
     curves: s.curves,
@@ -716,11 +717,17 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
         <Button variant="ghost" size="sm" onClick={onShowExport}>Export</Button>
         <Button variant="ghost" size="sm" onClick={() => useUIStore.getState().openNewSongWizard()}>New</Button>
         <Button variant="ghost" size="sm" onClick={() => setShowClearModal(true)}>Clear</Button>
+        <Button variant="ghost" size="sm" onClick={() => fileInputRef.current?.click()}>Import</Button>
         <Button variant="ghost" size="sm" onClick={onShowPatternOrder}>Order</Button>
         <Button variant="ghost" size="sm" onClick={onShowInstruments}>Instruments</Button>
-        <Button variant="ghost" size="sm" onClick={onShowDrumpads}>Pads</Button>                        
+        <Button variant="ghost" size="sm" onClick={() => useUIStore.getState().openModal('furnacePresets')}>Furnace</Button>
+        <Button variant="ghost" size="sm" onClick={onShowDrumpads}>Pads</Button>
         <Button variant={showMasterFX ? 'primary' : 'ghost'} size="sm" onClick={onShowMasterFX}>Master FX</Button>
-        
+        <Button
+          variant={modalOpen === 'instrumentFx' ? 'primary' : 'ghost'}
+          size="sm"
+          onClick={() => { const s = useUIStore.getState(); s.modalOpen === 'instrumentFx' ? s.closeModal() : s.openModal('instrumentFx'); }}
+        >Inst FX</Button>
         <Button variant={aiOpen ? 'primary' : 'ghost'} size="sm" onClick={toggleAI}>AI</Button>
         <Button variant="ghost" size="sm" onClick={() => onShowHelp?.('chip-effects')}>Reference</Button>
         <Button variant="ghost" size="sm" onClick={() => onShowHelp?.('shortcuts')}>Help</Button>

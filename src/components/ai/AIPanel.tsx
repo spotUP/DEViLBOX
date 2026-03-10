@@ -4,7 +4,7 @@
  */
 
 import { useEffect, useRef, useCallback, useState, useMemo } from 'react';
-import { useAIStore, AI_MODELS } from '@stores/useAIStore';
+import { useAIStore, AI_PROVIDERS, getModelsForProvider } from '@stores/useAIStore';
 import { useTrackerStore } from '@stores/useTrackerStore';
 import { useTransportStore } from '@stores/useTransportStore';
 import { useInstrumentStore } from '@stores/useInstrumentStore';
@@ -19,7 +19,9 @@ export const AIPanel: React.FC = () => {
   const error = useAIStore((s) => s.error);
   const close = useAIStore((s) => s.close);
   const clearHistory = useAIStore((s) => s.clearHistory);
+  const provider = useAIStore((s) => s.provider);
   const model = useAIStore((s) => s.model);
+  const setProvider = useAIStore((s) => s.setProvider);
   const setModel = useAIStore((s) => s.setModel);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -68,7 +70,7 @@ export const AIPanel: React.FC = () => {
 
   return (
     <div
-      className="fixed right-0 top-0 bottom-0 w-[380px] z-[45] flex flex-col bg-dark-bg border-l border-dark-border shadow-xl"
+      className="fixed right-0 top-0 bottom-0 w-[440px] z-[45] flex flex-col bg-dark-bg border-l border-dark-border shadow-xl"
       style={{ animation: 'slideInRight 0.2s ease-out' }}
       onKeyDown={stopPropagation}
     >
@@ -76,9 +78,25 @@ export const AIPanel: React.FC = () => {
       <div className="flex items-center justify-between px-3 py-2 border-b border-dark-border shrink-0">
         <span className="text-sm font-semibold text-text-primary">AI</span>
         <div className="flex items-center gap-1">
+          {/* Provider toggle */}
+          <div className="flex items-center bg-dark-surface rounded overflow-hidden border border-dark-border mr-1">
+            {AI_PROVIDERS.map((p) => (
+              <button
+                key={p.id}
+                onClick={() => setProvider(p.id)}
+                className={`px-1.5 py-0.5 text-[10px] transition-colors ${
+                  provider === p.id
+                    ? 'bg-dark-hover text-white font-semibold'
+                    : 'text-text-muted hover:text-text-primary'
+                }`}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
           {/* Model selector */}
           <div className="flex items-center bg-dark-surface rounded overflow-hidden border border-dark-border">
-            {AI_MODELS.map((m) => (
+            {getModelsForProvider(provider).map((m) => (
               <button
                 key={m.id}
                 onClick={() => setModel(m.id)}
