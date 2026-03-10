@@ -4,7 +4,6 @@
 
 export const VISUALIZER_MODES = [
   'pattern',
-  'spectrumBars',
   'circularSpectrum',
   'waveformTerrain',
   'plasmaField',
@@ -50,7 +49,6 @@ export type WebGLVisualizerMode = Exclude<VisualizerMode,
 
 export const MODE_LABELS: Record<VisualizerMode, string> = {
   pattern: 'PATTERN',
-  spectrumBars: 'SPECTRUM',
   circularSpectrum: 'RADIAL',
   waveformTerrain: 'TERRAIN',
   plasmaField: 'PLASMA',

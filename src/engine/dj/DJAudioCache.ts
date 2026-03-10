@@ -35,6 +35,14 @@ export interface CachedAudio {
   rmsDb?: number;                  // RMS loudness in dB (for auto-gain)
   peakDb?: number;                 // Peak level in dB
   analysisVersion?: number;        // Bump to re-analyze when algorithm improves
+  
+  // ── Genre classification ──
+  genrePrimary?: string;           // e.g. "Electronic", "Hip Hop"
+  genreSubgenre?: string;          // e.g. "Techno", "Drum n Bass"
+  genreConfidence?: number;        // 0-1
+  mood?: string;                   // e.g. "Energetic", "Chill"
+  energy?: number;                 // 0-1 (low → high energy)
+  danceability?: number;           // 0-1
 }
 
 /** Beat grid data — compatible with Serato beat markers */
@@ -325,6 +333,13 @@ export async function updateCacheAnalysis(
     onsets?: number[];
     frequencyPeaks?: number[][];
     analysisVersion?: number;
+    // Genre classification
+    genrePrimary?: string;
+    genreSubgenre?: string;
+    genreConfidence?: number;
+    mood?: string;
+    energy?: number;
+    danceability?: number;
   },
 ): Promise<void> {
   try {

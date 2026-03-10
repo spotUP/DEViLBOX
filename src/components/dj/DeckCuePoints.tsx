@@ -12,6 +12,7 @@
 import React, { useCallback } from 'react';
 import { useDJStore, type HotCue } from '@/stores/useDJStore';
 import { getDJEngine } from '@/engine/dj/DJEngine';
+import { markSeek } from './seekGuard';
 
 // Default hot cue colors (CDJ-style: varied neon palette)
 const HOT_CUE_COLORS = [
@@ -51,6 +52,7 @@ export const DeckCuePoints: React.FC<DeckCuePointsProps> = ({ deckId }) => {
         // Jump to cue position
         const seconds = cue.position / 1000;
         if (deck.playbackMode === 'audio') {
+          markSeek(deckId);
           deck.audioPlayer.seek(seconds);
           store.setDeckState(deckId, {
             audioPosition: seconds,

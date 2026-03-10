@@ -48,7 +48,8 @@ export class DeckEngine {
   // Audio chain nodes
   private deckGain: Tone.Gain;
   private eq3: Tone.EQ3;
-  private filter: Tone.Filter;
+  private filterHPF: Tone.Filter;
+  private filterLPF: Tone.Filter;
   private pitchShift: Tone.PitchShift;  // For key lock (compensates pitch when tempo changes)
   readonly channelGain: Tone.Gain;
 
@@ -118,20 +119,22 @@ export class DeckEngine {
   constructor(options: DeckEngineOptions) {
     this.id = options.id;
 
-    // Create the audio chain nodes (order: replayer → deckGain → EQ3 → filter → pitchShift → channelGain → output)
+    // Create the audio chain nodes (order: replayer → deckGain → EQ3 → HPF → LPF → pitchShift → channelGain → output)
     this.deckGain = new Tone.Gain(1);
     this.eq3 = new Tone.EQ3({ low: 0, mid: 0, high: 0 });
-    this.filter = new Tone.Filter({ type: 'lowpass', frequency: 20000, Q: 1 });
+    this.filterHPF = new Tone.Filter({ type: 'highpass', frequency: 20, Q: 1, rolloff: -24 });
+    this.filterLPF = new Tone.Filter({ type: 'lowpass', frequency: 20000, Q: 1, rolloff: -24 });
     this.pitchShift = new Tone.PitchShift({ pitch: 0, windowSize: 0.1, delayTime: 0 });
     this.channelGain = new Tone.Gain(1);
     this.meter = new Tone.Meter({ smoothing: 0.8 });
     this.waveformAnalyser = new Tone.Analyser('waveform', 256);
     this.fftAnalyser = new Tone.FFT(1024);
 
-    // Wire: deckGain → EQ3 → filter → pitchShift → channelGain → [output + meter + analyser]
+    // Wire: deckGain → EQ3 → HPF → LPF → pitchShift → channelGain → [output + meter + analyser]
     this.deckGain.connect(this.eq3);
-    this.eq3.connect(this.filter);
-    this.filter.connect(this.pitchShift);
+    this.eq3.connect(this.filterHPF);
+    this.filterHPF.connect(this.filterLPF);
+    this.filterLPF.connect(this.pitchShift);
     this.pitchShift.connect(this.channelGain);
     this.channelGain.connect(options.outputNode);
     this.channelGain.connect(this.meter);
@@ -222,7 +225,7 @@ export class DeckEngine {
       const bufferId = this.id === 'A' ? 0 : this.id === 'B' ? 1 : 2;
       this.scratchBuffer = new DeckScratchBuffer(ctx, bufferId);
       await this.scratchBuffer.init();
-      this.scratchBuffer.wireIntoChain(this.filter, this.channelGain);
+      this.scratchBuffer.wireIntoChain(this.filterLPF, this.channelGain);
       this.scratchBufferReady = true;
     } catch (err) {
       console.warn('[DeckEngine] Scratch buffer init failed, reverse scratch disabled:', err);
@@ -924,25 +927,33 @@ export class DeckEngine {
   setFilterPosition(position: number): void {
     this.filterPosition = Math.max(-1, Math.min(1, position));
 
+    // Both filters are always in the chain: eq3 → HPF → LPF → pitchShift
+    // At center (0): HPF@20Hz + LPF@20kHz = transparent bypass
+    // Moving right (+): LPF sweeps down from 20kHz to 100Hz, HPF stays at 20Hz
+    // Moving left (-): HPF sweeps up from 20Hz to 10kHz, LPF stays at 20kHz
+
+    const RAMP = 0.03; // 30ms ramp for smooth sweeps
+
     if (this.filterPosition >= 0) {
-      // 0 → +1: LPF sweep from 20kHz (fully open / bypass) down to 100Hz
-      this.filter.type = 'lowpass';
-      // At 0: freq = 20000 (bypass). At 1: freq = 100.
-      const freq = 20000 * Math.pow(100 / 20000, this.filterPosition);
-      this.filter.frequency.rampTo(freq, 0.05);
+      // LPF active: sweep 20kHz → 100Hz as position goes 0 → 1
+      const lpfFreq = 20000 * Math.pow(100 / 20000, this.filterPosition);
+      this.filterLPF.frequency.rampTo(lpfFreq, RAMP);
+      // HPF fully open
+      this.filterHPF.frequency.rampTo(20, RAMP);
     } else {
-      // -1 → 0: HPF sweep from 10kHz down to 20Hz (bypass)
-      this.filter.type = 'highpass';
+      // HPF active: sweep 20Hz → 10kHz as position goes 0 → -1
       const amount = -this.filterPosition; // 0..1
-      // At 0 (amount=0): freq = 20 (bypass). At -1 (amount=1): freq = 10kHz.
-      const freq = 20 * Math.pow(10000 / 20, amount);
-      this.filter.frequency.rampTo(freq, 0.05);
+      const hpfFreq = 20 * Math.pow(10000 / 20, amount);
+      this.filterHPF.frequency.rampTo(hpfFreq, RAMP);
+      // LPF fully open
+      this.filterLPF.frequency.rampTo(20000, RAMP);
     }
   }
 
   setFilterResonance(q: number): void {
     this.filterResonance = Math.max(0.5, Math.min(15, q));
-    this.filter.Q.rampTo(this.filterResonance, 0.05);
+    this.filterHPF.Q.rampTo(this.filterResonance, 0.05);
+    this.filterLPF.Q.rampTo(this.filterResonance, 0.05);
   }
 
   // ==========================================================================
@@ -1106,7 +1117,8 @@ export class DeckEngine {
     this.waveformAnalyser.dispose();
     this.meter.dispose();
     this.channelGain.dispose();
-    this.filter.dispose();
+    this.filterHPF.dispose();
+    this.filterLPF.dispose();
     this.pitchShift.dispose();
     this.eq3.dispose();
     this.deckGain.dispose();

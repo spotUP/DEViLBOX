@@ -9,7 +9,7 @@ import { Play, Pause, Disc3, Link, Lock } from 'lucide-react';
 import { useDJStore } from '@/stores/useDJStore';
 import { getDJEngine } from '@/engine/dj/DJEngine';
 import { DJBeatSync } from '@/engine/dj/DJBeatSync';
-import { syncBPMToOther, phaseAlign } from '@/engine/dj/DJAutoSync';
+import { syncBPMToOther, phaseAlign, quantizedPlay } from '@/engine/dj/DJAutoSync';
 import { getQuantizeMode, setQuantizeMode, type QuantizeMode } from '@/engine/dj/DJQuantizedFX';
 
 interface DeckTransportProps {
@@ -24,7 +24,11 @@ export const DeckTransport: React.FC<DeckTransportProps> = ({ deckId }) => {
   const otherDeckId = deckId === 'A' ? 'B' : 'A';
   const thisBPM = useDJStore((s) => s.decks[deckId].effectiveBPM);
   const otherBPM = useDJStore((s) => s.decks[otherDeckId].effectiveBPM);
+  const otherIsPlaying = useDJStore((s) => s.decks[otherDeckId].isPlaying);
   const isSynced = Math.abs(thisBPM - otherBPM) < 0.5;
+
+  const [qMode, setQMode] = useState<QuantizeMode>(getQuantizeMode);
+  const [isPending, setIsPending] = useState(false);
 
   const handlePlayPause = useCallback(async () => {
     const engine = getDJEngine();
@@ -34,18 +38,26 @@ export const DeckTransport: React.FC<DeckTransportProps> = ({ deckId }) => {
       deck.pause();
       setDeckPlaying(deckId, false);
     } else {
-      await deck.play();
-      setDeckPlaying(deckId, true);
+      // Use quantized play if:
+      // 1. Quantize mode is 'beat' or 'bar'
+      // 2. The other deck is currently playing
+      const currentQMode = getQuantizeMode();
+      if (currentQMode !== 'off' && otherIsPlaying) {
+        setIsPending(true);
+        await quantizedPlay(deckId, currentQMode);
+        setIsPending(false);
+      } else {
+        await deck.play();
+        setDeckPlaying(deckId, true);
+      }
     }
-  }, [deckId, isPlaying, setDeckPlaying]);
+  }, [deckId, isPlaying, otherIsPlaying, setDeckPlaying]);
 
   const handleCue = useCallback(() => {
     const engine = getDJEngine();
     const deck = engine.getDeck(deckId);
     deck.cue(cuePoint);
   }, [deckId, cuePoint]);
-
-  const [qMode, setQMode] = useState<QuantizeMode>(getQuantizeMode);
 
   const handleQuantizeCycle = useCallback(() => {
     const modes: QuantizeMode[] = ['off', 'beat', 'bar'];
@@ -109,17 +121,20 @@ export const DeckTransport: React.FC<DeckTransportProps> = ({ deckId }) => {
       {/* Play / Pause */}
       <button
         onClick={handlePlayPause}
+        disabled={isPending}
         className={`
           flex items-center justify-center w-10 h-10 rounded-lg
           transition-all duration-100 border border-dark-border
           active:translate-y-[1px]
           ${
-            isPlaying
-              ? 'bg-green-600 text-white'
-              : 'bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover'
+            isPending
+              ? 'bg-yellow-600 text-white animate-pulse'
+              : isPlaying
+                ? 'bg-green-600 text-white'
+                : 'bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover'
           }
         `}
-        title={isPlaying ? 'Pause' : 'Play'}
+        title={isPending ? 'Waiting for beat...' : isPlaying ? 'Pause' : 'Play'}
       >
         {isPlaying ? <Pause size={18} /> : <Play size={18} />}
       </button>
@@ -162,21 +177,21 @@ export const DeckTransport: React.FC<DeckTransportProps> = ({ deckId }) => {
       <button
         onClick={handleQuantizeCycle}
         className={`
-          flex items-center justify-center h-10 px-2 rounded-lg
-          border border-dark-border text-[10px] font-bold tracking-wide
+          flex items-center justify-center h-10 px-2.5 rounded-lg
+          border text-[11px] font-bold tracking-wide
           active:translate-y-[1px]
           transition-all duration-100
           ${
             qMode === 'off'
-              ? 'bg-dark-bgTertiary text-text-muted hover:bg-dark-bgHover'
+              ? 'bg-dark-bgTertiary text-text-muted border-dark-border hover:bg-dark-bgHover'
               : qMode === 'beat'
-                ? 'bg-violet-600/30 text-violet-300 border-violet-500/40'
-                : 'bg-fuchsia-600/30 text-fuchsia-300 border-fuchsia-500/40'
+                ? 'bg-violet-600/40 text-violet-200 border-violet-400/60 shadow-[0_0_6px_rgba(139,92,246,0.3)]'
+                : 'bg-fuchsia-600/40 text-fuchsia-200 border-fuchsia-400/60 shadow-[0_0_6px_rgba(217,70,239,0.3)]'
           }
         `}
-        title={`Quantize: ${qMode.toUpperCase()} (click to cycle)`}
+        title={`Quantize: ${qMode.toUpperCase()}\nOFF = free play\nBEAT = snap to beat\nBAR = snap to bar\n(click to cycle)`}
       >
-        Q{qMode !== 'off' && <span className="ml-0.5 opacity-70">{qMode === 'beat' ? '♩' : '𝄁'}</span>}
+        {qMode === 'off' ? 'Q' : qMode === 'beat' ? 'Q:BT' : 'Q:BR'}
       </button>
 
       {/* Key Lock (master tempo) */}

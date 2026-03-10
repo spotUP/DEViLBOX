@@ -30,6 +30,15 @@ interface InitRequest {
 
 type WorkerMessage = AnalyzeRequest | InitRequest;
 
+interface GenreResult {
+  primary: string;              // Primary genre (e.g. "Electronic", "Rock")
+  subgenre: string;             // Sub-genre (e.g. "Techno", "Drum n Bass")
+  confidence: number;           // 0-1
+  mood: string;                 // e.g. "Energetic", "Chill", "Dark"
+  energy: number;               // 0-1 (low energy → high energy)
+  danceability: number;         // 0-1
+}
+
 interface AnalysisResult {
   bpm: number;
   bpmConfidence: number;        // 0-1 normalized
@@ -42,6 +51,7 @@ interface AnalysisResult {
   frequencyPeaks: number[][];   // [lowBand[], midBand[], highBand[]] waveform peaks
   rmsDb: number;                // RMS loudness in dB (for auto-gain)
   peakDb: number;               // Peak level in dB
+  genre: GenreResult;           // Genre classification
 }
 
 // ── Essentia Engine State ────────────────────────────────────────────────────
@@ -343,6 +353,514 @@ function computeFrequencyPeaks(
   return [normalize(lowPeaks), normalize(midPeaks), normalize(highPeaks)];
 }
 
+/**
+ * Classify genre based on audio features.
+ * Uses BPM, key, spectral characteristics, rhythm patterns, and energy.
+ * 
+ * Comprehensive heuristic classifier for tracker/electronic music genres.
+ * Covers: Techno, House, Trance, D&B, Breakbeat, Chiptune, Synthwave, 
+ * Industrial, Ambient, Hip-Hop, and many subgenres.
+ */
+function classifyGenre(
+  bpm: number,
+  key: string,
+  timeSignature: number,
+  frequencyPeaks: number[][],
+  rmsDb: number,
+  beats: number[],
+  _mono: Float32Array,
+  _sampleRate: number,
+): GenreResult {
+  // ── Spectral Feature Extraction ──────────────────────────────────────────
+  const [lowBand, midBand, highBand] = frequencyPeaks;
+  
+  // Average energy per band (sub-bass/bass, mids, highs)
+  const avgLow = lowBand.reduce((a, b) => a + b, 0) / lowBand.length;
+  const avgMid = midBand.reduce((a, b) => a + b, 0) / midBand.length;
+  const avgHigh = highBand.reduce((a, b) => a + b, 0) / highBand.length;
+  const totalEnergy = avgLow + avgMid + avgHigh + 0.001;
+  
+  // Normalized ratios
+  const bassRatio = avgLow / totalEnergy;      // Heavy bass = techno, dub, hip-hop
+  const midRatio = avgMid / totalEnergy;       // Strong mids = acid, vocals, guitars
+  const highRatio = avgHigh / totalEnergy;     // High = cymbals, hi-hats, brightness
+  
+  // Spectral balance indicators
+  const isBassHeavy = bassRatio > 0.45;
+  const isMidHeavy = midRatio > 0.4;
+  const isBright = avgHigh > avgLow * 0.8;
+  const isDark = avgLow > avgHigh * 2;
+  
+  // Spectral variance (how much energy varies - indicates complexity)
+  const spectralVariance = Math.sqrt(
+    Math.pow(bassRatio - 0.33, 2) + 
+    Math.pow(midRatio - 0.33, 2) + 
+    Math.pow(highRatio - 0.33, 2)
+  );
+  const isBalanced = spectralVariance < 0.15;
+  
+  // ── Rhythm Feature Extraction ────────────────────────────────────────────
+  
+  // Beat regularity (variance in beat intervals)
+  let beatVariance = 0;
+  if (beats.length > 2) {
+    const intervals: number[] = [];
+    for (let i = 1; i < beats.length; i++) {
+      intervals.push(beats[i] - beats[i - 1]);
+    }
+    const avgInterval = intervals.reduce((a, b) => a + b, 0) / intervals.length;
+    beatVariance = intervals.reduce((a, b) => a + Math.pow(b - avgInterval, 2), 0) / intervals.length;
+  }
+  const beatRegularity = Math.max(0, 1 - beatVariance * 10); // 0-1, higher = more regular
+  
+  // Rhythm pattern indicators
+  const isFourOnFloor = beatRegularity > 0.65 && beats.length > 16;
+  const isSyncopated = beatRegularity < 0.5 && beats.length > 8;
+  const isBreakbeat = beatRegularity > 0.3 && beatRegularity < 0.65;
+  
+  // Beat density (beats per second - indicates complexity)
+  const trackDuration = beats.length > 1 ? beats[beats.length - 1] - beats[0] : 1;
+  const beatDensity = beats.length / Math.max(trackDuration, 1);
+  const isDense = beatDensity > 3; // More than 3 beats/sec at detected tempo
+  
+  // ── Energy & Dynamics ────────────────────────────────────────────────────
+  
+  // Energy (normalized from dB)
+  const energy = Math.min(1, Math.max(0, (rmsDb + 40) / 40)); // -40dB → 0, 0dB → 1
+  const isHighEnergy = energy > 0.65;
+  const isMidEnergy = energy > 0.4 && energy <= 0.65;
+  const isLowEnergy = energy <= 0.4;
+  
+  // ── Key/Mode Analysis ────────────────────────────────────────────────────
+  
+  const isMinor = key.toLowerCase().includes('minor');
+  const isMajor = key.toLowerCase().includes('major');
+  
+  // ── Half-time/Double-time Correction ─────────────────────────────────────
+  // BPM detection can sometimes detect half or double the actual tempo
+  
+  let effectiveBpm = bpm;
+  
+  // If BPM is very low but energy is high with regular beats, likely half-time
+  if (bpm >= 55 && bpm < 75 && isHighEnergy && isFourOnFloor) {
+    effectiveBpm = bpm * 2;
+  } else if (bpm >= 75 && bpm < 95 && isHighEnergy && beatRegularity > 0.6) {
+    // Could be half-time house/techno or actual hip-hop tempo
+    // Check spectral characteristics
+    if (isFourOnFloor && !isSyncopated) {
+      effectiveBpm = bpm * 2;
+    }
+  }
+  
+  // If BPM is very high, might be double-time detection
+  if (bpm > 200 && bpm <= 280 && !isHighEnergy) {
+    effectiveBpm = bpm / 2;
+  }
+  
+  // ── Danceability ─────────────────────────────────────────────────────────
+  
+  const bpmDanceScore = 
+    (effectiveBpm >= 115 && effectiveBpm <= 135) ? 1.0 :  // House/techno sweet spot
+    (effectiveBpm >= 100 && effectiveBpm <= 150) ? 0.85 :
+    (effectiveBpm >= 85 && effectiveBpm <= 170) ? 0.7 :
+    (effectiveBpm >= 70 && effectiveBpm <= 180) ? 0.5 : 0.3;
+    
+  const danceability = (bpmDanceScore * 0.4 + beatRegularity * 0.4 + energy * 0.2);
+  
+  // ── Mood Classification ──────────────────────────────────────────────────
+  
+  let mood: string;
+  if (isMinor && isDark && isHighEnergy) {
+    mood = 'Dark & Intense';
+  } else if (isMinor && isDark && !isHighEnergy) {
+    mood = 'Melancholic';
+  } else if (isHighEnergy && isBright) {
+    mood = 'Euphoric';
+  } else if (isHighEnergy) {
+    mood = 'Energetic';
+  } else if (isLowEnergy && isDark) {
+    mood = 'Atmospheric';
+  } else if (isLowEnergy) {
+    mood = 'Chill';
+  } else if (isMajor && isBright) {
+    mood = 'Uplifting';
+  } else {
+    mood = 'Driving';
+  }
+  
+  // ── Genre Classification ─────────────────────────────────────────────────
+  
+  let primary: string;
+  let subgenre: string;
+  let confidence = 0.55; // Base confidence
+  
+  // Chiptune/8-bit detection
+  const isChiptuneSpectrum = highRatio > 0.35 && midRatio > bassRatio && !isBassHeavy;
+  
+  // Acid detection (303-style resonant mids)
+  const isAcidSpectrum = midRatio > 0.38 && highRatio > 0.25 && isHighEnergy;
+  
+  // Industrial/harsh detection
+  const isIndustrial = isDark && isHighEnergy && spectralVariance > 0.2;
+  
+  // Ambient detection
+  const isAmbientSpectrum = isLowEnergy && beatRegularity < 0.4 && !isBassHeavy;
+  
+  // ════════════════════════════════════════════════════════════════════════
+  // VERY FAST: 180+ BPM
+  // ════════════════════════════════════════════════════════════════════════
+  if (effectiveBpm >= 180) {
+    primary = 'Electronic';
+    
+    if (effectiveBpm >= 200) {
+      if (isHighEnergy && isDark) {
+        subgenre = 'Speedcore';
+        confidence = 0.7;
+      } else if (isHighEnergy) {
+        subgenre = 'Gabber';
+        confidence = 0.65;
+      } else {
+        subgenre = 'Happy Hardcore';
+        confidence = 0.6;
+      }
+    } else {
+      // 180-200 BPM
+      if (isChiptuneSpectrum) {
+        subgenre = 'Happy Hardcore';
+        confidence = 0.7;
+      } else if (isIndustrial) {
+        subgenre = 'Industrial Hardcore';
+        confidence = 0.65;
+      } else {
+        subgenre = 'Hardcore';
+        confidence = 0.6;
+      }
+    }
+  }
+  // ════════════════════════════════════════════════════════════════════════
+  // FAST: 160-180 BPM (D&B, Jungle, Fast Trance)
+  // ════════════════════════════════════════════════════════════════════════
+  else if (effectiveBpm >= 160 && effectiveBpm < 180) {
+    primary = 'Electronic';
+    
+    if (isBassHeavy && isBreakbeat) {
+      subgenre = 'Drum & Bass';
+      confidence = 0.75;
+      if (isDark && isHighEnergy) {
+        subgenre = 'Neurofunk';
+        confidence = 0.7;
+      } else if (isBright && isMidEnergy) {
+        subgenre = 'Liquid D&B';
+        confidence = 0.65;
+      }
+    } else if (isBassHeavy && isSyncopated) {
+      subgenre = 'Jungle';
+      confidence = 0.7;
+    } else if (isChiptuneSpectrum) {
+      subgenre = 'Chiptune';
+      confidence = 0.7;
+    } else if (isFourOnFloor && isHighEnergy) {
+      subgenre = 'Hard Trance';
+      confidence = 0.65;
+    } else {
+      subgenre = 'Breakcore';
+      confidence = 0.55;
+    }
+  }
+  // ════════════════════════════════════════════════════════════════════════
+  // FAST-MEDIUM: 138-160 BPM (Trance, Hardstyle, Fast Techno)
+  // ════════════════════════════════════════════════════════════════════════
+  else if (effectiveBpm >= 138 && effectiveBpm < 160) {
+    primary = 'Electronic';
+    
+    if (isFourOnFloor && isHighEnergy && isBassHeavy) {
+      if (effectiveBpm >= 150) {
+        subgenre = 'Hardstyle';
+        confidence = 0.75;
+      } else {
+        subgenre = 'Hard Techno';
+        confidence = 0.7;
+      }
+    } else if (isFourOnFloor && isBright && isHighEnergy) {
+      subgenre = 'Uplifting Trance';
+      confidence = 0.7;
+    } else if (isFourOnFloor && isMidHeavy) {
+      if (isMinor) {
+        subgenre = 'Psytrance';
+        confidence = 0.65;
+      } else {
+        subgenre = 'Trance';
+        confidence = 0.65;
+      }
+    } else if (isAcidSpectrum && isFourOnFloor) {
+      subgenre = 'Acid Techno';
+      confidence = 0.7;
+    } else if (isChiptuneSpectrum) {
+      subgenre = 'Chiptune';
+      confidence = 0.7;
+    } else if (isIndustrial) {
+      subgenre = 'Industrial';
+      confidence = 0.6;
+    } else {
+      subgenre = 'Eurodance';
+      confidence = 0.55;
+    }
+  }
+  // ════════════════════════════════════════════════════════════════════════
+  // MEDIUM-FAST: 125-138 BPM (Techno, Tech House, Progressive)
+  // ════════════════════════════════════════════════════════════════════════
+  else if (effectiveBpm >= 125 && effectiveBpm < 138) {
+    primary = 'Electronic';
+    
+    if (isAcidSpectrum && isFourOnFloor) {
+      subgenre = 'Acid Techno';
+      confidence = 0.75;
+    } else if (isFourOnFloor && isBassHeavy && isDark) {
+      subgenre = 'Techno';
+      confidence = 0.75;
+      if (isIndustrial) {
+        subgenre = 'Industrial Techno';
+        confidence = 0.7;
+      }
+    } else if (isFourOnFloor && isBassHeavy && isHighEnergy) {
+      subgenre = 'Peak Time Techno';
+      confidence = 0.7;
+    } else if (isFourOnFloor && isBalanced && isMidEnergy) {
+      subgenre = 'Minimal Techno';
+      confidence = 0.65;
+    } else if (isFourOnFloor && isBright) {
+      subgenre = 'Progressive Trance';
+      confidence = 0.65;
+    } else if (isChiptuneSpectrum) {
+      subgenre = 'Chiptune';
+      confidence = 0.7;
+    } else if (isFourOnFloor) {
+      subgenre = 'Tech House';
+      confidence = 0.6;
+    } else if (isBreakbeat) {
+      subgenre = 'Breakbeat';
+      confidence = 0.6;
+    } else {
+      subgenre = 'Electronic';
+      confidence = 0.5;
+    }
+  }
+  // ════════════════════════════════════════════════════════════════════════
+  // MEDIUM: 118-125 BPM (House, Electro, Disco)
+  // ════════════════════════════════════════════════════════════════════════
+  else if (effectiveBpm >= 118 && effectiveBpm < 125) {
+    primary = 'Electronic';
+    
+    if (isAcidSpectrum && isFourOnFloor) {
+      subgenre = 'Acid House';
+      confidence = 0.75;
+    } else if (isFourOnFloor && isBassHeavy && isHighEnergy) {
+      subgenre = 'Tech House';
+      confidence = 0.7;
+    } else if (isFourOnFloor && isBright && isHighEnergy) {
+      subgenre = 'Electro House';
+      confidence = 0.7;
+    } else if (isFourOnFloor && isBalanced) {
+      subgenre = 'House';
+      confidence = 0.7;
+    } else if (isChiptuneSpectrum) {
+      subgenre = 'Chiptune';
+      confidence = 0.7;
+    } else if (isBright && isMidHeavy) {
+      subgenre = 'Nu Disco';
+      confidence = 0.6;
+    } else if (isBreakbeat) {
+      subgenre = 'Electro';
+      confidence = 0.6;
+    } else {
+      subgenre = 'House';
+      confidence = 0.55;
+    }
+  }
+  // ════════════════════════════════════════════════════════════════════════
+  // MEDIUM-SLOW: 105-118 BPM (Deep House, Garage, Funk)
+  // ════════════════════════════════════════════════════════════════════════
+  else if (effectiveBpm >= 105 && effectiveBpm < 118) {
+    if (isFourOnFloor && isBassHeavy && !isHighEnergy) {
+      primary = 'Electronic';
+      subgenre = 'Deep House';
+      confidence = 0.7;
+    } else if (isFourOnFloor && isHighEnergy && isBassHeavy) {
+      primary = 'Electronic';
+      subgenre = 'Tech House';
+      confidence = 0.65;
+    } else if (isSyncopated && isBassHeavy) {
+      primary = 'Electronic';
+      subgenre = 'UK Garage';
+      confidence = 0.65;
+    } else if (isChiptuneSpectrum) {
+      primary = 'Electronic';
+      subgenre = 'Chiptune';
+      confidence = 0.7;
+    } else if (isFourOnFloor) {
+      primary = 'Electronic';
+      subgenre = 'House';
+      confidence = 0.6;
+    } else if (isBright && isMidHeavy) {
+      primary = 'Electronic';
+      subgenre = 'Synthwave';
+      confidence = 0.6;
+    } else {
+      primary = 'Electronic';
+      subgenre = 'Electro';
+      confidence = 0.55;
+    }
+  }
+  // ════════════════════════════════════════════════════════════════════════
+  // SLOW-MEDIUM: 85-105 BPM (Hip-Hop, R&B, Downtempo, Synthwave)
+  // ════════════════════════════════════════════════════════════════════════
+  else if (effectiveBpm >= 85 && effectiveBpm < 105) {
+    // Key differentiator: four-on-floor vs syncopated
+    if (isFourOnFloor && isHighEnergy) {
+      // Likely electronic
+      primary = 'Electronic';
+      if (isAcidSpectrum) {
+        subgenre = 'Acid House';
+        confidence = 0.65;
+      } else if (isBassHeavy) {
+        subgenre = 'Deep House';
+        confidence = 0.65;
+      } else {
+        subgenre = 'Downtempo';
+        confidence = 0.6;
+      }
+    } else if (isSyncopated && isBassHeavy && !isHighEnergy) {
+      // Hip-hop characteristics
+      primary = 'Hip Hop';
+      if (effectiveBpm < 95) {
+        subgenre = 'Boom Bap';
+        confidence = 0.65;
+      } else {
+        subgenre = 'Hip Hop';
+        confidence = 0.6;
+      }
+    } else if (isSyncopated && isBassHeavy && isHighEnergy) {
+      primary = 'Hip Hop';
+      subgenre = 'Trap';
+      confidence = 0.65;
+    } else if (isChiptuneSpectrum) {
+      primary = 'Electronic';
+      subgenre = 'Chiptune';
+      confidence = 0.7;
+    } else if (isBright && isMidHeavy && !isBassHeavy) {
+      primary = 'Electronic';
+      subgenre = 'Synthwave';
+      confidence = 0.65;
+    } else if (isDark && isMidEnergy) {
+      primary = 'Electronic';
+      subgenre = 'Darkwave';
+      confidence = 0.6;
+    } else {
+      primary = 'Electronic';
+      subgenre = 'Downtempo';
+      confidence = 0.55;
+    }
+  }
+  // ════════════════════════════════════════════════════════════════════════
+  // SLOW: 70-85 BPM (Dub, Trip-Hop, Ambient)
+  // ════════════════════════════════════════════════════════════════════════
+  else if (effectiveBpm >= 70 && effectiveBpm < 85) {
+    if (isBassHeavy && !isFourOnFloor && isMidEnergy) {
+      primary = 'Reggae / Dub';
+      subgenre = 'Dub';
+      confidence = 0.6;
+    } else if (isDark && isSyncopated) {
+      primary = 'Electronic';
+      subgenre = 'Trip Hop';
+      confidence = 0.65;
+    } else if (isAmbientSpectrum) {
+      primary = 'Electronic';
+      subgenre = 'Ambient';
+      confidence = 0.6;
+    } else if (isBassHeavy && isSyncopated) {
+      primary = 'Hip Hop';
+      subgenre = 'Lo-Fi Hip Hop';
+      confidence = 0.55;
+    } else if (isChiptuneSpectrum) {
+      primary = 'Electronic';
+      subgenre = 'Chiptune';
+      confidence = 0.65;
+    } else {
+      primary = 'Electronic';
+      subgenre = 'Downtempo';
+      confidence = 0.55;
+    }
+  }
+  // ════════════════════════════════════════════════════════════════════════
+  // VERY SLOW: 50-70 BPM (Ambient, Drone, Experimental)
+  // ════════════════════════════════════════════════════════════════════════
+  else if (effectiveBpm >= 50 && effectiveBpm < 70) {
+    primary = 'Electronic';
+    
+    if (isAmbientSpectrum) {
+      subgenre = 'Ambient';
+      confidence = 0.65;
+    } else if (isDark && isLowEnergy) {
+      subgenre = 'Dark Ambient';
+      confidence = 0.6;
+    } else if (isDense) {
+      subgenre = 'IDM';
+      confidence = 0.55;
+    } else {
+      subgenre = 'Ambient';
+      confidence = 0.5;
+    }
+  }
+  // ════════════════════════════════════════════════════════════════════════
+  // EXTREMELY SLOW: <50 BPM (Drone, Noise, Experimental)
+  // ════════════════════════════════════════════════════════════════════════
+  else {
+    primary = 'Electronic';
+    
+    if (isHighEnergy) {
+      subgenre = 'Noise';
+      confidence = 0.5;
+    } else if (isAmbientSpectrum) {
+      subgenre = 'Drone';
+      confidence = 0.55;
+    } else {
+      subgenre = 'Experimental';
+      confidence = 0.45;
+    }
+  }
+  
+  // ── Post-processing: Genre Refinements ───────────────────────────────────
+  
+  // Boost confidence for very clear patterns
+  if (isFourOnFloor && beatRegularity > 0.8) {
+    confidence = Math.min(0.85, confidence + 0.1);
+  }
+  
+  // Time signature adjustments
+  if (timeSignature === 3) {
+    // Waltz/6-8 time is less common in electronic music
+    if (primary === 'Electronic') {
+      subgenre = subgenre + ' (3/4)';
+      confidence = Math.max(0.4, confidence - 0.1);
+    }
+  }
+  
+  // IDM detection: irregular beats + complex spectrum + electronic
+  if (primary === 'Electronic' && isDense && !isFourOnFloor && spectralVariance > 0.18) {
+    subgenre = 'IDM';
+    confidence = 0.6;
+  }
+  
+  return {
+    primary,
+    subgenre,
+    confidence: Math.min(0.9, Math.max(0.4, confidence)),
+    mood,
+    energy,
+    danceability,
+  };
+}
+
 // ── Message Handling ─────────────────────────────────────────────────────────
 
 function postProgress(id: string, progress: number): void {
@@ -393,11 +911,24 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
 
         // 4. Frequency-band waveform peaks
         const frequencyPeaks = computeFrequencyPeaks(pcmLeft, pcmRight, sampleRate, numBins);
-        postProgress(id, 90);
+        postProgress(id, 85);
 
         // 5. Loudness analysis (RMS + peak) for auto-gain
         const loudness = computeLoudness(mono);
-        postProgress(id, 95);
+        postProgress(id, 90);
+
+        // 6. Genre classification
+        const genre = classifyGenre(
+          rhythm.bpm,
+          keyResult.key,
+          timeSignature,
+          frequencyPeaks,
+          loudness.rmsDb,
+          rhythm.beats,
+          mono,
+          sampleRate,
+        );
+        postProgress(id, 98);
 
         const result: AnalysisResult = {
           bpm: rhythm.bpm,
@@ -411,6 +942,7 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
           frequencyPeaks,
           rmsDb: loudness.rmsDb,
           peakDb: loudness.peakDb,
+          genre,
         };
 
         postProgress(id, 100);
