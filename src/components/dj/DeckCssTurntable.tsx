@@ -127,7 +127,11 @@ export const DeckCssTurntable: React.FC<DeckCssTurntableProps> = ({ deckId }) =>
       const angleDeg = (angleRef.current * 180) / Math.PI;
       applyRotation(angleDeg);
 
-      // Tonearm: derive from song progress (0-25°)
+      // Tonearm: track from outer groove to inner groove
+      // START_DEG = needle at outer groove edge of record
+      // END_DEG   = needle at inner groove near the label
+      const ARM_START_DEG = 5;
+      const ARM_END_DEG = 25;
       const deck = useDJStore.getState().decks[deckId];
       const duration = deck.durationMs > 0 ? deck.durationMs / 1000 : 180;
       const pos = deck.playbackMode === 'audio' ? deck.audioPosition : deck.elapsedMs / 1000;
@@ -136,7 +140,7 @@ export const DeckCssTurntable: React.FC<DeckCssTurntableProps> = ({ deckId }) =>
       const wobble = playing && !isScratchActiveRef.current
         ? Math.sin(now * 0.001) * 0.15
         : 0;
-      applyTonearm(progress * 22 + wobble);
+      applyTonearm(ARM_START_DEG + progress * (ARM_END_DEG - ARM_START_DEG) + wobble);
 
       rafIdRef.current = requestAnimationFrame(tick);
     };
