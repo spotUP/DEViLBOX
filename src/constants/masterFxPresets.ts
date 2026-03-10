@@ -937,4 +937,557 @@ export const MASTER_FX_PRESETS: MasterFxPreset[] = [
       },
     ],
   },
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // DJ — Creative FX for live mixing (using previously missing effects)
+  // ═══════════════════════════════════════════════════════════════════════════
+  {
+    name: 'Dub Echo',
+    description: 'Classic dub delay with feedback and filtering — ping-pong stereo bounce',
+    category: 'DJ',
+    effects: [
+      {
+        category: 'tonejs',
+        type: 'PingPongDelay',
+        enabled: true,
+        wet: 35,
+        parameters: { delayTime: 0.375, feedback: 0.4, maxDelay: 2 },
+      },
+      {
+        category: 'tonejs',
+        type: 'JCReverb',
+        enabled: true,
+        wet: 20,
+        parameters: { roomSize: 0.6 },
+      },
+    ],
+  },
+  {
+    name: 'Filter Sweep',
+    description: 'Auto-filter LFO sweep — classic DJ build/breakdown tool',
+    category: 'DJ',
+    effects: [
+      {
+        category: 'tonejs',
+        type: 'AutoFilter',
+        enabled: true,
+        wet: 80,
+        parameters: { frequency: 0.5, baseFrequency: 200, octaves: 4, type: 'sine', depth: 0.8 },
+      },
+    ],
+  },
+  {
+    name: 'Tape Stop',
+    description: 'Pitch shift down for tape-stop/slowdown effect',
+    category: 'DJ',
+    effects: [
+      {
+        category: 'tonejs',
+        type: 'PitchShift',
+        enabled: true,
+        wet: 100,
+        parameters: { pitch: -2, windowSize: 0.1, delayTime: 0 },
+      },
+    ],
+  },
+  {
+    name: 'Lo-Fi Radio',
+    description: 'Bit crusher + tremolo — old radio / transmission vibe',
+    category: 'DJ',
+    effects: [
+      {
+        category: 'tonejs',
+        type: 'BitCrusher',
+        enabled: true,
+        wet: 60,
+        parameters: { bits: 8 },
+      },
+      {
+        category: 'tonejs',
+        type: 'Tremolo',
+        enabled: true,
+        wet: 40,
+        parameters: { frequency: 4, depth: 0.6, type: 'sine' },
+      },
+    ],
+  },
+  {
+    name: 'Phaser Wash',
+    description: 'Deep phaser sweep — psychedelic movement across the stereo field',
+    category: 'DJ',
+    effects: [
+      {
+        category: 'tonejs',
+        type: 'Phaser',
+        enabled: true,
+        wet: 60,
+        parameters: { frequency: 0.3, octaves: 3, stages: 10, Q: 6, baseFrequency: 350 },
+      },
+    ],
+  },
+  {
+    name: 'Auto-Pan',
+    description: 'LFO-driven stereo panning — adds motion and width to static mixes',
+    category: 'DJ',
+    effects: [
+      {
+        category: 'tonejs',
+        type: 'AutoPanner',
+        enabled: true,
+        wet: 70,
+        parameters: { frequency: 0.25, depth: 0.8, type: 'sine' },
+      },
+    ],
+  },
+  {
+    name: 'Vibrato Wobble',
+    description: 'Pitch wobble for tape warble / underwater effect',
+    category: 'DJ',
+    effects: [
+      {
+        category: 'tonejs',
+        type: 'Vibrato',
+        enabled: true,
+        wet: 50,
+        parameters: { frequency: 3, depth: 0.3, type: 'sine', maxDelay: 0.005 },
+      },
+    ],
+  },
+  {
+    name: 'Frequency Shift',
+    description: 'Subtle frequency shifting for metallic / alien detuning',
+    category: 'DJ',
+    effects: [
+      {
+        category: 'tonejs',
+        type: 'FrequencyShifter',
+        enabled: true,
+        wet: 70,
+        parameters: { frequency: 5 },
+      },
+    ],
+  },
+  {
+    name: 'Feedback Loop',
+    description: 'Self-oscillating feedback delay — chaotic dub siren territory',
+    category: 'DJ',
+    effects: [
+      {
+        category: 'tonejs',
+        type: 'FeedbackDelay',
+        enabled: true,
+        wet: 40,
+        parameters: { delayTime: 0.25, feedback: 0.7, maxDelay: 2 },
+      },
+    ],
+  },
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Genre — Expanded genre presets using more effect types
+  // ═══════════════════════════════════════════════════════════════════════════
+  {
+    name: 'Psychedelic',
+    description: 'Leslie rotary speaker + phaser — swirling 60s psychedelia',
+    category: 'Genre',
+    effects: [
+      {
+        category: 'wasm',
+        type: 'Leslie',
+        enabled: true,
+        wet: 50,
+        parameters: {},
+      },
+      {
+        category: 'tonejs',
+        type: 'Phaser',
+        enabled: true,
+        wet: 30,
+        parameters: { frequency: 0.2, octaves: 4, stages: 8, Q: 4, baseFrequency: 300 },
+      },
+      {
+        category: 'tonejs',
+        type: 'Reverb',
+        enabled: true,
+        wet: 25,
+        parameters: { decay: 3, preDelay: 0.02 },
+      },
+    ],
+  },
+  {
+    name: 'Synthwave',
+    description: 'Chorus + delay + compression — 80s retro synth shimmer',
+    category: 'Genre',
+    effects: [
+      {
+        category: 'tonejs',
+        type: 'Chorus',
+        enabled: true,
+        wet: 40,
+        parameters: { frequency: 1.5, delayTime: 3.5, depth: 0.7 },
+      },
+      {
+        category: 'tonejs',
+        type: 'Delay',
+        enabled: true,
+        wet: 25,
+        parameters: { delayTime: 0.375, feedback: 0.3, maxDelay: 2 },
+      },
+      {
+        category: 'tonejs',
+        type: 'Compressor',
+        enabled: true,
+        wet: 100,
+        parameters: { threshold: -16, ratio: 3, attack: 0.01, release: 0.2 },
+      },
+    ],
+  },
+  {
+    name: 'Shoegaze',
+    description: 'Tremolo + reverb + chorus — wall of ethereal sound',
+    category: 'Genre',
+    effects: [
+      {
+        category: 'tonejs',
+        type: 'Tremolo',
+        enabled: true,
+        wet: 30,
+        parameters: { frequency: 2, depth: 0.4, type: 'sine' },
+      },
+      {
+        category: 'tonejs',
+        type: 'Chorus',
+        enabled: true,
+        wet: 50,
+        parameters: { frequency: 0.5, delayTime: 5, depth: 0.9 },
+      },
+      {
+        category: 'tonejs',
+        type: 'Reverb',
+        enabled: true,
+        wet: 60,
+        parameters: { decay: 6, preDelay: 0.05 },
+      },
+    ],
+  },
+  {
+    name: 'Acid House',
+    description: 'Auto-filter + distortion — squelchy 303-inspired filtering',
+    category: 'Genre',
+    effects: [
+      {
+        category: 'tonejs',
+        type: 'AutoFilter',
+        enabled: true,
+        wet: 70,
+        parameters: { frequency: 1, baseFrequency: 300, octaves: 3, type: 'sawtooth', depth: 0.9 },
+      },
+      {
+        category: 'tonejs',
+        type: 'Distortion',
+        enabled: true,
+        wet: 30,
+        parameters: { distortion: 0.3 },
+      },
+    ],
+  },
+  {
+    name: 'Garage / 2-Step',
+    description: 'Tight compression + subtle delay — punchy UK garage master',
+    category: 'Genre',
+    effects: [
+      {
+        category: 'tonejs',
+        type: 'Compressor',
+        enabled: true,
+        wet: 100,
+        parameters: { threshold: -14, ratio: 4, attack: 0.005, release: 0.15 },
+      },
+      {
+        category: 'tonejs',
+        type: 'PingPongDelay',
+        enabled: true,
+        wet: 15,
+        parameters: { delayTime: 0.25, feedback: 0.2, maxDelay: 1 },
+      },
+      {
+        category: 'tonejs',
+        type: 'EQ3',
+        enabled: true,
+        wet: 100,
+        parameters: { low: 3, mid: -1, high: 2 },
+      },
+    ],
+  },
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Wide — Spatial effects using missing processors
+  // ═══════════════════════════════════════════════════════════════════════════
+  {
+    name: 'Leslie Cabinet',
+    description: 'Rotary speaker emulation — classic organ cabinet swirl',
+    category: 'Wide',
+    effects: [
+      {
+        category: 'wasm',
+        type: 'Leslie',
+        enabled: true,
+        wet: 50,
+        parameters: {},
+      },
+    ],
+  },
+  {
+    name: 'Space Echo',
+    description: 'Spacey stereo delay with modulation — for deep spatial depth',
+    category: 'Wide',
+    effects: [
+      {
+        category: 'wasm',
+        type: 'SpaceyDelayer',
+        enabled: true,
+        wet: 35,
+        parameters: {},
+      },
+      {
+        category: 'tonejs',
+        type: 'StereoWidener',
+        enabled: true,
+        wet: 100,
+        parameters: { width: 0.7 },
+      },
+    ],
+  },
+  {
+    name: 'Hall Reverb',
+    description: 'Large hall convolution reverb — lush ambient tail',
+    category: 'Wide',
+    effects: [
+      {
+        category: 'tonejs',
+        type: 'Reverb',
+        enabled: true,
+        wet: 30,
+        parameters: { decay: 5, preDelay: 0.04 },
+      },
+    ],
+  },
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Warm — Analog character using WAM and WASM effects
+  // ═══════════════════════════════════════════════════════════════════════════
+  {
+    name: 'Tube Screamer Glow',
+    description: 'TS-9 style overdrive — warm mid-push without harshness',
+    category: 'Warm',
+    effects: [
+      {
+        category: 'wam',
+        type: 'WAMTS9',
+        enabled: true,
+        wet: 40,
+        parameters: {},
+      },
+      {
+        category: 'tonejs',
+        type: 'EQ3',
+        enabled: true,
+        wet: 100,
+        parameters: { low: 1, mid: 2, high: -1 },
+      },
+    ],
+  },
+  {
+    name: 'Rotary Warmth',
+    description: 'Leslie + tape saturation — organic analog warmth',
+    category: 'Warm',
+    effects: [
+      {
+        category: 'wasm',
+        type: 'Leslie',
+        enabled: true,
+        wet: 30,
+        parameters: {},
+      },
+      {
+        category: 'tonejs',
+        type: 'TapeSaturation',
+        enabled: true,
+        wet: 60,
+        parameters: { drive: 0.3, type: 'warm' },
+      },
+    ],
+  },
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Loud — Aggressive mastering using distortion/fuzz effects
+  // ═══════════════════════════════════════════════════════════════════════════
+  {
+    name: 'Big Muff Wall',
+    description: 'Big Muff Pi fuzz — thick wall of sustain and harmonics',
+    category: 'Loud',
+    effects: [
+      {
+        category: 'wam',
+        type: 'WAMBigMuff',
+        enabled: true,
+        wet: 50,
+        parameters: {},
+      },
+      {
+        category: 'tonejs',
+        type: 'Compressor',
+        enabled: true,
+        wet: 100,
+        parameters: { threshold: -12, ratio: 6, attack: 0.005, release: 0.15 },
+      },
+    ],
+  },
+  {
+    name: 'QuadraFuzz Smash',
+    description: 'Multi-band fuzz destruction — controlled chaos',
+    category: 'Loud',
+    effects: [
+      {
+        category: 'wam',
+        type: 'WAMQuadraFuzz',
+        enabled: true,
+        wet: 50,
+        parameters: {},
+      },
+    ],
+  },
+  {
+    name: 'Disto Machine',
+    description: 'WAM distortion machine — industrial edge',
+    category: 'Loud',
+    effects: [
+      {
+        category: 'wam',
+        type: 'WAMDistoMachine',
+        enabled: true,
+        wet: 40,
+        parameters: {},
+      },
+      {
+        category: 'tonejs',
+        type: 'EQ3',
+        enabled: true,
+        wet: 100,
+        parameters: { low: 2, mid: 0, high: -2 },
+      },
+    ],
+  },
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Vinyl — Lo-fi and vintage character
+  // ═══════════════════════════════════════════════════════════════════════════
+  {
+    name: 'Cassette Deck',
+    description: 'Bit crush + vibrato + saturation — worn cassette tape character',
+    category: 'Vinyl',
+    effects: [
+      {
+        category: 'tonejs',
+        type: 'BitCrusher',
+        enabled: true,
+        wet: 20,
+        parameters: { bits: 12 },
+      },
+      {
+        category: 'tonejs',
+        type: 'Vibrato',
+        enabled: true,
+        wet: 30,
+        parameters: { frequency: 2, depth: 0.15, type: 'sine', maxDelay: 0.005 },
+      },
+      {
+        category: 'tonejs',
+        type: 'TapeSaturation',
+        enabled: true,
+        wet: 50,
+        parameters: { drive: 0.4, type: 'warm' },
+      },
+    ],
+  },
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // DJ — WAM Pedal effects for live performance
+  // ═══════════════════════════════════════════════════════════════════════════
+  {
+    name: 'Stone Phaser',
+    description: 'WAM Stone phaser — deep analog-modeled phase shifting',
+    category: 'DJ',
+    effects: [
+      {
+        category: 'wam',
+        type: 'WAMStonePhaser',
+        enabled: true,
+        wet: 60,
+        parameters: {},
+      },
+    ],
+  },
+  {
+    name: 'Vox Amp Crunch',
+    description: 'Vox amplifier emulation — British crunch for mix character',
+    category: 'DJ',
+    effects: [
+      {
+        category: 'wam',
+        type: 'WAMVoxAmp',
+        enabled: true,
+        wet: 40,
+        parameters: {},
+      },
+    ],
+  },
+  {
+    name: 'WAM Delay Wash',
+    description: 'Faust delay + ping-pong — complex rhythmic delays',
+    category: 'DJ',
+    effects: [
+      {
+        category: 'wam',
+        type: 'WAMFaustDelay',
+        enabled: true,
+        wet: 30,
+        parameters: {},
+      },
+      {
+        category: 'wam',
+        type: 'WAMPingPongDelay',
+        enabled: true,
+        wet: 25,
+        parameters: {},
+      },
+    ],
+  },
+  {
+    name: 'Pitch Up +3',
+    description: 'WAM pitch shifter up 3 semitones — for build-ups and risers',
+    category: 'DJ',
+    effects: [
+      {
+        category: 'wam',
+        type: 'WAMPitchShifter',
+        enabled: true,
+        wet: 100,
+        parameters: {},
+      },
+    ],
+  },
+  {
+    name: 'Graphic EQ Scoop',
+    description: 'WAM graphic equalizer — mid-scoop for dance floor punch',
+    category: 'DJ',
+    effects: [
+      {
+        category: 'wam',
+        type: 'WAMGraphicEQ',
+        enabled: true,
+        wet: 100,
+        parameters: {},
+      },
+    ],
+  },
 ];
