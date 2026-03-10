@@ -19,6 +19,7 @@ import { AMIGA_UADE_PRESET_IDS, getInstrumentPresetsForSystem } from '@constants
 import { PixiButton, PixiIcon } from '../components';
 import { PixiPureTextInput } from '../input/PixiPureTextInput';
 import { usePixiTheme } from '../theme';
+import { useModalClose } from '@hooks/useDialogKeyboard';
 import { PIXI_FONTS } from '../fonts';
 import { Div, Txt } from '../layout';
 import type { FederatedPointerEvent, FederatedWheelEvent } from 'pixi.js';
@@ -37,6 +38,8 @@ export const PixiNewSongWizard: React.FC = () => {
   const close = useUIStore((s) => s.closeNewSongWizard);
   const theme = usePixiTheme();
   const { app } = useApplication();
+
+  useModalClose({ isOpen, onClose: close });
 
   const [step, setStep] = useState<WizardStep>(1);
   const [startMode, setStartMode] = useState<StartMode>('empty');

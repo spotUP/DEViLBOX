@@ -10,6 +10,7 @@ import { PixiLabel, PixiButton, PixiScrollView } from '../components';
 import { PixiSelect, type SelectOption } from '../components/PixiSelect';
 import { usePixiTheme, usePixiThemeId } from '../theme';
 import { PIXI_FONTS } from '../fonts';
+import { useModalClose } from '@hooks/useDialogKeyboard';
 import { useTrackerStore, useAutomationStore } from '@stores';
 import { useChannelAutomationParams } from '@hooks/useChannelAutomationParams';
 
@@ -46,6 +47,8 @@ export const PixiAutomationPanel: React.FC<PixiAutomationPanelProps> = ({
   const theme = usePixiTheme();
   const themeId = usePixiThemeId();
   const isCyan = themeId === 'cyan-lineart';
+
+  useModalClose({ isOpen, onClose });
 
   const patterns = useTrackerStore(s => s.patterns);
   const currentPatternIndex = useTrackerStore(s => s.currentPatternIndex);

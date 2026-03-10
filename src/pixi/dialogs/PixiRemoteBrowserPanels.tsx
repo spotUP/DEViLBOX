@@ -8,6 +8,7 @@
 
 import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { usePixiTheme } from '../theme';
+import { useModalClose } from '@hooks/useDialogKeyboard';
 import { Div, Txt } from '../layout';
 import { PixiButton } from '../components/PixiButton';
 import { PixiList } from '../components/PixiList';
@@ -63,6 +64,8 @@ export const PixiModlandPanel: React.FC<ModlandPanelProps> = ({
   onClose,
 }) => {
   const theme = usePixiTheme();
+
+  useModalClose({ isOpen, onClose });
 
   const [query, setQuery] = useState('');
   const [format, setFormat] = useState('');
@@ -310,6 +313,8 @@ export const PixiHVSCPanel: React.FC<HVSCPanelProps> = ({
   onClose,
 }) => {
   const theme = usePixiTheme();
+
+  useModalClose({ isOpen, onClose });
 
   const [path, setPath] = useState('');
   const [entries, setEntries] = useState<HVSCEntry[]>([]);

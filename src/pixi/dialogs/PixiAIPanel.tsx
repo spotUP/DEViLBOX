@@ -12,10 +12,11 @@ import { PixiButton, PixiLabel } from '../components';
 import { usePixiTheme } from '../theme';
 import { PIXI_FONTS } from '../fonts';
 import { usePixiResponsive } from '../hooks/usePixiResponsive';
-import { useAIStore, AI_MODELS, type AIMessage } from '@stores/useAIStore';
+import { useModalClose } from '@hooks/useDialogKeyboard';
+import { useAIStore, AI_PROVIDERS, getModelsForProvider, type AIMessage } from '@stores/useAIStore';
 import { sendMessage, stopStreaming } from '@/services/aiChatService';
 
-const PANEL_W = 380;
+const PANEL_W = 440;
 const MSG_PAD = 8;
 const LINE_H = 14;
 const MAX_CHARS_PER_LINE = 48;
@@ -106,7 +107,9 @@ const MessageRow: React.FC<{ msg: AIMessage; width: number }> = ({ msg, width })
 const ChatInput: React.FC<{ panelRight: number; isStreaming: boolean }> = ({ panelRight, isStreaming }) => {
   const [text, setText] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
+  const provider = useAIStore((s) => s.provider);
   const model = useAIStore((s) => s.model);
+  const setProvider = useAIStore((s) => s.setProvider);
   const setModel = useAIStore((s) => s.setModel);
 
   const handleSubmit = useCallback(() => {
@@ -150,28 +153,53 @@ const ChatInput: React.FC<{ panelRight: number; isStreaming: boolean }> = ({ pan
       }}
       onKeyDown={(e) => e.stopPropagation()}
     >
-      {/* Model selector */}
-      <div style={{ display: 'flex', gap: 2 }}>
-        {AI_MODELS.map((m) => (
-          <button
-            key={m.id}
-            onClick={() => setModel(m.id)}
-            style={{
-              padding: '2px 8px',
-              fontSize: 10,
-              fontFamily: 'monospace',
-              border: 'none',
-              borderRadius: 3,
-              cursor: 'pointer',
-              background: model === m.id ? '#60A5FA' : '#222',
-              color: model === m.id ? '#111' : '#888',
-              fontWeight: model === m.id ? 600 : 400,
-            }}
-            title={m.description}
-          >
-            {m.label}
-          </button>
-        ))}
+      {/* Provider + Model selector */}
+      <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+        {/* Provider toggle */}
+        <div style={{ display: 'flex', gap: 1, background: '#111', borderRadius: 3, padding: 1 }}>
+          {AI_PROVIDERS.map((p) => (
+            <button
+              key={p.id}
+              onClick={() => setProvider(p.id)}
+              style={{
+                padding: '2px 6px',
+                fontSize: 9,
+                fontFamily: 'monospace',
+                border: 'none',
+                borderRadius: 2,
+                cursor: 'pointer',
+                background: provider === p.id ? '#444' : 'transparent',
+                color: provider === p.id ? '#fff' : '#666',
+                fontWeight: provider === p.id ? 600 : 400,
+              }}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
+        {/* Model buttons for current provider */}
+        <div style={{ display: 'flex', gap: 2 }}>
+          {getModelsForProvider(provider).map((m) => (
+            <button
+              key={m.id}
+              onClick={() => setModel(m.id)}
+              style={{
+                padding: '2px 8px',
+                fontSize: 10,
+                fontFamily: 'monospace',
+                border: 'none',
+                borderRadius: 3,
+                cursor: 'pointer',
+                background: model === m.id ? '#60A5FA' : '#222',
+                color: model === m.id ? '#111' : '#888',
+                fontWeight: model === m.id ? 600 : 400,
+              }}
+              title={m.description}
+            >
+              {m.label}
+            </button>
+          ))}
+        </div>
       </div>
       {/* Input + send row */}
       <div style={{ display: 'flex', gap: 4 }}>
@@ -239,6 +267,8 @@ export const PixiAIPanel: React.FC = () => {
   const isStreaming = useAIStore((s) => s.isStreaming);
   const close = useAIStore((s) => s.close);
   const clearHistory = useAIStore((s) => s.clearHistory);
+
+  useModalClose({ isOpen, onClose: close });
 
   const drawPanelBg = useCallback(
     (g: GraphicsType) => {

@@ -59,17 +59,33 @@ const _sharedTransform = new Matrix();
  */
 export class MegaText extends Graphics {
   private _labelCount = 0;
+  private _prevLabels: GlyphLabel[] = [];
 
   /** Number of labels rendered in the last updateLabels() call. */
   get labelCount(): number { return this._labelCount; }
 
   /**
    * Rebuild the graphics context with all glyph quads for the given labels.
+   * Skips the rebuild if labels haven't changed since the last call.
    *
    * @param labels - Array of text labels to render.
    * @param fontSize - The target font size in pixels (default 11, matching pattern editor).
    */
   updateLabels(labels: GlyphLabel[], fontSize: number = 11): void {
+    // Fast dirty check — skip full rebuild if labels are identical
+    if (labels.length === this._prevLabels.length && labels.length > 0) {
+      let same = true;
+      const prev = this._prevLabels;
+      for (let i = 0; i < labels.length; i++) {
+        const a = labels[i], b = prev[i];
+        if (a.text !== b.text || a.x !== b.x || a.y !== b.y || a.color !== b.color || a.alpha !== b.alpha) {
+          same = false;
+          break;
+        }
+      }
+      if (same) return;
+    }
+    this._prevLabels = labels;
     const ctx = this.context;
     ctx.clear();
     this._labelCount = labels.length;

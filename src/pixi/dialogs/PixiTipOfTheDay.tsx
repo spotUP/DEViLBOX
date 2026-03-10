@@ -15,6 +15,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { PixiModal, PixiButton, PixiCheckbox, PixiIcon } from '../components';
 import { usePixiTheme, usePixiThemeId } from '../theme';
+import { useModalClose } from '@hooks/useDialogKeyboard';
 import { PIXI_FONTS } from '../fonts';
 import { DEVILBOX_TIPS } from '../../constants/tips';
 import { CHANGELOG, CURRENT_VERSION, BUILD_NUMBER } from '@generated/changelog';
@@ -212,6 +213,8 @@ export const PixiTipOfTheDay: React.FC<PixiTipOfTheDayProps> = ({
   const themeId = usePixiThemeId();
   const isCyan = themeId === 'cyan-lineart';
 
+  useModalClose({ isOpen, onClose });
+
   const [activeTab, setActiveTab] = useState<'tips' | 'changelog'>(initialTab);
   const [currentTipIndex, setCurrentTipIndex] = useState(0);
   const [showAtStartup, setShowAtStartup] = useState(() => {
@@ -290,7 +293,7 @@ export const PixiTipOfTheDay: React.FC<PixiTipOfTheDayProps> = ({
               borderRadius: 8,
             }}
           >
-            <PixiIcon name={activeTab === 'tips' ? 'thunderbolt' : 'preset-a'} size={20} color={accentColor} layout={{}} />
+            <PixiIcon name={activeTab === 'tips' ? 'thunderbolt' : 'preset-a'} size={20} color={0xffffff} layout={{}} />
           </layoutContainer>
           <layoutContainer layout={{ flexDirection: 'column', gap: 2 }}>
             <pixiBitmapText
@@ -355,7 +358,7 @@ export const PixiTipOfTheDay: React.FC<PixiTipOfTheDayProps> = ({
                 marginBottom: 8,
               }}
             >
-              <PixiIcon name="thunderbolt" size={28} color={accentColor} layout={{}} />
+              <PixiIcon name="thunderbolt" size={28} color={0xffffff} layout={{ width: 28, height: 28 }} />
             </layoutContainer>
 
             {/* Tip title — text-xl font-bold */}

@@ -11,6 +11,7 @@ import { useInstrumentStore } from '@stores/useInstrumentStore';
 import { notify } from '@stores/useNotificationStore';
 import type { SynthType } from '@typedefs/instrument';
 import { usePixiTheme } from '../theme';
+import { useModalClose } from '@hooks/useDialogKeyboard';
 import { Div, Txt, GlModal } from '../layout';
 import { PIXI_FONTS } from '../fonts';
 import { PixiIcon } from '../components/PixiIcon';
@@ -157,6 +158,8 @@ export const PixiFurnacePresetBrowser: React.FC<PixiFurnacePresetBrowserProps> =
   const [activeFamily, setActiveFamily] = useState<FamilyKey>('FM');
   const [scrollY, setScrollY] = useState(0);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
+
+  useModalClose({ isOpen, onClose });
 
   const chips = CHIP_FAMILIES[activeFamily];
 
