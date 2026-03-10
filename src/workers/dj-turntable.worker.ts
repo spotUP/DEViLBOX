@@ -30,7 +30,9 @@ let colors: DeckColors = {
 let deckId: 'A' | 'B' | 'C' = 'A';
 let isPlaying = false, effectiveBPM = 120;
 let scratchVelocity = 1, isScratchActive = false;
-let angle = 0, lastTimestamp = 0, dirty = true;
+let angle = 0, posSec = 0, dirty = true;
+let scratchIntegrating = false;
+let lastScratchAngle = 0;  // Saved angle when scratch ends (for stopped decks)
 
 // ─── Message handler ──────────────────────────────────────────────────────────
 
@@ -52,12 +54,32 @@ self.onmessage = (e: MessageEvent<TurntableMsg>) => {
       isPlaying = msg.isPlaying; effectiveBPM = msg.effectiveBPM;
       dirty = true;
       break;
+    case 'position':
+      posSec = msg.posSec;
+      // Update lastScratchAngle when not actively scratching so scratch starts from correct angle
+      if (!scratchIntegrating) {
+        const rps = (effectiveBPM / BASE_BPM) * BASE_RPS;
+        lastScratchAngle = posSec * rps * 2 * Math.PI;
+      }
+      dirty = true;
+      break;
     case 'velocity':
       scratchVelocity = msg.v;
       dirty = true;
       break;
     case 'scratchActive':
       isScratchActive = msg.active;
+      if (msg.active && !scratchIntegrating) {
+        scratchIntegrating = true;
+        // Sync angle to current position before integrating
+        const rps = (effectiveBPM / BASE_BPM) * BASE_RPS;
+        angle = posSec * rps * 2 * Math.PI;
+      }
+      if (!msg.active) {
+        // Save current angle when scratch ends (for stopped decks)
+        lastScratchAngle = angle;
+        scratchIntegrating = false;
+      }
       dirty = true;
       break;
     case 'resize':
@@ -77,26 +99,36 @@ self.onmessage = (e: MessageEvent<TurntableMsg>) => {
 
 // ─── RAF loop ─────────────────────────────────────────────────────────────────
 
+let lastRafTime = 0;
+
 function startRAF(): void {
-  const tick = (ts: number) => {
-    // Always advance rotation while playing; only redraw when dirty or animating
-    if (isPlaying || dirty) renderFrame(ts);
-    else lastTimestamp = ts;
+  const tick = (now: number) => {
+    const dt = lastRafTime > 0 ? (now - lastRafTime) / 1000 : 0;
+    lastRafTime = now;
+    if (isPlaying || dirty) renderFrame(dt);
     requestAnimationFrame(tick);
   };
   requestAnimationFrame(tick);
 }
 
-function renderFrame(timestamp: number): void {
+function renderFrame(dt: number): void {
   if (!ctx) return;
   dirty = false;
 
-  if (lastTimestamp > 0 && isPlaying) {
-    const dt = (timestamp - lastTimestamp) / 1000;
-    const rps = (effectiveBPM / BASE_BPM) * BASE_RPS * scratchVelocity;
-    angle += rps * 2 * Math.PI * dt;
+  const rps = (effectiveBPM / BASE_BPM) * BASE_RPS;
+  const omegaNormal = rps * 2 * Math.PI;
+
+  if (scratchIntegrating) {
+    // During scratch: integrate from velocity (smooth, no store jitter)
+    angle += scratchVelocity * omegaNormal * dt;
+  } else if (isPlaying) {
+    // Playing: derive from audio position (authoritative)
+    angle = posSec * omegaNormal;
+  } else {
+    // Stopped + not scratching: keep angle at last scratch position
+    // (don't snap back to posSec-derived angle)
+    angle = lastScratchAngle;
   }
-  lastTimestamp = timestamp;
 
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
