@@ -20,8 +20,7 @@ interface DeckTurntableProps {
 import type { TurntableMsg, DeckColorsExt } from '@engine/renderer/worker-types';
 
 const SIZE = 96;
-const MOMENTUM_DECAY_MS  = 500;
-const SCRATCH_SENSITIVITY = 0.06;
+const MOMENTUM_DECAY_MS = 500;
 
 function snapshotColors(el: HTMLElement): DeckColorsExt {
   const cs = getComputedStyle(el);
@@ -87,6 +86,15 @@ export const DeckTurntable: React.FC<DeckTurntableProps> = ({ deckId }) => {
       { equalityFn: (a, b) => a.isPlaying === b.isPlaying && a.effectiveBPM === b.effectiveBPM },
     );
 
+    // Position subscription — drives rotation from actual audio position
+    const unsubPos = useDJStore.subscribe(
+      (s) => {
+        const d = s.decks[deckId];
+        return d.playbackMode === 'audio' ? d.audioPosition : d.elapsedMs / 1000;
+      },
+      (posSec) => bridgeRef.current?.post({ type: 'position', posSec }),
+    );
+
     // Pattern scratch velocity → turntable spin.
     // When a scratch pattern is active, forward velocity to the worker so the
     // vinyl spins forward/backward matching the scratch. When not scratching,
@@ -119,6 +127,7 @@ export const DeckTurntable: React.FC<DeckTurntableProps> = ({ deckId }) => {
 
     return () => {
       unsub();
+      unsubPos();
       unsubScratch();
       unsubTheme();
       bridge.dispose();
@@ -129,7 +138,8 @@ export const DeckTurntable: React.FC<DeckTurntableProps> = ({ deckId }) => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [deckId]);
 
-  // ── Momentum decay (main thread — posts velocity to worker) ───────────────
+  // ── Momentum decay (main thread — posts velocity to worker AND audio engine) ───
+  // Technics 1200 physics: cubic ease-out decay back to normal speed (1.0)
 
   const startMomentumDecay = useCallback((fromVelocity: number) => {
     if (momentumDecayRafRef.current) cancelAnimationFrame(momentumDecayRafRef.current);
@@ -142,12 +152,21 @@ export const DeckTurntable: React.FC<DeckTurntableProps> = ({ deckId }) => {
       const v    = momentumStartVelRef.current + (1 - momentumStartVelRef.current) * ease;
       scratchVelocityRef.current = v;
       bridgeRef.current?.post({ type: 'velocity', v });
+      // Update audio engine velocity during decay (clamp to prevent near-zero stutter)
+      const audioV = Math.abs(v) < 0.1 ? 0.1 * Math.sign(v || 1) : v;
+      try { getDJEngine().getDeck(deckId).setScratchVelocity(audioV); } catch { /* Engine not ready */ }
 
-      if (t < 1) momentumDecayRafRef.current = requestAnimationFrame(animate);
-      else { scratchVelocityRef.current = 1; momentumDecayRafRef.current = 0; }
+      if (t < 1) {
+        momentumDecayRafRef.current = requestAnimationFrame(animate);
+      } else {
+        scratchVelocityRef.current = 1;
+        momentumDecayRafRef.current = 0;
+        // Decay complete - now properly end scratch mode
+        try { getDJEngine().getDeck(deckId).stopScratch(0); } catch { /* ignore */ }
+      }
     };
     momentumDecayRafRef.current = requestAnimationFrame(animate);
-  }, []);
+  }, [deckId]);
 
   // ── Pointer handlers ────────────────────────────────────────────────────────
 
@@ -157,38 +176,35 @@ export const DeckTurntable: React.FC<DeckTurntableProps> = ({ deckId }) => {
     if (momentumDecayRafRef.current) { cancelAnimationFrame(momentumDecayRafRef.current); momentumDecayRafRef.current = 0; }
 
     lastPointerRef.current     = { x: e.clientX, y: e.clientY };
-    scratchVelocityRef.current = 1;
+    // Record stops when touched (like putting your hand on vinyl)
+    scratchVelocityRef.current = 0;
     jogActiveRef.current = true;
     setIsScratchActive(true);
     useDJStore.getState().setDeckScratchActive(deckId, true);
     bridgeRef.current?.post({ type: 'scratchActive', active: true });
-    try { getDJEngine().getDeck(deckId).startScratch(); } catch { /* Engine not ready */ }
+    bridgeRef.current?.post({ type: 'velocity', v: 0 }); // Stop the record immediately
+    try { 
+      getDJEngine().getDeck(deckId).startScratch();
+      getDJEngine().getDeck(deckId).setScratchVelocity(0); // Stop audio too
+    } catch { /* Engine not ready */ }
   }, [deckId]);
 
   const handlePointerMove = useCallback((e: React.PointerEvent<HTMLElement>) => {
     if (!lastPointerRef.current) return;
-    const container = containerRef.current;
-    if (!container) return;
 
-    const rect   = container.getBoundingClientRect();
-    const cx     = rect.left + SIZE / 2;
-    const cy     = rect.top  + SIZE / 2;
-    const rx     = e.clientX - cx, ry = e.clientY - cy;
-    const radius = Math.sqrt(rx * rx + ry * ry);
+    // Vertical drag: up = forward, down = backward (like scratching a record)
+    const dy = lastPointerRef.current.y - e.clientY; // Invert so up is positive
+    // Scale: ~25px drag = full speed (1.0), clamp to ±4
+    const v = Math.max(-4, Math.min(4, dy * 0.15));
+    scratchVelocityRef.current = v;
+    bridgeRef.current?.post({ type: 'velocity', v });
+    try { getDJEngine().getDeck(deckId).setScratchVelocity(v); } catch { /* Engine not ready */ }
 
-    if (radius > 4) {
-      const dx         = e.clientX - lastPointerRef.current.x;
-      const dy         = e.clientY - lastPointerRef.current.y;
-      const tangential = (rx * dy - ry * dx) / radius;
-      const v          = Math.max(-4, Math.min(4, 1 + tangential * SCRATCH_SENSITIVITY));
-      scratchVelocityRef.current = v;
-      bridgeRef.current?.post({ type: 'velocity', v });
-      try { getDJEngine().getDeck(deckId).setScratchVelocity(v); } catch { /* Engine not ready */ }
-    }
     lastPointerRef.current = { x: e.clientX, y: e.clientY };
   }, [deckId]);
 
   const handlePointerUp = useCallback((e: React.PointerEvent<HTMLElement>) => {
+    if (!lastPointerRef.current) return; // Already released
     e.currentTarget.releasePointerCapture(e.pointerId);
     lastPointerRef.current = null;
     const fromVelocity = scratchVelocityRef.current;
@@ -197,7 +213,18 @@ export const DeckTurntable: React.FC<DeckTurntableProps> = ({ deckId }) => {
     useDJStore.getState().setDeckScratchActive(deckId, false);
     bridgeRef.current?.post({ type: 'scratchActive', active: false });
     startMomentumDecay(fromVelocity);
-    try { getDJEngine().getDeck(deckId).stopScratch(200); } catch { /* Engine not ready */ }
+  }, [deckId, startMomentumDecay]);
+
+  // Handle pointer cancel / lost capture (e.g., system gesture interruption)
+  const handlePointerCancel = useCallback((e: React.PointerEvent<HTMLElement>) => {
+    if (!lastPointerRef.current) return;
+    try { e.currentTarget.releasePointerCapture(e.pointerId); } catch { /* ignore */ }
+    lastPointerRef.current = null;
+    jogActiveRef.current = false;
+    setIsScratchActive(false);
+    useDJStore.getState().setDeckScratchActive(deckId, false);
+    bridgeRef.current?.post({ type: 'scratchActive', active: false });
+    startMomentumDecay(scratchVelocityRef.current);
   }, [deckId, startMomentumDecay]);
 
   useEffect(() => {
@@ -216,6 +243,8 @@ export const DeckTurntable: React.FC<DeckTurntableProps> = ({ deckId }) => {
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerCancel}
+      onLostPointerCapture={handlePointerCancel}
     />
   );
 };
