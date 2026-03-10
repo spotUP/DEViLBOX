@@ -1,19 +1,23 @@
 /**
  * DJFxQuickPresets - Quick dropdown for applying master FX presets in DJ view.
  *
- * Shows factory presets (grouped by category, DJ category first) and user presets.
+ * Shows factory presets (grouped by category, DJ category first), user presets,
+ * and an "Add Effect" section with all 49 effects from the unified registry.
  * One-click apply without opening the full Master Effects editor.
  * When logged in, user presets are synced to the server.
  */
 
 import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { ChevronDown, Star, Trash2, CloudOff, Cloud } from 'lucide-react';
+import { ChevronDown, Star, Trash2, CloudOff, Cloud, Plus } from 'lucide-react';
 import { MASTER_FX_PRESETS, type MasterFxPreset } from '@/constants/masterFxPresets';
+import { AVAILABLE_EFFECTS, type AvailableEffect } from '@/constants/unifiedEffects';
+import { GUITARML_MODEL_REGISTRY } from '@/constants/guitarMLRegistry';
+import { getDefaultEffectParameters } from '@engine/InstrumentFactory';
 import { useAudioStore } from '@/stores/useAudioStore';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { pushToCloud } from '@/lib/cloudSync';
 import { SYNC_KEYS } from '@/hooks/useCloudSync';
-import type { EffectConfig } from '@typedefs/instrument';
+import type { EffectConfig, EffectType } from '@typedefs/instrument';
 
 // ── User preset types ────────────────────────────────────────────────────────
 
@@ -27,8 +31,18 @@ const USER_PRESETS_KEY = 'master-fx-user-presets';
 // ── Category order (DJ first for DJ view) ────────────────────────────────────
 
 const CATEGORY_ORDER: MasterFxPreset['category'][] = [
-  'DJ', 'Genre', 'Loud', 'Warm', 'Clean', 'Wide', 'Vinyl',
+  'DJ', 'Genre', 'Loud', 'Warm', 'Clean', 'Wide', 'Vinyl', 'Neural',
 ];
+
+// Effects where wet should default to 100% (not 50%)
+const DYNAMICS_EFFECTS = new Set<string>(['Compressor', 'EQ3']);
+
+// Group all available effects by their UI group for the "Add Effect" section
+const effectsByGroup = AVAILABLE_EFFECTS.reduce((acc, effect) => {
+  if (!acc[effect.group]) acc[effect.group] = [];
+  acc[effect.group].push(effect);
+  return acc;
+}, {} as Record<string, AvailableEffect[]>);
 
 // Group factory presets by category
 const groupedPresets = CATEGORY_ORDER.map((cat) => ({
@@ -40,9 +54,11 @@ const groupedPresets = CATEGORY_ORDER.map((cat) => ({
 
 export const DJFxQuickPresets: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
+  const [showAddEffect, setShowAddEffect] = useState(false);
   const [activePresetName, setActivePresetName] = useState<string | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const setMasterEffects = useAudioStore((s) => s.setMasterEffects);
+  const addMasterEffectConfig = useAudioStore((s) => s.addMasterEffectConfig);
   const user = useAuthStore((s) => s.user);
 
   // ── Local user presets ───────────────────────────────────────────────────
@@ -124,6 +140,38 @@ export const DJFxQuickPresets: React.FC = () => {
     setActivePresetName(null);
     setIsOpen(false);
   }, [setMasterEffects]);
+
+  // ── Add individual effect from unified registry ───────────────────────
+  const handleAddEffect = useCallback(
+    (availableEffect: AvailableEffect) => {
+      const type = (availableEffect.type as EffectType) || 'Distortion';
+      const params: Record<string, number | string> = { ...getDefaultEffectParameters(type) };
+
+      if (availableEffect.category === 'neural' && availableEffect.neuralModelIndex !== undefined) {
+        const model = GUITARML_MODEL_REGISTRY[availableEffect.neuralModelIndex];
+        if (model?.parameters) {
+          Object.entries(model.parameters).forEach(([key, param]) => {
+            if (param) params[key] = param.default;
+          });
+        }
+      }
+
+      const defaultWet = DYNAMICS_EFFECTS.has(type) ? 100 : 50;
+
+      addMasterEffectConfig({
+        category: availableEffect.category,
+        type,
+        enabled: true,
+        wet: defaultWet,
+        parameters: params,
+        neuralModelIndex: availableEffect.neuralModelIndex,
+        neuralModelName: availableEffect.category === 'neural' ? availableEffect.label : undefined,
+      });
+      setActivePresetName(null);
+      // Don't close — let user add multiple effects
+    },
+    [addMasterEffectConfig],
+  );
 
   // ── Click outside to close ─────────────────────────────────────────────
 
@@ -223,6 +271,44 @@ export const DJFxQuickPresets: React.FC = () => {
               ))}
             </div>
           ))}
+
+          {/* Add Individual Effect section */}
+          <div className="border-t border-dark-border">
+            <button
+              onClick={() => setShowAddEffect(!showAddEffect)}
+              className="w-full flex items-center gap-1.5 px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-accent-primary/80 hover:text-accent-primary hover:bg-dark-bgHover transition-colors"
+            >
+              <Plus size={10} />
+              Add Individual Effect
+              <ChevronDown size={10} className={`ml-auto transition-transform ${showAddEffect ? 'rotate-180' : ''}`} />
+            </button>
+
+            {showAddEffect && (
+              <div className="px-2 pb-2 space-y-2">
+                {Object.entries(effectsByGroup).map(([group, effects]) => (
+                  <div key={group}>
+                    <div className="px-1 py-1 text-[9px] font-bold uppercase tracking-widest text-text-muted/50">
+                      {group}
+                    </div>
+                    <div className="flex flex-wrap gap-1">
+                      {effects.map((effect) => (
+                        <button
+                          key={effect.type ?? `neural-${effect.neuralModelIndex}`}
+                          onClick={() => handleAddEffect(effect)}
+                          className="px-1.5 py-0.5 text-[10px] rounded border border-dark-borderLight
+                            bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover hover:text-text-primary
+                            hover:border-accent-primary/50 transition-colors"
+                          title={effect.description}
+                        >
+                          {effect.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>
