@@ -1014,24 +1014,69 @@ async function loadAudioSample(file: File): Promise<FileLoadResult> {
 }
 
 /**
- * Load and play a V2M (Farbrausch V2 Synthesizer Music) file.
- * V2M is a playback-only demoscene synth format.
+ * Load a V2M (Farbrausch V2 Synthesizer Music) file.
+ * V2M can be loaded as editable patterns or played directly.
  */
-async function loadV2MFile(file: File): Promise<FileLoadResult> {
+async function loadV2MFile(file: File, mode: 'edit' | 'play' = 'edit'): Promise<FileLoadResult> {
   try {
-    const { getV2MPlayer } = await import('@/lib/import/V2MPlayer');
-    const player = getV2MPlayer();
-    
     const arrayBuffer = await file.arrayBuffer();
     
-    // play() internally calls ensureInitialized() and waits
-    await player.play(arrayBuffer);
+    if (mode === 'play') {
+      // Playback-only mode using pre-rendered player
+      const { getV2MPlayer } = await import('@/lib/import/V2MPlayer');
+      const player = getV2MPlayer();
+      await player.play(arrayBuffer);
+      
+      notify.success(`Playing V2M: ${file.name}`);
+      return {
+        success: true,
+        message: `Playing V2M: ${file.name}`
+      };
+    }
     
-    notify.success(`Playing V2M: ${file.name}`);
+    // Import as editable song
+    const { importV2M, getV2MSummary } = await import('@/lib/import/V2MToPattern');
+    
+    // Get summary first for logging
+    const summary = getV2MSummary(arrayBuffer);
+    console.log('[V2M Import]', summary);
+    
+    // Import to DEViLBOX format
+    const result = importV2M(arrayBuffer, {
+      rowsPerPattern: 64,
+      bpm: 120,
+      speed: 6,
+      createInstruments: true,
+    });
+    
+    // Update song state using existing stores
+    const { loadPatterns, setPatternOrder, setCurrentPattern } = useTrackerStore.getState();
+    const { setBPM } = useTransportStore.getState();
+    const { setMetadata } = useProjectStore.getState();
+    const { addInstrument } = useInstrumentStore.getState();
+    
+    // Set song metadata
+    setMetadata({ name: file.name.replace(/\.v2m$/i, '') });
+    setBPM(result.bpm);
+    
+    // Load patterns
+    loadPatterns(result.patterns);
+    
+    // Set pattern order
+    const patternIds = result.patterns.map((_p, i) => i);
+    setPatternOrder(patternIds);
+    setCurrentPattern(0);
+    
+    // Add instruments
+    for (const inst of result.instruments) {
+      addInstrument(inst);
+    }
+    
+    notify.success(`Imported V2M: ${result.patterns.length} patterns, ${result.instruments.length} instruments`);
     
     return {
       success: true,
-      message: `Playing V2M: ${file.name}`
+      message: `Imported ${file.name}: ${result.patterns.length} patterns, ${result.instruments.length} instruments`,
     };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);

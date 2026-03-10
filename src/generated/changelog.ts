@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-03-10T20:13:30.270Z
+ * Generated: 2026-03-10T20:55:13.421Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.2601';
-export const BUILD_NUMBER = '2601';
-export const BUILD_HASH = 'fd7039315';
+export const BUILD_VERSION = '1.0.2614';
+export const BUILD_NUMBER = '2614';
+export const BUILD_HASH = '90546c78a';
 export const BUILD_DATE = '2026-03-10';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,61 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.2601',
+    version: '1.0.2614',
     date: '2026-03-10',
     changes: [
+      {
+        type: 'feature',
+        "description": "Click-outside-to-close and auto-close for Modland browser"
+      },
+      {
+        type: 'fix',
+        "description": "Sync button matches BPM only, no longer seeks/resets position"
+      },
+      {
+        type: 'fix',
+        "description": "Eliminate clicks in fader LFO and scratch pattern chops"
+      },
+      {
+        type: 'feature',
+        "description": "Add V2 Synthesizer worklet and instrument types"
+      },
+      {
+        type: 'improvement',
+        "description": "Add pattern editor optimization and loop stutter fix notes"
+      },
+      {
+        type: 'improvement',
+        "description": "Chore: engine, store, tracker, and miscellaneous updates"
+      },
+      {
+        type: 'improvement',
+        "description": "Pixi UI dialog and component updates"
+      },
+      {
+        type: 'improvement',
+        "description": "Dialog and modal UI improvements"
+      },
+      {
+        type: 'feature',
+        "description": "DJ engine improvements and component updates"
+      },
+      {
+        type: 'feature',
+        "description": "Add tracker analysis pipeline with genre detection"
+      },
+      {
+        type: 'feature',
+        "description": "Add V2 Synthesizer and V2M Player WASM modules"
+      },
+      {
+        type: 'fix',
+        "description": "Browser panels overlay + one-shot scratch buttons"
+      },
+      {
+        type: 'feature',
+        "description": "Add CSS Technics SL-1200 turntable with proper aspect ratio"
+      },
       {
         type: 'fix',
         "description": "Fix bulk pattern edits not syncing to playback engines"
@@ -198,58 +250,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'improvement',
         "description": "Update audit reports, CLAUDE.md, and project metadata"
-      },
-      {
-        type: 'improvement',
-        "description": "Chore: move regression tests to CI-only and update build config"
-      },
-      {
-        type: 'feature',
-        "description": "UI improvements — theme editor, custom banner, settings modal"
-      },
-      {
-        type: 'feature',
-        "description": "Update engines with improved playback and format handling"
-      },
-      {
-        type: 'feature',
-        "description": "Expand import format support and update parsers"
-      },
-      {
-        type: 'improvement',
-        "description": "Chore: update WASM C/C++ sources for harness and paula_soft improvements"
-      },
-      {
-        type: 'improvement',
-        "description": "Chore: rebuild WASM modules and update worklets"
-      },
-      {
-        type: 'improvement',
-        "description": "Chore: update build paths for third-party directory restructure"
-      },
-      {
-        type: 'improvement',
-        "description": "Chore: remove unneeded third-party reference sources from git"
-      },
-      {
-        type: 'feature',
-        "description": "Implement complete Furnace chip flags pipeline with version compat"
-      },
-      {
-        type: 'feature',
-        "description": "Chore: add gearmulator build-native to gitignore"
-      },
-      {
-        type: 'fix',
-        "description": "Sync arrangement playhead on view switch and update changelog"
-      },
-      {
-        type: 'feature',
-        "description": "Add searchable filter to PixiSelect dropdown"
-      },
-      {
-        type: 'feature',
-        "description": "Import dialog format capabilities, warnings, and metadata"
       }
     ]
   }
