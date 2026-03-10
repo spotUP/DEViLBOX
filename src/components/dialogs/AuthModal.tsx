@@ -5,6 +5,7 @@
 import React, { useState } from 'react';
 import { X, User, Lock, AlertCircle } from 'lucide-react';
 import { useAuthStore } from '@stores/useAuthStore';
+import { useModalClose } from '@hooks/useDialogKeyboard';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -13,6 +14,7 @@ interface AuthModalProps {
 }
 
 export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess }) => {
+  useModalClose({ isOpen, onClose });
   const [mode, setMode] = useState<'login' | 'signup'>('login');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');

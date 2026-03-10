@@ -12,6 +12,7 @@ import { Button } from '@components/ui/Button';
 import type { ModuleInfo } from '@lib/import/ModuleLoader';
 import type { ImportOptions } from './ImportModuleDialog';
 import type { FurnaceModule } from '@lib/import/formats/FurnaceSongParser';
+import { useModalClose } from '@hooks/useDialogKeyboard';
 
 interface ImportFurnaceDialogProps {
   isOpen: boolean;
@@ -109,6 +110,7 @@ export const ImportFurnaceDialog: React.FC<ImportFurnaceDialogProps> = ({
   onImport,
   initialFile,
 }) => {
+  useModalClose({ isOpen, onClose });
   const [module, setModule]           = useState<FurnaceModule | null>(null);
   const [moduleBuffer, setModuleBuffer] = useState<ArrayBuffer | null>(null);
   const [moduleFile, setModuleFile]   = useState<File | null>(null);

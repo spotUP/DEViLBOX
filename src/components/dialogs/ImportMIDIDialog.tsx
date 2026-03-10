@@ -12,6 +12,7 @@ import { Button } from '@components/ui/Button';
 import type { ModuleInfo } from '@lib/import/ModuleLoader';
 import type { ImportOptions } from './ImportModuleDialog';
 import type { MIDIImportOptions } from '@lib/import/MIDIImporter';
+import { useModalClose } from '@hooks/useDialogKeyboard';
 
 interface MIDIPreview {
   bpm: number;
@@ -46,6 +47,7 @@ export const ImportMIDIDialog: React.FC<ImportMIDIDialogProps> = ({
   onImport,
   initialFile,
 }) => {
+  useModalClose({ isOpen, onClose });
   const [preview, setPreview]       = useState<MIDIPreview | null>(null);
   const [moduleFile, setModuleFile] = useState<File | null>(null);
   const [isLoading, setIsLoading]   = useState(false);

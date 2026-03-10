@@ -11,6 +11,7 @@ import {
   Zap, Download,
 } from 'lucide-react';
 import { useFormatStore } from '@stores';
+import { useModalClose } from '@hooks/useDialogKeyboard';
 import { useShallow } from 'zustand/react/shallow';
 import { notify } from '@stores/useNotificationStore';
 import { useSettingsStore } from '@stores/useSettingsStore';
@@ -55,6 +56,7 @@ interface SIDInfoModalProps {
 }
 
 export const SIDInfoModal: React.FC<SIDInfoModalProps> = ({ onClose }) => {
+  useModalClose({ isOpen: true, onClose });
   const { sidMetadata, setSidMetadata, songDBInfo } = useFormatStore(
     useShallow((state) => ({
       sidMetadata: state.sidMetadata,

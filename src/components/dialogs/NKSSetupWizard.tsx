@@ -13,6 +13,7 @@ import { useUIStore } from '@stores/useUIStore';
 import { useMIDIStore } from '@stores/useMIDIStore';
 import { useInstrumentStore } from '@stores/useInstrumentStore';
 import { notify } from '@stores/useNotificationStore';
+import { useModalClose } from '@hooks/useDialogKeyboard';
 
 type WizardStep = 'intro' | 'pages' | 'export' | 'done';
 
@@ -20,6 +21,7 @@ export const NKSSetupWizard: React.FC = () => {
   const modalOpen = useUIStore(s => s.modalOpen);
   const closeModal = useUIStore(s => s.closeModal);
   const isOpen = modalOpen === 'nks-wizard';
+  useModalClose({ isOpen, onClose: () => closeModal() });
 
   const nksKnobAssignments = useMIDIStore(s => s.nksKnobAssignments);
   const nksKnobPage = useMIDIStore(s => s.nksKnobPage);

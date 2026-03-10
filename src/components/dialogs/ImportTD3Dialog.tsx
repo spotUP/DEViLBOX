@@ -9,6 +9,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { X, AlertCircle, Music2 } from 'lucide-react';
 import { Button } from '@components/ui/Button';
+import { useModalClose } from '@hooks/useDialogKeyboard';
 
 interface TD3Preview {
   name: string;
@@ -32,6 +33,7 @@ export const ImportTD3Dialog: React.FC<ImportTD3DialogProps> = ({
   initialFile,
   onImport,
 }) => {
+  useModalClose({ isOpen, onClose });
   const [preview, setPreview]         = useState<TD3Preview | null>(null);
   const [td3File, setTD3File]         = useState<File | null>(null);
   const [isLoading, setIsLoading]     = useState(false);

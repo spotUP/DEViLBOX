@@ -4,6 +4,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { X, Sparkles } from 'lucide-react';
+import { useModalClose } from '@hooks/useDialogKeyboard';
 import { CHANGELOG, CURRENT_VERSION, type ChangelogEntry } from '@generated/changelog';
 
 const STORAGE_KEY = 'devilbox-seen-version';
@@ -31,6 +32,7 @@ const ChangeTypeLabel: React.FC<{ type: 'feature' | 'fix' | 'improvement' }> = (
 };
 
 export const WhatsNewModal: React.FC<WhatsNewModalProps> = ({ onClose }) => {
+  useModalClose({ isOpen: true, onClose });
   const handleClose = () => {
     // Mark current version as seen
     localStorage.setItem(STORAGE_KEY, CURRENT_VERSION);

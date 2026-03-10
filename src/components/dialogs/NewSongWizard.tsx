@@ -18,6 +18,7 @@ import { useTabsStore } from '@stores/useTabsStore';
 import { getGroupedPresets, SYSTEM_PRESETS } from '@constants/systemPresets';
 import type { SystemPreset } from '@constants/systemPresets';
 import { AMIGA_UADE_PRESET_IDS, getInstrumentPresetsForSystem } from '@constants/uadeInstrumentPresets';
+import { useModalClose } from '@hooks/useDialogKeyboard';
 
 type WizardStep = 1 | 2 | 3;
 type StartMode = 'empty' | 'preset';
@@ -27,6 +28,7 @@ const GROUPED_PRESETS = getGroupedPresets();
 export const NewSongWizard: React.FC = () => {
   const isOpen = useUIStore((s) => s.newSongWizardOpen);
   const close = useUIStore((s) => s.closeNewSongWizard);
+  useModalClose({ isOpen, onClose: close });
 
   const [step, setStep] = useState<WizardStep>(1);
   const [startMode, setStartMode] = useState<StartMode>('empty');
