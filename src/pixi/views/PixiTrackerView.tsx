@@ -21,6 +21,7 @@ import { PixiMacroLanes } from './tracker/PixiMacroLanes';
 import { PixiMacroSlotsPanel } from './tracker/PixiMacroSlotsPanel';
 import { PixiMIDIKnobBar } from './tracker/PixiMIDIKnobBar';
 import { PixiEditorControlsBar } from './tracker/PixiEditorControlsBar';
+import { PixiChannelVUMeters } from './tracker/PixiChannelVUMeters';
 import { PixiRandomizeDialog } from '../dialogs/PixiRandomizeDialog';
 import { PixiAcidPatternDialog } from '../dialogs/PixiAcidPatternDialog';
 import { PixiFurnaceView } from './furnace/PixiFurnaceView';
@@ -300,14 +301,11 @@ export const PixiTrackerView: React.FC = () => {
               so the header offset is just PE_HEADER in that case. */}
           {(() => {
             const PE_HEADER = 28;     // PixiPatternEditor channel header
-            const PE_ROW = 24;        // PixiPatternEditor row height
-            const HEADER_OFFSET = PE_HEADER; // below channel headers (scrollbar collapses via display:none)
             const gridH = instrumentPanelHeight - PE_HEADER;
-            const vuHeight = Math.max(50, Math.floor((gridH - PE_ROW) / 2));
+            const editRowY = Math.floor(gridH / 2); // Center of grid area (edit row position)
             return (
-              <pixiContainer alpha={viewMode === 'tracker' && editorMode === 'classic' ? 1 : 0} renderable={viewMode === 'tracker' && editorMode === 'classic'} eventMode={viewMode === 'tracker' && editorMode === 'classic' ? 'static' : 'none'} layout={{ position: 'absolute', top: HEADER_OFFSET, width: Math.max(100, editorWidth), height: vuHeight }}>
-                {/* VU meters temporarily disabled for scroll stutter testing */}
-                {/* <PixiChannelVUMeters width={Math.max(100, editorWidth)} height={vuHeight} /> */}
+              <pixiContainer alpha={viewMode === 'tracker' && editorMode === 'classic' ? 1 : 0} renderable={viewMode === 'tracker' && editorMode === 'classic'} eventMode={viewMode === 'tracker' && editorMode === 'classic' ? 'static' : 'none'} layout={{ position: 'absolute', top: PE_HEADER, width: Math.max(100, editorWidth), height: gridH }}>
+                <PixiChannelVUMeters width={Math.max(100, editorWidth)} height={gridH} editRowY={editRowY} />
               </pixiContainer>
             );
           })()}

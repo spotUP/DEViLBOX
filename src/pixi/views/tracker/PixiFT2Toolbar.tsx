@@ -28,6 +28,7 @@ import { PixiPureTextInput } from '../../input/PixiPureTextInput';
 import { PixiFXSearchReplace } from '../../components/PixiFXSearchReplace';
 import { PixiVisualizer } from './PixiVisualizer';
 import { useTransportStore, useTrackerStore, useUIStore, useInstrumentStore, useProjectStore, useAudioStore, useAutomationStore, useEditorStore } from '@stores';
+import { useAIStore } from '@stores/useAIStore';
 import { exportSong } from '@lib/export/exporters';
 import { useShallow } from 'zustand/react/shallow';
 import { useTapTempo } from '@hooks/useTapTempo';
@@ -148,6 +149,10 @@ export const PixiFT2Toolbar: React.FC = () => {
   // ── UI store ─────────────────────────────────────────────────────────────
   const modalOpen = useUIStore(s => s.modalOpen);
   const showAutomation = useUIStore(s => s.showAutomationLanes);
+
+  // ── AI store ─────────────────────────────────────────────────────────────
+  const aiOpen = useAIStore(s => s.isOpen);
+  const toggleAI = useAIStore(s => s.toggle);
 
   // ── Project store (isDirty for Save button label) ─────────────────────────
   const isDirty = useProjectStore(s => s.isDirty);
@@ -589,6 +594,14 @@ export const PixiFT2Toolbar: React.FC = () => {
           size="sm"
           active={modalOpen === 'instrumentFx'}
           onClick={() => { const s = useUIStore.getState(); s.modalOpen === 'instrumentFx' ? s.closeModal() : s.openModal('instrumentFx'); }}
+        />
+        <PixiButton
+          label="AI"
+          variant={aiOpen ? 'ft2' : 'ghost'}
+          color={aiOpen ? 'green' : 'default'}
+          size="sm"
+          active={aiOpen}
+          onClick={toggleAI}
         />
         <PixiButton label="Reference" variant="ghost" size="sm" onClick={() => handleShowHelp('chip-effects')} />
         <PixiButton label="Help"      variant="ghost" size="sm" onClick={() => handleShowHelp('shortcuts')} />
