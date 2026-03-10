@@ -5,7 +5,7 @@
  * Layout mirrors between A (left-aligned) and B (right-aligned).
  */
 
-import React, { useEffect, useRef, useCallback, useState, Suspense, lazy } from 'react';
+import React, { useEffect, useRef, useCallback, useState } from 'react';
 import { useDJStore } from '@/stores/useDJStore';
 import { getDJEngine } from '@/engine/dj/DJEngine';
 import { parseModuleToSong } from '@/lib/import/parseModuleToSong';
@@ -13,6 +13,7 @@ import { detectBPM } from '@/engine/dj/DJBeatDetector';
 import { cacheSong } from '@/engine/dj/DJSongCache';
 import { isAudioFile } from '@/lib/audioFileUtils';
 import { getDJPipeline } from '@/engine/dj/DJPipeline';
+import { isSeekActive } from './seekGuard';
 import { DeckTransport } from './DeckTransport';
 import { DeckPitchSlider } from './DeckPitchSlider';
 import { DeckNudge } from './DeckNudge';
@@ -20,7 +21,7 @@ import { DeckTrackInfo } from './DeckTrackInfo';
 import { DeckTrackOverview } from './DeckTrackOverview';
 import { DeckVisualizer } from './DeckVisualizer';
 import { DeckTurntable } from './DeckTurntable';
-import { DeckVinylView } from './DeckVinylView';
+import { DeckCssTurntable } from './DeckCssTurntable';
 import { DeckLoopControls } from './DeckLoopControls';
 import { DeckScopes } from './DeckScopes';
 import { DeckScratch } from './DeckScratch';
@@ -29,9 +30,6 @@ import { DeckCuePoints } from './DeckCuePoints';
 import { DeckBeatGrid } from './DeckBeatGrid';
 import { DeckAudioWaveform } from './DeckAudioWaveform';
 import { DeckPatternDisplay } from './DeckPatternDisplay';
-
-// Lazy-load 3D view to avoid Three.js bundle bloat for users who don't use it
-const DeckVinyl3DView = lazy(() => import('./DeckVinyl3DView'));
 
 interface DJDeckProps {
   deckId: 'A' | 'B' | 'C';
@@ -45,6 +43,10 @@ export const DJDeck: React.FC<DJDeckProps> = ({ deckId }) => {
   const dragCountRef = useRef(0);
   const deckViewMode = useDJStore((s) => s.deckViewMode);
   const hasPatternData = useDJStore((s) => s.decks[deckId].totalPositions > 0);
+  const hasAudioWaveform = useDJStore((s) => {
+    const peaks = s.decks[deckId].waveformPeaks;
+    return !!(peaks && peaks.length > 0);
+  });
 
   // Poll playback position and update store at ~30fps
   useEffect(() => {
@@ -60,7 +62,7 @@ export const DJDeck: React.FC<DJDeckProps> = ({ deckId }) => {
 
         if (deck.playbackMode === 'audio') {
           // Audio file mode — poll audio player position
-          if (deck.audioPlayer.isCurrentlyPlaying()) {
+          if (deck.audioPlayer.isCurrentlyPlaying() && !isSeekActive(deckId)) {
             const pos = deck.audioPlayer.getPosition();
             const dur = deck.audioPlayer.getDuration();
             const update: Record<string, unknown> = {
@@ -361,29 +363,23 @@ export const DJDeck: React.FC<DJDeckProps> = ({ deckId }) => {
         {deckViewMode === 'visualizer' && <DeckTurntable deckId={deckId} />}
       </div>
 
-      {/* Track overview bar (with beatgrid overlay for audio mode) */}
-      <div className="relative">
-        <DeckTrackOverview deckId={deckId} />
-        <DeckBeatGrid deckId={deckId} />
-      </div>
+      {/* Track overview bar — hidden when combined audio waveform is showing */}
+      {!hasAudioWaveform && (
+        <div className="relative">
+          <DeckTrackOverview deckId={deckId} />
+          <DeckBeatGrid deckId={deckId} />
+        </div>
+      )}
 
-      {/* Scrolling audio waveform (audio mode only, shown above the visualizer) */}
+      {/* Combined audio waveform: overview strip + scrolling waveform (audio mode only) */}
       <DeckAudioWaveform deckId={deckId} />
 
       {/* Main controls area: pattern display / vinyl + pitch slider */}
       <div className={`flex gap-2 flex-1 min-h-0 ${isB ? 'flex-row-reverse' : ''}`}>
         {/* Pattern display / Visualizer / Vinyl */}
         <div className="flex-1 min-w-0 min-h-0 flex items-center justify-center relative">
-          {deckViewMode === '3d' ? (
-            <Suspense fallback={
-              <div className="flex items-center justify-center w-full h-full text-text-muted text-xs font-mono">
-                Loading 3D...
-              </div>
-            }>
-              <DeckVinyl3DView deckId={deckId} />
-            </Suspense>
-          ) : deckViewMode === 'vinyl' ? (
-            <DeckVinylView deckId={deckId} />
+          {deckViewMode === 'vinyl' ? (
+            <DeckCssTurntable deckId={deckId} />
           ) : (
             <DeckVisualizer deckId={deckId} resetKey={vizResetKey} />
           )}

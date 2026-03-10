@@ -57,39 +57,64 @@ export const DeckVinylView: React.FC<DeckVinylViewProps> = ({ deckId, size = DEF
   useEffect(() => {
     const physics = physicsRef.current;
     let prevRate = 1;
+    // When not scratching, snap angle to audioPosition.
+    // When scratching, integrate angle from physics rate (smooth, no store-lag jitter).
+    let scratchIntegrating = false;
 
     const tick = (now: number) => {
       const dt = lastTickRef.current > 0 ? (now - lastTickRef.current) / 1000 : 0;
       lastTickRef.current = now;
 
-      // Always advance angle for visual rotation
-      const baseBPM = effectiveBPM || 120;
+      const { isPlaying: playing, effectiveBPM: bpm } = playStateRef.current;
+      const baseBPM = bpm || 120;
       const rps = (baseBPM / 120) * 0.5556; // 33⅓ RPM normalized
+      const omegaNormal = rps * 2 * Math.PI; // rad/s at normal playback
 
-      if (isPlaying || isScratchActiveRef.current) {
-        // If scratching, use physics rate; otherwise normal playback
-        let rate = 1;
+      if (playing || isScratchActiveRef.current) {
+        // Tick physics for scratch velocity forwarding
         if (isScratchActiveRef.current || physics.spinbackActive || physics.powerCutActive) {
-          rate = physics.tick(dt);
-        }
+          const rate = physics.tick(dt);
 
-        angleRef.current += rps * rate * 2 * Math.PI * dt;
-
-        // Forward physics rate to DeckEngine scratch API
-        if (isScratchActiveRef.current && Math.abs(rate - prevRate) > 0.01) {
-          try { getDJEngine().getDeck(deckId).setScratchVelocity(rate); } catch { /* not ready */ }
-          prevRate = rate;
-        }
-
-        // Check if physics has settled back to normal — exit scratch
-        if (isScratchActiveRef.current && !physics.touching && !physics.spinbackActive && !physics.powerCutActive) {
-          if (Math.abs(rate - 1.0) < 0.02) {
-            isScratchActiveRef.current = false;
-            setIsScratchActive(false);
-            try { getDJEngine().getDeck(deckId).stopScratch(50); } catch { /* not ready */ }
-            useDJStore.getState().setDeckScratchActive(deckId, false);
-            prevRate = 1;
+          // When scratch starts, switch to integration mode
+          if (isScratchActiveRef.current && !scratchIntegrating) {
+            scratchIntegrating = true;
+            // Sync angle to current position before integrating
+            const deck = useDJStore.getState().decks[deckId];
+            const posSec = deck.playbackMode === 'audio' ? deck.audioPosition : deck.elapsedMs / 1000;
+            angleRef.current = posSec * omegaNormal;
           }
+
+          // Forward physics rate to DeckEngine scratch API
+          if (isScratchActiveRef.current && Math.abs(rate - prevRate) > 0.01) {
+            try { getDJEngine().getDeck(deckId).setScratchVelocity(rate); } catch { /* not ready */ }
+            prevRate = rate;
+          }
+
+          // Integrate angle from physics rate (smooth, follows hand exactly)
+          if (scratchIntegrating) {
+            angleRef.current += rate * omegaNormal * dt;
+          }
+
+          // Check if physics has settled back to normal — exit scratch
+          if (isScratchActiveRef.current && !physics.touching && !physics.spinbackActive && !physics.powerCutActive) {
+            if (Math.abs(rate - 1.0) < 0.02) {
+              isScratchActiveRef.current = false;
+              setIsScratchActive(false);
+              scratchIntegrating = false;
+              try { getDJEngine().getDeck(deckId).stopScratch(50); } catch { /* not ready */ }
+              useDJStore.getState().setDeckScratchActive(deckId, false);
+              prevRate = 1;
+            }
+          }
+        }
+
+        // When NOT scratching, derive angle from store position (authoritative)
+        if (!scratchIntegrating) {
+          const deck = useDJStore.getState().decks[deckId];
+          const posSec = deck.playbackMode === 'audio'
+            ? deck.audioPosition
+            : deck.elapsedMs / 1000;
+          angleRef.current = posSec * omegaNormal;
         }
       }
       // When not playing (and not scratching), platter is stationary
