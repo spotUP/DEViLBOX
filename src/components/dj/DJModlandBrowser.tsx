@@ -43,10 +43,12 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose }) =
   const [hasMore, setHasMore] = useState(false);
   const [downloadingPaths, setDownloadingPaths] = useState<Set<string>>(new Set());
   const [selectedIndex, setSelectedIndex] = useState(-1);
+  const [, setLoadedDecks] = useState<Set<string>>(new Set());
 
   const searchTimerRef = useRef<ReturnType<typeof setTimeout>>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
   const thirdDeckActive = useThirdDeckActive();
   const LIMIT = 50;
 
@@ -58,6 +60,19 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose }) =
     // Auto-focus search input
     requestAnimationFrame(() => inputRef.current?.focus());
   }, []);
+
+  // ── Click outside to close ──────────────────────────────────────────────
+
+  useEffect(() => {
+    if (!onClose) return;
+    const handlePointerDown = (e: PointerEvent) => {
+      if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
+        onClose();
+      }
+    };
+    document.addEventListener('pointerdown', handlePointerDown);
+    return () => document.removeEventListener('pointerdown', handlePointerDown);
+  }, [onClose]);
 
   // ── Debounced search ────────────────────────────────────────────────────
 
@@ -168,6 +183,16 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose }) =
         useDJStore.getState().setDeckViewMode('visualizer');
 
         console.log(`[DJModlandBrowser] Loaded ${file.filename} in audio mode (skipped tracker bugs)`);
+
+        // Track loaded decks and auto-close when all active decks are filled
+        setLoadedDecks((prev) => {
+          const next = new Set(prev).add(deckId);
+          const requiredDecks = thirdDeckActive ? 3 : 2;
+          if (next.size >= requiredDecks && onClose) {
+            setTimeout(onClose, 300); // brief delay so user sees the load complete
+          }
+          return next;
+        });
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load');
       } finally {
@@ -178,7 +203,7 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose }) =
         });
       }
     },
-    [],
+    [thirdDeckActive, onClose],
   );
 
   // ── Add to playlist ─────────────────────────────────────────────────────
@@ -269,6 +294,7 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose }) =
 
   return (
     <div
+      ref={panelRef}
       className="bg-dark-bgSecondary border border-dark-border rounded-lg p-3 flex flex-col gap-2 max-h-[400px] relative z-50"
       onKeyDown={handleKeyDown}
       tabIndex={-1}
