@@ -842,7 +842,7 @@ export async function loadFile(params: Record<string, unknown>): Promise<Record<
     // Import with default options (no yields — keeps state transition atomic
     // so React doesn't render empty intermediate state causing stutter)
     const subsong = (params.subsong as number) ?? 0;
-    const useLibopenmpt = (params.useLibopenmpt as boolean) ?? false;
+    const useLibopenmpt = (params.useLibopenmpt as boolean) ?? true;
     await importTrackerModule(moduleInfo as any, {
       useLibopenmpt,
       subsong,

@@ -40,6 +40,14 @@ export class ErrorBoundary extends Component<Props, State> {
     if (import.meta.env.DEV) {
       console.error('[ErrorBoundary] Caught error:', error);
       console.error('[ErrorBoundary] Component stack:', errorInfo.componentStack);
+
+      // Auto-reload on HMR corruption (useState/useEffect is null = stale React module)
+      if (error.message?.includes("Cannot read properties of null (reading 'use")
+        || error.message?.includes("Cannot read properties of null (reading 'useState')")
+        || error.message?.includes("Cannot read properties of null (reading 'useEffect')")) {
+        console.warn('[ErrorBoundary] HMR corruption detected — auto-reloading in 1s');
+        setTimeout(() => window.location.reload(), 1000);
+      }
     }
   }
 

@@ -81,6 +81,7 @@ const DEFAULT_THEME: ThemeSnapshot = {
 };
 
 let theme: ThemeSnapshot = DEFAULT_THEME;
+let dirty = true;
 
 // ─── Message handler ──────────────────────────────────────────────────────────
 
@@ -108,13 +109,16 @@ self.onmessage = (e: MessageEvent<WorkerMsg>) => {
     case 'pattern':
       pattern = msg.pattern;
       layout  = msg.layout;
+      dirty = true;
       break;
     case 'playback':
       currentRow = msg.currentRow;
       isPlaying  = msg.isPlaying;
+      dirty = true;
       break;
     case 'resize':
       renderer?.resize(msg.w, msg.h, msg.dpr);
+      dirty = true;
       break;
   }
 };
@@ -130,7 +134,8 @@ function startRAF(): void {
 }
 
 function renderFrame(): void {
-  if (!renderer) return;
+  if (!renderer || !dirty) return;
+  dirty = false;
   const patterns = pattern ? [pattern] : [];
   renderer.render({
     patterns,

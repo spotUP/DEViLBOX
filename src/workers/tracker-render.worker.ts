@@ -54,6 +54,9 @@ let ui: UIStateSnapshot = {
 let layout: ChannelLayoutSnapshot = { offsets: [], widths: [], totalWidth: 0 };
 let playback = { row: 0, smoothOffset: 0, patternIndex: 0, isPlaying: false };
 let dragOver: { channelIndex: number; rowIndex: number } | null = null;
+let dirty = true; // Dirty flag — skip GPU draws when nothing changed
+// Reusable playback object for render calls (avoids per-frame allocation)
+const workerPlayback = { row: 0, smoothOffset: 0, patternIndex: 0, isPlaying: false };
 
 // ─── Message handler ──────────────────────────────────────────────────────────
 
@@ -91,50 +94,61 @@ self.onmessage = (e: MessageEvent<TrackerWorkerMsg>) => {
     case 'patterns':
       patterns = msg.patterns;
       currentPatternIndex = msg.currentPatternIndex;
+      dirty = true;
       break;
 
     case 'scroll':
       scrollX = msg.x;
+      dirty = true;
       break;
 
     case 'cursor':
       cursor = msg.cursor;
+      dirty = true;
       break;
 
     case 'selection':
       selection = msg.selection;
+      dirty = true;
       break;
 
-    case 'playback':
+    case 'playback': {
       playback = {
         row: msg.row,
         smoothOffset: msg.smoothOffset,
         patternIndex: msg.patternIndex,
         isPlaying: msg.isPlaying,
       };
+      dirty = true;
       break;
+    }
 
     case 'resize':
       width  = msg.w;
       height = msg.h;
       dpr    = msg.dpr;
       renderer?.resize(width, height, dpr);
+      dirty = true;
       break;
 
     case 'theme':
       theme = msg.theme;
+      dirty = true;
       break;
 
     case 'uiState':
       ui = msg.uiState;
+      dirty = true;
       break;
 
     case 'channelLayout':
       layout = msg.channelLayout;
+      dirty = true;
       break;
 
     case 'dragOver':
       dragOver = msg.cell;
+      dirty = true;
       break;
 
     case 'hitTest': {
@@ -161,7 +175,13 @@ self.onmessage = (e: MessageEvent<TrackerWorkerMsg>) => {
 
 function startRAF(): void {
   const tick = () => {
-    renderFrame();
+    // During playback, always render (smooth scrolling needs continuous updates)
+    if (playback.isPlaying) dirty = true;
+    
+    // Only call renderFrame if dirty (skip GPU calls when nothing changed)
+    if (dirty) {
+      renderFrame();
+    }
     requestAnimationFrame(tick);
   };
   requestAnimationFrame(tick);
@@ -169,6 +189,17 @@ function startRAF(): void {
 
 function renderFrame(): void {
   if (!renderer || !theme) return;
+  dirty = false;
+
+  // Use smoothOffset directly from main thread
+  // Main thread has accurate replayer state, no need to recompute
+  const smoothOffset = playback.smoothOffset;
+
+  // Reuse workerPlayback object to avoid per-frame allocation
+  workerPlayback.row = playback.row;
+  workerPlayback.smoothOffset = smoothOffset;
+  workerPlayback.patternIndex = playback.patternIndex;
+  workerPlayback.isPlaying = playback.isPlaying;
 
   renderer.render({
     patterns,
@@ -176,7 +207,7 @@ function renderFrame(): void {
     scrollX,
     cursor,
     selection,
-    playback,
+    playback: workerPlayback,
     theme,
     ui,
     layout,

@@ -97,6 +97,8 @@ import {
   getChannelLevels as _getChannelLevels,
   updateChannelEnvelopes as _updateChannelEnvelopes,
   setChannelKeyOff as _setChannelKeyOff,
+  updateRealtimeChannelLevels as _updateRealtimeChannelLevels,
+  getRealtimeChannelLevels as _getRealtimeChannelLevels,
 } from './tone/ChannelRouting';
 import {
   type MasterEffectsContext,
@@ -158,6 +160,7 @@ export class ToneEngine {
   public masterInput: Tone.Gain; // Where tracker instruments connect
   public synthBus: Tone.Gain; // Bypass bus for DevilboxSynths (skips AmigaFilter)
   private synthBusMeter: Tone.Meter; // Level meter on synthBus for WASM engine metering
+  private masterMeter: Tone.Meter; // Level meter at masterEffectsInput merge point
   private pitchResamplerNode: AudioWorkletNode | null = null; // Pitch resampler for WASM engines
   public masterEffectsInput: Tone.Gain; // Merge point for master effects (both paths feed in here)
   private blepInput: Tone.Gain; // BLEP insertion point — isolates BLEP routing from effects chain rebuilds
@@ -380,6 +383,11 @@ export class ToneEngine {
     // don't work for WASM engines since they mix internally)
     this.synthBusMeter = new Tone.Meter({ normalRange: true });
     this.synthBus.connect(this.synthBusMeter);
+
+    // Master meter at the merge point - catches ALL audio (libopenmpt goes through masterInput,
+    // native synths through synthBus - both meet at masterEffectsInput)
+    this.masterMeter = new Tone.Meter({ normalRange: true });
+    this.masterEffectsInput.connect(this.masterMeter);
 
     // Init pitch resampler for WASM engine pitch shifting (async — falls back to direct connection)
     this.initPitchResampler();
@@ -4351,6 +4359,8 @@ export class ToneEngine {
     this.analyser.dispose();
     this.fft.dispose();
     this.amigaFilter.dispose();
+    this.synthBusMeter.dispose();
+    this.masterMeter.dispose();
     this.synthBus.dispose();
     this.masterEffectsInput.dispose();
     this.blepInput.dispose();
@@ -4544,7 +4554,27 @@ export class ToneEngine {
   public updateMuteStates(channels: { muted: boolean; solo: boolean }[]): void { _updateMuteStates(this._channelCtx, channels); }
   public isChannelMuted(channelIndex: number): boolean { return _isChannelMuted(this._channelCtx, channelIndex); }
   private disposeChannelOutputs(): void { _disposeChannelOutputs(this._channelCtx); }
-  public getChannelLevels(numChannels: number): number[] { return _getChannelLevels(this._channelCtx, numChannels); }
+  public getChannelLevels(numChannels: number): number[] {
+    // First check for per-channel meter data from TypeScript synths
+    const perChannelLevels = _getChannelLevels(this._channelCtx, numChannels);
+    const hasPerChannelData = perChannelLevels.some(l => l > 0);
+    if (hasPerChannelData) {
+      return perChannelLevels;
+    }
+    // Check for realtime per-channel levels from WASM engines (libopenmpt, etc.)
+    const wasmLevels = _getRealtimeChannelLevels(this.channelMeter, numChannels);
+    if (wasmLevels) {
+      return wasmLevels;
+    }
+    // Fall back to master meter level (distribute uniformly)
+    const masterLevel = this.masterMeter.getValue() as number;
+    const normalized = Math.max(0, Math.min(1, masterLevel));
+    return Array(numChannels).fill(normalized);
+  }
+  /** Update realtime per-channel levels from WASM engines */
+  public updateRealtimeChannelLevels(levels: number[]): void { _updateRealtimeChannelLevels(this.channelMeter, levels); }
+  /** Get the master level (0-1) from masterEffectsInput where all audio converges */
+  public getMasterLevel(): number { return this.masterMeter.getValue() as number; }
   /** Get the synthBus level (0-1) for WASM engines that bypass per-channel routing */
   public getSynthBusLevel(): number { return this.synthBusMeter.getValue() as number; }
 

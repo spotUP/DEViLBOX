@@ -17,8 +17,10 @@ import { SYSTEM_PRESETS, getGroupedPresets } from '@/constants/systemPresets';
 import { SubsongSelector } from './SubsongSelector';
 import { SIDSubsongSelector } from './SIDSubsongSelector';
 import { ModuleInfoButton } from './ModuleInfoButton';
+import { GenreAnalysisBadge } from './GenreAnalysisBadge';
 import { GrooveSettingsModal } from '@components/dialogs/GrooveSettingsModal';
 import { notify } from '@stores/useNotificationStore';
+import { useTrackerAnalysis } from '@/hooks/useTrackerAnalysis';
 import {
   Eye, EyeOff, List, Grid3x3, Piano, Radio,
   Activity, LayoutGrid, Cpu, SlidersHorizontal, Zap,
@@ -153,6 +155,9 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
   const grooveActive = (grooveTemplateId !== 'straight' && swing > 0) || jitter > 0;
 
   const { quality, averageFps: avgFps } = fps;
+
+  // Initialize tracker audio analysis (capture + analyze during playback)
+  useTrackerAnalysis();
 
   return (
     <div className="flex-shrink flex items-center justify-between px-2 py-1 bg-dark-bgTertiary border-b border-dark-border min-h-[28px]">
@@ -357,6 +362,9 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
           </button>
           {showGrooveSettings && <GrooveSettingsModal onClose={() => setShowGrooveSettings(false)} />}
         </div>
+
+        {/* Genre Analysis Badge */}
+        <GenreAnalysisBadge />
 
         {/* Status Message (ProTracker Style) */}
         {statusMessage && (

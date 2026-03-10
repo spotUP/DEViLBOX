@@ -88,7 +88,7 @@ let lastUpdateTime = 0;
 let pendingRow: number | null = null;
 let pendingPatternLength: number | undefined = undefined;
 let throttleTimer: number | null = null;
-const THROTTLE_INTERVAL = 20; // 50Hz for Amiga PAL feel
+const THROTTLE_INTERVAL = 250; // Throttle React re-renders during playback (RAF reads position directly)
 
 // Cancel pending throttle update (called on seek to prevent old row values reverting)
 export function cancelPendingRowUpdate(): void {

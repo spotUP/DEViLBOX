@@ -30,6 +30,15 @@ const COLOR_GREEN = '#22c55e';
 const COLOR_YELLOW = '#eab308';
 const COLOR_RED = '#ef4444';
 
+/** Parse a CSS color string to [r,g,b]. Supports #hex, rgb(), rgba(). */
+function parseColor(s: string): [number, number, number] {
+  const m = s.match(/^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/);
+  if (m) return [+m[1], +m[2], +m[3]];
+  const hex = s.replace('#', '');
+  if (hex.length >= 6) return [parseInt(hex.slice(0, 2), 16), parseInt(hex.slice(2, 4), 16), parseInt(hex.slice(4, 6), 16)];
+  return [34, 197, 94]; // fallback green
+}
+
 interface MeterState {
   level: number;
 }
@@ -38,9 +47,10 @@ interface ChannelVUMetersProps {
   channelOffsets?: number[];
   channelWidths?: number[];
   scrollLeft?: number;
+  editRowY?: number;  // CSS-px Y of the edit row center line
 }
 
-export const ChannelVUMeters: React.FC<ChannelVUMetersProps> = memo(({ channelOffsets = [], channelWidths = [], scrollLeft: scrollLeftProp = 0 }) => {
+export const ChannelVUMeters: React.FC<ChannelVUMetersProps> = memo(({ channelOffsets = [], channelWidths = [], scrollLeft: scrollLeftProp = 0, editRowY: editRowYProp }) => {
   const { patterns, currentPatternIndex } = useTrackerStore(useShallow(s => ({
     patterns: s.patterns,
     currentPatternIndex: s.currentPatternIndex
@@ -58,10 +68,12 @@ export const ChannelVUMeters: React.FC<ChannelVUMetersProps> = memo(({ channelOf
   const scrollLeftRef = useRef(scrollLeftProp);
   const channelOffsetsRef = useRef(channelOffsets);
   const channelWidthsRef = useRef(channelWidths);
+  const editRowYRef = useRef(editRowYProp ?? 0);
   useEffect(() => { numChannelsRef.current = numChannels; }, [numChannels]);
   useEffect(() => { scrollLeftRef.current = scrollLeftProp; }, [scrollLeftProp]);
   useEffect(() => { channelOffsetsRef.current = channelOffsets; }, [channelOffsets]);
   useEffect(() => { channelWidthsRef.current = channelWidths; }, [channelWidths]);
+  useEffect(() => { editRowYRef.current = editRowYProp ?? 0; }, [editRowYProp]);
 
   // Initialize meter states
   useEffect(() => {
@@ -116,15 +128,33 @@ export const ChannelVUMeters: React.FC<ChannelVUMetersProps> = memo(({ channelOf
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.clearRect(0, 0, cw, ch);
 
-      const engine = getToneEngine();
       const nc = numChannelsRef.current;
       const isRealtime = useSettingsStore.getState().vuMeterMode === 'realtime';
-      const triggerLevels = engine.getChannelTriggerLevels(nc);
-      const triggerGens = engine.getChannelTriggerGenerations(nc);
-      const realtimeLevels = isRealtime ? engine.getChannelLevels(nc) : null;
+      let triggerLevels: number[];
+      let triggerGens: number[];
+      let realtimeLevels: number[] | null = null;
+      try {
+        const engine = getToneEngine();
+        if (isRealtime) {
+          realtimeLevels = engine.getChannelLevels(nc);
+        }
+        triggerLevels = engine.getChannelTriggerLevels(nc);
+        triggerGens = engine.getChannelTriggerGenerations(nc);
+      } catch {
+        animationRef.current = requestAnimationFrame(tick);
+        return;
+      }
       const sl = scrollLeftRef.current;
       const offsets = channelOffsetsRef.current;
       const widths = channelWidthsRef.current;
+      const isPlaying = useTransportStore.getState().isPlaying;
+      const swingEnabled = useSettingsStore.getState().vuMeterSwing;
+      const mirrorEnabled = useSettingsStore.getState().vuMeterMirror;
+      const vuStyle = useSettingsStore.getState().vuMeterStyle;
+
+      // Read theme accent color for fill style
+      const accentRaw = getComputedStyle(document.documentElement).getPropertyValue('--color-accent-primary').trim() || '#22c55e';
+      const [ar, ag, ab] = parseColor(accentRaw);
 
       // Grow lastGens if needed
       if (lastGensRef.current.length < nc) {
@@ -143,68 +173,95 @@ export const ChannelVUMeters: React.FC<ChannelVUMetersProps> = memo(({ channelOf
         const staggerOffset = i * 0.012;
 
         // When playback is stopped, kill meters instantly (no lingering bounce)
-        if (!useTransportStore.getState().isPlaying) {
+        if (!isPlaying) {
           meter.level = 0;
-        } else if (isRealtime && realtimeLevels) {
-          // Realtime mode: use actual audio levels from AnalyserNode
-          const target = realtimeLevels[i] || 0;
-          if (target > meter.level) {
-            meter.level = target; // instant attack
-          } else {
-            meter.level = meter.level * (DECAY_RATE - staggerOffset);
-            if (meter.level < 0.01) meter.level = 0;
-          }
         } else {
-          // Trigger mode: only jump on NEW trigger (generation-gated)
-          const isNewTrigger = triggerGens[i] !== lastGensRef.current[i];
-          if (isNewTrigger && triggerLevels[i] > 0) {
-            meter.level = triggerLevels[i];
-            lastGensRef.current[i] = triggerGens[i];
+          // Always decay first — prevents meters getting stuck when
+          // WASM engines call triggerChannelMeter on every audio tick
+          meter.level = meter.level * (DECAY_RATE - staggerOffset);
+          if (meter.level < 0.01) meter.level = 0;
+
+          if (isRealtime && realtimeLevels) {
+            // Realtime mode: only bump UP to new peaks
+            const target = realtimeLevels[i] || 0;
+            if (target > meter.level) {
+              meter.level = target;
+            }
           } else {
-            const decayRate = DECAY_RATE - staggerOffset;
-            meter.level = meter.level * decayRate;
-            if (meter.level < 0.01) meter.level = 0;
+            // Trigger mode: only bump UP on new triggers
+            const isNewTrigger = triggerGens[i] !== lastGensRef.current[i];
+            if (isNewTrigger) {
+              lastGensRef.current[i] = triggerGens[i];
+              if (triggerLevels[i] > meter.level) {
+                meter.level = triggerLevels[i];
+              }
+            }
           }
         }
 
-        // Swing position — global time-based sine wave with per-channel phase offset.
-        const swingEnabled = useSettingsStore.getState().vuMeterSwing;
-        const swingPos = swingEnabled && meter.level > 0.02
-          ? Math.sin(performance.now() * SWING_FREQ + i * SWING_PHASE_STEP) * SWING_RANGE
-          : 0;
-
         // Calculate channel center X
         let centerX: number;
-        if (offsets[i] && widths[i]) {
+        if (offsets[i] !== undefined && widths[i]) {
           const offset = offsets[i] - LINE_NUMBER_WIDTH;
           centerX = offset + widths[i] / 2;
         } else {
           centerX = i * 260 + 130;
         }
 
-        // Apply scroll and swing
-        const meterX = centerX - METER_WIDTH / 2 - sl + swingPos;
+        // Get channel width for fill style
+        const channelW = widths[i] || 260;
+        const channelX = offsets[i] !== undefined ? offsets[i] - LINE_NUMBER_WIDTH - sl : i * 260 - sl;
 
-        // Draw segments bottom-to-top
-        const activeSegments = Math.round(meter.level * NUM_SEGMENTS);
+        // Edit row Y — segments extrude from this line both up and down
+        const ery = editRowYRef.current;
 
-        for (let s = 0; s < activeSegments; s++) {
-          const ratio = s / (NUM_SEGMENTS - 1);
-          const segY = ch - 2 - (s * (SEGMENT_HEIGHT + SEGMENT_GAP)) - SEGMENT_HEIGHT;
-
-          // Determine color
-          let color: string;
-          if (ratio < 0.6) {
-            color = COLOR_GREEN;
-          } else if (ratio < 0.85) {
-            color = COLOR_YELLOW;
-          } else {
-            color = COLOR_RED;
+        if (vuStyle === 'fill') {
+          // Fill style: theme-colored rectangle, very subtle
+          const fillHeight = Math.round(meter.level * (ery > 0 ? ery : ch / 2));
+          if (fillHeight > 0) {
+            ctx.fillStyle = `rgba(${ar},${ag},${ab},0.12)`;
+            // Upward from edit row
+            ctx.fillRect(Math.round(channelX), ery - fillHeight, channelW, fillHeight);
+            if (mirrorEnabled) {
+              // Mirrored downward from edit row
+              ctx.fillRect(Math.round(channelX), ery, channelW, fillHeight);
+            }
           }
+        } else {
+          // Segments style: LED-style bars
+          // Apply scroll and swing
+          const swingPos = swingEnabled && meter.level > 0.02
+            ? Math.sin(performance.now() * SWING_FREQ + i * SWING_PHASE_STEP) * SWING_RANGE
+            : 0;
+          const meterX = centerX - METER_WIDTH / 2 - sl + swingPos;
 
-          // Draw segment - simplified for performance
-          ctx.fillStyle = color;
-          ctx.fillRect(Math.round(meterX), Math.round(segY), METER_WIDTH, SEGMENT_HEIGHT);
+          const activeSegments = Math.round(meter.level * NUM_SEGMENTS);
+          const segStep = SEGMENT_HEIGHT + SEGMENT_GAP;
+
+          for (let s = 0; s < activeSegments; s++) {
+            const ratio = s / (NUM_SEGMENTS - 1);
+
+            // Determine color
+            let color: string;
+            if (ratio < 0.6) {
+              color = COLOR_GREEN;
+            } else if (ratio < 0.85) {
+              color = COLOR_YELLOW;
+            } else {
+              color = COLOR_RED;
+            }
+
+            ctx.fillStyle = color;
+            // Segments grow upward from edit row
+            const segYUp = ery - (s + 1) * segStep;
+            ctx.fillRect(Math.round(meterX), Math.round(segYUp), METER_WIDTH, SEGMENT_HEIGHT);
+
+            if (mirrorEnabled) {
+              // Mirrored: segments grow downward from edit row
+              const segYDown = ery + s * segStep;
+              ctx.fillRect(Math.round(meterX), Math.round(segYDown), METER_WIDTH, SEGMENT_HEIGHT);
+            }
+          }
         }
       }
 

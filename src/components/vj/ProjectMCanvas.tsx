@@ -107,6 +107,12 @@ export const ProjectMCanvas = React.forwardRef<VJCanvasHandle, ProjectMCanvasPro
     const [error, setError] = useState<string | null>(null);
     const audioBusRef = useRef<AudioDataBus | null>(null);
 
+    // Stuck-detection: timestamp of last preset load (grace period before checking)
+    const presetLoadTimeRef = useRef(0);
+
+    // Ref to hold doLoadPreset so the render loop doesn't re-run when its identity changes
+    const doLoadPresetRef = useRef<(idx: number, smooth?: boolean) => Promise<void>>(undefined);
+
     useEffect(() => { visibleRef.current = visible; }, [visible]);
 
     // Init — wait until canvas has real dimensions (layout complete)
@@ -176,13 +182,59 @@ export const ProjectMCanvas = React.forwardRef<VJCanvasHandle, ProjectMCanvasPro
       };
     }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+    // Load preset by index (async — fetches .milk on demand)
+    const doLoadPreset = useCallback(async (idx: number, smooth = true) => {
+      const names = allPresetNames ?? Object.keys(BUILTIN_PRESETS);
+      if (!engineRef.current || names.length === 0) return;
+      const wrappedIdx = ((idx % names.length) + names.length) % names.length;
+      const name = names[wrappedIdx];
+      const content = await fetchPresetContent(name);
+      if (!content || !engineRef.current) return;
+      presetLoadTimeRef.current = performance.now();
+      engineRef.current.loadPresetData(content, smooth);
+      currentIdxRef.current = wrappedIdx;
+      onPresetChange?.(wrappedIdx, name);
+      // Pre-fetch next random preset in background
+      const nextIdx = Math.floor(Math.random() * names.length);
+      fetchPresetContent(names[nextIdx]); // fire-and-forget
+    }, [onPresetChange]);
+
+    // Keep ref in sync so render loop always has current doLoadPreset
+    useEffect(() => { doLoadPresetRef.current = doLoadPreset; }, [doLoadPreset]);
+
+    // Load preset by name (async)
+    const doLoadPresetByName = useCallback(async (name: string, smooth = true) => {
+      const names = allPresetNames ?? Object.keys(BUILTIN_PRESETS);
+      const idx = names.indexOf(name);
+      if (idx >= 0) {
+        await doLoadPreset(idx, smooth);
+      }
+    }, [doLoadPreset]);
+
     // Render loop — only runs when visible (stops rAF entirely when hidden)
     useEffect(() => {
       if (!ready || !visible) return;
+      // Stuck detection: sample a few center pixels to detect frozen output.
+      // We use a tiny offscreen canvas to read pixels from the WebGL canvas,
+      // since reading directly from the GL context after swap may return undefined data.
+      let sampleCanvas: OffscreenCanvas | HTMLCanvasElement | null = null;
+      let sampleCtx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D | null = null;
+      try {
+        sampleCanvas = new OffscreenCanvas(1, 1);
+        sampleCtx = sampleCanvas.getContext('2d');
+      } catch {
+        // OffscreenCanvas not supported — skip stuck detection
+      }
+      let frameCount = 0;
+      let prevHash1 = 0;
+      let prevHash2 = 0;
+      let alternatingCount = 0;
+
       const render = () => {
-        if (!visibleRef.current) return; // stop loop if visibility changed mid-frame
+        if (!visibleRef.current) return;
         const engine = engineRef.current;
         const bus = audioBusRef.current;
+        const canvas = canvasRef.current;
         if (engine && bus) {
           const frame = bus.update();
           const waveform = frame.waveform;
@@ -193,12 +245,46 @@ export const ProjectMCanvas = React.forwardRef<VJCanvasHandle, ProjectMCanvasPro
           }
           engine.pushAudio(stereo, waveform.length);
           engine.renderFrame();
+
+          // Stuck detection — every ~15 frames (~0.25s), sample center pixel
+          // and detect alternation between exactly 2 hashes (the classic stuck/strobe symptom).
+          frameCount++;
+          if (sampleCtx && canvas && (frameCount & 15) === 0) {
+            const timeSinceLoad = performance.now() - presetLoadTimeRef.current;
+            if (timeSinceLoad > 2000) {
+              sampleCtx.drawImage(canvas, canvas.width >> 1, canvas.height >> 1, 1, 1, 0, 0, 1, 1);
+              const px = sampleCtx.getImageData(0, 0, 1, 1).data;
+              const hash = (px[0] << 16) | (px[1] << 8) | px[2];
+
+              // Detect alternation: hash keeps flipping between prevHash1 and prevHash2
+              if (hash === prevHash1 || hash === prevHash2) {
+                alternatingCount++;
+              } else {
+                // New hash breaks the pattern
+                prevHash2 = prevHash1;
+                prevHash1 = hash;
+                alternatingCount = 0;
+              }
+
+              // 4 consecutive matches = ~1 second stuck → force new preset
+              if (alternatingCount >= 4) {
+                alternatingCount = 0;
+                prevHash1 = 0;
+                prevHash2 = 0;
+                console.warn('[ProjectM] Stuck/strobe detected — forcing preset change');
+                const names = allPresetNames ?? Object.keys(BUILTIN_PRESETS);
+                if (names.length > 0) {
+                  doLoadPresetRef.current?.(Math.floor(Math.random() * names.length), false);
+                }
+              }
+            }
+          }
         }
         rafRef.current = requestAnimationFrame(render);
       };
       rafRef.current = requestAnimationFrame(render);
       return () => cancelAnimationFrame(rafRef.current);
-    }, [ready, visible]);
+    }, [ready, visible]); // doLoadPreset accessed via ref to avoid restarting the loop
 
     // Resize
     useEffect(() => {
@@ -215,31 +301,6 @@ export const ProjectMCanvas = React.forwardRef<VJCanvasHandle, ProjectMCanvasPro
       observer.observe(canvas);
       return () => observer.disconnect();
     }, [ready]);
-
-    // Load preset by index (async — fetches .milk on demand)
-    const doLoadPreset = useCallback(async (idx: number, smooth = true) => {
-      const names = allPresetNames ?? Object.keys(BUILTIN_PRESETS);
-      if (!engineRef.current || names.length === 0) return;
-      const wrappedIdx = ((idx % names.length) + names.length) % names.length;
-      const name = names[wrappedIdx];
-      const content = await fetchPresetContent(name);
-      if (!content || !engineRef.current) return;
-      engineRef.current.loadPresetData(content, smooth);
-      currentIdxRef.current = wrappedIdx;
-      onPresetChange?.(wrappedIdx, name);
-      // Pre-fetch next random preset in background
-      const nextIdx = Math.floor(Math.random() * names.length);
-      fetchPresetContent(names[nextIdx]); // fire-and-forget
-    }, [onPresetChange]);
-
-    // Load preset by name (async)
-    const doLoadPresetByName = useCallback(async (name: string, smooth = true) => {
-      const names = allPresetNames ?? Object.keys(BUILTIN_PRESETS);
-      const idx = names.indexOf(name);
-      if (idx >= 0) {
-        await doLoadPreset(idx, smooth);
-      }
-    }, [doLoadPreset]);
 
     // Imperative API
     React.useImperativeHandle(ref, () => ({

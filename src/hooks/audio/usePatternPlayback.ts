@@ -451,31 +451,24 @@ export const usePatternPlayback = () => {
         let lastPosition = -1;
 
         replayer.onRowChange = (row, patternNum, position) => {
-          // If row is 0 or position changed, it's a jump or pattern start.
-          // Update immediately to prevent "ghost" frames from old position.
-          const isJump = row === 0 || position !== lastPosition;
-          // Read from ref so pattern lengths stay current after hot-swaps
-          const currentPatterns = patternsRef.current;
-          setCurrentRowThrottled(row, currentPatterns[patternNum]?.length ?? 64, isJump);
-
-          // Always track global row so arrangement view has current position
-          // even when switching from another view mid-playback
-          const globalRow = position * 64 + row;
-          useTransportStore.getState().setCurrentGlobalRow(globalRow);
-          if (arrangement.isArrangementMode) {
-            useArrangementStore.getState().setPlaybackRow(globalRow);
-          }
-
+          // During playback, the pattern editor RAF loop reads position directly
+          // from getStateAtTime() — no React store updates needed for row scrolling.
+          // Only update React stores on pattern/position jumps (infrequent).
           if (row === 0 && (patternNum !== lastPatternNum || position !== lastPosition)) {
             lastPatternNum = patternNum;
             lastPosition = position;
-            // Mark as replayer-driven BEFORE the state update so the useEffect
-            // knows this position change came from natural playback advancement,
-            // not a user action. This prevents false reloads at pattern boundaries.
             replayerAdvancedRef.current = true;
             queueMicrotask(() => {
               setCurrentPattern(patternNum, true);
               setCurrentPosition(position, true);
+              // Update global row and status bar only on pattern boundaries
+              const currentPatterns = patternsRef.current;
+              setCurrentRowThrottled(row, currentPatterns[patternNum]?.length ?? 64, true);
+              const globalRow = position * 64 + row;
+              useTransportStore.getState().setCurrentGlobalRow(globalRow);
+              if (arrangement.isArrangementMode) {
+                useArrangementStore.getState().setPlaybackRow(globalRow);
+              }
             });
           }
         };

@@ -58,6 +58,10 @@ export class ChannelMeterState {
   _triggerGensCache: number[] = new Array(16).fill(0);
   _channelTriggerGens = new Map<number, number>();
   _triggerGenCounter = 0;
+  // Realtime per-channel levels from WASM engines (libopenmpt, etc.)
+  // Updated each audio frame, used by realtime VU mode
+  _realtimeChannelLevels: number[] = new Array(16).fill(0);
+  _realtimeLevelsTimestamp = 0; // performance.now() of last update
 }
 
 export function triggerChannelMeter(state: ChannelMeterState, channelIndex: number, velocity: number): void {
@@ -111,6 +115,41 @@ export function getChannelTriggerGenerations(state: ChannelMeterState, numChanne
   return s._triggerGensCache;
 }
 
+/**
+ * Update realtime per-channel levels from WASM engines (libopenmpt, etc.)
+ * Called each audio frame to provide per-channel data for realtime VU mode.
+ */
+export function updateRealtimeChannelLevels(state: ChannelMeterState, levels: number[]): void {
+  const s = state as any;
+  // Grow array if needed
+  if (s._realtimeChannelLevels.length < levels.length) {
+    s._realtimeChannelLevels = new Array(Math.max(levels.length, 16)).fill(0);
+  }
+  // Apply noise floor threshold to prevent meters from getting stuck at low values
+  const NOISE_FLOOR = 0.02;
+  for (let i = 0; i < levels.length; i++) {
+    s._realtimeChannelLevels[i] = levels[i] > NOISE_FLOOR ? levels[i] : 0;
+  }
+  s._realtimeLevelsTimestamp = performance.now();
+}
+
+/**
+ * Get realtime per-channel levels for VU meters.
+ * Returns the levels array if recently updated (within 100ms), otherwise null.
+ */
+export function getRealtimeChannelLevels(state: ChannelMeterState, numChannels: number): number[] | null {
+  const s = state as any;
+  // Consider stale if not updated in last 100ms
+  if (performance.now() - s._realtimeLevelsTimestamp > 100) {
+    return null;
+  }
+  const result: number[] = [];
+  for (let i = 0; i < numChannels; i++) {
+    result.push(s._realtimeChannelLevels[i] || 0);
+  }
+  return result;
+}
+
 // ============================================
 // CHANNEL ROUTING FUNCTIONS
 // ============================================
@@ -124,7 +163,7 @@ export function getChannelOutput(ctx: ChannelRoutingContext, channelIndex: numbe
     // Create channel audio chain with metering
     const input = new Tone.Gain(1);
     const channel = new Tone.Channel({ volume: 0, pan: 0 });
-    const meter = new Tone.Meter({ smoothing: 0.8 });
+    const meter = new Tone.Meter({ smoothing: 0.15 });
 
     // Connect: input → channel → meter → masterInput
     input.connect(channel);
@@ -501,6 +540,8 @@ export function clearChannelPitch(ctx: ChannelRoutingContext, channelIndex: numb
  * Mute/unmute channel
  */
 export function setChannelMute(ctx: ChannelRoutingContext, channelIndex: number, muted: boolean): void {
+  // Update quick lookup map (used by isChannelMuted during note triggering)
+  ctx.channelMuteStates.set(channelIndex, muted);
   // Ensure channel exists
   if (!ctx.channelOutputs.has(channelIndex)) {
     getChannelOutput(ctx, channelIndex);
@@ -592,6 +633,9 @@ export function disposeChannelOutputs(ctx: ChannelRoutingContext): void {
  */
 export function getChannelLevels(ctx: ChannelRoutingContext, numChannels: number): number[] {
   const levels: number[] = [];
+  // Noise floor threshold — meters below this are treated as silent
+  // to prevent VU meters from getting stuck at low residual values
+  const NOISE_FLOOR = 0.02;
   for (let i = 0; i < numChannels; i++) {
     const channelOutput = ctx.channelOutputs.get(i);
     if (channelOutput) {
@@ -599,7 +643,7 @@ export function getChannelLevels(ctx: ChannelRoutingContext, numChannels: number
       // -60dB = 0, 0dB = 1
       const db = channelOutput.meter.getValue() as number;
       const normalized = Math.max(0, Math.min(1, (db + 60) / 60));
-      levels.push(normalized);
+      levels.push(normalized > NOISE_FLOOR ? normalized : 0);
     } else {
       levels.push(0);
     }

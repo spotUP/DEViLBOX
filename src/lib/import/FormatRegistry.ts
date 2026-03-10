@@ -1817,6 +1817,15 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
     extRegex: /\.(pt3|pt2|pt1|stc|st1|st3|vtx|psg|sqt|psc|asc|gtr|ftc|ayc|cop|tfc|tfd|tf0|pdt|chi|str|dst|dmm|et1)$/i,
     nativeOnly: true,
   },
+  {
+    key: 'v2m',
+    label: 'V2M',
+    description: 'Farbrausch V2 Synthesizer Music — demoscene synth format',
+    family: 'chip-dump',
+    matchMode: 'extension',
+    extRegex: /\.v2m$/i,
+    nativeOnly: true,
+  },
 
   // ═══════════════════════════════════════════════════════════════════════════
   // PC TRACKER — Native parser + libopenmpt fallback
