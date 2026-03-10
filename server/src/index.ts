@@ -16,6 +16,7 @@ import songdbRoutes from './routes/songdb';
 import scRoutes from './routes/sc';
 import deepsidRoutes from './routes/deepsid';
 import aiRoutes from './routes/ai';
+import analysisRoutes from './routes/analysis';
 import { initDatabase } from './db/database';
 import { initDataDirectories } from './utils/fileSystem';
 import { initModlandIndex, scheduleModlandUpdates } from './services/modlandIndexer';
@@ -88,6 +89,7 @@ app.use('/api/songdb', songdbRoutes);
 app.use('/api/sc', scRoutes);
 app.use('/api/deepsid', deepsidRoutes);
 app.use('/api/ai', aiRoutes);
+app.use('/api/analysis', analysisRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

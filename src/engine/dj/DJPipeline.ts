@@ -17,6 +17,7 @@
  */
 
 import { getCachedAudio, cacheAudio, updateCacheAnalysis, hashFile } from './DJAudioCache';
+import { lookupServerAnalysis, storeServerAnalysis } from '@/lib/analysisCache';
 import { useDJStore } from '@/stores/useDJStore';
 import type { DeckId } from './DeckEngine';
 import { getDJEngineIfActive } from './DJEngine';
@@ -462,7 +463,92 @@ export class DJPipeline {
     }
 
     if (cached && !cached.beatGrid) {
-      // Audio cached but not analyzed — decode to PCM and analyze only
+      // Audio cached but not analyzed — check server cache first
+      const hash = await hashFile(fileBuffer);
+      const serverAnalysis = await lookupServerAnalysis(hash);
+
+      if (serverAnalysis && serverAnalysis.bpm > 0 && serverAnalysis.beats.length > 0) {
+        // Server cache hit — merge analysis into local cache
+        console.log(`[DJPipeline] Server analysis cache hit for ${filename}`);
+        const beatGrid: BeatGridData = {
+          beats: serverAnalysis.beats,
+          downbeats: serverAnalysis.downbeats,
+          bpm: serverAnalysis.bpm,
+          timeSignature: serverAnalysis.timeSignature,
+        };
+        await updateCacheAnalysis(fileBuffer, {
+          beatGrid,
+          bpm: serverAnalysis.bpm,
+          bpmConfidence: serverAnalysis.bpmConfidence,
+          musicalKey: serverAnalysis.musicalKey,
+          keyConfidence: serverAnalysis.keyConfidence,
+          frequencyPeaks: serverAnalysis.frequencyPeaks,
+          analysisVersion: serverAnalysis.analysisVersion,
+          genrePrimary: serverAnalysis.genrePrimary,
+          genreSubgenre: serverAnalysis.genreSubgenre,
+          genreConfidence: serverAnalysis.genreConfidence,
+          mood: serverAnalysis.mood,
+          energy: serverAnalysis.energy,
+          danceability: serverAnalysis.danceability,
+        });
+
+        if (deckId) {
+          const TARGET_RMS_DB = -14;
+          const rmsDb = serverAnalysis.rmsDb;
+          const peakDb = serverAnalysis.peakDb;
+          const autoTrimDb = rmsDb > -80
+            ? Math.max(-12, Math.min(12, TARGET_RMS_DB - rmsDb))
+            : 0;
+          const deckState = useDJStore.getState().decks[deckId];
+          const trimGain = deckState.autoGainEnabled ? autoTrimDb : 0;
+
+          useDJStore.getState().setDeckState(deckId, {
+            analysisState: 'ready',
+            beatGrid,
+            musicalKey: serverAnalysis.musicalKey,
+            keyConfidence: serverAnalysis.keyConfidence,
+            frequencyPeaks: serverAnalysis.frequencyPeaks.map(b => new Float32Array(b)),
+            rmsDb,
+            peakDb,
+            trimGain,
+            genrePrimary: serverAnalysis.genrePrimary,
+            genreSubgenre: serverAnalysis.genreSubgenre,
+            genreConfidence: serverAnalysis.genreConfidence,
+            mood: serverAnalysis.mood,
+            energy: serverAnalysis.energy,
+            danceability: serverAnalysis.danceability,
+          });
+        }
+
+        return {
+          wavData: cached.audioData,
+          duration: cached.duration,
+          sampleRate: cached.sampleRate,
+          waveformPeaks: new Float32Array(cached.waveformPeaks),
+          analysis: {
+            bpm: serverAnalysis.bpm,
+            bpmConfidence: serverAnalysis.bpmConfidence,
+            beats: serverAnalysis.beats,
+            downbeats: serverAnalysis.downbeats,
+            timeSignature: serverAnalysis.timeSignature,
+            musicalKey: serverAnalysis.musicalKey,
+            keyConfidence: serverAnalysis.keyConfidence,
+            frequencyPeaks: serverAnalysis.frequencyPeaks,
+            rmsDb: serverAnalysis.rmsDb,
+            peakDb: serverAnalysis.peakDb,
+            genre: {
+              primary: serverAnalysis.genrePrimary,
+              subgenre: serverAnalysis.genreSubgenre,
+              confidence: serverAnalysis.genreConfidence,
+              mood: serverAnalysis.mood,
+              energy: serverAnalysis.energy,
+              danceability: serverAnalysis.danceability,
+            },
+          },
+        };
+      }
+
+      // No server cache — fall through to local analysis
       console.log(`[DJPipeline] Cached but unanalyzed: ${filename}`);
       try {
         const audioCtx = new OfflineAudioContext(2, 1, 44100);
@@ -476,7 +562,8 @@ export class DJPipeline {
       }
     }
 
-    // Dedup: if the same file is already being rendered, piggyback on that promise
+    // No local audio cache at all — check server for analysis before full render
+    // (analysis will be applied after render completes)
     const hash = await hashFile(fileBuffer);
     const existing = this.inflight.get(hash);
     if (existing) {
@@ -669,6 +756,31 @@ export class DJPipeline {
           mood: analysis.genre.mood,
           energy: analysis.genre.energy,
           danceability: analysis.genre.danceability,
+        });
+
+        // Store to server cache (fire-and-forget) for other users
+        const taskHash = await hashFile(task.fileBuffer);
+        storeServerAnalysis({
+          hash: taskHash,
+          bpm: analysis.bpm,
+          bpmConfidence: analysis.bpmConfidence,
+          timeSignature: analysis.timeSignature,
+          musicalKey: analysis.musicalKey,
+          keyConfidence: analysis.keyConfidence,
+          rmsDb: analysis.rmsDb,
+          peakDb: analysis.peakDb,
+          genrePrimary: analysis.genre.primary,
+          genreSubgenre: analysis.genre.subgenre,
+          genreConfidence: analysis.genre.confidence,
+          mood: analysis.genre.mood,
+          energy: analysis.genre.energy,
+          danceability: analysis.genre.danceability,
+          duration,
+          beats: analysis.beats,
+          downbeats: analysis.downbeats,
+          waveformPeaks: waveformPeaks ? Array.from(waveformPeaks) : [],
+          frequencyPeaks: analysis.frequencyPeaks,
+          analysisVersion: 1,
         });
       }
     } catch (err) {

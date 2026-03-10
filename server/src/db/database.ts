@@ -111,6 +111,32 @@ export function initDatabase() {
       key TEXT PRIMARY KEY,
       value TEXT NOT NULL
     );
+
+    -- Song analysis cache (shared across all users)
+    -- Binary-packed arrays for compact storage (~5KB/song vs ~15KB JSON)
+    CREATE TABLE IF NOT EXISTS song_analysis (
+      hash TEXT PRIMARY KEY,
+      bpm REAL,
+      bpm_confidence REAL,
+      time_signature INTEGER DEFAULT 4,
+      musical_key TEXT,
+      key_confidence REAL,
+      rms_db REAL,
+      peak_db REAL,
+      genre_primary TEXT,
+      genre_subgenre TEXT,
+      genre_confidence REAL,
+      mood TEXT,
+      energy REAL,
+      danceability REAL,
+      duration REAL,
+      beats BLOB,
+      downbeats BLOB,
+      waveform_peaks BLOB,
+      frequency_peaks BLOB,
+      analysis_version INTEGER DEFAULT 1,
+      created_at INTEGER NOT NULL
+    );
   `);
 
   // Migration: add type column to files table
