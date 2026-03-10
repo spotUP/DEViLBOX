@@ -152,6 +152,40 @@ export async function syncCellClear(
 }
 
 /**
+ * Sync an entire pattern from the TrackerStore to the OpenMPT soundlib.
+ * Used after bulk operations (clearChannel, clearPattern, transpose, etc.)
+ * that modify many cells at once.
+ */
+export async function syncFullPattern(
+  patternIndex: number,
+  channels: { rows: TrackerCell[] }[],
+): Promise<void> {
+  if (!_loaded) return;
+
+  const osl = await import('@lib/import/wasm/OpenMPTSoundlib');
+
+  for (let ch = 0; ch < channels.length; ch++) {
+    const rows = channels[ch].rows;
+    for (let row = 0; row < rows.length; row++) {
+      const cell = rows[row];
+      const note = mapNoteToOpenMPT(cell.note);
+      const { volcmd, volval } = mapVolumeToOpenMPT(cell.volume);
+      const fx = mapEffectToOpenMPT(cell.effTyp, cell.eff);
+      await osl.setPatternCell(patternIndex, row, ch, {
+        note,
+        instrument: cell.instrument,
+        volcmd,
+        vol: volval,
+        command: fx.cmd,
+        param: fx.param,
+      });
+    }
+  }
+
+  _dirty = true;
+}
+
+/**
  * Serialize the current soundlib state to a binary module buffer.
  * Used to reload into LibopenmptEngine after edits.
  * Clears the dirty flag on success.
