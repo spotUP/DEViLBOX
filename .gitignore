@@ -173,3 +173,5 @@ test-claude-cli.sh
 
 # ProjectM third-party (large, not needed for builds)
 third-party/projectm-master/
+v2-synth-wasm/build/
+v2m-wasm/build/
