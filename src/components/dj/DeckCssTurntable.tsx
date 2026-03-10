@@ -116,9 +116,16 @@ export const DeckCssTurntable: React.FC<DeckCssTurntableProps> = ({ deckId }) =>
 
         if (!scratchIntegrating) {
           const deck = useDJStore.getState().decks[deckId];
-          const posSec = deck.playbackMode === 'audio'
-            ? deck.audioPosition
-            : deck.elapsedMs / 1000;
+          let posSec: number;
+          if (deck.playbackMode === 'audio') {
+            try {
+              posSec = getDJEngine().getDeck(deckId).audioPlayer.getPosition();
+            } catch {
+              posSec = deck.audioPosition;
+            }
+          } else {
+            posSec = deck.elapsedMs / 1000;
+          }
           angleRef.current = posSec * omegaNormal;
         }
       }
@@ -134,7 +141,17 @@ export const DeckCssTurntable: React.FC<DeckCssTurntableProps> = ({ deckId }) =>
       const ARM_END_DEG = 25;
       const deck = useDJStore.getState().decks[deckId];
       const duration = deck.durationMs > 0 ? deck.durationMs / 1000 : 180;
-      const pos = deck.playbackMode === 'audio' ? deck.audioPosition : deck.elapsedMs / 1000;
+      // Get LIVE position from audio player (not stale store value)
+      let pos: number;
+      if (deck.playbackMode === 'audio') {
+        try {
+          pos = getDJEngine().getDeck(deckId).audioPlayer.getPosition();
+        } catch {
+          pos = deck.audioPosition;
+        }
+      } else {
+        pos = deck.elapsedMs / 1000;
+      }
       const progress = duration > 0 ? Math.min(pos / duration, 1) : 0;
       // Slight wobble when playing
       const wobble = playing && !isScratchActiveRef.current
