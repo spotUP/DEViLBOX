@@ -140,7 +140,7 @@ export const PixiModal: React.FC<PixiModalProps> = ({
         )}
 
         {/* Content — NO padding, each modal controls its own layout */}
-        <layoutContainer layout={{ flex: 1, flexDirection: 'column', overflow: 'hidden' }}>
+        <layoutContainer eventMode="auto" layout={{ flex: 1, flexDirection: 'column', overflow: 'hidden' }}>
           {children}
         </layoutContainer>
       </layoutContainer>

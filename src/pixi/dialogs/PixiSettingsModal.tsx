@@ -32,6 +32,21 @@ import { getDJEngineIfActive } from '@engine/dj/DJEngine';
 import { BG_MODES, getBgModeLabel } from '@/components/tracker/TrackerVisualBackground';
 import { getASIDDeviceManager, isASIDSupported } from '@lib/sid/ASIDDeviceManager';
 import { notify } from '@stores';
+import { useModalClose } from '@hooks/useDialogKeyboard';
+
+// ── Tab definitions ────────────────────────────────────────────────────────────
+
+type SettingsTab = 'general' | 'audio' | 'visual' | 'recording' | 'input' | 'sid' | 'about';
+
+const TABS: Array<{ id: SettingsTab; label: string }> = [
+  { id: 'general', label: 'General' },
+  { id: 'audio', label: 'Audio' },
+  { id: 'visual', label: 'Visual' },
+  { id: 'recording', label: 'Recording' },
+  { id: 'input', label: 'Input' },
+  { id: 'sid', label: 'SID' },
+  { id: 'about', label: 'About' },
+];
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
@@ -155,6 +170,10 @@ interface PixiSettingsModalProps {
 export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, onClose }) => {
   const theme = usePixiTheme();
   const { app } = useApplication();
+  const [activeTab, setActiveTab] = useState<SettingsTab>('general');
+
+  // Standard modal keyboard handling (Enter/Escape to close)
+  useModalClose({ isOpen, onClose });
 
   // ── Store hooks ──────────────────────────────────────────────────────────
   const useHexNumbers = useUIStore((s) => s.useHexNumbers);
@@ -464,16 +483,60 @@ export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, on
           </layoutContainer>
         </layoutContainer>
 
+        {/* Tab Bar */}
+        <layoutContainer
+          layout={{
+            flexDirection: 'row',
+            paddingLeft: 8,
+            paddingRight: 8,
+            backgroundColor: theme.bgTertiary.color,
+            borderBottomWidth: 1,
+            borderColor: theme.border.color,
+            height: 32,
+            alignItems: 'center',
+          }}
+        >
+          {TABS.map((tab) => (
+            <layoutContainer
+              key={tab.id}
+              eventMode="static"
+              cursor="pointer"
+              onClick={() => setActiveTab(tab.id)}
+              layout={{
+                paddingLeft: 12,
+                paddingRight: 12,
+                paddingTop: 6,
+                paddingBottom: 6,
+                borderBottomWidth: activeTab === tab.id ? 2 : 0,
+                borderColor: theme.accent.color,
+                marginBottom: activeTab === tab.id ? -1 : 0,
+              }}
+            >
+              <pixiBitmapText
+                text={tab.label.toUpperCase()}
+                style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 10, fill: 0xffffff }}
+                tint={activeTab === tab.id ? theme.accent.color : theme.textMuted.color}
+                layout={{}}
+              />
+            </layoutContainer>
+          ))}
+        </layoutContainer>
+
         {/* Content — DOM: p-4 space-y-6 max-h-[70vh] overflow-y-auto */}
         <PixiScrollView
           width={MODAL_W}
-          height={scrollAreaH}
+          height={scrollAreaH - 32}
           contentHeight={contentH}
           direction="vertical"
           bgColor={theme.bg.color}
         >
           <Div className="flex-col gap-3 p-4" layout={{ width: CONTENT_W, backgroundColor: theme.bg.color }}>
 
+          {/* ═══════════════════════════════════════════════════════════════════
+              GENERAL TAB — Display, Layout
+              ═══════════════════════════════════════════════════════════════════ */}
+          {activeTab === 'general' && (
+            <>
           {/* ═══════ DISPLAY ═══════ */}
           <SectionHeader text="DISPLAY" />
 
@@ -553,6 +616,28 @@ export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, on
             <PixiCheckbox checked={blankEmptyCells} onChange={setBlankEmptyCells} />
           </SettingRow>
 
+          {/* ═══════ LAYOUT ═══════ */}
+          <SectionHeader text="LAYOUT" />
+
+          <SettingRow label="TB-303 Panel:">
+            <PixiCheckbox checked={!tb303Collapsed} onChange={(v) => setTB303Collapsed(!v)} />
+          </SettingRow>
+
+          <SettingRow label="Oscilloscope:">
+            <PixiCheckbox checked={oscilloscopeVisible} onChange={setOscilloscopeVisible} />
+          </SettingRow>
+
+          <SettingRow label="Fullscreen:">
+            <PixiCheckbox checked={isFullscreen} onChange={toggleFullscreen} />
+          </SettingRow>
+            </>
+          )}
+
+          {/* ═══════════════════════════════════════════════════════════════════
+              VISUAL TAB — Visual Background, CRT, Lens, Workbench
+              ═══════════════════════════════════════════════════════════════════ */}
+          {activeTab === 'visual' && (
+            <>
           <SettingRow label="Visual Background:" description="Audio-reactive effects behind tracker">
             <PixiCheckbox checked={trackerVisualBg} onChange={setTrackerVisualBg} />
           </SettingRow>
@@ -701,22 +786,14 @@ export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, on
             <Txt className="text-[9px] font-mono text-accent-primary">Tab</Txt>
             <Txt className="text-[9px] font-mono text-text-muted">{' — hold for Exposé (fit all windows) · release to restore'}</Txt>
           </Div>
+            </>
+          )}
 
-          {/* ═══════ LAYOUT ═══════ */}
-          <SectionHeader text="LAYOUT" />
-
-          <SettingRow label="TB-303 Panel:">
-            <PixiCheckbox checked={!tb303Collapsed} onChange={(v) => setTB303Collapsed(!v)} />
-          </SettingRow>
-
-          <SettingRow label="Oscilloscope:">
-            <PixiCheckbox checked={oscilloscopeVisible} onChange={setOscilloscopeVisible} />
-          </SettingRow>
-
-          <SettingRow label="Fullscreen:">
-            <PixiCheckbox checked={isFullscreen} onChange={toggleFullscreen} />
-          </SettingRow>
-
+          {/* ═══════════════════════════════════════════════════════════════════
+              RECORDING TAB
+              ═══════════════════════════════════════════════════════════════════ */}
+          {activeTab === 'recording' && (
+            <>
           {/* ═══════ RECORDING ═══════ */}
           <SectionHeader text="RECORDING" />
 
@@ -759,7 +836,14 @@ export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, on
               />
             </Div>
           </SettingRow>
+            </>
+          )}
 
+          {/* ═══════════════════════════════════════════════════════════════════
+              INPUT TAB — MIDI, Keyboard, Vinyl Scratch
+              ═══════════════════════════════════════════════════════════════════ */}
+          {activeTab === 'input' && (
+            <>
           {/* ═══════ MIDI ═══════ */}
           <SectionHeader text="MIDI" />
 
@@ -823,7 +907,14 @@ export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, on
             <Txt className="text-[9px] font-mono text-text-muted">F = Fader cut · 1 = Trans · 2 = Crab · 3 = Flare</Txt>
             <Txt className="text-[9px] font-mono text-text-muted">4 = Chirp · 5 = Stab · 6 = 8-Finger · 7 = Twiddle · 0 = Stop</Txt>
           </Div>
+            </>
+          )}
 
+          {/* ═══════════════════════════════════════════════════════════════════
+              AUDIO TAB — Engine settings
+              ═══════════════════════════════════════════════════════════════════ */}
+          {activeTab === 'audio' && (
+            <>
           {/* ═══════ ENGINE ═══════ */}
           <SectionHeader text="ENGINE" />
 
@@ -955,7 +1046,12 @@ export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, on
               </Txt>
             </Div>
           </SettingRow>
+            </>
+          )}
 
+          {/* Keyboard section is part of INPUT tab (already wrapped above) */}
+          {activeTab === 'input' && (
+            <>
           {/* ═══════ KEYBOARD ═══════ */}
           <SectionHeader text="KEYBOARD" />
 
@@ -980,7 +1076,14 @@ export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, on
               width={150}
             />
           </SettingRow>
+            </>
+          )}
 
+          {/* ═══════════════════════════════════════════════════════════════════
+              SID TAB — SID Engine, SID Hardware
+              ═══════════════════════════════════════════════════════════════════ */}
+          {activeTab === 'sid' && (
+            <>
           {/* ═══════ C64 SID ENGINE ═══════ */}
           <SectionHeader text="C64 SID PLAYER ENGINE" />
 
@@ -1213,7 +1316,14 @@ export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, on
               )}
             </>
           )}
+            </>
+          )}
 
+          {/* ═══════════════════════════════════════════════════════════════════
+              ABOUT TAB — Modland, Danger Zone, Info
+              ═══════════════════════════════════════════════════════════════════ */}
+          {activeTab === 'about' && (
+            <>
           {/* ═══════ MODLAND ═══════ */}
           <SectionHeader text="MODLAND INTEGRATION" />
 
@@ -1251,6 +1361,8 @@ export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, on
             <Txt className="text-[10px] font-mono text-text-muted">TB-303 Acid Tracker</Txt>
             <Txt className="text-[10px] font-mono text-accent-primary">Settings are saved automatically</Txt>
           </Div>
+            </>
+          )}
 
         </Div>
       </PixiScrollView>

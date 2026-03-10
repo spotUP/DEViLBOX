@@ -18,6 +18,7 @@ import { TR707DrumMap } from '../../engine/tr707/TR707Synth';
 import { PixiButton } from '../components';
 import { PixiPureTextInput } from '../input/PixiPureTextInput';
 import { usePixiTheme } from '../theme';
+import { useModalClose } from '@hooks/useDialogKeyboard';
 import { Div, Txt, GlModal, GlModalFooter } from '../layout';
 
 const MODAL_W = 700;
@@ -46,6 +47,8 @@ export const PixiDrumpadEditorModal: React.FC<PixiDrumpadEditorModalProps> = ({
   const { instruments } = useInstrumentStore();
   const { devices, isEnabled } = useMIDI();
   const { padBank: activeBank, setPadBank: setActiveBank } = useMIDIStore();
+
+  useModalClose({ isOpen, onClose });
 
   const [mappings, setMappings] = useState<PadMapping[]>([]);
   const [selectedPadIndex, setSelectedPadIndex] = useState<number | null>(null);

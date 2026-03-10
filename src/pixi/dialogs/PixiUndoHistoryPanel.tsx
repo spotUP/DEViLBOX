@@ -7,6 +7,7 @@ import { useCallback, useMemo } from 'react';
 import type { Graphics as GraphicsType } from 'pixi.js';
 import { PixiButton, PixiLabel } from '../components';
 import { usePixiTheme } from '../theme';
+import { useModalClose } from '@hooks/useDialogKeyboard';
 import { PIXI_FONTS } from '../fonts';
 import {
   useHistoryStore,
@@ -57,6 +58,8 @@ export const PixiUndoHistoryPanel: React.FC<PixiUndoHistoryPanelProps> = ({ isOp
   const redoStack = useHistoryStore((s) => s.redoStack);
   const undo = useHistoryStore((s) => s.undo);
   const redo = useHistoryStore((s) => s.redo);
+
+  useModalClose({ isOpen, onClose });
 
   const drawPanelBg = useCallback(
     (g: GraphicsType) => {

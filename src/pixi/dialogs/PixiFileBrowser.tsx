@@ -8,6 +8,7 @@
 
 import React, { useState, useCallback, useMemo } from 'react';
 import { usePixiTheme } from '../theme';
+import { useModalClose } from '@hooks/useDialogKeyboard';
 import { Div, Txt, GlModal } from '../layout';
 import { PIXI_FONTS } from '../fonts';
 import { PixiButton } from '../components/PixiButton';
@@ -86,6 +87,8 @@ export const PixiFileBrowser: React.FC<PixiFileBrowserProps> = ({
   const theme = usePixiTheme();
   const [fileSource, _setFileSource] = useState<FileSource>(getLastFileSource);
   const setFileSource = (s: FileSource) => { setLastFileSource(s); _setFileSource(s); };
+
+  useModalClose({ isOpen, onClose });
 
   const nav = useFileNavigation({
     isOpen,

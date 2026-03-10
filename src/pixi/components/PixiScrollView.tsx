@@ -137,7 +137,7 @@ export const PixiScrollView: React.FC<PixiScrollViewProps> = ({
     >
       {/* Stencil mask for content clipping — must be renderable for PixiJS stencil system.
           Uses bgColor prop to match parent background so it's visually seamless. */}
-      <pixiGraphics ref={maskRef} draw={drawMask} />
+      <pixiGraphics ref={maskRef} draw={drawMask} eventMode="none" />
 
       {/* Scrollable content — clipped by mask */}
       <pixiContainer ref={contentRef} eventMode="auto">

@@ -135,7 +135,8 @@ export const PixiButton: React.FC<PixiButtonProps> = ({
     if (variant === 'ghost') {
       if (pressed) return { bg: theme.bgActive.color, border: 0x000000, borderAlpha: 0, text: theme.text.color, showBg: true };
       if (hovered) return { bg: theme.bgHover.color, border: 0x000000, borderAlpha: 0, text: theme.text.color, showBg: true };
-      return { bg: 0x000000, border: 0x000000, borderAlpha: 0, text: theme.textSecondary.color, showBg: false };
+      // Subtle background so buttons are visible even when not hovered
+      return { bg: theme.bgTertiary.color, border: 0x000000, borderAlpha: 0, text: theme.textSecondary.color, showBg: true };
     }
 
     // default

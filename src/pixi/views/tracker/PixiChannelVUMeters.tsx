@@ -40,6 +40,7 @@ const FILL_GREEN = { color: COLOR_GREEN, alpha: 0.9 };
 const FILL_YELLOW = { color: COLOR_YELLOW, alpha: 0.9 };
 const FILL_RED = { color: COLOR_RED, alpha: 0.9 };
 const FILL_CLEAR = { color: 0x000000, alpha: 0 };
+const FILL_SOLID = { color: COLOR_GREEN, alpha: 0.35 }; // Fill style background
 
 interface MeterState {
   level: number;
@@ -48,12 +49,17 @@ interface MeterState {
 interface PixiChannelVUMetersProps {
   width: number;
   height: number;
+  editRowY?: number; // Y position of edit row - segments grow from here
 }
 
-export const PixiChannelVUMeters: React.FC<PixiChannelVUMetersProps> = ({ width, height }) => {
+export const PixiChannelVUMeters: React.FC<PixiChannelVUMetersProps> = ({ width, height, editRowY }) => {
   const pattern = useTrackerStore(useShallow(s => s.patterns[s.currentPatternIndex]));
   const columnVisibility = useEditorStore(s => s.columnVisibility);
   const numChannels = pattern?.channels.length || 4;
+  
+  // Default editRowY to center of component
+  const editRowYRef = useRef(editRowY ?? height / 2);
+  useEffect(() => { editRowYRef.current = editRowY ?? height / 2; }, [editRowY, height]);
 
   // Compute channel offsets/widths matching PixiPatternEditor layout
   const { channelOffsets, channelWidths } = useMemo(() => {
@@ -190,24 +196,26 @@ export const PixiChannelVUMeters: React.FC<PixiChannelVUMetersProps> = ({ width,
         const meter = metersRef.current[i];
         if (!meter) continue;
         const staggerOffset = i * 0.012;
+
+        // Always decay first — prevents meters getting stuck when
+        // WASM engines call triggerChannelMeter on every audio tick
+        meter.level *= (DECAY_RATE - staggerOffset);
+        if (meter.level < 0.01) meter.level = 0;
+
         if (isRealtime && realtimeLevels) {
-          // Realtime mode: use actual audio levels from AnalyserNode
+          // Realtime mode: only bump UP to new peaks
           const target = realtimeLevels[i] || 0;
           if (target > meter.level) {
-            meter.level = target; // instant attack
-          } else {
-            meter.level *= (DECAY_RATE - staggerOffset);
-            if (meter.level < 0.01) meter.level = 0;
+            meter.level = target;
           }
         } else {
-          // Trigger mode: only jump on NEW trigger (generation-gated)
+          // Trigger mode: only bump UP on new triggers
           const isNewTrigger = triggerGens[i] !== lastGensRef.current[i];
-          if (isNewTrigger && triggerLevels[i] > 0) {
-            meter.level = triggerLevels[i];
+          if (isNewTrigger) {
             lastGensRef.current[i] = triggerGens[i];
-          } else {
-            meter.level *= (DECAY_RATE - staggerOffset);
-            if (meter.level < 0.01) meter.level = 0;
+            if (triggerLevels[i] > meter.level) {
+              meter.level = triggerLevels[i];
+            }
           }
         }
         if (meter.level > 0) anyActive = true;
@@ -224,6 +232,10 @@ export const PixiChannelVUMeters: React.FC<PixiChannelVUMetersProps> = ({ width,
       g.rect(0, 0, widthRef.current, heightRef.current);
       g.fill(FILL_CLEAR);
 
+      const swingEnabled = useSettingsStore.getState().vuMeterSwing;
+      const mirrorEnabled = useSettingsStore.getState().vuMeterMirror;
+      const vuStyle = useSettingsStore.getState().vuMeterStyle;
+
       for (let i = 0; i < nc; i++) {
         const meter = metersRef.current[i];
         if (!meter) continue;
@@ -232,53 +244,82 @@ export const PixiChannelVUMeters: React.FC<PixiChannelVUMetersProps> = ({ width,
 
         if (meter.level < 0.01) continue;
 
-        // Swing position — global time-based sine wave with per-channel phase offset.
-        const swingEnabled = useSettingsStore.getState().vuMeterSwing;
-        const swingPos = swingEnabled && meter.level > 0.02
-          ? Math.sin(performance.now() * SWING_FREQ + i * SWING_PHASE_STEP) * SWING_RANGE
-          : 0;
-
-        let centerX: number;
-        if (offsets[i] !== undefined && widths[i]) {
-          const offset = offsets[i] - LINE_NUMBER_WIDTH;
-          centerX = offset + widths[i] / 2;
+        // Get channel dimensions
+        const channelW = widths[i] || (widthRef.current / nc);
+        let channelX: number;
+        if (offsets[i] !== undefined) {
+          channelX = offsets[i] - LINE_NUMBER_WIDTH;
         } else {
-          const channelWidth = widthRef.current / nc;
-          centerX = i * channelWidth + channelWidth / 2;
+          channelX = i * channelW;
         }
 
-        const meterX = centerX - METER_WIDTH / 2 + swingPos;
-        const activeSegments = Math.round(meter.level * NUM_SEGMENTS);
+        const ery = editRowYRef.current; // Edit row Y position
 
-        // Green segments
-        const greenEnd = Math.min(activeSegments, Math.ceil(NUM_SEGMENTS * 0.6));
-        if (greenEnd > 0) {
-          for (let s = 0; s < greenEnd; s++) {
-            const segY = h - 2 - s * (SEGMENT_HEIGHT + SEGMENT_GAP) - SEGMENT_HEIGHT;
-            g.rect(meterX, segY, METER_WIDTH, SEGMENT_HEIGHT);
+        if (vuStyle === 'fill') {
+          // Fill style: solid color rectangle filling channel width
+          const fillHeight = Math.round(meter.level * (ery > 0 ? ery : h / 2));
+          if (fillHeight > 0) {
+            // Normal: fill upward from edit row
+            g.rect(channelX, ery - fillHeight, channelW, fillHeight);
+            if (mirrorEnabled) {
+              // Mirror: also fill downward from edit row
+              g.rect(channelX, ery, channelW, fillHeight);
+            }
+            g.fill(FILL_SOLID);
           }
-          g.fill(FILL_GREEN);
-        }
+        } else {
+          // Segments style: LED-style bars
+          // Swing position — global time-based sine wave with per-channel phase offset.
+          const swingPos = swingEnabled && meter.level > 0.02
+            ? Math.sin(performance.now() * SWING_FREQ + i * SWING_PHASE_STEP) * SWING_RANGE
+            : 0;
 
-        // Yellow segments
-        const yellowStart = greenEnd;
-        const yellowEnd = Math.min(activeSegments, Math.ceil(NUM_SEGMENTS * 0.85));
-        if (yellowEnd > yellowStart) {
-          for (let s = yellowStart; s < yellowEnd; s++) {
-            const segY = h - 2 - s * (SEGMENT_HEIGHT + SEGMENT_GAP) - SEGMENT_HEIGHT;
-            g.rect(meterX, segY, METER_WIDTH, SEGMENT_HEIGHT);
+          let centerX: number;
+          if (offsets[i] !== undefined && widths[i]) {
+            const offset = offsets[i] - LINE_NUMBER_WIDTH;
+            centerX = offset + widths[i] / 2;
+          } else {
+            centerX = i * channelW + channelW / 2;
           }
-          g.fill(FILL_YELLOW);
-        }
 
-        // Red segments
-        const redStart = yellowEnd;
-        if (activeSegments > redStart) {
-          for (let s = redStart; s < activeSegments; s++) {
-            const segY = h - 2 - s * (SEGMENT_HEIGHT + SEGMENT_GAP) - SEGMENT_HEIGHT;
-            g.rect(meterX, segY, METER_WIDTH, SEGMENT_HEIGHT);
+          const meterX = centerX - METER_WIDTH / 2 + swingPos;
+          const activeSegments = Math.round(meter.level * NUM_SEGMENTS);
+          const segStep = SEGMENT_HEIGHT + SEGMENT_GAP;
+
+          // Helpers to compute segment Y positions from edit row
+          const getSegYUp = (s: number) => ery - (s + 1) * segStep;
+          const getSegYDown = (s: number) => ery + s * segStep;
+
+          // Green segments
+          const greenEnd = Math.min(activeSegments, Math.ceil(NUM_SEGMENTS * 0.6));
+          if (greenEnd > 0) {
+            for (let s = 0; s < greenEnd; s++) {
+              g.rect(meterX, getSegYUp(s), METER_WIDTH, SEGMENT_HEIGHT);
+              if (mirrorEnabled) g.rect(meterX, getSegYDown(s), METER_WIDTH, SEGMENT_HEIGHT);
+            }
+            g.fill(FILL_GREEN);
           }
-          g.fill(FILL_RED);
+
+          // Yellow segments
+          const yellowStart = greenEnd;
+          const yellowEnd = Math.min(activeSegments, Math.ceil(NUM_SEGMENTS * 0.85));
+          if (yellowEnd > yellowStart) {
+            for (let s = yellowStart; s < yellowEnd; s++) {
+              g.rect(meterX, getSegYUp(s), METER_WIDTH, SEGMENT_HEIGHT);
+              if (mirrorEnabled) g.rect(meterX, getSegYDown(s), METER_WIDTH, SEGMENT_HEIGHT);
+            }
+            g.fill(FILL_YELLOW);
+          }
+
+          // Red segments
+          const redStart = yellowEnd;
+          if (activeSegments > redStart) {
+            for (let s = redStart; s < activeSegments; s++) {
+              g.rect(meterX, getSegYUp(s), METER_WIDTH, SEGMENT_HEIGHT);
+              if (mirrorEnabled) g.rect(meterX, getSegYDown(s), METER_WIDTH, SEGMENT_HEIGHT);
+            }
+            g.fill(FILL_RED);
+          }
         }
       }
 

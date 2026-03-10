@@ -49,26 +49,48 @@ const HEADER_HEIGHT = 28;
 const SCROLL_THRESHOLD = 50; // Horizontal scroll accumulator resistance
 const V_SCROLL_THRESHOLD = 30; // Vertical scroll accumulator — absorbs trackpad momentum
 
-// ─── Note formatting ─────────────────────────────────────────────────────────
+// ─── Pre-computed lookup tables (zero allocations in hot render loop) ────────
 const NOTE_NAMES = ['C-', 'C#', 'D-', 'D#', 'E-', 'F-', 'F#', 'G-', 'G#', 'A-', 'A#', 'B-'];
 
+const HEX_TABLE: string[] = new Array(256);
+const DEC_TABLE: string[] = new Array(256);
+for (let i = 0; i < 256; i++) {
+  HEX_TABLE[i] = i.toString(16).toUpperCase().padStart(2, '0');
+  DEC_TABLE[i] = i.toString(10).padStart(2, '0');
+}
+
+const EFFECT_CHARS: string[] = new Array(36);
+for (let i = 0; i < 10; i++) EFFECT_CHARS[i] = i.toString();
+for (let i = 10; i < 36; i++) EFFECT_CHARS[i] = String.fromCharCode(55 + i);
+
+const NOTE_TABLE_CACHE = new Map<number, string[]>();
+function getNoteTable(displayOffset: number): string[] {
+  let table = NOTE_TABLE_CACHE.get(displayOffset);
+  if (table) return table;
+  table = new Array(98);
+  table[0] = '---';
+  for (let n = 1; n < 97; n++) {
+    const adj = n + displayOffset - 1;
+    const semitone = ((adj % 12) + 12) % 12;
+    const octave = Math.floor(adj / 12);
+    table[n] = `${NOTE_NAMES[semitone]}${octave}`;
+  }
+  table[97] = 'OFF';
+  NOTE_TABLE_CACHE.set(displayOffset, table);
+  return table;
+}
+
 function noteToString(note: number, displayOffset = 0): string {
-  if (note === 0) return '---';
-  if (note === 97) return 'OFF';
-  const n = note + displayOffset - 1;
-  const semitone = ((n % 12) + 12) % 12;
-  const octave = Math.floor(n / 12);
-  return `${NOTE_NAMES[semitone]}${octave}`;
+  return getNoteTable(displayOffset)[note] ?? '---';
 }
 
 function hexByte(val: number): string {
-  return val.toString(16).toUpperCase().padStart(2, '0');
+  return HEX_TABLE[val & 0xFF];
 }
 
 function formatEffect(typ: number, val: number, useHex: boolean): string {
   if (typ === 0 && val === 0) return '...';
-  const t = typ < 10 ? String(typ) : String.fromCharCode(55 + typ);
-  return `${t}${useHex ? hexByte(val) : val.toString().padStart(2, '0')}`;
+  return (EFFECT_CHARS[typ] ?? '?') + (useHex ? HEX_TABLE[val & 0xFF] : DEC_TABLE[val & 0xFF]);
 }
 
 // ─── Color helpers ───────────────────────────────────────────────────────────
@@ -221,17 +243,11 @@ function renderGrid(g: GraphicsType, p: RenderParams, vStart: number): void {
 }
 
 /** Cursor/selection overlay — active channel, caret, selection, peer cursors. */
-function renderOverlay(
-  g: GraphicsType, p: RenderParams, cursor: CursorPosition, selection: BlockSelection | null,
-  vStart: number, _currentRow: number,
-  peerCursor: PeerCursorData, peerSel: PeerSelectionData | null,
+/** Active channel highlight — fixed position, doesn't scroll with content */
+function renderChannelHighlight(
+  g: GraphicsType, p: RenderParams, cursor: CursorPosition,
 ): void {
   g.clear();
-
-  // Center-line highlight is now drawn in a separate fixed Graphics element
-  // outside the scroll container, so it doesn't move with pivot.y during smooth scrolling.
-
-  // Active channel highlight
   const cursorCh = cursor.channelIndex;
   if (cursorCh >= 0 && cursorCh < p.numChannels) {
     const colX = p.channelOffsets[cursorCh] - p.scrollLeft;
@@ -239,6 +255,15 @@ function renderOverlay(
     g.rect(colX, 0, chW, p.gridHeight);
     g.fill(FILL_WHITE_002);
   }
+}
+
+/** Selection, and peer cursors — only redraws on selection/vStart changes. */
+function renderOverlay(
+  g: GraphicsType, p: RenderParams, _cursor: CursorPosition, selection: BlockSelection | null,
+  vStart: number, _currentRow: number,
+  peerCursor: PeerCursorData, peerSel: PeerSelectionData | null,
+): void {
+  g.clear();
 
   // Selection overlay
   if (selection && p.displayPattern) {
@@ -284,8 +309,14 @@ function renderOverlay(
     g.rect(px, py, CHAR_WIDTH * 3 + 4, p.rowHeight);
     g.fill(FILL_PURPLE_055);
   }
+}
 
-  // Cursor caret
+/** Cursor caret only — cheapest possible redraw, runs on every cursor move. */
+function renderCursorCaret(
+  g: GraphicsType, p: RenderParams, cursor: CursorPosition, vStart: number,
+): void {
+  g.clear();
+  const cursorCh = cursor.channelIndex;
   if (!p.isPlaying && cursorCh >= 0 && cursorCh < p.numChannels) {
     const colX = p.channelOffsets[cursorCh] - p.scrollLeft;
     const y = p.baseY + (cursor.rowIndex - vStart) * p.rowHeight;
@@ -305,8 +336,10 @@ function renderOverlay(
   }
 }
 
-/** Generate text labels for visible rows (M/S buttons + cell data). */
-function generateLabels(p: RenderParams, vStart: number, currentRow: number): LabelData[] {
+/** Generate text labels for visible rows (M/S buttons + cell data).
+ *  NOTE: Does NOT use currentRow for coloring — current-row highlight is handled
+ *  by the overlay layer, so labels only need regeneration when vStart changes. */
+function generateLabels(p: RenderParams, vStart: number): LabelData[] {
   if (!p.displayPattern) return [];
   const labels: LabelData[] = [];
 
@@ -345,8 +378,8 @@ function generateLabels(p: RenderParams, vStart: number, currentRow: number): La
       lineNumText = `${beat}.${tick}`;
     } else {
       lineNumText = p.useHex
-        ? actualRow.toString(16).toUpperCase().padStart(2, '0')
-        : actualRow.toString().padStart(2, '0');
+        ? HEX_TABLE[actualRow & 0xFF]
+        : DEC_TABLE[actualRow & 0xFF];
     }
     labels.push({
       x: 4, y, text: lineNumText,
@@ -364,14 +397,13 @@ function generateLabels(p: RenderParams, vStart: number, currentRow: number): La
       const isCollapsed = channel.collapsed;
       const cell = channel.rows[actualRow];
       if (!cell) continue;
-      const isCurrentRow = rowNum === currentRow;
       const baseX = colX + 8;
 
       const noteText = noteToString(cell.note ?? 0, p.noteDisplayOffset);
       const noteColor = cell.note === 97
         ? p.theme.cellEffect.color
         : (cell.note > 0 && cell.note < 97)
-          ? (isCurrentRow ? p.theme.currentRowText.color : p.theme.cellNote.color)
+          ? p.theme.cellNote.color
           : p.theme.cellEmpty.color;
       if (noteText !== '---' || !p.blankEmpty) {
         labels.push({ x: baseX, y, text: noteText, color: noteColor, fontFamily: PIXI_FONTS.MONO, alpha: isGhost ? 0.35 : undefined });
@@ -429,7 +461,7 @@ function generateLabels(p: RenderParams, vStart: number, currentRow: number): La
 
       if (p.columnVisibility.probability && cell.probability !== undefined) {
         const probText = cell.probability > 0
-          ? (p.useHex ? hexByte(cell.probability) : cell.probability.toString().padStart(2, '0'))
+          ? (p.useHex ? HEX_TABLE[cell.probability & 0xFF] : DEC_TABLE[cell.probability & 0xFF])
           : (p.blankEmpty ? '' : '..');
         if (probText) {
           labels.push({ x: px, y, text: probText, color: cell.probability > 0 ? probColor(cell.probability) : p.theme.cellEmpty.color, fontFamily: PIXI_FONTS.MONO, alpha: isGhost ? 0.35 : undefined });
@@ -856,6 +888,8 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
   const gridScrollContainerRef = useRef<ContainerType | null>(null); // inner scroll container
   const gridGraphicsRef = useRef<GraphicsType | null>(null);
   const overlayGraphicsRef = useRef<GraphicsType | null>(null);
+  const channelHighlightRef = useRef<GraphicsType | null>(null);  // fixed channel highlight (outside scroll container)
+  const cursorCaretRef = useRef<GraphicsType | null>(null);       // fast-path cursor caret (redraws on every cursor move)
   const highlightGraphicsRef = useRef<GraphicsType | null>(null);   // fixed center-line highlight (outside scroll container)
   const dragOverlayRef = useRef<GraphicsType | null>(null);
   const megaTextRef = useRef<MegaText | null>(null);
@@ -933,6 +967,8 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
   // unsynchronized RAF loops and ensures layout engine can't reset our offset.
   useTick(() => {
     const { isPlaying: playing, smoothScrolling: smooth } = useTransportStore.getState();
+    
+    // PERF: Early return when idle - skip expensive store reads
     if (!playing) {
       if (smoothOffsetRef.current !== 0) {
         smoothOffsetRef.current = 0;
@@ -942,6 +978,8 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
       prevPatternRef.current = -1;
       return;
     }
+    
+    // Only read other stores when actually playing
     const replayer = getTrackerReplayer();
     const audioTime = Tone.now() + 0.01;
     const audioState = replayer.getStateAtTime(audioTime);
@@ -1054,6 +1092,8 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
 
   // ── Imperative redraw — called from subscription (cursor) and useEffect (other deps) ──
   const prevVStartRef = useRef(-9999);
+  const prevSelectionRef = useRef<BlockSelection | null>(null);
+  const prevChannelRef = useRef(-1);
   const fullRedrawRef = useRef(true); // Force full redraw on non-cursor dep changes
 
   const imperativeRedraw = useCallback(() => {
@@ -1063,23 +1103,50 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
     const currentRow = p.isPlaying ? p.playbackRow : cursor.rowIndex;
     const vStart = currentRow - p.topLines;
     const vStartChanged = vStart !== prevVStartRef.current;
+    const selectionChanged = selection !== prevSelectionRef.current;
+    const channelChanged = cursor.channelIndex !== prevChannelRef.current;
     const mega = megaTextRef.current;
 
     if (fullRedrawRef.current) {
       fullRedrawRef.current = false;
       prevVStartRef.current = vStart;
+      prevSelectionRef.current = selection;
+      prevChannelRef.current = cursor.channelIndex;
       const gGrid = gridGraphicsRef.current;
       if (gGrid) renderGrid(gGrid, p, vStart);
-      if (mega) mega.updateLabels(generateLabels(p, vStart, currentRow));
+      if (mega) mega.updateLabels(generateLabels(p, vStart));
+      const gOverlay = overlayGraphicsRef.current;
+      if (gOverlay) renderOverlay(gOverlay, p, cursor, selection, vStart, currentRow,
+        peerCursorRef.current, peerSelectionRef.current);
+      const gChHighlight0 = channelHighlightRef.current;
+      if (gChHighlight0) renderChannelHighlight(gChHighlight0, p, cursor);
     } else if (vStartChanged) {
       prevVStartRef.current = vStart;
-      if (mega) mega.updateLabels(generateLabels(p, vStart, currentRow));
+      prevSelectionRef.current = selection;
+      prevChannelRef.current = cursor.channelIndex;
+      if (mega) mega.updateLabels(generateLabels(p, vStart));
+      const gOverlay = overlayGraphicsRef.current;
+      if (gOverlay) renderOverlay(gOverlay, p, cursor, selection, vStart, currentRow,
+        peerCursorRef.current, peerSelectionRef.current);
+      const gChHighlight = channelHighlightRef.current;
+      if (gChHighlight) renderChannelHighlight(gChHighlight, p, cursor);
+    } else if (selectionChanged || channelChanged) {
+      // Selection or active channel changed but viewport didn't scroll —
+      // redraw overlay (selection) and channel highlight
+      prevSelectionRef.current = selection;
+      prevChannelRef.current = cursor.channelIndex;
+      const gOverlay = overlayGraphicsRef.current;
+      if (gOverlay) renderOverlay(gOverlay, p, cursor, selection, vStart, currentRow,
+        peerCursorRef.current, peerSelectionRef.current);
+      const gChHighlight = channelHighlightRef.current;
+      if (gChHighlight) renderChannelHighlight(gChHighlight, p, cursor);
     }
+    // When only cursor row moved within same viewport+channel, skip everything
+    // except the cursor caret (one rect clear+draw).
 
-    // Overlay ALWAYS redraws — cursor highlight, selection, peer cursors (cheap)
-    const gOverlay = overlayGraphicsRef.current;
-    if (gOverlay) renderOverlay(gOverlay, p, cursor, selection, vStart, currentRow,
-      peerCursorRef.current, peerSelectionRef.current);
+    // Cursor caret — always redraws (cheapest possible: clear + 1 rect)
+    const gCaret = cursorCaretRef.current;
+    if (gCaret) renderCursorCaret(gCaret, p, cursor, vStart);
 
     // Fixed center-line highlight — drawn outside the scroll container so it stays
     // fixed during smooth scrolling while content scrolls via pivot.y
@@ -1087,8 +1154,11 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
     if (gHighlight) {
       gHighlight.clear();
       const centerY = p.baseY + (currentRow - vStart) * p.rowHeight;
-      gHighlight.rect(0, centerY, p.width, p.rowHeight);
-      gHighlight.fill({ color: p.theme.accentGlow.color, alpha: p.trackerVisualBg ? 0.5 : p.theme.accentGlow.alpha });
+      // Only draw if highlight is within visible grid area
+      if (centerY >= 0 && centerY < p.gridHeight) {
+        gHighlight.rect(0, centerY, p.width, p.rowHeight);
+        gHighlight.fill({ color: p.theme.accentGlow.color, alpha: p.trackerVisualBg ? 0.5 : p.theme.accentGlow.alpha });
+      }
     }
   }, []); // Empty deps — everything read from refs
   imperativeRedrawRef.current = imperativeRedraw;
@@ -1570,9 +1640,13 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
         >
           <pixiGraphics ref={gridGraphicsRef} draw={() => {}} layout={gridGraphicsLayout} />
           <pixiGraphics ref={overlayGraphicsRef} draw={() => {}} layout={gridGraphicsLayout} />
+          <pixiGraphics ref={cursorCaretRef} draw={() => {}} layout={gridGraphicsLayout} />
 
           {/* MegaText added imperatively to gridScrollContainerRef */}
         </pixiContainer>
+
+        {/* Fixed channel highlight — outside scroll container so it covers the full visible area */}
+        <pixiGraphics ref={channelHighlightRef} draw={() => {}} layout={gridGraphicsLayout} eventMode="none" />
 
         {/* Fixed center-line highlight — outside scroll container so it stays fixed during smooth scrolling */}
         <pixiGraphics ref={highlightGraphicsRef} draw={() => {}} layout={gridGraphicsLayout} eventMode="none" />

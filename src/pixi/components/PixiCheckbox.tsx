@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import type { FederatedPointerEvent } from 'pixi.js';
 import { PIXI_FONTS } from '../fonts';
 import { usePixiTheme } from '../theme';
 
@@ -24,25 +25,37 @@ export const PixiCheckbox: React.FC<PixiCheckboxProps> = ({
 
   const totalWidth = size + (label ? 6 + label.length * 7 : 0);
 
+  const handleClick = () => {
+    if (!disabled) onChange(!checked);
+  };
+
   return (
     <pixiContainer
       eventMode={disabled ? 'none' : 'static'}
       cursor="pointer"
       onPointerOver={() => setHovered(true)}
       onPointerOut={() => setHovered(false)}
-      onPointerUp={() => !disabled && onChange(!checked)}
-      onClick={() => !disabled && onChange(!checked)}
+      onPointerDown={(e: FederatedPointerEvent) => e.stopPropagation()}
+      onPointerUp={handleClick}
       alpha={disabled ? 0.4 : 1}
       layout={{ width: totalWidth, height: size, flexDirection: 'row', alignItems: 'center', gap: 6, ...layoutProp }}
     >
-      <layoutContainer
-        layout={{
-          width: size,
-          height: size,
-          backgroundColor: checked ? theme.accent.color : theme.bgTertiary.color,
-          borderWidth: 1,
-          borderColor: hovered || checked ? theme.accent.color : theme.border.color,
+      <pixiGraphics
+        eventMode="none"
+        draw={(g) => {
+          g.clear();
+          g.roundRect(0, 0, size, size, 2);
+          g.fill({ color: checked ? theme.accent.color : theme.bgTertiary.color });
+          g.stroke({ color: hovered || checked ? theme.accent.color : theme.border.color, width: 1 });
+          if (checked) {
+            // Checkmark
+            g.moveTo(2, size / 2);
+            g.lineTo(size * 0.4, size - 3);
+            g.lineTo(size - 2, 3);
+            g.stroke({ color: 0xffffff, width: 2 });
+          }
         }}
+        layout={{ width: size, height: size }}
       />
       {label && (
         <pixiBitmapText

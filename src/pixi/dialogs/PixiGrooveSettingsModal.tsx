@@ -10,6 +10,7 @@ import { useTransportStore } from '@stores/useTransportStore';
 import { GROOVE_TEMPLATES } from '@typedefs/audio';
 import { PixiButton, PixiCheckbox, PixiSlider } from '../components';
 import { usePixiTheme } from '../theme';
+import { useModalClose } from '@hooks/useDialogKeyboard';
 import { Div, Txt, GlModal, GlModalFooter } from '../layout';
 import type { FederatedWheelEvent } from 'pixi.js';
 
@@ -39,6 +40,8 @@ export const PixiGrooveSettingsModal: React.FC<PixiGrooveSettingsModalProps> = (
   onClose,
 }) => {
   const theme = usePixiTheme();
+
+  useModalClose({ isOpen, onClose });
 
   const swing = useTransportStore((s) => s.swing);
   const setSwing = useTransportStore((s) => s.setSwing);
