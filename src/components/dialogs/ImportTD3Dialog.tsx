@@ -38,7 +38,7 @@ export const ImportTD3Dialog: React.FC<ImportTD3DialogProps> = ({
   const [td3File, setTD3File]         = useState<File | null>(null);
   const [isLoading, setIsLoading]     = useState(false);
   const [error, setError]             = useState<string | null>(null);
-  const [replacePatterns, setReplacePatterns] = useState(false);
+  const [replacePatterns, setReplacePatterns] = useState(true);
 
   const handleFileSelect = useCallback(async (file: File) => {
     setIsLoading(true);
@@ -147,6 +147,18 @@ export const ImportTD3Dialog: React.FC<ImportTD3DialogProps> = ({
                 <label className="flex items-start gap-3 cursor-pointer">
                   <input
                     type="radio"
+                    checked={replacePatterns}
+                    onChange={() => setReplacePatterns(true)}
+                    className="mt-0.5 accent-accent-primary"
+                  />
+                  <div>
+                    <p className="text-sm text-text-primary">Load as new song</p>
+                    <p className="text-xs text-text-muted">Replace current project with TD-3 patterns</p>
+                  </div>
+                </label>
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <input
+                    type="radio"
                     checked={!replacePatterns}
                     onChange={() => setReplacePatterns(false)}
                     className="mt-0.5 accent-accent-primary"
@@ -154,18 +166,6 @@ export const ImportTD3Dialog: React.FC<ImportTD3DialogProps> = ({
                   <div>
                     <p className="text-sm text-text-primary">Append to project</p>
                     <p className="text-xs text-text-muted">Add patterns alongside existing patterns</p>
-                  </div>
-                </label>
-                <label className="flex items-start gap-3 cursor-pointer">
-                  <input
-                    type="radio"
-                    checked={replacePatterns}
-                    onChange={() => setReplacePatterns(true)}
-                    className="mt-0.5 accent-accent-primary"
-                  />
-                  <div>
-                    <p className="text-sm text-text-primary">Replace project</p>
-                    <p className="text-xs text-text-muted">Clear all existing patterns first</p>
                   </div>
                 </label>
               </div>

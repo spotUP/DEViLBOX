@@ -726,6 +726,19 @@ async function loadSongFile(file: File, options: FileLoadOptions): Promise<FileL
     setCurrentPattern(existingPatterns.length);
     setPatternOrder(allPatterns.map((_, i) => i));
 
+    // Set song metadata when loading as a new song
+    if (options.replacePatterns) {
+      const songName = file.name.replace(/\.(sqs|seq)$/i, '') || 'TD-3 Patterns';
+      setMetadata({
+        name: songName,
+        author: 'TD-3 Import',
+        description: `Imported from ${td3File.name} v${td3File.version}`,
+      });
+      // Set BPM from first pattern if available
+      const firstTempo = td3File.patterns[0]?.tempo;
+      if (firstTempo && firstTempo > 0) setBPM(firstTempo);
+    }
+
     return {
       success: true,
       message: `Imported ${importedPatterns.length} TD-3 pattern(s)`
