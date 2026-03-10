@@ -31,6 +31,12 @@ export const DeckTrackInfo: React.FC<DeckTrackInfoProps> = ({ deckId }) => {
   const analysisProgress = useDJStore((s) => s.decks[deckId].analysisProgress);
   const analysisBPM = useDJStore((s) => s.decks[deckId].beatGrid?.bpm ?? 0);
   const pitchOffset = useDJStore((s) => s.decks[deckId].pitchOffset);
+  
+  // Genre classification
+  const genrePrimary = useDJStore((s) => s.decks[deckId].genrePrimary);
+  const genreSubgenre = useDJStore((s) => s.decks[deckId].genreSubgenre);
+  const mood = useDJStore((s) => s.decks[deckId].mood);
+  const energy = useDJStore((s) => s.decks[deckId].energy);
 
   const otherDeckId = deckId === 'A' ? 'B' : 'A';
   const otherBPM = useDJStore((s) => s.decks[otherDeckId].effectiveBPM);
@@ -177,6 +183,36 @@ export const DeckTrackInfo: React.FC<DeckTrackInfoProps> = ({ deckId }) => {
           </span>
         )}
       </div>
+      
+      {/* Genre / Mood row */}
+      {genreSubgenre && (
+        <div className="flex items-center gap-2 text-[10px] text-text-muted">
+          <span
+            className="px-1.5 py-0.5 rounded bg-surface-secondary/50 text-text-secondary"
+            title={`${genrePrimary} • ${genreSubgenre}`}
+          >
+            {genreSubgenre}
+          </span>
+          {mood && (
+            <span className="text-text-muted">
+              {mood}
+            </span>
+          )}
+          {/* Energy bar */}
+          <div className="flex items-center gap-1">
+            <span className="text-[9px] opacity-60">NRG</span>
+            <div className="w-12 h-1.5 bg-surface-secondary/50 rounded-full overflow-hidden">
+              <div
+                className="h-full rounded-full transition-all duration-300"
+                style={{
+                  width: `${energy * 100}%`,
+                  backgroundColor: energy > 0.7 ? '#f97316' : energy > 0.4 ? '#eab308' : '#22c55e',
+                }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

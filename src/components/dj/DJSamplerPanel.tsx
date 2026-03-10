@@ -240,7 +240,7 @@ export const DJSamplerPanel: React.FC<DJSamplerPanelProps> = ({ onClose }) => {
             onClick={onClose}
             className="px-1.5 py-0.5 text-[9px] font-mono text-text-muted hover:text-white bg-dark-surface border border-dark-border rounded transition-colors"
           >
-            ✕
+            X
           </button>
         </div>
       </div>

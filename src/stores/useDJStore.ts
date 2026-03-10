@@ -113,6 +113,14 @@ export interface DeckState {
   musicalKey: string | null;
   keyConfidence: number;
   frequencyPeaks: Float32Array[] | null;  // [low, mid, high] band peaks
+  
+  // Genre classification
+  genrePrimary: string | null;      // e.g. "Electronic", "Hip Hop"
+  genreSubgenre: string | null;     // e.g. "Techno", "Drum n Bass"
+  genreConfidence: number;          // 0-1
+  mood: string | null;              // e.g. "Energetic", "Chill"
+  energy: number;                   // 0-1 (low → high energy)
+  danceability: number;             // 0-1
 }
 
 export type DeckId = 'A' | 'B' | 'C';
@@ -192,6 +200,14 @@ const defaultDeckState: DeckState = {
   musicalKey: null,
   keyConfidence: 0,
   frequencyPeaks: null,
+  
+  // Genre classification
+  genrePrimary: null,
+  genreSubgenre: null,
+  genreConfidence: 0,
+  mood: null,
+  energy: 0.5,
+  danceability: 0.5,
 };
 
 // ============================================================================
