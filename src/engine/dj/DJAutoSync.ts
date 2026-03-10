@@ -76,48 +76,32 @@ export function phaseAlign(
 ): void {
   const store = useDJStore.getState();
   const otherState = store.decks[otherDeckId];
-
   if (!otherState.beatGrid) return;
-
-  const otherPhase = getPhaseInfo(otherDeckId);
-  if (!otherPhase) return;
 
   const thisState = store.decks[deckId];
   if (!thisState.beatGrid) return;
 
-  const thisBeatGrid = thisState.beatGrid;
+  const otherPhase = getPhaseInfo(otherDeckId);
+  const thisPhase = getPhaseInfo(deckId);
+  if (!otherPhase || !thisPhase) return;
+
   const thisPosition = getCurrentPosition(deckId);
-
-  // Find nearest beat/downbeat in this deck
-  const beats = mode === 'bar' ? thisBeatGrid.downbeats : thisBeatGrid.beats;
-  if (beats.length === 0) return;
-
-  // Find the beat in this deck that's closest to the current phase of the other deck
-  const otherBeatPhase = mode === 'bar' ? otherPhase.barPhase : otherPhase.beatPhase;
-
-  // We want to seek to a position where our beat phase matches their beat phase
-  // Find the nearest beat, then offset by the phase difference
-  let bestBeatIdx = 0;
-  let bestDist = Infinity;
-  for (let i = 0; i < beats.length; i++) {
-    const dist = Math.abs(beats[i] - thisPosition);
-    if (dist < bestDist) {
-      bestDist = dist;
-      bestBeatIdx = i;
-    }
-  }
-
-  // Calculate the beat period (average time between beats)
-  const beatPeriod = thisBeatGrid.bpm > 0 ? 60 / thisBeatGrid.bpm : 0.5;
-  const barPeriod = beatPeriod * thisBeatGrid.timeSignature;
+  const beatPeriod = thisState.beatGrid.bpm > 0 ? 60 / thisState.beatGrid.bpm : 0.5;
+  const barPeriod = beatPeriod * thisState.beatGrid.timeSignature;
   const period = mode === 'bar' ? barPeriod : beatPeriod;
 
-  // Target: snap to the nearest beat, then apply the other deck's phase offset
-  const targetBeat = beats[bestBeatIdx];
-  const phaseOffset = otherBeatPhase * period;
-  const seekTarget = targetBeat + phaseOffset;
+  const otherPh = mode === 'bar' ? otherPhase.barPhase : otherPhase.beatPhase;
+  const thisPh = mode === 'bar' ? thisPhase.barPhase : thisPhase.beatPhase;
 
-  // Perform the seek
+  // Minimal phase correction: how much to nudge this deck so phases match
+  // Normalize to [-0.5, 0.5] so we never shift more than half a period
+  let phaseDiff = otherPh - thisPh;
+  if (phaseDiff > 0.5) phaseDiff -= 1;
+  if (phaseDiff < -0.5) phaseDiff += 1;
+
+  const seekTarget = thisPosition + phaseDiff * period;
+  if (seekTarget < 0) return; // don't seek before start
+
   seekDeck(deckId, seekTarget);
 }
 

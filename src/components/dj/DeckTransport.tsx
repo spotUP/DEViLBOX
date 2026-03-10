@@ -9,7 +9,7 @@ import { Play, Pause, Disc3, Link, Lock } from 'lucide-react';
 import { useDJStore } from '@/stores/useDJStore';
 import { getDJEngine } from '@/engine/dj/DJEngine';
 import { DJBeatSync } from '@/engine/dj/DJBeatSync';
-import { syncBPMToOther, quantizedPlay } from '@/engine/dj/DJAutoSync';
+import { syncBPMToOther, phaseAlign, quantizedPlay } from '@/engine/dj/DJAutoSync';
 import { getQuantizeMode, setQuantizeMode, type QuantizeMode } from '@/engine/dj/DJQuantizedFX';
 
 interface DeckTransportProps {
@@ -88,10 +88,11 @@ export const DeckTransport: React.FC<DeckTransportProps> = ({ deckId }) => {
       // Check if other deck has a track loaded (either mode)
       if (!otherState.fileName) return;
 
-      // If both decks have analysis beat grids, use precise BPM sync
+      // If both decks have analysis beat grids, use precise BPM sync + phase align
       if (thisState.beatGrid && otherState.beatGrid) {
         const semitones = syncBPMToOther(deckId, otherDeckId);
         useDJStore.getState().setDeckPitch(deckId, semitones);
+        phaseAlign(deckId, otherDeckId);
         return;
       }
 
