@@ -893,14 +893,18 @@ export class ScratchPlayback {
       const ctx  = Tone.getContext().rawContext as AudioContext;
       const periodSec = (60 / bpm) * LFO_DIVISION_BEATS[division];
       const now = ctx.currentTime;
+      const ramp = 0.0015; // 1.5ms anti-click ramp
 
       // 4 bars look-ahead
       const totalDivisions = Math.round(16 / LFO_DIVISION_BEATS[division]);
       gain.cancelScheduledValues(now);
       for (let i = 0; i < totalDivisions; i++) {
         const t = now + i * periodSec;
-        gain.setValueAtTime(1, t);
-        gain.setValueAtTime(0, t + periodSec * 0.5);
+        gain.setValueAtTime(0, t);
+        gain.linearRampToValueAtTime(1, t + ramp);
+        const off = t + periodSec * 0.5;
+        gain.setValueAtTime(1, off);
+        gain.linearRampToValueAtTime(0, off + ramp);
       }
 
       const totalMs = totalDivisions * periodSec * 1000;
@@ -960,11 +964,15 @@ export class ScratchPlayback {
       // 4 chops per beat, 40% open duty cycle (crisper than 50%)
       const chopPeriodSec = (60 / bpm) / 4;
       const now = ctx.currentTime;
+      const ramp = 0.0015;
       gain.cancelScheduledValues(now);
       for (let i = 0; i < PATTERN_FADER_LOOKAHEAD; i++) {
         const t = now + i * chopPeriodSec;
-        gain.setValueAtTime(1, t);
-        gain.setValueAtTime(0, t + chopPeriodSec * 0.40);
+        gain.setValueAtTime(0, t);
+        gain.linearRampToValueAtTime(1, t + ramp);
+        const off = t + chopPeriodSec * 0.40;
+        gain.setValueAtTime(1, off);
+        gain.linearRampToValueAtTime(0, off + ramp);
       }
       const totalMs = PATTERN_FADER_LOOKAHEAD * chopPeriodSec * 1000;
       this.patternFaderTimeoutId = setTimeout(() => {
@@ -987,11 +995,15 @@ export class ScratchPlayback {
       // 4 finger taps per beat, 28% open duty cycle (very staccato)
       const tapPeriodSec = (60 / bpm) / 4;
       const now = ctx.currentTime;
+      const ramp = 0.0015;
       gain.cancelScheduledValues(now);
       for (let i = 0; i < PATTERN_FADER_LOOKAHEAD; i++) {
         const t = now + i * tapPeriodSec;
-        gain.setValueAtTime(1, t);
-        gain.setValueAtTime(0, t + tapPeriodSec * 0.28);
+        gain.setValueAtTime(0, t);
+        gain.linearRampToValueAtTime(1, t + ramp);
+        const off = t + tapPeriodSec * 0.28;
+        gain.setValueAtTime(1, off);
+        gain.linearRampToValueAtTime(0, off + ramp);
       }
       const totalMs = PATTERN_FADER_LOOKAHEAD * tapPeriodSec * 1000;
       this.patternFaderTimeoutId = setTimeout(() => {
@@ -1014,11 +1026,15 @@ export class ScratchPlayback {
       // 8 taps per beat (both hands), 20% open duty cycle (very rapid staccato)
       const tapPeriodSec = (60 / bpm) / 8;
       const now = ctx.currentTime;
+      const ramp = 0.0015;
       gain.cancelScheduledValues(now);
       for (let i = 0; i < PATTERN_FADER_LOOKAHEAD; i++) {
         const t = now + i * tapPeriodSec;
-        gain.setValueAtTime(1, t);
-        gain.setValueAtTime(0, t + tapPeriodSec * 0.20);
+        gain.setValueAtTime(0, t);
+        gain.linearRampToValueAtTime(1, t + ramp);
+        const off = t + tapPeriodSec * 0.20;
+        gain.setValueAtTime(1, off);
+        gain.linearRampToValueAtTime(0, off + ramp);
       }
       const totalMs = PATTERN_FADER_LOOKAHEAD * tapPeriodSec * 1000;
       this.patternFaderTimeoutId = setTimeout(() => {
