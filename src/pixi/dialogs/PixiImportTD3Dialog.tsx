@@ -64,7 +64,7 @@ export const PixiImportTD3Dialog: React.FC<PixiImportTD3DialogProps> = ({
   const [td3File, setTD3File] = useState<File | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [replacePatterns, setReplacePatterns] = useState(false);
+  const [replacePatterns, setReplacePatterns] = useState(true);
 
   // ── File parsing ───────────────────────────────────────────────────────────
 
@@ -250,24 +250,24 @@ export const PixiImportTD3Dialog: React.FC<PixiImportTD3DialogProps> = ({
               <PixiLabel text="Import Mode" size="sm" weight="medium" color="text" />
 
               <PixiCheckbox
-                checked={!replacePatterns}
-                onChange={() => setReplacePatterns(false)}
-                label="Append to project"
+                checked={replacePatterns}
+                onChange={() => setReplacePatterns(true)}
+                label="Load as new song"
               />
               <PixiLabel
-                text="Add patterns alongside existing patterns"
+                text="Replace current project with TD-3 patterns"
                 size="sm"
                 color="textMuted"
                 layout={{ marginLeft: 18 }}
               />
 
               <PixiCheckbox
-                checked={replacePatterns}
-                onChange={() => setReplacePatterns(true)}
-                label="Replace project"
+                checked={!replacePatterns}
+                onChange={() => setReplacePatterns(false)}
+                label="Append to project"
               />
               <PixiLabel
-                text="Clear all existing patterns first"
+                text="Add patterns alongside existing patterns"
                 size="sm"
                 color="textMuted"
                 layout={{ marginLeft: 18 }}
