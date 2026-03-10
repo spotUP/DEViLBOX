@@ -88,14 +88,15 @@ export const DeckScratch: React.FC<DeckScratchProps> = ({ deckId }) => {
   const handlePatternPointerUp = useCallback((_patternName: string) => {
     const held = performance.now() - pressTimeRef.current;
     if (held < TAP_MS) {
-      // Tap: let current cycle finish then stop (store cleared by DJDeck RAF)
+      // Tap: one-shot — let current cycle finish then stop
       try { getDeck().finishPatternCycle(); } catch { /* engine not ready */ }
     } else {
       // Hold release: stop immediately
       try { getDeck().stopPattern(); } catch { /* engine not ready */ }
-      useDJStore.getState().setDeckPattern(deckId, null);
-      setWaitingPattern(null);
     }
+    // Always clear active state so button goes inactive immediately
+    useDJStore.getState().setDeckPattern(deckId, null);
+    setWaitingPattern(null);
   }, [deckId, getDeck]);
 
   // ── Fader LFO buttons ────────────────────────────────────────────────────
