@@ -135,3 +135,65 @@ export function useDialogKeyboard({
     }
   };
 }
+
+/**
+ * useModalClose - Simpler hook for modals that just need Enter/Escape to close
+ * 
+ * Use this for info modals, settings, etc. that don't have a separate confirm action.
+ * For dialogs with OK/Cancel buttons, use useDialogKeyboard instead.
+ */
+interface UseModalCloseOptions {
+  isOpen: boolean;
+  onClose: () => void;
+  enableEnter?: boolean; // Default: true
+  enableEscape?: boolean; // Default: true
+}
+
+export function useModalClose({
+  isOpen,
+  onClose,
+  enableEnter = true,
+  enableEscape = true,
+}: UseModalCloseOptions) {
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    if (!isOpen) return;
+
+    const target = e.target as HTMLElement;
+    const isTextarea = target.tagName === 'TEXTAREA';
+    const isSelect = target.tagName === 'SELECT';
+    const isButton = target.tagName === 'BUTTON';
+    const isInput = target.tagName === 'INPUT';
+
+    // Escape to close
+    if (enableEscape && e.key === 'Escape') {
+      e.preventDefault();
+      e.stopPropagation();
+      onClose();
+      return;
+    }
+
+    // Enter to close (smart detection to avoid interfering with form elements)
+    if (enableEnter && e.key === 'Enter' && !e.shiftKey) {
+      // Ctrl/Cmd+Enter always closes
+      if (e.ctrlKey || e.metaKey) {
+        e.preventDefault();
+        e.stopPropagation();
+        onClose();
+        return;
+      }
+      
+      // Plain Enter - skip in form elements
+      if (isTextarea || isSelect || isButton || isInput) return;
+
+      e.preventDefault();
+      e.stopPropagation();
+      onClose();
+    }
+  }, [isOpen, onClose, enableEnter, enableEscape]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    document.addEventListener('keydown', handleKeyDown, { capture: true });
+    return () => document.removeEventListener('keydown', handleKeyDown, { capture: true });
+  }, [isOpen, handleKeyDown]);
+}

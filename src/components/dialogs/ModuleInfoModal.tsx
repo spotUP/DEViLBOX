@@ -11,6 +11,7 @@ import { useModlandResultStore } from '@stores/useModlandResultStore';
 import { useInstrumentStore } from '@stores/useInstrumentStore';
 import { useShallow } from 'zustand/react/shallow';
 import { X, Disc3, Database, Zap, Settings, MessageSquare } from 'lucide-react';
+import { useModalClose } from '@hooks/useDialogKeyboard';
 
 interface Props {
   isOpen: boolean;
@@ -47,6 +48,7 @@ const SectionHeader: React.FC<{ icon: React.ReactNode; title: string }> = ({ ico
 );
 
 export const ModuleInfoModal: React.FC<Props> = ({ isOpen, onClose }) => {
+  useModalClose({ isOpen, onClose });
   const { patterns } = useTrackerStore(
     useShallow((s) => ({ patterns: s.patterns }))
   );

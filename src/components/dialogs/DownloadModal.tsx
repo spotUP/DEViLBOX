@@ -5,6 +5,7 @@
 import React from 'react';
 import { X, Monitor, Apple, Terminal, Download, ExternalLink } from 'lucide-react';
 import { Button } from '@components/ui/Button';
+import { useModalClose } from '@hooks/useDialogKeyboard';
 
 interface DownloadModalProps {
   isOpen: boolean;
@@ -12,6 +13,7 @@ interface DownloadModalProps {
 }
 
 export const DownloadModal: React.FC<DownloadModalProps> = ({ isOpen, onClose }) => {
+  useModalClose({ isOpen, onClose });
   if (!isOpen) return null;
 
   // These should point to your GitHub Releases page or similar

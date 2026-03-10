@@ -11,10 +11,12 @@ import React from 'react';
 import { Lock, RefreshCcw } from 'lucide-react';
 import { Button } from '@components/ui/Button';
 import { useUIStore } from '@stores/useUIStore';
+import { useModalClose } from '@hooks/useDialogKeyboard';
 
 export const NonEditableDialog: React.FC = () => {
   const isOpen = useUIStore((s) => s.nonEditableDialogOpen);
   const close  = useUIStore((s) => s.closeNonEditableDialog);
+  useModalClose({ isOpen, onClose: close });
 
   if (!isOpen) return null;
 

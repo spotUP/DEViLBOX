@@ -7,6 +7,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { X, Share, Plus, Square } from 'lucide-react';
+import { useModalClose } from '@hooks/useDialogKeyboard';
 
 interface AddToHomeScreenModalProps {
   isOpen: boolean;
@@ -17,6 +18,7 @@ export const AddToHomeScreenModal: React.FC<AddToHomeScreenModalProps> = ({
   isOpen,
   onClose,
 }) => {
+  useModalClose({ isOpen, onClose });
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [isIOS, setIsIOS] = useState(false);
   const [isStandalone, setIsStandalone] = useState(false);

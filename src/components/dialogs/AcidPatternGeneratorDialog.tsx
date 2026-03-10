@@ -4,6 +4,7 @@
 
 import React, { useState, useMemo, useCallback } from 'react';
 import { generateAcidPattern, ALL_SCALES, getScaleName, type AcidPatternParams, type Scale } from '@lib/generators/acidPatternGenerator';
+import { useModalClose } from '@hooks/useDialogKeyboard';
 import { useTrackerStore, useInstrumentStore } from '@stores';
 import { Wand2, X, RefreshCw, AlertTriangle } from 'lucide-react';
 
@@ -26,6 +27,7 @@ export const AcidPatternGeneratorDialog: React.FC<AcidPatternGeneratorDialogProp
   channelIndex: initialChannelIndex,
   onClose,
 }) => {
+  useModalClose({ isOpen: true, onClose });
   const { patterns, currentPatternIndex, setChannelRows } = useTrackerStore();
   const instruments = useInstrumentStore((s) => s.instruments);
   const createInstrument = useInstrumentStore((s) => s.createInstrument);

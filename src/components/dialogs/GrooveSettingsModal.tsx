@@ -4,6 +4,7 @@
 
 import React from 'react';
 import { X, Info } from 'lucide-react';
+import { useModalClose } from '@hooks/useDialogKeyboard';
 import { useTransportStore } from '@stores/useTransportStore';
 import { GROOVE_TEMPLATES } from '@typedefs/audio';
 
@@ -12,6 +13,7 @@ interface GrooveSettingsModalProps {
 }
 
 export const GrooveSettingsModal: React.FC<GrooveSettingsModalProps> = ({ onClose }) => {
+  useModalClose({ isOpen: true, onClose });
   const {
     swing,
     setSwing,

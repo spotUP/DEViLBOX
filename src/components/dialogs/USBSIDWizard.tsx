@@ -13,6 +13,7 @@ import { useUIStore } from '@stores/useUIStore';
 import { useSettingsStore } from '@stores/useSettingsStore';
 import { SID_ENGINES } from '@engine/deepsid/DeepSIDEngineManager';
 import { notify } from '@stores/useNotificationStore';
+import { useModalClose } from '@hooks/useDialogKeyboard';
 
 type WizardStep = 'detect' | 'connect' | 'engine' | 'done';
 
@@ -20,6 +21,7 @@ export const USBSIDWizard: React.FC = () => {
   const modalOpen = useUIStore(s => s.modalOpen);
   const closeModal = useUIStore(s => s.closeModal);
   const isOpen = modalOpen === 'usb-sid-wizard';
+  useModalClose({ isOpen, onClose: () => closeModal() });
 
   const sidEngine = useSettingsStore(s => s.sidEngine);
   const setSidEngine = useSettingsStore(s => s.setSidEngine);

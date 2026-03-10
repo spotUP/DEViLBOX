@@ -3,6 +3,7 @@ import { Lightbulb, ChevronLeft, ChevronRight, X, Info, Sparkles, History } from
 import { DEVILBOX_TIPS } from '../../constants/tips';
 import { CHANGELOG, CURRENT_VERSION, BUILD_NUMBER, type ChangelogEntry } from '@generated/changelog';
 import { useThemeStore } from '@stores';
+import { useModalClose } from '@hooks/useDialogKeyboard';
 
 const SEEN_VERSION_KEY = 'devilbox-seen-version';
 
@@ -96,6 +97,25 @@ export const TipOfTheDay: React.FC<TipOfTheDayProps> = ({ isOpen, onClose, initi
     localStorage.setItem('show-tips-at-startup', checked.toString());
   };
 
+  // Use standard modal close hook for Enter/Escape
+  useModalClose({ isOpen, onClose });
+  
+  // Arrow keys for tip navigation
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleArrows = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        handlePrev();
+      } else if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        handleNext();
+      }
+    };
+    document.addEventListener('keydown', handleArrows);
+    return () => document.removeEventListener('keydown', handleArrows);
+  }, [isOpen, handlePrev, handleNext]);
+
   if (!isOpen) return null;
 
   const tip = DEVILBOX_TIPS[currentTipIndex];
@@ -104,7 +124,10 @@ export const TipOfTheDay: React.FC<TipOfTheDayProps> = ({ isOpen, onClose, initi
   return (
     <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[100] p-4 backdrop-blur-sm">
       <div 
-        className={`max-w-xl w-full rounded-xl border-2 shadow-2xl overflow-hidden transition-all animate-in zoom-in-95 duration-200
+        role="dialog"
+        aria-modal="true"
+        tabIndex={-1}
+        className={`max-w-xl w-full rounded-xl border-2 shadow-2xl overflow-hidden transition-all animate-in zoom-in-95 duration-200 outline-none
           ${isCyanTheme ? 'bg-[#051515] border-cyan-500/50' : 'bg-[#1a1a1a] border-ft2-border'}
         `}
       >
@@ -113,7 +136,7 @@ export const TipOfTheDay: React.FC<TipOfTheDayProps> = ({ isOpen, onClose, initi
           ${isCyanTheme ? 'bg-cyan-900/20' : 'bg-dark-bgSecondary'}
         `}>
           <div className="flex items-center gap-3">
-            <div className={`p-2 rounded-lg ${isCyanTheme ? 'bg-cyan-500/20 text-cyan-400' : 'bg-accent-primary/20 text-accent-primary'}`}>
+            <div className={`p-2 rounded-lg ${isCyanTheme ? 'bg-cyan-500/20' : 'bg-accent-primary/20'} text-white`}>
               {activeTab === 'tips' ? <Lightbulb size={20} /> : <Sparkles size={20} />}
             </div>
             <div>
@@ -165,9 +188,10 @@ export const TipOfTheDay: React.FC<TipOfTheDayProps> = ({ isOpen, onClose, initi
         <div className="h-[300px] overflow-y-auto scrollbar-modern bg-black/10">
           {activeTab === 'tips' ? (
             <div className="h-full p-8 flex flex-col items-center justify-center text-center space-y-6">
-              <div className={`w-16 h-16 rounded-full flex items-center justify-center bg-opacity-10 mb-2
-                ${isCyanTheme ? 'bg-cyan-500 text-cyan-400' : 'bg-accent-primary text-accent-primary'}
-              `}>
+              <div
+                className="w-16 h-16 rounded-full flex items-center justify-center mb-2 text-white"
+                style={{ backgroundColor: isCyanTheme ? 'rgba(0,255,255,0.1)' : 'rgba(239,68,68,0.1)' }}
+              >
                 <Info size={32} />
               </div>
               

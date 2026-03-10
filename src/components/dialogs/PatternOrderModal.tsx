@@ -4,6 +4,7 @@
 
 import React, { useState } from 'react';
 import { useTrackerStore , useFormatStore } from '@stores';
+import { useModalClose } from '@hooks/useDialogKeyboard';
 import { getTrackerReplayer } from '@engine/TrackerReplayer';
 import { notify } from '@stores/useNotificationStore';
 import { Plus, Trash2, X } from 'lucide-react';
@@ -14,6 +15,7 @@ interface PatternOrderModalProps {
 }
 
 export const PatternOrderModal: React.FC<PatternOrderModalProps> = ({ onClose }) => {
+  useModalClose({ isOpen: true, onClose });
   // Reactive: re-renders when a new song with/without per-channel tables is loaded
   const hasPerChannelTables = useFormatStore((state) => !!state.channelTrackTables);
 

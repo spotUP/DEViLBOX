@@ -17,6 +17,7 @@ import { Button } from '@components/ui/Button';
 import { useInstrumentStore } from '@/stores/useInstrumentStore';
 import type { InstrumentConfig } from '@/types/instrument';
 import type { IFF8SVXResult } from '@lib/audio/IFF8SVXParser';
+import { useModalClose } from '@hooks/useDialogKeyboard';
 
 const IS_IFF = /\.(iff|8svx)$/i;
 const IS_SUPPORTED = /\.(wav|mp3|ogg|flac|aiff?|m4a|iff|8svx)$/i;
@@ -71,6 +72,7 @@ export const ImportAudioDialog: React.FC<ImportAudioDialogProps> = ({
   onClose,
   initialFile,
 }) => {
+  useModalClose({ isOpen, onClose });
   const [preview, setPreview]         = useState<AudioPreview | null>(null);
   const [audioFile, setAudioFile]     = useState<File | null>(null);
   const [parsed8SVX, setParsed8SVX]   = useState<IFF8SVXResult | null>(null);

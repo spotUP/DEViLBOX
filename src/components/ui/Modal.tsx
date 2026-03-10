@@ -1,14 +1,23 @@
 /**
  * Modal - Reusable modal wrapper component
  * Supports both modern and retro (FT2) themes with consistent behavior
+ * 
+ * Keyboard behavior:
+ * - Escape: closes modal (when closeOnEscape=true)
+ * - Enter: triggers onConfirm if provided (smart detection avoids text inputs)
+ * - Ctrl/Cmd+Enter: force confirm even in text inputs
  */
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useCallback, useRef } from 'react';
 
 interface ModalProps {
   isOpen: boolean;
   onClose: () => void;
   children: React.ReactNode;
+
+  // Confirm action (if provided, Enter triggers it)
+  onConfirm?: () => void;
+  confirmDisabled?: boolean;
 
   // Style
   theme?: 'modern' | 'retro'; // dark-* vs ft2-*
@@ -19,6 +28,7 @@ interface ModalProps {
   // Behavior
   closeOnBackdropClick?: boolean;
   closeOnEscape?: boolean;
+  closeOnEnter?: boolean; // If no onConfirm, Enter closes modal (default: true)
 
   // Animation
   animation?: 'fade' | 'slide' | 'scale';
@@ -31,28 +41,89 @@ export const Modal: React.FC<ModalProps> = ({
   isOpen,
   onClose,
   children,
+  onConfirm,
+  confirmDisabled = false,
   theme = 'modern',
   size = 'md',
   backdropOpacity = 'medium',
   rounded = true,
   closeOnBackdropClick = true,
   closeOnEscape = true,
+  closeOnEnter = true,
   animation = 'fade',
   className = '',
 }) => {
-  // Handle escape key
-  useEffect(() => {
-    if (!isOpen || !closeOnEscape) return;
+  const modalRef = useRef<HTMLDivElement>(null);
+  
+  // Handle keyboard events
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    if (!isOpen) return;
+    
+    const target = e.target as HTMLElement;
+    const isTextarea = target.tagName === 'TEXTAREA';
+    const isSelect = target.tagName === 'SELECT';
+    const isButton = target.tagName === 'BUTTON';
+    const isInput = target.tagName === 'INPUT';
+    const inputType = isInput ? (target as HTMLInputElement).type : '';
+    const isTextInput = isInput && ['text', 'search', 'url', 'email', 'password'].includes(inputType);
 
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
+    // Escape to close
+    if (closeOnEscape && e.key === 'Escape') {
+      e.preventDefault();
+      e.stopPropagation();
+      onClose();
+      return;
+    }
+
+    // Ctrl/Cmd+Enter - force confirm/close even in text inputs
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+      if (onConfirm && !confirmDisabled) {
+        e.preventDefault();
+        e.stopPropagation();
+        onConfirm();
+      } else if (closeOnEnter) {
+        e.preventDefault();
+        e.stopPropagation();
         onClose();
       }
-    };
+      return;
+    }
 
-    document.addEventListener('keydown', handleEscape);
-    return () => document.removeEventListener('keydown', handleEscape);
-  }, [isOpen, closeOnEscape, onClose]);
+    // Enter to confirm/close (smart detection)
+    if (e.key === 'Enter' && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
+      // Allow Enter in textarea (for newlines)
+      if (isTextarea) return;
+      // Allow Enter in select (to select option)
+      if (isSelect) return;
+      // Allow Enter on buttons (triggers click)
+      if (isButton) return;
+      // Allow Enter in text inputs (might be for form submission within modal)
+      // But if there's no form, we want Enter to close - let individual modals handle this
+      if (isTextInput) return;
+
+      if (onConfirm && !confirmDisabled) {
+        e.preventDefault();
+        e.stopPropagation();
+        onConfirm();
+      } else if (closeOnEnter) {
+        e.preventDefault();
+        e.stopPropagation();
+        onClose();
+      }
+    }
+  }, [isOpen, onClose, onConfirm, confirmDisabled, closeOnEscape, closeOnEnter]);
+
+  // Keyboard listener and focus management
+  useEffect(() => {
+    if (!isOpen) return;
+
+    // Focus modal for keyboard events
+    modalRef.current?.focus();
+
+    // Add at capture phase to intercept before other handlers
+    document.addEventListener('keydown', handleKeyDown, { capture: true });
+    return () => document.removeEventListener('keydown', handleKeyDown, { capture: true });
+  }, [isOpen, handleKeyDown]);
 
   // Handle backdrop click
   const handleBackdropClick = (e: React.MouseEvent) => {
@@ -111,7 +182,7 @@ export const Modal: React.FC<ModalProps> = ({
     ${animationMap[animation]}
     ${size !== 'fullscreen' ? 'shadow-xl max-h-[90vh] overflow-hidden' : ''}
     ${className}
-    flex flex-col
+    flex flex-col outline-none
   `;
 
   return (
@@ -119,7 +190,13 @@ export const Modal: React.FC<ModalProps> = ({
       className={backdropClasses}
       onClick={handleBackdropClick}
     >
-      <div className={modalClasses}>
+      <div 
+        ref={modalRef}
+        role="dialog"
+        aria-modal="true"
+        tabIndex={-1}
+        className={modalClasses}
+      >
         {children}
       </div>
     </div>

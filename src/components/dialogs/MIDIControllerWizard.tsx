@@ -18,6 +18,7 @@ import {
   type ControllerKnob,
 } from '../../midi/controllerProfiles';
 import { notify } from '@stores/useNotificationStore';
+import { useModalClose } from '@hooks/useDialogKeyboard';
 
 type WizardStep = 'detect' | 'select' | 'profile' | 'done';
 
@@ -25,6 +26,7 @@ export const MIDIControllerWizard: React.FC = () => {
   const modalOpen = useUIStore(s => s.modalOpen);
   const closeModal = useUIStore(s => s.closeModal);
   const isOpen = modalOpen === 'midi-wizard';
+  useModalClose({ isOpen, onClose: () => closeModal() });
 
   const inputDevices = useMIDIStore(s => s.inputDevices);
   const outputDevices = useMIDIStore(s => s.outputDevices);
