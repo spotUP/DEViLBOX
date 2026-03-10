@@ -82,33 +82,44 @@ export const DeckTransport: React.FC<DeckTransportProps> = ({ deckId }) => {
       const engine = getDJEngine();
       const thisDeck = engine.getDeck(deckId);
       const otherDeck = engine.getDeck(otherDeckId);
-      const otherState = useDJStore.getState().decks[otherDeckId];
-      const thisState = useDJStore.getState().decks[deckId];
+      const store = useDJStore.getState();
+      const otherState = store.decks[otherDeckId];
+      const thisState = store.decks[deckId];
 
       // Check if other deck has a track loaded (either mode)
       if (!otherState.fileName) return;
 
+      // Ensure crossfader is fully on the OTHER deck so no audio leaks
+      // crossfader: 0 = deck A, 1 = deck B
+      const cf = store.crossfaderPosition;
+      if (deckId === 'A' && cf < 1) store.setCrossfader(1);
+      else if (deckId === 'B' && cf > 0) store.setCrossfader(0);
+
       // If both decks have analysis beat grids, use precise BPM sync + phase align
       if (thisState.beatGrid && otherState.beatGrid) {
         const semitones = syncBPMToOther(deckId, otherDeckId);
-        useDJStore.getState().setDeckPitch(deckId, semitones);
+        store.setDeckPitch(deckId, semitones);
         phaseAlign(deckId, otherDeckId);
-        return;
-      }
-
-      if (otherDeck.playbackMode === 'audio' || thisDeck.playbackMode === 'audio') {
+      } else if (otherDeck.playbackMode === 'audio' || thisDeck.playbackMode === 'audio') {
         // For audio mode, match BPM via the detected values in the store
         const targetBPM = otherState.detectedBPM;
-        const thisBPMBase = useDJStore.getState().decks[deckId].detectedBPM;
+        const thisBPMBase = thisState.detectedBPM;
         if (targetBPM > 0 && thisBPMBase > 0) {
           const ratio = targetBPM / thisBPMBase;
           const semitones = 12 * Math.log2(ratio);
-          useDJStore.getState().setDeckPitch(deckId, semitones);
+          store.setDeckPitch(deckId, semitones);
         }
       } else {
         if (!otherDeck.replayer.getSong()) return;
         const semitones = DJBeatSync.syncBPM(otherDeck, thisDeck);
-        useDJStore.getState().setDeckPitch(deckId, semitones);
+        store.setDeckPitch(deckId, semitones);
+      }
+
+      // Auto-play if this deck isn't playing yet
+      if (!thisState.isPlaying) {
+        thisDeck.play().then(() => {
+          useDJStore.getState().setDeckPlaying(deckId, true);
+        });
       }
     } catch {
       // Engine might not be initialized yet
