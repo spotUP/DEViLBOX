@@ -23,8 +23,6 @@ import { useSettingsStore } from '@stores/useSettingsStore';
 import { focusPopout } from '@components/ui/PopOutWindow';
 import { VJPresetBrowser } from './VJPresetBrowser';
 import { VJPatternOverlay } from './VJPatternOverlay';
-import { ISFCanvas, type ISFCanvasHandle } from './ISFCanvas';
-import { ThreeCanvas, type ThreeCanvasHandle } from './ThreeCanvas';
 
 // Lazy-load ProjectMCanvas (heavy WASM dependency)
 const ProjectMCanvas = React.lazy(() => import('./ProjectMCanvas').then(m => ({ default: m.ProjectMCanvas })));
@@ -292,7 +290,7 @@ const VJPatternOverlayWrapper: React.FC = () => {
 
 // ─── VJControls — DOM overlay controls (used by both DOM view + PixiDOMOverlay) ─
 
-export type VJLayer = 'milkdrop' | 'isf' | 'three' | 'projectm';
+export type VJLayer = 'milkdrop' | 'projectm';
 
 interface VJControlsProps {
   currentName: string;
@@ -396,22 +394,6 @@ export const VJControls: React.FC<VJControlsProps> = ({
                     Milkdrop
                   </button>
                   <button
-                    onClick={() => onSwitchLayer('isf')}
-                    className={`px-2 py-0.5 text-[10px] rounded transition-colors ${
-                      activeLayer === 'isf' ? 'bg-accent/60 text-white' : 'bg-white/10 text-white/50 hover:text-white/80'
-                    }`}
-                  >
-                    ISF
-                  </button>
-                  <button
-                    onClick={() => onSwitchLayer('three')}
-                    className={`px-2 py-0.5 text-[10px] rounded transition-colors ${
-                      activeLayer === 'three' ? 'bg-accent/60 text-white' : 'bg-white/10 text-white/50 hover:text-white/80'
-                    }`}
-                  >
-                    3D
-                  </button>
-                  <button
                     onClick={() => onSwitchLayer('projectm')}
                     className={`px-2 py-0.5 text-[10px] rounded transition-colors ${
                       activeLayer === 'projectm' ? 'bg-accent/60 text-white' : 'bg-white/10 text-white/50 hover:text-white/80'
@@ -511,8 +493,6 @@ interface VJViewProps {
 export const VJView: React.FC<VJViewProps> = ({ isPopout = false }) => {
   const vjViewActive = useUIStore((s) => s.activeView === 'vj') || isPopout;
   const canvasHandleRef = useRef<VJCanvasHandle>(null);
-  const isfHandleRef = useRef<ISFCanvasHandle>(null);
-  const threeHandleRef = useRef<ThreeCanvasHandle>(null);
   const projectmHandleRef = useRef<VJCanvasHandle>(null);
   const [activeLayer, setActiveLayer] = useState<VJLayer>('milkdrop');
   const [presetName, setPresetName] = useState('Loading...');
@@ -541,24 +521,21 @@ export const VJView: React.FC<VJViewProps> = ({ isPopout = false }) => {
     return () => document.removeEventListener('fullscreenchange', onChange);
   }, []);
 
-  // ISF state
-  const [isfPresetName, setISFPresetName] = useState('');
-  const [isfPresetIdx, setISFPresetIdx] = useState(0);
-  const [isfPresetCount, setISFPresetCount] = useState(0);
-
-  // Three.js state
-  const [threeSceneName, setThreeSceneName] = useState('');
-  const [threeSceneIdx, setThreeSceneIdx] = useState(0);
-  const [threeSceneCount, setThreeSceneCount] = useState(0);
-
   // projectM state
   const [pmPresetName, setPmPresetName] = useState('');
   const [pmPresetIdx, setPmPresetIdx] = useState(0);
   const [pmPresetCount, setPmPresetCount] = useState(0);
 
-  const currentName = activeLayer === 'milkdrop' ? presetName : activeLayer === 'isf' ? isfPresetName : activeLayer === 'projectm' ? pmPresetName : threeSceneName;
-  const currentIdx = activeLayer === 'milkdrop' ? presetIdx : activeLayer === 'isf' ? isfPresetIdx : activeLayer === 'projectm' ? pmPresetIdx : threeSceneIdx;
-  const currentCount = activeLayer === 'milkdrop' ? presetCount : activeLayer === 'isf' ? isfPresetCount : activeLayer === 'projectm' ? pmPresetCount : threeSceneCount;
+  // Stable callbacks for projectM (avoid inline arrows that change every render)
+  const handlePMReady = useCallback((count: number) => setPmPresetCount(count), []);
+  const handlePMPresetChange = useCallback((idx: number, name: string) => {
+    setPmPresetIdx(idx);
+    setPmPresetName(name);
+  }, []);
+
+  const currentName = activeLayer === 'milkdrop' ? presetName : pmPresetName;
+  const currentIdx = activeLayer === 'milkdrop' ? presetIdx : pmPresetIdx;
+  const currentCount = activeLayer === 'milkdrop' ? presetCount : pmPresetCount;
 
   const handlePresetChange = useCallback((idx: number, name: string) => {
     setPresetIdx(idx);
@@ -569,21 +546,31 @@ export const VJView: React.FC<VJViewProps> = ({ isPopout = false }) => {
     setPresetCount(count);
   }, []);
 
-  // Auto-advance timer
+  // Auto-advance timer — picks randomly from BOTH engines
   useEffect(() => {
     if (!autoAdvance) return;
-    const count = activeLayer === 'milkdrop' ? presetCount : activeLayer === 'isf' ? isfPresetCount : activeLayer === 'projectm' ? pmPresetCount : threeSceneCount;
-    if (count === 0) return;
+    const totalMD = presetCount;
+    const totalPM = pmPresetCount;
+    const total = totalMD + totalPM;
+    if (total === 0) return;
+
     const advance = () => {
-      if (activeLayer === 'milkdrop') canvasHandleRef.current?.nextPreset();
-      else if (activeLayer === 'isf') isfHandleRef.current?.nextPreset();
-      else if (activeLayer === 'projectm') projectmHandleRef.current?.nextPreset();
-      else threeHandleRef.current?.nextScene();
+      // Weighted random: pick engine proportional to preset count
+      const roll = Math.random() * total;
+      if (roll < totalMD && totalMD > 0) {
+        // Pick a random Milkdrop preset
+        if (activeLayer !== 'milkdrop') setActiveLayer('milkdrop');
+        canvasHandleRef.current?.randomPreset();
+      } else if (totalPM > 0) {
+        // Pick a random projectM preset
+        if (activeLayer !== 'projectm') setActiveLayer('projectm');
+        projectmHandleRef.current?.randomPreset();
+      }
       autoAdvanceTimerRef.current = setTimeout(advance, 15000 + Math.random() * 15000);
     };
     autoAdvanceTimerRef.current = setTimeout(advance, 15000 + Math.random() * 15000);
     return () => { if (autoAdvanceTimerRef.current) clearTimeout(autoAdvanceTimerRef.current); };
-  }, [autoAdvance, presetCount, isfPresetCount, threeSceneCount, pmPresetCount, activeLayer]);
+  }, [autoAdvance, presetCount, pmPresetCount, activeLayer]);
 
   const handlePopOut = useCallback(() => {
     const s = useUIStore.getState();
@@ -612,16 +599,12 @@ export const VJView: React.FC<VJViewProps> = ({ isPopout = false }) => {
 
   const handleNext = useCallback(() => {
     if (activeLayer === 'milkdrop') canvasHandleRef.current?.nextPreset();
-    else if (activeLayer === 'isf') isfHandleRef.current?.nextPreset();
-    else if (activeLayer === 'projectm') projectmHandleRef.current?.nextPreset();
-    else threeHandleRef.current?.nextScene();
+    else projectmHandleRef.current?.nextPreset();
   }, [activeLayer]);
 
   const handleRandom = useCallback(() => {
     if (activeLayer === 'milkdrop') canvasHandleRef.current?.randomPreset();
-    else if (activeLayer === 'isf') isfHandleRef.current?.randomPreset();
-    else if (activeLayer === 'projectm') projectmHandleRef.current?.randomPreset();
-    else threeHandleRef.current?.randomScene();
+    else projectmHandleRef.current?.randomPreset();
   }, [activeLayer]);
 
   return (
@@ -635,30 +618,13 @@ export const VJView: React.FC<VJViewProps> = ({ isPopout = false }) => {
           visible={vjViewActive && activeLayer === 'milkdrop'}
         />
       </div>
-      {/* ISF layer */}
-      <div className={`absolute inset-0 ${activeLayer === 'isf' ? '' : 'hidden'}`}>
-        <ISFCanvas
-          ref={isfHandleRef}
-          onReady={(count) => setISFPresetCount(count)}
-          onPresetChange={(idx, name) => { setISFPresetIdx(idx); setISFPresetName(name); }}
-          visible={vjViewActive && activeLayer === 'isf'}
-        />
-      </div>
-      {/* Three.js 3D layer */}
-      <div className={`absolute inset-0 ${activeLayer === 'three' ? '' : 'hidden'}`}>
-        <ThreeCanvas
-          ref={threeHandleRef}
-          onReady={(count) => setThreeSceneCount(count)}
-          onSceneChange={(idx, name) => { setThreeSceneIdx(idx); setThreeSceneName(name); }}
-        />
-      </div>
       {/* projectM WASM layer */}
       <div className={`absolute inset-0 ${activeLayer === 'projectm' ? '' : 'hidden'}`}>
         <React.Suspense fallback={<div className="w-full h-full bg-black flex items-center justify-center"><span className="text-white/50 font-mono text-sm">Loading projectM...</span></div>}>
           <ProjectMCanvas
             ref={projectmHandleRef}
-            onReady={(count) => setPmPresetCount(count)}
-            onPresetChange={(idx, name) => { setPmPresetIdx(idx); setPmPresetName(name); }}
+            onReady={handlePMReady}
+            onPresetChange={handlePMPresetChange}
             visible={vjViewActive && activeLayer === 'projectm'}
           />
         </React.Suspense>
@@ -681,16 +647,14 @@ export const VJView: React.FC<VJViewProps> = ({ isPopout = false }) => {
         isFullscreen={isFullscreen}
         browserOpen={browserOpen}
       />
-      {(activeLayer === 'milkdrop' || activeLayer === 'projectm') && (
-        <VJPresetBrowser
-          isOpen={browserOpen}
-          onClose={() => setBrowserOpen(false)}
-          onSelectPreset={activeLayer === 'projectm' ? handlePMBrowserSelect : handleBrowserSelect}
-          currentPresetIdx={activeLayer === 'projectm' ? pmPresetIdx : presetIdx}
-          currentPresetName={activeLayer === 'projectm' ? pmPresetName : undefined}
-          mode={activeLayer === 'projectm' ? 'projectm' : 'butterchurn'}
-        />
-      )}
+      <VJPresetBrowser
+        isOpen={browserOpen}
+        onClose={() => setBrowserOpen(false)}
+        onSelectPreset={activeLayer === 'projectm' ? handlePMBrowserSelect : handleBrowserSelect}
+        currentPresetIdx={activeLayer === 'projectm' ? pmPresetIdx : presetIdx}
+        currentPresetName={activeLayer === 'projectm' ? pmPresetName : undefined}
+        mode={activeLayer === 'projectm' ? 'projectm' : 'butterchurn'}
+      />
     </div>
   );
 };

@@ -12,6 +12,25 @@ import { immer } from 'zustand/middleware/immer';
 import { getToneEngine } from '../engine/ToneEngine';
 import { useFormatStore } from './useFormatStore';
 
+// Forward effective mute state to TrackerReplayer's channelMuteMask.
+// This is essential for WASM synth engines (FC, TFMX, etc.) whose audio
+// bypasses per-channel Tone.Channel nodes and routes through synthBus.
+function forwardReplayerMuteMask(channels: MixerChannelState[], isSoloing: boolean): void {
+  try {
+    // Lazy import to avoid circular deps
+    const { getTrackerReplayer } = require('../engine/TrackerReplayer');
+    const replayer = getTrackerReplayer();
+    let mask = 0;
+    for (let i = 0; i < Math.min(channels.length, 16); i++) {
+      const effectiveMute = isSoloing ? !channels[i].soloed : channels[i].muted;
+      if (!effectiveMute) mask |= (1 << i);
+    }
+    replayer.setChannelMuteMask(mask);
+  } catch {
+    // Replayer not initialized yet
+  }
+}
+
 // Lazy references to WASM engines to avoid circular imports
 let _furnaceDispatchEngine: any = null;
 function getFurnaceDispatchEngine(): any {
@@ -240,6 +259,7 @@ export const useMixerStore = create<MixerStore>()(
       });
       const { channels: chans, isSoloing: soloing } = get();
       forwardWasmChannelGain(ch, chans, soloing);
+      forwardReplayerMuteMask(chans, soloing);
     },
 
     setChannelSolo(ch: number, soloed: boolean): void {
@@ -258,6 +278,7 @@ export const useMixerStore = create<MixerStore>()(
         });
       });
       forwardAllWasmChannelGains(channels, isSoloing);
+      forwardReplayerMuteMask(channels, isSoloing);
     },
 
     setChannelEffect(ch: number, slot: 0 | 1, type: string | null): void {

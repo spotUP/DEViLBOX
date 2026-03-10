@@ -10,6 +10,7 @@
 
 import { useEffect, useRef, useCallback } from 'react';
 import { useKeyboardStore } from '@stores/useKeyboardStore';
+import { useUIStore } from '@stores/useUIStore';
 import { SchemeLoader } from '@engine/keyboard/SchemeLoader';
 import { CommandRegistry } from '@engine/keyboard/CommandRegistry';
 import { KeyboardNormalizer } from '@engine/keyboard/KeyboardNormalizer';
@@ -136,7 +137,6 @@ import {
 import { useTrackerStore } from '@stores/useTrackerStore';
 import { useEditorStore } from '@stores/useEditorStore';
 import { useCursorStore } from '@stores/useCursorStore';
-import { useUIStore } from '@stores/useUIStore';
 import { getToneEngine } from '@engine/ToneEngine';
 
 // Singleton registry - populated once with all available commands
@@ -808,6 +808,13 @@ export function useGlobalKeyboardHandler(options: UseGlobalKeyboardHandlerOption
     const handleKeyDown = (e: KeyboardEvent) => {
       // Skip if a Pixi pure-text input is focused (no DOM element to check)
       if ((window as any).__pixiInputFocused) return;
+
+      // Skip if a modal is open - let the modal handle keyboard events
+      // Exception: Escape key is allowed through so modals can close
+      const modalOpen = useUIStore.getState().modalOpen;
+      if (modalOpen && e.key !== 'Escape') {
+        return;
+      }
 
       // Skip if focus is inside a text input, contenteditable, or CodeMirror editor.
       // CodeMirror 6 uses a root div (.cm-editor) with tabindex but the contenteditable

@@ -67,6 +67,7 @@ export async function sendMessage(prompt: string): Promise<void> {
         prompt,
         context: gatherContext(),
         conversationId: store.conversationId,
+        provider: store.provider,
         model: store.model,
       }),
       signal: abort.signal,

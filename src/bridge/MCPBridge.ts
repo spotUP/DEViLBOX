@@ -401,26 +401,38 @@ function connect(): void {
     return;
   }
 
-  ws.onopen = () => {
-    console.log('[mcp-bridge] Connected to MCP relay');
-    backoffMs = INITIAL_BACKOFF_MS;
-    connectAttempts = 0;
+  let receivedMessage = false;
 
-    // Auto-dismiss the welcome modal so MCP agents can work immediately
-    try { dismissModal(); } catch { /* ignore if store not ready */ }
+  ws.onopen = () => {
+    if (connectAttempts === 0) {
+      console.log('[mcp-bridge] Connected to MCP relay');
+    }
   };
 
   ws.onmessage = (event) => {
+    // Only reset backoff when we actually receive a message (real MCP server is connected)
+    if (!receivedMessage) {
+      receivedMessage = true;
+      backoffMs = INITIAL_BACKOFF_MS;
+      connectAttempts = 0;
+      console.log('[mcp-bridge] MCP server active');
+    }
     handleMessage(typeof event.data === 'string' ? event.data : event.data.toString());
   };
 
   ws.onclose = () => {
     connectAttempts++;
-    if (connectAttempts <= 2) {
+    if (connectAttempts === 1) {
       console.log('[mcp-bridge] MCP relay not available, will retry in background');
     }
     ws = null;
-    scheduleReconnect();
+    if (!receivedMessage) {
+      // Connection succeeded but no messages — relay exists but MCP server isn't connected
+      // Use longer backoff to avoid churning
+      scheduleReconnect();
+    } else {
+      scheduleReconnect();
+    }
   };
 
   ws.onerror = () => {

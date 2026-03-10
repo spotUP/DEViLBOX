@@ -89,7 +89,7 @@ export default defineConfig({
   },
   resolve: {
     // Force single instances of Pixi packages to prevent pixi-react instanceof failures
-    dedupe: ['pixi.js', '@pixi/react', '@pixi/layout', '@pixi/ui'],
+    dedupe: ['react', 'react-dom', 'pixi.js', '@pixi/react', '@pixi/layout', '@pixi/ui'],
     alias: {
       '@': path.resolve(__dirname, './src'),
       '@components': path.resolve(__dirname, './src/components'),
@@ -108,7 +108,7 @@ export default defineConfig({
     exclude: ['chiptune3'],
     // Pre-bundle @dnd-kit packages upfront so lazy-loaded components that use
     // them don't trigger a runtime re-optimization (504 Outdated Optimize Dep).
-    include: ['@dnd-kit/core', '@dnd-kit/sortable', '@dnd-kit/utilities'],
+    include: ['react', 'react-dom', '@dnd-kit/core', '@dnd-kit/sortable', '@dnd-kit/utilities'],
     // Don't scan Reference Code folder for dependencies
     entries: ['src/**/*.{ts,tsx,js,jsx}'],
   },

@@ -6,13 +6,44 @@
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
 
-export type AIModel = 'haiku' | 'sonnet' | 'opus';
+// --- Provider + Model definitions ---
 
-export const AI_MODELS: { id: AIModel; label: string; description: string }[] = [
-  { id: 'haiku',  label: 'Haiku',  description: 'Fast & cheap' },
-  { id: 'sonnet', label: 'Sonnet', description: 'Balanced' },
-  { id: 'opus',   label: 'Opus',   description: 'Most capable' },
+export type AIProvider = 'claude' | 'copilot';
+
+export interface AIModelDef {
+  id: string;
+  label: string;
+  description: string;
+  provider: AIProvider;
+}
+
+export const AI_PROVIDERS: { id: AIProvider; label: string }[] = [
+  { id: 'claude',  label: 'Claude' },
+  { id: 'copilot', label: 'Copilot' },
 ];
+
+export const AI_MODELS: AIModelDef[] = [
+  // Claude models
+  { id: 'haiku',  label: 'Haiku',  description: 'Fast & cheap',   provider: 'claude' },
+  { id: 'sonnet', label: 'Sonnet', description: 'Balanced',       provider: 'claude' },
+  { id: 'opus',   label: 'Opus',   description: 'Most capable',   provider: 'claude' },
+  // Copilot models (Haiku first = default)
+  { id: 'claude-haiku-4.5',  label: 'Haiku',  description: 'Fast via Copilot',    provider: 'copilot' },
+  { id: 'claude-sonnet-4.6', label: 'Sonnet', description: 'Claude via Copilot',  provider: 'copilot' },
+  { id: 'claude-opus-4.6',   label: 'Opus',   description: 'Premium via Copilot', provider: 'copilot' },
+  { id: 'gpt-4.1',           label: 'GPT-4.1',    description: 'OpenAI via Copilot',  provider: 'copilot' },
+];
+
+export function getModelsForProvider(provider: AIProvider): AIModelDef[] {
+  return AI_MODELS.filter((m) => m.provider === provider);
+}
+
+export function getDefaultModel(provider: AIProvider): string {
+  const models = getModelsForProvider(provider);
+  return models[0]?.id || 'haiku';
+}
+
+// --- Messages ---
 
 export interface AIToolCall {
   tool: string;
@@ -35,7 +66,8 @@ interface AIState {
   isStreaming: boolean;
   conversationId: string | null;
   error: string | null;
-  model: AIModel;
+  provider: AIProvider;
+  model: string;
 }
 
 interface AIActions {
@@ -51,7 +83,8 @@ interface AIActions {
   addToolCall: (messageId: string, toolCall: AIToolCall) => void;
   addToolResult: (messageId: string, tool: string, result: string) => void;
   finalizeAssistantMessage: (messageId: string) => void;
-  setModel: (model: AIModel) => void;
+  setProvider: (provider: AIProvider) => void;
+  setModel: (model: string) => void;
   clearHistory: () => void;
 }
 
@@ -62,7 +95,8 @@ export const useAIStore = create<AIState & AIActions>()(
     isStreaming: false,
     conversationId: null,
     error: null,
-    model: 'haiku' as AIModel,
+    provider: 'copilot' as AIProvider,
+    model: 'claude-haiku-4.5',
 
     toggle: () => set((s) => { s.isOpen = !s.isOpen; }),
     open: () => set((s) => { s.isOpen = true; }),
@@ -72,6 +106,14 @@ export const useAIStore = create<AIState & AIActions>()(
     setConversationId: (id) => set((s) => { s.conversationId = id; }),
     setError: (error) => set((s) => { s.error = error; }),
     setModel: (model) => set((s) => { s.model = model; }),
+
+    setProvider: (provider) => set((s) => {
+      s.provider = provider;
+      // Auto-switch to default model for the new provider
+      s.model = getDefaultModel(provider);
+      // Clear conversation when switching providers
+      s.conversationId = null;
+    }),
 
     addUserMessage: (content) => {
       const id = crypto.randomUUID();
