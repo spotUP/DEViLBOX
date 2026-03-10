@@ -56,7 +56,7 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose }) =
 
   useEffect(() => {
     getModlandStatus().then(setStatus).catch(() => {});
-    getModlandFormats().then(setFormats).catch(() => {});
+    getModlandFormats().then(fmts => setFormats(fmts.sort((a, b) => a.format.localeCompare(b.format)))).catch(() => {});
     // Auto-focus search input
     requestAnimationFrame(() => inputRef.current?.focus());
   }, []);
