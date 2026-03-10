@@ -8,6 +8,7 @@
 import React, { useState, useEffect } from 'react';
 import { Cpu } from 'lucide-react';
 import { Button } from '@components/ui/Button';
+import { useModalClose } from '@hooks/useDialogKeyboard';
 
 interface InstrumentPreview {
   name: string;
@@ -53,6 +54,7 @@ export const ImportInstrumentDialog: React.FC<ImportInstrumentDialogProps> = ({
   onConfirm,
   onCancel,
 }) => {
+  useModalClose({ isOpen, onClose: onCancel });
   const [preview, setPreview] = useState<InstrumentPreview | null>(null);
   const [error, setError]     = useState<string | null>(null);
 

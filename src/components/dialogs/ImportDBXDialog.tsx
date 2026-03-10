@@ -8,6 +8,7 @@
 import React, { useState, useEffect } from 'react';
 import { FolderOpen, Music, Layers, Cpu, User, Clock } from 'lucide-react';
 import { Button } from '@components/ui/Button';
+import { useModalClose } from '@hooks/useDialogKeyboard';
 
 interface DBXPreview {
   name: string;
@@ -31,6 +32,7 @@ export const ImportDBXDialog: React.FC<ImportDBXDialogProps> = ({
   onConfirm,
   onCancel,
 }) => {
+  useModalClose({ isOpen, onClose: onCancel });
   const [preview, setPreview] = useState<DBXPreview | null>(null);
   const [error, setError]     = useState<string | null>(null);
 

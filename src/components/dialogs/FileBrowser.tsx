@@ -12,6 +12,7 @@ import '@cubone/react-file-manager/dist/style.css';
 import { hasElectronFS } from '@utils/electron';
 import { useFileNavigation, isTrackerModule, type FileSource, getLastFileSource, setLastFileSource } from './useFileNavigation';
 import { ModlandPanel, HVSCPanel } from './FilePreviewPanel';
+import { useModalClose } from '@hooks/useDialogKeyboard';
 
 interface FileBrowserProps {
   isOpen: boolean;
@@ -33,6 +34,7 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
   currentProjectData,
   suggestedFilename = 'untitled.dbx',
 }) => {
+  useModalClose({ isOpen, onClose });
   const [fileSource, _setFileSource] = useState<FileSource>(getLastFileSource);
   const setFileSource = (s: FileSource) => { setLastFileSource(s); _setFileSource(s); };
   const modalRef = useRef<HTMLDivElement>(null);

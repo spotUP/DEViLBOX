@@ -4,6 +4,7 @@
 
 import React, { useState, useCallback } from 'react';
 import { Dices, AlertTriangle, RefreshCw, X } from 'lucide-react';
+import { useModalClose } from '@hooks/useDialogKeyboard';
 import { useTrackerStore } from '@stores';
 import { ALL_SCALES, getScaleName, noteNameToMidi, type Scale } from '@lib/generators/acidPatternGenerator';
 import { midiToXMNote } from '@lib/xmConversions';
@@ -144,6 +145,7 @@ export const RandomizeDialog: React.FC<RandomizeDialogProps> = ({
   channelIndex: initialChannelIndex,
   onClose,
 }) => {
+  useModalClose({ isOpen: true, onClose });
   const { patterns, currentPatternIndex, setChannelRows } = useTrackerStore();
   const currentPattern = patterns[currentPatternIndex];
 

@@ -24,6 +24,7 @@ import { parseSIDHeader, type SIDHeaderInfo } from '@/lib/sid/SIDHeaderParser';
 import { SIDInfoPanel } from './SIDInfoPanel';
 import { getFormatCapabilities, type FormatCapabilityInfo } from '@lib/import/FormatCapabilities';
 import { Info } from 'lucide-react';
+import { useModalClose } from '@hooks/useDialogKeyboard';
 
 export interface ImportOptions {
   useLibopenmpt: boolean;     // Use libopenmpt for sample-accurate playback
@@ -94,6 +95,7 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
   initialFile,
   companionFiles,
 }) => {
+  useModalClose({ isOpen, onClose });
   const [moduleInfo, setModuleInfo]     = useState<ModuleInfo | null>(null);
   const [loadedFileName, setLoadedFileName] = useState('');
   const [isLoading, setIsLoading]       = useState(false);

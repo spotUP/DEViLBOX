@@ -6,6 +6,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { History, X, RotateCcw, Trash2 } from 'lucide-react';
 import { listLocalRevisions, loadLocalRevision, deleteLocalRevision, type LocalRevision } from '@hooks/useProjectPersistence';
 import { notify } from '@stores/useNotificationStore';
+import { useModalClose } from '@hooks/useDialogKeyboard';
 
 interface RevisionBrowserDialogProps {
   isOpen: boolean;
@@ -13,6 +14,7 @@ interface RevisionBrowserDialogProps {
 }
 
 export const RevisionBrowserDialog: React.FC<RevisionBrowserDialogProps> = ({ isOpen, onClose }) => {
+  useModalClose({ isOpen, onClose });
   const [revisions, setRevisions] = useState<LocalRevision[]>([]);
   const [loading, setLoading] = useState(false);
   const [confirmRestore, setConfirmRestore] = useState<number | null>(null);
