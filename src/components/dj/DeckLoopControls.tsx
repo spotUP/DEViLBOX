@@ -157,14 +157,14 @@ export const DeckLoopControls: React.FC<DeckLoopControlsProps> = ({ deckId }) =>
           <button
             onClick={handleSetLoopIn}
             className={`
-              flex-1 flex items-center justify-center font-mono font-bold
+              flex items-center justify-center font-mono font-bold
               transition-all duration-75 select-none rounded-l-sm
               ${audioLoopIn !== null
                 ? 'bg-cyan-700/60 text-cyan-200'
                 : 'bg-dark-bgTertiary text-text-muted hover:bg-dark-bgHover hover:text-text-secondary'
               }
             `}
-            style={{ height: 40, fontSize: 10, minWidth: 36 }}
+            style={{ height: 40, fontSize: 10, width: 28, minWidth: 28 }}
             title={audioLoopIn !== null ? `Loop IN: ${formatSec(audioLoopIn)}` : 'Set loop IN at current position'}
           >
             IN
@@ -172,14 +172,14 @@ export const DeckLoopControls: React.FC<DeckLoopControlsProps> = ({ deckId }) =>
           <button
             onClick={handleSetLoopOut}
             className={`
-              flex-1 flex items-center justify-center font-mono font-bold
+              flex items-center justify-center font-mono font-bold
               transition-all duration-75 select-none
               ${audioLoopOut !== null
                 ? 'bg-cyan-700/60 text-cyan-200'
                 : 'bg-dark-bgTertiary text-text-muted hover:bg-dark-bgHover hover:text-text-secondary'
               }
             `}
-            style={{ height: 40, fontSize: 10, minWidth: 36 }}
+            style={{ height: 40, fontSize: 10, width: 32, minWidth: 32 }}
             title={audioLoopOut !== null ? `Loop OUT: ${formatSec(audioLoopOut)}` : 'Set loop OUT at current position'}
           >
             OUT

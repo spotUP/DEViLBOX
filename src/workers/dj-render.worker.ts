@@ -103,39 +103,47 @@ function isHivelyFormat(filename: string): boolean {
 // ── UADE Engine State ────────────────────────────────────────────────────────
 
 let uadeWasm: WebAssembly.Module | null = null;
+let uadeWasmBinary: ArrayBuffer | null = null;
+let uadeJsCode: string | null = null;
 let uadeReady = false;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let uadeInstance: any = null;
 
-async function initUADE(): Promise<void> {
-  if (uadeReady) return;
+async function initUADE(forceReinit = false): Promise<void> {
+  if (uadeReady && !forceReinit) return;
 
   const baseUrl = self.location.origin;
-  const [wasmResponse, jsResponse] = await Promise.all([
-    fetch(`${baseUrl}/uade/UADE.wasm`),
-    fetch(`${baseUrl}/uade/UADE.js`),
-  ]);
+  
+  // Cache the WASM binary and JS code, but always create a fresh instance
+  if (!uadeWasmBinary || !uadeJsCode) {
+    const [wasmResponse, jsResponse] = await Promise.all([
+      fetch(`${baseUrl}/uade/UADE.wasm`),
+      fetch(`${baseUrl}/uade/UADE.js`),
+    ]);
 
-  const wasmBinary = await wasmResponse.arrayBuffer();
-  let jsCode = await jsResponse.text();
+    uadeWasmBinary = await wasmResponse.arrayBuffer();
+    let jsCode = await jsResponse.text();
 
-  // Transform Emscripten glue for worker scope (same pattern as UADEEngine.ts)
-  jsCode = jsCode.replace(/import\.meta\.url/g, `"${baseUrl}/uade/UADE.js"`);
-  jsCode = jsCode.replace(/export\s+default\s+/g, 'var createUADE = ');
-  jsCode = jsCode.replace(/export\s*\{[^}]*\}/g, '');
+    // Transform Emscripten glue for worker scope (same pattern as UADEEngine.ts)
+    jsCode = jsCode.replace(/import\.meta\.url/g, `"${baseUrl}/uade/UADE.js"`);
+    jsCode = jsCode.replace(/export\s+default\s+/g, 'var createUADE = ');
+    jsCode = jsCode.replace(/export\s*\{[^}]*\}/g, '');
 
-  // Fix environment detection and mock document for worker scope
-  jsCode = jsCode.replace(/ENVIRONMENT_IS_WEB\s*=\s*!0/g, 'ENVIRONMENT_IS_WEB=false');
-  jsCode = jsCode.replace(/ENVIRONMENT_IS_WORKER\s*=\s*!1/g, 'ENVIRONMENT_IS_WORKER=true');
-  jsCode = 'var document = { currentScript: { src: "' + baseUrl + '/uade/UADE.js" }, title: "" };\n' + jsCode;
+    // Fix environment detection and mock document for worker scope
+    jsCode = jsCode.replace(/ENVIRONMENT_IS_WEB\s*=\s*!0/g, 'ENVIRONMENT_IS_WEB=false');
+    jsCode = jsCode.replace(/ENVIRONMENT_IS_WORKER\s*=\s*!1/g, 'ENVIRONMENT_IS_WORKER=true');
+    jsCode = 'var document = { currentScript: { src: "' + baseUrl + '/uade/UADE.js" }, title: "" };\n' + jsCode;
+    
+    uadeJsCode = jsCode;
+  }
 
-  // Execute the glue code to get factory function (same pattern as worklet)
+  // Execute the glue code to get factory function - always fresh execution
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const factory = new Function(jsCode + '\n;return typeof createUADE !== "undefined" ? createUADE : Module;')();
+  const factory = new Function(uadeJsCode + '\n;return typeof createUADE !== "undefined" ? createUADE : Module;')();
 
-  // Instantiate UADE WASM
+  // Instantiate UADE WASM with a COPY of the binary (ensures fresh memory)
   uadeInstance = await factory({
-    wasmBinary,
+    wasmBinary: uadeWasmBinary.slice(0), // Clone to ensure fresh instantiation
     print: (msg: string) => console.log('[DJRenderWorker/UADE]', msg),
     printErr: (msg: string) => console.warn('[DJRenderWorker/UADE]', msg),
   });
@@ -146,9 +154,10 @@ async function initUADE(): Promise<void> {
     throw new Error(`uade_wasm_init failed with code ${initRet}`);
   }
 
-  // Store for reuse
-  uadeWasm = await WebAssembly.compile(wasmBinary);
-  void uadeWasm; // keep reference alive
+  // Store compiled module for reference
+  if (!uadeWasm) {
+    uadeWasm = await WebAssembly.compile(uadeWasmBinary);
+  }
   uadeReady = true;
   console.log('[DJRenderWorker] UADE engine initialized');
 }
@@ -163,7 +172,7 @@ async function renderWithUADE(
   // gets corrupted after a render cycle and cannot be reused.
   uadeReady = false;
   uadeInstance = null;
-  await initUADE();
+  await initUADE(true); // Force complete reinitialization
   const wasm = uadeInstance;
 
   // Root cause fix: aggressive filename sanitization. 
@@ -194,26 +203,46 @@ async function renderWithUADE(
   let loadResult = wasm._uade_wasm_load(filePtr, fileSize, fnamePtr);
   
   if (loadResult !== 0) {
-    console.warn(`[DJRenderWorker/UADE] First load failed (${loadResult}), attempting IPC buffer clear and retry...`);
-    // Clear IPC state
-    if (wasm._uade_wasm_stop) wasm._uade_wasm_stop();
-    const dummyL = wasm._malloc(1024 * 4);
-    const dummyR = wasm._malloc(1024 * 4);
-    for (let i = 0; i < 3; i++) wasm._uade_wasm_render(dummyL, dummyR, 1024);
-    wasm._free(dummyL);
-    wasm._free(dummyR);
+    console.warn(`[DJRenderWorker/UADE] First load failed (${loadResult}), force reinit and retry...`);
+    // Force complete reinitialization - IPC buffers are corrupted
+    wasm._free(filePtr);
+    wasm._free(fnamePtr);
+    uadeReady = false;
+    uadeInstance = null;
+    await initUADE(true);
+    const wasm2 = uadeInstance;
     
-    // Final attempt
-    loadResult = wasm._uade_wasm_load(filePtr, fileSize, fnamePtr);
+    // Reallocate and retry
+    const filePtr2 = wasm2._malloc(fileSize);
+    wasm2.HEAPU8.set(fileBytes, filePtr2);
+    const fnamePtr2 = wasm2._malloc(fnameLen);
+    wasm2.stringToUTF8(safeFilename, fnamePtr2, fnameLen);
+    
+    loadResult = wasm2._uade_wasm_load(filePtr2, fileSize, fnamePtr2);
+    wasm2._free(filePtr2);
+    wasm2._free(fnamePtr2);
+    
+    if (loadResult !== 0) {
+      throw new Error(`UADE failed to load ${safeFilename} (error: ${loadResult})`);
+    }
+    
+    // Continue with the new wasm instance
+    return renderWithUADEContinue(wasm2, safeFilename, subsong, id);
   }
 
   wasm._free(filePtr);
   wasm._free(fnamePtr);
 
-  if (loadResult !== 0) {
-    throw new Error(`UADE failed to load ${safeFilename} (error: ${loadResult})`);
-  }
+  return renderWithUADEContinue(wasm, safeFilename, subsong, id);
+}
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function renderWithUADEContinue(
+  wasm: any,
+  safeFilename: string,
+  subsong: number,
+  id: string,
+): Promise<{ left: Float32Array; right: Float32Array; sampleRate: number }> {
   // Set subsong if specified
   if (subsong > 0) {
     wasm._uade_wasm_set_subsong(subsong);

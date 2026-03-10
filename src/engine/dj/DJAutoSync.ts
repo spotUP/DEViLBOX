@@ -183,6 +183,72 @@ export function onNextDownbeat(deckId: DeckId, callback: () => void): () => void
   return () => clearTimeout(timer);
 }
 
+/**
+ * Quantized play: Start playback of a deck on the next beat/bar boundary of
+ * the master deck (the other playing deck). This makes mixing much easier!
+ * 
+ * @param deckId - The deck to start playing
+ * @param mode - 'beat' for next beat, 'bar' for next downbeat (recommended)
+ * @returns Promise that resolves when playback starts, or immediately if no master
+ */
+export async function quantizedPlay(
+  deckId: DeckId,
+  mode: 'beat' | 'bar' = 'bar',
+): Promise<void> {
+  const store = useDJStore.getState();
+  const otherDeckId: DeckId = deckId === 'A' ? 'B' : deckId === 'B' ? 'A' : 'A';
+  const otherDeck = store.decks[otherDeckId];
+  
+  // If other deck isn't playing or doesn't have a beat grid, just play immediately
+  if (!otherDeck.isPlaying || !otherDeck.beatGrid) {
+    const engine = getDJEngine();
+    const deck = engine.getDeck(deckId);
+    await deck.play();
+    store.setDeckPlaying(deckId, true);
+    return;
+  }
+  
+  // Sync BPM first (this also sets up the pitch)
+  syncBPMToOther(deckId, otherDeckId);
+  
+  // Calculate delay until the next beat/bar boundary of the playing deck
+  const delay = mode === 'bar' 
+    ? timeToNextDownbeat(otherDeckId) 
+    : timeToNextBeat(otherDeckId);
+  
+  // If delay is very short (< 50ms), wait for the NEXT boundary instead
+  // This prevents starting mid-beat due to timing jitter
+  const beatPeriod = 60 / (otherDeck.beatGrid.bpm || 120);
+  const barPeriod = beatPeriod * (otherDeck.beatGrid.timeSignature || 4);
+  const period = mode === 'bar' ? barPeriod : beatPeriod;
+  const effectiveDelay = delay < 0.05 ? delay + period : delay;
+  
+  // Set a pending state for visual feedback (optional)
+  console.log(`[DJAutoSync] Quantized play: waiting ${(effectiveDelay * 1000).toFixed(0)}ms for ${mode}`);
+  
+  return new Promise((resolve) => {
+    setTimeout(async () => {
+      try {
+        const engine = getDJEngine();
+        const deck = engine.getDeck(deckId);
+        
+        // Phase-align just before starting so we're perfectly in sync
+        const thisDeckState = useDJStore.getState().decks[deckId];
+        if (thisDeckState.beatGrid) {
+          phaseAlign(deckId, otherDeckId, mode);
+        }
+        
+        await deck.play();
+        useDJStore.getState().setDeckPlaying(deckId, true);
+        resolve();
+      } catch (err) {
+        console.warn('[DJAutoSync] Quantized play failed:', err);
+        resolve();
+      }
+    }, effectiveDelay * 1000);
+  });
+}
+
 // ── Exported helpers (used by UI components) ─────────────────────────────────
 
 export { type PhaseInfo };

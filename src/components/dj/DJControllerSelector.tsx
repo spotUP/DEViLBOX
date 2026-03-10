@@ -51,7 +51,7 @@ export const DJControllerSelector: React.FC = () => {
     <select
       value={selectedId}
       onChange={handleChange}
-      className="px-2 py-1 text-[10px] font-mono bg-dark-bgTertiary text-text-secondary border border-dark-border rounded hover:bg-dark-bgHover transition-colors cursor-pointer"
+      className="px-3 py-1.5 text-xs font-mono bg-dark-bgTertiary text-text-secondary border border-dark-border rounded hover:bg-dark-bgHover transition-colors cursor-pointer"
       title="Select DJ controller for MIDI mapping"
     >
       <option value="">Controller: None</option>

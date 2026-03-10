@@ -8,6 +8,7 @@
 import React, { useRef, useEffect, useCallback } from 'react';
 import { useDJStore } from '@/stores/useDJStore';
 import { useThemeStore } from '@stores';
+import { markSeek } from './seekGuard';
 import { getDJEngine } from '@/engine/dj/DJEngine';
 import { OffscreenBridge } from '@engine/renderer/OffscreenBridge';
 import OverviewWorkerFactory from '@/workers/dj-overview.worker.ts?worker';
@@ -132,6 +133,7 @@ export const DeckTrackOverview: React.FC<DeckTrackOverviewProps> = ({ deckId }) 
       const deck = getDJEngine().getDeck(deckId);
       if (deck.playbackMode === 'audio') {
         const seekSec = f * (useDJStore.getState().decks[deckId].durationMs / 1000);
+        markSeek(deckId);
         deck.audioPlayer.seek(seekSec);
         useDJStore.getState().setDeckState(deckId, { audioPosition: seekSec, elapsedMs: seekSec * 1000 });
       } else {

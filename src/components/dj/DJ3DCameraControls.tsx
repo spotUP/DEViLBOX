@@ -142,7 +142,7 @@ export const CameraControlOverlay: React.FC<CameraControlOverlayProps> = ({
         onPointerMove={onDragMove}
         onPointerUp={onDragEnd}
         onPointerCancel={onDragEnd}
-      >🔄<br/>Orbit</div>
+      >Orbit</div>
       <div
         className={pad}
         title="Drag to pan"
@@ -150,7 +150,7 @@ export const CameraControlOverlay: React.FC<CameraControlOverlayProps> = ({
         onPointerMove={onDragMove}
         onPointerUp={onDragEnd}
         onPointerCancel={onDragEnd}
-      >✋<br/>Pan</div>
+      >Pan</div>
       <div
         className={pad}
         title="Drag up/down to zoom"
@@ -158,8 +158,8 @@ export const CameraControlOverlay: React.FC<CameraControlOverlayProps> = ({
         onPointerMove={onDragMove}
         onPointerUp={onDragEnd}
         onPointerCancel={onDragEnd}
-      >🔍<br/>Zoom</div>
-      <button className={btn} title="Reset camera" onClick={resetView}>⊙ Reset</button>
+      >Zoom</div>
+      <button className={btn} title="Reset camera" onClick={resetView}>Reset</button>
     </div>
   );
 };

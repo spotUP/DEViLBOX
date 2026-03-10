@@ -66,6 +66,14 @@ export interface PipelineResult {
     frequencyPeaks: number[][];
     rmsDb: number;
     peakDb: number;
+    genre: {
+      primary: string;
+      subgenre: string;
+      confidence: number;
+      mood: string;
+      energy: number;
+      danceability: number;
+    };
   } | null;
 }
 
@@ -415,6 +423,13 @@ export class DJPipeline {
           rmsDb,
           peakDb,
           trimGain,
+          // Genre from cache
+          genrePrimary: cached.genrePrimary ?? null,
+          genreSubgenre: cached.genreSubgenre ?? null,
+          genreConfidence: cached.genreConfidence ?? 0,
+          mood: cached.mood ?? null,
+          energy: cached.energy ?? 0.5,
+          danceability: cached.danceability ?? 0.5,
         });
       }
 
@@ -434,6 +449,14 @@ export class DJPipeline {
           frequencyPeaks: cached.frequencyPeaks ?? [],
           rmsDb: cached.rmsDb ?? -100,
           peakDb: cached.peakDb ?? -100,
+          genre: {
+            primary: cached.genrePrimary ?? 'Unknown',
+            subgenre: cached.genreSubgenre ?? 'Unknown',
+            confidence: cached.genreConfidence ?? 0,
+            mood: cached.mood ?? 'Unknown',
+            energy: cached.energy ?? 0.5,
+            danceability: cached.danceability ?? 0.5,
+          },
         },
       };
     }
@@ -639,6 +662,13 @@ export class DJPipeline {
           keyConfidence: analysis.keyConfidence,
           frequencyPeaks: analysis.frequencyPeaks,
           analysisVersion: 1,
+          // Genre classification
+          genrePrimary: analysis.genre.primary,
+          genreSubgenre: analysis.genre.subgenre,
+          genreConfidence: analysis.genre.confidence,
+          mood: analysis.genre.mood,
+          energy: analysis.genre.energy,
+          danceability: analysis.genre.danceability,
         });
       }
     } catch (err) {
@@ -671,6 +701,13 @@ export class DJPipeline {
           rmsDb: analysis.rmsDb,
           peakDb: analysis.peakDb,
           trimGain,
+          // Genre classification
+          genrePrimary: analysis.genre.primary,
+          genreSubgenre: analysis.genre.subgenre,
+          genreConfidence: analysis.genre.confidence,
+          mood: analysis.genre.mood,
+          energy: analysis.genre.energy,
+          danceability: analysis.genre.danceability,
         });
       } else {
         // Analysis failed but render succeeded
