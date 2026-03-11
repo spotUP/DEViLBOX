@@ -151,6 +151,21 @@ function App() {
     }
   }, [currentVersion.buildNumber, openModal]);
 
+  // Auto-join collab room from URL (e.g. ?collab=XXXXXX)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const collabCode = params.get('collab');
+    if (collabCode && collabCode.length >= 6) {
+      // Clean the URL so refreshing doesn't re-trigger
+      const url = new URL(window.location.href);
+      url.searchParams.delete('collab');
+      window.history.replaceState({}, '', url.pathname + url.search);
+      // Open the collab modal in join mode and auto-join
+      openModal('collaboration');
+      useCollaborationStore.getState().joinRoom(collabCode);
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Cloud sync: pull on login, push on local mutations
   useCloudSync();
   useEffect(() => { setupCloudSyncSubscribers(); }, []);
