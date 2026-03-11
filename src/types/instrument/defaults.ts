@@ -82,7 +82,7 @@ import type {
 // ============================================================================
 
 export interface InstrumentMetadata {
-  importedFrom?: 'MOD' | 'XM' | 'IT' | 'S3M' | 'FUR';
+  importedFrom?: 'MOD' | 'XM' | 'IT' | 'S3M' | 'FUR' | 'XRNS';
   originalEnvelope?: EnvelopePoints; // Preserved point-based volume envelope for FT2 processing
   panningEnvelope?: EnvelopePoints; // Preserved panning envelope for FT2 processing
   autoVibrato?: AutoVibrato; // Preserved auto-vibrato settings

@@ -543,7 +543,7 @@ function convertSampleToInstrument(
 
   // Create metadata
   const metadata: InstrumentMetadata = {
-    importedFrom: sourceFormat === 'FUR' || sourceFormat === 'DMF' ? 'FUR' : sourceFormat,
+    importedFrom: sourceFormat === 'FUR' || sourceFormat === 'DMF' ? 'FUR' : (sourceFormat === 'XRNS' ? 'XRNS' : sourceFormat),
     originalEnvelope: parentInstrument.volumeEnvelope,
     panningEnvelope: parentInstrument.panningEnvelope,
     autoVibrato: parentInstrument.autoVibrato,
