@@ -6,7 +6,7 @@
  * wet/dry, and inline parameter editing.
  */
 
-import React, { useState, useCallback, useImperativeHandle, forwardRef } from 'react';
+import React, { useState, useCallback, useImperativeHandle, forwardRef, useRef, useEffect } from 'react';
 import type { EffectConfig, AudioEffectType as EffectType } from '@typedefs/instrument';
 import { useInstrumentStore } from '@stores/useInstrumentStore';
 import { Plus, X, Search } from 'lucide-react';
@@ -34,6 +34,12 @@ export const InstrumentEffectsPanel = forwardRef<InstrumentEffectsPanelHandle, I
 }, ref) => {
   const [showBrowser, setShowBrowser] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Keep effects ref in sync to avoid stale closures in callbacks (critical for smooth knobs)
+  const effectsRef = useRef(effects);
+  useEffect(() => {
+    effectsRef.current = effects;
+  }, [effects]);
 
   useImperativeHandle(ref, () => ({
     toggleBrowser: () => setShowBrowser(prev => !prev),
@@ -78,24 +84,24 @@ export const InstrumentEffectsPanel = forwardRef<InstrumentEffectsPanelHandle, I
   }, [instrumentId, addEffectConfig]);
 
   const handleToggle = useCallback((effectId: string) => {
-    const effect = effects.find(fx => fx.id === effectId);
+    const effect = effectsRef.current.find(fx => fx.id === effectId);
     if (effect) {
       updateEffect(instrumentId, effectId, { enabled: !effect.enabled });
     }
-  }, [effects, instrumentId, updateEffect]);
+  }, [instrumentId, updateEffect]);
 
   const handleRemove = useCallback((effectId: string) => {
     removeEffect(instrumentId, effectId);
   }, [instrumentId, removeEffect]);
 
   const handleUpdateParameter = useCallback((effectId: string, key: string, value: number | string) => {
-    const effect = effects.find(fx => fx.id === effectId);
+    const effect = effectsRef.current.find(fx => fx.id === effectId);
     if (effect) {
       updateEffect(instrumentId, effectId, {
         parameters: { ...effect.parameters, [key]: value },
       });
     }
-  }, [effects, instrumentId, updateEffect]);
+  }, [instrumentId, updateEffect]);
 
   const handleUpdateWet = useCallback((effectId: string, wet: number) => {
     updateEffect(instrumentId, effectId, { wet });
