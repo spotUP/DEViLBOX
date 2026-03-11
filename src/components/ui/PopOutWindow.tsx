@@ -33,8 +33,6 @@ interface PopOutWindowProps {
   title?: string;
   width?: number;
   height?: number;
-  /** Auto-resize popup to fit rendered content (one-shot after first paint) */
-  fitContent?: boolean;
   children: React.ReactNode;
 }
 
@@ -44,7 +42,6 @@ export const PopOutWindow: React.FC<PopOutWindowProps> = ({
   title = 'DEViLBOX',
   width = 900,
   height = 600,
-  fitContent = false,
   children,
 }) => {
   const popupRef = useRef<Window | null>(null);
@@ -117,9 +114,6 @@ export const PopOutWindow: React.FC<PopOutWindowProps> = ({
     // Also set document.title directly for browsers that need it
     popup.document.title = title;
 
-    // Variables for cleanup
-    let resizeObserver: ResizeObserver | null = null;
-
     const mount = popup.document.getElementById('popout-root') as HTMLDivElement;
     if (!mount) {
       console.error('[PopOutWindow] Failed to find popout-root element');
@@ -152,65 +146,7 @@ export const PopOutWindow: React.FC<PopOutWindowProps> = ({
     requestAnimationFrame(() => {
       setMountEl(mount);
       setReady(true);
-      
-      // Auto-resize popup to fit content after React renders (opt-in)
-      // We delay this until after React has had time to render content
-      if (fitContent) {
-        // Wait for React to render content, then measure and resize
-        setTimeout(() => {
-          if (popup.closed) return;
-          const contentWidth = mount.scrollWidth;
-          const contentHeight = mount.scrollHeight;
-          console.log('[PopOutWindow] fitContent measuring:', contentWidth, 'x', contentHeight);
-          if (contentWidth > 0 && contentHeight > 0) {
-            // Account for window chrome (title bar, borders)
-            const chromeWidth = popup.outerWidth - popup.innerWidth;
-            const chromeHeight = popup.outerHeight - popup.innerHeight;
-            const targetW = contentWidth + chromeWidth + 20; // +20 for safety margin
-            const targetH = contentHeight + chromeHeight + 20;
-            // Re-center after resize
-            const newLeft = Math.round(screen.width / 2 - targetW / 2);
-            const newTop = Math.round(screen.height / 2 - targetH / 2);
-            popup.moveTo(Math.max(0, newLeft), Math.max(0, newTop));
-            popup.resizeTo(
-              Math.min(targetW, screen.availWidth),
-              Math.min(targetH, screen.availHeight)
-            );
-          }
-        }, 100); // Give React time to render
-      }
     });
-
-    // ResizeObserver for ongoing size changes (but skip initial since we handle that above)
-    if (fitContent) {
-      let initialSkipped = false;
-      resizeObserver = new ResizeObserver(() => {
-        if (!initialSkipped) {
-          initialSkipped = true;
-          return; // Skip initial observation, we handle that with setTimeout above
-        }
-        if (popup.closed) return;
-        requestAnimationFrame(() => {
-          if (popup.closed) return;
-          const contentWidth = mount.scrollWidth;
-          const contentHeight = mount.scrollHeight;
-          if (contentWidth > 0 && contentHeight > 0) {
-            const chromeWidth = popup.outerWidth - popup.innerWidth;
-            const chromeHeight = popup.outerHeight - popup.innerHeight;
-            const targetW = contentWidth + chromeWidth + 20;
-            const targetH = contentHeight + chromeHeight + 20;
-            const newLeft = Math.round(screen.width / 2 - targetW / 2);
-            const newTop = Math.round(screen.height / 2 - targetH / 2);
-            popup.moveTo(Math.max(0, newLeft), Math.max(0, newTop));
-            popup.resizeTo(
-              Math.min(targetW, screen.availWidth),
-              Math.min(targetH, screen.availHeight)
-            );
-          }
-        });
-      });
-      resizeObserver.observe(mount);
-    }
 
     // MutationObserver: mirror Vite HMR style injections during dev
     const observer = new MutationObserver((mutations) => {
@@ -269,7 +205,6 @@ export const PopOutWindow: React.FC<PopOutWindowProps> = ({
 
     // Cleanup on unmount (e.g. parent sets isOpen=false)
     return () => {
-      resizeObserver?.disconnect();
       observer.disconnect();
       closingRef.current = true;
       openPopouts.delete(title);
@@ -282,7 +217,7 @@ export const PopOutWindow: React.FC<PopOutWindowProps> = ({
       setMountEl(null);
       setReady(false);
     };
-  }, [isOpen, title, width, height, fitContent]);
+  }, [isOpen, title, width, height]);
 
   if (!isOpen || !ready || !mountEl) return null;
 
