@@ -221,7 +221,11 @@ export const TB303KnobPanel: React.FC = memo(() => {
       </div>
 
       {/* Full panel content — always in DOM, clipped when collapsed */}
-      <div ref={contentRef}>
+      <div ref={contentRef} style={{
+        opacity: tb303Collapsed ? 0 : 1,
+        transition: 'opacity 200ms ease',
+        pointerEvents: tb303Collapsed ? 'none' : 'auto',
+      }}>
         <ScrollLockContainer className="w-full">
           <JC303StyledKnobPanel
             key={targetInstrument.id}
