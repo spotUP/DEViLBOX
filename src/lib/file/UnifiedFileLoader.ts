@@ -395,6 +395,13 @@ export async function loadFile(
   try {
     // === SONG FORMATS (replace project) ===
     if (isSongFormat(filename)) {
+      // TD-3 pattern files need replace/append choice from user
+      if ((filename.endsWith('.sqs') || filename.endsWith('.seq')) && options.replacePatterns === undefined) {
+        const { useUIStore } = await import('@stores/useUIStore');
+        useUIStore.getState().setPendingTD3File(file);
+        return { success: 'pending-confirmation', file };
+      }
+
       // GoatTracker .sng files can be detected by magic bytes and always bypass
       // the confirmation dialog — they route directly to the GTUltra engine.
       if (filename.endsWith('.sng')) {
@@ -612,7 +619,10 @@ async function loadSongFile(file: File, options: FileLoadOptions): Promise<FileL
   if (isPlaying) stopTransport();
   engine.releaseAll();
 
-  if (!options.preserveInstruments) {
+  // TD-3 append mode: skip full reset — the TD-3 handler manages patterns itself
+  const isTD3Append = (filename.endsWith('.sqs') || filename.endsWith('.seq')) && options.replacePatterns === false;
+
+  if (!options.preserveInstruments && !isTD3Append) {
     resetAutomation();
     resetTransport();
     resetTracker();
