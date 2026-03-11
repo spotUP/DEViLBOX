@@ -208,6 +208,33 @@ export async function importTrackerModule(
         order: patternOrder.length > 0 ? patternOrder : [0],
         instrumentNames: parsedInstruments.map(i => i.name),
       };
+    } else if (format === 'XRNS') {
+      // XRNS patterns are already in the correct format from XRNSParser
+      const patternOrder = importMetadata.modData?.patternOrderTable || [];
+      const patLen = patterns[0]?.length || 64;
+      const numChannels = importMetadata.originalChannelCount || (patterns[0]?.[0] as unknown[] | undefined)?.length || 4;
+      result = {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        patterns: (patterns as any[]).map((pat: any[][], idx: number) => ({
+          id: `pattern-${idx}`, name: `Pattern ${idx}`, length: patLen, importMetadata,
+          channels: Array.from({ length: numChannels }, (_, ch) => ({
+            id: `channel-${ch}`, name: `Track ${ch + 1}`,
+            muted: false, solo: false, collapsed: false,
+            volume: 100, pan: 0, instrumentId: null, color: null,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            rows: pat.map((row: any[]) => {
+              const cell = row[ch] || {};
+              return {
+                note: cell.note || 0, instrument: cell.instrument || 0,
+                volume: cell.volume || 0, effTyp: cell.effTyp || 0,
+                eff: cell.eff || 0, effTyp2: 0, eff2: 0,
+              };
+            }),
+          })),
+        })),
+        order: patternOrder.length > 0 ? patternOrder : [0],
+        instrumentNames: parsedInstruments.map(i => i.name),
+      };
     } else {
       result = convertMODModule(
         patterns as any, importMetadata.originalChannelCount,
@@ -449,7 +476,7 @@ async function loadSongFile(file: File, options: FileLoadOptions): Promise<FileL
   // Loading an external song — prevent auto-save from overwriting user's saved project
   clearExplicitlySaved();
 
-  const { loadPatterns, setPatternOrder, setCurrentPattern } = useTrackerStore.getState();
+  const { loadPatterns, setPatternOrder, setCurrentPattern, reset: resetTracker } = useTrackerStore.getState();
   const { applyEditorMode } = useFormatStore.getState();
   const { loadInstruments, addInstrument, reset: resetInstruments } = useInstrumentStore.getState();
   const { setBPM, setGrooveTemplate, reset: resetTransport, isPlaying, stop: stopTransport } = useTransportStore.getState();
@@ -588,6 +615,7 @@ async function loadSongFile(file: File, options: FileLoadOptions): Promise<FileL
   if (!options.preserveInstruments) {
     resetAutomation();
     resetTransport();
+    resetTracker();
     resetInstruments();
     engine.disposeAllInstruments();
   }
