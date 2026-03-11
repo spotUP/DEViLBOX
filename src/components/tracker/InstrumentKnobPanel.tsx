@@ -40,10 +40,10 @@ const TAB_BAR_HEIGHT = 32;
 const TB303_EXPANDED_HEIGHT = 512;
 const GENERIC_EXPANDED_HEIGHT = 180;
 const SC_EXPANDED_HEIGHT = 140;
-const FX_PANEL_HEIGHT = 360; // FX panels get scrollable area
 
-function getExpandedHeight(synthType: SynthType | undefined, activeTab: PanelTab): number {
-  if (activeTab === 'instFx' || activeTab === 'masterFx') return FX_PANEL_HEIGHT;
+// For FX tabs, return null to signal "auto height"
+function getExpandedHeight(synthType: SynthType | undefined, activeTab: PanelTab): number | null {
+  if (activeTab === 'instFx' || activeTab === 'masterFx') return null;
   if (!synthType) return GENERIC_EXPANDED_HEIGHT;
   if (TB303_TYPES.includes(synthType)) return TB303_EXPANDED_HEIGHT;
   if (SC_TYPES.includes(synthType)) return SC_EXPANDED_HEIGHT;
@@ -567,17 +567,19 @@ export const InstrumentKnobPanel: React.FC = memo(() => {
   }
 
   // ─── Inline panel with collapse/expand animation ───────────────────────────
+  const isAutoHeight = expandedHeight === null;
+
   return (
     <div
       className="tb303-knob-panel"
       style={{
         position: 'relative',
         width: '100%',
-        height: tb303Collapsed ? `${COLLAPSED_HEIGHT}px` : `${expandedHeight}px`,
+        height: tb303Collapsed ? `${COLLAPSED_HEIGHT}px` : (isAutoHeight ? 'auto' : `${expandedHeight}px`),
         background: '#1a1a1a',
         borderTop: '1px solid #333',
         overflow: 'hidden',
-        transition: 'height 300ms cubic-bezier(0.4, 0, 0.2, 1)',
+        transition: isAutoHeight ? undefined : 'height 300ms cubic-bezier(0.4, 0, 0.2, 1)',
       }}
     >
       {/* Collapsed header — always visible */}
@@ -644,7 +646,7 @@ export const InstrumentKnobPanel: React.FC = memo(() => {
         pointerEvents: tb303Collapsed ? 'none' : 'auto',
         display: 'flex',
         flexDirection: 'column',
-        height: `${expandedHeight}px`,
+        ...(isAutoHeight ? {} : { height: `${expandedHeight}px` }),
       }}>
         {/* Tab bar */}
         <TabBar
