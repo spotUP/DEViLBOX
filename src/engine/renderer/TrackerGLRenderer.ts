@@ -209,6 +209,7 @@ export class TrackerGLRenderer {
     rowNormal:           [0,0,0,1] as [number,number,number,number],
     rowHighlight:        [0,0,0,1] as [number,number,number,number],
     centerLine:          [0,0,0,1] as [number,number,number,number],
+    rowCurrent:          [0,0,0,1] as [number,number,number,number],
     cursor:              [0,0,0,1] as [number,number,number,number],
     cursorSecondary:     [0,0,0,1] as [number,number,number,number],
     text:                [0,0,0,1] as [number,number,number,number],
@@ -395,6 +396,7 @@ export class TrackerGLRenderer {
       this.colors.rowNormal           = parseColor(theme.rowNormal);
       this.colors.rowHighlight        = parseColor(theme.rowHighlight);
       this.colors.centerLine          = parseRgba(theme.accentGlow);
+      this.colors.rowCurrent          = parseColor(theme.rowCurrent);
       this.colors.cursor              = parseColor(theme.accent);
       this.colors.cursorSecondary     = parseColor(theme.accentSecondary);
       this.colors.text                = parseColor(theme.textNote);
@@ -517,11 +519,10 @@ export class TrackerGLRenderer {
       }
     }
 
-    // Center line highlight
+    // Center line highlight — solid background using trackerRowCurrent
     {
-      const [r, g, b] = colors.centerLine;
-      const alpha = ui.trackerVisualBg ? 0.85 : 1;
-      this.addRect(0, centerLineTop, width, rowH, [r, g, b, alpha]);
+      const [r, g, b] = colors.rowCurrent;
+      this.addRect(0, centerLineTop, width, rowH, [r, g, b, 1]);
     }
 
     // Channel separators and left stripes (full height)

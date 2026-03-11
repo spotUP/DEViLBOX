@@ -846,6 +846,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       accent:              theme.colors.accent,
       accentSecondary:     theme.colors.accentSecondary,
       accentGlow:          theme.colors.accentGlow,
+      rowCurrent:          theme.colors.trackerRowCurrent,
       bg:                  theme.colors.trackerRowEven,
       rowNormal:           theme.colors.trackerRowOdd,
       rowHighlight:        theme.colors.trackerRowHighlight,
