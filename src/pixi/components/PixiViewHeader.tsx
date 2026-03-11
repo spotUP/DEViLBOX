@@ -7,26 +7,17 @@
  */
 
 import React, { useCallback } from 'react';
-import { useUIStore } from '@stores/useUIStore';
 import { usePixiTheme } from '../theme';
 import { PixiSelect, type SelectOption } from './PixiSelect';
 import { PixiLabel } from './PixiLabel';
+import { VIEW_OPTIONS, switchView } from '@/constants/viewOptions';
 
 export const VIEW_HEADER_HEIGHT = 36;
 
-const VIEW_MODE_OPTIONS: SelectOption[] = [
-  { value: 'tracker',     label: 'Tracker' },
-  { value: 'grid',        label: 'Grid' },
-  { value: 'pianoroll',   label: 'Piano Roll' },
-  { value: 'tb303',       label: 'TB-303' },
-  { value: 'arrangement', label: 'Arrangement' },
-  { value: 'dj',          label: 'DJ Mixer' },
-  { value: 'drumpad',     label: 'Drum Pads' },
-  { value: 'mixer',       label: 'Mixer' },
-  { value: 'vj',          label: 'VJ View' },
-  { value: 'studio',      label: 'Studio' },
-  { value: 'split',       label: 'Split View' },
-];
+const VIEW_MODE_OPTIONS: SelectOption[] = VIEW_OPTIONS.map(({ value, label }) => ({
+  value,
+  label,
+}));
 
 export interface PixiViewHeaderProps {
   /** Current view value for the selector dropdown */
@@ -48,17 +39,7 @@ export const PixiViewHeader: React.FC<PixiViewHeaderProps> = ({
   const theme = usePixiTheme();
 
   const defaultViewChange = useCallback((val: string) => {
-    if (val === activeView) return;
-    const store = useUIStore.getState();
-    // tracker/grid/tb303 are sub-modes of the tracker view
-    if (val === 'tracker' || val === 'grid' || val === 'tb303') {
-      setTimeout(() => {
-        store.setActiveView('tracker');
-        store.setTrackerViewMode(val as any);
-      }, 0);
-    } else {
-      setTimeout(() => store.setActiveView(val as any), 0);
-    }
+    switchView(val, activeView);
   }, [activeView]);
 
   const handleChange = onViewChange ?? defaultViewChange;
