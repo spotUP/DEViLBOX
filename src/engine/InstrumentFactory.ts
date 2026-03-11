@@ -40,6 +40,9 @@ import { VSTBridgeSynth } from './vstbridge/VSTBridgeSynth';
 import { SYNTH_REGISTRY } from './vstbridge/synth-registry';
 import { GearmulatorSynth } from './gearmulator/GearmulatorSynth';
 import { SynthRegistry } from './registry/SynthRegistry';
+import { WaveSabreSynth } from './wavesabre/WaveSabreSynth';
+import { OidosSynth } from './oidos/OidosSynth';
+import { TunefishSynth } from './tunefish/TunefishSynth';
 
 // Sub-factory imports
 import { VOLUME_NORMALIZATION_OFFSETS } from './factories/volumeNormalization';
@@ -713,6 +716,68 @@ export class InstrumentFactory {
           console.error('[InstrumentFactory] Gearmulator init failed:', err);
         });
         instrument = gmSynth;
+        break;
+      }
+
+      // WaveSabre demoscene synths (Falcon, Slaughter)
+      case 'WaveSabreSynth': {
+        const wsType = config.xrns?.synthType?.includes('slaughter') ? 'slaughter' : 'falcon';
+        const wsSynth = new WaveSabreSynth(wsType);
+        const wsVolDb = config.volume ?? -12;
+        // Apply XRNS parameters if available
+        if (config.xrns?.parameters) {
+          for (let i = 0; i < config.xrns.parameters.length; i++) {
+            wsSynth.setParameter?.(i, config.xrns.parameters[i]);
+          }
+        }
+        wsSynth.ensureInitialized().then(() => {
+          if (wsSynth.output) {
+            wsSynth.output.gain.value = Math.pow(10, wsVolDb / 20);
+          }
+        }).catch((err: unknown) => {
+          console.error('[InstrumentFactory] WaveSabre init failed:', err);
+        });
+        instrument = wsSynth;
+        break;
+      }
+
+      // Oidos demoscene synth
+      case 'OidosSynth': {
+        const oidosSynth = new OidosSynth();
+        const oidosVolDb = config.volume ?? -12;
+        // Apply XRNS parameters if available
+        if (config.xrns?.parameters) {
+          for (let i = 0; i < config.xrns.parameters.length; i++) {
+            oidosSynth.setParameter?.(i, config.xrns.parameters[i]);
+          }
+        }
+        oidosSynth.ensureInitialized().then(() => {
+          if (oidosSynth.output) {
+            oidosSynth.output.gain.value = Math.pow(10, oidosVolDb / 20);
+          }
+        }).catch((err: unknown) => {
+          console.error('[InstrumentFactory] Oidos init failed:', err);
+        });
+        instrument = oidosSynth;
+        break;
+      }
+
+      // Tunefish 4 demoscene synth
+      case 'TunefishSynth': {
+        const tunefishSynth = new TunefishSynth();
+        const tfVolDb = config.volume ?? -12;
+        // Apply XRNS parameters if available
+        if (config.xrns?.parameters) {
+          tunefishSynth.setParameters(config.xrns.parameters);
+        }
+        tunefishSynth.ensureInitialized().then(() => {
+          if (tunefishSynth.output) {
+            tunefishSynth.output.gain.value = Math.pow(10, tfVolDb / 20);
+          }
+        }).catch((err: unknown) => {
+          console.error('[InstrumentFactory] Tunefish init failed:', err);
+        });
+        instrument = tunefishSynth;
         break;
       }
 
