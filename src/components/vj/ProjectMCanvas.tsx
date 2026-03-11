@@ -221,7 +221,7 @@ export const ProjectMCanvas = React.forwardRef<VJCanvasHandle, ProjectMCanvasPro
       let sampleCtx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D | null = null;
       try {
         sampleCanvas = new OffscreenCanvas(1, 1);
-        sampleCtx = sampleCanvas.getContext('2d');
+        sampleCtx = sampleCanvas.getContext('2d', { willReadFrequently: true });
       } catch {
         // OffscreenCanvas not supported — skip stuck detection
       }
@@ -246,12 +246,12 @@ export const ProjectMCanvas = React.forwardRef<VJCanvasHandle, ProjectMCanvasPro
           engine.pushAudio(stereo, waveform.length);
           engine.renderFrame();
 
-          // Stuck detection — every ~15 frames (~0.25s), sample center pixel
+          // Stuck detection — every ~31 frames (~0.5s), sample center pixel
           // and detect alternation between exactly 2 hashes (the classic stuck/strobe symptom).
           frameCount++;
-          if (sampleCtx && canvas && (frameCount & 15) === 0) {
+          if (sampleCtx && canvas && (frameCount & 31) === 0) {
             const timeSinceLoad = performance.now() - presetLoadTimeRef.current;
-            if (timeSinceLoad > 2000) {
+            if (timeSinceLoad > 3000) {
               sampleCtx.drawImage(canvas, canvas.width >> 1, canvas.height >> 1, 1, 1, 0, 0, 1, 1);
               const px = sampleCtx.getImageData(0, 0, 1, 1).data;
               const hash = (px[0] << 16) | (px[1] << 8) | px[2];
@@ -266,8 +266,8 @@ export const ProjectMCanvas = React.forwardRef<VJCanvasHandle, ProjectMCanvasPro
                 alternatingCount = 0;
               }
 
-              // 4 consecutive matches = ~1 second stuck → force new preset
-              if (alternatingCount >= 4) {
+              // 6 consecutive matches = ~3 seconds stuck → force new preset
+              if (alternatingCount >= 6) {
                 alternatingCount = 0;
                 prevHash1 = 0;
                 prevHash2 = 0;
