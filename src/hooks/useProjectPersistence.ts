@@ -99,8 +99,12 @@ const safeCancelIdleCallback = cancelIdleCallbackPolyfill;
  * - 14: Clean initial state — no default instruments, no song. Tracker starts empty.
  * - 15: SuperCollider default now includes pre-compiled SynthDef binary so new
  *       instruments produce sound immediately without requiring sclang compilation.
+ * - 16: TB-303 defaults updated to match real 303 hardware:
+ *       accentDecay 0.006→0.057 (47ms→200ms), softAttack 0→0.25 (0.3ms→3ms),
+ *       normalDecay 0.164→0.404 (517ms→1230ms), slideTime 0.17→0.162 (63ms→60ms).
+ *       Previous values caused harsh/clicky accent sound.
  */
-const SCHEMA_VERSION = 15;
+const SCHEMA_VERSION = 16;
 
 interface SavedProject {
   version: string;

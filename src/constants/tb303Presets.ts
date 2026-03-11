@@ -12,16 +12,17 @@
 
 import type { InstrumentPreset } from '@typedefs/instrument';
 
-/** Shared Devil Fish defaults matching db303-local/default-preset.xml
- *  (the reference app loads this XML on init via loadDefaults → fetch("presets/default-preset.xml"))
+/** Shared Devil Fish defaults matching real TB-303 hardware values.
+ *  Conversions verified against JC303.cpp::setParameter() formulas.
+ *  Original 303 values from setDevilMod(false) in JC303.cpp.
  */
 const DF_DEFAULTS = {
   enabled: true,
   oversamplingOrder: 2 as const,  // 4x oversampling — MUST be set (type: 0|1|2|3|4)
   filterSelect: 0,                // 0=DiodeLadder (only valid: 0 or 5=Korg). Reference init uses 0.
-  normalDecay: 0.164,             // default-preset.xml: 0.164
-  accentDecay: 0.006,             // default-preset.xml: 0.006 — CRITICAL for acid screams
-  softAttack: 0,                  // default-preset.xml: 0
+  normalDecay: 0.404,             // Real 303: 1230ms. Formula: linToLin(v, 0, 1, 30, 3000)
+  accentDecay: 0.057,             // Real 303: 200ms (FIXED). Formula: linToLin(v, 0, 1, 30, 3000)
+  softAttack: 0.25,               // Real 303: 3ms. Formula: linToExp(v, 0, 1, 0.3, 3000)
   accentSoftAttack: 0.1,          // default-preset.xml: 0.1
   passbandCompensation: 0.09,     // default-preset.xml: 0.09. App inverts → WASM 0.91
   resTracking: 0.257,             // default-preset.xml: 0.743 (inverted on read: 1-0.743=0.257). App inverts → WASM 0.743
@@ -55,7 +56,7 @@ export const TB303_PRESETS: InstrumentPreset['config'][] = [
       filter: { cutoff: 0.5, resonance: 0.5 },
       filterEnvelope: { envMod: 0.5, decay: 0.5 },
       accent: { amount: 0.5 },
-      slide: { time: 0.17, mode: 'exponential' },
+      slide: { time: 0.162, mode: 'exponential' },
       devilFish: { ...DF_DEFAULTS, normalDecay: 0.5 },
       lfo: { waveform: 0, rate: 0, contour: 0, pitchDepth: 0, pwmDepth: 0, filterDepth: 0 },
       chorus: { enabled: false, mode: 0, mix: 0.5 },
@@ -78,7 +79,7 @@ export const TB303_PRESETS: InstrumentPreset['config'][] = [
       filter: { cutoff: 0.4, resonance: 0.65 },
       filterEnvelope: { envMod: 0.6, decay: 0.3 },
       accent: { amount: 0.7 },
-      slide: { time: 0.17, mode: 'exponential' },
+      slide: { time: 0.162, mode: 'exponential' },
       devilFish: { ...DF_DEFAULTS, normalDecay: 0.3 },
     },
     effects: [],
@@ -394,7 +395,7 @@ export const TB303_PRESETS: InstrumentPreset['config'][] = [
       filter: { cutoff: 0.5, resonance: 0.5 },
       filterEnvelope: { envMod: 0.5, decay: 0.4 },
       accent: { amount: 0.5 },
-      slide: { time: 0.17, mode: 'exponential' },
+      slide: { time: 0.162, mode: 'exponential' },
       devilFish: { ...DF_DEFAULTS, normalDecay: 0.4 },
       delay: { enabled: true, time: 0.3, feedback: 0.3, tone: 0.5, mix: 0.5, stereo: 0.75 },
     },

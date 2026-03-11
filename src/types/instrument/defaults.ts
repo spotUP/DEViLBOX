@@ -268,6 +268,16 @@ export interface InstrumentConfig {
   symphonie?: import('@/engine/symphonie/SymphoniePlaybackData').SymphoniePlaybackData;
   // SunVox WASM patch
   sunvox?: SunVoxConfig;
+  // Demoscene 4k/64k intro synths
+  oidos?: import('../oidosInstrument').OidosInstrumentConfig;
+  wavesabre?: import('../wavesabreInstrument').WaveSabreInstrumentConfig;
+  // XRNS imported synth data (raw parameters from Renoise)
+  xrns?: {
+    synthType: string;
+    pluginIdentifier?: string;
+    parameters: number[];
+    parameterChunk?: string;
+  };
   // Modular Synthesis
   modularSynth?: import('../modular').ModularPatchConfig;
   // SuperCollider scripted synthesis
@@ -1394,7 +1404,7 @@ export const DEFAULT_TB303: TB303Config = {
     amount: 0.5,        // db303 default: accent=0.5 (normalized 0-1)
   },
   slide: {
-    time: 0.17,         // db303 default: slideTime=0.17 (normalized 0-1)
+    time: 0.162,        // Real 303: 60ms. Formula: linToLin(v, 0, 1, 2, 360)
     mode: 'exponential',
   },
   overdrive: {
@@ -1406,9 +1416,9 @@ export const DEFAULT_TB303: TB303Config = {
   // Conversion: JC303.cpp::setParameter() converts 0-1 → real values inside WASM.
   devilFish: {
     enabled: true,
-    normalDecay: 0.164,          // default-preset.xml: 0.164
-    accentDecay: 0.006,          // default-preset.xml: 0.006 — CRITICAL for acid screams
-    softAttack: 0,               // default-preset.xml: 0
+    normalDecay: 0.404,          // Real 303: 1230ms. Formula: linToLin(v, 0, 1, 30, 3000)
+    accentDecay: 0.057,          // Real 303: 200ms (FIXED on hardware). Was 0.006 (47ms) - too harsh/clicky
+    softAttack: 0.25,            // Real 303: 3ms attack. Was 0 (0.3ms) - caused clicks. Formula: linToExp(v, 0, 1, 0.3, 3000)
     accentSoftAttack: 0.1,       // default-preset.xml: 0.1 (punch on accented notes)
     passbandCompensation: 0.09,  // default-preset.xml: 0.09. App inverts → WASM gets 1-0.09=0.91
     resTracking: 0.257,           // default-preset.xml: 0.743 (inverted on read: 1-0.743=0.257). App inverts → WASM gets 0.743
