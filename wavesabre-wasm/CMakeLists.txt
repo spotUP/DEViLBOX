@@ -73,6 +73,7 @@ if(EMSCRIPTEN)
                 \"_wavesabre_has_gmdls\",\
                 \"_wavesabre_destroy\",\
                 \"_wavesabre_set_param\",\
+                \"_wavesabre_set_chunk\",\
                 \"_wavesabre_note_on\",\
                 \"_wavesabre_note_off\",\
                 \"_wavesabre_render\",\

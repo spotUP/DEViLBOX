@@ -26,6 +26,7 @@ let wavesabre_set_gmdls_data = null;
 let wavesabre_has_gmdls = null;
 let wavesabre_destroy = null;
 let wavesabre_set_param = null;
+let wavesabre_set_chunk = null;
 let wavesabre_note_on = null;
 let wavesabre_note_off = null;
 let wavesabre_render = null;
@@ -76,6 +77,18 @@ class WaveSabreProcessor extends AudioWorkletProcessor {
             }
           }
           break;
+        case 'setChunk':
+          // Load binary preset chunk (VST state from XRNS)
+          if (ready && wavesabre_set_chunk && data.chunk) {
+            const chunkBytes = new Uint8Array(data.chunk);
+            console.log('[WaveSabre] setChunk:', chunkBytes.length, 'bytes');
+            const chunkPtr = Module._malloc(chunkBytes.length);
+            Module.HEAPU8.set(chunkBytes, chunkPtr);
+            wavesabre_set_chunk(synth, chunkPtr, chunkBytes.length);
+            Module._free(chunkPtr);
+            console.log('[WaveSabre] Chunk loaded successfully');
+          }
+          break;
       }
     };
   }
@@ -107,6 +120,7 @@ class WaveSabreProcessor extends AudioWorkletProcessor {
       wavesabre_has_gmdls = Module.cwrap('wavesabre_has_gmdls', 'number', []);
       wavesabre_destroy = Module.cwrap('wavesabre_destroy', null, ['number']);
       wavesabre_set_param = Module.cwrap('wavesabre_set_param', null, ['number', 'number', 'number']);
+      wavesabre_set_chunk = Module.cwrap('wavesabre_set_chunk', null, ['number', 'number', 'number']);
       wavesabre_note_on = Module.cwrap('wavesabre_note_on', null, ['number', 'number', 'number', 'number']);
       wavesabre_note_off = Module.cwrap('wavesabre_note_off', null, ['number', 'number']);
       wavesabre_render = Module.cwrap('wavesabre_render', null, ['number', 'number', 'number', 'number']);

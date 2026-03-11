@@ -1176,6 +1176,7 @@ export const useInstrumentStore = create<InstrumentStore>()(
       // Also fix any out-of-range IDs (e.g. Date.now() timestamps from older versions)
       const usedIds = new Set<number>();
       const migratedInstruments = newInstruments.map(inst => {
+        console.log(`[InstrumentStore] loadInstruments: id=${inst.id} name="${inst.name}" synthType=${inst.synthType} hasXrns=${!!inst.xrns}`);
         // Ensure complete config for the synthType
         const completeInst = ensureCompleteInstrumentConfig(inst);
 
@@ -1196,6 +1197,8 @@ export const useInstrumentStore = create<InstrumentStore>()(
           // createInstrument deep-merges with defaults that always include tb303,
           // causing every Sampler/Player/etc. to revert to TB303 on reload)
           synthType: inst.synthType,
+          // Preserve XRNS data for demoscene synths (WaveSabre, Oidos, Tunefish)
+          xrns: inst.xrns,
           // Add type field if missing (backward compatibility)
           // Sampler = sample, everything else = synth
           type: inst.type || (inst.synthType === 'Sampler' ? 'sample' as const : 'synth' as const),
