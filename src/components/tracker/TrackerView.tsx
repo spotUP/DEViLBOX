@@ -439,13 +439,6 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
           onClose={() => setPendingAudioFile(null)}
           initialFile={pendingAudioFile}
         />
-        {/* TD-3 / TB-303 pattern import dialog */}
-        <ImportTD3Dialog
-          isOpen={!!pendingTD3File}
-          onClose={() => setPendingTD3File(null)}
-          initialFile={pendingTD3File}
-          onImport={handleTD3Import}
-        />
         {/* SunVox patch/song import dialog */}
         {pendingSunVoxFile && (
           <SunVoxImportDialog
@@ -788,13 +781,6 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
         isOpen={!!pendingAudioFile}
         onClose={() => setPendingAudioFile(null)}
         initialFile={pendingAudioFile}
-      />
-      {/* TD-3 / TB-303 pattern import dialog */}
-      <ImportTD3Dialog
-        isOpen={!!pendingTD3File}
-        onClose={() => setPendingTD3File(null)}
-        initialFile={pendingTD3File}
-        onImport={handleTD3Import}
       />
       {/* SunVox patch/song import dialog */}
       {pendingSunVoxFile && (
