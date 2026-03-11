@@ -77,12 +77,15 @@ class OidosProcessor extends AudioWorkletProcessor {
       
       switch (type) {
         case 'init':
+          console.log('[Oidos] init received, wasmBytes length:', data.wasmBytes?.byteLength);
           this.initWasm(data.wasmBytes);
           break;
         case 'noteOn':
+          console.log('[Oidos] noteOn:', data.note, 'vel:', data.velocity, 'synth:', !!synth);
           if (synth) synth.noteOn(data.note, data.velocity);
           break;
         case 'noteOff':
+          console.log('[Oidos] noteOff:', data.note);
           if (synth) synth.noteOff(data.note);
           break;
         case 'setParameter':
