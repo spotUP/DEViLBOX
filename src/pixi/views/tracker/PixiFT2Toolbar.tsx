@@ -577,7 +577,6 @@ export const PixiFT2Toolbar: React.FC = () => {
           onClick={handleToggleFXSearchReplace}
         />
         <PixiButton label="Instruments" variant="ghost" size="sm" onClick={handleShowInstruments} />
-        <PixiButton label="Furnace"     variant="ghost" size="sm" onClick={() => useUIStore.getState().openModal('furnacePresets')} />
         <PixiButton label="Pads"        variant="ghost" size="sm" onClick={handleShowDrumpads} />
         <PixiButton
           label="Master FX"
