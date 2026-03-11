@@ -202,20 +202,20 @@ export const PixiChannelVUMeters: React.FC<PixiChannelVUMetersProps> = ({ width,
         meter.level *= (DECAY_RATE - staggerOffset);
         if (meter.level < 0.01) meter.level = 0;
 
+        // Always check trigger data (works for all synths including native WASM like DB303)
+        const isNewTrigger = triggerGens[i] !== lastGensRef.current[i];
+        if (isNewTrigger) {
+          lastGensRef.current[i] = triggerGens[i];
+          if (triggerLevels[i] > meter.level) {
+            meter.level = triggerLevels[i];
+          }
+        }
+
+        // In realtime mode, also use per-channel audio meter data (higher wins)
         if (isRealtime && realtimeLevels) {
-          // Realtime mode: only bump UP to new peaks
           const target = realtimeLevels[i] || 0;
           if (target > meter.level) {
             meter.level = target;
-          }
-        } else {
-          // Trigger mode: only bump UP on new triggers
-          const isNewTrigger = triggerGens[i] !== lastGensRef.current[i];
-          if (isNewTrigger) {
-            lastGensRef.current[i] = triggerGens[i];
-            if (triggerLevels[i] > meter.level) {
-              meter.level = triggerLevels[i];
-            }
           }
         }
         if (meter.level > 0) anyActive = true;
