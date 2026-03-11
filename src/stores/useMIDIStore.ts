@@ -491,30 +491,9 @@ export const useMIDIStore = create<MIDIStore>()(
                 const mapping = store.ccMappings.find((m) => m.ccNumber === message.cc);
 
                 if (mapping) {
-                  // Convert CC value (0-127) to parameter range
-                  const normalized = message.value / 127;
-                  let paramValue: number;
-
-                  if (mapping.curve === 'logarithmic') {
-                    // Logarithmic scaling for frequency-like parameters
-                    // Guard against log(0) - use minimum of 1 for log calculation
-                    const safeMin = Math.max(1, mapping.min);
-                    const safeMax = Math.max(safeMin + 1, mapping.max);
-                    const logMin = Math.log(safeMin);
-                    const logMax = Math.log(safeMax);
-                    paramValue = Math.exp(logMin + normalized * (logMax - logMin));
-                  } else {
-                    // Linear scaling
-                    paramValue = mapping.min + normalized * (mapping.max - mapping.min);
-                  }
-
-                  // Call registered handler for this parameter (using external Map)
-                  const handler = ccHandlersMap.get(mapping.parameter as TB303Parameter);
-                  if (handler) {
-                    handler(paramValue);
-                  } else {
-                    console.warn(`[MIDI CC] No handler registered for ${mapping.parameter}`);
-                  }
+                  // Route through the unified parameter router (same as bank knobs)
+                  // This ensures both audio engine AND UI store get updated
+                  routeParameterToEngine(mapping.parameter as MappableParameter, message.value / 127);
                 }
               }
             });
