@@ -16,6 +16,7 @@ import { JC303StyledKnobPanel } from '@components/instruments/controls/JC303Styl
 import { PopOutWindow, focusPopout } from '@components/ui/PopOutWindow';
 import { ScrollLockContainer } from '@components/ui/ScrollLockContainer';
 import { Knob } from '@components/controls/Knob';
+import { SynthControlsRouter } from './SynthControlsRouter';
 import type { TB303Config, EffectConfig, InstrumentConfig, SynthType } from '@typedefs/instrument';
 import type { InstrumentEffectsPanelHandle } from '@components/effects/InstrumentEffectsPanel';
 import type { MasterEffectsPanelHandle } from '@components/effects/MasterEffectsPanel';
@@ -40,16 +41,13 @@ const SC_TYPES: SynthType[] = ['SuperCollider'];
 const COLLAPSED_HEIGHT = 40;
 const TAB_BAR_HEIGHT = 32;
 const TB303_EXPANDED_HEIGHT = 512;
-const GENERIC_EXPANDED_HEIGHT = 180;
-const SC_EXPANDED_HEIGHT = 140;
 
-// For FX tabs, return null to signal "auto height"
+// For FX tabs and most synth types, return null to signal "auto height"
+// Only TB303 has a fixed hardware UI height
 function getExpandedHeight(synthType: SynthType | undefined, activeTab: PanelTab): number | null {
-  if (activeTab === 'instFx' || activeTab === 'masterFx') return null;
-  if (!synthType) return GENERIC_EXPANDED_HEIGHT;
-  if (TB303_TYPES.includes(synthType)) return TB303_EXPANDED_HEIGHT;
-  if (SC_TYPES.includes(synthType)) return SC_EXPANDED_HEIGHT;
-  return GENERIC_EXPANDED_HEIGHT;
+  if (activeTab !== 'synth') return null;
+  if (synthType && TB303_TYPES.includes(synthType)) return TB303_EXPANDED_HEIGHT;
+  return null; // auto height — each control component knows its own size
 }
 
 // ─── Generic Synth Knobs ─────────────────────────────────────────────────────
@@ -552,10 +550,8 @@ export const InstrumentKnobPanel: React.FC = memo(() => {
                     onPresetLoad={handlePresetLoad}
                     instrumentId={targetInstrument.id}
                   />
-                ) : isSC ? (
-                  <SCParamSliders instrument={targetInstrument} onUpdate={handleGenericUpdate} />
                 ) : (
-                  <GenericSynthKnobs instrument={targetInstrument} onUpdate={handleGenericUpdate} />
+                  <SynthControlsRouter instrument={targetInstrument} onUpdate={handleGenericUpdate} fallback={isSC ? <SCParamSliders instrument={targetInstrument} onUpdate={handleGenericUpdate} /> : <GenericSynthKnobs instrument={targetInstrument} onUpdate={handleGenericUpdate} />} />
                 )
               ) : activeTab === 'instFx' ? (
                 <Suspense fallback={<FxLoadingFallback />}>
@@ -718,10 +714,8 @@ export const InstrumentKnobPanel: React.FC = memo(() => {
                   instrumentId={targetInstrument.id}
                 />
               </ScrollLockContainer>
-            ) : isSC ? (
-              <SCParamSliders instrument={targetInstrument} onUpdate={handleGenericUpdate} />
             ) : (
-              <GenericSynthKnobs instrument={targetInstrument} onUpdate={handleGenericUpdate} />
+              <SynthControlsRouter instrument={targetInstrument} onUpdate={handleGenericUpdate} fallback={isSC ? <SCParamSliders instrument={targetInstrument} onUpdate={handleGenericUpdate} /> : <GenericSynthKnobs instrument={targetInstrument} onUpdate={handleGenericUpdate} />} />
             )
           ) : activeTab === 'instFx' ? (
             <Suspense fallback={<FxLoadingFallback />}>
