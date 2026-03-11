@@ -124,13 +124,10 @@ export function startCapture(
   // Connect to ToneEngine's masterChannel (where all audio flows through)
   try {
     const toneEngine = getToneEngine();
-    const masterChannel = toneEngine.masterChannel;
-    
-    // Get the native AudioNode from the Tone.Channel using the utility
-    const masterNode = getNativeAudioNode(masterChannel);
-    
-    console.log('[TrackerAudioCapture] masterChannel:', masterChannel);
-    console.log('[TrackerAudioCapture] masterNode:', masterNode, 'constructor:', masterNode?.constructor?.name);
+    // Tap masterEffectsInput (Tone.Gain) — all audio flows through here before
+    // the master channel. Tone.Gain unwraps reliably to a native GainNode.
+    const masterGain = toneEngine.masterEffectsInput;
+    const masterNode = getNativeAudioNode(masterGain);
     
     if (masterNode && typeof masterNode.connect === 'function' && scriptProcessor) {
       // Create a silent gain node to terminate the scriptProcessor
@@ -143,7 +140,7 @@ export function startCapture(
       scriptProcessor.connect(silentGain); // Connect to silent node, not destination
       console.log(`[TrackerAudioCapture] Started capturing (target: ${TARGET_SECONDS}s)`);
     } else {
-      throw new Error('Could not find masterChannel native node to tap');
+      throw new Error('Could not find masterEffectsInput native node to tap');
     }
   } catch (err) {
     console.error('[TrackerAudioCapture] Failed to connect:', err);
