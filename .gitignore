@@ -175,3 +175,5 @@ test-claude-cli.sh
 third-party/projectm-master/
 v2-synth-wasm/build/
 v2m-wasm/build/
+tunefish-wasm/build/
+wavesabre-wasm/build/
