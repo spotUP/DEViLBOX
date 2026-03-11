@@ -160,6 +160,11 @@ export const PT2Hardware: React.FC<PT2HardwareProps> = ({ instrument, onChange }
   const sampleRateRef = useRef(44100);
   const audioCtxRef = useRef<AudioContext | null>(null);
   const currentSourceRef = useRef<AudioBufferSourceNode | null>(null);
+  // Playback position tracking for cursor overlay
+  const playStartTimeRef = useRef(0);
+  const playDurationRef = useRef(0);   // total sample duration in seconds
+  const playLoopingRef = useRef(false);
+  const playActiveRef = useRef(false);
 
   /* Keep refs in sync — CLAUDE.md configRef pattern */
   useEffect(() => { configRef.current = instrument; }, [instrument]);
@@ -294,7 +299,7 @@ export const PT2Hardware: React.FC<PT2HardwareProps> = ({ instrument, onChange }
             try { currentSourceRef.current.stop(); } catch { /* already stopped */ }
             currentSourceRef.current = null;
           }
-          if (len <= 0) return;
+          if (len <= 0) { playActiveRef.current = false; return; }
           // Copy Int8 sample data from WASM heap into a Float32 AudioBuffer
           const raw = new Int8Array(mod!.HEAP8.buffer, ptr, len);
           const sr = sampleRateRef.current;
@@ -303,7 +308,8 @@ export const PT2Hardware: React.FC<PT2HardwareProps> = ({ instrument, onChange }
           for (let i = 0; i < len; i++) ch[i] = raw[i] / 128.0;
           const src = ctx.createBufferSource();
           src.buffer = buf;
-          if (loopType !== 0 && loopLength > 2) {
+          const isLooping = loopType !== 0 && loopLength > 2;
+          if (isLooping) {
             src.loop = true;
             src.loopStart = loopStart / sr;
             src.loopEnd   = (loopStart + loopLength) / sr;
@@ -311,7 +317,17 @@ export const PT2Hardware: React.FC<PT2HardwareProps> = ({ instrument, onChange }
           src.connect(ctx.destination);
           src.start();
           currentSourceRef.current = src;
-          src.onended = () => { if (currentSourceRef.current === src) currentSourceRef.current = null; };
+          // Track playback for position cursor
+          playStartTimeRef.current = ctx.currentTime;
+          playDurationRef.current = len / sr;
+          playLoopingRef.current = isLooping;
+          playActiveRef.current = true;
+          src.onended = () => {
+            if (currentSourceRef.current === src) {
+              currentSourceRef.current = null;
+              playActiveRef.current = false;
+            }
+          };
         };
 
         mod.onStopSample = () => {
@@ -319,6 +335,7 @@ export const PT2Hardware: React.FC<PT2HardwareProps> = ({ instrument, onChange }
             try { currentSourceRef.current.stop(); } catch { /* already stopped */ }
             currentSourceRef.current = null;
           }
+          playActiveRef.current = false;
         };
 
         /* Init */
@@ -393,10 +410,36 @@ export const PT2Hardware: React.FC<PT2HardwareProps> = ({ instrument, onChange }
 
         /* Start React-driven rAF render loop */
         let rafId = 0;
+        // PT2 waveform area: x=3..316 (314px wide), y=138..201 in screen coords
+        // Canvas shows from SAMPLER_Y=121, so waveform y=17..80 in canvas coords
+        const WAVE_X = 3, WAVE_W = 314, WAVE_Y = 138 - SAMPLER_Y, WAVE_H = 64;
         const renderLoop = () => {
           if (cancelled) return;
           if (m._pt2_sampled_tick) m._pt2_sampled_tick();
           blitFramebuffer(m, ctx, imgData);
+
+          // Draw playback position cursor over waveform
+          if (playActiveRef.current && audioCtxRef.current && playDurationRef.current > 0) {
+            const elapsed = audioCtxRef.current.currentTime - playStartTimeRef.current;
+            const dur = playDurationRef.current;
+            let progress: number;
+            if (playLoopingRef.current) {
+              progress = (elapsed % dur) / dur;
+            } else {
+              progress = Math.min(elapsed / dur, 1);
+              if (progress >= 1) playActiveRef.current = false;
+            }
+            if (playActiveRef.current) {
+              const px = Math.round(WAVE_X + progress * WAVE_W);
+              ctx.strokeStyle = '#fbbf24';
+              ctx.lineWidth = 1;
+              ctx.beginPath();
+              ctx.moveTo(px, WAVE_Y);
+              ctx.lineTo(px, WAVE_Y + WAVE_H);
+              ctx.stroke();
+            }
+          }
+
           rafId = requestAnimationFrame(renderLoop);
         };
         rafId = requestAnimationFrame(renderLoop);
