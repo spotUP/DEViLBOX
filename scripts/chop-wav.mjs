@@ -193,8 +193,8 @@ function writeWav(filePath, startFrame, endFrame) {
   header.writeUInt16LE(numChannels, 22);
   header.writeUInt32LE(sampleRate, 24);
   header.writeUInt32LE(fmt.byteRate, 28);
-  header.writeUInt16LE(blockAlign, 30);
-  header.writeUInt16LE(bitsPerSample, 32);
+  header.writeUInt16LE(blockAlign, 32);
+  header.writeUInt16LE(bitsPerSample, 34);
   header.write('data', 36);
   header.writeUInt32LE(audioDataSize, 40);
 
