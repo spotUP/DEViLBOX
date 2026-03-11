@@ -3,7 +3,7 @@
  * Connects to useAudioStore for master effects management
  */
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useImperativeHandle, forwardRef } from 'react';
 import {
   DndContext,
   closestCenter,
@@ -106,7 +106,12 @@ function SortableVisualEffect({ effect, onToggle, onRemove, onUpdateParameter, o
 }
 
 interface MasterEffectsPanelProps {
-  /* no props required — reads from useAudioStore */
+  hideHeader?: boolean;
+}
+
+export interface MasterEffectsPanelHandle {
+  toggleAddMenu: () => void;
+  togglePresetMenu: () => void;
 }
 
 // User preset storage key
@@ -117,11 +122,17 @@ interface UserMasterFxPreset {
   effects: EffectConfig[];
 }
 
-export const MasterEffectsPanel: React.FC<MasterEffectsPanelProps> = () => {
+export const MasterEffectsPanel = forwardRef<MasterEffectsPanelHandle, MasterEffectsPanelProps>(({ hideHeader = false }, ref) => {
   const [showAddMenu, setShowAddMenu] = useState(false);
   const [showPresetMenu, setShowPresetMenu] = useState(false);
   const [showSaveDialog, setShowSaveDialog] = useState(false);
   const [presetName, setPresetName] = useState('');
+
+  useImperativeHandle(ref, () => ({
+    toggleAddMenu: () => setShowAddMenu(prev => !prev),
+    togglePresetMenu: () => setShowPresetMenu(prev => !prev),
+  }), []);
+
   const {
     masterEffects,
     addMasterEffectConfig,
@@ -298,102 +309,106 @@ export const MasterEffectsPanel: React.FC<MasterEffectsPanelProps> = () => {
   }, {} as Record<string, AvailableEffect[]>);
 
   return (
-    <div className="bg-dark-bg border border-dark-border rounded-lg overflow-hidden">
+    <div className={hideHeader ? "bg-dark-bg overflow-visible relative" : "bg-dark-bg border border-dark-border rounded-lg overflow-hidden"}>
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 bg-dark-bgSecondary border-b border-dark-border">
-        <div className="flex items-center gap-2">
-          <Settings size={16} className="text-accent-primary" />
-          <span className="font-medium text-sm text-text-primary">Master Effects</span>
-          <span className="text-xs text-text-muted px-2 py-0.5 bg-dark-bg rounded">
-            {masterEffects.length} FX
-          </span>
-        </div>
-        <div className="flex items-center gap-2">
-          {/* Presets Dropdown */}
-          <div className="relative">
+      {!hideHeader && (
+        <div className="flex items-center justify-between px-4 py-3 bg-dark-bgSecondary border-b border-dark-border">
+          <div className="flex items-center gap-2">
+            <Settings size={16} className="text-accent-primary" />
+            <span className="font-medium text-sm text-text-primary">Master Effects</span>
+            <span className="text-xs text-text-muted px-2 py-0.5 bg-dark-bg rounded">
+              {masterEffects.length} FX
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            {/* Presets Dropdown */}
+            <div className="relative">
+              <button
+                onClick={() => setShowPresetMenu(!showPresetMenu)}
+                className="px-3 py-1 text-xs font-medium rounded bg-dark-bg text-text-primary
+                         hover:bg-dark-bgHover transition-colors flex items-center gap-1 border border-dark-border"
+              >
+                Presets <ChevronDown size={12} />
+              </button>
+            </div>
+
+            {/* Save Preset Button */}
             <button
-              onClick={() => setShowPresetMenu(!showPresetMenu)}
-              className="px-3 py-1 text-xs font-medium rounded bg-dark-bg text-text-primary
-                       hover:bg-dark-bgHover transition-colors flex items-center gap-1 border border-dark-border"
+              onClick={() => setShowSaveDialog(true)}
+              className="p-1.5 rounded text-text-muted hover:text-accent-primary hover:bg-dark-bgHover transition-colors"
+              title="Save current effects as preset"
             >
-              Presets <ChevronDown size={12} />
+              <Save size={14} />
             </button>
 
-            {showPresetMenu && (
-              <div className="absolute right-0 top-full mt-1 w-56 bg-dark-bgSecondary border border-dark-border rounded-lg shadow-xl z-50 max-h-[70vh] overflow-y-auto">
-                {/* User Presets */}
-                {userPresets.length > 0 && (
-                  <>
-                    <div className="px-3 py-2 text-xs text-text-muted font-medium uppercase tracking-wide bg-dark-bgTertiary">
-                      User Presets
-                    </div>
-                    {userPresets.map((preset) => (
-                      <div
-                        key={preset.name}
-                        className="flex items-center justify-between px-3 py-2 hover:bg-dark-bgHover cursor-pointer group"
-                      >
-                        <span
-                          onClick={() => handleLoadUserPreset(preset)}
-                          className="text-sm text-text-primary flex-1"
-                        >
-                          {preset.name}
-                        </span>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDeleteUserPreset(preset.name);
-                          }}
-                          className="text-text-muted hover:text-accent-error opacity-0 group-hover:opacity-100 transition-opacity"
-                          title="Delete preset"
-                        >
-                          <X size={12} />
-                        </button>
-                      </div>
-                    ))}
-                    <div className="border-t border-dark-border my-1" />
-                  </>
-                )}
-
-                {/* Factory Presets by Category */}
-                {sortedCategories.map((category) => (
-                  <div key={category}>
-                    <div className="px-3 py-2 text-xs text-text-muted font-medium uppercase tracking-wide bg-dark-bgTertiary">
-                      {category}
-                    </div>
-                    {[...presetsByCategory[category]].sort((a, b) => a.name.localeCompare(b.name)).map((preset) => (
-                      <div
-                        key={preset.name}
-                        onClick={() => handleLoadPreset(preset)}
-                        className="px-3 py-2 hover:bg-dark-bgHover cursor-pointer"
-                      >
-                        <div className="text-sm text-text-primary">{preset.name}</div>
-                        <div className="text-xs text-text-muted">{preset.description}</div>
-                      </div>
-                    ))}
-                  </div>
-                ))}
-              </div>
-            )}
+            <button
+              onClick={() => setShowAddMenu(!showAddMenu)}
+              className="px-3 py-1 text-xs font-medium rounded bg-accent-primary/10 text-accent-primary
+                       hover:bg-accent-primary/20 transition-colors"
+            >
+              + Add Effect
+            </button>
           </div>
-
-          {/* Save Preset Button */}
-          <button
-            onClick={() => setShowSaveDialog(true)}
-            className="p-1.5 rounded text-text-muted hover:text-accent-primary hover:bg-dark-bgHover transition-colors"
-            title="Save current effects as preset"
-          >
-            <Save size={14} />
-          </button>
-
-          <button
-            onClick={() => setShowAddMenu(!showAddMenu)}
-            className="px-3 py-1 text-xs font-medium rounded bg-accent-primary/10 text-accent-primary
-                     hover:bg-accent-primary/20 transition-colors"
-          >
-            + Add Effect
-          </button>
         </div>
-      </div>
+      )}
+
+      {/* Preset dropdown — rendered outside header so it works in both modes */}
+      {showPresetMenu && (
+        <div className="absolute right-0 top-0 mt-1 w-56 bg-dark-bgSecondary border border-dark-border rounded-lg shadow-xl z-50 max-h-[70vh] overflow-y-auto"
+          style={hideHeader ? { top: 0, right: 8 } : { top: '100%', right: 16 }}>
+          {/* User Presets */}
+          {userPresets.length > 0 && (
+            <>
+              <div className="px-3 py-2 text-xs text-text-muted font-medium uppercase tracking-wide bg-dark-bgTertiary">
+                User Presets
+              </div>
+              {userPresets.map((preset) => (
+                <div
+                  key={preset.name}
+                  className="flex items-center justify-between px-3 py-2 hover:bg-dark-bgHover cursor-pointer group"
+                >
+                  <span
+                    onClick={() => handleLoadUserPreset(preset)}
+                    className="text-sm text-text-primary flex-1"
+                  >
+                    {preset.name}
+                  </span>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDeleteUserPreset(preset.name);
+                    }}
+                    className="text-text-muted hover:text-accent-error opacity-0 group-hover:opacity-100 transition-opacity"
+                    title="Delete preset"
+                  >
+                    <X size={12} />
+                  </button>
+                </div>
+              ))}
+              <div className="border-t border-dark-border my-1" />
+            </>
+          )}
+
+          {/* Factory Presets by Category */}
+          {sortedCategories.map((category) => (
+            <div key={category}>
+              <div className="px-3 py-2 text-xs text-text-muted font-medium uppercase tracking-wide bg-dark-bgTertiary">
+                {category}
+              </div>
+              {[...presetsByCategory[category]].sort((a, b) => a.name.localeCompare(b.name)).map((preset) => (
+                <div
+                  key={preset.name}
+                  onClick={() => handleLoadPreset(preset)}
+                  className="px-3 py-2 hover:bg-dark-bgHover cursor-pointer"
+                >
+                  <div className="text-sm text-text-primary">{preset.name}</div>
+                  <div className="text-xs text-text-muted">{preset.description}</div>
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Save Preset Dialog */}
       {showSaveDialog && (
@@ -510,4 +525,5 @@ export const MasterEffectsPanel: React.FC<MasterEffectsPanelProps> = () => {
       </div>
     </div>
   );
-};
+});
+MasterEffectsPanel.displayName = 'MasterEffectsPanel';
