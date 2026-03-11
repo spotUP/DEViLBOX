@@ -695,7 +695,17 @@ async function loadSongFile(file: File, options: FileLoadOptions): Promise<FileL
     const currentInstruments = useInstrumentStore.getState().instruments;
     const instrumentIndex = currentInstruments.findIndex(i => i.id === tb303Instrument.id) + 1;
 
-    const importedPatterns = td3File.patterns.map((td3Pattern, idx) => {
+    // Filter out empty TD3 patterns (all rests / no notes) — the TD-3 often
+    // stores unused initialization patterns at the start of the file.
+    const nonEmptyTD3Patterns = td3File.patterns.filter(
+      p => p.steps.some(s => s.note !== null)
+    );
+
+    if (nonEmptyTD3Patterns.length === 0) {
+      return { success: false, error: 'All TD-3 patterns are empty (no notes)' };
+    }
+
+    const importedPatterns = nonEmptyTD3Patterns.map((td3Pattern, idx) => {
       const cells = td3StepsToTrackerCells(td3Pattern.steps, 2);
       const patternLength = td3Pattern.length || 16;
       return {
@@ -741,7 +751,11 @@ async function loadSongFile(file: File, options: FileLoadOptions): Promise<FileL
 
     return {
       success: true,
-      message: `Imported ${importedPatterns.length} TD-3 pattern(s)`
+      message: `Imported ${importedPatterns.length} TD-3 pattern(s)${
+        td3File.patterns.length > importedPatterns.length
+          ? ` (${td3File.patterns.length - importedPatterns.length} empty skipped)`
+          : ''
+      }`
     };
   }
 
