@@ -41,7 +41,8 @@ export const PixiCollaborationModal: React.FC<PixiCollaborationModalProps> = ({ 
 
   const handleCopy = useCallback(() => {
     if (!roomCode) return;
-    navigator.clipboard.writeText(roomCode).then(() => {
+    const link = `${window.location.origin}${window.location.pathname}?collab=${roomCode}`;
+    navigator.clipboard.writeText(link).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     });
@@ -100,9 +101,9 @@ export const PixiCollaborationModal: React.FC<PixiCollaborationModalProps> = ({ 
 
           {(status === 'waiting' || status === 'error') && roomCode && (
             <layoutContainer layout={{ flexDirection: 'column', alignItems: 'center', width: MODAL_W - 32 }}>
-              <PixiLabel text="Share this code with your friend:" size="sm" color="textSecondary" font="sans" />
+              <PixiLabel text="Share this link with your friend:" size="sm" color="textSecondary" font="sans" />
 
-              {/* Room code display */}
+              {/* Copy invite link button */}
               <layoutContainer
                 eventMode="static"
                 cursor="pointer"
@@ -111,7 +112,7 @@ export const PixiCollaborationModal: React.FC<PixiCollaborationModalProps> = ({ 
                   flexDirection: 'row',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  gap: 12,
+                  gap: 8,
                   marginTop: 10,
                   paddingLeft: 24,
                   paddingRight: 24,
@@ -123,11 +124,11 @@ export const PixiCollaborationModal: React.FC<PixiCollaborationModalProps> = ({ 
                   borderRadius: 8,
                 }}
               >
-                <PixiLabel text={roomCode} size="xl" weight="bold" font="mono" color="accent" />
                 <PixiLabel
-                  text={copied ? '✓' : '⎘'}
+                  text={copied ? '✓  Link copied!' : '⎘  Copy invite link'}
                   size="md"
-                  color={copied ? 'success' : 'textMuted'}
+                  weight="bold"
+                  color={copied ? 'success' : 'accent'}
                   font="sans"
                 />
               </layoutContainer>

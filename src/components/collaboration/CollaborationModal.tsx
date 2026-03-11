@@ -33,7 +33,8 @@ export const CollaborationModal: React.FC<CollaborationModalProps> = ({ isOpen, 
 
   const handleCopy = useCallback(() => {
     if (!roomCode) return;
-    navigator.clipboard.writeText(roomCode).then(() => {
+    const link = `${window.location.origin}${window.location.pathname}?collab=${roomCode}`;
+    navigator.clipboard.writeText(link).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     });
@@ -94,18 +95,21 @@ export const CollaborationModal: React.FC<CollaborationModalProps> = ({ isOpen, 
             )}
             {(status === 'waiting' || status === 'error') && roomCode && (
               <div className="py-2">
-                <p className="text-text-secondary text-sm mb-3">Share this code with your friend:</p>
+                <p className="text-text-secondary text-sm mb-3">Share this link with your friend:</p>
                 <div
                   className="flex items-center justify-center gap-3 px-6 py-4 rounded-xl bg-dark-bgSecondary border-2 border-accent-primary/50 cursor-pointer hover:border-accent-primary transition-colors group"
                   onClick={handleCopy}
-                  title="Click to copy"
+                  title="Click to copy invite link"
                 >
-                  <span className="font-mono text-3xl font-bold text-accent-primary tracking-widest">
-                    {roomCode}
-                  </span>
                   {copied
-                    ? <Check size={20} className="text-accent-success" />
-                    : <Copy size={20} className="text-text-muted group-hover:text-accent-primary transition-colors" />
+                    ? <>
+                        <Check size={20} className="text-accent-success" />
+                        <span className="font-semibold text-accent-success">Link copied!</span>
+                      </>
+                    : <>
+                        <Copy size={20} className="text-text-muted group-hover:text-accent-primary transition-colors" />
+                        <span className="font-semibold text-accent-primary">Copy invite link</span>
+                      </>
                   }
                 </div>
                 <div className="flex items-center justify-center gap-2 mt-4 text-text-muted text-sm">
