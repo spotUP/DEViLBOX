@@ -75,6 +75,7 @@ export const Knob: React.FC<KnobProps> = React.memo(({
   const dragStartY = useRef(0);
   const dragStartX = useRef(0);
   const dragStartValue = useRef(0);
+  const dragDirection = useRef<'vertical' | 'horizontal' | null>(null);
   const lastTapTime = useRef(0);
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const rafRef = useRef<number | null>(null);
@@ -253,6 +254,7 @@ export const Knob: React.FC<KnobProps> = React.memo(({
     dragStartY.current = clientY;
     dragStartX.current = clientX;
     dragStartValue.current = getNormalized();
+    dragDirection.current = null; // Reset - will be determined on first move
     const ownerDoc = knobRef.current?.ownerDocument ?? document;
     const ownerWin = ownerDoc.defaultView ?? window;
     ownerDoc.body.style.cursor = 'ns-resize';
@@ -264,13 +266,20 @@ export const Knob: React.FC<KnobProps> = React.memo(({
       const moveY = 'touches' in ev ? ev.touches[0].clientY : ev.clientY;
       const moveX = 'touches' in ev ? ev.touches[0].clientX : ev.clientX;
 
-      // Support bidirectional drag (horizontal + vertical)
       const deltaY = dragStartY.current - moveY;
       const deltaX = moveX - dragStartX.current;
 
-      // Use the larger delta for better control
-      const isHorizontal = Math.abs(deltaX) > Math.abs(deltaY);
-      const delta = isHorizontal ? deltaX : deltaY;
+      // Lock to first significant direction to prevent jumps when changing direction
+      if (dragDirection.current === null) {
+        const threshold = 5; // pixels before locking direction
+        if (Math.abs(deltaY) >= threshold || Math.abs(deltaX) >= threshold) {
+          dragDirection.current = Math.abs(deltaX) > Math.abs(deltaY) ? 'horizontal' : 'vertical';
+        } else {
+          return; // Don't update until direction is locked
+        }
+      }
+
+      const delta = dragDirection.current === 'horizontal' ? deltaX : deltaY;
 
       const sensitivity = 150;
       const deltaNorm = delta / sensitivity;
