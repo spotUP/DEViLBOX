@@ -196,44 +196,42 @@ function unwrapToNative(obj: any): AudioNode | null {
  * @returns The native AudioNode, or null if not found
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function getNativeAudioNode(toneNode: any): AudioNode | null {
-  if (!toneNode) return null;
+export function getNativeAudioNode(toneNode: any, _depth = 0): AudioNode | null {
+  if (!toneNode || _depth > 5) return null;
 
   // If it's already a native AudioNode, return it directly
   if (isNativeAudioNode(toneNode)) {
     return toneNode;
   }
 
-  // Check direct properties: input, output, and internal node references.
-  // For each candidate, try unwrapping SAC wrappers to find the real native node.
-  const directCandidates = [
+  // Try direct SAC unwrap first
+  const directUnwrap = unwrapToNative(toneNode);
+  if (directUnwrap) return directUnwrap;
+
+  // Check internal node references and try SAC unwrap on each
+  const candidates = [
     toneNode.input,
     toneNode.output,
-    toneNode._gainNode,        // Tone.Gain stores its GainNode here
-    toneNode._node,            // Some Tone.js nodes use _node
-    toneNode._input,           // Or _input
-    toneNode._output,          // Or _output
-    toneNode._nativeNode,      // Possible internal property
-    toneNode._nativeAudioNode, // SAC wrapper property
+    toneNode._gainNode,
+    toneNode._node,
+    toneNode._input,
+    toneNode._output,
+    toneNode._nativeNode,
+    toneNode._nativeAudioNode,
   ];
 
-  for (const candidate of directCandidates) {
+  for (const candidate of candidates) {
+    if (!candidate || typeof candidate !== 'object') continue;
     const native = unwrapToNative(candidate);
     if (native) return native;
   }
 
-  // Handle nested wrappers (e.g., Tone.js InputNode/OutputNode that wrap SAC nodes)
-  if (toneNode.input && typeof toneNode.input === 'object') {
-    const inputObj = toneNode.input;
-    const innerCandidates = [
-      inputObj._gainNode,
-      inputObj._node,
-      inputObj.input,
-      inputObj._nativeAudioNode,
-    ];
-    for (const inner of innerCandidates) {
-      const native = unwrapToNative(inner);
-      if (native) return native;
+  // Recurse into .input and .output for nested Tone.js wrappers
+  // (e.g., Channel → Solo → Gain → SAC GainNode → native GainNode)
+  for (const prop of ['input', 'output'] as const) {
+    if (toneNode[prop] && typeof toneNode[prop] === 'object') {
+      const result = getNativeAudioNode(toneNode[prop], _depth + 1);
+      if (result) return result;
     }
   }
 
