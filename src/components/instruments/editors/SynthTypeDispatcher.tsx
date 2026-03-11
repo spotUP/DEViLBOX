@@ -572,7 +572,7 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
     return (
       <div className={`synth-editor-container ${mainBg}`}>
         {/* Tab Content - Use TB303Controls (Full JC303 Panel) */}
-        <div className="synth-editor-content p-4 flex items-center justify-center">
+        <div className="synth-editor-content p-4 flex items-center justify-center overflow-y-auto">
           <Suspense fallback={<LoadingControls />}>
             <TB303Controls
               config={instrument.tb303}
