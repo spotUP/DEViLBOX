@@ -61,8 +61,9 @@ export const useNavigationInput = (refs: TrackerInputRefs) => {
       const key = e.key;
       const keyLower = key.toLowerCase();
 
-      // F9-F12: Jump in pattern (FT2-style)
+      // F9-F12: Jump in pattern (FT2-style) — disabled during playback
       if (key === 'F9') {
+        if (isPlaying) return false;
         e.preventDefault();
         if (e.shiftKey) {
           setPtnJumpPos(0, cursorRef.current.rowIndex);
@@ -78,6 +79,7 @@ export const useNavigationInput = (refs: TrackerInputRefs) => {
         return true;
       }
       if (key === 'F10') {
+        if (isPlaying) return false;
         e.preventDefault();
         if (e.shiftKey) {
           setPtnJumpPos(1, cursorRef.current.rowIndex);
@@ -93,6 +95,7 @@ export const useNavigationInput = (refs: TrackerInputRefs) => {
         return true;
       }
       if (key === 'F11') {
+        if (isPlaying) return false;
         e.preventDefault();
         if (e.shiftKey) {
           setPtnJumpPos(2, cursorRef.current.rowIndex);
@@ -108,6 +111,7 @@ export const useNavigationInput = (refs: TrackerInputRefs) => {
         return true;
       }
       if (key === 'F12') {
+        if (isPlaying) return false;
         e.preventDefault();
         if (e.shiftKey) {
           setPtnJumpPos(3, cursorRef.current.rowIndex);
@@ -123,29 +127,33 @@ export const useNavigationInput = (refs: TrackerInputRefs) => {
         return true;
       }
 
-      // PageUp: Jump 16 lines up
+      // PageUp: Jump 16 lines up — disabled during playback
       if (key === 'PageUp') {
+        if (isPlaying) return false;
         e.preventDefault();
         moveCursorToRow(Math.max(0, cursorRef.current.rowIndex - 16));
         return true;
       }
 
-      // PageDown: Jump 16 lines down
+      // PageDown: Jump 16 lines down — disabled during playback
       if (key === 'PageDown') {
+        if (isPlaying) return false;
         e.preventDefault();
         moveCursorToRow(Math.min(pattern.length - 1, cursorRef.current.rowIndex + 16));
         return true;
       }
 
-      // Home: Jump to line 0
+      // Home: Jump to line 0 — disabled during playback
       if (key === 'Home') {
+        if (isPlaying) return false;
         e.preventDefault();
         moveCursorToRow(0);
         return true;
       }
 
-      // End: Jump to last line
+      // End: Jump to last line — disabled during playback
       if (key === 'End') {
+        if (isPlaying) return false;
         e.preventDefault();
         moveCursorToRow(pattern.length - 1);
         return true;
@@ -191,8 +199,9 @@ export const useNavigationInput = (refs: TrackerInputRefs) => {
         return true;
       }
 
-      // Arrow keys (up/down) with RAF-driven smooth scrolling
+      // Arrow keys (up/down) — disabled during playback
       if (key === 'ArrowUp' || key === 'ArrowDown') {
+        if (isPlaying) return false;
         e.preventDefault();
         const dir = key === 'ArrowUp' ? 'up' as const : 'down' as const;
         if (e.repeat) {
@@ -225,7 +234,9 @@ export const useNavigationInput = (refs: TrackerInputRefs) => {
 
       if (key === 'ArrowLeft') {
         e.preventDefault();
-        if (e.shiftKey && !e.altKey) {
+        if (isPlaying) {
+          moveCursor('left');
+        } else if (e.shiftKey && !e.altKey) {
           if (currentPatternIndex > 0) setCurrentPattern(currentPatternIndex - 1);
         } else if (e.altKey) {
           if (!selectionRef.current) startSelection();
@@ -239,7 +250,9 @@ export const useNavigationInput = (refs: TrackerInputRefs) => {
 
       if (key === 'ArrowRight') {
         e.preventDefault();
-        if (e.shiftKey && !e.altKey) {
+        if (isPlaying) {
+          moveCursor('right');
+        } else if (e.shiftKey && !e.altKey) {
           if (currentPatternIndex < patterns.length - 1) setCurrentPattern(currentPatternIndex + 1);
         } else if (e.altKey) {
           if (!selectionRef.current) startSelection();
