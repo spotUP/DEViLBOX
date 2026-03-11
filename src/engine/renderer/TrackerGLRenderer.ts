@@ -519,8 +519,8 @@ export class TrackerGLRenderer {
 
     // Center line highlight
     {
-      const [r, g, b, a] = colors.centerLine;
-      const alpha = ui.trackerVisualBg ? a * 0.5 : a;
+      const [r, g, b] = colors.centerLine;
+      const alpha = ui.trackerVisualBg ? 0.85 : 1;
       this.addRect(0, centerLineTop, width, rowH, [r, g, b, alpha]);
     }
 
