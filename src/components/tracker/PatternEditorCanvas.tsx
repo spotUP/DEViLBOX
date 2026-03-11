@@ -481,10 +481,13 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     const isPlaying = useTransportStore.getState().isPlaying;
 
     if (isPlaying && !e.shiftKey && !e.metaKey && !e.ctrlKey) {
-      isScratchDragRef.current = true;
       const scratch = getTrackerScratchController();
-      scratch.onGrabStart(e.clientY, performance.now());
-      return;
+      const activated = scratch.onGrabStart(e.clientY, performance.now());
+      if (activated) {
+        isScratchDragRef.current = true;
+        return;
+      }
+      // If scratch didn't activate (e.g., replayer not ready), fall through to normal click
     }
 
     const cursorStore = useCursorStore.getState();
@@ -646,6 +649,10 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
 
   const handleWheel = useCallback((e: React.WheelEvent) => {
     if (!containerRef.current) return;
+
+    // During playback, the native wheel handler (useEffect below) routes to
+    // TrackerScratchController. Don't also scroll rows — that would fight.
+    if (useTransportStore.getState().isPlaying) return;
     
     // Vertical scroll moves rows
     if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
