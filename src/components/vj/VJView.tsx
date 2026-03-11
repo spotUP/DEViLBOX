@@ -19,6 +19,7 @@ import { AudioDataBus } from '@engine/vj/AudioDataBus';
 import { ExternalLink, SkipForward, Shuffle, Pause, Play, List, Maximize, Minimize, Music } from 'lucide-react';
 import { useUIStore } from '@stores/useUIStore';
 import { useDJStore } from '@stores/useDJStore';
+import { useTransportStore } from '@stores/useTransportStore';
 import { useSettingsStore } from '@stores/useSettingsStore';
 import { focusPopout } from '@components/ui/PopOutWindow';
 import { VJPresetBrowser } from './VJPresetBrowser';
@@ -284,8 +285,39 @@ const PatternOverlayToggle: React.FC = () => {
 // ─── Conditional wrapper for pattern overlay on VJ view ─────────────────────
 const VJPatternOverlayWrapper: React.FC = () => {
   const enabled = useSettingsStore(s => s.vjPatternOverlay);
+  const trackerPlaying = useTransportStore(s => s.isPlaying);
+  const deckA = useDJStore(s => s.decks.A);
+  const deckB = useDJStore(s => s.decks.B);
   if (!enabled) return null;
-  return <VJPatternOverlay />;
+
+  // Collect active sources
+  const sources: Array<{ source: 'tracker' | 'deckA' | 'deckB'; key: string }> = [];
+  if (trackerPlaying) {
+    sources.push({ source: 'tracker', key: 'tracker' });
+  }
+  // DJ decks: show if they have loaded content (songPos tracking indicates loaded song)
+  if (deckA.isPlaying) sources.push({ source: 'deckA', key: 'deckA' });
+  if (deckB.isPlaying) sources.push({ source: 'deckB', key: 'deckB' });
+
+  // If nothing is playing, show tracker overlay as idle display (original behavior)
+  if (sources.length === 0) {
+    return <VJPatternOverlay source="tracker" />;
+  }
+
+  // Single source — centered
+  if (sources.length === 1) {
+    return <VJPatternOverlay source={sources[0].source} />;
+  }
+
+  // Multiple sources — spread overlays with offset
+  return (
+    <>
+      {sources.map((s, i) => {
+        const offset = sources.length <= 1 ? 0 : (i / (sources.length - 1)) * 2 - 1; // -1..+1
+        return <VJPatternOverlay key={s.key} source={s.source} offsetX={offset} />;
+      })}
+    </>
+  );
 };
 
 // ─── VJControls — DOM overlay controls (used by both DOM view + PixiDOMOverlay) ─
