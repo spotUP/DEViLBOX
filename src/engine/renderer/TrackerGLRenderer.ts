@@ -519,10 +519,11 @@ export class TrackerGLRenderer {
       }
     }
 
-    // Center line highlight — solid background using trackerRowCurrent
+    // Center line highlight
     {
-      const [r, g, b] = colors.rowCurrent;
-      this.addRect(0, centerLineTop, width, rowH, [r, g, b, 1]);
+      const [r, g, b, a] = colors.centerLine;
+      const alpha = ui.trackerVisualBg ? a * 0.5 : a;
+      this.addRect(0, centerLineTop, width, rowH, [r, g, b, alpha]);
     }
 
     // Channel separators and left stripes (full height)
