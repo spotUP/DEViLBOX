@@ -444,11 +444,11 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
   return (
     <div
       ref={containerRef}
-      className="w-full overflow-hidden flex justify-center py-2 select-none"
+      className="w-full overflow-hidden flex items-start justify-center py-2 select-none"
       style={{ minHeight: `${totalHeight + 16}px` }}
     >
       <div
-        className="relative bg-[#1a1a1a] rounded-xl shadow-lg border-b-4 border-r-2 border-black/40 overflow-hidden"
+        className="relative mx-auto bg-[#1a1a1a] rounded-xl shadow-lg border-b-4 border-r-2 border-black/40 overflow-hidden"
         style={{
           width: `${containerWidth}px`, height: `${totalHeight}px`,
           background: 'linear-gradient(180deg, #252525 0%, #1a1a1a 100%)',
