@@ -1442,6 +1442,21 @@ export const useTrackerStore = create<TrackerStore>()(
     loadPatterns: (patterns) =>
       set((state) => {
         if (patterns.length > 0) {
+          // Debug logging for pattern loading
+          console.log('[TrackerStore] loadPatterns called with', patterns.length, 'patterns');
+          let totalNotes = 0;
+          patterns.forEach((p, pIdx) => {
+            p.channels.forEach((c) => {
+              c.rows.forEach((r) => {
+                if (r.note > 0) totalNotes++;
+              });
+            });
+            if (pIdx < 3) {
+              console.log(`[TrackerStore] Pattern ${pIdx}: ${p.channels.length} channels, ${p.channels[0]?.rows?.length || 0} rows`);
+            }
+          });
+          console.log('[TrackerStore] Total notes in loaded patterns:', totalNotes);
+          
           // Ensure all channels have required properties (color) and length is valid
           const normalizedPatterns = patterns.map((pattern) => ({
             ...pattern,

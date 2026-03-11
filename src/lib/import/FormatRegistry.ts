@@ -2038,6 +2038,21 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
   },
 
   // ═══════════════════════════════════════════════════════════════════════════
+  // DEMOSCENE FORMATS — Renoise XRNS with VSTi synth extraction
+  // ═══════════════════════════════════════════════════════════════════════════
+  {
+    key: 'xrns',
+    label: 'Renoise',
+    description: 'Renoise song with WaveSabre/Oidos/Tunefish synth extraction',
+    family: 'pc-tracker',
+    matchMode: 'extension',
+    extRegex: /\.xrns$/i,
+    nativeOnly: true,
+    nativeParser: { module: '@lib/import/formats/XRNSParser', parseFn: 'parseXRNS' },
+    hasMetadata: true,
+  },
+
+  // ═══════════════════════════════════════════════════════════════════════════
   // LIBOPENMPT — Standard tracker formats (native parser first, then libopenmpt)
   // ═══════════════════════════════════════════════════════════════════════════
   {

@@ -219,10 +219,44 @@ export async function importTrackerModule(
       const patternOrder = importMetadata.modData?.patternOrderTable || [];
       const patLen = patterns[0]?.length || 64;
       const numChannels = importMetadata.originalChannelCount || (patterns[0]?.[0] as unknown[] | undefined)?.length || 4;
+      
+      console.log('[Import] XRNS conversion:', {
+        patternCount: patterns.length,
+        patLen,
+        numChannels,
+        patternOrder: patternOrder.slice(0, 10),
+        firstPatternRows: patterns[0]?.length,
+        firstRowCells: (patterns[0]?.[0] as unknown[])?.length,
+      });
+      
+      // Debug: Sample first pattern's data structure
+      if (patterns[0]) {
+        const firstPat = patterns[0] as unknown[][];
+        console.log('[Import] XRNS Pattern 0 sample:', {
+          rowCount: firstPat.length,
+          row0: firstPat[0],
+          row0Type: typeof firstPat[0],
+          row0IsArray: Array.isArray(firstPat[0]),
+        });
+        // Find first non-empty cell
+        for (let row = 0; row < Math.min(64, firstPat.length); row++) {
+          const rowData = firstPat[row] as { note?: number }[];
+          if (Array.isArray(rowData)) {
+            for (let ch = 0; ch < rowData.length; ch++) {
+              const cell = rowData[ch];
+              if (cell?.note && cell.note > 0) {
+                console.log(`[Import] XRNS first note found: row=${row} ch=${ch}`, cell);
+                break;
+              }
+            }
+          }
+        }
+      }
+      
       result = {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         patterns: (patterns as any[]).map((pat: any[][], idx: number) => ({
-          id: `pattern-${idx}`, name: `Pattern ${idx}`, length: patLen, importMetadata,
+          id: `pattern-${idx}`, name: `Pattern ${idx}`, length: pat.length || patLen, importMetadata,
           channels: Array.from({ length: numChannels }, (_, ch) => ({
             id: `channel-${ch}`, name: `Track ${ch + 1}`,
             muted: false, solo: false, collapsed: false,
@@ -241,6 +275,24 @@ export async function importTrackerModule(
         order: patternOrder.length > 0 ? patternOrder : [0],
         instrumentNames: parsedInstruments.map(i => i.name),
       };
+      
+      // Debug: Check if any patterns have notes
+      let totalNotes = 0;
+      result.patterns.forEach((p: any, pIdx: number) => {
+        let patNotes = 0;
+        p.channels.forEach((c: any) => {
+          c.rows.forEach((r: any) => {
+            if (r.note > 0) {
+              totalNotes++;
+              patNotes++;
+            }
+          });
+        });
+        if (pIdx < 5) {
+          console.log(`[Import] XRNS Pattern ${pIdx}: ${patNotes} notes, ${p.channels.length} channels, ${p.channels[0]?.rows?.length} rows`);
+        }
+      });
+      console.log('[Import] XRNS total notes in converted patterns:', totalNotes);
     } else {
       result = convertMODModule(
         patterns as any, importMetadata.originalChannelCount,
@@ -289,7 +341,7 @@ export async function importTrackerModule(
 
   // ── UADE / exotic Amiga / parseModuleToSong path ──
   // Also route here when metadata.song exists but has no pattern data
-  const songHasPatterns = info.metadata.song?.patterns?.length > 0;
+  const songHasPatterns = (info.metadata.song?.patterns?.length ?? 0) > 0;
   if (!info.metadata.song || !songHasPatterns) {
     if (!info.file) {
       notify.error('File reference lost — cannot import');
