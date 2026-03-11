@@ -331,7 +331,7 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
     const updateWidth = () => {
       if (containerRef.current?.parentElement) {
         const parentWidth = containerRef.current.parentElement.clientWidth - 32;
-        setContainerWidth(Math.max(1000, parentWidth));
+        setContainerWidth(Math.min(1200, Math.max(1000, parentWidth)));
       }
     };
     updateWidth();
