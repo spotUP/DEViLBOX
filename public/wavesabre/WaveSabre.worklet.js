@@ -1,0 +1,147 @@
+// WaveSabre Synth AudioWorklet
+// Wraps Falcon and Slaughter synths from WaveSabre
+
+// Polyfill performance.now() for AudioWorklet context
+if (typeof performance === 'undefined') {
+  globalThis.performance = {
+    now: () => Date.now()
+  };
+}
+
+let Module = null;
+let synth = null;
+let ready = false;
+
+// Synth types
+const SYNTH_FALCON = 0;
+const SYNTH_SLAUGHTER = 1;
+
+// Wrapped WASM functions
+let wavesabre_set_sample_rate = null;
+let wavesabre_create_falcon = null;
+let wavesabre_create_slaughter = null;
+let wavesabre_destroy = null;
+let wavesabre_set_param = null;
+let wavesabre_note_on = null;
+let wavesabre_note_off = null;
+let wavesabre_render = null;
+
+// Audio buffers
+let outputPtrL = 0;
+let outputPtrR = 0;
+const BUFFER_SIZE = 128;
+
+class WaveSabreProcessor extends AudioWorkletProcessor {
+  constructor() {
+    super();
+    this.synthType = SYNTH_FALCON; // Default
+    
+    this.port.onmessage = (e) => {
+      const { type, data } = e.data;
+      
+      switch (type) {
+        case 'init':
+          this.initWasm(data.wasmBytes, data.synthType || 'falcon');
+          break;
+        case 'noteOn':
+          if (ready && wavesabre_note_on) {
+            wavesabre_note_on(synth, data.note, data.velocity, 0);
+          }
+          break;
+        case 'noteOff':
+          if (ready && wavesabre_note_off) {
+            wavesabre_note_off(synth, data.note);
+          }
+          break;
+        case 'setParameter':
+          if (ready && wavesabre_set_param) {
+            wavesabre_set_param(synth, data.index, data.value);
+          }
+          break;
+        case 'setParameters':
+          if (ready && wavesabre_set_param && data.params) {
+            for (const [index, value] of Object.entries(data.params)) {
+              wavesabre_set_param(synth, parseInt(index), value);
+            }
+          }
+          break;
+      }
+    };
+  }
+
+  async initWasm(wasmBytes, synthTypeName) {
+    try {
+      // Determine synth type
+      this.synthType = synthTypeName === 'slaughter' ? SYNTH_SLAUGHTER : SYNTH_FALCON;
+      
+      // Load module using Emscripten factory pattern
+      // jsCode is already a string (decoded in main thread since worklet doesn't have TextDecoder)
+      // The Emscripten JS defines: var createWaveSabreSynth = (()=>...)();
+      // We wrap it in a function that returns the factory
+      const moduleFactory = new Function(wasmBytes.jsCode + '\nreturn createWaveSabreSynth;')();
+      
+      Module = await moduleFactory({
+        wasmBinary: wasmBytes.wasmBinary
+      });
+      
+      // Wrap functions
+      wavesabre_set_sample_rate = Module.cwrap('wavesabre_set_sample_rate', null, ['number']);
+      wavesabre_create_falcon = Module.cwrap('wavesabre_create_falcon', 'number', []);
+      wavesabre_create_slaughter = Module.cwrap('wavesabre_create_slaughter', 'number', []);
+      wavesabre_destroy = Module.cwrap('wavesabre_destroy', null, ['number']);
+      wavesabre_set_param = Module.cwrap('wavesabre_set_param', null, ['number', 'number', 'number']);
+      wavesabre_note_on = Module.cwrap('wavesabre_note_on', null, ['number', 'number', 'number', 'number']);
+      wavesabre_note_off = Module.cwrap('wavesabre_note_off', null, ['number', 'number']);
+      wavesabre_render = Module.cwrap('wavesabre_render', null, ['number', 'number', 'number', 'number']);
+      
+      // Set sample rate
+      wavesabre_set_sample_rate(sampleRate);
+      
+      // Create synth
+      if (this.synthType === SYNTH_SLAUGHTER) {
+        synth = wavesabre_create_slaughter();
+      } else {
+        synth = wavesabre_create_falcon();
+      }
+      
+      // Allocate output buffers in WASM memory
+      outputPtrL = Module._malloc(BUFFER_SIZE * 4);
+      outputPtrR = Module._malloc(BUFFER_SIZE * 4);
+      
+      ready = true;
+      this.port.postMessage({ type: 'ready', synthType: synthTypeName });
+    } catch (err) {
+      this.port.postMessage({ type: 'error', error: err.message });
+    }
+  }
+
+  process(inputs, outputs, parameters) {
+    if (!ready || !synth) {
+      return true;
+    }
+
+    const output = outputs[0];
+    if (!output || output.length === 0) return true;
+
+    const left = output[0];
+    const right = output[1] || left;
+    const blockSize = left.length;
+
+    // Render audio
+    wavesabre_render(synth, outputPtrL, outputPtrR, blockSize);
+
+    // Copy from WASM memory to output
+    const heapF32 = Module.HEAPF32;
+    const offsetL = outputPtrL / 4;
+    const offsetR = outputPtrR / 4;
+    
+    for (let i = 0; i < blockSize; i++) {
+      left[i] = heapF32[offsetL + i];
+      right[i] = heapF32[offsetR + i];
+    }
+
+    return true;
+  }
+}
+
+registerProcessor('wavesabre-processor', WaveSabreProcessor);
