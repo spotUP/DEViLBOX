@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-03-11T11:10:17.978Z
+ * Generated: 2026-03-11T17:24:16.922Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.2632';
-export const BUILD_NUMBER = '2632';
-export const BUILD_HASH = '50778111e';
+export const BUILD_VERSION = '1.0.2688';
+export const BUILD_NUMBER = '2688';
+export const BUILD_HASH = 'db1140adc';
 export const BUILD_DATE = '2026-03-11';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,226 +30,208 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.2632',
+    version: '1.0.2688',
     date: '2026-03-11',
     changes: [
       {
+        type: 'fix',
+        "description": "Use ref pattern to avoid stale closures"
+      },
+      {
+        type: 'fix',
+        "description": "Tracker scratch — wheel handler conflict + grab activation check"
+      },
+      {
         type: 'feature',
-        "description": "Add playback position cursor to PT2 and FT2 sample editors"
+        "description": "Auto-join room from URL query parameter"
       },
       {
         type: 'fix',
-        "description": "Fix getNativeAudioNode: recursively unwrap nested Tone.js wrappers"
+        "description": "Open at correct size from the start"
       },
       {
         type: 'fix',
-        "description": "Fix audio capture: tap masterEffectsInput instead of masterChannel"
+        "description": "Move useCallback before early return to fix hooks ordering error"
       },
       {
         type: 'fix',
-        "description": "Fix VU meters: empty channels no longer mirror active channel levels"
+        "description": "WobbleBass knob ranges, duplicate Neural keys, structuredClone error"
       },
       {
         type: 'fix',
-        "description": "Fix TD-3 import: show dialog from all entry points, fix empty pattern"
+        "description": "Live parameter updates for WobbleBass + knob layout improvements"
+      },
+      {
+        type: 'fix',
+        "description": "Fix title and fitContent sizing"
+      },
+      {
+        type: 'fix',
+        "description": "Revert to document.write (blob URLs break popups)"
+      },
+      {
+        type: 'feature',
+        "description": "Add Furnace chip synth routing to SynthControlsRouter"
       },
       {
         type: 'improvement',
-        "description": "Remove unused TD-3 imports from TrackerView"
+        "description": "Extract SynthControlsRouter for cleaner synth UI routing"
       },
       {
         type: 'improvement',
-        "description": "Show TD-3 import dialog in all views (DJ, arrangement, etc.)"
+        "description": "Chore: gitignore tunefish and wavesabre build dirs"
       },
       {
         type: 'fix',
-        "description": "Fix TD-3 import leaving old patterns + 303 panel bottom clipped"
+        "description": "Debug: add temporary logging for instrument effects chain"
       },
       {
         type: 'improvement',
-        "description": "Skip empty TD-3 patterns on import"
-      }
-    ]
-  },
-  {
-    version: '2026-03-10',
-    date: '2026-03-10',
-    changes: [
+        "description": "Minor cleanup in knob panels"
+      },
       {
         type: 'fix',
-        "description": "Fix TD-3 import to load as new song by default"
+        "description": "Use Blob URL to avoid about:blank in title bar"
       },
       {
         type: 'improvement',
-        "description": "Sort Modland format dropdown alphabetically"
-      },
-      {
-        type: 'fix',
-        "description": "Fix tonearm not resetting on track loop"
-      },
-      {
-        type: 'feature',
-        "description": "Consolidate master FX: add individual effect browser + 25 new presets"
-      },
-      {
-        type: 'fix',
-        "description": "Tonearm starts on outer groove, ends near label"
-      },
-      {
-        type: 'feature',
-        "description": "Shared song analysis cache (server-side SQLite)"
-      },
-      {
-        type: 'feature',
-        "description": "Sync button auto-plays and guards crossfader"
-      },
-      {
-        type: 'fix',
-        "description": "Sync button now phase-aligns without jumping to start"
-      },
-      {
-        type: 'feature',
-        "description": "V2M file import as editable patterns with V2 synth support"
-      },
-      {
-        type: 'feature',
-        "description": "Click-outside-to-close and auto-close for Modland browser"
-      },
-      {
-        type: 'fix',
-        "description": "Sync button matches BPM only, no longer seeks/resets position"
-      },
-      {
-        type: 'fix',
-        "description": "Eliminate clicks in fader LFO and scratch pattern chops"
-      },
-      {
-        type: 'feature',
-        "description": "Add V2 Synthesizer worklet and instrument types"
+        "description": "Move FX panel headers into tab bar with action buttons"
       },
       {
         type: 'improvement',
-        "description": "Add pattern editor optimization and loop stutter fix notes"
+        "description": "FX tabs: auto height to fit effect modules"
       },
       {
         type: 'improvement',
-        "description": "Chore: engine, store, tracker, and miscellaneous updates"
+        "description": "FX tabs: horizontal layout for effects pedals"
+      },
+      {
+        type: 'feature',
+        "description": "InstrumentKnobPanel: follow selected instrument, add FX tabs"
       },
       {
         type: 'improvement',
-        "description": "Pixi UI dialog and component updates"
+        "description": "Replace TB303+SC panels with unified InstrumentKnobPanel"
+      },
+      {
+        type: 'fix',
+        "description": "Fix 303 panel visible when collapsed — fade content out"
+      },
+      {
+        type: 'fix',
+        "description": "Fix 303 FX tab sliders hidden behind tips bar"
       },
       {
         type: 'improvement',
-        "description": "Dialog and modal UI improvements"
-      },
-      {
-        type: 'feature',
-        "description": "DJ engine improvements and component updates"
-      },
-      {
-        type: 'feature',
-        "description": "Add tracker analysis pipeline with genre detection"
-      },
-      {
-        type: 'feature',
-        "description": "Add V2 Synthesizer and V2M Player WASM modules"
-      },
-      {
-        type: 'fix',
-        "description": "Browser panels overlay + one-shot scratch buttons"
-      },
-      {
-        type: 'feature',
-        "description": "Add CSS Technics SL-1200 turntable with proper aspect ratio"
-      },
-      {
-        type: 'fix',
-        "description": "Fix bulk pattern edits not syncing to playback engines"
-      }
-    ]
-  },
-  {
-    version: '2026-03-09',
-    date: '2026-03-09',
-    changes: [
-      {
-        type: 'improvement',
-        "description": "Chore: update gitignore, gearmulator build, and changelog"
-      },
-      {
-        type: 'feature',
-        "description": "Chore: add Claude slash commands, update MCP config and CLAUDE.md"
-      },
-      {
-        type: 'feature',
-        "description": "AI chat panel, SC68 visualizer, VU meters, and UI improvements"
-      },
-      {
-        type: 'fix',
-        "description": "Symphonie Pro delta16 decoding and sample editor for native formats"
-      },
-      {
-        type: 'feature',
-        "description": "Engine improvements, new exporters, and format support updates"
-      },
-      {
-        type: 'feature',
-        "description": "Add AI chat, music analysis, and MCP bridge improvements"
-      },
-      {
-        type: 'feature',
-        "description": "Update WASM engine builds and add Furnace FileOps module"
-      }
-    ]
-  },
-  {
-    version: '2026-03-08',
-    date: '2026-03-08',
-    changes: [
-      {
-        type: 'fix',
-        "description": "Pre-upload all Furnace instruments before sequencer playback"
-      },
-      {
-        type: 'feature',
-        "description": "Add Ben Daglish, SidMon2, Symphonie Pro WASM engines and improvements"
-      },
-      {
-        type: 'fix',
-        "description": "Furnace INS2 instrument upload for all non-FM platforms"
-      },
-      {
-        type: 'fix',
-        "description": "Furnace C64 SID crash — HEAPU8 undefined after WASM memory growth"
-      },
-      {
-        type: 'fix',
-        "description": "Register missing C64SID, KlysSynth, Sc68Synth in SYNTH_INFO"
-      },
-      {
-        type: 'fix',
-        "description": "Cap Symphonie instruments at 128 to prevent duplicate React keys"
-      },
-      {
-        type: 'fix',
-        "description": "Symphonie Pro mix clipping and sample-to-instrument mapping"
-      },
-      {
-        type: 'fix',
-        "description": "Symphonie Pro broken audio — suppress notes and fix instrument types"
-      },
-      {
-        type: 'fix',
-        "description": "Symphonie Pro silent playback and missing instrument samples"
-      },
-      {
-        type: 'fix',
-        "description": "Reduce MCP bridge reconnect spam and fix Symphonie type errors"
+        "description": "Animate 303 panel expand/collapse with eased height transition"
       },
       {
         type: 'improvement',
-        "description": "Chore: gitignore artofnoise/pumatracker build dirs and update changelog"
+        "description": "Pin 303 expand/collapse buttons to top-right of screen"
+      },
+      {
+        type: 'fix',
+        "description": "Fix 303 centering — make ScrollLockContainer full width"
+      },
+      {
+        type: 'fix',
+        "description": "Fix 303 horizontal centering — add mx-auto on hardware div"
+      },
+      {
+        type: 'improvement',
+        "description": "Center 303 panel horizontally — cap max width at 1200px"
+      },
+      {
+        type: 'fix',
+        "description": "Fix 303 panel shadow/border layers clipping unevenly"
+      },
+      {
+        type: 'fix',
+        "description": "Fix 303 panel cutoff — remove maxHeight limit, let flex layout handle sizing"
+      },
+      {
+        type: 'fix',
+        "description": "Correct 303 tab-to-page mapping for hardware knobs"
+      },
+      {
+        type: 'fix',
+        "description": "Fix VU meters for native synths (DB303) — always use trigger data"
+      },
+      {
+        type: 'improvement',
+        "description": "Enable pattern scratch during playback without DJ/toggle gate"
+      },
+      {
+        type: 'fix',
+        "description": "Throttle direct synth updates to prevent audio noise"
+      },
+      {
+        type: 'improvement',
+        "description": "Allow left/right/tab cursor movement during playback"
+      },
+      {
+        type: 'fix',
+        "description": "Route CC mappings through unified parameter router"
+      },
+      {
+        type: 'improvement',
+        "description": "Use same accent color for cursor caret during playback"
+      },
+      {
+        type: 'feature',
+        "description": "Chore: add demoscene synth third-party sources"
+      },
+      {
+        type: 'improvement',
+        "description": "Update CLAUDE.md with TB-303 accent hardware details"
+      },
+      {
+        type: 'improvement',
+        "description": "Chore: update generated changelog and file manifest"
+      },
+      {
+        type: 'feature',
+        "description": "Add useImportDialog hook and dialog improvements"
+      },
+      {
+        type: 'improvement',
+        "description": "Chore: rename behringer_td-3_patterns to behringer-td-3"
+      },
+      {
+        type: 'feature',
+        "description": "Chore: add demoscene XRNS example songs"
+      },
+      {
+        type: 'feature',
+        "description": "Add Tunefish, WaveSabre, Oidos demoscene synths"
+      },
+      {
+        type: 'feature',
+        "description": "Add XRNS debug logging for pattern pipeline"
+      },
+      {
+        type: 'fix',
+        "description": "Hardware-accurate accent timing + soft limiter"
+      },
+      {
+        type: 'fix',
+        "description": "Lock drag direction to prevent value jumps"
+      },
+      {
+        type: 'fix',
+        "description": "Fix cursor caret hidden behind highlight bar during playback"
+      },
+      {
+        type: 'improvement',
+        "description": "Revert \"Make highlight bar solid during playback (non-visual-bg mode)\""
+      },
+      {
+        type: 'improvement',
+        "description": "Make highlight bar solid during playback (non-visual-bg mode)"
+      },
+      {
+        type: 'improvement',
+        "description": "Restore highlight bar to original accentGlow color"
       }
     ]
   }

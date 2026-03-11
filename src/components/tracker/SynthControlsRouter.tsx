@@ -6,7 +6,7 @@
  */
 
 import React, { lazy, Suspense, useCallback } from 'react';
-import type { InstrumentConfig, SynthType } from '@typedefs/instrument';
+import type { InstrumentConfig, MAMEConfig } from '@typedefs/instrument';
 import {
   DEFAULT_DUB_SIREN, DEFAULT_SPACE_LASER, DEFAULT_V2, DEFAULT_V2_SPEECH,
   DEFAULT_SYNARE, DEFAULT_DEXED, DEFAULT_OBXD, DEFAULT_SAM,
@@ -16,7 +16,7 @@ import {
   DEFAULT_DELTAMUSIC1, DEFAULT_DELTAMUSIC2, DEFAULT_FRED, DEFAULT_TFMX,
   DEFAULT_OCTAMED, DEFAULT_SIDMON1, DEFAULT_HIPPEL_COSO, DEFAULT_ROB_HUBBARD,
   DEFAULT_DAVID_WHITTAKER, DEFAULT_SONIC_ARRANGER, DEFAULT_WOBBLE_BASS,
-  DEFAULT_FURNACE,
+  DEFAULT_FURNACE, DEFAULT_MAME_VFX, DEFAULT_MAME_DOC,
 } from '@typedefs/instrument';
 import { deepMerge } from '@lib/migration';
 import { isMAMEChipType } from '@constants/chipParameters';
@@ -337,7 +337,8 @@ export const SynthControlsRouter: React.FC<SynthControlsRouterProps> = ({ instru
 
     // ── Gearmulator ─────────────────────────────────────────
     if (synthType.startsWith('Gearmulator')) {
-      return <GearmulatorEditor instrument={instrument} handleChange={onUpdate} />;
+      const cfg = instrument.gearmulator || { preset: 0, bank: 0 };
+      return <GearmulatorEditor config={cfg} onChange={(u) => onUpdate({ gearmulator: u })} />;
     }
 
     // ── VSTBridge (generic) ─────────────────────────────────
@@ -354,13 +355,15 @@ export const SynthControlsRouter: React.FC<SynthControlsRouterProps> = ({ instru
           instrumentId={instrument.id}
           onParamChange={handleChipParamChange}
           onTextChange={handleChipTextChange}
+          onLoadPreset={(program) => onUpdate({ parameters: { ...instrument.parameters, program } })}
         />
       );
     }
 
     // ── MAME VFX/DOC ────────────────────────────────────────
     if (synthType === 'MAMEVFX' || synthType === 'MAMEDOC') {
-      const cfg = instrument.mame || (synthType === 'MAMEVFX' ? { preset: 0 } : { preset: 0 });
+      const defaultCfg = synthType === 'MAMEVFX' ? DEFAULT_MAME_VFX : DEFAULT_MAME_DOC;
+      const cfg: MAMEConfig = instrument.mame || defaultCfg;
       return <MAMEControls config={cfg} onChange={(u) => onUpdate({ mame: { ...cfg, ...u } })} />;
     }
 
@@ -374,7 +377,7 @@ export const SynthControlsRouter: React.FC<SynthControlsRouterProps> = ({ instru
     return null;
   })();
 
-  if (!content) return <>{fallback}</> ?? null;
+  if (!content) return fallback ? <>{fallback}</> : null;
 
   return (
     <Suspense fallback={<LoadingFallback />}>
