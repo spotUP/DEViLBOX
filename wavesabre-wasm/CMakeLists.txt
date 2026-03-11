@@ -19,10 +19,12 @@ set(CORE_SOURCES
     src/MxcsrFlagGuard_stub.cpp
 )
 
-# Synth sources - Falcon and Slaughter only (Adultery/Specimen need Windows GSM/DLS)
+# Synth sources - Falcon, Slaughter, and Adultery (GmDls stub replaces Windows API)
 set(SYNTH_SOURCES
     ${WAVESABRE_DIR}/src/Falcon.cpp
     ${WAVESABRE_DIR}/src/Slaughter.cpp
+    ${WAVESABRE_DIR}/src/Adultery.cpp
+    ${WAVESABRE_DIR}/src/SamplePlayer.cpp
 )
 
 # Effect sources (some synths use effects)
@@ -36,6 +38,7 @@ set(EFFECT_SOURCES
 # WASM wrapper
 set(WRAPPER_SOURCES
     src/wavesabre_wasm.cpp
+    src/GmDls_wasm.cpp
 )
 
 if(EMSCRIPTEN)
@@ -65,6 +68,9 @@ if(EMSCRIPTEN)
             -s EXPORTED_FUNCTIONS='[\
                 \"_wavesabre_create_falcon\",\
                 \"_wavesabre_create_slaughter\",\
+                \"_wavesabre_create_adultery\",\
+                \"_wavesabre_set_gmdls_data\",\
+                \"_wavesabre_has_gmdls\",\
                 \"_wavesabre_destroy\",\
                 \"_wavesabre_set_param\",\
                 \"_wavesabre_note_on\",\

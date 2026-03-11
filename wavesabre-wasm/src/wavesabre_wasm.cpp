@@ -14,6 +14,7 @@
 
 #include "WaveSabreCore/Falcon.h"
 #include "WaveSabreCore/Slaughter.h"
+#include "WaveSabreCore/Adultery.h"
 #include "WaveSabreCore/Helpers.h"
 
 using namespace WaveSabreCore;
@@ -21,7 +22,8 @@ using namespace WaveSabreCore;
 // Synth type enum
 enum SynthType {
     SYNTH_FALCON = 0,
-    SYNTH_SLAUGHTER = 1
+    SYNTH_SLAUGHTER = 1,
+    SYNTH_ADULTERY = 2
 };
 
 // Wrapper struct to hold any synth type
@@ -56,6 +58,16 @@ EXPORT void* wavesabre_create_slaughter() {
     auto wrapper = new SynthWrapper();
     wrapper->type = SYNTH_SLAUGHTER;
     wrapper->device = new Slaughter();
+    wrapper->sampleRate = globalSampleRate;
+    wrapper->inputBuffer[0] = dummyInput;
+    wrapper->inputBuffer[1] = dummyInput;
+    return wrapper;
+}
+
+EXPORT void* wavesabre_create_adultery() {
+    auto wrapper = new SynthWrapper();
+    wrapper->type = SYNTH_ADULTERY;
+    wrapper->device = new Adultery();
     wrapper->sampleRate = globalSampleRate;
     wrapper->inputBuffer[0] = dummyInput;
     wrapper->inputBuffer[1] = dummyInput;
@@ -120,6 +132,8 @@ EXPORT int wavesabre_get_num_params(int synthType) {
             return static_cast<int>(Falcon::ParamIndices::NumParams);
         case SYNTH_SLAUGHTER:
             return static_cast<int>(Slaughter::ParamIndices::NumParams);
+        case SYNTH_ADULTERY:
+            return static_cast<int>(Adultery::ParamIndices::NumParams);
         default:
             return 32;
     }

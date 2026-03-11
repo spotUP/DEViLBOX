@@ -12,6 +12,24 @@ import {
   SlaughterParamIndex,
 } from '@typedefs/wavesabreInstrument';
 
+// Shared GM DLS data — loaded once, reused across all Adultery instances
+let gmDlsDataPromise: Promise<ArrayBuffer> | null = null;
+
+function fetchGmDlsData(): Promise<ArrayBuffer> {
+  if (!gmDlsDataPromise) {
+    gmDlsDataPromise = fetch('/wavesabre/gm.dls')
+      .then((res) => {
+        if (!res.ok) throw new Error(`Failed to fetch gm.dls: ${res.status}`);
+        return res.arrayBuffer();
+      })
+      .catch((err) => {
+        gmDlsDataPromise = null;
+        throw err;
+      });
+  }
+  return gmDlsDataPromise;
+}
+
 export class WaveSabreSynth implements DevilboxSynth {
   readonly name = 'WaveSabreSynth';
   readonly output: GainNode;
@@ -30,10 +48,11 @@ export class WaveSabreSynth implements DevilboxSynth {
 
   constructor(synthType: WaveSabreSynthType = 'falcon') {
     this.synthType = synthType;
+    // Adultery uses raw parameter indices — no named config
     this.config =
-      synthType === 'falcon'
-        ? { ...DEFAULT_FALCON_CONFIG }
-        : { ...DEFAULT_SLAUGHTER_CONFIG };
+      synthType === 'slaughter'
+        ? { ...DEFAULT_SLAUGHTER_CONFIG }
+        : { ...DEFAULT_FALCON_CONFIG };
 
     this.audioContext = getDevilboxAudioContext();
     this.output = this.audioContext.createGain();
@@ -71,11 +90,12 @@ export class WaveSabreSynth implements DevilboxSynth {
       this.workletNode.port.onmessage = (e) => {
         const { type, error } = e.data;
         if (type === 'ready') {
-          // Apply default config first (sets sensible base params)
-          if (this._pendingParams.length === 0) {
+          // For adultery, load GM DLS data before applying params
+          if (this.synthType === 'adultery') {
+            this.loadGmDlsAndApplyParams();
+          } else if (this._pendingParams.length === 0) {
             this.applyConfig(this.config);
           } else {
-            // XRNS parameters override defaults — send them after init
             for (const { index, value } of this._pendingParams) {
               this.workletNode?.port.postMessage({
                 type: 'setParameter',
@@ -88,6 +108,17 @@ export class WaveSabreSynth implements DevilboxSynth {
           if (this._resolveInit) {
             this._resolveInit();
             this._resolveInit = null;
+          }
+        } else if (type === 'gmdlsLoaded') {
+          // Now apply pending XRNS params (which include SampleIndex)
+          if (this._pendingParams.length > 0) {
+            for (const { index, value } of this._pendingParams) {
+              this.workletNode?.port.postMessage({
+                type: 'setParameter',
+                data: { index, value },
+              });
+            }
+            this._pendingParams = [];
           }
         } else if (type === 'error') {
           console.error('[WaveSabreSynth] WASM error:', error);
@@ -126,6 +157,27 @@ export class WaveSabreSynth implements DevilboxSynth {
   /** Alias for ready() - used by InstrumentFactory */
   async ensureInitialized(): Promise<void> {
     return this.ready();
+  }
+
+  /** Load GM DLS data for Adultery, then apply pending params */
+  private async loadGmDlsAndApplyParams(): Promise<void> {
+    try {
+      const dlsData = await fetchGmDlsData();
+      this.workletNode?.port.postMessage({
+        type: 'loadGmDls',
+        data: { dlsData },
+      });
+    } catch (err) {
+      console.warn('[WaveSabreSynth] GM DLS not available — Adultery samples will be silent:', err);
+      // Still send pending params (non-sample params will work)
+      for (const { index, value } of this._pendingParams) {
+        this.workletNode?.port.postMessage({
+          type: 'setParameter',
+          data: { index, value },
+        });
+      }
+      this._pendingParams = [];
+    }
   }
 
   /** Set a parameter by index (for XRNS parameter arrays) */

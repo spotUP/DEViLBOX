@@ -129,7 +129,7 @@ export interface SlaughterConfig {
 // Combined WaveSabre instrument config
 // ═══════════════════════════════════════════════════════════════════════════
 
-export type WaveSabreSynthType = 'falcon' | 'slaughter';
+export type WaveSabreSynthType = 'falcon' | 'slaughter' | 'adultery';
 
 export interface WaveSabreInstrumentConfig {
   synthType: WaveSabreSynthType;
