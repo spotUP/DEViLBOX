@@ -18,10 +18,12 @@ import * as Tone from 'tone';
 import { useTrackerStore } from '@stores/useTrackerStore';
 import { useTransportStore } from '@stores/useTransportStore';
 import { useMixerStore } from '@stores/useMixerStore';
+import { useDJStore, type DeckId } from '@stores/useDJStore';
 import { AudioDataBus, type VJAudioFrame } from '@engine/vj/AudioDataBus';
 import { getTrackerReplayer } from '@engine/TrackerReplayer';
+import { getDJEngineIfActive } from '@engine/dj/DJEngine';
 import { getToneEngine } from '@engine/ToneEngine';
-import type { TrackerCell } from '@/types/tracker';
+import type { TrackerCell, Pattern } from '@/types/tracker';
 
 const NOTE_NAMES = ['C-', 'C#', 'D-', 'D#', 'E-', 'F-', 'F#', 'G-', 'G#', 'A-', 'A#', 'B-'];
 
@@ -111,13 +113,68 @@ function pseudoRandom(seed: number): number {
   return x - Math.floor(x);
 }
 
-export const VJPatternOverlay: React.FC = React.memo(() => {
+// ── Data source types ────────────────────────────────────────────────────────
+export type OverlaySource = 'tracker' | 'deckA' | 'deckB' | 'deckC';
+
+interface PatternSnapshot {
+  pattern: Pattern;
+  currentRow: number;
+  isPlaying: boolean;
+  label?: string;
+}
+
+/** Extract current pattern data from the given source. Returns null if no data available. */
+function getPatternSnapshot(source: OverlaySource): PatternSnapshot | null {
+  if (source === 'tracker') {
+    const { patterns, currentPatternIndex } = useTrackerStore.getState();
+    const { currentRow, isPlaying } = useTransportStore.getState();
+    const pattern = patterns[currentPatternIndex];
+    if (!pattern) return null;
+    return { pattern, currentRow, isPlaying };
+  }
+
+  // DJ deck source
+  const deckId = source.replace('deck', '') as DeckId;
+  const djEngine = getDJEngineIfActive();
+  if (!djEngine) return null;
+
+  const deck = djEngine.getDeck(deckId);
+  if (!deck) return null;
+
+  const song = deck.replayer.getSong();
+  if (!song || !song.patterns.length) return null;
+
+  const songPos = deck.replayer.getSongPos();
+  const patIdx = song.songPositions[songPos] ?? 0;
+  const pattern = song.patterns[patIdx];
+  if (!pattern) return null;
+
+  const deckState = useDJStore.getState().decks[deckId];
+  return {
+    pattern,
+    currentRow: deck.replayer.getPattPos(),
+    isPlaying: deckState.isPlaying,
+    label: `Deck ${deckId}`,
+  };
+}
+
+interface VJPatternOverlayProps {
+  source?: OverlaySource;
+  /** Visual offset for stacking multiple overlays (0 = centered, 1 = right, -1 = left) */
+  offsetX?: number;
+}
+
+export const VJPatternOverlay: React.FC<VJPatternOverlayProps> = React.memo(({ source = 'tracker', offsetX = 0 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const rafRef = useRef(0);
   const busRef = useRef<AudioDataBus | null>(null);
   const animRef = useRef<AnimState>(createAnimState());
   const lastTimeRef = useRef(0);
+  const sourceRef = useRef(source);
+  const offsetXRef = useRef(offsetX);
+  sourceRef.current = source;
+  offsetXRef.current = offsetX;
   // Per-channel VU meter levels (decayed each frame)
   const vuLevelsRef = useRef<number[]>([]);
   const vuLastGensRef = useRef<number[]>([]);
@@ -155,14 +212,12 @@ export const VJPatternOverlay: React.FC = React.memo(() => {
       const t = anim.time;
 
       // ── Read stores ────────────────────────────────────────────────────
-      const { patterns, currentPatternIndex } = useTrackerStore.getState();
-      const { currentRow, isPlaying } = useTransportStore.getState();
-      const pattern = patterns[currentPatternIndex];
-      if (!pattern) {
+      const snapshot = getPatternSnapshot(sourceRef.current);
+      if (!snapshot) {
         rafRef.current = requestAnimationFrame(render);
         return;
       }
-
+      const { pattern, currentRow, isPlaying } = snapshot;
       const channels = pattern.channels;
       const numChannels = channels.length;
       numChannelsRef.current = numChannels;
@@ -206,17 +261,25 @@ export const VJPatternOverlay: React.FC = React.memo(() => {
       // Smooth scroll via replayer audio timeline for sub-row interpolation
       let displayRow = currentRow;
       if (isPlaying) {
-        const replayer = getTrackerReplayer();
-        const audioTime = Tone.now() + 0.01;
-        const audioState = replayer.getStateAtTime(audioTime);
-        if (audioState) {
-          displayRow = audioState.row;
-          const nextState = replayer.getStateAtTime(audioTime + 0.5, true);
-          const dur = (nextState && nextState.row !== audioState.row)
-            ? nextState.time - audioState.time
-            : (2.5 / useTransportStore.getState().bpm) * useTransportStore.getState().speed;
-          const progress = Math.min(Math.max((audioTime - audioState.time) / (dur || 0.125), 0), 1);
-          anim.scrollOffset = progress * ROW_H;
+        // Use the appropriate replayer based on source
+        const curSource = sourceRef.current;
+        const replayer = curSource === 'tracker'
+          ? getTrackerReplayer()
+          : getDJEngineIfActive()?.getDeck(curSource.replace('deck', '') as DeckId)?.replayer;
+        if (replayer) {
+          const audioTime = Tone.now() + 0.01;
+          const audioState = replayer.getStateAtTime(audioTime);
+          if (audioState) {
+            displayRow = audioState.row;
+            const nextState = replayer.getStateAtTime(audioTime + 0.5, true);
+            const dur = (nextState && nextState.row !== audioState.row)
+              ? nextState.time - audioState.time
+              : (2.5 / (useTransportStore.getState().bpm || 125)) * (useTransportStore.getState().speed || 6);
+            const progress = Math.min(Math.max((audioTime - audioState.time) / (dur || 0.125), 0), 1);
+            anim.scrollOffset = progress * ROW_H;
+          } else {
+            anim.scrollOffset = 0;
+          }
         } else {
           anim.scrollOffset = 0;
         }
@@ -238,7 +301,7 @@ export const VJPatternOverlay: React.FC = React.memo(() => {
       const ry = (orbitY + anim.tiltKickY + highShimmer) * tiltDampen;
       const rz = Math.sin(t * 0.07) * 2 + anim.tiltKickX * 0.15;
       const scale = 2.1 + anim.bassAccum * 0.12 + anim.beatFlash * 0.08 + anim.energyPulse * 0.3;
-      const driftX = Math.sin(t * 0.09) * 20 + Math.cos(t * 0.23) * 15 + frame.midEnergy * Math.sin(t * 3) * 8;
+      const driftX = Math.sin(t * 0.09) * 20 + Math.cos(t * 0.23) * 15 + frame.midEnergy * Math.sin(t * 3) * 8 + offsetXRef.current * 180;
       const driftY = Math.sin(t * 0.14) * 12 + anim.bounceY;
       const opacity = 0.8 + frame.rms * 0.2 + anim.beatFlash * 0.15;
 
