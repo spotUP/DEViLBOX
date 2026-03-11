@@ -355,7 +355,8 @@ async function loadWithNativeParser(
             if (note > 0) notesInPattern++;
             rowData.push({
               note,
-              instrument: noteCol?.instrument ?? 0,
+              // XRNS uses 0-based instrument indices, DEViLBOX uses 1-based
+              instrument: noteCol?.instrument !== undefined ? noteCol.instrument + 1 : 0,
               volume: noteCol?.volume ?? 0,
               effTyp: 0,
               eff: 0,

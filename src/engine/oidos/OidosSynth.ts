@@ -117,6 +117,8 @@ export class OidosSynth implements DevilboxSynth {
         const { type, error } = e.data;
         if (type === 'ready') {
           // Send any pending params
+          // Send pending params (from XRNS import)
+          const hadPendingParams = this._pendingParams.length > 0;
           for (const { index, value } of this._pendingParams) {
             this.workletNode?.port.postMessage({
               type: 'setParameter',
@@ -125,8 +127,10 @@ export class OidosSynth implements DevilboxSynth {
           }
           this._pendingParams = [];
 
-          // Apply initial config
-          this.applyConfig(this.config);
+          // Only apply initial config if no XRNS params were queued
+          if (!hadPendingParams) {
+            this.applyConfig(this.config);
+          }
 
           if (this._resolveInit) {
             this._resolveInit();
@@ -141,7 +145,7 @@ export class OidosSynth implements DevilboxSynth {
       this.workletNode.connect(this.output);
 
       // Load WASM
-      const wasmResponse = await fetch('/oidos/Oidos_bg.wasm');
+      const wasmResponse = await fetch('/oidos/Oidos.wasm');
       const wasmBytes = await wasmResponse.arrayBuffer();
       this.workletNode.port.postMessage({
         type: 'init',

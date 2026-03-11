@@ -99,10 +99,7 @@ export function convertToInstrument(
     if (synthType === 'wavesabre-slaughter' || synthType === 'wavesabre-falcon') {
       devilboxSynthType = 'WaveSabreSynth';
     } else if (synthType === 'wavesabre-adultery') {
-      // Adultery not yet compiled into WaveSabre WASM
-      devilboxSynthType = 'Sampler';
-      instName = `${parsed.name} [Adultery - no audio]`;
-      console.warn(`[InstrumentConverter] WaveSabre Adultery not in WASM build yet`);
+      devilboxSynthType = 'WaveSabreSynth';
     } else if (synthType === 'oidos') {
       devilboxSynthType = 'OidosSynth';
     } else if (synthType === 'tunefish') {
@@ -185,6 +182,28 @@ export function convertToInstrument(
         };
       });
     }
+  }
+
+  // If no instruments were created (e.g., XRNS Macro devices, empty instruments),
+  // create a placeholder to maintain consistent instrument ID numbering.
+  // Pattern data references instruments by index, so we need every slot filled.
+  if (instruments.length === 0) {
+    const isXRNS = sourceFormat as string === 'XRNS';
+    const isMacro = parsed.name.toLowerCase().startsWith('macro');
+    
+    // For XRNS Macro devices, create a silent placeholder
+    // For other formats, this shouldn't happen but handle gracefully
+    console.log(`[InstrumentConverter] Creating placeholder for empty instrument ${instrumentId}: "${parsed.name}" (${isXRNS && isMacro ? 'XRNS Macro' : 'empty'})`);
+    
+    instruments.push({
+      id: instrumentId,
+      name: parsed.name + (isXRNS && isMacro ? ' [Macro - silent]' : ' [empty]'),
+      synthType: 'Synth',  // Use basic synth as placeholder
+      type: 'synth',
+      effects: [],
+      volume: -60,  // Silent
+      pan: 0,
+    });
   }
 
   return instruments;
