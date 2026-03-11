@@ -86,6 +86,58 @@ export function convertToInstrument(
     return instruments;
   }
 
+  // Check if this is an XRNS demoscene synth (WaveSabre, Oidos, Tunefish)
+  if (parsed.xrnsSynth) {
+    const { synthType, pluginIdentifier, parameters, parameterChunk } = parsed.xrnsSynth;
+    console.log(`[InstrumentConverter] Creating XRNS synth: ${synthType} for "${parsed.name}"`);
+    
+    // Map XRNS synth type to DEViLBOX synth type
+    let devilboxSynthType: SynthType;
+    let instName = parsed.name;
+    
+    // WaveSabre synths - only Falcon and Slaughter have WASM support
+    if (synthType === 'wavesabre-slaughter' || synthType === 'wavesabre-falcon') {
+      devilboxSynthType = 'WaveSabreSynth';
+    } else if (synthType === 'wavesabre-adultery') {
+      // Adultery not yet compiled into WaveSabre WASM
+      devilboxSynthType = 'Sampler';
+      instName = `${parsed.name} [Adultery - no audio]`;
+      console.warn(`[InstrumentConverter] WaveSabre Adultery not in WASM build yet`);
+    } else if (synthType === 'oidos') {
+      devilboxSynthType = 'OidosSynth';
+    } else if (synthType === 'tunefish') {
+      devilboxSynthType = 'TunefishSynth';
+    } else if (synthType === 'wavesabre-specimen') {
+      // Specimen is WaveSabre's sampler - use our Sampler
+      devilboxSynthType = 'Sampler';
+    } else {
+      devilboxSynthType = 'Sampler';
+      if (pluginIdentifier) {
+        instName = `${parsed.name} [${pluginIdentifier} - unsupported]`;
+      }
+    }
+    
+    const xrnsInst: InstrumentConfig = {
+      id: instrumentId,
+      name: instName,
+      synthType: devilboxSynthType,
+      type: 'synth',
+      effects: [],
+      volume: 0,
+      pan: 0,
+      // Store XRNS-specific data for the synth engine
+      xrns: {
+        synthType,
+        pluginIdentifier,
+        parameters,
+        parameterChunk,
+      },
+    };
+    
+    instruments.push(xrnsInst);
+    return instruments;
+  }
+
   // Standard sample-based conversion for MOD/XM/IT/S3M
   // XM instruments can have multiple samples.
   // The primary instrument keeps the original slot ID (matches pattern references).

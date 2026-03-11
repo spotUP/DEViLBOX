@@ -9,6 +9,7 @@ import { parseXM } from './formats/XMParser';
 import { parseMOD } from './formats/MODParser';
 import { parseFurnaceSong, convertFurnaceToDevilbox, buildFurnaceNativeData } from './formats/FurnaceSongParser';
 import { DefleMaskParser, type DMFModule } from './formats/DefleMaskParser';
+import { parseXRNS, xrnsNoteToMidi, getXRNSSynthType } from './formats/XRNSParser';
 import { isGoatTrackerSong } from './formats/GoatTrackerDetect';
 import { FurnaceDispatchEngine } from '@engine/furnace-dispatch/FurnaceDispatchEngine';
 import type { ParsedInstrument, ImportMetadata } from '../../types/tracker';
@@ -122,8 +123,8 @@ export async function loadModuleFile(file: File): Promise<ModuleInfo> {
           return;
         }
 
-        const useNativeParser = ext === '.xm' || ext === '.mod' || ext === '.fur' || ext === '.dmf';
-        // Try native parser for XM/MOD
+        const useNativeParser = ext === '.xm' || ext === '.mod' || ext === '.fur' || ext === '.dmf' || ext === '.xrns';
+        // Try native parser for XM/MOD/XRNS
         if (useNativeParser) {
           console.log('[ModuleLoader] Trying native parser for', ext);
           try {
@@ -149,7 +150,7 @@ export async function loadModuleFile(file: File): Promise<ModuleInfo> {
 
               // Load with libopenmpt for playback (skip for formats not supported by libopenmpt)
               let player: ChiptunePlayer | undefined;
-              if (ext !== '.fur' && ext !== '.dmf') {
+              if (ext !== '.fur' && ext !== '.dmf' && ext !== '.xrns') {
                 player = await loadWithLibopenmpt(arrayBuffer);
               }
 
@@ -165,7 +166,7 @@ export async function loadModuleFile(file: File): Promise<ModuleInfo> {
           } catch (nativeError) {
             console.warn(`[ModuleLoader] Native parser failed:`, nativeError);
             // Don't fall back to libopenmpt for formats it doesn't support
-            if (ext === '.fur' || ext === '.dmf') {
+            if (ext === '.fur' || ext === '.dmf' || ext === '.xrns') {
               reject(new Error(`Failed to parse ${ext} file: ${nativeError instanceof Error ? nativeError.message : 'unknown error'}`));
               return;
             }
@@ -328,6 +329,90 @@ async function loadWithNativeParser(
         importMetadata: result.metadata,
         instruments: result.instruments,
         patterns: result.patterns as unknown[][],
+      };
+    } else if (ext === '.xrns') {
+      console.log('[ModuleLoader] Parsing Renoise XRNS file...');
+      const xrns = await parseXRNS(buffer);
+      console.log('[ModuleLoader] XRNS parse complete:', {
+        name: xrns.name,
+        bpm: xrns.bpm,
+        patterns: xrns.patterns.length,
+        instruments: xrns.instruments.length,
+        tracks: xrns.patterns[0]?.tracks.length ?? 0,
+        sequence: xrns.sequence.slice(0, 10),
+      });
+      
+      // Convert XRNS patterns to simple format
+      const convertedPatterns: unknown[][] = xrns.patterns.map((p, patIdx) => {
+        const rows: unknown[] = [];
+        let notesInPattern = 0;
+        for (let row = 0; row < p.lines; row++) {
+          const rowData: unknown[] = [];
+          for (let ch = 0; ch < p.tracks.length; ch++) {
+            const line = p.tracks[ch].lines.get(row);
+            const noteCol = line?.noteColumns[0];
+            const note = noteCol?.note ? xrnsNoteToMidi(noteCol.note) : 0;
+            if (note > 0) notesInPattern++;
+            rowData.push({
+              note,
+              instrument: noteCol?.instrument ?? 0,
+              volume: noteCol?.volume ?? 0,
+              effTyp: 0,
+              eff: 0,
+            });
+          }
+          rows.push(rowData);
+        }
+        if (patIdx < 5 || notesInPattern > 0) {
+          console.log(`[ModuleLoader] Pattern ${patIdx}: ${p.lines} lines, ${p.tracks.length} tracks, ${notesInPattern} notes`);
+        }
+        return rows;
+      });
+      
+      // Create synthetic instruments (WaveSabre/Oidos/Tunefish synths where detected)
+      const instruments: ParsedInstrument[] = xrns.instruments.map((inst, i) => {
+        const synthType = getXRNSSynthType(inst);
+        return {
+          id: i,
+          name: inst.name,
+          samples: [],
+          fadeout: 0,
+          volumeType: 'none' as const,
+          panningType: 'none' as const,
+          // XRNS synth metadata for InstrumentConverter
+          xrnsSynth: synthType !== 'sampler' ? {
+            synthType,
+            pluginIdentifier: inst.pluginIdentifier,
+            parameters: inst.parameters,
+            parameterChunk: inst.parameterChunk,
+          } : undefined,
+        };
+      });
+      
+      const metadata: ImportMetadata = {
+        sourceFormat: 'XRNS' as ImportMetadata['sourceFormat'],
+        sourceFile: xrns.name,
+        importedAt: new Date().toISOString(),
+        originalChannelCount: xrns.patterns[0]?.tracks.length ?? 1,
+        originalPatternCount: xrns.patterns.length,
+        originalInstrumentCount: xrns.instruments.length,
+        modData: {
+          moduleType: 'XRNS',
+          initialSpeed: xrns.ticksPerLine,
+          initialBPM: xrns.bpm,
+          amigaPeriods: false,
+          channelNames: [],
+          songLength: xrns.sequence.length,
+          restartPosition: 0,
+          patternOrderTable: xrns.sequence,
+        },
+      };
+      
+      return {
+        format: 'XRNS' as 'XM', // Use XM type for compatibility
+        importMetadata: metadata,
+        instruments,
+        patterns: convertedPatterns,
       };
     }
   } catch (error) {
