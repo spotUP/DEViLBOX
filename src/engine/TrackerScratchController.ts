@@ -115,6 +115,7 @@ export class TrackerScratchController {
   async initScratchBuffer(): Promise<void> {
     if (this.scratchBufferReady) return;
 
+    console.log('[TrackerScratch] Initializing scratch buffer...');
     const ctx = Tone.getContext().rawContext as AudioContext;
     // Use bufferId 0 (Deck A slot) — tracker scratch doesn't coexist with DJ mode
     this.scratchBuffer = new DeckScratchBuffer(ctx, 0);
@@ -134,8 +135,10 @@ export class TrackerScratchController {
       // Inject: playbackNode → playbackGain → masterInput (for scratch audio)
       this.scratchBuffer.playbackGain.connect(masterInput);
       this.scratchBufferReady = true;
+      console.log('[TrackerScratch] Scratch buffer wired successfully');
     } else {
-      console.warn('[TrackerScratch] Could not get native audio nodes; scratch disabled');
+      console.warn('[TrackerScratch] Could not get native audio nodes; scratch disabled',
+        { replayerGain: !!replayerGain, masterInput: !!masterInput });
     }
   }
 
@@ -239,7 +242,12 @@ export class TrackerScratchController {
    */
   onGrabStart(clientY: number, timestamp: number): boolean {
     const replayer = getTrackerReplayer();
-    if (!replayer.isPlaying()) return false;
+    if (!replayer.isPlaying()) {
+      console.log('[TrackerScratch] onGrabStart: replayer not playing, ignoring');
+      return false;
+    }
+
+    console.log('[TrackerScratch] onGrabStart: activating grab scratch');
 
     if (!this._isActive) {
       this.enterScratchMode(replayer);
@@ -411,10 +419,12 @@ export class TrackerScratchController {
 
   // ── Internal state machine ───────────────────────────────────────────────
 
-  private enterScratchMode(replayer: TrackerReplayer): void {
+   private enterScratchMode(replayer: TrackerReplayer): void {
     this._isActive = true;
     this.originalGainValue = 1;
     this.lastEventTime = performance.now();
+
+    console.log('[TrackerScratch] Entering scratch mode');
 
     // Store and enable smooth scrolling for scratch mode
     const transportState = useTransportStore.getState();
@@ -435,8 +445,11 @@ export class TrackerScratchController {
       void this.initScratchBuffer().then(() => {
         // Once buffer is ready and we're still active, engage scratch audio
         if (this._isActive && this.scratchBuffer) {
+          console.log('[TrackerScratch] Scratch buffer ready, engaging audio');
           this.engageScratchAudio(replayer);
         }
+      }).catch((err) => {
+        console.error('[TrackerScratch] Failed to init scratch buffer:', err);
       });
     } else {
       this.engageScratchAudio(replayer);
