@@ -16,6 +16,7 @@ import {
   DEFAULT_DELTAMUSIC1, DEFAULT_DELTAMUSIC2, DEFAULT_FRED, DEFAULT_TFMX,
   DEFAULT_OCTAMED, DEFAULT_SIDMON1, DEFAULT_HIPPEL_COSO, DEFAULT_ROB_HUBBARD,
   DEFAULT_DAVID_WHITTAKER, DEFAULT_SONIC_ARRANGER, DEFAULT_WOBBLE_BASS,
+  DEFAULT_FURNACE,
 } from '@typedefs/instrument';
 import { deepMerge } from '@lib/migration';
 import { isMAMEChipType } from '@constants/chipParameters';
@@ -361,6 +362,12 @@ export const SynthControlsRouter: React.FC<SynthControlsRouterProps> = ({ instru
     if (synthType === 'MAMEVFX' || synthType === 'MAMEDOC') {
       const cfg = instrument.mame || (synthType === 'MAMEVFX' ? { preset: 0 } : { preset: 0 });
       return <MAMEControls config={cfg} onChange={(u) => onUpdate({ mame: { ...cfg, ...u } })} />;
+    }
+
+    // ── Furnace chip synths ─────────────────────────────────
+    if (synthType === 'Furnace' || synthType.startsWith('Furnace')) {
+      const cfg = deepMerge(DEFAULT_FURNACE, instrument.furnace || {});
+      return <FurnaceControls config={cfg} instrumentId={instrument.id} onChange={(u) => onUpdate({ furnace: { ...cfg, ...u } })} />;
     }
 
     // ── No dedicated controls — use fallback ──
