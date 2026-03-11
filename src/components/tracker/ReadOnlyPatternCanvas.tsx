@@ -101,6 +101,7 @@ export const ReadOnlyPatternCanvas: React.FC<ReadOnlyPatternCanvasProps> = React
       accent:              t.colors.accent,
       accentSecondary:     t.colors.accentSecondary,
       accentGlow:          t.colors.accentGlow,
+      rowCurrent:          t.colors.trackerRowCurrent,
       bg:                  t.colors.trackerRowEven,
       rowNormal:           t.colors.trackerRowOdd,
       rowHighlight:        t.colors.trackerRowHighlight,
