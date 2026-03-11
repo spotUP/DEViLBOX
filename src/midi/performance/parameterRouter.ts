@@ -252,21 +252,46 @@ function getVSTBridgeSynth(instrumentId: number): unknown {
 }
 
 // ============================================================================
-// Direct synth engine call — bypass store/React for immediate audio response
+// Throttle for direct synth calls — prevent audio glitches from rapid MIDI CC
 // ============================================================================
 
-function sendDirectToSynth(instrumentId: number, param: string, value: number): void {
+const _pendingSynthUpdates: Map<number, Map<string, number>> = new Map();
+let _synthFlushScheduled = false;
+
+function flushSynthUpdates(): void {
+  _synthFlushScheduled = false;
   try {
     const engine = getToneEngine();
-    engine.instruments.forEach((instrument, key) => {
-      if ((key >>> 16) !== instrumentId) return;
-      const synthObj = instrument as unknown as Record<string, unknown>;
-      if (typeof synthObj.set === 'function') {
-        (synthObj.set as (p: string, v: number) => void)(param, value);
-      }
-    });
+    for (const [instrumentId, params] of _pendingSynthUpdates) {
+      engine.instruments.forEach((instrument, key) => {
+        if ((key >>> 16) !== instrumentId) return;
+        const synthObj = instrument as unknown as Record<string, unknown>;
+        if (typeof synthObj.set === 'function') {
+          const setFn = synthObj.set as (p: string, v: number) => void;
+          for (const [param, value] of params) {
+            setFn(param, value);
+          }
+        }
+      });
+    }
   } catch {
-    // Engine not initialized yet — store update will handle it later
+    // Engine not initialized yet
+  }
+  _pendingSynthUpdates.clear();
+}
+
+function sendDirectToSynth(instrumentId: number, param: string, value: number): void {
+  // Coalesce rapid updates — only send to synth at ~60Hz (requestAnimationFrame)
+  let instrumentParams = _pendingSynthUpdates.get(instrumentId);
+  if (!instrumentParams) {
+    instrumentParams = new Map();
+    _pendingSynthUpdates.set(instrumentId, instrumentParams);
+  }
+  instrumentParams.set(param, value);
+
+  if (!_synthFlushScheduled) {
+    _synthFlushScheduled = true;
+    requestAnimationFrame(flushSynthUpdates);
   }
 }
 
