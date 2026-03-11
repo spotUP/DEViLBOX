@@ -373,6 +373,24 @@ export const SynthControlsRouter: React.FC<SynthControlsRouterProps> = ({ instru
       return <FurnaceControls config={cfg} instrumentId={instrument.id} onChange={(u) => onUpdate({ furnace: { ...cfg, ...u } })} />;
     }
 
+    // ── XRNS demoscene synths (WaveSabre, Oidos, Tunefish) ──
+    // These use WASM engines with parameters stored in instrument.xrns
+    if (synthType === 'WaveSabreSynth' || synthType === 'OidosSynth' || synthType === 'TunefishSynth') {
+      const xrnsSynthType = instrument.xrns?.synthType || synthType;
+      const paramCount = instrument.xrns?.parameters?.length || 0;
+      return (
+        <div style={{ padding: '12px', color: '#aaa', fontSize: '12px' }}>
+          <div style={{ fontWeight: 'bold', marginBottom: '8px', color: '#fff' }}>
+            {xrnsSynthType.replace('wavesabre-', '').replace('WaveSabreSynth', 'WaveSabre').toUpperCase()}
+          </div>
+          <div>WASM synth with {paramCount} parameters</div>
+          <div style={{ marginTop: '8px', opacity: 0.7 }}>
+            Parameters loaded from XRNS file
+          </div>
+        </div>
+      );
+    }
+
     // ── No dedicated controls — use fallback ──
     return null;
   })();

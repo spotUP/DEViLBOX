@@ -730,15 +730,18 @@ export class InstrumentFactory {
         } else {
           wsType = 'falcon';
         }
+        console.log(`[InstrumentFactory] Creating WaveSabreSynth: type=${wsType} id=${config.id} name=${config.name} xrns=${JSON.stringify(config.xrns?.synthType)}`);
         const wsSynth = new WaveSabreSynth(wsType);
         const wsVolDb = config.volume ?? -12;
         // Apply XRNS parameters if available
         if (config.xrns?.parameters) {
+          console.log(`[InstrumentFactory] Applying ${config.xrns.parameters.length} XRNS params to WaveSabre`);
           for (let i = 0; i < config.xrns.parameters.length; i++) {
             wsSynth.setParameter?.(i, config.xrns.parameters[i]);
           }
         }
         wsSynth.ensureInitialized().then(() => {
+          console.log(`[InstrumentFactory] WaveSabre initialized, output=${!!wsSynth.output}`);
           if (wsSynth.output) {
             wsSynth.output.gain.value = Math.pow(10, wsVolDb / 20);
           }
