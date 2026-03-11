@@ -178,7 +178,7 @@ export const SynthControlsRouter: React.FC<SynthControlsRouterProps> = ({ instru
     // ── WobbleBass ──────────────────────────────────────────
     if (synthType === 'WobbleBass') {
       const cfg = deepMerge(DEFAULT_WOBBLE_BASS, instrument.wobbleBass || {});
-      return <WobbleBassControls config={cfg} onChange={(wb) => onUpdate({ wobbleBass: wb })} />;
+      return <WobbleBassControls config={cfg} instrumentId={instrument.id} onChange={(wb) => onUpdate({ wobbleBass: wb })} />;
     }
 
     // ── DubSiren ────────────────────────────────────────────

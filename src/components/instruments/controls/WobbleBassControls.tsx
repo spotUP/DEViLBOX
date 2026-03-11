@@ -1,9 +1,12 @@
 import React, { useRef, useEffect, useCallback } from 'react';
 import type { WobbleBassConfig } from '@typedefs/instrument';
 import { Knob } from '@components/controls/Knob';
+import { InstrumentOscilloscope } from '@components/visualization/InstrumentOscilloscope';
+import { WOBBLE_BASS_PRESETS } from '@constants/synthPresets/wobbleBass';
 
 interface WobbleBassControlsProps {
   config: WobbleBassConfig;
+  instrumentId?: number;
   onChange: (config: WobbleBassConfig) => void;
 }
 
@@ -23,6 +26,14 @@ const WAVE_LABELS: Record<string, string> = { sawtooth: 'SAW', square: 'SQR', tr
 const FILTER_TYPES = ['lowpass', 'bandpass', 'highpass'] as const;
 const FILTER_LABELS: Record<string, string> = { lowpass: 'LP', bandpass: 'BP', highpass: 'HP' };
 const ROLLOFFS = [-12, -24, -48] as const;
+
+// Map each mode to its representative preset config
+const MODE_PRESETS: Record<string, Partial<WobbleBassConfig>> = Object.fromEntries(
+  ['classic', 'reese', 'fm', 'growl', 'hybrid'].map((mode) => {
+    const preset = WOBBLE_BASS_PRESETS.find((p) => (p.config as Partial<WobbleBassConfig>).mode === mode);
+    return [mode, preset?.config ?? {}];
+  })
+);
 const LFO_SHAPES = ['sine', 'triangle', 'saw', 'square', 'sample_hold'] as const;
 const LFO_SHAPE_LABELS: Record<string, string> = { sine: 'SIN', triangle: 'TRI', saw: 'SAW', square: 'SQR', sample_hold: 'S&H' };
 const DIST_TYPES = ['soft', 'hard', 'fuzz', 'bitcrush'] as const;
@@ -78,13 +89,23 @@ const KnobWrap: React.FC<{ label: string; value: number; min: number; max: numbe
 
 /* ── main component ──────────────────────────────────────── */
 
-export const WobbleBassControls: React.FC<WobbleBassControlsProps> = ({ config, onChange }) => {
+export const WobbleBassControls: React.FC<WobbleBassControlsProps> = ({ config, instrumentId, onChange }) => {
   // CRITICAL: configRef pattern to avoid stale state in callbacks
   const configRef = useRef(config);
   useEffect(() => { configRef.current = config; }, [config]);
 
   const set = useCallback((path: string[], value: any) => {
     onChange(deepSet(configRef.current, path, value));
+  }, [onChange]);
+
+  const handleModeChange = useCallback((mode: string) => {
+    const preset = MODE_PRESETS[mode];
+    if (preset) {
+      // Apply preset config merged with current config, then set mode
+      onChange({ ...configRef.current, ...preset, mode } as WobbleBassConfig);
+    } else {
+      onChange({ ...configRef.current, mode } as WobbleBassConfig);
+    }
   }, [onChange]);
 
   const pct = (v: number) => `${Math.round(v)}%`;
@@ -96,8 +117,22 @@ export const WobbleBassControls: React.FC<WobbleBassControlsProps> = ({ config, 
       {/* ── MODE SELECTOR ─────────────────────────── */}
       <div className="flex items-center gap-3">
         <span className="text-[11px] font-bold uppercase tracking-widest text-zinc-500">Mode</span>
-        <BtnGroup items={MODES} value={config.mode} onSelect={v => set(['mode'], v)} />
+        <BtnGroup items={MODES} value={config.mode} onSelect={v => handleModeChange(v)} />
       </div>
+
+      {/* ── OSCILLOSCOPE ──────────────────────────── */}
+      {instrumentId != null && (
+        <div style={{ background: SECTION_BG, borderRadius: 8, padding: '4px 6px' }}>
+          <InstrumentOscilloscope
+            instrumentId={instrumentId}
+            width="auto"
+            height={48}
+            color={ACCENT}
+            backgroundColor={SECTION_BG}
+            lineWidth={1.5}
+          />
+        </div>
+      )}
 
       {/* ── ROW 1: OSCILLATORS ────────────────────── */}
       <div className="flex flex-wrap gap-2">
