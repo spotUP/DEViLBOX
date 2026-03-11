@@ -133,8 +133,11 @@ function getPatternSnapshot(source: OverlaySource): PatternSnapshot | null {
     return { pattern, currentRow, isPlaying };
   }
 
-  // DJ deck source
+  // DJ deck source — read position from store (updated by DJDeck rAF loop)
   const deckId = source.replace('deck', '') as DeckId;
+  const deckState = useDJStore.getState().decks[deckId];
+  if (!deckState.isPlaying) return null;
+
   const djEngine = getDJEngineIfActive();
   if (!djEngine) return null;
 
@@ -144,16 +147,15 @@ function getPatternSnapshot(source: OverlaySource): PatternSnapshot | null {
   const song = deck.replayer.getSong();
   if (!song || !song.patterns.length) return null;
 
-  const songPos = deck.replayer.getSongPos();
-  const patIdx = song.songPositions[songPos] ?? 0;
+  // Use store's songPos/pattPos — kept current by DJDeck polling loop
+  const patIdx = song.songPositions[deckState.songPos] ?? 0;
   const pattern = song.patterns[patIdx];
   if (!pattern) return null;
 
-  const deckState = useDJStore.getState().decks[deckId];
   return {
     pattern,
-    currentRow: deck.replayer.getPattPos(),
-    isPlaying: deckState.isPlaying,
+    currentRow: deckState.pattPos,
+    isPlaying: true,
     label: `Deck ${deckId}`,
   };
 }
@@ -217,7 +219,7 @@ export const VJPatternOverlay: React.FC<VJPatternOverlayProps> = React.memo(({ s
         rafRef.current = requestAnimationFrame(render);
         return;
       }
-      const { pattern, currentRow, isPlaying } = snapshot;
+      const { pattern, currentRow, isPlaying, label: sourceLabel } = snapshot;
       const channels = pattern.channels;
       const numChannels = channels.length;
       numChannelsRef.current = numChannels;
@@ -261,12 +263,10 @@ export const VJPatternOverlay: React.FC<VJPatternOverlayProps> = React.memo(({ s
       // Smooth scroll via replayer audio timeline for sub-row interpolation
       let displayRow = currentRow;
       if (isPlaying) {
-        // Use the appropriate replayer based on source
         const curSource = sourceRef.current;
-        const replayer = curSource === 'tracker'
-          ? getTrackerReplayer()
-          : getDJEngineIfActive()?.getDeck(curSource.replace('deck', '') as DeckId)?.replayer;
-        if (replayer) {
+        if (curSource === 'tracker') {
+          // Tracker: use replayer timeline for sub-row interpolation
+          const replayer = getTrackerReplayer();
           const audioTime = Tone.now() + 0.01;
           const audioState = replayer.getStateAtTime(audioTime);
           if (audioState) {
@@ -281,6 +281,8 @@ export const VJPatternOverlay: React.FC<VJPatternOverlayProps> = React.memo(({ s
             anim.scrollOffset = 0;
           }
         } else {
+          // DJ deck: position comes from store, no sub-row interpolation needed
+          displayRow = currentRow;
           anim.scrollOffset = 0;
         }
       } else {
@@ -300,8 +302,9 @@ export const VJPatternOverlay: React.FC<VJPatternOverlayProps> = React.memo(({ s
       const rx = (orbitX + bassTilt + anim.tiltKickX + midSway) * tiltDampen;
       const ry = (orbitY + anim.tiltKickY + highShimmer) * tiltDampen;
       const rz = Math.sin(t * 0.07) * 2 + anim.tiltKickX * 0.15;
-      const scale = 2.1 + anim.bassAccum * 0.12 + anim.beatFlash * 0.08 + anim.energyPulse * 0.3;
-      const driftX = Math.sin(t * 0.09) * 20 + Math.cos(t * 0.23) * 15 + frame.midEnergy * Math.sin(t * 3) * 8 + offsetXRef.current * 180;
+      const baseScale = offsetXRef.current !== 0 ? 1.5 : 2.1; // Smaller when side-by-side
+      const scale = baseScale + anim.bassAccum * 0.12 + anim.beatFlash * 0.08 + anim.energyPulse * 0.3;
+      const driftX = Math.sin(t * 0.09) * 20 + Math.cos(t * 0.23) * 15 + frame.midEnergy * Math.sin(t * 3) * 8 + offsetXRef.current * 300;
       const driftY = Math.sin(t * 0.14) * 12 + anim.bounceY;
       const opacity = 0.8 + frame.rms * 0.2 + anim.beatFlash * 0.15;
 
@@ -379,6 +382,17 @@ export const VJPatternOverlay: React.FC<VJPatternOverlayProps> = React.memo(({ s
       // Channel headers
       ctx.font = '11px "Berkeley Mono", "JetBrains Mono", "Fira Code", monospace';
       if (letterSpacing > 0.1) ctx.letterSpacing = `${letterSpacing.toFixed(1)}px`;
+      // Deck source label (for DJ decks)
+      if (sourceLabel) {
+        ctx.save();
+        ctx.font = 'bold 13px "Berkeley Mono", "JetBrains Mono", monospace';
+        ctx.fillStyle = hsl(baseHue, 80, 90, 0.9);
+        ctx.textAlign = 'right';
+        ctx.fillText(sourceLabel, canvasW - 4, ROW_H * 0.5);
+        ctx.restore();
+        ctx.font = '11px "Berkeley Mono", "JetBrains Mono", "Fira Code", monospace';
+        if (letterSpacing > 0.1) ctx.letterSpacing = `${letterSpacing.toFixed(1)}px`;
+      }
       ctx.fillStyle = hsl(baseHue, 50, 85, 0.8 + anim.beatFlash * 0.2);
       for (let ch = 0; ch < numChannels; ch++) {
         const x = rowNumW + ch * cellW;
