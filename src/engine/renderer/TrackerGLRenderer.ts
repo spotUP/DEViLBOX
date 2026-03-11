@@ -764,9 +764,8 @@ export class TrackerGLRenderer {
       const caretX = cursorX + caretOffX;
       const caretY = centerLineTop;
 
-      // Determine caret color
-      let caretColor = colors.cursor;
-      if (isPlaying) caretColor = colors.cursorSecondary;
+      // Determine caret color (same accent color whether playing or not)
+      const caretColor = colors.cursor;
 
       // Draw caret background
       this.addRect(caretX, caretY, caretW, rowH, caretColor);
