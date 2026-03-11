@@ -990,24 +990,32 @@ export const useInstrumentStore = create<InstrumentStore>()(
 
     // Add effect with full configuration (for unified effects system)
     addEffectConfig: (instrumentId, effect) => {
+      console.log('[InstrumentStore] addEffectConfig called for instrumentId:', instrumentId, 'effect type:', effect.type);
       set((state) => {
         const instrument = state.instruments.find((inst) => inst.id === instrumentId);
         if (instrument) {
           instrument.effects.push(createEffectFromConfig(effect));
+          console.log('[InstrumentStore] addEffectConfig: effect added, total effects:', instrument.effects.length);
+        } else {
+          console.warn('[InstrumentStore] addEffectConfig: instrument not found');
         }
       });
 
       // Rebuild instrument effect chain in audio engine (async for neural effects)
       const instrument = get().instruments.find((inst) => inst.id === instrumentId);
       if (instrument) {
+        console.log('[InstrumentStore] addEffectConfig: calling rebuildInstrumentEffects with', instrument.effects.length, 'effects');
         (async () => {
           try {
             const engine = getToneEngine();
             await engine.rebuildInstrumentEffects(instrumentId, instrument.effects);
+            console.log('[InstrumentStore] addEffectConfig: rebuildInstrumentEffects completed');
           } catch (error) {
             console.warn('[InstrumentStore] Could not rebuild instrument effects:', error);
           }
         })();
+      } else {
+        console.warn('[InstrumentStore] addEffectConfig: instrument not found for rebuild');
       }
     },
 
