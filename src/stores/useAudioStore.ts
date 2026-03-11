@@ -196,8 +196,8 @@ export const useAudioStore = create<AudioStore>()(
           // have Tone nodes. Skip the per-param update path for enable/disable toggles.
           if ('enabled' in updates) return;
 
-          // Clone before passing to ToneEngine — Immer revokes draft proxies after set()
-          const effectCopy = structuredClone(effect) as EffectConfig;
+          // Clone before passing to ToneEngine — Immer draft proxies can't be structuredCloned
+          const effectCopy = JSON.parse(JSON.stringify(effect)) as EffectConfig;
 
           // Notify ToneEngine to update effect parameters
           const engine = get().toneEngineInstance;

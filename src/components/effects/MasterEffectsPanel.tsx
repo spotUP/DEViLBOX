@@ -456,7 +456,7 @@ export const MasterEffectsPanel = forwardRef<MasterEffectsPanelHandle, MasterEff
                     const enc = ENCLOSURE_COLORS[effect.type ?? ''] || DEFAULT_ENCLOSURE;
                     return (
                       <button
-                        key={effect.type ?? `neural-${effect.neuralModelIndex}`}
+                        key={effect.neuralModelIndex != null ? `neural-${effect.neuralModelIndex}` : effect.type}
                         onClick={() => handleAddEffect(effect)}
                         className="px-2 py-1 text-[10px] rounded border transition-colors hover:text-white"
                         style={{
