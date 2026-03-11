@@ -2812,3 +2812,35 @@ html[data-theme="cyan-lineart"] #root > * {
   background: #041010;
   border-color: rgba(0, 255, 255, 0.2);
 }
+
+/* Horizontal FX layout for the inline instrument panel */
+.fx-horizontal-layout > div {
+  display: flex !important;
+  flex-direction: row !important;
+  height: 100% !important;
+}
+/* The effects chain container — horizontal scroll */
+.fx-horizontal-layout .space-y-3 {
+  display: flex !important;
+  flex-direction: row !important;
+  gap: 12px !important;
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
+  padding-bottom: 8px !important;
+}
+.fx-horizontal-layout .space-y-3 > * {
+  margin-top: 0 !important;
+  flex-shrink: 0;
+}
+/* Override the vertical overflow container */
+.fx-horizontal-layout .overflow-y-auto {
+  overflow-y: hidden !important;
+  overflow-x: auto !important;
+  display: flex !important;
+  flex-direction: row !important;
+  gap: 12px !important;
+}
+.fx-horizontal-layout .overflow-y-auto > * {
+  margin-top: 0 !important;
+  flex-shrink: 0;
+}

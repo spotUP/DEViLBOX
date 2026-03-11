@@ -514,15 +514,19 @@ export const InstrumentKnobPanel: React.FC = memo(() => {
                 )
               ) : activeTab === 'instFx' ? (
                 <Suspense fallback={<FxLoadingFallback />}>
-                  <InstrumentEffectsPanel
-                    instrumentId={targetInstrument.id}
-                    instrumentName={instrumentName}
-                    effects={targetInstrument.effects || []}
-                  />
+                  <div className="fx-horizontal-layout" style={{ height: '100%' }}>
+                    <InstrumentEffectsPanel
+                      instrumentId={targetInstrument.id}
+                      instrumentName={instrumentName}
+                      effects={targetInstrument.effects || []}
+                    />
+                  </div>
                 </Suspense>
               ) : (
                 <Suspense fallback={<FxLoadingFallback />}>
-                  <MasterEffectsPanel />
+                  <div className="fx-horizontal-layout" style={{ height: '100%' }}>
+                    <MasterEffectsPanel />
+                  </div>
                 </Suspense>
               )}
             </ScrollLockContainer>
@@ -671,7 +675,7 @@ export const InstrumentKnobPanel: React.FC = memo(() => {
             )
           ) : activeTab === 'instFx' ? (
             <Suspense fallback={<FxLoadingFallback />}>
-              <div className="p-2">
+              <div className="fx-horizontal-layout p-2 h-full">
                 <InstrumentEffectsPanel
                   instrumentId={targetInstrument.id}
                   instrumentName={instrumentName}
@@ -681,7 +685,7 @@ export const InstrumentKnobPanel: React.FC = memo(() => {
             </Suspense>
           ) : (
             <Suspense fallback={<FxLoadingFallback />}>
-              <div className="p-2">
+              <div className="fx-horizontal-layout p-2 h-full">
                 <MasterEffectsPanel />
               </div>
             </Suspense>
