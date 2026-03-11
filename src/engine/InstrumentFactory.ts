@@ -41,6 +41,7 @@ import { SYNTH_REGISTRY } from './vstbridge/synth-registry';
 import { GearmulatorSynth } from './gearmulator/GearmulatorSynth';
 import { SynthRegistry } from './registry/SynthRegistry';
 import { WaveSabreSynth } from './wavesabre/WaveSabreSynth';
+import type { WaveSabreSynthType } from '@typedefs/wavesabreInstrument';
 import { OidosSynth } from './oidos/OidosSynth';
 import { TunefishSynth } from './tunefish/TunefishSynth';
 
@@ -721,7 +722,14 @@ export class InstrumentFactory {
 
       // WaveSabre demoscene synths (Falcon, Slaughter)
       case 'WaveSabreSynth': {
-        const wsType = config.xrns?.synthType?.includes('slaughter') ? 'slaughter' : 'falcon';
+        let wsType: WaveSabreSynthType;
+        if (config.xrns?.synthType?.includes('adultery')) {
+          wsType = 'adultery';
+        } else if (config.xrns?.synthType?.includes('slaughter')) {
+          wsType = 'slaughter';
+        } else {
+          wsType = 'falcon';
+        }
         const wsSynth = new WaveSabreSynth(wsType);
         const wsVolDb = config.volume ?? -12;
         // Apply XRNS parameters if available

@@ -64,11 +64,13 @@ class WaveSabreProcessor extends AudioWorkletProcessor {
           break;
         case 'setParameter':
           if (ready && wavesabre_set_param) {
+            console.log('[WaveSabre] setParameter:', data.index, '=', data.value);
             wavesabre_set_param(synth, data.index, data.value);
           }
           break;
         case 'setParameters':
           if (ready && wavesabre_set_param && data.params) {
+            console.log('[WaveSabre] setParameters:', Object.keys(data.params).length, 'params');
             for (const [index, value] of Object.entries(data.params)) {
               wavesabre_set_param(synth, parseInt(index), value);
             }
@@ -115,15 +117,19 @@ class WaveSabreProcessor extends AudioWorkletProcessor {
       // Create synth
       if (this.synthType === SYNTH_SLAUGHTER) {
         synth = wavesabre_create_slaughter();
+        console.log('[WaveSabre] Created Slaughter synth, ptr:', synth);
       } else if (this.synthType === SYNTH_ADULTERY) {
         synth = wavesabre_create_adultery();
+        console.log('[WaveSabre] Created Adultery synth, ptr:', synth);
       } else {
         synth = wavesabre_create_falcon();
+        console.log('[WaveSabre] Created Falcon synth, ptr:', synth);
       }
       
       // Allocate output buffers in WASM memory
       outputPtrL = Module._malloc(BUFFER_SIZE * 4);
       outputPtrR = Module._malloc(BUFFER_SIZE * 4);
+      console.log('[WaveSabre] Allocated output buffers, L:', outputPtrL, 'R:', outputPtrR);
       
       ready = true;
       this.port.postMessage({ type: 'ready', synthType: synthTypeName });
@@ -169,9 +175,21 @@ class WaveSabreProcessor extends AudioWorkletProcessor {
     const offsetL = outputPtrL / 4;
     const offsetR = outputPtrR / 4;
     
+    // Debug: check if WASM is outputting non-zero samples
+    let maxSample = 0;
     for (let i = 0; i < blockSize; i++) {
       left[i] = heapF32[offsetL + i];
       right[i] = heapF32[offsetR + i];
+      const absL = Math.abs(left[i]);
+      if (absL > maxSample) maxSample = absL;
+    }
+    
+    // Log once per second if we have audio
+    if (!this._lastLog || currentTime - this._lastLog > 1) {
+      if (maxSample > 0.0001) {
+        console.log('[WaveSabre] Audio output detected, max:', maxSample.toFixed(4));
+      }
+      this._lastLog = currentTime;
     }
 
     return true;
