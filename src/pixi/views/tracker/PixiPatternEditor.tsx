@@ -317,9 +317,10 @@ function renderCursorCaret(
 ): void {
   g.clear();
   const cursorCh = cursor.channelIndex;
-  if (!p.isPlaying && cursorCh >= 0 && cursorCh < p.numChannels) {
+  if (cursorCh >= 0 && cursorCh < p.numChannels) {
     const colX = p.channelOffsets[cursorCh] - p.scrollLeft;
-    const y = p.baseY + (cursor.rowIndex - vStart) * p.rowHeight;
+    const row = p.isPlaying ? p.playbackRow : cursor.rowIndex;
+    const y = p.baseY + (row - vStart) * p.rowHeight;
     let cursorW = CHAR_WIDTH * 3 + 4;
     let cursorX = colX + 8;
     const noteWidth = CHAR_WIDTH * 3 + 4;
@@ -332,7 +333,7 @@ function renderCursorCaret(
     else if (cursor.columnType === 'probability') { cursorX = colX + 8 + noteWidth + CHAR_WIDTH * 12 + 28; cursorW = CHAR_WIDTH * 2; }
 
     g.rect(cursorX, y, cursorW, p.rowHeight);
-    g.fill({ color: p.recordMode ? p.theme.error.color : p.theme.accent.color, alpha: 0.45 });
+    g.fill({ color: p.recordMode ? p.theme.error.color : p.theme.accent.color, alpha: 1 });
   }
 }
 
@@ -1640,7 +1641,6 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
         >
           <pixiGraphics ref={gridGraphicsRef} draw={() => {}} layout={gridGraphicsLayout} />
           <pixiGraphics ref={overlayGraphicsRef} draw={() => {}} layout={gridGraphicsLayout} />
-          <pixiGraphics ref={cursorCaretRef} draw={() => {}} layout={gridGraphicsLayout} />
 
           {/* MegaText added imperatively to gridScrollContainerRef */}
         </pixiContainer>
@@ -1650,6 +1650,9 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
 
         {/* Fixed center-line highlight — outside scroll container so it stays fixed during smooth scrolling */}
         <pixiGraphics ref={highlightGraphicsRef} draw={() => {}} layout={gridGraphicsLayout} eventMode="none" />
+
+        {/* Cursor caret — on top of highlight bar so it's never obscured */}
+        <pixiGraphics ref={cursorCaretRef} draw={() => {}} layout={gridGraphicsLayout} eventMode="none" />
 
         {/* Drag-and-drop highlight overlay — pure GL, visible during instrument drag */}
         <pixiGraphics
