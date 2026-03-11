@@ -93,6 +93,9 @@ export class DB303Synth implements DevilboxSynth {
   private overdrive: WaveShaperNode | null = null;
   private overdriveGain: GainNode | null = null;
   private overdriveAmount: number = 0;
+  
+  // Soft limiter to prevent clipping on accents
+  private limiter: DynamicsCompressorNode | null = null;
 
   // Compatibility properties
   public config: Record<string, unknown> = {};
@@ -111,6 +114,15 @@ export class DB303Synth implements DevilboxSynth {
   constructor() {
     this.audioContext = getDevilboxAudioContext();
     this.output = this.audioContext.createGain();
+    
+    // Create soft limiter to prevent clipping on accented notes
+    // The 303's accent circuit can cause significant volume spikes
+    this.limiter = this.audioContext.createDynamicsCompressor();
+    this.limiter.threshold.value = -3;    // Start limiting at -3dB
+    this.limiter.knee.value = 6;          // Soft knee for natural compression
+    this.limiter.ratio.value = 12;        // Strong limiting ratio
+    this.limiter.attack.value = 0.001;    // Fast attack (1ms) to catch transients
+    this.limiter.release.value = 0.05;    // Fast release (50ms) to recover quickly
 
     // Create promise that resolves when worklet reports 'ready'
     this._initPromise = new Promise<void>((resolve) => {
@@ -238,8 +250,14 @@ export class DB303Synth implements DevilboxSynth {
       this._pendingParams = [];
     }
 
-    // Connect worklet directly to output (no Tone.js effects in chain)
-    this.workletNode.connect(this.output);
+    // Connect worklet through limiter to output to prevent accent clipping
+    // Chain: worklet → limiter → output
+    if (this.limiter) {
+      this.workletNode.connect(this.limiter);
+      this.limiter.connect(this.output);
+    } else {
+      this.workletNode.connect(this.output);
+    }
 
     // CRITICAL: Connect through silent keepalive to destination to force process() calls
     try {
@@ -857,6 +875,9 @@ export class DB303Synth implements DevilboxSynth {
 
     const now = this.audioContext.currentTime;
     const RAMP = 0.03; // 30ms smooth transition
+    
+    // Determine final output node (limiter or direct output)
+    const finalNode = this.limiter || this.output;
 
     if (this.overdriveAmount > 0) {
       // Lazy-create native overdrive nodes
@@ -875,27 +896,27 @@ export class DB303Synth implements DevilboxSynth {
       this.overdrive.curve = curve;
       this.overdriveGain.gain.linearRampToValueAtTime(1 + this.overdriveAmount * 2, now + RAMP);
 
-      // Rewire: worklet → overdriveGain → overdrive → output
+      // Rewire: worklet → overdriveGain → overdrive → limiter → output
       try {
-        this.workletNode.disconnect(this.output);
+        this.workletNode.disconnect(finalNode);
       } catch { /* not connected */ }
       try {
         this.workletNode.connect(this.overdriveGain);
         this.overdriveGain.connect(this.overdrive);
-        this.overdrive.connect(this.output);
+        this.overdrive.connect(finalNode);
       } catch { /* already connected */ }
     } else {
-      // Bypass: worklet → output (direct)
+      // Bypass: worklet → limiter → output (or worklet → output if no limiter)
       if (this.overdrive && this.overdriveGain) {
         try {
           this.workletNode.disconnect(this.overdriveGain);
           this.overdriveGain.disconnect(this.overdrive);
-          this.overdrive.disconnect(this.output);
+          this.overdrive.disconnect(finalNode);
         } catch { /* not connected */ }
         this.overdriveGain.gain.linearRampToValueAtTime(1, now + RAMP);
       }
       try {
-        this.workletNode.connect(this.output);
+        this.workletNode.connect(finalNode);
       } catch { /* already connected */ }
     }
   }
@@ -1196,6 +1217,10 @@ export class DB303Synth implements DevilboxSynth {
     if (this.overdriveGain) {
       this.overdriveGain.disconnect();
       this.overdriveGain = null;
+    }
+    if (this.limiter) {
+      this.limiter.disconnect();
+      this.limiter = null;
     }
     this.output.disconnect();
   }
