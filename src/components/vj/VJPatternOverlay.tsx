@@ -205,6 +205,10 @@ export const VJPatternOverlay: React.FC<VJPatternOverlayProps> = React.memo(({ s
     bus.enable();
     busRef.current = bus;
 
+    // Reusable per-frame arrays to reduce GC pressure
+    const snapshotBuf: Array<{ snapshot: PatternSnapshot; source: OverlaySource }> = [];
+    const layoutBuf: Array<{ xBase: number; sectionW: number; numChannels: number }> = [];
+
     const render = (timestamp: number) => {
       const dt = Math.min((timestamp - (lastTimeRef.current || timestamp)) / 1000, 0.05);
       lastTimeRef.current = timestamp;
@@ -214,28 +218,29 @@ export const VJPatternOverlay: React.FC<VJPatternOverlayProps> = React.memo(({ s
 
       // ── Gather snapshots from all sources ────────────────────────────
       const allSources = sourcesRef.current;
-      const snapshots: Array<{ snapshot: PatternSnapshot; source: OverlaySource }> = [];
+      snapshotBuf.length = 0;
       for (const src of allSources) {
         const snap = getPatternSnapshot(src);
-        if (snap) snapshots.push({ snapshot: snap, source: src });
+        if (snap) snapshotBuf.push({ snapshot: snap, source: src });
       }
       // Fallback: if nothing playing, try tracker for idle display
-      if (snapshots.length === 0) {
+      if (snapshotBuf.length === 0) {
         const fallback = getPatternSnapshot('tracker');
         if (!fallback) {
           rafRef.current = requestAnimationFrame(render);
           return;
         }
-        snapshots.push({ snapshot: fallback, source: 'tracker' });
+        snapshotBuf.push({ snapshot: fallback, source: 'tracker' });
       }
+      const snapshots = snapshotBuf;
 
       // Compute total canvas width (all sources side by side)
       let totalW = 0;
-      const sectionLayouts: Array<{ xBase: number; sectionW: number; numChannels: number }> = [];
+      layoutBuf.length = 0;
       for (const { snapshot } of snapshots) {
         const numCh = snapshot.pattern.channels.length;
         const sectionW = ROW_NUM_W + numCh * CELL_W;
-        sectionLayouts.push({ xBase: totalW, sectionW, numChannels: numCh });
+        layoutBuf.push({ xBase: totalW, sectionW, numChannels: numCh });
         totalW += sectionW;
       }
       // Add gaps between sections
@@ -243,9 +248,9 @@ export const VJPatternOverlay: React.FC<VJPatternOverlayProps> = React.memo(({ s
       // Recalculate xBase with gaps
       if (snapshots.length > 1) {
         let x = 0;
-        for (let i = 0; i < sectionLayouts.length; i++) {
-          sectionLayouts[i].xBase = x;
-          x += sectionLayouts[i].sectionW + GAP_PX;
+        for (let i = 0; i < layoutBuf.length; i++) {
+          layoutBuf[i].xBase = x;
+          x += layoutBuf[i].sectionW + GAP_PX;
         }
       }
 
@@ -253,7 +258,7 @@ export const VJPatternOverlay: React.FC<VJPatternOverlayProps> = React.memo(({ s
       if (canvas.width !== canvasW) canvas.width = canvasW;
 
       // Track total channels for click handler
-      numChannelsRef.current = sectionLayouts.reduce((s, l) => s + l.numChannels, 0);
+      numChannelsRef.current = layoutBuf.reduce((s, l) => s + l.numChannels, 0);
 
       // Check if any source is playing
       const anyPlaying = snapshots.some(s => s.snapshot.isPlaying);
@@ -349,10 +354,10 @@ export const VJPatternOverlay: React.FC<VJPatternOverlayProps> = React.memo(({ s
       for (let si = 0; si < snapshots.length; si++) {
         const { snapshot, source: src } = snapshots[si];
         const { pattern, currentRow, isPlaying: srcPlaying, label: sourceLabel } = snapshot;
-        const { xBase, numChannels } = sectionLayouts[si];
+        const { xBase, numChannels } = layoutBuf[si];
         const channels = pattern.channels;
         const patLen = pattern.length;
-        const sectionW = sectionLayouts[si].sectionW;
+        const sectionW = layoutBuf[si].sectionW;
 
         // Display row = currentRow (no sub-row for DJ, tracker uses anim.scrollOffset)
         const displayRow = currentRow;
