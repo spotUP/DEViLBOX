@@ -249,9 +249,9 @@ export const ProjectMCanvas = React.forwardRef<VJCanvasHandle, ProjectMCanvasPro
           // Stuck detection — every ~31 frames (~0.5s), sample center pixel
           // and detect alternation between exactly 2 hashes (the classic stuck/strobe symptom).
           frameCount++;
-          if (sampleCtx && canvas && (frameCount & 31) === 0) {
+          if (sampleCtx && canvas && (frameCount & 63) === 0) {
             const timeSinceLoad = performance.now() - presetLoadTimeRef.current;
-            if (timeSinceLoad > 3000) {
+            if (timeSinceLoad > 5000) {
               sampleCtx.drawImage(canvas, canvas.width >> 1, canvas.height >> 1, 1, 1, 0, 0, 1, 1);
               const px = sampleCtx.getImageData(0, 0, 1, 1).data;
               const hash = (px[0] << 16) | (px[1] << 8) | px[2];
@@ -267,11 +267,10 @@ export const ProjectMCanvas = React.forwardRef<VJCanvasHandle, ProjectMCanvasPro
               }
 
               // 6 consecutive matches = ~3 seconds stuck → force new preset
-              if (alternatingCount >= 6) {
+              if (alternatingCount >= 12) {
                 alternatingCount = 0;
                 prevHash1 = 0;
                 prevHash2 = 0;
-                console.warn('[ProjectM] Stuck/strobe detected — forcing preset change');
                 const names = allPresetNames ?? Object.keys(BUILTIN_PRESETS);
                 if (names.length > 0) {
                   doLoadPresetRef.current?.(Math.floor(Math.random() * names.length), false);

@@ -106,12 +106,20 @@ export class DeckAudioPlayer {
 
     // Tiny fade-in (10ms) to prevent DC offset clicks/ticks
     this.player.fadeIn = 0.01;
+    const startOffset = this._pendingOffset ?? 0;
     if (this._pendingOffset !== null) {
       this.player.start(undefined, this._pendingOffset);
       this._pendingOffset = null;
     } else {
       this.player.start();
     }
+
+    // Initialize checkpoint tracking immediately so getPosition() is always
+    // accurate — even if setPlaybackRate() hasn't been called yet (e.g. scratch
+    // that goes backward before any forward rate change)
+    this._rateChangePos = startOffset;
+    this._rateChangeTime = Tone.now();
+    this._rateTrackingActive = true;
   }
 
   pause(): void {

@@ -142,6 +142,9 @@ export class AudioDataBus {
     deltaTime: 0,
   };
 
+  private _retryCount = 0;
+  private static readonly MAX_RETRIES = 10;
+
   enable(): void {
     if (!this.enabled) {
       try {
@@ -149,8 +152,10 @@ export class AudioDataBus {
         this.waveformAnalyser = analysers.waveform;
         this.fftAnalyser = analysers.fft;
         this.enabled = true;
+        this._retryCount = 0;
       } catch (e) {
-        void e;
+        console.warn('[AudioDataBus] Failed to acquire analysers, will retry on next update():', e);
+        this.enabled = true; // Mark enabled so update() runs and can retry
       }
     }
   }
@@ -167,8 +172,33 @@ export class AudioDataBus {
   /** Call once per rAF frame. Returns the current audio frame. */
   update(): VJAudioFrame {
     const now = performance.now();
-    const dt = (now - this.lastTime) / 1000;
+    const dt = Math.max(0.001, Math.min((now - this.lastTime) / 1000, 0.1));
     this.lastTime = now;
+
+    // Retry analyser acquisition if initial attempt failed
+    if (this.enabled && (!this.waveformAnalyser || !this.fftAnalyser)) {
+      if (this._retryCount < AudioDataBus.MAX_RETRIES) {
+        this._retryCount++;
+        try {
+          const analysers = acquireAnalysers();
+          this.waveformAnalyser = analysers.waveform;
+          this.fftAnalyser = analysers.fft;
+          this._retryCount = 0;
+        } catch {
+          // Inject synthetic noise so ProjectM doesn't freeze
+          this._injectIdleNoise();
+          this.frame.time = now / 1000;
+          this.frame.deltaTime = dt;
+          return this.frame;
+        }
+      } else {
+        // Max retries exceeded — still inject noise
+        this._injectIdleNoise();
+        this.frame.time = now / 1000;
+        this.frame.deltaTime = dt;
+        return this.frame;
+      }
+    }
 
     if (!this.waveformAnalyser || !this.fftAnalyser) return this.frame;
 
@@ -189,6 +219,12 @@ export class AudioDataBus {
       if (abs > rawPeak) rawPeak = abs;
     }
     const rawRms = Math.sqrt(sumSq / waveform.length);
+
+    // When audio is truly silent (no signal from analysers), inject low-level
+    // synthetic noise so ProjectM shader equations keep evolving and don't freeze
+    if (rawRms < 0.0001 && rawPeak < 0.0001) {
+      this._injectIdleNoise();
+    }
 
     // Band energies from FFT (convert dB to linear, use peak + average blend)
     // Noise floor is ~-90dB, so use -80 as floor for better dynamic range
@@ -268,6 +304,15 @@ export class AudioDataBus {
   /** Get the last computed frame without recalculating. */
   getFrame(): VJAudioFrame {
     return this.frame;
+  }
+
+  /** Inject low-amplitude noise into waveformBuf so ProjectM keeps animating during silence */
+  private _injectIdleNoise(): void {
+    const buf = this.waveformBuf;
+    for (let i = 0; i < buf.length; i++) {
+      buf[i] = (Math.random() - 0.5) * 0.002; // ≈ -54dB noise floor
+    }
+    this.frame.waveform = buf;
   }
 
   // ─── Global shared instance for MCP / non-VJ consumers ─────────────────────
