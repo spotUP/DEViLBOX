@@ -125,6 +125,14 @@ EXPORT void wavesabre_render(void* ptr, float* outputL, float* outputR, int numS
     }
 }
 
+// Load chunk data (binary preset state from VST)
+EXPORT void wavesabre_set_chunk(void* ptr, void* data, int size) {
+    auto wrapper = static_cast<SynthWrapper*>(ptr);
+    if (wrapper && wrapper->device && data && size > 0) {
+        wrapper->device->SetChunk(data, size);
+    }
+}
+
 // Get number of parameters for each synth type
 EXPORT int wavesabre_get_num_params(int synthType) {
     switch (synthType) {

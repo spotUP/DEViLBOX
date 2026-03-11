@@ -45,6 +45,7 @@ export class WaveSabreSynth implements DevilboxSynth {
   private _initPromise: Promise<void>;
   private _resolveInit: (() => void) | null = null;
   private _pendingParams: Array<{ index: number; value: number }> = [];
+  private _pendingChunk: ArrayBuffer | null = null;
 
   constructor(synthType: WaveSabreSynthType = 'falcon') {
     this.synthType = synthType;
@@ -93,9 +94,16 @@ export class WaveSabreSynth implements DevilboxSynth {
           // For adultery, load GM DLS data before applying params
           if (this.synthType === 'adultery') {
             this.loadGmDlsAndApplyParams();
-          } else if (this._pendingParams.length === 0) {
-            this.applyConfig(this.config);
-          } else {
+          } else if (this._pendingChunk) {
+            // XRNS chunk takes priority - it contains the full preset state
+            this.workletNode?.port.postMessage({
+              type: 'setChunk',
+              data: { chunk: this._pendingChunk },
+            });
+            this._pendingChunk = null;
+            this._pendingParams = []; // Chunk includes params, don't send separately
+          } else if (this._pendingParams.length > 0) {
+            // Send individual params if no chunk
             for (const { index, value } of this._pendingParams) {
               this.workletNode?.port.postMessage({
                 type: 'setParameter',
@@ -103,6 +111,8 @@ export class WaveSabreSynth implements DevilboxSynth {
               });
             }
             this._pendingParams = [];
+          } else {
+            this.applyConfig(this.config);
           }
 
           if (this._resolveInit) {
@@ -111,7 +121,14 @@ export class WaveSabreSynth implements DevilboxSynth {
           }
         } else if (type === 'gmdlsLoaded') {
           // Now apply pending XRNS params (which include SampleIndex)
-          if (this._pendingParams.length > 0) {
+          if (this._pendingChunk) {
+            this.workletNode?.port.postMessage({
+              type: 'setChunk',
+              data: { chunk: this._pendingChunk },
+            });
+            this._pendingChunk = null;
+            this._pendingParams = [];
+          } else if (this._pendingParams.length > 0) {
             for (const { index, value } of this._pendingParams) {
               this.workletNode?.port.postMessage({
                 type: 'setParameter',
@@ -189,6 +206,26 @@ export class WaveSabreSynth implements DevilboxSynth {
       });
     } else {
       this._pendingParams.push({ index, value });
+    }
+  }
+
+  /** Set preset chunk from Base64 string (XRNS ParameterChunk) */
+  setChunk(base64Chunk: string): void {
+    // Decode Base64 to ArrayBuffer
+    const binaryString = atob(base64Chunk);
+    const bytes = new Uint8Array(binaryString.length);
+    for (let i = 0; i < binaryString.length; i++) {
+      bytes[i] = binaryString.charCodeAt(i);
+    }
+    const chunkBuffer = bytes.buffer;
+
+    if (this.workletNode) {
+      this.workletNode.port.postMessage({
+        type: 'setChunk',
+        data: { chunk: chunkBuffer },
+      });
+    } else {
+      this._pendingChunk = chunkBuffer;
     }
   }
 
