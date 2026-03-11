@@ -382,6 +382,9 @@ function flushConfigUpdates(): void {
   _configFlushScheduled = false;
   const instrumentStore = useInstrumentStore.getState();
   for (const [instrumentId, update] of _pendingConfigUpdates) {
+    if ((globalThis as Record<string, unknown>).MIDI_DEBUG) {
+      console.log(`[parameterRouter] Flushing update to instrument ${instrumentId}:`, update);
+    }
     instrumentStore.updateInstrument(instrumentId, update);
   }
   _pendingConfigUpdates.clear();
@@ -461,6 +464,11 @@ export function routeParameterToEngine(
   }
 
   const value = route.transform ? route.transform(normalizedValue) : normalizedValue;
+
+  // Debug: Log parameter routing
+  if ((globalThis as Record<string, unknown>).MIDI_DEBUG) {
+    console.log(`[parameterRouter] ${param} = ${normalizedValue} → ${value} (instrument ${instrument.id})`);
+  }
 
   switch (route.type) {
     case 'config': {
