@@ -34,8 +34,7 @@ import { KeyboardShortcutSheet } from './KeyboardShortcutSheet';
 import { EffectPicker } from './EffectPicker';
 import { UndoHistoryPanel } from './UndoHistoryPanel';
 import { FT2Toolbar } from './FT2Toolbar';
-import { TB303KnobPanel } from './TB303KnobPanel';
-import { SCKnobPanel } from './SCKnobPanel';
+import { InstrumentKnobPanel } from './InstrumentKnobPanel';
 import { EditorControlsBar } from './EditorControlsBar';
 import { TB303View } from '@components/demo/TB303View';
 import { MobileTrackerView } from './MobileTrackerView';
@@ -509,17 +508,12 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
         />
       </div>
 
-      {/* TB-303 Live Knobs - full height, panel has its own collapse toggle */}
+      {/* Instrument Knob Panel - follows cursor channel, adapts to synth type */}
       {viewMode !== 'tb303' && (
         <div className="flex-shrink-0">
-          <TB303KnobPanel />
+          <InstrumentKnobPanel />
         </div>
       )}
-
-      {/* SuperCollider Live Params - collapsible panel */}
-      <div className="flex-shrink-0">
-        <SCKnobPanel />
-      </div>
 
       {/* Editor Controls Toolbar - Compact & Shrinkable */}
       <EditorControlsBar
