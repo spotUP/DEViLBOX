@@ -333,7 +333,12 @@ export async function importTrackerModule(
     });
 
     const samplerCount = instruments.filter(i => i.synthType === 'Sampler').length;
-    if (samplerCount > 0) await engine.preloadInstruments(instruments);
+    const wasmSynthCount = instruments.filter(i => 
+      i.synthType === 'WaveSabreSynth' || 
+      i.synthType === 'OidosSynth' || 
+      i.synthType === 'TunefishSynth'
+    ).length;
+    if (samplerCount > 0 || wasmSynthCount > 0) await engine.preloadInstruments(instruments);
     notify.success(`Imported "${info.metadata.title}" — ${result.patterns.length} patterns, ${instruments.length} instruments`);
     if (info.file) checkModlandFileWithPatternHash(info.file, null);
     return;
