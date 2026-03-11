@@ -13,6 +13,7 @@ import { useCallback, useMemo } from 'react';
 import type { Graphics as GraphicsType } from 'pixi.js';
 import { useTrackerStore, useTransportStore, useAudioStore, useUIStore, useEditorStore , useFormatStore } from '@stores';
 import type { TrackerViewMode } from '@stores/useUIStore';
+import { switchView } from '@/constants/viewOptions';
 import { useShallow } from 'zustand/react/shallow';
 import { useFPSMonitor } from '@/hooks/useFPSMonitor';
 import { SYSTEM_PRESETS, getGroupedPresets } from '@/constants/systemPresets';
@@ -359,11 +360,11 @@ export const PixiEditorControlsBar: React.FC<PixiEditorControlsBarProps> = ({
 
   // ── Handlers ─────────────────────────────────────────────────────────────
   const handleViewModeChange = useCallback((val: string) => {
-    // Local sub-modes stay in tracker view; global views switch activeView
+    // Local sub-modes stay in tracker view; global views use shared switchView
     if (val === 'tracker' || val === 'grid' || val === 'tb303' || val === 'sunvox') {
       setTimeout(() => onViewModeChange(val as TrackerViewMode), 0);
     } else {
-      setTimeout(() => useUIStore.getState().setActiveView(val as any), 0);
+      switchView(val);
     }
   }, [onViewModeChange]);
 
