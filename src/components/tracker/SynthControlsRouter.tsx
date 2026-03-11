@@ -337,7 +337,7 @@ export const SynthControlsRouter: React.FC<SynthControlsRouterProps> = ({ instru
 
     // ── Gearmulator ─────────────────────────────────────────
     if (synthType.startsWith('Gearmulator')) {
-      const cfg = instrument.gearmulator || { preset: 0, bank: 0 };
+      const cfg = instrument.gearmulator || { synthType: 0, preset: 0, bank: 0 };
       return <GearmulatorEditor config={cfg} onChange={(u) => onUpdate({ gearmulator: u })} />;
     }
 
@@ -364,7 +364,7 @@ export const SynthControlsRouter: React.FC<SynthControlsRouterProps> = ({ instru
     if (synthType === 'MAMEVFX' || synthType === 'MAMEDOC') {
       const defaultCfg = synthType === 'MAMEVFX' ? DEFAULT_MAME_VFX : DEFAULT_MAME_DOC;
       const cfg: MAMEConfig = instrument.mame || defaultCfg;
-      return <MAMEControls config={cfg} onChange={(u) => onUpdate({ mame: { ...cfg, ...u } })} />;
+      return <MAMEControls config={cfg} handle={instrument.id} onChange={(u) => onUpdate({ mame: { ...cfg, ...u } })} />;
     }
 
     // ── Furnace chip synths ─────────────────────────────────
