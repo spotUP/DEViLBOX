@@ -477,22 +477,13 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     const cell = getCellFromCoords(e.clientX, e.clientY);
     if (!cell) return;
 
-    // During playback with scratch enabled, left-click drag = grab scratch (hand on record)
+    // During playback, left-click drag = grab scratch (hand on record, vinyl physics)
     const isPlaying = useTransportStore.getState().isPlaying;
-    const uiState = useUIStore.getState();
-    const isDJView = uiState.activeView === 'dj';
-    const scratchToggleOn = uiState.scratchEnabled;
-    const shouldScratch = (isDJView || scratchToggleOn) && isPlaying;
 
-    if (shouldScratch && !e.shiftKey && !e.metaKey && !e.ctrlKey) {
+    if (isPlaying && !e.shiftKey && !e.metaKey && !e.ctrlKey) {
       isScratchDragRef.current = true;
       const scratch = getTrackerScratchController();
       scratch.onGrabStart(e.clientY, performance.now());
-      return;
-    }
-
-    // Non-playing scratch mode: block selection but don't grab
-    if ((isDJView || scratchToggleOn) && !isPlaying) {
       return;
     }
 
