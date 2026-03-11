@@ -226,6 +226,10 @@ export const TB303KnobPanel: React.FC = memo(() => {
         overflow: 'hidden'
       }}
     >
+      {/* Action buttons — always pinned to top-right of screen */}
+      <div className="absolute top-1 right-1 z-50 flex items-center gap-1">
+        {panelActions}
+      </div>
       <ScrollLockContainer className="w-full">
         <JC303StyledKnobPanel
           key={targetInstrument.id}
@@ -233,7 +237,6 @@ export const TB303KnobPanel: React.FC = memo(() => {
           onChange={handleConfigChange}
           onPresetLoad={handlePresetLoad}
           instrumentId={targetInstrument.id}
-          headerActions={panelActions}
         />
       </ScrollLockContainer>
     </div>
