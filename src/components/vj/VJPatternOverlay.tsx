@@ -167,7 +167,7 @@ interface VJPatternOverlayProps {
 
 const GAP_PX = 16; // gap between side-by-side source sections
 
-export const VJPatternOverlay: React.FC<VJPatternOverlayProps> = React.memo(({ sources = ['tracker'] }) => {
+export const VJPatternOverlay: React.FC<VJPatternOverlayProps> = React.memo(({ sources = ['tracker'] as OverlaySource[] }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const rafRef = useRef(0);
