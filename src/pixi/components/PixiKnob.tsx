@@ -139,6 +139,7 @@ export const PixiKnob: React.FC<PixiKnobProps> = ({
   const dragStartY = useRef(0);
   const dragStartX = useRef(0);
   const dragStartNorm = useRef(0);
+  const dragDirection = useRef<'vertical' | 'horizontal' | null>(null);
   const lastClickTime = useRef(0);
   const onChangeRef = useRef(onChange);
   const valueRef = useRef(value);
@@ -265,12 +266,23 @@ export const PixiKnob: React.FC<PixiKnobProps> = ({
     dragStartY.current = e.clientY;
     dragStartX.current = e.clientX;
     dragStartNorm.current = getNormalized(valueRef.current);
+    dragDirection.current = null; // Reset — will be determined on first move
 
     const onMove = (ev: PointerEvent) => {
       const deltaY = dragStartY.current - ev.clientY;
       const deltaX = ev.clientX - dragStartX.current;
-      const isHoriz = Math.abs(deltaX) > Math.abs(deltaY);
-      let delta = (isHoriz ? deltaX : deltaY) / DRAG_SENSITIVITY;
+
+      // Lock to first significant direction to prevent jumps when direction changes (12 o'clock fix)
+      if (dragDirection.current === null) {
+        const threshold = 5; // pixels before locking
+        if (Math.abs(deltaY) >= threshold || Math.abs(deltaX) >= threshold) {
+          dragDirection.current = Math.abs(deltaX) > Math.abs(deltaY) ? 'horizontal' : 'vertical';
+        } else {
+          return; // Don't update until direction is locked
+        }
+      }
+
+      let delta = (dragDirection.current === 'horizontal' ? deltaX : deltaY) / DRAG_SENSITIVITY;
 
       // Fine mode
       if (ev.shiftKey) delta *= 0.1;
@@ -281,6 +293,7 @@ export const PixiKnob: React.FC<PixiKnobProps> = ({
 
     const onUp = () => {
       setIsDragging(false);
+      dragDirection.current = null;
       document.removeEventListener('pointermove', onMove);
       document.removeEventListener('pointerup', onUp);
     };
