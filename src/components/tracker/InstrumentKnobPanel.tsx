@@ -493,6 +493,17 @@ export const InstrumentKnobPanel: React.FC = memo(() => {
     return undefined;
   }, [activeTab]);
 
+  // Calculate popout dimensions based on content
+  const getPopoutDimensions = useCallback(() => {
+    if (isTB303) {
+      return { width: 1180, height: TB303_EXPANDED_HEIGHT + TAB_BAR_HEIGHT + 20 };
+    }
+    if (activeTab === 'instFx' || activeTab === 'masterFx') {
+      return { width: 1000, height: 400 };
+    }
+    return { width: 800, height: 500 };
+  }, [isTB303, activeTab]);
+
   // No instrument on this channel — render nothing
   if (!targetInstrument) {
     if (tb303PoppedOut) {
@@ -501,9 +512,8 @@ export const InstrumentKnobPanel: React.FC = memo(() => {
           isOpen={true}
           onClose={() => setTB303PoppedOut(false)}
           title="DEViLBOX — Synth Panel"
-          width={1200}
-          height={640}
-          fitContent
+          width={400}
+          height={200}
         >
           <div className="flex items-center justify-center h-full text-gray-500 text-sm">
             No instrument selected
@@ -521,15 +531,15 @@ export const InstrumentKnobPanel: React.FC = memo(() => {
 
   // ─── Popped-out mode ───────────────────────────────────────────────────────
   if (tb303PoppedOut) {
+    const { width: popoutWidth, height: popoutHeight } = getPopoutDimensions();
     return (
       <>
         <PopOutWindow
           isOpen={true}
           onClose={() => setTB303PoppedOut(false)}
           title={`DEViLBOX — ${targetInstrument.name || synthType}`}
-          width={1200}
-          height={640}
-          fitContent
+          width={popoutWidth}
+          height={popoutHeight}
         >
           <div style={{ background: '#1a1a1a' }}>
             <TabBar
