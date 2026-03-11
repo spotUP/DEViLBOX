@@ -88,8 +88,14 @@ export const DeckCssTurntable: React.FC<DeckCssTurntableProps> = ({ deckId }) =>
 
           if (isScratchActiveRef.current && !scratchIntegrating) {
             scratchIntegrating = true;
+            let posSec: number;
             const deck = useDJStore.getState().decks[deckId];
-            const posSec = deck.playbackMode === 'audio' ? deck.audioPosition : deck.elapsedMs / 1000;
+            if (deck.playbackMode === 'audio') {
+              try { posSec = getDJEngine().getDeck(deckId).audioPlayer.getPosition(); }
+              catch { posSec = deck.audioPosition; }
+            } else {
+              posSec = deck.elapsedMs / 1000;
+            }
             angleRef.current = posSec * omegaNormal;
           }
 
