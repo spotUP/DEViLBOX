@@ -19,7 +19,6 @@ import { ImportModuleDialog } from '@components/dialogs/ImportModuleDialog';
 import { ImportFurnaceDialog } from '@components/dialogs/ImportFurnaceDialog';
 import { ImportMIDIDialog } from '@components/dialogs/ImportMIDIDialog';
 import { ImportAudioDialog } from '@components/dialogs/ImportAudioDialog';
-import { ImportTD3Dialog } from '@components/dialogs/ImportTD3Dialog';
 import { SunVoxImportDialog } from '@components/instruments/SunVoxImportDialog';
 import { ScaleVolumeDialog } from './ScaleVolumeDialog';
 import { FadeVolumeDialog } from './FadeVolumeDialog';
@@ -134,8 +133,6 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
   const pendingCompanionFiles = useUIStore((state) => state.pendingCompanionFiles);
   const pendingAudioFile = useUIStore((state) => state.pendingAudioFile);
   const setPendingAudioFile = useUIStore((state) => state.setPendingAudioFile);
-  const pendingTD3File = useUIStore((state) => state.pendingTD3File);
-  const setPendingTD3File = useUIStore((state) => state.setPendingTD3File);
   const pendingSunVoxFile = useUIStore((state) => state.pendingSunVoxFile);
   const setPendingSunVoxFile = useUIStore((state) => state.setPendingSunVoxFile);
   const dialogOpen = useUIStore((state) => state.dialogOpen);
@@ -144,7 +141,7 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
   const setPatternEditorPoppedOut = useUIStore((state) => state.setPatternEditorPoppedOut);
 
   // Import handlers (extracted to hook)
-  const { handleModuleImport, handleTD3Import, handleSunVoxImport } = useModuleImport();
+  const { handleModuleImport, handleSunVoxImport } = useModuleImport();
 
   // View mode state (shared with GL via store)
   const viewMode = useUIStore((s) => s.trackerViewMode);
