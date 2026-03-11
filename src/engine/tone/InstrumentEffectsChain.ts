@@ -34,9 +34,14 @@ export async function buildInstrumentEffectChain(
   effects: EffectConfig[],
   instrument: Tone.ToneAudioNode | DevilboxSynth
 ): Promise<void> {
+  console.log('[ToneEngine] buildInstrumentEffectChain called for key:', key, 
+    'effects:', effects.length,
+    'isNative:', isDevilboxSynth(instrument));
+    
   // Dispose existing effect chain if any
   const existing = ctx.instrumentEffectChains.get(key);
   if (existing) {
+    console.log('[ToneEngine] buildInstrumentEffectChain: disposing existing chain with', existing.effects.length, 'effects');
     // Clean up per-node registry entries
     for (const [effectId, entry] of ctx.instrumentEffectNodes) {
       if (existing.effects.includes(entry.node)) {
@@ -102,9 +107,11 @@ export async function buildInstrumentEffectChain(
   }
 
   // Create effect nodes (async for neural effects)
+  console.log('[ToneEngine] buildInstrumentEffectChain: creating', enabledEffects.length, 'effect nodes');
   const effectNodes = (await Promise.all(
     enabledEffects.map((config) => InstrumentFactory.createEffect(config))
   )) as Tone.ToneAudioNode[];
+  console.log('[ToneEngine] buildInstrumentEffectChain: created', effectNodes.length, 'effect nodes');
 
   // Build full chain: instrument → [bridge?] → effect[0] → ... → effect[N-1] → output → destination
   let bridge: Tone.Gain | undefined;
@@ -113,9 +120,12 @@ export async function buildInstrumentEffectChain(
       // Native synths can't connect directly to Tone.js effects (CrossFade input).
       // Insert a Tone.Gain bridge whose .input IS a native GainNode.
       bridge = new Tone.Gain(1);
+      console.log('[ToneEngine] buildInstrumentEffectChain: connecting native synth to bridge');
       connectInstrumentTo(bridge);
+      console.log('[ToneEngine] buildInstrumentEffectChain: connecting bridge to first effect');
       bridge.connect(effectNodes[0] as Tone.ToneAudioNode);
     } else {
+      console.log('[ToneEngine] buildInstrumentEffectChain: connecting Tone.js instrument to first effect');
       (instrument as Tone.ToneAudioNode).connect(effectNodes[0] as Tone.ToneAudioNode);
     }
     // Chain effects together
@@ -123,8 +133,10 @@ export async function buildInstrumentEffectChain(
       (effectNodes[i] as Tone.ToneAudioNode).connect(effectNodes[i + 1] as Tone.ToneAudioNode);
     }
     // Connect last effect to output
+    console.log('[ToneEngine] buildInstrumentEffectChain: connecting last effect to output');
     (effectNodes[effectNodes.length - 1] as Tone.ToneAudioNode).connect(output);
   } else {
+    console.log('[ToneEngine] buildInstrumentEffectChain: no enabled effects, connecting directly to output');
     connectInstrumentTo(output);
   }
 
@@ -133,12 +145,16 @@ export async function buildInstrumentEffectChain(
   const activeAnalyser = ctx.instrumentAnalysers.get(instrumentId2);
 
   if (activeAnalyser) {
+    console.log('[ToneEngine] buildInstrumentEffectChain: connecting output to analyser');
     output.connect(activeAnalyser.input);
   } else {
-    output.connect(ctx.getInstrumentOutputDestination(instrumentId2, isNativeSynth));
+    const dest = ctx.getInstrumentOutputDestination(instrumentId2, isNativeSynth);
+    console.log('[ToneEngine] buildInstrumentEffectChain: connecting output to destination (native:', isNativeSynth, ')');
+    output.connect(dest);
   }
 
   ctx.instrumentEffectChains.set(key, { effects: effectNodes as Tone.ToneAudioNode[], output, bridge });
+  console.log('[ToneEngine] buildInstrumentEffectChain: chain built and stored for key', key);
 
   // Register individual effect nodes for real-time parameter updates
   enabledEffects.forEach((config, i) => {
@@ -156,8 +172,18 @@ export async function rebuildInstrumentEffects(
 ): Promise<void> {
   const key = ctx.getInstrumentKey(instrumentId, -1);
   const instrument = ctx.instruments.get(key);
+  
+  // Debug: log all keys in the instruments map
+  console.log('[ToneEngine] rebuildInstrumentEffects called for instrumentId:', instrumentId, 
+    'key:', key, 
+    'has instrument:', !!instrument,
+    'effects count:', effects.length,
+    'all keys in map:', Array.from(ctx.instruments.keys()));
+  
   if (!instrument) {
-    console.warn('[ToneEngine] Cannot rebuild effects - instrument not found:', instrumentId);
+    // Instrument not yet created (no notes played) - effects will be applied on first note
+    // This is expected behavior, not an error
+    console.log('[ToneEngine] rebuildInstrumentEffects: instrument not yet created - effects will apply on first note');
     return;
   }
 
@@ -165,16 +191,21 @@ export async function rebuildInstrumentEffects(
   try {
     if (isDevilboxSynth(instrument)) {
       // Native synth — disconnect the AudioNode output
+      console.log('[ToneEngine] rebuildInstrumentEffects: disconnecting native synth output');
       instrument.output.disconnect();
     } else {
+      console.log('[ToneEngine] rebuildInstrumentEffects: disconnecting Tone.js instrument');
       instrument.disconnect();
     }
-  } catch {
+  } catch (e) {
     // May not be connected
+    console.log('[ToneEngine] rebuildInstrumentEffects: disconnect error (expected if not connected):', e);
   }
 
   // Build new effect chain (await for neural effects)
+  console.log('[ToneEngine] rebuildInstrumentEffects: building new effect chain with', effects.length, 'effects');
   await buildInstrumentEffectChain(ctx, key, effects, instrument);
+  console.log('[ToneEngine] rebuildInstrumentEffects: effect chain built successfully');
 }
 
 /**
