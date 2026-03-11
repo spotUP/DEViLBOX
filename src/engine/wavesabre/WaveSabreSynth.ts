@@ -71,17 +71,19 @@ export class WaveSabreSynth implements DevilboxSynth {
       this.workletNode.port.onmessage = (e) => {
         const { type, error } = e.data;
         if (type === 'ready') {
-          // Send pending params
-          for (const { index, value } of this._pendingParams) {
-            this.workletNode?.port.postMessage({
-              type: 'setParameter',
-              data: { index, value },
-            });
+          // Apply default config first (sets sensible base params)
+          if (this._pendingParams.length === 0) {
+            this.applyConfig(this.config);
+          } else {
+            // XRNS parameters override defaults — send them after init
+            for (const { index, value } of this._pendingParams) {
+              this.workletNode?.port.postMessage({
+                type: 'setParameter',
+                data: { index, value },
+              });
+            }
+            this._pendingParams = [];
           }
-          this._pendingParams = [];
-
-          // Apply initial config
-          this.applyConfig(this.config);
 
           if (this._resolveInit) {
             this._resolveInit();
@@ -195,9 +197,11 @@ export class WaveSabreSynth implements DevilboxSynth {
 
   noteOn(note: string | number, velocity: number = 1, _time?: number): void {
     const midi = typeof note === 'string' ? this.noteToMidi(note) : note;
+    // WaveSabre NoteOn expects MIDI velocity (0-127), but ToneEngine passes 0-1
+    const midiVelocity = Math.round(Math.max(0, Math.min(1, velocity)) * 127);
     this.workletNode?.port.postMessage({
       type: 'noteOn',
-      data: { note: midi, velocity },
+      data: { note: midi, velocity: midiVelocity },
     });
   }
 
