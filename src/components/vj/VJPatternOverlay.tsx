@@ -163,11 +163,13 @@ function getPatternSnapshot(source: OverlaySource): PatternSnapshot | null {
 interface VJPatternOverlayProps {
   /** Data sources to display (rendered side by side on one canvas) */
   sources?: OverlaySource[];
+  /** DJ crossfader position 0..1 (0=deck A, 1=deck B). Modulates per-deck opacity. */
+  crossfader?: number;
 }
 
 const GAP_PX = 16; // gap between side-by-side source sections
 
-export const VJPatternOverlay: React.FC<VJPatternOverlayProps> = React.memo(({ sources = ['tracker'] as OverlaySource[] }) => {
+export const VJPatternOverlay: React.FC<VJPatternOverlayProps> = React.memo(({ sources = ['tracker'] as OverlaySource[], crossfader = 0.5 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const rafRef = useRef(0);
@@ -176,6 +178,8 @@ export const VJPatternOverlay: React.FC<VJPatternOverlayProps> = React.memo(({ s
   const lastTimeRef = useRef(0);
   const sourcesRef = useRef(sources);
   sourcesRef.current = sources;
+  const crossfaderRef = useRef(crossfader);
+  crossfaderRef.current = crossfader;
   // Per-channel VU meter levels (decayed each frame)
   const vuLevelsRef = useRef<number[]>([]);
   const vuLastGensRef = useRef<number[]>([]);
@@ -359,11 +363,24 @@ export const VJPatternOverlay: React.FC<VJPatternOverlayProps> = React.memo(({ s
         const patLen = pattern.length;
         const sectionW = layoutBuf[si].sectionW;
 
+        // Crossfader-driven opacity: 0=deckA, 0.5=equal, 1=deckB
+        // Tracker source is unaffected (always 1.0)
+        const cf = crossfaderRef.current;
+        let sourceOpacity = 1.0;
+        if (src === 'deckA') {
+          sourceOpacity = 1 - cf;       // 1.0 at cf=0, 0.0 at cf=1
+        } else if (src === 'deckB') {
+          sourceOpacity = cf;            // 0.0 at cf=0, 1.0 at cf=1
+        }
+        // Minimum floor so the dim deck doesn't vanish entirely
+        sourceOpacity = 0.08 + sourceOpacity * 0.92;
+
         // Display row = currentRow (no sub-row for DJ, tracker uses anim.scrollOffset)
         const displayRow = currentRow;
 
         ctx.save();
         ctx.translate(xBase, 0);
+        ctx.globalAlpha = sourceOpacity;
 
         // ── Current-row highlight bar ────────────────────────────────
         if (srcPlaying) {
@@ -502,12 +519,12 @@ export const VJPatternOverlay: React.FC<VJPatternOverlayProps> = React.memo(({ s
             }
 
             if (doChroma && (isCurrent || hasNote)) {
-              ctx.globalAlpha = fillA * 0.35;
+              ctx.globalAlpha = fillA * 0.35 * sourceOpacity;
               ctx.fillStyle = hsl(fillH - 40, fillS, fillL, 1);
               ctx.fillText(text, x + 2 - chromaOff, y + ROW_H * 0.5);
               ctx.fillStyle = hsl(fillH + 40, fillS, fillL, 1);
               ctx.fillText(text, x + 2 + chromaOff, y + ROW_H * 0.5);
-              ctx.globalAlpha = 1;
+              ctx.globalAlpha = sourceOpacity;
             }
 
             ctx.fillStyle = hsl(fillH, fillS, fillL, fillA);
