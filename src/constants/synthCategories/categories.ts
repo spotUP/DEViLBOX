@@ -405,4 +405,18 @@ export const SYNTH_CATEGORIES: SynthCategory[] = [
       SYNTH_INFO.Monique,
     ],
   },
+  {
+    id: 'demoscene',
+    name: '🎮 Demoscene',
+    description: '4k/64k intro synths - WaveSabre, Oidos, Tunefish, V2',
+    synths: [
+      SYNTH_INFO.V2,
+      SYNTH_INFO.V2Speech,
+      SYNTH_INFO.WaveSabreSlaughter,
+      SYNTH_INFO.WaveSabreFalcon,
+      SYNTH_INFO.WaveSabreAdultery,
+      SYNTH_INFO.OidosSynth,
+      SYNTH_INFO.TunefishSynth,
+    ],
+  },
 ];
