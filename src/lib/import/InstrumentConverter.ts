@@ -29,7 +29,7 @@ import {
 export function convertToInstrument(
   parsed: ParsedInstrument,
   instrumentId: number,
-  sourceFormat: 'MOD' | 'XM' | 'IT' | 'S3M' | 'FUR' | 'DMF'
+  sourceFormat: 'MOD' | 'XM' | 'IT' | 'S3M' | 'FUR' | 'DMF' | 'XRNS'
 ): InstrumentConfig[] {
   const instruments: InstrumentConfig[] = [];
 
@@ -89,7 +89,7 @@ export function convertToInstrument(
   // Check if this is an XRNS demoscene synth (WaveSabre, Oidos, Tunefish)
   if (parsed.xrnsSynth) {
     const { synthType, pluginIdentifier, parameters, parameterChunk } = parsed.xrnsSynth;
-    console.log(`[InstrumentConverter] Creating XRNS synth: ${synthType} for "${parsed.name}"`);
+    console.log(`[InstrumentConverter] Creating XRNS synth: ${synthType} for "${parsed.name}" hasChunk=${!!parameterChunk} chunkLen=${parameterChunk?.length ?? 0} params=${parameters.length}`);
     
     // Map XRNS synth type to DEViLBOX synth type
     let devilboxSynthType: SynthType;
@@ -501,7 +501,7 @@ function convertSampleToInstrument(
   sample: ParsedSample,
   parentInstrument: ParsedInstrument,
   instrumentId: number,
-  sourceFormat: 'MOD' | 'XM' | 'IT' | 'S3M' | 'FUR' | 'DMF'
+  sourceFormat: 'MOD' | 'XM' | 'IT' | 'S3M' | 'FUR' | 'DMF' | 'XRNS'
 ): InstrumentConfig {
   // Convert sample PCM data to AudioBuffer and blob URL
   const { audioBuffer, blobUrl, loopStart: unrolledLoopStart, loopEnd: unrolledLoopEnd } = convertPCMToAudioBuffer(sample);
