@@ -29,6 +29,12 @@ export class DeckAudioPlayer {
   private _loaded = false;
   private _playbackRate = 1;
 
+  // Position tracking for variable-rate playback (scratch)
+  // Checkpointed whenever rate changes so getPosition() stays accurate
+  private _rateChangePos = 0;    // position in seconds at last rate change
+  private _rateChangeTime = 0;   // Tone.now() at last rate change
+  private _rateTrackingActive = false;
+
   // Pending seek offset for when player is stopped
   private _pendingOffset: number | null = null;
 
@@ -121,6 +127,7 @@ export class DeckAudioPlayer {
       this.player.stop();
     }
     this._pendingOffset = null;
+    this._rateTrackingActive = false;
     this.player.seek(0);
   }
 
@@ -130,19 +137,39 @@ export class DeckAudioPlayer {
   seek(seconds: number): void {
     const wasPlaying = this.player.state === 'started';
     const clamped = Math.max(0, Math.min(seconds, this._duration));
+    // Reset rate tracking to match new seek position
+    this._rateChangePos = clamped;
+    this._rateChangeTime = Tone.now();
+    this._rateTrackingActive = wasPlaying;
     if (wasPlaying) {
       this.player.stop();
       this.player.start(undefined, clamped);
     } else {
-      // Tone.Player.seek() only works during playback — store offset for next start()
       this._pendingOffset = clamped;
+      this._rateTrackingActive = false;
     }
   }
 
   /**
    * Set playback rate (for pitch/tempo). 1.0 = normal speed.
+   * Checkpoints position before applying new rate so getPosition() stays accurate.
    */
   setPlaybackRate(rate: number): void {
+    if (this._loaded && this.player.state === 'started') {
+      // Checkpoint current position before rate change
+      const now = Tone.now();
+      if (this._rateTrackingActive) {
+        this._rateChangePos += (now - this._rateChangeTime) * this._playbackRate;
+        if (this._duration > 0) {
+          this._rateChangePos = this._rateChangePos % this._duration;
+        }
+      } else {
+        // First rate change since playback started — snapshot from Tone state
+        this._rateChangePos = this._getPositionFromToneState() ?? 0;
+        this._rateTrackingActive = true;
+      }
+      this._rateChangeTime = now;
+    }
     this._playbackRate = rate;
     this.player.playbackRate = rate;
   }
@@ -153,25 +180,32 @@ export class DeckAudioPlayer {
 
   /**
    * Get current playback position in seconds.
-   * Uses Tone.js Transport timing for accuracy.
+   * Uses rate-change checkpoint tracking for accuracy during scratch.
    */
   getPosition(): number {
     if (!this._loaded) return 0;
-    // If we have a pending seek offset (player is stopped), return that
     if (this._pendingOffset !== null) return this._pendingOffset;
-    // Tone.Player doesn't expose a clean position getter,
-    // but we can calculate from the buffer source's progress
+
+    if (this._rateTrackingActive && this.player.state === 'started') {
+      const now = Tone.now();
+      const elapsed = (now - this._rateChangeTime) * this._playbackRate;
+      const raw = this._rateChangePos + elapsed;
+      return this._duration > 0 ? ((raw % this._duration) + this._duration) % this._duration : 0;
+    }
+
+    return this._getPositionFromToneState() ?? 0;
+  }
+
+  /** Read position from Tone.js internal state (original method, used as fallback) */
+  private _getPositionFromToneState(): number | null {
     try {
-      // Access the underlying buffer source's current offset
       const now = Tone.now();
       const state = (this.player as any)._state;
       if (state) {
         const lastEvent = state.getValueAtTime(now);
         if (lastEvent === 'started') {
-          // Find the start time from the state timeline
           const events = (state as any)._timeline;
           if (events && events.length > 0) {
-            // Get the last 'started' event
             for (let i = events.length - 1; i >= 0; i--) {
               const evt = events[i];
               if (evt.state === 'started') {
@@ -187,7 +221,7 @@ export class DeckAudioPlayer {
     } catch {
       // Fallback
     }
-    return 0;
+    return null;
   }
 
   getDuration(): number {
