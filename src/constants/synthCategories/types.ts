@@ -2,7 +2,7 @@
  * Synth Categories - Type definitions
  */
 
-import type { SynthType } from '@typedefs/instrument';
+import type { SynthType, InstrumentConfig } from '@typedefs/instrument';
 
 export interface SynthInfo {
   type: SynthType;
@@ -12,6 +12,7 @@ export interface SynthInfo {
   bestFor: string[];
   icon: string; // Lucide icon name
   color: string; // Tailwind color class
+  defaultConfig?: Partial<InstrumentConfig>; // Optional default config (e.g., xrns.synthType for WaveSabre variants)
 }
 
 export interface SynthCategory {
