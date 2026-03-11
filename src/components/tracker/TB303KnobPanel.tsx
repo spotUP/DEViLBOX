@@ -221,10 +221,9 @@ export const TB303KnobPanel: React.FC = memo(() => {
       style={{
         position: 'relative',
         width: '100%',
-        maxHeight: '400px', // Hard limit to prevent blocking
         background: '#1a1a1a',
         borderTop: '1px solid #333',
-        overflow: 'auto'
+        overflow: 'hidden'
       }}
     >
       <ScrollLockContainer>
