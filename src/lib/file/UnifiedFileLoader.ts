@@ -18,7 +18,7 @@ import { useAutomationStore } from '@/stores/useAutomationStore';
 import { useAudioStore } from '@/stores/useAudioStore';
 import { getToneEngine } from '@/engine/ToneEngine';
 import { notify } from '@/stores/useNotificationStore';
-import { isSupportedFormat } from '@/lib/import/FormatRegistry';
+import { isSupportedFormat, detectFormat } from '@/lib/import/FormatRegistry';
 import { isSupportedModule, type ModuleInfo } from '@/lib/import/ModuleLoader';
 import type { ImportOptions } from '@/components/dialogs/ImportModuleDialog';
 import type { UADEMetadata } from '@engine/uade/UADEEngine';
@@ -68,8 +68,14 @@ export async function importTrackerModule(
 ): Promise<void> {
   clearExplicitlySaved();
 
-  const { useLibopenmpt } = options;
   let format = info.metadata.type;
+  
+  // Determine if libopenmpt should be used based on format, not dialog options.
+  // nativeOnly formats (XRNS, Furnace, chip-dump, etc.) can't use libopenmpt.
+  const filename = info.file?.name || '';
+  const fmt = detectFormat(filename);
+  const useLibopenmpt = options.useLibopenmpt && !fmt?.nativeOnly;
+  console.log('[UnifiedFileLoader] importTrackerModule:', filename, 'nativeOnly:', fmt?.nativeOnly, 'useLibopenmpt:', useLibopenmpt);
 
   // Fire-and-forget SongDB metadata lookup (non-blocking)
   const buf = info.arrayBuffer ?? (info.file ? await info.file.arrayBuffer() : null);
@@ -282,7 +288,9 @@ export async function importTrackerModule(
   }
 
   // ── UADE / exotic Amiga / parseModuleToSong path ──
-  if (!info.metadata.song) {
+  // Also route here when metadata.song exists but has no pattern data
+  const songHasPatterns = info.metadata.song?.patterns?.length > 0;
+  if (!info.metadata.song || !songHasPatterns) {
     if (!info.file) {
       notify.error('File reference lost — cannot import');
       return;
@@ -320,6 +328,26 @@ export async function importTrackerModule(
 
   const result = convertModule(info.metadata.song);
   if (!result.patterns.length) {
+    // convertModule produced no patterns — fall back to parseModuleToSong
+    if (info.file) {
+      console.warn('[Import] convertModule produced no patterns, trying parseModuleToSong');
+      const { parseModuleToSong } = await import('@lib/import/parseModuleToSong');
+      const song = await parseModuleToSong(info.file, options.subsong ?? 0, options.uadeMetadata, options.midiOptions, options.companionFiles);
+      loadInstruments(song.instruments);
+      loadPatterns(song.patterns);
+      setCurrentPattern(0);
+      if (song.songPositions.length > 0) setPatternOrder(song.songPositions);
+      setOriginalModuleData(null);
+      setBPM(song.initialBPM);
+      setSpeed(song.initialSpeed);
+      setMetadata({ name: song.name, author: '', description: `Imported from ${info.file?.name || 'module'}` });
+      applyEditorMode(song);
+      const samplerCount = song.instruments.filter(i => i.synthType === 'Sampler').length;
+      if (samplerCount > 0) await engine.preloadInstruments(song.instruments);
+      notify.success(`Imported "${song.name}" — ${song.patterns.length} patterns, ${song.instruments.length} instruments`);
+      if (info.file) checkModlandFileWithPatternHash(info.file, null);
+      return;
+    }
     notify.error(`Module "${info.metadata.title}" contains no patterns to import.`);
     return;
   }
