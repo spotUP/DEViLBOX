@@ -3,7 +3,7 @@
  * Now uses the JC303 VST-style layout for authentic experience.
  */
 
-import React, { useCallback, useRef, useEffect, memo } from 'react';
+import React, { useCallback, useRef, memo } from 'react';
 import { useInstrumentStore, useUIStore, useMIDIStore } from '@stores';
 import { useShallow } from 'zustand/react/shallow';
 import { ChevronDown, ChevronUp, X, ExternalLink, Undo2 } from 'lucide-react';
