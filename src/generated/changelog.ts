@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-03-10T20:55:13.421Z
+ * Generated: 2026-03-11T11:10:17.978Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,10 +19,10 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.2614';
-export const BUILD_NUMBER = '2614';
-export const BUILD_HASH = '90546c78a';
-export const BUILD_DATE = '2026-03-10';
+export const BUILD_VERSION = '1.0.2632';
+export const BUILD_NUMBER = '2632';
+export const BUILD_HASH = '50778111e';
+export const BUILD_DATE = '2026-03-11';
 
 // Full version (patch IS the build number, so no need to append)
 export const FULL_VERSION = BUILD_VERSION;
@@ -30,9 +30,87 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.2614',
+    version: '1.0.2632',
+    date: '2026-03-11',
+    changes: [
+      {
+        type: 'feature',
+        "description": "Add playback position cursor to PT2 and FT2 sample editors"
+      },
+      {
+        type: 'fix',
+        "description": "Fix getNativeAudioNode: recursively unwrap nested Tone.js wrappers"
+      },
+      {
+        type: 'fix',
+        "description": "Fix audio capture: tap masterEffectsInput instead of masterChannel"
+      },
+      {
+        type: 'fix',
+        "description": "Fix VU meters: empty channels no longer mirror active channel levels"
+      },
+      {
+        type: 'fix',
+        "description": "Fix TD-3 import: show dialog from all entry points, fix empty pattern"
+      },
+      {
+        type: 'improvement',
+        "description": "Remove unused TD-3 imports from TrackerView"
+      },
+      {
+        type: 'improvement',
+        "description": "Show TD-3 import dialog in all views (DJ, arrangement, etc.)"
+      },
+      {
+        type: 'fix',
+        "description": "Fix TD-3 import leaving old patterns + 303 panel bottom clipped"
+      },
+      {
+        type: 'improvement',
+        "description": "Skip empty TD-3 patterns on import"
+      }
+    ]
+  },
+  {
+    version: '2026-03-10',
     date: '2026-03-10',
     changes: [
+      {
+        type: 'fix',
+        "description": "Fix TD-3 import to load as new song by default"
+      },
+      {
+        type: 'improvement',
+        "description": "Sort Modland format dropdown alphabetically"
+      },
+      {
+        type: 'fix',
+        "description": "Fix tonearm not resetting on track loop"
+      },
+      {
+        type: 'feature',
+        "description": "Consolidate master FX: add individual effect browser + 25 new presets"
+      },
+      {
+        type: 'fix',
+        "description": "Tonearm starts on outer groove, ends near label"
+      },
+      {
+        type: 'feature',
+        "description": "Shared song analysis cache (server-side SQLite)"
+      },
+      {
+        type: 'feature',
+        "description": "Sync button auto-plays and guards crossfader"
+      },
+      {
+        type: 'fix',
+        "description": "Sync button now phase-aligns without jumping to start"
+      },
+      {
+        type: 'feature',
+        "description": "V2M file import as editable patterns with V2 synth support"
+      },
       {
         type: 'feature',
         "description": "Click-outside-to-close and auto-close for Modland browser"
@@ -172,84 +250,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'improvement',
         "description": "Chore: gitignore artofnoise/pumatracker build dirs and update changelog"
-      },
-      {
-        type: 'feature',
-        "description": "Chore: add Furnace audit tools for parser testing and DEViLBOX rendering"
-      },
-      {
-        type: 'fix',
-        "description": "Pixi UI improvements for modals, scroll views, and settings"
-      },
-      {
-        type: 'feature',
-        "description": "Integrate ArtOfNoise/PumaTracker engines and debounced WASM re-export"
-      },
-      {
-        type: 'feature',
-        "description": "Add Digital Symphony and PumaTracker native format exporters"
-      },
-      {
-        type: 'improvement',
-        "description": "Chore: update Gearmulator WASM bridge and snapshot dumper"
-      },
-      {
-        type: 'feature',
-        "description": "Update Furnace dispatch wrapper, sequencer, and effect router"
-      },
-      {
-        type: 'feature',
-        "description": "Add ArtOfNoise and PumaTracker WASM engines"
-      },
-      {
-        type: 'feature',
-        "description": "Add UADE pattern encoders for 30 formats and uadePatternLayout support"
-      },
-      {
-        type: 'fix',
-        "description": "Resolve build errors and remove regression tests from dev.sh"
-      },
-      {
-        type: 'fix',
-        "description": "Resolve TypeScript errors in MCP bridge handlers and SonicArrangerEncoder"
-      },
-      {
-        type: 'feature',
-        "description": "Add MCP server with 116 tools for full tracker control and audio debugging"
-      }
-    ]
-  },
-  {
-    version: '2026-03-07',
-    date: '2026-03-07',
-    changes: [
-      {
-        type: 'improvement',
-        "description": "Chore: gitignore local Reference Code/Music symlinks"
-      },
-      {
-        type: 'improvement',
-        "description": "Chore: update gearmulator WASM JS and UADE pattern encoder"
-      },
-      {
-        type: 'fix',
-        "description": "Patch Furnace platform sources for WASM dispatch compatibility"
-      },
-      {
-        type: 'feature',
-        "description": "Chore: add serena memories and furnace audit tools"
-      },
-      {
-        type: 'feature',
-        "description": "Add gearmulator JP-8000 RAM dump and MicroQ snapshot tools"
-      },
-      {
-        type: 'feature',
-        "description": "Add new components, engines, and UADE format encoders"
-      },
-      {
-        type: 'improvement',
-        "description": "Update audit reports, CLAUDE.md, and project metadata"
       }
     ]
   }
