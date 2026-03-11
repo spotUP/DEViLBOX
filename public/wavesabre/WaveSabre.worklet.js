@@ -15,11 +15,15 @@ let ready = false;
 // Synth types
 const SYNTH_FALCON = 0;
 const SYNTH_SLAUGHTER = 1;
+const SYNTH_ADULTERY = 2;
 
 // Wrapped WASM functions
 let wavesabre_set_sample_rate = null;
 let wavesabre_create_falcon = null;
 let wavesabre_create_slaughter = null;
+let wavesabre_create_adultery = null;
+let wavesabre_set_gmdls_data = null;
+let wavesabre_has_gmdls = null;
 let wavesabre_destroy = null;
 let wavesabre_set_param = null;
 let wavesabre_note_on = null;
@@ -41,9 +45,14 @@ class WaveSabreProcessor extends AudioWorkletProcessor {
       
       switch (type) {
         case 'init':
+          console.log('[WaveSabre] init received, synthType:', data.synthType || 'falcon');
           this.initWasm(data.wasmBytes, data.synthType || 'falcon');
           break;
+        case 'loadGmDls':
+          this.loadGmDls(data.dlsData);
+          break;
         case 'noteOn':
+          console.log('[WaveSabre] noteOn:', data.note, 'vel:', data.velocity, 'ready:', ready);
           if (ready && wavesabre_note_on) {
             wavesabre_note_on(synth, data.note, data.velocity, 0);
           }
@@ -72,12 +81,15 @@ class WaveSabreProcessor extends AudioWorkletProcessor {
   async initWasm(wasmBytes, synthTypeName) {
     try {
       // Determine synth type
-      this.synthType = synthTypeName === 'slaughter' ? SYNTH_SLAUGHTER : SYNTH_FALCON;
+      if (synthTypeName === 'slaughter') {
+        this.synthType = SYNTH_SLAUGHTER;
+      } else if (synthTypeName === 'adultery') {
+        this.synthType = SYNTH_ADULTERY;
+      } else {
+        this.synthType = SYNTH_FALCON;
+      }
       
       // Load module using Emscripten factory pattern
-      // jsCode is already a string (decoded in main thread since worklet doesn't have TextDecoder)
-      // The Emscripten JS defines: var createWaveSabreSynth = (()=>...)();
-      // We wrap it in a function that returns the factory
       const moduleFactory = new Function(wasmBytes.jsCode + '\nreturn createWaveSabreSynth;')();
       
       Module = await moduleFactory({
@@ -88,6 +100,9 @@ class WaveSabreProcessor extends AudioWorkletProcessor {
       wavesabre_set_sample_rate = Module.cwrap('wavesabre_set_sample_rate', null, ['number']);
       wavesabre_create_falcon = Module.cwrap('wavesabre_create_falcon', 'number', []);
       wavesabre_create_slaughter = Module.cwrap('wavesabre_create_slaughter', 'number', []);
+      wavesabre_create_adultery = Module.cwrap('wavesabre_create_adultery', 'number', []);
+      wavesabre_set_gmdls_data = Module.cwrap('wavesabre_set_gmdls_data', null, ['number', 'number']);
+      wavesabre_has_gmdls = Module.cwrap('wavesabre_has_gmdls', 'number', []);
       wavesabre_destroy = Module.cwrap('wavesabre_destroy', null, ['number']);
       wavesabre_set_param = Module.cwrap('wavesabre_set_param', null, ['number', 'number', 'number']);
       wavesabre_note_on = Module.cwrap('wavesabre_note_on', null, ['number', 'number', 'number', 'number']);
@@ -100,6 +115,8 @@ class WaveSabreProcessor extends AudioWorkletProcessor {
       // Create synth
       if (this.synthType === SYNTH_SLAUGHTER) {
         synth = wavesabre_create_slaughter();
+      } else if (this.synthType === SYNTH_ADULTERY) {
+        synth = wavesabre_create_adultery();
       } else {
         synth = wavesabre_create_falcon();
       }
@@ -112,6 +129,23 @@ class WaveSabreProcessor extends AudioWorkletProcessor {
       this.port.postMessage({ type: 'ready', synthType: synthTypeName });
     } catch (err) {
       this.port.postMessage({ type: 'error', error: err.message });
+    }
+  }
+
+  loadGmDls(dlsData) {
+    if (!Module || !wavesabre_set_gmdls_data) {
+      this.port.postMessage({ type: 'error', error: 'WASM not ready for GmDls' });
+      return;
+    }
+    try {
+      const dataBytes = new Uint8Array(dlsData);
+      const ptr = Module._malloc(dataBytes.length);
+      Module.HEAPU8.set(dataBytes, ptr);
+      wavesabre_set_gmdls_data(ptr, dataBytes.length);
+      Module._free(ptr);
+      this.port.postMessage({ type: 'gmdlsLoaded' });
+    } catch (err) {
+      this.port.postMessage({ type: 'error', error: 'Failed to load GmDls: ' + err.message });
     }
   }
 
