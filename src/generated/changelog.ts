@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-03-11T17:24:16.922Z
+ * Generated: 2026-03-11T21:44:51.605Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.2688';
-export const BUILD_NUMBER = '2688';
-export const BUILD_HASH = 'db1140adc';
+export const BUILD_VERSION = '1.0.2693';
+export const BUILD_NUMBER = '2693';
+export const BUILD_HASH = '3f75f1d29';
 export const BUILD_DATE = '2026-03-11';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,29 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.2688',
+    version: '1.0.2693',
     date: '2026-03-11',
     changes: [
+      {
+        type: 'fix',
+        "description": "Fix V2 Emscripten module loading + add debug logs"
+      },
+      {
+        type: 'feature',
+        "description": "VJ pattern overlay supports tracker + DJ deck sources"
+      },
+      {
+        type: 'fix',
+        "description": "Add smoothness fixes to PixiKnob and GmKnob"
+      },
+      {
+        type: 'feature',
+        "description": "WobbleBass mode presets and oscilloscope visualizer"
+      },
+      {
+        type: 'fix',
+        "description": "Resolve TypeScript errors in SynthControlsRouter and TB303KnobPanel"
+      },
       {
         type: 'fix',
         "description": "Use ref pattern to avoid stale closures"
@@ -212,26 +232,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         "description": "Hardware-accurate accent timing + soft limiter"
-      },
-      {
-        type: 'fix',
-        "description": "Lock drag direction to prevent value jumps"
-      },
-      {
-        type: 'fix',
-        "description": "Fix cursor caret hidden behind highlight bar during playback"
-      },
-      {
-        type: 'improvement',
-        "description": "Revert \"Make highlight bar solid during playback (non-visual-bg mode)\""
-      },
-      {
-        type: 'improvement',
-        "description": "Make highlight bar solid during playback (non-visual-bg mode)"
-      },
-      {
-        type: 'improvement',
-        "description": "Restore highlight bar to original accentGlow color"
       }
     ]
   }
