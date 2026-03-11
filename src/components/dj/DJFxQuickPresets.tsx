@@ -17,7 +17,7 @@ import { useAudioStore } from '@/stores/useAudioStore';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { pushToCloud } from '@/lib/cloudSync';
 import { SYNC_KEYS } from '@/hooks/useCloudSync';
-import type { EffectConfig, EffectType } from '@typedefs/instrument';
+import type { EffectConfig, AudioEffectType } from '@typedefs/instrument';
 
 // ── User preset types ────────────────────────────────────────────────────────
 
@@ -144,7 +144,7 @@ export const DJFxQuickPresets: React.FC = () => {
   // ── Add individual effect from unified registry ───────────────────────
   const handleAddEffect = useCallback(
     (availableEffect: AvailableEffect) => {
-      const type = (availableEffect.type as EffectType) || 'Distortion';
+      const type = (availableEffect.type as AudioEffectType) || 'Distortion';
       const params: Record<string, number | string> = { ...getDefaultEffectParameters(type) };
 
       if (availableEffect.category === 'neural' && availableEffect.neuralModelIndex !== undefined) {

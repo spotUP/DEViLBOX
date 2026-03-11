@@ -74,6 +74,8 @@ export const TRACKER_EXTENSIONS = [
   '.hvl', '.ahx',
   // Dedicated parsers
   '.mmd0', '.mmd1', '.mmd2', '.mmd3', '.digi',
+  // Renoise (XRNS)
+  '.xrns',
   // UADE exotic Amiga formats
   '.hip', '.hip7', '.hipc', '.hst', '.soc', '.sog', '.s7g', '.mcmd',
   '.tfmx', '.mdat', '.mdst',
@@ -457,7 +459,7 @@ export function useFileNavigation({
             {
               description: 'All Supported Files',
               accept: {
-                'application/octet-stream': ['.dbx', '.dbox', '.mod', '.xm', '.it', '.s3m', '.fur', '.mptm', '.dmf', '.ftm', '.sqs', '.seq', '.mid', '.midi'],
+                'application/octet-stream': ['.dbx', '.dbox', '.mod', '.xm', '.it', '.s3m', '.fur', '.mptm', '.dmf', '.ftm', '.sqs', '.seq', '.mid', '.midi', '.xrns'],
               },
             },
           ],

@@ -229,35 +229,41 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
           setSelectedSubsong(sidInfo.defaultSubsong);
         }
 
-        // Fast header-only metadata extraction per format
-        const meta = nativeFmtForFile
-          ? getNativeFormatMetadata(nativeFmtForFile.key, buf)
-          : { channels: -1, patterns: -1, orders: -1, instruments: -1, samples: -1 };
+        // For formats with nativeParser (XM, MOD, XRNS), call loadModuleFile to populate nativeData
+        if (nativeFmtForFile?.nativeParser) {
+          const info = await loadModuleFile(file);
+          setModuleInfo(info);
+        } else {
+          // Furnace and other native formats without nativeParser - use header metadata only
+          const meta = nativeFmtForFile
+            ? getNativeFormatMetadata(nativeFmtForFile.key, buf)
+            : { channels: -1, patterns: -1, orders: -1, instruments: -1, samples: -1 };
 
-        // Extended metadata (title, composer, year) for formats that support it
-        const extMeta = nativeFmtForFile
-          ? getNativeFormatExtendedMetadata(nativeFmtForFile.key, buf)
-          : null;
+          // Extended metadata (title, composer, year) for formats that support it
+          const extMeta = nativeFmtForFile
+            ? getNativeFormatExtendedMetadata(nativeFmtForFile.key, buf)
+            : null;
 
-        // Build title: prefer extMeta title, then SID title, then filename
-        let displayTitle = sidInfo?.title || extMeta?.title || file.name.replace(/\.[^/.]+$/, '');
-        if (extMeta?.composer) displayTitle += ` — ${extMeta.composer}`;
+          // Build title: prefer extMeta title, then SID title, then filename
+          let displayTitle = sidInfo?.title || extMeta?.title || file.name.replace(/\.[^/.]+$/, '');
+          if (extMeta?.composer) displayTitle += ` — ${extMeta.composer}`;
 
-        setModuleInfo({
-          metadata: {
-            title: displayTitle,
-            type: isFurnace ? 'Furnace' : nativeFmtForFile!.label,
-            channels:    meta.channels,
-            patterns:    meta.patterns,
-            orders:      meta.orders,
-            instruments: meta.instruments,
-            samples:     meta.samples,
-            duration: 0,
-            message: extMeta?.year ? `Year: ${extMeta.year}` : undefined,
-          },
-          arrayBuffer: buf,
-          file,
-        });
+          setModuleInfo({
+            metadata: {
+              title: displayTitle,
+              type: isFurnace ? 'Furnace' : nativeFmtForFile!.label,
+              channels:    meta.channels,
+              patterns:    meta.patterns,
+              orders:      meta.orders,
+              instruments: meta.instruments,
+              samples:     meta.samples,
+              duration: 0,
+              message: extMeta?.year ? `Year: ${extMeta.year}` : undefined,
+            },
+            arrayBuffer: buf,
+            file,
+          });
+        }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to read file');
       } finally {

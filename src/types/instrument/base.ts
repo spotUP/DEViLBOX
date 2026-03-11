@@ -171,6 +171,11 @@ export type SynthType =
   | 'Sam'              // Commodore SAM Speech Synth
   | 'Synare'           // Synare 3 (Electronic Percussion)
   | 'WAM'              // Web Audio Module (External Plugin)
+  // Demoscene 4k/64k intro synths
+  | 'Oidos'            // Oidos additive synth (Loonies)
+  | 'OidosSynth'       // Oidos WASM synth instance
+  | 'WaveSabreSynth'   // WaveSabre synths (Falcon, Slaughter) from XRNS
+  | 'TunefishSynth'    // Tunefish 4 additive synth from XRNS
   // Named WAM Synths (WAM 2.0 instruments with preconfigured URLs)
   | 'WAMOBXd'           // OB-Xd WAM synth
   | 'WAMSynth101'       // Synth-101 WAM synth

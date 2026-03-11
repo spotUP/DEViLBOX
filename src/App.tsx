@@ -616,7 +616,7 @@ function App() {
 
     const result = await loadFile(file, { requireConfirmation: true });
 
-    if (result.success === 'pending-confirmation') {
+    if (result.success === 'pending-confirmation' || result.success === 'pending-import') {
       useUIStore.getState().setPendingModuleFile(result.file);
     } else if (result.success === true) {
       notify.success(result.message);
