@@ -1,5 +1,24 @@
 # DEViLBOX Project Memory
 
+## CRITICAL: Build Verification Rules
+
+**!!! ALWAYS RUN STRICT BUILD CHECK AFTER CODE CHANGES !!!**
+
+After writing or editing any TypeScript code, ALWAYS run:
+```bash
+npm run type-check
+```
+
+This runs `tsc -b --force` which catches errors that `npx tsc --noEmit` misses:
+- Unused variables (TS6133)
+- Type mismatches with undefined/null
+- Enum syntax errors with `erasableSyntaxOnly`
+- Other strict mode violations
+
+**DO NOT mark a task complete until `npm run type-check` passes with no errors.**
+
+---
+
 ## CRITICAL: Git Safety Rules
 
 **!!! ABSOLUTE RULE - NEVER VIOLATE !!!**
