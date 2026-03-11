@@ -238,23 +238,30 @@ export const PixiImportModuleDialog: React.FC<PixiImportModuleDialogProps> = ({
           setSidHeader(sidInfo);
           setSelectedSubsong(sidInfo.defaultSubsong);
         }
-        const meta = nativeFmtForFile
-          ? getNativeFormatMetadata(nativeFmtForFile.key, buf)
-          : { channels: -1, patterns: -1, orders: -1, instruments: -1, samples: -1 };
-        setModuleInfo({
-          metadata: {
-            title: sidInfo?.title || file.name.replace(/\.[^/.]+$/, ''),
-            type: isFurnace ? 'Furnace' : nativeFmtForFile!.label,
-            channels: meta.channels,
-            patterns: meta.patterns,
-            orders: meta.orders,
-            instruments: meta.instruments,
-            samples: meta.samples,
-            duration: 0,
-          },
-          arrayBuffer: buf,
-          file,
-        });
+        // For formats with nativeParser, call loadModuleFile to populate nativeData
+        if (nativeFmtForFile?.nativeParser) {
+          const info = await loadModuleFile(file);
+          setModuleInfo(info);
+        } else {
+          // Furnace and other native formats - just use metadata
+          const meta = nativeFmtForFile
+            ? getNativeFormatMetadata(nativeFmtForFile.key, buf)
+            : { channels: -1, patterns: -1, orders: -1, instruments: -1, samples: -1 };
+          setModuleInfo({
+            metadata: {
+              title: sidInfo?.title || file.name.replace(/\.[^/.]+$/, ''),
+              type: isFurnace ? 'Furnace' : nativeFmtForFile!.label,
+              channels: meta.channels,
+              patterns: meta.patterns,
+              orders: meta.orders,
+              instruments: meta.instruments,
+              samples: meta.samples,
+              duration: 0,
+            },
+            arrayBuffer: buf,
+            file,
+          });
+        }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to read file');
       } finally {

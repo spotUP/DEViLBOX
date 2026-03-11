@@ -310,6 +310,14 @@ export interface ParsedInstrument {
   // Furnace-specific data (for .fur imports)
   furnace?: FurnaceInstrumentData;
   rawBinaryData?: Uint8Array;  // Raw binary instrument data for upload to WASM
+
+  // XRNS/demoscene synth data (for .xrns imports)
+  xrnsSynth?: {
+    synthType: string;  // 'wavesabre-slaughter', 'wavesabre-falcon', 'oidos', 'tunefish'
+    pluginIdentifier?: string;
+    parameters: number[];
+    parameterChunk?: string;
+  };
 }
 
 /**
@@ -331,7 +339,7 @@ export interface ImportMetadata {
     | 'PumaTracker' | 'QuadraComposer' | 'RK' | 'RTM' | 'SAW' | 'SC'
     | 'SonicArranger' | 'STK' | 'STM' | 'STP' | 'Symphonie' | 'TCBTracker' | 'ULT' | 'UNIC'
     // PC tracker formats
-    | 'AMS' | 'DMF' | 'MadTracker2' | 'fmt' | 'xmf' | 'uax' | 'NATIVE'
+    | 'AMS' | 'DMF' | 'MadTracker2' | 'fmt' | 'xmf' | 'uax' | 'NATIVE' | 'XRNS'
     // Generic fallback
     | string;
   sourceFile: string;
