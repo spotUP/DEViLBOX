@@ -39,6 +39,19 @@ export const GmKnob: React.FC<GmKnobProps> = ({
   const [dragging, setDragging] = useState(false);
   const dragStart = useRef({ y: 0, startValue: 0 });
   const elRef = useRef<HTMLDivElement>(null);
+  const rafRef = useRef<number | null>(null);
+  const pendingValueRef = useRef<number | null>(null);
+  const onChangeRef = useRef(onChange);
+
+  // Keep onChange ref in sync
+  useEffect(() => { onChangeRef.current = onChange; }, [onChange]);
+
+  // Cleanup RAF on unmount
+  useEffect(() => {
+    return () => {
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    };
+  }, []);
 
   const frame = Math.round(Math.max(0, Math.min(1, value)) * (totalFrames - 1));
   const col = frame % cols;
@@ -59,10 +72,27 @@ export const GmKnob: React.FC<GmKnobProps> = ({
       const dy = dragStart.current.y - e.clientY;
       const sensitivity = e.shiftKey ? 0.001 : 0.005;
       const newVal = Math.max(0, Math.min(1, dragStart.current.startValue + dy * sensitivity));
-      onChange(newVal);
+
+      // RAF debouncing for smooth updates
+      pendingValueRef.current = newVal;
+      if (!rafRef.current) {
+        rafRef.current = requestAnimationFrame(() => {
+          if (pendingValueRef.current !== null) {
+            onChangeRef.current(pendingValueRef.current);
+            pendingValueRef.current = null;
+          }
+          rafRef.current = null;
+        });
+      }
     };
 
-    const onUp = () => setDragging(false);
+    const onUp = () => {
+      setDragging(false);
+      if (rafRef.current) {
+        cancelAnimationFrame(rafRef.current);
+        rafRef.current = null;
+      }
+    };
 
     document.addEventListener('mousemove', onMove);
     document.addEventListener('mouseup', onUp);
@@ -70,7 +100,7 @@ export const GmKnob: React.FC<GmKnobProps> = ({
       document.removeEventListener('mousemove', onMove);
       document.removeEventListener('mouseup', onUp);
     };
-  }, [dragging, onChange]);
+  }, [dragging]);
 
   const handleDoubleClick = useCallback(() => {
     onChange(bipolar ? 0.5 : 0);
