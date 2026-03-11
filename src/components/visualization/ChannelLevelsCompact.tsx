@@ -147,15 +147,15 @@ export const ChannelLevelsCompact: React.FC<ChannelLevelsCompactProps> = ({
 
       // Update levels with smoothing
       for (let i = 0; i < nc; i++) {
-        let trigger: number;
+        // Always check trigger data (works for native WASM synths like DB303)
+        const isNewTrigger = triggerGens[i] !== lastGensRef.current[i];
+        let trigger = isNewTrigger ? (triggerLevels[i] || 0) : 0;
+        if (isNewTrigger) lastGensRef.current[i] = triggerGens[i];
+
+        // In realtime mode, also use per-channel audio levels (higher wins)
         if (isRealtime && realtimeLevels) {
-          // Realtime mode: use actual audio levels from AnalyserNode
-          trigger = realtimeLevels[i] || 0;
-        } else {
-          // Trigger mode: only use level on NEW trigger
-          const isNewTrigger = triggerGens[i] !== lastGensRef.current[i];
-          trigger = isNewTrigger ? (triggerLevels[i] || 0) : 0;
-          if (isNewTrigger) lastGensRef.current[i] = triggerGens[i];
+          const rt = realtimeLevels[i] || 0;
+          if (rt > trigger) trigger = rt;
         }
         const current = levelStatesRef.current[i] || 0;
 
