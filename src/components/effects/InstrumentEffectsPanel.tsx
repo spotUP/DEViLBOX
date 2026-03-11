@@ -6,7 +6,7 @@
  * wet/dry, and inline parameter editing.
  */
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useImperativeHandle, forwardRef } from 'react';
 import type { EffectConfig, AudioEffectType as EffectType } from '@typedefs/instrument';
 import { useInstrumentStore } from '@stores/useInstrumentStore';
 import { Plus, X, Search } from 'lucide-react';
@@ -19,15 +19,25 @@ interface InstrumentEffectsPanelProps {
   instrumentId: number;
   instrumentName: string;
   effects: EffectConfig[];
+  hideHeader?: boolean;
 }
 
-export const InstrumentEffectsPanel: React.FC<InstrumentEffectsPanelProps> = ({
+export interface InstrumentEffectsPanelHandle {
+  toggleBrowser: () => void;
+}
+
+export const InstrumentEffectsPanel = forwardRef<InstrumentEffectsPanelHandle, InstrumentEffectsPanelProps>(({
   instrumentId,
   instrumentName,
   effects,
-}) => {
+  hideHeader = false,
+}, ref) => {
   const [showBrowser, setShowBrowser] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+
+  useImperativeHandle(ref, () => ({
+    toggleBrowser: () => setShowBrowser(prev => !prev),
+  }), []);
 
 
   const {
@@ -107,22 +117,24 @@ export const InstrumentEffectsPanel: React.FC<InstrumentEffectsPanelProps> = ({
   return (
     <div className="flex flex-col h-full min-h-0 bg-dark-bg">
       {/* Header */}
-      <div className="flex items-center justify-between px-3 py-2 bg-dark-bgSecondary border-b border-dark-border shrink-0">
-        <div className="flex items-center gap-2 min-w-0">
-          <span className="text-xs font-mono text-text-muted truncate">{instrumentName}</span>
-          <span className="text-[10px] text-text-muted px-1.5 py-0.5 bg-dark-bg rounded">
-            {effects.length} FX
-          </span>
+      {!hideHeader && (
+        <div className="flex items-center justify-between px-3 py-2 bg-dark-bgSecondary border-b border-dark-border shrink-0">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="text-xs font-mono text-text-muted truncate">{instrumentName}</span>
+            <span className="text-[10px] text-text-muted px-1.5 py-0.5 bg-dark-bg rounded">
+              {effects.length} FX
+            </span>
+          </div>
+          <button
+            onClick={() => setShowBrowser(!showBrowser)}
+            className="flex items-center gap-1 px-2 py-1 text-[10px] font-bold uppercase rounded
+                     bg-accent-primary/10 text-accent-primary hover:bg-accent-primary/20 transition-colors"
+          >
+            <Plus size={11} />
+            Add
+          </button>
         </div>
-        <button
-          onClick={() => setShowBrowser(!showBrowser)}
-          className="flex items-center gap-1 px-2 py-1 text-[10px] font-bold uppercase rounded
-                   bg-accent-primary/10 text-accent-primary hover:bg-accent-primary/20 transition-colors"
-        >
-          <Plus size={11} />
-          Add
-        </button>
-      </div>
+      )}
 
       {/* Effect Browser (collapsible) */}
       {showBrowser && (
@@ -233,4 +245,5 @@ export const InstrumentEffectsPanel: React.FC<InstrumentEffectsPanelProps> = ({
       </div>
     </div>
   );
-};
+});
+InstrumentEffectsPanel.displayName = 'InstrumentEffectsPanel';

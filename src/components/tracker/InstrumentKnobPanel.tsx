@@ -11,12 +11,14 @@
 import React, { useCallback, useRef, memo, useState, useMemo, Suspense, lazy } from 'react';
 import { useInstrumentStore, useUIStore, useMIDIStore } from '@stores';
 import { useShallow } from 'zustand/react/shallow';
-import { ChevronDown, ChevronUp, X, ExternalLink, Undo2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronDown, ChevronUp, X, ExternalLink, Undo2, ChevronLeft, ChevronRight, Plus } from 'lucide-react';
 import { JC303StyledKnobPanel } from '@components/instruments/controls/JC303StyledKnobPanel';
 import { PopOutWindow, focusPopout } from '@components/ui/PopOutWindow';
 import { ScrollLockContainer } from '@components/ui/ScrollLockContainer';
 import { Knob } from '@components/controls/Knob';
 import type { TB303Config, EffectConfig, InstrumentConfig, SynthType } from '@typedefs/instrument';
+import type { InstrumentEffectsPanelHandle } from '@components/effects/InstrumentEffectsPanel';
+import type { MasterEffectsPanelHandle } from '@components/effects/MasterEffectsPanel';
 
 // Lazy-load FX panels (heavy: DnD kit, visual effect editors, etc.)
 const InstrumentEffectsPanel = lazy(() =>
@@ -334,7 +336,8 @@ const TabBar: React.FC<{
   synthType: SynthType | undefined;
   instrumentName: string;
   fxCount: number;
-}> = memo(({ activeTab, onTabChange, synthType, instrumentName, fxCount }) => {
+  rightContent?: React.ReactNode;
+}> = memo(({ activeTab, onTabChange, synthType, instrumentName, fxCount, rightContent }) => {
   const tabs: { id: PanelTab; label: string; badge?: string }[] = [
     { id: 'synth', label: synthType === 'TB303' ? 'TB-303' : (synthType || 'Synth') },
     { id: 'instFx', label: 'Inst FX', badge: fxCount > 0 ? String(fxCount) : undefined },
@@ -360,6 +363,7 @@ const TabBar: React.FC<{
         </button>
       ))}
       <div className="flex-1" />
+      {rightContent}
       <span className="text-[10px] text-gray-600 font-mono truncate max-w-[200px]">{instrumentName}</span>
     </div>
   );
@@ -393,6 +397,8 @@ export const InstrumentKnobPanel: React.FC = memo(() => {
 
   const { controlledInstrumentId } = useMIDIStore();
   const contentRef = useRef<HTMLDivElement>(null);
+  const instFxRef = useRef<InstrumentEffectsPanelHandle>(null);
+  const masterFxRef = useRef<MasterEffectsPanelHandle>(null);
   const [activeTab, setActiveTab] = useState<PanelTab>('synth');
 
   // Determine which instrument to show — follows the selected instrument
@@ -477,6 +483,44 @@ export const InstrumentKnobPanel: React.FC = memo(() => {
   const instrumentName = `${instNum}: ${targetInstrument.name || synthType}`;
   const fxCount = targetInstrument.effects?.length ?? 0;
 
+  // Right-side content for tab bar — action buttons for FX tabs
+  const tabRightContent = useMemo(() => {
+    if (activeTab === 'instFx') {
+      return (
+        <button
+          onClick={() => instFxRef.current?.toggleBrowser()}
+          className="flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold uppercase rounded
+                   bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20 transition-colors"
+        >
+          <Plus size={10} />
+          Add
+        </button>
+      );
+    }
+    if (activeTab === 'masterFx') {
+      return (
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => masterFxRef.current?.togglePresetMenu()}
+            className="px-2 py-0.5 text-[10px] font-medium rounded bg-gray-800 text-gray-300
+                     hover:bg-gray-700 transition-colors border border-gray-700"
+          >
+            Presets
+          </button>
+          <button
+            onClick={() => masterFxRef.current?.toggleAddMenu()}
+            className="flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold uppercase rounded
+                     bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20 transition-colors"
+          >
+            <Plus size={10} />
+            Add
+          </button>
+        </div>
+      );
+    }
+    return undefined;
+  }, [activeTab]);
+
   // ─── Popped-out mode ───────────────────────────────────────────────────────
   if (tb303PoppedOut) {
     return (
@@ -496,6 +540,7 @@ export const InstrumentKnobPanel: React.FC = memo(() => {
               synthType={synthType}
               instrumentName={instrumentName}
               fxCount={fxCount}
+              rightContent={tabRightContent}
             />
             <ScrollLockContainer>
               {activeTab === 'synth' ? (
@@ -516,16 +561,18 @@ export const InstrumentKnobPanel: React.FC = memo(() => {
                 <Suspense fallback={<FxLoadingFallback />}>
                   <div className="fx-horizontal-layout" style={{ height: '100%' }}>
                     <InstrumentEffectsPanel
+                      ref={instFxRef}
                       instrumentId={targetInstrument.id}
                       instrumentName={instrumentName}
                       effects={targetInstrument.effects || []}
+                      hideHeader
                     />
                   </div>
                 </Suspense>
               ) : (
                 <Suspense fallback={<FxLoadingFallback />}>
                   <div className="fx-horizontal-layout" style={{ height: '100%' }}>
-                    <MasterEffectsPanel />
+                    <MasterEffectsPanel ref={masterFxRef} hideHeader />
                   </div>
                 </Suspense>
               )}
@@ -655,6 +702,7 @@ export const InstrumentKnobPanel: React.FC = memo(() => {
           synthType={synthType}
           instrumentName={instrumentName}
           fxCount={fxCount}
+          rightContent={tabRightContent}
         />
 
         {/* Tab content */}
@@ -679,16 +727,18 @@ export const InstrumentKnobPanel: React.FC = memo(() => {
             <Suspense fallback={<FxLoadingFallback />}>
               <div className="fx-horizontal-layout p-2 h-full">
                 <InstrumentEffectsPanel
+                  ref={instFxRef}
                   instrumentId={targetInstrument.id}
                   instrumentName={instrumentName}
                   effects={targetInstrument.effects || []}
+                  hideHeader
                 />
               </div>
             </Suspense>
           ) : (
             <Suspense fallback={<FxLoadingFallback />}>
               <div className="fx-horizontal-layout p-2 h-full">
-                <MasterEffectsPanel />
+                <MasterEffectsPanel ref={masterFxRef} hideHeader />
               </div>
             </Suspense>
           )}
