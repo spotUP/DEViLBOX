@@ -238,6 +238,13 @@ export const DJDeck: React.FC<DJDeckProps> = ({ deckId }) => {
     try {
       const engine = getDJEngine();
 
+      // TD-3 pattern files → route to import dialog (not a DJ-playable format)
+      if (/\.(sqs|seq)$/i.test(file.name)) {
+        const { useUIStore } = await import('@stores/useUIStore');
+        useUIStore.getState().setPendingTD3File(file);
+        return;
+      }
+
       if (isAudioFile(file.name)) {
         // Audio file mode (MP3, WAV, FLAC, etc.)
         const buffer = await file.arrayBuffer();

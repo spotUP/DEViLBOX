@@ -41,6 +41,7 @@ import { PatternMatchButton } from '@components/modland/PatternMatchButton';
 import { useModlandContributionModal } from '@stores/useModlandContributionModal';
 import { ImportDBXDialog } from '@components/dialogs/ImportDBXDialog';
 import { ImportInstrumentDialog } from '@components/dialogs/ImportInstrumentDialog';
+import { ImportTD3Dialog } from '@components/dialogs/ImportTD3Dialog';
 import { Button } from '@components/ui/Button';
 import { useVersionCheck } from '@hooks/useVersionCheck';
 import { useDevServerStatus } from '@hooks/useDevServerStatus';
@@ -123,6 +124,7 @@ function App() {
   const [pendingSongFile, setPendingSongFile]             = useState<File | null>(null);
   const [pendingInstrumentFile, setPendingInstrumentFile] = useState<File | null>(null);
   const djModeActive = useDJStore(s => s.djModeActive);
+  const pendingTD3File = useUIStore(s => s.pendingTD3File);
 
   // Modal state from store (single source of truth for DOM + WebGL)
   const modalOpen = useUIStore(s => s.modalOpen);
@@ -725,6 +727,19 @@ function App() {
             }}
           />
 
+          {/* TD-3 pattern import dialog (replace/append choice) */}
+          <ImportTD3Dialog
+            isOpen={!!pendingTD3File}
+            onClose={() => useUIStore.getState().setPendingTD3File(null)}
+            initialFile={pendingTD3File}
+            onImport={async (file, replacePatterns) => {
+              useUIStore.getState().setPendingTD3File(null);
+              const result = await loadFile(file, { requireConfirmation: false, replacePatterns });
+              if (result.success === true) notify.success(result.message);
+              else if (result.success === false) notify.error(result.error);
+            }}
+          />
+
           {/* Pop-out windows — rendered outside WebGL canvas as separate browser windows */}
           {instrumentEditorPoppedOut && (
             <Suspense fallback={null}>
@@ -1157,6 +1172,19 @@ function App() {
           onConfirm={async () => {
             if (pendingInstrumentFile) await loadFile(pendingInstrumentFile);
             setPendingInstrumentFile(null);
+          }}
+        />
+
+        {/* TD-3 pattern import dialog (replace/append choice) */}
+        <ImportTD3Dialog
+          isOpen={!!pendingTD3File}
+          onClose={() => useUIStore.getState().setPendingTD3File(null)}
+          initialFile={pendingTD3File}
+          onImport={async (file, replacePatterns) => {
+            useUIStore.getState().setPendingTD3File(null);
+            const result = await loadFile(file, { requireConfirmation: false, replacePatterns });
+            if (result.success === true) notify.success(result.message);
+            else if (result.success === false) notify.error(result.error);
           }}
         />
       </Suspense>
