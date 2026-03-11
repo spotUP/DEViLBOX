@@ -517,11 +517,28 @@ export const useInstrumentStore = create<InstrumentStore>()(
               return; // Handled — WASM engine runs independently, no invalidation needed
             }
 
-            // Complex factory synths (SuperSaw, Organ, ChipSynth, PWMSynth,
-            // StringMachine, FormantSynth, WobbleBass) have partial applyConfig
-            // methods that only cover a subset of their parameters. Rather than
-            // silently swallowing unhandled param changes, we fall through to
-            // invalidateInstrument which recreates the synth with the full new config.
+            // Complex factory synths with applyConfig methods — update in-place
+            // to avoid killing active voices. applyConfig covers the most common
+            // real-time parameters (filter, envelope, osc levels, LFO rate).
+            const complexFactorySynths = [
+              'SuperSaw', 'Organ', 'ChipSynth', 'PWMSynth',
+              'StringMachine', 'FormantSynth', 'WobbleBass',
+            ];
+            if (complexFactorySynths.includes(updatedInstrument.synthType)) {
+              const configKey = updatedInstrument.synthType === 'WobbleBass' ? 'wobbleBass'
+                : updatedInstrument.synthType === 'SuperSaw' ? 'superSaw'
+                : updatedInstrument.synthType === 'FormantSynth' ? 'formantSynth'
+                : updatedInstrument.synthType === 'StringMachine' ? 'stringMachine'
+                : updatedInstrument.synthType === 'PWMSynth' ? 'pwmSynth'
+                : updatedInstrument.synthType === 'ChipSynth' ? 'chipSynth'
+                : updatedInstrument.synthType === 'Organ' ? 'organ'
+                : null;
+              const synthConfig = configKey ? (updatedInstrument as any)[configKey] : null;
+              if (synthConfig) {
+                engine.updateComplexSynthParameters(id, synthConfig);
+                return; // Handled — no invalidation needed
+              }
+            }
 
             // Standard Tone.js synths: update in-place instead of recreating
             const toneJsSynthTypes = ['Synth', 'FMSynth', 'AMSynth', 'MonoSynth', 'DuoSynth', 'PluckSynth',
