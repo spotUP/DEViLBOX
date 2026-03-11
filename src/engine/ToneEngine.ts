@@ -4555,21 +4555,20 @@ export class ToneEngine {
   public isChannelMuted(channelIndex: number): boolean { return _isChannelMuted(this._channelCtx, channelIndex); }
   private disposeChannelOutputs(): void { _disposeChannelOutputs(this._channelCtx); }
   public getChannelLevels(numChannels: number): number[] {
-    // First check for per-channel meter data from TypeScript synths
+    // Per-channel meter data from TypeScript synths (each channel has its own Tone.Meter)
     const perChannelLevels = _getChannelLevels(this._channelCtx, numChannels);
-    const hasPerChannelData = perChannelLevels.some(l => l > 0);
-    if (hasPerChannelData) {
-      return perChannelLevels;
-    }
+
     // Check for realtime per-channel levels from WASM engines (libopenmpt, etc.)
     const wasmLevels = _getRealtimeChannelLevels(this.channelMeter, numChannels);
+
+    // Merge: use per-channel Tone.Meter data, overlay WASM levels where available
+    const result = perChannelLevels;
     if (wasmLevels) {
-      return wasmLevels;
+      for (let i = 0; i < numChannels; i++) {
+        if (wasmLevels[i] > result[i]) result[i] = wasmLevels[i];
+      }
     }
-    // Fall back to master meter level (distribute uniformly)
-    const masterLevel = this.masterMeter.getValue() as number;
-    const normalized = Math.max(0, Math.min(1, masterLevel));
-    return Array(numChannels).fill(normalized);
+    return result;
   }
   /** Update realtime per-channel levels from WASM engines */
   public updateRealtimeChannelLevels(levels: number[]): void { _updateRealtimeChannelLevels(this.channelMeter, levels); }
