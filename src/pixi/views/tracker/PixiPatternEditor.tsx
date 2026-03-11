@@ -332,7 +332,7 @@ function renderCursorCaret(
     else if (cursor.columnType === 'probability') { cursorX = colX + 8 + noteWidth + CHAR_WIDTH * 12 + 28; cursorW = CHAR_WIDTH * 2; }
 
     g.rect(cursorX, y, cursorW, p.rowHeight);
-    g.fill({ color: p.recordMode ? p.theme.error.color : p.theme.accent.color, alpha: 0.45 });
+    g.fill({ color: p.recordMode ? p.theme.error.color : p.theme.accent.color, alpha: 1 });
   }
 }
 
@@ -1157,7 +1157,7 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
       // Only draw if highlight is within visible grid area
       if (centerY >= 0 && centerY < p.gridHeight) {
         gHighlight.rect(0, centerY, p.width, p.rowHeight);
-        gHighlight.fill({ color: p.theme.accentGlow.color, alpha: p.trackerVisualBg ? 0.5 : p.theme.accentGlow.alpha });
+        gHighlight.fill({ color: p.theme.accentGlow.color, alpha: p.trackerVisualBg ? 0.5 : 1 });
       }
     }
   }, []); // Empty deps — everything read from refs
