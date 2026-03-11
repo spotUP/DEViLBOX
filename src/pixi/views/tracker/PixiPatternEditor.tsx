@@ -1157,7 +1157,7 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
       // Only draw if highlight is within visible grid area
       if (centerY >= 0 && centerY < p.gridHeight) {
         gHighlight.rect(0, centerY, p.width, p.rowHeight);
-        gHighlight.fill({ color: p.theme.trackerRowCurrent.color, alpha: 1 });
+        gHighlight.fill({ color: p.theme.accentGlow.color, alpha: p.trackerVisualBg ? 0.5 : p.theme.accentGlow.alpha });
       }
     }
   }, []); // Empty deps — everything read from refs
