@@ -1176,7 +1176,7 @@ export const useInstrumentStore = create<InstrumentStore>()(
       // Also fix any out-of-range IDs (e.g. Date.now() timestamps from older versions)
       const usedIds = new Set<number>();
       const migratedInstruments = newInstruments.map(inst => {
-        console.log(`[InstrumentStore] loadInstruments: id=${inst.id} name="${inst.name}" synthType=${inst.synthType} hasXrns=${!!inst.xrns}`);
+        console.log(`[InstrumentStore] loadInstruments: id=${inst.id} name="${inst.name}" synthType=${inst.synthType} hasXrns=${!!inst.xrns} xrnsChunk=${!!inst.xrns?.parameterChunk}`);
         // Ensure complete config for the synthType
         const completeInst = ensureCompleteInstrumentConfig(inst);
 

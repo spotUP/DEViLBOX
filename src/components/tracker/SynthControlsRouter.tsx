@@ -163,6 +163,11 @@ interface SynthControlsRouterProps {
 export const SynthControlsRouter: React.FC<SynthControlsRouterProps> = ({ instrument, onUpdate, fallback }) => {
   const synthType = instrument.synthType;
 
+  // Debug: log when routing WaveSabre/Oidos/Tunefish
+  if (synthType === 'WaveSabreSynth' || synthType === 'OidosSynth' || synthType === 'TunefishSynth' || instrument.xrns) {
+    console.log(`[SynthControlsRouter] Routing: synthType=${synthType} xrns=${JSON.stringify(instrument.xrns?.synthType)} hasXrns=${!!instrument.xrns}`);
+  }
+
   // Chip synth param change handler
   const handleChipParamChange = useCallback((name: string, value: number | string) => {
     const params = { ...(instrument.parameters as Record<string, unknown> || {}), [name]: value };
