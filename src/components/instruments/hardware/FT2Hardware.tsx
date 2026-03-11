@@ -305,6 +305,11 @@ export const FT2Hardware: React.FC<FT2HardwareProps> = ({ instrument, onChange }
   const sampleRateRef = useRef(44100);
   const audioCtxRef = useRef<AudioContext | null>(null);
   const currentSourceRef = useRef<AudioBufferSourceNode | null>(null);
+  // Playback position tracking for cursor overlay
+  const playStartTimeRef = useRef(0);
+  const playDurationRef = useRef(0);
+  const playLoopingRef = useRef(false);
+  const playActiveRef = useRef(false);
 
   /* Keep refs in sync — CLAUDE.md configRef pattern */
   useEffect(() => { configRef.current = instrument; }, [instrument]);
@@ -497,12 +502,11 @@ export const FT2Hardware: React.FC<FT2HardwareProps> = ({ instrument, onChange }
             try { currentSourceRef.current.stop(); } catch { /* ignore */ }
             currentSourceRef.current = null;
           }
-          if (len <= 0) return;
+          if (len <= 0) { playActiveRef.current = false; return; }
           const sr = sampleRateRef.current;
           const audioBuf = ctx.createBuffer(1, len, sr);
           const chData = audioBuf.getChannelData(0);
           if (is16bit) {
-            /* ptr is a WASM byte offset; HEAP16 is Int16Array over the same buffer */
             const raw = mod!.HEAP16.subarray(ptr >> 1, (ptr >> 1) + len);
             for (let i = 0; i < len; i++) chData[i] = raw[i] / 32768.0;
           } else {
@@ -511,7 +515,8 @@ export const FT2Hardware: React.FC<FT2HardwareProps> = ({ instrument, onChange }
           }
           const src = ctx.createBufferSource();
           src.buffer = audioBuf;
-          if (loopType !== 0 && loopLength > 2) {
+          const isLooping = loopType !== 0 && loopLength > 2;
+          if (isLooping) {
             src.loop = true;
             src.loopStart = loopStart / sr;
             src.loopEnd = (loopStart + loopLength) / sr;
@@ -519,8 +524,16 @@ export const FT2Hardware: React.FC<FT2HardwareProps> = ({ instrument, onChange }
           src.connect(ctx.destination);
           src.start();
           currentSourceRef.current = src;
+          // Track playback for position cursor
+          playStartTimeRef.current = ctx.currentTime;
+          playDurationRef.current = len / sr;
+          playLoopingRef.current = isLooping;
+          playActiveRef.current = true;
           src.onended = () => {
-            if (currentSourceRef.current === src) currentSourceRef.current = null;
+            if (currentSourceRef.current === src) {
+              currentSourceRef.current = null;
+              playActiveRef.current = false;
+            }
           };
         };
 
@@ -529,6 +542,7 @@ export const FT2Hardware: React.FC<FT2HardwareProps> = ({ instrument, onChange }
             try { currentSourceRef.current.stop(); } catch { /* ignore */ }
             currentSourceRef.current = null;
           }
+          playActiveRef.current = false;
         };
 
         /* Init */
@@ -595,10 +609,35 @@ export const FT2Hardware: React.FC<FT2HardwareProps> = ({ instrument, onChange }
 
         /* Start React-driven rAF render loop */
         let rafId = 0;
+        // FT2 waveform area: x=0..631 (632px), y=174..327 (154px)
+        const WAVE_X = 0, WAVE_W = 632, WAVE_Y = 174, WAVE_H = 154;
         const renderLoop = () => {
           if (cancelled) return;
           if (m._ft2_sampled_tick) m._ft2_sampled_tick();
           blitFramebuffer(m, ctx, imgData);
+
+          // Draw playback position cursor over waveform
+          if (playActiveRef.current && audioCtxRef.current && playDurationRef.current > 0) {
+            const elapsed = audioCtxRef.current.currentTime - playStartTimeRef.current;
+            const dur = playDurationRef.current;
+            let progress: number;
+            if (playLoopingRef.current) {
+              progress = (elapsed % dur) / dur;
+            } else {
+              progress = Math.min(elapsed / dur, 1);
+              if (progress >= 1) playActiveRef.current = false;
+            }
+            if (playActiveRef.current) {
+              const px = Math.round(WAVE_X + progress * WAVE_W);
+              ctx.strokeStyle = '#fbbf24';
+              ctx.lineWidth = 1;
+              ctx.beginPath();
+              ctx.moveTo(px, WAVE_Y);
+              ctx.lineTo(px, WAVE_Y + WAVE_H);
+              ctx.stroke();
+            }
+          }
+
           rafId = requestAnimationFrame(renderLoop);
         };
         rafId = requestAnimationFrame(renderLoop);
