@@ -720,7 +720,6 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
         <Button variant="ghost" size="sm" onClick={() => fileInputRef.current?.click()}>Import</Button>
         <Button variant="ghost" size="sm" onClick={onShowPatternOrder}>Order</Button>
         <Button variant="ghost" size="sm" onClick={onShowInstruments}>Instruments</Button>
-        <Button variant="ghost" size="sm" onClick={() => useUIStore.getState().openModal('furnacePresets')}>Furnace</Button>
         <Button variant="ghost" size="sm" onClick={onShowDrumpads}>Pads</Button>
         <Button variant={showMasterFX ? 'primary' : 'ghost'} size="sm" onClick={onShowMasterFX}>Master FX</Button>
         <Button
