@@ -22,6 +22,7 @@ import { useDJStore } from '@stores/useDJStore';
 import { useTransportStore } from '@stores/useTransportStore';
 import { useSettingsStore } from '@stores/useSettingsStore';
 import { focusPopout } from '@components/ui/PopOutWindow';
+import { VIEW_OPTIONS, switchView } from '@/constants/viewOptions';
 import { VJPresetBrowser } from './VJPresetBrowser';
 import { VJPatternOverlay } from './VJPatternOverlay';
 
@@ -290,34 +291,16 @@ const VJPatternOverlayWrapper: React.FC = () => {
   const deckB = useDJStore(s => s.decks.B);
   if (!enabled) return null;
 
-  // Collect active sources
-  const sources: Array<{ source: 'tracker' | 'deckA' | 'deckB'; key: string }> = [];
-  if (trackerPlaying) {
-    sources.push({ source: 'tracker', key: 'tracker' });
-  }
-  // DJ decks: show if they have loaded content (songPos tracking indicates loaded song)
-  if (deckA.isPlaying) sources.push({ source: 'deckA', key: 'deckA' });
-  if (deckB.isPlaying) sources.push({ source: 'deckB', key: 'deckB' });
+  // Collect active sources into a single array for one unified canvas
+  const activeSources: Array<'tracker' | 'deckA' | 'deckB'> = [];
+  if (trackerPlaying) activeSources.push('tracker');
+  if (deckA.isPlaying) activeSources.push('deckA');
+  if (deckB.isPlaying) activeSources.push('deckB');
 
   // If nothing is playing, show tracker overlay as idle display (original behavior)
-  if (sources.length === 0) {
-    return <VJPatternOverlay source="tracker" />;
-  }
+  if (activeSources.length === 0) activeSources.push('tracker');
 
-  // Single source — centered
-  if (sources.length === 1) {
-    return <VJPatternOverlay source={sources[0].source} />;
-  }
-
-  // Multiple sources — spread overlays with offset
-  return (
-    <>
-      {sources.map((s, i) => {
-        const offset = sources.length <= 1 ? 0 : (i / (sources.length - 1)) * 2 - 1; // -1..+1
-        return <VJPatternOverlay key={s.key} source={s.source} offsetX={offset} />;
-      })}
-    </>
-  );
+  return <VJPatternOverlay sources={activeSources} />;
 };
 
 // ─── VJControls — DOM overlay controls (used by both DOM view + PixiDOMOverlay) ─
@@ -391,29 +374,15 @@ export const VJControls: React.FC<VJControlsProps> = ({
                 onChange={(e) => {
                   const v = e.target.value;
                   if (v !== 'vj') {
-                    // DJ is safe — switching back keeps engine alive
-                    if (v !== 'dj') {
-                      const { decks } = useDJStore.getState();
-                      const anyPlaying = decks.A.isPlaying || decks.B.isPlaying || decks.C.isPlaying;
-                      if (anyPlaying && !window.confirm('Audio is playing. Switch view? This will stop DJ playback.')) {
-                        e.target.value = 'vj';
-                        return;
-                      }
-                    }
-                    useUIStore.getState().setActiveView(v as any);
+                    switchView(v, 'vj');
                   }
                 }}
                 className="px-2 py-0.5 text-[10px] font-bold tracking-widest uppercase bg-white/10 text-white border border-white/20 rounded hover:bg-white/20 transition-colors cursor-pointer flex-shrink-0"
                 title="Switch view"
               >
-                <option value="tracker">Tracker</option>
-                <option value="grid">Grid</option>
-                <option value="pianoroll">Piano Roll</option>
-                <option value="tb303">TB-303</option>
-                <option value="arrangement">Arrangement</option>
-                <option value="dj">DJ Mixer</option>
-                <option value="drumpad">Drum Pads</option>
-                <option value="vj">VJ View</option>
+                {VIEW_OPTIONS.map(({ value, label }) => (
+                  <option key={value} value={value}>{label}</option>
+                ))}
               </select>
               {onSwitchLayer && (
                 <div className="flex items-center gap-1 flex-shrink-0">
