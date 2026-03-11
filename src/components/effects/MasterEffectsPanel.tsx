@@ -3,7 +3,7 @@
  * Connects to useAudioStore for master effects management
  */
 
-import React, { useState, useCallback, useImperativeHandle, forwardRef } from 'react';
+import React, { useState, useCallback, useImperativeHandle, forwardRef, useRef, useEffect } from 'react';
 import {
   DndContext,
   closestCenter,
@@ -142,6 +142,12 @@ export const MasterEffectsPanel = forwardRef<MasterEffectsPanelHandle, MasterEff
     setMasterEffects,
   } = useAudioStore();
 
+  // Keep masterEffects ref in sync to avoid stale closures (critical for smooth knobs)
+  const masterEffectsRef = useRef(masterEffects);
+  useEffect(() => {
+    masterEffectsRef.current = masterEffects;
+  }, [masterEffects]);
+
   // Get user presets from localStorage with validation
   const getUserPresets = useCallback((): UserMasterFxPreset[] => {
     try {
@@ -277,29 +283,29 @@ export const MasterEffectsPanel = forwardRef<MasterEffectsPanelHandle, MasterEff
     setShowAddMenu(false);
   };
 
-  const handleToggle = (effectId: string) => {
-    const effect = masterEffects.find((fx) => fx.id === effectId);
+  const handleToggle = useCallback((effectId: string) => {
+    const effect = masterEffectsRef.current.find((fx) => fx.id === effectId);
     if (effect) {
       updateMasterEffect(effectId, { enabled: !effect.enabled });
     }
-  };
+  }, [updateMasterEffect]);
 
-  const handleRemove = (effectId: string) => {
+  const handleRemove = useCallback((effectId: string) => {
     removeMasterEffect(effectId);
-  };
+  }, [removeMasterEffect]);
 
-  const handleWetChange = (effectId: string, wet: number) => {
+  const handleWetChange = useCallback((effectId: string, wet: number) => {
     updateMasterEffect(effectId, { wet });
-  };
+  }, [updateMasterEffect]);
 
-  const handleUpdateParameter = (effectId: string, key: string, value: number | string) => {
-    const effect = masterEffects.find(fx => fx.id === effectId);
+  const handleUpdateParameter = useCallback((effectId: string, key: string, value: number | string) => {
+    const effect = masterEffectsRef.current.find(fx => fx.id === effectId);
     if (effect) {
       updateMasterEffect(effectId, {
         parameters: { ...effect.parameters, [key]: value },
       });
     }
-  };
+  }, [updateMasterEffect]);
 
   // Group effects by group for the add menu
   const effectsByCategory = AVAILABLE_EFFECTS.reduce((acc, effect) => {
