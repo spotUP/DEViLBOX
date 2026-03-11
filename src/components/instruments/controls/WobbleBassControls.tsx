@@ -87,9 +87,9 @@ export const WobbleBassControls: React.FC<WobbleBassControlsProps> = ({ config, 
     onChange(deepSet(configRef.current, path, value));
   }, [onChange]);
 
-  const pct = (v: number) => `${Math.round(v * 100)}%`;
+  const pct = (v: number) => `${Math.round(v)}%`;
   const hz = (v: number) => v >= 1000 ? `${(v / 1000).toFixed(1)}k` : `${Math.round(v)}Hz`;
-  const ms = (v: number) => v >= 1 ? `${v.toFixed(1)}s` : `${Math.round(v * 1000)}ms`;
+  const fmtMs = (v: number) => v >= 1000 ? `${(v / 1000).toFixed(1)}s` : `${Math.round(v)}ms`;
 
   return (
     <div className="flex flex-col gap-2 p-3 rounded-xl select-none" style={{ background: PANEL_BG, fontFamily: 'system-ui' }}>
@@ -107,7 +107,7 @@ export const WobbleBassControls: React.FC<WobbleBassControlsProps> = ({ config, 
             onSelect={v => set(['osc1', 'octave'], parseInt(v))} />
         </>}>
           <KnobWrap label="Detune" value={config.osc1.detune} min={-100} max={100} onChange={v => set(['osc1', 'detune'], v)} step={1} fmt={v => `${Math.round(v)}c`} bipolar />
-          <KnobWrap label="Level" value={config.osc1.level} min={0} max={1} onChange={v => set(['osc1', 'level'], v)} fmt={pct} />
+          <KnobWrap label="Level" value={config.osc1.level} min={0} max={100} onChange={v => set(['osc1', 'level'], v)} fmt={pct} />
         </Section>
 
         <Section label="OSC 2" className="flex-1 min-w-[200px]" controls={<>
@@ -116,29 +116,29 @@ export const WobbleBassControls: React.FC<WobbleBassControlsProps> = ({ config, 
             onSelect={v => set(['osc2', 'octave'], parseInt(v))} />
         </>}>
           <KnobWrap label="Detune" value={config.osc2.detune} min={-100} max={100} onChange={v => set(['osc2', 'detune'], v)} step={1} fmt={v => `${Math.round(v)}c`} bipolar />
-          <KnobWrap label="Level" value={config.osc2.level} min={0} max={1} onChange={v => set(['osc2', 'level'], v)} fmt={pct} />
+          <KnobWrap label="Level" value={config.osc2.level} min={0} max={100} onChange={v => set(['osc2', 'level'], v)} fmt={pct} />
         </Section>
 
         <Section label="SUB" className="min-w-[120px]" controls={<>
           <Toggle on={config.sub.enabled} onToggle={() => set(['sub', 'enabled'], !configRef.current.sub.enabled)} label="On" />
           <BtnGroup items={['-2','-1','0']} value={String(config.sub.octave)} onSelect={v => set(['sub', 'octave'], parseInt(v))} />
         </>}>
-          <KnobWrap label="Level" value={config.sub.level} min={0} max={1} onChange={v => set(['sub', 'level'], v)} fmt={pct} />
+          <KnobWrap label="Level" value={config.sub.level} min={0} max={100} onChange={v => set(['sub', 'level'], v)} fmt={pct} />
         </Section>
 
         <Section label="FM" className="min-w-[160px]" controls={
           <Toggle on={config.fm.enabled} onToggle={() => set(['fm', 'enabled'], !configRef.current.fm.enabled)} label="On" />
         }>
-          <KnobWrap label="Amount" value={config.fm.amount} min={0} max={1} onChange={v => set(['fm', 'amount'], v)} fmt={pct} />
+          <KnobWrap label="Amount" value={config.fm.amount} min={0} max={100} onChange={v => set(['fm', 'amount'], v)} fmt={pct} />
           <KnobWrap label="Ratio" value={config.fm.ratio} min={0.5} max={16} onChange={v => set(['fm', 'ratio'], v)} step={0.5} fmt={v => v.toFixed(1)} />
-          <KnobWrap label="Env" value={config.fm.envelope} min={0} max={1} onChange={v => set(['fm', 'envelope'], v)} fmt={pct} />
+          <KnobWrap label="Env" value={config.fm.envelope} min={0} max={100} onChange={v => set(['fm', 'envelope'], v)} fmt={pct} />
         </Section>
 
         <Section label="UNISON" className="min-w-[160px]" controls={
           <BtnGroup items={['1','2','4','8','16']} value={String(config.unison.voices)} onSelect={v => set(['unison', 'voices'], parseInt(v))} />
         }>
           <KnobWrap label="Detune" value={config.unison.detune} min={0} max={100} onChange={v => set(['unison', 'detune'], v)} step={1} fmt={v => `${Math.round(v)}c`} />
-          <KnobWrap label="Spread" value={config.unison.stereoSpread} min={0} max={1} onChange={v => set(['unison', 'stereoSpread'], v)} fmt={pct} />
+          <KnobWrap label="Spread" value={config.unison.stereoSpread} min={0} max={100} onChange={v => set(['unison', 'stereoSpread'], v)} fmt={pct} />
         </Section>
       </div>
 
@@ -149,17 +149,17 @@ export const WobbleBassControls: React.FC<WobbleBassControlsProps> = ({ config, 
           <BtnGroup items={ROLLOFFS.map(String)} value={String(config.filter.rolloff)} onSelect={v => set(['filter', 'rolloff'], parseInt(v))} />
         </>}>
           <KnobWrap label="Cutoff" value={config.filter.cutoff} min={20} max={20000} onChange={v => set(['filter', 'cutoff'], v)} fmt={hz} />
-          <KnobWrap label="Reso" value={config.filter.resonance} min={0} max={30} onChange={v => set(['filter', 'resonance'], v)} fmt={v => v.toFixed(1)} />
-          <KnobWrap label="Drive" value={config.filter.drive} min={0} max={1} onChange={v => set(['filter', 'drive'], v)} fmt={pct} />
-          <KnobWrap label="Key Trk" value={config.filter.keyTracking} min={0} max={1} onChange={v => set(['filter', 'keyTracking'], v)} fmt={pct} />
+          <KnobWrap label="Reso" value={config.filter.resonance} min={0} max={100} onChange={v => set(['filter', 'resonance'], v)} fmt={pct} />
+          <KnobWrap label="Drive" value={config.filter.drive} min={0} max={100} onChange={v => set(['filter', 'drive'], v)} fmt={pct} />
+          <KnobWrap label="Key Trk" value={config.filter.keyTracking} min={0} max={100} onChange={v => set(['filter', 'keyTracking'], v)} fmt={pct} />
         </Section>
 
         <Section label="FILTER ENV" className="min-w-[220px]">
-          <KnobWrap label="Amount" value={config.filterEnvelope.amount} min={-1} max={1} onChange={v => set(['filterEnvelope', 'amount'], v)} fmt={pct} bipolar />
-          <KnobWrap label="Attack" value={config.filterEnvelope.attack} min={0} max={2} onChange={v => set(['filterEnvelope', 'attack'], v)} fmt={ms} />
-          <KnobWrap label="Decay" value={config.filterEnvelope.decay} min={0} max={2} onChange={v => set(['filterEnvelope', 'decay'], v)} fmt={ms} />
-          <KnobWrap label="Sustain" value={config.filterEnvelope.sustain} min={0} max={1} onChange={v => set(['filterEnvelope', 'sustain'], v)} fmt={pct} />
-          <KnobWrap label="Release" value={config.filterEnvelope.release} min={0} max={4} onChange={v => set(['filterEnvelope', 'release'], v)} fmt={ms} />
+          <KnobWrap label="Amount" value={config.filterEnvelope.amount} min={-100} max={100} onChange={v => set(['filterEnvelope', 'amount'], v)} fmt={pct} bipolar />
+          <KnobWrap label="Attack" value={config.filterEnvelope.attack} min={0} max={2000} onChange={v => set(['filterEnvelope', 'attack'], v)} fmt={fmtMs} />
+          <KnobWrap label="Decay" value={config.filterEnvelope.decay} min={0} max={2000} onChange={v => set(['filterEnvelope', 'decay'], v)} fmt={fmtMs} />
+          <KnobWrap label="Sustain" value={config.filterEnvelope.sustain} min={0} max={100} onChange={v => set(['filterEnvelope', 'sustain'], v)} fmt={pct} />
+          <KnobWrap label="Release" value={config.filterEnvelope.release} min={0} max={2000} onChange={v => set(['filterEnvelope', 'release'], v)} fmt={fmtMs} />
         </Section>
       </div>
 
@@ -178,17 +178,17 @@ export const WobbleBassControls: React.FC<WobbleBassControlsProps> = ({ config, 
           <Toggle on={config.wobbleLFO.retrigger} onToggle={() => set(['wobbleLFO', 'retrigger'], !configRef.current.wobbleLFO.retrigger)} label="Retrig" />
         </>}>
           <KnobWrap label="Rate" value={config.wobbleLFO.rate} min={0.1} max={30} onChange={v => set(['wobbleLFO', 'rate'], v)} fmt={v => `${v.toFixed(1)}Hz`} />
-          <KnobWrap label="Amount" value={config.wobbleLFO.amount} min={0} max={1} onChange={v => set(['wobbleLFO', 'amount'], v)} fmt={pct} />
-          <KnobWrap label="Pitch" value={config.wobbleLFO.pitchAmount} min={0} max={1} onChange={v => set(['wobbleLFO', 'pitchAmount'], v)} fmt={pct} />
-          <KnobWrap label="FM Amt" value={config.wobbleLFO.fmAmount} min={0} max={1} onChange={v => set(['wobbleLFO', 'fmAmount'], v)} fmt={pct} />
+          <KnobWrap label="Amount" value={config.wobbleLFO.amount} min={0} max={100} onChange={v => set(['wobbleLFO', 'amount'], v)} fmt={pct} />
+          <KnobWrap label="Pitch" value={config.wobbleLFO.pitchAmount} min={0} max={100} onChange={v => set(['wobbleLFO', 'pitchAmount'], v)} fmt={pct} />
+          <KnobWrap label="FM Amt" value={config.wobbleLFO.fmAmount} min={0} max={100} onChange={v => set(['wobbleLFO', 'fmAmount'], v)} fmt={pct} />
           <KnobWrap label="Phase" value={config.wobbleLFO.phase} min={0} max={360} onChange={v => set(['wobbleLFO', 'phase'], v)} step={1} fmt={v => `${Math.round(v)}°`} />
         </Section>
 
         <Section label="AMP ENVELOPE" className="min-w-[200px]">
-          <KnobWrap label="Attack" value={config.envelope.attack} min={0} max={2} onChange={v => set(['envelope', 'attack'], v)} fmt={ms} />
-          <KnobWrap label="Decay" value={config.envelope.decay} min={0} max={2} onChange={v => set(['envelope', 'decay'], v)} fmt={ms} />
-          <KnobWrap label="Sustain" value={config.envelope.sustain} min={0} max={1} onChange={v => set(['envelope', 'sustain'], v)} fmt={pct} />
-          <KnobWrap label="Release" value={config.envelope.release} min={0} max={4} onChange={v => set(['envelope', 'release'], v)} fmt={ms} />
+          <KnobWrap label="Attack" value={config.envelope.attack} min={0} max={2000} onChange={v => set(['envelope', 'attack'], v)} fmt={fmtMs} />
+          <KnobWrap label="Decay" value={config.envelope.decay} min={0} max={2000} onChange={v => set(['envelope', 'decay'], v)} fmt={fmtMs} />
+          <KnobWrap label="Sustain" value={config.envelope.sustain} min={0} max={100} onChange={v => set(['envelope', 'sustain'], v)} fmt={pct} />
+          <KnobWrap label="Release" value={config.envelope.release} min={0} max={4000} onChange={v => set(['envelope', 'release'], v)} fmt={fmtMs} />
         </Section>
       </div>
 
@@ -198,16 +198,16 @@ export const WobbleBassControls: React.FC<WobbleBassControlsProps> = ({ config, 
           <Toggle on={config.distortion.enabled} onToggle={() => set(['distortion', 'enabled'], !configRef.current.distortion.enabled)} label="On" />
           <BtnGroup items={DIST_TYPES} value={config.distortion.type} onSelect={v => set(['distortion', 'type'], v)} />
         </>}>
-          <KnobWrap label="Drive" value={config.distortion.drive} min={0} max={1} onChange={v => set(['distortion', 'drive'], v)} fmt={pct} />
-          <KnobWrap label="Tone" value={config.distortion.tone} min={0} max={1} onChange={v => set(['distortion', 'tone'], v)} fmt={pct} />
+          <KnobWrap label="Drive" value={config.distortion.drive} min={0} max={100} onChange={v => set(['distortion', 'drive'], v)} fmt={pct} />
+          <KnobWrap label="Tone" value={config.distortion.tone} min={0} max={100} onChange={v => set(['distortion', 'tone'], v)} fmt={pct} />
         </Section>
 
         <Section label="FORMANT" className="flex-1 min-w-[200px]" controls={<>
           <Toggle on={config.formant.enabled} onToggle={() => set(['formant', 'enabled'], !configRef.current.formant.enabled)} label="On" />
           <BtnGroup items={VOWELS} value={config.formant.vowel.toUpperCase()} onSelect={v => set(['formant', 'vowel'], v)} />
         </>}>
-          <KnobWrap label="Morph" value={config.formant.morph} min={0} max={1} onChange={v => set(['formant', 'morph'], v)} fmt={pct} />
-          <KnobWrap label="LFO Amt" value={config.formant.lfoAmount} min={0} max={1} onChange={v => set(['formant', 'lfoAmount'], v)} fmt={pct} />
+          <KnobWrap label="Morph" value={config.formant.morph} min={0} max={100} onChange={v => set(['formant', 'morph'], v)} fmt={pct} />
+          <KnobWrap label="LFO Amt" value={config.formant.lfoAmount} min={0} max={100} onChange={v => set(['formant', 'lfoAmount'], v)} fmt={pct} />
         </Section>
       </div>
     </div>
