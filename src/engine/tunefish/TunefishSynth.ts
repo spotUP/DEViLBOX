@@ -70,7 +70,8 @@ export class TunefishSynth implements DevilboxSynth {
             this.numParams = numParams;
           }
 
-          // Send pending params
+          // Send pending params (from XRNS import or early setParameters calls)
+          const hadPendingParams = this._pendingParams.length > 0;
           for (const { index, value } of this._pendingParams) {
             this.workletNode?.port.postMessage({
               type: 'setParameter',
@@ -79,8 +80,11 @@ export class TunefishSynth implements DevilboxSynth {
           }
           this._pendingParams = [];
 
-          // Apply initial config
-          this.applyConfig(this.config);
+          // Only apply initial config if no XRNS params were queued
+          // (XRNS params override the default config)
+          if (!hadPendingParams) {
+            this.applyConfig(this.config);
+          }
 
           if (this._resolveInit) {
             this._resolveInit();
