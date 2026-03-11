@@ -161,22 +161,21 @@ function getPatternSnapshot(source: OverlaySource): PatternSnapshot | null {
 }
 
 interface VJPatternOverlayProps {
-  source?: OverlaySource;
-  /** Visual offset for stacking multiple overlays (0 = centered, 1 = right, -1 = left) */
-  offsetX?: number;
+  /** Data sources to display (rendered side by side on one canvas) */
+  sources?: OverlaySource[];
 }
 
-export const VJPatternOverlay: React.FC<VJPatternOverlayProps> = React.memo(({ source = 'tracker', offsetX = 0 }) => {
+const GAP_PX = 16; // gap between side-by-side source sections
+
+export const VJPatternOverlay: React.FC<VJPatternOverlayProps> = React.memo(({ sources = ['tracker'] }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const rafRef = useRef(0);
   const busRef = useRef<AudioDataBus | null>(null);
   const animRef = useRef<AnimState>(createAnimState());
   const lastTimeRef = useRef(0);
-  const sourceRef = useRef(source);
-  const offsetXRef = useRef(offsetX);
-  sourceRef.current = source;
-  offsetXRef.current = offsetX;
+  const sourcesRef = useRef(sources);
+  sourcesRef.current = sources;
   // Per-channel VU meter levels (decayed each frame)
   const vuLevelsRef = useRef<number[]>([]);
   const vuLastGensRef = useRef<number[]>([]);
@@ -213,23 +212,51 @@ export const VJPatternOverlay: React.FC<VJPatternOverlayProps> = React.memo(({ s
       anim.time += dt;
       const t = anim.time;
 
-      // ── Read stores ────────────────────────────────────────────────────
-      const snapshot = getPatternSnapshot(sourceRef.current);
-      if (!snapshot) {
-        rafRef.current = requestAnimationFrame(render);
-        return;
+      // ── Gather snapshots from all sources ────────────────────────────
+      const allSources = sourcesRef.current;
+      const snapshots: Array<{ snapshot: PatternSnapshot; source: OverlaySource }> = [];
+      for (const src of allSources) {
+        const snap = getPatternSnapshot(src);
+        if (snap) snapshots.push({ snapshot: snap, source: src });
       }
-      const { pattern, currentRow, isPlaying, label: sourceLabel } = snapshot;
-      const channels = pattern.channels;
-      const numChannels = channels.length;
-      numChannelsRef.current = numChannels;
-      const patLen = pattern.length;
+      // Fallback: if nothing playing, try tracker for idle display
+      if (snapshots.length === 0) {
+        const fallback = getPatternSnapshot('tracker');
+        if (!fallback) {
+          rafRef.current = requestAnimationFrame(render);
+          return;
+        }
+        snapshots.push({ snapshot: fallback, source: 'tracker' });
+      }
 
-      // Read mute state for visual dimming
-      const mixerChannels = useMixerStore.getState().channels;
+      // Compute total canvas width (all sources side by side)
+      let totalW = 0;
+      const sectionLayouts: Array<{ xBase: number; sectionW: number; numChannels: number }> = [];
+      for (const { snapshot } of snapshots) {
+        const numCh = snapshot.pattern.channels.length;
+        const sectionW = ROW_NUM_W + numCh * CELL_W;
+        sectionLayouts.push({ xBase: totalW, sectionW, numChannels: numCh });
+        totalW += sectionW;
+      }
+      // Add gaps between sections
+      if (snapshots.length > 1) totalW += (snapshots.length - 1) * GAP_PX;
+      // Recalculate xBase with gaps
+      if (snapshots.length > 1) {
+        let x = 0;
+        for (let i = 0; i < sectionLayouts.length; i++) {
+          sectionLayouts[i].xBase = x;
+          x += sectionLayouts[i].sectionW + GAP_PX;
+        }
+      }
 
-      const canvasW = ROW_NUM_W + numChannels * CELL_W;
+      const canvasW = totalW;
       if (canvas.width !== canvasW) canvas.width = canvasW;
+
+      // Track total channels for click handler
+      numChannelsRef.current = sectionLayouts.reduce((s, l) => s + l.numChannels, 0);
+
+      // Check if any source is playing
+      const anyPlaying = snapshots.some(s => s.snapshot.isPlaying);
 
       // ── Read audio ─────────────────────────────────────────────────────
       bus.update();
@@ -260,51 +287,37 @@ export const VJPatternOverlay: React.FC<VJPatternOverlayProps> = React.memo(({ s
       anim.trailAlpha = decay(anim.trailAlpha, 4);
       anim.energyPulse = anim.energyPulse * 0.9 + (frame.rms * 0.8 + frame.bassEnergy * 0.2) * 0.1;
 
-      // Smooth scroll via replayer audio timeline for sub-row interpolation
-      let displayRow = currentRow;
-      if (isPlaying) {
-        const curSource = sourceRef.current;
-        if (curSource === 'tracker') {
-          // Tracker: use replayer timeline for sub-row interpolation
-          const replayer = getTrackerReplayer();
-          const audioTime = Tone.now() + 0.01;
-          const audioState = replayer.getStateAtTime(audioTime);
-          if (audioState) {
-            displayRow = audioState.row;
-            const nextState = replayer.getStateAtTime(audioTime + 0.5, true);
-            const dur = (nextState && nextState.row !== audioState.row)
-              ? nextState.time - audioState.time
-              : (2.5 / (useTransportStore.getState().bpm || 125)) * (useTransportStore.getState().speed || 6);
-            const progress = Math.min(Math.max((audioTime - audioState.time) / (dur || 0.125), 0), 1);
-            anim.scrollOffset = progress * ROW_H;
-          } else {
-            anim.scrollOffset = 0;
-          }
+      // Sub-row scroll for tracker source only
+      if (anyPlaying && snapshots[0].source === 'tracker') {
+        const replayer = getTrackerReplayer();
+        const audioTime = Tone.now() + 0.01;
+        const audioState = replayer.getStateAtTime(audioTime);
+        if (audioState) {
+          const nextState = replayer.getStateAtTime(audioTime + 0.5, true);
+          const dur = (nextState && nextState.row !== audioState.row)
+            ? nextState.time - audioState.time
+            : (2.5 / (useTransportStore.getState().bpm || 125)) * (useTransportStore.getState().speed || 6);
+          const progress = Math.min(Math.max((audioTime - audioState.time) / (dur || 0.125), 0), 1);
+          anim.scrollOffset = progress * ROW_H;
         } else {
-          // DJ deck: position comes from store, no sub-row interpolation needed
-          displayRow = currentRow;
           anim.scrollOffset = 0;
         }
       } else {
         anim.scrollOffset = 0;
       }
-      anim.prevRow = displayRow;
 
-      // ── 3D transform ──────────────────────────────────────────────────
-      // Lissajous orbit — faster, wider, more complex
+      // ── 3D transform (shared for all sources) ────────────────────────
       const orbitX = Math.sin(t * 0.17) * Math.cos(t * 0.09) * 12 + Math.sin(t * 0.31) * 4;
       const orbitY = Math.sin(t * 0.13) * Math.cos(t * 0.21) * 8 + Math.cos(t * 0.37) * 3;
       const bassTilt = frame.bassEnergy * 10;
       const highShimmer = frame.highEnergy * Math.sin(t * 47) * 3;
       const midSway = frame.midEnergy * Math.sin(t * 7.3) * 4;
-      // Dampen 3D tilt when smooth-scrolling to avoid parallax artifacts
       const tiltDampen = (anim.scrollOffset > 0.5) ? 0.15 : 1;
       const rx = (orbitX + bassTilt + anim.tiltKickX + midSway) * tiltDampen;
       const ry = (orbitY + anim.tiltKickY + highShimmer) * tiltDampen;
       const rz = Math.sin(t * 0.07) * 2 + anim.tiltKickX * 0.15;
-      const baseScale = offsetXRef.current !== 0 ? 1.5 : 2.1; // Smaller when side-by-side
-      const scale = baseScale + anim.bassAccum * 0.12 + anim.beatFlash * 0.08 + anim.energyPulse * 0.3;
-      const driftX = Math.sin(t * 0.09) * 20 + Math.cos(t * 0.23) * 15 + frame.midEnergy * Math.sin(t * 3) * 8 + offsetXRef.current * 300;
+      const scale = 2.1 + anim.bassAccum * 0.12 + anim.beatFlash * 0.08 + anim.energyPulse * 0.3;
+      const driftX = Math.sin(t * 0.09) * 20 + Math.cos(t * 0.23) * 15 + frame.midEnergy * Math.sin(t * 3) * 8;
       const driftY = Math.sin(t * 0.14) * 12 + anim.bounceY;
       const opacity = 0.8 + frame.rms * 0.2 + anim.beatFlash * 0.15;
 
@@ -321,242 +334,263 @@ export const VJPatternOverlay: React.FC<VJPatternOverlayProps> = React.memo(({ s
       const outerGlow = `drop-shadow(0 0 ${(glowRadius * 2.5).toFixed(0)}px ${hsl((glowHue + 40) % 360, 70, 40, 0.25 + anim.beatFlash * 0.2)})`;
       canvas.style.filter = `${innerGlow} ${outerGlow}`;
 
-      // ── Draw pattern ──────────────────────────────────────────────────
+      // ── Clear & draw all source sections ──────────────────────────────
       ctx.clearRect(0, 0, canvasW, CANVAS_H);
-
-      const rowNumW = ROW_NUM_W;
-      const cellW = CELL_W;
       const baseHue = (bandHue(frame) + anim.hueShift) % 360;
       const letterSpacing = anim.bassAccum * 2.5 + anim.beatFlash * 1.5;
       ctx.textBaseline = 'middle';
-
-      // ── Current-row highlight bar (fixed position, no scroll) ────────
+      const rowNumW = ROW_NUM_W;
+      const cellW = CELL_W;
       const barY = ROW_H + VISIBLE_ROWS * ROW_H;
-      if (isPlaying) {
-        const flashBright = 0.45 + anim.beatFlash * 0.55;
-        ctx.fillStyle = hsl(baseHue, 80, 55, flashBright);
-        ctx.fillRect(0, barY, canvasW, ROW_H);
-        if (anim.beatFlash > 0.05) {
-          // Bright flash overlay on beat
-          ctx.fillStyle = hsl(baseHue, 95, 85, anim.beatFlash * 0.6);
-          ctx.fillRect(0, barY, canvasW, ROW_H);
-        }
-        // Energy-reactive side glow bars
-        const sideGlow = frame.rms * 0.3 + anim.beatFlash * 0.2;
-        if (sideGlow > 0.05) {
-          const grad = ctx.createLinearGradient(0, barY, 0, barY + ROW_H);
-          grad.addColorStop(0, hsl(baseHue, 90, 70, sideGlow));
-          grad.addColorStop(0.5, hsl(baseHue, 90, 70, 0));
-          grad.addColorStop(1, hsl(baseHue, 90, 70, sideGlow * 0.5));
-          ctx.fillStyle = grad;
-          ctx.fillRect(0, barY - 4, canvasW, ROW_H + 8);
-        }
-      } else {
-        ctx.fillStyle = 'rgba(255,255,255,0.1)';
-        ctx.fillRect(0, barY, canvasW, ROW_H);
-      }
 
-      // ── Per-channel vertical glow columns ─────────────────────────────
-      const bandEnergies = [frame.subEnergy, frame.bassEnergy, frame.midEnergy, frame.highEnergy];
-      for (let ch = 0; ch < numChannels; ch++) {
-        const bandIdx = ch % 4;
-        const energy = bandEnergies[bandIdx];
-        if (energy > 0.15) {
-          const colX = rowNumW + ch * cellW;
-          const colHue = (baseHue + ch * 35) % 360;
-          const colAlpha = (energy - 0.15) * 0.25 + anim.beatFlash * 0.08;
-          const grad = ctx.createLinearGradient(colX, 0, colX + cellW, 0);
-          grad.addColorStop(0, hsl(colHue, 70, 50, 0));
-          grad.addColorStop(0.3, hsl(colHue, 70, 50, colAlpha));
-          grad.addColorStop(0.7, hsl(colHue, 70, 50, colAlpha));
-          grad.addColorStop(1, hsl(colHue, 70, 50, 0));
-          ctx.fillStyle = grad;
-          ctx.fillRect(colX, 0, cellW, CANVAS_H);
-        }
-      }
+      // Read mute state for visual dimming (tracker only)
+      const mixerChannels = useMixerStore.getState().channels;
 
-      // ── Scrolled content ────────────────────────────────────────────
-      ctx.save();
-      ctx.translate(0, -anim.scrollOffset);
+      for (let si = 0; si < snapshots.length; si++) {
+        const { snapshot, source: src } = snapshots[si];
+        const { pattern, currentRow, isPlaying: srcPlaying, label: sourceLabel } = snapshot;
+        const { xBase, numChannels } = sectionLayouts[si];
+        const channels = pattern.channels;
+        const patLen = pattern.length;
+        const sectionW = sectionLayouts[si].sectionW;
 
-      // Channel headers
-      ctx.font = '11px "Berkeley Mono", "JetBrains Mono", "Fira Code", monospace';
-      if (letterSpacing > 0.1) ctx.letterSpacing = `${letterSpacing.toFixed(1)}px`;
-      // Deck source label (for DJ decks)
-      if (sourceLabel) {
+        // Display row = currentRow (no sub-row for DJ, tracker uses anim.scrollOffset)
+        const displayRow = currentRow;
+
         ctx.save();
-        ctx.font = 'bold 13px "Berkeley Mono", "JetBrains Mono", monospace';
-        ctx.fillStyle = hsl(baseHue, 80, 90, 0.9);
-        ctx.textAlign = 'right';
-        ctx.fillText(sourceLabel, canvasW - 4, ROW_H * 0.5);
-        ctx.restore();
+        ctx.translate(xBase, 0);
+
+        // ── Current-row highlight bar ────────────────────────────────
+        if (srcPlaying) {
+          const flashBright = 0.45 + anim.beatFlash * 0.55;
+          ctx.fillStyle = hsl(baseHue, 80, 55, flashBright);
+          ctx.fillRect(0, barY, sectionW, ROW_H);
+          if (anim.beatFlash > 0.05) {
+            ctx.fillStyle = hsl(baseHue, 95, 85, anim.beatFlash * 0.6);
+            ctx.fillRect(0, barY, sectionW, ROW_H);
+          }
+          const sideGlow = frame.rms * 0.3 + anim.beatFlash * 0.2;
+          if (sideGlow > 0.05) {
+            const grad = ctx.createLinearGradient(0, barY, 0, barY + ROW_H);
+            grad.addColorStop(0, hsl(baseHue, 90, 70, sideGlow));
+            grad.addColorStop(0.5, hsl(baseHue, 90, 70, 0));
+            grad.addColorStop(1, hsl(baseHue, 90, 70, sideGlow * 0.5));
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, barY - 4, sectionW, ROW_H + 8);
+          }
+        } else {
+          ctx.fillStyle = 'rgba(255,255,255,0.1)';
+          ctx.fillRect(0, barY, sectionW, ROW_H);
+        }
+
+        // ── Per-channel vertical glow columns ────────────────────────
+        const bandEnergies = [frame.subEnergy, frame.bassEnergy, frame.midEnergy, frame.highEnergy];
+        for (let ch = 0; ch < numChannels; ch++) {
+          const bandIdx = ch % 4;
+          const energy = bandEnergies[bandIdx];
+          if (energy > 0.15) {
+            const colX = rowNumW + ch * cellW;
+            const colHue = (baseHue + ch * 35) % 360;
+            const colAlpha = (energy - 0.15) * 0.25 + anim.beatFlash * 0.08;
+            const grad = ctx.createLinearGradient(colX, 0, colX + cellW, 0);
+            grad.addColorStop(0, hsl(colHue, 70, 50, 0));
+            grad.addColorStop(0.3, hsl(colHue, 70, 50, colAlpha));
+            grad.addColorStop(0.7, hsl(colHue, 70, 50, colAlpha));
+            grad.addColorStop(1, hsl(colHue, 70, 50, 0));
+            ctx.fillStyle = grad;
+            ctx.fillRect(colX, 0, cellW, CANVAS_H);
+          }
+        }
+
+        // ── Scrolled content ─────────────────────────────────────────
+        ctx.save();
+        ctx.translate(0, -(src === 'tracker' ? anim.scrollOffset : 0));
+
+        // Channel headers
         ctx.font = '11px "Berkeley Mono", "JetBrains Mono", "Fira Code", monospace';
         if (letterSpacing > 0.1) ctx.letterSpacing = `${letterSpacing.toFixed(1)}px`;
-      }
-      ctx.fillStyle = hsl(baseHue, 50, 85, 0.8 + anim.beatFlash * 0.2);
-      for (let ch = 0; ch < numChannels; ch++) {
-        const x = rowNumW + ch * cellW;
-        const name = channels[ch].shortName || channels[ch].name || `CH${ch + 1}`;
-        ctx.fillText(name.slice(0, 8), x + 2, ROW_H * 0.5);
-      }
-
-      // Separator — reactive thickness + glow
-      ctx.strokeStyle = hsl(baseHue, 70, 60, 0.5 + anim.beatFlash * 0.4);
-      ctx.lineWidth = 1 + anim.beatFlash * 3 + frame.rms * 2;
-      ctx.shadowColor = hsl(baseHue, 80, 60, 0.6);
-      ctx.shadowBlur = 4 + anim.beatFlash * 8;
-      ctx.beginPath();
-      ctx.moveTo(0, ROW_H);
-      ctx.lineTo(canvasW, ROW_H);
-      ctx.stroke();
-      ctx.shadowBlur = 0;
-
-      // ── Rows ──────────────────────────────────────────────────────────
-      const doChroma = anim.chromaShift > 0.3;
-      const chromaOff = anim.chromaShift;
-
-      for (let i = -VISIBLE_ROWS; i <= VISIBLE_ROWS; i++) {
-        const row = displayRow + i;
-        if (row < 0 || row >= patLen) continue;
-        const baseY = ROW_H + (i + VISIBLE_ROWS) * ROW_H;
-        const isCurrent = i === 0;
-
-        // Glitch: displace row horizontally on beat
-        let glitchX = 0;
-        if (anim.glitchAmount > 0.05) {
-          const r = pseudoRandom(anim.glitchSeed + i * 17.3);
-          if (r > 0.6) {
-            glitchX = (pseudoRandom(anim.glitchSeed + i * 31.7) - 0.5) * 40 * anim.glitchAmount;
-          }
+        // Deck source label
+        if (sourceLabel) {
+          ctx.save();
+          ctx.font = 'bold 13px "Berkeley Mono", "JetBrains Mono", monospace';
+          ctx.fillStyle = hsl(baseHue, 80, 90, 0.9);
+          ctx.textAlign = 'right';
+          ctx.fillText(sourceLabel, sectionW - 4, ROW_H * 0.5);
+          ctx.restore();
+          ctx.font = '11px "Berkeley Mono", "JetBrains Mono", "Fira Code", monospace';
+          if (letterSpacing > 0.1) ctx.letterSpacing = `${letterSpacing.toFixed(1)}px`;
+        }
+        ctx.fillStyle = hsl(baseHue, 50, 85, 0.8 + anim.beatFlash * 0.2);
+        for (let ch = 0; ch < numChannels; ch++) {
+          const x = rowNumW + ch * cellW;
+          const name = channels[ch].shortName || channels[ch].name || `CH${ch + 1}`;
+          ctx.fillText(name.slice(0, 8), x + 2, ROW_H * 0.5);
         }
 
-        const dist = Math.abs(i) / VISIBLE_ROWS;
-        // Wave distortion along rows
-        const wave = Math.sin(t * 4 + i * 0.5) * frame.midEnergy * 2;
-        const shimmer = 0.5 + 0.5 * Math.sin(t * 3.5 + i * 0.4);
-        const depthAlpha = (1 - dist * 0.55) * (0.85 + shimmer * 0.15);
+        // Separator
+        ctx.strokeStyle = hsl(baseHue, 70, 60, 0.5 + anim.beatFlash * 0.4);
+        ctx.lineWidth = 1 + anim.beatFlash * 3 + frame.rms * 2;
+        ctx.shadowColor = hsl(baseHue, 80, 60, 0.6);
+        ctx.shadowBlur = 4 + anim.beatFlash * 8;
+        ctx.beginPath();
+        ctx.moveTo(0, ROW_H);
+        ctx.lineTo(sectionW, ROW_H);
+        ctx.stroke();
+        ctx.shadowBlur = 0;
 
-        // Ghost trails: recently-passed rows get an echo
-        const trailBoost = (i < 0 && i > -4 && anim.trailAlpha > 0.05)
-          ? anim.trailAlpha * (1 + i / 4) * 0.3 : 0;
+        // ── Rows ─────────────────────────────────────────────────────
+        const doChroma = anim.chromaShift > 0.3;
+        const chromaOff = anim.chromaShift;
 
-        const y = baseY + wave;
+        for (let i = -VISIBLE_ROWS; i <= VISIBLE_ROWS; i++) {
+          const row = displayRow + i;
+          if (row < 0 || row >= patLen) continue;
+          const baseY = ROW_H + (i + VISIBLE_ROWS) * ROW_H;
+          const isCurrent = i === 0;
 
-        // Row number
-        const rnAlpha = isCurrent ? 1.0 : (0.5 + trailBoost) * depthAlpha;
-        ctx.fillStyle = isCurrent
-          ? hsl(baseHue, 70, 92, 0.95 + anim.beatFlash * 0.05)
-          : `rgba(255,255,255,${rnAlpha.toFixed(3)})`;
-        ctx.fillText(row.toString(16).toUpperCase().padStart(2, '0'), 4 + glitchX, y + ROW_H * 0.5);
-
-        for (let ch = 0; ch < numChannels; ch++) {
-          const cell = channels[ch].rows[row];
-          if (!cell) continue;
-          const x = rowNumW + ch * cellW + glitchX;
-          const hasNote = cell.note > 0;
-          const hasData = hasNote || cell.instrument > 0 || cell.effTyp > 0 || cell.eff > 0;
-          const text = fmtCell(cell);
-
-          // Color selection — richer palette
-          let fillH = baseHue, fillS = 30, fillL = 70, fillA = 0.3 * depthAlpha;
-          if (isCurrent && hasData) {
-            fillH = (baseHue + ch * 35) % 360;
-            fillS = 85;
-            fillL = 82 + anim.beatFlash * 18;
-            fillA = 0.97;
-          } else if (isCurrent) {
-            fillS = 40; fillL = 80; fillA = 0.75;
-          } else if (hasNote) {
-            fillH = (baseHue + ch * 35) % 360;
-            fillS = 55 + frame.rms * 30;
-            fillL = 72;
-            fillA = (0.8 + trailBoost) * depthAlpha;
-          } else if (hasData) {
-            fillA = (0.55 + trailBoost) * depthAlpha;
-          }
-
-          // Chromatic aberration on beat — draw R and B offsets, then main
-          if (doChroma && (isCurrent || hasNote)) {
-            ctx.globalAlpha = fillA * 0.35;
-            ctx.fillStyle = hsl(fillH - 40, fillS, fillL, 1);
-            ctx.fillText(text, x + 2 - chromaOff, y + ROW_H * 0.5);
-            ctx.fillStyle = hsl(fillH + 40, fillS, fillL, 1);
-            ctx.fillText(text, x + 2 + chromaOff, y + ROW_H * 0.5);
-            ctx.globalAlpha = 1;
-          }
-
-          ctx.fillStyle = hsl(fillH, fillS, fillL, fillA);
-          ctx.fillText(text, x + 2, y + ROW_H * 0.5);
-        }
-      }
-
-      ctx.restore();
-
-      // ── Per-channel VU meters (LED segments from highlight bar, mirrored) ─
-      {
-        while (vuLevelsRef.current.length < numChannels) vuLevelsRef.current.push(0);
-        while (vuLastGensRef.current.length < numChannels) vuLastGensRef.current.push(0);
-
-        let realtimeLevels: number[] | null = null;
-        let triggerLevels: number[] = [];
-        let triggerGens: number[] = [];
-        try {
-          const engine = getToneEngine();
-          realtimeLevels = engine.getChannelLevels(numChannels);
-          triggerLevels = engine.getChannelTriggerLevels(numChannels);
-          triggerGens = engine.getChannelTriggerGenerations(numChannels);
-        } catch { /* engine not ready */ }
-
-        // VU color matches the current-row highlight bar
-        const vuAlpha = 0.7 + anim.beatFlash * 0.3;
-
-        for (let ch = 0; ch < numChannels; ch++) {
-          const stagger = ch * 0.012;
-
-          if (!isPlaying) {
-            vuLevelsRef.current[ch] = 0;
-          } else if (realtimeLevels) {
-            const target = realtimeLevels[ch] || 0;
-            if (target > vuLevelsRef.current[ch]) {
-              vuLevelsRef.current[ch] = target;
-            } else {
-              vuLevelsRef.current[ch] *= (VU_DECAY_RATE - stagger);
-              if (vuLevelsRef.current[ch] < 0.01) vuLevelsRef.current[ch] = 0;
-            }
-          } else {
-            const isNew = triggerGens[ch] !== vuLastGensRef.current[ch];
-            if (isNew && triggerLevels[ch] > 0) {
-              vuLevelsRef.current[ch] = triggerLevels[ch];
-              vuLastGensRef.current[ch] = triggerGens[ch];
-            } else {
-              vuLevelsRef.current[ch] *= (VU_DECAY_RATE - stagger);
-              if (vuLevelsRef.current[ch] < 0.01) vuLevelsRef.current[ch] = 0;
+          let glitchX = 0;
+          if (anim.glitchAmount > 0.05) {
+            const r = pseudoRandom(anim.glitchSeed + i * 17.3);
+            if (r > 0.6) {
+              glitchX = (pseudoRandom(anim.glitchSeed + i * 31.7) - 0.5) * 40 * anim.glitchAmount;
             }
           }
 
-          const level = vuLevelsRef.current[ch];
-          if (level < 0.01) continue;
+          const dist = Math.abs(i) / VISIBLE_ROWS;
+          const wave = Math.sin(t * 4 + i * 0.5) * frame.midEnergy * 2;
+          const shimmer = 0.5 + 0.5 * Math.sin(t * 3.5 + i * 0.4);
+          const depthAlpha = (1 - dist * 0.55) * (0.85 + shimmer * 0.15);
+          const trailBoost = (i < 0 && i > -4 && anim.trailAlpha > 0.05)
+            ? anim.trailAlpha * (1 + i / 4) * 0.3 : 0;
+          const y = baseY + wave;
 
-          const centerX = rowNumW + ch * cellW + cellW / 2;
-          const meterX = Math.round(centerX - VU_METER_WIDTH / 2);
-          const activeSegs = Math.round(level * VU_NUM_SEGMENTS);
-          const segStep = VU_SEGMENT_HEIGHT + VU_SEGMENT_GAP;
+          // Row number
+          const rnAlpha = isCurrent ? 1.0 : (0.5 + trailBoost) * depthAlpha;
+          ctx.fillStyle = isCurrent
+            ? hsl(baseHue, 70, 92, 0.95 + anim.beatFlash * 0.05)
+            : `rgba(255,255,255,${rnAlpha.toFixed(3)})`;
+          ctx.fillText(row.toString(16).toUpperCase().padStart(2, '0'), 4 + glitchX, y + ROW_H * 0.5);
 
-          for (let s = 0; s < activeSegs; s++) {
-            const ratio = s / (VU_NUM_SEGMENTS - 1);
-            const fade = vuAlpha * (1 - ratio * 0.4);
-            ctx.fillStyle = hsl(baseHue, 80, 55 + ratio * 20, fade);
+          for (let ch = 0; ch < numChannels; ch++) {
+            const cell = channels[ch].rows[row];
+            if (!cell) continue;
+            const x = rowNumW + ch * cellW + glitchX;
+            const hasNote = cell.note > 0;
+            const hasData = hasNote || cell.instrument > 0 || cell.effTyp > 0 || cell.eff > 0;
+            const text = fmtCell(cell);
 
-            // Upward from bar top
-            const upY = barY - (s + 1) * segStep;
-            ctx.fillRect(meterX, Math.round(upY), VU_METER_WIDTH, VU_SEGMENT_HEIGHT);
+            let fillH = baseHue, fillS = 30, fillL = 70, fillA = 0.3 * depthAlpha;
+            if (isCurrent && hasData) {
+              fillH = (baseHue + ch * 35) % 360;
+              fillS = 85;
+              fillL = 82 + anim.beatFlash * 18;
+              fillA = 0.97;
+            } else if (isCurrent) {
+              fillS = 40; fillL = 80; fillA = 0.75;
+            } else if (hasNote) {
+              fillH = (baseHue + ch * 35) % 360;
+              fillS = 55 + frame.rms * 30;
+              fillL = 72;
+              fillA = (0.8 + trailBoost) * depthAlpha;
+            } else if (hasData) {
+              fillA = (0.55 + trailBoost) * depthAlpha;
+            }
 
-            // Mirrored downward from bar bottom
-            const downY = barY + ROW_H + s * segStep;
-            ctx.fillRect(meterX, Math.round(downY), VU_METER_WIDTH, VU_SEGMENT_HEIGHT);
+            if (doChroma && (isCurrent || hasNote)) {
+              ctx.globalAlpha = fillA * 0.35;
+              ctx.fillStyle = hsl(fillH - 40, fillS, fillL, 1);
+              ctx.fillText(text, x + 2 - chromaOff, y + ROW_H * 0.5);
+              ctx.fillStyle = hsl(fillH + 40, fillS, fillL, 1);
+              ctx.fillText(text, x + 2 + chromaOff, y + ROW_H * 0.5);
+              ctx.globalAlpha = 1;
+            }
+
+            ctx.fillStyle = hsl(fillH, fillS, fillL, fillA);
+            ctx.fillText(text, x + 2, y + ROW_H * 0.5);
           }
         }
-      }
+
+        ctx.restore(); // end scrolled content
+
+        // ── Per-channel VU meters (tracker source only) ──────────────
+        if (src === 'tracker') {
+          while (vuLevelsRef.current.length < numChannels) vuLevelsRef.current.push(0);
+          while (vuLastGensRef.current.length < numChannels) vuLastGensRef.current.push(0);
+
+          let realtimeLevels: number[] | null = null;
+          let triggerLevels: number[] = [];
+          let triggerGens: number[] = [];
+          try {
+            const engine = getToneEngine();
+            realtimeLevels = engine.getChannelLevels(numChannels);
+            triggerLevels = engine.getChannelTriggerLevels(numChannels);
+            triggerGens = engine.getChannelTriggerGenerations(numChannels);
+          } catch { /* engine not ready */ }
+
+          const vuAlpha = 0.7 + anim.beatFlash * 0.3;
+          for (let ch = 0; ch < numChannels; ch++) {
+            const stagger = ch * 0.012;
+            if (!srcPlaying) {
+              vuLevelsRef.current[ch] = 0;
+            } else if (realtimeLevels) {
+              const target = realtimeLevels[ch] || 0;
+              if (target > vuLevelsRef.current[ch]) {
+                vuLevelsRef.current[ch] = target;
+              } else {
+                vuLevelsRef.current[ch] *= (VU_DECAY_RATE - stagger);
+                if (vuLevelsRef.current[ch] < 0.01) vuLevelsRef.current[ch] = 0;
+              }
+            } else {
+              const isNew = triggerGens[ch] !== vuLastGensRef.current[ch];
+              if (isNew && triggerLevels[ch] > 0) {
+                vuLevelsRef.current[ch] = triggerLevels[ch];
+                vuLastGensRef.current[ch] = triggerGens[ch];
+              } else {
+                vuLevelsRef.current[ch] *= (VU_DECAY_RATE - stagger);
+                if (vuLevelsRef.current[ch] < 0.01) vuLevelsRef.current[ch] = 0;
+              }
+            }
+
+            const level = vuLevelsRef.current[ch];
+            if (level < 0.01) continue;
+
+            const centerX = rowNumW + ch * cellW + cellW / 2;
+            const meterX = Math.round(centerX - VU_METER_WIDTH / 2);
+            const activeSegs = Math.round(level * VU_NUM_SEGMENTS);
+            const segStep = VU_SEGMENT_HEIGHT + VU_SEGMENT_GAP;
+
+            for (let s = 0; s < activeSegs; s++) {
+              const ratio = s / (VU_NUM_SEGMENTS - 1);
+              const fade = vuAlpha * (1 - ratio * 0.4);
+              ctx.fillStyle = hsl(baseHue, 80, 55 + ratio * 20, fade);
+              const upY = barY - (s + 1) * segStep;
+              ctx.fillRect(meterX, Math.round(upY), VU_METER_WIDTH, VU_SEGMENT_HEIGHT);
+              const downY = barY + ROW_H + s * segStep;
+              ctx.fillRect(meterX, Math.round(downY), VU_METER_WIDTH, VU_SEGMENT_HEIGHT);
+            }
+          }
+        }
+
+        // ── Muted channel overlay (tracker only) ─────────────────────
+        if (src === 'tracker') {
+          for (let ch = 0; ch < numChannels; ch++) {
+            if (mixerChannels[ch]?.muted) {
+              const colX = rowNumW + ch * cellW;
+              ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+              ctx.fillRect(colX, 0, cellW, CANVAS_H);
+              ctx.save();
+              ctx.font = 'bold 11px monospace';
+              ctx.fillStyle = 'rgba(255, 80, 80, 0.7)';
+              ctx.textAlign = 'center';
+              ctx.textBaseline = 'middle';
+              ctx.fillText('MUTE', colX + cellW / 2, ROW_H * 0.5);
+              ctx.restore();
+            }
+          }
+        }
+
+        ctx.restore(); // end section translate
+      } // end source loop
 
       // ── Vignette edges ─────────────────────────────────────────────────
       const vigGrad = ctx.createRadialGradient(canvasW / 2, CANVAS_H / 2, canvasW * 0.3, canvasW / 2, CANVAS_H / 2, canvasW * 0.7);
@@ -564,23 +598,6 @@ export const VJPatternOverlay: React.FC<VJPatternOverlayProps> = React.memo(({ s
       vigGrad.addColorStop(1, `rgba(0,0,0,${(0.3 + anim.beatFlash * 0.15).toFixed(3)})`);
       ctx.fillStyle = vigGrad;
       ctx.fillRect(0, 0, canvasW, CANVAS_H);
-
-      // ── Muted channel overlay ────────────────────────────────────────
-      for (let ch = 0; ch < numChannels; ch++) {
-        if (mixerChannels[ch]?.muted) {
-          const colX = rowNumW + ch * cellW;
-          ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
-          ctx.fillRect(colX, 0, cellW, CANVAS_H);
-          // "MUTE" label
-          ctx.save();
-          ctx.font = 'bold 11px monospace';
-          ctx.fillStyle = 'rgba(255, 80, 80, 0.7)';
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'middle';
-          ctx.fillText('MUTE', colX + cellW / 2, ROW_H * 0.5);
-          ctx.restore();
-        }
-      }
 
       rafRef.current = requestAnimationFrame(render);
     };
