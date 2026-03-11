@@ -1221,9 +1221,9 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     const unsubCursor = useCursorStore.subscribe((s, prev) => {
       const b = bridgeRef.current;
       if (!b) return;
-      // PERF: Skip cursor posts during playback — the RAF loop sends 'playback' messages
-      // at animation frame rate which the worker uses for row highlighting instead.
-      if (s.cursor !== prev.cursor && !useTransportStore.getState().isPlaying) {
+      // Send cursor updates — during playback only channel/column changes matter
+      // (row follows playback), but we still need to tell the worker
+      if (s.cursor !== prev.cursor) {
         b.post({ type: 'cursor', cursor: {
           rowIndex:    s.cursor.rowIndex,
           channelIndex: s.cursor.channelIndex,
