@@ -289,6 +289,7 @@ const VJPatternOverlayWrapper: React.FC = () => {
   const trackerPlaying = useTransportStore(s => s.isPlaying);
   const deckA = useDJStore(s => s.decks.A);
   const deckB = useDJStore(s => s.decks.B);
+  const crossfader = useDJStore(s => s.crossfaderPosition);
   if (!enabled) return null;
 
   // Collect active sources into a single array for one unified canvas
@@ -300,7 +301,7 @@ const VJPatternOverlayWrapper: React.FC = () => {
   // If nothing is playing, show tracker overlay as idle display (original behavior)
   if (activeSources.length === 0) activeSources.push('tracker');
 
-  return <VJPatternOverlay sources={activeSources} />;
+  return <VJPatternOverlay sources={activeSources} crossfader={crossfader} />;
 };
 
 // ─── VJControls — DOM overlay controls (used by both DOM view + PixiDOMOverlay) ─
