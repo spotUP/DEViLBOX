@@ -85,7 +85,6 @@ export const TB303KnobPanel: React.FC = memo(() => {
           title="DEViLBOX — TB-303"
           width={1200}
           height={640}
-          fitContent
         >
           <div className="flex items-center justify-center h-full text-gray-500 text-sm">
             No TB-303 instrument found
@@ -106,7 +105,6 @@ export const TB303KnobPanel: React.FC = memo(() => {
           title="DEViLBOX — TB-303"
           width={1200}
           height={640}
-          fitContent
         >
           <div style={{ background: '#1a1a1a' }}>
             <ScrollLockContainer>
