@@ -190,7 +190,7 @@ interface RenderParams {
 }
 
 /** Static grid layer — backgrounds, separators, gutter. */
-function renderGrid(g: GraphicsType, p: RenderParams, vStart: number, currentRow: number): void {
+function renderGrid(g: GraphicsType, p: RenderParams, vStart: number): void {
   g.clear();
 
   // Always fill the full grid area to prevent black gaps at edges
@@ -205,13 +205,8 @@ function renderGrid(g: GraphicsType, p: RenderParams, vStart: number, currentRow
     const isInPattern = rowNum >= 0 && rowNum < p.patternLength;
     const isGhost = !isInPattern && p.showGhostPatterns;
     const ghostAlpha = isGhost ? 0.35 : 1;
-    const isCurrentRow = rowNum === currentRow && !isGhost;
 
-    if (isCurrentRow) {
-      // Edit bar: opaque accent background drawn as part of the grid (before text)
-      g.rect(0, y, p.width, p.rowHeight);
-      g.fill({ color: p.theme.accentGlow.color, alpha: p.trackerVisualBg ? 0.6 : 0.85 });
-    } else if (isInPattern || isGhost) {
+    if (isInPattern || isGhost) {
       const isHighlight = rowNum >= 0 && rowNum % p.rowHighlightInterval === 0;
       g.rect(LINE_NUMBER_WIDTH, y, p.width - LINE_NUMBER_WIDTH, p.rowHeight);
       g.fill({
@@ -219,6 +214,8 @@ function renderGrid(g: GraphicsType, p: RenderParams, vStart: number, currentRow
         alpha: (isHighlight ? p.theme.trackerRowHighlight.alpha : p.theme.trackerRowOdd.alpha) * ghostAlpha,
       });
     }
+
+    // Center-line highlight moved to renderOverlay to avoid grid redraw during scrolling
   }
 
   for (let ch = 0; ch < p.numChannels; ch++) {
@@ -340,9 +337,9 @@ function renderCursorCaret(
 }
 
 /** Generate text labels for visible rows (M/S buttons + cell data).
- *  Uses currentRow to render the edit bar row with bright contrasting text
- *  since the accent background is drawn opaquely in the grid layer. */
-function generateLabels(p: RenderParams, vStart: number, currentRow: number): LabelData[] {
+ *  NOTE: Does NOT use currentRow for coloring — current-row highlight is handled
+ *  by the overlay layer, so labels only need regeneration when vStart changes. */
+function generateLabels(p: RenderParams, vStart: number): LabelData[] {
   if (!p.displayPattern) return [];
   const labels: LabelData[] = [];
 
@@ -374,7 +371,6 @@ function generateLabels(p: RenderParams, vStart: number, currentRow: number): La
     }
 
     const isHighlightRow = actualRow % p.rowHighlightInterval === 0;
-    const isEditRow = rowNum === currentRow && !isGhost;
     let lineNumText: string;
     if (p.showBeatLabels) {
       const beat = Math.floor(actualRow / p.rowHighlightInterval) + 1;
@@ -387,12 +383,9 @@ function generateLabels(p: RenderParams, vStart: number, currentRow: number): La
     }
     labels.push({
       x: 4, y, text: lineNumText,
-      color: isEditRow ? p.theme.text.color : (isHighlightRow ? p.theme.accentSecondary.color : p.theme.textMuted.color),
+      color: isHighlightRow ? p.theme.accentSecondary.color : p.theme.textMuted.color,
       fontFamily: PIXI_FONTS.MONO, alpha: isGhost ? 0.35 : undefined,
     });
-
-    // On the edit row, use bright text that contrasts with the accent background
-    const editEmptyColor = p.theme.textMuted.color;
 
     for (let ch = 0; ch < p.numChannels; ch++) {
       const colX = p.channelOffsets[ch] - p.scrollLeft;
@@ -408,10 +401,10 @@ function generateLabels(p: RenderParams, vStart: number, currentRow: number): La
 
       const noteText = noteToString(cell.note ?? 0, p.noteDisplayOffset);
       const noteColor = cell.note === 97
-        ? (isEditRow ? p.theme.text.color : p.theme.cellEffect.color)
+        ? p.theme.cellEffect.color
         : (cell.note > 0 && cell.note < 97)
-          ? (isEditRow ? p.theme.text.color : p.theme.cellNote.color)
-          : (isEditRow ? editEmptyColor : p.theme.cellEmpty.color);
+          ? p.theme.cellNote.color
+          : p.theme.cellEmpty.color;
       if (noteText !== '---' || !p.blankEmpty) {
         labels.push({ x: baseX, y, text: noteText, color: noteColor, fontFamily: PIXI_FONTS.MONO, alpha: isGhost ? 0.35 : undefined });
       }
@@ -423,14 +416,14 @@ function generateLabels(p: RenderParams, vStart: number, currentRow: number): La
 
       const insText = cell.instrument > 0 ? hexByte(cell.instrument) : (p.blankEmpty ? '' : '..');
       if (insText) {
-        labels.push({ x: px, y, text: insText, color: cell.instrument > 0 ? (isEditRow ? p.theme.text.color : p.theme.cellInstrument.color) : (isEditRow ? editEmptyColor : p.theme.cellEmpty.color), fontFamily: PIXI_FONTS.MONO, alpha: isGhost ? 0.35 : undefined });
+        labels.push({ x: px, y, text: insText, color: cell.instrument > 0 ? p.theme.cellInstrument.color : p.theme.cellEmpty.color, fontFamily: PIXI_FONTS.MONO, alpha: isGhost ? 0.35 : undefined });
       }
       px += CHAR_WIDTH * 2 + 4;
 
       const volValid = cell.volume >= 0x10 && cell.volume <= 0x50;
       const volText = volValid ? hexByte(cell.volume) : (p.blankEmpty ? '' : '..');
       if (volText) {
-        labels.push({ x: px, y, text: volText, color: volValid ? (isEditRow ? p.theme.text.color : p.theme.cellVolume.color) : (isEditRow ? editEmptyColor : p.theme.cellEmpty.color), fontFamily: PIXI_FONTS.MONO, alpha: isGhost ? 0.35 : undefined });
+        labels.push({ x: px, y, text: volText, color: volValid ? p.theme.cellVolume.color : p.theme.cellEmpty.color, fontFamily: PIXI_FONTS.MONO, alpha: isGhost ? 0.35 : undefined });
       }
       px += CHAR_WIDTH * 2 + 4;
 
@@ -448,24 +441,20 @@ function generateLabels(p: RenderParams, vStart: number, currentRow: number): La
           : (cell.eff5 ?? 0);
         const effText = formatEffect(typ, val, p.useHex);
         if (effText !== '...' || !p.blankEmpty) {
-          labels.push({ x: px, y, text: effText, color: (typ > 0 || val > 0) ? (isEditRow ? p.theme.text.color : p.theme.cellEffect.color) : (isEditRow ? editEmptyColor : p.theme.cellEmpty.color), fontFamily: PIXI_FONTS.MONO, alpha: isGhost ? 0.35 : undefined });
+          labels.push({ x: px, y, text: effText, color: (typ > 0 || val > 0) ? p.theme.cellEffect.color : p.theme.cellEmpty.color, fontFamily: PIXI_FONTS.MONO, alpha: isGhost ? 0.35 : undefined });
         }
         px += CHAR_WIDTH * 3 + 4;
       }
 
       if (p.columnVisibility.flag1 && cell.flag1 !== undefined) {
         const flagChar = cell.flag1 === 1 ? 'A' : cell.flag1 === 2 ? 'S' : '.';
-        const flagColor = isEditRow
-          ? (cell.flag1 > 0 ? p.theme.text.color : editEmptyColor)
-          : (cell.flag1 === 1 ? FLAG_COLORS.accent : cell.flag1 === 2 ? FLAG_COLORS.slide : p.theme.cellEmpty.color);
+        const flagColor = cell.flag1 === 1 ? FLAG_COLORS.accent : cell.flag1 === 2 ? FLAG_COLORS.slide : p.theme.cellEmpty.color;
         labels.push({ x: px, y, text: flagChar, color: flagColor, fontFamily: PIXI_FONTS.MONO, alpha: isGhost ? 0.35 : undefined });
         px += CHAR_WIDTH + 4;
       }
       if (p.columnVisibility.flag2 && cell.flag2 !== undefined) {
         const flagChar = cell.flag2 === 1 ? 'M' : cell.flag2 === 2 ? 'H' : '.';
-        const flagColor = isEditRow
-          ? (cell.flag2 > 0 ? p.theme.text.color : editEmptyColor)
-          : (cell.flag2 === 1 ? FLAG_COLORS.mute : cell.flag2 === 2 ? FLAG_COLORS.hammer : p.theme.cellEmpty.color);
+        const flagColor = cell.flag2 === 1 ? FLAG_COLORS.mute : cell.flag2 === 2 ? FLAG_COLORS.hammer : p.theme.cellEmpty.color;
         labels.push({ x: px, y, text: flagChar, color: flagColor, fontFamily: PIXI_FONTS.MONO, alpha: isGhost ? 0.35 : undefined });
         px += CHAR_WIDTH + 4;
       }
@@ -475,7 +464,7 @@ function generateLabels(p: RenderParams, vStart: number, currentRow: number): La
           ? (p.useHex ? HEX_TABLE[cell.probability & 0xFF] : DEC_TABLE[cell.probability & 0xFF])
           : (p.blankEmpty ? '' : '..');
         if (probText) {
-          labels.push({ x: px, y, text: probText, color: cell.probability > 0 ? (isEditRow ? p.theme.text.color : probColor(cell.probability)) : (isEditRow ? editEmptyColor : p.theme.cellEmpty.color), fontFamily: PIXI_FONTS.MONO, alpha: isGhost ? 0.35 : undefined });
+          labels.push({ x: px, y, text: probText, color: cell.probability > 0 ? probColor(cell.probability) : p.theme.cellEmpty.color, fontFamily: PIXI_FONTS.MONO, alpha: isGhost ? 0.35 : undefined });
         }
       }
     }
@@ -1124,8 +1113,8 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
       prevSelectionRef.current = selection;
       prevChannelRef.current = cursor.channelIndex;
       const gGrid = gridGraphicsRef.current;
-      if (gGrid) renderGrid(gGrid, p, vStart, currentRow);
-      if (mega) mega.updateLabels(generateLabels(p, vStart, currentRow));
+      if (gGrid) renderGrid(gGrid, p, vStart);
+      if (mega) mega.updateLabels(generateLabels(p, vStart));
       const gOverlay = overlayGraphicsRef.current;
       if (gOverlay) renderOverlay(gOverlay, p, cursor, selection, vStart, currentRow,
         peerCursorRef.current, peerSelectionRef.current);
@@ -1135,9 +1124,7 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
       prevVStartRef.current = vStart;
       prevSelectionRef.current = selection;
       prevChannelRef.current = cursor.channelIndex;
-      const gGrid2 = gridGraphicsRef.current;
-      if (gGrid2) renderGrid(gGrid2, p, vStart, currentRow);
-      if (mega) mega.updateLabels(generateLabels(p, vStart, currentRow));
+      if (mega) mega.updateLabels(generateLabels(p, vStart));
       const gOverlay = overlayGraphicsRef.current;
       if (gOverlay) renderOverlay(gOverlay, p, cursor, selection, vStart, currentRow,
         peerCursorRef.current, peerSelectionRef.current);
@@ -1161,19 +1148,16 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
     const gCaret = cursorCaretRef.current;
     if (gCaret) renderCursorCaret(gCaret, p, cursor, vStart);
 
-    // Fixed center-line highlight — thin accent border only (background + text
-    // are handled in renderGrid/generateLabels to avoid overlapping draws)
+    // Fixed center-line highlight — drawn outside the scroll container so it stays
+    // fixed during smooth scrolling while content scrolls via pivot.y
     const gHighlight = highlightGraphicsRef.current;
     if (gHighlight) {
       gHighlight.clear();
       const centerY = p.baseY + (currentRow - vStart) * p.rowHeight;
+      // Only draw if highlight is within visible grid area
       if (centerY >= 0 && centerY < p.gridHeight) {
-        // Top edge
-        gHighlight.rect(0, centerY, p.width, 1);
-        gHighlight.fill({ color: p.theme.accent.color, alpha: 0.6 });
-        // Bottom edge
-        gHighlight.rect(0, centerY + p.rowHeight - 1, p.width, 1);
-        gHighlight.fill({ color: p.theme.accent.color, alpha: 0.6 });
+        gHighlight.rect(0, centerY, p.width, p.rowHeight);
+        gHighlight.fill({ color: p.theme.accentGlow.color, alpha: p.trackerVisualBg ? 0.5 : p.theme.accentGlow.alpha });
       }
     }
   }, []); // Empty deps — everything read from refs

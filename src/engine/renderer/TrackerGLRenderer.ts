@@ -510,31 +510,18 @@ export class TrackerGLRenderer {
       if (y + rowH < 0 || y > height) continue;
 
       if (!ui.trackerVisualBg) {
-        const isCurrentRow = !isGhostRow && rowIndex === currentRow;
-        if (isCurrentRow) {
-          // Edit row: opaque accent background (no overlay needed)
-          const [cr, cg, cb] = colors.centerLine;
-          this.addRect(0, y, width, rowH, [cr, cg, cb, 0.85]);
-        } else {
-          const isHL = rowIndex % hlInterval === 0;
-          const bgColor = isHL ? colors.rowHighlight : colors.rowNormal;
-          const alpha = isGhostRow ? bgColor[3] * 0.35 : bgColor[3];
-          this.addRect(0, y, width, rowH, [bgColor[0], bgColor[1], bgColor[2], alpha]);
-        }
-      } else {
-        const isCurrentRow = !isGhostRow && rowIndex === currentRow;
-        if (isCurrentRow) {
-          const [cr, cg, cb] = colors.centerLine;
-          this.addRect(0, y, width, rowH, [cr, cg, cb, 0.6]);
-        }
+        const isHL = rowIndex % hlInterval === 0;
+        const bgColor = isHL ? colors.rowHighlight : colors.rowNormal;
+        const alpha = isGhostRow ? bgColor[3] * 0.35 : bgColor[3];
+        this.addRect(0, y, width, rowH, [bgColor[0], bgColor[1], bgColor[2], alpha]);
       }
     }
 
-    // Center line border (thin accent edges, no fill overlay)
+    // Center line highlight
     {
-      const [r, g, b] = colors.centerLine;
-      this.addRect(0, centerLineTop, width, 1, [r, g, b, 0.6]);
-      this.addRect(0, centerLineTop + rowH - 1, width, 1, [r, g, b, 0.6]);
+      const [r, g, b, a] = colors.centerLine;
+      const alpha = ui.trackerVisualBg ? a * 0.5 : a;
+      this.addRect(0, centerLineTop, width, rowH, [r, g, b, alpha]);
     }
 
     // Channel separators and left stripes (full height)
@@ -635,12 +622,12 @@ export class TrackerGLRenderer {
         }
 
         // Note — use pre-computed note table
-        const isEditRow = !isGhostRow && rowIndex === currentRow;
+        const isCurrentPlayingRow = isPlaying && !isGhostRow && rowIndex === currentRow;
         const cellNote = cell.note ?? 0;
         if (!ui.blankEmpty || cellNote !== 0) {
-          const nc = cellNote === 0 ? (isEditRow ? colors.textMuted : colors.textMuted)
+          const nc = cellNote === 0 ? colors.textMuted
                    : cellNote === 97 ? colors.textEffect
-                   : (isEditRow && cellNote > 0 ? colors.textNoteActive : colors.textNote);
+                   : (isCurrentPlayingRow && cellNote > 0 ? colors.textNoteActive : colors.textNote);
           this.setTmpColor(nc, ghostAlpha);
           this.addGlyphString(noteTable[cellNote] ?? '---', x, gy, atlas, this.tmpColor);
         }
@@ -652,7 +639,7 @@ export class TrackerGLRenderer {
         // Instrument — use HEX_TABLE lookup
         const inst = cell.instrument ?? 0;
         if (inst !== 0) {
-          this.setTmpColor(isEditRow ? colors.text : colors.textInstrument, ghostAlpha);
+          this.setTmpColor(colors.textInstrument, ghostAlpha);
           this.addGlyphString(HEX_TABLE[inst & 0xFF], px, gy, atlas, this.tmpColor);
         } else if (!ui.blankEmpty) {
           this.setTmpColor(colors.textMuted, ghostAlpha);
@@ -664,7 +651,7 @@ export class TrackerGLRenderer {
         const vol = cell.volume ?? 0;
         const hasVol = vol >= 0x10 && vol <= 0x50;
         if (hasVol) {
-          this.setTmpColor(isEditRow ? colors.text : colors.textVolume, ghostAlpha);
+          this.setTmpColor(colors.textVolume, ghostAlpha);
           this.addGlyphString(HEX_TABLE[vol & 0xFF], px, gy, atlas, this.tmpColor);
         } else if (!ui.blankEmpty) {
           this.setTmpColor(colors.textMuted, ghostAlpha);
@@ -684,7 +671,7 @@ export class TrackerGLRenderer {
 
           const hasEff = colEffTyp !== 0 || colEff !== 0;
           if (hasEff) {
-            this.setTmpColor(isEditRow ? colors.text : colors.textEffect, ghostAlpha);
+            this.setTmpColor(colors.textEffect, ghostAlpha);
             this.addGlyphString((EFFECT_CHARS[colEffTyp] ?? '?') + HEX_TABLE[colEff & 0xFF], px, gy, atlas, this.tmpColor);
           } else if (!ui.blankEmpty) {
             this.setTmpColor(colors.textMuted, ghostAlpha);
