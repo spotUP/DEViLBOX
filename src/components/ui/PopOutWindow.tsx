@@ -95,9 +95,23 @@ export const PopOutWindow: React.FC<PopOutWindowProps> = ({
       'status=no',
     ].join(',');
 
-    const popup = window.open('', '', features);
+    // Build HTML document for the popup
+    const htmlContent = `<!DOCTYPE html><html><head><title>${title}</title><style>
+      html, body { margin: 0; padding: 0; background: #0b0909; color: #f2f0f0; overflow: auto; height: 100%; }
+      #popout-root { display: inline-block; min-width: 100%; }
+    </style></head><body><div id="popout-root"></div></body></html>`;
+    
+    // Use Blob URL instead of about:blank to avoid the ugly URL in the title bar
+    const blob = new Blob([htmlContent], { type: 'text/html' });
+    const blobUrl = URL.createObjectURL(blob);
+
+    const popup = window.open(blobUrl, '', features);
+
+    // Revoke the blob URL after the popup has loaded
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
 
     if (!popup) {
+      URL.revokeObjectURL(blobUrl);
       notify.warning('Popup blocked — please allow popups for this site');
       onClose();
       return;
@@ -106,115 +120,122 @@ export const PopOutWindow: React.FC<PopOutWindowProps> = ({
     popupRef.current = popup;
     openPopouts.set(title, popup);
 
-    // Write a full HTML document so the browser treats this as a real page
-    popup.document.open();
-    popup.document.write(`<!DOCTYPE html><html><head><title>${title}</title><style>
-      html, body { margin: 0; padding: 0; background: #0b0909; color: #f2f0f0; overflow: auto; height: 100%; }
-      #popout-root { display: inline-block; min-width: 100%; }
-    </style></head><body><div id="popout-root"></div></body></html>`);
-    popup.document.close();
-    
-    // Explicitly set title again to ensure it sticks
-    popup.document.title = title;
-
-    // Clone all stylesheets from parent window
-    const popupHead = popup.document.head;
-
-    // Clone <style> tags (Vite-injected Tailwind, CSS modules, etc.)
-    document.head.querySelectorAll('style').forEach((style) => {
-      const clone = popup.document.createElement('style');
-      clone.textContent = style.textContent;
-      clone.dataset.cloned = 'true';
-      popupHead.appendChild(clone);
-    });
-
-    // Clone <link rel="stylesheet"> tags
-    document.head.querySelectorAll('link[rel="stylesheet"]').forEach((link) => {
-      const clone = popup.document.createElement('link');
-      clone.rel = 'stylesheet';
-      clone.href = (link as HTMLLinkElement).href;
-      clone.dataset.cloned = 'true';
-      popupHead.appendChild(clone);
-    });
-
-    const mount = popup.document.getElementById('popout-root') as HTMLDivElement;
-    // Defer state updates to next frame to avoid synchronous setState in effect
-    requestAnimationFrame(() => {
-      setMountEl(mount);
-      setReady(true);
-    });
-
-    // Auto-resize popup to fit content after first render (opt-in)
+    // Variables for cleanup
     let resizeObserver: ResizeObserver | null = null;
-    if (fitContent) {
-      let resized = false;
-      resizeObserver = new ResizeObserver(() => {
-        if (resized || popup.closed) return;
-        // Wait one frame for layout to settle
-        requestAnimationFrame(() => {
-          if (popup.closed) return;
-          const contentWidth = mount.scrollWidth;
-          const contentHeight = mount.scrollHeight;
-          if (contentWidth > 0 && contentHeight > 0) {
-            // Account for window chrome (title bar, borders)
-            const chromeWidth = popup.outerWidth - popup.innerWidth;
-            const chromeHeight = popup.outerHeight - popup.innerHeight;
-            const targetW = contentWidth + chromeWidth;
-            const targetH = contentHeight + chromeHeight;
-            // Re-center after resize
-            const newLeft = Math.round(screen.width / 2 - targetW / 2);
-            const newTop = Math.round(screen.height / 2 - targetH / 2);
-            popup.moveTo(Math.max(0, newLeft), Math.max(0, newTop));
-            popup.resizeTo(
-              Math.min(targetW, screen.availWidth),
-              Math.min(targetH, screen.availHeight)
-            );
-            resized = true;
-          }
-        });
-      });
-      resizeObserver.observe(mount);
-    }
+    let observer: MutationObserver | null = null;
 
-    // MutationObserver: mirror Vite HMR style injections during dev
-    const observer = new MutationObserver((mutations) => {
+    // Wait for the blob content to load before accessing the document
+    const setupPopup = () => {
       if (popup.closed) return;
-      for (const mutation of mutations) {
-        for (const node of mutation.addedNodes) {
-          if (node instanceof HTMLStyleElement) {
-            const clone = popup.document.createElement('style');
-            clone.textContent = node.textContent;
-            clone.dataset.cloned = 'true';
-            popup.document.head.appendChild(clone);
-          }
-          if (node instanceof HTMLLinkElement && node.rel === 'stylesheet') {
-            const clone = popup.document.createElement('link');
-            clone.rel = 'stylesheet';
-            clone.href = node.href;
-            clone.dataset.cloned = 'true';
-            popup.document.head.appendChild(clone);
-          }
-        }
-        for (const node of mutation.removedNodes) {
-          if (popup.closed) return;
-          if (node instanceof HTMLStyleElement || node instanceof HTMLLinkElement) {
-            const clones = popup.document.head.querySelectorAll('[data-cloned="true"]');
-            clones.forEach((clone) => {
-              if (
-                (clone instanceof HTMLStyleElement && node instanceof HTMLStyleElement &&
-                  clone.textContent === node.textContent) ||
-                (clone instanceof HTMLLinkElement && node instanceof HTMLLinkElement &&
-                  clone.href === node.href)
-              ) {
-                clone.remove();
-              }
-            });
-          }
-        }
+      
+      const mount = popup.document.getElementById('popout-root') as HTMLDivElement;
+      if (!mount) {
+        // Document not ready yet, retry
+        setTimeout(setupPopup, 10);
+        return;
       }
-    });
 
-    observer.observe(document.head, { childList: true });
+      // Clone all stylesheets from parent window
+      const popupHead = popup.document.head;
+
+      // Clone <style> tags (Vite-injected Tailwind, CSS modules, etc.)
+      document.head.querySelectorAll('style').forEach((style) => {
+        const clone = popup.document.createElement('style');
+        clone.textContent = style.textContent;
+        clone.dataset.cloned = 'true';
+        popupHead.appendChild(clone);
+      });
+
+      // Clone <link rel="stylesheet"> tags
+      document.head.querySelectorAll('link[rel="stylesheet"]').forEach((link) => {
+        const clone = popup.document.createElement('link');
+        clone.rel = 'stylesheet';
+        clone.href = (link as HTMLLinkElement).href;
+        clone.dataset.cloned = 'true';
+        popupHead.appendChild(clone);
+      });
+
+      // Defer state updates to next frame to avoid synchronous setState in effect
+      requestAnimationFrame(() => {
+        setMountEl(mount);
+        setReady(true);
+      });
+
+      // Auto-resize popup to fit content after first render (opt-in)
+      if (fitContent) {
+        let resized = false;
+        resizeObserver = new ResizeObserver(() => {
+          if (resized || popup.closed) return;
+          // Wait one frame for layout to settle
+          requestAnimationFrame(() => {
+            if (popup.closed) return;
+            const contentWidth = mount.scrollWidth;
+            const contentHeight = mount.scrollHeight;
+            if (contentWidth > 0 && contentHeight > 0) {
+              // Account for window chrome (title bar, borders)
+              const chromeWidth = popup.outerWidth - popup.innerWidth;
+              const chromeHeight = popup.outerHeight - popup.innerHeight;
+              const targetW = contentWidth + chromeWidth;
+              const targetH = contentHeight + chromeHeight;
+              // Re-center after resize
+              const newLeft = Math.round(screen.width / 2 - targetW / 2);
+              const newTop = Math.round(screen.height / 2 - targetH / 2);
+              popup.moveTo(Math.max(0, newLeft), Math.max(0, newTop));
+              popup.resizeTo(
+                Math.min(targetW, screen.availWidth),
+                Math.min(targetH, screen.availHeight)
+              );
+              resized = true;
+            }
+          });
+        });
+        resizeObserver.observe(mount);
+      }
+
+      // MutationObserver: mirror Vite HMR style injections during dev
+      observer = new MutationObserver((mutations) => {
+        if (popup.closed) return;
+        for (const mutation of mutations) {
+          for (const node of mutation.addedNodes) {
+            if (node instanceof HTMLStyleElement) {
+              const clone = popup.document.createElement('style');
+              clone.textContent = node.textContent;
+              clone.dataset.cloned = 'true';
+              popup.document.head.appendChild(clone);
+            }
+            if (node instanceof HTMLLinkElement && node.rel === 'stylesheet') {
+              const clone = popup.document.createElement('link');
+              clone.rel = 'stylesheet';
+              clone.href = node.href;
+              clone.dataset.cloned = 'true';
+              popup.document.head.appendChild(clone);
+            }
+          }
+          for (const node of mutation.removedNodes) {
+            if (popup.closed) return;
+            if (node instanceof HTMLStyleElement || node instanceof HTMLLinkElement) {
+              const clones = popup.document.head.querySelectorAll('[data-cloned="true"]');
+              clones.forEach((clone) => {
+                if (
+                  (clone instanceof HTMLStyleElement && node instanceof HTMLStyleElement &&
+                    clone.textContent === node.textContent) ||
+                  (clone instanceof HTMLLinkElement && node instanceof HTMLLinkElement &&
+                    clone.href === node.href)
+                ) {
+                  clone.remove();
+                }
+              });
+            }
+          }
+        }
+      });
+      observer.observe(document.head, { childList: true });
+    };
+
+    // Start setup when popup is ready
+    popup.addEventListener('load', setupPopup);
+    // Fallback in case load event already fired
+    setTimeout(setupPopup, 50);
 
     // Handle popup close (user clicks X on popup window).
     // Defer onClose so React doesn't try to unmount the portal while
@@ -235,11 +256,12 @@ export const PopOutWindow: React.FC<PopOutWindowProps> = ({
     // Cleanup on unmount (e.g. parent sets isOpen=false)
     return () => {
       resizeObserver?.disconnect();
-      observer.disconnect();
+      observer?.disconnect();
       closingRef.current = true;
       openPopouts.delete(title);
       if (popup && !popup.closed) {
         popup.removeEventListener('pagehide', handlePopupClose);
+        popup.removeEventListener('load', setupPopup);
         popup.onbeforeunload = null;
         popup.close();
       }
