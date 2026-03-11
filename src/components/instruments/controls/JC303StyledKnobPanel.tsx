@@ -515,7 +515,7 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
         </div>
 
         {/* --- TAB CONTENT --- */}
-        <div style={{ position: 'absolute', left: 0, right: 0, top: 324, bottom: 30 }}>
+        <div style={{ position: 'absolute', left: 0, right: 0, top: 324, bottom: 0, zIndex: 5 }}>
 
           {/* OSC Tab — Oscillator controls */}
           {effectiveTab === 'osc' && (
@@ -680,7 +680,7 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
         )}
 
         {/* Quick Tips Bar */}
-        <div className="absolute bottom-0 left-0 right-0 flex items-center gap-2 px-4 py-1.5 bg-black/50 border-t border-white/5">
+        <div className="absolute bottom-0 left-0 right-0 flex items-center gap-2 px-4 py-1.5 bg-black/50 border-t border-white/5" style={{ zIndex: 2 }}>
           <Lightbulb size={12} className="text-yellow-500/70 flex-shrink-0" />
           <button onClick={() => cycleTip(-1)} className="text-gray-600 hover:text-gray-400 text-[10px] flex-shrink-0 px-0.5">&lsaquo;</button>
           <span
