@@ -10,6 +10,7 @@ export interface ThemeSnapshot {
   accent: string;
   accentSecondary: string;
   accentGlow: string;
+  rowCurrent: string;
   bg: string;
   rowNormal: string;
   rowHighlight: string;

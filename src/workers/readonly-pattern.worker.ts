@@ -65,6 +65,7 @@ const DEFAULT_THEME: ThemeSnapshot = {
   accent: '#00e5ff',
   accentSecondary: '#7c3aed',
   accentGlow: 'rgba(0,229,255,0.08)',
+  rowCurrent: '#1a2a25',
   bg: '#0a0a0b',
   rowNormal: '#0d0d0e',
   rowHighlight: '#111113',
