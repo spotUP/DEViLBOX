@@ -301,9 +301,10 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
   useEffect(() => { configRef.current = config; });
 
   // Sync MIDI knob page when UI tab changes
+  // Pages match KNOB_303_PAGES order: 0=Main, 1=MOJO, 2=DevilFish, 3=Korg, 4=LFO, 5=FX, 6=Oscillator
   const setKnobPage = useMIDIStore(s => s.setKnobPage);
   useEffect(() => {
-    const tabToPage: Record<TB303Tab, number> = { osc: 1, mojo: 2, lfo: 3, devilfish: 4, fx: 5 };
+    const tabToPage: Record<TB303Tab, number> = { osc: 6, mojo: 1, devilfish: 2, lfo: 4, fx: 5 };
     const page = tabToPage[effectiveTab];
     if (page !== undefined) setKnobPage(page);
   }, [effectiveTab, setKnobPage]);
