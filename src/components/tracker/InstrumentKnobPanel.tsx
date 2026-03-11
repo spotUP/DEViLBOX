@@ -457,32 +457,6 @@ export const InstrumentKnobPanel: React.FC = memo(() => {
     updateInstrument(targetInstrument.id, updates);
   }, [targetInstrument, updateInstrument]);
 
-  // No instrument on this channel — render nothing
-  if (!targetInstrument) {
-    if (tb303PoppedOut) {
-      return (
-        <PopOutWindow
-          isOpen={true}
-          onClose={() => setTB303PoppedOut(false)}
-          title="DEViLBOX — Synth Panel"
-          width={1200}
-          height={640}
-          fitContent
-        >
-          <div className="flex items-center justify-center h-full text-gray-500 text-sm">
-            No instrument selected
-          </div>
-        </PopOutWindow>
-      );
-    }
-    return null;
-  }
-
-  const expandedHeight = getExpandedHeight(synthType, activeTab);
-  const instNum = String(targetInstrument.id).padStart(2, '0');
-  const instrumentName = `${instNum}: ${targetInstrument.name || synthType}`;
-  const fxCount = targetInstrument.effects?.length ?? 0;
-
   // Right-side content for tab bar — action buttons for FX tabs
   const tabRightContent = useMemo(() => {
     if (activeTab === 'instFx') {
@@ -520,6 +494,32 @@ export const InstrumentKnobPanel: React.FC = memo(() => {
     }
     return undefined;
   }, [activeTab]);
+
+  // No instrument on this channel — render nothing
+  if (!targetInstrument) {
+    if (tb303PoppedOut) {
+      return (
+        <PopOutWindow
+          isOpen={true}
+          onClose={() => setTB303PoppedOut(false)}
+          title="DEViLBOX — Synth Panel"
+          width={1200}
+          height={640}
+          fitContent
+        >
+          <div className="flex items-center justify-center h-full text-gray-500 text-sm">
+            No instrument selected
+          </div>
+        </PopOutWindow>
+      );
+    }
+    return null;
+  }
+
+  const expandedHeight = getExpandedHeight(synthType, activeTab);
+  const instNum = String(targetInstrument.id).padStart(2, '0');
+  const instrumentName = `${instNum}: ${targetInstrument.name || synthType}`;
+  const fxCount = targetInstrument.effects?.length ?? 0;
 
   // ─── Popped-out mode ───────────────────────────────────────────────────────
   if (tb303PoppedOut) {
