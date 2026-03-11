@@ -226,7 +226,7 @@ export const TB303KnobPanel: React.FC = memo(() => {
         overflow: 'hidden'
       }}
     >
-      <ScrollLockContainer>
+      <ScrollLockContainer className="w-full">
         <JC303StyledKnobPanel
           key={targetInstrument.id}
           config={targetInstrument.tb303}
