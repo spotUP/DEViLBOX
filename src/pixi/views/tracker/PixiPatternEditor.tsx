@@ -101,12 +101,13 @@ const FLAG_COLORS = {
   hammer: 0x22d3ee,
 };
 
-// Pre-allocated fill style objects to avoid GC pressure in hot render loops
-const FILL_BLACK_045 = { color: 0x000000, alpha: 0.45 };
+// Placeholder fill style objects — overwritten per-render inside the component
+// with theme-derived colors (see useMemo in PixiPatternEditor).
+let FILL_BLACK_045 = { color: 0x000000, alpha: 0.45 };
 const FILL_WHITE_002 = { color: 0xffffff, alpha: 0.02 };
-const FILL_PURPLE_012 = { color: 0xa855f7, alpha: 0.12 };
-const FILL_PURPLE_045 = { color: 0xa855f7, alpha: 0.45 };
-const FILL_PURPLE_055 = { color: 0xa855f7, alpha: 0.55 };
+let FILL_PURPLE_012 = { color: 0xa855f7, alpha: 0.12 };
+let FILL_PURPLE_045 = { color: 0xa855f7, alpha: 0.45 };
+let FILL_PURPLE_055 = { color: 0xa855f7, alpha: 0.55 };
 
 
 function probColor(val: number): number {
@@ -485,6 +486,12 @@ interface PixiPatternEditorProps {
 
 export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, height }) => {
   const theme = usePixiTheme();
+
+  // Update module-level fill styles with current theme colors
+  FILL_BLACK_045 = { color: theme.bg.color, alpha: 0.45 };
+  FILL_PURPLE_012 = { color: theme.accentSecondary.color, alpha: 0.12 };
+  FILL_PURPLE_045 = { color: theme.accentSecondary.color, alpha: 0.45 };
+  FILL_PURPLE_055 = { color: theme.accentSecondary.color, alpha: 0.55 };
 
   // ── Store subscriptions ────────────────────────────────────────────────────
   const {
@@ -1661,7 +1668,7 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
           eventMode="none"
           draw={useCallback((g: GraphicsType) => {
             g.clear();
-            g.rect(0, 0, width, gridHeight).fill({ color: 0x6366f1, alpha: 0.08 });
+            g.rect(0, 0, width, gridHeight).fill({ color: theme.accent.color, alpha: 0.08 });
           }, [width, gridHeight])}
           layout={dragOverlayLayout}
         />

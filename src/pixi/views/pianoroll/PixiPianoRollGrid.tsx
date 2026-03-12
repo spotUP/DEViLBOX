@@ -176,9 +176,9 @@ export const PixiPianoRollGrid: React.FC<PixiPianoRollGridProps> = ({
       const bh = Math.abs(currentLocalY - drag.startLocalY);
       if (bw > 1 && bh > 1) {
         gfx.rect(bx, by, bw, bh);
-        gfx.fill({ color: 0x4a9eff, alpha: 0.1 });
+        gfx.fill({ color: theme.accentHighlight.color, alpha: 0.1 });
         gfx.rect(bx, by, bw, bh);
-        gfx.stroke({ color: 0x4a9eff, alpha: 0.7, width: 1 });
+        gfx.stroke({ color: theme.accentHighlight.color, alpha: 0.7, width: 1 });
       }
     } else if (drag.mode === 'move' && drag.originalNotes.length > 0) {
       const deltaRow = Math.round((currentLocalX - drag.startLocalX) / ppb);

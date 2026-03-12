@@ -181,7 +181,7 @@ export const PixiRemotePatternView: React.FC<{ width: number; height: number }> 
       if (isPlaybackRow) {
         grid.rect(0, y, gridW, ROW_HEIGHT).fill({ color: theme.accent.color });
       } else if (isPeerCursor) {
-        grid.rect(0, y, gridW, ROW_HEIGHT).fill({ color: 0x2a4060, alpha: 0.5 });
+        grid.rect(0, y, gridW, ROW_HEIGHT).fill({ color: theme.accentHighlight.color, alpha: 0.5 });
       } else if (isHighlight) {
         grid.rect(0, y, gridW, ROW_HEIGHT).fill({ color: theme.trackerRowHighlight.color, alpha: 0.3 });
       } else if (isBeat) {

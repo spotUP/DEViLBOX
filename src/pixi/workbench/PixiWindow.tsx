@@ -565,7 +565,7 @@ export const PixiWindow: React.FC<PixiWindowProps> = ({
   const drawFrame = useCallback((g: GraphicsType) => {
     g.clear();
     g.rect(0, 0, w, h);
-    g.fill({ color: 0x12121c, alpha: 0.96 });
+    g.fill({ color: theme.bgSecondary.color, alpha: 0.96 });
     // Border: focused > selected > hovered > normal
     let borderColor: number;
     let borderAlpha: number;
@@ -598,7 +598,7 @@ export const PixiWindow: React.FC<PixiWindowProps> = ({
   const drawMinimizedFrame = useCallback((g: GraphicsType) => {
     g.clear();
     g.rect(0, 0, MINIMIZED_SLOT_W, MINIMIZED_H);
-    g.fill({ color: 0x16161f, alpha: 0.96 });
+    g.fill({ color: theme.bgSecondary.color, alpha: 0.96 });
     g.rect(0, 0, MINIMIZED_SLOT_W, MINIMIZED_H);
     g.stroke({ color: theme.accent.color, alpha: 0.4, width: 1 });
   }, [theme]);
@@ -616,13 +616,13 @@ export const PixiWindow: React.FC<PixiWindowProps> = ({
     // Invisible full-size rect anchors pixi bounds so the layout engine
     // doesn't scale the graphics to fit and distort the circles.
     g.rect(0, 0, w, TITLE_H);
-    g.fill({ color: 0x000000, alpha: 0 });
+    g.fill({ color: theme.bg.color, alpha: 0 });
     // Red = close/hide
     g.circle(w - 12, TITLE_H / 2, 4);
-    g.fill({ color: 0xe05050, alpha: 0.9 });
+    g.fill({ color: theme.error.color, alpha: 0.9 });
     // Green = focus/fit this window
     g.circle(w - 28, TITLE_H / 2, 4);
-    g.fill({ color: 0x40b060, alpha: 0.9 });
+    g.fill({ color: theme.success.color, alpha: 0.9 });
   }, [w]);
 
   const handlePointerDownWindow = useCallback((_e: FederatedPointerEvent) => {

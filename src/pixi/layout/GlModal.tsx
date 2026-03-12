@@ -55,7 +55,7 @@ export const GlModal: React.FC<GlModalProps> = ({
   const drawOverlay = useCallback((g: GraphicsType) => {
     g.clear();
     g.rect(0, 0, screenW, screenH);
-    g.fill({ color: 0x000000, alpha: 0.6 });
+    g.fill({ color: theme.bg.color, alpha: 0.6 });
   }, [screenW, screenH]);
 
   const handleOverlayClick = useCallback((_e: FederatedPointerEvent) => {

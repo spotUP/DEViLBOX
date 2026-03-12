@@ -161,7 +161,7 @@ export const PixiPitchSlider: React.FC<PixiPitchSliderProps> = ({ width, height 
     // ── Groove — 3px wide, centered in housing ──
     const grooveX = scaleW + housingW / 2 - 1.5;
     g.rect(grooveX, EDGE_PAD, 3, trackH - EDGE_PAD * 2);
-    g.fill({ color: 0x000000, alpha: 0.75 });
+    g.fill({ color: theme.bg.color, alpha: 0.75 });
 
     // ── Handle ──
     const handleX = scaleW + 2;

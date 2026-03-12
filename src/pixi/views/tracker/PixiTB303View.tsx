@@ -332,7 +332,7 @@ export const PixiTB303View: React.FC<PixiTB303ViewProps> = ({ channelIndex = 0, 
         // Accent indicator
         if (step.accent) {
           g.rect(x + 2, LED_H + 4 + STEP_H - 30, STEP_W - 4, 12);
-          g.fill({ color: 0xd97706, alpha: 0.5 });
+          g.fill({ color: theme.warning.color, alpha: 0.5 });
         }
 
         // Slide indicator
@@ -345,7 +345,7 @@ export const PixiTB303View: React.FC<PixiTB303ViewProps> = ({ channelIndex = 0, 
       // Current step glow
       if (isCurrent) {
         g.roundRect(x - 1, LED_H + 3, STEP_W + 2, STEP_H + 2, 5);
-        g.stroke({ color: 0xef4444, width: 2, alpha: 0.7 });
+        g.stroke({ color: theme.error.color, width: 2, alpha: 0.7 });
       }
     }
   }, [width, sequencerWidth, theme, steps, currentStep]);

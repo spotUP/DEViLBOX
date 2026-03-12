@@ -408,7 +408,7 @@ export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, on
   const drawOverlay = (g: GraphicsType) => {
     g.clear();
     g.rect(0, 0, screenW, screenH);
-    g.fill({ color: 0x000000, alpha: 0.5 });
+    g.fill({ color: theme.bg.color, alpha: 0.5 });
   };
 
   const handleOverlayClick = (_e: FederatedPointerEvent) => { onClose(); };

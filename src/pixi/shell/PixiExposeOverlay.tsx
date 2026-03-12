@@ -15,16 +15,20 @@ import { useWorkbenchStore } from '@stores/useWorkbenchStore';
 
 // ─── View definitions ─────────────────────────────────────────────────────────
 
-const EXPOSE_VIEWS = [
-  { id: 'tracker',     label: 'Tracker',  icon: '♫', color: 0x60a5fa },
-  { id: 'arrangement', label: 'Arrange',  icon: '≡', color: 0x34d399 },
-  { id: 'pianoroll',   label: 'Piano',    icon: '♬', color: 0xc084fc },
-  { id: 'mixer',       label: 'Mixer',    icon: '☰', color: 0xa78bfa },
-  { id: 'dj',          label: 'DJ',       icon: '◎', color: 0xfb923c },
-  { id: 'vj',          label: 'VJ',       icon: '◈', color: 0xf472b6 },
-  { id: 'studio',      label: 'Studio',   icon: '⊞', color: 0xfbbf24 },
-  { id: 'split',       label: 'Split',    icon: '⊟', color: 0x94a3b8 },
-] as const;
+type ExposeView = { id: string; label: string; icon: string; color: number };
+
+function buildExposeViews(theme: ReturnType<typeof usePixiTheme>): ExposeView[] {
+  return [
+    { id: 'tracker',     label: 'Tracker',  icon: '♫', color: theme.accentHighlight.color },
+    { id: 'arrangement', label: 'Arrange',  icon: '≡', color: theme.success.color },
+    { id: 'pianoroll',   label: 'Piano',    icon: '♬', color: theme.accentSecondary.color },
+    { id: 'mixer',       label: 'Mixer',    icon: '☰', color: theme.accentSecondary.color },
+    { id: 'dj',          label: 'DJ',       icon: '◎', color: theme.warning.color },
+    { id: 'vj',          label: 'VJ',       icon: '◈', color: theme.error.color },
+    { id: 'studio',      label: 'Studio',   icon: '⊞', color: theme.warning.color },
+    { id: 'split',       label: 'Split',    icon: '⊟', color: theme.textMuted.color },
+  ];
+}
 
 const COLS = 4;
 const ROWS = 2;
@@ -41,6 +45,7 @@ interface PixiExposeOverlayProps {
 
 export const PixiExposeOverlay: React.FC<PixiExposeOverlayProps> = ({ width, height, thumbnails }) => {
   const theme = usePixiTheme();
+  const EXPOSE_VIEWS = useMemo(() => buildExposeViews(theme), [theme]);
   const viewExposeActive = useUIStore((s) => s.viewExposeActive);
   const selectedIdx = useUIStore((s) => s.viewExposeSelectedIdx);
   const activeView = useUIStore((s) => s.activeView);
@@ -159,7 +164,7 @@ export const PixiExposeOverlay: React.FC<PixiExposeOverlayProps> = ({ width, hei
   const drawOverlayBg = useCallback((g: GraphicsType) => {
     g.clear();
     g.rect(0, 0, width, height);
-    g.fill({ color: 0x000000, alpha: 0.78 });
+    g.fill({ color: theme.bg.color, alpha: 0.78 });
   }, [width, height]);
 
   if (!viewExposeActive) return (
@@ -235,7 +240,7 @@ export const PixiExposeOverlay: React.FC<PixiExposeOverlayProps> = ({ width, hei
               draw={(g) => {
                 g.clear();
                 g.roundRect(0, 0, cardW, cardH, CARD_RADIUS);
-                g.fill({ color: 0x1a1a2e, alpha: 0.92 });
+                g.fill({ color: theme.bgSecondary.color, alpha: 0.92 });
                 g.roundRect(0, 0, cardW, cardH, CARD_RADIUS);
                 g.stroke({
                   color: isSelected ? 0xffffff : (isActive ? theme.accent.color : theme.border.color),
@@ -273,7 +278,7 @@ export const PixiExposeOverlay: React.FC<PixiExposeOverlayProps> = ({ width, hei
                 g.clear();
                 // Subtle gradient bar at bottom
                 g.roundRect(0, cardH - LABEL_H, cardW, LABEL_H, 0);
-                g.fill({ color: 0x000000, alpha: 0.4 });
+                g.fill({ color: theme.bg.color, alpha: 0.4 });
               }}
               layout={{ position: 'absolute', width: cardW, height: cardH }}
             />

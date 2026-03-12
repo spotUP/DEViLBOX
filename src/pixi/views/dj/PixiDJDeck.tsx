@@ -5,7 +5,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Graphics as GraphicsType, FederatedPointerEvent } from 'pixi.js';
 import { PIXI_FONTS } from '../../fonts';
-import { usePixiTheme, usePixiThemeId, getDeckColors } from '../../theme';
+import { usePixiTheme, usePixiThemeId, getDeckColors, type PixiTheme } from '../../theme';
 import { PixiButton, PixiLabel, PixiSlider } from '../../components';
 import { useDJStore } from '@/stores/useDJStore';
 import { PixiDeckTransport } from './PixiDeckTransport';
@@ -52,6 +52,7 @@ const PixiSpectrumDisplay: React.FC<{
   vizMode: VizMode;
   onBeatFlash?: () => void;
 }> = ({ deckId, width, height, deckColor, vizMode, onBeatFlash }) => {
+  const theme = usePixiTheme();
   const graphicsRef = useRef<GraphicsType | null>(null);
   const rafRef = useRef(0);
   const prevEnergyRef = useRef(0);
@@ -81,7 +82,7 @@ const PixiSpectrumDisplay: React.FC<{
       lastTimeRef.current = now;
       vizTimeRef.current += dt;
 
-      g.rect(0, 0, width, height).fill({ color: 0x080808 });
+      g.rect(0, 0, width, height).fill({ color: theme.bg.color });
 
       const isPlaying = useDJStore.getState().decks[deckId]?.isPlaying ?? false;
       let fft: Float32Array | null = null;
@@ -105,27 +106,27 @@ const PixiSpectrumDisplay: React.FC<{
       }
 
       if (vizMode === 'waveform' && waveform && waveform.length > 0) {
-        drawWaveform(g, waveform, width, height, deckColor);
+        drawWaveform(g, waveform, width, height, deckColor, theme);
       } else if (vizMode === 'circular' && fft && fft.length > 0) {
-        drawCircular(g, fft, width, height, deckColor);
+        drawCircular(g, fft, width, height, deckColor, theme);
       } else if (vizMode === 'mirrored' && fft && fft.length > 0) {
         drawMirrored(g, fft, width, height, deckColor);
       } else if (vizMode === 'terrain' && fft && fft.length > 0) {
-        drawTerrain(g, fft, width, height, vizTimeRef.current, deckColor);
+        drawTerrain(g, fft, width, height, vizTimeRef.current, deckColor, theme);
       } else if (vizMode === 'starfield' && fft && fft.length > 0) {
         let rms = 0;
         for (let i = 0; i < fft.length; i++) { const v = (fft[i] + 100) / 100; rms += v * v; }
         rms = Math.sqrt(rms / fft.length);
-        drawStarfield(g, fft, width, height, vizTimeRef.current, deckColor, dt, rms, starsRef.current);
+        drawStarfield(g, fft, width, height, vizTimeRef.current, deckColor, dt, rms, starsRef.current, theme);
       } else if (vizMode === 'plasma') {
         drawPlasma(g, fft ?? new Float32Array(128).fill(-100), width, height, vizTimeRef.current);
       } else if (vizMode === 'particles') {
-        drawParticles(g, fft ?? new Float32Array(128).fill(-100), width, height, vizTimeRef.current, dt, burstsRef, lastBurstTimeRef);
+        drawParticles(g, fft ?? new Float32Array(128).fill(-100), width, height, vizTimeRef.current, dt, burstsRef, lastBurstTimeRef, theme);
       } else if (fft && fft.length > 0) {
         drawSpectrumBars(g, fft, width, height, deckColor);
       }
 
-      g.rect(0, 0, width, height).stroke({ color: 0x222222, width: 0.5 });
+      g.rect(0, 0, width, height).stroke({ color: theme.bgTertiary.color, width: 0.5 });
       rafRef.current = requestAnimationFrame(draw);
     };
     rafRef.current = requestAnimationFrame(draw);
@@ -150,7 +151,7 @@ function drawSpectrumBars(g: GraphicsType, fft: Float32Array, w: number, h: numb
   }
 }
 
-function drawWaveform(g: GraphicsType, data: Float32Array, w: number, h: number, accentColor: number) {
+function drawWaveform(g: GraphicsType, data: Float32Array, w: number, h: number, accentColor: number, theme: PixiTheme) {
   const mid = h / 2;
   const step = data.length / w;
   g.moveTo(0, mid);
@@ -161,10 +162,10 @@ function drawWaveform(g: GraphicsType, data: Float32Array, w: number, h: number,
   }
   g.stroke({ color: accentColor, width: 1.5 });
   // Center line
-  g.moveTo(0, mid).lineTo(w, mid).stroke({ color: 0x333333, width: 0.5 });
+  g.moveTo(0, mid).lineTo(w, mid).stroke({ color: theme.border.color, width: 0.5 });
 }
 
-function drawCircular(g: GraphicsType, fft: Float32Array, w: number, h: number, accentColor: number) {
+function drawCircular(g: GraphicsType, fft: Float32Array, w: number, h: number, accentColor: number, theme: PixiTheme) {
   const cx = w / 2, cy = h / 2;
   const radius = Math.min(w, h) * 0.3;
   const bars = 64;
@@ -180,7 +181,7 @@ function drawCircular(g: GraphicsType, fft: Float32Array, w: number, h: number, 
     const color = val > 0.7 ? 0xff4444 : val > 0.4 ? 0xffaa00 : accentColor;
     g.moveTo(x1, y1).lineTo(x2, y2).stroke({ color, width: 2 });
   }
-  g.circle(cx, cy, radius * 0.3).fill({ color: 0x111111 });
+  g.circle(cx, cy, radius * 0.3).fill({ color: theme.bgSecondary.color });
   g.circle(cx, cy, radius * 0.3).stroke({ color: accentColor, width: 1 });
 }
 
@@ -199,7 +200,7 @@ function drawMirrored(g: GraphicsType, fft: Float32Array, w: number, h: number, 
   }
 }
 
-function drawTerrain(g: GraphicsType, fftData: Float32Array, w: number, h: number, time: number, accentColor: number) {
+function drawTerrain(g: GraphicsType, fftData: Float32Array, w: number, h: number, time: number, accentColor: number, theme: PixiTheme) {
   g.clear();
   const lines = 40;
   const lineSpacing = h / (lines + 2);
@@ -228,7 +229,7 @@ function drawTerrain(g: GraphicsType, fftData: Float32Array, w: number, h: numbe
     }
     g.lineTo(w, baseY + lineSpacing);
     g.closePath();
-    g.fill(0x000000);
+    g.fill({ color: theme.bg.color });
 
     // Draw the waveform line on top
     g.moveTo(points[0], points[1]);
@@ -248,9 +249,10 @@ function drawStarfield(
   g: GraphicsType, fftData: Float32Array, w: number, h: number, _time: number,
   accentColor: number, dt: number, rms: number,
   stars: { x: number; y: number; z: number; speed: number; hue: number }[],
+  theme: PixiTheme,
 ) {
   g.clear();
-  g.rect(0, 0, w, h).fill(0x000000);
+  g.rect(0, 0, w, h).fill({ color: theme.bg.color });
 
   const cx = w / 2, cy = h / 2;
   const bass = (fftData[2] + 100) / 100;
@@ -368,6 +370,7 @@ function drawParticles(
   g: GraphicsType, fftData: Float32Array, w: number, h: number, time: number, dt: number,
   burstsRef: React.MutableRefObject<{ particles: { x: number; y: number; vx: number; vy: number; life: number; maxLife: number; color: number; size: number }[]; age: number }[]>,
   lastBurstTimeRef: React.MutableRefObject<number>,
+  theme: PixiTheme,
 ) {
   g.clear();
   g.rect(0, 0, w, h).fill(0x040303);
@@ -437,7 +440,7 @@ function drawParticles(
     const flicker = 0.5 + 0.5 * Math.sin(time * (3 + (seed % 1) * 5));
     const alpha2 = flicker * rms * 0.4;
     if (alpha2 > 0.05) {
-      g.circle(ex, ey, 1.5).fill({ color: 0xff8833, alpha: alpha2 });
+      g.circle(ex, ey, 1.5).fill({ color: theme.warning.color, alpha: alpha2 });
     }
   }
 
@@ -445,7 +448,7 @@ function drawParticles(
   if (bass > 0.3) {
     for (let x = 0; x < w; x += 4) {
       const glowAlpha = bass * 0.15 * Math.exp(-((x / w - 0.5) ** 2) * 4);
-      g.rect(x, h - 8, 4, 8).fill({ color: 0xef4444, alpha: glowAlpha });
+      g.rect(x, h - 8, 4, 8).fill({ color: theme.error.color, alpha: glowAlpha });
     }
   }
 }
@@ -459,6 +462,7 @@ const PixiVinylDisplay: React.FC<{
   size: number;
   deckColor: number;
 }> = ({ deckId, size, deckColor }) => {
+  const theme = usePixiTheme();
   const isPlaying = useDJStore(s => s.decks[deckId].isPlaying);
   const effectiveBPM = useDJStore(s => s.decks[deckId].effectiveBPM);
   const trackName = useDJStore(s => s.decks[deckId].trackName);
@@ -541,11 +545,11 @@ const PixiVinylDisplay: React.FC<{
     g.clear();
 
     // Platter
-    g.circle(cx, cy, outerR).fill({ color: 0x111111 });
-    g.circle(cx, cy, outerR).stroke({ color: 0x333333, width: 1.5 });
+    g.circle(cx, cy, outerR).fill({ color: theme.bgSecondary.color });
+    g.circle(cx, cy, outerR).stroke({ color: theme.border.color, width: 1.5 });
 
     // Vinyl disc
-    g.circle(cx, cy, outerR - 3).fill({ color: 0x0a0a0a });
+    g.circle(cx, cy, outerR - 3).fill({ color: theme.bg.color });
 
     // Grooves with shimmer
     const grooveStart = labelR + 6;
@@ -553,7 +557,7 @@ const PixiVinylDisplay: React.FC<{
     for (let i = 0; i < GROOVE_COUNT; i++) {
       const r = grooveStart + (i / (GROOVE_COUNT - 1)) * (grooveEnd - grooveStart);
       const alpha = 0.12 + 0.08 * Math.sin(i * 1.5 + rotation * 0.3);
-      g.circle(cx, cy, r).stroke({ color: 0x1a1a1a, alpha, width: 0.5 });
+      g.circle(cx, cy, r).stroke({ color: theme.bgSecondary.color, alpha, width: 0.5 });
     }
 
     // Rotation marker line
@@ -570,8 +574,8 @@ const PixiVinylDisplay: React.FC<{
       .fill({ color: 0xffffff, alpha: playing ? 0.7 : 0.2 });
 
     // Spindle
-    g.circle(cx, cy, 3).fill({ color: 0x000000 });
-    g.circle(cx, cy, 3).stroke({ color: 0x444444, width: 0.5 });
+    g.circle(cx, cy, 3).fill({ color: theme.bg.color });
+    g.circle(cx, cy, 3).stroke({ color: theme.border.color, width: 0.5 });
   }, [cx, cy, outerR, labelR, deckColor]);
 
   // ── Scratch enter/exit helpers ───────────────────────────────────────────
@@ -709,6 +713,7 @@ const _PixiTonearm: React.FC<{
   size: number;
   isPlaying: boolean;
 }> = ({ size, isPlaying }) => {
+  const theme = usePixiTheme();
   const drawArm = useCallback((g: GraphicsType) => {
     g.clear();
 
@@ -721,21 +726,21 @@ const _PixiTonearm: React.FC<{
 
     // Counterweight
     g.circle(baseX + Math.cos(armAngle) * 16, baseY - Math.sin(armAngle) * 16, 4)
-      .fill({ color: 0x555555 });
+      .fill({ color: theme.textMuted.color });
 
     // Arm shaft
     g.moveTo(baseX, baseY).lineTo(endX, endY)
-      .stroke({ color: 0x888888, width: 2 });
+      .stroke({ color: theme.textSecondary.color, width: 2 });
 
     // Headshell
     const sa = armAngle + 0.3;
     g.moveTo(endX, endY)
       .lineTo(endX - Math.cos(sa) * 12, endY + Math.sin(sa) * 12)
-      .stroke({ color: 0xaaaaaa, width: 3 });
+      .stroke({ color: theme.text.color, width: 3 });
 
     // Pivot
-    g.circle(baseX, baseY, 6).fill({ color: 0x444444 });
-    g.circle(baseX, baseY, 2).fill({ color: 0x888888 });
+    g.circle(baseX, baseY, 6).fill({ color: theme.border.color });
+    g.circle(baseX, baseY, 2).fill({ color: theme.textSecondary.color });
   }, [size, isPlaying]);
 
   return (
@@ -754,6 +759,7 @@ const PixiTurntable2D: React.FC<{
   width: number;
   height: number;
 }> = ({ deckId, deckColor, width: deckW, height: deckH }) => {
+  const theme = usePixiTheme();
   const isPlaying = useDJStore(s => s.decks[deckId].isPlaying);
   const trackName = useDJStore(s => s.decks[deckId].trackName);
   const pitchOffset = useDJStore(s => s.decks[deckId].pitchOffset);
@@ -858,19 +864,19 @@ const PixiTurntable2D: React.FC<{
     g.clear();
 
     // Deck chassis
-    g.roundRect(0, 0, deckW, deckH, 8).fill(0x1a1a1a).stroke({ color: 0x333333, width: 1 });
+    g.roundRect(0, 0, deckW, deckH, 8).fill({ color: theme.bgSecondary.color }).stroke({ color: theme.border.color, width: 1 });
 
     // Platter well
-    g.circle(platterCX, platterCY, platterR + 8).fill(0x111111);
+    g.circle(platterCX, platterCY, platterR + 8).fill({ color: theme.bgSecondary.color });
 
     // Platter
-    g.circle(platterCX, platterCY, platterR).fill(0x0a0a0a);
+    g.circle(platterCX, platterCY, platterR).fill({ color: theme.bg.color });
 
     // Vinyl grooves
     const labelR = platterR * 0.2;
     for (let r = platterR * 0.25; r < platterR * 0.95; r += 3) {
       const alpha = 0.12 + 0.06 * Math.sin(r * 0.5 + rotation * 0.3);
-      g.circle(platterCX, platterCY, r).stroke({ color: 0x1a1a1a, alpha, width: 0.5 });
+      g.circle(platterCX, platterCY, r).stroke({ color: theme.bgSecondary.color, alpha, width: 0.5 });
     }
 
     // Label area
@@ -891,15 +897,15 @@ const PixiTurntable2D: React.FC<{
     ).fill({ color: 0xffffff, alpha: playing ? 0.7 : 0.2 });
 
     // Spindle
-    g.circle(platterCX, platterCY, 3).fill(0x000000);
-    g.circle(platterCX, platterCY, 3).stroke({ color: 0x444444, width: 0.5 });
+    g.circle(platterCX, platterCY, 3).fill({ color: theme.bg.color });
+    g.circle(platterCX, platterCY, 3).stroke({ color: theme.border.color, width: 0.5 });
 
     // --- Tonearm ---
     const armPivotX = deckW * 0.78;
     const armPivotY = deckH * 0.1;
-    g.circle(armPivotX, armPivotY, 8).fill(0x444444);
+    g.circle(armPivotX, armPivotY, 8).fill({ color: theme.border.color });
     // Counterweight
-    g.circle(armPivotX + Math.cos(-0.5) * 18, armPivotY + Math.sin(-0.5) * 18, 5).fill(0x555555);
+    g.circle(armPivotX + Math.cos(-0.5) * 18, armPivotY + Math.sin(-0.5) * 18, 5).fill({ color: theme.textMuted.color });
 
     // Arm angle: sweeps inward when playing, parked when stopped
     const armAngle = playing ? Math.PI * 0.78 : Math.PI * 0.88;
@@ -908,38 +914,38 @@ const PixiTurntable2D: React.FC<{
     const armEndY = armPivotY + Math.sin(armAngle) * armLen;
 
     g.moveTo(armPivotX, armPivotY).lineTo(armEndX, armEndY)
-      .stroke({ color: 0x888888, width: 2 });
+      .stroke({ color: theme.textSecondary.color, width: 2 });
 
     // Headshell
     const headAngle = armAngle + 0.3;
     const headX = armEndX - Math.cos(headAngle) * 12;
     const headY = armEndY + Math.sin(headAngle) * 12;
     g.moveTo(armEndX, armEndY).lineTo(headX, headY)
-      .stroke({ color: 0xaaaaaa, width: 3 });
+      .stroke({ color: theme.text.color, width: 3 });
     // Stylus
     g.circle(headX, headY, 1.5).fill(0xffffff);
 
     // --- Pitch fader (right side) ---
     // Fader track
-    g.roundRect(faderX - 4, faderTop, 8, faderH, 4).fill(0x222222).stroke({ color: 0x444444, width: 0.5 });
+    g.roundRect(faderX - 4, faderTop, 8, faderH, 4).fill({ color: theme.bgTertiary.color }).stroke({ color: theme.border.color, width: 0.5 });
     // Center line (zero mark)
     const centerY = faderTop + faderH * 0.5;
-    g.moveTo(faderX - 6, centerY).lineTo(faderX + 6, centerY).stroke({ color: 0x666666, width: 1 });
+    g.moveTo(faderX - 6, centerY).lineTo(faderX + 6, centerY).stroke({ color: theme.textMuted.color, width: 1 });
     // Tick marks
     for (let i = 0; i <= 4; i++) {
       const y = faderTop + (i / 4) * faderH;
-      g.moveTo(faderX - 5, y).lineTo(faderX + 5, y).stroke({ color: 0x333333, width: 0.5 });
+      g.moveTo(faderX - 5, y).lineTo(faderX + 5, y).stroke({ color: theme.border.color, width: 0.5 });
     }
     // Fader knob
     const clampedFaderPos = Math.max(faderTop, Math.min(faderBottom, faderPos));
     g.roundRect(faderX - 8, clampedFaderPos - 5, 16, 10, 3)
-      .fill(0x888888).stroke({ color: 0xaaaaaa, width: 0.5 });
+      .fill({ color: theme.textSecondary.color }).stroke({ color: theme.text.color, width: 0.5 });
 
     // --- Controls row (bottom right) ---
     // Power button
     const pwrX = deckW * 0.76;
     const pwrY = deckH * 0.88;
-    g.circle(pwrX, pwrY, 9).fill(currentPower ? deckColor : 0x333333).stroke({ color: 0x555555, width: 1 });
+    g.circle(pwrX, pwrY, 9).fill(currentPower ? deckColor : 0x333333).stroke({ color: theme.textMuted.color, width: 1 });
     // Power symbol
     g.moveTo(pwrX, pwrY - 5).lineTo(pwrX, pwrY - 2).stroke({ color: 0xffffff, width: 1.5 });
     g.arc(pwrX, pwrY, 4, -Math.PI * 0.75, -Math.PI * 0.25).stroke({ color: 0xffffff, width: 1 });
@@ -947,7 +953,7 @@ const PixiTurntable2D: React.FC<{
     // RPM toggle
     const rpmX = deckW * 0.9;
     const rpmY = deckH * 0.88;
-    g.roundRect(rpmX - 14, rpmY - 7, 28, 14, 4).fill(0x222222).stroke({ color: 0x444444, width: 0.5 });
+    g.roundRect(rpmX - 14, rpmY - 7, 28, 14, 4).fill({ color: theme.bgTertiary.color }).stroke({ color: theme.border.color, width: 0.5 });
     const toggleX = currentRpm === 33 ? rpmX - 6 : rpmX + 6;
     g.circle(toggleX, rpmY, 4.5).fill(deckColor);
 

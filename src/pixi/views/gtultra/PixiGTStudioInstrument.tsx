@@ -12,6 +12,7 @@ import { PIXI_FONTS } from '@/pixi/fonts';
 import { MegaText, type GlyphLabel } from '@/pixi/utils/MegaText';
 import { useGTUltraStore } from '@/stores/useGTUltraStore';
 import { encodeAD, encodeSR, attackLabel, decayLabel, sustainLabel } from '@/lib/gtultra/GTVisualMapping';
+import { usePixiTheme } from '../../theme';
 
 // ── Colors (FT2 neutral dark theme) ──
 const C_BG       = 0x0d0d0d;
@@ -40,6 +41,7 @@ interface Props {
 }
 
 export const PixiGTStudioInstrument: React.FC<Props> = ({ width, height }) => {
+  const theme = usePixiTheme();
   const containerRef = useRef<any>(null);
   const bgRef = useRef<GraphicsType>(null);
   const envRef = useRef<GraphicsType>(null);
@@ -211,7 +213,7 @@ export const PixiGTStudioInstrument: React.FC<Props> = ({ width, height }) => {
     labels.push({ x: pad, y: pad, text: `#${currentInstrument.toString(16).padStart(2, '0').toUpperCase()} ${name}`, color: C_HEADER, fontFamily: ff });
 
     // ── ADSR Envelope visualization ──
-    bg.rect(pad, envY, envW, envH).fill({ color: 0x0a0a1a });
+    bg.rect(pad, envY, envW, envH).fill({ color: theme.bg.color });
     bg.rect(pad, envY, envW, envH).stroke({ color: C_BORDER, width: 1 });
 
     const pts = getEnvPoints();

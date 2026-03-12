@@ -446,7 +446,7 @@ export const PixiDJModlandBrowser: React.FC<PixiDJModlandBrowserProps> = ({
                   g.clear();
                   g.rect(0, 0, contentW - 8, ROW_H);
                   if (isSelected) {
-                    g.fill({ color: 0x166534, alpha: 0.3 });
+                    g.fill({ color: theme.success.color, alpha: 0.3 });
                   } else if (isHovered) {
                     g.fill({ color: theme.bgHover.color });
                   } else {

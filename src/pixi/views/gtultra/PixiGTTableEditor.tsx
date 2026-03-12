@@ -8,6 +8,7 @@ import type { Graphics as GraphicsType } from 'pixi.js';
 import { PIXI_FONTS } from '@/pixi/fonts';
 import { MegaText, type GlyphLabel } from '@/pixi/utils/MegaText';
 import { useGTUltraStore } from '@/stores/useGTUltraStore';
+import { usePixiTheme } from '../../theme';
 
 type TableType = 'wave' | 'pulse' | 'filter' | 'speed';
 const TABLE_TYPES: TableType[] = ['wave', 'pulse', 'filter', 'speed'];
@@ -32,6 +33,7 @@ const TABLE_COLORS: Record<TableType, number> = { wave: C_WAVE, pulse: C_PULSE, 
 interface Props { width: number; height: number }
 
 export const PixiGTTableEditor: React.FC<Props> = ({ width, height }) => {
+  const theme = usePixiTheme();
   const [activeTable, setActiveTable] = useState<TableType>('wave');
   const gridRef = useRef<GraphicsType>(null);
   const megaRef = useRef<MegaText | null>(null);
@@ -98,7 +100,7 @@ export const PixiGTTableEditor: React.FC<Props> = ({ width, height }) => {
       const isCursor = idx === tableCursor;
 
       if (isCursor) {
-        g.rect(0, y, width, ROW_H).fill({ color: 0x1a1a1a });
+        g.rect(0, y, width, ROW_H).fill({ color: theme.bgSecondary.color });
         g.rect(0, y, 2, ROW_H).fill({ color: C_CURSOR });
       }
 

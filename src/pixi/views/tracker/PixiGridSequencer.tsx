@@ -205,7 +205,7 @@ export const PixiGridSequencer: React.FC<PixiGridSequencerProps> = ({
 
       if (isCurrentDiscrete) {
         g.rect(x, 0, cellSize, HEADER_HEIGHT);
-        g.fill({ color: 0xef4444, alpha: 0.6 });
+        g.fill({ color: theme.error.color, alpha: 0.6 });
       }
 
       // Beat marker emphasis
@@ -263,10 +263,10 @@ export const PixiGridSequencer: React.FC<PixiGridSequencerProps> = ({
           // Octave indicator rings
           if (step?.octaveShift === 1) {
             g.roundRect(x + 1, y + 2, cellSize - 2, ROW_HEIGHT - 4, 2);
-            g.stroke({ color: 0x22d3ee, width: 1.5, alpha: 0.6 }); // cyan
+            g.stroke({ color: theme.accentHighlight.color, width: 1.5, alpha: 0.6 }); // cyan
           } else if (step?.octaveShift === -1) {
             g.roundRect(x + 1, y + 2, cellSize - 2, ROW_HEIGHT - 4, 2);
-            g.stroke({ color: 0xec4899, width: 1.5, alpha: 0.6 }); // pink
+            g.stroke({ color: theme.error.color, width: 1.5, alpha: 0.6 }); // pink
           }
 
           // Mute indicator
@@ -275,13 +275,13 @@ export const PixiGridSequencer: React.FC<PixiGridSequencerProps> = ({
             g.lineTo(x + cellSize - 2, y + ROW_HEIGHT - 2);
             g.moveTo(x + cellSize - 2, y + 2);
             g.lineTo(x + 2, y + ROW_HEIGHT - 2);
-            g.stroke({ color: 0xff4444, width: 1, alpha: 0.7 });
+            g.stroke({ color: theme.error.color, width: 1, alpha: 0.7 });
           }
 
           // Hammer indicator
           if (step?.hammer) {
             g.rect(x + 2, y + ROW_HEIGHT - 5, cellSize - 4, 2);
-            g.fill({ color: 0x22d3ee, alpha: 0.8 });
+            g.fill({ color: theme.accentHighlight.color, alpha: 0.8 });
           }
         } else {
           // Empty cell
@@ -292,13 +292,13 @@ export const PixiGridSequencer: React.FC<PixiGridSequencerProps> = ({
         // Current step playback highlight
         if (isCurrentDiscrete) {
           g.roundRect(x, y + 1, cellSize, ROW_HEIGHT - 2, 2);
-          g.fill({ color: 0xef4444, alpha: isActive ? 0.5 : 0.15 });
+          g.fill({ color: theme.error.color, alpha: isActive ? 0.5 : 0.15 });
         }
 
         // Trail
         if (trailOpacity > 0 && !isCurrentDiscrete) {
           g.roundRect(x, y + 1, cellSize, ROW_HEIGHT - 2, 2);
-          g.fill({ color: 0xef4444, alpha: trailOpacity * 0.12 });
+          g.fill({ color: theme.error.color, alpha: trailOpacity * 0.12 });
         }
 
         // Focus outline

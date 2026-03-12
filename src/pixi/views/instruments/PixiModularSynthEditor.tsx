@@ -529,6 +529,7 @@ interface CanvasViewProps {
 }
 
 const CanvasView: React.FC<CanvasViewProps> = ({ modules, connections, width, height, wiring, selectedModule, onSelect, onPort, onParam, onRemove, onUpdateModules }) => {
+  const theme = usePixiTheme();
   const [canvasOffset, setCanvasOffset] = useState({ x: 0, y: 0 });
   const [canvasZoom, setCanvasZoom] = useState(1);
   const isPanningRef = useRef(false);
@@ -649,24 +650,24 @@ const CanvasView: React.FC<CanvasViewProps> = ({ modules, connections, width, he
     for (let x = ox; x < width; x += gridSize) {
       const worldX = (x - canvasOffset.x) / canvasZoom;
       const isMajor = Math.abs(Math.round(worldX / baseGrid) % majorEvery) === 0;
-      if (!isMajor) g.moveTo(x, 0).lineTo(x, height).stroke({ color: 0x222222, width: 0.5 });
+      if (!isMajor) g.moveTo(x, 0).lineTo(x, height).stroke({ color: theme.bgTertiary.color, width: 0.5 });
     }
     for (let y = oy; y < height; y += gridSize) {
       const worldY = (y - canvasOffset.y) / canvasZoom;
       const isMajor = Math.abs(Math.round(worldY / baseGrid) % majorEvery) === 0;
-      if (!isMajor) g.moveTo(0, y).lineTo(width, y).stroke({ color: 0x222222, width: 0.5 });
+      if (!isMajor) g.moveTo(0, y).lineTo(width, y).stroke({ color: theme.bgTertiary.color, width: 0.5 });
     }
     // Major grid lines
     for (let x = ox; x < width; x += gridSize) {
       const worldX = (x - canvasOffset.x) / canvasZoom;
       if (Math.abs(Math.round(worldX / baseGrid) % majorEvery) === 0) {
-        g.moveTo(x, 0).lineTo(x, height).stroke({ color: 0x333333, width: 1 });
+        g.moveTo(x, 0).lineTo(x, height).stroke({ color: theme.border.color, width: 1 });
       }
     }
     for (let y = oy; y < height; y += gridSize) {
       const worldY = (y - canvasOffset.y) / canvasZoom;
       if (Math.abs(Math.round(worldY / baseGrid) % majorEvery) === 0) {
-        g.moveTo(0, y).lineTo(width, y).stroke({ color: 0x333333, width: 1 });
+        g.moveTo(0, y).lineTo(width, y).stroke({ color: theme.border.color, width: 1 });
       }
     }
   }, [canvasOffset, canvasZoom, width, height]);

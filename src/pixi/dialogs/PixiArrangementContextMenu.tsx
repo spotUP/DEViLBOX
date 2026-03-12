@@ -194,7 +194,7 @@ export const PixiArrangementContextMenu: React.FC = () => {
   const drawBackdrop = (g: GraphicsType) => {
     g.clear();
     g.rect(0, 0, screenW, screenH);
-    g.fill({ color: 0x000000, alpha: 0.15 });
+    g.fill({ color: theme.bg.color, alpha: 0.15 });
   };
 
   const handleBackdropClick = (_e: FederatedPointerEvent) => {
