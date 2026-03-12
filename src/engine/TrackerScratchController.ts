@@ -469,7 +469,7 @@ export class TrackerScratchController {
       this.scratchStartPattern = ts.currentPatternIndex;
     }
     this.scratchRowOffset = 0;
-    const patterns = useTrackerStore.getState().song?.patterns;
+    const patterns = useTrackerStore.getState().patterns;
     this.scratchPatternLength = (patterns && patterns[this.scratchStartPattern]?.length) || 64;
 
     // Store and enable smooth scrolling for scratch mode
