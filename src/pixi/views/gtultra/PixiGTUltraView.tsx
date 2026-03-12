@@ -17,6 +17,7 @@ import React, { useCallback, useEffect, useMemo } from 'react';
 import type { Graphics as GraphicsType } from 'pixi.js';
 import * as Tone from 'tone';
 import { PIXI_FONTS } from '@/pixi/fonts';
+import { usePixiTheme } from '@/pixi/theme';
 import { PixiButton } from '@/pixi/components/PixiButton';
 import { PixiGTPatternGrid } from './PixiGTPatternGrid';
 import { PixiGTOrderList } from './PixiGTOrderList';
@@ -49,6 +50,7 @@ interface Props {
 }
 
 export const PixiGTUltraView: React.FC<Props> = ({ width, height }) => {
+  const theme = usePixiTheme();
   const playing = useGTUltraStore((s) => s.playing);
   const songName = useGTUltraStore((s) => s.songName);
   const songAuthor = useGTUltraStore((s) => s.songAuthor);
@@ -294,7 +296,7 @@ export const PixiGTUltraView: React.FC<Props> = ({ width, height }) => {
         <pixiContainer eventMode="static" cursor="pointer" onPointerUp={() => cycleOctave(-1)}>
           <pixiBitmapText eventMode="none" text="-" style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }} tint={GT_TEXT_DIM} />
         </pixiContainer>
-        <pixiBitmapText text={octaveText} style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }} tint={0xe0e0e0} />
+        <pixiBitmapText text={octaveText} style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }} tint={theme.textSecondary.color} />
         <pixiContainer eventMode="static" cursor="pointer" onPointerUp={() => cycleOctave(1)}>
           <pixiBitmapText eventMode="none" text="+" style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }} tint={GT_TEXT_DIM} />
         </pixiContainer>
@@ -303,7 +305,7 @@ export const PixiGTUltraView: React.FC<Props> = ({ width, height }) => {
         <pixiContainer eventMode="static" cursor="pointer" onPointerUp={() => cycleStep(-1)}>
           <pixiBitmapText eventMode="none" text="-" style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }} tint={GT_TEXT_DIM} />
         </pixiContainer>
-        <pixiBitmapText text={stepText} style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }} tint={0xe0e0e0} />
+        <pixiBitmapText text={stepText} style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }} tint={theme.textSecondary.color} />
         <pixiContainer eventMode="static" cursor="pointer" onPointerUp={() => cycleStep(1)}>
           <pixiBitmapText eventMode="none" text="+" style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }} tint={GT_TEXT_DIM} />
         </pixiContainer>

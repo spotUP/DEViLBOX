@@ -85,7 +85,7 @@ interface Props {
 }
 
 export const PixiMusicLinePatternViewer: React.FC<Props> = ({ width, height }) => {
-  usePixiTheme(); // subscribe to theme (unused colors kept for future theming parity)
+  const theme = usePixiTheme(); // subscribe to theme (unused colors kept for future theming parity)
 
   const channelTrackTables = useFormatStore((s) => s.channelTrackTables);
   const patterns = useTrackerStore((s) => s.patterns);
@@ -327,7 +327,7 @@ export const PixiMusicLinePatternViewer: React.FC<Props> = ({ width, height }) =
         <pixiBitmapText
           text="No channel data"
           style={{ fontFamily: PIXI_FONTS.MONO, fontSize: FONT_SIZE, fill: 0xffffff }}
-          tint={0x555555}
+          tint={theme.textMuted.color}
           x={8}
           y={8}
         />
