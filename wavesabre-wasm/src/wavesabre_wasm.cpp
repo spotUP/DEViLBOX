@@ -37,11 +37,18 @@ struct SynthWrapper {
 static float globalSampleRate = 44100.0f;
 static float dummyInput[256] = {0};
 
-// Initialize sample rate
+static bool g_helpersInitialized = false;
+
+// Initialize sample rate and lookup tables
 EXPORT void wavesabre_set_sample_rate(float sr) {
     globalSampleRate = sr;
-    // WaveSabre uses a global Helpers::CurrentSampleRate
     Helpers::CurrentSampleRate = sr;
+    
+    // Initialize the FastSin lookup table (required before any synth can produce audio)
+    if (!g_helpersInitialized) {
+        Helpers::Init();
+        g_helpersInitialized = true;
+    }
 }
 
 EXPORT void* wavesabre_create_falcon() {
@@ -97,11 +104,11 @@ EXPORT float wavesabre_get_param(void* ptr, int index) {
     return 0.0f;
 }
 
-EXPORT void wavesabre_note_on(void* ptr, int note, int velocity, float detune) {
+EXPORT void wavesabre_note_on(void* ptr, int note, int velocity, int deltaSamples) {
     auto wrapper = static_cast<SynthWrapper*>(ptr);
     if (wrapper && wrapper->device) {
         auto synthDevice = static_cast<SynthDevice*>(wrapper->device);
-        synthDevice->NoteOn(note, velocity, detune);
+        synthDevice->NoteOn(note, velocity, deltaSamples);
     }
 }
 
@@ -117,10 +124,8 @@ EXPORT void wavesabre_render(void* ptr, float* outputL, float* outputR, int numS
     auto wrapper = static_cast<SynthWrapper*>(ptr);
     if (wrapper && wrapper->device) {
         float* outputs[2] = { outputL, outputR };
-        // Clear output first
         memset(outputL, 0, numSamples * sizeof(float));
         memset(outputR, 0, numSamples * sizeof(float));
-        // Run() takes inputs, outputs, numSamples
         wrapper->device->Run(0.0, wrapper->inputBuffer, outputs, numSamples);
     }
 }
