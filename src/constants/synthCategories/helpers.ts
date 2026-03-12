@@ -18,7 +18,7 @@ export function getCategoryForSynth(synthType: SynthType): SynthCategory | undef
 }
 
 // Helper to get synth info (returns fallback for unknown types)
-const UNKNOWN_SYNTH_INFO: SynthInfo = { type: 'Synth' as any, name: 'Unknown', shortName: '???', description: '', bestFor: [], icon: 'Music2', color: 'text-gray-400' };
+const UNKNOWN_SYNTH_INFO: SynthInfo = { type: 'Synth' as any, name: 'Unknown', shortName: '???', description: '', bestFor: [], icon: 'Music2', color: 'text-text-secondary' };
 export function getSynthInfo(synthType: SynthType): SynthInfo {
   return SYNTH_INFO[synthType] ?? UNKNOWN_SYNTH_INFO;
 }
@@ -47,6 +47,9 @@ const TAILWIND_HEX: Record<string, string> = {
   'text-slate-300': '#cbd5e1', 'text-slate-400': '#94a3b8',
   'text-stone-300': '#d6d3d1', 'text-stone-400': '#a8a29e',
   'text-white': '#ffffff',
+  // Design system token aliases
+  'text-text-primary': '#f2f0f0', 'text-text-secondary': '#a8a0a0', 'text-text-muted': '#686060',
+  'text-accent-highlight': '#22d3ee',
 };
 
 export function tailwindToHex(twClass: string): string {

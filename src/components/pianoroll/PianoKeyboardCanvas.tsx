@@ -25,8 +25,8 @@ function snapshotKeyboardColors(el: HTMLElement): KeyboardColors {
     blackKeyDimmed: '#1a1a1c',
     activeKey: accent,
     divider: '#888',
-    dividerLight: '#333',
-    labelDark: '#333',
+    dividerLight: 'var(--color-border-light)',
+    labelDark: 'var(--color-border-light)',
     labelLight: '#888',
   };
 }

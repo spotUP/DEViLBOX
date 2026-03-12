@@ -22,7 +22,7 @@ const ACTION_TYPE_BG_COLORS: Record<string, string> = {
   'text-red-400': 'bg-red-400',
   'text-purple-400': 'bg-purple-400',
   'text-orange-400': 'bg-orange-400',
-  'text-cyan-400': 'bg-cyan-400',
+  'text-accent-highlight': 'bg-accent-highlight',
   'text-neutral-400': 'bg-neutral-400',
 };
 

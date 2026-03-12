@@ -2811,11 +2811,16 @@ struct V2Synth
         if (cmd[1] != 0) // velocity==0 is actually a note off
         {
           COVER("MIDI note on");
+          printf("[V2 core] NoteOn received: note=%d vel=%d chan=%d pgm=%d\n", cmd[0], cmd[1], chan, chans[chan].pgm);
           if (chan == CHANS-1)
             ronanCBNoteOn(&ronan);
 
           // calculate current polyphony for this channel
           const V2Sound *sound = getpatch(chans[chan].pgm);
+          printf("[V2 core] Patch maxpoly=%d modnum=%d first_voice_bytes: %d %d %d %d %d %d\n", 
+                 sound->maxpoly, sound->modnum, 
+                 sound->voice[0], sound->voice[1], sound->voice[2], 
+                 sound->voice[3], sound->voice[4], sound->voice[5]);
           sInt npoly = 0;
           for (sInt i=0; i < POLY; i++)
             npoly += (chanmap[i] == chan);

@@ -184,12 +184,12 @@ const PianoRollGridComponent: React.FC<PianoRollGridProps> = ({
           key={`v-${row}`}
           className={`absolute top-0 bottom-0 ${
             beyondPattern
-              ? 'bg-gray-700/20'
+              ? 'bg-dark-bgHover/20'
               : isMeasure
-              ? 'bg-gray-500/50'
+              ? 'bg-dark-bgActive/50'
               : isBeat
-              ? 'bg-gray-600/40'
-              : 'bg-gray-700/30'
+              ? 'bg-dark-bgActive/40'
+              : 'bg-dark-bgHover/30'
           }`}
           style={{ left: x, width: 1 }}
         />
@@ -212,9 +212,9 @@ const PianoRollGridComponent: React.FC<PianoRollGridProps> = ({
           key={`h-${midiNote}`}
           className={`absolute left-0 ${
             outOfScale
-              ? 'bg-gray-900/70'
-              : black ? 'bg-gray-800/50' : 'bg-gray-900/30'
-          } ${isC ? 'border-t border-gray-500/50' : ''}`}
+              ? 'bg-dark-bgSecondary/70'
+              : black ? 'bg-dark-bgTertiary/50' : 'bg-dark-bgSecondary/30'
+          } ${isC ? 'border-t border-dark-borderLight/50' : ''}`}
           style={{
             top: y,
             height: verticalZoom,
@@ -260,7 +260,7 @@ const PianoRollGridComponent: React.FC<PianoRollGridProps> = ({
   return (
     <div
       ref={containerRef}
-      className={`flex-1 w-full h-full relative overflow-hidden bg-gray-900 ${cursorStyle}`}
+      className={`flex-1 w-full h-full relative overflow-hidden bg-dark-bgSecondary ${cursorStyle}`}
       onWheel={handleWheel}
       onClick={handleGridClick}
       onContextMenu={handleContextMenu}

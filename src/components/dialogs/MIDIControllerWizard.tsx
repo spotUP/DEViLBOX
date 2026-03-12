@@ -234,7 +234,7 @@ export const MIDIControllerWizard: React.FC = () => {
                 className={`w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-semibold rounded-lg transition-colors ${
                   initializing
                     ? 'bg-dark-bgSecondary text-text-muted cursor-wait'
-                    : 'bg-purple-600 hover:bg-purple-500 text-white'
+                    : 'bg-purple-600 hover:bg-purple-500 text-text-primary'
                 }`}
               >
                 {initializing ? (
@@ -336,7 +336,7 @@ export const MIDIControllerWizard: React.FC = () => {
                 disabled={!chosenInputId}
                 className={`w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-semibold rounded-lg transition-colors ${
                   chosenInputId
-                    ? 'bg-purple-600 hover:bg-purple-500 text-white'
+                    ? 'bg-purple-600 hover:bg-purple-500 text-text-primary'
                     : 'bg-dark-bgSecondary text-text-muted cursor-not-allowed'
                 }`}
               >
@@ -432,7 +432,7 @@ export const MIDIControllerWizard: React.FC = () => {
 
               <button
                 onClick={() => setStep('done')}
-                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-purple-600 hover:bg-purple-500 text-white text-sm font-semibold rounded-lg transition-colors"
+                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-purple-600 hover:bg-purple-500 text-text-primary text-sm font-semibold rounded-lg transition-colors"
               >
                 {matchedProfile ? 'Apply Profile & Finish' : 'Continue with Generic'}
                 <ChevronRight size={16} />
@@ -488,7 +488,7 @@ export const MIDIControllerWizard: React.FC = () => {
 
               <button
                 onClick={handleFinish}
-                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-green-600 hover:bg-green-500 text-white text-sm font-semibold rounded-lg transition-colors"
+                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-green-600 hover:bg-green-500 text-text-primary text-sm font-semibold rounded-lg transition-colors"
               >
                 <Check size={16} />
                 Done — Start Playing

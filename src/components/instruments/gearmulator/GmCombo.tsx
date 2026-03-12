@@ -81,7 +81,7 @@ export const GmCombo: React.FC<GmComboProps> = ({
           top: '100%',
           left: 0,
           zIndex: 1000,
-          background: '#1a1a1a',
+          background: 'var(--color-bg-tertiary)',
           border: '1px solid #555',
           maxHeight: 200,
           overflowY: 'auto',

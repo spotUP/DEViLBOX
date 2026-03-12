@@ -68,12 +68,12 @@ export const InstrumentEditorPopout: React.FC = () => {
     return (
       <div
         className="flex items-center justify-center h-screen"
-        style={{ background: '#0b0909', color: '#f2f0f0' }}
+        style={{ background: 'var(--color-bg)', color: 'var(--color-text)' }}
       >
         <div className="text-center">
-          <LucideIcons.Music2 size={48} className="mx-auto mb-4 opacity-50 text-gray-500" />
-          <p className="text-gray-400 mb-2">No instrument selected</p>
-          <p className="text-gray-500 text-sm">Select an instrument in the main window</p>
+          <LucideIcons.Music2 size={48} className="mx-auto mb-4 opacity-50 text-text-muted" />
+          <p className="text-text-secondary mb-2">No instrument selected</p>
+          <p className="text-text-muted text-sm">Select an instrument in the main window</p>
         </div>
       </div>
     );

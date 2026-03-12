@@ -177,7 +177,7 @@ export const SurgeControls: React.FC<SurgeControlsProps> = ({
   if (!synthReady) {
     return (
       <div className="flex flex-col gap-4 p-4">
-        <div className="flex items-center justify-center gap-2 p-4 text-gray-400">
+        <div className="flex items-center justify-center gap-2 p-4 text-text-secondary">
           <Loader size={16} className="animate-spin" />
           <span className="text-sm">Loading Surge XT...</span>
         </div>
@@ -187,7 +187,7 @@ export const SurgeControls: React.FC<SurgeControlsProps> = ({
   }
 
   const panelBg = isCyanTheme
-    ? 'bg-[#051515] border-cyan-900/50'
+    ? 'bg-[#051515] border-accent-highlight/20'
     : 'bg-[#1a1a1a] border-orange-900/30';
 
   const tabBarBg = isCyanTheme ? 'bg-[#061818]' : 'bg-[#111]';
@@ -195,7 +195,7 @@ export const SurgeControls: React.FC<SurgeControlsProps> = ({
   return (
     <div className="synth-controls-flow flex flex-col gap-0 overflow-y-auto">
       {/* Scene selector + Tab bar */}
-      <div className={`flex items-center gap-3 px-4 py-2 ${tabBarBg} border-b border-gray-800`}>
+      <div className={`flex items-center gap-3 px-4 py-2 ${tabBarBg} border-b border-dark-border`}>
         {/* Scene buttons */}
         <div className="flex gap-1">
           {(['A', 'B'] as Scene[]).map(scene => (
@@ -205,7 +205,7 @@ export const SurgeControls: React.FC<SurgeControlsProps> = ({
               className={`px-3 py-1.5 text-xs font-bold rounded transition-all ${
                 activeScene === scene
                   ? 'text-black'
-                  : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+                  : 'bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover'
               }`}
               style={activeScene === scene ? { backgroundColor: accentColor } : {}}
             >
@@ -214,7 +214,7 @@ export const SurgeControls: React.FC<SurgeControlsProps> = ({
           ))}
         </div>
 
-        <div className="w-px h-6 bg-gray-700" />
+        <div className="w-px h-6 bg-dark-bgHover" />
 
         {/* Tab buttons */}
         <div className="flex gap-1">
@@ -225,7 +225,7 @@ export const SurgeControls: React.FC<SurgeControlsProps> = ({
               className={`px-3 py-1.5 text-xs font-bold rounded transition-all ${
                 activeTab === tab.id
                   ? 'text-black'
-                  : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+                  : 'bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover'
               }`}
               style={activeTab === tab.id ? { backgroundColor: accentColor } : {}}
             >
@@ -441,7 +441,7 @@ const SurgeLfoTab: React.FC<SurgeLfoTabProps> = ({
             className={`px-2 py-1 text-[10px] font-bold rounded transition-all ${
               activeLfo === i + 1
                 ? 'text-black'
-                : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+                : 'bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover'
             }`}
             style={activeLfo === i + 1 ? { backgroundColor: accentColor } : {}}
           >
@@ -507,7 +507,7 @@ const SurgeFxTab: React.FC<SurgeFxTabProps> = ({
     if (fxParams.length === 0) {
       return (
         <div className={`p-4 rounded-xl border ${panelBg}`}>
-          <p className="text-sm text-gray-500">No FX parameters available.</p>
+          <p className="text-sm text-text-muted">No FX parameters available.</p>
         </div>
       );
     }
@@ -588,7 +588,7 @@ const SurgeOtherTab: React.FC<SurgeOtherTabProps> = ({
   if (uncategorized.length === 0) {
     return (
       <div className={`p-4 rounded-xl border ${panelBg}`}>
-        <p className="text-sm text-gray-500">All parameters are shown in the categorized tabs.</p>
+        <p className="text-sm text-text-muted">All parameters are shown in the categorized tabs.</p>
       </div>
     );
   }
@@ -605,7 +605,7 @@ const SurgeOtherTab: React.FC<SurgeOtherTabProps> = ({
   return (
     <>
       <div className={`p-3 rounded-lg border ${panelBg}`}>
-        <p className="text-xs text-gray-500 mb-1">
+        <p className="text-xs text-text-muted mb-1">
           {uncategorized.length} additional parameters not shown in other tabs
         </p>
       </div>

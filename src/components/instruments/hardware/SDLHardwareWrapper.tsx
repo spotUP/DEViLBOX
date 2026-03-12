@@ -461,7 +461,7 @@ export const SDLHardwareWrapper: React.FC<SDLHardwareWrapperProps> = ({
         {/* Loading overlay — shown while WASM initializes, hiding the black canvas underneath */}
         {!loaded && !error && (
           <div
-            className="absolute inset-0 flex items-center justify-center text-gray-500 text-xs"
+            className="absolute inset-0 flex items-center justify-center text-text-muted text-xs"
             style={{ pointerEvents: 'none' }}
           >
             Loading hardware UI…

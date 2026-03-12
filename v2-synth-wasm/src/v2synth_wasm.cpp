@@ -9,6 +9,7 @@
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
+#include <cstdio>
 
 // V2 synth core
 extern "C" {
@@ -24,6 +25,12 @@ extern "C" {
 
 // Include sdInit from sounddef
 extern void sdInit();
+
+// External sounddef state we need access to
+extern unsigned char *soundmem;  // Raw patch memory
+// v2soundsize calculated at compile time in sounddef.h, we can hardcode for WASM:
+// v2soundsize = v2nparms + 1 + 255*3 = ~115 params + 1 + 765 = ~881 bytes per patch
+// But more importantly, we need to know the offset: 128*sizeof(void*) bytes into soundmem
 
 // Global synth state
 static void* g_synth = nullptr;
@@ -56,7 +63,7 @@ int v2synth_init(uint32_t sampleRate) {
         return 1; // Already initialized
     }
     
-    // Initialize sounddef tables
+    // Initialize sounddef tables - this allocates soundmem and fills with v2initsnd
     sdInit();
     
     g_sampleRate = sampleRate;
@@ -69,18 +76,24 @@ int v2synth_init(uint32_t sampleRate) {
     }
     memset(g_synth, 0, size);
     
-    // Allocate default patchmap (128 patches × patch size)
-    // For now, allocate empty - will be filled by v2synth_load_patch
-    g_patchmap = (uint8_t*)malloc(128 * 256); // Conservative estimate
-    if (!g_patchmap) {
-        free(g_synth);
-        g_synth = nullptr;
-        return -1;
-    }
-    memset(g_patchmap, 0, 128 * 256);
+    // Use the full patchmap from sounddef (starts with offsets array)
+    // sdInit() allocates soundmem with structure:
+    //   [0..128*sizeof(long)-1]: patch offset table (patchoffsets)
+    //   [128*sizeof(long)..]: raw patch data (129 patches × v2soundsize)
+    // The synth's V2PatchMap expects: offsets[] + raw_data[] at same address
+    g_patchmap = soundmem;
     
     // Initialize synth with patchmap
     synthInit(g_synth, g_patchmap, sampleRate);
+    
+    // Debug: show first patch offset and data
+    long *offsets = (long*)soundmem;
+    uint8_t* patchData = soundmem + offsets[0];  // Patch 0 starts at this offset
+    
+    printf("[V2] Init complete, soundmem=%p offset[0]=%ld\n", soundmem, offsets[0]);
+    printf("[V2] Patch 0 bytes: %d %d %d %d %d %d\n", 
+           patchData[0], patchData[1], patchData[2], 
+           patchData[3], patchData[4], patchData[5]);
     
     g_initialized = true;
     return 0;
@@ -95,10 +108,8 @@ void v2synth_shutdown() {
         free(g_synth);
         g_synth = nullptr;
     }
-    if (g_patchmap) {
-        free(g_patchmap);
-        g_patchmap = nullptr;
-    }
+    // g_patchmap points into soundmem (managed by sounddef), don't free it
+    g_patchmap = nullptr;
     g_initialized = false;
 }
 
@@ -155,6 +166,8 @@ void v2synth_note_on(int channel, int note, int velocity) {
     g_midiBuffer[2] = velocity & 0x7F;
     g_midiBuffer[3] = 0xFD; // End marker
     
+    printf("[V2] NoteOn ch=%d note=%d vel=%d\n", channel, note, velocity);
+    
     synthProcessMIDI(g_synth, g_midiBuffer);
 }
 
@@ -193,6 +206,8 @@ void v2synth_control_change(int channel, int cc, int value) {
     g_midiBuffer[1] = cc & 0x7F;
     g_midiBuffer[2] = value & 0x7F;
     g_midiBuffer[3] = 0xFD; // End marker
+    
+    printf("[V2] CC ch=%d cc=%d val=%d\n", channel, cc, value);
     
     synthProcessMIDI(g_synth, g_midiBuffer);
 }
@@ -248,6 +263,14 @@ void v2synth_render(float* buffer, uint32_t numSamples) {
     }
     
     synthRender(g_synth, buffer, numSamples, nullptr, 0);
+    
+    // Debug: check first few samples
+    float maxSample = 0;
+    for (uint32_t i = 0; i < numSamples * 2 && i < 200; i++) {
+        float absVal = buffer[i] < 0 ? -buffer[i] : buffer[i];
+        if (absVal > maxSample) maxSample = absVal;
+    }
+    printf("[V2] Render %d samples, first200 max=%.6f\n", numSamples, maxSample);
 }
 
 /**

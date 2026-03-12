@@ -69,7 +69,7 @@ export const InstrumentLevelMeter: React.FC<InstrumentLevelMeterProps> = ({
   colorLow = '#22c55e',
   colorMid = '#eab308',
   colorHigh = '#ef4444',
-  backgroundColor = '#1a1a1a',
+  backgroundColor = 'var(--color-bg-tertiary)',
   className = '',
 }) => {
   // Default dimensions based on orientation
@@ -194,7 +194,7 @@ export const InstrumentLevelMeter: React.FC<InstrumentLevelMeterProps> = ({
           }
         } else {
           // Dim segment
-          ctx.fillStyle = '#333';
+          ctx.fillStyle = 'var(--color-border-light)';
           ctx.globalAlpha = 0.3;
           ctx.beginPath();
           ctx.roundRect(x, y, w, h, 1);

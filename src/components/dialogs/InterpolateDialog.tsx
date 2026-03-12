@@ -149,7 +149,7 @@ export const InterpolateDialog: React.FC<InterpolateDialogProps> = ({ isOpen, on
                 onClick={() => setCurve(opt.value)}
                 className={`px-2 py-1.5 text-xs rounded border transition-colors ${
                   curve === opt.value
-                    ? 'bg-accent-primary border-accent-primary text-white'
+                    ? 'bg-accent-primary border-accent-primary text-text-primary'
                     : 'bg-dark-bg border-dark-border text-text-secondary hover:border-text-muted'
                 }`}
                 title={opt.description}

@@ -80,7 +80,7 @@ export const CircularVU: React.FC<CircularVUProps> = ({ height = 100 }) => {
       }
 
       // Draw outer ring
-      ctx.strokeStyle = '#333';
+      ctx.strokeStyle = 'var(--color-border-light)';
       ctx.lineWidth = 2;
       ctx.beginPath();
       ctx.arc(centerX, centerY, maxRadius, 0, Math.PI * 2);
@@ -104,7 +104,7 @@ export const CircularVU: React.FC<CircularVUProps> = ({ height = 100 }) => {
       }
 
       // Draw center dot
-      ctx.fillStyle = level > 0.5 ? '#00ffff' : '#333';
+      ctx.fillStyle = level > 0.5 ? '#00ffff' : 'var(--color-border-light)';
       ctx.beginPath();
       ctx.arc(centerX, centerY, 4, 0, Math.PI * 2);
       ctx.fill();

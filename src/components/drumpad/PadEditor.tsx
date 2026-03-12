@@ -165,7 +165,7 @@ export const PadEditor: React.FC<PadEditorProps> = ({ padId, onClose }) => {
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-dark-border">
         <div>
-          <div className="text-sm font-bold text-white">Pad {pad.id}: {pad.name}</div>
+          <div className="text-sm font-bold text-text-primary">Pad {pad.id}: {pad.name}</div>
           <div className="text-xs text-text-muted">
             {pad.sample ? 'Sample loaded' : 'No sample'}
           </div>
@@ -173,7 +173,7 @@ export const PadEditor: React.FC<PadEditorProps> = ({ padId, onClose }) => {
         <div className="flex items-center gap-2">
           <button
             onClick={() => copyPad(padId)}
-            className="px-2 py-1 text-[10px] font-mono text-text-muted hover:text-white bg-dark-surface border border-dark-border rounded transition-colors"
+            className="px-2 py-1 text-[10px] font-mono text-text-muted hover:text-text-primary bg-dark-surface border border-dark-border rounded transition-colors"
             title="Copy pad settings"
           >
             Copy
@@ -183,7 +183,7 @@ export const PadEditor: React.FC<PadEditorProps> = ({ padId, onClose }) => {
             disabled={!clipboardPad}
             className={`px-2 py-1 text-[10px] font-mono rounded transition-colors ${
               clipboardPad
-                ? 'text-text-muted hover:text-white bg-dark-surface border border-dark-border'
+                ? 'text-text-muted hover:text-text-primary bg-dark-surface border border-dark-border'
                 : 'text-text-muted/30 bg-dark-surface/50 border border-dark-border/50 cursor-not-allowed'
             }`}
             title={clipboardPad ? `Paste from Pad ${clipboardPad.id}` : 'Nothing to paste'}
@@ -193,7 +193,7 @@ export const PadEditor: React.FC<PadEditorProps> = ({ padId, onClose }) => {
           {onClose && (
             <button
               onClick={onClose}
-              className="text-xs text-text-muted hover:text-white"
+              className="text-xs text-text-muted hover:text-text-primary"
             >
               Close
             </button>
@@ -211,7 +211,7 @@ export const PadEditor: React.FC<PadEditorProps> = ({ padId, onClose }) => {
               flex-1 px-4 py-2 text-xs font-bold transition-all duration-200
               ${activeTab === tab.id
                 ? 'bg-dark-surface text-accent-primary border-b-2 border-accent-primary scale-105'
-                : 'text-text-muted hover:text-white hover:scale-102'
+                : 'text-text-muted hover:text-text-primary hover:scale-102'
               }
               transform-gpu will-change-transform
             `}
@@ -231,7 +231,7 @@ export const PadEditor: React.FC<PadEditorProps> = ({ padId, onClose }) => {
                 type="text"
                 value={pad.name}
                 onChange={(e) => handleUpdate({ name: e.target.value })}
-                className="w-full bg-dark-surface border border-dark-border rounded px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-accent-primary"
+                className="w-full bg-dark-surface border border-dark-border rounded px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-accent-primary"
               />
             </div>
 
@@ -282,7 +282,7 @@ export const PadEditor: React.FC<PadEditorProps> = ({ padId, onClose }) => {
               <select
                 value={pad.output}
                 onChange={(e) => handleUpdate({ output: e.target.value as OutputBus })}
-                className="w-full bg-dark-surface border border-dark-border rounded px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-accent-primary"
+                className="w-full bg-dark-surface border border-dark-border rounded px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-accent-primary"
               >
                 <option value="stereo">Stereo Mix</option>
                 <option value="out1">Output 1</option>
@@ -301,7 +301,7 @@ export const PadEditor: React.FC<PadEditorProps> = ({ padId, onClose }) => {
                   <select
                     value={pad.muteGroup}
                     onChange={(e) => handleUpdate({ muteGroup: parseInt(e.target.value) })}
-                    className="w-full bg-dark-surface border border-dark-border rounded px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-accent-primary"
+                    className="w-full bg-dark-surface border border-dark-border rounded px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-accent-primary"
                   >
                     <option value={0}>Off</option>
                     {[1,2,3,4,5,6,7,8].map(g => (
@@ -314,7 +314,7 @@ export const PadEditor: React.FC<PadEditorProps> = ({ padId, onClose }) => {
                   <select
                     value={pad.playMode}
                     onChange={(e) => handleUpdate({ playMode: e.target.value as PlayMode })}
-                    className="w-full bg-dark-surface border border-dark-border rounded px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-accent-primary"
+                    className="w-full bg-dark-surface border border-dark-border rounded px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-accent-primary"
                   >
                     <option value="oneshot">One-Shot</option>
                     <option value="sustain">Sustain</option>
@@ -367,7 +367,7 @@ export const PadEditor: React.FC<PadEditorProps> = ({ padId, onClose }) => {
               <label className="block text-xs text-text-muted mb-1">MIDI Trigger</label>
               {midiMapping ? (
                 <div className="flex items-center gap-2 mb-2">
-                  <span className="text-sm text-white font-mono">
+                  <span className="text-sm text-text-primary font-mono">
                     Note {midiMapping.note}
                   </span>
                   <button
@@ -384,8 +384,8 @@ export const PadEditor: React.FC<PadEditorProps> = ({ padId, onClose }) => {
                 onClick={handleMIDILearn}
                 className={`w-full px-3 py-2 text-xs font-bold rounded transition-colors ${
                   isLearning
-                    ? 'animate-pulse bg-amber-600 text-white'
-                    : 'bg-dark-surface border border-dark-border text-text-muted hover:text-white'
+                    ? 'animate-pulse bg-amber-600 text-text-primary'
+                    : 'bg-dark-surface border border-dark-border text-text-muted hover:text-text-primary'
                 }`}
               >
                 {isLearning ? 'Hit a MIDI pad...' : 'MIDI Learn'}
@@ -394,7 +394,7 @@ export const PadEditor: React.FC<PadEditorProps> = ({ padId, onClose }) => {
 
             <button
               onClick={() => clearPad(padId)}
-              className="w-full px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded transition-colors"
+              className="w-full px-4 py-2 bg-red-600 hover:bg-red-700 text-text-primary text-xs font-bold rounded transition-colors"
             >
               Clear Pad
             </button>
@@ -434,7 +434,7 @@ export const PadEditor: React.FC<PadEditorProps> = ({ padId, onClose }) => {
                 <button
                   onClick={() => handleUpdate({ decayMode: 'start' })}
                   className={`px-2 py-0.5 text-[10px] font-mono rounded ${
-                    pad.decayMode === 'start' ? 'bg-accent-primary text-white' : 'bg-dark-surface text-text-muted'
+                    pad.decayMode === 'start' ? 'bg-accent-primary text-text-primary' : 'bg-dark-surface text-text-muted'
                   }`}
                 >
                   START
@@ -442,7 +442,7 @@ export const PadEditor: React.FC<PadEditorProps> = ({ padId, onClose }) => {
                 <button
                   onClick={() => handleUpdate({ decayMode: 'end' })}
                   className={`px-2 py-0.5 text-[10px] font-mono rounded ${
-                    pad.decayMode === 'end' ? 'bg-accent-primary text-white' : 'bg-dark-surface text-text-muted'
+                    pad.decayMode === 'end' ? 'bg-accent-primary text-text-primary' : 'bg-dark-surface text-text-muted'
                   }`}
                 >
                   END
@@ -490,7 +490,7 @@ export const PadEditor: React.FC<PadEditorProps> = ({ padId, onClose }) => {
               <select
                 value={pad.filterType}
                 onChange={(e) => handleUpdate({ filterType: e.target.value as FilterType })}
-                className="w-full bg-dark-surface border border-dark-border rounded px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-accent-primary"
+                className="w-full bg-dark-surface border border-dark-border rounded px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-accent-primary"
               >
                 <option value="off">Off</option>
                 <option value="lpf">Low Pass</option>
@@ -676,7 +676,7 @@ export const PadEditor: React.FC<PadEditorProps> = ({ padId, onClose }) => {
                     className="p-3 bg-dark-surface border border-dark-border rounded"
                   >
                     <div className="flex items-center justify-between">
-                      <div className="text-sm text-white">{layer.sample.name}</div>
+                      <div className="text-sm text-text-primary">{layer.sample.name}</div>
                       <button
                         onClick={() => removeLayerFromPad(padId, idx)}
                         className="text-xs text-red-400 hover:text-red-300"
@@ -695,7 +695,7 @@ export const PadEditor: React.FC<PadEditorProps> = ({ padId, onClose }) => {
                           onChange={(e) => updateLayerOnPad(padId, idx, {
                             velocityRange: [parseInt(e.target.value) || 0, layer.velocityRange[1]],
                           })}
-                          className="w-full bg-dark-bg border border-dark-border rounded px-2 py-1 text-xs text-white"
+                          className="w-full bg-dark-bg border border-dark-border rounded px-2 py-1 text-xs text-text-primary"
                         />
                       </div>
                       <div>
@@ -708,7 +708,7 @@ export const PadEditor: React.FC<PadEditorProps> = ({ padId, onClose }) => {
                           onChange={(e) => updateLayerOnPad(padId, idx, {
                             velocityRange: [layer.velocityRange[0], parseInt(e.target.value) || 127],
                           })}
-                          className="w-full bg-dark-bg border border-dark-border rounded px-2 py-1 text-xs text-white"
+                          className="w-full bg-dark-bg border border-dark-border rounded px-2 py-1 text-xs text-text-primary"
                         />
                       </div>
                       <div>
@@ -731,7 +731,7 @@ export const PadEditor: React.FC<PadEditorProps> = ({ padId, onClose }) => {
             )}
             <button
               onClick={() => setShowLayerBrowser(true)}
-              className="w-full px-4 py-2 bg-accent-primary hover:bg-accent-primary/80 text-white text-xs font-bold rounded transition-colors"
+              className="w-full px-4 py-2 bg-accent-primary hover:bg-accent-primary/80 text-text-primary text-xs font-bold rounded transition-colors"
             >
               + Add Layer
             </button>
@@ -765,7 +765,7 @@ export const PadEditor: React.FC<PadEditorProps> = ({ padId, onClose }) => {
               <select
                 value={pad.scratchAction ?? ''}
                 onChange={(e) => handleUpdate({ scratchAction: (e.target.value as ScratchActionId) || undefined })}
-                className="w-full bg-dark-surface border border-dark-border rounded px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-accent-primary font-mono"
+                className="w-full bg-dark-surface border border-dark-border rounded px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-accent-primary font-mono"
               >
                 {SCRATCH_ACTION_OPTIONS.map(({ value, label }) => (
                   <option key={value} value={value}>{label}</option>

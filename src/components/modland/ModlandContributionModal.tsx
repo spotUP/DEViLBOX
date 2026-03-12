@@ -118,7 +118,7 @@ export const ModlandContributionModal: React.FC<ModlandContributionModalProps> =
           target="_blank"
           rel="noopener noreferrer"
           onClick={onClose}
-          className="px-3 py-1.5 bg-accent-primary hover:bg-accent-secondary text-white rounded text-xs font-semibold flex items-center gap-1.5 transition-colors"
+          className="px-3 py-1.5 bg-accent-primary hover:bg-accent-secondary text-text-primary rounded text-xs font-semibold flex items-center gap-1.5 transition-colors"
         >
           <ExternalLink size={13} />
           Join Demozoo

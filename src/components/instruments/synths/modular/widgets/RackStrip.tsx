@@ -116,7 +116,7 @@ export const RackStrip: React.FC<RackStripProps> = ({
         </button>
 
         {/* Module name */}
-        <span className="flex-1 text-xs font-bold text-white uppercase tracking-wider truncate drop-shadow-md">
+        <span className="flex-1 text-xs font-bold text-text-primary uppercase tracking-wider truncate drop-shadow-md">
           {module.label || descriptor.name}
         </span>
 

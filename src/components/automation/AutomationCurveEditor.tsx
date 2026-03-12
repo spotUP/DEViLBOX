@@ -60,7 +60,7 @@ export const AutomationCurveEditor: React.FC<AutomationCurveEditorProps> = ({
     if (!ctx) return;
 
     // Clear canvas
-    ctx.fillStyle = '#1a1a1a';
+    ctx.fillStyle = 'var(--color-bg-tertiary)';
     ctx.fillRect(0, 0, width, height);
 
     // Draw grid

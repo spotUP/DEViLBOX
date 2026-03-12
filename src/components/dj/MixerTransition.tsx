@@ -92,7 +92,7 @@ export const MixerTransition: React.FC = () => {
           transition-all duration-100
           ${
             automating && direction === 'A→B'
-              ? 'bg-cyan-600/40 text-cyan-200 border border-cyan-500/50 animate-pulse'
+              ? 'bg-accent-highlight/40 text-accent-highlight border border-accent-highlight/50 animate-pulse'
               : 'bg-dark-bgTertiary text-text-muted border border-dark-border hover:bg-dark-bgHover hover:text-text-secondary'
           }
           disabled:opacity-30
@@ -149,7 +149,7 @@ export const MixerTransition: React.FC = () => {
           transition-all duration-100
           ${
             automating && direction === 'B→A'
-              ? 'bg-cyan-600/40 text-cyan-200 border border-cyan-500/50 animate-pulse'
+              ? 'bg-accent-highlight/40 text-accent-highlight border border-accent-highlight/50 animate-pulse'
               : 'bg-dark-bgTertiary text-text-muted border border-dark-border hover:bg-dark-bgHover hover:text-text-secondary'
           }
           disabled:opacity-30

@@ -22,7 +22,7 @@ function SectionHeader({ color, title }: { color: string; title: string }) {
   return (
     <div className="flex items-center gap-2 mb-4">
       <div className={`w-1 h-4 rounded-full`} style={{ backgroundColor: color }} />
-      <h3 className="text-sm font-bold text-white uppercase tracking-wide">{title}</h3>
+      <h3 className="text-sm font-bold text-text-primary uppercase tracking-wide">{title}</h3>
     </div>
   );
 }
@@ -172,11 +172,11 @@ export const BuzzmachineEditor: React.FC<BuzzmachineEditorProps> = ({
     <div className="space-y-4">
       {/* Preset Selector (if available) */}
       {hasPresets && (
-        <section className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800">
+        <section className="bg-[#1a1a1a] rounded-xl p-4 border border-dark-border">
           <SectionHeader color="#06b6d4" title="Presets" />
           <select
             onChange={(e) => handlePresetChange(e.target.value)}
-            className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition-all"
+            className="w-full bg-dark-bgTertiary border border-dark-borderLight rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-accent-highlight focus:border-transparent transition-all"
           >
             <option value="">Select preset...</option>
             {presetNames.map((name) => (
@@ -189,7 +189,7 @@ export const BuzzmachineEditor: React.FC<BuzzmachineEditorProps> = ({
       )}
 
       {/* Parameters */}
-      <section className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800">
+      <section className="bg-[#1a1a1a] rounded-xl p-4 border border-dark-border">
         <SectionHeader color="#8b5cf6" title={`${machineInfo.name} Parameters`} />
         
         {machineInfo.parameters.length > 0 ? (
@@ -200,8 +200,8 @@ export const BuzzmachineEditor: React.FC<BuzzmachineEditorProps> = ({
 
               if (isSwitch) {
                 return (
-                  <div key={param.index} className="flex flex-col items-center justify-center space-y-2 p-2 bg-gray-900/50 rounded-lg border border-gray-800">
-                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider text-center h-8 flex items-center">
+                  <div key={param.index} className="flex flex-col items-center justify-center space-y-2 p-2 bg-dark-bgSecondary/50 rounded-lg border border-dark-border">
+                    <span className="text-[10px] font-bold text-text-secondary uppercase tracking-wider text-center h-8 flex items-center">
                       {param.name}
                     </span>
                     <button
@@ -210,7 +210,7 @@ export const BuzzmachineEditor: React.FC<BuzzmachineEditorProps> = ({
                         w-full py-2 px-2 rounded font-bold text-[10px] transition-all
                         ${currentValue === 1
                           ? 'bg-green-600/20 text-green-400 ring-1 ring-green-500'
-                          : 'bg-gray-800 text-gray-500 hover:bg-gray-700'
+                          : 'bg-dark-bgTertiary text-text-muted hover:bg-dark-bgHover'
                         }
                       `}
                     >
@@ -238,7 +238,7 @@ export const BuzzmachineEditor: React.FC<BuzzmachineEditorProps> = ({
           </div>
         ) : (
           <div className="text-center py-4">
-            <p className="text-gray-500 text-sm italic">
+            <p className="text-text-muted text-sm italic">
               No parameters available for this machine.
             </p>
           </div>

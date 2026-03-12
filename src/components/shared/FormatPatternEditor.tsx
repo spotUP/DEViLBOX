@@ -18,16 +18,16 @@ const HEADER_H = ROW_H + 4;
 
 const COLORS = {
   bg: '#0d0d0d',
-  bgAlt: '#141414',
-  headerBg: '#1a1a1a',
+  bgAlt: 'var(--color-bg-secondary)',
+  headerBg: 'var(--color-bg-tertiary)',
   headerText: '#888',
   rowNum: '#555',
-  empty: '#333',
+  empty: 'var(--color-border-light)',
   cursor: 'rgba(255, 255, 255, 0.2)',
   cursorBorder: '#888',
   selection: 'rgba(100, 149, 237, 0.25)',
   playRow: 'rgba(233, 69, 96, 0.15)',
-  channelSep: '#222',
+  channelSep: 'var(--color-border)',
 };
 
 interface CursorPos {

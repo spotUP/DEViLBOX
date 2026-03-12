@@ -59,7 +59,7 @@ export const AccentChargeVisualizer: React.FC<AccentChargeVisualizerProps> = ({
 
     if (!enabled) {
       // Show disabled state
-      ctx.fillStyle = '#333';
+      ctx.fillStyle = 'var(--color-border-light)';
       ctx.font = '10px monospace';
       ctx.textAlign = 'center';
       ctx.fillText('DISABLED', width / 2, height / 2);
@@ -72,11 +72,11 @@ export const AccentChargeVisualizer: React.FC<AccentChargeVisualizerProps> = ({
     const barHeight = height - padding.top - padding.bottom;
 
     // Draw background bar
-    ctx.fillStyle = '#222';
+    ctx.fillStyle = 'var(--color-border)';
     ctx.fillRect(padding.left, padding.top, barWidth, barHeight);
 
     // Draw grid lines
-    ctx.strokeStyle = '#333';
+    ctx.strokeStyle = 'var(--color-border-light)';
     ctx.lineWidth = 1;
     ctx.setLineDash([2, 2]);
     for (let i = 1; i <= 4; i++) {
@@ -148,8 +148,8 @@ export const AccentChargeVisualizer: React.FC<AccentChargeVisualizerProps> = ({
   }, [width, height, charge, sweepSpeed, enabled, color]);
 
   return (
-    <div className="bg-[#1a1a1a] rounded-lg p-2 border border-gray-700 w-full">
-      <div className="text-xs text-gray-400 mb-1 font-mono">Accent Charge</div>
+    <div className="bg-[#1a1a1a] rounded-lg p-2 border border-dark-borderLight w-full">
+      <div className="text-xs text-text-secondary mb-1 font-mono">Accent Charge</div>
       <canvas
         ref={canvasRef}
         style={{ width: `${width}px`, height: `${height}px` }}

@@ -83,9 +83,9 @@ export const ArpeggioGrid: React.FC<ArpeggioGridProps> = ({
   };
 
   return (
-    <div className="bg-gray-900/50 rounded-lg border border-gray-800 overflow-hidden">
+    <div className="bg-dark-bgSecondary/50 rounded-lg border border-dark-border overflow-hidden">
       {/* Header */}
-      <div className="grid grid-cols-[2rem_3rem_2rem_2rem_2rem] gap-px text-[9px] font-bold uppercase tracking-wide text-gray-500 bg-gray-800/50 border-b border-gray-700">
+      <div className="grid grid-cols-[2rem_3rem_2rem_2rem_2rem] gap-px text-[9px] font-bold uppercase tracking-wide text-text-muted bg-dark-bgTertiary/50 border-b border-dark-borderLight">
         <div className="flex items-center justify-center py-1.5">#</div>
         <div className="flex items-center justify-center py-1.5">Note</div>
         <div className="flex items-center justify-center py-1.5" title="Volume">Vol</div>
@@ -109,14 +109,14 @@ export const ArpeggioGrid: React.FC<ArpeggioGridProps> = ({
       </div>
 
       {/* Footer controls */}
-      <div className="flex items-center justify-between px-2 py-1.5 bg-gray-800/30 border-t border-gray-800">
-        <div className="text-[10px] text-gray-500">
+      <div className="flex items-center justify-between px-2 py-1.5 bg-dark-bgTertiary/30 border-t border-dark-border">
+        <div className="text-[10px] text-text-muted">
           {steps.length}/{maxSteps} steps
         </div>
         <div className="flex items-center gap-1">
           <button
             onClick={() => handleClearStep(selectedIndex)}
-            className="p-1 text-gray-500 hover:text-gray-300 transition-colors"
+            className="p-1 text-text-muted hover:text-text-secondary transition-colors"
             title="Clear selected step"
           >
             <Trash2 size={12} />
@@ -127,8 +127,8 @@ export const ArpeggioGrid: React.FC<ArpeggioGridProps> = ({
             className={`
               p-1 transition-colors
               ${steps.length <= 1
-                ? 'text-gray-700 cursor-not-allowed'
-                : 'text-gray-500 hover:text-red-400'
+                ? 'text-text-muted cursor-not-allowed'
+                : 'text-text-muted hover:text-red-400'
               }
             `}
             title="Remove step"
@@ -141,8 +141,8 @@ export const ArpeggioGrid: React.FC<ArpeggioGridProps> = ({
             className={`
               p-1 transition-colors
               ${steps.length >= maxSteps
-                ? 'text-gray-700 cursor-not-allowed'
-                : 'text-gray-500 hover:text-green-400'
+                ? 'text-text-muted cursor-not-allowed'
+                : 'text-text-muted hover:text-green-400'
               }
             `}
             title="Add step"

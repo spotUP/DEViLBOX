@@ -64,7 +64,7 @@ export const SynthErrorDialog: React.FC = () => {
                   <span className="text-red-300/70"> ({activeError.synthName})</span>
                 )}
               </p>
-              <p className="mt-2 text-white">{activeError.message}</p>
+              <p className="mt-2 text-text-primary">{activeError.message}</p>
             </div>
           </div>
         </div>
@@ -72,7 +72,7 @@ export const SynthErrorDialog: React.FC = () => {
         {/* Expand/Collapse Debug Details */}
         <button
           onClick={() => setShowDetails(!showDetails)}
-          className="flex items-center gap-2 text-sm text-dark-text-secondary hover:text-white transition-colors"
+          className="flex items-center gap-2 text-sm text-dark-text-secondary hover:text-text-primary transition-colors"
         >
           {showDetails ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
           {showDetails ? 'Hide' : 'Show'} Debug Details

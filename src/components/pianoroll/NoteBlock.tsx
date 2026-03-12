@@ -70,7 +70,7 @@ const NoteBlockComponent: React.FC<NoteBlockProps> = ({
 
   // Color based on channel
   const channelColors = [
-    'bg-cyan-500',
+    'bg-accent-highlight',
     'bg-purple-500',
     'bg-green-500',
     'bg-amber-500',

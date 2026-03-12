@@ -77,7 +77,7 @@ export const MacroSlotsPanel: React.FC = () => {
                 <button
                   onClick={() => readMacroSlot(index)}
                   disabled={isEmpty}
-                  className="px-2 py-1 text-xs font-medium text-white bg-blue-600 rounded hover:bg-blue-700 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                  className="px-2 py-1 text-xs font-medium text-text-primary bg-blue-600 rounded hover:bg-blue-700 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                   title={`Paste macro slot ${index + 1} (Ctrl+${index + 1})`}
                 >
                   Read

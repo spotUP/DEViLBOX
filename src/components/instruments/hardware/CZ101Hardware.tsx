@@ -30,9 +30,9 @@ const CZ101Slider: React.FC<{
     <div className="flex flex-col items-center gap-1">
       {/* Slider track */}
       <div className="relative h-24 w-6 flex items-center justify-center">
-        <div className={`absolute inset-0 rounded bg-gray-800 border border-gray-700`}>
+        <div className={`absolute inset-0 rounded bg-dark-bgTertiary border border-dark-borderLight`}>
           {/* Slider groove */}
-          <div className="absolute left-1/2 top-1 bottom-1 w-0.5 -translate-x-1/2 bg-gray-900 rounded-full" />
+          <div className="absolute left-1/2 top-1 bottom-1 w-0.5 -translate-x-1/2 bg-dark-bgSecondary rounded-full" />
         </div>
 
         {/* Slider input */}
@@ -62,7 +62,7 @@ const CZ101Slider: React.FC<{
       </div>
 
       {/* Label */}
-      <div className={`text-[8px] font-bold text-gray-300 uppercase tracking-wide text-center`}>
+      <div className={`text-[8px] font-bold text-text-secondary uppercase tracking-wide text-center`}>
         {label}
       </div>
     </div>
@@ -80,14 +80,14 @@ const CZ101Button: React.FC<{
   small?: boolean;
 }> = ({ label, active = false, onClick, color = 'gray', small = false }) => {
   const colorMap = {
-    gray: active ? 'bg-gray-600' : 'bg-gray-700',
+    gray: active ? 'bg-dark-bgActive' : 'bg-dark-bgHover',
     orange: active ? 'bg-orange-500' : 'bg-orange-600',
   };
 
   return (
     <button
       onClick={onClick}
-      className={`${colorMap[color]} hover:brightness-110 text-white ${small ? 'text-[8px] px-2 py-1' : 'text-[9px] px-3 py-1.5'} font-bold rounded border border-gray-900 shadow-md transition-all ${active ? 'shadow-lg scale-95' : ''}`}
+      className={`${colorMap[color]} hover:brightness-110 text-text-primary ${small ? 'text-[8px] px-2 py-1' : 'text-[9px] px-3 py-1.5'} font-bold rounded border border-dark-border shadow-md transition-all ${active ? 'shadow-lg scale-95' : ''}`}
     >
       {label}
     </button>
@@ -112,20 +112,20 @@ export const CZ101Hardware: React.FC<CZ101HardwareProps> = ({
       {/* Top Panel - Logo & Model */}
       <div className="px-4 py-2 bg-gradient-to-r from-gray-900 to-gray-800 border-b-2 border-orange-600 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="text-white font-black text-xl tracking-[0.3em]" style={{ fontFamily: 'sans-serif' }}>
+          <div className="text-text-primary font-black text-xl tracking-[0.3em]" style={{ fontFamily: 'sans-serif' }}>
             CASIO
           </div>
         </div>
         <div className="text-right">
           <div className="text-orange-400 text-xs font-light tracking-[0.3em] uppercase">Phase Distortion</div>
-          <div className="text-white font-black text-3xl tracking-wide">CZ-101</div>
+          <div className="text-text-primary font-black text-3xl tracking-wide">CZ-101</div>
         </div>
       </div>
 
       {/* Main Panel - Compact Layout */}
       <div className="p-4">
         {/* LCD Display Area */}
-        <div className="mb-4 bg-gradient-to-b from-gray-800 to-gray-900 p-2 rounded border border-gray-700 shadow-inner">
+        <div className="mb-4 bg-gradient-to-b from-gray-800 to-gray-900 p-2 rounded border border-dark-borderLight shadow-inner">
           <div className="bg-amber-900/20 border border-amber-800 rounded p-2 min-h-[60px] font-mono text-xs text-amber-400">
             <div className="flex justify-between">
               <span>PATCH: 12</span>
@@ -142,7 +142,7 @@ export const CZ101Hardware: React.FC<CZ101HardwareProps> = ({
           <div className="text-[10px] font-bold text-orange-400 uppercase tracking-widest mb-2 text-center">
             Parameter Control
           </div>
-          <div className="flex gap-3 justify-center items-end bg-gray-900/30 rounded p-3">
+          <div className="flex gap-3 justify-center items-end bg-dark-bgSecondary/30 rounded p-3">
             <CZ101Slider
               label="DCW"
               value={parameters.dcw || 0.5}
@@ -205,8 +205,8 @@ export const CZ101Hardware: React.FC<CZ101HardwareProps> = ({
       </div>
 
       {/* Bottom Info */}
-      <div className="px-4 py-1 bg-black border-t border-gray-800">
-        <div className="text-[9px] text-gray-600 text-center uppercase tracking-widest">
+      <div className="px-4 py-1 bg-black border-t border-dark-border">
+        <div className="text-[9px] text-text-muted text-center uppercase tracking-widest">
           Phase Distortion Synthesis • 8 Voices • 1984
         </div>
       </div>

@@ -39,8 +39,8 @@ export const BiPhaseEditor: React.FC<VisualEffectEditorProps> = ({
             onClick={() => onUpdateParameter('routing', 0)}
             className={`px-4 py-1.5 text-xs font-medium rounded transition-colors ${
               Math.round(routing) === 0
-                ? 'bg-purple-600 text-white'
-                : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+                ? 'bg-purple-600 text-text-primary'
+                : 'bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover'
             }`}
           >
             Parallel
@@ -49,8 +49,8 @@ export const BiPhaseEditor: React.FC<VisualEffectEditorProps> = ({
             onClick={() => onUpdateParameter('routing', 1)}
             className={`px-4 py-1.5 text-xs font-medium rounded transition-colors ${
               Math.round(routing) === 1
-                ? 'bg-purple-600 text-white'
-                : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+                ? 'bg-purple-600 text-text-primary'
+                : 'bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover'
             }`}
           >
             Series
@@ -572,8 +572,8 @@ export const LeslieEditor: React.FC<VisualEffectEditorProps> = ({
               onClick={() => onUpdateParameter('speed', i === 0 ? 0.0 : i === 1 ? 0.5 : 1.0)}
               className={`px-2 py-1.5 text-xs font-medium rounded transition-colors ${
                 speedIdx === i
-                  ? 'bg-orange-600 text-white'
-                  : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+                  ? 'bg-orange-600 text-text-primary'
+                  : 'bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover'
               }`}
             >
               {label}

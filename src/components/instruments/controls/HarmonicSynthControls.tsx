@@ -74,8 +74,8 @@ export const HarmonicSynthControls: React.FC<HarmonicSynthControlsProps> = ({
   const barHighlight = isCyanTheme ? 'rgba(0, 255, 255, 1)' : 'rgba(74, 222, 128, 1)';
 
   const panelBg = isCyanTheme
-    ? 'bg-[#051515] border-cyan-900/50'
-    : 'bg-[#1a1a1a] border-gray-800';
+    ? 'bg-[#051515] border-accent-highlight/20'
+    : 'bg-[#1a1a1a] border-dark-border';
 
   const harmonics = config.harmonics || DEFAULT_HARMONIC_SYNTH.harmonics;
 

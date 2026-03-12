@@ -49,7 +49,7 @@ const ERA_STYLES: Record<string, { icon: React.ReactNode; color: string; descrip
   },
   Chords: {
     icon: <Music size={14} />,
-    color: 'text-cyan-400 border-cyan-400/30 bg-cyan-400/10',
+    color: 'text-accent-highlight border-accent-highlight/30 bg-accent-highlight/10',
     description: 'Standard musical chord voicings',
   },
 };
@@ -95,41 +95,41 @@ export const ArpeggioPresetBrowser: React.FC<ArpeggioPresetBrowserProps> = ({
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="w-full max-w-2xl max-h-[80vh] bg-gray-900 border border-gray-700 rounded-xl shadow-2xl overflow-hidden">
+      <div className="w-full max-w-2xl max-h-[80vh] bg-dark-bgSecondary border border-dark-borderLight rounded-xl shadow-2xl overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-800">
-          <h2 className="text-lg font-semibold text-white">Arpeggio Presets</h2>
+        <div className="flex items-center justify-between px-4 py-3 border-b border-dark-border">
+          <h2 className="text-lg font-semibold text-text-primary">Arpeggio Presets</h2>
           <button
             onClick={onClose}
-            className="p-1 text-gray-500 hover:text-white transition-colors"
+            className="p-1 text-text-muted hover:text-text-primary transition-colors"
           >
             <X size={20} />
           </button>
         </div>
 
         {/* Search */}
-        <div className="px-4 py-3 border-b border-gray-800">
+        <div className="px-4 py-3 border-b border-dark-border">
           <div className="relative">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
             <input
               type="text"
               placeholder="Search presets by name or tag..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 bg-gray-800/50 border border-gray-700 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
+              className="w-full pl-9 pr-4 py-2 bg-dark-bgTertiary/50 border border-dark-borderLight rounded-lg text-sm text-text-primary placeholder-gray-500 focus:outline-none focus:border-blue-500"
             />
           </div>
         </div>
 
         {/* Era tabs */}
-        <div className="flex items-center gap-1 px-4 py-2 border-b border-gray-800 overflow-x-auto">
+        <div className="flex items-center gap-1 px-4 py-2 border-b border-dark-border overflow-x-auto">
           <button
             onClick={() => setSelectedEra(null)}
             className={`
               px-3 py-1.5 rounded-md text-xs font-medium transition-colors whitespace-nowrap
               ${selectedEra === null
-                ? 'bg-white/10 text-white'
-                : 'text-gray-400 hover:text-white hover:bg-white/5'
+                ? 'bg-white/10 text-text-primary'
+                : 'text-text-secondary hover:text-text-primary hover:bg-white/5'
               }
             `}
           >
@@ -147,7 +147,7 @@ export const ArpeggioPresetBrowser: React.FC<ArpeggioPresetBrowserProps> = ({
                   transition-colors whitespace-nowrap border
                   ${selectedEra === era
                     ? style.color
-                    : 'text-gray-400 border-transparent hover:text-white hover:bg-white/5'
+                    : 'text-text-secondary border-transparent hover:text-text-primary hover:bg-white/5'
                   }
                 `}
               >
@@ -160,7 +160,7 @@ export const ArpeggioPresetBrowser: React.FC<ArpeggioPresetBrowserProps> = ({
 
         {/* Era description */}
         {selectedEra && (
-          <div className="px-4 py-2 text-xs text-gray-500 bg-gray-800/30">
+          <div className="px-4 py-2 text-xs text-text-muted bg-dark-bgTertiary/30">
             {ERA_STYLES[selectedEra]?.description}
           </div>
         )}
@@ -170,7 +170,7 @@ export const ArpeggioPresetBrowser: React.FC<ArpeggioPresetBrowserProps> = ({
           {/* Main list */}
           <div className="flex-1 overflow-y-auto p-2">
             {filteredPresets.length === 0 ? (
-              <div className="flex items-center justify-center h-full text-gray-500">
+              <div className="flex items-center justify-center h-full text-text-muted">
                 No presets found
               </div>
             ) : (
@@ -190,7 +190,7 @@ export const ArpeggioPresetBrowser: React.FC<ArpeggioPresetBrowserProps> = ({
                         transition-all group
                         ${isSelected
                           ? 'border-green-500 bg-green-500/10'
-                          : 'border-gray-800 hover:border-gray-700 hover:bg-gray-800/50'
+                          : 'border-dark-border hover:border-dark-borderLight hover:bg-dark-bgTertiary/50'
                         }
                       `}
                     >
@@ -214,7 +214,7 @@ export const ArpeggioPresetBrowser: React.FC<ArpeggioPresetBrowserProps> = ({
                       </span>
 
                       {/* Name */}
-                      <div className="font-medium text-sm text-white group-hover:text-blue-400 transition-colors">
+                      <div className="font-medium text-sm text-text-primary group-hover:text-blue-400 transition-colors">
                         {preset.name}
                       </div>
 
@@ -223,7 +223,7 @@ export const ArpeggioPresetBrowser: React.FC<ArpeggioPresetBrowserProps> = ({
                         {preset.tags.slice(0, 3).map((tag) => (
                           <span
                             key={tag}
-                            className="px-1.5 py-0.5 text-[9px] rounded bg-gray-800 text-gray-400"
+                            className="px-1.5 py-0.5 text-[9px] rounded bg-dark-bgTertiary text-text-secondary"
                           >
                             {tag}
                           </span>
@@ -251,34 +251,34 @@ export const ArpeggioPresetBrowser: React.FC<ArpeggioPresetBrowserProps> = ({
           </div>
 
           {/* Preview panel */}
-          <div className="w-64 border-l border-gray-800 p-4 bg-gray-800/30">
+          <div className="w-64 border-l border-dark-border p-4 bg-dark-bgTertiary/30">
             {hoveredPreset ? (
               <>
-                <h3 className="font-semibold text-white mb-2">{hoveredPreset.name}</h3>
-                <p className="text-xs text-gray-400 mb-4">{hoveredPreset.description}</p>
+                <h3 className="font-semibold text-text-primary mb-2">{hoveredPreset.name}</h3>
+                <p className="text-xs text-text-secondary mb-4">{hoveredPreset.description}</p>
 
                 <div className="space-y-3">
                   {/* Settings */}
                   <div className="text-xs space-y-1">
                     <div className="flex justify-between">
-                      <span className="text-gray-500">Speed</span>
-                      <span className="text-white">
+                      <span className="text-text-muted">Speed</span>
+                      <span className="text-text-primary">
                         {hoveredPreset.speed} {hoveredPreset.speedUnit}
                       </span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-gray-500">Mode</span>
-                      <span className="text-white capitalize">{hoveredPreset.mode}</span>
+                      <span className="text-text-muted">Mode</span>
+                      <span className="text-text-primary capitalize">{hoveredPreset.mode}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-gray-500">Steps</span>
-                      <span className="text-white">{hoveredPreset.steps.length}</span>
+                      <span className="text-text-muted">Steps</span>
+                      <span className="text-text-primary">{hoveredPreset.steps.length}</span>
                     </div>
                   </div>
 
                   {/* Steps preview */}
-                  <div className="bg-gray-900/50 rounded-lg p-2">
-                    <div className="text-[10px] text-gray-500 uppercase mb-1">Pattern</div>
+                  <div className="bg-dark-bgSecondary/50 rounded-lg p-2">
+                    <div className="text-[10px] text-text-muted uppercase mb-1">Pattern</div>
                     <div className="flex flex-wrap gap-1">
                       {hoveredPreset.steps.map((step, i) => (
                         <span
@@ -289,7 +289,7 @@ export const ArpeggioPresetBrowser: React.FC<ArpeggioPresetBrowserProps> = ({
                               ? 'bg-green-500/20 text-green-400'
                               : step.noteOffset < 0
                                 ? 'bg-red-500/20 text-red-400'
-                                : 'bg-gray-800 text-gray-400'
+                                : 'bg-dark-bgTertiary text-text-secondary'
                             }
                             ${step.effect === 'accent' ? 'ring-1 ring-orange-400' : ''}
                           `}
@@ -305,7 +305,7 @@ export const ArpeggioPresetBrowser: React.FC<ArpeggioPresetBrowserProps> = ({
                     {hoveredPreset.tags.map((tag) => (
                       <span
                         key={tag}
-                        className="px-1.5 py-0.5 text-[9px] rounded bg-gray-800 text-gray-400"
+                        className="px-1.5 py-0.5 text-[9px] rounded bg-dark-bgTertiary text-text-secondary"
                       >
                         {tag}
                       </span>
@@ -314,7 +314,7 @@ export const ArpeggioPresetBrowser: React.FC<ArpeggioPresetBrowserProps> = ({
                 </div>
               </>
             ) : (
-              <div className="flex flex-col items-center justify-center h-full text-gray-600">
+              <div className="flex flex-col items-center justify-center h-full text-text-muted">
                 <Music size={24} className="mb-2 opacity-50" />
                 <div className="text-xs text-center">
                   Hover over a preset<br />to see details

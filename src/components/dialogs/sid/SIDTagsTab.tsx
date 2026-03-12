@@ -106,7 +106,7 @@ export const SIDTagsTab: React.FC<SIDTagsTabProps> = ({ className, fileId }) => 
               <span key={tag.id} className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full border ${tagColor(tag.type)}`}>
                 {tag.name}
                 <button onClick={() => handleRemove(tag)} disabled={busy}
-                  className="hover:text-white transition-colors disabled:opacity-40">
+                  className="hover:text-text-primary transition-colors disabled:opacity-40">
                   <X className="w-3 h-3" />
                 </button>
               </span>
@@ -154,7 +154,7 @@ export const SIDTagsTab: React.FC<SIDTagsTabProps> = ({ className, fileId }) => 
               className="flex-1 text-sm bg-dark-bgPrimary border border-blue-800/40 rounded px-2 py-1.5 text-text-primary placeholder:text-text-muted/40"
             />
             <button onClick={handleCreate} disabled={busy || !newName.trim()}
-              className="flex items-center gap-1 text-xs px-3 py-1.5 rounded bg-blue-700 hover:bg-blue-600 text-white disabled:opacity-40 transition-colors">
+              className="flex items-center gap-1 text-xs px-3 py-1.5 rounded bg-blue-700 hover:bg-blue-600 text-text-primary disabled:opacity-40 transition-colors">
               {busy ? <Loader2 className="w-3 h-3 animate-spin" /> : <Plus className="w-3 h-3" />}
               Create
             </button>

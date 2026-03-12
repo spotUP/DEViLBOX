@@ -200,51 +200,51 @@ export const VisualEffectEditorWrapper: React.FC<VisualEffectEditorWrapperProps>
 
   // Icon mapping
   const iconMap: Record<string, React.ReactNode> = {
-    Distortion: <Zap size={18} className="text-white" />,
-    Reverb: <Waves size={18} className="text-white" />,
-    JCReverb: <Waves size={18} className="text-white" />,
-    Delay: <Clock size={18} className="text-white" />,
-    FeedbackDelay: <Clock size={18} className="text-white" />,
-    PingPongDelay: <Clock size={18} className="text-white" />,
-    Chorus: <Radio size={18} className="text-white" />,
-    Phaser: <Radio size={18} className="text-white" />,
-    Tremolo: <Wind size={18} className="text-white" />,
-    Vibrato: <Wind size={18} className="text-white" />,
-    Compressor: <Gauge size={18} className="text-white" />,
-    EQ3: <Sliders size={18} className="text-white" />,
-    Filter: <Sliders size={18} className="text-white" />,
-    StereoWidener: <ArrowLeftRight size={18} className="text-white" />,
-    SpaceyDelayer: <Clock size={18} className="text-white" />,
-    SpaceEcho: <Waves size={18} className="text-white" />,
-    BiPhase: <Radio size={18} className="text-white" />,
-    DubFilter: <Sliders size={18} className="text-white" />,
-    TapeSaturation: <Zap size={18} className="text-white" />,
-    Tumult: <Radio size={18} className="text-white" />,
-    VinylNoise: <Disc size={18} className="text-white" />,
-    ToneArm: <Disc size={18} className="text-white" />,
-    SidechainCompressor: <Gauge size={18} className="text-white" />,
-    RETapeEcho: <Disc size={18} className="text-white" />,
-    TapeSimulator: <Disc size={18} className="text-white" />,
-    MoogFilter: <Sliders size={18} className="text-white" />,
-    MVerb: <Waves size={18} className="text-white" />,
-    Leslie: <Radio size={18} className="text-white" />,
-    SpringReverb: <Waves size={18} className="text-white" />,
+    Distortion: <Zap size={18} className="text-text-primary" />,
+    Reverb: <Waves size={18} className="text-text-primary" />,
+    JCReverb: <Waves size={18} className="text-text-primary" />,
+    Delay: <Clock size={18} className="text-text-primary" />,
+    FeedbackDelay: <Clock size={18} className="text-text-primary" />,
+    PingPongDelay: <Clock size={18} className="text-text-primary" />,
+    Chorus: <Radio size={18} className="text-text-primary" />,
+    Phaser: <Radio size={18} className="text-text-primary" />,
+    Tremolo: <Wind size={18} className="text-text-primary" />,
+    Vibrato: <Wind size={18} className="text-text-primary" />,
+    Compressor: <Gauge size={18} className="text-text-primary" />,
+    EQ3: <Sliders size={18} className="text-text-primary" />,
+    Filter: <Sliders size={18} className="text-text-primary" />,
+    StereoWidener: <ArrowLeftRight size={18} className="text-text-primary" />,
+    SpaceyDelayer: <Clock size={18} className="text-text-primary" />,
+    SpaceEcho: <Waves size={18} className="text-text-primary" />,
+    BiPhase: <Radio size={18} className="text-text-primary" />,
+    DubFilter: <Sliders size={18} className="text-text-primary" />,
+    TapeSaturation: <Zap size={18} className="text-text-primary" />,
+    Tumult: <Radio size={18} className="text-text-primary" />,
+    VinylNoise: <Disc size={18} className="text-text-primary" />,
+    ToneArm: <Disc size={18} className="text-text-primary" />,
+    SidechainCompressor: <Gauge size={18} className="text-text-primary" />,
+    RETapeEcho: <Disc size={18} className="text-text-primary" />,
+    TapeSimulator: <Disc size={18} className="text-text-primary" />,
+    MoogFilter: <Sliders size={18} className="text-text-primary" />,
+    MVerb: <Waves size={18} className="text-text-primary" />,
+    Leslie: <Radio size={18} className="text-text-primary" />,
+    SpringReverb: <Waves size={18} className="text-text-primary" />,
     // WAM 2.0 effects
-    WAMBigMuff: <Globe size={18} className="text-white" />,
-    WAMTS9: <Globe size={18} className="text-white" />,
-    WAMDistoMachine: <Globe size={18} className="text-white" />,
-    WAMQuadraFuzz: <Globe size={18} className="text-white" />,
-    WAMVoxAmp: <Globe size={18} className="text-white" />,
-    WAMStonePhaser: <Globe size={18} className="text-white" />,
-    WAMPingPongDelay: <Globe size={18} className="text-white" />,
-    WAMFaustDelay: <Globe size={18} className="text-white" />,
-    WAMPitchShifter: <Globe size={18} className="text-white" />,
-    WAMGraphicEQ: <Globe size={18} className="text-white" />,
-    WAMPedalboard: <Globe size={18} className="text-white" />,
+    WAMBigMuff: <Globe size={18} className="text-text-primary" />,
+    WAMTS9: <Globe size={18} className="text-text-primary" />,
+    WAMDistoMachine: <Globe size={18} className="text-text-primary" />,
+    WAMQuadraFuzz: <Globe size={18} className="text-text-primary" />,
+    WAMVoxAmp: <Globe size={18} className="text-text-primary" />,
+    WAMStonePhaser: <Globe size={18} className="text-text-primary" />,
+    WAMPingPongDelay: <Globe size={18} className="text-text-primary" />,
+    WAMFaustDelay: <Globe size={18} className="text-text-primary" />,
+    WAMPitchShifter: <Globe size={18} className="text-text-primary" />,
+    WAMGraphicEQ: <Globe size={18} className="text-text-primary" />,
+    WAMPedalboard: <Globe size={18} className="text-text-primary" />,
   };
 
   const enc = ENCLOSURE_COLORS[effect.type] || DEFAULT_ENCLOSURE;
-  const icon = iconMap[effect.type] || <Music size={18} className="text-white" />;
+  const icon = iconMap[effect.type] || <Music size={18} className="text-text-primary" />;
   const isWAM = effect.type.startsWith('WAM');
 
   // WAM effects render only their native GUI — skip the pedal enclosure wrapper
@@ -290,7 +290,7 @@ export const VisualEffectEditorWrapper: React.FC<VisualEffectEditorWrapperProps>
             {icon}
           </div>
           <div>
-            <h2 className="text-base font-black text-white tracking-wide">
+            <h2 className="text-base font-black text-text-primary tracking-wide">
               {effect.neuralModelName || effect.type}
             </h2>
             <div className="flex items-center gap-2 mt-0.5">
@@ -307,7 +307,7 @@ export const VisualEffectEditorWrapper: React.FC<VisualEffectEditorWrapperProps>
                   transition: 'all 0.3s ease',
                 }}
               />
-              <p className="text-[11px] text-gray-400 font-medium">
+              <p className="text-[11px] text-text-secondary font-medium">
                 {effect.enabled ? 'Active' : 'Bypassed'} | Mix: {effect.wet}%
               </p>
             </div>
@@ -316,7 +316,7 @@ export const VisualEffectEditorWrapper: React.FC<VisualEffectEditorWrapperProps>
         {onClose && (
           <button
             onClick={onClose}
-            className="p-2 rounded-lg text-gray-500 hover:text-white hover:bg-white/5 transition-colors"
+            className="p-2 rounded-lg text-text-muted hover:text-text-primary hover:bg-white/5 transition-colors"
           >
             <X size={16} />
           </button>

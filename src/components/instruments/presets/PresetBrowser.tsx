@@ -76,7 +76,7 @@ export const PresetBrowser: React.FC<PresetBrowserProps> = ({ instrumentId, onCl
   };
 
   const getSynthTypeColor = (synthType: string): string => {
-    if (synthType === 'TB303') return 'text-cyan-400';
+    if (synthType === 'TB303') return 'text-accent-highlight';
     if (synthType === 'DubSiren') return 'text-red-500';
     if (synthType === 'SpaceLaser') return 'text-green-500';
     if (synthType === 'V2') return 'text-amber-500';
@@ -194,7 +194,7 @@ export const PresetBrowser: React.FC<PresetBrowserProps> = ({ instrumentId, onCl
                         px-1.5 py-0.5 text-[10px] font-bold rounded
                         ${hoveredPreset === preset.name
                           ? 'bg-ft2-bg text-red-500'
-                          : 'bg-red-600 text-white'}
+                          : 'bg-red-600 text-text-primary'}
                       `}
                     >
                       DF

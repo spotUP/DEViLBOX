@@ -418,7 +418,7 @@ export const SequenceEditor: React.FC<SequenceEditorProps> = ({
             <button
               onClick={() => { setIsSettingLoop(!isSettingLoop); setIsSettingEnd(false); }}
               className={`p-1 rounded transition-colors ${
-                isSettingLoop ? 'bg-blue-500 text-white' : 'text-blue-400 hover:bg-blue-500/20'
+                isSettingLoop ? 'bg-blue-500 text-text-primary' : 'text-blue-400 hover:bg-blue-500/20'
               }`}
               title={isSettingLoop ? 'Click canvas to set loop' : 'Set loop point'}>
               <Repeat size={12} />
@@ -430,7 +430,7 @@ export const SequenceEditor: React.FC<SequenceEditorProps> = ({
             <button
               onClick={() => { setIsSettingEnd(!isSettingEnd); setIsSettingLoop(false); }}
               className={`p-1 rounded transition-colors ${
-                isSettingEnd ? 'bg-red-500 text-white' : 'text-red-400 hover:bg-red-500/20'
+                isSettingEnd ? 'bg-red-500 text-text-primary' : 'text-red-400 hover:bg-red-500/20'
               }`}
               title={isSettingEnd ? 'Click canvas to set end' : 'Set end point'}>
               <Flag size={12} />

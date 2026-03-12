@@ -84,7 +84,7 @@ export const FredControls: React.FC<FredControlsProps> = ({ config, onChange, ua
   const accent  = isCyan ? '#00ffff' : '#ff8800';
   const knob    = isCyan ? '#00ffff' : '#ffaa44';
   const dim     = isCyan ? '#004444' : '#332200';
-  const panelBg = isCyan ? 'bg-[#041510] border-cyan-900/50' : 'bg-[#1a0e00] border-orange-900/30';
+  const panelBg = isCyan ? 'bg-[#041510] border-accent-highlight/20' : 'bg-[#1a0e00] border-orange-900/30';
 
   /**
    * Like `upd`, but also writes to chip RAM when a UADE context is active.
@@ -114,7 +114,7 @@ export const FredControls: React.FC<FredControlsProps> = ({ config, onChange, ua
     onChange: (v: number) => void; signed?: boolean; width?: string;
   }> = ({ label, value, min, max, onChange: onBx, signed, width = '52px' }) => (
     <div className="flex items-center gap-1.5">
-      <span className="text-[10px] text-gray-400 w-20 text-right whitespace-nowrap">{label}</span>
+      <span className="text-[10px] text-text-secondary w-20 text-right whitespace-nowrap">{label}</span>
       <input
         type="number"
         value={value}
@@ -205,7 +205,7 @@ export const FredControls: React.FC<FredControlsProps> = ({ config, onChange, ua
             onChange={(v) => void updWithChipRam('relative', Math.round(v), async (ed, base) => { await ed.writeU16(base + 8, Math.round(v)); })}
             label="Relative" color={knob} size="md"
             formatValue={(v) => Math.round(v).toString()} />
-          <span className="text-[10px] text-gray-500 max-w-[120px]">
+          <span className="text-[10px] text-text-muted max-w-[120px]">
             1024 = no shift. Values &lt;1024 pitch down, &gt;1024 pitch up.
           </span>
         </div>
@@ -227,7 +227,7 @@ export const FredControls: React.FC<FredControlsProps> = ({ config, onChange, ua
             onChange={(v) => void updWithChipRam('pulsePosH', Math.round(v), async (ed, base) => { await ed.writeU8(base + 44, Math.round(v)); })}
             label="High" color={knob} size="md"
             formatValue={(v) => Math.round(v).toString()} />
-          <div className="flex-1 h-4 rounded relative overflow-hidden" style={{ background: '#111', border: `1px solid ${dim}` }}>
+          <div className="flex-1 h-4 rounded relative overflow-hidden" style={{ background: 'var(--color-bg-secondary)', border: `1px solid ${dim}` }}>
             <div className="absolute h-full" style={{
               left: `${(config.pulsePosL / 64) * 100}%`,
               width: `${Math.max(0, (config.pulsePosH - config.pulsePosL) / 64 * 100)}%`,
@@ -258,7 +258,7 @@ export const FredControls: React.FC<FredControlsProps> = ({ config, onChange, ua
             label="Rate -" color={knob} size="sm"
             formatValue={(v) => Math.round(v).toString()} />
         </div>
-        <div className="mt-2 text-[9px] text-gray-600 font-mono">
+        <div className="mt-2 text-[9px] text-text-muted font-mono">
           PWM sweeps pulse width from Low→High at +Rate then High→Low at |Rate-|
         </div>
       </div>
@@ -295,7 +295,7 @@ export const FredControls: React.FC<FredControlsProps> = ({ config, onChange, ua
           color={accent}
           height={100}
         />
-        <p className="text-[9px] text-gray-600 mt-1">
+        <p className="text-[9px] text-text-muted mt-1">
           Steps 0–{config.arpeggioLimit - 1} active (set by Active Steps limit above)
         </p>
       </div>
@@ -321,7 +321,7 @@ export const FredControls: React.FC<FredControlsProps> = ({ config, onChange, ua
             label="Depth" color={knob} size="md"
             formatValue={(v) => Math.round(v).toString()} />
         </div>
-        <div className="mt-2 text-[9px] text-gray-600 font-mono">
+        <div className="mt-2 text-[9px] text-text-muted font-mono">
           Depth in 1/64th semitone units. Speed = ticks per LFO step.
         </div>
       </div>

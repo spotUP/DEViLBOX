@@ -31,6 +31,7 @@ export default {
         accent: {
           primary: 'var(--color-accent)',
           secondary: 'var(--color-accent-secondary)',
+          highlight: 'var(--color-accent-highlight)',
           warning: 'var(--color-warning)',
           error: 'var(--color-error)',
           success: 'var(--color-success)',

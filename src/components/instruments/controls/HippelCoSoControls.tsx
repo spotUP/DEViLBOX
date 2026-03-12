@@ -85,7 +85,7 @@ export const HippelCoSoControls: React.FC<HippelCoSoControlsProps> = ({
   const accent  = isCyan ? '#00ffff' : '#44aaff';
   const knob    = isCyan ? '#00ffff' : '#66bbff';
   const dim     = isCyan ? '#004444' : '#001833';
-  const panelBg = isCyan ? 'bg-[#041510] border-cyan-900/50' : 'bg-[#000e1a] border-blue-900/30';
+  const panelBg = isCyan ? 'bg-[#041510] border-accent-highlight/20' : 'bg-[#000e1a] border-blue-900/30';
 
   /**
    * Like `upd`, but also writes a single byte to chip RAM when a UADE context is
@@ -150,7 +150,7 @@ export const HippelCoSoControls: React.FC<HippelCoSoControlsProps> = ({
             formatValue={(v) => Math.round(v).toString()}
           />
         </div>
-        <span className="text-[10px] text-gray-600 mt-1 block">ticks per vseq step</span>
+        <span className="text-[10px] text-text-muted mt-1 block">ticks per vseq step</span>
       </div>
 
       {/* Vibrato */}
@@ -202,7 +202,7 @@ export const HippelCoSoControls: React.FC<HippelCoSoControlsProps> = ({
           color={accent}
           height={80}
         />
-        <p className="text-[9px] text-gray-600 mt-1">
+        <p className="text-[9px] text-text-muted mt-1">
           Relative pitch offsets per step (semitones). Use the loop marker (L) to set loop point.
         </p>
       </div>
@@ -220,7 +220,7 @@ export const HippelCoSoControls: React.FC<HippelCoSoControlsProps> = ({
           color={knob}
           height={80}
         />
-        <p className="text-[9px] text-gray-600 mt-1">
+        <p className="text-[9px] text-text-muted mt-1">
           Volume level per step (0–63). Sequence loops at the loop point.
         </p>
       </div>

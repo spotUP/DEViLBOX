@@ -95,7 +95,7 @@ export const ChannelCircularVU: React.FC<ChannelCircularVUProps> = ({ height = 1
         const level = pattern?.channels[ch]?.muted ? 0 : Math.max(0, Math.min(1, (baseLevel * channelMultiplier) + variation));
 
         // Draw cell border
-        ctx.strokeStyle = '#222';
+        ctx.strokeStyle = 'var(--color-border)';
         ctx.lineWidth = 1;
         ctx.strokeRect(x, y, cellWidth, cellHeight);
 
@@ -110,7 +110,7 @@ export const ChannelCircularVU: React.FC<ChannelCircularVUProps> = ({ height = 1
         const maxRadius = Math.min(cellWidth, cellHeight) / 2 - 12;
 
         // Draw outer ring
-        ctx.strokeStyle = '#333';
+        ctx.strokeStyle = 'var(--color-border-light)';
         ctx.lineWidth = 1;
         ctx.beginPath();
         ctx.arc(centerX, centerY, maxRadius, 0, Math.PI * 2);
@@ -137,7 +137,7 @@ export const ChannelCircularVU: React.FC<ChannelCircularVUProps> = ({ height = 1
         }
 
         // Draw center dot
-        ctx.fillStyle = level > 0.5 ? '#00ffff' : '#333';
+        ctx.fillStyle = level > 0.5 ? '#00ffff' : 'var(--color-border-light)';
         ctx.beginPath();
         ctx.arc(centerX, centerY, 3, 0, Math.PI * 2);
         ctx.fill();

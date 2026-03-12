@@ -27,11 +27,11 @@ export const MadBrain4FM2FEditor: React.FC<GeneratorEditorProps> = ({ config, on
       <div className="synth-editor-header px-4 py-3 bg-[#1a1a1a]">
         <div className="flex items-center gap-3">
           <div className="p-2 rounded-lg bg-gradient-to-br from-purple-600 to-indigo-600">
-            <Cpu size={20} className="text-white" />
+            <Cpu size={20} className="text-text-primary" />
           </div>
           <div>
-            <h2 className="text-lg font-bold text-white">MadBrain 4FM2F</h2>
-            <p className="text-xs text-gray-400">4-Op FM Synth by MadBrain</p>
+            <h2 className="text-lg font-bold text-text-primary">MadBrain 4FM2F</h2>
+            <p className="text-xs text-text-secondary">4-Op FM Synth by MadBrain</p>
           </div>
         </div>
       </div>
@@ -39,7 +39,7 @@ export const MadBrain4FM2FEditor: React.FC<GeneratorEditorProps> = ({ config, on
       {/* Content */}
       <div className="p-4 space-y-4">
         {/* Routing Section */}
-        <section className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800">
+        <section className="bg-[#1a1a1a] rounded-xl p-4 border border-dark-border">
           <SectionHeader color="#8b5cf6" title="FM Routing" />
           <div className="flex justify-center">
             <Knob
@@ -56,14 +56,14 @@ export const MadBrain4FM2FEditor: React.FC<GeneratorEditorProps> = ({ config, on
         </section>
 
         {/* Oscillator 4 Section */}
-        <section className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800">
+        <section className="bg-[#1a1a1a] rounded-xl p-4 border border-dark-border">
           <SectionHeader color="#6366f1" title="Oscillator 4" />
           <div className="mb-4">
-            <span className="text-xs text-gray-400 mb-2 block">Waveform</span>
+            <span className="text-xs text-text-secondary mb-2 block">Waveform</span>
             <select
               value={osc4Wave}
               onChange={(e) => updateParam(1, parseInt(e.target.value))}
-              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white"
+              className="w-full bg-dark-bgTertiary border border-dark-borderLight rounded-lg px-3 py-2 text-sm text-text-primary"
             >
               {waveLabels.slice(1).map((label, idx) => (
                 <option key={idx + 1} value={idx + 1}>{label}</option>
@@ -131,11 +131,11 @@ export const MadBrainDynamite6Editor: React.FC<GeneratorEditorProps> = ({ config
       <div className="synth-editor-header px-4 py-3 bg-[#1a1a1a]">
         <div className="flex items-center gap-3">
           <div className="p-2 rounded-lg bg-gradient-to-br from-yellow-500 to-orange-600">
-            <Zap size={20} className="text-white" />
+            <Zap size={20} className="text-text-primary" />
           </div>
           <div>
-            <h2 className="text-lg font-bold text-white">MadBrain Dynamite6</h2>
-            <p className="text-xs text-gray-400">6-Voice Synth by MadBrain</p>
+            <h2 className="text-lg font-bold text-text-primary">MadBrain Dynamite6</h2>
+            <p className="text-xs text-text-secondary">6-Voice Synth by MadBrain</p>
           </div>
         </div>
       </div>
@@ -143,7 +143,7 @@ export const MadBrainDynamite6Editor: React.FC<GeneratorEditorProps> = ({ config
       {/* Content */}
       <div className="p-4 space-y-4">
         {/* Pitch Section */}
-        <section className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800">
+        <section className="bg-[#1a1a1a] rounded-xl p-4 border border-dark-border">
           <SectionHeader color="#eab308" title="Pitch" />
           <div className="flex flex-wrap gap-6 items-end">
             <Knob
@@ -170,7 +170,7 @@ export const MadBrainDynamite6Editor: React.FC<GeneratorEditorProps> = ({ config
         </section>
 
         {/* Envelope Section */}
-        <section className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800">
+        <section className="bg-[#1a1a1a] rounded-xl p-4 border border-dark-border">
           <SectionHeader color="#f97316" title="Envelope" />
           <div className="flex flex-wrap gap-6 items-end">
             <Knob
@@ -217,7 +217,7 @@ export const MadBrainDynamite6Editor: React.FC<GeneratorEditorProps> = ({ config
         </section>
 
         {/* Routing Section */}
-        <section className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800">
+        <section className="bg-[#1a1a1a] rounded-xl p-4 border border-dark-border">
           <SectionHeader color="#f59e0b" title="Routing" />
           <div className="flex flex-wrap gap-1 justify-center">
             {routingLabels.map((label, idx) => (
@@ -228,7 +228,7 @@ export const MadBrainDynamite6Editor: React.FC<GeneratorEditorProps> = ({ config
                   w-10 h-10 rounded-lg font-bold text-sm transition-all
                   ${routing === idx
                     ? 'bg-amber-500/20 text-amber-400 ring-1 ring-amber-500'
-                    : 'bg-gray-800 text-gray-500 hover:text-gray-300'
+                    : 'bg-dark-bgTertiary text-text-muted hover:text-text-secondary'
                   }
                 `}
               >
@@ -274,11 +274,11 @@ export const MakkM3Editor: React.FC<GeneratorEditorProps> = ({ config, onChange 
       <div className="synth-editor-header px-4 py-3 bg-[#1a1a1a]">
         <div className="flex items-center gap-3">
           <div className="p-2 rounded-lg bg-gradient-to-br from-green-500 to-teal-600">
-            <Music size={20} className="text-white" />
+            <Music size={20} className="text-text-primary" />
           </div>
           <div>
-            <h2 className="text-lg font-bold text-white">Makk M3</h2>
-            <p className="text-xs text-gray-400">2-Osc Subtractive Synth by MAKK</p>
+            <h2 className="text-lg font-bold text-text-primary">Makk M3</h2>
+            <p className="text-xs text-text-secondary">2-Osc Subtractive Synth by MAKK</p>
           </div>
         </div>
       </div>
@@ -286,7 +286,7 @@ export const MakkM3Editor: React.FC<GeneratorEditorProps> = ({ config, onChange 
       {/* Content */}
       <div className="p-4 space-y-4">
         {/* Oscillator 1 */}
-        <section className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800">
+        <section className="bg-[#1a1a1a] rounded-xl p-4 border border-dark-border">
           <SectionHeader color="#22c55e" title="Oscillator 1" />
           <div className="flex gap-2 mb-3">
             {waveLabels.map((label, idx) => (
@@ -297,7 +297,7 @@ export const MakkM3Editor: React.FC<GeneratorEditorProps> = ({ config, onChange 
                   flex-1 py-1.5 rounded text-xs font-bold transition-all
                   ${osc1Wave === idx
                     ? 'bg-green-500/20 text-green-400 ring-1 ring-green-500'
-                    : 'bg-gray-800 text-gray-500 hover:text-gray-300'
+                    : 'bg-dark-bgTertiary text-text-muted hover:text-text-secondary'
                   }
                 `}
               >
@@ -320,7 +320,7 @@ export const MakkM3Editor: React.FC<GeneratorEditorProps> = ({ config, onChange 
         </section>
 
         {/* Oscillator 2 */}
-        <section className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800">
+        <section className="bg-[#1a1a1a] rounded-xl p-4 border border-dark-border">
           <SectionHeader color="#14b8a6" title="Oscillator 2" />
           <div className="flex gap-2 mb-3">
             {waveLabels.map((label, idx) => (
@@ -331,7 +331,7 @@ export const MakkM3Editor: React.FC<GeneratorEditorProps> = ({ config, onChange 
                   flex-1 py-1.5 rounded text-xs font-bold transition-all
                   ${osc2Wave === idx
                     ? 'bg-teal-500/20 text-teal-400 ring-1 ring-teal-500'
-                    : 'bg-gray-800 text-gray-500 hover:text-gray-300'
+                    : 'bg-dark-bgTertiary text-text-muted hover:text-text-secondary'
                   }
                 `}
               >
@@ -376,7 +376,7 @@ export const MakkM3Editor: React.FC<GeneratorEditorProps> = ({ config, onChange 
         </section>
 
         {/* Mix + Sub */}
-        <section className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800">
+        <section className="bg-[#1a1a1a] rounded-xl p-4 border border-dark-border">
           <SectionHeader color="#10b981" title="Mix & Sub" />
           <div className="flex gap-1 mb-3 flex-wrap">
             {mixTypeLabels.map((label, idx) => (
@@ -387,7 +387,7 @@ export const MakkM3Editor: React.FC<GeneratorEditorProps> = ({ config, onChange 
                   px-2 py-1 rounded text-xs font-bold transition-all
                   ${mixType === idx
                     ? 'bg-emerald-500/20 text-emerald-400 ring-1 ring-emerald-500'
-                    : 'bg-gray-800 text-gray-500 hover:text-gray-300'
+                    : 'bg-dark-bgTertiary text-text-muted hover:text-text-secondary'
                   }
                 `}
               >
@@ -417,11 +417,11 @@ export const MakkM3Editor: React.FC<GeneratorEditorProps> = ({ config, onChange 
               formatValue={(v) => Math.round(v).toString()}
             />
             <div className="flex flex-col items-center">
-              <span className="text-[10px] text-gray-500 mb-1">Sub Wave</span>
+              <span className="text-[10px] text-text-muted mb-1">Sub Wave</span>
               <select
                 value={subOscWave}
                 onChange={(e) => updateParam(9, parseInt(e.target.value))}
-                className="bg-gray-800 border border-gray-700 rounded px-2 py-1 text-xs text-white"
+                className="bg-dark-bgTertiary border border-dark-borderLight rounded px-2 py-1 text-xs text-text-primary"
               >
                 {subWaveLabels.map((label, idx) => (
                   <option key={idx} value={idx}>{label}</option>
@@ -509,18 +509,18 @@ export const MakkM4Editor: React.FC<GeneratorEditorProps> = ({ config, onChange 
       <div className="synth-editor-header px-4 py-3 bg-[#1a1a1a]">
         <div className="flex items-center gap-3">
           <div className="p-2 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600">
-            <Layers size={20} className="text-white" />
+            <Layers size={20} className="text-text-primary" />
           </div>
           <div>
-            <h2 className="text-lg font-bold text-white">Makk M4</h2>
-            <p className="text-xs text-gray-400">2-Osc Wavetable Synth by MAKK</p>
+            <h2 className="text-lg font-bold text-text-primary">Makk M4</h2>
+            <p className="text-xs text-text-secondary">2-Osc Wavetable Synth by MAKK</p>
           </div>
         </div>
       </div>
 
       <div className="p-4 space-y-4">
         {/* Oscillators */}
-        <section className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800">
+        <section className="bg-[#1a1a1a] rounded-xl p-4 border border-dark-border">
           <div className="flex items-center justify-between mb-4">
             <SectionHeader color="#8b5cf6" title="Oscillators" />
             <button
@@ -541,7 +541,7 @@ export const MakkM4Editor: React.FC<GeneratorEditorProps> = ({ config, onChange 
 
           <div className="grid grid-cols-2 gap-6">
             <div className="space-y-3">
-              <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Osc 1 Wave</label>
+              <label className="text-[10px] font-bold text-text-muted uppercase tracking-wider">Osc 1 Wave</label>
               <Knob
                 value={osc1Wave}
                 min={0}
@@ -553,7 +553,7 @@ export const MakkM4Editor: React.FC<GeneratorEditorProps> = ({ config, onChange 
               />
             </div>
             <div className="space-y-3">
-              <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Osc 2 Wave</label>
+              <label className="text-[10px] font-bold text-text-muted uppercase tracking-wider">Osc 2 Wave</label>
               <Knob
                 value={osc2Wave}
                 min={0}
@@ -599,7 +599,7 @@ export const MakkM4Editor: React.FC<GeneratorEditorProps> = ({ config, onChange 
         </section>
 
         {/* Filter */}
-        <section className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800">
+        <section className="bg-[#1a1a1a] rounded-xl p-4 border border-dark-border">
           <SectionHeader color="#ec4899" title="Filter" />
           <div className="flex flex-wrap gap-6 items-end">
             <Knob

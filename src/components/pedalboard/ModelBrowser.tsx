@@ -100,8 +100,8 @@ export const ModelBrowser: React.FC<ModelBrowserProps> = ({
 
   const accentColor = isCyanTheme ? '#00ffff' : '#ffcc00';
   const bgColor = isCyanTheme ? '#030808' : '#1e1e1e';
-  const panelBg = isCyanTheme ? '#051515' : '#1a1a1a';
-  const borderColor = isCyanTheme ? '#0a3030' : '#333';
+  const panelBg = isCyanTheme ? '#051515' : 'var(--color-bg-tertiary)';
+  const borderColor = isCyanTheme ? '#0a3030' : 'var(--color-border-light)';
 
   // Category icon rendering function
   const getCategoryIcon = (category: ModelCategory) => {
@@ -130,7 +130,7 @@ export const ModelBrowser: React.FC<ModelBrowserProps> = ({
         <div className="p-4 border-b" style={{ borderColor }}>
           {/* Search */}
           <div className="relative mb-3">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={16} />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" size={16} />
             <input
               type="text"
               placeholder="Search models..."
@@ -186,7 +186,7 @@ export const ModelBrowser: React.FC<ModelBrowserProps> = ({
         {/* Model Grid */}
         <div className="flex-1 overflow-y-auto p-4">
           {filteredModels.length === 0 ? (
-            <div className="text-center py-8 text-gray-500" role="status">
+            <div className="text-center py-8 text-text-muted" role="status">
               No models found matching "{searchQuery}"
             </div>
           ) : (
@@ -205,7 +205,7 @@ export const ModelBrowser: React.FC<ModelBrowserProps> = ({
                       >
                         {CATEGORY_LABELS[category]}
                       </h3>
-                      <span className="text-xs text-gray-500">({categoryModels.length})</span>
+                      <span className="text-xs text-text-muted">({categoryModels.length})</span>
                     </div>
 
                     <div className="grid grid-cols-2 gap-2" role="list" aria-label={`${CATEGORY_LABELS[category]} models`}>

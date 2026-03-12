@@ -54,8 +54,8 @@ export const BpmSyncControl: React.FC<BpmSyncControlProps> = ({
         onClick={() => onToggleSync(!isOn)}
         className={`flex items-center gap-1 px-2.5 py-1 rounded text-xs font-bold uppercase tracking-wide transition-colors ${
           isOn
-            ? 'bg-emerald-600 text-white'
-            : 'bg-gray-800 text-gray-500 hover:bg-gray-700'
+            ? 'bg-emerald-600 text-text-primary'
+            : 'bg-dark-bgTertiary text-text-muted hover:bg-dark-bgHover'
         }`}
         title={isOn ? 'BPM sync ON — click to disable' : 'Enable BPM sync'}
       >
@@ -69,7 +69,7 @@ export const BpmSyncControl: React.FC<BpmSyncControlProps> = ({
           <select
             value={syncDivision}
             onChange={(e) => onChangeDivision(e.target.value as SyncDivision)}
-            className="bg-gray-800 text-gray-200 text-xs rounded px-2 py-1 border border-gray-700 focus:outline-none focus:border-emerald-500"
+            className="bg-dark-bgTertiary text-text-secondary text-xs rounded px-2 py-1 border border-dark-borderLight focus:outline-none focus:border-emerald-500"
           >
             {Object.entries(grouped).map(([cat, divs]) => (
               <optgroup key={cat} label={cat}>

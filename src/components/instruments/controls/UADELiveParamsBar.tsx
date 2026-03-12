@@ -56,7 +56,7 @@ export const UADELiveParamsBar: React.FC<UADELiveParamsBarProps> = ({ instrument
   const accent  = isCyan ? '#00ffff' : '#44aaff';
   const knob    = isCyan ? '#00ffff' : '#66bbff';
   const dim     = isCyan ? '#004444' : '#001833';
-  const panelBg = isCyan ? 'bg-[#041510] border-cyan-900/50' : 'bg-[#000e1a] border-blue-900/30';
+  const panelBg = isCyan ? 'bg-[#041510] border-accent-highlight/20' : 'bg-[#000e1a] border-blue-900/30';
 
   const handleVolumeChange = useCallback((v: number) => {
     const rounded = Math.round(v);

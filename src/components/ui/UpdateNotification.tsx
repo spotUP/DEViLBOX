@@ -41,7 +41,7 @@ export const UpdateNotification: React.FC<UpdateNotificationProps> = ({
         <div className="flex items-center gap-2 flex-shrink-0">
           <Button
             onClick={onRefresh}
-            className="px-3 py-1.5 text-xs bg-accent-primary hover:bg-accent-primary/80 text-white font-medium rounded"
+            className="px-3 py-1.5 text-xs bg-accent-primary hover:bg-accent-primary/80 text-text-primary font-medium rounded"
           >
             Refresh
           </Button>

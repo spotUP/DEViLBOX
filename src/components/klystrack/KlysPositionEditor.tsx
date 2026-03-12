@@ -17,13 +17,13 @@ const CH_W = CHAR_W * 7 + 4;      // "P000+00"
 
 const COLORS = {
   bg: '#0d0d0d',
-  headerBg: '#1a1a1a',
+  headerBg: 'var(--color-bg-tertiary)',
   headerText: '#888',
   posNum: '#555',
   pattern: '#e0e0e0',
   transpose: '#ffaa55',
   currentRow: 'rgba(255, 255, 136, 0.15)',
-  channelSep: '#222',
+  channelSep: 'var(--color-border)',
 };
 
 interface KlysPositionEditorProps {

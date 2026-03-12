@@ -23,7 +23,7 @@ export const EFFECT_CATEGORY_COLORS: Record<EffectCategory, string> = {
   panning: 'text-purple-400',   // Panning set, slides
   timing:  'text-yellow-400',   // Note delay, retrigger, cut
   global:  'text-red-400',      // Speed, BPM, position jump, pattern break
-  sample:  'text-cyan-400',     // Sample offset, finetune
+  sample:  'text-accent-highlight',     // Sample offset, finetune
   misc:    'text-orange-400',   // Arpeggio, filter, loop
 };
 

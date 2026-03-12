@@ -78,7 +78,7 @@ export const ArrangementToolbar: React.FC = () => {
     <button
       className={`p-1.5 rounded text-xs transition-colors ${
         tool === mode
-          ? 'bg-accent-primary text-white'
+          ? 'bg-accent-primary text-text-primary'
           : 'bg-dark-bgTertiary text-text-secondary hover:bg-dark-border hover:text-text-primary'
       }`}
       onClick={() => setTool(mode)}
@@ -119,7 +119,7 @@ export const ArrangementToolbar: React.FC = () => {
         <button
           className={`p-1.5 rounded text-xs transition-colors ${
             isPlaying
-              ? 'bg-green-600 text-white'
+              ? 'bg-green-600 text-text-primary'
               : 'bg-dark-bgTertiary text-text-secondary hover:bg-dark-border hover:text-text-primary'
           }`}
           onClick={() => { Tone.start(); togglePlayPause(); }}

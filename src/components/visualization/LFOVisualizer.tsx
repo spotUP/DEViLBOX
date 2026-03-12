@@ -100,7 +100,7 @@ export const LFOVisualizer: React.FC<LFOVisualizerProps> = ({
   height = 50,
   color = '#a855f7',
   dotColor = '#ffffff',
-  backgroundColor = '#1a1a1a',
+  backgroundColor = 'var(--color-bg-tertiary)',
   className = '',
   label = 'LFO',
 }) => {
@@ -158,7 +158,7 @@ export const LFOVisualizer: React.FC<LFOVisualizerProps> = ({
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
       // Draw center line
-      ctx.strokeStyle = '#333';
+      ctx.strokeStyle = 'var(--color-border-light)';
       ctx.lineWidth = 1;
       ctx.beginPath();
       ctx.moveTo(padding.left, centerY);

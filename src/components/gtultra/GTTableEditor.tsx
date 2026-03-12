@@ -68,7 +68,7 @@ export const GTTableEditor: React.FC<{ width: number; height: number }> = ({ wid
     ctx.textBaseline = 'top';
 
     // Header
-    ctx.fillStyle = '#1a1a1a';
+    ctx.fillStyle = 'var(--color-bg-tertiary)';
     ctx.fillRect(0, 0, width, headerHeight);
     ctx.fillStyle = '#888';
     ctx.fillText(' IDX', 4, 2);
@@ -108,12 +108,12 @@ export const GTTableEditor: React.FC<{ width: number; height: number }> = ({ wid
 
       // Left value
       const left = table.left[idx];
-      ctx.fillStyle = left === 0 ? '#333' : color;
+      ctx.fillStyle = left === 0 ? 'var(--color-border-light)' : color;
       ctx.fillText(left.toString(16).toUpperCase().padStart(2, '0'), 40, y + 1);
 
       // Right value
       const right = table.right[idx];
-      ctx.fillStyle = right === 0 ? '#333' : color;
+      ctx.fillStyle = right === 0 ? 'var(--color-border-light)' : color;
       ctx.fillText(right.toString(16).toUpperCase().padStart(2, '0'), 80, y + 1);
 
       // Annotations for wave table left column
@@ -217,7 +217,7 @@ export const GTTableEditor: React.FC<{ width: number; height: number }> = ({ wid
   return (
     <div style={{ width, height, display: 'flex', flexDirection: 'column' }}>
       {/* Tab bar */}
-      <div style={{ display: 'flex', height: tabHeight, background: '#1a1a1a' }}>
+      <div style={{ display: 'flex', height: tabHeight, background: 'var(--color-bg-tertiary)' }}>
         {TABLE_TYPES.map((t) => (
           <button
             key={t}

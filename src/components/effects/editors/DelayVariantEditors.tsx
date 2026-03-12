@@ -84,8 +84,8 @@ export const SpaceyDelayerEditor: React.FC<VisualEffectEditorProps> = ({
             onClick={() => onUpdateParameter('multiTap', multiTap ? 0 : 1)}
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
               multiTap
-                ? 'bg-purple-600 text-white'
-                : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+                ? 'bg-purple-600 text-text-primary'
+                : 'bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover'
             }`}
           >
             Multi-Tap {multiTap ? 'ON' : 'OFF'}
@@ -94,8 +94,8 @@ export const SpaceyDelayerEditor: React.FC<VisualEffectEditorProps> = ({
             onClick={() => onUpdateParameter('tapeFilter', tapeFilter ? 0 : 1)}
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
               tapeFilter
-                ? 'bg-purple-600 text-white'
-                : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+                ? 'bg-purple-600 text-text-primary'
+                : 'bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover'
             }`}
           >
             Tape Filter {tapeFilter ? 'ON' : 'OFF'}
@@ -226,7 +226,7 @@ export const RETapeEchoEditor: React.FC<VisualEffectEditorProps> = ({
       <section className="rounded-xl p-4 border border-border bg-black/30 backdrop-blur-sm shadow-inner-dark">
         <SectionHeader color="#b91c1c" title="Mode & Options" />
         <div className="mb-3">
-          <div className="text-xs text-gray-400 mb-2">Echo Mode</div>
+          <div className="text-xs text-text-secondary mb-2">Echo Mode</div>
           <div className="grid grid-cols-6 gap-1">
             {modeLabels.map((label, i) => (
               <button
@@ -234,8 +234,8 @@ export const RETapeEchoEditor: React.FC<VisualEffectEditorProps> = ({
                 onClick={() => onUpdateParameter('mode', i)}
                 className={`px-2 py-1.5 rounded text-xs font-medium transition-colors ${
                   mode === i
-                    ? 'bg-red-600 text-white'
-                    : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+                    ? 'bg-red-600 text-text-primary'
+                    : 'bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover'
                 }`}
               >
                 {label}
@@ -248,8 +248,8 @@ export const RETapeEchoEditor: React.FC<VisualEffectEditorProps> = ({
             onClick={() => onUpdateParameter('playheadFilter', playheadFilter ? 0 : 1)}
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
               playheadFilter
-                ? 'bg-red-600 text-white'
-                : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+                ? 'bg-red-600 text-text-primary'
+                : 'bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover'
             }`}
           >
             Head EQ {playheadFilter ? 'ON' : 'OFF'}
@@ -258,8 +258,8 @@ export const RETapeEchoEditor: React.FC<VisualEffectEditorProps> = ({
             onClick={() => onUpdateParameter('inputBleed', inputBleed ? 0 : 1)}
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
               inputBleed
-                ? 'bg-red-600 text-white'
-                : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+                ? 'bg-red-600 text-text-primary'
+                : 'bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover'
             }`}
           >
             Bleed {inputBleed ? 'ON' : 'OFF'}

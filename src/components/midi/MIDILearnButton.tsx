@@ -111,7 +111,7 @@ export const MIDILearnButton: React.FC<MIDILearnButtonProps> = ({
       <div className={`inline-flex items-center gap-0.5 ${className}`}>
         <button
           onClick={handleClick}
-          className={`${sizeClasses} flex items-center justify-center rounded text-xs font-mono bg-cyan-500/30 text-cyan-300 hover:bg-cyan-500/50 transition-colors`}
+          className={`${sizeClasses} flex items-center justify-center rounded text-xs font-mono bg-accent-highlight/30 text-accent-highlight hover:bg-accent-highlight/50 transition-colors`}
           title={`CC ${mapping.ccNumber} mapped to ${displayName}. Click to remap.`}
         >
           {mapping.ccNumber}
@@ -134,7 +134,7 @@ export const MIDILearnButton: React.FC<MIDILearnButtonProps> = ({
       className={`${sizeClasses} flex items-center justify-center rounded transition-colors ${className} ${
         isLearning
           ? 'bg-amber-500/50 text-amber-200 animate-pulse'
-          : 'bg-gray-700/50 text-gray-400 hover:bg-gray-600/50 hover:text-gray-300'
+          : 'bg-dark-bgHover/50 text-text-secondary hover:bg-dark-bgHover/50 hover:text-text-secondary'
       }`}
       title={isLearning ? 'Waiting for MIDI CC... Click to cancel' : `Click to learn MIDI CC for ${displayName}`}
     >

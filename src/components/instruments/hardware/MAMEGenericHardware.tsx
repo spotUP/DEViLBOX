@@ -162,7 +162,7 @@ export const MAMEGenericHardware: React.FC<MAMEGenericHardwareProps> = ({
 
   if (!def) {
     return (
-      <div className="p-4 text-gray-500 text-center">
+      <div className="p-4 text-text-muted text-center">
         No parameter definitions for {synthType}
       </div>
     );

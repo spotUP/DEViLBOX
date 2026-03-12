@@ -197,7 +197,7 @@ export const PadButton: React.FC<PadButtonProps> = ({
 
       {/* Pad name */}
       <div className="absolute inset-0 flex items-center justify-center px-2">
-        <span className="text-xs font-bold text-white text-center truncate leading-tight">
+        <span className="text-xs font-bold text-text-primary text-center truncate leading-tight">
           {pad.name}
         </span>
       </div>

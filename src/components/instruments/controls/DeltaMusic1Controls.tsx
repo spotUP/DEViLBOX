@@ -116,7 +116,7 @@ export const DeltaMusic1Controls: React.FC<DeltaMusic1ControlsProps> = ({
   const accent  = isCyan ? '#00ffff' : '#ff9944';
   const knob    = isCyan ? '#00ffff' : '#ffbb66';
   const dim     = isCyan ? '#004444' : '#331800';
-  const panelBg = isCyan ? 'bg-[#041510] border-cyan-900/50' : 'bg-[#1a0e00] border-orange-900/30';
+  const panelBg = isCyan ? 'bg-[#041510] border-accent-highlight/20' : 'bg-[#1a0e00] border-orange-900/30';
 
   // Basic updater — just calls onChange with the partial config
   const upd = useCallback(<K extends keyof DeltaMusic1Config>(key: K, value: DeltaMusic1Config[K]) => {
@@ -199,7 +199,7 @@ export const DeltaMusic1Controls: React.FC<DeltaMusic1ControlsProps> = ({
             label="Volume" color={knob} size="md"
             formatValue={(v) => Math.round(v).toString()}
           />
-          <span className="text-[10px] text-gray-600">0-64 Amiga scale</span>
+          <span className="text-[10px] text-text-muted">0-64 Amiga scale</span>
         </div>
       </div>
 
@@ -271,7 +271,7 @@ export const DeltaMusic1Controls: React.FC<DeltaMusic1ControlsProps> = ({
               label="Length" color={knob} size="sm"
               formatValue={(v) => Math.round(v).toString()}
             />
-            <span className="text-[10px] text-gray-600 self-center">ticks (0 = off)</span>
+            <span className="text-[10px] text-text-muted self-center">ticks (0 = off)</span>
           </div>
         </div>
 
@@ -325,7 +325,7 @@ export const DeltaMusic1Controls: React.FC<DeltaMusic1ControlsProps> = ({
             formatValue={(v) => Math.round(v).toString()}
           />
         </div>
-        <div className="text-[10px] text-gray-600 mt-1">Wait: ticks before start. Step: LFO speed. Depth: period delta.</div>
+        <div className="text-[10px] text-text-muted mt-1">Wait: ticks before start. Step: LFO speed. Depth: period delta.</div>
       </div>
 
       {/* Bend Rate */}
@@ -338,7 +338,7 @@ export const DeltaMusic1Controls: React.FC<DeltaMusic1ControlsProps> = ({
             label="Rate" color={knob} size="md"
             formatValue={(v) => Math.round(v).toString()}
           />
-          <span className="text-[10px] text-gray-600">0 = no bend</span>
+          <span className="text-[10px] text-text-muted">0 = no bend</span>
         </div>
       </div>
 
@@ -352,7 +352,7 @@ export const DeltaMusic1Controls: React.FC<DeltaMusic1ControlsProps> = ({
             label="Speed" color={knob} size="md"
             formatValue={(v) => Math.round(v).toString()}
           />
-          <span className="text-[10px] text-gray-600">0 = disabled</span>
+          <span className="text-[10px] text-text-muted">0 = disabled</span>
         </div>
       </div>
 
@@ -367,7 +367,7 @@ export const DeltaMusic1Controls: React.FC<DeltaMusic1ControlsProps> = ({
               label="Delay" color={knob} size="md"
               formatValue={(v) => Math.round(v).toString()}
             />
-            <span className="text-[10px] text-gray-600">ticks between waveform segment advances</span>
+            <span className="text-[10px] text-text-muted">ticks between waveform segment advances</span>
           </div>
         </div>
       )}
@@ -408,7 +408,7 @@ export const DeltaMusic1Controls: React.FC<DeltaMusic1ControlsProps> = ({
             color={accent}
             height={80}
           />
-          <div className="text-[10px] text-gray-600 mt-2">
+          <div className="text-[10px] text-text-muted mt-2">
             8 semitone offsets played in sequence. 0 = no arpeggio.
           </div>
         </div>
@@ -421,7 +421,7 @@ export const DeltaMusic1Controls: React.FC<DeltaMusic1ControlsProps> = ({
   const renderTable = () => {
     if (config.isSample || !config.table) {
       return (
-        <div className="p-3 text-[11px] text-gray-500">
+        <div className="p-3 text-[11px] text-text-muted">
           No synth sound table — this is a PCM sample instrument.
         </div>
       );

@@ -127,8 +127,8 @@ export const CameraControlOverlay: React.FC<CameraControlOverlayProps> = ({
     }
   }, [getControls]);
 
-  const pad = "w-10 h-10 flex items-center justify-center rounded bg-black/50 hover:bg-white/20 text-white/70 hover:text-white text-[10px] leading-tight select-none cursor-grab active:cursor-grabbing border border-white/10 transition-colors touch-none";
-  const btn = "w-10 h-6 flex items-center justify-center rounded bg-black/50 hover:bg-white/20 text-white/70 hover:text-white text-[10px] select-none cursor-pointer border border-white/10 transition-colors";
+  const pad = "w-10 h-10 flex items-center justify-center rounded bg-black/50 hover:bg-white/20 text-white/70 hover:text-text-primary text-[10px] leading-tight select-none cursor-grab active:cursor-grabbing border border-white/10 transition-colors touch-none";
+  const btn = "w-10 h-6 flex items-center justify-center rounded bg-black/50 hover:bg-white/20 text-white/70 hover:text-text-primary text-[10px] select-none cursor-pointer border border-white/10 transition-colors";
 
   return (
     <div

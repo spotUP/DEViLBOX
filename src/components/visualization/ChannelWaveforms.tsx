@@ -86,7 +86,7 @@ export const ChannelWaveforms: React.FC<ChannelWaveformsProps> = ({ height = 100
           const y = row * cellHeight;
 
           // Draw cell border
-          ctx.strokeStyle = '#222';
+          ctx.strokeStyle = 'var(--color-border)';
           ctx.lineWidth = 1;
           ctx.strokeRect(x, y, cellWidth, cellHeight);
 
@@ -105,7 +105,7 @@ export const ChannelWaveforms: React.FC<ChannelWaveformsProps> = ({ height = 100
           const channelOffset = Math.floor((ch / channelCount) * values.length);
           const phaseShift = (ch * 123) % values.length; // Prime number for good distribution
 
-          ctx.strokeStyle = pattern?.channels[ch]?.muted ? '#333' : '#00d4aa';
+          ctx.strokeStyle = pattern?.channels[ch]?.muted ? 'var(--color-border-light)' : '#00d4aa';
           ctx.lineWidth = 1.5;
           ctx.beginPath();
 

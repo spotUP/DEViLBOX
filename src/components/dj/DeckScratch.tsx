@@ -136,7 +136,7 @@ export const DeckScratch: React.FC<DeckScratchProps> = ({ deckId }) => {
                     ? `${deckWaitBg} ${deckColor} animate-pulse`
                     : activePatternName !== null
                       ? 'bg-transparent border-white/5 text-white/20 cursor-not-allowed'
-                      : 'bg-transparent border-white/10 text-white/40 hover:border-white/30 hover:text-white/70'
+                      : 'bg-transparent border-white/10 text-white/40 hover:border-white/30 hover:text-text-primary/70'
                 }
               `}
               title={pattern.name}
@@ -189,7 +189,7 @@ export const DeckScratch: React.FC<DeckScratchProps> = ({ deckId }) => {
             px-2 py-0.5 rounded border font-mono text-xs tracking-wider transition-all
             ${!faderLFOActive
               ? `${deckActiveBg} ${deckColor}`
-              : 'bg-transparent border-white/10 text-white/40 hover:border-white/30 hover:text-white/70'
+              : 'bg-transparent border-white/10 text-white/40 hover:border-white/30 hover:text-text-primary/70'
             }
           `}
         >
@@ -206,7 +206,7 @@ export const DeckScratch: React.FC<DeckScratchProps> = ({ deckId }) => {
                 px-2 py-0.5 rounded border font-mono text-xs tracking-wider transition-all
                 ${isActive
                   ? `${deckActiveBg} ${deckColor}`
-                  : 'bg-transparent border-white/10 text-white/40 hover:border-white/30 hover:text-white/70'
+                  : 'bg-transparent border-white/10 text-white/40 hover:border-white/30 hover:text-text-primary/70'
                 }
               `}
               title={`Fader LFO ${division} note`}

@@ -70,7 +70,7 @@ export const HivelyControls: React.FC<HivelyControlsProps> = ({
   const knobColor = isCyanTheme ? '#00ffff' : '#66ddaa';
   const dimColor = isCyanTheme ? '#004444' : '#1a3328';
   const panelBg = isCyanTheme
-    ? 'bg-[#041510] border-cyan-900/50'
+    ? 'bg-[#041510] border-accent-highlight/20'
     : 'bg-[#0a1a12] border-green-900/30';
   // Update helpers using refs to avoid stale state
   const updateParam = useCallback(<K extends keyof HivelyConfig>(key: K, value: HivelyConfig[K]) => {
@@ -122,7 +122,7 @@ export const HivelyControls: React.FC<HivelyControlsProps> = ({
     onChange: (v: number) => void; format?: 'dec' | 'hex'; width?: string;
   }> = ({ label, value, min, max, onChange: onBoxChange, width = '48px' }) => (
     <div className="flex items-center gap-1.5">
-      <span className="text-[10px] text-gray-400 w-16 text-right whitespace-nowrap">{label}</span>
+      <span className="text-[10px] text-text-secondary w-16 text-right whitespace-nowrap">{label}</span>
       <input
         type="number"
         value={value}
@@ -155,7 +155,7 @@ export const HivelyControls: React.FC<HivelyControlsProps> = ({
             label="Volume" color={knobColor} size="md"
             formatValue={(v) => Math.round(v).toString()} />
           <div className="flex flex-col gap-1">
-            <span className="text-[10px] text-gray-400 uppercase tracking-wide">Wave Length</span>
+            <span className="text-[10px] text-text-secondary uppercase tracking-wide">Wave Length</span>
             <div className="flex gap-1">
               {WAVE_LENGTH_LABELS.map((label, i) => (
                 <button key={i}
@@ -164,7 +164,7 @@ export const HivelyControls: React.FC<HivelyControlsProps> = ({
                   style={{
                     background: config.waveLength === i ? accentColor : '#111',
                     color: config.waveLength === i ? '#000' : '#666',
-                    border: `1px solid ${config.waveLength === i ? accentColor : '#333'}`,
+                    border: `1px solid ${config.waveLength === i ? accentColor : 'var(--color-border-light)'}`,
                   }}>
                   {label}
                 </button>
@@ -301,7 +301,7 @@ export const HivelyControls: React.FC<HivelyControlsProps> = ({
             style={{
               background: config.hardCutRelease ? accentColor : '#111',
               color: config.hardCutRelease ? '#000' : '#666',
-              border: `1px solid ${config.hardCutRelease ? accentColor : '#333'}`,
+              border: `1px solid ${config.hardCutRelease ? accentColor : 'var(--color-border-light)'}`,
             }}>
             {config.hardCutRelease ? 'ON' : 'OFF'}
           </button>
@@ -331,14 +331,14 @@ export const HivelyControls: React.FC<HivelyControlsProps> = ({
             <button
               onClick={() => insertPerfRow(perfCursorY)}
               className="px-2 py-1 text-[10px] font-mono rounded border transition-colors hover:opacity-80"
-              style={{ borderColor: dimColor, color: accentColor, background: '#111' }}
+              style={{ borderColor: dimColor, color: accentColor, background: 'var(--color-bg-secondary)' }}
               title="Insert row (Shift+Enter)">
               +Row
             </button>
             <button
               onClick={() => deletePerfRow(perfCursorY)}
               className="px-2 py-1 text-[10px] font-mono rounded border transition-colors hover:opacity-80"
-              style={{ borderColor: dimColor, color: '#ff6666', background: '#111' }}
+              style={{ borderColor: dimColor, color: '#ff6666', background: 'var(--color-bg-secondary)' }}
               title="Delete row (Shift+Backspace)">
               -Row
             </button>
@@ -346,7 +346,7 @@ export const HivelyControls: React.FC<HivelyControlsProps> = ({
         </div>
 
         {/* Column headers */}
-        <div className="flex font-mono text-[10px] text-gray-500 px-1 border-b"
+        <div className="flex font-mono text-[10px] text-text-muted px-1 border-b"
           style={{ borderColor: dimColor }}>
           <span className="w-8 text-center">#</span>
           <span className="w-10 text-center">Note</span>
@@ -375,7 +375,7 @@ export const HivelyControls: React.FC<HivelyControlsProps> = ({
                 }}
                 onClick={() => setPerfCursorY(i)}>
                 {/* Row index */}
-                <span className="w-8 text-center text-gray-600">{i.toString().padStart(3, '0')}</span>
+                <span className="w-8 text-center text-text-muted">{i.toString().padStart(3, '0')}</span>
 
                 {/* Note */}
                 <select className="w-10 text-center bg-transparent border-none outline-none cursor-pointer"
@@ -383,13 +383,13 @@ export const HivelyControls: React.FC<HivelyControlsProps> = ({
                   value={entry.note}
                   onChange={(e) => updatePerfEntry(i, { note: parseInt(e.target.value) })}>
                   {NOTE_NAMES.map((name, ni) => (
-                    <option key={ni} value={ni} style={{ background: '#111', color: '#ccc' }}>{name}</option>
+                    <option key={ni} value={ni} style={{ background: 'var(--color-bg-secondary)', color: 'var(--color-text-secondary)' }}>{name}</option>
                   ))}
                 </select>
 
                 {/* Fixed */}
                 <span className="w-4 text-center cursor-pointer"
-                  style={{ color: entry.fixed ? '#ffaa00' : '#333' }}
+                  style={{ color: entry.fixed ? '#ffaa00' : 'var(--color-border-light)' }}
                   onClick={(e) => { e.stopPropagation(); updatePerfEntry(i, { fixed: !entry.fixed }); }}>
                   {entry.fixed ? '*' : '.'}
                 </span>
@@ -399,11 +399,11 @@ export const HivelyControls: React.FC<HivelyControlsProps> = ({
                   style={{ color: entry.waveform > 0 ? '#aaddff' : '#444' }}
                   value={entry.waveform}
                   onChange={(e) => updatePerfEntry(i, { waveform: parseInt(e.target.value) })}>
-                  <option value={0} style={{ background: '#111' }}>0</option>
-                  <option value={1} style={{ background: '#111' }}>1</option>
-                  <option value={2} style={{ background: '#111' }}>2</option>
-                  <option value={3} style={{ background: '#111' }}>3</option>
-                  <option value={4} style={{ background: '#111' }}>4</option>
+                  <option value={0} style={{ background: 'var(--color-bg-secondary)' }}>0</option>
+                  <option value={1} style={{ background: 'var(--color-bg-secondary)' }}>1</option>
+                  <option value={2} style={{ background: 'var(--color-bg-secondary)' }}>2</option>
+                  <option value={3} style={{ background: 'var(--color-bg-secondary)' }}>3</option>
+                  <option value={4} style={{ background: 'var(--color-bg-secondary)' }}>4</option>
                 </select>
 
                 {/* FX1 */}
@@ -412,7 +412,7 @@ export const HivelyControls: React.FC<HivelyControlsProps> = ({
                   value={entry.fx[0]}
                   onChange={(e) => updatePerfEntry(i, { fx: [parseInt(e.target.value), entry.fx[1]] })}>
                   {Array.from({ length: 16 }, (_, n) => (
-                    <option key={n} value={n} style={{ background: '#111' }}>
+                    <option key={n} value={n} style={{ background: 'var(--color-bg-secondary)' }}>
                       {n.toString(16).toUpperCase()}
                     </option>
                   ))}
@@ -434,7 +434,7 @@ export const HivelyControls: React.FC<HivelyControlsProps> = ({
                   value={entry.fx[1]}
                   onChange={(e) => updatePerfEntry(i, { fx: [entry.fx[0], parseInt(e.target.value)] })}>
                   {Array.from({ length: 16 }, (_, n) => (
-                    <option key={n} value={n} style={{ background: '#111' }}>
+                    <option key={n} value={n} style={{ background: 'var(--color-bg-secondary)' }}>
                       {n.toString(16).toUpperCase()}
                     </option>
                   ))}
@@ -456,10 +456,10 @@ export const HivelyControls: React.FC<HivelyControlsProps> = ({
 
         {/* Effect reference */}
         <div className="mt-2 p-2 rounded border text-[9px] font-mono grid grid-cols-4 gap-x-3 gap-y-0.5"
-          style={{ borderColor: dimColor, color: '#555' }}>
+          style={{ borderColor: dimColor, color: 'var(--color-text-muted)' }}>
           {Object.entries(PL_FX_NAMES).map(([code, name]) => (
             <span key={code}>
-              <span style={{ color: '#888' }}>{parseInt(code).toString(16).toUpperCase()}</span>
+              <span style={{ color: 'var(--color-text-muted)' }}>{parseInt(code).toString(16).toUpperCase()}</span>
               ={name}
             </span>
           ))}

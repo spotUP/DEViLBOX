@@ -212,7 +212,7 @@ export const EffectPicker: React.FC<EffectPickerProps> = ({ isOpen, position, on
             onClick={() => setSelectedCategory('all')}
             className={`px-2 py-0.5 text-[10px] rounded ${
               selectedCategory === 'all'
-                ? 'bg-neutral-700 text-white'
+                ? 'bg-neutral-700 text-text-primary'
                 : 'text-neutral-400 hover:text-neutral-200'
             }`}
           >
@@ -224,7 +224,7 @@ export const EffectPicker: React.FC<EffectPickerProps> = ({ isOpen, position, on
               onClick={() => setSelectedCategory(cat)}
               className={`px-2 py-0.5 text-[10px] rounded ${
                 selectedCategory === cat
-                  ? 'bg-neutral-700 text-white'
+                  ? 'bg-neutral-700 text-text-primary'
                   : `${EXTENDED_CATEGORY_COLORS[cat]} hover:opacity-80`
               }`}
             >
@@ -237,7 +237,7 @@ export const EffectPicker: React.FC<EffectPickerProps> = ({ isOpen, position, on
               onClick={() => setSelectedCategory('chip')}
               className={`px-2 py-0.5 text-[10px] rounded ${
                 selectedCategory === 'chip'
-                  ? 'bg-pink-700 text-white'
+                  ? 'bg-pink-700 text-text-primary'
                   : `${EXTENDED_CATEGORY_COLORS.chip} hover:opacity-80`
               }`}
             >

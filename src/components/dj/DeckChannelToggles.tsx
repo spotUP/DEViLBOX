@@ -66,7 +66,7 @@ export const DeckChannelToggles: React.FC<DeckChannelTogglesProps> = ({ deckId }
               active:translate-y-[0.5px]
               ${
                 enabled
-                  ? 'bg-accent-primary text-white'
+                  ? 'bg-accent-primary text-text-primary'
                   : 'bg-dark-bgTertiary text-text-muted hover:bg-dark-bgHover'
               }
             `}
@@ -87,7 +87,7 @@ export const DeckChannelToggles: React.FC<DeckChannelTogglesProps> = ({ deckId }
           active:translate-y-[0.5px]
           ${
             allEnabled
-              ? 'bg-accent-primary/60 text-white'
+              ? 'bg-accent-primary/60 text-text-primary'
               : 'bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover'
           }
         `}

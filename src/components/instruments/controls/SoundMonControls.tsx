@@ -161,7 +161,7 @@ export const SoundMonControls: React.FC<SoundMonControlsProps> = ({
   const accent  = isCyan ? '#00ffff' : '#44aaff';
   const knob    = isCyan ? '#00ffff' : '#66bbff';
   const dim     = isCyan ? '#004444' : '#001833';
-  const panelBg = isCyan ? 'bg-[#041510] border-cyan-900/50' : 'bg-[#000e1a] border-blue-900/30';
+  const panelBg = isCyan ? 'bg-[#041510] border-accent-highlight/20' : 'bg-[#000e1a] border-blue-900/30';
 
   const upd = useCallback(<K extends keyof SoundMonConfig>(key: K, value: SoundMonConfig[K]) => {
     onChange({ [key]: value } as Partial<SoundMonConfig>);
@@ -393,7 +393,7 @@ export const SoundMonControls: React.FC<SoundMonControlsProps> = ({
             label="Speed" color={knob} size="md"
             formatValue={(v) => Math.round(v).toString()} />
           {/* portamentoSpeed has no dedicated byte in the instrument header. */}
-          <span className="text-[10px] text-gray-600">0 = disabled</span>
+          <span className="text-[10px] text-text-muted">0 = disabled</span>
         </div>
       </div>
     </div>

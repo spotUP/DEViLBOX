@@ -504,7 +504,7 @@ export const MacroEditor: React.FC<MacroEditorProps> = ({
           <button
             onClick={() => { setIsSettingLoop(!isSettingLoop); setIsSettingRelease(false); }}
             className={`p-1 rounded transition-colors ${
-              isSettingLoop ? 'bg-blue-500 text-white' : 'text-blue-400 hover:bg-blue-500/20'
+              isSettingLoop ? 'bg-blue-500 text-text-primary' : 'text-blue-400 hover:bg-blue-500/20'
             }`}
             title={isSettingLoop ? 'Click canvas to set loop point' : 'Set loop point'}>
             <Repeat size={12} />
@@ -514,7 +514,7 @@ export const MacroEditor: React.FC<MacroEditorProps> = ({
           <button
             onClick={() => { setIsSettingRelease(!isSettingRelease); setIsSettingLoop(false); }}
             className={`p-1 rounded transition-colors ${
-              isSettingRelease ? 'bg-red-500 text-white' : 'text-red-400 hover:bg-red-500/20'
+              isSettingRelease ? 'bg-red-500 text-text-primary' : 'text-red-400 hover:bg-red-500/20'
             }`}
             title={isSettingRelease ? 'Click canvas to set release point' : 'Set release point'}>
             <Flag size={12} />

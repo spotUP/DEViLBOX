@@ -1013,7 +1013,7 @@ export const NibblesGame: React.FC<NibblesGameProps> = ({ height = 120, onExit }
       {/* HUD Overlay */}
       <div className={`absolute top-0 left-0 w-full flex justify-between px-2 py-0.5 pointer-events-none z-10 bg-black/40 backdrop-blur-sm transition-opacity opacity-0 ${uiState.isPlaying ? 'group-hover:opacity-100' : ''}`}>
         <div className="flex items-center gap-2">
-          <span className="font-mono text-[8px] text-white uppercase">P1: {uiState.score1} | L:{uiState.lives1}</span>
+          <span className="font-mono text-[8px] text-text-primary uppercase">P1: {uiState.score1} | L:{uiState.lives1}</span>
           {scoreMultiplier > 1 && (
             <span className="text-yellow-400 font-bold text-[9px] animate-pulse">
               x{scoreMultiplier}
@@ -1021,7 +1021,7 @@ export const NibblesGame: React.FC<NibblesGameProps> = ({ height = 120, onExit }
           )}
         </div>
         <div className="font-mono text-[8px] text-accent-primary font-bold">LVL {uiState.level + 1}</div>
-        <div className="font-mono text-[8px] text-white uppercase">P2: {uiState.score2} | L:{uiState.lives2}</div>
+        <div className="font-mono text-[8px] text-text-primary uppercase">P2: {uiState.score2} | L:{uiState.lives2}</div>
       </div>
 
       <canvas
@@ -1042,27 +1042,27 @@ export const NibblesGame: React.FC<NibblesGameProps> = ({ height = 120, onExit }
       {!uiState.isPlaying && !uiState.showMenu && !uiState.showHighScores && (
         <div className="absolute inset-0 flex items-center justify-center bg-black/60 backdrop-blur-sm z-20">
           <div className="flex flex-col items-center gap-2 scale-75 md:scale-100">
-            <h3 className="text-white font-bold text-sm tracking-widest uppercase">NIBBLES</h3>
+            <h3 className="text-text-primary font-bold text-sm tracking-widest uppercase">NIBBLES</h3>
             <button
               onClick={(e) => {
                 e.stopPropagation();
                 resetGame();
                 setIsPlaying(true);
               }}
-              className="bg-accent-primary hover:bg-accent-secondary text-white px-6 py-1 rounded-full text-xs font-bold uppercase transition-all shadow-glow-sm"
+              className="bg-accent-primary hover:bg-accent-secondary text-text-primary px-6 py-1 rounded-full text-xs font-bold uppercase transition-all shadow-glow-sm"
             >
               Start Game
             </button>
             <div className="flex gap-4">
               <button 
                 onClick={(e) => { e.stopPropagation(); setShowMenu(true); }} 
-                className="text-text-muted hover:text-white text-[9px] uppercase font-mono"
+                className="text-text-muted hover:text-text-primary text-[9px] uppercase font-mono"
               >
                 Options
               </button>
               <button 
                 onClick={(e) => { e.stopPropagation(); setShowHighScores(true); loadHighScores(); }} 
-                className="text-text-muted hover:text-white text-[9px] uppercase font-mono"
+                className="text-text-muted hover:text-text-primary text-[9px] uppercase font-mono"
               >
                 High Scores
               </button>
@@ -1087,7 +1087,7 @@ export const NibblesGame: React.FC<NibblesGameProps> = ({ height = 120, onExit }
             <span className="text-accent-primary font-bold text-[10px] uppercase tracking-wider">Fasttracker Nibbles Highscore</span>
             <button 
               onClick={(e) => { e.stopPropagation(); setShowHighScores(false); }} 
-              className="text-text-muted hover:text-white uppercase text-[10px]"
+              className="text-text-muted hover:text-text-primary uppercase text-[10px]"
             >
               Close
             </button>
@@ -1134,10 +1134,10 @@ export const NibblesGame: React.FC<NibblesGameProps> = ({ height = 120, onExit }
           onClick={(e) => e.stopPropagation()}
         >
           <div className="flex justify-between items-center border-b border-dark-border pb-1">
-            <span className="text-white font-bold text-[10px] uppercase">Options</span>
+            <span className="text-text-primary font-bold text-[10px] uppercase">Options</span>
             <button 
               onClick={(e) => { e.stopPropagation(); setShowMenu(false); }} 
-              className="text-text-muted hover:text-white uppercase text-[10px]"
+              className="text-text-muted hover:text-text-primary uppercase text-[10px]"
             >
               Close
             </button>
@@ -1149,7 +1149,7 @@ export const NibblesGame: React.FC<NibblesGameProps> = ({ height = 120, onExit }
               <select 
                 value={speed} 
                 onChange={e => { e.stopPropagation(); setSpeed(parseInt(e.target.value)); }} 
-                className="bg-dark-bgTertiary border border-dark-border rounded px-1 py-0.5 text-white"
+                className="bg-dark-bgTertiary border border-dark-border rounded px-1 py-0.5 text-text-primary"
               >
                 <option value={0}>Novice</option>
                 <option value={1}>Average</option>
@@ -1162,7 +1162,7 @@ export const NibblesGame: React.FC<NibblesGameProps> = ({ height = 120, onExit }
               <select 
                 value={numPlayers} 
                 onChange={e => { e.stopPropagation(); setNumPlayers(parseInt(e.target.value)); }} 
-                className="bg-dark-bgTertiary border border-dark-border rounded px-1 py-0.5 text-white"
+                className="bg-dark-bgTertiary border border-dark-border rounded px-1 py-0.5 text-text-primary"
               >
                 <option value={1}>1 Player</option>
                 <option value={2}>2 Players</option>
@@ -1250,7 +1250,7 @@ export const NibblesGame: React.FC<NibblesGameProps> = ({ height = 120, onExit }
               maxLength={20}
               placeholder="Enter your name"
               autoFocus
-              className="bg-dark-bgTertiary border border-dark-border rounded px-2 py-1 text-white text-[10px] font-mono focus:border-accent-primary focus:outline-none"
+              className="bg-dark-bgTertiary border border-dark-border rounded px-2 py-1 text-text-primary text-[10px] font-mono focus:border-accent-primary focus:outline-none"
             />
             <div className="flex gap-2">
               <button
@@ -1258,7 +1258,7 @@ export const NibblesGame: React.FC<NibblesGameProps> = ({ height = 120, onExit }
                   e.stopPropagation();
                   handleNameSubmit();
                 }}
-                className="flex-1 bg-accent-primary hover:bg-accent-secondary text-white px-3 py-1 rounded text-[9px] font-bold uppercase transition-all"
+                className="flex-1 bg-accent-primary hover:bg-accent-secondary text-text-primary px-3 py-1 rounded text-[9px] font-bold uppercase transition-all"
               >
                 Submit
               </button>

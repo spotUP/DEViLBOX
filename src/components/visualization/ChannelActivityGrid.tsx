@@ -136,7 +136,7 @@ export const ChannelActivityGrid: React.FC<ChannelActivityGridProps> = ({ height
         ctx.fillText((ch + 1).toString(), x + cellWidth / 2, y + cellHeight / 2 + 3);
 
         // Draw border
-        ctx.strokeStyle = pattern?.channels[ch]?.solo ? '#00ffff' : '#222';
+        ctx.strokeStyle = pattern?.channels[ch]?.solo ? '#00ffff' : 'var(--color-border)';
         ctx.lineWidth = pattern?.channels[ch]?.solo ? 2 : 1;
         ctx.strokeRect(x + padding, y + padding, cellWidth - padding * 2, cellHeight - padding * 2);
       }

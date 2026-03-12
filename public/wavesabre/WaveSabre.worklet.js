@@ -26,6 +26,7 @@ let wavesabre_set_gmdls_data = null;
 let wavesabre_has_gmdls = null;
 let wavesabre_destroy = null;
 let wavesabre_set_param = null;
+let wavesabre_get_param = null;
 let wavesabre_set_chunk = null;
 let wavesabre_note_on = null;
 let wavesabre_note_off = null;
@@ -86,6 +87,20 @@ class WaveSabreProcessor extends AudioWorkletProcessor {
             Module.HEAPU8.set(chunkBytes, chunkPtr);
             wavesabre_set_chunk(synth, chunkPtr, chunkBytes.length);
             Module._free(chunkPtr);
+            // Verify key params after chunk load (Osc volumes at indices 2, 7, 12)
+            if (wavesabre_get_param) {
+              const osc1Vol = wavesabre_get_param(synth, 2);
+              const osc2Vol = wavesabre_get_param(synth, 7);
+              const osc3Vol = wavesabre_get_param(synth, 12);
+              const masterVol = wavesabre_get_param(synth, 28);
+              console.log('[WaveSabre] After chunk: Osc1Vol=' + osc1Vol.toFixed(3) + 
+                          ' Osc2Vol=' + osc2Vol.toFixed(3) + 
+                          ' Osc3Vol=' + osc3Vol.toFixed(3) +
+                          ' Master=' + masterVol.toFixed(3));
+              if (osc1Vol === 0 && osc2Vol === 0 && osc3Vol === 0) {
+                console.warn('[WaveSabre] ⚠️ All oscillator volumes are 0 - preset may be silent!');
+              }
+            }
             console.log('[WaveSabre] Chunk loaded successfully');
           }
           break;
@@ -120,6 +135,7 @@ class WaveSabreProcessor extends AudioWorkletProcessor {
       wavesabre_has_gmdls = Module.cwrap('wavesabre_has_gmdls', 'number', []);
       wavesabre_destroy = Module.cwrap('wavesabre_destroy', null, ['number']);
       wavesabre_set_param = Module.cwrap('wavesabre_set_param', null, ['number', 'number', 'number']);
+      wavesabre_get_param = Module.cwrap('wavesabre_get_param', 'number', ['number', 'number']);
       wavesabre_set_chunk = Module.cwrap('wavesabre_set_chunk', null, ['number', 'number', 'number']);
       wavesabre_note_on = Module.cwrap('wavesabre_note_on', null, ['number', 'number', 'number', 'number']);
       wavesabre_note_off = Module.cwrap('wavesabre_note_off', null, ['number', 'number']);

@@ -17,11 +17,11 @@ export const AutomationPanel: React.FC = () => {
   // Theme-aware colors for "has data" indicator
   const currentThemeId = useThemeStore((state) => state.currentThemeId);
   const isCyanTheme = currentThemeId === 'cyan-lineart';
-  const hasDataBg = isCyanTheme ? 'bg-cyan-500/20' : 'bg-orange-500/20';
-  const hasDataText = isCyanTheme ? 'text-cyan-400' : 'text-orange-400';
-  const hasDataBorder = isCyanTheme ? 'border-cyan-500' : 'border-orange-500';
-  const hasDataHover = isCyanTheme ? 'hover:bg-cyan-500/30' : 'hover:bg-orange-500/30';
-  const hasDataDot = isCyanTheme ? 'bg-cyan-500' : 'bg-orange-500';
+  const hasDataBg = isCyanTheme ? 'bg-accent-highlight/20' : 'bg-orange-500/20';
+  const hasDataText = isCyanTheme ? 'text-accent-highlight' : 'text-orange-400';
+  const hasDataBorder = isCyanTheme ? 'border-accent-highlight' : 'border-orange-500';
+  const hasDataHover = isCyanTheme ? 'hover:bg-accent-highlight/30' : 'hover:bg-orange-500/30';
+  const hasDataDot = isCyanTheme ? 'bg-accent-highlight' : 'bg-orange-500';
 
   const pattern = patterns[currentPatternIndex];
   const numChannels = pattern?.channels.length || 4;

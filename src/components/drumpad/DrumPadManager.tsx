@@ -355,7 +355,7 @@ export const DrumPadManager: React.FC<DrumPadManagerProps> = ({ onClose }) => {
           <div className="flex items-center gap-2">
             <button
               onClick={() => useUIStore.getState().openModal('midi-pads')}
-              className="px-3 py-1.5 text-xs font-mono text-text-muted hover:text-white bg-dark-bgTertiary border border-dark-border rounded transition-colors flex items-center gap-1.5"
+              className="px-3 py-1.5 text-xs font-mono text-text-muted hover:text-text-primary bg-dark-bgTertiary border border-dark-border rounded transition-colors flex items-center gap-1.5"
               title="Open MIDI Pad Mapper"
             >
               <Piano className="w-3.5 h-3.5" />
@@ -394,7 +394,7 @@ export const DrumPadManager: React.FC<DrumPadManagerProps> = ({ onClose }) => {
                 <select
                   value={currentProgramId}
                   onChange={(e) => handleProgramChange(e.target.value)}
-                  className="w-full bg-dark-surface border border-dark-border rounded px-3 py-2 text-sm text-white font-mono focus:outline-none focus:ring-2 focus:ring-accent-primary"
+                  className="w-full bg-dark-surface border border-dark-border rounded px-3 py-2 text-sm text-text-primary font-mono focus:outline-none focus:ring-2 focus:ring-accent-primary"
                 >
                   {Array.from(programs.entries()).map(([id, program]) => (
                     <option key={id} value={id}>
@@ -406,19 +406,19 @@ export const DrumPadManager: React.FC<DrumPadManagerProps> = ({ onClose }) => {
                 <div className="grid grid-cols-3 gap-2 mt-3">
                   <button
                     onClick={handleNewProgram}
-                    className="px-3 py-2 bg-accent-primary hover:bg-accent-primary/80 text-white text-xs font-bold rounded transition-colors"
+                    className="px-3 py-2 bg-accent-primary hover:bg-accent-primary/80 text-text-primary text-xs font-bold rounded transition-colors"
                   >
                     + New
                   </button>
                   <button
                     onClick={handleCopyProgram}
-                    className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded transition-colors"
+                    className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-text-primary text-xs font-bold rounded transition-colors"
                   >
                     Copy
                   </button>
                   <button
                     onClick={handleDeleteProgram}
-                    className="px-3 py-2 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded transition-colors"
+                    className="px-3 py-2 bg-red-600 hover:bg-red-700 text-text-primary text-xs font-bold rounded transition-colors"
                     disabled={programs.size <= 1}
                   >
                     Delete
@@ -431,7 +431,7 @@ export const DrumPadManager: React.FC<DrumPadManagerProps> = ({ onClose }) => {
                   <select
                     value={selectedKitSourceId}
                     onChange={(e) => setSelectedKitSourceId(e.target.value)}
-                    className="w-full bg-dark-surface border border-dark-border rounded px-3 py-2 text-xs text-white focus:outline-none focus:ring-2 focus:ring-accent-primary"
+                    className="w-full bg-dark-surface border border-dark-border rounded px-3 py-2 text-xs text-text-primary focus:outline-none focus:ring-2 focus:ring-accent-primary"
                   >
                     {allKitSources.map((source) => (
                       <option key={source.id} value={source.id}>
@@ -448,7 +448,7 @@ export const DrumPadManager: React.FC<DrumPadManagerProps> = ({ onClose }) => {
                 {/* Add to Instruments Button */}
                 <button
                   onClick={handleLoadKit}
-                  className="w-full mt-2 px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded transition-colors flex items-center justify-center gap-2"
+                  className="w-full mt-2 px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-text-primary text-xs font-bold rounded transition-colors flex items-center justify-center gap-2"
                 >
                   <Download className="w-3 h-3" />
                   Add to Instruments
@@ -557,8 +557,8 @@ export const DrumPadManager: React.FC<DrumPadManagerProps> = ({ onClose }) => {
                       onClick={() => setNoteRepeatRate(rate)}
                       className={`px-2 py-1 text-[10px] font-mono rounded transition-colors ${
                         noteRepeatRate === rate
-                          ? 'bg-accent-primary text-white'
-                          : 'bg-dark-surface border border-dark-border text-text-muted hover:text-white'
+                          ? 'bg-accent-primary text-text-primary'
+                          : 'bg-dark-surface border border-dark-border text-text-muted hover:text-text-primary'
                       }`}
                     >
                       {rate}
@@ -607,7 +607,7 @@ export const DrumPadManager: React.FC<DrumPadManagerProps> = ({ onClose }) => {
                           });
                         }
                       }}
-                      className="w-full bg-dark-surface border border-dark-border rounded px-3 py-2 text-xs text-white focus:outline-none focus:ring-2 focus:ring-accent-primary font-mono"
+                      className="w-full bg-dark-surface border border-dark-border rounded px-3 py-2 text-xs text-text-primary focus:outline-none focus:ring-2 focus:ring-accent-primary font-mono"
                     >
                       <option value="MPC60">MPC 60 (12-bit, 40kHz)</option>
                       <option value="MPC3000">MPC 3000 (16-bit, 44.1kHz)</option>
@@ -627,19 +627,19 @@ export const DrumPadManager: React.FC<DrumPadManagerProps> = ({ onClose }) => {
                   <div className="text-xs font-mono text-text-muted mb-2">
                     PAD {selectedPadId}
                   </div>
-                  <div className="text-sm text-white mb-3">
+                  <div className="text-sm text-text-primary mb-3">
                     {programs.get(currentProgramId)?.pads[selectedPadId - 1]?.name || 'Empty'}
                   </div>
                   <div className="space-y-2">
                     <button
                       onClick={() => setShowSampleBrowser(true)}
-                      className="w-full px-3 py-2 bg-accent-primary hover:bg-accent-primary/80 text-white text-xs font-bold rounded transition-colors"
+                      className="w-full px-3 py-2 bg-accent-primary hover:bg-accent-primary/80 text-text-primary text-xs font-bold rounded transition-colors"
                     >
                       Load Sample
                     </button>
                     <button
                       onClick={() => setShowPadEditor(true)}
-                      className="w-full px-3 py-2 bg-dark-border hover:bg-dark-border/80 text-white text-xs font-bold rounded transition-colors"
+                      className="w-full px-3 py-2 bg-dark-border hover:bg-dark-border/80 text-text-primary text-xs font-bold rounded transition-colors"
                     >
                       Edit Parameters
                     </button>

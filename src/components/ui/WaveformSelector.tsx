@@ -109,7 +109,7 @@ export const WaveformSelector: React.FC<WaveformSelectorProps> = ({
               relative rounded transition-all
               ${isSelected
                 ? 'ring-2 ring-offset-1 ring-offset-[#1a1a1a]'
-                : 'hover:bg-gray-800'
+                : 'hover:bg-dark-bgTertiary'
               }
             `}
             style={isSelected ? {
@@ -129,7 +129,7 @@ export const WaveformSelector: React.FC<WaveformSelectorProps> = ({
                 y1={s.height / 2}
                 x2={s.width}
                 y2={s.height / 2}
-                stroke="#333"
+                stroke="var(--color-border-light)"
                 strokeWidth="1"
                 strokeDasharray="2,2"
               />
@@ -150,7 +150,7 @@ export const WaveformSelector: React.FC<WaveformSelectorProps> = ({
             <div
               className={`
                 absolute inset-x-0 bottom-0 text-center font-mono font-bold
-                ${isSelected ? 'text-white' : 'text-gray-500'}
+                ${isSelected ? 'text-text-primary' : 'text-text-muted'}
               `}
               style={{ fontSize: s.fontSize }}
             >

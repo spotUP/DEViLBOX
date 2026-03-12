@@ -136,7 +136,7 @@ export const DeckLoopControls: React.FC<DeckLoopControlsProps> = ({ deckId }) =>
           active:translate-y-[0.5px]
           ${
             loopActive
-              ? 'bg-cyan-600 text-white'
+              ? 'bg-accent-highlight text-text-primary'
               : 'bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover'
           }
         `}
@@ -145,7 +145,7 @@ export const DeckLoopControls: React.FC<DeckLoopControlsProps> = ({ deckId }) =>
       >
         <div
           className={`absolute top-1 right-1 w-1.5 h-1.5 rounded-full ${
-            loopActive ? 'bg-cyan-300' : 'bg-dark-border'
+            loopActive ? 'bg-accent-highlight' : 'bg-dark-border'
           }`}
         />
         LOOP
@@ -160,7 +160,7 @@ export const DeckLoopControls: React.FC<DeckLoopControlsProps> = ({ deckId }) =>
               flex items-center justify-center font-mono font-bold
               transition-all duration-75 select-none rounded-l-sm
               ${audioLoopIn !== null
-                ? 'bg-cyan-700/60 text-cyan-200'
+                ? 'bg-accent-highlight/60 text-accent-highlight'
                 : 'bg-dark-bgTertiary text-text-muted hover:bg-dark-bgHover hover:text-text-secondary'
               }
             `}
@@ -175,7 +175,7 @@ export const DeckLoopControls: React.FC<DeckLoopControlsProps> = ({ deckId }) =>
               flex items-center justify-center font-mono font-bold
               transition-all duration-75 select-none
               ${audioLoopOut !== null
-                ? 'bg-cyan-700/60 text-cyan-200'
+                ? 'bg-accent-highlight/60 text-accent-highlight'
                 : 'bg-dark-bgTertiary text-text-muted hover:bg-dark-bgHover hover:text-text-secondary'
               }
             `}
@@ -209,7 +209,7 @@ export const DeckLoopControls: React.FC<DeckLoopControlsProps> = ({ deckId }) =>
               className={`
                 flex items-center justify-center font-mono font-bold
                 transition-all duration-75 select-none
-                ${loopActive && audioLoopReady ? 'bg-cyan-700/40 text-cyan-300' : 'bg-dark-bgTertiary text-text-muted hover:bg-dark-bgHover'}
+                ${loopActive && audioLoopReady ? 'bg-accent-highlight/40 text-accent-highlight' : 'bg-dark-bgTertiary text-text-muted hover:bg-dark-bgHover'}
               `}
               style={{ height: 40, width: 28, fontSize: 9 }}
               title={`Auto-loop ${bars} bar${bars > 1 ? 's' : ''}`}
@@ -242,7 +242,7 @@ export const DeckLoopControls: React.FC<DeckLoopControlsProps> = ({ deckId }) =>
                   transition-all duration-75 select-none
                   ${
                     isActive
-                      ? 'bg-cyan-700/80 text-cyan-100'
+                      ? 'bg-accent-highlight/80 text-accent-highlight'
                       : isSelected
                         ? 'bg-dark-borderLight text-text-primary'
                         : 'bg-dark-bgTertiary text-text-muted hover:bg-dark-bgHover hover:text-text-secondary'
@@ -269,7 +269,7 @@ export const DeckLoopControls: React.FC<DeckLoopControlsProps> = ({ deckId }) =>
           active:translate-y-[0.5px]
           ${
             slipEnabled
-              ? 'bg-amber-600 text-white'
+              ? 'bg-amber-600 text-text-primary'
               : 'bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover'
           }
         `}

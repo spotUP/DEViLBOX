@@ -543,7 +543,7 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
                   <div className={`instrument-action-buttons flex gap-0.5 ${isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'} transition-opacity`}>
                     <button
                       onClick={(e) => handlePopOut(e, instrument.id)}
-                      className={`p-0.5 rounded ${isSelected ? 'hover:bg-ft2-bg/20' : 'hover:bg-ft2-border'} text-cyan-400`}
+                      className={`p-0.5 rounded ${isSelected ? 'hover:bg-ft2-bg/20' : 'hover:bg-ft2-border'} text-accent-highlight`}
                       title="Pop out editor"
                     >
                       <ExternalLink size={10} />
@@ -696,7 +696,7 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
                   <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity ml-auto">
                     <button
                       onClick={(e) => handlePopOut(e, instrument.id)}
-                      className="p-1 text-text-muted hover:text-cyan-400"
+                      className="p-1 text-text-muted hover:text-accent-highlight"
                       title="Pop out editor"
                     >
                       <ExternalLink size={12} />

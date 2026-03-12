@@ -59,7 +59,7 @@ export const ClipRenameDialog: React.FC = () => {
     >
       <div style={{
         background: '#1e1e2e',
-        border: '1px solid #444',
+        border: '1px solid var(--color-border-light)',
         borderRadius: 6,
         padding: '16px 20px',
         display: 'flex',
@@ -68,7 +68,7 @@ export const ClipRenameDialog: React.FC = () => {
         minWidth: 280,
         boxShadow: '0 8px 32px rgba(0,0,0,0.6)',
       }}>
-        <div style={{ color: '#ccc', fontSize: 11, fontFamily: 'JetBrains Mono, monospace', letterSpacing: 1, textTransform: 'uppercase' }}>
+        <div style={{ color: 'var(--color-text-secondary)', fontSize: 11, fontFamily: 'JetBrains Mono, monospace', letterSpacing: 1, textTransform: 'uppercase' }}>
           Rename Clip
         </div>
         <input
@@ -78,7 +78,7 @@ export const ClipRenameDialog: React.FC = () => {
             background: '#2a2a3e',
             border: '1px solid #555',
             borderRadius: 4,
-            color: '#fff',
+            color: 'var(--color-text)',
             fontFamily: 'JetBrains Mono, monospace',
             fontSize: 13,
             padding: '6px 10px',
@@ -94,7 +94,7 @@ export const ClipRenameDialog: React.FC = () => {
             onClick={cancel}
             style={{
               background: 'transparent', border: '1px solid #555', borderRadius: 4,
-              color: '#aaa', padding: '4px 12px', cursor: 'pointer', fontSize: 11,
+              color: 'var(--color-text-secondary)', padding: '4px 12px', cursor: 'pointer', fontSize: 11,
               fontFamily: 'JetBrains Mono, monospace',
             }}
           >
@@ -104,7 +104,7 @@ export const ClipRenameDialog: React.FC = () => {
             onClick={commit}
             style={{
               background: '#3b5bdb', border: 'none', borderRadius: 4,
-              color: '#fff', padding: '4px 12px', cursor: 'pointer', fontSize: 11,
+              color: 'var(--color-text)', padding: '4px 12px', cursor: 'pointer', fontSize: 11,
               fontFamily: 'JetBrains Mono, monospace',
             }}
           >

@@ -198,7 +198,7 @@ export const ChipExportPanel: React.FC<ChipExportPanelProps> = ({
             {!isChipRecording ? (
               <button
                 onClick={startChipRecording}
-                className="flex-1 px-4 py-2 rounded-lg bg-red-500 text-white font-mono text-sm hover:bg-red-600 transition-colors flex items-center justify-center gap-2"
+                className="flex-1 px-4 py-2 rounded-lg bg-red-500 text-text-primary font-mono text-sm hover:bg-red-600 transition-colors flex items-center justify-center gap-2"
               >
                 <span className="w-3 h-3 rounded-full bg-white" />
                 Record

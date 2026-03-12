@@ -29,8 +29,8 @@ export const SAMControls: React.FC<SAMControlsProps> = ({
 
   const knobColor = isCyanTheme ? '#00ffff' : '#ffcc33';
   const panelBg = isCyanTheme
-    ? 'bg-[#051515] border-cyan-900/50'
-    : 'bg-[#1a1a1a] border-gray-800';
+    ? 'bg-[#051515] border-accent-highlight/20'
+    : 'bg-[#1a1a1a] border-dark-border';
 
   const handleConvertToPhonemes = () => {
     try {
@@ -78,18 +78,18 @@ export const SAMControls: React.FC<SAMControlsProps> = ({
                 type="checkbox"
                 checked={config.phonetic}
                 onChange={(e) => onChange({ phonetic: e.target.checked })}
-                className="w-3 h-3 rounded border-gray-700 bg-transparent"
+                className="w-3 h-3 rounded border-dark-borderLight bg-transparent"
               />
-              <span className="text-[10px] text-gray-500 uppercase font-bold">Phonetic</span>
+              <span className="text-[10px] text-text-muted uppercase font-bold">Phonetic</span>
             </label>
             <label className="flex items-center gap-1.5 cursor-pointer">
               <input
                 type="checkbox"
                 checked={config.singmode}
                 onChange={(e) => onChange({ singmode: e.target.checked })}
-                className="w-3 h-3 rounded border-gray-700 bg-transparent"
+                className="w-3 h-3 rounded border-dark-borderLight bg-transparent"
               />
-              <span className="text-[10px] text-gray-500 uppercase font-bold" title="Adjusts pitch based on MIDI notes">Sing</span>
+              <span className="text-[10px] text-text-muted uppercase font-bold" title="Adjusts pitch based on MIDI notes">Sing</span>
             </label>
           </div>
         </div>
@@ -99,7 +99,7 @@ export const SAMControls: React.FC<SAMControlsProps> = ({
             type="text"
             value={config.text}
             onChange={(e) => handleTextChange(e.target.value)}
-            className="flex-1 bg-black/40 border border-gray-700 rounded-lg px-4 py-3 font-mono text-amber-500 focus:border-amber-500/50 outline-none"
+            className="flex-1 bg-black/40 border border-dark-borderLight rounded-lg px-4 py-3 font-mono text-amber-500 focus:border-amber-500/50 outline-none"
             placeholder="COMMODORE SIXTY FOUR"
           />
           <button
@@ -134,7 +134,7 @@ export const SAMControls: React.FC<SAMControlsProps> = ({
           </div>
           
           <div
-            className="w-full max-w-[200px] aspect-square bg-black/60 rounded-lg border border-gray-700 relative cursor-crosshair overflow-hidden touch-none"
+            className="w-full max-w-[200px] aspect-square bg-black/60 rounded-lg border border-dark-borderLight relative cursor-crosshair overflow-hidden touch-none"
             data-prevent-scroll
             onMouseMove={(e) => {
               if (e.buttons === 1) {
@@ -185,17 +185,17 @@ export const SAMControls: React.FC<SAMControlsProps> = ({
             />
             
             {/* Labels */}
-            <div className="absolute bottom-1 left-2 text-[8px] text-gray-500 uppercase font-bold">Mouth (X)</div>
-            <div className="absolute top-2 left-1 text-[8px] text-gray-500 uppercase font-bold origin-left rotate-90">Throat (Y)</div>
+            <div className="absolute bottom-1 left-2 text-[8px] text-text-muted uppercase font-bold">Mouth (X)</div>
+            <div className="absolute top-2 left-1 text-[8px] text-text-muted uppercase font-bold origin-left rotate-90">Throat (Y)</div>
           </div>
           
           <div className="flex flex-wrap gap-4 mt-4">
             <div className="text-center">
-              <div className="text-[10px] text-gray-500 uppercase font-bold">Mouth</div>
+              <div className="text-[10px] text-text-muted uppercase font-bold">Mouth</div>
               <div className="text-xs text-amber-500 font-mono font-bold">{config.mouth}</div>
             </div>
             <div className="text-center">
-              <div className="text-[10px] text-gray-500 uppercase font-bold">Throat</div>
+              <div className="text-[10px] text-text-muted uppercase font-bold">Throat</div>
               <div className="text-xs text-amber-500 font-mono font-bold">{config.throat}</div>
             </div>
           </div>
@@ -236,17 +236,17 @@ export const SAMControls: React.FC<SAMControlsProps> = ({
         >
           <div className="flex items-center gap-2">
             <Book size={14} className="text-amber-500" />
-            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Phoneme Reference</span>
+            <span className="text-[10px] font-bold text-text-secondary uppercase tracking-widest">Phoneme Reference</span>
           </div>
           {showPhonemes ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
         </button>
         
         {showPhonemes && (
-          <div className="p-4 grid grid-cols-2 sm:grid-cols-4 gap-2 border-t border-gray-800 bg-black/20">
+          <div className="p-4 grid grid-cols-2 sm:grid-cols-4 gap-2 border-t border-dark-border bg-black/20">
             {PHONEMES.map(p => (
-              <div key={p.code} className="flex flex-col p-1.5 rounded bg-gray-900/50 border border-gray-800">
+              <div key={p.code} className="flex flex-col p-1.5 rounded bg-dark-bgSecondary/50 border border-dark-border">
                 <span className="text-[10px] font-bold text-amber-500 font-mono">{p.code}</span>
-                <span className="text-[8px] text-gray-500 uppercase">{p.example}</span>
+                <span className="text-[8px] text-text-muted uppercase">{p.example}</span>
               </div>
             ))}
           </div>

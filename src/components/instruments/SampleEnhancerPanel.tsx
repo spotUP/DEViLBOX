@@ -311,7 +311,7 @@ export const SampleEnhancerPanel: React.FC<SampleEnhancerPanelProps> = ({
           {/* Denoise */}
           <div className="space-y-3 pt-4 border-t border-dark-border/50">
             <div className="flex items-center gap-2">
-              <Eraser size={14} className="text-cyan-400" />
+              <Eraser size={14} className="text-accent-highlight" />
               <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider">Quantization Denoise</span>
             </div>
             <Knob label="THRESH" value={denoiseThresh} min={-100} max={-20} unit="dB" onChange={setDenoiseThresh} size="sm" color="var(--color-synth-modulation)" />

@@ -99,7 +99,7 @@ export const MelodicaControls: React.FC<MelodicaControlsProps> = ({
   if (!synthReady) {
     return (
       <div className="flex flex-col gap-4 p-4">
-        <div className="flex items-center justify-center gap-2 p-4 text-gray-400">
+        <div className="flex items-center justify-center gap-2 p-4 text-text-secondary">
           <Loader size={16} className="animate-spin" />
           <span className="text-sm">Loading Melodica...</span>
         </div>
@@ -109,7 +109,7 @@ export const MelodicaControls: React.FC<MelodicaControlsProps> = ({
   }
 
   const panelBg = isCyanTheme
-    ? 'bg-[#051515] border-cyan-900/50'
+    ? 'bg-[#051515] border-accent-highlight/20'
     : 'bg-[#1a1a1a] border-teal-900/30';
 
   return (

@@ -139,9 +139,9 @@ export const JamCrackerControls: React.FC<JamCrackerControlsProps> = ({
     <div className="p-4 space-y-4 synth-controls-flow">
       {/* Header */}
       <div className="flex items-center gap-3 text-sm">
-        <span className="text-cyan-400 font-mono font-bold">JamCracker Pro</span>
-        <span className="text-gray-500">|</span>
-        <span className="text-gray-300">{config.name}</span>
+        <span className="text-accent-highlight font-mono font-bold">JamCracker Pro</span>
+        <span className="text-text-muted">|</span>
+        <span className="text-text-secondary">{config.name}</span>
         <div className="flex gap-2 ml-auto">
           {config.isAM && (
             <span className="px-2 py-0.5 bg-purple-900/50 text-purple-300 rounded text-xs font-mono">
@@ -164,12 +164,12 @@ export const JamCrackerControls: React.FC<JamCrackerControlsProps> = ({
       {/* AM Waveform Display */}
       {config.isAM && (
         <div className="space-y-2">
-          <div className="text-xs text-gray-500 font-mono uppercase tracking-wider">
+          <div className="text-xs text-text-muted font-mono uppercase tracking-wider">
             AM Waveform (64-byte phase modulation)
           </div>
           <canvas
             ref={canvasRef}
-            className="w-full rounded border border-gray-800 bg-[#0a0e14]"
+            className="w-full rounded border border-dark-border bg-[#0a0e14]"
             style={{ height: 120 }}
           />
         </div>
@@ -187,7 +187,7 @@ export const JamCrackerControls: React.FC<JamCrackerControlsProps> = ({
             max={1}
             bipolar={false}
           />
-          <span className="text-[10px] text-gray-500 font-mono">{config.volume}</span>
+          <span className="text-[10px] text-text-muted font-mono">{config.volume}</span>
         </div>
 
         {config.isAM && (
@@ -201,13 +201,13 @@ export const JamCrackerControls: React.FC<JamCrackerControlsProps> = ({
               max={1}
               bipolar={false}
             />
-            <span className="text-[10px] text-gray-500 font-mono">{config.phaseDelta}</span>
+            <span className="text-[10px] text-text-muted font-mono">{config.phaseDelta}</span>
           </div>
         )}
       </div>
 
       {/* Info */}
-      <div className="text-[10px] text-gray-600 font-mono">
+      <div className="text-[10px] text-text-muted font-mono">
         Flags: 0x{config.flags.toString(16).padStart(2, '0')}
         {config.isAM ? ' (AM synthesis — 64-byte waveform loop with phase modulation)' : ' (PCM sample)'}
       </div>
