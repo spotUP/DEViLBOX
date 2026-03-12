@@ -210,24 +210,34 @@ export class WaveSabreSynth implements DevilboxSynth {
   }
 
   /** Set preset chunk from Base64 string (XRNS ParameterChunk) */
-  setChunk(base64Chunk: string): void {
-    // Strip whitespace/newlines that XML text content may include
-    const cleaned = base64Chunk.replace(/\s+/g, '');
-    // Decode Base64 to ArrayBuffer
-    const binaryString = atob(cleaned);
-    const bytes = new Uint8Array(binaryString.length);
-    for (let i = 0; i < binaryString.length; i++) {
-      bytes[i] = binaryString.charCodeAt(i);
-    }
-    const chunkBuffer = bytes.buffer;
+  setChunk(base64Chunk: string): boolean {
+    try {
+      // Strip whitespace/newlines that XML text content may include
+      let cleaned = base64Chunk.replace(/\s+/g, '');
+      // Pad to multiple of 4 (base64 padding may be missing)
+      const pad = (4 - (cleaned.length % 4)) % 4;
+      if (pad) cleaned += '='.repeat(pad);
+      // Decode Base64 to ArrayBuffer
+      const binaryString = atob(cleaned);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      const chunkBuffer = bytes.buffer;
+      console.log(`[WaveSabreSynth] setChunk decoded: ${binaryString.length} bytes from ${base64Chunk.length} chars`);
 
-    if (this.workletNode) {
-      this.workletNode.port.postMessage({
-        type: 'setChunk',
-        data: { chunk: chunkBuffer },
-      });
-    } else {
-      this._pendingChunk = chunkBuffer;
+      if (this.workletNode) {
+        this.workletNode.port.postMessage({
+          type: 'setChunk',
+          data: { chunk: chunkBuffer },
+        });
+      } else {
+        this._pendingChunk = chunkBuffer;
+      }
+      return true;
+    } catch (err) {
+      console.warn(`[WaveSabreSynth] setChunk failed, will use individual params:`, err);
+      return false;
     }
   }
 
