@@ -37,7 +37,7 @@ async function getOrCreateModule(wasmBinary, jsCode) {
     // Evaluate the JS code to get the module factory
     let createModule;
     try {
-      const wrappedCode = `${jsCode}; return typeof createMVerbModule !== 'undefined' ? createMVerbModule : (typeof Module !== 'undefined' ? Module : null);`;
+      const wrappedCode = `${jsCode}; return createMVerbModule;`;
       createModule = new Function(wrappedCode)();
     } catch (evalErr) {
       console.error('Failed to evaluate MVerb JS:', evalErr);

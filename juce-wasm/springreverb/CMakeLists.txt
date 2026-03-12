@@ -1,3 +1,6 @@
+cmake_minimum_required(VERSION 3.15)
+project(SpringReverbWASM VERSION 1.0.0)
+
 # Spring Reverb WASM Effect Build
 # Built from scratch for DEViLBOX - classic dub spring tank
 
@@ -9,7 +12,7 @@ add_executable(SpringReverbWASM ${SPRINGREVERB_SOURCES})
 
 target_include_directories(SpringReverbWASM PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
-    ${CMAKE_SOURCE_DIR}/common
+    ${CMAKE_CURRENT_SOURCE_DIR}/../common
 )
 
 set_target_properties(SpringReverbWASM PROPERTIES
@@ -20,7 +23,7 @@ set_target_properties(SpringReverbWASM PROPERTIES
 
 target_link_options(SpringReverbWASM PRIVATE
     "SHELL:-s WASM=1"
-    "SHELL:-s EXPORT_ES6=1"
+    "SHELL:-s EXPORT_ES6=0"
     "SHELL:-s MODULARIZE=1"
     "SHELL:-s EXPORT_NAME='createSpringReverbModule'"
     "SHELL:-s ALLOW_MEMORY_GROWTH=1"

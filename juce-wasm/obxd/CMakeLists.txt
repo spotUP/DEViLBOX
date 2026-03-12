@@ -23,7 +23,7 @@ set_target_properties(OBXdWASM PROPERTIES
 
 target_link_options(OBXdWASM PRIVATE
     "SHELL:-s WASM=1"
-    "SHELL:-s EXPORT_ES6=1"
+    "SHELL:-s EXPORT_ES6=0"
     "SHELL:-s MODULARIZE=1"
     "SHELL:-s EXPORT_NAME='createOBXdModule'"
     "SHELL:-s ALLOW_MEMORY_GROWTH=1"

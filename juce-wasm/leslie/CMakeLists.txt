@@ -1,3 +1,6 @@
+cmake_minimum_required(VERSION 3.15)
+project(LeslieWASM VERSION 1.0.0)
+
 # Leslie Rotary Speaker WASM Effect Build
 # Built from scratch for DEViLBOX
 
@@ -9,7 +12,7 @@ add_executable(LeslieWASM ${LESLIE_SOURCES})
 
 target_include_directories(LeslieWASM PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
-    ${CMAKE_SOURCE_DIR}/common
+    ${CMAKE_CURRENT_SOURCE_DIR}/../common
 )
 
 set_target_properties(LeslieWASM PROPERTIES
@@ -20,7 +23,7 @@ set_target_properties(LeslieWASM PROPERTIES
 
 target_link_options(LeslieWASM PRIVATE
     "SHELL:-s WASM=1"
-    "SHELL:-s EXPORT_ES6=1"
+    "SHELL:-s EXPORT_ES6=0"
     "SHELL:-s MODULARIZE=1"
     "SHELL:-s EXPORT_NAME='createLeslieModule'"
     "SHELL:-s ALLOW_MEMORY_GROWTH=1"

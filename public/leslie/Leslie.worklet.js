@@ -36,7 +36,7 @@ async function getOrCreateModule(wasmBinary, jsCode) {
     // Evaluate the JS code to get the module factory
     let createModule;
     try {
-      const wrappedCode = `${jsCode}; return typeof createLeslieModule !== 'undefined' ? createLeslieModule : (typeof Module !== 'undefined' ? Module : null);`;
+      const wrappedCode = `${jsCode}; return createLeslieModule;`;
       createModule = new Function(wrappedCode)();
     } catch (evalErr) {
       console.error('Failed to evaluate Leslie JS:', evalErr);
