@@ -23,6 +23,7 @@ export interface PixiTheme {
   borderLight: PixiColor;
   accent: PixiColor;
   accentSecondary: PixiColor;
+  accentHighlight: PixiColor;
   accentGlow: PixiColor;
   text: PixiColor;
   textSecondary: PixiColor;

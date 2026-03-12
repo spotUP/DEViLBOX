@@ -348,7 +348,7 @@ export const PixiSc68View: React.FC<Props> = ({ width, height }) => {
         <pixiBitmapText
           text={title}
           style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 11, fill: 0xffffff }}
-          tint={0xdddddd}
+          tint={theme.textSecondary.color}
         />
 
         {/* Composer */}

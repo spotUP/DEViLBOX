@@ -2743,6 +2743,11 @@ struct V2Synth
       // copy to dest buffer(s)
       const StereoSample *src = &instance.mixbuf[instance.SRcFrameSize - tickd];
       sInt nread = min(todo, tickd);
+      static int copy_debug_count = 0;
+      if (copy_debug_count < 5 && nread > 0) {
+        printf("[V2 copy] src[0]={%f,%f} nread=%d tickd=%d\n", src[0].l, src[0].r, nread, tickd);
+        copy_debug_count++;
+      }
       if (!buf2) // interleaved samples
       {
         if (!add)
@@ -3208,6 +3213,8 @@ private:
     memset(instance.auxbbuf, 0, nsamples * sizeof(StereoSample));
 
     // process all channels
+    static int render_frame_count = 0;
+    int active_voices_this_frame = 0;
     for (sInt chan=0; chan < CHANS; chan++)
     {
       // check if any voices are active on this channel
@@ -3218,6 +3225,8 @@ private:
       if (voice == POLY)
         continue;
 
+      active_voices_this_frame++;
+      
       // clear channel buffer
       memset(instance.chanbuf, 0, nsamples * sizeof(StereoSample));
 
@@ -3236,6 +3245,12 @@ private:
 
       chansw[chan].process(nsamples); 
     }
+    if (render_frame_count < 3 || (active_voices_this_frame > 0 && render_frame_count < 20)) {
+      printf("[V2 render] frame=%d active_voices=%d nsamples=%d mixbuf[0]={%f,%f}\n", 
+             render_frame_count, active_voices_this_frame, nsamples, 
+             instance.mixbuf[0].l, instance.mixbuf[0].r);
+    }
+    render_frame_count++;
 
     // global filters
     StereoSample *mix = instance.mixbuf;
