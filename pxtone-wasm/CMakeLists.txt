@@ -41,7 +41,7 @@ target_link_options(Pxtone PRIVATE
     "SHELL:-s MODULARIZE=1"
     "SHELL:-s EXPORT_NAME='createPxtone'"
     "SHELL:-s EXPORTED_FUNCTIONS=['_malloc','_free','_pxtone_init','_pxtone_stop','_pxtone_render','_pxtone_get_sample_rate']"
-    "SHELL:-s EXPORTED_RUNTIME_METHODS=['ccall','cwrap','HEAPF32','HEAPU8']"
+    "SHELL:-s EXPORTED_RUNTIME_METHODS=['ccall','cwrap','HEAPF32','HEAPU8','wasmMemory']"
     "SHELL:-s ALLOW_MEMORY_GROWTH=1"
     "SHELL:-s INITIAL_MEMORY=16777216"
     "SHELL:-s STACK_SIZE=1048576"
