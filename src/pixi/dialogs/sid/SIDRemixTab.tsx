@@ -186,17 +186,17 @@ export const SIDRemixTab: React.FC<SIDRemixTabProps> = ({ width, height, compose
             <LinkRow
               text="Remix64 Homepage"
               url="https://remix64.com/"
-              tint={0x60a5fa}
+              tint={theme.accentHighlight.color}
             />
             <LinkRow
               text="Remix.Kwed.Org"
               url="https://remix.kwed.org/"
-              tint={0x60a5fa}
+              tint={theme.accentHighlight.color}
             />
             <LinkRow
               text="HVSC (High Voltage SID Collection)"
               url="https://www.hvsc.c64.org/"
-              tint={0x60a5fa}
+              tint={theme.accentHighlight.color}
             />
           </layoutContainer>
         </layoutContainer>

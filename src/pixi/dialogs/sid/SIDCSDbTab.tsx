@@ -195,7 +195,7 @@ export const SIDCSDbTab: React.FC<SIDCSDbTabProps> = ({ width, height, csdbId, c
                     key={g.id}
                     text={g.name}
                     url={`https://csdb.dk/group/?id=${g.id}`}
-                    tint={0x93c5fd}
+                    tint={theme.accentHighlight.color}
                   />
                 ))}
               </layoutContainer>
@@ -235,7 +235,7 @@ export const SIDCSDbTab: React.FC<SIDCSDbTabProps> = ({ width, height, csdbId, c
                   <pixiBitmapText
                     text={r.name}
                     style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 13, fill: 0xffffff }}
-                    tint={0x60a5fa}
+                    tint={theme.accentHighlight.color}
                     layout={{ flex: 1 }}
                   />
                   <pixiBitmapText
@@ -256,7 +256,7 @@ export const SIDCSDbTab: React.FC<SIDCSDbTabProps> = ({ width, height, csdbId, c
                     <pixiBitmapText
                       text={r.event}
                       style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 11, fill: 0xffffff }}
-                      tint={0x93c5fd}
+                      tint={theme.accentHighlight.color}
                       alpha={0.7}
                       layout={{}}
                     />

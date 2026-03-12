@@ -14,7 +14,7 @@
  *   tags: px-1.5 py-0.5 text-[10px] → 6/2 padding, 10px font
  */
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { usePixiTheme } from '../theme';
 import { PIXI_FONTS } from '../fonts';
 import type { ComposerProfile as ComposerData } from '@/lib/sid/composerApi';
@@ -28,58 +28,72 @@ interface PixiComposerProfileProps {
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
 /** Genre tag pill: bg-purple-900/30 text-purple-300/80 border-purple-800/30 */
-const GenreTag: React.FC<{ name: string }> = ({ name }) => (
-  <layoutContainer
-    layout={{
-      paddingLeft: 6, paddingRight: 6,
-      paddingTop: 2, paddingBottom: 2,
-      backgroundColor: 0x2d1a4e,
-      borderWidth: 1,
-      borderColor: 0x4a2d7a,
-      borderRadius: 4,
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 4,
-    }}
-  >
-    <pixiBitmapText
-      text="♦"
-      style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 10, fill: 0xffffff }}
-      tint={0xc084fc}
-      layout={{}}
-    />
-    <pixiBitmapText
-      text={name}
-      style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 12, fill: 0xffffff }}
-      tint={0xc084fc}
-      layout={{}}
-    />
-  </layoutContainer>
-);
+const GenreTag: React.FC<{ name: string }> = ({ name }) => {
+  const theme = usePixiTheme();
+  return (
+    <layoutContainer
+      layout={{
+        paddingLeft: 6, paddingRight: 6,
+        paddingTop: 2, paddingBottom: 2,
+        backgroundColor: 0x2d1a4e,
+        borderWidth: 1,
+        borderColor: 0x4a2d7a,
+        borderRadius: 4,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+      }}
+    >
+      <pixiBitmapText
+        text="♦"
+        style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 10, fill: 0xffffff }}
+        tint={theme.accentSecondary.color}
+        layout={{}}
+      />
+      <pixiBitmapText
+        text={name}
+        style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 12, fill: 0xffffff }}
+        tint={theme.accentSecondary.color}
+        layout={{}}
+      />
+    </layoutContainer>
+  );
+};
 
 /** Production tag pill: bg-green-900/30 text-green-300/80 border-green-800/30 */
-const ProdTag: React.FC<{ name: string }> = ({ name }) => (
-  <layoutContainer
-    layout={{
-      paddingLeft: 6, paddingRight: 6,
-      paddingTop: 2, paddingBottom: 2,
-      backgroundColor: 0x14332a,
-      borderWidth: 1,
-      borderColor: 0x2d6a4f,
-      borderRadius: 4,
-    }}
-  >
-    <pixiBitmapText
-      text={name}
-      style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 12, fill: 0xffffff }}
-      tint={0x86efac}
-      layout={{}}
-    />
-  </layoutContainer>
-);
+const ProdTag: React.FC<{ name: string }> = ({ name }) => {
+  const theme = usePixiTheme();
+  return (
+    <layoutContainer
+      layout={{
+        paddingLeft: 6, paddingRight: 6,
+        paddingTop: 2, paddingBottom: 2,
+        backgroundColor: 0x14332a,
+        borderWidth: 1,
+        borderColor: 0x2d6a4f,
+        borderRadius: 4,
+      }}
+    >
+      <pixiBitmapText
+        text={name}
+        style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 12, fill: 0xffffff }}
+        tint={theme.success.color}
+        layout={{}}
+      />
+    </layoutContainer>
+  );
+};
 
 export const PixiComposerProfile: React.FC<PixiComposerProfileProps> = ({ composer, width = 360 }) => {
   const theme = usePixiTheme();
+
+  const palette = useMemo(() => ({
+    heading: theme.text.color,
+    subtext: theme.textSecondary.color,
+    dim: theme.textMuted.color,
+    star: theme.warning.color,
+    notable: theme.warning.color,
+  }), [theme]);
 
   const birthYear = composer.born ? parseInt(composer.born.slice(0, 4)) : null;
   const deathYear = composer.died ? parseInt(composer.died.slice(0, 4)) : null;
@@ -129,7 +143,7 @@ export const PixiComposerProfile: React.FC<PixiComposerProfileProps> = ({ compos
           <pixiBitmapText
             text="♫"
             style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 30, fill: 0xffffff }}
-            tint={0x1e3a5a}
+            tint={palette.dim}
             layout={{}}
           />
         </layoutContainer>
@@ -140,7 +154,7 @@ export const PixiComposerProfile: React.FC<PixiComposerProfileProps> = ({ compos
           <pixiBitmapText
             text={composer.name}
             style={{ fontFamily: PIXI_FONTS.SANS_BOLD, fontSize: 16, fill: 0xffffff }}
-            tint={0xbfdbfe}
+            tint={palette.heading}
             layout={{}}
           />
 
@@ -149,7 +163,7 @@ export const PixiComposerProfile: React.FC<PixiComposerProfileProps> = ({ compos
             <pixiBitmapText
               text={`aka ${composer.handles.join(', ')}`}
               style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 14, fill: 0xffffff }}
-              tint={0x6b8db5}
+              tint={palette.subtext}
               layout={{}}
             />
           )}
@@ -165,7 +179,7 @@ export const PixiComposerProfile: React.FC<PixiComposerProfileProps> = ({ compos
               <pixiBitmapText
                 text={composer.country}
                 style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 14, fill: 0xffffff }}
-                tint={0x5a7fa0}
+                tint={palette.subtext}
                 layout={{}}
               />
             </layoutContainer>
@@ -182,7 +196,7 @@ export const PixiComposerProfile: React.FC<PixiComposerProfileProps> = ({ compos
               <pixiBitmapText
                 text={dateStr}
                 style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 14, fill: 0xffffff }}
-                tint={0x5a7fa0}
+                tint={palette.subtext}
                 layout={{}}
               />
             </layoutContainer>
@@ -194,13 +208,13 @@ export const PixiComposerProfile: React.FC<PixiComposerProfileProps> = ({ compos
               <pixiBitmapText
                 text="★"
                 style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 12, fill: 0xffffff }}
-                tint={0xfbbf24}
+                tint={palette.star}
                 layout={{}}
               />
               <pixiBitmapText
                 text={composer.notable}
                 style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 14, fill: 0xffffff }}
-                tint={0xe2b940}
+                tint={palette.notable}
                 layout={{}}
               />
             </layoutContainer>
@@ -215,7 +229,7 @@ export const PixiComposerProfile: React.FC<PixiComposerProfileProps> = ({ compos
           <pixiBitmapText
             text="♪"
             style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 12, fill: 0xffffff }}
-            tint={0x5a8abf}
+            tint={palette.dim}
             layout={{}}
           />
           <pixiBitmapText
@@ -232,7 +246,7 @@ export const PixiComposerProfile: React.FC<PixiComposerProfileProps> = ({ compos
             <pixiBitmapText
               text="📅"
               style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 12, fill: 0xffffff }}
-              tint={0x5a8abf}
+              tint={palette.dim}
               layout={{}}
             />
             <pixiBitmapText
@@ -249,7 +263,7 @@ export const PixiComposerProfile: React.FC<PixiComposerProfileProps> = ({ compos
           <pixiBitmapText
             text="CSDb ↗"
             style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 14, fill: 0xffffff }}
-            tint={0x5a8abf}
+            tint={palette.dim}
             layout={{ marginLeft: 'auto' }}
           />
         )}
@@ -397,13 +411,13 @@ export const PixiComposerProfile: React.FC<PixiComposerProfileProps> = ({ compos
               <pixiBitmapText
                 text="↗"
                 style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 10, fill: 0xffffff }}
-                tint={0x5a8abf}
+                tint={palette.dim}
                 layout={{}}
               />
               <pixiBitmapText
                 text={link.name}
                 style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 12, fill: 0xffffff }}
-                tint={0x5a8abf}
+                tint={palette.dim}
                 layout={{}}
               />
             </layoutContainer>

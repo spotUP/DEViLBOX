@@ -14,7 +14,7 @@ import { isRapidScrolling } from '../scrollPerf';
 import type { Graphics as GraphicsType } from 'pixi.js';
 import { useShallow } from 'zustand/react/shallow';
 import { PIXI_FONTS } from '../fonts';
-import { usePixiTheme } from '../theme';
+import { usePixiTheme, usePixiThemeId, getDeckColors } from '../theme';
 import { usePixiResponsive } from '../hooks/usePixiResponsive';
 import { useUIStore, useAudioStore, useTrackerStore, useTransportStore, useCursorStore, useEditorStore, useFormatStore } from '@stores';
 import { useSettingsStore } from '@stores/useSettingsStore';
@@ -75,6 +75,8 @@ const PixiDot: React.FC<{ color: number; size?: number }> = ({ color, size = 6 }
 
 const DJStatusContent: React.FC<{ barHeight: number }> = ({ barHeight }) => {
   const theme = usePixiTheme();
+  const themeId = usePixiThemeId();
+  const { deckA, deckB } = getDeckColors(themeId, theme.accent, theme.accentSecondary);
   const {
     deck1Playing, deck2Playing,
     deck1BPM, deck2BPM,
@@ -103,7 +105,7 @@ const DJStatusContent: React.FC<{ barHeight: number }> = ({ barHeight }) => {
   return (
     <pixiContainer layout={{ flexDirection: 'row', alignItems: 'center', flex: 1, height: barHeight }}>
       {/* Deck 1 label */}
-      <pixiBitmapText text="D1" style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 12, fill: 0xffffff }} tint={0x60a5fa} layout={{ alignSelf: 'center', marginRight: 4 }} />
+      <pixiBitmapText text="D1" style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 12, fill: 0xffffff }} tint={deckA} layout={{ alignSelf: 'center', marginRight: 4 }} />
       <pixiBitmapText text={d1Label} style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 12, fill: 0xffffff }} tint={d1Color} layout={textLayout} />
       {/* Always mounted — conditional render causes @pixi/layout BindingError */}
       <pixiContainer alpha={deck1Name ? 1 : 0} layout={{ flexDirection: 'row', flexShrink: 0 }}>
@@ -116,14 +118,14 @@ const DJStatusContent: React.FC<{ barHeight: number }> = ({ barHeight }) => {
         />
       </pixiContainer>
       <PixiSep height={10} />
-      <pixiBitmapText text={d1BpmStr} style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 12, fill: 0xffffff }} tint={0x60a5fa} layout={textLayout} />
+      <pixiBitmapText text={d1BpmStr} style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 12, fill: 0xffffff }} tint={deckA} layout={textLayout} />
       <pixiBitmapText text=" BPM" style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 12, fill: 0xffffff }} tint={theme.text.color} layout={textLayout} />
 
       <PixiSep height={10} />
       <pixiBitmapText text={xFadeStr} style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 12, fill: 0xffffff }} tint={theme.text.color} layout={textLayout} />
 
       <PixiSep height={10} />
-      <pixiBitmapText text="D2" style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 12, fill: 0xffffff }} tint={0xf87171} layout={{ alignSelf: 'center', marginRight: 4 }} />
+      <pixiBitmapText text="D2" style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 12, fill: 0xffffff }} tint={deckB} layout={{ alignSelf: 'center', marginRight: 4 }} />
       <pixiBitmapText text={d2Label} style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 12, fill: 0xffffff }} tint={d2Color} layout={textLayout} />
       {/* Always mounted — conditional render causes @pixi/layout BindingError */}
       <pixiContainer alpha={deck2Name ? 1 : 0} layout={{ flexDirection: 'row', flexShrink: 0 }}>
@@ -136,7 +138,7 @@ const DJStatusContent: React.FC<{ barHeight: number }> = ({ barHeight }) => {
         />
       </pixiContainer>
       <PixiSep height={10} />
-      <pixiBitmapText text={d2BpmStr} style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 12, fill: 0xffffff }} tint={0xf87171} layout={textLayout} />
+      <pixiBitmapText text={d2BpmStr} style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 12, fill: 0xffffff }} tint={deckB} layout={textLayout} />
       <pixiBitmapText text=" BPM" style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 12, fill: 0xffffff }} tint={theme.text.color} layout={textLayout} />
     </pixiContainer>
   );

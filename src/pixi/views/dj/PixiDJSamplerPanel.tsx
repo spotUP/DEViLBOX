@@ -106,6 +106,7 @@ const PadCell: React.FC<PadCellProps> = ({
   pad, velocity, isSelected, accentColor, bgColor, borderColor, textColor, textMutedColor,
   onTrigger, onRelease,
 }) => {
+  const theme = usePixiTheme();
   const isPressed = velocity > 0;
   const hasSample = pad.sample !== null;
   const hasScratch = !!pad.scratchAction;
@@ -148,7 +149,7 @@ const PadCell: React.FC<PadCellProps> = ({
         <pixiBitmapText
           text="SCR"
           style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 8, fill: 0xffffff }}
-          tint={0xd97706}
+          tint={theme.warning.color}
           layout={{ position: 'absolute', right: 4, top: 3 }}
         />
       )}

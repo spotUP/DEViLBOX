@@ -142,7 +142,7 @@ export const PixiTrackHeaders: React.FC<PixiTrackHeadersProps> = ({
                 <pixiBitmapText
                   text={isFolded ? '\u25B6' : '\u25BC'}
                   style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }}
-                  tint={0x94a3b8}
+                  tint={theme.textMuted.color}
                   layout={{}}
                 />
               </pixiContainer>
