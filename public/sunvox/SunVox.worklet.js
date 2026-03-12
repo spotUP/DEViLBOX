@@ -59,10 +59,16 @@ class SunVoxProcessor extends AudioWorkletProcessor {
       // ── Lifecycle ──────────────────────────────────────────────────────────
 
       case 'create': {
-        if (!m) break;
+        if (!m) {
+          console.log('[SunVox] create: WASM not loaded');
+          break;
+        }
+        console.log('[SunVox] create: calling _sunvox_wasm_create with sampleRate:', data.sampleRate);
         const handle = m._sunvox_wasm_create(data.sampleRate);
+        console.log('[SunVox] create: got handle:', handle);
         if (handle >= 0) {
           this.handles[handle] = { active: true };
+          console.log('[SunVox] create: handles now:', Object.keys(this.handles));
           this.port.postMessage({ type: 'handle', handle });
         } else {
           this.port.postMessage({ type: 'error', message: 'sunvox_wasm_create failed' });
@@ -249,12 +255,10 @@ class SunVoxProcessor extends AudioWorkletProcessor {
       }
 
       // Execute Emscripten JS via Function constructor (import() is unavailable in worklets)
-      console.log('[SunVox Worklet] building factory, jsCode length:', jsCode?.length, 'createSunVox already set:', !!globalThis.createSunVox);
       if (jsCode && !globalThis.createSunVox) {
         const wrappedCode = jsCode + '\nreturn createSunVox;';
         const factory = new Function(wrappedCode);
         const result = factory();
-        console.log('[SunVox Worklet] factory result type:', typeof result);
         if (typeof result === 'function') {
           globalThis.createSunVox = result;
         }
@@ -264,12 +268,10 @@ class SunVoxProcessor extends AudioWorkletProcessor {
         throw new Error('createSunVox factory not available');
       }
 
-      // Instantiate WASM module with pre-fetched binary for fast loading
-      console.log('[SunVox Worklet] calling createSunVox, wasmBinary byteLength:', wasmBinary?.byteLength);
+      // Instantiate WASM module with pre-fetched binary
       this.wasm = await globalThis.createSunVox({
         wasmBinary,
       });
-      console.log('[SunVox Worklet] createSunVox resolved, wasm keys:', Object.keys(this.wasm).slice(0, 8));
 
       // Allocate per-instance scratch buffers — reused for every render call
       this.renderBufL = this.wasm._malloc(MAX_FRAMES * 4);
@@ -299,6 +301,8 @@ class SunVoxProcessor extends AudioWorkletProcessor {
 
     const m = this.wasm;
     const heapF32 = m.HEAPF32;
+    if (!heapF32) return true;
+    
     const offL = this.renderBufL >> 2; // byte offset → Float32 index
     const offR = this.renderBufR >> 2;
 
