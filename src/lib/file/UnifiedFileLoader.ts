@@ -950,7 +950,9 @@ async function loadSongFile(file: File, options: FileLoadOptions): Promise<FileL
       };
       loadPatterns([pattern]);
       setCurrentPattern(0);
-      setPatternOrder([0]);
+      // Create enough pattern order positions to cover ~10 minutes of playback.
+      // At default 125 BPM / 6 speed, one 256-row pattern ≈ 123s, so 5 positions ≈ 10 min.
+      setPatternOrder([0, 0, 0, 0, 0]);
       setMetadata({ name, author: '', description: `Imported from ${file.name} (${extractedModules.length} modules)` });
       applyEditorMode({});
       return { success: true, message: `Loaded SunVox project: ${name} — ${extractedModules.length} module(s)` };
@@ -995,7 +997,8 @@ async function loadSongFile(file: File, options: FileLoadOptions): Promise<FileL
     };
     loadPatterns([pattern]);
     setCurrentPattern(0);
-    setPatternOrder([0]);
+    // Create enough pattern order positions to cover ~10 minutes of playback.
+    setPatternOrder([0, 0, 0, 0, 0]);
     setMetadata({ name, author: '', description: `Imported from ${file.name}` });
     // Reset to classic editor mode — clears stale musicline/furnace/hively state
     // from any previously-loaded file (otherwise the wrong viewer renders).
