@@ -55,7 +55,7 @@ void sound_stream_play( void ) { /* no-op in WASM: JS controls audio */ }
 /* Engine pool                                                               */
 /* ======================================================================== */
 
-#define MAX_ENGINES 8
+#define MAX_ENGINES 32
 
 static sunvox_engine g_engines[ MAX_ENGINES ];
 static bool          g_engine_used[ MAX_ENGINES ];
