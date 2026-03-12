@@ -7,7 +7,7 @@
  *   byte[2]: effect type (low nibble only)
  *   byte[3]: effect parameter
  *
- * Note mapping: XM note 13-48 → QC note 0-35
+ * Note mapping: XM note 37-72 → QC note 0-35
  * Effect: mostly direct ProTracker; vibrato depth halved, sample offset halved
  */
 
@@ -21,9 +21,9 @@ function encodeQCCell(cell: TrackerCell): Uint8Array {
   // Byte 0: instrument
   out[0] = (cell.instrument ?? 0) & 0xFF;
 
-  // Byte 1: note (XM 13 = C-1 → QC 0)
-  if (note > 0 && note >= 13 && note <= 48) {
-    out[1] = note - 13;
+  // Byte 1: note (XM 37 = C-3 → QC 0)
+  if (note > 0 && note >= 37 && note <= 72) {
+    out[1] = note - 37;
   } else {
     out[1] = 0xFF; // no note
   }

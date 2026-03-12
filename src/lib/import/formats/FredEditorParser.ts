@@ -99,7 +99,7 @@ interface FESong {
 
 function feNoteToXM(feNote: number): number {
   if (feNote < 1 || feNote > 72) return 0;
-  return feNote + 12; // 1-based: FE note 1 (C-1) → XM note 13
+  return feNote + 36; // 1-based: FE note 1 (C-1) → XM note 37 (C-3 in FT2 convention)
 }
 
 // ── Format detection ────────────────────────────────────────────────────────

@@ -7,7 +7,7 @@
  *   byte[2]: effect command
  *   byte[3]: effect data
  *
- * Note mapping: amigaNoteToXM(x) = x + 12 → reverse: xmNote - 12
+ * Note mapping: amigaNoteToXM(x) = x + 36 → reverse: xmNote - 36
  *
  * Effect mapping (reverse of mapOKTEffect):
  *   XM 0x0F → OKT 1 (set speed)
@@ -46,9 +46,9 @@ function encodeOktalyzerCell(cell: TrackerCell): Uint8Array {
   const out = new Uint8Array(4);
   const note = cell.note ?? 0;
 
-  // Byte 0: Amiga note index (reverse of amigaNoteToXM: xm - 12)
-  if (note > 0 && note > 12) {
-    out[0] = (note - 12) & 0xFF;
+  // Byte 0: Amiga note index (reverse of amigaNoteToXM: xm - 36)
+  if (note > 0 && note > 36) {
+    out[0] = (note - 36) & 0xFF;
   } else {
     out[0] = 0;
   }

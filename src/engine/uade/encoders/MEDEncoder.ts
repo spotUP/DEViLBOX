@@ -56,8 +56,8 @@ function encodeMED3Cell(cell: TrackerCell): Uint8Array {
 
   // Convert XM note to period
   let period = 0;
-  if (note > 0 && note >= 13) {
-    const idx = note - 13;
+  if (note > 0 && note >= 37) {
+    const idx = note - 37;
     if (idx >= 0 && idx < MED_PERIODS.length) {
       period = MED_PERIODS[idx];
     }

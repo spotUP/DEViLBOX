@@ -10,7 +10,7 @@
  *
  * Note mapping: XM note → PLM note
  *   Parser: (noteByte >> 4) * 12 + (noteByte & 0x0F) + 12 + 1
- *   Reverse: raw = xmNote - 13, octave = floor(raw/12), semi = raw%12
+ *   Reverse: raw = xmNote - 37, octave = floor(raw/12), semi = raw%12
  *            plmNote = (octave << 4) | semi
  */
 
@@ -49,8 +49,8 @@ function encodePLMCell(cell: TrackerCell): Uint8Array {
   const note = cell.note ?? 0;
 
   // Byte 0: note as BCD
-  if (note > 0 && note >= 13) {
-    const raw = note - 13;
+  if (note > 0 && note >= 37) {
+    const raw = note - 37;
     const octave = Math.floor(raw / 12);
     const semi = raw % 12;
     out[0] = (octave << 4) | semi;

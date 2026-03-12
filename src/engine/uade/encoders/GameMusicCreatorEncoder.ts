@@ -36,7 +36,7 @@ const MOD_PERIODS = [
 
 function xmNoteToPeriod(xmNote: number): number {
   if (xmNote === 0) return 0;
-  const periodIdx = xmNote - 13;
+  const periodIdx = xmNote - 37;
   if (periodIdx < 0 || periodIdx >= MOD_PERIODS.length) return 0;
   return MOD_PERIODS[periodIdx];
 }

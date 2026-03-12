@@ -150,7 +150,7 @@ for (let oct = 0; oct < 3; oct++) {
     if (idx < 36) {
       const period = PERIOD_TABLE[idx];
       if (!PERIOD_NOTE_MAP.has(period)) {
-        PERIOD_NOTE_MAP.set(period, `${NOTE_NAMES[note].replace('-', '')}${oct + 1}`);
+        PERIOD_NOTE_MAP.set(period, `${NOTE_NAMES[note].replace('-', '')}${oct + 3}`);
       }
     }
   }
@@ -174,7 +174,7 @@ export function periodToNoteName(period: number): string {
     for (let note = 0; note < 12; note++) {
       const idx = oct * 12 + note;
       if (idx < 36 && PERIOD_TABLE[idx] <= period) {
-        const name = `${NOTE_NAMES[note].replace('-', '')}${oct + 1}`;
+        const name = `${NOTE_NAMES[note].replace('-', '')}${oct + 3}`;
         // Cache for next hit
         PERIOD_NOTE_MAP.set(period, name);
         return name;

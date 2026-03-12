@@ -162,9 +162,9 @@ function sidmonPeriodToXMNote(period: number): number {
   }
 
   // SidMon note 1 = C-1 (period 5760), note 13 = C-2 (period 2880), etc.
-  // XM note 1 = C-0, XM note 13 = C-1.
-  // SidMon note 1 (C-1) -> XM note 13
-  return bestIdx + 12;
+  // XM note 1 = C-0, XM note 37 = C-3 (FT2 convention).
+  // SidMon note 1 (C-1) -> XM note 37
+  return bestIdx + 36;
 }
 
 /**

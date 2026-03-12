@@ -11,7 +11,7 @@
  *   byte[3] = eff & 0xFF
  *
  * Note mapping: XM note → Amiga period via standard ProTracker period table.
- *   XM note 13 = C-1 = period 856, XM note 24 = B-1 = period 453, etc.
+ *   XM note 37 = C-3 = period 856, XM note 48 = B-3 = period 453, etc.
  */
 
 import type { TrackerCell } from '@/types';
@@ -26,12 +26,12 @@ const MOD_PERIODS = [
 
 /**
  * Convert XM note number to Amiga period.
- * XM note 13 = C-1 → period index 0 → period 856
+ * XM note 37 = C-3 → period index 0 → period 856
  * Returns 0 for no note or out-of-range.
  */
 function xmNoteToPeriod(xmNote: number): number {
   if (xmNote === 0) return 0;
-  const periodIdx = xmNote - 13; // XM 13 = C-1 = index 0
+  const periodIdx = xmNote - 37; // XM 37 = C-3 = index 0 (FT2 convention)
   if (periodIdx < 0 || periodIdx >= MOD_PERIODS.length) return 0;
   return MOD_PERIODS[periodIdx];
 }

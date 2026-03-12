@@ -48,9 +48,8 @@ export function periodToNoteIndex(period: number): number {
 export function amigaNoteToXM(amigaNote: number): number {
   if (amigaNote === 0) return 0;
   // ProTracker: index 1 = C-1 (period 856)
-  // XM: note 1 = C-0. Octave offset: ProTracker octave 1 → XM octave 1 = note 13
-  // So ProTracker note 1 (C-1) → XM note 13 (C-1)
-  return amigaNote + 12;
+  // ProTracker C-1 → XM note 37 (C-3 in FT2 convention)
+  return amigaNote + 36;
 }
 
 // ── 8-bit signed → WAV ArrayBuffer ───────────────────────────────────────

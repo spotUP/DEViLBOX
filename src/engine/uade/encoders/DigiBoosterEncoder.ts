@@ -7,7 +7,7 @@
  *   byte[2]: effect type
  *   byte[3]: effect parameter
  *
- * Note mapping: XM note → DBM raw = xmNote - 12
+ * Note mapping: XM note → DBM raw = xmNote - 36
  */
 
 import type { TrackerCell } from '@/types';
@@ -17,9 +17,9 @@ function encodeDigiBoosterCell(cell: TrackerCell): Uint8Array {
   const out = new Uint8Array(4);
   const note = cell.note ?? 0;
 
-  // Byte 0: note (reverse of +12 offset)
-  if (note > 0 && note > 12) {
-    out[0] = Math.min(96, note - 12);
+  // Byte 0: note (reverse of +36 offset)
+  if (note > 0 && note > 36) {
+    out[0] = Math.min(96, note - 36);
   } else {
     out[0] = 0;
   }
