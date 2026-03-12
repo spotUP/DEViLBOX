@@ -269,8 +269,10 @@ class SunVoxProcessor extends AudioWorkletProcessor {
       }
 
       // Instantiate WASM module with pre-fetched binary
+      // Convert Uint8Array back to ArrayBuffer if needed (structured clone from main thread)
+      const wasmBuffer = wasmBinary instanceof Uint8Array ? wasmBinary.buffer : wasmBinary;
       this.wasm = await globalThis.createSunVox({
-        wasmBinary,
+        wasmBinary: wasmBuffer,
       });
 
       // Allocate per-instance scratch buffers — reused for every render call
