@@ -1318,28 +1318,39 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       let smoothOffset = 0;
 
       if (isPlaying) {
-        const replayer  = getTrackerReplayer();
-        const audioTime = Tone.now() + 0.01;
-        const audioState = replayer.getStateAtTime(audioTime);
-
-        if (audioState) {
-          currentRow       = audioState.row;
-          activePatternIdx = audioState.pattern;
-          
-          // Compute smooth offset for worker rendering
-          if (transportState.smoothScrolling) {
-            const nextState = replayer.getStateAtTime(audioTime + 0.5, true);
-            const effectiveDuration = (nextState && nextState.row !== audioState.row)
-              ? nextState.time - audioState.time
-              : (2.5 / transportState.bpm) * transportState.speed;
-            if (effectiveDuration > 0) {
-              const progress = Math.min(Math.max((audioTime - audioState.time) / effectiveDuration, 0), 1);
-              smoothOffset = progress * rowHeightRef.current;
-            }
+        // Check if scratch is active — use scratch position instead of replayer
+        const scratch = getTrackerScratchController();
+        if (scratch.isActive) {
+          const scratchState = scratch.getScratchDisplayState(rowHeightRef.current);
+          if (scratchState) {
+            currentRow = scratchState.row;
+            activePatternIdx = scratchState.pattern;
+            smoothOffset = scratchState.smoothOffset;
           }
         } else {
-          // UADE / opaque playback: replayer has no state, use transport store row
-          currentRow = transportState.currentRow;
+          const replayer  = getTrackerReplayer();
+          const audioTime = Tone.now() + 0.01;
+          const audioState = replayer.getStateAtTime(audioTime);
+
+          if (audioState) {
+            currentRow       = audioState.row;
+            activePatternIdx = audioState.pattern;
+            
+            // Compute smooth offset for worker rendering
+            if (transportState.smoothScrolling) {
+              const nextState = replayer.getStateAtTime(audioTime + 0.5, true);
+              const effectiveDuration = (nextState && nextState.row !== audioState.row)
+                ? nextState.time - audioState.time
+                : (2.5 / transportState.bpm) * transportState.speed;
+              if (effectiveDuration > 0) {
+                const progress = Math.min(Math.max((audioTime - audioState.time) / effectiveDuration, 0), 1);
+                smoothOffset = progress * rowHeightRef.current;
+              }
+            }
+          } else {
+            // UADE / opaque playback: replayer has no state, use transport store row
+            currentRow = transportState.currentRow;
+          }
         }
       }
 
