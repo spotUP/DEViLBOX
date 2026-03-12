@@ -1151,6 +1151,7 @@ Module['FS_createPreloadedFile'] = FS.createPreloadedFile;
 }
 
 // Begin runtime exports
+  Module['wasmMemory'] = wasmMemory;
   Module['ccall'] = ccall;
   Module['cwrap'] = cwrap;
   var missingLibrarySymbols = [
@@ -1335,7 +1336,6 @@ missingLibrarySymbols.forEach(missingLibrarySymbol)
   'err',
   'callMain',
   'abort',
-  'wasmMemory',
   'wasmExports',
   'HEAPF64',
   'HEAP8',
