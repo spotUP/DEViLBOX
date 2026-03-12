@@ -20,6 +20,7 @@ set_target_properties(Fred PROPERTIES
 
 target_link_options(Fred PRIVATE
   -sWASM=1
+  "SHELL:-s ENVIRONMENT='web'"
   -sEXPORTED_FUNCTIONS=['_fred_init','_fred_dispose','_fred_create_player','_fred_destroy_player','_fred_load_instrument','_fred_note_on','_fred_note_off','_fred_render','_fred_set_param','_fred_get_param','_malloc','_free']
   -sEXPORTED_RUNTIME_METHODS=['cwrap','getValue','HEAPF32','HEAPU8']
   -sMODULARIZE=1
