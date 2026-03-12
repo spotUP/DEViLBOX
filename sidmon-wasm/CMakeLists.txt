@@ -26,6 +26,8 @@ target_link_options(SidMon PRIVATE
   -sALLOW_MEMORY_GROWTH=1
   -sINITIAL_MEMORY=4194304
   -sSINGLE_FILE=0
+  -sENVIRONMENT=web,worker
+  -sASSERTIONS=0
 )
 
 # Copy output to public/sidmon/
