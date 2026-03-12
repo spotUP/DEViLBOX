@@ -1024,13 +1024,13 @@ void sa_note_on(void *ctxPtr, int handle, int note, int velocity) {
 
     /* Convert MIDI note to SA period table index.
      *
-     * SA note index = MIDI + 25 (derived from saNote2XM offset of -36 and XM→MIDI offset of +11).
+     * SA note index = MIDI + 1 (derived from saNote2XM offset of -12 and XM→MIDI offset of +11).
      * The period table is used directly — waveform length is NOT factored into the period.
      * On real Amiga hardware, shorter waveforms naturally sound higher in pitch because:
      *   audible_freq = PAL_CLOCK / (period * waveform_bytes)
      * The SA player always uses the same period for a given note regardless of waveform size.
      */
-    int saIndex = note + 25;
+    int saIndex = note + 1;
     if (saIndex < 1) saIndex = 1;
     if (saIndex > 108) saIndex = 108;
 

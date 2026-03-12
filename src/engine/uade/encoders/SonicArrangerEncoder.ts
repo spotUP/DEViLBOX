@@ -7,7 +7,7 @@
  *   byte[2]: (disableST<<7 | disableNT<<6 | arpTable<<4 | effect)
  *   byte[3]: effect argument
  *
- * Note mapping: xmNote = saNote - 36 → saNote = xmNote + 36
+ * Note mapping: xmNote = saNote - 12 → saNote = xmNote + 12
  *   xmNote 97 (note-off) → saNote 0x7F (force quiet)
  *
  * The parser stores original SA effect/arpeggio values on TrackerCell as
@@ -25,7 +25,7 @@ export function encodeSonicArrangerCell(cell: TrackerCell): Uint8Array {
   if (xmNote === 97) {
     out[0] = 0x7F; // note-off → force quiet
   } else if (xmNote > 0) {
-    out[0] = Math.max(1, Math.min(132, xmNote + 36));
+    out[0] = Math.max(1, Math.min(108, xmNote + 12));
   } else {
     out[0] = 0;
   }
