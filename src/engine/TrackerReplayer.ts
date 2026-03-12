@@ -1306,14 +1306,17 @@ export class TrackerReplayer {
         console.log('[TrackerReplayer] WASM seq: upload complete, subscribing to position updates...');
 
         // Subscribe to position updates from the WASM sequencer (~60fps)
-        this._seqPositionUnsub = dispatchEngine.onSeqPosition((order, row) => {
+        this._seqPositionUnsub = dispatchEngine.onSeqPosition((order, row, audioTime) => {
           if (!this.playing || !this.song) return;
           this.songPos = order;
           this.pattPos = row;
           const patternNum = this.song.songPositions[order] ?? 0;
 
-          // Queue display state with current audio time for smooth scrolling interpolation
-          this.queueDisplayState(Tone.now(), row, patternNum, order, 0);
+          // Use worklet audio timestamp + output latency for accurate sync
+          const rawCtx = Tone.context.rawContext as AudioContext;
+          const latency = rawCtx.outputLatency ?? rawCtx.baseLatency ?? 0;
+          const time = audioTime != null ? audioTime + latency : Tone.now();
+          this.queueDisplayState(time, row, patternNum, order, 0);
           // Fire row change callback for UI (pattern editor, transport store)
           if (this.onRowChange) {
             this.onRowChange(row, patternNum, order);
@@ -1390,7 +1393,7 @@ export class TrackerReplayer {
           // Also queue display states so smooth scrolling can interpolate between rows.
           let lastRow = -1;
           let lastOrder = -1;
-          mptEngine.onPosition = (order, pattern, row) => {
+          mptEngine.onPosition = (order, pattern, row, audioTime) => {
             if (!this.playing || !this.song) return;
             if (row === lastRow && order === lastOrder) return;
             lastRow = row;
@@ -1398,8 +1401,11 @@ export class TrackerReplayer {
             this.songPos = order;
             this.pattPos = row;
             const patternNum = this.song.songPositions[order] ?? pattern;
-            // Queue display state with current audio time for smooth scrolling interpolation
-            this.queueDisplayState(Tone.now(), row, patternNum, order, 0);
+            // Use worklet audio timestamp + output latency for accurate sync
+            const rawCtx = Tone.context.rawContext as AudioContext;
+            const latency = rawCtx.outputLatency ?? rawCtx.baseLatency ?? 0;
+            const time = audioTime != null ? audioTime + latency : Tone.now();
+            this.queueDisplayState(time, row, patternNum, order, 0);
             if (this.onRowChange) {
               this.onRowChange(row, patternNum, order);
             }
@@ -1935,9 +1941,12 @@ export class TrackerReplayer {
       const engine = getToneEngine();
       const saInst = engine.getInstrument(ch.instrument.id, ch.instrument, chIndex);
       if (saInst && typeof (saInst as any).set === 'function') {
-        // Reset speedCounter at row boundary so arpeggio (% 3) and slide
-        // gating (speedCounter != 0) stay synchronised with the tracker grid.
-        (saInst as any).set('speedCounter', 0);
+        // Reset speedCounter only when a new note triggers (not on every row).
+        // The WASM doSlide() skips accumulation when speedCounter==0, so resetting
+        // on empty rows causes audible pauses at pattern boundaries.
+        if (row.note > 0 && row.note < 97) {
+          (saInst as any).set('speedCounter', 0);
+        }
 
         if (row.saArpTable !== undefined) {
           (saInst as any).set('arpeggioTable', row.saArpTable);
