@@ -959,7 +959,7 @@ export const PixiEditInstrumentModal: React.FC<PixiEditInstrumentModalProps> = (
               />
             )}
             {activeTab === 'sound' && currentInstrument && currentInstrument.synthType !== 'ModularSynth' && (
-              isNativeWASMSynth(currentInstrument.synthType) && !currentInstrument.sample?.url && !(currentInstrument.parameters as Record<string, unknown>)?.sampleUrl ? (
+              isNativeWASMSynth(currentInstrument.synthType) && (!currentInstrument.sample?.url || SONG_ENGINE_SYNTH_TYPES.has(currentInstrument.synthType ?? '')) && !(currentInstrument.parameters as Record<string, unknown>)?.sampleUrl ? (
                 <NativeInstrumentPanel instrument={currentInstrument} onUpdate={updateInstrument} />
               ) : (
                 <SoundPanel instrument={currentInstrument} updateParam={updateParam} updateOsc={updateOsc} updateFilter={updateFilter} updateEnvelope={updateEnvelope} />
@@ -1127,6 +1127,15 @@ const NATIVE_WASM_SYNTH_TYPES = new Set([
   'SoundMonSynth', 'SidMonSynth', 'DigMugSynth', 'FCSynth', 'FredSynth',
   'TFMXSynth', 'OctaMEDSynth', 'SidMon1Synth', 'HippelCoSoSynth',
   'RobHubbardSynth', 'DavidWhittakerSynth', 'SunVoxSynth',
+]);
+
+// Whole-song engine types — always show NativeInstrumentPanel even if sample data present
+const SONG_ENGINE_SYNTH_TYPES = new Set([
+  'SymphonieSynth', 'UADESynth', 'MusicLineSynth', 'SonicArrangerSynth',
+  'SoundMonSynth', 'SidMonSynth', 'DigMugSynth', 'FCSynth', 'FredSynth',
+  'TFMXSynth', 'OctaMEDSynth', 'SidMon1Synth', 'HippelCoSoSynth',
+  'RobHubbardSynth', 'DavidWhittakerSynth', 'JamCrackerSynth',
+  'FuturePlayerSynth',
 ]);
 
 function isNativeWASMSynth(synthType?: string): boolean {
