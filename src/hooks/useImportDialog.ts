@@ -240,8 +240,10 @@ export function useImportDialog(
           setSelectedSubsong(sidInfo.defaultSubsong);
         }
 
-        // For formats with nativeParser, call loadModuleFile to populate nativeData
-        if (nativeFmtForFile?.nativeParser) {
+        // Only call loadModuleFile for formats libopenmpt can handle
+        const canUseLibopenmpt = nativeFmtForFile?.nativeParser &&
+          (nativeFmtForFile.libopenmptFallback || nativeFmtForFile.libopenmptPlayable);
+        if (canUseLibopenmpt) {
           const info = await loadModuleFile(file);
           setModuleInfo(info);
         } else {
