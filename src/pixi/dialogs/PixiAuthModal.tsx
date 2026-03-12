@@ -138,7 +138,7 @@ export const PixiAuthModal: React.FC<PixiAuthModalProps> = ({ isOpen, onClose, o
                 : 'Create an account to save your songs to the server. No email required!'
             }
             style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 14, fill: 0xffffff }}
-            tint={0x60a5fa}
+            tint={theme.accentHighlight.color}
             layout={{}}
           />
         </layoutContainer>

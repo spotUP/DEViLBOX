@@ -575,16 +575,16 @@ export const PixiChannelHeaders: React.FC<PixiChannelHeadersProps> = ({
                   draw={(g: GraphicsType) => {
                     g.clear();
                     g.roundRect(0, 0, 28, 12, 2);
-                    g.fill({ color: 0xfbbf24, alpha: 0.15 });
+                    g.fill({ color: theme.warning.color, alpha: 0.15 });
                     g.roundRect(0, 0, 28, 12, 2);
-                    g.stroke({ color: 0xfbbf24, alpha: 0.35, width: 1 });
+                    g.stroke({ color: theme.warning.color, alpha: 0.35, width: 1 });
                   }}
                   layout={{ position: 'absolute', width: 28, height: 12 }}
                 />
                 <pixiBitmapText
                   text={`S:${channelSpeeds![ch]}`}
                   style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 8, fill: 0xffffff }}
-                  tint={0xfbbf24}
+                  tint={theme.warning.color}
                   layout={LAYOUT_EMPTY}
                 />
               </pixiContainer>
@@ -595,16 +595,16 @@ export const PixiChannelHeaders: React.FC<PixiChannelHeadersProps> = ({
                   draw={(g: GraphicsType) => {
                     g.clear();
                     g.roundRect(0, 0, 20, 12, 2);
-                    g.fill({ color: 0x00cc66, alpha: 0.2 });
+                    g.fill({ color: theme.success.color, alpha: 0.2 });
                     g.roundRect(0, 0, 20, 12, 2);
-                    g.stroke({ color: 0x00cc66, alpha: 0.5, width: 1 });
+                    g.stroke({ color: theme.success.color, alpha: 0.5, width: 1 });
                   }}
                   layout={{ position: 'absolute', width: 20, height: 12 }}
                 />
                 <pixiBitmapText
                   text="SC"
                   style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 7, fill: 0xffffff }}
-                  tint={0x00cc66}
+                  tint={theme.success.color}
                   layout={LAYOUT_EMPTY}
                 />
               </pixiContainer>
@@ -615,7 +615,7 @@ export const PixiChannelHeaders: React.FC<PixiChannelHeadersProps> = ({
                   draw={(g: GraphicsType) => {
                     g.clear();
                     g.roundRect(0, 0, Math.max(50, chW - 120), 18, 3);
-                    g.fill({ color: 0x000000, alpha: 0.85 });
+                    g.fill({ color: theme.bg.color, alpha: 0.85 });
                     g.roundRect(0, 0, Math.max(50, chW - 120), 18, 3);
                     g.stroke({ color: 0x6366f1, alpha: 0.6, width: 1 });
                   }}

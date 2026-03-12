@@ -164,17 +164,17 @@ export const SIDGB64Tab: React.FC<SIDGB64TabProps> = ({ width, height, composerN
             <LinkRow
               text="GameBase64 Homepage"
               url="https://gb64.com/"
-              tint={0x60a5fa}
+              tint={theme.accentHighlight.color}
             />
             <LinkRow
               text="C64 Music in Games Archive"
               url="https://gb64.com/search.php?a=5"
-              tint={0x60a5fa}
+              tint={theme.accentHighlight.color}
             />
             <LinkRow
               text="GB64 Top Rated Games"
               url="https://gb64.com/search.php?a=4"
-              tint={0x60a5fa}
+              tint={theme.accentHighlight.color}
             />
           </layoutContainer>
         </layoutContainer>

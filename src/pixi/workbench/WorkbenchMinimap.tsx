@@ -195,7 +195,7 @@ export const WorkbenchMinimap: React.FC<Props> = ({ screenW, screenH }) => {
       <pixiBitmapText
         text={`${Math.round(camera.scale * 100)}%`}
         style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }}
-        tint={0x8080a0}
+        tint={theme.textMuted.color}
         x={PADDING + 2}
         y={MAP_H - 12}
       />

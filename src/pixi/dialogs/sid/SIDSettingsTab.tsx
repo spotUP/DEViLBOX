@@ -26,17 +26,20 @@ const SettingRow: React.FC<{
   children: React.ReactNode;
   labelW?: number;
   width: number;
-}> = ({ label, children, labelW = 90, width }) => (
-  <layoutContainer layout={{ flexDirection: 'row', alignItems: 'center', gap: 12, width }}>
-    <pixiBitmapText
-      text={label}
-      style={{ fontFamily: PIXI_FONTS.SANS_SEMIBOLD, fontSize: 13, fill: 0xffffff }}
-      tint={0x93c5fd}
-      layout={{ width: labelW }}
-    />
-    {children}
-  </layoutContainer>
-);
+}> = ({ label, children, labelW = 90, width }) => {
+  const theme = usePixiTheme();
+  return (
+    <layoutContainer layout={{ flexDirection: 'row', alignItems: 'center', gap: 12, width }}>
+      <pixiBitmapText
+        text={label}
+        style={{ fontFamily: PIXI_FONTS.SANS_SEMIBOLD, fontSize: 13, fill: 0xffffff }}
+        tint={theme.accentHighlight.color}
+        layout={{ width: labelW }}
+      />
+      {children}
+    </layoutContainer>
+  );
+};
 
 // ── Option definitions ──────────────────────────────────────────────────────
 

@@ -350,7 +350,7 @@ export const PixiTB303KnobPanel: React.FC<PixiTB303KnobPanelProps> = ({ width })
           <pixiBitmapText
             text="DB-303"
             style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 14, fill: 0xffffff }}
-            tint={0xffcc00}
+            tint={theme.warning.color}
             layout={{}}
           />
 
