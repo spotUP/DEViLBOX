@@ -18,7 +18,7 @@ class V2SynthProcessor extends AudioWorkletProcessor {
   async handleMessage(msg) {
     switch (msg.type) {
       case 'init':
-        console.log('[V2Synth] init received, sampleRate:', msg.sampleRate, 'wasmBinary length:', msg.wasmBinary?.length);
+        console.log('[V2Synth] init received, sampleRate:', msg.sampleRate, 'wasmBinary length:', msg.wasmBinary?.length || msg.wasmBinary?.byteLength);
         await this.initModule(msg.sampleRate, msg.wasmBinary, msg.jsCode);
         break;
       case 'loadPatch':
@@ -51,11 +51,14 @@ class V2SynthProcessor extends AudioWorkletProcessor {
   
   async initModule(sampleRate, wasmBinary, jsCode) {
     try {
+      // Convert Uint8Array back to ArrayBuffer if needed (structured clone from main thread)
+      const wasmBuffer = wasmBinary instanceof Uint8Array ? wasmBinary.buffer : wasmBinary;
+      
       // Execute the Emscripten module code - append return statement after the var declaration
       const createModule = new Function(jsCode + '\nreturn createV2Synth;')();
       
       this.module = await createModule({
-        wasmBinary: wasmBinary,
+        wasmBinary: wasmBuffer,
         print: (text) => console.log('[V2Synth]', text),
         printErr: (text) => console.error('[V2Synth]', text),
       });

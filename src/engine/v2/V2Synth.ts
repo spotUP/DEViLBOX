@@ -112,10 +112,11 @@ export class V2Synth implements DevilboxSynth {
       };
 
       // Initialize with WASM binary, JS code, and sample rate
+      console.log('[V2Synth] Sending init to worklet, wasmBinary size:', wasmBinary.byteLength, 'jsCode length:', jsCode.length);
       this._worklet!.port.postMessage({
         type: 'init',
         sampleRate: nativeCtx.sampleRate,
-        wasmBinary,
+        wasmBinary: new Uint8Array(wasmBinary),
         jsCode
       });
     });
