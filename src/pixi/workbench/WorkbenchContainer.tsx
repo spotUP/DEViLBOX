@@ -427,7 +427,7 @@ export const WorkbenchContainer: React.FC = () => {
   const drawBgHitArea = useCallback((g: GraphicsType) => {
     g.clear();
     g.rect(0, 0, width, height);
-    g.fill({ color: 0x000000, alpha: 0 });
+    g.fill({ color: theme.bg.color, alpha: 0 });
   }, [width, height]);
 
   // ─── Background pan ────────────────────────────────────────────────────────
@@ -463,8 +463,8 @@ export const WorkbenchContainer: React.FC = () => {
           const rh = Math.abs(r.curY - r.startY);
           g.clear();
           g.rect(rx, ry, rw, rh);
-          g.fill({ color: 0x4a9eff, alpha: 0.08 });
-          g.stroke({ color: 0x4a9eff, alpha: 0.5, width: Math.max(0.5, 1 / cam2.scale) });
+          g.fill({ color: theme.accentHighlight.color, alpha: 0.08 });
+          g.stroke({ color: theme.accentHighlight.color, alpha: 0.5, width: Math.max(0.5, 1 / cam2.scale) });
         }
         // Compute which windows intersect
         const wins = useWorkbenchStore.getState().windows;

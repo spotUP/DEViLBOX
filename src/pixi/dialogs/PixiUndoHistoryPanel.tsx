@@ -86,12 +86,12 @@ export const PixiUndoHistoryPanel: React.FC<PixiUndoHistoryPanelProps> = ({ isOp
     (g: GraphicsType) => {
       g.clear();
       g.rect(0, 0, PANEL_W, 20);
-      g.fill({ color: 0x1E3A5F, alpha: 0.5 });
+      g.fill({ color: theme.accentHighlight.color, alpha: 0.5 });
       // top & bottom subtle borders
       g.rect(0, 0, PANEL_W, 1);
-      g.fill({ color: 0x1D4ED8, alpha: 0.3 });
+      g.fill({ color: theme.accent.color, alpha: 0.3 });
       g.rect(0, 19, PANEL_W, 1);
-      g.fill({ color: 0x1D4ED8, alpha: 0.3 });
+      g.fill({ color: theme.accent.color, alpha: 0.3 });
     },
     [],
   );

@@ -10,6 +10,7 @@
 import { useCallback } from 'react';
 import type { Graphics as GraphicsType } from 'pixi.js';
 import { useDJStore } from '@/stores/useDJStore';
+import { usePixiTheme } from '../../theme';
 
 const W = 280;
 const H = 32;
@@ -19,6 +20,7 @@ interface Props {
 }
 
 export const PixiDeckBeatGrid: React.FC<Props> = ({ deckId }) => {
+  const theme = usePixiTheme();
   const analysisBeatGrid = useDJStore(s => s.decks[deckId].beatGrid);
   const seratoBeatGrid = useDJStore(s => s.decks[deckId].seratoBeatGrid);
   const audioPosition = useDJStore(s => s.decks[deckId].audioPosition);
@@ -67,7 +69,7 @@ export const PixiDeckBeatGrid: React.FC<Props> = ({ deckId }) => {
           const bx = Math.round((nearestBeat / totalDuration) * W);
           const glowAlpha = 0.15 + 0.3 * (1 - minDist / 0.1);
           g.rect(bx - 2, 0, 5, H);
-          g.fill({ color: 0xfbbf24, alpha: glowAlpha });
+          g.fill({ color: theme.warning.color, alpha: glowAlpha });
         }
       }
     } else if (hasSerato && durationMs > 0) {
@@ -95,7 +97,7 @@ export const PixiDeckBeatGrid: React.FC<Props> = ({ deckId }) => {
       // Current position highlight
       const currentX = Math.round((audioPosition / durationSec) * W);
       g.rect(currentX - 1, 0, 2, H);
-      g.fill({ color: 0xffc800, alpha: 0.4 });
+      g.fill({ color: theme.warning.color, alpha: 0.4 });
     }
   }, [analysisBeatGrid, seratoBeatGrid, audioPosition, durationMs, songPos, totalPositions, hasAnalysis, hasSerato]);
 

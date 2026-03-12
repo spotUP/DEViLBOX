@@ -8,6 +8,7 @@ import type { Graphics as GraphicsType } from 'pixi.js';
 import { PIXI_FONTS } from '@/pixi/fonts';
 import { MegaText, type GlyphLabel } from '@/pixi/utils/MegaText';
 import { useGTUltraStore } from '@/stores/useGTUltraStore';
+import { usePixiTheme } from '../../theme';
 
 const ROW_H = 14;
 const HEADER_H = 18;
@@ -27,6 +28,7 @@ const C_SEP      = 0x222222;
 interface Props { width: number; height: number }
 
 export const PixiGTOrderList: React.FC<Props> = ({ width, height }) => {
+  const theme = usePixiTheme();
   const gridRef = useRef<GraphicsType>(null);
   const megaRef = useRef<MegaText | null>(null);
   const containerRef = useRef<any>(null);
@@ -75,7 +77,7 @@ export const PixiGTOrderList: React.FC<Props> = ({ width, height }) => {
       const isPlay = idx === playbackPos.position;
       const isCursor = idx === orderCursor;
 
-      if (isPlay) g.rect(0, y, width, ROW_H).fill({ color: 0x3a1525 });
+      if (isPlay) g.rect(0, y, width, ROW_H).fill({ color: theme.error.color });
       if (isCursor) {
         g.rect(0, y, width, 1).fill({ color: C_CURSOR });
         g.rect(0, y + ROW_H - 1, width, 1).fill({ color: C_CURSOR });
@@ -106,7 +108,7 @@ export const PixiGTOrderList: React.FC<Props> = ({ width, height }) => {
 
         // Channel column highlight
         if (isCursor && ch === orderChannelCol) {
-          g.rect(x - 2, y, colW, ROW_H).fill({ color: 0x1a2a1a });
+          g.rect(x - 2, y, colW, ROW_H).fill({ color: theme.success.color });
         }
 
         labels.push({ x, y: y + 1, text, color, fontFamily: ff });

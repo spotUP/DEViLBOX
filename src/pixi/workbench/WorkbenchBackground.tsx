@@ -9,6 +9,7 @@
 import React, { useCallback, useLayoutEffect, useRef } from 'react';
 import type { Container as ContainerType, Graphics as GraphicsType } from 'pixi.js';
 import type { CameraState } from '@stores/useWorkbenchStore';
+import { usePixiTheme } from '../theme';
 
 interface Props {
   width: number;
@@ -30,6 +31,7 @@ export const WorkbenchBackground: React.FC<Props> = ({
   camera,
   gridSize = 40,
 }) => {
+  const theme = usePixiTheme();
   const dotsContainerRef = useRef<ContainerType>(null);
 
   // ── Compute effective pitch (depends on scale only) ──────────────────────
@@ -75,7 +77,7 @@ export const WorkbenchBackground: React.FC<Props> = ({
       }
       col += ep;
     }
-    g.fill({ color: 0x6060a0, alpha });
+    g.fill({ color: theme.textMuted.color, alpha });
 
     // Major dots (every 4 cells) — one batch fill
     const majorPitch = ep * 4;
@@ -91,7 +93,7 @@ export const WorkbenchBackground: React.FC<Props> = ({
         }
         mCol += majorPitch;
       }
-      g.fill({ color: 0x8080c0, alpha: mAlpha });
+      g.fill({ color: theme.textMuted.color, alpha: mAlpha });
     }
   }, [width, height, camera.scale, gridSize]); // ← NO camera.x, camera.y
 

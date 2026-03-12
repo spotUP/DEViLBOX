@@ -716,7 +716,7 @@ export const PixiArrangementCanvas: React.FC<PixiArrangementCanvasProps> = ({
         for (let s = 0; s < numSlices; s++) {
           const sliceAlpha = 0.3 * (1 - s / numSlices);
           g.rect(cx + CLIP_PADDING + s * sliceW, cy, sliceW, ch);
-          g.fill({ color: 0x000000, alpha: sliceAlpha });
+          g.fill({ color: theme.bg.color, alpha: sliceAlpha });
         }
       }
 
@@ -729,7 +729,7 @@ export const PixiArrangementCanvas: React.FC<PixiArrangementCanvasProps> = ({
         for (let s = 0; s < numSlices; s++) {
           const sliceAlpha = 0.3 * (1 - s / numSlices);
           g.rect(rightEdge - (s + 1) * sliceW, cy, sliceW, ch);
-          g.fill({ color: 0x000000, alpha: sliceAlpha });
+          g.fill({ color: theme.bg.color, alpha: sliceAlpha });
         }
       }
 

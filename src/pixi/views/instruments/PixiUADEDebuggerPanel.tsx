@@ -221,9 +221,9 @@ export const PixiUADEDebuggerPanel: FC<PixiUADEDebuggerPanelProps> = ({ instrume
   const drawPanelBg = useCallback((g: GraphicsType) => {
     g.clear();
     g.rect(0, 0, PANEL_W, STRIP_H + LABEL_Y_PAD);
-    g.fill({ color: 0x000e1a });
+    g.fill({ color: theme.bg.color });
     g.rect(0, 0, PANEL_W, 1);
-    g.fill({ color: 0x112233, alpha: 0.6 });
+    g.fill({ color: theme.bgSecondary.color, alpha: 0.6 });
   }, []);
 
   if (!channels) {

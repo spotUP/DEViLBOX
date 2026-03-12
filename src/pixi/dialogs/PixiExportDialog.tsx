@@ -114,16 +114,16 @@ const CHIP_FORMATS = [
   { id: 'zsm', label: 'ZSM', loop: 'none' as const, ext: '.zsm' },
 ];
 
-const getLoopInfo = (chipFormat: string, chipLoopRow: number) => {
+const getLoopInfo = (chipFormat: string, chipLoopRow: number, theme: ReturnType<typeof usePixiTheme>) => {
   if (chipFormat === 'vgm') {
     return chipLoopRow > 0
-      ? { text: `Loop point at row ${chipLoopRow} will be used`, color: 0x44cc44 }
-      : { text: 'Set loop point above for custom loop', color: 0x888888 };
+      ? { text: `Loop point at row ${chipLoopRow} will be used`, color: theme.success.color }
+      : { text: 'Set loop point above for custom loop', color: theme.textSecondary.color };
   }
   if (['nsf', 'gbs'].includes(chipFormat)) {
-    return { text: `${chipFormat.toUpperCase()} loops entire song automatically`, color: 0xddaa00 };
+    return { text: `${chipFormat.toUpperCase()} loops entire song automatically`, color: theme.warning.color };
   }
-  return { text: `${chipFormat.toUpperCase()} does not support loop points`, color: 0xff6644 };
+  return { text: `${chipFormat.toUpperCase()} does not support loop points`, color: theme.error.color };
 };
 
 // ── Component ──────────────────────────────────────────────────────────────────
@@ -1078,7 +1078,7 @@ export const PixiExportDialog: React.FC<PixiExportDialogProps> = ({ isOpen, onCl
 
                 {/* Color-coded loop support indicator */}
                 {(() => {
-                  const loopInfo = getLoopInfo(chipFormat, chipLoopPoint);
+                  const loopInfo = getLoopInfo(chipFormat, chipLoopPoint, theme);
                   return (
                     <layoutContainer layout={{ padding: 8, borderRadius: 4, borderWidth: 1, borderColor: loopInfo.color, width: CONTENT_W - 24 }}>
                       <PixiLabel text={loopInfo.text} size="xs" color="custom" customColor={loopInfo.color} />

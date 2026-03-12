@@ -243,7 +243,7 @@ export const PixiMixerChannelStrip: React.FC<PixiMixerChannelStripProps> = ({
     if (g) {
       g.clear();
       g.rect(0, 0, VU_WIDTH, VU_HEIGHT);
-      g.fill({ color: 0x111111, alpha: 1 });
+      g.fill({ color: theme.bgSecondary.color, alpha: 1 });
 
       if (quantizedLevel > 0) {
         const vuColor =
@@ -255,7 +255,7 @@ export const PixiMixerChannelStrip: React.FC<PixiMixerChannelStripProps> = ({
       }
 
       g.rect(0, 0, VU_WIDTH, VU_HEIGHT);
-      g.stroke({ color: 0x333333, alpha: 1, width: 1 });
+      g.stroke({ color: theme.border.color, alpha: 1, width: 1 });
 
       const peakY = VU_HEIGHT - quantizedPeak;
       if (peakRef.current > 0.01) {
