@@ -1935,11 +1935,14 @@ export class TrackerReplayer {
       const engine = getToneEngine();
       const saInst = engine.getInstrument(ch.instrument.id, ch.instrument, chIndex);
       if (saInst && typeof (saInst as any).set === 'function') {
+        // Reset speedCounter at row boundary so arpeggio (% 3) and slide
+        // gating (speedCounter != 0) stay synchronised with the tracker grid.
+        (saInst as any).set('speedCounter', 0);
+
         if (row.saArpTable !== undefined) {
           (saInst as any).set('arpeggioTable', row.saArpTable);
         }
         // Send 0xy effect arpeggio arg (effect 0 with non-zero param)
-        // The WASM handles the speedCounter % 3 cycling internally
         const arpEffArg = (effect === 0 && param !== 0) ? param : 0;
         (saInst as any).set('effectArpArg', arpEffArg);
 
