@@ -348,8 +348,8 @@ static void doVibrato(SAPlayer *p) {
     if (vibVal != 0 && vibLevel != 0) {
         int mod = (vibVal * 4) / (int)vibLevel;
         int newPeriod = (int)p->currentPeriod + mod;
-        if (newPeriod < 113) newPeriod = 113;
-        if (newPeriod > 13696) newPeriod = 13696;
+        if (newPeriod < 0) newPeriod = 0;
+        if (newPeriod > 65535) newPeriod = 65535;
         p->currentPeriod = (uint16_t)newPeriod;
     }
 
@@ -361,10 +361,11 @@ static void doAmf(SAPlayer *p) {
 
     int8_t amfVal = p->ins.amfTable[p->amfPosition];
 
-    /* Apply AMF as period modulation (subtraction, matching reference) */
+    /* Apply AMF as period modulation (subtraction, matching reference).
+     * Reference does unsigned 16-bit arithmetic with no clamp in DoAmf. */
     int newPeriod = (int)p->currentPeriod - amfVal;
-    if (newPeriod < 28) newPeriod = 28;
-    if (newPeriod > 13696) newPeriod = 13696;
+    if (newPeriod < 0) newPeriod = 0;
+    if (newPeriod > 65535) newPeriod = 65535;
     p->currentPeriod = (uint16_t)newPeriod;
 
     /* Delay-reload pattern: decrement counter, advance position when it hits 0 */
@@ -839,10 +840,12 @@ static void doAdsr(SAPlayer *p) {
 
 static void doVolumeSlide(SAPlayer *p) {
     if (p->volumeSlideSpeed == 0) return;
-    float newVol = p->currentVolume + (float)p->volumeSlideSpeed;
-    if (newVol < 0.0f) newVol = 0.0f;
-    if (newVol > 64.0f) newVol = 64.0f;
-    p->currentVolume = newVol;
+    /* Reference modifies CurrentVolume (the BASE volume used by ADSR),
+     * not the ADSR output. ins.volume is the base volume. */
+    int16_t newVol = (int16_t)p->ins.volume + p->volumeSlideSpeed;
+    if (newVol < 0) newVol = 0;
+    if (newVol > 64) newVol = 64;
+    p->ins.volume = (uint16_t)newVol;
 }
 
 /* ── Master per-tick update ───────────────────────────────────────────────── */
@@ -850,6 +853,12 @@ static void doVolumeSlide(SAPlayer *p) {
 static void sa_player_tick(SAPlayer *p) {
     if (!p->playing) return;
     if (p->flag & 0x01) return; /* muted (e.g., FmDrum finished) */
+
+    /* Always reset period from table before processing effects.
+     * Reference DoArpeggio ALWAYS looks up Periods[TransposedNote] each tick,
+     * then portamento/vibrato/AMF/slide modify it. Without this reset,
+     * effects compound across ticks instead of being applied fresh. */
+    p->currentPeriod = PERIOD_TABLE[p->baseNote];
 
     doArpeggio(p);
     doPortamento(p);
