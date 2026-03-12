@@ -425,6 +425,25 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   const isScratchDragRef = useRef(false);
   const [, setDragOverCell] = useState<{ channelIndex: number; rowIndex: number } | null>(null);
 
+  // Document-level handlers for scratch drag (cursor can leave canvas bounds)
+  useEffect(() => {
+    const onDocMouseMove = (e: MouseEvent) => {
+      if (!isScratchDragRef.current) return;
+      getTrackerScratchController().onGrabMove(e.clientY, performance.now());
+    };
+    const onDocMouseUp = () => {
+      if (!isScratchDragRef.current) return;
+      isScratchDragRef.current = false;
+      getTrackerScratchController().onGrabEnd(performance.now());
+    };
+    document.addEventListener('mousemove', onDocMouseMove);
+    document.addEventListener('mouseup', onDocMouseUp);
+    return () => {
+      document.removeEventListener('mousemove', onDocMouseMove);
+      document.removeEventListener('mouseup', onDocMouseUp);
+    };
+  }, []);
+
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
 
@@ -485,6 +504,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       const activated = scratch.onGrabStart(e.clientY, performance.now());
       if (activated) {
         isScratchDragRef.current = true;
+        e.preventDefault(); // Prevent text selection during scratch drag
         return;
       }
       // If scratch didn't activate (e.g., replayer not ready), fall through to normal click
@@ -508,11 +528,8 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   }, [isMobile, getCellFromCoords]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
-    // Scratch drag — route to scratch controller
-    if (isScratchDragRef.current) {
-      getTrackerScratchController().onGrabMove(e.clientY, performance.now());
-      return;
-    }
+    // Scratch drag handled by document-level listener (supports dragging outside canvas)
+    if (isScratchDragRef.current) return;
 
     if (!isDragging || isMobile) return;
 
@@ -523,12 +540,8 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   }, [isDragging, isMobile, getCellFromCoords]);
 
   const handleMouseUp = useCallback(() => {
-    // End scratch drag
-    if (isScratchDragRef.current) {
-      isScratchDragRef.current = false;
-      getTrackerScratchController().onGrabEnd(performance.now());
-      return;
-    }
+    // Scratch drag ended by document-level listener
+    if (isScratchDragRef.current) return;
     if (isDragging) {
       setIsDragging(false);
     }
@@ -1860,7 +1873,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
-        onMouseLeave={handleMouseUp}
+        onMouseLeave={() => { if (!isScratchDragRef.current) handleMouseUp(); }}
         onWheel={handleWheel}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
