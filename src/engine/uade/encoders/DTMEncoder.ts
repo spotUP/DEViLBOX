@@ -13,8 +13,8 @@
  *   byte[3]: effect parameter
  *
  * Note mapping for 2.04: XM note → BCD = octave*16 + semitone
- *   Parser: (d0 >> 4) * 12 + (d0 & 0x0F) + 12 → XM note
- *   Reverse: raw = xmNote - 12, octave = floor(raw/12), semi = raw%12
+ *   Parser: (d0 >> 4) * 12 + (d0 & 0x0F) + 36 → XM note
+ *   Reverse: raw = xmNote - 36, octave = floor(raw/12), semi = raw%12
  */
 
 import type { TrackerCell } from '@/types';
@@ -29,8 +29,8 @@ function encodeDTM204Cell(cell: TrackerCell): Uint8Array {
   const note = cell.note ?? 0;
 
   // Byte 0: note as BCD
-  if (note > 0 && note >= 13) {
-    const raw = note - 12;
+  if (note > 0 && note >= 37) {
+    const raw = note - 36;
     const octave = Math.floor(raw / 12);
     const semi = raw % 12;
     out[0] = ((octave & 0x0F) << 4) | (semi & 0x0F);

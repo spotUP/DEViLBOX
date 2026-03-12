@@ -66,15 +66,15 @@ function encodeCBACell(cell: TrackerCell): Uint8Array {
   // Byte 1: note
   //   DEViLBOX note 0 = no note → CBA 0
   //   DEViLBOX note 254 (CMD_NOTE_CUT) → CBA 255
-  //   DEViLBOX note N (1-96 range, stored as 12+note) → CBA = N - 12
+  //   DEViLBOX note N (1-96 range, stored as 36+note) → CBA = N - 36
   const note = cell.note ?? 0;
   if (note === 0) {
     out[1] = 0;
   } else if (note === CMD_NOTE_CUT) {
     out[1] = 255;
   } else {
-    // Reverse: parser does cell.note = 12 + cbaNote, so cbaNote = cell.note - 12
-    const cbaNote = note - 12;
+    // Reverse: parser does cell.note = 36 + cbaNote, so cbaNote = cell.note - 36
+    const cbaNote = note - 36;
     out[1] = (cbaNote >= 1 && cbaNote <= 96) ? cbaNote : 0;
   }
 

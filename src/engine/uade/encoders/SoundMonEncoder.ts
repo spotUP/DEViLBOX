@@ -18,10 +18,10 @@ function encodeSoundMonCell(cell: TrackerCell): Uint8Array {
   const note = cell.note ?? 0;
 
   // Byte 0: note value (the parser maps via period table → XM note)
-  // We store the raw note index. Parser uses amigaNoteToXM which adds 12.
-  // Reverse: xmNote - 12 = amiga note index
-  if (note > 0 && note > 12) {
-    out[0] = (note - 12) & 0xFF;
+  // We store the raw note index. Parser uses amigaNoteToXM which adds 36.
+  // Reverse: xmNote - 36 = amiga note index
+  if (note > 0 && note > 36) {
+    out[0] = (note - 36) & 0xFF;
   } else {
     out[0] = 0;
   }

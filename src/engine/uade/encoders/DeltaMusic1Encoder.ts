@@ -10,8 +10,8 @@
  * DeltaMusic uses 16-row blocks (not 64), assembled from 4 track sequences.
  *
  * Note mapping:
- *   Parser: DM1 note → period → periodToNoteIndex → amigaNoteToXM (adds 12)
- *   Reverse: xmNote → amigaIdx = xmNote - 12 (period table index)
+ *   Parser: DM1 note → period → periodToNoteIndex → amigaNoteToXM (adds 36)
+ *   Reverse: xmNote → amigaIdx = xmNote - 36 (period table index)
  *   The DM1 format stores a raw note index (1-83) which maps to its own period table.
  *   Since the parser maps through the standard Amiga period table, we reverse through that.
  */
@@ -28,12 +28,12 @@ function encodeDeltaMusic1Cell(cell: TrackerCell): Uint8Array {
   out[0] = instr > 0 ? (instr - 1) & 0xFF : 0;
 
   // Byte 1: note index
-  // Parser does: DM1 noteVal → DM1_PERIODS[noteVal-1] → periodToNoteIndex → +12 = xmNote
-  // Reverse: xmNote - 12 = amiga index (1-based) → we need to find the DM1 note that
+  // Parser does: DM1 noteVal → DM1_PERIODS[noteVal-1] → periodToNoteIndex → +36 = xmNote
+  // Reverse: xmNote - 36 = amiga index (1-based) → we need to find the DM1 note that
   // maps to this period. Since DM1 periods are a superset, we approximate:
   // For standard range, amiga note index ≈ DM1 note value
-  if (note > 0 && note > 12) {
-    out[1] = Math.min(83, note - 12);
+  if (note > 0 && note > 36) {
+    out[1] = Math.min(83, note - 36);
   } else {
     out[1] = 0;
   }

@@ -126,7 +126,7 @@ function sc40NoteToXm(noteIndex: number): number {
   const idx = noteIndex - 1;
   if (idx < SC_PERIOD_TABLE.length) {
     // Map period table index to XM note
-    return Math.max(1, Math.min(96, idx + 13));
+    return Math.max(1, Math.min(96, idx + 37));
   }
   return Math.max(1, Math.min(96, noteIndex));
 }

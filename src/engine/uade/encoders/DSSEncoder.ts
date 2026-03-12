@@ -18,7 +18,7 @@ import type { TrackerCell } from '@/types';
 import { registerPatternEncoder } from '../UADEPatternEncoder';
 
 // DSS period table (finetune 0) — 48 entries covering 4 octaves
-// Index 0 = lowest pitch (highest period), corresponds to XM note 13 (C-1)
+// Index 0 = lowest pitch (highest period), corresponds to XM note 37 (C-3)
 const DSS_PERIODS_FT0 = [
   1712, 1616, 1524, 1440, 1356, 1280, 1208, 1140, 1076, 1016,  960,  906,
    856,  808,  762,  720,  678,  640,  604,  570,  538,  508,  480,  453,
@@ -28,11 +28,11 @@ const DSS_PERIODS_FT0 = [
 
 /**
  * Convert XM note back to Amiga period.
- * Parser: xmNote = periodTableIndex + 13, so periodTableIndex = xmNote - 13
+ * Parser: xmNote = periodTableIndex + 37, so periodTableIndex = xmNote - 37
  */
 function xmNoteToPeriod(xmNote: number): number {
   if (xmNote === 0) return 0; // no note
-  const idx = xmNote - 13;
+  const idx = xmNote - 37;
   if (idx >= 0 && idx < DSS_PERIODS_FT0.length) return DSS_PERIODS_FT0[idx];
   return 0; // out of range
 }

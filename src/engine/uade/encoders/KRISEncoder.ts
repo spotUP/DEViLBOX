@@ -9,7 +9,7 @@
  *
  * Note mapping:
  *   Parser: (noteByte - 0x18) / 2 → 0-based index, then apply transpose and map to XM
- *   Reverse: noteIdx = xmNote - 13 (same as Amiga mapping), noteByte = noteIdx * 2 + 0x18
+ *   Reverse: noteIdx = xmNote - 37 (same as Amiga mapping), noteByte = noteIdx * 2 + 0x18
  */
 
 import type { TrackerCell } from '@/types';
@@ -20,8 +20,8 @@ function encodeKRISCell(cell: TrackerCell): Uint8Array {
   const note = cell.note ?? 0;
 
   // Byte 0: noteByte
-  if (note > 0 && note >= 13) {
-    const noteIdx = note - 13;
+  if (note > 0 && note >= 37) {
+    const noteIdx = note - 37;
     const noteByte = noteIdx * 2 + 0x18;
     out[0] = Math.min(0x9E, noteByte) & 0xFF;
   } else {

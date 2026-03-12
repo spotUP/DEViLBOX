@@ -10,8 +10,8 @@
  *   Bits 7-0:    Effect parameter
  *
  * Note mapping:
- *   Parser: zmNote → zmNoteToXM: zmNote + 12 = xmNote; 63 → 97 (note-off)
- *   Reverse: xmNote → zmNote = xmNote - 12; 97 → 63
+ *   Parser: zmNote → zmNoteToXM: zmNote + 36 = xmNote; 63 → 97 (note-off)
+ *   Reverse: xmNote → zmNote = xmNote - 36; 97 → 63
  *
  * Effect mapping:
  *   Parser: zmEffectToXM maps control nibble bits to XM effects
@@ -35,8 +35,8 @@ function encodeZoundMonitorCell(cell: TrackerCell): Uint8Array {
   let zmNote = 0;
   if (note === 97) {
     zmNote = 63; // note-off
-  } else if (note > 12 && note <= 48) {
-    zmNote = note - 12; // XM 13 → ZM 1, XM 48 → ZM 36
+  } else if (note > 36 && note <= 72) {
+    zmNote = note - 36; // XM 37 → ZM 1, XM 72 → ZM 36
   }
 
   // Reverse effect mapping: XM effect → control nibble + param

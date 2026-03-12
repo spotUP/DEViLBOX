@@ -348,11 +348,11 @@ function _parse(bytes: Uint8Array, filename: string): TrackerSong | null {
         // Instrument
         cell.instrument = instr;
 
-        // Note: 0 = no note; 255 = note cut; 1-96 → pitch = 12 + note (NOTE_MIDDLEC-49+note, MIDDLEC=61)
+        // Note: 0 = no note; 255 = note cut; 1-96 → pitch = 36 + note (FT2 convention)
         if (note === NOTE_CUT_BYTE) {
           cell.note = CMD_NOTE_CUT;  // 254 = note cut in DEViLBOX
         } else if (note > 0 && note <= 96) {
-          cell.note = 12 + note;
+          cell.note = 36 + note;
         }
 
         // Volume: 0 = no volume; 1-65 → volume = vol - 1 (0-64)

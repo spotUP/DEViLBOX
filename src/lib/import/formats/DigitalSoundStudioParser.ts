@@ -205,9 +205,9 @@ function periodToXMNote(period: number): number {
       bestIdx = i;
     }
   }
-  // bestIdx 0 = C-1 in ProTracker → XM note 13 (C-1 in XM is note 13)
-  // XM note numbering: 1 = C-0, 13 = C-1, 25 = C-2, etc.
-  const xmNote = bestIdx + 13;
+  // bestIdx 0 = C-1 in ProTracker → XM note 37 (C-3 in FT2 convention)
+  // XM note numbering: 1 = C-0, 37 = C-3, 49 = C-4, etc.
+  const xmNote = bestIdx + 37;
   return Math.max(1, Math.min(96, xmNote));
 }
 
