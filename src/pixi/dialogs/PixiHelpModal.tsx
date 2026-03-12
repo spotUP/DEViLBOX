@@ -477,7 +477,7 @@ const ShortcutSection: React.FC<{ group: ShortcutGroup; width: number }> = ({ gr
       <pixiBitmapText
         text={group.title.toUpperCase()}
         style={{ fontFamily: PIXI_FONTS.SANS_BOLD, fontSize: 12, fill: 0xffffff }}
-        tint={0x60A5FA}
+        tint={theme.accentHighlight.color}
         layout={{ marginBottom: 4 }}
       />
       {group.shortcuts.map((s, i) => (

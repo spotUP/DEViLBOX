@@ -404,7 +404,7 @@ export const PixiSc68View: React.FC<Props> = ({ width, height }) => {
           <pixiBitmapText
             text="ATARI ST - SC68/SNDH PLAYER"
             style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 12, fill: 0xffffff }}
-            tint={0x445566}
+            tint={theme.textMuted.color}
           />
         </pixiContainer>
       </pixiContainer>

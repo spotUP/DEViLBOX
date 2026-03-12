@@ -108,7 +108,7 @@ const VersionEntry: React.FC<{ entry: ChangelogEntry; isLatest: boolean; width: 
             <pixiBitmapText
               text="LATEST"
               style={{ fontFamily: PIXI_FONTS.SANS_BOLD, fontSize: 12, fill: 0xffffff }}
-              tint={0x000000}
+              tint={theme.bg.color}
               layout={{}}
             />
           </layoutContainer>

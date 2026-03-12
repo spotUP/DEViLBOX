@@ -10,9 +10,10 @@
  * Safe to render when UADEEngine is not running; falls back gracefully.
  */
 
-import { type FC, useCallback, useEffect, useRef, useState } from 'react';
+import { type FC, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Graphics as GraphicsType } from 'pixi.js';
 import { PIXI_FONTS } from '../../fonts';
+import { usePixiTheme } from '../../theme';
 import { UADEEngine } from '../../../engine/uade/UADEEngine';
 import type { UADEChannelData } from '../../../engine/uade/UADEEngine';
 import { amigaPeriodToNote } from '../../../engine/uade/amigaPeriodToNote';
@@ -69,6 +70,12 @@ interface StripProps {
 }
 
 const PixiChannelStrip: FC<StripProps> = ({ index, ch, instruments }) => {
+  const theme = usePixiTheme();
+  const palette = useMemo(() => ({
+    active: theme.accentHighlight.color,
+    dim: theme.textMuted.color,
+  }), [theme]);
+
   const noteInfo   = ch.period > 0 ? amigaPeriodToNote(ch.period) : null;
   const volPct     = ch.volume / 64;
   const instrName  = resolveInstrumentName(ch.samplePtr, instruments);
@@ -137,7 +144,7 @@ const PixiChannelStrip: FC<StripProps> = ({ index, ch, instruments }) => {
         <pixiBitmapText
           text={CHANNEL_LABELS[index]}
           style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }}
-          tint={0x336688}
+          tint={palette.active}
           layout={{}}
         />
         <pixiGraphics draw={drawDma} layout={{ width: DMA_R * 2, height: DMA_R * 2 }} />
@@ -159,13 +166,13 @@ const PixiChannelStrip: FC<StripProps> = ({ index, ch, instruments }) => {
         <pixiBitmapText
           text={periodText}
           style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 11, fill: 0xffffff }}
-          tint={0x224466}
+          tint={palette.dim}
           layout={{}}
         />
         <pixiBitmapText
           text={volText}
           style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 11, fill: 0xffffff }}
-          tint={0x224466}
+          tint={palette.dim}
           layout={{}}
         />
       </pixiContainer>
@@ -174,7 +181,7 @@ const PixiChannelStrip: FC<StripProps> = ({ index, ch, instruments }) => {
       <pixiBitmapText
         text={instrName}
         style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 11, fill: 0xffffff }}
-        tint={0x334455}
+        tint={palette.dim}
         layout={{}}
       />
     </pixiContainer>
@@ -190,6 +197,7 @@ interface PixiUADEDebuggerPanelProps {
 }
 
 export const PixiUADEDebuggerPanel: FC<PixiUADEDebuggerPanelProps> = ({ instruments }) => {
+  const theme = usePixiTheme();
   const [channels, setChannels] = useState<UADEChannelData[] | null>(null);
   const instrumentsRef = useRef(instruments);
   useEffect(() => { instrumentsRef.current = instruments; }, [instruments]);
@@ -232,7 +240,7 @@ export const PixiUADEDebuggerPanel: FC<PixiUADEDebuggerPanelProps> = ({ instrume
         <pixiBitmapText
           text="Paula debugger — waiting for playback..."
           style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }}
-          tint={0x112233}
+          tint={theme.textMuted.color}
           layout={{}}
         />
       </pixiContainer>
@@ -257,7 +265,7 @@ export const PixiUADEDebuggerPanel: FC<PixiUADEDebuggerPanelProps> = ({ instrume
       <pixiBitmapText
         text="PAULA DEBUGGER"
         style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 10, fill: 0xffffff }}
-        tint={0x336688}
+        tint={theme.accentHighlight.color}
         layout={{ marginBottom: 2 }}
       />
 

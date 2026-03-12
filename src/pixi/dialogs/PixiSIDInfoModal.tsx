@@ -357,7 +357,7 @@ export const PixiSIDInfoModal: React.FC<PixiSIDInfoModalProps> = ({ isOpen, onCl
           <pixiBitmapText
             text="SID File Info"
             style={{ fontFamily: PIXI_FONTS.SANS_BOLD, fontSize: 20, fill: 0xffffff }}
-            tint={0xdbeafe}
+            tint={theme.text.color}
             layout={{}}
           />
           <Badge
@@ -440,13 +440,13 @@ export const PixiSIDInfoModal: React.FC<PixiSIDInfoModalProps> = ({ isOpen, onCl
                 <pixiBitmapText
                 text={sidMetadata.title || 'Untitled'}
                 style={{ fontFamily: PIXI_FONTS.SANS_SEMIBOLD, fontSize: 18, fill: 0xffffff }}
-                tint={0xdbeafe}
+                tint={theme.text.color}
                 layout={{}}
               />
               <pixiBitmapText
                 text={sidMetadata.author || 'Unknown'}
                 style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 16, fill: 0xffffff }}
-                tint={0x93c5fd}
+                tint={theme.accentHighlight.color}
                 layout={{}}
               />
               {sidMetadata.copyright ? (
@@ -473,20 +473,20 @@ export const PixiSIDInfoModal: React.FC<PixiSIDInfoModalProps> = ({ isOpen, onCl
                   <pixiBitmapText
                     text={`${chipLabel}${chipCount > 1 ? ` × ${chipCount}` : ''}`}
                     style={{ fontFamily: PIXI_FONTS.SANS_MEDIUM, fontSize: 14, fill: 0xffffff }}
-                    tint={0x93c5fd}
+                    tint={theme.accentHighlight.color}
                     layout={{}}
                   />
                   <pixiBitmapText
                     text={clockLabel}
                     style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 14, fill: 0xffffff }}
-                    tint={0x93c5fd}
+                    tint={theme.accentHighlight.color}
                     layout={{}}
                   />
                   {durationStr ? (
                     <pixiBitmapText
                       text={durationStr}
                       style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 16, fill: 0xffffff }}
-                      tint={0xdbeafe}
+                      tint={theme.text.color}
                       layout={{}}
                     />
                   ) : null}
@@ -680,7 +680,7 @@ export const PixiSIDInfoModal: React.FC<PixiSIDInfoModalProps> = ({ isOpen, onCl
                       <LinkButton
                         text="CSDb"
                         url={`https://csdb.dk/${composer.csdbType}/?id=${composer.csdbId}`}
-                        tint={0x60a5fa}
+                        tint={theme.accentHighlight.color}
                       />
                     )}
                   </layoutContainer>
@@ -737,7 +737,7 @@ export const PixiSIDInfoModal: React.FC<PixiSIDInfoModalProps> = ({ isOpen, onCl
                     key={i}
                     text={`${yt.channel || `Performance ${i + 1}`}${yt.subtune > 0 ? ` (sub ${yt.subtune})` : ''}`}
                     url={`https://www.youtube.com/watch?v=${yt.videoId}`}
-                    tint={0xfca5a5}
+                    tint={theme.error.color}
                   />
                 ))}
               </layoutContainer>
@@ -845,7 +845,7 @@ export const PixiSIDInfoModal: React.FC<PixiSIDInfoModalProps> = ({ isOpen, onCl
                     <PixiLabel text="Links" size="xs" weight="semibold" color="textMuted" />
                     <layoutContainer layout={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
                       {composer.links.map((link, i) => (
-                        <LinkButton key={i} text={link.name} url={link.url} tint={0x93c5fd} />
+                        <LinkButton key={i} text={link.name} url={link.url} tint={theme.accentHighlight.color} />
                       ))}
                     </layoutContainer>
                   </layoutContainer>
@@ -894,7 +894,7 @@ export const PixiSIDInfoModal: React.FC<PixiSIDInfoModalProps> = ({ isOpen, onCl
                     <pixiBitmapText
                       text={loadingTuneId === tune.id ? '⏳' : '↓'}
                       style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 12, fill: 0xffffff }}
-                      tint={0x3b82f6}
+                      tint={theme.accentHighlight.color}
                       alpha={loadingTuneId === tune.id ? 1 : 0.4}
                       layout={{}}
                     />
@@ -927,7 +927,7 @@ export const PixiSIDInfoModal: React.FC<PixiSIDInfoModalProps> = ({ isOpen, onCl
                   <pixiBitmapText
                     text={showAllTunes ? '▲ Show less' : `▼ Show all ${tunes.length} tunes`}
                     style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 14, fill: 0xffffff }}
-                    tint={0x60a5fa}
+                    tint={theme.accentHighlight.color}
                     layout={{}}
                   />
                 </layoutContainer>

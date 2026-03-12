@@ -211,7 +211,7 @@ export const PixiArrangementAutomationLane: React.FC<PixiArrangementAutomationLa
       <pixiBitmapText
         text={paramLabel}
         style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }}
-        tint={0x94a3b8}
+        tint={theme.textMuted.color}
         layout={{ position: 'absolute', left: 5, top: 3 }}
       />
     </pixiContainer>

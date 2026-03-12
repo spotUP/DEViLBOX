@@ -127,16 +127,16 @@ export const SIDPlayerTab: React.FC<SIDPlayerTabProps> = ({ width, height, playe
           <pixiBitmapText
             text={player.title || playerName}
             style={{ fontFamily: PIXI_FONTS.SANS_BOLD, fontSize: 18, fill: 0xffffff }}
-            tint={0xdbeafe}
+            tint={theme.text.color}
             layout={{}}
           />
 
           {player.developer && (
-            <InfoRow label="Developer" value={player.developer} labelColor={0x93c5fd} valueColor={theme.text.color} />
+            <InfoRow label="Developer" value={player.developer} labelColor={theme.accentHighlight.color} valueColor={theme.text.color} />
           )}
 
           {yearRange && (
-            <InfoRow label="Active" value={yearRange} labelColor={0x93c5fd} valueColor={theme.text.color} />
+            <InfoRow label="Active" value={yearRange} labelColor={theme.accentHighlight.color} valueColor={theme.text.color} />
           )}
         </layoutContainer>
 

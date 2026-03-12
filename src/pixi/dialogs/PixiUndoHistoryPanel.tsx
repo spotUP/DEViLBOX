@@ -221,7 +221,7 @@ export const PixiUndoHistoryPanel: React.FC<PixiUndoHistoryPanelProps> = ({ isOp
           <pixiBitmapText
             text="Current State"
             style={{ fontFamily: PIXI_FONTS.SANS_MEDIUM, fontSize: 12, fill: 0xffffff }}
-            tint={0x60A5FA}
+            tint={theme.accentHighlight.color}
             layout={{}}
           />
         </layoutContainer>

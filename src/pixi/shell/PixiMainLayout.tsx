@@ -87,7 +87,7 @@ class ViewErrorBoundary extends Component<ViewErrorBoundaryProps, ViewErrorBound
           <pixiBitmapText
             text="Click here to reset to Tracker view"
             style={{ fontFamily: PIXI_FONTS.SANS_SEMIBOLD, fontSize: 13, fill: 0xffffff }}
-            tint={0x60a5fa}
+            tint={this.props.theme.accentHighlight.color}
             eventMode="static"
             cursor="pointer"
             onPointerUp={this.handleReset}
