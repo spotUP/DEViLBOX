@@ -238,8 +238,15 @@ export const PixiImportModuleDialog: React.FC<PixiImportModuleDialogProps> = ({
           setSidHeader(sidInfo);
           setSelectedSubsong(sidInfo.defaultSubsong);
         }
-        // For formats with nativeParser, call loadModuleFile to populate nativeData
-        if (nativeFmtForFile?.nativeParser) {
+        // For formats with nativeParser that libopenmpt can also handle, call
+        // loadModuleFile to populate nativeData.  Amiga-native formats (SoundFX,
+        // FC, OKT, MED, TFMX, etc.) are NOT libopenmpt-compatible — sending them
+        // through loadModuleFile would crash because libopenmpt can't parse them.
+        // Those formats go through the metadata-only path below and get routed to
+        // parseModuleToSong → tryRouteFormat at import time.
+        const canUseLibopenmpt = nativeFmtForFile?.nativeParser &&
+          (nativeFmtForFile.libopenmptFallback || nativeFmtForFile.libopenmptPlayable);
+        if (canUseLibopenmpt) {
           const info = await loadModuleFile(file);
           setModuleInfo(info);
         } else {
