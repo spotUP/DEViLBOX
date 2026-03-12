@@ -28,6 +28,7 @@ extern void sdInit();
 
 // External sounddef state we need access to
 extern unsigned char *soundmem;  // Raw patch memory
+extern char globals[];           // Global parameters (initialized by sdInit)
 // v2soundsize calculated at compile time in sounddef.h, we can hardcode for WASM:
 // v2soundsize = v2nparms + 1 + 255*3 = ~115 params + 1 + 765 = ~881 bytes per patch
 // But more importantly, we need to know the offset: 128*sizeof(void*) bytes into soundmem
@@ -86,14 +87,9 @@ int v2synth_init(uint32_t sampleRate) {
     // Initialize synth with patchmap
     synthInit(g_synth, g_patchmap, sampleRate);
     
-    // Debug: show first patch offset and data
-    long *offsets = (long*)soundmem;
-    uint8_t* patchData = soundmem + offsets[0];  // Patch 0 starts at this offset
-    
-    printf("[V2] Init complete, soundmem=%p offset[0]=%ld\n", soundmem, offsets[0]);
-    printf("[V2] Patch 0 bytes: %d %d %d %d %d %d\n", 
-           patchData[0], patchData[1], patchData[2], 
-           patchData[3], patchData[4], patchData[5]);
+    // Set default global parameters (v2initglobs was loaded into globals[] by sdInit)
+    // Critical: Without this, hcfreq=0 causes high-cut filter to zero all output
+    synthSetGlobals(g_synth, globals);
     
     g_initialized = true;
     return 0;
