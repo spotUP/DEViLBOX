@@ -194,10 +194,11 @@ export class SunVoxEngine {
     };
 
     // Send WASM binary + JS glue code to the worklet for instantiation
+    // Send wasmBinary as Uint8Array for reliable structured clone transfer
     this.workletNode.port.postMessage({
       type: 'init',
       sampleRate: ctx.sampleRate,
-      wasmBinary: SunVoxEngine.wasmBinary,
+      wasmBinary: SunVoxEngine.wasmBinary ? new Uint8Array(SunVoxEngine.wasmBinary) : null,
       jsCode: SunVoxEngine.jsCode,
     });
 
