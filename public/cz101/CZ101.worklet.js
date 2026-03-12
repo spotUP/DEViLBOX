@@ -22,11 +22,11 @@ class CZ101Processor extends AudioWorkletProcessor {
   }
 
   async handleMessage(event) {
-    const { type, register, value } = event.data;
+    const { type, register, value, wasmBinary } = event.data;
 
     switch (type) {
       case 'init':
-        await this.initWasm();
+        await this.initWasm(wasmBinary);
         break;
 
       case 'writeReg':
@@ -40,11 +40,15 @@ class CZ101Processor extends AudioWorkletProcessor {
     }
   }
 
-  async initWasm() {
+  async initWasm(wasmBinary) {
     try {
-      // Fetch the CZ101 WASM module
-      const response = await fetch('/cz101/CZ101.wasm');
-      const wasmBytes = await response.arrayBuffer();
+      let wasmBytes = wasmBinary;
+      
+      // If no wasmBinary passed, fetch it
+      if (!wasmBytes) {
+        const response = await fetch('/cz101/CZ101.wasm');
+        wasmBytes = await response.arrayBuffer();
+      }
 
       // Compile and instantiate
       const wasmModule = await WebAssembly.compile(wasmBytes);
@@ -66,7 +70,7 @@ class CZ101Processor extends AudioWorkletProcessor {
       }
 
       this.isInitialized = true;
-      this.port.postMessage({ type: 'initialized' });
+      this.port.postMessage({ type: 'ready' });
 
       console.log('[CZ101.worklet] WASM initialized');
     } catch (err) {
@@ -76,7 +80,7 @@ class CZ101Processor extends AudioWorkletProcessor {
       this.useFallback = true;
       this.initFallbackSynth();
       this.isInitialized = true;
-      this.port.postMessage({ type: 'initialized' });
+      this.port.postMessage({ type: 'ready' });
     }
   }
 
