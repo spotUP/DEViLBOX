@@ -44,21 +44,19 @@ const GRAB_TOUCH_COUNT = 3;
  *  Mac trackpad sends inertial scroll events with tiny deltas for 2-3s after
  *  the user lifts their fingers. These must NOT reset the idle timer, otherwise
  *  scratch mode stays active long after the user stopped interacting. */
-const SCROLL_IDLE_THRESHOLD = 3;
+const SCROLL_IDLE_THRESHOLD = 1;
 
 /** Minimum scroll delta to reset the idle timer (pixels).
- *  Must be higher than SCROLL_IDLE_THRESHOLD to filter out the tail end of
- *  Mac trackpad inertial decay (< 5px), while still capturing intentional
- *  scrolls. Since exit no longer requires rate convergence, this just needs
- *  to detect "user is still actively scrolling." */
-const SCROLL_SIGNIFICANT_THRESHOLD = 10;
+ *  Must be higher than inertial decay tail (< 1px), while still capturing
+ *  intentional trackpad scrolls (typically 2-8px). */
+const SCROLL_SIGNIFICANT_THRESHOLD = 2;
 
-/** Cooldown after exiting scratch mode (ms).
+/** Cooldown after exiting scroll-based scratch mode (ms).
  *  Mac trackpad inertial scroll can send events with large deltas (5-20px) for
  *  seconds after the user lifts their fingers. Without a cooldown, these events
- *  immediately re-enter scratch mode after exit, causing a rapid enter/exit loop
- *  that makes the tracker position oscillate and audio go silent. */
-const SCRATCH_EXIT_COOLDOWN_MS = 1500;
+ *  immediately re-enter scratch mode after exit, causing a rapid enter/exit loop.
+ *  NOTE: Only applies to scroll re-entry, not grab (mouse drag) re-entry. */
+const SCRATCH_EXIT_COOLDOWN_MS = 800;
 
 // ─── Controller ──────────────────────────────────────────────────────────────
 
@@ -235,7 +233,9 @@ export class TrackerScratchController {
     this._accelerationEnabled = useUIStore.getState().scratchAcceleration;
 
     // Convert scroll delta to angular impulse via physics utility
-    const impulse = TurntablePhysics.deltaToImpulse(deltaY, deltaMode);
+    // Boost impulse for pattern editor — trackpad deltas are small (2-8px)
+    // and users expect direct visual response when scrolling
+    const impulse = TurntablePhysics.deltaToImpulse(deltaY, deltaMode) * 8;
 
     // With acceleration disabled, use a more direct/linear feel
     const scaledImpulse = this._accelerationEnabled ? impulse : impulse * 1.5;
