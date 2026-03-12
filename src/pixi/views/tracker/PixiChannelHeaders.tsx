@@ -624,7 +624,7 @@ export const PixiChannelHeaders: React.FC<PixiChannelHeadersProps> = ({
                 <pixiBitmapText
                   text={(editValue || '').toUpperCase() || ' '}
                   style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 10, fill: 0xffffff }}
-                  tint={0xffffff}
+                  tint={theme.text.color}
                   alpha={0.9}
                   layout={LAYOUT_EMPTY}
                 />

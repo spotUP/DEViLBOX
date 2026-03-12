@@ -365,7 +365,7 @@ export const PixiAIPanel: React.FC = () => {
               <pixiBitmapText
                 text="Ctrl+L to toggle this panel"
                 style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }}
-                tint={0x555555}
+                tint={theme.textMuted.color}
                 layout={{ paddingTop: 12 }}
               />
             </layoutContainer>

@@ -20,6 +20,7 @@ export interface ThemeColors {
   // Accent colors
   accent: string;
   accentSecondary: string;
+  accentHighlight: string;
   accentGlow: string;
 
   // Text colors
@@ -75,6 +76,7 @@ const neoDarkTheme: Theme = {
     borderLight: '#3a3a40',
     accent: '#00d4aa',
     accentSecondary: '#7c3aed',
+    accentHighlight: '#22d3ee',
     accentGlow: 'rgba(0, 212, 170, 0.15)',
     text: '#f0f0f2',
     textSecondary: '#a0a0a8',
@@ -120,6 +122,7 @@ const cyanLineartTheme: Theme = {
     // All accents are cyan
     accent: '#00ffff',
     accentSecondary: '#00e0e0',
+    accentHighlight: '#00ffff',
     accentGlow: 'rgba(0, 255, 255, 0.12)',
 
     // Monochrome text - all cyan variants
@@ -168,6 +171,7 @@ const devilboxTheme: Theme = {
     borderLight: '#403535',
     accent: '#ef4444',
     accentSecondary: '#f97316',
+    accentHighlight: '#22d3ee',
     accentGlow: 'rgba(239, 68, 68, 0.15)',
     text: '#f2f0f0',
     textSecondary: '#a8a0a0',
@@ -213,6 +217,7 @@ const modernTheme: Theme = {
     // Accent: warm amber
     accent: '#f59e0b',
     accentSecondary: '#b45309',   // accentDim
+    accentHighlight: '#22d3ee',
     accentGlow: 'rgba(245, 158, 11, 0.25)',
 
     // Text
@@ -291,6 +296,7 @@ export const THEME_TOKEN_GROUPS: { label: string; tokens: { key: keyof ThemeColo
     tokens: [
       { key: 'accent', label: 'Primary' },
       { key: 'accentSecondary', label: 'Secondary' },
+      { key: 'accentHighlight', label: 'Highlight' },
       { key: 'accentGlow', label: 'Glow' },
     ],
   },
@@ -370,6 +376,7 @@ const applyTheme = (theme: Theme) => {
   root.style.setProperty('--color-border-light', colors.borderLight);
   root.style.setProperty('--color-accent', colors.accent);
   root.style.setProperty('--color-accent-secondary', colors.accentSecondary);
+  root.style.setProperty('--color-accent-highlight', colors.accentHighlight);
   root.style.setProperty('--color-accent-glow', colors.accentGlow);
   root.style.setProperty('--color-text', colors.text);
   root.style.setProperty('--color-text-secondary', colors.textSecondary);

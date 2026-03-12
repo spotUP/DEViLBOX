@@ -20,6 +20,7 @@ import { drainBindingErrorCount } from '../PixiApp';
 import { PixiNavBar } from './PixiNavBar';
 import { PixiStatusBar } from './PixiStatusBar';
 import { PixiExposeOverlay } from './PixiExposeOverlay';
+import { usePixiTheme } from '../theme';
 import { PIXI_FONTS } from '../fonts';
 import {
   MODERN_NAV_H,
@@ -43,6 +44,7 @@ import { WorkbenchContainer } from '../workbench/WorkbenchContainer';
 interface ViewErrorBoundaryProps {
   viewId: string;
   children: React.ReactNode;
+  theme: ReturnType<typeof usePixiTheme>;
 }
 
 interface ViewErrorBoundaryState {
@@ -75,12 +77,12 @@ class ViewErrorBoundary extends Component<ViewErrorBoundaryProps, ViewErrorBound
           <pixiBitmapText
             text={`View "${this.props.viewId}" failed to render`}
             style={{ fontFamily: PIXI_FONTS.SANS_SEMIBOLD, fontSize: 16, fill: 0xffffff }}
-            tint={0xef4444}
+            tint={this.props.theme.accent.color}
           />
           <pixiBitmapText
             text={this.state.error?.message?.slice(0, 120) || 'Unknown error'}
             style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 11, fill: 0xffffff }}
-            tint={0x888888}
+            tint={this.props.theme.textMuted.color}
           />
           <pixiBitmapText
             text="Click here to reset to Tracker view"
@@ -127,6 +129,7 @@ function resolveMainView(activeView: string): MainViewId {
 // ─── PixiMainLayout ──────────────────────────────────────────────────────────
 
 export const PixiMainLayout: React.FC = () => {
+  const theme = usePixiTheme();
   const { width: rawWidth, height } = usePixiResponsive();
   const { app } = useApplication();
   const activeView = useUIStore((s) => s.activeView);
@@ -322,7 +325,7 @@ export const PixiMainLayout: React.FC = () => {
                   flexDirection: 'column',
                 }}
               >
-                <ViewErrorBoundary viewId={viewId}>
+                <ViewErrorBoundary viewId={viewId} theme={theme}>
                   <ViewComponent />
                 </ViewErrorBoundary>
               </pixiContainer>
@@ -343,7 +346,7 @@ export const PixiMainLayout: React.FC = () => {
               flexDirection: 'column',
             }}
           >
-            <ViewErrorBoundary viewId="studio">
+            <ViewErrorBoundary viewId="studio" theme={theme}>
               <WorkbenchContainer />
             </ViewErrorBoundary>
           </pixiContainer>
@@ -363,7 +366,7 @@ export const PixiMainLayout: React.FC = () => {
               flexDirection: 'column',
             }}
           >
-            <ViewErrorBoundary viewId="vj">
+            <ViewErrorBoundary viewId="vj" theme={theme}>
               <PixiVJView />
             </ViewErrorBoundary>
           </pixiContainer>

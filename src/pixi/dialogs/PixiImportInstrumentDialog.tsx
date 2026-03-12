@@ -116,7 +116,7 @@ export const PixiImportInstrumentDialog: React.FC<PixiImportInstrumentDialogProp
             <pixiBitmapText
               text="Add Instrument?"
               style={{ fontFamily: PIXI_FONTS.SANS_BOLD, fontSize: 20, fill: 0xffffff }}
-              tint={0xffffff}
+              tint={theme.text.color}
               layout={{}}
             />
             <pixiBitmapText
@@ -145,7 +145,7 @@ export const PixiImportInstrumentDialog: React.FC<PixiImportInstrumentDialogProp
             <pixiBitmapText
               text={preview.name}
               style={{ fontFamily: PIXI_FONTS.SANS_BOLD, fontSize: 18, fill: 0xffffff }}
-              tint={0xffffff}
+              tint={theme.text.color}
               layout={{}}
             />
             <PixiLabel text={typeLabel} size="sm" color="textMuted" />

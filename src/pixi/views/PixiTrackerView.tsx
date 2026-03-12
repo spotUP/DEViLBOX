@@ -59,6 +59,7 @@ const MIDI_KNOB_BAR_H_COLLAPSED = 20;
 const MIDI_KNOB_BAR_H_EXPANDED = 56;
 
 export const PixiTrackerView: React.FC = () => {
+  const theme = usePixiTheme();
   // Enable FT2-style keyboard input (window event listeners — no DOM needed)
   useTrackerInput();
   useBlockOperations();
@@ -238,7 +239,7 @@ export const PixiTrackerView: React.FC = () => {
                   <pixiBitmapText
                     text="MusicLine"
                     style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 11, fill: 0xffffff }}
-                    tint={0x888888}
+                    tint={theme.textMuted.color}
                   />
                   <pixiContainer layout={{ flex: 1, height: 28 }} />
                   <PixiButton

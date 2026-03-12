@@ -37,8 +37,8 @@ const MODAL_W = 448;
 const MODAL_H = 400;
 
 // ─── Stat card — matches DOM grid-cols-3 bg-dark-bgSecondary rounded-lg p-2.5 ─
-const StatCard: React.FC<{ icon: string; value: string; label: string; accentColor: number; bgColor: number }> = ({
-  icon, value, label, accentColor, bgColor,
+const StatCard: React.FC<{ icon: string; value: string; label: string; accentColor: number; bgColor: number; theme: ReturnType<typeof usePixiTheme> }> = ({
+  icon, value, label, accentColor, bgColor, theme,
 }) => (
   <layoutContainer
     layout={{
@@ -64,13 +64,13 @@ const StatCard: React.FC<{ icon: string; value: string; label: string; accentCol
     <pixiBitmapText
       text={value}
       style={{ fontFamily: PIXI_FONTS.SANS_BOLD, fontSize: 16, fill: 0xffffff }}
-      tint={0xffffff}
+      tint={theme.text.color}
       layout={{}}
     />
     <pixiBitmapText
       text={label}
       style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 14, fill: 0xffffff }}
-      tint={0x888888}
+      tint={theme.textMuted.color}
       layout={{}}
     />
   </layoutContainer>
@@ -132,7 +132,7 @@ export const PixiImportDBXDialog: React.FC<PixiImportDBXDialogProps> = ({
             <pixiBitmapText
               text="Load Project?"
               style={{ fontFamily: PIXI_FONTS.SANS_BOLD, fontSize: 20, fill: 0xffffff }}
-              tint={0xffffff}
+              tint={theme.text.color}
               layout={{}}
             />
             <pixiBitmapText
@@ -184,6 +184,7 @@ export const PixiImportDBXDialog: React.FC<PixiImportDBXDialogProps> = ({
                 label="BPM"
                 accentColor={theme.accent.color}
                 bgColor={theme.bgSecondary.color}
+                theme={theme}
               />
               <StatCard
                 icon="▦"
@@ -191,6 +192,7 @@ export const PixiImportDBXDialog: React.FC<PixiImportDBXDialogProps> = ({
                 label="Patterns"
                 accentColor={theme.accent.color}
                 bgColor={theme.bgSecondary.color}
+                theme={theme}
               />
               <StatCard
                 icon="preset-a"
@@ -198,6 +200,7 @@ export const PixiImportDBXDialog: React.FC<PixiImportDBXDialogProps> = ({
                 label="Instruments"
                 accentColor={theme.accent.color}
                 bgColor={theme.bgSecondary.color}
+                theme={theme}
               />
             </layoutContainer>
 
