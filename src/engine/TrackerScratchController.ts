@@ -28,6 +28,7 @@ import { getToneEngine } from './ToneEngine';
 import { getNativeAudioNode } from '@/utils/audio-context';
 import { useUIStore } from '@/stores/useUIStore';
 import { useTransportStore } from '@/stores/useTransportStore';
+import { useTrackerStore } from '@/stores/useTrackerStore';
 import { SCRATCH_PATTERNS, type ScratchPattern, type ScratchFrame } from './dj/DJScratchEngine';
 import { TurntablePhysics } from './turntable/TurntablePhysics';
 
@@ -98,6 +99,16 @@ export class TrackerScratchController {
   /** Previous touch timestamp for velocity calculation (grab mode) */
   private grabLastTime = 0;
 
+  // ── Scratch display position tracking ──────────────────────────────────
+  /** Row when scratch started */
+  private scratchStartRow = 0;
+  /** Pattern index when scratch started */
+  private scratchStartPattern = 0;
+  /** Fractional row offset accumulated during scratch (can go negative) */
+  private scratchRowOffset = 0;
+  /** Pattern length at scratch start (for wrapping) */
+  private scratchPatternLength = 64;
+
   /** Whether scratch mode is enabled (only true during playback + user interaction) */
   get isActive(): boolean { return this._isActive; }
   get accelerationEnabled(): boolean { return this._accelerationEnabled; }
@@ -105,6 +116,27 @@ export class TrackerScratchController {
 
   /** Expose physics for external queries (e.g., UI visualization) */
   get turntable(): TurntablePhysics { return this.physics; }
+
+  /**
+   * Get the current display position during scratch.
+   * Returns { row, pattern, smoothOffset } for the pattern editor to render.
+   * row = integer row, smoothOffset = fractional pixel offset for smooth scrolling.
+   */
+  getScratchDisplayState(rowHeight: number): { row: number; pattern: number; smoothOffset: number } | null {
+    if (!this._isActive) return null;
+    const totalOffset = this.scratchRowOffset;
+    const len = this.scratchPatternLength;
+    // Compute integer row + fractional remainder
+    let intRow = this.scratchStartRow + Math.floor(totalOffset);
+    const frac = totalOffset - Math.floor(totalOffset);
+    // Wrap within pattern bounds
+    intRow = ((intRow % len) + len) % len;
+    return {
+      row: intRow,
+      pattern: this.scratchStartPattern,
+      smoothOffset: frac * rowHeight,
+    };
+  }
 
   // ── Initialization ───────────────────────────────────────────────────────
 
@@ -426,6 +458,20 @@ export class TrackerScratchController {
 
     console.log('[TrackerScratch] Entering scratch mode');
 
+    // Capture current display position for scratch visual tracking
+    const audioState = replayer.getStateAtTime(Tone.now());
+    if (audioState) {
+      this.scratchStartRow = audioState.row;
+      this.scratchStartPattern = audioState.pattern;
+    } else {
+      const ts = useTransportStore.getState();
+      this.scratchStartRow = ts.currentRow;
+      this.scratchStartPattern = ts.currentPatternIndex;
+    }
+    this.scratchRowOffset = 0;
+    const patterns = useTrackerStore.getState().song?.patterns;
+    this.scratchPatternLength = (patterns && patterns[this.scratchStartPattern]?.length) || 64;
+
     // Store and enable smooth scrolling for scratch mode
     const transportState = useTransportStore.getState();
     this.originalSmoothScrolling = transportState.smoothScrolling;
@@ -568,6 +614,13 @@ export class TrackerScratchController {
       // Send signed rate directly to the ring buffer worklet.
       // The worklet does per-sample smoothing for click-free audio.
       this.applyPlaybackRate(rate);
+
+      // Accumulate visual row offset: rate × dt × rowsPerSecond
+      const ts = useTransportStore.getState();
+      const rowDuration = (2.5 * ts.speed) / ts.bpm; // seconds per row
+      if (rowDuration > 0) {
+        this.scratchRowOffset += rate * dt / rowDuration;
+      }
 
       // Exit when idle (no recent significant input) and not in a special mode
       const idleMs = now - this.lastEventTime;
