@@ -38,7 +38,8 @@ class V2MPlayerProcessor extends AudioWorkletProcessor {
   async initModule(sampleRate, wasmBinary, jsCode) {
     try {
       // Execute the Emscripten module code
-      const createModule = new Function('return ' + jsCode)();
+      // The JS is "var createV2MPlayer=..." so we append the return statement
+      const createModule = new Function(jsCode + '\nreturn createV2MPlayer;')();
       
       this.module = await createModule({
         wasmBinary: wasmBinary,
