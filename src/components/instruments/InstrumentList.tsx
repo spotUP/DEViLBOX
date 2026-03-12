@@ -166,7 +166,8 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
       const isAmigaNative = inst.synthType === 'SonicArrangerSynth' || inst.synthType === 'FuturePlayerSynth' || inst.synthType === 'JamCrackerSynth';
       const previewNote = isModSample
         ? (inst.sample?.baseNote || 'C3')   // Natural pitch: playbackRate = 1.0
-        : (isBass || isAmigaNative ? 'C3' : 'C4');
+        : isAmigaNative ? 'C2'              // Amiga middle register (ProTracker C-2, period 428)
+        : (isBass ? 'C3' : 'C4');
 
       const now = Tone.now();
       engine.triggerNoteAttack(inst.id, previewNote, now, 0.8, inst);
