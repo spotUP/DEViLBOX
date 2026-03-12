@@ -377,7 +377,7 @@ export const PixiRoot: React.FC = () => {
           initialFile={pendingModuleFile}
         />
         <PixiImportModuleDialog
-          isOpen={!!pendingModuleFile && !/\.(fur|dmf|mid|midi)$/i.test(pendingModuleFile.name)}
+          isOpen={!!pendingModuleFile && !/\.(fur|dmf|mid|midi|v2m)$/i.test(pendingModuleFile.name)}
           onClose={() => { setPendingModuleFile(null); useUIStore.getState().setPendingCompanionFiles([]); }}
           onImport={handleModuleImportGL}
           initialFile={pendingModuleFile}

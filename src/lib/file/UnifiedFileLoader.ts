@@ -488,6 +488,12 @@ export async function loadFile(
   const filename = file.name.toLowerCase();
   
   try {
+    // === V2M FILES — handle before isSongFormat check ===
+    // V2M has its own player and shouldn't go through the ImportModuleDialog
+    if (filename.endsWith('.v2m')) {
+      return await loadV2MFile(file);
+    }
+
     // === SONG FORMATS (replace project) ===
     if (isSongFormat(filename)) {
       // TD-3 pattern files need replace/append choice from user
@@ -534,11 +540,6 @@ export async function loadFile(
     // Audio samples (.wav, .mp3, etc.)
     if (isAudioFile(filename)) {
       return await loadAudioSample(file);
-    }
-
-    // .v2m - Farbrausch V2M synth music (playback only)
-    if (filename.endsWith('.v2m')) {
-      return await loadV2MFile(file);
     }
 
     return { success: false, error: `Unsupported file format: ${file.name}` };
