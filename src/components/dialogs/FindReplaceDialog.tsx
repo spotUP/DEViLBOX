@@ -177,7 +177,7 @@ export const FindReplaceDialog: React.FC<FindReplaceDialogProps> = ({ isOpen, on
               onClick={() => setSearchType(type)}
               className={`flex-1 px-3 py-2 text-xs rounded transition-colors ${
                 searchType === type
-                  ? 'bg-accent-primary text-white'
+                  ? 'bg-accent-primary text-text-primary'
                   : 'bg-dark-bg text-text-secondary hover:text-text-primary'
               }`}
             >

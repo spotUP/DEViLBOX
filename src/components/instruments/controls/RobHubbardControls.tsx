@@ -42,7 +42,7 @@ export const RobHubbardControls: React.FC<RobHubbardControlsProps> = ({ config, 
   const accent  = isCyan ? '#00ffff' : '#44aaff';
   const knob    = isCyan ? '#00ffff' : '#66bbff';
   const dim     = isCyan ? '#004444' : '#001833';
-  const panelBg = isCyan ? 'bg-[#041510] border-cyan-900/50' : 'bg-[#000e1a] border-blue-900/30';
+  const panelBg = isCyan ? 'bg-[#041510] border-accent-highlight/20' : 'bg-[#000e1a] border-blue-900/30';
 
   const upd = useCallback(<K extends keyof RobHubbardConfig>(key: K, value: RobHubbardConfig[K]) => {
     onChange({ [key]: value } as Partial<RobHubbardConfig>);
@@ -107,7 +107,7 @@ export const RobHubbardControls: React.FC<RobHubbardControlsProps> = ({ config, 
             onChange={(v) => upd('vibratoIdx', Math.round(v))}
             label="Start Index" color={knob} size="sm"
             formatValue={(v) => Math.round(v).toString()} />
-          <span className="text-[10px] text-gray-600">Divisor 0 = disabled</span>
+          <span className="text-[10px] text-text-muted">Divisor 0 = disabled</span>
         </div>
       </div>
 
@@ -123,7 +123,7 @@ export const RobHubbardControls: React.FC<RobHubbardControlsProps> = ({ config, 
             onChange={(v) => upd('loPos', Math.round(v))}
             label="Lower Bound" color={knob} size="sm"
             formatValue={(v) => Math.round(v).toString()} />
-          <span className="text-[10px] text-gray-600">Upper 0 = disabled</span>
+          <span className="text-[10px] text-text-muted">Upper 0 = disabled</span>
         </div>
       </div>
 
@@ -189,7 +189,7 @@ export const RobHubbardControls: React.FC<RobHubbardControlsProps> = ({ config, 
               </div>
             </>
           ) : (
-            <div className="text-[11px] font-mono" style={{ color: '#444' }}>
+            <div className="text-[11px] font-mono" style={{ color: 'var(--color-text-muted)' }}>
               No vibrato table data
             </div>
           )}
@@ -231,13 +231,13 @@ export const RobHubbardControls: React.FC<RobHubbardControlsProps> = ({ config, 
                 <span className="text-[10px] font-mono" style={{ color: accent, opacity: 0.6 }}>
                   {config.sampleLen} bytes total
                 </span>
-                <span className="text-[10px] text-gray-600">
+                <span className="text-[10px] text-text-muted">
                   (read-only — from parsed binary)
                 </span>
               </div>
             </>
           ) : (
-            <div className="text-[11px] font-mono" style={{ color: '#444' }}>
+            <div className="text-[11px] font-mono" style={{ color: 'var(--color-text-muted)' }}>
               No sample data
             </div>
           )}

@@ -1,6 +1,55 @@
 import type { SynthInfo } from './types';
 
 export const pluginSynthEntries: Record<string, SynthInfo> = {
+  // Demoscene 4k/64k intro synths
+  WaveSabreSlaughter: {
+    type: 'WaveSabreSynth',
+    name: 'WaveSabre Slaughter',
+    shortName: 'Slaugh',
+    description: 'Demoscene synth from 64k intros - 3 oscillators, multimode filter, distortion, chorus. Used in Logicoma, Conspiracy demos.',
+    bestFor: ['Demoscene', '64k intros', 'Aggressive leads', 'Bass', 'Pads'],
+    icon: 'Flame',
+    color: 'text-red-500',
+    defaultConfig: { xrns: { synthType: 'wavesabre-slaughter' } },
+  },
+  WaveSabreFalcon: {
+    type: 'WaveSabreSynth',
+    name: 'WaveSabre Falcon',
+    shortName: 'Falcon',
+    description: 'Demoscene synth from 64k intros - lightweight FM/subtractive hybrid. Used in Logicoma, Conspiracy demos.',
+    bestFor: ['Demoscene', '64k intros', 'FM sounds', 'Lightweight'],
+    icon: 'Bird',
+    color: 'text-orange-400',
+    defaultConfig: { xrns: { synthType: 'wavesabre-falcon' } },
+  },
+  WaveSabreAdultery: {
+    type: 'WaveSabreSynth',
+    name: 'WaveSabre Adultery',
+    shortName: 'Adult',
+    description: 'Demoscene GM sampler from 64k intros - plays General MIDI samples from system DLS. Used in Logicoma demos.',
+    bestFor: ['Demoscene', '64k intros', 'General MIDI', 'Orchestral'],
+    icon: 'Music',
+    color: 'text-purple-400',
+    defaultConfig: { xrns: { synthType: 'wavesabre-adultery' } },
+  },
+  OidosSynth: {
+    type: 'OidosSynth',
+    name: 'Oidos',
+    shortName: 'Oidos',
+    description: 'Additive synth from Loonies demoscene group - 256 partials, frequency modulation, distortion. Tiny code size for 4k/8k intros.',
+    bestFor: ['Demoscene', '4k intros', 'Additive synthesis', 'Rich pads', 'Complex timbres'],
+    icon: 'Sparkles',
+    color: 'text-accent-highlight',
+  },
+  TunefishSynth: {
+    type: 'TunefishSynth',
+    name: 'Tunefish 4',
+    shortName: 'TF4',
+    description: 'Additive/subtractive synth from Brain Control - 2 oscillators, bandpass array, noise, modulation matrix. Used in demoscene.',
+    bestFor: ['Demoscene', '64k intros', 'Versatile', 'Pads', 'Leads', 'Bass'],
+    icon: 'Fish',
+    color: 'text-teal-400',
+  },
   WAM: {
     type: 'WAM',
     name: 'Web Audio Module',
@@ -8,7 +57,7 @@ export const pluginSynthEntries: Record<string, SynthInfo> = {
     description: 'Load external audio plugins from URL (standard WAM 2.0 format)',
     bestFor: ['External plugins', 'Community synths', 'Rich UI'],
     icon: 'Globe',
-    color: 'text-cyan-400',
+    color: 'text-accent-highlight',
   },
   WAMOBXd: {
     type: 'WAMOBXd',
@@ -98,7 +147,7 @@ export const pluginSynthEntries: Record<string, SynthInfo> = {
     description: 'Professional hybrid synth - dual scenes, 12 oscillator types, 32 effect types, 765 parameters, open source since 2018',
     bestFor: ['Professional', 'Hybrid', 'Sound design', 'Bass', 'Pads', 'Leads', 'FX'],
     icon: 'Activity',
-    color: 'text-cyan-400',
+    color: 'text-accent-highlight',
   },
   TonewheelOrgan: {
     type: 'TonewheelOrgan',
@@ -134,7 +183,7 @@ export const pluginSynthEntries: Record<string, SynthInfo> = {
     description: 'Polyphonic synth by Matt Tytel - 2 oscillators, sub, 2 filters, 2 LFOs, 2 step sequencers, effects',
     bestFor: ['Modern leads', 'Bass', 'Pads', 'Keys', 'EDM'],
     icon: 'Waves',
-    color: 'text-cyan-500',
+    color: 'text-accent-highlight',
   },
   Sorcer: {
     type: 'Sorcer',

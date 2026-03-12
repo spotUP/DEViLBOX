@@ -123,9 +123,9 @@ export const GTInstrumentPanel: React.FC<{ width: number; height: number }> = ({
         if (!isNaN(v) && v >= 0 && v <= max) onChange(v);
       }}
       style={{
-        background: '#141414',
+        background: 'var(--color-bg-secondary)',
         color,
-        border: '1px solid #222',
+        border: '1px solid var(--color-border)',
         padding: '1px 4px',
         width: digits === 1 ? 24 : 36,
         textAlign: 'center',
@@ -138,21 +138,21 @@ export const GTInstrumentPanel: React.FC<{ width: number; height: number }> = ({
   );
 
   const labelStyle: React.CSSProperties = {
-    color: '#666', fontSize: 10, width: 80, textAlign: 'right', paddingRight: 6,
+    color: 'var(--color-text-muted)', fontSize: 10, width: 80, textAlign: 'right', paddingRight: 6,
   };
 
   return (
     <div style={{
-      width, height, overflow: 'auto', padding: 8, borderBottom: '1px solid #222',
-      fontFamily: '"JetBrains Mono", monospace', fontSize: 11, background: '#0d0d0d', color: '#e0e0e0',
+      width, height, overflow: 'auto', padding: 8, borderBottom: '1px solid var(--color-border)',
+      fontFamily: '"JetBrains Mono", monospace', fontSize: 11, background: '#0d0d0d', color: 'var(--color-text-secondary)',
     }}>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', marginBottom: 4 }}>
-        <span style={{ color: '#888', fontWeight: 'bold', marginRight: 8, fontSize: 10 }}>INSTRUMENT</span>
+        <span style={{ color: 'var(--color-text-muted)', fontWeight: 'bold', marginRight: 8, fontSize: 10 }}>INSTRUMENT</span>
         <select
           value={currentInstrument}
           onChange={(e) => setCurrentInstrument(Number(e.target.value))}
-          style={{ background: '#141414', color: '#e0e0e0', border: '1px solid #222', padding: '1px 4px', fontSize: 11, flex: 1 }}
+          style={{ background: 'var(--color-bg-secondary)', color: 'var(--color-text-secondary)', border: '1px solid var(--color-border)', padding: '1px 4px', fontSize: 11, flex: 1 }}
         >
           {Array.from({ length: 64 }, (_, i) => (
             <option key={i} value={i}>
@@ -165,7 +165,7 @@ export const GTInstrumentPanel: React.FC<{ width: number; height: number }> = ({
       {/* Instrument name (read-only for now — WASM doesn't expose name setter easily) */}
       <div style={{ display: 'flex', alignItems: 'center', height: 20, marginBottom: 4 }}>
         <span style={labelStyle}>Name</span>
-        <span style={{ color: '#e0e0e0', fontSize: 11 }}>{instr?.name || '—'}</span>
+        <span style={{ color: 'var(--color-text-secondary)', fontSize: 11 }}>{instr?.name || '—'}</span>
       </div>
 
       {/* ADSR visualization */}
@@ -173,7 +173,7 @@ export const GTInstrumentPanel: React.FC<{ width: number; height: number }> = ({
         style={{ width: width - 24, height: 36, marginBottom: 4, borderRadius: 2 }} />
 
       {/* ADSR knobs */}
-      <div style={{ color: '#888', fontWeight: 'bold', fontSize: 10, marginBottom: 2 }}>ENVELOPE</div>
+      <div style={{ color: 'var(--color-text-muted)', fontWeight: 'bold', fontSize: 10, marginBottom: 2 }}>ENVELOPE</div>
       <div style={{ display: 'flex', gap: 8, marginBottom: 6 }}>
         {[
           { label: 'ATK', value: atk, param: 'atk' as const },
@@ -182,14 +182,14 @@ export const GTInstrumentPanel: React.FC<{ width: number; height: number }> = ({
           { label: 'REL', value: rel, param: 'rel' as const },
         ].map(({ label, value, param }) => (
           <div key={param} style={{ textAlign: 'center' }}>
-            <div style={{ color: '#555', fontSize: 9 }}>{label}</div>
+            <div style={{ color: 'var(--color-text-muted)', fontSize: 9 }}>{label}</div>
             <HexInput value={value} max={15} digits={1} onChange={(v) => setADSR(param, v)} />
           </div>
         ))}
       </div>
 
       {/* Table pointers */}
-      <div style={{ color: '#888', fontWeight: 'bold', fontSize: 10, marginBottom: 2 }}>TABLE POINTERS</div>
+      <div style={{ color: 'var(--color-text-muted)', fontWeight: 'bold', fontSize: 10, marginBottom: 2 }}>TABLE POINTERS</div>
       {[
         { label: 'Wave Tbl', value: instr?.wavePtr ?? 0, type: 0 },
         { label: 'Pulse Tbl', value: instr?.pulsePtr ?? 0, type: 1 },
@@ -203,16 +203,16 @@ export const GTInstrumentPanel: React.FC<{ width: number; height: number }> = ({
       ))}
 
       {/* Settings */}
-      <div style={{ color: '#888', fontWeight: 'bold', fontSize: 10, marginTop: 4, marginBottom: 2 }}>SETTINGS</div>
+      <div style={{ color: 'var(--color-text-muted)', fontWeight: 'bold', fontSize: 10, marginTop: 4, marginBottom: 2 }}>SETTINGS</div>
       <div style={{ display: 'flex', alignItems: 'center', height: 20 }}>
         <span style={labelStyle}>VibDelay</span>
-        <span style={{ background: '#141414', color: '#60e060', border: '1px solid #222', padding: '1px 4px', width: 36, textAlign: 'center', fontSize: 11 }}>
+        <span style={{ background: 'var(--color-bg-secondary)', color: '#60e060', border: '1px solid var(--color-border)', padding: '1px 4px', width: 36, textAlign: 'center', fontSize: 11 }}>
           {(instr?.vibdelay ?? 0).toString(16).toUpperCase().padStart(2, '0')}
         </span>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', height: 20 }}>
         <span style={labelStyle}>GateTimer</span>
-        <span style={{ background: '#141414', color: '#60e060', border: '1px solid #222', padding: '1px 4px', width: 36, textAlign: 'center', fontSize: 11 }}>
+        <span style={{ background: 'var(--color-bg-secondary)', color: '#60e060', border: '1px solid var(--color-border)', padding: '1px 4px', width: 36, textAlign: 'center', fontSize: 11 }}>
           {(instr?.gatetimer ?? 0).toString(16).toUpperCase().padStart(2, '0')}
         </span>
       </div>

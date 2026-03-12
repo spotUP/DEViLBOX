@@ -113,7 +113,7 @@ export const SidMonControls: React.FC<SidMonControlsProps> = ({
   const accent  = isCyan ? '#00ffff' : '#ff66aa';
   const knob    = isCyan ? '#00ffff' : '#ff88bb';
   const dim     = isCyan ? '#004444' : '#330022';
-  const panelBg = isCyan ? 'bg-[#041510] border-cyan-900/50' : 'bg-[#1a0010] border-pink-900/30';
+  const panelBg = isCyan ? 'bg-[#041510] border-accent-highlight/20' : 'bg-[#1a0010] border-pink-900/30';
 
   const upd = useCallback(<K extends keyof SidMonConfig>(key: K, value: SidMonConfig[K]) => {
     onChange({ [key]: value } as Partial<SidMonConfig>);
@@ -289,7 +289,7 @@ export const SidMonControls: React.FC<SidMonControlsProps> = ({
               style={{
                 background: config.filterMode === i ? accent : '#111',
                 color: config.filterMode === i ? '#000' : '#666',
-                border: `1px solid ${config.filterMode === i ? accent : '#333'}`,
+                border: `1px solid ${config.filterMode === i ? accent : 'var(--color-border-light)'}`,
               }}>
               {name}
             </button>

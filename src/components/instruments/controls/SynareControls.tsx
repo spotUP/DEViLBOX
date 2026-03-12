@@ -38,10 +38,10 @@ export const SynareControls: React.FC<SynareControlsProps> = ({
     ? 'bg-[#030808]'
     : 'bg-gradient-to-b from-[#1e1e1e] to-[#151515]';
   const panelBg = isCyanTheme
-    ? 'bg-[#051515] border-cyan-900/50'
-    : 'bg-[#1a1a1a] border-gray-800';
+    ? 'bg-[#051515] border-accent-highlight/20'
+    : 'bg-[#1a1a1a] border-dark-border';
   const headerBg = isCyanTheme
-    ? 'bg-[#041010] border-b-2 border-cyan-500'
+    ? 'bg-[#041010] border-b-2 border-accent-highlight'
     : 'bg-gradient-to-r from-[#2a2a2a] to-[#1a1a1a] border-b-4 border-[#ffcc00]';
 
   // Helpers
@@ -81,8 +81,8 @@ export const SynareControls: React.FC<SynareControlsProps> = ({
       {/* Pitch & Tone Section */}
       <div className={`p-4 rounded-xl border ${panelBg}`}>
         <div className="flex items-center gap-2 mb-4">
-          <Speaker size={16} className={isCyanTheme ? 'text-cyan-500' : 'text-yellow-500'} />
-          <h3 className={`font-bold ${isCyanTheme ? 'text-cyan-400' : 'text-yellow-400'}`}>PITCH & TONE</h3>
+          <Speaker size={16} className={isCyanTheme ? 'text-accent-highlight' : 'text-yellow-500'} />
+          <h3 className={`font-bold ${isCyanTheme ? 'text-accent-highlight' : 'text-yellow-400'}`}>PITCH & TONE</h3>
         </div>
         
         <div className="flex flex-wrap gap-6 items-end">
@@ -129,16 +129,16 @@ export const SynareControls: React.FC<SynareControlsProps> = ({
       <div className={`p-4 rounded-xl border ${panelBg}`}>
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
-            <MoveDown size={16} className={isCyanTheme ? 'text-cyan-500' : 'text-yellow-500'} />
-            <h3 className={`font-bold ${isCyanTheme ? 'text-cyan-400' : 'text-yellow-400'}`}>PITCH SWEEP</h3>
+            <MoveDown size={16} className={isCyanTheme ? 'text-accent-highlight' : 'text-yellow-500'} />
+            <h3 className={`font-bold ${isCyanTheme ? 'text-accent-highlight' : 'text-yellow-400'}`}>PITCH SWEEP</h3>
           </div>
           <label className="flex items-center gap-2 cursor-pointer">
-            <span className="text-xs text-gray-500">Enable</span>
+            <span className="text-xs text-text-muted">Enable</span>
             <input
               type="checkbox"
               checked={config.sweep.enabled}
               onChange={(e) => updateSweep({ enabled: e.target.checked })}
-              className={`w-4 h-4 rounded border-2 bg-transparent cursor-pointer ${isCyanTheme ? 'border-cyan-500 checked:bg-cyan-500' : 'border-yellow-500 checked:bg-yellow-500'}`}
+              className={`w-4 h-4 rounded border-2 bg-transparent cursor-pointer ${isCyanTheme ? 'border-accent-highlight checked:bg-accent-highlight' : 'border-yellow-500 checked:bg-yellow-500'}`}
             />
           </label>
         </div>
@@ -172,8 +172,8 @@ export const SynareControls: React.FC<SynareControlsProps> = ({
       {/* Filter Section */}
       <div className={`p-4 rounded-xl border ${panelBg}`}>
         <div className="flex items-center gap-2 mb-4">
-          <Activity size={16} className={isCyanTheme ? 'text-cyan-500' : 'text-yellow-500'} />
-          <h3 className={`font-bold ${isCyanTheme ? 'text-cyan-400' : 'text-yellow-400'}`}>FILTER</h3>
+          <Activity size={16} className={isCyanTheme ? 'text-accent-highlight' : 'text-yellow-500'} />
+          <h3 className={`font-bold ${isCyanTheme ? 'text-accent-highlight' : 'text-yellow-400'}`}>FILTER</h3>
         </div>
         
         <div className="mb-3">
@@ -228,16 +228,16 @@ export const SynareControls: React.FC<SynareControlsProps> = ({
       <div className={`p-4 rounded-xl border ${panelBg}`}>
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
-            <Waves size={16} className={isCyanTheme ? 'text-cyan-500' : 'text-yellow-500'} />
-            <h3 className={`font-bold ${isCyanTheme ? 'text-cyan-400' : 'text-yellow-400'}`}>MODULATION</h3>
+            <Waves size={16} className={isCyanTheme ? 'text-accent-highlight' : 'text-yellow-500'} />
+            <h3 className={`font-bold ${isCyanTheme ? 'text-accent-highlight' : 'text-yellow-400'}`}>MODULATION</h3>
           </div>
           <label className="flex items-center gap-2 cursor-pointer">
-            <span className="text-xs text-gray-500">Enable</span>
+            <span className="text-xs text-text-muted">Enable</span>
             <input
               type="checkbox"
               checked={config.lfo.enabled}
               onChange={(e) => onChange({ lfo: { ...config.lfo, enabled: e.target.checked } })}
-              className={`w-4 h-4 rounded border-2 bg-transparent cursor-pointer ${isCyanTheme ? 'border-cyan-500 checked:bg-cyan-500' : 'border-yellow-500 checked:bg-yellow-500'}`}
+              className={`w-4 h-4 rounded border-2 bg-transparent cursor-pointer ${isCyanTheme ? 'border-accent-highlight checked:bg-accent-highlight' : 'border-yellow-500 checked:bg-yellow-500'}`}
             />
           </label>
         </div>
@@ -263,11 +263,11 @@ export const SynareControls: React.FC<SynareControlsProps> = ({
           />
           
           <div className="flex flex-col items-center gap-2">
-            <span className="text-[10px] font-bold text-gray-500 uppercase">Target</span>
+            <span className="text-[10px] font-bold text-text-muted uppercase">Target</span>
             <select
               value={config.lfo.target}
               onChange={(e) => onChange({ lfo: { ...config.lfo, target: e.target.value as 'pitch' | 'filter' | 'both' } })}
-              className="bg-[#151515] border border-gray-700 text-xs text-text-primary rounded px-1 py-0.5"
+              className="bg-[#151515] border border-dark-borderLight text-xs text-text-primary rounded px-1 py-0.5"
             >
               <option value="pitch">Pitch</option>
               <option value="filter">Filter</option>
@@ -277,7 +277,7 @@ export const SynareControls: React.FC<SynareControlsProps> = ({
 
           {/* Momentary Throw Button */}
           <div className="flex flex-col items-center gap-2">
-            <span className="text-[10px] font-bold text-gray-500 uppercase">Throw</span>
+            <span className="text-[10px] font-bold text-text-muted uppercase">Throw</span>
             <button
               onMouseDown={() => handleThrow(true)}
               onMouseUp={() => handleThrow(false)}
@@ -287,7 +287,7 @@ export const SynareControls: React.FC<SynareControlsProps> = ({
               className={`
                 w-12 h-12 rounded-full flex items-center justify-center transition-all active:scale-95
                 ${isCyanTheme 
-                  ? 'bg-cyan-500/20 border-2 border-cyan-500 text-cyan-400' 
+                  ? 'bg-accent-highlight/20 border-2 border-accent-highlight text-accent-highlight' 
                   : 'bg-yellow-500/20 border-2 border-yellow-500 text-yellow-500'}
                 hover:shadow-[0_0_15px_rgba(255,204,0,0.4)]
               `}
@@ -311,13 +311,13 @@ export const SynareControls: React.FC<SynareControlsProps> = ({
           </div>
           <div>
             <h2 className="text-xl font-black tracking-tight" style={{ color: accentColor }}>SYNARE 3</h2>
-            <p className={`text-[10px] uppercase tracking-widest ${isCyanTheme ? 'text-cyan-600' : 'text-gray-400'}`}>Electronic Percussion</p>
+            <p className={`text-[10px] uppercase tracking-widest ${isCyanTheme ? 'text-accent-highlight' : 'text-text-secondary'}`}>Electronic Percussion</p>
           </div>
         </div>
       </div>
 
       {/* Tabs */}
-      <div className="flex border-b border-gray-800 bg-[#151515]">
+      <div className="flex border-b border-dark-border bg-[#151515]">
         {['main', 'mod'].map((tab) => (
           <button
             key={tab}
@@ -326,7 +326,7 @@ export const SynareControls: React.FC<SynareControlsProps> = ({
               flex-1 py-3 text-xs font-bold uppercase tracking-wider transition-colors
               ${activeTab === tab 
                 ? `bg-[#252525] border-b-2` 
-                : 'text-gray-500 hover:text-gray-300'
+                : 'text-text-muted hover:text-text-secondary'
               }
             `}
             style={activeTab === tab ? { color: accentColor, borderColor: accentColor } : undefined}

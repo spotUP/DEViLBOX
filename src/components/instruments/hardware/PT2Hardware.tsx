@@ -502,7 +502,7 @@ export const PT2Hardware: React.FC<PT2HardwareProps> = ({ instrument, onChange }
         }}
       />
       {!loaded && !error && (
-        <div className="text-gray-400 text-sm mt-2">
+        <div className="text-text-secondary text-sm mt-2">
           Loading PT2 sample editor...
         </div>
       )}

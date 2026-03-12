@@ -23,11 +23,11 @@ export const JeskolaTrilokEditor: React.FC<GeneratorEditorProps> = ({ config, on
       <div className="synth-editor-header px-4 py-3 bg-[#1a1a1a]">
         <div className="flex items-center gap-3">
           <div className="p-2 rounded-lg bg-gradient-to-br from-orange-600 to-red-700">
-            <Drum size={20} className="text-white" />
+            <Drum size={20} className="text-text-primary" />
           </div>
           <div>
-            <h2 className="text-lg font-bold text-white">Jeskola Trilok</h2>
-            <p className="text-xs text-gray-400">Drum Machine by Oskari Tammelin</p>
+            <h2 className="text-lg font-bold text-text-primary">Jeskola Trilok</h2>
+            <p className="text-xs text-text-secondary">Drum Machine by Oskari Tammelin</p>
           </div>
         </div>
       </div>
@@ -35,7 +35,7 @@ export const JeskolaTrilokEditor: React.FC<GeneratorEditorProps> = ({ config, on
       {/* Content */}
       <div className="p-4 space-y-4">
         {/* Bass Drum Section */}
-        <section className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800">
+        <section className="bg-[#1a1a1a] rounded-xl p-4 border border-dark-border">
           <SectionHeader color="#ef4444" title="Bass Drum" />
           <div className="flex flex-wrap gap-6 items-end">
             <Knob
@@ -69,8 +69,8 @@ export const JeskolaTrilokEditor: React.FC<GeneratorEditorProps> = ({ config, on
         </section>
 
         {/* Info */}
-        <div className="bg-gray-900/50 rounded-lg p-4 border border-gray-800">
-          <p className="text-xs text-gray-400 leading-relaxed">
+        <div className="bg-dark-bgSecondary/50 rounded-lg p-4 border border-dark-border">
+          <p className="text-xs text-text-secondary leading-relaxed">
             Trigger notes to play the bass drum. Use tracker note commands to control pitch and velocity.
           </p>
         </div>
@@ -101,11 +101,11 @@ export const JeskolaNoiseEditor: React.FC<GeneratorEditorProps> = ({ config, onC
       <div className="synth-editor-header px-4 py-3 bg-[#1a1a1a]">
         <div className="flex items-center gap-3">
           <div className="p-2 rounded-lg bg-gradient-to-br from-gray-500 to-gray-700">
-            <AudioWaveform size={20} className="text-white" />
+            <AudioWaveform size={20} className="text-text-primary" />
           </div>
           <div>
-            <h2 className="text-lg font-bold text-white">Jeskola Noise</h2>
-            <p className="text-xs text-gray-400">Noise Generator by Oskari Tammelin</p>
+            <h2 className="text-lg font-bold text-text-primary">Jeskola Noise</h2>
+            <p className="text-xs text-text-secondary">Noise Generator by Oskari Tammelin</p>
           </div>
         </div>
       </div>
@@ -113,7 +113,7 @@ export const JeskolaNoiseEditor: React.FC<GeneratorEditorProps> = ({ config, onC
       {/* Content */}
       <div className="p-4 space-y-4">
         {/* Envelope Section */}
-        <section className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800">
+        <section className="bg-[#1a1a1a] rounded-xl p-4 border border-dark-border">
           <SectionHeader color="#6b7280" title="Envelope" />
           <div className="flex flex-wrap gap-6 items-end">
             <Knob
@@ -147,7 +147,7 @@ export const JeskolaNoiseEditor: React.FC<GeneratorEditorProps> = ({ config, onC
         </section>
 
         {/* Tone Section */}
-        <section className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800">
+        <section className="bg-[#1a1a1a] rounded-xl p-4 border border-dark-border">
           <SectionHeader color="#a855f7" title="Tone" />
           <div className="flex flex-wrap gap-6 items-end">
             <Knob
@@ -205,11 +205,11 @@ export const CyanPhaseDTMFEditor: React.FC<GeneratorEditorProps> = ({ config, on
       <div className="synth-editor-header px-4 py-3 bg-[#1a1a1a]">
         <div className="flex items-center gap-3">
           <div className="p-2 rounded-lg bg-gradient-to-br from-cyan-500 to-blue-600">
-            <Phone size={20} className="text-white" />
+            <Phone size={20} className="text-text-primary" />
           </div>
           <div>
-            <h2 className="text-lg font-bold text-white">CyanPhase DTMF</h2>
-            <p className="text-xs text-gray-400">Dial Tone Generator by CyanPhase</p>
+            <h2 className="text-lg font-bold text-text-primary">CyanPhase DTMF</h2>
+            <p className="text-xs text-text-secondary">Dial Tone Generator by CyanPhase</p>
           </div>
         </div>
       </div>
@@ -217,7 +217,7 @@ export const CyanPhaseDTMFEditor: React.FC<GeneratorEditorProps> = ({ config, on
       {/* Content */}
       <div className="p-4 space-y-4">
         {/* Digit Selector */}
-        <section className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800">
+        <section className="bg-[#1a1a1a] rounded-xl p-4 border border-dark-border">
           <SectionHeader color="#06b6d4" title="Digit" />
           <div className="grid grid-cols-4 gap-2">
             {digitLabels.map((label, idx) => (
@@ -227,8 +227,8 @@ export const CyanPhaseDTMFEditor: React.FC<GeneratorEditorProps> = ({ config, on
                 className={`
                   py-3 rounded-lg font-bold text-lg transition-all
                   ${digit === idx
-                    ? 'bg-cyan-500/20 text-cyan-400 ring-2 ring-cyan-500'
-                    : 'bg-gray-800 text-gray-400 hover:text-gray-200 hover:bg-gray-700'
+                    ? 'bg-accent-highlight/20 text-accent-highlight ring-2 ring-accent-highlight'
+                    : 'bg-dark-bgTertiary text-text-secondary hover:text-text-secondary hover:bg-dark-bgHover'
                   }
                 `}
               >
@@ -239,7 +239,7 @@ export const CyanPhaseDTMFEditor: React.FC<GeneratorEditorProps> = ({ config, on
         </section>
 
         {/* Output */}
-        <section className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800">
+        <section className="bg-[#1a1a1a] rounded-xl p-4 border border-dark-border">
           <SectionHeader color="#3b82f6" title="Output" />
           <div className="flex flex-wrap gap-6 items-end">
             <Knob
@@ -300,11 +300,11 @@ export const ElenzilFrequencyBombEditor: React.FC<GeneratorEditorProps> = ({ con
       <div className="synth-editor-header px-4 py-3 bg-[#1a1a1a]">
         <div className="flex items-center gap-3">
           <div className="p-2 rounded-lg bg-gradient-to-br from-orange-500 to-red-600">
-            <Bomb size={20} className="text-white" />
+            <Bomb size={20} className="text-text-primary" />
           </div>
           <div>
-            <h2 className="text-lg font-bold text-white">Elenzil FrequencyBomb</h2>
-            <p className="text-xs text-gray-400">Frequency Sweep Generator by Elenzil</p>
+            <h2 className="text-lg font-bold text-text-primary">Elenzil FrequencyBomb</h2>
+            <p className="text-xs text-text-secondary">Frequency Sweep Generator by Elenzil</p>
           </div>
         </div>
       </div>
@@ -312,7 +312,7 @@ export const ElenzilFrequencyBombEditor: React.FC<GeneratorEditorProps> = ({ con
       {/* Content */}
       <div className="p-4 space-y-4">
         {/* Frequency Section */}
-        <section className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800">
+        <section className="bg-[#1a1a1a] rounded-xl p-4 border border-dark-border">
           <SectionHeader color="#f97316" title="Frequency Sweep" />
           <div className="flex flex-wrap gap-6 items-end">
             <Knob
@@ -353,7 +353,7 @@ export const ElenzilFrequencyBombEditor: React.FC<GeneratorEditorProps> = ({ con
                   px-3 py-1 text-xs rounded font-medium transition-all
                   ${attackUnit === unit
                     ? 'bg-orange-500/20 text-orange-400 ring-1 ring-orange-500'
-                    : 'bg-gray-800 text-gray-500 hover:text-gray-300'
+                    : 'bg-dark-bgTertiary text-text-muted hover:text-text-secondary'
                   }
                 `}
               >
@@ -364,7 +364,7 @@ export const ElenzilFrequencyBombEditor: React.FC<GeneratorEditorProps> = ({ con
         </section>
 
         {/* Waveform Section */}
-        <section className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800">
+        <section className="bg-[#1a1a1a] rounded-xl p-4 border border-dark-border">
           <SectionHeader color="#ef4444" title="Waveform" />
           <div className="flex gap-2 mb-4">
             {waveLabels.map((label, idx) => (
@@ -375,7 +375,7 @@ export const ElenzilFrequencyBombEditor: React.FC<GeneratorEditorProps> = ({ con
                   flex-1 py-2 rounded-lg font-bold text-xs transition-all
                   ${wave === idx
                     ? 'bg-red-500/20 text-red-400 ring-1 ring-red-500'
-                    : 'bg-gray-800 text-gray-500 hover:text-gray-300'
+                    : 'bg-dark-bgTertiary text-text-muted hover:text-text-secondary'
                   }
                 `}
               >

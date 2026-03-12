@@ -319,7 +319,7 @@ export const EditInstrumentModal: React.FC<EditInstrumentModalProps> = ({
               <button
                 onClick={handleSaveNew}
                 disabled={!instrumentName.trim()}
-                className="flex items-center gap-1.5 px-4 py-2 bg-green-600 text-white text-sm font-bold hover:bg-green-500 transition-colors rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex items-center gap-1.5 px-4 py-2 bg-green-600 text-text-primary text-sm font-bold hover:bg-green-500 transition-colors rounded disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Check size={14} />
                 Add Instrument

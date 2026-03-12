@@ -209,7 +209,7 @@ export const HardwareUIWrapper: React.FC<HardwareUIWrapperProps> = ({
 
   /* No hardware UI available */
   return (
-    <div className="p-8 text-center text-gray-500">
+    <div className="p-8 text-center text-text-muted">
       <p className="text-lg mb-2">Hardware UI not available for {synthType}</p>
       <p className="text-sm">This synth uses the standard control interface.</p>
     </div>

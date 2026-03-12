@@ -202,13 +202,13 @@ export const Sc68Visualizer: React.FC = () => {
       {/* Header */}
       <div className="flex items-center gap-3 px-3 py-1.5 border-b border-[#1a2030] shrink-0">
         <span className="text-xs font-bold" style={{ color: YM_GREEN }}>YM2149</span>
-        <span className="text-xs text-gray-300 truncate">{title}</span>
+        <span className="text-xs text-text-secondary truncate">{title}</span>
         {composer && <span className="text-xs truncate" style={{ color: YM_AMBER }}>{composer}</span>}
         <div className="flex-1" />
         <span className="text-xs" style={{ color: YM_CYAN }}>SC68</span>
         <button
           onClick={cycleMode}
-          className="text-xs px-2 py-0.5 text-gray-400 hover:text-white transition-colors"
+          className="text-xs px-2 py-0.5 text-text-secondary hover:text-text-primary transition-colors"
         >
           {VIZ_LABELS[mode]}
         </button>

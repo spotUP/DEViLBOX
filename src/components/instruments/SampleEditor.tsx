@@ -919,7 +919,7 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
                 className={
                   'flex items-center gap-1 px-2 py-1 rounded text-[10px] font-bold uppercase transition-colors ' +
                   (showBeatSlicer
-                    ? 'bg-violet-500 text-white'
+                    ? 'bg-violet-500 text-text-primary'
                     : 'bg-violet-500/10 text-violet-400 border border-violet-500/30 hover:bg-violet-500/20')
                 }
               >

@@ -435,7 +435,7 @@ export const MasterEffectsPanel = forwardRef<MasterEffectsPanelHandle, MasterEff
             />
             <button
               onClick={handleSavePreset}
-              className="px-3 py-1.5 text-xs font-medium rounded bg-accent-primary text-white hover:bg-accent-primaryHover transition-colors"
+              className="px-3 py-1.5 text-xs font-medium rounded bg-accent-primary text-text-primary hover:bg-accent-primaryHover transition-colors"
             >
               Save
             </button>
@@ -464,7 +464,7 @@ export const MasterEffectsPanel = forwardRef<MasterEffectsPanelHandle, MasterEff
                       <button
                         key={effect.neuralModelIndex != null ? `neural-${effect.neuralModelIndex}` : effect.type}
                         onClick={() => handleAddEffect(effect)}
-                        className="px-2 py-1 text-[10px] rounded border transition-colors hover:text-white"
+                        className="px-2 py-1 text-[10px] rounded border transition-colors hover:text-text-primary"
                         style={{
                           borderColor: enc.border,
                           background: enc.bg,

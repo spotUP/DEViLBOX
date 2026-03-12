@@ -26,7 +26,7 @@ export const furnaceChipEntries: Record<string, SynthInfo> = {
     description: 'Yamaha YM2151 - Sharp X68000, arcade machines',
     bestFor: ['Arcade FM', 'Bright leads', 'Brass', 'Game music'],
     icon: 'Cpu',
-    color: 'text-cyan-500',
+    color: 'text-accent-highlight',
   },
   FurnaceOPL: {
     type: 'FurnaceOPL',
@@ -242,7 +242,7 @@ export const furnaceChipEntries: Record<string, SynthInfo> = {
     description: 'Bandai WonderSwan - 4 channel wavetable + PCM',
     bestFor: ['WonderSwan', 'Portable gaming', 'Bandai'],
     icon: 'Smartphone',
-    color: 'text-cyan-400',
+    color: 'text-accent-highlight',
   },
   FurnaceVRC6: {
     type: 'FurnaceVRC6',
@@ -332,7 +332,7 @@ export const furnaceChipEntries: Record<string, SynthInfo> = {
     description: 'Ricoh RF5C68 - Sega CD, 8 channel PCM',
     bestFor: ['Sega CD', 'Mega CD', 'CD audio'],
     icon: 'Disc',
-    color: 'text-cyan-500',
+    color: 'text-accent-highlight',
   },
   FurnaceC140: {
     type: 'FurnaceC140',
@@ -377,7 +377,7 @@ export const furnaceChipEntries: Record<string, SynthInfo> = {
     description: 'OKI MSM6295 - 4 channel ADPCM',
     bestFor: ['Neo Geo', 'Data East', 'ADPCM drums'],
     icon: 'Volume2',
-    color: 'text-gray-400',
+    color: 'text-text-secondary',
   },
   FurnaceYMZ280B: {
     type: 'FurnaceYMZ280B',
@@ -422,7 +422,7 @@ export const furnaceChipEntries: Record<string, SynthInfo> = {
     description: 'Sharp SM8521 - Game.com',
     bestFor: ['Game.com', 'Tiger electronics', 'Obscure'],
     icon: 'Smartphone',
-    color: 'text-gray-500',
+    color: 'text-text-muted',
   },
   FurnaceT6W28: {
     type: 'FurnaceT6W28',
@@ -575,7 +575,7 @@ export const furnaceChipEntries: Record<string, SynthInfo> = {
     description: 'PC Speaker - internal IBM PC beeper',
     bestFor: ['DOS games', 'Beeper music', 'Lo-fi PC'],
     icon: 'Volume2',
-    color: 'text-gray-400',
+    color: 'text-text-secondary',
   },
   FurnacePONG: {
     type: 'FurnacePONG',
@@ -629,7 +629,7 @@ export const furnaceChipEntries: Record<string, SynthInfo> = {
     description: 'ZX Spectrum beeper - 1-bit audio',
     bestFor: ['ZX Spectrum', 'Beeper music', '1-bit audio'],
     icon: 'Speaker',
-    color: 'text-cyan-300',
+    color: 'text-accent-highlight',
   },
   FurnaceSCVTONE: {
     type: 'FurnaceSCVTONE',
@@ -647,6 +647,6 @@ export const furnaceChipEntries: Record<string, SynthInfo> = {
     description: 'Generic PCM DAC output',
     bestFor: ['PCM output', 'Generic DAC', 'Simple samples'],
     icon: 'AudioLines',
-    color: 'text-gray-300',
+    color: 'text-text-secondary',
   },
 };

@@ -153,17 +153,17 @@ const NoteContextMenu: React.FC<NoteContextMenuProps> = ({
         </button>
         <button
           onClick={() => { onToggleHammer(); onClose(); }}
-          className={`w-full px-3 py-1.5 text-left text-xs hover:bg-dark-bgActive flex items-center gap-2 ${hammer ? 'text-cyan-400' : 'text-text-secondary'}`}
+          className={`w-full px-3 py-1.5 text-left text-xs hover:bg-dark-bgActive flex items-center gap-2 ${hammer ? 'text-accent-highlight' : 'text-text-secondary'}`}
         >
-          <span className={`w-3 h-3 rounded-sm ${hammer ? 'bg-cyan-400' : 'border border-text-muted'}`} />
+          <span className={`w-3 h-3 rounded-sm ${hammer ? 'bg-accent-highlight' : 'border border-text-muted'}`} />
           Hammer {hammer && '✓'}
         </button>
         <div className="border-t border-dark-border my-1" />
         <button
           onClick={() => { onSetOctave(1); onClose(); }}
-          className={`w-full px-3 py-1.5 text-left text-xs hover:bg-dark-bgActive flex items-center gap-2 ${octaveShift === 1 ? 'text-cyan-400' : 'text-text-secondary'}`}
+          className={`w-full px-3 py-1.5 text-left text-xs hover:bg-dark-bgActive flex items-center gap-2 ${octaveShift === 1 ? 'text-accent-highlight' : 'text-text-secondary'}`}
         >
-          <span className={`w-3 h-3 rounded-sm ${octaveShift === 1 ? 'bg-accent-primary ring-2 ring-cyan-400 ring-inset' : 'border border-text-muted'}`} />
+          <span className={`w-3 h-3 rounded-sm ${octaveShift === 1 ? 'bg-accent-primary ring-2 ring-accent-highlight ring-inset' : 'border border-text-muted'}`} />
           Oct+ {octaveShift === 1 && '✓'}
         </button>
         <button
@@ -373,7 +373,7 @@ export const NoteGridCell: React.FC<NoteCellProps> = memo(({
   const getOctaveBorderClasses = () => {
     if (!isActive || octaveShift === 0) return '';
     // Octave up: cyan/teal border
-    if (octaveShift > 0) return 'ring-2 ring-cyan-400 ring-inset';
+    if (octaveShift > 0) return 'ring-2 ring-accent-highlight ring-inset';
     // Octave down: pink/magenta border
     return 'ring-2 ring-pink-400 ring-inset';
   };
@@ -446,7 +446,7 @@ export const NoteGridCell: React.FC<NoteCellProps> = memo(({
         )}
         {/* Hammer indicator */}
         {isActive && hammer && !mute && (
-          <span className="absolute inset-0 flex items-center justify-center text-cyan-400 text-xs font-bold z-10">
+          <span className="absolute inset-0 flex items-center justify-center text-accent-highlight text-xs font-bold z-10">
             H
           </span>
         )}

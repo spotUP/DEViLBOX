@@ -86,7 +86,7 @@ export const TB303KnobPanel: React.FC = memo(() => {
           width={1200}
           height={640}
         >
-          <div className="flex items-center justify-center h-full text-gray-500 text-sm">
+          <div className="flex items-center justify-center h-full text-text-muted text-sm">
             No TB-303 instrument found
           </div>
         </PopOutWindow>
@@ -106,7 +106,7 @@ export const TB303KnobPanel: React.FC = memo(() => {
           width={1200}
           height={640}
         >
-          <div style={{ background: '#1a1a1a' }}>
+          <div style={{ background: 'var(--color-bg-tertiary)' }}>
             <ScrollLockContainer>
               <JC303StyledKnobPanel
                 key={targetInstrument.id}
@@ -126,17 +126,17 @@ export const TB303KnobPanel: React.FC = memo(() => {
             position: 'relative',
             width: '100%',
             height: '40px',
-            background: '#1a1a1a',
-            borderTop: '1px solid #333',
+            background: 'var(--color-bg-tertiary)',
+            borderTop: '1px solid var(--color-border-light)',
           }}
         >
           <div className="absolute top-0 left-0 p-2 text-xs font-mono text-accent-primary flex items-center gap-2">
             <span className="font-bold">TB-303</span>
-            <span className="text-gray-500">Popped Out</span>
+            <span className="text-text-muted">Popped Out</span>
           </div>
           <div className="absolute top-0 right-0 z-50">
             <button
-              className="p-2 text-gray-400 hover:text-white bg-black/50 hover:bg-black/80 rounded-bl-lg flex items-center gap-1 text-xs"
+              className="p-2 text-text-secondary hover:text-text-primary bg-black/50 hover:bg-black/80 rounded-bl-lg flex items-center gap-1 text-xs"
               onClick={() => setTB303PoppedOut(false)}
               title="Restore panel inline"
             >
@@ -160,8 +160,8 @@ export const TB303KnobPanel: React.FC = memo(() => {
         position: 'relative',
         width: '100%',
         height: tb303Collapsed ? `${COLLAPSED_HEIGHT}px` : `${EXPANDED_HEIGHT}px`,
-        background: '#1a1a1a',
-        borderTop: '1px solid #333',
+        background: 'var(--color-bg-tertiary)',
+        borderTop: '1px solid var(--color-border-light)',
         overflow: 'hidden',
         transition: 'height 300ms cubic-bezier(0.4, 0, 0.2, 1)',
       }}
@@ -171,15 +171,15 @@ export const TB303KnobPanel: React.FC = memo(() => {
         style={{ opacity: tb303Collapsed ? 1 : 0, transition: 'opacity 200ms ease', pointerEvents: tb303Collapsed ? 'auto' : 'none' }}
       >
         <span className="font-bold">TB-303</span>
-        <span className="text-gray-500">CH{String(instruments.indexOf(targetInstrument) + 1).padStart(2, '0')}</span>
-        <span className="text-gray-400">{targetInstrument.name}</span>
+        <span className="text-text-muted">CH{String(instruments.indexOf(targetInstrument) + 1).padStart(2, '0')}</span>
+        <span className="text-text-secondary">{targetInstrument.name}</span>
       </div>
 
       {/* Action buttons — always pinned to top-right */}
       <div className="absolute top-1 right-1 z-50 flex items-center gap-1">
         {tb303Collapsed ? (
           <button
-            className="p-2 text-gray-400 hover:text-white bg-black/50 hover:bg-black/80 rounded-bl-lg"
+            className="p-2 text-text-secondary hover:text-text-primary bg-black/50 hover:bg-black/80 rounded-bl-lg"
             onClick={toggleTB303Collapsed}
             title="Expand synth panel"
           >
@@ -188,7 +188,7 @@ export const TB303KnobPanel: React.FC = memo(() => {
         ) : (
           <>
             <button
-              className="p-1.5 text-gray-500 hover:text-cyan-400 bg-black/40 hover:bg-black/70 rounded transition-colors"
+              className="p-1.5 text-text-muted hover:text-accent-highlight bg-black/40 hover:bg-black/70 rounded transition-colors"
               onClick={() => {
                 if (tb303PoppedOut) {
                   focusPopout('DEViLBOX — TB-303');
@@ -201,14 +201,14 @@ export const TB303KnobPanel: React.FC = memo(() => {
               <ExternalLink size={14} />
             </button>
             <button
-              className="p-1.5 text-gray-500 hover:text-white bg-black/40 hover:bg-black/70 rounded transition-colors"
+              className="p-1.5 text-text-muted hover:text-text-primary bg-black/40 hover:bg-black/70 rounded transition-colors"
               onClick={toggleTB303Collapsed}
               title="Collapse synth panel"
             >
               <ChevronUp size={14} />
             </button>
             <button
-              className="p-1.5 text-gray-500 hover:text-red-400 bg-black/40 hover:bg-black/70 rounded transition-colors"
+              className="p-1.5 text-text-muted hover:text-red-400 bg-black/40 hover:bg-black/70 rounded transition-colors"
               onClick={() => useUIStore.getState().setTB303Collapsed(true)}
               title="Close synth panel"
             >

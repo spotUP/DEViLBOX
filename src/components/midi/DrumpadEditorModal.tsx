@@ -329,7 +329,7 @@ export const DrumpadEditorModal: React.FC<DrumpadEditorModalProps> = ({ isOpen, 
                   {drumMachines.length === 1 ? (
                     <button
                       onClick={() => handleLoadDrumMachine(drumMachines[0].id)}
-                      className="px-3 py-1 text-[10px] font-bold bg-accent-primary hover:bg-accent-primary/80 text-white rounded transition-colors uppercase"
+                      className="px-3 py-1 text-[10px] font-bold bg-accent-primary hover:bg-accent-primary/80 text-text-primary rounded transition-colors uppercase"
                       title={`Auto-map ${drumMachines[0].name} to pads`}
                     >
                       {drumMachines[0].name}
@@ -337,7 +337,7 @@ export const DrumpadEditorModal: React.FC<DrumpadEditorModalProps> = ({ isOpen, 
                   ) : (
                     <select
                       onChange={(e) => e.target.value && handleLoadDrumMachine(parseInt(e.target.value))}
-                      className="px-2 py-1 text-[10px] font-bold bg-accent-primary hover:bg-accent-primary/80 text-white rounded transition-colors uppercase cursor-pointer"
+                      className="px-2 py-1 text-[10px] font-bold bg-accent-primary hover:bg-accent-primary/80 text-text-primary rounded transition-colors uppercase cursor-pointer"
                       defaultValue=""
                     >
                       <option value="" disabled>Select Kit...</option>
@@ -354,7 +354,7 @@ export const DrumpadEditorModal: React.FC<DrumpadEditorModalProps> = ({ isOpen, 
                 <span className="text-[10px] font-bold text-text-muted uppercase px-2">Auto-Map:</span>
                 <button
                   onClick={() => handleLoadPreset()}
-                  className="px-3 py-1 text-[10px] font-bold bg-dark-bgActive hover:bg-accent-primary text-white rounded transition-colors uppercase"
+                  className="px-3 py-1 text-[10px] font-bold bg-dark-bgActive hover:bg-accent-primary text-text-primary rounded transition-colors uppercase"
                 >
                   Match Names
                 </button>
@@ -374,13 +374,13 @@ export const DrumpadEditorModal: React.FC<DrumpadEditorModalProps> = ({ isOpen, 
             <div className="flex justify-center mb-6 gap-4">
               <button 
                 onClick={() => setActiveBank('A')}
-                className={`px-6 py-2 rounded-full font-medium transition-all ${activeBank === 'A' ? 'bg-accent-primary text-white' : 'bg-dark-bgSecondary text-text-muted'}`}
+                className={`px-6 py-2 rounded-full font-medium transition-all ${activeBank === 'A' ? 'bg-accent-primary text-text-primary' : 'bg-dark-bgSecondary text-text-muted'}`}
               >
                 Bank A
               </button>
               <button 
                 onClick={() => setActiveBank('B')}
-                className={`px-6 py-2 rounded-full font-medium transition-all ${activeBank === 'B' ? 'bg-accent-primary text-white' : 'bg-dark-bgSecondary text-text-muted'}`}
+                className={`px-6 py-2 rounded-full font-medium transition-all ${activeBank === 'B' ? 'bg-accent-primary text-text-primary' : 'bg-dark-bgSecondary text-text-muted'}`}
               >
                 Bank B
               </button>
@@ -461,7 +461,7 @@ export const DrumpadEditorModal: React.FC<DrumpadEditorModalProps> = ({ isOpen, 
                     <button
                       onClick={startLearn}
                       className={`
-                        px-3 py-2 rounded text-white transition-colors flex items-center gap-2
+                        px-3 py-2 rounded text-text-primary transition-colors flex items-center gap-2
                         ${isLearning ? 'bg-accent-warning animate-pulse' : 'bg-dark-bgActive hover:bg-accent-primary'}
                       `}
                     >

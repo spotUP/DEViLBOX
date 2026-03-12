@@ -452,7 +452,7 @@ export const ParameterEditor: React.FC<ParameterEditorProps> = ({
                 onClick={() => setEditMode(mode)}
                 className={`px-2 py-1 text-xs rounded ${
                   editMode === mode
-                    ? 'bg-blue-600 text-white'
+                    ? 'bg-blue-600 text-text-primary'
                     : 'bg-dark-bg text-text-secondary hover:bg-dark-bgSecondary'
                 }`}
               >

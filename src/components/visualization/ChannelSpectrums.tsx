@@ -88,7 +88,7 @@ export const ChannelSpectrums: React.FC<ChannelSpectrumsProps> = ({ height = 100
           const y = row * cellHeight;
 
           // Draw cell border
-          ctx.strokeStyle = '#222';
+          ctx.strokeStyle = 'var(--color-border)';
           ctx.lineWidth = 1;
           ctx.strokeRect(x, y, cellWidth, cellHeight);
 

@@ -25,11 +25,11 @@ export const FSMKickEditor: React.FC<GeneratorEditorProps> = ({ config, onChange
       <div className="synth-editor-header px-4 py-3 bg-[#1a1a1a]">
         <div className="flex items-center gap-3">
           <div className="p-2 rounded-lg bg-gradient-to-br from-red-600 to-orange-600">
-            <Drum size={20} className="text-white" />
+            <Drum size={20} className="text-text-primary" />
           </div>
           <div>
-            <h2 className="text-lg font-bold text-white">FSM Kick</h2>
-            <p className="text-xs text-gray-400">Kick Drum by Krzysztof Foltman</p>
+            <h2 className="text-lg font-bold text-text-primary">FSM Kick</h2>
+            <p className="text-xs text-text-secondary">Kick Drum by Krzysztof Foltman</p>
           </div>
         </div>
       </div>
@@ -37,7 +37,7 @@ export const FSMKickEditor: React.FC<GeneratorEditorProps> = ({ config, onChange
       {/* Content */}
       <div className="p-4 space-y-4">
         {/* Pitch Section */}
-        <section className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800">
+        <section className="bg-[#1a1a1a] rounded-xl p-4 border border-dark-border">
           <SectionHeader color="#ef4444" title="Pitch" />
           <div className="flex flex-wrap gap-6 items-end">
             <Knob
@@ -62,7 +62,7 @@ export const FSMKickEditor: React.FC<GeneratorEditorProps> = ({ config, onChange
         </section>
 
         {/* Envelope Section */}
-        <section className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800">
+        <section className="bg-[#1a1a1a] rounded-xl p-4 border border-dark-border">
           <SectionHeader color="#f97316" title="Envelope" />
           <div className="flex flex-wrap gap-6 items-end">
             <Knob
@@ -128,11 +128,11 @@ export const FSMKickXPEditor: React.FC<GeneratorEditorProps> = ({ config, onChan
       <div className="synth-editor-header px-4 py-3 bg-[#1a1a1a]">
         <div className="flex items-center gap-3">
           <div className="p-2 rounded-lg bg-gradient-to-br from-red-600 to-pink-600">
-            <Drum size={20} className="text-white" />
+            <Drum size={20} className="text-text-primary" />
           </div>
           <div>
-            <h2 className="text-lg font-bold text-white">FSM KickXP</h2>
-            <p className="text-xs text-gray-400">Extended Kick Drum by FSM</p>
+            <h2 className="text-lg font-bold text-text-primary">FSM KickXP</h2>
+            <p className="text-xs text-text-secondary">Extended Kick Drum by FSM</p>
           </div>
         </div>
       </div>
@@ -140,7 +140,7 @@ export const FSMKickXPEditor: React.FC<GeneratorEditorProps> = ({ config, onChan
       {/* Content */}
       <div className="p-4 space-y-4">
         {/* Pitch Section */}
-        <section className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800">
+        <section className="bg-[#1a1a1a] rounded-xl p-4 border border-dark-border">
           <SectionHeader color="#ef4444" title="Pitch" />
           <div className="flex flex-wrap gap-6 items-end">
             <Knob
@@ -187,7 +187,7 @@ export const FSMKickXPEditor: React.FC<GeneratorEditorProps> = ({ config, onChan
         </section>
 
         {/* Character Section */}
-        <section className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800">
+        <section className="bg-[#1a1a1a] rounded-xl p-4 border border-dark-border">
           <SectionHeader color="#f97316" title="Character" />
           <div className="flex flex-wrap gap-6 items-end">
             <Knob
@@ -244,7 +244,7 @@ export const FSMKickXPEditor: React.FC<GeneratorEditorProps> = ({ config, onChan
         </section>
 
         {/* Amplitude Section */}
-        <section className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800">
+        <section className="bg-[#1a1a1a] rounded-xl p-4 border border-dark-border">
           <SectionHeader color="#eab308" title="Amplitude" />
           <div className="flex flex-wrap gap-6 items-end">
             <Knob
@@ -305,11 +305,11 @@ export const OomekAggressorEditor: React.FC<GeneratorEditorProps> = ({ config, o
       <div className="synth-editor-header px-4 py-3 bg-[#1a1a1a]">
         <div className="flex items-center gap-3">
           <div className="p-2 rounded-lg bg-gradient-to-br from-red-500 to-orange-500">
-            <Radio size={20} className="text-white" />
+            <Radio size={20} className="text-text-primary" />
           </div>
           <div>
-            <h2 className="text-lg font-bold text-white">Oomek Aggressor 3o3</h2>
-            <p className="text-xs text-gray-400">303-Style Acid Synth by Radoslaw Dutkiewicz</p>
+            <h2 className="text-lg font-bold text-text-primary">Oomek Aggressor 3o3</h2>
+            <p className="text-xs text-text-secondary">303-Style Acid Synth by Radoslaw Dutkiewicz</p>
           </div>
         </div>
       </div>
@@ -317,7 +317,7 @@ export const OomekAggressorEditor: React.FC<GeneratorEditorProps> = ({ config, o
       {/* Content */}
       <div className="p-4 space-y-4">
         {/* Oscillator */}
-        <section className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800">
+        <section className="bg-[#1a1a1a] rounded-xl p-4 border border-dark-border">
           <SectionHeader color="#ef4444" title="Oscillator" />
           <div className="flex gap-4 justify-center mb-4">
             <button
@@ -326,7 +326,7 @@ export const OomekAggressorEditor: React.FC<GeneratorEditorProps> = ({ config, o
                 flex-1 max-w-32 py-3 rounded-lg font-bold transition-all
                 ${oscType === 0
                   ? 'bg-red-500/20 text-red-400 ring-2 ring-red-500'
-                  : 'bg-gray-800 text-gray-500 hover:text-gray-300'
+                  : 'bg-dark-bgTertiary text-text-muted hover:text-text-secondary'
                 }
               `}
             >
@@ -338,7 +338,7 @@ export const OomekAggressorEditor: React.FC<GeneratorEditorProps> = ({ config, o
                 flex-1 max-w-32 py-3 rounded-lg font-bold transition-all
                 ${oscType === 1
                   ? 'bg-red-500/20 text-red-400 ring-2 ring-red-500'
-                  : 'bg-gray-800 text-gray-500 hover:text-gray-300'
+                  : 'bg-dark-bgTertiary text-text-muted hover:text-text-secondary'
                 }
               `}
             >
@@ -360,7 +360,7 @@ export const OomekAggressorEditor: React.FC<GeneratorEditorProps> = ({ config, o
         </section>
 
         {/* Filter */}
-        <section className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800">
+        <section className="bg-[#1a1a1a] rounded-xl p-4 border border-dark-border">
           <SectionHeader color="#f97316" title="Filter" />
           <div className="flex flex-wrap gap-6 items-end">
             <Knob
@@ -394,7 +394,7 @@ export const OomekAggressorEditor: React.FC<GeneratorEditorProps> = ({ config, o
         </section>
 
         {/* Envelope & Accent */}
-        <section className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800">
+        <section className="bg-[#1a1a1a] rounded-xl p-4 border border-dark-border">
           <SectionHeader color="#eab308" title="Envelope & Output" />
           <div className="flex flex-wrap gap-6 items-end">
             <Knob

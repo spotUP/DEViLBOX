@@ -743,7 +743,7 @@ export const AudioToMidiModal: React.FC<AudioToMidiModalProps> = ({
                 'flex-1 flex items-center justify-center gap-2 py-2 rounded text-[11px] font-mono font-bold uppercase transition-colors ' +
                 (!detectedNotes || detectedNotes.length === 0
                   ? 'opacity-40 cursor-not-allowed bg-dark-bgSecondary text-text-muted border border-ft2-border'
-                  : 'bg-emerald-600 text-white border border-emerald-500 hover:bg-emerald-500')
+                  : 'bg-emerald-600 text-text-primary border border-emerald-500 hover:bg-emerald-500')
               }
             >
               <Music size={12} />

@@ -449,7 +449,7 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
                   key={stepIdx}
                   className={`flex items-center justify-center text-[10px] font-mono mx-0.5 rounded-sm relative overflow-hidden
                     ${isBeatMarker ? 'text-text-tertiary' : 'text-text-muted'}
-                    ${isCurrentDiscrete ? 'text-white font-bold' : ''}
+                    ${isCurrentDiscrete ? 'text-text-primary font-bold' : ''}
                   `}
                   style={{
                     width: `${cellSize}px`,
@@ -547,7 +547,7 @@ export const GridSequencer: React.FC<GridSequencerProps> = ({ channelIndex }) =>
               <span className="text-accent-secondary">↗</span> Ctrl+click: slide
             </span>
             <span className="flex items-center gap-1">
-              <span className="w-3 h-3 rounded-sm bg-accent-primary ring-2 ring-cyan-400 ring-inset" />
+              <span className="w-3 h-3 rounded-sm bg-accent-primary ring-2 ring-accent-highlight ring-inset" />
               <span className="w-3 h-3 rounded-sm bg-accent-primary ring-2 ring-pink-400 ring-inset" />
               Alt+click: octave
             </span>

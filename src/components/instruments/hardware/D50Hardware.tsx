@@ -61,7 +61,7 @@ const D50Knob: React.FC<{
       >
         {/* Knob body */}
         <div
-          className="absolute inset-0 rounded-full border-2 border-gray-800 shadow-lg"
+          className="absolute inset-0 rounded-full border-2 border-dark-border shadow-lg"
           style={{
             background: 'radial-gradient(circle at 30% 30%, #707070, #404040)',
           }}
@@ -77,7 +77,7 @@ const D50Knob: React.FC<{
         />
       </div>
 
-      <div className={`text-[8px] font-semibold text-gray-300 uppercase tracking-wide text-center max-w-[60px]`}>
+      <div className={`text-[8px] font-semibold text-text-secondary uppercase tracking-wide text-center max-w-[60px]`}>
         {label}
       </div>
     </div>
@@ -96,7 +96,7 @@ const D50Button: React.FC<{
   return (
     <button
       onClick={onClick}
-      className={`${small ? 'text-[8px] px-2 py-1' : 'text-[9px] px-3 py-1.5'} ${active ? 'bg-red-600' : 'bg-gray-700'} hover:brightness-110 text-white font-bold rounded border border-gray-900 shadow-md transition-all ${active ? 'shadow-lg' : ''}`}
+      className={`${small ? 'text-[8px] px-2 py-1' : 'text-[9px] px-3 py-1.5'} ${active ? 'bg-red-600' : 'bg-dark-bgHover'} hover:brightness-110 text-text-primary font-bold rounded border border-dark-border shadow-md transition-all ${active ? 'shadow-lg' : ''}`}
     >
       {label}
     </button>
@@ -119,25 +119,25 @@ export const D50Hardware: React.FC<D50HardwareProps> = ({
       }}
     >
       {/* Top Panel - Logo & LCD */}
-      <div className="px-6 py-3 bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900 border-b-2 border-gray-700">
+      <div className="px-6 py-3 bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900 border-b-2 border-dark-borderLight">
         <div className="flex items-center justify-between mb-3">
-          <div className="text-white font-black text-2xl tracking-wider" style={{ fontFamily: 'monospace' }}>
+          <div className="text-text-primary font-black text-2xl tracking-wider" style={{ fontFamily: 'monospace' }}>
             ROLAND
           </div>
           <div className="text-right">
-            <div className="text-gray-400 text-[10px] font-light tracking-[0.4em] uppercase">Linear Synthesizer</div>
-            <div className="text-white font-black text-4xl tracking-tight">D-50</div>
+            <div className="text-text-secondary text-[10px] font-light tracking-[0.4em] uppercase">Linear Synthesizer</div>
+            <div className="text-text-primary font-black text-4xl tracking-tight">D-50</div>
           </div>
         </div>
 
         {/* LCD Display */}
-        <div className="bg-gradient-to-b from-cyan-900 to-cyan-950 border-2 border-cyan-800 rounded p-3 shadow-inner">
-          <div className="font-mono text-cyan-400 text-sm">
+        <div className="bg-gradient-to-b from-cyan-900 to-cyan-950 border-2 border-accent-highlight/30 rounded p-3 shadow-inner">
+          <div className="font-mono text-accent-highlight text-sm">
             <div className="flex justify-between mb-1">
               <span>PATCH: 11</span>
               <span>FANTASIA</span>
             </div>
-            <div className="text-xs text-cyan-500 opacity-80">
+            <div className="text-xs text-accent-highlight opacity-80">
               <span>Upper: Piano+Str</span>
               <span className="ml-4">Lower: Synth Bass</span>
             </div>
@@ -149,12 +149,12 @@ export const D50Hardware: React.FC<D50HardwareProps> = ({
       <div className="p-6 bg-gradient-to-b from-gray-800 to-gray-900">
         {/* Tone Controls */}
         <div className="mb-6">
-          <div className="text-xs font-bold text-cyan-400 uppercase tracking-widest mb-3 pb-1 border-b border-gray-700">
+          <div className="text-xs font-bold text-accent-highlight uppercase tracking-widest mb-3 pb-1 border-b border-dark-borderLight">
             Tone Controls
           </div>
           <div className="grid grid-cols-4 gap-4">
             <div className="text-center">
-              <div className="text-[9px] text-gray-400 uppercase mb-2">Upper</div>
+              <div className="text-[9px] text-text-secondary uppercase mb-2">Upper</div>
               <div className="flex gap-3 justify-center">
                 <D50Knob
                   label="Level"
@@ -172,7 +172,7 @@ export const D50Hardware: React.FC<D50HardwareProps> = ({
             </div>
 
             <div className="text-center">
-              <div className="text-[9px] text-gray-400 uppercase mb-2">Lower</div>
+              <div className="text-[9px] text-text-secondary uppercase mb-2">Lower</div>
               <div className="flex gap-3 justify-center">
                 <D50Knob
                   label="Level"
@@ -190,7 +190,7 @@ export const D50Hardware: React.FC<D50HardwareProps> = ({
             </div>
 
             <div className="text-center">
-              <div className="text-[9px] text-gray-400 uppercase mb-2">Cutoff</div>
+              <div className="text-[9px] text-text-secondary uppercase mb-2">Cutoff</div>
               <D50Knob
                 label="Filter"
                 value={parameters.cutoff || 0.7}
@@ -200,7 +200,7 @@ export const D50Hardware: React.FC<D50HardwareProps> = ({
             </div>
 
             <div className="text-center">
-              <div className="text-[9px] text-gray-400 uppercase mb-2">Resonance</div>
+              <div className="text-[9px] text-text-secondary uppercase mb-2">Resonance</div>
               <D50Knob
                 label="Reso"
                 value={parameters.resonance || 0.3}
@@ -213,7 +213,7 @@ export const D50Hardware: React.FC<D50HardwareProps> = ({
 
         {/* Effects & Master */}
         <div className="mb-6">
-          <div className="text-xs font-bold text-cyan-400 uppercase tracking-widest mb-3 pb-1 border-b border-gray-700">
+          <div className="text-xs font-bold text-accent-highlight uppercase tracking-widest mb-3 pb-1 border-b border-dark-borderLight">
             Effects & Master
           </div>
           <div className="flex gap-6 justify-center items-end">
@@ -239,7 +239,7 @@ export const D50Hardware: React.FC<D50HardwareProps> = ({
         </div>
 
         {/* Control Buttons */}
-        <div className="grid grid-cols-4 gap-2 mt-6 pt-4 border-t border-gray-700">
+        <div className="grid grid-cols-4 gap-2 mt-6 pt-4 border-t border-dark-borderLight">
           <D50Button label="PATCH" />
           <D50Button label="TONE" />
           <D50Button label="CHASE" />
@@ -259,8 +259,8 @@ export const D50Hardware: React.FC<D50HardwareProps> = ({
       </div>
 
       {/* Bottom Info */}
-      <div className="px-4 py-1 bg-black border-t border-gray-800">
-        <div className="text-[9px] text-gray-600 text-center uppercase tracking-widest">
+      <div className="px-4 py-1 bg-black border-t border-dark-border">
+        <div className="text-[9px] text-text-muted text-center uppercase tracking-widest">
           LA Synthesis • 16 Voices • PCM + Analog • 1987
         </div>
       </div>

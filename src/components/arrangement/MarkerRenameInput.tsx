@@ -67,7 +67,7 @@ export const MarkerRenameInput: React.FC = () => {
         background: '#1e1e2e',
         border: `1px solid ${marker.color}`,
         borderRadius: 4,
-        color: '#fff',
+        color: 'var(--color-text)',
         fontFamily: 'JetBrains Mono, monospace',
         fontSize: 11,
         padding: '3px 6px',

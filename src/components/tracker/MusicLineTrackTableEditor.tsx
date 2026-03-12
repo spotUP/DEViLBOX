@@ -74,7 +74,7 @@ export const MusicLineTrackTableEditor: React.FC<MusicLineTrackTableEditorProps>
         display: 'flex',
         height: HEADER_HEIGHT,
         lineHeight: `${HEADER_HEIGHT}px`,
-        borderBottom: '1px solid #333',
+        borderBottom: '1px solid var(--color-border-light)',
       }}>
         <div style={{ width: POS_COL_WIDTH, textAlign: 'center', color: HVL_DIM }}>
           Pos
@@ -87,7 +87,7 @@ export const MusicLineTrackTableEditor: React.FC<MusicLineTrackTableEditorProps>
               width: CHAN_COL_WIDTH,
               textAlign: 'center',
               color: HVL_DIM,
-              borderLeft: '1px solid #333',
+              borderLeft: '1px solid var(--color-border-light)',
               display: 'flex',
               flexDirection: 'column',
               justifyContent: 'center',
@@ -136,7 +136,7 @@ export const MusicLineTrackTableEditor: React.FC<MusicLineTrackTableEditorProps>
                 <div key={ch} style={{
                   width: CHAN_COL_WIDTH,
                   textAlign: 'center',
-                  borderLeft: '1px solid #222',
+                  borderLeft: '1px solid var(--color-border)',
                   color: isEmpty ? HVL_DIM : HVL_TEXT,
                 }}>
                   {isEmpty ? '···' : patIdx.toString().padStart(3, '0')}

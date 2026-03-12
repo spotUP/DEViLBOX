@@ -109,7 +109,7 @@ export const ChannelParticles: React.FC<ChannelParticlesProps> = ({ height = 100
         const level = pattern?.channels[ch]?.muted ? 0 : Math.max(0, Math.min(1, (baseLevel * channelMultiplier) + variation));
 
         // Draw cell border
-        ctx.strokeStyle = '#222';
+        ctx.strokeStyle = 'var(--color-border)';
         ctx.lineWidth = 1;
         ctx.strokeRect(x, y, cellWidth, cellHeight);
 

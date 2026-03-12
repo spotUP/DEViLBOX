@@ -67,7 +67,7 @@ export const OctaMEDControls: React.FC<OctaMEDControlsProps> = ({ config, onChan
   const accent  = isCyan ? '#00ffff' : '#44aaff';
   const knob    = isCyan ? '#00ffff' : '#66bbff';
   const dim     = isCyan ? '#004444' : '#001833';
-  const panelBg = isCyan ? 'bg-[#041510] border-cyan-900/50' : 'bg-[#000e1a] border-blue-900/30';
+  const panelBg = isCyan ? 'bg-[#041510] border-accent-highlight/20' : 'bg-[#000e1a] border-blue-900/30';
 
   const upd = useCallback(<K extends keyof OctaMEDConfig>(key: K, value: OctaMEDConfig[K]) => {
     onChange({ [key]: value } as Partial<OctaMEDConfig>);
@@ -156,7 +156,7 @@ export const OctaMEDControls: React.FC<OctaMEDControlsProps> = ({ config, onChan
             formatValue={(v) => Math.round(v).toString()}
           />
         </div>
-        <div className="mt-2 text-[10px] text-gray-600">
+        <div className="mt-2 text-[10px] text-text-muted">
           Vol Tbl Speed / WF Speed: 0 = execute every output block
         </div>
       </div>
@@ -196,8 +196,8 @@ export const OctaMEDControls: React.FC<OctaMEDControlsProps> = ({ config, onChan
         <div className="flex flex-wrap gap-3 mb-3 text-[10px] font-mono">
           <span style={{ color: accent }}>FF = loop at current volume</span>
           <span style={{ color: '#ff4444' }}>FE = stop</span>
-          <span style={{ color: '#888' }}>00–40 = set volume (0–64)</span>
-          <span style={{ color: '#aaa' }}>80–BF = wait N ticks</span>
+          <span style={{ color: 'var(--color-text-muted)' }}>00–40 = set volume (0–64)</span>
+          <span style={{ color: 'var(--color-text-secondary)' }}>80–BF = wait N ticks</span>
         </div>
 
         <div className="grid gap-0.5" style={{ gridTemplateColumns: 'repeat(16, minmax(0, 1fr))' }}>
@@ -212,7 +212,7 @@ export const OctaMEDControls: React.FC<OctaMEDControlsProps> = ({ config, onChan
 
             return (
               <div key={i} className="flex flex-col items-center">
-                <span className="text-[8px] font-mono mb-0.5" style={{ color: '#333' }}>
+                <span className="text-[8px] font-mono mb-0.5" style={{ color: 'var(--color-border-light)' }}>
                   {i.toString(16).padStart(2, '0').toUpperCase()}
                 </span>
                 <input
@@ -232,7 +232,7 @@ export const OctaMEDControls: React.FC<OctaMEDControlsProps> = ({ config, onChan
                   style={{
                     width: '100%',
                     background: bg,
-                    borderColor: cls !== 'vol' || v > 0 ? dim : '#1a1a1a',
+                    borderColor: cls !== 'vol' || v > 0 ? dim : 'var(--color-bg-tertiary)',
                     color,
                     minWidth: 0,
                     padding: '2px 1px',
@@ -257,7 +257,7 @@ export const OctaMEDControls: React.FC<OctaMEDControlsProps> = ({ config, onChan
           <span style={{ color: accent }}>FF = loop</span>
           <span style={{ color: '#ff4444' }}>FE = stop</span>
           <span style={{ color: '#44cc88' }}>00–09 = select waveform 0–9</span>
-          <span style={{ color: '#aaa' }}>80–BF = wait N ticks</span>
+          <span style={{ color: 'var(--color-text-secondary)' }}>80–BF = wait N ticks</span>
         </div>
 
         <div className="grid gap-0.5" style={{ gridTemplateColumns: 'repeat(16, minmax(0, 1fr))' }}>
@@ -272,7 +272,7 @@ export const OctaMEDControls: React.FC<OctaMEDControlsProps> = ({ config, onChan
 
             return (
               <div key={i} className="flex flex-col items-center">
-                <span className="text-[8px] font-mono mb-0.5" style={{ color: '#333' }}>
+                <span className="text-[8px] font-mono mb-0.5" style={{ color: 'var(--color-border-light)' }}>
                   {i.toString(16).padStart(2, '0').toUpperCase()}
                 </span>
                 <input
@@ -292,7 +292,7 @@ export const OctaMEDControls: React.FC<OctaMEDControlsProps> = ({ config, onChan
                   style={{
                     width: '100%',
                     background: bg,
-                    borderColor: cls !== 'other' ? dim : '#1a1a1a',
+                    borderColor: cls !== 'other' ? dim : 'var(--color-bg-tertiary)',
                     color,
                     minWidth: 0,
                     padding: '2px 1px',
@@ -336,7 +336,7 @@ export const OctaMEDControls: React.FC<OctaMEDControlsProps> = ({ config, onChan
       ))}
 
       {config.waveforms.length === 0 && (
-        <div className="text-xs text-gray-600 p-3">No waveforms defined.</div>
+        <div className="text-xs text-text-muted p-3">No waveforms defined.</div>
       )}
     </div>
   );

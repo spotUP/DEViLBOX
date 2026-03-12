@@ -44,7 +44,7 @@ export const classicSynthEntries: Record<string, SynthInfo> = {
     description: 'Frequency modulation synth for complex harmonic tones',
     bestFor: ['Bells', 'Electric piano', 'Metallic sounds'],
     icon: 'Radio',
-    color: 'text-cyan-400',
+    color: 'text-accent-highlight',
   },
   AMSynth: {
     type: 'AMSynth',

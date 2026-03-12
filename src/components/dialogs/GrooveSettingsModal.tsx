@@ -69,7 +69,7 @@ export const GrooveSettingsModal: React.FC<GrooveSettingsModalProps> = ({ onClos
                             onClick={() => setGrooveTemplate(groove.id)}
                             className={`w-full text-left px-3 py-2 text-xs font-mono transition-all rounded ${
                               groove.id === grooveTemplateId
-                                ? 'bg-accent-primary text-white font-bold shadow-glow-sm'
+                                ? 'bg-accent-primary text-text-primary font-bold shadow-glow-sm'
                                 : 'text-text-secondary hover:bg-dark-bgHover hover:text-text-primary bg-dark-bgSecondary border border-transparent hover:border-ft2-border'
                             }`}
                           >
@@ -78,7 +78,7 @@ export const GrooveSettingsModal: React.FC<GrooveSettingsModalProps> = ({ onClos
                               {groove.id === grooveTemplateId && <div className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />}
                             </div>
                             {groove.description && (
-                              <div className={`text-[10px] mt-0.5 leading-tight ${groove.id === grooveTemplateId ? 'text-white' : 'opacity-60'}`}>
+                              <div className={`text-[10px] mt-0.5 leading-tight ${groove.id === grooveTemplateId ? 'text-text-primary' : 'opacity-60'}`}>
                                 {groove.description}
                               </div>
                             )}
@@ -155,7 +155,7 @@ export const GrooveSettingsModal: React.FC<GrooveSettingsModalProps> = ({ onClos
                     }}
                     className={`px-2 py-2 text-[10px] font-mono border rounded transition-all ${
                       grooveSteps === s
-                        ? 'bg-accent-primary border-accent-primary text-white font-bold'
+                        ? 'bg-accent-primary border-accent-primary text-text-primary font-bold'
                         : 'bg-dark-bgTertiary border-ft2-border text-text-secondary hover:border-text-muted'
                     }`}
                   >
@@ -172,8 +172,8 @@ export const GrooveSettingsModal: React.FC<GrooveSettingsModalProps> = ({ onClos
             {/* Humanization */}
             <section className="bg-dark-bgSecondary p-4 border border-ft2-border rounded-lg space-y-4">
               <div className="flex items-center justify-between">
-                <h3 className="text-cyan-400 text-xs font-bold tracking-wider uppercase">Humanization (Jitter)</h3>
-                <span className="text-lg font-mono text-cyan-400 font-bold leading-none">{jitter}%</span>
+                <h3 className="text-accent-highlight text-xs font-bold tracking-wider uppercase">Humanization (Jitter)</h3>
+                <span className="text-lg font-mono text-accent-highlight font-bold leading-none">{jitter}%</span>
               </div>
               
               <div className="space-y-2">
@@ -210,7 +210,7 @@ export const GrooveSettingsModal: React.FC<GrooveSettingsModalProps> = ({ onClos
           </div>
           <button
             onClick={onClose}
-            className="px-6 py-1.5 bg-accent-primary border border-accent-primary text-white text-xs font-bold hover:bg-accent-secondary hover:border-accent-secondary transition-all rounded shadow-glow-sm focus:outline-none uppercase tracking-widest"
+            className="px-6 py-1.5 bg-accent-primary border border-accent-primary text-text-primary text-xs font-bold hover:bg-accent-secondary hover:border-accent-secondary transition-all rounded shadow-glow-sm focus:outline-none uppercase tracking-widest"
           >
             Accept
           </button>

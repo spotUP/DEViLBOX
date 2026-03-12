@@ -46,7 +46,7 @@ import type { GearmulatorSynth } from '@engine/gearmulator/GearmulatorSynth';
 
 // Loading spinner for lazy components
 const LoadingControls = () => (
-  <div className="flex items-center justify-center py-8 text-gray-400">
+  <div className="flex items-center justify-center py-8 text-text-secondary">
     <div className="animate-spin w-6 h-6 border-2 border-current border-t-transparent rounded-full" />
     <span className="ml-2">Loading controls...</span>
   </div>
@@ -215,7 +215,7 @@ const GearmulatorEditorSection: React.FC<GearmulatorEditorSectionProps> = ({
         {/* Config panel: always shown when no skin, collapsible when skin is active */}
         {showHardwareUI && (
           <button
-            className="w-full px-4 py-2 text-xs text-gray-400 hover:text-gray-200 bg-[#0d0d1a] border-t border-gray-800 flex items-center gap-2 transition-colors"
+            className="w-full px-4 py-2 text-xs text-text-secondary hover:text-text-secondary bg-[#0d0d1a] border-t border-dark-border flex items-center gap-2 transition-colors"
             onClick={() => setShowConfig(!showConfig)}
           >
             <span className={`transition-transform ${showConfig ? 'rotate-90' : ''}`}>&#9654;</span>
@@ -653,7 +653,7 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
                 className={`p-1.5 rounded transition-all flex items-center gap-1.5 px-2 ${
                   uiMode === 'hardware'
                     ? 'bg-accent-primary/20 text-accent-primary ring-1 ring-accent-primary/50'
-                    : 'bg-gray-800 text-text-muted hover:text-text-secondary border border-gray-700'
+                    : 'bg-dark-bgTertiary text-text-muted hover:text-text-secondary border border-dark-borderLight'
                 }`}
                 title={uiMode === 'hardware' ? 'Switch to Simple Controls' : 'Switch to Hardware UI'}
               >
@@ -781,8 +781,8 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
             <button
               className={`px-2 py-1 text-xs rounded flex items-center gap-1 ${
                 uiMode === 'hardware'
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                  ? 'bg-blue-600 text-text-primary'
+                  : 'bg-dark-bgHover text-text-secondary hover:bg-dark-bgHover'
               }`}
               onClick={() => setUIMode(uiMode === 'simple' ? 'hardware' : 'simple')}
               title={uiMode === 'hardware' ? 'Switch to Simple Controls' : 'Switch to Hardware UI'}
@@ -1225,8 +1225,8 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
             <button
               className={`px-2 py-1 text-xs rounded flex items-center gap-1 ${
                 uiMode === 'hardware'
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                  ? 'bg-blue-600 text-text-primary'
+                  : 'bg-dark-bgHover text-text-secondary hover:bg-dark-bgHover'
               }`}
               onClick={() => setUIMode(uiMode === 'simple' ? 'hardware' : 'simple')}
               title={uiMode === 'hardware' ? 'Switch to Simple Controls' : 'Switch to Hardware UI'}
@@ -1371,7 +1371,7 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
     if (instrument.v2Speech || instrument.synthType === 'V2Speech') {
       const accentColor = isCyanTheme ? '#00ffff' : '#ffaa00';
       const headerBg = isCyanTheme
-        ? 'bg-[#041010] border-b-2 border-cyan-500'
+        ? 'bg-[#041010] border-b-2 border-accent-highlight'
         : 'bg-gradient-to-r from-[#2a2a2a] to-[#1a1a1a] border-b-4 border-[#ffaa00]';
 
       const handleDisableSpeech = () => {
@@ -1395,11 +1395,11 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className="p-2 rounded-lg bg-gradient-to-br from-amber-500 to-amber-700 shadow-lg">
-                      <Mic size={24} className="text-white" />
+                      <Mic size={24} className="text-text-primary" />
                     </div>
                     <div>
                       <h2 className="text-xl font-black tracking-tight" style={{ color: accentColor }}>V2 SPEECH</h2>
-                      <p className={`text-[10px] uppercase tracking-widest ${isCyanTheme ? 'text-cyan-600' : 'text-gray-400'}`}>Lisa Engine / Ronan</p>
+                      <p className={`text-[10px] uppercase tracking-widest ${isCyanTheme ? 'text-accent-highlight' : 'text-text-secondary'}`}>Lisa Engine / Ronan</p>
                     </div>
                   </div>
 
@@ -1407,7 +1407,7 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
                     {/* Mode Toggle: Switch to Synth */}
                     <button
                       onClick={handleDisableSpeech}
-                      className="p-1.5 rounded transition-all flex items-center gap-1.5 px-2 bg-gray-800 text-text-muted hover:text-amber-400 hover:bg-amber-500/10 border border-gray-700"
+                      className="p-1.5 rounded transition-all flex items-center gap-1.5 px-2 bg-dark-bgTertiary text-text-muted hover:text-amber-400 hover:bg-amber-500/10 border border-dark-borderLight"
                       title="Switch to Synth Mode"
                     >
                       <Music size={14} />
@@ -1419,7 +1419,7 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
                       className={`p-1.5 rounded transition-all flex items-center gap-1.5 px-2 ${
                         instrument.isLive
                           ? 'bg-accent-success/20 text-accent-success ring-1 ring-accent-success/50 animate-pulse-glow'
-                          : 'bg-gray-800 text-text-muted hover:text-text-secondary border border-gray-700'
+                          : 'bg-dark-bgTertiary text-text-muted hover:text-text-secondary border border-dark-borderLight'
                       }`}
                     >
                       <Radio size={14} />
@@ -1464,7 +1464,7 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
   if (editorMode === 'sam') {
     const accentColor = isCyanTheme ? '#00ffff' : '#ffcc33';
     const headerBg = isCyanTheme
-      ? 'bg-[#041010] border-b-2 border-cyan-500'
+      ? 'bg-[#041010] border-b-2 border-accent-highlight'
       : 'bg-gradient-to-r from-[#2a2a2a] to-[#1a1a1a] border-b-4 border-[#ffcc33]';
 
     const samConfig = deepMerge(DEFAULT_SAM, instrument.sam || {});
@@ -1485,12 +1485,12 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
             <div className={`synth-editor-header px-4 py-3 ${headerBg}`}>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-gradient-to-br from-amber-500 to-amber-700 shadow-lg text-white">
+                  <div className="p-2 rounded-lg bg-gradient-to-br from-amber-500 to-amber-700 shadow-lg text-text-primary">
                     <MessageSquare size={24} />
                   </div>
                   <div>
                     <h2 className="text-xl font-black tracking-tight" style={{ color: accentColor }}>SAM</h2>
-                    <p className={`text-[10px] uppercase tracking-widest ${isCyanTheme ? 'text-cyan-600' : 'text-gray-400'}`}>Software Automatic Mouth</p>
+                    <p className={`text-[10px] uppercase tracking-widest ${isCyanTheme ? 'text-accent-highlight' : 'text-text-secondary'}`}>Software Automatic Mouth</p>
                   </div>
                 </div>
 
@@ -1500,7 +1500,7 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
                     className={`p-1.5 rounded transition-all flex items-center gap-1.5 px-2 ${
                       instrument.isLive
                         ? 'bg-accent-success/20 text-accent-success ring-1 ring-accent-success/50 animate-pulse-glow'
-                        : 'bg-gray-800 text-text-muted hover:text-text-secondary border border-gray-700'
+                        : 'bg-dark-bgTertiary text-text-muted hover:text-text-secondary border border-dark-borderLight'
                     }`}
                   >
                     <Radio size={14} />
@@ -1593,7 +1593,7 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
                 className={`p-1.5 rounded transition-all flex items-center gap-1.5 px-2 ${
                   uiMode === 'hardware'
                     ? 'bg-accent-primary/20 text-accent-primary ring-1 ring-accent-primary/50'
-                    : 'bg-gray-800 text-text-muted hover:text-text-secondary border border-gray-700'
+                    : 'bg-dark-bgTertiary text-text-muted hover:text-text-secondary border border-dark-borderLight'
                 }`}
                 title={uiMode === 'hardware' ? 'Switch to Simple Controls' : 'Switch to Hardware UI'}
               >
@@ -1788,7 +1788,7 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
   if (editorMode === 'tonewheelOrgan') {
     const organAccentColor = isCyanTheme ? '#00ffff' : '#d4a017';
     const organHeaderBg = isCyanTheme
-      ? 'bg-[#041010] border-b-2 border-cyan-500'
+      ? 'bg-[#041010] border-b-2 border-accent-highlight'
       : 'bg-gradient-to-r from-[#2a2a2a] to-[#1a1a1a] border-b-4 border-[#d4a017]';
 
     return (
@@ -1808,11 +1808,11 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="p-2 rounded-lg bg-gradient-to-br from-amber-600 to-amber-800 shadow-lg">
-                    <Music size={24} className="text-white" />
+                    <Music size={24} className="text-text-primary" />
                   </div>
                   <div>
                     <h2 className="text-xl font-black tracking-tight" style={{ color: organAccentColor }}>TONEWHEEL ORGAN</h2>
-                    <p className={`text-[10px] uppercase tracking-widest ${isCyanTheme ? 'text-cyan-600' : 'text-gray-400'}`}>Hammond-Style Drawbar Organ</p>
+                    <p className={`text-[10px] uppercase tracking-widest ${isCyanTheme ? 'text-accent-highlight' : 'text-text-secondary'}`}>Hammond-Style Drawbar Organ</p>
                   </div>
                 </div>
 
@@ -1823,7 +1823,7 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
                     className={`p-1.5 rounded transition-all flex items-center gap-1.5 px-2 ${
                       vstUiMode === 'custom'
                         ? 'bg-amber-500/20 text-amber-400 ring-1 ring-amber-500/50'
-                        : 'bg-gray-800 text-text-muted hover:text-text-secondary border border-gray-700'
+                        : 'bg-dark-bgTertiary text-text-muted hover:text-text-secondary border border-dark-borderLight'
                     }`}
                     title={vstUiMode === 'custom' ? 'Switch to Generic Controls' : 'Switch to Custom Controls'}
                   >
@@ -1838,7 +1838,7 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
                     className={`p-1.5 rounded transition-all flex items-center gap-1.5 px-2 ${
                       instrument.isLive
                         ? 'bg-accent-success/20 text-accent-success ring-1 ring-accent-success/50 animate-pulse-glow'
-                        : 'bg-gray-800 text-text-muted hover:text-text-secondary border border-gray-700'
+                        : 'bg-dark-bgTertiary text-text-muted hover:text-text-secondary border border-dark-borderLight'
                     }`}
                   >
                     <Radio size={14} />
@@ -1879,7 +1879,7 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
   if (editorMode === 'melodica') {
     const melodicaAccentColor = isCyanTheme ? '#00ffff' : '#2dd4bf';
     const melodicaHeaderBg = isCyanTheme
-      ? 'bg-[#041010] border-b-2 border-cyan-500'
+      ? 'bg-[#041010] border-b-2 border-accent-highlight'
       : 'bg-gradient-to-r from-[#2a2a2a] to-[#1a1a1a] border-b-4 border-[#2dd4bf]';
 
     return (
@@ -1899,11 +1899,11 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="p-2 rounded-lg bg-gradient-to-br from-teal-500 to-teal-700 shadow-lg">
-                    <Music size={24} className="text-white" />
+                    <Music size={24} className="text-text-primary" />
                   </div>
                   <div>
                     <h2 className="text-xl font-black tracking-tight" style={{ color: melodicaAccentColor }}>MELODICA</h2>
-                    <p className={`text-[10px] uppercase tracking-widest ${isCyanTheme ? 'text-cyan-600' : 'text-gray-400'}`}>Reed Instrument Physical Model</p>
+                    <p className={`text-[10px] uppercase tracking-widest ${isCyanTheme ? 'text-accent-highlight' : 'text-text-secondary'}`}>Reed Instrument Physical Model</p>
                   </div>
                 </div>
 
@@ -1914,7 +1914,7 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
                     className={`p-1.5 rounded transition-all flex items-center gap-1.5 px-2 ${
                       vstUiMode === 'custom'
                         ? 'bg-teal-500/20 text-teal-400 ring-1 ring-teal-500/50'
-                        : 'bg-gray-800 text-text-muted hover:text-text-secondary border border-gray-700'
+                        : 'bg-dark-bgTertiary text-text-muted hover:text-text-secondary border border-dark-borderLight'
                     }`}
                     title={vstUiMode === 'custom' ? 'Switch to Generic Controls' : 'Switch to Custom Controls'}
                   >
@@ -1929,7 +1929,7 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
                     className={`p-1.5 rounded transition-all flex items-center gap-1.5 px-2 ${
                       instrument.isLive
                         ? 'bg-accent-success/20 text-accent-success ring-1 ring-accent-success/50 animate-pulse-glow'
-                        : 'bg-gray-800 text-text-muted hover:text-text-secondary border border-gray-700'
+                        : 'bg-dark-bgTertiary text-text-muted hover:text-text-secondary border border-dark-borderLight'
                     }`}
                   >
                     <Radio size={14} />
@@ -1970,7 +1970,7 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
   if (editorMode === 'vital') {
     const vitalAccentColor = isCyanTheme ? '#00ffff' : '#b84eff';
     const vitalHeaderBg = isCyanTheme
-      ? 'bg-[#041010] border-b-2 border-cyan-500'
+      ? 'bg-[#041010] border-b-2 border-accent-highlight'
       : 'bg-gradient-to-r from-[#2a2a2a] to-[#1a1a1a] border-b-4 border-[#b84eff]';
 
     return (
@@ -1990,11 +1990,11 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="p-2 rounded-lg bg-gradient-to-br from-purple-500 to-purple-700 shadow-lg">
-                    <Music size={24} className="text-white" />
+                    <Music size={24} className="text-text-primary" />
                   </div>
                   <div>
                     <h2 className="text-xl font-black tracking-tight" style={{ color: vitalAccentColor }}>VITAL</h2>
-                    <p className={`text-[10px] uppercase tracking-widest ${isCyanTheme ? 'text-cyan-600' : 'text-gray-400'}`}>Spectral Wavetable Synth</p>
+                    <p className={`text-[10px] uppercase tracking-widest ${isCyanTheme ? 'text-accent-highlight' : 'text-text-secondary'}`}>Spectral Wavetable Synth</p>
                   </div>
                 </div>
 
@@ -2004,7 +2004,7 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
                     className={`p-1.5 rounded transition-all flex items-center gap-1.5 px-2 ${
                       vstUiMode === 'custom'
                         ? 'bg-purple-500/20 text-purple-400 ring-1 ring-purple-500/50'
-                        : 'bg-gray-800 text-text-muted hover:text-text-secondary border border-gray-700'
+                        : 'bg-dark-bgTertiary text-text-muted hover:text-text-secondary border border-dark-borderLight'
                     }`}
                     title={vstUiMode === 'custom' ? 'Switch to Generic Controls' : 'Switch to Custom Controls'}
                   >
@@ -2019,7 +2019,7 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
                     className={`p-1.5 rounded transition-all flex items-center gap-1.5 px-2 ${
                       instrument.isLive
                         ? 'bg-accent-success/20 text-accent-success ring-1 ring-accent-success/50 animate-pulse-glow'
-                        : 'bg-gray-800 text-text-muted hover:text-text-secondary border border-gray-700'
+                        : 'bg-dark-bgTertiary text-text-muted hover:text-text-secondary border border-dark-borderLight'
                     }`}
                   >
                     <Radio size={14} />
@@ -2060,7 +2060,7 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
   if (editorMode === 'odin2') {
     const odinAccentColor = isCyanTheme ? '#00ffff' : '#4a9eff';
     const odinHeaderBg = isCyanTheme
-      ? 'bg-[#041010] border-b-2 border-cyan-500'
+      ? 'bg-[#041010] border-b-2 border-accent-highlight'
       : 'bg-gradient-to-r from-[#2a2a2a] to-[#1a1a1a] border-b-4 border-[#4a9eff]';
 
     return (
@@ -2080,11 +2080,11 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="p-2 rounded-lg bg-gradient-to-br from-blue-500 to-blue-700 shadow-lg">
-                    <Music size={24} className="text-white" />
+                    <Music size={24} className="text-text-primary" />
                   </div>
                   <div>
                     <h2 className="text-xl font-black tracking-tight" style={{ color: odinAccentColor }}>ODIN2</h2>
-                    <p className={`text-[10px] uppercase tracking-widest ${isCyanTheme ? 'text-cyan-600' : 'text-gray-400'}`}>Semi-Modular Hybrid Synth</p>
+                    <p className={`text-[10px] uppercase tracking-widest ${isCyanTheme ? 'text-accent-highlight' : 'text-text-secondary'}`}>Semi-Modular Hybrid Synth</p>
                   </div>
                 </div>
 
@@ -2094,7 +2094,7 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
                     className={`p-1.5 rounded transition-all flex items-center gap-1.5 px-2 ${
                       vstUiMode === 'custom'
                         ? 'bg-blue-500/20 text-blue-400 ring-1 ring-blue-500/50'
-                        : 'bg-gray-800 text-text-muted hover:text-text-secondary border border-gray-700'
+                        : 'bg-dark-bgTertiary text-text-muted hover:text-text-secondary border border-dark-borderLight'
                     }`}
                     title={vstUiMode === 'custom' ? 'Switch to Generic Controls' : 'Switch to Custom Controls'}
                   >
@@ -2109,7 +2109,7 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
                     className={`p-1.5 rounded transition-all flex items-center gap-1.5 px-2 ${
                       instrument.isLive
                         ? 'bg-accent-success/20 text-accent-success ring-1 ring-accent-success/50 animate-pulse-glow'
-                        : 'bg-gray-800 text-text-muted hover:text-text-secondary border border-gray-700'
+                        : 'bg-dark-bgTertiary text-text-muted hover:text-text-secondary border border-dark-borderLight'
                     }`}
                   >
                     <Radio size={14} />
@@ -2150,7 +2150,7 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
   if (editorMode === 'surge') {
     const surgeAccentColor = isCyanTheme ? '#00ffff' : '#ff8c00';
     const surgeHeaderBg = isCyanTheme
-      ? 'bg-[#041010] border-b-2 border-cyan-500'
+      ? 'bg-[#041010] border-b-2 border-accent-highlight'
       : 'bg-gradient-to-r from-[#2a2a2a] to-[#1a1a1a] border-b-4 border-[#ff8c00]';
 
     return (
@@ -2170,11 +2170,11 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="p-2 rounded-lg bg-gradient-to-br from-orange-500 to-orange-700 shadow-lg">
-                    <Music size={24} className="text-white" />
+                    <Music size={24} className="text-text-primary" />
                   </div>
                   <div>
                     <h2 className="text-xl font-black tracking-tight" style={{ color: surgeAccentColor }}>SURGE XT</h2>
-                    <p className={`text-[10px] uppercase tracking-widest ${isCyanTheme ? 'text-cyan-600' : 'text-gray-400'}`}>Hybrid Synthesizer</p>
+                    <p className={`text-[10px] uppercase tracking-widest ${isCyanTheme ? 'text-accent-highlight' : 'text-text-secondary'}`}>Hybrid Synthesizer</p>
                   </div>
                 </div>
 
@@ -2184,7 +2184,7 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
                     className={`p-1.5 rounded transition-all flex items-center gap-1.5 px-2 ${
                       vstUiMode === 'custom'
                         ? 'bg-orange-500/20 text-orange-400 ring-1 ring-orange-500/50'
-                        : 'bg-gray-800 text-text-muted hover:text-text-secondary border border-gray-700'
+                        : 'bg-dark-bgTertiary text-text-muted hover:text-text-secondary border border-dark-borderLight'
                     }`}
                     title={vstUiMode === 'custom' ? 'Switch to Generic Controls' : 'Switch to Custom Controls'}
                   >
@@ -2199,7 +2199,7 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
                     className={`p-1.5 rounded transition-all flex items-center gap-1.5 px-2 ${
                       instrument.isLive
                         ? 'bg-accent-success/20 text-accent-success ring-1 ring-accent-success/50 animate-pulse-glow'
-                        : 'bg-gray-800 text-text-muted hover:text-text-secondary border border-gray-700'
+                        : 'bg-dark-bgTertiary text-text-muted hover:text-text-secondary border border-dark-borderLight'
                     }`}
                   >
                     <Radio size={14} />

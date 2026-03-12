@@ -80,13 +80,13 @@ export const AcidPatternEditor: React.FC<AcidPatternEditorProps> = ({
       <div className="flex gap-2">
         <button
           onClick={handleClear}
-          className="px-3 py-1 bg-ft2-header text-white rounded hover:bg-ft2-cursor hover:text-ft2-bg"
+          className="px-3 py-1 bg-ft2-header text-text-primary rounded hover:bg-ft2-cursor hover:text-ft2-bg"
         >
           Clear
         </button>
         <button
           onClick={handleRandomize}
-          className="px-3 py-1 bg-ft2-header text-white rounded hover:bg-ft2-cursor hover:text-ft2-bg"
+          className="px-3 py-1 bg-ft2-header text-text-primary rounded hover:bg-ft2-cursor hover:text-ft2-bg"
         >
           Randomize
         </button>
@@ -136,7 +136,7 @@ export const AcidPatternEditor: React.FC<AcidPatternEditorProps> = ({
                   <span className="text-xs text-yellow-400">M</span>
                 )}
                 {note.hammer && (
-                  <span className="text-xs text-cyan-400">H</span>
+                  <span className="text-xs text-accent-highlight">H</span>
                 )}
               </div>
             </div>

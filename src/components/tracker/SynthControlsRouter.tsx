@@ -145,7 +145,7 @@ const FurnaceControls = lazy(() =>
 // ─── Loading fallback ────────────────────────────────────────────────────────
 
 const LoadingFallback = () => (
-  <div className="flex items-center justify-center py-8 text-gray-500 text-xs">
+  <div className="flex items-center justify-center py-8 text-text-muted text-xs">
     Loading controls…
   </div>
 );
@@ -163,10 +163,8 @@ interface SynthControlsRouterProps {
 export const SynthControlsRouter: React.FC<SynthControlsRouterProps> = ({ instrument, onUpdate, fallback }) => {
   const synthType = instrument.synthType;
 
-  // Debug: log when routing WaveSabre/Oidos/Tunefish
-  if (synthType === 'WaveSabreSynth' || synthType === 'OidosSynth' || synthType === 'TunefishSynth' || instrument.xrns) {
-    console.log(`[SynthControlsRouter] Routing: synthType=${synthType} xrns=${JSON.stringify(instrument.xrns?.synthType)} hasXrns=${!!instrument.xrns}`);
-  }
+  // Debug: always log for debugging
+  console.log(`[SynthControlsRouter] Routing: synthType=${synthType} id=${instrument.id} name="${instrument.name}" hasXrns=${!!instrument.xrns}`);
 
   // Chip synth param change handler
   const handleChipParamChange = useCallback((name: string, value: number | string) => {
@@ -384,8 +382,8 @@ export const SynthControlsRouter: React.FC<SynthControlsRouterProps> = ({ instru
       const xrnsSynthType = instrument.xrns?.synthType || synthType;
       const paramCount = instrument.xrns?.parameters?.length || 0;
       return (
-        <div style={{ padding: '12px', color: '#aaa', fontSize: '12px' }}>
-          <div style={{ fontWeight: 'bold', marginBottom: '8px', color: '#fff' }}>
+        <div style={{ padding: '12px', color: 'var(--color-text-secondary)', fontSize: '12px' }}>
+          <div style={{ fontWeight: 'bold', marginBottom: '8px', color: 'var(--color-text)' }}>
             {xrnsSynthType.replace('wavesabre-', '').replace('WaveSabreSynth', 'WaveSabre').toUpperCase()}
           </div>
           <div>WASM synth with {paramCount} parameters</div>

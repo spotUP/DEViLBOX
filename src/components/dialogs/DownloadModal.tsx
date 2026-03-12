@@ -30,7 +30,7 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({ isOpen, onClose })
       name: 'macOS',
       icon: <Apple size={24} />,
       desc: 'Disk Image (.dmg) for Intel/Apple Silicon',
-      color: 'text-gray-300',
+      color: 'text-text-secondary',
     },
     {
       name: 'Linux',

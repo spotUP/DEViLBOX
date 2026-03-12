@@ -206,7 +206,7 @@ export const WobbleBassControls: React.FC<WobbleBassControlsProps> = ({ config, 
           <div className="flex items-end gap-1">
             <span className="text-[9px] text-zinc-500 uppercase">Sync</span>
             <select value={config.wobbleLFO.sync} onChange={e => set(['wobbleLFO', 'sync'], e.target.value)}
-              className="text-[10px] rounded px-1 py-0.5 border-none outline-none" style={{ background: '#2a2a40', color: '#ccc' }}>
+              className="text-[10px] rounded px-1 py-0.5 border-none outline-none" style={{ background: '#2a2a40', color: 'var(--color-text-secondary)' }}>
               {SYNC_VALUES.map(s => <option key={s} value={s}>{s}</option>)}
             </select>
           </div>

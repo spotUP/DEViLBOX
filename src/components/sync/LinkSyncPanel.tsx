@@ -172,8 +172,8 @@ export const LinkSyncPanel: React.FC<LinkSyncPanelProps> = ({
               onClick={handlePlayToggle}
               className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded font-bold text-xs transition-colors ${
                 linkState.isPlaying
-                  ? 'bg-red-500 hover:bg-red-600 text-white'
-                  : 'bg-green-500 hover:bg-green-600 text-white'
+                  ? 'bg-red-500 hover:bg-red-600 text-text-primary'
+                  : 'bg-green-500 hover:bg-green-600 text-text-primary'
               }`}
             >
               {linkState.isPlaying ? (

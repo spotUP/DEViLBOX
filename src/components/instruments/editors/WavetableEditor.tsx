@@ -317,7 +317,7 @@ export const WavetableEditor: React.FC<WavetableEditorProps> = ({
       {/* Header */}
       <div className="flex items-center justify-between px-3 py-2 bg-dark-bg border-b border-dark-border">
         <div className="flex items-center gap-2">
-          <Waves size={14} className="text-cyan-400" />
+          <Waves size={14} className="text-accent-highlight" />
           <span className="font-mono text-[10px] font-bold text-text-primary">
             Wave {wavetable.id}
           </span>
@@ -330,7 +330,7 @@ export const WavetableEditor: React.FC<WavetableEditorProps> = ({
           {/* Import */}
           <button
             onClick={() => fileInputRef.current?.click()}
-            className="p-1 text-cyan-400 hover:bg-cyan-500/20 rounded"
+            className="p-1 text-accent-highlight hover:bg-accent-highlight/20 rounded"
             title="Import .wav or .h wave"
           >
             <FileUp size={14} />
@@ -531,7 +531,7 @@ export const WavetableListEditor: React.FC<WavetableListEditorProps> = ({
               onClick={() => setSelectedWave(index)}
               className={`flex flex-col items-center gap-0.5 px-2 py-1 rounded border transition-colors
                 ${isSelected
-                  ? 'bg-cyan-500/20 border-cyan-500'
+                  ? 'bg-accent-highlight/20 border-accent-highlight'
                   : 'bg-dark-bg border-dark-border hover:border-dark-border/80'
                 }`}
             >
@@ -542,7 +542,7 @@ export const WavetableListEditor: React.FC<WavetableListEditorProps> = ({
                 color={isSelected ? '#22d3ee' : '#4b5563'}
                 style="bar"
               />
-              <span className={`font-mono text-[9px] ${isSelected ? 'text-cyan-400' : 'text-text-muted'}`}>
+              <span className={`font-mono text-[9px] ${isSelected ? 'text-accent-highlight' : 'text-text-muted'}`}>
                 Wave {wave.id}
               </span>
             </button>
@@ -561,7 +561,7 @@ export const WavetableListEditor: React.FC<WavetableListEditorProps> = ({
             {selectedWave !== null && (
               <button
                 onClick={() => duplicateWavetable(selectedWave)}
-                className="px-3 py-1.5 rounded border border-dashed border-dark-border text-text-muted hover:text-text-primary hover:border-cyan-500 text-[10px] font-mono flex items-center gap-1"
+                className="px-3 py-1.5 rounded border border-dashed border-dark-border text-text-muted hover:text-text-primary hover:border-accent-highlight text-[10px] font-mono flex items-center gap-1"
               >
                 <Copy size={12} />
                 Duplicate

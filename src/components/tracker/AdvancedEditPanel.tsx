@@ -70,38 +70,38 @@ export const AdvancedEditPanel: React.FC<AdvancedEditPanelProps> = ({
               <button
                 onClick={() => onShowScaleVolume?.('block')}
                 disabled={!hasSelection}
-                className="px-3 py-1.5 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                className="px-3 py-1.5 text-xs bg-blue-600 hover:bg-blue-700 text-text-primary rounded disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
               >
                 Scale Block
               </button>
               <button
                 onClick={() => onShowFadeVolume?.('block')}
                 disabled={!hasSelection}
-                className="px-3 py-1.5 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                className="px-3 py-1.5 text-xs bg-blue-600 hover:bg-blue-700 text-text-primary rounded disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
               >
                 Fade Block
               </button>
               <button
                 onClick={() => onShowScaleVolume?.('track')}
-                className="px-3 py-1.5 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors"
+                className="px-3 py-1.5 text-xs bg-blue-600 hover:bg-blue-700 text-text-primary rounded transition-colors"
               >
                 Scale Track
               </button>
               <button
                 onClick={() => onShowFadeVolume?.('track')}
-                className="px-3 py-1.5 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors"
+                className="px-3 py-1.5 text-xs bg-blue-600 hover:bg-blue-700 text-text-primary rounded transition-colors"
               >
                 Fade Track
               </button>
               <button
                 onClick={() => onShowScaleVolume?.('pattern')}
-                className="px-3 py-1.5 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors"
+                className="px-3 py-1.5 text-xs bg-blue-600 hover:bg-blue-700 text-text-primary rounded transition-colors"
               >
                 Scale Pattern
               </button>
               <button
                 onClick={() => onShowFadeVolume?.('pattern')}
-                className="px-3 py-1.5 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors"
+                className="px-3 py-1.5 text-xs bg-blue-600 hover:bg-blue-700 text-text-primary rounded transition-colors"
               >
                 Fade Pattern
               </button>
@@ -132,7 +132,7 @@ export const AdvancedEditPanel: React.FC<AdvancedEditPanelProps> = ({
               <button
                 onClick={onReverse}
                 disabled={!hasSelection}
-                className="px-3 py-1.5 text-xs bg-orange-600 hover:bg-orange-700 text-white rounded disabled:opacity-30 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-1"
+                className="px-3 py-1.5 text-xs bg-orange-600 hover:bg-orange-700 text-text-primary rounded disabled:opacity-30 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-1"
               >
                 <ArrowUpDown size={12} />
                 Reverse
@@ -140,7 +140,7 @@ export const AdvancedEditPanel: React.FC<AdvancedEditPanelProps> = ({
               <button
                 onClick={onDuplicate}
                 disabled={!hasSelection}
-                className="px-3 py-1.5 text-xs bg-orange-600 hover:bg-orange-700 text-white rounded disabled:opacity-30 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-1"
+                className="px-3 py-1.5 text-xs bg-orange-600 hover:bg-orange-700 text-text-primary rounded disabled:opacity-30 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-1"
               >
                 <Copy size={12} />
                 Duplicate
@@ -148,7 +148,7 @@ export const AdvancedEditPanel: React.FC<AdvancedEditPanelProps> = ({
               <button
                 onClick={onExpand}
                 disabled={!hasSelection}
-                className="px-3 py-1.5 text-xs bg-orange-600 hover:bg-orange-700 text-white rounded disabled:opacity-30 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-1"
+                className="px-3 py-1.5 text-xs bg-orange-600 hover:bg-orange-700 text-text-primary rounded disabled:opacity-30 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-1"
               >
                 <Maximize2 size={12} />
                 Expand 2x
@@ -156,7 +156,7 @@ export const AdvancedEditPanel: React.FC<AdvancedEditPanelProps> = ({
               <button
                 onClick={onShrink}
                 disabled={!hasSelection}
-                className="px-3 py-1.5 text-xs bg-orange-600 hover:bg-orange-700 text-white rounded disabled:opacity-30 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-1"
+                className="px-3 py-1.5 text-xs bg-orange-600 hover:bg-orange-700 text-text-primary rounded disabled:opacity-30 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-1"
               >
                 <Minimize2 size={12} />
                 Shrink 2x
@@ -191,28 +191,28 @@ export const AdvancedEditPanel: React.FC<AdvancedEditPanelProps> = ({
                 <button
                   onClick={() => onMath?.('add', mathValue, mathColumn)}
                   disabled={!hasSelection}
-                  className="px-2 py-1 text-xs bg-teal-600 hover:bg-teal-700 text-white rounded disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                  className="px-2 py-1 text-xs bg-teal-600 hover:bg-teal-700 text-text-primary rounded disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                 >
                   +
                 </button>
                 <button
                   onClick={() => onMath?.('sub', mathValue, mathColumn)}
                   disabled={!hasSelection}
-                  className="px-2 py-1 text-xs bg-teal-600 hover:bg-teal-700 text-white rounded disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                  className="px-2 py-1 text-xs bg-teal-600 hover:bg-teal-700 text-text-primary rounded disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                 >
                   −
                 </button>
                 <button
                   onClick={() => onMath?.('mul', mathValue, mathColumn)}
                   disabled={!hasSelection}
-                  className="px-2 py-1 text-xs bg-teal-600 hover:bg-teal-700 text-white rounded disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                  className="px-2 py-1 text-xs bg-teal-600 hover:bg-teal-700 text-text-primary rounded disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                 >
                   ×
                 </button>
                 <button
                   onClick={() => onMath?.('div', mathValue, mathColumn)}
                   disabled={!hasSelection}
-                  className="px-2 py-1 text-xs bg-teal-600 hover:bg-teal-700 text-white rounded disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                  className="px-2 py-1 text-xs bg-teal-600 hover:bg-teal-700 text-text-primary rounded disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                 >
                   ÷
                 </button>
@@ -248,25 +248,25 @@ export const AdvancedEditPanel: React.FC<AdvancedEditPanelProps> = ({
               <button
                 onClick={() => onShowRemapInstrument?.('block')}
                 disabled={!hasSelection}
-                className="px-3 py-1.5 text-xs bg-purple-600 hover:bg-purple-700 text-white rounded disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                className="px-3 py-1.5 text-xs bg-purple-600 hover:bg-purple-700 text-text-primary rounded disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
               >
                 Remap Block
               </button>
               <button
                 onClick={() => onShowRemapInstrument?.('track')}
-                className="px-3 py-1.5 text-xs bg-purple-600 hover:bg-purple-700 text-white rounded transition-colors"
+                className="px-3 py-1.5 text-xs bg-purple-600 hover:bg-purple-700 text-text-primary rounded transition-colors"
               >
                 Remap Track
               </button>
               <button
                 onClick={() => onShowRemapInstrument?.('pattern')}
-                className="px-3 py-1.5 text-xs bg-purple-600 hover:bg-purple-700 text-white rounded transition-colors"
+                className="px-3 py-1.5 text-xs bg-purple-600 hover:bg-purple-700 text-text-primary rounded transition-colors"
               >
                 Remap Pattern
               </button>
               <button
                 onClick={() => onShowRemapInstrument?.('song')}
-                className="px-3 py-1.5 text-xs bg-purple-600 hover:bg-purple-700 text-white rounded transition-colors"
+                className="px-3 py-1.5 text-xs bg-purple-600 hover:bg-purple-700 text-text-primary rounded transition-colors"
               >
                 Remap Song
               </button>
@@ -296,14 +296,14 @@ export const AdvancedEditPanel: React.FC<AdvancedEditPanelProps> = ({
             <div className="grid grid-cols-2 gap-2">
               <button
                 onClick={onExportPattern}
-                className="px-3 py-1.5 text-xs bg-green-600 hover:bg-green-700 text-white rounded flex items-center justify-center gap-1 transition-colors"
+                className="px-3 py-1.5 text-xs bg-green-600 hover:bg-green-700 text-text-primary rounded flex items-center justify-center gap-1 transition-colors"
               >
                 <Download size={12} />
                 Pattern (.xp)
               </button>
               <button
                 onClick={onExportTrack}
-                className="px-3 py-1.5 text-xs bg-green-600 hover:bg-green-700 text-white rounded flex items-center justify-center gap-1 transition-colors"
+                className="px-3 py-1.5 text-xs bg-green-600 hover:bg-green-700 text-text-primary rounded flex items-center justify-center gap-1 transition-colors"
               >
                 <Download size={12} />
                 Track (.xt)

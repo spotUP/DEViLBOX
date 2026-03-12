@@ -104,7 +104,7 @@ export const SidMon1Controls: React.FC<SidMon1ControlsProps> = ({ config, onChan
   const accent  = isCyan ? '#00ffff' : '#44aaff';
   const knob    = isCyan ? '#00ffff' : '#66bbff';
   const dim     = isCyan ? '#004444' : '#001833';
-  const panelBg = isCyan ? 'bg-[#041510] border-cyan-900/50' : 'bg-[#000e1a] border-blue-900/30';
+  const panelBg = isCyan ? 'bg-[#041510] border-accent-highlight/20' : 'bg-[#000e1a] border-blue-900/30';
 
   const upd = useCallback(<K extends keyof SidMon1Config>(key: K, value: SidMon1Config[K]) => {
     onChange({ [key]: value } as Partial<SidMon1Config>);
@@ -195,7 +195,7 @@ export const SidMon1Controls: React.FC<SidMon1ControlsProps> = ({ config, onChan
             onChange={(v) => updU8WithChipRam('phaseSpeed', Math.round(v), 29)}
             label="Phase Speed" color={knob} size="sm"
             formatValue={(v) => Math.round(v).toString()} />
-          <span className="text-[10px] text-gray-600">Phase Shift 0 = disabled</span>
+          <span className="text-[10px] text-text-muted">Phase Shift 0 = disabled</span>
         </div>
       </div>
 

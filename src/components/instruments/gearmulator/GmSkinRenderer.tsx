@@ -264,7 +264,7 @@ export const GmSkinRenderer: React.FC<GmSkinRendererProps> = ({
         backgroundRepeat: 'no-repeat',
         fontFamily: '"Digital", monospace',
         fontSize: 14 * skinScale,
-        color: '#ccc',
+        color: 'var(--color-text-secondary)',
       }}
     >
       {/* Global elements (not in any tab page) */}

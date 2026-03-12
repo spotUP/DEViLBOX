@@ -62,6 +62,7 @@
     --color-synth-volume: #22c55e;      /* Volume controls */
     --color-synth-pan: #3b82f6;         /* Pan controls */
     --color-synth-effects: #8b5cf6;     /* Effects (delay, reverb) */
+    --color-accent-highlight: #22d3ee;  /* Cyan highlight for interactive elements */
     --color-tracker-cursor: #00ffff;    /* Current playback position */
 
     /* FT2 Toolbar button colors */

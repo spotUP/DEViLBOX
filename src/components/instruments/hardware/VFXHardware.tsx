@@ -77,7 +77,7 @@ const VFXKnob: React.FC<{
         />
       </div>
 
-      <div className={`text-[8px] font-semibold text-gray-300 uppercase tracking-wide text-center max-w-[60px]`}>
+      <div className={`text-[8px] font-semibold text-text-secondary uppercase tracking-wide text-center max-w-[60px]`}>
         {label}
       </div>
     </div>
@@ -96,7 +96,7 @@ const VFXButton: React.FC<{
   return (
     <button
       onClick={onClick}
-      className={`${small ? 'text-[8px] px-2 py-1' : 'text-[9px] px-3 py-1.5'} ${active ? 'bg-blue-600' : 'bg-gray-700'} hover:brightness-110 text-white font-bold rounded border border-gray-900 shadow-md transition-all ${active ? 'shadow-lg' : ''}`}
+      className={`${small ? 'text-[8px] px-2 py-1' : 'text-[9px] px-3 py-1.5'} ${active ? 'bg-blue-600' : 'bg-dark-bgHover'} hover:brightness-110 text-text-primary font-bold rounded border border-dark-border shadow-md transition-all ${active ? 'shadow-lg' : ''}`}
     >
       {label}
     </button>
@@ -123,7 +123,7 @@ export const VFXHardware: React.FC<VFXHardwareProps> = ({
         <div className="flex items-center justify-between mb-3">
           <div>
             <div className="text-blue-200 text-[10px] font-light tracking-[0.5em] uppercase">Ensoniq</div>
-            <div className="text-white font-black text-3xl tracking-wider">VFX</div>
+            <div className="text-text-primary font-black text-3xl tracking-wider">VFX</div>
             <div className="text-blue-300 text-[9px] font-light tracking-[0.3em] uppercase">SD Music Synthesizer</div>
           </div>
         </div>
@@ -150,7 +150,7 @@ export const VFXHardware: React.FC<VFXHardwareProps> = ({
       <div className="p-6 bg-gradient-to-b from-gray-900 to-black">
         {/* Oscillator Section */}
         <div className="mb-6">
-          <div className="text-xs font-bold text-blue-400 uppercase tracking-widest mb-3 pb-1 border-b border-gray-800">
+          <div className="text-xs font-bold text-blue-400 uppercase tracking-widest mb-3 pb-1 border-b border-dark-border">
             Oscillator / Wave
           </div>
           <div className="flex gap-5 justify-center">
@@ -189,7 +189,7 @@ export const VFXHardware: React.FC<VFXHardwareProps> = ({
 
         {/* Filter Section */}
         <div className="mb-6">
-          <div className="text-xs font-bold text-blue-400 uppercase tracking-widest mb-3 pb-1 border-b border-gray-800">
+          <div className="text-xs font-bold text-blue-400 uppercase tracking-widest mb-3 pb-1 border-b border-dark-border">
             Filter
           </div>
           <div className="flex gap-5 justify-center">
@@ -222,7 +222,7 @@ export const VFXHardware: React.FC<VFXHardwareProps> = ({
 
         {/* Envelope & Amp Section */}
         <div className="mb-6">
-          <div className="text-xs font-bold text-blue-400 uppercase tracking-widest mb-3 pb-1 border-b border-gray-800">
+          <div className="text-xs font-bold text-blue-400 uppercase tracking-widest mb-3 pb-1 border-b border-dark-border">
             Envelope / Amp
           </div>
           <div className="flex gap-5 justify-center">
@@ -261,7 +261,7 @@ export const VFXHardware: React.FC<VFXHardwareProps> = ({
 
         {/* Effects */}
         <div className="mb-4">
-          <div className="text-xs font-bold text-blue-400 uppercase tracking-widest mb-3 pb-1 border-b border-gray-800">
+          <div className="text-xs font-bold text-blue-400 uppercase tracking-widest mb-3 pb-1 border-b border-dark-border">
             Effects
           </div>
           <div className="flex gap-5 justify-center">
@@ -287,7 +287,7 @@ export const VFXHardware: React.FC<VFXHardwareProps> = ({
         </div>
 
         {/* Control Buttons */}
-        <div className="grid grid-cols-4 gap-2 mt-6 pt-4 border-t border-gray-800">
+        <div className="grid grid-cols-4 gap-2 mt-6 pt-4 border-t border-dark-border">
           <VFXButton label="PROGRAM" />
           <VFXButton label="EDIT" />
           <VFXButton label="SEQ" />
@@ -307,8 +307,8 @@ export const VFXHardware: React.FC<VFXHardwareProps> = ({
       </div>
 
       {/* Bottom Info */}
-      <div className="px-4 py-1 bg-black border-t border-gray-800">
-        <div className="text-[9px] text-gray-600 text-center uppercase tracking-widest">
+      <div className="px-4 py-1 bg-black border-t border-dark-border">
+        <div className="text-[9px] text-text-muted text-center uppercase tracking-widest">
           Wavetable Synthesis • 21 Voices • 32 Oscillators • 1989
         </div>
       </div>

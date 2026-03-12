@@ -698,7 +698,7 @@ export const FT2Hardware: React.FC<FT2HardwareProps> = ({ instrument, onChange }
         }}
       />
       {!loaded && !error && (
-        <div className="text-gray-400 text-sm mt-2">
+        <div className="text-text-secondary text-sm mt-2">
           Loading FT2 instrument editor...
         </div>
       )}

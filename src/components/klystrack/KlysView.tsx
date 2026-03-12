@@ -232,9 +232,9 @@ export const KlysView: React.FC<{ width?: number; height?: number }> = ({ width:
   const sidePanelContent = showInstEditor ? (
     <div className="flex flex-col h-full">
       <div className="flex items-center gap-1 px-2 py-1 bg-[#1a1a1a] border-b border-[#222]">
-        <span className="text-[10px] text-gray-500">Inst:</span>
+        <span className="text-[10px] text-text-muted">Inst:</span>
         <select
-          className="flex-1 bg-[#111] text-xs text-gray-200 border border-[#333] rounded px-1"
+          className="flex-1 bg-[#111] text-xs text-text-secondary border border-[#333] rounded px-1"
           value={selectedInstrument}
           onChange={e => setSelectedInstrument(parseInt(e.target.value, 10))}
         >
@@ -259,7 +259,7 @@ export const KlysView: React.FC<{ width?: number; height?: number }> = ({ width:
         onClick={handleExport}
       >Export .kt</button>
       <button
-        className={`px-2 py-0.5 text-xs rounded border ${showInstEditor ? 'bg-purple-700 text-purple-100 border-purple-500' : 'bg-gray-700 hover:bg-gray-600 text-gray-200 border-gray-500'}`}
+        className={`px-2 py-0.5 text-xs rounded border ${showInstEditor ? 'bg-purple-700 text-purple-100 border-purple-500' : 'bg-dark-bgHover hover:bg-dark-bgHover text-text-secondary border-dark-borderLight'}`}
         onClick={() => setShowInstEditor(!showInstEditor)}
       >Inst</button>
     </>

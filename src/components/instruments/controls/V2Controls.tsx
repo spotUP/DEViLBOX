@@ -45,8 +45,8 @@ export const V2Controls: React.FC<V2ControlsProps> = ({
   
   // Background styles
   const panelBg = isCyanTheme
-    ? 'bg-[#051515] border-cyan-900/50'
-    : 'bg-[#1a1a1a] border-gray-800';
+    ? 'bg-[#051515] border-accent-highlight/20'
+    : 'bg-[#1a1a1a] border-dark-border';
 
   // Helpers to update nested configs
   const updateOsc1 = (updates: Partial<typeof config.osc1>) => {
@@ -102,7 +102,7 @@ export const V2Controls: React.FC<V2ControlsProps> = ({
           <select
             value={config.osc1.mode}
             onChange={(e) => updateOsc1({ mode: parseInt(e.target.value) })}
-            className="bg-gray-900 border border-gray-700 text-xs text-amber-400 rounded px-2 py-1"
+            className="bg-dark-bgSecondary border border-dark-borderLight text-xs text-amber-400 rounded px-2 py-1"
           >
             {OSC_MODES.map((mode, i) => (
               <option key={mode} value={i}>{mode}</option>
@@ -157,18 +157,18 @@ export const V2Controls: React.FC<V2ControlsProps> = ({
           </div>
           <div className="flex items-center gap-3">
             <label className="flex items-center gap-1 cursor-pointer">
-              <span className="text-[10px] text-gray-500 uppercase">Ring</span>
+              <span className="text-[10px] text-text-muted uppercase">Ring</span>
               <input
                 type="checkbox"
                 checked={config.osc2.ringMod}
                 onChange={(e) => updateOsc2({ ringMod: e.target.checked })}
-                className="w-3 h-3 rounded border-gray-700 bg-transparent"
+                className="w-3 h-3 rounded border-dark-borderLight bg-transparent"
               />
             </label>
             <select
               value={config.osc2.mode}
               onChange={(e) => updateOsc2({ mode: parseInt(e.target.value) })}
-              className="bg-gray-900 border border-gray-700 text-xs text-amber-400 rounded px-2 py-1"
+              className="bg-dark-bgSecondary border border-dark-borderLight text-xs text-amber-400 rounded px-2 py-1"
             >
               {OSC23_MODES.map((mode, i) => (
                 <option key={mode} value={i}>{mode}</option>
@@ -224,18 +224,18 @@ export const V2Controls: React.FC<V2ControlsProps> = ({
           </div>
           <div className="flex items-center gap-3">
             <label className="flex items-center gap-1 cursor-pointer">
-              <span className="text-[10px] text-gray-500 uppercase">Ring</span>
+              <span className="text-[10px] text-text-muted uppercase">Ring</span>
               <input
                 type="checkbox"
                 checked={config.osc3.ringMod}
                 onChange={(e) => updateOsc3({ ringMod: e.target.checked })}
-                className="w-3 h-3 rounded border-gray-700 bg-transparent"
+                className="w-3 h-3 rounded border-dark-borderLight bg-transparent"
               />
             </label>
             <select
               value={config.osc3.mode}
               onChange={(e) => updateOsc3({ mode: parseInt(e.target.value) })}
-              className="bg-gray-900 border border-gray-700 text-xs text-amber-400 rounded px-2 py-1"
+              className="bg-dark-bgSecondary border border-dark-borderLight text-xs text-amber-400 rounded px-2 py-1"
             >
               {OSC23_MODES.map((mode, i) => (
                 <option key={mode} value={i}>{mode}</option>
@@ -296,7 +296,7 @@ export const V2Controls: React.FC<V2ControlsProps> = ({
           <select
             value={config.filter1.mode}
             onChange={(e) => updateFilter1({ mode: parseInt(e.target.value) })}
-            className="bg-gray-900 border border-gray-700 text-xs text-amber-400 rounded px-2 py-1"
+            className="bg-dark-bgSecondary border border-dark-borderLight text-xs text-amber-400 rounded px-2 py-1"
           >
             {FILTER_MODES.map((mode, i) => (
               <option key={mode} value={i}>{mode}</option>
@@ -346,7 +346,7 @@ export const V2Controls: React.FC<V2ControlsProps> = ({
           <select
             value={config.filter2.mode}
             onChange={(e) => updateFilter2({ mode: parseInt(e.target.value) })}
-            className="bg-gray-900 border border-gray-700 text-xs text-amber-400 rounded px-2 py-1"
+            className="bg-dark-bgSecondary border border-dark-borderLight text-xs text-amber-400 rounded px-2 py-1"
           >
             {FILTER_MODES.map((mode, i) => (
               <option key={mode} value={i}>{mode}</option>
@@ -396,7 +396,7 @@ export const V2Controls: React.FC<V2ControlsProps> = ({
           <select
             value={config.routing.mode}
             onChange={(e) => updateRouting({ mode: parseInt(e.target.value) })}
-            className="bg-gray-900 border border-gray-700 text-xs text-amber-400 rounded px-2 py-1"
+            className="bg-dark-bgSecondary border border-dark-borderLight text-xs text-amber-400 rounded px-2 py-1"
           >
             {ROUTING_MODES.map((mode, i) => (
               <option key={mode} value={i}>{mode}</option>
@@ -566,7 +566,7 @@ export const V2Controls: React.FC<V2ControlsProps> = ({
   return (
     <div className="flex flex-col h-full">
       {/* Tabs */}
-      <div className="flex border-b border-gray-800 bg-[#151515]">
+      <div className="flex border-b border-dark-border bg-[#151515]">
         {[
           { id: 'osc' as V2Tab, label: 'Oscillators', icon: Activity },
           { id: 'filter' as V2Tab, label: 'Filters', icon: Filter },
@@ -580,7 +580,7 @@ export const V2Controls: React.FC<V2ControlsProps> = ({
               flex-1 py-3 text-xs font-bold uppercase tracking-wider transition-colors flex items-center justify-center gap-2
               ${activeTab === tab.id 
                 ? `bg-[#252525] border-b-2` 
-                : 'text-gray-500 hover:text-gray-300'
+                : 'text-text-muted hover:text-text-secondary'
               }
             `}
             style={activeTab === tab.id ? { color: accentColor, borderColor: accentColor } : undefined}

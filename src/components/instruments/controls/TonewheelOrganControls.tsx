@@ -125,7 +125,7 @@ export const TonewheelOrganControls: React.FC<TonewheelOrganControlsProps> = ({
   if (!synthReady) {
     return (
       <div className="flex flex-col gap-4 p-4">
-        <div className="flex items-center justify-center gap-2 p-4 text-gray-400">
+        <div className="flex items-center justify-center gap-2 p-4 text-text-secondary">
           <Loader size={16} className="animate-spin" />
           <span className="text-sm">Loading Tonewheel Organ...</span>
         </div>
@@ -135,7 +135,7 @@ export const TonewheelOrganControls: React.FC<TonewheelOrganControlsProps> = ({
   }
 
   const panelBg = isCyanTheme
-    ? 'bg-[#051515] border-cyan-900/50'
+    ? 'bg-[#051515] border-accent-highlight/20'
     : 'bg-[#1a1a1a] border-amber-900/30';
 
   return (
@@ -180,7 +180,7 @@ export const TonewheelOrganControls: React.FC<TonewheelOrganControlsProps> = ({
                 className={`px-3 py-1.5 text-xs font-bold rounded transition-all ${
                   Math.round(params[P.PERCUSSION]) === i
                     ? 'text-black'
-                    : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+                    : 'bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover'
                 }`}
                 style={Math.round(params[P.PERCUSSION]) === i ? { backgroundColor: accentColor } : {}}
               >
@@ -189,7 +189,7 @@ export const TonewheelOrganControls: React.FC<TonewheelOrganControlsProps> = ({
             ))}
           </div>
 
-          <div className="w-px h-8 bg-gray-700" />
+          <div className="w-px h-8 bg-dark-bgHover" />
 
           {/* Fast / Slow toggle */}
           <div className="flex gap-1">
@@ -200,7 +200,7 @@ export const TonewheelOrganControls: React.FC<TonewheelOrganControlsProps> = ({
                 className={`px-3 py-1.5 text-xs font-bold rounded transition-all ${
                   Math.round(params[P.PERC_FAST]) === i
                     ? 'text-black'
-                    : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+                    : 'bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover'
                 }`}
                 style={Math.round(params[P.PERC_FAST]) === i ? { backgroundColor: accentColor } : {}}
               >
@@ -209,7 +209,7 @@ export const TonewheelOrganControls: React.FC<TonewheelOrganControlsProps> = ({
             ))}
           </div>
 
-          <div className="w-px h-8 bg-gray-700" />
+          <div className="w-px h-8 bg-dark-bgHover" />
 
           {/* Soft / Normal toggle */}
           <div className="flex gap-1">
@@ -220,7 +220,7 @@ export const TonewheelOrganControls: React.FC<TonewheelOrganControlsProps> = ({
                 className={`px-3 py-1.5 text-xs font-bold rounded transition-all ${
                   Math.round(params[P.PERC_SOFT]) === i
                     ? 'text-black'
-                    : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+                    : 'bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover'
                 }`}
                 style={Math.round(params[P.PERC_SOFT]) === i ? { backgroundColor: accentColor } : {}}
               >
@@ -249,7 +249,7 @@ export const TonewheelOrganControls: React.FC<TonewheelOrganControlsProps> = ({
                 className={`px-3 py-1.5 text-xs font-bold rounded transition-all ${
                   Math.round(params[P.VIBRATO_TYPE]) === i
                     ? 'text-black'
-                    : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+                    : 'bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover'
                 }`}
                 style={Math.round(params[P.VIBRATO_TYPE]) === i ? { backgroundColor: accentColor } : {}}
               >
@@ -376,7 +376,7 @@ const DrawbarSlider: React.FC<DrawbarSliderProps> = React.memo(({
       {/* Slider track */}
       <div
         ref={sliderRef}
-        className="relative w-6 h-28 rounded bg-gray-900 border border-gray-700 cursor-pointer"
+        className="relative w-6 h-28 rounded bg-dark-bgSecondary border border-dark-borderLight cursor-pointer"
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
@@ -394,7 +394,7 @@ const DrawbarSlider: React.FC<DrawbarSliderProps> = React.memo(({
         {[1, 2, 3, 4, 5, 6, 7].map(tick => (
           <div
             key={tick}
-            className="absolute left-0 right-0 h-px bg-gray-600 pointer-events-none"
+            className="absolute left-0 right-0 h-px bg-dark-bgActive pointer-events-none"
             style={{ bottom: `${(tick / 8) * 100}%` }}
           />
         ))}
@@ -409,7 +409,7 @@ const DrawbarSlider: React.FC<DrawbarSliderProps> = React.memo(({
         />
       </div>
       {/* Label */}
-      <div className="text-[10px] text-gray-500 font-mono whitespace-nowrap">
+      <div className="text-[10px] text-text-muted font-mono whitespace-nowrap">
         {label}
       </div>
     </div>

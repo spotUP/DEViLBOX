@@ -119,7 +119,7 @@ export const RomUploadDialog: React.FC = () => {
           <div className="flex items-start gap-3">
             <AlertTriangle size={18} className="text-amber-400 mt-0.5 shrink-0" />
             <div className="text-sm">
-              <p className="text-white">
+              <p className="text-text-primary">
                 This synth requires ROM files that couldn't be loaded automatically.
               </p>
               <p className="mt-2 text-dark-text-secondary">

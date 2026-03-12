@@ -577,7 +577,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
                 size="sm"
                 onClick={handleToggleASID}
                 title={asidEnabled ? `ASID active${asidReady ? '' : ' (no device)'}` : 'Enable ASID hardware SID output'}
-                className={`min-w-[44px] ${asidEnabled ? 'text-green-400 border-green-500/50' : 'text-gray-500'}`}
+                className={`min-w-[44px] ${asidEnabled ? 'text-green-400 border-green-500/50' : 'text-text-muted'}`}
               >
                 {asidEnabled ? '🔊 HW' : '🔇 HW'}
               </Button>
@@ -634,7 +634,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
                 useUIStore.getState().setOscilloscopePoppedOut(true);
               }
             }}
-            className="absolute top-1 right-1 p-0.5 rounded text-text-muted/0 group-hover:text-text-muted hover:!text-cyan-400 transition-all z-10"
+            className="absolute top-1 right-1 p-0.5 rounded text-text-muted/0 group-hover:text-text-muted hover:!text-accent-highlight transition-all z-10"
             title="Pop out visualizer"
           >
             <ExternalLink size={12} />

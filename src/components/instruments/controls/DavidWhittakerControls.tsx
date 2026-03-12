@@ -73,7 +73,7 @@ export const DavidWhittakerControls: React.FC<DavidWhittakerControlsProps> = ({
   const accent  = isCyan ? '#00ffff' : '#44aaff';
   const knob    = isCyan ? '#00ffff' : '#66bbff';
   const dim     = isCyan ? '#004444' : '#001833';
-  const panelBg = isCyan ? 'bg-[#041510] border-cyan-900/50' : 'bg-[#000e1a] border-blue-900/30';
+  const panelBg = isCyan ? 'bg-[#041510] border-accent-highlight/20' : 'bg-[#000e1a] border-blue-900/30';
 
   const upd = useCallback(<K extends keyof DavidWhittakerConfig>(key: K, value: DavidWhittakerConfig[K]) => {
     onChange({ [key]: value } as Partial<DavidWhittakerConfig>);
@@ -122,7 +122,7 @@ export const DavidWhittakerControls: React.FC<DavidWhittakerControlsProps> = ({
                 className="text-[11px] font-mono border rounded px-2 py-1"
                 style={{ width: '80px', background: '#060a0f', borderColor: dim, color: accent }}
               />
-              <span className="text-[10px] text-gray-500">
+              <span className="text-[10px] text-text-muted">
                 3579545 / value ≈ {approxHz} Hz
               </span>
             </div>
@@ -174,7 +174,7 @@ export const DavidWhittakerControls: React.FC<DavidWhittakerControlsProps> = ({
             color={accent}
             height={80}
           />
-          <p className="text-[9px] text-gray-600 mt-1">
+          <p className="text-[9px] text-text-muted mt-1">
             Volume level per step (0–64). Sequence loops at the loop point.
           </p>
         </div>
@@ -194,7 +194,7 @@ export const DavidWhittakerControls: React.FC<DavidWhittakerControlsProps> = ({
             color={knob}
             height={80}
           />
-          <p className="text-[9px] text-gray-600 mt-1">
+          <p className="text-[9px] text-text-muted mt-1">
             Semitone offsets from note pitch per step. Use the loop marker (L) to set loop point.
           </p>
         </div>

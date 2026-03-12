@@ -53,7 +53,7 @@ export const GTOrderList: React.FC<{
     ctx.textBaseline = 'top';
 
     // Header
-    ctx.fillStyle = '#1a1a1a';
+    ctx.fillStyle = 'var(--color-bg-tertiary)';
     ctx.fillRect(0, 0, width, HEADER_H - 2);
     ctx.fillStyle = '#888';
     ctx.fillText('ORD', 4, 3);
@@ -191,7 +191,7 @@ export const GTOrderList: React.FC<{
       ref={canvasRef}
       width={width}
       height={height}
-      style={{ width, height, borderBottom: '1px solid #222', outline: 'none' }}
+      style={{ width, height, borderBottom: '1px solid var(--color-border)', outline: 'none' }}
       tabIndex={0}
       onClick={handleClick}
       onDoubleClick={handleDoubleClick}

@@ -52,7 +52,7 @@ export const NoteActivityDisplay: React.FC<NoteActivityDisplayProps> = ({
   width = 200,
   height = 32,
   whiteKeyColor = '#f5f5f5',
-  blackKeyColor = '#1a1a1a',
+  blackKeyColor = 'var(--color-bg-tertiary)',
   activeColor = '#4ade80',
   backgroundColor = '#0a0a0a',
   className = '',
@@ -150,7 +150,7 @@ export const NoteActivityDisplay: React.FC<NoteActivityDisplayProps> = ({
         }
 
         // Key border
-        ctx.strokeStyle = '#333';
+        ctx.strokeStyle = 'var(--color-border-light)';
         ctx.lineWidth = 1;
         ctx.strokeRect(x + 0.5, 0.5, whiteKeyWidth - 1, height - 1);
 
@@ -192,7 +192,7 @@ export const NoteActivityDisplay: React.FC<NoteActivityDisplayProps> = ({
           }
 
           // Black key border
-          ctx.strokeStyle = '#222';
+          ctx.strokeStyle = 'var(--color-border)';
           ctx.lineWidth = 1;
           ctx.strokeRect(blackX, 0, blackKeyWidth, blackKeyHeight);
         }

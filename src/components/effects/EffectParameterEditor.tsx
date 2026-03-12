@@ -175,10 +175,10 @@ const NeuralEffectEditor: React.FC<NeuralEffectEditorProps> = ({
               boxShadow: '0 0 12px rgba(168,85,247,0.1)',
             }}
           >
-            <Volume2 size={18} className="text-white" />
+            <Volume2 size={18} className="text-text-primary" />
           </div>
           <div>
-            <h2 className="text-base font-black text-white tracking-wide">{effect.type}</h2>
+            <h2 className="text-base font-black text-text-primary tracking-wide">{effect.type}</h2>
             <div className="flex items-center gap-2 mt-0.5">
               {/* LED indicator */}
               <div
@@ -193,7 +193,7 @@ const NeuralEffectEditor: React.FC<NeuralEffectEditorProps> = ({
                   transition: 'all 0.3s ease',
                 }}
               />
-              <p className="text-[11px] text-gray-400 font-medium">
+              <p className="text-[11px] text-text-secondary font-medium">
                 Neural Effect | {effect.enabled ? 'Active' : 'Bypassed'}
               </p>
             </div>
@@ -202,7 +202,7 @@ const NeuralEffectEditor: React.FC<NeuralEffectEditorProps> = ({
         {onClose && (
           <button
             onClick={onClose}
-            className="p-2 rounded-lg text-gray-500 hover:text-white hover:bg-white/5 transition-colors"
+            className="p-2 rounded-lg text-text-muted hover:text-text-primary hover:bg-white/5 transition-colors"
           >
             <X size={16} />
           </button>
@@ -282,7 +282,7 @@ const NeuralEffectEditor: React.FC<NeuralEffectEditorProps> = ({
 
         {/* Info */}
         <div className="rounded-lg p-3 border border-border bg-black/20">
-          <p className="text-[11px] text-gray-500 leading-relaxed">
+          <p className="text-[11px] text-text-muted leading-relaxed">
             Neural effects use machine learning models for authentic amp/pedal emulation.
             Changes are applied in real-time.
           </p>

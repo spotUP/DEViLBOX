@@ -429,7 +429,7 @@ export const DrumKitEditor: React.FC<DrumKitEditorProps> = ({ instrument, onUpda
               {/* Test button */}
               <button
                 onClick={() => handlePreviewNote(editingMapping.noteStart)}
-                className="w-full px-3 py-2 bg-accent-primary hover:bg-accent-primary/80 text-white rounded transition-colors text-sm"
+                className="w-full px-3 py-2 bg-accent-primary hover:bg-accent-primary/80 text-text-primary rounded transition-colors text-sm"
               >
                 Test Sample
               </button>

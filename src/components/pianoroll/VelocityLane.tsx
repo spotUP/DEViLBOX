@@ -131,7 +131,7 @@ const VelocityLaneComponent: React.FC<VelocityLaneProps> = ({
       const y = LANE_HEIGHT - (vel / 127) * LANE_HEIGHT;
       lines.push(
         <div key={vel} className="absolute left-0 right-0 pointer-events-none" style={{ top: y }}>
-          <div className="border-t border-gray-700/40 w-full" />
+          <div className="border-t border-dark-borderLight/40 w-full" />
           <span className="absolute left-1 text-[8px] text-text-muted/40 -translate-y-full">{vel}</span>
         </div>
       );
@@ -142,7 +142,7 @@ const VelocityLaneComponent: React.FC<VelocityLaneProps> = ({
   return (
     <div
       ref={containerRef}
-      className="relative bg-gray-900/80 border-t border-dark-border overflow-hidden shrink-0"
+      className="relative bg-dark-bgSecondary/80 border-t border-dark-border overflow-hidden shrink-0"
       style={{ height: LANE_HEIGHT }}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}

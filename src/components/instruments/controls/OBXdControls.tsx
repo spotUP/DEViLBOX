@@ -43,7 +43,7 @@ export const OBXdControls: React.FC<OBXdControlsProps> = ({
   const knobColor = isCyanTheme ? '#00ffff' : '#ffa500';
 
   const panelBg = isCyanTheme
-    ? 'bg-[#051515] border-cyan-900/50'
+    ? 'bg-[#051515] border-accent-highlight/20'
     : 'bg-[#1a1a1a] border-amber-900/50';
 
   const renderOscillatorTab = () => (
@@ -59,11 +59,11 @@ export const OBXdControls: React.FC<OBXdControlsProps> = ({
 
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
           <div className="col-span-2">
-            <label className="text-xs text-gray-400 block mb-2">Waveform</label>
+            <label className="text-xs text-text-secondary block mb-2">Waveform</label>
             <select
               value={config.osc1Waveform || 'saw'}
               onChange={(e) => onChange({ osc1Waveform: e.target.value as OBXdConfig['osc1Waveform'] })}
-              className="bg-gray-900 border border-gray-700 text-xs rounded px-2 py-1 w-full"
+              className="bg-dark-bgSecondary border border-dark-borderLight text-xs rounded px-2 py-1 w-full"
               style={{ color: accentColor }}
             >
               {OSC_WAVEFORMS.map((wave) => (
@@ -124,11 +124,11 @@ export const OBXdControls: React.FC<OBXdControlsProps> = ({
 
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
           <div className="col-span-2">
-            <label className="text-xs text-gray-400 block mb-2">Waveform</label>
+            <label className="text-xs text-text-secondary block mb-2">Waveform</label>
             <select
               value={config.osc2Waveform || 'saw'}
               onChange={(e) => onChange({ osc2Waveform: e.target.value as OBXdConfig['osc2Waveform'] })}
-              className="bg-gray-900 border border-gray-700 text-xs rounded px-2 py-1 w-full"
+              className="bg-dark-bgSecondary border border-dark-borderLight text-xs rounded px-2 py-1 w-full"
               style={{ color: accentColor }}
             >
               {OSC_WAVEFORMS.map((wave) => (
@@ -191,7 +191,7 @@ export const OBXdControls: React.FC<OBXdControlsProps> = ({
               onChange={(e) => onChange({ oscSync: e.target.checked })}
               className="w-4 h-4 rounded"
             />
-            <span className="text-xs text-gray-300">OSC Sync</span>
+            <span className="text-xs text-text-secondary">OSC Sync</span>
           </label>
           <label className="flex items-center gap-2 cursor-pointer">
             <input
@@ -200,7 +200,7 @@ export const OBXdControls: React.FC<OBXdControlsProps> = ({
               onChange={(e) => onChange({ oscXor: e.target.checked })}
               className="w-4 h-4 rounded"
             />
-            <span className="text-xs text-gray-300">Ring Mod (XOR)</span>
+            <span className="text-xs text-text-secondary">Ring Mod (XOR)</span>
           </label>
           <label className="flex items-center gap-2 cursor-pointer">
             <input
@@ -209,7 +209,7 @@ export const OBXdControls: React.FC<OBXdControlsProps> = ({
               onChange={(e) => onChange({ unison: e.target.checked })}
               className="w-4 h-4 rounded"
             />
-            <span className="text-xs text-gray-300">Unison</span>
+            <span className="text-xs text-text-secondary">Unison</span>
           </label>
         </div>
         {config.unison && (
@@ -296,11 +296,11 @@ export const OBXdControls: React.FC<OBXdControlsProps> = ({
         </div>
 
         <div className="mt-4">
-          <label className="text-xs text-gray-400 block mb-2">Filter Type</label>
+          <label className="text-xs text-text-secondary block mb-2">Filter Type</label>
           <select
             value={config.filterType || 'lp24'}
             onChange={(e) => onChange({ filterType: e.target.value as OBXdConfig['filterType'] })}
-            className="bg-gray-900 border border-gray-700 text-xs rounded px-2 py-1"
+            className="bg-dark-bgSecondary border border-dark-borderLight text-xs rounded px-2 py-1"
             style={{ color: accentColor }}
           >
             <option value="lp24">LP 24dB</option>
@@ -508,11 +508,11 @@ export const OBXdControls: React.FC<OBXdControlsProps> = ({
             size="md"
           />
           <div>
-            <label className="text-xs text-gray-400 block mb-2">Waveform</label>
+            <label className="text-xs text-text-secondary block mb-2">Waveform</label>
             <select
               value={config.lfoWaveform || 'sine'}
               onChange={(e) => onChange({ lfoWaveform: e.target.value as OBXdConfig['lfoWaveform'] })}
-              className="bg-gray-900 border border-gray-700 text-xs rounded px-2 py-1 w-full"
+              className="bg-dark-bgSecondary border border-dark-borderLight text-xs rounded px-2 py-1 w-full"
               style={{ color: accentColor }}
             >
               {LFO_WAVEFORMS.map((wave) => (
@@ -534,7 +534,7 @@ export const OBXdControls: React.FC<OBXdControlsProps> = ({
         </div>
 
         <div className="mt-4">
-          <h4 className="text-xs text-gray-400 mb-4">LFO ROUTING</h4>
+          <h4 className="text-xs text-text-secondary mb-4">LFO ROUTING</h4>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
             <Knob
               value={config.lfoOscAmount ?? 0}
@@ -625,7 +625,7 @@ export const OBXdControls: React.FC<OBXdControlsProps> = ({
   return (
     <div className="flex flex-col h-full">
       {/* Tab Bar */}
-      <div className="flex border-b border-gray-800 bg-gray-900/50">
+      <div className="flex border-b border-dark-border bg-dark-bgSecondary/50">
         {tabs.map((tab) => (
           <button
             key={tab.id}
@@ -633,7 +633,7 @@ export const OBXdControls: React.FC<OBXdControlsProps> = ({
             className={`px-4 py-2 text-xs font-bold uppercase tracking-wider transition-all ${
               activeTab === tab.id
                 ? 'border-b-2 text-amber-400'
-                : 'text-gray-500 hover:text-gray-300'
+                : 'text-text-muted hover:text-text-secondary'
             }`}
             style={activeTab === tab.id ? { borderColor: accentColor, color: accentColor } : {}}
           >

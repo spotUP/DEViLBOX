@@ -37,7 +37,7 @@ export const LiveADSRVisualizer: React.FC<LiveADSRVisualizerProps> = ({
   height = 80,
   color = '#4ade80',
   activeColor = '#fbbf24',
-  backgroundColor = '#1a1a1a',
+  backgroundColor = 'var(--color-bg-tertiary)',
   className = '',
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -94,7 +94,7 @@ export const LiveADSRVisualizer: React.FC<LiveADSRVisualizerProps> = ({
     const ySustain = yBottom - (innerHeight * sustain);
 
     // Draw grid
-    ctx.strokeStyle = '#333';
+    ctx.strokeStyle = 'var(--color-border-light)';
     ctx.lineWidth = 1;
     ctx.setLineDash([2, 2]);
     ctx.beginPath();

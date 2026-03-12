@@ -374,7 +374,7 @@ export const MusicLinePatternViewer: React.FC = () => {
         fontSize: 12,
         lineHeight: `${ROW_H}px`,
         backgroundColor: '#0d0d0d',
-        color: '#888',
+        color: 'var(--color-text-muted)',
         outline: 'none',
       }}
     >
@@ -385,14 +385,14 @@ export const MusicLinePatternViewer: React.FC = () => {
           top: 0,
           zIndex: 10,
           display: 'flex',
-          backgroundColor: '#1a1a1a',
-          borderBottom: '1px solid #333',
+          backgroundColor: 'var(--color-bg-tertiary)',
+          borderBottom: '1px solid var(--color-border-light)',
           height: ROW_H + 2,
           alignItems: 'center',
         }}
       >
         {/* Row number column */}
-        <span style={{ width: 36, flexShrink: 0, textAlign: 'right', paddingRight: 6, color: '#555' }}>
+        <span style={{ width: 36, flexShrink: 0, textAlign: 'right', paddingRight: 6, color: 'var(--color-text-muted)' }}>
           ROW
         </span>
         {channelTrackTables.map((table, chIdx) => {
@@ -405,7 +405,7 @@ export const MusicLinePatternViewer: React.FC = () => {
                 width: chanWidth,
                 flexShrink: 0,
                 textAlign: 'center',
-                color: '#aaa',
+                color: 'var(--color-text-secondary)',
                 fontSize: 11,
                 letterSpacing: 0.5,
               }}
@@ -445,7 +445,7 @@ export const MusicLinePatternViewer: React.FC = () => {
                 flexShrink: 0,
                 textAlign: 'right',
                 paddingRight: 6,
-                color: rowIdx % 4 === 0 ? '#555' : '#333',
+                color: rowIdx % 4 === 0 ? '#555' : 'var(--color-border-light)',
                 fontSize: 11,
               }}
             >
@@ -476,7 +476,7 @@ export const MusicLinePatternViewer: React.FC = () => {
                       ? isChPlayhead
                         ? '#88ff88'
                         : '#cccccc'
-                      : '#333',
+                      : 'var(--color-border-light)',
                   }}
                 >
                   <span style={{
@@ -488,7 +488,7 @@ export const MusicLinePatternViewer: React.FC = () => {
                   </span>
                   <span style={{
                     width: 20,
-                    color: hasNote && cell.instrument ? '#ffaa44' : '#333',
+                    color: hasNote && cell.instrument ? '#ffaa44' : 'var(--color-border-light)',
                     backgroundColor: isCursorCh && cursor.column === 1 ? cursorBg : undefined,
                   }}>
                     {cell ? instrStr(cell.instrument) : '--'}
@@ -501,7 +501,7 @@ export const MusicLinePatternViewer: React.FC = () => {
                     return (
                       <span key={ec} style={{
                         width: 24,
-                        color: hasFx ? '#66aaff' : '#333',
+                        color: hasFx ? '#66aaff' : 'var(--color-border-light)',
                         fontSize: 10,
                         backgroundColor: isCursorCh && cursor.column === 2 + ec ? cursorBg : undefined,
                       }}>

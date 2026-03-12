@@ -34,7 +34,7 @@ interface ParamRowProps {
 
 const ParamRow: React.FC<ParamRowProps> = ({ label, value, max, min = 0, paramKey, onChange }) => (
   <div className="flex items-center gap-2 h-6">
-    <span className="w-24 text-xs text-gray-400 truncate text-right">{label}</span>
+    <span className="w-24 text-xs text-text-secondary truncate text-right">{label}</span>
     <input
       type="range"
       min={min}
@@ -43,7 +43,7 @@ const ParamRow: React.FC<ParamRowProps> = ({ label, value, max, min = 0, paramKe
       className="flex-1 h-1 accent-cyan-500"
       onChange={e => onChange(paramKey, parseInt(e.target.value, 10))}
     />
-    <span className="w-10 text-xs text-gray-300 font-mono text-right">{value}</span>
+    <span className="w-10 text-xs text-text-secondary font-mono text-right">{value}</span>
   </div>
 );
 
@@ -101,24 +101,24 @@ export const KlysInstrumentEditor: React.FC<KlysInstrumentEditorProps> = ({ inst
   }, [inst, nativeData, instrumentIndex]);
 
   if (!inst) {
-    return <div className="p-2 text-xs text-gray-500">No instrument selected</div>;
+    return <div className="p-2 text-xs text-text-muted">No instrument selected</div>;
   }
 
   return (
-    <div className="flex flex-col gap-1 p-2 bg-[#111] text-gray-200 overflow-y-auto text-xs" style={{ maxHeight: 400 }}>
-      <div className="text-sm font-bold text-cyan-400 mb-1">
+    <div className="flex flex-col gap-1 p-2 bg-[#111] text-text-secondary overflow-y-auto text-xs" style={{ maxHeight: 400 }}>
+      <div className="text-sm font-bold text-accent-highlight mb-1">
         {instrumentIndex.toString(16).toUpperCase().padStart(2, '0')}: {inst.name || 'Unnamed'}
       </div>
 
       {/* ADSR */}
-      <div className="text-[10px] text-gray-500 uppercase tracking-wider mt-1">Envelope</div>
+      <div className="text-[10px] text-text-muted uppercase tracking-wider mt-1">Envelope</div>
       <ParamRow label="Attack" value={inst.adsr.a} max={255} paramKey="adsr.a" instIdx={instrumentIndex} onChange={handleParam} />
       <ParamRow label="Decay" value={inst.adsr.d} max={255} paramKey="adsr.d" instIdx={instrumentIndex} onChange={handleParam} />
       <ParamRow label="Sustain" value={inst.adsr.s} max={255} paramKey="adsr.s" instIdx={instrumentIndex} onChange={handleParam} />
       <ParamRow label="Release" value={inst.adsr.r} max={255} paramKey="adsr.r" instIdx={instrumentIndex} onChange={handleParam} />
 
       {/* Core */}
-      <div className="text-[10px] text-gray-500 uppercase tracking-wider mt-1">Core</div>
+      <div className="text-[10px] text-text-muted uppercase tracking-wider mt-1">Core</div>
       <ParamRow label="Volume" value={inst.volume} max={128} paramKey="volume" instIdx={instrumentIndex} onChange={handleParam} />
       <ParamRow label="Base Note" value={inst.baseNote} max={95} paramKey="baseNote" instIdx={instrumentIndex} onChange={handleParam} />
       <ParamRow label="Finetune" value={inst.finetune} max={255} paramKey="finetune" instIdx={instrumentIndex} onChange={handleParam} />
@@ -126,20 +126,20 @@ export const KlysInstrumentEditor: React.FC<KlysInstrumentEditorProps> = ({ inst
       <ParamRow label="Pulse Width" value={inst.pw} max={2047} paramKey="pw" instIdx={instrumentIndex} onChange={handleParam} />
 
       {/* Filter */}
-      <div className="text-[10px] text-gray-500 uppercase tracking-wider mt-1">Filter</div>
+      <div className="text-[10px] text-text-muted uppercase tracking-wider mt-1">Filter</div>
       <ParamRow label="Cutoff" value={inst.cutoff} max={4095} paramKey="cutoff" instIdx={instrumentIndex} onChange={handleParam} />
       <ParamRow label="Resonance" value={inst.resonance} max={255} paramKey="resonance" instIdx={instrumentIndex} onChange={handleParam} />
       <ParamRow label="Type" value={inst.flttype} max={3} paramKey="flttype" instIdx={instrumentIndex} onChange={handleParam} />
 
       {/* Vibrato / PWM */}
-      <div className="text-[10px] text-gray-500 uppercase tracking-wider mt-1">Modulation</div>
+      <div className="text-[10px] text-text-muted uppercase tracking-wider mt-1">Modulation</div>
       <ParamRow label="Vib Speed" value={inst.vibratoSpeed} max={255} paramKey="vibratoSpeed" instIdx={instrumentIndex} onChange={handleParam} />
       <ParamRow label="Vib Depth" value={inst.vibratoDepth} max={255} paramKey="vibratoDepth" instIdx={instrumentIndex} onChange={handleParam} />
       <ParamRow label="PWM Speed" value={inst.pwmSpeed} max={255} paramKey="pwmSpeed" instIdx={instrumentIndex} onChange={handleParam} />
       <ParamRow label="PWM Depth" value={inst.pwmDepth} max={255} paramKey="pwmDepth" instIdx={instrumentIndex} onChange={handleParam} />
 
       {/* Misc */}
-      <div className="text-[10px] text-gray-500 uppercase tracking-wider mt-1">Routing</div>
+      <div className="text-[10px] text-text-muted uppercase tracking-wider mt-1">Routing</div>
       <ParamRow label="FX Bus" value={inst.fxBus} max={3} paramKey="fxBus" instIdx={instrumentIndex} onChange={handleParam} />
       <ParamRow label="Ring Mod" value={inst.ringMod} max={255} paramKey="ringMod" instIdx={instrumentIndex} onChange={handleParam} />
       <ParamRow label="Sync Src" value={inst.syncSource} max={255} paramKey="syncSource" instIdx={instrumentIndex} onChange={handleParam} />
@@ -147,7 +147,7 @@ export const KlysInstrumentEditor: React.FC<KlysInstrumentEditorProps> = ({ inst
       <ParamRow label="Prog Period" value={inst.progPeriod} max={255} paramKey="progPeriod" instIdx={instrumentIndex} onChange={handleParam} />
 
       {/* FM (collapsible) */}
-      <button className="text-[10px] text-gray-500 uppercase tracking-wider mt-1 text-left hover:text-gray-300"
+      <button className="text-[10px] text-text-muted uppercase tracking-wider mt-1 text-left hover:text-text-secondary"
         onClick={() => setShowFM(!showFM)}>
         {showFM ? '▼' : '▶'} FM Synthesis
       </button>
@@ -164,7 +164,7 @@ export const KlysInstrumentEditor: React.FC<KlysInstrumentEditorProps> = ({ inst
       )}
 
       {/* Program (collapsible) */}
-      <button className="text-[10px] text-gray-500 uppercase tracking-wider mt-1 text-left hover:text-gray-300"
+      <button className="text-[10px] text-text-muted uppercase tracking-wider mt-1 text-left hover:text-text-secondary"
         onClick={() => setShowProgram(!showProgram)}>
         {showProgram ? '▼' : '▶'} Program ({inst.program.filter(p => p !== 0).length}/32 steps)
       </button>

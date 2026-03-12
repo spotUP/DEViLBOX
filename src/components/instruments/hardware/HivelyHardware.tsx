@@ -334,7 +334,7 @@ export const HivelyHardware: React.FC<HivelyHardwareProps> = ({ config, onChange
       >
         {!loaded && !error && (
           <div
-            className="flex items-center justify-center text-gray-400"
+            className="flex items-center justify-center text-text-secondary"
             style={{ width: 800, height: 480 }}
           >
             Loading instrument editor...

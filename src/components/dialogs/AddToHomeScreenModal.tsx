@@ -148,7 +148,7 @@ export const AddToHomeScreenModal: React.FC<AddToHomeScreenModalProps> = ({
 
               <button
                 onClick={handleInstallClick}
-                className="w-full flex items-center justify-center gap-3 px-6 py-4 bg-accent-primary hover:bg-accent-primary/90 text-white font-bold rounded-lg transition-colors"
+                className="w-full flex items-center justify-center gap-3 px-6 py-4 bg-accent-primary hover:bg-accent-primary/90 text-text-primary font-bold rounded-lg transition-colors"
               >
                 <Square size={20} />
                 Install DEViLBOX

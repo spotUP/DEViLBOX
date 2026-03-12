@@ -99,7 +99,7 @@ export const ChannelRings: React.FC<ChannelRingsProps> = ({ height = 100 }) => {
         const maxRadius = Math.min(cellWidth, cellHeight) / 2 - 10;
 
         // Draw channel number (subtle)
-        ctx.fillStyle = '#333';
+        ctx.fillStyle = 'var(--color-border-light)';
         ctx.font = '8px monospace';
         ctx.fillText((ch + 1).toString(), x + 4, y + 10);
 

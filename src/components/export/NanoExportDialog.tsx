@@ -68,7 +68,7 @@ export const NanoExportDialog: React.FC<NanoExportDialogProps> = ({ onClose }) =
               <p className="text-[10px] text-amber-500/60 uppercase font-black tracking-[0.2em]">4k Intro Binary Packing</p>
             </div>
           </div>
-          <button onClick={onClose} className="p-2 hover:bg-dark-bgHover rounded-full transition-colors text-gray-400 hover:text-white">
+          <button onClick={onClose} className="p-2 hover:bg-dark-bgHover rounded-full transition-colors text-text-secondary hover:text-text-primary">
             <X size={20} />
           </button>
         </div>
@@ -78,21 +78,21 @@ export const NanoExportDialog: React.FC<NanoExportDialogProps> = ({ onClose }) =
           {/* Info Cards */}
           <div className="grid grid-cols-3 gap-4">
             <div className="bg-black/40 border border-border p-3 rounded-lg text-center">
-              <div className="text-[10px] text-gray-500 uppercase font-bold mb-1">Total Size</div>
-              <div className="text-lg font-mono text-white">{stats.bytes} <span className="text-xs text-gray-500">bytes</span></div>
+              <div className="text-[10px] text-text-muted uppercase font-bold mb-1">Total Size</div>
+              <div className="text-lg font-mono text-text-primary">{stats.bytes} <span className="text-xs text-text-muted">bytes</span></div>
             </div>
             <div className="bg-black/40 border border-border p-3 rounded-lg text-center">
-              <div className="text-[10px] text-gray-500 uppercase font-bold mb-1">Kilobytes</div>
-              <div className="text-lg font-mono text-white">{stats.kb} <span className="text-xs text-gray-500">KB</span></div>
+              <div className="text-[10px] text-text-muted uppercase font-bold mb-1">Kilobytes</div>
+              <div className="text-lg font-mono text-text-primary">{stats.kb} <span className="text-xs text-text-muted">KB</span></div>
             </div>
             <div className="bg-black/40 border border-border p-3 rounded-lg text-center">
-              <div className="text-[10px] text-gray-500 uppercase font-bold mb-1">Target</div>
+              <div className="text-[10px] text-text-muted uppercase font-bold mb-1">Target</div>
               <div className="text-lg font-mono text-green-500">4K OK</div>
             </div>
           </div>
 
           <div className="space-y-2">
-            <label className="text-xs font-bold text-gray-500 uppercase">Binary Data (Base64)</label>
+            <label className="text-xs font-bold text-text-muted uppercase">Binary Data (Base64)</label>
             <div className="relative group">
               <textarea
                 readOnly
@@ -111,7 +111,7 @@ export const NanoExportDialog: React.FC<NanoExportDialogProps> = ({ onClose }) =
 
           <div className="bg-amber-500/5 border border-amber-500/20 p-4 rounded-lg">
             <h4 className="text-xs font-bold text-amber-400 uppercase mb-2">How to use in 4k Intro:</h4>
-            <ul className="text-[11px] text-gray-400 space-y-1 list-disc pl-4">
+            <ul className="text-[11px] text-text-secondary space-y-1 list-disc pl-4">
               <li>Copy the Base64 string into your source code.</li>
               <li>Decode it into a Uint8Array at startup.</li>
               <li>Parse the fixed-length header (8 bytes).</li>
@@ -125,7 +125,7 @@ export const NanoExportDialog: React.FC<NanoExportDialogProps> = ({ onClose }) =
         <div className="p-6 bg-black/20 border-t border-border flex gap-3">
           <button
             onClick={handleDownload}
-            className="flex-1 py-3 bg-dark-bgActive hover:bg-dark-bgHover border border-border rounded-lg font-bold text-xs text-white transition-all flex items-center justify-center gap-2"
+            className="flex-1 py-3 bg-dark-bgActive hover:bg-dark-bgHover border border-border rounded-lg font-bold text-xs text-text-primary transition-all flex items-center justify-center gap-2"
           >
             <Save size={16} />
             DOWNLOAD .NANO

@@ -134,7 +134,7 @@ Time: ${new Date().toISOString()}
               </button>
               <button
                 onClick={this.handleReload}
-                className="px-4 py-2 bg-accent hover:bg-accent-hover rounded text-white transition-colors"
+                className="px-4 py-2 bg-accent hover:bg-accent-hover rounded text-text-primary transition-colors"
               >
                 Reload App
               </button>

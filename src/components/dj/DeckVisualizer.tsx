@@ -288,7 +288,7 @@ export const DeckVisualizer: React.FC<DeckVisualizerProps> = ({ deckId, resetKey
       {/* Mode label — bottom-right */}
       <div
         className="absolute bottom-1 right-1 text-[9px] font-mono uppercase tracking-wider pointer-events-none"
-        style={{ opacity: isFullscreen ? 0.7 : 0.4, color: '#888' }}
+        style={{ opacity: isFullscreen ? 0.7 : 0.4, color: 'var(--color-text-muted)' }}
       >
         {modeLabel}
         {slideshowActive && ' ⟳'}
@@ -298,21 +298,21 @@ export const DeckVisualizer: React.FC<DeckVisualizerProps> = ({ deckId, resetKey
       {(isHovered || isFullscreen) && (
         <div className="absolute top-1 right-1 flex gap-0.5 z-10">
           <button
-            className="p-0.5 rounded bg-black/50 hover:bg-black/80 text-white/60 hover:text-white/90 transition-colors"
+            className="p-0.5 rounded bg-black/50 hover:bg-black/80 text-white/60 hover:text-text-primary/90 transition-colors"
             onClick={goPrev}
             title="Previous visualizer"
           >
             <ChevronLeft size={12} />
           </button>
           <button
-            className="p-0.5 rounded bg-black/50 hover:bg-black/80 text-white/60 hover:text-white/90 transition-colors"
+            className="p-0.5 rounded bg-black/50 hover:bg-black/80 text-white/60 hover:text-text-primary/90 transition-colors"
             onClick={goNext}
             title="Next visualizer"
           >
             <ChevronRight size={12} />
           </button>
           <button
-            className="p-0.5 rounded bg-black/50 hover:bg-black/80 text-white/60 hover:text-white/90 transition-colors"
+            className="p-0.5 rounded bg-black/50 hover:bg-black/80 text-white/60 hover:text-text-primary/90 transition-colors"
             onClick={goRandom}
             title="Random visualizer"
           >
@@ -322,7 +322,7 @@ export const DeckVisualizer: React.FC<DeckVisualizerProps> = ({ deckId, resetKey
             className={`p-0.5 rounded transition-colors ${
               slideshowActive
                 ? 'bg-green-500/40 text-green-300 hover:bg-green-500/60'
-                : 'bg-black/50 hover:bg-black/80 text-white/60 hover:text-white/90'
+                : 'bg-black/50 hover:bg-black/80 text-white/60 hover:text-text-primary/90'
             }`}
             onClick={toggleSlideshow}
             title={slideshowActive ? 'Stop slideshow' : 'Random slideshow (15s)'}
@@ -330,7 +330,7 @@ export const DeckVisualizer: React.FC<DeckVisualizerProps> = ({ deckId, resetKey
             {slideshowActive ? <Pause size={12} /> : <Play size={12} />}
           </button>
           <button
-            className="p-0.5 rounded bg-black/50 hover:bg-black/80 text-white/60 hover:text-white/90 transition-colors"
+            className="p-0.5 rounded bg-black/50 hover:bg-black/80 text-white/60 hover:text-text-primary/90 transition-colors"
             onClick={toggleFullscreen}
             title={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
           >

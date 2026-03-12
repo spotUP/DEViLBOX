@@ -64,7 +64,7 @@ export const VSTBridgePanel: React.FC<VSTBridgePanelProps> = ({
   const knobColor = isCyanTheme ? '#00ffff' : '#a78bfa';
 
   const panelBg = isCyanTheme
-    ? 'bg-[#051515] border-cyan-900/50'
+    ? 'bg-[#051515] border-accent-highlight/20'
     : 'bg-[#1a1a1a] border-purple-900/50';
 
   // Load params from the synth after WASM init
@@ -128,7 +128,7 @@ export const VSTBridgePanel: React.FC<VSTBridgePanelProps> = ({
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center gap-2 p-8 text-gray-400">
+      <div className="flex items-center justify-center gap-2 p-8 text-text-secondary">
         <Loader size={16} className="animate-spin" />
         <span>Loading parameters...</span>
       </div>
@@ -137,7 +137,7 @@ export const VSTBridgePanel: React.FC<VSTBridgePanelProps> = ({
 
   if (params.length === 0) {
     return (
-      <div className="flex items-center justify-center gap-2 p-8 text-gray-500">
+      <div className="flex items-center justify-center gap-2 p-8 text-text-muted">
         <Sliders size={16} />
         <span>No parameters exposed by this synth</span>
       </div>

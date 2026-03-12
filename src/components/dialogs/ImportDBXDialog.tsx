@@ -69,7 +69,7 @@ export const ImportDBXDialog: React.FC<ImportDBXDialogProps> = ({
         <div className="flex items-center gap-3 mb-5">
           <FolderOpen className="w-5 h-5 text-accent-primary flex-shrink-0" />
           <div className="min-w-0">
-            <h2 className="text-lg font-bold text-white leading-tight">Load Project?</h2>
+            <h2 className="text-lg font-bold text-text-primary leading-tight">Load Project?</h2>
             <p className="text-text-muted text-xs font-mono truncate">{file.name}</p>
           </div>
         </div>
@@ -95,17 +95,17 @@ export const ImportDBXDialog: React.FC<ImportDBXDialogProps> = ({
             <div className="grid grid-cols-3 gap-2 mb-5">
               <div className="bg-dark-bgSecondary rounded-lg p-2.5 text-center">
                 <Clock className="w-4 h-4 text-accent-primary mx-auto mb-1" />
-                <p className="text-white text-sm font-bold">{preview.bpm}</p>
+                <p className="text-text-primary text-sm font-bold">{preview.bpm}</p>
                 <p className="text-text-muted text-xs">BPM</p>
               </div>
               <div className="bg-dark-bgSecondary rounded-lg p-2.5 text-center">
                 <Layers className="w-4 h-4 text-accent-primary mx-auto mb-1" />
-                <p className="text-white text-sm font-bold">{preview.patternCount}</p>
+                <p className="text-text-primary text-sm font-bold">{preview.patternCount}</p>
                 <p className="text-text-muted text-xs">Patterns</p>
               </div>
               <div className="bg-dark-bgSecondary rounded-lg p-2.5 text-center">
                 <Cpu className="w-4 h-4 text-accent-primary mx-auto mb-1" />
-                <p className="text-white text-sm font-bold">{preview.instrumentCount}</p>
+                <p className="text-text-primary text-sm font-bold">{preview.instrumentCount}</p>
                 <p className="text-text-muted text-xs">Instruments</p>
               </div>
             </div>

@@ -309,7 +309,17 @@ export async function importTrackerModule(
     const instruments: InstrumentConfig[] = [];
     let nextId = 1;
     for (const parsed of parsedInstruments) {
+      // Debug: log what we're passing to convertToInstrument
+      if (parsed.xrnsSynth) {
+        console.log(`[Import] Converting XRNS instrument ${nextId}: hasChunk=${!!parsed.xrnsSynth.parameterChunk} chunkLen=${parsed.xrnsSynth.parameterChunk?.length ?? 0}`);
+      }
       const converted = convertToInstrument(parsed, nextId, format as any);
+      // Debug: log what we got back
+      for (const inst of converted) {
+        if (inst.xrns) {
+          console.log(`[Import] Converted instrument ${inst.id}: synthType=${inst.synthType} xrns.hasChunk=${!!inst.xrns.parameterChunk}`);
+        }
+      }
       instruments.push(...converted);
       nextId += converted.length;
     }

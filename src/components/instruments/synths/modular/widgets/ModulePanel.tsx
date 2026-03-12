@@ -161,7 +161,7 @@ export const ModulePanel: React.FC<ModulePanelProps> = ({
 
         <button
           onClick={handleToggleCollapse}
-          className="p-0.5 hover:bg-black/20 rounded flex-shrink-0 text-white/70 hover:text-white transition-colors"
+          className="p-0.5 hover:bg-black/20 rounded flex-shrink-0 text-white/70 hover:text-text-primary transition-colors"
         >
           {isCollapsed ? (
             <ChevronRight className="w-3 h-3" />
@@ -170,13 +170,13 @@ export const ModulePanel: React.FC<ModulePanelProps> = ({
           )}
         </button>
 
-        <span className="flex-1 text-[10px] font-bold text-white uppercase tracking-wider truncate drop-shadow-md">
+        <span className="flex-1 text-[10px] font-bold text-text-primary uppercase tracking-wider truncate drop-shadow-md">
           {module.label || descriptor.name}
         </span>
 
         <button
           onClick={handleDelete}
-          className="p-0.5 hover:bg-red-500/80 rounded text-white/50 hover:text-white flex-shrink-0 transition-colors"
+          className="p-0.5 hover:bg-red-500/80 rounded text-white/50 hover:text-text-primary flex-shrink-0 transition-colors"
         >
           <X className="w-3 h-3" />
         </button>

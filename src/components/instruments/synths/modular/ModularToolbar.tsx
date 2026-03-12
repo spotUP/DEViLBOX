@@ -109,7 +109,7 @@ export const ModularToolbar: React.FC<ModularToolbarProps> = ({ config, onChange
                 px-3 py-1 text-xs rounded transition-colors capitalize
                 ${
                   config.viewMode === mode
-                    ? 'bg-accent-primary text-white font-bold'
+                    ? 'bg-accent-primary text-text-primary font-bold'
                     : 'text-text-secondary hover:text-text-primary hover:bg-dark-bgHover'
                 }
               `}

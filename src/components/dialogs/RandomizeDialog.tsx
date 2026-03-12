@@ -477,7 +477,7 @@ export const RandomizeDialog: React.FC<RandomizeDialogProps> = ({
             </button>
             <button
               onClick={() => checkOverwriteAndDo('apply')}
-              className="px-4 py-2 bg-accent-primary hover:bg-accent-primary/80 text-white rounded transition-colors font-medium"
+              className="px-4 py-2 bg-accent-primary hover:bg-accent-primary/80 text-text-primary rounded transition-colors font-medium"
             >
               Apply
             </button>

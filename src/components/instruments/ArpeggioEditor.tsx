@@ -168,12 +168,12 @@ export const ArpeggioEditor: React.FC<ArpeggioEditorProps> = ({
   const { min: speedMin, max: speedMax } = getSpeedRange();
 
   return (
-    <section className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800">
+    <section className="bg-[#1a1a1a] rounded-xl p-4 border border-dark-border">
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <div className="w-1 h-4 bg-yellow-500 rounded-full" />
-          <h3 className="text-sm font-bold text-white uppercase tracking-wide">Arpeggio</h3>
+          <h3 className="text-sm font-bold text-text-primary uppercase tracking-wide">Arpeggio</h3>
           {currentPresetName && (
             <span className="text-[10px] text-yellow-500/70 ml-1">({currentPresetName})</span>
           )}
@@ -187,7 +187,7 @@ export const ArpeggioEditor: React.FC<ArpeggioEditorProps> = ({
               p-1.5 rounded-lg transition-colors
               ${showAdvanced
                 ? 'bg-blue-500/20 text-blue-400'
-                : 'text-gray-500 hover:text-gray-300'
+                : 'text-text-muted hover:text-text-secondary'
               }
             `}
             title="Advanced options"
@@ -202,7 +202,7 @@ export const ArpeggioEditor: React.FC<ArpeggioEditorProps> = ({
               flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold uppercase transition-all
               ${config.enabled
                 ? 'bg-yellow-500/20 text-yellow-400 ring-1 ring-yellow-500'
-                : 'bg-gray-800 text-gray-500 hover:text-gray-300'
+                : 'bg-dark-bgTertiary text-text-muted hover:text-text-secondary'
               }
             `}
           >
@@ -216,15 +216,15 @@ export const ArpeggioEditor: React.FC<ArpeggioEditorProps> = ({
       <div className="mb-4">
         <button
           onClick={() => setShowPresetBrowser(true)}
-          className="w-full flex items-center justify-between px-3 py-2 bg-gray-800 rounded-lg text-sm text-white hover:bg-gray-700 transition-colors"
+          className="w-full flex items-center justify-between px-3 py-2 bg-dark-bgTertiary rounded-lg text-sm text-text-primary hover:bg-dark-bgHover transition-colors"
         >
           <div className="flex items-center gap-2">
-            <Library size={14} className="text-gray-500" />
+            <Library size={14} className="text-text-muted" />
             <span className="font-mono">
               {currentPresetName || 'Browse Presets...'}
             </span>
           </div>
-          <ChevronDown size={16} className="text-gray-500" />
+          <ChevronDown size={16} className="text-text-muted" />
         </button>
       </div>
 
@@ -242,11 +242,11 @@ export const ArpeggioEditor: React.FC<ArpeggioEditorProps> = ({
       {/* Pattern Grid */}
       <div className="mb-4">
         <div className="flex items-center justify-between mb-2">
-          <span className="text-[10px] text-gray-500 uppercase">Pattern Steps</span>
+          <span className="text-[10px] text-text-muted uppercase">Pattern Steps</span>
           <div className="flex items-center gap-1">
             <button
               onClick={handleCopySteps}
-              className="p-1 text-gray-500 hover:text-gray-300 transition-colors"
+              className="p-1 text-text-muted hover:text-text-secondary transition-colors"
               title="Copy pattern"
             >
               <Copy size={12} />
@@ -254,14 +254,14 @@ export const ArpeggioEditor: React.FC<ArpeggioEditorProps> = ({
             <button
               onClick={handlePasteSteps}
               disabled={!copiedSteps}
-              className={`p-1 transition-colors ${copiedSteps ? 'text-gray-500 hover:text-gray-300' : 'text-gray-700'}`}
+              className={`p-1 transition-colors ${copiedSteps ? 'text-text-muted hover:text-text-secondary' : 'text-text-muted'}`}
               title="Paste pattern"
             >
               <Clipboard size={12} />
             </button>
             <button
               onClick={handleRandomize}
-              className="p-1 text-gray-500 hover:text-purple-400 transition-colors"
+              className="p-1 text-text-muted hover:text-purple-400 transition-colors"
               title="Randomize pattern"
             >
               <Dice5 size={12} />
@@ -281,7 +281,7 @@ export const ArpeggioEditor: React.FC<ArpeggioEditorProps> = ({
       <div className="flex items-start gap-4 mb-4">
         {/* Speed Control */}
         <div className="flex-1">
-          <div className="text-[10px] text-gray-500 uppercase mb-2">Speed</div>
+          <div className="text-[10px] text-text-muted uppercase mb-2">Speed</div>
           <div className="flex items-center gap-2">
             <Knob
               value={config.speed}
@@ -304,7 +304,7 @@ export const ArpeggioEditor: React.FC<ArpeggioEditorProps> = ({
                     px-2 py-0.5 rounded text-[9px] font-bold uppercase transition-colors
                     ${config.speedUnit === unit.value
                       ? 'bg-yellow-500/20 text-yellow-400'
-                      : 'text-gray-600 hover:text-gray-400'
+                      : 'text-text-muted hover:text-text-secondary'
                     }
                   `}
                   title={unit.description}
@@ -318,7 +318,7 @@ export const ArpeggioEditor: React.FC<ArpeggioEditorProps> = ({
 
         {/* Mode Selection */}
         <div>
-          <div className="text-[10px] text-gray-500 uppercase mb-2">Mode</div>
+          <div className="text-[10px] text-text-muted uppercase mb-2">Mode</div>
           <div className="grid grid-cols-2 gap-1">
             {PLAYBACK_MODES.map((mode) => (
               <button
@@ -329,7 +329,7 @@ export const ArpeggioEditor: React.FC<ArpeggioEditorProps> = ({
                   transition-colors
                   ${config.mode === mode.value
                     ? 'bg-blue-500/20 text-blue-400'
-                    : 'bg-gray-800 text-gray-500 hover:text-gray-300'
+                    : 'bg-dark-bgTertiary text-text-muted hover:text-text-secondary'
                   }
                 `}
               >
@@ -343,10 +343,10 @@ export const ArpeggioEditor: React.FC<ArpeggioEditorProps> = ({
 
       {/* Advanced Options (collapsible) */}
       {showAdvanced && (
-        <div className="mt-4 pt-4 border-t border-gray-800 space-y-4">
+        <div className="mt-4 pt-4 border-t border-dark-border space-y-4">
           {/* Swing Control */}
           <div>
-            <div className="text-[10px] text-gray-500 uppercase mb-2">Swing</div>
+            <div className="text-[10px] text-text-muted uppercase mb-2">Swing</div>
             <div className="flex items-center gap-3">
               <input
                 type="range"
@@ -354,9 +354,9 @@ export const ArpeggioEditor: React.FC<ArpeggioEditorProps> = ({
                 max={100}
                 value={config.swing ?? 0}
                 onChange={(e) => updateConfig({ swing: parseInt(e.target.value, 10) })}
-                className="flex-1 h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-purple-500"
+                className="flex-1 h-1 bg-dark-bgHover rounded-lg appearance-none cursor-pointer accent-purple-500"
               />
-              <span className="text-xs text-gray-400 w-12 text-right font-mono">
+              <span className="text-xs text-text-secondary w-12 text-right font-mono">
                 {config.swing ?? 0}%
               </span>
             </div>
@@ -364,7 +364,7 @@ export const ArpeggioEditor: React.FC<ArpeggioEditorProps> = ({
 
           {/* Mini Keyboard */}
           <div>
-            <div className="text-[10px] text-gray-500 uppercase mb-2">Pattern Notes</div>
+            <div className="text-[10px] text-text-muted uppercase mb-2">Pattern Notes</div>
             <MiniKeyboard
               steps={config.steps}
               currentStep={currentStep}
@@ -377,7 +377,7 @@ export const ArpeggioEditor: React.FC<ArpeggioEditorProps> = ({
       )}
 
       {/* Info Footer */}
-      <div className="mt-3 text-[10px] text-gray-500 text-center">
+      <div className="mt-3 text-[10px] text-text-muted text-center">
         {config.enabled ? (
           <>
             {config.steps.length} steps

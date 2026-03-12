@@ -83,7 +83,7 @@ export const GearmulatorEditor: React.FC<GearmulatorEditorProps> = ({ config, on
           GM
         </div>
         <div>
-          <h2 className="text-sm font-bold text-white">{info.name}</h2>
+          <h2 className="text-sm font-bold text-text-primary">{info.name}</h2>
           <p className="text-[10px] uppercase tracking-widest text-purple-400">
             Gearmulator DSP56300 Emulator
           </p>
@@ -94,7 +94,7 @@ export const GearmulatorEditor: React.FC<GearmulatorEditorProps> = ({ config, on
       <div
         className={`
           border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors
-          ${isDragging ? 'border-purple-400 bg-purple-900/30' : 'border-gray-600 hover:border-purple-500'}
+          ${isDragging ? 'border-purple-400 bg-purple-900/30' : 'border-dark-borderLight hover:border-purple-500'}
           ${romStatus === 'loaded' ? 'border-green-600 bg-green-900/20' : ''}
           ${romStatus === 'error' ? 'border-red-600 bg-red-900/20' : ''}
         `}
@@ -112,9 +112,9 @@ export const GearmulatorEditor: React.FC<GearmulatorEditorProps> = ({ config, on
         />
         {romStatus === 'none' && (
           <>
-            <p className="text-gray-300 text-sm font-medium mb-1">Drop firmware ROM here</p>
-            <p className="text-gray-500 text-xs">{info.romHint}</p>
-            <p className="text-gray-600 text-[10px] mt-2">ROMs are stored locally and never uploaded</p>
+            <p className="text-text-secondary text-sm font-medium mb-1">Drop firmware ROM here</p>
+            <p className="text-text-muted text-xs">{info.romHint}</p>
+            <p className="text-text-muted text-[10px] mt-2">ROMs are stored locally and never uploaded</p>
           </>
         )}
         {romStatus === 'loading' && (
@@ -124,7 +124,7 @@ export const GearmulatorEditor: React.FC<GearmulatorEditorProps> = ({ config, on
           <>
             <p className="text-green-300 text-sm font-medium">ROM loaded</p>
             <p className="text-green-500 text-xs">{config.romKey}</p>
-            <p className="text-gray-500 text-[10px] mt-1">Click to replace</p>
+            <p className="text-text-muted text-[10px] mt-1">Click to replace</p>
           </>
         )}
         {romStatus === 'error' && (
@@ -139,11 +139,11 @@ export const GearmulatorEditor: React.FC<GearmulatorEditorProps> = ({ config, on
       <div className="grid grid-cols-2 gap-3">
         {/* MIDI Channel */}
         <div className="bg-[#1a1a2e] rounded-lg p-3">
-          <label className="text-[10px] uppercase tracking-wider text-gray-400 block mb-1">
+          <label className="text-[10px] uppercase tracking-wider text-text-secondary block mb-1">
             MIDI Channel
           </label>
           <select
-            className="w-full bg-[#0a0a1a] text-white text-sm rounded px-2 py-1 border border-gray-700"
+            className="w-full bg-[#0a0a1a] text-text-primary text-sm rounded px-2 py-1 border border-dark-borderLight"
             value={config.channel ?? 0}
             onChange={(e) => handleChannelChange(parseInt(e.target.value))}
           >
@@ -155,7 +155,7 @@ export const GearmulatorEditor: React.FC<GearmulatorEditorProps> = ({ config, on
 
         {/* Clock Speed */}
         <div className="bg-[#1a1a2e] rounded-lg p-3">
-          <label className="text-[10px] uppercase tracking-wider text-gray-400 block mb-1">
+          <label className="text-[10px] uppercase tracking-wider text-text-secondary block mb-1">
             DSP Clock
           </label>
           <div className="flex items-center gap-2">
@@ -167,7 +167,7 @@ export const GearmulatorEditor: React.FC<GearmulatorEditorProps> = ({ config, on
               onChange={(e) => handleClockChange(parseInt(e.target.value))}
               className="flex-1 accent-purple-500"
             />
-            <span className="text-xs text-gray-300 w-8 text-right">
+            <span className="text-xs text-text-secondary w-8 text-right">
               {config.clockPercent ?? 100}%
             </span>
           </div>
@@ -175,7 +175,7 @@ export const GearmulatorEditor: React.FC<GearmulatorEditorProps> = ({ config, on
       </div>
 
       {/* Info */}
-      <div className="bg-[#0a0a1a] rounded-lg p-3 text-xs text-gray-500 space-y-1">
+      <div className="bg-[#0a0a1a] rounded-lg p-3 text-xs text-text-muted space-y-1">
         <p>Gearmulator emulates the DSP56300 processor running original firmware.</p>
         <p>You must provide your own firmware ROM file (not included).</p>
         {romStatus === 'loaded' && (

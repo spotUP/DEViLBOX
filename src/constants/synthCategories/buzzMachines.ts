@@ -17,7 +17,7 @@ export const buzzMachineEntries: Record<string, SynthInfo> = {
     description: 'Phone dial tone generator - classic DTMF tones',
     bestFor: ['Phone tones', 'Retro effects', 'Experimental'],
     icon: 'Phone',
-    color: 'text-cyan-400',
+    color: 'text-accent-highlight',
   },
   BuzzFreqBomb: {
     type: 'BuzzFreqBomb',
@@ -53,7 +53,7 @@ export const buzzMachineEntries: Record<string, SynthInfo> = {
     description: 'Jeskola Noise generator',
     bestFor: ['Noise', 'Hi-hats', 'Textures'],
     icon: 'Waves',
-    color: 'text-gray-400',
+    color: 'text-text-secondary',
   },
   BuzzTrilok: {
     type: 'BuzzTrilok',

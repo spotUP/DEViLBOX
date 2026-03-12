@@ -201,7 +201,7 @@ export const ADSREnvelope: React.FC<ADSREnvelopeProps> = ({
         cx={cpX}
         cy={cpY}
         r={6}
-        fill={dragging === id ? color : '#1a1a1a'}
+        fill={dragging === id ? color : 'var(--color-bg-tertiary)'}
         stroke={color}
         strokeWidth={2}
         style={{ filter: `drop-shadow(0 0 4px ${color})` }}
@@ -224,7 +224,7 @@ export const ADSREnvelope: React.FC<ADSREnvelopeProps> = ({
   );
 
   return (
-    <div ref={containerRef} className="bg-[#1a1a1a] rounded-lg p-3 border border-gray-700 w-full">
+    <div ref={containerRef} className="bg-[#1a1a1a] rounded-lg p-3 border border-dark-borderLight w-full">
       <svg
         ref={svgRef}
         width={width}
@@ -232,7 +232,7 @@ export const ADSREnvelope: React.FC<ADSREnvelopeProps> = ({
         className="select-none w-full"
       >
         {/* Grid lines */}
-        <g stroke="#333" strokeWidth="1">
+        <g stroke="var(--color-border-light)" strokeWidth="1">
           {/* Horizontal grid */}
           {[0, 25, 50, 75, 100].map((level) => (
             <line
@@ -283,20 +283,20 @@ export const ADSREnvelope: React.FC<ADSREnvelopeProps> = ({
       {/* Values display */}
       <div className="flex justify-between mt-2 text-xs font-mono">
         <div className="text-center">
-          <div className="text-gray-500">ATK</div>
-          <div className="text-white">{formatTime(attack)}</div>
+          <div className="text-text-muted">ATK</div>
+          <div className="text-text-primary">{formatTime(attack)}</div>
         </div>
         <div className="text-center">
-          <div className="text-gray-500">DEC</div>
-          <div className="text-white">{formatTime(decay)}</div>
+          <div className="text-text-muted">DEC</div>
+          <div className="text-text-primary">{formatTime(decay)}</div>
         </div>
         <div className="text-center">
-          <div className="text-gray-500">SUS</div>
-          <div className="text-white">{sustain}%</div>
+          <div className="text-text-muted">SUS</div>
+          <div className="text-text-primary">{sustain}%</div>
         </div>
         <div className="text-center">
-          <div className="text-gray-500">REL</div>
-          <div className="text-white">{formatTime(release)}</div>
+          <div className="text-text-muted">REL</div>
+          <div className="text-text-primary">{formatTime(release)}</div>
         </div>
       </div>
     </div>

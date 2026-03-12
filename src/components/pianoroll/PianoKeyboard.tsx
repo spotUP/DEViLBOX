@@ -64,7 +64,7 @@ const PianoKeyboardComponent: React.FC<PianoKeyboardProps> = ({
 
   return (
     <div
-      className="flex flex-col bg-gray-900 border-r border-dark-border overflow-hidden shrink-0"
+      className="flex flex-col bg-dark-bgSecondary border-r border-dark-border overflow-hidden shrink-0"
       style={{
         width: 48,
         height: containerHeight || 'auto',
@@ -87,8 +87,8 @@ const PianoKeyboardComponent: React.FC<PianoKeyboardProps> = ({
               ${isActive
                 ? 'bg-accent-primary text-text-inverse border-accent-primary brightness-110 shadow-lg'
                 : isBlack
-                  ? `bg-gray-800 text-gray-400 border-gray-700 hover:bg-gray-700 ${outOfScale ? 'opacity-40' : ''}`
-                  : `bg-white text-gray-700 border-border hover:bg-gray-100 ${outOfScale ? 'opacity-40' : ''}`
+                  ? `bg-dark-bgTertiary text-text-secondary border-dark-borderLight hover:bg-dark-bgHover ${outOfScale ? 'opacity-40' : ''}`
+                  : `bg-white text-text-muted border-border hover:bg-dark-bgHover ${outOfScale ? 'opacity-40' : ''}`
               }
               ${isC ? 'font-bold' : ''}
             `}

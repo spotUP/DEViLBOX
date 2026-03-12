@@ -80,7 +80,7 @@ export const mameSynthEntries: Record<string, SynthInfo> = {
     description: 'Apple ASC - 4-voice wavetable synthesis from Apple IIGS and Mac',
     bestFor: ['Retro Mac', 'Wavetable', 'IIGS sounds', '80s digital'],
     icon: 'Cpu',
-    color: 'text-gray-400',
+    color: 'text-text-secondary',
   },
   MAMEAstrocade: {
     type: 'MAMEAstrocade',
@@ -224,7 +224,7 @@ export const mameSynthEntries: Record<string, SynthInfo> = {
     description: 'NEC uPD931 - speech synthesis processor with LPC coding',
     bestFor: ['Japanese speech', 'Arcade voice', 'Retro talking', 'Speech FX'],
     icon: 'Mic',
-    color: 'text-cyan-400',
+    color: 'text-accent-highlight',
   },
   MAMEUPD933: {
     type: 'MAMEUPD933',
@@ -278,7 +278,7 @@ export const mameSynthEntries: Record<string, SynthInfo> = {
     description: 'Ensoniq VFX transwave synthesizer - alias for MAMEVFX',
     bestFor: ['Transwave', 'Digital', 'Pads', 'Textures'],
     icon: 'Cpu',
-    color: 'text-cyan-500',
+    color: 'text-accent-highlight',
   },
   D50: {
     type: 'D50',

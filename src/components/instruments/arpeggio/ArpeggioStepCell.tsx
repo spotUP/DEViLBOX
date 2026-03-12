@@ -124,15 +124,15 @@ export const ArpeggioStepCell: React.FC<ArpeggioStepCellProps> = ({
       onClick={onSelect}
       className={`
         grid grid-cols-[2rem_3rem_2rem_2rem_2rem] gap-px text-[10px] font-mono
-        border-b border-gray-800 cursor-pointer transition-colors
-        ${isActive ? 'bg-yellow-500/30' : isSelected ? 'bg-blue-500/20' : 'hover:bg-gray-800/50'}
+        border-b border-dark-border cursor-pointer transition-colors
+        ${isActive ? 'bg-yellow-500/30' : isSelected ? 'bg-blue-500/20' : 'hover:bg-dark-bgTertiary/50'}
       `}
     >
       {/* Step number */}
       <div
         className={`
           flex items-center justify-center py-1
-          ${isActive ? 'text-yellow-400 font-bold' : 'text-gray-600'}
+          ${isActive ? 'text-yellow-400 font-bold' : 'text-text-muted'}
         `}
       >
         {String(stepIndex).padStart(2, '0')}
@@ -142,7 +142,7 @@ export const ArpeggioStepCell: React.FC<ArpeggioStepCellProps> = ({
       <div
         className={`
           flex items-center justify-center py-1 cursor-text
-          ${step.noteOffset > 0 ? 'text-green-400' : step.noteOffset < 0 ? 'text-red-400' : 'text-white'}
+          ${step.noteOffset > 0 ? 'text-green-400' : step.noteOffset < 0 ? 'text-red-400' : 'text-text-primary'}
         `}
         onDoubleClick={() => handleDoubleClick('offset')}
         onWheel={(e) => adjustOffset(e.deltaY > 0 ? -1 : 1)}
@@ -160,7 +160,7 @@ export const ArpeggioStepCell: React.FC<ArpeggioStepCellProps> = ({
         ) : (
           <span>
             {step.noteOffset >= 0 ? '+' : ''}{step.noteOffset}
-            <span className="text-gray-600 ml-0.5">{getNoteOffset(step.noteOffset)}</span>
+            <span className="text-text-muted ml-0.5">{getNoteOffset(step.noteOffset)}</span>
           </span>
         )}
       </div>
@@ -169,7 +169,7 @@ export const ArpeggioStepCell: React.FC<ArpeggioStepCellProps> = ({
       <div
         className={`
           flex items-center justify-center py-1 cursor-text
-          ${step.volume !== undefined && step.volume < 100 ? 'text-purple-400' : 'text-gray-600'}
+          ${step.volume !== undefined && step.volume < 100 ? 'text-purple-400' : 'text-text-muted'}
         `}
         onDoubleClick={() => handleDoubleClick('volume')}
       >
@@ -192,7 +192,7 @@ export const ArpeggioStepCell: React.FC<ArpeggioStepCellProps> = ({
       <div
         className={`
           flex items-center justify-center py-1 cursor-text
-          ${step.gate !== undefined && step.gate < 100 ? 'text-cyan-400' : 'text-gray-600'}
+          ${step.gate !== undefined && step.gate < 100 ? 'text-accent-highlight' : 'text-text-muted'}
         `}
         onDoubleClick={() => handleDoubleClick('gate')}
       >
@@ -217,7 +217,7 @@ export const ArpeggioStepCell: React.FC<ArpeggioStepCellProps> = ({
           flex items-center justify-center py-1 cursor-pointer
           ${step.effect === 'accent' ? 'text-orange-400' :
             step.effect === 'slide' ? 'text-blue-400' :
-            step.effect === 'skip' ? 'text-red-400' : 'text-gray-600'}
+            step.effect === 'skip' ? 'text-red-400' : 'text-text-muted'}
         `}
         onClick={(e) => {
           e.stopPropagation();

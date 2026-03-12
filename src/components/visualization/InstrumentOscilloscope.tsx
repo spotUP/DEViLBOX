@@ -102,7 +102,7 @@ export const InstrumentOscilloscope: React.FC<InstrumentOscilloscopeProps> = ({
     }
 
     // Draw center line
-    ctx.strokeStyle = '#333';
+    ctx.strokeStyle = 'var(--color-border-light)';
     ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.moveTo(0, height / 2);

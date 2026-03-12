@@ -44,7 +44,7 @@ export const ArpeggioVisualization: React.FC<ArpeggioVisualizationProps> = ({
   const scale = (height - 20) / Math.max(vizData.range, 24);
 
   return (
-    <div className="relative bg-gray-900/50 rounded-lg border border-gray-800 overflow-hidden">
+    <div className="relative bg-dark-bgSecondary/50 rounded-lg border border-dark-border overflow-hidden">
       {/* Background grid */}
       <svg width="100%" height={height} className="absolute inset-0">
         {/* Horizontal center line (root note) */}
@@ -193,7 +193,7 @@ export const ArpeggioVisualization: React.FC<ArpeggioVisualizationProps> = ({
       </svg>
 
       {/* Legend */}
-      <div className="absolute bottom-1 right-1 flex items-center gap-2 text-[8px] text-gray-600">
+      <div className="absolute bottom-1 right-1 flex items-center gap-2 text-[8px] text-text-muted">
         <span className="flex items-center gap-0.5">
           <span className="w-2 h-2 bg-green-500 rounded-sm" /> +
         </span>
