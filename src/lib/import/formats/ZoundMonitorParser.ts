@@ -131,7 +131,7 @@ function zmNoteToXM(zmNote: number): number {
   if (zmNote === 0) return 0;
   if (zmNote === 63) return 97;  // note-off
   if (zmNote < 1 || zmNote > 36) return 0;
-  return zmNote + 12;  // ZM 1 (C-1) -> XM 13 (C-1)
+  return zmNote + 36;  // ZM 1 (C-1) -> XM 37 (C-3 in FT2 convention)
 }
 
 // ── Effect mapping ──────────────────────────────────────────────────────────

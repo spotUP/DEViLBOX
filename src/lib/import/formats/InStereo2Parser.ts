@@ -90,7 +90,7 @@ function readChunkTag(buf: Uint8Array, off: number): string {
 /** Convert IS20 period-table note index to XM note number */
 function is20NoteToXm(noteIndex: number): number {
   if (noteIndex <= 0 || noteIndex >= IS20_PERIODS.length) return 0;
-  return Math.min(96, noteIndex + 12);
+  return Math.min(96, noteIndex + 36);
 }
 
 // ── Format Identification ──────────────────────────────────────────────────

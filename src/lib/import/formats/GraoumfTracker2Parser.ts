@@ -370,7 +370,7 @@ function parseGTKFile(buf: Uint8Array, filename: string): TrackerSong | null {
         // XM: C-0=1, C-1=13, C-2=25, C-3=37... data[0]+13 where data[0]=24 → note=37=C-2
         let note = 0;
         if (data0 >= 24 && data0 < 84) {
-          note = data0 + 13;
+          note = data0 + 37;
         }
 
         const instr = data1;

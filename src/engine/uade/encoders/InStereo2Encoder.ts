@@ -8,8 +8,8 @@
  *   byte[3]: effect argument
  *
  * Note mapping:
- *   Parser: is20NoteToXm: noteIndex + 12 = xmNote (clamped to 96)
- *   Reverse: xmNote → noteIndex = xmNote - 12; 97 → 0x7f (note-off)
+ *   Parser: is20NoteToXm: noteIndex + 36 = xmNote (clamped to 96)
+ *   Reverse: xmNote → noteIndex = xmNote - 36; 97 → 0x7f (note-off)
  *
  * Effect mapping:
  *   Parser: is20EffectToXm maps various IS20 effects to XM
@@ -26,8 +26,8 @@ function encodeInStereo2Cell(cell: TrackerCell): Uint8Array {
   // Byte 0: note index
   if (note === 97) {
     out[0] = 0x7f; // note-off/mute
-  } else if (note > 12) {
-    out[0] = Math.min(108, note - 12);
+  } else if (note > 36) {
+    out[0] = Math.min(108, note - 36);
   } else {
     out[0] = 0;
   }

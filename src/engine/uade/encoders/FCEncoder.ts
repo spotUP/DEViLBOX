@@ -9,8 +9,8 @@
  *     bit 7: portamento enable (next row's val = portamento speed)
  *
  * Note mapping:
- *   Parser: xmNote = (periodIdx & 0x7F) + 13  (periodIdx includes transpose)
- *   Encoder: raw note = xmNote - 13  (writes un-transposed; UADE replayer applies transpose)
+ *   Parser: xmNote = (periodIdx & 0x7F) + 37  (periodIdx includes transpose)
+ *   Encoder: raw note = xmNote - 37  (writes un-transposed; UADE replayer applies transpose)
  *
  * Instrument mapping:
  *   The encoder receives an instrumentIdToFCIndex reverse map built by the parser.
@@ -33,7 +33,7 @@ export function createFCEncoder(instrReverseMap: Map<number, number>): (cell: Tr
     if (xmNote === 97) {
       out[0] = 0x49; // note off
     } else if (xmNote > 0 && xmNote <= 96) {
-      const raw = xmNote - 13;
+      const raw = xmNote - 37;
       if (raw >= 1 && raw <= 72) {
         out[0] = raw;
       }

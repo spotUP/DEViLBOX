@@ -8,8 +8,8 @@
  *   param:      effect parameter
  *
  * Note mapping (reverse of AMF parser):
- *   Parser: xmNote = noteRaw + 12 + 1 = noteRaw + 13
- *   Reverse: noteRaw = xmNote - 13
+ *   Parser: xmNote = noteRaw + 24 + 13 = noteRaw + 37
+ *   Reverse: noteRaw = xmNote - 37
  *
  * Effect mapping (reverse of convertModCommand):
  *   Most effects pass through 1:1 (standard MOD commands)
@@ -48,7 +48,7 @@ function encodeAMFCell(cell: TrackerCell): Uint8Array {
   // Byte 0: note
   const note = cell.note ?? 0;
   if (note > 0) {
-    const noteRaw = note - 13;
+    const noteRaw = note - 37;
     out[0] = (noteRaw > 0 && noteRaw <= 107) ? noteRaw : 0;
   }
 

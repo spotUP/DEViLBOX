@@ -39,12 +39,12 @@ const PT_PERIODS: number[] = [
 
 /**
  * Convert XM note to SM1 note index (1-66).
- * XM note 13 = C-1 → PT period 856 → closest SM1 index.
+ * XM note 37 = C-3 → PT period 856 → closest SM1 index.
  */
 function xmNoteToSM1(xmNote: number): number {
   if (xmNote <= 0 || xmNote > 96) return 0;
   // XM note → PT period
-  const ptIdx = xmNote - 13;
+  const ptIdx = xmNote - 37;
   if (ptIdx < 0 || ptIdx >= PT_PERIODS.length) return 0;
   const period = PT_PERIODS[ptIdx];
 

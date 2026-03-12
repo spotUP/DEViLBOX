@@ -70,8 +70,8 @@ function periodToNote(period: number): number {
     const d = Math.abs(MED_PERIODS[i] - period);
     if (d < bestDist) { bestDist = d; best = i; }
   }
-  // Convert to XM note: PT octave 1 starts at note 13 (C-1 in XM)
-  return best + 13;
+  // Convert to XM note: PT octave 1 starts at note 37 (C-3 in FT2 convention)
+  return best + 37;
 }
 
 export function parseMEDFile(buffer: ArrayBuffer, filename: string): TrackerSong {

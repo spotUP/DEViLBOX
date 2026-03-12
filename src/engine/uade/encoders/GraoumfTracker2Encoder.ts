@@ -21,7 +21,7 @@
  *   byte[4]: volume
  *
  * Note mapping:
- *   GTK: xmNote = data0 + 13 → reverse: data0 = xmNote - 13 (valid 24-83)
+ *   GTK: xmNote = data0 + 37 → reverse: data0 = xmNote - 37 (valid 24-83)
  *   GT2: xmNote = data0 + 1  → reverse: data0 = xmNote - 1  (valid 1-120)
  *
  * Effect reverse mapping (XM → GTK/GT2):
@@ -97,7 +97,7 @@ export function encodeGTK4Cell(cell: TrackerCell): Uint8Array {
 
   // Byte 0: note (24-83 range, 0=empty)
   if (note > 0 && note <= 96) {
-    const raw = note - 13;
+    const raw = note - 37;
     if (raw >= 24 && raw < 84) out[0] = raw;
   }
 
@@ -120,7 +120,7 @@ export function encodeGTK5Cell(cell: TrackerCell): Uint8Array {
   const note = cell.note ?? 0;
 
   if (note > 0 && note <= 96) {
-    const raw = note - 13;
+    const raw = note - 37;
     if (raw >= 24 && raw < 84) out[0] = raw;
   }
 

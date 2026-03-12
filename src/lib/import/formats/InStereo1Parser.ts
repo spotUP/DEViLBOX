@@ -94,7 +94,7 @@ function readString(buf: Uint8Array, off: number, len: number): string {
 /** Convert IS10 period-table note index to XM note number */
 function is10NoteToXm(noteIndex: number): number {
   if (noteIndex <= 0 || noteIndex >= IS10_PERIODS.length) return 0;
-  return Math.min(96, noteIndex + 12);
+  return Math.min(96, noteIndex + 36);
 }
 
 // ── Format Identification ──────────────────────────────────────────────────

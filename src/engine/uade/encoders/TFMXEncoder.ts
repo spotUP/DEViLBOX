@@ -12,7 +12,7 @@
  *   byte[3]: wait/detune/param
  *
  * Note mapping (reverse of parser):
- *   tfmxNote = (xmNote - 13) & 0x3F
+ *   tfmxNote = (xmNote - 37) & 0x3F
  *   macro = instrument - 1 (0-based)
  *   relVol = Math.round(volume / 4)  (0-15)
  */
@@ -51,7 +51,7 @@ function encodeTFMXCell(cell: TrackerCell): Uint8Array {
 
   // Note event
   if (note > 0 && note < 97) {
-    const tfmxNote = Math.max(0, Math.min(0x3F, note - 13));
+    const tfmxNote = Math.max(0, Math.min(0x3F, note - 37));
     const macro = Math.max(0, instr - 1) & 0x7F;
     const relVol = Math.min(15, Math.round(vol / 4));
     const wait = (effTyp === 0x0F) ? eff : 0;
@@ -66,7 +66,7 @@ function encodeTFMXCell(cell: TrackerCell): Uint8Array {
 
   // Portamento (effTyp 0x03)
   if (effTyp === 0x03 && note > 0) {
-    const tfmxNote = Math.max(0, Math.min(0x3F, note - 13));
+    const tfmxNote = Math.max(0, Math.min(0x3F, note - 37));
     out[0] = tfmxNote | 0xC0;
     out[1] = Math.max(0, instr - 1) & 0x7F;
     out[2] = (Math.min(15, Math.round(vol / 4)) << 4) & 0xF0;
