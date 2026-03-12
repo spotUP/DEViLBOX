@@ -81,7 +81,7 @@ export const PixiArrangementAutomationLane: React.FC<PixiArrangementAutomationLa
 
     // Background
     g.rect(0, 0, width, height);
-    g.fill({ color: 0x000000, alpha: 0.45 });
+    g.fill({ color: theme.bg.color, alpha: 0.45 });
 
     // Top/bottom borders
     g.rect(0, 0, width, 1);
@@ -111,7 +111,7 @@ export const PixiArrangementAutomationLane: React.FC<PixiArrangementAutomationLa
         if (x2 < 0 || x1 > width) continue;
         g.moveTo(x1, y1);
         g.lineTo(x2, y2);
-        g.stroke({ color: 0x60a5fa, alpha: 0.8, width: 1.5 });
+        g.stroke({ color: theme.accentHighlight.color, alpha: 0.8, width: 1.5 });
       }
     }
 
@@ -123,7 +123,7 @@ export const PixiArrangementAutomationLane: React.FC<PixiArrangementAutomationLa
       if (lx < width) {
         g.moveTo(lx, ly);
         g.lineTo(width, ly);
-        g.stroke({ color: 0x60a5fa, alpha: 0.3, width: 1 });
+        g.stroke({ color: theme.accentHighlight.color, alpha: 0.3, width: 1 });
       }
     }
 
@@ -133,7 +133,7 @@ export const PixiArrangementAutomationLane: React.FC<PixiArrangementAutomationLa
       const py = valueToY(pt.value, height);
       if (px < -POINT_RADIUS || px > width + POINT_RADIUS) continue;
       g.circle(px, py, POINT_RADIUS);
-      g.fill({ color: 0x3b82f6, alpha: 1 });
+      g.fill({ color: theme.accentHighlight.color, alpha: 1 });
       g.circle(px, py, POINT_RADIUS);
       g.stroke({ color: 0xffffff, alpha: 0.6, width: 1 });
     }
@@ -187,7 +187,7 @@ export const PixiArrangementAutomationLane: React.FC<PixiArrangementAutomationLa
   const drawLabel = useCallback((g: GraphicsType) => {
     g.clear();
     g.roundRect(2, 2, 36, 12, 2);
-    g.fill({ color: 0x1e293b, alpha: 0.7 });
+    g.fill({ color: theme.bgTertiary.color, alpha: 0.7 });
   }, []);
 
   // Abbreviate the parameter name for the label

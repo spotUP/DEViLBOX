@@ -16,6 +16,7 @@ import type { Container as ContainerType, Graphics as GraphicsType } from 'pixi.
 import { PIXI_FONTS } from '@/pixi/fonts';
 import { MegaText, type GlyphLabel } from '@/pixi/utils/MegaText';
 import { useGTUltraStore } from '@/stores/useGTUltraStore';
+import { usePixiTheme } from '../../theme';
 
 // ── Layout constants ──
 const FONT_SIZE = 11;
@@ -68,6 +69,7 @@ interface Props {
 }
 
 export const PixiGTPatternGrid: React.FC<Props> = ({ width, height }) => {
+  const theme = usePixiTheme();
   const gridRef = useRef<GraphicsType>(null);
   const overlayRef = useRef<GraphicsType>(null);
   const megaRef = useRef<MegaText | null>(null);
@@ -150,7 +152,7 @@ export const PixiGTPatternGrid: React.FC<Props> = ({ width, height }) => {
 
     // Record mode border
     if (recordMode) {
-      grid.rect(0, 0, width, height).stroke({ color: 0xef4444, width: 2, alpha: 0.5 });
+      grid.rect(0, 0, width, height).stroke({ color: theme.error.color, width: 2, alpha: 0.5 });
     }
 
     // Row backgrounds + labels

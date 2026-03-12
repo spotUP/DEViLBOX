@@ -1174,10 +1174,10 @@ const JamCrackerPanel: React.FC<{
       const mid = H / 2;
 
       // Background
-      g.rect(0, 0, W, H).fill({ color: 0x0a0e14 });
+      g.rect(0, 0, W, H).fill({ color: theme.bg.color });
 
       // Center line
-      g.moveTo(0, mid).lineTo(W, mid).stroke({ color: 0x1a2a3a, width: 1 });
+      g.moveTo(0, mid).lineTo(W, mid).stroke({ color: theme.border.color, width: 1 });
 
       const waveformData = jc.waveformData;
       if (!waveformData || waveformData.length < 64) {
@@ -1195,7 +1195,7 @@ const JamCrackerPanel: React.FC<{
         if (x === 0) g.moveTo(x, y);
         else g.lineTo(x, y);
       }
-      g.stroke({ color: 0x00ff8840, width: 1 });
+      g.stroke({ color: theme.success.color, alpha: 0.25, width: 1 });
 
       // Blended waveform (bright)
       let phase = 0;
@@ -1211,7 +1211,7 @@ const JamCrackerPanel: React.FC<{
         else g.lineTo(x, y);
         phase = (phase + Math.floor(jc.phaseDelta * WAVE_SIZE / W)) & 0xFF;
       }
-      g.stroke({ color: 0x00ff88, width: 2 });
+      g.stroke({ color: theme.success.color, width: 2 });
     },
     [jc.waveformData, jc.phaseDelta],
   );

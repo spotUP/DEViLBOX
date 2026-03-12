@@ -163,7 +163,7 @@ export const PixiMusicLinePatternViewer: React.FC<Props> = ({ width, height }) =
 
     // Anchor rect to establish Yoga content bounds
     g.rect(0, 0, width, HEADER_H);
-    g.fill({ color: 0x000000, alpha: 0 });
+    g.fill({ color: theme.bg.color, alpha: 0 });
   }, [width, numChannels, CHAN_W]);
 
   // ── Draw scrollable content background ──────────────────────────────────
@@ -172,7 +172,7 @@ export const PixiMusicLinePatternViewer: React.FC<Props> = ({ width, height }) =
 
     // Clip background
     g.rect(0, 0, width, viewH);
-    g.fill({ color: 0x0d0d0d });
+    g.fill({ color: theme.bg.color });
 
     const firstVisible = Math.floor(scrollY / ROW_H);
     const lastVisible = Math.min(numRows - 1, Math.ceil((scrollY + viewH) / ROW_H));
@@ -222,7 +222,7 @@ export const PixiMusicLinePatternViewer: React.FC<Props> = ({ width, height }) =
 
     // Anchor rect to establish Yoga content bounds
     g.rect(0, 0, width, viewH);
-    g.fill({ color: 0x000000, alpha: 0 });
+    g.fill({ color: theme.bg.color, alpha: 0 });
   }, [width, viewH, scrollY, numRows, currentRow, totalWidth, numChannels, maxScroll, contentH]);
 
   // ── Text labels ──────────────────────────────────────────────────────────
@@ -234,7 +234,7 @@ export const PixiMusicLinePatternViewer: React.FC<Props> = ({ width, height }) =
       x: 2,
       y: (HEADER_H - FONT_SIZE) / 2,
       text: 'ROW',
-      color: 0x555555,
+      color: theme.textMuted.color,
     });
 
     // Channel headers: "CH1 P:00"

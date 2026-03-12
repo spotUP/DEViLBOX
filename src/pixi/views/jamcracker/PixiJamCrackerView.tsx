@@ -128,23 +128,23 @@ export const PixiJamCrackerView: React.FC<Props> = ({ width, height }) => {
   const drawBg = useCallback((g: GraphicsType) => {
     g.clear();
     g.rect(0, 0, width, height);
-    g.fill({ color: 0x000000 });
+    g.fill({ color: theme.bg.color });
   }, [width, height]);
 
   const drawToolbarBg = useCallback((g: GraphicsType) => {
     g.clear();
     g.rect(0, 0, width, TOOLBAR_H);
-    g.fill({ color: 0x111111 });
+    g.fill({ color: theme.bgSecondary.color });
     g.rect(0, TOOLBAR_H - 1, width, 1);
-    g.fill({ color: 0x333333 });
+    g.fill({ color: theme.border.color });
   }, [width]);
 
   const drawOrderBg = useCallback((g: GraphicsType) => {
     g.clear();
     g.rect(0, 0, width, ORDER_H);
-    g.fill({ color: 0x0a0a0a });
+    g.fill({ color: theme.bg.color });
     g.rect(0, ORDER_H - 1, width, 1);
-    g.fill({ color: 0x333333 });
+    g.fill({ color: theme.border.color });
   }, [width]);
 
   const drawPatternBg = useCallback((g: GraphicsType) => {
@@ -157,17 +157,17 @@ export const PixiJamCrackerView: React.FC<Props> = ({ width, height }) => {
       // Alternating row background
       if (rowIdx % 8 === 0) {
         g.rect(0, y, width, ROW_H);
-        g.fill({ color: 0x0c0c18 });
+        g.fill({ color: theme.bg.color });
       }
       // Current row highlight
       if (isPlaying && rowIdx === currentRow) {
         g.rect(0, y, width, ROW_H);
-        g.fill({ color: 0x222244 });
+        g.fill({ color: theme.accentSecondary.color });
       }
       // Record mode cursor highlight (non-playing)
       if (!isPlaying && recordMode && rowIdx === scrollOffset + Math.floor(visibleRows / 2)) {
         g.rect(0, y, width, ROW_H);
-        g.fill({ color: 0x331111 });
+        g.fill({ color: theme.error.color });
       }
     }
   }, [width, height, patternData, scrollOffset, visibleRows, currentRow, isPlaying, recordMode]);

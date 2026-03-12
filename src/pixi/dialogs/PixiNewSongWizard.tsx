@@ -84,7 +84,7 @@ export const PixiNewSongWizard: React.FC = () => {
   const drawOverlay = useCallback((g: GraphicsType) => {
     g.clear();
     g.rect(0, 0, screenW, screenH);
-    g.fill({ color: 0x000000, alpha: 0.7 });
+    g.fill({ color: theme.bg.color, alpha: 0.7 });
   }, [screenW, screenH]);
 
   const handleOverlayClick = useCallback(() => {

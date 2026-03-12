@@ -12,6 +12,7 @@ import type { Graphics as GraphicsType } from 'pixi.js';
 import { useTick } from '@pixi/react';
 import { useSettingsStore } from '@stores/useSettingsStore';
 import { getToneEngine } from '@engine/ToneEngine';
+import { usePixiTheme } from '../../theme';
 import {
   createVisualizerState,
   type AudioData,
@@ -84,6 +85,7 @@ interface PixiTrackerVisualBgProps {
 }
 
 export const PixiTrackerVisualBg: React.FC<PixiTrackerVisualBgProps> = React.memo(({ width, height }) => {
+  const theme = usePixiTheme();
   // Offscreen rendering refs
   const displayCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const displayCtxRef = useRef<CanvasRenderingContext2D | null>(null);
@@ -286,7 +288,7 @@ export const PixiTrackerVisualBg: React.FC<PixiTrackerVisualBgProps> = React.mem
   const drawButtonBg = useCallback((g: GraphicsType) => {
     g.clear();
     g.roundRect(0, 0, buttonW, 16, 3);
-    g.fill({ color: 0x000000, alpha: 0.6 });
+    g.fill({ color: theme.bg.color, alpha: 0.6 });
     g.stroke({ color: 0xffffff, alpha: 0.15, width: 1 });
   }, [buttonW]);
 

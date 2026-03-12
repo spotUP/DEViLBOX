@@ -120,7 +120,7 @@ export const PixiBottomDock: React.FC<PixiBottomDockProps> = ({
   const drawHandle = useCallback((g: GraphicsType) => {
     g.clear();
     g.rect(0, 0, width, 4);
-    g.fill({ color: 0x000000, alpha: 0 }); // hit area
+    g.fill({ color: theme.bg.color, alpha: 0 }); // hit area
     // Visual indicator: small centered bar
     const barW = 40;
     const barX = (width - barW) / 2;

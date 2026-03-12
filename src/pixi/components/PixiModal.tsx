@@ -72,7 +72,7 @@ export const PixiModal: React.FC<PixiModalProps> = ({
   const drawOverlay = useCallback((g: GraphicsType) => {
     g.clear();
     g.rect(0, 0, screenW, screenH);
-    g.fill({ color: 0x000000, alpha: overlayAlpha });
+    g.fill({ color: theme.bg.color, alpha: overlayAlpha });
   }, [screenW, screenH, overlayAlpha]);
 
   const handleOverlayClick = useCallback((_e: FederatedPointerEvent) => {

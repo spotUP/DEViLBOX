@@ -84,15 +84,15 @@ export const PixiHivelyView: React.FC<HivelyViewProps> = ({ width, height }) => 
   const drawBg = useCallback((g: GraphicsType) => {
     g.clear();
     g.rect(0, 0, width, height);
-    g.fill({ color: 0x000000 });
+    g.fill({ color: theme.bg.color });
   }, [width, height]);
 
   const drawToolbarBg = useCallback((g: GraphicsType) => {
     g.clear();
     g.rect(0, 0, width, TOOLBAR_HEIGHT);
-    g.fill({ color: 0x111111 });
+    g.fill({ color: theme.bgSecondary.color });
     g.rect(0, TOOLBAR_HEIGHT - 1, width, 1);
-    g.fill({ color: 0x333333 });
+    g.fill({ color: theme.border.color });
   }, [width]);
 
   const drawPosBorder = useCallback((g: GraphicsType) => {

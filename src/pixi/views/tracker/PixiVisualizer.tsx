@@ -178,7 +178,7 @@ export const PixiVisualizer: React.FC<PixiVisualizerProps> = ({
 function drawBackground(g: GraphicsType, w: number, h: number, theme: PixiTheme) {
   // Pure black background so the visualizer stands out from the toolbar rows
   g.roundRect(0, 0, w, h, 4);
-  g.fill({ color: 0x000000 });
+  g.fill({ color: theme.bg.color });
   g.roundRect(0, 0, w, h, 4);
   g.stroke({ color: theme.border.color, alpha: 0.6, width: 1 });
 }
@@ -392,7 +392,7 @@ function drawStereoField(g: GraphicsType, data: Float32Array, w: number, h: numb
     const y = cy - m * radius * 0.7;
     if (!started) { g.moveTo(x, y); started = true; } else { g.lineTo(x, y); }
   }
-  g.stroke({ color: 0xa855f7, alpha: 0.6, width: 1.5 });
+  g.stroke({ color: theme.accentSecondary.color, alpha: 0.6, width: 1.5 });
 }
 
 function drawFrequencyBars(g: GraphicsType, data: Float32Array, w: number, h: number, theme: PixiTheme, peaks: Float32Array) {

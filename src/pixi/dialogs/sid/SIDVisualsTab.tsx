@@ -9,6 +9,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import type { Container as ContainerType, Graphics as GraphicsType } from 'pixi.js';
 import { PIXI_FONTS } from '@/pixi/fonts';
 import { MegaText, type GlyphLabel } from '@/pixi/utils/MegaText';
+import { usePixiTheme } from '../../theme';
 
 /* ── Colours ── */
 const C_BG       = 0x0a0a1a;
@@ -60,6 +61,7 @@ function noteName(n: number): string {
 }
 
 export const SIDVisualsTab: React.FC<SIDVisualsTabProps> = ({ width, height }) => {
+  const theme = usePixiTheme();
   const containerRef = useRef<ContainerType>(null);
   const bgRef    = useRef<GraphicsType>(null);
   const waveRef  = useRef<GraphicsType>(null);
@@ -124,7 +126,7 @@ export const SIDVisualsTab: React.FC<SIDVisualsTabProps> = ({ width, height }) =
     labels.push({ x: mapX, y: mapY - 18, text: 'C64 Memory Map (64KB)', color: C_LABEL, fontFamily: PIXI_FONTS.MONO });
 
     // Full 64K bar
-    g.rect(mapX, mapY, mapW, mapH).fill({ color: 0x1a1a2a }).stroke({ color: C_BORDER, width: 1 });
+    g.rect(mapX, mapY, mapW, mapH).fill({ color: theme.bgSecondary.color }).stroke({ color: C_BORDER, width: 1 });
 
     // BASIC ROM: $A000-$BFFF
     const basicX = mapX + 0xA000 * scale;

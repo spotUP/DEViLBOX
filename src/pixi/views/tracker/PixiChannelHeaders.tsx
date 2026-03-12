@@ -617,7 +617,7 @@ export const PixiChannelHeaders: React.FC<PixiChannelHeadersProps> = ({
                     g.roundRect(0, 0, Math.max(50, chW - 120), 18, 3);
                     g.fill({ color: theme.bg.color, alpha: 0.85 });
                     g.roundRect(0, 0, Math.max(50, chW - 120), 18, 3);
-                    g.stroke({ color: 0x6366f1, alpha: 0.6, width: 1 });
+                    g.stroke({ color: theme.accent.color, alpha: 0.6, width: 1 });
                   }}
                   layout={{ position: 'absolute', width: Math.max(50, chW - 120), height: 18 }}
                 />

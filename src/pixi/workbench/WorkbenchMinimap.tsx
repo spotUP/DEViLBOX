@@ -77,7 +77,7 @@ export const WorkbenchMinimap: React.FC<Props> = ({ screenW, screenH }) => {
 
     // Background
     g.roundRect(0, 0, MAP_W, MAP_H, 4);
-    g.fill({ color: 0x0a0a12, alpha: 0.92 });
+    g.fill({ color: theme.bg.color, alpha: 0.92 });
     g.roundRect(0, 0, MAP_W, MAP_H, 4);
     g.stroke({ color: theme.border.color, alpha: 0.6, width: 1 });
 
@@ -116,7 +116,7 @@ export const WorkbenchMinimap: React.FC<Props> = ({ screenW, screenH }) => {
 
     // Label
     g.rect(PADDING, MAP_H - 14, 40, 12);
-    g.fill({ color: 0x000000, alpha: 0.4 });
+    g.fill({ color: theme.bg.color, alpha: 0.4 });
   }, [camera, windows, screenW, screenH, worldToMap, theme]);
 
   // ─── Pointer interaction ────────────────────────────────────────────────────
