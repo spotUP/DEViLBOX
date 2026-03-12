@@ -1215,6 +1215,12 @@ class SymphonieProcessor extends AudioWorkletProcessor {
     this.port.onmessage = (e) => {
       const msg = e.data;
       switch (msg.type) {
+        case 'init':
+          // No WASM needed - pure JS engine, ready immediately
+          this._ready = true;
+          this.port.postMessage({ type: 'ready' });
+          break;
+
         case 'load':
           try {
             this._expander.loadSong(msg.playbackData);
