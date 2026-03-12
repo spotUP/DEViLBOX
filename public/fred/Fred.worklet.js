@@ -66,12 +66,13 @@ class FredProcessor extends AudioWorkletProcessor {
   }
 
   async _initWasm({ sampleRate, wasmBinary, jsCode }) {
-    const workerSelf = self;
-
-    // Polyfill browser globals expected by Emscripten
-    workerSelf.document    = workerSelf.document    || {};
-    workerSelf.performance = workerSelf.performance || { now: () => Date.now() };
-    workerSelf.location    = workerSelf.location    || { href: './' };
+    // Polyfill browser globals expected by Emscripten on globalThis
+    // AudioWorkletGlobalScope doesn't have 'self' or 'window' but has 'globalThis'
+    globalThis.document    = globalThis.document    || {};
+    globalThis.performance = globalThis.performance || { now: () => Date.now() };
+    globalThis.location    = globalThis.location    || { href: './' };
+    // Emscripten checks: if (!(globalThis.window || globalThis.WorkerGlobalScope))
+    globalThis.window      = globalThis.window      || {};
 
     // Execute the Emscripten factory via Function() to stay in AudioWorklet scope
     const factory = new Function(`${jsCode}; return createFred;`)();
