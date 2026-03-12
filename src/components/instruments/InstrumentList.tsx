@@ -161,7 +161,6 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
       // SA synths now use FT2-style octave convention: SA period 428 = XM 49 = C4.
       const isModSample = inst.metadata?.modPlayback?.usePeriodPlayback;
       const isBass = inst.synthType === 'TB303' || inst.name.toLowerCase().includes('bass');
-      const isAmigaNative = inst.synthType === 'SonicArrangerSynth' || inst.synthType === 'FuturePlayerSynth' || inst.synthType === 'JamCrackerSynth';
       const previewNote = isModSample
         ? (inst.sample?.baseNote || 'C3')   // Natural pitch: playbackRate = 1.0
         : (isBass ? 'C3' : 'C4');
