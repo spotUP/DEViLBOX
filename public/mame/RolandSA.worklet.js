@@ -1,3 +1,49 @@
+// Inline init function (self-contained worklet support)
+if (!globalThis.initMAMEWasmModule) {
+  globalThis.initMAMEWasmModule = async function(wasmBinary, jsCode, factoryName) {
+    if (!wasmBinary || !jsCode) throw new Error('Missing wasmBinary or jsCode');
+    // Provide URL polyfill if not available (worklet scope)
+    if (typeof URL === 'undefined') globalThis.URL = class URL { constructor() { this.href = ''; } };
+    // Replace import.meta.url and strip ES module exports (not usable in new Function())
+    const processedCode = jsCode.replace(/import\.meta\.url/g, '""').replace(/export\s+default\s+\w+;?/g, '');
+    let createModule;
+    try {
+      const wrappedCode = `${processedCode}; return typeof ${factoryName} !== 'undefined' ? ${factoryName} : (typeof Module !== 'undefined' ? Module : null);`;
+      createModule = new Function(wrappedCode)();
+    } catch (e) { throw new Error(`Could not evaluate ${factoryName}: ${e.message}`); }
+    if (!createModule) throw new Error(`Could not find factory function ${factoryName}`);
+    let capturedMemory = null;
+    const origInstantiate = WebAssembly.instantiate;
+    WebAssembly.instantiate = async function(...args) {
+      const result = await origInstantiate.apply(this, args);
+      const inst = result.instance || result;
+      if (inst.exports) for (const v of Object.values(inst.exports)) if (v instanceof WebAssembly.Memory) { capturedMemory = v; break; }
+      return result;
+    };
+    let Module;
+    try { Module = await createModule({ wasmBinary }); } finally { WebAssembly.instantiate = origInstantiate; }
+    if (capturedMemory && !Module.wasmMemory) Module.wasmMemory = capturedMemory;
+    return Module;
+  };
+}
+// Inline OscilloscopeMixin if not present
+if (!globalThis.OscilloscopeMixin) {
+  globalThis.OscilloscopeMixin = {
+    OSC_BUFFER_SIZE: 256, OSC_SEND_INTERVAL: 3,
+    init(p) { p.oscEnabled = false; p.oscBuffer = new Float32Array(256); p.oscFrameCount = 0; },
+    capture(p, buf) {
+      if (!p.oscEnabled) return;
+      if (++p.oscFrameCount < 3) return;
+      p.oscFrameCount = 0;
+      const len = Math.min(buf.length, 256);
+      for (let i = 0; i < len; i++) p.oscBuffer[i] = buf[i];
+      for (let i = len; i < 256; i++) p.oscBuffer[i] = 0;
+      const copy = p.oscBuffer.slice().buffer;
+      p.port.postMessage({ type: 'oscData', buffer: copy }, [copy]);
+    }
+  };
+}
+
 /**
  * Roland SA AudioWorklet Processor
  * Silicon-Accurate 16-Voice Sample Player for DEViLBOX

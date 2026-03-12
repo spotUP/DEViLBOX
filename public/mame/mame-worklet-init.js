@@ -70,10 +70,21 @@ globalThis.initMAMEWasmModule = async function initMAMEWasmModule(wasmBinary, js
     throw new Error('Missing wasmBinary or jsCode');
   }
 
+  // Replace import.meta.url with empty string (not needed when wasmBinary is provided)
+  // Also remove ES module export syntax that can't be evaluated via new Function()
+  const processedCode = jsCode
+    .replace(/import\.meta\.url/g, '""')
+    .replace(/export\s+default\s+\w+;?/g, '');
+
+  // Provide URL polyfill if not available (worklet scope)
+  if (typeof URL === 'undefined') {
+    globalThis.URL = class URL { constructor() { this.href = ''; } };
+  }
+
   // Evaluate the preprocessed JS to get the module factory function
   let createModule;
   try {
-    const wrappedCode = `${jsCode}; return typeof ${factoryName} !== 'undefined' ? ${factoryName} : (typeof Module !== 'undefined' ? Module : null);`;
+    const wrappedCode = `${processedCode}; return typeof ${factoryName} !== 'undefined' ? ${factoryName} : (typeof Module !== 'undefined' ? Module : null);`;
     createModule = new Function(wrappedCode)();
   } catch (evalErr) {
     throw new Error(`Could not evaluate ${factoryName}: ${evalErr.message}`);
