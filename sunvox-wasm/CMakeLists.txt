@@ -44,7 +44,7 @@ target_include_directories(${OUTPUT_NAME} PRIVATE
     "${SUNDOG_SRC}"
 )
 
-target_compile_definitions(${OUTPUT_NAME} PRIVATE STYPE_FLOAT)
+target_compile_definitions(${OUTPUT_NAME} PRIVATE STYPE_FLOAT UNIX)
 
 # psynths_vocal_filter.cpp uses cos/sin without including <math.h> (the include
 # in psynth.h is guarded by STYPE_FLOATINGPOINT && ARCH_X86, which we don't set).
@@ -91,7 +91,7 @@ if(EMSCRIPTEN)
         "SHELL:-s ENVIRONMENT='web,worker'"
         "SHELL:-s INITIAL_MEMORY=16777216"
         "SHELL:-s EXPORTED_FUNCTIONS=[${EXPORTED_FUNCTIONS_STR}]"
-        "SHELL:-s EXPORTED_RUNTIME_METHODS=['ccall','cwrap','setValue','getValue','UTF8ToString','FS']"
+        "SHELL:-s EXPORTED_RUNTIME_METHODS=['ccall','cwrap','setValue','getValue','UTF8ToString','FS','HEAPF32']"
         "SHELL:-s FILESYSTEM=1"
         "SHELL:-s INVOKE_RUN=0"
         "-O2"

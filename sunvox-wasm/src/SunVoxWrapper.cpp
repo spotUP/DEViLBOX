@@ -36,6 +36,9 @@
 #include "sound/sound.h"
 #include "sunvox_engine/sunvox_engine.h"
 
+/* Forward declaration for internal function not in header */
+void sunvox_select_current_playing_patterns( int first_sorted_pat, sunvox_engine *s );
+
 /* ======================================================================== */
 /* Stub sound system                                                         */
 /* ======================================================================== */
@@ -488,7 +491,8 @@ void sunvox_wasm_render( int handle, float *outL, float *outR, int frames )
         frames = MAX_RENDER_FRAMES;
 
     sunvox_engine *sv = &g_engines[ handle ];
-
+    
+    /* Debug: check state before render */
     sunvox_render_piece_of_sound(
         1,               /* buffer_type = 1 (float32) */
         g_render_buf,    /* interleaved stereo output  */
@@ -510,6 +514,9 @@ void sunvox_wasm_render( int handle, float *outL, float *outR, int frames )
 /*
  * sunvox_wasm_play
  * Start playback from the current position.
+ * Note: We cannot use sunvox_play() directly because it contains a busy-wait
+ * loop (while(s->playing == 0)) that hangs forever in single-threaded WASM.
+ * Instead, we queue a PLAY command that gets processed during the next render.
  */
 EMSCRIPTEN_KEEPALIVE
 void sunvox_wasm_play( int handle )
@@ -517,7 +524,32 @@ void sunvox_wasm_play( int handle )
     if ( !handle_valid( handle ) )
         return;
 
-    sunvox_play( &g_engines[ handle ] );
+    sunvox_engine *s = &g_engines[ handle ];
+    
+    /* Initialize playback state similarly to sunvox_play */
+    if ( s->playing == 0 )
+    {
+        s->time_counter = 0;
+        sunvox_sort_patterns( s );
+        sunvox_select_current_playing_patterns( 0, s );
+        for ( int i = 0; i < MAX_PLAYING_PATS; i++ )
+            clean_std_effects_for_playing_pattern( i, s );
+        s->time_counter--;
+        s->song_len = sunvox_get_song_length( s );
+    }
+    
+    /* Queue a PLAY command — it will be processed during render */
+    sunvox_note snote;
+    snote.vel = 0;
+    snote.ctl = 0;
+    snote.ctl_val = 0;
+    snote.note = NOTECMD_PLAY;
+    sunvox_send_user_command( &snote, 0, s );
+    
+    s->start_time = time_ticks();
+    s->single_pattern_play = -1;
+    s->end_of_song = 0;
+    s->stop_at_the_end_of_song = 0;
 }
 
 /*
