@@ -41,7 +41,7 @@ set_target_properties(DexedWASM PROPERTIES
 
 target_link_options(DexedWASM PRIVATE
     "SHELL:-s WASM=1"
-    "SHELL:-s EXPORT_ES6=1"
+    "SHELL:-s EXPORT_ES6=0"
     "SHELL:-s MODULARIZE=1"
     "SHELL:-s EXPORT_NAME='createDexedModule'"
     "SHELL:-s ALLOW_MEMORY_GROWTH=1"

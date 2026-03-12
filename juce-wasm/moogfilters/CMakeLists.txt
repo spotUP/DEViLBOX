@@ -1,3 +1,6 @@
+cmake_minimum_required(VERSION 3.15)
+project(MoogFiltersWASM VERSION 1.0.0)
+
 # MoogFilters WASM Effect Build
 # 6 analog-modeled Moog ladder filter implementations
 
@@ -9,7 +12,7 @@ add_executable(MoogFiltersWASM ${MOOGFILTERS_SOURCES})
 
 target_include_directories(MoogFiltersWASM PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
-    ${CMAKE_SOURCE_DIR}/common
+    ${CMAKE_CURRENT_SOURCE_DIR}/../common
 )
 
 set_target_properties(MoogFiltersWASM PROPERTIES
@@ -20,7 +23,7 @@ set_target_properties(MoogFiltersWASM PROPERTIES
 
 target_link_options(MoogFiltersWASM PRIVATE
     "SHELL:-s WASM=1"
-    "SHELL:-s EXPORT_ES6=1"
+    "SHELL:-s EXPORT_ES6=0"
     "SHELL:-s MODULARIZE=1"
     "SHELL:-s EXPORT_NAME='createMoogFiltersModule'"
     "SHELL:-s ALLOW_MEMORY_GROWTH=1"

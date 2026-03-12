@@ -1,3 +1,6 @@
+cmake_minimum_required(VERSION 3.15)
+project(MVerbWASM VERSION 1.0.0)
+
 # MVerb WASM Effect Build
 # Martin Eastwood's MVerb plate reverb (GPL v3)
 
@@ -9,7 +12,7 @@ add_executable(MVerbWASM ${MVERB_SOURCES})
 
 target_include_directories(MVerbWASM PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
-    ${CMAKE_SOURCE_DIR}/common
+    ${CMAKE_CURRENT_SOURCE_DIR}/../common
 )
 
 set_target_properties(MVerbWASM PROPERTIES
@@ -20,7 +23,7 @@ set_target_properties(MVerbWASM PROPERTIES
 
 target_link_options(MVerbWASM PRIVATE
     "SHELL:-s WASM=1"
-    "SHELL:-s EXPORT_ES6=1"
+    "SHELL:-s EXPORT_ES6=0"
     "SHELL:-s MODULARIZE=1"
     "SHELL:-s EXPORT_NAME='createMVerbModule'"
     "SHELL:-s ALLOW_MEMORY_GROWTH=1"

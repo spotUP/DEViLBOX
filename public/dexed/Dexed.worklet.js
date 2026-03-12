@@ -125,7 +125,7 @@ class DexedProcessor extends AudioWorkletProcessor {
       // Evaluate the JS code to get the module factory
       let createModule;
       try {
-        const wrappedCode = `${jsCode}; return typeof createDexedModule !== 'undefined' ? createDexedModule : (typeof Module !== 'undefined' ? Module : null);`;
+        const wrappedCode = `${jsCode}; return createDexedModule;`;
         createModule = new Function(wrappedCode)();
       } catch (evalErr) {
         console.error('Failed to evaluate Dexed JS:', evalErr);

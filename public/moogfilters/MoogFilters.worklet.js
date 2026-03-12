@@ -38,7 +38,7 @@ async function getOrCreateModule(wasmBinary, jsCode) {
     // Evaluate the JS code to get the module factory
     let createModule;
     try {
-      const wrappedCode = `${jsCode}; return typeof createMoogFiltersModule !== 'undefined' ? createMoogFiltersModule : (typeof Module !== 'undefined' ? Module : null);`;
+      const wrappedCode = `${jsCode}; return createMoogFiltersModule;`;
       createModule = new Function(wrappedCode)();
     } catch (evalErr) {
       console.error('Failed to evaluate MoogFilters JS:', evalErr);

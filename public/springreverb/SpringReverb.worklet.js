@@ -36,7 +36,7 @@ async function getOrCreateModule(wasmBinary, jsCode) {
     // Evaluate the JS code to get the module factory
     let createModule;
     try {
-      const wrappedCode = `${jsCode}; return typeof createSpringReverbModule !== 'undefined' ? createSpringReverbModule : (typeof Module !== 'undefined' ? Module : null);`;
+      const wrappedCode = `${jsCode}; return createSpringReverbModule;`;
       createModule = new Function(wrappedCode)();
     } catch (evalErr) {
       console.error('Failed to evaluate SpringReverb JS:', evalErr);
