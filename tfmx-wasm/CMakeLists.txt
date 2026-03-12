@@ -89,6 +89,8 @@ target_link_options(TFMX PRIVATE
   -sINITIAL_MEMORY=16777216
   -sSINGLE_FILE=0
   -sNO_FILESYSTEM=1
+  -sENVIRONMENT=web,worker
+  -sASSERTIONS=0
 )
 
 # Copy output to public/tfmx/
