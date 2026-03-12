@@ -211,8 +211,10 @@ export class WaveSabreSynth implements DevilboxSynth {
 
   /** Set preset chunk from Base64 string (XRNS ParameterChunk) */
   setChunk(base64Chunk: string): void {
+    // Strip whitespace/newlines that XML text content may include
+    const cleaned = base64Chunk.replace(/\s+/g, '');
     // Decode Base64 to ArrayBuffer
-    const binaryString = atob(base64Chunk);
+    const binaryString = atob(cleaned);
     const bytes = new Uint8Array(binaryString.length);
     for (let i = 0; i < binaryString.length; i++) {
       bytes[i] = binaryString.charCodeAt(i);

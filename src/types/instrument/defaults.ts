@@ -275,7 +275,7 @@ export interface InstrumentConfig {
   xrns?: {
     synthType: string;
     pluginIdentifier?: string;
-    parameters: number[];
+    parameters?: number[];
     parameterChunk?: string;
   };
   // Modular Synthesis
