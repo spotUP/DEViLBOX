@@ -734,11 +734,13 @@ export class InstrumentFactory {
         const wsSynth = new WaveSabreSynth(wsType);
         const wsVolDb = config.volume ?? -12;
         // Apply XRNS chunk (full preset state) if available - preferred over individual params
+        let chunkApplied = false;
         if (config.xrns?.parameterChunk) {
           console.log(`[InstrumentFactory] Applying XRNS chunk to WaveSabre (${config.xrns.parameterChunk.length} chars)`);
-          wsSynth.setChunk(config.xrns.parameterChunk);
-        } else if (config.xrns?.parameters) {
-          // Fall back to individual parameters if no chunk
+          chunkApplied = wsSynth.setChunk(config.xrns.parameterChunk);
+        }
+        if (!chunkApplied && config.xrns?.parameters) {
+          // Fall back to individual parameters if no chunk or chunk failed
           console.log(`[InstrumentFactory] Applying ${config.xrns.parameters.length} XRNS params to WaveSabre`);
           for (let i = 0; i < config.xrns.parameters.length; i++) {
             wsSynth.setParameter?.(i, config.xrns.parameters[i]);
