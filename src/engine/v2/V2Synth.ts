@@ -95,7 +95,7 @@ export class V2Synth implements DevilboxSynth {
       }, 10000);
 
       this._worklet!.port.onmessage = (event) => {
-        if (event.data.type === 'ready') {
+        if (event.data.type === 'ready' || event.data.type === 'initialized') {
           clearTimeout(timeout);
           this._initialized = true;
           // Apply initial V2 config before flushing notes
@@ -111,9 +111,10 @@ export class V2Synth implements DevilboxSynth {
         }
       };
 
-      // Initialize with WASM binary and JS code
+      // Initialize with WASM binary, JS code, and sample rate
       this._worklet!.port.postMessage({
         type: 'init',
+        sampleRate: nativeCtx.sampleRate,
         wasmBinary,
         jsCode
       });
