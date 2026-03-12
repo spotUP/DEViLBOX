@@ -92,7 +92,7 @@ export const MixerEQ: React.FC<MixerEQProps> = ({ deckId }) => {
               transition-all duration-75
               ${
                 killValues[key]
-                  ? 'bg-red-600 text-white shadow-[0_0_6px_rgba(220,38,38,0.5)]'
+                  ? 'bg-red-600 text-text-primary shadow-[0_0_6px_rgba(220,38,38,0.5)]'
                   : 'bg-dark-bgTertiary text-text-muted hover:bg-dark-bgHover border border-dark-border'
               }
             `}

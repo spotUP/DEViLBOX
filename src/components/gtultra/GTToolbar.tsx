@@ -95,7 +95,7 @@ export const GTToolbar: React.FC<{ width?: number; height?: number }> = () => {
       {/* Transport */}
       <button
         onClick={togglePlay}
-        className={`${BTN} border-transparent font-bold ${playing ? 'bg-red-600 text-white hover:bg-red-700' : 'bg-emerald-600 text-white hover:bg-emerald-700'}`}
+        className={`${BTN} border-transparent font-bold ${playing ? 'bg-red-600 text-text-primary hover:bg-red-700' : 'bg-emerald-600 text-text-primary hover:bg-emerald-700'}`}
       >
         {playing ? 'STOP' : 'PLAY'}
       </button>
@@ -103,7 +103,7 @@ export const GTToolbar: React.FC<{ width?: number; height?: number }> = () => {
       {/* Record */}
       <button
         onClick={() => setRecordMode(!recordMode)}
-        className={`${BTN} border-transparent font-bold ${recordMode ? 'bg-red-500 text-white' : 'bg-ft2-header text-ft2-textDim border-ft2-border'}`}
+        className={`${BTN} border-transparent font-bold ${recordMode ? 'bg-red-500 text-text-primary' : 'bg-ft2-header text-ft2-textDim border-ft2-border'}`}
         title="Record mode (edit pattern)"
       >
         REC
@@ -242,7 +242,7 @@ const ASIDToggle: React.FC = () => {
       title={connected
         ? (asidEnabled ? `ASID active: ${deviceName}` : `Click to enable: ${deviceName}`)
         : 'No ASID device — connect USB-SID-Pico or TherapSID'}
-      className={`${BTN} text-[9px] min-w-[60px] ${asidEnabled && connected ? 'bg-emerald-600 text-white border-emerald-500' : connected ? BTN_DEFAULT : 'opacity-40 cursor-not-allowed bg-ft2-header text-ft2-textDim border-ft2-border'}`}
+      className={`${BTN} text-[9px] min-w-[60px] ${asidEnabled && connected ? 'bg-emerald-600 text-text-primary border-emerald-500' : connected ? BTN_DEFAULT : 'opacity-40 cursor-not-allowed bg-ft2-header text-ft2-textDim border-ft2-border'}`}
       disabled={!connected}
     >
       {label}

@@ -26,7 +26,7 @@ export const percussionSynthEntries: Record<string, SynthInfo> = {
     description: 'Filtered noise generator with envelope',
     bestFor: ['Snares', 'Hi-hats', 'Risers', 'FX'],
     icon: 'Hash',
-    color: 'text-gray-400',
+    color: 'text-text-secondary',
   },
   DrumMachine: {
     type: 'DrumMachine',

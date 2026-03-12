@@ -260,7 +260,7 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
                       {!hasElectronFS() && !nav.hasServerFS && !nav.hasFilesystemAccess && (
                         <button
                           onClick={nav.handleRequestFilesystemAccess}
-                          className="px-4 py-2 bg-accent-primary text-white rounded hover:bg-accent-hover"
+                          className="px-4 py-2 bg-accent-primary text-text-primary rounded hover:bg-accent-hover"
                         >
                           Open Folder
                         </button>
@@ -279,7 +279,7 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
                           }
                         }
                       }}
-                      className="px-4 py-2 bg-accent-primary text-white rounded hover:bg-accent-hover"
+                      className="px-4 py-2 bg-accent-primary text-text-primary rounded hover:bg-accent-hover"
                     >
                       Select Folder
                     </button>
@@ -419,7 +419,7 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
               className={`flex items-center gap-2 px-6 py-2 rounded font-medium ${
                 (mode === 'load' && (!nav.selectedFile || nav.selectedFile.isDirectory))
                   ? 'bg-dark-bgTertiary text-text-muted cursor-not-allowed'
-                  : 'bg-accent-primary text-white hover:bg-accent-primaryHover'
+                  : 'bg-accent-primary text-text-primary hover:bg-accent-primaryHover'
               }`}
             >
               {fileSource === 'cloud' && <Cloud size={16} />}

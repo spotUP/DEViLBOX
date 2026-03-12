@@ -296,7 +296,7 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
             className={`
               px-2 py-1 text-xs rounded font-medium transition-colors flex items-center gap-1
               ${recordMode
-                ? 'bg-accent-error text-white animate-pulse'
+                ? 'bg-accent-error text-text-primary animate-pulse'
                 : 'bg-dark-bgSecondary text-text-secondary hover:text-text-primary'
               }
             `}

@@ -46,8 +46,8 @@ export const MAMEControls: React.FC<MAMEControlsProps> = ({
   
   // Background styles
   const panelBg = isCyanTheme
-    ? 'bg-[#051515] border-cyan-900/50'
-    : 'bg-[#1a1a1a] border-gray-800';
+    ? 'bg-[#051515] border-accent-highlight/20'
+    : 'bg-[#1a1a1a] border-dark-border';
 
   const handleFileUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>, bank: number) => {
     const file = e.target.files?.[0];

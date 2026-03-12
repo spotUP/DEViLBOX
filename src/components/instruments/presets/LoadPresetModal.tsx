@@ -325,14 +325,14 @@ export const LoadPresetModal: React.FC<LoadPresetModalProps> = ({ onClose }) => 
     const colors: Record<string, string> = {
       Bass: 'text-blue-400', Leads: 'text-yellow-400', Pads: 'text-purple-400',
       Drums: 'text-red-400', 'TR-808': 'text-red-500', 'TR-909': 'text-orange-400',
-      'TR-707': 'text-rose-400', 'TR-505': 'text-amber-400', Chip: 'text-cyan-400',
+      'TR-707': 'text-rose-400', 'TR-505': 'text-amber-400', Chip: 'text-accent-highlight',
       Furnace: 'text-teal-400', FX: 'text-green-400', Dub: 'text-green-400',
       DubSiren: 'text-red-500', SpaceLaser: 'text-green-500', V2: 'text-amber-500',
       Sam: 'text-amber-500', Synare: 'text-yellow-500', Drumnibus: 'text-emerald-400',
       Keys: 'text-amber-600', MAME: 'text-pink-400', Module: 'text-lime-400',
       // User categories
       Lead: 'text-yellow-400', Pad: 'text-purple-400', Drum: 'text-red-400',
-      User: 'text-gray-400', All: 'text-ft2-highlight',
+      User: 'text-text-secondary', All: 'text-ft2-highlight',
     };
     return colors[category] || 'text-ft2-highlight';
   };

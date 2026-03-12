@@ -516,8 +516,8 @@ export const MoogFilterEditor: React.FC<VisualEffectEditorProps> = ({
               onClick={() => onUpdateParameter('model', i)}
               className={`px-2 py-1.5 text-xs font-medium rounded transition-colors ${
                 Math.round(model) === i
-                  ? 'bg-amber-600 text-white'
-                  : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+                  ? 'bg-amber-600 text-text-primary'
+                  : 'bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover'
               }`}
             >
               {name}
@@ -534,8 +534,8 @@ export const MoogFilterEditor: React.FC<VisualEffectEditorProps> = ({
                   onClick={() => onUpdateParameter('filterMode', i)}
                   className={`px-2 py-1.5 text-xs font-medium rounded transition-colors ${
                     Math.round(filterMode) === i
-                      ? 'bg-amber-600 text-white'
-                      : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+                      ? 'bg-amber-600 text-text-primary'
+                      : 'bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover'
                   }`}
                 >
                   {name}

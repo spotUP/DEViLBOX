@@ -78,7 +78,7 @@ const OBXKnob: React.FC<{
         />
       </div>
 
-      <div className={`text-[9px] font-semibold text-gray-300 uppercase tracking-wide text-center`}>
+      <div className={`text-[9px] font-semibold text-text-secondary uppercase tracking-wide text-center`}>
         {label}
       </div>
     </div>
@@ -97,9 +97,9 @@ const OBXSwitch: React.FC<{
     <div className="flex flex-col items-center gap-1">
       <button
         onClick={onClick}
-        className={`w-6 h-6 rounded-full border-2 ${active ? 'bg-orange-500 border-orange-600' : 'bg-gray-800 border-gray-700'} shadow-md transition-all ${active ? 'shadow-lg shadow-orange-500/50' : ''}`}
+        className={`w-6 h-6 rounded-full border-2 ${active ? 'bg-orange-500 border-orange-600' : 'bg-dark-bgTertiary border-dark-borderLight'} shadow-md transition-all ${active ? 'shadow-lg shadow-orange-500/50' : ''}`}
       />
-      <div className="text-[8px] font-semibold text-gray-300 uppercase tracking-wide text-center">
+      <div className="text-[8px] font-semibold text-text-secondary uppercase tracking-wide text-center">
         {label}
       </div>
     </div>
@@ -126,11 +126,11 @@ export const OBXdHardware: React.FC<OBXdHardwareProps> = ({
         <div className="flex items-center justify-between">
           <div>
             <div className="text-orange-200 text-sm font-light tracking-[0.5em] uppercase">Oberheim</div>
-            <div className="text-white font-black text-4xl tracking-wider">OB-X</div>
+            <div className="text-text-primary font-black text-4xl tracking-wider">OB-X</div>
           </div>
           <div className="text-right">
             <div className="text-orange-200 text-xs font-light tracking-[0.3em] uppercase">Polyphonic</div>
-            <div className="text-white text-2xl font-bold">8 VOICE</div>
+            <div className="text-text-primary text-2xl font-bold">8 VOICE</div>
           </div>
         </div>
       </div>
@@ -139,12 +139,12 @@ export const OBXdHardware: React.FC<OBXdHardwareProps> = ({
       <div className="p-6 bg-gradient-to-b from-gray-800 to-gray-900">
         {/* Oscillator Section */}
         <div className="mb-6">
-          <div className="text-xs font-bold text-orange-400 uppercase tracking-widest mb-3 pb-1 border-b border-gray-700">
+          <div className="text-xs font-bold text-orange-400 uppercase tracking-widest mb-3 pb-1 border-b border-dark-borderLight">
             Oscillators
           </div>
           <div className="grid grid-cols-3 gap-6">
             <div className="text-center">
-              <div className="text-[10px] text-gray-400 uppercase mb-2">VCO 1</div>
+              <div className="text-[10px] text-text-secondary uppercase mb-2">VCO 1</div>
               <div className="flex gap-3 justify-center">
                 <OBXKnob
                   label="Freq"
@@ -162,7 +162,7 @@ export const OBXdHardware: React.FC<OBXdHardwareProps> = ({
             </div>
 
             <div className="text-center">
-              <div className="text-[10px] text-gray-400 uppercase mb-2">VCO 2</div>
+              <div className="text-[10px] text-text-secondary uppercase mb-2">VCO 2</div>
               <div className="flex gap-3 justify-center">
                 <OBXKnob
                   label="Freq"
@@ -180,7 +180,7 @@ export const OBXdHardware: React.FC<OBXdHardwareProps> = ({
             </div>
 
             <div className="text-center">
-              <div className="text-[10px] text-gray-400 uppercase mb-2">Mix</div>
+              <div className="text-[10px] text-text-secondary uppercase mb-2">Mix</div>
               <OBXKnob
                 label="Detune"
                 value={parameters.detune || 0.5}
@@ -191,7 +191,7 @@ export const OBXdHardware: React.FC<OBXdHardwareProps> = ({
           </div>
 
           {/* Waveform Switches */}
-          <div className="flex gap-8 justify-center mt-4 p-3 bg-gray-900/50 rounded">
+          <div className="flex gap-8 justify-center mt-4 p-3 bg-dark-bgSecondary/50 rounded">
             <div className="flex gap-3">
               <OBXSwitch label="SAW" active={parameters.vco1_saw === 1} onClick={() => onParamChange('vco1_saw', parameters.vco1_saw === 1 ? 0 : 1)} />
               <OBXSwitch label="PLS" active={parameters.vco1_pulse === 1} onClick={() => onParamChange('vco1_pulse', parameters.vco1_pulse === 1 ? 0 : 1)} />
@@ -205,7 +205,7 @@ export const OBXdHardware: React.FC<OBXdHardwareProps> = ({
 
         {/* Filter Section */}
         <div className="mb-6">
-          <div className="text-xs font-bold text-orange-400 uppercase tracking-widest mb-3 pb-1 border-b border-gray-700">
+          <div className="text-xs font-bold text-orange-400 uppercase tracking-widest mb-3 pb-1 border-b border-dark-borderLight">
             VCF (Filter)
           </div>
           <div className="flex gap-5 justify-center">
@@ -245,7 +245,7 @@ export const OBXdHardware: React.FC<OBXdHardwareProps> = ({
 
         {/* Envelope Section */}
         <div className="mb-6">
-          <div className="text-xs font-bold text-orange-400 uppercase tracking-widest mb-3 pb-1 border-b border-gray-700">
+          <div className="text-xs font-bold text-orange-400 uppercase tracking-widest mb-3 pb-1 border-b border-dark-borderLight">
             Envelope
           </div>
           <div className="flex gap-5 justify-center">
@@ -278,7 +278,7 @@ export const OBXdHardware: React.FC<OBXdHardwareProps> = ({
 
         {/* Master Section */}
         <div className="mb-4">
-          <div className="text-xs font-bold text-orange-400 uppercase tracking-widest mb-3 pb-1 border-b border-gray-700">
+          <div className="text-xs font-bold text-orange-400 uppercase tracking-widest mb-3 pb-1 border-b border-dark-borderLight">
             Master
           </div>
           <div className="flex gap-6 justify-center items-end">
@@ -302,8 +302,8 @@ export const OBXdHardware: React.FC<OBXdHardwareProps> = ({
       </div>
 
       {/* Bottom Info */}
-      <div className="px-4 py-1 bg-black border-t border-gray-800">
-        <div className="text-[9px] text-gray-600 text-center uppercase tracking-widest">
+      <div className="px-4 py-1 bg-black border-t border-dark-border">
+        <div className="text-[9px] text-text-muted text-center uppercase tracking-widest">
           Analog Polyphonic Synthesizer • Classic Warmth • 1979
         </div>
       </div>

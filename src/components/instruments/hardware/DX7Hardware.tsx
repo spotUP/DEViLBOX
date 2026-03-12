@@ -29,8 +29,8 @@ const DX7Slider: React.FC<{
   return (
     <div className="flex flex-col items-center gap-1">
       <div className="relative h-28 w-6 flex items-center justify-center">
-        <div className={`absolute inset-0 rounded bg-gray-800 border border-gray-700`}>
-          <div className="absolute left-1/2 top-1 bottom-1 w-0.5 -translate-x-1/2 bg-gray-900 rounded-full" />
+        <div className={`absolute inset-0 rounded bg-dark-bgTertiary border border-dark-borderLight`}>
+          <div className="absolute left-1/2 top-1 bottom-1 w-0.5 -translate-x-1/2 bg-dark-bgSecondary rounded-full" />
         </div>
 
         <input
@@ -57,7 +57,7 @@ const DX7Slider: React.FC<{
         />
       </div>
 
-      <div className={`text-[8px] font-bold text-gray-300 uppercase tracking-wide text-center`}>
+      <div className={`text-[8px] font-bold text-text-secondary uppercase tracking-wide text-center`}>
         {label}
       </div>
     </div>
@@ -75,14 +75,14 @@ const DX7Button: React.FC<{
   color?: 'gray' | 'green';
 }> = ({ label, active = false, onClick, small = false, color = 'gray' }) => {
   const colorMap = {
-    gray: active ? 'bg-gray-600' : 'bg-gray-700',
+    gray: active ? 'bg-dark-bgActive' : 'bg-dark-bgHover',
     green: active ? 'bg-green-600' : 'bg-green-700',
   };
 
   return (
     <button
       onClick={onClick}
-      className={`${colorMap[color]} hover:brightness-110 text-white ${small ? 'text-[8px] px-2 py-1' : 'text-[9px] px-3 py-1.5'} font-bold rounded border border-gray-900 shadow-md transition-all ${active ? 'shadow-lg' : ''}`}
+      className={`${colorMap[color]} hover:brightness-110 text-text-primary ${small ? 'text-[8px] px-2 py-1' : 'text-[9px] px-3 py-1.5'} font-bold rounded border border-dark-border shadow-md transition-all ${active ? 'shadow-lg' : ''}`}
     >
       {label}
     </button>
@@ -105,12 +105,12 @@ export const DX7Hardware: React.FC<DX7HardwareProps> = ({
       }}
     >
       {/* Top Panel - Logo & LCD */}
-      <div className="px-6 py-3 bg-gradient-to-r from-gray-900 to-gray-800 border-b-2 border-gray-700">
+      <div className="px-6 py-3 bg-gradient-to-r from-gray-900 to-gray-800 border-b-2 border-dark-borderLight">
         <div className="flex items-center justify-between mb-3">
           <div>
-            <div className="text-gray-400 text-[10px] font-light tracking-[0.5em] uppercase">Yamaha</div>
-            <div className="text-white font-black text-4xl tracking-wider">DX7</div>
-            <div className="text-gray-400 text-[9px] font-light tracking-[0.3em] uppercase">Digital Programmable Algorithm Synthesizer</div>
+            <div className="text-text-secondary text-[10px] font-light tracking-[0.5em] uppercase">Yamaha</div>
+            <div className="text-text-primary font-black text-4xl tracking-wider">DX7</div>
+            <div className="text-text-secondary text-[9px] font-light tracking-[0.3em] uppercase">Digital Programmable Algorithm Synthesizer</div>
           </div>
         </div>
 
@@ -136,10 +136,10 @@ export const DX7Hardware: React.FC<DX7HardwareProps> = ({
       <div className="p-6 bg-gradient-to-b from-gray-400 to-gray-500">
         {/* Operator Sliders */}
         <div className="mb-6">
-          <div className="text-xs font-bold text-gray-800 uppercase tracking-widest mb-3 pb-1 border-b border-gray-600">
+          <div className="text-xs font-bold text-text-muted uppercase tracking-widest mb-3 pb-1 border-b border-dark-borderLight">
             Operator Levels
           </div>
-          <div className="flex gap-4 justify-center items-end bg-gray-500/30 rounded p-4">
+          <div className="flex gap-4 justify-center items-end bg-dark-bgActive/30 rounded p-4">
             <DX7Slider
               label="OP1"
               value={parameters.op1_level || 0.99}
@@ -175,7 +175,7 @@ export const DX7Hardware: React.FC<DX7HardwareProps> = ({
 
         {/* Master Controls */}
         <div className="mb-4">
-          <div className="text-xs font-bold text-gray-800 uppercase tracking-widest mb-3 pb-1 border-b border-gray-600">
+          <div className="text-xs font-bold text-text-muted uppercase tracking-widest mb-3 pb-1 border-b border-dark-borderLight">
             Master
           </div>
           <div className="flex gap-6 justify-center items-end">
@@ -198,7 +198,7 @@ export const DX7Hardware: React.FC<DX7HardwareProps> = ({
         </div>
 
         {/* Function Buttons */}
-        <div className="grid grid-cols-4 gap-2 mt-6 pt-4 border-t border-gray-600">
+        <div className="grid grid-cols-4 gap-2 mt-6 pt-4 border-t border-dark-borderLight">
           <DX7Button label="EDIT" color="green" />
           <DX7Button label="VOICE" color="gray" />
           <DX7Button label="FUNCTION" color="gray" />
@@ -214,8 +214,8 @@ export const DX7Hardware: React.FC<DX7HardwareProps> = ({
         </div>
 
         {/* Algorithm Display */}
-        <div className="mt-4 p-3 bg-gray-700 rounded border border-gray-800">
-          <div className="text-[9px] text-gray-300 uppercase tracking-wide mb-2 text-center">Algorithm 5</div>
+        <div className="mt-4 p-3 bg-dark-bgHover rounded border border-dark-border">
+          <div className="text-[9px] text-text-secondary uppercase tracking-wide mb-2 text-center">Algorithm 5</div>
           <div className="flex justify-center gap-2 text-[10px] font-mono text-green-400">
             <div className="flex flex-col items-center gap-1">
               <div className="w-6 h-6 border-2 border-green-400 rounded flex items-center justify-center">6</div>
@@ -237,8 +237,8 @@ export const DX7Hardware: React.FC<DX7HardwareProps> = ({
       </div>
 
       {/* Bottom Info */}
-      <div className="px-4 py-1 bg-gray-800 border-t border-gray-700">
-        <div className="text-[9px] text-gray-400 text-center uppercase tracking-widest">
+      <div className="px-4 py-1 bg-dark-bgTertiary border-t border-dark-borderLight">
+        <div className="text-[9px] text-text-secondary text-center uppercase tracking-widest">
           6-Operator FM Synthesis • 32 Algorithms • 16 Voices • 1983
         </div>
       </div>

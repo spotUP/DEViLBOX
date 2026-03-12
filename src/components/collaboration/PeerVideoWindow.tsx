@@ -84,7 +84,7 @@ export const PeerVideoWindow: React.FC = () => {
           padding: '6px 10px',
           borderRadius: 6,
           background: '#1e1e2e',
-          border: '1px solid #444',
+          border: '1px solid var(--color-border-light)',
           color: '#a855f7',
           fontSize: 11,
           fontFamily: 'JetBrains Mono, monospace',
@@ -126,7 +126,7 @@ export const PeerVideoWindow: React.FC = () => {
         style={{
           height: HEADER_HEIGHT,
           background: 'linear-gradient(180deg, #1e1e2e 0%, #16161e 100%)',
-          borderBottom: '1px solid #333',
+          borderBottom: '1px solid var(--color-border-light)',
           display: 'flex',
           alignItems: 'center',
           padding: '0 6px',
@@ -168,7 +168,7 @@ export const PeerVideoWindow: React.FC = () => {
 
       {/* Video area */}
       {!minimized && (
-        <div style={{ position: 'relative', width: '100%', height: size.h, background: '#0a0a12' }}>
+        <div style={{ position: 'relative', width: '100%', height: size.h, background: 'var(--color-bg)' }}>
           {/* Remote video (main) */}
           {hasRemoteVideo ? (
             <video
@@ -185,7 +185,7 @@ export const PeerVideoWindow: React.FC = () => {
               flexDirection: 'column', gap: 4,
             }}>
               <VideoOff size={24} color="#555" />
-              <span style={{ fontSize: 10, color: '#555', fontFamily: 'JetBrains Mono, monospace' }}>
+              <span style={{ fontSize: 10, color: 'var(--color-text-muted)', fontFamily: 'JetBrains Mono, monospace' }}>
                 Waiting for peer video...
               </span>
             </div>

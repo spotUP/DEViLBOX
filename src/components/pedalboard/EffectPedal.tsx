@@ -38,7 +38,7 @@ const PEDAL_COLORS: Record<PedalboardEffectCategory | 'default', {
   dynamics:   { bg: '#383838', bgEnd: '#222222', accent: '#aaaaaa', knob: '#cccccc', border: '#484848' },
   cabinet:    { bg: '#4a3018', bgEnd: '#2a1a0d', accent: '#cc9955', knob: '#cc9955', border: '#5a4028' },
   utility:    { bg: '#383838', bgEnd: '#222222', accent: '#aaaaaa', knob: '#cccccc', border: '#484848' },
-  default:    { bg: '#2a2a2a', bgEnd: '#1a1a1a', accent: '#cccccc', knob: '#cccccc', border: '#3a3a3a' },
+  default:    { bg: '#2a2a2a', bgEnd: 'var(--color-bg-tertiary)', accent: '#cccccc', knob: '#cccccc', border: '#3a3a3a' },
 };
 
 /** 3D enclosure shadow — layered for depth like a real metal pedal */
@@ -254,7 +254,7 @@ export const EffectPedal: React.FC<EffectPedalProps> = ({
       {!effect.enabled && (
         <div
           className="text-center text-[8px] uppercase tracking-widest mt-2"
-          style={{ color: '#555' }}
+          style={{ color: 'var(--color-text-muted)' }}
           role="status"
         >
           Bypassed

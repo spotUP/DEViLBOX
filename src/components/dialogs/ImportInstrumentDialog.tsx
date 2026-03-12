@@ -94,7 +94,7 @@ export const ImportInstrumentDialog: React.FC<ImportInstrumentDialogProps> = ({
         <div className="flex items-center gap-3 mb-5">
           <Cpu className="w-5 h-5 text-accent-primary flex-shrink-0" />
           <div className="min-w-0">
-            <h2 className="text-lg font-bold text-white leading-tight">Add Instrument?</h2>
+            <h2 className="text-lg font-bold text-text-primary leading-tight">Add Instrument?</h2>
             <p className="text-text-muted text-xs font-mono truncate">{file.name}</p>
           </div>
         </div>
@@ -103,7 +103,7 @@ export const ImportInstrumentDialog: React.FC<ImportInstrumentDialogProps> = ({
           <p className="text-accent-error text-sm mb-5">{error}</p>
         ) : preview ? (
           <div className="bg-dark-bgSecondary rounded-lg p-4 mb-5">
-            <p className="text-white font-bold text-base truncate">{preview.name}</p>
+            <p className="text-text-primary font-bold text-base truncate">{preview.name}</p>
             <p className="text-text-muted text-sm mt-0.5">{typeLabel}</p>
           </div>
         ) : (

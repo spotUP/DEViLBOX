@@ -82,14 +82,14 @@ export const LFOControls: React.FC<LFOControlsProps> = ({
 
             {/* Filter Amount */}
             <div className="flex items-center gap-1">
-              <Filter size={12} className="text-cyan-400" />
+              <Filter size={12} className="text-accent-highlight" />
               <input
                 type="range"
                 min={0}
                 max={100}
                 value={lfo.filterAmount}
                 onChange={(e) => updateLFO({ filterAmount: parseInt(e.target.value) })}
-                className="w-12 h-1 accent-cyan-400"
+                className="w-12 h-1 accent-accent-highlight"
               />
             </div>
 
@@ -212,7 +212,7 @@ export const LFOControls: React.FC<LFOControlsProps> = ({
         {/* Filter */}
         <div className="text-center">
           <div className="flex items-center justify-center gap-1 mb-2">
-            <Filter size={14} className="text-cyan-400" />
+            <Filter size={14} className="text-accent-highlight" />
             <span className="text-xs text-text-muted">Filter</span>
           </div>
           <Knob

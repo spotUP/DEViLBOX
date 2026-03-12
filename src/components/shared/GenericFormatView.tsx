@@ -85,7 +85,7 @@ export const GenericFormatView: React.FC<GenericFormatViewProps> = ({
         width: '100%',
         height: '100%',
         backgroundColor: '#0d0d0d',
-        color: '#ccc',
+        color: 'var(--color-text-secondary)',
         fontFamily: 'JetBrains Mono, Fira Code, monospace',
         fontSize: '12px',
       }}
@@ -98,18 +98,18 @@ export const GenericFormatView: React.FC<GenericFormatViewProps> = ({
           gap: '12px',
           height: `${TOOLBAR_H}px`,
           padding: '0 12px',
-          borderBottom: '1px solid #222',
-          backgroundColor: '#1a1a1a',
+          borderBottom: '1px solid var(--color-border)',
+          backgroundColor: 'var(--color-bg-tertiary)',
         }}
       >
         <div style={{ fontWeight: 'bold', minWidth: '40px' }}>{formatLabel}</div>
-        <div style={{ flex: 1, fontSize: '11px', color: '#666' }}>{toolbarInfo}</div>
+        <div style={{ flex: 1, fontSize: '11px', color: 'var(--color-text-muted)' }}>{toolbarInfo}</div>
         <button
           onClick={isPlaying ? onStop : onPlay}
           style={{
             padding: '4px 12px',
             backgroundColor: isPlaying ? '#e95545' : '#4a7c4e',
-            color: '#fff',
+            color: 'var(--color-text)',
             border: 'none',
             borderRadius: '2px',
             cursor: 'pointer',
@@ -127,9 +127,9 @@ export const GenericFormatView: React.FC<GenericFormatViewProps> = ({
         <div
           style={{
             height: `${positionEditorHeight}px`,
-            borderBottom: '1px solid #222',
+            borderBottom: '1px solid var(--color-border)',
             overflow: 'auto',
-            backgroundColor: '#141414',
+            backgroundColor: 'var(--color-bg-secondary)',
           }}
         >
           {positionEditor}
@@ -150,7 +150,7 @@ export const GenericFormatView: React.FC<GenericFormatViewProps> = ({
         <div
           style={{
             flex: 1,
-            border: '1px solid #222',
+            border: '1px solid var(--color-border)',
             overflow: 'hidden',
             backgroundColor: '#0d0d0d',
           }}
@@ -172,9 +172,9 @@ export const GenericFormatView: React.FC<GenericFormatViewProps> = ({
           <div
             style={{
               width: `${sidePanelWidth}px`,
-              border: '1px solid #222',
+              border: '1px solid var(--color-border)',
               overflow: 'auto',
-              backgroundColor: '#141414',
+              backgroundColor: 'var(--color-bg-secondary)',
             }}
           >
             {sidePanel}

@@ -39,9 +39,9 @@ export const PedalboardManager: React.FC<PedalboardManagerProps> = ({
   const isCyanTheme = currentThemeId === 'cyan-lineart';
 
   const accentColor = isCyanTheme ? '#00ffff' : '#ffcc00';
-  const bgColor = isCyanTheme ? '#030808' : '#1a1a1a';
-  const panelBg = isCyanTheme ? '#051515' : '#1a1a1a';
-  const borderColor = isCyanTheme ? '#0a3030' : '#333';
+  const bgColor = isCyanTheme ? '#030808' : 'var(--color-bg-tertiary)';
+  const panelBg = isCyanTheme ? '#051515' : 'var(--color-bg-tertiary)';
+  const borderColor = isCyanTheme ? '#0a3030' : 'var(--color-border-light)';
 
   // Safe onChange wrapper with error handling
   const safeOnChange = useCallback((updatedPedalboard: NeuralPedalboard) => {
@@ -206,7 +206,7 @@ export const PedalboardManager: React.FC<PedalboardManagerProps> = ({
           <h3 className="text-lg font-bold" style={{ color: accentColor }}>
             Neural Pedalboard
           </h3>
-          <span className="text-xs text-gray-500" role="status">
+          <span className="text-xs text-text-muted" role="status">
             {pedalboard.chain.length} effect{pedalboard.chain.length !== 1 ? 's' : ''}
           </span>
         </div>
@@ -218,7 +218,7 @@ export const PedalboardManager: React.FC<PedalboardManagerProps> = ({
             size="sm"
             onClick={handleTogglePedalboard}
             icon={<Power size={14} />}
-            className={pedalboard.enabled ? 'text-green-400 hover:text-green-300' : 'text-gray-500 hover:text-gray-400'}
+            className={pedalboard.enabled ? 'text-green-400 hover:text-green-300' : 'text-text-muted hover:text-text-secondary'}
             aria-label={pedalboard.enabled ? 'Bypass pedalboard' : 'Enable pedalboard'}
             aria-pressed={pedalboard.enabled}
           >
@@ -257,7 +257,7 @@ export const PedalboardManager: React.FC<PedalboardManagerProps> = ({
       <div className="px-4 py-3 rounded-lg border" style={{ backgroundColor: panelBg, borderColor }}>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
           <div className="flex items-center gap-4">
-            <label htmlFor="input-gain" className="text-sm font-medium text-gray-400 min-w-[80px]">
+            <label htmlFor="input-gain" className="text-sm font-medium text-text-secondary min-w-[80px]">
               Input Gain
             </label>
             <div className="flex-1">
@@ -274,7 +274,7 @@ export const PedalboardManager: React.FC<PedalboardManagerProps> = ({
             </div>
           </div>
           <div className="flex items-center gap-4">
-            <label htmlFor="output-gain" className="text-sm font-medium text-gray-400 min-w-[80px]">
+            <label htmlFor="output-gain" className="text-sm font-medium text-text-secondary min-w-[80px]">
               Output Gain
             </label>
             <div className="flex-1">
@@ -298,7 +298,7 @@ export const PedalboardManager: React.FC<PedalboardManagerProps> = ({
         {pedalboard.chain.length === 0 ? (
           <div
             className="text-center py-12 rounded-lg border-2 border-dashed"
-            style={{ borderColor, color: '#666' }}
+            style={{ borderColor, color: 'var(--color-text-muted)' }}
             role="status"
           >
             <div className="text-sm mb-2">No effects in chain</div>
@@ -321,8 +321,8 @@ export const PedalboardManager: React.FC<PedalboardManagerProps> = ({
                   <button
                     onClick={() => handleMoveUp(index)}
                     disabled={index === 0}
-                    className="p-1 rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed hover:bg-gray-700"
-                    style={{ color: '#999' }}
+                    className="p-1 rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed hover:bg-dark-bgHover"
+                    style={{ color: 'var(--color-text-muted)' }}
                     title="Move effect up in chain"
                     aria-label="Move effect up in chain"
                   >
@@ -331,8 +331,8 @@ export const PedalboardManager: React.FC<PedalboardManagerProps> = ({
                   <button
                     onClick={() => handleMoveDown(index)}
                     disabled={index === pedalboard.chain.length - 1}
-                    className="p-1 rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed hover:bg-gray-700"
-                    style={{ color: '#999' }}
+                    className="p-1 rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed hover:bg-dark-bgHover"
+                    style={{ color: 'var(--color-text-muted)' }}
                     title="Move effect down in chain"
                     aria-label="Move effect down in chain"
                   >
@@ -378,7 +378,7 @@ export const PedalboardManager: React.FC<PedalboardManagerProps> = ({
             <h3 id="clear-confirm-title" className="text-lg font-bold mb-4" style={{ color: accentColor }}>
               Clear All Effects?
             </h3>
-            <p className="text-gray-400 mb-6">
+            <p className="text-text-secondary mb-6">
               This will remove all {pedalboard.chain.length} effect{pedalboard.chain.length !== 1 ? 's' : ''} from the chain.
             </p>
             <div className="flex gap-3 justify-end">

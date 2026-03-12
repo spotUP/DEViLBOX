@@ -84,7 +84,7 @@ export const DeltaMusic2Controls: React.FC<DeltaMusic2ControlsProps> = ({
   const accent  = isCyan ? '#00ffff' : '#ff9944';
   const knob    = isCyan ? '#00ffff' : '#ffbb66';
   const dim     = isCyan ? '#004444' : '#331800';
-  const panelBg = isCyan ? 'bg-[#041510] border-cyan-900/50' : 'bg-[#1a0e00] border-orange-900/30';
+  const panelBg = isCyan ? 'bg-[#041510] border-accent-highlight/20' : 'bg-[#1a0e00] border-orange-900/30';
 
   const SectionLabel: React.FC<{ label: string }> = ({ label }) => (
     <div className="text-[10px] font-bold uppercase tracking-widest mb-2"
@@ -180,7 +180,7 @@ export const DeltaMusic2Controls: React.FC<DeltaMusic2ControlsProps> = ({
     <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
       <div className={`rounded-lg border p-3 ${panelBg}`}>
         <SectionLabel label="Volume Table (5 entries)" />
-        <div className="text-[10px] text-gray-600 mb-2">
+        <div className="text-[10px] text-text-muted mb-2">
           Each entry: Speed (step rate), Level (0-255), Sustain (ticks at this level).
         </div>
         {config.volTable.slice(0, 5).map((entry, idx) => (
@@ -222,7 +222,7 @@ export const DeltaMusic2Controls: React.FC<DeltaMusic2ControlsProps> = ({
       {/* Vibrato table */}
       <div className={`rounded-lg border p-3 ${panelBg}`}>
         <SectionLabel label="Vibrato Table (5 entries)" />
-        <div className="text-[10px] text-gray-600 mb-2">
+        <div className="text-[10px] text-text-muted mb-2">
           Each entry: Speed (LFO rate), Delay (ticks before start), Sustain (ticks at this vibrato).
         </div>
         {config.vibTable.slice(0, 5).map((entry, idx) => (
@@ -264,7 +264,7 @@ export const DeltaMusic2Controls: React.FC<DeltaMusic2ControlsProps> = ({
             label="Bend" color={knob} size="md"
             formatValue={(v) => Math.round(v).toString()}
           />
-          <span className="text-[10px] text-gray-600">0 = no bend</span>
+          <span className="text-[10px] text-text-muted">0 = no bend</span>
         </div>
       </div>
     </div>
@@ -275,7 +275,7 @@ export const DeltaMusic2Controls: React.FC<DeltaMusic2ControlsProps> = ({
   const renderTable = () => {
     if (config.isSample || !config.table) {
       return (
-        <div className="p-3 text-[11px] text-gray-500">
+        <div className="p-3 text-[11px] text-text-muted">
           No synth sound table — this is a PCM sample instrument.
         </div>
       );

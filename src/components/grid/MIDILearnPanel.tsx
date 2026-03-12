@@ -116,7 +116,7 @@ export const MIDILearnPanel: React.FC<MIDILearnPanelProps> = ({ onClose }) => {
         {!isEnabled ? (
           <button
             onClick={handleEnableMIDI}
-            className="px-3 py-1.5 bg-accent-primary hover:bg-accent-primary/80 text-white rounded text-xs font-medium transition-colors"
+            className="px-3 py-1.5 bg-accent-primary hover:bg-accent-primary/80 text-text-primary rounded text-xs font-medium transition-colors"
           >
             Enable MIDI
           </button>
@@ -205,7 +205,7 @@ export const MIDILearnPanel: React.FC<MIDILearnPanelProps> = ({ onClose }) => {
                         className={`
                           flex items-center gap-2 px-2 py-1.5 rounded text-xs transition-colors
                           ${isCurrentlyLearning
-                            ? 'bg-accent-primary text-white animate-pulse'
+                            ? 'bg-accent-primary text-text-primary animate-pulse'
                             : isMapped
                             ? 'bg-accent-success/20 text-accent-success border border-accent-success/30'
                             : 'bg-dark-bgTertiary hover:bg-dark-bgActive text-text-secondary'

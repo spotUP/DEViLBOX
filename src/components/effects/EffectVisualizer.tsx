@@ -71,7 +71,7 @@ export const EffectOscilloscope: React.FC<EffectOscilloscopeProps> = ({
     ctx.fillRect(0, 0, width, height);
 
     // Zero line
-    ctx.strokeStyle = '#333';
+    ctx.strokeStyle = 'var(--color-border-light)';
     ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.moveTo(0, height / 2);
@@ -281,7 +281,7 @@ export const WaveshaperCurve: React.FC<WaveshaperCurveProps> = ({
     ctx.fillRect(0, 0, width, height);
 
     // Crosshairs
-    ctx.strokeStyle = '#333';
+    ctx.strokeStyle = 'var(--color-border-light)';
     ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.moveTo(width / 2, 0);
@@ -544,7 +544,7 @@ export const MiniOutputMeter: React.FC<MiniOutputMeterProps> = ({
     }
 
     // Peak tick at right edge
-    ctx.fillStyle = '#333';
+    ctx.fillStyle = 'var(--color-border-light)';
     ctx.fillRect(W - 2, 0, 2, H);
   });
 

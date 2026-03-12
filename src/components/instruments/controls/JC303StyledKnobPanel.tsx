@@ -414,13 +414,13 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
   const labelStyle = (x: number, y: number, width: number) => ({
     left: `${x}px`, top: `${y}px`, width: `${width}px`,
     position: 'absolute' as const, textAlign: 'center' as const,
-    fontSize: '10px', fontWeight: 'bold', color: '#888',
+    fontSize: '10px', fontWeight: 'bold', color: 'var(--color-text-muted)',
     textTransform: 'uppercase' as const, letterSpacing: '0.08em',
   });
 
   // Tab definitions
   const tabDefs: { id: TB303Tab; label: string; color: string; bgClass: string; textClass: string; ledOn?: boolean }[] = [
-    { id: 'osc', label: 'OSC', color: '#06b6d4', bgClass: 'bg-cyan-500', textClass: 'text-cyan-400' },
+    { id: 'osc', label: 'OSC', color: '#06b6d4', bgClass: 'bg-accent-highlight', textClass: 'text-accent-highlight' },
     { id: 'mojo', label: 'MOJO', color: '#ff9900', bgClass: 'bg-orange-500', textClass: 'text-orange-400' },
     ...(!isBuzz3o3 ? [
       { id: 'lfo' as TB303Tab, label: 'LFO', color: '#a855f7', bgClass: 'bg-purple-500', textClass: 'text-purple-400', ledOn: config.lfo?.enabled || false },
@@ -468,7 +468,7 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
           <Knob value={config.filter.cutoff} min={0} max={1} defaultValue={0.5} onChange={(v) => updateFilter('cutoff', v)} label="Cutoff" size="md" color="#ffcc00" formatValue={v => Math.round(CUTOFF_MIN * Math.pow(CUTOFF_MAX / CUTOFF_MIN, v)) + ' Hz'} />
           <label className="flex items-center gap-1 justify-center mt-1 cursor-pointer">
             <input type="checkbox" checked={config.devilFish?.extendedCutoff || false} onChange={(e) => updateDevilFish('extendedCutoff', e.target.checked)} className="w-3 h-3 accent-yellow-500 rounded" />
-            <span className="text-[8px] text-gray-400 uppercase">Wide</span>
+            <span className="text-[8px] text-text-secondary uppercase">Wide</span>
           </label>
         </div>
         <div style={style(250, 145, 65, 80)}><Knob value={config.filter.resonance} min={0} max={1} defaultValue={0} onChange={(v) => updateFilter('resonance', v)} label="Reso" size="md" color="#ffcc00" formatValue={v => Math.round(v * 100) + '%'} /></div>
@@ -476,7 +476,7 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
           <Knob value={config.filterEnvelope.envMod} min={0} max={1} defaultValue={0.5} onChange={(v) => updateFilterEnvelope('envMod', v)} label="EnvMod" size="md" color="#ffcc00" formatValue={v => Math.round(v * 100) + '%'} />
           <label className="flex items-center gap-1 justify-center mt-1 cursor-pointer">
             <input type="checkbox" checked={config.devilFish?.extendedEnvMod || false} onChange={(e) => updateDevilFish('extendedEnvMod', e.target.checked)} className="w-3 h-3 accent-yellow-500 rounded" />
-            <span className="text-[8px] text-gray-400 uppercase">Wide</span>
+            <span className="text-[8px] text-text-secondary uppercase">Wide</span>
           </label>
         </div>
         <div style={style(460, 145, 65, 80)}><Knob value={config.filterEnvelope.decay} min={0} max={1} defaultValue={0.5} onChange={(v) => updateFilterEnvelope('decay', v)} label="Decay" size="md" color="#ffcc00" formatValue={v => Math.round(DECAY_MIN * Math.pow(DECAY_MAX / DECAY_MIN, v)) + ' ms'} /></div>
@@ -492,7 +492,7 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
               className={clsx(
                 "relative px-3.5 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded-full border transition-all duration-200",
                 effectiveTab === t.id
-                  ? `${t.bgClass} text-white border-transparent shadow-lg ${shadowClasses[t.id] || ''}`
+                  ? `${t.bgClass} text-text-primary border-transparent shadow-lg ${shadowClasses[t.id] || ''}`
                   : `bg-black/40 ${t.textClass} border-white/5 hover:border-white/10 hover:bg-black/60`
               )}
             >
@@ -509,7 +509,7 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
             </button>
           ))}
           {/* Page indicator for MIDI controller */}
-          <span className="ml-auto text-[9px] text-gray-600 font-mono tracking-wider">
+          <span className="ml-auto text-[9px] text-text-muted font-mono tracking-wider">
             {tabDefs.findIndex(t => t.id === effectiveTab) + 1}/{tabDefs.length}
           </span>
         </div>
@@ -555,7 +555,7 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
                 <span className="text-[9px] font-bold text-purple-400/60 tracking-wider">WAVE</span>
                 <div className="flex gap-1.5 items-center">
                   {[0, 1, 2, 3, 4, 5].map(w => (
-                    <button key={w} onClick={() => updateLfo({ enabled: true, waveform: w })} className={clsx("w-10 h-8 text-[10px] font-bold rounded-md border-2 transition-all", config.lfo?.waveform === w ? "bg-purple-500 text-white border-purple-400 shadow-[0_0_8px_rgba(168,85,247,0.4)]" : "bg-black/50 text-purple-400/50 border-purple-900/40 hover:border-purple-500/50 hover:text-purple-400")}>
+                    <button key={w} onClick={() => updateLfo({ enabled: true, waveform: w })} className={clsx("w-10 h-8 text-[10px] font-bold rounded-md border-2 transition-all", config.lfo?.waveform === w ? "bg-purple-500 text-text-primary border-purple-400 shadow-[0_0_8px_rgba(168,85,247,0.4)]" : "bg-black/50 text-purple-400/50 border-purple-900/40 hover:border-purple-500/50 hover:text-purple-400")}>
                       {['TRI', 'SAW', 'SAW▼', 'SQR', 'S&H', 'NSE'][w]}
                     </button>
                   ))}
@@ -592,14 +592,14 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
               <div className="flex flex-col gap-2">
                 <span className="text-[9px] font-bold text-green-400/60 tracking-wider">DIMENSION</span>
                 <div className="flex items-center gap-2">
-                  <span className="text-[9px] text-gray-400 flex-shrink-0">Mode</span>
+                  <span className="text-[9px] text-text-secondary flex-shrink-0">Mode</span>
                   <div className="flex gap-1">
                     {[0, 1, 2, 3, 4].map(m => {
                       const activeMode = (config.chorus?.enabled && (config.chorus?.mode ?? 0) > 0) ? (config.chorus?.mode ?? 0) : 0;
                       return (
                         <button key={m} onClick={() => updateChorus({ mode: m, enabled: m > 0 })}
                           className={clsx("px-2.5 py-1 text-[10px] font-bold rounded border transition-all",
-                            activeMode === m ? "bg-green-500 text-white border-green-400" : "bg-black/50 text-green-400/50 border-green-900/40 hover:border-green-500/50"
+                            activeMode === m ? "bg-green-500 text-text-primary border-green-400" : "bg-black/50 text-green-400/50 border-green-900/40 hover:border-green-500/50"
                           )}>
                           {m === 0 ? 'Off' : m}
                         </button>
@@ -608,11 +608,11 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-[9px] text-gray-400 flex-shrink-0 w-8">Mix</span>
+                  <span className="text-[9px] text-text-secondary flex-shrink-0 w-8">Mix</span>
                   <input type="range" min={0} max={1} step={0.01} value={config.chorus?.mix ?? 0.5}
                     onChange={(e) => updateChorus({ mix: parseFloat(e.target.value) })}
                     className="flex-1 h-1.5 accent-green-500 cursor-pointer" style={{ minWidth: '80px' }} />
-                  <span className="text-[10px] text-gray-300 w-8 text-right tabular-nums">{Math.round((config.chorus?.mix ?? 0.5) * 100)}%</span>
+                  <span className="text-[10px] text-text-secondary w-8 text-right tabular-nums">{Math.round((config.chorus?.mix ?? 0.5) * 100)}%</span>
                 </div>
               </div>
               <div className="w-px self-stretch bg-white/5 flex-shrink-0" />
@@ -627,14 +627,14 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
                   { label: 'Spread', key: 'stereo', min: 0, max: 1, step: 0.01, value: config.delay?.stereo ?? 0.75, fmt: (v: number) => `${Math.round(v * 100)}%` },
                 ] as const).map(s => (
                   <div key={s.key} className="flex items-center gap-2">
-                    <span className="text-[9px] text-gray-400 w-14 flex-shrink-0">{s.label}</span>
+                    <span className="text-[9px] text-text-secondary w-14 flex-shrink-0">{s.label}</span>
                     <input type="range" min={s.min} max={s.max} step={s.step} value={s.value}
                       onChange={(e) => {
                         const raw = parseFloat(e.target.value);
                         updateDelay(s.key as string, 'convert' in s ? (s as { convert: (v: number) => number }).convert(raw) : raw);
                       }}
                       className="flex-1 h-1.5 accent-green-500 cursor-pointer" />
-                    <span className="text-[10px] text-gray-300 w-14 text-right tabular-nums">{s.fmt(s.value)}</span>
+                    <span className="text-[10px] text-text-secondary w-14 text-right tabular-nums">{s.fmt(s.value)}</span>
                   </div>
                 ))}
               </div>
@@ -647,13 +647,13 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
           <div className="flex items-center gap-2">
             <div className="bg-accent-primary p-1 rounded"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="black" strokeWidth="3"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" /></svg></div>
             <div className="flex flex-col -space-y-1">
-              <span className="text-white font-black italic text-xl tracking-tighter">DB-303</span>
-              <span className="text-[8px] text-gray-500 font-bold uppercase tracking-widest">TB-303 WASM Engine</span>
+              <span className="text-text-primary font-black italic text-xl tracking-tighter">DB-303</span>
+              <span className="text-[8px] text-text-muted font-bold uppercase tracking-widest">TB-303 WASM Engine</span>
             </div>
           </div>
           <div className="h-8 w-px bg-white/5"></div>
           <div className="flex flex-col">
-            <label className="text-[8px] font-bold text-gray-500 mb-1">PRESET</label>
+            <label className="text-[8px] font-bold text-text-muted mb-1">PRESET</label>
             <select value="" onChange={(e) => { const p = TB303_PRESETS.find(pr => pr.name === e.target.value); if (p) { if (onPresetLoad) { onPresetLoad(p); } else if (p.tb303) { onChange(p.tb303 as Partial<TB303Config>); } } }} className="bg-[#111] text-[10px] text-accent-primary border border-white/5 rounded px-2 py-1 outline-none focus:border-accent-primary transition-colors max-w-[160px]">
               <option value="" disabled>Load Preset...</option>{TB303_PRESETS.map((p) => (<option key={p.name} value={p.name}>{p.name}{p.effects?.length ? ` [${p.effects.length} FX]` : ''}</option>))}
             </select>
@@ -682,18 +682,18 @@ export const JC303StyledKnobPanel: React.FC<JC303StyledKnobPanelProps> = memo(({
         {/* Quick Tips Bar */}
         <div className="absolute bottom-0 left-0 right-0 flex items-center gap-2 px-4 py-1.5 bg-black/50 border-t border-white/5" style={{ zIndex: 2 }}>
           <Lightbulb size={12} className="text-yellow-500/70 flex-shrink-0" />
-          <button onClick={() => cycleTip(-1)} className="text-gray-600 hover:text-gray-400 text-[10px] flex-shrink-0 px-0.5">&lsaquo;</button>
+          <button onClick={() => cycleTip(-1)} className="text-text-muted hover:text-text-secondary text-[10px] flex-shrink-0 px-0.5">&lsaquo;</button>
           <span
             className={clsx(
-              "text-[10px] text-gray-400 flex-1 transition-opacity duration-200 min-w-0 truncate",
+              "text-[10px] text-text-secondary flex-1 transition-opacity duration-200 min-w-0 truncate",
               tipFading ? "opacity-0" : "opacity-100"
             )}
             title={TB303_QUICK_TIPS[tipIndex]}
           >
             {TB303_QUICK_TIPS[tipIndex]}
           </span>
-          <button onClick={() => cycleTip(1)} className="text-gray-600 hover:text-gray-400 text-[10px] flex-shrink-0 px-0.5">&rsaquo;</button>
-          <span className="text-[7px] text-gray-600 font-mono flex-shrink-0 ml-2">V{CURRENT_VERSION}</span>
+          <button onClick={() => cycleTip(1)} className="text-text-muted hover:text-text-secondary text-[10px] flex-shrink-0 px-0.5">&rsaquo;</button>
+          <span className="text-[7px] text-text-muted font-mono flex-shrink-0 ml-2">V{CURRENT_VERSION}</span>
         </div>
       </div>
     </div>

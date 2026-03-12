@@ -174,7 +174,7 @@ const ConfirmDialog: React.FC<{
             }}
             className={`px-3 py-1.5 text-sm rounded transition-colors ${
               danger
-                ? 'bg-accent-error text-white hover:bg-accent-error/80'
+                ? 'bg-accent-error text-text-primary hover:bg-accent-error/80'
                 : 'bg-accent-primary text-text-inverse hover:bg-accent-primary/80'
             }`}
           >

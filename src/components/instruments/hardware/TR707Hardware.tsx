@@ -55,9 +55,9 @@ const TR707Slider: React.FC<{
     <div className="flex flex-col items-center gap-2 flex-1">
       {/* Slider track */}
       <div className="relative h-32 w-8 flex items-center justify-center">
-        <div className={`absolute inset-0 rounded-full ${isDark ? 'bg-gray-800' : 'bg-gray-300'} border ${isDark ? 'border-gray-700' : 'border-gray-400'} z-0`}>
+        <div className={`absolute inset-0 rounded-full ${isDark ? 'bg-dark-bgTertiary' : 'bg-dark-bgHover'} border ${isDark ? 'border-dark-borderLight' : 'border-dark-borderLight'} z-0`}>
           {/* Slider groove */}
-          <div className="absolute left-1/2 top-2 bottom-2 w-1 -translate-x-1/2 bg-gray-900 rounded-full" />
+          <div className="absolute left-1/2 top-2 bottom-2 w-1 -translate-x-1/2 bg-dark-bgSecondary rounded-full" />
         </div>
 
         {/* Slider input */}
@@ -88,10 +88,10 @@ const TR707Slider: React.FC<{
 
       {/* Label */}
       <div className="text-center">
-        <div className={`text-xs font-bold ${isDark ? 'text-gray-300' : 'text-gray-700'} tracking-wider`}>
+        <div className={`text-xs font-bold ${isDark ? 'text-text-secondary' : 'text-text-muted'} tracking-wider`}>
           {shortLabel}
         </div>
-        <div className={`text-[10px] ${isDark ? 'text-gray-500' : 'text-gray-500'} uppercase`}>
+        <div className={`text-[10px] ${isDark ? 'text-text-muted' : 'text-text-muted'} uppercase`}>
           {label}
         </div>
       </div>
@@ -150,7 +150,7 @@ const TR707Knob: React.FC<{
       >
         {/* Knob body */}
         <div
-          className={`absolute inset-0 rounded-full ${isDark ? 'bg-gray-800' : 'bg-gray-700'} border-4 ${isDark ? 'border-gray-900' : 'border-gray-900'} shadow-lg`}
+          className={`absolute inset-0 rounded-full ${isDark ? 'bg-dark-bgTertiary' : 'bg-dark-bgHover'} border-4 ${isDark ? 'border-dark-border' : 'border-dark-border'} shadow-lg`}
           style={{
             background: isDark
               ? 'radial-gradient(circle at 30% 30%, #4b5563, #1f2937)'
@@ -168,10 +168,10 @@ const TR707Knob: React.FC<{
         />
 
         {/* Center cap */}
-        <div className={`absolute inset-0 m-auto w-3 h-3 rounded-full ${isDark ? 'bg-gray-950' : 'bg-black'} shadow-inner`} />
+        <div className={`absolute inset-0 m-auto w-3 h-3 rounded-full ${isDark ? 'bg-dark-bg' : 'bg-black'} shadow-inner`} />
       </div>
 
-      <div className={`text-xs font-bold ${isDark ? 'text-gray-300' : 'text-gray-700'} uppercase tracking-wider text-center`}>
+      <div className={`text-xs font-bold ${isDark ? 'text-text-secondary' : 'text-text-muted'} uppercase tracking-wider text-center`}>
         {label}
       </div>
     </div>
@@ -196,15 +196,15 @@ export const TR707Hardware: React.FC<TR707HardwareProps> = ({
       }}
     >
       {/* Top Panel - Logo & Brand */}
-      <div className="px-4 py-2 bg-gradient-to-r from-orange-600 to-orange-500 border-b-2 border-gray-500 flex items-center justify-between">
+      <div className="px-4 py-2 bg-gradient-to-r from-orange-600 to-orange-500 border-b-2 border-dark-borderLight flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <div className="text-white font-black text-xl tracking-wider" style={{ fontFamily: 'monospace' }}>
+          <div className="text-text-primary font-black text-xl tracking-wider" style={{ fontFamily: 'monospace' }}>
             ROLAND
           </div>
         </div>
         <div className="text-right">
-          <div className="text-gray-800 text-xs font-light tracking-[0.3em] uppercase">Rhythm Composer</div>
-          <div className="text-gray-900 font-black text-3xl tracking-tight">TR-707</div>
+          <div className="text-text-muted text-xs font-light tracking-[0.3em] uppercase">Rhythm Composer</div>
+          <div className="text-text-inverse font-black text-3xl tracking-tight">TR-707</div>
         </div>
       </div>
 
@@ -213,7 +213,7 @@ export const TR707Hardware: React.FC<TR707HardwareProps> = ({
         {/* Left Section - Memory/Pattern (Simplified) */}
         <div className="flex-shrink-0 w-48 space-y-3">
           {/* LCD Display Area */}
-          <div className="bg-gradient-to-b from-gray-700 to-gray-800 p-3 rounded border-2 border-gray-600 shadow-inner">
+          <div className="bg-gradient-to-b from-gray-700 to-gray-800 p-3 rounded border-2 border-dark-borderLight shadow-inner">
             <div className="bg-green-900/30 border border-green-800 rounded p-2 min-h-[80px] font-mono text-xs text-green-400">
               <div className="opacity-80">MEMORY PATTERN</div>
               <div className="mt-2 text-[10px]">PTN: 01</div>
@@ -226,7 +226,7 @@ export const TR707Hardware: React.FC<TR707HardwareProps> = ({
             {['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'].map((btn) => (
               <button
                 key={btn}
-                className="bg-gray-700 hover:bg-gray-600 text-white text-xs font-bold py-2 rounded border border-gray-600 shadow"
+                className="bg-dark-bgHover hover:bg-dark-bgHover text-text-primary text-xs font-bold py-2 rounded border border-dark-borderLight shadow"
               >
                 {btn}
               </button>
@@ -235,10 +235,10 @@ export const TR707Hardware: React.FC<TR707HardwareProps> = ({
 
           {/* Menu Buttons */}
           <div className="space-y-1">
-            <button className="w-full bg-orange-600 hover:bg-orange-500 text-white text-xs font-bold py-2 rounded border border-orange-700">
+            <button className="w-full bg-orange-600 hover:bg-orange-500 text-text-primary text-xs font-bold py-2 rounded border border-orange-700">
               EDIT
             </button>
-            <button className="w-full bg-gray-700 hover:bg-gray-600 text-white text-xs font-bold py-2 rounded border border-gray-600">
+            <button className="w-full bg-dark-bgHover hover:bg-dark-bgHover text-text-primary text-xs font-bold py-2 rounded border border-dark-borderLight">
               OPTION
             </button>
           </div>
@@ -246,11 +246,11 @@ export const TR707Hardware: React.FC<TR707HardwareProps> = ({
 
         {/* Right Section - Mixer Faders */}
         <div className="flex-1 flex flex-col">
-          <div className="text-xs font-bold text-gray-700 uppercase tracking-widest mb-2 text-center">
+          <div className="text-xs font-bold text-text-muted uppercase tracking-widest mb-2 text-center">
             LEVEL
           </div>
           <div className="flex gap-2 justify-between items-end flex-1 px-2">
-            <div className="text-[9px] text-gray-600 uppercase tracking-tight self-start">MAX</div>
+            <div className="text-[9px] text-text-muted uppercase tracking-tight self-start">MAX</div>
             {DRUM_VOICES.map((voice) => (
               <TR707Slider
                 key={voice.key}
@@ -260,14 +260,14 @@ export const TR707Hardware: React.FC<TR707HardwareProps> = ({
                 onChange={(value) => onParamChange(voice.key, value)}
               />
             ))}
-            <div className="text-[9px] text-gray-600 uppercase tracking-tight self-start">MAX</div>
+            <div className="text-[9px] text-text-muted uppercase tracking-tight self-start">MAX</div>
           </div>
-          <div className="text-[9px] text-gray-600 uppercase tracking-tight text-center mt-1">MIN</div>
+          <div className="text-[9px] text-text-muted uppercase tracking-tight text-center mt-1">MIN</div>
 
           {/* Shuffle Knob */}
           <div className="flex justify-end mt-3 pr-4">
             <div className="text-center">
-              <div className="text-[10px] text-gray-700 uppercase font-bold mb-1">Shuffle</div>
+              <div className="text-[10px] text-text-muted uppercase font-bold mb-1">Shuffle</div>
               <TR707Knob
                 label=""
                 value={parameters.decay || 0.5}
@@ -281,18 +281,18 @@ export const TR707Hardware: React.FC<TR707HardwareProps> = ({
 
       {/* Bottom Section - Sequencer */}
       <div className="px-4 pb-3">
-        <div className="bg-gradient-to-b from-gray-600 to-gray-700 rounded p-2 border border-gray-500">
+        <div className="bg-gradient-to-b from-gray-600 to-gray-700 rounded p-2 border border-dark-borderLight">
           <div className="grid grid-cols-16 gap-0.5 mb-2">
             {Array.from({ length: 16 }, (_, i) => (
               <div
                 key={i}
-                className="bg-gray-800 hover:bg-gray-700 border border-gray-600 h-6 rounded-sm flex items-center justify-center text-[9px] text-gray-400"
+                className="bg-dark-bgTertiary hover:bg-dark-bgHover border border-dark-borderLight h-6 rounded-sm flex items-center justify-center text-[9px] text-text-secondary"
               >
                 {i + 1}
               </div>
             ))}
           </div>
-          <div className="flex gap-2 text-[9px] text-gray-300 justify-between px-1">
+          <div className="flex gap-2 text-[9px] text-text-secondary justify-between px-1">
             <span>Bass Drum</span>
             <span>Snare Drum</span>
             <span>Low Tom</span>
@@ -304,8 +304,8 @@ export const TR707Hardware: React.FC<TR707HardwareProps> = ({
       </div>
 
       {/* Bottom Info */}
-      <div className="px-4 py-1 bg-gray-800 border-t border-gray-600">
-        <div className="text-[9px] text-gray-500 text-center uppercase tracking-widest">
+      <div className="px-4 py-1 bg-dark-bgTertiary border-t border-dark-borderLight">
+        <div className="text-[9px] text-text-muted text-center uppercase tracking-widest">
           PCM Digital Rhythm Composer • 1985
         </div>
       </div>

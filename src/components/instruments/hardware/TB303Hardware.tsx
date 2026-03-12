@@ -67,7 +67,7 @@ const TB303Knob: React.FC<{
       >
         {/* Knob body */}
         <div
-          className="absolute inset-0 rounded-full border-2 border-gray-900 shadow-lg"
+          className="absolute inset-0 rounded-full border-2 border-dark-border shadow-lg"
           style={{
             background: knobColor,
           }}
@@ -83,7 +83,7 @@ const TB303Knob: React.FC<{
         />
       </div>
 
-      <div className={`text-[9px] font-bold text-gray-300 uppercase tracking-wide text-center`}>
+      <div className={`text-[9px] font-bold text-text-secondary uppercase tracking-wide text-center`}>
         {label}
       </div>
     </div>
@@ -101,7 +101,7 @@ const TB303Button: React.FC<{
 }> = ({ label, active = false, onClick, color = 'gray' }) => {
 
   const colorMap = {
-    gray: active ? 'bg-gray-600' : 'bg-gray-700',
+    gray: active ? 'bg-dark-bgActive' : 'bg-dark-bgHover',
     orange: active ? 'bg-orange-500' : 'bg-orange-600',
     red: active ? 'bg-red-500' : 'bg-red-600',
   };
@@ -109,7 +109,7 @@ const TB303Button: React.FC<{
   return (
     <button
       onClick={onClick}
-      className={`${colorMap[color]} hover:brightness-110 text-white text-[9px] font-bold px-3 py-1.5 rounded border border-gray-900 shadow-md transition-all ${active ? 'shadow-lg scale-95' : ''}`}
+      className={`${colorMap[color]} hover:brightness-110 text-text-primary text-[9px] font-bold px-3 py-1.5 rounded border border-dark-border shadow-md transition-all ${active ? 'shadow-lg scale-95' : ''}`}
     >
       {label}
     </button>
@@ -132,15 +132,15 @@ export const TB303Hardware: React.FC<TB303HardwareProps> = ({
       }}
     >
       {/* Top Panel - Logo */}
-      <div className="px-4 py-2 bg-gradient-to-r from-gray-800 to-gray-700 border-b-2 border-gray-900 flex items-center justify-between">
+      <div className="px-4 py-2 bg-gradient-to-r from-gray-800 to-gray-700 border-b-2 border-dark-border flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <div className="text-white font-black text-xl tracking-wider" style={{ fontFamily: 'monospace' }}>
+          <div className="text-text-primary font-black text-xl tracking-wider" style={{ fontFamily: 'monospace' }}>
             ROLAND
           </div>
         </div>
         <div className="text-right">
-          <div className="text-gray-300 text-xs font-light tracking-[0.3em] uppercase">Bass Line</div>
-          <div className="text-white font-black text-3xl tracking-tight">TB-303</div>
+          <div className="text-text-secondary text-xs font-light tracking-[0.3em] uppercase">Bass Line</div>
+          <div className="text-text-primary font-black text-3xl tracking-tight">TB-303</div>
         </div>
       </div>
 
@@ -148,7 +148,7 @@ export const TB303Hardware: React.FC<TB303HardwareProps> = ({
       <div className="p-6">
         {/* VCF Section */}
         <div className="mb-6">
-          <div className="text-xs font-bold text-gray-700 uppercase tracking-widest mb-3 border-b border-gray-400 pb-1">
+          <div className="text-xs font-bold text-text-muted uppercase tracking-widest mb-3 border-b border-dark-borderLight pb-1">
             VCF (Voltage Controlled Filter)
           </div>
           <div className="flex gap-6 justify-center">
@@ -185,7 +185,7 @@ export const TB303Hardware: React.FC<TB303HardwareProps> = ({
 
         {/* VCO Section */}
         <div className="mb-6">
-          <div className="text-xs font-bold text-gray-700 uppercase tracking-widest mb-3 border-b border-gray-400 pb-1">
+          <div className="text-xs font-bold text-text-muted uppercase tracking-widest mb-3 border-b border-dark-borderLight pb-1">
             VCO (Voltage Controlled Oscillator)
           </div>
           <div className="flex gap-6 justify-center items-end">
@@ -211,14 +211,14 @@ export const TB303Hardware: React.FC<TB303HardwareProps> = ({
                   onClick={() => onParamChange('waveform', 1)}
                 />
               </div>
-              <div className="text-[9px] font-bold text-gray-700 uppercase">Wave</div>
+              <div className="text-[9px] font-bold text-text-muted uppercase">Wave</div>
             </div>
           </div>
         </div>
 
         {/* VCA Section */}
         <div className="mb-4">
-          <div className="text-xs font-bold text-gray-700 uppercase tracking-widest mb-3 border-b border-gray-400 pb-1">
+          <div className="text-xs font-bold text-text-muted uppercase tracking-widest mb-3 border-b border-dark-borderLight pb-1">
             VCA (Voltage Controlled Amplifier)
           </div>
           <div className="flex gap-6 justify-center">
@@ -240,7 +240,7 @@ export const TB303Hardware: React.FC<TB303HardwareProps> = ({
         </div>
 
         {/* Mode Buttons */}
-        <div className="flex gap-2 justify-center mt-6 pt-4 border-t border-gray-400">
+        <div className="flex gap-2 justify-center mt-6 pt-4 border-t border-dark-borderLight">
           <TB303Button label="NORMAL" color="gray" />
           <TB303Button label="PATTERN" color="gray" />
           <TB303Button label="WRITE" color="orange" />
@@ -249,8 +249,8 @@ export const TB303Hardware: React.FC<TB303HardwareProps> = ({
       </div>
 
       {/* Bottom Info */}
-      <div className="px-4 py-1 bg-gray-900 border-t border-gray-700">
-        <div className="text-[9px] text-gray-500 text-center uppercase tracking-widest">
+      <div className="px-4 py-1 bg-dark-bgSecondary border-t border-dark-borderLight">
+        <div className="text-[9px] text-text-muted text-center uppercase tracking-widest">
           Computerized Bass Line • 1981-1984 • Acid House Legend
         </div>
       </div>

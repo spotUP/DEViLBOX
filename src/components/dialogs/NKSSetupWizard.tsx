@@ -170,7 +170,7 @@ export const NKSSetupWizard: React.FC = () => {
 
               <button
                 onClick={handleEnableKnobBar}
-                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-orange-600 hover:bg-orange-500 text-white text-sm font-semibold rounded-lg transition-colors"
+                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-orange-600 hover:bg-orange-500 text-text-primary text-sm font-semibold rounded-lg transition-colors"
               >
                 See Parameter Pages
                 <ChevronRight size={16} />
@@ -254,7 +254,7 @@ export const NKSSetupWizard: React.FC = () => {
 
               <button
                 onClick={handleExportInfo}
-                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-orange-600 hover:bg-orange-500 text-white text-sm font-semibold rounded-lg transition-colors"
+                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-orange-600 hover:bg-orange-500 text-text-primary text-sm font-semibold rounded-lg transition-colors"
               >
                 Learn About Export
                 <ChevronRight size={16} />
@@ -315,7 +315,7 @@ export const NKSSetupWizard: React.FC = () => {
 
               <button
                 onClick={() => setStep('done')}
-                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-orange-600 hover:bg-orange-500 text-white text-sm font-semibold rounded-lg transition-colors"
+                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-orange-600 hover:bg-orange-500 text-text-primary text-sm font-semibold rounded-lg transition-colors"
               >
                 Got It
                 <ChevronRight size={16} />
@@ -367,7 +367,7 @@ export const NKSSetupWizard: React.FC = () => {
 
               <button
                 onClick={handleFinish}
-                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-green-600 hover:bg-green-500 text-white text-sm font-semibold rounded-lg transition-colors"
+                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-green-600 hover:bg-green-500 text-text-primary text-sm font-semibold rounded-lg transition-colors"
               >
                 <Check size={16} />
                 Done

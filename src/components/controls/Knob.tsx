@@ -566,7 +566,7 @@ export const Knob: React.FC<KnobProps> = React.memo(({
     {/* Floating tooltip during drag */}
     {isDragging && createPortal(
       <div
-        className="fixed pointer-events-none z-[9999] px-2 py-1 bg-black/90 border border-accent-primary rounded text-xs font-mono font-bold text-white shadow-xl transform -translate-x-1/2 -translate-y-full"
+        className="fixed pointer-events-none z-[9999] px-2 py-1 bg-black/90 border border-accent-primary rounded text-xs font-mono font-bold text-text-primary shadow-xl transform -translate-x-1/2 -translate-y-full"
         style={{
           left: (knobRef.current?.getBoundingClientRect().left || 0) + knobSize / 2,
           top: (knobRef.current?.getBoundingClientRect().top || 0) - 8,

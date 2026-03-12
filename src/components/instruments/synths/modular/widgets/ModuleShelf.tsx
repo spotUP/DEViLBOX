@@ -48,7 +48,7 @@ export const ModuleShelf: React.FC<ModuleShelfProps> = ({ onAddModule }) => {
       {/* Trigger button */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-2 px-3 py-1.5 bg-accent-primary hover:bg-accent-secondary text-white rounded text-sm font-bold transition-all shadow-md active:scale-95"
+        className="flex items-center gap-2 px-3 py-1.5 bg-accent-primary hover:bg-accent-secondary text-text-primary rounded text-sm font-bold transition-all shadow-md active:scale-95"
       >
         <Plus className="w-4 h-4" />
         Add Module

@@ -47,6 +47,9 @@ const TAILWIND_HEX: Record<string, number> = {
   'text-slate-300':  0xcbd5e1, 'text-slate-400':  0x94a3b8,
   'text-stone-300':  0xd6d3d1, 'text-stone-400':  0xa8a29e,
   'text-white':      0xffffff,
+  // Design system token aliases
+  'text-text-primary': 0xf2f0f0, 'text-text-secondary': 0xa8a0a0, 'text-text-muted': 0x686060,
+  'text-accent-highlight': 0x22d3ee,
 };
 
 /** Map Lucide icon names (from synthCategories) → fontaudio icon characters */

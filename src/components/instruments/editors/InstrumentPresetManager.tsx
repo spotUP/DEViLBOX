@@ -35,7 +35,7 @@ export const SpaceLaserHeader: React.FC<SynthHeaderProps> = ({
 }) => {
   const accentColor = isCyanTheme ? '#00ffff' : '#00ff00';
   const headerBg = isCyanTheme
-    ? 'bg-[#041010] border-b-2 border-cyan-500'
+    ? 'bg-[#041010] border-b-2 border-accent-highlight'
     : 'bg-gradient-to-r from-[#2a2a2a] to-[#1a1a1a] border-b-4 border-[#00ff00]';
 
   return (
@@ -54,11 +54,11 @@ export const SpaceLaserHeader: React.FC<SynthHeaderProps> = ({
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="p-2 rounded-lg bg-gradient-to-br from-green-500 to-green-700 shadow-lg">
-                <Zap size={24} className="text-white" />
+                <Zap size={24} className="text-text-primary" />
               </div>
               <div>
                 <h2 className="text-xl font-black tracking-tight" style={{ color: accentColor }}>SPACE LASER</h2>
-                <p className={`text-[10px] uppercase tracking-widest ${isCyanTheme ? 'text-cyan-600' : 'text-gray-400'}`}>Cosmic Zap Generator</p>
+                <p className={`text-[10px] uppercase tracking-widest ${isCyanTheme ? 'text-accent-highlight' : 'text-text-secondary'}`}>Cosmic Zap Generator</p>
               </div>
             </div>
             
@@ -68,7 +68,7 @@ export const SpaceLaserHeader: React.FC<SynthHeaderProps> = ({
                 className={`p-1.5 rounded transition-all flex items-center gap-1.5 px-2 ${
                   instrument.isLive
                     ? 'bg-accent-success/20 text-accent-success ring-1 ring-accent-success/50 animate-pulse-glow'
-                    : 'bg-gray-800 text-text-muted hover:text-text-secondary border border-gray-700'
+                    : 'bg-dark-bgTertiary text-text-muted hover:text-text-secondary border border-dark-borderLight'
                 }`}
               >
                 <Radio size={14} />
@@ -97,7 +97,7 @@ export const V2Header: React.FC<SynthHeaderProps> = ({
 }) => {
   const accentColor = isCyanTheme ? '#00ffff' : '#ffaa00';
   const headerBg = isCyanTheme
-    ? 'bg-[#041010] border-b-2 border-cyan-500'
+    ? 'bg-[#041010] border-b-2 border-accent-highlight'
     : 'bg-gradient-to-r from-[#2a2a2a] to-[#1a1a1a] border-b-4 border-[#ffaa00]';
 
   const handleEnableSpeech = () => {
@@ -120,11 +120,11 @@ export const V2Header: React.FC<SynthHeaderProps> = ({
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="p-2 rounded-lg bg-gradient-to-br from-amber-500 to-amber-700 shadow-lg">
-                <Box size={24} className="text-white" />
+                <Box size={24} className="text-text-primary" />
               </div>
               <div>
                 <h2 className="text-xl font-black tracking-tight" style={{ color: accentColor }}>V2 SYNTH</h2>
-                <p className={`text-[10px] uppercase tracking-widest ${isCyanTheme ? 'text-cyan-600' : 'text-gray-400'}`}>Farbrausch 4k Intro Engine</p>
+                <p className={`text-[10px] uppercase tracking-widest ${isCyanTheme ? 'text-accent-highlight' : 'text-text-secondary'}`}>Farbrausch 4k Intro Engine</p>
               </div>
             </div>
 
@@ -132,7 +132,7 @@ export const V2Header: React.FC<SynthHeaderProps> = ({
               {/* Mode Toggle: Switch to Speech */}
               <button
                 onClick={handleEnableSpeech}
-                className="p-1.5 rounded transition-all flex items-center gap-1.5 px-2 bg-gray-800 text-text-muted hover:text-amber-400 hover:bg-amber-500/10 border border-gray-700"
+                className="p-1.5 rounded transition-all flex items-center gap-1.5 px-2 bg-dark-bgTertiary text-text-muted hover:text-amber-400 hover:bg-amber-500/10 border border-dark-borderLight"
                 title="Switch to Speech Mode"
               >
                 <Mic size={14} />
@@ -144,7 +144,7 @@ export const V2Header: React.FC<SynthHeaderProps> = ({
                 className={`p-1.5 rounded transition-all flex items-center gap-1.5 px-2 ${
                   instrument.isLive
                     ? 'bg-accent-success/20 text-accent-success ring-1 ring-accent-success/50 animate-pulse-glow'
-                    : 'bg-gray-800 text-text-muted hover:text-text-secondary border border-gray-700'
+                    : 'bg-dark-bgTertiary text-text-muted hover:text-text-secondary border border-dark-borderLight'
                 }`}
               >
                 <Radio size={14} />
@@ -173,7 +173,7 @@ export const DubSirenHeader: React.FC<SynthHeaderProps> = ({
 }) => {
   const accentColor = isCyanTheme ? '#00ffff' : '#ff4444';
   const headerBg = isCyanTheme
-    ? 'bg-[#041010] border-b-2 border-cyan-500'
+    ? 'bg-[#041010] border-b-2 border-accent-highlight'
     : 'bg-gradient-to-r from-[#2a2a2a] to-[#1a1a1a] border-b-4 border-[#ff4444]';
 
   return (
@@ -192,11 +192,11 @@ export const DubSirenHeader: React.FC<SynthHeaderProps> = ({
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="p-2 rounded-lg bg-gradient-to-br from-red-500 to-red-700 shadow-lg">
-                <Megaphone size={24} className="text-white" />
+                <Megaphone size={24} className="text-text-primary" />
               </div>
               <div>
                 <h2 className="text-xl font-black tracking-tight" style={{ color: accentColor }}>DUB SIREN</h2>
-                <p className={`text-[10px] uppercase tracking-widest ${isCyanTheme ? 'text-cyan-600' : 'text-gray-400'}`}>Sound System Generator</p>
+                <p className={`text-[10px] uppercase tracking-widest ${isCyanTheme ? 'text-accent-highlight' : 'text-text-secondary'}`}>Sound System Generator</p>
               </div>
             </div>
 
@@ -206,7 +206,7 @@ export const DubSirenHeader: React.FC<SynthHeaderProps> = ({
                 className={`p-1.5 rounded transition-all flex items-center gap-1.5 px-2 ${
                   instrument.isLive
                     ? 'bg-accent-success/20 text-accent-success ring-1 ring-accent-success/50 animate-pulse-glow'
-                    : 'bg-gray-800 text-text-muted hover:text-text-secondary border border-gray-700'
+                    : 'bg-dark-bgTertiary text-text-muted hover:text-text-secondary border border-dark-borderLight'
                 }`}
               >
                 <Radio size={14} />
@@ -235,7 +235,7 @@ export const SynareHeader: React.FC<SynthHeaderProps> = ({
 }) => {
   const accentColor = isCyanTheme ? '#00ffff' : '#ffcc00';
   const headerBg = isCyanTheme
-    ? 'bg-[#041010] border-b-2 border-cyan-500'
+    ? 'bg-[#041010] border-b-2 border-accent-highlight'
     : 'bg-gradient-to-r from-[#2a2a2a] to-[#1a1a1a] border-b-4 border-[#ffcc00]';
 
   return (
@@ -258,7 +258,7 @@ export const SynareHeader: React.FC<SynthHeaderProps> = ({
               </div>
               <div>
                 <h2 className="text-xl font-black tracking-tight" style={{ color: accentColor }}>SYNARE 3</h2>
-                <p className={`text-[10px] uppercase tracking-widest ${isCyanTheme ? 'text-cyan-600' : 'text-gray-400'}`}>Electronic Percussion</p>
+                <p className={`text-[10px] uppercase tracking-widest ${isCyanTheme ? 'text-accent-highlight' : 'text-text-secondary'}`}>Electronic Percussion</p>
               </div>
             </div>
 
@@ -268,7 +268,7 @@ export const SynareHeader: React.FC<SynthHeaderProps> = ({
                 className={`p-1.5 rounded transition-all flex items-center gap-1.5 px-2 ${
                   instrument.isLive
                     ? 'bg-accent-success/20 text-accent-success ring-1 ring-accent-success/50 animate-pulse-glow'
-                    : 'bg-gray-800 text-text-muted hover:text-text-secondary border border-gray-700'
+                    : 'bg-dark-bgTertiary text-text-muted hover:text-text-secondary border border-dark-borderLight'
                 }`}
               >
                 <Radio size={14} />

@@ -436,7 +436,7 @@ export const MIDILearnModal: React.FC<MIDILearnModalProps> = ({ isOpen, onClose 
                   </p>
                   <button
                     onClick={enableMIDI}
-                    className="px-6 py-2 bg-accent-primary hover:bg-accent-primary/80 text-white rounded font-medium transition-colors"
+                    className="px-6 py-2 bg-accent-primary hover:bg-accent-primary/80 text-text-primary rounded font-medium transition-colors"
                   >
                     Enable MIDI
                   </button>
@@ -509,7 +509,7 @@ export const MIDILearnModal: React.FC<MIDILearnModalProps> = ({ isOpen, onClose 
                         </h4>
                         <button
                           onClick={applySuggestedMappings}
-                          className="px-3 py-1.5 bg-accent-primary hover:bg-accent-primary/80 text-white text-sm rounded transition-colors"
+                          className="px-3 py-1.5 bg-accent-primary hover:bg-accent-primary/80 text-text-primary text-sm rounded transition-colors"
                         >
                           Apply Suggested Mappings
                         </button>
@@ -566,7 +566,7 @@ export const MIDILearnModal: React.FC<MIDILearnModalProps> = ({ isOpen, onClose 
                             className={`
                               flex items-center justify-between px-3 py-2 rounded text-sm
                               ${isCurrentlyLearning
-                                ? 'bg-accent-primary text-white'
+                                ? 'bg-accent-primary text-text-primary'
                                 : mapped
                                 ? 'bg-accent-success/20 border border-accent-success/30'
                                 : 'bg-dark-bgTertiary'
@@ -647,7 +647,7 @@ export const MIDILearnModal: React.FC<MIDILearnModalProps> = ({ isOpen, onClose 
                             className={`
                               flex items-center justify-between px-3 py-2 rounded text-sm
                               ${isCurrentlyLearning
-                                ? 'bg-accent-primary text-white'
+                                ? 'bg-accent-primary text-text-primary'
                                 : mapped
                                 ? 'bg-accent-success/20 border border-accent-success/30'
                                 : 'bg-dark-bgTertiary'
@@ -823,7 +823,7 @@ export const MIDILearnModal: React.FC<MIDILearnModalProps> = ({ isOpen, onClose 
                   <button
                     onClick={applySuggestedMappings}
                     disabled={!selectedProfile}
-                    className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-accent-primary hover:bg-accent-primary/80 disabled:bg-dark-bgSecondary disabled:text-text-muted text-white rounded font-medium transition-colors"
+                    className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-accent-primary hover:bg-accent-primary/80 disabled:bg-dark-bgSecondary disabled:text-text-muted text-text-primary rounded font-medium transition-colors"
                   >
                     <Zap size={18} />
                     Apply Suggested Mappings
@@ -854,7 +854,7 @@ export const MIDILearnModal: React.FC<MIDILearnModalProps> = ({ isOpen, onClose 
                       <button
                         onClick={syncDisplayNames}
                         disabled={displaySyncStatus === 'syncing' || mappings.length === 0}
-                        className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-accent-primary hover:bg-accent-primary/80 disabled:bg-dark-bgTertiary disabled:text-text-muted text-white rounded text-sm transition-colors"
+                        className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-accent-primary hover:bg-accent-primary/80 disabled:bg-dark-bgTertiary disabled:text-text-muted text-text-primary rounded text-sm transition-colors"
                       >
                         <Monitor size={16} />
                         {displaySyncStatus === 'syncing' ? 'Syncing...' : 'Sync Current Mappings'}

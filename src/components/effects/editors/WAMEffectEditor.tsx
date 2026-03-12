@@ -32,7 +32,7 @@ export const GenericEffectEditor: React.FC<VisualEffectEditorProps> = ({
             formatValue={(v) => `${Math.round(v)}%`}
           />
         </div>
-        <p className="text-xs text-gray-500 text-center mt-4">
+        <p className="text-xs text-text-muted text-center mt-4">
           Use sliders in the expanded view for this effect type.
         </p>
       </section>

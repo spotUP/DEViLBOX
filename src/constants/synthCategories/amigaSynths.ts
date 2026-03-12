@@ -17,7 +17,7 @@ export const amigaSynthEntries: Record<string, SynthInfo> = {
     description: 'Playback-only engine for 130+ exotic Amiga tracker formats via UADE',
     bestFor: ['Amiga modules', 'Exotic formats', 'Playback'],
     icon: 'Disc',
-    color: 'text-gray-500',
+    color: 'text-text-muted',
   },
   SoundMonSynth: {
     type: 'SoundMonSynth',
@@ -26,7 +26,7 @@ export const amigaSynthEntries: Record<string, SynthInfo> = {
     description: 'SoundMon II / Brian Postma wavetable synthesizer',
     bestFor: ['Amiga chiptune', 'Wavetable'],
     icon: 'Disc',
-    color: 'text-gray-500',
+    color: 'text-text-muted',
   },
   SidMonSynth: {
     type: 'SidMonSynth',
@@ -35,7 +35,7 @@ export const amigaSynthEntries: Record<string, SynthInfo> = {
     description: 'SidMon II SID-like synthesis for Amiga',
     bestFor: ['Amiga chiptune', 'SID-like'],
     icon: 'Disc',
-    color: 'text-gray-500',
+    color: 'text-text-muted',
   },
   DigMugSynth: {
     type: 'DigMugSynth',
@@ -44,7 +44,7 @@ export const amigaSynthEntries: Record<string, SynthInfo> = {
     description: 'Digital Mugician 4-wave blending wavetable synthesizer',
     bestFor: ['Amiga chiptune', 'Wavetable'],
     icon: 'Disc',
-    color: 'text-gray-500',
+    color: 'text-text-muted',
   },
   FCSynth: {
     type: 'FCSynth',
@@ -53,7 +53,7 @@ export const amigaSynthEntries: Record<string, SynthInfo> = {
     description: 'Future Composer 1.3/1.4 with 47 waveforms and synth macro',
     bestFor: ['Amiga chiptune', 'Wavetable'],
     icon: 'Disc',
-    color: 'text-gray-500',
+    color: 'text-text-muted',
   },
   FredSynth: {
     type: 'FredSynth',
@@ -62,7 +62,7 @@ export const amigaSynthEntries: Record<string, SynthInfo> = {
     description: 'Fred Editor macro-driven wavetable synthesizer',
     bestFor: ['Amiga chiptune', 'Wavetable'],
     icon: 'Disc',
-    color: 'text-gray-500',
+    color: 'text-text-muted',
   },
   TFMXSynth: {
     type: 'TFMXSynth',
@@ -71,7 +71,7 @@ export const amigaSynthEntries: Record<string, SynthInfo> = {
     description: 'TFMX / Jochen Hippel SndMod/VolMod sequence synthesizer',
     bestFor: ['Amiga chiptune', 'Game music'],
     icon: 'Disc',
-    color: 'text-gray-500',
+    color: 'text-text-muted',
   },
   HippelCoSoSynth: {
     type: 'HippelCoSoSynth',
@@ -107,7 +107,7 @@ export const amigaSynthEntries: Record<string, SynthInfo> = {
     description: 'OctaMED synthesizer instrument: vol/wf command-table oscillator with up to 10 waveforms',
     bestFor: ['Amiga chiptune', 'Wavetable', 'Tracker synth'],
     icon: 'Waveform',
-    color: 'text-cyan-300',
+    color: 'text-accent-highlight',
   },
   DavidWhittakerSynth: {
     type: 'DavidWhittakerSynth',
@@ -143,7 +143,7 @@ export const amigaSynthEntries: Record<string, SynthInfo> = {
     description: 'Amiga Delta Music 1.0 — 4-channel wavetable synth with ADSR envelopes and arpeggios',
     bestFor: ['Amiga chiptune', 'Wavetable', '4-channel'],
     icon: 'Disc',
-    color: 'text-gray-400',
+    color: 'text-text-secondary',
   },
   DeltaMusic2Synth: {
     type: 'DeltaMusic2Synth',
@@ -152,7 +152,7 @@ export const amigaSynthEntries: Record<string, SynthInfo> = {
     description: 'Amiga Delta Music 2.0 — 4-channel wavetable synth with vol/vib tables',
     bestFor: ['Amiga chiptune', 'Wavetable', '4-channel'],
     icon: 'Disc',
-    color: 'text-gray-400',
+    color: 'text-text-secondary',
   },
   SonicArrangerSynth: {
     type: 'SonicArrangerSynth',
@@ -161,7 +161,7 @@ export const amigaSynthEntries: Record<string, SynthInfo> = {
     description: 'Amiga Sonic Arranger — 4-channel synth with 18 real-time waveform effects',
     bestFor: ['Amiga chiptune', 'Wavetable', 'Synthesis effects'],
     icon: 'Disc',
-    color: 'text-gray-400',
+    color: 'text-text-secondary',
   },
   JamCrackerSynth: {
     type: 'JamCrackerSynth',
@@ -170,7 +170,7 @@ export const amigaSynthEntries: Record<string, SynthInfo> = {
     description: 'Amiga JamCracker — 4-channel tracker with AM synthesis and PCM samples',
     bestFor: ['Amiga', 'AM synthesis', 'Tracker'],
     icon: 'Disc',
-    color: 'text-gray-400',
+    color: 'text-text-secondary',
   },
   FuturePlayerSynth: {
     type: 'FuturePlayerSynth',
@@ -179,7 +179,7 @@ export const amigaSynthEntries: Record<string, SynthInfo> = {
     description: 'Amiga Future Player — 4-channel synth with wavetable, modulation and envelope effects',
     bestFor: ['Amiga', 'Wavetable', 'Modulation synthesis'],
     icon: 'Disc',
-    color: 'text-gray-400',
+    color: 'text-text-secondary',
   },
   C64SID: {
     type: 'C64SID',
@@ -197,7 +197,7 @@ export const amigaSynthEntries: Record<string, SynthInfo> = {
     description: 'Klystrack chiptune tracker with wavetable synthesis, FM, filters and effects',
     bestFor: ['Chiptune', 'Wavetable', 'Tracker'],
     icon: 'Disc',
-    color: 'text-cyan-400',
+    color: 'text-accent-highlight',
   },
   Sc68Synth: {
     type: 'Sc68Synth',

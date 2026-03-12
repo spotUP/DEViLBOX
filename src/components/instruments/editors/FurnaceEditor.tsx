@@ -306,10 +306,10 @@ export const FurnaceEditor: React.FC<FurnaceEditorProps> = ({ config, instrument
       <div className="flex items-center justify-between bg-dark-bgSecondary p-3 rounded-lg border border-dark-border/50">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 bg-gradient-to-br from-indigo-600 to-violet-700 rounded flex items-center justify-center shadow-lg shadow-indigo-900/20">
-            <Cpu size={20} className="text-white" />
+            <Cpu size={20} className="text-text-primary" />
           </div>
           <div>
-            <h2 className="font-bold text-white text-sm tracking-tight">{chipName}</h2>
+            <h2 className="font-bold text-text-primary text-sm tracking-tight">{chipName}</h2>
             <div className="flex items-center gap-2">
               <span className="text-[10px] text-text-muted font-mono uppercase bg-dark-bg px-1.5 py-0.5 rounded border border-dark-border">
                 {category} • {paramRanges.opCount}OP
@@ -369,8 +369,8 @@ export const FurnaceEditor: React.FC<FurnaceEditorProps> = ({ config, instrument
               onClick={() => setActiveTab(tab)}
               className={`flex-1 py-1.5 px-3 rounded text-xs font-mono uppercase transition-colors ${
                 activeTab === tab
-                  ? 'bg-amber-600 text-white'
-                  : 'text-text-muted hover:text-white hover:bg-dark-bgSecondary'
+                  ? 'bg-amber-600 text-text-primary'
+                  : 'text-text-muted hover:text-text-primary hover:bg-dark-bgSecondary'
               }`}
             >
               {tab === 'fm' ? 'Operators' : tab === 'macros' ? 'Macros' : 'Settings'}
@@ -466,7 +466,7 @@ export const FurnaceEditor: React.FC<FurnaceEditorProps> = ({ config, instrument
       {category === "FM" && activeTab === 'chip' && (
         <div className="bg-dark-bgSecondary p-4 rounded-lg border border-dark-border animate-in fade-in duration-200">
           <div className="flex items-center gap-2 mb-4">
-            <Settings size={16} className="text-cyan-400" />
+            <Settings size={16} className="text-accent-highlight" />
             <h3 className="font-mono text-xs font-bold text-text-primary uppercase">Chip Settings</h3>
           </div>
 
@@ -477,7 +477,7 @@ export const FurnaceEditor: React.FC<FurnaceEditorProps> = ({ config, instrument
                 <select
                   value={config.opllPreset}
                   onChange={(e) => pushLiveUpdate({ opllPreset: parseInt(e.target.value) })}
-                  className="w-full bg-dark-bg border border-dark-border rounded px-2 py-1 text-xs text-white"
+                  className="w-full bg-dark-bg border border-dark-border rounded px-2 py-1 text-xs text-text-primary"
                 >
                   {OPLL_PRESETS.map((name, i) => (
                     <option key={i} value={i}>{i}: {name}</option>
@@ -529,13 +529,13 @@ export const FurnaceEditor: React.FC<FurnaceEditorProps> = ({ config, instrument
       {(category === "Wavetable" || config.wavetables.length > 0) && (
         <div className="bg-dark-bgSecondary p-4 rounded-lg border border-dark-border animate-in fade-in slide-in-from-top-2">
           <div className="flex items-center gap-2 mb-4">
-            <Waves size={16} className="text-cyan-400" />
+            <Waves size={16} className="text-accent-highlight" />
             <h3 className="font-mono text-xs font-bold text-text-primary uppercase tracking-wider">
               Wavetable Editor ({config.wavetables.length} waves)
             </h3>
             <button
               onClick={() => fileInputRef.current?.click()}
-              className="p-1 text-text-muted hover:text-cyan-400 transition-colors"
+              className="p-1 text-text-muted hover:text-accent-highlight transition-colors"
               title="Import .wav or .fuw wave"
             >
               <FileUp size={14} />
@@ -621,7 +621,7 @@ const OperatorCard: React.FC<OperatorCardProps> = ({
         <div className="flex items-center gap-2">
           <button
             onClick={onToggleExpand}
-            className="text-text-muted hover:text-white transition-colors"
+            className="text-text-muted hover:text-text-primary transition-colors"
           >
             {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
           </button>
@@ -770,8 +770,8 @@ const ToggleButton: React.FC<{
     onClick={() => onChange(!value)}
     className={`text-[9px] font-mono px-1.5 py-0.5 rounded border transition-colors ${
       value
-        ? 'bg-cyan-600/20 border-cyan-500/50 text-cyan-400'
-        : 'bg-dark-bg border-dark-border text-text-muted hover:text-white'
+        ? 'bg-accent-highlight/20 border-accent-highlight/50 text-accent-highlight'
+        : 'bg-dark-bg border-dark-border text-text-muted hover:text-text-primary'
     }`}
   >
     {label}
@@ -837,7 +837,7 @@ const GBPanel: React.FC<{ config: FurnaceConfig; onChange: (u: Partial<FurnaceCo
               className={`px-3 py-1 text-[10px] font-mono rounded border transition-colors ${
                 gb.envDir === 1
                   ? 'bg-emerald-600/20 border-emerald-500/50 text-emerald-400'
-                  : 'bg-dark-bg border-dark-border text-text-muted hover:text-white'
+                  : 'bg-dark-bg border-dark-border text-text-muted hover:text-text-primary'
               }`}
             >
               ↑ UP
@@ -847,7 +847,7 @@ const GBPanel: React.FC<{ config: FurnaceConfig; onChange: (u: Partial<FurnaceCo
               className={`px-3 py-1 text-[10px] font-mono rounded border transition-colors ${
                 gb.envDir === 0
                   ? 'bg-rose-600/20 border-rose-500/50 text-rose-400'
-                  : 'bg-dark-bg border-dark-border text-text-muted hover:text-white'
+                  : 'bg-dark-bg border-dark-border text-text-muted hover:text-text-primary'
               }`}
             >
               ↓ DOWN
@@ -860,7 +860,7 @@ const GBPanel: React.FC<{ config: FurnaceConfig; onChange: (u: Partial<FurnaceCo
               onClick={() => updateGB({ softEnv: !gb.softEnv })}
               className={`px-2 py-1 text-[9px] font-mono rounded border transition-colors ${
                 gb.softEnv
-                  ? 'bg-cyan-600/20 border-cyan-500/50 text-cyan-400'
+                  ? 'bg-accent-highlight/20 border-accent-highlight/50 text-accent-highlight'
                   : 'bg-dark-bg border-dark-border text-text-muted'
               }`}
             >
@@ -870,7 +870,7 @@ const GBPanel: React.FC<{ config: FurnaceConfig; onChange: (u: Partial<FurnaceCo
               onClick={() => updateGB({ alwaysInit: !gb.alwaysInit })}
               className={`px-2 py-1 text-[9px] font-mono rounded border transition-colors ${
                 gb.alwaysInit
-                  ? 'bg-cyan-600/20 border-cyan-500/50 text-cyan-400'
+                  ? 'bg-accent-highlight/20 border-accent-highlight/50 text-accent-highlight'
                   : 'bg-dark-bg border-dark-border text-text-muted'
               }`}
             >
@@ -1012,7 +1012,7 @@ const C64Panel: React.FC<{ config: FurnaceConfig; onChange: (u: Partial<FurnaceC
           {([
             { key: 'triOn',   label: 'TRI',   wfType: 'triangle', active: c64.triOn,   onColor: '#34d399', borderColor: 'border-emerald-500/50', textColor: 'text-emerald-400', bgColor: 'bg-emerald-600/20' },
             { key: 'sawOn',   label: 'SAW',   wfType: 'saw',      active: c64.sawOn,   onColor: '#fbbf24', borderColor: 'border-amber-500/50',   textColor: 'text-amber-400',   bgColor: 'bg-amber-600/20' },
-            { key: 'pulseOn', label: 'PULSE', wfType: 'square',   active: c64.pulseOn, onColor: '#22d3ee', borderColor: 'border-cyan-500/50',    textColor: 'text-cyan-400',    bgColor: 'bg-cyan-600/20' },
+            { key: 'pulseOn', label: 'PULSE', wfType: 'square',   active: c64.pulseOn, onColor: '#22d3ee', borderColor: 'border-accent-highlight/50',    textColor: 'text-accent-highlight',    bgColor: 'bg-accent-highlight/20' },
             { key: 'noiseOn', label: 'NOISE', wfType: 'noise',    active: c64.noiseOn, onColor: '#fb7185', borderColor: 'border-rose-500/50',    textColor: 'text-rose-400',    bgColor: 'bg-rose-600/20' },
           ] as const).map(({ key, label, wfType, active, onColor, borderColor, textColor, bgColor }) => (
             <button
@@ -1021,7 +1021,7 @@ const C64Panel: React.FC<{ config: FurnaceConfig; onChange: (u: Partial<FurnaceC
               className={`flex flex-col items-center gap-0.5 px-3 py-1.5 rounded border transition-colors ${
                 active
                   ? `${bgColor} ${borderColor} ${textColor}`
-                  : 'bg-dark-bg border-dark-border text-text-muted hover:text-white'
+                  : 'bg-dark-bg border-dark-border text-text-muted hover:text-text-primary'
               }`}
             >
               <WaveformThumbnail
@@ -1079,7 +1079,7 @@ const C64Panel: React.FC<{ config: FurnaceConfig; onChange: (u: Partial<FurnaceC
       <div className="grid grid-cols-2 gap-4">
         <div className="bg-dark-bgSecondary p-4 rounded-lg border border-dark-border">
           <div className="flex items-center gap-2 mb-4">
-            <Settings size={16} className="text-cyan-400" />
+            <Settings size={16} className="text-accent-highlight" />
             <h3 className="font-mono text-xs font-bold text-text-primary uppercase">Pulse Width</h3>
           </div>
           <Knob label="DUTY" value={c64.duty} min={0} max={4095}
@@ -1200,15 +1200,15 @@ const SNESPanel: React.FC<{ config: FurnaceConfig; onChange: (u: Partial<Furnace
   return (
     <div className="space-y-4 animate-in fade-in slide-in-from-top-2">
       {/* Envelope Mode */}
-      <div className="bg-dark-bgSecondary p-4 rounded-lg border border-cyan-500/30">
+      <div className="bg-dark-bgSecondary p-4 rounded-lg border border-accent-highlight/30">
         <div className="flex items-center gap-2 mb-4">
-          <Activity size={16} className="text-cyan-400" />
+          <Activity size={16} className="text-accent-highlight" />
           <h3 className="font-mono text-xs font-bold text-text-primary uppercase">SNES Envelope</h3>
           <button
             onClick={() => updateSNES({ useEnv: !snes.useEnv })}
             className={`ml-auto px-2 py-1 text-[9px] font-mono rounded border transition-colors ${
               snes.useEnv
-                ? 'bg-cyan-600/20 border-cyan-500/50 text-cyan-400'
+                ? 'bg-accent-highlight/20 border-accent-highlight/50 text-accent-highlight'
                 : 'bg-dark-bg border-dark-border text-text-muted'
             }`}
           >
@@ -1238,7 +1238,7 @@ const SNESPanel: React.FC<{ config: FurnaceConfig; onChange: (u: Partial<Furnace
               <select
                 value={typeof snes.gainMode === 'number' ? snes.gainMode : 0}
                 onChange={(e) => updateSNES({ gainMode: parseInt(e.target.value) })}
-                className="bg-dark-bg border border-dark-border rounded px-2 py-1 text-xs text-white"
+                className="bg-dark-bg border border-dark-border rounded px-2 py-1 text-xs text-text-primary"
               >
                 {gainModes.map((mode, i) => (
                   <option key={i} value={i}>{mode}</option>

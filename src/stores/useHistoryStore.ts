@@ -406,6 +406,6 @@ export const getActionTypeColor = (type: ActionType): string => {
     case 'READ_MACRO':
       return 'text-yellow-400';
     default:
-      return 'text-gray-400';
+      return 'text-text-secondary';
   }
 };

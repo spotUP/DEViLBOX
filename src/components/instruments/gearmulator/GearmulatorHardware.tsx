@@ -79,7 +79,7 @@ export const GearmulatorHardware: React.FC<GearmulatorHardwareProps> = ({
   }
 
   if (!paramMap || !rmlContent || !rcssContent) {
-    return <div style={{ color: '#888', padding: 16 }}>Loading skin...</div>;
+    return <div style={{ color: 'var(--color-text-muted)', padding: 16 }}>Loading skin...</div>;
   }
 
   return (

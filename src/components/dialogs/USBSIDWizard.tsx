@@ -225,7 +225,7 @@ export const USBSIDWizard: React.FC = () => {
 
               <button
                 onClick={() => setStep('connect')}
-                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold rounded-lg transition-colors"
+                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-text-primary text-sm font-semibold rounded-lg transition-colors"
               >
                 Set Up Hardware Output
                 <ChevronRight size={16} />
@@ -310,7 +310,7 @@ export const USBSIDWizard: React.FC = () => {
               {connected ? (
                 <button
                   onClick={() => setStep('engine')}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-green-600 hover:bg-green-500 text-white text-sm font-semibold rounded-lg transition-colors"
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-green-600 hover:bg-green-500 text-text-primary text-sm font-semibold rounded-lg transition-colors"
                 >
                   Continue
                   <ChevronRight size={16} />
@@ -322,7 +322,7 @@ export const USBSIDWizard: React.FC = () => {
                   className={`w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-semibold rounded-lg transition-colors ${
                     connecting
                       ? 'bg-dark-bgSecondary text-text-muted cursor-wait'
-                      : 'bg-blue-600 hover:bg-blue-500 text-white'
+                      : 'bg-blue-600 hover:bg-blue-500 text-text-primary'
                   }`}
                 >
                   {connecting ? (
@@ -386,7 +386,7 @@ export const USBSIDWizard: React.FC = () => {
 
               <button
                 onClick={handleSetEngine}
-                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold rounded-lg transition-colors"
+                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-text-primary text-sm font-semibold rounded-lg transition-colors"
               >
                 {sidEngine === 'jssid' ? 'Continue' : 'Switch to jsSID & Continue'}
                 <ChevronRight size={16} />
@@ -441,7 +441,7 @@ export const USBSIDWizard: React.FC = () => {
 
               <button
                 onClick={handleFinish}
-                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-green-600 hover:bg-green-500 text-white text-sm font-semibold rounded-lg transition-colors"
+                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-green-600 hover:bg-green-500 text-text-primary text-sm font-semibold rounded-lg transition-colors"
               >
                 <Check size={16} />
                 Done — Start Playing

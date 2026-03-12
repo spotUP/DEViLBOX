@@ -84,7 +84,7 @@ const GenericSynthKnobs: React.FC<{
 
   if (!hasOsc && !hasEnv && !hasFilter) {
     return (
-      <div className="flex items-center justify-center h-full text-gray-600 text-xs">
+      <div className="flex items-center justify-center h-full text-text-muted text-xs">
         No editable parameters for {instrument.synthType}
       </div>
     );
@@ -95,7 +95,7 @@ const GenericSynthKnobs: React.FC<{
       {/* Oscillator section */}
       {hasOsc && (
         <div className="flex flex-col gap-1">
-          <span className="text-[10px] text-cyan-400 font-bold uppercase tracking-wider">Oscillator</span>
+          <span className="text-[10px] text-accent-highlight font-bold uppercase tracking-wider">Oscillator</span>
           <div className="flex items-end gap-3">
             <Knob
               value={osc.detune ?? 0}
@@ -259,20 +259,20 @@ const SCParamSliders: React.FC<{
   return (
     <div className="px-3 py-2">
       <div className="flex items-center gap-2 mb-2">
-        <span className="text-xs font-bold px-1.5 py-0.5 rounded" style={{ backgroundColor: '#00cc66', color: '#000' }}>
+        <span className="text-xs font-bold px-1.5 py-0.5 rounded" style={{ backgroundColor: '#00cc66', color: 'var(--color-text-inverse)' }}>
           SC
         </span>
-        <span className="text-xs text-white font-bold">{synthDefName}</span>
-        <span className="text-[10px] text-gray-500">{params.length} params</span>
+        <span className="text-xs text-text-primary font-bold">{synthDefName}</span>
+        <span className="text-[10px] text-text-muted">{params.length} params</span>
         <div className="flex-1" />
         {totalPages > 1 && (
           <div className="flex items-center gap-1">
-            <button className="text-gray-400 hover:text-white disabled:opacity-30 p-0.5"
+            <button className="text-text-secondary hover:text-text-primary disabled:opacity-30 p-0.5"
               onClick={() => setParamPage(Math.max(0, paramPage - 1))} disabled={paramPage === 0}>
               <ChevronLeft size={12} />
             </button>
-            <span className="text-[10px] text-gray-500">{paramPage + 1}/{totalPages}</span>
-            <button className="text-gray-400 hover:text-white disabled:opacity-30 p-0.5"
+            <span className="text-[10px] text-text-muted">{paramPage + 1}/{totalPages}</span>
+            <button className="text-text-secondary hover:text-text-primary disabled:opacity-30 p-0.5"
               onClick={() => setParamPage(Math.min(totalPages - 1, paramPage + 1))} disabled={paramPage >= totalPages - 1}>
               <ChevronRight size={12} />
             </button>
@@ -291,12 +291,12 @@ const SCParamSliders: React.FC<{
               value={param.value}
               onChange={(e) => handleParamChange(param.name, parseFloat(e.target.value))}
             />
-            <span className="text-[10px] text-gray-400 truncate max-w-[64px] text-center">{param.name}</span>
-            <span className="text-[9px] text-gray-600">{Number(param.value.toPrecision(3))}</span>
+            <span className="text-[10px] text-text-secondary truncate max-w-[64px] text-center">{param.name}</span>
+            <span className="text-[9px] text-text-muted">{Number(param.value.toPrecision(3))}</span>
           </div>
         ))}
         {params.length === 0 && (
-          <span className="text-xs text-gray-600">Compile SynthDef to see params</span>
+          <span className="text-xs text-text-muted">Compile SynthDef to see params</span>
         )}
       </div>
     </div>
@@ -343,26 +343,26 @@ const TabBar: React.FC<{
   ];
 
   return (
-    <div className="flex items-center gap-0.5 px-2 border-b border-gray-800" style={{ height: `${TAB_BAR_HEIGHT}px` }}>
+    <div className="flex items-center gap-0.5 px-2 border-b border-dark-border" style={{ height: `${TAB_BAR_HEIGHT}px` }}>
       {tabs.map((tab) => (
         <button
           key={tab.id}
           className={`px-3 py-1 text-[11px] font-medium rounded-t transition-colors relative ${
             activeTab === tab.id
-              ? 'text-white bg-gray-800 border-b-2 border-cyan-400'
-              : 'text-gray-500 hover:text-gray-300 hover:bg-gray-800/50'
+              ? 'text-text-primary bg-dark-bgTertiary border-b-2 border-accent-primary'
+              : 'text-text-muted hover:text-text-secondary hover:bg-dark-bgHover'
           }`}
           onClick={() => onTabChange(tab.id)}
         >
           {tab.label}
           {tab.badge && (
-            <span className="ml-1 px-1 py-0 text-[9px] rounded bg-cyan-900 text-cyan-300">{tab.badge}</span>
+            <span className="ml-1 px-1 py-0 text-[9px] rounded bg-accent-highlight/20 text-accent-highlight">{tab.badge}</span>
           )}
         </button>
       ))}
       <div className="flex-1" />
       {rightContent}
-      <span className="text-[10px] text-gray-600 font-mono truncate max-w-[200px]">{instrumentName}</span>
+      <span className="text-[10px] text-text-muted font-mono truncate max-w-[200px]">{instrumentName}</span>
     </div>
   );
 });
@@ -370,7 +370,7 @@ TabBar.displayName = 'TabBar';
 
 // ─── FX Loading Fallback ─────────────────────────────────────────────────────
 const FxLoadingFallback = () => (
-  <div className="flex items-center justify-center h-full text-gray-600 text-xs">Loading effects...</div>
+  <div className="flex items-center justify-center h-full text-text-muted text-xs">Loading effects...</div>
 );
 
 // ─── Main Component ──────────────────────────────────────────────────────────
@@ -462,7 +462,7 @@ export const InstrumentKnobPanel: React.FC = memo(() => {
         <button
           onClick={() => instFxRef.current?.toggleBrowser()}
           className="flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold uppercase rounded
-                   bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20 transition-colors"
+                   bg-accent-highlight/10 text-accent-highlight hover:bg-accent-highlight/20 transition-colors"
         >
           <Plus size={10} />
           Add
@@ -474,15 +474,15 @@ export const InstrumentKnobPanel: React.FC = memo(() => {
         <div className="flex items-center gap-1">
           <button
             onClick={() => masterFxRef.current?.togglePresetMenu()}
-            className="px-2 py-0.5 text-[10px] font-medium rounded bg-gray-800 text-gray-300
-                     hover:bg-gray-700 transition-colors border border-gray-700"
+            className="px-2 py-0.5 text-[10px] font-medium rounded bg-dark-bgTertiary text-text-secondary
+                     hover:bg-dark-bgHover transition-colors border border-dark-borderLight"
           >
             Presets
           </button>
           <button
             onClick={() => masterFxRef.current?.toggleAddMenu()}
             className="flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold uppercase rounded
-                     bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20 transition-colors"
+                     bg-accent-highlight/10 text-accent-highlight hover:bg-accent-highlight/20 transition-colors"
           >
             <Plus size={10} />
             Add
@@ -515,7 +515,7 @@ export const InstrumentKnobPanel: React.FC = memo(() => {
           width={400}
           height={200}
         >
-          <div className="flex items-center justify-center h-full text-gray-500 text-sm">
+          <div className="flex items-center justify-center h-full text-text-muted text-sm">
             No instrument selected
           </div>
         </PopOutWindow>
@@ -541,7 +541,7 @@ export const InstrumentKnobPanel: React.FC = memo(() => {
           width={popoutWidth}
           height={popoutHeight}
         >
-          <div style={{ background: '#1a1a1a' }}>
+          <div style={{ background: 'var(--color-bg-tertiary)' }}>
             <TabBar
               activeTab={activeTab}
               onTabChange={setActiveTab}
@@ -593,20 +593,20 @@ export const InstrumentKnobPanel: React.FC = memo(() => {
             position: 'relative',
             width: '100%',
             height: '40px',
-            background: '#1a1a1a',
-            borderTop: '1px solid #333',
+            background: 'var(--color-bg-tertiary)',
+            borderTop: '1px solid var(--color-border-light)',
           }}
         >
           <div className="absolute top-0 left-0 p-2 text-xs font-mono flex items-center gap-2">
             <span className="font-bold px-1 py-0.5 rounded text-[10px]"
-              style={{ backgroundColor: getSynthColor(synthType), color: '#000' }}>
+              style={{ backgroundColor: getSynthColor(synthType), color: 'var(--color-text-inverse)' }}>
               {synthType}
             </span>
-            <span className="text-gray-500">Popped Out</span>
+            <span className="text-text-muted">Popped Out</span>
           </div>
           <div className="absolute top-0 right-0 z-50">
             <button
-              className="p-2 text-gray-400 hover:text-white bg-black/50 hover:bg-black/80 rounded-bl-lg flex items-center gap-1 text-xs"
+              className="p-2 text-text-secondary hover:text-text-primary bg-black/50 hover:bg-black/80 rounded-bl-lg flex items-center gap-1 text-xs"
               onClick={() => setTB303PoppedOut(false)}
               title="Restore panel inline"
             >
@@ -629,8 +629,8 @@ export const InstrumentKnobPanel: React.FC = memo(() => {
         position: 'relative',
         width: '100%',
         height: tb303Collapsed ? `${COLLAPSED_HEIGHT}px` : (isAutoHeight ? 'auto' : `${expandedHeight}px`),
-        background: '#1a1a1a',
-        borderTop: '1px solid #333',
+        background: 'var(--color-bg-tertiary)',
+        borderTop: '1px solid var(--color-border-light)',
         overflow: 'hidden',
         transition: isAutoHeight ? undefined : 'height 300ms cubic-bezier(0.4, 0, 0.2, 1)',
       }}
@@ -642,18 +642,18 @@ export const InstrumentKnobPanel: React.FC = memo(() => {
         onClick={toggleTB303Collapsed}
       >
         <span className="font-bold px-1 py-0.5 rounded text-[10px]"
-          style={{ backgroundColor: getSynthColor(synthType), color: '#000' }}>
+          style={{ backgroundColor: getSynthColor(synthType), color: 'var(--color-text-inverse)' }}>
           {synthType}
         </span>
-        <span className="text-gray-500">#{instNum}</span>
-        <span className="text-gray-400">{targetInstrument.name}</span>
+        <span className="text-text-muted">#{instNum}</span>
+        <span className="text-text-secondary">{targetInstrument.name}</span>
       </div>
 
       {/* Action buttons — always pinned to top-right */}
       <div className="absolute top-1 right-1 z-50 flex items-center gap-1">
         {tb303Collapsed ? (
           <button
-            className="p-2 text-gray-400 hover:text-white bg-black/50 hover:bg-black/80 rounded-bl-lg"
+            className="p-2 text-text-secondary hover:text-text-primary bg-black/50 hover:bg-black/80 rounded-bl-lg"
             onClick={toggleTB303Collapsed}
             title="Expand synth panel"
           >
@@ -662,7 +662,7 @@ export const InstrumentKnobPanel: React.FC = memo(() => {
         ) : (
           <>
             <button
-              className="p-1.5 text-gray-500 hover:text-cyan-400 bg-black/40 hover:bg-black/70 rounded transition-colors"
+              className="p-1.5 text-text-muted hover:text-accent-highlight bg-black/40 hover:bg-black/70 rounded transition-colors"
               onClick={() => {
                 if (tb303PoppedOut) {
                   focusPopout(`DEViLBOX — ${targetInstrument.name || synthType}`);
@@ -675,14 +675,14 @@ export const InstrumentKnobPanel: React.FC = memo(() => {
               <ExternalLink size={14} />
             </button>
             <button
-              className="p-1.5 text-gray-500 hover:text-white bg-black/40 hover:bg-black/70 rounded transition-colors"
+              className="p-1.5 text-text-muted hover:text-text-primary bg-black/40 hover:bg-black/70 rounded transition-colors"
               onClick={toggleTB303Collapsed}
               title="Collapse synth panel"
             >
               <ChevronUp size={14} />
             </button>
             <button
-              className="p-1.5 text-gray-500 hover:text-red-400 bg-black/40 hover:bg-black/70 rounded transition-colors"
+              className="p-1.5 text-text-muted hover:text-red-400 bg-black/40 hover:bg-black/70 rounded transition-colors"
               onClick={() => useUIStore.getState().setTB303Collapsed(true)}
               title="Close synth panel"
             >

@@ -296,7 +296,7 @@ export const MixerPanel: React.FC = () => {
         </span>
         <button
           onClick={toggleDomPanel}
-          className="text-[12px] text-white/30 hover:text-white/70 transition-colors leading-none px-1"
+          className="text-[12px] text-white/30 hover:text-text-primary/70 transition-colors leading-none px-1"
           title="Close mixer"
         >
           ✕

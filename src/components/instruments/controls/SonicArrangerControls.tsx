@@ -87,7 +87,7 @@ const WaveformLineCanvas: React.FC<{
     ctx.fillRect(0, 0, width, height);
 
     // centre line
-    ctx.strokeStyle = '#222';
+    ctx.strokeStyle = 'var(--color-border)';
     ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.moveTo(0, height / 2);
@@ -143,7 +143,7 @@ const BarChart: React.FC<{
 
     if (signed) {
       // centre line
-      ctx.strokeStyle = '#222';
+      ctx.strokeStyle = 'var(--color-border)';
       ctx.lineWidth = 1;
       ctx.beginPath();
       ctx.moveTo(0, height / 2);
@@ -193,7 +193,7 @@ export const SonicArrangerControls: React.FC<SonicArrangerControlsProps> = ({
   const accent  = isCyan ? '#00ffff' : '#ff8844';
   const knob    = isCyan ? '#00ffff' : '#ffaa66';
   const dim     = isCyan ? '#004444' : '#331a00';
-  const panelBg = isCyan ? 'bg-[#041510] border-cyan-900/50' : 'bg-[#140a00] border-orange-900/30';
+  const panelBg = isCyan ? 'bg-[#041510] border-accent-highlight/20' : 'bg-[#140a00] border-orange-900/30';
 
   const updateParam = useCallback((key: keyof SonicArrangerConfig, value: number) => {
     onChange({ ...configRef.current, [key]: value });
@@ -221,7 +221,7 @@ export const SonicArrangerControls: React.FC<SonicArrangerControlsProps> = ({
           style={{ background: '#0a0a0a', borderColor: dim, color: accent }}
         >
           {EFFECT_MODES.map((m) => (
-            <option key={m.value} value={m.value} style={{ background: '#111', color: '#ccc' }}>
+            <option key={m.value} value={m.value} style={{ background: 'var(--color-bg-secondary)', color: 'var(--color-text-secondary)' }}>
               {m.value}: {m.name}
             </option>
           ))}
@@ -256,7 +256,7 @@ export const SonicArrangerControls: React.FC<SonicArrangerControlsProps> = ({
           width={320} height={72}
           color={accent}
         />
-        <div className="flex items-center gap-3 mt-2 text-[10px] text-gray-500">
+        <div className="flex items-center gap-3 mt-2 text-[10px] text-text-muted">
           <span>Wave #{config.waveformNumber}</span>
           <span>Length: {config.waveformLength} words</span>
         </div>
@@ -400,7 +400,7 @@ export const SonicArrangerControls: React.FC<SonicArrangerControlsProps> = ({
             onChange={(v) => updateParam('portamentoSpeed', Math.round(v))}
             label="Speed" color={knob} size="md"
             formatValue={(v) => Math.round(v).toString()} />
-          <span className="text-[10px] text-gray-600">0 = disabled</span>
+          <span className="text-[10px] text-text-muted">0 = disabled</span>
         </div>
       </div>
 
@@ -417,23 +417,23 @@ export const SonicArrangerControls: React.FC<SonicArrangerControlsProps> = ({
                     Arp {tIdx + 1}
                   </span>
                   <div className="flex items-center gap-1">
-                    <label className="text-[9px] text-gray-500">Len</label>
+                    <label className="text-[9px] text-text-muted">Len</label>
                     <input
                       type="number" min={0} max={14}
                       value={arp.length}
                       onChange={(e) => updateArpField(tIdx, 'length', Math.max(0, Math.min(14, parseInt(e.target.value) || 0)))}
                       className="w-10 text-[10px] font-mono text-center border rounded px-1 py-0.5"
-                      style={{ background: '#111', borderColor: dim, color: '#ccc' }}
+                      style={{ background: 'var(--color-bg-secondary)', borderColor: dim, color: 'var(--color-text-secondary)' }}
                     />
                   </div>
                   <div className="flex items-center gap-1">
-                    <label className="text-[9px] text-gray-500">Rep</label>
+                    <label className="text-[9px] text-text-muted">Rep</label>
                     <input
                       type="number" min={0} max={14}
                       value={arp.repeat}
                       onChange={(e) => updateArpField(tIdx, 'repeat', Math.max(0, Math.min(14, parseInt(e.target.value) || 0)))}
                       className="w-10 text-[10px] font-mono text-center border rounded px-1 py-0.5"
-                      style={{ background: '#111', borderColor: dim, color: '#ccc' }}
+                      style={{ background: 'var(--color-bg-secondary)', borderColor: dim, color: 'var(--color-text-secondary)' }}
                     />
                   </div>
                 </div>
@@ -451,7 +451,7 @@ export const SonicArrangerControls: React.FC<SonicArrangerControlsProps> = ({
                         className="w-7 text-[9px] font-mono text-center border rounded py-0.5"
                         style={{
                           background: inLoop ? accent + '18' : inRange ? '#111' : '#080808',
-                          borderColor: inLoop ? accent + '44' : inRange ? '#333' : '#1a1a1a',
+                          borderColor: inLoop ? accent + '44' : inRange ? 'var(--color-border-light)' : 'var(--color-bg-tertiary)',
                           color: inRange ? '#ccc' : '#444',
                         }}
                       />

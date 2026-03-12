@@ -138,9 +138,9 @@ export const DeckTransport: React.FC<DeckTransportProps> = ({ deckId }) => {
           active:translate-y-[1px]
           ${
             isPending
-              ? 'bg-yellow-600 text-white animate-pulse'
+              ? 'bg-yellow-600 text-text-primary animate-pulse'
               : isPlaying
-                ? 'bg-green-600 text-white'
+                ? 'bg-green-600 text-text-primary'
                 : 'bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover'
           }
         `}
@@ -174,7 +174,7 @@ export const DeckTransport: React.FC<DeckTransportProps> = ({ deckId }) => {
           transition-all duration-100
           ${
             isSynced
-              ? 'bg-cyan-600/30 text-cyan-300'
+              ? 'bg-accent-highlight/30 text-accent-highlight'
               : 'bg-dark-bgTertiary text-text-muted hover:bg-dark-bgHover hover:text-text-secondary'
           }
         `}

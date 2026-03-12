@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-03-11T21:44:51.605Z
+ * Generated: 2026-03-11T22:30:18.034Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.2693';
-export const BUILD_NUMBER = '2693';
-export const BUILD_HASH = '3f75f1d29';
+export const BUILD_VERSION = '1.0.2706';
+export const BUILD_NUMBER = '2706';
+export const BUILD_HASH = '0791a5b31';
 export const BUILD_DATE = '2026-03-11';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,61 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.2693',
+    version: '1.0.2706',
     date: '2026-03-11',
     changes: [
+      {
+        type: 'fix',
+        "description": "DJ scratch position from audio player, add XRNS to metadata format"
+      },
+      {
+        type: 'fix',
+        "description": "Add XRNS source format, improve debug logging"
+      },
+      {
+        type: 'improvement',
+        "description": "Chore: update changelog"
+      },
+      {
+        type: 'improvement',
+        "description": "Unify view switcher to shared viewOptions"
+      },
+      {
+        type: 'feature',
+        "description": "Adultery WASM support, velocity fix, chunk-based presets"
+      },
+      {
+        type: 'fix',
+        "description": "Fix DJ scratch position reset: accurate variable-rate position tracking"
+      },
+      {
+        type: 'fix',
+        "description": "Fix VJ view pauses: willReadFrequently, stuck detection threshold, reduce GC"
+      },
+      {
+        type: 'fix',
+        "description": "Improve WASM synth routing and UI feedback"
+      },
+      {
+        type: 'improvement',
+        "description": "VJ overlay: single unified canvas for multiple sources"
+      },
+      {
+        type: 'feature',
+        "description": "Add debug logging and parameter application improvements"
+      },
+      {
+        type: 'fix',
+        "description": "Fix instrument index mapping and empty instrument handling"
+      },
+      {
+        type: 'fix',
+        "description": "VJ pattern overlay — DJ deck scrolling + side-by-side layout"
+      },
+      {
+        type: 'fix',
+        "description": "SynthControlsRouter type errors — Gearmulator synthType + MAME handle"
+      },
       {
         type: 'fix',
         "description": "Fix V2 Emscripten module loading + add debug logs"
@@ -180,58 +232,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'improvement',
         "description": "Enable pattern scratch during playback without DJ/toggle gate"
-      },
-      {
-        type: 'fix',
-        "description": "Throttle direct synth updates to prevent audio noise"
-      },
-      {
-        type: 'improvement',
-        "description": "Allow left/right/tab cursor movement during playback"
-      },
-      {
-        type: 'fix',
-        "description": "Route CC mappings through unified parameter router"
-      },
-      {
-        type: 'improvement',
-        "description": "Use same accent color for cursor caret during playback"
-      },
-      {
-        type: 'feature',
-        "description": "Chore: add demoscene synth third-party sources"
-      },
-      {
-        type: 'improvement',
-        "description": "Update CLAUDE.md with TB-303 accent hardware details"
-      },
-      {
-        type: 'improvement',
-        "description": "Chore: update generated changelog and file manifest"
-      },
-      {
-        type: 'feature',
-        "description": "Add useImportDialog hook and dialog improvements"
-      },
-      {
-        type: 'improvement',
-        "description": "Chore: rename behringer_td-3_patterns to behringer-td-3"
-      },
-      {
-        type: 'feature',
-        "description": "Chore: add demoscene XRNS example songs"
-      },
-      {
-        type: 'feature',
-        "description": "Add Tunefish, WaveSabre, Oidos demoscene synths"
-      },
-      {
-        type: 'feature',
-        "description": "Add XRNS debug logging for pattern pipeline"
-      },
-      {
-        type: 'fix',
-        "description": "Hardware-accurate accent timing + soft limiter"
       }
     ]
   }

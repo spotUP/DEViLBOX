@@ -36,7 +36,7 @@ export const FlagCell: React.FC<FlagCellProps> = ({ value, isActive }) => {
   } else if (value === 4) {
     // Hammer (TT-303 extension)
     displayText = 'H';
-    valueClasses = 'text-cyan-400 bg-cyan-400/20';
+    valueClasses = 'text-accent-highlight bg-accent-highlight/20';
     title = 'Hammer ON (TT-303: legato without glide)';
   }
 

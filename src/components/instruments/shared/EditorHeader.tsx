@@ -250,7 +250,7 @@ export const EditorHeader: React.FC<EditorHeaderProps> = ({
               <select
                 value={instrument.synthType}
                 onChange={(e) => handleSynthTypeChange(instrument, e.target.value as SynthType, onChange)}
-                className="px-2 py-1 text-sm font-medium bg-gray-800 border border-gray-700 rounded text-white hover:border-gray-500 focus:border-blue-500 focus:outline-none cursor-pointer"
+                className="px-2 py-1 text-sm font-medium bg-dark-bgTertiary border border-dark-borderLight rounded text-text-primary hover:border-dark-borderLight focus:border-blue-500 focus:outline-none cursor-pointer"
                 title="Switch synth type"
               >
                 {SYNTH_CATEGORIES
@@ -267,7 +267,7 @@ export const EditorHeader: React.FC<EditorHeaderProps> = ({
                   ))}
               </select>
             </div>
-            <p className="text-xs text-gray-400 truncate">{synthInfo.description}</p>
+            <p className="text-xs text-text-secondary truncate">{synthInfo.description}</p>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
             {/* Custom Header Controls (injected from parent) */}
@@ -279,7 +279,7 @@ export const EditorHeader: React.FC<EditorHeaderProps> = ({
               className={`p-1.5 rounded transition-all flex items-center gap-1.5 px-2 ${
                 instrument.isLive
                   ? 'bg-accent-success/20 text-accent-success ring-1 ring-accent-success/50 animate-pulse-glow'
-                  : 'bg-gray-800 text-text-muted hover:text-text-secondary border border-gray-700'
+                  : 'bg-dark-bgTertiary text-text-muted hover:text-text-secondary border border-dark-borderLight'
               }`}
               title={instrument.isLive ? 'Live Mode Active: Bypasses lookahead for zero-latency jamming' : 'Enable Live Mode: Bypasses lookahead buffer'}
             >
@@ -313,7 +313,7 @@ export const EditorHeader: React.FC<EditorHeaderProps> = ({
                 className={`p-1.5 rounded transition-all flex items-center gap-1.5 px-2 ${
                   isBaked
                     ? 'bg-amber-500/20 text-amber-400 ring-1 ring-amber-500/50 hover:bg-amber-500/30'
-                    : 'bg-gray-800 text-gray-400 hover:text-white hover:bg-gray-700 border border-gray-700'
+                    : 'bg-dark-bgTertiary text-text-secondary hover:text-text-primary hover:bg-dark-bgHover border border-dark-borderLight'
                 } ${isBaking ? 'opacity-50 cursor-not-allowed' : ''}`}
                 title={isBaked 
                   ? 'Unbake: Revert to live synth engine' 
@@ -337,7 +337,7 @@ export const EditorHeader: React.FC<EditorHeaderProps> = ({
               <button
                 onClick={onBakePro}
                 disabled={isBaking}
-                className={`p-1.5 rounded transition-all flex items-center gap-1.5 px-2 bg-gray-800 text-gray-400 hover:text-white hover:bg-gray-700 border border-gray-700 ${isBaking ? 'opacity-50 cursor-not-allowed' : ''}`}
+                className={`p-1.5 rounded transition-all flex items-center gap-1.5 px-2 bg-dark-bgTertiary text-text-secondary hover:text-text-primary hover:bg-dark-bgHover border border-dark-borderLight ${isBaking ? 'opacity-50 cursor-not-allowed' : ''}`}
                 title="Pro Bake: Render every unique note used in the song for maximum accuracy"
               >
                 {isBaking ? <Loader2 size={14} className="animate-spin" /> : <Zap size={14} className="text-amber-400" />}
@@ -356,7 +356,7 @@ export const EditorHeader: React.FC<EditorHeaderProps> = ({
                   link.click();
                   document.body.removeChild(link);
                 }}
-                className="p-1.5 rounded bg-gray-800 text-gray-400 hover:text-white hover:bg-gray-700 border border-gray-700 transition-all flex items-center gap-1.5 px-2"
+                className="p-1.5 rounded bg-dark-bgTertiary text-text-secondary hover:text-text-primary hover:bg-dark-bgHover border border-dark-borderLight transition-all flex items-center gap-1.5 px-2"
                 title="Download baked sample as WAV"
               >
                 <Download size={14} />
@@ -374,7 +374,7 @@ export const EditorHeader: React.FC<EditorHeaderProps> = ({
                 className={`p-1.5 rounded transition-all ${
                   showHelp
                     ? 'bg-blue-500/20 text-blue-400 ring-1 ring-blue-500'
-                    : 'bg-gray-800 text-gray-400 hover:text-white hover:bg-gray-700'
+                    : 'bg-dark-bgTertiary text-text-secondary hover:text-text-primary hover:bg-dark-bgHover'
                 }`}
                 title="Show help"
               >
@@ -387,12 +387,12 @@ export const EditorHeader: React.FC<EditorHeaderProps> = ({
 
       {/* Help Panel (collapsible) */}
       {showHelp && synthHelp && (
-        <div className="px-4 py-3 bg-gradient-to-r from-blue-900/20 to-purple-900/20 border-b border-gray-800 text-xs">
-          <p className="text-gray-300 mb-2">{synthHelp.overview}</p>
+        <div className="px-4 py-3 bg-gradient-to-r from-blue-900/20 to-purple-900/20 border-b border-dark-border text-xs">
+          <p className="text-text-secondary mb-2">{synthHelp.overview}</p>
           {synthHelp.tips.length > 0 && (
             <ul className="flex flex-wrap gap-2">
               {synthHelp.tips.slice(0, 3).map((tip, i) => (
-                <li key={i} className="text-gray-400 bg-black/30 px-2 py-1 rounded">
+                <li key={i} className="text-text-secondary bg-black/30 px-2 py-1 rounded">
                   {tip}
                 </li>
               ))}
@@ -439,13 +439,13 @@ export const VisualizationRow: React.FC<VisualizationRowProps> = ({
   return (
     <div className="synth-editor-viz-header">
       {/* Oscilloscope / Spectrum Toggle */}
-      <div className="flex bg-gray-900 rounded p-0.5">
+      <div className="flex bg-dark-bgSecondary rounded p-0.5">
         <button
           onClick={() => onVizModeChange('oscilloscope')}
           className={`px-2 py-1 text-xs font-medium rounded transition-all ${
             vizMode === 'oscilloscope'
-              ? 'bg-gray-700 text-white'
-              : 'text-gray-500 hover:text-gray-300'
+              ? 'bg-dark-bgHover text-text-primary'
+              : 'text-text-muted hover:text-text-secondary'
           }`}
         >
           <Activity size={12} className="inline mr-1" />
@@ -455,8 +455,8 @@ export const VisualizationRow: React.FC<VisualizationRowProps> = ({
           onClick={() => onVizModeChange('spectrum')}
           className={`px-2 py-1 text-xs font-medium rounded transition-all ${
             vizMode === 'spectrum'
-              ? 'bg-gray-700 text-white'
-              : 'text-gray-500 hover:text-gray-300'
+              ? 'bg-dark-bgHover text-text-primary'
+              : 'text-text-muted hover:text-text-secondary'
           }`}
         >
           <BarChart2 size={12} className="inline mr-1" />

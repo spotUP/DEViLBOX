@@ -334,7 +334,7 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
               className={`p-1.5 rounded transition-all flex items-center gap-1.5 px-2 ${
                 uiMode === 'hardware'
                   ? 'bg-accent-primary/20 text-accent-primary ring-1 ring-accent-primary/50'
-                  : 'bg-gray-800 text-text-muted hover:text-text-secondary border border-gray-700'
+                  : 'bg-dark-bgTertiary text-text-muted hover:text-text-secondary border border-dark-borderLight'
               }`}
               title={uiMode === 'hardware' ? 'Switch to Simple Controls' : 'Switch to Hardware UI'}
             >

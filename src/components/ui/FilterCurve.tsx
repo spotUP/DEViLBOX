@@ -187,7 +187,7 @@ export const FilterCurve: React.FC<FilterCurveProps> = ({
   const fillPath = `${filterPath} L ${width - padding.right} ${dbToY(MIN_DB)} L ${padding.left} ${dbToY(MIN_DB)} Z`;
 
   return (
-    <div ref={containerRef} className="bg-[#1a1a1a] rounded-lg p-3 border border-gray-700 w-full">
+    <div ref={containerRef} className="bg-[#1a1a1a] rounded-lg p-3 border border-dark-borderLight w-full">
       <svg
         ref={svgRef}
         width={width}
@@ -196,7 +196,7 @@ export const FilterCurve: React.FC<FilterCurveProps> = ({
         onMouseDown={handleMouseDown}
       >
         {/* Grid */}
-        <g stroke="#333" strokeWidth="1">
+        <g stroke="var(--color-border-light)" strokeWidth="1">
           {/* Horizontal grid (dB) */}
           {[-18, -12, -6, 0, 6, 12, 18].map((db) => (
             <g key={db}>
@@ -289,7 +289,7 @@ export const FilterCurve: React.FC<FilterCurveProps> = ({
             cx={controlX}
             cy={controlY}
             r={6}
-            fill={isDragging ? color : '#1a1a1a'}
+            fill={isDragging ? color : 'var(--color-bg-tertiary)'}
             stroke={color}
             strokeWidth={2}
             style={{ filter: `drop-shadow(0 0 4px ${color})` }}
@@ -315,16 +315,16 @@ export const FilterCurve: React.FC<FilterCurveProps> = ({
       {/* Values display */}
       <div className="flex justify-between mt-2 text-xs font-mono">
         <div className="text-center">
-          <div className="text-gray-500">CUTOFF</div>
-          <div className="text-white">{formatFreq(cutoff)}Hz</div>
+          <div className="text-text-muted">CUTOFF</div>
+          <div className="text-text-primary">{formatFreq(cutoff)}Hz</div>
         </div>
         <div className="text-center">
-          <div className="text-gray-500">RESO</div>
-          <div className="text-white">{resonance}</div>
+          <div className="text-text-muted">RESO</div>
+          <div className="text-text-primary">{resonance}</div>
         </div>
         <div className="text-center">
-          <div className="text-gray-500">TYPE</div>
-          <div className="text-white uppercase">{type}</div>
+          <div className="text-text-muted">TYPE</div>
+          <div className="text-text-primary uppercase">{type}</div>
         </div>
       </div>
     </div>

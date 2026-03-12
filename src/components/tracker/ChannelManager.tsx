@@ -326,7 +326,7 @@ export const ChannelManager: React.FC<ChannelManagerProps> = ({ isOpen, onClose 
                   {/* Record group indicator */}
                   {recordGroup > 0 && (
                     <span
-                      className="w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold text-white"
+                      className="w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold text-text-primary"
                       style={{ backgroundColor: RECORD_GROUP_COLORS[recordGroup as 1 | 2] }}
                     >
                       {recordGroup}
@@ -340,7 +340,7 @@ export const ChannelManager: React.FC<ChannelManagerProps> = ({ isOpen, onClose 
                       className="w-5 h-5 rounded border border-dark-border"
                       style={{ backgroundColor: channel.color || '#6b7280' }}
                     >
-                      <Palette size={12} className="opacity-0 group-hover:opacity-100 text-white" />
+                      <Palette size={12} className="opacity-0 group-hover:opacity-100 text-text-primary" />
                     </button>
                     {/* Color picker dropdown */}
                     <div className="absolute right-0 top-full mt-1 hidden group-hover:flex flex-wrap gap-1 p-2 bg-dark-bg border border-dark-border rounded shadow-lg z-10 w-24">

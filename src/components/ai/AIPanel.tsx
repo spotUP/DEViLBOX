@@ -86,7 +86,7 @@ export const AIPanel: React.FC = () => {
                 onClick={() => setProvider(p.id)}
                 className={`px-1.5 py-0.5 text-[10px] transition-colors ${
                   provider === p.id
-                    ? 'bg-dark-hover text-white font-semibold'
+                    ? 'bg-dark-hover text-text-primary font-semibold'
                     : 'text-text-muted hover:text-text-primary'
                 }`}
               >
@@ -102,7 +102,7 @@ export const AIPanel: React.FC = () => {
                 onClick={() => setModel(m.id)}
                 className={`px-1.5 py-0.5 text-[10px] transition-colors ${
                   model === m.id
-                    ? 'bg-accent text-white font-semibold'
+                    ? 'bg-accent text-text-primary font-semibold'
                     : 'text-text-muted hover:text-text-primary'
                 }`}
                 title={m.description}

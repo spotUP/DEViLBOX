@@ -170,7 +170,7 @@ export const MiniKeyboard: React.FC<MiniKeyboardProps> = ({
   }
 
   return (
-    <div className="bg-gray-900/50 rounded-lg border border-gray-800 p-2">
+    <div className="bg-dark-bgSecondary/50 rounded-lg border border-dark-border p-2">
       {/* Keyboard */}
       <svg
         viewBox={`0 0 ${keyboardWidth} 30`}
@@ -184,7 +184,7 @@ export const MiniKeyboard: React.FC<MiniKeyboardProps> = ({
       </svg>
 
       {/* Legend */}
-      <div className="flex items-center justify-center gap-3 mt-1.5 text-[9px] text-gray-500">
+      <div className="flex items-center justify-center gap-3 mt-1.5 text-[9px] text-text-muted">
         <span className="flex items-center gap-1">
           <span className="w-2 h-2 rounded-sm bg-green-400" />
           Pattern

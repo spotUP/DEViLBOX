@@ -58,7 +58,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
         <div className="flex items-center justify-between px-6 py-4 border-b border-dark-border">
           <div className="flex items-center gap-3">
             <AlertTriangle className={`w-5 h-5 ${styles.icon}`} />
-            <h3 className="text-lg font-bold text-white">{title}</h3>
+            <h3 className="text-lg font-bold text-text-primary">{title}</h3>
           </div>
           <button
             onClick={onCancel}
@@ -78,7 +78,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
         <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-dark-border">
           <button
             onClick={onCancel}
-            className="px-4 py-2 bg-dark-border hover:bg-dark-border/80 text-white text-sm font-bold rounded transition-colors"
+            className="px-4 py-2 bg-dark-border hover:bg-dark-border/80 text-text-primary text-sm font-bold rounded transition-colors"
           >
             {cancelLabel}
           </button>
@@ -87,7 +87,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
               onConfirm();
               onCancel();
             }}
-            className={`px-4 py-2 ${styles.button} text-white text-sm font-bold rounded transition-colors`}
+            className={`px-4 py-2 ${styles.button} text-text-primary text-sm font-bold rounded transition-colors`}
           >
             {confirmLabel}
           </button>

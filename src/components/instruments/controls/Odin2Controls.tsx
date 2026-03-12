@@ -31,7 +31,7 @@ const Toggle = memo(({ id, label, params, accentColor, setParam }: {
   <button
     onClick={() => setParam(id, params[id] > 0.5 ? 0 : 1)}
     className={`px-2 py-1 text-[10px] font-bold rounded transition-all ${
-      params[id] > 0.5 ? 'text-black' : 'bg-gray-800 text-gray-500 hover:bg-gray-700'
+      params[id] > 0.5 ? 'text-black' : 'bg-dark-bgTertiary text-text-muted hover:bg-dark-bgHover'
     }`}
     style={params[id] > 0.5 ? { backgroundColor: accentColor } : {}}
   >
@@ -48,7 +48,7 @@ const FxToggle = memo(({ id, label, params, fxAccent, setParam }: {
   <button
     onClick={() => setParam(id, params[id] > 0.5 ? 0 : 1)}
     className={`px-2 py-1 text-[10px] font-bold rounded transition-all ${
-      params[id] > 0.5 ? 'text-black' : 'bg-gray-800 text-gray-500 hover:bg-gray-700'
+      params[id] > 0.5 ? 'text-black' : 'bg-dark-bgTertiary text-text-muted hover:bg-dark-bgHover'
     }`}
     style={params[id] > 0.5 ? { backgroundColor: fxAccent } : {}}
   >
@@ -68,7 +68,7 @@ const TypeSelect = memo(({ id, labels, params, accentColor, setParam }: {
         key={label}
         onClick={() => setParam(id, i)}
         className={`px-1.5 py-1 text-[9px] font-bold rounded transition-all ${
-          Math.round(params[id]) === i ? 'text-black' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+          Math.round(params[id]) === i ? 'text-black' : 'bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover'
         }`}
         style={Math.round(params[id]) === i ? { backgroundColor: accentColor } : {}}
       >
@@ -245,7 +245,7 @@ export const Odin2Controls: React.FC<Odin2ControlsProps> = ({
   if (!synthReady) {
     return (
       <div className="flex flex-col gap-4 p-4">
-        <div className="flex items-center justify-center gap-2 p-4 text-gray-400">
+        <div className="flex items-center justify-center gap-2 p-4 text-text-secondary">
           <Loader size={16} className="animate-spin" />
           <span className="text-sm">Loading Odin2...</span>
         </div>
@@ -255,7 +255,7 @@ export const Odin2Controls: React.FC<Odin2ControlsProps> = ({
   }
 
   const panelBg = isCyanTheme
-    ? 'bg-[#051515] border-cyan-900/50'
+    ? 'bg-[#051515] border-accent-highlight/20'
     : 'bg-[#1a1a1a] border-blue-900/30';
   const fxBg = isCyanTheme
     ? 'bg-[#041210] border-teal-900/40'

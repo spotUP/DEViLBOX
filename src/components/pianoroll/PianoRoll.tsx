@@ -1199,7 +1199,7 @@ export const PianoRoll: React.FC<PianoRollProps> = ({ channelIndex }) => {
               useUIStore.getState().setPianoRollPoppedOut(true);
             }
           }}
-          className="p-1 rounded transition-colors text-text-muted hover:text-cyan-400"
+          className="p-1 rounded transition-colors text-text-muted hover:text-accent-highlight"
           title="Pop out to separate window"
         >
           <ExternalLink size={14} />

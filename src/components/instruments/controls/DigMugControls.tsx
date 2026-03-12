@@ -82,7 +82,7 @@ export const DigMugControls: React.FC<DigMugControlsProps> = ({
   const accent  = isCyan ? '#00ffff' : '#aaff44';
   const knob    = isCyan ? '#00ffff' : '#bbff66';
   const dim     = isCyan ? '#004444' : '#1a3300';
-  const panelBg = isCyan ? 'bg-[#041510] border-cyan-900/50' : 'bg-[#0a1400] border-lime-900/30';
+  const panelBg = isCyan ? 'bg-[#041510] border-accent-highlight/20' : 'bg-[#0a1400] border-lime-900/30';
 
   const upd = useCallback(<K extends keyof DigMugConfig>(key: K, value: DigMugConfig[K]) => {
     onChange({ [key]: value } as Partial<DigMugConfig>);
@@ -160,7 +160,7 @@ export const DigMugControls: React.FC<DigMugControlsProps> = ({
             const waveDef = DM_WAVES[waveIdx] ?? DM_WAVES[0];
             return (
               <div key={slot} className="flex flex-col gap-1">
-                <span className="text-[10px] text-gray-500 text-center">Wave {slot + 1}</span>
+                <span className="text-[10px] text-text-muted text-center">Wave {slot + 1}</span>
                 {/* Waveform preview */}
                 <div className="rounded overflow-hidden border"
                   style={{ borderColor: dim }}>
@@ -178,7 +178,7 @@ export const DigMugControls: React.FC<DigMugControlsProps> = ({
                   className="text-[9px] font-mono border rounded px-1 py-0.5"
                   style={{ background: '#0a0f00', borderColor: dim, color: accent }}>
                   {DM_WAVES.map((w, i) => (
-                    <option key={i} value={i} style={{ background: '#111', color: '#ccc' }}>
+                    <option key={i} value={i} style={{ background: 'var(--color-bg-secondary)', color: 'var(--color-text-secondary)' }}>
                       {i}: {w.name}
                     </option>
                   ))}
@@ -201,13 +201,13 @@ export const DigMugControls: React.FC<DigMugControlsProps> = ({
         </div>
 
         {/* Blend position bar */}
-        <div className="mt-2 h-3 rounded overflow-hidden" style={{ background: '#111', border: `1px solid ${dim}` }}>
+        <div className="mt-2 h-3 rounded overflow-hidden" style={{ background: 'var(--color-bg-secondary)', border: `1px solid ${dim}` }}>
           <div className="h-full transition-all" style={{
             width: `${(config.waveBlend / 63) * 100}%`,
             background: `linear-gradient(to right, ${accent}88, ${accent})`,
           }} />
         </div>
-        <div className="flex justify-between text-[9px] text-gray-600 mt-0.5">
+        <div className="flex justify-between text-[9px] text-text-muted mt-0.5">
           <span>W1</span><span>W2</span><span>W3</span><span>W4</span>
         </div>
       </div>

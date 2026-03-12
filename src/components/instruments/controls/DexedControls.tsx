@@ -48,7 +48,7 @@ export const DexedControls: React.FC<DexedControlsProps> = ({
   const knobColor = isCyanTheme ? '#00ffff' : '#60a5fa';
 
   const panelBg = isCyanTheme
-    ? 'bg-[#051515] border-cyan-900/50'
+    ? 'bg-[#051515] border-accent-highlight/20'
     : 'bg-[#1a1a2e] border-blue-900/50';
 
   const updateOperator = (index: number, updates: Partial<DexedOperatorConfig>) => {
@@ -95,7 +95,7 @@ export const DexedControls: React.FC<DexedControlsProps> = ({
               className={`w-8 h-8 text-xs rounded border transition-all ${
                 config.algorithm === i
                   ? 'border-blue-400 bg-blue-500/30 text-blue-300'
-                  : 'border-gray-700 bg-gray-800 text-gray-400 hover:border-gray-600'
+                  : 'border-dark-borderLight bg-dark-bgTertiary text-text-secondary hover:border-dark-borderLight'
               }`}
             >
               {i + 1}
@@ -103,7 +103,7 @@ export const DexedControls: React.FC<DexedControlsProps> = ({
           ))}
         </div>
 
-        <div className="text-xs text-gray-400 text-center font-mono">
+        <div className="text-xs text-text-secondary text-center font-mono">
           {DX7_ALGORITHMS[config.algorithm || 0]}
         </div>
       </div>
@@ -157,11 +157,11 @@ export const DexedControls: React.FC<DexedControlsProps> = ({
         </div>
 
         <div className="mt-4">
-          <label className="text-xs text-gray-400 block mb-2">LFO Waveform</label>
+          <label className="text-xs text-text-secondary block mb-2">LFO Waveform</label>
           <select
             value={config.lfoWave || 'triangle'}
             onChange={(e) => onChange({ lfoWave: e.target.value as DexedConfig['lfoWave'] })}
-            className="bg-gray-900 border border-gray-700 text-xs rounded px-2 py-1 w-full"
+            className="bg-dark-bgSecondary border border-dark-borderLight text-xs rounded px-2 py-1 w-full"
             style={{ color: accentColor }}
           >
             {LFO_WAVES.map((wave, i) => (
@@ -331,22 +331,22 @@ export const DexedControls: React.FC<DexedControlsProps> = ({
       <div className="flex flex-col h-full">
         {/* Tab Bar (Desktop) or Dropdown (Mobile/Tablet) */}
         {useMobileLayout ? (
-          <div className="p-2 border-b border-gray-800 bg-gray-900/50">
+          <div className="p-2 border-b border-dark-border bg-dark-bgSecondary/50">
             <select
               value={activeTab}
               onChange={(e) => setActiveTab(e.target.value as DexedTab)}
-              className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm font-bold uppercase"
+              className="w-full bg-dark-bgTertiary border border-dark-borderLight rounded px-3 py-2 text-sm font-bold uppercase"
               style={{ color: accentColor }}
             >
               {tabs.map((tab) => (
-                <option key={tab.id} value={tab.id} className="bg-gray-800">
+                <option key={tab.id} value={tab.id} className="bg-dark-bgTertiary">
                   {tab.label}
                 </option>
               ))}
             </select>
           </div>
         ) : (
-          <div className="flex border-b border-gray-800 bg-gray-900/50">
+          <div className="flex border-b border-dark-border bg-dark-bgSecondary/50">
             {tabs.map((tab) => (
               <button
                 key={tab.id}
@@ -354,7 +354,7 @@ export const DexedControls: React.FC<DexedControlsProps> = ({
                 className={`px-4 py-2 text-xs font-bold uppercase tracking-wider transition-all ${
                   activeTab === tab.id
                     ? 'border-b-2 text-blue-400'
-                    : 'text-gray-500 hover:text-gray-300'
+                    : 'text-text-muted hover:text-text-secondary'
                 }`}
                 style={activeTab === tab.id ? { borderColor: accentColor, color: accentColor } : {}}
               >

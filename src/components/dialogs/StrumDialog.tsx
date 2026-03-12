@@ -86,7 +86,7 @@ export const StrumDialog: React.FC<StrumDialogProps> = ({ isOpen, onClose }) => 
               onClick={() => setDirection('down')}
               className={`px-3 py-2 text-xs rounded border transition-colors ${
                 direction === 'down'
-                  ? 'bg-accent-primary border-accent-primary text-white'
+                  ? 'bg-accent-primary border-accent-primary text-text-primary'
                   : 'bg-dark-bg border-dark-border text-text-secondary hover:border-text-muted'
               }`}
             >
@@ -96,7 +96,7 @@ export const StrumDialog: React.FC<StrumDialogProps> = ({ isOpen, onClose }) => 
               onClick={() => setDirection('up')}
               className={`px-3 py-2 text-xs rounded border transition-colors ${
                 direction === 'up'
-                  ? 'bg-accent-primary border-accent-primary text-white'
+                  ? 'bg-accent-primary border-accent-primary text-text-primary'
                   : 'bg-dark-bg border-dark-border text-text-secondary hover:border-text-muted'
               }`}
             >

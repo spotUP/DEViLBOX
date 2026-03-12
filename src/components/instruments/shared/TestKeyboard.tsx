@@ -336,8 +336,8 @@ export const TestKeyboard: React.FC<TestKeyboardProps> = ({ instrument }) => {
                       relative border border-ft2-border rounded-b flex-1
                       transition-colors duration-75 cursor-pointer select-none touch-none
                       ${isActive
-                        ? 'bg-cyan-400 shadow-lg shadow-cyan-400/50'
-                        : 'bg-white hover:bg-gray-100'
+                        ? 'bg-accent-highlight shadow-lg shadow-cyan-400/50'
+                        : 'bg-white hover:bg-dark-bgHover'
                       }
                       ${isOctaveStart && index > 0 ? 'border-l-2 border-l-gray-300' : ''}
                     `}
@@ -347,16 +347,16 @@ export const TestKeyboard: React.FC<TestKeyboardProps> = ({ instrument }) => {
                   >
                     <div className="absolute bottom-1 left-0 right-0 text-center">
                       {isOctaveStart && (
-                        <div className="text-[8px] text-gray-400 font-mono">{key.octave}</div>
+                        <div className="text-[8px] text-text-secondary font-mono">{key.octave}</div>
                       )}
                       <div
-                        className="font-bold text-gray-700"
+                        className="font-bold text-text-muted"
                         style={{ fontSize: whiteKeyWidth < 30 ? '8px' : '10px' }}
                       >
                         {key.label}
                       </div>
                       {key.keyboardKey && (
-                        <div className="text-[8px] text-gray-400 font-mono uppercase">
+                        <div className="text-[8px] text-text-secondary font-mono uppercase">
                           {key.keyboardKey}
                         </div>
                       )}
@@ -399,7 +399,7 @@ export const TestKeyboard: React.FC<TestKeyboardProps> = ({ instrument }) => {
                       transition-colors duration-75 cursor-pointer select-none touch-none z-10
                       ${isActive
                         ? 'bg-amber-500 shadow-lg shadow-amber-500/50'
-                        : 'bg-gray-900 hover:bg-gray-700'
+                        : 'bg-dark-bgSecondary hover:bg-dark-bgHover'
                       }
                     `}
                     style={{
@@ -410,7 +410,7 @@ export const TestKeyboard: React.FC<TestKeyboardProps> = ({ instrument }) => {
                   >
                     {key.keyboardKey && (
                       <div
-                        className="absolute bottom-1 left-0 right-0 text-center text-gray-400 font-mono uppercase"
+                        className="absolute bottom-1 left-0 right-0 text-center text-text-secondary font-mono uppercase"
                         style={{ fontSize: '7px' }}
                       >
                         {key.keyboardKey}

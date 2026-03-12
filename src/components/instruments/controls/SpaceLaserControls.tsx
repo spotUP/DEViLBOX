@@ -32,8 +32,8 @@ export const SpaceLaserControls: React.FC<SpaceLaserControlsProps> = ({
   
   // Background styles
   const panelBg = isCyanTheme
-    ? 'bg-[#051515] border-cyan-900/50'
-    : 'bg-[#1a1a1a] border-gray-800';
+    ? 'bg-[#051515] border-accent-highlight/20'
+    : 'bg-[#1a1a1a] border-dark-border';
 
   // Helper to update nested configs
   const updateLaser = (updates: Partial<typeof config.laser>) => {
@@ -65,8 +65,8 @@ export const SpaceLaserControls: React.FC<SpaceLaserControlsProps> = ({
       {/* Laser Sweep Section */}
       <div className={`p-4 rounded-xl border ${panelBg}`}>
         <div className="flex items-center gap-2 mb-4">
-          <Zap size={16} className={isCyanTheme ? 'text-cyan-500' : 'text-green-500'} />
-          <h3 className={`font-bold ${isCyanTheme ? 'text-cyan-400' : 'text-green-400'}`}>LASER SWEEP</h3>
+          <Zap size={16} className={isCyanTheme ? 'text-accent-highlight' : 'text-green-500'} />
+          <h3 className={`font-bold ${isCyanTheme ? 'text-accent-highlight' : 'text-green-400'}`}>LASER SWEEP</h3>
         </div>
         
         <div className="grid grid-cols-2 md:grid-cols-4 gap-6 items-center gap-6">
@@ -99,7 +99,7 @@ export const SpaceLaserControls: React.FC<SpaceLaserControlsProps> = ({
           />
           
           <div className="flex flex-col items-center gap-2">
-            <span className="text-[10px] font-bold text-gray-500 uppercase">Curve</span>
+            <span className="text-[10px] font-bold text-text-muted uppercase">Curve</span>
             <div className="flex gap-1">
               {['exponential', 'linear'].map((curve) => (
                 <button
@@ -109,7 +109,7 @@ export const SpaceLaserControls: React.FC<SpaceLaserControlsProps> = ({
                     px-2 py-1 text-[10px] font-bold rounded border uppercase
                     ${config.laser.sweepCurve === curve
                       ? `bg-[#2a2a2a]`
-                      : 'bg-[#1a1a1a] border-gray-700 text-gray-500 hover:border-gray-500'
+                      : 'bg-[#1a1a1a] border-dark-borderLight text-text-muted hover:border-dark-borderLight'
                     }
                   `}
                   style={config.laser.sweepCurve === curve ? { borderColor: accentColor, color: accentColor } : undefined}
@@ -125,8 +125,8 @@ export const SpaceLaserControls: React.FC<SpaceLaserControlsProps> = ({
       {/* Noise Section */}
       <div className={`p-4 rounded-xl border ${panelBg}`}>
         <div className="flex items-center gap-2 mb-4">
-          <Wind size={16} className={isCyanTheme ? 'text-cyan-500' : 'text-green-500'} />
-          <h3 className={`font-bold ${isCyanTheme ? 'text-cyan-400' : 'text-green-400'}`}>NOISE GRIT</h3>
+          <Wind size={16} className={isCyanTheme ? 'text-accent-highlight' : 'text-green-500'} />
+          <h3 className={`font-bold ${isCyanTheme ? 'text-accent-highlight' : 'text-green-400'}`}>NOISE GRIT</h3>
         </div>
         
         <div className="flex gap-6 items-center">
@@ -141,7 +141,7 @@ export const SpaceLaserControls: React.FC<SpaceLaserControlsProps> = ({
           />
           
           <div className="flex flex-col items-center gap-2">
-            <span className="text-[10px] font-bold text-gray-500 uppercase">Type</span>
+            <span className="text-[10px] font-bold text-text-muted uppercase">Type</span>
             <div className="flex gap-1">
               {['white', 'pink', 'brown'].map((type) => (
                 <button
@@ -151,7 +151,7 @@ export const SpaceLaserControls: React.FC<SpaceLaserControlsProps> = ({
                     px-2 py-1 text-[10px] font-bold rounded border uppercase
                     ${config.noise.type === type
                       ? `bg-[#2a2a2a]`
-                      : 'bg-[#1a1a1a] border-gray-700 text-gray-500 hover:border-gray-500'
+                      : 'bg-[#1a1a1a] border-dark-borderLight text-text-muted hover:border-dark-borderLight'
                     }
                   `}
                   style={config.noise.type === type ? { borderColor: accentColor, color: accentColor } : undefined}
@@ -171,8 +171,8 @@ export const SpaceLaserControls: React.FC<SpaceLaserControlsProps> = ({
       {/* FM Section */}
       <div className={`p-4 rounded-xl border ${panelBg}`}>
         <div className="flex items-center gap-2 mb-4">
-          <Activity size={16} className={isCyanTheme ? 'text-cyan-500' : 'text-green-500'} />
-          <h3 className={`font-bold ${isCyanTheme ? 'text-cyan-400' : 'text-green-400'}`}>FM MODULATION</h3>
+          <Activity size={16} className={isCyanTheme ? 'text-accent-highlight' : 'text-green-500'} />
+          <h3 className={`font-bold ${isCyanTheme ? 'text-accent-highlight' : 'text-green-400'}`}>FM MODULATION</h3>
         </div>
         
         <div className="flex gap-6 items-center">
@@ -200,8 +200,8 @@ export const SpaceLaserControls: React.FC<SpaceLaserControlsProps> = ({
       {/* Filter Section */}
       <div className={`p-4 rounded-xl border ${panelBg}`}>
         <div className="flex items-center gap-2 mb-4">
-          <Filter size={16} className={isCyanTheme ? 'text-cyan-500' : 'text-green-500'} />
-          <h3 className={`font-bold ${isCyanTheme ? 'text-cyan-400' : 'text-green-400'}`}>FILTER</h3>
+          <Filter size={16} className={isCyanTheme ? 'text-accent-highlight' : 'text-green-500'} />
+          <h3 className={`font-bold ${isCyanTheme ? 'text-accent-highlight' : 'text-green-400'}`}>FILTER</h3>
         </div>
 
         <div className="flex flex-col items-center gap-4">
@@ -214,7 +214,7 @@ export const SpaceLaserControls: React.FC<SpaceLaserControlsProps> = ({
                   px-3 py-1 text-xs font-bold rounded border uppercase
                   ${config.filter.type === type
                     ? `bg-[#2a2a2a]`
-                    : 'bg-[#1a1a1a] border-gray-700 text-gray-500 hover:border-gray-500'
+                    : 'bg-[#1a1a1a] border-dark-borderLight text-text-muted hover:border-dark-borderLight'
                   }
                 `}
                 style={config.filter.type === type ? { borderColor: accentColor, color: accentColor } : undefined}
@@ -262,14 +262,14 @@ export const SpaceLaserControls: React.FC<SpaceLaserControlsProps> = ({
       <div className={`p-4 rounded-xl border ${panelBg}`}>
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
-            <Repeat size={16} className={isCyanTheme ? 'text-cyan-500' : 'text-green-500'} />
-            <h3 className={`font-bold ${isCyanTheme ? 'text-cyan-400' : 'text-green-400'}`}>SPACE DELAY</h3>
+            <Repeat size={16} className={isCyanTheme ? 'text-accent-highlight' : 'text-green-500'} />
+            <h3 className={`font-bold ${isCyanTheme ? 'text-accent-highlight' : 'text-green-400'}`}>SPACE DELAY</h3>
           </div>
           <input
             type="checkbox"
             checked={config.delay.enabled}
             onChange={(e) => updateDelay({ enabled: e.target.checked })}
-            className={`w-4 h-4 rounded border-2 bg-transparent cursor-pointer ${isCyanTheme ? 'border-cyan-500 checked:bg-cyan-500' : 'border-green-500 checked:bg-green-500'}`}
+            className={`w-4 h-4 rounded border-2 bg-transparent cursor-pointer ${isCyanTheme ? 'border-accent-highlight checked:bg-accent-highlight' : 'border-green-500 checked:bg-green-500'}`}
           />
         </div>
 
@@ -308,14 +308,14 @@ export const SpaceLaserControls: React.FC<SpaceLaserControlsProps> = ({
       <div className={`p-4 rounded-xl border ${panelBg}`}>
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
-            <Waves size={16} className={isCyanTheme ? 'text-cyan-500' : 'text-green-500'} />
-            <h3 className={`font-bold ${isCyanTheme ? 'text-cyan-400' : 'text-green-400'}`}>COSMIC REVERB</h3>
+            <Waves size={16} className={isCyanTheme ? 'text-accent-highlight' : 'text-green-500'} />
+            <h3 className={`font-bold ${isCyanTheme ? 'text-accent-highlight' : 'text-green-400'}`}>COSMIC REVERB</h3>
           </div>
           <input
             type="checkbox"
             checked={config.reverb.enabled}
             onChange={(e) => updateReverb({ enabled: e.target.checked })}
-            className={`w-4 h-4 rounded border-2 bg-transparent cursor-pointer ${isCyanTheme ? 'border-cyan-500 checked:bg-cyan-500' : 'border-green-500 checked:bg-green-500'}`}
+            className={`w-4 h-4 rounded border-2 bg-transparent cursor-pointer ${isCyanTheme ? 'border-accent-highlight checked:bg-accent-highlight' : 'border-green-500 checked:bg-green-500'}`}
           />
         </div>
 
@@ -346,14 +346,14 @@ export const SpaceLaserControls: React.FC<SpaceLaserControlsProps> = ({
   return (
     <div className="flex flex-col h-full">
       {/* Tabs */}
-      <div className="flex border-b border-gray-800 bg-[#151515]">
+      <div className="flex border-b border-dark-border bg-[#151515]">
         <button
           onClick={() => setActiveTab('laser')}
           className={`
             flex-1 py-3 text-xs font-bold uppercase tracking-wider transition-colors
             ${activeTab === 'laser' 
               ? `bg-[#252525] border-b-2` 
-              : 'text-gray-500 hover:text-gray-300'
+              : 'text-text-muted hover:text-text-secondary'
             }
           `}
           style={activeTab === 'laser' ? { color: accentColor, borderColor: accentColor } : undefined}
@@ -366,7 +366,7 @@ export const SpaceLaserControls: React.FC<SpaceLaserControlsProps> = ({
             flex-1 py-3 text-xs font-bold uppercase tracking-wider transition-colors
             ${activeTab === 'fm' 
               ? `bg-[#252525] border-b-2` 
-              : 'text-gray-500 hover:text-gray-300'
+              : 'text-text-muted hover:text-text-secondary'
             }
           `}
           style={activeTab === 'fm' ? { color: accentColor, borderColor: accentColor } : undefined}
@@ -379,7 +379,7 @@ export const SpaceLaserControls: React.FC<SpaceLaserControlsProps> = ({
             flex-1 py-3 text-xs font-bold uppercase tracking-wider transition-colors
             ${activeTab === 'fx' 
               ? `bg-[#252525] border-b-2` 
-              : 'text-gray-500 hover:text-gray-300'
+              : 'text-text-muted hover:text-text-secondary'
             }
           `}
           style={activeTab === 'fx' ? { color: accentColor, borderColor: accentColor } : undefined}

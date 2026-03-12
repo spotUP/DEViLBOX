@@ -67,7 +67,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
               <div className="flex items-center gap-3">
                 <AlertTriangle className="w-8 h-8 text-red-400" />
                 <div>
-                  <h3 className="text-lg font-bold text-white">Something went wrong</h3>
+                  <h3 className="text-lg font-bold text-text-primary">Something went wrong</h3>
                   <p className="text-sm text-text-muted">
                     {fallbackMessage || 'An unexpected error occurred in the drum pad system.'}
                   </p>
@@ -82,7 +82,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
                   </div>
                   {errorInfo && (
                     <details className="text-xs font-mono text-text-muted">
-                      <summary className="cursor-pointer hover:text-white">
+                      <summary className="cursor-pointer hover:text-text-primary">
                         Component Stack
                       </summary>
                       <pre className="mt-2 whitespace-pre-wrap">
@@ -97,14 +97,14 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
               <div className="flex gap-3">
                 <button
                   onClick={this.handleReset}
-                  className="flex items-center gap-2 px-4 py-2 bg-accent-primary hover:bg-accent-primary/80 text-white text-sm font-bold rounded transition-colors"
+                  className="flex items-center gap-2 px-4 py-2 bg-accent-primary hover:bg-accent-primary/80 text-text-primary text-sm font-bold rounded transition-colors"
                 >
                   <RefreshCw className="w-4 h-4" />
                   Try Again
                 </button>
                 <button
                   onClick={() => window.location.reload()}
-                  className="px-4 py-2 bg-dark-border hover:bg-dark-border/80 text-white text-sm font-bold rounded transition-colors"
+                  className="px-4 py-2 bg-dark-border hover:bg-dark-border/80 text-text-primary text-sm font-bold rounded transition-colors"
                 >
                   Reload Page
                 </button>

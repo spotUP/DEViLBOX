@@ -30,7 +30,7 @@ export const Toggle: React.FC<ToggleProps> = React.memo(({
   const isCyanTheme = currentThemeId === 'cyan-lineart';
   const color = isCyanTheme ? '#00ffff' : colorProp;
   const offBgColor = isCyanTheme ? '#0a1a1f' : '#1a1a1f';
-  const offBorderColor = isCyanTheme ? '#0a3333' : '#333';
+  const offBorderColor = isCyanTheme ? '#0a3333' : 'var(--color-border-light)';
   const thumbOffColor = isCyanTheme ? '#0a6666' : '#666';
 
   const sizes = {

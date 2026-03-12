@@ -176,7 +176,7 @@ export const InstrumentEffectsPanel = forwardRef<InstrumentEffectsPanelHandle, I
                       <button
                         key={effect.label}
                         onClick={() => handleAddEffect(effect)}
-                        className="px-2 py-1 text-[10px] rounded border transition-colors hover:text-white"
+                        className="px-2 py-1 text-[10px] rounded border transition-colors hover:text-text-primary"
                         style={{
                           borderColor: enc.border,
                           background: enc.bg,

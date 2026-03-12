@@ -125,7 +125,7 @@ export const GridControls: React.FC<GridControlsProps> = ({
           onClick={() => setShowMIDIPanel(!showMIDIPanel)}
           className={`flex items-center gap-1 px-2 py-1 text-xs rounded transition-colors ${
             showMIDIPanel
-              ? 'bg-accent-primary text-white'
+              ? 'bg-accent-primary text-text-primary'
               : 'text-text-secondary hover:text-text-primary hover:bg-dark-bgActive'
           }`}
           title="MIDI Learn"

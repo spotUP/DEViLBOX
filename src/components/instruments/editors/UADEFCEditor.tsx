@@ -95,7 +95,7 @@ function ByteCell({ index, value, onChange, label, signed }: ByteCellProps) {
         {editing ? (
           <input
             ref={inputRef}
-            className="absolute inset-0 w-full h-full text-center text-[10px] font-mono bg-dark-bg text-white border-0 outline-none rounded"
+            className="absolute inset-0 w-full h-full text-center text-[10px] font-mono bg-dark-bg text-text-primary border-0 outline-none rounded"
             value={draft}
             onChange={e => setDraft(e.target.value.slice(0, 2))}
             onBlur={commitEdit}

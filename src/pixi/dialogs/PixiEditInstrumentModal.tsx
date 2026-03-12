@@ -66,7 +66,7 @@ const TW_TO_HEX: Record<string, number> = {
   'text-red-400':     0xF87171,
   'text-purple-400':  0xC084FC,
   'text-orange-400':  0xFB923C,
-  'text-cyan-400':    0x22D3EE,
+  'text-accent-highlight':    0x22D3EE,
   'text-pink-400':    0xF472B6,
   'text-neutral-400': 0xA3A3A3,
 };

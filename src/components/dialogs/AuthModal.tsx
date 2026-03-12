@@ -159,7 +159,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
           <button
             type="submit"
             disabled={isLoading || (mode === 'signup' && password !== confirmPassword)}
-            className="w-full py-3 bg-accent-primary hover:bg-accent-primary/90 disabled:bg-accent-primary/50 disabled:cursor-not-allowed text-white font-bold rounded transition-colors"
+            className="w-full py-3 bg-accent-primary hover:bg-accent-primary/90 disabled:bg-accent-primary/50 disabled:cursor-not-allowed text-text-primary font-bold rounded transition-colors"
           >
             {isLoading ? 'Please wait...' : mode === 'login' ? 'Login' : 'Create Account'}
           </button>

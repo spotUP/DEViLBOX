@@ -91,7 +91,7 @@ const MiniFader: React.FC<MiniFaderProps> = ({ value, min, max, color, label, fo
           className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-1 rounded text-[9px] whitespace-nowrap pointer-events-none z-50"
           style={{
             backgroundColor: 'rgba(0,0,0,0.85)',
-            color: '#ccc',
+            color: 'var(--color-text-secondary)',
             border: '1px solid rgba(255,255,255,0.15)',
           }}
         >
@@ -203,7 +203,7 @@ const PanIndicator: React.FC<PanIndicatorProps> = ({ pan, color, onChange }) => 
           className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-1 rounded text-[9px] whitespace-nowrap pointer-events-none z-50"
           style={{
             backgroundColor: 'rgba(0,0,0,0.85)',
-            color: '#ccc',
+            color: 'var(--color-text-secondary)',
             border: '1px solid rgba(255,255,255,0.15)',
           }}
         >
@@ -302,7 +302,7 @@ export const TrackHeader: React.FC<TrackHeaderProps> = ({ track, height }) => {
             <button
               className={`w-6 h-5 rounded text-[10px] font-bold leading-none transition-colors flex-shrink-0 ${
                 track.muted
-                  ? 'bg-red-600 text-white'
+                  ? 'bg-red-600 text-text-primary'
                   : 'bg-dark-bgTertiary text-text-muted hover:bg-dark-border hover:text-text-primary'
               }`}
               onClick={() => toggleTrackMute(track.id)}
@@ -313,7 +313,7 @@ export const TrackHeader: React.FC<TrackHeaderProps> = ({ track, height }) => {
             <button
               className={`w-6 h-5 rounded text-[10px] font-bold leading-none transition-colors flex-shrink-0 ${
                 track.solo
-                  ? 'bg-yellow-600 text-white'
+                  ? 'bg-yellow-600 text-text-primary'
                   : 'bg-dark-bgTertiary text-text-muted hover:bg-dark-border hover:text-text-primary'
               }`}
               onClick={() => toggleTrackSolo(track.id)}

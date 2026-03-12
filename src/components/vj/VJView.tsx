@@ -273,7 +273,7 @@ const PatternOverlayToggle: React.FC = () => {
   return (
     <button
       onClick={() => toggle(!enabled)}
-      className={`p-2 rounded-full transition-colors text-white ${
+      className={`p-2 rounded-full transition-colors text-text-primary ${
         enabled ? 'bg-purple-600/50 hover:bg-purple-600/70' : 'bg-white/10 hover:bg-white/20'
       }`}
       title={enabled ? 'Hide pattern overlay' : 'Show pattern overlay'}
@@ -378,7 +378,7 @@ export const VJControls: React.FC<VJControlsProps> = ({
                     switchView(v, 'vj');
                   }
                 }}
-                className="px-2 py-0.5 text-[10px] font-bold tracking-widest uppercase bg-white/10 text-white border border-white/20 rounded hover:bg-white/20 transition-colors cursor-pointer flex-shrink-0"
+                className="px-2 py-0.5 text-[10px] font-bold tracking-widest uppercase bg-white/10 text-text-primary border border-white/20 rounded hover:bg-white/20 transition-colors cursor-pointer flex-shrink-0"
                 title="Switch view"
               >
                 {VIEW_OPTIONS.map(({ value, label }) => (
@@ -390,7 +390,7 @@ export const VJControls: React.FC<VJControlsProps> = ({
                   <button
                     onClick={() => onSwitchLayer('milkdrop')}
                     className={`px-2 py-0.5 text-[10px] rounded transition-colors ${
-                      activeLayer === 'milkdrop' ? 'bg-accent/60 text-white' : 'bg-white/10 text-white/50 hover:text-white/80'
+                      activeLayer === 'milkdrop' ? 'bg-accent/60 text-text-primary' : 'bg-white/10 text-white/50 hover:text-text-primary/80'
                     }`}
                   >
                     Milkdrop
@@ -398,7 +398,7 @@ export const VJControls: React.FC<VJControlsProps> = ({
                   <button
                     onClick={() => onSwitchLayer('projectm')}
                     className={`px-2 py-0.5 text-[10px] rounded transition-colors ${
-                      activeLayer === 'projectm' ? 'bg-accent/60 text-white' : 'bg-white/10 text-white/50 hover:text-white/80'
+                      activeLayer === 'projectm' ? 'bg-accent/60 text-text-primary' : 'bg-white/10 text-white/50 hover:text-text-primary/80'
                     }`}
                   >
                     projectM
@@ -420,7 +420,7 @@ export const VJControls: React.FC<VJControlsProps> = ({
           <div className="flex items-center justify-center gap-3">
             <button
               onClick={onRandom}
-              className="p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors"
+              className="p-2 rounded-full bg-white/10 hover:bg-white/20 text-text-primary transition-colors"
               title="Random preset"
             >
               <Shuffle size={18} />
@@ -428,7 +428,7 @@ export const VJControls: React.FC<VJControlsProps> = ({
 
             <button
               onClick={onToggleAutoAdvance}
-              className={`p-2 rounded-full transition-colors text-white ${
+              className={`p-2 rounded-full transition-colors text-text-primary ${
                 autoAdvance ? 'bg-green-600/50 hover:bg-green-600/70' : 'bg-white/10 hover:bg-white/20'
               }`}
               title={autoAdvance ? 'Pause auto-advance' : 'Resume auto-advance'}
@@ -438,7 +438,7 @@ export const VJControls: React.FC<VJControlsProps> = ({
 
             <button
               onClick={onNext}
-              className="p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors"
+              className="p-2 rounded-full bg-white/10 hover:bg-white/20 text-text-primary transition-colors"
               title="Next preset"
             >
               <SkipForward size={18} />
@@ -447,7 +447,7 @@ export const VJControls: React.FC<VJControlsProps> = ({
             {onToggleBrowser && (
               <button
                 onClick={onToggleBrowser}
-                className={`p-2 rounded-full transition-colors text-white ${
+                className={`p-2 rounded-full transition-colors text-text-primary ${
                   browserOpen ? 'bg-accent/50 hover:bg-accent/70' : 'bg-white/10 hover:bg-white/20'
                 }`}
                 title="Browse presets"
@@ -461,7 +461,7 @@ export const VJControls: React.FC<VJControlsProps> = ({
             {!isPopout && onPopOut && (
               <button
                 onClick={onPopOut}
-                className="p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors"
+                className="p-2 rounded-full bg-white/10 hover:bg-white/20 text-text-primary transition-colors"
                 title="Pop out to second screen"
               >
                 <ExternalLink size={18} />
@@ -471,7 +471,7 @@ export const VJControls: React.FC<VJControlsProps> = ({
             {onFullscreen && (
               <button
                 onClick={onFullscreen}
-                className="p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors"
+                className="p-2 rounded-full bg-white/10 hover:bg-white/20 text-text-primary transition-colors"
                 title={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
               >
                 {isFullscreen ? <Minimize size={18} /> : <Maximize size={18} />}

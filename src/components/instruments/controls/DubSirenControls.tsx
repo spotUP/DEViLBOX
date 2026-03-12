@@ -32,8 +32,8 @@ export const DubSirenControls: React.FC<DubSirenControlsProps> = ({
   
   // Background styles
   const panelBg = isCyanTheme
-    ? 'bg-[#051515] border-cyan-900/50'
-    : 'bg-[#1a1a1a] border-gray-800';
+    ? 'bg-[#051515] border-accent-highlight/20'
+    : 'bg-[#1a1a1a] border-dark-border';
 
   // Helper to update nested configs
   const updateOsc = (updates: Partial<typeof config.oscillator>) => {
@@ -74,7 +74,7 @@ export const DubSirenControls: React.FC<DubSirenControlsProps> = ({
     label: string
   ) => (
     <div className="flex flex-col gap-2">
-      <div className="text-xs font-bold text-gray-500 uppercase tracking-wide text-center">{label}</div>
+      <div className="text-xs font-bold text-text-muted uppercase tracking-wide text-center">{label}</div>
       <div className="flex gap-2 justify-center">
         {['sine', 'square', 'sawtooth', 'triangle'].map((type) => (
           <button
@@ -84,7 +84,7 @@ export const DubSirenControls: React.FC<DubSirenControlsProps> = ({
               w-10 h-10 rounded border transition-all flex items-center justify-center
               ${currentType === type
                 ? `bg-[#2a2a2a]`
-                : 'bg-[#1a1a1a] border-gray-700 hover:border-gray-500'
+                : 'bg-[#1a1a1a] border-dark-borderLight hover:border-dark-borderLight'
               }
             `}
             style={currentType === type ? { borderColor: accentColor, boxShadow: `0 0 10px ${accentColor}40` } : undefined}
@@ -106,8 +106,8 @@ export const DubSirenControls: React.FC<DubSirenControlsProps> = ({
       {/* Oscillator Section */}
       <div className={`p-4 rounded-xl border ${panelBg}`}>
         <div className="flex items-center gap-2 mb-4">
-          <Speaker size={16} className={isCyanTheme ? 'text-cyan-500' : 'text-red-500'} />
-          <h3 className={`font-bold ${isCyanTheme ? 'text-cyan-400' : 'text-red-400'}`}>OSCILLATOR</h3>
+          <Speaker size={16} className={isCyanTheme ? 'text-accent-highlight' : 'text-red-500'} />
+          <h3 className={`font-bold ${isCyanTheme ? 'text-accent-highlight' : 'text-red-400'}`}>OSCILLATOR</h3>
         </div>
         
         <div className="flex flex-col md:flex-row gap-6 items-center gap-6">
@@ -129,16 +129,16 @@ export const DubSirenControls: React.FC<DubSirenControlsProps> = ({
       <div className={`p-4 rounded-xl border ${panelBg}`}>
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
-            <Activity size={16} className={isCyanTheme ? 'text-cyan-500' : 'text-red-500'} />
-            <h3 className={`font-bold ${isCyanTheme ? 'text-cyan-400' : 'text-red-400'}`}>LFO MODULATION</h3>
+            <Activity size={16} className={isCyanTheme ? 'text-accent-highlight' : 'text-red-500'} />
+            <h3 className={`font-bold ${isCyanTheme ? 'text-accent-highlight' : 'text-red-400'}`}>LFO MODULATION</h3>
           </div>
           <label className="flex items-center gap-2 cursor-pointer">
-            <span className="text-xs text-gray-500">Enable</span>
+            <span className="text-xs text-text-muted">Enable</span>
             <input
               type="checkbox"
               checked={config.lfo.enabled}
               onChange={(e) => updateLFO({ enabled: e.target.checked })}
-              className={`w-4 h-4 rounded border-2 bg-transparent cursor-pointer ${isCyanTheme ? 'border-cyan-500 checked:bg-cyan-500' : 'border-red-500 checked:bg-red-500'}`}
+              className={`w-4 h-4 rounded border-2 bg-transparent cursor-pointer ${isCyanTheme ? 'border-accent-highlight checked:bg-accent-highlight' : 'border-red-500 checked:bg-red-500'}`}
             />
           </label>
         </div>
@@ -178,16 +178,16 @@ export const DubSirenControls: React.FC<DubSirenControlsProps> = ({
       <div className={`p-4 rounded-xl border ${panelBg}`}>
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
-            <Repeat size={16} className={isCyanTheme ? 'text-cyan-500' : 'text-red-500'} />
-            <h3 className={`font-bold ${isCyanTheme ? 'text-cyan-400' : 'text-red-400'}`}>DELAY</h3>
+            <Repeat size={16} className={isCyanTheme ? 'text-accent-highlight' : 'text-red-500'} />
+            <h3 className={`font-bold ${isCyanTheme ? 'text-accent-highlight' : 'text-red-400'}`}>DELAY</h3>
           </div>
           <label className="flex items-center gap-2 cursor-pointer">
-            <span className="text-xs text-gray-500">Enable</span>
+            <span className="text-xs text-text-muted">Enable</span>
             <input
               type="checkbox"
               checked={config.delay.enabled}
               onChange={(e) => updateDelay({ enabled: e.target.checked })}
-              className={`w-4 h-4 rounded border-2 bg-transparent cursor-pointer ${isCyanTheme ? 'border-cyan-500 checked:bg-cyan-500' : 'border-red-500 checked:bg-red-500'}`}
+              className={`w-4 h-4 rounded border-2 bg-transparent cursor-pointer ${isCyanTheme ? 'border-accent-highlight checked:bg-accent-highlight' : 'border-red-500 checked:bg-red-500'}`}
             />
           </label>
         </div>
@@ -223,7 +223,7 @@ export const DubSirenControls: React.FC<DubSirenControlsProps> = ({
           
           {/* Momentary Throw Button */}
           <div className="flex flex-col items-center gap-2">
-            <span className="text-[10px] font-bold text-gray-500 uppercase">Throw</span>
+            <span className="text-[10px] font-bold text-text-muted uppercase">Throw</span>
             <button
               onMouseDown={() => handleThrow(true)}
               onMouseUp={() => handleThrow(false)}
@@ -233,7 +233,7 @@ export const DubSirenControls: React.FC<DubSirenControlsProps> = ({
               className={`
                 w-12 h-12 rounded-full flex items-center justify-center transition-all active:scale-95
                 ${isCyanTheme 
-                  ? 'bg-cyan-500/20 border-2 border-cyan-500 text-cyan-400' 
+                  ? 'bg-accent-highlight/20 border-2 border-accent-highlight text-accent-highlight' 
                   : 'bg-red-500/20 border-2 border-red-500 text-red-500'}
                 hover:shadow-[0_0_15px_rgba(239,68,68,0.4)]
               `}
@@ -249,16 +249,16 @@ export const DubSirenControls: React.FC<DubSirenControlsProps> = ({
       <div className={`p-4 rounded-xl border ${panelBg}`}>
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
-            <Filter size={16} className={isCyanTheme ? 'text-cyan-500' : 'text-red-500'} />
-            <h3 className={`font-bold ${isCyanTheme ? 'text-cyan-400' : 'text-red-400'}`}>FILTER</h3>
+            <Filter size={16} className={isCyanTheme ? 'text-accent-highlight' : 'text-red-500'} />
+            <h3 className={`font-bold ${isCyanTheme ? 'text-accent-highlight' : 'text-red-400'}`}>FILTER</h3>
           </div>
           <label className="flex items-center gap-2 cursor-pointer">
-            <span className="text-xs text-gray-500">Enable</span>
+            <span className="text-xs text-text-muted">Enable</span>
             <input
               type="checkbox"
               checked={config.filter.enabled}
               onChange={(e) => updateFilter({ enabled: e.target.checked })}
-              className={`w-4 h-4 rounded border-2 bg-transparent cursor-pointer ${isCyanTheme ? 'border-cyan-500 checked:bg-cyan-500' : 'border-red-500 checked:bg-red-500'}`}
+              className={`w-4 h-4 rounded border-2 bg-transparent cursor-pointer ${isCyanTheme ? 'border-accent-highlight checked:bg-accent-highlight' : 'border-red-500 checked:bg-red-500'}`}
             />
           </label>
         </div>
@@ -274,7 +274,7 @@ export const DubSirenControls: React.FC<DubSirenControlsProps> = ({
                   px-3 py-1 text-xs font-bold rounded border uppercase
                   ${config.filter.type === type
                     ? `bg-[#2a2a2a]`
-                    : 'bg-[#1a1a1a] border-gray-700 text-gray-500 hover:border-gray-500'
+                    : 'bg-[#1a1a1a] border-dark-borderLight text-text-muted hover:border-dark-borderLight'
                   }
                 `}
                 style={config.filter.type === type ? { borderColor: accentColor, color: accentColor } : undefined}
@@ -309,16 +309,16 @@ export const DubSirenControls: React.FC<DubSirenControlsProps> = ({
       <div className={`p-4 rounded-xl border ${panelBg}`}>
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
-            <Waves size={16} className={isCyanTheme ? 'text-cyan-500' : 'text-red-500'} />
-            <h3 className={`font-bold ${isCyanTheme ? 'text-cyan-400' : 'text-red-400'}`}>REVERB</h3>
+            <Waves size={16} className={isCyanTheme ? 'text-accent-highlight' : 'text-red-500'} />
+            <h3 className={`font-bold ${isCyanTheme ? 'text-accent-highlight' : 'text-red-400'}`}>REVERB</h3>
           </div>
           <label className="flex items-center gap-2 cursor-pointer">
-            <span className="text-xs text-gray-500">Enable</span>
+            <span className="text-xs text-text-muted">Enable</span>
             <input
               type="checkbox"
               checked={config.reverb.enabled}
               onChange={(e) => updateReverb({ enabled: e.target.checked })}
-              className={`w-4 h-4 rounded border-2 bg-transparent cursor-pointer ${isCyanTheme ? 'border-cyan-500 checked:bg-cyan-500' : 'border-red-500 checked:bg-red-500'}`}
+              className={`w-4 h-4 rounded border-2 bg-transparent cursor-pointer ${isCyanTheme ? 'border-accent-highlight checked:bg-accent-highlight' : 'border-red-500 checked:bg-red-500'}`}
             />
           </label>
         </div>
@@ -350,14 +350,14 @@ export const DubSirenControls: React.FC<DubSirenControlsProps> = ({
   return (
     <div className="flex flex-col h-full">
       {/* Tabs */}
-      <div className="flex border-b border-gray-800 bg-[#151515]">
+      <div className="flex border-b border-dark-border bg-[#151515]">
         <button
           onClick={() => setActiveTab('main')}
           className={`
             flex-1 py-3 text-xs font-bold uppercase tracking-wider transition-colors
             ${activeTab === 'main' 
               ? `bg-[#252525] border-b-2` 
-              : 'text-gray-500 hover:text-gray-300'
+              : 'text-text-muted hover:text-text-secondary'
             }
           `}
           style={activeTab === 'main' ? { color: accentColor, borderColor: accentColor } : undefined}
@@ -370,7 +370,7 @@ export const DubSirenControls: React.FC<DubSirenControlsProps> = ({
             flex-1 py-3 text-xs font-bold uppercase tracking-wider transition-colors
             ${activeTab === 'fx' 
               ? `bg-[#252525] border-b-2` 
-              : 'text-gray-500 hover:text-gray-300'
+              : 'text-text-muted hover:text-text-secondary'
             }
           `}
           style={activeTab === 'fx' ? { color: accentColor, borderColor: accentColor } : undefined}

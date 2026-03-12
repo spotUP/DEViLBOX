@@ -391,7 +391,7 @@ export const MasterEffectsModal: React.FC<MasterEffectsModalProps> = ({ isOpen, 
                 useUIStore.getState().setMasterEffectsPoppedOut(true);
               }
             }}
-            className="p-2 rounded-lg hover:bg-dark-bgHover transition-colors text-text-muted hover:text-cyan-400"
+            className="p-2 rounded-lg hover:bg-dark-bgHover transition-colors text-text-muted hover:text-accent-highlight"
             title="Pop out to separate window"
           >
             <ExternalLink size={20} />
@@ -425,7 +425,7 @@ export const MasterEffectsModal: React.FC<MasterEffectsModalProps> = ({ isOpen, 
               />
               <button
                 onClick={handleSavePreset}
-                className="px-4 py-2 text-sm font-medium rounded-lg bg-accent-primary text-white hover:bg-accent-primaryHover transition-colors"
+                className="px-4 py-2 text-sm font-medium rounded-lg bg-accent-primary text-text-primary hover:bg-accent-primaryHover transition-colors"
               >
                 Save
               </button>
@@ -523,7 +523,7 @@ export const MasterEffectsModal: React.FC<MasterEffectsModalProps> = ({ isOpen, 
                       <button
                         onClick={handleConfirmAdd}
                         className="flex items-center gap-1.5 px-4 py-1.5 text-xs font-medium rounded-lg
-                                 bg-accent-primary text-white hover:bg-accent-primaryHover transition-colors"
+                                 bg-accent-primary text-text-primary hover:bg-accent-primaryHover transition-colors"
                       >
                         <Plus size={12} />
                         Add to Chain
@@ -601,7 +601,7 @@ export const MasterEffectsModal: React.FC<MasterEffectsModalProps> = ({ isOpen, 
                           key={effect.label}
                           onClick={() => handlePreviewEffect(effect)}
                           className="w-full px-3 py-2 text-sm rounded-lg border border-dark-border bg-dark-bgSecondary
-                                   hover:bg-accent-primary hover:text-white hover:border-accent-primary
+                                   hover:bg-accent-primary hover:text-text-primary hover:border-accent-primary
                                    transition-colors text-left flex items-center justify-between gap-2"
                         >
                           <span className="truncate">{effect.label}</span>

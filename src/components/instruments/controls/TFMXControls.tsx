@@ -287,7 +287,7 @@ export const TFMXControls: React.FC<TFMXControlsProps> = ({ config, onChange, ua
   const accent   = isCyan ? '#00ffff' : '#ff6644';
   const accentDim = isCyan ? '#009999' : '#cc4422';
   const dim      = isCyan ? '#004444' : '#331100';
-  const panelBg  = isCyan ? 'bg-[#041510] border-cyan-900/50' : 'bg-[#1a0800] border-red-900/30';
+  const panelBg  = isCyan ? 'bg-[#041510] border-accent-highlight/20' : 'bg-[#1a0800] border-red-900/30';
   const panelBg2 = isCyan ? '#041510' : '#1a0800';
   const inputBg  = isCyan ? '#020e0a' : '#0e0500';
 
@@ -324,7 +324,7 @@ export const TFMXControls: React.FC<TFMXControlsProps> = ({ config, onChange, ua
 
   const StatRow: React.FC<{ label: string; value: string }> = ({ label, value }) => (
     <div className="flex items-center gap-2 py-0.5">
-      <span className="text-[10px] text-gray-500 w-36">{label}</span>
+      <span className="text-[10px] text-text-muted w-36">{label}</span>
       <span className="text-[10px] font-mono" style={{ color: accent }}>{value}</span>
     </div>
   );
@@ -344,7 +344,7 @@ export const TFMXControls: React.FC<TFMXControlsProps> = ({ config, onChange, ua
           <StatRow label="Sample slots"     value={config.sampleCount.toString()} />
           <StatRow label="Sample headers"   value={`${config.sampleHeaders.byteLength} B`} />
           <StatRow label="Sample PCM bank"  value={`${(config.sampleData.byteLength / 1024).toFixed(1)} KiB`} />
-          <div className="mt-2 text-[9px] text-gray-600">
+          <div className="mt-2 text-[9px] text-text-muted">
             TFMX instruments use SndMod/VolMod macro sequences with a shared PCM sample bank.
           </div>
         </div>
@@ -354,7 +354,7 @@ export const TFMXControls: React.FC<TFMXControlsProps> = ({ config, onChange, ua
           <div className={`rounded-lg border p-3 ${panelBg}`}>
             <SectionLabel label="Sample Bank" />
             <div className="font-mono text-[9px] flex border-b mb-1 pb-0.5"
-              style={{ borderColor: dim, color: '#555' }}>
+              style={{ borderColor: dim, color: 'var(--color-text-muted)' }}>
               <span className="w-5">#</span>
               <span className="w-28">Name</span>
               <span className="w-16 text-right pr-2">Offset</span>
@@ -364,15 +364,15 @@ export const TFMXControls: React.FC<TFMXControlsProps> = ({ config, onChange, ua
             <div className="overflow-y-auto" style={{ maxHeight: '200px' }}>
               {samples.map((s) => (
                 <div key={s.idx} className="font-mono text-[9px] flex py-0.5 items-center">
-                  <span className="w-5 text-gray-600">{s.idx}</span>
+                  <span className="w-5 text-text-muted">{s.idx}</span>
                   <span className="w-28 truncate" style={{ color: accent }}>{s.name}</span>
-                  <span className="w-16 text-right pr-2 text-gray-500">
+                  <span className="w-16 text-right pr-2 text-text-muted">
                     ${s.startOffset.toString(16).padStart(6, '0')}
                   </span>
-                  <span className="w-16 text-right pr-2 text-gray-400">
+                  <span className="w-16 text-right pr-2 text-text-secondary">
                     {s.lenBytes > 0 ? `${(s.lenBytes / 1024).toFixed(1)}K` : '0'}
                   </span>
-                  <span className="w-16 text-right text-gray-500">
+                  <span className="w-16 text-right text-text-muted">
                     {s.repLenBytes > 2 ? `${(s.repLenBytes / 1024).toFixed(1)}K` : '–'}
                   </span>
                 </div>
@@ -401,7 +401,7 @@ export const TFMXControls: React.FC<TFMXControlsProps> = ({ config, onChange, ua
               }}>
               Export .mdat (Amiga)
             </button>
-            <div className="mt-1 text-[9px] text-gray-600">
+            <div className="mt-1 text-[9px] text-text-muted">
               Downloads the full mdat file with any chip RAM edits applied.
             </div>
           </div>
@@ -439,7 +439,7 @@ export const TFMXControls: React.FC<TFMXControlsProps> = ({ config, onChange, ua
               ['[4] Vib Delay',  4, hdr.vibDelay],
             ] as [string, number, number][]).map(([lbl, idx, val]) => (
               <div key={idx} className="flex items-center gap-2 py-0.5">
-                <span className="text-[9px] text-gray-500 w-24">{lbl}</span>
+                <span className="text-[9px] text-text-muted w-24">{lbl}</span>
                 <input
                   type="number"
                   min={0} max={255}
@@ -482,14 +482,14 @@ export const TFMXControls: React.FC<TFMXControlsProps> = ({ config, onChange, ua
 
           {showVolHex ? (
             <pre className="text-[9px] font-mono overflow-x-auto p-2 rounded"
-              style={{ background: '#080400', color: '#888', border: `1px solid ${dim}` }}>
+              style={{ background: '#080400', color: 'var(--color-text-muted)', border: `1px solid ${dim}` }}>
               {hexPreview(config.volModSeqData.slice(5))}
             </pre>
           ) : (
             <>
               {/* Column headers */}
               <div className="flex font-mono text-[9px] border-b mb-1 pb-0.5"
-                style={{ borderColor: dim, color: '#555' }}>
+                style={{ borderColor: dim, color: 'var(--color-text-muted)' }}>
                 <span className="w-6 text-center">Pos</span>
                 <span className="w-8 text-center">Hex</span>
                 <span className="w-16 text-center">Cmd</span>
@@ -498,18 +498,18 @@ export const TFMXControls: React.FC<TFMXControlsProps> = ({ config, onChange, ua
               </div>
               <div className="overflow-y-auto" style={{ maxHeight: '220px' }}>
                 {envEntries.length === 0 ? (
-                  <div className="text-[9px] text-gray-600 py-2">No envelope data</div>
+                  <div className="text-[9px] text-text-muted py-2">No envelope data</div>
                 ) : (
                   envEntries.map((e, i) => (
                     <div key={i} className="flex items-center font-mono text-[9px] py-0.5">
-                      <span className="w-6 text-center text-gray-600">{e.pos}</span>
-                      <span className="w-8 text-center text-gray-500">
+                      <span className="w-6 text-center text-text-muted">{e.pos}</span>
+                      <span className="w-8 text-center text-text-muted">
                         {e.raw.toString(16).padStart(2,'0')}
                       </span>
                       <span className="w-16 text-center font-bold" style={{ color: kindColor(e.kind) }}>
                         {e.label}
                       </span>
-                      <span className="flex-1 text-gray-400">{e.detail}</span>
+                      <span className="flex-1 text-text-secondary">{e.detail}</span>
                       {!readonly && e.kind === 'volume' && (
                         <input
                           type="number"
@@ -535,7 +535,7 @@ export const TFMXControls: React.FC<TFMXControlsProps> = ({ config, onChange, ua
                   ))
                 )}
               </div>
-              <div className="mt-2 text-[9px] text-gray-600">
+              <div className="mt-2 text-[9px] text-text-muted">
                 Volume range 0–64. Commands: E0=loop E1=end E8=sustain EA=vol-slide
               </div>
             </>
@@ -576,7 +576,7 @@ export const TFMXControls: React.FC<TFMXControlsProps> = ({ config, onChange, ua
       <div className="flex flex-col gap-3 p-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
         {seqCount === 0 ? (
           <div className={`rounded-lg border p-3 ${panelBg}`}>
-            <div className="text-[9px] text-gray-600">No SndModSeq data</div>
+            <div className="text-[9px] text-text-muted">No SndModSeq data</div>
           </div>
         ) : (
           <>
@@ -614,14 +614,14 @@ export const TFMXControls: React.FC<TFMXControlsProps> = ({ config, onChange, ua
 
               {showSndHex ? (
                 <pre className="text-[9px] font-mono overflow-x-auto p-2 rounded"
-                  style={{ background: '#080400', color: '#888', border: `1px solid ${dim}` }}>
+                  style={{ background: '#080400', color: 'var(--color-text-muted)', border: `1px solid ${dim}` }}>
                   {hexPreview(config.sndModSeqData.slice(clampedSeq * 64, clampedSeq * 64 + 64))}
                 </pre>
               ) : (
                 <>
                   {/* Column headers */}
                   <div className="flex font-mono text-[9px] border-b mb-1 pb-0.5"
-                    style={{ borderColor: dim, color: '#555' }}>
+                    style={{ borderColor: dim, color: 'var(--color-text-muted)' }}>
                     <span className="w-6 text-center">Pos</span>
                     <span className="w-8 text-center">Hex</span>
                     <span className="w-24 text-center">Cmd</span>
@@ -629,23 +629,23 @@ export const TFMXControls: React.FC<TFMXControlsProps> = ({ config, onChange, ua
                   </div>
                   <div className="overflow-y-auto" style={{ maxHeight: '260px' }}>
                     {entries.length === 0 ? (
-                      <div className="text-[9px] text-gray-600 py-2">Empty sequence</div>
+                      <div className="text-[9px] text-text-muted py-2">Empty sequence</div>
                     ) : (
                       entries.map((e, i) => (
                         <div key={i} className="flex items-center font-mono text-[9px] py-0.5">
-                          <span className="w-6 text-center text-gray-600">{e.pos}</span>
-                          <span className="w-8 text-center text-gray-500">
+                          <span className="w-6 text-center text-text-muted">{e.pos}</span>
+                          <span className="w-8 text-center text-text-muted">
                             {e.raw.toString(16).padStart(2,'0')}
                           </span>
                           <span className="w-24 text-center font-bold" style={{ color: kindColor(e.kind) }}>
                             {e.label}
                           </span>
-                          <span className="flex-1 text-gray-400">{e.detail}</span>
+                          <span className="flex-1 text-text-secondary">{e.detail}</span>
                         </div>
                       ))
                     )}
                   </div>
-                  <div className="mt-2 text-[9px] text-gray-600">
+                  <div className="mt-2 text-[9px] text-text-muted">
                     E2/E4=set/new wave · E3=vibrato · E7=jump seq · E8=sustain · E9=smp pack
                   </div>
                 </>

@@ -65,7 +65,7 @@ export const FCControls: React.FC<FCControlsProps> = ({ config, onChange, uadeCh
   const accent  = isCyan ? '#00ffff' : '#ffdd44';
   const knob    = isCyan ? '#00ffff' : '#ffee77';
   const dim     = isCyan ? '#004444' : '#332a00';
-  const panelBg = isCyan ? 'bg-[#041510] border-cyan-900/50' : 'bg-[#1a1500] border-yellow-900/30';
+  const panelBg = isCyan ? 'bg-[#041510] border-accent-highlight/20' : 'bg-[#1a1500] border-yellow-900/30';
 
   const upd = useCallback(<K extends keyof FCConfig>(key: K, value: FCConfig[K]) => {
     onChange({ [key]: value } as Partial<FCConfig>);
@@ -160,12 +160,12 @@ export const FCControls: React.FC<FCControlsProps> = ({ config, onChange, uadeCh
             className="text-xs font-mono border rounded px-2 py-1.5"
             style={{ background: '#100d00', borderColor: dim, color: accent }}>
             {Array.from({ length: 47 }, (_, i) => (
-              <option key={i} value={i} style={{ background: '#111', color: '#ccc' }}>
+              <option key={i} value={i} style={{ background: 'var(--color-bg-secondary)', color: 'var(--color-text-secondary)' }}>
                 {i}: {waveLabel(i)}
               </option>
             ))}
           </select>
-          <span className="text-[10px] text-gray-500">Initial waveform (overridden by synth macro)</span>
+          <span className="text-[10px] text-text-muted">Initial waveform (overridden by synth macro)</span>
         </div>
       </div>
 
@@ -258,11 +258,11 @@ export const FCControls: React.FC<FCControlsProps> = ({ config, onChange, uadeCh
               onChange={(v) => updWithChipRam('synthSpeed', Math.round(v), 0)}
               label="Speed" color={knob} size="sm"
               formatValue={(v) => Math.round(v).toString()} />
-            <span className="text-[10px] text-gray-500">Ticks per macro step (0 = disabled)</span>
+            <span className="text-[10px] text-text-muted">Ticks per macro step (0 = disabled)</span>
           </div>
 
           {/* Macro step grid */}
-          <div className="flex font-mono text-[10px] text-gray-500 px-1 border-b mb-1"
+          <div className="flex font-mono text-[10px] text-text-muted px-1 border-b mb-1"
             style={{ borderColor: dim }}>
             <span className="w-6 text-center">#</span>
             <span className="w-28 text-center">Waveform</span>
@@ -273,7 +273,7 @@ export const FCControls: React.FC<FCControlsProps> = ({ config, onChange, uadeCh
           <div className="overflow-y-auto" style={{ maxHeight: '260px' }}>
             {config.synthTable.map((step, i) => (
               <div key={i} className="flex items-center gap-1 py-0.5 font-mono">
-                <span className="w-6 text-center text-[10px] text-gray-600">
+                <span className="w-6 text-center text-[10px] text-text-muted">
                   {i.toString().padStart(2, '0')}
                 </span>
                 <select
@@ -282,7 +282,7 @@ export const FCControls: React.FC<FCControlsProps> = ({ config, onChange, uadeCh
                   className="text-[10px] font-mono border rounded px-1"
                   style={{ width: '108px', background: '#100d00', borderColor: dim, color: accent }}>
                   {Array.from({ length: 47 }, (_, n) => (
-                    <option key={n} value={n} style={{ background: '#111', color: '#ccc' }}>
+                    <option key={n} value={n} style={{ background: 'var(--color-bg-secondary)', color: 'var(--color-text-secondary)' }}>
                       {n}: {waveLabel(n)}
                     </option>
                   ))}
@@ -321,7 +321,7 @@ export const FCControls: React.FC<FCControlsProps> = ({ config, onChange, uadeCh
         <div className="grid grid-cols-8 gap-1">
           {config.arpTable.map((v, i) => (
             <div key={i} className="flex flex-col items-center gap-0.5">
-              <span className="text-[9px] font-mono text-gray-600">
+              <span className="text-[9px] font-mono text-text-muted">
                 {i.toString().padStart(2, '0')}
               </span>
               <input
@@ -342,7 +342,7 @@ export const FCControls: React.FC<FCControlsProps> = ({ config, onChange, uadeCh
                 style={{
                   width: '36px',
                   background: '#0e0c00',
-                  borderColor: v !== 0 ? dim : '#1a1a1a',
+                  borderColor: v !== 0 ? dim : 'var(--color-bg-tertiary)',
                   color: v !== 0 ? accent : '#444',
                 }}
               />

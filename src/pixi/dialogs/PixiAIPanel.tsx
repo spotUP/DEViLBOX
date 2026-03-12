@@ -156,7 +156,7 @@ const ChatInput: React.FC<{ panelRight: number; isStreaming: boolean }> = ({ pan
       {/* Provider + Model selector */}
       <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
         {/* Provider toggle */}
-        <div style={{ display: 'flex', gap: 1, background: '#111', borderRadius: 3, padding: 1 }}>
+        <div style={{ display: 'flex', gap: 1, background: 'var(--color-bg-secondary)', borderRadius: 3, padding: 1 }}>
           {AI_PROVIDERS.map((p) => (
             <button
               key={p.id}
@@ -211,7 +211,7 @@ const ChatInput: React.FC<{ panelRight: number; isStreaming: boolean }> = ({ pan
           placeholder="Ask AI..."
           style={{
             flex: 1,
-            background: '#111',
+            background: 'var(--color-bg-secondary)',
             border: '1px solid #333',
             borderRadius: 4,
             padding: '4px 8px',

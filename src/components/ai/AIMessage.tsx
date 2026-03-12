@@ -34,7 +34,7 @@ export const AIMessage: React.FC<AIMessageProps> = ({ message }) => {
                   {tc.result ? ' (done)' : ' (running...)'}
                 </summary>
                 <div className="px-2 py-1 bg-dark-bg/50 font-mono text-[10px] text-text-muted overflow-x-auto">
-                  <div className="text-cyan-400/70">Input: {JSON.stringify(tc.input, null, 1).slice(0, 200)}</div>
+                  <div className="text-accent-highlight/70">Input: {JSON.stringify(tc.input, null, 1).slice(0, 200)}</div>
                   {tc.result && (
                     <div className="text-green-400/70 mt-1">Result: {tc.result.slice(0, 200)}</div>
                   )}
