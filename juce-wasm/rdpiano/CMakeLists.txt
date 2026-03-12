@@ -1,3 +1,6 @@
+cmake_minimum_required(VERSION 3.15)
+project(RdPianoWASM VERSION 1.0.0)
+
 # RdPiano (Roland SA-synthesis Digital Piano) WASM Build
 # Based on librdpiano by Giulio Zausa (GPL-3.0)
 
@@ -19,7 +22,7 @@ add_executable(RdPianoWASM ${RDPIANO_CXX_SOURCES} ${RDPIANO_C_SOURCES})
 
 target_include_directories(RdPianoWASM PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
-    ${CMAKE_SOURCE_DIR}/common
+    ${CMAKE_CURRENT_SOURCE_DIR}/../common
 )
 
 target_compile_definitions(RdPianoWASM PRIVATE
@@ -44,7 +47,7 @@ set_target_properties(RdPianoWASM PROPERTIES
 
 target_link_options(RdPianoWASM PRIVATE
     "SHELL:-s WASM=1"
-    "SHELL:-s EXPORT_ES6=1"
+    "SHELL:-s EXPORT_ES6=0"
     "SHELL:-s MODULARIZE=1"
     "SHELL:-s EXPORT_NAME='createRdPianoModule'"
     "SHELL:-s ALLOW_MEMORY_GROWTH=1"

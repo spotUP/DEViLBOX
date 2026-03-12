@@ -241,7 +241,7 @@ class RdPianoProcessor extends AudioWorkletProcessor {
       // Evaluate Emscripten-generated JS to get module factory
       let createModule;
       try {
-        const wrappedCode = `${jsCode}; return typeof createRdPianoModule !== 'undefined' ? createRdPianoModule : (typeof Module !== 'undefined' ? Module : null);`;
+        const wrappedCode = `${jsCode}; return createRdPianoModule;`;
         createModule = new Function(wrappedCode)();
       } catch (evalErr) {
         throw new Error('Could not evaluate RdPiano module factory: ' + evalErr.message);

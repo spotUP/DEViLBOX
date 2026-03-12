@@ -109,7 +109,7 @@ class OBXdProcessor extends AudioWorkletProcessor {
       // Evaluate the JS code to get the module factory
       let createModule;
       try {
-        const wrappedCode = `${jsCode}; return typeof createOBXdModule !== 'undefined' ? createOBXdModule : (typeof Module !== 'undefined' ? Module : null);`;
+        const wrappedCode = `${jsCode}; return createOBXdModule;`;
         createModule = new Function(wrappedCode)();
       } catch (evalErr) {
         console.error('Failed to evaluate OBXd JS:', evalErr);
