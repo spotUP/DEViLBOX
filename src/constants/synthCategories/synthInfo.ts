@@ -2,7 +2,6 @@
  * Assembled SYNTH_INFO record from all per-family entries
  */
 
-import type { SynthType } from '@typedefs/instrument';
 import type { SynthInfo } from './types';
 import { classicSynthEntries } from './classicSynths';
 import { percussionSynthEntries } from './percussionSynths';
@@ -14,7 +13,7 @@ import { pluginSynthEntries } from './pluginSynths';
 import { fxSynthEntries } from './fxSynths';
 import { amigaSynthEntries } from './amigaSynths';
 
-export const SYNTH_INFO: Record<SynthType, SynthInfo> = {
+export const SYNTH_INFO: Record<string, SynthInfo> = {
   ...classicSynthEntries,
   ...percussionSynthEntries,
   ...sampleSynthEntries,
@@ -24,4 +23,4 @@ export const SYNTH_INFO: Record<SynthType, SynthInfo> = {
   ...pluginSynthEntries,
   ...fxSynthEntries,
   ...amigaSynthEntries,
-} as Record<SynthType, SynthInfo>;
+};
