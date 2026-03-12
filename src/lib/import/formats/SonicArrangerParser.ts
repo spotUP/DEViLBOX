@@ -46,8 +46,8 @@
  *   byte 3: effect argument
  *
  * Note → XM note conversion:
- *   SA period table entry 49 (1-based) = 856 = C-1 = DEViLBOX XM 13
- *   Formula: xmNote = saNote - 36   (valid for saNote 37..132 → XM 1..96)
+ *   SA period table entry 49 (1-based) = 856 = C-3 in FT2 convention = DEViLBOX XM 37
+ *   Formula: xmNote = saNote - 12   (valid for saNote 13..108 → XM 1..96)
  */
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
@@ -84,15 +84,15 @@ function readString(v: DataView, off: number, len: number): string {
 
 // -- SA note → XM note --------------------------------------------------------
 // SA period table is 1-based: index 49 = period 856 = ProTracker C-1.
-// ProTracker C-1 = XM note 13 (MIDI 24).  So xmNote = saNote - 36.
-// Verified: SA 49 → XM 13 → MOD period 856 ✓  (with -24 it gives 428, one octave too high)
-// This maps SA 37→XM 1 (lowest valid XM note) up through SA 132→XM 96.
+// FT2/OpenMPT convention: ProTracker C-1 displays as C-3 (XM note 37).
+// So xmNote = saNote - 12.  This maps SA 13→XM 1 up through SA 108→XM 96.
+// WASM uses saIndex = midiNote + 1 to reverse: (xmNote+11)+1 = xmNote+12 = saNote.
 
 function saNote2XM(note: number): number {
   if (note === 0) return 0;
   if (note === 0x7F || note === 0x80) return 97; // note-off (0x7F=force quiet, 0x80=release)
-  const xm = note - 36;
-  return xm >= 1 ? xm : 0;
+  const xm = note - 12;
+  return (xm >= 1 && xm <= 96) ? xm : 0;
 }
 
 // -- Sub-song info ------------------------------------------------------------
