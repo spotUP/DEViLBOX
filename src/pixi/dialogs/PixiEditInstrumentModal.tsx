@@ -959,7 +959,7 @@ export const PixiEditInstrumentModal: React.FC<PixiEditInstrumentModalProps> = (
               />
             )}
             {activeTab === 'sound' && currentInstrument && currentInstrument.synthType !== 'ModularSynth' && (
-              isNativeWASMSynth(currentInstrument.synthType) && (!currentInstrument.sample?.url || SONG_ENGINE_SYNTH_TYPES.has(currentInstrument.synthType ?? '')) && !(currentInstrument.parameters as Record<string, unknown>)?.sampleUrl ? (
+              isNativeWASMSynth(currentInstrument.synthType) && (SONG_ENGINE_SYNTH_TYPES.has(currentInstrument.synthType ?? '') || (!currentInstrument.sample?.url && !(currentInstrument.parameters as Record<string, unknown>)?.sampleUrl)) ? (
                 <NativeInstrumentPanel instrument={currentInstrument} onUpdate={updateInstrument} />
               ) : (
                 <SoundPanel instrument={currentInstrument} updateParam={updateParam} updateOsc={updateOsc} updateFilter={updateFilter} updateEnvelope={updateEnvelope} />
