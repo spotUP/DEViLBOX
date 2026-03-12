@@ -60,18 +60,28 @@ class SunVoxProcessor extends AudioWorkletProcessor {
 
       case 'create': {
         if (!m) {
-          console.log('[SunVox] create: WASM not loaded');
+          console.error('[SunVox] create: WASM not loaded');
+          this.port.postMessage({ type: 'error', message: 'sunvox_wasm_create failed: WASM not loaded' });
           break;
         }
-        console.log('[SunVox] create: calling _sunvox_wasm_create with sampleRate:', data.sampleRate);
-        const handle = m._sunvox_wasm_create(data.sampleRate);
-        console.log('[SunVox] create: got handle:', handle);
+        let handle = m._sunvox_wasm_create(data.sampleRate);
+        if (handle < 0) {
+          // All 32 slots exhausted — likely stale handles from previous HMR/page reloads.
+          // Destroy all handles we DON'T own and retry.
+          console.warn('[SunVox] create: no free slots, cleaning up stale handles');
+          for (let i = 0; i < 32; i++) {
+            if (!this.handles[i]) {
+              // Not owned by this processor instance — safe to reclaim
+              m._sunvox_wasm_destroy(i);
+            }
+          }
+          handle = m._sunvox_wasm_create(data.sampleRate);
+        }
         if (handle >= 0) {
           this.handles[handle] = { active: true };
-          console.log('[SunVox] create: handles now:', Object.keys(this.handles));
           this.port.postMessage({ type: 'handle', handle });
         } else {
-          this.port.postMessage({ type: 'error', message: 'sunvox_wasm_create failed' });
+          this.port.postMessage({ type: 'error', message: `sunvox_wasm_create returned ${handle} (sampleRate=${data.sampleRate})` });
         }
         break;
       }
@@ -270,7 +280,16 @@ class SunVoxProcessor extends AudioWorkletProcessor {
 
       // Instantiate WASM module with pre-fetched binary
       // Convert Uint8Array back to ArrayBuffer if needed (structured clone from main thread)
-      const wasmBuffer = wasmBinary instanceof Uint8Array ? wasmBinary.buffer : wasmBinary;
+      let wasmBuffer;
+      if (wasmBinary instanceof Uint8Array) {
+        // Ensure we get a clean ArrayBuffer (byteOffset may be non-zero after transfer)
+        wasmBuffer = wasmBinary.buffer.byteLength === wasmBinary.length
+          ? wasmBinary.buffer
+          : wasmBinary.slice().buffer;
+      } else {
+        wasmBuffer = wasmBinary;
+      }
+      console.log('[SunVox Worklet] initWasm: wasmBuffer size:', wasmBuffer?.byteLength, 'sampleRate:', sr);
       this.wasm = await globalThis.createSunVox({
         wasmBinary: wasmBuffer,
       });
