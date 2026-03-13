@@ -844,18 +844,36 @@ function parseAMS1(bytes: Uint8Array, filename: string): TrackerSong | null {
 
     let packChar = 0;
     if (hdr.packed) {
-      if (pos < bytes.length) {
-        packChar = bytes[pos++] ?? 0;
-      }
-    }
-    packChars.push(packChar);
+      // Packed samples have a 9-byte header: targetSize(4) + sourceSize(4) + packChar(1)
+      if (pos + 9 <= bytes.length) {
+        // Skip target size (we already know it from the sample header)
+        pos += 4;
+        const sourceSize = u32le(bytes, pos);
+        pos += 4;
+        packChar = i8s(bytes[pos++] ?? 0);
+        packChars.push(packChar);
 
-    if (byteLen > 0 && pos + byteLen <= bytes.length) {
-      samplePCM.push(bytes.slice(pos, pos + byteLen));
-      pos += byteLen;
+        if (sourceSize > 0 && pos + sourceSize <= bytes.length) {
+          samplePCM.push(bytes.slice(pos, pos + sourceSize));
+          pos += sourceSize;
+        } else {
+          samplePCM.push(null);
+          if (sourceSize > 0) pos = Math.min(pos + sourceSize, bytes.length);
+        }
+      } else {
+        packChars.push(packChar);
+        samplePCM.push(null);
+      }
     } else {
-      samplePCM.push(null);
-      if (byteLen > 0) pos = Math.min(pos + byteLen, bytes.length);
+      packChars.push(packChar);
+
+      if (byteLen > 0 && pos + byteLen <= bytes.length) {
+        samplePCM.push(bytes.slice(pos, pos + byteLen));
+        pos += byteLen;
+      } else {
+        samplePCM.push(null);
+        if (byteLen > 0) pos = Math.min(pos + byteLen, bytes.length);
+      }
     }
   }
 
@@ -1329,17 +1347,30 @@ function parseAMS2(bytes: Uint8Array, filename: string): TrackerSong | null {
 
     let packChar = 0;
     if (foundHdr.packed) {
-      if (pos < bytes.length) {
-        packChar = bytes[pos++] ?? 0;
-      }
-    }
-    packCharList[smp] = packChar;
+      // Packed samples have a 9-byte header: targetSize(4) + sourceSize(4) + packChar(1)
+      if (pos + 9 <= bytes.length) {
+        pos += 4; // skip target size
+        const sourceSize = u32le(bytes, pos);
+        pos += 4;
+        packChar = i8s(bytes[pos++] ?? 0);
+        packCharList[smp] = packChar;
 
-    if (byteLen > 0 && pos + byteLen <= bytes.length) {
-      samplePCM[smp] = bytes.slice(pos, pos + byteLen);
-      pos += byteLen;
+        if (sourceSize > 0 && pos + sourceSize <= bytes.length) {
+          samplePCM[smp] = bytes.slice(pos, pos + sourceSize);
+          pos += sourceSize;
+        } else {
+          if (sourceSize > 0) pos = Math.min(pos + sourceSize, bytes.length);
+        }
+      }
     } else {
-      if (byteLen > 0) pos = Math.min(pos + byteLen, bytes.length);
+      packCharList[smp] = packChar;
+
+      if (byteLen > 0 && pos + byteLen <= bytes.length) {
+        samplePCM[smp] = bytes.slice(pos, pos + byteLen);
+        pos += byteLen;
+      } else {
+        if (byteLen > 0) pos = Math.min(pos + byteLen, bytes.length);
+      }
     }
   }
 

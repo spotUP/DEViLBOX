@@ -102,7 +102,9 @@ export type TrackerFormat =
   | 'FuturePlayer'     // Future Player (Wanted Team, .fp)
   | 'PMD'              // PC-98 Professional Music Driver (YM2608/OPNA)
   | 'AdPlug'           // PC AdLib/OPL formats (RAD, HSC, DRO, IMF, CMF)
-  | 'KT';              // Klystrack chiptune tracker (.kt)
+  | 'KT'              // Klystrack chiptune tracker (.kt)
+  | 'Organya'         // Cave Story / Organya (.org)
+  | 'PxTone';         // PxTone Collage (.ptcop, .pttune)
 
 /**
  * Channel state - all the per-channel data needed for playback
@@ -487,7 +489,7 @@ export class TrackerReplayer {
 
   // External playback engines for formats that don't use standard tracker playback
   private c64SidEngine: C64SIDEngine | null = null;
-  private hivelyEngine: import('../hively/HivelyEngine').HivelyEngine | null = null;
+  private hivelyEngine: import('./hively/HivelyEngine').HivelyEngine | null = null;
   private _hvlPositionUnsub: (() => void) | null = null;
 
   /** Get the active C64 SID engine (for subsong switching etc.) */
@@ -1233,7 +1235,7 @@ export class TrackerReplayer {
         this.hivelyEngine = result.hivelyEngine;
         let lastRow = -1;
         let lastPosition = -1;
-        this._hvlPositionUnsub = this.hivelyEngine.onPositionUpdate((update) => {
+        this._hvlPositionUnsub = this.hivelyEngine.onPositionUpdate((update: import('./hively/HivelyEngine').HivelyPositionUpdate) => {
           if (!this.playing || !this.song) return;
           if (update.row === lastRow && update.position === lastPosition) return;
           lastRow = update.row;
