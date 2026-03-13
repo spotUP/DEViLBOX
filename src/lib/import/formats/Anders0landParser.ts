@@ -247,6 +247,5 @@ export async function parseAnders0landFile(
     initialSpeed: 6,
     initialBPM: 125,
     linearPeriods: false,
-    uadePatternLayout: true,
   };
 }

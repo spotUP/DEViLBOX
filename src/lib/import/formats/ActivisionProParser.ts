@@ -721,7 +721,6 @@ function parseInternal(bytes: Uint8Array, filename: string): TrackerSong | null 
     initialSpeed:    6,
     initialBPM:      125,
     linearPeriods:   false,
-    uadePatternLayout: true,
   };
 }
 

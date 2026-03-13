@@ -185,6 +185,5 @@ export async function parseDaveLoweFile(
     initialSpeed: 6,
     initialBPM: 125,
     linearPeriods: false,
-    uadePatternLayout: true,
   };
 }
