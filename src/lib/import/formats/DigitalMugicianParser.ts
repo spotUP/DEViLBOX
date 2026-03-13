@@ -591,7 +591,7 @@ export async function parseDigitalMugicianFile(
         volume: -6,
         pan: 0,
         uadeChipRam: chipRam,
-        metadata: { modPlayback: { usePeriodPlayback: true, periodMultiplier: 3546895 } },
+        metadata: { modPlayback: { usePeriodPlayback: true, periodMultiplier: 3546895, finetune: 0 } },
         ...(sampleUrl ? {
           sample: {
             url: sampleUrl,
@@ -639,7 +639,7 @@ export async function parseDigitalMugicianFile(
         volume: -6,
         pan: 0,
         uadeChipRam: chipRam,
-        metadata: { modPlayback: { usePeriodPlayback: true, periodMultiplier: 3546895 } },
+        metadata: { modPlayback: { usePeriodPlayback: true, periodMultiplier: 3546895, finetune: 0 } },
       } as InstrumentConfig);
 
     } else {
