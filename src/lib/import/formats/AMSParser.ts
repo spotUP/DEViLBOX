@@ -298,7 +298,7 @@ function buildSampleInstrument(
     sample: {
       audioBuffer: wavBuf,
       url: dataUrl,
-      baseNote: 'C3',
+      baseNote: 'C4',
       detune: 0,
       loop: loopActive,
       loopType: loopActive ? ('forward' as const) : ('off' as const),

@@ -195,15 +195,15 @@ export async function parseQuadraComposerFile(
             continue;
           }
 
-          const ins  = u8(view, p);
-          const note = u8(view, p + 1);
+          const note = u8(view, p);
+          const ins  = u8(view, p + 1);
           const fxt  = u8(view, p + 2) & 0x0F;
           let   fxp  = u8(view, p + 3);
           p += 4;
 
           // Fix effect 4 (vibrato): double depth nibble
           if (fxt === 0x04) {
-            fxp = (fxp & 0xF0) | ((fxp << 1) & 0x0F);
+            fxp = (fxp & 0xF0) | ((fxp & 0x0F) << 1);
           }
           // Fix effect 9 (sample offset): EMOD uses fxp×0x200; XM uses fxp×0x100
           if (fxt === 0x09) {
@@ -271,7 +271,7 @@ export async function parseQuadraComposerFile(
         const c = rowCells[ch];
 
         // Note: EMOD 0-35 = C-1 to B-3 → XM 13-48 (Amiga octave 1-3 = DEViLBOX XM 13-48)
-        const xmNote = c.note <= 35 ? c.note + 13 : 0;
+        const xmNote = c.note <= 35 ? c.note + 25 : 0;
 
         // Effect C (set volume) → XM volume column; clear effect
         let volCol = 0;
