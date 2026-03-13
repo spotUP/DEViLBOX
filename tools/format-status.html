@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>DEViLBOX Format Status Tracker</title>
+<style>
+  :root { --bg: #1a1a2e; --card: #16213e; --border: #0f3460; --accent: #e94560; --text: #eee; --dim: #888; --green: #4ade80; --yellow: #fbbf24; --red: #f87171; --blue: #60a5fa; --purple: #c084fc; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace; background: var(--bg); color: var(--text); padding: 20px; font-size: 13px; }
+  h1 { color: var(--accent); margin-bottom: 4px; font-size: 22px; }
+  .subtitle { color: var(--dim); margin-bottom: 16px; font-size: 12px; }
+  .controls { display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; align-items: center; }
+  .controls input, .controls select { background: var(--card); color: var(--text); border: 1px solid var(--border); padding: 6px 10px; border-radius: 4px; font-family: inherit; font-size: 12px; }
+  .controls input { width: 260px; }
+  .controls select { cursor: pointer; }
+  button { background: var(--accent); color: #fff; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-family: inherit; font-size: 12px; font-weight: bold; }
+  button:hover { opacity: 0.85; }
+  button.secondary { background: var(--border); }
+  .stats { display: flex; gap: 16px; margin-bottom: 16px; flex-wrap: wrap; }
+  .stat { background: var(--card); border: 1px solid var(--border); border-radius: 6px; padding: 8px 14px; min-width: 100px; }
+  .stat-val { font-size: 20px; font-weight: bold; }
+  .stat-label { font-size: 11px; color: var(--dim); }
+  .family-group { margin-bottom: 24px; }
+  .family-header { background: var(--border); color: var(--text); padding: 8px 12px; border-radius: 6px 6px 0 0; font-weight: bold; display: flex; justify-content: space-between; cursor: pointer; user-select: none; }
+  .family-header:hover { background: #1a4a80; }
+  .family-count { color: var(--dim); font-weight: normal; }
+  table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+  th { background: var(--card); color: var(--dim); text-align: left; padding: 6px 8px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; position: sticky; top: 0; overflow: hidden; text-overflow: ellipsis; }
+  td { padding: 5px 8px; border-bottom: 1px solid #1a2a4a; vertical-align: middle; overflow: hidden; text-overflow: ellipsis; }
+  tr:hover td { background: rgba(233,69,96,0.05); }
+  .fmt-label { font-weight: bold; white-space: nowrap; }
+  .fmt-key { color: var(--dim); font-size: 11px; }
+  .ext { color: var(--blue); font-size: 11px; }
+  .badge { display: inline-block; padding: 1px 6px; border-radius: 3px; font-size: 10px; margin-right: 3px; }
+  .badge-native { background: #1a4a2e; color: var(--green); }
+  .badge-uade { background: #4a3a1a; color: var(--yellow); }
+  .badge-openmpt { background: #1a2a4a; color: var(--blue); }
+  .badge-nativeonly { background: #3a1a4a; color: var(--purple); }
+  .badge-editable { background: #1a3a1a; color: #86efac; }
+  .badge-exportable { background: #2a1a3a; color: #d8b4fe; }
+  select.status-select { background: var(--card); color: var(--text); border: 1px solid var(--border); padding: 3px 6px; border-radius: 3px; font-family: inherit; font-size: 12px; cursor: pointer; width: 130px; }
+  select.status-select.s-works { border-color: var(--green); color: var(--green); }
+  select.status-select.s-partial { border-color: var(--yellow); color: var(--yellow); }
+  select.status-select.s-broken { border-color: var(--red); color: var(--red); }
+  select.status-select.s-silent { border-color: #f97316; color: #f97316; }
+  select.status-select.s-wrong-synth { border-color: var(--purple); color: var(--purple); }
+  select.status-select.s-crashes { border-color: #ef4444; color: #ef4444; font-weight: bold; }
+  select.status-select.s-untested { border-color: var(--border); color: var(--dim); }
+  select.status-select.s-retest { border-color: #22d3ee; color: #22d3ee; font-weight: bold; background: #0a2a3a; }
+  input.notes-input { background: var(--card); color: var(--text); border: 1px solid var(--border); padding: 3px 6px; border-radius: 3px; font-family: inherit; font-size: 12px; width: 100%; min-width: 200px; }
+  input.notes-input:focus, select.status-select:focus { outline: none; border-color: var(--accent); }
+  .hidden { display: none; }
+  .export-area { margin-top: 20px; }
+  textarea { width: 100%; height: 300px; background: var(--card); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 12px; font-family: inherit; font-size: 12px; resize: vertical; }
+  .toast { position: fixed; top: 20px; right: 20px; background: var(--green); color: #000; padding: 10px 20px; border-radius: 6px; font-weight: bold; opacity: 0; transition: opacity 0.3s; z-index: 999; pointer-events: none; }
+  .toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+
+<h1>🎵 DEViLBOX Format Status Tracker</h1>
+<p class="subtitle">188 formats — click a family header to collapse/expand. Server is source of truth. <span id="connectionStatus" style="color:#4ade80">●</span> <span id="connectionText">Connecting...</span></p>
+
+<div class="controls">
+  <input type="text" id="search" placeholder="Filter by name, key, or extension...">
+  <select id="filterStatus">
+    <option value="">All statuses</option>
+    <option value="untested">Untested</option>
+    <option value="works">Works</option>
+    <option value="partial">Partial</option>
+    <option value="broken">Broken</option>
+    <option value="silent">Silent</option>
+    <option value="wrong-synth">Wrong Synth</option>
+    <option value="crashes">Crashes</option>
+    <option value="retest">Ready for Retest</option>
+  </select>
+  <select id="filterFamily">
+    <option value="">All families</option>
+  </select>
+  <button onclick="exportJSON()">📋 Export JSON</button>
+  <button class="secondary" onclick="exportCSV()">📄 Export CSV</button>
+  <button class="secondary" onclick="resetAll()">🗑 Reset All</button>
+</div>
+
+<div class="stats" id="stats"></div>
+<div id="content"></div>
+<div class="export-area hidden" id="exportArea">
+  <textarea id="exportText" readonly></textarea>
+</div>
+<div class="toast" id="toast">Copied to clipboard!</div>
+
+<script>
+const FORMATS = [
+
+  {"key": "adpcmMono", "label": "ADPCM Mono", "family": "amiga-native", "nativeParser": true, "uade": true, "openmptFb": false, "openmptPlay": false, "nativeOnly": false, "ext": "", "editable": false, "exportable": false},
+  {"key": "amosMusicBank", "label": "AMOS Music Bank", "family": "amiga-native", "nativeParser": true, "uade": true, "openmptFb": false, "openmptPlay": false, "nativeOnly": false, "ext": ".abk", "editable": true, "exportable": true},
+  {"key": "ams", "label": "AMS / Velvet Studio", "family": "amiga-native", "nativeParser": true, "uade": true, "openmptFb": false, "openmptPlay": true, "nativeOnly": false, "ext": ".ams", "editable": false, "exportable": false},
+  {"key": "actionamics", "label": "Actionamics", "family": "amiga-native", "nativeParser": true, "uade": true, "openmptFb": false, "openmptPlay": false, "nativeOnly": false, "ext": ".act", "editable": false, "exportable": false},
+  {"key": "activisionPro", "label": "Activision Pro", "family": "amiga-native", "nativeParser": true, "uade": true, "openmptFb": false, "openmptPlay": false, "nativeOnly": false, "ext": ".avp .mw", "editable": false, "exportable": false},
+  {"key": "alcatrazPacker", "label": "Alcatraz Packer", "family": "amiga-native", "nativeParser": true, "uade": true, "openmptFb": false, "openmptPlay": false, "nativeOnly": false, "ext": "", "editable": false, "exportable": false},
+  {"key": "anders0land", "label": "Anders \u00d8land", "family": "amiga-native", "nativeParser": true, "uade": true, "openmptFb": false, "openmptPlay": false, "nativeOnly": false, "ext": "", "editable": false, "exportable": false},
+  {"key": "andrewParton", "label": "Andrew Parton", "family": "amiga-native", "nativeParser": true, "uade": true, "openmptFb": false, "openmptPlay": false, "nativeOnly": false, "ext": "", "editable": false, "exportable": false},
+  {"key": "artOfNoise", "label": "Art of Noise", "family": "amiga-native", "nativeParser": true, "uade": true, "openmptFb": false, "openmptPlay": false, "nativeOnly": false, "ext": ".aon .aon8", "editable": true, "exportable": true},
+  {"key": "ashleyHogg", "label": "Ashley Hogg", "family": "amiga-native", "nativeParser": true, "uade": true, "openmptFb": false, "openmptPlay": false, "nativeOnly": false, "ext": "", "editable": false, "exportable": false},
+  {"key": "benDaglish", "label": "Ben Daglish", "family": "amiga-native", "nativeParser": true, "uade": false, "openmptFb": false, "openmptPlay": false, "nativeOnly": false, "ext": ".bd", "editable": false, "exportable": false},
+  {"key": "benDaglishSID", "label": "Ben Daglish SID", "family": "amiga-native", "nativeParser": true, "uade": true, "openmptFb": false, "openmptPlay": false, "nativeOnly": false, "ext": "", "editable": false, "exportable": false},
+  {"key": "bladePacker", "label": "Blade Packer", "family": "amiga-native", "nativeParser": true, "uade": true, "openmptFb": false, "openmptPlay": false, "nativeOnly": false, "ext": "", "editable": false, "exportable": false},
+  {"key": "chuckBiscuits", "label": "Chuck Biscuits", "family": "amiga-native", "nativeParser": true, "uade": true, "openmptFb": false, "openmptPlay": false, "nativeOnly": false, "ext": ".cba", "editable": true, "exportable": true},
+  {"key": "cinemaware", "label": "Cinemaware", "family": "amiga-native", "nativeParser": true, "uade": true, "openmptFb": false, "openmptPlay": false, "nativeOnly": false, "ext": "", "editable": false, "exportable": false},
+  {"key": "coreDesign", "label": "Core Design", "family": "amiga-native", "nativeParser": true, "uade": true, "openmptFb": false, "openmptPlay": false, "nativeOnly": false, "ext": "", "editable": false, "exportable": false},
+  {"key": "customMade", "label": "Custom Made", "family": "amiga-native", "nativeParser": true, "uade": true, "openmptFb": false, "openmptPlay": false, "nativeOnly": false, "ext": "", "editable": false, "exportable": false},
+  {"key": "daveLowe", "label": "Dave Lowe", "family": "amiga-native", "nativeParser": true, "uade": true, "openmptFb": false, "openmptPlay": false, "nativeOnly": false, "ext": ".dl .dl_deli", "editable": false, "exportable": false},
+  {"key": "davidWhittaker", "label": "David Whittaker", "family": "amiga-native", "nativeParser": true, "uade": true, "openmptFb": false, "openmptPlay": false, "nativeOnly": false, "ext": ".dw .dwold", "editable": false, "exportable": false},
+  {"key": "deltaMusic1", "label": "Delta Music", "family": "amiga-native", "nativeParser": true, "uade": true, "openmptFb": false, "openmptPlay": false, "nativeOnly": false, "ext": ".dm .dm1", "editable": true, "exportable": true},
+  {"key": "deltaMusic2", "label": "Delta Music 2", "family": "amiga-native", "nativeParser": true, "uade": true, "openmptFb": false, "openmptPlay": false, "nativeOnly": false, "ext": ".dm2", "editable": true, "exportable": true},
+  {"key": "desire", "label": "Desire", "family": "amiga-native", "nativeParser": true, "uade": true, "openmptFb": false, "openmptPlay": false, "nativeOnly": false, "ext": "", "editable": false, "exportable": false},
+  {"key": "digi", "label": "DigiBooster", "family": "amiga-native", "nativeParser": true, "uade": true, "openmptFb": false, "openmptPlay": false, "nativeOnly": false, "ext": ".digi", "editable": true, "exportable": true},
+  {"key": "digiBoosterPro", "label": "DigiBooster Pro", "family": "amiga-native", "nativeParser": true, "uade": true, "openmptFb": true, "openmptPlay": true, "nativeOnly": false, "ext": ".dbm", "editable": true, "exportable": true},
+  {"key": "mugician", "label": "Digital Mugician", "family": "amiga-native", "nativeParser": true, "uade": true, "openmptFb": false, "openmptPlay": false, "nativeOnly": false, "ext": ".dmu .dmu2 .mug .mug2", "editable": true, "exportable": true},
+  {"key": "digitalSonixChrome", "label": "Digital Sonix Chrome", "family": "amiga-native", "nativeParser": true, "uade": true, "openmptFb": false, "openmptPlay": false, "nativeOnly": false, "ext": "", "editable": false, "exportable": false},
+  {"key": "digitalSoundStudio", "label": "Digital Sound Studio", "family": "amiga-native", "nativeParser": true, "uade": true, "openmptFb": false, "openmptPlay": false, "nativeOnly": false, "ext": ".dss", "editable": true, "exportable": true},
+  {"key": "digitalSymphony", "label": "Digital Symphony", "family": "amiga-native", "nativeParser": true, "uade": true, "openmptFb": false, "openmptPlay": false, "nativeOnly": false, "ext": ".dsym", "editable": true, "exportable": true},
+  {"key": "faceTheMusic", "label": "Face the Music", "family": "amiga-native", "nativeParser": true, "uade": true, "openmptFb": false, "openmptPlay": true, "nativeOnly": false, "ext": ".ftm", "editable": false, "exportable": false},
+  {"key": "fashionTracker", "label": "Fashion Tracker", "family": "amiga-native", "nativeParser": true, "uade": true, "openmptFb": false, "openmptPlay": false, "nativeOnly": false, "ext": "", "editable": false, "exportable": false},
+  {"key": "fred", "label": "Fred Editor", "family": "amiga-native", "nativeParser": true, "uade": true, "openmptFb": false, "openmptPlay": false, "nativeOnly": false, "ext": ".fred", "editable": true, "exportable": true},
+  {"key": "fredGray", "label": "Fred Gray", "family": "amiga-native", "nativeParser": true, "uade": true, "openmptFb": false, "openmptPlay": false, "nativeOnly": false, "ext": "", "editable": false, "exportable": false},
+  {"key": "fc", "label": "Future Composer", "family": "amiga-native", "nativeParser": true, "uade": true, "openmptFb": false, "openmptPlay": false, "nativeOnly": false, "ext": ".fc .fc2 .fc3 .fc4 .fc13 .fc14 .sfc .smod .bfc .bsi", "editable": true, "exportable": true},
+  {"key": "futurePlayer", "label": "Future Player", "family": "amiga-native", "nativeParser": true, "uade": true, "openmptFb": false, "openmptPlay": false, "nativeOnly": false, "ext": ".fp", "editable": true, "exportable": true},
+  {"key": "gameMusicCreator", "label": "Game Music Creator", "family": "amiga-native", "nativeParser": true, "uade": true, "openmptFb": false, "openmptPlay": false, "nativeOnly": false, "ext": ".gmc", "editable": true, "exportable": true},
+  {"key": "graoumfTracker2", "label": "Graoumf Tracker 2", "family": "amiga-native", "nativeParser": true, "uade": true, "openmptFb": false, "openmptPlay": false, "nativeOnly": false, "ext": ".gt2 .gtk", "editable": true, "exportable": true},
+  {"key": "hippelCoso", "label": "Hippel-CoSo", "family": "amiga-native", "nativeParser": true, "uade": true, "openmptFb": false, "openmptPlay": false, "nativeOnly": false, "ext": ".hipc .soc .coso", "editable": false, "exportable": false},
+  {"key": "hvl", "label": "HivelyTracker", "family": "amiga-native", "nativeParser": true, "uade": true, "openmptFb": false, "openmptPlay": false, "nativeOnly": false, "ext": ".hvl .ahx", "editable": true, "exportable": true},
+  {"key": "iffSmus", "label": "IFF SMUS", "family": "amiga-native", "nativeParser": true, "uade": true, "openmptFb": false, "openmptPlay": false, "nativeOnly": false, "ext": ".smus .snx .tiny", "editable": false, "exportable": false},
+  {"key": "iceTracker", "label": "IceTracker", "family": "amiga-native", "nativeParser": true, "uade": true, "openmptFb": false, "openmptPlay": false, "nativeOnly": false, "ext": ".ice", "editable": true, "exportable": true},
+  {"key": "inStereoAmbiguous", "label": "InStereo!", "family": "amiga-native", "nativeParser": false, "uade": true, "openmptFb": false, "openmptPlay": false, "nativeOnly": false, "ext": ".is", "editable": true, "exportable": true},
+  {"key": "inStereo1", "label": "InStereo! 1", "family": "amiga-native", "nativeParser": true, "uade": true, "openmptFb": false, "openmptPlay": false, "nativeOnly": false, "ext": ".is10", "editable": true, "exportable": true},
+  {"key": "inStereo2", "label": "InStereo! 2", "family": "amiga-native", "nativeParser": true, "uade": true, "openmptFb": false, "openmptPlay": false, "nativeOnly": false, "ext": ".is20", "editable": true, "exportable": true},
+  {"key": "infogrames", "label": "Infogrames", "family": "amiga-native", "nativeParser": true, "uade": true, "openmptFb": false, "openmptPlay": false, "nativeOnly": false, "ext": ".dum", "editable": false, "exportable": false},
+  {"key": "jamcracker", "label": "JamCracker Pro", "family": "amiga-native", "nativeParser": true, "uade": true, "openmptFb": false, "openmptPlay": false, "nativeOnly": false, "ext": ".jam .jc", "editable": true, "exportable": true},
+  {"key": "jankoMrsicFlogel", "label": "Janko Mrsic-Flogel", "family": "amiga-native", "nativeParser": true, "uade": true, "openmptFb": false, "openmptPlay": false, "nativeOnly": false, "ext": "", "editable": false, "exportable": false},
+  {"key": "janneSalmijarvi", "label": "Janne Salmij\u00e4rvi", "family": "amiga-native", "nativeParser": true, "uade": true, "openmptFb": false, "openmptPlay": false, "nativeOnly": false, "ext": "", "editable": false, "exportable": false},
+  {"key": "jasonBrooke", "label": "Jason Brooke", "family": "amiga-native", "nativeParser": true, "uade": true, "openmptFb": false, "openmptPlay": false, "nativeOnly": false, "ext": "", "editable": false, "exportable": false},
+  {"key": "jasonPage", "label": "Jason Page", "family": "amiga-native", "nativeParser": true, "uade": true, "openmptFb": false, "openmptPlay": false, "nativeOnly": false, "ext": "", "editable": false, "exportable": false},
+  {"key": "jeroenTel", "label": "Jeroen Tel", "family": "amiga-native", "nativeParser": true, "uade": true, "openmptFb": false, "openmptPlay": false, "nativeOnly": false, "ext": "", "editable": false, "exportable": false},
+  {"key": "jesperOlsen", "label": "Jesper Olsen", "family": "amiga-native", "nativeParser": true, "uade": true, "openmptFb": false, "openmptPlay": false, "nativeOnly": false, "ext": "", "editable": false, "exportable": false},
+  {"key": "jochenHippel7V", "label": "Jochen Hippel 7V", "family": "amiga-native", "nativeParser": true, "uade": true, "openmptFb": false, "openmptPlay": false, "nativeOnly": false, "ext": "", "editable": false, "exportable": false},
+  {"key": "jochenHippelST", "label": "Jochen Hippel ST", "family": "amiga-native", "nativeParser": true, "uade": true, "openmptFb": false, "openmptPlay": false, "nativeOnly": false, "ext": ".sog", "editable": false, "exportable": false},
+  {"key": "kris", "label": "KRIS / ChipTracker", "family": "amiga-native", "nativeParser": true, "uade": true, "openmptFb": false, "openmptPlay": false, "nativeOnly": false, "ext": ".kris", "editable": true, "exportable": true},
+  {"key": "kimChristensen", "label": "Kim Christensen", "family": "amiga-native", "nativeParser": true, "uade": true, "openmptFb": false, "openmptPlay": false, "nativeOnly": false, "ext": "", "editable": false, "exportable": false},
+  {"key": "kt", "label": "Klystrack", "family": "amiga-native", "nativeParser": true, "uade": false, "openmptFb": false, "openmptPlay": false, "nativeOnly": false, "ext": ".kt .ki", "editable": true, "exportable": true},
+  {"key": "krisHatlelid", "label": "Kris Hatlelid", "family": "amiga-native", "nativeParser": true, "uade": true, "openmptFb": false, "openmptPlay": false, "nativeOnly": false, "ext": "", "editable": false, "exportable": false},
+  {"key": "lme", "label": "LME", "family": "amiga-native", "nativeParser": true, "uade": true, "openmptFb": false, "openmptPlay": false, "nativeOnly": false, "ext": ".lme", "editable": false, "exportable": false},
+  {"key": "laxity", "label": "Laxity", "family": "amiga-native", "nativeParser": true, "uade": true, "openmptFb": false, "openmptPlay": false, "nativeOnly": false, "ext": "", "editable": false, "exportable": false},
+  {"key": "midiLoriciel", "label": "MIDI Loriciel", "family": "amiga-native", "nativeParser": true, "uade": true, "openmptFb": false, "openmptPlay": false, "nativeOnly": false, "ext": "", "editable": false, "exportable": false},
+  {"key": "mmdc", "label": "MMDC", "family": "amiga-native", "nativeParser": true, "uade": true, "openmptFb": false, "openmptPlay": false, "nativeOnly": false, "ext": "", "editable": false, "exportable": false},
+  {"key": "magneticFieldsPacker", "label": "Magnetic Fields Packer", "family": "amiga-native", "nativeParser": true, "uade": true, "openmptFb": false, "openmptPlay": false, "nativeOnly": false, "ext": ".mfp", "editable": true, "exportable": true},
+  {"key": "maniacsOfNoise", "label": "Maniacs of Noise", "family": "amiga-native", "nativeParser": true, "uade": true, "openmptFb": false, "openmptPlay": false, "nativeOnly": false, "ext": "", "editable": false, "exportable": false},
+  {"key": "markCooksey", "label": "Mark Cooksey", "family": "amiga-native", "nativeParser": true, "uade": true, "openmptFb": false, "openmptPlay": false, "nativeOnly": false, "ext": "", "editable": false, "exportable": false},
+  {"key": "martinWalker", "label": "Martin Walker", "family": "amiga-native", "nativeParser": true, "uade": true, "openmptFb": false, "openmptPlay": false, "nativeOnly": false, "ext": "", "editable": false, "exportable": false},
+  {"key": "maximumEffect", "label": "Maximum Effect", "family": "amiga-native", "nativeParser": true, "uade": true, "openmptFb": false, "openmptPlay": false, "nativeOnly": false, "ext": "", "editable": false, "exportable": false},
+  {"key": "medley", "label": "Medley", "family": "amiga-native", "nativeParser": true, "uade": true, "openmptFb": false, "openmptPlay": false, "nativeOnly": false, "ext": ".ml", "editable": false, "exportable": false},
+  {"key": "moshPacker", "label": "Mosh Packer", "family": "amiga-native", "nativeParser": true, "uade": true, "openmptFb": false, "openmptPlay": false, "nativeOnly": false, "ext": "", "editable": false, "exportable": false},
+  {"key": "multiMediaSound", "label": "MultiMedia Sound", "family": "amiga-native", "nativeParser": true, "uade": true, "openmptFb": false, "openmptPlay": false, "nativeOnly": false, "ext": "", "editable": false, "exportable": false},
+  {"key": "musicAssembler", "label": "Music Assembler", "family": "amiga-native", "nativeParser": true, "uade": true, "openmptFb": false, "openmptPlay": false, "nativeOnly": false, "ext": ".ma", "editable": true, "exportable": true},
+  {"key": "musicMaker4V", "label": "Music Maker 4V", "family": "amiga-native", "nativeParser": true, "uade": true, "openmptFb": false, "openmptPlay": false, "nativeOnly": false, "ext": "", "editable": false, "exportable": false},
+  {"key": "musicMaker8V", "label": "Music Maker 8V", "family": "amiga-native", "nativeParser": true, "uade": true, "openmptFb": false, "openmptPlay": false, "nativeOnly": false, "ext": "", "editable": false, "exportable": false},
+  {"key": "musicLine", "label": "MusicLine Editor", "family": "amiga-native", "nativeParser": true, "uade": false, "openmptFb": false, "openmptPlay": false, "nativeOnly": true, "ext": ".ml", "editable": true, "exportable": true},
+  {"key": "ntsp", "label": "NTSP", "family": "amiga-native", "nativeParser": true, "uade": true, "openmptFb": false, "openmptPlay": false, "nativeOnly": false, "ext": "", "editable": false, "exportable": false},
+  {"key": "nickPellingPacker", "label": "Nick Pelling Packer", "family": "amiga-native", "nativeParser": true, "uade": true, "openmptFb": false, "openmptPlay": false, "nativeOnly": false, "ext": "", "editable": false, "exportable": false},
+  {"key": "novoTradePacker", "label": "NovoTrade Packer", "family": "amiga-native", "nativeParser": true, "uade": true, "openmptFb": false, "openmptPlay": false, "nativeOnly": false, "ext": "", "editable": false, "exportable": false},
+  {"key": "med", "label": "OctaMED", "family": "amiga-native", "nativeParser": true, "uade": true, "openmptFb": false, "openmptPlay": true, "nativeOnly": false, "ext": ".med .mmd0 .mmd1 .mmd2 .mmd3", "editable": true, "exportable": true},
+  {"key": "okt", "label": "Oktalyzer", "family": "amiga-native", "nativeParser": true, "uade": true, "openmptFb": false, "openmptPlay": true, "nativeOnly": false, "ext": ".okt", "editable": true, "exportable": true},
+  {"key": "onEscapee", "label": "On Escapee", "family": "amiga-native", "nativeParser": true, "uade": true, "openmptFb": false, "openmptPlay": false, "nativeOnly": false, "ext": "", "editable": false, "exportable": false},
+  {"key": "paulRobotham", "label": "Paul Robotham", "family": "amiga-native", "nativeParser": true, "uade": true, "openmptFb": false, "openmptPlay": false, "nativeOnly": false, "ext": "", "editable": false, "exportable": false},
+  {"key": "paulShields", "label": "Paul Shields", "family": "amiga-native", "nativeParser": true, "uade": true, "openmptFb": false, "openmptPlay": false, "nativeOnly": false, "ext": "", "editable": false, "exportable": false},
+  {"key": "paulSummers", "label": "Paul Summers", "family": "amiga-native", "nativeParser": true, "uade": true, "openmptFb": false, "openmptPlay": false, "nativeOnly": false, "ext": "", "editable": false, "exportable": false},
+  {"key": "paulTonge", "label": "Paul Tonge", "family": "amiga-native", "nativeParser": true, "uade": true, "openmptFb": false, "openmptPlay": false, "nativeOnly": false, "ext": "", "editable": false, "exportable": false},
+  {"key": "peterVerswyvelenPacker", "label": "Peter Verswyvelen Packer", "family": "amiga-native", "nativeParser": true, "uade": true, "openmptFb": false, "openmptPlay": false, "nativeOnly": false, "ext": "", "editable": false, "exportable": false},
+  {"key": "pierreAdane", "label": "Pierre Adane", "family": "amiga-native", "nativeParser": true, "uade": true, "openmptFb": false, "openmptPlay": false, "nativeOnly": false, "ext": "", "editable": false, "exportable": false},
+  {"key": "pt36", "label": "ProTracker 3.6", "family": "amiga-native", "nativeParser": true, "uade": false, "openmptFb": true, "openmptPlay": false, "nativeOnly": false, "ext": "", "editable": true, "exportable": true},
+  {"key": "psa", "label": "Professional Sound Artists", "family": "amiga-native", "nativeParser": true, "uade": true, "openmptFb": false, "openmptPlay": false, "nativeOnly": false, "ext": ".psa", "editable": false, "exportable": false},
+  {"key": "pumaTracker", "label": "Puma Tracker", "family": "amiga-native", "nativeParser": true, "uade": true, "openmptFb": false, "openmptPlay": false, "nativeOnly": false, "ext": ".puma", "editable": true, "exportable": true},
+  {"key": "quadraComposer", "label": "Quadra Composer", "family": "amiga-native", "nativeParser": true, "uade": true, "openmptFb": false, "openmptPlay": false, "nativeOnly": false, "ext": ".emod .qc", "editable": true, "exportable": true},
+  {"key": "quartet", "label": "Quartet", "family": "amiga-native", "nativeParser": true, "uade": true, "openmptFb": false, "openmptPlay": false, "nativeOnly": false, "ext": "", "editable": false, "exportable": false},
+  {"key": "richardJoseph", "label": "Richard Joseph", "family": "amiga-native", "nativeParser": true, "uade": true, "openmptFb": false, "openmptPlay": false, "nativeOnly": false, "ext": ".rjp .rj", "editable": false, "exportable": false},
+  {"key": "robHubbard", "label": "Rob Hubbard", "family": "amiga-native", "nativeParser": true, "uade": true, "openmptFb": false, "openmptPlay": false, "nativeOnly": false, "ext": ".rh .rhp", "editable": false, "exportable": false},
+  {"key": "robHubbardST", "label": "Rob Hubbard ST", "family": "amiga-native", "nativeParser": true, "uade": true, "openmptFb": false, "openmptPlay": false, "nativeOnly": false, "ext": "", "editable": false, "exportable": false},
+  {"key": "ronKlaren", "label": "Ron Klaren", "family": "amiga-native", "nativeParser": true, "uade": true, "openmptFb": false, "openmptPlay": false, "nativeOnly": false, "ext": ".rk .rkb", "editable": false, "exportable": false},
+  {"key": "sawteeth", "label": "Sawteeth", "family": "amiga-native", "nativeParser": true, "uade": true, "openmptFb": false, "openmptPlay": false, "nativeOnly": false, "ext": ".st", "editable": false, "exportable": false},
+  {"key": "seanConran", "label": "Sean Conran", "family": "amiga-native", "nativeParser": true, "uade": true, "openmptFb": false, "openmptPlay": false, "nativeOnly": false, "ext": "", "editable": false, "exportable": false},
+  {"key": "sidmon1", "label": "SidMon 1", "family": "amiga-native", "nativeParser": true, "uade": true, "openmptFb": false, "openmptPlay": false, "nativeOnly": false, "ext": ".sid1", "editable": true, "exportable": true},
+  {"key": "sidmon2", "label": "SidMon II", "family": "amiga-native", "nativeParser": true, "uade": false, "openmptFb": false, "openmptPlay": false, "nativeOnly": false, "ext": ".sid2 .smn", "editable": true, "exportable": true},
+  {"key": "sonicArranger", "label": "Sonic Arranger", "family": "amiga-native", "nativeParser": true, "uade": true, "openmptFb": false, "openmptPlay": false, "nativeOnly": false, "ext": ".sa .sonic", "editable": true, "exportable": true},
+  {"key": "soundControl", "label": "Sound Control", "family": "amiga-native", "nativeParser": true, "uade": true, "openmptFb": false, "openmptPlay": false, "nativeOnly": false, "ext": ".sc .sct", "editable": true, "exportable": true},
+  {"key": "soundFactory", "label": "Sound Factory", "family": "amiga-native", "nativeParser": true, "uade": true, "openmptFb": false, "openmptPlay": false, "nativeOnly": false, "ext": ".psf", "editable": false, "exportable": false},
+  {"key": "soundMaster", "label": "Sound Master", "family": "amiga-native", "nativeParser": true, "uade": true, "openmptFb": false, "openmptPlay": false, "nativeOnly": false, "ext": "", "editable": false, "exportable": false},
+  {"key": "soundPlayer", "label": "Sound Player", "family": "amiga-native", "nativeParser": true, "uade": true, "openmptFb": false, "openmptPlay": false, "nativeOnly": false, "ext": "", "editable": false, "exportable": false},
+  {"key": "soundfx", "label": "Sound-FX", "family": "amiga-native", "nativeParser": true, "uade": true, "openmptFb": false, "openmptPlay": false, "nativeOnly": false, "ext": ".sfx .sfx2 .sfx13", "editable": true, "exportable": true},
+  {"key": "soundmon", "label": "SoundMon", "family": "amiga-native", "nativeParser": true, "uade": true, "openmptFb": false, "openmptPlay": false, "nativeOnly": false, "ext": ".bp .bp3 .sndmon", "editable": true, "exportable": true},
+  {"key": "specialFX", "label": "Special FX", "family": "amiga-native", "nativeParser": true, "uade": true, "openmptFb": false, "openmptPlay": false, "nativeOnly": false, "ext": "", "editable": false, "exportable": false},
+  {"key": "speedySystem", "label": "Speedy System", "family": "amiga-native", "nativeParser": true, "uade": true, "openmptFb": false, "openmptPlay": false, "nativeOnly": false, "ext": ".ss", "editable": false, "exportable": false},
+  {"key": "steveBarrett", "label": "Steve Barrett", "family": "amiga-native", "nativeParser": true, "uade": true, "openmptFb": false, "openmptPlay": false, "nativeOnly": false, "ext": "", "editable": false, "exportable": false},
+  {"key": "steveTurner", "label": "Steve Turner", "family": "amiga-native", "nativeParser": true, "uade": true, "openmptFb": false, "openmptPlay": false, "nativeOnly": false, "ext": ".jpold", "editable": false, "exportable": false},
+  {"key": "symphoniePro", "label": "Symphonie Pro", "family": "amiga-native", "nativeParser": true, "uade": true, "openmptFb": false, "openmptPlay": true, "nativeOnly": false, "ext": ".symmod", "editable": true, "exportable": true},
+  {"key": "synthPack", "label": "Synth Pack", "family": "amiga-native", "nativeParser": true, "uade": true, "openmptFb": false, "openmptPlay": false, "nativeOnly": false, "ext": "", "editable": false, "exportable": false},
+  {"key": "synthesis", "label": "Synthesis", "family": "amiga-native", "nativeParser": true, "uade": true, "openmptFb": false, "openmptPlay": false, "nativeOnly": false, "ext": ".syn", "editable": true, "exportable": true},
+  {"key": "tcbTracker", "label": "TCB Tracker", "family": "amiga-native", "nativeParser": true, "uade": true, "openmptFb": false, "openmptPlay": false, "nativeOnly": false, "ext": ".tcb", "editable": true, "exportable": true},
+  {"key": "tfmx", "label": "TFMX", "family": "amiga-native", "nativeParser": true, "uade": true, "openmptFb": false, "openmptPlay": false, "nativeOnly": false, "ext": ".tfmx .mdat .tfx", "editable": true, "exportable": true},
+  {"key": "tme", "label": "TME", "family": "amiga-native", "nativeParser": true, "uade": true, "openmptFb": false, "openmptPlay": false, "nativeOnly": false, "ext": ".tme", "editable": false, "exportable": false},
+  {"key": "thomasHermann", "label": "Thomas Hermann", "family": "amiga-native", "nativeParser": true, "uade": true, "openmptFb": false, "openmptPlay": false, "nativeOnly": false, "ext": "", "editable": false, "exportable": false},
+  {"key": "timeTracker", "label": "Time Tracker", "family": "amiga-native", "nativeParser": true, "uade": true, "openmptFb": false, "openmptPlay": false, "nativeOnly": false, "ext": "", "editable": false, "exportable": false},
+  {"key": "tomyTracker", "label": "Tomy Tracker", "family": "amiga-native", "nativeParser": true, "uade": true, "openmptFb": false, "openmptPlay": false, "nativeOnly": false, "ext": "", "editable": false, "exportable": false},
+  {"key": "tronic", "label": "Tronic", "family": "amiga-native", "nativeParser": true, "uade": true, "openmptFb": false, "openmptPlay": false, "nativeOnly": false, "ext": ".trc .dp .tro .tronic", "editable": false, "exportable": false},
+  {"key": "ufo", "label": "UFO", "family": "amiga-native", "nativeParser": true, "uade": true, "openmptFb": false, "openmptPlay": false, "nativeOnly": false, "ext": ".ufo", "editable": false, "exportable": false},
+  {"key": "wallyBeben", "label": "Wally Beben", "family": "amiga-native", "nativeParser": true, "uade": true, "openmptFb": false, "openmptPlay": false, "nativeOnly": false, "ext": "", "editable": false, "exportable": false},
+  {"key": "zoundMonitor", "label": "Zound Monitor", "family": "amiga-native", "nativeParser": true, "uade": true, "openmptFb": false, "openmptPlay": false, "nativeOnly": false, "ext": "", "editable": true, "exportable": true},
+  {"key": "imagesMusicSystem", "label": "Images Music System", "family": "amiga-native", "nativeParser": true, "uade": true, "openmptFb": false, "openmptPlay": false, "nativeOnly": false, "ext": ".ims", "editable": false, "exportable": false},
+  {"key": "titanicsPacker", "label": "Titanics Packer", "family": "amiga-native", "nativeParser": true, "uade": true, "openmptFb": false, "openmptPlay": false, "nativeOnly": false, "ext": "", "editable": false, "exportable": false},
+  {"key": "c64sid", "label": "C64 SID", "family": "c64-chip", "nativeParser": true, "uade": false, "openmptFb": false, "openmptPlay": false, "nativeOnly": true, "ext": ".sid", "editable": false, "exportable": false},
+  {"key": "goatTracker", "label": "GoatTracker", "family": "c64-chip", "nativeParser": false, "uade": false, "openmptFb": false, "openmptPlay": false, "nativeOnly": true, "ext": ".sng", "editable": true, "exportable": false},
+  {"key": "ay", "label": "AY", "family": "chip-dump", "nativeParser": true, "uade": false, "openmptFb": false, "openmptPlay": false, "nativeOnly": true, "ext": ".ay", "editable": false, "exportable": false},
+  {"key": "adplug", "label": "AdPlug", "family": "chip-dump", "nativeParser": true, "uade": false, "openmptFb": false, "openmptPlay": false, "nativeOnly": true, "ext": ".rad .hsc .cmf .d00 .dro .imf ...", "editable": false, "exportable": false},
+  {"key": "eupmini", "label": "EUP", "family": "chip-dump", "nativeParser": false, "uade": false, "openmptFb": false, "openmptPlay": false, "nativeOnly": true, "ext": ".eup", "editable": false, "exportable": false},
+  {"key": "gbs", "label": "GBS", "family": "chip-dump", "nativeParser": true, "uade": false, "openmptFb": false, "openmptPlay": false, "nativeOnly": true, "ext": ".gbs", "editable": false, "exportable": false},
+  {"key": "hes", "label": "HES", "family": "chip-dump", "nativeParser": true, "uade": false, "openmptFb": false, "openmptPlay": false, "nativeOnly": true, "ext": ".hes", "editable": false, "exportable": false},
+  {"key": "ixalance", "label": "IXS", "family": "chip-dump", "nativeParser": false, "uade": false, "openmptFb": false, "openmptPlay": false, "nativeOnly": true, "ext": ".ixs", "editable": false, "exportable": false},
+  {"key": "kss", "label": "KSS", "family": "chip-dump", "nativeParser": true, "uade": false, "openmptFb": false, "openmptPlay": false, "nativeOnly": true, "ext": ".kss", "editable": false, "exportable": false},
+  {"key": "mdx", "label": "MDX", "family": "chip-dump", "nativeParser": true, "uade": false, "openmptFb": false, "openmptPlay": false, "nativeOnly": true, "ext": ".mdx", "editable": false, "exportable": false},
+  {"key": "nsf", "label": "NSF", "family": "chip-dump", "nativeParser": true, "uade": false, "openmptFb": false, "openmptPlay": false, "nativeOnly": true, "ext": ".nsf .nsfe", "editable": false, "exportable": false},
+  {"key": "organya", "label": "Organya", "family": "chip-dump", "nativeParser": false, "uade": false, "openmptFb": false, "openmptPlay": false, "nativeOnly": true, "ext": ".org", "editable": false, "exportable": false},
+  {"key": "pmd", "label": "PMD", "family": "chip-dump", "nativeParser": true, "uade": false, "openmptFb": false, "openmptPlay": false, "nativeOnly": true, "ext": ".m .m2 .mz .pmd", "editable": false, "exportable": false},
+  {"key": "cpsycle", "label": "Psycle", "family": "chip-dump", "nativeParser": false, "uade": false, "openmptFb": false, "openmptPlay": false, "nativeOnly": true, "ext": ".psy", "editable": false, "exportable": false},
+  {"key": "pxtone", "label": "PxTone", "family": "chip-dump", "nativeParser": false, "uade": false, "openmptFb": false, "openmptPlay": false, "nativeOnly": true, "ext": ".ptcop .pttune", "editable": false, "exportable": false},
+  {"key": "s98", "label": "S98", "family": "chip-dump", "nativeParser": true, "uade": false, "openmptFb": false, "openmptPlay": false, "nativeOnly": true, "ext": ".s98", "editable": false, "exportable": false},
+  {"key": "sap", "label": "SAP", "family": "chip-dump", "nativeParser": true, "uade": false, "openmptFb": false, "openmptPlay": false, "nativeOnly": true, "ext": ".sap", "editable": false, "exportable": false},
+  {"key": "sndh", "label": "SNDH/SC68", "family": "chip-dump", "nativeParser": true, "uade": false, "openmptFb": false, "openmptPlay": false, "nativeOnly": true, "ext": ".sndh .sc68", "editable": false, "exportable": false},
+  {"key": "spc", "label": "SPC", "family": "chip-dump", "nativeParser": true, "uade": false, "openmptFb": false, "openmptPlay": false, "nativeOnly": true, "ext": ".spc", "editable": false, "exportable": false},
+  {"key": "v2m", "label": "V2M", "family": "chip-dump", "nativeParser": false, "uade": false, "openmptFb": false, "openmptPlay": false, "nativeOnly": true, "ext": ".v2m", "editable": false, "exportable": false},
+  {"key": "vgm", "label": "VGM", "family": "chip-dump", "nativeParser": true, "uade": false, "openmptFb": false, "openmptPlay": false, "nativeOnly": true, "ext": ".vgm .vgz", "editable": false, "exportable": false},
+  {"key": "ym", "label": "YM", "family": "chip-dump", "nativeParser": true, "uade": false, "openmptFb": false, "openmptPlay": false, "nativeOnly": true, "ext": ".ym", "editable": false, "exportable": false},
+  {"key": "zxtune", "label": "ZXTune", "family": "chip-dump", "nativeParser": false, "uade": false, "openmptFb": false, "openmptPlay": false, "nativeOnly": true, "ext": ".pt3 .pt2 .pt1 .stc .st1 .st3 ...", "editable": false, "exportable": false},
+  {"key": "dmf", "label": "DefleMask / X-Tracker", "family": "furnace", "nativeParser": true, "uade": true, "openmptFb": false, "openmptPlay": false, "nativeOnly": false, "ext": ".dmf", "editable": true, "exportable": false},
+  {"key": "fur", "label": "Furnace", "family": "furnace", "nativeParser": false, "uade": false, "openmptFb": false, "openmptPlay": false, "nativeOnly": true, "ext": ".fur", "editable": true, "exportable": true},
+  {"key": "xm", "label": "FastTracker II XM", "family": "libopenmpt", "nativeParser": true, "uade": false, "openmptFb": true, "openmptPlay": false, "nativeOnly": false, "ext": ".xm", "editable": true, "exportable": true},
+  {"key": "it", "label": "Impulse Tracker", "family": "libopenmpt", "nativeParser": true, "uade": false, "openmptFb": true, "openmptPlay": false, "nativeOnly": false, "ext": ".it .mptm", "editable": true, "exportable": true},
+  {"key": "mod", "label": "ProTracker MOD", "family": "libopenmpt", "nativeParser": true, "uade": true, "openmptFb": true, "openmptPlay": false, "nativeOnly": false, "ext": ".mod .m15", "editable": true, "exportable": true},
+  {"key": "s3m", "label": "ScreamTracker 3", "family": "libopenmpt", "nativeParser": true, "uade": false, "openmptFb": true, "openmptPlay": false, "nativeOnly": false, "ext": ".s3m", "editable": true, "exportable": true},
+  {"key": "midi", "label": "MIDI", "family": "midi", "nativeParser": true, "uade": false, "openmptFb": false, "openmptPlay": false, "nativeOnly": true, "ext": ".mid .midi", "editable": false, "exportable": false},
+  {"key": "amf", "label": "Advanced Music Format", "family": "pc-tracker", "nativeParser": true, "uade": false, "openmptFb": true, "openmptPlay": false, "nativeOnly": false, "ext": ".amf", "editable": false, "exportable": false},
+  {"key": "cdfm67", "label": "CDFM Composer 670", "family": "pc-tracker", "nativeParser": true, "uade": false, "openmptFb": true, "openmptPlay": false, "nativeOnly": false, "ext": ".c67", "editable": false, "exportable": false},
+  {"key": "composer667", "label": "Composer 667", "family": "pc-tracker", "nativeParser": true, "uade": false, "openmptFb": true, "openmptPlay": false, "nativeOnly": false, "ext": ".667", "editable": true, "exportable": true},
+  {"key": "669", "label": "Composer 669", "family": "pc-tracker", "nativeParser": true, "uade": false, "openmptFb": true, "openmptPlay": false, "nativeOnly": false, "ext": ".669", "editable": false, "exportable": false},
+  {"key": "dsm", "label": "DSIK Sound Module", "family": "pc-tracker", "nativeParser": true, "uade": false, "openmptFb": true, "openmptPlay": false, "nativeOnly": false, "ext": ".dsm", "editable": false, "exportable": false},
+  {"key": "mdl", "label": "DigiTrakker", "family": "pc-tracker", "nativeParser": true, "uade": false, "openmptFb": true, "openmptPlay": false, "nativeOnly": false, "ext": ".mdl", "editable": false, "exportable": false},
+  {"key": "dtm", "label": "Digital Tracker", "family": "pc-tracker", "nativeParser": true, "uade": false, "openmptFb": true, "openmptPlay": false, "nativeOnly": false, "ext": ".dtm", "editable": false, "exportable": false},
+  {"key": "plm", "label": "Disorder Tracker 2", "family": "pc-tracker", "nativeParser": true, "uade": false, "openmptFb": true, "openmptPlay": false, "nativeOnly": false, "ext": ".plm", "editable": false, "exportable": false},
+  {"key": "easyTrax", "label": "EasyTrax", "family": "pc-tracker", "nativeParser": true, "uade": false, "openmptFb": true, "openmptPlay": false, "nativeOnly": false, "ext": ".etx", "editable": false, "exportable": false},
+  {"key": "fmTracker", "label": "FM Tracker", "family": "pc-tracker", "nativeParser": true, "uade": false, "openmptFb": true, "openmptPlay": false, "nativeOnly": false, "ext": ".fmt", "editable": false, "exportable": false},
+  {"key": "far", "label": "Farandole Composer", "family": "pc-tracker", "nativeParser": true, "uade": false, "openmptFb": true, "openmptPlay": false, "nativeOnly": false, "ext": ".far", "editable": false, "exportable": false},
+  {"key": "j2b", "label": "Galaxy Sound System", "family": "pc-tracker", "nativeParser": false, "uade": false, "openmptFb": true, "openmptPlay": true, "nativeOnly": false, "ext": ".j2b", "editable": false, "exportable": false},
+  {"key": "gdm", "label": "General DigiMusic", "family": "pc-tracker", "nativeParser": true, "uade": false, "openmptFb": true, "openmptPlay": false, "nativeOnly": false, "ext": ".gdm", "editable": false, "exportable": false},
+  {"key": "itp", "label": "IT Project", "family": "pc-tracker", "nativeParser": false, "uade": false, "openmptFb": true, "openmptPlay": true, "nativeOnly": false, "ext": ".itp", "editable": false, "exportable": false},
+  {"key": "imagoOrpheus", "label": "Imago Orpheus", "family": "pc-tracker", "nativeParser": true, "uade": false, "openmptFb": true, "openmptPlay": true, "nativeOnly": false, "ext": ".imf", "editable": false, "exportable": false},
+  {"key": "karlMorton", "label": "Karl Morton", "family": "pc-tracker", "nativeParser": true, "uade": false, "openmptFb": true, "openmptPlay": false, "nativeOnly": false, "ext": ".mus", "editable": false, "exportable": false},
+  {"key": "mo3", "label": "MO3 Compressed", "family": "pc-tracker", "nativeParser": false, "uade": false, "openmptFb": true, "openmptPlay": true, "nativeOnly": false, "ext": ".mo3", "editable": false, "exportable": false},
+  {"key": "madTracker2", "label": "MadTracker 2", "family": "pc-tracker", "nativeParser": true, "uade": false, "openmptFb": true, "openmptPlay": true, "nativeOnly": false, "ext": ".mt2", "editable": false, "exportable": false},
+  {"key": "mtm", "label": "MultiTracker", "family": "pc-tracker", "nativeParser": true, "uade": false, "openmptFb": true, "openmptPlay": false, "nativeOnly": false, "ext": ".mtm", "editable": false, "exportable": false},
+  {"key": "nru", "label": "NoiseRunner", "family": "pc-tracker", "nativeParser": true, "uade": false, "openmptFb": true, "openmptPlay": false, "nativeOnly": false, "ext": ".nru", "editable": false, "exportable": false},
+  {"key": "nst", "label": "NoiseTracker", "family": "pc-tracker", "nativeParser": false, "uade": false, "openmptFb": true, "openmptPlay": true, "nativeOnly": false, "ext": ".nst", "editable": false, "exportable": false},
+  {"key": "psm", "label": "PSM", "family": "pc-tracker", "nativeParser": true, "uade": false, "openmptFb": true, "openmptPlay": true, "nativeOnly": false, "ext": ".psm", "editable": false, "exportable": false},
+  {"key": "ptm", "label": "PolyTracker", "family": "pc-tracker", "nativeParser": true, "uade": false, "openmptFb": true, "openmptPlay": false, "nativeOnly": false, "ext": ".ptm", "editable": false, "exportable": false},
+  {"key": "rtm", "label": "Reality Tracker", "family": "pc-tracker", "nativeParser": true, "uade": false, "openmptFb": true, "openmptPlay": false, "nativeOnly": false, "ext": ".rtm", "editable": false, "exportable": false},
+  {"key": "xrns", "label": "Renoise", "family": "pc-tracker", "nativeParser": true, "uade": false, "openmptFb": false, "openmptPlay": false, "nativeOnly": true, "ext": ".xrns", "editable": false, "exportable": false},
+  {"key": "stm", "label": "ScreamTracker 2", "family": "pc-tracker", "nativeParser": true, "uade": false, "openmptFb": true, "openmptPlay": false, "nativeOnly": false, "ext": ".stm", "editable": false, "exportable": false},
+  {"key": "stx", "label": "ScreamTracker STMIK", "family": "pc-tracker", "nativeParser": true, "uade": false, "openmptFb": true, "openmptPlay": false, "nativeOnly": false, "ext": ".stx", "editable": false, "exportable": false},
+  {"key": "stp", "label": "SoundTracker Pro II", "family": "pc-tracker", "nativeParser": true, "uade": false, "openmptFb": true, "openmptPlay": false, "nativeOnly": false, "ext": ".stp", "editable": false, "exportable": false},
+  {"key": "uax", "label": "UAX", "family": "pc-tracker", "nativeParser": true, "uade": false, "openmptFb": false, "openmptPlay": false, "nativeOnly": true, "ext": ".uax", "editable": false, "exportable": false},
+  {"key": "unic", "label": "UNIC Tracker", "family": "pc-tracker", "nativeParser": true, "uade": false, "openmptFb": true, "openmptPlay": false, "nativeOnly": false, "ext": ".unic", "editable": false, "exportable": false},
+  {"key": "stk", "label": "Ultimate SoundTracker", "family": "pc-tracker", "nativeParser": true, "uade": false, "openmptFb": true, "openmptPlay": false, "nativeOnly": false, "ext": ".stk", "editable": false, "exportable": false},
+  {"key": "ult", "label": "Ultra Tracker", "family": "pc-tracker", "nativeParser": true, "uade": false, "openmptFb": true, "openmptPlay": false, "nativeOnly": false, "ext": ".ult", "editable": false, "exportable": false},
+  {"key": "xmf", "label": "XMF", "family": "pc-tracker", "nativeParser": true, "uade": false, "openmptFb": true, "openmptPlay": false, "nativeOnly": false, "ext": ".xmf", "editable": true, "exportable": true},
+  {"key": "wow", "label": "WoW", "family": "pc-tracker", "nativeParser": false, "uade": false, "openmptFb": true, "openmptPlay": true, "nativeOnly": false, "ext": ".wow", "editable": false, "exportable": false},
+
+];
+
+const STATUS_OPTIONS = ['untested','works','partial','broken','silent','wrong-synth','crashes','retest'];
+
+// Server is the source of truth. We load from server, save incremental updates to server.
+let savedState = {};
+
+// Load all data from server on page open
+fetch('/get-data').then(r => r.json()).then(serverData => {
+  savedState = serverData || {};
+  render();
+  updateStats();
+  console.log(`[Init] Loaded ${Object.keys(savedState).length} entries from server`);
+}).catch(e => {
+  console.error('[Init] Failed to load from server:', e);
+  document.getElementById('connectionText').textContent = 'Server offline!';
+  document.getElementById('connectionStatus').style.color = '#f87171';
+});
+
+// SSE — live updates from server (Claude pushes, other browser tabs)
+let evtSource = null;
+function connectSSE() {
+  if (evtSource) evtSource.close();
+  evtSource = new EventSource('/events');
+  evtSource.addEventListener('connected', () => {
+    document.getElementById('connectionStatus').style.color = '#4ade80';
+    document.getElementById('connectionText').textContent = 'Connected (live)';
+  });
+  evtSource.addEventListener('update', (e) => {
+    const updates = JSON.parse(e.data);
+    applyUpdates(updates);
+  });
+  evtSource.addEventListener('bulk-update', (e) => {
+    const updates = JSON.parse(e.data);
+    applyUpdates(updates);
+  });
+  evtSource.onerror = () => {
+    document.getElementById('connectionStatus').style.color = '#f87171';
+    document.getElementById('connectionText').textContent = 'Disconnected — retrying...';
+  };
+}
+connectSSE();
+
+function applyUpdates(updates) {
+  let count = 0;
+  for (const [key, data] of Object.entries(updates)) {
+    savedState[key] = data;
+    count++;
+    // Update DOM directly if row exists (avoid full re-render)
+    const row = document.querySelector(`tr[data-key="${key}"]`);
+    if (row) {
+      const sel = row.querySelector('select');
+      if (sel && sel.value !== data.status) {
+        sel.value = data.status;
+        sel.className = 'status-select ' + statusClass(data.status);
+      }
+      const inp = row.querySelector('input');
+      if (inp && inp !== document.activeElement) {
+        inp.value = data.notes || '';
+      }
+    }
+  }
+  if (count > 0) {
+    updateStats();
+    console.log(`[SSE] Applied ${count} updates`);
+  }
+}
+
+function getState(key) {
+  return savedState[key] || { status: 'untested', notes: '' };
+}
+function setState(key, field, value) {
+  if (!savedState[key]) savedState[key] = { status: 'untested', notes: '' };
+  savedState[key][field] = value;
+  // Send incremental update to server (single format, not full state)
+  const st = savedState[key];
+  fetch('/update', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ format: key, status: st.status, notes: st.notes || '' })
+  }).catch(e => console.error('[Save] Failed:', e));
+  updateStats();
+}
+
+// Group by family
+const families = {};
+FORMATS.forEach(f => {
+  if (!families[f.family]) families[f.family] = [];
+  families[f.family].push(f);
+});
+
+const familyLabels = {
+  'amiga-native': '🎹 Amiga Native',
+  'pc-tracker': '💾 PC Tracker',
+  'chip-dump': '🎮 Chip Dump',
+  'libopenmpt': '🎵 Core (libopenmpt)',
+  'furnace': '🔧 Furnace',
+  'c64-chip': '🕹️ C64 Chip',
+  'midi': '🎼 MIDI'
+};
+
+// Populate family filter
+const familySelect = document.getElementById('filterFamily');
+Object.keys(families).forEach(f => {
+  const opt = document.createElement('option');
+  opt.value = f;
+  opt.textContent = `${familyLabels[f] || f} (${families[f].length})`;
+  familySelect.appendChild(opt);
+});
+
+function badges(fmt) {
+  let b = '';
+  if (fmt.nativeParser) b += '<span class="badge badge-native">parser</span>';
+  if (fmt.uade) b += '<span class="badge badge-uade">UADE</span>';
+  if (fmt.openmptFb) b += '<span class="badge badge-openmpt">openmpt</span>';
+  if (fmt.openmptPlay) b += '<span class="badge badge-openmpt">openmpt-play</span>';
+  if (fmt.nativeOnly) b += '<span class="badge badge-nativeonly">native-only</span>';
+  if (fmt.editable) b += '<span class="badge badge-editable">editable</span>';
+  if (fmt.exportable) b += '<span class="badge badge-exportable">export</span>';
+  return b;
+}
+
+function statusClass(s) { return 's-' + s; }
+
+function renderTable(fmts, familyKey) {
+  let html = '<table><colgroup><col style="width:180px"><col style="width:140px"><col style="width:100px"><col style="width:180px"><col style="width:140px"><col></colgroup><tr><th>Format</th><th>Key</th><th>Extensions</th><th>Backends</th><th>Status</th><th>Notes</th></tr>';
+  fmts.forEach(f => {
+    const st = getState(f.key);
+    html += `<tr data-key="${f.key}">
+      <td class="fmt-label">${f.label}</td>
+      <td class="fmt-key">${f.key}</td>
+      <td class="ext">${f.ext || '—'}</td>
+      <td>${badges(f)}</td>
+      <td><select class="status-select ${statusClass(st.status)}" onchange="handleStatus('${f.key}', this)">
+        ${STATUS_OPTIONS.map(s => `<option value="${s}" ${s===st.status?'selected':''}>${s}</option>`).join('')}
+      </select></td>
+      <td><input class="notes-input" value="${(st.notes||'').replace(/"/g,'&quot;')}" onchange="handleNotes('${f.key}', this)" placeholder="Add notes..."></td>
+    </tr>`;
+  });
+  html += '</table>';
+  return html;
+}
+
+const collapsedFamilies = {};
+
+function render() {
+  const search = document.getElementById('search').value.toLowerCase();
+  const filterStatus = document.getElementById('filterStatus').value;
+  const filterFamily = document.getElementById('filterFamily').value;
+  
+  let html = '';
+  const order = ['libopenmpt','furnace','amiga-native','pc-tracker','chip-dump','c64-chip','midi'];
+  
+  order.forEach(fam => {
+    if (filterFamily && filterFamily !== fam) return;
+    let fmts = families[fam] || [];
+    
+    if (search) {
+      fmts = fmts.filter(f => 
+        f.label.toLowerCase().includes(search) || 
+        f.key.toLowerCase().includes(search) || 
+        f.ext.toLowerCase().includes(search) ||
+        (getState(f.key).notes||'').toLowerCase().includes(search)
+      );
+    }
+    if (filterStatus) {
+      fmts = fmts.filter(f => getState(f.key).status === filterStatus);
+    }
+    if (fmts.length === 0) return;
+    
+    const collapsed = collapsedFamilies[fam];
+    html += `<div class="family-group">
+      <div class="family-header" onclick="toggleFamily('${fam}')">
+        <span>${collapsed ? '▶' : '▼'} ${familyLabels[fam] || fam}</span>
+        <span class="family-count">${fmts.length} formats</span>
+      </div>
+      <div class="${collapsed ? 'hidden' : ''}">${renderTable(fmts, fam)}</div>
+    </div>`;
+  });
+  
+  document.getElementById('content').innerHTML = html || '<p style="color:var(--dim);padding:20px;">No formats match your filters.</p>';
+}
+
+function toggleFamily(fam) {
+  collapsedFamilies[fam] = !collapsedFamilies[fam];
+  render();
+}
+
+function handleStatus(key, el) {
+  setState(key, 'status', el.value);
+  el.className = 'status-select ' + statusClass(el.value);
+}
+
+function handleNotes(key, el) {
+  setState(key, 'notes', el.value);
+}
+
+function updateStats() {
+  const counts = {};
+  STATUS_OPTIONS.forEach(s => counts[s] = 0);
+  FORMATS.forEach(f => counts[getState(f.key).status]++);
+  
+  const colors = { untested: 'var(--dim)', works: 'var(--green)', partial: 'var(--yellow)', broken: 'var(--red)', silent: '#f97316', 'wrong-synth': 'var(--purple)', crashes: '#ef4444' };
+  
+  let html = '';
+  STATUS_OPTIONS.forEach(s => {
+    html += `<div class="stat"><div class="stat-val" style="color:${colors[s]}">${counts[s]}</div><div class="stat-label">${s}</div></div>`;
+  });
+  html += `<div class="stat"><div class="stat-val" style="color:var(--accent)">${FORMATS.length}</div><div class="stat-label">total</div></div>`;
+  document.getElementById('stats').innerHTML = html;
+}
+
+function exportJSON() {
+  const data = {};
+  FORMATS.forEach(f => {
+    const st = getState(f.key);
+    if (st.status !== 'untested' || st.notes) {
+      data[f.key] = st;
+    }
+  });
+  const text = JSON.stringify(data, null, 2);
+  document.getElementById('exportText').value = text;
+  document.getElementById('exportArea').classList.remove('hidden');
+  navigator.clipboard.writeText(text).then(() => showToast('JSON copied to clipboard!'));
+}
+
+function exportCSV() {
+  let csv = 'key,label,family,status,notes\n';
+  FORMATS.forEach(f => {
+    const st = getState(f.key);
+    csv += `${f.key},"${f.label}",${f.family},${st.status},"${(st.notes||'').replace(/"/g,'""')}"\n`;
+  });
+  document.getElementById('exportText').value = csv;
+  document.getElementById('exportArea').classList.remove('hidden');
+  navigator.clipboard.writeText(csv).then(() => showToast('CSV copied to clipboard!'));
+}
+
+function resetAll() {
+  if (!confirm('Reset ALL statuses and notes? This cannot be undone.')) return;
+  if (!confirm('Are you REALLY sure? This clears all server data too.')) return;
+  savedState = {};
+  render();
+  updateStats();
+  showToast('All data reset');
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2000);
+}
+
+// Event listeners
+document.getElementById('search').addEventListener('input', render);
+document.getElementById('filterStatus').addEventListener('change', render);
+document.getElementById('filterFamily').addEventListener('change', render);
+
+// Initial render (data will arrive async from server, re-render then)
+render();
+updateStats();
+</script>
+</body>
+</html>
