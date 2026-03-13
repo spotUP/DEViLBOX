@@ -10,7 +10,7 @@
 #include <stddef.h>
 
 typedef struct {
-    const char     *name;    /* Filename (without path) */
+    const char     *name;    /* Relative path under /uade/ (e.g. "uaerc" or "ENV/EaglePlayer/foo.cfg") */
     const uint8_t  *data;    /* File content */
     size_t          size;    /* Size in bytes */
 } UADEBasedirFile;

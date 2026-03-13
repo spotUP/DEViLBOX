@@ -91,6 +91,9 @@ export interface UADEMetadata {
 export interface UADEPositionUpdate {
   subsong: number;
   position: number;
+  tickCount?: number;
+  totalFrames?: number;
+  audioTime?: number;
 }
 
 export interface UADEChannelData {
@@ -299,7 +302,13 @@ export class UADEEngine {
 
         case 'position':
           for (const cb of this._positionCallbacks) {
-            cb({ subsong: data.subsong ?? 0, position: data.position ?? 0 });
+            cb({
+              subsong: data.subsong ?? 0,
+              position: data.position ?? 0,
+              tickCount: data.tickCount,
+              totalFrames: data.totalFrames,
+              audioTime: data.audioTime,
+            });
           }
           break;
 

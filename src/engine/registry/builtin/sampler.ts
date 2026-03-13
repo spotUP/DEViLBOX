@@ -50,7 +50,7 @@ function handlePeriodPlayback(
     player.playbackRate = playbackRate;
   } else {
     // Keyboard playback — calculate rate from note
-    const baseNote = config.sample?.baseNote || 'C4';
+    const baseNote = config.sample?.baseNote || 'C3';
     const baseFreq = Tone.Frequency(baseNote).toFrequency();
     const targetFreq = Tone.Frequency(note).toFrequency();
     player.playbackRate = targetFreq / baseFreq;
@@ -96,7 +96,7 @@ const samplerDescs: SynthDescriptor[] = [
       // to match SampleEditor's display priority and avoid stale data URLs)
       const params = config.parameters as Record<string, string | number> | undefined;
       const sampleUrl = config.sample?.url || params?.sampleUrl as string | undefined;
-      const baseNote = config.sample?.baseNote || 'C4';
+      const baseNote = config.sample?.baseNote || 'C3';
 
       if (sampleUrl) {
         const urls: { [note: string]: string } = {};

@@ -978,7 +978,8 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
           this.port.postMessage({
             type: 'seqPosition',
             order: this._lastSeqOrder,
-            row: this._lastSeqRow
+            row: this._lastSeqRow,
+            audioTime: currentTime
           });
         }
       }
