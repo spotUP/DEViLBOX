@@ -398,6 +398,11 @@ export class TrackerGLRenderer {
     const { width, height } = this;
     const { offsets: channelOffsets, widths: channelWidths } = layout;
 
+    // Skip rendering when dimensions are too small (e.g. during init before
+    // the ResizeObserver fires). With height ≤ rowHeight the center line rect
+    // overflows NDC and fills the entire viewport.
+    if (height < 48 || width < 48) return;
+
     // Re-parse theme colors only when theme reference changes
     if (theme !== this.cachedTheme) {
       this.cachedTheme = theme;
@@ -443,6 +448,7 @@ export class TrackerGLRenderer {
     const visibleEnd = vStart + visibleLines;
     const centerLineTop = Math.floor(height / 2) - rowH / 2;
     const baseY = centerLineTop - topLines * rowH - smoothOffset;
+    const hlInterval = ui.rowHighlightInterval ?? 4;
     const hlInterval = ui.rowHighlightInterval ?? 4;
 
     // ── Clear ─────────────────────────────────────────────────────────────────
