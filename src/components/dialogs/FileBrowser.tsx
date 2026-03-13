@@ -315,7 +315,7 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
                       key={file.id}
                       data-file-row
                       onClick={() => {
-                        // Directories: open on single tap (standard file browser behavior)
+                        // Directories: open on single click
                         if (file.isDirectory) {
                           if (hasElectronFS()) {
                             nav.setCurrentPath(file.path);
@@ -326,20 +326,13 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
                           nav.setSelectedFile(null);
                           return;
                         }
-
-                        // Files: select on single tap, load on double tap
-                        const now = Date.now();
-                        const isDoubleTap = nav.lastClickRef.current.id === file.id && (now - nav.lastClickRef.current.time) < 500;
-                        
-                        if (isDoubleTap) {
-                          nav.setSelectedFile(file);
-                          if (mode === 'load') nav.handleLoad();
-                          nav.lastClickRef.current = { id: '', time: 0 };
-                          return;
-                        }
-
-                        nav.lastClickRef.current = { id: file.id, time: now };
+                        // Files: select on single click
                         nav.setSelectedFile(file);
+                      }}
+                      onDoubleClick={() => {
+                        if (file.isDirectory) return;
+                        nav.setSelectedFile(file);
+                        if (mode === 'load') nav.handleLoad();
                       }}
                       className={`flex items-center gap-3 p-3 rounded cursor-pointer transition-colors ${
                         nav.selectedFile?.id === file.id
