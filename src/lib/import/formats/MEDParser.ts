@@ -85,17 +85,16 @@ export function parseMEDFile(buffer: ArrayBuffer, filename: string): TrackerSong
   const isMMD1Plus = magic !== 'MMD0';
 
   // ── Parse header offsets ─────────────────────────────────────────────────
-  // Offset 0x04: module length
-  // Offset 0x08: pointer to MMD0Song structure
-  // Offset 0x0C: unused
-  // Offset 0x10: pointer to block (pattern) array
-  // Offset 0x14: expansion pointer
-  // ...
+  // MED file header (52 bytes):
+  // 0x00: magic (4)  0x04: modLength (4)  0x08: songOffset (4)
+  // 0x0C: playerSettings1 (4)  0x10: blockArrOffset (4)
+  // 0x14: flags+reserved (4)  0x18: sampleArrOffset (4)
+  // 0x1C: reserved2 (4)  0x20: expDataOffset (4)
 
-  const songOffset   = u32(buf, 0x08);  // → MMD0Song
-  const blockOffset  = u32(buf, 0x10);  // → pointer array of MMD0Block*
-  // sampleOffset at 0x14 (reserved for future sample parsing)
-  const expOffset    = u32(buf, 0x18);  // → MMD0Exp (extension)
+  const songOffset      = u32(buf, 0x08);  // → MMD0Song
+  const blockOffset     = u32(buf, 0x10);  // → pointer array of MMD0Block*
+  const sampleArrOffset = u32(buf, 0x18);  // → array of sample pointers
+  const expOffset       = u32(buf, 0x20);  // → MMD0Exp (extension)
 
   // ── Parse MMD0Song ───────────────────────────────────────────────────────
   // struct MMD0Song {
@@ -287,19 +286,20 @@ export function parseMEDFile(buffer: ArrayBuffer, filename: string): TrackerSong
     }
   }
 
-  // Build instruments — find sample PCM offsets
-  // The samples are stored after all the structure data. We scan for them.
-  // Since MED sample offsets aren't explicitly stored in older headers,
-  // we calculate offsets based on cumulative lengths.
+  // Build instruments — use sampleArrOffset to read per-instrument pointers.
+  // The header field at 0x18 (sampleArrOffset) points to an array of numSamples
+  // u32 BE pointers, each pointing to the instrument's data block in the file.
+  // For sample instruments, the data is: u32 length (bytes), u16 type, then PCM.
+  // For synth instruments, the data is the SynthInstr struct directly.
 
-  // Find a reasonable sample data start offset
-  // Heuristic: look for first block past the song structure
-  let sampleDataStart = songOffset + MAX_INSTRUMENTS * INSTR_HDR_SIZE + 268 + numSamples * 8;
-  // Round to word boundary
-  sampleDataStart = (sampleDataStart + 1) & ~1;
+  const instrPtrs: number[] = [];
+  if (sampleArrOffset > 0 && sampleArrOffset + numSamples * 4 <= buf.length) {
+    for (let i = 0; i < numSamples; i++) {
+      instrPtrs.push(u32(buf, sampleArrOffset + i * 4));
+    }
+  }
 
   const instruments: InstrumentConfig[] = [];
-  let samplePos = sampleDataStart;
 
   for (let i = 0; i < Math.min(MAX_INSTRUMENTS, numSamples || MAX_INSTRUMENTS); i++) {
     const instr = instrs[i];
@@ -307,9 +307,14 @@ export function parseMEDFile(buffer: ArrayBuffer, filename: string): TrackerSong
 
     const name = instrNames[i] || `Instrument ${i + 1}`;
 
+    // Get the absolute pointer to this instrument's data block
+    const instrPtr = instrPtrs[i] || 0;
+
     if (instr.synth || instr.waveLen === 0) {
-      const synthBase = samplePos;
-      const synthLen  = u32(buf, synthBase);  // total struct size in bytes
+      // Synth/hybrid instrument: instrPtr → MMDInstrHeader (6 bytes), then SynthInstr
+      const synthBase = instrPtr > 0 ? instrPtr + 6 : 0;  // skip MMDInstrHeader
+      const synthLen  = synthBase > 0 && synthBase + 4 <= buf.length
+        ? u32(buf, synthBase) : 0;  // total struct size in bytes
 
       if (synthLen > 0 && synthBase + synthLen <= buf.length) {
         // SynthInstr layout (from OctaMED SDK / libxmp med.h):
@@ -377,8 +382,6 @@ export function parseMEDFile(buffer: ArrayBuffer, filename: string): TrackerSong
             pan: 0,
             uadeChipRam: degenerateChipRam,
           } as InstrumentConfig);
-          samplePos += synthLen;
-          if (samplePos & 1) samplePos++;
           continue;
         }
 
@@ -461,8 +464,6 @@ export function parseMEDFile(buffer: ArrayBuffer, filename: string): TrackerSong
           uadeChipRam: octamedChipRam,
         } as InstrumentConfig);
 
-        samplePos += synthLen;
-        if (samplePos & 1) samplePos++;  // word-align
       } else {
         // Malformed SynthInstr — emit a silent OctaMEDSynth placeholder.
         // synthLen is 0 or out-of-bounds so we skip uadeChipRam.
@@ -490,12 +491,13 @@ export function parseMEDFile(buffer: ArrayBuffer, filename: string): TrackerSong
       continue;
     }
 
-    // Extract PCM
-    const len = Math.min(instr.waveLen, buf.length - samplePos);
-    const pcm = len > 0 ? buf.slice(samplePos, samplePos + len) : new Uint8Array(0);
-    samplePos += len;
-    // Align to word boundary
-    if (samplePos & 1) samplePos++;
+    // Extract PCM using the instrument pointer from sampleArrOffset
+    // instrPtr → MMDInstrHeader (u32 length, s16 type), then PCM data follows
+    const pcmBase = instrPtr > 0 ? instrPtr + 6 : 0;  // skip 6-byte MMDInstrHeader
+    const len = pcmBase > 0
+      ? Math.min(instr.waveLen, buf.length - pcmBase)
+      : 0;
+    const pcm = len > 0 ? buf.slice(pcmBase, pcmBase + len) : new Uint8Array(0);
 
     instruments.push(createSamplerInstrument(
       i + 1, name, pcm, instr.volume, 8287,

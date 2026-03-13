@@ -439,10 +439,35 @@ export function parseMusicLineFile(data: Uint8Array): TrackerSong | null {
     buildPattern(partDataMap.get(pn)!, idx, pn)
   );
 
-  // Map channelTrackTables from partNumbers to patternIndices
-  const mappedTrackTables: number[][] = channelTrackTables.map(table =>
-    table.map(pn => partToPatternIndex.get(pn) ?? 0)
-  );
+  // Map channelTrackTables from partNumbers to patternIndices.
+  // Empty channels get a sequence pointing to a dedicated silent pattern
+  // so they don't accidentally play pattern 0's data via the ?? 0 fallback.
+  let silentPatIdx = -1;
+  const mappedTrackTables: number[][] = channelTrackTables.map(table => {
+    if (table.length === 0) {
+      // Create a silent pattern on first need
+      if (silentPatIdx < 0) {
+        silentPatIdx = patterns.length;
+        const silentRows = patterns.length > 0 ? patterns[0].length : 64;
+        const silentPat: Pattern = Array.from({ length: silentRows }, () => [{
+          note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0
+        }]);
+        (silentPat as any).patternIndex = silentPatIdx;
+        patterns.push(silentPat);
+      }
+      // Point to silent pattern for as many positions as the longest channel
+      return [];  // Will be filled below after we know maxLen
+    }
+    return table.map(pn => partToPatternIndex.get(pn) ?? 0);
+  });
+
+  // Fill empty channel tables with silent pattern references matching the longest sequence
+  const maxLen = Math.max(1, ...mappedTrackTables.map(t => t.length));
+  for (let i = 0; i < mappedTrackTables.length; i++) {
+    if (mappedTrackTables[i].length === 0 && silentPatIdx >= 0) {
+      mappedTrackTables[i] = Array(maxLen).fill(silentPatIdx);
+    }
+  }
 
   // Build channel 0's sequence as the global songPositions (for compatibility)
   const songPositions = mappedTrackTables.length > 0 ? mappedTrackTables[0] : [0];
