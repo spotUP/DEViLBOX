@@ -2021,7 +2021,14 @@ export async function tryRouteFormat(
             if (prefs.anders0land === 'native') {
         try {
           const { isAnders0landFormat, parseAnders0landFile } = await import('@lib/import/formats/Anders0landParser');
-          if (isAnders0landFormat(buffer, originalFileName)) return await parseAnders0landFile(buffer, originalFileName);
+          if (isAnders0landFormat(buffer, originalFileName)) {
+            const a0Result = await parseAnders0landFile(buffer, originalFileName);
+            const a0Notes = a0Result.patterns.reduce((sum: number, p: any) =>
+              sum + p.channels.reduce((cs: number, ch: any) =>
+                cs + ch.rows.filter((r: any) => r.note > 0).length, 0), 0);
+            if (a0Notes > 0) return a0Result;
+            console.warn(`[Anders0landParser] 0 notes extracted, falling back to UADE`);
+          }
         } catch (err) {
           console.warn(`[Anders0landParser] Native parse failed for ${filename}, falling back to UADE:`, err);
         }
