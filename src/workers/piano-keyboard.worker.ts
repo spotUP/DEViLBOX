@@ -144,6 +144,38 @@ function renderFrame(): void {
 
     if (isActive || isDragTarget) {
       ctx.fillStyle = colors.activeKey;
+    } else if (colors.noteColors && colors.noteColors.length === 7 && !black) {
+      // Per-note colors from drum machine theme — WHITE keys only (7 groups: C,D,E,F,G,A,B)
+      const CHROMATIC_TO_GROUP = [0, -1, 1, -1, 2, 3, -1, 4, -1, 5, -1, 6];
+      const groupIdx = CHROMATIC_TO_GROUP[midi % 12];
+      const noteColor = groupIdx >= 0 ? colors.noteColors[groupIdx] : colors.whiteKey;
+      if (outOfScale) {
+        // Dim the note color for out-of-scale notes
+        ctx.fillStyle = noteColor;
+        ctx.fillRect(0, y, keyWidth, h);
+        ctx.globalAlpha = 0.5;
+        ctx.fillStyle = '#000';
+        ctx.fillRect(0, y, keyWidth, h);
+        ctx.globalAlpha = 1;
+        // Skip the normal outOfScale overlay below
+        ctx.fillStyle = black ? colors.dividerLight : colors.divider;
+        ctx.fillRect(0, y + h - 0.5, keyWidth, 0.5);
+        if (isHovered) {
+          ctx.fillStyle = 'rgba(255,255,255,0.12)';
+          ctx.fillRect(0, y, keyWidth, h);
+        }
+        const showAllLabels = verticalZoom >= 14;
+        if (isC || (showAllLabels && !black)) {
+          const name = isC ? getNoteNameFromMidi(midi) : NOTE_NAMES[noteInOctave];
+          ctx.fillStyle = colors.labelLight;
+          ctx.font = `${isC ? 'bold ' : ''}${Math.min(10, h - 2)}px Inter, system-ui, sans-serif`;
+          ctx.textAlign = 'left';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(name, 6, y + h / 2);
+        }
+        continue;
+      }
+      ctx.fillStyle = noteColor;
     } else if (black) {
       ctx.fillStyle = outOfScale ? colors.blackKeyDimmed : colors.blackKey;
     } else {

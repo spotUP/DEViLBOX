@@ -280,6 +280,8 @@ export interface KeyboardColors {
   dividerLight: string;
   labelDark: string;
   labelLight: string;
+  // Per-chromatic-note colors (0=C..11=B). When present, overrides whiteKey/blackKey.
+  noteColors?: string[];
 }
 
 export interface KeyboardState {

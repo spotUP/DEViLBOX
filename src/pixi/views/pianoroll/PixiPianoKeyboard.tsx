@@ -8,6 +8,7 @@ import { useCallback, useMemo } from 'react';
 import type { Graphics as GraphicsType, FederatedPointerEvent } from 'pixi.js';
 import { PIXI_FONTS } from '../../fonts';
 import { usePixiTheme } from '../../theme';
+import { useThemeStore, themes } from '@stores/useThemeStore';
 
 interface PixiPianoKeyboardProps {
   width?: number;
@@ -41,6 +42,7 @@ export const PixiPianoKeyboard: React.FC<PixiPianoKeyboardProps> = ({
   onKeyRelease,
 }) => {
   const theme = usePixiTheme();
+  const themeId = useThemeStore(s => s.currentThemeId);
 
   const drawKeyboard = useCallback((g: GraphicsType) => {
     g.clear();
@@ -48,6 +50,14 @@ export const PixiPianoKeyboard: React.FC<PixiPianoKeyboardProps> = ({
     // Background
     g.rect(0, 0, width, height);
     g.fill({ color: theme.bgSecondary.color });
+
+    // Get per-note colors from current theme (7-element: [C,D,E,F,G,A,B])
+    const themeId = useThemeStore.getState().currentThemeId;
+    const currentTheme = themes.find(t => t.id === themeId);
+    const noteColors = currentTheme?.colors.pianoKeyColors;
+    const hasNoteColors = noteColors?.length === 7;
+    // Map chromatic note (0-11) to white key group (0-6), -1 for black
+    const CHROMATIC_TO_GROUP = [0, -1, 1, -1, 2, 3, -1, 4, -1, 5, -1, 6];
 
     const visibleNotes = Math.ceil(height / noteHeight) + 1;
     const startNote = Math.max(0, Math.floor(scrollNote));
@@ -60,16 +70,23 @@ export const PixiPianoKeyboard: React.FC<PixiPianoKeyboardProps> = ({
       const noteInOctave = note % 12;
       const isBlack = BLACK_KEYS.has(noteInOctave);
       const isInChord = chordBuffer.includes(note);
+      const groupIdx = CHROMATIC_TO_GROUP[noteInOctave];
 
-      if (isBlack) {
-        // Black key
+      if (hasNoteColors && !isBlack && !isInChord && groupIdx >= 0) {
+        // Drum machine themed WHITE keys only — black keys stay dark
+        const hexStr = noteColors[groupIdx];
+        const nc = parseInt(hexStr.slice(1), 16);
+        g.rect(0, y, width, noteHeight);
+        g.fill({ color: nc });
+        g.rect(0, y + noteHeight - 1, width, 1);
+        g.fill({ color: 0x000000, alpha: 0.25 });
+      } else if (isBlack) {
         const keyColor = isInChord ? CHORD_TINT : 0x1a1a1d;
         g.rect(0, y, width * 0.65, noteHeight);
         g.fill({ color: keyColor });
         g.rect(0, y, width * 0.65, 1);
         g.fill({ color: isInChord ? 0xffe566 : 0x333338 });
       } else {
-        // White key
         const keyColor = isInChord ? CHORD_TINT : 0xe8e8e8;
         g.rect(0, y, width, noteHeight);
         g.fill({ color: keyColor });
@@ -88,7 +105,7 @@ export const PixiPianoKeyboard: React.FC<PixiPianoKeyboardProps> = ({
     // Right border
     g.rect(width - 1, 0, 1, height);
     g.fill({ color: theme.border.color, alpha: 0.3 });
-  }, [width, height, noteHeight, scrollNote, totalNotes, theme, chordBuffer]);
+  }, [width, height, noteHeight, scrollNote, totalNotes, theme, chordBuffer, themeId]);
 
   // Note labels for C notes
   const cLabels = useMemo(() => {

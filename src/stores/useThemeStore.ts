@@ -54,6 +54,22 @@ export interface ThemeColors {
   playbackCursor: string;   // Playback position line (default: cyan)
   currentRowText: string;   // Text color on the active playback row
   panelShadow: string;      // FT2 panel inset shadow
+
+  // Piano keyboard colors — 7-element array for white key groups.
+  // Index 0=C, 1=D, 2=E, 3=F, 4=G, 5=A, 6=B (H in German notation).
+  // Only white keys are colored; black keys stay dark.
+  pianoKeyColors?: string[];
+
+  // Theme-specific typography — when set, overrides the default Inter/JetBrains Mono fonts.
+  // Uses CSS font-family syntax (comma-separated fallback stack).
+  fontFamily?: string;
+  monoFontFamily?: string;
+  fontSize?: string;        // Base font size (e.g., '13px', '12px')
+
+  // Theme-specific control styles
+  knobStyle?: 'default' | 'metallic' | 'rubber' | 'vintage' | 'led';
+  buttonRadius?: string;    // CSS border-radius (e.g., '2px', '8px', '50%')
+  buttonStyle?: 'default' | 'raised' | 'flat' | 'beveled';
 }
 
 export interface Theme {
@@ -252,8 +268,681 @@ const modernTheme: Theme = {
   },
 };
 
+// ─── Vintage Drum Machine Themes ─────────────────────────────────────────────
+// Color palettes sampled from vintage drum machine hardware.
+// Hex values sourced from public.tableau.com/VintageDrumMachinesColourPalettes
+// Layout analysis from actual machine photographs.
+// pianoKeyColors: 7-element array [C, D, E, F, G, A, B] — one color per white key group.
+// Only WHITE keys are colored; black keys stay dark in the keyboard renderers.
+
+/**
+ * Roland TR-808 (1980)
+ * Colors from io808.com reference: dark charcoal body (#232425),
+ * signature orange stencil (#ff5a00), cream labels (#f6edc6).
+ * Step buttons: red (#d03933), orange (#e98e2f), yellow (#dfd442), white (#e9e8e7).
+ */
+const tr808Theme: Theme = {
+  id: 'tr-808',
+  name: 'Roland TR-808',
+  colors: {
+    bg: '#232425',
+    bgSecondary: '#2a2b2c',
+    bgTertiary: '#313335',
+    bgHover: '#3a3c3e',
+    bgActive: '#454748',
+    border: '#4a4c4e',
+    borderLight: '#5e6062',
+    accent: '#ff5a00',
+    accentSecondary: '#d03933',
+    accentHighlight: '#dfd442',
+    accentGlow: 'rgba(255, 90, 0, 0.3)',
+    text: '#f6edc6',
+    textSecondary: '#9b9fa0',
+    textMuted: '#6a6c6e',
+    textInverse: '#232425',
+    error: '#FE0000',
+    success: '#dfd442',
+    warning: '#e98e2f',
+    trackerRowEven: '#232425',
+    trackerRowOdd: '#282a2b',
+    trackerRowHighlight: '#2e3032',
+    trackerRowCurrent: '#3a2810',
+    trackerRowCursor: '#4a1808',
+    cellNote: '#f6edc6',
+    cellInstrument: '#dfd442',
+    cellVolume: '#e98e2f',
+    cellEffect: '#ff5a00',
+    cellAccent: '#d03933',
+    cellSlide: '#e98e2f',
+    cellEmpty: '#3a3c3e',
+    playbackCursor: '#FE0000',
+    currentRowText: '#f6edc6',
+    panelShadow: '#111111',
+    pianoKeyColors: [
+      '#d03933', '#e98e2f', '#dfd442', '#e9e8e7', '#d03933', '#e98e2f', '#dfd442',
+    ],
+    // TR-808: Clean Swiss/Japanese design — Helvetica-inspired, warm analog feel
+    fontFamily: "'Chakra Petch', 'Helvetica Neue', 'Helvetica', sans-serif",
+    monoFontFamily: "'Share Tech Mono', 'Consolas', monospace",
+    fontSize: '12px',
+    knobStyle: 'rubber',
+    buttonRadius: '2px',
+    buttonStyle: 'raised',
+  },
+};
+
+/**
+ * Roland TR-909 (1983)
+ * Industrial techno weapon. Silver METAL panel on dark navy-slate base.
+ * Signature ORANGE stripe. Cold, precise, METALLIC.
+ */
+const tr909Theme: Theme = {
+  id: 'tr-909',
+  name: 'Roland TR-909',
+  colors: {
+    bg: '#2a2e38',
+    bgSecondary: '#323844',
+    bgTertiary: '#3e4450',
+    bgHover: '#4a5060',
+    bgActive: '#545c6c',
+    border: '#5a6270',
+    borderLight: '#6e7888',
+    accent: '#FB9250',
+    accentSecondary: '#DFDBDA',
+    accentHighlight: '#FFFFFF',
+    accentGlow: 'rgba(251, 146, 80, 0.3)',
+    text: '#DFDBDA',
+    textSecondary: '#a0a4ac',
+    textMuted: '#6a7080',
+    textInverse: '#2a2e38',
+    error: '#e04040',
+    success: '#FB9250',
+    warning: '#DFDBDA',
+    trackerRowEven: '#2c3040',
+    trackerRowOdd: '#323844',
+    trackerRowHighlight: '#3c4250',
+    trackerRowCurrent: '#443828',
+    trackerRowCursor: '#4a3018',
+    cellNote: '#DFDBDA',
+    cellInstrument: '#FB9250',
+    cellVolume: '#8D8885',
+    cellEffect: '#FB9250',
+    cellAccent: '#FB9250',
+    cellSlide: '#DFDBDA',
+    cellEmpty: '#4a5060',
+    playbackCursor: '#FB9250',
+    currentRowText: '#FFFFFF',
+    panelShadow: '#1a1e28',
+    pianoKeyColors: [
+      '#FB9250', '#DFDBDA', '#FB9250', '#DFDBDA', '#FB9250', '#DFDBDA', '#FB9250',
+    ],
+    // TR-909: Industrial precision — geometric sans, cold metallic
+    fontFamily: "'Rajdhani', 'Futura', 'Century Gothic', sans-serif",
+    monoFontFamily: "'IBM Plex Mono', 'Consolas', monospace",
+    fontSize: '12px',
+    knobStyle: 'metallic',
+    buttonRadius: '3px',
+    buttonStyle: 'beveled',
+  },
+};
+
+/**
+ * Oberheim DMX (1981)
+ * Dark pro studio machine. Black body, white upper panel,
+ * blue graphics, red LEDs, WOOD side cheeks.
+ */
+const dmxTheme: Theme = {
+  id: 'dmx',
+  name: 'Oberheim DMX',
+  colors: {
+    bg: '#141318',
+    bgSecondary: '#1c1b22',
+    bgTertiary: '#26242e',
+    bgHover: '#302e38',
+    bgActive: '#3a3842',
+    border: '#3a3444',
+    borderLight: '#4a4454',
+    accent: '#4785B4',
+    accentSecondary: '#D00E0E',
+    accentHighlight: '#F8FCFB',
+    accentGlow: 'rgba(71, 133, 180, 0.3)',
+    text: '#F8FCFB',
+    textSecondary: '#a8acb4',
+    textMuted: '#5e6068',
+    textInverse: '#141318',
+    error: '#D00E0E',
+    success: '#4785B4',
+    warning: '#613614',
+    trackerRowEven: '#161520',
+    trackerRowOdd: '#1c1b24',
+    trackerRowHighlight: '#22202c',
+    trackerRowCurrent: '#1a2438',
+    trackerRowCursor: '#2a1018',
+    cellNote: '#F8FCFB',
+    cellInstrument: '#4785B4',
+    cellVolume: '#D00E0E',
+    cellEffect: '#613614',
+    cellAccent: '#D00E0E',
+    cellSlide: '#4785B4',
+    cellEmpty: '#2e2c38',
+    playbackCursor: '#D00E0E',
+    currentRowText: '#F8FCFB',
+    panelShadow: '#0a0a10',
+    pianoKeyColors: [
+      '#4785B4', '#D00E0E', '#F8FCFB', '#613614', '#4785B4', '#D00E0E', '#F8FCFB',
+    ],
+    // DMX: Early digital sampling era — bold monospace, clinical
+    fontFamily: "'Orbitron', 'Arial Black', 'Impact', sans-serif",
+    monoFontFamily: "'VT323', 'Courier New', monospace",
+    fontSize: '12px',
+    knobStyle: 'vintage',
+    buttonRadius: '2px',
+    buttonStyle: 'raised',
+  },
+};
+
+/**
+ * Linn LM-1 (1980)
+ * First great drum machine. ALL BLACK, minimal.
+ * Orange buttons, red indicators, grey buttons, wood cheeks.
+ */
+const linnLm1Theme: Theme = {
+  id: 'linn-lm1',
+  name: 'Linn LM-1',
+  colors: {
+    bg: '#141312',
+    bgSecondary: '#1c1b1a',
+    bgTertiary: '#262524',
+    bgHover: '#302f2e',
+    bgActive: '#3a3938',
+    border: '#383634',
+    borderLight: '#4a4846',
+    accent: '#FC650C',
+    accentSecondary: '#CA1B20',
+    accentHighlight: '#FFFFFF',
+    accentGlow: 'rgba(252, 101, 12, 0.3)',
+    text: '#d8d4d0',
+    textSecondary: '#908c88',
+    textMuted: '#585450',
+    textInverse: '#141312',
+    error: '#CA1B20',
+    success: '#FC650C',
+    warning: '#513B2E',
+    trackerRowEven: '#161514',
+    trackerRowOdd: '#1c1b1a',
+    trackerRowHighlight: '#242322',
+    trackerRowCurrent: '#2c1c0a',
+    trackerRowCursor: '#301008',
+    cellNote: '#d8d4d0',
+    cellInstrument: '#FC650C',
+    cellVolume: '#CA1B20',
+    cellEffect: '#424242',
+    cellAccent: '#FC650C',
+    cellSlide: '#CA1B20',
+    cellEmpty: '#2e2c2a',
+    playbackCursor: '#FC650C',
+    currentRowText: '#FFFFFF',
+    panelShadow: '#080808',
+    pianoKeyColors: [
+      '#FC650C', '#424242', '#CA1B20', '#513B2E', '#FC650C', '#424242', '#CA1B20',
+    ],
+    // Linn LM-1: First sample drum machine — warm analog, woody character
+    fontFamily: "'Chakra Petch', 'Helvetica', 'Arial', sans-serif",
+    monoFontFamily: "'DM Mono', 'Monaco', monospace",
+    fontSize: '12px',
+    knobStyle: 'vintage',
+    buttonRadius: '3px',
+    buttonStyle: 'raised',
+  },
+};
+
+/**
+ * AKAI MPC 60 (1988)
+ * Light grey body, baby blue LCD, salmon buttons.
+ * LIGHT, CLEAN, JAPANESE PRECISION.
+ */
+const mpc60Theme: Theme = {
+  id: 'mpc-60',
+  name: 'AKAI MPC 60',
+  colors: {
+    bg: '#3a3840',
+    bgSecondary: '#444250',
+    bgTertiary: '#4e4c5a',
+    bgHover: '#585664',
+    bgActive: '#62606e',
+    border: '#6a6878',
+    borderLight: '#7a7888',
+    accent: '#8AAAC3',
+    accentSecondary: '#E0635D',
+    accentHighlight: '#E6E4E7',
+    accentGlow: 'rgba(138, 170, 195, 0.3)',
+    text: '#E6E4E7',
+    textSecondary: '#B6B4B7',
+    textMuted: '#7a7880',
+    textInverse: '#3a3840',
+    error: '#E0635D',
+    success: '#8AAAC3',
+    warning: '#F2EBE3',
+    trackerRowEven: '#3c3a44',
+    trackerRowOdd: '#444250',
+    trackerRowHighlight: '#4c4a58',
+    trackerRowCurrent: '#3a4858',
+    trackerRowCursor: '#4a3838',
+    cellNote: '#E6E4E7',
+    cellInstrument: '#8AAAC3',
+    cellVolume: '#E0635D',
+    cellEffect: '#B6B4B7',
+    cellAccent: '#E0635D',
+    cellSlide: '#8AAAC3',
+    cellEmpty: '#4e4c58',
+    playbackCursor: '#8AAAC3',
+    currentRowText: '#E6E4E7',
+    panelShadow: '#2a2830',
+    pianoKeyColors: [
+      '#8AAAC3', '#E0635D', '#B6B4B7', '#E6E4E7', '#8AAAC3', '#E0635D', '#B6B4B7',
+    ],
+    // MPC 60: J Dilla's weapon — utilitarian Japanese design, LCD blue feel
+    fontFamily: "'Rajdhani', 'Arial', 'Helvetica', sans-serif",
+    monoFontFamily: "'IBM Plex Mono', 'Menlo', monospace",
+    fontSize: '12px',
+    knobStyle: 'rubber',
+    buttonRadius: '4px',
+    buttonStyle: 'flat',
+  },
+};
+
+/**
+ * Roland CompuRhythm CR-78 (1978)
+ * First programmable Roland drum machine. Black body,
+ * FESTIVAL of colorful buttons: gold, blue, green, red.
+ */
+const cr78Theme: Theme = {
+  id: 'cr-78',
+  name: 'Roland CR-78',
+  colors: {
+    bg: '#141618',
+    bgSecondary: '#1c1e22',
+    bgTertiary: '#26282e',
+    bgHover: '#303238',
+    bgActive: '#3a3c42',
+    border: '#383a40',
+    borderLight: '#4a4c52',
+    accent: '#FFC631',
+    accentSecondary: '#5E9CD9',
+    accentHighlight: '#2FB270',
+    accentGlow: 'rgba(255, 198, 49, 0.3)',
+    text: '#e8e6e0',
+    textSecondary: '#a8a6a0',
+    textMuted: '#686660',
+    textInverse: '#141618',
+    error: '#C91611',
+    success: '#2FB270',
+    warning: '#FFC631',
+    trackerRowEven: '#161820',
+    trackerRowOdd: '#1c1e24',
+    trackerRowHighlight: '#24262e',
+    trackerRowCurrent: '#282410',
+    trackerRowCursor: '#281010',
+    cellNote: '#e8e6e0',
+    cellInstrument: '#FFC631',
+    cellVolume: '#5E9CD9',
+    cellEffect: '#2FB270',
+    cellAccent: '#C91611',
+    cellSlide: '#FFC631',
+    cellEmpty: '#303238',
+    playbackCursor: '#FFC631',
+    currentRowText: '#FFFFFF',
+    panelShadow: '#0a0c0e',
+    pianoKeyColors: [
+      '#FFC631', '#5E9CD9', '#2FB270', '#C91611', '#FFC631', '#5E9CD9', '#2FB270',
+    ],
+    // CR-78: First programmable drum machine — retro-futuristic, space age
+    fontFamily: "'Space Mono', 'Courier New', monospace",
+    monoFontFamily: "'Space Mono', 'Courier New', monospace",
+    fontSize: '12px',
+    knobStyle: 'vintage',
+    buttonRadius: '50%',
+    buttonStyle: 'raised',
+  },
+};
+
+/**
+ * E-mu SP-12 (1985)
+ * Grey metal sampling drum machine. BLUE buttons. Hip-hop legend.
+ * CLINICAL, INDUSTRIAL, BLUE STEEL.
+ */
+const emuSp12Theme: Theme = {
+  id: 'emu-sp12',
+  name: 'E-mu SP-12',
+  colors: {
+    bg: '#1e2028',
+    bgSecondary: '#262830',
+    bgTertiary: '#30323c',
+    bgHover: '#3a3c48',
+    bgActive: '#444652',
+    border: '#404450',
+    borderLight: '#505462',
+    accent: '#144F9D',
+    accentSecondary: '#448ABD',
+    accentHighlight: '#FFFFFF',
+    accentGlow: 'rgba(20, 79, 157, 0.3)',
+    text: '#EAE6E5',
+    textSecondary: '#A5A3A6',
+    textMuted: '#606268',
+    textInverse: '#1e2028',
+    error: '#c44040',
+    success: '#448ABD',
+    warning: '#A5A3A6',
+    trackerRowEven: '#202430',
+    trackerRowOdd: '#282c36',
+    trackerRowHighlight: '#303440',
+    trackerRowCurrent: '#1a2c50',
+    trackerRowCursor: '#102860',
+    cellNote: '#EAE6E5',
+    cellInstrument: '#448ABD',
+    cellVolume: '#A5A3A6',
+    cellEffect: '#144F9D',
+    cellAccent: '#448ABD',
+    cellSlide: '#144F9D',
+    cellEmpty: '#3a3c48',
+    playbackCursor: '#144F9D',
+    currentRowText: '#FFFFFF',
+    panelShadow: '#101218',
+    pianoKeyColors: [
+      '#144F9D', '#448ABD', '#A5A3A6', '#EAE6E5', '#144F9D', '#448ABD', '#A5A3A6',
+    ],
+    // SP-12: Digital sampling precision — clean corporate, blue-tinted
+    fontFamily: "'IBM Plex Mono', 'Menlo', monospace",
+    monoFontFamily: "'IBM Plex Mono', 'Menlo', monospace",
+    fontSize: '12px',
+    knobStyle: 'rubber',
+    buttonRadius: '3px',
+    buttonStyle: 'flat',
+  },
+};
+
+/**
+ * Maestro Rhythm King MK-2 (1971)
+ * Funky rhythm box. Dark body with red, gold, baby blue buttons.
+ * Sly Stone vibes. FUNKY, SOULFUL.
+ */
+const maestroRhythmKingTheme: Theme = {
+  id: 'maestro-rk',
+  name: 'Maestro Rhythm King',
+  colors: {
+    bg: '#12101a',
+    bgSecondary: '#1a1620',
+    bgTertiary: '#241e2a',
+    bgHover: '#2e2634',
+    bgActive: '#38303e',
+    border: '#3e3448',
+    borderLight: '#504458',
+    accent: '#D94C45',
+    accentSecondary: '#F7BE29',
+    accentHighlight: '#ACE0F8',
+    accentGlow: 'rgba(217, 76, 69, 0.25)',
+    text: '#F2ECEE',
+    textSecondary: '#c4bec0',
+    textMuted: '#6e6470',
+    textInverse: '#12101a',
+    error: '#D94C45',
+    success: '#ACE0F8',
+    warning: '#F7BE29',
+    trackerRowEven: '#14101c',
+    trackerRowOdd: '#1a1622',
+    trackerRowHighlight: '#22182a',
+    trackerRowCurrent: '#2e1818',
+    trackerRowCursor: '#381414',
+    cellNote: '#F2ECEE',
+    cellInstrument: '#F7BE29',
+    cellVolume: '#ACE0F8',
+    cellEffect: '#D94C45',
+    cellAccent: '#D94C45',
+    cellSlide: '#F7BE29',
+    cellEmpty: '#302838',
+    playbackCursor: '#D94C45',
+    currentRowText: '#F2ECEE',
+    panelShadow: '#080610',
+    pianoKeyColors: [
+      '#D94C45', '#F7BE29', '#ACE0F8', '#D94C45', '#F7BE29', '#ACE0F8', '#D94C45',
+    ],
+    // Maestro Rhythm King: 70s funk machine — warm soulful typography
+    fontFamily: "'Chakra Petch', 'Georgia', 'Palatino', serif",
+    monoFontFamily: "'DM Mono', 'Courier New', monospace",
+    fontSize: '13px',
+    knobStyle: 'vintage',
+    buttonRadius: '6px',
+    buttonStyle: 'raised',
+  },
+};
+
+/**
+ * Maestro Rhythm & Sound (1972)
+ * Psychedelic. Black body, VIVID orange, teal/mint, bright yellow.
+ * HIGH-CONTRAST, ELECTRIC.
+ */
+const maestroRhythmSoundTheme: Theme = {
+  id: 'maestro-rs',
+  name: 'Maestro Rhythm & Sound',
+  colors: {
+    bg: '#0c0a14',
+    bgSecondary: '#141020',
+    bgTertiary: '#1c1628',
+    bgHover: '#261e32',
+    bgActive: '#30283c',
+    border: '#382e44',
+    borderLight: '#483e54',
+    accent: '#F97101',
+    accentSecondary: '#FBE900',
+    accentHighlight: '#B8E9E3',
+    accentGlow: 'rgba(249, 113, 1, 0.3)',
+    text: '#FEFCFF',
+    textSecondary: '#c8c4cc',
+    textMuted: '#6a6470',
+    textInverse: '#0C0A0D',
+    error: '#F97101',
+    success: '#B8E9E3',
+    warning: '#FBE900',
+    trackerRowEven: '#0e0c16',
+    trackerRowOdd: '#141020',
+    trackerRowHighlight: '#1c1428',
+    trackerRowCurrent: '#281808',
+    trackerRowCursor: '#302004',
+    cellNote: '#FEFCFF',
+    cellInstrument: '#FBE900',
+    cellVolume: '#B8E9E3',
+    cellEffect: '#F97101',
+    cellAccent: '#F97101',
+    cellSlide: '#FBE900',
+    cellEmpty: '#2a2238',
+    playbackCursor: '#F97101',
+    currentRowText: '#FEFCFF',
+    panelShadow: '#060410',
+    pianoKeyColors: [
+      '#F97101', '#FBE900', '#B8E9E3', '#F97101', '#FBE900', '#B8E9E3', '#F97101',
+    ],
+    // Maestro Rhythm & Sound: Psychedelic — vivid, electric, high contrast
+    fontFamily: "'Orbitron', 'Impact', 'Arial Black', sans-serif",
+    monoFontFamily: "'VT323', 'Courier New', monospace",
+    fontSize: '12px',
+    knobStyle: 'vintage',
+    buttonRadius: '4px',
+    buttonStyle: 'beveled',
+  },
+};
+
+/**
+ * Ace Tone Rhythm Ace FR-8L (1967)
+ * Grandfather of Roland. Warm WOODEN cabinet.
+ * Gold, green, deep red buttons. VINTAGE, ORGANIC.
+ */
+const aceToneTheme: Theme = {
+  id: 'ace-tone',
+  name: 'Ace Tone Rhythm Ace',
+  colors: {
+    bg: '#1e1408',
+    bgSecondary: '#28200e',
+    bgTertiary: '#342a16',
+    bgHover: '#3e3220',
+    bgActive: '#483c2a',
+    border: '#54421e',
+    borderLight: '#6a5830',
+    accent: '#E19907',
+    accentSecondary: '#4F8632',
+    accentHighlight: '#FBE6AF',
+    accentGlow: 'rgba(225, 153, 7, 0.25)',
+    text: '#FBE6AF',
+    textSecondary: '#c4a870',
+    textMuted: '#7a6438',
+    textInverse: '#1e1408',
+    error: '#8E0402',
+    success: '#4F8632',
+    warning: '#E19907',
+    trackerRowEven: '#201608',
+    trackerRowOdd: '#28200e',
+    trackerRowHighlight: '#322814',
+    trackerRowCurrent: '#342408',
+    trackerRowCursor: '#3a1406',
+    cellNote: '#FBE6AF',
+    cellInstrument: '#E19907',
+    cellVolume: '#4F8632',
+    cellEffect: '#8E0402',
+    cellAccent: '#E19907',
+    cellSlide: '#4F8632',
+    cellEmpty: '#3e3218',
+    playbackCursor: '#E19907',
+    currentRowText: '#FBE6AF',
+    panelShadow: '#100c04',
+    pianoKeyColors: [
+      '#E19907', '#4F8632', '#8E0402', '#FBE6AF', '#E19907', '#4F8632', '#8E0402',
+    ],
+    // Ace Tone: Japanese craftsmanship, warm wooden feel — elegant serif
+    fontFamily: "'Chakra Petch', 'Optima', 'Palatino', serif",
+    monoFontFamily: "'DM Mono', 'Menlo', monospace",
+    fontSize: '13px',
+    knobStyle: 'vintage',
+    buttonRadius: '8px',
+    buttonStyle: 'raised',
+  },
+};
+
+/**
+ * Hammond Auto-Vari 64 (1976)
+ * Elegant cream/beige organ rhythm unit. WARM, LIGHT, ELEGANT.
+ * Cream body, peach/salmon and orange buttons.
+ */
+const hammondAutoVariTheme: Theme = {
+  id: 'hammond-av64',
+  name: 'Hammond Auto-Vari 64',
+  colors: {
+    bg: '#2c2820',
+    bgSecondary: '#363228',
+    bgTertiary: '#403c30',
+    bgHover: '#4a4638',
+    bgActive: '#545040',
+    border: '#5e5844',
+    borderLight: '#706850',
+    accent: '#FBA02E',
+    accentSecondary: '#E1806D',
+    accentHighlight: '#F1F0EC',
+    accentGlow: 'rgba(251, 160, 46, 0.25)',
+    text: '#F1F0EC',
+    textSecondary: '#EAE4C4',
+    textMuted: '#908870',
+    textInverse: '#2c2820',
+    error: '#E1806D',
+    success: '#FBA02E',
+    warning: '#EAE4C4',
+    trackerRowEven: '#2e2a22',
+    trackerRowOdd: '#363228',
+    trackerRowHighlight: '#3e3a2e',
+    trackerRowCurrent: '#3e3418',
+    trackerRowCursor: '#402c18',
+    cellNote: '#F1F0EC',
+    cellInstrument: '#FBA02E',
+    cellVolume: '#E1806D',
+    cellEffect: '#EAE4C4',
+    cellAccent: '#FBA02E',
+    cellSlide: '#E1806D',
+    cellEmpty: '#504a3a',
+    playbackCursor: '#FBA02E',
+    currentRowText: '#F1F0EC',
+    panelShadow: '#1e1c14',
+    pianoKeyColors: [
+      '#FBA02E', '#E1806D', '#EAE4C4', '#FBA02E', '#E1806D', '#EAE4C4', '#FBA02E',
+    ],
+    // Hammond: 60s/70s organ company elegance — warm serif corporate
+    fontFamily: "'Georgia', 'Palatino Linotype', 'Book Antiqua', serif",
+    monoFontFamily: "'DM Mono', 'Courier New', monospace",
+    fontSize: '13px',
+    knobStyle: 'vintage',
+    buttonRadius: '6px',
+    buttonStyle: 'raised',
+  },
+};
+
+/**
+ * Boss HC-2 Hand Clapper (1984)
+ * Clean Japanese digital. Black body, blue buttons, grey accents.
+ * CLEAN, DIGITAL, BLUE ON BLACK.
+ */
+const bossHc2Theme: Theme = {
+  id: 'boss-hc2',
+  name: 'Boss HC-2',
+  colors: {
+    bg: '#0e0e12',
+    bgSecondary: '#16161c',
+    bgTertiary: '#202026',
+    bgHover: '#2a2a32',
+    bgActive: '#34343c',
+    border: '#32323c',
+    borderLight: '#424250',
+    accent: '#329BD4',
+    accentSecondary: '#496F9C',
+    accentHighlight: '#FEFEFE',
+    accentGlow: 'rgba(50, 155, 212, 0.3)',
+    text: '#BDBEB8',
+    textSecondary: '#8e8f8a',
+    textMuted: '#5a5c58',
+    textInverse: '#0e0e12',
+    error: '#c44040',
+    success: '#329BD4',
+    warning: '#496F9C',
+    trackerRowEven: '#101018',
+    trackerRowOdd: '#16161e',
+    trackerRowHighlight: '#1e1e28',
+    trackerRowCurrent: '#102838',
+    trackerRowCursor: '#0a2040',
+    cellNote: '#BDBEB8',
+    cellInstrument: '#329BD4',
+    cellVolume: '#496F9C',
+    cellEffect: '#FEFEFE',
+    cellAccent: '#329BD4',
+    cellSlide: '#496F9C',
+    cellEmpty: '#2a2a34',
+    playbackCursor: '#329BD4',
+    currentRowText: '#FEFEFE',
+    panelShadow: '#060608',
+    pianoKeyColors: [
+      '#329BD4', '#496F9C', '#BDBEB8', '#FEFEFE', '#329BD4', '#496F9C', '#BDBEB8',
+    ],
+    // Boss HC-2: Clean 80s Japanese digital — sharp, readable, precise
+    fontFamily: "'Rajdhani', 'Verdana', 'Tahoma', sans-serif",
+    monoFontFamily: "'Share Tech Mono', 'Consolas', monospace",
+    fontSize: '12px',
+    knobStyle: 'rubber',
+    buttonRadius: '3px',
+    buttonStyle: 'flat',
+  },
+};
+
 // Built-in themes (immutable)
-const builtinThemes: Theme[] = [devilboxTheme, neoDarkTheme, cyanLineartTheme, modernTheme];
+const builtinThemes: Theme[] = [
+  devilboxTheme, neoDarkTheme, cyanLineartTheme, modernTheme,
+  tr808Theme, tr909Theme, dmxTheme, linnLm1Theme, mpc60Theme, cr78Theme,
+  emuSp12Theme, maestroRhythmKingTheme, maestroRhythmSoundTheme,
+  aceToneTheme, hammondAutoVariTheme, bossHc2Theme,
+];
 
 // Placeholder custom theme (uses NeoDark colors until user customizes)
 const defaultCustomTheme: Theme = { id: 'custom', name: 'Custom', colors: { ...neoDarkTheme.colors } };
@@ -275,7 +964,7 @@ export function getDefaultCustomColors(): ThemeColors {
 }
 
 /** Labels for each ThemeColors token, grouped for UI display */
-export const THEME_TOKEN_GROUPS: { label: string; tokens: { key: keyof ThemeColors; label: string }[] }[] = [
+export const THEME_TOKEN_GROUPS: { label: string; tokens: { key: ThemeColorKey; label: string }[] }[] = [
   {
     label: 'Backgrounds',
     tokens: [
@@ -351,12 +1040,16 @@ export const THEME_TOKEN_GROUPS: { label: string; tokens: { key: keyof ThemeColo
   },
 ];
 
+/** Keys in ThemeColors that are actual color values (excludes arrays, fonts, and style fields) */
+type ThemeStyleKey = 'pianoKeyColors' | 'fontFamily' | 'monoFontFamily' | 'fontSize' | 'knobStyle' | 'buttonRadius' | 'buttonStyle';
+export type ThemeColorKey = NonNullable<{ [K in keyof ThemeColors]-?: K extends ThemeStyleKey ? never : ThemeColors[K] extends string ? K : never }[keyof ThemeColors]>;
+
 interface ThemeStore {
   currentThemeId: string;
   customThemeColors: ThemeColors | null;
   setTheme: (themeId: string) => void;
   getCurrentTheme: () => Theme;
-  setCustomColor: (key: keyof ThemeColors, value: string) => void;
+  setCustomColor: (key: ThemeColorKey, value: string) => void;
   resetCustomTheme: () => void;
   copyThemeToCustom: (themeId: string) => void;
 }
@@ -401,6 +1094,18 @@ const applyTheme = (theme: Theme) => {
   root.style.setProperty('--color-cell-empty', colors.cellEmpty);
   root.style.setProperty('--color-tracker-cursor', colors.playbackCursor);
   root.style.setProperty('--ft2-shadow', colors.panelShadow);
+
+  // Theme-specific fonts (fall back to defaults when not set)
+  const defaultSans = "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif";
+  const defaultMono = "'JetBrains Mono', 'SF Mono', 'Fira Code', 'Consolas', monospace";
+  root.style.setProperty('--theme-font-sans', colors.fontFamily || defaultSans);
+  root.style.setProperty('--theme-font-mono', colors.monoFontFamily || defaultMono);
+  root.style.setProperty('--theme-font-size', colors.fontSize || '12px');
+
+  // Theme-specific control styles
+  root.style.setProperty('--theme-button-radius', colors.buttonRadius || '4px');
+  root.style.setProperty('--theme-knob-style', colors.knobStyle || 'default');
+  root.style.setProperty('--theme-button-style', colors.buttonStyle || 'default');
 };
 
 export const useThemeStore = create<ThemeStore>()(
@@ -434,7 +1139,7 @@ export const useThemeStore = create<ThemeStore>()(
         return themes.find(t => t.id === currentThemeId) || devilboxTheme;
       },
 
-      setCustomColor: (key: keyof ThemeColors, value: string) => {
+      setCustomColor: (key: ThemeColorKey, value: string) => {
         const { customThemeColors, currentThemeId } = get();
         const colors = customThemeColors ? { ...customThemeColors } : getDefaultCustomColors();
         colors[key] = value;

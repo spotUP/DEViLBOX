@@ -7,6 +7,7 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import type { InstrumentConfig } from '@typedefs/instrument';
 import { ToneEngine } from '@engine/ToneEngine';
 import { useSettingsStore } from '@stores/useSettingsStore';
+import { useThemeStore } from '@stores/useThemeStore';
 
 interface TestKeyboardProps {
   instrument: InstrumentConfig;
@@ -102,6 +103,12 @@ export const TestKeyboard: React.FC<TestKeyboardProps> = ({ instrument }) => {
   const activeNotesRef = useRef<Set<string>>(new Set());
   // Single shared init promise — prevents concurrent init() calls from rapid key presses.
   const initPromiseRef = useRef<Promise<void> | null>(null);
+
+  // Get per-note theme colors
+  const pianoKeyColors = useThemeStore(s => {
+    const theme = s.getCurrentTheme();
+    return theme.colors.pianoKeyColors;
+  });
 
   useEffect(() => {
     activeNotesRef.current = activeNotes;
@@ -296,6 +303,41 @@ export const TestKeyboard: React.FC<TestKeyboardProps> = ({ instrument }) => {
   const keyHeight = 96;
   const blackKeyHeight = keyHeight * 0.6;
 
+  /** Lighten a hex color by mixing with white */
+  const lightenColor = useCallback((hex: string, amount: number): string => {
+    const r = parseInt(hex.slice(1, 3), 16);
+    const g = parseInt(hex.slice(3, 5), 16);
+    const b = parseInt(hex.slice(5, 7), 16);
+    const lr = Math.min(255, Math.round(r + (255 - r) * amount));
+    const lg = Math.min(255, Math.round(g + (255 - g) * amount));
+    const lb = Math.min(255, Math.round(b + (255 - b) * amount));
+    return `#${lr.toString(16).padStart(2, '0')}${lg.toString(16).padStart(2, '0')}${lb.toString(16).padStart(2, '0')}`;
+  }, []);
+
+  // Map chromatic note (0-11) to white key group index (0-6), -1 for black keys
+  // C=0, D=1, E=2, F=3, G=4, A=5, B=6
+  const CHROMATIC_TO_GROUP = [0, -1, 1, -1, 2, 3, -1, 4, -1, 5, -1, 6];
+
+  /** Get base, hover, and active colors for a key */
+  const getKeyColors = useCallback((noteInOctave: number, isBlack: boolean) => {
+    // Black keys always stay dark — only white keys get drum machine colors
+    if (isBlack) {
+      return { base: '#1a1a1d', hover: '#2a2a30', active: '#f59e0b', shadow: 'rgba(245, 158, 11, 0.5)' };
+    }
+    const groupIdx = CHROMATIC_TO_GROUP[noteInOctave];
+    const hasThemeColors = pianoKeyColors?.length === 7 && groupIdx >= 0;
+    if (hasThemeColors) {
+      const base = pianoKeyColors[groupIdx];
+      return {
+        base,
+        hover: lightenColor(base, 0.25),
+        active: lightenColor(base, 0.5),
+        shadow: base + '80',
+      };
+    }
+    return { base: '#ffffff', hover: '#f0f0f0', active: '#67e8f9', shadow: 'rgba(103, 232, 249, 0.5)' };
+  }, [pianoKeyColors, lightenColor]);
+
   return (
     <div ref={containerRef} className="space-y-3 w-full">
       <div className="space-y-3 pt-2">
@@ -310,6 +352,8 @@ export const TestKeyboard: React.FC<TestKeyboardProps> = ({ instrument }) => {
               {whiteKeys.map((key, index) => {
                 const isActive = activeNotes.has(key.note);
                 const isOctaveStart = key.label === 'C';
+                const noteIdx = NOTE_NAMES.indexOf(key.label);
+                const colors = getKeyColors(noteIdx, false);
                 return (
                   <button
                     key={key.note}
@@ -335,23 +379,31 @@ export const TestKeyboard: React.FC<TestKeyboardProps> = ({ instrument }) => {
                     className={`
                       relative border border-ft2-border rounded-b flex-1
                       transition-colors duration-75 cursor-pointer select-none touch-none
-                      ${isActive
-                        ? 'bg-accent-highlight shadow-lg shadow-cyan-400/50'
-                        : 'bg-white hover:bg-dark-bgHover'
-                      }
                       ${isOctaveStart && index > 0 ? 'border-l-2 border-l-gray-300' : ''}
                     `}
                     style={{
                       height: keyHeight,
+                      backgroundColor: isActive ? colors.active : colors.base,
+                      boxShadow: isActive ? `0 4px 12px ${colors.shadow}` : undefined,
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!activeNotes.has(key.note)) {
+                        (e.currentTarget as HTMLButtonElement).style.backgroundColor = colors.hover;
+                      }
+                    }}
+                    onMouseOut={(e) => {
+                      if (!activeNotes.has(key.note)) {
+                        (e.currentTarget as HTMLButtonElement).style.backgroundColor = colors.base;
+                      }
                     }}
                   >
                     <div className="absolute bottom-1 left-0 right-0 text-center">
                       {isOctaveStart && (
-                        <div className="text-[8px] text-text-secondary font-mono">{key.octave}</div>
+                        <div className="text-[8px] font-mono" style={{ color: pianoKeyColors ? '#00000080' : undefined, }}>{key.octave}</div>
                       )}
                       <div
-                        className="font-bold text-text-muted"
-                        style={{ fontSize: whiteKeyWidth < 30 ? '8px' : '10px' }}
+                        className="font-bold"
+                        style={{ fontSize: whiteKeyWidth < 30 ? '8px' : '10px', color: pianoKeyColors ? '#00000099' : undefined }}
                       >
                         {key.label}
                       </div>
@@ -371,6 +423,8 @@ export const TestKeyboard: React.FC<TestKeyboardProps> = ({ instrument }) => {
               {blackKeys.map((key) => {
                 const isActive = activeNotes.has(key.note);
                 const leftPosition = getBlackKeyPosition(key);
+                const noteIdx = NOTE_NAMES.indexOf(key.label + '#');
+                const colors = getKeyColors(noteIdx, true);
 
                 return (
                   <button
@@ -394,18 +448,24 @@ export const TestKeyboard: React.FC<TestKeyboardProps> = ({ instrument }) => {
                       e.preventDefault();
                       releaseNote(key.note);
                     }}
-                    className={`
-                      absolute border border-ft2-border rounded-b pointer-events-auto
-                      transition-colors duration-75 cursor-pointer select-none touch-none z-10
-                      ${isActive
-                        ? 'bg-amber-500 shadow-lg shadow-amber-500/50'
-                        : 'bg-dark-bgSecondary hover:bg-dark-bgHover'
-                      }
-                    `}
+                    className="absolute border border-ft2-border rounded-b pointer-events-auto
+                      transition-colors duration-75 cursor-pointer select-none touch-none z-10"
                     style={{
                       left: leftPosition,
                       width: blackKeyWidth,
                       height: blackKeyHeight,
+                      backgroundColor: isActive ? colors.active : colors.base,
+                      boxShadow: isActive ? `0 4px 12px ${colors.shadow}` : undefined,
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!activeNotes.has(key.note)) {
+                        (e.currentTarget as HTMLButtonElement).style.backgroundColor = colors.hover;
+                      }
+                    }}
+                    onMouseOut={(e) => {
+                      if (!activeNotes.has(key.note)) {
+                        (e.currentTarget as HTMLButtonElement).style.backgroundColor = colors.base;
+                      }
                     }}
                   >
                     {key.keyboardKey && (

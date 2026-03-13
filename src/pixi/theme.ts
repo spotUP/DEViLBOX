@@ -91,10 +91,15 @@ export function cssColorToPixi(cssColor: string | undefined): PixiColor {
 }
 
 /** Convert an entire ThemeColors object to PixiTheme */
+const NON_COLOR_KEYS = new Set(['pianoKeyColors', 'fontFamily', 'monoFontFamily', 'fontSize', 'knobStyle', 'buttonRadius', 'buttonStyle']);
 function themeColorsToPixi(colors: ThemeColors): PixiTheme {
   const result: Record<string, PixiColor> = {};
   for (const key of Object.keys(colors) as (keyof ThemeColors)[]) {
-    result[key] = cssColorToPixi(colors[key]);
+    if (NON_COLOR_KEYS.has(key)) continue;
+    const val = colors[key];
+    if (typeof val === 'string') {
+      result[key] = cssColorToPixi(val);
+    }
   }
   return result as unknown as PixiTheme;
 }
