@@ -174,7 +174,7 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
     description: 'Oktalyzer 8-channel — native parser or UADE',
     family: 'amiga-native',
     matchMode: 'both',
-    extRegex: /\.okt$/i,
+    extRegex: /\.(okt|okta)$/i,
     prefixes: ['okt.'],
     prefKey: 'okt',
     nativeParser: { module: '@lib/import/formats/OktalyzerParser', parseFn: 'parseOktalyzerFile' },

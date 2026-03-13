@@ -118,7 +118,7 @@ export async function tryRouteFormat(
   }
 
   // ── Oktalyzer ────────────────────────────────────────────────────────────
-  if (filename.endsWith('.okt')) {
+  if (filename.endsWith('.okt') || filename.endsWith('.okta')) {
     const { parseOktalyzerFile } = await import('@lib/import/formats/OktalyzerParser');
     return withNativeDefault('okt', ctx, (buf: Uint8Array | ArrayBuffer, name: string) => parseOktalyzerFile(buf as ArrayBuffer, name));
   }
