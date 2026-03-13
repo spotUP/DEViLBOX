@@ -62,17 +62,44 @@ DEViLBOX has an MCP server that gives Claude **full programmatic control** of th
 
 ### Prerequisites
 
-1. **Dev server running:** `npm run dev` (starts Vite on :5173 + Express on :3001)
+1. **Dev server running FIRST:** `npm run dev` (starts Vite on :5173, Express on :3001, **WS relay on :4003**)
 2. **Browser open:** Navigate to `http://localhost:5173` — the MCP bridge auto-connects in dev mode
 3. **Click in the browser** to unlock the AudioContext (required for audio tools)
 
-### Architecture
+### Architecture (Three-Link Chain)
 
 ```
-Claude Code ←stdio→ MCP Server (Node.js) ←WS:4003→ Browser SPA
+Claude Code ←stdio→ MCP Subprocess ←WS:4003/mcp→ Express Relay ←WS:4003→ Browser SPA
 ```
 
-The `.mcp.json` at project root configures auto-start. If it doesn't connect, restart Claude Code.
+**Three independent processes must ALL be running and connected:**
+
+1. **Express Dev Server** (owns port 4003): Central WS message broker
+2. **MCP Subprocess** (connects to port 4003 as client): Tool definitions, stdio to Claude
+3. **Browser SPA** (connects to port 4003 as client): Executes tool calls against the running app
+
+The `.mcp.json` at project root configures auto-start. Claude Code spawns the MCP subprocess automatically.
+
+### CRITICAL: "No browser connected" Troubleshooting
+
+This error means the MCP subprocess has no WebSocket link to the relay/browser. **Most common cause:** the MCP subprocess started before Express and owned port 4003, then Express restarted and reclaimed the port — leaving the MCP subprocess disconnected.
+
+**Quick diagnosis:**
+```bash
+# Who owns port 4003?
+lsof -nP -iTCP:4003 -sTCP:LISTEN
+# Should be the Express dev server node process
+
+# Does the MCP subprocess have a TCP connection?
+ps aux | grep "mcp/index.ts" | grep -v grep  # get PID
+lsof -nP -p <MCP_PID> | grep TCP
+# If EMPTY → MCP is disconnected → restart Claude Code to re-spawn it
+# (Claude Code does NOT auto-restart killed MCP subprocesses mid-session)
+```
+
+**Fix order:** Always start Express first (`npm run dev`), then start/restart Claude Code. If the MCP connection breaks mid-session, **restart Claude Code** — it will re-spawn the MCP subprocess which connects as a client to the Express relay.
+
+**Full troubleshooting guide:** `docs/MCP_DEBUGGING_GUIDE.md`
 
 ### Quick Start — Use `get_mcp_help` First
 

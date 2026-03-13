@@ -54,6 +54,22 @@
   textarea { width: 100%; height: 300px; background: var(--card); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 12px; font-family: inherit; font-size: 12px; resize: vertical; }
   .toast { position: fixed; top: 20px; right: 20px; background: var(--green); color: #000; padding: 10px 20px; border-radius: 6px; font-weight: bold; opacity: 0; transition: opacity 0.3s; z-index: 999; pointer-events: none; }
   .toast.show { opacity: 1; }
+  /* Synth Tests section */
+  .synth-section { margin-top: 32px; }
+  .synth-header { background: #1a2a4a; color: var(--text); padding: 10px 14px; border-radius: 6px 6px 0 0; font-weight: bold; display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+  .synth-controls { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .synth-controls button { padding: 5px 12px; font-size: 11px; }
+  .synth-status { font-size: 11px; color: var(--dim); font-weight: normal; }
+  .synth-table table { table-layout: auto; }
+  .synth-table th, .synth-table td { padding: 5px 10px; }
+  .pill { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 11px; font-weight: bold; }
+  .pill-pass { background: #14532d; color: var(--green); }
+  .pill-fail { background: #450a0a; color: var(--red); }
+  .pill-skip { background: #1c1c1c; color: var(--dim); }
+  .synth-stats { display: flex; gap: 12px; flex-wrap: wrap; padding: 8px 12px; background: var(--card); border-top: 1px solid var(--border); }
+  .synth-stat-item { font-size: 12px; }
+  .running-indicator { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--yellow); animation: pulse 1s infinite; margin-right: 6px; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
 </style>
 </head>
 <body>
@@ -84,6 +100,21 @@
 
 <div class="stats" id="stats"></div>
 <div id="content"></div>
+
+<!-- Synth Tests Section -->
+<div class="synth-section">
+  <div class="synth-header">
+    <span id="synth-title">🎹 Synth Tests</span>
+    <div class="synth-controls">
+      <button onclick="runSynthSuite('tone')" id="btn-tone">Tone.js</button>
+      <button onclick="runSynthSuite('custom')" id="btn-custom" class="secondary">Custom</button>
+      <button onclick="runSynthSuite('all')" id="btn-all" class="secondary">All Synths</button>
+      <span class="synth-status" id="synth-run-status"></span>
+    </div>
+  </div>
+  <div id="synth-test-table" class="synth-table"></div>
+</div>
+
 <div class="export-area hidden" id="exportArea">
   <textarea id="exportText" readonly></textarea>
 </div>
@@ -241,6 +272,45 @@ const FORMATS = [
   {"key": "zxtune", "label": "ZXTune", "family": "chip-dump", "nativeParser": false, "uade": false, "openmptFb": false, "openmptPlay": false, "nativeOnly": true, "ext": ".pt3 .pt2 .pt1 .stc .st1 .st3 ...", "editable": false, "exportable": false},
   {"key": "dmf", "label": "DefleMask / X-Tracker", "family": "furnace", "nativeParser": true, "uade": true, "openmptFb": false, "openmptPlay": false, "nativeOnly": false, "ext": ".dmf", "editable": true, "exportable": false},
   {"key": "fur", "label": "Furnace", "family": "furnace", "nativeParser": false, "uade": false, "openmptFb": false, "openmptPlay": false, "nativeOnly": true, "ext": ".fur", "editable": true, "exportable": true},
+
+  // Furnace Chip Synth Audit — NES demo songs
+  {"key": "fur-nes-bytesizedbop", "label": "Byte-Sized Bop", "family": "furnace-audit-nes", "chips": "NES"},
+  {"key": "fur-nes-famitune1", "label": "Famitune1", "family": "furnace-audit-nes", "chips": "NES+VRC6"},
+  {"key": "fur-nes-furnes", "label": "Fur_Nes", "family": "furnace-audit-nes", "chips": "NES"},
+  {"key": "fur-nes-futurereference", "label": "Future_Re-ference", "family": "furnace-audit-nes", "chips": "NES+VRC7"},
+  {"key": "fur-nes-riseagainst", "label": "Rise against the ashes", "family": "furnace-audit-nes", "chips": "?"},
+  {"key": "fur-nes-skysanctuary", "label": "Sky Sanctuary Zone", "family": "furnace-audit-nes", "chips": "NES+VRC7"},
+  {"key": "fur-nes-supercool", "label": "Super cool and awesome samurai", "family": "furnace-audit-nes", "chips": "NES"},
+  {"key": "fur-nes-superspaceinvaders", "label": "Super_Space_Invaders_Title", "family": "furnace-audit-nes", "chips": "NES"},
+  {"key": "fur-nes-thecheetahmen", "label": "The Cheetahmen", "family": "furnace-audit-nes", "chips": "NES"},
+  {"key": "fur-nes-theeast", "label": "The East", "family": "furnace-audit-nes", "chips": "NES+FDS"},
+  {"key": "fur-nes-blanketcritter", "label": "blanketcritter release ver", "family": "furnace-audit-nes", "chips": "5E01+C30"},
+  {"key": "fur-nes-carveyourownpath", "label": "carve_your_own_path", "family": "furnace-audit-nes", "chips": "NES+N163"},
+  {"key": "fur-nes-christmasfever", "label": "christmas-fever", "family": "furnace-audit-nes", "chips": "NES"},
+  {"key": "fur-nes-delarosamazapan", "label": "delarosamazapan", "family": "furnace-audit-nes", "chips": "NES+VRC7"},
+  {"key": "fur-nes-goingupastepatime", "label": "going_up_a_step_at_time", "family": "furnace-audit-nes", "chips": "?"},
+  {"key": "fur-nes-infinity", "label": "infinity", "family": "furnace-audit-nes", "chips": "NES+FDS"},
+  {"key": "fur-nes-oby1ingame", "label": "oby1_ingame", "family": "furnace-audit-nes", "chips": "?"},
+  {"key": "fur-nes-onesidedlove", "label": "one_sided_love", "family": "furnace-audit-nes", "chips": "NES+MMC5"},
+  {"key": "fur-nes-smashtv", "label": "smashtv", "family": "furnace-audit-nes", "chips": "?"},
+  {"key": "fur-nes-sweatsmile", "label": "sweatsmile_bossfight", "family": "furnace-audit-nes", "chips": "NES+VRC6"},
+  {"key": "fur-nes-thebest1990", "label": "the_best-1990", "family": "furnace-audit-nes", "chips": "NES"},
+  {"key": "fur-nes-turtlebyte", "label": "turtle_byte", "family": "furnace-audit-nes", "chips": "NES"},
+
+  // Furnace Chip Synth Audit — Game Boy demo songs
+  {"key": "fur-gb-gbwaitforme", "label": "GB_WaitForMe", "family": "furnace-audit-gb", "chips": "GB"},
+  {"key": "fur-gb-onhold", "label": "On Hold", "family": "furnace-audit-gb", "chips": "GB"},
+  {"key": "fur-gb-pleasureoftension", "label": "Pleasure of Tension", "family": "furnace-audit-gb", "chips": "GB"},
+  {"key": "fur-gb-cheap", "label": "cheap", "family": "furnace-audit-gb", "chips": "GB"},
+  {"key": "fur-gb-contested", "label": "contested", "family": "furnace-audit-gb", "chips": "GB"},
+  {"key": "fur-gb-dancingtothedeath", "label": "dancing to the death", "family": "furnace-audit-gb", "chips": "GB"},
+  {"key": "fur-gb-lagtrain", "label": "lagtrain", "family": "furnace-audit-gb", "chips": "GB"},
+  {"key": "fur-gb-minos", "label": "minos", "family": "furnace-audit-gb", "chips": "GB"},
+  {"key": "fur-gb-puggsinspace", "label": "puggs in space", "family": "furnace-audit-gb", "chips": "GB"},
+  {"key": "fur-gb-spreadtro", "label": "spreadtro", "family": "furnace-audit-gb", "chips": "GB"},
+  {"key": "fur-gb-snowdin", "label": "snowdin", "family": "furnace-audit-gb", "chips": "GB"},
+  {"key": "fur-gb-finger", "label": "finger", "family": "furnace-audit-gb", "chips": "GB"},
+  {"key": "fur-gb-yourewelldoing", "label": "You're Doing Well!", "family": "furnace-audit-gb", "chips": "GB"},
   {"key": "xm", "label": "FastTracker II XM", "family": "libopenmpt", "nativeParser": true, "uade": false, "openmptFb": true, "openmptPlay": false, "nativeOnly": false, "ext": ".xm", "editable": true, "exportable": true},
   {"key": "it", "label": "Impulse Tracker", "family": "libopenmpt", "nativeParser": true, "uade": false, "openmptFb": true, "openmptPlay": false, "nativeOnly": false, "ext": ".it .mptm", "editable": true, "exportable": true},
   {"key": "mod", "label": "ProTracker MOD", "family": "libopenmpt", "nativeParser": true, "uade": true, "openmptFb": true, "openmptPlay": false, "nativeOnly": false, "ext": ".mod .m15", "editable": true, "exportable": true},
@@ -379,7 +449,9 @@ const familyLabels = {
   'libopenmpt': '🎵 Core (libopenmpt)',
   'furnace': '🔧 Furnace',
   'c64-chip': '🕹️ C64 Chip',
-  'midi': '🎼 MIDI'
+  'midi': '🎼 MIDI',
+  'furnace-audit-nes': '🎮 Furnace Audit — NES',
+  'furnace-audit-gb': '🎮 Furnace Audit — Game Boy'
 };
 
 // Populate family filter
@@ -404,6 +476,47 @@ function badges(fmt) {
 }
 
 function statusClass(s) { return 's-' + s; }
+
+const AUDIT_FAMILIES = new Set(['furnace-audit-nes', 'furnace-audit-gb']);
+
+const AUDIT_STATUS_OPTIONS = ['untested','investigating','fixed','known-issue','wont-fix'];
+const AUDIT_STATUS_COLORS = { untested: 'var(--dim)', investigating: '#22d3ee', fixed: 'var(--green)', 'known-issue': 'var(--yellow)', 'wont-fix': 'var(--dim)' };
+
+function renderAuditTable(fmts) {
+  const PASS_THRESHOLD = 0.90;
+  let html = '<table><colgroup><col style="width:200px"><col style="width:80px"><col style="width:200px"><col style="width:70px"><col style="width:140px"><col></colgroup><tr><th>Song</th><th>Chips</th><th>EnvCorr (threshold 0.90)</th><th>Score</th><th>Status</th><th>Notes</th></tr>';
+  fmts.forEach(f => {
+    const st = savedState[f.key] || {};
+    const envCorr = typeof st.envCorr === 'number' ? st.envCorr : null;
+    const pass = envCorr !== null ? envCorr >= PASS_THRESHOLD : null;
+    const passColor = pass === true ? 'var(--green)' : pass === false ? 'var(--red)' : 'var(--dim)';
+    const passText = pass === true ? 'PASS' : pass === false ? 'FAIL' : '—';
+    const barPct = envCorr !== null ? Math.max(0, Math.min(100, envCorr * 100)).toFixed(1) : 0;
+    const barColor = envCorr === null ? 'var(--dim)' : envCorr >= PASS_THRESHOLD ? 'var(--green)' : envCorr >= 0.80 ? 'var(--yellow)' : 'var(--red)';
+    const envLabel = envCorr !== null ? envCorr.toFixed(4) : '—';
+    const rmsText = typeof st.rmsDbDiff === 'number' ? ` (${st.rmsDbDiff > 0 ? '+' : ''}${st.rmsDbDiff.toFixed(1)}dB)` : '';
+    const barHtml = envCorr !== null ? `<div style="display:flex;align-items:center;gap:6px">
+      <div style="flex:1;background:#1a2a4a;border-radius:3px;height:10px;position:relative">
+        <div style="width:${barPct}%;background:${barColor};height:100%;border-radius:3px;min-width:2px"></div>
+        <div style="position:absolute;left:${PASS_THRESHOLD * 100}%;top:-2px;width:2px;height:14px;background:#fff;opacity:0.4"></div>
+      </div>
+    </div>` : '<span style="color:var(--dim)">not tested</span>';
+    const auditStatus = st.auditStatus || 'untested';
+    const auditColor = AUDIT_STATUS_COLORS[auditStatus] || 'var(--dim)';
+    html += `<tr data-key="${f.key}">
+      <td class="fmt-label">${f.label}</td>
+      <td class="ext" style="color:var(--purple);font-size:11px">${f.chips || '?'}</td>
+      <td>${barHtml}<span style="color:${barColor};font-size:11px">${envLabel}${rmsText}</span></td>
+      <td style="color:${passColor};font-weight:bold;font-size:12px">${passText}</td>
+      <td><select class="status-select" style="color:${auditColor};border-color:${auditColor};width:130px" onchange="handleAuditStatus('${f.key}', this)">
+        ${AUDIT_STATUS_OPTIONS.map(s => `<option value="${s}" ${s===auditStatus?'selected':''}>${s}</option>`).join('')}
+      </select></td>
+      <td><input class="notes-input" value="${(st.notes||'').replace(/"/g,'&quot;')}" onchange="handleNotes('${f.key}', this)" placeholder="analysis notes..."></td>
+    </tr>`;
+  });
+  html += '</table>';
+  return html;
+}
 
 function renderTable(fmts, familyKey) {
   let html = '<table><colgroup><col style="width:180px"><col style="width:140px"><col style="width:100px"><col style="width:180px"><col style="width:140px"><col></colgroup><tr><th>Format</th><th>Key</th><th>Extensions</th><th>Backends</th><th>Status</th><th>Notes</th></tr>';
@@ -432,7 +545,7 @@ function render() {
   const filterFamily = document.getElementById('filterFamily').value;
   
   let html = '';
-  const order = ['libopenmpt','furnace','amiga-native','pc-tracker','chip-dump','c64-chip','midi'];
+  const order = ['furnace-audit-nes','furnace-audit-gb','libopenmpt','furnace','amiga-native','pc-tracker','chip-dump','c64-chip','midi'];
   
   order.forEach(fam => {
     if (filterFamily && filterFamily !== fam) return;
@@ -457,7 +570,7 @@ function render() {
         <span>${collapsed ? '▶' : '▼'} ${familyLabels[fam] || fam}</span>
         <span class="family-count">${fmts.length} formats</span>
       </div>
-      <div class="${collapsed ? 'hidden' : ''}">${renderTable(fmts, fam)}</div>
+      <div class="${collapsed ? 'hidden' : ''}">${AUDIT_FAMILIES.has(fam) ? renderAuditTable(fmts) : renderTable(fmts, fam)}</div>
     </div>`;
   });
   
@@ -478,18 +591,46 @@ function handleNotes(key, el) {
   setState(key, 'notes', el.value);
 }
 
+function handleAuditStatus(key, el) {
+  // Push auditStatus to server (stored alongside envCorr etc.)
+  const st = savedState[key] || {};
+  st.auditStatus = el.value;
+  savedState[key] = st;
+  el.style.color = AUDIT_STATUS_COLORS[el.value] || 'var(--dim)';
+  el.style.borderColor = AUDIT_STATUS_COLORS[el.value] || 'var(--dim)';
+  fetch('/update', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ format: key, auditStatus: el.value, notes: st.notes || '' })
+  }).catch(e => console.error('[Save] Failed:', e));
+}
+
 function updateStats() {
   const counts = {};
   STATUS_OPTIONS.forEach(s => counts[s] = 0);
-  FORMATS.forEach(f => counts[getState(f.key).status]++);
-  
+  const nonAuditFmts = FORMATS.filter(f => !AUDIT_FAMILIES.has(f.family));
+  nonAuditFmts.forEach(f => counts[getState(f.key).status]++);
+
+  // Audit pass/fail counts
+  const PASS_THRESHOLD = 0.90;
+  const auditFmts = FORMATS.filter(f => AUDIT_FAMILIES.has(f.family));
+  let auditPass = 0, auditFail = 0, auditUntested = 0;
+  auditFmts.forEach(f => {
+    const st = savedState[f.key] || {};
+    if (typeof st.envCorr === 'number') {
+      if (st.envCorr >= PASS_THRESHOLD) auditPass++; else auditFail++;
+    } else auditUntested++;
+  });
+
   const colors = { untested: 'var(--dim)', works: 'var(--green)', partial: 'var(--yellow)', broken: 'var(--red)', silent: '#f97316', 'wrong-synth': 'var(--purple)', crashes: '#ef4444' };
-  
+
   let html = '';
   STATUS_OPTIONS.forEach(s => {
     html += `<div class="stat"><div class="stat-val" style="color:${colors[s]}">${counts[s]}</div><div class="stat-label">${s}</div></div>`;
   });
-  html += `<div class="stat"><div class="stat-val" style="color:var(--accent)">${FORMATS.length}</div><div class="stat-label">total</div></div>`;
+  html += `<div class="stat"><div class="stat-val" style="color:var(--accent)">${nonAuditFmts.length}</div><div class="stat-label">formats</div></div>`;
+  html += `<div class="stat"><div class="stat-val" style="color:var(--green)">${auditPass}</div><div class="stat-label">chip pass</div></div>`;
+  html += `<div class="stat"><div class="stat-val" style="color:var(--red)">${auditFail}</div><div class="stat-label">chip fail</div></div>`;
   document.getElementById('stats').innerHTML = html;
 }
 
@@ -542,6 +683,188 @@ document.getElementById('filterFamily').addEventListener('change', render);
 // Initial render (data will arrive async from server, re-render then)
 render();
 updateStats();
+
+// ─── Synth Tests ────────────────────────────────────────────────────────────
+
+let synthTestResults = {}; // key: synthType → result object
+let synthTestRunning = false;
+
+// Suite labels for display
+const SYNTH_SUITES = {
+  tone: ['AMSynth','DuoSynth','FMSynth','MembraneSynth','MetalSynth','MonoSynth','NoiseSynth','PluckSynth','PolySynth','Synth'],
+  custom: ['TB303','DubSiren','SpaceLaser','Synare','V2','Sam','Dexed','OBXd','SuperSaw','Organ','DrumMachine','ChipSynth','PWMSynth','WobbleBass','StringMachine','FormantSynth','GranularSynth','Wavetable'],
+};
+const SYNTH_SUITE_LABELS = { tone: 'Tone.js', custom: 'Custom', furnace: 'Furnace' };
+
+function callBridge(method, params = {}) {
+  return new Promise((resolve) => {
+    let ws;
+    try {
+      ws = new WebSocket('ws://localhost:4003/mcp');
+    } catch (e) {
+      resolve({ error: 'WebSocket failed: ' + e.message });
+      return;
+    }
+    const id = Math.random().toString(36).slice(2);
+    const timer = setTimeout(() => { try { ws.close(); } catch {} resolve({ error: 'timeout' }); }, 120000);
+    ws.onopen = () => ws.send(JSON.stringify({ id, type: 'call', method, params }));
+    ws.onmessage = (e) => {
+      clearTimeout(timer);
+      try { resolve(JSON.parse(e.data)); } catch { resolve({ error: 'parse error' }); }
+      ws.close();
+    };
+    ws.onerror = () => { clearTimeout(timer); resolve({ error: 'ws error' }); };
+  });
+}
+
+async function runSynthSuite(suite) {
+  if (synthTestRunning) return;
+  synthTestRunning = true;
+
+  const statusEl = document.getElementById('synth-run-status');
+  const titleEl = document.getElementById('synth-title');
+  titleEl.innerHTML = '<span class="running-indicator"></span>🎹 Synth Tests — running ' + (SYNTH_SUITE_LABELS[suite] || suite) + '...';
+  statusEl.textContent = 'Connecting to DEViLBOX...';
+
+  // Disable buttons
+  ['btn-tone','btn-custom','btn-all'].forEach(id => document.getElementById(id).disabled = true);
+
+  try {
+    const timeout = suite === 'furnace' ? 10000 : suite === 'custom' ? 8000 : 5000;
+    statusEl.textContent = 'Running tests (this may take a moment)...';
+    const result = await callBridge('run_synth_tests', { suite, timeout });
+
+    if (result.error) {
+      statusEl.textContent = 'Error: ' + result.error + ' — is DEViLBOX open at localhost:5173?';
+    } else {
+      const data = result.data || result;
+      const results = data.results || [];
+      const ts = data.timestamp ? new Date(data.timestamp).toLocaleTimeString() : new Date().toLocaleTimeString();
+
+      // Merge results into state
+      results.forEach(r => { synthTestResults[r.synthType] = r; });
+
+      // Save to server
+      const updates = {};
+      results.forEach(r => {
+        updates['synth-' + r.synthType] = {
+          status: r.loaded ? (r.producedSound && r.noteOnWorked ? 'works' : r.loaded ? 'partial' : 'broken') : 'broken',
+          synthType: r.synthType,
+          name: r.name,
+          loaded: r.loaded,
+          producedSound: r.producedSound,
+          noteOnWorked: r.noteOnWorked,
+          noteOffWorked: r.noteOffWorked,
+          loadTimeMs: r.loadTimeMs,
+          error: r.error || null,
+          lastTestedAt: ts,
+        };
+      });
+      fetch('/push-updates', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates),
+      }).catch(() => {});
+
+      const passed = results.filter(r => r.producedSound && r.noteOnWorked).length;
+      statusEl.textContent = `Last run: ${ts} — ${passed}/${results.length} passed`;
+      titleEl.textContent = '🎹 Synth Tests';
+    }
+  } catch (e) {
+    statusEl.textContent = 'Error: ' + e.message;
+    titleEl.textContent = '🎹 Synth Tests';
+  }
+
+  synthTestRunning = false;
+  ['btn-tone','btn-custom','btn-all'].forEach(id => document.getElementById(id).disabled = false);
+  renderSynthTests();
+}
+
+function renderSynthTests() {
+  const el = document.getElementById('synth-test-table');
+  const allResults = Object.values(synthTestResults);
+
+  // Also check server state for previously saved synth test results
+  const serverSynthKeys = Object.keys(savedState).filter(k => k.startsWith('synth-'));
+  serverSynthKeys.forEach(k => {
+    const st = savedState[k];
+    if (st && st.synthType && !synthTestResults[st.synthType]) {
+      synthTestResults[st.synthType] = st;
+    }
+  });
+
+  const merged = Object.values(synthTestResults);
+  if (merged.length === 0) {
+    el.innerHTML = '<div style="padding:16px;color:var(--dim);background:var(--card);border-radius:0 0 6px 6px;">No results yet — click a Run button above. Requires DEViLBOX open at <strong style="color:var(--text)">localhost:5173</strong>.</div>';
+    return;
+  }
+
+  // Group by suite
+  const tone = merged.filter(r => SYNTH_SUITES.tone.includes(r.synthType));
+  const custom = merged.filter(r => SYNTH_SUITES.custom.includes(r.synthType));
+  const other = merged.filter(r => !SYNTH_SUITES.tone.includes(r.synthType) && !SYNTH_SUITES.custom.includes(r.synthType));
+
+  let html = '<table><colgroup><col style="width:160px"><col style="width:80px"><col style="width:70px"><col style="width:70px"><col style="width:70px"><col style="width:70px"><col style="width:80px"><col></colgroup>';
+  html += '<tr><th>Synth</th><th>Suite</th><th>Loaded</th><th>Sound</th><th>Note On</th><th>Note Off</th><th>Load Time</th><th>Notes</th></tr>';
+
+  const renderRow = (r) => {
+    const suite = SYNTH_SUITES.tone.includes(r.synthType) ? 'Tone.js' : SYNTH_SUITES.custom.includes(r.synthType) ? 'Custom' : 'Other';
+    const p = (v, label) => v === undefined || v === null ? `<span class="pill pill-skip">—</span>` :
+      v ? `<span class="pill pill-pass">${label || '✓'}</span>` : `<span class="pill pill-fail">${label || '✗'}</span>`;
+    const loadMs = r.loadTimeMs != null ? `${r.loadTimeMs < 1 ? '<1' : Math.round(r.loadTimeMs)}ms` : '—';
+    const notes = r.error ? `<span style="color:var(--red);font-size:11px">${r.error}</span>` : (r.lastTestedAt ? `<span style="color:var(--dim);font-size:11px">${r.lastTestedAt}</span>` : '');
+    return `<tr>
+      <td class="fmt-label">${r.name || r.synthType}</td>
+      <td><span class="badge badge-native" style="font-size:10px">${suite}</span></td>
+      <td>${p(r.loaded)}</td>
+      <td>${p(r.producedSound)}</td>
+      <td>${p(r.noteOnWorked)}</td>
+      <td>${p(r.noteOffWorked)}</td>
+      <td style="color:var(--dim);font-size:11px">${loadMs}</td>
+      <td>${notes}</td>
+    </tr>`;
+  };
+
+  [...tone, ...custom, ...other].forEach(r => { html += renderRow(r); });
+  html += '</table>';
+
+  // Stats bar
+  const total = merged.length;
+  const passed = merged.filter(r => r.producedSound && r.noteOnWorked).length;
+  const loaded = merged.filter(r => r.loaded).length;
+  const failed = merged.filter(r => r.loaded && (!r.producedSound || !r.noteOnWorked)).length;
+  html += `<div class="synth-stats">
+    <span class="synth-stat-item" style="color:var(--green)">${passed} producing sound</span>
+    <span class="synth-stat-item" style="color:var(--yellow)">${loaded - passed} loaded but silent</span>
+    <span class="synth-stat-item" style="color:var(--red)">${total - loaded} failed to load</span>
+    <span class="synth-stat-item" style="color:var(--dim)">${total} total tested</span>
+  </div>`;
+
+  el.innerHTML = html;
+}
+
+// Load any previously saved synth test results from server
+function loadSynthResultsFromServer() {
+  const synthKeys = Object.keys(savedState).filter(k => k.startsWith('synth-'));
+  synthKeys.forEach(k => {
+    const st = savedState[k];
+    if (st && st.synthType) synthTestResults[st.synthType] = st;
+  });
+  if (Object.keys(synthTestResults).length > 0) renderSynthTests();
+}
+
+// Hook into the server data load to also populate synth results
+const _origFetch = window._origSavedStateCb;
+const _synthResultPoll = setInterval(() => {
+  const synthKeys = Object.keys(savedState).filter(k => k.startsWith('synth-'));
+  if (synthKeys.length > 0) {
+    loadSynthResultsFromServer();
+    clearInterval(_synthResultPoll);
+  }
+}, 500);
+
+// Initial empty render
+renderSynthTests();
 </script>
 </body>
 </html>
