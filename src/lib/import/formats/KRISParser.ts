@@ -208,6 +208,21 @@ export async function parseKRISFile(
     return Math.max(1, Math.min(96, xmNote));
   }
 
+  // ── Find actual pattern length by scanning for last meaningful row ─────────
+  function getActualPatternLength(chans: ChannelData[]): number {
+    let lastRow = -1;
+    for (let row = 0; row < (chans[0]?.rows.length ?? 0); row++) {
+      for (const ch of chans) {
+        const c = ch.rows[row];
+        if (c.note !== 0 || c.instrument !== 0 || c.effTyp !== 0 || c.eff !== 0) {
+          lastRow = row;
+          break;
+        }
+      }
+    }
+    return lastRow >= 0 ? lastRow + 1 : 1;
+  }
+
   // ── Build patterns (one per order position) ──────────────────────────────────
   const patterns: Pattern[] = [];
   const songPositions: number[] = [];
@@ -251,7 +266,7 @@ export async function parseKRISFile(
     patterns.push({
       id: `pattern-${o}`,
       name: `Pattern ${o}`,
-      length: ROWS_PER_TRACK,
+      length: getActualPatternLength(channels),
       channels,
       importMetadata: {
         sourceFormat: 'KRIS',
