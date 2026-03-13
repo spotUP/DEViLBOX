@@ -188,6 +188,48 @@ interface RenderParams {
   playbackRow: number;
   playbackPatternIdx: number;
   noteDisplayOffset: number;
+  // Song-order data for seamless smooth-scroll across pattern boundaries
+  smoothScrollActive: boolean;   // true when smooth scrolling during playback
+  songPosition: number;          // current position in song order (-1 = not playing)
+  songPositions: number[];       // song order (pattern number per position)
+  songLength: number;            // total positions in song order
+}
+
+/**
+ * During smooth-scroll playback, resolve a row that falls outside the current
+ * pattern [0, patternLength) into the correct pattern + row by walking the song
+ * order.  Returns null when resolution fails (song edges, no data).
+ */
+function resolveSongRow(
+  rowNum: number, p: RenderParams,
+): { pattern: TrackerPattern; row: number } | null {
+  if (!p.smoothScrollActive || p.songPosition < 0 || p.songLength === 0) return null;
+  const { patterns, songPositions, songLength, songPosition, patternLength } = p;
+  if (rowNum < 0) {
+    let remain = -rowNum;
+    let pos = songPosition - 1;
+    while (remain > 0 && pos >= 0) {
+      const pat = patterns[songPositions[pos]];
+      const len = pat?.length ?? 64;
+      if (remain <= len) return pat ? { pattern: pat, row: len - remain } : null;
+      remain -= len;
+      pos--;
+    }
+    return null;
+  }
+  if (rowNum >= patternLength) {
+    let remain = rowNum - patternLength;
+    let pos = songPosition + 1;
+    while (remain >= 0 && pos < songLength) {
+      const pat = patterns[songPositions[pos]];
+      const len = pat?.length ?? 64;
+      if (remain < len) return pat ? { pattern: pat, row: remain } : null;
+      remain -= len;
+      pos++;
+    }
+    return null;
+  }
+  return null;
 }
 
 /** Static grid layer — backgrounds, separators, gutter. */
@@ -205,10 +247,14 @@ function renderGrid(g: GraphicsType, p: RenderParams, vStart: number): void {
 
     const isInPattern = rowNum >= 0 && rowNum < p.patternLength;
     const isGhost = !isInPattern && p.showGhostPatterns;
+    // During smooth-scroll playback, resolve boundary rows via song order
+    // so the grid background extends seamlessly across pattern boundaries.
+    const songRow = (!isInPattern && !isGhost) ? resolveSongRow(rowNum, p) : null;
     const ghostAlpha = isGhost ? 0.35 : 1;
 
-    if (isInPattern || isGhost) {
-      const isHighlight = rowNum >= 0 && rowNum % p.rowHighlightInterval === 0;
+    if (isInPattern || isGhost || songRow) {
+      const actualRow = songRow ? songRow.row : rowNum;
+      const isHighlight = actualRow >= 0 && actualRow % p.rowHighlightInterval === 0;
       g.rect(LINE_NUMBER_WIDTH, y, p.width - LINE_NUMBER_WIDTH, p.rowHeight);
       g.fill({
         color: isHighlight ? p.theme.trackerRowHighlight.color : p.theme.trackerRowOdd.color,
@@ -247,13 +293,15 @@ function renderGrid(g: GraphicsType, p: RenderParams, vStart: number): void {
 /** Active channel highlight — fixed position, doesn't scroll with content */
 function renderChannelHighlight(
   g: GraphicsType, p: RenderParams, cursor: CursorPosition,
+  smoothOffset = 0,
 ): void {
   g.clear();
   const cursorCh = cursor.channelIndex;
   if (cursorCh >= 0 && cursorCh < p.numChannels) {
     const colX = p.channelOffsets[cursorCh] - p.scrollLeft;
     const chW = p.channelWidths[cursorCh];
-    g.rect(colX, 0, chW, p.gridHeight);
+    // Extend rect to cover scroll offset so there's no gap at top/bottom
+    g.rect(colX, smoothOffset, chW, p.gridHeight);
     g.fill(FILL_WHITE_002);
   }
 }
@@ -315,13 +363,14 @@ function renderOverlay(
 /** Cursor caret only — cheapest possible redraw, runs on every cursor move. */
 function renderCursorCaret(
   g: GraphicsType, p: RenderParams, cursor: CursorPosition, vStart: number,
+  smoothOffset = 0,
 ): void {
   g.clear();
   const cursorCh = cursor.channelIndex;
   if (cursorCh >= 0 && cursorCh < p.numChannels) {
     const colX = p.channelOffsets[cursorCh] - p.scrollLeft;
     const row = p.isPlaying ? p.playbackRow : cursor.rowIndex;
-    const y = p.baseY + (row - vStart) * p.rowHeight;
+    const y = p.baseY + (row - vStart) * p.rowHeight + smoothOffset;
     let cursorW = CHAR_WIDTH * 3 + 4;
     let cursorX = colX + 8;
     const noteWidth = CHAR_WIDTH * 3 + 4;
@@ -338,10 +387,8 @@ function renderCursorCaret(
   }
 }
 
-/** Generate text labels for visible rows (M/S buttons + cell data).
- *  NOTE: Does NOT use currentRow for coloring — current-row highlight is handled
- *  by the overlay layer, so labels only need regeneration when vStart changes. */
-function generateLabels(p: RenderParams, vStart: number): LabelData[] {
+/** Generate text labels for visible rows (M/S buttons + cell data). */
+function generateLabels(p: RenderParams, vStart: number, activeRow = -1): LabelData[] {
   if (!p.displayPattern) return [];
   const labels: LabelData[] = [];
 
@@ -355,24 +402,35 @@ function generateLabels(p: RenderParams, vStart: number): LabelData[] {
     let isGhost = false;
 
     if (rowNum < 0 || rowNum >= p.patternLength) {
-      if (!p.showGhostPatterns) continue;
-      isGhost = true;
-      if (rowNum < 0) {
-        const prevPatIdx = p.displayPatternIndex > 0 ? p.displayPatternIndex - 1 : p.patterns.length - 1;
-        actualPattern = p.patterns[prevPatIdx];
-        if (!actualPattern) continue;
-        actualRow = actualPattern.length + rowNum;
-        if (actualRow < 0) continue;
+      // During smooth-scroll playback, resolve via song order for seamless
+      // visual continuity at pattern boundaries (shown at full alpha).
+      const songRow = resolveSongRow(rowNum, p);
+      if (songRow) {
+        actualPattern = songRow.pattern;
+        actualRow = songRow.row;
+      } else if (p.showGhostPatterns) {
+        isGhost = true;
+        if (rowNum < 0) {
+          const prevPatIdx = p.displayPatternIndex > 0 ? p.displayPatternIndex - 1 : p.patterns.length - 1;
+          actualPattern = p.patterns[prevPatIdx];
+          if (!actualPattern) continue;
+          actualRow = actualPattern.length + rowNum;
+          if (actualRow < 0) continue;
+        } else {
+          const nextPatIdx = p.displayPatternIndex < p.patterns.length - 1 ? p.displayPatternIndex + 1 : 0;
+          actualPattern = p.patterns[nextPatIdx];
+          if (!actualPattern) continue;
+          actualRow = rowNum - p.patternLength;
+          if (actualRow >= actualPattern.length) continue;
+        }
       } else {
-        const nextPatIdx = p.displayPatternIndex < p.patterns.length - 1 ? p.displayPatternIndex + 1 : 0;
-        actualPattern = p.patterns[nextPatIdx];
-        if (!actualPattern) continue;
-        actualRow = rowNum - p.patternLength;
-        if (actualRow >= actualPattern.length) continue;
+        continue;
       }
     }
 
     const isHighlightRow = actualRow % p.rowHighlightInterval === 0;
+    const isActiveRow = rowNum === activeRow && !isGhost;
+    const WHITE = 0xffffff;
     let lineNumText: string;
     if (p.showBeatLabels) {
       const beat = Math.floor(actualRow / p.rowHighlightInterval) + 1;
@@ -385,7 +443,7 @@ function generateLabels(p: RenderParams, vStart: number): LabelData[] {
     }
     labels.push({
       x: 4, y, text: lineNumText,
-      color: isHighlightRow ? p.theme.accentSecondary.color : p.theme.textMuted.color,
+      color: isActiveRow ? WHITE : isHighlightRow ? p.theme.accentSecondary.color : p.theme.textMuted.color,
       fontFamily: PIXI_FONTS.MONO, alpha: isGhost ? 0.35 : undefined,
     });
 
@@ -402,11 +460,10 @@ function generateLabels(p: RenderParams, vStart: number): LabelData[] {
       const baseX = colX + 8;
 
       const noteText = noteToString(cell.note ?? 0, p.noteDisplayOffset);
-      const noteColor = cell.note === 97
-        ? p.theme.cellEffect.color
-        : (cell.note > 0 && cell.note < 97)
-          ? p.theme.cellNote.color
-          : p.theme.cellEmpty.color;
+      const noteColor = isActiveRow ? WHITE
+        : cell.note === 97 ? p.theme.cellEffect.color
+        : (cell.note > 0 && cell.note < 97) ? p.theme.cellNote.color
+        : p.theme.cellEmpty.color;
       if (noteText !== '---' || !p.blankEmpty) {
         labels.push({ x: baseX, y, text: noteText, color: noteColor, fontFamily: PIXI_FONTS.MONO, alpha: isGhost ? 0.35 : undefined });
       }
@@ -418,7 +475,7 @@ function generateLabels(p: RenderParams, vStart: number): LabelData[] {
 
       const insText = cell.instrument > 0 ? hexByte(cell.instrument) : (p.blankEmpty ? '' : '..');
       if (insText) {
-        labels.push({ x: px, y, text: insText, color: cell.instrument > 0 ? p.theme.cellInstrument.color : p.theme.cellEmpty.color, fontFamily: PIXI_FONTS.MONO, alpha: isGhost ? 0.35 : undefined });
+        labels.push({ x: px, y, text: insText, color: isActiveRow ? WHITE : cell.instrument > 0 ? p.theme.cellInstrument.color : p.theme.cellEmpty.color, fontFamily: PIXI_FONTS.MONO, alpha: isGhost ? 0.35 : undefined });
       }
       px += CHAR_WIDTH * 2 + 4;
 
@@ -443,20 +500,20 @@ function generateLabels(p: RenderParams, vStart: number): LabelData[] {
           : (cell.eff5 ?? 0);
         const effText = formatEffect(typ, val, p.useHex);
         if (effText !== '...' || !p.blankEmpty) {
-          labels.push({ x: px, y, text: effText, color: (typ > 0 || val > 0) ? p.theme.cellEffect.color : p.theme.cellEmpty.color, fontFamily: PIXI_FONTS.MONO, alpha: isGhost ? 0.35 : undefined });
+          labels.push({ x: px, y, text: effText, color: isActiveRow ? WHITE : (typ > 0 || val > 0) ? p.theme.cellEffect.color : p.theme.cellEmpty.color, fontFamily: PIXI_FONTS.MONO, alpha: isGhost ? 0.35 : undefined });
         }
         px += CHAR_WIDTH * 3 + 4;
       }
 
       if (p.columnVisibility.flag1 && cell.flag1 !== undefined) {
         const flagChar = cell.flag1 === 1 ? 'A' : cell.flag1 === 2 ? 'S' : '.';
-        const flagColor = cell.flag1 === 1 ? FLAG_COLORS.accent : cell.flag1 === 2 ? FLAG_COLORS.slide : p.theme.cellEmpty.color;
+        const flagColor = isActiveRow ? WHITE : cell.flag1 === 1 ? FLAG_COLORS.accent : cell.flag1 === 2 ? FLAG_COLORS.slide : p.theme.cellEmpty.color;
         labels.push({ x: px, y, text: flagChar, color: flagColor, fontFamily: PIXI_FONTS.MONO, alpha: isGhost ? 0.35 : undefined });
         px += CHAR_WIDTH + 4;
       }
       if (p.columnVisibility.flag2 && cell.flag2 !== undefined) {
         const flagChar = cell.flag2 === 1 ? 'M' : cell.flag2 === 2 ? 'H' : '.';
-        const flagColor = cell.flag2 === 1 ? FLAG_COLORS.mute : cell.flag2 === 2 ? FLAG_COLORS.hammer : p.theme.cellEmpty.color;
+        const flagColor = isActiveRow ? WHITE : cell.flag2 === 1 ? FLAG_COLORS.mute : cell.flag2 === 2 ? FLAG_COLORS.hammer : p.theme.cellEmpty.color;
         labels.push({ x: px, y, text: flagChar, color: flagColor, fontFamily: PIXI_FONTS.MONO, alpha: isGhost ? 0.35 : undefined });
         px += CHAR_WIDTH + 4;
       }
@@ -466,7 +523,7 @@ function generateLabels(p: RenderParams, vStart: number): LabelData[] {
           ? (p.useHex ? HEX_TABLE[cell.probability & 0xFF] : DEC_TABLE[cell.probability & 0xFF])
           : (p.blankEmpty ? '' : '..');
         if (probText) {
-          labels.push({ x: px, y, text: probText, color: cell.probability > 0 ? probColor(cell.probability) : p.theme.cellEmpty.color, fontFamily: PIXI_FONTS.MONO, alpha: isGhost ? 0.35 : undefined });
+          labels.push({ x: px, y, text: probText, color: isActiveRow ? WHITE : cell.probability > 0 ? probColor(cell.probability) : p.theme.cellEmpty.color, fontFamily: PIXI_FONTS.MONO, alpha: isGhost ? 0.35 : undefined });
         }
       }
     }
@@ -973,7 +1030,13 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
   // ── Pixi ticker for playback tracking ──────────────────────────────────────
   // Runs inside Pixi's own ticker, BEFORE each render. Eliminates jitter from
   // unsynchronized RAF loops and ensures layout engine can't reset our offset.
-  useTick(() => {
+  const halfFrameRef = useRef(0.008); // ~half of 60fps frame, refined each tick
+  useTick((ticker) => {
+    // Adaptive half-frame lookahead: centers timing error so row changes appear
+    // at the perceptually correct moment (max error = ±half frame instead of 0..full frame).
+    const dtSec = ticker.deltaMS / 1000;
+    halfFrameRef.current = halfFrameRef.current * 0.9 + (dtSec * 0.5) * 0.1; // EMA smooth
+
     const { isPlaying: playing, smoothScrolling: smooth } = useTransportStore.getState();
     
     // PERF: Early return when idle - skip expensive store reads
@@ -989,17 +1052,19 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
     
     // Only read other stores when actually playing
     const replayer = getTrackerReplayer();
-    const audioTime = Tone.now() + 0.01;
+    const audioTime = Tone.now() + halfFrameRef.current;
     const audioState = replayer.getStateAtTime(audioTime);
     const ts = useTrackerStore.getState();
 
     let newRow: number;
     let newOffset: number;
     let newPattern: number;
+    let newSongPosition = -1;
 
     if (audioState) {
       newRow = audioState.row;
       newPattern = audioState.pattern;
+      newSongPosition = audioState.position;
       newOffset = 0;
       if (smooth) {
         // Recalculate row duration on row change OR when cached value is 0 (first frame)
@@ -1029,6 +1094,28 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
     smoothOffsetRef.current = newOffset;
     if (gridScrollContainerRef.current) gridScrollContainerRef.current.pivot.y = newOffset;
 
+    // During smooth scrolling, update highlight/caret Y every frame to compensate
+    // for pivot.y changes (they're inside the scroll container but must appear fixed).
+    if (newOffset > 0) {
+      const p = renderParamsRef.current;
+      const cursor = cursorRef.current;
+      const currentRow = p.isPlaying ? p.playbackRow : cursor.rowIndex;
+      const vs = currentRow - p.topLines;
+      const gHighlight = highlightGraphicsRef.current;
+      if (gHighlight) {
+        gHighlight.clear();
+        const centerY = p.baseY + (currentRow - vs) * p.rowHeight + newOffset;
+        if (centerY >= 0 && centerY < p.gridHeight + newOffset) {
+          gHighlight.rect(0, centerY, p.width, p.rowHeight);
+          gHighlight.fill({ color: p.theme.accentGlow.color, alpha: p.trackerVisualBg ? 0.5 : p.theme.accentGlow.alpha });
+        }
+      }
+      const gCaret = cursorCaretRef.current;
+      if (gCaret) renderCursorCaret(gCaret, p, cursor, vs, newOffset);
+      const gChHighlight = channelHighlightRef.current;
+      if (gChHighlight) renderChannelHighlight(gChHighlight, p, cursor, newOffset);
+    }
+
     if (newRow !== prevRowRef.current || newPattern !== prevPatternRef.current) {
       // Debug: log row timing to detect visual groove/swing
       if (typeof window !== 'undefined' && (window as any).SCROLL_DEBUG && audioState) {
@@ -1045,10 +1132,25 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
       const patternChanged = newPattern !== prevPatternRef.current;
       prevRowRef.current = newRow;
       prevPatternRef.current = newPattern;
-      renderParamsRef.current = {
-        ...renderParamsRef.current,
+      // Patch render params imperatively — on pattern change, also swap the
+      // displayPattern/displayPatternIndex/patternLength so the imperative
+      // redraw draws from the NEW pattern data in this same frame, instead of
+      // waiting for React to re-render (which causes a 1-3 frame "pause").
+      const patchedParams: Partial<RenderParams> = {
         playbackRow: newRow,
         playbackPatternIdx: newPattern,
+        songPosition: newSongPosition,
+        smoothScrollActive: smooth,
+      };
+      if (patternChanged) {
+        const newDisplayPattern = patterns[newPattern] ?? renderParamsRef.current.displayPattern;
+        patchedParams.displayPattern = newDisplayPattern;
+        patchedParams.displayPatternIndex = newPattern;
+        patchedParams.patternLength = newDisplayPattern?.length ?? 64;
+      }
+      renderParamsRef.current = {
+        ...renderParamsRef.current,
+        ...patchedParams,
       };
       fullRedrawRef.current = true;
       imperativeRedrawRef.current?.();
@@ -1096,6 +1198,10 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
     channelMuted, channelSolo, useHex, blankEmpty, showBeatLabels, columnVisibility,
     currentPatternIndex, playbackRow: playbackRowRef.current, playbackPatternIdx,
     noteDisplayOffset: getTrackerReplayer().getSong()?.noteDisplayOffset ?? 0,
+    smoothScrollActive: false,
+    songPosition: -1,
+    songPositions: getTrackerReplayer().getSong()?.songPositions ?? [],
+    songLength: getTrackerReplayer().getSong()?.songPositions?.length ?? 0,
   };
 
   // ── Imperative redraw — called from subscription (cursor) and useEffect (other deps) ──
@@ -1122,22 +1228,22 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
       prevChannelRef.current = cursor.channelIndex;
       const gGrid = gridGraphicsRef.current;
       if (gGrid) renderGrid(gGrid, p, vStart);
-      if (mega) mega.updateLabels(generateLabels(p, vStart));
+      if (mega) mega.updateLabels(generateLabels(p, vStart, currentRow));
       const gOverlay = overlayGraphicsRef.current;
       if (gOverlay) renderOverlay(gOverlay, p, cursor, selection, vStart, currentRow,
         peerCursorRef.current, peerSelectionRef.current);
       const gChHighlight0 = channelHighlightRef.current;
-      if (gChHighlight0) renderChannelHighlight(gChHighlight0, p, cursor);
+      if (gChHighlight0) renderChannelHighlight(gChHighlight0, p, cursor, smoothOffsetRef.current);
     } else if (vStartChanged) {
       prevVStartRef.current = vStart;
       prevSelectionRef.current = selection;
       prevChannelRef.current = cursor.channelIndex;
-      if (mega) mega.updateLabels(generateLabels(p, vStart));
+      if (mega) mega.updateLabels(generateLabels(p, vStart, currentRow));
       const gOverlay = overlayGraphicsRef.current;
       if (gOverlay) renderOverlay(gOverlay, p, cursor, selection, vStart, currentRow,
         peerCursorRef.current, peerSelectionRef.current);
       const gChHighlight = channelHighlightRef.current;
-      if (gChHighlight) renderChannelHighlight(gChHighlight, p, cursor);
+      if (gChHighlight) renderChannelHighlight(gChHighlight, p, cursor, smoothOffsetRef.current);
     } else if (selectionChanged || channelChanged) {
       // Selection or active channel changed but viewport didn't scroll —
       // redraw overlay (selection) and channel highlight
@@ -1147,22 +1253,21 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
       if (gOverlay) renderOverlay(gOverlay, p, cursor, selection, vStart, currentRow,
         peerCursorRef.current, peerSelectionRef.current);
       const gChHighlight = channelHighlightRef.current;
-      if (gChHighlight) renderChannelHighlight(gChHighlight, p, cursor);
+      if (gChHighlight) renderChannelHighlight(gChHighlight, p, cursor, smoothOffsetRef.current);
     }
     // When only cursor row moved within same viewport+channel, skip everything
     // except the cursor caret (one rect clear+draw).
 
-    // Cursor caret — always redraws (cheapest possible: clear + 1 rect)
+    // Cursor caret — always redraws (cheapest possible: clear + 1 rect).
+    // Now inside the scroll container, so offset by pivot.y to stay visually fixed.
     const gCaret = cursorCaretRef.current;
-    if (gCaret) renderCursorCaret(gCaret, p, cursor, vStart);
+    if (gCaret) renderCursorCaret(gCaret, p, cursor, vStart, smoothOffsetRef.current);
 
-    // Fixed center-line highlight — drawn outside the scroll container so it stays
-    // fixed during smooth scrolling while content scrolls via pivot.y
+    // Center-line highlight — inside scroll container, offset by pivot.y to appear fixed.
     const gHighlight = highlightGraphicsRef.current;
     if (gHighlight) {
       gHighlight.clear();
-      const centerY = p.baseY + (currentRow - vStart) * p.rowHeight;
-      // Only draw if highlight is within visible grid area
+      const centerY = p.baseY + (currentRow - vStart) * p.rowHeight + smoothOffsetRef.current;
       if (centerY >= 0 && centerY < p.gridHeight) {
         gHighlight.rect(0, centerY, p.width, p.rowHeight);
         gHighlight.fill({ color: p.theme.accentGlow.color, alpha: p.trackerVisualBg ? 0.5 : p.theme.accentGlow.alpha });
@@ -1648,18 +1753,14 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
         >
           <pixiGraphics ref={gridGraphicsRef} draw={() => {}} layout={gridGraphicsLayout} />
           <pixiGraphics ref={overlayGraphicsRef} draw={() => {}} layout={gridGraphicsLayout} />
+          {/* Center-line highlight + cursor caret draw BEHIND text (MegaText added last, imperatively).
+              Their Y is offset by smoothOffsetRef.current so they appear fixed during smooth scrolling. */}
+          <pixiGraphics ref={channelHighlightRef} draw={() => {}} layout={gridGraphicsLayout} />
+          <pixiGraphics ref={highlightGraphicsRef} draw={() => {}} layout={gridGraphicsLayout} />
+          <pixiGraphics ref={cursorCaretRef} draw={() => {}} layout={gridGraphicsLayout} />
 
-          {/* MegaText added imperatively to gridScrollContainerRef */}
+          {/* MegaText added imperatively — renders ON TOP of highlight and caret */}
         </pixiContainer>
-
-        {/* Fixed channel highlight — outside scroll container so it covers the full visible area */}
-        <pixiGraphics ref={channelHighlightRef} draw={() => {}} layout={gridGraphicsLayout} eventMode="none" />
-
-        {/* Fixed center-line highlight — outside scroll container so it stays fixed during smooth scrolling */}
-        <pixiGraphics ref={highlightGraphicsRef} draw={() => {}} layout={gridGraphicsLayout} eventMode="none" />
-
-        {/* Cursor caret — on top of highlight bar so it's never obscured */}
-        <pixiGraphics ref={cursorCaretRef} draw={() => {}} layout={gridGraphicsLayout} eventMode="none" />
 
         {/* Drag-and-drop highlight overlay — pure GL, visible during instrument drag */}
         <pixiGraphics
