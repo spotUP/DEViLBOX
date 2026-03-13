@@ -890,7 +890,12 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
 
   // Playback row tracking — smooth offset is imperative (no React state)
   const playbackRowRef = useRef(0);
-  const [playbackPatternIdx, setPlaybackPatternIdx] = useState(0);
+  // Pattern index during playback — stored as ref to avoid React re-render cascade.
+  // The RAF loop handles all visual updates imperatively; a React state change here
+  // would trigger: re-render → renderParamsRef overwrite → useEffect → redundant
+  // fullRedraw (grid + 300-600 labels + overlay), causing visible stutter at pattern
+  // boundaries. The ref is synced back to displayPatternIndex when playback stops.
+  const playbackPatternIdxRef = useRef(0);
   const smoothOffsetRef = useRef(0);          // frame-rate smooth offset — NO React state
   const gridContainerRef = useRef<ContainerType | null>(null);       // outer grid container (for drag coord conversion)
   const gridScrollContainerRef = useRef<ContainerType | null>(null); // inner scroll container
@@ -1045,16 +1050,31 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
       const patternChanged = newPattern !== prevPatternRef.current;
       prevRowRef.current = newRow;
       prevPatternRef.current = newPattern;
+
+      // When pattern changes, update displayPattern/patternLength imperatively
+      // so the immediate redraw uses correct data. Without this, the React
+      // state update (setPlaybackPatternIdx) takes 1-3 frames to propagate,
+      // causing a visible flash of stale pattern data at transitions.
+      const extra: Partial<RenderParams> = patternChanged
+        ? (() => {
+            const newPat = ts.patterns[newPattern];
+            return newPat
+              ? { displayPattern: newPat, displayPatternIndex: newPattern, patternLength: newPat.length }
+              : {};
+          })()
+        : {};
+
       renderParamsRef.current = {
         ...renderParamsRef.current,
         playbackRow: newRow,
         playbackPatternIdx: newPattern,
+        ...extra,
       };
       fullRedrawRef.current = true;
       imperativeRedrawRef.current?.();
       playbackRowRef.current = newRow;
       if (patternChanged) {
-        setPlaybackPatternIdx(newPattern);
+        playbackPatternIdxRef.current = newPattern;
       }
     }
   });
@@ -1065,9 +1085,9 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
   // re-render. This 1-3 frame timing gap caused visible jumps at pattern transitions
   // because currentRow would be from the new pattern while pattern data was still old.
   const displayPattern = isPlaying
-    ? (patterns[playbackPatternIdx] ?? pattern)
+    ? (patterns[playbackPatternIdxRef.current] ?? pattern)
     : pattern;
-  const displayPatternIndex = isPlaying ? playbackPatternIdx : currentPatternIndex;
+  const displayPatternIndex = isPlaying ? playbackPatternIdxRef.current : currentPatternIndex;
 
   // ── Visible range ─────────────────────────────────────────────────────────
   const scrollbarHeight = allChannelsFit ? 0 : SCROLLBAR_HEIGHT;
@@ -1094,7 +1114,7 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
     displayPattern, displayPatternIndex, patterns, isPlaying, recordMode,
     scrollLeft: scrollLeftRef.current, rowHeight, rowHighlightInterval,
     channelMuted, channelSolo, useHex, blankEmpty, showBeatLabels, columnVisibility,
-    currentPatternIndex, playbackRow: playbackRowRef.current, playbackPatternIdx,
+    currentPatternIndex, playbackRow: playbackRowRef.current, playbackPatternIdx: playbackPatternIdxRef.current,
     noteDisplayOffset: getTrackerReplayer().getSong()?.noteDisplayOffset ?? 0,
   };
 
@@ -1199,7 +1219,7 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
       showGhostPatterns, trackerVisualBg, numChannels, channelOffsets, channelWidths,
       displayPattern, displayPatternIndex, patterns, isPlaying, recordMode, scrollLeft,
       rowHeight, rowHighlightInterval, channelMuted, channelSolo, useHex, blankEmpty,
-      showBeatLabels, columnVisibility, currentPatternIndex, playbackPatternIdx,
+      showBeatLabels, columnVisibility, currentPatternIndex,
       imperativeRedraw]);
 
   // ── Click → cell mapping ──────────────────────────────────────────────────
