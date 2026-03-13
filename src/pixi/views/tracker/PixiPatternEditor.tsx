@@ -449,6 +449,9 @@ function generateLabels(p: RenderParams, vStart: number, activeRow = -1): LabelD
     // passed (smaller rowNum = visually above) fade out. Rows ahead get no glow.
     const behind = activeRow >= 0 && !isGhost ? activeRow - rowNum : -1;
     const glow = behind >= 0 && behind <= TRAIL_ROWS ? 1 - behind / TRAIL_ROWS : 0;
+    // Only highlight cells that actually have content — empty positions stay dim
+    const glowFor = (has: boolean) => has ? glow : 0;
+    const fontFor = (has: boolean) => has && behind === 0 ? PIXI_FONTS.MONO_BOLD : PIXI_FONTS.MONO;
     const font = behind === 0 ? PIXI_FONTS.MONO_BOLD : PIXI_FONTS.MONO;
     let lineNumText: string;
     if (p.showBeatLabels) {
@@ -479,12 +482,13 @@ function generateLabels(p: RenderParams, vStart: number, activeRow = -1): LabelD
       const baseX = colX + 8;
 
       const noteText = noteToString(cell.note ?? 0, p.noteDisplayOffset);
+      const noteHasContent = cell.note > 0;
       const noteColor = lerpWhite(
         cell.note === 97 ? p.theme.cellEffect.color
         : (cell.note > 0 && cell.note < 97) ? p.theme.cellNote.color
-        : p.theme.cellEmpty.color, glow);
+        : p.theme.cellEmpty.color, glowFor(noteHasContent));
       if (noteText !== '---' || !p.blankEmpty) {
-        labels.push({ x: baseX, y, text: noteText, color: noteColor, fontFamily: font, alpha: isGhost ? 0.35 : undefined });
+        labels.push({ x: baseX, y, text: noteText, color: noteColor, fontFamily: fontFor(noteHasContent), alpha: isGhost ? 0.35 : undefined });
       }
 
       if (isCollapsed) continue;
@@ -494,14 +498,14 @@ function generateLabels(p: RenderParams, vStart: number, activeRow = -1): LabelD
 
       const insText = cell.instrument > 0 ? hexByte(cell.instrument) : (p.blankEmpty ? '' : '..');
       if (insText) {
-        labels.push({ x: px, y, text: insText, color: lerpWhite(cell.instrument > 0 ? p.theme.cellInstrument.color : p.theme.cellEmpty.color, glow), fontFamily: font, alpha: isGhost ? 0.35 : undefined });
+        labels.push({ x: px, y, text: insText, color: lerpWhite(cell.instrument > 0 ? p.theme.cellInstrument.color : p.theme.cellEmpty.color, glowFor(cell.instrument > 0)), fontFamily: fontFor(cell.instrument > 0), alpha: isGhost ? 0.35 : undefined });
       }
       px += CHAR_WIDTH * 2 + 4;
 
       const volValid = cell.volume >= 0x10 && cell.volume <= 0x50;
       const volText = volValid ? hexByte(cell.volume) : (p.blankEmpty ? '' : '..');
       if (volText) {
-        labels.push({ x: px, y, text: volText, color: lerpWhite(volValid ? p.theme.cellVolume.color : p.theme.cellEmpty.color, glow), fontFamily: font, alpha: isGhost ? 0.35 : undefined });
+        labels.push({ x: px, y, text: volText, color: lerpWhite(volValid ? p.theme.cellVolume.color : p.theme.cellEmpty.color, glowFor(volValid)), fontFamily: fontFor(volValid), alpha: isGhost ? 0.35 : undefined });
       }
       px += CHAR_WIDTH * 2 + 4;
 
@@ -519,21 +523,24 @@ function generateLabels(p: RenderParams, vStart: number, activeRow = -1): LabelD
           : (cell.eff5 ?? 0);
         const effText = formatEffect(typ, val, p.useHex);
         if (effText !== '...' || !p.blankEmpty) {
-          labels.push({ x: px, y, text: effText, color: lerpWhite((typ > 0 || val > 0) ? p.theme.cellEffect.color : p.theme.cellEmpty.color, glow), fontFamily: font, alpha: isGhost ? 0.35 : undefined });
+          const effHasContent = typ > 0 || val > 0;
+          labels.push({ x: px, y, text: effText, color: lerpWhite(effHasContent ? p.theme.cellEffect.color : p.theme.cellEmpty.color, glowFor(effHasContent)), fontFamily: fontFor(effHasContent), alpha: isGhost ? 0.35 : undefined });
         }
         px += CHAR_WIDTH * 3 + 4;
       }
 
       if (p.columnVisibility.flag1 && cell.flag1 !== undefined) {
         const flagChar = cell.flag1 === 1 ? 'A' : cell.flag1 === 2 ? 'S' : '.';
-        const flagColor = lerpWhite(cell.flag1 === 1 ? FLAG_COLORS.accent : cell.flag1 === 2 ? FLAG_COLORS.slide : p.theme.cellEmpty.color, glow);
-        labels.push({ x: px, y, text: flagChar, color: flagColor, fontFamily: font, alpha: isGhost ? 0.35 : undefined });
+        const flag1HasContent = cell.flag1 === 1 || cell.flag1 === 2;
+        const flagColor = lerpWhite(cell.flag1 === 1 ? FLAG_COLORS.accent : cell.flag1 === 2 ? FLAG_COLORS.slide : p.theme.cellEmpty.color, glowFor(flag1HasContent));
+        labels.push({ x: px, y, text: flagChar, color: flagColor, fontFamily: fontFor(flag1HasContent), alpha: isGhost ? 0.35 : undefined });
         px += CHAR_WIDTH + 4;
       }
       if (p.columnVisibility.flag2 && cell.flag2 !== undefined) {
         const flagChar = cell.flag2 === 1 ? 'M' : cell.flag2 === 2 ? 'H' : '.';
-        const flagColor = lerpWhite(cell.flag2 === 1 ? FLAG_COLORS.mute : cell.flag2 === 2 ? FLAG_COLORS.hammer : p.theme.cellEmpty.color, glow);
-        labels.push({ x: px, y, text: flagChar, color: flagColor, fontFamily: font, alpha: isGhost ? 0.35 : undefined });
+        const flag2HasContent = cell.flag2 === 1 || cell.flag2 === 2;
+        const flagColor = lerpWhite(cell.flag2 === 1 ? FLAG_COLORS.mute : cell.flag2 === 2 ? FLAG_COLORS.hammer : p.theme.cellEmpty.color, glowFor(flag2HasContent));
+        labels.push({ x: px, y, text: flagChar, color: flagColor, fontFamily: fontFor(flag2HasContent), alpha: isGhost ? 0.35 : undefined });
         px += CHAR_WIDTH + 4;
       }
 
@@ -542,7 +549,7 @@ function generateLabels(p: RenderParams, vStart: number, activeRow = -1): LabelD
           ? (p.useHex ? HEX_TABLE[cell.probability & 0xFF] : DEC_TABLE[cell.probability & 0xFF])
           : (p.blankEmpty ? '' : '..');
         if (probText) {
-          labels.push({ x: px, y, text: probText, color: lerpWhite(cell.probability > 0 ? probColor(cell.probability) : p.theme.cellEmpty.color, glow), fontFamily: font, alpha: isGhost ? 0.35 : undefined });
+          labels.push({ x: px, y, text: probText, color: lerpWhite(cell.probability > 0 ? probColor(cell.probability) : p.theme.cellEmpty.color, glowFor(cell.probability > 0)), fontFamily: fontFor(cell.probability > 0), alpha: isGhost ? 0.35 : undefined });
         }
       }
     }
