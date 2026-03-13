@@ -117,7 +117,6 @@ export function parseMIDILoricielFile(buffer: ArrayBuffer, filename: string): Tr
     name: `${moduleName} [MIDI Loriciel]`, format: 'MOD' as TrackerFormat,
     patterns: [pattern], instruments, songPositions: [0],
     songLength: 1, restartPosition: 0, numChannels: 4,
-    initialSpeed: 6, initialBPM: 125, linearPeriods: false,
-    uadePatternLayout: true,
+    initialSpeed: 6, initialBPM: 125, linearPeriods: false, uadePatternLayout: true,
   };
 }
