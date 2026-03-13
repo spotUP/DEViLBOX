@@ -91,7 +91,7 @@ export async function parseOrganyaFile(
 
   return {
     name: `${baseName} [Organya]`,
-    format: 'MOD' as TrackerFormat,
+    format: 'Organya' as TrackerFormat,
     patterns: [pattern],
     instruments,
     songPositions: [0],

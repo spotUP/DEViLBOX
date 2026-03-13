@@ -132,6 +132,7 @@ interface AstSample {
   loopLength: number;  // in words
   pcm: Int8Array | null;
   arpeggioListNumber: number;
+  effectSpeed: number;
 }
 
 interface AstInstrument {
@@ -379,10 +380,11 @@ function parseInternal(bytes: Uint8Array, filename: string): TrackerSong | null 
     const loopStart = u16BE(bytes, base + 6);
     const loopLength = u16BE(bytes, base + 8);
     const effectLength = u16BE(bytes, base + 12);
+    const effectSpeed = u16BE(bytes, base + 14);
     const arpeggioListNumber = (effectLength >> 8) & 0xff;
     const name = readAmigaString(bytes, base + 32, 32);
 
-    samples.push({ name, length, loopStart, loopLength, pcm: null, arpeggioListNumber });
+    samples.push({ name, length, loopStart, loopLength, pcm: null, arpeggioListNumber, effectSpeed });
   }
 
   // ── Tracks ─────────────────────────────────────────────────────────────
@@ -447,7 +449,7 @@ function parseInternal(bytes: Uint8Array, filename: string): TrackerSong | null 
       const pcmBytes = new Uint8Array(sample.pcm.buffer);
       // Sample stored as signed 8-bit; createSamplerInstrument expects Uint8Array
       // (it will interpret as signed internally — consistent with other parsers)
-      const period = PERIODS[PERIOD_TABLE_REFERENCE_IDX] || 856;
+      const period = sample.effectSpeed > 0 ? sample.effectSpeed : (PERIODS[PERIOD_TABLE_REFERENCE_IDX] || 856);
       const sampleRate = periodToRate(period);
       const loopStart = sample.loopLength > 1 ? sample.loopStart * 2 : 0;
       const loopEnd = sample.loopLength > 1 ? (sample.loopStart + sample.loopLength) * 2 : 0;

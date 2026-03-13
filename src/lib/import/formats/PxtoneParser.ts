@@ -112,7 +112,7 @@ export async function parsePxtoneFile(
 
   return {
     name: `${baseName} [PxTone]`,
-    format: 'MOD' as TrackerFormat,
+    format: 'PxTone' as TrackerFormat,
     patterns: [pattern],
     instruments,
     songPositions: [0],
