@@ -449,11 +449,24 @@ export function parseMusicLineFile(data: Uint8Array): TrackerSong | null {
       if (silentPatIdx < 0) {
         silentPatIdx = patterns.length;
         const silentRows = patterns.length > 0 ? patterns[0].length : 64;
-        const silentPat: Pattern = Array.from({ length: silentRows }, () => [{
-          note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0
-        }]);
-        (silentPat as any).patternIndex = silentPatIdx;
-        patterns.push(silentPat);
+        const silentChannel: ChannelData = {
+          id: 'channel-0',
+          name: 'Voice',
+          muted: false,
+          solo: false,
+          collapsed: false,
+          volume: 100,
+          pan: 0,
+          instrumentId: null,
+          color: null,
+          rows: Array.from({ length: silentRows }, () => createEmptyCell()),
+        };
+        patterns.push({
+          id: `silent-${silentPatIdx}`,
+          name: 'Silent',
+          channels: [silentChannel],
+          length: silentRows,
+        });
       }
       // Point to silent pattern for as many positions as the longest channel
       return [];  // Will be filled below after we know maxLen
