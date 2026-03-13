@@ -6,7 +6,8 @@
  */
 
 import type { TrackerSong } from '@/engine/TrackerReplayer';
-import type { Pattern, TrackerCell, InstrumentConfig } from '@/types';
+import type { Pattern, TrackerCell, ChannelData } from '@/types';
+import type { InstrumentConfig } from '@/types/instrument';
 import { DefleMaskParser, type DMFModule, type DMFNote } from '@lib/import/formats/DefleMaskParser';
 
 /**
@@ -26,23 +27,37 @@ export function parseDefleMaskToTrackerSong(buffer: ArrayBuffer, fileName: strin
     const patIdx = patterns.length;
     songPositions.push(patIdx);
 
-    const pattern: Pattern = Array.from({ length: numRows }, (_, row) => {
-      const rowCells: TrackerCell[] = [];
+    // Build channels for this pattern
+    const channels: ChannelData[] = Array.from({ length: numChannels }, (_, ch) => {
+      const patNum = dmf.patternMatrix[ch]?.[matrixPos] ?? 0;
+      const patternOffset = ch * dmf.matrixRows + patNum;
+      const dmfPat = dmf.patterns[patternOffset];
 
-      for (let ch = 0; ch < numChannels; ch++) {
-        const patNum = dmf.patternMatrix[ch]?.[matrixPos] ?? 0;
-        // Patterns stored: all for ch0, then all for ch1, etc.
-        const patternOffset = ch * dmf.matrixRows + patNum;
-        const dmfPat = dmf.patterns[patternOffset];
+      const rows: TrackerCell[] = Array.from({ length: numRows }, (__, row) => {
         const dmfNote = dmfPat?.rows?.[row]?.[ch];
+        return convertDMFNote(dmfNote);
+      });
 
-        rowCells.push(convertDMFNote(dmfNote));
-      }
-
-      return rowCells;
+      return {
+        id: `channel-${ch}`,
+        name: `Ch ${ch + 1}`,
+        muted: false,
+        solo: false,
+        collapsed: false,
+        volume: 100,
+        pan: 0,
+        instrumentId: null,
+        color: null,
+        rows,
+      };
     });
 
-    patterns.push(pattern);
+    patterns.push({
+      id: `pattern-${patIdx}`,
+      name: `Pattern ${patIdx}`,
+      channels,
+      length: numRows,
+    });
   }
 
   // Build instruments as ChipSynth placeholders
@@ -86,7 +101,7 @@ export function parseDefleMaskToTrackerSong(buffer: ArrayBuffer, fileName: strin
 function convertDMFNote(dmfNote: DMFNote | undefined): TrackerCell {
   const cell: TrackerCell = {
     note: 0, instrument: 0, volume: 0,
-    effTyp: 0, eff: 0,
+    effTyp: 0, eff: 0, effTyp2: 0, eff2: 0,
   };
 
   if (!dmfNote) return cell;
