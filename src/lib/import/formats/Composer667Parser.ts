@@ -358,5 +358,6 @@ function _parse669(bytes: Uint8Array, filename: string): TrackerSong | null {
     initialBPM:      125,
     linearPeriods:   false,
     uadePatternLayout,
+    libopenmptFileData: bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength),
   };
 }
