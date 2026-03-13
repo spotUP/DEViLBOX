@@ -196,6 +196,21 @@ export async function parseICEFile(buffer: ArrayBuffer, filename: string): Promi
 
   const trackerPatterns: Pattern[] = [];
 
+  // ── Find actual pattern length by scanning for last meaningful row ─────────
+  function getActualPatternLength(chans: ChannelData[]): number {
+    let lastRow = -1;
+    for (let row = 0; row < (chans[0]?.rows.length ?? 0); row++) {
+      for (const ch of chans) {
+        const c = ch.rows[row];
+        if (c.note !== 0 || c.instrument !== 0 || c.effTyp !== 0 || c.eff !== 0) {
+          lastRow = row;
+          break;
+        }
+      }
+    }
+    return lastRow >= 0 ? lastRow + 1 : 1;
+  }
+
   for (let orderIdx = 0; orderIdx < numOrders; orderIdx++) {
     const channels: ChannelData[] = Array.from({ length: NUM_CHANNELS }, (_, ch) => {
       const trackIdx = trackRefs[orderIdx * 4 + ch];
@@ -232,7 +247,7 @@ export async function parseICEFile(buffer: ArrayBuffer, filename: string): Promi
     trackerPatterns.push({
       id: `pattern-${orderIdx}`,
       name: `Pattern ${orderIdx}`,
-      length: ROWS_PER_TRACK,
+      length: getActualPatternLength(channels),
       channels,
       importMetadata: {
         sourceFormat: 'ICE',
