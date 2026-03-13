@@ -637,7 +637,7 @@ export class TrackerGLRenderer {
       // Line number — use pre-computed hex/dec tables
       // Glow trails behind the playhead: active row = white, rows above fade out
       const TRAIL_ROWS = 3;
-      const behind = !isGhostRow ? currentRow - i : -1;
+      const behind = isPlaying && !isGhostRow ? currentRow - i : -1;
       const glow = behind >= 0 && behind <= TRAIL_ROWS ? 1 - behind / TRAIL_ROWS : 0;
       const bold = behind === 0; // bold on the exact active row
       let lineNumStr: string;
@@ -669,21 +669,23 @@ export class TrackerGLRenderer {
         const gy = y + (rowH - atlas.glyphLogicalHeight) / 2;
 
         if (isCollapsed) {
-          const nc = lerpWhiteRGBA(cell.note === 0 ? colors.textMuted : colors.textNote, glow);
+          const noteHas = (cell.note ?? 0) > 0;
+          const nc = lerpWhiteRGBA(noteHas ? colors.textNote : colors.textMuted, noteHas ? glow : 0);
           this.setTmpColor(nc, ghostAlpha);
-          this.addGlyphString(noteTable[cell.note ?? 0] ?? '---', x, gy, atlas, this.tmpColor, bold);
+          this.addGlyphString(noteTable[cell.note ?? 0] ?? '---', x, gy, atlas, this.tmpColor, noteHas && bold);
           continue;
         }
 
         // Note — use pre-computed note table
         const cellNote = cell.note ?? 0;
         if (!ui.blankEmpty || cellNote !== 0) {
+          const noteHas = cellNote > 0;
           const nc = lerpWhiteRGBA(
                    cellNote === 0 ? colors.textMuted
                    : cellNote === 97 ? colors.textEffect
-                   : colors.textNote, glow);
+                   : colors.textNote, noteHas ? glow : 0);
           this.setTmpColor(nc, ghostAlpha);
-          this.addGlyphString(noteTable[cellNote] ?? '---', x, gy, atlas, this.tmpColor, bold);
+          this.addGlyphString(noteTable[cellNote] ?? '---', x, gy, atlas, this.tmpColor, noteHas && bold);
         }
 
         // Parameters
@@ -696,8 +698,8 @@ export class TrackerGLRenderer {
           this.setTmpColor(lerpWhiteRGBA(colors.textInstrument, glow), ghostAlpha);
           this.addGlyphString(HEX_TABLE[inst & 0xFF], px, gy, atlas, this.tmpColor, bold);
         } else if (!ui.blankEmpty) {
-          this.setTmpColor(lerpWhiteRGBA(colors.textMuted, glow), ghostAlpha);
-          this.addGlyphString('..', px, gy, atlas, this.tmpColor, bold);
+          this.setTmpColor(lerpWhiteRGBA(colors.textMuted, 0), ghostAlpha);
+          this.addGlyphString('..', px, gy, atlas, this.tmpColor, false);
         }
         px += CHAR_WIDTH * 2 + 4;
 
@@ -708,8 +710,8 @@ export class TrackerGLRenderer {
           this.setTmpColor(lerpWhiteRGBA(colors.textVolume, glow), ghostAlpha);
           this.addGlyphString(HEX_TABLE[vol & 0xFF], px, gy, atlas, this.tmpColor, bold);
         } else if (!ui.blankEmpty) {
-          this.setTmpColor(lerpWhiteRGBA(colors.textMuted, glow), ghostAlpha);
-          this.addGlyphString('..', px, gy, atlas, this.tmpColor, bold);
+          this.setTmpColor(lerpWhiteRGBA(colors.textMuted, 0), ghostAlpha);
+          this.addGlyphString('..', px, gy, atlas, this.tmpColor, false);
         }
         px += CHAR_WIDTH * 2 + 4;
 
@@ -728,8 +730,8 @@ export class TrackerGLRenderer {
             this.setTmpColor(lerpWhiteRGBA(colors.textEffect, glow), ghostAlpha);
             this.addGlyphString((EFFECT_CHARS[colEffTyp] ?? '?') + HEX_TABLE[colEff & 0xFF], px, gy, atlas, this.tmpColor, bold);
           } else if (!ui.blankEmpty) {
-            this.setTmpColor(lerpWhiteRGBA(colors.textMuted, glow), ghostAlpha);
-            this.addGlyphString('...', px, gy, atlas, this.tmpColor, bold);
+            this.setTmpColor(lerpWhiteRGBA(colors.textMuted, 0), ghostAlpha);
+            this.addGlyphString('...', px, gy, atlas, this.tmpColor, false);
           }
           px += CHAR_WIDTH * 3 + 4;
         }
@@ -745,8 +747,8 @@ export class TrackerGLRenderer {
             else if (flagVal === 3) { flagStr = 'M'; fc = colors.flagMute; }
             else if (flagVal === 4) { flagStr = 'H'; fc = colors.flagHammer; }
             if (flagVal || !ui.blankEmpty) {
-              this.setTmpColor(lerpWhiteRGBA(fc, glow), ghostAlpha);
-              this.addGlyphString(flagStr, fx, gy, atlas, this.tmpColor, bold);
+              this.setTmpColor(lerpWhiteRGBA(fc, flagVal ? glow : 0), ghostAlpha);
+              this.addGlyphString(flagStr, fx, gy, atlas, this.tmpColor, !!flagVal && bold);
             }
           };
           drawFlag(cell.flag1, px);

@@ -1254,7 +1254,7 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
       prevChannelRef.current = cursor.channelIndex;
       const gGrid = gridGraphicsRef.current;
       if (gGrid) renderGrid(gGrid, p, vStart);
-      if (mega) mega.updateLabels(generateLabels(p, vStart, currentRow));
+      if (mega) mega.updateLabels(generateLabels(p, vStart, p.isPlaying ? currentRow : -1));
       const gOverlay = overlayGraphicsRef.current;
       if (gOverlay) renderOverlay(gOverlay, p, cursor, selection, vStart, currentRow,
         peerCursorRef.current, peerSelectionRef.current);
@@ -1264,7 +1264,7 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
       prevVStartRef.current = vStart;
       prevSelectionRef.current = selection;
       prevChannelRef.current = cursor.channelIndex;
-      if (mega) mega.updateLabels(generateLabels(p, vStart, currentRow));
+      if (mega) mega.updateLabels(generateLabels(p, vStart, p.isPlaying ? currentRow : -1));
       const gOverlay = overlayGraphicsRef.current;
       if (gOverlay) renderOverlay(gOverlay, p, cursor, selection, vStart, currentRow,
         peerCursorRef.current, peerSelectionRef.current);
