@@ -20,6 +20,7 @@ import { getToneEngine } from '../../engine/ToneEngine';
 import * as Tone from 'tone';
 import { AudioDataBus } from '../../engine/vj/AudioDataBus';
 import { getAudioMonitor, disposeAudioMonitor } from '../monitoring/AudioMonitor';
+import { testAllSynths, testToneSynths, testCustomSynths, testFurnaceSynths } from '../../utils/synthTester';
 
 // ─── Note Parsing ──────────────────────────────────────────────────────────────
 
@@ -678,7 +679,8 @@ export function triggerNote(params: Record<string, unknown>): Record<string, unk
   try {
     const engine = getToneEngine();
 
-    const config = (engine as any).getInstrumentConfig?.(id) ?? {};
+    const config = useInstrumentStore.getState().instruments.find(i => i.id === id);
+    if (!config) return { error: `Instrument ${id} not found` };
     const now = Tone.now();
     if (duration) {
       engine.triggerNoteAttack(id, note, now, velocity / 127, config);
@@ -699,7 +701,8 @@ export function releaseNote(params: Record<string, unknown>): Record<string, unk
 
   try {
     const engine = getToneEngine();
-    const config = (engine as any).getInstrumentConfig?.(id) ?? {};
+    const config = useInstrumentStore.getState().instruments.find(i => i.id === id);
+    if (!config) return { ok: true }; // instrument not found, nothing to release
     engine.triggerNoteRelease(id, note, Tone.now(), config);
     return { ok: true, instrumentId: id, note };
   } catch (e) {
@@ -965,7 +968,6 @@ export async function analyzeInstrumentSpectrum(params: Record<string, unknown>)
 
   try {
     const engine = getToneEngine();
-    const config = (engine as any).getInstrumentConfig?.(instrumentId) ?? {};
     const instrumentConfig = useInstrumentStore.getState().getInstrument(instrumentId);
     if (!instrumentConfig) return { error: `Instrument ${instrumentId} not found` };
 
@@ -974,8 +976,8 @@ export async function analyzeInstrumentSpectrum(params: Record<string, unknown>)
     const durationSec = durationMs / 1000;
 
     // Trigger the note
-    engine.triggerNoteAttack(instrumentId, note, now, 0.8, config);
-    engine.triggerNoteRelease(instrumentId, note, now + durationSec, config);
+    engine.triggerNoteAttack(instrumentId, note, now, 0.8, instrumentConfig);
+    engine.triggerNoteRelease(instrumentId, note, now + durationSec, instrumentConfig);
 
     // Wait for attack + collect FFT frames
     return new Promise((resolve) => {
@@ -1160,7 +1162,8 @@ export async function sweepParameter(params: Record<string, unknown>): Promise<R
     if (!hasSetter) return { error: `Synth for instrument ${instrumentId} does not support parameter setting` };
 
     const bus = AudioDataBus.getShared();
-    const config = (engine as any).getInstrumentConfig?.(instrumentId) ?? {};
+    const sweepConfig = useInstrumentStore.getState().instruments.find(i => i.id === instrumentId);
+    if (!sweepConfig) return { error: `Instrument ${instrumentId} not found` };
     const results: Array<Record<string, unknown>> = [];
 
     for (let i = 0; i <= steps; i++) {
@@ -1174,7 +1177,7 @@ export async function sweepParameter(params: Record<string, unknown>): Promise<R
 
       // Trigger note
       const now = Tone.now();
-      engine.triggerNoteAttack(instrumentId, note, now, 0.8, config);
+      engine.triggerNoteAttack(instrumentId, note, now, 0.8, sweepConfig);
 
       // Collect FFT frames during note
       const fftFrames: Float32Array[] = [];
@@ -1201,7 +1204,7 @@ export async function sweepParameter(params: Record<string, unknown>): Promise<R
       });
 
       // Release note
-      engine.triggerNoteRelease(instrumentId, note, Tone.now(), config);
+      engine.triggerNoteRelease(instrumentId, note, Tone.now(), sweepConfig);
 
       // Wait for release tail
       await new Promise(r => setTimeout(r, 100));
@@ -1758,5 +1761,27 @@ export async function exportMidi(params: Record<string, unknown>): Promise<Recor
     }
   } catch (e) {
     return { error: `exportMidi failed: ${(e as Error).message}` };
+  }
+}
+
+/** Run synth tests and return results — used by the format-status test report page */
+export async function runSynthTests(params: Record<string, unknown>): Promise<Record<string, unknown>> {
+  const suite = (params.suite as string) ?? 'all';
+  const timeout = (params.timeout as number) ?? 5000;
+
+  try {
+    let summary;
+    if (suite === 'tone') {
+      summary = await testToneSynths();
+    } else if (suite === 'custom') {
+      summary = await testCustomSynths();
+    } else if (suite === 'furnace') {
+      summary = await testFurnaceSynths();
+    } else {
+      summary = await testAllSynths({ timeout, verbose: false });
+    }
+    return { ok: true, suite, ...summary };
+  } catch (e) {
+    return { error: `runSynthTests failed: ${(e as Error).message}` };
   }
 }

@@ -14,6 +14,7 @@ import { ALL_SYNTH_TYPES, SYNTH_INFO } from '@constants/synthCategories';
 import { InstrumentFactory } from '@engine/InstrumentFactory';
 import { isDevilboxSynth } from '@typedefs/synth';
 import { getNativeAudioNode } from '@utils/audio-context';
+import { ToneEngine } from '@engine/ToneEngine';
 import type { SynthType, InstrumentConfig } from '@typedefs/instrument';
 
 export interface SynthTestResult {
@@ -92,45 +93,105 @@ async function testSynth(synthType: SynthType): Promise<SynthTestResult> {
 
     result.loaded = true;
 
-    // Connect to destination with an analyser to detect sound
-    const analyser = new Tone.Analyser('waveform', 256);
-    if (isDevilboxSynth(instrument)) {
-      const nativeInput = getNativeAudioNode(analyser);
-      if (nativeInput) instrument.output.connect(nativeInput);
-    } else {
-      (instrument as unknown as { connect: (dest: unknown) => void }).connect(analyser);
-    }
-    analyser.toDestination();
+    // NATIVE_ROUTING_V2
+    // Use native Web Audio routing for reliable signal detection.
+    // Tone.js instrument.connect(Tone.Analyser) has timing issues with fast-decay
+    // synths and WASM-based synths. Using native AudioContext nodes is more reliable.
+    //
+    // CRITICAL: Tone.js native synths (MetalSynth, PluckSynth, etc.) use Tone.getContext()
+    // which is a DIFFERENT AudioContext than ToneEngine.getInstance().nativeContext.
+    // We must use the instrument's own context; fall back to ToneEngine for WASM synths.
+    const instrumentNativeCtx = (instrument as unknown as { context?: { rawContext?: AudioContext; _rawContext?: AudioContext } })?.context?.rawContext
+      ?? (instrument as unknown as { context?: { _rawContext?: AudioContext } })?.context?._rawContext;
+    const nativeCtx = instrumentNativeCtx ?? ToneEngine.getInstance().nativeContext;
+    const nativeAnalyser = nativeCtx.createAnalyser();
+    nativeAnalyser.fftSize = 256;
+    nativeAnalyser.connect(nativeCtx.destination);
 
-    // Try to trigger a note
-    try {
-      if ('triggerAttack' in instrument && typeof instrument.triggerAttack === 'function') {
-        instrument.triggerAttack('C4', Tone.now(), 0.8);
+    // Connect instrument output → native analyser
+    const instrumentOutput = isDevilboxSynth(instrument)
+      ? instrument.output
+      : (instrument as unknown as { output?: unknown }).output ?? instrument;
+    const nativeOut = getNativeAudioNode(instrumentOutput);
+    if (nativeOut) {
+      nativeOut.connect(nativeAnalyser);
+    }
+
+    // WASM-based synths need time for their AudioWorklet to initialize
+    const WASM_SYNTHS: SynthType[] = ['TB303', 'V2', 'ChipSynth', 'Sam', 'Dexed', 'OBXd'];
+    if (WASM_SYNTHS.includes(synthType)) {
+      await new Promise((resolve) => setTimeout(resolve, 800));
+    }
+
+    // Use native AudioContext time for accurate scheduling
+    const now = nativeCtx.currentTime;
+
+    // GranularSynth uses Tone.GrainPlayer — start()/stop() interface
+    if (synthType === 'GranularSynth') {
+      try {
+        const player = instrument as unknown as { start: (t: number) => void; stop: (t: number) => void };
+        player.start(now);
         result.noteOnWorked = true;
-      } else if ('triggerAttackRelease' in instrument && typeof instrument.triggerAttackRelease === 'function') {
-        (instrument as unknown as { triggerAttackRelease: (note: string, dur: string, time: number, vel: number) => void }).triggerAttackRelease('C4', '8n', Tone.now(), 0.8);
-        result.noteOnWorked = true;
+      } catch (e) {
+        result.error = `GranularSynth start error: ${e}`;
       }
-    } catch (e) {
-      result.error = `Note trigger error: ${e}`;
+    } else {
+      // Synths that don't take a note argument for attack/release
+      // NoiseSynth/MetalSynth: triggerAttack(time, vel), triggerRelease(time)
+      const isNoNote = synthType === 'NoiseSynth' || synthType === 'MetalSynth';
+
+      // Try to trigger a note using native currentTime for reliable scheduling
+      try {
+        if ('triggerAttack' in instrument && typeof instrument.triggerAttack === 'function') {
+          if (isNoNote) {
+            (instrument as unknown as Tone.NoiseSynth).triggerAttack(now, 0.8);
+          } else {
+            instrument.triggerAttack('C4', now, 0.8);
+          }
+          result.noteOnWorked = true;
+        } else if ('triggerAttackRelease' in instrument && typeof instrument.triggerAttackRelease === 'function') {
+          if (isNoNote) {
+            (instrument as unknown as Tone.NoiseSynth).triggerAttackRelease('8n', now, 0.8);
+          } else {
+            (instrument as unknown as { triggerAttackRelease: (note: string, dur: string, time: number, vel: number) => void }).triggerAttackRelease('C4', '8n', now, 0.8);
+          }
+          result.noteOnWorked = true;
+        }
+      } catch (e) {
+        result.error = `Note trigger error: ${e}`;
+      }
     }
 
-    // Wait for sound to be produced
-    await new Promise((resolve) => setTimeout(resolve, 100));
-
-    // Check if sound was produced
-    try {
-      const values = analyser.getValue() as Float32Array;
-      const hasSignal = values.some((v) => Math.abs(v) > 0.001);
-      result.producedSound = hasSignal;
-    } catch {
-      // Some synths may not produce sound in test context
+    // Poll native analyser every 10ms for up to 500ms — catches fast-decay percussive synths
+    const nativeBuf = new Float32Array(nativeAnalyser.fftSize);
+    let hasSignal = false;
+    let dbgMax = 0;
+    for (let elapsed = 0; elapsed < 500 && !hasSignal; elapsed += 10) {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      try {
+        nativeAnalyser.getFloatTimeDomainData(nativeBuf);
+        const m = Math.max(...Array.from(nativeBuf).map(Math.abs));
+        if (m > dbgMax) dbgMax = m;
+        if (m > 0.001) hasSignal = true;
+      } catch { /* ignore */ }
     }
+    if (!hasSignal) console.warn(`[synthTester] ${synthType} silent: nativeOut=${!!nativeOut} maxSeen=${dbgMax.toFixed(6)} nativeCtxTime=${nativeCtx.currentTime.toFixed(2)}`);
+    result.producedSound = hasSignal;
 
     // Try note off
     try {
-      if ('triggerRelease' in instrument && typeof instrument.triggerRelease === 'function') {
-        instrument.triggerRelease('C4', Tone.now());
+      if (synthType === 'GranularSynth') {
+        (instrument as unknown as { stop: (t: number) => void }).stop(Tone.now());
+        result.noteOffWorked = true;
+      } else if ('triggerRelease' in instrument && typeof instrument.triggerRelease === 'function') {
+        const releaseTime = nativeCtx.currentTime;
+        const isNoNoteRelease = synthType === 'NoiseSynth' || synthType === 'MetalSynth' ||
+          synthType === 'MembraneSynth' || synthType === 'MonoSynth' || synthType === 'DuoSynth';
+        if (isNoNoteRelease) {
+          (instrument as unknown as Tone.NoiseSynth).triggerRelease(releaseTime);
+        } else {
+          instrument.triggerRelease('C4', releaseTime);
+        }
         result.noteOffWorked = true;
       }
     } catch {
@@ -140,16 +201,13 @@ async function testSynth(synthType: SynthType): Promise<SynthTestResult> {
     // Cleanup
     await new Promise((resolve) => setTimeout(resolve, 50));
     try {
-      if (isDevilboxSynth(instrument)) {
-        try { instrument.output.disconnect(); } catch { /* already disconnected */ }
-      } else {
-        (instrument as unknown as { disconnect: () => void }).disconnect();
+      if (nativeOut) {
+        try { nativeOut.disconnect(nativeAnalyser); } catch { /* already disconnected */ }
       }
-      analyser.disconnect();
+      nativeAnalyser.disconnect();
       if ('dispose' in instrument && typeof instrument.dispose === 'function') {
         instrument.dispose();
       }
-      analyser.dispose();
     } catch {
       // Cleanup errors not critical
     }
