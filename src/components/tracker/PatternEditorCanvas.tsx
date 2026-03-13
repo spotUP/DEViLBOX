@@ -1454,6 +1454,15 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
         const { width, height } = entry.contentRect;
         if (width > 0 && height > 0) {
           setDimensions({ width, height });
+          // Post resize directly to worker to avoid React re-render delay —
+          // critical on first layout when the worker may have been init'd with
+          // height=1, causing the center line to fill the entire viewport.
+          const dpr = window.devicePixelRatio || 1;
+          bridgeRef.current?.post({ type: 'resize', w: width, h: height, dpr });
+          if (canvasRef.current) {
+            canvasRef.current.style.width  = `${width}px`;
+            canvasRef.current.style.height = `${height}px`;
+          }
         }
       }
     });
