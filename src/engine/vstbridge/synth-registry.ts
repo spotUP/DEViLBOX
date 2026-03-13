@@ -54,7 +54,7 @@ registerVSTBridge({
   wasmFile: 'Dexed',
   synthClassName: 'DexedSynth',
   moduleFactoryName: 'createDexedModule',
-  volumeOffsetDb: 41,
+  volumeOffsetDb: -10,
   commands: ['loadSysEx', 'loadPatch'],
 });
 
@@ -131,7 +131,7 @@ registerVSTBridge({
   wasmFile: 'Melodica',
   synthClassName: 'MelodicaWASMSynth',
   moduleFactoryName: 'createMelodicaModule',
-  volumeOffsetDb: 0,
+  volumeOffsetDb: -9,
 });
 
 // ---------------------------------------------------------------------------
@@ -175,7 +175,7 @@ registerVSTBridge({
   wasmFile: 'Sorcer',
   synthClassName: 'SorcerSynth',
   moduleFactoryName: 'createSorcerModule',
-  volumeOffsetDb: 0,
+  volumeOffsetDb: 17,
 });
 
 // ---------------------------------------------------------------------------
