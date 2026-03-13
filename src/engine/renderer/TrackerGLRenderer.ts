@@ -853,7 +853,7 @@ export class TrackerGLRenderer {
       const info = atlas.lookup.get(str[si]);
       if (info) {
         this.addGlyph(cx, y, info, color);
-        if (bold) this.addGlyph(cx + 0.5, y, info, color); // fake bold: double-strike offset
+        if (bold) this.addGlyph(cx + 1, y, info, color); // fake bold: double-strike offset
         cx += info.logicalWidth;
       } else {
         cx += atlas.glyphLogicalWidth;
