@@ -381,6 +381,7 @@ function parseInternal(bytes: Uint8Array, filename: string): TrackerSong | null 
     initialSpeed:    speed,
     initialBPM:      DEFAULT_BPM,
     linearPeriods:   false,
+    libopenmptFileData: bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength),
   };
 }
 
