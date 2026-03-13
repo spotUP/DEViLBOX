@@ -635,7 +635,7 @@ export async function parsePumaTrackerFile(
 
   return {
     name,
-    format:          'PumaTracker' as TrackerFormat,
+    format:          'MOD' as TrackerFormat,
     patterns,
     instruments,
     songPositions,

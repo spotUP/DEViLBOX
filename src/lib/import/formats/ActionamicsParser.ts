@@ -502,7 +502,6 @@ function parseInternal(bytes: Uint8Array, filename: string): TrackerSong | null 
       if ((b0 & 0x80) !== 0) {
         // Delay: ~b0 = delay count
         delayCounter = (~b0) & 0xff;
-        rows.push({ note: 0, instrNum: 0, effect: 0, effectArg: 0 });
         continue;
       }
 
@@ -575,7 +574,7 @@ function parseInternal(bytes: Uint8Array, filename: string): TrackerSong | null 
       case 0x76: return { effTyp: 0x09, eff: arg };          // Set sample offset
       case 0x77: return { effTyp: 0x0E, eff: 0xD0 | (arg & 0x0f) }; // Note delay (Exy E=D)
       case 0x78: return { effTyp: 0x0E, eff: 0xC0 | (arg & 0x0f) }; // Mute (cut) → ECx
-      case 0x79: return { effTyp: 0x09, eff: arg };          // Sample restart
+      case 0x79: return { effTyp: 0x09, eff: 0x00 };          // Sample restart → offset 0
       case 0x7A: return { effTyp: 0x07, eff: arg };          // Tremolo
       case 0x7B: return { effTyp: 0x0D, eff: arg };          // Break
       case 0x7C: return { effTyp: 0x0C, eff: Math.min(64, arg) }; // Set volume
