@@ -501,4 +501,5 @@ export function parseDavidWhittakerFile(buffer: ArrayBuffer, filename: string, m
     initialBPM: 125,
     uadePatternLayout: true,
   };
+}
 
