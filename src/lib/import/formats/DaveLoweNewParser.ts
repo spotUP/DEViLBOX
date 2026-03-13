@@ -216,5 +216,6 @@ export function parseDaveLoweNewFile(buffer: ArrayBuffer, filename: string): Tra
     initialSpeed: 6,
     initialBPM: 125,
     linearPeriods: false,
+    uadePatternLayout: true,
   };
 }
