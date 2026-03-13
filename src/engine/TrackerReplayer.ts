@@ -1910,26 +1910,6 @@ export class TrackerReplayer {
     this.lastDequeuedState = null;
   }
 
-  /**
-   * Find the NEXT row state after the given state in the ring buffer.
-   * Returns the first entry with a different row (or pattern), or null if not found.
-   * Used for smooth scroll duration calculation — avoids the bug where peeking
-   * with a large time returns a state 2-3 rows ahead, inflating the duration.
-   */
-  public getNextRowState(currentState: DisplayState): DisplayState | null {
-    // The current state may already be dequeued (in lastDequeuedState),
-    // so search from the ring tail — entries there are the NEXT states.
-    let idx = this.stateRingTail;
-    for (let i = 0; i < this.stateRingCount; i++) {
-      const state = this.stateRing[idx];
-      if (state.row !== currentState.row || state.pattern !== currentState.pattern) {
-        return state;
-      }
-      idx = (idx + 1) % TrackerReplayer.MAX_STATE_QUEUE_SIZE;
-    }
-    return null;
-  }
-
   // ==========================================================================
   // ROW PROCESSING (TICK 0)
   // ==========================================================================
