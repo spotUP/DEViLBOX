@@ -84,7 +84,19 @@ export async function withNativeThenUADE(
       }
       const input = (opts?.usesBytes || opts?.isFormat) ? bytes! : ctx.buffer;
       const result = await (nativeParse as NativeParserWithBytes)(input as any, ctx.originalFileName);
-      if (result) return injectUADEPlayback(result, ctx);
+      if (result) {
+        // Defense-in-depth: if native parser returned 0 notes across all patterns,
+        // it's likely a stub parser that couldn't actually parse the file.
+        // Fall through to UADE instead of returning empty data.
+        const totalNotes = result.patterns.reduce((sum, p) =>
+          sum + p.channels.reduce((cSum, ch) =>
+            cSum + ch.rows.filter(r => r.note > 0).length, 0), 0);
+        if (totalNotes === 0) {
+          console.warn(`[${parserName}] Native parser returned 0 notes for ${ctx.originalFileName}, falling back to UADE`);
+          return callUADE(ctx);
+        }
+        return injectUADEPlayback(result, ctx);
+      }
     } catch (err) {
       console.warn(`[${parserName}] Native parse failed for ${ctx.originalFileName}, falling back to UADE:`, err);
     }

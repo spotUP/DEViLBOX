@@ -84,6 +84,7 @@ class MPT extends AudioWorkletProcessor {
 			order: libopenmpt._openmpt_module_get_current_order(this.modulePtr),
 			pattern: libopenmpt._openmpt_module_get_current_pattern(this.modulePtr),
 			row: libopenmpt._openmpt_module_get_current_row(this.modulePtr),
+			audioTime: currentTime,
 		}
 
 		// Per-channel VU levels (mono max of L/R)

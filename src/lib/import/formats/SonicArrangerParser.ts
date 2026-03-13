@@ -82,6 +82,21 @@ function readString(v: DataView, off: number, len: number): string {
   return s.trim();
 }
 
+// -- SA period table (from sonic_arranger_synth.c) ----------------------------
+// 1-based: index 49 = period 856 = ProTracker C-1, index 73 = 214 = PT C-3.
+const SA_PERIOD_TABLE: readonly number[] = [
+  0,
+  13696,12928,12192,11520,10848,10240,9664,9120,8608,8128,7680,7248,
+   6848, 6464, 6096, 5760, 5424, 5120,4832,4560,4304,4064,3840,3624,
+   3424, 3232, 3048, 2880, 2712, 2560,2416,2280,2152,2032,1920,1812,
+   1712, 1616, 1524, 1440, 1356, 1280,1208,1140,1076,1016, 960, 906,
+    856,  808,  762,  720,  678,  640, 604, 570, 538, 508, 480, 453,
+    428,  404,  381,  360,  339,  320, 302, 285, 269, 254, 240, 226,
+    214,  202,  190,  180,  170,  160, 151, 143, 135, 127, 120, 113,
+    107,  101,   95,   90,   85,   80,  75,  71,  67,  63,  60,  56,
+     53,   50,   47,   45,   42,   40,  37,  35,  33,  31,  30,  28,
+];
+
 // -- SA note → XM note --------------------------------------------------------
 // SA period table is 1-based: index 49 = period 856 = ProTracker C-1.
 // FT2/OpenMPT convention: ProTracker C-1 displays as C-3 (XM note 37).
@@ -93,6 +108,14 @@ function saNote2XM(note: number): number {
   if (note === 0x7F || note === 0x80) return 97; // note-off (0x7F=force quiet, 0x80=release)
   const xm = note - 12;
   return (xm >= 1 && xm <= 96) ? xm : 0;
+}
+
+// Look up the real Amiga period for an SA note (after transpose).
+// xmNote is the transposed XM note; SA index = xmNote + 12.
+function saNotePeriod(xmNote: number): number | undefined {
+  if (xmNote <= 0 || xmNote >= 97) return undefined;
+  const saIdx = xmNote + 12;
+  return (saIdx >= 1 && saIdx <= 108) ? SA_PERIOD_TABLE[saIdx] : undefined;
 }
 
 // -- Sub-song info ------------------------------------------------------------
@@ -594,9 +617,10 @@ export async function parseSonicArrangerFile(
         }
 
         instruments.push({
-          // sampleRate = PAL_CLOCK / 214 = 16574 Hz (period 214 = SA note 61 = XM 37 = C3).
-          // baseNote in createSamplerInstrument is 'C3' (MIDI 48 = XM 37),
-          // so the rate must match the DMA rate at that period for correct pitch.
+          // sampleRate = PAL_CLOCK / 214 = 16574 Hz (period 214 = SA note 73 = XM 61 = C5).
+          // With rawPeriod stored on cells, the replayer computes:
+          //   rate = PAL_CLOCK / rawPeriod / sampleRate
+          // e.g. SA note 49 (period 856): rate = 3546895/856/16574 ≈ 0.25 = 2 octaves down from C5.
           ...createSamplerInstrument(id, inst.name, pcm, inst.volume, 16574, loopStart, loopEnd),
           uadeChipRam: chipRam,
         });
@@ -815,6 +839,10 @@ export async function parseSonicArrangerFile(
           effVal = Math.max(0, effVal - first);
         }
 
+        // Store real SA Amiga period so the replayer uses it directly
+        // instead of the broken noteToPeriod MOD mapping (fixes sample pitch).
+        const saPeriod = saNotePeriod(xmNote);
+
         rows.push({
           note:       xmNote,
           instrument: instrNum,
@@ -823,6 +851,7 @@ export async function parseSonicArrangerFile(
           eff:        effVal,
           effTyp2: 0,
           eff2:    0,
+          ...(saPeriod ? { period: saPeriod } : {}),
           saArpTable: tl.arpeggioTable,
           saEffect: tl.effect,
           saEffectArg: tl.effArg,

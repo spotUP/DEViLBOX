@@ -355,9 +355,15 @@ export async function importTrackerModule(
   }
 
   // ── UADE / exotic Amiga / parseModuleToSong path ──
-  // Also route here when metadata.song exists but has no pattern data
+  // Also route here when metadata.song exists but has no pattern data.
+  // CRITICAL: formats with a nativeParser MUST use parseModuleToSong so their
+  // native parser runs and assigns the correct synthType to instruments (e.g.
+  // SymphonieSynth, FCSynth). Without this, libopenmpt metadata.song causes
+  // the fallback path below to create generic 'Synth' instruments instead.
   const songHasPatterns = (info.metadata.song?.patterns?.length ?? 0) > 0;
-  if (!info.metadata.song || !songHasPatterns) {
+  const hasNativeParser = !!fmt?.nativeParser;
+  if (!info.metadata.song || !songHasPatterns || hasNativeParser) {
+    if (hasNativeParser) console.log(`[UnifiedFileLoader] Format has nativeParser — using parseModuleToSong for ${filename}`);
     if (!info.file) {
       notify.error('File reference lost — cannot import');
       return;

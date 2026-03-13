@@ -1776,10 +1776,19 @@ class UADEProcessor extends AudioWorkletProcessor {
           this._prevPeriods[i] = period;
         }
 
+        const totalFrames = this._wasm._uade_wasm_get_total_frames();
         this.port.postMessage({
           type: 'channels',
           channels,
-          totalFrames: this._wasm._uade_wasm_get_total_frames()
+          totalFrames
+        });
+
+        // Post position update with CIA tick count for audio/visual sync
+        this.port.postMessage({
+          type: 'position',
+          tickCount: this._wasm._uade_wasm_get_tick_count(),
+          totalFrames,
+          audioTime: currentTime
         });
 
         // Post per-channel VU levels derived from Paula volume registers

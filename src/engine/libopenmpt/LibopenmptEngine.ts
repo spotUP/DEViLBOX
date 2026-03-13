@@ -16,7 +16,7 @@ import { getToneEngine } from '@engine/ToneEngine';
 // Position callback type
 // ---------------------------------------------------------------------------
 
-export type LibopenmptPositionCallback = (order: number, pattern: number, row: number) => void;
+export type LibopenmptPositionCallback = (order: number, pattern: number, row: number, audioTime?: number) => void;
 
 // ---------------------------------------------------------------------------
 // Engine
@@ -111,10 +111,10 @@ export class LibopenmptEngine {
   }
 
   private handleMessage(msg: MessageEvent): void {
-    const { cmd, order, pattern, row, chLevels } = msg.data;
+    const { cmd, order, pattern, row, chLevels, audioTime } = msg.data;
     switch (cmd) {
       case 'pos':
-        this._onPosition?.(order, pattern, row);
+        this._onPosition?.(order, pattern, row, audioTime);
         if (chLevels) {
           try {
             const engine = getToneEngine();

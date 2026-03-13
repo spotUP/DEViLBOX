@@ -92,7 +92,7 @@
  */
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
-import type { Pattern, ChannelData, TrackerCell, InstrumentConfig, UADEChipRamInfo } from '@/types';
+import type { Pattern, ChannelData, TrackerCell, InstrumentConfig, UADEChipRamInfo, SynthType } from '@/types';
 import { arrayBufferToBase64 } from '@/lib/import/InstrumentConverter';
 import type {
   SymphoniePlaybackData,
@@ -550,11 +550,6 @@ export async function parseSymphonieProFile(
         (song.instruments[0] as unknown as Record<string, unknown>)['symphonie'] = playbackData;
       }
 
-      // Set synthType on ALL instruments — keeps WASM engine routing working.
-      for (let i = 0; i < song.instruments.length; i++) {
-        (song.instruments[i] as unknown as Record<string, unknown>)['synthType'] = 'SymphonieSynth';
-      }
-
       // Populate each instrument with decoded PCM sample data.
       // The sample editor will show when sample data is present (see isSampleType).
       for (let i = 0; i < playbackData.instruments.length && i < song.instruments.length; i++) {
@@ -590,6 +585,14 @@ export async function parseSymphonieProFile(
       }
     } catch (err) {
       console.warn('[SymphonieProParser] parseSymphonieForPlayback failed; playback will be silent:', err);
+    }
+
+    // Ensure synthType is SymphonieSynth on ALL instruments — even if
+    // parseSymphonieForPlayback failed above. The instruments are created
+    // with synthType in _parseSymphonieProFile, but reinforce it here to
+    // guarantee WASM engine routing works correctly.
+    for (let i = 0; i < song.instruments.length; i++) {
+      (song.instruments[i] as unknown as Record<string, unknown>)['synthType'] = 'SymphonieSynth';
     }
 
     return song;
@@ -795,7 +798,8 @@ function _parseSymphonieProFile(bytes: Uint8Array, filename: string): TrackerSon
     ? cappedInstruments.map((si, i) => ({
         id:        i + 1,
         name:      si.name || `Instrument ${i + 1}`,
-        type:      'sample' as const,
+        type:      'synth' as const,
+        synthType: 'SymphonieSynth' as SynthType,
         effects:   [],
         volume:    si.volume ?? 0,
         pan:       0,
@@ -809,7 +813,8 @@ function _parseSymphonieProFile(bytes: Uint8Array, filename: string): TrackerSon
     : [{
         id:        1,
         name:      songTitle,
-        type:      'sample' as const,
+        type:      'synth' as const,
+        synthType: 'SymphonieSynth' as SynthType,
         effects:   [],
         volume:    0,
         pan:       0,

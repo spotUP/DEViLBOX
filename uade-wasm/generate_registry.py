@@ -15,7 +15,7 @@ import os
 import sys
 import struct
 
-UADE_SRC = os.path.join(os.path.dirname(__file__), '..', 'Reference Code', 'uade-3.05')
+UADE_SRC = os.path.join(os.path.dirname(__file__), '..', 'third-party', 'uade-3.05')
 PLAYERS_DIR = os.path.join(UADE_SRC, 'players')
 OUT_C = os.path.join(os.path.dirname(__file__), 'src', 'player_registry.c')
 OUT_BASEDIR_C = os.path.join(os.path.dirname(__file__), 'src', 'basedir_data.c')
@@ -27,6 +27,10 @@ BASEDIR_FILES = [
     ('eagleplayer.conf',                'eagleplayer.conf'),# Player detection rules
     ('amigasrc/score/score',            'score'),           # 68k score binary
 ]
+
+# ENV directory contains eagleplayer config files needed at runtime.
+# These are written to /uade/ENV/EaglePlayer/ in the virtual filesystem.
+ENV_DIR = os.path.join(PLAYERS_DIR, 'ENV')
 
 def sanitize_name(name):
     """Convert a player name to a valid C identifier."""
@@ -101,6 +105,25 @@ def generate_basedir_data():
         cname = sanitize_name(memfs_name)
         files.append((memfs_name, cname, data))
         print(f"  Embedded basedir file: {memfs_name} ({len(data):,} bytes)")
+
+    # Walk ENV/ directory tree and embed all config files
+    # These get mounted at /uade/ENV/... in the virtual filesystem
+    if os.path.isdir(ENV_DIR):
+        for dirpath, dirnames, filenames in os.walk(ENV_DIR):
+            for fname in sorted(filenames):
+                src_path = os.path.join(dirpath, fname)
+                # Path relative to PLAYERS_DIR parent (i.e. relative to /uade/)
+                rel_path = os.path.relpath(src_path, os.path.join(PLAYERS_DIR, '..'))
+                # rel_path is like "players/ENV/EaglePlayer/EP-Mugician_II.cfg"
+                # We want memfs_name to be "ENV/EaglePlayer/EP-Mugician_II.cfg"
+                memfs_name = os.path.relpath(src_path, PLAYERS_DIR)
+                cname = sanitize_name(memfs_name)
+                with open(src_path, 'rb') as f:
+                    data = f.read()
+                files.append((memfs_name, cname, data))
+                print(f"  Embedded ENV file: {memfs_name} ({len(data):,} bytes)")
+    else:
+        print(f"WARNING: ENV directory not found: {ENV_DIR}", file=sys.stderr)
 
     with open(OUT_BASEDIR_C, 'w') as out:
         out.write('/*\n')
