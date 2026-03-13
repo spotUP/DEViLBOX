@@ -17,7 +17,7 @@ const KEYBOARD_WIDTH = 72;
 function snapshotKeyboardColors(el: HTMLElement): KeyboardColors {
   const cs = getComputedStyle(el);
   const accent = cs.getPropertyValue('--color-accent').trim() || '#06b6d4';
-  return {
+  const result: KeyboardColors = {
     bg: cs.getPropertyValue('--color-bg').trim() || '#111',
     whiteKey: '#e8e8ec',
     blackKey: cs.getPropertyValue('--color-bg-secondary').trim() || '#22242a',
@@ -29,6 +29,12 @@ function snapshotKeyboardColors(el: HTMLElement): KeyboardColors {
     labelDark: 'var(--color-border-light)',
     labelLight: '#888',
   };
+  // Pull per-note piano key colors from the current theme
+  const theme = useThemeStore.getState().getCurrentTheme();
+  if (theme.colors.pianoKeyColors?.length === 7) {
+    result.noteColors = theme.colors.pianoKeyColors;
+  }
+  return result;
 }
 
 interface PianoKeyboardCanvasProps {
