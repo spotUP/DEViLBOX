@@ -616,6 +616,7 @@ export async function parseSidMon2File(
 
   for (let trackPos = 0; trackPos < songLength; trackPos++) {
     const channelRows: TrackerCell[][] = [[], [], [], []];
+    currentPatternLen = 64; // Reset per pattern (effect 0x76 only affects current pattern)
 
     for (let patRow = 0; patRow < MAX_PATTERN_LEN && patRow < currentPatternLen; patRow++) {
       for (let ch = 0; ch < 4; ch++) {
