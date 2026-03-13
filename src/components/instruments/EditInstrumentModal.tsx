@@ -15,6 +15,7 @@ import { useInstrumentStore } from '@stores/useInstrumentStore';
 import { SYNTH_INFO, ALL_SYNTH_TYPES, getSynthInfo } from '@constants/synthCategories';
 import { UnifiedInstrumentEditor } from './editors';
 import { EffectChain, TestKeyboard, CategorizedSynthSelector } from './shared';
+import { hasBuiltInInput } from './hardware/HardwareUIWrapper';
 import { SavePresetDialog } from './presets';
 import { InstrumentList } from './InstrumentList';
 import * as LucideIcons from 'lucide-react';
@@ -395,10 +396,12 @@ export const EditInstrumentModal: React.FC<EditInstrumentModalProps> = ({
                 )}
               </div>
 
-              {/* Test Keyboard */}
-              <div className="p-2 border-t border-dark-border bg-dark-bgSecondary shrink-0">
-                {tempInstrument && <TestKeyboard instrument={tempInstrument} />}
-              </div>
+              {/* Test Keyboard — hidden when hardware UI has its own step sequencer/keyboard */}
+              {tempInstrument && !hasBuiltInInput(tempInstrument.synthType as SynthType) && (
+                <div className="p-2 border-t border-dark-border bg-dark-bgSecondary shrink-0">
+                  <TestKeyboard instrument={tempInstrument} />
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -633,8 +636,8 @@ export const EditInstrumentModal: React.FC<EditInstrumentModalProps> = ({
               </div>
             )}
 
-            {/* Test Keyboard (Collapsible) - only show when instrument selected */}
-            {currentInstrument && (
+            {/* Test Keyboard (Collapsible) — hidden when hardware UI has its own input */}
+            {currentInstrument && !hasBuiltInInput(currentInstrument.synthType as SynthType) && (
               <div className="border-t border-dark-border">
                 <button
                   onClick={() => setShowKeyboard(!showKeyboard)}
