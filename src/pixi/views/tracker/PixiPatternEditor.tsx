@@ -117,6 +117,20 @@ function probColor(val: number): number {
   return 0xf87171;
 }
 
+/** Lerp a hex color toward white by factor t (0 = original, 1 = white). */
+function lerpWhite(color: number, t: number): number {
+  if (t <= 0) return color;
+  if (t >= 1) return 0xffffff;
+  const r = (color >> 16) & 0xff;
+  const g = (color >> 8) & 0xff;
+  const b = color & 0xff;
+  return (
+    (Math.round(r + (255 - r) * t) << 16) |
+    (Math.round(g + (255 - g) * t) << 8) |
+    Math.round(b + (255 - b) * t)
+  );
+}
+
 // ─── Imperative render helpers (pure functions, no closures over React state) ─
 
 type TrackerPattern = NonNullable<ReturnType<typeof useTrackerStore.getState>['patterns'][0]>;
@@ -429,8 +443,10 @@ function generateLabels(p: RenderParams, vStart: number, activeRow = -1): LabelD
     }
 
     const isHighlightRow = actualRow % p.rowHighlightInterval === 0;
-    const isActiveRow = rowNum === activeRow && !isGhost;
-    const WHITE = 0xffffff;
+    // Glow trail: rows near the active row lerp toward white, fading over TRAIL_ROWS
+    const TRAIL_ROWS = 3;
+    const dist = activeRow >= 0 && !isGhost ? Math.abs(rowNum - activeRow) : TRAIL_ROWS + 1;
+    const glow = dist <= TRAIL_ROWS ? 1 - dist / TRAIL_ROWS : 0; // 1 = white, 0 = normal
     let lineNumText: string;
     if (p.showBeatLabels) {
       const beat = Math.floor(actualRow / p.rowHighlightInterval) + 1;
@@ -443,7 +459,7 @@ function generateLabels(p: RenderParams, vStart: number, activeRow = -1): LabelD
     }
     labels.push({
       x: 4, y, text: lineNumText,
-      color: isActiveRow ? WHITE : isHighlightRow ? p.theme.accentSecondary.color : p.theme.textMuted.color,
+      color: lerpWhite(isHighlightRow ? p.theme.accentSecondary.color : p.theme.textMuted.color, glow),
       fontFamily: PIXI_FONTS.MONO, alpha: isGhost ? 0.35 : undefined,
     });
 
@@ -460,10 +476,10 @@ function generateLabels(p: RenderParams, vStart: number, activeRow = -1): LabelD
       const baseX = colX + 8;
 
       const noteText = noteToString(cell.note ?? 0, p.noteDisplayOffset);
-      const noteColor = isActiveRow ? WHITE
-        : cell.note === 97 ? p.theme.cellEffect.color
+      const noteColor = lerpWhite(
+        cell.note === 97 ? p.theme.cellEffect.color
         : (cell.note > 0 && cell.note < 97) ? p.theme.cellNote.color
-        : p.theme.cellEmpty.color;
+        : p.theme.cellEmpty.color, glow);
       if (noteText !== '---' || !p.blankEmpty) {
         labels.push({ x: baseX, y, text: noteText, color: noteColor, fontFamily: PIXI_FONTS.MONO, alpha: isGhost ? 0.35 : undefined });
       }
@@ -475,14 +491,14 @@ function generateLabels(p: RenderParams, vStart: number, activeRow = -1): LabelD
 
       const insText = cell.instrument > 0 ? hexByte(cell.instrument) : (p.blankEmpty ? '' : '..');
       if (insText) {
-        labels.push({ x: px, y, text: insText, color: isActiveRow ? WHITE : cell.instrument > 0 ? p.theme.cellInstrument.color : p.theme.cellEmpty.color, fontFamily: PIXI_FONTS.MONO, alpha: isGhost ? 0.35 : undefined });
+        labels.push({ x: px, y, text: insText, color: lerpWhite(cell.instrument > 0 ? p.theme.cellInstrument.color : p.theme.cellEmpty.color, glow), fontFamily: PIXI_FONTS.MONO, alpha: isGhost ? 0.35 : undefined });
       }
       px += CHAR_WIDTH * 2 + 4;
 
       const volValid = cell.volume >= 0x10 && cell.volume <= 0x50;
       const volText = volValid ? hexByte(cell.volume) : (p.blankEmpty ? '' : '..');
       if (volText) {
-        labels.push({ x: px, y, text: volText, color: volValid ? p.theme.cellVolume.color : p.theme.cellEmpty.color, fontFamily: PIXI_FONTS.MONO, alpha: isGhost ? 0.35 : undefined });
+        labels.push({ x: px, y, text: volText, color: lerpWhite(volValid ? p.theme.cellVolume.color : p.theme.cellEmpty.color, glow), fontFamily: PIXI_FONTS.MONO, alpha: isGhost ? 0.35 : undefined });
       }
       px += CHAR_WIDTH * 2 + 4;
 
@@ -500,20 +516,20 @@ function generateLabels(p: RenderParams, vStart: number, activeRow = -1): LabelD
           : (cell.eff5 ?? 0);
         const effText = formatEffect(typ, val, p.useHex);
         if (effText !== '...' || !p.blankEmpty) {
-          labels.push({ x: px, y, text: effText, color: isActiveRow ? WHITE : (typ > 0 || val > 0) ? p.theme.cellEffect.color : p.theme.cellEmpty.color, fontFamily: PIXI_FONTS.MONO, alpha: isGhost ? 0.35 : undefined });
+          labels.push({ x: px, y, text: effText, color: lerpWhite((typ > 0 || val > 0) ? p.theme.cellEffect.color : p.theme.cellEmpty.color, glow), fontFamily: PIXI_FONTS.MONO, alpha: isGhost ? 0.35 : undefined });
         }
         px += CHAR_WIDTH * 3 + 4;
       }
 
       if (p.columnVisibility.flag1 && cell.flag1 !== undefined) {
         const flagChar = cell.flag1 === 1 ? 'A' : cell.flag1 === 2 ? 'S' : '.';
-        const flagColor = isActiveRow ? WHITE : cell.flag1 === 1 ? FLAG_COLORS.accent : cell.flag1 === 2 ? FLAG_COLORS.slide : p.theme.cellEmpty.color;
+        const flagColor = lerpWhite(cell.flag1 === 1 ? FLAG_COLORS.accent : cell.flag1 === 2 ? FLAG_COLORS.slide : p.theme.cellEmpty.color, glow);
         labels.push({ x: px, y, text: flagChar, color: flagColor, fontFamily: PIXI_FONTS.MONO, alpha: isGhost ? 0.35 : undefined });
         px += CHAR_WIDTH + 4;
       }
       if (p.columnVisibility.flag2 && cell.flag2 !== undefined) {
         const flagChar = cell.flag2 === 1 ? 'M' : cell.flag2 === 2 ? 'H' : '.';
-        const flagColor = isActiveRow ? WHITE : cell.flag2 === 1 ? FLAG_COLORS.mute : cell.flag2 === 2 ? FLAG_COLORS.hammer : p.theme.cellEmpty.color;
+        const flagColor = lerpWhite(cell.flag2 === 1 ? FLAG_COLORS.mute : cell.flag2 === 2 ? FLAG_COLORS.hammer : p.theme.cellEmpty.color, glow);
         labels.push({ x: px, y, text: flagChar, color: flagColor, fontFamily: PIXI_FONTS.MONO, alpha: isGhost ? 0.35 : undefined });
         px += CHAR_WIDTH + 4;
       }
@@ -523,7 +539,7 @@ function generateLabels(p: RenderParams, vStart: number, activeRow = -1): LabelD
           ? (p.useHex ? HEX_TABLE[cell.probability & 0xFF] : DEC_TABLE[cell.probability & 0xFF])
           : (p.blankEmpty ? '' : '..');
         if (probText) {
-          labels.push({ x: px, y, text: probText, color: isActiveRow ? WHITE : cell.probability > 0 ? probColor(cell.probability) : p.theme.cellEmpty.color, fontFamily: PIXI_FONTS.MONO, alpha: isGhost ? 0.35 : undefined });
+          labels.push({ x: px, y, text: probText, color: lerpWhite(cell.probability > 0 ? probColor(cell.probability) : p.theme.cellEmpty.color, glow), fontFamily: PIXI_FONTS.MONO, alpha: isGhost ? 0.35 : undefined });
         }
       }
     }
