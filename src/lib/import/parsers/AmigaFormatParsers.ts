@@ -712,7 +712,7 @@ export async function tryRouteFormat(
 
   // ── Actionamics (.act) ────────────────────────────────────────────────────
   // Identified by "ACTIONAMICS SOUND TOOL" signature at offset 62.
-  if (matchesExt(filename, ['act'])) {
+  if (matchesExt(filename, ['act', 'ast'])) {
     const { isActionamicsFormat, parseActionamicsFile } = await import('@lib/import/formats/ActionamicsParser');
     return withNativeThenUADE('actionamics', ctx,
       (bytes: Uint8Array | ArrayBuffer, name: string) => parseActionamicsFile(bytes as Uint8Array, name),
