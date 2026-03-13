@@ -215,7 +215,7 @@ export const useNavigationInput = (refs: TrackerInputRefs) => {
         // Start RAF-driven scroll (time-based throttle — refresh-rate independent)
         heldArrowRef.current = { dir, selecting };
         if (!arrowRafRef.current) {
-          let lastMoveTime = 0;
+          let lastMoveTime = performance.now(); // seed with current time to prevent immediate double-move
           const MOVE_INTERVAL = 50; // ~20 moves/sec regardless of refresh rate
           const tick = (now: number) => {
             const held = heldArrowRef.current;
