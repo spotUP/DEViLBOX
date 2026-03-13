@@ -416,6 +416,7 @@ function shouldActivate(desc: NativeEngineDescriptor, song: TrackerSong): boolea
 export interface NativeEngineStartResult {
   suppressNotes: boolean;
   c64SidEngine: C64SIDEngine | null;
+  hivelyEngine: HivelyEngine | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -432,6 +433,7 @@ export async function startNativeEngines(
   const toneEngine = getToneEngine();
   let suppressNotes = false;
   let c64SidEngine: C64SIDEngine | null = null;
+  let hivelyEngine: HivelyEngine | null = null;
 
   // Clean up any leftover silence detectors from a previous session
   for (const [, detector] of activeSilenceDetectors) {
@@ -474,6 +476,11 @@ export async function startNativeEngines(
       if (!muted) {
         instance.play();
         console.log(`[NativeEngineRouting] ${desc.key} loaded & playing`);
+
+        // Capture HivelyEngine for position sync in TrackerReplayer
+        if (desc.key === 'Hively') {
+          hivelyEngine = instance as unknown as HivelyEngine;
+        }
 
         // Direct routing for engines without a synth in song.instruments
         if (desc.needsDirectRouting && !isDJDeck && !routedNativeEngines.has(desc.synthType)) {
@@ -604,7 +611,7 @@ export async function startNativeEngines(
     }
   }
 
-  return { suppressNotes, c64SidEngine };
+  return { suppressNotes, c64SidEngine, hivelyEngine };
 }
 
 // ---------------------------------------------------------------------------

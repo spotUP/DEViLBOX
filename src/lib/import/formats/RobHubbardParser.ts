@@ -144,12 +144,11 @@ export function isRobHubbardFormat(buffer: ArrayBuffer, filename?: string): bool
  */
 function findSampleTable(buf: Uint8Array): { tableOffset: number; count: number } | null {
   // ── Step 1: find sample count ─────────────────────────────────────────────
+  // Scan for MOVE.L (A0)+,D2 opcode 0x2418 — the count byte precedes it
   let sampleCount = -1;
-  for (let i = 0; i < 8; i++) {
-    const off = 64 + i * 2;
-    if (off + 2 > buf.length) break;
+  const step1Limit = Math.min(256, buf.length - 2);
+  for (let off = 64; off < step1Limit; off += 2) {
     if (u16BE(buf, off) === 0x2418) {
-      // After post-increment: A2 = off + 2.  The count byte is at -3(A2) = off - 1.
       if (off - 1 >= 0) {
         sampleCount = buf[off - 1];
       }
@@ -159,10 +158,10 @@ function findSampleTable(buf: Uint8Array): { tableOffset: number; count: number 
   if (sampleCount < 0) return null;
 
   // ── Step 2: find sample table offset ─────────────────────────────────────
+  // Scan for LEA pc-relative opcode 0x41FA
   let d16Pos = -1;
-  for (let i = 0; i <= 4; i++) {
-    const off = 54 + i * 2;
-    if (off + 2 > buf.length) break;
+  const step2Limit = Math.min(128, buf.length - 2);
+  for (let off = 40; off < step2Limit; off += 2) {
     if (u16BE(buf, off) === 0x41FA) {
       d16Pos = off + 2; // displacement word is immediately after the opcode
       break;
