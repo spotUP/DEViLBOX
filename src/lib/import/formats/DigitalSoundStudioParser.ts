@@ -402,7 +402,7 @@ export function parseDigitalSoundStudioFile(bytes: Uint8Array, filename: string)
       // But sample.LoopStart is an absolute byte offset within the sample block,
       // so relative to sample data it is: info.loopStart - info.startOffset
       // (Both are relative to the sample data block base)
-      const loopStartBytes = hasLoop ? info.loopStart : 0;
+      const loopStartBytes = hasLoop ? Math.max(0, info.loopStart - info.startOffset) : 0;
       const loopEndBytes   = hasLoop ? loopStartBytes + info.loopLength * 2 : 0;
 
       // C3 rate: use frequency field if non-zero, else use period table for C3
