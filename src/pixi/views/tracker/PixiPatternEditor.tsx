@@ -1070,7 +1070,13 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
         playbackPatternIdx: newPattern,
         ...extra,
       };
-      fullRedrawRef.current = true;
+      // Only force full redraw on pattern changes (structural: new data, new length).
+      // Normal row advancement is handled by the vStartChanged path in imperativeRedraw,
+      // which skips the expensive renderGrid call. Setting fullRedraw on every row was
+      // causing grid+labels+overlay regeneration 4-8× per second unnecessarily.
+      if (patternChanged) {
+        fullRedrawRef.current = true;
+      }
       imperativeRedrawRef.current?.();
       playbackRowRef.current = newRow;
       if (patternChanged) {
@@ -1152,6 +1158,8 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
       prevVStartRef.current = vStart;
       prevSelectionRef.current = selection;
       prevChannelRef.current = cursor.channelIndex;
+      const gGrid = gridGraphicsRef.current;
+      if (gGrid) renderGrid(gGrid, p, vStart);
       if (mega) mega.updateLabels(generateLabels(p, vStart));
       const gOverlay = overlayGraphicsRef.current;
       if (gOverlay) renderOverlay(gOverlay, p, cursor, selection, vStart, currentRow,
