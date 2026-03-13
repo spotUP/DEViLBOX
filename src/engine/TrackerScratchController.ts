@@ -216,6 +216,9 @@ export class TrackerScratchController {
 
     const replayer = getTrackerReplayer();
 
+    // Only enter scratch mode when transport is playing
+    if (!replayer.isPlaying()) return false;
+
     // First significant event — enter scratch mode
     if (!this._isActive) {
       console.warn(`[TrackerScratch] Entering scratch mode, delta=${deltaY.toFixed(1)}`);
