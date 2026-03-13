@@ -190,6 +190,10 @@ export class CZ101Synth implements DevilboxSynth {
       keepalive.connect(ctx.destination);
     } catch { /* keepalive failed */ }
 
+    // Fetch WASM on main thread (fetch not available in AudioWorklets in some browsers)
+    const wasmResponse = await fetch(`${baseUrl}cz101/CZ101.wasm`);
+    const wasmBinary = await wasmResponse.arrayBuffer();
+
     // Wait for worklet ready
     await new Promise<void>((resolve, reject) => {
       const timeout = setTimeout(() => reject(new Error('CZ101 init timeout')), 5000);
@@ -204,7 +208,7 @@ export class CZ101Synth implements DevilboxSynth {
 
       this.workletNode!.port.addEventListener('message', handler);
       this.workletNode!.port.start();
-      this.workletNode!.port.postMessage({ type: 'init' });
+      this.workletNode!.port.postMessage({ type: 'init', wasmBinary }, [wasmBinary]);
     });
 
     this.isInitialized = true;
