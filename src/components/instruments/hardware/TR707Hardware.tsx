@@ -47,41 +47,45 @@ const TR707Slider: React.FC<{
   const currentThemeId = useThemeStore((state) => state.currentThemeId);
   const isDark = currentThemeId !== 'cyan-lineart';
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    onChange(parseFloat(e.target.value));
+  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    const track = e.currentTarget;
+    const rect = track.getBoundingClientRect();
+
+    const computeValue = (clientY: number) => {
+      const y = clientY - rect.top;
+      // Invert: top = 1, bottom = 0
+      const raw = 1 - Math.max(0, Math.min(1, y / rect.height));
+      onChange(Math.round(raw * 100) / 100);
+    };
+    computeValue(e.clientY);
+
+    const handleMouseMove = (moveEvent: MouseEvent) => computeValue(moveEvent.clientY);
+    const handleMouseUp = () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
   };
 
   return (
     <div className="flex flex-col items-center gap-2 flex-1">
-      {/* Slider track */}
-      <div className="relative h-32 w-8 flex items-center justify-center">
-        <div className={`absolute inset-0 rounded-full ${isDark ? 'bg-dark-bgTertiary' : 'bg-dark-bgHover'} border ${isDark ? 'border-dark-borderLight' : 'border-dark-borderLight'} z-0`}>
-          {/* Slider groove */}
+      {/* Slider track — handles mouse input directly */}
+      <div
+        className="relative h-32 w-8 cursor-pointer select-none"
+        onMouseDown={handleMouseDown}
+      >
+        <div className={`absolute inset-0 rounded-full ${isDark ? 'bg-dark-bgTertiary' : 'bg-dark-bgHover'} border ${isDark ? 'border-dark-borderLight' : 'border-dark-borderLight'}`}>
           <div className="absolute left-1/2 top-2 bottom-2 w-1 -translate-x-1/2 bg-dark-bgSecondary rounded-full" />
         </div>
 
-        {/* Slider input */}
-        <input
-          type="range"
-          min="0"
-          max="1"
-          step="0.01"
-          value={value}
-          onChange={handleChange}
-          className="absolute h-32 w-8 bg-transparent cursor-pointer vertical-slider z-10 opacity-0"
-          style={{
-            writingMode: 'vertical-lr' as React.CSSProperties['writingMode'],
-            direction: 'rtl' as React.CSSProperties['direction'],
-          }}
-          title={`${label}: ${Math.round(value * 100)}%`}
-        />
-
         {/* Slider cap */}
         <div
-          className={`absolute w-6 h-3 rounded-sm ${isDark ? 'bg-red-600' : 'bg-red-500'} border border-red-800 shadow-lg pointer-events-none transition-all z-20`}
+          className={`absolute left-1/2 w-6 h-3 rounded-sm ${isDark ? 'bg-red-600' : 'bg-red-500'} border border-red-800 shadow-lg pointer-events-none`}
           style={{
-            top: `${100 - value * 100}%`,
-            transform: 'translateY(-50%)',
+            top: `${(1 - value) * 100}%`,
+            transform: 'translate(-50%, -50%)',
           }}
         />
       </div>

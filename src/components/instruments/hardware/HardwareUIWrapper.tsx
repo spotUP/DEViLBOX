@@ -125,6 +125,14 @@ const GEARMULATOR_TYPES: SynthType[] = [
   'GearmulatorJP8000',
 ];
 
+/** Synth types whose dedicated hardware UI includes a built-in keyboard or step sequencer,
+ *  meaning the external TestKeyboard is redundant and should be hidden. */
+const SYNTHS_WITH_BUILTIN_INPUT = new Set<string>([
+  'DrumMachine',  // TR-808/909 has a 16-step sequencer
+  'MAMETR707',    // TR-707 has a 16-step sequencer
+  'TB303',        // TB-303 has its own note input
+]);
+
 /** Check if a synth type has any hardware UI (dedicated or generic) */
 // eslint-disable-next-line react-refresh/only-export-components
 export function hasHardwareUI(synthType: SynthType): boolean {
@@ -134,6 +142,12 @@ export function hasHardwareUI(synthType: SynthType): boolean {
   if (GEARMULATOR_TYPES.includes(synthType)) return true;
   if (isVSTBridgeType(synthType)) return true;
   return false;
+}
+
+/** Check if a synth's hardware UI has a built-in keyboard/step-sequencer */
+// eslint-disable-next-line react-refresh/only-export-components
+export function hasBuiltInInput(synthType: SynthType): boolean {
+  return SYNTHS_WITH_BUILTIN_INPUT.has(synthType);
 }
 
 /** Get the hardware UI component for a synth type (dedicated only) */
