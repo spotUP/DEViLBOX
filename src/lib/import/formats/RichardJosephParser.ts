@@ -234,6 +234,5 @@ export async function parseRJPFile(
     initialSpeed: 6,
     initialBPM: 125,
     linearPeriods: false,
-    uadePatternLayout: true,
   };
 }
