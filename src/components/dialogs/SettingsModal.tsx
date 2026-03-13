@@ -23,7 +23,8 @@ import { getASIDDeviceManager, isASIDSupported } from '@lib/sid/ASIDDeviceManage
 import { useModalClose } from '@hooks/useDialogKeyboard';
 
 /** Normalize any CSS color to #RRGGBB for <input type="color"> */
-function normalizeToHex6(color: string): string {
+function normalizeToHex6(color: string | undefined): string {
+  if (!color) return '#000000';
   const s = color.trim();
   const rgbaMatch = s.match(/^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/);
   if (rgbaMatch) {
