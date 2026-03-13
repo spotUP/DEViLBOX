@@ -42,6 +42,7 @@ set(ZLIB_SOURCES
 set(FILEOPS_SOURCES
   # File operations
   ${FURNACE_ENGINE}/fileOps/fur.cpp
+  ${FURNACE_ENGINE}/fileOps/dmf.cpp
   ${FURNACE_ENGINE}/fileOps/fileOpsCommon.cpp
 
   # I/O

@@ -100,12 +100,28 @@ export async function tryRouteFormat(
           if (result) return result;
         }
       } catch (err) {
-        console.warn(`[XTrackerParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+        console.warn(`[XTrackerParser] Native parse failed for ${filename}, falling back:`, err);
       }
     }
-    // DefleMask DMF (non-DDMF magic) falls through to Furnace parser
-    if (!bytes[0] || !(bytes[0] === 0x44 && bytes[1] === 0x44 && bytes[2] === 0x4D && bytes[3] === 0x46)) {
-      { const { parseFurnaceFile } = await import('./FurnaceToSong'); return parseFurnaceFile(buffer, originalFileName, subsong); }
+    // Check for DefleMask magic ".DeFleMask." (starts with 0x2E 0x44 0x65 0x46)
+    const isDefleMask = bytes.length > 16 &&
+      bytes[0] === 0x2E && bytes[1] === 0x44 && bytes[2] === 0x65 && bytes[3] === 0x46;
+    const isDDMF = bytes[0] === 0x44 && bytes[1] === 0x44 && bytes[2] === 0x4D && bytes[3] === 0x46;
+    if (isDefleMask) {
+      // Try Furnace WASM first (supports DMF natively), then TS DefleMask parser
+      try {
+        const { parseFurnaceFile } = await import('./FurnaceToSong');
+        return await parseFurnaceFile(buffer, originalFileName, subsong);
+      } catch {
+        // WASM doesn't support DMF yet — use TS DefleMask parser
+        const { parseDefleMaskToTrackerSong } = await import('./DefleMaskToSong');
+        return parseDefleMaskToTrackerSong(buffer, originalFileName);
+      }
+    }
+    if (!isDDMF) {
+      // Unknown .dmf variant → try Furnace WASM
+      const { parseFurnaceFile } = await import('./FurnaceToSong');
+      return parseFurnaceFile(buffer, originalFileName, subsong);
     }
     // X-Tracker DMF that wasn't handled above → UADE fallback
     const { parseUADEFile: parseUADE_dmf } = await import('@lib/import/formats/UADEParser');
