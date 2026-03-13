@@ -80,8 +80,8 @@ const PT_PERIODS: number[] = [
  * Map a SidMon 1 note index (0-66) to an XM note number (1-96).
  */
 function sm1NoteToXM(sm1Note: number): number {
-  if (sm1Note < 0 || sm1Note >= SM1_PERIODS.length) return 0;
-  const period = SM1_PERIODS[sm1Note + 1];
+  if (sm1Note <= 0 || sm1Note >= SM1_PERIODS.length) return 0;
+  const period = SM1_PERIODS[sm1Note];
   if (!period || period <= 0) return 0;
 
   let bestIdx = 0;
@@ -345,7 +345,7 @@ export function parseSidMon1File(buffer: ArrayBuffer, filename: string, moduleBa
   // Each pattern row is 5 bytes: note, sample, effect, param, speed
   const patStart  = position - 12 >= 0 ? u32BE(buf, position - 12) : 0;
   const patEnd    = position - 8  >= 0 ? u32BE(buf, position - 8)  : patStart;
-  const numPatRows = Math.floor((patEnd - patStart) / 5);
+  const numPatRows = Math.max(0, Math.floor((patEnd - patStart) / 5));
 
   interface SM1Row {
     note:   number;
