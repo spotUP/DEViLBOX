@@ -1224,7 +1224,7 @@ export function parseFCFile(buffer: ArrayBuffer, filename: string, moduleBase = 
     restartPosition: 0,
     numChannels: 4,
     initialSpeed: sequences.length > 0 && sequences[0].speed > 0 ? sequences[0].speed : 3,
-    initialBPM: 125,
+    initialBPM: Math.round(125 * 6 / (sequences.length > 0 && sequences[0].speed > 0 ? sequences[0].speed : 3)),
     linearPeriods: false,
     uadePatternLayout,
   };
