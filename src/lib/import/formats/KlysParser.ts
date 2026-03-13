@@ -224,6 +224,57 @@ export function parseKlystrack(buf: ArrayBuffer): TrackerSong {
   // BPM estimation from song_rate
   const bpm = songRate > 0 ? Math.round((songRate * 60) / (songSpeed + songSpeed2 || 6)) : 125;
 
+  // Pre-populate klysNative with stub data so KlysView has something to display
+  // immediately. WASM onSongData callback will overwrite with real data when ready.
+  const nativePatterns: KlysNativeData['patterns'] = patterns.map(p => ({
+    numSteps: p.length,
+    steps: Array.from({ length: p.length }, () => ({
+      note: 0,
+      instrument: 0xFF,
+      ctrl: 0,
+      volume: 0,
+      command: 0,
+    })),
+  }));
+
+  const nativeSequences: KlysNativeData['sequences'] = Array.from(
+    { length: numChannels },
+    (_, ch) => ({
+      entries: songPositions.map((pat, pos) => ({
+        position: pos,
+        pattern: pat,
+        noteOffset: 0,
+      })),
+    }),
+  );
+
+  const nativeInstruments: KlysNativeData['instruments'] = instruments.map(i => ({
+    name: i.name,
+    adsr: { a: 0, d: 0, s: 127, r: 0 },
+    flags: 0,
+    cydflags: 0,
+    baseNote: 60,
+    finetune: 0,
+    slideSpeed: 0,
+    pw: 128,
+    volume: 100,
+    progPeriod: 0,
+    vibratoSpeed: 0,
+    vibratoDepth: 0,
+    pwmSpeed: 0,
+    pwmDepth: 0,
+    cutoff: 255,
+    resonance: 0,
+    flttype: 0,
+    fxBus: 0,
+    buzzOffset: 0,
+    ringMod: 0,
+    syncSource: 0,
+    wavetableEntry: 0,
+    fm: { modulation: 0, feedback: 0, harmonic: 0, adsr: { a: 0, d: 0, s: 0, r: 0 } },
+    program: [],
+  }));
+
   const klysNative: KlysNativeData = {
     channels: numChannels,
     songLength,
@@ -233,9 +284,9 @@ export function parseKlystrack(buf: ArrayBuffer): TrackerSong {
     songRate,
     masterVolume,
     flags,
-    patterns: [], // populated from WASM
-    sequences: [], // populated from WASM
-    instruments: [], // populated from WASM
+    patterns: nativePatterns,
+    sequences: nativeSequences,
+    instruments: nativeInstruments,
   };
 
   const format: TrackerFormat = 'KT';
