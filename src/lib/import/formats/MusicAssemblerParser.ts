@@ -815,13 +815,13 @@ function parseMusicAssembler(bytes: Uint8Array, filename: string): TrackerSong |
         } else if (tr.note !== 0) {
           // Apply transpose (signed byte added to note index)
           const rawNote = tr.note + transpose;
-          const clamped = Math.max(0, Math.min(MA_PERIODS.length - 1, rawNote));
+          const clamped = Math.max(1, Math.min(MA_PERIODS.length - 1, rawNote));
           xmNote = maNoteToXM(clamped);
         }
 
         cells[row][v] = {
           note:       xmNote,
-          instrument: tr.note !== 0 || tr.release ? lastInstrument : 0,
+          instrument: xmNote !== 0 || tr.release ? lastInstrument : 0,
           volume:     0,
           effTyp:     0,
           eff:        0,
