@@ -449,6 +449,7 @@ function generateLabels(p: RenderParams, vStart: number, activeRow = -1): LabelD
     // passed (smaller rowNum = visually above) fade out. Rows ahead get no glow.
     const behind = activeRow >= 0 && !isGhost ? activeRow - rowNum : -1;
     const glow = behind >= 0 && behind <= TRAIL_ROWS ? 1 - behind / TRAIL_ROWS : 0;
+    const font = behind === 0 ? PIXI_FONTS.MONO_BOLD : PIXI_FONTS.MONO;
     let lineNumText: string;
     if (p.showBeatLabels) {
       const beat = Math.floor(actualRow / p.rowHighlightInterval) + 1;
@@ -462,7 +463,7 @@ function generateLabels(p: RenderParams, vStart: number, activeRow = -1): LabelD
     labels.push({
       x: 4, y, text: lineNumText,
       color: lerpWhite(isHighlightRow ? p.theme.accentSecondary.color : p.theme.textMuted.color, glow),
-      fontFamily: PIXI_FONTS.MONO, alpha: isGhost ? 0.35 : undefined,
+      fontFamily: font, alpha: isGhost ? 0.35 : undefined,
     });
 
     for (let ch = 0; ch < p.numChannels; ch++) {
@@ -483,7 +484,7 @@ function generateLabels(p: RenderParams, vStart: number, activeRow = -1): LabelD
         : (cell.note > 0 && cell.note < 97) ? p.theme.cellNote.color
         : p.theme.cellEmpty.color, glow);
       if (noteText !== '---' || !p.blankEmpty) {
-        labels.push({ x: baseX, y, text: noteText, color: noteColor, fontFamily: PIXI_FONTS.MONO, alpha: isGhost ? 0.35 : undefined });
+        labels.push({ x: baseX, y, text: noteText, color: noteColor, fontFamily: font, alpha: isGhost ? 0.35 : undefined });
       }
 
       if (isCollapsed) continue;
@@ -493,14 +494,14 @@ function generateLabels(p: RenderParams, vStart: number, activeRow = -1): LabelD
 
       const insText = cell.instrument > 0 ? hexByte(cell.instrument) : (p.blankEmpty ? '' : '..');
       if (insText) {
-        labels.push({ x: px, y, text: insText, color: lerpWhite(cell.instrument > 0 ? p.theme.cellInstrument.color : p.theme.cellEmpty.color, glow), fontFamily: PIXI_FONTS.MONO, alpha: isGhost ? 0.35 : undefined });
+        labels.push({ x: px, y, text: insText, color: lerpWhite(cell.instrument > 0 ? p.theme.cellInstrument.color : p.theme.cellEmpty.color, glow), fontFamily: font, alpha: isGhost ? 0.35 : undefined });
       }
       px += CHAR_WIDTH * 2 + 4;
 
       const volValid = cell.volume >= 0x10 && cell.volume <= 0x50;
       const volText = volValid ? hexByte(cell.volume) : (p.blankEmpty ? '' : '..');
       if (volText) {
-        labels.push({ x: px, y, text: volText, color: lerpWhite(volValid ? p.theme.cellVolume.color : p.theme.cellEmpty.color, glow), fontFamily: PIXI_FONTS.MONO, alpha: isGhost ? 0.35 : undefined });
+        labels.push({ x: px, y, text: volText, color: lerpWhite(volValid ? p.theme.cellVolume.color : p.theme.cellEmpty.color, glow), fontFamily: font, alpha: isGhost ? 0.35 : undefined });
       }
       px += CHAR_WIDTH * 2 + 4;
 
@@ -518,7 +519,7 @@ function generateLabels(p: RenderParams, vStart: number, activeRow = -1): LabelD
           : (cell.eff5 ?? 0);
         const effText = formatEffect(typ, val, p.useHex);
         if (effText !== '...' || !p.blankEmpty) {
-          labels.push({ x: px, y, text: effText, color: lerpWhite((typ > 0 || val > 0) ? p.theme.cellEffect.color : p.theme.cellEmpty.color, glow), fontFamily: PIXI_FONTS.MONO, alpha: isGhost ? 0.35 : undefined });
+          labels.push({ x: px, y, text: effText, color: lerpWhite((typ > 0 || val > 0) ? p.theme.cellEffect.color : p.theme.cellEmpty.color, glow), fontFamily: font, alpha: isGhost ? 0.35 : undefined });
         }
         px += CHAR_WIDTH * 3 + 4;
       }
@@ -526,13 +527,13 @@ function generateLabels(p: RenderParams, vStart: number, activeRow = -1): LabelD
       if (p.columnVisibility.flag1 && cell.flag1 !== undefined) {
         const flagChar = cell.flag1 === 1 ? 'A' : cell.flag1 === 2 ? 'S' : '.';
         const flagColor = lerpWhite(cell.flag1 === 1 ? FLAG_COLORS.accent : cell.flag1 === 2 ? FLAG_COLORS.slide : p.theme.cellEmpty.color, glow);
-        labels.push({ x: px, y, text: flagChar, color: flagColor, fontFamily: PIXI_FONTS.MONO, alpha: isGhost ? 0.35 : undefined });
+        labels.push({ x: px, y, text: flagChar, color: flagColor, fontFamily: font, alpha: isGhost ? 0.35 : undefined });
         px += CHAR_WIDTH + 4;
       }
       if (p.columnVisibility.flag2 && cell.flag2 !== undefined) {
         const flagChar = cell.flag2 === 1 ? 'M' : cell.flag2 === 2 ? 'H' : '.';
         const flagColor = lerpWhite(cell.flag2 === 1 ? FLAG_COLORS.mute : cell.flag2 === 2 ? FLAG_COLORS.hammer : p.theme.cellEmpty.color, glow);
-        labels.push({ x: px, y, text: flagChar, color: flagColor, fontFamily: PIXI_FONTS.MONO, alpha: isGhost ? 0.35 : undefined });
+        labels.push({ x: px, y, text: flagChar, color: flagColor, fontFamily: font, alpha: isGhost ? 0.35 : undefined });
         px += CHAR_WIDTH + 4;
       }
 
@@ -541,7 +542,7 @@ function generateLabels(p: RenderParams, vStart: number, activeRow = -1): LabelD
           ? (p.useHex ? HEX_TABLE[cell.probability & 0xFF] : DEC_TABLE[cell.probability & 0xFF])
           : (p.blankEmpty ? '' : '..');
         if (probText) {
-          labels.push({ x: px, y, text: probText, color: lerpWhite(cell.probability > 0 ? probColor(cell.probability) : p.theme.cellEmpty.color, glow), fontFamily: PIXI_FONTS.MONO, alpha: isGhost ? 0.35 : undefined });
+          labels.push({ x: px, y, text: probText, color: lerpWhite(cell.probability > 0 ? probColor(cell.probability) : p.theme.cellEmpty.color, glow), fontFamily: font, alpha: isGhost ? 0.35 : undefined });
         }
       }
     }
