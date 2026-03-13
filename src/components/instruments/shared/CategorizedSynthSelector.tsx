@@ -284,7 +284,7 @@ export const CategorizedSynthSelector: React.FC<CategorizedSynthSelectorProps> =
 
     return (
       <div
-        key={synth.type}
+        key={synth.name}
         data-synth-type={synth.type}
         onClick={() => handleSelectSynth(synth.type)}
         onMouseEnter={() => setHoveredSynth(synth.type)}
@@ -372,7 +372,7 @@ export const CategorizedSynthSelector: React.FC<CategorizedSynthSelectorProps> =
 
             return (
               <button
-                key={synth.type}
+                key={synth.name}
                 data-synth-type={synth.type}
                 onClick={() => handleSelectSynth(synth.type)}
                 className={`
