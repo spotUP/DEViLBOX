@@ -28,6 +28,7 @@ interface FormatStore {
   klysFileData: ArrayBuffer | null;
   musiclineFileData: Uint8Array | null;
   c64SidFileData: Uint8Array | null;
+  goatTrackerData: Uint8Array | null;
   jamCrackerFileData: ArrayBuffer | null;
   futurePlayerFileData: ArrayBuffer | null;
   preTrackerFileData: ArrayBuffer | null;
@@ -96,6 +97,7 @@ export const useFormatStore = create<FormatStore>()(
     klysFileData: null,
     musiclineFileData: null,
     c64SidFileData: null,
+    goatTrackerData: null,
     jamCrackerFileData: null,
     futurePlayerFileData: null,
     preTrackerFileData: null,
@@ -146,6 +148,7 @@ export const useFormatStore = create<FormatStore>()(
       useEditorStore.getState().setLinearPeriods(song.linearPeriods ?? false);
       set((state) => {
         state.c64SidFileData = song.c64SidFileData ?? null;
+        state.goatTrackerData = song.goatTrackerData ?? null;
         state.jamCrackerFileData = song.jamCrackerFileData ?? null;
         state.futurePlayerFileData = song.futurePlayerFileData ?? null;
         state.preTrackerFileData = song.preTrackerFileData ?? null;
@@ -213,6 +216,7 @@ export const useFormatStore = create<FormatStore>()(
       state.editorMode = 'classic';
       clearNative(state);
       state.c64SidFileData = null;
+      state.goatTrackerData = null;
       state.jamCrackerFileData = null;
       state.futurePlayerFileData = null;
       state.preTrackerFileData = null;
