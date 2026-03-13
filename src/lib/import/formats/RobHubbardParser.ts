@@ -403,6 +403,5 @@ export async function parseRobHubbardFile(
     initialSpeed: 6,
     initialBPM: 125,
     linearPeriods: false,
-    uadePatternLayout: true,
   };
 }

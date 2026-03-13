@@ -239,7 +239,7 @@ export function parseKlystrack(buf: ArrayBuffer): TrackerSong {
 
   const nativeSequences: KlysNativeData['sequences'] = Array.from(
     { length: numChannels },
-    (_, ch) => ({
+    (_) => ({
       entries: songPositions.map((pat, pos) => ({
         position: pos,
         pattern: pat,
