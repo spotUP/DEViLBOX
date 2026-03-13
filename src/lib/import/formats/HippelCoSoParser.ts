@@ -285,7 +285,7 @@ export async function parseHippelCoSoFile(
 
     // Resolve fseq: if fseqIdx is -128, no fseq (just hold base note)
     let fseq: number[] = [0, -31];
-    if (fseqIdx !== -128) {
+    if (fseqIdx !== -128 && fseqIdx >= 0) {
       const fseqPtrOff = frqseqsOff + fseqIdx * 2;
       if (fseqPtrOff + 2 <= buf.length) {
         const fseqDataOff = u16BE(buf, fseqPtrOff);

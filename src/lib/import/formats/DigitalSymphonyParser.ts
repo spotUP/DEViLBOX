@@ -580,16 +580,14 @@ function parseDigitalSymphonyFileImpl(bytes: Uint8Array, filename: string): Trac
     return (mod3 === 1 || mod3 === 2) ? 50 : -50;
   }
 
-  // ── Sample name length array (63 bytes) ──────────────────────────────────
+  // ── Sample name length + length array (interspersed) ──────────────────────
+  // Per OpenMPT Load_dsym.cpp: each sample has a nameLen byte, then if not
+  // virtual (bit7=0), immediately followed by 3-byte uint24LE length.
   const sampleNameLength = new Uint8Array(64); // index 1..63
+  const sampleLength = new Uint32Array(64); // in bytes
   for (let smp = 1; smp <= MAX_SAMPLES; smp++) {
     if (pos >= bytes.length) return null;
     sampleNameLength[smp] = bytes[pos++];
-  }
-
-  // ── Read sample lengths (uint24LE << 1, only for non-virtual samples) ────
-  const sampleLength = new Uint32Array(64); // in bytes
-  for (let smp = 1; smp <= MAX_SAMPLES; smp++) {
     if (!(sampleNameLength[smp] & 0x80)) {
       if (pos + 3 > bytes.length) return null;
       const len24 = bytes[pos] | (bytes[pos + 1] << 8) | (bytes[pos + 2] << 16);
