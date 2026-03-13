@@ -57,8 +57,8 @@ export default {
         }
       },
       fontFamily: {
-        sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
-        mono: ['JetBrains Mono', 'SF Mono', 'Fira Code', 'Consolas', 'monospace'],
+        sans: ['var(--theme-font-sans)', 'Inter', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
+        mono: ['var(--theme-font-mono)', 'JetBrains Mono', 'SF Mono', 'Fira Code', 'Consolas', 'monospace'],
       },
       fontSize: {
         'tracker': '12px',

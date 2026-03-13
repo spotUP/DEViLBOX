@@ -259,7 +259,7 @@ export const EditorHeader: React.FC<EditorHeaderProps> = ({
                       {category.synths
                         .sort((a, b) => a.name.localeCompare(b.name))
                         .map((synth) => (
-                          <option key={`${category.id}-${synth.type}`} value={synth.type}>
+                          <option key={`${category.id}-${synth.name}`} value={synth.type}>
                             {synth.name}
                           </option>
                         ))}
