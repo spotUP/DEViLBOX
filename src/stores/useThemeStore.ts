@@ -263,7 +263,9 @@ export let themes: Theme[] = [...builtinThemes, defaultCustomTheme];
 
 /** Rebuild the exported themes array when custom theme changes */
 function rebuildThemesList(customColors: ThemeColors | null) {
-  const customTheme: Theme = { id: 'custom', name: 'Custom', colors: customColors || { ...neoDarkTheme.colors } };
+  // Merge with defaults so persisted colors missing newer keys still have values
+  const colors = customColors ? { ...neoDarkTheme.colors, ...customColors } : { ...neoDarkTheme.colors };
+  const customTheme: Theme = { id: 'custom', name: 'Custom', colors };
   themes = [...builtinThemes, customTheme];
 }
 

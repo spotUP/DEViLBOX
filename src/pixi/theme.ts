@@ -53,7 +53,8 @@ export interface PixiTheme {
  * Parse a CSS color string to PixiJS numeric color + alpha.
  * Supports: #RGB, #RRGGBB, #RRGGBBAA, rgba(r,g,b,a), rgb(r,g,b)
  */
-export function cssColorToPixi(cssColor: string): PixiColor {
+export function cssColorToPixi(cssColor: string | undefined): PixiColor {
+  if (!cssColor) return { color: 0xffffff, alpha: 1 };
   const s = cssColor.trim();
 
   // Handle rgba(r, g, b, a)
