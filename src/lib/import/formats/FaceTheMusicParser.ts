@@ -213,6 +213,7 @@ export function parseFaceTheMusicFile(bytes: Uint8Array, filename: string): Trac
 
     let globalRow = 0;
     let spacing   = defaultSpacing;
+    let lastInstr = 0;  // Track last instrument set per channel
 
     while (pos + 2 <= chunkEnd) {
       const data0 = u8(view, pos);
@@ -270,6 +271,7 @@ export function parseFaceTheMusicFile(bytes: Uint8Array, filename: string): Trac
           cell.effTyp = 0x41;  // CMD_CHANNELVOLUME (0x41 in OpenMPT; store as generic vol col)
           cell.volume = Math.round(volRaw);
           cell.instrument = param;
+          lastInstr = param;
           break;
         }
       }
@@ -279,11 +281,11 @@ export function parseFaceTheMusicFile(bytes: Uint8Array, filename: string): Trac
       if (noteBits >= 35) {
         cell.note = 97;  // Key-off
       } else if (noteBits !== 0) {
-        // Load_ftm.cpp: m.note = NOTE_MIDDLEC - 13 + note
-        // NOTE_MIDDLEC = 61 in OpenMPT, C5 = 61 — but in XM/DEViLBOX note 1 = C-0
-        // OpenMPT: NOTE_MIDDLEC=61 → minus 13 = 48, so note 1 → cell 49 = C4
-        // In DEViLBOX XM convention: C4 = 49 (C-0=1, C-1=13, C-2=25, C-3=37, C-4=49)
         cell.note = 48 + noteBits;
+        // If no instrument was set in this event, carry forward the last one
+        if (cell.instrument === 0 && lastInstr > 0) {
+          cell.instrument = lastInstr;
+        }
       }
 
       globalRow += 1 + spacing;

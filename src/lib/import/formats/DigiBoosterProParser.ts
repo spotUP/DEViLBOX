@@ -505,7 +505,7 @@ function buildInstrumentConfig(
     },
     metadata: {
       modPlayback: {
-        usePeriodPlayback: false,
+        usePeriodPlayback: true,
         periodMultiplier:  3546895,
         finetune:          0,
         defaultVolume:     vol,
