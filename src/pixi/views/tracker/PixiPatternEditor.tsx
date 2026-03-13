@@ -1009,8 +1009,12 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
       if (smooth) {
         // Recalculate row duration on row change OR when cached value is 0 (first frame)
         if (cachedRowDurRef.current === 0 || newRow !== prevRowRef.current || newPattern !== prevPatternRef.current) {
-          const nextState = replayer.getStateAtTime(audioTime + 0.5, true);
-          if (nextState && nextState.row !== audioState.row) {
+          // Find the NEXT row's state in the ring buffer (the one immediately after current).
+          // We need to peek just far enough to find a state with a different row,
+          // not the furthest state in the buffer (which could be 2-3 rows ahead,
+          // giving an inflated duration that makes smooth scroll move at half speed).
+          const nextState = replayer.getNextRowState(audioState);
+          if (nextState) {
             cachedRowDurRef.current = nextState.time - audioState.time;
           } else {
             // Compute from BPM/speed — use replayer's actual values for accuracy
