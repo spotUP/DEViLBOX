@@ -123,11 +123,9 @@
     -webkit-overflow-scrolling: auto;
   }
 
-  /* Prevent pull-to-refresh and overscroll on all elements by default */
-  * {
-    overscroll-behavior: none;
-    -webkit-overflow-scrolling: touch;
-  }
+  /* Allow scrollable containers (overflow-auto/scroll) to scroll normally
+     while still preventing scroll-chaining to the parent page.
+     html, body, #root already have overscroll-behavior: none above. */
 
   /* Disable elastic scrolling on iOS */
   @supports (-webkit-touch-callout: none) {
