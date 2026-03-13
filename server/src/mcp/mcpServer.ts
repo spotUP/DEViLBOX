@@ -6,10 +6,7 @@
  */
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-// MCP SDK expects Zod 3 schemas (._parse). Root zod is v4 which lacks ._parse.
-// Resolve zod from the SDK's own node_modules to get the compatible version.
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const { z } = require('@modelcontextprotocol/sdk/node_modules/zod') as typeof import('zod');
+import { z } from 'zod';
 import { readFile } from 'fs/promises';
 import { basename } from 'path';
 import { callBrowser } from './wsRelay';
