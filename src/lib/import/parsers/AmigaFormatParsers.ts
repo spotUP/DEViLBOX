@@ -438,7 +438,13 @@ export async function tryRouteFormat(
         if (prefs.davidWhittaker !== 'uade') {
       try {
         const { parseDavidWhittakerFile } = await import('@lib/import/formats/DavidWhittakerParser');
-        return parseDavidWhittakerFile(buffer, originalFileName);
+        const dwResult = parseDavidWhittakerFile(buffer, originalFileName);
+        // Check if native parser produced any notes; if not, fall to UADE
+        const dwNotes = dwResult.patterns.reduce((sum: number, p: any) =>
+          sum + p.channels.reduce((cs: number, ch: any) =>
+            cs + ch.rows.filter((r: any) => r.note > 0).length, 0), 0);
+        if (dwNotes > 0) return dwResult;
+        console.warn(`[DavidWhittakerParser] 0 notes extracted, falling back to UADE`);
       } catch (err) {
         console.warn(`[DavidWhittakerParser] Native parse failed for ${filename}, falling back to UADE:`, err);
       }
@@ -1209,7 +1215,14 @@ export async function tryRouteFormat(
         try {
           const { isRJPFormat, parseRJPFile } = await import('@lib/import/formats/RichardJosephParser');
           const _rjpBuf = new Uint8Array(buffer);
-          if (isRJPFormat(_rjpBuf)) return await parseRJPFile(buffer, originalFileName);
+          if (isRJPFormat(_rjpBuf)) {
+            const rjpResult = await parseRJPFile(buffer, originalFileName);
+            const rjpNotes = rjpResult.patterns.reduce((sum: number, p: any) =>
+              sum + p.channels.reduce((cs: number, ch: any) =>
+                cs + ch.rows.filter((r: any) => r.note > 0).length, 0), 0);
+            if (rjpNotes > 0) return rjpResult;
+            console.warn(`[RichardJosephParser] 0 notes extracted, falling back to UADE`);
+          }
         } catch (err) {
           console.warn(`[RichardJosephParser] Native parse failed for ${filename}, falling back to UADE:`, err);
         }
