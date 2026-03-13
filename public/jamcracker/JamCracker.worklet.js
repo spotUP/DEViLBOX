@@ -77,8 +77,11 @@ class JamCrackerProcessor extends AudioWorkletProcessor {
 
       // Pattern data access
       case 'get-pattern-data': {
-        if (!this.wasm || !this.tuneLoaded) break;
         const { patIdx, requestId } = data;
+        if (!this.wasm || !this.tuneLoaded) {
+          this.port.postMessage({ type: 'pattern-data', requestId, patIdx, numRows: 0, rows: [] });
+          break;
+        }
         const numRows = this.wasm._jc_get_pattern_rows(patIdx);
         const rows = [];
         for (let r = 0; r < numRows; r++) {

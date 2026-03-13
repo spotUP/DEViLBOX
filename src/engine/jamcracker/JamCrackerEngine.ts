@@ -297,7 +297,14 @@ export class JamCrackerEngine {
     return new Promise((resolve) => {
       if (!this.workletNode) { resolve({ numRows: 0, rows: [] }); return; }
       const requestId = `jc-pat-${this._requestId++}`;
-      this._patternCallbacks.set(requestId, (data) => resolve(data));
+      const timeout = setTimeout(() => {
+        this._patternCallbacks.delete(requestId);
+        resolve({ numRows: 0, rows: [] });
+      }, 3000);
+      this._patternCallbacks.set(requestId, (data) => {
+        clearTimeout(timeout);
+        resolve(data);
+      });
       this.workletNode.port.postMessage({ type: 'get-pattern-data', patIdx, requestId });
     });
   }
