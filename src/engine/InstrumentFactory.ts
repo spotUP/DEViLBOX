@@ -678,7 +678,9 @@ export class InstrumentFactory {
         break;
       }
 
-      case 'UADESynth': {
+      case 'UADESynth':
+      case 'DeltaMusic1Synth':
+      case 'DeltaMusic2Synth': {
         const uadeSynth = new UADESynth();
         if (config.uade) {
           // Fire-and-forget: load the file data into the UADE engine

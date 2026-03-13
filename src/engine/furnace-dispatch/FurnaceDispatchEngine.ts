@@ -927,7 +927,7 @@ export class FurnaceDispatchEngine {
   // Sequencer state
   private _seqLoadResolve: (() => void) | null = null;
   private _seqLoadReject: ((err: Error) => void) | null = null;
-  private _seqPositionCallbacks: Set<(order: number, row: number) => void> = new Set();
+  private _seqPositionCallbacks: Set<(order: number, row: number, audioTime?: number) => void> = new Set();
 
   // Module-level wavetable/sample data from .fur file import
   // Stored here so FurnaceDispatchSynth can upload to each platform during chip init
@@ -1254,7 +1254,7 @@ export class FurnaceDispatchEngine {
 
       case 'seqPosition':
         for (const cb of this._seqPositionCallbacks) {
-          cb(data.order as number, data.row as number);
+          cb(data.order as number, data.row as number, data.audioTime as number | undefined);
         }
         break;
 
@@ -1928,7 +1928,7 @@ export class FurnaceDispatchEngine {
   }
 
   /** Register callback for sequencer position updates */
-  onSeqPosition(callback: (order: number, row: number) => void): () => void {
+  onSeqPosition(callback: (order: number, row: number, audioTime?: number) => void): () => void {
     this._seqPositionCallbacks.add(callback);
     return () => { this._seqPositionCallbacks.delete(callback); };
   }

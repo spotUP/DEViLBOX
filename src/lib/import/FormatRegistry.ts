@@ -205,7 +205,6 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
     extRegex: /\.digi$/i,
     prefixes: ['digi.'],
     prefKey: 'digi',
-    nativeParser: { module: '@lib/import/formats/DigiBoosterParser', parseFn: 'parseDigiBoosterFile' },
     uadeFallback: true,
     hasMetadata: true,
   },

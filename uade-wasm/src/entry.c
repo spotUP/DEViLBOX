@@ -115,6 +115,8 @@ static void populate_virtual_fs(void) {
     EM_ASM({
         FS.mkdir('/uade');
         FS.mkdir('/uade/players');
+        FS.mkdir('/uade/ENV');
+        FS.mkdir('/uade/ENV/EaglePlayer');
     });
 
     /* Write each eagleplayer binary into MEMFS */

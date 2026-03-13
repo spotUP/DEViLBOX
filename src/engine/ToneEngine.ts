@@ -1465,7 +1465,21 @@ export class ToneEngine {
     const isMAME = config.synthType?.startsWith('MAME') || config.synthType === 'CZ101' || config.synthType === 'CEM3394' || config.synthType === 'SCSP';
     const isFurnace = config.synthType?.startsWith('Furnace') || config.synthType === 'Furnace';
     const isBuzzmachine = config.synthType?.startsWith('Buzz') || config.synthType === 'Buzzmachine';
-    const isWASMSynth = ['TB303', 'V2', 'Sam', 'DubSiren', 'SpaceLaser', 'Synare', 'Dexed', 'OBXd', 'WAM', 'SonicArrangerSynth', 'JamCrackerSynth', 'FuturePlayerSynth', 'GearmulatorVirus', 'GearmulatorVirusTI', 'GearmulatorMicroQ', 'GearmulatorXT', 'GearmulatorNord', 'GearmulatorJP8000', 'WaveSabreSynth', 'OidosSynth', 'TunefishSynth'].includes(config.synthType || '');
+    const isWASMSynth = [
+      // AudioWorklet WASM synths — use shared instances (one per instrument ID)
+      // to avoid exhausting fixed player-handle pools across channels.
+      'TB303', 'V2', 'Sam', 'DubSiren', 'SpaceLaser', 'Synare', 'Dexed', 'OBXd', 'WAM',
+      'SonicArrangerSynth', 'JamCrackerSynth', 'FuturePlayerSynth',
+      'SoundMonSynth', 'SidMonSynth', 'SidMon1Synth',
+      'DigMugSynth', 'DeltaMusic1Synth', 'DeltaMusic2Synth',
+      'FCSynth', 'TFMXSynth', 'SymphonieSynth', 'SunVoxSynth',
+      'FredSynth', 'HippelCoSoSynth', 'RobHubbardSynth',
+      'OctaMEDSynth', 'DavidWhittakerSynth',
+      'HivelySynth', 'KlysSynth', 'MAMEVASynth', 'UADESynth',
+      'GearmulatorVirus', 'GearmulatorVirusTI', 'GearmulatorMicroQ',
+      'GearmulatorXT', 'GearmulatorNord', 'GearmulatorJP8000',
+      'WaveSabreSynth', 'OidosSynth', 'TunefishSynth',
+    ].includes(config.synthType || '');
     const isVSTBridge = !isWASMSynth && typeof config.synthType === 'string' && SYNTH_REGISTRY.has(config.synthType);
     const isSharedType = config.synthType === 'Sampler' || config.synthType === 'Player' || config.synthType === 'SunVoxSynth' || isMAME || isFurnace || isBuzzmachine || isWASMSynth || isVSTBridge;
     const key = isSharedType
@@ -2170,6 +2184,8 @@ export class ToneEngine {
       case 'RobHubbardSynth':
       case 'DavidWhittakerSynth':
       case 'SonicArrangerSynth':
+      case 'DeltaMusic1Synth':
+      case 'DeltaMusic2Synth':
       // SunVox WASM patch player
       case 'SunVoxSynth':
       // Gearmulator DSP56300 VA synths

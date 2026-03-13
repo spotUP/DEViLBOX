@@ -313,121 +313,121 @@ export const useSettingsStore = create<SettingsStore>()(
         davidWhittaker: 'native', // DavidWhittakerParser — dedicated David Whittaker support
         deltaMusic2: 'native',  // DeltaMusic2Parser — dedicated Delta Music 2.0 support
         artOfNoise: 'native',   // ArtOfNoiseParser — dedicated Art of Noise support
-        benDaglish: 'native',   // BenDaglishParser — dedicated Ben Daglish support
+        benDaglish: 'uade',   // BenDaglishParser — dedicated Ben Daglish support
         sonicArranger: 'native', // SonicArrangerParser — dedicated Sonic Arranger support
-        inStereo1: 'native',    // InStereo1Parser — dedicated InStereo! 1.0 support
-        inStereo2: 'native',    // InStereo2Parser — dedicated InStereo! 2.0 support
+        inStereo1: 'uade',    // InStereo1Parser — dedicated InStereo! 1.0 support
+        inStereo2: 'uade',    // InStereo2Parser — dedicated InStereo! 2.0 support
         pumaTracker: 'native',      // PumaTrackerParser — dedicated PumaTracker support
-        synthesis: 'native',        // SynthesisParser — dedicated Synthesis support
+        synthesis: 'uade',        // SynthesisParser — dedicated Synthesis support
         musicAssembler: 'native',   // MusicAssemblerParser — dedicated Music Assembler support
         digitalSoundStudio: 'native', // DigitalSoundStudioParser — dedicated Digital Sound Studio support
         digitalSymphony: 'native',    // DigitalSymphonyParser — dedicated Digital Symphony support
-        imagoOrpheus: 'native',     // ImagoOrpheusParser — dedicated Imago Orpheus support
-        cdfm67: 'native',           // CDFM67Parser — dedicated CDFM Composer 670 support
-        easyTrax: 'native',         // EasyTraxParser — dedicated EasyTrax support
-        karlMorton: 'native',       // KarlMortonParser — dedicated Karl Morton Music Format support
+        imagoOrpheus: 'uade',     // ImagoOrpheusParser — dedicated Imago Orpheus support
+        cdfm67: 'uade',           // CDFM67Parser — dedicated CDFM Composer 670 support
+        easyTrax: 'uade',         // EasyTraxParser — dedicated EasyTrax support
+        karlMorton: 'uade',       // KarlMortonParser — dedicated Karl Morton Music Format support
         ams: 'native',              // AMSParser — Extreme's Tracker / Velvet Studio support
-        xTracker: 'native',         // XTrackerParser — dedicated X-Tracker DMF support
-        xmf: 'native',              // XMFParser — dedicated Astroidea XMF support
-        uax: 'native',              // UAXParser — Unreal Audio Package sound ripper
-        graoumfTracker2: 'native',  // GraoumfTracker2Parser — dedicated Graoumf Tracker 1/2 support
+        xTracker: 'uade',         // XTrackerParser — dedicated X-Tracker DMF support
+        xmf: 'uade',              // XMFParser — dedicated Astroidea XMF support
+        uax: 'uade',              // UAXParser — Unreal Audio Package sound ripper
+        graoumfTracker2: 'uade',  // GraoumfTracker2Parser — dedicated Graoumf Tracker 1/2 support
         symphoniePro: 'native',     // SymphonieProParser — dedicated Symphonie Pro support
-        chuckBiscuits: 'native',    // ChuckBiscuitsParser — dedicated Chuck Biscuits / Black Artist support
+        chuckBiscuits: 'uade',    // ChuckBiscuitsParser — dedicated Chuck Biscuits / Black Artist support
         speedySystem: 'uade',       // SpeedySystemParser — prefer UADE (DOC RAM samples required)
         tronic: 'uade',             // TronicParser — no native parser; always UADE
         digiBoosterPro: 'native',   // DigiBoosterProParser — dedicated DigiBooster Pro (.dbm) support
         gameMusicCreator: 'uade',   // GameMusicCreatorParser — prefer UADE (complex synthesis)
         faceTheMusic: 'native',     // FaceTheMusicParser — native parser available
-        soundControl: 'native',     // SoundControlParser — native parser available
-        soundFactory: 'native',     // SoundFactoryParser — native parser available
+        soundControl: 'uade',     // SoundControlParser — native parser available
+        soundFactory: 'uade',     // SoundFactoryParser — native parser available
         actionamics: 'native',      // ActionamicsParser — native parser available
         activisionPro: 'native',    // ActivisionProParser — native parser available
-        ronKlaren: 'native',        // RonKlarenParser — native parser available
+        ronKlaren: 'uade',        // RonKlarenParser — native parser available
         deltaMusic1: 'native',  // DeltaMusic1Parser — native parser available
-        pt36: 'native',         // PT36Parser — native parser available
+        pt36: 'uade',         // PT36Parser — native parser available
         musicLine: 'native',      // MusicLineParser — native parser (magic-byte gated)
-        medley: 'native',         // MedleyParser — dedicated Medley support
-        markCooksey: 'native',    // MarkCookseyParser — dedicated Mark Cooksey support
-        jeroenTel: 'native',      // JeroenTelParser — dedicated Jeroen Tel support
-        quartet: 'native',        // QuartetParser — dedicated Quartet support
-        soundMaster: 'native',    // SoundMasterParser — dedicated SoundMaster support
-        amosMusicBank: 'native',  // AmosMusicBankParser — native only
+        medley: 'uade',         // MedleyParser — dedicated Medley support
+        markCooksey: 'uade',    // MarkCookseyParser — dedicated Mark Cooksey support
+        jeroenTel: 'uade',      // JeroenTelParser — dedicated Jeroen Tel support
+        quartet: 'uade',        // QuartetParser — dedicated Quartet support
+        soundMaster: 'uade',    // SoundMasterParser — dedicated SoundMaster support
+        amosMusicBank: 'uade',  // AmosMusicBankParser — native only
         iceTracker: 'native',     // IceTrackerParser — native only
-        zoundMonitor: 'native',   // ZoundMonitorParser — dedicated ZoundMonitor support
-        synthPack: 'native',      // SynthPackParser — dedicated SynthPack support
-        tcbTracker: 'native',     // TCBTrackerParser — dedicated TCB Tracker support
-        mmdc: 'native',           // MMDCParser — dedicated MMDC support
-        psa: 'native',            // PSAParser — dedicated PSA support
-        steveTurner: 'native',    // SteveTurnerParser — dedicated Steve Turner support
-        tme: 'native',            // TMEParser — dedicated TME support
-        jasonBrooke: 'native',    // JasonBrookeParser — dedicated Jason Brooke support
-        laxity: 'native',         // LaxityParser — dedicated Laxity support
-        fredGray: 'native',       // FredGrayParser — dedicated Fred Gray support
-        musicMaker4V: 'native',   // MusicMakerParser — dedicated Music Maker 4V support
-        musicMaker8V: 'native',   // MusicMakerParser — dedicated Music Maker 8V support
-        maniacsOfNoise: 'native', // ManiacsOfNoiseParser — dedicated Maniacs of Noise support
-        ufo: 'native',            // UFOParser — dedicated UFO/MicroProse support
+        zoundMonitor: 'uade',   // ZoundMonitorParser — dedicated ZoundMonitor support
+        synthPack: 'uade',      // SynthPackParser — dedicated SynthPack support
+        tcbTracker: 'uade',     // TCBTrackerParser — dedicated TCB Tracker support
+        mmdc: 'uade',           // MMDCParser — dedicated MMDC support
+        psa: 'uade',            // PSAParser — dedicated PSA support
+        steveTurner: 'uade',    // SteveTurnerParser — dedicated Steve Turner support
+        tme: 'uade',            // TMEParser — dedicated TME support
+        jasonBrooke: 'uade',    // JasonBrookeParser — dedicated Jason Brooke support
+        laxity: 'uade',         // LaxityParser — dedicated Laxity support
+        fredGray: 'uade',       // FredGrayParser — dedicated Fred Gray support
+        musicMaker4V: 'uade',   // MusicMakerParser — dedicated Music Maker 4V support
+        musicMaker8V: 'uade',   // MusicMakerParser — dedicated Music Maker 8V support
+        maniacsOfNoise: 'uade', // ManiacsOfNoiseParser — dedicated Maniacs of Noise support
+        ufo: 'uade',            // UFOParser — dedicated UFO/MicroProse support
         iffSmus: 'native',        // IffSmusParser — dedicated IFF SMUS support
-        magneticFieldsPacker: 'native', // MagneticFieldsPackerParser — dedicated MFP support
+        magneticFieldsPacker: 'uade', // MagneticFieldsPackerParser — dedicated MFP support
         richardJoseph: 'native',  // RichardJosephParser — dedicated Richard Joseph support
-        daveLowe: 'native',       // DaveLoweParser — dedicated Dave Lowe support
-        lme: 'native',            // LMEParser — dedicated Leggless Music Editor support
-        jochenHippelST: 'native', // JochenHippelSTParser — dedicated Jochen Hippel ST support
-        specialFX: 'native',      // SpecialFXParser — dedicated Special FX ST support
-        timeTracker: 'native',          // TimeTrackerParser — dedicated TimeTracker support
+        daveLowe: 'uade',       // DaveLoweParser — dedicated Dave Lowe support
+        lme: 'uade',            // LMEParser — dedicated Leggless Music Editor support
+        jochenHippelST: 'uade', // JochenHippelSTParser — dedicated Jochen Hippel ST support
+        specialFX: 'uade',      // SpecialFXParser — dedicated Special FX ST support
+        timeTracker: 'uade',          // TimeTrackerParser — dedicated TimeTracker support
         kris: 'native',                 // KRISParser — dedicated ChipTracker/KRIS support
-        cinemaware: 'native',           // CinemawareParser — dedicated Cinemaware support
-        novoTradePacker: 'native',      // NovoTradePackerParser — dedicated NovoPacker support
-        alcatrazPacker: 'native',       // AlcatrazPackerParser — dedicated Alcatraz Packer support
-        bladePacker: 'native',          // BladePackerParser — dedicated Blade Packer support
-        tomyTracker: 'native',          // TomyTrackerParser — dedicated Tomy Tracker support
-        imagesMusicSystem: 'native',    // ImagesMusicSystemParser — dedicated IMS prefix support
-        fashionTracker: 'native',       // FashionTrackerParser — dedicated Fashion Tracker support
-        multiMediaSound: 'native',      // MultiMediaSoundParser — dedicated MultiMedia Sound support
-        seanConran: 'native',           // SeanConranParser — dedicated Sean Conran support
-        thomasHermann: 'native',        // ThomasHermannParser — dedicated Thomas Hermann support
-        titanicsPacker: 'native',       // TitanicsPackerParser — dedicated Titanics Packer support
-        krisHatlelid: 'native',         // KrisHatlelidParser — dedicated Kris Hatlelid support
-        ntsp: 'native',                 // NTSPParser — dedicated NTSP System support
-        moshPacker: 'native',           // MoshPackerParser — dedicated Mosh Packer support
-        coreDesign: 'native',           // CoreDesignParser — dedicated Core Design support
-        jankoMrsicFlogel: 'native',     // JankoMrsicFlogelParser — dedicated JMF support
-        soundPlayer: 'native',          // SoundPlayerParser — dedicated Sound Player support
-        nickPellingPacker: 'native',    // NickPellingPackerParser — dedicated NPP support
-        peterVerswyvelenPacker: 'native', // PeterVerswyvelenPackerParser — dedicated PVP support
-        wallyBeben: 'native',           // WallyBebenParser — dedicated Wally Beben support
-        steveBarrett: 'native',         // SteveBarrettParser — dedicated Steve Barrett support
+        cinemaware: 'uade',           // CinemawareParser — dedicated Cinemaware support
+        novoTradePacker: 'uade',      // NovoTradePackerParser — dedicated NovoPacker support
+        alcatrazPacker: 'uade',       // AlcatrazPackerParser — dedicated Alcatraz Packer support
+        bladePacker: 'uade',          // BladePackerParser — dedicated Blade Packer support
+        tomyTracker: 'uade',          // TomyTrackerParser — dedicated Tomy Tracker support
+        imagesMusicSystem: 'uade',    // ImagesMusicSystemParser — dedicated IMS prefix support
+        fashionTracker: 'uade',       // FashionTrackerParser — dedicated Fashion Tracker support
+        multiMediaSound: 'uade',      // MultiMediaSoundParser — dedicated MultiMedia Sound support
+        seanConran: 'uade',           // SeanConranParser — dedicated Sean Conran support
+        thomasHermann: 'uade',        // ThomasHermannParser — dedicated Thomas Hermann support
+        titanicsPacker: 'uade',       // TitanicsPackerParser — dedicated Titanics Packer support
+        krisHatlelid: 'uade',         // KrisHatlelidParser — dedicated Kris Hatlelid support
+        ntsp: 'uade',                 // NTSPParser — dedicated NTSP System support
+        moshPacker: 'uade',           // MoshPackerParser — dedicated Mosh Packer support
+        coreDesign: 'uade',           // CoreDesignParser — dedicated Core Design support
+        jankoMrsicFlogel: 'uade',     // JankoMrsicFlogelParser — dedicated JMF support
+        soundPlayer: 'uade',          // SoundPlayerParser — dedicated Sound Player support
+        nickPellingPacker: 'uade',    // NickPellingPackerParser — dedicated NPP support
+        peterVerswyvelenPacker: 'uade', // PeterVerswyvelenPackerParser — dedicated PVP support
+        wallyBeben: 'uade',           // WallyBebenParser — dedicated Wally Beben support
+        steveBarrett: 'uade',         // SteveBarrettParser — dedicated Steve Barrett support
         paulSummers: 'native',          // PaulSummersParser — dedicated Paul Summers support
-        desire: 'native',               // DesireParser — dedicated Desire support
+        desire: 'uade',               // DesireParser — dedicated Desire support
         martinWalker: 'native',         // MartinWalkerParser — dedicated Martin Walker support
-        paulShields: 'native',          // PaulShieldsParser — dedicated Paul Shields support
-        paulRobotham: 'native',         // PaulRobothamParser — dedicated Paul Robotham support
-        pierreAdane: 'native',          // PierreAdaneParser — dedicated Pierre Adane support
+        paulShields: 'uade',          // PaulShieldsParser — dedicated Paul Shields support
+        paulRobotham: 'uade',         // PaulRobothamParser — dedicated Paul Robotham support
+        pierreAdane: 'uade',          // PierreAdaneParser — dedicated Pierre Adane support
         anders0land: 'native',          // Anders0landParser — dedicated Anders 0land support
-        andrewParton: 'native',         // AndrewPartonParser — dedicated Andrew Parton support
-        customMade: 'native',           // CustomMadeParser — dedicated Custom Made support
-        benDaglishSID: 'native',        // BenDaglishSIDParser — dedicated Ben Daglish SID support
-        digitalSonixChrome: 'native',   // DigitalSonixChromeParser — dedicated DSC support
-        jesperOlsen: 'native',          // JesperOlsenParser — dedicated Jesper Olsen support
-        kimChristensen: 'native',       // KimChristensenParser — dedicated Kim Christensen support
-        ashleyHogg: 'native',           // AshleyHoggParser — dedicated Ashley Hogg support
-        adpcmMono: 'native',            // ADPCMmonoParser — dedicated ADPCM Mono support
-        janneSalmijarvi: 'native',      // JanneSalmijarviParser — dedicated Janne Salmijarvi support
-        jochenHippel7V: 'native',       // JochenHippel7VParser — dedicated Jochen Hippel 7V support
-        maximumEffect: 'native',        // MaximumEffectParser — dedicated Maximum Effect support
+        andrewParton: 'uade',         // AndrewPartonParser — dedicated Andrew Parton support
+        customMade: 'uade',           // CustomMadeParser — dedicated Custom Made support
+        benDaglishSID: 'uade',        // BenDaglishSIDParser — dedicated Ben Daglish SID support
+        digitalSonixChrome: 'uade',   // DigitalSonixChromeParser — dedicated DSC support
+        jesperOlsen: 'uade',          // JesperOlsenParser — dedicated Jesper Olsen support
+        kimChristensen: 'uade',       // KimChristensenParser — dedicated Kim Christensen support
+        ashleyHogg: 'uade',           // AshleyHoggParser — dedicated Ashley Hogg support
+        adpcmMono: 'uade',            // ADPCMmonoParser — dedicated ADPCM Mono support
+        janneSalmijarvi: 'uade',      // JanneSalmijarviParser — dedicated Janne Salmijarvi support
+        jochenHippel7V: 'uade',       // JochenHippel7VParser — dedicated Jochen Hippel 7V support
+        maximumEffect: 'uade',        // MaximumEffectParser — dedicated Maximum Effect support
         midiLoriciel: 'native',         // MIDILoricielParser — dedicated MIDI Loriciel support
-        onEscapee: 'native',            // OnEscapeeParser — dedicated onEscapee support
-        paulTonge: 'native',            // PaulTongeParser — dedicated Paul Tonge support
-        robHubbardST: 'native',         // RobHubbardSTParser — dedicated Rob Hubbard ST support
+        onEscapee: 'uade',            // OnEscapeeParser — dedicated onEscapee support
+        paulTonge: 'uade',            // PaulTongeParser — dedicated Paul Tonge support
+        robHubbardST: 'uade',         // RobHubbardSTParser — dedicated Rob Hubbard ST support
         robHubbard: 'native',           // RobHubbardParser — dedicated Rob Hubbard support
         futurePlayer: 'native',       // Native WASM replayer (transpiled 68k)
-        jasonPage: 'native',          // JasonPageParser — dedicated Jason Page support
-        infogrames: 'native',         // InfogramesParser — dedicated Infogrames support
-        sawteeth: 'native',           // SawteethParser — dedicated Sawteeth support
-        fmTracker: 'native',          // FMTrackerParser — dedicated FM Tracker support
+        jasonPage: 'uade',          // JasonPageParser — dedicated Jason Page support
+        infogrames: 'uade',         // InfogramesParser — dedicated Infogrames support
+        sawteeth: 'uade',           // SawteethParser — dedicated Sawteeth support
+        fmTracker: 'uade',          // FMTrackerParser — dedicated FM Tracker support
         madTracker2: 'native',        // MadTracker2Parser — dedicated MadTracker 2 support
-        psm: 'native',                // PSMParser — dedicated PSM/PSM16 support
-        composer667: 'native',        // Composer667Parser — dedicated Composer 667 support
+        psm: 'uade',                // PSMParser — dedicated PSM/PSM16 support
+        composer667: 'uade',        // Composer667Parser — dedicated Composer 667 support
         kt: 'native',                // KlysParser — native klystrack engine
         uade: 'enhanced',           // UADE formats — enhanced (editable) by default
       },
@@ -632,12 +632,17 @@ export const useSettingsStore = create<SettingsStore>()(
     })),
     {
       name: 'devilbox-settings',
-      version: 2,
+      version: 3,
       migrate: (persistedState: unknown, version: number) => {
         const s = (persistedState ?? {}) as Record<string, unknown>;
         if (version < 2) {
           // v2: workbench becomes the default UI
           s.renderMode = 'dom';
+        }
+        if (version < 3) {
+          // v3: 88 format engine defaults changed from 'native' to 'uade'.
+          // Clear persisted formatEngine so all formats get fresh defaults.
+          delete s.formatEngine;
         }
         return s;
       },
