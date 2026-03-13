@@ -458,7 +458,12 @@ export const usePatternPlayback = () => {
             lastPatternNum = patternNum;
             lastPosition = position;
             replayerAdvancedRef.current = true;
-            queueMicrotask(() => {
+            // Use setTimeout(0) instead of queueMicrotask: microtasks drain before
+            // the next macrotask (setInterval), so React re-renders from Zustand
+            // store updates would block the scheduler's next interval callback.
+            // setTimeout(0) defers to the macrotask queue, letting the scheduler
+            // fire on time even when React work is heavy at pattern boundaries.
+            setTimeout(() => {
               setCurrentPattern(patternNum, true);
               setCurrentPosition(position, true);
               // Update global row and status bar only on pattern boundaries
@@ -469,7 +474,7 @@ export const usePatternPlayback = () => {
               if (arrangement.isArrangementMode) {
                 useArrangementStore.getState().setPlaybackRow(globalRow);
               }
-            });
+            }, 0);
           }
         };
 

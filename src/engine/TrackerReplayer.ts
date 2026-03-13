@@ -862,6 +862,10 @@ export class TrackerReplayer {
     this._warnedMissingInstruments = undefined;
     this.instrumentMap = new Map(song.instruments.map(i => [i.id, i]));
 
+    // Dispose all ToneEngine instrument instances — this frees WASM handles
+    // (e.g. DigMug player slots) that would otherwise leak across song changes.
+    getToneEngine().disposeAllInstruments();
+
     // Pre-load any embedded-buffer Sampler instruments so ToneEngine begins decoding
     // immediately on song load rather than lazily on first note trigger.
     // Without this, the first note fired per instrument is always dropped while
@@ -1137,8 +1141,11 @@ export class TrackerReplayer {
 
   // Lookahead scheduling state (BassoonTracker pattern)
   // BassoonTracker uses: 200ms initial buffer, 1 SECOND during playback, scheduler every 10ms
-  private scheduleAheadTime = 0.1; // Increased to 100ms to support early 'push' grooves
-  private schedulerInterval = 0.015; // Check every 15ms (must be < scheduleAheadTime)
+  // 250ms lookahead gives resilience against main-thread stalls (React re-renders at
+  // pattern boundaries can block setInterval for 50-150ms). Groove/swing offsets are
+  // applied per-tick relative to their own time, so larger lookahead is safe.
+  private scheduleAheadTime = 0.25;
+  private schedulerInterval = 0.010; // Check every 10ms (fills more frequently)
   private nextScheduleTime = 0;
   
   private lastGrooveTemplateId = 'straight';
@@ -1150,6 +1157,9 @@ export class TrackerReplayer {
 
   async play(): Promise<void> {
     if (!this.song) return;
+
+    const _playT0 = performance.now();
+    const _playLog = (label: string) => console.log(`[TrackerReplayer.play] ${label}: ${(performance.now() - _playT0).toFixed(0)}ms`);
 
     // If already playing (e.g. reload path), stop first so we don't orphan schedulers
     if (this.playing) {
@@ -1163,8 +1173,10 @@ export class TrackerReplayer {
     this._suppressNotes = false;
 
     await unlockIOSAudio(); // Play silent MP3 + pump AudioContext for iOS
+    _playLog('unlockIOSAudio');
     if (gen !== this._playGeneration) return; // stale — another play/stop happened
     await Tone.start();
+    _playLog('Tone.start');
     if (gen !== this._playGeneration) return;
 
     // CRITICAL: Wait for AudioContext to actually be running
@@ -1187,10 +1199,12 @@ export class TrackerReplayer {
         return;
       }
     }
+    _playLog('AudioContext running');
 
     // Ensure WASM synths (Open303, etc.) are initialized before starting playback.
     const engine = getToneEngine();
     await engine.ensureWASMSynthsReady(this.song.instruments);
+    _playLog('ensureWASMSynthsReady');
     if (gen !== this._playGeneration) return;
 
     // Start all native WASM engines (HVL, JamCracker, SID, MusicLine, UADE routing)
@@ -1202,6 +1216,7 @@ export class TrackerReplayer {
         this._muted,
         this.routedNativeEngines,
       );
+      _playLog('startNativeEngines');
       if (gen !== this._playGeneration) return;
       if (result.suppressNotes) this._suppressNotes = true;
       if (result.c64SidEngine) this.c64SidEngine = result.c64SidEngine;
@@ -1217,6 +1232,7 @@ export class TrackerReplayer {
     // Without this, the first note on each sample-based instrument is dropped because
     // decodeAudioData() hasn't completed by the time the first tick fires.
     await engine.awaitPendingLoads();
+    _playLog('awaitPendingLoads');
     if (gen !== this._playGeneration) return;
 
     // WASM sequencer path: if Furnace native data exists, upload it to the WASM sequencer
@@ -1438,6 +1454,7 @@ export class TrackerReplayer {
       }
     }
 
+    _playLog('startScheduler (total)');
     this.startScheduler();
   }
 
