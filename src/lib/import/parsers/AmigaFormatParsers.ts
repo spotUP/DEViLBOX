@@ -1130,7 +1130,15 @@ export async function tryRouteFormat(
         if (prefs.iffSmus === 'native') {
       try {
         const { isIffSmusFormat, parseIffSmusFile } = await import('@lib/import/formats/IffSmusParser');
-        if (isIffSmusFormat(buffer)) return await parseIffSmusFile(buffer, originalFileName, companionFiles);
+        if (isIffSmusFormat(buffer)) {
+          const smusResult = await parseIffSmusFile(buffer, originalFileName, companionFiles);
+          // If any instruments have real audio (companion .ss files), use native result
+          const hasAudio = smusResult.instruments.some(
+            (inst: any) => inst.sample?.audioBuffer && inst.sample.audioBuffer.byteLength > 100,
+          );
+          if (hasAudio) return smusResult;
+          console.warn(`[IffSmusParser] All instruments silent (no .ss companions), falling back to UADE`);
+        }
       } catch (err) {
         console.warn(`[IffSmusParser] Native parse failed for ${filename}, falling back to UADE:`, err);
       }
@@ -2086,7 +2094,14 @@ export async function tryRouteFormat(
             if (prefs.iffSmus === 'native') {
         try {
           const { isIffSmusFormat, parseIffSmusFile } = await import('@lib/import/formats/IffSmusParser');
-          if (isIffSmusFormat(buffer)) return await parseIffSmusFile(buffer, originalFileName, companionFiles);
+          if (isIffSmusFormat(buffer)) {
+            const smusResult = await parseIffSmusFile(buffer, originalFileName, companionFiles);
+            const hasAudio = smusResult.instruments.some(
+              (inst: any) => inst.sample?.audioBuffer && inst.sample.audioBuffer.byteLength > 100,
+            );
+            if (hasAudio) return smusResult;
+            console.warn(`[IffSmusParser] All instruments silent (no .ss companions), falling back to UADE`);
+          }
         } catch (err) {
           console.warn(`[IffSmusParser] Native parse failed for ${filename}, falling back to UADE:`, err);
         }
