@@ -78,7 +78,7 @@ export class MegaText extends Graphics {
       const prev = this._prevLabels;
       for (let i = 0; i < labels.length; i++) {
         const a = labels[i], b = prev[i];
-        if (a.text !== b.text || a.x !== b.x || a.y !== b.y || a.color !== b.color || a.alpha !== b.alpha) {
+        if (a.text !== b.text || a.x !== b.x || a.y !== b.y || a.color !== b.color || a.alpha !== b.alpha || a.fontFamily !== b.fontFamily) {
           same = false;
           break;
         }

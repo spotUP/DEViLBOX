@@ -634,6 +634,7 @@ export class TrackerGLRenderer {
       const TRAIL_ROWS = 3;
       const behind = !isGhostRow ? currentRow - i : -1;
       const glow = behind >= 0 && behind <= TRAIL_ROWS ? 1 - behind / TRAIL_ROWS : 0;
+      const bold = behind === 0; // bold on the exact active row
       let lineNumStr: string;
       if (ui.showBeatLabels) {
         const beat = Math.floor(rowIndex / hlInterval) + 1;
@@ -645,7 +646,7 @@ export class TrackerGLRenderer {
       const lnColor = lerpWhiteRGBA(isHL ? colors.lineNumberHighlight : colors.lineNumber, glow);
       this.setTmpColor(lnColor, ghostAlpha);
       this.addGlyphString(lineNumStr, 4, y + (rowH - atlas.glyphLogicalHeight) / 2,
-        atlas, this.tmpColor);
+        atlas, this.tmpColor, bold);
 
       // Each channel
       for (let ch = 0; ch < numChannels; ch++) {
@@ -665,7 +666,7 @@ export class TrackerGLRenderer {
         if (isCollapsed) {
           const nc = lerpWhiteRGBA(cell.note === 0 ? colors.textMuted : colors.textNote, glow);
           this.setTmpColor(nc, ghostAlpha);
-          this.addGlyphString(noteTable[cell.note ?? 0] ?? '---', x, gy, atlas, this.tmpColor);
+          this.addGlyphString(noteTable[cell.note ?? 0] ?? '---', x, gy, atlas, this.tmpColor, bold);
           continue;
         }
 
@@ -677,7 +678,7 @@ export class TrackerGLRenderer {
                    : cellNote === 97 ? colors.textEffect
                    : colors.textNote, glow);
           this.setTmpColor(nc, ghostAlpha);
-          this.addGlyphString(noteTable[cellNote] ?? '---', x, gy, atlas, this.tmpColor);
+          this.addGlyphString(noteTable[cellNote] ?? '---', x, gy, atlas, this.tmpColor, bold);
         }
 
         // Parameters
@@ -688,10 +689,10 @@ export class TrackerGLRenderer {
         const inst = cell.instrument ?? 0;
         if (inst !== 0) {
           this.setTmpColor(lerpWhiteRGBA(colors.textInstrument, glow), ghostAlpha);
-          this.addGlyphString(HEX_TABLE[inst & 0xFF], px, gy, atlas, this.tmpColor);
+          this.addGlyphString(HEX_TABLE[inst & 0xFF], px, gy, atlas, this.tmpColor, bold);
         } else if (!ui.blankEmpty) {
           this.setTmpColor(lerpWhiteRGBA(colors.textMuted, glow), ghostAlpha);
-          this.addGlyphString('..', px, gy, atlas, this.tmpColor);
+          this.addGlyphString('..', px, gy, atlas, this.tmpColor, bold);
         }
         px += CHAR_WIDTH * 2 + 4;
 
@@ -700,10 +701,10 @@ export class TrackerGLRenderer {
         const hasVol = vol >= 0x10 && vol <= 0x50;
         if (hasVol) {
           this.setTmpColor(lerpWhiteRGBA(colors.textVolume, glow), ghostAlpha);
-          this.addGlyphString(HEX_TABLE[vol & 0xFF], px, gy, atlas, this.tmpColor);
+          this.addGlyphString(HEX_TABLE[vol & 0xFF], px, gy, atlas, this.tmpColor, bold);
         } else if (!ui.blankEmpty) {
           this.setTmpColor(lerpWhiteRGBA(colors.textMuted, glow), ghostAlpha);
-          this.addGlyphString('..', px, gy, atlas, this.tmpColor);
+          this.addGlyphString('..', px, gy, atlas, this.tmpColor, bold);
         }
         px += CHAR_WIDTH * 2 + 4;
 
@@ -720,10 +721,10 @@ export class TrackerGLRenderer {
           const hasEff = colEffTyp !== 0 || colEff !== 0;
           if (hasEff) {
             this.setTmpColor(lerpWhiteRGBA(colors.textEffect, glow), ghostAlpha);
-            this.addGlyphString((EFFECT_CHARS[colEffTyp] ?? '?') + HEX_TABLE[colEff & 0xFF], px, gy, atlas, this.tmpColor);
+            this.addGlyphString((EFFECT_CHARS[colEffTyp] ?? '?') + HEX_TABLE[colEff & 0xFF], px, gy, atlas, this.tmpColor, bold);
           } else if (!ui.blankEmpty) {
             this.setTmpColor(lerpWhiteRGBA(colors.textMuted, glow), ghostAlpha);
-            this.addGlyphString('...', px, gy, atlas, this.tmpColor);
+            this.addGlyphString('...', px, gy, atlas, this.tmpColor, bold);
           }
           px += CHAR_WIDTH * 3 + 4;
         }
@@ -740,7 +741,7 @@ export class TrackerGLRenderer {
             else if (flagVal === 4) { flagStr = 'H'; fc = colors.flagHammer; }
             if (flagVal || !ui.blankEmpty) {
               this.setTmpColor(lerpWhiteRGBA(fc, glow), ghostAlpha);
-              this.addGlyphString(flagStr, fx, gy, atlas, this.tmpColor);
+              this.addGlyphString(flagStr, fx, gy, atlas, this.tmpColor, bold);
             }
           };
           drawFlag(cell.flag1, px);
@@ -755,7 +756,7 @@ export class TrackerGLRenderer {
           const pc = p >= 75 ? PROB_COLORS[3] : p >= 50 ? PROB_COLORS[2] : p >= 25 ? PROB_COLORS[1] : PROB_COLORS[0];
           const probStr = ui.useHex ? HEX_TABLE[p] : DEC_TABLE[p];
           this.setTmpColor(lerpWhiteRGBA(pc, glow), ghostAlpha);
-          this.addGlyphString(probStr, px, gy, atlas, this.tmpColor);
+          this.addGlyphString(probStr, px, gy, atlas, this.tmpColor, bold);
         }
 
         // Selection highlight (rect pass would be cleaner but we need to do it here per row)
@@ -845,13 +846,14 @@ export class TrackerGLRenderer {
     y: number,
     atlas: GlyphAtlas,
     color: [number,number,number,number],
+    bold = false,
   ): void {
     let cx = x;
-    // Index-based iteration avoids creating a string iterator object
     for (let si = 0; si < str.length; si++) {
       const info = atlas.lookup.get(str[si]);
       if (info) {
         this.addGlyph(cx, y, info, color);
+        if (bold) this.addGlyph(cx + 0.5, y, info, color); // fake bold: double-strike offset
         cx += info.logicalWidth;
       } else {
         cx += atlas.glyphLogicalWidth;
