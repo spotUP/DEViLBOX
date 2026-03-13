@@ -73,7 +73,26 @@ export function pcm8ToWAV(
   // looping samples and harmless for one-shots.
   const MIN_SAMPLES = 512;
   const srcLen = pcm.length;
-  const numSamples = srcLen < MIN_SAMPLES && srcLen > 0
+  if (srcLen === 0) {
+    // Return a minimal valid silent WAV — browsers reject 0-sample WAVs
+    const silentBuf = new ArrayBuffer(44 + MIN_SAMPLES * 2);
+    const sv = new DataView(silentBuf);
+    writeStr(sv, 0, 'RIFF');
+    sv.setUint32(4, silentBuf.byteLength - 8, true);
+    writeStr(sv, 8, 'WAVE');
+    writeStr(sv, 12, 'fmt ');
+    sv.setUint32(16, 16, true);
+    sv.setUint16(20, 1, true);
+    sv.setUint16(22, 1, true);
+    sv.setUint32(24, rate, true);
+    sv.setUint32(28, rate * 2, true);
+    sv.setUint16(32, 2, true);
+    sv.setUint16(34, 16, true);
+    writeStr(sv, 36, 'data');
+    sv.setUint32(40, MIN_SAMPLES * 2, true);
+    return silentBuf;
+  }
+  const numSamples = srcLen < MIN_SAMPLES
     ? Math.ceil(MIN_SAMPLES / srcLen) * srcLen
     : srcLen;
 

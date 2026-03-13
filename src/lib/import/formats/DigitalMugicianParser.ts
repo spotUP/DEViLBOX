@@ -936,6 +936,11 @@ export async function parseDigitalMugicianFile(
     initialBPM: 125,
     linearPeriods: false,
     uadePatternLayout,
+    metadata: {
+      modPlayback: {
+        usePeriodPlayback: true,
+      },
+    },
   };
 }
 
