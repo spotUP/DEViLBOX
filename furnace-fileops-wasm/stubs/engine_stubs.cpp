@@ -68,6 +68,28 @@ bool DivEngine::loadMod(unsigned char* file, size_t len) {
 }
 
 // ============================================================
+// Sample rate conversion — used by DMF loader
+// ============================================================
+static const int sampleRates[6]={
+  4000, 8000, 11025, 16000, 22050, 32000
+};
+
+int DivEngine::fileToDivRate(int frate) {
+  if (frate<0) frate=0;
+  if (frate>5) frate=5;
+  return sampleRates[frate];
+}
+
+int DivEngine::divToFileRate(int drate) {
+  if (drate>26000) return 5;
+  else if (drate>18000) return 4;
+  else if (drate>14000) return 3;
+  else if (drate>9500) return 2;
+  else if (drate>6000) return 1;
+  return 0;
+}
+
+// ============================================================
 // Error/warning access
 // ============================================================
 String DivEngine::getLastError() {
