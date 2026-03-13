@@ -526,6 +526,40 @@ export class TrackerGLRenderer {
       this.addRect(0, centerLineTop, width, rowH, [r, g, b, alpha]);
     }
 
+    // Cursor caret background — drawn behind text so notes remain readable
+    if (!pattern.channels[cursor.channelIndex]?.collapsed) {
+      const colX = channelOffsets[cursor.channelIndex] - scrollX;
+      const chW  = channelWidths[cursor.channelIndex];
+      const cursorX = colX + Math.floor((chW - contentWidth) / 2);
+
+      const paramBase = noteWidth + 4;
+      const hasAcidC  = pattern.channels[cursor.channelIndex]?.rows[0]?.flag1 !== undefined
+                     || pattern.channels[cursor.channelIndex]?.rows[0]?.flag2 !== undefined;
+      const acidOff = CHAR_WIDTH * 10 + 16;
+      const probOff = acidOff + (hasAcidC ? CHAR_WIDTH * 2 + 8 : 0);
+
+      let caretOffX = 0;
+      let caretW    = CHAR_WIDTH;
+
+      switch (cursor.columnType) {
+        case 'note':       caretOffX = 0;                                                               caretW = noteWidth; break;
+        case 'instrument': caretOffX = paramBase + cursor.digitIndex * CHAR_WIDTH;                      break;
+        case 'volume':     caretOffX = paramBase + (CHAR_WIDTH * 2 + 4) + cursor.digitIndex * CHAR_WIDTH; break;
+        case 'effTyp':     caretOffX = paramBase + CHAR_WIDTH * 4 + 8;                                  break;
+        case 'effParam':   caretOffX = paramBase + CHAR_WIDTH * 4 + 8 + CHAR_WIDTH + cursor.digitIndex * CHAR_WIDTH; break;
+        case 'effTyp2':    caretOffX = paramBase + CHAR_WIDTH * 7 + 12;                                 break;
+        case 'effParam2':  caretOffX = paramBase + CHAR_WIDTH * 7 + 12 + CHAR_WIDTH + cursor.digitIndex * CHAR_WIDTH; break;
+        case 'flag1':      caretOffX = paramBase + acidOff;                                             break;
+        case 'flag2':      caretOffX = paramBase + acidOff + CHAR_WIDTH + 4;                            break;
+        case 'probability':caretOffX = paramBase + probOff + cursor.digitIndex * CHAR_WIDTH;            break;
+        default:           caretOffX = paramBase + CHAR_WIDTH * 4 + 8;                                  break;
+      }
+
+      const caretX = cursorX + caretOffX;
+      const caretY = centerLineTop;
+      this.addRect(caretX, caretY, caretW, rowH, colors.cursor);
+    }
+
     // Channel separators and left stripes (full height)
     for (let ch = 0; ch < numChannels; ch++) {
       const colX = channelOffsets[ch] - scrollX;
@@ -587,6 +621,8 @@ export class TrackerGLRenderer {
       const isHL = rowIndex % hlInterval === 0;
 
       // Line number — use pre-computed hex/dec tables
+      const isActiveRow = !isGhostRow && i === currentRow;
+      const WHITE: [number,number,number,number] = [1, 1, 1, 1];
       let lineNumStr: string;
       if (ui.showBeatLabels) {
         const beat = Math.floor(rowIndex / hlInterval) + 1;
@@ -595,7 +631,7 @@ export class TrackerGLRenderer {
       } else {
         lineNumStr = ui.useHex ? HEX_TABLE[rowIndex & 0xFF] : DEC_TABLE[rowIndex & 0xFF];
       }
-      const lnColor = isHL ? colors.lineNumberHighlight : colors.lineNumber;
+      const lnColor = isActiveRow ? WHITE : isHL ? colors.lineNumberHighlight : colors.lineNumber;
       this.setTmpColor(lnColor, ghostAlpha);
       this.addGlyphString(lineNumStr, 4, y + (rowH - atlas.glyphLogicalHeight) / 2,
         atlas, this.tmpColor);
@@ -616,20 +652,19 @@ export class TrackerGLRenderer {
         const gy = y + (rowH - atlas.glyphLogicalHeight) / 2;
 
         if (isCollapsed) {
-          // Just note column — use pre-computed note table
-          const nc = cell.note === 0 ? colors.textMuted : colors.textNote;
+          const nc = isActiveRow ? WHITE : cell.note === 0 ? colors.textMuted : colors.textNote;
           this.setTmpColor(nc, ghostAlpha);
           this.addGlyphString(noteTable[cell.note ?? 0] ?? '---', x, gy, atlas, this.tmpColor);
           continue;
         }
 
         // Note — use pre-computed note table
-        const isCurrentPlayingRow = isPlaying && !isGhostRow && rowIndex === currentRow;
         const cellNote = cell.note ?? 0;
         if (!ui.blankEmpty || cellNote !== 0) {
-          const nc = cellNote === 0 ? colors.textMuted
+          const nc = isActiveRow ? WHITE
+                   : cellNote === 0 ? colors.textMuted
                    : cellNote === 97 ? colors.textEffect
-                   : (isCurrentPlayingRow && cellNote > 0 ? colors.textNoteActive : colors.textNote);
+                   : colors.textNote;
           this.setTmpColor(nc, ghostAlpha);
           this.addGlyphString(noteTable[cellNote] ?? '---', x, gy, atlas, this.tmpColor);
         }
@@ -641,10 +676,10 @@ export class TrackerGLRenderer {
         // Instrument — use HEX_TABLE lookup
         const inst = cell.instrument ?? 0;
         if (inst !== 0) {
-          this.setTmpColor(colors.textInstrument, ghostAlpha);
+          this.setTmpColor(isActiveRow ? WHITE : colors.textInstrument, ghostAlpha);
           this.addGlyphString(HEX_TABLE[inst & 0xFF], px, gy, atlas, this.tmpColor);
         } else if (!ui.blankEmpty) {
-          this.setTmpColor(colors.textMuted, ghostAlpha);
+          this.setTmpColor(isActiveRow ? WHITE : colors.textMuted, ghostAlpha);
           this.addGlyphString('..', px, gy, atlas, this.tmpColor);
         }
         px += CHAR_WIDTH * 2 + 4;
@@ -653,10 +688,10 @@ export class TrackerGLRenderer {
         const vol = cell.volume ?? 0;
         const hasVol = vol >= 0x10 && vol <= 0x50;
         if (hasVol) {
-          this.setTmpColor(colors.textVolume, ghostAlpha);
+          this.setTmpColor(isActiveRow ? WHITE : colors.textVolume, ghostAlpha);
           this.addGlyphString(HEX_TABLE[vol & 0xFF], px, gy, atlas, this.tmpColor);
         } else if (!ui.blankEmpty) {
-          this.setTmpColor(colors.textMuted, ghostAlpha);
+          this.setTmpColor(isActiveRow ? WHITE : colors.textMuted, ghostAlpha);
           this.addGlyphString('..', px, gy, atlas, this.tmpColor);
         }
         px += CHAR_WIDTH * 2 + 4;
@@ -673,10 +708,10 @@ export class TrackerGLRenderer {
 
           const hasEff = colEffTyp !== 0 || colEff !== 0;
           if (hasEff) {
-            this.setTmpColor(colors.textEffect, ghostAlpha);
+            this.setTmpColor(isActiveRow ? WHITE : colors.textEffect, ghostAlpha);
             this.addGlyphString((EFFECT_CHARS[colEffTyp] ?? '?') + HEX_TABLE[colEff & 0xFF], px, gy, atlas, this.tmpColor);
           } else if (!ui.blankEmpty) {
-            this.setTmpColor(colors.textMuted, ghostAlpha);
+            this.setTmpColor(isActiveRow ? WHITE : colors.textMuted, ghostAlpha);
             this.addGlyphString('...', px, gy, atlas, this.tmpColor);
           }
           px += CHAR_WIDTH * 3 + 4;
@@ -687,11 +722,11 @@ export class TrackerGLRenderer {
         if (hasFlagCols) {
           const drawFlag = (flagVal: number | undefined, fx: number) => {
             let flagStr = '.';
-            let fc: [number,number,number,number] = colors.textMuted;
-            if (flagVal === 1) { flagStr = 'A'; fc = colors.flagAccent; }
-            else if (flagVal === 2) { flagStr = 'S'; fc = colors.flagSlide; }
-            else if (flagVal === 3) { flagStr = 'M'; fc = colors.flagMute; }
-            else if (flagVal === 4) { flagStr = 'H'; fc = colors.flagHammer; }
+            let fc: [number,number,number,number] = isActiveRow ? WHITE : colors.textMuted;
+            if (flagVal === 1) { flagStr = 'A'; fc = isActiveRow ? WHITE : colors.flagAccent; }
+            else if (flagVal === 2) { flagStr = 'S'; fc = isActiveRow ? WHITE : colors.flagSlide; }
+            else if (flagVal === 3) { flagStr = 'M'; fc = isActiveRow ? WHITE : colors.flagMute; }
+            else if (flagVal === 4) { flagStr = 'H'; fc = isActiveRow ? WHITE : colors.flagHammer; }
             if (flagVal || !ui.blankEmpty) {
               this.setTmpColor(fc, ghostAlpha);
               this.addGlyphString(flagStr, fx, gy, atlas, this.tmpColor);
@@ -706,7 +741,7 @@ export class TrackerGLRenderer {
         // Probability — use pre-parsed PROB_COLORS instead of parseColor() in hot loop
         if (cell.probability !== undefined && cell.probability > 0) {
           const p = Math.min(99, Math.max(0, cell.probability));
-          const pc = p >= 75 ? PROB_COLORS[3] : p >= 50 ? PROB_COLORS[2] : p >= 25 ? PROB_COLORS[1] : PROB_COLORS[0];
+          const pc = isActiveRow ? WHITE : p >= 75 ? PROB_COLORS[3] : p >= 50 ? PROB_COLORS[2] : p >= 25 ? PROB_COLORS[1] : PROB_COLORS[0];
           const probStr = ui.useHex ? HEX_TABLE[p] : DEC_TABLE[p];
           this.setTmpColor(pc, ghostAlpha);
           this.addGlyphString(probStr, px, gy, atlas, this.tmpColor);
@@ -728,125 +763,8 @@ export class TrackerGLRenderer {
       }
     }
 
-    // ═══════════════════════════════════════════════════════════════════════════
-    // PASS 3 — Overlays (cursor caret + channel separators top-pass)
-    // ═══════════════════════════════════════════════════════════════════════════
-
-    // Cursor caret
-    if (!pattern.channels[cursor.channelIndex]?.collapsed) {
-      const colX = channelOffsets[cursor.channelIndex] - scrollX;
-      const chW  = channelWidths[cursor.channelIndex];
-      const cursorX = colX + Math.floor((chW - contentWidth) / 2);
-
-      const paramBase = noteWidth + 4;
-      const hasAcidC  = pattern.channels[cursor.channelIndex]?.rows[0]?.flag1 !== undefined
-                     || pattern.channels[cursor.channelIndex]?.rows[0]?.flag2 !== undefined;
-      const acidOff = CHAR_WIDTH * 10 + 16;
-      const probOff = acidOff + (hasAcidC ? CHAR_WIDTH * 2 + 8 : 0);
-
-      let caretOffX = 0;
-      let caretW    = CHAR_WIDTH;
-
-      switch (cursor.columnType) {
-        case 'note':       caretOffX = 0;                                                               caretW = noteWidth; break;
-        case 'instrument': caretOffX = paramBase + cursor.digitIndex * CHAR_WIDTH;                      break;
-        case 'volume':     caretOffX = paramBase + (CHAR_WIDTH * 2 + 4) + cursor.digitIndex * CHAR_WIDTH; break;
-        case 'effTyp':     caretOffX = paramBase + CHAR_WIDTH * 4 + 8;                                  break;
-        case 'effParam':   caretOffX = paramBase + CHAR_WIDTH * 4 + 8 + CHAR_WIDTH + cursor.digitIndex * CHAR_WIDTH; break;
-        case 'effTyp2':    caretOffX = paramBase + CHAR_WIDTH * 7 + 12;                                 break;
-        case 'effParam2':  caretOffX = paramBase + CHAR_WIDTH * 7 + 12 + CHAR_WIDTH + cursor.digitIndex * CHAR_WIDTH; break;
-        case 'flag1':      caretOffX = paramBase + acidOff;                                             break;
-        case 'flag2':      caretOffX = paramBase + acidOff + CHAR_WIDTH + 4;                            break;
-        case 'probability':caretOffX = paramBase + probOff + cursor.digitIndex * CHAR_WIDTH;            break;
-        default:           caretOffX = paramBase + CHAR_WIDTH * 4 + 8;                                  break;
-      }
-
-      const caretX = cursorX + caretOffX;
-      const caretY = centerLineTop;
-
-      // Determine caret color (same accent color whether playing or not)
-      const caretColor = colors.cursor;
-
-      // Draw caret background
-      this.addRect(caretX, caretY, caretW, rowH, caretColor);
-    }
-
+    // Flush final batches
     this.flushRects();
-    this.flushGlyphs();
-
-    // Draw cursor text (white on colored background) — separate glyph pass
-    if (!pattern.channels[cursor.channelIndex]?.collapsed) {
-      const colX = channelOffsets[cursor.channelIndex] - scrollX;
-      const chW  = channelWidths[cursor.channelIndex];
-      const cursorX = colX + Math.floor((chW - contentWidth) / 2);
-
-      const paramBase = noteWidth + 4;
-      const hasAcidC  = pattern.channels[cursor.channelIndex]?.rows[0]?.flag1 !== undefined
-                     || pattern.channels[cursor.channelIndex]?.rows[0]?.flag2 !== undefined;
-      const acidOff = CHAR_WIDTH * 10 + 16;
-      const probOff = acidOff + (hasAcidC ? CHAR_WIDTH * 2 + 8 : 0);
-
-      let caretOffX = 0;
-      switch (cursor.columnType) {
-        case 'note':       caretOffX = 0; break;
-        case 'instrument': caretOffX = paramBase + cursor.digitIndex * CHAR_WIDTH; break;
-        case 'volume':     caretOffX = paramBase + CHAR_WIDTH * 2 + 4 + cursor.digitIndex * CHAR_WIDTH; break;
-        case 'effTyp':     caretOffX = paramBase + CHAR_WIDTH * 4 + 8; break;
-        case 'effParam':   caretOffX = paramBase + CHAR_WIDTH * 4 + 8 + CHAR_WIDTH + cursor.digitIndex * CHAR_WIDTH; break;
-        case 'effTyp2':    caretOffX = paramBase + CHAR_WIDTH * 7 + 12; break;
-        case 'effParam2':  caretOffX = paramBase + CHAR_WIDTH * 7 + 12 + CHAR_WIDTH + cursor.digitIndex * CHAR_WIDTH; break;
-        case 'flag1':      caretOffX = paramBase + acidOff; break;
-        case 'flag2':      caretOffX = paramBase + acidOff + CHAR_WIDTH + 4; break;
-        case 'probability':caretOffX = paramBase + probOff + cursor.digitIndex * CHAR_WIDTH; break;
-        default:           caretOffX = paramBase + CHAR_WIDTH * 4 + 8; break;
-      }
-
-      const caretRow = isPlaying ? currentRow : cursor.rowIndex;
-      const caretCell = pattern.channels[cursor.channelIndex]?.rows[caretRow];
-      if (caretCell) {
-        const col = cursor.columnType;
-        const di  = cursor.digitIndex;
-        let charStr = '';
-        if (col === 'note') {
-          charStr = noteTable[caretCell.note ?? 0] ?? '---';
-        } else if (col === 'instrument') {
-          const s = (caretCell.instrument ?? 0) === 0 ? '..' : HEX_TABLE[(caretCell.instrument ?? 0) & 0xFF];
-          charStr = s[di] ?? '.';
-        } else if (col === 'volume') {
-          const v = caretCell.volume ?? 0;
-          const s = (v >= 0x10 && v <= 0x50) ? HEX_TABLE[v & 0xFF] : '..';
-          charStr = s[di] ?? '.';
-        } else if (col === 'effTyp') {
-          const et = caretCell.effTyp ?? 0; const ep = caretCell.eff ?? 0;
-          charStr = (et !== 0 || ep !== 0) ? (EFFECT_CHARS[et] ?? '?') : '.';
-        } else if (col === 'effParam') {
-          const et = caretCell.effTyp ?? 0; const ep = caretCell.eff ?? 0;
-          const s = (et !== 0 || ep !== 0) ? HEX_TABLE[ep & 0xFF] : '..';
-          charStr = s[di] ?? '.';
-        } else if (col === 'effTyp2') {
-          const et2 = caretCell.effTyp2 ?? 0; const ep2 = caretCell.eff2 ?? 0;
-          charStr = (et2 !== 0 || ep2 !== 0) ? (EFFECT_CHARS[et2] ?? '?') : '.';
-        } else if (col === 'effParam2') {
-          const et2 = caretCell.effTyp2 ?? 0; const ep2 = caretCell.eff2 ?? 0;
-          const s = (et2 !== 0 || ep2 !== 0) ? HEX_TABLE[ep2 & 0xFF] : '..';
-          charStr = s[di] ?? '.';
-        } else if (col === 'flag1') {
-          charStr = caretCell.flag1 === 1 ? 'A' : caretCell.flag1 === 2 ? 'S' : '.';
-        } else if (col === 'flag2') {
-          charStr = caretCell.flag2 === 1 ? 'A' : caretCell.flag2 === 2 ? 'S' : '.';
-        } else if (col === 'probability') {
-          const p = caretCell.probability ?? 0;
-          const s = p > 0 ? (ui.useHex ? HEX_TABLE[p & 0xFF] : DEC_TABLE[p & 0xFF]) : '..';
-          charStr = s[di] ?? '.';
-        }
-
-        const caretX = cursorX + caretOffX;
-        const caretY = centerLineTop;
-        const gy = caretY + (rowH - atlas.glyphLogicalHeight) / 2;
-        this.addGlyphString(charStr, caretX, gy, atlas, [1, 1, 1, 1]);
-      }
-    }
-
     this.flushGlyphs();
   }
 
