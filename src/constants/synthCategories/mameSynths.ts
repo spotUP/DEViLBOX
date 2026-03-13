@@ -183,7 +183,7 @@ export const mameSynthEntries: Record<string, SynthInfo> = {
   },
   MAMETIA: {
     type: 'MAMETIA',
-    name: 'Atari TIA',
+    name: 'Atari TIA (MAME)',
     shortName: 'TIA',
     description: 'Atari 2600 TIA - MAME-accurate 2-voice with 16 distortion modes',
     bestFor: ['Atari sounds', '2600 bleeps', 'Lo-fi', 'Retro FX'],
@@ -273,7 +273,7 @@ export const mameSynthEntries: Record<string, SynthInfo> = {
   },
   VFX: {
     type: 'VFX',
-    name: 'Ensoniq VFX',
+    name: 'Ensoniq VFX (alias)',
     shortName: 'VFX',
     description: 'Ensoniq VFX transwave synthesizer - alias for MAMEVFX',
     bestFor: ['Transwave', 'Digital', 'Pads', 'Textures'],

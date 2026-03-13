@@ -1,4 +1,6 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+/* Drum machine theme fonts — loaded on demand via Google Fonts */
+@import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=IBM+Plex+Mono:wght@400;500;600&family=Orbitron:wght@400;500;700&family=VT323&family=Share+Tech+Mono&family=Chakra+Petch:wght@400;500;600;700&family=Rajdhani:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -13,7 +15,7 @@
 
 @layer base {
   :root {
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+    font-family: var(--theme-font-sans, 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif);
     line-height: 1.5;
     font-weight: 400;
     color-scheme: dark;
@@ -158,7 +160,7 @@
 @layer components {
   /* Tracker cell styles */
   .tracker-cell {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--theme-font-mono, 'JetBrains Mono', monospace);
     font-size: 12px;
     font-feature-settings: 'tnum';
     letter-spacing: 0.02em;
@@ -531,7 +533,7 @@
 
   /* FT2 Sample Editor Display */
   .ft2-display {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--theme-font-mono, 'JetBrains Mono', monospace);
     background: var(--color-bg);
     color: var(--color-accent);
     border: 1px solid var(--ft2-border);
@@ -623,7 +625,7 @@
   kbd {
     display: inline-block;
     padding: 0.125rem 0.375rem;
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--theme-font-mono, 'JetBrains Mono', monospace);
     font-size: 0.75em;
     background-color: var(--color-bg-tertiary);
     border: 1px solid var(--color-border);
@@ -642,7 +644,7 @@
 
   .knob-label {
     color: var(--color-text-secondary);
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--theme-font-mono, 'JetBrains Mono', monospace);
     font-weight: 500;
     text-transform: uppercase;
     letter-spacing: 0.05em;
@@ -686,7 +688,7 @@
 
   .knob-value {
     color: var(--color-accent);
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--theme-font-mono, 'JetBrains Mono', monospace);
     font-weight: 600;
     min-width: 50px;
     text-align: center;
@@ -717,7 +719,7 @@
   }
 
   .tb303-knob-panel-label {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--theme-font-mono, 'JetBrains Mono', monospace);
     font-size: 10px;
     font-weight: 600;
     color: var(--color-text-muted);
@@ -743,7 +745,7 @@
   .tb303-synth-select {
     padding: 3px 6px;
     font-size: 10px;
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--theme-font-mono, 'JetBrains Mono', monospace);
     color: var(--color-text-primary);
     background: var(--color-bg-tertiary);
     border: 1px solid var(--color-border);
@@ -773,7 +775,7 @@
     gap: 4px;
     padding: 4px 8px;
     font-size: 10px;
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--theme-font-mono, 'JetBrains Mono', monospace);
     color: var(--color-text-secondary);
     background: var(--color-bg-tertiary);
     border: 1px solid var(--color-border);
@@ -979,7 +981,7 @@
   }
 
   .tb303-param-inline {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--theme-font-mono, 'JetBrains Mono', monospace);
     font-size: 11px;
     font-weight: 500;
     white-space: nowrap;
@@ -1060,7 +1062,7 @@
 
   .toggle-label {
     color: var(--color-text-secondary);
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--theme-font-mono, 'JetBrains Mono', monospace);
     font-weight: 500;
     text-transform: uppercase;
     letter-spacing: 0.05em;
@@ -1090,7 +1092,7 @@
 
   .switch3way-label {
     color: var(--color-text-secondary);
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--theme-font-mono, 'JetBrains Mono', monospace);
     font-size: 9px;
     font-weight: 500;
     text-transform: uppercase;
@@ -1116,7 +1118,7 @@
     flex: 1;
     background: none;
     border: none;
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--theme-font-mono, 'JetBrains Mono', monospace);
     font-size: 8px;
     font-weight: 600;
     text-transform: uppercase;
@@ -1159,7 +1161,7 @@
   }
 
   .devilfish-title-text {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--theme-font-mono, 'JetBrains Mono', monospace);
     font-size: 11px;
     font-weight: 600;
     color: #ef4444;
@@ -1182,7 +1184,7 @@
   }
 
   .devilfish-section-label {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--theme-font-mono, 'JetBrains Mono', monospace);
     font-size: 8px;
     font-weight: 600;
     color: var(--color-text-muted);
@@ -1227,7 +1229,7 @@
   }
 
   .devilfish-label {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--theme-font-mono, 'JetBrains Mono', monospace);
     font-size: 10px;
     font-weight: 600;
     color: #ef4444;
@@ -1283,7 +1285,7 @@
     background: linear-gradient(180deg, #f8f9fa 0%, #e9ecef 100%);
     border-right: 1px solid #495057;
     color: #212529;
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--theme-font-mono, 'JetBrains Mono', monospace);
     font-size: 11px;
     font-weight: 600;
     display: flex;
@@ -1308,7 +1310,7 @@
     height: 65%;
     top: 0;
     color: #f8f9fa;
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--theme-font-mono, 'JetBrains Mono', monospace);
     font-size: 10px;
     font-weight: 600;
     display: flex;
@@ -1409,7 +1411,7 @@
     background: var(--color-bg-tertiary);
     border: 2px solid var(--color-border);
     border-radius: 8px;
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--theme-font-mono, 'JetBrains Mono', monospace);
     font-size: 20px;
     font-weight: 700;
     color: var(--color-accent);
@@ -1464,7 +1466,7 @@
     background: var(--color-bg-tertiary);
     border: 1px solid var(--color-border);
     border-radius: 12px;
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--theme-font-mono, 'JetBrains Mono', monospace);
     font-size: 14px;
     font-weight: 600;
     color: var(--color-text);
@@ -1818,7 +1820,7 @@
   padding: 8px 14px;
   background: var(--color-bg-secondary);
   border-bottom: 1px solid var(--color-border);
-  font-family: 'JetBrains Mono', monospace;
+  font-family: var(--theme-font-mono, 'JetBrains Mono', monospace);
   font-size: 13px;
   position: relative;
   /* Remove overflow-x: auto to prevent horizontal scrolling */
@@ -1883,7 +1885,7 @@
 
 /* Live mode queue indicator */
 .ft2-queue-indicator {
-  font-family: 'JetBrains Mono', monospace;
+  font-family: var(--theme-font-mono, 'JetBrains Mono', monospace);
   font-size: 10px;
   padding: 2px 6px;
   background: rgba(251, 146, 60, 0.2);
@@ -1895,7 +1897,7 @@
 
 /* Groove/Swing Template Selector */
 .ft2-groove-select {
-  font-family: 'JetBrains Mono', monospace;
+  font-family: var(--theme-font-mono, 'JetBrains Mono', monospace);
   font-size: 11px;
   min-width: 100px;
   max-width: 130px;
@@ -1938,7 +1940,7 @@
 
 /* FT2 3D Button - Modernized to be flatter */
 .ft2-btn {
-  font-family: 'JetBrains Mono', monospace;
+  font-family: var(--theme-font-mono, 'JetBrains Mono', monospace);
   font-size: 11px;
   font-weight: 600;
   padding: 5px 8px;
@@ -2086,7 +2088,7 @@
 .ft2-numeric-value {
   background: var(--color-bg);
   color: var(--color-accent);
-  font-family: 'JetBrains Mono', monospace;
+  font-family: var(--theme-font-mono, 'JetBrains Mono', monospace);
   font-size: 12px;
   font-weight: 700;
   padding: 4px 8px;
@@ -2586,7 +2588,7 @@ html[data-theme="cyan-lineart"] #root > * {
 
 .synth-editor-tab {
   padding: 6px 12px;
-  font-family: 'JetBrains Mono', monospace;
+  font-family: var(--theme-font-mono, 'JetBrains Mono', monospace);
   font-size: 11px;
   font-weight: 600;
   text-transform: uppercase;
@@ -2843,4 +2845,81 @@ html[data-theme="cyan-lineart"] #root > * {
 .fx-horizontal-layout .overflow-y-auto > * {
   margin-top: 0 !important;
   flex-shrink: 0;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   Theme-responsive button and control styles
+   ═══════════════════════════════════════════════════════════════════════════════ */
+
+/* Theme button radius */
+.theme-button,
+.synth-editor-tab,
+button[class*="rounded"] {
+  border-radius: var(--theme-button-radius, 4px);
+}
+
+/* Raised button style (3D beveled look for vintage machines) */
+[data-theme="tr-808"] button,
+[data-theme="linn-lm1"] button,
+[data-theme="cr-78"] button,
+[data-theme="ace-tone"] button,
+[data-theme="maestro-rhythm-king"] button,
+[data-theme="hammond-auto-vari"] button {
+  text-shadow: 0 1px 0 rgba(0,0,0,0.3);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.1), 0 2px 4px rgba(0,0,0,0.3);
+}
+
+[data-theme="tr-808"] button:active,
+[data-theme="linn-lm1"] button:active,
+[data-theme="cr-78"] button:active,
+[data-theme="ace-tone"] button:active,
+[data-theme="maestro-rhythm-king"] button:active,
+[data-theme="hammond-auto-vari"] button:active {
+  box-shadow: inset 0 2px 4px rgba(0,0,0,0.4);
+}
+
+/* Beveled button style (metallic industrial look) */
+[data-theme="tr-909"] button,
+[data-theme="dmx"] button,
+[data-theme="maestro-rhythm-sound"] button {
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.15), inset 0 -1px 0 rgba(0,0,0,0.2), 0 1px 3px rgba(0,0,0,0.3);
+}
+
+/* Flat button style (clean digital look) */
+[data-theme="mpc-60"] button,
+[data-theme="sp-12"] button,
+[data-theme="boss-hc2"] button {
+  box-shadow: none;
+  border-width: 1px;
+}
+
+/* Metallic knob glow for TR-909 */
+[data-theme="tr-909"] input[type="range"]::-webkit-slider-thumb {
+  box-shadow: 0 0 8px rgba(251, 146, 80, 0.4);
+}
+
+/* Vintage LED glow for CR-78 */
+[data-theme="cr-78"] .tracker-cell {
+  text-shadow: 0 0 4px currentColor;
+}
+
+/* Warm vintage glow for tube-era machines */
+[data-theme="maestro-rhythm-king"] .tracker-cell,
+[data-theme="maestro-rhythm-sound"] .tracker-cell,
+[data-theme="ace-tone"] .tracker-cell,
+[data-theme="hammond-auto-vari"] .tracker-cell {
+  text-shadow: 0 0 2px rgba(255, 200, 100, 0.15);
+}
+
+/* LCD/digital glow for 80s machines */
+[data-theme="mpc-60"] .tracker-cell {
+  text-shadow: 0 0 3px rgba(138, 170, 195, 0.2);
+}
+
+[data-theme="sp-12"] .tracker-cell {
+  text-shadow: 0 0 3px rgba(68, 138, 189, 0.2);
+}
+
+[data-theme="boss-hc2"] .tracker-cell {
+  text-shadow: 0 0 3px rgba(50, 155, 212, 0.2);
 }
