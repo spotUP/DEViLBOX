@@ -449,7 +449,6 @@ export class TrackerGLRenderer {
     const centerLineTop = Math.floor(height / 2) - rowH / 2;
     const baseY = centerLineTop - topLines * rowH - smoothOffset;
     const hlInterval = ui.rowHighlightInterval ?? 4;
-    const hlInterval = ui.rowHighlightInterval ?? 4;
 
     // ── Clear ─────────────────────────────────────────────────────────────────
     if (ui.trackerVisualBg) {
