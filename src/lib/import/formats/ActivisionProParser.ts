@@ -952,11 +952,9 @@ function decodeAvpTrack(
       noteByte = pos < len ? data[pos++] : 0;
     }
 
-    // noteByte encoding: bits 6..0 = note index, or special flags
-    // High bit of noteByte can encode instrument / other info.
-    // For simplicity we extract note from bits 5..0 (6-bit note field is common in Amiga trackers).
+    // noteByte encoding: bits 5..0 = note index, bits 7..6 = instrument
     const noteIdx = noteByte & 0x3f;
-    const instrBit = (noteByte >> 6) & 0x01;
+    const instrField = (noteByte >> 6) & 0x03;
 
     let xmNote = 0;
     let instrId = 0;
@@ -965,9 +963,9 @@ function decodeAvpTrack(
       xmNote = avpNoteToXM(noteIdx);
     }
 
-    // Instrument index from the tracking — simple heuristic
-    if (instrBit && instruments.length > 0) {
-      instrId = 1; // We don't have full instrument encoding here; use 1 as fallback
+    // Instrument index from upper 2 bits (0-3); clamp to available instruments
+    if (instrField > 0 && instruments.length > 0) {
+      instrId = Math.min(instrField, instruments.length);
     }
 
     rows.push({ note: xmNote, instrument: instrId, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 });

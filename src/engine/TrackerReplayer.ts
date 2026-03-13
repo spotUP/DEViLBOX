@@ -456,6 +456,10 @@ export class TrackerReplayer {
   // still allowing the pattern view to follow the scratch position.
   private _suppressNotes = false;
 
+  // SonicArranger dynamic track length (effect 0x9): overrides pattern length
+  // Reset to 0 on each pattern advance; 0 = use normal pattern length
+  private _saTrackLen = 0;
+
   // Generation counter for play() to detect stale async continuations.
   // Incremented at the start of every play() call; checked after each await.
   // If the value changed (another play/stop happened while awaiting), the stale
@@ -483,6 +487,8 @@ export class TrackerReplayer {
 
   // External playback engines for formats that don't use standard tracker playback
   private c64SidEngine: C64SIDEngine | null = null;
+  private hivelyEngine: import('../hively/HivelyEngine').HivelyEngine | null = null;
+  private _hvlPositionUnsub: (() => void) | null = null;
 
   /** Get the active C64 SID engine (for subsong switching etc.) */
   public getC64SIDEngine(): C64SIDEngine | null {
@@ -1220,6 +1226,29 @@ export class TrackerReplayer {
       if (gen !== this._playGeneration) return;
       if (result.suppressNotes) this._suppressNotes = true;
       if (result.c64SidEngine) this.c64SidEngine = result.c64SidEngine;
+
+      // Subscribe to HivelyEngine position updates (~15fps from WASM)
+      // This replaces the TS scheduler as the authoritative position source
+      if (result.hivelyEngine) {
+        this.hivelyEngine = result.hivelyEngine;
+        let lastRow = -1;
+        let lastPosition = -1;
+        this._hvlPositionUnsub = this.hivelyEngine.onPositionUpdate((update) => {
+          if (!this.playing || !this.song) return;
+          if (update.row === lastRow && update.position === lastPosition) return;
+          lastRow = update.row;
+          lastPosition = update.position;
+          this.songPos = update.position;
+          this.pattPos = update.row;
+          const patternNum = this.song.songPositions[update.position] ?? 0;
+          const time = Tone.now();
+          this.queueDisplayState(time, update.row, patternNum, update.position, 0);
+          if (this.onRowChange) {
+            this.onRowChange(update.row, patternNum, update.position);
+          }
+        });
+        _playLog('HVL position subscription active');
+      }
     }
 
     this.playing = true;
@@ -1500,6 +1529,13 @@ export class TrackerReplayer {
 
     // Stop routed native engines (UADE/Hively/SID/MusicLine/JamCracker)
     this.c64SidEngine = stopNativeEngines(this.song, this.routedNativeEngines, this.c64SidEngine);
+
+    // Clean up HVL position subscription
+    if (this._hvlPositionUnsub) {
+      this._hvlPositionUnsub();
+      this._hvlPositionUnsub = null;
+    }
+    this.hivelyEngine = null;
 
     // Stop all channels (release synth notes + stop sample players)
     for (let i = 0; i < this.channels.length; i++) {
@@ -2000,6 +2036,11 @@ export class TrackerReplayer {
             break;
           case 0xA: // VolumeSlide — signed byte
             (saInst as any).set('volumeSlide', saArg);
+            break;
+          case 0x9: // SetTrackLen — dynamic pattern length override
+            if (saArg > 0 && saArg <= 128) {
+              this._saTrackLen = saArg;
+            }
             break;
         }
       }
@@ -4561,14 +4602,20 @@ export class TrackerReplayer {
 
     // Pattern end or position jump (Bxx / Dxx / natural end of pattern)
     const patternNum = this.song.songPositions[this.songPos];
-    const patternLength = this.accessor.getMode() !== 'classic'
+    let patternLength = this.accessor.getMode() !== 'classic'
       ? this.accessor.getPatternLength(this.songPos)
       : (this.song.patterns[patternNum]?.length ?? 64);
+
+    // SonicArranger effect 0x9 (SetTrackLen) overrides pattern length
+    if (this._saTrackLen > 0) {
+      patternLength = Math.min(patternLength, this._saTrackLen);
+    }
 
     if (this.pattPos >= patternLength || this.posJumpFlag) {
       this.pattPos = this.pBreakPos; // Dxx target row, or 0 if Bxx/natural
       this.pBreakPos = 0;
       this.posJumpFlag = false;
+      this._saTrackLen = 0; // Reset dynamic track length on pattern advance
 
       // FT2: ++song.songPos (Bxx already set songPos = param-1, so net = param)
       this.songPos++;
