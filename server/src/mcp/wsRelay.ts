@@ -12,6 +12,14 @@
  *
  * CLIENT mode: If port 4003 is already taken, connects as a WS client
  * (used by MCP subprocess when Express already owns the port).
+ *
+ * ⚠️  RACE CONDITION: Both Express (server/src/index.ts) and the MCP
+ * subprocess (server/src/mcp/index.ts) call startRelay(). Whichever starts
+ * first owns port 4003 in SERVER mode; the other falls back to CLIENT mode.
+ * CORRECT order: Express starts first (owns 4003), MCP subprocess starts
+ * second (client mode). If Express restarts (Vite HMR, crash), it reclaims
+ * port 4003 and the MCP subprocess loses its connection with NO auto-reconnect.
+ * Fix: kill the MCP subprocess PID; Claude Code will restart it in client mode.
  */
 
 import { randomUUID } from 'crypto';
