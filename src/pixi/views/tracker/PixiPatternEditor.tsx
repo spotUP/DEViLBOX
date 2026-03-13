@@ -890,12 +890,7 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
 
   // Playback row tracking — smooth offset is imperative (no React state)
   const playbackRowRef = useRef(0);
-  // Pattern index during playback — stored as ref to avoid React re-render cascade.
-  // The RAF loop handles all visual updates imperatively; a React state change here
-  // would trigger: re-render → renderParamsRef overwrite → useEffect → redundant
-  // fullRedraw (grid + 300-600 labels + overlay), causing visible stutter at pattern
-  // boundaries. The ref is synced back to displayPatternIndex when playback stops.
-  const playbackPatternIdxRef = useRef(0);
+  const [playbackPatternIdx, setPlaybackPatternIdx] = useState(0);
   const smoothOffsetRef = useRef(0);          // frame-rate smooth offset — NO React state
   const gridContainerRef = useRef<ContainerType | null>(null);       // outer grid container (for drag coord conversion)
   const gridScrollContainerRef = useRef<ContainerType | null>(null); // inner scroll container
@@ -1009,12 +1004,8 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
       if (smooth) {
         // Recalculate row duration on row change OR when cached value is 0 (first frame)
         if (cachedRowDurRef.current === 0 || newRow !== prevRowRef.current || newPattern !== prevPatternRef.current) {
-          // Find the NEXT row's state in the ring buffer (the one immediately after current).
-          // We need to peek just far enough to find a state with a different row,
-          // not the furthest state in the buffer (which could be 2-3 rows ahead,
-          // giving an inflated duration that makes smooth scroll move at half speed).
-          const nextState = replayer.getNextRowState(audioState);
-          if (nextState) {
+          const nextState = replayer.getStateAtTime(audioTime + 0.5, true);
+          if (nextState && nextState.row !== audioState.row) {
             cachedRowDurRef.current = nextState.time - audioState.time;
           } else {
             // Compute from BPM/speed — use replayer's actual values for accuracy
@@ -1054,37 +1045,16 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
       const patternChanged = newPattern !== prevPatternRef.current;
       prevRowRef.current = newRow;
       prevPatternRef.current = newPattern;
-
-      // When pattern changes, update displayPattern/patternLength imperatively
-      // so the immediate redraw uses correct data. Without this, the React
-      // state update (setPlaybackPatternIdx) takes 1-3 frames to propagate,
-      // causing a visible flash of stale pattern data at transitions.
-      const extra: Partial<RenderParams> = patternChanged
-        ? (() => {
-            const newPat = ts.patterns[newPattern];
-            return newPat
-              ? { displayPattern: newPat, displayPatternIndex: newPattern, patternLength: newPat.length }
-              : {};
-          })()
-        : {};
-
       renderParamsRef.current = {
         ...renderParamsRef.current,
         playbackRow: newRow,
         playbackPatternIdx: newPattern,
-        ...extra,
       };
-      // Only force full redraw on pattern changes (structural: new data, new length).
-      // Normal row advancement is handled by the vStartChanged path in imperativeRedraw,
-      // which skips the expensive renderGrid call. Setting fullRedraw on every row was
-      // causing grid+labels+overlay regeneration 4-8× per second unnecessarily.
-      if (patternChanged) {
-        fullRedrawRef.current = true;
-      }
+      fullRedrawRef.current = true;
       imperativeRedrawRef.current?.();
       playbackRowRef.current = newRow;
       if (patternChanged) {
-        playbackPatternIdxRef.current = newPattern;
+        setPlaybackPatternIdx(newPattern);
       }
     }
   });
@@ -1095,9 +1065,9 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
   // re-render. This 1-3 frame timing gap caused visible jumps at pattern transitions
   // because currentRow would be from the new pattern while pattern data was still old.
   const displayPattern = isPlaying
-    ? (patterns[playbackPatternIdxRef.current] ?? pattern)
+    ? (patterns[playbackPatternIdx] ?? pattern)
     : pattern;
-  const displayPatternIndex = isPlaying ? playbackPatternIdxRef.current : currentPatternIndex;
+  const displayPatternIndex = isPlaying ? playbackPatternIdx : currentPatternIndex;
 
   // ── Visible range ─────────────────────────────────────────────────────────
   const scrollbarHeight = allChannelsFit ? 0 : SCROLLBAR_HEIGHT;
@@ -1124,13 +1094,12 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
     displayPattern, displayPatternIndex, patterns, isPlaying, recordMode,
     scrollLeft: scrollLeftRef.current, rowHeight, rowHighlightInterval,
     channelMuted, channelSolo, useHex, blankEmpty, showBeatLabels, columnVisibility,
-    currentPatternIndex, playbackRow: playbackRowRef.current, playbackPatternIdx: playbackPatternIdxRef.current,
+    currentPatternIndex, playbackRow: playbackRowRef.current, playbackPatternIdx,
     noteDisplayOffset: getTrackerReplayer().getSong()?.noteDisplayOffset ?? 0,
   };
 
   // ── Imperative redraw — called from subscription (cursor) and useEffect (other deps) ──
   const prevVStartRef = useRef(-9999);
-  const prevGridAlignRef = useRef(-9999); // Track grid stripe alignment to skip redundant renderGrid
   const prevSelectionRef = useRef<BlockSelection | null>(null);
   const prevChannelRef = useRef(-1);
   const fullRedrawRef = useRef(true); // Force full redraw on non-cursor dep changes
@@ -1163,14 +1132,6 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
       prevVStartRef.current = vStart;
       prevSelectionRef.current = selection;
       prevChannelRef.current = cursor.channelIndex;
-      // Grid is outside scroll container (fixed position) — only redraw when
-      // the row highlight stripe alignment shifts or pattern boundary enters view.
-      const gridAlign = ((vStart % p.rowHighlightInterval) + p.rowHighlightInterval) % p.rowHighlightInterval;
-      if (gridAlign !== prevGridAlignRef.current || fullRedrawRef.current) {
-        prevGridAlignRef.current = gridAlign;
-        const gGrid = gridGraphicsRef.current;
-        if (gGrid) renderGrid(gGrid, p, vStart);
-      }
       if (mega) mega.updateLabels(generateLabels(p, vStart));
       const gOverlay = overlayGraphicsRef.current;
       if (gOverlay) renderOverlay(gOverlay, p, cursor, selection, vStart, currentRow,
@@ -1238,7 +1199,7 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
       showGhostPatterns, trackerVisualBg, numChannels, channelOffsets, channelWidths,
       displayPattern, displayPatternIndex, patterns, isPlaying, recordMode, scrollLeft,
       rowHeight, rowHighlightInterval, channelMuted, channelSolo, useHex, blankEmpty,
-      showBeatLabels, columnVisibility, currentPatternIndex,
+      showBeatLabels, columnVisibility, currentPatternIndex, playbackPatternIdx,
       imperativeRedraw]);
 
   // ── Click → cell mapping ──────────────────────────────────────────────────
@@ -1679,17 +1640,13 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
         onPointerUpOutside={handlePointerUp}
       >
 
-        {/* Grid background — fixed layer, not scrolled by pivot.y.
-            Row highlight stripes are drawn at screen positions; labels scroll over them.
-            This avoids regenerating the grid on every row change during playback. */}
-        <pixiGraphics ref={gridGraphicsRef} draw={() => {}} layout={gridGraphicsLayout} eventMode="none" />
-
         {/* Smooth-scroll layer — y updated imperatively by RAF; eventMode="none" so clicks pass to outer container */}
         <pixiContainer
           ref={gridScrollContainerRef}
           layout={gridScrollLayout}
           eventMode="none"
         >
+          <pixiGraphics ref={gridGraphicsRef} draw={() => {}} layout={gridGraphicsLayout} />
           <pixiGraphics ref={overlayGraphicsRef} draw={() => {}} layout={gridGraphicsLayout} />
 
           {/* MegaText added imperatively to gridScrollContainerRef */}
