@@ -630,10 +630,10 @@ export class TrackerGLRenderer {
       const isHL = rowIndex % hlInterval === 0;
 
       // Line number — use pre-computed hex/dec tables
-      // Glow trail: rows near the active row lerp toward white, fading over TRAIL_ROWS
+      // Glow trails behind the playhead: active row = white, rows above fade out
       const TRAIL_ROWS = 3;
-      const dist = !isGhostRow ? Math.abs(i - currentRow) : TRAIL_ROWS + 1;
-      const glow = dist <= TRAIL_ROWS ? 1 - dist / TRAIL_ROWS : 0;
+      const behind = !isGhostRow ? currentRow - i : -1;
+      const glow = behind >= 0 && behind <= TRAIL_ROWS ? 1 - behind / TRAIL_ROWS : 0;
       let lineNumStr: string;
       if (ui.showBeatLabels) {
         const beat = Math.floor(rowIndex / hlInterval) + 1;

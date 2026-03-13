@@ -445,8 +445,10 @@ function generateLabels(p: RenderParams, vStart: number, activeRow = -1): LabelD
     const isHighlightRow = actualRow % p.rowHighlightInterval === 0;
     // Glow trail: rows near the active row lerp toward white, fading over TRAIL_ROWS
     const TRAIL_ROWS = 3;
-    const dist = activeRow >= 0 && !isGhost ? Math.abs(rowNum - activeRow) : TRAIL_ROWS + 1;
-    const glow = dist <= TRAIL_ROWS ? 1 - dist / TRAIL_ROWS : 0; // 1 = white, 0 = normal
+    // Glow trails BEHIND the playhead: active row = full white, rows already
+    // passed (smaller rowNum = visually above) fade out. Rows ahead get no glow.
+    const behind = activeRow >= 0 && !isGhost ? activeRow - rowNum : -1;
+    const glow = behind >= 0 && behind <= TRAIL_ROWS ? 1 - behind / TRAIL_ROWS : 0;
     let lineNumText: string;
     if (p.showBeatLabels) {
       const beat = Math.floor(actualRow / p.rowHighlightInterval) + 1;
