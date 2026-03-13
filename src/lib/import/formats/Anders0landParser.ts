@@ -146,17 +146,48 @@ export async function parseAnders0landFile(
     throw new Error('Not an Anders 0land module');
   }
 
+  const buf = new Uint8Array(buffer);
+
   // ── Module name from filename ─────────────────────────────────────────────
 
   const baseName = filename.split('/').pop() ?? filename;
   // Strip "hot." prefix (case-insensitive)
   const moduleName = baseName.replace(/^hot\./i, '') || baseName;
 
+  // ── Parse chunk offsets to extract metadata from mdt ──────────────────────
+
+  const mplSize = u32BE(buf, 4);
+  const mdtOff = mplSize;           // mdt chunk starts after mpl
+  const mdtDataOff = mdtOff + 8;    // mdt data starts after 8-byte header
+
+  // Extract pattern count and instrument count from mdt header
+  // Reference: Anders 0land_v1.asm EP_NewModuleInfo (lines 415-426)
+  let numPatterns = 1;
+  let numInstruments = DEFAULT_INSTRUMENTS;
+
+  if (mdtDataOff + 22 <= buf.length) {
+    // Instrument count: (word@20 - word@18) >> 2
+    const w18 = (buf[mdtDataOff + 18] << 8) | buf[mdtDataOff + 19];
+    const w20 = (buf[mdtDataOff + 20] << 8) | buf[mdtDataOff + 21];
+    if (w20 > w18) {
+      numInstruments = Math.max(1, Math.min(64, (w20 - w18) >> 2));
+    }
+
+    // Pattern count: (word@6 - word@4) >> 2
+    if (mdtDataOff + 8 <= buf.length) {
+      const w4 = (buf[mdtDataOff + 4] << 8) | buf[mdtDataOff + 5];
+      const w6 = (buf[mdtDataOff + 6] << 8) | buf[mdtDataOff + 7];
+      if (w6 > w4) {
+        numPatterns = Math.max(1, Math.min(256, (w6 - w4) >> 2));
+      }
+    }
+  }
+
   // ── Instrument placeholders ───────────────────────────────────────────────
 
   const instruments: InstrumentConfig[] = [];
 
-  for (let i = 0; i < DEFAULT_INSTRUMENTS; i++) {
+  for (let i = 0; i < numInstruments; i++) {
     instruments.push({
       id: i + 1,
       name: `Sample ${i + 1}`,
@@ -168,55 +199,54 @@ export async function parseAnders0landFile(
     } as InstrumentConfig);
   }
 
-  // ── Empty pattern (placeholder — UADE handles actual audio) ───────────────
+  // ── Empty patterns (placeholder — UADE handles actual audio) ──────────────
 
-  const emptyRows = Array.from({ length: 64 }, () => ({
-    note: 0,
-    instrument: 0,
-    volume: 0,
-    effTyp: 0,
-    eff: 0,
-    effTyp2: 0,
-    eff2: 0,
-  }));
+  const patterns = [];
+  for (let p = 0; p < numPatterns; p++) {
+    const emptyRows = Array.from({ length: 64 }, () => ({
+      note: 0, instrument: 0, volume: 0,
+      effTyp: 0, eff: 0, effTyp2: 0, eff2: 0,
+    }));
 
-  const pattern = {
-    id: 'pattern-0',
-    name: 'Pattern 0',
-    length: 64,
-    channels: Array.from({ length: 4 }, (_, ch) => ({
-      id: `channel-${ch}`,
-      name: `Channel ${ch + 1}`,
-      muted: false,
-      solo: false,
-      collapsed: false,
-      volume: 100,
-      pan: ch === 0 || ch === 3 ? -50 : 50,
-      instrumentId: null,
-      color: null,
-      rows: emptyRows,
-    })),
-    importMetadata: {
-      sourceFormat: 'MOD' as const,
-      sourceFile: filename,
-      importedAt: new Date().toISOString(),
-      originalChannelCount: 4,
-      originalPatternCount: 1,
-      originalInstrumentCount: DEFAULT_INSTRUMENTS,
-    },
-  };
+    patterns.push({
+      id: `pattern-${p}`,
+      name: `Pattern ${p}`,
+      length: 64,
+      channels: Array.from({ length: 4 }, (_, ch) => ({
+        id: `p${p}-ch${ch}`,
+        name: `Channel ${ch + 1}`,
+        muted: false,
+        solo: false,
+        collapsed: false,
+        volume: 100,
+        pan: ch === 0 || ch === 3 ? -50 : 50,
+        instrumentId: null,
+        color: null,
+        rows: emptyRows,
+      })),
+      importMetadata: {
+        sourceFormat: 'MOD' as const,
+        sourceFile: filename,
+        importedAt: new Date().toISOString(),
+        originalChannelCount: 4,
+        originalPatternCount: numPatterns,
+        originalInstrumentCount: numInstruments,
+      },
+    });
+  }
 
   return {
     name: `${moduleName} [Anders 0land]`,
     format: 'MOD' as TrackerFormat,
-    patterns: [pattern],
+    patterns,
     instruments,
-    songPositions: [0],
-    songLength: 1,
+    songPositions: Array.from({ length: numPatterns }, (_, i) => i),
+    songLength: numPatterns,
     restartPosition: 0,
     numChannels: 4,
     initialSpeed: 6,
     initialBPM: 125,
     linearPeriods: false,
+    uadePatternLayout: true,
   };
 }
