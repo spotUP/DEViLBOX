@@ -16,6 +16,7 @@
 class DivEngineAccess: public DivEngine {
 public:
   bool doLoadFur(unsigned char* data, size_t len) { return loadFur(data, len); }
+  bool doLoad(unsigned char* data, size_t len, const char* nameHint=NULL) { return load(data, len, nameHint); }
   SafeWriter* doSaveFur() { return saveFur(false); }
   void doRegisterSystems() { registerSystems(); }
   void setActive(bool a) { active = a; }
@@ -49,14 +50,15 @@ extern "C" {
 int fur_load(const uint8_t* data, size_t len) {
   ensureInit();
 
-  // loadFur takes ownership of the buffer and deletes it,
+  // load() takes ownership of the buffer and deletes it,
   // so we must provide a copy allocated with new[]
   unsigned char* buf = new unsigned char[len];
   memcpy(buf, data, len);
 
-  bool ok = g_engine.doLoadFur(buf, len);
+  // Use load() dispatcher which handles .fur, .dmf, .ftm, and other formats
+  bool ok = g_engine.doLoad(buf, len);
   if (!ok) {
-    snprintf(g_errorBuf, sizeof(g_errorBuf), "loadFur failed: %s",
+    snprintf(g_errorBuf, sizeof(g_errorBuf), "load failed: %s",
              g_engine.getError().c_str());
     return -1;
   }
