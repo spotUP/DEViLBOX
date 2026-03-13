@@ -142,6 +142,7 @@ import {
   getModalState,
   runFormatTest,
   runRegressionSuite,
+  runSynthTests,
   exportWav,
   exportPatternText,
   exportMidi,
@@ -348,6 +349,7 @@ const handlers: Record<string, Handler> = {
   // ─── Format Regression Testing ──────────────────────────────────────────
   run_format_test: runFormatTest,
   run_regression_suite: runRegressionSuite,
+  run_synth_tests: runSynthTests,
 
   // ─── Export Tools ───────────────────────────────────────────────────────
   export_wav: exportWav,
