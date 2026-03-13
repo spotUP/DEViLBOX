@@ -589,7 +589,7 @@ export function parseArtOfNoiseFile(bytes: Uint8Array, filename: string): Tracke
       const wfIdx = si.waveForm;
       const wf = wfIdx < waveForms.length ? waveForms[wfIdx] : null;
 
-      if (wf && wf.length > 0 && si.length > 0) {
+      if (wf && wf.length > 0 && si.length > 0 && si.startOffset * 2 < wf.length) {
         // Sample data: si.startOffset and si.length are in words → multiply by 2 for bytes
         const byteStart  = si.startOffset * 2;
         const byteLength = si.length * 2;
