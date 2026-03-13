@@ -202,7 +202,8 @@ export const ModlandPanel: React.FC<ModlandPanelProps> = ({ isOpen, onLoadTracke
                 <div
                   key={file.full_path}
                   className="flex items-center gap-3 px-3 py-2 bg-dark-bgTertiary rounded border border-transparent
-                             hover:bg-dark-bgHover hover:border-dark-border transition-colors group"
+                             hover:bg-dark-bgHover hover:border-dark-border transition-colors group cursor-pointer"
+                  onDoubleClick={() => handleModlandLoad(file)}
                 >
                   <FileAudio size={16} className="text-text-muted flex-shrink-0" />
                   <div className="flex-1 min-w-0">
