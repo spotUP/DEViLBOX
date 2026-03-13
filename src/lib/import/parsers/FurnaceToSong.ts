@@ -216,9 +216,12 @@ function computeBPM(sub: FurnaceSubsong): number {
 }
 
 export async function parseFurnaceFile(buffer: ArrayBuffer, _fileName: string, subsong = 0): Promise<TrackerSong> {
+  console.log(`[FurnaceToSong] parseFurnaceFile: "${_fileName}", ${buffer.byteLength} bytes, subsong=${subsong}`);
   // Try WASM parser first, fall back to TS parser
   try {
-    return await parseFurnaceFileWasm(buffer, _fileName, subsong);
+    const result = await parseFurnaceFileWasm(buffer, _fileName, subsong);
+    console.log(`[FurnaceToSong] WASM success: ${result.patterns.length} patterns, ${result.instruments.length} instruments`);
+    return result;
   } catch (err) {
     // DefleMask (.dmf) files can only be parsed by the WASM engine (which has
     // Furnace's full DMF import). The TS fallback only handles .fur format.
@@ -228,7 +231,14 @@ export async function parseFurnaceFile(buffer: ArrayBuffer, _fileName: string, s
       throw new Error(`DefleMask import requires Furnace WASM engine (WASM error: ${err})`);
     }
     console.warn('[FurnaceToSong] WASM parser failed, falling back to TS parser:', err);
-    return parseFurnaceFileTS(buffer, _fileName, subsong);
+    try {
+      const result = await parseFurnaceFileTS(buffer, _fileName, subsong);
+      console.log(`[FurnaceToSong] TS fallback success: ${result.patterns.length} patterns, ${result.instruments.length} instruments`);
+      return result;
+    } catch (tsErr) {
+      console.error('[FurnaceToSong] Both WASM and TS parsers failed!', { wasmErr: err, tsErr });
+      throw tsErr;
+    }
   }
 }
 
