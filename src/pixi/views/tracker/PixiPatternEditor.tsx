@@ -1126,6 +1126,7 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
 
   // ── Imperative redraw — called from subscription (cursor) and useEffect (other deps) ──
   const prevVStartRef = useRef(-9999);
+  const prevGridAlignRef = useRef(-9999); // Track grid stripe alignment to skip redundant renderGrid
   const prevSelectionRef = useRef<BlockSelection | null>(null);
   const prevChannelRef = useRef(-1);
   const fullRedrawRef = useRef(true); // Force full redraw on non-cursor dep changes
@@ -1158,8 +1159,14 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
       prevVStartRef.current = vStart;
       prevSelectionRef.current = selection;
       prevChannelRef.current = cursor.channelIndex;
-      const gGrid = gridGraphicsRef.current;
-      if (gGrid) renderGrid(gGrid, p, vStart);
+      // Grid is outside scroll container (fixed position) — only redraw when
+      // the row highlight stripe alignment shifts or pattern boundary enters view.
+      const gridAlign = ((vStart % p.rowHighlightInterval) + p.rowHighlightInterval) % p.rowHighlightInterval;
+      if (gridAlign !== prevGridAlignRef.current || fullRedrawRef.current) {
+        prevGridAlignRef.current = gridAlign;
+        const gGrid = gridGraphicsRef.current;
+        if (gGrid) renderGrid(gGrid, p, vStart);
+      }
       if (mega) mega.updateLabels(generateLabels(p, vStart));
       const gOverlay = overlayGraphicsRef.current;
       if (gOverlay) renderOverlay(gOverlay, p, cursor, selection, vStart, currentRow,
@@ -1668,13 +1675,17 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
         onPointerUpOutside={handlePointerUp}
       >
 
+        {/* Grid background — fixed layer, not scrolled by pivot.y.
+            Row highlight stripes are drawn at screen positions; labels scroll over them.
+            This avoids regenerating the grid on every row change during playback. */}
+        <pixiGraphics ref={gridGraphicsRef} draw={() => {}} layout={gridGraphicsLayout} eventMode="none" />
+
         {/* Smooth-scroll layer — y updated imperatively by RAF; eventMode="none" so clicks pass to outer container */}
         <pixiContainer
           ref={gridScrollContainerRef}
           layout={gridScrollLayout}
           eventMode="none"
         >
-          <pixiGraphics ref={gridGraphicsRef} draw={() => {}} layout={gridGraphicsLayout} />
           <pixiGraphics ref={overlayGraphicsRef} draw={() => {}} layout={gridGraphicsLayout} />
 
           {/* MegaText added imperatively to gridScrollContainerRef */}
