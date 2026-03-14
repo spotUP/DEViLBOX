@@ -606,6 +606,28 @@ describe('Native parser tests', () => {
     expect(await uadeDetect('blacklamp.gray')).toBe(true);
     console.log(`  FredGray: ${buf.byteLength} bytes, UADE-routed`);
   });
+
+  it('JochenHippelST: 5th_gear.hip (non-MCMD short form)', async () => {
+    const buf = readFileSync(resolve(BASE, '5th_gear.hip'));
+    const ab = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer;
+    const { isJochenHippelSTFormat, parseJochenHippelSTFile } = await import('@lib/import/formats/JochenHippelSTParser');
+    expect(isJochenHippelSTFormat(ab)).toBe(true);
+    const song = await parseJochenHippelSTFile(ab, '5th_gear.hip');
+    logResult('JochenHippelST hip', song);
+    expect(song).toBeTruthy();
+    expect(song.format).toBeTruthy();
+  });
+
+  it('JochenHippelST: airballtest.sog (raw TFMX magic)', async () => {
+    const buf = readFileSync(resolve(BASE, 'airballtest.sog'));
+    const ab = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer;
+    const { isJochenHippelSTFormat, parseJochenHippelSTFile } = await import('@lib/import/formats/JochenHippelSTParser');
+    expect(isJochenHippelSTFormat(ab)).toBe(true);
+    const song = await parseJochenHippelSTFile(ab, 'airballtest.sog');
+    logResult('JochenHippelST sog', song);
+    expect(song).toBeTruthy();
+    expect(song.format).toBeTruthy();
+  });
 });
 
 // ── UADE routing detection tests ───────────────────────────────────────────
@@ -624,7 +646,7 @@ describe('UADE routing detection for remaining formats', () => {
     'forgotten_worlds.fw', // fw.*
     // 'flood.glue' — now has native GlueMonParser
     'blazing_thunder.hd', // hd.*
-    '5th_gear.hip',       // hip.*
+    // '5th_gear.hip' — now has native JochenHippelSTParser test
     'alien_storm.md',     // md.*
     'atron.mk2',          // mk2.*
     'lefetichemaya.mok',  // mok.*
@@ -640,7 +662,7 @@ describe('UADE routing detection for remaining formats', () => {
     // UADE_EXTENSIONS (*.ext form)
     'action.aps',         // aps
     'airball.ps',         // ps
-    'airballtest.sog',    // sog
+    // 'airballtest.sog' — now has native JochenHippelSTParser test
     'amberstar.hip7',     // hip7
     'prehistoric_tale.hipc', // hipc
     'beast_busters.ims',  // ims
