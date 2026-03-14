@@ -140,10 +140,9 @@ export class SpaceLaserSynth implements DevilboxSynth {
   }
 
   /**
-   * Manual release
+   * Manual release — note param is ignored (SpaceLaser is monophonic)
    */
-  triggerRelease(time?: number) {
-    // If time is null or undefined, use immediate time to prevent Tone.js ReferenceError/AssertionError
+  triggerRelease(_note?: string | number, time?: number) {
     const t = time === null || time === undefined ? audioNow() : time;
     this.synth.triggerRelease(t);
   }
