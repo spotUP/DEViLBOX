@@ -540,6 +540,30 @@ describe('Native parser tests', () => {
     expect(song.format).toBeTruthy();
   });
 
+  it('SoundMon V2: aquarivs.bp', async () => {
+    // aquarivs.bp is SoundMon V2 ("V.2" magic at offset 26)
+    const buf = readFileSync(resolve(BASE, 'aquarivs.bp'));
+    const ab = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer;
+    const { isSoundMonFormat, parseSoundMonFile } = await import('@lib/import/formats/SoundMonParser');
+    expect(isSoundMonFormat(ab)).toBe(true);
+    const song = await parseSoundMonFile(ab, 'aquarivs.bp');
+    logResult('SoundMon V2', song);
+    expect(song).toBeTruthy();
+    expect(song.format).toBeTruthy();
+  });
+
+  it('SoundMon V3: antidust.bp3', async () => {
+    // antidust.bp3 is SoundMon V3 ("V.3" magic at offset 26)
+    const buf = readFileSync(resolve(BASE, 'antidust.bp3'));
+    const ab = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer;
+    const { isSoundMonFormat, parseSoundMonFile } = await import('@lib/import/formats/SoundMonParser');
+    expect(isSoundMonFormat(ab)).toBe(true);
+    const song = await parseSoundMonFile(ab, 'antidust.bp3');
+    logResult('SoundMon V3', song);
+    expect(song).toBeTruthy();
+    expect(song.format).toBeTruthy();
+  });
+
   it('TomyTracker: inconvenient.sg', async () => {
     // inconvenient.sg is TomyTracker format (.sg extension), not Anders0land (which requires hot.* prefix)
     const buf = readFileSync(resolve(BASE, 'inconvenient.sg'));
@@ -552,6 +576,30 @@ describe('Native parser tests', () => {
     } else {
       console.log('  TomyTracker: not detected, falls to UADE');
     }
+  });
+
+  it('MusicMaker4V: axelf.mm4', async () => {
+    // axelf.mm4 is IFF FORM+MMV8+.mm4 extension → Music Maker 4V
+    const buf = readFileSync(resolve(BASE, 'axelf.mm4'));
+    const ab = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer;
+    const { isMusicMaker4VFormat, parseMusicMaker4VFile } = await import('@lib/import/formats/MusicMakerParser');
+    expect(isMusicMaker4VFormat(ab, 'axelf.mm4')).toBe(true);
+    const song = parseMusicMaker4VFile(ab, 'axelf.mm4');
+    logResult('MusicMaker4V', song);
+    expect(song).toBeTruthy();
+    expect(song.format).toBeTruthy();
+  });
+
+  it('MusicMaker8V: crockett8.mm8', async () => {
+    // crockett8.mm8 is IFF FORM+MMV8+.mm8 extension → Music Maker 8V
+    const buf = readFileSync(resolve(BASE, 'crockett8.mm8'));
+    const ab = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer;
+    const { isMusicMaker8VFormat, parseMusicMaker8VFile } = await import('@lib/import/formats/MusicMakerParser');
+    expect(isMusicMaker8VFormat(ab, 'crockett8.mm8')).toBe(true);
+    const song = parseMusicMaker8VFile(ab, 'crockett8.mm8');
+    logResult('MusicMaker8V', song);
+    expect(song).toBeTruthy();
+    expect(song.format).toBeTruthy();
   });
 
   it('QuadraComposer: synth_corn.emod', async () => {

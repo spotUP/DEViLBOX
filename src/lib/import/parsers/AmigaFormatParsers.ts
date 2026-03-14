@@ -2077,31 +2077,19 @@ export async function tryRouteFormat(
   // ── Music Maker 4V (mm4.* / sdata.* prefix) ──────────────────────────────
   // eagleplayer.conf: MusicMaker_4V  prefixes=mm4,sdata
   if (matchesExt(filename, ['mm4', 'sdata'])) {
-    if (prefs.musicMaker4V === 'native') {
-      try {
-        const { isMusicMaker4VFormat, parseMusicMaker4VFile } = await import('@lib/import/formats/MusicMakerParser');
-        if (isMusicMaker4VFormat(buffer, originalFileName)) return parseMusicMaker4VFile(buffer, originalFileName);
-      } catch (err) {
-        console.warn(`[MusicMakerParser/4V] Native parse failed for ${filename}, falling back to UADE:`, err);
-      }
-    }
-    const { parseUADEFile: parseUADE_mm4 } = await import('@lib/import/formats/UADEParser');
-    return parseUADE_mm4(buffer, originalFileName, prefs.uade ?? 'enhanced', subsong, preScannedMeta);
+    const { isMusicMaker4VFormat, parseMusicMaker4VFile } = await import('@lib/import/formats/MusicMakerParser');
+    return withNativeThenUADE('musicMaker4V', ctx,
+      (buf: Uint8Array | ArrayBuffer, name: string) => { if (isMusicMaker4VFormat(buf as ArrayBuffer, name)) return parseMusicMaker4VFile(buf as ArrayBuffer, name); return null; },
+      'MusicMakerParser/4V', { injectUADE: true });
   }
 
   // ── Music Maker 8V (mm8.* prefix) ────────────────────────────────────────
   // eagleplayer.conf: MusicMaker_8V  prefixes=mm8
   if (matchesExt(filename, ['mm8'])) {
-    if (prefs.musicMaker8V === 'native') {
-      try {
-        const { isMusicMaker8VFormat, parseMusicMaker8VFile } = await import('@lib/import/formats/MusicMakerParser');
-        if (isMusicMaker8VFormat(buffer, originalFileName)) return parseMusicMaker8VFile(buffer, originalFileName);
-      } catch (err) {
-        console.warn(`[MusicMakerParser/8V] Native parse failed for ${filename}, falling back to UADE:`, err);
-      }
-    }
-    const { parseUADEFile: parseUADE_mm8 } = await import('@lib/import/formats/UADEParser');
-    return parseUADE_mm8(buffer, originalFileName, prefs.uade ?? 'enhanced', subsong, preScannedMeta);
+    const { isMusicMaker8VFormat, parseMusicMaker8VFile } = await import('@lib/import/formats/MusicMakerParser');
+    return withNativeThenUADE('musicMaker8V', ctx,
+      (buf: Uint8Array | ArrayBuffer, name: string) => { if (isMusicMaker8VFormat(buf as ArrayBuffer, name)) return parseMusicMaker8VFile(buf as ArrayBuffer, name); return null; },
+      'MusicMakerParser/8V', { injectUADE: true });
   }
 
   // ── Maniacs of Noise (mon.* prefix) ──────────────────────────────────────
