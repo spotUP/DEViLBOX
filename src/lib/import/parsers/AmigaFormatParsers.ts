@@ -195,9 +195,17 @@ export async function tryRouteFormat(
   }
 
   // ── Sound-FX ──────────────────────────────────────────────────────────────
-  if (matchesExt(filename, ['sfx', 'sfx2', 'sfx13'])) {
-    const { parseSoundFXFile } = await import('@lib/import/formats/SoundFXParser');
-    return withNativeThenUADE('soundfx', ctx, (buf: Uint8Array | ArrayBuffer, name: string) => parseSoundFXFile(buf as ArrayBuffer, name), 'SoundFXParser');
+  // .sfx/.sfx2 — OpenMPT
+  if (matchesExt(filename, ['sfx', 'sfx2'])) {
+    const { parseWithOpenMPT } = await import('@lib/import/wasm/OpenMPTConverter');
+    const song = await parseWithOpenMPT(buffer, originalFileName);
+    song.libopenmptFileData = buffer.slice(0);
+    return song;
+  }
+  // .sfx13 — UADE only (not in OpenMPT)
+  if (matchesExt(filename, ['sfx13'])) {
+    const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
+    return parseUADEFile(buffer, originalFileName, prefs.uade ?? 'enhanced', subsong, preScannedMeta);
   }
 
   // ── JamCracker ────────────────────────────────────────────────────────────
@@ -447,67 +455,53 @@ export async function tryRouteFormat(
   }
 
   // ── Digital Symphony ──────────────────────────────────────────────────────
-  // .dsym files — identified by 8-byte magic \x02\x01\x13\x13\x14\x12\x01\x0B at offset 0.
+  // .dsym files — OpenMPT
   if (matchesExt(filename, ['dsym'])) {
-    const { isDigitalSymphonyFormat, parseDigitalSymphonyFile } = await import('@lib/import/formats/DigitalSymphonyParser');
-    return withNativeThenUADE('digitalSymphony', ctx,
-      (bytes: Uint8Array | ArrayBuffer, name: string) => parseDigitalSymphonyFile(bytes as Uint8Array, name),
-      'DigitalSymphonyParser', { isFormat: isDigitalSymphonyFormat, usesBytes: true });
+    const { parseWithOpenMPT } = await import('@lib/import/wasm/OpenMPTConverter');
+    const song = await parseWithOpenMPT(buffer, originalFileName);
+    song.libopenmptFileData = buffer.slice(0);
+    return song;
   }
 
   // ── Graoumf Tracker 1/2 ───────────────────────────────────────────────────
-  // .gt2 files (GT2 format) and .gtk files (GTK format) — identified by "GT2" / "GTK" magic.
-  if (matchesExt(filename, ['gt2', 'gtk'])) {
-    const { isGraoumfTracker2Format, parseGraoumfTracker2File } = await import('@lib/import/formats/GraoumfTracker2Parser');
-    return withNativeThenUADE('graoumfTracker2', ctx,
-      (bytes: Uint8Array | ArrayBuffer, name: string) => parseGraoumfTracker2File(bytes as Uint8Array, name),
-      'GraoumfTracker2Parser', { isFormat: isGraoumfTracker2Format, usesBytes: true });
+  // .gt2 — OpenMPT; .gtk — UADE only (not in OpenMPT)
+  if (matchesExt(filename, ['gt2'])) {
+    const { parseWithOpenMPT } = await import('@lib/import/wasm/OpenMPTConverter');
+    const song = await parseWithOpenMPT(buffer, originalFileName);
+    song.libopenmptFileData = buffer.slice(0);
+    return song;
+  }
+  if (matchesExt(filename, ['gtk'])) {
+    const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
+    return parseUADEFile(buffer, originalFileName, prefs.uade ?? 'enhanced', subsong, preScannedMeta);
   }
 
   // ── Symphonie Pro ─────────────────────────────────────────────────────────
-  // .symmod files — identified by "SymM" magic at offset 0.
+  // .symmod files — OpenMPT for pattern data + libopenmpt for audio playback.
   if (matchesExt(filename, ['symmod'])) {
-        if (prefs.symphoniePro === 'native') {
-      try {
-        const { isSymphonieProFormat, parseSymphonieProFile } = await import('@lib/import/formats/SymphonieProParser');
-        const bytes = new Uint8Array(buffer);
-        if (isSymphonieProFormat(bytes)) {
-          const result = await parseSymphonieProFile(bytes, originalFileName);
-          if (result) return result;
-        }
-      } catch (err) {
-        console.warn(`[SymphonieProParser] Native parse failed for ${filename}, falling back to UADE:`, err);
-      }
-    }
-    const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
-    return parseUADEFile(buffer, originalFileName, prefs.uade ?? 'enhanced', subsong, preScannedMeta);
+    const { parseWithOpenMPT } = await import('@lib/import/wasm/OpenMPTConverter');
+    const song = await parseWithOpenMPT(buffer, originalFileName);
+    song.libopenmptFileData = buffer.slice(0);
+    return song;
   }
 
   // ── DigiBooster Pro ───────────────────────────────────────────────────────
-  // .dbm files — identified by "DBM0" magic at offset 0.
+  // .dbm files — OpenMPT
   // NOTE: .digi (DigiBooster 1.x) is handled separately above; this is DBM Pro only.
   if (matchesExt(filename, ['dbm'])) {
-    const { isDigiBoosterProFormat, parseDigiBoosterProFile } = await import('@lib/import/formats/DigiBoosterProParser');
-    return withNativeThenUADE('digiBoosterPro', ctx,
-      (bytes: Uint8Array | ArrayBuffer, name: string) => parseDigiBoosterProFile(bytes as Uint8Array, name),
-      'DigiBoosterProParser', { isFormat: isDigiBoosterProFormat, usesBytes: true });
+    const { parseWithOpenMPT } = await import('@lib/import/wasm/OpenMPTConverter');
+    const song = await parseWithOpenMPT(buffer, originalFileName);
+    song.libopenmptFileData = buffer.slice(0);
+    return song;
   }
 
   // ── PumaTracker ───────────────────────────────────────────────────────────
-  // .puma files — no magic bytes; heuristic header validation (mirrors OpenMPT).
+  // .puma files — OpenMPT
   if (matchesExt(filename, ['puma'])) {
-        if (prefs.pumaTracker === 'native') {
-      try {
-        const { isPumaTrackerFormat, parsePumaTrackerFile } = await import('@lib/import/formats/PumaTrackerParser');
-        if (isPumaTrackerFormat(buffer)) {
-          return parsePumaTrackerFile(buffer, originalFileName);
-        }
-      } catch (err) {
-        console.warn(`[PumaTrackerParser] Native parse failed for ${filename}, falling back to UADE:`, err);
-      }
-    }
-    const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
-    return parseUADEFile(buffer, originalFileName, prefs.uade ?? 'enhanced', subsong, preScannedMeta);
+    const { parseWithOpenMPT } = await import('@lib/import/wasm/OpenMPTConverter');
+    const song = await parseWithOpenMPT(buffer, originalFileName);
+    song.libopenmptFileData = buffer.slice(0);
+    return song;
   }
 
   // ── Synthesis ─────────────────────────────────────────────────────────────
@@ -558,12 +552,12 @@ export async function tryRouteFormat(
   }
 
   // ── Chuck Biscuits / Black Artist ────────────────────────────────────────
-  // .cba files — identified by 'CBA\xF9' magic at offset 0.
+  // .cba files — OpenMPT
   if (matchesExt(filename, ['cba'])) {
-    const { isChuckBiscuitsFormat, parseChuckBiscuitsFile } = await import('@lib/import/formats/ChuckBiscuitsParser');
-    return withNativeThenUADE('chuckBiscuits', ctx,
-      (bytes: Uint8Array | ArrayBuffer, name: string) => parseChuckBiscuitsFile(bytes as Uint8Array, name),
-      'ChuckBiscuitsParser', { isFormat: isChuckBiscuitsFormat, usesBytes: true });
+    const { parseWithOpenMPT } = await import('@lib/import/wasm/OpenMPTConverter');
+    const song = await parseWithOpenMPT(buffer, originalFileName);
+    song.libopenmptFileData = buffer.slice(0);
+    return song;
   }
 
   // ── Ben Daglish (bd.* prefix or .bd extension) ─────────────────────────
@@ -575,39 +569,30 @@ export async function tryRouteFormat(
   }
 
   // ── Images Music System (.ims) ────────────────────────────────────────────
+  // .ims files — OpenMPT
   if (matchesExt(filename, ['ims'])) {
-    try {
-      const { isIMSFormat, parseIMSFile } = await import('@lib/import/formats/IMSParser');
-      if (isIMSFormat(buffer)) return parseIMSFile(buffer, originalFileName);
-    } catch (err) {
-      console.warn(`[IMSParser] Native parse failed for ${filename}, falling back to UADE:`, err);
-    }
-    const { parseUADEFile: parseUADE_ims } = await import('@lib/import/formats/UADEParser');
-    return parseUADE_ims(buffer, originalFileName, prefs.uade ?? 'enhanced', subsong, preScannedMeta);
+    const { parseWithOpenMPT } = await import('@lib/import/wasm/OpenMPTConverter');
+    const song = await parseWithOpenMPT(buffer, originalFileName);
+    song.libopenmptFileData = buffer.slice(0);
+    return song;
   }
 
   // ── ICE Tracker / SoundTracker 2.6 (.ice) ────────────────────────────────
+  // .ice files — OpenMPT
   if (matchesExt(filename, ['ice'])) {
-    try {
-      const { isICEFormat, parseICEFile } = await import('@lib/import/formats/ICEParser');
-      if (isICEFormat(buffer)) return parseICEFile(buffer, originalFileName);
-    } catch (err) {
-      console.warn(`[ICEParser] Native parse failed for ${filename}, falling back to UADE:`, err);
-    }
-    const { parseUADEFile: parseUADE_ice } = await import('@lib/import/formats/UADEParser');
-    return parseUADE_ice(buffer, originalFileName, prefs.uade ?? 'enhanced', subsong, preScannedMeta);
+    const { parseWithOpenMPT } = await import('@lib/import/wasm/OpenMPTConverter');
+    const song = await parseWithOpenMPT(buffer, originalFileName);
+    song.libopenmptFileData = buffer.slice(0);
+    return song;
   }
 
   // ── ChipTracker (.kris) ───────────────────────────────────────────────────
+  // .kris files — OpenMPT
   if (matchesExt(filename, ['kris'])) {
-    try {
-      const { isKRISFormat, parseKRISFile } = await import('@lib/import/formats/KRISParser');
-      if (isKRISFormat(buffer)) return parseKRISFile(buffer, originalFileName);
-    } catch (err) {
-      console.warn(`[KRISParser] Native parse failed for ${filename}, falling back to UADE:`, err);
-    }
-    const { parseUADEFile: parseUADE_kris } = await import('@lib/import/formats/UADEParser');
-    return parseUADE_kris(buffer, originalFileName, prefs.uade ?? 'enhanced', subsong, preScannedMeta);
+    const { parseWithOpenMPT } = await import('@lib/import/wasm/OpenMPTConverter');
+    const song = await parseWithOpenMPT(buffer, originalFileName);
+    song.libopenmptFileData = buffer.slice(0);
+    return song;
   }
 
   // ── MusicLine Editor (.ml) ───────────────────────────────────────────────
@@ -627,39 +612,21 @@ export async function tryRouteFormat(
   }
 
   // ── Game Music Creator (.gmc) ─────────────────────────────────────────────
-  // No magic bytes — identified by structural heuristics (mirrors OpenMPT).
-  // GMCParser is the OpenMPT-faithful implementation; GameMusicCreatorParser
-  // is the legacy alternative — both extract PCM, try GMC first.
+  // .gmc files — OpenMPT
   if (matchesExt(filename, ['gmc'])) {
-        if (prefs.gameMusicCreator === 'native') {
-      try {
-        const { isGMCFormat, parseGMCFile } = await import('@lib/import/formats/GMCParser');
-        if (isGMCFormat(buffer)) return await parseGMCFile(buffer, originalFileName);
-      } catch (err) {
-        console.warn(`[GMCParser] Native parse failed for ${filename}, trying GameMusicCreatorParser:`, err);
-      }
-      try {
-        const { isGameMusicCreatorFormat, parseGameMusicCreatorFile } = await import('@lib/import/formats/GameMusicCreatorParser');
-        const bytes = new Uint8Array(buffer);
-        if (isGameMusicCreatorFormat(bytes)) {
-          const result = parseGameMusicCreatorFile(bytes, originalFileName);
-          if (result) return result;
-        }
-      } catch (err) {
-        console.warn(`[GameMusicCreatorParser] Native parse failed for ${filename}, falling back to UADE:`, err);
-      }
-    }
-    const { parseUADEFile: parseUADE_gmc } = await import('@lib/import/formats/UADEParser');
-    return parseUADE_gmc(buffer, originalFileName, prefs.uade ?? 'enhanced', subsong, preScannedMeta);
+    const { parseWithOpenMPT } = await import('@lib/import/wasm/OpenMPTConverter');
+    const song = await parseWithOpenMPT(buffer, originalFileName);
+    song.libopenmptFileData = buffer.slice(0);
+    return song;
   }
 
   // ── Face The Music (.ftm) ─────────────────────────────────────────────────
-  // Magic "FTMN" at offset 0; embedded-sample variant only.
+  // .ftm files — OpenMPT
   if (matchesExt(filename, ['ftm'])) {
-    const { isFaceTheMusicFormat, parseFaceTheMusicFile } = await import('@lib/import/formats/FaceTheMusicParser');
-    return withNativeThenUADE('faceTheMusic', ctx,
-      (bytes: Uint8Array | ArrayBuffer, name: string) => parseFaceTheMusicFile(bytes as Uint8Array, name),
-      'FaceTheMusicParser', { isFormat: isFaceTheMusicFormat, usesBytes: true });
+    const { parseWithOpenMPT } = await import('@lib/import/wasm/OpenMPTConverter');
+    const song = await parseWithOpenMPT(buffer, originalFileName);
+    song.libopenmptFileData = buffer.slice(0);
+    return song;
   }
 
   // ── Sawteeth (.st — magic "SWTD" required to disambiguate) ───────────────
@@ -1089,25 +1056,14 @@ export async function tryRouteFormat(
   }
 
   // ── AMS (Extreme's Tracker / Velvet Studio) ───────────────────────────────
-  // PC format — no UADE fallback.  Two magic variants:
+  // PC format — OpenMPT.  Two magic variants:
   //   "Extreme"    → AMS 1.x (Extreme's Tracker)
   //   "AMShdr\x1A" → AMS 2.x (Velvet Studio 2.00–2.02)
   if (matchesExt(filename, ['ams'])) {
-    if (prefs.ams === 'native') {
-      try {
-        const { isAMSFormat, parseAMSFile } = await import('@lib/import/formats/AMSParser');
-        const bytes = new Uint8Array(buffer);
-        if (isAMSFormat(bytes)) {
-          const result = parseAMSFile(bytes, originalFileName);
-          if (result) return result;
-        }
-      } catch (err) {
-        console.warn(`[AMSParser] Native parse failed for ${filename}, falling back to UADE:`, err);
-      }
-    }
-    // PC format — fall back to UADE
-    const { parseUADEFile: parseUADE_ams } = await import('@lib/import/formats/UADEParser');
-    return parseUADE_ams(buffer, originalFileName, prefs.uade ?? 'enhanced', subsong, preScannedMeta);
+    const { parseWithOpenMPT } = await import('@lib/import/wasm/OpenMPTConverter');
+    const song = await parseWithOpenMPT(buffer, originalFileName);
+    song.libopenmptFileData = buffer.slice(0);
+    return song;
   }
 
   // ── IFF SMUS / Sonix Music Driver (.smus, .snx, .tiny) ───────────────────

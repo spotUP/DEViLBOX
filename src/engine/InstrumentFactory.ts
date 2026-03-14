@@ -32,7 +32,7 @@ import { SunVoxSynth } from './sunvox/SunVoxSynth';
 import { FuturePlayerSynth } from './futureplayer/FuturePlayerSynth';
 import { UADESynth } from './uade/UADESynth';
 import { SuperColliderSynth } from './sc/SuperColliderSynth';
-import { MAMESynth } from './MAMESynth';
+import { ES5503Synth } from './es5503/ES5503Synth';
 import { getDevilboxAudioContext } from '@/utils/audio-context';
 import { FurnaceDispatchSynth, FurnaceDispatchPlatform } from './furnace-dispatch';
 import { BuzzmachineType } from './buzzmachines/BuzzmachineEngine';
@@ -354,9 +354,12 @@ export class InstrumentFactory {
         instrument = createD50(config);
         break;
 
-      case 'MAMEDOC':
-        instrument = new MAMESynth({ type: 'doc' });
+      case 'MAMEDOC': {
+        const docSynth = new ES5503Synth();
+        docSynth.output.gain.value = Math.pow(10, ((config.volume ?? -12) + 62) / 20);
+        instrument = docSynth;
         break;
+      }
 
       case 'MAMERSA':
         instrument = createRdPiano(config);
