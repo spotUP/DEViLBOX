@@ -503,7 +503,7 @@ export class UADEEngine {
    * @param data - Raw file bytes
    * @param filenameHint - Original filename (used by UADE for format detection)
    */
-  async load(data: ArrayBuffer, filenameHint: string, skipScan = false): Promise<UADEMetadata> {
+  async load(data: ArrayBuffer, filenameHint: string, skipScan = false, subsong = 0): Promise<UADEMetadata> {
     await this._initPromise;
     if (!this.workletNode) throw new Error('UADEEngine not initialized');
 
@@ -515,7 +515,7 @@ export class UADEEngine {
     // Clone buffer before transferring (caller may need it later for subsong switching)
     const transferBuf = data.slice(0);
     this.workletNode.port.postMessage(
-      { type: 'load', buffer: transferBuf, filenameHint, skipScan },
+      { type: 'load', buffer: transferBuf, filenameHint, skipScan, subsong },
       [transferBuf]
     );
 
@@ -524,15 +524,20 @@ export class UADEEngine {
 
   /**
    * loadTune(buffer) — WASM engine registry compatible wrapper for load().
-   * Reads the filename hint from the format store's uadeEditableFileName field.
+   * Reads the filename hint and current subsong from the format store.
    */
   async loadTune(buffer: ArrayBuffer): Promise<void> {
     const { useFormatStore } = await import('@/stores/useFormatStore');
-    const fileName = useFormatStore.getState().uadeEditableFileName || 'module.mod';
+    const state = useFormatStore.getState();
+    const fileName = state.uadeEditableFileName || 'module.mod';
     // Skip the worklet scan for compiled 68k replayer formats that loop indefinitely.
+    // Prefix-based formats (dl.*, dln.*, rh.*) are matched by the leading component.
     const ext = fileName.split('.').pop()?.toLowerCase() ?? '';
-    const skipScan = ['jpo', 'jpold'].includes(ext);
-    await this.load(buffer, fileName, skipScan);
+    const prefix = fileName.split('.')[0]?.toLowerCase() ?? '';
+    const SKIP_SCAN_EXTS = new Set(['jpo', 'jpold', 'rh', 'rhp']);
+    const SKIP_SCAN_PREFIXES = new Set(['dl', 'dl_deli', 'dln', 'rh']);
+    const skipScan = SKIP_SCAN_EXTS.has(ext) || SKIP_SCAN_PREFIXES.has(prefix);
+    await this.load(buffer, fileName, skipScan, state.uadeEditableCurrentSubsong);
   }
 
   /**
