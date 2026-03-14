@@ -63,6 +63,11 @@ const EFFECT_CHARS: string[] = new Array(36);
 for (let i = 0; i < 10; i++) EFFECT_CHARS[i] = i.toString();
 for (let i = 10; i < 36; i++) EFFECT_CHARS[i] = String.fromCharCode(55 + i);
 
+// Symphonie DSP effects — effTyp=0x50 ('D') for bufLen column, effTyp2=0x50+type for type+feedback column
+// DSP type 0=Off/bufLen, 1=CrEcho, 2=Echo, 3=Delay, 4=CrDelay
+const DSP_EFFECT_BASE = 0x50;
+const DSP_TYPE_CHARS = ['D', 'C', 'E', 'L', 'X'] as const; // D=bufLen, CrEcho/Echo/deLay/Xdelay
+
 const NOTE_TABLE_CACHE = new Map<number, string[]>();
 function getNoteTable(displayOffset: number): string[] {
   let table = NOTE_TABLE_CACHE.get(displayOffset);
@@ -90,6 +95,11 @@ function hexByte(val: number): string {
 
 function formatEffect(typ: number, val: number, useHex: boolean): string {
   if (typ === 0 && val === 0) return '...';
+  // Symphonie DSP effects: typ 0x50-0x54 → type letter + value
+  if (typ >= DSP_EFFECT_BASE && typ <= DSP_EFFECT_BASE + 4) {
+    const dspChar = DSP_TYPE_CHARS[typ - DSP_EFFECT_BASE] ?? 'D';
+    return dspChar + (useHex ? HEX_TABLE[val & 0xFF] : DEC_TABLE[val & 0xFF]);
+  }
   return (EFFECT_CHARS[typ] ?? '?') + (useHex ? HEX_TABLE[val & 0xFF] : DEC_TABLE[val & 0xFF]);
 }
 
