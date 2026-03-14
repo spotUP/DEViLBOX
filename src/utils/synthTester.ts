@@ -46,6 +46,7 @@ const SKIP_SYNTHS: SynthType[] = [
   'DrumKit', // Requires sample URLs
   'GranularSynth', // Requires a sample URL via config.granular.sampleUrl
   'Buzzmachine', // Effects processor — needs audio input, produces no sound alone
+  'C64SID',      // Audio handled by C64SIDEngine — InstrumentFactory returns null intentionally
 ];
 
 /**
