@@ -19,8 +19,6 @@
 import type { TrackerSong } from '@/engine/TrackerReplayer';
 import type { Pattern, TrackerCell, InstrumentConfig } from '@/types';
 import type { DigMugConfig, UADEChipRamInfo } from '@/types/instrument';
-import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
-import { encodeDigitalMugicianCell } from '@/engine/uade/encoders/DigitalMugicianEncoder';
 import { arrayBufferToBase64 } from '@/lib/import/InstrumentConverter';
 
 // -- WAV helper for sample editor ------------------------------------------
@@ -888,43 +886,6 @@ export async function parseDigitalMugicianFile(
   // -- Module name from first song title or filename ------------------------
   const moduleName = song.title.trim() || filename.replace(/\.[^/.]+$/, '');
 
-  // -- Build uadePatternLayout with song-step indirection -------------------
-  // DM patterns are stored as a flat array of 4-byte rows at patternDataStart.
-  // Each song step has a pre-multiplied pattern offset (step.pattern = patIdx << 6).
-  // getCellFileOffset resolves: song step → pattern base row → file offset.
-  const uadePatternLayout: UADEPatternLayout = {
-    formatId: 'digitalMugician',
-    patternDataFileOffset: patternDataStart,
-    bytesPerCell: 4,
-    rowsPerPattern: 64,
-    numChannels: 4,
-    numPatterns: trackerPatterns.length,
-    moduleSize: buf.byteLength,
-    encodeCell: encodeDigitalMugicianCell,
-    getCellFileOffset: (pattern: number, row: number, channel: number): number => {
-      // pattern = index into trackerPatterns (= song step index from patternCache)
-      // We need to find the song step that created this pattern to get the track offsets.
-      // The patternCache maps cacheKey → patIdx, but we need the reverse.
-      // Since each pattern was built from a specific stepIdx, look up the step's tracks.
-      // Find the first stepIdx that maps to this pattern index.
-      let stepIdx = -1;
-      for (let s = 0; s < numSteps; s++) {
-        if (songPositions[s] === pattern) {
-          stepIdx = s;
-          break;
-        }
-      }
-      if (stepIdx < 0) return 0;
-
-      const trackBase = stepIdx * 4;
-      if (trackBase + channel >= song.tracks.length) return 0;
-      const step = song.tracks[trackBase + channel];
-      const rowOffset = step.pattern + row; // step.pattern is pre-multiplied (<<6)
-      if (rowOffset < 0 || rowOffset >= totalPatternRows) return 0;
-      return patternDataStart + rowOffset * 4;
-    },
-  };
-
   return {
     name: moduleName,
     format: 'MOD',
@@ -937,7 +898,9 @@ export async function parseDigitalMugicianFile(
     initialSpeed: songSpeed > 0 ? songSpeed : 6,
     initialBPM: 125,
     linearPeriods: false,
-    uadePatternLayout,
+    // uadePatternLayout omitted: DigMugSynth instruments handle audio directly.
+    // UADE audio is silent for Digital Mugician — DigMugSynth has its own WASM engine
+    // that correctly emulates DM wavetable synthesis without UADE.
   };
 }
 
