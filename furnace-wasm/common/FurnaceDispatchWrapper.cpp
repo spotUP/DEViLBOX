@@ -3620,6 +3620,13 @@ void furnace_dispatch_render_samples(int handle) {
                s->samples, s->depth, (void*)s->data8, (void*)s->data16, s->length8, s->length16, s->loopEnd, s->renderOn[0][0]);
       }
     }
+    // Call render() on all PCM samples so chip-native formats (dataBRR for SNES,
+    // dataADPCMA/B for YM2610, etc.) are computed before renderSamples() reads them.
+    // Without this, SNES/SPC700 plays with empty sampleMem because dataBRR is NULL.
+    for (int i = 0; i < sLen; i++) {
+      DivSample* smp = it->second->engine.song.sample[i];
+      if (smp) smp->render(0xffffffff);
+    }
     it->second->dispatch->renderSamples(0);
     printf("[FurnaceDispatch] renderSamples POST: handle=%d done\n", handle);
   }
