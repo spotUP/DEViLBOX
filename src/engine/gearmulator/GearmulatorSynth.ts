@@ -10,6 +10,50 @@ import type { GearmulatorConfig } from '@typedefs/instrument';
 import { getDevilboxAudioContext, noteToMidi, audioNow } from '@/utils/audio-context';
 import { getToneEngine } from '@engine/ToneEngine';
 
+// ─── ROM preprocessing helpers ─────────────────────────────────────────────
+
+async function fetchRom(url: string): Promise<ArrayBuffer | null> {
+  try {
+    const resp = await fetch(url);
+    if (!resp.ok) return null;
+    return resp.arrayBuffer();
+  } catch {
+    return null;
+  }
+}
+
+/** Swap every pair of bytes — converts EPROM 16-bit byte-swapped dumps */
+function byteSwap16(buf: ArrayBuffer): ArrayBuffer {
+  const arr = new Uint8Array(buf.slice(0));
+  for (let i = 0; i < arr.length - 1; i += 2) {
+    const tmp = arr[i]; arr[i] = arr[i + 1]; arr[i + 1] = tmp;
+  }
+  return arr.buffer;
+}
+
+/** Interleave two 8-bit EPROM chips into one 16-bit ROM (L=low byte, H=high byte) */
+function interleaveEproms(lo: Uint8Array, hi: Uint8Array): ArrayBuffer {
+  const out = new Uint8Array(lo.length + hi.length);
+  for (let i = 0; i < lo.length; i++) {
+    out[i * 2]     = lo[i];
+    out[i * 2 + 1] = hi[i];
+  }
+  return out.buffer;
+}
+
+/** Patch Nord Lead 2x ROM: uppercase magic bytes → lowercase so validation passes */
+function patchNordRom(buf: ArrayBuffer): ArrayBuffer {
+  const arr = new Uint8Array(buf.slice(0));
+  // Search for "Nr2" (0x4E 0x72 0x32) and "NL2" (0x4E 0x4C 0x32), patch N → n (0x4E → 0x6E)
+  for (let i = 0; i < arr.length - 2; i++) {
+    if (arr[i] === 0x4E && arr[i + 1] === 0x72 && arr[i + 2] === 0x32) arr[i] = 0x6E; // Nr2 → nr2
+    if (arr[i] === 0x4E && arr[i + 1] === 0x4C && arr[i + 2] === 0x32) arr[i] = 0x6E; // NL2 → nL2
+  }
+  return arr.buffer;
+}
+
+// ───────────────────────────────────────────────────────────────────────────
+
 /** Gearmulator synth device types */
 export const GM_SYNTH_TYPES = {
   VIRUS_ABC: 0,
@@ -220,13 +264,72 @@ export class GearmulatorSynth implements DevilboxSynth {
     }
   }
 
-  // ─── ROM Management (IndexedDB) ────────────────────────────────────────────
+  // ─── ROM Management (IndexedDB + auto-load from disk) ──────────────────────
 
   private async loadROM(): Promise<ArrayBuffer | Uint8Array | null> {
-    const key = this.config.romKey;
-    if (!key) return null;
+    // 1. Try user-uploaded ROM from IndexedDB first
+    if (this.config.romKey) {
+      const data = await GearmulatorSynth.loadROMFromDB(this.config.romKey);
+      if (data) return data;
+    }
 
-    return GearmulatorSynth.loadROMFromDB(key);
+    // 2. Try auto-loading from the stable per-type key in IndexedDB
+    const autoKey = `gearmulator-auto-${this.config.synthType}`;
+    const cached = await GearmulatorSynth.loadROMFromDB(autoKey);
+    if (cached) return cached;
+
+    // 3. Fetch from public/roms/gearmulator/extracted/ and cache in IndexedDB
+    try {
+      const rom = await GearmulatorSynth.loadROMFromDisk(this.config.synthType);
+      if (rom) {
+        await GearmulatorSynth.saveROMToDB(autoKey, rom);
+        return rom;
+      }
+    } catch {
+      // Silent fail — ROM files not available
+    }
+
+    return null;
+  }
+
+  /** Fetch ROM from public/roms/gearmulator/extracted/ and apply preprocessing */
+  static async loadROMFromDisk(synthType: number): Promise<ArrayBuffer | null> {
+    const BASE = '/roms/gearmulator/extracted/';
+
+    switch (synthType) {
+      case 0: // Access Virus A/B/C — single file, raw
+        return fetchRom(`${BASE}Access%20Virus%20C%20(am29f040b_6v6).BIN`);
+
+      case 1: // Access Virus TI — single file, raw
+        return fetchRom(`${BASE}Virus_TI2_FW.bin`);
+
+      case 2: { // Waldorf microQ — single file, needs 16-bit byte-swap
+        const buf = await fetchRom(`${BASE}microQ223.BIN`);
+        if (!buf) return null;
+        return byteSwap16(buf);
+      }
+
+      case 3: { // Waldorf Microwave II/XT — two EPROMs, interleave H+L
+        const [hBuf, lBuf] = await Promise.all([
+          fetchRom(`${BASE}microWave_2.0_H.bin`),
+          fetchRom(`${BASE}microWave_2.0_L.bin`),
+        ]);
+        if (!hBuf || !lBuf) return null;
+        return interleaveEproms(new Uint8Array(lBuf), new Uint8Array(hBuf));
+      }
+
+      case 4: { // Nord Lead 2x — single file, patch magic bytes
+        const buf = await fetchRom(`${BASE}nord-lead-2-27c4001-v104.bin`);
+        if (!buf) return null;
+        return patchNordRom(buf);
+      }
+
+      case 5: // Roland JP-8000 — single file, raw
+        return fetchRom(`${BASE}jp8000_v1.05.bin`);
+
+      default:
+        return null;
+    }
   }
 
   static async loadROMFromDB(key: string): Promise<ArrayBuffer | Uint8Array | null> {
