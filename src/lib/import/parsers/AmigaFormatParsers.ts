@@ -1916,14 +1916,8 @@ export async function tryRouteFormat(
       'JochenHippel7VParser');
   }
 
-  // ── Jochen Hippel ST (.sog extension or HST.* prefix) ────────────────────
-  if (matchesExt(filename, ['sog'])) {
-    const { isJochenHippelSTFormat, parseJochenHippelSTFile } = await import('@lib/import/formats/JochenHippelSTParser');
-    return withNativeThenUADE('jochenHippelST', ctx,
-      (buf: Uint8Array | ArrayBuffer, name: string) => { if (isJochenHippelSTFormat(buf as ArrayBuffer)) return parseJochenHippelSTFile(buf as ArrayBuffer, name); return null; },
-      'JochenHippelSTParser');
-  }
-  if (matchesExt(filename, ['hst'])) {
+  // ── Jochen Hippel ST (.sog / .hst / .hip extension or HST.* prefix) ──────
+  if (matchesExt(filename, ['sog', 'hst', 'hip'])) {
     const { isJochenHippelSTFormat, parseJochenHippelSTFile } = await import('@lib/import/formats/JochenHippelSTParser');
     return withNativeThenUADE('jochenHippelST', ctx,
       (buf: Uint8Array | ArrayBuffer, name: string) => { if (isJochenHippelSTFormat(buf as ArrayBuffer)) return parseJochenHippelSTFile(buf as ArrayBuffer, name); return null; },

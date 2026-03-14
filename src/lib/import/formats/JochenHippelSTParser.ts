@@ -238,9 +238,11 @@ export function isJochenHippelSTFormat(buffer: ArrayBuffer | Uint8Array): boolea
   }
 
   // advance by word offset to reach song data
+  // 68k LEA d16(PC),An: EA = (address of displacement word) + d16
+  // i.e. EA = off + d16 (before advancing off past the displacement word)
   if (off + 2 > buf.length) return false;
   const jmp = u16BE(buf, off); off += 2;
-  const songOff = off + jmp;
+  const songOff = (off - 2) + jmp;
 
   return checkTFMXSTSong(buf, songOff);
 }
