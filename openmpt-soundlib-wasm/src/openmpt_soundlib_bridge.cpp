@@ -505,6 +505,33 @@ int osl_set_sample_data(int32_t sampleIdx, const void *data, int32_t numFrames,
 }
 
 // ============================================================================
+// MIDI macro config (Zxx / Symphonie DSP)
+// ============================================================================
+
+/**
+ * Get MIDI macro string (Zxx) at index 0-127.
+ * Returns pointer to a static buffer — copy before the next call.
+ */
+EMSCRIPTEN_KEEPALIVE
+const char *osl_get_midi_macro_string(int idx) {
+    static char buf[64];
+    buf[0] = '\0';
+    if (!g_sf || idx < 0 || idx >= 128) return buf;
+    const std::string macroStr = static_cast<std::string>(g_sf->m_MidiCfg.Zxx[static_cast<size_t>(idx)]);
+    snprintf(buf, sizeof(buf), "%s", macroStr.c_str());
+    return buf;
+}
+
+/**
+ * Set MIDI macro string (Zxx) at index 0-127.
+ */
+EMSCRIPTEN_KEEPALIVE
+void osl_set_midi_macro_string(int idx, const char *str) {
+    if (!g_sf || idx < 0 || idx >= 128 || !str) return;
+    g_sf->m_MidiCfg.Zxx[static_cast<size_t>(idx)] = std::string_view(str);
+}
+
+// ============================================================================
 // Speed/tempo
 // ============================================================================
 
