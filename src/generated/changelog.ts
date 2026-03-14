@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-03-14T10:02:37.891Z
+ * Generated: 2026-03-14T12:01:07.108Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.2816';
-export const BUILD_NUMBER = '2816';
-export const BUILD_HASH = '59c56a58b';
+export const BUILD_VERSION = '1.0.2830';
+export const BUILD_NUMBER = '2830';
+export const BUILD_HASH = '9a720b08f';
 export const BUILD_DATE = '2026-03-14';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,65 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.2816',
+    version: '1.0.2830',
     date: '2026-03-14',
     changes: [
+      {
+        type: 'fix',
+        "description": "Symphonie WASM: rebuild with playback fixes"
+      },
+      {
+        type: 'fix',
+        "description": "VFXSynth: fix ES5506 register map and rendering pipeline"
+      },
+      {
+        type: 'improvement',
+        "description": "Format routing: route sfx/dsym/gt2 through OpenMPT; switch MAMEDOC to ES5503Synth"
+      },
+      {
+        type: 'improvement',
+        "description": "OpenMPT Soundlib: MIDI macro API + DSP echo export + WASM rebuild"
+      },
+      {
+        type: 'improvement',
+        "description": "Symphonie Pro: DSP echo display + route audio through libopenmpt"
+      },
+      {
+        type: 'feature',
+        "description": "GL UI: implement tracker interface gaps"
+      },
+      {
+        type: 'improvement',
+        "description": "Update changelog"
+      },
+      {
+        type: 'feature',
+        "description": "MCP: add run_synth_tests tool, auto-reconnect, 15min timeout, MAME batch testing"
+      },
+      {
+        type: 'fix',
+        "description": "Fix MAME chip synths: ES5503 wavetable, RF5C400 pan/freq, VFX rendering"
+      },
+      {
+        type: 'fix',
+        "description": "Fix Symphonie Pro: CMD_REPLAY_FROM playback, instrument column noise"
+      },
+      {
+        type: 'fix',
+        "description": "UADE engine: pass subsong on load, expand skipScan formats, fix looping"
+      },
+      {
+        type: 'fix',
+        "description": "Fix Steve Turner parser: timing, effects, subsong metadata"
+      },
+      {
+        type: 'feature',
+        "description": "Add UADE subsong selector for native-parsed formats (Steve Turner etc.)"
+      },
+      {
+        type: 'fix',
+        "description": "Fix GL UI BindingErrors: remove StrictMode, eliminate hover-state re-renders"
+      },
       {
         type: 'improvement',
         "description": "Synth tester: skip C64SID — InstrumentFactory returns null intentionally"
@@ -182,62 +238,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         "description": "Fix SidMon2 pattern length leak between patterns"
-      },
-      {
-        type: 'fix',
-        "description": "Fix KRIS and ICE pattern length trimming (pause at wraps)"
-      },
-      {
-        type: 'fix',
-        "description": "Fix SidMon1 and MusicAssembler parser bugs"
-      },
-      {
-        type: 'fix',
-        "description": "Fix 6 format parsers: AMS, InStereo, PumaTracker, Actionamics, QuadraComposer"
-      },
-      {
-        type: 'feature',
-        "description": "Add diagnostic logging to Furnace import pipeline"
-      },
-      {
-        type: 'fix',
-        "description": "Rebuild Furnace WASM with DMF support and fix missing stubs"
-      },
-      {
-        type: 'fix',
-        "description": "Fix DSS, Hippel-COSO, Digital Symphony instrument/sample bugs"
-      },
-      {
-        type: 'fix',
-        "description": "Fix DigitalMugician: add required finetune field to modPlayback metadata"
-      },
-      {
-        type: 'fix',
-        "description": "Fix TypeScript errors: Pattern structure, TrackerCell fields, metadata placement"
-      },
-      {
-        type: 'fix',
-        "description": "Fix DefleMask (.dmf) import — detect magic and route correctly"
-      },
-      {
-        type: 'fix',
-        "description": "Fix Mugician, ArtOfNoise, Fred + status page improvements"
-      },
-      {
-        type: 'fix',
-        "description": "Fix 5 broken format parsers: OKT, DigiBoosterPro, MED, FaceTheMusic, MusicLine"
-      },
-      {
-        type: 'feature',
-        "description": "Add double-click to load files in all dialogs"
-      },
-      {
-        type: 'fix',
-        "description": "Fix dialog scroll: remove universal overscroll-behavior: none"
-      },
-      {
-        type: 'fix',
-        "description": "Fix duplicate hlInterval declaration in GL renderer"
       }
     ]
   }
