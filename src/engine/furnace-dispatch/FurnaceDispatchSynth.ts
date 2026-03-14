@@ -452,6 +452,9 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
         if (this._volumeOffsetDb !== 0) {
           sharedGain.gain.value = Math.pow(10, this._volumeOffsetDb / 20);
         }
+        // Route audio through this.output so consumers (tester, effect chains) can tap it.
+        // ToneEngine also routes sharedGain → synthBus directly — both paths coexist.
+        sharedGain.connect(this.output);
       }
 
       // Set up default instrument for this platform
@@ -1301,8 +1304,11 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
     }
     this._releaseTimeouts.clear();
 
-    // The _nativeGain is the engine's shared gain node — don't disconnect it
-    // here as other synths may still be using it. The engine manages its lifecycle.
+    // The _nativeGain is the engine's shared gain node — don't fully disconnect it
+    // here as other synths may still be using it. Only remove the tap to this.output.
+    if (this._nativeGain) {
+      try { this._nativeGain.disconnect(this.output); } catch { /* already disconnected */ }
+    }
     this._nativeGain = null;
 
     // Don't dispose the engine singleton — other synths may use it

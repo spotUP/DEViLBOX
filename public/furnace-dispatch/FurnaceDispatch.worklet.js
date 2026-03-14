@@ -913,6 +913,11 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
       return true;
     }
 
+    // Zero output before mixing — outside try-block so a per-chip crash
+    // doesn't silence all other chips (they still mix into a clean buffer).
+    outputL.fill(0);
+    outputR.fill(0);
+
     try {
       // --- Process scheduled commands at sample-accurate positions ---
       // Sort by time so earliest commands execute first
@@ -935,31 +940,42 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
       while (this.tickAccumulator >= this.samplesPerTick) {
         if (this.sequencerActive && this.wasm.seqIsPlaying && this.wasm.seqIsPlaying()) {
           // WASM sequencer drives everything — calls dispatch_cmd() internally
-          const pos = this.wasm.seqTick();
-          this._lastSeqOrder = (pos >> 16) & 0xFFFF;
-          this._lastSeqRow = pos & 0xFFFF;
+          try {
+            const pos = this.wasm.seqTick();
+            this._lastSeqOrder = (pos >> 16) & 0xFFFF;
+            this._lastSeqRow = pos & 0xFFFF;
+          } catch (e) {
+            console.error('[FurnaceDispatch] seqTick WASM trap:', e);
+            this.sequencerActive = false;
+          }
         }
         // Always tick chips for macro processing and audio generation
         for (const chip of this.chips.values()) {
-          this.wasm.tick(chip.handle);
+          try { this.wasm.tick(chip.handle); } catch { /* skip bad chip */ }
         }
         this.tickAccumulator -= this.samplesPerTick;
       }
 
-      // Zero output — we'll mix all chips into it
-      outputL.fill(0);
-      outputR.fill(0);
-
       // Render each chip and mix into output with postAmp scaling
       // (Furnace pattern: each disCont[] renders to its own buffer, scaled by getPostAmp(), then mixed)
+      // Per-chip try-catch: a WASM trap in one chip must not silence all others.
       for (const chip of this.chips.values()) {
-        this.wasm.render(chip.handle, this.outputPtrL, this.outputPtrR, numSamples);
-
-        const amp = POST_AMP[chip.platformType] || 1.0;
-        // Mix this chip's output into the main output
-        for (let i = 0; i < numSamples; i++) {
-          outputL[i] += this.outputBufferL[i] * amp;
-          outputR[i] += this.outputBufferR[i] * amp;
+        try {
+          this.wasm.render(chip.handle, this.outputPtrL, this.outputPtrR, numSamples);
+          const amp = POST_AMP[chip.platformType] || 1.0;
+          // Mix this chip's output into the main output
+          for (let i = 0; i < numSamples; i++) {
+            outputL[i] += this.outputBufferL[i] * amp;
+            outputR[i] += this.outputBufferR[i] * amp;
+          }
+        } catch (chipErr) {
+          // Report each bad chip once, then skip it silently
+          if (!this._badChips) this._badChips = new Set();
+          if (!this._badChips.has(chip.platformType)) {
+            this._badChips.add(chip.platformType);
+            const msg = `WASM render error for platform ${chip.platformType}: ${chipErr.message || chipErr}`;
+            this.port.postMessage({ type: 'error', message: msg });
+          }
         }
       }
 
