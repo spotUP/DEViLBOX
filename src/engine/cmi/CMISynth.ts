@@ -7,6 +7,7 @@ const CMIParam = {
   MASTER_VOLUME: 0,
   VOICE_COUNT: 1,
   SAMPLE_RATE: 2,
+  WAVEFORM: 3,
 } as const;
 
 /**
@@ -181,6 +182,7 @@ export class CMISynth extends MAMEBaseSynth {
       'volume': CMIParam.MASTER_VOLUME,
       'voice_count': CMIParam.VOICE_COUNT,
       'sample_rate': CMIParam.SAMPLE_RATE,
+      'waveform': CMIParam.WAVEFORM,
     };
 
     const paramId = paramMap[param];
