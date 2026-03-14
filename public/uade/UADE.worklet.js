@@ -32,6 +32,7 @@ class UADEProcessor extends AudioWorkletProcessor {
     this._paused = false;
     this._lastData = null;       // Last loaded file bytes (for subsong re-scan)
     this._lastHint = '';
+    this._currentSubsong = 0;    // Last requested subsong index (preserved across reloads)
 
     // Float32 output buffers allocated in WASM heap
     this._outL = null;
@@ -68,6 +69,9 @@ class UADEProcessor extends AudioWorkletProcessor {
             this.port.postMessage({ type: 'error', message: 'Failed to reload song for playback' });
             break;
           }
+          if (this._currentSubsong > 0) {
+            this._wasm._uade_wasm_set_subsong(this._currentSubsong);
+          }
           this._needsReload = false;
         }
         this._playing = true;
@@ -89,6 +93,7 @@ class UADEProcessor extends AudioWorkletProcessor {
 
       case 'setSubsong':
         if (this._wasm && this._ready) {
+          this._currentSubsong = data.index;
           this._wasm._uade_wasm_set_subsong(data.index);
         }
         break;
@@ -668,6 +673,19 @@ class UADEProcessor extends AudioWorkletProcessor {
         if (ret2 !== 0) {
           console.warn('[UADE.worklet] Reload after scan failed (ret=' + ret2 + '), scan data still valid');
         }
+      } else {
+        // Compiled replayers (skipScan=true) should loop indefinitely.
+        // Explicitly enable looping here because a previous scan (of a different
+        // format) may have called _uade_wasm_set_looping(0), leaving UADE in
+        // non-looping mode. Without this, modules that emit a song-end signal
+        // (e.g. Steve Turner .jpo) stop after one play and produce silence.
+        this._wasm._uade_wasm_set_looping(1);
+      }
+
+      // Apply subsong index (for both normal and skipScan modes).
+      this._currentSubsong = subsongIndex;
+      if (subsongIndex > 0) {
+        this._wasm._uade_wasm_set_subsong(subsongIndex);
       }
 
       this._playing = false;
