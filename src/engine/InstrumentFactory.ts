@@ -81,7 +81,6 @@ import {
   createBuzz3o3,
   createBuzz3o3DF,
   createModularSynth,
-  createMAMEAICA,
   createMAMEASC,
   createMAMEAstrocade,
   createMAMEC352,
@@ -102,6 +101,7 @@ import {
   createMAMEYMF271,
   createMAMEYMOPQ,
   createMAMEVASynth,
+  createMAMECMI,
 } from './factories/CommunitySynthFactory';
 
 // Re-export standalone functions (preserves existing import paths)
@@ -421,9 +421,6 @@ export class InstrumentFactory {
         break;
 
       // MAME Hardware-Accurate Synths
-      case 'MAMEAICA':
-        instrument = createMAMEAICA(config);
-        break;
       case 'MAMEASC':
         instrument = createMAMEASC(config);
         break;
@@ -483,6 +480,9 @@ export class InstrumentFactory {
         break;
       case 'MAMEVASynth':
         instrument = createMAMEVASynth(config);
+        break;
+      case 'MAMECMI':
+        instrument = createMAMECMI(config);
         break;
 
       case 'ModularSynth':

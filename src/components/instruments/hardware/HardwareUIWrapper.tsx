@@ -88,7 +88,6 @@ const MAME_GENERIC_TYPES: SynthType[] = [
   'CEM3394',          // Curtis Electromusic Analog Voice
 
   // PCM / ROM-based (minimal controls)
-  'MAMEAICA',         // Sega Dreamcast AICA
   'MAMEICS2115',      // ICS WaveFront 32-Voice
   'MAMEK054539',      // Konami K054539 PCM/ADPCM
   'MAMEC352',         // Namco C352 32-Voice PCM

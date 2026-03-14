@@ -259,7 +259,6 @@ const SYNTH_CONFIGS: Record<string, Record<string, unknown>> = {
 
   // === MAME Standalone WASM Chips ===
   // ROM/sample-dependent (definitively silent without ROM):
-  // 'MAMEAICA': { synthType: 'MAMEAICA', volume: -12 },     // needs wavetable ROM
   // 'MAMERF5C400': { synthType: 'MAMERF5C400', volume: -12 }, // needs sample ROM
   'MAMEASC': { synthType: 'MAMEASC', volume: -12 },
   'MAMEAstrocade': { synthType: 'MAMEAstrocade', volume: -12 },
@@ -297,7 +296,6 @@ const SYNTH_CONFIGS: Record<string, Record<string, unknown>> = {
   'SidMonSynth': { synthType: 'SidMonSynth', volume: -12, sidMon: DEFAULT_SIDMON },
 
   // === Missing MAME Synths ===
-  'MAMEAICA': { synthType: 'MAMEAICA', volume: -12 },
   'MAMEDOC': { synthType: 'MAMEDOC', volume: -12 },
   'MAMEMSM5232': { synthType: 'MAMEMSM5232', volume: -12 },
   'MAMERF5C400': { synthType: 'MAMERF5C400', volume: -12 },
@@ -450,7 +448,6 @@ const SYNTH_CONFIGS_FULL: Record<string, any> = {
   'MAMESWP30': { synthType: 'MAMESWP30', volume: -12 },
 
   // === MAME Per-Chip WASM Synths ===
-  'MAMEAICA': { synthType: 'MAMEAICA', volume: -12 },
   'MAMEASC': { synthType: 'MAMEASC', volume: -12 },
   'MAMEAstrocade': { synthType: 'MAMEAstrocade', volume: -12 },
   'MAMEC352': { synthType: 'MAMEC352', volume: -12 },
@@ -662,7 +659,6 @@ const SYNTH_CONFIGS_FULL: Record<string, any> = {
   // === MAME Synths (standalone WASM chips) ===
   // 'MAMEVFX': { synthType: 'MAMEVFX', volume: -12 },   // needs ROM
   // 'MAMESWP30': { synthType: 'MAMESWP30', volume: -12 }, // needs ROM
-  // 'MAMEAICA': { synthType: 'MAMEAICA', volume: -12 },  // silent: sample-playback, needs ROM
   // 'MAMERF5C400': { synthType: 'MAMERF5C400', volume: -12 }, // silent: sample-playback, needs ROM
   'MAMEDOC': { synthType: 'MAMEDOC', volume: -12 },
   'MAMERSA': { synthType: 'MAMERSA', volume: -12 },
@@ -1806,7 +1802,6 @@ async function testVolumeLevels(skipPreWarm = false) {
         // Old MAME engine synths (need ROM banks - different architecture, no auto-loading)
         'MAMEVFX', 'MAMEDOC', 'MAMERSA', 'MAMESWP30',
         // Note: MAMEC352, MAMEICS2115, MAMEK054539, MAMERF5C400, MAMEES5503 now have auto-loading
-        // Note: MAMEAICA is wavetable with RAM upload, should work without ROM
       ];
       if (ROM_DEPENDENT_SYNTHS.includes(name)) {
         testResults.passed++;
