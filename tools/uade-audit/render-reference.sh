@@ -81,6 +81,7 @@ render_file() {
       -f "$output" \
       -t "$DURATION" \
       --disable-timeouts \
+      --one \
       "$input" \
       2>/dev/null; then
     if [ -f "$output" ] && [ -s "$output" ]; then
