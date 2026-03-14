@@ -994,10 +994,9 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
   const megaTextRef = useRef<MegaText | null>(null);
   // Clip mask for the grid — prevents pattern rows drawn at negative y (above center)
   // from bleeding into the channel header area above the grid container.
-  const [gridClipMask, setGridClipMask] = useState<GraphicsType | null>(null);
-  const gridClipMaskRef = useCallback((g: GraphicsType | null) => {
-    if (g && g !== gridClipMask) setGridClipMask(g);
-  }, [gridClipMask]);
+  // Use a plain ref (not state) to avoid triggering a re-render on mount, which
+  // would cause @pixi/layout BindingErrors during the initial layout pass.
+  const gridClipMaskRef = useRef<GraphicsType | null>(null);
   const prevRowRef = useRef(-1);
   const prevPatternRef = useRef(-1);
   const imperativeRedrawRef = useRef<(() => void) | null>(null);
@@ -1232,6 +1231,18 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
     g.clear();
     g.rect(0, 0, width, gridHeight).fill({ color: 0xffffff });
   }, [width, gridHeight]);
+
+  // Apply clip mask to scroll container imperatively after mount.
+  // Using useEffect (not state) avoids triggering a re-render during the initial
+  // @pixi/layout pass, which would cause Yoga BindingErrors from concurrent
+  // insertChild/removeChild calls on nodes not yet fully initialized.
+  useEffect(() => {
+    const scroll = gridScrollContainerRef.current;
+    const mask = gridClipMaskRef.current;
+    if (scroll && mask && scroll.mask !== mask) {
+      scroll.mask = mask;
+    }
+  });
 
   // ── Render params ref — captured each React render, read by imperativeRedraw ──
   const renderParamsRef = useRef<RenderParams>(null!);
@@ -1796,11 +1807,17 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
       >
 
         {/* Clip mask — clips the scroll container so pattern rows drawn at negative y
-            (above center) don't bleed into the channel header area above. */}
+            (above center) don't bleed into the channel header area above.
+            NOTE: Do NOT set renderable={false} here. StencilMask.init sets includeInBuild=false
+            to hide it from the normal render pass, but StencilMaskPipe.push temporarily sets
+            includeInBuild=true and calls collectRenderables. collectRenderables checks
+            globalDisplayStatus >= 7, which requires renderable=true (bit 0). With renderable=false
+            the stencil buffer is never filled → all content clipped → black editor.
+            NOTE: eventMode="none" — this graphics is only used as a mask, never for interaction. */}
         <pixiGraphics
           ref={gridClipMaskRef}
           draw={drawGridClipMask}
-          renderable={false}
+          eventMode="none"
           layout={{ position: 'absolute' as const, width, height: gridHeight }}
         />
 
@@ -1809,7 +1826,6 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
           ref={gridScrollContainerRef}
           layout={gridScrollLayout}
           eventMode="none"
-          mask={gridClipMask}
         >
           <pixiGraphics ref={gridGraphicsRef} draw={() => {}} layout={gridGraphicsLayout} />
           <pixiGraphics ref={overlayGraphicsRef} draw={() => {}} layout={gridGraphicsLayout} />

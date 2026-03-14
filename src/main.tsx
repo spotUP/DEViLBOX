@@ -1,4 +1,3 @@
-import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { enableMapSet } from 'immer'
 import './index.css'
@@ -64,13 +63,11 @@ window.addEventListener('unhandledrejection', (event) => {
 });
 
 createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <ErrorBoundary>
-      <ResponsiveProvider>
-        <App />
-      </ResponsiveProvider>
-    </ErrorBoundary>
-  </StrictMode>,
+  <ErrorBoundary>
+    <ResponsiveProvider>
+      <App />
+    </ResponsiveProvider>
+  </ErrorBoundary>,
 )
 
 // Register service worker for sample pack caching
