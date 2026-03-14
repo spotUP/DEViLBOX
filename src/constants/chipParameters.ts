@@ -782,6 +782,176 @@ export const CHIP_SYNTH_DEFS: Record<string, ChipSynthDef> = {
       romType: 'swp30',
     },
   },
+
+  // =========================================================================
+  // MAMECMI - Fairlight CMI IIx (1982)
+  // =========================================================================
+  MAMECMI: {
+    synthType: 'MAMECMI',
+    name: 'Fairlight CMI IIx',
+    subtitle: '8-Voice 8-bit PCM Sampler (1982)',
+    color: '#f59e0b',
+    presetCount: 0,
+    parameters: [
+      { key: 'volume', label: 'Volume', group: 'Output', type: 'knob', min: 0, max: 1, step: 0.01, default: 0.8, formatValue: 'percent' },
+      { key: 'voice', label: 'Voice', group: 'Voice', type: 'knob', min: 0, max: 7, step: 1, default: 0, formatValue: 'int' },
+    ],
+  },
+
+  // =========================================================================
+  // MAMEFZPCM - Casio FZ-1 (1987)
+  // =========================================================================
+  MAMEFZPCM: {
+    synthType: 'MAMEFZPCM',
+    name: 'Casio FZ PCM',
+    subtitle: '8-Voice 16-bit PCM Sampler (1987)',
+    color: '#06b6d4',
+    presetCount: 0,
+    parameters: [
+      { key: 'volume', label: 'Volume', group: 'Output', type: 'knob', min: 0, max: 1, step: 0.01, default: 0.8, formatValue: 'percent' },
+      { key: 'voice', label: 'Voice', group: 'Voice', type: 'knob', min: 0, max: 7, step: 1, default: 0, formatValue: 'int' },
+    ],
+  },
+
+  // =========================================================================
+  // MAMEPS1SPU - PlayStation 1 CXD2922BQ SPU (1994)
+  // =========================================================================
+  MAMEPS1SPU: {
+    synthType: 'MAMEPS1SPU',
+    name: 'PlayStation SPU',
+    subtitle: '24-Voice ADPCM Sampler (1994)',
+    color: '#3b82f6',
+    presetCount: 0,
+    parameters: [
+      { key: 'volume', label: 'Volume', group: 'Output', type: 'knob', min: 0, max: 1, step: 0.01, default: 0.8, formatValue: 'percent' },
+      { key: 'voice', label: 'Voice', group: 'Voice', type: 'knob', min: 0, max: 23, step: 1, default: 0, formatValue: 'int' },
+    ],
+  },
+
+  // =========================================================================
+  // MAMEMultiPCM - Yamaha YMW258-F GEW8 (Sega Model 1/2)
+  // =========================================================================
+  MAMEMultiPCM: {
+    synthType: 'MAMEMultiPCM',
+    name: 'Yamaha MultiPCM',
+    subtitle: 'YMW258-F GEW8 — 28-Slot ROM Sampler (requires ROM)',
+    color: '#eab308',
+    presetCount: 0,
+    parameters: [
+      { key: 'volume', label: 'Volume', group: 'Output', type: 'knob', min: 0, max: 1, step: 0.01, default: 0.8, formatValue: 'percent' },
+      { key: 'voice', label: 'Slot', group: 'Playback', type: 'knob', min: 0, max: 27, step: 1, default: 0, formatValue: 'int' },
+    ],
+    romConfig: {
+      requiredZip: 'multipcm.zip (Sega Model 1/2 YMW258-F GEW8 wave ROM)',
+      bankCount: 1,
+      romType: 'multipcm',
+    },
+  },
+
+  // =========================================================================
+  // MAMEZSG2 - ZOOM ZSG-2 (48-channel ADPCM ROM sampler)
+  // =========================================================================
+  MAMEZSG2: {
+    synthType: 'MAMEZSG2',
+    name: 'ZOOM ZSG-2',
+    subtitle: '48-Channel ADPCM ROM Sampler (requires ROM)',
+    color: '#22c55e',
+    presetCount: 0,
+    parameters: [
+      { key: 'volume', label: 'Volume', group: 'Output', type: 'knob', min: 0, max: 1, step: 0.01, default: 0.8, formatValue: 'percent' },
+      { key: 'voice', label: 'Channel', group: 'Playback', type: 'knob', min: 0, max: 47, step: 1, default: 0, formatValue: 'int' },
+    ],
+    romConfig: {
+      requiredZip: 'zsg2.zip (ZOOM ZSG-2 wave ROM)',
+      bankCount: 1,
+      romType: 'zsg2',
+    },
+  },
+
+  // =========================================================================
+  // MAMEKS0164 - Samsung KS0164 (32-voice wavetable GM synth)
+  // =========================================================================
+  MAMEKS0164: {
+    synthType: 'MAMEKS0164',
+    name: 'Samsung KS0164',
+    subtitle: '32-Voice Wavetable GM Synth (requires ROM)',
+    color: '#6366f1',
+    presetCount: 0,
+    parameters: [
+      { key: 'volume', label: 'Volume', group: 'Output', type: 'knob', min: 0, max: 1, step: 0.01, default: 0.8, formatValue: 'percent' },
+      { key: 'voice', label: 'Voice', group: 'Playback', type: 'knob', min: 0, max: 31, step: 1, default: 0, formatValue: 'int' },
+    ],
+    romConfig: {
+      requiredZip: 'ks0164.zip (Samsung KS0164 wave ROM)',
+      bankCount: 1,
+      romType: 'ks0164',
+    },
+  },
+
+  // =========================================================================
+  // MAMESWP00 - Yamaha SWP00 AWM2 (MU50 XG module)
+  // =========================================================================
+  MAMESWP00: {
+    synthType: 'MAMESWP00',
+    name: 'Yamaha SWP00',
+    subtitle: 'AWM2 32-Voice ROMpler — MU50 (requires ROM)',
+    color: '#a855f7',
+    presetCount: 0,
+    parameters: [
+      { key: 'volume', label: 'Volume', group: 'Output', type: 'knob', min: 0, max: 1, step: 0.01, default: 0.8, formatValue: 'percent' },
+      { key: 'voice', label: 'Voice', group: 'Playback', type: 'knob', min: 0, max: 31, step: 1, default: 0, formatValue: 'int' },
+      { key: 'cutoff', label: 'Cutoff', group: 'Filter', type: 'knob', min: 0, max: 1, step: 0.01, default: 1.0, formatValue: 'percent' },
+      { key: 'resonance', label: 'Resonance', group: 'Filter', type: 'knob', min: 0, max: 1, step: 0.01, default: 0.0, formatValue: 'percent' },
+    ],
+    romConfig: {
+      requiredZip: 'mu50.zip (Yamaha MU50 / SWP00 wave ROM)',
+      bankCount: 1,
+      romType: 'swp00',
+    },
+  },
+
+  // =========================================================================
+  // MAMESWP20 - Yamaha SWP20 AWM2 (MU50/MU80 XG module)
+  // =========================================================================
+  MAMESWP20: {
+    synthType: 'MAMESWP20',
+    name: 'Yamaha SWP20',
+    subtitle: 'AWM2 32-Voice ROMpler — MU80 (requires ROM)',
+    color: '#8b5cf6',
+    presetCount: 0,
+    parameters: [
+      { key: 'volume', label: 'Volume', group: 'Output', type: 'knob', min: 0, max: 1, step: 0.01, default: 0.8, formatValue: 'percent' },
+      { key: 'voice', label: 'Voice', group: 'Playback', type: 'knob', min: 0, max: 31, step: 1, default: 0, formatValue: 'int' },
+    ],
+    romConfig: {
+      requiredZip: 'mu80.zip (Yamaha MU80 / SWP20 wave ROM)',
+      bankCount: 1,
+      romType: 'swp20',
+    },
+  },
+
+  // =========================================================================
+  // MAMERolandGP - Roland TC6116 PCM (SC-88 / JV-series)
+  // =========================================================================
+  MAMERolandGP: {
+    synthType: 'MAMERolandGP',
+    name: 'Roland GP TC6116',
+    subtitle: 'SC-88 PCM 28-Channel (requires ROM)',
+    color: '#ef4444',
+    presetCount: 0,
+    parameters: [
+      { key: 'volume', label: 'Volume', group: 'Output', type: 'knob', min: 0, max: 1, step: 0.01, default: 0.8, formatValue: 'percent' },
+      { key: 'voice', label: 'Channel', group: 'Playback', type: 'knob', min: 0, max: 27, step: 1, default: 0, formatValue: 'int' },
+      { key: 'vol1Speed', label: 'Att Speed', group: 'Envelope', type: 'knob', min: 0.0001, max: 0.05, step: 0.0001, default: 0.001, formatValue: 'percent', logarithmic: true },
+      { key: 'vol2Speed', label: 'Rel Speed', group: 'Envelope', type: 'knob', min: 0.0001, max: 0.05, step: 0.0001, default: 0.001, formatValue: 'percent', logarithmic: true },
+      { key: 'cutoff', label: 'Cutoff', group: 'Filter', type: 'knob', min: 0, max: 1, step: 0.01, default: 1.0, formatValue: 'percent' },
+    ],
+    romConfig: {
+      requiredZip: 'sc88.zip (Roland SC-88 / TC6116 wave ROM)',
+      bankCount: 1,
+      romType: 'rolandgp',
+    },
+  },
 };
 
 // ---------------------------------------------------------------------------
