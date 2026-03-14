@@ -7,12 +7,13 @@
  *   Right:  Volume knob, Save, Load, Collab, Auth, MIDI, Theme, Dock, DOM
  */
 
-import React, { useCallback } from 'react';
+import React, { useCallback, useMemo } from 'react';
 import type { FederatedPointerEvent } from 'pixi.js';
 import { PIXI_FONTS } from '../fonts';
 import { usePixiTheme } from '../theme';
 import { PixiButton } from '../components/PixiButton';
 import { PixiKnob } from '../components/PixiKnob';
+import { PixiSelect, type SelectOption } from '../components/PixiSelect';
 import { usePixiResponsive } from '../hooks/usePixiResponsive';
 import { useThemeStore, themes, useTabsStore, type ProjectTab } from '@stores';
 import { useSettingsStore } from '@stores/useSettingsStore';
@@ -123,12 +124,11 @@ export const PixiNavBar: React.FC = () => {
     useUIStore.getState().setShowFileBrowser(true);
   }, []);
 
-  // Theme cycling
-  const handleThemeCycle = useCallback(() => {
-    const idx = themes.findIndex((t) => t.id === currentThemeId);
-    const next = themes[(idx + 1) % themes.length];
-    setTheme(next.id);
-  }, [currentThemeId, setTheme]);
+  // Theme options for dropdown
+  const themeOptions = useMemo<SelectOption[]>(
+    () => themes.map(t => ({ value: t.id, label: t.name.toUpperCase() })),
+    [], // themes is module-level stable
+  );
 
   const handleSwitchToDom = useCallback(() => {
     setRenderMode('dom');
@@ -156,7 +156,7 @@ export const PixiNavBar: React.FC = () => {
 
   // Transport bar width: center zone gets whatever's left after left/right
   const LEFT_W = 460;
-  const RIGHT_W = 460;
+  const RIGHT_W = 488;
   const transportW = Math.max(200, width - LEFT_W - RIGHT_W);
 
   return (
@@ -293,7 +293,14 @@ export const PixiNavBar: React.FC = () => {
           width={28}
         />
 
-        <PixiButton label="THEME" variant="ghost" size="sm" onClick={handleThemeCycle} width={52} />
+        <PixiSelect
+          options={themeOptions}
+          value={currentThemeId}
+          onChange={setTheme}
+          width={80}
+          height={24}
+          searchable
+        />
         <PixiButton label="APP" variant="ghost" size="sm" onClick={handleDownloadApp} width={36} />
         <PixiButton label="DOM" variant="ghost" size="sm" onClick={handleSwitchToDom} width={36} />
 
