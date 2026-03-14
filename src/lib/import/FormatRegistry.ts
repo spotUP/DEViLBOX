@@ -334,6 +334,18 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
     uadeFallback: true,
   },
   {
+    key: 'steveTurner',
+    label: 'Steve Turner',
+    description: 'Steve Turner compiled 68k modules (.jpo / .jpold) — native pattern parser + UADE audio',
+    family: 'amiga-native',
+    matchMode: 'both',
+    extRegex: /\.(jpo|jpold)$/i,
+    prefixes: ['jpo.'],
+    prefKey: 'steveTurner',
+    nativeParser: { module: '@lib/import/formats/SteveTurnerParser', parseFn: 'parseSteveTurnerFile' },
+    uadeFallback: true,
+  },
+  {
     key: 'sonicArranger',
     label: 'Sonic Arranger',
     description: 'Sonic Arranger — magic "SOARV1.0"',

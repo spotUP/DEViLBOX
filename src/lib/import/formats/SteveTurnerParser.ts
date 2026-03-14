@@ -191,31 +191,36 @@ interface NoteEvent {
   row: number;
   /** XM note number (1-96, 0 = no note); 13 = C-1. */
   note: number;
-  /** 1-based instrument index. */
+  /** 1-based instrument index (0 = no change). */
   instrument: number;
+  /** Effect type (0 = none). */
+  effTyp: number;
+  /** Effect parameter. */
+  eff: number;
 }
 
 /**
  * Decode a single channel's pattern data from the position list into note events.
  *
+ * Timing: The replayer's duration counter ($58) is already in "row" units.
+ * Each duration byte (0x80-0xAF → 1-48) advances by that many rows directly.
+ * The subsong speed byte controls VBI rate but does NOT scale durations; it is
+ * NOT used here.
+ *
  * @param buf           Full file buffer.
  * @param posListStart  File offset of the position list start.
- * @param seqOffset     Base of sequence area (position list offsets are relative to this).
  * @param offtblOffset  File offset of the offset table.
- * @param speed         Ticks per step (from subsong entry).
  */
 function decodeChannel(
   buf: Uint8Array,
   posListStart: number,
   offtblOffset: number,
-  speed: number,
 ): NoteEvent[] {
   const events: NoteEvent[] = [];
   let pos = posListStart; // current position in position list
-  let tick = 0;
+  let row = 0;            // current row (duration bytes are already in row units)
   let duration = 1;
   let currentInstrument = 0; // 0-based
-  let currentNoteByte = 0;   // last note byte (0-83)
   let blockCount = 0;
 
   while (pos < buf.length && blockCount < MAX_PATTERN_BLOCKS) {
@@ -242,34 +247,46 @@ function decodeChannel(
 
       if (b <= 0x7f) {
         // Note trigger at pitch b, current instrument
-        currentNoteByte = b;
         const xmNote = b + 13; // map note byte 0-83 → XM 13-96 (C-1..B-7)
         events.push({
-          row: Math.min(Math.floor(tick / speed), MAX_ROWS - 1),
+          row: Math.min(row, MAX_ROWS - 1),
           note: Math.min(xmNote, 96),
           instrument: currentInstrument + 1,
+          effTyp: 0, eff: 0,
         });
-        tick += duration;
+        row += duration;
         if (events.length >= MAX_ROWS) { blockDone = true; }
       } else if (b <= 0xaf) {
-        // Set duration: 0x80-0xAF → duration = b - 0x7F (1-48)
+        // Set duration: 0x80-0xAF → duration = b - 0x7F (1-48 rows)
         duration = b - 0x7f;
       } else if (b <= 0xcf) {
-        // Trigger note at current pitch with new instrument (b - 0xB0)
+        // Instrument change + implicit retrigger at current pitch (b - 0xB0).
+        // Display as instrument-only row (no note pitch): in tracker notation an
+        // instrument number without a note means "retrigger at previous pitch with
+        // new instrument" — avoids flooding the note column with repeated pitches.
         currentInstrument = b - 0xb0;
-        const xmNote = currentNoteByte + 13;
         events.push({
-          row: Math.min(Math.floor(tick / speed), MAX_ROWS - 1),
-          note: Math.min(xmNote, 96),
+          row: Math.min(row, MAX_ROWS - 1),
+          note: 0,
           instrument: currentInstrument + 1,
+          effTyp: 0, eff: 0,
         });
-        tick += duration;
+        row += duration;
         if (events.length >= MAX_ROWS) { blockDone = true; }
       } else if (b <= 0xef) {
         // Select instrument (b - 0xD0), no trigger
         currentInstrument = b - 0xd0;
       } else if (b <= 0xf8) {
-        // Set pitch effect (b - 0xF0) — irrelevant for display
+        // Pitch effect command (b - 0xF0): 0=none,1=portUp,2=portDown,3=portToNote,
+        // 4=vibrato,5-8=format-specific.  Attach to the last row as an effect.
+        const effectNum = b - 0xf0;
+        if (effectNum > 0 && events.length > 0) {
+          // Map to a tracker effect code: use E5x (finetune) slot as a generic
+          // "pitch mod" placeholder until exact meanings are confirmed.
+          const last = events[events.length - 1];
+          last.effTyp = 0x0e; // Extended effect 'E'
+          last.eff = (5 << 4) | (effectNum & 0x0f); // E5n — pitch effect n
+        }
       } else if (b === 0xfe) {
         // Loop point marker — no note triggered; decoding continues after this byte
         // (runtime: after next note's duration expires, jump back here)
@@ -280,7 +297,7 @@ function decodeChannel(
       }
     }
 
-    if (events.length >= MAX_ROWS) break;
+    if (row >= MAX_ROWS) break;
   }
 
   return events;
@@ -343,12 +360,24 @@ function buildPattern(
     })),
   );
 
-  // Place events into rows (last event wins if multiple on same row)
+  // Place events into rows.
+  // Merge strategy: a note pitch wins over an instrument-only event on the same row;
+  // effect data from any event is preserved (last writer wins for effects).
   channelEvents.forEach((events, ch) => {
     for (const ev of events) {
-      if (ev.row < numRows) {
-        channelRows[ch][ev.row].note       = ev.note;
-        channelRows[ch][ev.row].instrument = ev.instrument;
+      if (ev.row >= numRows) continue;
+      const row = channelRows[ch][ev.row];
+      // Only overwrite note/instrument if this event carries a pitched note,
+      // or if the row has no note yet (instrument-only event populates instrument col).
+      if (ev.note > 0) {
+        row.note       = ev.note;
+        row.instrument = ev.instrument;
+      } else if (ev.instrument > 0 && row.note === 0) {
+        row.instrument = ev.instrument;
+      }
+      if (ev.effTyp > 0) {
+        row.effTyp = ev.effTyp;
+        row.eff    = ev.eff;
       }
     }
   });
@@ -453,7 +482,7 @@ export function parseSteveTurnerFile(buffer: ArrayBuffer, filename: string): Tra
         continue;
       }
       channelEvents.push(
-        decodeChannel(buf, posListStart, hdr.offtblOffset, sub.speed),
+        decodeChannel(buf, posListStart, hdr.offtblOffset),
       );
     }
 
@@ -472,22 +501,29 @@ export function parseSteveTurnerFile(buffer: ArrayBuffer, filename: string): Tra
   }
 
   // ── Build TrackerSong ─────────────────────────────────────────────────────
+  // UADE plays subsong 0 by default and loops it. Limit songPositions to only
+  // subsong 0 so the pattern cursor stays in sync with the audio. All patterns
+  // remain available in the patterns array for the pattern list UI.
 
   const result: TrackerSong = {
     name: `${moduleName} [Steve Turner]`,
     format: 'MOD' as TrackerFormat,
     patterns,
     instruments,
-    songPositions,
-    songLength: patterns.length,
+    songPositions: [0],
+    songLength: 1,
     restartPosition: 0,
     numChannels: 4,
     initialSpeed: subsongs[0]?.speed ?? 6,
     initialBPM: 125,
     linearPeriods: false,
-    // Mark for UADE playback
+    // Mark for UADE playback + subsong switching
     uadeEditableFileData: buffer.slice(0),
     uadeEditableFileName: filename,
+    uadeEditableSubsongs: subsongs.length > 1 ? {
+      count: subsongs.length,
+      speeds: subsongs.map(s => s.speed),
+    } : undefined,
   } as TrackerSong & { uadeEditableFileData?: ArrayBuffer; uadeEditableFileName?: string };
 
   // Count instrument entries actually used in INSTR table
