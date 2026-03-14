@@ -99,23 +99,19 @@ export class ES5503Synth extends MAMEBaseSynth {
   }
 
   protected async initialize(): Promise<void> {
-    try {
-      // Load Ensoniq Mirage wavetable ROM data
-      const romData = await loadES5503ROMs();
+    // Set up worklet first so _initPromise resolves quickly (built-in waveforms work immediately).
+    // ROM loading runs in background — custom Mirage wavetables load after worklet is ready.
+    await super.initialize();
 
-      // Call parent initialize first to set up worklet
-      await super.initialize();
-
-      // Load custom wavetables into wave RAM (pages 8+)
+    loadES5503ROMs().then(romData => {
       this.loadWaveData(romData, 2048);  // Start at page 8 (offset 2048)
-
       this.romLoaded = true;
       console.log('[ES5503] Mirage wavetable ROM loaded successfully');
-    } catch (error) {
+    }).catch(error => {
       console.error('[ES5503] ROM loading failed:', error);
       console.error('Place ROM files in /public/roms/es5503/ - see /public/roms/README.md');
-      // Continue anyway - synth works with 8 built-in waveforms
-    }
+      // Synth works with 8 built-in waveforms without ROM
+    });
   }
 
   // ===========================================================================
