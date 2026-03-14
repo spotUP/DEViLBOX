@@ -728,7 +728,15 @@ export class TrackerGLRenderer {
           const hasEff = colEffTyp !== 0 || colEff !== 0;
           if (hasEff) {
             this.setTmpColor(lerpWhiteRGBA(colors.textEffect, glow), ghostAlpha);
-            this.addGlyphString((EFFECT_CHARS[colEffTyp] ?? '?') + HEX_TABLE[colEff & 0xFF], px, gy, atlas, this.tmpColor, bold);
+            // Symphonie DSP effects: effTyp 0x50-0x54 → type letter + value
+            let effStr: string;
+            if (colEffTyp >= 0x50 && colEffTyp <= 0x54) {
+              const DSP_CHARS = ['D', 'E', 'C', 'L', 'X'];
+              effStr = (DSP_CHARS[colEffTyp - 0x50] ?? 'D') + HEX_TABLE[colEff & 0xFF];
+            } else {
+              effStr = (EFFECT_CHARS[colEffTyp] ?? '?') + HEX_TABLE[colEff & 0xFF];
+            }
+            this.addGlyphString(effStr, px, gy, atlas, this.tmpColor, bold);
           } else if (!ui.blankEmpty) {
             this.setTmpColor(lerpWhiteRGBA(colors.textMuted, 0), ghostAlpha);
             this.addGlyphString('...', px, gy, atlas, this.tmpColor, false);

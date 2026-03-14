@@ -478,6 +478,7 @@ export async function tryRouteFormat(
 
   // ── Symphonie Pro ─────────────────────────────────────────────────────────
   // .symmod files — OpenMPT for pattern data + libopenmpt for audio playback.
+  // OpenMPT handles notes and DSP events (DSPEcho + DSPDelay) via Zxx MIDI macros.
   if (matchesExt(filename, ['symmod'])) {
     const { parseWithOpenMPT } = await import('@lib/import/wasm/OpenMPTConverter');
     const song = await parseWithOpenMPT(buffer, originalFileName);
