@@ -150,6 +150,14 @@ export const VOLUME_NORMALIZATION_OFFSETS: Record<string, number> = {
   'MAMETR707': 22,       // Measured 2026-02-07: -31.6dB → need +22dB
   'MAMEVASynth': 15,     // Measured: -13.0dB → target -10dB
   'MAMECMI': 0,          // TBD — needs calibration once WASM is compiled
+  'MAMEFZPCM': 0,        // TBD — needs calibration once WASM is compiled
+  'MAMEPS1SPU': 0,       // TBD — needs calibration once WASM is compiled
+  'MAMEMultiPCM': 0,     // TBD — needs calibration once WASM is compiled
+  'MAMEZSG2': 0,         // TBD — needs calibration once WASM is compiled
+  'MAMEKS0164': 0,       // TBD — needs calibration once WASM is compiled
+  'MAMESWP00': 0,        // TBD — needs calibration once WASM is compiled
+  'MAMESWP20': 0,        // TBD — needs calibration once WASM is compiled
+  'MAMERolandGP': 0,     // TBD — needs calibration once WASM is compiled
   'MAMEICS2115': 30,     // Recalibrated 2026-02-28
   'MAMEK054539': 19,     // Recalibrated 2026-02-28
   'MAMEC352': 17,        // Measured 2026-02-07: -26.7dB → need +17dB

@@ -29,6 +29,14 @@ import { YMF271Synth } from '../../ymf271/YMF271Synth';
 import { YMOPQSynth } from '../../ymopq/YMOPQSynth';
 import { VASynthSynth } from '../../vasynth/VASynthSynth';
 import { CMISynth } from '../../cmi/CMISynth';
+import { FZSynth } from '../../fz/FZSynth';
+import { PS1SPUSynth } from '../../ps1spu/PS1SPUSynth';
+import { MultiPCMSynth } from '../../multipcm/MultiPCMSynth';
+import { ZSG2Synth } from '../../zsg2/ZSG2Synth';
+import { KS0164Synth } from '../../ks0164/KS0164Synth';
+import { SWP00Synth } from '../../swp00/SWP00Synth';
+import { SWP20Synth } from '../../swp20/SWP20Synth';
+import { RolandGPSynth } from '../../rolandgp/RolandGPSynth';
 
 const VOLUME_OFFSETS: Record<string, number> = {
   MAMEASC: 11, MAMEAstrocade: 18, MAMEC352: 17, MAMEES5503: 62,
@@ -36,7 +44,15 @@ const VOLUME_OFFSETS: Record<string, number> = {
   MAMESN76477: 5, MAMESNKWave: 8, MAMESP0250: 26, MAMETMS36XX: 6,
   MAMETMS5220: 37, MAMETR707: 22, MAMEUPD931: 23, MAMEUPD933: 28,
   MAMEVotrax: 20, MAMEYMF271: 15, MAMEYMOPQ: 19, MAMEVASynth: 20,
-  MAMECMI: 0,  // TBD — needs calibration once WASM is compiled
+  MAMECMI: 0,       // TBD — needs calibration once WASM is compiled
+  MAMEFZPCM: 0,     // TBD
+  MAMEPS1SPU: 0,    // TBD
+  MAMEMultiPCM: 0,  // TBD
+  MAMEZSG2: 0,      // TBD
+  MAMEKS0164: 0,    // TBD
+  MAMESWP00: 0,     // TBD
+  MAMESWP20: 0,     // TBD
+  MAMERolandGP: 0,  // TBD
 };
 
 function getNormalizedVolume(synthType: string, configVolume: number | undefined): number {
@@ -61,6 +77,8 @@ const SYNTH_CLASSES: Record<string, new () => any> = {
   K054539Synth, MEA8000Synth, RF5C400Synth, SN76477Synth, SNKWaveSynth,
   SP0250Synth, TMS36XXSynth, TMS5220Synth, TR707Synth, UPD931Synth,
   UPD933Synth, VotraxSynth, YMF271Synth, YMOPQSynth, VASynthSynth, CMISynth,
+  FZSynth, PS1SPUSynth, MultiPCMSynth, ZSG2Synth, KS0164Synth,
+  SWP00Synth, SWP20Synth, RolandGPSynth,
 };
 
 interface MAMEChipDef {
@@ -91,6 +109,14 @@ const MAME_CHIPS: MAMEChipDef[] = [
   { id: 'MAMEYMOPQ', name: 'Yamaha OPQ (YM3806)', className: 'YMOPQSynth' },
   { id: 'MAMEVASynth', name: 'Virtual Analog', className: 'VASynthSynth' },
   { id: 'MAMECMI', name: 'Fairlight CMI IIx', className: 'CMISynth' },
+  { id: 'MAMEFZPCM', name: 'Casio FZ PCM', className: 'FZSynth' },
+  { id: 'MAMEPS1SPU', name: 'PlayStation SPU', className: 'PS1SPUSynth' },
+  { id: 'MAMEMultiPCM', name: 'Yamaha MultiPCM', className: 'MultiPCMSynth' },
+  { id: 'MAMEZSG2', name: 'ZOOM ZSG-2', className: 'ZSG2Synth' },
+  { id: 'MAMEKS0164', name: 'Samsung KS0164', className: 'KS0164Synth' },
+  { id: 'MAMESWP00', name: 'Yamaha SWP00', className: 'SWP00Synth' },
+  { id: 'MAMESWP20', name: 'Yamaha SWP20', className: 'SWP20Synth' },
+  { id: 'MAMERolandGP', name: 'Roland GP TC6116', className: 'RolandGPSynth' },
 ];
 
 for (const chip of MAME_CHIPS) {

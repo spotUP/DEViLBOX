@@ -63,6 +63,14 @@ import { YMF271Synth } from '../ymf271/YMF271Synth';
 import { YMOPQSynth } from '../ymopq/YMOPQSynth';
 import { VASynthSynth } from '../vasynth/VASynthSynth';
 import { CMISynth } from '../cmi/CMISynth';
+import { FZSynth } from '../fz/FZSynth';
+import { PS1SPUSynth } from '../ps1spu/PS1SPUSynth';
+import { MultiPCMSynth } from '../multipcm/MultiPCMSynth';
+import { ZSG2Synth } from '../zsg2/ZSG2Synth';
+import { KS0164Synth } from '../ks0164/KS0164Synth';
+import { SWP00Synth } from '../swp00/SWP00Synth';
+import { SWP20Synth } from '../swp20/SWP20Synth';
+import { RolandGPSynth } from '../rolandgp/RolandGPSynth';
 import { ModularSynth } from '../modular/ModularSynth';
 import { DEFAULT_MODULAR_PATCH } from '@/types/modular';
 import { getNormalizedVolume } from './volumeNormalization';
@@ -1166,6 +1174,62 @@ export function createMAMEVASynth(config: InstrumentConfig): Tone.ToneAudioNode 
 export function createMAMECMI(config: InstrumentConfig): Tone.ToneAudioNode {
   const synth = new CMISynth();
   synth.output.gain.value = Tone.dbToGain(getNormalizedVolume('MAMECMI', config.volume));
+  applyChipParameters(synth, config);
+  return synth as unknown as Tone.ToneAudioNode;
+}
+
+export function createMAMEFZPCM(config: InstrumentConfig): Tone.ToneAudioNode {
+  const synth = new FZSynth();
+  synth.output.gain.value = Tone.dbToGain(getNormalizedVolume('MAMEFZPCM', config.volume));
+  applyChipParameters(synth, config);
+  return synth as unknown as Tone.ToneAudioNode;
+}
+
+export function createMAMEPS1SPU(config: InstrumentConfig): Tone.ToneAudioNode {
+  const synth = new PS1SPUSynth();
+  synth.output.gain.value = Tone.dbToGain(getNormalizedVolume('MAMEPS1SPU', config.volume));
+  applyChipParameters(synth, config);
+  return synth as unknown as Tone.ToneAudioNode;
+}
+
+export function createMAMEMultiPCM(config: InstrumentConfig): Tone.ToneAudioNode {
+  const synth = new MultiPCMSynth();
+  synth.output.gain.value = Tone.dbToGain(getNormalizedVolume('MAMEMultiPCM', config.volume));
+  applyChipParameters(synth, config);
+  return synth as unknown as Tone.ToneAudioNode;
+}
+
+export function createMAMEZSG2(config: InstrumentConfig): Tone.ToneAudioNode {
+  const synth = new ZSG2Synth();
+  synth.output.gain.value = Tone.dbToGain(getNormalizedVolume('MAMEZSG2', config.volume));
+  applyChipParameters(synth, config);
+  return synth as unknown as Tone.ToneAudioNode;
+}
+
+export function createMAMEKS0164(config: InstrumentConfig): Tone.ToneAudioNode {
+  const synth = new KS0164Synth();
+  synth.output.gain.value = Tone.dbToGain(getNormalizedVolume('MAMEKS0164', config.volume));
+  applyChipParameters(synth, config);
+  return synth as unknown as Tone.ToneAudioNode;
+}
+
+export function createMAMESWP00(config: InstrumentConfig): Tone.ToneAudioNode {
+  const synth = new SWP00Synth();
+  synth.output.gain.value = Tone.dbToGain(getNormalizedVolume('MAMESWP00', config.volume));
+  applyChipParameters(synth, config);
+  return synth as unknown as Tone.ToneAudioNode;
+}
+
+export function createMAMESWP20(config: InstrumentConfig): Tone.ToneAudioNode {
+  const synth = new SWP20Synth();
+  synth.output.gain.value = Tone.dbToGain(getNormalizedVolume('MAMESWP20', config.volume));
+  applyChipParameters(synth, config);
+  return synth as unknown as Tone.ToneAudioNode;
+}
+
+export function createMAMERolandGP(config: InstrumentConfig): Tone.ToneAudioNode {
+  const synth = new RolandGPSynth();
+  synth.output.gain.value = Tone.dbToGain(getNormalizedVolume('MAMERolandGP', config.volume));
   applyChipParameters(synth, config);
   return synth as unknown as Tone.ToneAudioNode;
 }
