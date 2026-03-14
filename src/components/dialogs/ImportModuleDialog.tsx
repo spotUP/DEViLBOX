@@ -500,7 +500,7 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
           {isLoading && (
             <div className="flex items-center gap-2">
               <div className="w-4 h-4 border-2 border-accent-primary border-t-transparent rounded-full animate-spin" />
-              <span className="text-xs text-text-muted">Loading…</span>
+              <span className="text-xs text-text-muted">Parsing Pattern Data…</span>
             </div>
           )}
 
