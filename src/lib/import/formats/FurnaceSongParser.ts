@@ -2216,20 +2216,20 @@ function parseSample(reader: BinaryReader, version: number): FurnaceSample {
           break;
         case 3:  // DIV_SAMPLE_DEPTH_YMZ_ADPCM
         case 4:  // DIV_SAMPLE_DEPTH_QSOUND_ADPCM
-        case 9:  // DIV_SAMPLE_DEPTH_VOX
-        case 12: // DIV_SAMPLE_DEPTH_4BIT
-          byteCount = Math.floor((count + 1) / 2);
-          break;
         case 5:  // DIV_SAMPLE_DEPTH_ADPCM_A
-          byteCount = Math.floor((count + 1) / 2);
-          break;
         case 6:  // DIV_SAMPLE_DEPTH_ADPCM_B
+        case 7:  // DIV_SAMPLE_DEPTH_ADPCM_K
+        case 10: // DIV_SAMPLE_DEPTH_VOX
+        case 15: // DIV_SAMPLE_DEPTH_4BIT
           byteCount = Math.floor((count + 1) / 2);
           break;
-        case 10: // DIV_SAMPLE_DEPTH_MULAW
+        case 9:  // DIV_SAMPLE_DEPTH_BRR (SNES) — 9 bytes per 16 samples
+          byteCount = 9 * Math.ceil(count / 16);
+          break;
+        case 11: // DIV_SAMPLE_DEPTH_MULAW
           byteCount = count;
           break;
-        case 11: // DIV_SAMPLE_DEPTH_C219
+        case 12: // DIV_SAMPLE_DEPTH_C219
           byteCount = Math.floor((count + 1) & ~1); // padded to even
           break;
         case 13: // DIV_SAMPLE_DEPTH_IMA_ADPCM
@@ -2237,9 +2237,6 @@ function parseSample(reader: BinaryReader, version: number): FurnaceSample {
           break;
         case 14: // DIV_SAMPLE_DEPTH_12BIT
           byteCount = Math.floor((count * 3 + 1) / 2);
-          break;
-        case 7:  // DIV_SAMPLE_DEPTH_BRR
-          byteCount = 9 * Math.ceil(count / 16);
           break;
         default:
           // Unknown depth — assume 1 byte per sample as fallback
