@@ -483,6 +483,15 @@ export async function tryRouteFormat(
     const { parseWithOpenMPT } = await import('@lib/import/wasm/OpenMPTConverter');
     const song = await parseWithOpenMPT(buffer, originalFileName);
     song.libopenmptFileData = buffer.slice(0);
+    // Symphonie Pro stores full Amiga paths in instrument names (e.g. "HD3:Samples/Kick").
+    // Strip everything up to the last '/' or ':' to keep only the sample filename.
+    for (const inst of song.instruments) {
+      const raw = inst.name ?? '';
+      const slashIdx = raw.lastIndexOf('/');
+      const colonIdx = raw.lastIndexOf(':');
+      const stripIdx = Math.max(slashIdx, colonIdx);
+      if (stripIdx >= 0) inst.name = raw.substring(stripIdx + 1);
+    }
     return song;
   }
 
