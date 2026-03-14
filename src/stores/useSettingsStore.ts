@@ -184,6 +184,8 @@ export interface FormatEnginePreferences {
   paulTonge: FormatEngineChoice;        // pat.* → PaulTongeParser vs UADE
   robHubbardST: FormatEngineChoice;     // rho.* → RobHubbardSTParser vs UADE
   robHubbard: FormatEngineChoice;       // rh.* → RobHubbardParser vs UADE
+  glueMonParser: FormatEngineChoice;    // glue.*/gm.* → GlueMonParser vs UADE
+  davidHanney: FormatEngineChoice;      // dh.* → DavidHanneyParser vs UADE
   // Newly wired parsers (2026-02-27 batch 4)
   futurePlayer: FormatEngineChoice;     // .fp/fp.* → FuturePlayerParser vs UADE
   jasonPage: FormatEngineChoice;        // jpn.*/jpnd.*/jp.* → JasonPageParser vs UADE
@@ -420,6 +422,8 @@ export const useSettingsStore = create<SettingsStore>()(
         paulTonge: 'uade',            // PaulTongeParser — dedicated Paul Tonge support
         robHubbardST: 'uade',         // RobHubbardSTParser — dedicated Rob Hubbard ST support
         robHubbard: 'native',           // RobHubbardParser — dedicated Rob Hubbard support
+        glueMonParser: 'uade',        // GlueMonParser — detection-only, UADE handles audio
+        davidHanney: 'uade',          // DavidHanneyParser — detection-only, UADE handles audio
         futurePlayer: 'native',       // Native WASM replayer (transpiled 68k)
         jasonPage: 'uade',          // JasonPageParser — dedicated Jason Page support
         infogrames: 'uade',         // InfogramesParser — dedicated Infogrames support

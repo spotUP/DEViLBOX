@@ -149,6 +149,36 @@ describe('Format parser tests with real Modland files', () => {
       console.log('  CoreDesign: Not detected as CoreDesign format');
     }
   });
+
+  it('GlueMon: flood.glue - detection-only, UADE fallback', async () => {
+    const buf = readFileSync(resolve(BASE, 'flood.glue'));
+    const u8 = new Uint8Array(buf);  // copy: avoid Node.js Buffer pool byteOffset
+    const ab = u8.buffer.slice(u8.byteOffset, u8.byteOffset + u8.byteLength);
+    const { isGlueMonFormat, parseGlueMonFile } = await import('@lib/import/formats/GlueMonParser');
+
+    expect(isGlueMonFormat(u8)).toBe(true);
+    const song = parseGlueMonFile(ab, 'flood.glue');
+    logResult('GlueMon', song);
+    expect(song).toBeTruthy();
+    expect(song.name).toContain('GlueMon');
+    console.log(`  Song name: "${song.name}", channels: ${song.numChannels}`);
+    console.log(`  Notes: ${countNotes(song)} (0 = correct, withNativeThenUADE will fall through to UADE)`);
+  });
+
+  it('DavidHanney: tearaway.dh - detection-only, UADE fallback', async () => {
+    const buf = readFileSync(resolve(BASE, 'tearaway.dh'));
+    const u8 = new Uint8Array(buf);  // copy: avoid Node.js Buffer pool byteOffset
+    const ab = u8.buffer.slice(u8.byteOffset, u8.byteOffset + u8.byteLength);
+    const { isDavidHanneyFormat, parseDavidHanneyFile } = await import('@lib/import/formats/DavidHanneyParser');
+
+    expect(isDavidHanneyFormat(u8)).toBe(true);
+    const song = parseDavidHanneyFile(ab, 'tearaway.dh');
+    logResult('DavidHanney', song);
+    expect(song).toBeTruthy();
+    expect(song.name).toContain('DavidHanney');
+    console.log(`  Song name: "${song.name}", channels: ${song.numChannels}`);
+    console.log(`  Notes: ${countNotes(song)} (0 = correct, withNativeThenUADE will fall through to UADE)`);
+  });
 });
 
 // ── Native parsers — full parse ────────────────────────────────────────────
@@ -586,13 +616,13 @@ describe('UADE routing detection for remaining formats', () => {
     // UADE_ONLY_PREFIXES (prefix.name form)
     'agony.aam',          // aam.* prefix
     'letsdance.bss',      // bss.* prefix
-    'tearaway.dh',        // dh.* prefix
+    // 'tearaway.dh' — now has native DavidHanneyParser
     'dns.hollywoodpokerpro', // dns.* prefix
     'crash_and_burn.dz',  // dz.* prefix
     'bladerunner.ea',     // ea.* prefix
     'ems.ballade',        // ems.* prefix
     'forgotten_worlds.fw', // fw.*
-    'flood.glue',         // glue.*
+    // 'flood.glue' — now has native GlueMonParser
     'blazing_thunder.hd', // hd.*
     '5th_gear.hip',       // hip.*
     'alien_storm.md',     // md.*
