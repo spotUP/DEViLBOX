@@ -335,6 +335,16 @@ export const SYNTH_CATEGORIES: SynthCategory[] = [
       SYNTH_INFO.MAMEVASynth,
       SYNTH_INFO.MAMEYMF271,
       SYNTH_INFO.MAMEYMOPQ,
+      // PCM / Sampler chips (WASM standalone engines)
+      SYNTH_INFO.MAMECMI,
+      SYNTH_INFO.MAMEFZPCM,
+      SYNTH_INFO.MAMEPS1SPU,
+      SYNTH_INFO.MAMEMultiPCM,
+      SYNTH_INFO.MAMEZSG2,
+      SYNTH_INFO.MAMEKS0164,
+      SYNTH_INFO.MAMESWP00,
+      SYNTH_INFO.MAMESWP20,
+      SYNTH_INFO.MAMERolandGP,
     ],
   },
   {
@@ -353,6 +363,8 @@ export const SYNTH_CATEGORIES: SynthCategory[] = [
       SYNTH_INFO.MAMESNKWave,
       SYNTH_INFO.MAMETIA,
       SYNTH_INFO.MAMETMS36XX,
+      SYNTH_INFO.MAMEMultiPCM,  // Sega Model 1/2 arcade
+      SYNTH_INFO.MAMEZSG2,       // ZOOM effects processor
     ],
   },
   {

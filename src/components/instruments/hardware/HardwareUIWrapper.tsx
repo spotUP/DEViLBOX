@@ -20,6 +20,15 @@ import { MAMEGenericHardware } from './MAMEGenericHardware';
 import { BuzzGenericHardware } from './BuzzGenericHardware';
 import { VSTBridgeGenericHardware, isVSTBridgeType } from './VSTBridgeGenericHardware';
 import { GearmulatorHardware } from '../gearmulator/GearmulatorHardware';
+import { CMIHardware } from './CMIHardware';
+import { FZHardware } from './FZHardware';
+import { PS1SPUHardware } from './PS1SPUHardware';
+import { MultiPCMHardware } from './MultiPCMHardware';
+import { ZSG2Hardware } from './ZSG2Hardware';
+import { KS0164Hardware } from './KS0164Hardware';
+import { SWP00Hardware } from './SWP00Hardware';
+import { SWP20Hardware } from './SWP20Hardware';
+import { RolandGPHardware } from './RolandGPHardware';
 
 interface HardwareUIWrapperProps {
   synthType: SynthType;
@@ -51,6 +60,17 @@ const DEDICATED_UI_MAP: Partial<Record<SynthType, React.ComponentType<HWComponen
   // Synthesizers - MAME (dedicated)
   MAMERSA: D50Hardware,         // Roland D-50 LA Synthesis (1987)
   MAMEVFX: VFXHardware,         // Ensoniq VFX Wavetable (1989)
+
+  // MAME PCM / Samplers (dedicated hardware UIs)
+  MAMECMI: CMIHardware,         // Fairlight CMI IIx 8-Voice PCM (1982)
+  MAMEFZPCM: FZHardware,        // Casio FZ-1 16-bit PCM Sampler (1987)
+  MAMEPS1SPU: PS1SPUHardware,   // Sony PlayStation SPU ADPCM (1994)
+  MAMEMultiPCM: MultiPCMHardware, // Yamaha YMW258-F GEW8 28-Slot (1992)
+  MAMEZSG2: ZSG2Hardware,       // ZOOM ZSG-2 48-Channel ADPCM
+  MAMEKS0164: KS0164Hardware,   // Samsung KS0164 32-Voice GM Wavetable
+  MAMESWP00: SWP00Hardware,     // Yamaha SWP00 AWM2 MU50 (1994)
+  MAMESWP20: SWP20Hardware,     // Yamaha SWP20 AWM2 MU80 (1994)
+  MAMERolandGP: RolandGPHardware, // Roland TC6116 SC-88 PCM (1994)
 };
 
 /**
