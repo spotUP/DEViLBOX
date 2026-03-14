@@ -428,7 +428,12 @@ export async function parseUADEFile(
     engine.resetTickSnapshots();
   }
 
-  const metadata = preScannedMeta ?? await engine.load(buffer, filename);
+  // Compiled 68k replayer formats loop indefinitely without an end signal.
+  // Skip the worklet's built-in scan for these to avoid a 600-second hang.
+  const SKIP_SCAN_EXTS = new Set(['jpo', 'jpold']);
+  const skipScan = mode === 'enhanced' && SKIP_SCAN_EXTS.has(ext);
+
+  const metadata = preScannedMeta ?? await engine.load(buffer, filename, skipScan);
   const scanRows = metadata.scanData ?? [];
 
   // Phase 3a: Route to native parser when UADE detects a format with native support.
@@ -885,6 +890,18 @@ export async function parseUADEFile(
 
   // Build the subsong name: append subsong index when it's not the default
   const songName = subsong > 0 ? `${name} (${subsong + 1})` : name;
+
+  // Compiled 68k replayers continuously update Paula registers on every tick,
+  // causing the enhanced scan to generate a note-trigger for every DMA write.
+  // This creates excessive retriggering in the reconstructed patterns.
+  // Force classic (UADESynth streaming) for these formats instead.
+  const FORCE_CLASSIC_FORMATS = new Set<string>([
+    'jpo', 'jpold',   // SteveTurner — compiled replayer, UADE streaming required for correct audio
+  ]);
+  if (mode === 'enhanced' && FORCE_CLASSIC_FORMATS.has(ext)) {
+    console.log(`[UADEParser] ${ext.toUpperCase()} uses compiled replayer; forcing classic UADESynth streaming`);
+    return buildClassicSong(songName, ext, filename, buffer, metadata, activeScanRows, periodToNoteIndex);
+  }
 
   // Synthesis-based formats use short macro-driven waveforms (16-32 bytes) that the
   // enhanced scan cannot reliably extract. Force classic (UADE playback) for these.
@@ -1950,11 +1967,15 @@ function buildClassicSong(
   // Build patterns from scan data (64 rows per pattern)
   const ROWS_PER_PATTERN = 64;
   const PAULA_CHANNEL_NAMES = ['Paula 1', 'Paula 2', 'Paula 3', 'Paula 4'];
-  const totalRows = scanRows.length;
+  // When scan was skipped (skipScan formats), scanRows is empty — use a minimum of
+  // ROWS_PER_PATTERN so the pattern has a valid non-zero length for the playback engine.
+  const totalRows = Math.max(scanRows.length, ROWS_PER_PATTERN);
   const numPatterns = Math.max(1, Math.ceil(totalRows / ROWS_PER_PATTERN));
 
   const patterns: Pattern[] = [];
   const songPositions: number[] = [];
+  // Suppress retriggering: only emit note+instrument when the sample pointer changes.
+  const prevInstrPerChannel: number[] = [-1, -1, -1, -1];
 
   for (let pat = 0; pat < numPatterns; pat++) {
     const rowStart = pat * ROWS_PER_PATTERN;
@@ -1989,9 +2010,12 @@ function buildClassicSong(
         const instrId = ch.samplePtr > 0 ? (sampleMap.get(ch.samplePtr) ?? 0) : 0;
         const volume = Math.min(0x50, 0x10 + ch.volume);
 
+        const isNewNote = instrId !== prevInstrPerChannel[chIdx];
+        prevInstrPerChannel[chIdx] = instrId;
+
         return {
-          note,
-          instrument: instrId,
+          note: isNewNote ? note : 0,
+          instrument: isNewNote ? instrId : 0,
           volume,
           effTyp: 0,
           eff: 0,

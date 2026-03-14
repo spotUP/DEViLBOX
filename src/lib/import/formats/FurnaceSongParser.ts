@@ -607,9 +607,13 @@ function convertOldChipFlags(oldFlags: number, fileChipId: number): string {
  * @param chipFlags - mutable array of key=value\n flag strings per chip
  */
 function applyVersionCompatFlags(version: number, systems: number[], chipFlags: string[]): void {
-  // Helper: append a flag to a chip's flag string
+  // Helper: append a flag to a chip's flag string.
+  // Ensures a newline separator between existing flags and the new flag,
+  // since FLAG blocks from .fur files may not end with '\n'.
   const setFlag = (i: number, key: string, value: string | number | boolean) => {
-    chipFlags[i] = (chipFlags[i] || '') + `${key}=${value}\n`;
+    const existing = chipFlags[i] || '';
+    const prefix = existing.length > 0 && !existing.endsWith('\n') ? '\n' : '';
+    chipFlags[i] = existing + prefix + `${key}=${value}\n`;
   };
 
   // Helper: check if a flag is already set in a chip's flag string
