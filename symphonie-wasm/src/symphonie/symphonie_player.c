@@ -495,8 +495,16 @@ static void fx_fromadd(SymVoice* v, uint8_t vol) {
     v->fromAdd += (sampleLen * (int8_t)vol) >> SYM_FROMADDSTEP_LN;
 }
 
-static void fx_replay_from(SymVoice* v, uint8_t vol) {
-    if (!v->sampleStartPtr || !v->sampleEndPtr) return;
+static void fx_replay_from(SymSong* song, SymVoice* v, uint8_t vol, uint8_t instr_idx) {
+    /* If voice was never keyed on, initialise from instrument at default pitch */
+    if (!v->sampleStartPtr || !v->sampleEndPtr) {
+        if (instr_idx < song->numInstruments) {
+            SymInstrument* inst = &song->instruments[instr_idx];
+            int32_t freq = get_note_freq(song, inst->tune);
+            start_sample(song, v, inst, freq, SYM_VOLUME_MAX);
+        }
+        if (!v->sampleStartPtr || !v->sampleEndPtr) return;
+    }
     int32_t sampleLen = (int32_t)(v->sampleEndPtr - v->sampleStartPtr);
     int32_t startPos = vol;
 
@@ -572,7 +580,7 @@ static void play_line_note(SymSong* song, int channel, const SymNote* note) {
             case SYM_FX_VSLIDE_DOWN: fx_volume_slide_down(v, note->volume); return;
             case SYM_FX_PSLIDE_UP:   fx_pitch_slide_up(v, note->volume); return;
             case SYM_FX_PSLIDE_DOWN: fx_pitch_slide_down(v, note->volume); return;
-            case SYM_FX_REPLAY_FROM: fx_replay_from(v, note->volume); return;
+            case SYM_FX_REPLAY_FROM: fx_replay_from(song, v, note->volume, note->instr); return;
             case SYM_FX_FROM_AND_PITCH:
                 if (note->pitch != 0xFF && note->instr < song->numInstruments) {
                     SymInstrument* inst = &song->instruments[note->instr];
@@ -581,7 +589,7 @@ static void play_line_note(SymSong* song, int channel, const SymNote* note) {
                         v->freq = get_note_freq(song, pitch);
                     }
                 }
-                fx_replay_from(v, note->volume);
+                fx_replay_from(song, v, note->volume, note->instr);
                 return;
             case SYM_FX_SET_FROMADD: fx_set_fromadd(v, note->volume); return;
             case SYM_FX_FROMADD:     fx_fromadd(v, note->volume); return;
