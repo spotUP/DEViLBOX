@@ -18,6 +18,7 @@ import type {
   FurnaceSubsongPlayback,
 } from '@typedefs';
 import { useEditorStore } from './useEditorStore';
+import { useUIStore } from './useUIStore';
 
 interface FormatStore {
   editorMode: EditorMode;
@@ -150,6 +151,7 @@ export const useFormatStore = create<FormatStore>()(
 
     applyEditorMode: (song) => {
       useEditorStore.getState().setLinearPeriods(song.linearPeriods ?? false);
+      let newEditorMode: EditorMode = 'classic';
       set((state) => {
         state.c64SidFileData = song.c64SidFileData ?? null;
         state.goatTrackerData = song.goatTrackerData ?? null;
@@ -177,23 +179,27 @@ export const useFormatStore = create<FormatStore>()(
         state.uadeEditableCurrentSubsong = 0;
         state.libopenmptFileData = (song as any).libopenmptFileData ?? null;
         if (song.furnaceNative) {
+          newEditorMode = 'furnace';
           state.editorMode = 'furnace';
           clearNative(state);
           state.furnaceNative = song.furnaceNative;
           state.furnaceSubsongs = song.furnaceSubsongs ?? null;
           state.furnaceActiveSubsong = song.furnaceActiveSubsong ?? 0;
         } else if (song.hivelyNative) {
+          newEditorMode = 'hively';
           state.editorMode = 'hively';
           clearNative(state);
           state.hivelyNative = song.hivelyNative;
           state.hivelyFileData = song.hivelyFileData ?? null;
           state.hivelyMeta = song.hivelyMeta ?? null;
         } else if (song.klysNative) {
+          newEditorMode = 'klystrack';
           state.editorMode = 'klystrack';
           clearNative(state);
           state.klysNative = song.klysNative;
           state.klysFileData = song.klysFileData ?? null;
         } else if (song.channelTrackTables) {
+          newEditorMode = 'musicline';
           state.editorMode = 'musicline';
           clearNative(state);
           state.musiclineFileData = song.musiclineFileData ?? null;
@@ -201,19 +207,28 @@ export const useFormatStore = create<FormatStore>()(
           state.channelSpeeds = song.channelSpeeds ?? null;
           state.channelGrooves = song.channelGrooves ?? null;
         } else if (song.jamCrackerFileData) {
+          newEditorMode = 'jamcracker';
           state.editorMode = 'jamcracker';
           clearNative(state);
         } else if (song.goatTrackerData || song.c64SidFileData) {
+          newEditorMode = 'goattracker';
           state.editorMode = 'goattracker';
           clearNative(state);
         } else if (song.sc68FileData) {
+          newEditorMode = 'sc68';
           state.editorMode = 'sc68';
           clearNative(state);
         } else {
           state.editorMode = 'classic';
-          clearNative(state);
         }
       });
+      // Ensure the tracker window is in tracker sub-view for all custom editor
+      // modes — they render inside viewMode === 'tracker'. Without this, loading
+      // a GoatTracker file while on 'grid' or 'pianoroll' would leave the custom
+      // editor invisible until the user manually switched views.
+      if (newEditorMode !== 'classic') {
+        useUIStore.getState().setTrackerViewMode('tracker');
+      }
     },
 
     setFurnaceActiveSubsong: (index) => set((state) => { state.furnaceActiveSubsong = index; }),
