@@ -177,3 +177,6 @@ v2-synth-wasm/build/
 v2m-wasm/build/
 tunefish-wasm/build/
 wavesabre-wasm/build/
+
+# Private notes / sensitive files
+\!TODO.TXT
