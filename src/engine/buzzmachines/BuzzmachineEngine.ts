@@ -927,7 +927,7 @@ export class BuzzmachineEngine {
     return new Promise<void>((resolve, reject) => {
       const timeout = setTimeout(() => {
         reject(new Error('Buzzmachine init timeout'));
-      }, 5000);
+      }, 15000);
 
       workletNode.port.onmessage = (event) => {
         if (event.data.type === 'initialized') {
