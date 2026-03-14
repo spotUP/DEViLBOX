@@ -290,25 +290,24 @@ export function createAMSynth(config: InstrumentConfig): Tone.ToneAudioNode {
 }
 
 export function createPluckSynth(config: InstrumentConfig): Tone.ToneAudioNode {
-  const synth = new Tone.PolySynth(Tone.PluckSynth as unknown as typeof Tone.Synth);
-  synth.set({
+  // PluckSynth (Karplus-Strong) — use directly, NOT wrapped in PolySynth.
+  // PolySynth(PluckSynth) fails because PluckSynth doesn't expose the standard
+  // frequency/envelope interface that PolySynth expects from its voice type.
+  const synth = new Tone.PluckSynth({
     attackNoise: 1,
-    dampening: 4000,
-    resonance: 0.7,
-  } as unknown as Partial<Tone.SynthOptions>);
+    dampening: 3000,
+    resonance: 0.96,
+  });
   synth.volume.value = getNormalizedVolume('PluckSynth', config.volume);
-  // Wrap to prevent voice leak on rapid retrigger
+
   return {
-    triggerAttackRelease: (note: string, duration: number, time?: number, velocity?: number) => {
-      try { synth.triggerRelease(note, time); } catch { /* ignore */ }
-      synth.triggerAttackRelease(note, duration, time, velocity);
-    },
-    triggerAttack: (note: string, time?: number, velocity?: number) => {
-      try { synth.triggerRelease(note, time); } catch { /* ignore */ }
-      synth.triggerAttack(note, time, velocity);
-    },
-    triggerRelease: (note: string, time?: number) => synth.triggerRelease(note, time),
-    releaseAll: () => synth.releaseAll(),
+    triggerAttack: (note: string | number, time?: number) =>
+      synth.triggerAttack(note as string, time),
+    triggerRelease: (_note?: string | number, time?: number) =>
+      synth.triggerRelease(time),
+    triggerAttackRelease: (note: string | number, _duration: number, time?: number) =>
+      synth.triggerAttack(note as string, time),
+    releaseAll: () => {},
     connect: (dest: Tone.InputNode) => synth.connect(dest),
     disconnect: () => synth.disconnect(),
     dispose: () => synth.dispose(),

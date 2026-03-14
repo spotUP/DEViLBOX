@@ -8,7 +8,6 @@
 import * as Tone from 'tone';
 import { SynthRegistry } from '../SynthRegistry';
 import type { InstrumentConfig } from '@typedefs/instrument';
-import { AICASynth } from '../../aica/AICASynth';
 import { ASCSynth } from '../../asc/ASCSynth';
 import { AstrocadeSynth } from '../../astrocade/AstrocadeSynth';
 import { C352Synth } from '../../c352/C352Synth';
@@ -29,13 +28,15 @@ import { VotraxSynth } from '../../votrax/VotraxSynth';
 import { YMF271Synth } from '../../ymf271/YMF271Synth';
 import { YMOPQSynth } from '../../ymopq/YMOPQSynth';
 import { VASynthSynth } from '../../vasynth/VASynthSynth';
+import { CMISynth } from '../../cmi/CMISynth';
 
 const VOLUME_OFFSETS: Record<string, number> = {
-  MAMEAICA: 0, MAMEASC: 11, MAMEAstrocade: 18, MAMEC352: 17, MAMEES5503: 62,
+  MAMEASC: 11, MAMEAstrocade: 18, MAMEC352: 17, MAMEES5503: 62,
   MAMEICS2115: 35, MAMEK054539: 22, MAMEMEA8000: 12, MAMERF5C400: 0,
   MAMESN76477: 5, MAMESNKWave: 8, MAMESP0250: 26, MAMETMS36XX: 6,
   MAMETMS5220: 37, MAMETR707: 22, MAMEUPD931: 23, MAMEUPD933: 28,
   MAMEVotrax: 20, MAMEYMF271: 15, MAMEYMOPQ: 19, MAMEVASynth: 20,
+  MAMECMI: 0,  // TBD — needs calibration once WASM is compiled
 };
 
 function getNormalizedVolume(synthType: string, configVolume: number | undefined): number {
@@ -56,10 +57,10 @@ function applyChipParameters(synth: { setParam: (key: string, value: number) => 
 
 // Constructor lookup — maps class name to actual class
 const SYNTH_CLASSES: Record<string, new () => any> = {
-  AICASynth, ASCSynth, AstrocadeSynth, C352Synth, ES5503Synth, ICS2115Synth,
+  ASCSynth, AstrocadeSynth, C352Synth, ES5503Synth, ICS2115Synth,
   K054539Synth, MEA8000Synth, RF5C400Synth, SN76477Synth, SNKWaveSynth,
   SP0250Synth, TMS36XXSynth, TMS5220Synth, TR707Synth, UPD931Synth,
-  UPD933Synth, VotraxSynth, YMF271Synth, YMOPQSynth, VASynthSynth,
+  UPD933Synth, VotraxSynth, YMF271Synth, YMOPQSynth, VASynthSynth, CMISynth,
 };
 
 interface MAMEChipDef {
@@ -69,7 +70,6 @@ interface MAMEChipDef {
 }
 
 const MAME_CHIPS: MAMEChipDef[] = [
-  { id: 'MAMEAICA', name: 'Sega AICA (Dreamcast)', className: 'AICASynth' },
   { id: 'MAMEASC', name: 'Apple Sound Chip', className: 'ASCSynth' },
   { id: 'MAMEAstrocade', name: 'Bally Astrocade', className: 'AstrocadeSynth' },
   { id: 'MAMEC352', name: 'Namco C352', className: 'C352Synth' },
@@ -90,6 +90,7 @@ const MAME_CHIPS: MAMEChipDef[] = [
   { id: 'MAMEYMF271', name: 'Yamaha OPX (YMF271)', className: 'YMF271Synth' },
   { id: 'MAMEYMOPQ', name: 'Yamaha OPQ (YM3806)', className: 'YMOPQSynth' },
   { id: 'MAMEVASynth', name: 'Virtual Analog', className: 'VASynthSynth' },
+  { id: 'MAMECMI', name: 'Fairlight CMI IIx', className: 'CMISynth' },
 ];
 
 for (const chip of MAME_CHIPS) {

@@ -2120,7 +2120,6 @@ export class ToneEngine {
       case 'CEM3394':
       case 'SCSP':
       // MAME Per-Chip WASM Synths -- falls through
-      case 'MAMEAICA':
       case 'MAMEASC':
       case 'MAMEAstrocade':
       case 'MAMEC352':

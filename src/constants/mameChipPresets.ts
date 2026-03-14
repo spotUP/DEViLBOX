@@ -562,15 +562,6 @@ export const MAME_CHIP_PRESETS: InstrumentPreset['config'][] = [
   // ============================================
   {
     type: 'synth',
-    name: 'AICA Default',
-    synthType: 'MAMEAICA',
-    parameters: { volume: 0.8 },
-    effects: [],
-    volume: -10,
-    pan: 0,
-  },
-  {
-    type: 'synth',
     name: 'SCSP Default',
     synthType: 'SCSP',
     parameters: { volume: 0.8 },
@@ -668,16 +659,4 @@ export const MAME_CHIP_PRESETS: InstrumentPreset['config'][] = [
     pan: 0,
   },
 
-  // ============================================
-  // AICA - Sega Dreamcast sound processor
-  // ============================================
-  {
-    type: 'synth',
-    name: 'AICA FM Piano',
-    synthType: 'MAMEAICA',
-    parameters: { _program: 0, volume: 0.8 },
-    effects: [],
-    volume: -10,
-    pan: 0,
-  },
 ];
