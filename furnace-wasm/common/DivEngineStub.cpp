@@ -100,3 +100,25 @@ void engine_clear_all() {
 }
 
 } // extern "C"
+
+// Include brrUtils for BRR encoding
+extern "C" {
+#include "../../third-party/furnace-master/src/engine/brrUtils.h"
+}
+
+// DivSample::render — encode PCM (data16) to chip-native formats.
+// Currently implements BRR encoding for SNES/SPC700.
+void DivSample::render(unsigned int formatMask) {
+  // If depth is already BRR, nothing to encode (dataBRR is already populated by set_sample)
+  if (depth == DIV_SAMPLE_DEPTH_BRR) return;
+
+  // Only encode to BRR if we have 16-bit PCM data (depth=16) and enough samples
+  if (depth == DIV_SAMPLE_DEPTH_16BIT && data16 && samples > 0) {
+    if (dataBRR == nullptr) {
+      if (!initBRR(samples)) return;
+    }
+    int sampleCount = loop ? loopEnd : (int)samples;
+    if (sampleCount <= 0 || sampleCount > (int)samples) sampleCount = (int)samples;
+    brrEncode(data16, dataBRR, sampleCount, loop ? loopStart : -1, brrEmphasis, brrNoFilter);
+  }
+}
