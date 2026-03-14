@@ -1,16 +1,17 @@
 /**
- * MAMEGenericHardware — SDL2/WASM hardware UI for any MAME chip synth
+ * MAMEGenericHardware — Pure React hardware UI for any MAME chip synth
  *
- * Reads ChipParameterDef[] from chipParameters.ts, serializes parameter
- * metadata into the init buffer protocol, and wraps SDLHardwareWrapper.
+ * Reads ChipParameterDef[] from chipParameters.ts and renders grouped
+ * knobs, toggles, and selects using HWKnob / HWSectionLabel.
  *
- * This single component covers 25+ MAME chip types.
+ * Replaces the SDL2/WASM canvas approach — no WASM dependency.
+ * Covers 25+ MAME chip types with a consistent dark hardware aesthetic.
  */
 
-import React, { useRef, useEffect, useMemo, useCallback } from 'react';
-import { SDLHardwareWrapper, type SDLModule } from './SDLHardwareWrapper';
-import { getChipSynthDef, type ChipSynthDef } from '@/constants/chipParameters';
+import React, { useRef, useEffect, useMemo } from 'react';
+import { getChipSynthDef, type ChipParameterDef } from '@/constants/chipParameters';
 import type { SynthType } from '@typedefs/instrument';
+import { HWKnob, HWSectionLabel } from './MAMESharedKnob';
 
 interface MAMEGenericHardwareProps {
   synthType: SynthType;
@@ -18,112 +19,107 @@ interface MAMEGenericHardwareProps {
   onParamChange: (key: string, value: number) => void;
 }
 
-/* ── Serialize parameter metadata to init buffer ───────────────────────── */
+/* ── Format display helper ─────────────────────────────────────────────── */
 
-function buildInitBuffer(def: ChipSynthDef): Uint8Array {
-  /* Filter to only knob/select/toggle types (skip text, vowelEditor) */
-  const params = def.parameters.filter(
-    (p) => p.type === 'knob' || p.type === 'select' || p.type === 'toggle',
-  );
-
-  /* Estimate buffer size (generous upper bound) */
-  const bufSize = 256 + params.length * 256;
-  const buf = new Uint8Array(bufSize);
-  let pos = 0;
-
-  /* param_count */
-  buf[pos++] = params.length;
-
-  /* accent_color_rgb — parse hex color string */
-  const color = def.color || '#44BBBB';
-  const r = parseInt(color.slice(1, 3), 16) || 0x44;
-  const g = parseInt(color.slice(3, 5), 16) || 0xBB;
-  const b = parseInt(color.slice(5, 7), 16) || 0xBB;
-  buf[pos++] = r;
-  buf[pos++] = g;
-  buf[pos++] = b;
-
-  /* chip_name */
-  const nameBytes = new TextEncoder().encode(def.name);
-  buf[pos++] = nameBytes.length;
-  buf.set(nameBytes, pos);
-  pos += nameBytes.length;
-
-  /* subtitle */
-  const subBytes = new TextEncoder().encode(def.subtitle);
-  buf[pos++] = subBytes.length;
-  buf.set(subBytes, pos);
-  pos += subBytes.length;
-
-  /* Per-parameter metadata */
-  for (const p of params) {
-    /* type */
-    const typeMap: Record<string, number> = { knob: 0, select: 1, toggle: 2 };
-    buf[pos++] = typeMap[p.type] ?? 0;
-
-    /* label */
-    const labelBytes = new TextEncoder().encode(p.label);
-    buf[pos++] = labelBytes.length;
-    buf.set(labelBytes, pos);
-    pos += labelBytes.length;
-
-    /* group */
-    const groupBytes = new TextEncoder().encode(p.group);
-    buf[pos++] = groupBytes.length;
-    buf.set(groupBytes, pos);
-    pos += groupBytes.length;
-
-    /* min, max, step, value (float32 LE) */
-    const dv = new DataView(buf.buffer, buf.byteOffset + pos, 16);
-    dv.setFloat32(0, p.min ?? 0, true);
-    dv.setFloat32(4, p.max ?? 1, true);
-    dv.setFloat32(8, p.step ?? 0.01, true);
-    dv.setFloat32(12, p.default, true);
-    pos += 16;
-
-    /* option_count */
-    const opts = p.options ?? [];
-    buf[pos++] = opts.length;
-
-    /* Per-option */
-    for (const opt of opts) {
-      /* opt_value (float32 LE) */
-      const odv = new DataView(buf.buffer, buf.byteOffset + pos, 4);
-      odv.setFloat32(0, opt.value, true);
-      pos += 4;
-
-      /* opt_label */
-      const olBytes = new TextEncoder().encode(opt.label);
-      buf[pos++] = olBytes.length;
-      buf.set(olBytes, pos);
-      pos += olBytes.length;
-    }
-  }
-
-  return buf.slice(0, pos);
+function makeFormatDisplay(p: ChipParameterDef): (v: number) => string {
+  const fmt = p.formatValue;
+  if (fmt === 'percent') return (v) => `${Math.round(v * 100)}%`;
+  if (fmt === 'int')     return (v) => `${Math.round(v)}`;
+  if (fmt === 'hz')      return (v) => `${Math.round(v)} Hz`;
+  if (fmt === 'db')      return (v) => `${Math.round(v)} dB`;
+  if (fmt === 'seconds') return (v) => v >= 1 ? `${v.toFixed(2)}s` : `${Math.round(v * 1000)}ms`;
+  // Default: int for large ranges, percent for 0-1
+  return (p.max ?? 1) > 1
+    ? (v) => `${Math.round(v)}`
+    : (v) => `${Math.round(v * 100)}%`;
 }
 
-/* ── Serialize current parameter values to config buffer ───────────────── */
+/* ── Parameter renderers ───────────────────────────────────────────────── */
 
-function buildConfigBuffer(
-  def: ChipSynthDef,
-  parameters: Record<string, number>,
-): Uint8Array {
-  const params = def.parameters.filter(
-    (p) => p.type === 'knob' || p.type === 'select' || p.type === 'toggle',
-  );
-  const buf = new Uint8Array(params.length * 4);
-  const dv = new DataView(buf.buffer);
-
-  for (let i = 0; i < params.length; i++) {
-    const val = parameters[params[i].key] ?? params[i].default;
-    dv.setFloat32(i * 4, val, true);
-  }
-
-  return buf;
+interface ParamRendererProps {
+  p: ChipParameterDef;
+  value: number;
+  color: string;
+  onChange: (key: string, value: number) => void;
 }
 
-/* ── Component ─────────────────────────────────────────────────────────── */
+const KnobParam: React.FC<ParamRendererProps> = ({ p, value, color, onChange }) => (
+  <HWKnob
+    label={p.label}
+    value={value}
+    min={p.min ?? 0}
+    max={p.max ?? 1}
+    step={p.step}
+    onChange={(v) => onChange(p.key, v)}
+    color={color}
+    size="sm"
+    formatDisplay={makeFormatDisplay(p)}
+  />
+);
+
+const ToggleParam: React.FC<ParamRendererProps> = ({ p, value, color, onChange }) => {
+  const active = value > 0.5;
+  return (
+    <div className="flex flex-col items-center gap-1">
+      <button
+        onClick={() => onChange(p.key, active ? 0 : 1)}
+        className="rounded font-mono transition-all"
+        style={{
+          width: 56,
+          height: 22,
+          fontSize: 8,
+          background: active ? `${color}35` : 'rgba(255,255,255,0.04)',
+          border: `1px solid ${active ? color : 'rgba(255,255,255,0.12)'}`,
+          color: active ? color : 'rgba(255,255,255,0.35)',
+          boxShadow: active ? `0 0 6px ${color}30` : undefined,
+        }}
+      >
+        {p.label}
+      </button>
+    </div>
+  );
+};
+
+const SelectParam: React.FC<ParamRendererProps> = ({ p, value, color, onChange }) => {
+  const opts = p.options;
+  if (opts && opts.length > 0) {
+    // Render as option buttons
+    return (
+      <div className="flex flex-col items-start gap-0.5">
+        <div className="text-[7px] uppercase tracking-wider mb-1" style={{ color: 'rgba(255,255,255,0.4)' }}>
+          {p.label}
+        </div>
+        {opts.map((opt) => {
+          const active = Math.abs(value - opt.value) < 0.01;
+          return (
+            <button
+              key={opt.label}
+              onClick={() => onChange(p.key, opt.value)}
+              className="rounded font-mono transition-all text-left"
+              style={{
+                width: 72,
+                height: 18,
+                fontSize: 7,
+                paddingLeft: 4,
+                background: active ? `${color}35` : 'rgba(255,255,255,0.04)',
+                border: `1px solid ${active ? color : 'rgba(255,255,255,0.1)'}`,
+                color: active ? color : 'rgba(255,255,255,0.35)',
+                boxShadow: active ? `0 0 4px ${color}25` : undefined,
+              }}
+            >
+              {opt.label}
+            </button>
+          );
+        })}
+      </div>
+    );
+  }
+
+  // No options — render as knob
+  return <KnobParam p={p} value={value} color={color} onChange={onChange} />;
+};
+
+/* ── Main component ─────────────────────────────────────────────────────── */
 
 export const MAMEGenericHardware: React.FC<MAMEGenericHardwareProps> = ({
   synthType,
@@ -134,54 +130,126 @@ export const MAMEGenericHardware: React.FC<MAMEGenericHardwareProps> = ({
   const onChangeRef = useRef(onParamChange);
   useEffect(() => { onChangeRef.current = onParamChange; }, [onParamChange]);
 
-  /* Filtered param list (same filtering as init buffer) */
-  const filteredParams = useMemo(
-    () => (def?.parameters ?? []).filter(
-      (p) => p.type === 'knob' || p.type === 'select' || p.type === 'toggle',
-    ),
-    [def],
-  );
-
-  const initBuffer = useMemo(() => {
-    if (!def) return new Uint8Array(0);
-    return buildInitBuffer(def);
-  }, [def]);
-
-  const configBuffer = useMemo(() => {
-    if (!def) return new Uint8Array(0);
-    return buildConfigBuffer(def, parameters);
-  }, [def, parameters]);
-
-  const handleModuleReady = useCallback((mod: SDLModule) => {
-    mod.onParamChange = (paramIndex: number, value: number) => {
-      if (paramIndex >= 0 && paramIndex < filteredParams.length) {
-        onChangeRef.current(filteredParams[paramIndex].key, value);
-      }
-    };
-  }, [filteredParams]);
+  const handleChange = (key: string, value: number) => onChangeRef.current(key, value);
 
   if (!def) {
     return (
-      <div className="p-4 text-text-muted text-center">
+      <div className="p-4 text-center" style={{ color: 'rgba(255,255,255,0.4)' }}>
         No parameter definitions for {synthType}
       </div>
     );
   }
 
+  const color = def.color || '#60a5fa';
+
+  // Group parameters
+  const paramsByGroup = useMemo(() => {
+    const groups = new Map<string, ChipParameterDef[]>();
+    for (const p of def.parameters) {
+      if (p.type === 'text' || p.type === 'vowelEditor') continue;
+      const g = p.group || 'General';
+      if (!groups.has(g)) groups.set(g, []);
+      groups.get(g)!.push(p);
+    }
+    return groups;
+  }, [def]);
+
   return (
-    <SDLHardwareWrapper
-      moduleUrl="/mame-generic/MAMEGeneric.js"
-      factoryName="createMAMEGeneric"
-      canvasWidth={560}
-      canvasHeight={360}
-      initFn="_mame_generic_init_with_data"
-      startFn="_mame_generic_start"
-      shutdownFn="_mame_generic_shutdown"
-      loadConfigFn="_mame_generic_load_config"
-      configBuffer={configBuffer}
-      initBuffer={initBuffer}
-      initWithDataFn="_mame_generic_init_with_data"
-      onModuleReady={handleModuleReady}
-    />
+    <div
+      className="rounded-lg overflow-hidden shadow-2xl select-none"
+      style={{
+        background: 'linear-gradient(180deg, #1a1a1a 0%, #0d0d0d 100%)',
+        border: '2px solid #2a2a2a',
+      }}
+    >
+      {/* Header */}
+      <div
+        className="px-5 py-3 border-b"
+        style={{
+          background: 'linear-gradient(90deg, #181818 0%, #222222 50%, #181818 100%)',
+          borderColor: 'rgba(255,255,255,0.08)',
+        }}
+      >
+        <div className="flex items-center justify-between">
+          <div>
+            <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: 7, letterSpacing: '0.3em', textTransform: 'uppercase' }}>
+              MAME CHIP EMULATION
+            </div>
+            <div style={{ color: '#e0e0e0', fontSize: 18, fontWeight: 900, letterSpacing: '0.05em' }}>
+              {def.name}
+            </div>
+            <div style={{ color: 'rgba(255,255,255,0.3)', fontSize: 7, letterSpacing: '0.1em' }}>
+              {def.subtitle}
+            </div>
+          </div>
+          {/* Accent badge */}
+          <div
+            className="rounded px-2 py-1 font-mono"
+            style={{ background: `${color}18`, border: `1px solid ${color}40` }}
+          >
+            <div style={{ color, fontSize: 9, fontWeight: 700, letterSpacing: '0.1em' }}>
+              {def.synthType}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Parameter groups */}
+      <div className="p-4">
+        <div className="flex flex-wrap gap-5 items-start">
+          {Array.from(paramsByGroup.entries()).map(([group, params]) => (
+            <div key={group} style={{ minWidth: 70 }}>
+              <HWSectionLabel label={group} color={`${color}80`} />
+              <div className="flex flex-wrap gap-3 items-start mt-1">
+                {params.map((p) => {
+                  const value = parameters[p.key] ?? p.default;
+                  if (p.type === 'toggle') {
+                    return (
+                      <ToggleParam
+                        key={p.key}
+                        p={p}
+                        value={value}
+                        color={color}
+                        onChange={handleChange}
+                      />
+                    );
+                  }
+                  if (p.type === 'select') {
+                    return (
+                      <SelectParam
+                        key={p.key}
+                        p={p}
+                        value={value}
+                        color={color}
+                        onChange={handleChange}
+                      />
+                    );
+                  }
+                  return (
+                    <KnobParam
+                      key={p.key}
+                      p={p}
+                      value={value}
+                      color={color}
+                      onChange={handleChange}
+                    />
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Bottom bar */}
+      <div
+        className="px-5 py-1 text-center"
+        style={{ background: 'rgba(0,0,0,0.5)', borderTop: '1px solid rgba(255,255,255,0.06)' }}
+      >
+        <div style={{ color: 'rgba(255,255,255,0.18)', fontSize: 7, letterSpacing: '0.3em', textTransform: 'uppercase' }}>
+          {def.name}  •  MAME EMULATION
+        </div>
+      </div>
+    </div>
   );
 };

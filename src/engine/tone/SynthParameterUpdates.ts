@@ -270,7 +270,18 @@ export function loadSynthROM(ctx: SynthUpdateContext, instrumentId: number, synt
   const instrument = ctx.instruments.get(instrumentKey);
   if (!instrument) return;
 
-  const synth = instrument as unknown as { loadROM?: (bank: number, data: Uint8Array) => void; loadWaveROM?: (buffer: ArrayBuffer) => void; setRom?: (bank: number, data: Uint8Array) => void };
+  const synth = instrument as unknown as {
+    loadROM?: (bank: number, data: Uint8Array) => void;
+    loadRom?: (data: Uint8Array) => void;
+    loadWaveROM?: (buffer: ArrayBuffer) => void;
+    setRom?: (bank: number, data: Uint8Array) => void;
+    romLoaded?: boolean;
+  };
+
+  const SINGLE_ROM_CHIPS = new Set([
+    'MAMEMultiPCM', 'MAMEZSG2', 'MAMEKS0164',
+    'MAMESWP00', 'MAMESWP20', 'MAMERolandGP',
+  ]);
 
   if (synthType === 'MAMERSA') {
     // RdPianoSynth / D50Synth: loadROM(romId, data)
@@ -281,6 +292,12 @@ export function loadSynthROM(ctx: SynthUpdateContext, instrumentId: number, synt
     // MU2000Synth: loadWaveROM(data) - single ROM bank
     if (typeof synth.loadWaveROM === 'function') {
       synth.loadWaveROM(data.buffer as ArrayBuffer);
+    }
+  } else if (SINGLE_ROM_CHIPS.has(synthType)) {
+    // MultiPCM, ZSG2, KS0164, SWP00, SWP20, RolandGP: loadRom(data) single buffer
+    if (typeof synth.loadRom === 'function') {
+      synth.loadRom(data);
+      synth.romLoaded = true;
     }
   } else {
     // Generic fallback: try loadROM, then setRom
