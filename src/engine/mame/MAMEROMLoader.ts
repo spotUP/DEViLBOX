@@ -561,22 +561,6 @@ export async function loadRolandSAROMs(): Promise<Uint8Array> {
 }
 
 /**
- * MultiPCM (Yamaha YMW258-F / GEW8) ROM configuration
- * Used in Sega Model 1/2, various Yamaha arcade boards
- * ROM contains 12-byte-per-sample metadata table + sample data
- */
-export const MULTIPCM_ROM_CONFIG: ChipROMConfig = {
-  chipName: 'MultiPCM',
-  basePath: '/roms/multipcm',
-  zipFile: 'multipcm.zip',
-  combinedFile: 'multipcm_samples.bin',
-  combinedSize: 8 * 1024 * 1024,  // 8MB typical
-  files: [
-    { name: 'multipcm_samples.bin', offset: 0, required: true },
-  ],
-};
-
-/**
  * ZSG-2 (ZOOM ZSG-2) ROM configuration
  * Used in ZOOM GFX-8, Studio 1201 effects processors
  * ROM contains 4-bit ADPCM compressed sample data
@@ -586,9 +570,9 @@ export const ZSG2_ROM_CONFIG: ChipROMConfig = {
   basePath: '/roms/zsg2',
   zipFile: 'zsg2.zip',
   combinedFile: 'zsg2_samples.bin',
-  combinedSize: 4 * 1024 * 1024,  // 4MB typical
+  combinedSize: 2 * 1024 * 1024,  // 2MB (Taito Capriccio Cyclone e69-02.ic3)
   files: [
-    { name: 'zsg2_samples.bin', offset: 0, required: true },
+    { name: 'e69-02.ic3', offset: 0, required: true },
   ],
 };
 
@@ -601,9 +585,9 @@ export const KS0164_ROM_CONFIG: ChipROMConfig = {
   basePath: '/roms/ks0164',
   zipFile: 'ks0164.zip',
   combinedFile: 'ks0164_samples.bin',
-  combinedSize: 4 * 1024 * 1024,  // 4MB typical
+  combinedSize: 4 * 1024 * 1024,  // 4MB (dgPIX Funky Ball flash.u3)
   files: [
-    { name: 'ks0164_samples.bin', offset: 0, required: true },
+    { name: 'flash.u3', offset: 0, required: true },
   ],
 };
 
@@ -616,9 +600,10 @@ export const SWP00_ROM_CONFIG: ChipROMConfig = {
   basePath: '/roms/swp00',
   zipFile: 'swp00.zip',
   combinedFile: 'swp00_wave.bin',
-  combinedSize: 16 * 1024 * 1024,  // 16MB addressable
+  combinedSize: 4 * 1024 * 1024,  // 4MB (Yamaha MU50: xq057c0.ic18 + xq058c0.ic19)
   files: [
-    { name: 'swp00_wave.bin', offset: 0, required: true },
+    { name: 'xq057c0.ic18', offset: 0, required: true },
+    { name: 'xq058c0.ic19', offset: 2 * 1024 * 1024, required: true },
   ],
 };
 
@@ -631,9 +616,12 @@ export const SWP20_ROM_CONFIG: ChipROMConfig = {
   basePath: '/roms/swp20',
   zipFile: 'swp20.zip',
   combinedFile: 'swp20_wave.bin',
-  combinedSize: 16 * 1024 * 1024,  // 16MB addressable
+  combinedSize: 8 * 1024 * 1024,  // 8MB (Yamaha MU80: 4×2MB)
   files: [
-    { name: 'swp20_wave.bin', offset: 0, required: true },
+    { name: 'xq012b0-822.bin', offset: 0, required: true },
+    { name: 'xq013b0-823.bin', offset: 2 * 1024 * 1024, required: true },
+    { name: 'xq089b0-824.bin', offset: 4 * 1024 * 1024, required: true },
+    { name: 'xq090b0-825.bin', offset: 6 * 1024 * 1024, required: true },
   ],
 };
 
@@ -646,18 +634,13 @@ export const ROLANDGP_ROM_CONFIG: ChipROMConfig = {
   basePath: '/roms/rolandgp',
   zipFile: 'rolandgp.zip',
   combinedFile: 'rolandgp_wave.bin',
-  combinedSize: 4 * 1024 * 1024,  // 4MB typical (SC-88 wave ROM)
+  combinedSize: 4 * 1024 * 1024,  // 4MB (Roland JV-880: roland-a + roland-b)
   files: [
-    { name: 'rolandgp_wave.bin', offset: 0, required: true },
+    { name: 'roland-a_r15209312_lh5375n2.ic27', offset: 0, required: true },
+    { name: 'roland-b_r15209313_lh5375n3.ic25', offset: 2 * 1024 * 1024, required: true },
   ],
 };
 
-/**
- * Helper: Load MultiPCM ROMs
- */
-export async function loadMultiPCMROMs(): Promise<Uint8Array> {
-  return loadChipROMs(MULTIPCM_ROM_CONFIG);
-}
 
 /**
  * Helper: Load ZSG2 ROMs
