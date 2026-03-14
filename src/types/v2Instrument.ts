@@ -226,7 +226,7 @@ export const DEFAULT_V2_INSTRUMENT: V2InstrumentConfig = {
     panning: 64,
     transpose: 64,
     keySync: 'none',
-    channelVolume: 0,
+    channelVolume: 127,
     auxARecv: 0,
     auxBRecv: 0,
     auxASend: 0,
