@@ -1510,6 +1510,10 @@ void furnace_dispatch_set_wavetable(int handle, int waveIndex, unsigned char* da
     }
     songWaves[waveIndex] = wave; // Borrowed reference (g_wavetables owns it)
     wit->second->engine.song.waveLen = (int)songWaves.size();
+    // Notify dispatch so wavetable platforms (PCE, Namco, etc.) update channel shapes
+    if (wit->second->dispatch) {
+      wit->second->dispatch->notifyWaveChange(waveIndex);
+    }
   }
 }
 
