@@ -555,9 +555,9 @@ static void fx_dsp_echo(SymSong* song, uint8_t pitch, uint8_t vol, uint8_t instr
     song->dsp.intensity = (float)instr / 127.0f;
     dsp_set_fx_class(&song->dsp, pitch);
     if (vol > 0) {
-        int32_t maxLen = song->dsp.fxLength - 2;
-        int32_t delay = (maxLen * vol) / 100;
-        if (delay > 0) song->dsp.readPtrDelay = delay;
+        /* readPtrDelay is a percentage (0-100); vol is bufLen (0-127) — scale accordingly.
+         * dsp_start() computes: delay_samples = (fxLength - 2) * readPtrDelay / 100 */
+        song->dsp.readPtrDelay = (vol * 100) / 127;
     }
     dsp_start(&song->dsp);
 }
@@ -1218,7 +1218,8 @@ int sym_render(SymSong* song, float* buffer, int frames) {
         float fMixL = (float)mixL / mixDiv;
         float fMixR = (float)mixR / mixDiv;
 
-        /* DSP wet mix */
+        /* DSP wet mix — feed dry mono mix into ring buffer, then read delayed output */
+        dsp_add_sample(&song->dsp, (fMixL + fMixR) * 0.5f);
         dsp_advance_write(&song->dsp);
         float wet = dsp_get_wet(&song->dsp);
         dsp_advance_read(&song->dsp);
