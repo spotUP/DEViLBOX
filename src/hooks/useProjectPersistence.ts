@@ -29,6 +29,10 @@ const AUTO_SAVE_INTERVAL = 30000; // 30 seconds
 // - Overwriting saved state with an externally-loaded song
 let explicitlySaved = false;
 
+// Module-level guard: prevents loadProjectFromStorage from running more than once
+// per page session, even if the hook remounts (e.g. due to Vite HMR).
+let hasLoadedFromStorage = false;
+
 /**
  * Mark the current project as explicitly saved by the user.
  * Called after Ctrl+S / save button and when restoring from IDB / revision.
@@ -624,13 +628,12 @@ export async function deleteLocalRevision(key: number): Promise<void> {
 export function useProjectPersistence() {
   const { isDirty, markAsModified } = useProjectStore();
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const hasLoadedRef = useRef(false);
   const initialLoadRef = useRef(true);
 
-  // Load on mount (only once)
+  // Load on mount (only once per page session — module-level guard survives HMR remounts)
   useEffect(() => {
-    if (!hasLoadedRef.current) {
-      hasLoadedRef.current = true;
+    if (!hasLoadedFromStorage) {
+      hasLoadedFromStorage = true;
       hasSavedProject().then(has => {
         if (has) loadProjectFromStorage();
       });
