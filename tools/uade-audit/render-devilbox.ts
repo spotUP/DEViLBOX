@@ -40,6 +40,7 @@ interface UADEModule {
   _uade_wasm_stop(): void;
   _uade_wasm_cleanup(): void;
   _uade_wasm_set_looping(loop: number): void;
+  _uade_wasm_set_one_subsong(on: number): void;
   _uade_wasm_get_total_frames(): number;
   _malloc(size: number): number;
   _free(ptr: number): void;
@@ -217,6 +218,8 @@ async function renderFile(
   // Stop any previous song
   mod._uade_wasm_stop();
   mod._uade_wasm_set_looping(0);
+  // One-subsong mode: stop after the first subsong ends (matches uade123 -1 flag in render-reference.sh)
+  mod._uade_wasm_set_one_subsong(1);
 
   const loadRet = mod._uade_wasm_load(ptr, data.byteLength, hintPtr);
   mod._free(ptr);
@@ -314,8 +317,24 @@ async function main(): Promise<void> {
         continue;
       }
 
+      // Reload WASM module per file — some eagleplayers call unguarded exit(1) which
+      // corrupts the Emscripten module state (IPC machine gets stuck in S_STATE).
+      // A fresh module instance guarantees clean IPC state for every file.
+      let fileMod: UADEModule;
+      try {
+        fileMod = await loadUADEModule();
+        const initRet = fileMod._uade_wasm_init(SAMPLE_RATE);
+        if (initRet !== 0) throw new Error(`_uade_wasm_init failed (ret=${initRet})`);
+      } catch (e) {
+        console.log(`[render] ${name}... FAIL: module load: ${(e as Error).message}`);
+        fail++;
+        continue;
+      }
+
       process.stdout.write(`[render] ${name}... `);
-      const result = await renderFile(mod, inputPath, outputPath);
+      const result = await renderFile(fileMod, inputPath, outputPath);
+      try { fileMod._uade_wasm_cleanup(); } catch { /* ignore */ }
+
       if (result.ok) {
         const sizeKb = Math.round(statSync(outputPath).size / 1024);
         console.log(`OK (${result.frames} frames, ${sizeKb}KB)`);
@@ -359,7 +378,10 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
-  try { mod._uade_wasm_cleanup(); } catch { /* ignore cleanup errors */ }
+  // Single-file mode: cleanup the shared module instance
+  if (!batchMode) {
+    try { mod._uade_wasm_cleanup(); } catch { /* ignore cleanup errors */ }
+  }
 }
 
 main().catch(err => {
