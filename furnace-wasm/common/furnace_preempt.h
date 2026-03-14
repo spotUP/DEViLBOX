@@ -522,6 +522,21 @@ struct DivSample {
   void putSampleData(SafeWriter* w) {}
   DivDataErrors readSampleData(SafeReader& reader, short version) { return DIV_DATA_SUCCESS; }
 
+  // Encode PCM samples to chip-native formats.
+  // Called before renderSamples() so each platform can read its native format.
+  // Currently only BRR encoding is implemented (needed by SNES/SPC700).
+  void render(unsigned int formatMask=0xffffffff);
+
+  bool initBRR(unsigned int count) {
+    unsigned int needed = ((count + 15) / 16) * 9 + 9;
+    if (dataBRR) { delete[] dataBRR; dataBRR = nullptr; }
+    dataBRR = new unsigned char[needed];
+    if (!dataBRR) return false;
+    memset(dataBRR, 0, needed);
+    lengthBRR = ((count + 15) / 16) * 9;
+    return true;
+  }
+
   DivSample():
     name(""),
     centerRate(8363),
