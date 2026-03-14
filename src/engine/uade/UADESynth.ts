@@ -38,7 +38,9 @@ export class UADESynth implements DevilboxSynth {
     this._currentConfig = config;
 
     await this.engine.ready();
-    await this.engine.load(config.fileData, config.filename);
+    const ext = config.filename.split('.').pop()?.toLowerCase() ?? '';
+    const skipScan = ['jpo', 'jpold'].includes(ext);
+    await this.engine.load(config.fileData, config.filename, skipScan);
 
     // Set the requested subsong
     if (config.currentSubsong > 0) {
