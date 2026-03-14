@@ -1037,14 +1037,18 @@ function _convertEvent(
             break;
         }
       } else {
-        // Normal key-on: note + optional instrument + optional volume
+        // Normal key-on: note + optional instrument + optional volume.
+        // Instrument is only set when a note is present — matches OpenMPT
+        // which only writes m.instr when event.note >= 0. Without this guard
+        // every empty row (note=-1, inst=0) would show "--- 01 .." in the UI.
         if (ev.note >= 0 && ev.note <= 84) {
           const n = clampNote(ev.note + 25 + transpose);
-          if (n > 0) cell.note = n;
-        }
-
-        if (ev.inst < numInstruments) {
-          cell.instrument = ev.inst + 1; // 0-based file → 1-based TrackerCell
+          if (n > 0) {
+            cell.note = n;
+            if (ev.inst < numInstruments) {
+              cell.instrument = ev.inst + 1; // 0-based file → 1-based TrackerCell
+            }
+          }
         }
 
         if (ev.param > 0 && ev.param <= 100) {
