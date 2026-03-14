@@ -936,12 +936,69 @@ const bossHc2Theme: Theme = {
   },
 };
 
+/**
+ * Wurlitzer Side Man (1959)
+ * The first commercially successful drum machine. Wood-grain cabinet, warm cream/ivory
+ * control panel, amber VU meter glow, dark mahogany brown structural elements.
+ * Warm, analogue, tube-era 1950s styling — like a living room hi-fi, not a studio machine.
+ * WARM WOOD, IVORY CREAM, AMBER GLOW.
+ */
+const wurlitzerSideManTheme: Theme = {
+  id: 'wurlitzer-sideman',
+  name: 'Wurlitzer Side Man',
+  colors: {
+    bg: '#1c1008',               // dark mahogany — the cabinet wood
+    bgSecondary: '#251608',      // slightly lighter wood grain
+    bgTertiary: '#2e1e0a',       // mid-tone walnut
+    bgHover: '#3a2810',
+    bgActive: '#4a3418',
+    border: '#5c3e18',           // warm brown border
+    borderLight: '#7a5428',      // lighter warm wood
+    accent: '#C88B30',           // amber VU meter glow
+    accentSecondary: '#8C6020',  // darker amber / brass
+    accentHighlight: '#E8A840',  // bright warm gold
+    accentGlow: 'rgba(200, 139, 48, 0.35)',
+    text: '#F0E0C0',             // warm ivory / cream
+    textSecondary: '#C0A878',    // aged parchment
+    textMuted: '#7a6040',        // faded brown
+    textInverse: '#1c1008',
+    error: '#c04040',
+    success: '#C88B30',
+    warning: '#8C6020',
+    trackerRowEven: '#1e1108',
+    trackerRowOdd: '#261508',
+    trackerRowHighlight: '#301c08',
+    trackerRowCurrent: '#3c2408',
+    trackerRowCursor: '#4e2e00',
+    cellNote: '#F0E0C0',         // ivory text
+    cellInstrument: '#C88B30',   // amber
+    cellVolume: '#8C6020',       // brass
+    cellEffect: '#E8A840',       // bright gold
+    cellAccent: '#C88B30',
+    cellSlide: '#8C6020',
+    cellEmpty: '#302010',
+    playbackCursor: '#C88B30',
+    currentRowText: '#fff8e8',
+    panelShadow: '#0c0804',
+    pianoKeyColors: [
+      '#C88B30', '#8C6020', '#F0E0C0', '#E8A840', '#C88B30', '#8C6020', '#F0E0C0',
+    ],
+    // Wurlitzer Side Man: Warm 50s hi-fi serif — like a console television
+    fontFamily: "'Georgia', 'Palatino', serif",
+    monoFontFamily: "'Courier New', 'Courier', monospace",
+    fontSize: '12px',
+    knobStyle: 'vintage',
+    buttonRadius: '4px',
+    buttonStyle: 'raised',
+  },
+};
+
 // Built-in themes (immutable)
 const builtinThemes: Theme[] = [
   devilboxTheme, neoDarkTheme, cyanLineartTheme, modernTheme,
   tr808Theme, tr909Theme, dmxTheme, linnLm1Theme, mpc60Theme, cr78Theme,
   emuSp12Theme, maestroRhythmKingTheme, maestroRhythmSoundTheme,
-  aceToneTheme, hammondAutoVariTheme, bossHc2Theme,
+  aceToneTheme, hammondAutoVariTheme, bossHc2Theme, wurlitzerSideManTheme,
 ];
 
 // Placeholder custom theme (uses NeoDark colors until user customizes)
