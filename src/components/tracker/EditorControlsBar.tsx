@@ -16,6 +16,7 @@ import { GROOVE_TEMPLATES } from '@typedefs/audio';
 import { SYSTEM_PRESETS, getGroupedPresets } from '@/constants/systemPresets';
 import { SubsongSelector } from './SubsongSelector';
 import { SIDSubsongSelector } from './SIDSubsongSelector';
+import { UADESubsongSelector } from './UADESubsongSelector';
 import { ModuleInfoButton } from './ModuleInfoButton';
 import { GenreAnalysisBadge } from './GenreAnalysisBadge';
 import { GrooveSettingsModal } from '@components/dialogs/GrooveSettingsModal';
@@ -211,6 +212,7 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
         {/* Subsong Selector */}
         <SubsongSelector />
         <SIDSubsongSelector />
+        <UADESubsongSelector />
         <ModuleInfoButton />
 
         {/* Channel Selector (grid and piano roll views) */}
