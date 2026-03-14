@@ -18,6 +18,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { useFPSMonitor } from '@/hooks/useFPSMonitor';
 import { SYSTEM_PRESETS, getGroupedPresets } from '@/constants/systemPresets';
 import { notify } from '@stores/useNotificationStore';
+import { useTrackerAnalysisDisplay } from '@/hooks/useTrackerAnalysis';
 import { usePixiTheme } from '../../theme';
 import { PIXI_FONTS } from '../../fonts';
 import { PixiButton } from '../../components/PixiButton';
@@ -25,6 +26,95 @@ import { PixiSelect, type SelectOption } from '../../components/PixiSelect';
 import { PixiViewHeader } from '../../components/PixiViewHeader';
 
 const BAR_H = 36;
+
+// ─── Genre Analysis Badge ─────────────────────────────────────────────────────
+
+const PixiGenreAnalysisBadge: React.FC = () => {
+  const theme = usePixiTheme();
+  const { isCapturing, isAnalyzing, isReady, progress, genre } = useTrackerAnalysisDisplay();
+
+  if (!isCapturing && !isAnalyzing && !isReady) return <pixiContainer />;
+
+  if (isCapturing) {
+    const barW = Math.round((progress / 100) * 48);
+    return (
+      <pixiContainer layout={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingLeft: 4, paddingRight: 4 }}>
+        <pixiGraphics
+          draw={(g: GraphicsType) => {
+            g.clear();
+            g.roundRect(0, 0, 52, 14, 2);
+            g.fill({ color: theme.bgSecondary.color, alpha: 1 });
+            g.roundRect(0, 0, 52, 14, 2);
+            g.stroke({ color: theme.border.color, alpha: 0.4, width: 1 });
+            // Fill bar
+            if (barW > 0) {
+              g.roundRect(2, 2, Math.max(2, barW), 10, 1);
+              g.fill({ color: theme.accent.color, alpha: 0.6 });
+            }
+          }}
+          layout={{ position: 'absolute', width: 52, height: 14 }}
+        />
+        <pixiBitmapText
+          text="ANA"
+          style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 9, fill: 0xffffff }}
+          tint={theme.textMuted.color}
+          layout={{}}
+        />
+      </pixiContainer>
+    );
+  }
+
+  if (isAnalyzing) {
+    return (
+      <pixiContainer layout={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingLeft: 4, paddingRight: 4 }}>
+        <pixiGraphics
+          draw={(g: GraphicsType) => {
+            g.clear();
+            g.roundRect(0, 0, 52, 14, 2);
+            g.fill({ color: theme.accent.color, alpha: 0.15 });
+            g.roundRect(0, 0, 52, 14, 2);
+            g.stroke({ color: theme.accent.color, alpha: 0.4, width: 1 });
+          }}
+          layout={{ position: 'absolute', width: 52, height: 14 }}
+        />
+        <pixiBitmapText
+          text="ANALYZING"
+          style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 9, fill: 0xffffff }}
+          tint={theme.accent.color}
+          layout={{}}
+        />
+      </pixiContainer>
+    );
+  }
+
+  if (isReady && genre) {
+    const label = (genre.subgenre || genre.primary).toUpperCase().slice(0, 10);
+    const mood = genre.mood.toUpperCase().slice(0, 8);
+    const text = `${label} \u2022 ${mood}`;
+    return (
+      <pixiContainer layout={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingLeft: 4, paddingRight: 4 }}>
+        <pixiGraphics
+          draw={(g: GraphicsType) => {
+            g.clear();
+            g.roundRect(0, 0, 120, 14, 2);
+            g.fill({ color: theme.accent.color, alpha: 0.1 });
+            g.roundRect(0, 0, 120, 14, 2);
+            g.stroke({ color: theme.accent.color, alpha: 0.3, width: 1 });
+          }}
+          layout={{ position: 'absolute', width: 120, height: 14 }}
+        />
+        <pixiBitmapText
+          text={text}
+          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }}
+          tint={theme.accent.color}
+          layout={{ paddingLeft: 4 }}
+        />
+      </pixiContainer>
+    );
+  }
+
+  return <pixiContainer />;
+};
 
 // ─── View Mode ───────────────────────────────────────────────────────────────
 
@@ -457,6 +547,10 @@ export const PixiEditorControlsBar: React.FC<PixiEditorControlsBarProps> = ({
     useUIStore.getState().openModal('automation');
   }, []);
 
+  const handleAdvancedEdit = useCallback(() => {
+    useUIStore.getState().openModal('advancedEdit');
+  }, []);
+
   const handleShowDrumpads = useCallback(() => {
     useUIStore.getState().openModal('drumpads');
   }, []);
@@ -519,6 +613,15 @@ export const PixiEditorControlsBar: React.FC<PixiEditorControlsBarProps> = ({
         size="sm"
         active={showGhostPatterns}
         onClick={handleToggleGhosts}
+        layout={{ display: viewMode === 'tracker' ? 'flex' : 'none' }}
+      />
+
+      {/* Advanced Edit — tracker view only */}
+      <PixiButton
+        label="Edit"
+        variant="ghost"
+        size="sm"
+        onClick={handleAdvancedEdit}
         layout={{ display: viewMode === 'tracker' ? 'flex' : 'none' }}
       />
 
@@ -591,6 +694,9 @@ export const PixiEditorControlsBar: React.FC<PixiEditorControlsBarProps> = ({
 
       {/* Spacer */}
       <pixiContainer layout={{ flex: 1 }} />
+
+      {/* Genre Analysis Badge */}
+      <PixiGenreAnalysisBadge />
 
       {/* Status message */}
       <pixiBitmapText

@@ -17,6 +17,7 @@ import { PIXI_FONTS } from '../../fonts';
 import { FAD_ICONS } from '../../fontaudioIcons';
 import { usePixiTheme } from '../../theme';
 import { PixiButton } from '../../components/PixiButton';
+import { PixiPureTextInput } from '../../input/PixiPureTextInput';
 
 interface PixiInstrumentPanelProps {
   width: number;
@@ -108,6 +109,7 @@ const DEFAULT_ICON_CHAR = FAD_ICONS['keyboard'] ?? '';
 
 const ITEM_H = 30;
 const ACTION_BAR_H = 46;
+const SEARCH_H = 28;
 const FOOTER_H = 24;
 const BUFFER = 3;
 
@@ -123,6 +125,7 @@ export const PixiInstrumentPanel: React.FC<PixiInstrumentPanelProps> = ({ width,
 
   const [scrollY, setScrollY] = useState(0);
   const [hoveredId, setHoveredId] = useState<number | null>(null);
+  const [searchFilter, setSearchFilter] = useState('');
   const lastClickRef = useRef<{ id: number; time: number }>({ id: -1, time: 0 });
 
   const sorted = useMemo(
@@ -130,8 +133,22 @@ export const PixiInstrumentPanel: React.FC<PixiInstrumentPanelProps> = ({ width,
     [instruments],
   );
 
-  const listH = height - ACTION_BAR_H - FOOTER_H;
-  const totalHeight = sorted.length * ITEM_H;
+  const filtered = useMemo(() => {
+    if (!searchFilter.trim()) return sorted;
+    const lower = searchFilter.toLowerCase();
+    return sorted.filter(inst => {
+      const synthInfo = getSynthInfo(inst.synthType);
+      const badge = inst.metadata?.displayType || synthInfo?.shortName || inst.synthType;
+      return (
+        inst.name.toLowerCase().includes(lower) ||
+        inst.synthType.toLowerCase().includes(lower) ||
+        (badge || '').toLowerCase().includes(lower)
+      );
+    });
+  }, [sorted, searchFilter]);
+
+  const listH = height - ACTION_BAR_H - SEARCH_H - FOOTER_H;
+  const totalHeight = filtered.length * ITEM_H;
   const maxScroll = Math.max(0, totalHeight - listH);
 
   // Scroll to selected instrument when it changes
@@ -149,8 +166,8 @@ export const PixiInstrumentPanel: React.FC<PixiInstrumentPanelProps> = ({ width,
 
   // Virtual scrolling
   const startIdx = Math.max(0, Math.floor(scrollY / ITEM_H) - BUFFER);
-  const endIdx = Math.min(sorted.length, Math.ceil((scrollY + listH) / ITEM_H) + BUFFER);
-  const visibleItems = useMemo(() => sorted.slice(startIdx, endIdx), [sorted, startIdx, endIdx]);
+  const endIdx = Math.min(filtered.length, Math.ceil((scrollY + listH) / ITEM_H) + BUFFER);
+  const visibleItems = useMemo(() => filtered.slice(startIdx, endIdx), [filtered, startIdx, endIdx]);
 
   const handleWheel = useCallback((e: FederatedWheelEvent) => {
     e.stopPropagation();
@@ -253,6 +270,18 @@ export const PixiInstrumentPanel: React.FC<PixiInstrumentPanelProps> = ({ width,
         <PixiButton label="SAMPLE" icon="diskio"      iconPosition="top" variant="ghost" size="sm" onClick={handleSamplePack} width={50} height={40} color="green" />
         <PixiButton label="EDIT"   icon="pen"         iconPosition="top" variant="ghost" size="sm" onClick={handleEdit}       width={40} height={40} />
         <PixiButton label="CHIP"   icon="cpu"         iconPosition="top" variant="ghost" size="sm" onClick={handleChip}       width={40} height={40} />
+      </layoutContainer>
+
+      {/* ═══ Search / Filter ═══ */}
+      <layoutContainer layout={{ width, height: SEARCH_H, flexDirection: 'row', alignItems: 'center', paddingLeft: 6, paddingRight: 6, flexShrink: 0, backgroundColor: theme.bgSecondary.color, borderBottomWidth: 1, borderColor: theme.border.color }}>
+        <PixiPureTextInput
+          value={searchFilter}
+          onChange={setSearchFilter}
+          placeholder="Filter instruments..."
+          width={width - 12}
+          height={20}
+          fontSize={11}
+        />
       </layoutContainer>
 
       {/* ═══ Instrument List ═══ */}
@@ -403,7 +432,7 @@ export const PixiInstrumentPanel: React.FC<PixiInstrumentPanelProps> = ({ width,
       {/* ═══ Footer ═══ */}
       <layoutContainer layout={{ width, height: FOOTER_H, flexShrink: 0, alignItems: 'center', paddingLeft: 8, backgroundColor: theme.bgTertiary.color, borderTopWidth: 1, borderColor: theme.border.color }}>
         <pixiBitmapText
-          text={`${instruments.length} instrument${instruments.length !== 1 ? 's' : ''}`}
+          text={searchFilter ? `${filtered.length}/${instruments.length} instruments` : `${instruments.length} instrument${instruments.length !== 1 ? 's' : ''}`}
           style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 13, fill: 0xffffff }}
           tint={theme.textMuted.color}
           layout={{ marginTop: 4 }}

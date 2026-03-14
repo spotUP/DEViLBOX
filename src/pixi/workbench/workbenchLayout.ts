@@ -19,8 +19,8 @@ export const WORKBENCH_CHROME_H = NAV_H + STATUS_BAR_H; // 130px
 
 // ─── Modern shell layout constants ───────────────────────────────────────────
 
-/** Single-row nav bar */
-export const MODERN_NAV_H = 52;
+/** Single-row nav bar + project tab bar row */
+export const MODERN_NAV_H = 76; // 52px main nav + 24px project tab bar
 
 /** Slim status bar */
 export const MODERN_STATUS_BAR_H = 28;
