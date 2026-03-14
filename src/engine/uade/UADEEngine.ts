@@ -503,7 +503,7 @@ export class UADEEngine {
    * @param data - Raw file bytes
    * @param filenameHint - Original filename (used by UADE for format detection)
    */
-  async load(data: ArrayBuffer, filenameHint: string): Promise<UADEMetadata> {
+  async load(data: ArrayBuffer, filenameHint: string, skipScan = false): Promise<UADEMetadata> {
     await this._initPromise;
     if (!this.workletNode) throw new Error('UADEEngine not initialized');
 
@@ -515,7 +515,7 @@ export class UADEEngine {
     // Clone buffer before transferring (caller may need it later for subsong switching)
     const transferBuf = data.slice(0);
     this.workletNode.port.postMessage(
-      { type: 'load', buffer: transferBuf, filenameHint },
+      { type: 'load', buffer: transferBuf, filenameHint, skipScan },
       [transferBuf]
     );
 
@@ -529,7 +529,10 @@ export class UADEEngine {
   async loadTune(buffer: ArrayBuffer): Promise<void> {
     const { useFormatStore } = await import('@/stores/useFormatStore');
     const fileName = useFormatStore.getState().uadeEditableFileName || 'module.mod';
-    await this.load(buffer, fileName);
+    // Skip the worklet scan for compiled 68k replayer formats that loop indefinitely.
+    const ext = fileName.split('.').pop()?.toLowerCase() ?? '';
+    const skipScan = ['jpo', 'jpold'].includes(ext);
+    await this.load(buffer, fileName, skipScan);
   }
 
   /**
@@ -654,6 +657,17 @@ export class UADEEngine {
 
     this.workletNode.port.postMessage({ type: 'isolateChannel', channelIndex, durationMs });
     return promise;
+  }
+
+  /**
+   * Set the Paula channel mute mask for live playback.
+   * Bit N=1 means channel N is ACTIVE (playing); bit N=0 means muted.
+   * Bits 0-3 correspond to Paula channels 0-3.
+   * Use 0x0F to unmute all channels.
+   */
+  setMuteMask(mask: number): void {
+    if (!this.workletNode) return;
+    this.workletNode.port.postMessage({ type: 'setMuteMask', mask });
   }
 
   /**

@@ -43,6 +43,25 @@ function forwardWasmMuteStates(channels: { muted: boolean; solo: boolean }[]): v
   const editorMode = useFormatStore.getState().editorMode;
   const anySolo = channels.some(ch => ch.solo);
 
+  // UADE: uses bitmask API — bit N=1 means Paula channel N is active (playing)
+  // Check for live UADE instance before other engines since UADE classic mode
+  // is 'classic' editorMode and wouldn't otherwise be caught below.
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { UADEEngine } = require('../engine/uade/UADEEngine');
+    if (UADEEngine.hasInstance()) {
+      const engine = UADEEngine.getInstance();
+      let mask = 0;
+      channels.slice(0, 4).forEach((ch: { muted: boolean; solo: boolean }, i: number) => {
+        const effectiveMute = anySolo ? !ch.solo : ch.muted;
+        if (!effectiveMute) mask |= (1 << i);
+      });
+      engine.setMuteMask(mask);
+    }
+  } catch {
+    // UADE not loaded
+  }
+
   // Furnace uses binary mute API
   if (editorMode === 'furnace') {
     try {
