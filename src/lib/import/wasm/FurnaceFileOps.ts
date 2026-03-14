@@ -150,8 +150,8 @@ export async function loadFurFileWasm(buffer: ArrayBuffer): Promise<{
   nativeData: FurnaceNativeData;
   instrumentBinaries: Uint8Array[];
   wavetables: Array<{ data: number[]; width: number; height: number }>;
-  samples: Array<{ data: Int16Array | Int8Array; rate: number; depth: number;
-    loopStart: number; loopEnd: number; loopMode: number; name: string }>;
+  samples: Array<{ data: Int16Array | Int8Array | Uint8Array; rate: number; depth: number;
+    loopStart: number; loopEnd: number; loopMode: number; name: string; samples: number }>;
 }> {
   const m = await getModule();
   if (!cachedAPI) cachedAPI = getAPI(m);
@@ -327,8 +327,8 @@ export async function loadFurFileWasm(buffer: ArrayBuffer): Promise<{
 
   // Read samples
   const numSamples = api.fur_get_num_samples();
-  const samples: Array<{ data: Int16Array | Int8Array; rate: number; depth: number;
-    loopStart: number; loopEnd: number; loopMode: number; name: string }> = [];
+  const samples: Array<{ data: Int16Array | Int8Array | Uint8Array; rate: number; depth: number;
+    loopStart: number; loopEnd: number; loopMode: number; name: string; samples: number }> = [];
   for (let i = 0; i < numSamples; i++) {
     const centerRate = api.fur_get_sample_info(i, 0);
     const loopStart = api.fur_get_sample_info(i, 1);
@@ -342,21 +342,26 @@ export async function loadFurFileWasm(buffer: ArrayBuffer): Promise<{
     const actualLen = m.getValue(outLenPtr, 'i32');
     m._free(outLenPtr);
 
-    let sampleData: Int16Array | Int8Array;
-    if (depth === 16 || depth === 0) {
-      // 16-bit samples
+    let sampleData: Int16Array | Int8Array | Uint8Array;
+    if (depth === 16) {
+      // 16-bit PCM: Int16Array, one element per sample frame
       const src = new Int16Array(m.HEAPU8.buffer, sampleDataPtr, numSampleFrames);
       sampleData = new Int16Array(src); // Copy out of WASM heap
-    } else {
-      // 8-bit samples
+    } else if (depth === 8) {
+      // 8-bit PCM: Int8Array, one element per sample frame
       const src = new Int8Array(m.HEAPU8.buffer, sampleDataPtr, actualLen);
       sampleData = new Int8Array(src);
+    } else {
+      // Compressed format (DPCM depth=1, ADPCM, BRR, etc.): raw bytes
+      const src = new Uint8Array(m.HEAPU8.buffer, sampleDataPtr, actualLen);
+      sampleData = new Uint8Array(src);
     }
 
     samples.push({
       data: sampleData,
       rate: centerRate,
-      depth: depth === 16 || depth === 0 ? 16 : 8,
+      depth,                     // Preserve actual depth (1=DPCM, 3=YMZ, 5=ADPCM-A, etc.)
+      samples: numSampleFrames,  // Frame count (used for compressed formats in uploadModuleSamplesToPlatform)
       loopStart,
       loopEnd,
       loopMode: hasLoop ? 1 : 0,

@@ -118,10 +118,10 @@ function readStr(buf: Uint8Array, off: number, len: number): string {
 export function isTCBTrackerFormat(buffer: ArrayBuffer, filename?: string): boolean {
   const buf = new Uint8Array(buffer);
 
-  // ── Prefix check (optional fast-reject) ──────────────────────────────────
+  // ── Filename check (optional fast-reject): accept tcb.* prefix OR *.tcb extension ──
   if (filename !== undefined) {
     const base = (filename.split('/').pop() ?? filename).toLowerCase();
-    if (!base.startsWith('tcb.')) return false;
+    if (!base.startsWith('tcb.') && !base.endsWith('.tcb')) return false;
   }
 
   // ── Minimum size ─────────────────────────────────────────────────────────
