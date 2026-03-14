@@ -487,6 +487,8 @@ const CMD_TREMOLO       = 12;
 const CMD_VIBRATO       = 13;
 const CMD_RETRIG        = 16;
 const CMD_ADD_HALFTONE  = 18;
+const CMD_DSP_ECHO      = 24;
+const CMD_DSP_DELAY     = 25; // dropped by OpenMPT (not implemented) but present in files
 
 // SymEvent::Volume enum (special param values > 200)
 const VOL_COMMAND   = 200;
@@ -540,18 +542,15 @@ export async function parseSymphonieProFile(
     // Store original file data for export
     song.symphonieFileData = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
 
-    // Parse playback data (decoded instruments + patterns) for the AudioWorklet engine
+    // Use libopenmpt for audio playback (it handles Symphonie Pro correctly,
+    // including CMD_REPLAY_FROM). The native parser provides pattern display.
+    song.libopenmptFileData = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
+
+    // Populate instruments with decoded PCM sample data for the sample editor.
+    // Audio playback is handled by libopenmpt, not individual synth instances.
     try {
       const playbackData = await parseSymphonieForPlayback(bytes.buffer as ArrayBuffer, filename);
 
-      // Attach playback data to the first instrument so InstrumentFactory
-      // can instantiate SymphonieSynth for native playback.
-      if (song.instruments.length > 0) {
-        (song.instruments[0] as unknown as Record<string, unknown>)['symphonie'] = playbackData;
-      }
-
-      // Populate each instrument with decoded PCM sample data.
-      // The sample editor will show when sample data is present (see isSampleType).
       for (let i = 0; i < playbackData.instruments.length && i < song.instruments.length; i++) {
         const si = playbackData.instruments[i];
         const inst = song.instruments[i] as unknown as Record<string, unknown>;
@@ -584,15 +583,12 @@ export async function parseSymphonieProFile(
         }
       }
     } catch (err) {
-      console.warn('[SymphonieProParser] parseSymphonieForPlayback failed; playback will be silent:', err);
+      console.warn('[SymphonieProParser] parseSymphonieForPlayback failed (sample editor data unavailable):', err);
     }
 
-    // Ensure synthType is SymphonieSynth on ALL instruments — even if
-    // parseSymphonieForPlayback failed above. The instruments are created
-    // with synthType in _parseSymphonieProFile, but reinforce it here to
-    // guarantee WASM engine routing works correctly.
+    // Instruments are Sampler type — sample data available in editor, audio via libopenmpt.
     for (let i = 0; i < song.instruments.length; i++) {
-      (song.instruments[i] as unknown as Record<string, unknown>)['synthType'] = 'SymphonieSynth';
+      (song.instruments[i] as unknown as Record<string, unknown>)['synthType'] = 'Sampler';
     }
 
     return song;
@@ -1121,8 +1117,20 @@ function _convertEvent(
       cell.eff    = Math.min(ev.param, 0xFF);
       break;
 
+    case CMD_DSP_ECHO: {
+      // DSP Echo: note=type(0-4), param=bufLen(0-127), inst=feedback(0-127)
+      // Use same encoding as OpenMPTConverter DSP cells:
+      //   effTyp=0x50 ('D') + bufLen, effTyp2=0x50+type ('C/E/L/X') + feedback
+      const dspType = ev.note >= 0 && ev.note <= 4 ? ev.note : 0;
+      cell.effTyp  = 0x50;
+      cell.eff     = Math.min(ev.param, 0x7F);
+      cell.effTyp2 = 0x50 + dspType;
+      cell.eff2    = Math.min(ev.inst, 0x7F);
+      break;
+    }
+
     default:
-      // All other effects (CV, Filter, DSP, etc.) — skip for display
+      // All other effects (CV, Filter, etc.) — skip for display
       break;
   }
 }
@@ -1433,9 +1441,7 @@ export async function parseSymphonieForPlayback(
   const CHUNK_STEREO_DETUNE    = 11;
   const CHUNK_STEREO_PHASE     = 12;
 
-  // DSP command IDs
-  const CMD_DSP_ECHO  = 24;
-  const CMD_DSP_DELAY = 25;
+  // CMD_DSP_ECHO (24) and CMD_DSP_DELAY (25) are module-level constants above
 
   // ── Accumulated state ─────────────────────────────────────────────────────
   let trackLen        = 0;
