@@ -217,6 +217,8 @@ interface RenderParams {
   songPosition: number;          // current position in song order (-1 = not playing)
   songPositions: number[];       // song order (pattern number per position)
   songLength: number;            // total positions in song order
+  /** Per-frame cache shared between renderGrid and generateLabels to avoid redundant O(n) walks. */
+  songRowCache: Map<number, { pattern: TrackerPattern; row: number } | null>;
 }
 
 /**
@@ -228,32 +230,32 @@ function resolveSongRow(
   rowNum: number, p: RenderParams,
 ): { pattern: TrackerPattern; row: number } | null {
   if (!p.smoothScrollActive || p.songPosition < 0 || p.songLength === 0) return null;
+  if (p.songRowCache.has(rowNum)) return p.songRowCache.get(rowNum)!;
   const { patterns, songPositions, songLength, songPosition, patternLength } = p;
+  let result: { pattern: TrackerPattern; row: number } | null = null;
   if (rowNum < 0) {
     let remain = -rowNum;
     let pos = songPosition - 1;
     while (remain > 0 && pos >= 0) {
       const pat = patterns[songPositions[pos]];
       const len = pat?.length ?? 64;
-      if (remain <= len) return pat ? { pattern: pat, row: len - remain } : null;
+      if (remain <= len) { result = pat ? { pattern: pat, row: len - remain } : null; break; }
       remain -= len;
       pos--;
     }
-    return null;
-  }
-  if (rowNum >= patternLength) {
+  } else if (rowNum >= patternLength) {
     let remain = rowNum - patternLength;
     let pos = songPosition + 1;
     while (remain >= 0 && pos < songLength) {
       const pat = patterns[songPositions[pos]];
       const len = pat?.length ?? 64;
-      if (remain < len) return pat ? { pattern: pat, row: remain } : null;
+      if (remain < len) { result = pat ? { pattern: pat, row: remain } : null; break; }
       remain -= len;
       pos++;
     }
-    return null;
   }
-  return null;
+  p.songRowCache.set(rowNum, result);
+  return result;
 }
 
 /** Static grid layer — backgrounds, separators, gutter. */
@@ -1272,6 +1274,7 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
     songPosition: -1,
     songPositions: getTrackerReplayer().getSong()?.songPositions ?? [],
     songLength: getTrackerReplayer().getSong()?.songPositions?.length ?? 0,
+    songRowCache: renderParamsRef.current?.songRowCache ?? new Map(),
   };
 
   // ── Imperative redraw — called from subscription (cursor) and useEffect (other deps) ──
@@ -1282,6 +1285,9 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
 
   const imperativeRedraw = useCallback(() => {
     const p = renderParamsRef.current;
+    // Clear per-frame cache so renderGrid and generateLabels share resolved rows
+    // without redundant O(n) song-order walks in the same synchronous pass.
+    p.songRowCache.clear();
     const cursor = cursorRef.current;
     const selection = selectionRef.current;
     const currentRow = p.isPlaying ? p.playbackRow : cursor.rowIndex;
