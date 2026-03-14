@@ -310,11 +310,12 @@ function renderChannelHighlight(
   smoothOffset = 0,
 ): void {
   g.clear();
+  // Anchor rect: prevents @pixi/layout from scaling column-width content to full width.
+  g.rect(0, 0, p.width, p.gridHeight).fill({ color: 0x000000, alpha: 0 });
   const cursorCh = cursor.channelIndex;
   if (cursorCh >= 0 && cursorCh < p.numChannels) {
     const colX = p.channelOffsets[cursorCh] - p.scrollLeft;
     const chW = p.channelWidths[cursorCh];
-    // Extend rect to cover scroll offset so there's no gap at top/bottom
     g.rect(colX, smoothOffset, chW, p.gridHeight);
     g.fill(FILL_WHITE_002);
   }
@@ -327,6 +328,8 @@ function renderOverlay(
   peerCursor: PeerCursorData, peerSel: PeerSelectionData | null,
 ): void {
   g.clear();
+  // Anchor rect: prevents @pixi/layout from scaling selection/peer geometry to fill the grid.
+  g.rect(0, 0, p.width, p.gridHeight).fill({ color: 0x000000, alpha: 0 });
 
   // Selection overlay
   if (selection && p.displayPattern) {
@@ -341,7 +344,7 @@ function renderOverlay(
       const y1 = p.baseY + (startRow - vStart) * p.rowHeight;
       const h = (endRow - startRow + 1) * p.rowHeight;
       g.rect(colX, y1, chW, h);
-      g.fill({ color: p.theme.accentGlow.color, alpha: 0.15 });
+      g.fill({ color: p.theme.accentGlow.color, alpha: p.theme.accentGlow.alpha });
     }
   }
 
@@ -380,11 +383,16 @@ function renderCursorCaret(
   smoothOffset = 0,
 ): void {
   g.clear();
+  // Anchor rect: sets bounding box = layout dimensions so @pixi/layout scale = 1.
+  // Without this, layout scales the tiny caret rect up to fill the entire grid area.
+  g.rect(0, 0, p.width, p.gridHeight).fill({ color: 0x000000, alpha: 0 });
+
   const cursorCh = cursor.channelIndex;
   if (cursorCh >= 0 && cursorCh < p.numChannels) {
     const colX = p.channelOffsets[cursorCh] - p.scrollLeft;
     const row = p.isPlaying ? p.playbackRow : cursor.rowIndex;
     const y = p.baseY + (row - vStart) * p.rowHeight + smoothOffset;
+    if (!isFinite(colX) || !isFinite(y)) return;
     let cursorW = CHAR_WIDTH * 3 + 4;
     let cursorX = colX + 8;
     const noteWidth = CHAR_WIDTH * 3 + 4;
@@ -984,6 +992,12 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
   const highlightGraphicsRef = useRef<GraphicsType | null>(null);   // fixed center-line highlight (outside scroll container)
   const dragOverlayRef = useRef<GraphicsType | null>(null);
   const megaTextRef = useRef<MegaText | null>(null);
+  // Clip mask for the grid — prevents pattern rows drawn at negative y (above center)
+  // from bleeding into the channel header area above the grid container.
+  const [gridClipMask, setGridClipMask] = useState<GraphicsType | null>(null);
+  const gridClipMaskRef = useCallback((g: GraphicsType | null) => {
+    if (g && g !== gridClipMask) setGridClipMask(g);
+  }, [gridClipMask]);
   const prevRowRef = useRef(-1);
   const prevPatternRef = useRef(-1);
   const imperativeRedrawRef = useRef<(() => void) | null>(null);
@@ -1130,10 +1144,11 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
       const gHighlight = highlightGraphicsRef.current;
       if (gHighlight) {
         gHighlight.clear();
+        gHighlight.rect(0, 0, p.width, p.gridHeight).fill({ color: 0x000000, alpha: 0 });
         const centerY = p.baseY + (currentRow - vs) * p.rowHeight + newOffset;
         if (centerY >= 0 && centerY < p.gridHeight + newOffset) {
           gHighlight.rect(0, centerY, p.width, p.rowHeight);
-          gHighlight.fill({ color: p.theme.accentGlow.color, alpha: p.trackerVisualBg ? 0.5 : p.theme.accentGlow.alpha });
+          gHighlight.fill({ color: 0xffffff, alpha: p.trackerVisualBg ? 0.15 : 0.12 });
         }
       }
       const gCaret = cursorCaretRef.current;
@@ -1213,6 +1228,10 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
   const gridGraphicsLayout = useMemo(() => ({ position: 'absolute' as const, width, height: gridHeight }), [width, gridHeight]);
   const scrollbarLayout = useMemo(() => ({ display: allChannelsFit ? 'none' as const : 'flex' as const, width, height: SCROLLBAR_HEIGHT }), [allChannelsFit, width]);
   const dragOverlayLayout = useMemo(() => ({ position: 'absolute' as const, width, height: gridHeight, left: 0, top: 0 }), [width, gridHeight]);
+  const drawGridClipMask = useCallback((g: GraphicsType) => {
+    g.clear();
+    g.rect(0, 0, width, gridHeight).fill({ color: 0xffffff });
+  }, [width, gridHeight]);
 
   // ── Render params ref — captured each React render, read by imperativeRedraw ──
   const renderParamsRef = useRef<RenderParams>(null!);
@@ -1293,10 +1312,12 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
     const gHighlight = highlightGraphicsRef.current;
     if (gHighlight) {
       gHighlight.clear();
+      // Anchor rect: prevents @pixi/layout from scaling single-row-height content to full grid height.
+      gHighlight.rect(0, 0, p.width, p.gridHeight).fill({ color: 0x000000, alpha: 0 });
       const centerY = p.baseY + (currentRow - vStart) * p.rowHeight + smoothOffsetRef.current;
       if (centerY >= 0 && centerY < p.gridHeight) {
         gHighlight.rect(0, centerY, p.width, p.rowHeight);
-        gHighlight.fill({ color: p.theme.accentGlow.color, alpha: p.trackerVisualBg ? 0.5 : p.theme.accentGlow.alpha });
+        gHighlight.fill({ color: 0xffffff, alpha: p.trackerVisualBg ? 0.15 : 0.12 });
       }
     }
   }, []); // Empty deps — everything read from refs
@@ -1533,6 +1554,9 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
     if (!canvas) return;
 
     const onWheel = (e: WheelEvent) => {
+      // Don't scroll tracker when any GL modal is open — let the modal's scroll view handle it
+      if (useUIStore.getState().modalOpen !== null) return;
+
       const { isPlaying: playing, allChannelsFit: allFit, channelOffsets: offsets, totalChannelsWidth: totalW, width: w } = wheelStateRef.current;
       e.preventDefault();
 
@@ -1771,11 +1795,21 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
         onPointerUpOutside={handlePointerUp}
       >
 
+        {/* Clip mask — clips the scroll container so pattern rows drawn at negative y
+            (above center) don't bleed into the channel header area above. */}
+        <pixiGraphics
+          ref={gridClipMaskRef}
+          draw={drawGridClipMask}
+          renderable={false}
+          layout={{ position: 'absolute' as const, width, height: gridHeight }}
+        />
+
         {/* Smooth-scroll layer — y updated imperatively by RAF; eventMode="none" so clicks pass to outer container */}
         <pixiContainer
           ref={gridScrollContainerRef}
           layout={gridScrollLayout}
           eventMode="none"
+          mask={gridClipMask}
         >
           <pixiGraphics ref={gridGraphicsRef} draw={() => {}} layout={gridGraphicsLayout} />
           <pixiGraphics ref={overlayGraphicsRef} draw={() => {}} layout={gridGraphicsLayout} />
