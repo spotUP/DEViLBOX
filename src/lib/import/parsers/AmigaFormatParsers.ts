@@ -691,7 +691,7 @@ export async function tryRouteFormat(
     const { isSoundFactoryFormat, parseSoundFactoryFile } = await import('@lib/import/formats/SoundFactoryParser');
     return withNativeThenUADE('soundFactory', ctx,
       (bytes: Uint8Array | ArrayBuffer, name: string) => parseSoundFactoryFile(bytes as Uint8Array, name),
-      'SoundFactoryParser', { isFormat: isSoundFactoryFormat, usesBytes: true });
+      'SoundFactoryParser', { isFormat: isSoundFactoryFormat, usesBytes: true, injectUADE: true });
   }
 
   // ── Actionamics (.act) ────────────────────────────────────────────────────

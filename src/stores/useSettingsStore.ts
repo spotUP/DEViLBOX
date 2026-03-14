@@ -341,7 +341,7 @@ export const useSettingsStore = create<SettingsStore>()(
         gameMusicCreator: 'uade',   // GameMusicCreatorParser — prefer UADE (complex synthesis)
         faceTheMusic: 'native',     // FaceTheMusicParser — native parser available
         soundControl: 'uade',     // SoundControlParser — native parser available
-        soundFactory: 'uade',     // SoundFactoryParser — native parser available
+        soundFactory: 'native',   // SoundFactoryParser — native + UADE injection for 1:1 audio
         actionamics: 'native',      // ActionamicsParser — native parser available
         activisionPro: 'native',    // ActivisionProParser — native parser available
         ronKlaren: 'uade',        // RonKlarenParser — native parser available
