@@ -175,14 +175,31 @@ const toneSynths: SynthDescriptor[] = [
     loadMode: 'eager',
     volumeOffsetDb: 32,
     create: (config) => {
-      const synth = new Tone.PolySynth(Tone.PluckSynth as unknown as typeof Tone.Synth);
-      synth.set({
+      // Use a plain PluckSynth (not PolySynth wrapper) so the FeedbackCombFilter AudioWorklet
+      // is created ONCE at construction time. synthTester's workletsAreReady() + 50ms wait
+      // ensures onReady fires and connects the audio chain before any note is triggered.
+      // With PolySynth, each triggerAttack creates a NEW voice with a NEW FeedbackCombFilter
+      // whose onReady fires as a microtask — a race condition with audio rendering that produces
+      // silence in the tester. Plain PluckSynth avoids this by reusing the pre-connected filter.
+      const synth = new Tone.PluckSynth({
         attackNoise: 1,
         dampening: 4000,
-        resonance: 0.7,
-      } as unknown as Partial<Tone.SynthOptions>);
+        resonance: 0.98, // High resonance for audible sustain well within 500ms polling window
+      });
       synth.volume.value = getNormalizedVolume('PluckSynth', config.volume);
-      return synth;
+      // Wrapper hides .output → path B (Tone.Analyser) in synthTester
+      return {
+        triggerAttackRelease: (note: string, duration: number, time?: number) =>
+          synth.triggerAttackRelease(note, duration, time),
+        triggerAttack: (note: string, time?: number) =>
+          synth.triggerAttack(note, time),
+        triggerRelease: (_note: string, time?: number) => synth.triggerRelease(time),
+        releaseAll: () => { /* PluckSynth has no releaseAll — no-op */ },
+        connect: (dest: Tone.InputNode) => synth.connect(dest),
+        disconnect: () => synth.disconnect(),
+        dispose: () => synth.dispose(),
+        volume: synth.volume,
+      } as unknown as Tone.ToneAudioNode;
     },
   },
   {
@@ -192,7 +209,7 @@ const toneSynths: SynthDescriptor[] = [
     loadMode: 'eager',
     volumeOffsetDb: 23,
     create: (config) => {
-      return new Tone.MetalSynth({
+      const synth = new Tone.MetalSynth({
         envelope: {
           attack: (config.envelope?.attack ?? 1) / 1000,
           decay: (config.envelope?.decay ?? 100) / 1000,
@@ -200,14 +217,29 @@ const toneSynths: SynthDescriptor[] = [
         },
         volume: getNormalizedVolume('MetalSynth', config.volume),
       });
+      // Wrap to translate (time, velocity) calling convention used by synthTester/NoiseSynth
+      // path into MetalSynth's actual (note, time, velocity) signature. Also hides .output
+      // so synthTester uses path B (Tone.Analyser) — scheduleTime = Tone.now() — ensuring
+      // events are not scheduled hundreds of seconds in the past.
+      return {
+        triggerAttack: (time: number, velocity?: number) => synth.triggerAttack('C3', time, velocity),
+        triggerRelease: (time?: number) => synth.triggerRelease(time),
+        triggerAttackRelease: (duration: string | number, time?: number, velocity?: number) =>
+          synth.triggerAttackRelease(duration, time ?? Tone.now(), velocity),
+        releaseAll: () => { /* MetalSynth has no releaseAll — no-op */ },
+        connect: (dest: Tone.InputNode) => synth.connect(dest),
+        disconnect: () => synth.disconnect(),
+        dispose: () => synth.dispose(),
+        volume: synth.volume,
+      } as unknown as Tone.ToneAudioNode;
     },
     onTriggerAttack: (synth, _note, time, velocity, opts) => {
       const finalVelocity = opts.accent ? Math.min(1, velocity * ACCENT_BOOST) : velocity;
-      (synth as Tone.MetalSynth).triggerAttack(time, finalVelocity);
+      (synth as unknown as { triggerAttack: (t: number, v: number) => void }).triggerAttack(time, finalVelocity);
       return true;
     },
     onTriggerRelease: (synth, _note, time) => {
-      (synth as Tone.MetalSynth).triggerRelease(time);
+      (synth as unknown as { triggerRelease: (t: number) => void }).triggerRelease(time);
       return true;
     },
   },

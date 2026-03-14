@@ -2893,6 +2893,14 @@ export class ToneEngine {
           }
         }
       }
+      // Special case: GranularSynth (Tone.GrainPlayer) has no triggerRelease — use stop().
+      if (config.synthType === 'GranularSynth' && instrument) {
+        const player = instrument as Tone.GrainPlayer;
+        if (player.state === 'started') {
+          const stopTime = config.isLive ? this.getImmediateTime() : this.getSafeTime(time);
+          if (stopTime !== null) player.stop(stopTime);
+        }
+      }
       return;
     }
 
