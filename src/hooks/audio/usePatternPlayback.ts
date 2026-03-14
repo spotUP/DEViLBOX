@@ -254,11 +254,13 @@ export const usePatternPlayback = () => {
 
                   // Update pattern position if needed
                   if (patternIdx !== store.currentPositionIndex && patternIdx < store.patternOrder.length) {
-                    setCurrentPosition(patternIdx, true);
-                    setCurrentPattern(store.patternOrder[patternIdx] ?? patternIdx, true);
+                    startTransition(() => {
+                      setCurrentPosition(patternIdx, true);
+                      setCurrentPattern(store.patternOrder[patternIdx] ?? patternIdx, true);
+                    });
                   }
 
-                  setCurrentRowThrottled(rowInPattern, pLen);
+                  setCurrentRowThrottled(rowInPattern, pLen, true);
                 });
               }).catch(err => {
                 console.error('[Playback] UADE engine ready failed:', err);

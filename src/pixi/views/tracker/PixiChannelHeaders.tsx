@@ -148,7 +148,7 @@ interface PixiChannelHeadersProps {
 }
 
 
-export const PixiChannelHeaders: React.FC<PixiChannelHeadersProps> = ({
+const PixiChannelHeadersInner: React.FC<PixiChannelHeadersProps> = ({
   pattern,
   channelWidths,
   channelOffsets,
@@ -793,3 +793,5 @@ export const PixiChannelHeaders: React.FC<PixiChannelHeadersProps> = ({
     </pixiContainer>
   );
 };
+
+export const PixiChannelHeaders = React.memo(PixiChannelHeadersInner);
