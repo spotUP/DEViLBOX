@@ -22,12 +22,12 @@ const UADE_ONLY_PREFIXES = [
   'ast.', 'bss.',
   // FutureComposer-BSI, custom
   'bfc.', 'bsi.', 'fc-bsi.', 'cus.', 'cust.', 'custom.',
-  // DavidHanney, DynamicSynthesizer, DariusZendeh
-  'dh.', 'dns.', 'dz.', 'mkiio.',
-  // EarAche, EMS
-  'ea.', 'mg.', 'ems.', 'emsv6.',
-  // ForgottenWorlds, GlueMon
-  'fw.', 'glue.', 'gm.',
+  // DynamicSynthesizer, DariusZendeh (DavidHanney handled by DavidHanneyParser)
+  'dns.', 'dz.', 'mkiio.',
+  // EarAche, EMS (mg.* was GlueMon alias — handled by GlueMonParser; ea.* = EarAche still UADE)
+  'ea.', 'ems.', 'emsv6.',
+  // ForgottenWorlds (GlueMon handled by GlueMonParser)
+  'fw.',
   // HowieDavies, MajorTom variants
   'hd.', 'hn.', 'thn.', 'mtp2.', 'arp.',
   // JochenHippel base (hip.*, mcmd.*, sog.*) — different from CoSo and 7V
