@@ -276,12 +276,6 @@ export const PixiRoot: React.FC = () => {
       {/* Modern fixed-zone shell */}
       <PixiMainLayout />
 
-      {/* Global dropdown layer — above all window masks (zIndex 9999) */}
-      <PixiGlobalDropdownLayer />
-
-      {/* Global tooltip layer — above windows, below dropdowns (zIndex 9998) */}
-      <PixiGlobalTooltipLayer />
-
       {/* GL-native modals — inside scene graph so CRT shader catches them */}
       <pixiContainer zIndex={300} layout={{ position: 'absolute', left: 0, top: 0, width, height }}>
         <PixiNewSongWizard />
@@ -441,6 +435,12 @@ export const PixiRoot: React.FC = () => {
         <PixiPeerCursor width={width} height={height} />
         <PixiCollaborationToolbar />
       </pixiContainer>
+
+      {/* Global tooltip layer — above all modals (rendered last = on top) */}
+      <PixiGlobalTooltipLayer />
+
+      {/* Global dropdown layer — topmost layer, above modals and tooltips */}
+      <PixiGlobalDropdownLayer />
     </pixiContainer>
   );
 };
