@@ -88,6 +88,16 @@ export async function withNativeThenUADE(
       const input = (opts?.usesBytes || opts?.isFormat) ? bytes! : ctx.buffer;
       const result = await (nativeParse as NativeParserWithBytes)(input as any, ctx.originalFileName);
       if (result) {
+        // When injectUADE is set, this is a metadata-only stub parser — UADE always
+        // provides audio. Inject fileData and return immediately without the 0-notes check
+        // (the stub parser is expected to have 0 notes; UADE handles actual playback).
+        if (opts?.injectUADE) {
+          if (!(result as any).uadeEditableFileData) {
+            (result as any).uadeEditableFileData = ctx.buffer.slice(0);
+            (result as any).uadeEditableFileName = ctx.originalFileName;
+          }
+          return injectUADEPlayback(result, ctx);
+        }
         // Defense-in-depth: if native parser returned 0 notes across all patterns,
         // it's likely a stub parser that couldn't actually parse the file.
         // Fall through to UADE instead of returning empty data.
@@ -97,10 +107,6 @@ export async function withNativeThenUADE(
         if (totalNotes === 0) {
           console.warn(`[${parserName}] Native parser returned 0 notes for ${ctx.originalFileName}, falling back to UADE`);
           return callUADE(ctx);
-        }
-        if (opts?.injectUADE && !(result as any).uadeEditableFileData) {
-          (result as any).uadeEditableFileData = ctx.buffer.slice(0);
-          (result as any).uadeEditableFileName = ctx.originalFileName;
         }
         return injectUADEPlayback(result, ctx);
       }
