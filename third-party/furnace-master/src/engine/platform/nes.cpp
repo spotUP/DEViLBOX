@@ -114,11 +114,14 @@ void DivPlatformNES::acquire_puNES(blip_buffer_t** bb, size_t len) {
   nes->timestamp=0;
   nes->bb=bb[0];
 
+  size_t breakAt=len;
+
   for (size_t i=0; i<len; i++) {
     // heuristic
     int pcmAdvance=1;
     if (writes.empty()) {
       if (dpcmMode || dacSample==-1) {
+        breakAt=i;
         break;
       } else {
         pcmAdvance=len-i;

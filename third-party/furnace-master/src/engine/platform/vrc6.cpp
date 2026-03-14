@@ -51,6 +51,14 @@ void DivPlatformVRC6::acquireDirect(blip_buffer_t** bb, size_t len) {
     oscBuf[i]->begin(len);
   }
 
+  // DEBUG: log first few calls
+  static int vrc6DebugCount = 0;
+  bool doDebug = (vrc6DebugCount < 5);
+  if (doDebug) {
+    printf("[VRC6 acquireDirect] call #%d len=%zu writes_pending=%d\n",
+           vrc6DebugCount, len, (int)writes.size());
+  }
+
   for (size_t h=0; h<len; h++) {
     // running heuristic
     int advance=vrc6.predict();
@@ -96,6 +104,11 @@ void DivPlatformVRC6::acquireDirect(blip_buffer_t** bb, size_t len) {
     vrc6.tick(advance);
     h+=advance-1;
     int sample=vrc6.out()<<9; // scale to 16 bit
+    if (doDebug && h < 10) {
+      printf("[VRC6] h=%zu advance=%d out=%d sample=%d p0=%d p1=%d saw=%d\n",
+             h, advance, (int)vrc6.out(), sample,
+             (int)vrc6.pulse_out(0), (int)vrc6.pulse_out(1), (int)vrc6.sawtooth_out());
+    }
     if (sample!=prevSample) {
       blip_add_delta(bb[0],h,sample-prevSample);
       prevSample=sample;
@@ -109,6 +122,9 @@ void DivPlatformVRC6::acquireDirect(blip_buffer_t** bb, size_t len) {
     // Command part (what the heck why at the END?!)
     while (!writes.empty()) {
       QueuedWrite w=writes.front();
+      if (doDebug) {
+        printf("[VRC6] write addr=0x%04x val=0x%02x\n", w.addr, w.val);
+      }
       switch (w.addr&0xf000) {
         case 0x9000: // Pulse 1
           if (w.addr<=0x9003) {
@@ -145,6 +161,9 @@ void DivPlatformVRC6::acquireDirect(blip_buffer_t** bb, size_t len) {
 
   for (int i=0; i<3; i++) {
     oscBuf[i]->end(len);
+  }
+  if (doDebug) {
+    vrc6DebugCount++;
   }
 }
 
@@ -250,6 +269,11 @@ void DivPlatformVRC6::tick(bool sysTick) {
 
 int DivPlatformVRC6::dispatch(DivCommand c) {
   int CHIP_DIVIDER=(c.chan==2)?14:16;
+  static int vrc6DispatchCount = 0;
+  if (vrc6DispatchCount < 30) {
+    printf("[VRC6 dispatch] cmd=%d chan=%d val1=%d val2=%d skipReg=%d\n", c.cmd, c.chan, c.value, c.value2, (int)skipRegisterWrites);
+    vrc6DispatchCount++;
+  }
   switch (c.cmd) {
     case DIV_CMD_NOTE_ON:
       if (c.chan!=2) { // pulse wave
