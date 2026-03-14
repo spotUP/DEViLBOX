@@ -430,8 +430,11 @@ export async function parseUADEFile(
 
   // Compiled 68k replayer formats loop indefinitely without an end signal.
   // Skip the worklet's built-in scan for these to avoid a 600-second hang.
-  const SKIP_SCAN_EXTS = new Set(['jpo', 'jpold']);
-  const skipScan = mode === 'enhanced' && SKIP_SCAN_EXTS.has(ext);
+  // Prefix-based formats (dl.*, dln.*, rh.*) are matched by the leading component.
+  const prefix = filename.split('.')[0]?.toLowerCase() ?? '';
+  const SKIP_SCAN_EXTS = new Set(['jpo', 'jpold', 'rh', 'rhp']);
+  const SKIP_SCAN_PREFIXES = new Set(['dl', 'dl_deli', 'dln', 'rh']);
+  const skipScan = mode === 'enhanced' && (SKIP_SCAN_EXTS.has(ext) || SKIP_SCAN_PREFIXES.has(prefix));
 
   const metadata = preScannedMeta ?? await engine.load(buffer, filename, skipScan);
   const scanRows = metadata.scanData ?? [];

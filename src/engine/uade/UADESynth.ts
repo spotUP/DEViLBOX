@@ -39,13 +39,11 @@ export class UADESynth implements DevilboxSynth {
 
     await this.engine.ready();
     const ext = config.filename.split('.').pop()?.toLowerCase() ?? '';
-    const skipScan = ['jpo', 'jpold'].includes(ext);
-    await this.engine.load(config.fileData, config.filename, skipScan);
-
-    // Set the requested subsong
-    if (config.currentSubsong > 0) {
-      this.engine.setSubsong(config.currentSubsong);
-    }
+    const prefix = config.filename.split('.')[0]?.toLowerCase() ?? '';
+    const SKIP_SCAN_EXTS = new Set(['jpo', 'jpold', 'rh', 'rhp']);
+    const SKIP_SCAN_PREFIXES = new Set(['dl', 'dl_deli', 'dln', 'rh']);
+    const skipScan = SKIP_SCAN_EXTS.has(ext) || SKIP_SCAN_PREFIXES.has(prefix);
+    await this.engine.load(config.fileData, config.filename, skipScan, config.currentSubsong ?? 0);
   }
 
   triggerAttack(_note?: string | number, _time?: number, _velocity?: number): void {
