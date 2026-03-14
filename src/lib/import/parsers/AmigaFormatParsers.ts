@@ -1226,16 +1226,10 @@ export async function tryRouteFormat(
   // Apple IIgs SoundSmith/MegaTracker. External DOC RAM samples required;
   // UADE is preferred (bundles samples in module archives), but native is available.
   if (matchesExt(filename, ['ss'])) {
-        if (prefs.speedySystem === 'native') {
-      try {
-        const { isSpeedySystemFormat, parseSpeedySystemFile } = await import('@lib/import/formats/SpeedySystemParser');
-        if (isSpeedySystemFormat(buffer)) return await parseSpeedySystemFile(buffer, originalFileName);
-      } catch (err) {
-        console.warn(`[SpeedySystemParser] Native parse failed for ${filename}, falling back to UADE:`, err);
-      }
-    }
-    const { parseUADEFile: parseUADE_ss } = await import('@lib/import/formats/UADEParser');
-    return parseUADE_ss(buffer, originalFileName, prefs.uade ?? 'enhanced', subsong, preScannedMeta);
+    const { isSpeedySystemFormat, parseSpeedySystemFile } = await import('@lib/import/formats/SpeedySystemParser');
+    return withNativeThenUADE('speedySystem', ctx,
+      (buf: Uint8Array | ArrayBuffer, name: string) => { if (isSpeedySystemFormat(buf as ArrayBuffer)) return parseSpeedySystemFile(buf as ArrayBuffer, name); return null; },
+      'SpeedySystemParser', { injectUADE: true });
   }
 
   // ── Tronic (.trc/.dp/.tro/.tronic) ───────────────────────────────────────
@@ -1303,32 +1297,20 @@ export async function tryRouteFormat(
   // Compiled 68k Amiga music format. Three sub-variants: Old (D040D040 magic),
   // New/Medium (601A + 48E780F0), and Rare (4DFA + DFF000 hardware register).
   if (matchesExt(filename, ['mc', 'mcr', 'mco'])) {
-    if (prefs.markCooksey === 'native') {
-      try {
-        const { isMarkCookseyFormat, parseMarkCookseyFile } = await import('@lib/import/formats/MarkCookseyParser');
-        if (isMarkCookseyFormat(buffer, originalFileName)) return parseMarkCookseyFile(buffer, originalFileName);
-      } catch (err) {
-        console.warn(`[MarkCookseyParser] Native parse failed for ${filename}, falling back to UADE:`, err);
-      }
-    }
-    const { parseUADEFile: parseUADE_mc } = await import('@lib/import/formats/UADEParser');
-    return parseUADE_mc(buffer, originalFileName, prefs.uade ?? 'enhanced', subsong, preScannedMeta);
+    const { isMarkCookseyFormat, parseMarkCookseyFile } = await import('@lib/import/formats/MarkCookseyParser');
+    return withNativeThenUADE('markCooksey', ctx,
+      (buf: Uint8Array | ArrayBuffer, name: string) => { if (isMarkCookseyFormat(buf as ArrayBuffer, name)) return parseMarkCookseyFile(buf as ArrayBuffer, name); return null; },
+      'MarkCookseyParser', { injectUADE: true });
   }
 
   // ── Jeroen Tel (jt.* / mon_old.* prefix) ────────────────────────────────────
   // Compiled 68k Amiga music format (Maniacs of Noise / Jeroen Tel).
   // Detection: scan first 40 bytes for 0x02390001 + structural checks.
   if (matchesExt(filename, ['jt', 'mon_old'])) {
-    if (prefs.jeroenTel === 'native') {
-      try {
-        const { isJeroenTelFormat, parseJeroenTelFile } = await import('@lib/import/formats/JeroenTelParser');
-        if (isJeroenTelFormat(buffer, originalFileName)) return parseJeroenTelFile(buffer, originalFileName);
-      } catch (err) {
-        console.warn(`[JeroenTelParser] Native parse failed for ${filename}, falling back to UADE:`, err);
-      }
-    }
-    const { parseUADEFile: parseUADE_jt } = await import('@lib/import/formats/UADEParser');
-    return parseUADE_jt(buffer, originalFileName, prefs.uade ?? 'enhanced', subsong, preScannedMeta);
+    const { isJeroenTelFormat, parseJeroenTelFile } = await import('@lib/import/formats/JeroenTelParser');
+    return withNativeThenUADE('jeroenTel', ctx,
+      (buf: Uint8Array | ArrayBuffer, name: string) => { if (isJeroenTelFormat(buf as ArrayBuffer, name)) return parseJeroenTelFile(buf as ArrayBuffer, name); return null; },
+      'JeroenTelParser', { injectUADE: true });
   }
 
   // ── Quartet / Quartet PSG / Quartet ST (qpa.* / sqt.* / qts.* prefix) ──────
@@ -1404,16 +1386,10 @@ export async function tryRouteFormat(
   // ── Jason Page (jpn.* / jpnd.* / jp.*) ──────────────────────────────────────
   // Amiga 4-channel format. Three sub-variants (old/new/raw binary).
   if (matchesExt(filename, ['jpn', 'jpnd', 'jp'])) {
-    if (prefs.jasonPage === 'native') {
-      try {
-        const { isJasonPageFormat, parseJasonPageFile } = await import('@lib/import/formats/JasonPageParser');
-        if (isJasonPageFormat(buffer, originalFileName)) return await parseJasonPageFile(buffer, originalFileName);
-      } catch (err) {
-        console.warn(`[JasonPageParser] Native parse failed for ${filename}, falling back to UADE:`, err);
-      }
-    }
-    const { parseUADEFile: parseUADE_jp } = await import('@lib/import/formats/UADEParser');
-    return parseUADE_jp(buffer, originalFileName, prefs.uade ?? 'enhanced', subsong, preScannedMeta);
+    const { isJasonPageFormat, parseJasonPageFile } = await import('@lib/import/formats/JasonPageParser');
+    return withNativeThenUADE('jasonPage', ctx,
+      (buf: Uint8Array | ArrayBuffer, name: string) => { if (isJasonPageFormat(buf as ArrayBuffer, name)) return parseJasonPageFile(buf as ArrayBuffer, name); return null; },
+      'JasonPageParser', { injectUADE: true });
   }
 
 
@@ -2076,16 +2052,10 @@ export async function tryRouteFormat(
   // ── Jason Brooke (jcbo.* / jcb.* / jb.* prefix) ─────────────────────────
   // eagleplayer.conf: JasonBrooke  prefixes=jcbo,jcb,jb
   if (matchesExt(filename, ['jcbo', 'jcb', 'jb'])) {
-    if (prefs.jasonBrooke === 'native') {
-      try {
-        const { isJasonBrookeFormat, parseJasonBrookeFile } = await import('@lib/import/formats/JasonBrookeParser');
-        if (isJasonBrookeFormat(buffer, originalFileName)) return parseJasonBrookeFile(buffer, originalFileName);
-      } catch (err) {
-        console.warn(`[JasonBrookeParser] Native parse failed for ${filename}, falling back to UADE:`, err);
-      }
-    }
-    const { parseUADEFile: parseUADE_jb } = await import('@lib/import/formats/UADEParser');
-    return parseUADE_jb(buffer, originalFileName, prefs.uade ?? 'enhanced', subsong, preScannedMeta);
+    const { isJasonBrookeFormat, parseJasonBrookeFile } = await import('@lib/import/formats/JasonBrookeParser');
+    return withNativeThenUADE('jasonBrooke', ctx,
+      (buf: Uint8Array | ArrayBuffer, name: string) => { if (isJasonBrookeFormat(buf as ArrayBuffer, name)) return parseJasonBrookeFile(buf as ArrayBuffer, name); return null; },
+      'JasonBrookeParser', { injectUADE: true });
   }
 
   // ── Laxity (powt.* / pt.* prefix) ────────────────────────────────────────
