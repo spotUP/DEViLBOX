@@ -602,6 +602,12 @@ class VoiceExpander {
   // ---- loadSong — called from SymphonieProcessor with SymphoniePlaybackData ----
 
   loadSong(data) {
+    console.log('[Symphonie] loadSong v2 patterns=' + data.patterns.length + ' instruments=' + data.instruments.length);
+    // Log first pattern events to debug CMD_REPLAY_FROM
+    if (data.patterns.length > 0) {
+      const firstEvs = data.patterns[0].events.slice(0, 5);
+      console.log('[Symphonie] first 5 events:', JSON.stringify(firstEvs));
+    }
     this._orderList = data.orderList;
     this._patterns  = data.patterns;
     this._orderPos  = 0;
@@ -749,7 +755,14 @@ class VoiceExpander {
       if (ev.instrument <= 0) continue; // 1-based; 0 = no instrument
       const inst = this._instruments[ev.instrument - 1];
       if (!inst || !inst.checkReady()) continue;
-      if (ev.note > 0) {
+      if (ev.cmd === 5) {
+        // CMD_REPLAY_FROM: retrigger sample from byte offset (param = 0-255 position)
+        const voiceNr = ev.channel * 2;
+        const noteIdx = ev.note > 0 ? ev.note - 1 : 0;
+        console.log('[Symphonie] CMD_REPLAY_FROM ch=' + ev.channel + ' inst=' + ev.instrument + ' noteIdx=' + noteIdx + ' param=' + ev.param + ' instReady=' + inst.checkReady());
+        this.SongEventKeyOnSamplePos(inst, voiceNr,     noteIdx, ev.param);
+        this.SongEventKeyOnSamplePos(inst, voiceNr + 1, noteIdx, ev.param);
+      } else if (ev.note > 0) {
         const vol = (ev.volume > 0 && ev.volume !== 255) ? ev.volume : inst.Volume;
         // PlayInstrumentNote equivalent (using channel-based voice allocation)
         const voiceNr = ev.channel * 2; // L voice for this channel; R = voiceNr+1
@@ -761,7 +774,7 @@ class VoiceExpander {
         this.PlayInstrumentIntoVoice(inst, voiceNr + 1, freq, vol);
       }
       // Handle volume-only events (note === 0, volume change)
-      if (ev.note === 0 && ev.volume !== 255 && ev.volume >= 0) {
+      if (ev.note === 0 && ev.cmd !== 5 && ev.volume !== 255 && ev.volume >= 0) {
         const voiceNr = ev.channel * 2;
         this.SongEventSetVolume(voiceNr,     ev.volume);
         this.SongEventSetVolume(voiceNr + 1, ev.volume);
