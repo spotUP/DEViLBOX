@@ -127,7 +127,7 @@ export const PixiNavBar: React.FC = () => {
 
   // Theme options for dropdown
   const themeOptions = useMemo<SelectOption[]>(
-    () => themes.map(t => ({ value: t.id, label: t.name.toUpperCase() })),
+    () => themes.map(t => ({ value: t.id, label: t.name.toUpperCase(), color: t.colors.accent })),
     [], // themes is module-level stable
   );
 
