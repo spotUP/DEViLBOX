@@ -242,7 +242,6 @@ export type SynthType =
   | 'ZxtuneSynth'       // ZXTune (AY-3-8910 / YM2149 ZX Spectrum formats)
   | 'MAMEFZPCM'         // Casio FZ-1 8-Voice 16-bit PCM Sampler
   | 'MAMEPS1SPU'        // PlayStation 1 CXD2922BQ SPU (24-voice ADPCM)
-  | 'MAMEMultiPCM'      // Yamaha YMW258-F GEW8 (28-slot ROM sampler)
   | 'MAMEZSG2'          // ZOOM ZSG-2 (48-channel ROM sampler)
   | 'MAMEKS0164'        // Samsung KS0164 (32-voice wavetable ROM)
   | 'MAMESWP00'         // Yamaha SWP00 AWM2 (32-voice ROM, Chamberlin filter)

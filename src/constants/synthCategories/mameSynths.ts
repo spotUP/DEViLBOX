@@ -307,15 +307,6 @@ export const mameSynthEntries: Record<string, SynthInfo> = {
     icon: 'Cpu',
     color: 'text-blue-400',
   },
-  MAMEMultiPCM: {
-    type: 'MAMEMultiPCM',
-    name: 'Yamaha MultiPCM',
-    shortName: 'GEW8',
-    description: 'Yamaha YMW258-F GEW8 (Sega Model 1/2) 28-slot ROM sampler with LFO and ADSR',
-    bestFor: ['Arcade', 'Game audio', 'PCM', 'Vintage samples'],
-    icon: 'Cpu',
-    color: 'text-yellow-400',
-  },
   MAMEZSG2: {
     type: 'MAMEZSG2',
     name: 'ZOOM ZSG-2',

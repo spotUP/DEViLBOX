@@ -104,7 +104,6 @@ import {
   createMAMECMI,
   createMAMEFZPCM,
   createMAMEPS1SPU,
-  createMAMEMultiPCM,
   createMAMEZSG2,
   createMAMEKS0164,
   createMAMESWP00,
@@ -497,9 +496,6 @@ export class InstrumentFactory {
         break;
       case 'MAMEPS1SPU':
         instrument = createMAMEPS1SPU(config);
-        break;
-      case 'MAMEMultiPCM':
-        instrument = createMAMEMultiPCM(config);
         break;
       case 'MAMEZSG2':
         instrument = createMAMEZSG2(config);

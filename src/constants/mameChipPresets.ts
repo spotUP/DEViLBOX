@@ -855,56 +855,6 @@ export const MAME_CHIP_PRESETS: InstrumentPreset['config'][] = [
   },
 
   // ============================================
-  // MAMEMultiPCM - Yamaha YMW258-F GEW8 28-Slot PCM
-  // ROM-based sampler; load ROM to get real audio
-  // ============================================
-  {
-    type: 'synth',
-    name: 'MultiPCM Lead',
-    synthType: 'MAMEMultiPCM',
-    parameters: { volume: 0.8 },
-    effects: [],
-    volume: -8,
-    pan: 0,
-  },
-  {
-    type: 'synth',
-    name: 'MultiPCM Pad',
-    synthType: 'MAMEMultiPCM',
-    parameters: { volume: 0.6 },
-    effects: [],
-    volume: -12,
-    pan: 0,
-  },
-  {
-    type: 'synth',
-    name: 'MultiPCM Bass',
-    synthType: 'MAMEMultiPCM',
-    parameters: { volume: 0.9 },
-    effects: [],
-    volume: -6,
-    pan: 0,
-  },
-  {
-    type: 'synth',
-    name: 'MultiPCM Strings',
-    synthType: 'MAMEMultiPCM',
-    parameters: { volume: 0.65 },
-    effects: [],
-    volume: -10,
-    pan: 0,
-  },
-  {
-    type: 'synth',
-    name: 'MultiPCM Brass',
-    synthType: 'MAMEMultiPCM',
-    parameters: { volume: 0.75 },
-    effects: [],
-    volume: -9,
-    pan: 0,
-  },
-
-  // ============================================
   // MAMEZSG2 - ZOOM ZSG-2 48-Channel ROM PCM
   // ADPCM 2:1 compressed; 32552Hz native rate
   // ============================================

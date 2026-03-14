@@ -152,7 +152,6 @@ export const VOLUME_NORMALIZATION_OFFSETS: Record<string, number> = {
   'MAMECMI': 0,          // TBD — needs calibration once WASM is compiled
   'MAMEFZPCM': 0,        // TBD — needs calibration once WASM is compiled
   'MAMEPS1SPU': 0,       // TBD — needs calibration once WASM is compiled
-  'MAMEMultiPCM': 0,     // TBD — needs calibration once WASM is compiled
   'MAMEZSG2': 0,         // TBD — needs calibration once WASM is compiled
   'MAMEKS0164': 0,       // TBD — needs calibration once WASM is compiled
   'MAMESWP00': 0,        // TBD — needs calibration once WASM is compiled
