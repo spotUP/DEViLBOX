@@ -102,6 +102,14 @@ import {
   createMAMEYMOPQ,
   createMAMEVASynth,
   createMAMECMI,
+  createMAMEFZPCM,
+  createMAMEPS1SPU,
+  createMAMEMultiPCM,
+  createMAMEZSG2,
+  createMAMEKS0164,
+  createMAMESWP00,
+  createMAMESWP20,
+  createMAMERolandGP,
 } from './factories/CommunitySynthFactory';
 
 // Re-export standalone functions (preserves existing import paths)
@@ -483,6 +491,30 @@ export class InstrumentFactory {
         break;
       case 'MAMECMI':
         instrument = createMAMECMI(config);
+        break;
+      case 'MAMEFZPCM':
+        instrument = createMAMEFZPCM(config);
+        break;
+      case 'MAMEPS1SPU':
+        instrument = createMAMEPS1SPU(config);
+        break;
+      case 'MAMEMultiPCM':
+        instrument = createMAMEMultiPCM(config);
+        break;
+      case 'MAMEZSG2':
+        instrument = createMAMEZSG2(config);
+        break;
+      case 'MAMEKS0164':
+        instrument = createMAMEKS0164(config);
+        break;
+      case 'MAMESWP00':
+        instrument = createMAMESWP00(config);
+        break;
+      case 'MAMESWP20':
+        instrument = createMAMESWP20(config);
+        break;
+      case 'MAMERolandGP':
+        instrument = createMAMERolandGP(config);
         break;
 
       case 'ModularSynth':
