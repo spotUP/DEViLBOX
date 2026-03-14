@@ -209,6 +209,9 @@ export class VFXSynth implements DevilboxSynth {
     this.isInitialized = true;
     console.log('[VFXSynth] Initialized with ES5506 handle:', this.handle);
 
+    // Start audio rendering before ROM load so the ScriptProcessor is connected
+    this.startRendering();
+
     // Auto-load sample ROM banks
     try {
       const banks = await loadVFXROMs();
@@ -221,6 +224,28 @@ export class VFXSynth implements DevilboxSynth {
       console.error('Place ROM files in /public/roms/vfx/ - see /public/roms/README.md');
       // Continue anyway - synth will initialize but won't produce sound without ROMs
     }
+  }
+
+  /**
+   * Connect a ScriptProcessorNode to render MAME ES5506 audio into the output GainNode.
+   * Called once after WASM init. ScriptProcessor is deprecated but works for non-worklet synths.
+   */
+  private startRendering(): void {
+    const bufferSize = 512;
+    if (!this.audioContext.createScriptProcessor) {
+      console.warn('[VFXSynth] ScriptProcessorNode not available');
+      return;
+    }
+    const processor = this.audioContext.createScriptProcessor(bufferSize, 0, 2);
+    processor.onaudioprocess = (e: AudioProcessingEvent) => {
+      if (!this.isInitialized || this.handle === 0) return;
+      const outL = e.outputBuffer.getChannelData(0);
+      const outR = e.outputBuffer.getChannelData(1);
+      const { left, right } = this.mameEngine.render(this.handle, bufferSize);
+      outL.set(left);
+      outR.set(right);
+    };
+    processor.connect(this.output);
   }
 
   /**
@@ -246,17 +271,6 @@ export class VFXSynth implements DevilboxSynth {
     // Each voice has 14 registers
     const offset = (voice * 0x10) + reg;
     this.mameEngine.write16(this.handle, offset, value);
-  }
-
-  /**
-   * Convert MIDI note to ES5506 frequency count
-   */
-  private midiNoteToFreqCount(midiNote: number, sampleRate: number = 44100): number {
-    // ES5506 frequency count is a 32-bit fixed-point value
-    // Frequency = (freqcount * sampleRate) / 2^32
-    const freq = 440 * Math.pow(2, (midiNote - 69) / 12);
-    const freqCount = Math.floor((freq * Math.pow(2, 32)) / sampleRate);
-    return freqCount & 0xFFFFFFFF;
   }
 
   /**
@@ -312,22 +326,30 @@ export class VFXSynth implements DevilboxSynth {
     voice.velocity = Math.floor(velocity * 127);
     voice.active = true;
 
-    // Set frequency
-    const freqCount = this.midiNoteToFreqCount(midiNote);
-    this.writeVoiceReg(voiceIndex, ES5506_REG.FREQCOUNT, freqCount >>> 16);
-    this.writeVoiceReg(voiceIndex, ES5506_REG.FREQCOUNT + 1, freqCount & 0xFFFF);
+    // MAMEChips.wasm ES5506 uses a paged register scheme:
+    //   write PAGE (voice index) to 0x78, then write per-voice registers at fixed offsets.
+    //   Page 0 (addr < 0x80): CONTROL=0x00, FREQ@0x08-0x0A, LVOL=0x10
+    //   Page 1 (addr | 0x80): START@0x88, END@0x90
+    const sampleRate = this.audioContext.sampleRate;
+    const freq = 440 * Math.pow(2, (midiNote - 69) / 12);
+    const freqCount = Math.floor((freq * 2048 * 32) / sampleRate);
 
-    // Set volume (left and right)
-    const volume = this.velocityToVolume(voice.velocity);
-    this.writeVoiceReg(voiceIndex, ES5506_REG.LVOL, volume);
-    this.writeVoiceReg(voiceIndex, ES5506_REG.RVOL, volume);
+    const vol = this.velocityToVolume(voice.velocity);
 
-    // Reset accumulator to start sample
-    this.writeVoiceReg(voiceIndex, ES5506_REG.ACCUM, 0);
-
-    // Start playing (clear stop bit)
-    const control = ES5506Control.LOOP_ENABLE;
-    this.writeVoiceReg(voiceIndex, ES5506_REG.CONTROL, control);
+    // Select voice
+    this.mameEngine.write(this.handle, 0x78, voiceIndex);
+    // Stop while reconfiguring
+    this.mameEngine.write16(this.handle, 0x00, 0x0001);
+    // Set pitch
+    this.mameEngine.write16(this.handle, 0x08, freqCount & 0xFFFF);
+    this.mameEngine.write(this.handle, 0x0A, (freqCount >> 16) & 0xFF);
+    // Set sample loop start = 0, end = 0x10000 (first 64K of ROM bank 0)
+    this.mameEngine.write16(this.handle, 0x80 | 0x08, 0x0000);
+    this.mameEngine.write16(this.handle, 0x80 | 0x10, 0x1000);
+    // Set volume
+    this.mameEngine.write16(this.handle, 0x10, vol);
+    // Start playback (LOOP_ENABLE)
+    this.mameEngine.write16(this.handle, 0x00, ES5506Control.LOOP_ENABLE);
   }
 
   /**
