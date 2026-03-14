@@ -311,16 +311,22 @@ describe('Native parser tests', () => {
     }
   });
 
-  it('NickPellingPacker: 3rdblock.ntp', async () => {
+  it('NovoTradePacker: 3rdblock.ntp', async () => {
+    // .ntp = NovoTrade Packer (MODU magic), NOT NickPellingPacker (COMP magic)
+    // This specific file has D1=0 at offset 16, so NovoTradePackerParser doesn't detect it
+    // and it falls through to UADE.
     const buf = readFileSync(resolve(BASE, '3rdblock.ntp'));
-    const { isNickPellingPackerFormat, parseNickPellingPackerFile } = await import('@lib/import/formats/NickPellingPackerParser');
-    if (isNickPellingPackerFormat(buf.buffer as ArrayBuffer)) {
-      const song = parseNickPellingPackerFile(buf.buffer as ArrayBuffer, '3rdblock.ntp');
-      logResult('NickPellingPacker', song);
+    const ab = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer;
+    const { isNovoTradePackerFormat, parseNovoTradePackerFile } = await import('@lib/import/formats/NovoTradePackerParser');
+    if (isNovoTradePackerFormat(ab)) {
+      const song = parseNovoTradePackerFile(ab, '3rdblock.ntp');
+      logResult('NovoTradePacker', song);
       expect(song).toBeTruthy();
       expect(song.format).toBeTruthy();
     } else {
-      console.log('  NickPellingPacker: not detected, falls to UADE');
+      // MODU magic present but D1=0; falls to UADE
+      console.log('  NovoTradePacker: D1=0 at offset 16, falls to UADE');
+      expect(buf.byteLength).toBeGreaterThan(0);
     }
   });
 
@@ -510,40 +516,41 @@ describe('Native parser tests', () => {
     }
   });
 
-  it('RobHubbard: battleships.rho', async () => {
+  it('RobHubbardST: battleships.rho', async () => {
+    // .rho files use RobHubbardSTParser (different from .rh which uses RobHubbardParser)
     const buf = readFileSync(resolve(BASE, 'battleships.rho'));
-    const { isRobHubbardFormat, parseRobHubbardFile } = await import('@lib/import/formats/RobHubbardParser');
-    if (isRobHubbardFormat(buf.buffer as ArrayBuffer, 'battleships.rho')) {
-      const song = await parseRobHubbardFile(buf.buffer as ArrayBuffer, 'battleships.rho');
-      logResult('RobHubbard rho', song);
-      expect(song).toBeTruthy();
-    } else {
-      console.log('  RobHubbard rho: not detected');
-    }
+    const ab = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer;
+    const { isRobHubbardSTFormat, parseRobHubbardSTFile } = await import('@lib/import/formats/RobHubbardSTParser');
+    expect(isRobHubbardSTFormat(ab)).toBe(true);
+    const song = parseRobHubbardSTFile(ab, 'battleships.rho');
+    logResult('RobHubbardST rho', song);
+    expect(song).toBeTruthy();
+    expect(song.format).toBeTruthy();
   });
 
-  it('RichardJoseph: punisher.psa', async () => {
+  it('PSA: punisher.psa', async () => {
+    // punisher.psa is PSA format (magic "PSA\0"), routed to PSAParser
     const buf = readFileSync(resolve(BASE, 'punisher.psa'));
-    const { isRJPFormat, parseRJPFile } = await import('@lib/import/formats/RichardJosephParser');
-    const u8 = new Uint8Array(buf);
-    if (isRJPFormat(u8)) {
-      const song = await parseRJPFile(buf.buffer as ArrayBuffer, 'punisher.psa');
-      logResult('RichardJoseph', song);
-      expect(song).toBeTruthy();
-    } else {
-      console.log('  RichardJoseph: not detected');
-    }
+    const ab = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer;
+    const { isPSAFormat, parsePSAFile } = await import('@lib/import/formats/PSAParser');
+    expect(isPSAFormat(ab)).toBe(true);
+    const song = parsePSAFile(ab, 'punisher.psa');
+    logResult('PSA', song);
+    expect(song).toBeTruthy();
+    expect(song.format).toBeTruthy();
   });
 
-  it('Anders0land: inconvenient.sg', async () => {
+  it('TomyTracker: inconvenient.sg', async () => {
+    // inconvenient.sg is TomyTracker format (.sg extension), not Anders0land (which requires hot.* prefix)
     const buf = readFileSync(resolve(BASE, 'inconvenient.sg'));
-    const { isAnders0landFormat, parseAnders0landFile } = await import('@lib/import/formats/Anders0landParser');
-    if (isAnders0landFormat(buf.buffer as ArrayBuffer, 'inconvenient.sg')) {
-      const song = await parseAnders0landFile(buf.buffer as ArrayBuffer, 'inconvenient.sg');
-      logResult('Anders0land', song);
+    const ab = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer;
+    const { isTomyTrackerFormat, parseTomyTrackerFile } = await import('@lib/import/formats/TomyTrackerParser');
+    if (isTomyTrackerFormat(ab)) {
+      const song = parseTomyTrackerFile(ab, 'inconvenient.sg');
+      logResult('TomyTracker', song);
       expect(song).toBeTruthy();
     } else {
-      console.log('  Anders0land: not detected');
+      console.log('  TomyTracker: not detected, falls to UADE');
     }
   });
 
