@@ -8,12 +8,13 @@
  */
 
 import React, { useCallback } from 'react';
+import type { FederatedPointerEvent } from 'pixi.js';
 import { PIXI_FONTS } from '../fonts';
 import { usePixiTheme } from '../theme';
 import { PixiButton } from '../components/PixiButton';
 import { PixiKnob } from '../components/PixiKnob';
 import { usePixiResponsive } from '../hooks/usePixiResponsive';
-import { useThemeStore, themes } from '@stores/useThemeStore';
+import { useThemeStore, themes, useTabsStore, type ProjectTab } from '@stores';
 import { useSettingsStore } from '@stores/useSettingsStore';
 import { useUIStore } from '@stores/useUIStore';
 import { useProjectStore } from '@stores/useProjectStore';
@@ -26,6 +27,10 @@ import { useAIStore } from '@stores/useAIStore';
 import { MODERN_NAV_H } from '../workbench/workbenchLayout';
 import { serializeProjectToBlob } from '@hooks/useProjectPersistence';
 import { PixiTransportBar } from './PixiTransportBar';
+import { BUILD_VERSION } from '@constants/version';
+
+const NAV_ROW_H = 52;
+const TAB_ROW_H = MODERN_NAV_H - NAV_ROW_H; // 24px
 
 // ─── View selector pills ─────────────────────────────────────────────────────
 
@@ -53,6 +58,13 @@ export const PixiNavBar: React.FC = () => {
   // Theme store
   const currentThemeId = useThemeStore((s) => s.currentThemeId);
   const setTheme = useThemeStore((s) => s.setTheme);
+
+  // Tabs store
+  const tabs = useTabsStore((s) => s.tabs);
+  const activeTabId = useTabsStore((s) => s.activeTabId);
+  const addTab = useTabsStore((s) => s.addTab);
+  const closeTab = useTabsStore((s) => s.closeTab);
+  const setActiveTab = useTabsStore((s) => s.setActiveTab);
 
   // Settings store
   const setRenderMode = useSettingsStore((s) => s.setRenderMode);
@@ -137,9 +149,14 @@ export const PixiNavBar: React.FC = () => {
     useUIStore.getState().openModal('settings');
   }, []);
 
+  // Download App modal
+  const handleDownloadApp = useCallback(() => {
+    useUIStore.getState().openModal('download');
+  }, []);
+
   // Transport bar width: center zone gets whatever's left after left/right
   const LEFT_W = 460;
-  const RIGHT_W = 440;
+  const RIGHT_W = 460;
   const transportW = Math.max(200, width - LEFT_W - RIGHT_W);
 
   return (
@@ -147,19 +164,21 @@ export const PixiNavBar: React.FC = () => {
       layout={{
         width,
         height: MODERN_NAV_H,
-        flexDirection: 'row',
-        alignItems: 'center',
+        flexDirection: 'column',
         backgroundColor: theme.bgTertiary.color,
         borderBottomWidth: 1,
         borderColor: theme.border.color,
       }}
     >
 
+      {/* ── Main nav row ── */}
+      <pixiContainer layout={{ width, height: NAV_ROW_H, flexDirection: 'row', alignItems: 'center', flexShrink: 0 }}>
+
       {/* ═══ Left zone: Logo + view selector pills ═══ */}
       <pixiContainer
         layout={{
           width: LEFT_W,
-          height: MODERN_NAV_H,
+          height: NAV_ROW_H,
           flexDirection: 'row',
           alignItems: 'center',
           paddingLeft: 16,
@@ -197,13 +216,13 @@ export const PixiNavBar: React.FC = () => {
       </pixiContainer>
 
       {/* ═══ Center zone: Transport ═══ */}
-      <PixiTransportBar width={transportW} height={MODERN_NAV_H} />
+      <PixiTransportBar width={transportW} height={NAV_ROW_H} />
 
       {/* ═══ Right zone: Volume, Actions, Status ═══ */}
       <pixiContainer
         layout={{
           width: RIGHT_W,
-          height: MODERN_NAV_H,
+          height: NAV_ROW_H,
           flexDirection: 'row',
           alignItems: 'center',
           justifyContent: 'flex-end',
@@ -275,8 +294,110 @@ export const PixiNavBar: React.FC = () => {
         />
 
         <PixiButton label="THEME" variant="ghost" size="sm" onClick={handleThemeCycle} width={52} />
+        <PixiButton label="APP" variant="ghost" size="sm" onClick={handleDownloadApp} width={36} />
         <PixiButton label="DOM" variant="ghost" size="sm" onClick={handleSwitchToDom} width={36} />
+
+        {/* Build version badge */}
+        <pixiBitmapText
+          text={BUILD_VERSION}
+          style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 9, fill: 0xffffff }}
+          tint={theme.textMuted.color}
+          layout={{ marginLeft: 4 }}
+        />
       </pixiContainer>
+
+      </pixiContainer>{/* end main nav row */}
+
+      {/* ── Project tab bar row ── */}
+      <layoutContainer
+        layout={{
+          width,
+          height: TAB_ROW_H,
+          flexDirection: 'row',
+          alignItems: 'center',
+          paddingLeft: 8,
+          paddingRight: 8,
+          gap: 2,
+          backgroundColor: theme.bgSecondary.color,
+          borderTopWidth: 1,
+          borderColor: theme.border.color,
+          flexShrink: 0,
+        }}
+      >
+        {tabs.map((tab: ProjectTab) => {
+          const isActive = tab.id === activeTabId;
+          return (
+            <layoutContainer
+              key={tab.id}
+              eventMode="static"
+              cursor="pointer"
+              onPointerUp={() => setActiveTab(tab.id)}
+              layout={{
+                height: TAB_ROW_H - 4,
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 4,
+                paddingLeft: 8,
+                paddingRight: tabs.length > 1 ? 4 : 8,
+                backgroundColor: isActive ? theme.bg.color : theme.bgTertiary.color,
+                borderWidth: 1,
+                borderColor: isActive ? theme.accent.color : theme.border.color,
+                borderRadius: 3,
+              }}
+            >
+              <pixiBitmapText
+                text={(tab.name || 'Untitled').toUpperCase() + (tab.isDirty ? ' *' : '')}
+                style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }}
+                tint={isActive ? theme.text.color : theme.textMuted.color}
+                layout={{}}
+                eventMode="none"
+              />
+              {tabs.length > 1 && (
+                <layoutContainer
+                  eventMode="static"
+                  cursor="pointer"
+                  onPointerUp={(e: FederatedPointerEvent) => { e.stopPropagation(); closeTab(tab.id); }}
+                  layout={{ width: 12, height: 12, justifyContent: 'center', alignItems: 'center' }}
+                >
+                  <pixiBitmapText
+                    text="x"
+                    style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 9, fill: 0xffffff }}
+                    tint={theme.textMuted.color}
+                    layout={{}}
+                    eventMode="none"
+                  />
+                </layoutContainer>
+              )}
+            </layoutContainer>
+          );
+        })}
+
+        {/* Add tab button */}
+        <layoutContainer
+          eventMode="static"
+          cursor="pointer"
+          onPointerUp={() => addTab()}
+          layout={{
+            width: TAB_ROW_H - 4,
+            height: TAB_ROW_H - 4,
+            justifyContent: 'center',
+            alignItems: 'center',
+            backgroundColor: theme.bgTertiary.color,
+            borderWidth: 1,
+            borderColor: theme.border.color,
+            borderRadius: 3,
+          }}
+        >
+          <pixiBitmapText
+            text="+"
+            style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 12, fill: 0xffffff }}
+            tint={theme.textMuted.color}
+            layout={{}}
+            eventMode="none"
+          />
+        </layoutContainer>
+      </layoutContainer>
+
     </layoutContainer>
   );
 };
