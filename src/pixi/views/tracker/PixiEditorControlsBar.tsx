@@ -263,6 +263,65 @@ const SIDSubsongAndInfo: React.FC = () => {
   );
 };
 
+// ─── UADE Editable Subsong Selector ──────────────────────────────────────────
+
+const UADESubsongSelector: React.FC = () => {
+  const { uadeEditableSubsongs, uadeEditableCurrentSubsong } = useFormatStore(
+    useShallow(s => ({
+      uadeEditableSubsongs: s.uadeEditableSubsongs,
+      uadeEditableCurrentSubsong: s.uadeEditableCurrentSubsong,
+    }))
+  );
+  const setPatternOrder = useTrackerStore(s => s.setPatternOrder);
+  const setCurrentPattern = useTrackerStore(s => s.setCurrentPattern);
+  const setSpeed = useTransportStore(s => s.setSpeed);
+
+  const options = useMemo<SelectOption[]>(() => {
+    if (!uadeEditableSubsongs) return [];
+    return Array.from({ length: uadeEditableSubsongs.count }, (_, i) => ({
+      value: String(i),
+      label: `${i + 1}. Subsong ${i + 1}`,
+    }));
+  }, [uadeEditableSubsongs]);
+
+  const handleChange = useCallback(async (val: string) => {
+    const newIdx = Number(val);
+    if (!uadeEditableSubsongs || newIdx === uadeEditableCurrentSubsong) return;
+
+    // Update store, pattern view, and transport
+    useFormatStore.setState({ uadeEditableCurrentSubsong: newIdx });
+    setPatternOrder([newIdx]);
+    setCurrentPattern(newIdx);
+    setSpeed(uadeEditableSubsongs.speeds[newIdx] ?? 6);
+
+    // Switch UADE subsong in-place (no full reload — avoids double-init)
+    try {
+      const { UADEEngine } = await import('@engine/uade/UADEEngine');
+      if (UADEEngine.hasInstance()) {
+        const engine = UADEEngine.getInstance();
+        engine.setSubsong(newIdx);
+        engine.play();
+      }
+    } catch (err) {
+      console.error('[UADESubsongSelector] setSubsong failed:', err);
+    }
+
+    notify.success(`Subsong ${newIdx + 1}/${uadeEditableSubsongs.count}`);
+  }, [uadeEditableSubsongs, uadeEditableCurrentSubsong, setPatternOrder, setCurrentPattern, setSpeed]);
+
+  if (!uadeEditableSubsongs || uadeEditableSubsongs.count <= 1) return <pixiContainer />;
+
+  return (
+    <PixiSelect
+      options={options}
+      value={String(uadeEditableCurrentSubsong)}
+      onChange={handleChange}
+      width={120}
+      height={24}
+    />
+  );
+};
+
 // ─── Module Info Button (non-SID) ────────────────────────────────────────────
 
 const ModuleInfoButton: React.FC = () => {
@@ -443,6 +502,9 @@ export const PixiEditorControlsBar: React.FC<PixiEditorControlsBarProps> = ({
 
       {/* SID subsong selector + info button */}
       <SIDSubsongAndInfo />
+
+      {/* UADE editable subsong selector (Steve Turner, etc.) */}
+      <UADESubsongSelector />
 
       {/* Module info button (non-SID) */}
       <ModuleInfoButton />

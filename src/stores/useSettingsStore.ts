@@ -358,7 +358,7 @@ export const useSettingsStore = create<SettingsStore>()(
         tcbTracker: 'uade',     // TCBTrackerParser — dedicated TCB Tracker support
         mmdc: 'uade',           // MMDCParser — dedicated MMDC support
         psa: 'uade',            // PSAParser — dedicated PSA support
-        steveTurner: 'uade',    // SteveTurnerParser — dedicated Steve Turner support
+        steveTurner: 'native',  // SteveTurnerParser — native parses patterns + subsongs, UADE handles audio
         tme: 'uade',            // TMEParser — dedicated TME support
         jasonBrooke: 'uade',    // JasonBrookeParser — dedicated Jason Brooke support
         laxity: 'uade',         // LaxityParser — dedicated Laxity support
