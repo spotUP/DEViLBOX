@@ -46,6 +46,10 @@ export const CHANGELOG: ChangelogEntry[] = [
         "description": "Add 9 MAME PCM/sampler chip synths with hardware UIs and presets"
       },
       {
+        type: 'fix',
+        "description": "Fix silent audio in FZ/PS1SPU/MultiPCM/ZSG2/KS0164/SWP00/SWP20/RolandGP/CMI worklets: use m.wasmMemory instead of m.memory for heap access"
+      },
+      {
         type: 'feature',
         "description": "Add comprehensive format parser regression suite: 108 tests covering 90+ formats"
       },
