@@ -2891,6 +2891,7 @@ button[class*="rounded"] {
 [data-theme="boss-hc2"] button {
   box-shadow: none;
   border-width: 1px;
+  border-color: var(--color-border);
 }
 
 /* Metallic knob glow for TR-909 */

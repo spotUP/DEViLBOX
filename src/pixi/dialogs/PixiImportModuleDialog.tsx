@@ -471,7 +471,7 @@ export const PixiImportModuleDialog: React.FC<PixiImportModuleDialogProps> = ({
         {/* ── Loading state ── */}
         {isLoading && (
           <layoutContainer layout={{ alignItems: 'center', justifyContent: 'center', height: 60 }}>
-            <PixiLabel text="Loading…" size="sm" color="textMuted" />
+            <PixiLabel text="Parsing Pattern Data…" size="sm" color="textMuted" />
           </layoutContainer>
         )}
 
