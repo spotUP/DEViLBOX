@@ -73,6 +73,9 @@ export async function withNativeThenUADE(
   opts?: {
     isFormat?: (bytes: Uint8Array) => boolean;
     usesBytes?: boolean;
+    /** Always inject uadeEditableFileData into native result so UADE handles audio 1:1.
+     *  Use when the native parser provides pattern display but can't fully emulate synthesis. */
+    injectUADE?: boolean;
   },
 ): Promise<TrackerSong> {
   if (ctx.prefs[prefKey] === 'native') {
@@ -94,6 +97,10 @@ export async function withNativeThenUADE(
         if (totalNotes === 0) {
           console.warn(`[${parserName}] Native parser returned 0 notes for ${ctx.originalFileName}, falling back to UADE`);
           return callUADE(ctx);
+        }
+        if (opts?.injectUADE && !(result as any).uadeEditableFileData) {
+          (result as any).uadeEditableFileData = ctx.buffer.slice(0);
+          (result as any).uadeEditableFileName = ctx.originalFileName;
         }
         return injectUADEPlayback(result, ctx);
       }

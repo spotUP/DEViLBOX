@@ -437,42 +437,17 @@ export async function parseDeltaMusic1File(buffer: ArrayBuffer, filename: string
 
     } else if (inst.table !== null) {
       // Synth (wavetable) instrument.
-      // Pre-render the sound table sequence for a better timbral approximation.
-      // The 48-byte table drives waveform segment playback at runtime:
-      //   entry >= 0x80 (& != 0xFF): set segDelay = (entry & 0x7F); advance
-      //   entry < 0x80:              play sampleData[entry*32 .. +32] for segDelay ticks
-      //   entry == 0xFF:             loop (byte after 0xFF = loop-back table index)
-      //
-      // We pre-render by walking the table and appending each referenced 32-byte segment
-      // (repeated segDelay times, capped to avoid huge buffers). The result loops over
-      // the full timbral sequence rather than being a static single-frame snapshot.
-      const SEGMENT_BYTES = 32;
-      const MAX_DELAY_REPS = 6; // cap per-segment repeats to keep buffer reasonable
-
-      interface DM1Step { segOffset: number; reps: number; }
-      const tableSteps: DM1Step[] = [];
-      let segDelay = 1;
-      let tableLoopIndex = 0; // index into tableSteps where the sound table loops back
-      let hasLoopMarker = false;
-
+      // Extract first valid waveform segment for pattern display only.
+      // Audio is handled by UADE (uadeEditableFileData injected in routing layer),
+      // so the exact waveform content doesn't affect playback quality.
+      let waveOffset = 0;
       for (let t = 0; t < 48; t++) {
         const entry = inst.table[t];
-        if (entry === 0xff) {
-          // Next byte is the loop-back table index (segment entry index, not tableSteps index)
-          hasLoopMarker = true;
-          tableLoopIndex = tableSteps.length; // loop back to start by default
-          break;
-        } else if (entry >= 0x80) {
-          segDelay = entry & 0x7f;
-        } else {
-          const segOff = entry * SEGMENT_BYTES;
-          if (segOff + SEGMENT_BYTES <= inst.sampleData.length) {
-            tableSteps.push({ segOffset: segOff, reps: Math.max(1, Math.min(segDelay, MAX_DELAY_REPS)) });
-          }
-        }
+        if (entry === 0xff) break;
+        if (entry < 0x80) { waveOffset = entry * 32; break; }
       }
-
-      if (tableSteps.length === 0) {
+      const waveLen = Math.min(32, inst.sampleData.length - waveOffset);
+      if (waveLen <= 0) {
         trackerInstruments.push({
           id,
           name: `Synth ${i}`,
@@ -487,27 +462,15 @@ export async function parseDeltaMusic1File(buffer: ArrayBuffer, filename: string
         continue;
       }
 
-      // Build pre-rendered PCM buffer
-      const totalSamples = tableSteps.reduce((s, step) => s + step.reps * SEGMENT_BYTES, 0);
-      const pcmUint8 = new Uint8Array(totalSamples);
-      let pcmPos = 0;
-      // Compute loop start sample (bytes before the loop-back point in tableSteps)
-      const loopStartSample = tableSteps.slice(0, tableLoopIndex).reduce(
-        (s, step) => s + step.reps * SEGMENT_BYTES, 0
-      );
-      for (const step of tableSteps) {
-        for (let rep = 0; rep < step.reps; rep++) {
-          for (let j = 0; j < SEGMENT_BYTES; j++) {
-            pcmUint8[pcmPos++] = inst.sampleData[step.segOffset + j] & 0xff;
-          }
-        }
+      const pcmUint8 = new Uint8Array(waveLen);
+      for (let j = 0; j < waveLen; j++) {
+        pcmUint8[j] = inst.sampleData[waveOffset + j] & 0xff;
       }
-      const loopEndSample = hasLoopMarker ? totalSamples : totalSamples; // always loop
 
       // Store at PCM_BASE_RATE (8287 Hz) — Chrome requires ≥ 3000 Hz for decodeAudioData.
-      // ToneEngine computes playbackRate = (periodMultiplier / period) / sampleRate,
-      // so pitch is correct at any sampleRate; 8287 Hz is safe and consistent with PCM.
-      const synthInst = createSamplerInstrument(id, `Synth ${i}`, pcmUint8, inst.volume, PCM_BASE_RATE, loopStartSample, loopEndSample);
+      // This waveform is used only for the instrument editor display; actual audio comes
+      // from UADE via uadeEditableFileData injected by the routing layer.
+      const synthInst = createSamplerInstrument(id, `Synth ${i}`, pcmUint8, inst.volume, PCM_BASE_RATE, 0, waveLen);
       // Attach DM1 config for future editor use, but keep synthType as 'Sampler'
       // so the waveform PCM data routes through the native Tone.js sampler engine.
       synthInst.deltaMusic1 = buildDM1Config(inst);
