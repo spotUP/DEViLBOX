@@ -559,3 +559,137 @@ export async function loadVFXROMs(): Promise<Uint8Array[]> {
 export async function loadRolandSAROMs(): Promise<Uint8Array> {
   return await loadChipROMs(ROLANDSA_ROM_CONFIG);
 }
+
+/**
+ * MultiPCM (Yamaha YMW258-F / GEW8) ROM configuration
+ * Used in Sega Model 1/2, various Yamaha arcade boards
+ * ROM contains 12-byte-per-sample metadata table + sample data
+ */
+export const MULTIPCM_ROM_CONFIG: ChipROMConfig = {
+  chipName: 'MultiPCM',
+  basePath: '/roms/multipcm',
+  zipFile: 'multipcm.zip',
+  combinedFile: 'multipcm_samples.bin',
+  combinedSize: 8 * 1024 * 1024,  // 8MB typical
+  files: [
+    { name: 'multipcm_samples.bin', offset: 0, required: true },
+  ],
+};
+
+/**
+ * ZSG-2 (ZOOM ZSG-2) ROM configuration
+ * Used in ZOOM GFX-8, Studio 1201 effects processors
+ * ROM contains 4-bit ADPCM compressed sample data
+ */
+export const ZSG2_ROM_CONFIG: ChipROMConfig = {
+  chipName: 'ZSG2',
+  basePath: '/roms/zsg2',
+  zipFile: 'zsg2.zip',
+  combinedFile: 'zsg2_samples.bin',
+  combinedSize: 4 * 1024 * 1024,  // 4MB typical
+  files: [
+    { name: 'zsg2_samples.bin', offset: 0, required: true },
+  ],
+};
+
+/**
+ * KS0164 (Samsung KS0164) ROM configuration
+ * Samsung GM wavetable synth — used in OEM sound cards
+ */
+export const KS0164_ROM_CONFIG: ChipROMConfig = {
+  chipName: 'KS0164',
+  basePath: '/roms/ks0164',
+  zipFile: 'ks0164.zip',
+  combinedFile: 'ks0164_samples.bin',
+  combinedSize: 4 * 1024 * 1024,  // 4MB typical
+  files: [
+    { name: 'ks0164_samples.bin', offset: 0, required: true },
+  ],
+};
+
+/**
+ * SWP00 (Yamaha MU50 AWM2) ROM configuration
+ * Yamaha XG wave ROM for MU50 tone generator
+ */
+export const SWP00_ROM_CONFIG: ChipROMConfig = {
+  chipName: 'SWP00',
+  basePath: '/roms/swp00',
+  zipFile: 'swp00.zip',
+  combinedFile: 'swp00_wave.bin',
+  combinedSize: 16 * 1024 * 1024,  // 16MB addressable
+  files: [
+    { name: 'swp00_wave.bin', offset: 0, required: true },
+  ],
+};
+
+/**
+ * SWP20 (Yamaha MU80 AWM2) ROM configuration
+ * Yamaha XG wave ROM for MU80 tone generator (same AWM2 family as SWP00)
+ */
+export const SWP20_ROM_CONFIG: ChipROMConfig = {
+  chipName: 'SWP20',
+  basePath: '/roms/swp20',
+  zipFile: 'swp20.zip',
+  combinedFile: 'swp20_wave.bin',
+  combinedSize: 16 * 1024 * 1024,  // 16MB addressable
+  files: [
+    { name: 'swp20_wave.bin', offset: 0, required: true },
+  ],
+};
+
+/**
+ * RolandGP (Roland TC6116 SC-88) ROM configuration
+ * Roland SC-88 / JV-series wave ROM
+ */
+export const ROLANDGP_ROM_CONFIG: ChipROMConfig = {
+  chipName: 'RolandGP',
+  basePath: '/roms/rolandgp',
+  zipFile: 'rolandgp.zip',
+  combinedFile: 'rolandgp_wave.bin',
+  combinedSize: 4 * 1024 * 1024,  // 4MB typical (SC-88 wave ROM)
+  files: [
+    { name: 'rolandgp_wave.bin', offset: 0, required: true },
+  ],
+};
+
+/**
+ * Helper: Load MultiPCM ROMs
+ */
+export async function loadMultiPCMROMs(): Promise<Uint8Array> {
+  return loadChipROMs(MULTIPCM_ROM_CONFIG);
+}
+
+/**
+ * Helper: Load ZSG2 ROMs
+ */
+export async function loadZSG2ROMs(): Promise<Uint8Array> {
+  return loadChipROMs(ZSG2_ROM_CONFIG);
+}
+
+/**
+ * Helper: Load KS0164 ROMs
+ */
+export async function loadKS0164ROMs(): Promise<Uint8Array> {
+  return loadChipROMs(KS0164_ROM_CONFIG);
+}
+
+/**
+ * Helper: Load SWP00 ROMs
+ */
+export async function loadSWP00ROMs(): Promise<Uint8Array> {
+  return loadChipROMs(SWP00_ROM_CONFIG);
+}
+
+/**
+ * Helper: Load SWP20 ROMs
+ */
+export async function loadSWP20ROMs(): Promise<Uint8Array> {
+  return loadChipROMs(SWP20_ROM_CONFIG);
+}
+
+/**
+ * Helper: Load RolandGP ROMs
+ */
+export async function loadRolandGPROMs(): Promise<Uint8Array> {
+  return loadChipROMs(ROLANDGP_ROM_CONFIG);
+}
