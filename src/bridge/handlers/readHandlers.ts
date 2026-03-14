@@ -761,7 +761,7 @@ export function renderPatternText(params: Record<string, unknown>): Record<strin
   const channelIndices = channelFilter ?? Array.from({ length: pattern.channels.length }, (_, i) => i);
 
   // Build header
-  const header = 'Row | ' + channelIndices.map((c) => `Ch${String(c).padStart(2, '0')}         `).join('| ');
+  const header = 'Row | ' + channelIndices.map((c) => `Ch${String(c).padStart(2, '0')}             `).join('| ');
   const sep = '-'.repeat(header.length);
 
   const lines: string[] = [header, sep];
@@ -770,14 +770,15 @@ export function renderPatternText(params: Record<string, unknown>): Record<strin
     const cellStrs: string[] = [];
     for (const c of channelIndices) {
       const cell = pattern.channels[c]?.rows[r];
-      if (!cell || (!cell.note && !cell.instrument && !cell.volume && !cell.effTyp)) {
-        cellStrs.push('--- .. .. ...');
+      if (!cell || (!cell.note && !cell.instrument && !cell.volume && !cell.effTyp && !cell.effTyp2)) {
+        cellStrs.push('--- .. .. ... ...');
       } else {
         const n = noteToString(cell.note);
         const i = cell.instrument ? formatHex(cell.instrument) : '..';
         const v = cell.volume ? formatHex(cell.volume) : '..';
-        const e = cell.effTyp ? `${formatHex(cell.effTyp, 1)}${formatHex(cell.eff)}` : '...';
-        cellStrs.push(`${n} ${i} ${v} ${e}`);
+        const e1 = effectToString(cell.effTyp, cell.eff);
+        const e2 = (cell.effTyp2 || cell.eff2) ? effectToString(cell.effTyp2 ?? 0, cell.eff2 ?? 0) : '...';
+        cellStrs.push(`${n} ${i} ${v} ${e1} ${e2}`);
       }
     }
     lines.push(`${rowStr} | ${cellStrs.join('| ')}`);
