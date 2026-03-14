@@ -43,6 +43,9 @@ set(COMMON_SOURCES
 
   # blip_buf resampling
   ${FURNACE_EXTERN}/blip_buf/blip_buf.c
+
+  # BRR encoding (required by DivSample::render for SNES)
+  ${FURNACE_ENGINE}/brrUtils.c
 )
 
 # ============================================================
