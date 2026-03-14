@@ -42,6 +42,17 @@ function formatHex(val: number, digits = 2): string {
   return val.toString(16).toUpperCase().padStart(digits, '0');
 }
 
+const DSP_EFFECT_CHARS = ['D', 'E', 'C', 'L', 'X'];
+
+function effectToString(effTyp: number, eff: number): string {
+  if (effTyp === 0 && eff === 0) return '...';
+  // Symphonie DSP effects: effTyp 0x50-0x54 → type letter + value
+  if (effTyp >= 0x50 && effTyp <= 0x54) {
+    return `${DSP_EFFECT_CHARS[effTyp - 0x50] ?? 'D'}${formatHex(eff)}`;
+  }
+  return `${formatHex(effTyp, 1)}${formatHex(eff)}`;
+}
+
 function formatCell(cell: { note: number; instrument: number; volume: number; effTyp: number; eff: number; effTyp2?: number; eff2?: number }) {
   return {
     note: cell.note,
@@ -50,7 +61,7 @@ function formatCell(cell: { note: number; instrument: number; volume: number; ef
     volume: cell.volume,
     effTyp: cell.effTyp,
     eff: cell.eff,
-    effStr: cell.effTyp ? `${formatHex(cell.effTyp, 1)}${formatHex(cell.eff)}` : '...',
+    effStr: effectToString(cell.effTyp, cell.eff),
     effTyp2: cell.effTyp2 ?? 0,
     eff2: cell.eff2 ?? 0,
   };

@@ -350,6 +350,14 @@ export const CHIP_CAPABILITIES: Record<string, Partial<MAMEChipCapabilities>> = 
     hasStereo: true,
     sampleRAMSize: 16777216, // 16MB
   },
+  CMI: {
+    numVoices: 8,
+    hasPCM: true,
+    hasADSR: true,
+    hasPanning: true,
+    hasStereo: true,
+    sampleRAMSize: 65536, // 64KB per-voice RAM (8-bit samples)
+  },
   SN76477: {
     numVoices: 1,
     hasNoise: true,
