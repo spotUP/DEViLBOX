@@ -1449,7 +1449,7 @@ export async function tryRouteFormat(
     const { isPSAFormat, parsePSAFile } = await import('@lib/import/formats/PSAParser');
     return withNativeThenUADE('psa', ctx,
       (buf: Uint8Array | ArrayBuffer, name: string) => { if (isPSAFormat(buf as ArrayBuffer)) return parsePSAFile(buf as ArrayBuffer, name); return null; },
-      'PSAParser');
+      'PSAParser', { injectUADE: true });
   }
 
   // ── MMDC (.mmdc / MMDC.*) ────────────────────────────────────────────────────
@@ -1458,7 +1458,7 @@ export async function tryRouteFormat(
     const { isMMDCFormat, parseMMDCFile } = await import('@lib/import/formats/MMDCParser');
     return withNativeThenUADE('mmdc', ctx,
       (buf: Uint8Array | ArrayBuffer, name: string) => { if (isMMDCFormat(buf as ArrayBuffer)) return parseMMDCFile(buf as ArrayBuffer, name); return null; },
-      'MMDCParser');
+      'MMDCParser', { injectUADE: true });
   }
 
   // ── Steve Turner (.jpo / .jpold / JPO.*) ────────────────────────────────────
@@ -1536,7 +1536,7 @@ export async function tryRouteFormat(
     const { isTomyTrackerFormat, parseTomyTrackerFile } = await import('@lib/import/formats/TomyTrackerParser');
     return withNativeThenUADE('tomyTracker', ctx,
       (buf: Uint8Array | ArrayBuffer, name: string) => { if (isTomyTrackerFormat(buf as ArrayBuffer)) return parseTomyTrackerFile(buf as ArrayBuffer, name); return null; },
-      'TomyTrackerParser');
+      'TomyTrackerParser', { injectUADE: true });
   }
 
   // ── Images Music System (IMS.* prefix) ────────────────────────────────────
@@ -1677,7 +1677,7 @@ export async function tryRouteFormat(
     const { isSpecialFXFormat, parseSpecialFXFile } = await import('@lib/import/formats/SpecialFXParser');
     return withNativeThenUADE('specialFX', ctx,
       (buf: Uint8Array | ArrayBuffer, name: string) => { if (isSpecialFXFormat(buf as ArrayBuffer)) return parseSpecialFXFile(buf as ArrayBuffer, name); return null; },
-      'SpecialFXParser');
+      'SpecialFXParser', { injectUADE: true });
   }
 
   // ── Sound Player / Steve Barrett (SJS.* prefix) ───────────────────────────
@@ -1991,7 +1991,7 @@ export async function tryRouteFormat(
     const { isRobHubbardSTFormat, parseRobHubbardSTFile } = await import('@lib/import/formats/RobHubbardSTParser');
     return withNativeThenUADE('robHubbardST', ctx,
       (buf: Uint8Array | ArrayBuffer, name: string) => { if (isRobHubbardSTFormat(buf as ArrayBuffer)) return parseRobHubbardSTFile(buf as ArrayBuffer, name); return null; },
-      'RobHubbardSTParser');
+      'RobHubbardSTParser', { injectUADE: true });
   }
 
   // ── Rob Hubbard (RH.* prefix) ─────────────────────────────────────────────
@@ -2045,23 +2045,16 @@ export async function tryRouteFormat(
     const { isSpecialFXFormat, parseSpecialFXFile } = await import('@lib/import/formats/SpecialFXParser');
     return withNativeThenUADE('specialFX', ctx,
       (buf: Uint8Array | ArrayBuffer, name: string) => { if (isSpecialFXFormat(buf as ArrayBuffer)) return parseSpecialFXFile(buf as ArrayBuffer, name); return null; },
-      'SpecialFXParser');
+      'SpecialFXParser', { injectUADE: true });
   }
 
   // ── SynthPack (OSP.* prefix) ─────────────────────────────────────────────
   // eagleplayer.conf: SynthPack  prefixes=osp
   // Magic: "OBISYNTHPACK" at byte offset 0.
+  // NOTE: UADE does not include the SynthPack eagleplayer — native stub parser only.
   if (matchesExt(filename, ['osp'])) {
-    if (prefs.synthPack === 'native') {
-      try {
-        const { isSynthPackFormat, parseSynthPackFile } = await import('@lib/import/formats/SynthPackParser');
-        if (isSynthPackFormat(buffer, originalFileName)) return parseSynthPackFile(buffer, originalFileName);
-      } catch (err) {
-        console.warn(`[SynthPackParser] Native parse failed for ${filename}, falling back to UADE:`, err);
-      }
-    }
-    const { parseUADEFile: parseUADE_osp } = await import('@lib/import/formats/UADEParser');
-    return parseUADE_osp(buffer, originalFileName, prefs.uade ?? 'enhanced', subsong, preScannedMeta);
+    const { parseSynthPackFile } = await import('@lib/import/formats/SynthPackParser');
+    return parseSynthPackFile(buffer, originalFileName);
   }
 
   // ── Fred Gray (gray.* prefix) ────────────────────────────────────────────
@@ -2145,14 +2138,6 @@ export async function tryRouteFormat(
   // eagleplayer.conf: ManiacsOfNoise  prefixes=mon
   // mon_old.* is handled above by the JeroenTel block.
   if (matchesExt(filename, ['mon']) && !matchesExt(filename, ['mon_old'])) {
-    if (prefs.maniacsOfNoise === 'native') {
-      try {
-        const { isManiacsOfNoiseFormat, parseManiacsOfNoiseFile } = await import('@lib/import/formats/ManiacsOfNoiseParser');
-        if (isManiacsOfNoiseFormat(buffer, originalFileName)) return parseManiacsOfNoiseFile(buffer, originalFileName);
-      } catch (err) {
-        console.warn(`[ManiacsOfNoiseParser] Native parse failed for ${filename}, falling back to UADE:`, err);
-      }
-    }
     const { parseUADEFile: parseUADE_mon } = await import('@lib/import/formats/UADEParser');
     return parseUADE_mon(buffer, originalFileName, prefs.uade ?? 'enhanced', subsong, preScannedMeta);
   }
