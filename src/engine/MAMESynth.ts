@@ -1,6 +1,7 @@
 import type { DevilboxSynth } from '@/types/synth';
 import { getDevilboxAudioContext, noteToFrequency } from '@/utils/audio-context';
 import { MAMEEngine } from './MAMEEngine';
+import { loadES5503ROMs } from './mame/MAMEROMLoader';
 
 export type MAMESynthType = 'vfx' | 'doc' | 'rsa' | 'swp30';
 
@@ -94,6 +95,19 @@ export class MAMESynth implements DevilboxSynth {
       if (this.config.type === 'vfx') {
         this.engine.write(this.handle, 0x58, 31); // 32 active voices
         this.engine.write(this.handle, 0x60, 0x01); // Single master mode
+      }
+
+      // ES5503 (DOC): load sample wavetable ROM so oscillators have data to read
+      if (this.config.type === 'doc') {
+        try {
+          const wavetable = await loadES5503ROMs();
+          this.engine.setRom(0, wavetable);
+          console.log('[MAMESynth] ES5503 wavetable loaded:', wavetable.length, 'bytes');
+          // Enable 1 oscillator (register 0xE1, value = num_oscillators - 1)
+          this.engine.write(this.handle, 0xE1, 0);
+        } catch (err) {
+          console.warn('[MAMESynth] ES5503 wavetable load failed:', err);
+        }
       }
 
       // Start the rendering loop
@@ -208,15 +222,27 @@ export class MAMESynth implements DevilboxSynth {
       
       this.engine.write16(this.handle, 0x00, 0x0000); // PLAY
     } else if (this.config.type === 'doc') {
-      // ES5503 (DOC) - Flat address space
-      this.engine.write(this.handle, 0xE0, 0x00); 
-      this.engine.write(this.handle, 0x00 + vIdx, 0); // STOP bit in control?
-      
-      const freqVal = Math.floor((freq * 0x10000) / (32000 / 32));
-      this.engine.write(this.handle, 0x00 + vIdx, freqVal & 0xFF);
-      this.engine.write(this.handle, 0x20 + vIdx, (freqVal >> 8) & 0xFF);
-      this.engine.write(this.handle, 0x40 + vIdx, Math.floor(velocity * 255));
-      this.engine.write(this.handle, 0x80 + vIdx, 0x00); // PLAY
+      // ES5503 (DOC) register map:
+      //   0x00-0x1F: oscillator frequency lo (1 byte each)
+      //   0x20-0x3F: oscillator frequency hi (1 byte each)
+      //   0x40-0x5F: oscillator volume (1 byte each)
+      //   0x80-0x9F: oscillator control (bit7=HALT, bit6=INT, others: wave mode)
+      //   0xA0-0xBF: oscillator wave table pointer (page select, 256-byte pages)
+      //   0xE1:      oscillator count (N-1, max 31)
+      //
+      // Frequency: increment added to 23-bit accumulator each sample; upper 8 bits
+      // select byte within the 256-byte wave page.
+      // freqVal = desired_hz * 65536 / sampleRate  (16-bit split lo/hi)
+      //
+      // Wave page 8 = offset 0x800 in ROM = first actual sample data (SYNTH_48 wave)
+      const sampleRate = 44100;
+      const freqVal = Math.floor((freq * 65536) / sampleRate);
+      this.engine.write(this.handle, 0x80 + vIdx, 0x80); // HALT oscillator while configuring
+      this.engine.write(this.handle, 0x00 + vIdx, freqVal & 0xFF);        // freq lo
+      this.engine.write(this.handle, 0x20 + vIdx, (freqVal >> 8) & 0xFF); // freq hi
+      this.engine.write(this.handle, 0x40 + vIdx, Math.floor(velocity * 255)); // volume
+      this.engine.write(this.handle, 0xA0 + vIdx, 8); // wave table page 8 (first real data)
+      this.engine.write(this.handle, 0x80 + vIdx, 0x00); // PLAY (clear HALT)
     } else if (this.config.type === 'rsa') {
       // Roland SA - Each voice has 10 parts
       // Pitch mapping: 0x4000 = 32000Hz (for 32kHz mode)

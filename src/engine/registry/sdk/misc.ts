@@ -25,7 +25,7 @@ import { VFXSynth } from '../../vfx/VFXSynth';
 import { D50Synth } from '../../d50/D50Synth';
 import { RdPianoSynth } from '../../rdpiano/RdPianoSynth';
 import { MU2000Synth } from '../../mu2000/MU2000Synth';
-import { MAMESynth } from '../../MAMESynth';
+import { ES5503Synth } from '../../es5503/ES5503Synth';
 import { DrumKitSynth } from '../../DrumKitSynth';
 import { WavetableSynth } from '../../WavetableSynth';
 import {
@@ -307,9 +307,13 @@ const mameComplexDescs: SynthDescriptor[] = [
     loadMode: 'lazy',
     sharedInstance: true,
     useSynthBus: true,
-    volumeOffsetDb: 0,
-    create: () => {
-      return new MAMESynth({ type: 'doc' }) as unknown as Tone.ToneAudioNode;
+    volumeOffsetDb: 62,  // Same as MAMEES5503: ES5503Synth native output is very quiet
+    create: (config) => {
+      // Route to ES5503Synth: same ES5503 DOC chip via dedicated worklet (ES5503.wasm),
+      // which works reliably. MAMESynth({type:'doc'}) via MAMEChips.wasm had no audio.
+      const synth = new ES5503Synth();
+      synth.output.gain.value = Math.pow(10, ((config.volume ?? -12) + 62) / 20);
+      return synth as unknown as Tone.ToneAudioNode;
     },
     onTriggerRelease: (synth, _note, time) => { (synth as any).triggerRelease(time); return true; },
   },

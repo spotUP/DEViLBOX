@@ -89,6 +89,27 @@ export class RF5C400Synth extends MAMEBaseSynth {
       velocity: Math.floor(velocity * 127),
       voice: this.currentVoice,
     });
+
+    // Fix 1: Pan register — C++ noteOn hardcodes chan.pan = 0x4747 but panTable[0x47] = 0,
+    // making both L and R silent. 0x2323 gives panTable[0x23] ≈ 0.71 per side.
+    // Register layout: 0x400 + (ch << 5) + 0x06
+    const panOffset = 0x400 + (this.currentVoice << 5) + 0x06;
+    this.workletNode.port.postMessage({
+      type: 'writeRegister',
+      offset: panOffset,
+      data: 0x2323,
+    });
+
+    // Fix 2: Frequency register — C++ noteOn writes step=192 for C4 (≈0.13 Hz, inaudible).
+    // writeChannelRegister case 0x02: chan.step = ((data & 0x1fff) << (data >> 13)) * 4
+    // data=0x7000 → step = (4096 << 3) * 4 = 131072 → ~172 Hz (audible)
+    // Register layout: 0x400 + (ch << 5) + 0x02
+    const freqOffset = 0x400 + (this.currentVoice << 5) + 0x02;
+    this.workletNode.port.postMessage({
+      type: 'writeRegister',
+      offset: freqOffset,
+      data: 0x7000,
+    });
   }
 
   protected writeKeyOff(): void {
