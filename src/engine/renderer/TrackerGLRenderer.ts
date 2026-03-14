@@ -544,7 +544,9 @@ export class TrackerGLRenderer {
     if (!pattern.channels[cursor.channelIndex]?.collapsed) {
       const colX = channelOffsets[cursor.channelIndex] - scrollX;
       const chW  = channelWidths[cursor.channelIndex];
-      const cursorX = colX + Math.floor((chW - contentWidth) / 2);
+      const cursorEffectCols = pattern.channels[cursor.channelIndex]?.effectCols ?? 2;
+      const cursorContentWidth = contentWidth + cursorEffectCols * (CHAR_WIDTH * 3 + 4);
+      const cursorX = colX + Math.floor((chW - cursorContentWidth) / 2);
 
       const paramBase = noteWidth + 4;
       const hasAcidC  = pattern.channels[cursor.channelIndex]?.rows[0]?.flag1 !== undefined
@@ -665,7 +667,9 @@ export class TrackerGLRenderer {
         if (!cell) continue;
 
         const isCollapsed = chData.collapsed;
-        const x = colX + Math.floor((chW - (isCollapsed ? noteWidth : contentWidth)) / 2);
+        const effectCols = chData.effectCols ?? 2;
+        const chContentWidth = contentWidth + effectCols * (CHAR_WIDTH * 3 + 4);
+        const x = colX + Math.floor((chW - (isCollapsed ? noteWidth : chContentWidth)) / 2);
         const gy = y + (rowH - atlas.glyphLogicalHeight) / 2;
 
         if (isCollapsed) {
@@ -690,7 +694,6 @@ export class TrackerGLRenderer {
 
         // Parameters
         let px = x + noteWidth + 4;
-        const effectCols = chData.effectCols ?? 2;
 
         // Instrument — use HEX_TABLE lookup
         const inst = cell.instrument ?? 0;
