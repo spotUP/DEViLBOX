@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-03-13T20:55:00.633Z
+ * Generated: 2026-03-14T10:02:37.891Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,10 +19,10 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.2803';
-export const BUILD_NUMBER = '2803';
-export const BUILD_HASH = 'aeb8837f4';
-export const BUILD_DATE = '2026-03-13';
+export const BUILD_VERSION = '1.0.2816';
+export const BUILD_NUMBER = '2816';
+export const BUILD_HASH = '59c56a58b';
+export const BUILD_DATE = '2026-03-14';
 
 // Full version (patch IS the build number, so no need to append)
 export const FULL_VERSION = BUILD_VERSION;
@@ -30,7 +30,65 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.2803',
+    version: '1.0.2816',
+    date: '2026-03-14',
+    changes: [
+      {
+        type: 'improvement',
+        "description": "Synth tester: skip C64SID — InstrumentFactory returns null intentionally"
+      },
+      {
+        type: 'improvement',
+        "description": "UADE: propagate skipScan to UADESynth for looping 68k replayer formats"
+      },
+      {
+        type: 'improvement',
+        "description": "Tools + changelog: format status updates, furnace audit tools, changelog"
+      },
+      {
+        type: 'fix',
+        "description": "UI tweaks: theme fixes, import dialog loading text, CSS border fix"
+      },
+      {
+        type: 'feature',
+        "description": "Synth tester: add testMAMESynths(), skip Buzzmachine effects processor"
+      },
+      {
+        type: 'fix',
+        "description": "Tone.js: GranularSynth stop fix, PluckSynth race fix, BitCrusher wet fix"
+      },
+      {
+        type: 'fix',
+        "description": "Furnace: FurnaceDispatch output tap fix, platform chip updates, WASM rebuild"
+      },
+      {
+        type: 'improvement',
+        "description": "Format parsers: Steve Turner native decode, Amiga routing refactor"
+      },
+      {
+        type: 'improvement',
+        "description": "Update UADE audit tools: improved comparison metrics and rendering"
+      },
+      {
+        type: 'improvement',
+        "description": "UADE: skipScan for looping formats, mute mask support, WASM rebuild"
+      },
+      {
+        type: 'fix',
+        "description": "Fix V2 synth: connect worklet before init message, fix default channel volume"
+      },
+      {
+        type: 'improvement',
+        "description": "Refactor settings modal: transparent overlay, improved tab navigation"
+      },
+      {
+        type: 'fix',
+        "description": "Fix PixiJS rendering: anchor rects, channel header clip mask, layer ordering"
+      }
+    ]
+  },
+  {
+    version: '2026-03-13',
     date: '2026-03-13',
     changes: [
       {
@@ -180,58 +238,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         "description": "Fix duplicate hlInterval declaration in GL renderer"
-      },
-      {
-        type: 'fix',
-        "description": "Fix GL pattern editor: center line fills entire viewport on init"
-      },
-      {
-        type: 'fix',
-        "description": "Fix theme crashes: guard against undefined/stale custom theme colors"
-      },
-      {
-        type: 'fix',
-        "description": "Fix SettingsModal crash: guard normalizeToHex6 against undefined color"
-      },
-      {
-        type: 'fix',
-        "description": "Fix DOM fake bold: increase offset from 0.5px to 1px for visibility"
-      },
-      {
-        type: 'improvement',
-        "description": "Bold font on active/triggered row in pattern editor"
-      },
-      {
-        type: 'fix',
-        "description": "Fix glow trail direction: trail behind playhead, not ahead"
-      },
-      {
-        type: 'improvement',
-        "description": "Pattern editor: white glow trail fading from active row"
-      },
-      {
-        type: 'fix',
-        "description": "Fix arrow key double-step: seed RAF lastMoveTime with current time"
-      },
-      {
-        type: 'improvement',
-        "description": "Pattern editor: z-order and active row improvements (DOM/GL)"
-      },
-      {
-        type: 'improvement',
-        "description": "Pattern editor: smooth scroll, z-order, and active row improvements (Pixi)"
-      },
-      {
-        type: 'fix',
-        "description": "UADE rebuild, engine fixes, Sonic Arranger/Symphonie parsers, settings refactor"
-      },
-      {
-        type: 'improvement',
-        "description": "Revert: undo 5 pattern editor optimization attempts that caused regressions"
-      },
-      {
-        type: 'fix',
-        "description": "Fix smooth scroll duration calculation returning inflated values"
       }
     ]
   }
