@@ -1,7 +1,7 @@
 /**
  * PixiVisualizer — Multi-mode GPU visualizer for WebGL mode.
- * Three modes toggled by click: Waveform, Spectrum, Vectorscope.
- * Uses Pixi Graphics for GPU-accelerated rendering via app.ticker.
+ * GPU modes rendered via PixiGraphics; DOM modes (canvas-based + AudioMotion)
+ * rendered via PixiDOMOverlay positioned over the visualizer bounds.
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -10,23 +10,101 @@ import { PIXI_FONTS } from '../../fonts';
 import { usePixiTheme, type PixiTheme } from '../../theme';
 import { useTransportStore } from '@stores';
 import { getToneEngine } from '@engine/ToneEngine';
+import { PixiDOMOverlay } from '../../components/PixiDOMOverlay';
+import { CircularVU } from '@components/visualization/CircularVU';
+import { ChannelWaveforms } from '@components/visualization/ChannelWaveforms';
+import { ChannelActivityGrid } from '@components/visualization/ChannelActivityGrid';
+import { ChannelSpectrums } from '@components/visualization/ChannelSpectrums';
+import { ChannelCircularVU } from '@components/visualization/ChannelCircularVU';
+import { ChannelParticles } from '@components/visualization/ChannelParticles';
+import { ChannelRings } from '@components/visualization/ChannelRings';
+import { ChannelTunnel } from '@components/visualization/ChannelTunnel';
+import { ChannelRadar } from '@components/visualization/ChannelRadar';
+import { NibblesGame } from '@components/visualization/NibblesGame';
+import { SineScroller } from '@components/visualization/SineScroller';
+import { AudioMotionVisualizer } from '@components/visualization/AudioMotionVisualizer';
 
-type VizMode = 'waveform' | 'spectrum' | 'vectorscope' | 'channels' | 'stereo' | 'freqbars' | 'levels' | 'particles' | 'mirror' | 'radial' | 'energy' | 'logo' | 'banner';
-const VIZ_MODES: VizMode[] = ['waveform', 'spectrum', 'vectorscope', 'channels', 'stereo', 'freqbars', 'levels', 'particles', 'mirror', 'radial', 'energy', 'logo', 'banner'];
+type VizMode =
+  // GPU-native modes
+  'waveform' | 'spectrum' | 'vectorscope' | 'channels' | 'stereo' | 'freqbars' | 'levels' | 'particles' | 'mirror' | 'radial' | 'energy' | 'logo' | 'banner' |
+  // DOM-canvas modes (rendered via PixiDOMOverlay)
+  'circular' | 'chanWaves' | 'chanActivity' | 'chanSpectrum' | 'chanCircular' | 'chanParticles' | 'chanRings' | 'chanTunnel' | 'chanRadar' | 'chanNibbles' | 'sineScroll' |
+  // AudioMotion modes (rendered via PixiDOMOverlay + AudioMotionVisualizer)
+  'amLED' | 'amBars' | 'amMirror' | 'amRadial' | 'amGraph' | 'amRadialGraph' | 'amDualStereo' | 'amLumi' | 'amAlpha' | 'amOutline' | 'amDualV' | 'amDualOverlay' | 'amBark' | 'amMel' | 'amOctave' | 'amNotes' | 'amMirrorReflex' | 'amRadialInvert' | 'amRadialLED' | 'amLinear' | 'amAWeight' | 'amLumiMirror';
+
+const VIZ_MODES: VizMode[] = [
+  'waveform', 'spectrum', 'vectorscope', 'channels', 'stereo', 'freqbars', 'levels', 'particles',
+  'mirror', 'radial', 'energy', 'logo', 'banner',
+  'circular', 'sineScroll', 'chanWaves', 'chanActivity', 'chanSpectrum', 'chanCircular',
+  'chanParticles', 'chanRings', 'chanTunnel', 'chanRadar', 'chanNibbles',
+  'amLED', 'amBars', 'amMirror', 'amRadial', 'amGraph', 'amRadialGraph', 'amDualStereo',
+  'amLumi', 'amAlpha', 'amOutline', 'amDualV', 'amDualOverlay', 'amBark', 'amMel',
+  'amOctave', 'amNotes', 'amMirrorReflex', 'amRadialInvert', 'amRadialLED',
+  'amLinear', 'amAWeight', 'amLumiMirror',
+];
+
 const VIZ_MODE_LABELS: Record<VizMode, string> = {
-  waveform: 'WAVE',
-  spectrum: 'SPECTRUM',
-  vectorscope: 'SCOPE',
-  channels: 'CH-OSC',
-  stereo: 'STEREO',
-  freqbars: 'BARS',
-  levels: 'LEVELS',
-  particles: 'PARTICLES',
-  mirror: 'MIRROR',
-  radial: 'RADIAL',
-  energy: 'ENERGY',
-  logo: 'LOGO',
-  banner: 'BANNER',
+  waveform: 'WAVE',      spectrum: 'SPECTRUM',  vectorscope: 'SCOPE',
+  channels: 'CH-OSC',   stereo: 'STEREO',      freqbars: 'BARS',
+  levels: 'LEVELS',     particles: 'PARTICLES', mirror: 'MIRROR',
+  radial: 'RADIAL',     energy: 'ENERGY',       logo: 'LOGO',
+  banner: 'BANNER',     circular: 'CIRCULAR',   sineScroll: 'SINE',
+  chanWaves: 'CH-WAVE', chanActivity: 'CH-ACT', chanSpectrum: 'CH-SPEC',
+  chanCircular: 'CH-CIR', chanParticles: 'CH-PRT', chanRings: 'CH-RING',
+  chanTunnel: 'CH-TUN', chanRadar: 'CH-RADAR',  chanNibbles: 'NIBBLES',
+  amLED: 'AM-LED',      amBars: 'AM-BARS',      amMirror: 'AM-MIRROR',
+  amRadial: 'AM-RADIAL', amGraph: 'AM-GRAPH',   amRadialGraph: 'AM-RGRAPH',
+  amDualStereo: 'AM-DUAL', amLumi: 'AM-LUMI',   amAlpha: 'AM-ALPHA',
+  amOutline: 'AM-OUT',  amDualV: 'AM-DUALV',    amDualOverlay: 'AM-OVL',
+  amBark: 'AM-BARK',    amMel: 'AM-MEL',         amOctave: 'AM-OCT',
+  amNotes: 'AM-NOTES',  amMirrorReflex: 'AM-MRF', amRadialInvert: 'AM-RINV',
+  amRadialLED: 'AM-RLED', amLinear: 'AM-LIN',   amAWeight: 'AM-AWT',
+  amLumiMirror: 'AM-LMR',
+};
+
+/** Modes that use DOM canvas components rendered via PixiDOMOverlay */
+const DOM_MODES = new Set<VizMode>([
+  'circular', 'chanWaves', 'chanActivity', 'chanSpectrum', 'chanCircular',
+  'chanParticles', 'chanRings', 'chanTunnel', 'chanRadar', 'chanNibbles', 'sineScroll',
+  'amLED', 'amBars', 'amMirror', 'amRadial', 'amGraph', 'amRadialGraph', 'amDualStereo',
+  'amLumi', 'amAlpha', 'amOutline', 'amDualV', 'amDualOverlay', 'amBark', 'amMel',
+  'amOctave', 'amNotes', 'amMirrorReflex', 'amRadialInvert', 'amRadialLED',
+  'amLinear', 'amAWeight', 'amLumiMirror',
+]);
+
+/** Map VizMode → AudioMotion preset name */
+const AUDIOMOTION_PRESET_MAP: Partial<Record<VizMode, string>> = {
+  amLED: 'ledBars',        amBars: 'smoothBars',     amMirror: 'mirrorBars',
+  amRadial: 'radialSpectrum', amGraph: 'graphLine',  amRadialGraph: 'radialGraph',
+  amDualStereo: 'dualStereo', amLumi: 'lumiBars',    amAlpha: 'alphaBars',
+  amOutline: 'outlineBars', amDualV: 'dualVertical', amDualOverlay: 'dualOverlay',
+  amBark: 'barkSpectrum',  amMel: 'melGraph',        amOctave: 'octaveBands',
+  amNotes: 'noteLabels',   amMirrorReflex: 'mirrorReflex', amRadialInvert: 'radialInvert',
+  amRadialLED: 'radialLED', amLinear: 'linearBars',  amAWeight: 'aWeighted',
+  amLumiMirror: 'lumiMirror',
+};
+
+// ─── DOM Visualizer Content (rendered in PixiDOMOverlay's secondary React root) ─
+
+interface DOMVizContentProps { mode: VizMode; height: number; onExit: () => void; }
+
+const DOMVizContent: React.FC<DOMVizContentProps> = ({ mode, height, onExit }) => {
+  const amPreset = AUDIOMOTION_PRESET_MAP[mode];
+  if (amPreset) return <AudioMotionVisualizer preset={amPreset} audioSource="master" height={height} />;
+  switch (mode) {
+    case 'circular':     return <CircularVU height={height} />;
+    case 'chanWaves':    return <ChannelWaveforms height={height} />;
+    case 'chanActivity': return <ChannelActivityGrid height={height} />;
+    case 'chanSpectrum': return <ChannelSpectrums height={height} />;
+    case 'chanCircular': return <ChannelCircularVU height={height} />;
+    case 'chanParticles':return <ChannelParticles height={height} />;
+    case 'chanRings':    return <ChannelRings height={height} />;
+    case 'chanTunnel':   return <ChannelTunnel height={height} />;
+    case 'chanRadar':    return <ChannelRadar height={height} />;
+    case 'chanNibbles':  return <NibblesGame height={height} onExit={onExit} />;
+    case 'sineScroll':   return <SineScroller height={height} />;
+    default:             return null;
+  }
 };
 
 interface PixiVisualizerProps {
@@ -84,6 +162,9 @@ export const PixiVisualizer: React.FC<PixiVisualizerProps> = ({
       g.clear();
       drawBackground(g, width, height, theme);
 
+      // DOM modes have no GPU drawing — PixiDOMOverlay handles them
+      if (DOM_MODES.has(mode)) return;
+
       try {
         const engine = getToneEngine();
         switch (mode) {
@@ -140,6 +221,8 @@ export const PixiVisualizer: React.FC<PixiVisualizerProps> = ({
     rafId = requestAnimationFrame(draw);
     return () => cancelAnimationFrame(rafId);
   }, [isPlaying, mode, width, height, theme]);
+
+  const isDOMMode = DOM_MODES.has(mode);
 
   // Memoized layout objects for prop-dependent values (width/height change infrequently)
   const layoutContainer = useMemo(
@@ -210,6 +293,12 @@ export const PixiVisualizer: React.FC<PixiVisualizerProps> = ({
         layout={mode === 'banner' ? LAYOUT_OVERLAY_LABEL : LAYOUT_OVERLAY_COLLAPSED}
         alpha={mode === 'banner' ? 0.9 : 0}
       />
+
+      {/* DOM canvas overlay — always mounted, shown only for DOM_MODES.
+          PixiDOMOverlay positions a fixed div exactly over this container. */}
+      <PixiDOMOverlay layout={layoutFill} visible={isDOMMode} style={{ overflow: 'hidden' }}>
+        <DOMVizContent mode={mode} height={height} onExit={handleClick} />
+      </PixiDOMOverlay>
     </pixiContainer>
   );
 };

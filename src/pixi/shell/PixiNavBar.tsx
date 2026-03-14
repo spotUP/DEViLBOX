@@ -7,8 +7,8 @@
  *   Right:  Volume knob, Save, Load, Collab, Auth, MIDI, Theme, Dock, DOM
  */
 
-import React, { useCallback, useMemo } from 'react';
-import type { FederatedPointerEvent } from 'pixi.js';
+import React, { useCallback, useMemo, useRef } from 'react';
+import type { FederatedPointerEvent, Container as ContainerType } from 'pixi.js';
 import { PIXI_FONTS } from '../fonts';
 import { usePixiTheme } from '../theme';
 import { PixiButton } from '../components/PixiButton';
@@ -29,6 +29,7 @@ import { MODERN_NAV_H } from '../workbench/workbenchLayout';
 import { serializeProjectToBlob } from '@hooks/useProjectPersistence';
 import { PixiTransportBar } from './PixiTransportBar';
 import { BUILD_VERSION } from '@constants/version';
+import { usePixiDropdownStore } from '../stores/usePixiDropdownStore';
 
 const NAV_ROW_H = 52;
 const TAB_ROW_H = MODERN_NAV_H - NAV_ROW_H; // 24px
@@ -139,14 +140,73 @@ export const PixiNavBar: React.FC = () => {
     useUIStore.getState().openModal('collaboration');
   }, []);
 
-  // Auth modal
+  // Auth modal / user dropdown
+  const authContainerRef = useRef<ContainerType>(null);
+  const AUTH_DROPDOWN_ID = 'nav-auth';
+  const logout = useAuthStore((s) => s.logout);
   const handleOpenAuth = useCallback(() => {
     useUIStore.getState().openModal('auth');
   }, []);
+  const handleAuthClick = useCallback(() => {
+    if (!authUser) { handleOpenAuth(); return; }
+    const el = authContainerRef.current;
+    if (!el) return;
+    const pos = el.toGlobal({ x: 0, y: NAV_ROW_H });
+    requestAnimationFrame(() => {
+      usePixiDropdownStore.getState().openDropdown({
+        kind: 'select',
+        id: AUTH_DROPDOWN_ID,
+        x: pos.x,
+        y: pos.y,
+        width: 130,
+        options: [
+          { value: '__user__', label: `@${authUser.username}`, disabled: true },
+          { value: 'logout', label: 'Sign Out' },
+        ],
+        onSelect: (v) => {
+          if (v === 'logout') logout();
+          usePixiDropdownStore.getState().closeDropdown(AUTH_DROPDOWN_ID);
+        },
+        onClose: () => usePixiDropdownStore.getState().closeDropdown(AUTH_DROPDOWN_ID),
+      });
+    });
+  }, [authUser, handleOpenAuth, logout]);
 
-  // MIDI / Settings modal
-  const handleOpenMIDI = useCallback(() => {
-    useUIStore.getState().openModal('settings');
+  // MIDI device quick-picker
+  const midiContainerRef = useRef<ContainerType>(null);
+  const MIDI_DROPDOWN_ID = 'nav-midi';
+  const handleMIDIClick = useCallback(() => {
+    const el = midiContainerRef.current;
+    if (!el) return;
+    const pos = el.toGlobal({ x: 0, y: NAV_ROW_H });
+    const { inputDevices: devs, selectedInputId: selId } = useMIDIStore.getState();
+    const deviceOptions = devs.map(d => ({
+      value: d.id,
+      label: (selId === d.id ? '\u25cf ' : '\u25cb ') + d.name.slice(0, 18),
+    }));
+    requestAnimationFrame(() => {
+      usePixiDropdownStore.getState().openDropdown({
+        kind: 'select',
+        id: MIDI_DROPDOWN_ID,
+        x: pos.x,
+        y: pos.y,
+        width: 200,
+        options: [
+          { value: '__inp__', label: 'INPUT DEVICE' },
+          ...(deviceOptions.length > 0 ? deviceOptions : [{ value: '__none__', label: 'No devices found', disabled: true }]),
+          { value: '_settings', label: 'MIDI Settings...' },
+        ],
+        onSelect: (v) => {
+          if (v === '_settings') {
+            useUIStore.getState().openModal('settings');
+          } else if (v !== '__inp__' && v !== '__none__') {
+            useMIDIStore.getState().selectInput(v);
+          }
+          usePixiDropdownStore.getState().closeDropdown(MIDI_DROPDOWN_ID);
+        },
+        onClose: () => usePixiDropdownStore.getState().closeDropdown(MIDI_DROPDOWN_ID),
+      });
+    });
   }, []);
 
   // Download App modal
@@ -259,18 +319,22 @@ export const PixiNavBar: React.FC = () => {
           width={48}
         />
 
-        {/* Auth */}
-        <PixiButton
-          label={authUser ? authUser.username.slice(0, 6) : 'LOGIN'}
-          variant="ghost"
-          size="sm"
-          onClick={handleOpenAuth}
-          width={44}
-        />
+        {/* Auth — shows sign-out dropdown when logged in */}
+        <pixiContainer ref={authContainerRef} layout={{ flexShrink: 0 }}>
+          <PixiButton
+            label={authUser ? authUser.username.slice(0, 6) : 'LOGIN'}
+            variant="ghost"
+            size="sm"
+            onClick={handleAuthClick}
+            width={44}
+          />
+        </pixiContainer>
 
-        {/* MIDI */}
+        {/* MIDI — opens device picker dropdown */}
         {hasMIDI && (
-          <PixiButton label="MIDI" variant="ghost" size="sm" onClick={handleOpenMIDI} width={40} />
+          <pixiContainer ref={midiContainerRef} layout={{ flexShrink: 0 }}>
+            <PixiButton label="MIDI" variant="ghost" size="sm" onClick={handleMIDIClick} width={40} />
+          </pixiContainer>
         )}
 
         {/* Exposé — shows in all views */}
