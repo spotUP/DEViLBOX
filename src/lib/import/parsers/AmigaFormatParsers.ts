@@ -124,10 +124,18 @@ export async function tryRouteFormat(
   }
 
   // ── OctaMED / MED ────────────────────────────────────────────────────────
-  if (filename.endsWith('.med') || filename.endsWith('.mmd0') || filename.endsWith('.mmd1')
-    || filename.endsWith('.mmd2') || filename.endsWith('.mmd3')) {
-    const { parseMEDFile } = await import('@lib/import/formats/MEDParser');
-    return withNativeDefault('med', ctx, (buf: Uint8Array | ArrayBuffer, name: string) => parseMEDFile(buf as ArrayBuffer, name));
+  // Handles .med/.mmd0-3 extension files AND prefix-named files (med.* UADE prefix)
+  // by magic-byte detection (MMD0/MMD1/MMD2/MMD3 at offset 0).
+  {
+    const buf4 = new Uint8Array(buffer instanceof ArrayBuffer ? buffer : buffer).subarray(0, 4);
+    const isMEDExt = filename.endsWith('.med') || filename.endsWith('.mmd0') || filename.endsWith('.mmd1')
+      || filename.endsWith('.mmd2') || filename.endsWith('.mmd3');
+    const isMEDMagic = buf4[0] === 0x4D && buf4[1] === 0x4D && buf4[2] === 0x44
+      && (buf4[3] === 0x30 || buf4[3] === 0x31 || buf4[3] === 0x32 || buf4[3] === 0x33); // MMD0-3
+    if (isMEDExt || isMEDMagic) {
+      const { parseMEDFile } = await import('@lib/import/formats/MEDParser');
+      return withNativeDefault('med', ctx, (buf: Uint8Array | ArrayBuffer, name: string) => parseMEDFile(buf as ArrayBuffer, name));
+    }
   }
 
   // ── DigiBooster ──────────────────────────────────────────────────────────
@@ -163,12 +171,16 @@ export async function tryRouteFormat(
 
   // ── SidMon 1.0 / SidMon II (.smn can be either) ─────────────────────────
   if (matchesExt(filename, ['smn'])) {
-        // Try SidMon1 magic first
+    // Try SidMon1 magic first
     if (prefs.sidmon1 !== 'uade') {
       try {
         const { isSidMon1Format, parseSidMon1File } = await import('@lib/import/formats/SidMon1Parser');
         if (isSidMon1Format(buffer)) {
-          return parseSidMon1File(buffer, originalFileName);
+          const result = parseSidMon1File(buffer, originalFileName);
+          // Inject UADE for 1:1 audio — SidMon1Synth doesn't emulate all instrument types
+          (result as any).uadeEditableFileData = buffer.slice(0);
+          (result as any).uadeEditableFileName = originalFileName;
+          return result;
         }
       } catch (err) {
         console.warn(`[SidMon1Parser] Native parse failed for ${filename}, falling back:`, err);
@@ -373,7 +385,7 @@ export async function tryRouteFormat(
   // ── Digital Mugician ──────────────────────────────────────────────────────
   if (matchesExt(filename, ['dmu', 'dmu2', 'mug', 'mug2'])) {
     const { parseDigitalMugicianFile } = await import('@lib/import/formats/DigitalMugicianParser');
-    return withNativeThenUADE('mugician', ctx, (buf: Uint8Array | ArrayBuffer, name: string) => parseDigitalMugicianFile(buf as ArrayBuffer, name), 'DigitalMugicianParser');
+    return withNativeThenUADE('mugician', ctx, (buf: Uint8Array | ArrayBuffer, name: string) => parseDigitalMugicianFile(buf as ArrayBuffer, name), 'DigitalMugicianParser', { injectUADE: true });
   }
 
   // ── Chip-dump formats (VGM, YM, NSF, SAP, AY) ───────────────────────────
@@ -387,7 +399,11 @@ export async function tryRouteFormat(
       try {
         const { isSidMon1Format, parseSidMon1File } = await import('@lib/import/formats/SidMon1Parser');
         if (isSidMon1Format(buffer)) {
-          return parseSidMon1File(buffer, originalFileName);
+          const result = parseSidMon1File(buffer, originalFileName);
+          // Inject UADE for 1:1 audio — SidMon1Synth doesn't emulate all instrument types
+          (result as any).uadeEditableFileData = buffer.slice(0);
+          (result as any).uadeEditableFileName = originalFileName;
+          return result;
         }
       } catch (err) {
         console.warn(`[SidMon1Parser] Native parse failed for ${filename}, falling back to SID:`, err);
@@ -413,7 +429,11 @@ export async function tryRouteFormat(
       try {
         const { isSidMon1Format, parseSidMon1File } = await import('@lib/import/formats/SidMon1Parser');
         if (isSidMon1Format(buffer)) {
-          return parseSidMon1File(buffer, originalFileName);
+          const result = parseSidMon1File(buffer, originalFileName);
+          // Inject UADE for 1:1 audio — SidMon1Synth doesn't emulate all instrument types
+          (result as any).uadeEditableFileData = buffer.slice(0);
+          (result as any).uadeEditableFileName = originalFileName;
+          return result;
         }
       } catch (err) {
         console.warn(`[SidMon1Parser] Native parse failed for ${filename}, falling back to UADE:`, err);
@@ -529,7 +549,7 @@ export async function tryRouteFormat(
     const { isDigitalSoundStudioFormat, parseDigitalSoundStudioFile } = await import('@lib/import/formats/DigitalSoundStudioParser');
     return withNativeThenUADE('digitalSoundStudio', ctx,
       (bytes: Uint8Array | ArrayBuffer, name: string) => parseDigitalSoundStudioFile(bytes as Uint8Array, name),
-      'DigitalSoundStudioParser', { isFormat: isDigitalSoundStudioFormat, usesBytes: true });
+      'DigitalSoundStudioParser', { isFormat: isDigitalSoundStudioFormat, usesBytes: true, injectUADE: true });
   }
 
   // ── Music Assembler ────────────────────────────────────────────────────────
@@ -1130,12 +1150,18 @@ export async function tryRouteFormat(
 
   // ── Delta Music 1.0 (.dm, .dm1) — identified by "ALL " magic ──────────────
   if (matchesExt(filename, ['dm', 'dm1'])) {
-        if (prefs.deltaMusic1 === 'native') {
+    if (prefs.deltaMusic1 === 'native') {
       try {
         const { isDeltaMusic1Format, parseDeltaMusic1File } = await import('@lib/import/formats/DeltaMusic1Parser');
         if (isDeltaMusic1Format(buffer)) {
           const result = await parseDeltaMusic1File(buffer, originalFileName);
-          if (result) return result;
+          if (result) {
+            // Inject UADE for 1:1 audio — native parser provides pattern display,
+            // UADE provides the actual DM1 synthesis (wavetable cycling, etc.)
+            (result as any).uadeEditableFileData = buffer.slice(0);
+            (result as any).uadeEditableFileName = originalFileName;
+            return result;
+          }
         }
       } catch (err) {
         console.warn(`[DeltaMusic1Parser] Native parse failed for ${filename}, falling back to UADE:`, err);
@@ -1616,14 +1642,14 @@ export async function tryRouteFormat(
   // Same format as .mug/.dmu — " MUGICIAN/SOFTEYES 1990" signature at offset 0.
   if (matchesExt(filename, ['mug'])) {
     const { parseDigitalMugicianFile } = await import('@lib/import/formats/DigitalMugicianParser');
-    return withNativeThenUADE('mugician', ctx, (buf: Uint8Array | ArrayBuffer, name: string) => parseDigitalMugicianFile(buf as ArrayBuffer, name), 'DigitalMugicianParser');
+    return withNativeThenUADE('mugician', ctx, (buf: Uint8Array | ArrayBuffer, name: string) => parseDigitalMugicianFile(buf as ArrayBuffer, name), 'DigitalMugicianParser', { injectUADE: true });
   }
 
   // ── Mugician II (MUG2.* prefix) ───────────────────────────────────────────
   // Same format as .mug2/.dmu2 — " MUGICIAN2/SOFTEYES 1990" signature at offset 0.
   if (matchesExt(filename, ['mug2'])) {
     const { parseDigitalMugicianFile } = await import('@lib/import/formats/DigitalMugicianParser');
-    return withNativeThenUADE('mugician', ctx, (buf: Uint8Array | ArrayBuffer, name: string) => parseDigitalMugicianFile(buf as ArrayBuffer, name), 'DigitalMugicianParser');
+    return withNativeThenUADE('mugician', ctx, (buf: Uint8Array | ArrayBuffer, name: string) => parseDigitalMugicianFile(buf as ArrayBuffer, name), 'DigitalMugicianParser', { injectUADE: true });
   }
 
   // ── Core Design (CORE.* prefix) ───────────────────────────────────────────
@@ -1990,13 +2016,13 @@ export async function tryRouteFormat(
   // (mug.* and mug2.* are already handled above; these cover the dmu.* variants)
   if (matchesExt(filename, ['dmu'])) {
     const { parseDigitalMugicianFile } = await import('@lib/import/formats/DigitalMugicianParser');
-    return withNativeThenUADE('mugician', ctx, (buf: Uint8Array | ArrayBuffer, name: string) => parseDigitalMugicianFile(buf as ArrayBuffer, name), 'DigitalMugicianParser');
+    return withNativeThenUADE('mugician', ctx, (buf: Uint8Array | ArrayBuffer, name: string) => parseDigitalMugicianFile(buf as ArrayBuffer, name), 'DigitalMugicianParser', { injectUADE: true });
   }
 
   // ── Mugician II prefix (DMU2.* prefix) ───────────────────────────────────
   if (matchesExt(filename, ['dmu2'])) {
     const { parseDigitalMugicianFile } = await import('@lib/import/formats/DigitalMugicianParser');
-    return withNativeThenUADE('mugician', ctx, (buf: Uint8Array | ArrayBuffer, name: string) => parseDigitalMugicianFile(buf as ArrayBuffer, name), 'DigitalMugicianParser');
+    return withNativeThenUADE('mugician', ctx, (buf: Uint8Array | ArrayBuffer, name: string) => parseDigitalMugicianFile(buf as ArrayBuffer, name), 'DigitalMugicianParser', { injectUADE: true });
   }
 
   // ── Jochen Hippel ST (MDST.* prefix) ─────────────────────────────────────
