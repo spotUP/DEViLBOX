@@ -122,10 +122,12 @@ function mapEffect(cmd: number, param: number): { effTyp: number; eff: number } 
     case 28: return { effTyp: 33, eff: param }; // CMD_XFINEPORTAUPDOWN → Xxx
     case 29: return { effTyp: 25, eff: param }; // CMD_PANNINGSLIDE → Pxy
     case 30: return { effTyp: 21, eff: param }; // CMD_SETENVPOSITION → Lxx
-    case 31: return { effTyp: 0, eff: 0 }; // CMD_MIDI (no tracker equiv)
+    case 31: return { effTyp: 0, eff: 0 }; // CMD_MIDI — handled separately in buildChannelData
     default: return { effTyp: 0, eff: 0 }; // Unknown → empty
   }
 }
+
+type DSPMacroMap = Map<number, { type: number; bufLen: number; feedback: number }>;
 
 /** Convert OpenMPT pattern data cell array to ChannelData */
 function buildChannelData(
@@ -133,6 +135,7 @@ function buildChannelData(
   rows: osl.PatternCell[][],
   numRows: number,
   format: TrackerFormat,
+  dspMacroMap: DSPMacroMap = new Map(),
 ): ChannelData {
   const cells: TrackerCell[] = [];
 
@@ -146,15 +149,34 @@ function buildChannelData(
       continue;
     }
 
-    const fx = mapEffect(cell.command, cell.param);
+    let effTyp = 0, eff = 0, effTyp2 = 0, eff2 = 0;
+
+    if (cell.command === 31) {
+      // CMD_MIDI — look up in DSP macro map (Symphonie DSP echo events)
+      const macroIdx = cell.param >= 0x80 ? cell.param - 0x80 : cell.param;
+      const dsp = dspMacroMap.get(macroIdx);
+      if (dsp) {
+        // Col 1: 0x50 ('D') + bufLen — shows "Dxx" for buffer length
+        // Col 2: 0x50+type ('C/E/L/X') + feedback — shows type letter + feedback
+        effTyp  = osl.DSP_EFFECT_MARKER;            // always 0x50 → 'D'
+        eff     = dsp.bufLen;
+        effTyp2 = osl.DSP_EFFECT_MARKER + (dsp.type & 0x07); // 0x50+type → type letter
+        eff2    = dsp.feedback;
+      }
+    } else {
+      const fx = mapEffect(cell.command, cell.param);
+      effTyp = fx.effTyp;
+      eff    = fx.eff;
+    }
+
     cells.push({
       note: mapNote(cell.note, format),
       instrument: cell.instrument,
       volume: mapVolumeColumn(cell.volcmd, cell.vol),
-      effTyp: fx.effTyp,
-      eff: fx.eff,
-      effTyp2: 0,
-      eff2: 0,
+      effTyp,
+      eff,
+      effTyp2,
+      eff2,
     });
   }
 
@@ -188,6 +210,18 @@ export async function parseWithOpenMPT(
   try {
     const info = await osl.getModuleInfo();
     const format = mapFormat(info.type);
+
+    // Read DSP macro config for Symphonie Pro modules
+    const isSymmod = info.type === 'SymMOD' || filename.toLowerCase().endsWith('.symmod');
+    const dspMacroMap: DSPMacroMap = new Map();
+    if (isSymmod) {
+      for (let i = 0; i < 128; i++) {
+        const str = await osl.getMidiMacroString(i);
+        if (!str) continue;
+        const dsp = osl.parseSymphonieDSPMacro(str);
+        if (dsp) dspMacroMap.set(i, dsp);
+      }
+    }
 
     // Get order list
     const orderList = await osl.getOrderList();
@@ -224,7 +258,7 @@ export async function parseWithOpenMPT(
       const cellData = await osl.getPatternData(p);
       const channels: ChannelData[] = [];
       for (let c = 0; c < numChannels; c++) {
-        channels.push(buildChannelData(c, cellData, numRows, format));
+        channels.push(buildChannelData(c, cellData, numRows, format, dspMacroMap));
       }
 
       patterns.push({
