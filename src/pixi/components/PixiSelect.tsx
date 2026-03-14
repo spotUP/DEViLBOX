@@ -47,7 +47,7 @@ export const PixiDropdownPanel: React.FC<PixiDropdownPanelProps> = ({
   searchable = false,
 }) => {
   const theme = usePixiTheme();
-  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+  // hoveredIndex state removed — direct PixiJS tint used instead to avoid BindingErrors
   const [scrollOffset, setScrollOffset] = useState(0);
   const [searchFilter, setSearchFilter] = useState('');
 
@@ -122,8 +122,8 @@ export const PixiDropdownPanel: React.FC<PixiDropdownPanelProps> = ({
             key={`${opt.value}-${i}`}
             eventMode={isGroup || opt.disabled ? 'none' : 'static'}
             cursor={isGroup || opt.disabled ? 'default' : 'pointer'}
-            onPointerOver={() => !isGroup && !opt.disabled && setHoveredIndex(i)}
-            onPointerOut={() => setHoveredIndex(null)}
+            onPointerOver={(e: { currentTarget: ContainerType }) => { if (!isGroup && !opt.disabled) e.currentTarget.tint = theme.accent.color; }}
+            onPointerOut={(e: { currentTarget: ContainerType }) => { e.currentTarget.tint = 0xffffff; }}
             onPointerUp={() => { if (!isGroup && !opt.disabled) { onSelect(opt.value); onClose(); } }}
             onClick={() => { if (!isGroup && !opt.disabled) { onSelect(opt.value); onClose(); } }}
             layout={{
@@ -131,7 +131,6 @@ export const PixiDropdownPanel: React.FC<PixiDropdownPanelProps> = ({
               height: itemHeight,
               alignItems: 'center',
               paddingLeft: isGroup ? 4 : 8,
-              backgroundColor: hoveredIndex === i ? theme.accent.color : undefined,
             }}
           >
             <pixiBitmapText
@@ -180,7 +179,6 @@ export const PixiSelect: React.FC<PixiSelectProps> = ({
 }) => {
   const theme = usePixiTheme();
   const [open, setOpen] = useState(false);
-  const [hovered, setHovered] = useState(false);
   const containerRef = useRef<ContainerType>(null);
   // Stable ID for this select instance
   const idRef = useRef(`pixi-select-${++_selectIdCounter}`);
@@ -254,15 +252,15 @@ export const PixiSelect: React.FC<PixiSelectProps> = ({
       ref={containerRef}
       eventMode={disabled ? 'none' : 'static'}
       cursor={disabled ? 'default' : 'pointer'}
-      onPointerOver={() => setHovered(true)}
-      onPointerOut={() => setHovered(false)}
+      onPointerOver={(e: { currentTarget: ContainerType }) => { e.currentTarget.tint = 0xdddddd; }}
+      onPointerOut={(e: { currentTarget: ContainerType }) => { e.currentTarget.tint = 0xffffff; }}
       onPointerUp={handleToggle}
       onClick={handleToggle}
       alpha={disabled ? 0.4 : 1}
       layout={{
         width,
         height,
-        backgroundColor: open ? theme.bgHover.color : hovered ? theme.bgHover.color : theme.bgTertiary.color,
+        backgroundColor: open ? theme.bgHover.color : theme.bgTertiary.color,
         borderWidth: 1,
         borderColor: open ? theme.accent.color : theme.border.color,
         borderRadius: 3,
