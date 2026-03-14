@@ -900,8 +900,8 @@ export const CHIP_SYNTH_DEFS: Record<string, ChipSynthDef> = {
     parameters: [
       { key: 'volume', label: 'Volume', group: 'Output', type: 'knob', min: 0, max: 1, step: 0.01, default: 0.8, formatValue: 'percent' },
       { key: 'voice', label: 'Voice', group: 'Playback', type: 'knob', min: 0, max: 31, step: 1, default: 0, formatValue: 'int' },
-      { key: 'cutoff', label: 'Cutoff', group: 'Filter', type: 'knob', min: 0, max: 1, step: 0.01, default: 1.0, formatValue: 'percent' },
-      { key: 'resonance', label: 'Resonance', group: 'Filter', type: 'knob', min: 0, max: 1, step: 0.01, default: 0.0, formatValue: 'percent' },
+      { key: 'filter_cutoff', label: 'Cutoff', group: 'Filter', type: 'knob', min: 0, max: 1, step: 0.01, default: 1.0, formatValue: 'percent' },
+      { key: 'filter_resonance', label: 'Resonance', group: 'Filter', type: 'knob', min: 0, max: 1, step: 0.01, default: 0.0, formatValue: 'percent' },
     ],
     romConfig: {
       requiredZip: 'mu50.zip (Yamaha MU50 / SWP00 wave ROM)',
@@ -942,9 +942,9 @@ export const CHIP_SYNTH_DEFS: Record<string, ChipSynthDef> = {
     parameters: [
       { key: 'volume', label: 'Volume', group: 'Output', type: 'knob', min: 0, max: 1, step: 0.01, default: 0.8, formatValue: 'percent' },
       { key: 'voice', label: 'Channel', group: 'Playback', type: 'knob', min: 0, max: 27, step: 1, default: 0, formatValue: 'int' },
-      { key: 'vol1Speed', label: 'Att Speed', group: 'Envelope', type: 'knob', min: 0.0001, max: 0.05, step: 0.0001, default: 0.001, formatValue: 'percent', logarithmic: true },
-      { key: 'vol2Speed', label: 'Rel Speed', group: 'Envelope', type: 'knob', min: 0.0001, max: 0.05, step: 0.0001, default: 0.001, formatValue: 'percent', logarithmic: true },
-      { key: 'cutoff', label: 'Cutoff', group: 'Filter', type: 'knob', min: 0, max: 1, step: 0.01, default: 1.0, formatValue: 'percent' },
+      { key: 'vol1_speed', label: 'Att Speed', group: 'Envelope', type: 'knob', min: 0.0001, max: 0.05, step: 0.0001, default: 0.001, formatValue: 'percent', logarithmic: true },
+      { key: 'vol2_speed', label: 'Rel Speed', group: 'Envelope', type: 'knob', min: 0.0001, max: 0.05, step: 0.0001, default: 0.001, formatValue: 'percent', logarithmic: true },
+      { key: 'cutoff_tv', label: 'Cutoff', group: 'Filter', type: 'knob', min: 0, max: 1, step: 0.01, default: 1.0, formatValue: 'percent' },
     ],
     romConfig: {
       requiredZip: 'sc88.zip (Roland SC-88 / TC6116 wave ROM)',
