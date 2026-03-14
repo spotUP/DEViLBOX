@@ -49,6 +49,8 @@ interface FormatStore {
   symphonieFileData: ArrayBuffer | null;
   uadeEditableFileData: ArrayBuffer | null;
   uadeEditableFileName: string | null;
+  uadeEditableSubsongs: { count: number; speeds: number[] } | null;
+  uadeEditableCurrentSubsong: number;
   libopenmptFileData: ArrayBuffer | null;
   hivelyMeta: { stereoMode: number; mixGain: number; speedMultiplier: number; version: number } | null;
   furnaceSubsongs: FurnaceSubsongPlayback[] | null;
@@ -118,6 +120,8 @@ export const useFormatStore = create<FormatStore>()(
     symphonieFileData: null,
     uadeEditableFileData: null,
     uadeEditableFileName: null,
+    uadeEditableSubsongs: null,
+    uadeEditableCurrentSubsong: 0,
     libopenmptFileData: null,
     hivelyMeta: null,
     furnaceSubsongs: null,
@@ -169,6 +173,8 @@ export const useFormatStore = create<FormatStore>()(
         state.symphonieFileData = (song as any).symphonieFileData ?? null;
         state.uadeEditableFileData = (song as any).uadeEditableFileData ?? null;
         state.uadeEditableFileName = (song as any).uadeEditableFileName ?? null;
+        state.uadeEditableSubsongs = (song as any).uadeEditableSubsongs ?? null;
+        state.uadeEditableCurrentSubsong = 0;
         state.libopenmptFileData = (song as any).libopenmptFileData ?? null;
         if (song.furnaceNative) {
           state.editorMode = 'furnace';
@@ -237,6 +243,8 @@ export const useFormatStore = create<FormatStore>()(
       state.symphonieFileData = null;
       state.uadeEditableFileData = null;
       state.uadeEditableFileName = null;
+      state.uadeEditableSubsongs = null;
+      state.uadeEditableCurrentSubsong = 0;
       state.libopenmptFileData = null;
       state.originalModuleData = null;
       state.songDBInfo = null;
