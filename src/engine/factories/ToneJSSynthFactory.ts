@@ -1888,8 +1888,9 @@ export function createChipSynth(config: InstrumentConfig): Tone.ToneAudioNode {
     });
 
     // Add bit crusher for 8-bit sound
+    // wet=0: SAC's AudioWorkletNode wet path is non-functional; dry path passes audio directly.
     const bitCrusher = new Tone.BitCrusher(chipConfig.bitDepth);
-    bitCrusher.wet.value = 1;
+    bitCrusher.wet.value = 0;
     noise.connect(bitCrusher);
 
     return {
@@ -1945,8 +1946,9 @@ export function createChipSynth(config: InstrumentConfig): Tone.ToneAudioNode {
   });
 
   // Add bit crusher for 8-bit character
+  // wet=0: SAC's AudioWorkletNode wet path is non-functional; dry path passes audio directly.
   const bitCrusher = new Tone.BitCrusher(chipConfig.bitDepth);
-  bitCrusher.wet.value = 1;
+  bitCrusher.wet.value = 0;
   synth.connect(bitCrusher);
 
   // Create ArpeggioEngine only if arpeggio is ENABLED (not just configured)
