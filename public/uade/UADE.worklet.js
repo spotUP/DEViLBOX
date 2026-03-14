@@ -49,7 +49,7 @@ class UADEProcessor extends AudioWorkletProcessor {
         break;
 
       case 'load':
-        this._load(data.buffer, data.filenameHint, data.subsong || 0);
+        this._load(data.buffer, data.filenameHint, data.subsong || 0, data.skipScan || false);
         break;
 
       case 'addCompanionFile':
@@ -379,6 +379,14 @@ class UADEProcessor extends AudioWorkletProcessor {
         }
         break;
       }
+
+      case 'setMuteMask': {
+        const { mask } = data;
+        if (this._wasm && this._wasm._uade_wasm_mute_channels) {
+          this._wasm._uade_wasm_mute_channels(mask & 0x0F);
+        }
+        break;
+      }
     }
   }
 
@@ -591,7 +599,7 @@ class UADEProcessor extends AudioWorkletProcessor {
     return ret;
   }
 
-  _load(buffer, filenameHint, subsongIndex = 0) {
+  _load(buffer, filenameHint, subsongIndex = 0, skipScan = false) {
     if (!this._wasm || !this._ready) {
       this.port.postMessage({ type: 'error', message: 'WASM not ready' });
       return;
@@ -630,23 +638,36 @@ class UADEProcessor extends AudioWorkletProcessor {
       const maxSubsong = this._wasm._uade_wasm_get_subsong_max();
       const subsongCount = this._wasm._uade_wasm_get_subsong_count();
 
-      // Fast-scan the entire song to extract pattern data before playback
-      console.log('[UADE.worklet] Starting song scan...');
-      const scanStart = performance.now();
-      const scanResult = this._scanSong(subsongIndex);
-      const isEnhanced = scanResult && scanResult.isEnhanced;
-      const scanData = isEnhanced ? scanResult.rows : scanResult;
-      const scanDuration = Math.round(performance.now() - scanStart);
-      console.log('[UADE.worklet] Scan complete: ' + (isEnhanced ? 'enhanced' : 'basic') +
-        ', ' + (Array.isArray(scanData) ? scanData.length : 0) + ' rows, ' +
-        (isEnhanced ? Object.keys(scanResult.samples || {}).length + ' samples, ' : '') +
-        scanDuration + 'ms');
+      // Fast-scan the entire song to extract pattern data before playback.
+      // skipScan=true is used for formats (e.g. compiled 68k replayers) where the
+      // player loops indefinitely without an end signal — running the scan would
+      // hang the worklet thread for up to MAX_SECONDS (600s).
+      let scanResult = null;
+      let isEnhanced = false;
+      let scanData = [];
+      if (!skipScan) {
+        console.log('[UADE.worklet] Starting song scan...');
+        const scanStart = performance.now();
+        scanResult = this._scanSong(subsongIndex);
+        isEnhanced = !!(scanResult && scanResult.isEnhanced);
+        scanData = isEnhanced ? scanResult.rows : (scanResult ?? []);
+        const scanDuration = Math.round(performance.now() - scanStart);
+        console.log('[UADE.worklet] Scan complete: ' + (isEnhanced ? 'enhanced' : 'basic') +
+          ', ' + (Array.isArray(scanData) ? scanData.length : 0) + ' rows, ' +
+          (isEnhanced ? Object.keys(scanResult.samples || {}).length + ' samples, ' : '') +
+          scanDuration + 'ms');
+      } else {
+        console.log('[UADE.worklet] Skipping song scan (skipScan=true, compiled replayer)');
+      }
 
-      // Reload the song for playback (scan consumed the song state)
-      this._wasm._uade_wasm_stop();
-      const ret2 = this._loadIntoWasm(data, filenameHint);
-      if (ret2 !== 0) {
-        console.warn('[UADE.worklet] Reload after scan failed (ret=' + ret2 + '), scan data still valid');
+      // Reload the song for playback (scan consumed the song state).
+      // Not needed when skipScan=true since the song state is untouched.
+      if (!skipScan) {
+        this._wasm._uade_wasm_stop();
+        const ret2 = this._loadIntoWasm(data, filenameHint);
+        if (ret2 !== 0) {
+          console.warn('[UADE.worklet] Reload after scan failed (ret=' + ret2 + '), scan data still valid');
+        }
       }
 
       this._playing = false;

@@ -439,6 +439,19 @@ void uade_wasm_set_looping(int loop) {
 }
 
 /*
+ * Enable/disable one-subsong mode.
+ * When enabled, UADE stops playback after the first subsong ends instead of
+ * advancing to the next subsong. Useful for audit renders that compare a single
+ * subsong against a reference that also uses --one-subsong mode.
+ * Must be called before uade_wasm_load().
+ */
+EMSCRIPTEN_KEEPALIVE
+void uade_wasm_set_one_subsong(int on) {
+    if (!s_state) return;
+    s_state->config.one_subsong = on ? 1 : 0;
+}
+
+/*
  * Clean restart for looping — reset IPC and replay the song.
  * Returns 1 if restart succeeded, 0 if it failed.
  */
