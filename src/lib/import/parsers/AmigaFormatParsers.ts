@@ -139,9 +139,25 @@ export async function tryRouteFormat(
   }
 
   // ── DigiBooster ──────────────────────────────────────────────────────────
+  // .digi files come in two sub-formats:
+  //   DBMX / DBM0 magic  → DigiBoosterParser (native, full decode)
+  //   "DIGI Boo..." text  → old DigiBooster 1.x text-header; handled by OpenMPT
   if (filename.endsWith('.digi')) {
-    const { parseDigiBoosterFile } = await import('@lib/import/formats/DigiBoosterParser');
-    return withNativeDefault('digi', ctx, (buf: Uint8Array | ArrayBuffer, name: string) => parseDigiBoosterFile(buf as ArrayBuffer, name));
+    if (ctx.prefs.digi !== 'uade') {
+      const { parseDigiBoosterFile } = await import('@lib/import/formats/DigiBoosterParser');
+      try {
+        return injectUADEPlayback(parseDigiBoosterFile(ctx.buffer, ctx.originalFileName), ctx);
+      } catch {
+        // Not DBMX/DBM0 magic — fall through to OpenMPT (handles old text-header format)
+        const { parseWithOpenMPT } = await import('@lib/import/wasm/OpenMPTConverter');
+        const song = await parseWithOpenMPT(buffer, originalFileName);
+        song.libopenmptFileData = buffer.slice(0);
+        return song;
+      }
+    }
+    // User explicitly requested UADE
+    const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
+    return parseUADEFile(ctx.buffer, ctx.originalFileName, ctx.prefs.uade ?? 'enhanced', ctx.subsong, ctx.preScannedMeta);
   }
 
   // ── Delta Music 2.0 ──────────────────────────────────────────────────────
@@ -201,9 +217,11 @@ export async function tryRouteFormat(
   }
 
   // ── Fred Editor ───────────────────────────────────────────────────────────
+  // Force UADE classic mode — Fred Editor has synthesized instruments that UADE
+  // enhanced mode can't extract as PCM. Classic mode uses UADESynth streaming.
   if (matchesExt(filename, ['fred'])) {
-    const { parseFredEditorFile } = await import('@lib/import/formats/FredEditorParser');
-    return withNativeThenUADE('fred', ctx, (buf: Uint8Array | ArrayBuffer, name: string) => parseFredEditorFile(buf as ArrayBuffer, name), 'FredEditorParser');
+    const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
+    return parseUADEFile(buffer, originalFileName, 'classic', subsong, preScannedMeta);
   }
 
   // ── Sound-FX ──────────────────────────────────────────────────────────────
@@ -281,50 +299,38 @@ export async function tryRouteFormat(
   }
 
   // ── InStereo! 2.0 (.is20 — unambiguous) ──────────────────────────────────
-  // Magic "IS20DF10" at offset 0.
+  // Use native parser for instrument display + inject UADE for 1:1 audio playback.
+  // This gives individual instrument previews while UADE handles the song audio.
   if (matchesExt(filename, ['is20'])) {
-    const { isInStereo2Format, parseInStereo2File } = await import('@lib/import/formats/InStereo2Parser');
-    return withNativeThenUADE('inStereo2', ctx,
-      (bytes: Uint8Array | ArrayBuffer, name: string) => parseInStereo2File(bytes as Uint8Array, name),
-      'InStereo2Parser', { isFormat: isInStereo2Format, usesBytes: true });
+    try {
+      const { isInStereo2Format, parseInStereo2File } = await import('@lib/import/formats/InStereo2Parser');
+      const bytes = new Uint8Array(buffer);
+      if (isInStereo2Format(bytes)) {
+        const result = parseInStereo2File(bytes, originalFileName);
+        if (result) {
+          // Inject UADE for 1:1 audio — InStereo2Synth can't reproduce all instrument types
+          (result as any).uadeEditableFileData = buffer.slice(0);
+          (result as any).uadeEditableFileName = originalFileName;
+          return result;
+        }
+      }
+    } catch (err) {
+      console.warn(`[InStereo2Parser] Native parse failed for ${filename}, falling back to UADE:`, err);
+    }
+    const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
+    return parseUADEFile(buffer, originalFileName, 'classic', subsong, preScannedMeta);
   }
 
   // ── InStereo! 1.0 (.is10 — unambiguous) ──────────────────────────────────
-  // Magic "ISM!V1.2" at offset 0.
   if (matchesExt(filename, ['is10'])) {
-    const { isInStereo1Format, parseInStereo1File } = await import('@lib/import/formats/InStereo1Parser');
-    return withNativeThenUADE('inStereo1', ctx,
-      (bytes: Uint8Array | ArrayBuffer, name: string) => parseInStereo1File(bytes as Uint8Array, name),
-      'InStereo1Parser', { isFormat: isInStereo1Format, usesBytes: true });
+    const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
+    return parseUADEFile(buffer, originalFileName, 'classic', subsong, preScannedMeta);
   }
 
   // ── InStereo! (.is — ambiguous: detect by magic) ─────────────────────────
   if (matchesExt(filename, ['is'])) {
-        const bytes = new Uint8Array(buffer);
-    if (prefs.inStereo2 === 'native') {
-      try {
-        const { isInStereo2Format, parseInStereo2File } = await import('@lib/import/formats/InStereo2Parser');
-        if (isInStereo2Format(bytes)) {
-          const result = parseInStereo2File(bytes, originalFileName);
-          if (result) return result;
-        }
-      } catch (err) {
-        console.warn(`[InStereo2Parser] failed for ${filename}, trying IS10:`, err);
-      }
-    }
-    if (prefs.inStereo1 === 'native') {
-      try {
-        const { isInStereo1Format, parseInStereo1File } = await import('@lib/import/formats/InStereo1Parser');
-        if (isInStereo1Format(bytes)) {
-          const result = parseInStereo1File(bytes, originalFileName);
-          if (result) return result;
-        }
-      } catch (err) {
-        console.warn(`[InStereo1Parser] Native parse failed for ${filename}, falling back to UADE:`, err);
-      }
-    }
     const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
-    return parseUADEFile(buffer, originalFileName, prefs.uade ?? 'enhanced', subsong, preScannedMeta);
+    return parseUADEFile(buffer, originalFileName, 'classic', subsong, preScannedMeta);
   }
 
   // ── PreTracker ───────────────────────────────────────────────────────────
@@ -687,11 +693,11 @@ export async function tryRouteFormat(
   }
 
   // ── Sound Factory (.psf) ──────────────────────────────────────────────────
+  // Force UADE classic mode — SoundFactory has synth instruments that UADE enhanced
+  // mode can't extract as PCM. Classic mode uses UADESynth streaming for 1:1 audio.
   if (matchesExt(filename, ['psf'])) {
-    const { isSoundFactoryFormat, parseSoundFactoryFile } = await import('@lib/import/formats/SoundFactoryParser');
-    return withNativeThenUADE('soundFactory', ctx,
-      (bytes: Uint8Array | ArrayBuffer, name: string) => parseSoundFactoryFile(bytes as Uint8Array, name),
-      'SoundFactoryParser', { isFormat: isSoundFactoryFormat, usesBytes: true, injectUADE: true });
+    const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
+    return parseUADEFile(buffer, originalFileName, 'classic', subsong, preScannedMeta);
   }
 
   // ── Actionamics (.act) ────────────────────────────────────────────────────
@@ -713,12 +719,11 @@ export async function tryRouteFormat(
   }
 
   // ── Ron Klaren (.rk, .rkb) ────────────────────────────────────────────────
-  // Identified by Amiga HUNK magic (0x3F3) at offset 0 and "RON_KLAREN_SOUNDMODULE!" at offset 40.
+  // Force UADE classic mode — Ron Klaren has synthesized instruments that UADE
+  // enhanced mode can't extract as PCM. Classic mode uses UADESynth streaming.
   if (matchesExt(filename, ['rk', 'rkb'])) {
-    const { isRonKlarenFormat, parseRonKlarenFile } = await import('@lib/import/formats/RonKlarenParser');
-    return withNativeThenUADE('ronKlaren', ctx,
-      (bytes: Uint8Array | ArrayBuffer, name: string) => parseRonKlarenFile(bytes as Uint8Array, name),
-      'RonKlarenParser', { isFormat: isRonKlarenFormat, usesBytes: true });
+    const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
+    return parseUADEFile(buffer, originalFileName, 'classic', subsong, preScannedMeta);
   }
 
   // ── UNIC Tracker (.unic) ─────────────────────────────────────────────────
@@ -1272,12 +1277,11 @@ export async function tryRouteFormat(
   }
 
   // ── Leggless Music Editor (.lme / LME.*) ────────────────────────────────────
-  // Amiga 4-channel format (Leggless Music Editor). Magic: "LME" at offset 0.
+  // Force UADE classic mode — LME has synth instruments that UADE enhanced mode
+  // can't extract as PCM. Classic mode uses UADESynth streaming for 1:1 audio.
   if (matchesExt(filename, ['lme'])) {
-    const { isLMEFormat, parseLMEFile } = await import('@lib/import/formats/LMEParser');
-    return withNativeThenUADE('lme', ctx,
-      (buf: Uint8Array | ArrayBuffer, name: string) => { if (isLMEFormat(buf as ArrayBuffer)) return parseLMEFile(buf as ArrayBuffer, name); return null; },
-      'LMEParser');
+    const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
+    return parseUADEFile(buffer, originalFileName, 'classic', subsong, preScannedMeta);
   }
 
   // ── Medley (.ml) ─────────────────────────────────────────────────────────

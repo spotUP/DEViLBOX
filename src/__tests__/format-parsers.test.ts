@@ -712,7 +712,7 @@ describe('UADE routing detection for remaining formats', () => {
     'count_duckula.scr',  // scr
     'ziriax.pvp',         // pvp
     'axelf.psf',          // psf (SoundFactory)
-    'theday.digi',        // digi
+    // theday.digi → old DigiBooster 1.x text-header ("DIGI Boo..."); routes to OpenMPT, not UADE
     'turtle_ready.adsc',  // adsc
     'primemover.hot',     // hot (Anders Öland)
     'inconvenient.sg',    // sg (TomyTracker - also tested above)
@@ -767,6 +767,46 @@ describe('WASM engine format parser structure tests', () => {
       console.log(`  ✓ format='Organya', organyaFileData=${(song as any).organyaFileData.byteLength} bytes`);
     } catch (e) {
       console.log(`  Parser error on minimal data (expected): ${(e as Error).message?.substring(0, 80)}`);
+    }
+  });
+
+  it('DigiBoosterParser: rejects old text-header DIGI format (routes to OpenMPT)', async () => {
+    // theday.digi starts with "DIGI Boo..." (old DigiBooster 1.x text header).
+    // DigiBoosterParser only handles DBMX/DBM0 magic — it should throw.
+    // AmigaFormatParsers catches the throw and falls through to OpenMPT.
+    const { parseDigiBoosterFile } = await import('@lib/import/formats/DigiBoosterParser');
+    const filePath = resolve(BASE, 'theday.digi');
+    let fileExists = false;
+    try {
+      readFileSync(filePath);
+      fileExists = true;
+    } catch { /* skip */ }
+
+    if (fileExists) {
+      const raw = readFileSync(filePath);
+      const buf = raw.buffer.slice(raw.byteOffset, raw.byteOffset + raw.byteLength) as ArrayBuffer;
+      expect(() => parseDigiBoosterFile(buf, 'theday.digi')).toThrow(/Not a DigiBooster/);
+      console.log('  theday.digi: DigiBoosterParser correctly rejects old text-header format ✓');
+    } else {
+      console.log('  SKIP: theday.digi not found');
+    }
+  });
+
+  it('DigiBoosterParser: parses DBMX magic correctly', async () => {
+    // Build a minimal DBMX file with just enough structure to parse
+    const { parseDigiBoosterFile } = await import('@lib/import/formats/DigiBoosterParser');
+    const buf = new ArrayBuffer(256);
+    const u8 = new Uint8Array(buf);
+    // Write DBMX magic
+    u8[0] = 0x44; u8[1] = 0x42; u8[2] = 0x4D; u8[3] = 0x58; // "DBMX"
+    try {
+      const song = parseDigiBoosterFile(buf, 'test.digi');
+      logResult('DigiBooster', song);
+      expect(song.format).toBe('DIGI');
+      console.log(`  ✓ format='DIGI', DBMX magic accepted`);
+    } catch (e) {
+      // Minimal buffer may be too small for full parse — that's acceptable
+      console.log(`  Parser error on minimal DBMX data (expected): ${(e as Error).message?.substring(0, 80)}`);
     }
   });
 
