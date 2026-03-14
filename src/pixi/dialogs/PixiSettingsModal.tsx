@@ -407,8 +407,9 @@ export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, on
 
   const drawOverlay = (g: GraphicsType) => {
     g.clear();
+    // Transparent hit area — no visual fill, just captures pointer/wheel events outside the modal
     g.rect(0, 0, screenW, screenH);
-    g.fill({ color: theme.bg.color, alpha: 0.5 });
+    g.fill({ color: 0x000000, alpha: 0 });
   };
 
   const handleOverlayClick = (_e: FederatedPointerEvent) => { onClose(); };
@@ -496,30 +497,35 @@ export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, on
             alignItems: 'center',
           }}
         >
-          {TABS.map((tab) => (
-            <layoutContainer
-              key={tab.id}
-              eventMode="static"
-              cursor="pointer"
-              onClick={() => setActiveTab(tab.id)}
-              layout={{
-                paddingLeft: 12,
-                paddingRight: 12,
-                paddingTop: 6,
-                paddingBottom: 6,
-                borderBottomWidth: activeTab === tab.id ? 2 : 0,
-                borderColor: theme.accent.color,
-                marginBottom: activeTab === tab.id ? -1 : 0,
-              }}
-            >
-              <pixiBitmapText
-                text={tab.label.toUpperCase()}
-                style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 10, fill: 0xffffff }}
-                tint={activeTab === tab.id ? theme.accent.color : theme.textMuted.color}
-                layout={{}}
-              />
-            </layoutContainer>
-          ))}
+          {TABS.map((tab) => {
+            const isActive = activeTab === tab.id;
+            return (
+              <layoutContainer
+                key={tab.id}
+                eventMode="static"
+                cursor="pointer"
+                onPointerDown={() => setActiveTab(tab.id)}
+                onClick={() => setActiveTab(tab.id)}
+                layout={{
+                  paddingLeft: 12,
+                  paddingRight: 12,
+                  paddingTop: 6,
+                  paddingBottom: 6,
+                  // backgroundColor drives the active indicator — known to update correctly
+                  // unlike borderBottomWidth which can fail to re-render on 0→2 transitions
+                  backgroundColor: isActive ? theme.bgSecondary.color : undefined,
+                  borderRadius: isActive ? 4 : 0,
+                }}
+              >
+                <pixiBitmapText
+                  text={tab.label.toUpperCase()}
+                  style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 10, fill: 0xffffff }}
+                  tint={isActive ? theme.accent.color : theme.textMuted.color}
+                  layout={{}}
+                />
+              </layoutContainer>
+            );
+          })}
         </layoutContainer>
 
         {/* Content — DOM: p-4 space-y-6 max-h-[70vh] overflow-y-auto */}
@@ -530,13 +536,12 @@ export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, on
           direction="vertical"
           bgColor={theme.bg.color}
         >
-          <Div className="flex-col gap-3 p-4" layout={{ width: CONTENT_W, backgroundColor: theme.bg.color }}>
+          <Div className="flex-col p-4" layout={{ width: CONTENT_W, backgroundColor: theme.bg.color }}>
 
           {/* ═══════════════════════════════════════════════════════════════════
               GENERAL TAB — Display, Layout
               ═══════════════════════════════════════════════════════════════════ */}
-          {activeTab === 'general' && (
-            <>
+          <layoutContainer renderable={activeTab === 'general'} layout={{ width: CONTENT_W, height: activeTab === 'general' ? contentH : 0, overflow: 'hidden', flexDirection: 'column', gap: 12 }}>
           {/* ═══════ DISPLAY ═══════ */}
           <SectionHeader text="DISPLAY" />
 
@@ -630,14 +635,12 @@ export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, on
           <SettingRow label="Fullscreen:">
             <PixiCheckbox checked={isFullscreen} onChange={toggleFullscreen} />
           </SettingRow>
-            </>
-          )}
+          </layoutContainer>
 
           {/* ═══════════════════════════════════════════════════════════════════
               VISUAL TAB — Visual Background, CRT, Lens, Workbench
               ═══════════════════════════════════════════════════════════════════ */}
-          {activeTab === 'visual' && (
-            <>
+          <layoutContainer renderable={activeTab === 'visual'} layout={{ width: CONTENT_W, height: activeTab === 'visual' ? contentH : 0, overflow: 'hidden', flexDirection: 'column', gap: 12 }}>
           <SettingRow label="Visual Background:" description="Audio-reactive effects behind tracker">
             <PixiCheckbox checked={trackerVisualBg} onChange={setTrackerVisualBg} />
           </SettingRow>
@@ -786,14 +789,12 @@ export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, on
             <Txt className="text-[9px] font-mono text-accent-primary">Tab</Txt>
             <Txt className="text-[9px] font-mono text-text-muted">{' — hold for Exposé (fit all windows) · release to restore'}</Txt>
           </Div>
-            </>
-          )}
+          </layoutContainer>
 
           {/* ═══════════════════════════════════════════════════════════════════
               RECORDING TAB
               ═══════════════════════════════════════════════════════════════════ */}
-          {activeTab === 'recording' && (
-            <>
+          <layoutContainer renderable={activeTab === 'recording'} layout={{ width: CONTENT_W, height: activeTab === 'recording' ? contentH : 0, overflow: 'hidden', flexDirection: 'column', gap: 12 }}>
           {/* ═══════ RECORDING ═══════ */}
           <SectionHeader text="RECORDING" />
 
@@ -836,14 +837,12 @@ export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, on
               />
             </Div>
           </SettingRow>
-            </>
-          )}
+          </layoutContainer>
 
           {/* ═══════════════════════════════════════════════════════════════════
               INPUT TAB — MIDI, Keyboard, Vinyl Scratch
               ═══════════════════════════════════════════════════════════════════ */}
-          {activeTab === 'input' && (
-            <>
+          <layoutContainer renderable={activeTab === 'input'} layout={{ width: CONTENT_W, height: activeTab === 'input' ? contentH : 0, overflow: 'hidden', flexDirection: 'column', gap: 12 }}>
           {/* ═══════ MIDI ═══════ */}
           <SectionHeader text="MIDI" />
 
@@ -907,14 +906,12 @@ export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, on
             <Txt className="text-[9px] font-mono text-text-muted">F = Fader cut · 1 = Trans · 2 = Crab · 3 = Flare</Txt>
             <Txt className="text-[9px] font-mono text-text-muted">4 = Chirp · 5 = Stab · 6 = 8-Finger · 7 = Twiddle · 0 = Stop</Txt>
           </Div>
-            </>
-          )}
+          </layoutContainer>
 
           {/* ═══════════════════════════════════════════════════════════════════
               AUDIO TAB — Engine settings
               ═══════════════════════════════════════════════════════════════════ */}
-          {activeTab === 'audio' && (
-            <>
+          <layoutContainer renderable={activeTab === 'audio'} layout={{ width: CONTENT_W, height: activeTab === 'audio' ? contentH : 0, overflow: 'hidden', flexDirection: 'column', gap: 12 }}>
           {/* ═══════ ENGINE ═══════ */}
           <SectionHeader text="ENGINE" />
 
@@ -1046,12 +1043,10 @@ export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, on
               </Txt>
             </Div>
           </SettingRow>
-            </>
-          )}
+          </layoutContainer>
 
-          {/* Keyboard section is part of INPUT tab (already wrapped above) */}
-          {activeTab === 'input' && (
-            <>
+          {/* Keyboard section is part of INPUT tab */}
+          <layoutContainer renderable={activeTab === 'input'} layout={{ width: CONTENT_W, height: activeTab === 'input' ? contentH : 0, overflow: 'hidden', flexDirection: 'column', gap: 12 }}>
           {/* ═══════ KEYBOARD ═══════ */}
           <SectionHeader text="KEYBOARD" />
 
@@ -1076,14 +1071,12 @@ export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, on
               width={150}
             />
           </SettingRow>
-            </>
-          )}
+          </layoutContainer>
 
           {/* ═══════════════════════════════════════════════════════════════════
               SID TAB — SID Engine, SID Hardware
               ═══════════════════════════════════════════════════════════════════ */}
-          {activeTab === 'sid' && (
-            <>
+          <layoutContainer renderable={activeTab === 'sid'} layout={{ width: CONTENT_W, height: activeTab === 'sid' ? contentH : 0, overflow: 'hidden', flexDirection: 'column', gap: 12 }}>
           {/* ═══════ C64 SID ENGINE ═══════ */}
           <SectionHeader text="C64 SID PLAYER ENGINE" />
 
@@ -1316,14 +1309,12 @@ export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, on
               )}
             </>
           )}
-            </>
-          )}
+          </layoutContainer>
 
           {/* ═══════════════════════════════════════════════════════════════════
               ABOUT TAB — Modland, Danger Zone, Info
               ═══════════════════════════════════════════════════════════════════ */}
-          {activeTab === 'about' && (
-            <>
+          <layoutContainer renderable={activeTab === 'about'} layout={{ width: CONTENT_W, height: activeTab === 'about' ? contentH : 0, overflow: 'hidden', flexDirection: 'column', gap: 12 }}>
           {/* ═══════ MODLAND ═══════ */}
           <SectionHeader text="MODLAND INTEGRATION" />
 
@@ -1361,8 +1352,7 @@ export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, on
             <Txt className="text-[10px] font-mono text-text-muted">TB-303 Acid Tracker</Txt>
             <Txt className="text-[10px] font-mono text-accent-primary">Settings are saved automatically</Txt>
           </Div>
-            </>
-          )}
+          </layoutContainer>
 
         </Div>
       </PixiScrollView>
