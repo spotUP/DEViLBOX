@@ -63,15 +63,11 @@ const DM1_PERIODS: number[] = [
 ];
 
 /**
- * PAL sample rate at ProTracker C-1 (period 856).
- * Synth wavetable instruments are stored at this rate with baseNote "C3" so that
- * DM1 note index 37 (period 856, XM note 13 = C-1) plays at the correct frequency.
- */
-const SYNTH_BASE_RATE = Math.round(PAL_CLOCK / (2 * 856)); // 2072 Hz
-
-/**
  * PAL sample rate at ProTracker C-3 (period 214) -- standard Amiga PCM rate.
- * PCM sample instruments are stored at this rate with baseNote "C3".
+ * Both PCM samples and wavetable synth instruments are stored at this rate.
+ * Chrome's decodeAudioData requires ≥ 3000 Hz; C-1 rate (2072 Hz) is too low.
+ * ToneEngine uses stored sampleRate to compute playbackRate, so the pitch math
+ * is correct regardless of which rate is used to store the waveform.
  */
 const PCM_BASE_RATE = Math.round(PAL_CLOCK / (2 * 214)); // 8287 Hz
 
@@ -441,24 +437,42 @@ export async function parseDeltaMusic1File(buffer: ArrayBuffer, filename: string
 
     } else if (inst.table !== null) {
       // Synth (wavetable) instrument.
-      // The 48-byte sound table drives waveform segment playback at runtime:
-      //   entry >= 0x80: set tableDelay (entry & 0x7F); advance to next
-      //   entry == 0xFF: loop back to table[entry+1]; stop scanning
-      //   entry <  0x80: play segment at sampleData[entry * 32 .. +32)
+      // Pre-render the sound table sequence for a better timbral approximation.
+      // The 48-byte table drives waveform segment playback at runtime:
+      //   entry >= 0x80 (& != 0xFF): set segDelay = (entry & 0x7F); advance
+      //   entry < 0x80:              play sampleData[entry*32 .. +32] for segDelay ticks
+      //   entry == 0xFF:             loop (byte after 0xFF = loop-back table index)
       //
-      // For the static snapshot we use the first valid waveform segment.
-      let waveOffset = 0;
+      // We pre-render by walking the table and appending each referenced 32-byte segment
+      // (repeated segDelay times, capped to avoid huge buffers). The result loops over
+      // the full timbral sequence rather than being a static single-frame snapshot.
+      const SEGMENT_BYTES = 32;
+      const MAX_DELAY_REPS = 6; // cap per-segment repeats to keep buffer reasonable
+
+      interface DM1Step { segOffset: number; reps: number; }
+      const tableSteps: DM1Step[] = [];
+      let segDelay = 1;
+      let tableLoopIndex = 0; // index into tableSteps where the sound table loops back
+      let hasLoopMarker = false;
+
       for (let t = 0; t < 48; t++) {
         const entry = inst.table[t];
-        if (entry === 0xff) break;
-        if (entry < 0x80) {
-          waveOffset = entry * 32;
+        if (entry === 0xff) {
+          // Next byte is the loop-back table index (segment entry index, not tableSteps index)
+          hasLoopMarker = true;
+          tableLoopIndex = tableSteps.length; // loop back to start by default
           break;
+        } else if (entry >= 0x80) {
+          segDelay = entry & 0x7f;
+        } else {
+          const segOff = entry * SEGMENT_BYTES;
+          if (segOff + SEGMENT_BYTES <= inst.sampleData.length) {
+            tableSteps.push({ segOffset: segOff, reps: Math.max(1, Math.min(segDelay, MAX_DELAY_REPS)) });
+          }
         }
-        // entry >= 0x80: delay modifier -- keep scanning
       }
-      const waveLen = Math.min(32, inst.sampleData.length - waveOffset);
-      if (waveLen <= 0) {
+
+      if (tableSteps.length === 0) {
         trackerInstruments.push({
           id,
           name: `Synth ${i}`,
@@ -473,15 +487,27 @@ export async function parseDeltaMusic1File(buffer: ArrayBuffer, filename: string
         continue;
       }
 
-      const pcmUint8 = new Uint8Array(waveLen);
-      for (let j = 0; j < waveLen; j++) {
-        pcmUint8[j] = inst.sampleData[waveOffset + j] & 0xff;
+      // Build pre-rendered PCM buffer
+      const totalSamples = tableSteps.reduce((s, step) => s + step.reps * SEGMENT_BYTES, 0);
+      const pcmUint8 = new Uint8Array(totalSamples);
+      let pcmPos = 0;
+      // Compute loop start sample (bytes before the loop-back point in tableSteps)
+      const loopStartSample = tableSteps.slice(0, tableLoopIndex).reduce(
+        (s, step) => s + step.reps * SEGMENT_BYTES, 0
+      );
+      for (const step of tableSteps) {
+        for (let rep = 0; rep < step.reps; rep++) {
+          for (let j = 0; j < SEGMENT_BYTES; j++) {
+            pcmUint8[pcmPos++] = inst.sampleData[step.segOffset + j] & 0xff;
+          }
+        }
       }
+      const loopEndSample = hasLoopMarker ? totalSamples : totalSamples; // always loop
 
-      // Store at SYNTH_BASE_RATE (2072 Hz = PAL C-1) with baseNote "C3" (XM note 37).
-      // DM1 note index 37 (period 856) maps to XM note 13 (C-1), so the sampler
-      // pitches the waveform correctly for all DM1 note values.
-      const synthInst = createSamplerInstrument(id, `Synth ${i}`, pcmUint8, inst.volume, SYNTH_BASE_RATE, 0, waveLen);
+      // Store at PCM_BASE_RATE (8287 Hz) — Chrome requires ≥ 3000 Hz for decodeAudioData.
+      // ToneEngine computes playbackRate = (periodMultiplier / period) / sampleRate,
+      // so pitch is correct at any sampleRate; 8287 Hz is safe and consistent with PCM.
+      const synthInst = createSamplerInstrument(id, `Synth ${i}`, pcmUint8, inst.volume, PCM_BASE_RATE, loopStartSample, loopEndSample);
       // Attach DM1 config for future editor use, but keep synthType as 'Sampler'
       // so the waveform PCM data routes through the native Tone.js sampler engine.
       synthInst.deltaMusic1 = buildDM1Config(inst);
