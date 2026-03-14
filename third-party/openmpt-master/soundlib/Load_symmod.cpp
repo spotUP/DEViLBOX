@@ -977,9 +977,13 @@ static bool ConvertDSP(const SymEvent event, MIDIMacroConfigData::Macro &macro, 
 		return true;
 	} else if(event.command == SymEvent::DSPDelay)
 	{
-		// DSP first has to be turned on from the Symphonie GUI before it can be used in a track (unlike Echo),
-		// so it's not implemented for now.
-		return false;
+		// DSPDelay uses the same macro encoding as DSPEcho.
+		// note encodes the delay type (3=Delay, 4=CrDelay), matching the SYM_DSP_* constants.
+		const uint8 type = (event.note < 5) ? event.note : 3;
+		const uint8 length = (event.param < 128) ? event.param : 127;
+		const uint8 feedback = (event.inst < 128) ? event.inst : 127;
+		macro = MPT_AFORMAT("F0F080{} F0F081{} F0F082{}")(mpt::afmt::HEX0<2>(type), mpt::afmt::HEX0<2>(length), mpt::afmt::HEX0<2>(feedback));
+		return true;
 	}
 	return false;
 }
@@ -987,7 +991,7 @@ static bool ConvertDSP(const SymEvent event, MIDIMacroConfigData::Macro &macro, 
 
 static uint8 MapToClosestMidiMacro(const SymEvent event, std::map<SymEvent, uint8> &macroMap)
 {
-	if(event.command == SymEvent::DSPDelay)
+	if(event.command == SymEvent::DSPDelay && macroMap.empty())
 		return 0;
 	uint8 bestMatch = 0;
 	uint32 bestDistance = uint32_max;
