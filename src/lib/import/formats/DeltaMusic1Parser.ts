@@ -40,8 +40,6 @@
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, TrackerCell, InstrumentConfig, UADEChipRamInfo, DeltaMusic1Config } from '@/types';
-import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
-import { encodeDeltaMusic1Cell } from '@/engine/uade/encoders/DeltaMusic1Encoder';
 import { createSamplerInstrument, periodToNoteIndex, amigaNoteToXM } from './AmigaUtils';
 
 // -- Constants ---------------------------------------------------------------
@@ -253,7 +251,6 @@ export async function parseDeltaMusic1File(buffer: ArrayBuffer, filename: string
   // -- Read blocks ---------------------------------------------------------
   // Each block = 64 bytes = 16 rows x 4 bytes.
   // Row layout: [instrument: uint8, note: uint8, effect: uint8, effectArg: uint8]
-  const blockDataOffset = off; // file offset of block data section
   const numBlocks = Math.floor(blockSectionLength / 64);
   const blocks: DM1BlockLine[][] = [];
   for (let b = 0; b < numBlocks; b++) {
@@ -485,8 +482,8 @@ export async function parseDeltaMusic1File(buffer: ArrayBuffer, filename: string
       // DM1 note index 37 (period 856) maps to XM note 13 (C-1), so the sampler
       // pitches the waveform correctly for all DM1 note values.
       const synthInst = createSamplerInstrument(id, `Synth ${i}`, pcmUint8, inst.volume, SYNTH_BASE_RATE, 0, waveLen);
-      // Upgrade the synthType and attach the DM1 config + chip RAM info.
-      synthInst.synthType = 'DeltaMusic1Synth';
+      // Attach DM1 config for future editor use, but keep synthType as 'Sampler'
+      // so the waveform PCM data routes through the native Tone.js sampler engine.
       synthInst.deltaMusic1 = buildDM1Config(inst);
       if (chipRam) synthInst.uadeChipRam = chipRam;
       trackerInstruments.push(synthInst);
@@ -710,35 +707,6 @@ export async function parseDeltaMusic1File(buffer: ArrayBuffer, filename: string
   }
   const moduleName = filename.replace(/.[^/.]+$/, '');
 
-  // Build uadePatternLayout with getCellFileOffset for track/block indirection
-  const uadePatternLayout: UADEPatternLayout = {
-    formatId: 'deltaMusic1',
-    patternDataFileOffset: blockDataOffset,
-    bytesPerCell: 4,
-    rowsPerPattern: 16,
-    numChannels: 4,
-    numPatterns: trackerPatterns.length,
-    moduleSize: buffer.byteLength,
-    encodeCell: encodeDeltaMusic1Cell,
-    getCellFileOffset: (pattern: number, row: number, channel: number): number => {
-      const chEntries = effectiveEntries[channel];
-      if (!chEntries || chEntries.length === 0) return 0;
-      // Resolve track position with loop wrapping (same logic as pattern build)
-      let trackPos = pattern;
-      const tLen = chEntries.length;
-      if (trackPos >= tLen) {
-        const loopStart = loopPositions[channel] < tLen ? loopPositions[channel] : 0;
-        const loopSpan = tLen - loopStart;
-        trackPos = loopSpan > 0
-          ? loopStart + ((pattern - loopStart) % loopSpan)
-          : tLen - 1;
-      }
-      const entry = chEntries[trackPos];
-      if (!entry || entry.blockNumber >= numBlocks) return 0;
-      return blockDataOffset + entry.blockNumber * 64 + row * 4;
-    },
-  };
-
   return {
     name: moduleName,
     format: 'MOD' as TrackerFormat,
@@ -751,6 +719,8 @@ export async function parseDeltaMusic1File(buffer: ArrayBuffer, filename: string
     initialSpeed: 6,
     initialBPM: 125,
     linearPeriods: false,
-    uadePatternLayout,
+    // uadePatternLayout omitted: native Sampler instruments handle audio directly.
+    // UADE audio is unreliable for Delta Music — DM1Synth wavetable instruments
+    // are now PCM Samplers; UADE chip RAM editing can be restored once audio works.
   };
 }

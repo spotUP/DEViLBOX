@@ -76,28 +76,32 @@ export class VSTBridgeSynth implements DevilboxSynth {
 
       this._worklet = workletNode;
 
-      // Listen for param metadata and other messages
-      const originalOnMessage = workletNode.port.onmessage;
-      workletNode.port.onmessage = (event) => {
-        if (event.data.type === 'params') {
-          this._params = event.data.params;
-          // Initialize param values from defaults
-          for (const p of this._params) {
-            if (!this._paramValues.has(p.id)) {
-              this._paramValues.set(p.id, p.defaultValue);
+      // Promise that resolves once the worklet sends back param metadata
+      const paramsReceived = new Promise<void>((resolve) => {
+        const originalOnMessage = workletNode.port.onmessage;
+        workletNode.port.onmessage = (event) => {
+          if (event.data.type === 'params') {
+            this._params = event.data.params;
+            // Initialize param values from defaults
+            for (const p of this._params) {
+              if (!this._paramValues.has(p.id)) {
+                this._paramValues.set(p.id, p.defaultValue);
+              }
             }
+            resolve();
           }
-        }
-        // Forward to the ready handler set by createVSTBridgeNode
-        if (originalOnMessage) originalOnMessage.call(workletNode.port, event);
-      };
+          // Forward to the ready handler set by createVSTBridgeNode
+          if (originalOnMessage) originalOnMessage.call(workletNode.port, event);
+        };
+      });
 
       // Wait for WASM ready
       await readyPromise;
       this._isReady = true;
 
-      // Query parameter metadata from WASM
+      // Query parameter metadata from WASM, then wait for the response
       this._worklet.port.postMessage({ type: 'getParams' });
+      await Promise.race([paramsReceived, new Promise<void>((r) => setTimeout(r, 3000))]);
 
       // Process any pending notes
       for (const { note, velocity } of this._pendingNotes) {
