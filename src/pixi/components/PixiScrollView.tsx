@@ -49,11 +49,13 @@ export const PixiScrollView: React.FC<PixiScrollViewProps> = ({
   const canScrollV = direction !== 'horizontal' && maxScrollY > 0;
   const canScrollH = direction !== 'vertical' && maxScrollX > 0;
 
-  // Mouse wheel scrolling — also block native event to prevent background content from scrolling
+  // Mouse wheel scrolling — stopPropagation prevents PixiJS scene-graph bubbling.
+  // nativeEvent.preventDefault() is intentionally omitted: PixiJS registers the canvas
+  // wheel listener as { passive: true }, so calling preventDefault() from a synthetic
+  // handler fails silently and spams console warnings. Background scroll prevention is
+  // handled upstream (PixiPatternEditor checks modalOpen before processing wheel events).
   const handleWheel = useCallback((e: FederatedWheelEvent) => {
     e.stopPropagation();
-    (e as unknown as { nativeEvent?: WheelEvent }).nativeEvent?.preventDefault?.();
-    (e as unknown as { nativeEvent?: WheelEvent }).nativeEvent?.stopImmediatePropagation?.();
     if (canScrollV) {
       setScrollY(prev => Math.max(0, Math.min(maxScrollY, prev + e.deltaY)));
     }
@@ -73,6 +75,9 @@ export const PixiScrollView: React.FC<PixiScrollViewProps> = ({
   // Draw scrollbar
   const drawScrollbar = useCallback((g: GraphicsType) => {
     g.clear();
+    // Anchor rect: sets bounding box = layout dimensions so @pixi/layout scale factor = 1.
+    // Without this, the thin scrollbar content gets scaled to fill the full layout area.
+    g.rect(0, 0, width, height).fill({ color: 0x000000, alpha: 0 });
 
     if (canScrollV && showScrollbar) {
       // Vertical scrollbar track
@@ -144,10 +149,11 @@ export const PixiScrollView: React.FC<PixiScrollViewProps> = ({
         {children}
       </pixiContainer>
 
-      {/* Scrollbar overlay */}
+      {/* Scrollbar overlay — eventMode="none" so it never intercepts pointer events */}
       {showScrollbar && (canScrollV || canScrollH) && (
         <pixiGraphics
           draw={drawScrollbar}
+          eventMode="none"
           layout={{ position: 'absolute', width, height }}
         />
       )}
