@@ -7,7 +7,7 @@
  * every PixiWindow mask — so they always appear on top.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { FederatedPointerEvent, FederatedWheelEvent, Container as ContainerType } from 'pixi.js';
+import type { FederatedPointerEvent, FederatedWheelEvent, Container as ContainerType, Graphics as GraphicsType } from 'pixi.js';
 import { PIXI_FONTS } from '../fonts';
 import { usePixiTheme } from '../theme';
 import { usePixiDropdownStore } from '../stores/usePixiDropdownStore';
@@ -18,7 +18,32 @@ export interface SelectOption {
   label: string;
   group?: string;
   disabled?: boolean;
+  /** Optional CSS hex accent color to show as a leading swatch dot (e.g. '#00d4aa') */
+  color?: string;
 }
+
+// ─── Color swatch dot ─────────────────────────────────────────────────────────
+
+const SWATCH_SIZE = 8;
+/** Always-mounted swatch: visible when `color` is provided, invisible when not.
+ * Consistent tree structure prevents @pixi/layout BindingErrors. */
+const ColorSwatch: React.FC<{ color?: string }> = ({ color }) => {
+  const hexNum = color ? parseInt(color.replace('#', ''), 16) : 0;
+  const draw = useCallback((g: GraphicsType) => {
+    g.clear();
+    if (color) {
+      g.circle(SWATCH_SIZE / 2, SWATCH_SIZE / 2, SWATCH_SIZE / 2 - 0.5);
+      g.fill({ color: hexNum });
+    }
+  }, [color, hexNum]);
+  return (
+    <pixiGraphics
+      draw={draw}
+      alpha={color ? 1 : 0}
+      layout={{ width: SWATCH_SIZE, height: SWATCH_SIZE, alignSelf: 'center', marginRight: 4 }}
+    />
+  );
+};
 
 interface PixiDropdownPanelProps {
   options: SelectOption[];
@@ -57,6 +82,9 @@ export const PixiDropdownPanel: React.FC<PixiDropdownPanelProps> = ({
     const lower = searchFilter.toLowerCase();
     return options.filter(o => o.label.toLowerCase().includes(lower) || o.value === '');
   }, [options, searchFilter, searchable]);
+
+  // Show swatch column only if any option has a color — keeps structure identical for all items
+  const hasSwatch = useMemo(() => options.some(o => !!o.color), [options]);
 
   const visibleCount = Math.min(filteredOptions.length, maxItems);
   const searchInputH = searchable ? 28 : 0;
@@ -130,9 +158,12 @@ export const PixiDropdownPanel: React.FC<PixiDropdownPanelProps> = ({
               width: width - PANEL_PADDING * 2,
               height: itemHeight,
               alignItems: 'center',
+              flexDirection: 'row',
               paddingLeft: isGroup ? 4 : 8,
             }}
           >
+            {/* Color swatch — always mounted for consistent tree; invisible when no color */}
+            {hasSwatch && <ColorSwatch color={opt.color} />}
             <pixiBitmapText
               eventMode="none"
               text={opt.label}
