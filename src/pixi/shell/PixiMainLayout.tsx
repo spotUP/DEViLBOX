@@ -155,17 +155,15 @@ export const PixiMainLayout: React.FC = () => {
     : height - MODERN_NAV_H - MODERN_STATUS_BAR_H;
 
   // ─── Yoga BindingError recovery ────────────────────────────────────────────
-  // When BindingErrors are suppressed, views can end up with 0×0 computed layout.
-  // Detect this and trigger a size change to force @pixi/layout recalculation.
-  const recoveryRef = useRef(0);
+  // When BindingErrors are suppressed, trigger a renderer resize to force
+  // @pixi/layout to recalculate the Yoga tree (fixes 0×0 computed layout nodes).
+  // NOTE: Do NOT call React forceUpdate here — it causes a massive re-render
+  // that may itself trigger more BindingErrors, creating an infinite CPU loop.
   useEffect(() => {
     const timer = setInterval(() => {
       const errors = drainBindingErrorCount();
       if (errors > 0) {
         console.warn(`[PixiMainLayout] ${errors} BindingError(s) detected — triggering layout recovery`);
-        // Force a React re-render which will re-apply layout props
-        recoveryRef.current++;
-        // Trigger a fake resize event so @pixi/layout recalculates the tree
         if (app?.renderer) {
           app.renderer.resize(width, height);
         }
