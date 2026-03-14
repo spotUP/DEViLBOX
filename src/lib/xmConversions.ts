@@ -203,6 +203,12 @@ export function xmEffectToString(effTyp: number, eff: number): string {
     return '...'; // No effect
   }
 
+  // Symphonie DSP effects: effTyp 0x50-0x54 → type letter + value
+  if (effTyp >= 0x50 && effTyp <= 0x54) {
+    const DSP_CHARS = ['D', 'E', 'C', 'L', 'X'];
+    return `${DSP_CHARS[effTyp - 0x50] ?? 'D'}${HEX_BYTE[eff] ?? '00'}`;
+  }
+
   const typeChar = EFFECT_CHAR_MAP[effTyp] ?? '0';
   return `${typeChar}${HEX_BYTE[eff] ?? '00'}`;
 }

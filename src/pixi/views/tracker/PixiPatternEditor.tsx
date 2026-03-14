@@ -64,9 +64,9 @@ for (let i = 0; i < 10; i++) EFFECT_CHARS[i] = i.toString();
 for (let i = 10; i < 36; i++) EFFECT_CHARS[i] = String.fromCharCode(55 + i);
 
 // Symphonie DSP effects — effTyp=0x50 ('D') for bufLen column, effTyp2=0x50+type for type+feedback column
-// DSP type 0=Off/bufLen, 1=CrEcho, 2=Echo, 3=Delay, 4=CrDelay
+// DSP type 0=Off, 1=Echo, 2=CrEcho, 3=Delay, 4=CrDelay
 const DSP_EFFECT_BASE = 0x50;
-const DSP_TYPE_CHARS = ['D', 'C', 'E', 'L', 'X'] as const; // D=bufLen, CrEcho/Echo/deLay/Xdelay
+const DSP_TYPE_CHARS = ['D', 'E', 'C', 'L', 'X'] as const; // D=Off, E=Echo, C=CrEcho, L=deLay, X=CrDelay
 
 const NOTE_TABLE_CACHE = new Map<number, string[]>();
 function getNoteTable(displayOffset: number): string[] {
