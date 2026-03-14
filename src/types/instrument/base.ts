@@ -239,7 +239,15 @@ export type SynthType =
   // SC68/SNDH Atari ST replayer
   | 'Sc68Synth'         // SC68/SNDH (Atari ST YM2149 + 68000 replayer)
   // ZXTune ZX Spectrum replayer
-  | 'ZxtuneSynth';      // ZXTune (AY-3-8910 / YM2149 ZX Spectrum formats)
+  | 'ZxtuneSynth'       // ZXTune (AY-3-8910 / YM2149 ZX Spectrum formats)
+  | 'MAMEFZPCM'         // Casio FZ-1 8-Voice 16-bit PCM Sampler
+  | 'MAMEPS1SPU'        // PlayStation 1 CXD2922BQ SPU (24-voice ADPCM)
+  | 'MAMEMultiPCM'      // Yamaha YMW258-F GEW8 (28-slot ROM sampler)
+  | 'MAMEZSG2'          // ZOOM ZSG-2 (48-channel ROM sampler)
+  | 'MAMEKS0164'        // Samsung KS0164 (32-voice wavetable ROM)
+  | 'MAMESWP00'         // Yamaha SWP00 AWM2 (32-voice ROM, Chamberlin filter)
+  | 'MAMESWP20'         // Yamaha SWP20 AWM2 (32-voice ROM, approximated)
+  | 'MAMERolandGP';     // Roland TC6116 PCM (28-channel, dual vol envelopes)
 
 export type WaveformType = 'sine' | 'square' | 'sawtooth' | 'triangle' | 'noise';
 
