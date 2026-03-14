@@ -123,13 +123,20 @@ int v2synth_load_patch(int channel, const uint8_t* patchData, int size) {
         return -1;
     }
     
-    // Copy patch to patchmap at channel offset
-    // V2 patch size is ~256 bytes (v2soundsize from sounddef.h)
-    memcpy(g_patchmap + channel * 256, patchData, size < 256 ? size : 256);
+    // The patchmap starts with 128 sU32 offsets (512 bytes on 32-bit WASM),
+    // then raw patch data. Use the stored offset for the correct channel position.
+    // v2soundsize = v2nparms+1+255*3 ≈ 855 bytes; cap at 1024 to be safe.
+    const uint32_t *offsets = (const uint32_t *)g_patchmap;
+    uint32_t patchOffset = offsets[channel];
+    int copySize = size < 1024 ? size : 1024;
+    memcpy(g_patchmap + patchOffset, patchData, copySize);
     
-    // Re-init synth with updated patchmap
+    // Re-init synth with updated patchmap.
+    // synthInit zeros the entire V2Synth (memset), so we must restore globals
+    // afterwards — otherwise hcfreq=0 zeroes all output (high-cut kills signal).
     synthInit(g_synth, g_patchmap, g_sampleRate);
-    
+    synthSetGlobals(g_synth, globals);
+
     return 0;
 }
 

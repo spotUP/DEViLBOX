@@ -1,6 +1,7 @@
 import type { V2Config } from '@/types/instrument';
 import type { DevilboxSynth } from '@/types/synth';
 import { getDevilboxAudioContext, noteToMidi } from '@/utils/audio-context';
+import { v2ConfigToBytes, DEFAULT_V2_INSTRUMENT } from '@/types/v2Instrument';
 
 export class V2Synth implements DevilboxSynth {
   public readonly name: string = 'V2Synth';
@@ -11,11 +12,9 @@ export class V2Synth implements DevilboxSynth {
   private _initPromise: Promise<void>;
   private _pendingNotes: Array<{note: number, vel: number}> = [];
   private _releaseTimers: Set<ReturnType<typeof setTimeout>> = new Set();
-  private _initialConfig?: V2Config;
 
-  constructor(config?: V2Config) {
+  constructor(_config?: V2Config) {
     this.output = getDevilboxAudioContext().createGain();
-    this._initialConfig = config;
     this._initPromise = this._initialize();
   }
 
@@ -88,6 +87,20 @@ export class V2Synth implements DevilboxSynth {
       outputChannelCount: [2]
     });
 
+    // CRITICAL: Connect worklet to destination BEFORE sending init message.
+    // Chrome's AudioWorklet thread only delivers port messages when the worklet
+    // has a path to the audio destination (process() must be callable).
+    // Without this connection, postMessage is queued but never delivered — deadlock.
+    this._worklet.connect(this.output);
+    try {
+      const keepalive = nativeCtx.createGain();
+      keepalive.gain.value = 0;
+      this._worklet.connect(keepalive);
+      keepalive.connect(nativeCtx.destination);
+    } catch (e) {
+      console.warn('[V2Synth] Keepalive connection failed:', e);
+    }
+
     // Wait for ready message with timeout
     await new Promise<void>((resolve, reject) => {
       const timeout = setTimeout(() => {
@@ -95,15 +108,20 @@ export class V2Synth implements DevilboxSynth {
       }, 10000);
 
       this._worklet!.port.onmessage = (event) => {
+        console.log('[V2Synth] main thread received msg:', event.data?.type, JSON.stringify(event.data).slice(0, 80));
         if (event.data.type === 'ready' || event.data.type === 'initialized') {
           clearTimeout(timeout);
           this._initialized = true;
-          // Apply initial V2 config before flushing notes
-          if (this._initialConfig) {
-            this._applyV2Config(this._initialConfig);
+          // Load default patch on channel 0 so the synth produces audio immediately.
+          const patchData = v2ConfigToBytes(DEFAULT_V2_INSTRUMENT);
+          this._worklet!.port.postMessage({ type: 'loadPatch', channel: 0, patchData });
+          // V2 default sound has chanvol=0 routed via CC7 (volume).
+          // Send CC7=127 on all channels so output is audible immediately.
+          for (let ch = 0; ch < 16; ch++) {
+            this._worklet!.port.postMessage({ type: 'controlChange', channel: ch, cc: 7, value: 127 });
           }
           // Flush any pending notes that were queued during init
-          this._pendingNotes.forEach(n => this._sendMIDI([0x90, n.note, n.vel]));
+          this._pendingNotes.forEach(n => this._noteOn(0, n.note, n.vel));
           this._pendingNotes = [];
           resolve();
         } else if (event.data.type === 'error') {
@@ -121,19 +139,6 @@ export class V2Synth implements DevilboxSynth {
       });
     });
 
-    // Connect worklet to native GainNode output
-    this._worklet.connect(this.output);
-
-    // CRITICAL: Connect worklet through a silent keepalive to destination.
-    // Without a path to destination, the browser never calls process().
-    try {
-      const keepalive = nativeCtx.createGain();
-      keepalive.gain.value = 0;
-      this._worklet.connect(keepalive);
-      keepalive.connect(nativeCtx.destination);
-    } catch (e) {
-      console.warn('[V2Synth] Keepalive connection failed:', e);
-    }
   }
 
   public async ready() {
@@ -154,132 +159,67 @@ export class V2Synth implements DevilboxSynth {
       return;
     }
 
-    // MIDI Note On: 0x90
-    this._sendMIDI([0x90, midiNote, vel]);
+    this._noteOn(0, midiNote, vel);
   }
 
-  public triggerRelease() {
-    if (!this._initialized) return;
-    // We don't have the current note here, but V2 handles polyphony.
-    // Standard trackers send Note Off for the note on that channel.
-    // For now, we'll send All Notes Off if needed or handle via explicit note.
+  public triggerRelease(note?: string | number) {
+    if (!this._initialized || !this._worklet) return;
+    if (note !== undefined) {
+      const midiNote = typeof note === 'string' ? noteToMidi(note) : note;
+      this._noteOff(0, midiNote);
+    }
   }
 
   /**
    * Release all voices (panic button, song stop, etc.)
-   * Sends MIDI All Notes Off (CC 123) on all channels
    */
   public releaseAll(): void {
     if (!this._initialized || !this._worklet) return;
-    // MIDI All Notes Off: CC 123 on channel 0
-    this._sendMIDI([0xB0, 123, 0]);
+    this._worklet.port.postMessage({ type: 'allNotesOff', channel: 0 });
   }
 
   public triggerAttackRelease(note: string | number, duration: number, _time?: number, velocity: number = 1) {
     this.triggerAttack(note, undefined, velocity);
-    // V2 is polyphonic and stateful, better to send Note Off
     const midiNote = typeof note === 'string' ? noteToMidi(note) : note;
     const d = typeof duration === 'number' ? duration : parseFloat(String(duration));
     const timer = setTimeout(() => {
       this._releaseTimers.delete(timer);
-      // Only send if still initialized (not disposed)
       if (this._initialized && this._worklet) {
-        this._sendMIDI([0x80, midiNote, 0]);
+        this._noteOff(0, midiNote);
       }
     }, d * 1000);
     this._releaseTimers.add(timer);
   }
 
-  public setParameter(index: number, value: number) {
-    if (this._worklet && this._initialized) {
-      this._worklet.port.postMessage({
-        type: 'param',
-        index,
-        value
-      });
-    }
+  public setParameter(_index: number, _value: number) {
+    // V2 parameters are set via loadPatch/setGlobals — individual param index not supported
   }
 
   /** Apply a V2Config, mapping config fields to WASM parameter indices */
   public applyConfig(config: V2Config) {
     if (this._initialized) {
       this._applyV2Config(config);
-    } else {
-      this._initialConfig = config;
     }
   }
 
-  private _applyV2Config(config: V2Config) {
-    // Osc 1 (indices 2-7)
-    if (config.osc1) {
-      this.setParameter(2, config.osc1.mode);
-      this.setParameter(4, config.osc1.transpose + 64);
-      this.setParameter(5, config.osc1.detune + 64);
-      this.setParameter(6, config.osc1.color);
-      this.setParameter(7, config.osc1.level);
-    }
-    // Osc 2 (indices 8-13)
-    if (config.osc2) {
-      this.setParameter(8, config.osc2.mode);
-      this.setParameter(9, config.osc2.ringMod ? 1 : 0);
-      this.setParameter(10, config.osc2.transpose + 64);
-      this.setParameter(11, config.osc2.detune + 64);
-      this.setParameter(12, config.osc2.color);
-      this.setParameter(13, config.osc2.level);
-    }
-    // Osc 3 (indices 14-19)
-    if (config.osc3) {
-      this.setParameter(14, config.osc3.mode);
-      this.setParameter(15, config.osc3.ringMod ? 1 : 0);
-      this.setParameter(16, config.osc3.transpose + 64);
-      this.setParameter(17, config.osc3.detune + 64);
-      this.setParameter(18, config.osc3.color);
-      this.setParameter(19, config.osc3.level);
-    }
-    // Filter 1 (indices 20-22)
-    if (config.filter1) {
-      this.setParameter(20, config.filter1.mode);
-      this.setParameter(21, config.filter1.cutoff);
-      this.setParameter(22, config.filter1.resonance);
-    }
-    // Filter 2 (indices 23-25)
-    if (config.filter2) {
-      this.setParameter(23, config.filter2.mode);
-      this.setParameter(24, config.filter2.cutoff);
-      this.setParameter(25, config.filter2.resonance);
-    }
-    // Routing (indices 26-27)
-    if (config.routing) {
-      this.setParameter(26, config.routing.mode);
-      this.setParameter(27, config.routing.balance);
-    }
-    // Amp Envelope (indices 32-37: Attack, Decay, Sustain, SusTime, Release, Amplify)
-    if (config.envelope) {
-      this.setParameter(32, config.envelope.attack);
-      this.setParameter(33, config.envelope.decay);
-      this.setParameter(34, config.envelope.sustain);
-      this.setParameter(36, config.envelope.release);
-    }
-    // Envelope 2 (indices 38-43: Attack, Decay, Sustain, SusTime, Release, Amplify)
-    if (config.envelope2) {
-      this.setParameter(38, config.envelope2.attack);
-      this.setParameter(39, config.envelope2.decay);
-      this.setParameter(40, config.envelope2.sustain);
-      this.setParameter(42, config.envelope2.release);
-    }
-    // LFO 1 (indices 44-50: Mode, KeySync, EnvMode, Rate, Phase, Polarity, Amplify)
-    if (config.lfo1) {
-      this.setParameter(47, config.lfo1.rate);
-      this.setParameter(50, config.lfo1.depth);
-    }
+  private _applyV2Config(_config: V2Config) {
+    // V2 uses binary patch data — load DEFAULT_V2_INSTRUMENT as the default patch.
+    // The V2Config → V2InstrumentConfig mapping is not yet implemented; for now we load
+    // the standard default so the synth produces sound on note trigger.
+    if (!this._worklet) return;
+    const patchData = v2ConfigToBytes(DEFAULT_V2_INSTRUMENT);
+    this._worklet.port.postMessage({ type: 'loadPatch', channel: 0, patchData });
   }
 
-  private _sendMIDI(msg: number[]) {
+  private _noteOn(channel: number, note: number, velocity: number) {
     if (this._worklet && this._initialized) {
-      this._worklet.port.postMessage({
-        type: 'midi',
-        msg
-      });
+      this._worklet.port.postMessage({ type: 'noteOn', channel, note, velocity });
+    }
+  }
+
+  private _noteOff(channel: number, note: number) {
+    if (this._worklet && this._initialized) {
+      this._worklet.port.postMessage({ type: 'noteOff', channel, note });
     }
   }
 
