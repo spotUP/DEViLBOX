@@ -7,7 +7,7 @@
  * - Ticks 1+: process continuous effects
  */
 
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, startTransition } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useTrackerStore, useTransportStore, useInstrumentStore, useAudioStore, useSettingsStore , useFormatStore } from '@stores';
 import { useEditorStore } from '@stores/useEditorStore';
@@ -132,12 +132,12 @@ export const usePatternPlayback = () => {
   // UADE live row counter (increments on note triggers during playback)
   const uadeLiveRowRef = useRef(0);
 
-  // Flag to distinguish replayer-driven position changes from user-driven ones.
-  // Without this, the replayer's 100ms lookahead scheduling means its getCurrentPosition()
-  // can be ahead of the store's currentPositionIndex when React re-renders. This causes
-  // isNaturalAdvancement to fail, triggering a full song reload at every pattern boundary,
-  // which resets the scheduler timeline and creates ~100ms cumulative drift per pattern.
-  const replayerAdvancedRef = useRef(false);
+  // Counter to distinguish replayer-driven position changes from user-driven ones.
+  // Was boolean; changed to counter to handle high-BPM songs where multiple patterns
+  // advance within one 250ms scheduler batch (each onRowChange increments; effect resets
+  // to 0). With a boolean, the second effect run would see false → needsReload = true
+  // → replayer stops and restarts → audible gap.
+  const replayerAdvancedRef = useRef(0);
 
   // Sync BPM changes to engine (for visualization, metronome, etc.)
   useEffect(() => {
@@ -202,8 +202,8 @@ export const usePatternPlayback = () => {
       // The old approach (comparing replayer.getCurrentPosition() with store position)
       // failed because the replayer's 100ms lookahead scheduling meant it was often
       // 1+ positions ahead of the store when React re-rendered, causing false reloads.
-      const wasReplayerAdvanced = replayerAdvancedRef.current;
-      replayerAdvancedRef.current = false;
+      const wasReplayerAdvanced = replayerAdvancedRef.current > 0;
+      replayerAdvancedRef.current = 0;
 
       const isNaturalAdvancement = hasStartedRef.current &&
                                    replayer.isPlaying() &&
@@ -457,18 +457,23 @@ export const usePatternPlayback = () => {
           if (row === 0 && (patternNum !== lastPatternNum || position !== lastPosition)) {
             lastPatternNum = patternNum;
             lastPosition = position;
-            replayerAdvancedRef.current = true;
+            replayerAdvancedRef.current++;
             // Use setTimeout(0) instead of queueMicrotask: microtasks drain before
             // the next macrotask (setInterval), so React re-renders from Zustand
             // store updates would block the scheduler's next interval callback.
             // setTimeout(0) defers to the macrotask queue, letting the scheduler
             // fire on time even when React work is heavy at pattern boundaries.
             setTimeout(() => {
-              setCurrentPattern(patternNum, true);
-              setCurrentPosition(position, true);
-              // Update global row and status bar only on pattern boundaries
-              const currentPatterns = patternsRef.current;
-              setCurrentRowThrottled(row, currentPatterns[patternNum]?.length ?? 64, true);
+              // startTransition: marks these store updates as non-urgent so React
+              // doesn't block higher-priority work (WASM postMessage processing,
+              // Pixi RAF callbacks) to run them immediately.
+              startTransition(() => {
+                setCurrentPattern(patternNum, true);
+                setCurrentPosition(position, true);
+                // Update global row and status bar only on pattern boundaries
+                const currentPatterns = patternsRef.current;
+                setCurrentRowThrottled(row, currentPatterns[patternNum]?.length ?? 64, true);
+              });
               const globalRow = position * 64 + row;
               useTransportStore.getState().setCurrentGlobalRow(globalRow);
               if (arrangement.isArrangementMode) {

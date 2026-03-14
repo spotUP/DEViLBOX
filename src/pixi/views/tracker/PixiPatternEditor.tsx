@@ -17,7 +17,7 @@
  *  - Stepped horizontal scroll with accumulator (matches DOM behavior)
  */
 
-import React, { useCallback, useMemo, useRef, useState, useEffect } from 'react';
+import React, { useCallback, useMemo, useRef, useState, useEffect, startTransition } from 'react';
 import { createPortal } from 'react-dom';
 import { useTick } from '@pixi/react';
 import type { Graphics as GraphicsType, FederatedPointerEvent, Container as ContainerType } from 'pixi.js';
@@ -1206,7 +1206,11 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
       imperativeRedrawRef.current?.();
       playbackRowRef.current = newRow;
       if (patternChanged) {
-        setPlaybackPatternIdx(newPattern);
+        // startTransition: the imperative patch above already updates the display
+        // this frame; the React state update is only needed to re-sync displayPattern
+        // for the useEffect-driven redraw. Marking it as non-urgent prevents this
+        // state flush from blocking Pixi's renderer.render() call.
+        startTransition(() => setPlaybackPatternIdx(newPattern));
       }
     }
   });
