@@ -134,7 +134,6 @@ export type SynthType =
   | 'Buzz3o3DF'        // Oomek Aggressor Devil Fish (enhanced 303)
   | 'BuzzM4'           // Makk M4 (100-waveform wavetable synth)
   // MAME Hardware-Accurate Synths
-  | 'MAMEAICA'         // Sega AICA (Dreamcast/Naomi)
   | 'MAMEASC'          // Apple Sound Chip (IIGS/Mac)
   | 'MAMEAstrocade'    // Bally Astrocade custom sound
   | 'MAMEC352'         // Namco C352 (arcade PCM, needs ROM)
@@ -157,6 +156,7 @@ export type SynthType =
   | 'MAMEYMF271'       // Yamaha OPX (12-voice FM+PCM)
   | 'MAMEYMOPQ'        // Yamaha OPQ (YM3806 FM)
   | 'MAMEVASynth'      // Virtual Analog modeling synth
+  | 'MAMECMI'          // Fairlight CMI IIx (8-voice sampling synthesizer)
   | 'MAMEVFX'          // Ensoniq VFX (ES5506)
   | 'MAMEDOC'          // Ensoniq ESQ-1 (ES5503)
   | 'MAMERSA'          // Roland SA (MKS-20/RD-1000)

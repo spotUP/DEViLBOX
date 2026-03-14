@@ -42,7 +42,6 @@ import { MU2000Synth } from '../mu2000/MU2000Synth';
 import { WAMSynth } from '../wam/WAMSynth';
 import { WAM_SYNTH_URLS } from '@/constants/wamPlugins';
 // MAME Hardware Synths
-import { AICASynth } from '../aica/AICASynth';
 import { ASCSynth } from '../asc/ASCSynth';
 import { AstrocadeSynth } from '../astrocade/AstrocadeSynth';
 import { C352Synth } from '../c352/C352Synth';
@@ -63,6 +62,7 @@ import { VotraxSynth } from '../votrax/VotraxSynth';
 import { YMF271Synth } from '../ymf271/YMF271Synth';
 import { YMOPQSynth } from '../ymopq/YMOPQSynth';
 import { VASynthSynth } from '../vasynth/VASynthSynth';
+import { CMISynth } from '../cmi/CMISynth';
 import { ModularSynth } from '../modular/ModularSynth';
 import { DEFAULT_MODULAR_PATCH } from '@/types/modular';
 import { getNormalizedVolume } from './volumeNormalization';
@@ -1023,13 +1023,6 @@ export function applyChipParameters(synth: { setParam: (key: string, value: numb
 }
 
 
-export function createMAMEAICA(config: InstrumentConfig): Tone.ToneAudioNode {
-  const synth = new AICASynth();
-  synth.output.gain.value = Tone.dbToGain(getNormalizedVolume('MAMEAICA', config.volume));
-  applyChipParameters(synth, config);
-  return synth as unknown as Tone.ToneAudioNode;
-}
-
 export function createMAMEASC(config: InstrumentConfig): Tone.ToneAudioNode {
   const synth = new ASCSynth();
   synth.output.gain.value = Tone.dbToGain(getNormalizedVolume('MAMEASC', config.volume));
@@ -1166,6 +1159,13 @@ export function createMAMEYMOPQ(config: InstrumentConfig): Tone.ToneAudioNode {
 export function createMAMEVASynth(config: InstrumentConfig): Tone.ToneAudioNode {
   const synth = new VASynthSynth();
   synth.output.gain.value = Tone.dbToGain(getNormalizedVolume('MAMEVASynth', config.volume));
+  applyChipParameters(synth, config);
+  return synth as unknown as Tone.ToneAudioNode;
+}
+
+export function createMAMECMI(config: InstrumentConfig): Tone.ToneAudioNode {
+  const synth = new CMISynth();
+  synth.output.gain.value = Tone.dbToGain(getNormalizedVolume('MAMECMI', config.volume));
   applyChipParameters(synth, config);
   return synth as unknown as Tone.ToneAudioNode;
 }

@@ -12,7 +12,7 @@ import { SynthRegistry } from '../SynthRegistry';
 // ── MAME chip synths (21 synths) ─────────────────────────────────────────────
 SynthRegistry.registerLazy(
   [
-    'MAMEAICA', 'MAMEASC', 'MAMEAstrocade', 'MAMEC352', 'MAMEES5503',
+    'MAMEASC', 'MAMEAstrocade', 'MAMEC352', 'MAMEES5503',
     'MAMEICS2115', 'MAMEK054539', 'MAMEMEA8000', 'MAMERF5C400',
     'MAMESN76477', 'MAMESNKWave', 'MAMESP0250', 'MAMETMS36XX',
     'MAMETMS5220', 'MAMETR707', 'MAMEUPD931', 'MAMEUPD933',

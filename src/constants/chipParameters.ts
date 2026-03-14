@@ -660,18 +660,6 @@ export const CHIP_SYNTH_DEFS: Record<string, ChipSynthDef> = {
   // PCM / ROM-based chips (minimal controls)
   // =========================================================================
 
-  // MAMEAICA - Sega Dreamcast AICA
-  MAMEAICA: {
-    synthType: 'MAMEAICA',
-    name: 'AICA',
-    subtitle: 'Sega Dreamcast Sound Processor',
-    color: '#0ea5e9',
-    presetCount: 0,
-    parameters: [
-      { key: 'volume', label: 'Volume', group: 'Output', type: 'knob', min: 0, max: 1, step: 0.01, default: 0.8, formatValue: 'percent' },
-    ],
-  },
-
   // MAMEICS2115 - ICS WaveFront
   MAMEICS2115: {
     synthType: 'MAMEICS2115',

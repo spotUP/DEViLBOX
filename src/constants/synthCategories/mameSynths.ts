@@ -64,15 +64,6 @@ export const mameSynthEntries: Record<string, SynthInfo> = {
     icon: 'Gamepad2',
     color: 'text-blue-500',
   },
-  MAMEAICA: {
-    type: 'MAMEAICA',
-    name: 'Sega AICA',
-    shortName: 'AICA',
-    description: 'Sega Dreamcast/Naomi AICA - 64-voice ADPCM+FM sound processor',
-    bestFor: ['Dreamcast sounds', 'Arcade PCM', '90s gaming', 'ADPCM samples'],
-    icon: 'Gamepad2',
-    color: 'text-blue-400',
-  },
   MAMEASC: {
     type: 'MAMEASC',
     name: 'Apple Sound Chip',
@@ -261,6 +252,15 @@ export const mameSynthEntries: Record<string, SynthInfo> = {
     bestFor: ['FM synthesis', 'Yamaha sounds', 'Vintage FM', 'Keyboard sounds'],
     icon: 'Radio',
     color: 'text-indigo-500',
+  },
+  MAMECMI: {
+    type: 'MAMECMI',
+    name: 'Fairlight CMI IIx',
+    shortName: 'CMI',
+    description: 'Fairlight CMI IIx 8-voice sampling synthesizer (1982) - iconic 80s orchestral sampler',
+    bestFor: ['Orchestral', '80s pop', 'Sampling', 'Vintage digital', 'Cinematic'],
+    icon: 'Cpu',
+    color: 'text-yellow-400',
   },
   MAMEVASynth: {
     type: 'MAMEVASynth',

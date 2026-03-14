@@ -342,7 +342,6 @@ export const SYNTH_CATEGORIES: SynthCategory[] = [
     name: 'MAME Arcade & Retro',
     description: 'Arcade game and retro computer sound chips (MAME-emulated)',
     synths: [
-      SYNTH_INFO.MAMEAICA,
       SYNTH_INFO.MAMEASC,
       SYNTH_INFO.MAMEAstrocade,
       SYNTH_INFO.MAMEC352,
