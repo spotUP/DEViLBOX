@@ -324,7 +324,7 @@ public:
     std::vector<sound_stream_view> m_views;
     int m_samples;
     int samples() const { return m_samples; }
-    int output_count() const { return (int)outputs.size(); }
+    int output_count() const { return (int)m_views.size(); }
     void set_sample_rate(uint32_t rate) {}
     void put_int_clamp(int channel, int index, s32 value, s32 range) {
         if (channel < (int)m_views.size()) m_views[channel].put_int(index, value, range);
