@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-03-13T07:30:19.977Z
+ * Generated: 2026-03-13T20:55:00.633Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.2755';
-export const BUILD_NUMBER = '2755';
-export const BUILD_HASH = 'c99dcc731';
+export const BUILD_VERSION = '1.0.2803';
+export const BUILD_NUMBER = '2803';
+export const BUILD_HASH = 'aeb8837f4';
 export const BUILD_DATE = '2026-03-13';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,201 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.2755',
+    version: '1.0.2803',
     date: '2026-03-13',
     changes: [
+      {
+        type: 'feature',
+        "description": "Add UADE audio quality audit CLI tools"
+      },
+      {
+        type: 'fix',
+        "description": "Fix pattern editor trail: gate on isPlaying, skip empty cells"
+      },
+      {
+        type: 'improvement',
+        "description": "Update project docs: CLAUDE.md, MCP help, format status tool"
+      },
+      {
+        type: 'improvement',
+        "description": "Misc UI polish: editor header, synth selector, MAME synths, CSS tweaks"
+      },
+      {
+        type: 'improvement',
+        "description": "Replace TR-707 native slider with custom drag handler"
+      },
+      {
+        type: 'fix',
+        "description": "Fix triggerNote/releaseNote: look up instrument from store, not engine"
+      },
+      {
+        type: 'feature',
+        "description": "Add per-note piano key colors and vintage drum machine themes"
+      },
+      {
+        type: 'improvement',
+        "description": "Calibrate volume offsets for Furnace chips and VST synths"
+      },
+      {
+        type: 'fix',
+        "description": "Fix CZ101 WASM init: fetch binary on main thread, pass to worklet"
+      },
+      {
+        type: 'fix',
+        "description": "Fix pattern editor trail highlight: only apply to cells with content"
+      },
+      {
+        type: 'fix',
+        "description": "Fix UADE audio for stub/hybrid parsers: add uadeEditableFileData"
+      },
+      {
+        type: 'fix',
+        "description": "Fix parser type errors: remove uadePatternLayout: true, cast ArrayBuffer slices"
+      },
+      {
+        type: 'fix',
+        "description": "Fix MCP server startup on Node v24: import zod directly"
+      },
+      {
+        type: 'fix',
+        "description": "Fix CDFM67 + Composer667: add libopenmptFileData for OPL audio"
+      },
+      {
+        type: 'fix',
+        "description": "Fix RobHubbard uadePatternLayout + GoatTracker FormatStore storage"
+      },
+      {
+        type: 'fix',
+        "description": "Fix 4 broken formats: DavidWhittaker, DaveLowe, AshleyHogg, DMF"
+      },
+      {
+        type: 'fix',
+        "description": "Fix 6 broken format parsers: AMS, Actionamics, ActivisionPro, Organya, PxTone, Anders0land"
+      },
+      {
+        type: 'fix',
+        "description": "Fix last 3 broken formats: DavidWhittaker, RichardJoseph, MidiLoriciel"
+      },
+      {
+        type: 'fix',
+        "description": "Fix remaining partial/silent formats: Anders0land, MartinWalker, PaulSummers, IFF SMUS"
+      },
+      {
+        type: 'fix',
+        "description": "Fix Klystrack empty klysNative — pre-populate with stub data"
+      },
+      {
+        type: 'fix',
+        "description": "Fix RobHubbard, ActivisionPro, HVL position sync, SonicArranger SetTrackLen"
+      },
+      {
+        type: 'fix',
+        "description": "Fix JamCracker pattern display + FC BPM calculation"
+      },
+      {
+        type: 'fix',
+        "description": "Fix SidMon2 pattern length leak between patterns"
+      },
+      {
+        type: 'fix',
+        "description": "Fix KRIS and ICE pattern length trimming (pause at wraps)"
+      },
+      {
+        type: 'fix',
+        "description": "Fix SidMon1 and MusicAssembler parser bugs"
+      },
+      {
+        type: 'fix',
+        "description": "Fix 6 format parsers: AMS, InStereo, PumaTracker, Actionamics, QuadraComposer"
+      },
+      {
+        type: 'feature',
+        "description": "Add diagnostic logging to Furnace import pipeline"
+      },
+      {
+        type: 'fix',
+        "description": "Rebuild Furnace WASM with DMF support and fix missing stubs"
+      },
+      {
+        type: 'fix',
+        "description": "Fix DSS, Hippel-COSO, Digital Symphony instrument/sample bugs"
+      },
+      {
+        type: 'fix',
+        "description": "Fix DigitalMugician: add required finetune field to modPlayback metadata"
+      },
+      {
+        type: 'fix',
+        "description": "Fix TypeScript errors: Pattern structure, TrackerCell fields, metadata placement"
+      },
+      {
+        type: 'fix',
+        "description": "Fix DefleMask (.dmf) import — detect magic and route correctly"
+      },
+      {
+        type: 'fix',
+        "description": "Fix Mugician, ArtOfNoise, Fred + status page improvements"
+      },
+      {
+        type: 'fix',
+        "description": "Fix 5 broken format parsers: OKT, DigiBoosterPro, MED, FaceTheMusic, MusicLine"
+      },
+      {
+        type: 'feature',
+        "description": "Add double-click to load files in all dialogs"
+      },
+      {
+        type: 'fix',
+        "description": "Fix dialog scroll: remove universal overscroll-behavior: none"
+      },
+      {
+        type: 'fix',
+        "description": "Fix duplicate hlInterval declaration in GL renderer"
+      },
+      {
+        type: 'fix',
+        "description": "Fix GL pattern editor: center line fills entire viewport on init"
+      },
+      {
+        type: 'fix',
+        "description": "Fix theme crashes: guard against undefined/stale custom theme colors"
+      },
+      {
+        type: 'fix',
+        "description": "Fix SettingsModal crash: guard normalizeToHex6 against undefined color"
+      },
+      {
+        type: 'fix',
+        "description": "Fix DOM fake bold: increase offset from 0.5px to 1px for visibility"
+      },
+      {
+        type: 'improvement',
+        "description": "Bold font on active/triggered row in pattern editor"
+      },
+      {
+        type: 'fix',
+        "description": "Fix glow trail direction: trail behind playhead, not ahead"
+      },
+      {
+        type: 'improvement',
+        "description": "Pattern editor: white glow trail fading from active row"
+      },
+      {
+        type: 'fix',
+        "description": "Fix arrow key double-step: seed RAF lastMoveTime with current time"
+      },
+      {
+        type: 'improvement',
+        "description": "Pattern editor: z-order and active row improvements (DOM/GL)"
+      },
+      {
+        type: 'improvement',
+        "description": "Pattern editor: smooth scroll, z-order, and active row improvements (Pixi)"
+      },
+      {
+        type: 'fix',
+        "description": "UADE rebuild, engine fixes, Sonic Arranger/Symphonie parsers, settings refactor"
+      },
       {
         type: 'improvement',
         "description": "Revert: undo 5 pattern editor optimization attempts that caused regressions"
@@ -40,206 +232,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         "description": "Fix smooth scroll duration calculation returning inflated values"
-      },
-      {
-        type: 'fix',
-        "description": "Move grid to fixed layer and reduce redraw frequency"
-      },
-      {
-        type: 'fix',
-        "description": "Add renderGrid to vStartChanged path and remove per-row fullRedraw"
-      },
-      {
-        type: 'fix',
-        "description": "Eliminate redundant full redraw at pattern boundaries"
-      },
-      {
-        type: 'fix',
-        "description": "Increase scheduler lookahead to 250ms and defer pattern boundary React updates"
-      },
-      {
-        type: 'fix',
-        "description": "Only reset speedCounter on note triggers, not every row"
-      }
-    ]
-  },
-  {
-    version: '2026-03-12',
-    date: '2026-03-12',
-    changes: [
-      {
-        type: 'fix',
-        "description": "Remove unused isAmigaNative variable"
-      },
-      {
-        type: 'fix',
-        "description": "Shift all Amiga format note display +2 octaves to match FT2/OpenMPT convention"
-      },
-      {
-        type: 'fix',
-        "description": "Shift note display +2 octaves to match FT2/OpenMPT convention"
-      },
-      {
-        type: 'fix',
-        "description": "Lower instrument preview note from C3 to C2 for Amiga-native synths"
-      },
-      {
-        type: 'fix',
-        "description": "Reset period from table each tick and fix volume slide target"
-      },
-      {
-        type: 'fix',
-        "description": "Reset speedCounter at row boundaries for correct arpeggio/slide timing"
-      },
-      {
-        type: 'fix',
-        "description": "Route amiga-native formats through parseModuleToSong instead of libopenmpt"
-      },
-      {
-        type: 'fix',
-        "description": "Song engine types always show NativeInstrumentPanel"
-      },
-      {
-        type: 'fix',
-        "description": "Fix JS eval in V2MPlayer worklet"
-      },
-      {
-        type: 'fix',
-        "description": "Fix instrument editor showing basic synth for song engine types"
-      },
-      {
-        type: 'fix',
-        "description": "Fix SunVox import: create 5 pattern order positions instead of 1"
-      },
-      {
-        type: 'fix',
-        "description": "Fix SunVox handle exhaustion: reclaim stale slots from HMR/reloads"
-      },
-      {
-        type: 'fix',
-        "description": "Fix SunVox WASM init: send wasmBinary as Uint8Array for reliable transfer"
-      },
-      {
-        type: 'fix',
-        "description": "Add ready message handler for init"
-      },
-      {
-        type: 'fix',
-        "description": "Make worklets self-contained with inline initMAMEWasmModule"
-      },
-      {
-        type: 'fix',
-        "description": "Fix V2Synth: send wasmBinary as Uint8Array for reliable worklet transfer"
-      },
-      {
-        type: 'fix',
-        "description": "Polyfill globalThis for AudioWorklet scope"
-      },
-      {
-        type: 'fix',
-        "description": "Fix shell environment assertion in worklets"
-      },
-      {
-        type: 'fix',
-        "description": "Export wasmMemory for worklet access"
-      },
-      {
-        type: 'fix',
-        "description": "Fix V2Synth init: send sampleRate and accept 'initialized' message"
-      },
-      {
-        type: 'fix',
-        "description": "Fix JUCE synth module factory eval errors"
-      },
-      {
-        type: 'fix',
-        "description": "Route .v2m files to V2MPlayer instead of ImportModuleDialog"
-      },
-      {
-        type: 'fix',
-        "description": "Increase MAX_ENGINES from 8 to 32"
-      },
-      {
-        type: 'fix',
-        "description": "Fix TrackerScratchController: use store.patterns not store.song.patterns"
-      },
-      {
-        type: 'improvement',
-        "description": "Replace hardcoded color hex values with theme tokens in Pixi graphics"
-      },
-      {
-        type: 'improvement',
-        "description": "Replace all hardcoded tint={0x} values in src/pixi/ with theme tokens"
-      },
-      {
-        type: 'fix',
-        "description": "Call synthSetGlobals to prevent high-cut filter silence"
-      },
-      {
-        type: 'feature',
-        "description": "Add accentHighlight token to Pixi/GL theme system"
-      },
-      {
-        type: 'improvement',
-        "description": "Replace hardcoded colors with design system tokens app-wide"
-      },
-      {
-        type: 'fix',
-        "description": "Add default params to prevent silence"
-      },
-      {
-        type: 'fix',
-        "description": "Fix WaveSabre audio - add Helpers::Init() and fix NoteOn signature"
-      },
-      {
-        type: 'fix',
-        "description": "Clean up SunVox worklet debug logging"
-      },
-      {
-        type: 'fix',
-        "description": "Fix SunVox WASM playback - add pattern selection init"
-      },
-      {
-        type: 'fix',
-        "description": "Robust chunk decoding with param fallback"
-      },
-      {
-        type: 'fix',
-        "description": "Fix touchpad/scroll scratch: lower thresholds, boost impulse"
-      },
-      {
-        type: 'fix',
-        "description": "Strip whitespace from base64 chunks, fix SYNTH_INFO types"
-      },
-      {
-        type: 'feature',
-        "description": "Add visual pattern scrolling during scratch"
-      },
-      {
-        type: 'fix',
-        "description": "Fix pattern editor scratch: document-level mouse tracking"
-      }
-    ]
-  },
-  {
-    version: '2026-03-11',
-    date: '2026-03-11',
-    changes: [
-      {
-        type: 'improvement',
-        "description": "Link VJ overlay opacity to DJ crossfader position"
-      },
-      {
-        type: 'feature',
-        "description": "Add Demoscene category to synth browser"
-      },
-      {
-        type: 'fix',
-        "description": "Fix DJ scratch position reset and ProjectM stuck visuals"
-      },
-      {
-        type: 'fix',
-        "description": "DJ scratch position from audio player, add XRNS to metadata format"
       }
     ]
   }
