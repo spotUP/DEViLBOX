@@ -65,7 +65,6 @@ import { VASynthSynth } from '../vasynth/VASynthSynth';
 import { CMISynth } from '../cmi/CMISynth';
 import { FZSynth } from '../fz/FZSynth';
 import { PS1SPUSynth } from '../ps1spu/PS1SPUSynth';
-import { MultiPCMSynth } from '../multipcm/MultiPCMSynth';
 import { ZSG2Synth } from '../zsg2/ZSG2Synth';
 import { KS0164Synth } from '../ks0164/KS0164Synth';
 import { SWP00Synth } from '../swp00/SWP00Synth';
@@ -1188,13 +1187,6 @@ export function createMAMEFZPCM(config: InstrumentConfig): Tone.ToneAudioNode {
 export function createMAMEPS1SPU(config: InstrumentConfig): Tone.ToneAudioNode {
   const synth = new PS1SPUSynth();
   synth.output.gain.value = Tone.dbToGain(getNormalizedVolume('MAMEPS1SPU', config.volume));
-  applyChipParameters(synth, config);
-  return synth as unknown as Tone.ToneAudioNode;
-}
-
-export function createMAMEMultiPCM(config: InstrumentConfig): Tone.ToneAudioNode {
-  const synth = new MultiPCMSynth();
-  synth.output.gain.value = Tone.dbToGain(getNormalizedVolume('MAMEMultiPCM', config.volume));
   applyChipParameters(synth, config);
   return synth as unknown as Tone.ToneAudioNode;
 }

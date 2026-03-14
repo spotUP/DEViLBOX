@@ -437,15 +437,6 @@ export const CHIP_CAPABILITIES: Record<string, Partial<MAMEChipCapabilities>> = 
     hasStereo: true,
     hasPanning: true,
   },
-  MultiPCM: {
-    numVoices: 28,
-    hasPCM: true,
-    hasADSR: true,
-    hasPitchLFO: true,
-    hasAmpLFO: true,
-    hasStereo: true,
-    hasPanning: true,
-  },
   ZSG2: {
     numVoices: 48,
     hasPCM: true,
