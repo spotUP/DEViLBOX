@@ -23,7 +23,6 @@ import { GearmulatorHardware } from '../gearmulator/GearmulatorHardware';
 import { CMIHardware } from './CMIHardware';
 import { FZHardware } from './FZHardware';
 import { PS1SPUHardware } from './PS1SPUHardware';
-import { MultiPCMHardware } from './MultiPCMHardware';
 import { ZSG2Hardware } from './ZSG2Hardware';
 import { KS0164Hardware } from './KS0164Hardware';
 import { SWP00Hardware } from './SWP00Hardware';
@@ -65,7 +64,6 @@ const DEDICATED_UI_MAP: Partial<Record<SynthType, React.ComponentType<HWComponen
   MAMECMI: CMIHardware,         // Fairlight CMI IIx 8-Voice PCM (1982)
   MAMEFZPCM: FZHardware,        // Casio FZ-1 16-bit PCM Sampler (1987)
   MAMEPS1SPU: PS1SPUHardware,   // Sony PlayStation SPU ADPCM (1994)
-  MAMEMultiPCM: MultiPCMHardware, // Yamaha YMW258-F GEW8 28-Slot (1992)
   MAMEZSG2: ZSG2Hardware,       // ZOOM ZSG-2 48-Channel ADPCM
   MAMEKS0164: KS0164Hardware,   // Samsung KS0164 32-Voice GM Wavetable
   MAMESWP00: SWP00Hardware,     // Yamaha SWP00 AWM2 MU50 (1994)
