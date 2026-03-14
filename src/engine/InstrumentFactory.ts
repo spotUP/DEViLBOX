@@ -745,7 +745,15 @@ export class InstrumentFactory {
       case 'GearmulatorXT':
       case 'GearmulatorNord':
       case 'GearmulatorJP8000': {
-        const gmConfig = config.gearmulator ?? { synthType: 0 };
+        const GM_TYPE: Record<string, number> = {
+          GearmulatorVirus: 0, GearmulatorVirusTI: 1,
+          GearmulatorMicroQ: 2, GearmulatorXT: 3,
+          GearmulatorNord: 4, GearmulatorJP8000: 5,
+        };
+        const synthTypeNum = GM_TYPE[config.type] ?? 0;
+        const gmConfig = config.gearmulator ?? { synthType: synthTypeNum };
+        // Ensure synthType is always correct for this instrument type
+        if (gmConfig.synthType !== synthTypeNum) gmConfig.synthType = synthTypeNum;
         const gmVolDb = config.volume ?? -12;
         const gmSynth = new GearmulatorSynth(gmConfig);
         gmSynth.output.gain.value = Math.pow(10, gmVolDb / 20);

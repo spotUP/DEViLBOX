@@ -29,14 +29,15 @@ export const GearmulatorEditor: React.FC<GearmulatorEditorProps> = ({ config, on
 
   useEffect(() => { configRef.current = config; }, [config]);
 
-  // Check if ROM is already stored
+  // Check if ROM is already stored (user-uploaded key OR auto-loaded key)
   useEffect(() => {
-    if (config.romKey) {
-      checkRomExists(config.romKey).then(exists => {
-        setRomStatus(exists ? 'loaded' : 'none');
-      });
-    }
-  }, [config.romKey]);
+    const autoKey = `gearmulator-auto-${config.synthType}`;
+    const checkKeys = [config.romKey, autoKey].filter(Boolean) as string[];
+    if (checkKeys.length === 0) { setRomStatus('none'); return; }
+    Promise.any(checkKeys.map(k => checkRomExists(k).then(e => { if (!e) throw new Error(); return true; })))
+      .then(() => setRomStatus('loaded'))
+      .catch(() => setRomStatus('none'));
+  }, [config.romKey, config.synthType]);
 
   const info = SYNTH_NAMES[config.synthType] ?? { name: 'Unknown', romHint: 'Firmware ROM' };
 
