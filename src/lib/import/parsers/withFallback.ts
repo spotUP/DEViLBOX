@@ -39,7 +39,7 @@ async function callUADE(ctx: FallbackContext): Promise<TrackerSong> {
  * If a native parser result has uadePatternLayout, inject the raw file binary
  * so UADE can handle playback while the native parser provides pattern display.
  */
-function injectUADEPlayback(result: TrackerSong, ctx: FallbackContext): TrackerSong {
+export function injectUADEPlayback(result: TrackerSong, ctx: FallbackContext): TrackerSong {
   if ((result as any).uadePatternLayout && !(result as any).uadeEditableFileData) {
     (result as any).uadeEditableFileData = ctx.buffer.slice(0);
     (result as any).uadeEditableFileName = ctx.originalFileName;
