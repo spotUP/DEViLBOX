@@ -431,7 +431,6 @@ async function renderFurFile(furPath: string, outPath: string): Promise<RenderRe
     // 3. Create chips
     const chipIds = native.chipIds || [];
     if (chipIds.length === 0) throw new Error('No chip IDs');
-
     // Each entry: { handle, chipId } — one per system slot (duplicates allowed)
     const chipInstances: Array<{ handle: number; chipId: number }> = [];
     let totalChannels = 0;
