@@ -618,6 +618,23 @@ describe('Native parser tests', () => {
     expect(song.format).toBeTruthy();
   });
 
+  it('MED: med.sadman (MMD1 prefix-named file)', async () => {
+    const buf = readFileSync(resolve(BASE, 'med.sadman'));
+    const ab = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer;
+    const { parseMEDFile } = await import('@lib/import/formats/MEDParser');
+    const song = parseMEDFile(ab, 'med.sadman');
+    logResult('MED sadman', song);
+    expect(song).toBeTruthy();
+    expect(song.format).toBeTruthy();
+  });
+
+  it('EMS: ballade.ems (RIFF-wrapped, UADE-only)', async () => {
+    const buf = readFileSync(resolve(BASE, 'ballade.ems'));
+    expect(buf.byteLength).toBeGreaterThan(0);
+    // .ems is a RIFF-format file; routed to UADE via catch-all
+    expect(await uadeDetect('ballade.ems')).toBe(true);
+  });
+
   it('JochenHippelST: airballtest.sog (raw TFMX magic)', async () => {
     const buf = readFileSync(resolve(BASE, 'airballtest.sog'));
     const ab = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer;
