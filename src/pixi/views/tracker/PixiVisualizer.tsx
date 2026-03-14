@@ -11,8 +11,8 @@ import { usePixiTheme, type PixiTheme } from '../../theme';
 import { useTransportStore } from '@stores';
 import { getToneEngine } from '@engine/ToneEngine';
 
-type VizMode = 'waveform' | 'spectrum' | 'vectorscope' | 'channels' | 'stereo' | 'freqbars' | 'levels' | 'particles';
-const VIZ_MODES: VizMode[] = ['waveform', 'spectrum', 'vectorscope', 'channels', 'stereo', 'freqbars', 'levels', 'particles'];
+type VizMode = 'waveform' | 'spectrum' | 'vectorscope' | 'channels' | 'stereo' | 'freqbars' | 'levels' | 'particles' | 'mirror' | 'radial' | 'energy' | 'logo' | 'banner';
+const VIZ_MODES: VizMode[] = ['waveform', 'spectrum', 'vectorscope', 'channels', 'stereo', 'freqbars', 'levels', 'particles', 'mirror', 'radial', 'energy', 'logo', 'banner'];
 const VIZ_MODE_LABELS: Record<VizMode, string> = {
   waveform: 'WAVE',
   spectrum: 'SPECTRUM',
@@ -22,6 +22,11 @@ const VIZ_MODE_LABELS: Record<VizMode, string> = {
   freqbars: 'BARS',
   levels: 'LEVELS',
   particles: 'PARTICLES',
+  mirror: 'MIRROR',
+  radial: 'RADIAL',
+  energy: 'ENERGY',
+  logo: 'LOGO',
+  banner: 'BANNER',
 };
 
 interface PixiVisualizerProps {
@@ -37,6 +42,9 @@ const LAYOUT_MODE_LABEL: Record<string, unknown> = {};
 const LAYOUT_MODE_LABEL_COLLAPSED: Record<string, unknown> = { width: 0, height: 0 };
 const LAYOUT_MODE_INDICATOR: Record<string, unknown> = { position: 'absolute', right: 4, bottom: 2 };
 const LAYOUT_MODE_INDICATOR_COLLAPSED: Record<string, unknown> = { position: 'absolute', width: 0, height: 0 };
+// Logo/banner overlay text — visible only in logo/banner modes
+const LAYOUT_OVERLAY_LABEL: Record<string, unknown> = { position: 'absolute' };
+const LAYOUT_OVERLAY_COLLAPSED: Record<string, unknown> = { position: 'absolute', width: 0, height: 0 };
 
 export const PixiVisualizer: React.FC<PixiVisualizerProps> = ({
   width = 160,
@@ -103,6 +111,21 @@ export const PixiVisualizer: React.FC<PixiVisualizerProps> = ({
           case 'particles':
             drawParticles(g, engine.getWaveform(), width, height, theme, particlesRef.current);
             break;
+          case 'mirror':
+            drawMirrorWave(g, engine.getWaveform(), width, height, theme);
+            break;
+          case 'radial':
+            drawRadialSpectrum(g, engine.getFFT(), width, height, theme);
+            break;
+          case 'energy':
+            drawEnergyBurst(g, engine.getWaveform(), engine.getFFT(), width, height, theme);
+            break;
+          case 'logo':
+            drawLogoBackground(g, engine.getWaveform(), width, height, theme);
+            break;
+          case 'banner':
+            drawBannerBackground(g, engine.getWaveform(), width, height, theme);
+            break;
         }
       } catch (e) {
         // Engine not ready — only log unexpected errors
@@ -168,6 +191,24 @@ export const PixiVisualizer: React.FC<PixiVisualizerProps> = ({
         tint={theme.textMuted.color}
         layout={isPlaying ? LAYOUT_MODE_INDICATOR : LAYOUT_MODE_INDICATOR_COLLAPSED}
         alpha={isPlaying ? 0.5 : 0}
+      />
+
+      {/* Logo mode overlay — large DEViLBOX text, energy-reactive alpha */}
+      <pixiBitmapText
+        text="DEViLBOX"
+        style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 20, fill: 0xffffff }}
+        tint={theme.accent.color}
+        layout={mode === 'logo' ? LAYOUT_OVERLAY_LABEL : LAYOUT_OVERLAY_COLLAPSED}
+        alpha={mode === 'logo' ? 1 : 0}
+      />
+
+      {/* Banner mode overlay — mode label as large banner text */}
+      <pixiBitmapText
+        text="★ DEViLBOX ★"
+        style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 12, fill: 0xffffff }}
+        tint={theme.accentSecondary.color}
+        layout={mode === 'banner' ? LAYOUT_OVERLAY_LABEL : LAYOUT_OVERLAY_COLLAPSED}
+        alpha={mode === 'banner' ? 0.9 : 0}
       />
     </pixiContainer>
   );
@@ -529,5 +570,166 @@ function drawParticles(g: GraphicsType, data: Float32Array, w: number, h: number
     const size = 1.5 + energy * 4 + speed * 0.3;
     g.circle(p.x, p.y, size);
     g.fill({ color: theme.accent.color, alpha });
+  }
+}
+
+// ─── AudioMotion-style extra modes ──────────────────────────────────────────
+
+/** Mirror: symmetric waveform reflected across horizontal center */
+function drawMirrorWave(g: GraphicsType, data: Float32Array, w: number, h: number, theme: PixiTheme) {
+  if (!data || data.length === 0) return;
+  const midY = h / 2;
+  const padX = 4;
+  const drawW = w - padX * 2;
+  const step = data.length / drawW;
+
+  // Upper half (normal)
+  g.moveTo(padX, midY - Math.abs(data[0] ?? 0) * (midY - 4));
+  for (let i = 1; i < drawW; i++) {
+    const val = Math.abs(data[Math.floor(i * step)] ?? 0);
+    g.lineTo(padX + i, midY - val * (midY - 4));
+  }
+  g.stroke({ color: theme.accent.color, alpha: 0.9, width: 1.5 });
+
+  // Lower half (mirrored)
+  g.moveTo(padX, midY + Math.abs(data[0] ?? 0) * (midY - 4));
+  for (let i = 1; i < drawW; i++) {
+    const val = Math.abs(data[Math.floor(i * step)] ?? 0);
+    g.lineTo(padX + i, midY + val * (midY - 4));
+  }
+  g.stroke({ color: theme.accent.color, alpha: 0.6, width: 1 });
+
+  // Center divider
+  g.moveTo(padX, midY); g.lineTo(w - padX, midY);
+  g.stroke({ color: theme.border.color, alpha: 0.2, width: 1 });
+
+  // Glow fill between the two halves (horizontal band)
+  g.moveTo(padX, midY - Math.abs(data[0] ?? 0) * (midY - 4));
+  for (let i = 1; i < drawW; i++) {
+    const val = Math.abs(data[Math.floor(i * step)] ?? 0);
+    g.lineTo(padX + i, midY - val * (midY - 4));
+  }
+  for (let i = drawW - 1; i >= 0; i--) {
+    const val = Math.abs(data[Math.floor(i * step)] ?? 0);
+    g.lineTo(padX + i, midY + val * (midY - 4));
+  }
+  g.closePath();
+  g.fill({ color: theme.accent.color, alpha: 0.06 });
+}
+
+/** Radial: polar spectrum — FFT bars radiating from center */
+function drawRadialSpectrum(g: GraphicsType, data: Float32Array, w: number, h: number, theme: PixiTheme) {
+  if (!data || data.length === 0) return;
+  const cx = w / 2;
+  const cy = h / 2;
+  const innerR = Math.min(w, h) * 0.15;
+  const outerMax = Math.min(w, h) * 0.46;
+  const barCount = 48;
+  const step = Math.floor(data.length / barCount);
+  const angleStep = (Math.PI * 2) / barCount;
+
+  // Inner circle
+  g.circle(cx, cy, innerR);
+  g.stroke({ color: theme.border.color, alpha: 0.15, width: 1 });
+
+  for (let i = 0; i < barCount; i++) {
+    let sum = 0;
+    for (let j = 0; j < step; j++) sum += data[i * step + j] ?? -100;
+    const db = sum / step;
+    const norm = Math.max(0, Math.min(1, (db + 100) / 100));
+    const barLen = norm * (outerMax - innerR);
+
+    const angle = i * angleStep - Math.PI / 2;
+    const x1 = cx + Math.cos(angle) * innerR;
+    const y1 = cy + Math.sin(angle) * innerR;
+    const x2 = cx + Math.cos(angle) * (innerR + barLen);
+    const y2 = cy + Math.sin(angle) * (innerR + barLen);
+
+    const color = norm > 0.8 ? theme.warning.color : theme.accent.color;
+    g.moveTo(x1, y1);
+    g.lineTo(x2, y2);
+    g.stroke({ color, alpha: 0.5 + norm * 0.5, width: 2 });
+  }
+}
+
+/** Energy: concentric pulsing rings driven by low-frequency energy */
+function drawEnergyBurst(g: GraphicsType, wave: Float32Array, fft: Float32Array, w: number, h: number, theme: PixiTheme) {
+  const cx = w / 2;
+  const cy = h / 2;
+  const maxR = Math.min(w, h) * 0.45;
+
+  // Compute bass energy (low FFT bins) and overall RMS
+  let bassEnergy = 0;
+  const bassCount = Math.min(8, fft?.length ?? 0);
+  for (let i = 0; i < bassCount; i++) bassEnergy += Math.max(0, ((fft?.[i] ?? -100) + 100) / 100);
+  bassEnergy = bassCount > 0 ? bassEnergy / bassCount : 0;
+
+  let rms = 0;
+  const waveLen = wave?.length ?? 0;
+  for (let i = 0; i < waveLen; i++) rms += (wave?.[i] ?? 0) ** 2;
+  rms = waveLen > 0 ? Math.sqrt(rms / waveLen) : 0;
+
+  // Three rings at different radii
+  const rings = [
+    { r: maxR * (0.3 + bassEnergy * 0.5), color: theme.accent.color, alpha: 0.9, w: 2 },
+    { r: maxR * (0.5 + rms * 0.4), color: theme.accentSecondary.color, alpha: 0.5, w: 1.5 },
+    { r: maxR * (0.7 + rms * 0.25), color: theme.border.color, alpha: 0.3, w: 1 },
+  ];
+
+  for (const ring of rings) {
+    if (ring.r > 2) {
+      g.circle(cx, cy, ring.r);
+      g.stroke({ color: ring.color, alpha: ring.alpha, width: ring.w });
+      // Glow
+      g.circle(cx, cy, ring.r);
+      g.stroke({ color: ring.color, alpha: ring.alpha * 0.15, width: ring.w * 4 });
+    }
+  }
+
+  // Center dot pulsing with energy
+  const dotR = 2 + bassEnergy * 6 + rms * 4;
+  g.circle(cx, cy, dotR);
+  g.fill({ color: theme.accent.color, alpha: 0.9 });
+  g.circle(cx, cy, dotR * 2);
+  g.fill({ color: theme.accent.color, alpha: 0.1 });
+}
+
+/** Logo background: subtle waveform + accent decorations behind DEViLBOX text overlay */
+function drawLogoBackground(g: GraphicsType, data: Float32Array, w: number, h: number, theme: PixiTheme) {
+  // Faint waveform ribbon
+  if (data && data.length > 0) {
+    const midY = h / 2;
+    const step = data.length / w;
+    g.moveTo(0, midY + (data[0] ?? 0) * (h / 3));
+    for (let i = 1; i < w; i++) {
+      g.lineTo(i, midY + (data[Math.floor(i * step)] ?? 0) * (h / 3));
+    }
+    g.stroke({ color: theme.accent.color, alpha: 0.15, width: 2 });
+  }
+  // Corner accent lines
+  g.moveTo(0, 0); g.lineTo(16, 0);
+  g.moveTo(0, 0); g.lineTo(0, 8);
+  g.stroke({ color: theme.accent.color, alpha: 0.6, width: 1.5 });
+  g.moveTo(w, h); g.lineTo(w - 16, h);
+  g.moveTo(w, h); g.lineTo(w, h - 8);
+  g.stroke({ color: theme.accent.color, alpha: 0.6, width: 1.5 });
+}
+
+/** Banner background: horizontal scan-line animation + waveform */
+function drawBannerBackground(g: GraphicsType, data: Float32Array, w: number, h: number, theme: PixiTheme) {
+  // Subtle horizontal scan lines
+  for (let y = 2; y < h; y += 4) {
+    g.moveTo(0, y); g.lineTo(w, y);
+    g.stroke({ color: theme.border.color, alpha: 0.06, width: 1 });
+  }
+  // Thin bottom waveform
+  if (data && data.length > 0) {
+    const baseY = h - 6;
+    const step = data.length / w;
+    g.moveTo(0, baseY + (data[0] ?? 0) * 4);
+    for (let i = 1; i < w; i++) {
+      g.lineTo(i, baseY + (data[Math.floor(i * step)] ?? 0) * 4);
+    }
+    g.stroke({ color: theme.accentSecondary.color, alpha: 0.5, width: 1 });
   }
 }
