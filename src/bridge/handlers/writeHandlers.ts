@@ -20,7 +20,7 @@ import { getToneEngine } from '../../engine/ToneEngine';
 import * as Tone from 'tone';
 import { AudioDataBus } from '../../engine/vj/AudioDataBus';
 import { getAudioMonitor, disposeAudioMonitor } from '../monitoring/AudioMonitor';
-import { testAllSynths, testToneSynths, testCustomSynths, testFurnaceSynths } from '../../utils/synthTester';
+import { testAllSynths, testToneSynths, testCustomSynths, testFurnaceSynths, testMAMESynths } from '../../utils/synthTester';
 
 // ─── Note Parsing ──────────────────────────────────────────────────────────────
 
@@ -1777,6 +1777,10 @@ export async function runSynthTests(params: Record<string, unknown>): Promise<Re
       summary = await testCustomSynths();
     } else if (suite === 'furnace') {
       summary = await testFurnaceSynths();
+    } else if (suite === 'mame') {
+      const startIndex = (params.startIndex as number) ?? 0;
+      const batchSize = (params.batchSize as number) ?? 0;
+      summary = await testMAMESynths(startIndex, batchSize);
     } else {
       summary = await testAllSynths({ timeout, verbose: false });
     }

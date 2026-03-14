@@ -28,7 +28,7 @@ import { WebSocket, WebSocketServer } from 'ws';
 import type { BridgeRequest, BridgeResponse } from './protocol';
 
 const PORT = Number(process.env.MCP_BRIDGE_PORT ?? 4003);
-const TIMEOUT_MS = 30_000;
+const TIMEOUT_MS = 900_000;
 
 type PendingResolve = (response: BridgeResponse) => void;
 
@@ -167,39 +167,47 @@ export function startRelay(): void {
 
 /**
  * Connect to an existing relay as an MCP client (used by MCP subprocess
- * when Express already owns port 4003).
+ * when Express already owns port 4003). Auto-reconnects if the relay restarts.
  */
 function connectAsClient(): void {
   mode = 'client';
-  // Connect to /mcp path so the relay knows we're an MCP client, not a browser
-  const ws = new WebSocket(`ws://localhost:${PORT}/mcp`);
 
-  ws.on('open', () => {
-    browserSocket = ws;
-    console.error('[mcp-bridge] Connected to existing relay as MCP client');
-  });
+  function attempt(delayMs = 0): void {
+    setTimeout(() => {
+      const ws = new WebSocket(`ws://localhost:${PORT}/mcp`);
 
-  ws.on('message', (data) => {
-    try {
-      const msg = JSON.parse(data.toString());
-      const resolve = pending.get(msg.id);
-      if (resolve) {
-        pending.delete(msg.id);
-        resolve(msg as BridgeResponse);
-      }
-    } catch {
-      // ignore
-    }
-  });
+      ws.on('open', () => {
+        browserSocket = ws;
+        console.error('[mcp-bridge] Connected to existing relay as MCP client');
+      });
 
-  ws.on('close', () => {
-    console.error('[mcp-bridge] MCP client connection closed');
-    browserSocket = null;
-  });
+      ws.on('message', (data) => {
+        try {
+          const msg = JSON.parse(data.toString());
+          const resolve = pending.get(msg.id);
+          if (resolve) {
+            pending.delete(msg.id);
+            resolve(msg as BridgeResponse);
+          }
+        } catch {
+          // ignore
+        }
+      });
 
-  ws.on('error', (err) => {
-    console.error('[mcp-bridge] MCP client error:', err.message);
-  });
+      ws.on('close', () => {
+        console.error('[mcp-bridge] MCP client connection closed — reconnecting in 2s');
+        browserSocket = null;
+        attempt(2000);
+      });
+
+      ws.on('error', (err) => {
+        console.error('[mcp-bridge] MCP client error:', err.message);
+        // 'close' fires after error, so reconnect is handled there
+      });
+    }, delayMs);
+  }
+
+  attempt();
 }
 
 export function isConnected(): boolean {
