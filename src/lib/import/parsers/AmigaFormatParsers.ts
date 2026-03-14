@@ -2189,6 +2189,24 @@ export async function tryRouteFormat(
     }
   }
 
+  // ── GlueMon (GLUE.* / GM.* prefix) ──────────────────────────────────────
+  // 4-channel Amiga format by GlueMaster/Northstar. Magic: "GLUE" at offset 0.
+  if (matchesExt(filename, ['glue', 'gm'])) {
+    const { isGlueMonFormat, parseGlueMonFile } = await import('@lib/import/formats/GlueMonParser');
+    return withNativeThenUADE('glueMonParser', ctx,
+      (buf: Uint8Array | ArrayBuffer, name: string) => { if (isGlueMonFormat(buf as ArrayBuffer)) return parseGlueMonFile(buf as ArrayBuffer, name); return null; },
+      'GlueMonParser');
+  }
+
+  // ── David Hanney (DH.* prefix) ────────────────────────────────────────────
+  // Amiga music format by David Hanney (1992). Magic: "DSNGSEQU" at offset 0.
+  if (matchesExt(filename, ['dh'])) {
+    const { isDavidHanneyFormat, parseDavidHanneyFile } = await import('@lib/import/formats/DavidHanneyParser');
+    return withNativeThenUADE('davidHanney', ctx,
+      (buf: Uint8Array | ArrayBuffer, name: string) => { if (isDavidHanneyFormat(buf as ArrayBuffer)) return parseDavidHanneyFile(buf as ArrayBuffer, name); return null; },
+      'DavidHanneyParser');
+  }
+
   // ── UADE-only prefix formats + catch-all ─────────────────────────────────
   { const uadeResult = await tryUADEPrefixParse(buffer, filename, originalFileName, prefs, subsong, preScannedMeta);
     if (uadeResult) return uadeResult; }
