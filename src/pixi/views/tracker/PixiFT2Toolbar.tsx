@@ -21,6 +21,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import type { FederatedPointerEvent } from 'pixi.js';
 import { usePixiTheme } from '../../theme';
 import { PIXI_FONTS } from '../../fonts';
 import { PixiButton, PixiNumericInput } from '../../components';
@@ -29,11 +30,13 @@ import { PixiFXSearchReplace } from '../../components/PixiFXSearchReplace';
 import { PixiVisualizer } from './PixiVisualizer';
 import { useTransportStore, useTrackerStore, useUIStore, useInstrumentStore, useProjectStore, useAudioStore, useAutomationStore, useEditorStore } from '@stores';
 import { useAIStore } from '@stores/useAIStore';
+import { useSettingsStore } from '@stores/useSettingsStore';
 import { exportSong } from '@lib/export/exporters';
 import { useShallow } from 'zustand/react/shallow';
 import { useTapTempo } from '@hooks/useTapTempo';
 import { GROOVE_TEMPLATES } from '@typedefs/audio';
 import { notify } from '@stores/useNotificationStore';
+import { getTrackerScratchController } from '@engine/TrackerScratchController';
 
 // ─── Layout constants ────────────────────────────────────────────────────────
 
@@ -181,6 +184,45 @@ export const PixiFT2Toolbar: React.FC = () => {
   // ── Tap Tempo ─────────────────────────────────────────────────────────────
   const { tap: handleTapTempo, tapCount, isActive: tapActive } = useTapTempo(setBPM);
 
+  // ── ASID hardware toggle ───────────────────────────────────────────────────
+  const asidEnabled = useSettingsStore(s => s.asidEnabled);
+  const [asidReady, setAsidReady] = useState(false);
+
+  const handleToggleASID = useCallback(async () => {
+    const settings = useSettingsStore.getState();
+    if (settings.asidEnabled) {
+      settings.setAsidEnabled(false);
+      setAsidReady(false);
+      notify.info('ASID hardware output disabled');
+    } else {
+      try {
+        const { getASIDDeviceManager } = await import('@lib/sid/ASIDDeviceManager');
+        const mgr = getASIDDeviceManager();
+        await mgr.init();
+        const devices = mgr.getDevices();
+        if (devices.length === 0) {
+          notify.warning('No ASID devices found. Connect USB-SID-Pico and retry.');
+          return;
+        }
+        if (!settings.asidDeviceId && devices.length > 0) {
+          settings.setAsidDeviceId(devices[0].id);
+          mgr.selectDevice(devices[0].id);
+        }
+        settings.setAsidEnabled(true);
+        setAsidReady(mgr.isDeviceReady());
+        notify.success(`ASID enabled: ${devices[0]?.name || 'device'}`);
+      } catch (err) {
+        notify.error(`ASID init failed: ${err}`);
+      }
+    }
+  }, []);
+
+  // ── Power cut — shift+click on Play Song / Play Pattern ──────────────────
+  const shiftKeyRef = useRef(false);
+  const handleTransportPointerDown = useCallback((e: FederatedPointerEvent) => {
+    shiftKeyRef.current = (e.nativeEvent as PointerEvent).shiftKey;
+  }, []);
+
   // ── Modal handlers ────────────────────────────────────────────────────────
   const handleShowExport      = useCallback(() => useUIStore.getState().openModal('export'), []);
   const handleShowHelp        = useCallback((tab?: string) => useUIStore.getState().openModal('help', { initialTab: tab ?? 'shortcuts' }), []);
@@ -256,13 +298,19 @@ export const PixiFT2Toolbar: React.FC = () => {
 
   // ── Transport handlers ────────────────────────────────────────────────────
   const handlePlaySong = useCallback(async () => {
-    if (isPlayingSong) { stop(); return; }
+    if (isPlayingSong) {
+      if (shiftKeyRef.current) { getTrackerScratchController().triggerPowerCut(); return; }
+      stop(); return;
+    }
     setIsLooping(false);
     await play().catch(() => {});
   }, [isPlayingSong, stop, setIsLooping, play]);
 
   const handlePlayPattern = useCallback(async () => {
-    if (isPlayingPattern) { stop(); return; }
+    if (isPlayingPattern) {
+      if (shiftKeyRef.current) { getTrackerScratchController().triggerPowerCut(); return; }
+      stop(); return;
+    }
     if (isPlaying) stop();
     setIsLooping(true);
     await play().catch(() => {});
@@ -337,6 +385,8 @@ export const PixiFT2Toolbar: React.FC = () => {
 
           {/* Transport Row 1: Position | BPM | Pattern | EditStep | PlaySong PlayPattern */}
           <layoutContainer
+            eventMode="static"
+            onPointerDown={handleTransportPointerDown}
             layout={{
               width: '100%',
               height: TRANSPORT_ROW_H,
@@ -601,6 +651,14 @@ export const PixiFT2Toolbar: React.FC = () => {
           size="sm"
           active={aiOpen}
           onClick={toggleAI}
+        />
+        <PixiButton
+          label={asidEnabled ? (asidReady ? 'HW ON' : 'HW...') : 'HW'}
+          variant={asidEnabled ? 'ft2' : 'ghost'}
+          color={asidEnabled ? 'green' : 'default'}
+          size="sm"
+          active={asidEnabled}
+          onClick={handleToggleASID}
         />
         <PixiButton label="Reference" variant="ghost" size="sm" onClick={() => handleShowHelp('chip-effects')} />
         <PixiButton label="Help"      variant="ghost" size="sm" onClick={() => handleShowHelp('shortcuts')} />
