@@ -180,6 +180,58 @@ export async function getPatternNumRows(pattern: number): Promise<number> {
   return m._osl_get_pattern_num_rows(pattern);
 }
 
+// ─── MIDI macro config (Zxx / Symphonie DSP) ──────────────────────────────
+
+/** effTyp value used in TrackerCell to mark a Symphonie DSP effect. */
+export const DSP_EFFECT_MARKER = 0x50;
+
+/** Get MIDI macro string (Zxx) at index 0-127. Empty string = unused slot. */
+export async function getMidiMacroString(idx: number): Promise<string> {
+  const m = await getModule();
+  const ptr = m._osl_get_midi_macro_string(idx);
+  return m.UTF8ToString(ptr);
+}
+
+/** Set MIDI macro string (Zxx) at index 0-127. */
+export async function setMidiMacroString(idx: number, str: string): Promise<void> {
+  const m = await getModule();
+  const len = m.lengthBytesUTF8(str) + 1;
+  const ptr = m._malloc(len);
+  m.stringToUTF8(str, ptr, len);
+  m._osl_set_midi_macro_string(idx, ptr);
+  m._free(ptr);
+}
+
+/**
+ * Parse a Symphonie DSP Echo macro string.
+ * Format: "F0F080xx F0F081yy F0F082zz" (case-insensitive).
+ * Returns null if the string is not a Symphonie DSP macro.
+ */
+export function parseSymphonieDSPMacro(
+  macro: string,
+): { type: number; bufLen: number; feedback: number } | null {
+  const m = macro.trim().replace(/\s+/g, ' ');
+  const match = m.match(
+    /^F0F080([0-9A-F]{2})\s+F0F081([0-9A-F]{2})\s+F0F082([0-9A-F]{2})$/i,
+  );
+  if (!match) return null;
+  return {
+    type:     parseInt(match[1], 16),
+    bufLen:   parseInt(match[2], 16),
+    feedback: parseInt(match[3], 16),
+  };
+}
+
+/** Build a Symphonie DSP Echo macro string from parameters. */
+export function buildSymphonieDSPMacro(
+  type: number,
+  bufLen: number,
+  feedback: number,
+): string {
+  const h = (n: number) => n.toString(16).padStart(2, '0').toUpperCase();
+  return `F0F080${h(type & 0xFF)} F0F081${h(bufLen & 0xFF)} F0F082${h(feedback & 0xFF)}`;
+}
+
 /**
  * Read all cells from a pattern as a flat array.
  * Returns [rows][channels] of PatternCell.

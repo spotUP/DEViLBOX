@@ -98,6 +98,30 @@ export function getFormat(): SaveFormat {
 }
 
 /**
+ * Find or allocate a MIDI macro slot for a Symphonie DSP echo event.
+ * Returns the slot index (0-127), or -1 if all slots are full.
+ */
+async function allocateDSPMacro(
+  osl: typeof import('@lib/import/wasm/OpenMPTSoundlib'),
+  type: number,
+  bufLen: number,
+  feedback: number,
+): Promise<number> {
+  const target = osl.buildSymphonieDSPMacro(type, bufLen, feedback).toUpperCase();
+  let firstFree = -1;
+  for (let i = 0; i < 128; i++) {
+    const str = await osl.getMidiMacroString(i);
+    if (str.toUpperCase() === target) return i;
+    if (firstFree === -1 && (!str || str === '')) firstFree = i;
+  }
+  if (firstFree !== -1) {
+    await osl.setMidiMacroString(firstFree, target);
+    return firstFree;
+  }
+  return -1;
+}
+
+/**
  * Forward a cell edit to the OpenMPT soundlib WASM module.
  * Called from useTrackerStore.setCell() after the store mutation.
  */
@@ -114,15 +138,32 @@ export async function syncCellEdit(
 
   const note = mapNoteToOpenMPT(fullCell.note);
   const { volcmd, volval } = mapVolumeToOpenMPT(fullCell.volume);
-  const fx = mapEffectToOpenMPT(fullCell.effTyp, fullCell.eff);
+
+  let cmdFinal: number;
+  let paramFinal: number;
+
+  if (fullCell.effTyp === osl.DSP_EFFECT_MARKER) {
+    // Symphonie DSP effect — encode as MIDI macro (CMD_MIDI = 31)
+    // effTyp2 = 0x50+type, eff = bufLen, eff2 = feedback
+    const type     = (fullCell.effTyp2 - osl.DSP_EFFECT_MARKER) & 0x07;
+    const bufLen   = fullCell.eff    & 0x7F;
+    const feedback = fullCell.eff2   & 0x7F;
+    const slot = await allocateDSPMacro(osl, type, bufLen, feedback);
+    cmdFinal   = slot >= 0 ? 31 : 0;
+    paramFinal = slot >= 0 ? (0x80 | slot) : 0;
+  } else {
+    const fx = mapEffectToOpenMPT(fullCell.effTyp, fullCell.eff);
+    cmdFinal   = fx.cmd;
+    paramFinal = fx.param;
+  }
 
   await osl.setPatternCell(patternIndex, rowIndex, channelIndex, {
     note,
     instrument: fullCell.instrument,
     volcmd,
     vol: volval,
-    command: fx.cmd,
-    param: fx.param,
+    command: cmdFinal,
+    param: paramFinal,
   });
 
   _dirty = true;

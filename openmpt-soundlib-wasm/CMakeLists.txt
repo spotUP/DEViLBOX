@@ -129,7 +129,9 @@ target_link_options(OpenMPTSoundlib PRIVATE
 '_osl_add_pattern',\
 '_osl_set_order',\
 '_osl_set_initial_speed',\
-'_osl_set_initial_tempo'\
+'_osl_set_initial_tempo',\
+'_osl_get_midi_macro_string',\
+'_osl_set_midi_macro_string'\
 ]"
   "SHELL:-s EXPORTED_RUNTIME_METHODS=['ccall','cwrap','UTF8ToString','stringToUTF8','HEAPU8','HEAP32','HEAPF32']"
   "SHELL:-s ALLOW_MEMORY_GROWTH=1"
