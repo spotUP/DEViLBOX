@@ -917,6 +917,14 @@ export class TrackerReplayer {
       // and calls Tone.setContext() before we create any new Tone.js nodes. Otherwise
       // the new nodes end up on a stale Tone context and can't connect to masterInput.
       const engine = this.isDJDeck ? null : getToneEngine();
+      // Sync Tone.js to the engine's context before creating new nodes.
+      // getToneEngine() may return an existing engine whose masterInput is on context C1
+      // while Tone.js was left on a different context C2 (e.g. by offline rendering in
+      // SynthBaker/previewGenerator). Creating newSep on C2 then connecting to masterInput
+      // on C1 would throw another InvalidAccessError.
+      if (engine) {
+        Tone.setContext(engine.nativeContext);
+      }
       try { this.masterGain.dispose(); } catch { /* ignored */ }
       this.separationNode.dispose();
       this.masterGain = new Tone.Gain(1);
