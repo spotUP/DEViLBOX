@@ -182,19 +182,24 @@ async function testSynth(synthType: SynthType): Promise<SynthTestResult> {
       // NoiseSynth/MetalSynth: triggerAttack(time, vel), triggerRelease(time)
       const isNoNote = synthType === 'NoiseSynth' || synthType === 'MetalSynth';
 
+      // Drum machine synths: use MIDI note 36 (C2 = kick drum) instead of C4=60
+      // TR707 drum map only covers notes 35-56; C4=60 has no mapping → silence
+      const DRUM_SYNTHS: ReadonlySet<string> = new Set(['MAMETR707']);
+      const testNote = DRUM_SYNTHS.has(synthType) ? 'C2' : 'C4';
+
       try {
         if ('triggerAttack' in instrument && typeof instrument.triggerAttack === 'function') {
           if (isNoNote) {
             (instrument as unknown as Tone.NoiseSynth).triggerAttack(scheduleTime, 0.8);
           } else {
-            instrument.triggerAttack('C4', scheduleTime, 0.8);
+            instrument.triggerAttack(testNote, scheduleTime, 0.8);
           }
           result.noteOnWorked = true;
         } else if ('triggerAttackRelease' in instrument && typeof instrument.triggerAttackRelease === 'function') {
           if (isNoNote) {
             (instrument as unknown as Tone.NoiseSynth).triggerAttackRelease('8n', scheduleTime, 0.8);
           } else {
-            (instrument as unknown as { triggerAttackRelease: (note: string, dur: string, time: number, vel: number) => void }).triggerAttackRelease('C4', '8n', scheduleTime, 0.8);
+            (instrument as unknown as { triggerAttackRelease: (note: string, dur: string, time: number, vel: number) => void }).triggerAttackRelease(testNote, '8n', scheduleTime, 0.8);
           }
           result.noteOnWorked = true;
         }
@@ -438,9 +443,11 @@ export async function testBuzzmachineSynths(): Promise<SynthTestSummary> {
 /**
  * Test only MAME hardware chip synths
  */
-export async function testMAMESynths(): Promise<SynthTestSummary> {
+export async function testMAMESynths(startIndex = 0, batchSize = 0): Promise<SynthTestSummary> {
   // 30s timeout: ROM-based chips (TR707, C352, ICS2115, etc.) fetch+unzip ROMs on first init
-  return testAllSynths({ filter: (t) => t.startsWith('MAME'), timeout: 30000 });
+  const allMame = ALL_SYNTH_TYPES.filter((t) => t.startsWith('MAME'));
+  const slice = batchSize > 0 ? allMame.slice(startIndex, startIndex + batchSize) : allMame;
+  return testAllSynths({ filter: (t) => (slice as string[]).includes(t), timeout: 30000 });
 }
 
 /**

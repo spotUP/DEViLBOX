@@ -1810,6 +1810,18 @@ export function createMcpServer(): McpServer {
     (p) => call('run_regression_suite', p as Record<string, unknown>),
   );
 
+  server.tool(
+    'run_synth_tests',
+    'Run synth load+trigger tests in the browser. Suite: "tone" (Tone.js), "custom" (TB303/Buzz/etc), "furnace" (Furnace chips), "mame" (MAME chips), "all" (everything). Returns per-synth pass/fail with loaded/producedSound/noteOnWorked flags. For "mame", use startIndex+batchSize to test in small batches (e.g. batchSize:3) to avoid CPU overload.',
+    {
+      suite: z.enum(['tone', 'custom', 'furnace', 'mame', 'all']).optional().describe('Which synth suite to test (default: "all")'),
+      timeout: z.number().optional().describe('Per-synth timeout in ms (default: 5000; use 30000 for MAME)'),
+      startIndex: z.number().optional().describe('For mame suite: index of first synth to test (default: 0)'),
+      batchSize: z.number().optional().describe('For mame suite: number of synths to test (default: 0 = all). Use 3 to avoid CPU overload.'),
+    },
+    (p) => call('run_synth_tests', p),
+  );
+
   // ═══════════════════════════════════════════════════════════════════════════════
   // EXPORT TOOLS
   // ═══════════════════════════════════════════════════════════════════════════════
