@@ -88,8 +88,8 @@ function sfxPeriodToNote(period: number): number {
   // Use the shared periodToNoteIndex which does closest-match
   const noteIdx = periodToNoteIndex(period);
   if (noteIdx === 0) return 0;
-  // periodToNoteIndex returns 1-based (1 = C-1), XM note: C-3 = 37 (FT2 convention)
-  return noteIdx + 36;
+  // periodToNoteIndex returns 1-based (1 = C-1), XM note 13 = "C-1"
+  return noteIdx + 12;
 }
 
 // -- Format detection ---------------------------------------------------------

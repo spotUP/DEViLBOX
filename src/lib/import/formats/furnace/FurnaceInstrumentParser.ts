@@ -587,8 +587,6 @@ export function parseInstrument(reader: BinaryReader): FurnaceInstrument {
       resetDuty: false,
     };
 
-    console.log(`[FurnaceParser] INST C64 PARSED: tri=${c64TriOn} saw=${c64SawOn} pulse=${c64PulseOn} noise=${c64NoiseOn} ADSR=${c64A}/${c64D}/${c64S}/${c64R} duty=${c64Duty}`);
-
     // Amiga data — ALWAYS read (16 bytes)
     // Reference: instrument.cpp:2972-2982
     const amigaInitSample = reader.readInt16();
@@ -599,10 +597,13 @@ export function parseInstrument(reader: BinaryReader): FurnaceInstrument {
     if (amigaInitSample >= 0) {
       inst.samples.push(amigaInitSample);
     }
+    // useSample: only infer from initSample for Amiga type (14). For all other types
+    // (e.g. SU=30), useSample defaults false here; version>=104 SU block overrides it.
+    const isAmigaType = inst.type === 14; /* DIV_INS_AMIGA */
     inst.amiga = {
       initSample: amigaInitSample,
       useNoteMap: false,
-      useSample: amigaInitSample >= 0,
+      useSample: isAmigaType && amigaInitSample >= 0,
       useWave: amigaUseWave,
       waveLen: amigaWaveLen,
     };
@@ -706,8 +707,6 @@ export function parseInstrument(reader: BinaryReader): FurnaceInstrument {
     if (waveMacroLen > 0) {
       inst.macros.push({ code: 3, length: waveMacroLen, loop: waveMacroLoop, release: -1, mode: 0, type: 0, delay: 0, speed: 1, data: waveMacroVals });
     }
-
-    console.log(`[FurnaceParser] INST parsed ${inst.macros.length} macros, waveMacro: len=${waveMacroLen} vals=[${waveMacroVals.slice(0, 5).join(',')}${waveMacroLen > 5 ? '...' : ''}]`);
 
     // ========================================================================
     // FM macros (v29+) — Reference: instrument.cpp:3050-3161

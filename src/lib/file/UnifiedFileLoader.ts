@@ -118,7 +118,7 @@ export async function importTrackerModule(
   engine.disposeAllInstruments();
 
   // ── Try OpenMPT WASM soundlib for PC tracker formats ──
-  const isOpenMPTFormat = /^(MOD|XM|IT|S3M)$/i.test(format) || /\.(mod|xm|it|s3m|mptm|mo3)$/i.test(info.file?.name || '');
+  const isOpenMPTFormat = /^(MOD|XM|IT|S3M)$/i.test(format) || /\.(mod|xm|it|s3m|mptm|mo3|med|mmd[0-3]|mmdc|okt|okta)$/i.test(info.file?.name || '');
   if (info.arrayBuffer && isOpenMPTFormat) {
     try {
       const { parseWithOpenMPT } = await import('@lib/import/wasm/OpenMPTConverter');
@@ -362,8 +362,12 @@ export async function importTrackerModule(
   // the fallback path below to create generic 'Synth' instruments instead.
   const songHasPatterns = (info.metadata.song?.patterns?.length ?? 0) > 0;
   const hasNativeParser = !!fmt?.nativeParser;
-  if (!info.metadata.song || !songHasPatterns || hasNativeParser) {
+  // nativeOnly formats (PxTone, Organya, chip-dump etc.) must always go through
+  // parseModuleToSong even if the server returned libopenmpt-parsed metadata.
+  const isNativeOnly = !!fmt?.nativeOnly;
+  if (!info.metadata.song || !songHasPatterns || hasNativeParser || isNativeOnly) {
     if (hasNativeParser) console.log(`[UnifiedFileLoader] Format has nativeParser — using parseModuleToSong for ${filename}`);
+    if (isNativeOnly && !hasNativeParser) console.log(`[UnifiedFileLoader] nativeOnly format — using parseModuleToSong for ${filename}`);
     if (!info.file) {
       notify.error('File reference lost — cannot import');
       return;

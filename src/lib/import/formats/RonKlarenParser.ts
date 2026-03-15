@@ -95,9 +95,9 @@ const RK_PERIODS: number[] = [
    214,  202,  190,  180,  170,  160,  151,  143,  135,  127,
 ];
 
-// RK period index 36 → period 856 → XM note 37 (C-3)
+// RK period index 36 → period 856 → XM note 13 (displays "C-1")
 const RK_REFERENCE_IDX = 36;
-const XM_REFERENCE_NOTE = 37;
+const XM_REFERENCE_NOTE = 13;
 
 // ── Utilities ──────────────────────────────────────────────────────────────
 

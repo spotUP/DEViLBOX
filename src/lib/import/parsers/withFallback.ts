@@ -21,17 +21,20 @@ export interface FallbackContext {
   prefs: FormatEnginePreferences;
   subsong: number;
   preScannedMeta?: UADEMetadata;
+  /** Companion files (e.g. SMPL.* for MIDI-Loriciel, .ssd for Paul Robotham) */
+  companionFiles?: Map<string, ArrayBuffer>;
 }
 
 type NativeParser = (buffer: ArrayBuffer, filename: string) => Promise<TrackerSong> | TrackerSong;
 type NativeParserWithBytes = (bytes: Uint8Array, filename: string) => Promise<TrackerSong | null> | TrackerSong | null;
 
 /** Call UADE as fallback */
-async function callUADE(ctx: FallbackContext): Promise<TrackerSong> {
+export async function callUADE(ctx: FallbackContext): Promise<TrackerSong> {
   const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
   return parseUADEFile(
     ctx.buffer, ctx.originalFileName,
     ctx.prefs.uade ?? 'enhanced', ctx.subsong, ctx.preScannedMeta,
+    ctx.companionFiles,
   );
 }
 

@@ -134,8 +134,8 @@ function periodToFreq(period: number): number {
  */
 function psfNoteToXm(noteByte: number): number {
   if (noteByte > 0x7F) return 0;
-  // Map to XM: note 0 → C-3 (XM note 37, FT2 convention)
-  const xmNote = noteByte + 37;
+  // Map to XM: note 0 → C-1 (XM note 13, displays "C-1")
+  const xmNote = noteByte + 13;
   return Math.max(1, Math.min(96, xmNote));
 }
 

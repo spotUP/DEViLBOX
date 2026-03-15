@@ -41,15 +41,13 @@ export function periodToNoteIndex(period: number): number {
 }
 
 /**
- * Convert an Oktalyzer/MED note index to a TrackerCell note number.
- * Oktalyzer uses 1-based note index into the period table.
- * XM notes: 1 = C-0. We add 12 (one octave) to match the period table starting at C-1.
+ * Convert an Amiga note index (1-based into ProTracker period table) to an XM note number.
+ * ProTracker index 1 = C-1 (period 856) → XM note 13 (displays as "C-1").
  */
 export function amigaNoteToXM(amigaNote: number): number {
   if (amigaNote === 0) return 0;
-  // ProTracker: index 1 = C-1 (period 856)
-  // ProTracker C-1 → XM note 37 (C-3 in FT2 convention)
-  return amigaNote + 36;
+  // ProTracker: index 1 = C-1 (period 856) → XM note 13 = "C-1"
+  return amigaNote + 12;
 }
 
 // ── 8-bit signed → WAV ArrayBuffer ───────────────────────────────────────

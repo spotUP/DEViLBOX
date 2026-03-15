@@ -102,8 +102,8 @@ function bpNoteToXM(note: number, transpose: number): number {
       bestIdx = i;
     }
   }
-  // PT_PERIODS[0] = C-1 = XM note 37 (C-3 in FT2 convention)
-  const xmNote = bestIdx + 37;
+  // PT_PERIODS[0] = C-1 = XM note 13 (displays "C-1")
+  const xmNote = bestIdx + 13;
   return Math.max(1, Math.min(96, xmNote));
 }
 
