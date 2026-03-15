@@ -37,7 +37,7 @@
  * Extensions: .is, .is10
  *
  * Note mapping: same Amiga period table as Sonic Arranger (identical Tables.cs).
- *   noteIndex + 12 → XM note number (index 49 = period 856 = XM note 61 = C-5)
+ *   noteIndex - 36 → XM note number (index 49 = period 856 = C-1 = XM note 13)
  */
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
@@ -91,10 +91,14 @@ function readString(buf: Uint8Array, off: number, len: number): string {
   return str.trim();
 }
 
-/** Convert IS10 period-table note index to XM note number */
+/** Convert IS10 period-table note index to XM note number.
+ * IS10_PERIODS[49] = 856 = ProTracker C-1 = XM note 13.
+ * Mapping: xmNote = noteIndex - 36.
+ */
 function is10NoteToXm(noteIndex: number): number {
   if (noteIndex <= 0 || noteIndex >= IS10_PERIODS.length) return 0;
-  return Math.min(96, noteIndex + 12);
+  const xm = noteIndex - 36;
+  return (xm >= 1 && xm <= 96) ? xm : 0;
 }
 
 // ── Format Identification ──────────────────────────────────────────────────

@@ -1359,8 +1359,11 @@ export function encodeInstrumentAsINS2(inst: FurnaceInstrument, formatVersion: n
     writeUint8((((fm.ams2 ?? 0) & 3) << 6) | opsFlag | ((fm.opllPreset ?? 0) & 31));
 
     // Byte 4 (version >= 224): block(bits 3-0)
-    // Always emit for safety since we're writing a modern version
-    writeUint8((fm.block ?? 0) & 0x0F);
+    // Only write if version >= 224, to match what the WASM reader expects.
+    // If written for v<224, the WASM skips reading it but operators start there → 1-byte misalignment.
+    if (version >= 224) {
+      writeUint8((fm.block ?? 0) & 0x0F);
+    }
 
     // Operators: 8 bytes each, bit-packed (matching C++ reader exactly)
     for (let i = 0; i < opCount && i < 4; i++) {

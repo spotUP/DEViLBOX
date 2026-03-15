@@ -40,18 +40,19 @@ function s8(v: number): number {
  *
  * Mirrors FlodJS FCPlayer.process exactly:
  *   periodIdx = (frqTranspose_unsigned + fcNote + seqTranspose) & 0x7F
- *   xmNote    = periodIdx + 37 (FT2 convention, +24 octave shift)
+ *   xmNote    = periodIdx + 1 (FC index 0=sub-bass, index 12=856=C-1=XM13, index 24=428=C-2=XM25)
  *
- * Derivation (createSamplerInstrument uses baseNote:'C3' = XM note 37, sampleRate=8287 Hz):
- *   - FC period index 24 → period 428 → 8287 Hz → plays at natural rate → XM note 61
- *   - 61 - 24 = 37 → offset is +37
+ * Derivation (createSamplerInstrument uses baseNote:'C3'=XM37, sampleRate=8287 Hz):
+ *   - FC period index 12 → period 856 → Amiga C-1 = XM note 13 → formula: 12+1=13 ✓
+ *   - FC period index 36 → period 214 → Amiga C-3 = XM note 37 → formula: 36+1=37 ✓
+ *   - Playback rate check: 8287 * 2^((13-37)/12) = 8287/16 ≈ 2072 Hz = 3546895/(856*2) ✓
  *
  * frqTranspose MUST be the raw unsigned byte value (0-255) from the freq macro,
  * NOT sign-extended. In FlodJS all bytes are read unsigned, so the & 0x7F wrap
  * handles the full range including "negative" offsets stored as 0x80-0xFF.
  */
 function fcPeriodIdxToXM(periodIdx: number): number {
-  return Math.max(1, Math.min(96, (periodIdx & 0x7F) + 37));
+  return Math.max(1, Math.min(96, (periodIdx & 0x7F) + 1));
 }
 
 // ── FC Period Table (from FlodJS FCPlayer) ────────────────────────────────
