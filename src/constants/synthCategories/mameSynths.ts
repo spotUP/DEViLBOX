@@ -352,4 +352,13 @@ export const mameSynthEntries: Record<string, SynthInfo> = {
     icon: 'Cpu',
     color: 'text-red-400',
   },
+  MAMEMultiPCM: {
+    type: 'MAMEMultiPCM',
+    name: 'MultiPCM',
+    shortName: 'YMW258-F',
+    description: 'Yamaha YMW258-F MultiPCM 28-channel PCM chip (Sega Model 1/2 arcade)',
+    bestFor: ['Sega arcade', 'PCM', 'Model 1', 'Model 2'],
+    icon: 'Cpu',
+    color: 'text-yellow-400',
+  },
 };
