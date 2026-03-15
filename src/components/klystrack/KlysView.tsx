@@ -14,7 +14,7 @@
 import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react';
 import { useTrackerStore , useFormatStore } from '@stores';
 import { useTransportStore } from '@stores/useTransportStore';
-import { GenericFormatView } from '@/components/shared/GenericFormatView';
+import { FormatEditorGL } from '@/components/shared/FormatEditorGL';
 import { KlysPositionEditor } from './KlysPositionEditor';
 import { KlysInstrumentEditor } from './KlysInstrumentEditor';
 import { klysToFormatChannels, KLYS_COLUMNS } from './klysAdapter';
@@ -290,33 +290,84 @@ export const KlysView: React.FC<{ width?: number; height?: number }> = ({ width:
   return (
     <div
       ref={containerRef}
-      className="flex flex-col flex-1 min-h-0 bg-dark-bgPrimary text-ft2-text font-mono"
-      style={propW ? { width, height } : undefined}
+      style={{
+        display: 'flex', flexDirection: 'column',
+        width: propW ? width : '100%',
+        height: propH ? height : '100%',
+        backgroundColor: '#0d0d0d',
+        fontFamily: '"JetBrains Mono", "Fira Code", monospace',
+        fontSize: '12px',
+        color: 'var(--color-text-secondary)',
+      }}
     >
-      <GenericFormatView
-        formatLabel="KT"
-        toolbarInfo={toolbarInfo}
-        isPlaying={isPlaying}
-        onPlay={handlePlay}
-        onStop={handleStop}
-        toolbarSlot={toolbarSlot}
-        positionEditor={
-          <KlysPositionEditor
-            width={width}
-            height={POSITION_H}
-            nativeData={nativeData}
-            currentPosition={activePosition}
-            onPositionChange={handlePositionChange}
+      {/* Toolbar */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: '12px',
+        height: '36px', padding: '0 12px',
+        borderBottom: '1px solid var(--color-border)',
+        backgroundColor: 'var(--color-bg-tertiary)',
+        flexShrink: 0,
+      }}>
+        <div style={{ fontWeight: 'bold', minWidth: '40px' }}>KT</div>
+        <div style={{ flex: 1, fontSize: '11px', color: 'var(--color-text-muted)' }}>{toolbarInfo}</div>
+        <button
+          onClick={isPlaying ? handleStop : handlePlay}
+          style={{
+            padding: '4px 12px',
+            backgroundColor: isPlaying ? '#e95545' : '#4a7c4e',
+            color: 'var(--color-text)',
+            border: 'none',
+            borderRadius: '2px',
+            cursor: 'pointer',
+            fontSize: '11px',
+            fontWeight: 'bold',
+          }}
+        >
+          {isPlaying ? 'Stop' : 'Play'}
+        </button>
+        {toolbarSlot}
+      </div>
+
+      {/* Position Editor */}
+      <div style={{
+        height: `${POSITION_H}px`,
+        borderBottom: '1px solid var(--color-border)',
+        overflow: 'auto',
+        backgroundColor: 'var(--color-bg-secondary)',
+        flexShrink: 0,
+      }}>
+        <KlysPositionEditor
+          width={width}
+          height={POSITION_H}
+          nativeData={nativeData}
+          currentPosition={activePosition}
+          onPositionChange={handlePositionChange}
+        />
+      </div>
+
+      {/* Main content: pattern + side panel */}
+      <div style={{ flex: 1, minHeight: 0, display: 'flex', overflow: 'hidden' }}>
+        <div style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
+          <FormatEditorGL
+            columns={KLYS_COLUMNS}
+            channels={channels}
+            currentRow={currentRow}
+            isPlaying={isPlaying}
+            onCellChange={handleCellChange}
           />
-        }
-        positionEditorHeight={POSITION_H}
-        columns={KLYS_COLUMNS}
-        channels={channels}
-        currentRow={currentRow}
-        onCellChange={handleCellChange}
-        sidePanel={sidePanelContent}
-        sidePanelWidth={280}
-      />
+        </div>
+        {sidePanelContent && (
+          <div style={{
+            width: '280px',
+            borderLeft: '1px solid var(--color-border)',
+            overflow: 'auto',
+            backgroundColor: 'var(--color-bg-secondary)',
+            flexShrink: 0,
+          }}>
+            {sidePanelContent}
+          </div>
+        )}
+      </div>
     </div>
   );
 };
