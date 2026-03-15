@@ -147,7 +147,6 @@ export const PixiExportDialog: React.FC<PixiExportDialogProps> = ({ isOpen, onCl
   const [exportMode, setExportMode] = useState<ExportMode>('song');
   const [options, setOptions] = useState<ExportOptions>({
     includeAutomation: true,
-    compress: false,
     prettify: true,
   });
   const [sfxName] = useState('MySound');
@@ -1184,11 +1183,6 @@ export const PixiExportDialog: React.FC<PixiExportDialogProps> = ({ isOpen, onCl
                   checked={options.prettify ?? true}
                   onChange={(v) => setOptions({ ...options, prettify: v })}
                 />
-              </layoutContainer>
-
-              <layoutContainer layout={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: CONTENT_W - 24 }}>
-                <PixiLabel text="Compress (coming soon)" size="xs" color="textMuted" />
-                <PixiCheckbox checked={false} onChange={() => {}} disabled />
               </layoutContainer>
             </layoutContainer>
           </>

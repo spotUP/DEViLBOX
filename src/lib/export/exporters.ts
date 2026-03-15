@@ -41,7 +41,6 @@ export interface InstrumentExport {
 
 export interface ExportOptions {
   includeAutomation?: boolean;
-  compress?: boolean;
   prettify?: boolean;
 }
 

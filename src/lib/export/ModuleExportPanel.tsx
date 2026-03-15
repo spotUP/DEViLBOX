@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { useTrackerStore, useInstrumentStore, useProjectStore, notify } from '@stores';
+import { useTrackerStore, useInstrumentStore, useProjectStore, useTransportStore, notify } from '@stores';
 import { exportAsXM, type XMExportOptions } from './XMExporter';
-import { exportAsMOD, type MODExportOptions } from './MODExporter';
+import { exportSongToMOD } from './modExport';
 import { exportWithOpenMPT, type OpenMPTExportOptions } from './OpenMPTExporter';
 
 interface ModuleExportPanelProps {
@@ -15,12 +15,12 @@ export const ModuleExportPanel: React.FC<ModuleExportPanelProps> = ({
   exportMode,
   onClose,
 }) => {
-  const { patterns } = useTrackerStore();
+  const { patterns, patternOrder } = useTrackerStore();
   const { instruments } = useInstrumentStore();
   const { metadata } = useProjectStore();
+  const { bpm, speed } = useTransportStore();
 
   const [xmChannelCount, setXmChannelCount] = useState(8);
-  const [modChannelCount, setModChannelCount] = useState<4 | 6 | 8>(4);
   const [bakeSynthsToSamples, setBakeSynthsToSamples] = useState(true);
   const [exportWarnings, setExportWarnings] = useState<string[]>([]);
 
@@ -86,16 +86,24 @@ export const ModuleExportPanel: React.FC<ModuleExportPanelProps> = ({
         onClose();
       }
     } else {
-      const modOptions: MODExportOptions = {
-        channelCount: modChannelCount,
-        moduleName: metadata.name || 'DEViLBOX Export',
-        bakeSynthsToSamples,
+      const nChannels = patterns[0]?.channels.length ?? 4;
+      const song = {
+        name: metadata.name || 'DEViLBOX Export',
+        format: 'MOD' as const,
+        patterns,
+        instruments,
+        songPositions: patternOrder,
+        songLength: patternOrder.length,
+        restartPosition: 0,
+        numChannels: nChannels,
+        initialBPM: bpm,
+        initialSpeed: speed,
       };
 
-      const result = await exportAsMOD(patterns, instruments, modOptions);
+      const result = await exportSongToMOD(song, { bakeSynths: bakeSynthsToSamples });
 
       // Download the file
-      const url = URL.createObjectURL(result.data);
+      const url = URL.createObjectURL(result.blob);
       const a = document.createElement('a');
       a.href = url;
       a.download = result.filename;
@@ -182,51 +190,6 @@ export const ModuleExportPanel: React.FC<ModuleExportPanelProps> = ({
             ProTracker MOD Export (.mod)
           </h3>
           <div className="space-y-3">
-            {/* Channel Count */}
-            <div>
-              <label className="block text-xs font-mono text-text-muted mb-1">
-                MOD Format
-              </label>
-              <div className="grid grid-cols-3 gap-2">
-                <button
-                  onClick={() => setModChannelCount(4)}
-                  className={`
-                    px-3 py-2 rounded-lg text-xs font-mono transition-all
-                    ${modChannelCount === 4
-                      ? 'bg-accent-secondary text-text-inverse'
-                      : 'bg-dark-bg text-text-secondary hover:bg-dark-bgHover border border-dark-border'
-                    }
-                  `}
-                >
-                  4 Channel (M.K.)
-                </button>
-                <button
-                  onClick={() => setModChannelCount(6)}
-                  className={`
-                    px-3 py-2 rounded-lg text-xs font-mono transition-all
-                    ${modChannelCount === 6
-                      ? 'bg-accent-secondary text-text-inverse'
-                      : 'bg-dark-bg text-text-secondary hover:bg-dark-bgHover border border-dark-border'
-                    }
-                  `}
-                >
-                  6 Channel (6CHN)
-                </button>
-                <button
-                  onClick={() => setModChannelCount(8)}
-                  className={`
-                    px-3 py-2 rounded-lg text-xs font-mono transition-all
-                    ${modChannelCount === 8
-                      ? 'bg-accent-secondary text-text-inverse'
-                      : 'bg-dark-bg text-text-secondary hover:bg-dark-bgHover border border-dark-border'
-                    }
-                  `}
-                >
-                  8 Channel (8CHN)
-                </button>
-              </div>
-            </div>
-
             {/* Synth instrument handling */}
             <label className="flex items-center gap-3 text-sm font-mono text-text-primary cursor-pointer hover:text-accent-primary transition-colors">
               <input
@@ -235,15 +198,15 @@ export const ModuleExportPanel: React.FC<ModuleExportPanelProps> = ({
                 onChange={(e) => setBakeSynthsToSamples(e.target.checked)}
                 className="w-4 h-4 rounded border-dark-border bg-dark-bg text-accent-primary focus:ring-accent-primary"
               />
-              Include synth instrument slots (audio will be silent)
+              Bake synth instruments to PCM samples
             </label>
 
             <div className="text-sm font-mono text-text-secondary space-y-1">
               <div>Format: <span className="text-accent-primary">ProTracker MOD</span></div>
+              <div>Channels: <span className="text-accent-primary">{patterns[0]?.channels.length ?? 4}</span></div>
               <div>Patterns: <span className="text-accent-primary">{patterns.length}</span></div>
               <div>Max Samples: <span className="text-accent-primary">31</span></div>
-              <div>Max Rows/Pattern: <span className="text-accent-primary">64</span></div>
-              <div>Note Range: <span className="text-accent-primary">C-0 to B-3</span></div>
+              <div>Note Range: <span className="text-accent-primary">C-1 to B-6</span></div>
             </div>
 
             {/* Warnings display */}
