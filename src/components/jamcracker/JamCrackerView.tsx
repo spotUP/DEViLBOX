@@ -13,11 +13,12 @@
 
 import React, { useRef, useEffect, useCallback } from 'react';
 import { useTransportStore } from '@stores/useTransportStore';
-import { GenericFormatView } from '@/components/shared/GenericFormatView';
+import { FormatEditorGL } from '@/components/shared/FormatEditorGL';
 import { JAMCRACKER_COLUMNS } from './jamcrackerAdapter';
 import { JamCrackerEngine } from '@engine/jamcracker/JamCrackerEngine';
 import { useJamCrackerData } from '@/hooks/useJamCrackerData';
 
+const TOOLBAR_H = 36;
 const ORDER_H = 120;
 
 export const JamCrackerView: React.FC = () => {
@@ -109,17 +110,46 @@ export const JamCrackerView: React.FC = () => {
   );
 
   return (
-    <GenericFormatView
-      formatLabel="JAM"
-      toolbarInfo={toolbarInfo}
-      isPlaying={isPlaying}
-      toolbarSlot={toolbarSlot}
-      positionEditor={positionEditor}
-      positionEditorHeight={ORDER_H}
-      columns={JAMCRACKER_COLUMNS}
-      channels={channels}
-      currentRow={currentRow}
-      onCellChange={handleCellChange}
-    />
+    <div style={{
+      display: 'flex', flexDirection: 'column',
+      width: '100%', height: '100%',
+      backgroundColor: '#0d0d0d',
+      fontFamily: '"JetBrains Mono", "Fira Code", monospace',
+      fontSize: '12px',
+      color: 'var(--color-text-secondary)',
+    }}>
+      {/* Toolbar */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: '12px',
+        height: `${TOOLBAR_H}px`, padding: '0 12px',
+        borderBottom: '1px solid var(--color-border)',
+        backgroundColor: 'var(--color-bg-tertiary)',
+      }}>
+        <div style={{ fontWeight: 'bold', minWidth: '40px' }}>JAM</div>
+        <div style={{ flex: 1, fontSize: '11px', color: 'var(--color-text-muted)' }}>{toolbarInfo}</div>
+        {toolbarSlot}
+      </div>
+
+      {/* Song Order */}
+      <div style={{
+        height: `${ORDER_H}px`,
+        borderBottom: '1px solid var(--color-border)',
+        overflow: 'auto',
+        backgroundColor: 'var(--color-bg-secondary)',
+      }}>
+        {positionEditor}
+      </div>
+
+      {/* Pattern Editor */}
+      <div style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
+        <FormatEditorGL
+          columns={JAMCRACKER_COLUMNS}
+          channels={channels}
+          currentRow={currentRow}
+          isPlaying={isPlaying}
+          onCellChange={handleCellChange}
+        />
+      </div>
+    </div>
   );
 };
