@@ -16,7 +16,7 @@ import { useTrackerStore, useFormatStore } from '@stores';
 import { useTransportStore } from '@stores/useTransportStore';
 import { getTrackerReplayer } from '@engine/TrackerReplayer';
 import { exportAsHively } from '@lib/export/HivelyExporter';
-import { FormatEditorGL } from '@/components/shared/FormatEditorGL';
+import { PatternEditorCanvas } from '@/components/tracker/PatternEditorCanvas';
 import { HIVELY_COLUMNS, hivelyToFormatChannels } from './hivelyAdapter';
 import { HivelyPositionEditor } from './HivelyPositionEditor';
 
@@ -141,11 +141,11 @@ export const HivelyView: React.FC<{ width?: number; height?: number }> = () => {
 
       {/* Pattern Editor */}
       <div style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
-        <FormatEditorGL
-          columns={HIVELY_COLUMNS}
-          channels={channels}
-          currentRow={currentRow}
-          isPlaying={isPlaying}
+        <PatternEditorCanvas
+          formatColumns={HIVELY_COLUMNS}
+          formatChannels={channels}
+          formatCurrentRow={currentRow}
+          formatIsPlaying={isPlaying}
         />
       </div>
     </div>
