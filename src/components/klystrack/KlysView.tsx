@@ -14,7 +14,7 @@
 import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react';
 import { useTrackerStore , useFormatStore } from '@stores';
 import { useTransportStore } from '@stores/useTransportStore';
-import { FormatEditorGL } from '@/components/shared/FormatEditorGL';
+import { PatternEditorCanvas } from '@/components/tracker/PatternEditorCanvas';
 import { KlysPositionEditor } from './KlysPositionEditor';
 import { KlysInstrumentEditor } from './KlysInstrumentEditor';
 import { klysToFormatChannels, KLYS_COLUMNS } from './klysAdapter';
@@ -348,12 +348,12 @@ export const KlysView: React.FC<{ width?: number; height?: number }> = ({ width:
       {/* Main content: pattern + side panel */}
       <div style={{ flex: 1, minHeight: 0, display: 'flex', overflow: 'hidden' }}>
         <div style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
-          <FormatEditorGL
-            columns={KLYS_COLUMNS}
-            channels={channels}
-            currentRow={currentRow}
-            isPlaying={isPlaying}
-            onCellChange={handleCellChange}
+          <PatternEditorCanvas
+            formatColumns={KLYS_COLUMNS}
+            formatChannels={channels}
+            formatCurrentRow={currentRow}
+            formatIsPlaying={isPlaying}
+            onFormatCellChange={handleCellChange}
           />
         </div>
         {sidePanelContent && (
