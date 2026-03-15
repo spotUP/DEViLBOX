@@ -104,11 +104,21 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   const isFormatModeRef     = useRef(isFormatMode);
   const formatCurrentRowRef = useRef(formatCurrentRow ?? 0);
   const formatIsPlayingRef  = useRef(formatIsPlaying ?? false);
+  // Tracks last formatChannels identity sent to worker — RAF compares this to detect changes.
+  const formatChannelsSentRef = useRef<FormatChannel[] | undefined>(undefined);
+  // Pre-computed format pattern snapshot — updated every render so RAF always has fresh data
+  // (avoids stale closure problem: the RAF effect only re-runs on dimensions.height change)
+  const formatChannelsRef     = useRef<FormatChannel[] | undefined>(undefined);
+  const formatPatternSnapshotRef = useRef<PatternSnapshot[]>([]);
 
   // Keep refs in sync with props on every render
   isFormatModeRef.current     = isFormatMode;
   formatCurrentRowRef.current = formatCurrentRow ?? 0;
   formatIsPlayingRef.current  = formatIsPlaying ?? false;
+  formatChannelsRef.current   = formatChannels;
+  if (isFormatMode && formatColumns && formatChannels) {
+    formatPatternSnapshotRef.current = [formatChannelsToSnapshot(formatChannels, formatColumns)];
+  }
   // Mutable ref — set imperatively in useEffect to avoid StrictMode double-transferControlToOffscreen
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -1544,13 +1554,42 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     const tick = () => {
       // FORMAT MODE: use format engine's playback state (skip all tracker store reads)
       if (isFormatModeRef.current) {
-        bridgeRef.current?.post({
-          type: 'playback',
-          row: formatCurrentRowRef.current,
-          smoothOffset: 0,
-          patternIndex: 0,
-          isPlaying: formatIsPlayingRef.current,
-        });
+        const newRow     = formatCurrentRowRef.current;
+        const newPlaying = formatIsPlayingRef.current;
+        const bridge     = bridgeRef.current;
+
+        if (bridge) {
+          // FIX: If formatChannels changed since last send, post 'patterns' FIRST so
+          // the worker always has correct data before receiving the new playback row.
+          // (useEffect posts 'patterns' after paint; RAF fires before paint — wrong order.)
+          // Use refs (not closure values) so we always compare against the current render.
+          const currentChannels = formatChannelsRef.current;
+          if (currentChannels !== formatChannelsSentRef.current) {
+            formatChannelsSentRef.current = currentChannels;
+            bridge.post({
+              type: 'patterns',
+              patterns: formatPatternSnapshotRef.current,
+              currentPatternIndex: 0,
+            });
+            bridge.post({ type: 'channelLayout', channelLayout: snapshotLayout() });
+            // Force a playback send on channel change to update worker position
+            prevRow = -1;
+          }
+
+          // PERF: Dedup — only post when row or playing state actually changes
+          if (newRow !== prevRow || newPlaying !== prevPlaying) {
+            prevRow     = newRow;
+            prevPlaying = newPlaying;
+            bridge.post({
+              type: 'playback',
+              row: newRow,
+              smoothOffset: 0,
+              patternIndex: 0,
+              isPlaying: newPlaying,
+            });
+          }
+        }
+
         rafId = requestAnimationFrame(tick);
         return;
       }
