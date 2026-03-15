@@ -140,15 +140,22 @@ export const JamCrackerView: React.FC = () => {
         {positionEditor}
       </div>
 
-      {/* Pattern Editor */}
+      {/* Pattern Editor — only mount once pattern data is loaded so the worker
+           initialises with valid channel/cell data (not an empty snapshot) */}
       <div style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
-        <PatternEditorCanvas
-          formatColumns={JAMCRACKER_COLUMNS}
-          formatChannels={channels}
-          formatCurrentRow={currentRow}
-          formatIsPlaying={isPlaying}
-          onFormatCellChange={handleCellChange}
-        />
+        {channels.length > 0 ? (
+          <PatternEditorCanvas
+            formatColumns={JAMCRACKER_COLUMNS}
+            formatChannels={channels}
+            formatCurrentRow={currentRow}
+            formatIsPlaying={isPlaying}
+            onFormatCellChange={handleCellChange}
+          />
+        ) : (
+          <div className="flex items-center justify-center h-full text-text-secondary text-sm font-mono">
+            Loading pattern data…
+          </div>
+        )}
       </div>
     </div>
   );
