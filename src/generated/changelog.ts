@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-03-14T18:43:33.875Z
+ * Generated: 2026-03-15T10:07:48.061Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,10 +19,10 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.2853';
-export const BUILD_NUMBER = '2853';
-export const BUILD_HASH = 'c261c3b90';
-export const BUILD_DATE = '2026-03-14';
+export const BUILD_VERSION = '1.0.2883';
+export const BUILD_NUMBER = '2883';
+export const BUILD_HASH = 'c1f54de35';
+export const BUILD_DATE = '2026-03-15';
 
 // Full version (patch IS the build number, so no need to append)
 export const FULL_VERSION = BUILD_VERSION;
@@ -30,9 +30,127 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.2853',
+    version: '1.0.2883',
+    date: '2026-03-15',
+    changes: [
+      {
+        type: 'fix',
+        "description": "Fix Medley (.ml/.mso), injectUADE logic, MAMEMultiPCM missing entry"
+      },
+      {
+        type: 'fix',
+        "description": "Add native tests for DSS/SCR/DSR/DODA; fix missing injectUADE on pvp/dsr"
+      },
+      {
+        type: 'feature',
+        "description": "Add native detection tests for WallyBeben, SteveBarrett, PaulSummers, DaveLoweNew"
+      },
+      {
+        type: 'improvement',
+        "description": "Convert daveLowe and magneticFieldsPacker to withNativeThenUADE"
+      },
+      {
+        type: 'improvement',
+        "description": "Convert adpcmMono/robHubbard to withNativeThenUADE; remove duplicate smus/snx/tiny block"
+      },
+      {
+        type: 'improvement',
+        "description": "Convert 9 more format routing blocks to withNativeThenUADE"
+      },
+      {
+        type: 'feature',
+        "description": "Add SoundMon/MusicMaker native parser tests; convert mm4/mm8 to withNativeThenUADE"
+      },
+      {
+        type: 'improvement',
+        "description": "Convert 5 inline native-parser blocks to withNativeThenUADE with injectUADE"
+      },
+      {
+        type: 'fix',
+        "description": "Fix injectUADE: bypass 0-notes check for stub parsers; add injectUADE to 6 formats"
+      },
+      {
+        type: 'fix',
+        "description": "Fix format parser tests: correct wrong parsers for .ntp, .rho, .psa, .sg files"
+      }
+    ]
+  },
+  {
+    version: '2026-03-14',
     date: '2026-03-14',
     changes: [
+      {
+        type: 'fix',
+        "description": "Fix .digi routing: fall back to OpenMPT for old DigiBooster 1.x text-header format"
+      },
+      {
+        type: 'feature',
+        "description": "Furnace WASM stub: implement DivSample::render() for BRR encoding (SNES)"
+      },
+      {
+        type: 'improvement',
+        "description": "Furnace WASM: call render() on all PCM samples before renderSamples(); SoundFactory: enable native+UADE injection"
+      },
+      {
+        type: 'fix',
+        "description": "DeltaMusic1: simplify synth instrument to first-segment snapshot; withFallback: add injectUADE option; Furnace: fix BRR/ADPCM sample depth byte counts"
+      },
+      {
+        type: 'feature',
+        "description": "Add MED magic-based routing; cover med.sadman and ballade.ems in tests"
+      },
+      {
+        type: 'improvement',
+        "description": "Update format status dashboard"
+      },
+      {
+        type: 'improvement',
+        "description": "DeltaMusic1: pre-render full sound table sequence for synth instruments"
+      },
+      {
+        type: 'fix',
+        "description": "Remove MAMEMultiPCM synth; fix ZSG-2 ROM config size"
+      },
+      {
+        type: 'fix',
+        "description": "Remove unused uadePatternLayout from parsers; misc synth fixes"
+      },
+      {
+        type: 'fix',
+        "description": "Add .hip routing to JochenHippelSTParser; fix PC-relative LEA off-by-2"
+      },
+      {
+        type: 'improvement',
+        "description": "Update generated changelog"
+      },
+      {
+        type: 'feature',
+        "description": "Add 10 vintage drum machine themes: TR-606 through Sequential Tom"
+      },
+      {
+        type: 'improvement',
+        "description": "Furnace: notify dispatch on wavetable change for PCE/Namco platforms"
+      },
+      {
+        type: 'fix',
+        "description": "Gearmulator: auto-load ROMs from disk, fix synthType routing and Tone.js context"
+      },
+      {
+        type: 'feature',
+        "description": "Add GlueMon and DavidHanney native format parsers"
+      },
+      {
+        type: 'improvement',
+        "description": "Auto-switch to tracker view when loading custom-editor formats"
+      },
+      {
+        type: 'improvement',
+        "description": "Refactor MAME PCM/wavetable chip hardware UI to pure React"
+      },
+      {
+        type: 'fix',
+        "description": "Fix Symphonie Pro instrument names showing full Amiga paths"
+      },
       {
         type: 'feature',
         "description": "Add Wurlitzer Side Man (1959) theme — warm wood/amber 50s hi-fi palette"
@@ -44,10 +162,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'feature',
         "description": "Add 9 MAME PCM/sampler chip synths with hardware UIs and presets"
-      },
-      {
-        type: 'fix',
-        "description": "Fix silent audio in FZ/PS1SPU/MultiPCM/ZSG2/KS0164/SWP00/SWP20/RolandGP/CMI worklets: use m.wasmMemory instead of m.memory for heap access"
       },
       {
         type: 'feature',
@@ -64,10 +178,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'feature',
         "description": "Add CHIP_SYNTH_DEFS for new MAME PCM synths (CMI, FZ, PS1, MultiPCM, ZSG2, KS0164, SWP00/20, RolandGP)"
-      },
-      {
-        type: 'improvement',
-        "description": "Update generated changelog"
       },
       {
         type: 'feature',
@@ -112,126 +222,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         "description": "Fix Symphonie DSP effect display: reorder type chars E/C swap"
-      },
-      {
-        type: 'feature',
-        "description": "GL UI: add accent color swatches to theme dropdown"
-      },
-      {
-        type: 'feature',
-        "description": "GL UI: add 31 visualizer modes via DOM overlay + NavBar auth/MIDI dropdowns"
-      },
-      {
-        type: 'fix',
-        "description": "GL UI: fix remaining gaps — theme dropdown + 5 new visualizer modes"
-      },
-      {
-        type: 'fix',
-        "description": "Symphonie WASM: rebuild with playback fixes"
-      },
-      {
-        type: 'fix',
-        "description": "VFXSynth: fix ES5506 register map and rendering pipeline"
-      },
-      {
-        type: 'improvement',
-        "description": "Format routing: route sfx/dsym/gt2 through OpenMPT; switch MAMEDOC to ES5503Synth"
-      },
-      {
-        type: 'improvement',
-        "description": "OpenMPT Soundlib: MIDI macro API + DSP echo export + WASM rebuild"
-      },
-      {
-        type: 'improvement',
-        "description": "Symphonie Pro: DSP echo display + route audio through libopenmpt"
-      },
-      {
-        type: 'feature',
-        "description": "GL UI: implement tracker interface gaps"
-      },
-      {
-        type: 'improvement',
-        "description": "Update changelog"
-      },
-      {
-        type: 'feature',
-        "description": "MCP: add run_synth_tests tool, auto-reconnect, 15min timeout, MAME batch testing"
-      },
-      {
-        type: 'fix',
-        "description": "Fix MAME chip synths: ES5503 wavetable, RF5C400 pan/freq, VFX rendering"
-      },
-      {
-        type: 'fix',
-        "description": "Fix Symphonie Pro: CMD_REPLAY_FROM playback, instrument column noise"
-      },
-      {
-        type: 'fix',
-        "description": "UADE engine: pass subsong on load, expand skipScan formats, fix looping"
-      },
-      {
-        type: 'fix',
-        "description": "Fix Steve Turner parser: timing, effects, subsong metadata"
-      },
-      {
-        type: 'feature',
-        "description": "Add UADE subsong selector for native-parsed formats (Steve Turner etc.)"
-      },
-      {
-        type: 'fix',
-        "description": "Fix GL UI BindingErrors: remove StrictMode, eliminate hover-state re-renders"
-      },
-      {
-        type: 'improvement',
-        "description": "Synth tester: skip C64SID — InstrumentFactory returns null intentionally"
-      },
-      {
-        type: 'improvement',
-        "description": "UADE: propagate skipScan to UADESynth for looping 68k replayer formats"
-      },
-      {
-        type: 'improvement',
-        "description": "Tools + changelog: format status updates, furnace audit tools, changelog"
-      },
-      {
-        type: 'fix',
-        "description": "UI tweaks: theme fixes, import dialog loading text, CSS border fix"
-      },
-      {
-        type: 'feature',
-        "description": "Synth tester: add testMAMESynths(), skip Buzzmachine effects processor"
-      },
-      {
-        type: 'fix',
-        "description": "Tone.js: GranularSynth stop fix, PluckSynth race fix, BitCrusher wet fix"
-      },
-      {
-        type: 'fix',
-        "description": "Furnace: FurnaceDispatch output tap fix, platform chip updates, WASM rebuild"
-      },
-      {
-        type: 'improvement',
-        "description": "Format parsers: Steve Turner native decode, Amiga routing refactor"
-      },
-      {
-        type: 'improvement',
-        "description": "Update UADE audit tools: improved comparison metrics and rendering"
-      },
-      {
-        type: 'improvement',
-        "description": "UADE: skipScan for looping formats, mute mask support, WASM rebuild"
-      },
-      {
-        type: 'fix',
-        "description": "Fix V2 synth: connect worklet before init message, fix default channel volume"
-      },
-      {
-        type: 'improvement',
-        "description": "Refactor settings modal: transparent overlay, improved tab navigation"
-      },
-      {
-        type: 'fix',
-        "description": "Fix PixiJS rendering: anchor rects, channel header clip mask, layer ordering"
       }
     ]
   }

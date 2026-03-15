@@ -34,6 +34,7 @@ export class LibopenmptEngine {
   private _playing = false;
   private _onPosition: LibopenmptPositionCallback | null = null;
   private _onEnded: (() => void) | null = null;
+  private _durationSeconds: number = 0;
 
   /** The raw Web Audio output node for routing into the stereo separation chain */
   public output!: GainNode;
@@ -131,6 +132,11 @@ export class LibopenmptEngine {
           } catch { /* ToneEngine not ready */ }
         }
         break;
+      case 'meta':
+        if (msg.data.meta?.dur > 0) {
+          this._durationSeconds = msg.data.meta.dur;
+        }
+        break;
       case 'end':
         this._playing = false;
         this._onEnded?.();
@@ -150,6 +156,11 @@ export class LibopenmptEngine {
   /** Set callback for song end. */
   set onEnded(cb: (() => void) | null) {
     this._onEnded = cb;
+  }
+
+  /** Duration of the loaded module in seconds (0 if unknown). */
+  getDurationSeconds(): number {
+    return this._durationSeconds;
   }
 
   /** Load a module file (raw binary) into the worklet. */

@@ -297,7 +297,7 @@ const POST_AMP: Record<number, number> = {
   5: 1.5,   // DIV_SYSTEM_SMS_OPLL (compound)
   83: 1.5,  // DIV_SYSTEM_T6W28 (SMS derivative)
   // OPLL family — 1.5
-  29: 1.5,  // DIV_SYSTEM_OPLL
+  28: 1.5,  // DIV_SYSTEM_OPLL
   48: 1.5,  // DIV_SYSTEM_VRC7
   59: 1.5,  // DIV_SYSTEM_OPLL_DRUMS
   // NES — 2.0
@@ -312,9 +312,9 @@ const POST_AMP: Record<number, number> = {
   81: 2.0,  // DIV_SYSTEM_YM2612_DUALPCM_EXT
   89: 2.0,  // DIV_SYSTEM_YM2612_CSM
   // POKEY — 2.0
-  42: 2.0,  // DIV_SYSTEM_POKEY
+  41: 2.0,  // DIV_SYSTEM_POKEY
   // FDS — 2.0 (useNP default)
-  30: 2.0,  // DIV_SYSTEM_FDS
+  29: 2.0,  // DIV_SYSTEM_FDS
   // C64 — 3.0 (reSIDfp core)
   11: 3.0,  // DIV_SYSTEM_C64_6581
   12: 3.0,  // DIV_SYSTEM_C64_8580
@@ -330,7 +330,7 @@ const POST_AMP: Record<number, number> = {
   // VSU / Virtual Boy — 6.0
   47: 6.0,  // DIV_SYSTEM_VBOY
   // MMC5 — 64.0
-  31: 64.0, // DIV_SYSTEM_MMC5
+  30: 64.0, // DIV_SYSTEM_MMC5
   // TIA — 0.5
   21: 0.5,  // DIV_SYSTEM_TIA
 };
