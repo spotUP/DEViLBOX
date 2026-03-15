@@ -111,6 +111,9 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   // Accumulator for horizontal scroll resistance
   const scrollAccumulatorRef = useRef(0);
 
+  // Set to true if worker reports WebGL2 is unsupported
+  const [webglUnsupported, setWebglUnsupported] = useState(false);
+
   // Bridge to the OffscreenCanvas worker
   const bridgeRef = useRef<TrackerOffscreenBridge | null>(null);
   // Ref-tracked scroll for immediate worker updates (avoids React re-renders on scroll)
@@ -1152,8 +1155,11 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
         // Worker is ready — send layout so it can start rendering
         bridge.post({ type: 'channelLayout', channelLayout: snapshotLayout() });
       },
-      onMessage: () => {
-        // Future: handle click replies from worker (currently hit-tested on main thread)
+      onMessage: (msg) => {
+        if (msg.type === 'webgl-unsupported') {
+          clearTimeout(readyTimeoutId);
+          setWebglUnsupported(true);
+        }
       },
       onError: (err) => {
         clearTimeout(readyTimeoutId);
@@ -1607,6 +1613,15 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     setScrollLeft(left);
     if (headerScrollRef.current) headerScrollRef.current.scrollLeft = left;
   }, []);
+
+  if (webglUnsupported) {
+    return (
+      <div className="flex-1 flex items-center justify-center flex-col gap-2 text-text-muted">
+        <span className="text-xs font-mono">WebGL2 not supported in this browser.</span>
+        <span className="text-[10px] text-text-muted/60">Pattern editor requires OffscreenCanvas WebGL2.</span>
+      </div>
+    );
+  }
 
   if (!pattern) {
     return (

@@ -80,8 +80,8 @@ self.onmessage = (e: MessageEvent<TrackerWorkerMsg>) => {
         renderer = new TrackerGLRenderer(msg.canvas);
         renderer.resize(width, height, dpr);
       } catch (err) {
-        // WebGL2 not available — nothing we can do in a worker
         console.error('[TrackerWorker] WebGL2 init failed:', err);
+        (self as unknown as Worker).postMessage({ type: 'webgl-unsupported' } satisfies TrackerWorkerReply);
         return;
       }
 
