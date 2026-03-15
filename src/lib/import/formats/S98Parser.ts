@@ -476,8 +476,8 @@ function walkCommands(
       : null
   );
 
-  // Prevent infinite loops: limit iterations
-  const maxIterations = buf.length * 4;
+  // Prevent infinite loops: limit iterations (buf.length is a reasonable upper bound)
+  const maxIterations = Math.min(buf.length * 2, 500_000);
   let iterations = 0;
   let looped = false;
 
@@ -854,9 +854,12 @@ function eventsToPatterns(
   const rowDuration = 1 / 60; // seconds
   const ticksPerRow = Math.max(1, Math.round(rowDuration / tickInterval));
 
-  const maxTick = Math.max(...events.map(e => e.tick));
+  // Avoid call stack overflow on large event arrays; iterate manually
+  let maxTick = 0;
+  for (const e of events) { if (e.tick > maxTick) maxTick = e.tick; }
+  const MAX_PATTERNS = 256; // cap to avoid multi-second freezes on long files
   const totalRows = Math.max(ROWS_PER_PATTERN, Math.ceil(maxTick / ticksPerRow) + 1);
-  const numPatterns = Math.ceil(totalRows / ROWS_PER_PATTERN);
+  const numPatterns = Math.min(MAX_PATTERNS, Math.ceil(totalRows / ROWS_PER_PATTERN));
 
   const patterns: Pattern[] = [];
   for (let p = 0; p < numPatterns; p++) {

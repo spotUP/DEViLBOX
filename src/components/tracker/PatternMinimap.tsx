@@ -43,8 +43,8 @@ export const PatternMinimap: React.FC<PatternMinimapProps> = React.memo(({ heigh
     for (let row = 0; row < patternLength; row++) {
       let count = 0;
       for (let ch = 0; ch < pattern.channels.length; ch++) {
-        const cell = pattern.channels[ch].rows[row];
-        if (cell.note > 0 || cell.effTyp > 0 || cell.volume >= 0x10) {
+        const cell = pattern.channels[ch].rows[row] as typeof pattern.channels[0]['rows'][0] | undefined;
+        if (cell && (cell.note > 0 || cell.effTyp > 0 || cell.volume >= 0x10)) {
           count++;
         }
       }
