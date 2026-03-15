@@ -124,6 +124,9 @@ for (let i = 0; i < 256; i++) {
   DEC_TABLE[i] = i.toString(10).padStart(2, '0');
 }
 
+// Pre-compute single hex digit strings (0-F)
+const HEX1_TABLE: string[] = Array.from({ length: 16 }, (_, i) => i.toString(16).toUpperCase());
+
 // Pre-compute note strings for all 98 notes × range of display offsets (-24 to +24)
 const NOTE_CACHE = new Map<number, string[]>();
 function getNoteTable(displayOffset: number): string[] {
@@ -141,6 +144,8 @@ function getNoteTable(displayOffset: number): string[] {
   NOTE_CACHE.set(displayOffset, table);
   return table;
 }
+
+const COL_GAP = 4; // Gap between columns in data-driven mode
 
 // Effect type char lookup (0-35 → '0'-'9','A'-'Z')
 const EFFECT_CHARS: string[] = new Array(36);
@@ -680,102 +685,133 @@ export class TrackerGLRenderer {
           continue;
         }
 
-        // Note — use pre-computed note table
-        const cellNote = cell.note ?? 0;
-        if (!ui.blankEmpty || cellNote !== 0) {
-          const noteHas = cellNote > 0;
-          const nc = lerpWhiteRGBA(
-                   cellNote === 0 ? colors.textMuted
-                   : cellNote === 97 ? colors.textEffect
-                   : colors.textNote, noteHas ? glow : 0);
-          this.setTmpColor(nc, ghostAlpha);
-          this.addGlyphString(noteTable[cellNote] ?? '---', x, gy, atlas, this.tmpColor, noteHas && bold);
-        }
+        if (ui.columns && cell.params) {
+          // DATA-DRIVEN PATH — renders custom format columns
+          let px = x;
+          for (let ci = 0; ci < ui.columns.length; ci++) {
+            const col = ui.columns[ci];
+            const val = cell.params[ci] ?? col.emptyValue;
+            const isEmpty = val === col.emptyValue;
+            const baseColor: [number, number, number, number] = isEmpty ? col.emptyColor : col.color;
+            this.setTmpColor(lerpWhiteRGBA(baseColor, isEmpty ? 0 : glow), ghostAlpha);
 
-        // Parameters
-        let px = x + noteWidth + 4;
-
-        // Instrument — use HEX_TABLE lookup
-        const inst = cell.instrument ?? 0;
-        if (inst !== 0) {
-          this.setTmpColor(lerpWhiteRGBA(colors.textInstrument, glow), ghostAlpha);
-          this.addGlyphString(HEX_TABLE[inst & 0xFF], px, gy, atlas, this.tmpColor, bold);
-        } else if (!ui.blankEmpty) {
-          this.setTmpColor(lerpWhiteRGBA(colors.textMuted, 0), ghostAlpha);
-          this.addGlyphString('..', px, gy, atlas, this.tmpColor, false);
-        }
-        px += CHAR_WIDTH * 2 + 4;
-
-        // Volume — use HEX_TABLE lookup
-        const vol = cell.volume ?? 0;
-        const hasVol = vol >= 0x10 && vol <= 0x50;
-        if (hasVol) {
-          this.setTmpColor(lerpWhiteRGBA(colors.textVolume, glow), ghostAlpha);
-          this.addGlyphString(HEX_TABLE[vol & 0xFF], px, gy, atlas, this.tmpColor, bold);
-        } else if (!ui.blankEmpty) {
-          this.setTmpColor(lerpWhiteRGBA(colors.textMuted, 0), ghostAlpha);
-          this.addGlyphString('..', px, gy, atlas, this.tmpColor, false);
-        }
-        px += CHAR_WIDTH * 2 + 4;
-
-        // Effect columns (variable) — use EFFECT_CHARS and HEX_TABLE lookups
-        for (let ecol = 0; ecol < effectCols; ecol++) {
-          let colEffTyp = 0;
-          let colEff = 0;
-          if (ecol === 0) { colEffTyp = cell.effTyp ?? 0; colEff = cell.eff ?? 0; }
-          else if (ecol === 1) { colEffTyp = cell.effTyp2 ?? 0; colEff = cell.eff2 ?? 0; }
-          else if (ecol === 2) { colEffTyp = cell.effTyp3 ?? 0; colEff = cell.eff3 ?? 0; }
-          else if (ecol === 3) { colEffTyp = cell.effTyp4 ?? 0; colEff = cell.eff4 ?? 0; }
-          else if (ecol === 4) { colEffTyp = cell.effTyp5 ?? 0; colEff = cell.eff5 ?? 0; }
-
-          const hasEff = colEffTyp !== 0 || colEff !== 0;
-          if (hasEff) {
-            this.setTmpColor(lerpWhiteRGBA(colors.textEffect, glow), ghostAlpha);
-            // Symphonie DSP effects: effTyp 0x50-0x54 → type letter + value
-            let effStr: string;
-            if (colEffTyp >= 0x50 && colEffTyp <= 0x54) {
-              const DSP_CHARS = ['D', 'E', 'C', 'L', 'X'];
-              effStr = (DSP_CHARS[colEffTyp - 0x50] ?? 'D') + HEX_TABLE[colEff & 0xFF];
+            let str: string;
+            if (col.type === 'note') {
+              str = noteTable[val] ?? '---';
             } else {
-              effStr = (EFFECT_CHARS[colEffTyp] ?? '?') + HEX_TABLE[colEff & 0xFF];
+              switch (col.hexDigits) {
+                case 1:  str = HEX1_TABLE[val & 0xF]; break;
+                case 2:  str = HEX_TABLE[val & 0xFF]; break;
+                case 3:  str = (val & 0xFFF).toString(16).toUpperCase().padStart(3, '0'); break;
+                default: str = (val & 0xFFFF).toString(16).toUpperCase().padStart(4, '0'); break;
+              }
             }
-            this.addGlyphString(effStr, px, gy, atlas, this.tmpColor, bold);
+
+            if (!isEmpty || !ui.blankEmpty) {
+              this.addGlyphString(str, px, gy, atlas, this.tmpColor, !isEmpty && bold);
+            }
+            px += col.charWidth * CHAR_WIDTH + COL_GAP;
+          }
+        } else {
+          // EXISTING FIXED-COLUMN PATH (note/inst/vol/eff) — UNCHANGED
+
+          // Note — use pre-computed note table
+          const cellNote = cell.note ?? 0;
+          if (!ui.blankEmpty || cellNote !== 0) {
+            const noteHas = cellNote > 0;
+            const nc = lerpWhiteRGBA(
+                     cellNote === 0 ? colors.textMuted
+                     : cellNote === 97 ? colors.textEffect
+                     : colors.textNote, noteHas ? glow : 0);
+            this.setTmpColor(nc, ghostAlpha);
+            this.addGlyphString(noteTable[cellNote] ?? '---', x, gy, atlas, this.tmpColor, noteHas && bold);
+          }
+
+          // Parameters
+          let px = x + noteWidth + 4;
+
+          // Instrument — use HEX_TABLE lookup
+          const inst = cell.instrument ?? 0;
+          if (inst !== 0) {
+            this.setTmpColor(lerpWhiteRGBA(colors.textInstrument, glow), ghostAlpha);
+            this.addGlyphString(HEX_TABLE[inst & 0xFF], px, gy, atlas, this.tmpColor, bold);
           } else if (!ui.blankEmpty) {
             this.setTmpColor(lerpWhiteRGBA(colors.textMuted, 0), ghostAlpha);
-            this.addGlyphString('...', px, gy, atlas, this.tmpColor, false);
+            this.addGlyphString('..', px, gy, atlas, this.tmpColor, false);
           }
-          px += CHAR_WIDTH * 3 + 4;
-        }
+          px += CHAR_WIDTH * 2 + 4;
 
-        // Flag columns
-        const hasFlagCols = cell.flag1 !== undefined || cell.flag2 !== undefined;
-        if (hasFlagCols) {
-          const drawFlag = (flagVal: number | undefined, fx: number) => {
-            let flagStr = '.';
-            let fc: [number,number,number,number] = colors.textMuted;
-            if (flagVal === 1) { flagStr = 'A'; fc = colors.flagAccent; }
-            else if (flagVal === 2) { flagStr = 'S'; fc = colors.flagSlide; }
-            else if (flagVal === 3) { flagStr = 'M'; fc = colors.flagMute; }
-            else if (flagVal === 4) { flagStr = 'H'; fc = colors.flagHammer; }
-            if (flagVal || !ui.blankEmpty) {
-              this.setTmpColor(lerpWhiteRGBA(fc, flagVal ? glow : 0), ghostAlpha);
-              this.addGlyphString(flagStr, fx, gy, atlas, this.tmpColor, !!flagVal && bold);
+          // Volume — use HEX_TABLE lookup
+          const vol = cell.volume ?? 0;
+          const hasVol = vol >= 0x10 && vol <= 0x50;
+          if (hasVol) {
+            this.setTmpColor(lerpWhiteRGBA(colors.textVolume, glow), ghostAlpha);
+            this.addGlyphString(HEX_TABLE[vol & 0xFF], px, gy, atlas, this.tmpColor, bold);
+          } else if (!ui.blankEmpty) {
+            this.setTmpColor(lerpWhiteRGBA(colors.textMuted, 0), ghostAlpha);
+            this.addGlyphString('..', px, gy, atlas, this.tmpColor, false);
+          }
+          px += CHAR_WIDTH * 2 + 4;
+
+          // Effect columns (variable) — use EFFECT_CHARS and HEX_TABLE lookups
+          for (let ecol = 0; ecol < effectCols; ecol++) {
+            let colEffTyp = 0;
+            let colEff = 0;
+            if (ecol === 0) { colEffTyp = cell.effTyp ?? 0; colEff = cell.eff ?? 0; }
+            else if (ecol === 1) { colEffTyp = cell.effTyp2 ?? 0; colEff = cell.eff2 ?? 0; }
+            else if (ecol === 2) { colEffTyp = cell.effTyp3 ?? 0; colEff = cell.eff3 ?? 0; }
+            else if (ecol === 3) { colEffTyp = cell.effTyp4 ?? 0; colEff = cell.eff4 ?? 0; }
+            else if (ecol === 4) { colEffTyp = cell.effTyp5 ?? 0; colEff = cell.eff5 ?? 0; }
+
+            const hasEff = colEffTyp !== 0 || colEff !== 0;
+            if (hasEff) {
+              this.setTmpColor(lerpWhiteRGBA(colors.textEffect, glow), ghostAlpha);
+              // Symphonie DSP effects: effTyp 0x50-0x54 → type letter + value
+              let effStr: string;
+              if (colEffTyp >= 0x50 && colEffTyp <= 0x54) {
+                const DSP_CHARS = ['D', 'E', 'C', 'L', 'X'];
+                effStr = (DSP_CHARS[colEffTyp - 0x50] ?? 'D') + HEX_TABLE[colEff & 0xFF];
+              } else {
+                effStr = (EFFECT_CHARS[colEffTyp] ?? '?') + HEX_TABLE[colEff & 0xFF];
+              }
+              this.addGlyphString(effStr, px, gy, atlas, this.tmpColor, bold);
+            } else if (!ui.blankEmpty) {
+              this.setTmpColor(lerpWhiteRGBA(colors.textMuted, 0), ghostAlpha);
+              this.addGlyphString('...', px, gy, atlas, this.tmpColor, false);
             }
-          };
-          drawFlag(cell.flag1, px);
-          px += CHAR_WIDTH + 4;
-          drawFlag(cell.flag2, px);
-          px += CHAR_WIDTH + 4;
-        }
+            px += CHAR_WIDTH * 3 + 4;
+          }
 
-        // Probability — use pre-parsed PROB_COLORS instead of parseColor() in hot loop
-        if (cell.probability !== undefined && cell.probability > 0) {
-          const p = Math.min(99, Math.max(0, cell.probability));
-          const pc = p >= 75 ? PROB_COLORS[3] : p >= 50 ? PROB_COLORS[2] : p >= 25 ? PROB_COLORS[1] : PROB_COLORS[0];
-          const probStr = ui.useHex ? HEX_TABLE[p] : DEC_TABLE[p];
-          this.setTmpColor(lerpWhiteRGBA(pc, glow), ghostAlpha);
-          this.addGlyphString(probStr, px, gy, atlas, this.tmpColor, bold);
-        }
+          // Flag columns
+          const hasFlagCols = cell.flag1 !== undefined || cell.flag2 !== undefined;
+          if (hasFlagCols) {
+            const drawFlag = (flagVal: number | undefined, fx: number) => {
+              let flagStr = '.';
+              let fc: [number,number,number,number] = colors.textMuted;
+              if (flagVal === 1) { flagStr = 'A'; fc = colors.flagAccent; }
+              else if (flagVal === 2) { flagStr = 'S'; fc = colors.flagSlide; }
+              else if (flagVal === 3) { flagStr = 'M'; fc = colors.flagMute; }
+              else if (flagVal === 4) { flagStr = 'H'; fc = colors.flagHammer; }
+              if (flagVal || !ui.blankEmpty) {
+                this.setTmpColor(lerpWhiteRGBA(fc, flagVal ? glow : 0), ghostAlpha);
+                this.addGlyphString(flagStr, fx, gy, atlas, this.tmpColor, !!flagVal && bold);
+              }
+            };
+            drawFlag(cell.flag1, px);
+            px += CHAR_WIDTH + 4;
+            drawFlag(cell.flag2, px);
+            px += CHAR_WIDTH + 4;
+          }
+
+          // Probability — use pre-parsed PROB_COLORS instead of parseColor() in hot loop
+          if (cell.probability !== undefined && cell.probability > 0) {
+            const p = Math.min(99, Math.max(0, cell.probability));
+            const pc = p >= 75 ? PROB_COLORS[3] : p >= 50 ? PROB_COLORS[2] : p >= 25 ? PROB_COLORS[1] : PROB_COLORS[0];
+            const probStr = ui.useHex ? HEX_TABLE[p] : DEC_TABLE[p];
+            this.setTmpColor(lerpWhiteRGBA(pc, glow), ghostAlpha);
+            this.addGlyphString(probStr, px, gy, atlas, this.tmpColor, bold);
+          }
+        } // end fixed-column path
 
         // Selection highlight (rect pass would be cleaner but we need to do it here per row)
         if (sel && !isGhostRow && ch >= minSelCh && ch <= maxSelCh
