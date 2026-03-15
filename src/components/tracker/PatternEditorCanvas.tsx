@@ -41,6 +41,8 @@ import type {
   CellSnapshot,
 } from '@engine/renderer/worker-types';
 import TrackerWorkerFactory from '@/workers/tracker-render.worker.ts?worker';
+import type { ColumnDef, FormatChannel, OnCellChange } from '@/components/shared/format-editor-types';
+import { toColumnSpec, formatChannelsToSnapshot } from '@/components/shared/format-editor-types';
 
 const CHAR_WIDTH = 10;
 const LINE_NUMBER_WIDTH = 40;
@@ -62,6 +64,12 @@ interface PatternEditorCanvasProps {
   onSwipeRight?: () => void; // For mobile: move cursor right
   onSwipeUp?: () => void; // For mobile: move cursor up
   onSwipeDown?: () => void; // For mobile: move cursor down
+  // ── Format mode ──────────────────────────────────────────────────────────
+  formatColumns?: ColumnDef[];
+  formatChannels?: FormatChannel[];
+  formatCurrentRow?: number;
+  formatIsPlaying?: boolean;
+  onFormatCellChange?: OnCellChange;
 }
 
 // PERFORMANCE: Memoize to prevent re-renders on every scroll step
@@ -74,8 +82,25 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   onSwipeRight: _onSwipeRight, // Reserved - using internal handler instead
   onSwipeUp: _onSwipeUp,   // Reserved - currently allows native scroll
   onSwipeDown: _onSwipeDown, // Reserved - currently allows native scroll
+  formatColumns,
+  formatChannels,
+  formatCurrentRow,
+  formatIsPlaying,
+  onFormatCellChange: _onFormatCellChange,
 }) => {
   const { isMobile } = useResponsiveSafe();
+
+  const isFormatMode = !!formatColumns;
+
+  // Refs for format mode values consumed by the RAF loop (must not cause re-subscribes)
+  const isFormatModeRef     = useRef(isFormatMode);
+  const formatCurrentRowRef = useRef(formatCurrentRow ?? 0);
+  const formatIsPlayingRef  = useRef(formatIsPlaying ?? false);
+
+  // Keep refs in sync with props on every render
+  isFormatModeRef.current     = isFormatMode;
+  formatCurrentRowRef.current = formatCurrentRow ?? 0;
+  formatIsPlayingRef.current  = formatIsPlaying ?? false;
   // Mutable ref — set imperatively in useEffect to avoid StrictMode double-transferControlToOffscreen
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -113,6 +138,13 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
 
   // Set to true if worker reports WebGL2 is unsupported
   const [webglUnsupported, setWebglUnsupported] = useState(false);
+
+  const [formatCursor, setFormatCursor] = useState({
+    channelIndex: 0, rowIndex: 0, columnIndex: 0,
+  });
+  void setFormatCursor; // used by future keyboard handler tasks
+  const [_formatOctave, _setFormatOctave] = useState(3);
+  void _formatOctave; void _setFormatOctave; // scaffolding for future keyboard handler tasks
 
   // Bridge to the OffscreenCanvas worker
   const bridgeRef = useRef<TrackerOffscreenBridge | null>(null);
@@ -221,9 +253,26 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
 
   // Channel Metrics: calculate numChannels, offsets, and widths once per pattern/theme change
   const { numChannels, channelOffsets, channelWidths, totalChannelsWidth } = useMemo(() => {
-    if (!pattern) return { 
-      numChannels: 0, 
-      channelOffsets: [], 
+    // FORMAT MODE: compute widths from column definitions
+    if (isFormatMode && formatColumns && formatChannels) {
+      const FORMAT_COL_GAP  = 4;
+      const FORMAT_CHAN_GAP = 8;
+      const contentWidth = formatColumns.reduce(
+        (sum, col) => sum + col.charWidth * CHAR_WIDTH + FORMAT_COL_GAP, 0
+      ) - FORMAT_COL_GAP;
+      const chanW = LINE_NUMBER_WIDTH + contentWidth + FORMAT_CHAN_GAP;
+      const n = formatChannels.length;
+      return {
+        numChannels: n,
+        channelOffsets: formatChannels.map((_, i) => i * chanW),
+        channelWidths:  formatChannels.map(() => chanW),
+        totalChannelsWidth: n * chanW,
+      };
+    }
+
+    if (!pattern) return {
+      numChannels: 0,
+      channelOffsets: [],
       channelWidths: [],
       totalChannelsWidth: 0
     };
@@ -273,7 +322,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       channelWidths: widths,
       totalChannelsWidth: currentX - LINE_NUMBER_WIDTH
     };
-  }, [pattern, instruments, columnVisibility]);
+  }, [pattern, instruments, columnVisibility, isFormatMode, formatColumns, formatChannels]);
 
   // Keep channelOffsetsRef/channelWidthsRef in sync for the RAF loop (selection math)
   useEffect(() => {
@@ -881,7 +930,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     const ui = useUIStore.getState();
     const settings = useSettingsStore.getState();
     const editor = useEditorStore.getState();
-    return {
+    const base: UIStateSnapshot = {
       useHex:             ui.useHexNumbers,
       blankEmpty:         ui.blankEmptyCells,
       showGhostPatterns:  editor.showGhostPatterns,
@@ -893,7 +942,11 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       showBeatLabels:     ui.showBeatLabels,
       noteDisplayOffset:  getTrackerReplayer().getSong()?.noteDisplayOffset ?? 0,
     };
-  }, []);
+    if (isFormatMode && formatColumns) {
+      base.columns = formatColumns.map(toColumnSpec);
+    }
+    return base;
+  }, [isFormatMode, formatColumns]);
 
   const snapshotPatterns = useCallback((): PatternSnapshot[] => {
     const state = useTrackerStore.getState();
@@ -929,6 +982,11 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       })),
     }));
   }, []);
+
+  const snapshotFormatPatterns = useCallback((): PatternSnapshot[] => {
+    if (!formatColumns || !formatChannels) return [];
+    return [formatChannelsToSnapshot(formatChannels, formatColumns)];
+  }, [formatColumns, formatChannels]);
 
   const snapshotLayout = useCallback((): ChannelLayoutSnapshot => ({
     offsets: channelOffsets,
@@ -1194,21 +1252,23 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
           height:             h,
           theme:              snapshotTheme(),
           uiState:            snapshotUI(),
-          patterns:           snapshotPatterns(),
-          currentPatternIndex: state.currentPatternIndex,
-          cursor: {
+          patterns:           isFormatMode ? snapshotFormatPatterns() : snapshotPatterns(),
+          currentPatternIndex: isFormatMode ? 0 : state.currentPatternIndex,
+          cursor: isFormatMode ? {
+            rowIndex: 0, channelIndex: 0, columnType: '0', digitIndex: 0,
+          } : {
             rowIndex:    cursorState.cursor.rowIndex,
             channelIndex: cursorState.cursor.channelIndex,
             columnType:  cursorState.cursor.columnType,
             digitIndex:  cursorState.cursor.digitIndex,
           },
-          selection:          cursorState.selection ? {
+          selection: isFormatMode ? null : (cursorState.selection ? {
             startChannel: cursorState.selection.startChannel,
             endChannel:   cursorState.selection.endChannel,
             startRow:     cursorState.selection.startRow,
             endRow:       cursorState.selection.endRow,
             columnTypes:  cursorState.selection.columnTypes,
-          } : null,
+          } : null),
           channelLayout: snapshotLayout(),
         },
         [offscreen],
@@ -1217,6 +1277,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
 
     // Subscribe to tracker store — post pattern/ui deltas
     const unsubTracker = useTrackerStore.subscribe((s, prev) => {
+      if (isFormatModeRef.current) return;
       const b = bridgeRef.current;
       if (!b) return;
       if (s.patterns !== prev.patterns || s.currentPatternIndex !== prev.currentPatternIndex) {
@@ -1227,6 +1288,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     });
 
     const unsubEditor = useEditorStore.subscribe((s, prev) => {
+      if (isFormatModeRef.current) return;
       const b = bridgeRef.current;
       if (!b) return;
       if (s.columnVisibility !== prev.columnVisibility || s.showGhostPatterns !== prev.showGhostPatterns || s.recordMode !== prev.recordMode) {
@@ -1236,6 +1298,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
 
     // Subscribe to cursor store — post cursor/selection deltas
     const unsubCursor = useCursorStore.subscribe((s, prev) => {
+      if (isFormatModeRef.current) return;
       const b = bridgeRef.current;
       if (!b) return;
       // Send cursor updates — during playback only channel/column changes matter
@@ -1261,6 +1324,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
 
     // Subscribe to UI store
     const unsubUI = useUIStore.subscribe((s, prev) => {
+      if (isFormatModeRef.current) return;
       if (s.useHexNumbers !== prev.useHexNumbers || s.blankEmptyCells !== prev.blankEmptyCells
           || s.trackerZoom !== prev.trackerZoom || s.rowHighlightInterval !== prev.rowHighlightInterval
           || s.showBeatLabels !== prev.showBeatLabels
@@ -1271,6 +1335,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
 
     // Subscribe to settings store
     const unsubSettings = useSettingsStore.subscribe((s, prev) => {
+      if (isFormatModeRef.current) return;
       if (s.trackerVisualBg !== prev.trackerVisualBg) {
         bridgeRef.current?.post({ type: 'uiState', uiState: snapshotUI() });
       }
@@ -1297,6 +1362,36 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     bridgeRef.current?.post({ type: 'channelLayout', channelLayout: snapshotLayout() });
   }, [snapshotLayout]);
 
+  // Format mode: re-sync columns/channels/layout when props change
+  useEffect(() => {
+    if (!isFormatMode) return;
+    const bridge = bridgeRef.current;
+    if (!bridge) return;
+    bridge.post({ type: 'uiState', uiState: snapshotUI() });
+    bridge.post({
+      type: 'patterns',
+      patterns: snapshotFormatPatterns(),
+      currentPatternIndex: 0,
+    });
+    bridge.post({ type: 'channelLayout', channelLayout: snapshotLayout() });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isFormatMode, formatColumns, formatChannels]);
+
+  // Format mode: sync cursor to worker
+  useEffect(() => {
+    if (!isFormatMode) return;
+    bridgeRef.current?.post({
+      type: 'cursor',
+      cursor: {
+        rowIndex:     formatCursor.rowIndex,
+        channelIndex: formatCursor.channelIndex,
+        columnType:   String(formatCursor.columnIndex),
+        digitIndex:   0,
+      },
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isFormatMode, formatCursor]);
+
 
   // ─── Thin overlay RAF (updates macroOverlayRef + posts playback state) ─────
   // This runs on the main thread to update overlay DOM positions (macroLanes)
@@ -1309,6 +1404,19 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     let prevPlaying = false;
 
     const tick = () => {
+      // FORMAT MODE: use format engine's playback state (skip all tracker store reads)
+      if (isFormatModeRef.current) {
+        bridgeRef.current?.post({
+          type: 'playback',
+          row: formatCurrentRowRef.current,
+          smoothOffset: 0,
+          patternIndex: 0,
+          isPlaying: formatIsPlayingRef.current,
+        });
+        rafId = requestAnimationFrame(tick);
+        return;
+      }
+
       const transportState = useTransportStore.getState();
       const isPlaying      = transportState.isPlaying;
 
@@ -1623,7 +1731,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     );
   }
 
-  if (!pattern) {
+  if (!pattern && !isFormatMode) {
     return (
       <div className="flex-1 flex items-center justify-center text-text-muted">
         No pattern loaded
@@ -1631,7 +1739,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     );
   }
 
-  const mobileChannel = pattern.channels[mobileChannelIndex];
+  const mobileChannel = pattern?.channels[mobileChannelIndex];
   // Note: trigger levels are animation-driven and updated via RAF - provide defaults for render
   const mobileTrigger = { level: 0, triggered: false };
 
@@ -1660,7 +1768,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
                   CH {(mobileChannelIndex + 1).toString().padStart(2, '0')}
                 </span>
                 <span className="text-xs text-text-muted">
-                  / {pattern.channels.length.toString().padStart(2, '0')}
+                  / {(pattern?.channels.length ?? 0).toString().padStart(2, '0')}
                 </span>
                 <ChannelVUMeter level={mobileTrigger.level} isActive={mobileTrigger.triggered} />
               </div>
@@ -1679,9 +1787,9 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
 
             <button
               onClick={handleHeaderSwipeLeft}
-              disabled={mobileChannelIndex >= pattern.channels.length - 1}
+              disabled={mobileChannelIndex >= (pattern?.channels.length ?? 0) - 1}
               className={`p-2 rounded-lg transition-colors ${
-                mobileChannelIndex >= pattern.channels.length - 1 ? 'text-text-muted opacity-30' : 'text-text-secondary hover:bg-dark-bgHover'
+                mobileChannelIndex >= (pattern?.channels.length ?? 0) - 1 ? 'text-text-muted opacity-30' : 'text-text-secondary hover:bg-dark-bgHover'
               }`}
             >
               <ChevronRight size={20} />
@@ -1742,7 +1850,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
               data-vu-scroll
             >
               <div className="flex" style={{ width: totalChannelsWidth }}>
-                {pattern.channels.map((channel, idx) => {
+                {(pattern?.channels ?? []).map((channel, idx) => {
                   // Trigger levels are animation-driven via RAF; ChannelVUMeter is disabled
                   const trigger = { level: 0, triggered: false };
                   const channelWidth = channelWidths[idx];
@@ -1796,8 +1904,8 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
                         <ChannelContextMenu
                           channelIndex={idx}
                           channel={channel}
-                          patternId={pattern.id}
-                          patternLength={pattern.length}
+                          patternId={pattern?.id ?? ''}
+                          patternLength={pattern?.length ?? 0}
                           onFillPattern={handleFillPattern}
                           onClearChannel={handleClearChannel}
                           onCopyChannel={handleCopyChannel}
@@ -1880,7 +1988,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
                 })}
 
                 {/* Add channel button */}
-                {pattern.channels.length < 16 && (
+                {(pattern?.channels.length ?? 0) < 16 && !isFormatMode && (
                   <button
                     onClick={addChannel}
                     className="flex-shrink-0 w-12 flex items-center justify-center border-r border-dark-border
