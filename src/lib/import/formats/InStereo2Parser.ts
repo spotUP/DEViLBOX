@@ -32,7 +32,7 @@
  * Note mapping (same period table as InStereo 1.0 and Sonic Arranger):
  *   Note index 64..127 = sample instruments (instrNum >= 64 in player)
  *   Note index 0..63   = synth instruments
- *   Period table index + 12 → XM note number
+ *   Period table index - 36 → XM note number (index 49 = period 856 = C-1 = XM note 13)
  */
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
@@ -87,10 +87,14 @@ function readChunkTag(buf: Uint8Array, off: number): string {
   return String.fromCharCode(buf[off], buf[off + 1], buf[off + 2], buf[off + 3]);
 }
 
-/** Convert IS20 period-table note index to XM note number */
+/** Convert IS20 period-table note index to XM note number.
+ * IS20_PERIODS[49] = 856 = ProTracker C-1 = XM note 13.
+ * Mapping: xmNote = noteIndex - 36.
+ */
 function is20NoteToXm(noteIndex: number): number {
   if (noteIndex <= 0 || noteIndex >= IS20_PERIODS.length) return 0;
-  return Math.min(96, noteIndex + 12);
+  const xm = noteIndex - 36;
+  return (xm >= 1 && xm <= 96) ? xm : 0;
 }
 
 // ── Format Identification ──────────────────────────────────────────────────
