@@ -227,7 +227,9 @@ export const TestKeyboard: React.FC<TestKeyboardProps> = ({ instrument }) => {
     // ensureContextRunning() calls engine.init() which calls Tone.start() —
     // resuming a suspended AudioContext is only allowed within a user gesture,
     // which is exactly where attackNote is called (mousedown / keydown).
-    void ensureContextRunning().then(doAttack);
+    void ensureContextRunning()
+      .then(() => engine.ensureInstrumentReady(inst))
+      .then(doAttack);
   }, [instrument, ensureContextRunning]);
 
   // Release note - stops the sustained note

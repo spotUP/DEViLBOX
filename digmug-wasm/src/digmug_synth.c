@@ -358,8 +358,10 @@ int dm_render(void *ctxPtr, int handle, float *outL, float *outR, int numSamples
         sample = (float)p->ins.pcmData[idx] * volNorm;
       }
 
-      float phaseInc = freq / (float)p->sampleRate;
-      p->phase += phaseInc * (float)p->ins.pcmLen;
+      /* Amiga-style PCM: C4 (period 428) plays at 3546895/428 ≈ 8288 Hz.
+       * phaseInc = freq / C4_freq * amiga_C4_rate / outputRate         */
+      float phaseInc = freq * 8287.56f / (261.626f * (float)p->sampleRate);
+      p->phase += phaseInc;
     }
 
     outL[i] = sample;
