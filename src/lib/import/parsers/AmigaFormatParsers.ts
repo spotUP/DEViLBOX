@@ -283,19 +283,10 @@ export async function tryRouteFormat(
   // ── Sonic Arranger ────────────────────────────────────────────────────────
   // Magic "SOARV1.0" at offset 0. "@OARV1.0" is LH-compressed — falls to UADE.
   if (matchesExt(filename, ['sa', 'sonic'])) {
-        if (prefs.sonicArranger === 'native') {
-      try {
-        const { isSonicArrangerFormat, parseSonicArrangerFile } = await import('@lib/import/formats/SonicArrangerParser');
-        if (isSonicArrangerFormat(buffer)) {
-          const result = parseSonicArrangerFile(buffer, originalFileName);
-          if (result) return result;
-        }
-      } catch (err) {
-        console.warn(`[SonicArrangerParser] Native parse failed for ${filename}, falling back to UADE:`, err);
-      }
-    }
-    const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
-    return parseUADEFile(buffer, originalFileName, prefs.uade ?? 'enhanced', subsong, preScannedMeta);
+    const { isSonicArrangerFormat, parseSonicArrangerFile } = await import('@lib/import/formats/SonicArrangerParser');
+    return withNativeThenUADE('sonicArranger', ctx,
+      (buf: Uint8Array | ArrayBuffer, name: string) => { if (isSonicArrangerFormat(buf as ArrayBuffer)) return parseSonicArrangerFile(buf as ArrayBuffer, name) ?? null; return null; },
+      'SonicArrangerParser');
   }
 
   // ── InStereo! 2.0 (.is20 — unambiguous) ──────────────────────────────────
@@ -322,13 +313,56 @@ export async function tryRouteFormat(
   }
 
   // ── InStereo! 1.0 (.is10 — unambiguous) ──────────────────────────────────
+  // Use native parser for instrument display + inject UADE for 1:1 audio playback.
   if (matchesExt(filename, ['is10'])) {
+    try {
+      const { isInStereo1Format, parseInStereo1File } = await import('@lib/import/formats/InStereo1Parser');
+      const bytes = new Uint8Array(buffer);
+      if (isInStereo1Format(bytes)) {
+        const result = parseInStereo1File(bytes, originalFileName);
+        if (result) {
+          (result as any).uadeEditableFileData = buffer.slice(0);
+          (result as any).uadeEditableFileName = originalFileName;
+          return result;
+        }
+      }
+    } catch (err) {
+      console.warn(`[InStereo1Parser] Native parse failed for ${filename}, falling back to UADE:`, err);
+    }
     const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
     return parseUADEFile(buffer, originalFileName, 'classic', subsong, preScannedMeta);
   }
 
   // ── InStereo! (.is — ambiguous: detect by magic) ─────────────────────────
+  // Try IS1 first (ISM!V1.2 magic), then IS2, with UADE for audio in both cases.
   if (matchesExt(filename, ['is'])) {
+    const bytes = new Uint8Array(buffer);
+    try {
+      const { isInStereo1Format, parseInStereo1File } = await import('@lib/import/formats/InStereo1Parser');
+      if (isInStereo1Format(bytes)) {
+        const result = parseInStereo1File(bytes, originalFileName);
+        if (result) {
+          (result as any).uadeEditableFileData = buffer.slice(0);
+          (result as any).uadeEditableFileName = originalFileName;
+          return result;
+        }
+      }
+    } catch (err) {
+      console.warn(`[InStereo1Parser] Native parse failed for ${filename}, trying IS2:`, err);
+    }
+    try {
+      const { isInStereo2Format, parseInStereo2File } = await import('@lib/import/formats/InStereo2Parser');
+      if (isInStereo2Format(bytes)) {
+        const result = parseInStereo2File(bytes, originalFileName);
+        if (result) {
+          (result as any).uadeEditableFileData = buffer.slice(0);
+          (result as any).uadeEditableFileName = originalFileName;
+          return result;
+        }
+      }
+    } catch (err) {
+      console.warn(`[InStereo2Parser] Native parse failed for ${filename}, falling back to UADE:`, err);
+    }
     const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
     return parseUADEFile(buffer, originalFileName, 'classic', subsong, preScannedMeta);
   }
@@ -668,17 +702,11 @@ export async function tryRouteFormat(
   // ── Sawteeth (.st — magic "SWTD" required to disambiguate) ───────────────
   // Fully synthesized format (no PCM samples). Native parser available (metadata only).
   if (matchesExt(filename, ['st'])) {
-        if (prefs.sawteeth === 'native') {
-      try {
-        const { isSawteethFormat, parseSawteethFile } = await import('@lib/import/formats/SawteethParser');
-        const _stBytes = new Uint8Array(buffer);
-        if (isSawteethFormat(_stBytes)) {
-          const result = parseSawteethFile(_stBytes, originalFileName);
-          if (result) return result;
-        }
-      } catch (err) {
-        console.warn(`[SawteethParser] Native parse failed for ${filename}, falling back to UADE:`, err);
-      }
+    const { isSawteethFormat, parseSawteethFile } = await import('@lib/import/formats/SawteethParser');
+    if (isSawteethFormat(new Uint8Array(buffer))) {
+      return withNativeThenUADE('sawteeth', ctx,
+        (buf: Uint8Array | ArrayBuffer, name: string) => { if (isSawteethFormat(new Uint8Array(buf as ArrayBuffer))) return parseSawteethFile(new Uint8Array(buf as ArrayBuffer), name) ?? null; return null; },
+        'SawteethParser');
     }
     const { parseUADEFile: parseUADE_st } = await import('@lib/import/formats/UADEParser');
     return parseUADE_st(buffer, originalFileName, prefs.uade ?? 'enhanced', subsong, preScannedMeta);
@@ -1155,25 +1183,10 @@ export async function tryRouteFormat(
 
   // ── Delta Music 1.0 (.dm, .dm1) — identified by "ALL " magic ──────────────
   if (matchesExt(filename, ['dm', 'dm1'])) {
-    if (prefs.deltaMusic1 === 'native') {
-      try {
-        const { isDeltaMusic1Format, parseDeltaMusic1File } = await import('@lib/import/formats/DeltaMusic1Parser');
-        if (isDeltaMusic1Format(buffer)) {
-          const result = await parseDeltaMusic1File(buffer, originalFileName);
-          if (result) {
-            // Inject UADE for 1:1 audio — native parser provides pattern display,
-            // UADE provides the actual DM1 synthesis (wavetable cycling, etc.)
-            (result as any).uadeEditableFileData = buffer.slice(0);
-            (result as any).uadeEditableFileName = originalFileName;
-            return result;
-          }
-        }
-      } catch (err) {
-        console.warn(`[DeltaMusic1Parser] Native parse failed for ${filename}, falling back to UADE:`, err);
-      }
-    }
-    const { parseUADEFile: parseUADE_dm1 } = await import('@lib/import/formats/UADEParser');
-    return parseUADE_dm1(buffer, originalFileName, prefs.uade ?? 'enhanced', subsong, preScannedMeta);
+    const { isDeltaMusic1Format, parseDeltaMusic1File } = await import('@lib/import/formats/DeltaMusic1Parser');
+    return withNativeThenUADE('deltaMusic1', ctx,
+      async (buf: Uint8Array | ArrayBuffer, name: string) => { if (isDeltaMusic1Format(buf as ArrayBuffer)) return await parseDeltaMusic1File(buf as ArrayBuffer, name) ?? null; return null; },
+      'DeltaMusic1Parser', { injectUADE: true });
   }
 
   // ── Richard Joseph Player (.rjp, RJP.*, .sng with RJP magic) ─────────────
@@ -1186,24 +1199,10 @@ export async function tryRouteFormat(
       new Uint8Array(buffer)[1] === 0x4a &&   // 'J'
       new Uint8Array(buffer)[2] === 0x50)     // 'P'
   ) {
-    if (prefs.richardJoseph === 'native') {
-      try {
-        const { isRJPFormat, parseRJPFile } = await import('@lib/import/formats/RichardJosephParser');
-        const _rjpBuf = new Uint8Array(buffer);
-        if (isRJPFormat(_rjpBuf)) {
-          const rjpResult = await parseRJPFile(buffer, originalFileName);
-          const rjpNotes = rjpResult.patterns.reduce((sum: number, p: any) =>
-            sum + p.channels.reduce((cs: number, ch: any) =>
-              cs + ch.rows.filter((r: any) => r.note > 0).length, 0), 0);
-          if (rjpNotes > 0) return rjpResult;
-          console.warn(`[RichardJosephParser] 0 notes extracted, falling back to UADE`);
-        }
-      } catch (err) {
-        console.warn(`[RichardJosephParser] Native parse failed for ${filename}, falling back to UADE:`, err);
-      }
-    }
-    const { parseUADEFile: parseUADE_rjp } = await import('@lib/import/formats/UADEParser');
-    return parseUADE_rjp(buffer, originalFileName, prefs.uade ?? 'enhanced', subsong, preScannedMeta);
+    const { isRJPFormat, parseRJPFile } = await import('@lib/import/formats/RichardJosephParser');
+    return withNativeThenUADE('richardJoseph', ctx,
+      async (buf: Uint8Array | ArrayBuffer, name: string) => { if (isRJPFormat(new Uint8Array(buf as ArrayBuffer))) return await parseRJPFile(buf as ArrayBuffer, name); return null; },
+      'RichardJosephParser', { injectUADE: true });
   }
 
   // ── ProTracker 3.6 IFF wrapper (FORM/MODL magic) ──────────────────────────
@@ -1233,16 +1232,8 @@ export async function tryRouteFormat(
   }
 
   // ── Tronic (.trc/.dp/.tro/.tronic) ───────────────────────────────────────
-  // Amiga tracker by Stefan Hartmann. Native parser available.
+  // Amiga tracker by Stefan Hartmann. No public format spec; always delegates to UADE.
   if (matchesExt(filename, ['trc', 'dp', 'tro', 'tronic'])) {
-        if (prefs.tronic === 'native') {
-      try {
-        const { isTronicFormat, parseTronicFile } = await import('@lib/import/formats/TronicParser');
-        if (isTronicFormat(buffer)) return await parseTronicFile(buffer, originalFileName);
-      } catch (err) {
-        console.warn(`[TronicParser] Native parse failed for ${filename}, falling back to UADE:`, err);
-      }
-    }
     const { parseUADEFile: parseUADE_trc } = await import('@lib/import/formats/UADEParser');
     return parseUADE_trc(buffer, originalFileName, prefs.uade ?? 'enhanced', subsong, preScannedMeta);
   }
@@ -1281,16 +1272,10 @@ export async function tryRouteFormat(
   // ── Medley (.ml) ─────────────────────────────────────────────────────────
   // Amiga 4-channel format (Medley tracker). Magic: "MSOB" at bytes[0..3].
   if (matchesExt(filename, ['ml'])) {
-    if (prefs.medley === 'native') {
-      try {
-        const { isMedleyFormat, parseMedleyFile } = await import('@lib/import/formats/MedleyParser');
-        if (isMedleyFormat(buffer)) return parseMedleyFile(buffer, originalFileName);
-      } catch (err) {
-        console.warn(`[MedleyParser] Native parse failed for ${filename}, falling back to UADE:`, err);
-      }
-    }
-    const { parseUADEFile: parseUADE_ml } = await import('@lib/import/formats/UADEParser');
-    return parseUADE_ml(buffer, originalFileName, prefs.uade ?? 'enhanced', subsong, preScannedMeta);
+    const { isMedleyFormat, parseMedleyFile } = await import('@lib/import/formats/MedleyParser');
+    return withNativeThenUADE('medley', ctx,
+      (buf: Uint8Array | ArrayBuffer, name: string) => { if (isMedleyFormat(buf as ArrayBuffer)) return parseMedleyFile(buf as ArrayBuffer, name); return null; },
+      'MedleyParser', { injectUADE: true });
   }
 
   // ── Mark Cooksey / Don Adan (mc.* / mcr.* / mco.* prefix) ─────────────────
@@ -1315,30 +1300,18 @@ export async function tryRouteFormat(
 
   // ── Quartet / Quartet PSG / Quartet ST (qpa.* / sqt.* / qts.* prefix) ──────
   if (matchesExt(filename, ['qpa', 'sqt', 'qts'])) {
-    if (prefs.quartet === 'native') {
-      try {
-        const { isQuartetFormat, parseQuartetFile } = await import('@lib/import/formats/QuartetParser');
-        if (isQuartetFormat(buffer, originalFileName)) return parseQuartetFile(buffer, originalFileName);
-      } catch (err) {
-        console.warn(`[QuartetParser] Native parse failed for ${filename}, falling back to UADE:`, err);
-      }
-    }
-    const { parseUADEFile: parseUADE_quartet } = await import('@lib/import/formats/UADEParser');
-    return parseUADE_quartet(buffer, originalFileName, prefs.uade ?? 'enhanced', subsong, preScannedMeta);
+    const { isQuartetFormat, parseQuartetFile } = await import('@lib/import/formats/QuartetParser');
+    return withNativeThenUADE('quartet', ctx,
+      (buf: Uint8Array | ArrayBuffer, name: string) => { if (isQuartetFormat(buf as ArrayBuffer, name)) return parseQuartetFile(buf as ArrayBuffer, name); return null; },
+      'QuartetParser', { injectUADE: true });
   }
 
   // ── Sound Master (sm.* / sm1.* / sm2.* / sm3.* / smpro.* prefix) ───────────
   if (matchesExt(filename, ['sm', 'sm1', 'sm2', 'sm3', 'smpro'])) {
-    if (prefs.soundMaster === 'native') {
-      try {
-        const { isSoundMasterFormat, parseSoundMasterFile } = await import('@lib/import/formats/SoundMasterParser');
-        if (isSoundMasterFormat(buffer, originalFileName)) return parseSoundMasterFile(buffer, originalFileName);
-      } catch (err) {
-        console.warn(`[SoundMasterParser] Native parse failed for ${filename}, falling back to UADE:`, err);
-      }
-    }
-    const { parseUADEFile: parseUADE_sm } = await import('@lib/import/formats/UADEParser');
-    return parseUADE_sm(buffer, originalFileName, prefs.uade ?? 'enhanced', subsong, preScannedMeta);
+    const { isSoundMasterFormat, parseSoundMasterFile } = await import('@lib/import/formats/SoundMasterParser');
+    return withNativeThenUADE('soundMaster', ctx,
+      (buf: Uint8Array | ArrayBuffer, name: string) => { if (isSoundMasterFormat(buf as ArrayBuffer, name)) return parseSoundMasterFile(buf as ArrayBuffer, name); return null; },
+      'SoundMasterParser', { injectUADE: true });
   }
 
   // ── ZoundMonitor (sng.* prefix OR *.sng extension) ──────────────────────────
@@ -1347,16 +1320,10 @@ export async function tryRouteFormat(
   // Richard Joseph .sng files are caught earlier by the RJP magic check).
   // Detection: computed offset from bytes[0..1], then "df?:" or "?amp" tag check.
   if (matchesExt(filename, ['sng'])) {
-    if (prefs.zoundMonitor === 'native') {
-      try {
-        const { isZoundMonitorFormat, parseZoundMonitorFile } = await import('@lib/import/formats/ZoundMonitorParser');
-        if (isZoundMonitorFormat(buffer, originalFileName)) return parseZoundMonitorFile(buffer, originalFileName, companionFiles);
-      } catch (err) {
-        console.warn(`[ZoundMonitorParser] Native parse failed for ${filename}, falling back to UADE:`, err);
-      }
-    }
-    const { parseUADEFile: parseUADE_sng } = await import('@lib/import/formats/UADEParser');
-    return parseUADE_sng(buffer, originalFileName, prefs.uade ?? 'enhanced', subsong, preScannedMeta);
+    const { isZoundMonitorFormat, parseZoundMonitorFile } = await import('@lib/import/formats/ZoundMonitorParser');
+    return withNativeThenUADE('zoundMonitor', ctx,
+      (buf: Uint8Array | ArrayBuffer, name: string) => { if (isZoundMonitorFormat(buf as ArrayBuffer, name)) return parseZoundMonitorFile(buf as ArrayBuffer, name, companionFiles); return null; },
+      'ZoundMonitorParser');
   }
 
   // ── Future Player (.fp / FP.*) ───────────────────────────────────────────────
@@ -1370,17 +1337,10 @@ export async function tryRouteFormat(
 
   // ── TCB Tracker (tcb.* or *.tcb) ─────────────────────────────────────────────
   if (matchesExt(filename, ['tcb'])) {
-    if (prefs.tcbTracker === 'native') {
-      try {
-        const { isTCBTrackerFormat, parseTCBTrackerFile } = await import('@lib/import/formats/TCBTrackerParser');
-        // Pass filename without the prefix check restriction — detect by magic bytes
-        if (isTCBTrackerFormat(buffer)) return injectUADEPlayback(await parseTCBTrackerFile(buffer, originalFileName), { buffer, originalFileName, prefs, subsong });
-      } catch (err) {
-        console.warn(`[TCBTrackerParser] Native parse failed for ${filename}, falling back to UADE:`, err);
-      }
-    }
-    const { parseUADEFile: parseUADE_tcb } = await import('@lib/import/formats/UADEParser');
-    return parseUADE_tcb(buffer, originalFileName, prefs.uade ?? 'enhanced', subsong, preScannedMeta);
+    const { isTCBTrackerFormat, parseTCBTrackerFile } = await import('@lib/import/formats/TCBTrackerParser');
+    return withNativeThenUADE('tcbTracker', ctx,
+      async (buf: Uint8Array | ArrayBuffer, name: string) => { if (isTCBTrackerFormat(buf as ArrayBuffer)) return parseTCBTrackerFile(buf as ArrayBuffer, name); return null; },
+      'TCBTrackerParser');
   }
 
   // ── Jason Page (jpn.* / jpnd.* / jp.*) ──────────────────────────────────────
@@ -1397,16 +1357,10 @@ export async function tryRouteFormat(
 
   // ── TME (.tme / TME.*) ───────────────────────────────────────────────────────
   if (matchesExt(filename, ['tme'])) {
-    if (prefs.tme === 'native') {
-      try {
-        const { isTMEFormat, parseTMEFile } = await import('@lib/import/formats/TMEParser');
-        if (isTMEFormat(buffer)) return parseTMEFile(buffer, originalFileName);
-      } catch (err) {
-        console.warn(`[TMEParser] Native parse failed for ${filename}, falling back to UADE:`, err);
-      }
-    }
-    const { parseUADEFile: parseUADE_tme } = await import('@lib/import/formats/UADEParser');
-    return parseUADE_tme(buffer, originalFileName, prefs.uade ?? 'enhanced', subsong, preScannedMeta);
+    const { isTMEFormat, parseTMEFile } = await import('@lib/import/formats/TMEParser');
+    return withNativeThenUADE('tme', ctx,
+      (buf: Uint8Array | ArrayBuffer, name: string) => { if (isTMEFormat(buf as ArrayBuffer)) return parseTMEFile(buf as ArrayBuffer, name); return null; },
+      'TMEParser', { injectUADE: true });
   }
 
   // ── Infogrames DUM (.dum) ────────────────────────────────────────────────────
@@ -1813,16 +1767,10 @@ export async function tryRouteFormat(
   // ── Ben Daglish SID (BDS.* prefix) ────────────────────────────────────────
   // Amiga HUNK-based SID-style 3-voice format. UADE prefix: BDS.
   if (matchesExt(filename, ['bds'])) {
-          if (prefs.benDaglishSID === 'native') {
-      try {
-        const { isBenDaglishSIDFormat, parseBenDaglishSIDFile } = await import('@lib/import/formats/BenDaglishSIDParser');
-        if (isBenDaglishSIDFormat(buffer, originalFileName)) return await parseBenDaglishSIDFile(buffer, originalFileName);
-      } catch (err) {
-        console.warn(`[BenDaglishSIDParser] Native parse failed for ${filename}, falling back to UADE:`, err);
-      }
-    }
-    const { parseUADEFile: parseUADE_bds } = await import('@lib/import/formats/UADEParser');
-    return parseUADE_bds(buffer, originalFileName, prefs.uade ?? 'enhanced', subsong, preScannedMeta);
+    const { isBenDaglishSIDFormat, parseBenDaglishSIDFile } = await import('@lib/import/formats/BenDaglishSIDParser');
+    return withNativeThenUADE('benDaglishSID', ctx,
+      async (buf: Uint8Array | ArrayBuffer, name: string) => { if (isBenDaglishSIDFormat(buf as ArrayBuffer, name)) return parseBenDaglishSIDFile(buf as ArrayBuffer, name); return null; },
+      'BenDaglishSIDParser', { injectUADE: true });
   }
 
   // ── Digital Sonix & Chrome (DSC.* prefix) ────────────────────────────────
