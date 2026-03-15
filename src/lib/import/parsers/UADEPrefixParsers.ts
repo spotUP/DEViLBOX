@@ -32,8 +32,8 @@ const UADE_ONLY_PREFIXES = [
   'hd.', 'hn.', 'thn.', 'mtp2.', 'arp.',
   // JochenHippel base (hip.*, mcmd.*, sog.*) — different from CoSo and 7V
   'hip.', 'mcmd.', 'sog.',
-  // MikeDavies, MarkII, MusiclineEditor
-  'md.', 'mk2.', 'mkii.', 'ml.',
+  // MarkII, MusiclineEditor (MikeDavies handled by AmigaFormatParsers with classic mode)
+  'mk2.', 'mkii.', 'ml.',
   // Silmarils
   'mok.',
   // Pokeynoise

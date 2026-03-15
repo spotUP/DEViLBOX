@@ -70,8 +70,8 @@ function periodToNote(period: number): number {
     const d = Math.abs(MED_PERIODS[i] - period);
     if (d < bestDist) { bestDist = d; best = i; }
   }
-  // Convert to XM note: PT octave 1 starts at note 37 (C-3 in FT2 convention)
-  return best + 37;
+  // Convert to XM note: Amiga C-1 (period 856, index 0) → XM note 13 (displays "C-1")
+  return best + 13;
 }
 
 export function parseMEDFile(buffer: ArrayBuffer, filename: string): TrackerSong {
@@ -210,7 +210,8 @@ export function parseMEDFile(buffer: ArrayBuffer, filename: string): TrackerSong
           effTyp  = buf[offset + 2];
           eff     = buf[offset + 3];
           // MMD1 notes are 0=none, 1=C-0, 2=C#0, ..., 96=B-7
-          note = rawNote > 0 ? rawNote + 12 : 0; // Shift up one octave for XM
+          // This matches XM note numbering directly (1=C-0, 49=C-4) — no shift needed.
+          note = rawNote;
         } else {
           // MMD0 cell format: 3 bytes
           // byte0: high 4 bits = instrument high nibble, low 4 bits = note high

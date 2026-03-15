@@ -16,7 +16,7 @@
 import type { TrackerSong } from '@/engine/TrackerReplayer';
 import type { UADEMetadata } from '@/engine/uade/UADEEngine';
 import type { FormatEnginePreferences } from '@/stores/useSettingsStore';
-import { withNativeDefault, withNativeThenUADE, getBasename, injectUADEPlayback, type FallbackContext } from './withFallback';
+import { withNativeDefault, withNativeThenUADE, callUADE, getBasename, injectUADEPlayback, type FallbackContext } from './withFallback';
 import { tryChipDumpParse } from './ChipDumpParsers';
 import { tryUADEPrefixParse } from './UADEPrefixParsers';
 import { tryPCTrackerParse } from './PCTrackerParsers';
@@ -78,7 +78,7 @@ export async function tryRouteFormat(
   preScannedMeta?: UADEMetadata,
   companionFiles?: Map<string, ArrayBuffer>,
 ): Promise<TrackerSong | null> {
-  const ctx: FallbackContext = { buffer, originalFileName, prefs, subsong, preScannedMeta };
+  const ctx: FallbackContext = { buffer, originalFileName, prefs, subsong, preScannedMeta, companionFiles };
 
   // ── HivelyTracker / AHX ─────────────────────────────────────────────────
   if (filename.endsWith('.hvl') || filename.endsWith('.ahx')) {
@@ -1045,7 +1045,7 @@ export async function tryRouteFormat(
     const { isUFOFormat, parseUFOFile } = await import('@lib/import/formats/UFOParser');
     return withNativeThenUADE('ufo', ctx,
       (buf: Uint8Array | ArrayBuffer, name: string) => { if (isUFOFormat(buf as ArrayBuffer)) return parseUFOFile(buf as ArrayBuffer, name); return null; },
-      'UFOParser');
+      'UFOParser', { injectUADE: true });
   }
 
   // ── Astroidea XMF / Imperium Galactica (.xmf) ────────────────────────────
@@ -1277,6 +1277,14 @@ export async function tryRouteFormat(
     return parseUADEFile(buffer, originalFileName, 'classic', subsong, preScannedMeta);
   }
 
+  // ── Mike Davies (MD.* / .md) ─────────────────────────────────────────────
+  // Compiled 68k synthesizer. UADE enhanced mode extracts wrong/garbled samples.
+  // Classic mode streams correct audio. Prefix-normalize for UADE replayer selection.
+  if (matchesExt(filename, ['md'])) {
+    const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
+    return parseUADEFile(buffer, toUADEPrefixName(originalFileName, ['md']), 'classic', subsong, preScannedMeta);
+  }
+
   // ── Medley (.ml / .mso) ───────────────────────────────────────────────────
   // Amiga 4-channel format (Medley tracker). Magic: "MSOB" at bytes[0..3].
   // UADESynth plays this format incorrectly; UADEEditableSynth plays it correctly.
@@ -1387,7 +1395,7 @@ export async function tryRouteFormat(
     const { isInfogramesFormat, parseInfogramesFile } = await import('@lib/import/formats/InfogramesParser');
     return withNativeThenUADE('infogrames', ctx,
       (buf: Uint8Array | ArrayBuffer, name: string) => { if (isInfogramesFormat(buf as ArrayBuffer)) return parseInfogramesFile(buf as ArrayBuffer, name); return null; },
-      'InfogramesParser');
+      'InfogramesParser', { injectUADE: true });
   }
 
   // ── PSA (.psa / PSA.*) ───────────────────────────────────────────────────────
@@ -1423,7 +1431,7 @@ export async function tryRouteFormat(
     const { isTimeTrackerFormat, parseTimeTrackerFile } = await import('@lib/import/formats/TimeTrackerParser');
     return withNativeThenUADE('timeTracker', ctx,
       (buf: Uint8Array | ArrayBuffer, name: string) => { if (isTimeTrackerFormat(buf as ArrayBuffer)) return parseTimeTrackerFile(buf as ArrayBuffer, name); return null; },
-      'TimeTrackerParser');
+      'TimeTrackerParser', { injectUADE: true });
   }
 
   // ── ChipTracker (KRIS.* prefix) ──────────────────────────────────────────
@@ -1441,7 +1449,7 @@ export async function tryRouteFormat(
     const { isCinemawareFormat, parseCinemawareFile } = await import('@lib/import/formats/CinemawareParser');
     return withNativeThenUADE('cinemaware', ctx,
       (buf: Uint8Array | ArrayBuffer, name: string) => { if (isCinemawareFormat(buf as ArrayBuffer)) return parseCinemawareFile(buf as ArrayBuffer, name); return null; },
-      'CinemawareParser');
+      'CinemawareParser', { injectUADE: true });
   }
 
   // ── NovoTrade Packer (NTP.* prefix) ──────────────────────────────────────
@@ -1450,7 +1458,7 @@ export async function tryRouteFormat(
     const { isNovoTradePackerFormat, parseNovoTradePackerFile } = await import('@lib/import/formats/NovoTradePackerParser');
     return withNativeThenUADE('novoTradePacker', ctx,
       (buf: Uint8Array | ArrayBuffer, name: string) => { if (isNovoTradePackerFormat(buf as ArrayBuffer)) return parseNovoTradePackerFile(buf as ArrayBuffer, name); return null; },
-      'NovoTradePackerParser');
+      'NovoTradePackerParser', { injectUADE: true });
   }
 
   // ── Alcatraz Packer (ALP.* prefix) ───────────────────────────────────────
@@ -1459,7 +1467,7 @@ export async function tryRouteFormat(
     const { isAlcatrazPackerFormat, parseAlcatrazPackerFile } = await import('@lib/import/formats/AlcatrazPackerParser');
     return withNativeThenUADE('alcatrazPacker', ctx,
       (buf: Uint8Array | ArrayBuffer, name: string) => { if (isAlcatrazPackerFormat(buf as ArrayBuffer)) return parseAlcatrazPackerFile(buf as ArrayBuffer, name); return null; },
-      'AlcatrazPackerParser');
+      'AlcatrazPackerParser', { injectUADE: true });
   }
 
   // ── Blade Packer (UDS.* prefix) ──────────────────────────────────────────
@@ -1468,7 +1476,7 @@ export async function tryRouteFormat(
     const { isBladePackerFormat, parseBladePackerFile } = await import('@lib/import/formats/BladePackerParser');
     return withNativeThenUADE('bladePacker', ctx,
       (buf: Uint8Array | ArrayBuffer, name: string) => { if (isBladePackerFormat(buf as ArrayBuffer)) return parseBladePackerFile(buf as ArrayBuffer, name); return null; },
-      'BladePackerParser');
+      'BladePackerParser', { injectUADE: true });
   }
 
   // ── Tomy Tracker (SG.* prefix) ────────────────────────────────────────────
@@ -1487,7 +1495,7 @@ export async function tryRouteFormat(
     const { isImagesMusicSystemFormat, parseImagesMusicSystemFile } = await import('@lib/import/formats/ImagesMusicSystemParser');
     return withNativeThenUADE('imagesMusicSystem', ctx,
       (buf: Uint8Array | ArrayBuffer, name: string) => { if (isImagesMusicSystemFormat(buf as ArrayBuffer)) return parseImagesMusicSystemFile(buf as ArrayBuffer, name); return null; },
-      'ImagesMusicSystemParser');
+      'ImagesMusicSystemParser', { injectUADE: true });
   }
 
   // ── Fashion Tracker (EX.* prefix) ────────────────────────────────────────
@@ -1495,15 +1503,20 @@ export async function tryRouteFormat(
     const { isFashionTrackerFormat, parseFashionTrackerFile } = await import('@lib/import/formats/FashionTrackerParser');
     return withNativeThenUADE('fashionTracker', ctx,
       (buf: Uint8Array | ArrayBuffer, name: string) => { if (isFashionTrackerFormat(buf as ArrayBuffer)) return parseFashionTrackerFile(buf as ArrayBuffer, name); return null; },
-      'FashionTrackerParser');
+      'FashionTrackerParser', { injectUADE: true });
   }
 
   // ── MultiMedia Sound (MMS.* / SFX20.* prefix) ────────────────────────────
+  // Stub parser provides no useful display data. Use UADE for real instruments/patterns,
+  // then inject uadeEditableFileData so UADEEditableSynth handles playback correctly.
   if (matchesExt(filename, ['mms', 'sfx20'])) {
-    const { isMultiMediaSoundFormat, parseMultiMediaSoundFile } = await import('@lib/import/formats/MultiMediaSoundParser');
-    return withNativeThenUADE('multiMediaSound', ctx,
-      (buf: Uint8Array | ArrayBuffer, name: string) => { if (isMultiMediaSoundFormat(buf as ArrayBuffer)) return parseMultiMediaSoundFile(buf as ArrayBuffer, name); return null; },
-      'MultiMediaSoundParser');
+    const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
+    const result = await parseUADEFile(buffer, originalFileName, prefs.uade ?? 'enhanced', subsong, preScannedMeta);
+    if (!(result as any).uadeEditableFileData) {
+      (result as any).uadeEditableFileData = buffer.slice(0);
+      (result as any).uadeEditableFileName = originalFileName;
+    }
+    return result;
   }
 
   // ── Sean Conran (SCR.* prefix) ───────────────────────────────────────────
@@ -1530,7 +1543,7 @@ export async function tryRouteFormat(
     const { isTitanicsPackerFormat, parseTitanicsPackerFile } = await import('@lib/import/formats/TitanicsPackerParser');
     return withNativeThenUADE('titanicsPacker', ctx,
       (buf: Uint8Array | ArrayBuffer, name: string) => { if (isTitanicsPackerFormat(buf as ArrayBuffer)) return parseTitanicsPackerFile(buf as ArrayBuffer, name); return null; },
-      'TitanicsPackerParser');
+      'TitanicsPackerParser', { injectUADE: true });
   }
 
   // ── Kris Hatlelid (KH.* prefix) ──────────────────────────────────────────
@@ -1540,7 +1553,7 @@ export async function tryRouteFormat(
     const khCtx = { ...ctx, originalFileName: toUADEPrefixName(originalFileName, ['kh']) };
     return withNativeThenUADE('krisHatlelid', khCtx,
       (buf: Uint8Array | ArrayBuffer, name: string) => { if (isKrisHatlelidFormat(buf as ArrayBuffer)) return parseKrisHatlelidFile(buf as ArrayBuffer, name); return null; },
-      'KrisHatlelidParser');
+      'KrisHatlelidParser', { injectUADE: true });
   }
 
   // ── NTSP System (TWO.* prefix) ───────────────────────────────────────────
@@ -1549,7 +1562,7 @@ export async function tryRouteFormat(
     const { isNTSPFormat, parseNTSPFile } = await import('@lib/import/formats/NTSPParser');
     return withNativeThenUADE('ntsp', ctx,
       (buf: Uint8Array | ArrayBuffer, name: string) => { if (isNTSPFormat(buf as ArrayBuffer)) return parseNTSPFile(buf as ArrayBuffer, name); return null; },
-      'NTSPParser');
+      'NTSPParser', { injectUADE: true });
   }
 
   // ── UFO / MicroProse (MUS.* / UFO.* prefix) ──────────────────────────────
@@ -1558,7 +1571,7 @@ export async function tryRouteFormat(
     const { isUFOFormat, parseUFOFile } = await import('@lib/import/formats/UFOParser');
     return withNativeThenUADE('ufo', ctx,
       (buf: Uint8Array | ArrayBuffer, name: string) => { if (isUFOFormat(buf as ArrayBuffer)) return parseUFOFile(buf as ArrayBuffer, name); return null; },
-      'UFOParser');
+      'UFOParser', { injectUADE: true });
   }
 
   // ── Mosh Packer (MOSH.* prefix) ──────────────────────────────────────────
@@ -1567,7 +1580,7 @@ export async function tryRouteFormat(
     const { isMoshPackerFormat, parseMoshPackerFile } = await import('@lib/import/formats/MoshPackerParser');
     return withNativeThenUADE('moshPacker', ctx,
       (buf: Uint8Array | ArrayBuffer, name: string) => { if (isMoshPackerFormat(buf as ArrayBuffer)) return parseMoshPackerFile(buf as ArrayBuffer, name); return null; },
-      'MoshPackerParser');
+      'MoshPackerParser', { injectUADE: true });
   }
 
   // ── Mugician (MUG.* prefix) ───────────────────────────────────────────────
@@ -1587,9 +1600,10 @@ export async function tryRouteFormat(
   // ── Core Design (CORE.* prefix) ───────────────────────────────────────────
   if (matchesExt(filename, ['core'])) {
     const { isCoreDesignFormat, parseCoreDesignFile } = await import('@lib/import/formats/CoreDesignParser');
-    return withNativeThenUADE('coreDesign', ctx,
+    const coreCtx = { ...ctx, originalFileName: toUADEPrefixName(originalFileName, ['core']) };
+    return withNativeThenUADE('coreDesign', coreCtx,
       (buf: Uint8Array | ArrayBuffer, name: string) => { if (isCoreDesignFormat(buf as ArrayBuffer)) return parseCoreDesignFile(buf as ArrayBuffer, name); return null; },
-      'CoreDesignParser');
+      'CoreDesignParser', { injectUADE: true });
   }
 
   // ── Janko Mrsic-Flogel (JMF.* prefix) ────────────────────────────────────
@@ -1598,7 +1612,7 @@ export async function tryRouteFormat(
     const jmfCtx = { ...ctx, originalFileName: toUADEPrefixName(originalFileName, ['jmf']) };
     return withNativeThenUADE('jankoMrsicFlogel', jmfCtx,
       (buf: Uint8Array | ArrayBuffer, name: string) => { if (isJankoMrsicFlogelFormat(buf as ArrayBuffer)) return parseJankoMrsicFlogelFile(buf as ArrayBuffer, name); return null; },
-      'JankoMrsicFlogelParser');
+      'JankoMrsicFlogelParser', { injectUADE: true });
   }
 
   // ── Special FX (JD.* prefix) ──────────────────────────────────────────────
@@ -1614,7 +1628,7 @@ export async function tryRouteFormat(
     const { isSoundPlayerFormat, parseSoundPlayerFile } = await import('@lib/import/formats/SoundPlayerParser');
     return withNativeThenUADE('soundPlayer', ctx,
       (buf: Uint8Array | ArrayBuffer, name: string) => { if (isSoundPlayerFormat(buf as ArrayBuffer)) return parseSoundPlayerFile(buf as ArrayBuffer, name); return null; },
-      'SoundPlayerParser');
+      'SoundPlayerParser', { injectUADE: true });
   }
 
   // ── Nick Pelling Packer (NPP.* prefix) ────────────────────────────────────
@@ -1622,7 +1636,7 @@ export async function tryRouteFormat(
     const { isNickPellingPackerFormat, parseNickPellingPackerFile } = await import('@lib/import/formats/NickPellingPackerParser');
     return withNativeThenUADE('nickPellingPacker', ctx,
       (buf: Uint8Array | ArrayBuffer, name: string) => { if (isNickPellingPackerFormat(buf as ArrayBuffer)) return parseNickPellingPackerFile(buf as ArrayBuffer, name); return null; },
-      'NickPellingPackerParser');
+      'NickPellingPackerParser', { injectUADE: true });
   }
 
   // ── Peter Verswyvelen Packer (PVP.* prefix) ───────────────────────────────
@@ -1638,7 +1652,7 @@ export async function tryRouteFormat(
     const { isWallyBebenFormat, parseWallyBebenFile } = await import('@lib/import/formats/WallyBebenParser');
     return withNativeThenUADE('wallyBeben', ctx,
       (buf: Uint8Array | ArrayBuffer, name: string) => { if (isWallyBebenFormat(buf as ArrayBuffer)) return parseWallyBebenFile(buf as ArrayBuffer, name); return null; },
-      'WallyBebenParser');
+      'WallyBebenParser', { injectUADE: true });
   }
 
   // ── Steve Barrett (SB.* prefix) ───────────────────────────────────────────
@@ -1646,15 +1660,14 @@ export async function tryRouteFormat(
     const { isSteveBarrettFormat, parseSteveBarrettFile } = await import('@lib/import/formats/SteveBarrettParser');
     return withNativeThenUADE('steveBarrett', ctx,
       (buf: Uint8Array | ArrayBuffer, name: string) => { if (isSteveBarrettFormat(buf as ArrayBuffer)) return parseSteveBarrettFile(buf as ArrayBuffer, name); return null; },
-      'SteveBarrettParser');
+      'SteveBarrettParser', { injectUADE: true });
   }
 
   // ── Paul Summers (SNK.* prefix) ───────────────────────────────────────────
+  // Compiled Amiga format — enhanced mode extracts garbled samples, use classic streaming.
   if (matchesExt(filename, ['snk'])) {
-    const { isPaulSummersFormat, parsePaulSummersFile } = await import('@lib/import/formats/PaulSummersParser');
-    return withNativeThenUADE('paulSummers', ctx,
-      (buf: Uint8Array | ArrayBuffer, name: string) => { if (isPaulSummersFormat(buf as ArrayBuffer)) return parsePaulSummersFile(buf as ArrayBuffer, name); return null; },
-      'PaulSummersParser');
+    const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
+    return parseUADEFile(buffer, toUADEPrefixName(originalFileName, ['snk']), 'classic', subsong, preScannedMeta);
   }
 
   // ── Desire (DSR.* prefix) ─────────────────────────────────────────────────
@@ -1672,7 +1685,7 @@ export async function tryRouteFormat(
     const { isDaveLoweNewFormat, parseDaveLoweNewFile } = await import('@lib/import/formats/DaveLoweNewParser');
     return withNativeThenUADE('daveLowe', ctx,
       (buf: Uint8Array | ArrayBuffer, name: string) => { if (isDaveLoweNewFormat(buf as ArrayBuffer)) return parseDaveLoweNewFile(buf as ArrayBuffer, name); return null; },
-      'DaveLoweNewParser');
+      'DaveLoweNewParser', { injectUADE: true });
   }
 
   // ── Martin Walker (AVP.* / MW.* prefix) ──────────────────────────────────
@@ -1681,16 +1694,23 @@ export async function tryRouteFormat(
     const { isMartinWalkerFormat, parseMartinWalkerFile } = await import('@lib/import/formats/MartinWalkerParser');
     return withNativeThenUADE('martinWalker', ctx,
       (buf: Uint8Array | ArrayBuffer, name: string) => { if (isMartinWalkerFormat(buf as ArrayBuffer)) return parseMartinWalkerFile(buf as ArrayBuffer, name); return null; },
-      'MartinWalkerParser');
+      'MartinWalkerParser', { injectUADE: true });
   }
 
   // ── Paul Shields (PS.* prefix) ────────────────────────────────────────────
   // Amiga 3-variant format with zero-prefix header. UADE prefix: ps.
+  // Use UADE prefix-form filename so the replayer is correctly identified.
   if (matchesExt(filename, ['ps'])) {
     const { isPaulShieldsFormat, parsePaulShieldsFile } = await import('@lib/import/formats/PaulShieldsParser');
-    return withNativeThenUADE('paulShields', ctx,
-      (buf: Uint8Array | ArrayBuffer, name: string) => { if (isPaulShieldsFormat(buf as ArrayBuffer)) return parsePaulShieldsFile(buf as ArrayBuffer, name); return null; },
-      'PaulShieldsParser');
+    if (isPaulShieldsFormat(buffer)) {
+      const result = parsePaulShieldsFile(buffer, originalFileName);
+      if (!(result as any).uadeEditableFileData) {
+        (result as any).uadeEditableFileData = buffer.slice(0);
+        (result as any).uadeEditableFileName = toUADEPrefixName(originalFileName, ['ps']);
+      }
+      return result;
+    }
+    return callUADE(ctx);
   }
 
   // ── Paul Robotham (DAT.* prefix) ──────────────────────────────────────────
@@ -1699,7 +1719,7 @@ export async function tryRouteFormat(
     const { isPaulRobothamFormat, parsePaulRobothamFile } = await import('@lib/import/formats/PaulRobothamParser');
     return withNativeThenUADE('paulRobotham', ctx,
       (buf: Uint8Array | ArrayBuffer, name: string) => { if (isPaulRobothamFormat(buf as ArrayBuffer)) return parsePaulRobothamFile(buf as ArrayBuffer, name); return null; },
-      'PaulRobothamParser');
+      'PaulRobothamParser', { injectUADE: true });
   }
 
   // ── Pierre Adane Packer (PAP.* prefix) ────────────────────────────────────
@@ -1708,14 +1728,18 @@ export async function tryRouteFormat(
     const { isPierreAdaneFormat, parsePierreAdaneFile } = await import('@lib/import/formats/PierreAdaneParser');
     return withNativeThenUADE('pierreAdane', ctx,
       (buf: Uint8Array | ArrayBuffer, name: string) => { if (isPierreAdaneFormat(buf as ArrayBuffer)) return parsePierreAdaneFile(buf as ArrayBuffer, name); return null; },
-      'PierreAdaneParser');
+      'PierreAdaneParser', { injectUADE: true });
   }
 
   // ── Anders 0land (HOT.* prefix) ───────────────────────────────────────────
   // Amiga 3-chunk format (mpl/mdt/msm). UADE prefix: hot.
   if (matchesExt(filename, ['hot'])) {
     const { isAnders0landFormat, parseAnders0landFile } = await import('@lib/import/formats/Anders0landParser');
-    return withNativeThenUADE('anders0land', ctx,
+    // UADE and the native parser both require hot.* prefix naming.
+    // Remap extension-named files (e.g. "primemover.hot" → "hot.primemover").
+    const hotBase = (filename.split('/').pop() ?? filename).replace(/\.hot$/i, '');
+    const uadeCtx = { ...ctx, originalFileName: `hot.${hotBase}` };
+    return withNativeThenUADE('anders0land', uadeCtx,
       async (buf: Uint8Array | ArrayBuffer, name: string) => { if (isAnders0landFormat(buf as ArrayBuffer, name)) return await parseAnders0landFile(buf as ArrayBuffer, name); return null; },
       'Anders0landParser', { injectUADE: true });
   }
@@ -1762,7 +1786,7 @@ export async function tryRouteFormat(
     const { isJesperOlsenFormat, parseJesperOlsenFile } = await import('@lib/import/formats/JesperOlsenParser');
     return withNativeThenUADE('jesperOlsen', ctx,
       (buf: Uint8Array | ArrayBuffer, name: string) => { if (isJesperOlsenFormat(buf as ArrayBuffer)) return parseJesperOlsenFile(buf as ArrayBuffer, name); return null; },
-      'JesperOlsenParser');
+      'JesperOlsenParser', { injectUADE: true });
   }
 
   // ── Kim Christensen (KIM.* prefix) ────────────────────────────────────────
@@ -1771,7 +1795,7 @@ export async function tryRouteFormat(
     const { isKimChristensenFormat, parseKimChristensenFile } = await import('@lib/import/formats/KimChristensenParser');
     return withNativeThenUADE('kimChristensen', ctx,
       (buf: Uint8Array | ArrayBuffer, name: string) => { if (isKimChristensenFormat(buf as ArrayBuffer)) return parseKimChristensenFile(buf as ArrayBuffer, name); return null; },
-      'KimChristensenParser');
+      'KimChristensenParser', { injectUADE: true });
   }
 
   // ── Ashley Hogg (ASH.* prefix) ────────────────────────────────────────────
@@ -1779,7 +1803,7 @@ export async function tryRouteFormat(
     const { isAshleyHoggFormat, parseAshleyHoggFile } = await import('@lib/import/formats/AshleyHoggParser');
     return withNativeThenUADE('ashleyHogg', ctx,
       (buf: Uint8Array | ArrayBuffer, name: string) => { if (isAshleyHoggFormat(buf as ArrayBuffer)) return parseAshleyHoggFile(buf as ArrayBuffer, name); return null; },
-      'AshleyHoggParser');
+      'AshleyHoggParser', { injectUADE: true });
   }
 
   // ── ADPCM Mono (ADPCM.* prefix) ───────────────────────────────────────────
@@ -1795,7 +1819,7 @@ export async function tryRouteFormat(
     const { isJanneSalmijarviFormat, parseJanneSalmijarviFile } = await import('@lib/import/formats/JanneSalmijarviParser');
     return withNativeThenUADE('janneSalmijarvi', ctx,
       (buf: Uint8Array | ArrayBuffer, name: string) => { if (isJanneSalmijarviFormat(buf as ArrayBuffer)) return parseJanneSalmijarviFile(buf as ArrayBuffer, name); return null; },
-      'JanneSalmijarviParser');
+      'JanneSalmijarviParser', { injectUADE: true });
   }
 
   // ── Jochen Hippel 7V (HIP7.* / S7G.* prefix) ─────────────────────────────
@@ -1803,7 +1827,7 @@ export async function tryRouteFormat(
     const { isJochenHippel7VFormat, parseJochenHippel7VFile } = await import('@lib/import/formats/JochenHippel7VParser');
     return withNativeThenUADE('jochenHippel7V', ctx,
       (buf: Uint8Array | ArrayBuffer, name: string) => { if (isJochenHippel7VFormat(buf as ArrayBuffer)) return parseJochenHippel7VFile(buf as ArrayBuffer, name); return null; },
-      'JochenHippel7VParser');
+      'JochenHippel7VParser', { injectUADE: true });
   }
 
   // ── Jochen Hippel ST (.sog / .hst / .hip extension or HST.* prefix) ──────
@@ -1811,7 +1835,7 @@ export async function tryRouteFormat(
     const { isJochenHippelSTFormat, parseJochenHippelSTFile } = await import('@lib/import/formats/JochenHippelSTParser');
     return withNativeThenUADE('jochenHippelST', ctx,
       (buf: Uint8Array | ArrayBuffer, name: string) => { if (isJochenHippelSTFormat(buf as ArrayBuffer)) return parseJochenHippelSTFile(buf as ArrayBuffer, name); return null; },
-      'JochenHippelSTParser');
+      'JochenHippelSTParser', { injectUADE: true });
   }
 
   // ── Maximum Effect (MAX.* prefix) / MaxTrax (.mxtx) ─────────────────────
@@ -1819,7 +1843,7 @@ export async function tryRouteFormat(
     const { isMaximumEffectFormat, parseMaximumEffectFile } = await import('@lib/import/formats/MaximumEffectParser');
     return withNativeThenUADE('maximumEffect', ctx,
       (buf: Uint8Array | ArrayBuffer, name: string) => { if (isMaximumEffectFormat(buf as ArrayBuffer)) return parseMaximumEffectFile(buf as ArrayBuffer, name); return null; },
-      'MaximumEffectParser');
+      'MaximumEffectParser', { injectUADE: true });
   }
 
   // ── MIDI Loriciel (MIDI.* prefix) ─────────────────────────────────────────
@@ -1827,7 +1851,7 @@ export async function tryRouteFormat(
     const { isMIDILoricielFormat, parseMIDILoricielFile } = await import('@lib/import/formats/MIDILoricielParser');
     return withNativeThenUADE('midiLoriciel', ctx,
       (buf: Uint8Array | ArrayBuffer, name: string) => { if (isMIDILoricielFormat(buf as ArrayBuffer)) return parseMIDILoricielFile(buf as ArrayBuffer, name); return null; },
-      'MIDILoricielParser');
+      'MIDILoricielParser', { injectUADE: true });
   }
 
   // ── onEscapee (ONE.* prefix) ──────────────────────────────────────────────
@@ -1835,7 +1859,7 @@ export async function tryRouteFormat(
     const { isOnEscapeeFormat, parseOnEscapeeFile } = await import('@lib/import/formats/OnEscapeeParser');
     return withNativeThenUADE('onEscapee', ctx,
       (buf: Uint8Array | ArrayBuffer, name: string) => { if (isOnEscapeeFormat(buf as ArrayBuffer)) return parseOnEscapeeFile(buf as ArrayBuffer, name); return null; },
-      'OnEscapeeParser');
+      'OnEscapeeParser', { injectUADE: true });
   }
 
   // ── Paul Tonge (PAT.* prefix) ─────────────────────────────────────────────
@@ -1843,7 +1867,7 @@ export async function tryRouteFormat(
     const { isPaulTongeFormat, parsePaulTongeFile } = await import('@lib/import/formats/PaulTongeParser');
     return withNativeThenUADE('paulTonge', ctx,
       (buf: Uint8Array | ArrayBuffer, name: string) => { if (isPaulTongeFormat(buf as ArrayBuffer)) return parsePaulTongeFile(buf as ArrayBuffer, name); return null; },
-      'PaulTongeParser');
+      'PaulTongeParser', { injectUADE: true });
   }
 
   // ── Rob Hubbard ST (RHO.* prefix) ─────────────────────────────────────────
@@ -1890,7 +1914,7 @@ export async function tryRouteFormat(
     const { isJochenHippelSTFormat, parseJochenHippelSTFile } = await import('@lib/import/formats/JochenHippelSTParser');
     return withNativeThenUADE('jochenHippelST', ctx,
       (buf: Uint8Array | ArrayBuffer, name: string) => { if (isJochenHippelSTFormat(buf as ArrayBuffer)) return parseJochenHippelSTFile(buf as ArrayBuffer, name); return null; },
-      'JochenHippelSTParser');
+      'JochenHippelSTParser', { injectUADE: true });
   }
 
   // ── Special FX ST (DODA.* prefix) ────────────────────────────────────────
@@ -2029,7 +2053,7 @@ export async function tryRouteFormat(
     const { isGlueMonFormat, parseGlueMonFile } = await import('@lib/import/formats/GlueMonParser');
     return withNativeThenUADE('glueMonParser', ctx,
       (buf: Uint8Array | ArrayBuffer, name: string) => { if (isGlueMonFormat(buf as ArrayBuffer)) return parseGlueMonFile(buf as ArrayBuffer, name); return null; },
-      'GlueMonParser');
+      'GlueMonParser', { injectUADE: true });
   }
 
   // ── David Hanney (DH.* prefix) ────────────────────────────────────────────
@@ -2038,7 +2062,7 @@ export async function tryRouteFormat(
     const { isDavidHanneyFormat, parseDavidHanneyFile } = await import('@lib/import/formats/DavidHanneyParser');
     return withNativeThenUADE('davidHanney', ctx,
       (buf: Uint8Array | ArrayBuffer, name: string) => { if (isDavidHanneyFormat(buf as ArrayBuffer)) return parseDavidHanneyFile(buf as ArrayBuffer, name); return null; },
-      'DavidHanneyParser');
+      'DavidHanneyParser', { injectUADE: true });
   }
 
   // ── UADE-only prefix formats + catch-all ─────────────────────────────────

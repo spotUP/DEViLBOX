@@ -137,7 +137,7 @@ export function isIMSFormat(buffer: ArrayBuffer): boolean {
  */
 function imsNoteToXM(noteIdx: number): number {
   if (noteIdx === 63) return 0;          // empty cell
-  if (noteIdx < 48)  return 37 + noteIdx; // valid note range
+  if (noteIdx < 48)  return 13 + noteIdx; // valid note range
   return -1;                              // invalid
 }
 

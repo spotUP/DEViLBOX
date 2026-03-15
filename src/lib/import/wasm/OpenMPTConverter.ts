@@ -313,10 +313,17 @@ export async function parseWithOpenMPT(
             ? `data:audio/wav;base64,${arrayBufferToBase64(audioBuffer)}`
             : '';
 
+          // Compute Tone.js base note from relativeTone.
+          // OpenMPT root is C5 (MIDI 72). relativeTone shifts semitones from there.
+          // Tone.js uses format 'C4', 'C#4', etc — NOT tracker 'C-4' notation.
+          const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+          const rootMidi = 72 + (smpInfo.relativeTone || 0); // C5 = MIDI 72
+          const toneBaseNote = `${NOTE_NAMES[((rootMidi % 12) + 12) % 12]}${Math.floor(rootMidi / 12) - 1}`;
+
           sampleConfig = {
             audioBuffer,
             url: sampleUrl,
-            baseNote: 'C-4',
+            baseNote: toneBaseNote,
             detune: smpInfo.fineTune || 0,
             loop: smpInfo.hasLoop,
             loopType: smpInfo.pingPongLoop ? 'pingpong' : (smpInfo.hasLoop ? 'forward' : 'off'),

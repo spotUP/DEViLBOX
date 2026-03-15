@@ -56,9 +56,9 @@ const PAL_CLOCK = 3546895;
 const SYN_REFERENCE_IDX = 49; // SYN_PERIODS[49] = 856
 
 /**
- * XM note number corresponding to SYN_REFERENCE_IDX (Amiga C-3 = XM C-3).
+ * XM note number corresponding to SYN_REFERENCE_IDX (Amiga C-1 = XM note 13).
  */
-const XM_REFERENCE_NOTE = 37;
+const XM_REFERENCE_NOTE = 13;
 
 /**
  * PAL sample rate at the reference period (856): 3546895 / (2 × 856) ≈ 2072 Hz.

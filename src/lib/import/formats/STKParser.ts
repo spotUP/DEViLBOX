@@ -111,8 +111,8 @@ function periodToNote(period: number): number {
       bestIdx  = i;
     }
   }
-  // Index 0 in table = C-1 = XM note 37 (C-3 in FT2 convention)
-  return bestIdx + 37;
+  // Index 0 in table = C-1 = XM note 13 (displays "C-1")
+  return bestIdx + 13;
 }
 
 // ── Format detection ──────────────────────────────────────────────────────────
