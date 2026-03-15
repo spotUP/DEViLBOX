@@ -48,6 +48,14 @@ const CHAR_WIDTH = 10;
 const LINE_NUMBER_WIDTH = 40;
 // Channel width is computed dynamically in render() based on acid/prob columns
 
+const KEY_TO_SEMITONE: Record<string, number> = {
+  'z': 0, 's': 1, 'x': 2, 'd': 3, 'c': 4, 'v': 5,
+  'g': 6, 'b': 7, 'h': 8, 'n': 9, 'j': 10, 'm': 11,
+  'q': 12, '2': 13, 'w': 14, '3': 15, 'e': 16, 'r': 17,
+  '5': 18, 't': 19, '6': 20, 'y': 21, '7': 22, 'u': 23,
+  'i': 24, '9': 25, 'o': 26, '0': 27, 'p': 28,
+};
+
 // NOTE_NAMES, noteToString and hexByte moved to TrackerGLRenderer (WebGL worker)
 
 interface ChannelTrigger {
@@ -86,7 +94,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   formatChannels,
   formatCurrentRow,
   formatIsPlaying,
-  onFormatCellChange: _onFormatCellChange,
+  onFormatCellChange,
 }) => {
   const { isMobile } = useResponsiveSafe();
 
@@ -142,9 +150,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   const [formatCursor, setFormatCursor] = useState({
     channelIndex: 0, rowIndex: 0, columnIndex: 0,
   });
-  void setFormatCursor; // used by future keyboard handler tasks
-  const [_formatOctave, _setFormatOctave] = useState(3);
-  void _formatOctave; void _setFormatOctave; // scaffolding for future keyboard handler tasks
+  const [formatOctave, setFormatOctave] = useState(3);
 
   // Bridge to the OffscreenCanvas worker
   const bridgeRef = useRef<TrackerOffscreenBridge | null>(null);
@@ -545,6 +551,51 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     if (isMobile || e.button !== 0) return; // Only left click on desktop
 
+    // FORMAT MODE: own hit-test (pattern may be undefined)
+    if (isFormatMode && formatChannels && formatColumns) {
+      const container = containerRef.current;
+      if (!container) return;
+      const rect = container.getBoundingClientRect();
+      const relX = e.clientX - rect.left;
+      const relY = e.clientY - rect.top;
+
+      // Find channel
+      let chIdx = -1;
+      for (let ch = 0; ch < channelOffsets.length; ch++) {
+        const absX = LINE_NUMBER_WIDTH + channelOffsets[ch];
+        if (relX >= absX && relX < absX + (channelWidths[ch] ?? 0)) {
+          chIdx = ch;
+          break;
+        }
+      }
+      if (chIdx < 0) return;
+
+      // Find row (center-scroll logic matching the renderer)
+      const numRows = formatChannels[chIdx]?.patternLength ?? 0;
+      const containerHeight = container.clientHeight;
+      const ROW_H = rowHeightRef.current;
+      const currentDisplayRow = formatIsPlayingRef.current ? formatCurrentRowRef.current : formatCursor.rowIndex;
+      const centerLineTop = Math.floor(containerHeight / 2) - ROW_H / 2;
+      const rowOffset = Math.floor((relY - centerLineTop) / ROW_H);
+      const rowIdx = Math.max(0, Math.min(numRows - 1, currentDisplayRow + rowOffset));
+
+      // Find column
+      const FORMAT_COL_GAP = 4;
+      const localX = relX - LINE_NUMBER_WIDTH - channelOffsets[chIdx] - 2;
+      let colIdx = 0;
+      let px = 0;
+      for (let ci = 0; ci < formatColumns.length; ci++) {
+        const colW = formatColumns[ci].charWidth * CHAR_WIDTH + FORMAT_COL_GAP;
+        if (localX < px + colW) { colIdx = ci; break; }
+        px += colW;
+        if (ci === formatColumns.length - 1) colIdx = ci;
+      }
+
+      setFormatCursor({ channelIndex: chIdx, rowIndex: rowIdx, columnIndex: colIdx });
+      containerRef.current?.focus();
+      return;
+    }
+
     const cell = getCellFromCoords(e.clientX, e.clientY);
     if (!cell) return;
 
@@ -621,6 +672,72 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       cellContextMenu.openMenu(e, cell.rowIndex, cell.channelIndex);
     }
   }, [getCellFromCoords, cellContextMenu]);
+
+  const handleFormatKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (!isFormatMode || !formatColumns || !formatChannels) return;
+    const col = formatColumns[formatCursor.columnIndex];
+    const numRows = formatChannels[0]?.patternLength ?? 0;
+
+    const moveCursor = (delta: { channelIndex?: number; rowIndex?: number; columnIndex?: number }) => {
+      setFormatCursor(prev => ({
+        channelIndex: Math.max(0, Math.min(formatChannels!.length - 1,
+          prev.channelIndex + (delta.channelIndex ?? 0))),
+        rowIndex: Math.max(0, Math.min(numRows - 1,
+          prev.rowIndex + (delta.rowIndex ?? 0))),
+        columnIndex: Math.max(0, Math.min(formatColumns!.length - 1,
+          prev.columnIndex + (delta.columnIndex ?? 0))),
+      }));
+    };
+
+    if (e.key === '[' || e.key === '-') { e.preventDefault(); setFormatOctave(o => Math.max(0, o - 1)); return; }
+    if (e.key === ']' || e.key === '=') { e.preventDefault(); setFormatOctave(o => Math.min(7, o + 1)); return; }
+
+    switch (e.key) {
+      case 'ArrowUp':    e.preventDefault(); moveCursor({ rowIndex: -1 }); return;
+      case 'ArrowDown':  e.preventDefault(); moveCursor({ rowIndex: +1 }); return;
+      case 'ArrowLeft':  e.preventDefault(); moveCursor({ columnIndex: -1 }); return;
+      case 'ArrowRight': e.preventDefault(); moveCursor({ columnIndex: +1 }); return;
+      case 'Tab':        e.preventDefault(); moveCursor({ channelIndex: e.shiftKey ? -1 : +1 }); return;
+      case 'PageUp':     e.preventDefault(); moveCursor({ rowIndex: -16 }); return;
+      case 'PageDown':   e.preventDefault(); moveCursor({ rowIndex: +16 }); return;
+      case 'Home':       e.preventDefault(); setFormatCursor(p => ({ ...p, rowIndex: 0 })); return;
+      case 'End':        e.preventDefault(); setFormatCursor(p => ({ ...p, rowIndex: Math.max(0, numRows - 1) })); return;
+      case 'Delete':
+      case 'Backspace':
+        e.preventDefault();
+        if (col) {
+          onFormatCellChange?.(formatCursor.channelIndex, formatCursor.rowIndex, col.key, col.emptyValue ?? 0);
+          moveCursor({ rowIndex: +1 });
+        }
+        return;
+    }
+
+    if (!col) return;
+
+    if (col.type === 'note') {
+      const semitone = KEY_TO_SEMITONE[e.key.toLowerCase()];
+      if (semitone !== undefined) {
+        e.preventDefault();
+        const midi = semitone + formatOctave * 12;
+        if (midi >= 0 && midi <= 95) {
+          onFormatCellChange?.(formatCursor.channelIndex, formatCursor.rowIndex, col.key, midi);
+          moveCursor({ rowIndex: +1 });
+        }
+      }
+    } else if (col.type === 'hex' || col.type === 'ctrl') {
+      if (/^[0-9a-fA-F]$/i.test(e.key)) {
+        e.preventDefault();
+        const digit = parseInt(e.key, 16);
+        const hexDigits = col.hexDigits ?? 2;
+        const cur = formatChannels[formatCursor.channelIndex]?.rows[formatCursor.rowIndex]?.[col.key]
+          ?? (col.emptyValue ?? 0);
+        const mask = (1 << (hexDigits * 4)) - 1;
+        onFormatCellChange?.(formatCursor.channelIndex, formatCursor.rowIndex, col.key,
+          ((cur << 4) | digit) & mask);
+        moveCursor({ rowIndex: +1 });
+      }
+    }
+  }, [isFormatMode, formatColumns, formatChannels, formatCursor, formatOctave, onFormatCellChange]);
 
   // Handle tap on pattern canvas - move cursor to tapped cell
   const handlePatternTap = useCallback((tapX: number, tapY: number) => {
@@ -2072,6 +2189,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
         style={{ minHeight: 200 }}
         tabIndex={0}
         onContextMenu={handleContextMenu}
+        onKeyDown={isFormatMode ? handleFormatKeyDown : undefined}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
