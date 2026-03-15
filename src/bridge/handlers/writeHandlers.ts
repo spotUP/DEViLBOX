@@ -670,7 +670,7 @@ export function setSynthParam(params: Record<string, unknown>): Record<string, u
 }
 
 /** Trigger a note on an instrument (for testing/preview) */
-export function triggerNote(params: Record<string, unknown>): Record<string, unknown> {
+export async function triggerNote(params: Record<string, unknown>): Promise<Record<string, unknown>> {
   const id = params.id as number;
   const note = params.note as string;
   const velocity = (params.velocity as number) ?? 100;
@@ -681,6 +681,7 @@ export function triggerNote(params: Record<string, unknown>): Record<string, unk
 
     const config = useInstrumentStore.getState().instruments.find(i => i.id === id);
     if (!config) return { error: `Instrument ${id} not found` };
+    await engine.ensureInstrumentReady(config);
     const now = Tone.now();
     if (duration) {
       engine.triggerNoteAttack(id, note, now, velocity / 127, config);
