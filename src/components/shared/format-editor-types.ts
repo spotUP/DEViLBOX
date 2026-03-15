@@ -5,6 +5,8 @@
  * Formats define their columns (note, hex, ctrl) and rendering behavior.
  */
 
+import type { ColumnSpec, PatternSnapshot, ChannelSnapshot, CellSnapshot } from '@engine/renderer/worker-types';
+
 export type ColumnType = 'note' | 'hex' | 'ctrl';
 
 /**
@@ -30,6 +32,10 @@ export interface ColumnDef {
   hexDigits?: number;
   /** Function to format a value for display */
   formatter: (value: number) => string;
+  /** Pixi tint color when cell has a value (hex number, e.g. 0x60e060) */
+  pixiColor?: number;
+  /** Pixi tint color when cell is empty */
+  pixiEmptyColor?: number;
 }
 
 /**
@@ -76,3 +82,83 @@ export type OnCellChange = (
  * each channel's current row independently during playback.
  */
 export type CurrentRowSpec = number | number[];
+
+/** Parse a CSS hex color to RGBA array. CSS vars/named colors fall back to neutral gray. */
+function parseColorToRgba(css: string): [number, number, number, number] {
+  const clean = css.trim().replace('#', '');
+  if (/^[0-9a-fA-F]{6}$/.test(clean)) {
+    return [
+      parseInt(clean.slice(0, 2), 16) / 255,
+      parseInt(clean.slice(2, 4), 16) / 255,
+      parseInt(clean.slice(4, 6), 16) / 255,
+      1.0,
+    ];
+  }
+  if (/^[0-9a-fA-F]{3}$/.test(clean)) {
+    return [
+      parseInt(clean[0] + clean[0], 16) / 255,
+      parseInt(clean[1] + clean[1], 16) / 255,
+      parseInt(clean[2] + clean[2], 16) / 255,
+      1.0,
+    ];
+  }
+  // CSS var, named color, or other — fall back to neutral gray
+  return [0.6, 0.6, 0.6, 1.0];
+}
+
+/**
+ * Convert a ColumnDef (main-thread, has formatter function) to a ColumnSpec
+ * (serializable, safe to send to WebGL worker).
+ */
+export function toColumnSpec(col: ColumnDef): ColumnSpec {
+  return {
+    charWidth: col.charWidth,
+    type: col.type === 'note' ? 'note' : 'hex',
+    hexDigits: col.hexDigits ?? 2,
+    emptyValue: col.emptyValue ?? 0,
+    color: parseColorToRgba(col.color),
+    emptyColor: parseColorToRgba(col.emptyColor),
+  };
+}
+
+/**
+ * Convert FormatChannel[] + ColumnDef[] to a PatternSnapshot for the WebGL worker.
+ * Each cell's values are stored in CellSnapshot.params[] (index = column index).
+ * The fixed Note/Inst/Vol/Eff fields are zeroed — the renderer uses the column-driven
+ * path when params is present.
+ */
+export function formatChannelsToSnapshot(
+  channels: FormatChannel[],
+  columns: ColumnDef[],
+  patternId = 'fmt-0',
+): PatternSnapshot {
+  const length = channels.length > 0
+    ? Math.max(...channels.map(c => c.patternLength))
+    : 0;
+
+  const channelSnapshots: ChannelSnapshot[] = channels.map((ch, chIdx) => {
+    const rows: CellSnapshot[] = Array.from({ length }, (_, ri) => {
+      const cell = ch.rows[ri];
+      return {
+        note: 0, instrument: 0, volume: 0,
+        effTyp: 0, eff: 0, effTyp2: 0, eff2: 0,
+        params: columns.map(col => {
+          const v = cell?.[col.key];
+          return v === undefined ? (col.emptyValue ?? 0) : v;
+        }),
+      };
+    });
+    return {
+      id: `ch-${chIdx}`,
+      name: ch.label,
+      effectCols: 0,
+      rows,
+    };
+  });
+
+  return {
+    id: patternId,
+    length,
+    channels: channelSnapshots,
+  };
+}
