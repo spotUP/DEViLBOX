@@ -164,13 +164,15 @@ export const GTUltraView: React.FC<{ width?: number; height?: number }> = ({ wid
       {/* Main content */}
       <div className="flex flex-1 min-h-0 overflow-hidden">
         {/* Pattern editor */}
-        <PatternEditorCanvas
-          formatColumns={GTU_COLUMNS}
-          formatChannels={channels}
-          formatCurrentRow={currentRow}
-          formatIsPlaying={isPlaying}
-          onFormatCellChange={handleCellChange}
-        />
+        <div style={{ flex: 1, minWidth: 0, minHeight: 0, overflow: 'hidden' }}>
+          <PatternEditorCanvas
+            formatColumns={GTU_COLUMNS}
+            formatChannels={channels}
+            formatCurrentRow={isPlaying ? playbackPos.row : currentRow}
+            formatIsPlaying={isPlaying}
+            onFormatCellChange={handleCellChange}
+          />
+        </div>
 
         {/* Sidebar */}
         <div className="flex flex-col border-l border-ft2-border" style={{ width: sidebarW }}>
