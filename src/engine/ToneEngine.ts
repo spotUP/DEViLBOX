@@ -1799,7 +1799,10 @@ export class ToneEngine {
         // If we have a stored edited buffer, use that instead of URL
         // Note: audioBuffer can be ArrayBuffer, Uint8Array, or base64 string (from persistence)
         // Guard: after JSON deserialization, ArrayBuffer becomes {} — reject non-buffer objects
-        const isValidBuffer = storedBuffer instanceof ArrayBuffer ||
+        // Guard: audioBuffer can be ArrayBuffer, Uint8Array, or base64 string (from persistence)
+        // After JSON deserialization, ArrayBuffer becomes {} — reject non-buffer objects
+        // Also reject empty ArrayBuffer(0) — e.g. from OpenMPT empty samples — which cause EncodingError
+        const isValidBuffer = (storedBuffer instanceof ArrayBuffer && storedBuffer.byteLength > 0) ||
           (storedBuffer as unknown) instanceof Uint8Array ||
           typeof storedBuffer === 'string';
         if (storedBuffer && isValidBuffer) {
