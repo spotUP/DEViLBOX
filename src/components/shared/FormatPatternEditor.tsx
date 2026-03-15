@@ -10,10 +10,10 @@ import type { ColumnDef, FormatChannel, OnCellChange } from './format-editor-typ
 
 const CHAR_W = 8;
 const CHAR_H = 14;
-const ROW_H = CHAR_H + 2;
-const ROW_NUM_W = CHAR_W * 3 + 4;
+const ROW_H = 24;  // Match standard PatternEditorCanvas row height
+const ROW_NUM_W = CHAR_W * 4 + 4; // wider "row " label with breathing room
 const COL_GAP = 4;
-const CHAN_GAP = 8;
+const CHAN_GAP = 10;
 const HEADER_H = ROW_H + 4;
 
 const COLORS = {
@@ -113,10 +113,11 @@ export const FormatPatternEditor: React.FC<FormatPatternEditorProps> = ({
     ctx.fillStyle = COLORS.headerBg;
     ctx.fillRect(0, 0, width, HEADER_H);
     ctx.fillStyle = COLORS.headerText;
-    ctx.fillText('ROW', 2, 4);
+    const headerTextY = Math.floor((HEADER_H - CHAR_H) / 2);
+    // Row number column has no header label (matches standard tracker)
     for (let ch = 0; ch < numChannels; ch++) {
       const x = ROW_NUM_W + ch * (channelWidth + CHAN_GAP);
-      ctx.fillText(channels[ch].label, x, 4);
+      ctx.fillText(channels[ch].label, x, headerTextY);
     }
 
     // Per-channel play rows: use per-channel array if provided, else broadcast single row
@@ -185,7 +186,9 @@ export const FormatPatternEditor: React.FC<FormatPatternEditorProps> = ({
           const value = cell ? cell[col.key] : undefined;
           const isEmpty = value === undefined || value === col.emptyValue;
 
-          const text = isEmpty ? '•'.repeat(col.charWidth) : col.formatter(value!);
+          // Always use the formatter — it returns '---'/'--' for empty values,
+          // matching the visual style of the standard pattern editor.
+          const text = col.formatter(isEmpty ? (col.emptyValue ?? 0) : value!);
           ctx.fillStyle = isEmpty ? col.emptyColor : col.color;
           ctx.fillText(text, colX, y + 1);
 

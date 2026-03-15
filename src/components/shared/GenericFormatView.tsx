@@ -19,8 +19,8 @@ interface GenericFormatViewProps {
 
   // Playback
   isPlaying: boolean;
-  onPlay: () => void;
-  onStop: () => void;
+  onPlay?: () => void;
+  onStop?: () => void;
 
   // Extra toolbar buttons (format-specific)
   toolbarSlot?: ReactNode;
@@ -43,7 +43,7 @@ interface GenericFormatViewProps {
 }
 
 export const GenericFormatView: React.FC<GenericFormatViewProps> = ({
-  formatLabel, toolbarInfo, isPlaying, onPlay, onStop, toolbarSlot,
+  formatLabel, toolbarInfo, isPlaying, onPlay = undefined, onStop = undefined, toolbarSlot,
   positionEditor, positionEditorHeight = 160,
   columns, channels, currentRow, currentRowPerChannel, onCellChange,
   sidePanel, sidePanelWidth = 280,
@@ -104,21 +104,23 @@ export const GenericFormatView: React.FC<GenericFormatViewProps> = ({
       >
         <div style={{ fontWeight: 'bold', minWidth: '40px' }}>{formatLabel}</div>
         <div style={{ flex: 1, fontSize: '11px', color: 'var(--color-text-muted)' }}>{toolbarInfo}</div>
-        <button
-          onClick={isPlaying ? onStop : onPlay}
-          style={{
-            padding: '4px 12px',
-            backgroundColor: isPlaying ? '#e95545' : '#4a7c4e',
-            color: 'var(--color-text)',
-            border: 'none',
-            borderRadius: '2px',
-            cursor: 'pointer',
-            fontSize: '11px',
-            fontWeight: 'bold',
-          }}
-        >
-          {isPlaying ? 'Stop' : 'Play'}
-        </button>
+        {(onPlay || onStop) && (
+          <button
+            onClick={isPlaying ? onStop : onPlay}
+            style={{
+              padding: '4px 12px',
+              backgroundColor: isPlaying ? '#e95545' : '#4a7c4e',
+              color: 'var(--color-text)',
+              border: 'none',
+              borderRadius: '2px',
+              cursor: 'pointer',
+              fontSize: '11px',
+              fontWeight: 'bold',
+            }}
+          >
+            {isPlaying ? 'Stop' : 'Play'}
+          </button>
+        )}
         {toolbarSlot}
       </div>
 
