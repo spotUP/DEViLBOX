@@ -24,6 +24,12 @@ export const ModuleExportPanel: React.FC<ModuleExportPanelProps> = ({
   const [bakeSynthsToSamples, setBakeSynthsToSamples] = useState(true);
   const [exportWarnings, setExportWarnings] = useState<string[]>([]);
 
+  const nChannels = patterns[0]?.channels.length ?? 4;
+  const hasNotes = patterns.some(pat =>
+    pat.channels.some(ch => ch.rows.some(row => row.note > 0)),
+  );
+  const modCompatible = nChannels <= 4 && hasNotes;
+
   // Clear warnings when export mode changes
   useEffect(() => {
     setExportWarnings([]);
@@ -86,7 +92,10 @@ export const ModuleExportPanel: React.FC<ModuleExportPanelProps> = ({
         onClose();
       }
     } else {
-      const nChannels = patterns[0]?.channels.length ?? 4;
+      if (!modCompatible) {
+        notify.error('This format cannot be exported to ProTracker MOD.');
+        return false;
+      }
       const song = {
         name: metadata.name || 'DEViLBOX Export',
         format: 'MOD' as const,
@@ -99,6 +108,7 @@ export const ModuleExportPanel: React.FC<ModuleExportPanelProps> = ({
         initialBPM: bpm,
         initialSpeed: speed,
       };
+
 
       const result = await exportSongToMOD(song, { bakeSynths: bakeSynthsToSamples });
 
@@ -189,43 +199,59 @@ export const ModuleExportPanel: React.FC<ModuleExportPanelProps> = ({
           <h3 className="text-sm font-mono font-bold text-accent-primary mb-3">
             ProTracker MOD Export (.mod)
           </h3>
-          <div className="space-y-3">
-            {/* Synth instrument handling */}
-            <label className="flex items-center gap-3 text-sm font-mono text-text-primary cursor-pointer hover:text-accent-primary transition-colors">
-              <input
-                type="checkbox"
-                checked={bakeSynthsToSamples}
-                onChange={(e) => setBakeSynthsToSamples(e.target.checked)}
-                className="w-4 h-4 rounded border-dark-border bg-dark-bg text-accent-primary focus:ring-accent-primary"
-              />
-              Bake synth instruments to PCM samples
-            </label>
-
-            <div className="text-sm font-mono text-text-secondary space-y-1">
-              <div>Format: <span className="text-accent-primary">ProTracker MOD</span></div>
-              <div>Channels: <span className="text-accent-primary">{patterns[0]?.channels.length ?? 4}</span></div>
-              <div>Patterns: <span className="text-accent-primary">{patterns.length}</span></div>
-              <div>Max Samples: <span className="text-accent-primary">31</span></div>
-              <div>Note Range: <span className="text-accent-primary">C-1 to B-6</span></div>
+          {!modCompatible ? (
+            <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3">
+              <h4 className="text-xs font-mono font-bold text-red-400 mb-2">
+                Not ProTracker Compatible
+              </h4>
+              <ul className="text-xs font-mono text-red-300 space-y-1">
+                {nChannels > 4 && (
+                  <li>• This format uses {nChannels} channels — ProTracker only supports 4</li>
+                )}
+                {!hasNotes && (
+                  <li>• No playable note data found in patterns — this format stores audio externally and cannot be exported to MOD</li>
+                )}
+              </ul>
             </div>
+          ) : (
+            <div className="space-y-3">
+              {/* Synth instrument handling */}
+              <label className="flex items-center gap-3 text-sm font-mono text-text-primary cursor-pointer hover:text-accent-primary transition-colors">
+                <input
+                  type="checkbox"
+                  checked={bakeSynthsToSamples}
+                  onChange={(e) => setBakeSynthsToSamples(e.target.checked)}
+                  className="w-4 h-4 rounded border-dark-border bg-dark-bg text-accent-primary focus:ring-accent-primary"
+                />
+                Bake synth instruments to PCM samples
+              </label>
 
-            {/* Warnings display */}
-            {exportWarnings.length > 0 && (
-              <div className="bg-orange-500/10 border border-orange-500/30 rounded-lg p-3">
-                <h4 className="text-xs font-mono font-bold text-orange-400 mb-2">
-                  Export Warnings ({exportWarnings.length})
-                </h4>
-                <ul className="text-xs font-mono text-orange-300 space-y-1 max-h-32 overflow-y-auto">
-                  {exportWarnings.map((warning, idx) => (
-                    <li key={idx} className="flex items-start gap-2">
-                      <span className="text-orange-400">•</span>
-                      <span>{warning}</span>
-                    </li>
-                  ))}
-                </ul>
+              <div className="text-sm font-mono text-text-secondary space-y-1">
+                <div>Format: <span className="text-accent-primary">ProTracker MOD</span></div>
+                <div>Channels: <span className="text-accent-primary">{nChannels}</span></div>
+                <div>Patterns: <span className="text-accent-primary">{patterns.length}</span></div>
+                <div>Max Samples: <span className="text-accent-primary">31</span></div>
+                <div>Note Range: <span className="text-accent-primary">C-1 to B-6</span></div>
               </div>
-            )}
-          </div>
+
+              {/* Warnings display */}
+              {exportWarnings.length > 0 && (
+                <div className="bg-orange-500/10 border border-orange-500/30 rounded-lg p-3">
+                  <h4 className="text-xs font-mono font-bold text-orange-400 mb-2">
+                    Export Warnings ({exportWarnings.length})
+                  </h4>
+                  <ul className="text-xs font-mono text-orange-300 space-y-1 max-h-32 overflow-y-auto">
+                    {exportWarnings.map((warning, idx) => (
+                      <li key={idx} className="flex items-start gap-2">
+                        <span className="text-orange-400">•</span>
+                        <span>{warning}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 
