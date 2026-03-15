@@ -271,7 +271,7 @@ export async function parseQuadraComposerFile(
         const c = rowCells[ch];
 
         // Note: EMOD 0-35 = C-1 to B-3 → XM 13-48 (Amiga octave 1-3 = DEViLBOX XM 13-48)
-        const xmNote = c.note <= 35 ? c.note + 25 : 0;
+        const xmNote = c.note <= 35 ? c.note + 13 : 0;
 
         // Effect C (set volume) → XM volume column; clear effect
         let volCol = 0;

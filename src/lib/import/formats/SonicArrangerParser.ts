@@ -46,8 +46,8 @@
  *   byte 3: effect argument
  *
  * Note → XM note conversion:
- *   SA period table entry 49 (1-based) = 856 = C-3 in FT2 convention = DEViLBOX XM 37
- *   Formula: xmNote = saNote - 12   (valid for saNote 13..108 → XM 1..96)
+ *   SA period table entry 49 (1-based) = period 856 = ProTracker C-1 = DEViLBOX XM 13
+ *   Formula: xmNote = saNote - 36   (valid for saNote 37..132 → XM 1..96)
  */
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
