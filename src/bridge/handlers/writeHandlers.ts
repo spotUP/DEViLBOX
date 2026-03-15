@@ -1633,61 +1633,266 @@ export async function runRegressionSuite(params: Record<string, unknown>): Promi
 
 // ─── Export Tools ────────────────────────────────────────────────────────────
 
+/**
+ * Async live-capture registry.
+ * Captures run in the background; callers poll with the captureId.
+ * Stored on `window` so Vite HMR module reloads don't lose in-flight captures.
+ */
+interface CaptureEntry {
+  status: 'capturing' | 'done' | 'error';
+  blob?: Blob;
+  error?: string;
+  startedAt: number;
+}
+const _liveCaptures: Map<string, CaptureEntry> =
+  (window as any).__devilboxLiveCaptures ??
+  ((window as any).__devilboxLiveCaptures = new Map<string, CaptureEntry>());
+
 /** Export current pattern or song to WAV, returning base64-encoded WAV data */
 export async function exportWav(params: Record<string, unknown>): Promise<Record<string, unknown>> {
   try {
-    const scope = (params.scope as string) || 'pattern'; // 'pattern' or 'song'
+    // ── Phase 2 fast-path: poll an in-progress live capture ──────────────────
+    // Triggered by patternIndex=-1 (works with existing MCP schema) or captureId param.
+    // Captures are stored on window.__devilboxLiveCaptures (survives HMR).
+    const isPoll = params.captureId || (params.patternIndex as number) === -1;
+    if (isPoll) {
+      const captureId = (params.captureId as string | undefined);
+      // Find the entry: by id if provided, otherwise the most recent one
+      let entry: CaptureEntry | undefined;
+      let foundId: string | undefined;
+      if (captureId) {
+        entry = _liveCaptures.get(captureId);
+        foundId = captureId;
+      } else {
+        // Pick the most recent entry
+        for (const [id, e] of _liveCaptures) {
+          if (!entry || e.startedAt > entry.startedAt) { entry = e; foundId = id; }
+        }
+      }
+      if (!entry || !foundId) {
+        return { error: 'No pending capture found. Start one with export_wav(scope:"song") first.' };
+      }
+      if (entry.status === 'capturing') {
+        const elapsed = ((Date.now() - entry.startedAt) / 1000).toFixed(1);
+        return { ok: true, captureId: foundId, status: 'capturing', elapsedSec: +elapsed };
+      }
+      if (entry.status === 'error') {
+        _liveCaptures.delete(foundId);
+        return { error: entry.error ?? 'Capture failed' };
+      }
+      // Done — encode and return
+      const doneBlob = entry.blob!;
+      _liveCaptures.delete(foundId);
+      const doneArrBuf = await doneBlob.arrayBuffer();
+      const doneBytes = new Uint8Array(doneArrBuf);
+      let doneB64 = '';
+      for (let i = 0; i < doneBytes.length; i += 8190) {
+        doneB64 += btoa(String.fromCharCode(...doneBytes.subarray(i, i + 8190)));
+      }
+      return {
+        ok: true,
+        captureId: foundId,
+        status: 'done',
+        method: 'live-capture',
+        scope: 'song',
+        durationSec: +((doneArrBuf.byteLength - 44) / (44100 * 4)).toFixed(2),
+        sizeBytes: doneArrBuf.byteLength,
+        wavBase64: doneB64,
+      };
+    }
+
+    const scope = (params.scope as string) || 'song';
     const patternIndex = params.patternIndex as number | undefined;
 
     const tracker = useTrackerStore.getState();
     const instruments = useInstrumentStore.getState().instruments;
     const transport = useTransportStore.getState();
-    const bpm = transport.bpm;
 
-    const { renderPatternToAudio, audioBufferToWav } = await import('../../lib/export/audioExport');
+    const {
+      getUADEInstrument,
+      renderUADEToWav,
+      captureAudioLive,
+      renderPatternToAudio,
+      audioBufferToWav,
+    } = await import('../../lib/export/audioExport');
 
-    if (scope === 'song') {
-      // Render all patterns in order
+    // ── Determine the active format ──────────────────────────────────────────
+    // Synth types that can render offline WITHOUT pre-loading audio buffers.
+    // Sampler/Player are excluded: Tone.Offline never loads their sample URLs,
+    // so they produce silence. Songs using these must use live capture instead.
+    const OFFLINE_SYNTH_TYPES = new Set([
+      'MonoSynth', 'PolySynth', 'DuoSynth', 'FMSynth', 'AMSynth',
+      'MembraneSynth', 'MetalSynth', 'NoiseSynth', 'PluckSynth',
+    ]);
+    // Check format store for native engines that bypass Tone.js entirely
+    const { useFormatStore } = await import('../../stores/useFormatStore');
+    const fmt = useFormatStore.getState();
+    const hasNativeEngine = !!(
+      fmt.libopenmptFileData || fmt.uadeEditableFileData ||
+      fmt.hivelyFileData || fmt.klysFileData || fmt.musiclineFileData ||
+      fmt.c64SidFileData || fmt.jamCrackerFileData || fmt.futurePlayerFileData ||
+      fmt.preTrackerFileData || fmt.maFileData || fmt.hippelFileData ||
+      fmt.sonixFileData || fmt.pxtoneFileData || fmt.organyaFileData ||
+      fmt.eupFileData || fmt.ixsFileData || fmt.psycleFileData ||
+      fmt.sc68FileData || fmt.zxtuneFileData || fmt.pumaTrackerFileData ||
+      fmt.artOfNoiseFileData || fmt.bdFileData || fmt.sd2FileData ||
+      fmt.symphonieFileData || fmt.goatTrackerData
+    );
+    const isToneOnly = !hasNativeEngine && instruments.every(
+      i => !i || !i.synthType || OFFLINE_SYNTH_TYPES.has(i.synthType),
+    );
+
+    // ── Helper: blob → base64 ────────────────────────────────────────────────
+    // Chunk size MUST be a multiple of 3 so btoa() never emits mid-string padding.
+    // 8190 = 3 × 2730 — produces clean base64 with padding only at the very end.
+    async function blobToBase64(blob: Blob): Promise<string> {
+      const buf = await blob.arrayBuffer();
+      const bytes = new Uint8Array(buf);
+      let b64 = '';
+      for (let i = 0; i < bytes.length; i += 8190) {
+        b64 += btoa(String.fromCharCode(...bytes.subarray(i, i + 8190)));
+      }
+      return b64;
+    }
+
+    // ── Helper: estimate song duration from BPM/speed/patterns ──────────────
+    async function estimateSongDuration(): Promise<number> {
+      // For libopenmpt-backed files, ask the engine directly.
+      if (fmt.libopenmptFileData) {
+        try {
+          const { LibopenmptEngine } = await import('../../engine/libopenmpt/LibopenmptEngine');
+          if (LibopenmptEngine.hasInstance()) {
+            const sec = LibopenmptEngine.getInstance().getDurationSeconds();
+            if (sec > 0) return sec + 2; // +2 s tail
+          }
+        } catch { /* fall through to estimate */ }
+      }
+      const bpm = transport.bpm || 125;
+      const speed = transport.speed || 6;
+      const secPerRow = (speed * 60) / (bpm * 24);
+      let totalRows = 0;
+      for (const patIdx of tracker.patternOrder) {
+        const pat = tracker.patterns[patIdx];
+        totalRows += pat ? (pat.channels[0]?.rows?.length ?? 64) : 64;
+      }
+      return Math.max(5, totalRows * secPerRow + 2); // +2 s tail
+    }
+
+    // ── 1. UADE path: accurate offline render ────────────────────────────────
+    const uadeInst = getUADEInstrument(instruments);
+    if (uadeInst?.uade?.fileData) {
+      const blob = await renderUADEToWav(
+        uadeInst.uade.fileData,
+        uadeInst.uade.filename ?? 'module',
+      );
+      const arrayBuf = await blob.arrayBuffer();
+      const base64 = await blobToBase64(blob);
+      return {
+        ok: true,
+        method: 'uade-offline',
+        scope: 'song',
+        sizeBytes: arrayBuf.byteLength,
+        durationSec: +((arrayBuf.byteLength - 44) / (44100 * 4)).toFixed(2),
+        wavBase64: base64,
+      };
+    }
+
+    // ── 2. Tone.js-only path: offline render (instant, works for single pattern too) ──
+    if (isToneOnly) {
+      const bpm = transport.bpm || 125;
+      if (scope === 'pattern') {
+        const idx = patternIndex ?? tracker.currentPatternIndex;
+        const pattern = tracker.patterns[idx];
+        if (!pattern) return { error: `Pattern ${idx} not found` };
+        const audioBuffer = await renderPatternToAudio(pattern, instruments, bpm);
+        const wavBlob = audioBufferToWav(audioBuffer);
+        const base64 = await blobToBase64(wavBlob);
+        const arrayBuf = await wavBlob.arrayBuffer();
+        return {
+          ok: true,
+          method: 'tone-offline',
+          scope: 'pattern',
+          patternIndex: idx,
+          sampleRate: audioBuffer.sampleRate,
+          durationSec: +(audioBuffer.length / audioBuffer.sampleRate).toFixed(2),
+          sizeBytes: arrayBuf.byteLength,
+          wavBase64: base64,
+        };
+      }
+      // Song: render patterns in order
       const sequence = tracker.patternOrder;
       const buffers: AudioBuffer[] = [];
       for (const idx of sequence) {
         const pattern = tracker.patterns[idx];
         if (!pattern) continue;
-        const buf = await renderPatternToAudio(pattern, instruments, bpm);
-        buffers.push(buf);
+        buffers.push(await renderPatternToAudio(pattern, instruments, bpm));
       }
       if (buffers.length === 0) return { error: 'No patterns in sequence to export' };
-
-      // Concatenate
       const totalLength = buffers.reduce((s, b) => s + b.length, 0);
       const sampleRate = buffers[0].sampleRate;
-      const numChannels = buffers[0].numberOfChannels;
-      const offlineCtx = new OfflineAudioContext(numChannels, totalLength, sampleRate);
-      const combined = offlineCtx.createBuffer(numChannels, totalLength, sampleRate);
-      let offset = 0;
+      const combined = new OfflineAudioContext(2, totalLength, sampleRate)
+        .createBuffer(2, totalLength, sampleRate);
+      let off = 0;
       for (const buf of buffers) {
-        for (let ch = 0; ch < numChannels; ch++) {
-          combined.getChannelData(ch).set(buf.getChannelData(ch), offset);
+        for (let ch = 0; ch < 2; ch++) {
+          combined.getChannelData(ch).set(buf.getChannelData(Math.min(ch, buf.numberOfChannels - 1)), off);
         }
-        offset += buf.length;
+        off += buf.length;
       }
-
       const wavBlob = audioBufferToWav(combined);
+      const base64 = await blobToBase64(wavBlob);
       const arrayBuf = await wavBlob.arrayBuffer();
-      const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuf)));
-      return { ok: true, scope: 'song', patterns: sequence.length, sampleRate, durationSec: +(totalLength / sampleRate).toFixed(2), sizeBytes: arrayBuf.byteLength, wavBase64: base64 };
-    } else {
-      // Single pattern
-      const idx = patternIndex ?? tracker.currentPatternIndex;
-      const pattern = tracker.patterns[idx];
-      if (!pattern) return { error: `Pattern ${idx} not found` };
-
-      const audioBuffer = await renderPatternToAudio(pattern, instruments, bpm);
-      const wavBlob = audioBufferToWav(audioBuffer);
-      const arrayBuf = await wavBlob.arrayBuffer();
-      const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuf)));
-      return { ok: true, scope: 'pattern', patternIndex: idx, sampleRate: audioBuffer.sampleRate, durationSec: +(audioBuffer.length / audioBuffer.sampleRate).toFixed(2), sizeBytes: arrayBuf.byteLength, wavBase64: base64 };
+      return {
+        ok: true,
+        method: 'tone-offline',
+        scope: 'song',
+        patterns: sequence.length,
+        sampleRate,
+        durationSec: +(totalLength / sampleRate).toFixed(2),
+        sizeBytes: arrayBuf.byteLength,
+        wavBase64: base64,
+      };
     }
+
+    // ── 3. Universal live-capture path: works for all native WASM engines ────
+    // Two-phase: first call starts the capture and returns a captureId.
+    // Subsequent calls with captureId are handled by the fast-path at top of function.
+
+    // ── Start a new capture ────────────────────────────────────────────────
+    const maxDurationSec = typeof params.maxDurationSec === 'number'
+      ? params.maxDurationSec
+      : 60;
+    const rawDurationSec = await estimateSongDuration();
+    const durationSec = Math.min(rawDurationSec, maxDurationSec);
+
+    const captureId = crypto.randomUUID();
+    const entry: CaptureEntry = { status: 'capturing', startedAt: Date.now() };
+    _liveCaptures.set(captureId, entry);
+
+    // Fire-and-forget: capture runs in background
+    captureAudioLive(durationSec)
+      .then(blob => {
+        entry.status = 'done';
+        entry.blob = blob;
+      })
+      .catch(err => {
+        entry.status = 'error';
+        entry.error = (err as Error).message;
+      });
+
+    // Start playback from the beginning
+    await seekTo({ position: 0 });
+    await play({});
+
+    return {
+      ok: true,
+      captureId,
+      status: 'capturing',
+      method: 'live-capture',
+      scope: 'song',
+      estimatedDurationSec: +durationSec.toFixed(2),
+      instructions: `Poll with export_wav(captureId: "${captureId}") until status is "done"`,
+    };
   } catch (e) {
     return { error: `exportWav failed: ${(e as Error).message}` };
   }
@@ -1761,6 +1966,57 @@ export async function exportMidi(params: Record<string, unknown>): Promise<Recor
     }
   } catch (e) {
     return { error: `exportMidi failed: ${(e as Error).message}` };
+  }
+}
+
+/** Export the loaded song to ProTracker MOD format, returning base64-encoded data */
+export async function exportMod(params: Record<string, unknown>): Promise<Record<string, unknown>> {
+  try {
+    const bakeSynths = (params.bakeSynths as boolean) ?? true;
+
+    const trackerState = useTrackerStore.getState();
+    const instrumentState = useInstrumentStore.getState();
+    const transportState = (await import('../../stores/useTransportStore')).useTransportStore.getState();
+    const projectState = useProjectStore.getState();
+
+    const nChannels = trackerState.patterns[0]?.channels.length ?? 4;
+    const song: import('../../engine/TrackerReplayer').TrackerSong = {
+      name: projectState.metadata?.name ?? 'Untitled',
+      format: 'MED',
+      patterns: trackerState.patterns,
+      instruments: instrumentState.instruments,
+      songPositions: trackerState.patternOrder,
+      songLength: trackerState.patternOrder.length,
+      restartPosition: 0,
+      numChannels: nChannels,
+      initialSpeed: transportState.speed,
+      initialBPM: transportState.bpm,
+    };
+
+    const { exportSongToMOD } = await import('../../lib/export/modExport');
+    const result = await exportSongToMOD(song, { bakeSynths });
+
+    const arrayBuf = await result.blob.arrayBuffer();
+    const bytes = new Uint8Array(arrayBuf);
+    let binary = '';
+    const CHUNK = 8192;
+    for (let i = 0; i < bytes.length; i += CHUNK) {
+      binary += String.fromCharCode(...Array.from(bytes.subarray(i, Math.min(i + CHUNK, bytes.length))));
+    }
+    const base64 = btoa(binary);
+
+    return {
+      ok: true,
+      filename: result.filename,
+      sizeBytes: arrayBuf.byteLength,
+      instrumentCount: result.instrumentCount,
+      patternCount: result.patternCount,
+      orderCount: result.orderCount,
+      warnings: result.warnings,
+      modBase64: base64,
+    };
+  } catch (e) {
+    return { error: `exportMod failed: ${(e as Error).message}` };
   }
 }
 
