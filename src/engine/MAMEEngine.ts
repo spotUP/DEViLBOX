@@ -45,7 +45,8 @@ export class MAMEEngine {
   private static instance: MAMEEngine;
   private module: EmscriptenMAMEModule | null = null;
   private isInitialized: boolean = false;
-  private heapU8: Uint8Array | null = null;
+  // heapU8 intentionally removed — always use fresh Uint8Array(module.wasmMemory.buffer)
+  // after each _malloc to handle WASM heap growth correctly.
 
   private constructor() {}
 
@@ -79,14 +80,35 @@ export class MAMEEngine {
       const wasmResponse = await fetch(`${baseUrl}mame/MAMEChips.wasm`);
       const wasmBinary = await wasmResponse.arrayBuffer();
 
-      // Initialize the module
-      this.module = await moduleFactory({ wasmBinary });
+      // Intercept WebAssembly.instantiate to capture wasmMemory from exports.
+      // The Emscripten JS does NOT expose wasmMemory on the Module object;
+      // it's assigned as a local variable from wasmExports["c"]. We grab it here.
+      let capturedMemory: WebAssembly.Memory | null = null;
+      const origInstantiate = WebAssembly.instantiate.bind(WebAssembly);
+      WebAssembly.instantiate = async function (...args: Parameters<typeof WebAssembly.instantiate>) {
+        const result = await origInstantiate(...args);
+        const inst = (result as { instance?: WebAssembly.Instance }).instance ?? result;
+        if ((inst as WebAssembly.Instance).exports) {
+          for (const v of Object.values((inst as WebAssembly.Instance).exports)) {
+            if (v instanceof WebAssembly.Memory) { capturedMemory = v; break; }
+          }
+        }
+        return result;
+      } as typeof WebAssembly.instantiate;
 
-      // Create HEAP view from wasmMemory (HEAPU8 is not exported, but wasmMemory is)
-      if (this.module && this.module.wasmMemory) {
-        this.heapU8 = new Uint8Array(this.module.wasmMemory.buffer);
+      let mod: EmscriptenMAMEModule;
+      try {
+        mod = await moduleFactory({ wasmBinary }) as EmscriptenMAMEModule;
+      } finally {
+        WebAssembly.instantiate = origInstantiate;
       }
 
+      // Attach captured memory so callers can always get a fresh heap view
+      if (capturedMemory && !mod.wasmMemory) {
+        mod.wasmMemory = capturedMemory;
+      }
+
+      this.module = mod;
       this.isInitialized = true;
       console.log('🎹 MAMEEngine: WASM Module Loaded (Multi-Instance)');
     } catch (err) {
@@ -141,10 +163,11 @@ export class MAMEEngine {
    * Set a ROM bank
    */
   public setRom(bank: number, data: Uint8Array): void {
-    if (!this.isInitialized || !this.heapU8 || !this.module) return;
+    if (!this.isInitialized || !this.module?.wasmMemory) return;
 
     const ptr = this.module._malloc(data.length);
-    this.heapU8.set(data, ptr);
+    // Always create a fresh view after _malloc — heap may have grown, invalidating old views
+    new Uint8Array(this.module.wasmMemory.buffer).set(data, ptr);
     this.module._mame_set_rom(bank, ptr, data.length);
   }
 
@@ -152,10 +175,11 @@ export class MAMEEngine {
    * Send MIDI/SysEx event to the instance
    */
   public addMidiEvent(handle: number, data: Uint8Array): void {
-    if (!this.isInitialized || handle === 0 || !this.heapU8 || !this.module) return;
+    if (!this.isInitialized || handle === 0 || !this.module?.wasmMemory) return;
 
     const ptr = this.module._malloc(data.length);
-    this.heapU8.set(data, ptr);
+    // Always create a fresh view after _malloc — heap may have grown, invalidating old views
+    new Uint8Array(this.module.wasmMemory.buffer).set(data, ptr);
     this.module._mame_add_midi_event(handle, ptr, data.length);
     this.module._free(ptr);
   }
@@ -164,15 +188,17 @@ export class MAMEEngine {
    * Load specialized Roland SA ROMs
    */
   public rsaLoadRoms(handle: number, ic5: Uint8Array, ic6: Uint8Array, ic7: Uint8Array): void {
-    if (!this.isInitialized || handle === 0 || !this.heapU8 || !this.module) return;
+    if (!this.isInitialized || handle === 0 || !this.module?.wasmMemory) return;
 
     const ptr5 = this.module._malloc(ic5.length);
     const ptr6 = this.module._malloc(ic6.length);
     const ptr7 = this.module._malloc(ic7.length);
 
-    this.heapU8.set(ic5, ptr5);
-    this.heapU8.set(ic6, ptr6);
-    this.heapU8.set(ic7, ptr7);
+    // Always create a fresh view after allocations — heap may have grown
+    const heap = new Uint8Array(this.module.wasmMemory.buffer);
+    heap.set(ic5, ptr5);
+    heap.set(ic6, ptr6);
+    heap.set(ic7, ptr7);
 
     this.module._rsa_load_roms(handle, ptr5, ptr6, ptr7);
   }

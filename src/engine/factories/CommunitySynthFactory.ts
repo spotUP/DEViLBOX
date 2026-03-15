@@ -917,7 +917,19 @@ export function createSCSP(config: InstrumentConfig): Tone.ToneAudioNode {
 
 export function createVFX(config: InstrumentConfig): Tone.ToneAudioNode {
   const synth = new VFXSynth();
-  void synth.init();
+  synth.init().then(() => {
+    if (synth.getStatus().romLoaded) {
+      import('../../stores/useInstrumentStore').then(({ useInstrumentStore }) => {
+        const store = useInstrumentStore.getState();
+        const inst = store.instruments.find((i) => i.id === config.id);
+        if (inst) {
+          store.updateInstrument(config.id, {
+            mame: { ...(inst.mame ?? {}), romsLoaded: true },
+          });
+        }
+      }).catch(() => {});
+    }
+  }).catch(() => {});
 
   synth.output.gain.value = Tone.dbToGain(getNormalizedVolume('MAMEVFX', config.volume));
 
