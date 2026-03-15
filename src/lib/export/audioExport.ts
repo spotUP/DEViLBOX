@@ -313,6 +313,103 @@ function concatenateAudioBuffers(
 }
 
 // ==========================================================================
+// LIVE CAPTURE PATH — real-time tap from masterEffectsInput
+// Works for every format: WASM engines, OctaMED synths, Tone.js synths.
+// ==========================================================================
+
+/**
+ * Capture audio from ToneEngine's masterEffectsInput for `durationSec` seconds.
+ * Returns a stereo WAV Blob.
+ *
+ * The caller must start playback BEFORE awaiting this promise so no samples
+ * are missed.  Example:
+ *
+ *   const capture = captureAudioLive(durationSec);
+ *   play();
+ *   const wav = await capture;
+ *   stop();
+ */
+export function captureAudioLive(
+  durationSec: number,
+  onProgress?: (percent: number) => void,
+): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    import('@/engine/ToneEngine').then(({ getToneEngine }) => {
+      import('@/utils/audio-context').then(({ getNativeAudioNode }) => {
+        const toneCtx = Tone.getContext();
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const ctx: AudioContext = (toneCtx as any).rawContext ?? (toneCtx as any)._context ?? toneCtx;
+
+        const sampleRate = ctx.sampleRate;
+        const totalSamples = Math.ceil(durationSec * sampleRate);
+        const BUFFER_SIZE = 4096;
+
+        const bufL = new Float32Array(totalSamples);
+        const bufR = new Float32Array(totalSamples);
+        let captured = 0;
+        let done = false;
+
+        const processor = ctx.createScriptProcessor(BUFFER_SIZE, 2, 2);
+
+        function finish() {
+          if (done) return;
+          done = true;
+          try { processor.disconnect(); } catch { /* ignore */ }
+          try {
+            const toneEngine = getToneEngine();
+            const mn = getNativeAudioNode(toneEngine.masterEffectsInput);
+            mn?.disconnect(processor);
+          } catch { /* ignore */ }
+
+          const audioBuffer = ctx.createBuffer(2, captured, sampleRate);
+          audioBuffer.getChannelData(0).set(bufL.subarray(0, captured));
+          audioBuffer.getChannelData(1).set(bufR.subarray(0, captured));
+          resolve(audioBufferToWav(audioBuffer));
+        }
+
+        processor.onaudioprocess = (event: AudioProcessingEvent) => {
+          if (done) return;
+          const inputL = event.inputBuffer.getChannelData(0);
+          const inputR = event.inputBuffer.numberOfChannels > 1
+            ? event.inputBuffer.getChannelData(1)
+            : inputL;
+
+          const count = Math.min(inputL.length, totalSamples - captured);
+          bufL.set(inputL.subarray(0, count), captured);
+          bufR.set(inputR.subarray(0, count), captured);
+          captured += count;
+
+          onProgress?.(Math.min(99, (captured / totalSamples) * 100));
+
+          if (captured >= totalSamples) finish();
+        };
+
+        try {
+          const toneEngine = getToneEngine();
+          const masterNode = getNativeAudioNode(toneEngine.masterEffectsInput);
+          if (!masterNode) throw new Error('Could not find masterEffectsInput native node');
+
+          // Silent gain sink — ScriptProcessor requires an output but we don't
+          // want to double-route audio to the speaker.
+          const silentGain = ctx.createGain();
+          silentGain.gain.value = 0;
+          silentGain.connect(ctx.destination);
+
+          masterNode.connect(processor);
+          processor.connect(silentGain);
+
+          // Watchdog: resolve early if caller-supplied duration elapses without
+          // reaching totalSamples (e.g., song ended with silence padding).
+          setTimeout(finish, durationSec * 1000 + 500);
+        } catch (err) {
+          reject(err instanceof Error ? err : new Error(String(err)));
+        }
+      });
+    });
+  });
+}
+
+// ==========================================================================
 // UADE RENDER PATH — accurate offline render for UADE-backed modules
 // ==========================================================================
 
