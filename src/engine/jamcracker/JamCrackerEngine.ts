@@ -322,7 +322,14 @@ export class JamCrackerEngine {
   }> {
     return new Promise((resolve) => {
       if (!this.workletNode) { resolve({ songLen: 0, numPats: 0, numInst: 0, entries: [] }); return; }
-      this._songStructureResolve = resolve;
+      const timeout = setTimeout(() => {
+        this._songStructureResolve = null;
+        resolve({ songLen: 0, numPats: 0, numInst: 0, entries: [] });
+      }, 3000);
+      this._songStructureResolve = (data) => {
+        clearTimeout(timeout);
+        resolve(data);
+      };
       this.workletNode.port.postMessage({ type: 'get-song-structure' });
     });
   }
