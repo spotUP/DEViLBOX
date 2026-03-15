@@ -382,7 +382,6 @@ export async function parseDigitalMugicianFile(
   }
 
   // -- Wavetable data (128 bytes each) --------------------------------------
-  const wavetableStart = pos;
   const wavetableData = new Uint8Array(wavetableBytes);
   for (let i = 0; i < wavetableBytes && pos + i < buf.length; i++) {
     wavetableData[i] = buf[pos + i];
@@ -390,16 +389,18 @@ export async function parseDigitalMugicianFile(
   pos += wavetableBytes;
 
   // -- Instrument headers (32 bytes each for PCM samples, V2) ---------------
+  // File layout: ... waveforms | sample headers | TRACKS/PATTERNS | PCM audio | arpeggios
+  // Tracks come BEFORE PCM audio data.
   const instrHeaderStart = pos;
+  let instrDataSize = 0;  // total PCM audio bytes (offset 72), 0 for V1
+
   if (instrHeaderCount > 0) {
-    // PCM instrument data follows the headers
+    // Sample headers end here; tracks start immediately after
     const instrDataStart = instrHeaderStart + (instrHeaderCount << 5);
 
-    // instrDataSize from offset 72
-    const instrDataSize = u32BE(buf, 72);
-
-    // Extract PCM data block
-    const pcmDataOffset = instrDataStart;
+    // PCM audio data follows the tracks (not the headers)
+    instrDataSize = u32BE(buf, 72);
+    const pcmDataOffset = instrDataStart + totalPatternRows * 4;
 
     // Now assign PCM info to samples with wave >= 32
     for (let i = 1; i < samples.length; i++) {
@@ -412,7 +413,7 @@ export async function parseDigitalMugicianFile(
       const ptrStart = u32BE(buf, headerOff);
       const ptrEnd = u32BE(buf, headerOff + 4);
       const loopPtr = u32BE(buf, headerOff + 8);
-      const sName = readString(buf, headerOff + 12, 12);
+      const sName = readString(buf, headerOff + 12, 12).trim();
 
       sample.pointer = ptrStart;
       sample.sampleLength = ptrEnd - ptrStart;
@@ -430,31 +431,16 @@ export async function parseDigitalMugicianFile(
       if ((sample.pointer & 1) !== 0) sample.pointer--;
       if ((sample.sampleLength & 1) !== 0) sample.sampleLength--;
 
-      // Adjust pointer relative to PCM data block
+      // Adjust pointer to absolute file offset (relative to PCM audio block)
       sample.pointer += pcmDataOffset;
-    }
-
-    pos = instrDataStart + instrDataSize;
-  } else {
-    // No instrument headers -- skip the size field
-    if (pos + 4 <= buf.length) {
-      const skipSize = u32BE(buf, 72);
-      pos = instrHeaderStart + skipSize;
     }
   }
 
   // -- Pattern data ---------------------------------------------------------
-  // totalPatternRows tells us how many 4-byte rows to read
-  // The pattern data position is: after wavetable + instrument header/data block
-  // Actually, from the FlodJS loader:
-  //   pattern data starts at: position + (instr << 5) where position was after wavetable
-  //   and instr was from offset 68
-  // Let's recalculate based on FlodJS logic:
-  //   After instruments parsed, we stored wavetable. Then:
-  //   stream.position = position + (instr << 5) where position = wavetableStart + wavetableBytes
-  //   and instr = instrHeaderCount
+  // Tracks start immediately after sample headers (instrHeaderCount * 32 bytes).
+  // For V1 files with no PCM samples, instrHeaderCount == 0 so patterns start at instrHeaderStart.
 
-  const patternDataStart = wavetableStart + wavetableBytes + (instrHeaderCount << 5);
+  const patternDataStart = instrHeaderStart + (instrHeaderCount << 5);
   const patternRows: DMPatternRow[] = [];
 
   let ppos = patternDataStart;
@@ -476,39 +462,11 @@ export async function parseDigitalMugicianFile(
   // -- Arpeggio data (optional, appended at end if flag == 1) ---------------
   const arpeggios = new Uint8Array(256);
   if (arpeggioFlag === 1) {
-    // From FlodJS: arpeggio data is at position after pattern data + instrument PCM
-    // Let's try to read from the position after patterns + PCM data
-    // The FlodJS code reads arpeggios after all other data:
-    //   stream.position = position (after patterns + PCM instrument data)
-    //   if arpeggioFlag == 1: read up to 256 bytes
-
-    // From the FlodJS flow, after pattern data, the PCM instrument data is read
-    // Then arpeggios come last.
-    // Let's compute: patternDataEnd = patternDataStart + totalPatternRows * 4
     const patternDataEnd = patternDataStart + totalPatternRows * 4;
 
-    // If there were instrument headers, PCM data was already before patterns
-    // Actually re-reading FlodJS more carefully:
-    // position = after instrument defs + wavetable
-    // instrDataStart = position (saved as 'instr' var if nonzero)
-    // stream.position = position + (instr << 5) => skip instr headers
-    // read patterns
-    // then: position = stream.position (after patterns)
-    // stream.position = 72; read instrDataSize; stream.position = position
-    // if instr: data = mixer.store(stream, instrDataSize) => reads PCM
-    // position = stream.position (after PCM)
-    // then check arpeggioFlag, read arpeggios from position
-
-    // So arpeggios come after: patterns + PCM instrument data
-    let arpPos: number;
-    if (instrHeaderCount > 0) {
-      const instrPCMSize = u32BE(buf, 72);
-      arpPos = patternDataEnd + instrPCMSize;
-    } else {
-      // No instruments: FlodJS does position += stream.readUint() at offset 72
-      // which was already accounted for above
-      arpPos = patternDataEnd;
-    }
+    // File layout: ... sample headers | patterns | PCM audio | arpeggios
+    // Arpeggios come after PCM audio data.
+    const arpPos = patternDataEnd + instrDataSize;
 
     if (arpPos < buf.length) {
       const arpLen = Math.min(256, buf.length - arpPos);
@@ -663,6 +621,12 @@ export async function parseDigitalMugicianFile(
   }
 
   const songSpeed = song.speed & 0x0f;
+
+  // Eagerly create all declared instruments so the full list appears in the editor,
+  // even if some are not referenced in the current song's patterns.
+  for (let si = 1; si < numInstruments; si++) {
+    getOrCreateInstrument(si);
+  }
 
   // -- Convert to TrackerSong patterns --------------------------------------
   // Each "step" in the song references a pattern for each of the 4 channels.
