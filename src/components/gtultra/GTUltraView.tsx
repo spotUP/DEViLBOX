@@ -17,7 +17,7 @@ import React, { useCallback, useEffect, useRef, useState, useMemo } from 'react'
 import * as Tone from 'tone';
 import { useTransportStore } from '@stores/useTransportStore';
 import { useGTUltraStore } from '../../stores/useGTUltraStore';
-import { FormatEditorGL } from '@/components/shared/FormatEditorGL';
+import { PatternEditorCanvas } from '@/components/tracker/PatternEditorCanvas';
 import type { FormatChannel } from '@/components/shared/format-editor-types';
 import { GTU_COLUMNS, gtuToFormatChannels, parseBinaryPatternData } from './gtuAdapter';
 import { GTToolbar } from './GTToolbar';
@@ -164,12 +164,12 @@ export const GTUltraView: React.FC<{ width?: number; height?: number }> = ({ wid
       {/* Main content */}
       <div className="flex flex-1 min-h-0 overflow-hidden">
         {/* Pattern editor */}
-        <FormatEditorGL
-          columns={GTU_COLUMNS}
-          channels={channels}
-          currentRow={currentRow}
-          isPlaying={isPlaying}
-          onCellChange={handleCellChange}
+        <PatternEditorCanvas
+          formatColumns={GTU_COLUMNS}
+          formatChannels={channels}
+          formatCurrentRow={currentRow}
+          formatIsPlaying={isPlaying}
+          onFormatCellChange={handleCellChange}
         />
 
         {/* Sidebar */}
