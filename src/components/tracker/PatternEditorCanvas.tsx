@@ -1334,6 +1334,13 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
         if (msg.type === 'webgl-unsupported') {
           clearTimeout(readyTimeoutId);
           setWebglUnsupported(true);
+        } else if (msg.type === 'error') {
+          clearTimeout(readyTimeoutId);
+          reportSynthError(
+            'Tracker Worker',
+            msg.message,
+            { errorType: 'init' },
+          );
         }
       },
       onError: (err) => {
@@ -1347,10 +1354,16 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     });
     bridgeRef.current = bridge;
 
-    // Defer canvas transfer + init to next animation frame — flex layout
-    // hasn't run yet at mount/remount time, so clientWidth/clientHeight are
-    // 0 if read synchronously, which initialises the worker with a 1×1 canvas.
-    const initRafId = requestAnimationFrame(() => {
+    // Defer canvas transfer + init to the next task — flex layout hasn't run
+    // yet at mount time, so clientWidth/clientHeight are 0 if read
+    // synchronously (the ResizeObserver corrects this anyway).
+    // NOTE: requestAnimationFrame is NOT used here because it is paused
+    // indefinitely in background tabs, causing the 10 s ready-timeout to fire
+    // before the init message is ever sent.  setTimeout(0) throttles to ~1 s
+    // in background tabs (well within the 10 s window) and fires immediately
+    // when foregrounded.
+    const initTimerId = setTimeout(() => {
+      try {
       const dpr   = window.devicePixelRatio || 1;
       const w     = Math.max(1, container.clientWidth);
       const h     = Math.max(1, container.clientHeight);
@@ -1390,7 +1403,15 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
         },
         [offscreen],
       );
-    });
+      } catch (initErr) {
+        clearTimeout(readyTimeoutId);
+        reportSynthError(
+          'Tracker Worker',
+          `Worker init failed: ${(initErr as Error)?.message ?? String(initErr)}`,
+          { errorType: 'init' },
+        );
+      }
+    }, 0);
 
     // Subscribe to tracker store — post pattern/ui deltas
     const unsubTracker = useTrackerStore.subscribe((s, prev) => {
@@ -1459,7 +1480,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     });
 
     return () => {
-      cancelAnimationFrame(initRafId);
+      clearTimeout(initTimerId);
       clearTimeout(readyTimeoutId);
       unsubTracker();
       unsubEditor();
