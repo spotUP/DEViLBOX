@@ -168,7 +168,7 @@ export const ModlandPanel: React.FC<ModlandPanelProps> = ({ isOpen, onLoadTracke
                      rounded text-text-secondary cursor-pointer hover:bg-dark-bgHover transition-colors"
         >
           <option value="">All formats</option>
-          {modlandFormats.map((f) => (
+          {[...modlandFormats].sort((a, b) => a.format.localeCompare(b.format)).map((f) => (
             <option key={f.format} value={f.format}>
               {f.format} ({f.count.toLocaleString()})
             </option>
