@@ -119,10 +119,9 @@ export class JSIDPlay2Engine {
     }, 'OPENED', 15000);
     console.log('[JSIDPlay2] SID file opened');
 
-    // Fire-and-forget: try setting sample rate (may not be supported)
-    if (this.config.sampleRate && this.worker) {
-      this.worker.postMessage({ eventType: 'SET_SAMPLING_RATE', eventData: { samplingRate: this.config.sampleRate } });
-    }
+    // NOTE: SET_SAMPLING_RATE crashes the jsidplay2 WASM GC worker with "illegal cast"
+    // (RuntimeError in wasm_gc reference type handling). Skipped intentionally — the
+    // default sample rate (44100) works correctly, and no resampling is needed.
 
     // Fire-and-forget: try setting SID model
     if (this.config.chipModel && this.worker) {
