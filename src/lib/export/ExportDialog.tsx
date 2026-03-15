@@ -45,7 +45,6 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
   const [exportMode, setExportMode] = useState<ExportMode>('song');
   const [options, setOptions] = useState<ExportOptions>({
     includeAutomation: true,
-    compress: false,
     prettify: true,
   });
 
@@ -682,13 +681,13 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                 </div>
               )}
 
-              {/* Export Options */}
-              <div className="bg-dark-bgSecondary border border-dark-border rounded-lg p-4">
-                <h3 className="text-sm font-mono font-bold text-accent-primary mb-3">
-                  Options
-                </h3>
-                <div className="space-y-2">
-                  {exportMode === 'song' && (
+              {/* Export Options — only shown when there are relevant options for the current mode */}
+              {exportMode === 'song' && (
+                <div className="bg-dark-bgSecondary border border-dark-border rounded-lg p-4">
+                  <h3 className="text-sm font-mono font-bold text-accent-primary mb-3">
+                    Options
+                  </h3>
+                  <div className="space-y-2">
                     <label className="flex items-center gap-3 text-sm font-mono text-text-primary cursor-pointer hover:text-accent-primary transition-colors">
                       <input
                         type="checkbox"
@@ -698,27 +697,9 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                       />
                       Include automation data
                     </label>
-                  )}
-                  <label className="flex items-center gap-3 text-sm font-mono text-text-primary cursor-pointer hover:text-accent-primary transition-colors">
-                    <input
-                      type="checkbox"
-                      checked={options.prettify}
-                      onChange={(e) => setOptions({ ...options, prettify: e.target.checked })}
-                      className="w-4 h-4 rounded border-dark-border bg-dark-bg text-accent-primary focus:ring-accent-primary"
-                    />
-                    Prettify JSON (human-readable)
-                  </label>
-                  <label className="flex items-center gap-3 text-sm font-mono text-text-muted cursor-not-allowed">
-                    <input
-                      type="checkbox"
-                      checked={options.compress}
-                      disabled
-                      className="w-4 h-4 rounded opacity-50"
-                    />
-                    Compress (coming soon)
-                  </label>
+                  </div>
                 </div>
-              </div>
+              )}
             </>
           ) : (
             <>
