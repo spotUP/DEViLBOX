@@ -13,7 +13,7 @@
 
 import React, { useRef, useEffect, useCallback } from 'react';
 import { useTransportStore } from '@stores/useTransportStore';
-import { FormatEditorGL } from '@/components/shared/FormatEditorGL';
+import { PatternEditorCanvas } from '@/components/tracker/PatternEditorCanvas';
 import { JAMCRACKER_COLUMNS } from './jamcrackerAdapter';
 import { JamCrackerEngine } from '@engine/jamcracker/JamCrackerEngine';
 import { useJamCrackerData } from '@/hooks/useJamCrackerData';
@@ -142,12 +142,12 @@ export const JamCrackerView: React.FC = () => {
 
       {/* Pattern Editor */}
       <div style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
-        <FormatEditorGL
-          columns={JAMCRACKER_COLUMNS}
-          channels={channels}
-          currentRow={currentRow}
-          isPlaying={isPlaying}
-          onCellChange={handleCellChange}
+        <PatternEditorCanvas
+          formatColumns={JAMCRACKER_COLUMNS}
+          formatChannels={channels}
+          formatCurrentRow={currentRow}
+          formatIsPlaying={isPlaying}
+          onFormatCellChange={handleCellChange}
         />
       </div>
     </div>
