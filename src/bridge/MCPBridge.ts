@@ -146,6 +146,7 @@ import {
   exportWav,
   exportPatternText,
   exportMidi,
+  exportMod,
 } from './handlers/writeHandlers';
 import { analyzeSongHandler } from './handlers/analysisHandlers';
 import { generatePattern, transformPattern } from './handlers/generatorHandlers';
@@ -355,6 +356,7 @@ const handlers: Record<string, Handler> = {
   export_wav: exportWav,
   export_pattern_text: exportPatternText,
   export_midi: exportMidi,
+  export_mod: exportMod,
 };
 
 let ws: WebSocket | null = null;
