@@ -17,7 +17,7 @@ import React, { useCallback, useEffect, useRef, useState, useMemo } from 'react'
 import * as Tone from 'tone';
 import { useTransportStore } from '@stores/useTransportStore';
 import { useGTUltraStore } from '../../stores/useGTUltraStore';
-import { FormatPatternEditor } from '@/components/shared/FormatPatternEditor';
+import { FormatEditorGL } from '@/components/shared/FormatEditorGL';
 import type { FormatChannel } from '@/components/shared/format-editor-types';
 import { GTU_COLUMNS, gtuToFormatChannels, parseBinaryPatternData } from './gtuAdapter';
 import { GTToolbar } from './GTToolbar';
@@ -155,7 +155,6 @@ export const GTUltraView: React.FC<{ width?: number; height?: number }> = ({ wid
   }, [orderData, currentOrderPos]);
 
   const sidebarW = Math.min(SIDEBAR_WIDTH, Math.floor(width * 0.35));
-  const editorW = width - sidebarW;
 
   return (
     <div ref={containerRef} className="flex flex-col flex-1 min-h-0 bg-dark-bgPrimary text-ft2-text font-mono" style={propW ? { width, height } : undefined}>
@@ -165,9 +164,7 @@ export const GTUltraView: React.FC<{ width?: number; height?: number }> = ({ wid
       {/* Main content */}
       <div className="flex flex-1 min-h-0 overflow-hidden">
         {/* Pattern editor */}
-        <FormatPatternEditor
-          width={editorW}
-          height={height - 36}
+        <FormatEditorGL
           columns={GTU_COLUMNS}
           channels={channels}
           currentRow={currentRow}
