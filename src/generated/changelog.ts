@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-03-15T10:07:48.061Z
+ * Generated: 2026-03-15T20:26:31.179Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.2883';
-export const BUILD_NUMBER = '2883';
-export const BUILD_HASH = 'c1f54de35';
+export const BUILD_VERSION = '1.0.2912';
+export const BUILD_NUMBER = '2912';
+export const BUILD_HASH = 'ce1fca86f';
 export const BUILD_DATE = '2026-03-15';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,125 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.2883',
+    version: '1.0.2912',
     date: '2026-03-15',
     changes: [
+      {
+        type: 'improvement',
+        "description": "Chore: delete FormatEditorGL — PatternEditorCanvas is the one true editor"
+      },
+      {
+        type: 'feature',
+        "description": "Migrate KlysView, HivelyView, GTUltraView to PatternEditorCanvas format mode"
+      },
+      {
+        type: 'feature',
+        "description": "Use PatternEditorCanvas in format mode"
+      },
+      {
+        type: 'feature',
+        "description": "Format mode mouse hit-test + keyboard handler"
+      },
+      {
+        type: 'feature',
+        "description": "Format mode channel/column header"
+      },
+      {
+        type: 'feature',
+        "description": "Add format mode props, refs, and channel width computation"
+      },
+      {
+        type: 'feature',
+        "description": "Add Canvas2D fallback renderer with data-driven column support"
+      },
+      {
+        type: 'improvement',
+        "description": "Chore: delete FormatPatternEditor, GenericFormatView, HivelyPatternEditor (replaced by FormatEditorGL)"
+      },
+      {
+        type: 'feature',
+        "description": "Migrate HivelyView to FormatEditorGL"
+      },
+      {
+        type: 'feature',
+        "description": "Migrate GTUltraView to FormatEditorGL"
+      },
+      {
+        type: 'feature',
+        "description": "Migrate KlysView to FormatEditorGL"
+      },
+      {
+        type: 'feature',
+        "description": "Migrate JamCrackerView to FormatEditorGL"
+      },
+      {
+        type: 'feature',
+        "description": "Add FormatEditorGL unified WebGL2 format pattern editor"
+      },
+      {
+        type: 'feature',
+        "description": "Add data-driven column rendering to TrackerGLRenderer"
+      },
+      {
+        type: 'improvement',
+        "description": "Misc updates: libopenmpt engine, pattern canvas, changelog, audit tool"
+      },
+      {
+        type: 'improvement',
+        "description": "Update MCP server tools and drag-drop handler"
+      },
+      {
+        type: 'fix',
+        "description": "Update format parser tests: add new format coverage and fix assertions"
+      },
+      {
+        type: 'improvement',
+        "description": "Extend shared format editor types and components"
+      },
+      {
+        type: 'feature',
+        "description": "Update export UI: add live capture mode to export dialogs"
+      },
+      {
+        type: 'improvement',
+        "description": "Update JamCracker WASM harness and binary"
+      },
+      {
+        type: 'fix',
+        "description": "Format parser audit fixes: routing, detection, and withFallback pattern"
+      },
+      {
+        type: 'improvement',
+        "description": "Expand PxtoneParser: full pattern and instrument data extraction"
+      },
+      {
+        type: 'improvement',
+        "description": "Improve MAME engine and OctaMED controls"
+      },
+      {
+        type: 'fix',
+        "description": "Update Furnace WASM: sync wrapper and sequencer fixes"
+      },
+      {
+        type: 'feature',
+        "description": "Add live audio capture export via MCP bridge"
+      },
+      {
+        type: 'improvement',
+        "description": "Refactor JamCracker/Klys views to use shared GenericFormatView"
+      },
+      {
+        type: 'feature',
+        "description": "Add view-switcher dropdown to SplitView toolbar"
+      },
+      {
+        type: 'fix',
+        "description": "Fix Digital Mugician parser: tracks precede PCM audio in file layout"
+      },
+      {
+        type: 'feature',
+        "description": "Add ColumnSpec and params/columns fields to worker types"
+      },
       {
         type: 'fix',
         "description": "Fix Medley (.ml/.mso), injectUADE logic, MAMEMultiPCM missing entry"
@@ -118,110 +234,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         "description": "Add .hip routing to JochenHippelSTParser; fix PC-relative LEA off-by-2"
-      },
-      {
-        type: 'improvement',
-        "description": "Update generated changelog"
-      },
-      {
-        type: 'feature',
-        "description": "Add 10 vintage drum machine themes: TR-606 through Sequential Tom"
-      },
-      {
-        type: 'improvement',
-        "description": "Furnace: notify dispatch on wavetable change for PCE/Namco platforms"
-      },
-      {
-        type: 'fix',
-        "description": "Gearmulator: auto-load ROMs from disk, fix synthType routing and Tone.js context"
-      },
-      {
-        type: 'feature',
-        "description": "Add GlueMon and DavidHanney native format parsers"
-      },
-      {
-        type: 'improvement',
-        "description": "Auto-switch to tracker view when loading custom-editor formats"
-      },
-      {
-        type: 'improvement',
-        "description": "Refactor MAME PCM/wavetable chip hardware UI to pure React"
-      },
-      {
-        type: 'fix',
-        "description": "Fix Symphonie Pro instrument names showing full Amiga paths"
-      },
-      {
-        type: 'feature',
-        "description": "Add Wurlitzer Side Man (1959) theme — warm wood/amber 50s hi-fi palette"
-      },
-      {
-        type: 'fix',
-        "description": "Fix persistence hook running twice on HMR remount, wiping DSP effects"
-      },
-      {
-        type: 'feature',
-        "description": "Add 9 MAME PCM/sampler chip synths with hardware UIs and presets"
-      },
-      {
-        type: 'feature',
-        "description": "Add comprehensive format parser regression suite: 108 tests covering 90+ formats"
-      },
-      {
-        type: 'fix',
-        "description": "Fix TrackerGLRenderer channel content centering for effect columns"
-      },
-      {
-        type: 'improvement',
-        "description": "Ignore !TODO.TXT (contains private notes, must not be committed)"
-      },
-      {
-        type: 'feature',
-        "description": "Add CHIP_SYNTH_DEFS for new MAME PCM synths (CMI, FZ, PS1, MultiPCM, ZSG2, KS0164, SWP00/20, RolandGP)"
-      },
-      {
-        type: 'feature',
-        "description": "Add MAME PCM synths: FZ-1, PS1 SPU, MultiPCM, ZSG2, KS0164, SWP00, SWP20, Roland GP"
-      },
-      {
-        type: 'fix',
-        "description": "Fix pattern-wrap pauses: UADE immediate updates, resolveSongRow cache, memo headers"
-      },
-      {
-        type: 'fix',
-        "description": "Fix pattern-wrap pauses: counter for natural-advance ref, startTransition for store updates"
-      },
-      {
-        type: 'fix',
-        "description": "Symphonie Pro: fix DSP display, DSPDelay parsing, DSP audio, MCP effStr"
-      },
-      {
-        type: 'feature',
-        "description": "Add CMISynth engine stub (Fairlight CMI IIx)"
-      },
-      {
-        type: 'improvement',
-        "description": "Update third-party: openmpt Load_symmod.cpp"
-      },
-      {
-        type: 'fix',
-        "description": "Fix MAME stream output_count + add CMI capabilities; fix MCP effStr for Symphonie DSP"
-      },
-      {
-        type: 'improvement',
-        "description": "Symphonie: rebuild WASM with updated symphonie_player.c"
-      },
-      {
-        type: 'fix',
-        "description": "Fix SpaceLaserSynth.triggerRelease signature to accept optional note param"
-      },
-      {
-        type: 'improvement',
-        "description": "Replace MAME AICA with Fairlight CMI IIx synth"
-      },
-      {
-        type: 'fix',
-        "description": "Fix Symphonie DSP effect display: reorder type chars E/C swap"
       }
     ]
   }
