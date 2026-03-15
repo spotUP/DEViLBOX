@@ -594,5 +594,38 @@ function createXMWithEmptyPattern(): ArrayBuffer {
 }
 
 function createXMWithNoInstruments(): ArrayBuffer {
-  return createTestXM();
+  // Like createTestXM() but with instrumentCount=0 and no instrument data
+  const patternStart = 336;
+  const packedSize = 4 * 64;
+  const patternDataSize = 9 + packedSize;
+
+  const buffer = new ArrayBuffer(patternStart + patternDataSize);
+  const view = new DataView(buffer);
+  const encoder = new TextEncoder();
+
+  new Uint8Array(buffer, 0, 17).set(encoder.encode('Extended Module: '));
+  new Uint8Array(buffer, 17, 20).set(encoder.encode('Test Module').slice(0, 20));
+  view.setUint8(37, 0x1a);
+  new Uint8Array(buffer, 38, 20).set(encoder.encode('DEViLBOX').slice(0, 20));
+  view.setUint16(58, 0x0104, true);
+  view.setUint32(60, 276, true);
+  view.setUint16(64, 1, true);
+  view.setUint16(66, 0, true);
+  view.setUint16(68, 4, true);
+  view.setUint16(70, 1, true);
+  view.setUint16(72, 0, true);  // instrumentCount = 0
+  view.setUint16(74, 1, true);
+  view.setUint16(76, 6, true);
+  view.setUint16(78, 125, true);
+  view.setUint8(80, 0);
+
+  let offset = patternStart;
+  view.setUint32(offset, 9, true);
+  view.setUint8(offset + 4, 0);
+  view.setUint16(offset + 5, 64, true);
+  view.setUint16(offset + 7, packedSize, true);
+  offset += 9;
+  for (let i = 0; i < packedSize; i++) view.setUint8(offset + i, 0x80);
+
+  return buffer;
 }
