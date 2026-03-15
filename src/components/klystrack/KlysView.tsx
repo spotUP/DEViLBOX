@@ -348,13 +348,19 @@ export const KlysView: React.FC<{ width?: number; height?: number }> = ({ width:
       {/* Main content: pattern + side panel */}
       <div style={{ flex: 1, minHeight: 0, display: 'flex', overflow: 'hidden' }}>
         <div style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
-          <PatternEditorCanvas
-            formatColumns={KLYS_COLUMNS}
-            formatChannels={channels}
-            formatCurrentRow={currentRow}
-            formatIsPlaying={isPlaying}
-            onFormatCellChange={handleCellChange}
-          />
+          {channels.length > 0 ? (
+            <PatternEditorCanvas
+              formatColumns={KLYS_COLUMNS}
+              formatChannels={channels}
+              formatCurrentRow={currentRow}
+              formatIsPlaying={isPlaying}
+              onFormatCellChange={handleCellChange}
+            />
+          ) : (
+            <div className="flex items-center justify-center h-full text-text-secondary text-sm font-mono">
+              Loading pattern data…
+            </div>
+          )}
         </div>
         {sidePanelContent && (
           <div style={{
