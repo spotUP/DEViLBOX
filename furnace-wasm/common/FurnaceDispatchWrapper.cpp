@@ -333,7 +333,7 @@ struct DispatchInstance {
       bb[i] = blip_new(32768);
       if (bb[i]) {
         blip_set_rates(bb[i], (double)chipRate, (double)sampleRate);
-        blip_set_dc(bb[i], 1); // Enable DC offset high-pass filter (matches Furnace default)
+        blip_set_dc(bb[i], 1); // Enable DC high-pass filter (matches Furnace default audioHiPass=1)
       }
     }
 
@@ -1154,29 +1154,7 @@ void furnace_dispatch_render(int handle, float* outL, float* outR, int numSample
               ? (float)inst->bbReadOut[1][i] / 32768.0f : outL[i]; // Mono: duplicate L
   }
 
-  // Debug: log first few render calls per chip
   inst->renderCount++;
-  if (inst->renderCount <= 3 || (inst->renderCount % 500 == 0 && inst->renderCount <= 2000)) {
-    // Check raw acquire output for non-zero
-    int maxRaw = 0;
-    if (!inst->useDirect && inst->bbIn[0]) {
-      for (int j = 0; j < chipSamples && j < 256; j++) {
-        int v = inst->bbIn[0][j] < 0 ? -inst->bbIn[0][j] : inst->bbIn[0][j];
-        if (v > maxRaw) maxRaw = v;
-      }
-    }
-    // Check blip output
-    int maxOut = 0;
-    if (inst->bbReadOut[0]) {
-      for (int j = 0; j < numSamples; j++) {
-        int v = inst->bbReadOut[0][j] < 0 ? -inst->bbReadOut[0][j] : inst->bbReadOut[0][j];
-        if (v > maxOut) maxOut = v;
-      }
-    }
-    printf("[FurnaceDispatch] render #%d: platform=%d, chipSamples=%d, outSamples=%d, direct=%d, outs=%d, maxRaw=%d, maxOut=%d, rate=%d\n",
-           inst->renderCount, inst->platformType, chipSamples, numSamples,
-           inst->useDirect ? 1 : 0, inst->chipOuts, maxRaw, maxOut, inst->dispatch->rate);
-  }
 }
 
 /**
@@ -4198,6 +4176,27 @@ void furnace_dispatch_load_ins2(int insIndex, unsigned char* data, int dataLen) 
             ins->amiga.noteMap[note].dpcmFreq = (signed char)data[off];
             ins->amiga.noteMap[note].dpcmDelta = (signed char)data[off + 1];
           }
+        }
+      }
+      pos = featEnd;
+    }
+    // ── SU: Sound Unit ──
+    else if (fc0 == 'S' && fc1 == 'U') {
+      // Upstream readFeatureSU: switchRoles (1 byte) + hwSeqLen (1 byte) + hwSeq entries (5 bytes each)
+      // Reference: instrument.cpp:3149-3161 (version >= 185 for hwSeq)
+      if (featLen >= 1) {
+        ins->su.switchRoles = data[pos] != 0;
+      }
+      if (featLen >= 2) {
+        int suSeqLen = data[pos + 1];
+        ins->su.hwSeqLen = suSeqLen;
+        int entryBase = pos + 2;
+        for (int i = 0; i < suSeqLen && i < 256 && entryBase + i * 5 + 4 < featEnd; i++) {
+          unsigned char* entry = data + entryBase + i * 5;
+          ins->su.hwSeq[i].cmd = entry[0];
+          ins->su.hwSeq[i].bound = entry[1];
+          ins->su.hwSeq[i].val = entry[2];
+          ins->su.hwSeq[i].speed = *(unsigned short*)(entry + 3);
         }
       }
       pos = featEnd;
