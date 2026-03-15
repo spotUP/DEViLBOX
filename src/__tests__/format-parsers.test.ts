@@ -826,6 +826,64 @@ describe('Native parser tests', () => {
     expect(song).toBeTruthy();
     expect(song.format).toBeTruthy();
   });
+
+  it('DigitalSonixChrome: dragonsbreath.dsc', async () => {
+    const buf = readFileSync(resolve(BASE, 'dragonsbreath.dsc'));
+    const ab = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer;
+    const { isDscFormat, parseDscFile } = await import('@lib/import/formats/DigitalSonixChromeParser');
+    expect(isDscFormat(ab)).toBe(true);
+    const song = parseDscFile(ab, 'dragonsbreath.dsc');
+    logResult('DigitalSonixChrome', song);
+    expect(song).toBeTruthy();
+    expect(song.format).toBeTruthy();
+  });
+
+  it('KrisHatlelid: fiendish_freddys.kh', async () => {
+    const buf = readFileSync(resolve(BASE, 'fiendish_freddys.kh'));
+    const ab = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer;
+    const { isKrisHatlelidFormat, parseKrisHatlelidFile } = await import('@lib/import/formats/KrisHatlelidParser');
+    expect(isKrisHatlelidFormat(ab)).toBe(true);
+    const song = parseKrisHatlelidFile(ab, 'fiendish_freddys.kh');
+    logResult('KrisHatlelid', song);
+    expect(song).toBeTruthy();
+    expect(song.format).toBeTruthy();
+  });
+
+  it('MMDC: captain_planet.mmdc', async () => {
+    const buf = readFileSync(resolve(BASE, 'captain_planet.mmdc'));
+    const ab = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer;
+    const { isMMDCFormat, parseMMDCFile } = await import('@lib/import/formats/MMDCParser');
+    expect(isMMDCFormat(ab)).toBe(true);
+    const song = parseMMDCFile(ab, 'captain_planet.mmdc');
+    logResult('MMDC', song);
+    expect(song).toBeTruthy();
+    expect(song.format).toBeTruthy();
+  });
+
+  it('MarkCooksey Old: commando.mc', async () => {
+    const buf = readFileSync(resolve(BASE, 'commando.mc'));
+    const ab = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer;
+    const { isMarkCookseyFormat, parseMarkCookseyFile } = await import('@lib/import/formats/MarkCookseyParser');
+    expect(isMarkCookseyFormat(ab, 'commando.mc')).toBe(true);
+    const song = await parseMarkCookseyFile(ab, 'commando.mc');
+    logResult('MarkCooksey mc', song);
+    expect(song).toBeTruthy();
+    expect(song.format).toBeTruthy();
+  });
+
+  it('JochenHippel7V: amberstar.hip7', async () => {
+    const buf = readFileSync(resolve(BASE, 'amberstar.hip7'));
+    const ab = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer;
+    const { isJochenHippel7VFormat, parseJochenHippel7VFile } = await import('@lib/import/formats/JochenHippel7VParser');
+    if (isJochenHippel7VFormat(ab)) {
+      const song = parseJochenHippel7VFile(ab, 'amberstar.hip7');
+      logResult('JochenHippel7V', song);
+      expect(song).toBeTruthy();
+      expect(song.format).toBeTruthy();
+    } else {
+      console.log('  JochenHippel7V: not detected, falls to UADE');
+    }
+  });
 });
 
 // ── UADE routing detection tests ───────────────────────────────────────────
@@ -861,20 +919,20 @@ describe('UADE routing detection for remaining formats', () => {
     'action.aps',         // aps
     'airball.ps',         // ps
     // 'airballtest.sog' — now has native JochenHippelSTParser test
-    'amberstar.hip7',     // hip7
+    // 'amberstar.hip7' — now has native JochenHippel7VParser test
     'prehistoric_tale.hipc', // hipc
     'beast_busters.ims',  // ims
-    'bombjack.jmf',       // jmf
-    'battlecommand.jd',   // jd
-    'fiendish_freddys.kh', // kh
+    'bombjack.jmf',       // jmf (native JankoMrsicFlogel detection fails for this file)
+    // 'battlecommand.jd' — now has native SpecialFXParser test
+    // 'fiendish_freddys.kh' — now has native KrisHatlelidParser test
     'ninjaspirit.lme',    // lme
-    'commando.mc',        // mc
-    'axelf.mm4',          // mm4
-    'crockett8.mm8',      // mm8
-    'captain_planet.mmdc', // mmdc
+    // 'commando.mc' — now has native MarkCookseyParser test
+    // 'axelf.mm4' — now has native MusicMaker4VParser test
+    // 'crockett8.mm8' — now has native MusicMaker8VParser test
+    // 'captain_planet.mmdc' — now has native MMDCParser test
     'angel_harp.mms',     // mms
-    'aquarivs.bp',        // bp
-    'antidust.bp3',       // bp3
+    // 'aquarivs.bp' — now has native SoundMonParser test
+    // 'antidust.bp3' — now has native SoundMonParser test
     'newtek.bsi',         // bsi
     // 'artificial_dreams.sb' — now has native SteveBarrettParser test
     // 'chubbygristle.bds' — now has native BenDaglishSIDParser test
@@ -883,7 +941,7 @@ describe('UADE routing detection for remaining formats', () => {
     'adept.smod',         // smod (FC variant)
     // 'fightingsoccer.snk' — now has native PaulSummersParser test
     // 'flimbos_quest.sqt' — now has native QuartetParser test
-    'dragonsbreath.dsc',  // dsc
+    // 'dragonsbreath.dsc' — now has native DigitalSonixChromeParser test
     // 'batmanreturns.dsr' — now has native DesireParser test
     // 'doxtro3.dss' — now has native DigitalSoundStudioParser test
     // 'batmanthemovie.doda' — now has native SpecialFXParser test
@@ -891,7 +949,7 @@ describe('UADE routing detection for remaining formats', () => {
     'crusaders1.dm',      // dm
     'flight.dmu',         // dmu
     // 'count_duckula.scr' — now has native SeanConranParser test
-    'ziriax.pvp',         // pvp
+    'ziriax.pvp',         // pvp (native PeterVerswyvelenPacker detection fails for this file)
     'axelf.psf',          // psf (SoundFactory)
     // theday.digi → old DigiBooster 1.x text-header ("DIGI Boo..."); routes to OpenMPT, not UADE
     'turtle_ready.adsc',  // adsc

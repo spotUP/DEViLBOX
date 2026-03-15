@@ -214,25 +214,27 @@ describe('MODParser', () => {
 
   describe('Amiga Period Conversion', () => {
     it('should convert common periods to notes', () => {
-      expect(periodToNote(1712)).toBe('C-0');
-      expect(periodToNote(856)).toBe('C-1');
-      expect(periodToNote(428)).toBe('C-2');
-      expect(periodToNote(214)).toBe('C-3');
+      // MODParser uses XM octave naming: Amiga C-1 (period 856) = XM C-3
+      expect(periodToNote(1712)).toBe('C-2');
+      expect(periodToNote(856)).toBe('C-3');
+      expect(periodToNote(428)).toBe('C-4');
+      expect(periodToNote(214)).toBe('C-5');
     });
 
     it('should handle all notes in octave', () => {
-      expect(periodToNote(428)).toBe('C-2');
-      expect(periodToNote(404)).toBe('C#2');
-      expect(periodToNote(381)).toBe('D-2');
-      expect(periodToNote(360)).toBe('D#2');
-      expect(periodToNote(339)).toBe('E-2');
-      expect(periodToNote(320)).toBe('F-2');
-      expect(periodToNote(302)).toBe('F#2');
-      expect(periodToNote(285)).toBe('G-2');
-      expect(periodToNote(269)).toBe('G#2');
-      expect(periodToNote(254)).toBe('A-2');
-      expect(periodToNote(240)).toBe('A#2');
-      expect(periodToNote(226)).toBe('B-2');
+      // Amiga octave 2 (periods 428–226) maps to XM octave 4
+      expect(periodToNote(428)).toBe('C-4');
+      expect(periodToNote(404)).toBe('C#4');
+      expect(periodToNote(381)).toBe('D-4');
+      expect(periodToNote(360)).toBe('D#4');
+      expect(periodToNote(339)).toBe('E-4');
+      expect(periodToNote(320)).toBe('F-4');
+      expect(periodToNote(302)).toBe('F#4');
+      expect(periodToNote(285)).toBe('G-4');
+      expect(periodToNote(269)).toBe('G#4');
+      expect(periodToNote(254)).toBe('A-4');
+      expect(periodToNote(240)).toBe('A#4');
+      expect(periodToNote(226)).toBe('B-4');
     });
 
     it('should return null for invalid periods', () => {
@@ -243,8 +245,8 @@ describe('MODParser', () => {
 
     it('should handle period values with rounding', () => {
       // Test that nearby periods map to correct notes
-      expect(periodToNote(427)).toBe('C-2'); // Slightly off 428
-      expect(periodToNote(429)).toBe('C-2');
+      expect(periodToNote(427)).toBe('C-4'); // Slightly off 428
+      expect(periodToNote(429)).toBe('C-4');
     });
   });
 
