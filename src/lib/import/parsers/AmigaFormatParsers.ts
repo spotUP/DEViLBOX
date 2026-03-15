@@ -1182,22 +1182,17 @@ export async function tryRouteFormat(
   // Two-file format: song data in .mfp, PCM samples in companion smp.* file.
   // Native parser extracts structure; UADE provides full audio with samples.
   if (matchesExt(filename, ['mfp'])) {
-    if (prefs.magneticFieldsPacker === 'native') {
-      try {
-        const { isMFPFormat, parseMFPFile } = await import('@lib/import/formats/MFPParser');
-        if (isMFPFormat(buffer, originalFileName)) return await parseMFPFile(buffer, originalFileName);
-      } catch (err) {
-        console.warn(`[MFPParser] Native parse failed for ${filename}, falling back to MagneticFieldsPackerParser:`, err);
-      }
-      try {
-        const { isMagneticFieldsPackerFormat, parseMagneticFieldsPackerFile } = await import('@lib/import/formats/MagneticFieldsPackerParser');
-        if (isMagneticFieldsPackerFormat(buffer, originalFileName)) return await parseMagneticFieldsPackerFile(buffer, originalFileName);
-      } catch (err) {
-        console.warn(`[MagneticFieldsPackerParser] Native parse failed for ${filename}, falling back to UADE:`, err);
-      }
-    }
-    const { parseUADEFile: parseUADE_mfp } = await import('@lib/import/formats/UADEParser');
-    return parseUADE_mfp(buffer, originalFileName, prefs.uade ?? 'enhanced', subsong, preScannedMeta);
+    const [{ isMFPFormat, parseMFPFile }, { isMagneticFieldsPackerFormat, parseMagneticFieldsPackerFile }] = await Promise.all([
+      import('@lib/import/formats/MFPParser'),
+      import('@lib/import/formats/MagneticFieldsPackerParser'),
+    ]);
+    return withNativeThenUADE('magneticFieldsPacker', ctx,
+      async (buf: Uint8Array | ArrayBuffer, name: string) => {
+        if (isMFPFormat(buf as ArrayBuffer, name)) return await parseMFPFile(buf as ArrayBuffer, name);
+        if (isMagneticFieldsPackerFormat(buf as ArrayBuffer, name)) return await parseMagneticFieldsPackerFile(buf as ArrayBuffer, name);
+        return null;
+      },
+      'MFPParser', { injectUADE: true });
   }
 
   // ── Delta Music 1.0 (.dm, .dm1) — identified by "ALL " magic ──────────────
@@ -1261,23 +1256,17 @@ export async function tryRouteFormat(
   // Compiled 68k Amiga music format. Two variants: old and new. Both detected
   // by opcode patterns at offsets 0/4/8.
   if (matchesExt(filename, ['dl', 'dl_deli'])) {
-    if (prefs.daveLowe === 'native') {
-      try {
-        const { isDaveLoweFormat, parseDaveLoweFile } = await import('@lib/import/formats/DaveLoweParser');
-        const _dlBuf = new Uint8Array(buffer);
-        if (isDaveLoweFormat(_dlBuf)) return await parseDaveLoweFile(buffer, originalFileName);
-      } catch (err) {
-        console.warn(`[DaveLoweParser] Native parse failed for ${filename}, trying DaveLoweNew:`, err);
-      }
-      try {
-        const { isDaveLoweNewFormat, parseDaveLoweNewFile } = await import('@lib/import/formats/DaveLoweNewParser');
-        if (isDaveLoweNewFormat(buffer)) return parseDaveLoweNewFile(buffer, originalFileName);
-      } catch (err) {
-        console.warn(`[DaveLoweNewParser] Native parse failed for ${filename}, falling back to UADE:`, err);
-      }
-    }
-    const { parseUADEFile: parseUADE_dl } = await import('@lib/import/formats/UADEParser');
-    return parseUADE_dl(buffer, originalFileName, prefs.uade ?? 'enhanced', subsong, preScannedMeta);
+    const [{ isDaveLoweFormat, parseDaveLoweFile }, { isDaveLoweNewFormat, parseDaveLoweNewFile }] = await Promise.all([
+      import('@lib/import/formats/DaveLoweParser'),
+      import('@lib/import/formats/DaveLoweNewParser'),
+    ]);
+    return withNativeThenUADE('daveLowe', ctx,
+      async (buf: Uint8Array | ArrayBuffer, name: string) => {
+        if (isDaveLoweFormat(new Uint8Array(buf as ArrayBuffer))) return await parseDaveLoweFile(buf as ArrayBuffer, name);
+        if (isDaveLoweNewFormat(buf as ArrayBuffer)) return parseDaveLoweNewFile(buf as ArrayBuffer, name);
+        return null;
+      },
+      'DaveLoweParser', { injectUADE: true });
   }
 
   // ── Leggless Music Editor (.lme / LME.*) ────────────────────────────────────
