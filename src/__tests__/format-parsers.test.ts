@@ -744,6 +744,50 @@ describe('Native parser tests', () => {
     expect(song.format).toBeTruthy();
   });
 
+  it('DigitalSoundStudio: doxtro3.dss', async () => {
+    const buf = readFileSync(resolve(BASE, 'doxtro3.dss'));
+    const ab = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer;
+    const { isDigitalSoundStudioFormat, parseDigitalSoundStudioFile } = await import('@lib/import/formats/DigitalSoundStudioParser');
+    expect(isDigitalSoundStudioFormat(new Uint8Array(ab))).toBe(true);
+    const song = parseDigitalSoundStudioFile(new Uint8Array(ab), 'doxtro3.dss');
+    expect(song).toBeTruthy();
+    logResult('DigitalSoundStudio', song!);
+    expect(song!.format).toBeTruthy();
+  });
+
+  it('SeanConran: count_duckula.scr', async () => {
+    const buf = readFileSync(resolve(BASE, 'count_duckula.scr'));
+    const ab = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer;
+    const { isSeanConranFormat, parseSeanConranFile } = await import('@lib/import/formats/SeanConranParser');
+    expect(isSeanConranFormat(new Uint8Array(ab))).toBe(true);
+    const song = await parseSeanConranFile(ab, 'count_duckula.scr');
+    logResult('SeanConran', song);
+    expect(song).toBeTruthy();
+    expect(song.format).toBeTruthy();
+  });
+
+  it('Desire: batmanreturns.dsr', async () => {
+    const buf = readFileSync(resolve(BASE, 'batmanreturns.dsr'));
+    const ab = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer;
+    const { isDesireFormat, parseDesireFile } = await import('@lib/import/formats/DesireParser');
+    expect(isDesireFormat(ab)).toBe(true);
+    const song = parseDesireFile(ab, 'batmanreturns.dsr');
+    logResult('Desire', song);
+    expect(song).toBeTruthy();
+    expect(song.format).toBeTruthy();
+  });
+
+  it('SpecialFX: batmanthemovie.doda', async () => {
+    const buf = readFileSync(resolve(BASE, 'batmanthemovie.doda'));
+    const ab = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer;
+    const { isSpecialFXFormat, parseSpecialFXFile } = await import('@lib/import/formats/SpecialFXParser');
+    expect(isSpecialFXFormat(ab)).toBe(true);
+    const song = parseSpecialFXFile(ab, 'batmanthemovie.doda');
+    logResult('SpecialFX doda', song);
+    expect(song).toBeTruthy();
+    expect(song.format).toBeTruthy();
+  });
+
   it('JochenHippelST: 5th_gear.hip (non-MCMD short form)', async () => {
     const buf = readFileSync(resolve(BASE, '5th_gear.hip'));
     const ab = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer;
@@ -840,13 +884,13 @@ describe('UADE routing detection for remaining formats', () => {
     // 'fightingsoccer.snk' — now has native PaulSummersParser test
     // 'flimbos_quest.sqt' — now has native QuartetParser test
     'dragonsbreath.dsc',  // dsc
-    'batmanreturns.dsr',  // dsr
-    'doxtro3.dss',        // dss
-    'batmanthemovie.doda', // doda
+    // 'batmanreturns.dsr' — now has native DesireParser test
+    // 'doxtro3.dss' — now has native DigitalSoundStudioParser test
+    // 'batmanthemovie.doda' — now has native SpecialFXParser test
     // 'balrog.dln' — now has native DaveLoweNewParser test
     'crusaders1.dm',      // dm
     'flight.dmu',         // dmu
-    'count_duckula.scr',  // scr
+    // 'count_duckula.scr' — now has native SeanConranParser test
     'ziriax.pvp',         // pvp
     'axelf.psf',          // psf (SoundFactory)
     // theday.digi → old DigiBooster 1.x text-header ("DIGI Boo..."); routes to OpenMPT, not UADE

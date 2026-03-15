@@ -1277,9 +1277,9 @@ export async function tryRouteFormat(
     return parseUADEFile(buffer, originalFileName, 'classic', subsong, preScannedMeta);
   }
 
-  // ── Medley (.ml) ─────────────────────────────────────────────────────────
+  // ── Medley (.ml / .mso) ───────────────────────────────────────────────────
   // Amiga 4-channel format (Medley tracker). Magic: "MSOB" at bytes[0..3].
-  if (matchesExt(filename, ['ml'])) {
+  if (matchesExt(filename, ['ml', 'mso'])) {
     const { isMedleyFormat, parseMedleyFile } = await import('@lib/import/formats/MedleyParser');
     return withNativeThenUADE('medley', ctx,
       (buf: Uint8Array | ArrayBuffer, name: string) => { if (isMedleyFormat(buf as ArrayBuffer)) return parseMedleyFile(buf as ArrayBuffer, name); return null; },
@@ -1624,7 +1624,7 @@ export async function tryRouteFormat(
     const { isPeterVerswyvelenPackerFormat, parsePeterVerswyvelenPackerFile } = await import('@lib/import/formats/PeterVerswyvelenPackerParser');
     return withNativeThenUADE('peterVerswyvelenPacker', ctx,
       (buf: Uint8Array | ArrayBuffer, name: string) => { if (isPeterVerswyvelenPackerFormat(buf as ArrayBuffer)) return parsePeterVerswyvelenPackerFile(buf as ArrayBuffer, name); return null; },
-      'PeterVerswyvelenPackerParser');
+      'PeterVerswyvelenPackerParser', { injectUADE: true });
   }
 
   // ── Wally Beben (WB.* prefix) ─────────────────────────────────────────────
@@ -1657,7 +1657,7 @@ export async function tryRouteFormat(
     const { isDesireFormat, parseDesireFile } = await import('@lib/import/formats/DesireParser');
     return withNativeThenUADE('desire', ctx,
       (buf: Uint8Array | ArrayBuffer, name: string) => { if (isDesireFormat(buf as ArrayBuffer)) return parseDesireFile(buf as ArrayBuffer, name); return null; },
-      'DesireParser');
+      'DesireParser', { injectUADE: true });
   }
 
   // ── Dave Lowe New (DLN.* prefix) ──────────────────────────────────────────
