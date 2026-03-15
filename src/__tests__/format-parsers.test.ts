@@ -658,8 +658,46 @@ describe('Native parser tests', () => {
 
   it('FredGray: blacklamp.gray', async () => {
     const buf = readFileSync(resolve(BASE, 'blacklamp.gray'));
-    expect(await uadeDetect('blacklamp.gray')).toBe(true);
-    console.log(`  FredGray: ${buf.byteLength} bytes, UADE-routed`);
+    const ab = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer;
+    const { isFredGrayFormat, parseFredGrayFile } = await import('@lib/import/formats/FredGrayParser');
+    expect(isFredGrayFormat(ab, 'blacklamp.gray')).toBe(true);
+    const song = parseFredGrayFile(ab, 'blacklamp.gray');
+    logResult('FredGray', song);
+    expect(song).toBeTruthy();
+    expect(song.format).toBeTruthy();
+  });
+
+  it('BenDaglishSID: chubbygristle.bds', async () => {
+    const buf = readFileSync(resolve(BASE, 'chubbygristle.bds'));
+    const ab = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer;
+    const { isBenDaglishSIDFormat, parseBenDaglishSIDFile } = await import('@lib/import/formats/BenDaglishSIDParser');
+    expect(isBenDaglishSIDFormat(ab, 'chubbygristle.bds')).toBe(true);
+    const song = await parseBenDaglishSIDFile(ab, 'chubbygristle.bds');
+    logResult('BenDaglishSID', song);
+    expect(song).toBeTruthy();
+    expect(song.format).toBeTruthy();
+  });
+
+  it('Quartet: flimbos_quest.sqt', async () => {
+    const buf = readFileSync(resolve(BASE, 'flimbos_quest.sqt'));
+    const ab = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer;
+    const { isQuartetFormat, parseQuartetFile } = await import('@lib/import/formats/QuartetParser');
+    expect(isQuartetFormat(ab, 'flimbos_quest.sqt')).toBe(true);
+    const song = await parseQuartetFile(ab, 'flimbos_quest.sqt');
+    logResult('Quartet', song);
+    expect(song).toBeTruthy();
+    expect(song.format).toBeTruthy();
+  });
+
+  it('SoundMaster: doofus.sm', async () => {
+    const buf = readFileSync(resolve(BASE, 'doofus.sm'));
+    const ab = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer;
+    const { isSoundMasterFormat, parseSoundMasterFile } = await import('@lib/import/formats/SoundMasterParser');
+    expect(isSoundMasterFormat(ab, 'doofus.sm')).toBe(true);
+    const song = await parseSoundMasterFile(ab, 'doofus.sm');
+    logResult('SoundMaster', song);
+    expect(song).toBeTruthy();
+    expect(song.format).toBeTruthy();
   });
 
   it('JochenHippelST: 5th_gear.hip (non-MCMD short form)', async () => {
