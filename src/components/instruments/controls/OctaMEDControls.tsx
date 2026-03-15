@@ -101,6 +101,7 @@ export const OctaMEDControls: React.FC<OctaMEDControlsProps> = ({ config, onChan
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const numChannels = useTrackerStore((s) => s.patterns[0]?.channels.length ?? 4);
   const currentThemeId = useThemeStore((s) => s.currentThemeId);
   const isCyan = currentThemeId === 'cyan-lineart';
 
@@ -407,14 +408,16 @@ export const OctaMEDControls: React.FC<OctaMEDControlsProps> = ({ config, onChan
           </button>
         ))}
         <div className="ml-auto flex items-center gap-2 mr-2">
-          <button
-            onClick={() => { void handleExportMod(); }}
-            disabled={exportingMod}
-            className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider border rounded transition-colors"
-            style={{ color: exportingMod ? '#444' : accent, borderColor: dim, background: 'transparent', cursor: exportingMod ? 'wait' : 'pointer' }}
-          >
-            {exportingMod ? 'Exporting...' : 'Export .mod'}
-          </button>
+          {numChannels <= 4 && (
+            <button
+              onClick={() => { void handleExportMod(); }}
+              disabled={exportingMod}
+              className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider border rounded transition-colors"
+              style={{ color: exportingMod ? '#444' : accent, borderColor: dim, background: 'transparent', cursor: exportingMod ? 'wait' : 'pointer' }}
+            >
+              {exportingMod ? 'Exporting...' : 'Export .mod'}
+            </button>
+          )}
           {uadeChipRam && (
             <button
               onClick={handleExport}
