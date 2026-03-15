@@ -34,8 +34,8 @@ const UADE_ONLY_PREFIXES = [
   'hip.', 'mcmd.', 'sog.',
   // MikeDavies, MarkII, MusiclineEditor
   'md.', 'mk2.', 'mkii.', 'ml.',
-  // Silmarils, Medley
-  'mok.', 'mso.',
+  // Silmarils
+  'mok.',
   // Pokeynoise
   'pn.',
   // RiffRaff, SeanConnolly
@@ -74,9 +74,17 @@ export async function tryUADEPrefixParse(
 
   // ── UADE-only prefix formats (matches both prefix.name and name.prefix) ──
   const ext = base.slice(base.lastIndexOf('.') + 1);
-  if (UADE_ONLY_PREFIXES.some(p => base.startsWith(p) || p === `${ext}.`)) {
+  const matchedPrefix = UADE_ONLY_PREFIXES.find(p => base.startsWith(p) || p === `${ext}.`);
+  if (matchedPrefix) {
+    // Normalize extension-form filename to prefix form so UADE selects the right replayer.
+    // e.g. "deepspace.mk2" → "mk2.deepspace" (UADE keys off the filename prefix).
+    let uadeFileName = originalFileName;
+    if (!base.startsWith(matchedPrefix)) {
+      const dot = base.lastIndexOf('.');
+      if (dot > 0) uadeFileName = `${base.slice(dot + 1)}.${base.slice(0, dot)}`;
+    }
     const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
-    return parseUADEFile(buffer, originalFileName, prefs.uade ?? 'enhanced', subsong, preScannedMeta);
+    return parseUADEFile(buffer, uadeFileName, prefs.uade ?? 'enhanced', subsong, preScannedMeta);
   }
 
   // ── UADE catch-all: 130+ exotic Amiga formats ───────────────────────────

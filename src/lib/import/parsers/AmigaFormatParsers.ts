@@ -1279,11 +1279,17 @@ export async function tryRouteFormat(
 
   // ── Medley (.ml / .mso) ───────────────────────────────────────────────────
   // Amiga 4-channel format (Medley tracker). Magic: "MSOB" at bytes[0..3].
+  // UADESynth plays this format incorrectly; UADEEditableSynth plays it correctly.
+  // Strategy: parse via UADE for real instruments/patterns, then inject uadeEditableFileData
+  // to force UADEEditableSynth for audio (which uses MSOB magic-byte detection correctly).
   if (matchesExt(filename, ['ml', 'mso'])) {
-    const { isMedleyFormat, parseMedleyFile } = await import('@lib/import/formats/MedleyParser');
-    return withNativeThenUADE('medley', ctx,
-      (buf: Uint8Array | ArrayBuffer, name: string) => { if (isMedleyFormat(buf as ArrayBuffer)) return parseMedleyFile(buf as ArrayBuffer, name); return null; },
-      'MedleyParser', { injectUADE: true });
+    const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
+    const result = await parseUADEFile(buffer, originalFileName, prefs.uade ?? 'enhanced', subsong, preScannedMeta);
+    if (!(result as any).uadeEditableFileData) {
+      (result as any).uadeEditableFileData = buffer.slice(0);
+      (result as any).uadeEditableFileName = originalFileName;
+    }
+    return result;
   }
 
   // ── Mark Cooksey / Don Adan (mc.* / mcr.* / mco.* prefix) ─────────────────
@@ -1747,7 +1753,7 @@ export async function tryRouteFormat(
     const { isDscFormat, parseDscFile } = await import('@lib/import/formats/DigitalSonixChromeParser');
     return withNativeThenUADE('digitalSonixChrome', ctx,
       (buf: Uint8Array | ArrayBuffer, name: string) => { if (isDscFormat(buf as ArrayBuffer)) return parseDscFile(buf as ArrayBuffer, name); return null; },
-      'DigitalSonixChromeParser');
+      'DigitalSonixChromeParser', { injectUADE: true });
   }
 
   // ── Jesper Olsen (JO.* prefix) ────────────────────────────────────────────
