@@ -26,23 +26,46 @@ interface GlobalDragDropHandlerProps {
 const COMPANION_PREFIX_MAP: Record<string, string> = {
   'mdat.': 'smpl.',   // TFMX: mdat.songname → smpl.songname
   'mfp.':  'smp.',    // MFP:  mfp.songname  → smp.songname
+  'midi.': 'smpl.',   // MIDI-Loriciel: MIDI.songname → SMPL.songname
+};
+
+/**
+ * Map of filename extension patterns that require companion files.
+ * key = main file extension (lowercase, with dot), value = companion extensions.
+ * Used when both files share the same base name but differ in extension.
+ */
+const COMPANION_EXT_MAP: Record<string, string[]> = {
+  '.dat':   ['.ssd'],                   // Paul Robotham: songname.dat → songname.ssd
+  '.sdata': ['.ip', '.ip.n', '.ip.l'],  // MusicMaker V8 Old: sdata + ip files
+  '.dum':   ['.ins'],                   // Infogrames: songname.dum → songname.ins
 };
 
 /**
  * Check if a filename matches a known multi-file pattern and return the
- * expected companion filename, or null if no companion is needed.
+ * expected companion filenames, or null if no companion is needed.
  */
-function getExpectedCompanionName(filename: string): string | null {
+function getExpectedCompanionNames(filename: string): string[] | null {
   const basename = (filename.split('/').pop() ?? filename).split('\\').pop() ?? filename;
   const lower = basename.toLowerCase();
+
+  // Prefix-based companions (e.g. mdat.song → smpl.song)
   for (const [prefix, companionPrefix] of Object.entries(COMPANION_PREFIX_MAP)) {
     if (lower.startsWith(prefix)) {
-      // Preserve original casing of the suffix part
-      return companionPrefix + basename.slice(prefix.length);
+      return [companionPrefix + basename.slice(prefix.length)];
     }
   }
+
+  // Extension-based companions (e.g. song.dat → song.ssd)
+  for (const [ext, companionExts] of Object.entries(COMPANION_EXT_MAP)) {
+    if (lower.endsWith(ext)) {
+      const base = basename.slice(0, basename.length - ext.length);
+      return companionExts.map(cext => base + cext);
+    }
+  }
+
   return null;
 }
+
 
 // All supported file extensions — module formats from ModuleLoader + app-specific
 const SUPPORTED_EXTENSIONS = new Set([
@@ -168,10 +191,10 @@ export const GlobalDragDropHandler: React.FC<GlobalDragDropHandlerProps> = ({
       }
 
       // For multi-file formats (e.g. TFMX mdat.* + smpl.*), try to auto-load
-      // the companion from the same directory using the File System Access API.
+      // the companion(s) from the same directory using the File System Access API.
       // This avoids prompting the user with a manual file picker.
-      const expectedCompanion = getExpectedCompanionName(file.name);
-      if (expectedCompanion && onFolderLoadedRef.current) {
+      const expectedCompanions = getExpectedCompanionNames(file.name);
+      if (expectedCompanions && expectedCompanions.length > 0 && onFolderLoadedRef.current) {
         // Try File System Access API (Chrome 86+) to get the parent directory
         const fileItem = fileItems.find(item => {
           const f = item.getAsFile();
@@ -187,21 +210,22 @@ export const GlobalDragDropHandler: React.FC<GlobalDragDropHandlerProps> = ({
             // The user just confirms the folder — no hunting for files needed.
             const dirHandle = await (window as unknown as { showDirectoryPicker(opts?: Record<string, unknown>): Promise<FileSystemDirectoryHandle> })
               .showDirectoryPicker({ startIn: handle, mode: 'read' });
-            // Read the companion file from the directory
-            const companionHandle = await dirHandle.getFileHandle(expectedCompanion).catch(() => null)
-              // Case-insensitive fallback: scan directory for matching name
-              || await (async () => {
-                const lowerExpected = expectedCompanion.toLowerCase();
-                for await (const [entryName, entryHandle] of dirHandle as unknown as AsyncIterable<[string, FileSystemHandle]>) {
-                  if (entryName.toLowerCase() === lowerExpected && entryHandle.kind === 'file') {
-                    return entryHandle as FileSystemFileHandle;
-                  }
-                }
-                return null;
-              })();
-            if (companionHandle) {
-              const companionFile = await companionHandle.getFile();
-              await onFolderLoadedRef.current(file, [companionFile]);
+
+            // Build case-insensitive directory index once
+            const dirEntries: Record<string, FileSystemFileHandle> = {};
+            for await (const [entryName, entryHandle] of dirHandle as unknown as AsyncIterable<[string, FileSystemHandle]>) {
+              if (entryHandle.kind === 'file') dirEntries[entryName.toLowerCase()] = entryHandle as FileSystemFileHandle;
+            }
+
+            // Find each expected companion (case-insensitive)
+            const companionFiles: File[] = [];
+            for (const name of expectedCompanions) {
+              const h = dirEntries[name.toLowerCase()];
+              if (h) companionFiles.push(await h.getFile());
+            }
+
+            if (companionFiles.length > 0) {
+              await onFolderLoadedRef.current(file, companionFiles);
               return;
             }
           } catch {
