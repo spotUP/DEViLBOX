@@ -2092,6 +2092,7 @@ static void seqProcessRow(int i, bool afterDelay) {
           HINT_PORTA(i, ch.portaNote, ch.portaSpeed);
         }
       } else if (!ch.noteOnInhibit) {
+        dispatchCmd(DIV_CMD_VOLUME, i, ch.volume >> 8);
         dispatchCmd(DIV_CMD_NOTE_ON, i, ch.note, ch.volume >> 8);
         ch.releasing = false;
         ch.goneThroughNote = true;
