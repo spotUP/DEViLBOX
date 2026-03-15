@@ -1798,9 +1798,9 @@ async function parseOldFormat(
     compatFlags.delayBehavior = version >= 110 ? reader.readUint8() : (reader.readUint8(), 0);          // 22
     compatFlags.jumpTreatment = version >= 113 ? reader.readUint8() : (reader.readUint8(), 0);          // 23
     reader.readUint8(); // 24: autoSystem (NOT a compat flag, song-level field)
-    compatFlags.disableSampleMacro = version >= 117 ? !!reader.readUint8() : (reader.readUint8(), false);// 25
-    compatFlags.brokenOutVol2 = version >= 121 ? !!reader.readUint8() : (reader.readUint8(), false);    // 26
-    compatFlags.oldArpStrategy = version >= 130 ? !!reader.readUint8() : (reader.readUint8(), false);   // 27
+    compatFlags.disableSampleMacro = version >= 117 ? !!reader.readUint8() : (reader.readUint8(), true); // 25 — true for v<117
+    compatFlags.brokenOutVol2 = version >= 121 ? !!reader.readUint8() : (reader.readUint8(), false);     // 26
+    compatFlags.oldArpStrategy = version >= 130 ? !!reader.readUint8() : (reader.readUint8(), true);     // 27 — true for v<130
   }
 
   // Virtual tempo
@@ -1855,16 +1855,25 @@ async function parseOldFormat(
   }
 
   // Extended compat flags block 2 (8 bytes)
-  // Reference: fur.cpp:1600-1637
+  // Reference: fur.cpp:700-836 (version defaults) and fur.cpp:1600-1637 (file read)
+  // Set version-based defaults first (matching Furnace's default initialization in loadFur)
+  compatFlags.brokenPortaLegato = version < 138;  // true for v<138
+  compatFlags.brokenFMOff = version < 155;        // true for v<155
+  compatFlags.preNoteNoEffect = version < 168;    // true for v<168
+  compatFlags.oldDPCM = version < 183;            // true for v<183
+  compatFlags.resetArpPhaseOnNewNote = false;     // false for v<184 (Furnace default)
+  compatFlags.ceilVolumeScaling = false;          // false for v<188 (Furnace default)
+  compatFlags.oldAlwaysSetVolume = version < 191; // true for v<191 ← critical for GB volume envelope
+  compatFlags.oldSampleOffset = version < 200;    // true for v<200
   if (version >= 138) {
-    compatFlags.brokenPortaLegato = !!reader.readUint8();                                                // 0
-    compatFlags.brokenFMOff = version >= 155 ? !!reader.readUint8() : (reader.readUint8(), false);       // 1
-    compatFlags.preNoteNoEffect = version >= 168 ? !!reader.readUint8() : (reader.readUint8(), false);   // 2
-    compatFlags.oldDPCM = version >= 183 ? !!reader.readUint8() : (reader.readUint8(), false);           // 3
-    compatFlags.resetArpPhaseOnNewNote = version >= 184 ? !!reader.readUint8() : (reader.readUint8(), false);// 4
-    compatFlags.ceilVolumeScaling = version >= 188 ? !!reader.readUint8() : (reader.readUint8(), false); // 5
-    compatFlags.oldAlwaysSetVolume = version >= 191 ? !!reader.readUint8() : (reader.readUint8(), false);// 6
-    compatFlags.oldSampleOffset = version >= 200 ? !!reader.readUint8() : (reader.readUint8(), false);  // 7
+    compatFlags.brokenPortaLegato = !!reader.readUint8();                                                                        // 0
+    compatFlags.brokenFMOff = version >= 155 ? !!reader.readUint8() : (reader.readUint8(), compatFlags.brokenFMOff);             // 1
+    compatFlags.preNoteNoEffect = version >= 168 ? !!reader.readUint8() : (reader.readUint8(), compatFlags.preNoteNoEffect);     // 2
+    compatFlags.oldDPCM = version >= 183 ? !!reader.readUint8() : (reader.readUint8(), compatFlags.oldDPCM);                    // 3
+    compatFlags.resetArpPhaseOnNewNote = version >= 184 ? !!reader.readUint8() : (reader.readUint8(), false);                    // 4
+    compatFlags.ceilVolumeScaling = version >= 188 ? !!reader.readUint8() : (reader.readUint8(), false);                         // 5
+    compatFlags.oldAlwaysSetVolume = version >= 191 ? !!reader.readUint8() : (reader.readUint8(), compatFlags.oldAlwaysSetVolume);// 6
+    compatFlags.oldSampleOffset = version >= 200 ? !!reader.readUint8() : (reader.readUint8(), compatFlags.oldSampleOffset);    // 7
   }
 
   // Store parsed compat flags on module

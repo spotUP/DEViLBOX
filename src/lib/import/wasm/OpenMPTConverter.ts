@@ -34,19 +34,22 @@ function mapFormat(type: string): TrackerFormat {
  * Map OpenMPT note value (1-120) to DEViLBOX note value (1-96, 97=keyoff).
  *
  * OpenMPT adds an internal offset when loading each format:
- *   MOD: period table lookup adds +36 vs DEViLBOX's ProTracker convention
- *   XM:  note byte + 12 (OpenMPT C-5 = 61 vs FT2/DEViLBOX C-4 = 49)
- *   S3M/IT: packed octave formula adds +12
- * We subtract the offset to match each format's native note display.
+ *   SFX/MOD: ReadMODPatternEntry converts Amiga period → note = periodIdx + 25
+ *            (periodIdx 12 = C-1 period 856 → OpenMPT note 37).
+ *            DEViLBOX XM C-1 = note 13, so offset = 37 - 13 = 24.
+ *   XM/IT/S3M/DBM: OpenMPT adds +12 for display (C-4 in file → C-5 in OpenMPT).
+ *                  DEViLBOX XM C-1 = note 13, OpenMPT XM C-1 = 13+12 = 25,
+ *                  so offset = 25 - 13 = 12.
  */
-function mapNote(openmptNote: number, _format: TrackerFormat): number {
+function mapNote(openmptNote: number, format: TrackerFormat): number {
   if (openmptNote === 0) return 0;         // Empty
   if (openmptNote === 255) return 97;      // Note Off → XM note-off
   if (openmptNote === 254) return 97;      // Note Cut → treat as note-off
   if (openmptNote === 253) return 97;      // Fade → treat as note-off
   if (openmptNote >= 1 && openmptNote <= 120) {
-    // Apply format-specific offset to match native tracker display conventions
-    const offset = 12;
+    // SFX uses Amiga period encoding (ReadMODPatternEntry): C-1 = OpenMPT note 37.
+    // All other formats use XM-style encoding (direct note byte + 12): C-1 = OpenMPT note 25.
+    const offset = format === 'SFX' ? 24 : 12;
     const adjusted = openmptNote - offset;
     return Math.max(1, Math.min(adjusted, 96));
   }
