@@ -700,6 +700,50 @@ describe('Native parser tests', () => {
     expect(song.format).toBeTruthy();
   });
 
+  it('WallyBeben: wicked.wb', async () => {
+    const buf = readFileSync(resolve(BASE, 'wicked.wb'));
+    const ab = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer;
+    const { isWallyBebenFormat, parseWallyBebenFile } = await import('@lib/import/formats/WallyBebenParser');
+    expect(isWallyBebenFormat(ab)).toBe(true);
+    const song = parseWallyBebenFile(ab, 'wicked.wb');
+    logResult('WallyBeben', song);
+    expect(song).toBeTruthy();
+    expect(song.format).toBeTruthy();
+  });
+
+  it('SteveBarrett: artificial_dreams.sb', async () => {
+    const buf = readFileSync(resolve(BASE, 'artificial_dreams.sb'));
+    const ab = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer;
+    const { isSteveBarrettFormat, parseSteveBarrettFile } = await import('@lib/import/formats/SteveBarrettParser');
+    expect(isSteveBarrettFormat(ab)).toBe(true);
+    const song = parseSteveBarrettFile(ab, 'artificial_dreams.sb');
+    logResult('SteveBarrett', song);
+    expect(song).toBeTruthy();
+    expect(song.format).toBeTruthy();
+  });
+
+  it('PaulSummers: fightingsoccer.snk', async () => {
+    const buf = readFileSync(resolve(BASE, 'fightingsoccer.snk'));
+    const ab = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer;
+    const { isPaulSummersFormat, parsePaulSummersFile } = await import('@lib/import/formats/PaulSummersParser');
+    expect(isPaulSummersFormat(ab)).toBe(true);
+    const song = parsePaulSummersFile(ab, 'fightingsoccer.snk');
+    logResult('PaulSummers', song);
+    expect(song).toBeTruthy();
+    expect(song.format).toBeTruthy();
+  });
+
+  it('DaveLoweNew: balrog.dln', async () => {
+    const buf = readFileSync(resolve(BASE, 'balrog.dln'));
+    const ab = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer;
+    const { isDaveLoweNewFormat, parseDaveLoweNewFile } = await import('@lib/import/formats/DaveLoweNewParser');
+    expect(isDaveLoweNewFormat(ab)).toBe(true);
+    const song = parseDaveLoweNewFile(ab, 'balrog.dln');
+    logResult('DaveLoweNew', song);
+    expect(song).toBeTruthy();
+    expect(song.format).toBeTruthy();
+  });
+
   it('JochenHippelST: 5th_gear.hip (non-MCMD short form)', async () => {
     const buf = readFileSync(resolve(BASE, '5th_gear.hip'));
     const ab = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer;
@@ -788,18 +832,18 @@ describe('UADE routing detection for remaining formats', () => {
     'aquarivs.bp',        // bp
     'antidust.bp3',       // bp3
     'newtek.bsi',         // bsi
-    'artificial_dreams.sb', // sb
-    'chubbygristle.bds',  // bds
-    'wicked.wb',          // wb
-    'doofus.sm',          // sm
+    // 'artificial_dreams.sb' — now has native SteveBarrettParser test
+    // 'chubbygristle.bds' — now has native BenDaglishSIDParser test
+    // 'wicked.wb' — now has native WallyBebenParser test
+    // 'doofus.sm' — now has native SoundMasterParser test
     'adept.smod',         // smod (FC variant)
-    'fightingsoccer.snk', // snk
-    'flimbos_quest.sqt',  // sqt
+    // 'fightingsoccer.snk' — now has native PaulSummersParser test
+    // 'flimbos_quest.sqt' — now has native QuartetParser test
     'dragonsbreath.dsc',  // dsc
     'batmanreturns.dsr',  // dsr
     'doxtro3.dss',        // dss
     'batmanthemovie.doda', // doda
-    'balrog.dln',         // dln
+    // 'balrog.dln' — now has native DaveLoweNewParser test
     'crusaders1.dm',      // dm
     'flight.dmu',         // dmu
     'count_duckula.scr',  // scr
