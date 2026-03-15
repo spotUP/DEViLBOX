@@ -1,15 +1,19 @@
 /**
- * Tracker Render Worker — OffscreenCanvas WebGL2 rendering thread
+ * Tracker Render Worker — OffscreenCanvas rendering thread
+ *
+ * Tries WebGL2 first (TrackerGLRenderer); falls back to Canvas2D
+ * (TrackerCanvas2DRenderer) when WebGL2 is unavailable (e.g. Safari < 17.4,
+ * Chrome with hardware acceleration disabled).
  *
  * Owns the RAF loop. Receives state snapshots via postMessage from the main
- * thread and renders via TrackerGLRenderer. Main thread is never in the
- * critical rendering path — scroll events bypass React entirely.
+ * thread. Main thread is never in the critical rendering path.
  *
  * Click hit-testing is performed here (worker knows exact cell geometry)
  * and results are posted back to the main thread.
  */
 
 import { TrackerGLRenderer } from '../engine/renderer/TrackerGLRenderer';
+import { TrackerCanvas2DRenderer } from '../engine/renderer/TrackerCanvas2DRenderer';
 import type {
   TrackerWorkerMsg,
   TrackerWorkerReply,
@@ -28,7 +32,7 @@ const LINE_NUMBER_WIDTH = 40;
 
 // ─── Worker state ─────────────────────────────────────────────────────────────
 
-let renderer: TrackerGLRenderer | null = null;
+let renderer: TrackerGLRenderer | TrackerCanvas2DRenderer | null = null;
 let width  = 800;
 let height = 600;
 let dpr    = 1;
@@ -76,18 +80,31 @@ self.onmessage = (e: MessageEvent<TrackerWorkerMsg>) => {
       selection = msg.selection;
       layout   = msg.channelLayout;
 
+      let glErr: unknown = null;
       try {
         renderer = new TrackerGLRenderer(msg.canvas);
         renderer.resize(width, height, dpr);
       } catch (err) {
-        console.error('[TrackerWorker] WebGL2 init failed:', err);
-        (self as unknown as Worker).postMessage({ type: 'webgl-unsupported' } satisfies TrackerWorkerReply);
-        return;
+        glErr = err;
+      }
+
+      if (!renderer) {
+        try {
+          renderer = new TrackerCanvas2DRenderer(msg.canvas);
+          renderer.resize(width, height, dpr);
+        } catch (c2dErr) {
+          console.error('[TrackerWorker] Canvas2D init also failed:', c2dErr);
+          (self as unknown as Worker).postMessage({
+            type: 'error',
+            message: `Renderer init failed — WebGL2: ${String(glErr)}; Canvas2D: ${String(c2dErr)}`,
+          } satisfies TrackerWorkerReply);
+          (self as unknown as Worker).postMessage({ type: 'webgl-unsupported' } satisfies TrackerWorkerReply);
+          return;
+        }
       }
 
       startRAF();
-      const reply: TrackerWorkerReply = { type: 'ready' };
-      (self as unknown as Worker).postMessage(reply);
+      (self as unknown as Worker).postMessage({ type: 'ready' } satisfies TrackerWorkerReply);
       break;
     }
 
