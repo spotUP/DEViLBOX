@@ -84,7 +84,7 @@ const SAMPLE_RATE       = 8287;  // standard Amiga PAL rate
 
 // XM note base: noteIdx 1 = C-0 in 1-indexed UNIC table; OpenMPT maps
 // noteIdx + NOTE_MIDDLEC − 13 where NOTE_MIDDLEC = 49 → adds 36.
-const UNIC_NOTE_OFFSET  = 36;    // noteIdx + 36 = XM note
+const UNIC_NOTE_OFFSET  = 12;    // noteIdx + 12 = XM note (noteIdx 1 = C-1 = XM 13)
 
 // LRRL stereo panning (Amiga standard)
 const CHANNEL_PAN = [-50, 50, 50, -50] as const;

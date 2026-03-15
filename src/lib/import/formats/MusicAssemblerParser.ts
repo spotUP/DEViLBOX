@@ -84,9 +84,9 @@ const MA_PERIODS: number[] = [
 const MA_REFERENCE_IDX = 12; // MA_PERIODS[12] = 856
 
 /**
- * XM note number for the MA reference period.
+ * XM note number for the MA reference period (Amiga C-1 = XM 13, displays "C-1").
  */
-const XM_REFERENCE_NOTE = 37;
+const XM_REFERENCE_NOTE = 13;
 
 /**
  * Channel map from MusicAssemblerWorker.cs Tables.ChannelMap.

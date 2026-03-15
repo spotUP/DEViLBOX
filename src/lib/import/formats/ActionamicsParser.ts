@@ -72,7 +72,7 @@ const PERIODS: number[] = [
 // The mapping: xmNote = noteIndex (the table index IS the XM note).
 // Because PERIODS[37]=856 = ProTracker C-2 = XM C3 = note 37. So 1:1 mapping works.
 const PERIOD_TABLE_REFERENCE_IDX = 37; // period 856
-const XM_REFERENCE_NOTE = 37;          // XM C-3
+const XM_REFERENCE_NOTE = 13;          // XM C-1 (displays "C-1")
 
 // ── Utilities ──────────────────────────────────────────────────────────────
 

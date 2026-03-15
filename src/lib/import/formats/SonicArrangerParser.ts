@@ -99,22 +99,21 @@ const SA_PERIOD_TABLE: readonly number[] = [
 
 // -- SA note → XM note --------------------------------------------------------
 // SA period table is 1-based: index 49 = period 856 = ProTracker C-1.
-// FT2/OpenMPT convention: ProTracker C-1 displays as C-3 (XM note 37).
-// So xmNote = saNote - 12.  This maps SA 13→XM 1 up through SA 108→XM 96.
-// WASM uses saIndex = midiNote + 1 to reverse: (xmNote+11)+1 = xmNote+12 = saNote.
+// XM note 13 = C-1 (displays "C-1"). So xmNote = saNote - 36.
+// Reverse: saIdx = xmNote + 36.
 
 function saNote2XM(note: number): number {
   if (note === 0) return 0;
   if (note === 0x7F || note === 0x80) return 97; // note-off (0x7F=force quiet, 0x80=release)
-  const xm = note - 12;
+  const xm = note - 36;
   return (xm >= 1 && xm <= 96) ? xm : 0;
 }
 
 // Look up the real Amiga period for an SA note (after transpose).
-// xmNote is the transposed XM note; SA index = xmNote + 12.
+// xmNote is the transposed XM note; SA index = xmNote + 36.
 function saNotePeriod(xmNote: number): number | undefined {
   if (xmNote <= 0 || xmNote >= 97) return undefined;
-  const saIdx = xmNote + 12;
+  const saIdx = xmNote + 36;
   return (saIdx >= 1 && saIdx <= 108) ? SA_PERIOD_TABLE[saIdx] : undefined;
 }
 
