@@ -46,6 +46,7 @@ export class DigMugSynth implements DevilboxSynth {
   private audioContext: AudioContext;
   private _disposed = false;
   private _playerHandle = -1;
+  private _initPromise: Promise<void> | null = null;
 
   private static _engineConnectedToSynth = false;
   private _ownsEngineConnection = false;
@@ -64,6 +65,11 @@ export class DigMugSynth implements DevilboxSynth {
   }
 
   async setInstrument(config: DigMugConfig): Promise<void> {
+    this._initPromise = this._doSetInstrument(config);
+    return this._initPromise;
+  }
+
+  private async _doSetInstrument(config: DigMugConfig): Promise<void> {
     await this.engine.ready();
 
     if (this._playerHandle >= 0) {
@@ -81,6 +87,10 @@ export class DigMugSynth implements DevilboxSynth {
       { type: 'loadInstrument', handle: this._playerHandle, buffer: blob },
       [blob],
     );
+  }
+
+  ensureInitialized(): Promise<void> {
+    return this._initPromise ?? Promise.resolve();
   }
 
   triggerAttack(note?: string | number, _time?: number, velocity?: number): void {
