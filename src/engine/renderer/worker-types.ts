@@ -45,6 +45,7 @@ export interface CellSnapshot {
   flag1?: number;
   flag2?: number;
   probability?: number;
+  params?: number[];
 }
 
 export interface ChannelSnapshot {
@@ -100,6 +101,18 @@ export interface UIStateSnapshot {
   rowHighlightInterval: number; // Every N rows gets a highlight color
   showBeatLabels: boolean;     // Show beat.tick format in line number gutter
   noteDisplayOffset: number;   // Semitones to add to note for display (e.g. -12 for MOD)
+  columns?: ColumnSpec[];      // When present, renderer uses column-driven path instead of fixed Note/Inst/Vol/Eff
+}
+
+// ─── Column specification ────────────────────────────────────────────────────
+
+export interface ColumnSpec {
+  charWidth: number;
+  type: 'note' | 'hex';
+  hexDigits: number;
+  emptyValue: number;
+  color: [number, number, number, number];
+  emptyColor: [number, number, number, number];
 }
 
 // ─── Channel layout ───────────────────────────────────────────────────────────
@@ -149,6 +162,7 @@ export type TrackerWorkerMsg =
 
 export type TrackerWorkerReply =
   | { type: 'ready' }
+  | { type: 'webgl-unsupported' }
   | {
       type: 'click';
       row: number;
