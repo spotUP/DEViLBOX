@@ -12,41 +12,41 @@
  */
 
 import React, { useRef, useEffect, useState, useCallback } from 'react';
-import { useTrackerStore , useFormatStore } from '@stores';
+import { useTrackerStore, useFormatStore } from '@stores';
 import { useTransportStore } from '@stores/useTransportStore';
 import { getTrackerReplayer } from '@engine/TrackerReplayer';
 import { exportAsHively } from '@lib/export/HivelyExporter';
-import { HivelyPatternEditor } from './HivelyPatternEditor';
+import { FormatEditorGL } from '@/components/shared/FormatEditorGL';
+import { HIVELY_COLUMNS, hivelyToFormatChannels } from './hivelyAdapter';
 import { HivelyPositionEditor } from './HivelyPositionEditor';
 
 const TOOLBAR_H = 36;
 const POSITION_H = 160;
 
-export const HivelyView: React.FC<{ width?: number; height?: number }> = ({ width: propW, height: propH }) => {
+export const HivelyView: React.FC<{ width?: number; height?: number }> = () => {
   const nativeData = useFormatStore(s => s.hivelyNative);
   const currentPositionIndex = useTrackerStore(s => s.currentPositionIndex);
   const setCurrentPosition = useTrackerStore(s => s.setCurrentPosition);
   const isPlaying = useTransportStore(s => s.isPlaying);
+  const currentRow = useTransportStore(s => s.currentRow);
 
   const [editPosition, setEditPosition] = useState(0);
 
+  // Measure container width for HivelyPositionEditor (canvas-based, needs numeric width)
   const containerRef = useRef<HTMLDivElement>(null);
-  const [size, setSize] = useState({ w: propW ?? 800, h: propH ?? 600 });
-
+  const [containerWidth, setContainerWidth] = useState(800);
   useEffect(() => {
-    if (propW && propH) { setSize({ w: propW, h: propH }); return; }
     const el = containerRef.current;
     if (!el) return;
     const ro = new ResizeObserver(([entry]) => {
-      const { width, height } = entry.contentRect;
-      if (width > 0 && height > 0) setSize({ w: width, h: height });
+      const { width } = entry.contentRect;
+      if (width > 0) setContainerWidth(width);
     });
     ro.observe(el);
-    setSize({ w: el.clientWidth || 800, h: el.clientHeight || 600 });
+    setContainerWidth(el.clientWidth || 800);
     return () => ro.disconnect();
-  }, [propW, propH]);
+  }, []);
 
-  const { w: width, h: height } = size;
   const activePosition = isPlaying ? currentPositionIndex : editPosition;
 
   const handlePositionChange = useCallback((pos: number) => {
@@ -73,7 +73,7 @@ export const HivelyView: React.FC<{ width?: number; height?: number }> = ({ widt
 
   if (!nativeData) {
     return (
-      <div ref={containerRef} className="flex flex-col flex-1 min-h-0 bg-dark-bgPrimary text-ft2-text font-mono items-center justify-center">
+      <div className="flex flex-col flex-1 min-h-0 bg-dark-bgPrimary text-ft2-text font-mono items-center justify-center">
         <span className="text-ft2-textDim">No HivelyTracker module loaded</span>
       </div>
     );
@@ -89,16 +89,31 @@ export const HivelyView: React.FC<{ width?: number; height?: number }> = ({ widt
     `${activePosition.toString().padStart(3, '0')}/${nativeData.positions.length.toString().padStart(3, '0')}`,
   ].join('  |  ');
 
-  const editorH = height - TOOLBAR_H - POSITION_H;
+  const channels = hivelyToFormatChannels(nativeData, activePosition);
 
   return (
-    <div ref={containerRef} className="flex flex-col flex-1 min-h-0 bg-dark-bgPrimary text-ft2-text font-mono" style={propW ? { width, height } : undefined}>
+    <div
+      ref={containerRef}
+      style={{
+        display: 'flex', flexDirection: 'column',
+        width: '100%', height: '100%',
+        backgroundColor: '#0d0d0d',
+        fontFamily: '"JetBrains Mono", "Fira Code", monospace',
+        fontSize: '12px',
+        color: 'var(--color-text-secondary)',
+      }}
+    >
       {/* Toolbar */}
-      <div className="flex items-center gap-2 px-3 border-b border-ft2-border bg-dark-bgSecondary" style={{ height: TOOLBAR_H }}>
-        <span className="text-xs font-bold text-yellow-300">{formatLabel}</span>
-        <span className="text-ft2-textDim">|</span>
-        <span className="text-xs text-ft2-textDim">{toolbarInfo}</span>
-        <div className="flex-1" />
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: '8px',
+        height: `${TOOLBAR_H}px`, padding: '0 12px',
+        borderBottom: '1px solid var(--color-border)',
+        backgroundColor: 'var(--color-bg-tertiary)',
+        flexShrink: 0,
+      }}>
+        <span style={{ fontWeight: 'bold', color: '#fde047', fontSize: '12px' }}>{formatLabel}</span>
+        <span style={{ color: 'var(--color-text-muted)' }}>|</span>
+        <span style={{ fontSize: '11px', color: 'var(--color-text-muted)', flex: 1 }}>{toolbarInfo}</span>
         <button
           className="px-2 py-0.5 text-xs bg-green-800 hover:bg-green-700 text-green-100 rounded border border-green-600"
           onClick={() => handleExport('hvl')}
@@ -110,9 +125,13 @@ export const HivelyView: React.FC<{ width?: number; height?: number }> = ({ widt
       </div>
 
       {/* Position editor */}
-      <div className="border-b border-ft2-border" style={{ height: POSITION_H }}>
+      <div style={{
+        height: `${POSITION_H}px`,
+        borderBottom: '1px solid var(--color-border)',
+        flexShrink: 0,
+      }}>
         <HivelyPositionEditor
-          width={width}
+          width={containerWidth}
           height={POSITION_H}
           nativeData={nativeData}
           currentPosition={activePosition}
@@ -120,13 +139,13 @@ export const HivelyView: React.FC<{ width?: number; height?: number }> = ({ widt
         />
       </div>
 
-      {/* Track editor */}
-      <div className="flex-1 min-h-0">
-        <HivelyPatternEditor
-          width={width}
-          height={Math.max(100, editorH)}
-          nativeData={nativeData}
-          currentPosition={activePosition}
+      {/* Pattern Editor */}
+      <div style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
+        <FormatEditorGL
+          columns={HIVELY_COLUMNS}
+          channels={channels}
+          currentRow={currentRow}
+          isPlaying={isPlaying}
         />
       </div>
     </div>
