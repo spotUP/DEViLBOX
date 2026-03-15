@@ -1741,6 +1741,7 @@ export function createMcpServer(): McpServer {
           { tool: 'export_wav', description: 'Render pattern/song to WAV (base64)' },
           { tool: 'export_pattern_text', description: 'Export pattern as tracker text or CSV' },
           { tool: 'export_midi', description: 'Export pattern/song to MIDI (base64)' },
+          { tool: 'export_mod', description: 'Export loaded song to ProTracker MOD (base64); bakes OctaMED synths to PCM' },
         ],
         'Utility': [
           { tool: 'get_mcp_help', description: 'This help listing' },
@@ -1828,10 +1829,12 @@ export function createMcpServer(): McpServer {
 
   server.tool(
     'export_wav',
-    'Render current pattern or full song to WAV audio. Returns base64-encoded WAV data. For Tone.js synth-based songs only (not UADE/WASM engine formats).',
+    'Render current pattern or full song to WAV audio. Returns base64-encoded WAV data. Works for all formats (Tone.js synths, OctaMED, ProTracker MOD, and native WASM engines). For live-capture formats (native engines), this is two-phase: first call returns a captureId; poll with that captureId until status is "done".',
     {
       scope: z.enum(['pattern', 'song']).optional().describe('Export scope: "pattern" (default) or "song" (all patterns in order)'),
       patternIndex: z.number().optional().describe('Pattern index to export (default: current pattern). Only used when scope="pattern".'),
+      captureId: z.string().optional().describe('Poll a running live-capture by its ID (returned from a previous export_wav call). When provided, returns status "capturing" or "done" with wavBase64.'),
+      maxDurationSec: z.number().optional().describe('Cap live-capture duration in seconds (default 60). Ignored for offline renders.'),
     },
     (p) => call('export_wav', p),
   );
@@ -1854,6 +1857,15 @@ export function createMcpServer(): McpServer {
       patternIndex: z.number().optional().describe('Pattern index (default: current). Only used when scope="pattern".'),
     },
     (p) => call('export_midi', p),
+  );
+
+  server.tool(
+    'export_mod',
+    'Export the loaded song to ProTracker MOD format. OctaMED synth instruments are baked to PCM samples. Returns base64-encoded MOD binary plus warnings for any data-loss (dropped instruments, out-of-range notes, unsupported effects).',
+    {
+      bakeSynths: z.boolean().optional().describe('Bake OctaMED synth instruments to PCM before export (default: true)'),
+    },
+    (p) => call('export_mod', p),
   );
 
   server.tool(
