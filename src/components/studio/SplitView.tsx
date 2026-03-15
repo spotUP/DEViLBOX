@@ -9,6 +9,7 @@ import React, { lazy, Suspense, useCallback, useRef, useState, useEffect } from 
 import { useInstrumentStore } from '@stores/useInstrumentStore';
 import { useUIStore } from '@stores/useUIStore';
 import { ChevronLeft, ChevronRight, Maximize2, Minimize2 } from 'lucide-react';
+import { VIEW_OPTIONS, switchView } from '@/constants/viewOptions';
 
 // Lazy-load heavy sub-views
 const TrackerView = lazy(() =>
@@ -214,7 +215,25 @@ export const SplitView: React.FC = () => {
   }, []);
 
   return (
-    <div ref={containerRef} className="flex flex-1 min-h-0 min-w-0 overflow-hidden">
+    <div className="flex flex-col flex-1 min-h-0 min-w-0 overflow-hidden">
+      {/* View switcher bar */}
+      <div className="flex items-center gap-2 px-2 py-1 bg-dark-bgTertiary border-b border-dark-border shrink-0">
+        <span className="text-[10px] font-mono text-text-muted tracking-widest">SPLIT VIEW</span>
+        <div className="flex-1" />
+        <select
+          value="split"
+          onChange={(e) => switchView(e.target.value, 'split')}
+          className="text-xs bg-dark-bgSecondary border border-dark-border rounded px-2 py-0.5 text-text-secondary hover:border-accent-primary/50 focus:outline-none focus:border-accent-primary cursor-pointer"
+          title="Switch view"
+        >
+          {VIEW_OPTIONS.map(opt => (
+            <option key={opt.value} value={opt.value}>{opt.label}</option>
+          ))}
+        </select>
+      </div>
+
+      {/* Panels */}
+      <div ref={containerRef} className="flex flex-1 min-h-0 min-w-0 overflow-hidden">
       {/* Tracker panel */}
       <Panel id="tracker" collapsed={collapsed.tracker} onToggle={() => togglePanel('tracker')} width={collapsed.tracker ? undefined : (trackerW ?? undefined)}>
         <Suspense fallback={<LoadingFallback label="tracker" />}>
@@ -247,6 +266,7 @@ export const SplitView: React.FC = () => {
           <MixerContent />
         </Suspense>
       </Panel>
+      </div>
     </div>
   );
 };
