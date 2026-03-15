@@ -246,7 +246,8 @@ export type SynthType =
   | 'MAMEKS0164'        // Samsung KS0164 (32-voice wavetable ROM)
   | 'MAMESWP00'         // Yamaha SWP00 AWM2 (32-voice ROM, Chamberlin filter)
   | 'MAMESWP20'         // Yamaha SWP20 AWM2 (32-voice ROM, approximated)
-  | 'MAMERolandGP';     // Roland TC6116 PCM (28-channel, dual vol envelopes)
+  | 'MAMERolandGP'      // Roland TC6116 PCM (28-channel, dual vol envelopes)
+  | 'MAMEMultiPCM';    // Yamaha YMW258-F MultiPCM (28-channel PCM, Sega Model 1/2)
 
 export type WaveformType = 'sine' | 'square' | 'sawtooth' | 'triangle' | 'noise';
 

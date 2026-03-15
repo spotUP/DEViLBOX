@@ -74,10 +74,35 @@ export async function withNativeThenUADE(
     isFormat?: (bytes: Uint8Array) => boolean;
     usesBytes?: boolean;
     /** Always inject uadeEditableFileData into native result so UADE handles audio 1:1.
-     *  Use when the native parser provides pattern display but can't fully emulate synthesis. */
+     *  Use when the native parser provides pattern display but can't fully emulate synthesis.
+     *  When set, pref is irrelevant — native parser always runs for metadata and UADE
+     *  always handles audio via uadeEditableFileData / UADEEditableSynth. */
     injectUADE?: boolean;
   },
 ): Promise<TrackerSong> {
+  // injectUADE: native parser provides metadata/display, UADE always handles audio.
+  // Run native parser unconditionally and inject uadeEditableFileData regardless of pref.
+  if (opts?.injectUADE) {
+    try {
+      const bytes = (opts?.usesBytes || opts?.isFormat) ? new Uint8Array(ctx.buffer) : undefined;
+      if (!opts?.isFormat || !bytes || opts.isFormat(bytes)) {
+        const input = (opts?.usesBytes || opts?.isFormat) ? bytes! : ctx.buffer;
+        const result = await (nativeParse as NativeParserWithBytes)(input as any, ctx.originalFileName);
+        if (result) {
+          if (!(result as any).uadeEditableFileData) {
+            (result as any).uadeEditableFileData = ctx.buffer.slice(0);
+            (result as any).uadeEditableFileName = ctx.originalFileName;
+          }
+          return injectUADEPlayback(result, ctx);
+        }
+      }
+    } catch (err) {
+      console.warn(`[${parserName}] Native parse failed for ${ctx.originalFileName}:`, err);
+    }
+    // Native parse failed — fall back to UADE for display too
+    return callUADE(ctx);
+  }
+
   if (ctx.prefs[prefKey] === 'native') {
     try {
       const bytes = (opts?.usesBytes || opts?.isFormat) ? new Uint8Array(ctx.buffer) : undefined;
@@ -88,16 +113,6 @@ export async function withNativeThenUADE(
       const input = (opts?.usesBytes || opts?.isFormat) ? bytes! : ctx.buffer;
       const result = await (nativeParse as NativeParserWithBytes)(input as any, ctx.originalFileName);
       if (result) {
-        // When injectUADE is set, this is a metadata-only stub parser — UADE always
-        // provides audio. Inject fileData and return immediately without the 0-notes check
-        // (the stub parser is expected to have 0 notes; UADE handles actual playback).
-        if (opts?.injectUADE) {
-          if (!(result as any).uadeEditableFileData) {
-            (result as any).uadeEditableFileData = ctx.buffer.slice(0);
-            (result as any).uadeEditableFileName = ctx.originalFileName;
-          }
-          return injectUADEPlayback(result, ctx);
-        }
         // Defense-in-depth: if native parser returned 0 notes across all patterns,
         // it's likely a stub parser that couldn't actually parse the file.
         // Fall through to UADE instead of returning empty data.
