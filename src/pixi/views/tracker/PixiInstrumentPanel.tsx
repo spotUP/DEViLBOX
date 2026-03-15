@@ -9,10 +9,12 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Graphics as GraphicsType, FederatedWheelEvent, FederatedPointerEvent } from 'pixi.js';
+import * as Tone from 'tone';
 import { useInstrumentStore } from '@stores/useInstrumentStore';
 import { useUIStore } from '@stores/useUIStore';
 import { getSynthInfo } from '@constants/synthCategories';
 import { BASS_PRESETS } from '@constants/factoryPresets';
+import { getToneEngine } from '@engine/ToneEngine';
 import { PIXI_FONTS } from '../../fonts';
 import { FAD_ICONS } from '../../fontaudioIcons';
 import { usePixiTheme } from '../../theme';
@@ -174,6 +176,40 @@ export const PixiInstrumentPanel: React.FC<PixiInstrumentPanelProps> = ({ width,
     setScrollY(prev => Math.max(0, Math.min(maxScroll, prev + e.deltaY)));
   }, [maxScroll]);
 
+  const previewTimeoutRef = useRef<number | null>(null);
+
+  const previewInstrument = useCallback(async (id: number) => {
+    const inst = useInstrumentStore.getState().getInstrument(id);
+    if (!inst) return;
+    try {
+      await Tone.start();
+      let attempts = 0;
+      while (Tone.context.state !== 'running' && attempts < 10) {
+        await new Promise(resolve => setTimeout(resolve, 50));
+        attempts++;
+      }
+      if (Tone.context.state !== 'running') return;
+
+      if (previewTimeoutRef.current) window.clearTimeout(previewTimeoutRef.current);
+
+      const engine = getToneEngine();
+      await engine.ensureInstrumentReady(inst);
+
+      const isModSample = inst.metadata?.modPlayback?.usePeriodPlayback;
+      const isBass = inst.synthType === 'TB303' || inst.name.toLowerCase().includes('bass');
+      const previewNote = isModSample ? (inst.sample?.baseNote || 'C3') : (isBass ? 'C3' : 'C4');
+
+      engine.triggerNoteAttack(inst.id, previewNote, Tone.now(), 0.8, inst);
+
+      const isSampler = ['Sampler', 'Sam', 'Player', 'DrumKit'].includes(inst.synthType ?? '');
+      previewTimeoutRef.current = window.setTimeout(() => {
+        engine.triggerNoteRelease(inst.id, previewNote, Tone.now(), inst);
+      }, isSampler ? 300 : 800);
+    } catch {
+      // Preview failure is non-fatal
+    }
+  }, []);
+
   const handleItemClick = useCallback((id: number) => {
     const now = Date.now();
     if (lastClickRef.current.id === id && now - lastClickRef.current.time < 300) {
@@ -181,9 +217,10 @@ export const PixiInstrumentPanel: React.FC<PixiInstrumentPanelProps> = ({ width,
       lastClickRef.current = { id: -1, time: 0 };
     } else {
       select(id);
+      previewInstrument(id);
       lastClickRef.current = { id, time: now };
     }
-  }, [select]);
+  }, [select, previewInstrument]);
 
   // ─── Action bar handlers ────────────────────────────────────────────────────
 
