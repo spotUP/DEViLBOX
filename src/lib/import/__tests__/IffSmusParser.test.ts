@@ -82,10 +82,10 @@ describe('parseIffSmusFile — yessonix with companions', () => {
     const companions = loadCompanionMap();
     const song = await parseIffSmusFile(loadBuf(YESSONIX_SMUS), 'yessonix.smus', companions);
 
-    // yes1, yes2, yesdrumintro have .ss files -> should have real audio
-    // createSamplerInstrument stores WAV in sample.audioBuffer (ArrayBuffer)
+    // yes1, yes2, yesdrumintro have .ss files -> real audio (>16KB after WAV encoding)
+    // Silent placeholders are ~1068 bytes (44-byte header + 512 silent samples)
     const withAudio = song.instruments.filter(
-      (inst) => inst.sample?.audioBuffer && inst.sample.audioBuffer.byteLength > 100,
+      (inst) => inst.sample?.audioBuffer && inst.sample.audioBuffer.byteLength > 5000,
     );
     expect(withAudio.length).toBe(3);
   });
@@ -94,9 +94,9 @@ describe('parseIffSmusFile — yessonix with companions', () => {
     const companions = loadCompanionMap();
     const song = await parseIffSmusFile(loadBuf(YESSONIX_SMUS), 'yessonix.smus', companions);
 
-    // yes2end, yesguitar, yesguitar2 have no .ss -> silent placeholders
+    // yes2end, yesguitar, yesguitar2 have no .ss -> silent placeholders (~1068 bytes)
     const silent = song.instruments.filter(
-      (inst) => !inst.sample?.audioBuffer || inst.sample.audioBuffer.byteLength <= 100,
+      (inst) => !inst.sample?.audioBuffer || inst.sample.audioBuffer.byteLength <= 5000,
     );
     expect(silent.length).toBeGreaterThanOrEqual(3);
   });
@@ -117,10 +117,10 @@ describe('parseIffSmusFile — yessonix with companions', () => {
 
   it('instruments without companions parse identically to no-companion call', async () => {
     const songNoCompanion = await parseIffSmusFile(loadBuf(YESSONIX_SMUS), 'yessonix.smus');
-    // All instruments should be silent placeholders (tiny WAV)
+    // All instruments should be silent placeholders (~1068 bytes: 44-byte WAV header + 512 silent samples)
     for (const inst of songNoCompanion.instruments) {
       expect(inst.sample?.audioBuffer).toBeDefined();
-      expect(inst.sample!.audioBuffer!.byteLength).toBeLessThan(100);
+      expect(inst.sample!.audioBuffer!.byteLength).toBeLessThan(5000);
     }
   });
 
