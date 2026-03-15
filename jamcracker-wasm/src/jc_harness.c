@@ -24,6 +24,8 @@ static uint16_t g_song_length = 0;
 static uint16_t g_num_patterns = 0;
 static uint16_t g_num_instruments = 0;
 static uint32_t g_tick_count = 0;
+static int g_row_idx = 0;           /* ascending row index within current pattern */
+static uint8_t g_prev_notecnt = 0;  /* last observed pp_notecnt for change detection */
 
 #define VBLANK_HZ 50.0
 
@@ -33,6 +35,8 @@ EXPORT int jc_init(const uint8_t *module_data, uint32_t module_size) {
     paula_reset();
     g_accum = 0.0;
     g_tick_count = 0;
+    g_row_idx = 0;
+    g_prev_notecnt = 0;
     g_frames_per_tick = (double)PAULA_RATE_PAL / VBLANK_HZ;
 
     /* Free previous song data if any */
@@ -81,7 +85,15 @@ EXPORT int jc_render(float *buf, int frames) {
 
         if (g_accum >= g_frames_per_tick) {
             g_accum -= g_frames_per_tick;
+            uint8_t nc_before = READ8((uintptr_t)pp_notecnt);
             pp_play();
+            uint8_t nc_after = READ8((uintptr_t)pp_notecnt);
+            if (nc_after < nc_before) {
+                g_row_idx++;          /* normal row step */
+            } else if (nc_after > nc_before || (nc_before == 0 && nc_after > 0)) {
+                g_row_idx = 0;        /* pattern changed, notecnt reset */
+            }
+            g_prev_notecnt = nc_after;
             g_tick_count++;
         }
     }
@@ -104,7 +116,7 @@ EXPORT int jc_get_song_pos(void) {
 /* Row within current pattern (counts down from pattern row count) */
 EXPORT int jc_get_row(void) {
     if (!g_initialized) return 0;
-    return (int)READ8((uintptr_t)pp_notecnt);
+    return g_row_idx;
 }
 
 /* Current speed (ticks per row) */
@@ -276,8 +288,9 @@ EXPORT int jc_get_pattern_rows(int patIdx) {
     if (!g_initialized || patIdx < 0 || patIdx >= (int)g_num_patterns) return 0;
     uint32_t pt_base = READ32((uintptr_t)patttable);
     if (!pt_base) return 0;
-    uint16_t size_bytes = READ16(pt_base + patIdx * pt_sizeof + pt_size);
-    return (int)(size_bytes / (nt_sizeof * 4));
+    /* pt_size stores the row count directly (replayer: mulu #nt_sizeof*4,d3 then add to ptr) */
+    uint16_t num_rows = READ16(pt_base + patIdx * pt_sizeof + pt_size);
+    return (int)num_rows;
 }
 
 EXPORT int jc_get_pattern_cell(int patIdx, int row, int channel, int field) {
@@ -286,8 +299,8 @@ EXPORT int jc_get_pattern_cell(int patIdx, int row, int channel, int field) {
     if (field < 0 || field >= nt_sizeof) return 0;
     uint32_t pt_base = READ32((uintptr_t)patttable);
     if (!pt_base) return 0;
-    uint16_t size_bytes = READ16(pt_base + patIdx * pt_sizeof + pt_size);
-    int num_rows = (int)(size_bytes / (nt_sizeof * 4));
+    /* pt_size stores the row count directly */
+    int num_rows = (int)READ16(pt_base + patIdx * pt_sizeof + pt_size);
     if (row < 0 || row >= num_rows) return 0;
     uint32_t pat_addr = READ32(pt_base + patIdx * pt_sizeof + pt_address);
     if (!pat_addr) return 0;
@@ -300,8 +313,7 @@ EXPORT void jc_set_pattern_cell(int patIdx, int row, int channel, int field, int
     if (field < 0 || field >= nt_sizeof) return;
     uint32_t pt_base = READ32((uintptr_t)patttable);
     if (!pt_base) return;
-    uint16_t size_bytes = READ16(pt_base + patIdx * pt_sizeof + pt_size);
-    int num_rows = (int)(size_bytes / (nt_sizeof * 4));
+    int num_rows = (int)READ16(pt_base + patIdx * pt_sizeof + pt_size);
     if (row < 0 || row >= num_rows) return;
     uint32_t pat_addr = READ32(pt_base + patIdx * pt_sizeof + pt_address);
     if (!pat_addr) return;
