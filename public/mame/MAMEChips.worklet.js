@@ -205,7 +205,7 @@ class MAMEChipsProcessor extends AudioWorkletProcessor {
 
     const mod = this.wasmModule || this.wasmInstance.exports;
     const ptr = mod._malloc(romData.byteLength);
-    const heap = new Uint8Array(mod.HEAPU8.buffer);
+    const heap = new Uint8Array(mod.wasmMemory.buffer);
     heap.set(new Uint8Array(romData), ptr);
     mod._mame_set_rom(bank, ptr, romData.byteLength);
 
@@ -224,7 +224,7 @@ class MAMEChipsProcessor extends AudioWorkletProcessor {
     const ptr6 = mod._malloc(ic6.byteLength);
     const ptr7 = mod._malloc(ic7.byteLength);
 
-    const heap = new Uint8Array(mod.HEAPU8.buffer);
+    const heap = new Uint8Array(mod.wasmMemory.buffer);
     heap.set(new Uint8Array(ic5), ptr5);
     heap.set(new Uint8Array(ic6), ptr6);
     heap.set(new Uint8Array(ic7), ptr7);
@@ -279,7 +279,7 @@ class MAMEChipsProcessor extends AudioWorkletProcessor {
       mod._mame_render(handle, this.leftPtr, this.rightPtr, numSamples);
 
       // Get rendered audio from WASM heap
-      const heap = new Float32Array(mod.HEAPF32.buffer);
+      const heap = new Float32Array(mod.wasmMemory.buffer);
       const leftOffset = this.leftPtr / 4;
       const rightOffset = this.rightPtr / 4;
 

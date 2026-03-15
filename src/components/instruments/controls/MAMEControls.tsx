@@ -112,12 +112,12 @@ export const MAMEControls: React.FC<MAMEControlsProps> = ({
           </div>
           <div>
             <h3 className="text-sm font-bold uppercase tracking-wider text-text-primary">
-              MAME {config.type.toUpperCase()} ENGINE
+              MAME {(config.type ?? 'vfx').toUpperCase()} ENGINE
             </h3>
             <p className="text-[10px] text-text-muted">
-              {config.type === 'vfx' ? 'ES5506 (OTTO) 32-Voice Wavetable' : 
-               config.type === 'doc' ? 'ES5503 (DOC) 32-Voice Wavetable' : 
-               config.type === 'swp30' ? 'Yamaha SWP30 (AWM2) ROMpler/DSP' :
+              {(config.type ?? 'vfx') === 'vfx' ? 'ES5506 (OTTO) 32-Voice Wavetable' :
+               (config.type ?? 'vfx') === 'doc' ? 'ES5503 (DOC) 32-Voice Wavetable' :
+               (config.type ?? 'vfx') === 'swp30' ? 'Yamaha SWP30 (AWM2) ROMpler/DSP' :
                'Roland SA CPU-B Synthesis'}
             </p>
           </div>

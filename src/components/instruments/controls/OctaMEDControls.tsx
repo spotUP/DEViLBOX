@@ -8,7 +8,7 @@
 import React, { useRef, useEffect, useCallback, useState } from 'react';
 import type { OctaMEDConfig, UADEChipRamInfo } from '@/types/instrument';
 import { Knob } from '@components/controls/Knob';
-import { useThemeStore } from '@stores';
+import { useThemeStore, useTrackerStore, useInstrumentStore, useProjectStore, useTransportStore } from '@stores';
 import { SequenceEditor } from '@components/instruments/shared';
 import { UADEChipEditor } from '@engine/uade/UADEChipEditor';
 import { UADEEngine } from '@engine/uade/UADEEngine';
@@ -60,6 +60,46 @@ export const OctaMEDControls: React.FC<OctaMEDControlsProps> = ({ config, onChan
     void editor.exportModule(uadeChipRam.moduleBase, uadeChipRam.moduleSize, 'module.med');
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [uadeChipRam]);
+
+  const [exportingMod, setExportingMod] = useState(false);
+  const handleExportMod = useCallback(async () => {
+    setExportingMod(true);
+    try {
+      const trackerState = useTrackerStore.getState();
+      const instrumentState = useInstrumentStore.getState();
+      const projectState = useProjectStore.getState();
+      const transportState = useTransportStore.getState();
+
+      const nChannels = trackerState.patterns[0]?.channels.length ?? 4;
+      const song = {
+        name: projectState.metadata?.name ?? 'Untitled',
+        format: 'MED' as const,
+        patterns: trackerState.patterns,
+        instruments: instrumentState.instruments,
+        songPositions: trackerState.patternOrder,
+        songLength: trackerState.patternOrder.length,
+        restartPosition: 0,
+        numChannels: nChannels,
+        initialSpeed: transportState.speed,
+        initialBPM: transportState.bpm,
+      };
+
+      const { exportSongToMOD } = await import('@/lib/export/modExport');
+      const result = await exportSongToMOD(song, { bakeSynths: true });
+
+      const url = URL.createObjectURL(result.blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = result.filename;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('[OctaMEDControls] Export MOD failed:', err);
+    } finally {
+      setExportingMod(false);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const currentThemeId = useThemeStore((s) => s.currentThemeId);
   const isCyan = currentThemeId === 'cyan-lineart';
@@ -366,20 +406,25 @@ export const OctaMEDControls: React.FC<OctaMEDControlsProps> = ({ config, onChan
             {label}
           </button>
         ))}
-        {uadeChipRam && (
+        <div className="ml-auto flex items-center gap-2 mr-2">
           <button
-            onClick={handleExport}
-            className="ml-auto px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider border rounded transition-colors"
-            style={{
-              color: accent,
-              borderColor: dim,
-              background: 'transparent',
-              marginRight: '8px',
-            }}
+            onClick={() => { void handleExportMod(); }}
+            disabled={exportingMod}
+            className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider border rounded transition-colors"
+            style={{ color: exportingMod ? '#444' : accent, borderColor: dim, background: 'transparent', cursor: exportingMod ? 'wait' : 'pointer' }}
           >
-            Export .med (Amiga)
+            {exportingMod ? 'Exporting...' : 'Export .mod'}
           </button>
-        )}
+          {uadeChipRam && (
+            <button
+              onClick={handleExport}
+              className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider border rounded transition-colors"
+              style={{ color: accent, borderColor: dim, background: 'transparent' }}
+            >
+              Export .med
+            </button>
+          )}
+        </div>
       </div>
 
       {activeTab === 'params'   && renderParams()}
