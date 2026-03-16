@@ -50,7 +50,7 @@ const KnobParam: React.FC<ParamRendererProps> = ({ p, value, color, onChange }) 
     min={p.min ?? 0}
     max={p.max ?? 1}
     step={p.step}
-    onChange={(v) => onChange(p.key, v)}
+    onChange={(v: number) => onChange(p.key, v)}
     color={color}
     size="sm"
     formatDisplay={makeFormatDisplay(p)}
