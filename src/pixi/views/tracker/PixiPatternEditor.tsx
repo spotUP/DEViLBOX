@@ -9,16 +9,14 @@
  *  - pixiGraphics for: row backgrounds, channel separators, center-line,
  *    selection overlay, cursor caret, peer cursor/selection, ghost patterns
  *  - pixiBitmapText for all visible cell text (~30 visible rows)
- *  - Channel header via PixiChannelHeaders (native GL rendering; DOM portals
- *    only for color picker and name editing input)
+ *  - Channel header via PixiChannelHeaders (native GL rendering)
  *  - Cell context menu via GL PixiContextMenu (right-click menu)
- *  - ParameterEditor via React portal to document.body (full-screen modal)
+ *  - ParameterEditor via UIStore openModal → PixiPatternBarEditor in PixiRoot
  *  - Collaboration peer cursor/selection in drawGrid
  *  - Stepped horizontal scroll with accumulator (matches DOM behavior)
  */
 
 import React, { useCallback, useMemo, useRef, useState, useEffect, startTransition } from 'react';
-import { createPortal } from 'react-dom';
 import { useTick } from '@pixi/react';
 import type { Graphics as GraphicsType, FederatedPointerEvent, Container as ContainerType } from 'pixi.js';
 import { usePixiTheme, type PixiTheme } from '../../theme';
@@ -33,7 +31,6 @@ import { getTrackerScratchController } from '@engine/TrackerScratchController';
 import { useBDAnimations } from '@hooks/tracker/useBDAnimations';
 import { GENERATORS, type GeneratorType } from '@utils/patternGenerators';
 import { PixiContextMenu, type ContextMenuItem } from '../../input/PixiContextMenu';
-import { ParameterEditor } from '@/components/tracker/ParameterEditor';
 import { PixiChannelHeaders } from './PixiChannelHeaders';
 import { haptics } from '@/utils/haptics';
 import * as Tone from 'tone';
@@ -673,14 +670,8 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
     setCtxMenuState(prev => ({ ...prev, position: null }));
   }, []);
 
-  // ── Parameter editor state ────────────────────────────────────────────────
-  const [parameterEditorState, setParameterEditorState] = useState<{
-    isOpen: boolean;
-    field: 'volume' | 'effect' | 'effectParam';
-    channelIndex: number;
-    startRow: number;
-    endRow: number;
-  } | null>(null);
+  // ── Parameter editor — opens via UIStore modal ────────────────────────────
+  const openModal = useUIStore((s) => s.openModal);
 
   const handleOpenParameterEditor = useCallback((field: 'volume' | 'effect' | 'effectParam') => {
     if (!pattern) return;
@@ -689,9 +680,9 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
     const channelIdx = ctxMenuState.position ? ctxMenuState.channelIndex : cur.channelIndex;
     const start = sel?.startRow ?? cur.rowIndex;
     const end = sel?.endRow ?? Math.min(cur.rowIndex + 15, pattern.length - 1);
-    setParameterEditorState({ isOpen: true, field, channelIndex: channelIdx, startRow: start, endRow: end });
+    openModal('parameterEditor', { field, channelIndex: channelIdx, startRow: start, endRow: end });
     closeCellContextMenu();
-  }, [ctxMenuState, pattern, closeCellContextMenu]);
+  }, [ctxMenuState, pattern, openModal, closeCellContextMenu]);
 
   // ── B/D Animation handlers ────────────────────────────────────────────────
   const bdAnimations = useBDAnimations();
@@ -1880,17 +1871,6 @@ export const PixiPatternEditor: React.FC<PixiPatternEditorProps> = ({ width, hei
         onClose={closeCellContextMenu}
       />
 
-      {/* ─── Parameter Editor (full-screen modal via React portal) ─────── */}
-      {parameterEditorState?.isOpen && createPortal(
-        <ParameterEditor
-          onClose={() => setParameterEditorState(null)}
-          channelIndex={parameterEditorState.channelIndex}
-          startRow={parameterEditorState.startRow}
-          endRow={parameterEditorState.endRow}
-          field={parameterEditorState.field}
-        />,
-        document.body,
-      )}
     </pixiContainer>
   );
 };

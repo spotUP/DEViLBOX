@@ -41,6 +41,7 @@ import { ChannelRadar } from '@components/visualization/ChannelRadar';
 import { NibblesGame } from '@components/visualization/NibblesGame';
 import { SineScroller } from '@components/visualization/SineScroller';
 import { AudioMotionVisualizer } from '@components/visualization/AudioMotionVisualizer';
+import { JingleVisualizer } from '@components/visualization/JingleVisualizer';
 import { SettingsModal } from '@components/dialogs/SettingsModal';
 
 import { ImportModuleDialog, type ImportOptions } from '@components/dialogs/ImportModuleDialog';
@@ -167,8 +168,9 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
   const { masterEffects } = useAudioStore(useShallow((s) => ({
     masterEffects: s.masterEffects,
   })));
-  const { oscilloscopeVisible, modalOpen } = useUIStore(useShallow((s) => ({
+  const { oscilloscopeVisible, modalOpen, jingleActive } = useUIStore(useShallow((s) => ({
     oscilloscopeVisible: s.oscilloscopeVisible,
+    jingleActive: s.jingleActive,
     modalOpen: s.modalOpen,
   })));
   const { curves, reset: resetAutomation } = useAutomationStore(useShallow((s) => ({
@@ -643,6 +645,13 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
           <div className="absolute bottom-1 right-2 text-[9px] font-mono text-text-muted opacity-40 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
             v{CURRENT_VERSION}
           </div>
+
+          {/* Jingle overlay — covers whatever viz is active during startup jingle */}
+          {jingleActive && (
+            <div className="absolute inset-0 z-20">
+              <JingleVisualizer height={100} />
+            </div>
+          )}
 
           {oscilloscopeVisible && (
             <>

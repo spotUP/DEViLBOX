@@ -2,7 +2,7 @@
  * App - Main application component
  */
 
-import { useEffect, useState, useCallback, lazy, Suspense } from 'react';
+import { useEffect, useRef, useState, useCallback, lazy, Suspense } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { AppLayout } from '@components/layout/AppLayout';
 import { TrackerView } from '@components/tracker/TrackerView';
@@ -24,6 +24,8 @@ import { initKeyboardRouter, destroyKeyboardRouter } from './engine/keyboard/Key
 import { useCloudSync } from './hooks/useCloudSync';
 import { setupCloudSyncSubscribers } from './lib/cloudSyncSubscribers';
 import { getToneEngine } from '@engine/ToneEngine';
+import { getJingleEngine } from '@engine/jingle/JingleEngine';
+import { injectMouthPatterns, teardownMouthPatterns } from '@engine/jingle/JinglePatterns';
 import type { EffectConfig } from './types/instrument';
 import { Zap, Music, Sliders, Download, List } from 'lucide-react';
 import { ToastNotification } from '@components/ui/ToastNotification';
@@ -86,6 +88,32 @@ const MixerView  = lazy(() => import('./components/panels/MixerPanel').then(m =>
 const StudioCanvasView = lazy(() => import('./components/studio/StudioCanvasView').then(m => ({ default: m.StudioCanvasView })));
 const SplitView = lazy(() => import('./components/studio/SplitView').then(m => ({ default: m.SplitView })));
 
+// Module-level flag — resets on every page load (sessionStorage persists through reloads)
+let jinglePlayedThisLoad = false;
+
+/** Play the startup jingle once per page load (no-op if disabled or already played). */
+async function playStartupJingle(): Promise<void> {
+  const settings = useSettingsStore.getState();
+  if (!settings.welcomeJingleEnabled || jinglePlayedThisLoad) return;
+
+  jinglePlayedThisLoad = true;
+  const jingle = getJingleEngine();
+  jingle.onEnd(() => {
+    useUIStore.getState().setJingleActive(false);
+    useUIStore.getState().setPostJingleActive(true);
+    teardownMouthPatterns();
+    useUIStore.getState().setStatusMessage('DEVILBOX READY', false, 3000);
+  });
+  try {
+    await jingle.preload('/devilbox1.mp3');
+    injectMouthPatterns();
+    jingle.play();
+    useUIStore.getState().setJingleActive(true);
+  } catch {
+    // Jingle load failed — silently skip; app continues normally
+  }
+}
+
 function App() {
   // Check for application updates
   const { updateAvailable, latestVersion, currentVersion, refresh } = useVersionCheck();
@@ -133,6 +161,25 @@ function App() {
   const { openModal, closeModal, togglePatterns } = useUIStore();
 
   const { showPatternDialog: showTD3Pattern, closePatternDialog, showKnobBar, setShowKnobBar } = useMIDIStore();
+
+  // Startup jingle: track whether the tips modal was shown and when it's dismissed
+  const tipsModalWasShownRef = useRef(false);
+  const prevModalOpenRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    const prev = prevModalOpenRef.current;
+    prevModalOpenRef.current = modalOpen;
+
+    if (modalOpen === 'tips') {
+      tipsModalWasShownRef.current = true;
+    }
+
+    // Tips modal just dismissed → fire jingle now (audio context is guaranteed running
+    // since the user had to click something to dismiss the dialog)
+    if (prev === 'tips' && !modalOpen) {
+      void playStartupJingle();
+    }
+  }, [modalOpen]);
 
   // Unified startup logic: Show Tips or What's New
   useEffect(() => {
@@ -566,6 +613,13 @@ function App() {
       window.removeEventListener('click', handleFirstInteraction);
       window.removeEventListener('keydown', handleFirstInteraction);
       window.removeEventListener('touchstart', handleFirstInteraction);
+
+      // Fire jingle immediately only when the tips modal was never shown.
+      // When tips IS shown, playStartupJingle() is called by the modalOpen watcher
+      // (tips → null transition) so we don't double-fire here.
+      if (!tipsModalWasShownRef.current) {
+        void playStartupJingle();
+      }
     };
 
     window.addEventListener('click', handleFirstInteraction);

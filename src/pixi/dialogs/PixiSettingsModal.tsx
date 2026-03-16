@@ -198,6 +198,8 @@ export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, on
 
   const customBannerImage = useSettingsStore((s) => s.customBannerImage);
   const setCustomBannerImage = useSettingsStore((s) => s.setCustomBannerImage);
+  const welcomeJingleEnabled = useSettingsStore((s) => s.welcomeJingleEnabled);
+  const setWelcomeJingleEnabled = useSettingsStore((s) => s.setWelcomeJingleEnabled);
 
   const amigaLimits = useSettingsStore((s) => s.amigaLimits);
   const setAmigaLimits = useSettingsStore((s) => s.setAmigaLimits);
@@ -634,6 +636,10 @@ export const PixiSettingsModal: React.FC<PixiSettingsModalProps> = ({ isOpen, on
 
           <SettingRow label="Fullscreen:">
             <PixiCheckbox checked={isFullscreen} onChange={toggleFullscreen} />
+          </SettingRow>
+
+          <SettingRow label="Welcome Jingle:" description="Play startup audio on first interaction">
+            <PixiCheckbox checked={welcomeJingleEnabled} onChange={setWelcomeJingleEnabled} />
           </SettingRow>
           </layoutContainer>
 
