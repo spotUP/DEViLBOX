@@ -46,7 +46,6 @@ import { createSamplerInstrument } from './AmigaUtils';
 
 const SIGNATURE = 'ACTIONAMICS SOUND TOOL';
 const SIGNATURE_OFFSET = 62;
-const PAL_CLOCK = 3546895;
 
 /**
  * Actionamics period table (verbatim from Tables.cs).
@@ -104,12 +103,6 @@ function astNoteToXM(noteIdx: number): number {
   // PERIODS[37]=856=ProTracker C-2=XM C3=37. Direct index mapping.
   const xm = XM_REFERENCE_NOTE + (noteIdx - PERIOD_TABLE_REFERENCE_IDX);
   return Math.max(1, Math.min(96, xm));
-}
-
-/** Get sample rate from period */
-function periodToRate(period: number): number {
-  if (period <= 0) return 8287;
-  return Math.round(PAL_CLOCK / (2 * period));
 }
 
 // ── Format Identification ──────────────────────────────────────────────────
@@ -448,9 +441,10 @@ function parseInternal(bytes: Uint8Array, filename: string): TrackerSong | null 
     if (sample.pcm && sample.length > 0) {
       const pcmBytes = new Uint8Array(sample.pcm.buffer);
       // Sample stored as signed 8-bit; createSamplerInstrument expects Uint8Array
-      // (it will interpret as signed internally — consistent with other parsers)
-      const period = sample.effectSpeed > 0 ? sample.effectSpeed : (PERIODS[PERIOD_TABLE_REFERENCE_IDX] || 856);
-      const sampleRate = periodToRate(period);
+      // (it will interpret as signed internally — consistent with other parsers).
+      // Use fixed 8287 Hz (Amiga PAL C-3 standard rate) — effectSpeed is a modulation
+      // counter, not a playback period, so it must NOT be used for sample rate.
+      const sampleRate = 8287;
       const loopStart = sample.loopLength > 1 ? sample.loopStart * 2 : 0;
       const loopEnd = sample.loopLength > 1 ? (sample.loopStart + sample.loopLength) * 2 : 0;
 
