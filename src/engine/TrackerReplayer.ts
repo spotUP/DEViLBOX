@@ -312,6 +312,10 @@ export interface TrackerSong {
    *  emulated chip RAM, making the 68k replayer play the edited data in real-time. */
   uadePatternLayout?: import('./uade/UADEPatternEncoder').UADEPatternLayout;
 
+  /** CIA tick of the first reconstructed row — offset for real-time position calculation.
+   *  During playback, row = floor((tickCount - uadeFirstTick) / initialSpeed). */
+  uadeFirstTick?: number;
+
   // Per-channel independent sequencing (MusicLine Editor and similar formats)
   // When present, each channel uses its own pattern sequence instead of the global songPositions.
   // channelTrackTables[chIdx][posIdx] = patternIndex  (analogous to Furnace orders matrix)
@@ -491,6 +495,7 @@ export class TrackerReplayer {
   private c64SidEngine: C64SIDEngine | null = null;
   private hivelyEngine: import('./hively/HivelyEngine').HivelyEngine | null = null;
   private _hvlPositionUnsub: (() => void) | null = null;
+  private _uadePositionUnsub: (() => void) | null = null;
 
   /** Get the active C64 SID engine (for subsong switching etc.) */
   public getC64SIDEngine(): C64SIDEngine | null {
@@ -1273,6 +1278,52 @@ export class TrackerReplayer {
         });
         _playLog('HVL position subscription active');
       }
+
+      // Subscribe to UADEEngine position updates for real-time row/pattern tracking.
+      // Derives pattern/row from CIA tick count using the speed detected during scan.
+      if (result.uadeEngine && this.song.uadeFirstTick != null) {
+        const speed = this.song.initialSpeed || 6;
+        const firstTick = this.song.uadeFirstTick;
+        const patternLengths = this.song.patterns.map(p => p.length);
+        let lastRow = -1;
+        let lastPosition = -1;
+        this._uadePositionUnsub = result.uadeEngine.onPositionUpdate((update) => {
+          if (!this.playing || !this.song) return;
+          const tickCount = update.tickCount ?? 0;
+          // Convert CIA tick count to absolute row index
+          const absoluteRow = Math.max(0, Math.floor((tickCount - firstTick) / speed));
+          // Map absolute row to pattern position + row within pattern
+          let remaining = absoluteRow;
+          let position = 0;
+          for (let i = 0; i < this.song!.songPositions.length; i++) {
+            const patIdx = this.song!.songPositions[i];
+            const patLen = patternLengths[patIdx] ?? 64;
+            if (remaining < patLen) {
+              position = i;
+              break;
+            }
+            remaining -= patLen;
+            position = i;
+            // If we've exhausted all patterns, clamp to last position
+            if (i === this.song!.songPositions.length - 1) {
+              remaining = Math.min(remaining, patLen - 1);
+            }
+          }
+          const row = remaining;
+          if (row === lastRow && position === lastPosition) return;
+          lastRow = row;
+          lastPosition = position;
+          this.songPos = position;
+          this.pattPos = row;
+          const patternNum = this.song!.songPositions[position] ?? 0;
+          const time = Tone.now();
+          this.queueDisplayState(time, row, patternNum, position, 0);
+          if (this.onRowChange) {
+            this.onRowChange(row, patternNum, position);
+          }
+        });
+        _playLog('UADE position subscription active');
+      }
     }
 
     this.playing = true;
@@ -1581,6 +1632,12 @@ export class TrackerReplayer {
       this._hvlPositionUnsub = null;
     }
     this.hivelyEngine = null;
+
+    // Clean up UADE position subscription
+    if (this._uadePositionUnsub) {
+      this._uadePositionUnsub();
+      this._uadePositionUnsub = null;
+    }
 
     // Stop all channels (release synth notes + stop sample players)
     for (let i = 0; i < this.channels.length; i++) {

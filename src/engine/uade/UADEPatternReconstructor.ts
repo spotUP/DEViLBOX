@@ -28,6 +28,7 @@ export interface ReconstructedSong {
   patterns:  Pattern[];
   bpm:       number;
   speed:     number;
+  firstTick: number;      // CIA tick of the first row (offset for position calculation)
   warnings:  string[];
 }
 
@@ -251,7 +252,7 @@ export function reconstructPatterns(
   // ── Guard: not enough data ────────────────────────────────────────────────
   if (snapshots.length < 2) {
     warnings.push('Too few CIA tick snapshots to reconstruct patterns (need ≥ 2)');
-    return { patterns: [], bpm: 125, speed: 6, warnings };
+    return { patterns: [], bpm: 125, speed: 6, firstTick: 0, warnings };
   }
 
   // ── Step 1: detect speed ──────────────────────────────────────────────────
@@ -275,8 +276,7 @@ export function reconstructPatterns(
 
   if (totalRows === 0) {
     warnings.push('All tick snapshots have the same tick value — cannot reconstruct rows');
-    return { patterns: [], bpm: 125, speed, warnings };
-  }
+    return { patterns: [], bpm: 125, speed, firstTick, warnings };  }
 
   // ── Step 3: build channel rows ────────────────────────────────────────────
   // We build one large flat channel row array per channel, then slice into
@@ -423,5 +423,5 @@ export function reconstructPatterns(
 
   // BPM is not derivable from CIA tick snapshots alone (would need CIA timer rate vs audio SR).
   // Return 125 as the standard ProTracker/UADE default.
-  return { patterns, bpm: 125, speed, warnings };
+  return { patterns, bpm: 125, speed, firstTick, warnings };
 }

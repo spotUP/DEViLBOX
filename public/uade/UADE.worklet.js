@@ -708,6 +708,7 @@ class UADEProcessor extends AudioWorkletProcessor {
           tempoChanges: scanResult.tempoChanges,
           bpm: scanResult.bpm,
           speed: scanResult.speed,
+          firstTick: scanResult.firstTick ?? 0,
           warnings: scanResult.warnings || [],
         };
       }
@@ -1231,6 +1232,7 @@ class UADEProcessor extends AudioWorkletProcessor {
       tempoChanges,
       bpm: detectedBPM,
       speed: detectedSpeed,
+      firstTick: firstCiaATick,
       warnings,
       isEnhanced: true,
     };
@@ -1510,6 +1512,7 @@ class UADEProcessor extends AudioWorkletProcessor {
           tempoChanges: scanResult.tempoChanges,
           bpm: scanResult.bpm,
           speed: scanResult.speed,
+          firstTick: scanResult.firstTick ?? 0,
           warnings: scanResult.warnings || [],
         },
       });

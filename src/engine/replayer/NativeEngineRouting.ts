@@ -14,6 +14,7 @@ import type { TrackerSong } from '../TrackerReplayer';
 import { getToneEngine } from '../ToneEngine';
 import { getNativeAudioNode } from '@utils/audio-context';
 import { HivelyEngine } from '../hively/HivelyEngine';
+import type { UADEEngine } from '../uade/UADEEngine';
 import { MusicLineEngine } from '../musicline/MusicLineEngine';
 import { C64SIDEngine } from '../C64SIDEngine';
 import { SilenceDetector } from './SilenceDetector';
@@ -417,6 +418,7 @@ export interface NativeEngineStartResult {
   suppressNotes: boolean;
   c64SidEngine: C64SIDEngine | null;
   hivelyEngine: HivelyEngine | null;
+  uadeEngine: UADEEngine | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -434,6 +436,7 @@ export async function startNativeEngines(
   let suppressNotes = false;
   let c64SidEngine: C64SIDEngine | null = null;
   let hivelyEngine: HivelyEngine | null = null;
+  let uadeEngine: UADEEngine | null = null;
 
   // Clean up any leftover silence detectors from a previous session
   for (const [, detector] of activeSilenceDetectors) {
@@ -480,6 +483,11 @@ export async function startNativeEngines(
         // Capture HivelyEngine for position sync in TrackerReplayer
         if (desc.key === 'Hively') {
           hivelyEngine = instance as unknown as HivelyEngine;
+        }
+
+        // Capture UADEEngine for position sync in TrackerReplayer
+        if (desc.key === 'UADEEditable') {
+          uadeEngine = instance as unknown as UADEEngine;
         }
 
         // Direct routing for engines without a synth in song.instruments
@@ -611,7 +619,7 @@ export async function startNativeEngines(
     }
   }
 
-  return { suppressNotes, c64SidEngine, hivelyEngine };
+  return { suppressNotes, c64SidEngine, hivelyEngine, uadeEngine };
 }
 
 // ---------------------------------------------------------------------------

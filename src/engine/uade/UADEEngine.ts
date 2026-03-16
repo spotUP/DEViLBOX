@@ -42,7 +42,8 @@ export interface UADEEnhancedScanData {
   samples: Record<number, UADEExtractedSample>; // samplePtr → extracted sample
   tempoChanges: Array<{ row: number; bpm: number; speed: number }>;
   bpm: number;          // Detected BPM
-  speed: number;        // Detected speed
+  speed: number;        // Detected speed (CIA ticks per row)
+  firstTick: number;    // CIA tick of the first row (offset for position calculation)
   warnings?: string[];  // Degradation notices (e.g. VBlank fallback, no PCM extracted)
 }
 
