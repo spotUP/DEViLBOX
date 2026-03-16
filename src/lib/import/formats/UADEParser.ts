@@ -461,8 +461,15 @@ export async function parseUADEFile(
   // Skip the worklet's built-in scan for these to avoid a 600-second hang.
   // Prefix-based formats (dl.*, dln.*, rh.*) are matched by the leading component.
   const prefix = filename.split('.')[0]?.toLowerCase() ?? '';
-  const SKIP_SCAN_EXTS = new Set(['jpo', 'jpold', 'rh', 'rhp']);
-  const SKIP_SCAN_PREFIXES = new Set(['dl', 'dl_deli', 'dln', 'rh']);
+  const SKIP_SCAN_EXTS = new Set(['jpo', 'jpold', 'rh', 'rhp',
+    'mon',  // ManiacsOfNoise — enhanced scan crashes browser
+  ]);
+  const SKIP_SCAN_PREFIXES = new Set(['dl', 'dl_deli', 'dln', 'rh',
+    'sas',  // SonicArranger prefix-form — enhanced scan crashes browser
+    'spl',  // SoundProgrammingLanguage — compiled replayer
+    'riff', // RiffRaff — compiled replayer
+    'hd',   // HowieDavies — compiled replayer
+  ]);
   const skipScan = mode === 'enhanced' && (SKIP_SCAN_EXTS.has(ext) || SKIP_SCAN_PREFIXES.has(prefix));
 
   const metadata = preScannedMeta ?? await engine.load(buffer, filename, skipScan);
@@ -940,8 +947,11 @@ export async function parseUADEFile(
   }
 
   const FORCE_CLASSIC_PREFIXES = new Set<string>([
-    'fw',  // ForgottenWorlds — enhanced scan produces silent output; classic streaming required
-    'sas', // SonicArranger prefix-form — enhanced scan crashes browser
+    'fw',   // ForgottenWorlds — enhanced scan produces silent output; classic streaming required
+    'sas',  // SonicArranger prefix-form — enhanced scan crashes browser
+    'spl',  // SoundProgrammingLanguage — compiled replayer, enhanced scan gives wrong audio
+    'riff', // RiffRaff — compiled replayer, enhanced scan gives wrong audio
+    'hd',   // HowieDavies — compiled replayer, enhanced scan gives wrong audio
   ]);
   if (mode === 'enhanced' && FORCE_CLASSIC_PREFIXES.has(prefix)) {
     console.log(`[UADEParser] ${prefix.toUpperCase()} uses prefix form; forcing classic UADESynth streaming`);
