@@ -531,6 +531,8 @@ async function renderFurFile(furPath: string, outPath: string): Promise<RenderRe
     //   [8-11]  loopEnd (int32)
     //   [12]    depth (DIV_SAMPLE_DEPTH)
     //   [13]    loopMode
+    //   [14]    brrEmphasis (bool — default true in Furnace DivSample)
+    //   [15]    brrNoFilter (bool)
     //   [16-19] centerRate (uint32)
     //   [22]    loop enabled flag
     //   [32+]   sample data
@@ -565,9 +567,11 @@ async function renderFurFile(furPath: string, outPath: string): Promise<RenderRe
       view.setInt32(4, smp.loopStart || 0, true);             // loopStart
       view.setInt32(8, smp.loopEnd || 0, true);               // loopEnd
       view.setUint8(12, smp.depth || 16);                     // depth
-      view.setUint8(13, smp.loopMode || 0);                   // loopMode
-      view.setUint32(16, smp.rate || SAMPLE_RATE, true);      // centerRate
-      view.setUint8(22, (smp.loopEnd || 0) > (smp.loopStart || 0) ? 1 : 0); // loop flag
+      view.setUint8(13, (smp as any).loopDirection ?? (smp as any).loopMode ?? 0); // loopMode
+      view.setUint8(14, (smp as any).brrEmphasis === false ? 0 : 1);  // brrEmphasis (default true in Furnace DivSample)
+      view.setUint8(15, (smp as any).brrNoFilter ? 1 : 0);  // brrNoFilter
+      view.setUint32(16, (smp as any).c4Rate || (smp as any).rate || (smp as any).compatRate || 0, true); // centerRate (0 = use default off=1.0 in chip)
+      view.setUint8(22, (smp as any).loop ? 1 : 0); // loop flag (from SMP2 flags bit 0)
 
       // Copy PCM data after header
       if (smp.data instanceof Int16Array) {
@@ -1104,11 +1108,17 @@ async function main() {
   } else {
     // Single file mode
     const furPath = args[0];
-    const outPath = args[1] || furPath.replace(/\.fur$/, '_devilbox.wav');
+    // If no explicit output path given, use a temp file and auto-delete after (prevents disk fill)
+    const explicitOut = args[1];
+    const outPath = explicitOut ?? `/tmp/furnace-render-${Date.now()}.wav`;
     console.log(`Rendering: ${furPath}`);
     const result = await renderFurFile(furPath, outPath);
     if (result.success) {
       console.log(`  OK  ${(result.duration || 0).toFixed(1)}s  ${((result.wavSize || 0) / 1048576).toFixed(1)}MB  → ${outPath}`);
+      // Auto-delete temp output to prevent disk accumulation
+      if (!explicitOut) {
+        try { unlinkSync(outPath); } catch { /* ignore */ }
+      }
     } else {
       console.error(`  FAIL  ${result.error}`);
       process.exit(1);
