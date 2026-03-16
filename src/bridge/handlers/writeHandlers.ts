@@ -5,6 +5,7 @@
  */
 
 import { useTrackerStore } from '../../stores/useTrackerStore';
+import { clearConsoleEntries } from '../consoleCapture';
 import { useTransportStore } from '../../stores/useTransportStore';
 import { useCursorStore } from '../../stores/useCursorStore';
 import { useHistoryStore } from '../../stores/useHistoryStore';
@@ -2037,5 +2038,27 @@ export async function runSynthTests(params: Record<string, unknown>): Promise<Re
     return { ok: true, suite, ...summary };
   } catch (e) {
     return { error: `runSynthTests failed: ${(e as Error).message}` };
+  }
+}
+
+export function clearConsoleErrors(): Record<string, unknown> {
+  clearConsoleEntries();
+  return { ok: true };
+}
+
+/**
+ * Evaluate arbitrary JavaScript in the browser context.
+ * Returns the JSON-serializable result.
+ * Used for debugging — e.g., reading localStorage after a page crash.
+ */
+export function evaluateScript(params: Record<string, unknown>): unknown {
+  const code = params.code as string;
+  if (!code) return { error: 'Missing code param' };
+  try {
+    // eslint-disable-next-line no-eval
+    const result = (0, eval)(code);
+    return { result };
+  } catch (e) {
+    return { error: (e as Error).message };
   }
 }

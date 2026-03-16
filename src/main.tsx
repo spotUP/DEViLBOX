@@ -1,3 +1,6 @@
+import { startConsoleCapture } from './bridge/consoleCapture'
+startConsoleCapture();
+
 import { createRoot } from 'react-dom/client'
 import { enableMapSet } from 'immer'
 import './index.css'

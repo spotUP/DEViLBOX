@@ -1868,6 +1868,44 @@ export function createMcpServer(): McpServer {
     (p) => call('export_mod', p),
   );
 
+  // ═══════════════════════════════════════════════════════════════════════════════
+  // CONSOLE CAPTURE & DEBUGGING
+  // ═══════════════════════════════════════════════════════════════════════════════
+
+  server.tool(
+    'get_console_errors',
+    'Get browser console errors and warnings captured since the last clear_console_errors call. Returns an array of {level, message, timestamp} entries. Use this after loading a song to see WASM crashes, JS errors, and worklet failures.',
+    {},
+    () => call('get_console_errors'),
+  );
+
+  server.tool(
+    'clear_console_errors',
+    'Clear the browser console error buffer. Call before loading a song to get clean per-song error output.',
+    {},
+    () => call('clear_console_errors'),
+  );
+
+  server.tool(
+    'play_fur',
+    'Load a .fur file from disk and immediately start playback. Combines load_file + play in one call.',
+    {
+      path: z.string().describe('Absolute path to the .fur file'),
+      subsong: z.number().optional().describe('Subsong index (default 0)'),
+    },
+    async (p) => {
+      try {
+        const fileData = await readFile(p.path);
+        const base64 = fileData.toString('base64');
+        const filename = basename(p.path);
+        await callBrowser('load_file', { filename, data: base64, subsong: p.subsong });
+        return textResult(await callBrowser('play', {}));
+      } catch (e) {
+        return textResult({ error: `Failed to load/play file: ${(e as Error).message}` });
+      }
+    },
+  );
+
   server.tool(
     'batch',
     'Execute multiple tool calls in sequence, returning all results. Useful for atomic multi-step operations (e.g., set multiple cells then play). Stops on first error unless continueOnError is true.',
