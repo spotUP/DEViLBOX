@@ -1180,8 +1180,8 @@ export const useInstrumentStore = create<InstrumentStore>()(
         // Ensure complete config for the synthType
         const completeInst = ensureCompleteInstrumentConfig(inst);
 
-        // Sanitize out-of-range IDs to valid 1-128 range
-        if (completeInst.id < 1 || completeInst.id > 128) {
+        // Sanitize out-of-range or duplicate IDs to valid 1-128 range
+        if (completeInst.id < 1 || completeInst.id > 128 || usedIds.has(completeInst.id)) {
           let newId = 1;
           for (let id = 1; id <= 128; id++) {
             if (!usedIds.has(id)) { newId = id; break; }
