@@ -2,13 +2,14 @@
  * PixiAIPanel — GL-native right-side panel for the in-app AI assistant.
  * Follows the PixiUndoHistoryPanel pattern.
  *
- * Messages are rendered as BitmapText. The input is a DOM hybrid (PixiTextInput portal).
+ * Messages are rendered as BitmapText. The input area is fully native GL:
+ * PixiPureTextInput + PixiButton rows for providers/models/send.
  */
 
-import { useCallback, useMemo, useRef, useEffect, useState } from 'react';
-import { createPortal } from 'react-dom';
+import { useCallback, useMemo, useState } from 'react';
 import type { Graphics as GraphicsType } from 'pixi.js';
 import { PixiButton, PixiLabel } from '../components';
+import { PixiPureTextInput } from '../input/PixiPureTextInput';
 import { usePixiTheme } from '../theme';
 import { PIXI_FONTS } from '../fonts';
 import { usePixiResponsive } from '../hooks/usePixiResponsive';
@@ -20,6 +21,10 @@ const PANEL_W = 440;
 const MSG_PAD = 8;
 const LINE_H = 14;
 const MAX_CHARS_PER_LINE = 48;
+const INPUT_AREA_H = 60;
+const PROVIDER_ROW_H = 22;
+const INPUT_ROW_H = 28;
+const INPUT_PAD = 6;
 
 /** Simple word-wrap for BitmapText */
 function wrapText(text: string, maxChars: number): string[] {
@@ -103,14 +108,14 @@ const MessageRow: React.FC<{ msg: AIMessage; width: number }> = ({ msg, width })
   );
 };
 
-/** DOM input portal for the chat input */
-const ChatInput: React.FC<{ panelRight: number; isStreaming: boolean }> = ({ panelRight, isStreaming }) => {
+/** Native GL chat input area — provider selector, model selector, text input, send/stop */
+const ChatInputGL: React.FC<{ isStreaming: boolean }> = ({ isStreaming }) => {
   const [text, setText] = useState('');
-  const inputRef = useRef<HTMLInputElement>(null);
   const provider = useAIStore((s) => s.provider);
   const model = useAIStore((s) => s.model);
   const setProvider = useAIStore((s) => s.setProvider);
   const setModel = useAIStore((s) => s.setModel);
+  const theme = usePixiTheme();
 
   const handleSubmit = useCallback(() => {
     const trimmed = text.trim();
@@ -119,143 +124,118 @@ const ChatInput: React.FC<{ panelRight: number; isStreaming: boolean }> = ({ pan
     setText('');
   }, [text, isStreaming]);
 
-  const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent) => {
-      e.stopPropagation();
-      if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
-        handleSubmit();
-      }
+  const models = getModelsForProvider(provider);
+
+  const drawInputAreaBg = useCallback(
+    (g: GraphicsType) => {
+      g.clear();
+      g.rect(0, 0, PANEL_W, INPUT_AREA_H);
+      g.fill({ color: theme.bgSecondary.color });
+      g.rect(1, 0, PANEL_W - 1, 1);
+      g.fill({ color: theme.border.color });
     },
-    [handleSubmit],
+    [theme],
   );
 
-  // Auto-focus when panel opens
-  useEffect(() => {
-    const t = setTimeout(() => inputRef.current?.focus(), 100);
-    return () => clearTimeout(t);
-  }, []);
+  const drawSeparator = useCallback(
+    (g: GraphicsType) => {
+      g.clear();
+      g.rect(0, 3, 1, 14);
+      g.fill({ color: theme.border.color, alpha: 0.5 });
+    },
+    [theme],
+  );
 
-  return createPortal(
-    <div
-      style={{
-        position: 'fixed',
-        right: panelRight,
-        bottom: 28, // above status bar
+  return (
+    <layoutContainer
+      layout={{
         width: PANEL_W,
-        display: 'flex',
+        height: INPUT_AREA_H,
         flexDirection: 'column',
+        paddingLeft: INPUT_PAD,
+        paddingRight: INPUT_PAD,
+        paddingTop: INPUT_PAD,
         gap: 4,
-        padding: '6px 8px',
-        background: '#1a1a1a',
-        borderTop: '1px solid #333',
-        zIndex: 46,
       }}
-      onKeyDown={(e) => e.stopPropagation()}
     >
-      {/* Provider + Model selector */}
-      <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-        {/* Provider toggle */}
-        <div style={{ display: 'flex', gap: 1, background: 'var(--color-bg-secondary)', borderRadius: 3, padding: 1 }}>
-          {AI_PROVIDERS.map((p) => (
-            <button
-              key={p.id}
-              onClick={() => setProvider(p.id)}
-              style={{
-                padding: '2px 6px',
-                fontSize: 9,
-                fontFamily: 'monospace',
-                border: 'none',
-                borderRadius: 2,
-                cursor: 'pointer',
-                background: provider === p.id ? '#444' : 'transparent',
-                color: provider === p.id ? '#fff' : '#666',
-                fontWeight: provider === p.id ? 600 : 400,
-              }}
-            >
-              {p.label}
-            </button>
-          ))}
-        </div>
-        {/* Model buttons for current provider */}
-        <div style={{ display: 'flex', gap: 2 }}>
-          {getModelsForProvider(provider).map((m) => (
-            <button
-              key={m.id}
-              onClick={() => setModel(m.id)}
-              style={{
-                padding: '2px 8px',
-                fontSize: 10,
-                fontFamily: 'monospace',
-                border: 'none',
-                borderRadius: 3,
-                cursor: 'pointer',
-                background: model === m.id ? '#60A5FA' : '#222',
-                color: model === m.id ? '#111' : '#888',
-                fontWeight: model === m.id ? 600 : 400,
-              }}
-              title={m.description}
-            >
-              {m.label}
-            </button>
-          ))}
-        </div>
-      </div>
-      {/* Input + send row */}
-      <div style={{ display: 'flex', gap: 4 }}>
-        <input
-          ref={inputRef}
+      <pixiGraphics draw={drawInputAreaBg} layout={{ position: 'absolute', width: PANEL_W, height: INPUT_AREA_H }} />
+
+      {/* Provider + model selector row */}
+      <layoutContainer
+        layout={{
+          flexDirection: 'row',
+          height: PROVIDER_ROW_H,
+          gap: 2,
+          alignItems: 'center',
+        }}
+      >
+        {AI_PROVIDERS.map((p) => (
+          <PixiButton
+            key={p.id}
+            label={p.label}
+            variant={provider === p.id ? 'primary' : 'ghost'}
+            size="sm"
+            width={52}
+            height={18}
+            onClick={() => setProvider(p.id)}
+          />
+        ))}
+        <pixiGraphics draw={drawSeparator} layout={{ width: 5, height: PROVIDER_ROW_H }} />
+        {models.map((m) => (
+          <PixiButton
+            key={m.id}
+            label={m.label}
+            variant={model === m.id ? 'primary' : 'ghost'}
+            size="sm"
+            width={m.label.length > 5 ? 52 : 44}
+            height={18}
+            onClick={() => setModel(m.id)}
+          />
+        ))}
+      </layoutContainer>
+
+      {/* Text input + send/stop row */}
+      <layoutContainer
+        layout={{
+          flexDirection: 'row',
+          height: INPUT_ROW_H,
+          gap: 4,
+          alignItems: 'center',
+        }}
+      >
+        <PixiPureTextInput
           value={text}
-          onChange={(e) => setText(e.target.value)}
-          onKeyDown={handleKeyDown}
+          onChange={setText}
+          onSubmit={handleSubmit}
           placeholder="Ask AI..."
-          style={{
-            flex: 1,
-            background: 'var(--color-bg-secondary)',
-            border: '1px solid #333',
-            borderRadius: 4,
-            padding: '4px 8px',
-            color: '#ddd',
-            fontSize: 12,
-            fontFamily: 'monospace',
-            outline: 'none',
-          }}
+          width={PANEL_W - INPUT_PAD * 2 - 56}
+          height={24}
+          fontSize={11}
+          font="sans"
+          layout={{ flex: 1 }}
         />
         {isStreaming ? (
-          <button
+          <PixiButton
+            label="Stop"
+            variant="danger"
+            size="sm"
+            width={50}
+            height={24}
             onClick={stopStreaming}
-            style={{
-              padding: '4px 12px',
-              background: '#3B1515',
-              color: '#F87171',
-              border: 'none',
-              borderRadius: 4,
-              fontSize: 12,
-              cursor: 'pointer',
-            }}
-          >
-            Stop
-          </button>
+          />
         ) : (
-          <button
+          <PixiButton
+            label="Send"
+            variant={text.trim() ? 'primary' : 'ghost'}
+            size="sm"
+            width={50}
+            height={24}
             onClick={handleSubmit}
             disabled={!text.trim()}
-            style={{
-              padding: '4px 12px',
-              background: text.trim() ? '#1E3A5F' : '#222',
-              color: text.trim() ? '#60A5FA' : '#555',
-              border: 'none',
-              borderRadius: 4,
-              fontSize: 12,
-              cursor: text.trim() ? 'pointer' : 'default',
-            }}
-          >
-            Send
-          </button>
+          />
         )}
-      </div>
-    </div>,
-    document.body,
+      </layoutContainer>
+    </layoutContainer>
   );
 };
 
@@ -294,90 +274,88 @@ export const PixiAIPanel: React.FC = () => {
   if (!isOpen) return null;
 
   return (
-    <>
+    <layoutContainer
+      layout={{
+        position: 'absolute',
+        right: 0,
+        top: 0,
+        width: PANEL_W,
+        height: '100%',
+        flexDirection: 'column',
+      }}
+    >
+      {/* Panel background */}
+      <pixiGraphics draw={drawPanelBg} layout={{ position: 'absolute', width: PANEL_W, height: '100%' }} />
+
+      {/* Header */}
       <layoutContainer
         layout={{
-          position: 'absolute',
-          right: 0,
-          top: 0,
-          width: PANEL_W,
-          height: '100%',
-          flexDirection: 'column',
+          flexDirection: 'row',
+          alignItems: 'center',
+          height: 28,
+          paddingLeft: 12,
+          paddingRight: 8,
         }}
       >
-        {/* Panel background */}
-        <pixiGraphics draw={drawPanelBg} layout={{ position: 'absolute', width: PANEL_W, height: '100%' }} />
-
-        {/* Header */}
-        <layoutContainer
-          layout={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            height: 28,
-            paddingLeft: 12,
-            paddingRight: 8,
-          }}
-        >
-          <pixiGraphics draw={drawHeaderBorder} layout={{ position: 'absolute', width: PANEL_W, height: 28 }} />
-          <PixiLabel text="AI" size="xs" weight="semibold" font="sans" layout={{ flex: 1 }} />
-          <PixiButton
-            label="Clear"
-            variant="ghost"
-            size="sm"
-            onClick={clearHistory}
-            width={40}
-            height={22}
-          />
-          <PixiButton
-            label="x"
-            variant="ghost"
-            size="sm"
-            onClick={close}
-            width={24}
-            height={22}
-          />
-        </layoutContainer>
-
-        {/* Messages area */}
-        <layoutContainer
-          layout={{
-            flex: 1,
-            flexDirection: 'column',
-            overflow: 'scroll',
-            paddingTop: 8,
-            paddingBottom: 40,
-          }}
-        >
-          {messages.length === 0 && (
-            <layoutContainer layout={{ paddingLeft: 16, paddingTop: 32 }}>
-              <pixiBitmapText
-                text="Ask the AI to edit patterns,"
-                style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 11, fill: 0xffffff }}
-                tint={theme.textMuted.color}
-                layout={{}}
-              />
-              <pixiBitmapText
-                text="mix, search music, and more."
-                style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 11, fill: 0xffffff }}
-                tint={theme.textMuted.color}
-                layout={{ paddingTop: 2 }}
-              />
-              <pixiBitmapText
-                text="Ctrl+L to toggle this panel"
-                style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }}
-                tint={theme.textMuted.color}
-                layout={{ paddingTop: 12 }}
-              />
-            </layoutContainer>
-          )}
-          {messages.map((msg) => (
-            <MessageRow key={msg.id} msg={msg} width={PANEL_W} />
-          ))}
-        </layoutContainer>
+        <pixiGraphics draw={drawHeaderBorder} layout={{ position: 'absolute', width: PANEL_W, height: 28 }} />
+        <PixiLabel text="AI" size="xs" weight="semibold" font="sans" layout={{ flex: 1 }} />
+        <PixiButton
+          label="Clear"
+          variant="ghost"
+          size="sm"
+          onClick={clearHistory}
+          width={40}
+          height={22}
+        />
+        <PixiButton
+          label="x"
+          variant="ghost"
+          size="sm"
+          onClick={close}
+          width={24}
+          height={22}
+        />
       </layoutContainer>
 
-      {/* DOM input overlay */}
-      <ChatInput panelRight={0} isStreaming={isStreaming} />
-    </>
+      {/* Messages area — paddingBottom reserves space for the input area */}
+      <layoutContainer
+        layout={{
+          flex: 1,
+          flexDirection: 'column',
+          overflow: 'scroll',
+          paddingTop: 8,
+          paddingBottom: INPUT_AREA_H + 4,
+        }}
+      >
+        {messages.length === 0 && (
+          <layoutContainer layout={{ paddingLeft: 16, paddingTop: 32 }}>
+            <pixiBitmapText
+              text="Ask the AI to edit patterns,"
+              style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 11, fill: 0xffffff }}
+              tint={theme.textMuted.color}
+              layout={{}}
+            />
+            <pixiBitmapText
+              text="mix, search music, and more."
+              style={{ fontFamily: PIXI_FONTS.SANS, fontSize: 11, fill: 0xffffff }}
+              tint={theme.textMuted.color}
+              layout={{ paddingTop: 2 }}
+            />
+            <pixiBitmapText
+              text="Ctrl+L to toggle this panel"
+              style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }}
+              tint={theme.textMuted.color}
+              layout={{ paddingTop: 12 }}
+            />
+          </layoutContainer>
+        )}
+        {messages.map((msg) => (
+          <MessageRow key={msg.id} msg={msg} width={PANEL_W} />
+        ))}
+      </layoutContainer>
+
+      {/* Native GL input area — provider selector + text input + send button */}
+      <ChatInputGL isStreaming={isStreaming} />
+    </layoutContainer>
   );
 };

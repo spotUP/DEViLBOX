@@ -97,6 +97,8 @@ interface UIStore {
   pendingAudioFile: File | null;   // Audio sample file pending import (adds sampler instrument)
   pendingTD3File: File | null;     // TD-3 pattern file pending import (.sqs/.seq)
   pendingSunVoxFile: File | null;  // SunVox file pending import (.sunsynth / .sunvox)
+  jingleActive: boolean;           // Startup jingle is playing (drives PixiVisualizer jingle mode)
+  postJingleActive: boolean;       // Jingle just ended — switch visualizer to logo mode
 
   // Actions
   togglePanel: (panel: PanelType) => void;
@@ -167,6 +169,10 @@ interface UIStore {
   setPendingAudioFile: (file: File | null) => void;
   setPendingTD3File: (file: File | null) => void;
   setPendingSunVoxFile: (file: File | null) => void;
+
+  // Jingle action
+  setJingleActive: (v: boolean) => void;
+  setPostJingleActive: (v: boolean) => void;
 
   // Dialog command (keyboard → dialog bridge)
   dialogOpen: DialogCommand | null;
@@ -261,6 +267,8 @@ export const useUIStore = create<UIStore>()(
       pendingAudioFile: null,
       pendingTD3File: null,
       pendingSunVoxFile: null,
+      jingleActive: false,
+      postJingleActive: false,
 
       // Dialog bridge (keyboard → dialog)
       dialogOpen: null,
@@ -580,6 +588,16 @@ export const useUIStore = create<UIStore>()(
       setPendingSunVoxFile: (file) =>
         set((state) => {
           state.pendingSunVoxFile = file;
+        }),
+
+      setJingleActive: (v) =>
+        set((state) => {
+          state.jingleActive = v;
+        }),
+
+      setPostJingleActive: (v) =>
+        set((state) => {
+          state.postJingleActive = v;
         }),
 
       // Non-editable song dialog actions

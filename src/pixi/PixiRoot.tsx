@@ -79,6 +79,7 @@ import { PixiMasterEffectsModal } from './dialogs/PixiMasterEffectsModal';
 import { PixiInstrumentEffectsModal } from './dialogs/PixiInstrumentEffectsModal';
 import { PixiNonEditableDialog } from './dialogs/PixiNonEditableDialog';
 import { PixiAIPanel } from './dialogs/PixiAIPanel';
+import { PixiPatternBarEditor } from './dialogs/PixiPatternBarEditor';
 import { clearExplicitlySaved } from '@hooks/useProjectPersistence';
 
 export const PixiRoot: React.FC = () => {
@@ -418,6 +419,7 @@ export const PixiRoot: React.FC = () => {
         <PixiSynthErrorDialog />
         <PixiNonEditableDialog />
         <PixiArrangementContextMenu />
+        <PixiPatternBarEditor isOpen={modalOpen === 'parameterEditor'} onClose={closeModal} />
         <PixiAIPanel />
       </pixiContainer>
 

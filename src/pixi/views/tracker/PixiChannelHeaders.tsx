@@ -11,7 +11,6 @@
  */
 
 import React, { useCallback, useMemo, useRef, useState, type RefCallback } from 'react';
-import { createPortal } from 'react-dom';
 import type { Graphics as GraphicsType, FederatedPointerEvent } from 'pixi.js';
 import { usePixiTheme } from '../../theme';
 import { PIXI_FONTS } from '../../fonts';
@@ -23,6 +22,7 @@ import { useTrackerStore } from '@stores/useTrackerStore';
 import { GENERATORS, type GeneratorType } from '@utils/patternGenerators';
 import type { ChannelData } from '@typedefs/tracker';
 import type { ContextMenuItem } from '../../input/PixiContextMenu';
+import { PixiPureTextInput } from '../../input/PixiPureTextInput';
 
 // ─── Layout constants ────────────────────────────────────────────────────────
 const HEADER_HEIGHT = 28;
@@ -328,12 +328,6 @@ const PixiChannelHeadersInner: React.FC<PixiChannelHeadersProps> = ({
     setEditValue(pattern.channels[ch]?.name || '');
   }, [pattern.channels]);
 
-  const finishEditing = useCallback(() => {
-    if (editingChannel !== null) {
-      onUpdateName(editingChannel, editValue);
-      setEditingChannel(null);
-    }
-  }, [editingChannel, editValue, onUpdateName]);
 
   // ── Popup handlers ─────────────────────────────────────────────────────────
   const openContextMenu = useCallback((ch: number, e: FederatedPointerEvent) => {
@@ -610,25 +604,18 @@ const PixiChannelHeadersInner: React.FC<PixiChannelHeadersProps> = ({
               </pixiContainer>
             )}
             {showChannelNames && editingChannel === ch && (
-              <pixiContainer layout={LAYOUT_NAME_ROW}>
-                <pixiGraphics
-                  draw={(g: GraphicsType) => {
-                    g.clear();
-                    g.roundRect(0, 0, Math.max(50, chW - 120), 18, 3);
-                    g.fill({ color: theme.bg.color, alpha: 0.85 });
-                    g.roundRect(0, 0, Math.max(50, chW - 120), 18, 3);
-                    g.stroke({ color: theme.accent.color, alpha: 0.6, width: 1 });
-                  }}
-                  layout={{ position: 'absolute', width: Math.max(50, chW - 120), height: 18 }}
-                />
-                <pixiBitmapText
-                  text={(editValue || '').toUpperCase() || ' '}
-                  style={{ fontFamily: PIXI_FONTS.MONO_BOLD, fontSize: 10, fill: 0xffffff }}
-                  tint={theme.text.color}
-                  alpha={0.9}
-                  layout={LAYOUT_EMPTY}
-                />
-              </pixiContainer>
+              <PixiPureTextInput
+                autoFocus
+                value={editValue}
+                onChange={(v) => setEditValue(v.toUpperCase())}
+                onSubmit={(v) => { onUpdateName(ch, v.toUpperCase()); setEditingChannel(null); }}
+                onCancel={() => setEditingChannel(null)}
+                onBlur={(v) => { onUpdateName(ch, v.toUpperCase()); setEditingChannel(null); }}
+                width={Math.max(50, chW - 120)}
+                height={18}
+                fontSize={10}
+                layout={LAYOUT_NAME_ROW}
+              />
             )}
             {showChannelNames && editingChannel !== ch && (
               <pixiBitmapText
@@ -733,7 +720,7 @@ const PixiChannelHeadersInner: React.FC<PixiChannelHeadersProps> = ({
     numChannels, pattern.channels, channelWidths, channelOffsets, scrollLeft,
     theme, showChannelNames, channelSpeeds, songInitialSpeed, editingChannel, editValue,
     instruments,
-    onToggleMute, onToggleSolo, onToggleCollapse, onAddChannel,
+    onToggleMute, onToggleSolo, onToggleCollapse, onAddChannel, onUpdateName,
     openContextMenu, openColorPicker, startEditing,
     drawMuteBtn, drawSoloBtn, drawCollapseBtn, drawContextBtn, drawColorBtn, drawAddBtn, drawHoverBtn,
   ]);
@@ -769,27 +756,6 @@ const PixiChannelHeadersInner: React.FC<PixiChannelHeadersProps> = ({
         </pixiContainer>
       </pixiContainer>
 
-      {/* Hidden DOM input for keyboard/IME capture during channel name editing */}
-      {editingChannel !== null && createPortal(
-        <input
-          autoFocus
-          type="text"
-          value={editValue}
-          onChange={(e) => setEditValue(e.target.value)}
-          onBlur={finishEditing}
-          onKeyDown={(e) => { if (e.key === 'Enter') finishEditing(); if (e.key === 'Escape') setEditingChannel(null); }}
-          style={{
-            position: 'fixed',
-            left: 0,
-            top: 0,
-            width: 1,
-            height: 1,
-            opacity: 0,
-            pointerEvents: 'none',
-          }}
-        />,
-        document.body,
-      )}
     </pixiContainer>
   );
 };

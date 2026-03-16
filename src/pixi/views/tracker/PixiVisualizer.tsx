@@ -9,7 +9,9 @@ import type { Graphics as GraphicsType } from 'pixi.js';
 import { PIXI_FONTS } from '../../fonts';
 import { usePixiTheme, type PixiTheme } from '../../theme';
 import { useTransportStore } from '@stores';
+import { useUIStore } from '@stores/useUIStore';
 import { getToneEngine } from '@engine/ToneEngine';
+import { getJingleEngine } from '@engine/jingle/JingleEngine';
 import { PixiDOMOverlay } from '../../components/PixiDOMOverlay';
 import { CircularVU } from '@components/visualization/CircularVU';
 import { ChannelWaveforms } from '@components/visualization/ChannelWaveforms';
@@ -26,7 +28,7 @@ import { AudioMotionVisualizer } from '@components/visualization/AudioMotionVisu
 
 type VizMode =
   // GPU-native modes
-  'waveform' | 'spectrum' | 'vectorscope' | 'channels' | 'stereo' | 'freqbars' | 'levels' | 'particles' | 'mirror' | 'radial' | 'energy' | 'logo' | 'banner' |
+  'jingle' | 'waveform' | 'spectrum' | 'vectorscope' | 'channels' | 'stereo' | 'freqbars' | 'levels' | 'particles' | 'mirror' | 'radial' | 'energy' | 'logo' | 'banner' |
   // DOM-canvas modes (rendered via PixiDOMOverlay)
   'circular' | 'chanWaves' | 'chanActivity' | 'chanSpectrum' | 'chanCircular' | 'chanParticles' | 'chanRings' | 'chanTunnel' | 'chanRadar' | 'chanNibbles' | 'sineScroll' |
   // AudioMotion modes (rendered via PixiDOMOverlay + AudioMotionVisualizer)
@@ -34,16 +36,19 @@ type VizMode =
 
 const VIZ_MODES: VizMode[] = [
   'waveform', 'spectrum', 'vectorscope', 'channels', 'stereo', 'freqbars', 'levels', 'particles',
+  // Note: 'jingle' is not in the cycle — it is set programmatically when jingle plays
   'mirror', 'radial', 'energy', 'logo', 'banner',
   'circular', 'sineScroll', 'chanWaves', 'chanActivity', 'chanSpectrum', 'chanCircular',
-  'chanParticles', 'chanRings', 'chanTunnel', 'chanRadar', 'chanNibbles',
+  'chanParticles', 'chanRings', 'chanTunnel', 'chanRadar',
   'amLED', 'amBars', 'amMirror', 'amRadial', 'amGraph', 'amRadialGraph', 'amDualStereo',
   'amLumi', 'amAlpha', 'amOutline', 'amDualV', 'amDualOverlay', 'amBark', 'amMel',
   'amOctave', 'amNotes', 'amMirrorReflex', 'amRadialInvert', 'amRadialLED',
   'amLinear', 'amAWeight', 'amLumiMirror',
+  'chanNibbles', // last slot — easter egg
 ];
 
 const VIZ_MODE_LABELS: Record<VizMode, string> = {
+  jingle: 'JINGLE',
   waveform: 'WAVE',      spectrum: 'SPECTRUM',  vectorscope: 'SCOPE',
   channels: 'CH-OSC',   stereo: 'STEREO',      freqbars: 'BARS',
   levels: 'LEVELS',     particles: 'PARTICLES', mirror: 'MIRROR',
@@ -124,6 +129,16 @@ const LAYOUT_MODE_INDICATOR_COLLAPSED: Record<string, unknown> = { position: 'ab
 const LAYOUT_OVERLAY_LABEL: Record<string, unknown> = { position: 'absolute' };
 const LAYOUT_OVERLAY_COLLAPSED: Record<string, unknown> = { position: 'absolute', width: 0, height: 0 };
 
+/** Jingle animation state (mutable, not React state — drives rAF loop directly) */
+interface JingleAnimState {
+  startTime: number;
+  lastBeatTime: number;
+  beatFlash: number; // 0-1, decays each frame
+  beatCount: number; // total beats detected
+  typedChars: number; // chars typed so far across "DEVILBOX" + "READY"
+  glitchFrames: number; // #3 — frames remaining for glitch effect
+}
+
 export const PixiVisualizer: React.FC<PixiVisualizerProps> = ({
   width = 160,
   height = 64,
@@ -133,7 +148,25 @@ export const PixiVisualizer: React.FC<PixiVisualizerProps> = ({
   const graphicsRef = useRef<GraphicsType | null>(null);
   const peakHoldsRef = useRef(new Float32Array(64));
   const particlesRef = useRef<ParticleState[]>([]);
+  const jingleAnimRef = useRef<JingleAnimState>({ startTime: 0, lastBeatTime: 0, beatFlash: 0, beatCount: 0, typedChars: 0, glitchFrames: 0 });
   const isPlaying = useTransportStore(s => s.isPlaying);
+  const jingleActive = useUIStore(s => s.jingleActive);
+  const postJingleActive = useUIStore(s => s.postJingleActive);
+
+  // Reset jingle animation state when jingle starts
+  useEffect(() => {
+    if (jingleActive) {
+      jingleAnimRef.current = { startTime: performance.now(), lastBeatTime: 0, beatFlash: 0, beatCount: 0, typedChars: 0, glitchFrames: 0 };
+    }
+  }, [jingleActive]);
+
+  // Switch to logo mode when jingle ends, then clear the flag
+  useEffect(() => {
+    if (postJingleActive) {
+      setMode('logo');
+      useUIStore.getState().setPostJingleActive(false);
+    }
+  }, [postJingleActive]);
 
   const handleClick = useCallback(() => {
     setMode(prev => {
@@ -144,13 +177,16 @@ export const PixiVisualizer: React.FC<PixiVisualizerProps> = ({
 
   // Animation loop
   useEffect(() => {
-    if (!isPlaying || !graphicsRef.current) return;
+    const shouldAnimate = isPlaying || jingleActive;
+    if (!shouldAnimate || !graphicsRef.current) return;
 
     // Connect analyser nodes so getWaveform()/getFFT() return real data
-    try {
-      getToneEngine().enableAnalysers();
-    } catch {
-      // Engine not ready yet — will try again on next effect
+    if (isPlaying) {
+      try {
+        getToneEngine().enableAnalysers();
+      } catch {
+        // Engine not ready yet — will try again on next effect
+      }
     }
 
     let rafId: number;
@@ -161,6 +197,13 @@ export const PixiVisualizer: React.FC<PixiVisualizerProps> = ({
 
       g.clear();
       drawBackground(g, width, height, theme);
+
+      // Jingle active — draw jingle animation regardless of current viz mode
+      if (jingleActive) {
+        drawJingleMode(g, getJingleEngine().getAnalyser(), width, height, theme, jingleAnimRef.current);
+        rafId = requestAnimationFrame(draw);
+        return;
+      }
 
       // DOM modes have no GPU drawing — PixiDOMOverlay handles them
       if (DOM_MODES.has(mode)) return;
@@ -220,7 +263,7 @@ export const PixiVisualizer: React.FC<PixiVisualizerProps> = ({
 
     rafId = requestAnimationFrame(draw);
     return () => cancelAnimationFrame(rafId);
-  }, [isPlaying, mode, width, height, theme]);
+  }, [isPlaying, jingleActive, mode, width, height, theme]);
 
   const isDOMMode = DOM_MODES.has(mode);
 
@@ -254,26 +297,26 @@ export const PixiVisualizer: React.FC<PixiVisualizerProps> = ({
       {/* Single graphics element — drawStatic when paused, animation loop drives it when playing */}
       <pixiGraphics
         ref={graphicsRef}
-        draw={isPlaying ? () => {} : drawStatic}
+        draw={isPlaying || jingleActive ? () => {} : drawStatic}
         layout={layoutFill}
       />
 
-      {/* Centered mode label — visible when stopped, collapsed when playing */}
+      {/* Centered mode label — visible when stopped and not in jingle mode */}
       <pixiBitmapText
-        text={VIZ_MODE_LABELS[mode]}
+        text={VIZ_MODE_LABELS[mode] ?? ''}
         style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 10, fill: 0xffffff }}
         tint={theme.textMuted.color}
-        layout={isPlaying ? LAYOUT_MODE_LABEL_COLLAPSED : LAYOUT_MODE_LABEL}
-        alpha={!isPlaying ? 1 : 0}
+        layout={isPlaying || jingleActive ? LAYOUT_MODE_LABEL_COLLAPSED : LAYOUT_MODE_LABEL}
+        alpha={!isPlaying && !jingleActive ? 1 : 0}
       />
 
-      {/* Bottom-right mode indicator — visible when playing, collapsed when stopped */}
+      {/* Bottom-right mode indicator — visible when playing, hidden during jingle */}
       <pixiBitmapText
-        text={VIZ_MODE_LABELS[mode]}
+        text={VIZ_MODE_LABELS[mode] ?? ''}
         style={{ fontFamily: PIXI_FONTS.MONO, fontSize: 11, fill: 0xffffff }}
         tint={theme.textMuted.color}
-        layout={isPlaying ? LAYOUT_MODE_INDICATOR : LAYOUT_MODE_INDICATOR_COLLAPSED}
-        alpha={isPlaying ? 0.5 : 0}
+        layout={isPlaying && !jingleActive ? LAYOUT_MODE_INDICATOR : LAYOUT_MODE_INDICATOR_COLLAPSED}
+        alpha={isPlaying && !jingleActive ? 0.5 : 0}
       />
 
       {/* Logo mode overlay — large DEViLBOX text, energy-reactive alpha */}
@@ -802,6 +845,253 @@ function drawLogoBackground(g: GraphicsType, data: Float32Array, w: number, h: n
   g.moveTo(w, h); g.lineTo(w - 16, h);
   g.moveTo(w, h); g.lineTo(w, h - 8);
   g.stroke({ color: theme.accent.color, alpha: 0.6, width: 1.5 });
+}
+
+// ── Jingle pixel font (3×5 bitmap, bit 2=left col, bit 0=right col) ──────────
+const JINGLE_PIXEL_CHARS: Record<string, number[]> = {
+  ' ': [0b000, 0b000, 0b000, 0b000, 0b000],
+  'D': [0b110, 0b101, 0b101, 0b101, 0b110],
+  'E': [0b111, 0b100, 0b110, 0b100, 0b111],
+  'V': [0b101, 0b101, 0b101, 0b010, 0b010],
+  'I': [0b111, 0b010, 0b010, 0b010, 0b111],
+  'L': [0b100, 0b100, 0b100, 0b100, 0b111],
+  'B': [0b110, 0b101, 0b110, 0b101, 0b110],
+  'O': [0b010, 0b101, 0b101, 0b101, 0b010],
+  'X': [0b101, 0b101, 0b010, 0b101, 0b101],
+  'R': [0b110, 0b101, 0b110, 0b101, 0b101],
+  'A': [0b010, 0b101, 0b111, 0b101, 0b101],
+  'Y': [0b101, 0b101, 0b010, 0b010, 0b010],
+  'U': [0b101, 0b101, 0b101, 0b101, 0b010],
+  'W': [0b101, 0b101, 0b111, 0b111, 0b101],
+  'S': [0b011, 0b100, 0b010, 0b001, 0b110],
+  'M': [0b101, 0b111, 0b111, 0b101, 0b101],
+  'K': [0b101, 0b110, 0b100, 0b110, 0b101],
+  'T': [0b111, 0b010, 0b010, 0b010, 0b010],
+  'C': [0b011, 0b100, 0b100, 0b100, 0b011],
+  'G': [0b011, 0b100, 0b110, 0b101, 0b011],
+  'H': [0b101, 0b101, 0b111, 0b101, 0b101],
+  'N': [0b101, 0b111, 0b111, 0b101, 0b101],
+  'F': [0b111, 0b100, 0b110, 0b100, 0b100],
+  'P': [0b110, 0b101, 0b110, 0b100, 0b100],
+};
+
+function drawPixelChar(
+  g: GraphicsType, ch: string, x: number, y: number,
+  px: number, color: number, alpha: number,
+): void {
+  const pattern = JINGLE_PIXEL_CHARS[ch];
+  if (!pattern) return;
+  for (let row = 0; row < 5; row++) {
+    const bits = pattern[row] ?? 0;
+    for (let col = 0; col < 3; col++) {
+      if (bits & (1 << (2 - col))) {
+        g.rect(x + col * px, y + row * px, px, px);
+        g.fill({ color, alpha });
+      }
+    }
+  }
+}
+
+function drawPixelText(
+  g: GraphicsType, text: string, x: number, y: number,
+  px: number, color: number, alpha: number,
+  perLetterColor?: number[],
+): void {
+  let cx = x;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i]!;
+    const c = perLetterColor?.[i] ?? color;
+    drawPixelChar(g, ch, cx, y, px, c, alpha);
+    cx += 3 * px + px; // char width + 1px gap
+  }
+}
+
+/** Jingle mode: split layout — spectrum bars left, typed text right */
+function drawJingleMode(
+  g: GraphicsType,
+  analyser: AnalyserNode | null,
+  w: number,
+  h: number,
+  theme: PixiTheme,
+  animState: JingleAnimState,
+) {
+  if (!analyser) return;
+
+  const freqData = new Uint8Array(analyser.frequencyBinCount);
+  analyser.getByteFrequencyData(freqData);
+  const waveData = new Uint8Array(analyser.fftSize);
+  analyser.getByteTimeDomainData(waveData);
+
+  // RMS for beat detection
+  let rms = 0;
+  for (let i = 0; i < waveData.length; i++) {
+    const s = ((waveData[i] ?? 128) - 128) / 128;
+    rms += s * s;
+  }
+  rms = Math.sqrt(rms / waveData.length);
+
+  const now = performance.now();
+  if (rms > 0.25 && now - animState.lastBeatTime > 180) {
+    animState.lastBeatTime = now;
+    animState.beatFlash = 1.0;
+    animState.beatCount++;
+    animState.glitchFrames = 4; // #3 — trigger glitch on beat
+  }
+  animState.beatFlash = Math.max(0, animState.beatFlash - 0.05);
+  if (animState.glitchFrames > 0) animState.glitchFrames--;
+
+  // Advance typed text ("DEVILBOX" then "READY" after a pause)
+  const elapsed = now - animState.startTime;
+  const typingStart = 400;
+  const charMs = 80;
+  const line2Gap = 300;
+  const totalLine1 = 8; // "DEVILBOX"
+  const totalLine2 = 5; // "READY"
+  if (elapsed > typingStart) {
+    const rawChars = Math.floor((elapsed - typingStart) / charMs);
+    if (rawChars <= totalLine1) {
+      animState.typedChars = rawChars;
+    } else {
+      const l2 = Math.floor((elapsed - typingStart - totalLine1 * charMs - line2Gap) / charMs);
+      animState.typedChars = totalLine1 + Math.max(0, Math.min(totalLine2, l2));
+    }
+  }
+
+  // Beat flash overlay
+  if (animState.beatFlash > 0) {
+    g.rect(0, 0, w, h);
+    g.fill({ color: theme.accent.color, alpha: animState.beatFlash * 0.1 });
+  }
+
+  // ── Left panel: spectrum bars ─────────────────────────────────────────────
+  const barPanelW = Math.floor(w * 0.57);
+  const barCount = 24;
+  const padX = 3;
+  const padY = 3;
+  const barAreaH = h - padY - 8; // leave 8px for waveform at bottom
+  const barW = (barPanelW - padX * 2) / barCount;
+  const step = Math.floor(freqData.length / barCount);
+
+  const glitching = animState.glitchFrames > 0;
+  const glitchShift = glitching ? (Math.random() - 0.5) * 8 : 0;
+
+  // #3 — ghost pass: tinted shifted bars drawn first for RGB-split feel
+  if (glitching) {
+    for (let i = 0; i < barCount; i++) {
+      let sum = 0;
+      for (let j = 0; j < step; j++) sum += freqData[i * step + j] ?? 0;
+      const norm = (sum / step) / 255;
+      const barH = norm * barAreaH;
+      if (barH > 0.5) {
+        g.rect(padX + i * barW - glitchShift * 1.5, padY + barAreaH - barH, Math.max(1, barW - 1), barH);
+        g.fill({ color: 0xff2040, alpha: 0.25 });
+        g.rect(padX + i * barW + glitchShift * 1.5, padY + barAreaH - barH, Math.max(1, barW - 1), barH);
+        g.fill({ color: 0x2040ff, alpha: 0.25 });
+      }
+    }
+  }
+
+  for (let i = 0; i < barCount; i++) {
+    let sum = 0;
+    for (let j = 0; j < step; j++) sum += freqData[i * step + j] ?? 0;
+    const norm = (sum / step) / 255;
+    const barH = norm * barAreaH;
+    if (barH > 0.5) {
+      // #3 — every 5th bar group gets a small random horizontal offset when glitching
+      const groupShift = glitching && (i % 5 === 0) ? glitchShift : 0;
+      const x = padX + i * barW + groupShift;
+      const y = padY + barAreaH - barH;
+      let color: number;
+      if (i < 3)       color = 0xff3333;           // sub-bass: red
+      else if (i < 8)  color = 0xff8833;           // bass: orange
+      else if (i < 16) color = theme.accent.color; // mid
+      else             color = 0xffffff;           // high: white
+      g.rect(x, y, Math.max(1, barW - 1), barH);
+      g.fill({ color, alpha: 0.6 + norm * 0.4 });
+    }
+  }
+
+  // #3 — bright scan-line slices on glitch frames
+  if (glitching) {
+    for (let s = 0; s < 2; s++) {
+      const sliceY = padY + Math.random() * barAreaH;
+      g.rect(0, sliceY, barPanelW, 1 + Math.random() * 2);
+      g.fill({ color: theme.accent.color, alpha: 0.55 });
+    }
+  }
+
+  // Waveform strip along the bottom of the bar panel
+  const waveY = h - 6;
+  const wSamples = barPanelW - padX * 2;
+  const wStep = waveData.length / wSamples;
+  g.moveTo(padX, waveY + (((waveData[0] ?? 128) - 128) / 128) * 3);
+  for (let i = 1; i < wSamples; i++) {
+    const val = (((waveData[Math.floor(i * wStep)] ?? 128) - 128) / 128) * 3;
+    g.lineTo(padX + i, waveY + val);
+  }
+  g.stroke({ color: theme.accent.color, alpha: 0.7, width: 1 });
+
+  // ── Right panel: typed text ───────────────────────────────────────────────
+  const textX = barPanelW + 3;
+  const px = 2; // pixel size (2×2 per dot)
+  const charW = 3 * px + px; // = 8px per char
+
+  // Per-letter brightness for "DEVILBOX" based on frequency band energy
+  // Letters map to frequency bands: D=sub, E-V=bass, I-L=mid, B-O-X=high
+  const bandEnergy = (lo: number, hi: number): number => {
+    let s = 0;
+    for (let i = lo; i <= hi; i++) s += freqData[i] ?? 0;
+    return (s / (hi - lo + 1)) / 255;
+  };
+  const bandMap = [
+    bandEnergy(0, 2),   // D: sub-bass
+    bandEnergy(3, 5),   // E: bass
+    bandEnergy(6, 8),   // V: lower-mid
+    bandEnergy(9, 11),  // I: mid
+    bandEnergy(12, 14), // L: mid
+    bandEnergy(15, 17), // B: upper-mid
+    bandEnergy(18, 20), // O: high
+    bandEnergy(21, 23), // X: high
+  ];
+  const LINE1 = 'DEVILBOX';
+  const LINE2 = 'READY';
+  const line1Typed = Math.min(animState.typedChars, totalLine1);
+  const line2Typed = Math.max(0, animState.typedChars - totalLine1);
+
+  // Line 1: DEVILBOX — each typed letter lit by its band energy
+  for (let i = 0; i < line1Typed; i++) {
+    const energy = bandMap[i] ?? 0;
+    const lit = energy > 0.3;
+    const col = lit ? (theme.cellNote?.color ?? theme.accent.color) : theme.textMuted.color;
+    const alpha = lit ? 0.9 + energy * 0.1 : 0.4;
+    drawPixelChar(g, LINE1[i]!, textX + i * charW, 4, px, col, alpha);
+  }
+  // Cursor blink after last typed char on line 1 (while line 1 is still typing)
+  if (line1Typed < totalLine1 && line1Typed > 0 && Math.floor(elapsed / 400) % 2 === 0) {
+    g.rect(textX + line1Typed * charW, 4, 1, 5 * px);
+    g.fill({ color: theme.accent.color, alpha: 0.8 });
+  }
+
+  // Line 2: READY
+  const line2Y = 4 + 5 * px + 3; // below line 1 with gap
+  for (let i = 0; i < line2Typed; i++) {
+    drawPixelChar(g, LINE2[i]!, textX + i * charW, line2Y, px, theme.accent.color, 0.85);
+  }
+  if (line2Typed > 0 && line2Typed < totalLine2 && Math.floor(elapsed / 400) % 2 === 0) {
+    g.rect(textX + line2Typed * charW, line2Y, 1, 5 * px);
+    g.fill({ color: theme.accent.color, alpha: 0.8 });
+  }
+
+  // ── Boot messages (appear after beat thresholds) ──────────────────────────
+  const bootMsgs = ['AUDIO OK', 'WASM OK', 'TRACK RDY'];
+  const bootBeats = [2, 5, 9];
+  const msgY0 = line2Y + 5 * px + 4;
+  for (let m = 0; m < bootMsgs.length; m++) {
+    if (animState.beatCount >= (bootBeats[m] ?? 99)) {
+      const msg = bootMsgs[m]!;
+      drawPixelText(g, msg, textX, msgY0 + m * 9, 1, theme.textMuted.color, 0.55);
+    }
+  }
 }
 
 /** Banner background: horizontal scan-line animation + waveform */
