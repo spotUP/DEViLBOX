@@ -1052,6 +1052,12 @@ int furnace_dispatch_cmd(int handle, int cmd, int chan, int val1, int val2) {
 
   DispatchInstance* inst = it->second;
 
+  // Bounds-check channel against this chip's channel count.
+  // Prevents crashes when a multi-chip song's channels fall back to the wrong chip.
+  if (chan < 0 || chan >= inst->numChannels) {
+    return -1;
+  }
+
   DivCommand dc((DivDispatchCmds)cmd, (unsigned char)chan, val1, val2);
   int ret = inst->dispatch->dispatch(dc);
 
