@@ -1155,7 +1155,7 @@ async function loadAudioSample(file: File): Promise<FileLoadResult> {
       sample: {
         audioBuffer: arrayBuf,
         url: '',
-        baseNote: 'C-4',
+        baseNote: 'C4',
         detune: 0,
         loop: false,
         loopStart: 0,
