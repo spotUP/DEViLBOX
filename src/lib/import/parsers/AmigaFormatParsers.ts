@@ -301,11 +301,13 @@ export async function tryRouteFormat(
 
   // ── Sonic Arranger ────────────────────────────────────────────────────────
   // Magic "SOARV1.0" at offset 0. "@OARV1.0" is LH-compressed — falls to UADE.
+  // injectUADE: native parser always runs for editable pattern display;
+  // UADE handles audio via uadeEditableFileData / UADEEditableSynth (classic streaming).
   if (matchesExt(filename, ['sa', 'sonic'])) {
     const { isSonicArrangerFormat, parseSonicArrangerFile } = await import('@lib/import/formats/SonicArrangerParser');
     return withNativeThenUADE('sonicArranger', ctx,
       (buf: Uint8Array | ArrayBuffer, name: string) => { if (isSonicArrangerFormat(buf as ArrayBuffer)) return parseSonicArrangerFile(buf as ArrayBuffer, name) ?? null; return null; },
-      'SonicArrangerParser');
+      'SonicArrangerParser', { injectUADE: true });
   }
 
   // ── InStereo! 2.0 (.is20 — unambiguous) ──────────────────────────────────
