@@ -568,7 +568,7 @@ export async function parseSymphonieProFile(
             audioBuffer: wavBuffer,
             url: dataUrl,
             sampleRate,
-            baseNote: 'C-4',
+            baseNote: 'C4',
             detune: 0,
             loop: loopEnabled,
             loopType: loopEnabled ? 'forward' : 'off',

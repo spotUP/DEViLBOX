@@ -21,6 +21,7 @@ export class OctaMEDSynth implements DevilboxSynth {
 
   private static _engineConnectedToSynth = false;
   private _ownsEngineConnection = false;
+  private _initPromise: Promise<void> | null = null;
 
   constructor() {
     this.audioContext = getDevilboxAudioContext();
@@ -35,7 +36,16 @@ export class OctaMEDSynth implements DevilboxSynth {
     }
   }
 
-  async setInstrument(config: OctaMEDConfig): Promise<void> {
+  setInstrument(config: OctaMEDConfig): Promise<void> {
+    this._initPromise = this._doSetInstrument(config);
+    return this._initPromise;
+  }
+
+  ensureInitialized(): Promise<void> {
+    return this._initPromise ?? Promise.resolve();
+  }
+
+  private async _doSetInstrument(config: OctaMEDConfig): Promise<void> {
     await this.engine.ready();
 
     this.engine.sendMessage({ type: 'createPlayer' });

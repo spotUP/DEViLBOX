@@ -17,6 +17,33 @@ import type { Pattern, ChannelData, TrackerCell } from '@/types';
 import type { UADEEnhancedScanRow, UADEMetadata } from '@/engine/uade/UADEEngine';
 import { createSamplerInstrument } from './AmigaUtils';
 
+// Amiga C-3 reference sample rate (PAL: 3546895 / 428 ≈ 8287 Hz; industry standard 8363 Hz)
+const AMIGA_STANDARD_RATE = 8363;
+
+/**
+ * Linearly upsample 8-bit signed PCM from srcRate to dstRate.
+ * Used to bring low-rate UADE captures (e.g. ~2750 Hz) up to a standard
+ * Amiga sample rate so the ToneEngine playbackRate stays near 1.0 for
+ * typical notes, avoiding interpolation artifacts at extreme ratios.
+ */
+function linearUpsample(src: Uint8Array, srcRate: number, dstRate: number): Uint8Array {
+  const ratio = srcRate / dstRate;
+  const outLen = Math.ceil(src.length / ratio);
+  const out = new Uint8Array(outLen);
+  for (let i = 0; i < outLen; i++) {
+    const pos = i * ratio;
+    const i0 = Math.floor(pos);
+    const i1 = Math.min(i0 + 1, src.length - 1);
+    const f = pos - i0;
+    const s0 = src[i0] > 127 ? src[i0] - 256 : src[i0];
+    const s1 = src[i1] > 127 ? src[i1] - 256 : src[i1];
+    const mixed = s0 + f * (s1 - s0);
+    const clipped = Math.max(-128, Math.min(127, Math.round(mixed)));
+    out[i] = clipped < 0 ? clipped + 256 : clipped;
+  }
+  return out;
+}
+
 /**
  * Complete UADE eagleplayer extension set, derived from eagleplayer.conf prefixes.
  *
@@ -156,6 +183,8 @@ const UADE_EXTENSIONS: Set<string> = new Set([
   'avp', 'mw',
   // Maximum Effect
   'max',
+  // MaxTrax
+  'mxtx',
   // MikeDavies
   'md',
   // Mosh Packer
@@ -432,8 +461,32 @@ export async function parseUADEFile(
   // Skip the worklet's built-in scan for these to avoid a 600-second hang.
   // Prefix-based formats (dl.*, dln.*, rh.*) are matched by the leading component.
   const prefix = filename.split('.')[0]?.toLowerCase() ?? '';
-  const SKIP_SCAN_EXTS = new Set(['jpo', 'jpold', 'rh', 'rhp']);
-  const SKIP_SCAN_PREFIXES = new Set(['dl', 'dl_deli', 'dln', 'rh']);
+  const SKIP_SCAN_EXTS = new Set(['jpo', 'jpold', 'rh', 'rhp',
+    'mon',   // ManiacsOfNoise — enhanced scan crashes browser
+    'sa',    // SonicArranger compiled binary variant — JSR prolog, enhanced scan hangs
+    // Suffix-form compiled replayer formats (test files use .ext suffix, not prefix.name):
+    'spl',   // SoundProgrammingLanguage — AmigaDOS hunk, enhanced scan gives wrong audio
+    'riff',  // RiffRaff — AmigaDOS hunk, enhanced scan gives wrong audio
+    'hd',    // HowieDavies — AmigaDOS hunk, enhanced scan gives wrong audio
+    'tw',    // Thomas Weber — 68k BRA code, enhanced scan gives wrong audio
+    'dz',    // DariusZendeh — 68k MOVEM prolog, enhanced scan gives wrong audio
+    'bss',   // BeathovenSynthesizer — AmigaDOS hunk, enhanced scan gives wrong audio
+    'scn',   // SeanConnolly — 68k BRA code, enhanced scan gives wrong audio
+    'scumm', // SCUMM — 68k compiled replayer, enhanced scan gives wrong audio
+  ]);
+  const SKIP_SCAN_PREFIXES = new Set(['dl', 'dl_deli', 'dln', 'rh',
+    'sas',   // SonicArranger prefix-form — enhanced scan crashes browser
+    'spl',   // SoundProgrammingLanguage — compiled replayer
+    'riff',  // RiffRaff — compiled replayer
+    'hd',    // HowieDavies — compiled replayer
+    'tw',    // Thomas Weber — compiled replayer (BRA code)
+    'dz',    // Darius Zendeh — compiled replayer (MOVEM prolog)
+    'bss',   // Beathoven Synthesizer — AmigaDOS hunk binary
+    'scn',   // Sean Connolly — compiled replayer (BRA code)
+    'scumm', // SCUMM music — compiled replayer
+    'dns',   // Dynamic Synthesizer — compiled replayer (BRA code)
+    'mk2', 'mkii', // MarkII — compiled 68k (MOVEM prolog); test file atron.mk2 confirmed
+  ]);
   const skipScan = mode === 'enhanced' && (SKIP_SCAN_EXTS.has(ext) || SKIP_SCAN_PREFIXES.has(prefix));
 
   const metadata = preScannedMeta ?? await engine.load(buffer, filename, skipScan);
@@ -463,7 +516,10 @@ export async function parseUADEFile(
       'Quadra Composer':    async () => { const { parseQuadraComposerFile } = await import('./QuadraComposerParser'); return parseQuadraComposerFile(buffer, filename); },
       'FutureComposer1.3':  async () => { const { parseFCFile } = await import('./FCParser'); return parseFCFile(buffer, filename, 0); },
       'FutureComposer1.4':  async () => { const { parseFCFile } = await import('./FCParser'); return parseFCFile(buffer, filename, 0); },
-      'FutureComposer-BSI': async () => { const { parseFCFile } = await import('./FCParser'); return parseFCFile(buffer, filename, 0); },
+      // FC BSI ("FUCO" magic) — parseFCFile returns a 0-note stub for BSI; returning null
+      // here lets the code fall through to the UADE enhanced scan which detects the correct
+      // tempo from the Paula register log (enhanced.bpm / enhanced.speed).
+      'FutureComposer-BSI': async () => null,
       'SIDMon1.0': async () => {
         const { parseSidMon1File } = await import('./SidMon1Parser');
         // SidMon 1 is a compiled Amiga binary; scan chip RAM for the SID-MON header
@@ -900,10 +956,40 @@ export async function parseUADEFile(
   // Force classic (UADESynth streaming) for these formats instead.
   const FORCE_CLASSIC_FORMATS = new Set<string>([
     'jpo', 'jpold',   // SteveTurner — compiled replayer, UADE streaming required for correct audio
+    'mon',            // ManiacsOfNoise — enhanced scan crashes browser
+    'sa',             // SonicArranger compiled binary variant — JSR prolog code
+    // Suffix-form compiled replayer formats (test files use .ext suffix, not prefix.name):
+    'spl',   // SoundProgrammingLanguage — AmigaDOS hunk compiled replayer
+    'riff',  // RiffRaff — AmigaDOS hunk compiled replayer
+    'hd',    // HowieDavies — AmigaDOS hunk compiled replayer
+    'tw',    // Thomas Weber — 68k BRA code compiled replayer
+    'dz',    // DariusZendeh — 68k MOVEM prolog compiled replayer
+    'bss',   // BeathovenSynthesizer — AmigaDOS hunk compiled replayer
+    'scn',   // SeanConnolly — 68k BRA code compiled replayer
+    'scumm', // SCUMM — 68k compiled replayer (ManiacMansion music)
   ]);
   if (mode === 'enhanced' && FORCE_CLASSIC_FORMATS.has(ext)) {
     console.log(`[UADEParser] ${ext.toUpperCase()} uses compiled replayer; forcing classic UADESynth streaming`);
     return buildClassicSong(songName, ext, filename, buffer, metadata, activeScanRows, periodToNoteIndex);
+  }
+
+  const FORCE_CLASSIC_PREFIXES = new Set<string>([
+    'fw',    // ForgottenWorlds — enhanced scan produces silent output; classic streaming required
+    'sas',   // SonicArranger prefix-form — enhanced scan crashes browser
+    'spl',   // SoundProgrammingLanguage — compiled replayer, enhanced scan gives wrong audio
+    'riff',  // RiffRaff — compiled replayer, enhanced scan gives wrong audio
+    'hd',    // HowieDavies — compiled replayer, enhanced scan gives wrong audio
+    'tw',    // Thomas Weber — compiled replayer (BRA code)
+    'dz',    // Darius Zendeh — compiled replayer (MOVEM prolog)
+    'bss',   // Beathoven Synthesizer — AmigaDOS hunk binary
+    'scn',   // Sean Connolly — compiled replayer (BRA code)
+    'scumm', // SCUMM music — compiled replayer
+    'dns',   // Dynamic Synthesizer — compiled replayer (BRA code)
+    'mk2', 'mkii', // MarkII — compiled 68k replayer, MOVEM prolog
+  ]);
+  if (mode === 'enhanced' && FORCE_CLASSIC_PREFIXES.has(prefix)) {
+    console.log(`[UADEParser] ${prefix.toUpperCase()} uses prefix form; forcing classic UADESynth streaming`);
+    return buildClassicSong(songName, prefix, filename, buffer, metadata, activeScanRows, periodToNoteIndex);
   }
 
   // Synthesis-based formats use short macro-driven waveforms (16-32 bytes) that the
@@ -1020,9 +1106,12 @@ export async function parseUADEFile(
             // After the first sample pass, Paula reloads lc to (ptr + loopStart).
             // Without this alias, tick snapshots during looped playback would fail
             // the instrument lookup and produce instrument = 0 in pattern rows.
-            const loopStart = inst.sample?.loopStart;
-            if (loopStart != null && loopStart > 0) {
-              samplePtrToInstrIndex.set(ptr + loopStart, instrIdx);
+            // Use the raw enhanced scan loopStart (unscaled byte offset from chip
+            // RAM base) rather than inst.sample.loopStart which is a scaled PCM
+            // frame count after upsampling.
+            const rawLoopStart = activeEnhancedScan.samples[ptr]?.loopStart;
+            if (rawLoopStart != null && rawLoopStart > 0) {
+              samplePtrToInstrIndex.set(ptr + rawLoopStart, instrIdx);
             }
           }
         });
@@ -1678,18 +1767,39 @@ function buildEnhancedSong(
     const rawRate = sample.typicalPeriod > 0
       ? Math.round(3546895 / sample.typicalPeriod)
       : 8287;
-    // Clamp to valid Web Audio API range (8000–96000 Hz)
-    const sampleRate = Math.max(8000, Math.min(96000, rawRate));
 
     // Reconstruct Uint8Array from transferred data
-    const pcm = sample.pcm instanceof Uint8Array
+    let pcm = sample.pcm instanceof Uint8Array
       ? sample.pcm
       : new Uint8Array(sample.pcm);
 
+    // Upsample low-rate captures to the Amiga standard rate (8363 Hz).
+    // Formats like Maniacs of Noise play samples at low periods (high period values)
+    // giving capture rates as low as ~2750 Hz.  Storing at that rate means the
+    // ToneEngine must apply playbackRate << 1 for normal notes, which causes
+    // interpolation artefacts (beepy/clicky timbre).  Upsampling to 8363 Hz brings
+    // the playback ratio close to 1.0 for typical notes and produces cleaner audio.
+    // Also clamp to Web Audio API maximum (96000 Hz) for very high-pitch captures.
+    let sampleRate: number;
+    if (rawRate < AMIGA_STANDARD_RATE) {
+      pcm = linearUpsample(pcm, rawRate, AMIGA_STANDARD_RATE);
+      sampleRate = AMIGA_STANDARD_RATE;
+    } else {
+      sampleRate = Math.min(96000, rawRate);
+    }
+
     // Clamp loopEnd to pcm.length — wlen from DMA can exceed extracted bytes if sample
     // was truncated by MEM_READ_BUF_SIZE during capture.
+    // When PCM was upsampled, scale loop positions by the same ratio.
+    const upsampleRatio = sampleRate / rawRate;
+    const scaledLoopStart = rawRate < AMIGA_STANDARD_RATE
+      ? Math.round(sample.loopStart * upsampleRatio)
+      : sample.loopStart;
     const rawLoopEnd = sample.loopLength > 0 ? sample.loopStart + sample.loopLength : 0;
-    const loopEnd = rawLoopEnd > 0 ? Math.min(rawLoopEnd, pcm.length) : 0;
+    const scaledLoopEnd = rawLoopEnd > 0
+      ? (rawRate < AMIGA_STANDARD_RATE ? Math.round(rawLoopEnd * upsampleRatio) : rawLoopEnd)
+      : 0;
+    const loopEnd = scaledLoopEnd > 0 ? Math.min(scaledLoopEnd, pcm.length) : 0;
 
     // Use extracted name if available; otherwise build contextual label
     const extractedName = extractedNames?.[instrId - 1];
@@ -1702,7 +1812,7 @@ function buildEnhancedSong(
       pcm,
       64, // Full volume
       sampleRate,
-      sample.loopStart,
+      scaledLoopStart,
       loopEnd,
     );
     // Attach chip RAM address so SampleEditor can call write-back after edits.
