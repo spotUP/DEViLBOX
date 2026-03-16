@@ -330,14 +330,15 @@ export async function parseTCBTrackerFile(
 
         // Note decoding: high nibble = octave (1-3), low nibble = semitone (0-11)
         // noteOffset from amigaFreqs flag: 3 for non-Amiga freqs, 0 for Amiga freqs.
-        // Matches OpenMPT: m.note = NOTE_MIDDLEC-24 + octave*12 + semitone + noteOffset
-        //   → DEViLBOX note = OpenMPT note - 36 = octave*12 + semitone + 1 + noteOffset
+        // OpenMPT: m.note = NOTE_MIDDLEC-24 + octave*12 + semitone + noteOffset
+        //        = 37 + octave*12 + semitone + noteOffset
+        // DEViLBOX note = OpenMPT note - 12 = 25 + octave*12 + semitone + noteOffset
         let xmNote = 0;
         if (noteByte >= 0x10 && noteByte <= 0x3B) {
           const octave = noteByte >> 4;
           const semitone = noteByte & 0x0F;
           if (semitone < 12) {
-            xmNote = octave * 12 + semitone + 1 + noteOffset;
+            xmNote = octave * 12 + semitone + 25 + noteOffset;
           }
         }
 
