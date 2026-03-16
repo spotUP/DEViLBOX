@@ -195,8 +195,8 @@ export async function parseQuadraComposerFile(
             continue;
           }
 
-          const note = u8(view, p);
-          const ins  = u8(view, p + 1);
+          const ins  = u8(view, p);     // byte 0 = SampleNr
+          const note = u8(view, p + 1); // byte 1 = NoteNr
           const fxt  = u8(view, p + 2) & 0x0F;
           let   fxp  = u8(view, p + 3);
           p += 4;
