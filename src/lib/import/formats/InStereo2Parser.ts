@@ -589,7 +589,10 @@ export function parseInStereo2File(bytes: Uint8Array, filename: string): Tracker
   }
 
   const moduleName = filename.replace(/\.[^/.]+$/, '');
-  const tempo = song.tempo > 0 ? song.tempo : 50;
+  const tempoHz = song.tempo > 0 ? song.tempo : 50;
+  // InStereo2 tempo is in Hz (like SonicArranger). Convert to tracker BPM:
+  // BPM = tempoHz * 125 / 50 (same formula as UADE ASM: mulu #125 / divu #50)
+  const tempo = Math.max(32, Math.min(255, Math.round(tempoHz * 125 / 50)));
 
   // Build uadePatternLayout with getCellFileOffset for track row indirection
   const uadePatternLayout: UADEPatternLayout = {
