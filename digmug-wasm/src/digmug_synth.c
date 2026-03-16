@@ -48,7 +48,7 @@
 
 #define DM_WAVE_MAX    128
 #define DM_ARP_SIZE     8
-#define MAX_PLAYERS     8
+#define MAX_PLAYERS     64
 
 /* ── Instrument structure ───────────────────────────────────────────────────── */
 
