@@ -1960,6 +1960,11 @@ export async function tryRouteFormat(
     const { parseUADEFile: parseUADE_scumm } = await import('@lib/import/formats/UADEParser');
     return parseUADE_scumm(buffer, toUADEPrefixName(originalFileName, ['scumm']), 'classic', subsong, preScannedMeta);
   }
+  // AProSys (APS.* prefix) — ADRVPACK compressed; enhanced scan reads garbage from packed binary
+  if (matchesExt(filename, ['aps'])) {
+    const { parseUADEFile: parseUADE_aps } = await import('@lib/import/formats/UADEParser');
+    return parseUADE_aps(buffer, toUADEPrefixName(originalFileName, ['aps']), 'classic', subsong, preScannedMeta);
+  }
   // Enhanced-scan capable formats (UADE_ONLY_PREFIXES) → enhanced scan:
   if (matchesExt(filename, ['mok'])) {
     const { parseUADEFile: parseUADE_mok } = await import('@lib/import/formats/UADEParser');

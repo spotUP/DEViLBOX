@@ -473,6 +473,7 @@ export async function parseUADEFile(
     'bss',   // BeathovenSynthesizer — AmigaDOS hunk, enhanced scan gives wrong audio
     'scn',   // SeanConnolly — 68k BRA code, enhanced scan gives wrong audio
     'scumm', // SCUMM — 68k compiled replayer, enhanced scan gives wrong audio
+    'aps',   // AProSys — ADRVPACK-packed binary; scan produces garbage rows
   ]);
   const SKIP_SCAN_PREFIXES = new Set(['dl', 'dl_deli', 'dln', 'rh',
     'sas',   // SonicArranger prefix-form — enhanced scan crashes browser
@@ -486,8 +487,11 @@ export async function parseUADEFile(
     'scumm', // SCUMM music — compiled replayer
     'dns',   // Dynamic Synthesizer — compiled replayer (BRA code)
     'mk2', 'mkii', // MarkII — compiled 68k (MOVEM prolog); test file atron.mk2 confirmed
+    'aps',   // AProSys — ADRVPACK-packed binary; scan produces garbage rows
   ]);
-  const skipScan = mode === 'enhanced' && (SKIP_SCAN_EXTS.has(ext) || SKIP_SCAN_PREFIXES.has(prefix));
+  // SKIP_SCAN formats are compiled/packed binaries where the Paula register scan either
+  // hangs indefinitely or produces garbage rows. Skip scan regardless of mode.
+  const skipScan = SKIP_SCAN_EXTS.has(ext) || SKIP_SCAN_PREFIXES.has(prefix);
 
   const metadata = preScannedMeta ?? await engine.load(buffer, filename, skipScan);
   const scanRows = metadata.scanData ?? [];
@@ -967,6 +971,7 @@ export async function parseUADEFile(
     'bss',   // BeathovenSynthesizer — AmigaDOS hunk compiled replayer
     'scn',   // SeanConnolly — 68k BRA code compiled replayer
     'scumm', // SCUMM — 68k compiled replayer (ManiacMansion music)
+    'aps',   // AProSys — ADRVPACK-compressed format; enhanced scan reads garbage from packed binary
   ]);
   if (mode === 'enhanced' && FORCE_CLASSIC_FORMATS.has(ext)) {
     console.log(`[UADEParser] ${ext.toUpperCase()} uses compiled replayer; forcing classic UADESynth streaming`);
