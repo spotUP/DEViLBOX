@@ -552,7 +552,7 @@ export async function parseDigitalMugicianFile(
           sample: {
             url: sampleUrl,
             sampleRate: 8363,
-            baseNote: 'C-4',
+            baseNote: 'C4',
             detune: 0,
             loop: loopEnabled,
             loopType: loopEnabled ? 'forward' as const : 'off' as const,
