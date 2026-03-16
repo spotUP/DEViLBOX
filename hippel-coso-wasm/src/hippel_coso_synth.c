@@ -46,7 +46,7 @@
 
 /* ── Constants ─────────────────────────────────────────────────────────────── */
 
-#define MAX_PLAYERS      8
+#define MAX_PLAYERS      32
 #define TICKS_PER_SEC    50     /* Amiga 50 Hz timer */
 #define MAX_SEQ_LEN      1024   /* max fseq / vseq length */
 

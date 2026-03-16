@@ -1182,9 +1182,13 @@ export const useInstrumentStore = create<InstrumentStore>()(
 
         // Sanitize out-of-range or duplicate IDs to valid 1-128 range
         if (completeInst.id < 1 || completeInst.id > 128 || usedIds.has(completeInst.id)) {
-          let newId = 1;
+          let newId = -1; // sentinel: no available slot
           for (let id = 1; id <= 128; id++) {
             if (!usedIds.has(id)) { newId = id; break; }
+          }
+          if (newId === -1) {
+            // All 128 slots exhausted — skip this instrument to prevent duplicate key collisions
+            return null;
           }
           completeInst.id = newId;
         }
@@ -1209,7 +1213,7 @@ export const useInstrumentStore = create<InstrumentStore>()(
             category: effect.category || ('tonejs' as const),
           })) || [],
         };
-      });
+      }).filter((inst): inst is NonNullable<typeof inst> => inst !== null);
 
       // Defer state update to avoid synchronous pixi-react reconciler re-render
       // during zustand setState — prevents BindingError: "Expected null or instance of Node"
