@@ -78,6 +78,7 @@ export type DJAction =
   | 'scratch_a' | 'scratch_b'
   // Tracker scratch patterns (work without DJ engine)
   | 'tracker_fader_cut' | 'tracker_fader_cut_on' | 'tracker_fader_cut_off'
+  | 'tracker_fader_gain'
   | 'tracker_scratch_trans' | 'tracker_scratch_crab' | 'tracker_scratch_flare'
   | 'tracker_scratch_chirp' | 'tracker_scratch_stab' | 'tracker_scratch_8crab'
   | 'tracker_scratch_twdl' | 'tracker_scratch_stop';

@@ -112,6 +112,14 @@ export class DeckScratchBuffer {
   // CAPTURE CONTROL
   // ==========================================================================
 
+  /** Reset the ring buffer — call when a new song starts so stale audio from
+   *  a previous song is never played back during scratch. Zeros the buffer,
+   *  resets write position, and clears the totalWritten counter. */
+  resetCapture(): void {
+    if (!this.initialized) return;
+    this.captureNode.port.postMessage({ type: 'reset' });
+  }
+
   /** Freeze capture — stops writing so the buffer becomes a fixed record. */
   freezeCapture(): void {
     if (!this.initialized) return;
