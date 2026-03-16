@@ -48,6 +48,7 @@ import {
   getVoiceState,
   getInstrumentLevel,
   getLoadedSynths,
+  getConsoleErrors,
 } from './handlers/readHandlers';
 import {
   setCell,
@@ -147,6 +148,8 @@ import {
   exportPatternText,
   exportMidi,
   exportMod,
+  clearConsoleErrors,
+  evaluateScript,
 } from './handlers/writeHandlers';
 import { analyzeSongHandler } from './handlers/analysisHandlers';
 import { generatePattern, transformPattern } from './handlers/generatorHandlers';
@@ -357,6 +360,11 @@ const handlers: Record<string, Handler> = {
   export_pattern_text: exportPatternText,
   export_midi: exportMidi,
   export_mod: exportMod,
+
+  // ─── Console Capture ────────────────────────────────────────────────────
+  get_console_errors: () => getConsoleErrors(),
+  clear_console_errors: () => clearConsoleErrors(),
+  evaluate_script: evaluateScript,
 };
 
 let ws: WebSocket | null = null;
