@@ -933,19 +933,46 @@ connectSSE();
 function applyUpdates(updates) {
   let count = 0;
   for (const [key, data] of Object.entries(updates)) {
-    savedState[key] = data;
+    savedState[key] = { ...(savedState[key] || {}), ...data };
     count++;
     // Update DOM directly if row exists (avoid full re-render)
     const row = document.querySelector(`tr[data-key="${key}"]`);
     if (row) {
+      // Standard status dropdown (non-audit rows)
       const sel = row.querySelector('select');
-      if (sel && sel.value !== data.status) {
+      if (sel && data.status !== undefined && sel.value !== data.status) {
         sel.value = data.status;
         sel.className = 'status-select ' + statusClass(data.status);
       }
+      // Notes input
       const inp = row.querySelector('input');
-      if (inp && inp !== document.activeElement) {
+      if (inp && inp !== document.activeElement && data.notes !== undefined) {
         inp.value = data.notes || '';
+      }
+    }
+    // Console audit badge (works/crashes/pageCrash) — audit rows only
+    if (data.consoleAuditStatus !== undefined) {
+      const badge = document.querySelector(`[data-console-badge="${key}"]`);
+      if (badge) {
+        badge.textContent = data.consoleAuditStatus;
+        badge.style.color = CONSOLE_AUDIT_COLORS[data.consoleAuditStatus] || 'var(--dim)';
+      }
+    }
+    // EnvCorr bar update — re-render just the bar cell if envCorr arrived
+    if (data.envCorr !== undefined && row) {
+      const PASS_THRESHOLD = 0.90;
+      const envCorr = data.envCorr;
+      const barColor = envCorr >= PASS_THRESHOLD ? 'var(--green)' : envCorr >= 0.80 ? 'var(--yellow)' : 'var(--red)';
+      const barPct = Math.max(0, Math.min(100, envCorr * 100)).toFixed(1);
+      const rmsText = typeof data.rmsDbDiff === 'number' ? ` (${data.rmsDbDiff > 0 ? '+' : ''}${data.rmsDbDiff.toFixed(1)}dB)` : '';
+      const passColor = envCorr >= PASS_THRESHOLD ? 'var(--green)' : 'var(--red)';
+      const passText = envCorr >= PASS_THRESHOLD ? 'PASS' : 'FAIL';
+      const cells = row.querySelectorAll('td');
+      if (cells[2]) cells[2].innerHTML = `<div style="display:flex;align-items:center;gap:6px"><div style="flex:1;background:#1a2a4a;border-radius:3px;height:10px;position:relative"><div style="width:${barPct}%;background:${barColor};height:100%;border-radius:3px;min-width:2px"></div><div style="position:absolute;left:90%;top:-2px;width:2px;height:14px;background:#fff;opacity:0.4"></div></div></div><span style="color:${barColor};font-size:11px">${envCorr.toFixed(4)}${rmsText}</span>`;
+      if (cells[3]) {
+        const badge = cells[3].querySelector('[data-console-badge]');
+        const badgeHtml = badge ? badge.outerHTML : '';
+        cells[3].innerHTML = `<span style="color:${passColor};font-weight:bold;font-size:12px">${passText}</span>${badgeHtml}`;
       }
     }
   }
@@ -1044,9 +1071,11 @@ const AUDIT_FAMILIES = new Set(['furnace-audit-nes', 'furnace-audit-gb', 'furnac
 const AUDIT_STATUS_OPTIONS = ['untested','investigating','fixed','known-issue','wont-fix'];
 const AUDIT_STATUS_COLORS = { untested: 'var(--dim)', investigating: '#22d3ee', fixed: 'var(--green)', 'known-issue': 'var(--yellow)', 'wont-fix': 'var(--dim)' };
 
+const CONSOLE_AUDIT_COLORS = { works: 'var(--green)', crashes: '#ef4444', pageCrash: '#f97316', fail: 'var(--yellow)' };
+
 function renderAuditTable(fmts) {
   const PASS_THRESHOLD = 0.90;
-  let html = '<table><colgroup><col style="width:200px"><col style="width:80px"><col style="width:200px"><col style="width:70px"><col style="width:140px"><col></colgroup><tr><th>Song</th><th>Chips</th><th>EnvCorr (threshold 0.90)</th><th>Score</th><th>Status</th><th>Notes</th></tr>';
+  let html = '<table><colgroup><col style="width:200px"><col style="width:80px"><col style="width:200px"><col style="width:90px"><col style="width:140px"><col></colgroup><tr><th>Song</th><th>Chips</th><th>EnvCorr (threshold 0.90)</th><th>Score</th><th>Status</th><th>Notes</th></tr>';
   fmts.forEach(f => {
     const st = savedState[f.key] || {};
     const envCorr = typeof st.envCorr === 'number' ? st.envCorr : null;
@@ -1065,11 +1094,15 @@ function renderAuditTable(fmts) {
     </div>` : '<span style="color:var(--dim)">not tested</span>';
     const auditStatus = st.auditStatus || 'untested';
     const auditColor = AUDIT_STATUS_COLORS[auditStatus] || 'var(--dim)';
+    // Console audit badge (works/crashes/pageCrash — set by console-audit.ts or wav-compare-audit.ts)
+    const consoleAs = st.consoleAuditStatus || '';
+    const consoleBadgeColor = CONSOLE_AUDIT_COLORS[consoleAs] || 'var(--dim)';
+    const consoleBadge = `<span data-console-badge="${f.key}" style="font-size:10px;font-weight:bold;color:${consoleBadgeColor};margin-left:4px">${consoleAs}</span>`;
     html += `<tr data-key="${f.key}">
       <td class="fmt-label">${f.label}</td>
       <td class="ext" style="color:var(--purple);font-size:11px">${f.chips || '?'}</td>
       <td>${barHtml}<span style="color:${barColor};font-size:11px">${envLabel}${rmsText}</span></td>
-      <td style="color:${passColor};font-weight:bold;font-size:12px">${passText}</td>
+      <td style="color:${passColor};font-weight:bold;font-size:12px">${passText}${consoleBadge}</td>
       <td><select class="status-select" style="color:${auditColor};border-color:${auditColor};width:130px" onchange="handleAuditStatus('${f.key}', this)">
         ${AUDIT_STATUS_OPTIONS.map(s => `<option value="${s}" ${s===auditStatus?'selected':''}>${s}</option>`).join('')}
       </select></td>
@@ -1173,15 +1206,23 @@ function updateStats() {
   const nonAuditFmts = FORMATS.filter(f => !AUDIT_FAMILIES.has(f.family));
   nonAuditFmts.forEach(f => counts[getState(f.key).status]++);
 
-  // Audit pass/fail counts
+  // EnvCorr pass/fail counts (wav comparison audit)
   const PASS_THRESHOLD = 0.90;
   const auditFmts = FORMATS.filter(f => AUDIT_FAMILIES.has(f.family));
-  let auditPass = 0, auditFail = 0, auditUntested = 0;
+  let auditPass = 0, auditFail = 0;
   auditFmts.forEach(f => {
     const st = savedState[f.key] || {};
     if (typeof st.envCorr === 'number') {
       if (st.envCorr >= PASS_THRESHOLD) auditPass++; else auditFail++;
-    } else auditUntested++;
+    }
+  });
+
+  // Console audit counts (works/crashes from consoleAuditStatus field)
+  let consoleWorks = 0, consoleCrashes = 0, consoleTested = 0;
+  auditFmts.forEach(f => {
+    const as = (savedState[f.key] || {}).consoleAuditStatus;
+    if (as === 'works') { consoleWorks++; consoleTested++; }
+    else if (as === 'crashes' || as === 'pageCrash' || as === 'fail') { consoleCrashes++; consoleTested++; }
   });
 
   const colors = { untested: 'var(--dim)', works: 'var(--green)', partial: 'var(--yellow)', broken: 'var(--red)', silent: '#f97316', 'wrong-synth': 'var(--purple)', crashes: '#ef4444' };
@@ -1191,8 +1232,13 @@ function updateStats() {
     html += `<div class="stat"><div class="stat-val" style="color:${colors[s]}">${counts[s]}</div><div class="stat-label">${s}</div></div>`;
   });
   html += `<div class="stat"><div class="stat-val" style="color:var(--accent)">${nonAuditFmts.length}</div><div class="stat-label">formats</div></div>`;
-  html += `<div class="stat"><div class="stat-val" style="color:var(--green)">${auditPass}</div><div class="stat-label">chip pass</div></div>`;
-  html += `<div class="stat"><div class="stat-val" style="color:var(--red)">${auditFail}</div><div class="stat-label">chip fail</div></div>`;
+  html += `<div class="stat"><div class="stat-val" style="color:var(--green)">${auditPass}</div><div class="stat-label">env pass</div></div>`;
+  html += `<div class="stat"><div class="stat-val" style="color:var(--red)">${auditFail}</div><div class="stat-label">env fail</div></div>`;
+  if (consoleTested > 0) {
+    html += `<div class="stat"><div class="stat-val" style="color:var(--green)">${consoleWorks}</div><div class="stat-label">console ✓</div></div>`;
+    html += `<div class="stat"><div class="stat-val" style="color:#ef4444">${consoleCrashes}</div><div class="stat-label">console ✗</div></div>`;
+    html += `<div class="stat"><div class="stat-val" style="color:var(--dim)">${auditFmts.length - consoleTested}</div><div class="stat-label">untested</div></div>`;
+  }
   document.getElementById('stats').innerHTML = html;
 }
 
