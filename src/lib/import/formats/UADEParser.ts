@@ -463,6 +463,7 @@ export async function parseUADEFile(
   const prefix = filename.split('.')[0]?.toLowerCase() ?? '';
   const SKIP_SCAN_EXTS = new Set(['jpo', 'jpold', 'rh', 'rhp',
     'mon',  // ManiacsOfNoise — enhanced scan crashes browser
+    'sa',   // SonicArranger compiled binary variant — JSR prolog, enhanced scan hangs
   ]);
   const SKIP_SCAN_PREFIXES = new Set(['dl', 'dl_deli', 'dln', 'rh',
     'sas',   // SonicArranger prefix-form — enhanced scan crashes browser
@@ -946,6 +947,7 @@ export async function parseUADEFile(
   const FORCE_CLASSIC_FORMATS = new Set<string>([
     'jpo', 'jpold',   // SteveTurner — compiled replayer, UADE streaming required for correct audio
     'mon',            // ManiacsOfNoise — enhanced scan crashes browser
+    'sa',             // SonicArranger compiled binary variant — JSR prolog code
   ]);
   if (mode === 'enhanced' && FORCE_CLASSIC_FORMATS.has(ext)) {
     console.log(`[UADEParser] ${ext.toUpperCase()} uses compiled replayer; forcing classic UADESynth streaming`);
