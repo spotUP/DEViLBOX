@@ -1973,31 +1973,27 @@ export async function exportMidi(params: Record<string, unknown>): Promise<Recor
 /** Export the loaded song to ProTracker MOD format, returning base64-encoded data */
 export async function exportMod(params: Record<string, unknown>): Promise<Record<string, unknown>> {
   try {
-    const bakeSynths = (params.bakeSynths as boolean) ?? true;
+    const format = ((params.format as string) ?? 'mod') as 'mod' | 'xm' | 'it' | 's3m';
 
     const trackerState = useTrackerStore.getState();
     const instrumentState = useInstrumentStore.getState();
     const transportState = (await import('../../stores/useTransportStore')).useTransportStore.getState();
     const projectState = useProjectStore.getState();
 
-    const nChannels = trackerState.patterns[0]?.channels.length ?? 4;
-    const song: import('../../engine/TrackerReplayer').TrackerSong = {
-      name: projectState.metadata?.name ?? 'Untitled',
-      format: 'MED',
-      patterns: trackerState.patterns,
-      instruments: instrumentState.instruments,
-      songPositions: trackerState.patternOrder,
-      songLength: trackerState.patternOrder.length,
-      restartPosition: 0,
-      numChannels: nChannels,
-      initialSpeed: transportState.speed,
-      initialBPM: transportState.bpm,
-    };
+    const { exportWithOpenMPT } = await import('../../lib/export/OpenMPTExporter');
+    const result = await exportWithOpenMPT(
+      trackerState.patterns,
+      instrumentState.instruments,
+      trackerState.patternOrder,
+      {
+        format,
+        moduleName: projectState.metadata?.name ?? 'Untitled',
+        initialBPM:   transportState.bpm,
+        initialSpeed: transportState.speed,
+      },
+    );
 
-    const { exportSongToMOD } = await import('../../lib/export/modExport');
-    const result = await exportSongToMOD(song, { bakeSynths });
-
-    const arrayBuf = await result.blob.arrayBuffer();
+    const arrayBuf = await result.data.arrayBuffer();
     const bytes = new Uint8Array(arrayBuf);
     let binary = '';
     const CHUNK = 8192;
@@ -2010,9 +2006,6 @@ export async function exportMod(params: Record<string, unknown>): Promise<Record
       ok: true,
       filename: result.filename,
       sizeBytes: arrayBuf.byteLength,
-      instrumentCount: result.instrumentCount,
-      patternCount: result.patternCount,
-      orderCount: result.orderCount,
       warnings: result.warnings,
       modBase64: base64,
     };

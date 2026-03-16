@@ -459,6 +459,96 @@ function readITSample(
   };
 }
 
+// ── Effect / volume mapping ───────────────────────────────────────────────────
+
+/**
+ * Map IT volume column byte to XM volume column encoding.
+ *
+ * IT volume column byte ranges:
+ *   0-64:    Set volume          → XM 0x10-0x50
+ *   65-74:   Fine volume up      → XM 0x90-0x99
+ *   75-84:   Fine volume down    → XM 0x80-0x89
+ *   85-94:   Volume slide up     → XM 0x70-0x79
+ *   95-104:  Volume slide down   → XM 0x60-0x69
+ *   105-114: Portamento down     → dropped (no XM vol-col equiv)
+ *   115-124: Portamento up       → dropped
+ *   128-192: Set panning 0-64    → XM 0xC0-0xCF
+ *   193-202: Vibrato speed       → XM 0xA0-0xA9
+ *   203-212: Vibrato depth       → XM 0xB0-0xB9
+ */
+function mapITVolume(rawVol: number): number {
+  if (rawVol <= 64)  return 0x10 + rawVol;
+  if (rawVol <= 74)  return 0x90 | (rawVol - 65);
+  if (rawVol <= 84)  return 0x80 | (rawVol - 75);
+  if (rawVol <= 94)  return 0x70 | (rawVol - 85);
+  if (rawVol <= 104) return 0x60 | (rawVol - 95);
+  if (rawVol >= 128 && rawVol <= 192) return 0xC0 | Math.round((rawVol - 128) * 15 / 64);
+  if (rawVol >= 193 && rawVol <= 202) return 0xA0 | (rawVol - 193);
+  if (rawVol >= 203 && rawVol <= 212) return 0xB0 | (rawVol - 203);
+  return 0;
+}
+
+/**
+ * Map IT effect command byte (A=1..Z=26) and param to XM-compatible effTyp/eff.
+ * IT and S3M share the same A-Z effect command namespace.
+ * Returns [xmEffTyp, xmEff]; [0,0] = no effect (dropped).
+ *
+ * Reference: OpenMPT Load_it.cpp, S3MTools.cpp.
+ */
+function mapITEffect(cmd: number, param: number): [number, number] {
+  switch (cmd) {
+    case  0: return [0, 0];
+    case  1: return [0x0F, param];                         // A: set speed → Fxx
+    case  2: return [0x0B, param];                         // B: position jump
+    case  3: return [0x0D, param];                         // C: pattern break
+    case  4: return [0x0A, param];                         // D: volume slide
+    case  5:                                               // E: portamento down
+      if (param >= 0xF0) return [0x0E, 0x20 | (param & 0x0F)]; // EFx → E2x fine
+      if (param >= 0xE0) return [0x21, 0x20 | (param & 0x0F)]; // EEx → extra fine
+      return [0x02, param];
+    case  6:                                               // F: portamento up
+      if (param >= 0xF0) return [0x0E, 0x10 | (param & 0x0F)]; // FFx → E1x fine
+      if (param >= 0xE0) return [0x21, 0x10 | (param & 0x0F)]; // FEx → extra fine
+      return [0x01, param];
+    case  7: return [0x03, param];                         // G: tone portamento
+    case  8: return [0x04, param];                         // H: vibrato
+    case  9: return [0x1D, param];                         // I: tremor
+    case 10: return [0x00, param];                         // J: arpeggio
+    case 11: return [0x06, param];                         // K: vibrato + vol slide
+    case 12: return [0x05, param];                         // L: tone porta + vol slide
+    case 13: return [0, 0];                                // M: channel volume (no XM equiv)
+    case 14: return [0, 0];                                // N: channel vol slide (no XM equiv)
+    case 15: return [0x09, param];                         // O: sample offset
+    case 16: return [0, 0];                                // P: set envelope position (no XM equiv)
+    case 17: return [0x0E, 0x90 | (param & 0x0F)];        // Q: retrig → E9x
+    case 18: return [0x07, param];                         // R: tremolo
+    case 19: {                                             // S: extended sub-commands
+      const sub = (param >> 4) & 0x0F;
+      const val =  param       & 0x0F;
+      switch (sub) {
+        case 0x3: return [0x0E, 0x30 | val]; // S3x → E3x glissando
+        case 0x4: return [0x0E, 0x40 | val]; // S4x → E4x vibrato waveform
+        case 0x5: return [0x0E, 0x50 | val]; // S5x → E5x finetune
+        case 0x6: return [0x0E, 0x60 | val]; // S6x → E6x pattern loop
+        case 0x8: return [0x0E, 0x80 | val]; // S8x → E8x set panning (coarse)
+        case 0xC: return [0x0E, 0xC0 | val]; // SCx → ECx note cut
+        case 0xD: return [0x0E, 0xD0 | val]; // SDx → EDx note delay
+        case 0xE: return [0x0E, 0xE0 | val]; // SEx → EEx pattern delay
+        default:  return [0, 0];
+      }
+    }
+    case 20:                                               // T: set tempo (BPM ≥ 32)
+      return param >= 0x20 ? [0x0F, param] : [0, 0];
+    case 21: return [0x04, param];                         // U: fine vibrato (approx as vibrato)
+    case 22: return [0x10, param];                         // V: global volume
+    case 23: return [0x11, param];                         // W: global vol slide
+    case 24: return [0x08, Math.min(255, param << 1)];     // X: set pan 0-127 → 0-255
+    case 25: return [0x19, param];                         // Y: panbrello
+    case 26: return [0, 0];                                // Z: MIDI (drop)
+    default: return [0, 0];
+  }
+}
+
 // ── Pattern decoder ───────────────────────────────────────────────────────────
 
 /**
@@ -529,14 +619,12 @@ function decodeITPattern(
     }
 
     if (mask & 0x04) {
-      volume       = rowData[pos++];
+      volume       = mapITVolume(rowData[pos++]);
       lastVol[ch]  = volume;
-      // Volume column: 0-64 = set volume; 65+ = volume commands (stored as-is)
     }
 
     if (mask & 0x08) {
-      effTyp          = rowData[pos++];
-      eff             = rowData[pos++];
+      [effTyp, eff]   = mapITEffect(rowData[pos++], rowData[pos++]);
       lastEffTyp[ch]  = effTyp;
       lastEff[ch]     = eff;
     }
