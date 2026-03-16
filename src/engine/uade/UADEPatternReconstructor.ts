@@ -238,18 +238,25 @@ export function reconstructPatterns(
       if (firstSnap && ch < firstSnap.channels.length) {
         const state = firstSnap.channels[ch];
 
-        // Only emit a note if DMA is active and period is valid
-        if (state.dmaEn && state.period > 0) {
-          // A loop reload changes lc from sample_start to loop_start_addr, but
-          // the instrument is the same and the period is unchanged — treat it as
-          // "held" so we don't emit a spurious note event every sample loop.
+        // Use DMA restart detection (triggered flag) as primary note-on signal.
+        // Fallback: if triggered is never set (old WASM without DMA detection),
+        // use the legacy heuristic of period+LC change detection.
+        const hasTriggered = state.triggered === 1;
+        const hasDma = state.dmaEn !== 0 && state.period > 0;
+
+        if (hasDma) {
+          // Legacy heuristic: detect held notes by comparing period + instrument
           const currInstr = samplePtrToInstrIndex.get(state.lc) ?? 0;
           const prevInstr = samplePtrToInstrIndex.get(prevLc[ch]) ?? 0;
           const sameInstrument = currInstr !== 0 && currInstr === prevInstr;
-          const isHeld = state.period === prevPeriod[ch] &&
+          const isHeldLegacy = state.period === prevPeriod[ch] &&
                          (state.lc === prevLc[ch] || sameInstrument);
 
-          if (!isHeld) {
+          // A note is "new" if the WASM triggered flag is set, OR (for old
+          // WASM builds without DMA detection) the legacy heuristic fires.
+          const isNewNote = hasTriggered || !isHeldLegacy;
+
+          if (isNewNote) {
             // Map period → XM note
             const noteInfo = amigaPeriodToNote(state.period);
             if (noteInfo !== null) {

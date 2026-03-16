@@ -74,6 +74,10 @@ static UadeTickSnapshot g_tick_snaps[TICK_SNAP_SIZE];
 static uint32_t         g_tick_snap_write   = 0;
 static uint32_t         g_tick_snap_read    = 0;
 static uint8_t          g_tick_snap_enabled = 0;
+
+/* Per-channel state for DMA restart detection (see uade_wasm_on_cia_a_tick). */
+static uint32_t g_prev_lc[4]  = {0, 0, 0, 0};
+static uint8_t  g_prev_dma[4] = {0, 0, 0, 0};
 /* ------------------------------------------------------------------------- */
 
 /* Called from audio.c AUDx handlers (inside #ifdef UADE_WASM guards). */
@@ -262,6 +266,9 @@ int uade_wasm_load(const uint8_t *data, size_t len, const char *filename_hint) {
     s_pcm_write = 0;
     s_total_frames = 0;
     g_uade_tick_count = 0;
+
+    /* Reset DMA restart detection state */
+    for (int i = 0; i < 4; i++) { g_prev_lc[i] = 0; g_prev_dma[i] = 0; }
 
     /* Write the file to MEMFS using the original filename so UADE can
      * identify the format by filename pattern (e.g. TFMX needs "mdat.*").
@@ -577,7 +584,17 @@ void uade_wasm_on_cia_a_tick(void) {
         snap->channels[ch].lc        = (uint32_t)audio_channel[ch].lc;
         snap->channels[ch].len       = (uint16_t)(audio_channel[ch].len & 0xFFFF);
         snap->channels[ch].dma_en    = dmaen(1 << ch) ? 1 : 0;
-        snap->channels[ch].triggered = 0; /* reserved for future DMA-restart detection */
+
+        /* DMA restart detection: triggered=1 when LC changed or DMA just enabled */
+        uint32_t curr_lc  = snap->channels[ch].lc;
+        uint8_t  curr_dma = snap->channels[ch].dma_en;
+        uint8_t  triggered = 0;
+        if (curr_dma && (curr_lc != g_prev_lc[ch] || !g_prev_dma[ch])) {
+            triggered = 1;
+        }
+        snap->channels[ch].triggered = triggered;
+        g_prev_lc[ch]  = curr_lc;
+        g_prev_dma[ch] = curr_dma;
     }
     g_tick_snap_write++;
 }
