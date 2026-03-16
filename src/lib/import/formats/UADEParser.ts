@@ -474,6 +474,7 @@ export async function parseUADEFile(
     'scn',   // SeanConnolly — 68k BRA code, enhanced scan gives wrong audio
     'scumm', // SCUMM — 68k compiled replayer, enhanced scan gives wrong audio
     'aps',   // AProSys — ADRVPACK-packed binary; scan produces garbage rows
+    'sas',   // SonicArranger suffix-form compiled binary — scan crashes browser
   ]);
   const SKIP_SCAN_PREFIXES = new Set(['dl', 'dl_deli', 'dln', 'rh',
     'sas',   // SonicArranger prefix-form — enhanced scan crashes browser
@@ -972,6 +973,7 @@ export async function parseUADEFile(
     'scn',   // SeanConnolly — 68k BRA code compiled replayer
     'scumm', // SCUMM — 68k compiled replayer (ManiacMansion music)
     'aps',   // AProSys — ADRVPACK-compressed format; enhanced scan reads garbage from packed binary
+    'sas',   // SonicArranger suffix-form compiled binary — enhanced scan crashes browser
   ]);
   if (mode === 'enhanced' && FORCE_CLASSIC_FORMATS.has(ext)) {
     console.log(`[UADEParser] ${ext.toUpperCase()} uses compiled replayer; forcing classic UADESynth streaming`);
