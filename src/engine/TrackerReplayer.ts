@@ -553,6 +553,14 @@ export class TrackerReplayer {
     return this.separationNode.inputTone;
   }
 
+  /** Get the full merged output of the tracker (after stereo separation).
+   *  ALL tracker audio — internal sequencer AND native WASM engines (libopenmpt, UADE, etc.)
+   *  — converges here before reaching ToneEngine.masterInput.
+   *  Use this to mute/unmute the entire tracker output without needing per-engine calls. */
+  getFullOutput(): Tone.Gain {
+    return this.separationNode.outputTone;
+  }
+
   /** Get current song position */
   getSongPos(): number { return this.songPos; }
 
@@ -893,6 +901,12 @@ export class TrackerReplayer {
     if (song.musiclineFileData) {
       preInitMusicLine(song.musiclineFileData);
     }
+
+    // Reset scratch buffer — new song means old captured audio is stale.
+    // Lazy import to avoid circular dependency.
+    import('@/engine/TrackerScratchController').then(({ getTrackerScratchController }) => {
+      getTrackerScratchController().resetScratchBuffer();
+    }).catch(() => { /* scratch not available */ });
 
     // Dispose old channels before creating new ones (prevent Web Audio node leaks)
     for (const ch of this.channels) {
@@ -1308,13 +1322,32 @@ export class TrackerReplayer {
           throw new Error('FurnaceDispatchEngine worklet not initialized');
         }
 
-        // Ensure at least the primary chip is created so the sequencer has a dispatch handle.
-        // The worklet's seqLoadSong links to the first chip — if no chip exists, commands go nowhere.
-        const chipIds = this.song.furnaceNative.chipIds;
-        if (chipIds && chipIds.length > 0 && !dispatchEngine.hasChip(chipIds[0])) {
-          console.log('[TrackerReplayer] WASM seq: creating chip for platform', chipIds[0]);
-          await dispatchEngine.createChip(chipIds[0]);
-          if (gen !== this._playGeneration) return;
+        // Create all chips needed by this song. For multi-chip songs (e.g. 5E01+NAMCO_CUS30)
+        // every secondary chip must also exist or those channels will fall back to the wrong
+        // chip handle and crash with "memory access out of bounds" / "table index out of bounds".
+        // Also destroy chips from the previous song that this song doesn't use, so they don't
+        // accumulate and get rendered unnecessarily.
+        const chipIds = this.song.furnaceNative.chipIds ?? [];
+        const newChipSet = new Set(chipIds);
+
+        // Destroy old chips not needed by new song
+        const oldChipIds = [...(dispatchEngine as any).chips.keys() as IterableIterator<number>];
+        for (const platformType of oldChipIds) {
+          if (!newChipSet.has(platformType)) {
+            console.log('[TrackerReplayer] WASM seq: destroying old chip for platform', platformType);
+            dispatchEngine.destroyChip(platformType);
+          }
+        }
+
+        // Create all chips for new song
+        for (const chipId of chipIds) {
+          if (!dispatchEngine.hasChip(chipId)) {
+            console.log('[TrackerReplayer] WASM seq: creating chip for platform', chipId);
+            await dispatchEngine.createChip(chipId);
+            if (gen !== this._playGeneration) return;
+            await dispatchEngine.waitForChipCreated(chipId);
+            if (gen !== this._playGeneration) return;
+          }
         }
 
         // Ensure the dispatch engine audio output is routed to speakers.
@@ -1509,9 +1542,11 @@ export class TrackerReplayer {
         this._seqPositionUnsub = null;
       }
       try {
-        // Dynamic import is cached — this resolves synchronously after first load
+        // Use cached import — post seqStop directly to the worklet
         import('@engine/furnace-dispatch/FurnaceDispatchEngine').then(({ FurnaceDispatchEngine }) => {
-          FurnaceDispatchEngine.getInstance().seqStop();
+          const eng = FurnaceDispatchEngine.getInstance();
+          eng.seqStop();
+          eng.reset(); // silence all chip voices immediately
         });
       } catch { /* ignored */ }
     }

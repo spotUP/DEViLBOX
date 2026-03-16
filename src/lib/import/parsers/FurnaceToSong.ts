@@ -335,11 +335,15 @@ async function parseFurnaceFileWasm(buffer: ArrayBuffer, _fileName: string, subs
     engine.setModuleSamples(loaded.samples.length > 0 ? loaded.samples : null);
   }
 
-  // Upload to WASM sequencer for native playback
+  // Upload to WASM sequencer for native playback — only if engine is already initialized.
+  // If not yet initialized (no worklet), TrackerReplayer will upload when play is clicked.
   try {
-    const { uploadFurnaceToSequencer } = await import('@/lib/export/FurnaceSequencerSerializer');
-    await uploadFurnaceToSequencer(loaded.nativeData, subsong);
-    console.log('[FurnaceToSong] WASM-parsed song uploaded to WASM sequencer');
+    const { FurnaceDispatchEngine } = await import('@engine/furnace-dispatch/FurnaceDispatchEngine');
+    if (FurnaceDispatchEngine.getInstance().isInitialized) {
+      const { uploadFurnaceToSequencer } = await import('@/lib/export/FurnaceSequencerSerializer');
+      await uploadFurnaceToSequencer(loaded.nativeData, subsong);
+      console.log('[FurnaceToSong] WASM-parsed song uploaded to WASM sequencer');
+    }
   } catch (err) {
     console.warn('[FurnaceToSong] Failed to upload to WASM sequencer:', err);
   }
@@ -466,9 +470,12 @@ async function parseFurnaceFileTS(buffer: ArrayBuffer, _fileName: string, subson
 
   if (result.furnaceNative) {
     try {
-      const { uploadFurnaceToSequencer } = await import('@/lib/export/FurnaceSequencerSerializer');
-      await uploadFurnaceToSequencer(result.furnaceNative, subsong);
-      console.log('[FurnaceToSong] Song uploaded to WASM sequencer (TS fallback)');
+      const { FurnaceDispatchEngine } = await import('@engine/furnace-dispatch/FurnaceDispatchEngine');
+      if (FurnaceDispatchEngine.getInstance().isInitialized) {
+        const { uploadFurnaceToSequencer } = await import('@/lib/export/FurnaceSequencerSerializer');
+        await uploadFurnaceToSequencer(result.furnaceNative, subsong);
+        console.log('[FurnaceToSong] Song uploaded to WASM sequencer (TS fallback)');
+      }
     } catch (err) {
       console.warn('[FurnaceToSong] Failed to upload to WASM sequencer, falling back to TS replayer:', err);
     }
