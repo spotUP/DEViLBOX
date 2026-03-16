@@ -45,6 +45,13 @@ window.addEventListener('error', (event) => {
     return;
   }
 
+  // event.error is null for cross-origin script errors (browser sanitizes them for security)
+  // or when WASM/worker code throws a non-Error value. Log what we can from the event itself.
+  if (event.error == null) {
+    console.warn('[Global] Uncaught script error (cross-origin or non-Error throw):', event.message || '(no message)', event.filename ? `@ ${event.filename}:${event.lineno}` : '');
+    return;
+  }
+
   console.error('[Global] Uncaught error:', event.error);
   // In production, send to error reporting service
 });
