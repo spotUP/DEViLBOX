@@ -114,11 +114,64 @@ Call `get_mcp_help` to see all ~130 tools grouped by category. Optionally filter
 | **Mixer** | `set_channel_volume`, `set_channel_mute`, `solo_channel` | Mix control |
 | **Instruments** | `get_instruments_list`, `get_synth_config`, `update_synth_config` | Synth programming |
 | **Audio Analysis** | `get_audio_analysis`, `get_audio_level`, `wait_for_audio` | Debugging audio |
+| **Console Debugging** | `get_console_errors`, `clear_console_errors`, `play_fur` | Capture browser errors, load+play .fur in one call |
 | **AI Composition** | `analyze_song`, `generate_pattern`, `transform_pattern` | Music generation |
 | **Modland** | `search_modland`, `load_modland` | Search & play 190K+ tracker modules |
 | **HVSC** | `search_hvsc`, `load_hvsc` | Search & play 80K+ C64 SID tunes |
 | **File Loading** | `load_file` | Load any of 188+ music formats from disk |
 | **Batch** | `batch` | Execute multiple tools atomically in sequence |
+
+### Console Debugging — Format Error Triage
+
+Three tools for catching WASM crashes, JS errors, and worklet failures that only appear at runtime:
+
+- **`clear_console_errors`** — wipe the buffer before loading a new file (gets clean per-song errors)
+- **`play_fur(path)`** — load a `.fur` file from disk AND immediately start playback in one call
+- **`get_console_errors`** — returns `{entries: [{level, message, timestamp}]}` of everything captured since last clear
+
+The browser captures: `console.error`, `console.warn`, `window.onerror` (Uncaught:), and `unhandledrejection` (UnhandledRejection:).
+
+**Standard debug loop for a single format:**
+```
+clear_console_errors()
+play_fur("/path/to/song.fur")
+# wait 3-5 seconds
+get_console_errors()   → look for WASM panics, "table index out of bounds", worklet errors
+get_audio_level()      → check for silence (isSilent: true = loaded but no audio)
+```
+
+**Batch audit loop across all .fur demos:**
+```python
+DEMOS = "/Users/spot/Code/DEViLBOX/third-party/furnace-master/demos"
+for chip_dir in os.listdir(DEMOS):
+    for fur_file in glob(f"{DEMOS}/{chip_dir}/*.fur"):
+        clear_console_errors()
+        play_fur(fur_file)
+        sleep(3)
+        errors = get_console_errors()   # crashes = bad
+        level  = get_audio_level()      # isSilent = broken but no crash
+        # → classify as works / crashes / silent
+        # → POST to http://localhost:4444/update
+```
+
+**Updating the format status tracker at localhost:4444:**
+```bash
+curl -X POST http://localhost:4444/update \
+  -H "Content-Type: application/json" \
+  -d '{"key": "fur-nes-demo", "data": {"auditStatus": "fixed", "notes": "works"}}'
+```
+
+The tracker is the source of truth for format audit progress. Load the current state with `GET /get-data`.
+
+### Format Status Tracker — localhost:4444
+
+A live dashboard tracking audio-correlation audit results for all 731 .fur demo files.
+
+- **`GET /get-data`** → full status dict: `{key: {auditStatus, envCorr, chip, song, divergeAt, rmsdB}}`
+- **`POST /update`** → `{key: string, data: {...}}` — update one entry; pushes SSE to all browsers
+- **`POST /push-updates`** → `{updates: {key: data, ...}}` — bulk update many entries at once
+- Keys follow pattern: `fur-<chip>-<song>` (chip = directory name, song = filename lowercased, spaces/dashes stripped)
+- `auditStatus` values: `fixed` | `fail` | `unknown` | `crashes` | `silent`
 
 ### Common Patterns
 
