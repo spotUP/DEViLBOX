@@ -96,8 +96,9 @@ function detectSpeed(snapshots: UADETickSnapshot[], channelCount: number): numbe
 }
 
 /**
- * Detect a simple XM effect from per-tick deltas within a row.
+ * Detect XM effects from per-tick state changes within a row.
  *
+ * Detects: portamento up/down, volume slide, arpeggio, vibrato, retrigger.
  * Returns { effTyp, eff } or zeros if no effect detected.
  */
 function detectEffect(
@@ -111,6 +112,34 @@ function detectEffect(
     .map(s => s.channels[ch]);
 
   if (states.length < 2) return { effTyp: 0, eff: 0 };
+
+  // ── Arpeggio detection ──────────────────────────────────────────────────
+  // Arpeggio cycles through 2-3 distinct period values rapidly (every tick).
+  // XM effect 0 (0x00): xy — x=semitones up, y=semitones up (alternating).
+  const uniquePeriods = new Set(states.filter(s => s.period > 0).map(s => s.period));
+  if (uniquePeriods.size >= 2 && uniquePeriods.size <= 3) {
+    const sorted = [...uniquePeriods].sort((a, b) => b - a); // highest period (lowest pitch) first
+    const basePeriod = sorted[0];  // base note = lowest pitch = highest period
+    // Check if the periods alternate (arpeggio pattern)
+    let isArpeggio = true;
+    for (const s of states) {
+      if (s.period > 0 && !uniquePeriods.has(s.period)) {
+        isArpeggio = false;
+        break;
+      }
+    }
+    if (isArpeggio && basePeriod > 0) {
+      // Convert period ratios to semitones: semitones = 12 * log2(basePeriod / period)
+      const semitonesArr = sorted.slice(1).map(p =>
+        Math.round(12 * Math.log2(basePeriod / p))
+      );
+      const x = Math.min(0xF, Math.max(0, semitonesArr[0] ?? 0));
+      const y = Math.min(0xF, Math.max(0, semitonesArr[1] ?? 0));
+      if (x > 0 || y > 0) {
+        return { effTyp: 0x00, eff: (x << 4) | y };
+      }
+    }
+  }
 
   // ── Portamento detection ─────────────────────────────────────────────────
   // If the period changes by a constant delta each tick, it's a portamento.
@@ -135,6 +164,29 @@ function detectEffect(
     }
   }
 
+  // ── Vibrato detection ───────────────────────────────────────────────────
+  // Vibrato: period oscillates around a center value (alternating +/-).
+  // XM effect 4 (0x04): xy — x=speed, y=depth.
+  if (periodDeltas.length >= 3) {
+    let signChanges = 0;
+    for (let i = 1; i < periodDeltas.length; i++) {
+      if ((periodDeltas[i] > 0 && periodDeltas[i - 1] < 0) ||
+          (periodDeltas[i] < 0 && periodDeltas[i - 1] > 0)) {
+        signChanges++;
+      }
+    }
+    // Vibrato has frequent sign changes (oscillating pattern)
+    if (signChanges >= 2) {
+      const maxDelta = Math.max(...periodDeltas.map(Math.abs));
+      const depth = Math.min(0xF, Math.round(maxDelta / 2));
+      // Speed: estimate from how quickly the oscillation cycles
+      const speed = Math.min(0xF, Math.max(1, Math.round(signChanges * 2)));
+      if (depth > 0) {
+        return { effTyp: 0x04, eff: (speed << 4) | depth };
+      }
+    }
+  }
+
   // ── Volume slide detection ───────────────────────────────────────────────
   // If volume changes by a constant delta each tick, it's a volume slide.
   const volDeltas: number[] = [];
@@ -151,6 +203,29 @@ function detectEffect(
         ? (absSpeed << 4)        // slide up in high nybble
         : (absSpeed & 0x0F);     // slide down in low nybble
       return { effTyp: 0x0A, eff };
+    }
+  }
+
+  // ── Retrigger detection ────────────────────────────────────────────────
+  // Multiple DMA restarts within a single row = note retrigger.
+  // XM effect E9x: retrigger note every x ticks.
+  const triggerTicks: number[] = [];
+  for (let i = 0; i < rowSnapshots.length; i++) {
+    if (ch < rowSnapshots[i].channels.length && rowSnapshots[i].channels[ch].triggered === 1) {
+      triggerTicks.push(i);
+    }
+  }
+  if (triggerTicks.length >= 2) {
+    // Compute interval between triggers
+    const intervals: number[] = [];
+    for (let i = 1; i < triggerTicks.length; i++) {
+      intervals.push(triggerTicks[i] - triggerTicks[i - 1]);
+    }
+    // Check if intervals are consistent (retrigger pattern)
+    const firstInterval = intervals[0];
+    if (firstInterval > 0 && firstInterval <= 0xF &&
+        intervals.every(d => d === firstInterval)) {
+      return { effTyp: 0x0E, eff: 0x90 | firstInterval };  // E9x
     }
   }
 
