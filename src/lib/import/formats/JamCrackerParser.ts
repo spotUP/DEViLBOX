@@ -15,7 +15,9 @@
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, ChannelData, TrackerCell, InstrumentConfig, JamCrackerConfig } from '@/types';
+import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
 import { createSamplerInstrument, amigaNoteToXM } from './AmigaUtils';
+import { encodeJCCell } from '@/engine/uade/encoders/JamCrackerEncoder';
 
 // -- Binary reading helpers ---------------------------------------------------
 
@@ -159,6 +161,7 @@ export async function parseJamCrackerFile(
   //   [6] nt_volume   (uint8, 0=no change, 1-65 → vol 0-64)
   //   [7] nt_porta    (uint8)
 
+  const patternDataFileOffset = pos;  // file offset where cell data begins
   const patternData: JCNote[][][] = [];
   for (let p = 0; p < nop; p++) {
     const rowCount = jcPatterns[p].rows;
@@ -396,6 +399,33 @@ export async function parseJamCrackerFile(
 
   const moduleName = filename.replace(/\.[^/.]+$/, '');
 
+  // Build cumulative byte offsets for each pattern start (variable rows per pattern)
+  const BYTES_PER_CELL = 8;
+  const NUM_CHANNELS = 4;
+  const patternFileOffsets: number[] = [];
+  let accumOffset = patternDataFileOffset;
+  for (let p = 0; p < nop; p++) {
+    patternFileOffsets.push(accumOffset);
+    accumOffset += jcPatterns[p].rows * NUM_CHANNELS * BYTES_PER_CELL;
+  }
+
+  const uadePatternLayout: UADEPatternLayout = {
+    formatId: 'jamCracker',
+    patternDataFileOffset,
+    bytesPerCell: BYTES_PER_CELL,
+    rowsPerPattern: jcPatterns[0]?.rows ?? 64,
+    numChannels: NUM_CHANNELS,
+    numPatterns: nop,
+    moduleSize: buffer.byteLength,
+    encodeCell: encodeJCCell,
+    getCellFileOffset(pattern: number, row: number, channel: number): number {
+      if (pattern < 0 || pattern >= nop) return -1;
+      if (row < 0 || row >= jcPatterns[pattern].rows) return -1;
+      if (channel < 0 || channel >= NUM_CHANNELS) return -1;
+      return patternFileOffsets[pattern] + (row * NUM_CHANNELS + channel) * BYTES_PER_CELL;
+    },
+  };
+
   return {
     name: moduleName,
     format: 'JamCracker' as TrackerFormat,
@@ -409,5 +439,6 @@ export async function parseJamCrackerFile(
     initialBPM: 125,
     linearPeriods: false,
     jamCrackerFileData: buffer.slice(0),
+    uadePatternLayout,
   };
 }
