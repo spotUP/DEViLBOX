@@ -1852,7 +1852,8 @@ export class ToneEngine {
                   
                   this.decodedAudioBuffers.set(instrumentId, audioBuffer);
                 } catch (err) {
-                  console.error(`[ToneEngine] Sampler ${instrumentId} failed to load edited buffer:`, err);
+                  // Raw Amiga/module PCM fails decodeAudioData — expected for tracker samples
+                  console.warn(`[ToneEngine] Sampler ${instrumentId} could not decode audio buffer (raw PCM?):`, (err as Error)?.message ?? err);
                 }
               })();
               this.instrumentLoadingPromises.set(key, loadPromise);
@@ -1872,7 +1873,8 @@ export class ToneEngine {
                   samplerRef.add(baseNote as Tone.Unit.Note, toneBuffer);
                   this.decodedAudioBuffers.set(instrumentId, audioBuffer);
                 } catch (err) {
-                  console.error(`[ToneEngine] Sampler ${instrumentId} failed to load edited buffer:`, err);
+                  // Raw Amiga/module PCM fails decodeAudioData — expected for tracker samples
+                  console.warn(`[ToneEngine] Sampler ${instrumentId} could not decode audio buffer (raw PCM?):`, (err as Error)?.message ?? err);
                 }
               })();
               this.instrumentLoadingPromises.set(key, loadPromise);
