@@ -485,6 +485,7 @@ export async function parseUADEFile(
     'scn',   // Sean Connolly — compiled replayer (BRA code)
     'scumm', // SCUMM music — compiled replayer
     'dns',   // Dynamic Synthesizer — compiled replayer (BRA code)
+    'mk2', 'mkii', // MarkII — compiled 68k (MOVEM prolog); test file atron.mk2 confirmed
   ]);
   const skipScan = mode === 'enhanced' && (SKIP_SCAN_EXTS.has(ext) || SKIP_SCAN_PREFIXES.has(prefix));
 
@@ -984,6 +985,7 @@ export async function parseUADEFile(
     'scn',   // Sean Connolly — compiled replayer (BRA code)
     'scumm', // SCUMM music — compiled replayer
     'dns',   // Dynamic Synthesizer — compiled replayer (BRA code)
+    'mk2', 'mkii', // MarkII — compiled 68k replayer, MOVEM prolog
   ]);
   if (mode === 'enhanced' && FORCE_CLASSIC_PREFIXES.has(prefix)) {
     console.log(`[UADEParser] ${prefix.toUpperCase()} uses prefix form; forcing classic UADESynth streaming`);
