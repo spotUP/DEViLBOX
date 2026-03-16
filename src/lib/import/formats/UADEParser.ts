@@ -932,6 +932,8 @@ export async function parseUADEFile(
   // Force classic (UADESynth streaming) for these formats instead.
   const FORCE_CLASSIC_FORMATS = new Set<string>([
     'jpo', 'jpold',   // SteveTurner — compiled replayer, UADE streaming required for correct audio
+    'sas',            // SonicArranger prefix-form — enhanced scan crashes browser
+    'mon',            // ManiacsOfNoise — enhanced scan crashes browser
   ]);
   if (mode === 'enhanced' && FORCE_CLASSIC_FORMATS.has(ext)) {
     console.log(`[UADEParser] ${ext.toUpperCase()} uses compiled replayer; forcing classic UADESynth streaming`);
