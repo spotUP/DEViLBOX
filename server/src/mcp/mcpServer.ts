@@ -1861,9 +1861,9 @@ export function createMcpServer(): McpServer {
 
   server.tool(
     'export_mod',
-    'Export the loaded song to ProTracker MOD format. OctaMED synth instruments are baked to PCM samples. Returns base64-encoded MOD binary plus warnings for any data-loss (dropped instruments, out-of-range notes, unsupported effects).',
+    'Export the loaded song to a tracker module format via OpenMPT WASM. Returns base64-encoded file data plus any warnings.',
     {
-      bakeSynths: z.boolean().optional().describe('Bake OctaMED synth instruments to PCM before export (default: true)'),
+      format: z.enum(['mod', 'xm', 'it', 's3m']).optional().describe('Output format (default: mod)'),
     },
     (p) => call('export_mod', p),
   );

@@ -1,7 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { useTrackerStore, useInstrumentStore, useProjectStore, useTransportStore, notify } from '@stores';
-import { exportAsXM, type XMExportOptions } from './XMExporter';
-import { exportSongToMOD } from './modExport';
 import { exportWithOpenMPT, type OpenMPTExportOptions } from './OpenMPTExporter';
 
 interface ModuleExportPanelProps {
@@ -9,6 +7,20 @@ interface ModuleExportPanelProps {
   exportMode: 'xm' | 'mod' | 'it' | 's3m';
   onClose: () => void;
 }
+
+const FORMAT_LABELS: Record<string, string> = {
+  mod: 'ProTracker MOD',
+  xm:  'FastTracker II XM',
+  it:  'Impulse Tracker IT',
+  s3m: 'ScreamTracker 3 S3M',
+};
+
+const CHANNEL_MAX: Record<string, number> = {
+  mod: 32,
+  xm:  32,
+  it:  64,
+  s3m: 32,
+};
 
 export const ModuleExportPanel: React.FC<ModuleExportPanelProps> = ({
   handlerRef,
@@ -20,292 +32,110 @@ export const ModuleExportPanel: React.FC<ModuleExportPanelProps> = ({
   const { metadata } = useProjectStore();
   const { bpm, speed } = useTransportStore();
 
-  const [xmChannelCount, setXmChannelCount] = useState(8);
-  const [bakeSynthsToSamples, setBakeSynthsToSamples] = useState(true);
+  const [channelCount, setChannelCount] = useState(
+    exportMode === 'mod' ? 4 : 8,
+  );
   const [exportWarnings, setExportWarnings] = useState<string[]>([]);
 
-  const nChannels = patterns[0]?.channels.length ?? 4;
   const hasNotes = patterns.some(pat =>
     pat.channels.some(ch => ch.rows.some(row => row.note > 0)),
   );
-  const modCompatible = nChannels <= 4 && hasNotes;
+  const maxChannels = CHANNEL_MAX[exportMode] ?? 32;
 
-  // Clear warnings when export mode changes
   useEffect(() => {
     setExportWarnings([]);
+    setChannelCount(exportMode === 'mod' ? 4 : 8);
   }, [exportMode]);
 
-  // Register export handler
+  // All four formats export via OpenMPT WASM (CSoundFile::SaveMod/SaveXM/SaveIT/SaveS3M)
   handlerRef.current = async () => {
-    if (exportMode === 'it' || exportMode === 's3m') {
-      // IT/S3M export via OpenMPT WASM
-      const songPositions = patterns.map((_, i) => i);
-      const opts: OpenMPTExportOptions = {
-        format: exportMode,
-        moduleName: metadata.name || 'DEViLBOX Export',
-        channelLimit: exportMode === 's3m' ? Math.min(xmChannelCount, 32) : xmChannelCount,
-      };
+    if (!hasNotes) {
+      notify.error('No playable note data — this format stores audio externally and cannot be exported.');
+      return false;
+    }
 
-      const result = await exportWithOpenMPT(patterns, instruments, songPositions, opts);
+    const opts: OpenMPTExportOptions = {
+      format: exportMode,
+      moduleName: metadata.name || 'DEViLBOX Export',
+      channelLimit: Math.min(channelCount, maxChannels),
+      initialBPM: bpm,
+      initialSpeed: speed,
+    };
 
-      const url = URL.createObjectURL(result.data);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = result.filename;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+    const result = await exportWithOpenMPT(patterns, instruments, patternOrder, opts);
 
-      if (result.warnings.length > 0) {
-        setExportWarnings(result.warnings);
-        notify.warning(`${exportMode.toUpperCase()} exported with ${result.warnings.length} warnings.`);
-      } else {
-        notify.success(`${exportMode.toUpperCase()} file "${result.filename}" exported successfully!`);
-        onClose();
-      }
-    } else if (exportMode === 'xm') {
-      const xmOptions: XMExportOptions = {
-        channelLimit: xmChannelCount,
-        moduleName: metadata.name || 'DEViLBOX Export',
-        bakeSynthsToSamples,
-      };
+    const url = URL.createObjectURL(result.data);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = result.filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
 
-      const result = await exportAsXM(patterns, instruments, xmOptions);
-
-      // Download the file
-      const url = URL.createObjectURL(result.data);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = result.filename;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-
-      // Show warnings if any
-      if (result.warnings.length > 0) {
-        setExportWarnings(result.warnings);
-        notify.warning(`XM exported with ${result.warnings.length} warnings. Check the dialog for details.`);
-      } else {
-        notify.success(`XM file "${result.filename}" exported successfully!`);
-        onClose();
-      }
+    if (result.warnings.length > 0) {
+      setExportWarnings(result.warnings);
+      notify.warning(`${exportMode.toUpperCase()} exported with ${result.warnings.length} warnings.`);
     } else {
-      if (!modCompatible) {
-        notify.error('This format cannot be exported to ProTracker MOD.');
-        return false;
-      }
-      const song = {
-        name: metadata.name || 'DEViLBOX Export',
-        format: 'MOD' as const,
-        patterns,
-        instruments,
-        songPositions: patternOrder,
-        songLength: patternOrder.length,
-        restartPosition: 0,
-        numChannels: nChannels,
-        initialBPM: bpm,
-        initialSpeed: speed,
-      };
-
-
-      const result = await exportSongToMOD(song, { bakeSynths: bakeSynthsToSamples });
-
-      // Download the file
-      const url = URL.createObjectURL(result.blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = result.filename;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-
-      // Show warnings if any
-      if (result.warnings.length > 0) {
-        setExportWarnings(result.warnings);
-        notify.warning(`MOD exported with ${result.warnings.length} warnings. Check the dialog for details.`);
-      } else {
-        notify.success(`MOD file "${result.filename}" exported successfully!`);
-        onClose();
-      }
+      notify.success(`${exportMode.toUpperCase()} file "${result.filename}" exported successfully!`);
+      onClose();
     }
   };
 
   return (
-    <>
-      {exportMode === 'xm' && (
-        <div className="bg-dark-bgSecondary border border-dark-border rounded-lg p-4 mb-4">
-          <h3 className="text-sm font-mono font-bold text-accent-primary mb-3">
-            FastTracker II XM Export (.xm)
-          </h3>
-          <div className="space-y-3">
-            {/* Channel Count */}
-            <div>
-              <label className="block text-xs font-mono text-text-muted mb-1">
-                Channel Count (max 32)
-              </label>
-              <input
-                type="number"
-                min={2}
-                max={32}
-                value={xmChannelCount}
-                onChange={(e) => setXmChannelCount(Math.min(32, Math.max(2, Number(e.target.value))))}
-                className="input w-full"
-              />
-            </div>
+    <div className="bg-dark-bgSecondary border border-dark-border rounded-lg p-4 mb-4">
+      <h3 className="text-sm font-mono font-bold text-accent-primary mb-3">
+        {FORMAT_LABELS[exportMode]} Export (.{exportMode})
+      </h3>
 
-            {/* Synth instrument handling */}
-            <label className="flex items-center gap-3 text-sm font-mono text-text-primary cursor-pointer hover:text-accent-primary transition-colors">
-              <input
-                type="checkbox"
-                checked={bakeSynthsToSamples}
-                onChange={(e) => setBakeSynthsToSamples(e.target.checked)}
-                className="w-4 h-4 rounded border-dark-border bg-dark-bg text-accent-primary focus:ring-accent-primary"
-              />
-              Include synth instrument slots (audio will be silent)
-            </label>
-
-            <div className="text-sm font-mono text-text-secondary space-y-1">
-              <div>Format: <span className="text-accent-primary">FastTracker II Extended Module</span></div>
-              <div>Patterns: <span className="text-accent-primary">{patterns.length}</span></div>
-              <div>Channels: <span className="text-accent-primary">{Math.min(patterns[0]?.channels.length || 8, 32)}</span></div>
-              <div>Instruments: <span className="text-accent-primary">{Math.min(instruments.length, 128)}</span></div>
-            </div>
-
-            {/* Warnings display */}
-            {exportWarnings.length > 0 && (
-              <div className="bg-orange-500/10 border border-orange-500/30 rounded-lg p-3">
-                <h4 className="text-xs font-mono font-bold text-orange-400 mb-2">
-                  Export Warnings ({exportWarnings.length})
-                </h4>
-                <ul className="text-xs font-mono text-orange-300 space-y-1 max-h-32 overflow-y-auto">
-                  {exportWarnings.map((warning, idx) => (
-                    <li key={idx} className="flex items-start gap-2">
-                      <span className="text-orange-400">•</span>
-                      <span>{warning}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </div>
+      {!hasNotes ? (
+        <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3">
+          <p className="text-xs font-mono text-red-300">
+            No playable note data found. This format stores audio externally and cannot be exported to a tracker module.
+          </p>
         </div>
-      )}
+      ) : (
+        <div className="space-y-3">
+          <div>
+            <label className="block text-xs font-mono text-text-muted mb-1">
+              Channel Count (max {maxChannels})
+            </label>
+            <input
+              type="number"
+              min={1}
+              max={maxChannels}
+              value={channelCount}
+              onChange={(e) => setChannelCount(Math.min(maxChannels, Math.max(1, Number(e.target.value))))}
+              className="input w-full"
+            />
+          </div>
 
-      {exportMode === 'mod' && (
-        <div className="bg-dark-bgSecondary border border-dark-border rounded-lg p-4 mb-4">
-          <h3 className="text-sm font-mono font-bold text-accent-primary mb-3">
-            ProTracker MOD Export (.mod)
-          </h3>
-          {!modCompatible ? (
-            <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3">
-              <h4 className="text-xs font-mono font-bold text-red-400 mb-2">
-                Not ProTracker Compatible
+          <div className="text-sm font-mono text-text-secondary space-y-1">
+            <div>Format: <span className="text-accent-primary">{FORMAT_LABELS[exportMode]}</span></div>
+            <div>Engine: <span className="text-accent-primary">OpenMPT CSoundFile (WASM)</span></div>
+            <div>Patterns: <span className="text-accent-primary">{patterns.length}</span></div>
+            <div>Channels: <span className="text-accent-primary">{Math.min(patterns[0]?.channels.length || channelCount, maxChannels)}</span></div>
+            <div>Instruments: <span className="text-accent-primary">{instruments.length}</span></div>
+            <div>BPM / Speed: <span className="text-accent-primary">{bpm} / {speed}</span></div>
+          </div>
+
+          {exportWarnings.length > 0 && (
+            <div className="bg-orange-500/10 border border-orange-500/30 rounded-lg p-3">
+              <h4 className="text-xs font-mono font-bold text-orange-400 mb-2">
+                Export Warnings ({exportWarnings.length})
               </h4>
-              <ul className="text-xs font-mono text-red-300 space-y-1">
-                {nChannels > 4 && (
-                  <li>• This format uses {nChannels} channels — ProTracker only supports 4</li>
-                )}
-                {!hasNotes && (
-                  <li>• No playable note data found in patterns — this format stores audio externally and cannot be exported to MOD</li>
-                )}
+              <ul className="text-xs font-mono text-orange-300 space-y-1 max-h-32 overflow-y-auto">
+                {exportWarnings.map((warning, idx) => (
+                  <li key={idx} className="flex items-start gap-2">
+                    <span className="text-orange-400">•</span>
+                    <span>{warning}</span>
+                  </li>
+                ))}
               </ul>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {/* Synth instrument handling */}
-              <label className="flex items-center gap-3 text-sm font-mono text-text-primary cursor-pointer hover:text-accent-primary transition-colors">
-                <input
-                  type="checkbox"
-                  checked={bakeSynthsToSamples}
-                  onChange={(e) => setBakeSynthsToSamples(e.target.checked)}
-                  className="w-4 h-4 rounded border-dark-border bg-dark-bg text-accent-primary focus:ring-accent-primary"
-                />
-                Bake synth instruments to PCM samples
-              </label>
-
-              <div className="text-sm font-mono text-text-secondary space-y-1">
-                <div>Format: <span className="text-accent-primary">ProTracker MOD</span></div>
-                <div>Channels: <span className="text-accent-primary">{nChannels}</span></div>
-                <div>Patterns: <span className="text-accent-primary">{patterns.length}</span></div>
-                <div>Max Samples: <span className="text-accent-primary">31</span></div>
-                <div>Note Range: <span className="text-accent-primary">C-1 to B-6</span></div>
-              </div>
-
-              {/* Warnings display */}
-              {exportWarnings.length > 0 && (
-                <div className="bg-orange-500/10 border border-orange-500/30 rounded-lg p-3">
-                  <h4 className="text-xs font-mono font-bold text-orange-400 mb-2">
-                    Export Warnings ({exportWarnings.length})
-                  </h4>
-                  <ul className="text-xs font-mono text-orange-300 space-y-1 max-h-32 overflow-y-auto">
-                    {exportWarnings.map((warning, idx) => (
-                      <li key={idx} className="flex items-start gap-2">
-                        <span className="text-orange-400">•</span>
-                        <span>{warning}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
             </div>
           )}
         </div>
       )}
-
-      {(exportMode === 'it' || exportMode === 's3m') && (
-        <div className="bg-dark-bgSecondary border border-dark-border rounded-lg p-4 mb-4">
-          <h3 className="text-sm font-mono font-bold text-accent-primary mb-3">
-            {exportMode === 'it' ? 'Impulse Tracker IT Export (.it)' : 'ScreamTracker 3 S3M Export (.s3m)'}
-          </h3>
-          <div className="space-y-3">
-            <div>
-              <label className="block text-xs font-mono text-text-muted mb-1">
-                Channel Count (max {exportMode === 's3m' ? 32 : 64})
-              </label>
-              <input
-                type="number"
-                min={2}
-                max={exportMode === 's3m' ? 32 : 64}
-                value={xmChannelCount}
-                onChange={(e) => setXmChannelCount(Math.min(
-                  exportMode === 's3m' ? 32 : 64,
-                  Math.max(2, Number(e.target.value)),
-                ))}
-                className="input w-full"
-              />
-            </div>
-
-            <div className="text-sm font-mono text-text-secondary space-y-1">
-              <div>Format: <span className="text-accent-primary">
-                {exportMode === 'it' ? 'Impulse Tracker Module' : 'ScreamTracker 3 Module'}
-              </span></div>
-              <div>Engine: <span className="text-accent-primary">OpenMPT CSoundFile (WASM)</span></div>
-              <div>Patterns: <span className="text-accent-primary">{patterns.length}</span></div>
-              <div>Channels: <span className="text-accent-primary">{Math.min(patterns[0]?.channels.length || 8, exportMode === 's3m' ? 32 : 64)}</span></div>
-              <div>Instruments: <span className="text-accent-primary">{instruments.length}</span></div>
-            </div>
-
-            {exportWarnings.length > 0 && (
-              <div className="bg-orange-500/10 border border-orange-500/30 rounded-lg p-3">
-                <h4 className="text-xs font-mono font-bold text-orange-400 mb-2">
-                  Export Warnings ({exportWarnings.length})
-                </h4>
-                <ul className="text-xs font-mono text-orange-300 space-y-1 max-h-32 overflow-y-auto">
-                  {exportWarnings.map((warning, idx) => (
-                    <li key={idx} className="flex items-start gap-2">
-                      <span className="text-orange-400">•</span>
-                      <span>{warning}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-    </>
+    </div>
   );
 };

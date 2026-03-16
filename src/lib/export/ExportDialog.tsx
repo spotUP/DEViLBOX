@@ -19,13 +19,15 @@ import {
   type ExportOptions,
 } from './exporters';
 import { NanoExporter } from './NanoExporter';
+import { saveFurFileWasm } from '@lib/import/wasm/FurnaceFileOps';
+import { useFormatStore } from '@stores/useFormatStore';
 import type { AutomationCurve } from '@typedefs/automation';
 import { AudioExportPanel } from './AudioExportPanel';
 import { MidiExportPanel } from './MidiExportPanel';
 import { ModuleExportPanel } from './ModuleExportPanel';
 import { ChipExportPanel } from './ChipExportPanel';
 
-type ExportMode = 'song' | 'sfx' | 'instrument' | 'audio' | 'midi' | 'xm' | 'mod' | 'it' | 's3m' | 'chip' | 'nano';
+type ExportMode = 'song' | 'sfx' | 'instrument' | 'audio' | 'midi' | 'xm' | 'mod' | 'it' | 's3m' | 'chip' | 'nano' | 'fur';
 type DialogMode = 'export' | 'import';
 
 interface ExportDialogProps {
@@ -56,6 +58,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
   const [chipExtension, setChipExtension] = useState('vgm');
 
   const modalData = useUIStore(s => s.modalData);
+  const editorMode = useFormatStore(s => s.editorMode);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const audioHandlerRef = useRef<(() => Promise<false | void>) | null>(null);
@@ -169,6 +172,22 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
 
         case 'chip': {
           if (await chipHandlerRef.current?.() === false) return;
+          break;
+        }
+
+        case 'fur': {
+          const furBuffer = await saveFurFileWasm();
+          const blob = new Blob([furBuffer], { type: 'application/octet-stream' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `${metadata.name || 'song'}.fur`;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+          notify.success(`Furnace file "${metadata.name || 'song'}.fur" exported successfully! (${furBuffer.byteLength} bytes)`);
+          onClose();
           break;
         }
 
@@ -511,6 +530,21 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                     <Zap size={24} className="mx-auto mb-2" />
                     <div className="font-mono text-sm font-semibold">Nano</div>
                   </button>
+                  {editorMode === 'furnace' && (
+                    <button
+                      onClick={() => setExportMode('fur')}
+                      className={`
+                        p-4 rounded-lg border-2 transition-all text-center
+                        ${exportMode === 'fur'
+                          ? 'bg-accent-primary text-text-inverse border-accent-primary glow-sm'
+                          : 'bg-dark-bgSecondary text-text-primary border-dark-border hover:border-dark-borderLight'
+                        }
+                      `}
+                    >
+                      <FileMusic size={24} className="mx-auto mb-2" />
+                      <div className="font-mono text-sm font-semibold">Furnace</div>
+                    </button>
+                  )}
                 </div>
               </div>
 
@@ -647,6 +681,22 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                 />
               )}
 
+              {exportMode === 'fur' && (
+                <div className="bg-dark-bgSecondary border border-dark-border rounded-lg p-4 mb-4">
+                  <h3 className="text-sm font-mono font-bold text-accent-primary mb-3">
+                    Furnace Export (.fur)
+                  </h3>
+                  <div className="space-y-3">
+                    <div className="text-sm font-mono text-text-secondary space-y-1">
+                      <div>Format: <span className="text-accent-primary">Furnace Tracker Module</span></div>
+                      <div>Engine: <span className="text-accent-primary">FurnaceFileOps WASM</span></div>
+                      <div>Patterns: <span className="text-accent-primary">{patterns.length}</span></div>
+                      <div>Instruments: <span className="text-accent-primary">{instruments.length}</span></div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {exportMode === 'nano' && (
                 <div className="bg-dark-bgSecondary border border-dark-border rounded-lg p-4 mb-4">
                   <h3 className="text-sm font-mono font-bold text-accent-primary mb-3">
@@ -765,6 +815,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                   : exportMode === 's3m' ? '.s3m'
                   : exportMode === 'chip' ? `.${chipExtension}`
                   : exportMode === 'nano' ? '.dbn'
+                  : exportMode === 'fur' ? '.fur'
                   : `.${exportMode}.json`
                 }`
               : 'Select a file to import'}

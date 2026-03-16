@@ -14,6 +14,8 @@ export interface OpenMPTExportOptions {
   format: SaveFormat;
   moduleName: string;
   channelLimit?: number;
+  initialBPM?: number;
+  initialSpeed?: number;
 }
 
 export interface OpenMPTExportResult {
@@ -105,8 +107,8 @@ export async function exportWithOpenMPT(
 
   try {
     // Set speed/tempo
-    await osl.setInitialSpeed(6);
-    await osl.setInitialTempo(125);
+    await osl.setInitialSpeed(options.initialSpeed ?? 6);
+    await osl.setInitialTempo(options.initialBPM ?? 125);
 
     // Write pattern data
     for (let p = 0; p < patterns.length; p++) {
