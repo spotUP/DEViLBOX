@@ -196,6 +196,78 @@ function makeEmptyPattern(
   };
 }
 
+// ── Effect / volume mapping ───────────────────────────────────────────────────
+
+/**
+ * Map S3M volume column byte to XM volume column encoding.
+ * S3M: 0-64 = set volume; >64 = no volume column.
+ * XM: 0 = none, 0x10-0x50 = set volume 0-64.
+ */
+function mapS3MVolume(rawVol: number): number {
+  if (rawVol <= 64) return 0x10 + rawVol;
+  return 0;
+}
+
+/**
+ * Map S3M effect command letter (A=1..Z=26) and param to XM-compatible effTyp/eff.
+ * Returns [xmEffTyp, xmEff]; [0,0] = no effect (dropped).
+ *
+ * Reference: OpenMPT S3MTools.cpp, XM effect spec.
+ */
+function mapS3MEffect(cmd: number, param: number): [number, number] {
+  switch (cmd) {
+    case  0: return [0, 0];
+    case  1: return [0x0F, param];                         // A: set speed → Fxx
+    case  2: return [0x0B, param];                         // B: position jump
+    case  3: return [0x0D, param];                         // C: pattern break
+    case  4: return [0x0A, param];                         // D: volume slide
+    case  5:                                               // E: portamento down
+      if (param >= 0xF0) return [0x0E, 0x20 | (param & 0x0F)]; // EFx → E2x fine
+      if (param >= 0xE0) return [0x21, 0x20 | (param & 0x0F)]; // EEx → extra fine
+      return [0x02, param];
+    case  6:                                               // F: portamento up
+      if (param >= 0xF0) return [0x0E, 0x10 | (param & 0x0F)]; // FFx → E1x fine
+      if (param >= 0xE0) return [0x21, 0x10 | (param & 0x0F)]; // FEx → extra fine
+      return [0x01, param];
+    case  7: return [0x03, param];                         // G: tone portamento
+    case  8: return [0x04, param];                         // H: vibrato
+    case  9: return [0x1D, param];                         // I: tremor
+    case 10: return [0x00, param];                         // J: arpeggio
+    case 11: return [0x06, param];                         // K: vibrato + vol slide
+    case 12: return [0x05, param];                         // L: tone porta + vol slide
+    case 13: return [0, 0];                                // M: channel volume (no XM equiv)
+    case 14: return [0, 0];                                // N: channel vol slide (no XM equiv)
+    case 15: return [0x09, param];                         // O: sample offset
+    case 16: return [0, 0];                                // P: panning slide (no XM effect equiv)
+    case 17: return [0x0E, 0x90 | (param & 0x0F)];        // Q: retrig → E9x
+    case 18: return [0x07, param];                         // R: tremolo
+    case 19: {                                             // S: extended sub-commands
+      const sub = (param >> 4) & 0x0F;
+      const val =  param       & 0x0F;
+      switch (sub) {
+        case 0x3: return [0x0E, 0x30 | val]; // S3x → E3x glissando
+        case 0x4: return [0x0E, 0x40 | val]; // S4x → E4x vibrato waveform
+        case 0x5: return [0x0E, 0x50 | val]; // S5x → E5x finetune
+        case 0x6: return [0x0E, 0x60 | val]; // S6x → E6x pattern loop
+        case 0x8: return [0x0E, 0x80 | val]; // S8x → E8x set panning (coarse)
+        case 0xC: return [0x0E, 0xC0 | val]; // SCx → ECx note cut
+        case 0xD: return [0x0E, 0xD0 | val]; // SDx → EDx note delay
+        case 0xE: return [0x0E, 0xE0 | val]; // SEx → EEx pattern delay
+        default:  return [0, 0];
+      }
+    }
+    case 20:                                               // T: set tempo (BPM ≥ 32)
+      return param >= 0x20 ? [0x0F, param] : [0, 0];
+    case 21: return [0x04, param];                         // U: fine vibrato (approx as vibrato)
+    case 22: return [0x10, param];                         // V: global volume
+    case 23: return [0x11, param];                         // W: global vol slide
+    case 24: return [0x08, Math.min(255, param << 1)];     // X: set pan 0-127 → 0-255
+    case 25: return [0x19, param];                         // Y: panbrello
+    case 26: return [0, 0];                                // Z: MIDI (drop)
+    default: return [0, 0];
+  }
+}
+
 // ── Pattern decoder ───────────────────────────────────────────────────────────
 
 /**
@@ -255,15 +327,11 @@ function decodeS3MPattern(
     }
 
     if (flagByte & 0x40) {
-      // Volume (0-64; values > 64 treated as no volume)
-      const rawVol = rowData[pos++];
-      volume = rawVol <= 64 ? rawVol : 0;
+      volume = mapS3MVolume(rowData[pos++]);
     }
 
     if (flagByte & 0x80) {
-      // Effect: S3M command letter (A=1..Z=26) stored raw in effTyp
-      effTyp = rowData[pos++];
-      eff    = rowData[pos++];
+      [effTyp, eff] = mapS3MEffect(rowData[pos++], rowData[pos++]);
     }
 
     if (ch < numChannels) {
