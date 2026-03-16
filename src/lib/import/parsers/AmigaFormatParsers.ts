@@ -1352,7 +1352,7 @@ export async function tryRouteFormat(
     const { isZoundMonitorFormat, parseZoundMonitorFile } = await import('@lib/import/formats/ZoundMonitorParser');
     return withNativeThenUADE('zoundMonitor', ctx,
       (buf: Uint8Array | ArrayBuffer, name: string) => { if (isZoundMonitorFormat(buf as ArrayBuffer, name)) return parseZoundMonitorFile(buf as ArrayBuffer, name, companionFiles); return null; },
-      'ZoundMonitorParser');
+      'ZoundMonitorParser', { injectUADE: true });
   }
 
   // ── Future Player (.fp / FP.*) ───────────────────────────────────────────────
@@ -1361,7 +1361,7 @@ export async function tryRouteFormat(
     const { isFuturePlayerFormat, parseFuturePlayerFile } = await import('@lib/import/formats/FuturePlayerParser');
     return withNativeThenUADE('futurePlayer', ctx,
       (buf: Uint8Array | ArrayBuffer, name: string) => { if (isFuturePlayerFormat(buf as ArrayBuffer)) return parseFuturePlayerFile(buf as ArrayBuffer, name); return null; },
-      'FuturePlayerParser');
+      'FuturePlayerParser', { injectUADE: true });
   }
 
   // ── TCB Tracker (tcb.* or *.tcb) ─────────────────────────────────────────────
@@ -1369,7 +1369,7 @@ export async function tryRouteFormat(
     const { isTCBTrackerFormat, parseTCBTrackerFile } = await import('@lib/import/formats/TCBTrackerParser');
     return withNativeThenUADE('tcbTracker', ctx,
       async (buf: Uint8Array | ArrayBuffer, name: string) => { if (isTCBTrackerFormat(buf as ArrayBuffer)) return parseTCBTrackerFile(buf as ArrayBuffer, name); return null; },
-      'TCBTrackerParser');
+      'TCBTrackerParser', { injectUADE: true });
   }
 
   // ── Jason Page (jpn.* / jpnd.* / jp.*) ──────────────────────────────────────
@@ -1445,7 +1445,7 @@ export async function tryRouteFormat(
     const { isKRISFormat, parseKRISFile } = await import('@lib/import/formats/KRISParser');
     return withNativeThenUADE('kris', ctx,
       async (buf: Uint8Array | ArrayBuffer, name: string) => { if (isKRISFormat(buf as ArrayBuffer)) return await parseKRISFile(buf as ArrayBuffer, name); return null; },
-      'KRISParser');
+      'KRISParser', { injectUADE: true });
   }
 
   // ── Cinemaware (CIN.* prefix) ─────────────────────────────────────────────
