@@ -1922,6 +1922,54 @@ export async function tryRouteFormat(
     return parseUADE_amc(buffer, toUADEPrefixName(originalFileName, ['amc']), prefs.uade ?? 'enhanced', subsong, preScannedMeta);
   }
 
+  // ── Tier 3 suffix-form → UADE prefix-form routing ────────────────────────
+  // eagleplayer.conf only registers these by prefixes=xxx (no suffix entries).
+  // Without conversion, UADE receives e.g. "boulderdash.spl" and can't find
+  // an eagleplayer → silent/failed audio. Convert to prefix form first.
+  //
+  // Compiled replayer formats (FORCE_CLASSIC_FORMATS) → classic streaming:
+  if (matchesExt(filename, ['spl'])) {
+    const { parseUADEFile: parseUADE_spl } = await import('@lib/import/formats/UADEParser');
+    return parseUADE_spl(buffer, toUADEPrefixName(originalFileName, ['spl']), 'classic', subsong, preScannedMeta);
+  }
+  if (matchesExt(filename, ['riff'])) {
+    const { parseUADEFile: parseUADE_riff } = await import('@lib/import/formats/UADEParser');
+    return parseUADE_riff(buffer, toUADEPrefixName(originalFileName, ['riff']), 'classic', subsong, preScannedMeta);
+  }
+  if (matchesExt(filename, ['hd'])) {
+    const { parseUADEFile: parseUADE_hd } = await import('@lib/import/formats/UADEParser');
+    return parseUADE_hd(buffer, toUADEPrefixName(originalFileName, ['hd']), 'classic', subsong, preScannedMeta);
+  }
+  if (matchesExt(filename, ['tw'])) {
+    const { parseUADEFile: parseUADE_tw } = await import('@lib/import/formats/UADEParser');
+    return parseUADE_tw(buffer, toUADEPrefixName(originalFileName, ['tw']), 'classic', subsong, preScannedMeta);
+  }
+  if (matchesExt(filename, ['dz'])) {
+    const { parseUADEFile: parseUADE_dz } = await import('@lib/import/formats/UADEParser');
+    return parseUADE_dz(buffer, toUADEPrefixName(originalFileName, ['dz']), 'classic', subsong, preScannedMeta);
+  }
+  if (matchesExt(filename, ['bss'])) {
+    const { parseUADEFile: parseUADE_bss } = await import('@lib/import/formats/UADEParser');
+    return parseUADE_bss(buffer, toUADEPrefixName(originalFileName, ['bss']), 'classic', subsong, preScannedMeta);
+  }
+  if (matchesExt(filename, ['scn'])) {
+    const { parseUADEFile: parseUADE_scn } = await import('@lib/import/formats/UADEParser');
+    return parseUADE_scn(buffer, toUADEPrefixName(originalFileName, ['scn']), 'classic', subsong, preScannedMeta);
+  }
+  if (matchesExt(filename, ['scumm'])) {
+    const { parseUADEFile: parseUADE_scumm } = await import('@lib/import/formats/UADEParser');
+    return parseUADE_scumm(buffer, toUADEPrefixName(originalFileName, ['scumm']), 'classic', subsong, preScannedMeta);
+  }
+  // Enhanced-scan capable formats (UADE_ONLY_PREFIXES) → enhanced scan:
+  if (matchesExt(filename, ['mok'])) {
+    const { parseUADEFile: parseUADE_mok } = await import('@lib/import/formats/UADEParser');
+    return parseUADE_mok(buffer, toUADEPrefixName(originalFileName, ['mok']), prefs.uade ?? 'enhanced', subsong, preScannedMeta);
+  }
+  if (matchesExt(filename, ['ea'])) {
+    const { parseUADEFile: parseUADE_ea } = await import('@lib/import/formats/UADEParser');
+    return parseUADE_ea(buffer, toUADEPrefixName(originalFileName, ['ea']), prefs.uade ?? 'enhanced', subsong, preScannedMeta);
+  }
+
   // ── Mugician prefix (DMU.* / DMU2.* prefix) ──────────────────────────────
   // eagleplayer.conf: Mugician prefixes=dmu,mug  MugicianII prefixes=dmu2,mug2
   // (mug.* and mug2.* are already handled above; these cover the dmu.* variants)
