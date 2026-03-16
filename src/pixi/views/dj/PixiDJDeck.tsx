@@ -481,6 +481,9 @@ const PixiVinylDisplay: React.FC<{
   const lastPointerRef = useRef<{ x: number; y: number } | null>(null);
   const lastPointerTimeRef = useRef(0);
   const graphicsRef = useRef<GraphicsType | null>(null);
+  const isHoveredRef = useRef(false);
+  const lastScrollTimeRef = useRef(0);
+  const scrollReleaseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Keep play state accessible from rAF closure without re-creating it
   const playStateRef = useRef({ isPlaying, effectiveBPM });
@@ -646,34 +649,39 @@ const PixiVinylDisplay: React.FC<{
     document.addEventListener('pointerup', onUp);
   }, [enterScratch, size]);
 
-  // ── Wheel handler (nudge) ────────────────────────────────────────────────
+  // ── Wheel handler (scroll scratch — velocity control) ───────────────────
   const handleWheel = useCallback((e: WheelEvent) => {
-    if (!playStateRef.current.isPlaying) return;
+    if (!isHoveredRef.current || !playStateRef.current.isPlaying) return;
     e.preventDefault();
 
     if (!isScratchActiveRef.current) {
       enterScratch();
     }
 
-    const impulse = TurntablePhysics.deltaToImpulse(e.deltaY, e.deltaMode);
-    physicsRef.current.applyImpulse(impulse);
+    const now = performance.now();
+    const dt = Math.max(0.001, (now - lastScrollTimeRef.current) / 1000);
+    lastScrollTimeRef.current = now;
+
+    const normalizedDelta = e.deltaMode === 1 ? e.deltaY * 12 : e.deltaMode === 2 ? e.deltaY * 400 : e.deltaY;
+    const omega = TurntablePhysics.deltaToAngularVelocity(normalizedDelta, dt);
+    physicsRef.current.setTouching(true);
+    physicsRef.current.setHandVelocity(omega);
+
+    if (scrollReleaseTimerRef.current !== null) clearTimeout(scrollReleaseTimerRef.current);
+    scrollReleaseTimerRef.current = setTimeout(() => {
+      scrollReleaseTimerRef.current = null;
+      physicsRef.current.setTouching(false);
+    }, 150);
   }, [enterScratch]);
 
-  // Attach wheel listener (needs { passive: false })
+  // Attach document-level wheel listener; hover state gates which deck handles it
   useEffect(() => {
-    const g = graphicsRef.current;
-    if (!g) return;
-    const canvas = (g as any).canvas?.parentElement ?? document.querySelector('canvas');
-    if (!canvas) return;
-
-    // We need the wheel on the actual DOM canvas; pixi doesn't have onWheel
-    const handler = (e: WheelEvent) => {
-      handleWheel(e);
+    const handler = (e: WheelEvent) => handleWheel(e);
+    document.addEventListener('wheel', handler, { passive: false });
+    return () => {
+      document.removeEventListener('wheel', handler);
+      if (scrollReleaseTimerRef.current !== null) clearTimeout(scrollReleaseTimerRef.current);
     };
-    // Note: wheel events are handled by the pixi canvas globally;
-    // for now we skip wheel since it requires DOM access. The primary
-    // interaction (pointer drag) is fully functional.
-    void handler;
   }, [handleWheel]);
 
   return (
@@ -684,6 +692,8 @@ const PixiVinylDisplay: React.FC<{
         eventMode="static"
         cursor={isScratchActive ? 'grabbing' : 'grab'}
         onPointerDown={handlePointerDown}
+        onPointerEnter={() => { isHoveredRef.current = true; }}
+        onPointerLeave={() => { isHoveredRef.current = false; }}
         layout={{ width: size, height: size }}
       />
       <pixiBitmapText
@@ -776,6 +786,9 @@ const PixiTurntable2D: React.FC<{
   const lastPointerRef = useRef<{ x: number; y: number } | null>(null);
   const lastPointerTimeRef = useRef(0);
   const graphicsRef = useRef<GraphicsType | null>(null);
+  const isHoveredRef = useRef(false);
+  const lastScrollTimeRef = useRef(0);
+  const scrollReleaseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Pitch fader drag state
   const [isDraggingFader, setIsDraggingFader] = useState(false);
@@ -1024,6 +1037,40 @@ const PixiTurntable2D: React.FC<{
     document.addEventListener('pointerup', onUp);
   }, [enterScratch, deckW, deckH, platterCX, platterCY, platterR]);
 
+  // ── Wheel handler (scroll scratch — velocity control) ───────────────────
+  const handleWheel2D = useCallback((e: WheelEvent) => {
+    if (!isHoveredRef.current || !playStateRef.current.isPlaying || !powerOnRef.current) return;
+    e.preventDefault();
+
+    if (!isScratchActiveRef.current) {
+      enterScratch();
+    }
+
+    const now = performance.now();
+    const dt = Math.max(0.001, (now - lastScrollTimeRef.current) / 1000);
+    lastScrollTimeRef.current = now;
+
+    const normalizedDelta = e.deltaMode === 1 ? e.deltaY * 12 : e.deltaMode === 2 ? e.deltaY * 400 : e.deltaY;
+    const omega = TurntablePhysics.deltaToAngularVelocity(normalizedDelta, dt);
+    physicsRef.current.setTouching(true);
+    physicsRef.current.setHandVelocity(omega);
+
+    if (scrollReleaseTimerRef.current !== null) clearTimeout(scrollReleaseTimerRef.current);
+    scrollReleaseTimerRef.current = setTimeout(() => {
+      scrollReleaseTimerRef.current = null;
+      physicsRef.current.setTouching(false);
+    }, 150);
+  }, [enterScratch]);
+
+  useEffect(() => {
+    const handler = (e: WheelEvent) => handleWheel2D(e);
+    document.addEventListener('wheel', handler, { passive: false });
+    return () => {
+      document.removeEventListener('wheel', handler);
+      if (scrollReleaseTimerRef.current !== null) clearTimeout(scrollReleaseTimerRef.current);
+    };
+  }, [handleWheel2D]);
+
   // Power button handler
   const handlePowerClick = useCallback(() => {
     const newPower = !powerOnRef.current;
@@ -1087,6 +1134,8 @@ const PixiTurntable2D: React.FC<{
         eventMode="static"
         cursor={isScratchActive ? 'grabbing' : 'grab'}
         onPointerDown={handlePlatterPointerDown}
+        onPointerEnter={() => { isHoveredRef.current = true; }}
+        onPointerLeave={() => { isHoveredRef.current = false; }}
         draw={(g: GraphicsType) => { g.clear(); g.circle(platterCX, platterCY, platterR).fill({ color: 0xff0000, alpha: 0.001 }); }}
         layout={{ position: 'absolute', top: 0, left: 0, width: deckW, height: deckH }}
       />

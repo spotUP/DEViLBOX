@@ -161,6 +161,12 @@ class DJControllerMapper {
     const mapping = this.ccLookup.get(key);
     if (!mapping) return;
 
+    // Tracker CC actions bypass normal param routing
+    if (mapping.param === 'tracker_fader_gain') {
+      this.executeTrackerScratchAction('tracker_fader_gain', value);
+      return;
+    }
+
     let normalized = value / 127;
     if (mapping.invert) normalized = 1 - normalized;
 
@@ -356,7 +362,7 @@ class DJControllerMapper {
    * Execute tracker scratch actions (fader cut, pattern toggles).
    * These work without DJ engine — they use TrackerScratchController directly.
    */
-  private executeTrackerScratchAction(action: string): void {
+  private executeTrackerScratchAction(action: string, midiValue?: number): void {
     const ctrl = getTrackerScratchController();
     switch (action) {
       case 'tracker_fader_cut':
@@ -394,6 +400,11 @@ class DJControllerMapper {
       case 'tracker_scratch_stop':
         ctrl.stopFaderPattern();
         break;
+      case 'tracker_fader_gain': {
+        const gain = (midiValue ?? 0) / 127;
+        ctrl.setFaderGain(gain);
+        break;
+      }
     }
   }
 

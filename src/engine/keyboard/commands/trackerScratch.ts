@@ -17,9 +17,11 @@ import { SCRATCH_PATTERNS } from '@engine/dj/DJScratchEngine';
 
 // ── Fader cut (hold-to-mute) ────────────────────────────────────────────────
 
-/** Engage fader cut (mute). Call on keydown. */
+/** Engage fader cut (mute). Call on keydown. Only fires during active scratch. */
 export function trackerFaderCutOn(): boolean {
-  getTrackerScratchController().setFaderCut(true);
+  const ctrl = getTrackerScratchController();
+  if (!ctrl.isActive) return false;
+  ctrl.setFaderCut(true);
   useUIStore.getState().setStatusMessage('Fader: CUT', false, 300);
   return true;
 }

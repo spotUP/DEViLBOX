@@ -16,6 +16,8 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import * as Tone from 'tone';
 import { AudioDataBus } from '@engine/vj/AudioDataBus';
+import { TurntablePhysics } from '@engine/turntable/TurntablePhysics';
+import { getDJEngine } from '@engine/dj/DJEngine';
 import { ExternalLink, SkipForward, Shuffle, Pause, Play, List, Maximize, Minimize, Music } from 'lucide-react';
 import { useUIStore } from '@stores/useUIStore';
 import { useDJStore } from '@stores/useDJStore';
@@ -506,6 +508,15 @@ export const VJView: React.FC<VJViewProps> = ({ isPopout = false }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
+  // ── DJ deck scratch via scroll ──────────────────────────────────────────
+  const scratchPhysicsRef = useRef<TurntablePhysics | null>(null);
+  const scratchActiveRef = useRef(false);
+  const scratchLastScrollTimeRef = useRef(0);
+  const scratchReleaseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const scratchRafRef = useRef<number | null>(null);
+  const scratchLastTickRef = useRef(0);
+  const scratchDeckRef = useRef<'A' | 'B' | null>(null);
+
   // Fullscreen toggle
   const handleFullscreen = useCallback(() => {
     const el = containerRef.current;
@@ -573,6 +584,87 @@ export const VJView: React.FC<VJViewProps> = ({ isPopout = false }) => {
     autoAdvanceTimerRef.current = setTimeout(advance, 15000 + Math.random() * 15000);
     return () => { if (autoAdvanceTimerRef.current) clearTimeout(autoAdvanceTimerRef.current); };
   }, [autoAdvance, presetCount, pmPresetCount, activeLayer]);
+
+  // Wheel listener — scratch whichever DJ deck is playing
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const handler = (e: WheelEvent) => {
+      // Find an active DJ deck
+      const decks = useDJStore.getState().decks;
+      const deckId: 'A' | 'B' | null = decks.A.isPlaying ? 'A' : decks.B.isPlaying ? 'B' : null;
+      if (!deckId) return; // No DJ deck playing — let event pass
+
+      e.preventDefault();
+
+      if (!scratchPhysicsRef.current) {
+        scratchPhysicsRef.current = new TurntablePhysics();
+      }
+      const physics = scratchPhysicsRef.current;
+
+      // Enter scratch on first event
+      if (!scratchActiveRef.current || scratchDeckRef.current !== deckId) {
+        scratchActiveRef.current = true;
+        scratchDeckRef.current = deckId;
+        try { getDJEngine().getDeck(deckId).startScratch(); } catch { /* engine not ready */ }
+
+        // Physics rAF loop — forwards rate to DeckEngine
+        if (scratchRafRef.current !== null) cancelAnimationFrame(scratchRafRef.current);
+        scratchLastTickRef.current = performance.now();
+        let prevRate = 1;
+
+        const tick = (now: number) => {
+          const dt = (now - scratchLastTickRef.current) / 1000;
+          scratchLastTickRef.current = now;
+
+          const rate = physics.tick(dt);
+
+          if (Math.abs(rate - prevRate) > 0.01) {
+            try { getDJEngine().getDeck(deckId).setScratchVelocity(rate); } catch { /* */ }
+            prevRate = rate;
+          }
+
+          // Exit when motor restores to normal and hand is released
+          if (!physics.touching && Math.abs(rate - 1.0) < 0.02) {
+            scratchActiveRef.current = false;
+            scratchDeckRef.current = null;
+            try { getDJEngine().getDeck(deckId).stopScratch(50); } catch { /* */ }
+            scratchRafRef.current = null;
+            return;
+          }
+
+          scratchRafRef.current = requestAnimationFrame(tick);
+        };
+
+        scratchRafRef.current = requestAnimationFrame(tick);
+      }
+
+      // Velocity control (same as pattern editor and DJ vinyl)
+      const now = performance.now();
+      const dt = Math.max(0.001, (now - scratchLastScrollTimeRef.current) / 1000);
+      scratchLastScrollTimeRef.current = now;
+
+      const normalizedDelta = e.deltaMode === 1 ? e.deltaY * 12 : e.deltaMode === 2 ? e.deltaY * 400 : e.deltaY;
+      const omega = TurntablePhysics.deltaToAngularVelocity(normalizedDelta, dt);
+      physics.setTouching(true);
+      physics.setHandVelocity(omega);
+
+      if (scratchReleaseTimerRef.current !== null) clearTimeout(scratchReleaseTimerRef.current);
+      scratchReleaseTimerRef.current = setTimeout(() => {
+        scratchReleaseTimerRef.current = null;
+        physics.setTouching(false);
+      }, 150);
+    };
+
+    container.addEventListener('wheel', handler, { passive: false });
+    return () => {
+      container.removeEventListener('wheel', handler);
+      if (scratchRafRef.current !== null) cancelAnimationFrame(scratchRafRef.current);
+      if (scratchReleaseTimerRef.current !== null) clearTimeout(scratchReleaseTimerRef.current);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // containerRef is stable; useDJStore is read imperatively
 
   const handlePopOut = useCallback(() => {
     const s = useUIStore.getState();
