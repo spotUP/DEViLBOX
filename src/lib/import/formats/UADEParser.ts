@@ -492,7 +492,10 @@ export async function parseUADEFile(
       'Quadra Composer':    async () => { const { parseQuadraComposerFile } = await import('./QuadraComposerParser'); return parseQuadraComposerFile(buffer, filename); },
       'FutureComposer1.3':  async () => { const { parseFCFile } = await import('./FCParser'); return parseFCFile(buffer, filename, 0); },
       'FutureComposer1.4':  async () => { const { parseFCFile } = await import('./FCParser'); return parseFCFile(buffer, filename, 0); },
-      'FutureComposer-BSI': async () => { const { parseFCFile } = await import('./FCParser'); return parseFCFile(buffer, filename, 0); },
+      // FC BSI ("FUCO" magic) — parseFCFile returns a 0-note stub for BSI; returning null
+      // here lets the code fall through to the UADE enhanced scan which detects the correct
+      // tempo from the Paula register log (enhanced.bpm / enhanced.speed).
+      'FutureComposer-BSI': async () => null,
       'SIDMon1.0': async () => {
         const { parseSidMon1File } = await import('./SidMon1Parser');
         // SidMon 1 is a compiled Amiga binary; scan chip RAM for the SID-MON header
