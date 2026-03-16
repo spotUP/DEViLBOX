@@ -465,10 +465,16 @@ export async function parseUADEFile(
     'mon',  // ManiacsOfNoise — enhanced scan crashes browser
   ]);
   const SKIP_SCAN_PREFIXES = new Set(['dl', 'dl_deli', 'dln', 'rh',
-    'sas',  // SonicArranger prefix-form — enhanced scan crashes browser
-    'spl',  // SoundProgrammingLanguage — compiled replayer
-    'riff', // RiffRaff — compiled replayer
-    'hd',   // HowieDavies — compiled replayer
+    'sas',   // SonicArranger prefix-form — enhanced scan crashes browser
+    'spl',   // SoundProgrammingLanguage — compiled replayer
+    'riff',  // RiffRaff — compiled replayer
+    'hd',    // HowieDavies — compiled replayer
+    'tw',    // Thomas Weber — compiled replayer (BRA code)
+    'dz',    // Darius Zendeh — compiled replayer (MOVEM prolog)
+    'bss',   // Beathoven Synthesizer — AmigaDOS hunk binary
+    'scn',   // Sean Connolly — compiled replayer (BRA code)
+    'scumm', // SCUMM music — compiled replayer
+    'dns',   // Dynamic Synthesizer — compiled replayer (BRA code)
   ]);
   const skipScan = mode === 'enhanced' && (SKIP_SCAN_EXTS.has(ext) || SKIP_SCAN_PREFIXES.has(prefix));
 
@@ -947,11 +953,17 @@ export async function parseUADEFile(
   }
 
   const FORCE_CLASSIC_PREFIXES = new Set<string>([
-    'fw',   // ForgottenWorlds — enhanced scan produces silent output; classic streaming required
-    'sas',  // SonicArranger prefix-form — enhanced scan crashes browser
-    'spl',  // SoundProgrammingLanguage — compiled replayer, enhanced scan gives wrong audio
-    'riff', // RiffRaff — compiled replayer, enhanced scan gives wrong audio
-    'hd',   // HowieDavies — compiled replayer, enhanced scan gives wrong audio
+    'fw',    // ForgottenWorlds — enhanced scan produces silent output; classic streaming required
+    'sas',   // SonicArranger prefix-form — enhanced scan crashes browser
+    'spl',   // SoundProgrammingLanguage — compiled replayer, enhanced scan gives wrong audio
+    'riff',  // RiffRaff — compiled replayer, enhanced scan gives wrong audio
+    'hd',    // HowieDavies — compiled replayer, enhanced scan gives wrong audio
+    'tw',    // Thomas Weber — compiled replayer (BRA code)
+    'dz',    // Darius Zendeh — compiled replayer (MOVEM prolog)
+    'bss',   // Beathoven Synthesizer — AmigaDOS hunk binary
+    'scn',   // Sean Connolly — compiled replayer (BRA code)
+    'scumm', // SCUMM music — compiled replayer
+    'dns',   // Dynamic Synthesizer — compiled replayer (BRA code)
   ]);
   if (mode === 'enhanced' && FORCE_CLASSIC_PREFIXES.has(prefix)) {
     console.log(`[UADEParser] ${prefix.toUpperCase()} uses prefix form; forcing classic UADESynth streaming`);
