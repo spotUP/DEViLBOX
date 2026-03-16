@@ -462,8 +462,17 @@ export async function parseUADEFile(
   // Prefix-based formats (dl.*, dln.*, rh.*) are matched by the leading component.
   const prefix = filename.split('.')[0]?.toLowerCase() ?? '';
   const SKIP_SCAN_EXTS = new Set(['jpo', 'jpold', 'rh', 'rhp',
-    'mon',  // ManiacsOfNoise — enhanced scan crashes browser
-    'sa',   // SonicArranger compiled binary variant — JSR prolog, enhanced scan hangs
+    'mon',   // ManiacsOfNoise — enhanced scan crashes browser
+    'sa',    // SonicArranger compiled binary variant — JSR prolog, enhanced scan hangs
+    // Suffix-form compiled replayer formats (test files use .ext suffix, not prefix.name):
+    'spl',   // SoundProgrammingLanguage — AmigaDOS hunk, enhanced scan gives wrong audio
+    'riff',  // RiffRaff — AmigaDOS hunk, enhanced scan gives wrong audio
+    'hd',    // HowieDavies — AmigaDOS hunk, enhanced scan gives wrong audio
+    'tw',    // Thomas Weber — 68k BRA code, enhanced scan gives wrong audio
+    'dz',    // DariusZendeh — 68k MOVEM prolog, enhanced scan gives wrong audio
+    'bss',   // BeathovenSynthesizer — AmigaDOS hunk, enhanced scan gives wrong audio
+    'scn',   // SeanConnolly — 68k BRA code, enhanced scan gives wrong audio
+    'scumm', // SCUMM — 68k compiled replayer, enhanced scan gives wrong audio
   ]);
   const SKIP_SCAN_PREFIXES = new Set(['dl', 'dl_deli', 'dln', 'rh',
     'sas',   // SonicArranger prefix-form — enhanced scan crashes browser
@@ -948,6 +957,15 @@ export async function parseUADEFile(
     'jpo', 'jpold',   // SteveTurner — compiled replayer, UADE streaming required for correct audio
     'mon',            // ManiacsOfNoise — enhanced scan crashes browser
     'sa',             // SonicArranger compiled binary variant — JSR prolog code
+    // Suffix-form compiled replayer formats (test files use .ext suffix, not prefix.name):
+    'spl',   // SoundProgrammingLanguage — AmigaDOS hunk compiled replayer
+    'riff',  // RiffRaff — AmigaDOS hunk compiled replayer
+    'hd',    // HowieDavies — AmigaDOS hunk compiled replayer
+    'tw',    // Thomas Weber — 68k BRA code compiled replayer
+    'dz',    // DariusZendeh — 68k MOVEM prolog compiled replayer
+    'bss',   // BeathovenSynthesizer — AmigaDOS hunk compiled replayer
+    'scn',   // SeanConnolly — 68k BRA code compiled replayer
+    'scumm', // SCUMM — 68k compiled replayer (ManiacMansion music)
   ]);
   if (mode === 'enhanced' && FORCE_CLASSIC_FORMATS.has(ext)) {
     console.log(`[UADEParser] ${ext.toUpperCase()} uses compiled replayer; forcing classic UADESynth streaming`);
