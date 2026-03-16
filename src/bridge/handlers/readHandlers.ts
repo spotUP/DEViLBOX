@@ -6,6 +6,7 @@
  */
 
 import { useTrackerStore } from '../../stores/useTrackerStore';
+import { getConsoleEntries } from '../consoleCapture';
 import { useTransportStore } from '../../stores/useTransportStore';
 import { useFormatStore } from '../../stores/useFormatStore';
 import { useInstrumentStore } from '../../stores/useInstrumentStore';
@@ -1182,4 +1183,8 @@ export function getFullState(): Record<string, unknown> {
     clipboard: getClipboardState(),
     errors: getSynthErrors(),
   };
+}
+
+export function getConsoleErrors(): Record<string, unknown> {
+  return { entries: getConsoleEntries() };
 }
