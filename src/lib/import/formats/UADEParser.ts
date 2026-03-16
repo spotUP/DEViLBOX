@@ -1057,9 +1057,12 @@ export async function parseUADEFile(
             // After the first sample pass, Paula reloads lc to (ptr + loopStart).
             // Without this alias, tick snapshots during looped playback would fail
             // the instrument lookup and produce instrument = 0 in pattern rows.
-            const loopStart = inst.sample?.loopStart;
-            if (loopStart != null && loopStart > 0) {
-              samplePtrToInstrIndex.set(ptr + loopStart, instrIdx);
+            // Use the raw enhanced scan loopStart (unscaled byte offset from chip
+            // RAM base) rather than inst.sample.loopStart which is a scaled PCM
+            // frame count after upsampling.
+            const rawLoopStart = activeEnhancedScan.samples[ptr]?.loopStart;
+            if (rawLoopStart != null && rawLoopStart > 0) {
+              samplePtrToInstrIndex.set(ptr + rawLoopStart, instrIdx);
             }
           }
         });
