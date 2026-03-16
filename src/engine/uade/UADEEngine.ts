@@ -534,8 +534,8 @@ export class UADEEngine {
     // Prefix-based formats (dl.*, dln.*, rh.*) are matched by the leading component.
     const ext = fileName.split('.').pop()?.toLowerCase() ?? '';
     const prefix = fileName.split('.')[0]?.toLowerCase() ?? '';
-    const SKIP_SCAN_EXTS = new Set(['jpo', 'jpold', 'rh', 'rhp']);
-    const SKIP_SCAN_PREFIXES = new Set(['dl', 'dl_deli', 'dln', 'rh']);
+    const SKIP_SCAN_EXTS = new Set(['jpo', 'jpold', 'rh', 'rhp', 'mm4', 'mm8', 'sdata', 'jd', 'doda', 'gray']);
+    const SKIP_SCAN_PREFIXES = new Set(['dl', 'dl_deli', 'dln', 'rh', 'mm4', 'mm8', 'sdata', 'jd', 'doda', 'gray']);
     const skipScan = SKIP_SCAN_EXTS.has(ext) || SKIP_SCAN_PREFIXES.has(prefix);
     await this.load(buffer, fileName, skipScan, state.uadeEditableCurrentSubsong);
   }

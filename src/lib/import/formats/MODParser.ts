@@ -59,15 +59,23 @@ const FORMAT_CHANNELS: { [key: string]: number } = {
   'M!K!': 4, // ProTracker (>64 patterns)
   'FLT4': 4, // StarTrekker 4-channel
   'FLT8': 8, // StarTrekker 8-channel
+  '1CHN': 1, // 1-channel
+  '2CHN': 2, // FastTracker 2-channel
+  '3CHN': 3, // 3-channel
   '4CHN': 4, // FastTracker 4-channel
+  '5CHN': 5, // 5-channel
   '6CHN': 6, // FastTracker 6-channel
+  '7CHN': 7, // 7-channel
   '8CHN': 8, // FastTracker/TakeTracker 8-channel
+  '9CHN': 9, // 9-channel
   'OCTA': 8, // Octalyser
   'CD81': 8, // Octalyser/Atari
-  '2CHN': 2, // FastTracker 2-channel
   'TDZ1': 1, // TakeTracker 1-channel
   'TDZ2': 2, // TakeTracker 2-channel
   'TDZ3': 3, // TakeTracker 3-channel
+  '10CH': 10, '11CH': 11, '12CH': 12, '13CH': 13, '14CH': 14, '15CH': 15,
+  '16CH': 16, '17CH': 17, '18CH': 18, '19CH': 19, '20CH': 20, '21CH': 21,
+  '22CH': 22, '24CH': 24, '28CH': 28, '32CH': 32,
 };
 
 /**
@@ -330,9 +338,23 @@ function readMODHeader(view: DataView): MODHeader {
   }
   offset += 128;
 
-  // Read format tag (4 bytes)
-  const formatTag = readString(view, offset, 4);
-  const channelCount = FORMAT_CHANNELS[formatTag] || 4; // Default to 4 if unknown
+  // Read format tag (4 bytes) — include null bytes for exact matching
+  let formatTag = '';
+  for (let i = 0; i < 4; i++) formatTag += String.fromCharCode(view.getUint8(offset + i));
+
+  // Parse channel count: known tags first, then dynamic "NNnCH"/"NNCH" patterns
+  let channelCount = FORMAT_CHANNELS[formatTag];
+  if (!channelCount) {
+    // "5CHN", "7CHN", "9CHN" — single digit + CHN
+    const m1 = formatTag.match(/^(\d)CHN$/);
+    if (m1) channelCount = parseInt(m1[1]);
+    // "10CH".."32CH" — two digits + CH
+    const m2 = formatTag.match(/^(\d{2})CH$/);
+    if (m2) channelCount = parseInt(m2[1]);
+  }
+  if (!channelCount) channelCount = 4; // Default to 4 if unknown
+  // Strip null bytes from formatTag for display
+  formatTag = formatTag.replace(/\0/g, '');
 
   return {
     title,
@@ -430,16 +452,17 @@ function readString(view: DataView, offset: number, maxLength: number): string {
 export function periodToNote(period: number): string | null {
   if (period === 0) return null;
 
-  // Amiga period table (linearized for accuracy)
+  // Amiga/ProTracker period table — native ProTracker naming:
+  // C-1=856, C-2=428, C-3=214 (matches amigaNoteToXM: Amiga index 1 → note 13 = C-1)
   const PERIOD_TABLE: { [key: number]: string } = {
-    1712: 'C-2', 1616: 'C#2', 1525: 'D-2', 1440: 'D#2', 1357: 'E-2', 1281: 'F-2',
-    1209: 'F#2', 1141: 'G-2', 1077: 'G#2', 1017: 'A-2', 960: 'A#2', 907: 'B-2',
-    856: 'C-3', 808: 'C#3', 762: 'D-3', 720: 'D#3', 678: 'E-3', 640: 'F-3',
-    604: 'F#3', 570: 'G-3', 538: 'G#3', 508: 'A-3', 480: 'A#3', 453: 'B-3',
-    428: 'C-4', 404: 'C#4', 381: 'D-4', 360: 'D#4', 339: 'E-4', 320: 'F-4',
-    302: 'F#4', 285: 'G-4', 269: 'G#4', 254: 'A-4', 240: 'A#4', 226: 'B-4',
-    214: 'C-5', 202: 'C#5', 190: 'D-5', 180: 'D#5', 170: 'E-5', 160: 'F-5',
-    151: 'F#5', 143: 'G-5', 135: 'G#5', 127: 'A-5', 120: 'A#5', 113: 'B-5',
+    1712: 'C-0', 1616: 'C#0', 1525: 'D-0', 1440: 'D#0', 1357: 'E-0', 1281: 'F-0',
+    1209: 'F#0', 1141: 'G-0', 1077: 'G#0', 1017: 'A-0', 960: 'A#0', 907: 'B-0',
+    856: 'C-1', 808: 'C#1', 762: 'D-1', 720: 'D#1', 678: 'E-1', 640: 'F-1',
+    604: 'F#1', 570: 'G-1', 538: 'G#1', 508: 'A-1', 480: 'A#1', 453: 'B-1',
+    428: 'C-2', 404: 'C#2', 381: 'D-2', 360: 'D#2', 339: 'E-2', 320: 'F-2',
+    302: 'F#2', 285: 'G-2', 269: 'G#2', 254: 'A-2', 240: 'A#2', 226: 'B-2',
+    214: 'C-3', 202: 'C#3', 190: 'D-3', 180: 'D#3', 170: 'E-3', 160: 'F-3',
+    151: 'F#3', 143: 'G-3', 135: 'G#3', 127: 'A-3', 120: 'A#3', 113: 'B-3',
   };
 
   // Find closest period

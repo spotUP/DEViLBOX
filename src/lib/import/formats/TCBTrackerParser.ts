@@ -220,6 +220,11 @@ export async function parseTCBTrackerFile(
   // Format 2 ("AN COOL."): amigaFreqs (2 bytes) precedes instrNames.
   // Format 1 ("AN COOL!"): instrNames start immediately after header.
 
+  // amigaFreqs (format 2 only): 0 = non-Amiga freqs (noteOffset=3), 1 = Amiga freqs (noteOffset=0).
+  // Matches OpenMPT Load_tcb.cpp: const uint8 noteOffset = useAmigaFreqs ? 0 : 3
+  const amigaFreqs = isNewFmt ? u16BE(buf, 144) : 0;
+  const noteOffset = (isNewFmt && amigaFreqs !== 0) ? 0 : 3;
+
   const instrNamesOff = isNewFmt ? 146 : 144; // 144 or 144+2
 
   const instrNames: string[] = [];
@@ -324,12 +329,15 @@ export async function parseTCBTrackerFile(
         const effectType = instrEffect & 0x0F;
 
         // Note decoding: high nibble = octave (1-3), low nibble = semitone (0-11)
+        // noteOffset from amigaFreqs flag: 3 for non-Amiga freqs, 0 for Amiga freqs.
+        // Matches OpenMPT: m.note = NOTE_MIDDLEC-24 + octave*12 + semitone + noteOffset
+        //   → DEViLBOX note = OpenMPT note - 36 = octave*12 + semitone + 1 + noteOffset
         let xmNote = 0;
         if (noteByte >= 0x10 && noteByte <= 0x3B) {
           const octave = noteByte >> 4;
           const semitone = noteByte & 0x0F;
           if (semitone < 12) {
-            xmNote = octave * 12 + semitone + 1;
+            xmNote = octave * 12 + semitone + 1 + noteOffset;
           }
         }
 
