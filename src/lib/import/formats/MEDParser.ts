@@ -53,26 +53,6 @@ function s8(buf: Uint8Array, off: number): number {
   return v >= 128 ? v - 256 : v;
 }
 
-/**
- * MED/MMD0 period to note conversion.
- * The period table is identical to ProTracker.
- */
-const MED_PERIODS = [
-  856, 808, 762, 720, 678, 640, 604, 570, 538, 508, 480, 453,  // oct 1
-  428, 404, 381, 360, 339, 320, 302, 285, 269, 254, 240, 226,  // oct 2
-  214, 202, 190, 180, 170, 160, 151, 143, 135, 127, 120, 113,  // oct 3
-];
-
-function periodToNote(period: number): number {
-  if (period === 0) return 0;
-  let best = 0, bestDist = Infinity;
-  for (let i = 0; i < MED_PERIODS.length; i++) {
-    const d = Math.abs(MED_PERIODS[i] - period);
-    if (d < bestDist) { bestDist = d; best = i; }
-  }
-  // Convert to XM note: Amiga C-1 (period 856, index 0) → XM note 13 (displays "C-1")
-  return best + 13;
-}
 
 export function parseMEDFile(buffer: ArrayBuffer, filename: string): TrackerSong {
   const buf = new Uint8Array(buffer);
@@ -141,8 +121,12 @@ export function parseMEDFile(buffer: ArrayBuffer, filename: string): TrackerSong
   const songLen   = u16(buf, so + 2);
   const playseq: number[] = [];
   for (let i = 0; i < 256; i++) playseq.push(buf[so + 4 + i]);
-  const defTempo  = u16(buf, so + 260);  // BPM tempo
-  const tempo2    = buf[so + 264];        // ticks per line (speed)
+  const defTempo  = u16(buf, so + 260);  // Default tempo (BPM or VBL)
+  // MMD0Song layout after 256-byte playseq:
+  //   so+260: deftempo (u16), so+262: playtransp (int8), so+263: flags (u8)
+  //   so+264: flags2 (u8), so+265: tempo2 (u8 ticks-per-line = speed)
+  const playTranspose = s8(buf, so + 262); // signed int8 global transpose
+  const tempo2    = buf[so + 265];        // ticks per line (speed)
   const numSamples = buf[so + 267];
 
   // ── Parse block (pattern) pointers ──────────────────────────────────────
@@ -204,27 +188,36 @@ export function parseMEDFile(buffer: ArrayBuffer, filename: string): TrackerSong
         let note = 0, inst = 0, effTyp = 0, eff = 0;
 
         if (isMMD1Plus) {
-          // MMD1 cell format: byte0=note, byte1=inst, byte2=effect, byte3=param
-          const rawNote = buf[offset];
+          // MMD1+ cell format (4 bytes): byte0=note, byte1=inst, byte2=effect, byte3=param
+          // (From OpenMPT Load_med.cpp: const auto [noteVal, instr, command, param])
+          // note = (noteVal & 0x7F) + transpose, transpose = NOTE_MIN+47+playTranspose = 48
+          // DEViLBOX note = OpenMPT note - 36 → rawNote + 12 + playTranspose
+          const rawNoteVal = buf[offset];
           inst    = buf[offset + 1];
           effTyp  = buf[offset + 2];
           eff     = buf[offset + 3];
-          // MMD1 notes are 0=none, 1=C-0, 2=C#0, ..., 96=B-7
-          // This matches XM note numbering directly (1=C-0, 49=C-4) — no shift needed.
-          note = rawNote;
+          if (rawNoteVal === 0x80) {
+            note = 97; // note cut
+          } else {
+            const rawNote = rawNoteVal & 0x7F;
+            note = rawNote > 0 ? rawNote + 12 + playTranspose : 0;
+          }
         } else {
-          // MMD0 cell format: 3 bytes
-          // byte0: high 4 bits = instrument high nibble, low 4 bits = note high
-          // byte1: note low 8 bits (this is actually period, not note number in MMD0)
-          // Actually: byte0[7:4]=inst high, byte0[3:0]=note-period high; byte1=note period low; byte2[7:4]=inst low, byte2[3:0]=eff; byte3=param
+          // MMD0 cell format (3 bytes), from OpenMPT Load_med.cpp:
+          //   byte0[5:0] = note number (1-indexed, 0=no note)
+          //   byte0[7:6] = instrument high 2 bits
+          //   byte1[7:4] = instrument low 4 bits
+          //   byte1[3:0] = command type
+          //   byte2      = command param
+          // note = (byte0 & 0x3F) + transpose, transpose = 48; DEViLBOX = OpenMPT - 36
           const raw0 = buf[offset];
           const raw1 = buf[offset + 1];
           const raw2 = buf[offset + 2];
-          const period = ((raw0 & 0x0F) << 8) | raw1;
-          inst = ((raw0 >> 4) << 4) | (raw2 >> 4);
-          const rawEff = raw2 & 0x0F;
-          eff = offset + 3 < buf.length ? buf[offset + 3] : 0;
-          note = periodToNote(period);
+          const rawNote = raw0 & 0x3F;
+          inst = (raw1 >> 4) | ((raw0 & 0x80) >> 3) | ((raw0 & 0x40) >> 1);
+          const rawEff = raw1 & 0x0F;
+          eff = raw2;
+          note = rawNote > 0 ? rawNote + 12 + playTranspose : 0;
           const { effTyp: e, eff: ev } = mapMEDEffect(rawEff, eff);
           effTyp = e;
           eff = ev;

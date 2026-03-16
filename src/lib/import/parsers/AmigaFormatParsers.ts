@@ -742,9 +742,15 @@ export async function tryRouteFormat(
   // ── Sound Factory (.psf) ──────────────────────────────────────────────────
   // Force UADE classic mode — SoundFactory has synth instruments that UADE enhanced
   // mode can't extract as PCM. Classic mode uses UADESynth streaming for 1:1 audio.
+  // Normalize suffix-form to prefix form: axelf.psf → psf.axelf
   if (matchesExt(filename, ['psf'])) {
     const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
-    return parseUADEFile(buffer, originalFileName, 'classic', subsong, preScannedMeta);
+    const psfBase = getBasename(filename);
+    const psfDot = psfBase.lastIndexOf('.');
+    const psfName = (psfDot > 0 && !psfBase.startsWith('psf.'))
+      ? `${psfBase.slice(psfDot + 1)}.${psfBase.slice(0, psfDot)}`
+      : originalFileName;
+    return parseUADEFile(buffer, psfName, 'classic', subsong, preScannedMeta);
   }
 
   // ── Actionamics (.act) ────────────────────────────────────────────────────
@@ -1664,10 +1670,13 @@ export async function tryRouteFormat(
   }
 
   // ── Paul Summers (SNK.* prefix) ───────────────────────────────────────────
-  // Compiled Amiga format — enhanced mode extracts garbled samples, use classic streaming.
+  // Compiled Amiga format. Stub parser + UADE audio via UADEEditableSynth.
   if (matchesExt(filename, ['snk'])) {
-    const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
-    return parseUADEFile(buffer, toUADEPrefixName(originalFileName, ['snk']), 'classic', subsong, preScannedMeta);
+    const snkCtx = { ...ctx, originalFileName: toUADEPrefixName(originalFileName, ['snk']) };
+    const { isPaulSummersFormat, parsePaulSummersFile } = await import('@lib/import/formats/PaulSummersParser');
+    return withNativeThenUADE('paulSummers', snkCtx,
+      (buf: Uint8Array | ArrayBuffer, name: string) => { if (isPaulSummersFormat(buf as ArrayBuffer)) return parsePaulSummersFile(buf as ArrayBuffer, name); return null; },
+      'PaulSummersParser', { injectUADE: true });
   }
 
   // ── Desire (DSR.* prefix) ─────────────────────────────────────────────────
@@ -1890,7 +1899,7 @@ export async function tryRouteFormat(
   // eagleplayer.conf: AM-Composer  prefixes=amc
   if (matchesExt(filename, ['amc'])) {
     const { parseUADEFile: parseUADE_amc } = await import('@lib/import/formats/UADEParser');
-    return parseUADE_amc(buffer, originalFileName, prefs.uade ?? 'enhanced', subsong, preScannedMeta);
+    return parseUADE_amc(buffer, toUADEPrefixName(originalFileName, ['amc']), prefs.uade ?? 'enhanced', subsong, preScannedMeta);
   }
 
   // ── Mugician prefix (DMU.* / DMU2.* prefix) ──────────────────────────────
@@ -1969,7 +1978,14 @@ export async function tryRouteFormat(
   // eagleplayer.conf: MusicMaker_4V  prefixes=mm4,sdata
   if (matchesExt(filename, ['mm4', 'sdata'])) {
     const { isMusicMaker4VFormat, parseMusicMaker4VFile } = await import('@lib/import/formats/MusicMakerParser');
-    return withNativeThenUADE('musicMaker4V', ctx,
+    // Normalize suffix-form to UADE prefix form so callUADE fallback works:
+    // axelf.mm4 → mm4.axelf (UADE eagleplayer keyed on prefix)
+    const mm4Base = getBasename(filename);
+    const mm4Dot = mm4Base.lastIndexOf('.');
+    const mm4Ctx = (mm4Dot > 0 && !mm4Base.startsWith('mm4.') && !mm4Base.startsWith('sdata.'))
+      ? { ...ctx, originalFileName: `${mm4Base.slice(mm4Dot + 1)}.${mm4Base.slice(0, mm4Dot)}` }
+      : ctx;
+    return withNativeThenUADE('musicMaker4V', mm4Ctx,
       (buf: Uint8Array | ArrayBuffer, name: string) => { if (isMusicMaker4VFormat(buf as ArrayBuffer, name)) return parseMusicMaker4VFile(buf as ArrayBuffer, name); return null; },
       'MusicMakerParser/4V', { injectUADE: true });
   }
@@ -1978,7 +1994,13 @@ export async function tryRouteFormat(
   // eagleplayer.conf: MusicMaker_8V  prefixes=mm8
   if (matchesExt(filename, ['mm8'])) {
     const { isMusicMaker8VFormat, parseMusicMaker8VFile } = await import('@lib/import/formats/MusicMakerParser');
-    return withNativeThenUADE('musicMaker8V', ctx,
+    // Normalize suffix-form to UADE prefix form: axelf.mm8 → mm8.axelf
+    const mm8Base = getBasename(filename);
+    const mm8Dot = mm8Base.lastIndexOf('.');
+    const mm8Ctx = (mm8Dot > 0 && !mm8Base.startsWith('mm8.'))
+      ? { ...ctx, originalFileName: `${mm8Base.slice(mm8Dot + 1)}.${mm8Base.slice(0, mm8Dot)}` }
+      : ctx;
+    return withNativeThenUADE('musicMaker8V', mm8Ctx,
       (buf: Uint8Array | ArrayBuffer, name: string) => { if (isMusicMaker8VFormat(buf as ArrayBuffer, name)) return parseMusicMaker8VFile(buf as ArrayBuffer, name); return null; },
       'MusicMakerParser/8V', { injectUADE: true });
   }

@@ -1081,6 +1081,7 @@ export interface FurnaceSample {
   compatRate: number;
   c4Rate: number;
   depth: number;
+  loop: boolean;
   loopStart: number;
   loopEnd: number;
   loopDirection: number;
@@ -2167,6 +2168,7 @@ function parseSample(reader: BinaryReader, version: number): FurnaceSample {
     compatRate: 0,
     c4Rate: 0,
     depth: 16,
+    loop: false,
     loopStart: -1,
     loopEnd: -1,
     loopDirection: 0,
@@ -2183,10 +2185,12 @@ function parseSample(reader: BinaryReader, version: number): FurnaceSample {
     sample.depth = reader.readUint8();
     const rawLoopMode = reader.readUint8(); // always consume the byte
     sample.loopDirection = version >= 123 ? rawLoopMode : 0;
-    reader.readUint8(); // flags
-    reader.readUint8(); // flags2
-    sample.loopStart = reader.readInt32();
-    sample.loopEnd = reader.readInt32();
+    (sample as any).brrEmphasis = reader.readUint8() !== 0;
+    (sample as any).brrNoFilter = reader.readUint8() !== 0;
+    sample.loopStart = reader.readInt32(); // = loop ? loopStart : -1
+    sample.loopEnd = reader.readInt32();   // = loop ? loopEnd : -1
+    // Loop is encoded as loopStart=-1/loopEnd=-1 when not looping (matches Furnace sample.cpp)
+    sample.loop = sample.loopStart >= 0 && sample.loopEnd >= 0;
     reader.skip(16); // Sample presence bitfields
 
     // Read sample data — byte count depends on depth (matches Furnace sample.cpp initInternal)
@@ -2268,6 +2272,9 @@ function parseSample(reader: BinaryReader, version: number): FurnaceSample {
 
     if (version >= 19) {
       sample.loopStart = reader.readInt32();
+      // Loop is determined by loopStart >= 0 (matches Furnace sample.cpp lines 117+177)
+      sample.loop = (sample.loopStart ?? -1) >= 0;
+      sample.loopEnd = sample.loop ? sample.length : 0;
     }
 
     // Read sample data
