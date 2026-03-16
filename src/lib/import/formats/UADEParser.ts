@@ -156,6 +156,8 @@ const UADE_EXTENSIONS: Set<string> = new Set([
   'avp', 'mw',
   // Maximum Effect
   'max',
+  // MaxTrax
+  'mxtx',
   // MikeDavies
   'md',
   // Mosh Packer
