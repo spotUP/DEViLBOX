@@ -1265,6 +1265,15 @@ export class FurnaceDispatchEngine {
   }
 
   /**
+   * Destroy a chip dispatch instance. Used to clean up chips from previous songs.
+   */
+  destroyChip(platformType: number): void {
+    if (!this.chips.has(platformType)) return;
+    this.workletNode?.port.postMessage({ type: 'destroyChip', platformType });
+    this.chips.delete(platformType);
+  }
+
+  /**
    * Create a chip dispatch instance for the given platform.
    * The worklet handles reuse if the same platform already exists.
    */
