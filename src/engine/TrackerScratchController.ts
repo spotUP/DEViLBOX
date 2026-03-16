@@ -51,12 +51,10 @@ const SCROLL_IDLE_THRESHOLD = 1;
  *  intentional trackpad scrolls (typically 2-8px). */
 const SCROLL_SIGNIFICANT_THRESHOLD = 2;
 
-/** Cooldown after exiting scroll-based scratch mode (ms).
- *  Mac trackpad inertial scroll can send events with large deltas (5-20px) for
- *  seconds after the user lifts their fingers. Without a cooldown, these events
- *  immediately re-enter scratch mode after exit, causing a rapid enter/exit loop.
- *  NOTE: Only applies to scroll re-entry, not grab (mouse drag) re-entry. */
-const SCRATCH_EXIT_COOLDOWN_MS = 800;
+/** How long after the last scroll event before releasing the platter (ms).
+ *  Must be longer than the typical gap between trackpad scroll events (~16-32ms)
+ *  so a continuous gesture doesn't accidentally drop touch state between events. */
+const SCROLL_RELEASE_MS = 150;
 
 // ─── Controller ──────────────────────────────────────────────────────────────
 
@@ -89,13 +87,16 @@ export class TrackerScratchController {
   /** The transport's original smoothScrolling state before scratch started */
   private originalSmoothScrolling = false;
 
-  /** Timestamp when scratch mode was last exited (for cooldown) */
-  private lastExitTime = 0;
 
   /** Previous touch Y position for delta calculation (grab mode) */
   private grabLastY = 0;
   /** Previous touch timestamp for velocity calculation (grab mode) */
   private grabLastTime = 0;
+
+  /** Last scroll event timestamp for dt calculation (scroll/wheel mode) */
+  private _lastScrollTime = 0;
+  /** Timer to release hand from platter after scroll stops (50ms) */
+  private _scrollReleaseTimerId: ReturnType<typeof setTimeout> | null = null;
 
   // ── Scratch display position tracking ──────────────────────────────────
   /** Row when scratch started */
@@ -151,24 +152,30 @@ export class TrackerScratchController {
     this.scratchBuffer = new DeckScratchBuffer(ctx, 0);
     await this.scratchBuffer.init();
 
-    // Wire: tap the replayer's masterGain output into capture, and wire
-    // playback into ToneEngine's masterInput
-    const replayer = getTrackerReplayer();
+    // Wire: tap ToneEngine buses into capture, and wire playback into masterInput
     const engine = getToneEngine();
 
-    const replayerGain = getNativeAudioNode(replayer.getMasterGain() as unknown as Record<string, unknown>);
     const masterInput = getNativeAudioNode(engine.masterInput as unknown as Record<string, unknown>);
+    const synthBus    = getNativeAudioNode(engine.synthBus    as unknown as Record<string, unknown>);
 
-    if (replayerGain && masterInput) {
-      // Tap: replayer masterGain → captureNode (capture taps audio, doesn't interrupt chain)
-      replayerGain.connect(this.scratchBuffer['captureNode']);
-      // Inject: playbackNode → playbackGain → masterInput (for scratch audio)
+    if (masterInput && synthBus) {
+      // Tap 1: ToneEngine masterInput → captureNode
+      //   Captures: MOD/XM/IT/S3M (masterGain→separationNode→masterInput)
+      //             + UADE/Hively/native WASM engines (nativeEngine→separationNode→masterInput)
+      masterInput.connect(this.scratchBuffer['captureNode']);
+      // Tap 2: ToneEngine synthBus → captureNode
+      //   Captures: Furnace chips, C64 SID, DB303, and all other ToneEngine synths
+      //             (these bypass masterInput and flow through synthBus directly)
+      synthBus.connect(this.scratchBuffer['captureNode']);
+      // Inject: playbackNode → playbackGain → masterInput (scratch audio playback)
       this.scratchBuffer.playbackGain.connect(masterInput);
       this.scratchBufferReady = true;
+      // Reset immediately — no previous song audio should be in the buffer yet
+      this.scratchBuffer.resetCapture();
       console.log('[TrackerScratch] Scratch buffer wired successfully');
     } else {
       console.warn('[TrackerScratch] Could not get native audio nodes; scratch disabled',
-        { replayerGain: !!replayerGain, masterInput: !!masterInput });
+        { masterInput: !!masterInput, synthBus: !!synthBus });
     }
   }
 
@@ -195,15 +202,6 @@ export class TrackerScratchController {
     // these must not re-enter scratch mode after a clean exit.
     if (!this._isActive && absDelta < SCROLL_IDLE_THRESHOLD) {
       return false; // passthrough — let normal scroll handling take over
-    }
-
-    // Cooldown: after exiting scratch, ignore ALL scroll events for a period.
-    // Mac trackpad inertial scroll sends large deltas (5-20px) for 1-2 seconds
-    // that would otherwise immediately re-enter scratch mode, causing a rapid
-    // enter/exit oscillation loop.
-    if (!this._isActive && (timestamp - this.lastExitTime) < SCRATCH_EXIT_COOLDOWN_MS) {
-      console.warn(`[TrackerScratch] Cooldown blocking re-entry, delta=${deltaY.toFixed(1)}, remaining=${(SCRATCH_EXIT_COOLDOWN_MS - (timestamp - this.lastExitTime)).toFixed(0)}ms`);
-      return false; // passthrough — still in cooldown from last scratch
     }
 
     // When active and the idle timer has expired (no significant input for 300ms),
@@ -235,16 +233,37 @@ export class TrackerScratchController {
     // Read acceleration preference from store
     this._accelerationEnabled = useUIStore.getState().scratchAcceleration;
 
-    // Convert scroll delta to angular impulse via physics utility
-    // Boost impulse for pattern editor — trackpad deltas are small (2-8px)
-    // and users expect direct visual response when scrolling
-    const impulse = TurntablePhysics.deltaToImpulse(deltaY, deltaMode) * 8;
+    // Velocity control (same as grab mode) — hand on record, motor disengaged.
+    // Impulse mode produced ~0.007 rad/s per 5px scroll, far below the 0.15 rad/s
+    // slipmat breakaway threshold, so the motor instantly corrected and no audible
+    // scratch occurred. Velocity control gives direct, responsive feel.
+    const dt = Math.max(0.001, (timestamp - this._lastScrollTime) / 1000);
+    this._lastScrollTime = timestamp;
 
-    // With acceleration disabled, use a more direct/linear feel
-    const scaledImpulse = this._accelerationEnabled ? impulse : impulse * 1.5;
+    // Normalize deltaMode (line=12px, page=400px)
+    const normalizedDelta = deltaMode === 1 ? deltaY * 12 : deltaMode === 2 ? deltaY * 400 : deltaY;
+    const omega = TurntablePhysics.deltaToAngularVelocity(normalizedDelta, dt);
 
-    this.physics.applyImpulse(scaledImpulse);
+    this.physics.setTouching(true);
+    this.physics.setHandVelocity(omega);
+
+    // Release hand after scroll stops — motor re-engages naturally
+    this.clearScrollReleaseTimer();
+    this._scrollReleaseTimerId = setTimeout(() => {
+      this._scrollReleaseTimerId = null;
+      if (this._isActive) {
+        this.physics.setTouching(false);
+      }
+    }, SCROLL_RELEASE_MS);
+
     return true;
+  }
+
+  private clearScrollReleaseTimer(): void {
+    if (this._scrollReleaseTimerId !== null) {
+      clearTimeout(this._scrollReleaseTimerId);
+      this._scrollReleaseTimerId = null;
+    }
   }
 
   // ── Touch handlers (grab mode — 3 fingers on Mac trackpad) ────────────
@@ -429,7 +448,7 @@ export class TrackerScratchController {
    */
   private exitScratchModeAndStop(): void {
     this._isActive = false;
-    this.lastExitTime = performance.now();
+    this.clearScrollReleaseTimer();
     this.stopPhysicsLoop();
 
     // Silence the scratch buffer immediately (it's already at/near zero rate)
@@ -440,7 +459,7 @@ export class TrackerScratchController {
 
     // Stop the tracker replayer and full transport chain
     const replayer = getTrackerReplayer();
-    replayer.getMasterGain().gain.rampTo(this.originalGainValue, 0.01);
+    replayer.getFullOutput().gain.rampTo(this.originalGainValue, 0.01);
     replayer.stop();
     useTransportStore.getState().stop();
     getToneEngine().stop();
@@ -524,9 +543,11 @@ export class TrackerScratchController {
     this.scratchBuffer.startScratch(rate);
     this.scratchBuffer.snapScratchRate(rate);
 
-    // NOW mute replayer (capture is frozen, so this silence won't be captured)
+    // NOW mute the full tracker output — covers internal sequencer AND native WASM
+    // engines (libopenmpt, UADE, etc.) that bypass masterGain and connect directly
+    // to the separation node. masterGain alone would leave native engines audible.
     const now = Tone.getContext().rawContext.currentTime;
-    const gainParam = replayer.getMasterGain().gain;
+    const gainParam = replayer.getFullOutput().gain;
     gainParam.cancelScheduledValues(now);
     gainParam.setValueAtTime(0, now);
 
@@ -542,7 +563,7 @@ export class TrackerScratchController {
 
   private exitScratchMode(replayer: TrackerReplayer): void {
     this._isActive = false;
-    this.lastExitTime = performance.now();
+    this.clearScrollReleaseTimer();
     this.stopPhysicsLoop();
 
     const fadeSec = TrackerScratchController.EXIT_CROSSFADE_SEC;
@@ -560,12 +581,9 @@ export class TrackerScratchController {
     replayer.setSuppressNotes(false);
 
     // Crossfade — scratch buffer out, live tracker in.
-    const masterGain = replayer.getMasterGain();
-    if (masterGain) {
-      // Force gain to 1 immediately (no ramp — just restore it)
-      masterGain.gain.value = this.originalGainValue;
-      console.warn(`[TrackerScratch] Gain restored to ${this.originalGainValue}`);
-    }
+    // Restore the full output gain (covers all formats, including native WASM engines).
+    replayer.getFullOutput().gain.value = this.originalGainValue;
+    console.warn(`[TrackerScratch] Gain restored to ${this.originalGainValue}`);
 
     // Crossfade: ramp scratch buffer gain down over the same duration
     if (this.scratchBuffer && this.scratchBufferReady) {
@@ -686,6 +704,20 @@ export class TrackerScratchController {
       param.cancelScheduledValues(ctx.currentTime);
       param.setValueAtTime(active ? 0 : 1, ctx.currentTime);
     } catch { /* replayer not ready */ }
+  }
+
+  /**
+   * Set fader gain directly (0.0–1.0). Only applies during active scratch.
+   * Used for continuous MIDI CC (joystick crossfader).
+   */
+  setFaderGain(value: number): void {
+    if (!this._isActive) return;
+    if (!this.scratchBuffer || !this.scratchBufferReady) return;
+    const clamped = Math.max(0, Math.min(1, value));
+    const ctx = Tone.getContext().rawContext as AudioContext;
+    const gain = this.scratchBuffer.playbackGain.gain;
+    gain.cancelScheduledValues(ctx.currentTime);
+    gain.setValueAtTime(clamped, ctx.currentTime);
   }
 
   // ── Scratch patterns (fader chops while held) ────────────────────────────
@@ -902,6 +934,14 @@ export class TrackerScratchController {
   }
 
   // ── Cleanup ──────────────────────────────────────────────────────────────
+
+  /** Reset the scratch ring buffer. Call when a new song loads so stale audio
+   *  from the previous song is never heard during scratch. */
+  resetScratchBuffer(): void {
+    if (this.scratchBuffer && this.scratchBufferReady) {
+      this.scratchBuffer.resetCapture();
+    }
+  }
 
   /** Force-stop scratching (e.g., when playback stops externally) */
   forceStop(): void {

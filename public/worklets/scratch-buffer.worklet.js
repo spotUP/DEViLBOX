@@ -14,10 +14,10 @@
  *   ScratchCaptureProcessor: continuously writes audio into ring buffer
  *   ScratchPlaybackProcessor: reads ring buffer at variable rate with interpolation
  *
- * Ring buffer: 45 s × sampleRate × 2 ch interleaved (L/R)
+ * Ring buffer: 120 s × sampleRate × 2 ch interleaved (L/R)
  */
 
-const BUFFER_SECONDS = 45;
+const BUFFER_SECONDS = 120;
 
 /**
  * Rate smoothing time constant in seconds.
@@ -35,9 +35,10 @@ const RATE_SMOOTH_SEC = 0.005;
 const ZERO_FADE_SAMPLES = 48;
 
 // Module-level shared state (one AudioWorkletGlobalScope per context)
-const rings     = [];            // Float32Array per bufferId, lazy-initialized
-const writePoss = [0, 0];        // Current write position per bufferId
-const frozen    = [false, false]; // Per-buffer freeze state
+const rings        = [];            // Float32Array per bufferId, lazy-initialized
+const writePoss    = [0, 0];        // Current write position per bufferId (mod bufLen)
+const totalWritten = [0, 0];        // Total frames ever written per bufferId (never wraps)
+const frozen       = [false, false]; // Per-buffer freeze state
 
 function getOrCreateRing(bufferId, sr) {
   if (!rings[bufferId]) {
@@ -87,6 +88,14 @@ class ScratchCaptureProcessor extends AudioWorkletProcessor {
         frozen[this.bufferId] = true;
       } else if (d.type === 'unfreeze') {
         frozen[this.bufferId] = false;
+      } else if (d.type === 'reset') {
+        // Clear the ring buffer and reset counters — call when a new song starts
+        // so scratch never plays back audio from a previous song.
+        const ring = rings[this.bufferId];
+        if (ring) ring.fill(0);
+        writePoss[this.bufferId]    = 0;
+        totalWritten[this.bufferId] = 0;
+        frozen[this.bufferId]       = false;
       }
     };
   }
@@ -125,6 +134,7 @@ class ScratchCaptureProcessor extends AudioWorkletProcessor {
 
     if (!isFrozen) {
       writePoss[this.bufferId] = wp;
+      totalWritten[this.bufferId] += frames;
     }
 
     this._framesSinceReport += frames;
@@ -163,11 +173,13 @@ class ScratchPlaybackProcessor extends AudioWorkletProcessor {
     this.bufferFrames = Math.round(sampleRate * BUFFER_SECONDS);
     this.ring         = getOrCreateRing(this.bufferId, sampleRate);
 
-    this.active     = false;
-    this.readPosF   = 0;     // fractional read position (sub-sample precision)
-    this.targetRate = 0;     // target playback rate from main thread
-    this.smoothRate = 0;     // smoothed rate (used per-sample for position advance)
-    this.startPos   = 0;     // position at scratch start (for framesBack calc)
+    this.active      = false;
+    this.readPosF    = 0;     // fractional read position (sub-sample precision)
+    this.targetRate  = 0;     // target playback rate from main thread
+    this.smoothRate  = 0;     // smoothed rate (used per-sample for position advance)
+    this.startPos    = 0;     // position at scratch start (for framesBack calc)
+    this.frozenWP    = 0;     // write position frozen at scratch start (for loop clamping)
+    this.validFrames = 0;     // valid captured frames in buffer at scratch start
 
     // Rate smoothing coefficient
     this.smoothAlpha = 1 - Math.exp(-1 / (RATE_SMOOTH_SEC * sampleRate));
@@ -192,6 +204,8 @@ class ScratchPlaybackProcessor extends AudioWorkletProcessor {
           this.smoothRate   = d.rate ?? 0; // snap on start
           this.prevSign     = Math.sign(this.smoothRate);
           this.fadeCounter  = 0;
+          this.frozenWP     = d.startPos;
+          this.validFrames  = Math.min(totalWritten[this.bufferId], this.bufferFrames);
           this.active       = true;
           break;
 
@@ -199,18 +213,35 @@ class ScratchPlaybackProcessor extends AudioWorkletProcessor {
           this.targetRate = d.rate;
           break;
 
-        case 'startFromWrite':
-          // Start from the EXACT write position (reads shared module state directly)
+        case 'startFromWrite': {
+          // Position the read head at the MIDPOINT of all captured valid content.
+          // This gives equal forward and backward scratch range:
+          //   - Rate +1.0: reads from midpoint → WP (forward through recent audio)
+          //   - Rate -1.0: reads from midpoint → history (backward through older audio)
+          //   - Rate  0.0: stays at midpoint (correct hold/stopped scratch behavior)
+          //
+          // With a 120s ring buffer, once the song has played >2 minutes you get
+          // a full 60s of forward AND backward range before hitting the buffer edge.
+          // At 4× rate you get 15s of scratch in either direction — more than enough
+          // for any realistic scratch session.
           this.ring         = getOrCreateRing(this.bufferId, sampleRate);
           this.bufferFrames = Math.round(sampleRate * BUFFER_SECONDS);
-          this.startPos     = writePoss[this.bufferId];
-          this.readPosF     = writePoss[this.bufferId];
+          const wp          = writePoss[this.bufferId];
+          const bufLen      = this.bufferFrames;
+          const captured    = Math.min(totalWritten[this.bufferId], bufLen);
+          // Half of valid content — symmetric range in both directions.
+          const halfValid   = Math.floor(captured / 2);
+          this.startPos     = wp;
+          this.readPosF     = (wp - halfValid + bufLen) % bufLen;
           this.targetRate   = d.rate ?? 0;
           this.smoothRate   = d.rate ?? 0;
           this.prevSign     = Math.sign(this.smoothRate);
           this.fadeCounter  = 0;
+          this.frozenWP     = wp;
+          this.validFrames  = captured;
           this.active       = true;
           break;
+        }
 
         case 'stop': {
           this.active = false;
