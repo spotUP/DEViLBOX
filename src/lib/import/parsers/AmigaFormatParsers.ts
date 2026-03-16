@@ -1846,6 +1846,13 @@ export async function tryRouteFormat(
     return parseUADEFile(buffer, toUADEPrefixName(originalFileName, ['mxtx']), prefs.uade ?? 'enhanced', subsong, preScannedMeta);
   }
 
+  // ── AudioSculpture / Startrekker AM (.adsc, .mod_adsc4) ──────────────────────
+  // UADE eagleplayer requires prefix form: adsc.songname
+  if (matchesExt(filename, ['adsc', 'mod_adsc4'])) {
+    const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
+    return parseUADEFile(buffer, toUADEPrefixName(originalFileName, ['adsc', 'mod_adsc4']), prefs.uade ?? 'enhanced', subsong, preScannedMeta);
+  }
+
   // ── Maximum Effect (MAX.* prefix) ────────────────────────────────────────────
   if (matchesExt(filename, ['max'])) {
     const { isMaximumEffectFormat, parseMaximumEffectFile } = await import('@lib/import/formats/MaximumEffectParser');
