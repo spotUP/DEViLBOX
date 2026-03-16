@@ -313,6 +313,14 @@ export async function tryRouteFormat(
       'SonicArrangerParser', { injectUADE: true });
   }
 
+  // ── Sonic Arranger SAS (.sas — suffix-form compiled binary) ──────────────
+  // .sas files are suffix-form SonicArranger compiled replayers (sas.songname in UADE).
+  // UADE eagleplayer needs prefix form; pass as classic streaming (compiled binary).
+  if (matchesExt(filename, ['sas'])) {
+    const { parseUADEFile: parseUADE_sas } = await import('@lib/import/formats/UADEParser');
+    return parseUADE_sas(buffer, toUADEPrefixName(originalFileName, ['sas']), 'classic', subsong, preScannedMeta);
+  }
+
   // ── InStereo! 2.0 (.is20 — unambiguous) ──────────────────────────────────
   // Use native parser for instrument display + inject UADE for 1:1 audio playback.
   // This gives individual instrument previews while UADE handles the song audio.
