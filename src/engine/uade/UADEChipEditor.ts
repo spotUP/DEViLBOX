@@ -128,6 +128,31 @@ export class UADEChipEditor {
   }
 
   /**
+   * Universal export: read the module back from chip RAM using the original
+   * file size. Works for ANY UADE format — no encoder or pattern layout needed.
+   * Any chip RAM edits (pattern cells, instrument params) are included.
+   */
+  async exportWithOriginalSize(originalFileSize: number, filename: string): Promise<void> {
+    const moduleBase = await this.getModuleBase();
+    if (moduleBase === 0 || originalFileSize <= 0) {
+      throw new Error('Cannot export: module base or file size unknown');
+    }
+    await this.exportModule(moduleBase, originalFileSize, filename);
+  }
+
+  /**
+   * Read the edited module bytes (for non-browser contexts or further processing).
+   * Returns the raw bytes without triggering a download.
+   */
+  async readEditedModule(originalFileSize: number): Promise<Uint8Array> {
+    const moduleBase = await this.getModuleBase();
+    if (moduleBase === 0 || originalFileSize <= 0) {
+      throw new Error('Cannot read module: module base or file size unknown');
+    }
+    return this.readModule(moduleBase, originalFileSize);
+  }
+
+  /**
    * Trigger a browser download of the module binary in its original format.
    * Call this after the user has finished editing parameters.
    */
