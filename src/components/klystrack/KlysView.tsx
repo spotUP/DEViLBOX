@@ -37,9 +37,6 @@ export const KlysView: React.FC<{ width?: number; height?: number }> = ({ width:
 
   const containerRef = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ w: propW ?? 800, h: propH ?? 600 });
-  // Ref so position callback always sees current native data without stale closure
-  const nativeDataRef = useRef(nativeData);
-  useEffect(() => { nativeDataRef.current = nativeData; }, [nativeData]);
 
   const klysFileData = useFormatStore(s => s.klysFileData);
 
@@ -65,24 +62,9 @@ export const KlysView: React.FC<{ width?: number; height?: number }> = ({ width:
         const sp = update.songPosition;
         useTrackerStore.setState({ currentPositionIndex: sp });
 
-        // Compute current row within active pattern from song position.
-        // pattern_step (update.patternPosition) can be unreliable; derive from
-        // sequence data instead: row = (songPosition - entryStart) % patternLen.
-        let row = update.patternPosition;
-        const nd = nativeDataRef.current;
-        if (nd && nd.sequences[0]) {
-          const seq = nd.sequences[0];
-          let entryStart = 0;
-          let activePatIdx = -1;
-          for (const entry of seq.entries) {
-            if (entry.position <= sp) { entryStart = entry.position; activePatIdx = entry.pattern; }
-          }
-          if (activePatIdx >= 0 && activePatIdx < nd.patterns.length) {
-            const patLen = nd.patterns[activePatIdx].numSteps;
-            if (patLen > 0) row = (sp - entryStart) % patLen;
-          }
-        }
-        useTransportStore.setState({ currentRow: row });
+        // patternPosition = g_mus.song_track[0].pattern_step = song_position - entry.position
+        // This is the correct row within the currently-playing pattern for channel 0.
+        useTransportStore.setState({ currentRow: update.patternPosition });
       });
 
       // Subscribe to song data BEFORE loading so we catch the response

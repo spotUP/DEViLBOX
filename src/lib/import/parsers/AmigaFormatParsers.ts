@@ -182,26 +182,29 @@ export async function tryRouteFormat(
   // ── Delta Music 2.0 ──────────────────────────────────────────────────────
   // DM2Parser handles .dm2 files (magic ".FNL" at 0xBC6).
   // .dm and .dm1 are Delta Music 1.x — different format, handled by UADE.
+  // injectUADE: native parser always runs for editable patterns; UADE handles audio.
   if (filename.endsWith('.dm2')) {
     const { isDeltaMusic2Format, parseDeltaMusic2File } = await import('@lib/import/formats/DeltaMusic2Parser');
     return withNativeThenUADE('deltaMusic2', ctx,
       (bytes: Uint8Array | ArrayBuffer, name: string) => parseDeltaMusic2File(bytes as Uint8Array, name),
-      'DeltaMusic2Parser', { isFormat: isDeltaMusic2Format, usesBytes: true });
+      'DeltaMusic2Parser', { isFormat: isDeltaMusic2Format, usesBytes: true, injectUADE: true });
   }
 
   // ── Future Composer ──────────────────────────────────────────────────────
   // FCParser handles FC 1.3 (magic "FC13"/"SMOD") and FC 1.4 (magic "FC14").
   // Future Composer 2 and other FC variants have different magic bytes and
   // fall through to UADE automatically when the native parser rejects them.
+  // injectUADE: native parser always runs for editable patterns; UADE handles audio.
   if (isFCFormat(filename)) {
     const { parseFCFile } = await import('@lib/import/formats/FCParser');
-    return withNativeThenUADE('fc', ctx, (buf: Uint8Array | ArrayBuffer, name: string) => parseFCFile(buf as ArrayBuffer, name), 'FCParser');
+    return withNativeThenUADE('fc', ctx, (buf: Uint8Array | ArrayBuffer, name: string) => parseFCFile(buf as ArrayBuffer, name), 'FCParser', { injectUADE: true });
   }
 
   // ── SoundMon (Brian Postma) ─────────────────────────────────────────────
+  // injectUADE: native parser always runs for editable patterns; UADE handles audio.
   if (matchesExt(filename, ['bp', 'bp3', 'sndmon'])) {
     const { parseSoundMonFile } = await import('@lib/import/formats/SoundMonParser');
-    return withNativeThenUADE('soundmon', ctx, (buf: Uint8Array | ArrayBuffer, name: string) => parseSoundMonFile(buf as ArrayBuffer, name), 'SoundMonParser');
+    return withNativeThenUADE('soundmon', ctx, (buf: Uint8Array | ArrayBuffer, name: string) => parseSoundMonFile(buf as ArrayBuffer, name), 'SoundMonParser', { injectUADE: true });
   }
 
   // ── SidMon 1.0 / SidMon II (.smn can be either) ─────────────────────────
@@ -301,11 +304,13 @@ export async function tryRouteFormat(
 
   // ── Sonic Arranger ────────────────────────────────────────────────────────
   // Magic "SOARV1.0" at offset 0. "@OARV1.0" is LH-compressed — falls to UADE.
+  // injectUADE: native parser always runs for editable pattern display;
+  // UADE handles audio via uadeEditableFileData / UADEEditableSynth (classic streaming).
   if (matchesExt(filename, ['sa', 'sonic'])) {
     const { isSonicArrangerFormat, parseSonicArrangerFile } = await import('@lib/import/formats/SonicArrangerParser');
     return withNativeThenUADE('sonicArranger', ctx,
       (buf: Uint8Array | ArrayBuffer, name: string) => { if (isSonicArrangerFormat(buf as ArrayBuffer)) return parseSonicArrangerFile(buf as ArrayBuffer, name) ?? null; return null; },
-      'SonicArrangerParser');
+      'SonicArrangerParser', { injectUADE: true });
   }
 
   // ── InStereo! 2.0 (.is20 — unambiguous) ──────────────────────────────────
@@ -530,7 +535,7 @@ export async function tryRouteFormat(
     const { isArtOfNoiseFormat, parseArtOfNoiseFile } = await import('@lib/import/formats/ArtOfNoiseParser');
     return withNativeThenUADE('artOfNoise', ctx,
       (bytes: Uint8Array | ArrayBuffer, name: string) => parseArtOfNoiseFile(bytes as Uint8Array, name),
-      'ArtOfNoiseParser', { isFormat: isArtOfNoiseFormat, usesBytes: true });
+      'ArtOfNoiseParser', { isFormat: isArtOfNoiseFormat, usesBytes: true, injectUADE: true });
   }
 
   // ── Digital Symphony ──────────────────────────────────────────────────────
@@ -599,7 +604,7 @@ export async function tryRouteFormat(
     const { isSynthesisFormat, parseSynthesisFile } = await import('@lib/import/formats/SynthesisParser');
     return withNativeThenUADE('synthesis', ctx,
       (bytes: Uint8Array | ArrayBuffer, name: string) => parseSynthesisFile(bytes as Uint8Array, name),
-      'SynthesisParser', { isFormat: isSynthesisFormat, usesBytes: true });
+      'SynthesisParser', { isFormat: isSynthesisFormat, usesBytes: true, injectUADE: true });
   }
 
   // ── Digital Sound Studio ──────────────────────────────────────────────────
@@ -617,7 +622,7 @@ export async function tryRouteFormat(
     const { isMusicAssemblerFormat, parseMusicAssemblerFile } = await import('@lib/import/formats/MusicAssemblerParser');
     return withNativeThenUADE('musicAssembler', ctx,
       (bytes: Uint8Array | ArrayBuffer, name: string) => parseMusicAssemblerFile(bytes as Uint8Array, name),
-      'MusicAssemblerParser', { isFormat: isMusicAssemblerFormat, usesBytes: true });
+      'MusicAssemblerParser', { isFormat: isMusicAssemblerFormat, usesBytes: true, injectUADE: true });
   }
 
   // ── Composer 667 ─────────────────────────────────────────────────────────
@@ -725,7 +730,7 @@ export async function tryRouteFormat(
     if (isSawteethFormat(new Uint8Array(buffer))) {
       return withNativeThenUADE('sawteeth', ctx,
         (buf: Uint8Array | ArrayBuffer, name: string) => { if (isSawteethFormat(new Uint8Array(buf as ArrayBuffer))) return parseSawteethFile(new Uint8Array(buf as ArrayBuffer), name) ?? null; return null; },
-        'SawteethParser');
+        'SawteethParser', { injectUADE: true });
     }
     const { parseUADEFile: parseUADE_st } = await import('@lib/import/formats/UADEParser');
     return parseUADE_st(buffer, originalFileName, prefs.uade ?? 'enhanced', subsong, preScannedMeta);
@@ -736,7 +741,7 @@ export async function tryRouteFormat(
     const { isSoundControlFormat, parseSoundControlFile } = await import('@lib/import/formats/SoundControlParser');
     return withNativeThenUADE('soundControl', ctx,
       (bytes: Uint8Array | ArrayBuffer, name: string) => parseSoundControlFile(bytes as Uint8Array, name),
-      'SoundControlParser', { isFormat: isSoundControlFormat, usesBytes: true });
+      'SoundControlParser', { isFormat: isSoundControlFormat, usesBytes: true, injectUADE: true });
   }
 
   // ── Sound Factory (.psf) ──────────────────────────────────────────────────
@@ -759,7 +764,7 @@ export async function tryRouteFormat(
     const { isActionamicsFormat, parseActionamicsFile } = await import('@lib/import/formats/ActionamicsParser');
     return withNativeThenUADE('actionamics', ctx,
       (bytes: Uint8Array | ArrayBuffer, name: string) => parseActionamicsFile(bytes as Uint8Array, name),
-      'ActionamicsParser', { isFormat: isActionamicsFormat, usesBytes: true });
+      'ActionamicsParser', { isFormat: isActionamicsFormat, usesBytes: true, injectUADE: true });
   }
 
   // ── Activision Pro / Martin Walker (.avp, .mw) ────────────────────────────
@@ -768,7 +773,7 @@ export async function tryRouteFormat(
     const { isActivisionProFormat, parseActivisionProFile } = await import('@lib/import/formats/ActivisionProParser');
     return withNativeThenUADE('activisionPro', ctx,
       (bytes: Uint8Array | ArrayBuffer, name: string) => parseActivisionProFile(bytes as Uint8Array, name),
-      'ActivisionProParser', { isFormat: isActivisionProFormat, usesBytes: true });
+      'ActivisionProParser', { isFormat: isActivisionProFormat, usesBytes: true, injectUADE: true });
   }
 
   // ── Ron Klaren (.rk, .rkb) ────────────────────────────────────────────────
@@ -1353,7 +1358,7 @@ export async function tryRouteFormat(
     const { isZoundMonitorFormat, parseZoundMonitorFile } = await import('@lib/import/formats/ZoundMonitorParser');
     return withNativeThenUADE('zoundMonitor', ctx,
       (buf: Uint8Array | ArrayBuffer, name: string) => { if (isZoundMonitorFormat(buf as ArrayBuffer, name)) return parseZoundMonitorFile(buf as ArrayBuffer, name, companionFiles); return null; },
-      'ZoundMonitorParser');
+      'ZoundMonitorParser', { injectUADE: true });
   }
 
   // ── Future Player (.fp / FP.*) ───────────────────────────────────────────────
@@ -1362,7 +1367,7 @@ export async function tryRouteFormat(
     const { isFuturePlayerFormat, parseFuturePlayerFile } = await import('@lib/import/formats/FuturePlayerParser');
     return withNativeThenUADE('futurePlayer', ctx,
       (buf: Uint8Array | ArrayBuffer, name: string) => { if (isFuturePlayerFormat(buf as ArrayBuffer)) return parseFuturePlayerFile(buf as ArrayBuffer, name); return null; },
-      'FuturePlayerParser');
+      'FuturePlayerParser', { injectUADE: true });
   }
 
   // ── TCB Tracker (tcb.* or *.tcb) ─────────────────────────────────────────────
@@ -1370,7 +1375,7 @@ export async function tryRouteFormat(
     const { isTCBTrackerFormat, parseTCBTrackerFile } = await import('@lib/import/formats/TCBTrackerParser');
     return withNativeThenUADE('tcbTracker', ctx,
       async (buf: Uint8Array | ArrayBuffer, name: string) => { if (isTCBTrackerFormat(buf as ArrayBuffer)) return parseTCBTrackerFile(buf as ArrayBuffer, name); return null; },
-      'TCBTrackerParser');
+      'TCBTrackerParser', { injectUADE: true });
   }
 
   // ── Jason Page (jpn.* / jpnd.* / jp.*) ──────────────────────────────────────
@@ -1446,7 +1451,7 @@ export async function tryRouteFormat(
     const { isKRISFormat, parseKRISFile } = await import('@lib/import/formats/KRISParser');
     return withNativeThenUADE('kris', ctx,
       async (buf: Uint8Array | ArrayBuffer, name: string) => { if (isKRISFormat(buf as ArrayBuffer)) return await parseKRISFile(buf as ArrayBuffer, name); return null; },
-      'KRISParser');
+      'KRISParser', { injectUADE: true });
   }
 
   // ── Cinemaware (CIN.* prefix) ─────────────────────────────────────────────
@@ -1847,8 +1852,23 @@ export async function tryRouteFormat(
       'JochenHippelSTParser', { injectUADE: true });
   }
 
-  // ── Maximum Effect (MAX.* prefix) / MaxTrax (.mxtx) ─────────────────────
-  if (matchesExt(filename, ['max', 'mxtx'])) {
+  // ── MaxTrax (.mxtx) ──────────────────────────────────────────────────────────
+  // MaxTrax is a synthesis-only Amiga format, completely different from Maximum Effect.
+  // Routes to UADE eagleplayer using prefix form.
+  if (matchesExt(filename, ['mxtx'])) {
+    const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
+    return parseUADEFile(buffer, toUADEPrefixName(originalFileName, ['mxtx']), prefs.uade ?? 'enhanced', subsong, preScannedMeta);
+  }
+
+  // ── AudioSculpture / Startrekker AM (.adsc, .mod_adsc4) ──────────────────────
+  // UADE eagleplayer requires prefix form: adsc.songname
+  if (matchesExt(filename, ['adsc', 'mod_adsc4'])) {
+    const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
+    return parseUADEFile(buffer, toUADEPrefixName(originalFileName, ['adsc', 'mod_adsc4']), prefs.uade ?? 'enhanced', subsong, preScannedMeta);
+  }
+
+  // ── Maximum Effect (MAX.* prefix) ────────────────────────────────────────────
+  if (matchesExt(filename, ['max'])) {
     const { isMaximumEffectFormat, parseMaximumEffectFile } = await import('@lib/import/formats/MaximumEffectParser');
     return withNativeThenUADE('maximumEffect', ctx,
       (buf: Uint8Array | ArrayBuffer, name: string) => { if (isMaximumEffectFormat(buf as ArrayBuffer)) return parseMaximumEffectFile(buf as ArrayBuffer, name); return null; },

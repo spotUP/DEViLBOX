@@ -1854,6 +1854,10 @@ export class ToneEngine {
                 } catch (err) {
                   // Raw Amiga/module PCM fails decodeAudioData — expected for tracker samples
                   console.warn(`[ToneEngine] Sampler ${instrumentId} could not decode audio buffer (raw PCM?):`, (err as Error)?.message ?? err);
+                  // Fallback: try loading from data URL (e.g. WAV-wrapped PCM from createSamplerInstrument)
+                  if (sampleUrl) {
+                    playerRef.load(sampleUrl).catch(e => console.warn(`[ToneEngine] URL fallback also failed for Sampler ${instrumentId}:`, e));
+                  }
                 }
               })();
               this.instrumentLoadingPromises.set(key, loadPromise);
@@ -1875,6 +1879,10 @@ export class ToneEngine {
                 } catch (err) {
                   // Raw Amiga/module PCM fails decodeAudioData — expected for tracker samples
                   console.warn(`[ToneEngine] Sampler ${instrumentId} could not decode audio buffer (raw PCM?):`, (err as Error)?.message ?? err);
+                  // Fallback: try loading from data URL (e.g. WAV-wrapped PCM from createSamplerInstrument)
+                  if (sampleUrl) {
+                    samplerRef.add(baseNote as Tone.Unit.Note, sampleUrl);
+                  }
                 }
               })();
               this.instrumentLoadingPromises.set(key, loadPromise);
