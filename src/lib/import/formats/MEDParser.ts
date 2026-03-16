@@ -53,6 +53,11 @@ function s8(buf: Uint8Array, off: number): number {
   return v >= 128 ? v - 256 : v;
 }
 
+function s16(buf: Uint8Array, off: number): number {
+  const v = (buf[off] << 8) | buf[off + 1];
+  return v >= 32768 ? v - 65536 : v;
+}
+
 
 export function parseMEDFile(buffer: ArrayBuffer, filename: string): TrackerSong {
   const buf = new Uint8Array(buffer);
@@ -64,10 +69,11 @@ export function parseMEDFile(buffer: ArrayBuffer, filename: string): TrackerSong
 
   const isMMD1Plus = magic !== 'MMD0';
   // OpenMPT uses transpose = NOTE_MIN(1) + 47 + playTranspose = 48 for MMD0/1/2,
-  // 24 for MMD3 (subtracts 24). DEViLBOX note = OpenMPT note - 12, so:
-  //   MMD0/1/2: baseTranspose = 48 - 12 = 36
-  //   MMD3:     baseTranspose = 24 - 12 = 12
-  const noteBaseTranspose = magic === 'MMD3' ? 12 : 36;
+  // and subtracts 24 for MMD3 (version > 2) → transpose = 24.
+  // DEViLBOX note = OpenMPT note - 24 (period 428 = C-2 in DEViLBOX = C-4 in OpenMPT = note 49):
+  //   MMD0/1/2: baseTranspose = 48 - 24 = 24
+  //   MMD3:     baseTranspose = 24 - 24 = 0
+  const noteBaseTranspose = magic === 'MMD3' ? 0 : 24;
 
   // ── Parse header offsets ─────────────────────────────────────────────────
   // MED file header (52 bytes):
@@ -97,23 +103,27 @@ export function parseMEDFile(buffer: ArrayBuffer, filename: string): TrackerSong
   //   uint8  numsamples;          // Number of samples actually used
   // };
 
+  // sizeof(MMD0Sample) = 8
+  // struct MMD0Sample { uint16 loopStart; uint16 loopLength; uint8 midiChannel; uint8 midiPreset; uint8 sampleVolume; int8 sampleTranspose; }
   const INSTR_HDR_SIZE = 8;
   const MAX_INSTRUMENTS = 63;
 
   let so = songOffset;
-  const instrs: Array<{ synth: boolean; waveLen: number; loopStart: number; loopLength: number; volume: number; finetune: number }> = [];
+  // MMD0Sample structs: loopStart/loopLength come from here.
+  // waveLen and synth flag come from MMDInstrHeader at the instrument pointer (loaded later).
+  const instrs: Array<{ loopStart: number; loopLength: number; volume: number; finetune: number }> = [];
 
   for (let i = 0; i < MAX_INSTRUMENTS; i++) {
     const base = so + i * INSTR_HDR_SIZE;
     if (base + INSTR_HDR_SIZE > buf.length) break;
-    const length = u32(buf, base);         // Length in words for samples, or 0 for synth
-    const type = s8(buf, base + 4);        // -2=hybrid, -1=synth, 0+=sample
-    const volume = buf[base + 5];
-    const loopStart = u16(buf, base + 6) * 2;
-    const loopLength = u16(buf, base + 8) * 2; // Note: might be at different offset
+    // MMD0Sample fields (8 bytes):
+    const loopStart  = u16(buf, base + 0) * 2;  // loop start in words → bytes
+    const loopLength = u16(buf, base + 2) * 2;  // loop length in words → bytes
+    // base+4: midiChannel (unused here)
+    // base+5: midiPreset  (unused here)
+    const volume = buf[base + 6];                // sampleVolume (0..64)
+    // base+7: sampleTranspose (unused for MOD export)
     instrs.push({
-      synth: type < 0,
-      waveLen: length * 2,  // Length is in words
       loopStart,
       loopLength,
       volume: volume || 64,
@@ -126,13 +136,37 @@ export function parseMEDFile(buffer: ArrayBuffer, filename: string): TrackerSong
   const songLen   = u16(buf, so + 2);
   const playseq: number[] = [];
   for (let i = 0; i < 256; i++) playseq.push(buf[so + 4 + i]);
-  const defTempo  = u16(buf, so + 260);  // Default tempo (BPM or VBL)
+  const defTempo  = u16(buf, so + 260);  // Default tempo (BPM or VBL counter)
   // MMD0Song layout after 256-byte playseq:
   //   so+260: deftempo (u16), so+262: playtransp (int8), so+263: flags (u8)
   //   so+264: flags2 (u8), so+265: tempo2 (u8 ticks-per-line = speed)
   const playTranspose = s8(buf, so + 262); // signed int8 global transpose
+  const medFlags  = buf[so + 263];       // flags: bit6=8channel mode
+  const medFlags2 = buf[so + 264];       // flags2: bit5=BPM mode, bit7=MIX, bits0-4=rowsPerBeat-1
   const tempo2    = buf[so + 265];        // ticks per line (speed)
-  const numSamples = buf[so + 267];
+  // so+266..so+281: trackVol[16]; so+282: masterVol; so+283: numSamples
+  const numSamples = buf[so + 283];
+
+  // Compute actual BPM using OpenMPT's MMDTempoToBPM() formula.
+  const is8Ch         = (medFlags  & 0x40) !== 0;
+  const bpmMode       = (medFlags2 & 0x20) !== 0;
+  const softwareMix   = (medFlags2 & 0x80) !== 0;
+  const rowsPerBeat   = 1 + (medFlags2 & 0x1F);
+
+  let computedBPM: number;
+  if (bpmMode && !is8Ch) {
+    computedBPM = defTempo < 7 ? 111.5 : (defTempo * rowsPerBeat) / 4.0;
+  } else if (is8Ch && defTempo > 0) {
+    const MED_8CH_TEMPOS = [179, 164, 152, 141, 131, 123, 116, 110, 104, 99];
+    computedBPM = MED_8CH_TEMPOS[Math.min(10, defTempo) - 1] ?? 125;
+  } else if (!softwareMix && defTempo > 0 && defTempo <= 10) {
+    computedBPM = (6.0 * 1773447 / 14500) / defTempo; // SoundTracker VBL formula
+  } else if (softwareMix && defTempo < 8) {
+    computedBPM = 157.86;
+  } else {
+    computedBPM = defTempo / 0.264;
+  }
+  const initialBPM = Math.max(32, Math.min(255, Math.round(computedBPM)));
 
   // ── Parse block (pattern) pointers ──────────────────────────────────────
   // blockOffset → array of 4-byte pointers to MMD0Block structures
@@ -150,6 +184,9 @@ export function parseMEDFile(buffer: ArrayBuffer, filename: string): TrackerSong
     numChannels = u16(buf, blockPtrs[0]);
     numChannels = Math.max(1, Math.min(64, numChannels));
   }
+
+  // Context for effect conversion (needed by mapMEDEffect for 0x0F tempo)
+  const tempoCtx: MEDTempoCtx = { is8Ch, bpmMode, softwareMix, rowsPerBeat };
 
   // ── Parse patterns ───────────────────────────────────────────────────────
   const trackerPatterns: Pattern[] = [];
@@ -199,14 +236,18 @@ export function parseMEDFile(buffer: ArrayBuffer, filename: string): TrackerSong
           // DEViLBOX note = OpenMPT note - 36 → rawNote + 12 + playTranspose
           const rawNoteVal = buf[offset];
           inst    = buf[offset + 1];
-          effTyp  = buf[offset + 2];
-          eff     = buf[offset + 3];
+          const rawEff1 = buf[offset + 2];
+          const rawParm = buf[offset + 3];
           if (rawNoteVal === 0x80) {
             note = 97; // note cut
           } else {
             const rawNote = rawNoteVal & 0x7F;
             note = rawNote > 0 ? rawNote + noteBaseTranspose + playTranspose : 0;
           }
+          // Apply effect mapping (same as MMD0 — MED effects need conversion)
+          const mapped1 = mapMEDEffect(rawEff1, rawParm, tempoCtx);
+          effTyp = mapped1.effTyp;
+          eff    = mapped1.eff;
         } else {
           // MMD0 cell format (3 bytes), from OpenMPT Load_med.cpp:
           //   byte0[5:0] = note number (1-indexed, 0=no note)
@@ -221,9 +262,8 @@ export function parseMEDFile(buffer: ArrayBuffer, filename: string): TrackerSong
           const rawNote = raw0 & 0x3F;
           inst = (raw1 >> 4) | ((raw0 & 0x80) >> 3) | ((raw0 & 0x40) >> 1);
           const rawEff = raw1 & 0x0F;
-          eff = raw2;
           note = rawNote > 0 ? rawNote + noteBaseTranspose + playTranspose : 0;
-          const { effTyp: e, eff: ev } = mapMEDEffect(rawEff, eff);
+          const { effTyp: e, eff: ev } = mapMEDEffect(rawEff, raw2, tempoCtx);
           effTyp = e;
           eff = ev;
         }
@@ -309,40 +349,49 @@ export function parseMEDFile(buffer: ArrayBuffer, filename: string): TrackerSong
     // Get the absolute pointer to this instrument's data block
     const instrPtr = instrPtrs[i] || 0;
 
-    if (instr.synth || instr.waveLen === 0) {
-      // Synth/hybrid instrument: instrPtr → MMDInstrHeader (6 bytes), then SynthInstr
-      const synthBase = instrPtr > 0 ? instrPtr + 6 : 0;  // skip MMDInstrHeader
-      const synthLen  = synthBase > 0 && synthBase + 4 <= buf.length
-        ? u32(buf, synthBase) : 0;  // total struct size in bytes
+    // Read MMDInstrHeader (6 bytes) from instrPtr:
+    //   instrPtr+0: uint32 length — byte length of sample data (for samples) or synth chunk
+    //   instrPtr+4: int16  type   — negative = synth/hybrid, 0+ = sample
+    let instrLength = 0;
+    let instrType = 0;
+    if (instrPtr > 0 && instrPtr + 6 <= buf.length) {
+      instrLength = u32(buf, instrPtr);
+      instrType   = s16(buf, instrPtr + 4);
+    }
+    const isSynth = instrType < 0;
 
-      if (synthLen > 0 && synthBase + synthLen <= buf.length) {
-        // SynthInstr layout (from OctaMED SDK / libxmp med.h):
-        //   +0    u32  length      — total struct size in bytes
-        //   +4    s16  type        — -1=synth, -2=hybrid
-        //   +6    u8   defaultdecay
-        //   +7    u8   reserved[3]
-        //   +10   u16  rep         — loop start (in words)
-        //   +12   u16  replen      — loop length (in words)
-        //   +14   u16  voltbllen   — number of valid entries in voltbl
-        //   +16   u16  wftbllen    — number of valid entries in wftbl
-        //   +18   u8   volspeed    — vol-table execute rate
-        //   +19   u8   wfspeed     — wf-table execute rate
-        //   +20   u16  wforms      — number of waveforms (1-64)
-        //   +22   u8   voltbl[128] — volume command table
-        //   +150  u8   wftbl[128]  — waveform command table
-        //   +278  u32  wf[wforms]  — per-waveform offsets from struct start to SynthWF
-        //
-        // Each SynthWF at wf[j]:
-        //   +0   u16  length  — waveform length in words
-        //   +2   s8   wfdata  — length*2 bytes of signed PCM
+    if (isSynth) {
+      // Synth/hybrid instrument: MMDSynthInstr starts at instrPtr + 6.
+      // All field offsets below are from instrPtr (matching OpenMPT's layout):
+      //   instrPtr+0:  u32  length      — total chunk size in bytes (MMDInstrHeader.length)
+      //   instrPtr+4:  s16  type        — -1=synth, -2=hybrid
+      //   instrPtr+6:  u8   defaultdecay
+      //   instrPtr+7:  u8   reserved[3]
+      //   instrPtr+10: u16  loopStart   — loop start in words (hybrid only)
+      //   instrPtr+12: u16  loopLength  — loop length in words (hybrid only)
+      //   instrPtr+14: u16  voltblLen   — number of valid entries in voltbl
+      //   instrPtr+16: u16  wftblLen    — number of valid entries in wftbl
+      //   instrPtr+18: u8   volSpeed
+      //   instrPtr+19: u8   wfSpeed
+      //   instrPtr+20: u16  numWaveforms (1-64, or 0xFFFF)
+      //   instrPtr+22: u8   voltbl[128]
+      //   instrPtr+150: u8  wftbl[128]
+      //   instrPtr+278: u32 wf[numWaveforms] — offsets from instrPtr to SynthWF
+      //
+      // Each SynthWF at instrPtr+wf[j]:
+      //   +0: u16 length — waveform length in words
+      //   +2: s8  wfdata — length*2 bytes of signed PCM
 
-        const repWords    = u16(buf, synthBase + 10);
-        const repLenWords = u16(buf, synthBase + 12);
-        const voltblLen   = u16(buf, synthBase + 14);
-        const wftblLen    = u16(buf, synthBase + 16);
-        const volspeed    = buf[synthBase + 18];
-        const wfspeed     = buf[synthBase + 19];
-        const wforms      = u16(buf, synthBase + 20);
+      const synthLen = instrLength;  // from MMDInstrHeader.length
+
+      if (synthLen > 0 && instrPtr + 6 + synthLen <= buf.length) {
+        const repWords    = u16(buf, instrPtr + 10);
+        const repLenWords = u16(buf, instrPtr + 12);
+        const voltblLen   = u16(buf, instrPtr + 14);
+        const wftblLen    = u16(buf, instrPtr + 16);
+        const volspeed    = buf[instrPtr + 18];
+        const wfspeed     = buf[instrPtr + 19];
+        const wforms      = u16(buf, instrPtr + 20);
 
         const loopStartBytes = repWords * 2;
         const loopLenBytes   = repLenWords * 2;
@@ -352,12 +401,12 @@ export function parseMEDFile(buffer: ArrayBuffer, filename: string): TrackerSong
           const degenerateChipRam: UADEChipRamInfo = {
             moduleBase: 0,
             moduleSize: buf.length,
-            instrBase: synthBase,
+            instrBase: instrPtr + 6,
             instrSize: synthLen,
             sections: {
-              voltbl: synthBase + 22,
-              wftbl: synthBase + 150,
-              waveforms: synthBase + 278,
+              voltbl: instrPtr + 22,
+              wftbl: instrPtr + 150,
+              waveforms: instrPtr + 278,
             },
           };
           instruments.push({
@@ -384,25 +433,25 @@ export function parseMEDFile(buffer: ArrayBuffer, filename: string): TrackerSong
           continue;
         }
 
-        // Vol table: 128 bytes at offset 22 (clamp to voltblLen valid entries)
+        // Vol table: 128 bytes at instrPtr+22 (clamp to voltblLen valid entries)
         const voltbl = new Uint8Array(128).fill(0xFF);
         const voltblCopy = Math.min(voltblLen, 128);
-        for (let b = 0; b < voltblCopy; b++) voltbl[b] = buf[synthBase + 22 + b];
+        for (let b = 0; b < voltblCopy; b++) voltbl[b] = buf[instrPtr + 22 + b];
 
-        // Wf table: 128 bytes at offset 150 (clamp to wftblLen valid entries)
+        // Wf table: 128 bytes at instrPtr+150 (clamp to wftblLen valid entries)
         const wftbl = new Uint8Array(128).fill(0xFF);
         const wftblCopy = Math.min(wftblLen, 128);
-        for (let b = 0; b < wftblCopy; b++) wftbl[b] = buf[synthBase + 150 + b];
+        for (let b = 0; b < wftblCopy; b++) wftbl[b] = buf[instrPtr + 150 + b];
 
-        // Waveform pointer table: wforms × u32 at offset 278.
-        // Each value is an offset from the SynthInstr struct start to a SynthWF.
-        // SynthWF layout: u16 length (in words), then length*2 signed bytes.
+        // Waveform pointer table: wforms × u32 at instrPtr+278.
+        // Each value is an offset from instrPtr to the SynthWF data.
+        // SynthWF: u16 length (words) + PCM data.
         const waveforms: Int8Array[] = [];
         for (let w = 0; w < wforms; w++) {
-          const ptrOff = synthBase + 278 + w * 4;
+          const ptrOff = instrPtr + 278 + w * 4;
           if (ptrOff + 4 > buf.length) break;
-          const wfOffset = u32(buf, ptrOff);  // offset from struct start
-          const wfAbs    = synthBase + wfOffset;
+          const wfOffset = u32(buf, ptrOff);  // offset from instrPtr
+          const wfAbs    = instrPtr + wfOffset;
           if (wfAbs + 2 > buf.length) {
             waveforms.push(new Int8Array(256)); // missing — silent
             continue;
@@ -442,12 +491,12 @@ export function parseMEDFile(buffer: ArrayBuffer, filename: string): TrackerSong
         const octamedChipRam: UADEChipRamInfo = {
           moduleBase: 0,
           moduleSize: buf.length,
-          instrBase: synthBase,
+          instrBase: instrPtr + 6,
           instrSize: synthLen,
           sections: {
-            voltbl: synthBase + 22,
-            wftbl: synthBase + 150,
-            waveforms: synthBase + 278,
+            voltbl: instrPtr + 22,
+            wftbl: instrPtr + 150,
+            waveforms: instrPtr + 278,
           },
         };
 
@@ -465,7 +514,6 @@ export function parseMEDFile(buffer: ArrayBuffer, filename: string): TrackerSong
 
       } else {
         // Malformed SynthInstr — emit a silent OctaMEDSynth placeholder.
-        // synthLen is 0 or out-of-bounds so we skip uadeChipRam.
         instruments.push({
           id: i + 1,
           name,
@@ -490,11 +538,11 @@ export function parseMEDFile(buffer: ArrayBuffer, filename: string): TrackerSong
       continue;
     }
 
-    // Extract PCM using the instrument pointer from sampleArrOffset
-    // instrPtr → MMDInstrHeader (u32 length, s16 type), then PCM data follows
-    const pcmBase = instrPtr > 0 ? instrPtr + 6 : 0;  // skip 6-byte MMDInstrHeader
+    // Sample instrument: PCM starts at instrPtr + 6 (after 6-byte MMDInstrHeader)
+    // instrLength (from MMDInstrHeader.length) is the byte count of the PCM data.
+    const pcmBase = instrPtr > 0 ? instrPtr + 6 : 0;
     const len = pcmBase > 0
-      ? Math.min(instr.waveLen, buf.length - pcmBase)
+      ? Math.min(instrLength, buf.length - pcmBase)
       : 0;
     const pcm = len > 0 ? buf.slice(pcmBase, pcmBase + len) : new Uint8Array(0);
 
@@ -534,13 +582,39 @@ export function parseMEDFile(buffer: ArrayBuffer, filename: string): TrackerSong
     restartPosition: 0,
     numChannels,
     initialSpeed: tempo2 || 6,
-    initialBPM: defTempo || 125,
+    initialBPM: initialBPM,
     linearPeriods: false,
     uadePatternLayout,
   };
 }
 
-function mapMEDEffect(cmd: number, param: number): { effTyp: number; eff: number } {
+interface MEDTempoCtx {
+  is8Ch: boolean;
+  bpmMode: boolean;
+  softwareMix: boolean;
+  rowsPerBeat: number;
+}
+
+function medTempoToBPM(tempo: number, ctx: MEDTempoCtx): number {
+  // Mirrors OpenMPT MMDTempoToBPM() exactly.
+  if (ctx.bpmMode && !ctx.is8Ch) {
+    if (tempo < 7) return 112;
+    return Math.round((tempo * ctx.rowsPerBeat) / 4.0);
+  }
+  if (ctx.is8Ch && tempo > 0) {
+    const tempos = [179, 164, 152, 141, 131, 123, 116, 110, 104, 99];
+    return tempos[Math.min(10, tempo) - 1] ?? 125;
+  }
+  if (!ctx.softwareMix && tempo > 0 && tempo <= 10) {
+    return Math.round((6.0 * 1773447.0 / 14500.0) / tempo);
+  }
+  if (ctx.softwareMix && tempo < 8) {
+    return 158;
+  }
+  return Math.round(tempo / 0.264);
+}
+
+function mapMEDEffect(cmd: number, param: number, ctx: MEDTempoCtx): { effTyp: number; eff: number } {
   switch (cmd) {
     case 0x0: return { effTyp: 0, eff: param };      // Arpeggio (or empty)
     case 0x1: return { effTyp: 0x01, eff: param };   // Portamento up
@@ -551,7 +625,9 @@ function mapMEDEffect(cmd: number, param: number): { effTyp: number; eff: number
     case 0x6: return { effTyp: 0x06, eff: param };   // Vibrato + volume slide
     case 0x7: return { effTyp: 0x07, eff: param };   // Tremolo
     case 0x8: return { effTyp: 0x08, eff: param };   // Set panning
-    case 0x9: return { effTyp: 0x09, eff: param };   // Sample offset
+    case 0x9:                                         // Set secondary speed (MED) — NOT sample offset
+      if (param > 0 && param <= 0x20) return { effTyp: 0x0F, eff: param };
+      return { effTyp: 0, eff: 0 };
     case 0xA: return { effTyp: 0x0A, eff: param };   // Volume slide
     case 0xB: return { effTyp: 0x0B, eff: param };   // Position jump
     case 0xC: return { effTyp: 0x0C, eff: param };   // Set volume
@@ -562,7 +638,38 @@ function mapMEDEffect(cmd: number, param: number): { effTyp: number; eff: number
       const val = param & 0xF;
       return { effTyp: 0x0E, eff: (sub << 4) | val };
     }
-    case 0xF: return { effTyp: 0x0F, eff: param };   // Set tempo
+    case 0xF: {
+      // MED 0x0F (Misc/Tempo) — mirrors OpenMPT ConvertMEDEffect case 0x0F
+      if (param === 0) return { effTyp: 0x0D, eff: 0 };  // pattern break
+      if (param <= 0xF0) {
+        // Tempo: convert from OctaMED VBL/BPM counter to actual BPM
+        if (param < 3) return { effTyp: 0x0F, eff: 0x70 };  // bug-compat: ~112 BPM
+        const bpm = Math.max(32, Math.min(255, medTempoToBPM(param, ctx)));
+        return { effTyp: 0x0F, eff: bpm };
+      }
+      // Special params > 0xF0 (not tempo commands):
+      switch (param) {
+        case 0xF1: return { effTyp: 0x0E, eff: 0x93 }; // play note twice
+        case 0xF2: return { effTyp: 0x0E, eff: 0xD3 }; // delay note
+        case 0xF3: return { effTyp: 0x0E, eff: 0x92 }; // play note three times
+        case 0xF8: return { effTyp: 0x0E, eff: 0x01 }; // filter off (E01)
+        case 0xF9: return { effTyp: 0x0E, eff: 0x00 }; // filter on (E00)
+        default:   return { effTyp: 0, eff: 0 };       // ignore (MIDI pedal, end-of-song, etc.)
+      }
+    }
+    // MED extended commands (0x10+) — mirrors OpenMPT ConvertMEDEffect
+    case 0x19: return { effTyp: 0x09, eff: param };  // Sample offset (MED uses 0x19, not 0x09)
+    case 0x1D: return { effTyp: 0x0D, eff: param };  // Pattern break (hex param)
+    case 0x1E: return { effTyp: 0x0E, eff: 0xE0 | Math.min(param, 0x0F) }; // Repeat row (EEx)
+    case 0x16: return { effTyp: 0x0E, eff: 0x60 | (param & 0x0F) }; // Loop (E6x)
+    case 0x18: return { effTyp: 0x0E, eff: 0xC0 | (param & 0x0F) }; // Stop note (ECx)
+    case 0x1A: return { effTyp: 0x0E, eff: 0xA0 | (param & 0x0F) }; // Slide vol up once (EAx)
+    case 0x1B: return { effTyp: 0x0E, eff: 0xB0 | (param & 0x0F) }; // Slide vol down once (EBx)
+    case 0x1F: {                                                      // Note delay/retrigger
+      if (param & 0xF0) return { effTyp: 0x0E, eff: 0xD0 | (param >> 4) };
+      if (param & 0x0F) return { effTyp: 0x0E, eff: 0x90 | (param & 0x0F) };
+      return { effTyp: 0, eff: 0 };
+    }
     default:  return { effTyp: 0, eff: 0 };
   }
 }
