@@ -450,7 +450,17 @@ export function parseFuturePlayerFile(buffer: ArrayBuffer, filename: string): Tr
   // One FuturePlayerSynth per discovered instrument pointer
   const instruments: InstrumentConfig[] = [];
   instrumentMap.forEach((id, instrPtr) => {
+    // Skip null pointers — instrPtr=0 means the voice stream had a malformed set-instrument
+    // command. A FuturePlayerSynth with instrPtr=0 would call engine.play() on click instead
+    // of engine.noteOn(), causing whole-song playback (audible as a double-beep).
+    if (instrPtr === 0) return;
+
     const meta = getInstrumentMeta(instrPtr);
+
+    // Skip instruments with no audio data at all (no wavetable, no PCM sample).
+    // These produce silence or a WASM-default tone that causes an unexpected beep.
+    if (!meta.isWavetable && meta.sampleSize === 0) return;
+
     const typeLabel = meta.isWavetable ? 'Synth' : 'Sample';
     const sizeLabel = meta.sampleSize > 0 ? ` (${meta.sampleSize}B)` : '';
     instruments.push({
