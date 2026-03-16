@@ -1133,8 +1133,9 @@ export async function parseUADEFile(
           song.songPositions = reconstructed.patterns.map((_, i) => i);
           song.songLength = reconstructed.patterns.length;
           song.initialSpeed = reconstructed.speed;
+          song.uadeFirstTick = reconstructed.firstTick;
           console.log(
-            `[UADEParser] CIA tick reconstructor: ${reconstructed.patterns.length} patterns, speed=${reconstructed.speed}`,
+            `[UADEParser] CIA tick reconstructor: ${reconstructed.patterns.length} patterns, speed=${reconstructed.speed}, firstTick=${reconstructed.firstTick}`,
           );
         }
       }
@@ -1964,6 +1965,7 @@ function buildEnhancedSong(
     numChannels: 4,
     initialSpeed: enhanced.speed || 6,
     initialBPM: enhanced.bpm || 125,
+    uadeFirstTick: enhanced.firstTick ?? 0,
   };
 }
 
