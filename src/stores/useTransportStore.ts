@@ -213,11 +213,10 @@ export const useTransportStore = create<TransportStore>()(
 
     stop: () =>
       set((state) => {
+        // Keep currentRow at last playback position (don't reset to 0)
+        // so the pattern editor stays where playback stopped.
         state.isPlaying = false;
         state.isPaused = false;
-        state.currentRow = 0;
-        state.continuousRow = 0;
-        state.position = '0:0:0';
       }),
 
     togglePlayPause: async () => {
