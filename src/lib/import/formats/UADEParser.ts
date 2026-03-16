@@ -908,6 +908,14 @@ export async function parseUADEFile(
     return buildClassicSong(songName, ext, filename, buffer, metadata, activeScanRows, periodToNoteIndex);
   }
 
+  const FORCE_CLASSIC_PREFIXES = new Set<string>([
+    'fw',  // ForgottenWorlds — enhanced scan produces silent output; classic streaming required
+  ]);
+  if (mode === 'enhanced' && FORCE_CLASSIC_PREFIXES.has(prefix)) {
+    console.log(`[UADEParser] ${prefix.toUpperCase()} uses prefix form; forcing classic UADESynth streaming`);
+    return buildClassicSong(songName, prefix, filename, buffer, metadata, activeScanRows, periodToNoteIndex);
+  }
+
   // Synthesis-based formats use short macro-driven waveforms (16-32 bytes) that the
   // enhanced scan cannot reliably extract. Force classic (UADE playback) for these.
   // NOTE: bare 'fc' is excluded here because .fc covers both FC 1.x (synthesis) and FC 2.0
