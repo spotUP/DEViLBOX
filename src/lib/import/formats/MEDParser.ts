@@ -63,6 +63,11 @@ export function parseMEDFile(buffer: ArrayBuffer, filename: string): TrackerSong
   }
 
   const isMMD1Plus = magic !== 'MMD0';
+  // OpenMPT uses transpose = NOTE_MIN(1) + 47 + playTranspose = 48 for MMD0/1/2,
+  // 24 for MMD3 (subtracts 24). DEViLBOX note = OpenMPT note - 12, so:
+  //   MMD0/1/2: baseTranspose = 48 - 12 = 36
+  //   MMD3:     baseTranspose = 24 - 12 = 12
+  const noteBaseTranspose = magic === 'MMD3' ? 12 : 36;
 
   // ── Parse header offsets ─────────────────────────────────────────────────
   // MED file header (52 bytes):
@@ -200,7 +205,7 @@ export function parseMEDFile(buffer: ArrayBuffer, filename: string): TrackerSong
             note = 97; // note cut
           } else {
             const rawNote = rawNoteVal & 0x7F;
-            note = rawNote > 0 ? rawNote + 12 + playTranspose : 0;
+            note = rawNote > 0 ? rawNote + noteBaseTranspose + playTranspose : 0;
           }
         } else {
           // MMD0 cell format (3 bytes), from OpenMPT Load_med.cpp:
@@ -217,7 +222,7 @@ export function parseMEDFile(buffer: ArrayBuffer, filename: string): TrackerSong
           inst = (raw1 >> 4) | ((raw0 & 0x80) >> 3) | ((raw0 & 0x40) >> 1);
           const rawEff = raw1 & 0x0F;
           eff = raw2;
-          note = rawNote > 0 ? rawNote + 12 + playTranspose : 0;
+          note = rawNote > 0 ? rawNote + noteBaseTranspose + playTranspose : 0;
           const { effTyp: e, eff: ev } = mapMEDEffect(rawEff, eff);
           effTyp = e;
           eff = ev;
