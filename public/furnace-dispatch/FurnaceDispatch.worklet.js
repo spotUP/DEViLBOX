@@ -136,6 +136,8 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
         if (chip && this.wasm) {
           this.wasm.destroy(chip.handle);
           this.chips.delete(data.platformType);
+          // Clear bad-chip flag so the platform can be retried if recreated
+          if (this._badChips) this._badChips.delete(data.platformType);
         }
         break;
       }
