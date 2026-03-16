@@ -51,7 +51,7 @@ import type { AutomationCurve } from '@typedefs/automation';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
-type ExportMode = 'song' | 'sfx' | 'instrument' | 'audio' | 'midi' | 'xm' | 'mod' | 'it' | 's3m' | 'chip' | 'nano';
+type ExportMode = 'song' | 'sfx' | 'instrument' | 'audio' | 'midi' | 'xm' | 'mod' | 'it' | 's3m' | 'chip' | 'nano' | 'native';
 type DialogMode = 'export' | 'import';
 
 interface PixiExportDialogProps {
@@ -77,6 +77,7 @@ const MODE_OPTIONS: SelectOption[] = [
   { value: 's3m', label: 'S3M Module (.s3m)' },
   { value: 'chip', label: 'Chip (.vgm/.nsf/...)' },
   { value: 'nano', label: 'Nano Binary (.dbn)' },
+  { value: 'native', label: 'Native Format (with edits)' },
 ];
 
 const FORMAT_EXTENSIONS: Record<ExportMode, string> = {
@@ -91,6 +92,7 @@ const FORMAT_EXTENSIONS: Record<ExportMode, string> = {
   s3m: '.s3m',
   chip: '.vgm',
   nano: '.dbn',
+  native: '',
 };
 
 
@@ -133,7 +135,7 @@ export const PixiExportDialog: React.FC<PixiExportDialogProps> = ({ isOpen, onCl
 
   // ── Store hooks ────────────────────────────────────────────────────────────
   const { patterns, currentPatternIndex, importPattern, setCurrentPattern, loadPatterns } = useTrackerStore();
-  const { originalModuleData } = useFormatStore();
+  const { originalModuleData, uadeEditableFileData, uadeEditableFileName } = useFormatStore();
   const { instruments, currentInstrumentId, addInstrument, setCurrentInstrument, loadInstruments } = useInstrumentStore();
   const { metadata, setMetadata } = useProjectStore();
   const { bpm, setBPM, isPlaying, stop, currentRow } = useTransportStore();
@@ -459,6 +461,21 @@ export const PixiExportDialog: React.FC<PixiExportDialogProps> = ({ isOpen, onCl
           break;
         }
 
+        case 'native': {
+          if (!uadeEditableFileData) {
+            notify.warning('No UADE module loaded — native export requires a loaded Amiga format');
+            break;
+          }
+          const { UADEChipEditor } = await import('@engine/uade/UADEChipEditor');
+          const { UADEEngine } = await import('@engine/uade/UADEEngine');
+          const editor = new UADEChipEditor(UADEEngine.getInstance());
+          const filename = uadeEditableFileName || metadata.name || 'module';
+          await editor.exportWithOriginalSize(uadeEditableFileData.byteLength, filename);
+          notify.success('Native module exported with edits!');
+          onClose();
+          break;
+        }
+
         default:
           break;
       }
@@ -468,6 +485,7 @@ export const PixiExportDialog: React.FC<PixiExportDialogProps> = ({ isOpen, onCl
     }
   }, [exportMode, patterns, instruments, metadata, bpm, curves, masterEffects, options,
       selectedPatternIndex, selectedInstrumentId, sfxName, onClose, originalModuleData,
+      uadeEditableFileData, uadeEditableFileName,
       audioScope, midiScope, midiFormat, midiIncludeAutomation,
       xmChannels, bakeSynths, modChannels, chipFormat, chipTitle, chipAuthor, chipLoopPoint]);
 
@@ -1149,6 +1167,33 @@ export const PixiExportDialog: React.FC<PixiExportDialogProps> = ({ isOpen, onCl
                 <PixiLabel text={`Target Size: < 4KB`} size="xs" color="text" />
                 <PixiLabel text={`Format: DBXN Binary`} size="xs" color="text" />
                 <PixiLabel text={`Used Instruments: ${nanoUsedInstruments}`} size="xs" color="text" />
+              </layoutContainer>
+            )}
+
+            {exportMode === 'native' && (
+              <layoutContainer
+                layout={{
+                  flexDirection: 'column',
+                  gap: 6,
+                  padding: 10,
+                  borderRadius: 6,
+                  borderWidth: 1,
+                  backgroundColor: theme.bgSecondary.color,
+                  borderColor: theme.border.color,
+                  width: CONTENT_W,
+                }}
+              >
+                <PixiLabel text="Native Format Export" size="sm" weight="bold" color="accent" />
+                {uadeEditableFileData ? (
+                  <>
+                    <PixiLabel text="Export the original module binary with all chip RAM edits applied." size="xs" color="textSecondary" />
+                    <PixiLabel text={`File: ${uadeEditableFileName || 'unknown'}`} size="xs" color="text" />
+                    <PixiLabel text={`Size: ${(uadeEditableFileData.byteLength / 1024).toFixed(1)} KB`} size="xs" color="text" />
+                    <PixiLabel text="Includes: pattern edits, instrument parameter changes" size="xs" color="text" />
+                  </>
+                ) : (
+                  <PixiLabel text="No UADE module loaded. Load an Amiga tracker file first." size="xs" color="warning" />
+                )}
               </layoutContainer>
             )}
 
