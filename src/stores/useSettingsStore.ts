@@ -252,6 +252,9 @@ interface SettingsStore {
   // Render Mode
   renderMode: 'dom' | 'webgl';  // UI rendering: 'dom' = React/Tailwind, 'webgl' = PixiJS
 
+  // Startup jingle
+  welcomeJingleEnabled: boolean;
+
   // Actions
   setAmigaLimits: (enabled: boolean) => void;
   setLinearInterpolation: (enabled: boolean) => void;
@@ -280,6 +283,7 @@ interface SettingsStore {
   setCustomBannerImage: (dataUrl: string | null) => void;
   setWobbleWindows: (enabled: boolean) => void;
   setRenderMode: (mode: 'dom' | 'webgl') => void;
+  setWelcomeJingleEnabled: (v: boolean) => void;
   setCrtEnabled:  (enabled: boolean) => void;
   setCrtParam:    (param: keyof CRTParams, value: number) => void;
   resetCrtParams: () => void;
@@ -456,7 +460,8 @@ export const useSettingsStore = create<SettingsStore>()(
       lensPreset: 'off',
       lensParams: { barrel: 0, chromatic: 0, vignette: 0 },
       renderMode: 'dom' as const,  // Default: DOM rendering (GL UI is experimental)
-      
+      welcomeJingleEnabled: true,  // Play startup jingle on first interaction
+
       // SID Hardware defaults
       sidHardwareMode: 'off' as const,
       asidEnabled: false,
@@ -613,6 +618,9 @@ export const useSettingsStore = create<SettingsStore>()(
           state.renderMode = renderMode;
         }),
 
+    setWelcomeJingleEnabled: (v) =>
+      set((state) => { state.welcomeJingleEnabled = v; }),
+
     setCrtEnabled: (crtEnabled) =>
       set((state) => { state.crtEnabled = crtEnabled; }),
 
@@ -692,6 +700,7 @@ export const useSettingsStore = create<SettingsStore>()(
         lensParams:  state.lensParams,
         sidHardwareMode: state.sidHardwareMode,
         sidEngine: state.sidEngine,
+        welcomeJingleEnabled: state.welcomeJingleEnabled,
         // renderMode intentionally not persisted — always start in DOM mode
       }),
     }

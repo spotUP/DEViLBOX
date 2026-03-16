@@ -16,6 +16,8 @@ interface PixiPureTextInputProps {
   onChange: (value: string) => void;
   onSubmit?: (value: string) => void;
   onCancel?: () => void;
+  /** Called when focus is lost by clicking outside (not via Enter/Escape) */
+  onBlur?: (value: string) => void;
   placeholder?: string;
   width?: number;
   height?: number;
@@ -29,6 +31,8 @@ interface PixiPureTextInputProps {
   layout?: Record<string, unknown>;
   /** When set, displayed text is masked with this character (e.g. "•") */
   mask?: string;
+  /** Auto-focus and select-all on mount */
+  autoFocus?: boolean;
 }
 
 const PADDING_H = 6;
@@ -40,6 +44,7 @@ export const PixiPureTextInput: React.FC<PixiPureTextInputProps> = ({
   onChange,
   onSubmit,
   onCancel,
+  onBlur,
   placeholder = '',
   width = 120,
   height = 24,
@@ -51,6 +56,7 @@ export const PixiPureTextInput: React.FC<PixiPureTextInputProps> = ({
   disabled = false,
   layout: layoutProp,
   mask,
+  autoFocus = false,
 }) => {
   const theme = usePixiTheme();
   const [focused, setFocused] = useState(false);
@@ -66,6 +72,7 @@ export const PixiPureTextInput: React.FC<PixiPureTextInputProps> = ({
   const onChangeRef = useRef(onChange);
   const onSubmitRef = useRef(onSubmit);
   const onCancelRef = useRef(onCancel);
+  const onBlurRef = useRef(onBlur);
 
   useEffect(() => { valueRef.current = value; }, [value]);
   useEffect(() => { cursorPosRef.current = cursorPos; }, [cursorPos]);
@@ -74,6 +81,20 @@ export const PixiPureTextInput: React.FC<PixiPureTextInputProps> = ({
   useEffect(() => { onChangeRef.current = onChange; }, [onChange]);
   useEffect(() => { onSubmitRef.current = onSubmit; }, [onSubmit]);
   useEffect(() => { onCancelRef.current = onCancel; }, [onCancel]);
+  useEffect(() => { onBlurRef.current = onBlur; }, [onBlur]);
+
+  // Auto-focus: select all on mount when autoFocus=true
+  useEffect(() => {
+    if (autoFocus) {
+      setFocused(true);
+      const len = valueRef.current.length;
+      setCursorPos(len);
+      setSelStart(0);
+      setSelEnd(len);
+      setCursorVisible(true);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Cursor blink
   useEffect(() => {
@@ -88,10 +109,13 @@ export const PixiPureTextInput: React.FC<PixiPureTextInputProps> = ({
     return () => { (window as any).__pixiInputFocused = false; };
   }, [focused]);
 
-  // Click-outside to blur
+  // Click-outside to blur — calls onBlur so consumers can commit value
   useEffect(() => {
     if (!focused) return;
-    const handler = () => setFocused(false);
+    const handler = () => {
+      setFocused(false);
+      onBlurRef.current?.(valueRef.current);
+    };
     document.addEventListener('pointerdown', handler, true);
     return () => document.removeEventListener('pointerdown', handler, true);
   }, [focused]);
