@@ -1838,8 +1838,16 @@ export async function tryRouteFormat(
       'JochenHippelSTParser', { injectUADE: true });
   }
 
-  // ── Maximum Effect (MAX.* prefix) / MaxTrax (.mxtx) ─────────────────────
-  if (matchesExt(filename, ['max', 'mxtx'])) {
+  // ── MaxTrax (.mxtx) ──────────────────────────────────────────────────────────
+  // MaxTrax is a synthesis-only Amiga format, completely different from Maximum Effect.
+  // Routes to UADE eagleplayer using prefix form.
+  if (matchesExt(filename, ['mxtx'])) {
+    const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
+    return parseUADEFile(buffer, toUADEPrefixName(originalFileName, ['mxtx']), prefs.uade ?? 'enhanced', subsong, preScannedMeta);
+  }
+
+  // ── Maximum Effect (MAX.* prefix) ────────────────────────────────────────────
+  if (matchesExt(filename, ['max'])) {
     const { isMaximumEffectFormat, parseMaximumEffectFile } = await import('@lib/import/formats/MaximumEffectParser');
     return withNativeThenUADE('maximumEffect', ctx,
       (buf: Uint8Array | ArrayBuffer, name: string) => { if (isMaximumEffectFormat(buf as ArrayBuffer)) return parseMaximumEffectFile(buf as ArrayBuffer, name); return null; },
