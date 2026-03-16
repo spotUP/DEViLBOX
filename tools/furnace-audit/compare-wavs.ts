@@ -45,7 +45,7 @@ function parseWav(buffer: Buffer): WavData {
 
     if (chunkId === 'fmt ') {
       const audioFormat = view.getUint16(offset + 8, true);
-      if (audioFormat !== 1) throw new Error(`Unsupported format: ${audioFormat} (need PCM=1)`);
+      if (audioFormat !== 1 && audioFormat !== 3) throw new Error(`Unsupported format: ${audioFormat} (need PCM=1 or float32=3)`);
       channels = view.getUint16(offset + 10, true);
       sampleRate = view.getUint32(offset + 12, true);
       bitsPerSample = view.getUint16(offset + 22, true);
@@ -83,6 +83,50 @@ function parseWav(buffer: Buffer): WavData {
     samples,
     duration: totalSamples / channels / sampleRate,
   };
+}
+
+// ── Envelope Correlation (exported for use by other scripts) ─────────────────
+
+/**
+ * Compute envelope correlation between two WAV files.
+ * Phase-independent: compares RMS amplitude in ~10ms windows.
+ * Returns a value in [-1, 1]; ≥ 0.90 is considered a pass.
+ */
+export function envelopeCorrelation(refPath: string, testPath: string): number {
+  const refBuf = readFileSync(refPath);
+  const testBuf = readFileSync(testPath);
+  const ref = parseWav(refBuf);
+  const test = parseWav(testBuf);
+
+  const len = Math.min(ref.samples.length, test.samples.length);
+  const envWindowSamples = Math.floor(ref.sampleRate * 0.01) * ref.channels;
+  const envLen = Math.floor(len / envWindowSamples);
+  let envSumRef = 0, envSumTest = 0, envSumRefSq = 0, envSumTestSq = 0, envSumRefTest = 0;
+
+  for (let w = 0; w < envLen; w++) {
+    const base = w * envWindowSamples;
+    let rmsR = 0, rmsT = 0;
+    for (let i = 0; i < envWindowSamples; i++) {
+      rmsR += ref.samples[base + i] * ref.samples[base + i];
+      rmsT += test.samples[base + i] * test.samples[base + i];
+    }
+    rmsR = Math.sqrt(rmsR / envWindowSamples);
+    rmsT = Math.sqrt(rmsT / envWindowSamples);
+    envSumRef += rmsR;
+    envSumTest += rmsT;
+    envSumRefSq += rmsR * rmsR;
+    envSumTestSq += rmsT * rmsT;
+    envSumRefTest += rmsR * rmsT;
+  }
+
+  const envMeanRef = envSumRef / envLen;
+  const envMeanTest = envSumTest / envLen;
+  const envNum = envSumRefTest - envLen * envMeanRef * envMeanTest;
+  const envDenRef = Math.sqrt(envSumRefSq - envLen * envMeanRef * envMeanRef);
+  const envDenTest = Math.sqrt(envSumTestSq - envLen * envMeanTest * envMeanTest);
+  return (envDenRef > 0 && envDenTest > 0)
+    ? envNum / (envDenRef * envDenTest)
+    : (envDenRef === 0 && envDenTest === 0 ? 1.0 : 0.0);
 }
 
 // ── Comparison Metrics ───────────────────────────────────────────────────────
@@ -316,11 +360,15 @@ function printResults(results: CompareResult[]) {
   console.log('');
 }
 
-// ── Main ─────────────────────────────────────────────────────────────────────
+// ── Main (only when run directly) ────────────────────────────────────────────
 
-const args = process.argv.slice(2);
+const isMain = import.meta.url === `file://${process.argv[1]}` ||
+  process.argv[1]?.endsWith('compare-wavs.ts') ||
+  process.argv[1]?.endsWith('compare-wavs.js');
 
-if (args[0] === '--batch' && args.length === 3) {
+const args = isMain ? process.argv.slice(2) : [];
+
+if (isMain && args[0] === '--batch' && args.length === 3) {
   const results = batchCompare(args[1], args[2]);
   printResults(results);
 
@@ -331,12 +379,12 @@ if (args[0] === '--batch' && args.length === 3) {
 
   process.exit(results.some(r => !r.pass) ? 1 : 0);
 
-} else if (args.length === 2) {
+} else if (isMain && args.length === 2) {
   const result = compareWavs(args[0], args[1], basename(args[0]));
   console.log(JSON.stringify(result, null, 2));
   process.exit(result.pass ? 0 : 1);
 
-} else {
+} else if (isMain) {
   console.log('Usage:');
   console.log('  npx tsx tools/furnace-audit/compare-wavs.ts <reference.wav> <test.wav>');
   console.log('  npx tsx tools/furnace-audit/compare-wavs.ts --batch <ref-dir> <test-dir>');
