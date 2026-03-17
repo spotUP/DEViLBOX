@@ -227,123 +227,136 @@ function generateSoundMon() {
 }
 
 // ── 4. SidMon II Template ──────────────────────────────────────────────────
-// Very complex format with variable-length patterns. Template approach is ideal.
-// Minimal valid file: magic + header offsets + empty track + 1 pointer + 1 empty pattern row
+// SidMon II header layout (from SidMon2Parser.ts):
+//   Offset 0-1:  unused (2 bytes)
+//   Offset 2:    length (u8) — number of track positions (songLen)
+//   Offset 3:    speedDef (u8) — default speed
+//   Offset 4-5:  sampleCount encoded as (count << 6) in u16BE
+//   Offset 14-17: trackDataLen (u32BE) — entries per pass (= channels × positions)
+//   Offset 26-29: waveDataLen (u32BE) — numInstruments = (val >> 5) + 1
+//   Offset 30-33: waveTotalLen (u32BE) — total wave table bytes
+//   Offset 34-37: arpeggioLen (u32BE)
+//   Offset 38-41: vibratoLen (u32BE)
+//   Offset 50-53: patDataLen (u32BE)
+//   Offset 58-85: "SIDMON II - THE MIDI VERSION" magic
+//   Offset 90:   track data (3 passes × trackDataLen bytes)
+//   then: instruments (32 bytes each, count = (waveDataLen >> 5) + 1, skip inst 0)
+//   then: wave data (waveTotalLen bytes)
+//   then: arpeggio data (arpeggioLen bytes)
+//   then: vibrato data (vibratoLen bytes)
+//   then: sample metadata (sampleCount × 64 bytes each, last 32 = name)
+//   then: pattern pointers (higher × u16BE)
+//   then: patDataLen u32BE
+//   then: pattern data
+//   then: sample PCM data
 function generateSidMon2() {
-  // SidMon II file structure (from SidMon2Parser.ts):
-  //   0x00: header with section lengths at specific offsets
-  //   0x3A: "SIDMON II - THE MIDI VERSION" magic at offset 58
-  //   0x5A: start of track data (offset 90)
-  //
-  // Section lengths (at header offsets):
-  //   offset 0:  u32 trackDataLen (in entries, not bytes)
-  //   offset 4:  u32 numInstruments
-  //   offset 8:  u32 waveDataLen
-  //   offset 12: u32 arpeggioLen
-  //   offset 16: u32 vibratoLen
-  //   offset 20: u32 numSamples (sampleCount)
-  //   offset 24: u32 speed
-  //   offset 28: u32 length (song length - 1)
-  //   ... more offsets
-
-  // Build minimal SidMon II file
   const MAGIC = 'SIDMON II - THE MIDI VERSION';
   const MAGIC_OFF = 58;
   const TRACK_DATA_OFF = 90;
 
-  const songLength = 1;     // 1 song step
-  const trackEntries = 4;   // 4 channels × 1 step
-  const numInstruments = 2;  // instrument 0 (empty) + instrument 1 (default)
-  const numPatterns = 2;     // pattern 0 (default) + pattern 1 (silent)
+  const songLength = 1;        // 1 track position
+  const trackEntries = 4;      // 4 channels × 1 position
+  const numInstruments = 2;    // instrument 0 (implicit empty) + instrument 1
+  // waveDataLen: parser does numInst = (waveDataLen >> 5) + 1, so for 2 instr: (val >> 5) + 1 = 2 → val = 32
+  const waveDataLen = 32;
+  const waveTotalLen = 32;     // 32 bytes of wave data (1 waveform cycle)
+  const arpeggioLen = 16;      // 16 bytes of arpeggio data
+  const vibratoLen = 0;
+  const sampleCount = 0;
+  const numPatterns = 1;       // pattern 0 only (empty)
+
+  // Pattern data: one empty row per pattern = 3 bytes (value=0, eff=0, param=0)
+  const patDataLen = 3;
 
   // Track data: 3 passes × trackEntries bytes
   const trackDataSize = trackEntries * 3;
-  // Instruments: numInstruments × 32 bytes
-  const instrSize = numInstruments * 32;
-  // Wave data: minimal (just 2 entries)
-  const waveDataLen = 2;
-  // Arpeggio: 8 bytes (1 arpeggio)
-  const arpeggioLen = 8;
-  // Vibrato: 0
-  const vibratoLen = 0;
-  // Pattern pointers: numPatterns × 2 bytes
+
+  // Instrument data: (numInstruments - 1) × 32 bytes (instrument 0 is implicit)
+  const instrDataSize = (numInstruments - 1) * 32;
+
+  // Pattern pointer table: numPatterns × u16BE
   const patPtrSize = numPatterns * 2;
-  // Pattern data: minimal (1 empty row per pattern = 1 byte each: value=0 effect=0 param=0 = 3 bytes)
-  const patDataLen = 6; // 2 patterns × 3 bytes each
-  // Samples: 0 (no PCM data)
-  const numSamples = 0;
 
-  // Total size
-  const totalSize = TRACK_DATA_OFF + trackDataSize + instrSize + waveDataLen * 2 +
-    arpeggioLen + vibratoLen + numSamples * 64 + patPtrSize + 4 + patDataLen;
+  // Total file size
+  const totalSize = TRACK_DATA_OFF + trackDataSize + instrDataSize +
+    waveTotalLen + arpeggioLen + vibratoLen +
+    patPtrSize + 4 + patDataLen; // +4 for patDataLen u32
 
-  const buf = new Uint8Array(totalSize + 64); // padding
-  let pos = 0;
+  const buf = new Uint8Array(totalSize + 16); // small padding
+  let pos;
 
-  // Header offsets
-  writeU32BE(buf, 0, trackEntries);       // trackDataLen
-  writeU32BE(buf, 4, numInstruments);     // numInstruments
-  writeU32BE(buf, 8, waveDataLen);        // waveDataLen
-  writeU32BE(buf, 12, arpeggioLen);       // arpeggioLen
-  writeU32BE(buf, 16, vibratoLen);        // vibratoLen
-  writeU32BE(buf, 20, numSamples);        // numSamples
-  writeU32BE(buf, 24, 6);                 // speed
-  writeU32BE(buf, 28, songLength - 1);    // length (song length - 1)
-  // Offsets 32-49: more section lengths (zeros = safe defaults)
-  writeU32BE(buf, 50, patDataLen);        // pattern data length
+  // -- Header (offsets 0-89) --
+  writeU8(buf, 0, 0);             // unused
+  writeU8(buf, 1, 0);             // unused
+  writeU8(buf, 2, songLength);    // length (number of track positions)
+  writeU8(buf, 3, 6);             // speedDef
+  writeU16BE(buf, 4, sampleCount << 6); // sampleCount encoded
+  // Offsets 6-13: zeros (unused)
+  writeU32BE(buf, 14, trackEntries);    // trackDataLen
+  // Offsets 18-25: zeros (unused)
+  writeU32BE(buf, 26, waveDataLen);     // waveDataLen → numInstruments = (32 >> 5) + 1 = 2
+  writeU32BE(buf, 30, waveTotalLen);    // waveTotalLen
+  writeU32BE(buf, 34, arpeggioLen);     // arpeggioLen
+  writeU32BE(buf, 38, vibratoLen);      // vibratoLen
+  // Offsets 42-49: zeros
+  writeU32BE(buf, 50, patDataLen);      // pattern data length
 
   // Magic at offset 58
   writeString(buf, MAGIC_OFF, MAGIC, 28);
+  // Offsets 86-89: zeros
 
-  // Track data at offset 90: 3 interleaved passes
+  // -- Track data at offset 90 --
   pos = TRACK_DATA_OFF;
-  // Pass 1: pattern numbers (all 0)
+  // Pass 1: pattern numbers (pattern 0 for all channels)
   for (let i = 0; i < trackEntries; i++) writeU8(buf, pos++, 0);
   // Pass 2: transposes (all 0)
   for (let i = 0; i < trackEntries; i++) writeS8(buf, pos++, 0);
   // Pass 3: sound transposes (all 0)
   for (let i = 0; i < trackEntries; i++) writeS8(buf, pos++, 0);
 
-  // Instruments (32 bytes each)
-  for (let i = 0; i < numInstruments; i++) {
-    // All zeros = valid empty instrument
-    pos += 32;
-  }
+  // -- Instrument 1 (32 bytes) --
+  // wave=0, waveLen=2, waveSpeed=1, waveDelay=0, arpeggio=0, ...
+  const instOff = pos;
+  writeU8(buf, instOff + 0, 0);   // wave (<<4 in parser, so 0)
+  writeU8(buf, instOff + 1, 2);   // waveLen
+  writeU8(buf, instOff + 2, 1);   // waveSpeed
+  writeU8(buf, instOff + 3, 0);   // waveDelay
+  // arpeggio, vibrato: all zeros
+  // Offset +16: attackMax
+  writeU8(buf, instOff + 16, 64); // attackMax (volume)
+  writeU8(buf, instOff + 17, 4);  // attackSpeed
+  writeU8(buf, instOff + 18, 0);  // decayMin
+  writeU8(buf, instOff + 19, 1);  // decaySpeed
+  writeU8(buf, instOff + 20, 32); // sustain
+  writeU8(buf, instOff + 21, 0);  // releaseMin
+  writeU8(buf, instOff + 22, 2);  // releaseSpeed
+  pos += 32;
 
-  // Wave data (2 bytes × waveDataLen)
-  for (let i = 0; i < waveDataLen; i++) {
-    writeU16BE(buf, pos, 0); pos += 2;
-  }
+  // -- Wave data (32 bytes: square wave) --
+  for (let i = 0; i < 16; i++) buf[pos++] = 127;   // positive half
+  for (let i = 0; i < 16; i++) buf[pos++] = 0x80;  // negative half (-128)
 
-  // Arpeggio data
-  for (let i = 0; i < arpeggioLen; i++) writeU8(buf, pos++, 0);
+  // -- Arpeggio data (16 bytes: all zeros = no arpeggio) --
+  for (let i = 0; i < arpeggioLen; i++) buf[pos++] = 0;
 
-  // Vibrato data (none)
+  // -- Vibrato data (0 bytes) --
 
-  // Sample metadata (none)
+  // -- Sample metadata (0 samples) --
 
-  // Pattern pointer table (numPatterns × u16)
-  const patPtrStart = pos;
-  writeU16BE(buf, pos, 0); pos += 2;     // pattern 0 at byte offset 0
-  writeU16BE(buf, pos, 3); pos += 2;     // pattern 1 at byte offset 3
+  // -- Pattern pointer table --
+  writeU16BE(buf, pos, 0); pos += 2; // pattern 0 at byte offset 0
 
-  // Pattern data length (u32)
+  // -- Pattern data length (u32BE) --
   writeU32BE(buf, pos, patDataLen); pos += 4;
 
-  // Pattern data: each pattern = one empty row (value=0, effect=0x00, param=0x00)
-  // Row with value=0: means "no note, effect + param follow" = 3 bytes
-  writeU8(buf, pos++, 0);   // value = 0 (no note)
-  writeU8(buf, pos++, 0);   // effect = 0
-  writeU8(buf, pos++, 0);   // param = 0
+  // -- Pattern 0: one empty row (3 bytes: value=0, effect=0, param=0) --
+  writeU8(buf, pos++, 0);  // value = 0 (no note)
+  writeU8(buf, pos++, 0);  // effect = 0
+  writeU8(buf, pos++, 0);  // param = 0
 
-  writeU8(buf, pos++, 0);   // pattern 1: value = 0
-  writeU8(buf, pos++, 0);   // effect = 0
-  writeU8(buf, pos++, 0);   // param = 0
-
-  // Trim to actual size
   const finalBuf = buf.slice(0, pos);
   fs.writeFileSync(path.join(OUT_DIR, 'sidmon2.sd2'), finalBuf);
-  console.log(`  sidmon2.sd2: ${finalBuf.length} bytes (minimal template)`);
+  console.log(`  sidmon2.sd2: ${finalBuf.length} bytes (SidMon II template)`);
 }
 
 // ── 5. PumaTracker Template ────────────────────────────────────────────────
