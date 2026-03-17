@@ -53,6 +53,8 @@
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, TrackerCell, InstrumentConfig } from '@/types';
 import type { HippelCoSoConfig, UADEChipRamInfo } from '@/types/instrument';
+import type { UADEVariablePatternLayout } from '@/engine/uade/UADEPatternEncoder';
+import { hippelCoSoEncoder } from '@/engine/uade/encoders/HippelCoSoEncoder';
 
 // ── Binary read helpers ─────────────────────────────────────────────────────
 
@@ -495,6 +497,60 @@ export async function parseHippelCoSoFile(
     trackerPatterns.push(createEmptyPattern(filename, instruments.length));
   }
 
+  // ── Build variable-length layout for encoder wiring ──────────────────────
+  // Scan all song steps to find highest referenced pattern index
+  let maxPatIdx = 0;
+  const trackMap: number[][] = [];
+  for (let stepIdx = 0; stepIdx < songStepCount; stepIdx++) {
+    const stepBase = song.pointer + stepIdx * 12;
+    const chPats: number[] = [];
+    for (let ch = 0; ch < 4; ch++) {
+      const chBase = stepBase + ch * 3;
+      const patIdx = chBase + 3 <= buf.length ? u8(buf, chBase) : 0;
+      if (patIdx > maxPatIdx) maxPatIdx = patIdx;
+      chPats.push(patIdx);
+    }
+    trackMap.push(chPats);
+  }
+
+  // Read pattern pointer table and compute per-pattern addresses + sizes
+  const numFilePatterns = maxPatIdx + 1;
+  const filePatternAddrs: number[] = [];
+  const filePatternSizes: number[] = [];
+
+  // Collect all pattern data offsets then sort to determine sizes
+  const patOffs: { idx: number; off: number }[] = [];
+  for (let i = 0; i < numFilePatterns; i++) {
+    const ptrOff = patternsOff + i * 2;
+    const dataOff = ptrOff + 2 <= buf.length ? u16BE(buf, ptrOff) : 0;
+    patOffs.push({ idx: i, off: dataOff });
+  }
+  // Sort by offset to find boundaries (patterns may not be stored in order)
+  const sorted = [...patOffs].sort((a, b) => a.off - b.off);
+  // End boundary: tracksOff or end of file
+  const patDataEnd = tracksOff > 0 ? tracksOff : buf.length;
+
+  for (let i = 0; i < numFilePatterns; i++) {
+    const off = patOffs[i].off;
+    filePatternAddrs.push(off);
+    // Find next higher offset to compute size
+    const sortedIdx = sorted.findIndex(s => s.idx === i);
+    const nextOff = sortedIdx < sorted.length - 1 ? sorted[sortedIdx + 1].off : patDataEnd;
+    filePatternSizes.push(Math.max(0, nextOff - off));
+  }
+
+  const variableLayout: UADEVariablePatternLayout = {
+    formatId: 'hippelCoSo',
+    numChannels: 4,
+    numFilePatterns,
+    rowsPerPattern: ROWS_PER_PATTERN,
+    moduleSize: buf.length,
+    encoder: hippelCoSoEncoder,
+    filePatternAddrs,
+    filePatternSizes,
+    trackMap,
+  };
+
   const moduleName = filename.replace(/\.[^/.]+$/, '');
   const speedBPM   = Math.round(song.speed > 0 ? (2500.0 / song.speed) : 125);
 
@@ -510,6 +566,7 @@ export async function parseHippelCoSoFile(
     initialSpeed: 6,
     initialBPM: Math.max(32, Math.min(255, speedBPM)),
     linearPeriods: false,
+    uadeVariableLayout: variableLayout,
   };
 }
 

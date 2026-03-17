@@ -166,4 +166,46 @@ export class UADEChipEditor {
     a.click();
     URL.revokeObjectURL(url);
   }
+
+  // ── Variable-Length Pattern Rewriting ──────────────────────────────────────
+
+  /**
+   * Re-encode and write an entire channel's pattern data to chip RAM.
+   * Uses trackMap to resolve (TrackerSong patternIdx, channel) → file-level
+   * pattern index, then writes the re-encoded data at the file pattern's address.
+   *
+   * @returns true if written, false if the re-encoded data exceeded the
+   *          original size (edit rejected to prevent buffer overflow).
+   */
+  async rewriteVariablePattern(
+    layout: import('./UADEPatternEncoder').UADEVariablePatternLayout,
+    trackerPatternIndex: number,
+    channel: number,
+    rows: TrackerCell[],
+  ): Promise<boolean> {
+    const filePatIdx = layout.trackMap[trackerPatternIndex]?.[channel];
+    if (filePatIdx == null || filePatIdx < 0) return false;
+
+    const fileOffset = layout.filePatternAddrs[filePatIdx];
+    const originalSize = layout.filePatternSizes[filePatIdx];
+    if (fileOffset == null || originalSize == null) return false;
+
+    const moduleBase = await this.getModuleBase();
+    const encoded = layout.encoder.encodePattern(rows, channel);
+
+    if (encoded.length > originalSize) {
+      console.warn(
+        `[UADEChipEditor] Variable-length pattern overflow: ` +
+        `file pattern ${filePatIdx} encoded ${encoded.length} bytes > original ${originalSize}`,
+      );
+      return false;
+    }
+
+    // Write the encoded data, then zero-fill the remaining bytes
+    const addr = moduleBase + fileOffset;
+    const padded = new Uint8Array(originalSize);
+    padded.set(encoded);
+    await this.writeBytes(addr, padded);
+    return true;
+  }
 }

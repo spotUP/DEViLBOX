@@ -312,6 +312,10 @@ export interface TrackerSong {
    *  emulated chip RAM, making the 68k replayer play the edited data in real-time. */
   uadePatternLayout?: import('./uade/UADEPatternEncoder').UADEPatternLayout;
 
+  /** UADE variable-length pattern layout — for formats where cell byte size varies.
+   *  Uses full-pattern re-serialization instead of per-cell patching. */
+  uadeVariableLayout?: import('./uade/UADEPatternEncoder').UADEVariablePatternLayout;
+
   /** CIA tick of the first reconstructed row — offset for real-time position calculation.
    *  During playback, row = floor((tickCount - uadeFirstTick) / initialSpeed). */
   uadeFirstTick?: number;

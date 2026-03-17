@@ -40,7 +40,9 @@
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, TrackerCell, InstrumentConfig, UADEChipRamInfo } from '@/types';
+import type { UADEVariablePatternLayout } from '@/engine/uade/UADEPatternEncoder';
 import { createSamplerInstrument } from './AmigaUtils';
+import { actionamicsEncoder } from '@/engine/uade/encoders/ActionamicsEncoder';
 
 // ── Constants ──────────────────────────────────────────────────────────────
 
@@ -395,10 +397,14 @@ function parseInternal(bytes: Uint8Array, filename: string): TrackerSong | null 
 
   const trackDataStart = tracksOffset + trackOffsetsLength;
   const trackDataArrays: Uint8Array[] = [];
+  const filePatternAddrs: number[] = [];
+  const filePatternSizes: number[] = [];
 
   for (let i = 0; i < numTracks; i++) {
     const trackStart = trackDataStart + trackOffsetTable[i];
     const trackEnd = trackDataStart + trackOffsetTable[i + 1];
+    filePatternAddrs.push(trackStart);
+    filePatternSizes.push(Math.max(0, trackEnd - trackStart));
     if (trackEnd > len || trackStart > trackEnd) {
       trackDataArrays.push(new Uint8Array(0));
       continue;
@@ -711,6 +717,29 @@ function parseInternal(bytes: Uint8Array, filename: string): TrackerSong | null 
   const bpm = tempo > 0 ? tempo : 125;
   const speed = primarySong.speed > 0 ? primarySong.speed : 6;
 
+  // Build trackMap: trackerPatternIdx → [ch0 trackIdx, ch1 trackIdx, ...]
+  const trackMap: number[][] = [];
+  for (let posIdx = startPos; posIdx <= endPos && posIdx < numPositions; posIdx++) {
+    const chTracks: number[] = [];
+    for (let ch = 0; ch < 4; ch++) {
+      const trackIdx = positions[ch][posIdx].trackNumber;
+      chTracks.push(trackIdx < numTracks ? trackIdx : -1);
+    }
+    trackMap.push(chTracks);
+  }
+
+  const variableLayout: UADEVariablePatternLayout = {
+    formatId: 'actionamics',
+    numChannels: 4,
+    numFilePatterns: numTracks,
+    rowsPerPattern: ROWS_PER_PATTERN,
+    moduleSize: len,
+    encoder: actionamicsEncoder,
+    filePatternAddrs,
+    filePatternSizes,
+    trackMap,
+  };
+
   return {
     name: moduleName,
     format: 'AST' as TrackerFormat,
@@ -725,5 +754,6 @@ function parseInternal(bytes: Uint8Array, filename: string): TrackerSong | null 
     linearPeriods: false,
     uadeEditableFileData: bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer,
     uadeEditableFileName: filename,
+    uadeVariableLayout: variableLayout,
   };
 }
