@@ -26,8 +26,11 @@ import { AudioExportPanel } from './AudioExportPanel';
 import { MidiExportPanel } from './MidiExportPanel';
 import { ModuleExportPanel } from './ModuleExportPanel';
 import { ChipExportPanel } from './ChipExportPanel';
+import { exportAsJamCracker } from './JamCrackerExporter';
+import { exportSongToSoundMon } from './soundMonExport';
+import { saveAs } from 'file-saver';
 
-type ExportMode = 'song' | 'sfx' | 'instrument' | 'audio' | 'midi' | 'xm' | 'mod' | 'it' | 's3m' | 'chip' | 'nano' | 'fur';
+type ExportMode = 'song' | 'sfx' | 'instrument' | 'audio' | 'midi' | 'xm' | 'mod' | 'it' | 's3m' | 'chip' | 'nano' | 'fur' | 'native';
 type DialogMode = 'export' | 'import';
 
 interface ExportDialogProps {
@@ -214,6 +217,39 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
           URL.revokeObjectURL(url);
 
           notify.success(`Nano binary "${metadata.name || 'song'}.dbn" exported successfully! (${nanoData.length} bytes)`);
+          onClose();
+          break;
+        }
+
+        case 'native': {
+          const { getTrackerReplayer } = await import('@engine/TrackerReplayer');
+          const song = getTrackerReplayer().getSong();
+          if (!song) { notify.error('No song loaded'); return; }
+
+          const preset = useUIStore.getState().activeSystemPreset || '';
+          const format = song.format;
+          let result: { data: Blob; filename: string; warnings: string[] } | null = null;
+
+          if (preset.includes('jamcracker') || format === 'JamCracker' as string) {
+            result = await exportAsJamCracker(song);
+          } else if (preset.includes('soundmon') || format === ('SMON' as string)) {
+            result = exportSongToSoundMon(song);
+          } else if (preset.includes('protracker') || format === 'MOD') {
+            const { exportSongToMOD } = await import('./modExport');
+            const modResult = await exportSongToMOD(song, { bakeSynths: true });
+            result = { data: modResult.blob, filename: modResult.filename, warnings: modResult.warnings };
+          }
+
+          if (result) {
+            saveAs(result.data, result.filename);
+            if (result.warnings.length > 0) {
+              notify.warning(`Exported with warnings: ${result.warnings.join('; ')}`);
+            } else {
+              notify.success(`Native format exported: ${result.filename}`);
+            }
+          } else {
+            notify.error(`No native exporter for format "${preset || format}"`);
+          }
           onClose();
           break;
         }
@@ -545,6 +581,21 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                       <div className="font-mono text-sm font-semibold">Furnace</div>
                     </button>
                   )}
+                  {(editorMode === 'jamcracker' || editorMode === 'classic') && (
+                    <button
+                      onClick={() => setExportMode('native')}
+                      className={`
+                        p-4 rounded-lg border-2 transition-all text-center
+                        ${exportMode === 'native'
+                          ? 'bg-accent-primary text-text-inverse border-accent-primary glow-sm'
+                          : 'bg-dark-bgSecondary text-text-primary border-dark-border hover:border-dark-borderLight'
+                        }
+                      `}
+                    >
+                      <FileMusic size={24} className="mx-auto mb-2" />
+                      <div className="font-mono text-sm font-semibold">Native</div>
+                    </button>
+                  )}
                 </div>
               </div>
 
@@ -692,6 +743,27 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                       <div>Engine: <span className="text-accent-primary">FurnaceFileOps WASM</span></div>
                       <div>Patterns: <span className="text-accent-primary">{patterns.length}</span></div>
                       <div>Instruments: <span className="text-accent-primary">{instruments.length}</span></div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {exportMode === 'native' && (
+                <div className="bg-dark-bgSecondary border border-dark-border rounded-lg p-4 mb-4">
+                  <h3 className="text-sm font-mono font-bold text-accent-primary mb-3">
+                    Native Amiga Format Export
+                  </h3>
+                  <div className="space-y-3">
+                    <div className="text-sm font-mono text-text-secondary space-y-1">
+                      <div>Preset: <span className="text-accent-primary">{useUIStore.getState().activeSystemPreset || 'auto-detect'}</span></div>
+                      <div>Patterns: <span className="text-accent-primary">{patterns.length}</span></div>
+                      <div>Instruments: <span className="text-accent-primary">{instruments.length}</span></div>
+                    </div>
+                    <div className="bg-dark-bg border border-dark-border rounded-lg p-3">
+                      <p className="text-xs font-mono text-text-primary leading-relaxed">
+                        Exports as the original Amiga tracker format (JamCracker .jam, SoundMon .bp, ProTracker .mod).
+                        Pattern data and instruments are serialized from the current song state.
+                      </p>
                     </div>
                   </div>
                 </div>
