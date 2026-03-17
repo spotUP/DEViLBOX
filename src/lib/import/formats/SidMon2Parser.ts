@@ -20,7 +20,9 @@
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, TrackerCell, InstrumentConfig } from '@/types';
 import type { SidMonConfig, UADEChipRamInfo } from '@/types/instrument';
+import type { UADEVariablePatternLayout } from '@/engine/uade/UADEPatternEncoder';
 import { arrayBufferToBase64 } from '@/lib/import/InstrumentConverter';
+import { sidMon2Encoder } from '@/engine/uade/encoders/SidMon2Encoder';
 
 // -- SidMon II period table (from S2Player.js) --------------------------------
 // Index 0 is unused (0). Indices 1-72 cover 6 octaves (C-1 to B-6).
@@ -387,8 +389,12 @@ export async function parseSidMon2File(
 
   const numPointers = higher + 1;
   const pointers = new Uint16Array(numPointers + 1);
+  // Save original byte offsets (relative to patternDataStart) for encoder wiring
+  const origPointerByteOffsets = new Uint16Array(numPointers + 1);
   for (let i = 0; i < numPointers; i++) {
-    pointers[i] = readUshort(data, pos); pos += 2;
+    pointers[i] = readUshort(data, pos);
+    origPointerByteOffsets[i] = pointers[i];
+    pos += 2;
   }
 
   // -- Pattern data (variable-length encoded) ---------------------------------
@@ -452,6 +458,8 @@ export async function parseSidMon2File(
   for (let k = pointerJ; k <= numPointers; k++) {
     pointers[k] = patternRows.length;
   }
+  // Set sentinel byte offset for size calculation
+  origPointerByteOffsets[numPointers] = patternDataLen;
 
   // Align to word boundary after pattern data
   if ((pos & 1) !== 0) pos++;
@@ -470,6 +478,12 @@ export async function parseSidMon2File(
   }
 
   // -- Resolve track pattern pointers -----------------------------------------
+  // Save original pattern indices (file-level) before overwriting with row offsets
+  const trackOrigPatterns = new Uint8Array(trackLen);
+  for (let i = 0; i < trackLen; i++) {
+    trackOrigPatterns[i] = tracks[i].pattern;
+  }
+
   // Replace raw pattern indices with decoded row offsets
 
   for (let i = 0; i < trackLen; i++) {
@@ -855,6 +869,43 @@ export async function parseSidMon2File(
 
   const moduleName = filename.replace(/\.[^/.]+$/, '');
 
+  // ── Build variable-length encoder layout ────────────────────────────────
+  // File-level patterns: indexed 0..numPointers-1
+  // Each is a single-channel byte stream at patternDataStart + origPointerByteOffsets[i]
+  const filePatternAddrs: number[] = [];
+  const filePatternSizes: number[] = [];
+  for (let i = 0; i < numPointers; i++) {
+    filePatternAddrs.push(patternDataStart + origPointerByteOffsets[i]);
+    // Size = distance to next pattern's byte offset (or end of pattern data)
+    const nextOff = i + 1 < numPointers ? origPointerByteOffsets[i + 1] : patternDataLen;
+    filePatternSizes.push(Math.max(0, nextOff - origPointerByteOffsets[i]));
+  }
+
+  // Build trackMap: trackerPatternIdx → [ch0 filePatIdx, ch1 filePatIdx, ...]
+  // trackerPatterns[trackPos] → for channel ch, track index = trackPos + ch * songLength
+  const trackMap: number[][] = [];
+  for (let trackPos = 0; trackPos < songLength; trackPos++) {
+    const chPats: number[] = [];
+    for (let ch = 0; ch < 4; ch++) {
+      const trackIdx = trackPos + ch * songLength;
+      const filePatIdx = trackIdx < trackLen ? trackOrigPatterns[trackIdx] : -1;
+      chPats.push(filePatIdx < numPointers ? filePatIdx : -1);
+    }
+    trackMap.push(chPats);
+  }
+
+  const variableLayout: UADEVariablePatternLayout = {
+    formatId: 'sidMon2',
+    numChannels: 4,
+    numFilePatterns: numPointers,
+    rowsPerPattern: 64,
+    moduleSize: buffer.byteLength,
+    encoder: sidMon2Encoder,
+    filePatternAddrs,
+    filePatternSizes,
+    trackMap,
+  };
+
   return {
     name: moduleName,
     format: 'MOD' as TrackerFormat,
@@ -868,5 +919,6 @@ export async function parseSidMon2File(
     initialBPM: 125,
     linearPeriods: false,
     sd2FileData: buffer.slice(0),
+    uadeVariableLayout: variableLayout,
   };
 }

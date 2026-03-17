@@ -139,8 +139,8 @@ export interface UADEVariablePatternLayout {
   /** Number of channels in the module */
   numChannels: number;
 
-  /** Total number of patterns */
-  numPatterns: number;
+  /** Total number of file-level patterns/tracks (NOT TrackerSong patterns) */
+  numFilePatterns: number;
 
   /** Rows per pattern (usually 64, but may vary per pattern) */
   rowsPerPattern: number | number[];
@@ -152,18 +152,26 @@ export interface UADEVariablePatternLayout {
   encoder: VariableLengthEncoder;
 
   /**
-   * Per-pattern, per-channel chip RAM addresses where each channel's
-   * pattern data starts.  patternAddrs[patIdx][chIdx] = file byte offset.
-   * Used to write re-encoded data back to the correct location.
+   * File byte offset where each file-level pattern's data starts.
+   * filePatternAddrs[filePatIdx] = byte offset from file start.
+   * These formats store single-channel patterns, so no per-channel dimension.
    */
-  patternAddrs: number[][];
+  filePatternAddrs: number[];
 
   /**
-   * Per-pattern, per-channel original byte sizes.
-   * originalSizes[patIdx][chIdx] = byte count of the original encoded data.
-   * Used for overflow detection: re-encoded data must fit within this limit.
+   * Original byte sizes of each file-level pattern's encoded data.
+   * filePatternSizes[filePatIdx] = byte count.
+   * Re-encoded data must fit within this limit (overflow = reject edit).
    */
-  originalSizes: number[][];
+  filePatternSizes: number[];
+
+  /**
+   * Map from (TrackerSong patternIdx, channelIdx) → file-level pattern index.
+   * trackMap[trackerPatIdx][chIdx] = filePatIdx.
+   * Multiple tracker patterns may reference the same file pattern (shared tracks).
+   * -1 means no track assigned (empty channel).
+   */
+  trackMap: number[][];
 }
 
 const variableEncoderRegistry = new Map<string, VariableLengthEncoder>();
