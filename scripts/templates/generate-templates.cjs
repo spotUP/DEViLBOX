@@ -152,49 +152,78 @@ function generateJamCracker() {
   console.log(`  jamcracker.jam: ${buf.length} bytes, ${NUM_PATTERNS} patterns`);
 }
 
-// ── 3. SoundMon Template ───────────────────────────────────────────────────
-// SoundMon v2 ("BPSM"): 3 bytes/cell, 4 channels, 48-row patterns
-// Header: magic(4) + songLength(u16) + numPatterns(u16) + instruments(15*32)
+// ── 3. SoundMon V2 Template ────────────────────────────────────────────────
+// Binary layout (from SoundMonParser.ts):
+//   [0..25]   26-byte title
+//   [26..28]  "V.2" magic (3 bytes)
+//   [29]      nTables (synth table count)
+//   [30..31]  songLength (u16BE, number of sequence steps)
+//   [32..511] 15 instruments × 32 bytes
+//   [512..]   Track table: songLength × 4 channels × 4 bytes
+//   [..]      Pattern data: (higherPattern) × 16 rows × 3 bytes/cell
+//   [..]      Synth tables: nTables × 64 bytes
+//   [..]      Sample PCM data
+//
+// Pattern 0 = empty (not stored in file). Track table references pattern
+// indices; 0 means "empty block". Pattern data starts at pattern 1.
 function generateSoundMon() {
-  const MAGIC = 'BPSM'; // SoundMon v2
-  const NUM_PATTERNS = 32;
-  const NUM_INSTRUMENTS = 15;
-  const ROWS_PER_PATTERN = 48;
-  const CHANNELS = 4;
-  const CELL_SIZE = 3;
+  const SONG_LENGTH = 1;   // 1 sequence step
+  const NUM_PATTERNS = 1;  // 1 stored pattern block (index 1; 0 = empty)
+  const N_TABLES = 1;      // 1 synth table (default waveform)
 
-  // SoundMon v2 layout (from SoundMonParser.ts):
-  //   0x00: "BPSM" (4 bytes)
-  //   0x1C: songLength (u16BE) at offset 28
-  //   0x1E: numPatterns at offset 30 (u16BE - actually stored differently)
-  // Actually, let me check the exact layout...
-  // SoundMon v2 uses SoundTracker-like layout with "BPSM" marker
+  // --- Header (32 bytes) ---
+  const headerSize = 32;
+  // 15 instruments × 32 bytes
+  const instrSize = 15 * 32;
+  // Track table: songLength × 4 channels × 4 bytes
+  const trackTableSize = SONG_LENGTH * 4 * 4;
+  // Pattern data: NUM_PATTERNS × 16 rows × 3 bytes
+  const patDataSize = NUM_PATTERNS * 16 * 3;
+  // Synth tables: nTables × 64 bytes
+  const synthTableSize = N_TABLES * 64;
 
-  // Simplified: create a valid SoundMon v1.0 file ("V.2" magic variant)
-  // Header: songName(26) + [0x1A] reserved(5) + magic(4) = 35 bytes
-  // Then 15 instruments × 32 bytes = 480 bytes
-  // Then voltable(64 bytes) + song positions(128) + pattern count(u16) + pattern data
+  const totalSize = headerSize + instrSize + trackTableSize + patDataSize + synthTableSize;
+  const buf = new Uint8Array(totalSize);
 
-  const instrSize = NUM_INSTRUMENTS * 32;
-  const volTableSize = 64;
-  const songPosSize = 128; // 128 bytes for song positions
-  const patDataSize = NUM_PATTERNS * ROWS_PER_PATTERN * CHANNELS * CELL_SIZE;
+  // Title
+  writeString(buf, 0, 'DEViLBOX Template', 26);
+  // Magic "V.2" at offset 26
+  writeString(buf, 26, 'V.2', 3);
+  buf[29] = N_TABLES;  // nTables
+  writeU16BE(buf, 30, SONG_LENGTH);
 
-  // Actually this format is complex. Let me use a simpler approach:
-  // Generate a minimal valid SoundMon v2 file that UADE can load.
+  // --- 15 Instruments (32 bytes each) ---
+  // Instrument 1: default synth (0xFF marker)
+  const inst1Off = headerSize + 0 * 32;
+  buf[inst1Off] = 0xFF;       // synth marker
+  buf[inst1Off + 1] = 0;      // waveform table index
+  buf[inst1Off + 2] = 32;     // waveform table length (words) → 64 bytes
+  buf[inst1Off + 5] = 0;      // ADSR table index
+  buf[inst1Off + 6] = 16;     // ADSR table length (words) → 32 bytes
+  // Remaining bytes = 0 (LFO, EG, etc.)
+  // Instruments 2-15: all zeros (empty sample instruments with length=0)
 
-  // SoundMon v2 file structure (from parser analysis):
-  //   Offset 0: Song name (26 bytes)
-  //   Offset 26: 0x1A (terminator)
-  //   Offset 27: unused (1 byte)
-  //   Offset 28: "V.2" or "BPSM" (4 bytes)
-  //   Offset 32: 15 instruments × 32 bytes
-  //   Offset 512: Step table (4 positions × numSteps × 4 channels)
-  //   ... then arpeggio tables, then pattern data
+  // --- Track Table ---
+  // 1 step × 4 channels × 4 bytes [patternIdx(u16BE), soundTranspose(s8), noteTranspose(s8)]
+  // Channel 0 references pattern 1, others reference pattern 0 (empty)
+  const trackOff = headerSize + instrSize;
+  writeU16BE(buf, trackOff + 0, 1);  // Ch0 → pattern 1
+  writeS8(buf, trackOff + 2, 0);     // sound transpose
+  writeS8(buf, trackOff + 3, 0);     // note transpose
+  // Ch1-3 → pattern 0 (empty) — already zeros
 
-  // This is too format-specific and error-prone without a running parser to verify.
-  // Skip SoundMon template for now — it needs more research.
-  console.log('  soundmon: SKIPPED (complex format, needs parser-guided construction)');
+  // --- Pattern Data ---
+  // Pattern 1: 16 rows × 3 bytes, all empty (note=0, instr|eff=0, param=0)
+  // Already zero-filled
+
+  // --- Synth Table 0: Square wave ---
+  const synthOff = headerSize + instrSize + trackTableSize + patDataSize;
+  // 64 bytes: simple square wave (32 high + 32 low)
+  for (let i = 0; i < 32; i++) buf[synthOff + i] = 127;      // positive half
+  for (let i = 32; i < 64; i++) buf[synthOff + i] = 128 & 0xFF; // negative half (-128 as u8)
+
+  fs.writeFileSync(path.join(OUT_DIR, 'soundmon.bp'), buf);
+  console.log(`  soundmon.bp: ${buf.length} bytes, ${NUM_PATTERNS} pattern blocks, ${N_TABLES} synth tables`);
 }
 
 // ── 4. SidMon II Template ──────────────────────────────────────────────────
@@ -392,6 +421,292 @@ function generatePumaTracker() {
   console.log(`  pumatracker.puma: ${finalBuf.length} bytes, ${NUM_PATTERNS} patterns`);
 }
 
+// ── 6. HippelCoSo Template ─────────────────────────────────────────────────
+// Header: "COSO" + 7 section offsets (32 bytes)
+// Then: freq seqs, vol seqs, patterns, tracks, songs, headers/sampleinfo, samples
+function generateHippelCoSo() {
+  // Minimal valid HippelCoSo: 1 song, 1 track row, 1 pattern, 1 volume sequence, 1 freq sequence
+  const parts = [];
+
+  // Header: "COSO" + 7 u32BE offsets (filled later)
+  const header = new Uint8Array(32);
+  writeString(header, 0, 'COSO', 4);
+  parts.push(header);
+
+  // We'll build sections and compute offsets after
+  const BASE = 32;
+
+  // Freq sequences: pointer table + data
+  // 1 freq seq at index 0: just a single 0xE0 (end/loop) marker
+  const frqPtrTable = new Uint8Array(2); // 1 entry × u16BE
+  writeU16BE(frqPtrTable, 0, 2); // data starts 2 bytes after this table
+  const frqData = new Uint8Array(2);
+  frqData[0] = 0; // pitch offset 0 (no pitch change)
+  frqData[1] = 0xE1 & 0xFF; // end marker (225 unsigned = -31 signed)
+  // Actually looking at parser: freq sequence is just raw s8 values with special negative codes
+  // Let's use a simple end marker: -32 (0xE0) = loop to start
+  frqData[1] = 0xE0; // loop marker = -32
+
+  const frqSeqs = new Uint8Array(frqPtrTable.length + frqData.length);
+  frqSeqs.set(frqPtrTable, 0);
+  frqSeqs.set(frqData, frqPtrTable.length);
+
+  // Volume sequences: pointer table + data
+  // 1 vol seq at index 0: speed=1, freqSeq=0, vibSpeed=0, vibDepth=0, vibDelay=0, then vol=64, end
+  const volPtrTable = new Uint8Array(2);
+  writeU16BE(volPtrTable, 0, 2); // data starts 2 bytes after this table
+  const volData = new Uint8Array(7);
+  volData[0] = 1;    // speed
+  volData[1] = 0;    // freq seq index (s8)
+  volData[2] = 0;    // vibrato speed
+  volData[3] = 0;    // vibrato depth
+  volData[4] = 0;    // vibrato delay
+  volData[5] = 64;   // volume value
+  volData[6] = 0xE1; // end marker (-31 as u8)
+
+  const volSeqs = new Uint8Array(volPtrTable.length + volData.length);
+  volSeqs.set(volPtrTable, 0);
+  volSeqs.set(volData, volPtrTable.length);
+
+  // Pattern data: 1 pattern pointer + data
+  // Pattern 0: just an end marker (-1 = 0xFF)
+  const patPtrTable = new Uint8Array(2);
+  writeU16BE(patPtrTable, 0, 2); // data starts 2 bytes after
+  const patData = new Uint8Array(1);
+  patData[0] = 0xFF; // -1 = end of pattern (next track step)
+
+  const patterns = new Uint8Array(patPtrTable.length + patData.length);
+  patterns.set(patPtrTable, 0);
+  patterns.set(patData, patPtrTable.length);
+
+  // Tracks: 1 track row = 4 channels × 3 bytes (patIdx, transpose, volTranspose)
+  const tracks = new Uint8Array(12);
+  for (let ch = 0; ch < 4; ch++) {
+    tracks[ch * 3 + 0] = 0;  // pattern 0
+    tracks[ch * 3 + 1] = 0;  // transpose
+    tracks[ch * 3 + 2] = 0;  // vol transpose
+  }
+
+  // Songs: 1 song definition = 6 bytes (firstTrack, lastTrack, speed)
+  const songs = new Uint8Array(6);
+  writeU16BE(songs, 0, 0);   // first track index
+  writeU16BE(songs, 2, 0);   // last track index (same = 1 step)
+  writeU16BE(songs, 4, 6);   // speed
+
+  // Headers/sampleinfo: empty (no samples)
+  const headers = new Uint8Array(0);
+  // Samples: empty
+  const samples = new Uint8Array(0);
+
+  // Compute offsets
+  let off = BASE;
+  const frqOff = off; off += frqSeqs.length;
+  const volOff = off; off += volSeqs.length;
+  const patOff = off; off += patterns.length;
+  const trkOff = off; off += tracks.length;
+  const sngOff = off; off += songs.length;
+  const hdrOff = off; off += headers.length;
+  const smpOff = off; off += samples.length;
+
+  // Write offsets to header
+  writeU32BE(header, 4, frqOff);
+  writeU32BE(header, 8, volOff);
+  writeU32BE(header, 12, patOff);
+  writeU32BE(header, 16, trkOff);
+  writeU32BE(header, 20, sngOff);
+  writeU32BE(header, 24, hdrOff);
+  writeU32BE(header, 28, smpOff);
+
+  // Assemble final buffer
+  const totalSize = off;
+  const buf = new Uint8Array(totalSize);
+  buf.set(header, 0);
+  buf.set(frqSeqs, frqOff);
+  buf.set(volSeqs, volOff);
+  buf.set(patterns, patOff);
+  buf.set(tracks, trkOff);
+  buf.set(songs, sngOff);
+
+  fs.writeFileSync(path.join(OUT_DIR, 'hippelcoso.coso'), buf);
+  console.log(`  hippelcoso.coso: ${buf.length} bytes`);
+}
+
+// ── 7. Future Composer 1.4 Template ────────────────────────────────────────
+// Header: "FC14" + lengths/offsets + 10 sample defs + sequences + patterns + macros
+function generateFutureComposer() {
+  // Build sections, then compute offsets
+  const HEADER_SIZE = 40; // 4 (magic) + 8×4 (lengths/offsets) + 4 (wavePtr)
+
+  // 10 sample definitions (6 bytes each = 60 bytes)
+  const sampleDefs = new Uint8Array(60); // all zeros = no samples
+
+  // 80 waveform lengths (FC14 only)
+  const waveLens = new Uint8Array(80); // all zeros
+
+  // 1 sequence (13 bytes): all channels → pattern 0, speed 6
+  const seqData = new Uint8Array(13);
+  // Channels 0-3: pattern=0, transpose=0, instrument=0
+  // Already zeros
+  seqData[12] = 6; // speed
+
+  // 1 pattern (64 bytes = 32 rows × 2 bytes): all empty
+  const patData = new Uint8Array(64);
+
+  // 1 frequency macro (64 bytes): just end marker
+  const freqMacro = new Uint8Array(64);
+  freqMacro[0] = 0xE1; // end marker
+
+  // 1 volume macro (64 bytes): speed=1, sustain=0, vib=0,0,0, then vol=64, end
+  const volMacro = new Uint8Array(64);
+  volMacro[0] = 1;    // speed
+  volMacro[1] = 0;    // sustain
+  volMacro[2] = 0;    // vibrato speed
+  volMacro[3] = 0;    // vibrato depth
+  volMacro[4] = 0;    // vibrato delay
+  volMacro[5] = 40;   // volume (40/64)
+  volMacro[6] = 0xE1; // end marker
+
+  // Compute offsets
+  const dataStart = HEADER_SIZE + sampleDefs.length + waveLens.length;
+  const seqOff = dataStart;
+  const patOff = seqOff + seqData.length;
+  const freqOff = patOff + patData.length;
+  const volOff = freqOff + freqMacro.length;
+  const smpOff = volOff + volMacro.length;
+
+  const totalSize = smpOff; // no sample PCM data
+  const buf = new Uint8Array(totalSize);
+  let pos = 0;
+
+  // Magic
+  writeString(buf, 0, 'FC14', 4); pos = 4;
+
+  // Section lengths/offsets
+  writeU32BE(buf, 4, seqData.length);     // seqLen
+  writeU32BE(buf, 8, patOff);             // patPtr
+  writeU32BE(buf, 12, patData.length);    // patLen
+  writeU32BE(buf, 16, freqOff);           // freqMacroPtr
+  writeU32BE(buf, 20, freqMacro.length);  // freqMacroLen
+  writeU32BE(buf, 24, volOff);            // volMacroPtr
+  writeU32BE(buf, 28, volMacro.length);   // volMacroLen
+  writeU32BE(buf, 32, smpOff);           // samplePtr
+  writeU32BE(buf, 36, smpOff);           // wavePtr (FC14, = samplePtr when no waves)
+
+  // Sample definitions
+  buf.set(sampleDefs, HEADER_SIZE);
+  // Waveform lengths (FC14)
+  buf.set(waveLens, HEADER_SIZE + sampleDefs.length);
+
+  // Sequence data
+  buf.set(seqData, seqOff);
+  // Pattern data
+  buf.set(patData, patOff);
+  // Freq macro
+  buf.set(freqMacro, freqOff);
+  // Vol macro
+  buf.set(volMacro, volOff);
+
+  fs.writeFileSync(path.join(OUT_DIR, 'futurecomposer.fc'), buf);
+  console.log(`  futurecomposer.fc: ${buf.length} bytes`);
+}
+
+// ── 8. OctaMED MMD0 Template ───────────────────────────────────────────────
+// Header: "MMD0" + song struct (788 bytes) + block pointers + blocks + sample pointers
+function generateOctaMED() {
+  // MMD0 header: 36 bytes (9 × u32BE fields)
+  // MMD0Song: 788 bytes (504 instrs + 2 numBlocks + 2 songLen + 256 playseq + 2 tempo + ...)
+  const HEADER_SIZE = 36;
+  const SONG_SIZE = 788;
+
+  // Block: 2 bytes header (numTracks, numLines) + cell data
+  const NUM_TRACKS = 4;
+  const NUM_LINES = 64;  // 0-based → 63
+  const CELL_SIZE = 3;   // MMD0 = 3 bytes/cell
+  const blockHeaderSize = 2;
+  const blockDataSize = NUM_TRACKS * NUM_LINES * CELL_SIZE;
+  const blockSize = blockHeaderSize + blockDataSize;
+
+  // Layout
+  const songOff = HEADER_SIZE;
+  const blockArrOff = songOff + SONG_SIZE;
+  const blockPtrSize = 4; // 1 block pointer
+  const blockOff = blockArrOff + blockPtrSize;
+  const sampleArrOff = blockOff + blockSize;
+  const samplePtrSize = 4; // 1 null pointer (no samples)
+  const totalSize = sampleArrOff + samplePtrSize;
+
+  const buf = new Uint8Array(totalSize);
+
+  // Header
+  writeString(buf, 0, 'MMD0', 4);
+  writeU32BE(buf, 4, totalSize);        // modLength
+  writeU32BE(buf, 8, songOff);          // songOffset
+  writeU32BE(buf, 12, 0);               // playerSettings1
+  writeU32BE(buf, 16, blockArrOff);     // blockArrOffset
+  writeU32BE(buf, 20, 0);               // flags
+  writeU32BE(buf, 24, sampleArrOff);    // sampleArrOffset
+  writeU32BE(buf, 28, 0);               // reserved2
+  writeU32BE(buf, 32, 0);               // expDataOffset (no expansion)
+
+  // MMD0Song at songOff
+  let pos = songOff;
+
+  // 63 instrument headers (8 bytes each = 504 bytes)
+  for (let i = 0; i < 63; i++) {
+    const iOff = pos + i * 8;
+    writeU16BE(buf, iOff + 0, 0);  // loopStart
+    writeU16BE(buf, iOff + 2, 0);  // loopLen
+    writeU8(buf, iOff + 4, 0);     // MIDI channel
+    writeU8(buf, iOff + 5, 0);     // MIDI preset
+    writeU8(buf, iOff + 6, 64);    // volume
+    writeS8(buf, iOff + 7, 0);     // transpose
+  }
+  pos += 504;
+
+  writeU16BE(buf, pos, 1);     // numBlocks = 1
+  pos += 2;
+  writeU16BE(buf, pos, 1);     // songLength = 1
+  pos += 2;
+
+  // playseq[256]: pattern 0 at position 0, rest zeros
+  buf[pos] = 0; // position 0 → block 0
+  pos += 256;
+
+  writeU16BE(buf, pos, 125);   // default tempo (BPM)
+  pos += 2;
+  writeS8(buf, pos, 0);        // playtransp
+  pos += 1;
+  writeU8(buf, pos, 0);        // flags
+  pos += 1;
+  writeU8(buf, pos, 0x20);     // flags2 (bit 5 = BPM mode)
+  pos += 1;
+  writeU8(buf, pos, 6);        // tempo2 (speed = ticks per line)
+  pos += 1;
+
+  // trkvol[16] = all 64
+  for (let i = 0; i < 16; i++) writeU8(buf, pos + i, 64);
+  pos += 16;
+
+  writeU8(buf, pos, 64);       // masterVol
+  pos += 1;
+  writeU8(buf, pos, 0);        // numSamples
+  pos += 1;
+
+  // Block pointer array
+  writeU32BE(buf, blockArrOff, blockOff);
+
+  // Block 0: header + empty cells
+  writeU8(buf, blockOff, NUM_TRACKS);
+  writeU8(buf, blockOff + 1, NUM_LINES - 1); // lines = count - 1
+  // Cell data: all zeros (empty)
+
+  // Sample pointer array: 1 null pointer
+  writeU32BE(buf, sampleArrOff, 0);
+
+  fs.writeFileSync(path.join(OUT_DIR, 'octamed.mmd0'), buf);
+  console.log(`  octamed.mmd0: ${buf.length} bytes, 4 channels, ${NUM_LINES} rows`);
+}
+
 // ── Main ───────────────────────────────────────────────────────────────────
 
 console.log('Generating template files...');
@@ -400,4 +715,7 @@ generateJamCracker();
 generateSoundMon();
 generateSidMon2();
 generatePumaTracker();
+generateHippelCoSo();
+generateFutureComposer();
+generateOctaMED();
 console.log(`\nTemplates written to: ${OUT_DIR}`);

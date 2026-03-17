@@ -238,6 +238,30 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
             const { exportSongToMOD } = await import('./modExport');
             const modResult = await exportSongToMOD(song, { bakeSynths: true });
             result = { data: modResult.blob, filename: modResult.filename, warnings: modResult.warnings };
+          } else {
+            // Fallback: UADE chip RAM readback (works for any running UADE format)
+            try {
+              const { UADEChipEditor } = await import('@engine/uade/UADEChipEditor');
+              const { UADEEngine } = await import('@engine/uade/UADEEngine');
+              if (UADEEngine.hasInstance()) {
+                const chipEditor = new UADEChipEditor(UADEEngine.getInstance());
+                // Get original file size from first instrument's chipRamInfo
+                const instruments = song.instruments || [];
+                const chipInfo = instruments.find(i => i.uadeChipRam)?.uadeChipRam;
+                const moduleSize = chipInfo?.moduleSize ?? 0;
+                if (moduleSize > 0) {
+                  const bytes = await chipEditor.readEditedModule(moduleSize);
+                  const ext = (song.name || '').split('.').pop() || 'bin';
+                  const baseName = (song.name || 'export').replace(/\.[^/.]+$/, '').replace(/[^a-zA-Z0-9_-]/g, '_');
+                  const filename = `${baseName}.${ext}`;
+                  result = {
+                    data: new Blob([new Uint8Array(bytes.buffer as ArrayBuffer, bytes.byteOffset, bytes.byteLength)], { type: 'application/octet-stream' }),
+                    filename,
+                    warnings: ['Exported via chip RAM readback — edits to pattern data are included']
+                  };
+                }
+              }
+            } catch { /* UADE engine not running */ }
           }
 
           if (result) {
@@ -761,8 +785,9 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                     </div>
                     <div className="bg-dark-bg border border-dark-border rounded-lg p-3">
                       <p className="text-xs font-mono text-text-primary leading-relaxed">
-                        Exports as the original Amiga tracker format (JamCracker .jam, SoundMon .bp, ProTracker .mod).
-                        Pattern data and instruments are serialized from the current song state.
+                        Exports as the original Amiga tracker format (JamCracker .jam, SoundMon .bp, ProTracker .mod,
+                        Future Composer .fc, HippelCoSo .coso, OctaMED .mmd0).
+                        Formats with full serializers build the file from scratch; others use chip RAM readback.
                       </p>
                     </div>
                   </div>

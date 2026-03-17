@@ -1134,6 +1134,7 @@ export const SYSTEM_PRESETS: SystemPreset[] = [
     fileID: 0, fileID_DMF: 0, channels: 4, minChans: 4, maxChans: 4,
     isFM: false, isSTD: true, isCompound: false, waveWidth: 0, waveHeight: 256, vgmVersion: 0,
     amigaFormat: true, defaultBpm: 125,
+    templateFile: 'templates/soundmon.bp',
     compatibleSynthTypes: ['SoundMonSynth', 'Sampler'],
     channelDefs: [
       { name: 'SoundMon L1', shortName: 'SL', type: DivChanType.PCM },
@@ -1165,6 +1166,7 @@ export const SYSTEM_PRESETS: SystemPreset[] = [
     fileID: 0, fileID_DMF: 0, channels: 4, minChans: 4, maxChans: 4,
     isFM: false, isSTD: true, isCompound: false, waveWidth: 0, waveHeight: 256, vgmVersion: 0,
     amigaFormat: true, defaultBpm: 125,
+    templateFile: 'templates/futurecomposer.fc',
     compatibleSynthTypes: ['Sampler'],
     channelDefs: [
       { name: 'FC Tone 1', shortName: 'T1', type: DivChanType.PCM },
@@ -1180,6 +1182,7 @@ export const SYSTEM_PRESETS: SystemPreset[] = [
     fileID: 0, fileID_DMF: 0, channels: 4, minChans: 4, maxChans: 4,
     isFM: false, isSTD: true, isCompound: false, waveWidth: 0, waveHeight: 256, vgmVersion: 0,
     amigaFormat: true, defaultBpm: 125,
+    templateFile: 'templates/hippelcoso.coso',
     compatibleSynthTypes: ['Sampler'],
     channelDefs: [
       { name: 'HiC L1', shortName: 'HL', type: DivChanType.PCM },
@@ -1195,6 +1198,7 @@ export const SYSTEM_PRESETS: SystemPreset[] = [
     fileID: 0, fileID_DMF: 0, channels: 8, minChans: 4, maxChans: 8,
     isFM: false, isSTD: true, isCompound: false, waveWidth: 0, waveHeight: 256, vgmVersion: 0,
     amigaFormat: true, defaultBpm: 125,
+    templateFile: 'templates/octamed.mmd0',
     compatibleSynthTypes: ['Sampler'],
     channelDefs: [
       { name: 'MED L1', shortName: 'M1', type: DivChanType.PCM },
