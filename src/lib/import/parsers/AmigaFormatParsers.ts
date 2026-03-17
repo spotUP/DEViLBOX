@@ -231,9 +231,9 @@ export async function tryRouteFormat(
     }
   }
 
-  // ── SidMon II (.sid2 — unambiguous SidMon 2) ─────────────────────────────
+  // ── SidMon II (.sid2 / .sd2 — unambiguous SidMon 2) ──────────────────────
   // Dedicated Sd2Engine WASM replayer handles playback; native parser provides patterns.
-  if (matchesExt(filename, ['sid2'])) {
+  if (matchesExt(filename, ['sid2', 'sd2'])) {
     const { parseSidMon2File } = await import('@lib/import/formats/SidMon2Parser');
     return parseSidMon2File(buffer, originalFileName);
   }
@@ -599,12 +599,12 @@ export async function tryRouteFormat(
   }
 
   // ── PumaTracker ───────────────────────────────────────────────────────────
-  // .puma files — OpenMPT
+  // .puma files — native parser + UADE fallback
   if (matchesExt(filename, ['puma'])) {
-    const { parseWithOpenMPT } = await import('@lib/import/wasm/OpenMPTConverter');
-    const song = await parseWithOpenMPT(buffer, originalFileName);
-    song.libopenmptFileData = buffer.slice(0);
-    return song;
+    const { isPumaTrackerFormat, parsePumaTrackerFile } = await import('@lib/import/formats/PumaTrackerParser');
+    return withNativeThenUADE('pumaTracker', ctx,
+      (bytes: Uint8Array | ArrayBuffer, name: string) => parsePumaTrackerFile(bytes instanceof Uint8Array ? bytes.buffer as ArrayBuffer : bytes, name),
+      'PumaTrackerParser', { isFormat: (b: Uint8Array) => isPumaTrackerFormat(b.buffer as ArrayBuffer), injectUADE: true });
   }
 
   // ── Synthesis ─────────────────────────────────────────────────────────────
