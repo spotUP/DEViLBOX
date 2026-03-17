@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-03-15T20:26:31.179Z
+ * Generated: 2026-03-17T21:20:42.486Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,10 +19,10 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.2912';
-export const BUILD_NUMBER = '2912';
-export const BUILD_HASH = 'ce1fca86f';
-export const BUILD_DATE = '2026-03-15';
+export const BUILD_VERSION = '1.0.2993';
+export const BUILD_NUMBER = '2993';
+export const BUILD_HASH = '380171d71';
+export const BUILD_DATE = '2026-03-17';
 
 // Full version (patch IS the build number, so no need to append)
 export const FULL_VERSION = BUILD_VERSION;
@@ -30,210 +30,206 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.2912',
-    date: '2026-03-15',
+    version: '1.0.2993',
+    date: '2026-03-17',
     changes: [
       {
-        type: 'improvement',
-        "description": "Chore: delete FormatEditorGL — PatternEditorCanvas is the one true editor"
-      },
-      {
-        type: 'feature',
-        "description": "Migrate KlysView, HivelyView, GTUltraView to PatternEditorCanvas format mode"
-      },
-      {
-        type: 'feature',
-        "description": "Use PatternEditorCanvas in format mode"
-      },
-      {
-        type: 'feature',
-        "description": "Format mode mouse hit-test + keyboard handler"
-      },
-      {
-        type: 'feature',
-        "description": "Format mode channel/column header"
-      },
-      {
-        type: 'feature',
-        "description": "Add format mode props, refs, and channel width computation"
-      },
-      {
-        type: 'feature',
-        "description": "Add Canvas2D fallback renderer with data-driven column support"
-      },
-      {
-        type: 'improvement',
-        "description": "Chore: delete FormatPatternEditor, GenericFormatView, HivelyPatternEditor (replaced by FormatEditorGL)"
-      },
-      {
-        type: 'feature',
-        "description": "Migrate HivelyView to FormatEditorGL"
-      },
-      {
-        type: 'feature',
-        "description": "Migrate GTUltraView to FormatEditorGL"
-      },
-      {
-        type: 'feature',
-        "description": "Migrate KlysView to FormatEditorGL"
-      },
-      {
-        type: 'feature',
-        "description": "Migrate JamCrackerView to FormatEditorGL"
-      },
-      {
-        type: 'feature',
-        "description": "Add FormatEditorGL unified WebGL2 format pattern editor"
-      },
-      {
-        type: 'feature',
-        "description": "Add data-driven column rendering to TrackerGLRenderer"
-      },
-      {
-        type: 'improvement',
-        "description": "Misc updates: libopenmpt engine, pattern canvas, changelog, audit tool"
-      },
-      {
-        type: 'improvement',
-        "description": "Update MCP server tools and drag-drop handler"
+        type: 'fix',
+        "description": "Suppress libopenmpt WASM stderr to silence console spam"
       },
       {
         type: 'fix',
-        "description": "Update format parser tests: add new format coverage and fix assertions"
-      },
-      {
-        type: 'improvement',
-        "description": "Extend shared format editor types and components"
+        "description": "Upsample sub-8kHz WAV in pcm8ToWAV to fix Chrome decode failures"
       },
       {
         type: 'feature',
-        "description": "Update export UI: add live capture mode to export dialogs"
+        "description": "Add HippelCoSo from-scratch exporter + roundtrip tests"
       },
       {
         type: 'improvement',
-        "description": "Update JamCracker WASM harness and binary"
-      },
-      {
-        type: 'fix',
-        "description": "Format parser audit fixes: routing, detection, and withFallback pattern"
-      },
-      {
-        type: 'improvement',
-        "description": "Expand PxtoneParser: full pattern and instrument data extraction"
-      },
-      {
-        type: 'improvement',
-        "description": "Improve MAME engine and OctaMED controls"
-      },
-      {
-        type: 'fix',
-        "description": "Update Furnace WASM: sync wrapper and sequencer fixes"
+        "description": "Wire all Amiga format exporters into Native export tab"
       },
       {
         type: 'feature',
-        "description": "Add live audio capture export via MCP bridge"
+        "description": "Add SoundMon exporter wrapper with chip RAM fallback"
       },
       {
-        type: 'improvement',
-        "description": "Refactor JamCracker/Klys views to use shared GenericFormatView"
+        type: 'fix',
+        "description": "Fix SoundMon exporter bugs + export roundtrip tests"
+      },
+      {
+        type: 'fix',
+        "description": "Fix SidMon2 template header layout and PumaTracker loading path"
       },
       {
         type: 'feature',
-        "description": "Add view-switcher dropdown to SplitView toolbar"
+        "description": "Add templates for SoundMon, HippelCoSo, Future Composer, OctaMED + chip RAM export fallback"
       },
       {
         type: 'fix',
-        "description": "Fix Digital Mugician parser: tracks precede PCM audio in file layout"
+        "description": "Inject UADE for QuadraComposer audio; fix EMS test files"
+      },
+      {
+        type: 'improvement',
+        "description": "From-scratch file builders for JamCracker and SoundMon, native export UI"
+      },
+      {
+        type: 'improvement',
+        "description": "Shrink template files: 1 pattern instead of 64"
       },
       {
         type: 'feature',
-        "description": "Add ColumnSpec and params/columns fields to worker types"
+        "description": "New Song: template-based creation for exotic Amiga formats"
       },
       {
         type: 'fix',
-        "description": "Fix Medley (.ml/.mso), injectUADE logic, MAMEMultiPCM missing entry"
+        "description": "Fix MMDC prefix form and remove mmdc from OpenMPT path"
       },
       {
         type: 'fix',
-        "description": "Add native tests for DSS/SCR/DSR/DODA; fix missing injectUADE on pvp/dsr"
-      },
-      {
-        type: 'feature',
-        "description": "Add native detection tests for WallyBeben, SteveBarrett, PaulSummers, DaveLoweNew"
+        "description": "Fix PVP prefix routing and MED format parsing"
       },
       {
         type: 'improvement',
-        "description": "Convert daveLowe and magneticFieldsPacker to withNativeThenUADE"
-      },
-      {
-        type: 'improvement',
-        "description": "Convert adpcmMono/robHubbard to withNativeThenUADE; remove duplicate smus/snx/tiny block"
-      },
-      {
-        type: 'improvement',
-        "description": "Convert 9 more format routing blocks to withNativeThenUADE"
-      },
-      {
-        type: 'feature',
-        "description": "Add SoundMon/MusicMaker native parser tests; convert mm4/mm8 to withNativeThenUADE"
-      },
-      {
-        type: 'improvement',
-        "description": "Convert 5 inline native-parser blocks to withNativeThenUADE with injectUADE"
-      },
-      {
-        type: 'fix',
-        "description": "Fix injectUADE: bypass 0-notes check for stub parsers; add injectUADE to 6 formats"
-      },
-      {
-        type: 'fix',
-        "description": "Fix format parser tests: correct wrong parsers for .ntp, .rho, .psa, .sg files"
+        "description": "UADE: variable-length encoders for SidMon2, PumaTracker, HippelCoSo, Actionamics"
       }
     ]
   },
   {
-    version: '2026-03-14',
-    date: '2026-03-14',
+    version: '2026-03-16',
+    date: '2026-03-16',
     changes: [
       {
         type: 'fix',
-        "description": "Fix .digi routing: fall back to OpenMPT for old DigiBooster 1.x text-header format"
+        "description": "Add .sas suffix-form routing for SonicArranger compiled binary"
+      },
+      {
+        type: 'fix',
+        "description": "Skip Paula scan for SKIP_SCAN formats regardless of mode"
       },
       {
         type: 'feature',
-        "description": "Furnace WASM stub: implement DivSample::render() for BRR encoding (SNES)"
-      },
-      {
-        type: 'improvement',
-        "description": "Furnace WASM: call render() on all PCM samples before renderSamples(); SoundFactory: enable native+UADE injection"
-      },
-      {
-        type: 'fix',
-        "description": "DeltaMusic1: simplify synth instrument to first-segment snapshot; withFallback: add injectUADE option; Furnace: fix BRR/ADPCM sample depth byte counts"
+        "description": "Add variable-length encoder infrastructure for RLE/packed formats"
       },
       {
         type: 'feature',
-        "description": "Add MED magic-based routing; cover med.sadman and ballade.ems in tests"
+        "description": "Add console audit badges and live envCorr bar updates to format-status"
+      },
+      {
+        type: 'fix',
+        "description": "Fix MMD0Sample struct layout, transpose, tempo, and effect mapping"
+      },
+      {
+        type: 'fix',
+        "description": "Convert Tier 3 suffix-form files to UADE prefix form before routing"
       },
       {
         type: 'improvement',
-        "description": "Update format status dashboard"
+        "description": "UADE: real-time score position tracking during playback"
+      },
+      {
+        type: 'fix',
+        "description": "Stop playback keeps pattern editor at current position"
+      },
+      {
+        type: 'feature',
+        "description": "Enable native parsers by default for remaining 4 formats"
       },
       {
         type: 'improvement',
-        "description": "DeltaMusic1: pre-render full sound table sequence for synth instruments"
+        "description": "UADE: declarative encoder factory for common cell layouts"
+      },
+      {
+        type: 'improvement',
+        "description": "UADE: universal native export, enhanced effect detection"
+      },
+      {
+        type: 'improvement',
+        "description": "UADE: JamCracker encoder, DMA restart detection, improved pattern reconstruction"
       },
       {
         type: 'fix',
-        "description": "Remove MAMEMultiPCM synth; fix ZSG-2 ROM config size"
+        "description": "Enable native pattern editing for SonicArranger by default"
       },
       {
         type: 'fix',
-        "description": "Remove unused uadePatternLayout from parsers; misc synth fixes"
+        "description": "Add mk2/mkii to skip-scan and force-classic prefix sets"
       },
       {
         type: 'fix',
-        "description": "Add .hip routing to JochenHippelSTParser; fix PC-relative LEA off-by-2"
+        "description": "TCBTrackerParser note formula correction"
+      },
+      {
+        type: 'fix',
+        "description": "MEDParser MMD3 noteBaseTranspose (12 instead of 36)"
+      },
+      {
+        type: 'improvement',
+        "description": "Update project memory with multi-chip, scratch, and import fixes"
+      },
+      {
+        type: 'feature',
+        "description": "Startup jingle, GL AI panel input, jingle visualizer mode, pattern bar editor"
+      },
+      {
+        type: 'feature',
+        "description": "120s buffer, scroll wheel velocity, fader gain MIDI CC, scratch in VJView"
+      },
+      {
+        type: 'fix',
+        "description": "MED cell decode, MOD channel widths, TCB note offset, UADE routing"
+      },
+      {
+        type: 'fix',
+        "description": "Create all chips on song load, destroy stale chips between songs"
+      },
+      {
+        type: 'fix',
+        "description": "Channel bounds check in WASM dispatch + destroyChip API"
+      },
+      {
+        type: 'fix',
+        "description": "Envelope correlation export, float32 WAV, BRR field offsets"
+      },
+      {
+        type: 'feature',
+        "description": "Add console capture, evaluate_script, and play_fur tools"
+      },
+      {
+        type: 'fix',
+        "description": "Explicit number type for HWKnob onChange callback in MAMEGenericHardware"
+      },
+      {
+        type: 'fix',
+        "description": "Extend skip-scan/force-classic to suffix-form compiled replayer extensions"
+      },
+      {
+        type: 'fix',
+        "description": "Correct baseNote format from OpenMPT 'C-4' to Tone.js 'C4'"
+      },
+      {
+        type: 'fix',
+        "description": "Add .sa to skip-scan and force-classic for compiled binary SA files"
+      },
+      {
+        type: 'fix',
+        "description": "Swap instrument/note byte order per IFF EMOD spec"
+      },
+      {
+        type: 'fix',
+        "description": "Add compiled 68k replayer prefixes to skip-scan and force-classic"
+      },
+      {
+        type: 'improvement',
+        "description": "Prevent browser crashes: skip enhanced scan for compiled replayer formats"
+      },
+      {
+        type: 'fix',
+        "description": "Fix SonicArranger prefix-form crash: move sas to FORCE_CLASSIC_PREFIXES"
+      },
+      {
+        type: 'fix',
+        "description": "Fix InStereo! 2 wrong pattern speed: convert Hz tempo to BPM"
       }
     ]
   }
