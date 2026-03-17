@@ -1428,9 +1428,11 @@ export async function tryRouteFormat(
 
   // ── MMDC (.mmdc / MMDC.*) ────────────────────────────────────────────────────
   // MED Packer format by Antony "Ratt" Crowther. Magic: bytes[0..3] == 'MMDC'.
+  // UADE eagleplayer expects prefix form: mmdc.songname
   if (matchesExt(filename, ['mmdc'])) {
     const { isMMDCFormat, parseMMDCFile } = await import('@lib/import/formats/MMDCParser');
-    return withNativeThenUADE('mmdc', ctx,
+    const mmdcCtx = { ...ctx, originalFileName: toUADEPrefixName(originalFileName, ['mmdc']) };
+    return withNativeThenUADE('mmdc', mmdcCtx,
       (buf: Uint8Array | ArrayBuffer, name: string) => { if (isMMDCFormat(buf as ArrayBuffer)) return parseMMDCFile(buf as ArrayBuffer, name); return null; },
       'MMDCParser', { injectUADE: true });
   }
