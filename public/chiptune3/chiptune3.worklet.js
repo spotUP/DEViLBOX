@@ -12,7 +12,9 @@ const OPENMPT_MODULE_RENDER_INTERPOLATIONFILTER_LENGTH = 3
 let libopenmpt
 
 // init
-libopenmptPromise()
+// Suppress libopenmpt WASM stderr — "error loading file" is expected when OpenMPT
+// tries Amiga/UADE formats before falling back, and floods the browser console.
+libopenmptPromise({ print: () => {}, printErr: () => {} })
 .then(res => {
 	libopenmpt = res
 
