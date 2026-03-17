@@ -2278,19 +2278,58 @@ function parseSample(reader: BinaryReader, version: number): FurnaceSample {
     }
 
     // Read sample data
-    const dataSize = version < 58 ? sample.length * 2 : sample.length;
     if (sample.depth === 16) {
-      const data = new Int16Array(sample.length);
-      for (let i = 0; i < sample.length; i++) {
+      const count = version < 58 ? sample.length : sample.length;
+      const data = new Int16Array(count);
+      for (let i = 0; i < count; i++) {
         data[i] = reader.readInt16();
       }
       sample.data = data;
     } else {
-      const data = new Int8Array(dataSize);
-      for (let i = 0; i < dataSize; i++) {
-        data[i] = reader.readInt8();
+      // Compute exact byte count per depth (same logic as SMP2 format)
+      const count = sample.length;
+      let byteCount: number;
+      if (version < 58) {
+        // Pre-v58: byte storage is length*2 for all non-16bit depths
+        byteCount = count * 2;
+      } else {
+        switch (sample.depth) {
+          case 0:  // 1-bit
+            byteCount = Math.floor((count + 7) / 8);
+            break;
+          case 1:  // 1-bit DPCM
+            byteCount = count > 0 ? 1 + ((Math.floor((count - 1) / 8) + 15) & ~15) : 0;
+            break;
+          case 3:  // YMZ ADPCM
+          case 4:  // QSound ADPCM
+          case 5:  // ADPCM-A
+          case 6:  // ADPCM-B
+          case 7:  // ADPCM-K
+          case 10: // VOX
+          case 15: // 4-bit
+            byteCount = Math.floor((count + 1) / 2);
+            break;
+          case 9:  // BRR (SNES) — 9 bytes per 16 samples
+            byteCount = 9 * Math.ceil(count / 16);
+            break;
+          case 11: // mu-law
+            byteCount = count;
+            break;
+          case 12: // C219
+            byteCount = (count + 1) & ~1;
+            break;
+          case 13: // IMA ADPCM
+            byteCount = 4 + Math.floor((count + 1) / 2);
+            break;
+          case 14: // 12-bit
+            byteCount = Math.floor((count * 3 + 1) / 2);
+            break;
+          default: // 8-bit and unknown depths: 1 byte per sample
+            byteCount = count;
+            break;
+        }
       }
-      sample.data = data;
+      sample.data = reader.readBytes(byteCount);
     }
   } else {
     throw new Error(`Unknown sample format: "${magic}"`);
