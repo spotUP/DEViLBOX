@@ -19,6 +19,7 @@ FRONTEND_PORT=5173
 BACKEND_PORT=3001
 COLLAB_PORT=4002
 MCP_PORT=4003
+FORMAT_PORT=4444
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # ── Colours ────────────────────────────────────────────────────────────────────
@@ -42,24 +43,28 @@ kill_port() {
   fi
 }
 
-log "Clearing ports $BACKEND_PORT, $COLLAB_PORT, $MCP_PORT and $FRONTEND_PORT..."
+log "Clearing ports $BACKEND_PORT, $COLLAB_PORT, $MCP_PORT, $FORMAT_PORT and $FRONTEND_PORT..."
 kill_port "$BACKEND_PORT"
 kill_port "$COLLAB_PORT"
 kill_port "$MCP_PORT"
+kill_port "$FORMAT_PORT"
 kill_port "$FRONTEND_PORT"
 
 # ── Cleanup on exit ────────────────────────────────────────────────────────────
 BACKEND_PID=""
 COLLAB_PID=""
+FORMAT_PID=""
 
 cleanup() {
   echo ""
   log "Shutting down..."
   [ -n "$BACKEND_PID" ] && kill "$BACKEND_PID" 2>/dev/null || true
   [ -n "$COLLAB_PID" ]  && kill "$COLLAB_PID"  2>/dev/null || true
+  [ -n "$FORMAT_PID" ]  && kill "$FORMAT_PID"  2>/dev/null || true
   kill_port "$BACKEND_PORT"
   kill_port "$COLLAB_PORT"
   kill_port "$MCP_PORT"
+  kill_port "$FORMAT_PORT"
   kill_port "$FRONTEND_PORT"
   ok "Done."
 }
@@ -111,6 +116,7 @@ ok "AssemblyScript built."
 mkdir -p logs
 : > logs/backend.log
 : > logs/collab.log
+: > logs/format-server.log
 
 # ── API server (Express) ───────────────────────────────────────────────────────
 log "Starting API server on port $BACKEND_PORT..."
@@ -149,6 +155,24 @@ for i in $(seq 1 20); do
   sleep 0.5
 done
 
+# ── Format status server ──────────────────────────────────────────────────────
+log "Starting format status server on port $FORMAT_PORT..."
+npx tsx "$SCRIPT_DIR/tools/format-server.ts" > logs/format-server.log 2>&1 &
+FORMAT_PID=$!
+
+log "Waiting for format server to be ready..."
+for i in $(seq 1 20); do
+  if nc -z localhost "$FORMAT_PORT" 2>/dev/null; then
+    ok "Format server ready (PID: $FORMAT_PID)"
+    break
+  fi
+  if [ "$i" -eq 20 ]; then
+    warn "Format server didn't respond in 10 s — check logs/format-server.log"
+    tail -5 logs/format-server.log | sed 's/^/  /'
+  fi
+  sleep 0.5
+done
+
 # ── Status banner (backend up, Vite starting below) ───────────────────────────
 echo ""
 echo -e "${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
@@ -156,6 +180,7 @@ echo -e "${GREEN}  DEViLBOX back-end running${RESET}"
 echo -e "  API    → ${CYAN}http://localhost:$BACKEND_PORT${RESET}   (logs/backend.log)"
 echo -e "  Collab → ${CYAN}ws://localhost:$COLLAB_PORT${RESET}    (logs/collab.log)"
 echo -e "  MCP    → ${CYAN}ws://localhost:$MCP_PORT${RESET}    (AI tools relay)"
+echo -e "  Format → ${CYAN}http://localhost:$FORMAT_PORT${RESET}  (logs/format-server.log)"
 echo -e "  Vite   → ${CYAN}http://localhost:$FRONTEND_PORT${RESET}  (output below)"
 echo -e "${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
 echo -e "  ${YELLOW}Ctrl-C to stop all servers${RESET}"
