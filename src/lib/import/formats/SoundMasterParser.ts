@@ -149,7 +149,8 @@ function stripSoundMasterPrefix(name: string): string {
       .replace(/^sm3\./i, '')
       .replace(/^sm2\./i, '')
       .replace(/^sm1\./i, '')
-      .replace(/^sm\./i, '') || name
+      .replace(/^sm\./i, '')
+      .replace(/\.(smpro|sm3|sm2|sm1|sm)$/i, '') || name
   );
 }
 

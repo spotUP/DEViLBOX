@@ -51,7 +51,7 @@ export function parseRobHubbardSTFile(buffer: ArrayBuffer, filename: string, _mo
   if (!isRobHubbardSTFormat(buf)) throw new Error('Not a Rob Hubbard ST module');
 
   const baseName = filename.split('/').pop() ?? filename;
-  const moduleName = baseName.replace(/^rho\./i, '') || baseName;
+  const moduleName = baseName.replace(/^rho\./i, '').replace(/\.rho$/i, '') || baseName;
 
   const instruments: InstrumentConfig[] = [{
     id: 1, name: 'Sample 1', type: 'synth' as const,

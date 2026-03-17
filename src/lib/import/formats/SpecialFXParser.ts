@@ -76,7 +76,7 @@ export function parseSpecialFXFile(buffer: ArrayBuffer, filename: string): Track
   if (!isSpecialFXFormat(buf)) throw new Error('Not a Special FX module');
 
   const baseName = filename.split('/').pop() ?? filename;
-  const moduleName = baseName.replace(/^jd\./i, '') || baseName;
+  const moduleName = baseName.replace(/^jd\./i, '').replace(/^doda\./i, '').replace(/\.jd$/i, '').replace(/\.doda$/i, '') || baseName;
 
   const instruments: InstrumentConfig[] = [{
     id: 1, name: 'Sample 1', type: 'synth' as const,

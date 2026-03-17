@@ -432,7 +432,7 @@ export function parseSteveTurnerFile(buffer: ArrayBuffer, filename: string): Tra
   const baseName = filename.split('/').pop() ?? filename;
   // Strip "JPO." prefix (case-insensitive) or .jpo/.jpold extension
   const moduleName =
-    baseName.replace(/^jpo\./i, '').replace(/\.jpold?$/i, '') || baseName;
+    baseName.replace(/^jpo\./i, '').replace(/\.jpold?$/i, '').replace(/\.jpo$/i, '') || baseName;
 
   // ── Parse header offsets ──────────────────────────────────────────────────
 
