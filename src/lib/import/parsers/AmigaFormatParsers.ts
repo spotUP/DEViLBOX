@@ -275,17 +275,18 @@ export async function tryRouteFormat(
   }
 
   // ── Quadra Composer ───────────────────────────────────────────────────────
+  // Native parser provides full pattern/instrument display; UADE handles audio
+  // for authentic Amiga playback (IFF EMOD via UADEEditableSynth).
   if (matchesExt(filename, ['emod', 'qc'])) {
     try {
       const { isQuadraComposerFormat, parseQuadraComposerFile } = await import('@lib/import/formats/QuadraComposerParser');
       if (isQuadraComposerFormat(buffer)) {
-        return parseQuadraComposerFile(buffer, originalFileName);
+        return injectUADEPlayback(await parseQuadraComposerFile(buffer, originalFileName), ctx);
       }
     } catch (err) {
       console.warn(`[QuadraComposerParser] Native parse failed for ${filename}, falling back to UADE:`, err);
     }
-    const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
-    return parseUADEFile(buffer, originalFileName, prefs.uade ?? 'enhanced', subsong, preScannedMeta);
+    return callUADE(ctx);
   }
 
   // ── AMOS Music Bank ───────────────────────────────────────────────────────
