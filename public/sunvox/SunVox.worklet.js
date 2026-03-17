@@ -27,6 +27,11 @@ class SunVoxProcessor extends AudioWorkletProcessor {
     // Value: { active: true } — all handles share the static render bufs.
     this.handles = {};
 
+    this._playReceived = false;
+    this._debuggedNonZero = false;
+    this._debugZeroCount = 0;
+    this._warnedNoHeap = false;
+
     this.port.onmessage = (event) => {
       // All messages are handled directly in onmessage. AudioWorklet onmessage and
       // process() run on the same audio rendering thread and are serialized by the
@@ -119,10 +124,49 @@ class SunVoxProcessor extends AudioWorkletProcessor {
           m._sunvox_wasm_load_song(data.handle, pathPtr);
           m._free(pathPtr);
           m.FS.unlink('/tmp/input.sunvox');
-          this.port.postMessage({ type: 'songLoaded', handle: data.handle });
+          // Return song metadata immediately after load
+          const namePtr = m._malloc(256);
+          m._sunvox_wasm_get_song_name(data.handle, namePtr, 256);
+          const songName = m.UTF8ToString(namePtr);
+          m._free(namePtr);
+          const bpm = m._sunvox_wasm_get_bpm(data.handle);
+          const speed = m._sunvox_wasm_get_speed(data.handle);
+          const patCount = m._sunvox_wasm_get_pattern_count(data.handle);
+          this.port.postMessage({ type: 'songLoaded', handle: data.handle, songName, bpm, speed, patCount });
         } catch (err) {
           this.port.postMessage({ type: 'error', message: String(err) });
         }
+        break;
+      }
+
+      case 'getPatterns': {
+        if (!m) break;
+        const h = data.handle;
+        const patCount = m._sunvox_wasm_get_pattern_count(h);
+        const patterns = [];
+        for (let p = 0; p < patCount; p++) {
+          const lines = m._sunvox_wasm_get_pattern_lines(h, p);
+          if (lines <= 0) continue; // empty slot
+          const flags = m._sunvox_wasm_get_pattern_flags(h, p);
+          if (flags & 1) continue; // skip clones (SUNVOX_PATTERN_FLAG_CLONE)
+          const tracks = m._sunvox_wasm_get_pattern_tracks(h, p);
+          const x = m._sunvox_wasm_get_pattern_x(h, p);
+          const notes = [];
+          for (let t = 0; t < tracks; t++) {
+            const col = [];
+            for (let l = 0; l < lines; l++) {
+              const note    = m._sunvox_wasm_get_note(h, p, t, l);
+              const vel     = m._sunvox_wasm_get_note_vel(h, p, t, l);
+              const module  = m._sunvox_wasm_get_note_module(h, p, t, l);
+              const ctl     = m._sunvox_wasm_get_note_ctl(h, p, t, l);
+              const ctlVal  = m._sunvox_wasm_get_note_ctl_val(h, p, t, l);
+              col.push({ note, vel, module, ctl, ctlVal });
+            }
+            notes.push(col);
+          }
+          patterns.push({ patIndex: p, x, tracks, lines, notes });
+        }
+        this.port.postMessage({ type: 'patterns', handle: h, patterns });
         break;
       }
 
@@ -230,7 +274,10 @@ class SunVoxProcessor extends AudioWorkletProcessor {
         break;
 
       case 'play':
-        if (m) m._sunvox_wasm_play(data.handle);
+        if (m) {
+          m._sunvox_wasm_play(data.handle);
+          this._playReceived = true;
+        }
         break;
 
       case 'stop':
@@ -322,17 +369,57 @@ class SunVoxProcessor extends AudioWorkletProcessor {
 
     const m = this.wasm;
     const heapF32 = m.HEAPF32;
-    if (!heapF32) return true;
-    
+    if (!heapF32) {
+      if (!this._warnedNoHeap) {
+        this._warnedNoHeap = true;
+        console.error('[SunVox Worklet] HEAPF32 not available on module — audio will be silent');
+      }
+      return true;
+    }
+
     const offL = this.renderBufL >> 2; // byte offset → Float32 index
     const offR = this.renderBufR >> 2;
 
     for (const h of Object.keys(this.handles)) {
       const hi = parseInt(h);
+      // Guard: if BPM is 0, sunvox_render_piece_of_sound will infinite-loop (one_tick=0).
+      // Check before render and skip the handle until the song is properly loaded.
+      const bpm = m._sunvox_wasm_get_bpm ? m._sunvox_wasm_get_bpm(hi) : 1;
+      if (bpm <= 0) {
+        if (!this._warnedZeroBpm) {
+          this._warnedZeroBpm = true;
+          console.warn('[SunVox Worklet] BPM=0 for handle', hi, '— skipping render to prevent tab freeze');
+        }
+        continue;
+      }
       m._sunvox_wasm_render(hi, this.renderBufL, this.renderBufR, numSamples);
       for (let i = 0; i < numSamples; i++) {
         outputL[i] += heapF32[offL + i];
         outputR[i] += heapF32[offR + i];
+      }
+    }
+
+    // Debug: log first non-zero block (fires once), or warn after persistent silence
+    if (!this._debuggedNonZero) {
+      let maxAbs = 0;
+      for (let i = 0; i < numSamples; i++) maxAbs = Math.max(maxAbs, Math.abs(outputL[i]));
+      if (maxAbs > 0) {
+        this._debuggedNonZero = true;
+        console.log('[SunVox Worklet] First non-zero render block: maxAbs=', maxAbs,
+          'handles=', Object.keys(this.handles));
+      } else {
+        this._debugZeroCount = (this._debugZeroCount || 0) + 1;
+        // Log after 10 silent blocks (~58ms) and again at 200 (~1.16s)
+        if (this._debugZeroCount === 10 || this._debugZeroCount === 200) {
+          const rawL = heapF32[offL];
+          const rawR = heapF32[offR];
+          console.warn('[SunVox Worklet] Silent after', this._debugZeroCount, 'blocks.',
+            'handles=', Object.keys(this.handles),
+            'heapF32 length=', heapF32.length,
+            'bufL ptr=', this.renderBufL, 'offL=', offL,
+            'heapF32[offL]=', rawL, 'heapF32[offR]=', rawR,
+            'playing?', this._playReceived);
+        }
       }
     }
 
