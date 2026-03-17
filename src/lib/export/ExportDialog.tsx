@@ -238,6 +238,26 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
             const { exportSongToMOD } = await import('./modExport');
             const modResult = await exportSongToMOD(song, { bakeSynths: true });
             result = { data: modResult.blob, filename: modResult.filename, warnings: modResult.warnings };
+          } else if (preset.includes('futurecomposer') || format === 'FC' as string) {
+            const { exportFC } = await import('./FCExporter');
+            const buf = exportFC(song);
+            const baseName = (song.name || 'untitled').replace(/[^a-zA-Z0-9_-]/g, '_');
+            result = { data: new Blob([buf], { type: 'application/octet-stream' }), filename: `${baseName}.fc`, warnings: [] };
+          } else if (preset.includes('sidmon') || format === 'SidMon2' as string) {
+            const { exportSidMon2File } = await import('./SidMon2Exporter');
+            const buf = await exportSidMon2File(song);
+            const baseName = (song.name || 'untitled').replace(/[^a-zA-Z0-9_-]/g, '_');
+            result = { data: new Blob([buf], { type: 'application/octet-stream' }), filename: `${baseName}.sd2`, warnings: [] };
+          } else if (preset.includes('pumatracker') || format === 'PumaTracker' as string) {
+            const { exportPumaTrackerFile } = await import('./PumaTrackerExporter');
+            const buf = exportPumaTrackerFile(song);
+            const baseName = (song.name || 'untitled').replace(/[^a-zA-Z0-9_-]/g, '_');
+            result = { data: new Blob([buf as unknown as Uint8Array<ArrayBuffer>], { type: 'application/octet-stream' }), filename: `${baseName}.puma`, warnings: [] };
+          } else if (preset.includes('octamed') || format === 'OctaMED' as string) {
+            const { exportMED } = await import('./MEDExporter');
+            const buf = exportMED(song);
+            const baseName = (song.name || 'untitled').replace(/[^a-zA-Z0-9_-]/g, '_');
+            result = { data: new Blob([buf], { type: 'application/octet-stream' }), filename: `${baseName}.mmd0`, warnings: [] };
           } else {
             // Fallback: UADE chip RAM readback (works for any running UADE format)
             try {
@@ -786,8 +806,8 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                     <div className="bg-dark-bg border border-dark-border rounded-lg p-3">
                       <p className="text-xs font-mono text-text-primary leading-relaxed">
                         Exports as the original Amiga tracker format (JamCracker .jam, SoundMon .bp, ProTracker .mod,
-                        Future Composer .fc, HippelCoSo .coso, OctaMED .mmd0).
-                        Formats with full serializers build the file from scratch; others use chip RAM readback.
+                        Future Composer .fc, SidMon II .sd2, PumaTracker .puma, OctaMED .mmd0).
+                        All formats have full from-scratch serializers; chip RAM readback is available as fallback.
                       </p>
                     </div>
                   </div>
