@@ -620,9 +620,17 @@ export async function parseGDMFile(
           if (rawNote !== 0) {
             // High bit = no-retrig flag (ignore); strip it for note decode.
             const noteByte = (rawNote & 0x7F) - 1;
-            // GDM note encoding: high nibble = octave, low nibble = semitone
-            // XM note = semitone + 12 * octave + 12 + 1 (1-based, C-0 = 1)
-            const xmNote = (noteByte & 0x0F) + 12 * (noteByte >> 4) + 12 + 1;
+            const octave   = noteByte >> 4;
+            const semitone = noteByte & 0x0F;
+            // GDM note encoding: high nibble = octave, low nibble = semitone.
+            // OpenMPT Load_gdm.cpp: m.note = (note & 0x0F) + 12*(note >> 4) + 12 + NOTE_MIN
+            //   i.e. xmNote = octave*12 + semitone + 13  (all formats).
+            //
+            // For S3M-origin GDM (originalFormat=3), OpenMPT plays these notes
+            // using S3M/linear period calculation.  During MOD export the exporter
+            // applies noteExportOffset=-60 (see TrackerSong.noteExportOffset) so
+            // that S3M octave 5 → ProTracker octave 0 (period 1712 = FreqS3MTable[0]).
+            const xmNote = octave * 12 + semitone + 13;  // OpenMPT formula (all formats)
             cell = { ...cell, note: xmNote };
           }
           if (instr !== 0) {
@@ -726,6 +734,11 @@ export async function parseGDMFile(
 
   // ── Assemble TrackerSong ───────────────────────────────────────────────────
 
+  // For S3M-origin GDM files the notes use OpenMPT numbering (C-0=1, C-5=61).
+  // When exporting to ProTracker MOD we must subtract 60 semitones so that
+  // S3M C-5 (note=61) → ProTracker C-0 (period=1712 = FreqS3MTable[0]).
+  const noteExportOffset = (originalFormat === 3) ? -60 : undefined;
+
   return {
     name:            songTitle,
     format:          trackerFormat,
@@ -738,6 +751,7 @@ export async function parseGDMFile(
     initialSpeed:    tempo  > 0 ? tempo  : 6,
     initialBPM:      bpm    > 0 ? bpm    : 125,
     linearPeriods,
+    ...(noteExportOffset !== undefined ? { noteExportOffset } : {}),
   };
 }
 
