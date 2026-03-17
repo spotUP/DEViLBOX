@@ -196,6 +196,23 @@ export interface FormatEnginePreferences {
   psm: FormatEngineChoice;              // .psm → PSMParser vs libopenmpt
   composer667: FormatEngineChoice;      // .667 → Composer667Parser vs libopenmpt
   kt: FormatEngineChoice;               // .kt/.ki → KlysParser (native klystrack)
+  earAche: FormatEngineChoice;          // .ea/ea.* → EarAcheParser vs UADE
+  scumm: FormatEngineChoice;            // .scumm/scumm.* → SCUMMParser vs UADE
+  // Wanted Team Dave Lowe-derived formats
+  soprol: FormatEngineChoice;           // .spl/spl.* → WantedTeamDaveLoweParser vs UADE
+  riffRaff: FormatEngineChoice;         // .riff/riff.* → WantedTeamDaveLoweParser vs UADE
+  howieDavies: FormatEngineChoice;      // .hd/hd.* → WantedTeamDaveLoweParser vs UADE
+  beathovenSynthesizer: FormatEngineChoice; // .bss/bss.* → WantedTeamDaveLoweParser vs UADE
+  seanConnolly: FormatEngineChoice;     // .scn/scn.* → SeanConnollyParser vs UADE
+  // Simple stub parsers (filename-based title, UADE classic audio)
+  dariusZendeh: FormatEngineChoice;     // .dz/dz.* → SimpleAmigaStubParser vs UADE
+  silmarils: FormatEngineChoice;        // .mok/mok.* → SimpleAmigaStubParser vs UADE
+  markII: FormatEngineChoice;           // .mk2/mk2.* → SimpleAmigaStubParser vs UADE
+  artAndMagic: FormatEngineChoice;      // .aam/aam.* → SimpleAmigaStubParser vs UADE
+  sonicArrangerSas: FormatEngineChoice; // .sas/sas.* → SimpleAmigaStubParser vs UADE
+  mikeDavies: FormatEngineChoice;       // .md/md.* → SimpleAmigaStubParser vs UADE
+  aProSys: FormatEngineChoice;          // .aps/aps.* → SimpleAmigaStubParser vs UADE
+  leggless: FormatEngineChoice;         // .lme/lme.* → SimpleAmigaStubParser vs UADE
   uade: UADEImportMode;        // UADE-only formats → enhanced (editable) vs classic (playback-only)
 }
 
@@ -371,7 +388,7 @@ export const useSettingsStore = create<SettingsStore>()(
         fredGray: 'uade',       // FredGrayParser — dedicated Fred Gray support
         musicMaker4V: 'uade',   // MusicMakerParser — dedicated Music Maker 4V support
         musicMaker8V: 'uade',   // MusicMakerParser — dedicated Music Maker 8V support
-        maniacsOfNoise: 'uade', // ManiacsOfNoiseParser — dedicated Maniacs of Noise support
+        maniacsOfNoise: 'native', // ManiacsOfNoiseParser — filename title + UADE classic audio
         ufo: 'uade',            // UFOParser — dedicated UFO/MicroProse support
         iffSmus: 'native',        // IffSmusParser — dedicated IFF SMUS support
         magneticFieldsPacker: 'uade', // MagneticFieldsPackerParser — dedicated MFP support
@@ -434,9 +451,24 @@ export const useSettingsStore = create<SettingsStore>()(
         sawteeth: 'uade',           // SawteethParser — dedicated Sawteeth support
         fmTracker: 'uade',          // FMTrackerParser — dedicated FM Tracker support
         madTracker2: 'native',        // MadTracker2Parser — dedicated MadTracker 2 support
-        psm: 'uade',                // PSMParser — dedicated PSM/PSM16 support
+        psm: 'native',              // PSMParser — dedicated PSM/PSM16 support
         composer667: 'uade',        // Composer667Parser — dedicated Composer 667 support
         kt: 'native',                // KlysParser — native klystrack engine
+        earAche: 'native',           // EarAcheParser — native pattern display + UADE classic audio
+        scumm: 'native',             // SCUMMParser — native pattern display + UADE classic audio
+        soprol: 'native',            // WantedTeamDaveLoweParser — SOPROL title + UADE classic audio
+        riffRaff: 'native',          // WantedTeamDaveLoweParser — Riff Raff title + UADE classic audio
+        howieDavies: 'native',       // WantedTeamDaveLoweParser — Howie Davies title + UADE classic audio
+        beathovenSynthesizer: 'native', // WantedTeamDaveLoweParser — BSS title + UADE classic audio
+        seanConnolly: 'native',      // SeanConnollyParser — title from embedded header + UADE classic audio
+        dariusZendeh: 'native',      // SimpleAmigaStubParser — filename title + UADE classic audio
+        silmarils: 'native',         // SimpleAmigaStubParser — filename title + UADE classic audio
+        markII: 'native',            // SimpleAmigaStubParser — filename title + UADE classic audio
+        artAndMagic: 'native',       // SimpleAmigaStubParser — filename title + UADE classic audio
+        sonicArrangerSas: 'native',  // SimpleAmigaStubParser — filename title + UADE classic audio
+        mikeDavies: 'native',        // SimpleAmigaStubParser — filename title + UADE classic audio
+        aProSys: 'native',           // SimpleAmigaStubParser — filename title + UADE classic audio
+        leggless: 'native',          // SimpleAmigaStubParser — filename title + UADE classic audio
         uade: 'enhanced',           // UADE formats — enhanced (editable) by default
       },
       performanceQuality: 'high',
@@ -644,7 +676,7 @@ export const useSettingsStore = create<SettingsStore>()(
     })),
     {
       name: 'devilbox-settings',
-      version: 3,
+      version: 4,
       migrate: (persistedState: unknown, version: number) => {
         const s = (persistedState ?? {}) as Record<string, unknown>;
         if (version < 2) {
@@ -655,6 +687,11 @@ export const useSettingsStore = create<SettingsStore>()(
           // v3: 88 format engine defaults changed from 'native' to 'uade'.
           // Clear persisted formatEngine so all formats get fresh defaults.
           delete s.formatEngine;
+        }
+        if (version < 4) {
+          // v4: PSM default changed from 'uade' to 'native' (native PSMParser).
+          const fe = s.formatEngine as Record<string, unknown> | undefined;
+          if (fe && fe.psm === 'uade') fe.psm = 'native';
         }
         return s;
       },
