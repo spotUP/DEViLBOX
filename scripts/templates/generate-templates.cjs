@@ -35,7 +35,8 @@ function writeS8(buf, off, val) { buf[off] = val < 0 ? val + 256 : val & 0xFF; }
 // 4 channels, 64 patterns (all empty), 1 order entry, 31 instrument slots
 // Standard M.K. format
 function generateMOD() {
-  const NUM_PATTERNS = 64;
+  // MOD only needs patterns that are referenced — start with just 1
+  const NUM_PATTERNS = 1;
   const ROWS_PER_PATTERN = 64;
   const CHANNELS = 4;
   const CELL_SIZE = 4;
@@ -83,7 +84,7 @@ function generateMOD() {
 // 4 channels, 8 bytes/cell, variable rows per pattern
 function generateJamCracker() {
   const NUM_INSTRUMENTS = 32;
-  const NUM_PATTERNS = 64;
+  const NUM_PATTERNS = 1;  // only emit patterns referenced in song table
   const ROWS_PER_PATTERN = 64;
   const CHANNELS = 4;
   const CELL_SIZE = 8;
