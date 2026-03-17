@@ -1,13 +1,15 @@
 /**
  * JamCrackerExporter.ts - Export JamCracker Pro (.jam) files
  *
- * Uses the WASM engine's jc_save() to serialize the current in-memory state
- * (including edits) to a valid JamCracker binary. Falls back to the original
- * file data if the engine is not running.
+ * Priority chain:
+ *   1. WASM engine jc_save() — includes runtime edits from chip RAM
+ *   2. From-scratch serializer (jamExport.ts) — builds from TrackerSong data
+ *   3. Original file data fallback — returns unedited import data
  */
 
 import type { TrackerSong } from '@/engine/TrackerReplayer';
 import { JamCrackerEngine } from '@/engine/jamcracker/JamCrackerEngine';
+import { exportSongToJam } from './jamExport';
 
 export interface JamCrackerExportResult {
   data: Blob;
@@ -18,7 +20,7 @@ export interface JamCrackerExportResult {
 export async function exportAsJamCracker(song: TrackerSong): Promise<JamCrackerExportResult> {
   const warnings: string[] = [];
 
-  // Try WASM serialization first (includes edits)
+  // 1. Try WASM serialization first (includes chip RAM edits)
   if (JamCrackerEngine.hasInstance()) {
     const engine = JamCrackerEngine.getInstance();
     try {
@@ -28,19 +30,27 @@ export async function exportAsJamCracker(song: TrackerSong): Promise<JamCrackerE
         const baseName = (song.name || 'untitled').replace(/[^a-zA-Z0-9_-]/g, '_');
         return { data, filename: `${baseName}.jam`, warnings };
       }
-      warnings.push('WASM save returned empty data. Falling back to original file.');
+      warnings.push('WASM save returned empty data.');
     } catch (e) {
-      warnings.push(`WASM save failed: ${(e as Error).message}. Falling back to original data.`);
+      warnings.push(`WASM save failed: ${(e as Error).message}.`);
     }
   }
 
-  // Fallback: export original binary
+  // 2. Build from TrackerSong data (works for template-created songs)
+  try {
+    const result = exportSongToJam(song);
+    return { ...result, warnings: [...warnings, ...result.warnings] };
+  } catch (e) {
+    warnings.push(`From-scratch build failed: ${(e as Error).message}.`);
+  }
+
+  // 3. Fallback: export original binary
   const fileData = song.jamCrackerFileData;
   if (!fileData || fileData.byteLength === 0) {
     throw new Error('No JamCracker file data available for export');
   }
 
-  warnings.push('Engine not running — exports original file without in-session edits.');
+  warnings.push('Using original file without in-session edits.');
   const data = new Blob([fileData], { type: 'application/octet-stream' });
   const baseName = (song.name || 'untitled').replace(/[^a-zA-Z0-9_-]/g, '_');
   return { data, filename: `${baseName}.jam`, warnings };
