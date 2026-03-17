@@ -3483,11 +3483,12 @@ void furnace_dispatch_set_sample(int handle, int sampleIndex, unsigned char* dat
         break;
 
       case DIV_SAMPLE_DEPTH_BRR:
-        // SNES BRR: 9 bytes per 16 samples
-        bytesNeeded = (sample->samples + 15) / 16 * 9;
-        sample->dataBRR = new unsigned char[bytesNeeded];
-        memcpy(sample->dataBRR, data + 32, std::min((unsigned int)dataSize, bytesNeeded));
-        sample->lengthBRR = bytesNeeded;
+        // SNES BRR: 9 bytes per 16-sample block — dataSize IS the BRR byte count.
+        // TS sends s.data.length (BRR byte count) as sampleCount, not PCM frame count,
+        // so we must not use sample->samples for the byte calculation.
+        sample->dataBRR = new unsigned char[dataSize];
+        memcpy(sample->dataBRR, data + 32, dataSize);
+        sample->lengthBRR = dataSize;
         break;
 
       case DIV_SAMPLE_DEPTH_VOX:
@@ -3597,13 +3598,6 @@ void furnace_dispatch_render_samples(int handle) {
   if (it != g_instances.end() && it->second->dispatch) {
     int sLen = it->second->engine.song.sampleLen;
     printf("[FurnaceDispatch] renderSamples PRE: handle=%d, sampleLen=%d\n", handle, sLen);
-    if (sLen > 0) {
-      DivSample* s = it->second->engine.song.sample[0];
-      if (s) {
-        printf("[FurnaceDispatch]   sample[0]: samples=%u, depth=%d, data8=%p, data16=%p, length8=%u, length16=%u, loopEnd=%d, renderOn[0][0]=%d\n",
-               s->samples, s->depth, (void*)s->data8, (void*)s->data16, s->length8, s->length16, s->loopEnd, s->renderOn[0][0]);
-      }
-    }
     // Call render() on all PCM samples so chip-native formats (dataBRR for SNES,
     // dataADPCMA/B for YM2610, etc.) are computed before renderSamples() reads them.
     // Without this, SNES/SPC700 plays with empty sampleMem because dataBRR is NULL.
