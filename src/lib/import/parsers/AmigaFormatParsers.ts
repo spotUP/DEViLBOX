@@ -1661,7 +1661,9 @@ export async function tryRouteFormat(
   // ── Peter Verswyvelen Packer (PVP.* prefix) ───────────────────────────────
   if (matchesExt(filename, ['pvp'])) {
     const { isPeterVerswyvelenPackerFormat, parsePeterVerswyvelenPackerFile } = await import('@lib/import/formats/PeterVerswyvelenPackerParser');
-    return withNativeThenUADE('peterVerswyvelenPacker', ctx,
+    // UADE eagleplayer expects prefix form: pvp.songname
+    const pvpCtx = { ...ctx, originalFileName: toUADEPrefixName(originalFileName, ['pvp']) };
+    return withNativeThenUADE('peterVerswyvelenPacker', pvpCtx,
       (buf: Uint8Array | ArrayBuffer, name: string) => { if (isPeterVerswyvelenPackerFormat(buf as ArrayBuffer)) return parsePeterVerswyvelenPackerFile(buf as ArrayBuffer, name); return null; },
       'PeterVerswyvelenPackerParser', { injectUADE: true });
   }

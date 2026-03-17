@@ -177,16 +177,20 @@ export function parseMEDFile(buffer: ArrayBuffer, filename: string): TrackerSong
   }
 
   // ── Determine number of channels from first block ────────────────────────
-  // MMD0Block: uint16 numtracks, uint16 lines, data[]
-  // MMD1Block: uint16 numtracks, uint16 lines, uint32 blockinfo_offset (extra), data[]
+  // MMD0Block: uint8 numtracks, uint8 numlines, data[]
+  // MMD1Block: uint16 numtracks, uint16 numlines, uint32 blockinfo_offset (extra), data[]
+  // OpenMPT MEDScanNumChannels: version < 1 → ReadUint8(), else → ReadUint16BE()
   let numChannels = 4;
   if (blockPtrs.length > 0) {
-    numChannels = u16(buf, blockPtrs[0]);
+    numChannels = isMMD1Plus ? u16(buf, blockPtrs[0]) : buf[blockPtrs[0]];
     numChannels = Math.max(1, Math.min(64, numChannels));
   }
 
-  // Context for effect conversion (needed by mapMEDEffect for 0x0F tempo)
-  const tempoCtx: MEDTempoCtx = { is8Ch, bpmMode, softwareMix, rowsPerBeat };
+  // volHex flag: bit 4 (0x10) of medFlags — volumes are hex (0-64) vs BCD
+  const volHex = (medFlags & 0x10) !== 0;
+
+  // Context for effect conversion (needed by mapMEDEffect for 0x0F tempo and 0x0C volume)
+  const tempoCtx: MEDTempoCtx = { is8Ch, bpmMode, softwareMix, rowsPerBeat, volHex };
 
   // ── Parse patterns ───────────────────────────────────────────────────────
   const trackerPatterns: Pattern[] = [];
@@ -553,7 +557,49 @@ export function parseMEDFile(buffer: ArrayBuffer, filename: string): TrackerSong
   }
 
   // ── Build output ─────────────────────────────────────────────────────────
-  const songPositions = playseq.slice(0, Math.max(1, songLen));
+  let songPositions: number[];
+
+  if (magic === 'MMD2' || magic === 'MMD3') {
+    // MMD2/3 song positions come from the MMD2Song structure (at so+4) + PlaySeq tables.
+    // The 256-byte song[] field of MMDSong is MMD2Song for version >= 2:
+    //   so+4:  playSeqTableOffset (u32) — points to array of u32 pointers, one per PlaySeq
+    //   so+8:  sectionTableOffset (u32) — points to array of songLen u16 section indices
+    //   so+12: trackVolsOffset (u32)
+    //   so+16: numTracks (u16)
+    //   so+18: numPlaySeqs (u16)
+    const playSeqTableOffset = u32(buf, so + 4);
+    const sectionTableOffset = u32(buf, so + 8);
+
+    const positions: number[] = [];
+    if (sectionTableOffset > 0 && sectionTableOffset < buf.length &&
+        playSeqTableOffset > 0 && playSeqTableOffset < buf.length) {
+      // Read songLen section indices (u16 each) from sectionTableOffset
+      for (let si = 0; si < songLen; si++) {
+        const sectionIdx = u16(buf, sectionTableOffset + si * 2);
+        // Get pointer to MMD2PlaySeq from playSeqTableOffset + sectionIdx * 4
+        const ptrOff = playSeqTableOffset + sectionIdx * 4;
+        if (ptrOff + 4 > buf.length) continue;
+        const playSeqPtr = u32(buf, ptrOff);
+        if (playSeqPtr === 0 || playSeqPtr >= buf.length) continue;
+        // MMD2PlaySeq: name[32], commandTableOffset(u32), reserved(u32), length(u16) = 42 bytes
+        if (playSeqPtr + 42 > buf.length) continue;
+        const seqLen = u16(buf, playSeqPtr + 40);
+        // Followed by seqLen u16 pattern indices
+        for (let pi = 0; pi < seqLen; pi++) {
+          const patOff = playSeqPtr + 42 + pi * 2;
+          if (patOff + 2 > buf.length) break;
+          const patIdx = u16(buf, patOff);
+          if (patIdx < 0x8000 && patIdx < trackerPatterns.length) {
+            positions.push(patIdx);
+          }
+        }
+      }
+    }
+    songPositions = positions.length > 0 ? positions : playseq.slice(0, Math.max(1, songLen));
+  } else {
+    // MMD0/1: sequence is the raw u8 array in playseq[]
+    songPositions = playseq.slice(0, Math.max(1, songLen));
+  }
 
   const medBytesPerCell = isMMD1Plus ? 4 : 3;
   const uadePatternLayout: UADEPatternLayout = {
@@ -593,6 +639,7 @@ interface MEDTempoCtx {
   bpmMode: boolean;
   softwareMix: boolean;
   rowsPerBeat: number;
+  volHex: boolean;
 }
 
 function medTempoToBPM(tempo: number, ctx: MEDTempoCtx): number {
@@ -620,7 +667,11 @@ function mapMEDEffect(cmd: number, param: number, ctx: MEDTempoCtx): { effTyp: n
     case 0x1: return { effTyp: 0x01, eff: param };   // Portamento up
     case 0x2: return { effTyp: 0x02, eff: param };   // Portamento down
     case 0x3: return { effTyp: 0x03, eff: param };   // Tone portamento
-    case 0x4: return { effTyp: 0x04, eff: param };   // Vibrato
+    case 0x4: {
+      // Vibrato — MED vibrato depth is TWICE as deep as ProTracker (OpenMPT doubles it)
+      const vibratoDepth = Math.min((param & 0x0F) * 2, 0x0F);
+      return { effTyp: 0x04, eff: (param & 0xF0) | vibratoDepth };
+    }
     case 0x5: return { effTyp: 0x05, eff: param };   // Tone porta + volume slide
     case 0x6: return { effTyp: 0x06, eff: param };   // Vibrato + volume slide
     case 0x7: return { effTyp: 0x07, eff: param };   // Tremolo
@@ -630,8 +681,19 @@ function mapMEDEffect(cmd: number, param: number, ctx: MEDTempoCtx): { effTyp: n
       return { effTyp: 0, eff: 0 };
     case 0xA: return { effTyp: 0x0A, eff: param };   // Volume slide
     case 0xB: return { effTyp: 0x0B, eff: param };   // Position jump
-    case 0xC: return { effTyp: 0x0C, eff: param };   // Set volume
-    case 0xD: return { effTyp: 0x0D, eff: param };   // Pattern break
+    case 0xC: {
+      // Set Volume — mirrors OpenMPT ConvertMEDEffect case 0x0C
+      // !volHex: BCD encoding (e.g. 0x40 = decimal 40), valid if param < 0x99
+      // volHex: hex 0-127, clamp to 0-64 via min(param & 0x7F, 64)
+      let vol: number;
+      if (!ctx.volHex && param < 0x99) {
+        vol = (param >> 4) * 10 + (param & 0x0F);
+      } else {
+        vol = Math.min(param & 0x7F, 64);
+      }
+      return { effTyp: 0x0C, eff: vol };
+    }
+    case 0xD: return { effTyp: 0x0A, eff: param };   // Volume slide (MED 0x0D = ProTracker 0x0A)
     case 0xE: {
       // Extended effects
       const sub = (param >> 4) & 0xF;
