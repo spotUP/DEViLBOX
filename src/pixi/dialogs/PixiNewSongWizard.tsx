@@ -51,6 +51,48 @@ export const PixiNewSongWizard: React.FC = () => {
   const finish = useCallback(
     (mode: StartMode, loadInstruments: boolean) => {
       const presetId = selectedPresetId;
+      const preset = SYSTEM_PRESETS.find((p) => p.id === presetId);
+
+      // If this is a template-based Amiga format, load the template file
+      if (mode === 'preset' && preset?.templateFile) {
+        const templatePath = preset.templateFile;
+        // Close wizard immediately, then load async
+        setStep(1); setStartMode('empty'); setSelectedPresetId('amiga_protracker');
+        setWithPresetInstruments(true); setFilter(''); setScrollY(0);
+        close();
+
+        // Fetch template and load it through the unified file loader
+        (async () => {
+          try {
+            const resp = await fetch(`/${templatePath}`);
+            if (!resp.ok) throw new Error(`Failed to fetch template: ${resp.status}`);
+            const buf = await resp.arrayBuffer();
+            // Derive filename from template path
+            const filename = templatePath.split('/').pop() || 'template.mod';
+            const file = new File([buf], filename);
+
+            useTabsStore.getState().addTab();
+            const { loadFile } = await import('@lib/file/UnifiedFileLoader');
+            await loadFile(file, { requireConfirmation: false });
+
+            // Apply Amiga settings after load
+            if (AMIGA_UADE_PRESET_IDS.has(presetId)) {
+              useTrackerStore.getState().applyAmigaSongSettings(presetId);
+            }
+            useUIStore.getState().setActiveSystemPreset(presetId);
+            useUIStore.getState().setStatusMessage(`New ${preset.name} project`, false, 2000);
+          } catch (err) {
+            console.error('[NewSongWizard] Template load failed:', err);
+            useUIStore.getState().setStatusMessage('Template load failed — using blank project', true, 3000);
+            // Fallback: create blank song
+            useTabsStore.getState().addTab();
+            if (presetId) useTrackerStore.getState().applySystemPreset(presetId);
+          }
+        })();
+        return;
+      }
+
+      // Standard non-template flow
       useTabsStore.getState().addTab();
       queueMicrotask(() => {
         if (mode === 'preset' && presetId) {
@@ -435,6 +477,18 @@ const GlStep2: React.FC<GlStep2Props> = ({
               <InfoBox label="Channels" value={String(selected.channels)} />
               <InfoBox label="BPM" value={String(selected.defaultBpm ?? 125)} />
             </Div>
+
+            {/* Native format badge */}
+            {selected.templateFile && (
+              <Div className="flex-row items-center gap-2 p-2 rounded" layout={{
+                backgroundColor: 0x1a3a1a, borderWidth: 1, borderColor: 0x2a6a2a, borderRadius: 4,
+              }}>
+                <PixiIcon name="diskio" size={12} color={0x4ade80} layout={{}} />
+                <Txt className="text-[11px] text-accent-success">
+                  Native format — creates editable file you can export
+                </Txt>
+              </Div>
+            )}
 
             {/* Compatible synths — DOM: bg-dark-bg rounded p-3 border */}
             {selected.compatibleSynthTypes && selected.compatibleSynthTypes.length > 0 && (
