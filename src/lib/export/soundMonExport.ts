@@ -53,12 +53,41 @@ function writeString(buf: Uint8Array, off: number, str: string, len: number): vo
 
 // ── Note conversion ─────────────────────────────────────────────────────
 
-/** XM note → SoundMon note index. Parser uses amigaNoteToXM which adds 36. */
+/** XM note → SoundMon note index.
+ *  Parser bpNoteToXM: SM note 1 → PERIODS[36]=856 → C-1 → XM 13.
+ *  So reverse: SM note = XM note - 12. Range: 1-48 (4 octaves). */
 function xmNoteToSM(xmNote: number): number {
   if (xmNote === 0 || xmNote === 97) return 0;
-  const smNote = xmNote - 36;
-  if (smNote < 1 || smNote > 84) return 0;
+  const smNote = xmNote - 12;
+  if (smNote < 1 || smNote > 48) return 0;
   return smNote;
+}
+
+// ── Effect reverse-mapping (XM → SoundMon) ─────────────────────────────
+
+/** Map XM effect type → SoundMon effect number.
+ *  Parser mapping (SM → XM): 0→0x00, 1→vol, 2→0x0F, 3→0x0E, 4→0x01, 5→0x02, 6→0x04, 7→0x0B
+ *  Reverse:
+ */
+function xmEffectToSM(xmEffTyp: number, xmEff: number): { smOpt: number; smParam: number } {
+  switch (xmEffTyp) {
+    case 0x00: // Arpeggio → SM 0
+      return { smOpt: xmEff !== 0 ? 0 : 0, smParam: xmEff };
+    case 0x01: // Porta up → SM 4
+      return { smOpt: 4, smParam: xmEff };
+    case 0x02: // Porta down → SM 5
+      return { smOpt: 5, smParam: xmEff };
+    case 0x04: // Vibrato → SM 6
+      return { smOpt: 6, smParam: xmEff };
+    case 0x0B: // Position jump → SM 7
+      return { smOpt: 7, smParam: xmEff };
+    case 0x0E: // Filter → SM 3
+      return { smOpt: 3, smParam: xmEff ? 1 : 0 };
+    case 0x0F: // Speed → SM 2
+      return { smOpt: 2, smParam: xmEff };
+    default:
+      return { smOpt: 0, smParam: 0 };
+  }
 }
 
 // ── Cell encoding ───────────────────────────────────────────────────────
@@ -69,10 +98,22 @@ function encodeCell(cell: TrackerCell, buf: Uint8Array, off: number): void {
   writeS8(buf, off, note);
 
   const instr = (cell.instrument ?? 0) & 0x0F;
-  const effTyp = (cell.effTyp ?? 0) & 0x0F;
-  buf[off + 1] = (instr << 4) | effTyp;
+  const xmEffTyp = cell.effTyp ?? 0;
+  const xmEff = cell.eff ?? 0;
 
-  writeS8(buf, off + 2, cell.eff ?? 0);
+  // Volume column takes priority if set (SoundMon effect 1 = set volume)
+  const vol = cell.volume ?? 0;
+  if (vol >= 0x10 && vol <= 0x50) {
+    buf[off + 1] = (instr << 4) | 1;  // SM effect 1 = set volume
+    writeS8(buf, off + 2, (vol - 0x10));
+  } else if (xmEffTyp !== 0 || xmEff !== 0) {
+    const { smOpt, smParam } = xmEffectToSM(xmEffTyp, xmEff);
+    buf[off + 1] = (instr << 4) | (smOpt & 0x0F);
+    writeS8(buf, off + 2, smParam);
+  } else {
+    buf[off + 1] = (instr << 4);
+    buf[off + 2] = 0;
+  }
 }
 
 /** Check if a 16-row channel block is entirely empty. */
