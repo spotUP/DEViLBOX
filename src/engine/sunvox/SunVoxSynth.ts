@@ -15,7 +15,7 @@
 import type { DevilboxSynth } from '@/types/synth';
 import { getDevilboxAudioContext, noteToMidi } from '@/utils/audio-context';
 import { SunVoxEngine } from './SunVoxEngine';
-import type { SunVoxControl } from './SunVoxEngine';
+import type { SunVoxControl, SunVoxPatternData, SunVoxSongMeta } from './SunVoxEngine';
 
 export class SunVoxSynth implements DevilboxSynth {
   readonly name = 'SunVoxSynth';
@@ -26,6 +26,10 @@ export class SunVoxSynth implements DevilboxSynth {
   private _disposed = false;
   private _handle = -1;
   private _moduleId = -1;
+  // Promise that resolves when setModule/setSong fully completes (handle created + synth loaded).
+  // Exposed via ensureInitialized() so ensureWASMSynthsReady can await all instruments before play.
+  private _loadReady: Promise<void> = Promise.resolve();
+  private _songMeta: SunVoxSongMeta | null = null;
 
   // Cached control values from the last setControl call, keyed by ctlId string.
   private _controlValues: Map<string, number> = new Map();
@@ -45,6 +49,12 @@ export class SunVoxSynth implements DevilboxSynth {
    * Creates an engine handle on first call.
    */
   async setModule(data: ArrayBuffer): Promise<void> {
+    const p = this._doSetModule(data);
+    this._loadReady = p;
+    return p;
+  }
+
+  private async _doSetModule(data: ArrayBuffer): Promise<void> {
     await this.engine.ready();
 
     if (this._handle < 0) {
@@ -59,13 +69,41 @@ export class SunVoxSynth implements DevilboxSynth {
    * Creates an engine handle on first call.
    */
   async setSong(data: ArrayBuffer): Promise<void> {
+    const p = this._doSetSong(data);
+    this._loadReady = p;
+    return p;
+  }
+
+  private async _doSetSong(data: ArrayBuffer): Promise<void> {
     await this.engine.ready();
 
     if (this._handle < 0) {
       this._handle = await this.engine.createHandle(this.audioContext.sampleRate);
     }
 
-    await this.engine.loadSong(this._handle, data);
+    this._songMeta = await this.engine.loadSong(this._handle, data);
+  }
+
+  /** Returns song metadata (bpm, speed, name) after setSong completes. */
+  getSongMeta(): SunVoxSongMeta | null {
+    return this._songMeta;
+  }
+
+  /** Read all patterns from the loaded song. */
+  async getPatterns(): Promise<SunVoxPatternData[]> {
+    if (this._handle < 0) return [];
+    return this.engine.getPatterns(this._handle);
+  }
+
+  /** Read all module names from the loaded song/synth. */
+  async getModules(): Promise<import('./SunVoxEngine').SunVoxModuleInfo[]> {
+    if (this._handle < 0) return [];
+    return this.engine.getModules(this._handle);
+  }
+
+  /** Called by ToneEngine.ensureWASMSynthsReady — resolves when handle + module are ready. */
+  ensureInitialized(): Promise<void> {
+    return this._loadReady;
   }
 
   // ── Parameter access ──────────────────────────────────────────────────────
@@ -82,6 +120,18 @@ export class SunVoxSynth implements DevilboxSynth {
       throw new Error('[SunVoxSynth] No module loaded');
     }
     return this.engine.saveSynth(this._handle, this._moduleId);
+  }
+
+  /**
+   * Extract a specific module by ID from the loaded song handle as a .sunsynth ArrayBuffer.
+   * Useful for extracting individual modules from a loaded .sunvox song before disposing
+   * the reader handle.
+   */
+  async extractModule(moduleId: number): Promise<ArrayBuffer> {
+    if (this._handle < 0) {
+      throw new Error('[SunVoxSynth] No handle');
+    }
+    return this.engine.saveSynth(this._handle, moduleId);
   }
 
   /** Save the current song as a .sunvox ArrayBuffer. */

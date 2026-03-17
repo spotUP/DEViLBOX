@@ -59,9 +59,9 @@ const SMP_LOOP  = 0x08;
 // ── Effect command numbers (XM/FT2 effect table) ──────────────────────────────
 // These match the CMD_ enum values used by TrackerReplayer:
 //   0x00 = none         0x01 = portamento up   0x02 = portamento down
-//   0x03 = tone porta   0x04 = retrig           0x05 = vibrato
-//   0x0A = volume slide 0x0F = speed
-//   0x0E = extended (for S3MCMDEX / note delay via E sub-commands)
+//   0x03 = tone porta   0x04 = vibrato          0x05 = vibrato
+//   0x0A = volume slide 0x0E = extended (E9x retrig / E8x pan / EDx delay)
+//   0x0F = speed
 
 // farEffects[highNibble of effect byte] → effTyp value
 // Mirrors OpenMPT's static constexpr EffectCommand farEffects[] exactly.
@@ -70,7 +70,7 @@ const FAR_EFFECTS: ReadonlyArray<number> = [
   0x01, // 0x1 = portamento up
   0x02, // 0x2 = portamento down
   0x03, // 0x3 = tone portamento
-  0x04, // 0x4 = retrig           (CMD_RETRIG mapped to XM Rxy via 0x1B, but OpenMPT uses 0x04 directly — see below)
+  0x0E, // 0x4 = retrig → E9x  (CMD_RETRIG; use effTyp=0x0E, eff=0x90|(retrigCount))
   0x05, // 0x5 = vibrato depth    (CMD_VIBRATO)
   0x05, // 0x6 = vibrato speed    (CMD_VIBRATO)
   0x0A, // 0x7 = volume slide up  (CMD_VOLUMESLIDE)
@@ -166,9 +166,11 @@ function convertFAREffect(effectByte: number): FAREffectResult {
       return { effTyp: FAR_EFFECTS[type], eff: param };
 
     case 0x04:
-      // Retrig: 6/(1+(param & 0xF)) + 1
-      param = Math.floor(6 / (1 + (param & 0x0F))) + 1;
-      return { effTyp: FAR_EFFECTS[type], eff: param };
+      // Retrig → E9x (CMD_RETRIG): FAR param is retrig speed (0-F); encode as E9x.
+      // FAR_EFFECTS[4] = 0x0E; eff = 0x90 | (retrig count 0-F).
+      // OpenMPT: m.command = CMD_RETRIG; Load_far.cpp does not convert the param further
+      // for effect index 4 (it goes through the default path after fixing via effTrans).
+      return { effTyp: FAR_EFFECTS[type], eff: 0x90 | (param & 0x0F) };
 
     case 0x05:
       // Vibrato depth (no param adjustment)

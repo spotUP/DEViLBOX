@@ -28,7 +28,7 @@
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, ChannelData, TrackerCell, InstrumentConfig } from '@/types';
-import { createSamplerInstrument } from './AmigaUtils';
+import { pcm8ToWAV } from './AmigaUtils';
 
 // ── Binary helpers (little-endian throughout) ────────────────────────────────
 
@@ -175,7 +175,9 @@ function translateULTEffect(
           return [XM_PORTA_DOWN, 0xF0 | loNibble];
         case 0x8: // Pan position (v≥'4' only)
           if (version >= 0x34) {
-            return [XM_S3M_CMDEX, 0x60 | loNibble];
+            // S6x in XM_S3M_CMDEX (0x60|loNibble) would become MOD E6x = PATTERN LOOP.
+            // Use MOD effect 8 (set panning, 0x00=left … 0xFF=right) instead.
+            return [0x08, loNibble * 0x11];
           }
           return [EFF_NONE, PAR_NONE];
         case 0x9: // Retrigger
@@ -193,8 +195,8 @@ function translateULTEffect(
       }
     }
 
-    case 0xF: // Speed / BPM
-      if (param > 0x2F) {
+    case 0xF: // Speed / BPM — same threshold as ProTracker: F01-F1F=speed, F20+=BPM
+      if (param > 0x1F) {
         return [XM_TEMPO, param];
       }
       return [XM_SPEED, param];
@@ -388,15 +390,15 @@ export async function parseULTFile(
   }
 
   // ── Order list (256 bytes) ─────────────────────────────────────────────────
-  // 0xFF = end-of-list, 0xFE = loop point
+  // 0xFF = end-of-list, 0xFE = restart/loop point (do NOT stop — just record)
   const orderList: number[] = [];
   let restartPos = 0;
   for (let i = 0; i < 256; i++) {
     const b = v.getUint8(pos + i);
     if (b === 0xFF) break;
     if (b === 0xFE) {
-      restartPos = orderList.length;
-      break;
+      if (restartPos === 0) restartPos = orderList.length;
+      continue;   // keep reading — 0xFE is a subsong separator, not a terminator
     }
     orderList.push(b);
   }
@@ -640,11 +642,37 @@ export async function parseULTFile(
         },
       } as unknown as InstrumentConfig);
     } else {
-      // 8-bit: use createSamplerInstrument (encodes to 16-bit WAV internally)
+      // 8-bit: build WAV inline (same as 16-bit path) — do NOT use createSamplerInstrument
+      // because that sets usePeriodPlayback:true (Amiga clock math), which is wrong for
+      // ULT, a PC (DOS) format that uses linear Hz-based C5 speed.
       const loopEnd = (loop && loopEndFrames > loopStartFrames) ? loopEndFrames : 0;
-      instruments.push(
-        createSamplerInstrument(id, hdr.name, pcm, vol64, c5Speed, loopStartFrames, loopEnd),
-      );
+      const wavBuf  = pcm8ToWAV(pcm, c5Speed, loopStartFrames, loopEnd);
+      const dataUrl = wavToDataUrl(wavBuf);
+      const hasLoop = loopEnd > loopStartFrames && loopEnd > 2;
+      const loopType = ping ? 'pingpong' as const : 'forward' as const;
+
+      instruments.push({
+        id,
+        name:      hdr.name.replace(/\0/g, '').trim() || `Sample ${id}`,
+        type:      'sample'  as const,
+        synthType: 'Sampler' as const,
+        effects:   [],
+        volume:    vol64 > 0 ? 20 * Math.log10(vol64 / 64) : -60,
+        pan:       0,
+        sample: {
+          audioBuffer: wavBuf,
+          url:         dataUrl,
+          baseNote:    'C3',
+          detune:      0,
+          loop:        hasLoop,
+          loopType:    hasLoop ? loopType : 'off' as const,
+          loopStart:   loopStartFrames,
+          loopEnd:     loopEnd > 0 ? loopEnd : pcm.length,
+          sampleRate:  c5Speed,
+          reverse:     false,
+          playbackRate: 1.0,
+        },
+      } as unknown as InstrumentConfig);
     }
   }
 
@@ -696,7 +724,7 @@ export async function parseULTFile(
     songLength:      orderList.length,
     restartPosition: restartPos,
     numChannels,
-    initialSpeed:    4,    // UltraTracker default speed
+    initialSpeed:    6,    // UltraTracker default speed (OpenMPT uses ModSequence default of 6)
     initialBPM:      125,  // UltraTracker default BPM
     linearPeriods:   false,
   };

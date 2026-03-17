@@ -80,7 +80,6 @@ const CHANNEL_PAN = [-60, 60, 60, -60, -60, 60, 60, -60] as const;
 const EFF_PORTA_UP      = 0x01;
 const EFF_PORTA_DOWN    = 0x02;
 const EFF_TONE_PORTA    = 0x03;
-const EFF_VIBRATO       = 0x04;
 const EFF_SPEED         = 0x0F;
 const EFF_PATTERN_BREAK = 0x0D;
 const EFF_NONE          = 0x00;
@@ -136,14 +135,15 @@ function map669Effect(command: number, param: number): { effTyp: number; eff: nu
     case 1: return { effTyp: EFF_PORTA_DOWN,    eff: param };
     case 2: return { effTyp: EFF_TONE_PORTA,    eff: param };
     case 3: return { effTyp: EFF_PORTA_UP,      eff: 0xF0 | param };
-    case 4: return { effTyp: EFF_VIBRATO,       eff: (param << 4) | param };
-    case 5: return { effTyp: EFF_SPEED,         eff: param };
-    case 6:
-      switch (param) {
-        case 0:  return { effTyp: 0x0E, eff: 0x04 };
-        case 1:  return { effTyp: 0x0E, eff: 0x14 };
-        default: return { effTyp: EFF_NONE, eff: 0 };
-      }
+    // Effect 4: CMD_VIBRATO in effTrans[], but OpenMPT (MODPLUG_TRACKER) converts to
+    // CMD_ARPEGGIO with param |= (param << 4) — repeating the nibble in both halves.
+    // Source: Load_669.cpp case 4 switch.
+    case 4: return { effTyp: 0x00 /* arpeggio */, eff: param | (param << 4) };
+    case 5: return { effTyp: EFF_SPEED,           eff: param };
+    // Effect 6: CMD_PANNINGSLIDE (XM-only, dropped in MOD export).
+    // Source: Load_669.cpp case 6 → m->param = 0x4F / 0xF4, CMD_PANNINGSLIDE.
+    // CMD_PANNINGSLIDE has no MOD equivalent — drop it.
+    case 6: return { effTyp: EFF_NONE, eff: 0 };
     case 7: return { effTyp: 0x0E, eff: 0x90 | param };
     default: return { effTyp: EFF_NONE, eff: 0 };
   }
@@ -313,6 +313,8 @@ export async function parse669File(
 
   for (let i = 0; i < rawOrders.length; i++) {
     const patIdx   = rawOrders[i];
+    // tempoList[i] and breakList[i] are indexed by ORDER POSITION i, matching
+    // the file layout (OFFSET_TEMPO_LIST + i, OFFSET_BREAKS + i).
     const speed    = tempoList[i] > 0 ? tempoList[i] : 4;
     const breakRow = breakList[i];
     patterns.push(buildPattern(patIdx, i, speed, breakRow));
@@ -362,7 +364,11 @@ export async function parse669File(
       loopEnd   = Math.min(hdr.loopEnd, hdr.length);
     }
 
-    const pcm = raw.subarray(startOff, endOff);
+    // 669 samples are unsigned PCM (0=min, 128=silence, 255=max).
+    // pcm8ToWAV expects signed PCM, so XOR each byte with 0x80 to convert.
+    const rawPcm = raw.subarray(startOff, endOff);
+    const pcm = new Uint8Array(rawPcm.length);
+    for (let k = 0; k < rawPcm.length; k++) pcm[k] = rawPcm[k] ^ 0x80;
 
     return createSamplerInstrument(id, name, pcm, 64, SAMPLE_RATE, loopStart, loopEnd);
   });
@@ -390,7 +396,7 @@ export async function parse669File(
     restartPosition: effectiveRestart,
     numChannels:     NUM_CHANNELS,
     initialSpeed:    4,
-    initialBPM:      125,
+    initialBPM:      78,
     linearPeriods:   false,
     uadePatternLayout,
   };

@@ -296,6 +296,12 @@ struct DispatchInstance {
       dispatch->quit();
       delete dispatch;
     }
+    // Free per-instance samples (instance owns them, not the global g_samples pool)
+    for (auto* s : engine.song.sample) delete s;
+    engine.song.sample.clear();
+    // Free per-instance instruments added by furnace_dispatch_set_sample
+    for (auto* ins : engine.song.ins) delete ins;
+    engine.song.ins.clear();
     delete[] bufL;
     delete[] bufR;
     delete[] bufs;
@@ -853,8 +859,8 @@ int furnace_dispatch_create(int platformType, int sampleRate) {
     // === 5E01 (Enhanced NES) ===
     case DIV_SYSTEM_5E01:
       inst->dispatch = new DivPlatformNES();
+      ((DivPlatformNES*)inst->dispatch)->set5E01(true);
       inst->numChannels = 5;
-      // 5E01 uses NES with enhanced mode
       break;
 
     // === SID Variants ===
@@ -3537,6 +3543,13 @@ void furnace_dispatch_set_sample(int handle, int sampleIndex, unsigned char* dat
         sample->length4 = bytesNeeded;
         break;
 
+      case DIV_SAMPLE_DEPTH_BRR:
+        // SNES BRR: 9 bytes per 16-sample block, stored directly
+        sample->dataBRR = new unsigned char[dataSize];
+        memcpy(sample->dataBRR, data + 32, dataSize);
+        sample->lengthBRR = dataSize;
+        break;
+
       case DIV_SAMPLE_DEPTH_16BIT:
         // Signed 16-bit PCM (default/most common)
         sample->data16 = new short[sample->samples];
@@ -3554,16 +3567,17 @@ void furnace_dispatch_set_sample(int handle, int sampleIndex, unsigned char* dat
     }
   }
 
-  engine_set_sample(sampleIndex, sample);
-
-  // Sync to dispatch instance's song (renderSamples reads from song.sample)
+  // Store sample per-instance — each DispatchInstance owns its samples independently.
+  // Do NOT use engine_set_sample() (global pool) — that would delete samples still referenced
+  // by other chip instances in multi-chip songs, causing use-after-free crashes.
   auto sit = g_instances.find(handle);
   if (sit != g_instances.end()) {
     auto& songSamples = sit->second->engine.song.sample;
     if (sampleIndex >= (int)songSamples.size()) {
       songSamples.resize(sampleIndex + 1, nullptr);
     }
-    songSamples[sampleIndex] = sample; // Borrowed reference (g_samples owns it)
+    delete songSamples[sampleIndex]; // Free any previous sample owned by this instance
+    songSamples[sampleIndex] = sample; // Instance takes ownership
     sit->second->engine.song.sampleLen = (int)songSamples.size();
 
     // Ensure at least one instrument exists in song.ins for chips that need it
@@ -4110,6 +4124,30 @@ void furnace_dispatch_load_ins2(int insIndex, unsigned char* data, int dataLen) 
           next = data[p++];
           ins->snes.sus = (next >> 5) & 3;
           ins->snes.d2 = next & 31;
+        }
+      }
+      pos = featEnd;
+    }
+    // ── SM: Sample Map (Amiga/SNES/sample-based platforms) ──
+    else if (fc0 == 'S' && fc1 == 'M') {
+      // Upstream readFeatureSM:
+      //   short  initSample           (2 bytes)
+      //   byte   flags: useWave=4 | useSample=2 | useNoteMap=1  (1 byte)
+      //   byte   waveLen              (1 byte)
+      //   if useNoteMap: 120 × (short freq + short map) = 480 bytes
+      if (featLen >= 4) {
+        int p = pos;
+        ins->amiga.initSample = *(short*)(data + p); p += 2;
+        unsigned char flags = data[p++];
+        ins->amiga.useWave   = (flags & 4) != 0;
+        ins->amiga.useSample = (flags & 2) != 0;
+        ins->amiga.useNoteMap = (flags & 1) != 0;
+        ins->amiga.waveLen = data[p++];
+        if (ins->amiga.useNoteMap && featLen >= 4 + 120 * 4) {
+          for (int note = 0; note < 120; note++) {
+            ins->amiga.noteMap[note].freq = *(short*)(data + p); p += 2;
+            ins->amiga.noteMap[note].map  = *(short*)(data + p); p += 2;
+          }
         }
       }
       pos = featEnd;

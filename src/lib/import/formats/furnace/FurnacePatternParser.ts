@@ -378,12 +378,11 @@ export function convertFurnaceCell(cell: FurnacePatternCell, isChipSynth: boolea
     // For chip synths (SID, NES, GB, etc.), use native Furnace octave numbering
     // For Amiga/sample-based, apply -24 offset (Furnace C-4 = MOD C-2)
     const octaveOffset = isChipSynth ? 0 : -24;
-    note = (adjustedOctave * 12) + semitone + 1 + octaveOffset;
+    note = (adjustedOctave * 12) + semitone + octaveOffset;
 
-    // Clamp to valid XM range (1-96 playable, 97 = note off)
-    // Notes out of range are silenced (0 = empty) rather than transposed
+    // Clamp to valid range
     if (note > 96) note = 96;
-    if (note < 1) note = 0;
+    if (note < 0) note = 0;
   }
 
   // Convert volume

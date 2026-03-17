@@ -150,7 +150,7 @@ const GDM_EFF_TRANS: number[] = [
   /* 0x11 none(internal) */ 0x00,
   /* 0x12 retrig */         0x1B,
   /* 0x13 globalVol */      0x10,
-  /* 0x14 fineVibrato */    0x15, // XM fine vibrato
+  /* 0x14 fineVibrato */    0x04, // CMD_FINEVIBRATO → approximate as vibrato (best MOD equivalent)
   /* 0x15 none */           0x00,
   /* 0x16 none */           0x00,
   /* 0x17 none */           0x00,
@@ -161,7 +161,7 @@ const GDM_EFF_TRANS: number[] = [
   /* 0x1C none */           0x00,
   /* 0x1D none */           0x00,
   /* 0x1E S3MCmdEx */       0x1E,
-  /* 0x1F tempo */          0x1F,
+  /* 0x1F tempo */          0x0F, // CMD_TEMPO → Fxx BPM (param ≥ 0x20); must survive MOD export
 ];
 
 // Names for original format IDs 1-9
@@ -289,11 +289,11 @@ function translateGDMEffect(rawCmd: number, param: number): EffectResult {
       if (eff & 0xF0) eff &= 0xF0;
       break;
 
-    // 0x0C volume: clamp to 64, move to volume column
+    // 0x0C volume: clamp to 64, move to volume column (XM-style: 0x10+v)
     case 0x0C:
       eff     = Math.min(eff, 64);
       volcmd  = 1; // VOLCMD_VOLUME (volume column has a value)
-      vol     = eff;
+      vol     = 0x10 + eff;
       outEffTyp = 0x00;
       eff       = 0;
       break;
@@ -319,6 +319,13 @@ function translateGDMEffect(rawCmd: number, param: number): EffectResult {
     case 0x12:
       outEffTyp = 0x0E; // CMD_MODCMDEX
       eff = 0x90 | (param & 0x0F);
+      break;
+
+    // 0x1F tempo: BPM value — pass through as Fxx (param is already BPM ≥ 0x20)
+    // GDM_EFF_TRANS[0x1F] = 0x0F so outEffTyp is already 0x0F; param passes through.
+    // Drop if param < 0x20 (invalid BPM — would be misread as speed by OpenMPT).
+    case 0x1F:
+      if (eff < 0x20) { outEffTyp = 0x00; eff = 0; }
       break;
 
     // 0x1E S3MCmdEx: only surround (0x01→0x91) and 4-bit panning (0x8x) survive

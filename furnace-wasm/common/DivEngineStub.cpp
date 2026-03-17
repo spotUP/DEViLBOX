@@ -44,8 +44,10 @@ DivWavetable* DivEngine::getWave(int index) {
 }
 
 DivSample* DivEngine::getSample(int index) {
-  if (index >= 0 && index < (int)g_samples.size() && g_samples[index]) {
-    return g_samples[index];
+  // Read from instance-local song.sample[] so each chip instance has independent sample data.
+  // This prevents multi-chip songs from corrupting each other via the old global g_samples[] pool.
+  if (index >= 0 && index < (int)song.sample.size() && song.sample[index]) {
+    return song.sample[index];
   }
   static DivSample defaultSample;
   return &defaultSample;

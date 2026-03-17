@@ -1593,7 +1593,7 @@ export class FurnaceDispatchEngine {
       header.setUint8(12, s.depth);                // depth (DIV_SAMPLE_DEPTH)
       header.setUint8(13, s.loopMode);             // loopMode (0=fwd, 1=back, 2=pingpong)
       header.setUint32(16, s.rate, true);          // centerRate (C-4 rate)
-      header.setUint8(22, s.loopEnd > s.loopStart ? 1 : 0); // loop enabled flag
+      header.setUint8(22, s.loopMode !== 0 ? 1 : 0); // loop enabled flag (use actual hasLoop flag)
       // Copy PCM data
       if (s.data instanceof Int16Array) {
         // Int16Array → write as little-endian 16-bit samples

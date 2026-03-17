@@ -993,6 +993,7 @@ export async function parseUADEFile(
     'scumm', // SCUMM music — compiled replayer
     'dns',   // Dynamic Synthesizer — compiled replayer (BRA code)
     'mk2', 'mkii', // MarkII — compiled 68k replayer, MOVEM prolog
+    'ea',    // EarAche — synthesis replayer; enhanced scan produces completely wrong notes/instruments
   ]);
   if (mode === 'enhanced' && FORCE_CLASSIC_PREFIXES.has(prefix)) {
     console.log(`[UADEParser] ${prefix.toUpperCase()} uses prefix form; forcing classic UADESynth streaming`);

@@ -109,25 +109,26 @@ export function parseMEDFile(buffer: ArrayBuffer, filename: string): TrackerSong
   const MAX_INSTRUMENTS = 63;
 
   let so = songOffset;
-  // MMD0Sample structs: loopStart/loopLength come from here.
+  // MMD0Sample structs: loopStart/loopLength/volume/sampleTranspose come from here.
   // waveLen and synth flag come from MMDInstrHeader at the instrument pointer (loaded later).
-  const instrs: Array<{ loopStart: number; loopLength: number; volume: number; finetune: number }> = [];
+  const instrs: Array<{ loopStart: number; loopLength: number; volume: number; finetune: number; sampleTranspose: number }> = [];
 
   for (let i = 0; i < MAX_INSTRUMENTS; i++) {
     const base = so + i * INSTR_HDR_SIZE;
     if (base + INSTR_HDR_SIZE > buf.length) break;
     // MMD0Sample fields (8 bytes):
-    const loopStart  = u16(buf, base + 0) * 2;  // loop start in words → bytes
-    const loopLength = u16(buf, base + 2) * 2;  // loop length in words → bytes
+    const loopStart       = u16(buf, base + 0) * 2;  // loop start in words → bytes
+    const loopLength      = u16(buf, base + 2) * 2;  // loop length in words → bytes
     // base+4: midiChannel (unused here)
     // base+5: midiPreset  (unused here)
-    const volume = buf[base + 6];                // sampleVolume (0..64)
-    // base+7: sampleTranspose (unused for MOD export)
+    const volume          = buf[base + 6];            // sampleVolume (0..64)
+    const sampleTranspose = s8(buf, base + 7);        // int8 semitone transpose per instrument
     instrs.push({
       loopStart,
       loopLength,
       volume: volume || 64,
       finetune: 0,
+      sampleTranspose,
     });
   }
 
@@ -272,6 +273,13 @@ export function parseMEDFile(buffer: ArrayBuffer, filename: string): TrackerSong
           eff = ev;
         }
 
+        // Apply per-instrument sampleTranspose (RelativeTone in OpenMPT).
+        // MOD format has no RelativeTone, so bake it into the note value here.
+        if (note > 0 && note !== 97 && inst > 0 && inst <= instrs.length) {
+          const st = instrs[inst - 1]?.sampleTranspose ?? 0;
+          if (st !== 0) note = Math.max(1, Math.min(120, note + st));
+        }
+
         rows.push({ note, instrument: inst, volume: 0, effTyp, eff, effTyp2: 0, eff2: 0 });
       }
 
@@ -310,16 +318,38 @@ export function parseMEDFile(buffer: ArrayBuffer, filename: string): TrackerSong
   // Each sample is a contiguous block of 8-bit signed PCM.
   // We need to find sample offsets from the instrument table.
 
-  // Parse from MMD0Exp (if present) for instrument names and extra data
+  // Parse from MMD0Exp (if present) for instrument names and extra data.
+  // MMD0Exp layout (80 bytes total, from OpenMPT Load_med.cpp):
+  //   +0:  nextModOffset (u32)
+  //   +4:  instrExtOffset (u32)    ← pointer to MMDInstrExt array
+  //   +8:  instrExtEntries (u16)
+  //   +10: instrExtEntrySize (u16)
+  //   +12: annoText (u32)
+  //   +16: annoLength (u32)
+  //   +20: instrInfoOffset (u32)   ← pointer to MMDInstrInfo array
+  //   +24: instrInfoEntries (u16)
+  //   +26: instrInfoEntrySize (u16)
+  // MMDInstrExt layout: hold(u8), decay(u8), suppressMidiOff(u8), finetune(int8), ...
   let instrNames: string[] = [];
-  if (expOffset > 0 && expOffset < buf.length) {
-    // MMD0Exp.nextmod, hdrlen, instrext_offset, instrext_entries, ...
-    // instrExt fields at expOffset+8..+14 (reserved for future instrument extension parsing)
-    const instrInfoOff = u32(buf, expOffset + 16);
-    const instrInfoEntries = u16(buf, expOffset + 20);
-    const instrInfoSize = u16(buf, expOffset + 22);
+  const instrExtFinetuneArr: number[] = new Array(MAX_INSTRUMENTS).fill(0);
+  if (expOffset > 0 && expOffset + 28 <= buf.length) {
+    // InstrExt — hold/decay/finetune per instrument
+    const instrExtOff     = u32(buf, expOffset + 4);
+    const instrExtEntries = u16(buf, expOffset + 8);
+    const instrExtSize    = u16(buf, expOffset + 10);
+    if (instrExtOff > 0 && instrExtSize >= 4 && instrExtEntries > 0 &&
+        instrExtOff + instrExtEntries * instrExtSize <= buf.length) {
+      for (let i = 0; i < Math.min(instrExtEntries, MAX_INSTRUMENTS); i++) {
+        const base = instrExtOff + i * instrExtSize;
+        // byte 3: finetune (int8, MOD-style -8..+7)
+        instrExtFinetuneArr[i] = s8(buf, base + 3);
+      }
+    }
 
-    // Read instrument names from InstrInfo (40 bytes each: name[40])
+    // InstrInfo — instrument names (40 chars each)
+    const instrInfoOff     = u32(buf, expOffset + 20);
+    const instrInfoEntries = u16(buf, expOffset + 24);
+    const instrInfoSize    = u16(buf, expOffset + 26);
     if (instrInfoOff > 0 && instrInfoOff < buf.length) {
       for (let i = 0; i < instrInfoEntries; i++) {
         const base = instrInfoOff + i * instrInfoSize;
@@ -550,10 +580,16 @@ export function parseMEDFile(buffer: ArrayBuffer, filename: string): TrackerSong
       : 0;
     const pcm = len > 0 ? buf.slice(pcmBase, pcmBase + len) : new Uint8Array(0);
 
-    instruments.push(createSamplerInstrument(
+    const samplerInst = createSamplerInstrument(
       i + 1, name, pcm, instr.volume, 8287,
       instr.loopStart, instr.loopStart + instr.loopLength
-    ));
+    );
+    // Apply InstrExt finetune (MOD-style -8..+7) if present
+    const extFine = instrExtFinetuneArr[i] ?? 0;
+    if (extFine !== 0 && samplerInst.metadata?.modPlayback) {
+      samplerInst.metadata.modPlayback.finetune = extFine;
+    }
+    instruments.push(samplerInst);
   }
 
   // ── Build output ─────────────────────────────────────────────────────────

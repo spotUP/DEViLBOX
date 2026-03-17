@@ -66,10 +66,10 @@ class SunVoxProcessor extends AudioWorkletProcessor {
         }
         let handle = m._sunvox_wasm_create(data.sampleRate);
         if (handle < 0) {
-          // All 32 slots exhausted — likely stale handles from previous HMR/page reloads.
+          // All 64 slots exhausted — likely stale handles from previous HMR/page reloads.
           // Destroy all handles we DON'T own and retry.
           console.warn('[SunVox] create: no free slots, cleaning up stale handles');
-          for (let i = 0; i < 32; i++) {
+          for (let i = 0; i < 64; i++) {
             if (!this.handles[i]) {
               // Not owned by this processor instance — safe to reclaim
               m._sunvox_wasm_destroy(i);
@@ -81,7 +81,7 @@ class SunVoxProcessor extends AudioWorkletProcessor {
           this.handles[handle] = { active: true };
           this.port.postMessage({ type: 'handle', handle });
         } else {
-          this.port.postMessage({ type: 'error', message: `sunvox_wasm_create returned ${handle} (sampleRate=${data.sampleRate})` });
+          this.port.postMessage({ type: 'createError', message: `sunvox_wasm_create returned ${handle} (sampleRate=${data.sampleRate})` });
         }
         break;
       }
@@ -119,10 +119,49 @@ class SunVoxProcessor extends AudioWorkletProcessor {
           m._sunvox_wasm_load_song(data.handle, pathPtr);
           m._free(pathPtr);
           m.FS.unlink('/tmp/input.sunvox');
-          this.port.postMessage({ type: 'songLoaded', handle: data.handle });
+          // Return song metadata immediately after load
+          const namePtr = m._malloc(256);
+          m._sunvox_wasm_get_song_name(data.handle, namePtr, 256);
+          const songName = m.UTF8ToString(namePtr);
+          m._free(namePtr);
+          const bpm = m._sunvox_wasm_get_bpm(data.handle);
+          const speed = m._sunvox_wasm_get_speed(data.handle);
+          const patCount = m._sunvox_wasm_get_pattern_count(data.handle);
+          this.port.postMessage({ type: 'songLoaded', handle: data.handle, songName, bpm, speed, patCount });
         } catch (err) {
           this.port.postMessage({ type: 'error', message: String(err) });
         }
+        break;
+      }
+
+      case 'getPatterns': {
+        if (!m) break;
+        const h = data.handle;
+        const patCount = m._sunvox_wasm_get_pattern_count(h);
+        const patterns = [];
+        for (let p = 0; p < patCount; p++) {
+          const lines = m._sunvox_wasm_get_pattern_lines(h, p);
+          if (lines <= 0) continue; // empty slot
+          const flags = m._sunvox_wasm_get_pattern_flags(h, p);
+          if (flags & 1) continue; // skip clones (SUNVOX_PATTERN_FLAG_CLONE)
+          const tracks = m._sunvox_wasm_get_pattern_tracks(h, p);
+          const x = m._sunvox_wasm_get_pattern_x(h, p);
+          const notes = [];
+          for (let t = 0; t < tracks; t++) {
+            const col = [];
+            for (let l = 0; l < lines; l++) {
+              const note    = m._sunvox_wasm_get_note(h, p, t, l);
+              const vel     = m._sunvox_wasm_get_note_vel(h, p, t, l);
+              const module  = m._sunvox_wasm_get_note_module(h, p, t, l);
+              const ctl     = m._sunvox_wasm_get_note_ctl(h, p, t, l);
+              const ctlVal  = m._sunvox_wasm_get_note_ctl_val(h, p, t, l);
+              col.push({ note, vel, module, ctl, ctlVal });
+            }
+            notes.push(col);
+          }
+          patterns.push({ patIndex: p, x, tracks, lines, notes });
+        }
+        this.port.postMessage({ type: 'patterns', handle: h, patterns });
         break;
       }
 

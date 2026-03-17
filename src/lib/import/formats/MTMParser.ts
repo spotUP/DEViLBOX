@@ -108,12 +108,15 @@ function mapMTMEffect(cmd: number, param: number): { effTyp: number; eff: number
 
 /**
  * Convert MTM raw note value (noteInstr >> 2) to XM note number.
- * MTM stores 0-based semitone index; XM note 1 = C-0.
- * Returns 0 for empty.
+ * MTM raw note 1 = C-1 (Amiga period 856).  XM note 13 = C-1 (period 856).
+ * Offset: +12 to align MTM 1-based index with XM note numbering.
+ * Mirrors OpenMPT Load_mtm.cpp: m->note = (noteInstr>>2) + 36 + NOTE_MIN,
+ * but we target Amiga ProTracker period range (notes 13-48) not IT range.
+ * Returns 0 for empty (rawNote === 0).
  */
 function mtmNoteToXM(rawNote: number): number {
   if (rawNote === 0) return 0;
-  return Math.min(rawNote, 96);
+  return Math.min(rawNote, 120);
 }
 
 // -- Parser -------------------------------------------------------------------

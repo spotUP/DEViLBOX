@@ -111,6 +111,7 @@
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, ChannelData, TrackerCell, InstrumentConfig } from '@/types';
+import { pcm8ToWAV } from './AmigaUtils';
 
 // ── Little-endian binary helpers ──────────────────────────────────────────────
 
@@ -624,7 +625,8 @@ function _parseNewPSM(bytes: Uint8Array, filename: string): TrackerSong | null {
           if (pp < rowEnd) {
             const vol = u8(bytes, pp++);
             // PSM vol 0..127 → 0..64: (min(vol,127)+1)/2
-            cell.volume = Math.round((Math.min(vol, 127) + 1) / 2);
+            // PSM vol 0..127 → 0..64: (min(vol,127)+1)/2, then convert to XM-style (0x10+v)
+            cell.volume = 0x10 + Math.round((Math.min(vol, 127) + 1) / 2);
           }
         }
         if (flagByte & 0x10) { // effect
@@ -818,8 +820,17 @@ function _parsePSM16(bytes: Uint8Array, filename: string): TrackerSong | null {
   //   filename[13], name[24], offset(4), memoffset(4), sampleNumber(2),
   //   flags(1), length(4), loopStart(4), loopEnd(4), finetune(1), volume(1), c2freq(2)
   // Total: 13+24+4+4+2+1+4+4+4+1+1+2 = 64 bytes
+  //
+  // flags:
+  //   0x04 = 16-bit,  0x08 = unsigned PCM,  0x10 = delta PCM,
+  //   0x20 = ping-pong loop,  0x80 = loop
+  // If (flags & 0x7F) == 0 → also delta PCM (default encoding).
+  // Source: PSM16SampleHeader::GetSampleFormat() in Load_psm.cpp
   const SAMPLE_HDR_SIZE = 64;
   const instruments: InstrumentConfig[] = [];
+  // Per-instrument note offset to compensate for non-standard c2freq.
+  // rawNote is tuned for ~8363 Hz samples; samples at 2× rate need +12 semitones, etc.
+  const instrNoteAdjust: number[] = []; // indexed by smpNumber - 1
 
   if (smpOffset > 4) {
     const smpPos = smpOffset - 4;
@@ -827,34 +838,129 @@ function _parsePSM16(bytes: Uint8Array, filename: string): TrackerSong | null {
       let sp = smpPos + 4;
       for (let s = 0; s < numSamples; s++) {
         if (sp + SAMPLE_HDR_SIZE > bytes.length) break;
-        const sName      = readString(bytes, sp + 13, 24);
-        const smpNumber  = u16le(bytes, sp + 41);
+
+        // Read PSM16SampleHeader fields
+        const sName       = readString(bytes, sp + 13, 24);
+        const fileOffset  = u32le(bytes, sp + 37);  // absolute file offset to PCM data
+        const smpNumber   = u16le(bytes, sp + 45);
+        const flags       = u8(bytes, sp + 47);
+        const smpLength   = u32le(bytes, sp + 48);  // length in bytes (16-bit: divide by 2 for frames)
+        const loopStart   = u32le(bytes, sp + 52);
+        const loopEnd     = u32le(bytes, sp + 56);
+        const finetune    = u8(bytes, sp + 60);     // low nibble = MOD finetune, high = transpose
+        const volume      = u8(bytes, sp + 61);     // 0..64
+        const c2freq      = u16le(bytes, sp + 62);  // sample rate
         sp += SAMPLE_HDR_SIZE;
 
-        if (smpNumber > 0 && smpNumber < 256) {
-          // Extend array if needed
-          while (instruments.length < smpNumber) {
-            const idx = instruments.length + 1;
-            instruments.push({
-              id:        idx,
-              name:      `Sample ${idx}`,
-              type:      'sample' as const,
-              synthType: 'Sampler' as const,
-              effects:   [],
-              volume:    0,
-              pan:       0,
-            } as unknown as InstrumentConfig);
-          }
-          instruments[smpNumber - 1] = {
-            id:        smpNumber,
-            name:      sName || `Sample ${smpNumber}`,
-            type:      'sample' as const,
-            synthType: 'Sampler' as const,
-            effects:   [],
-            volume:    0,
-            pan:       0,
-          } as unknown as InstrumentConfig;
+        if (smpNumber < 1 || smpNumber >= 256) continue;
+
+        // Compute note offset for this sample's c2freq vs MOD standard 8363 Hz.
+        // rawNote is designed for ~8363 Hz samples; e.g. c2freq=16898 ≈ 2× → +12 semitones.
+        {
+          const effectiveC2 = c2freq > 0 ? c2freq : 8363;
+          const semiOffset  = Math.round(12 * Math.log2(effectiveC2 / 8363));
+          while (instrNoteAdjust.length < smpNumber) instrNoteAdjust.push(0);
+          instrNoteAdjust[smpNumber - 1] = semiOffset;
         }
+
+        // Ensure array is large enough
+        while (instruments.length < smpNumber) {
+          const idx = instruments.length + 1;
+          instruments.push({
+            id: idx, name: `Sample ${idx}`,
+            type: 'sample' as const, synthType: 'Sampler' as const,
+            effects: [], volume: 0, pan: 0,
+          } as unknown as InstrumentConfig);
+        }
+
+        // Decode PCM
+        const is16Bit    = (flags & 0x04) !== 0;
+        const isUnsigned = (flags & 0x08) !== 0;
+        const isDelta    = (flags & 0x10) !== 0 || (flags & 0x7F) === 0;
+        const hasLoop    = (flags & 0x80) !== 0;
+
+        let wavBuf: ArrayBuffer | undefined;
+        if (fileOffset > 0 && smpLength > 0 && fileOffset + smpLength <= bytes.length) {
+          const raw = bytes.subarray(fileOffset, fileOffset + smpLength);
+
+          if (is16Bit) {
+            // 16-bit: decode pairs of bytes as signed 16-bit LE, then downscale to 8-bit
+            const numFrames = smpLength >> 1;
+            const pcm8 = new Uint8Array(numFrames);
+            let acc16 = 0;
+            for (let i = 0; i < numFrames; i++) {
+              let sample = (raw[i * 2] ?? 0) | (((raw[i * 2 + 1] ?? 0) << 8));
+              // Sign-extend 16-bit
+              if (sample >= 0x8000) sample -= 0x10000;
+              if (isDelta) {
+                acc16 = (acc16 + sample) & 0xFFFF;
+                if (acc16 >= 0x8000) acc16 -= 0x10000;
+                sample = acc16;
+              }
+              if (isUnsigned) sample -= 32768;
+              // Downscale to 8-bit signed stored as uint8
+              pcm8[i] = ((sample >> 8) + 128) & 0xFF;
+            }
+            const sampleRate = c2freq > 0 ? c2freq : 8287;
+            const loopEndFrames = loopEnd > 0 ? Math.min(loopEnd, numFrames) : (hasLoop ? numFrames : 0);
+            wavBuf = pcm8ToWAV(pcm8, sampleRate, loopStart, loopEndFrames);
+          } else {
+            // 8-bit
+            const pcm8 = new Uint8Array(smpLength);
+            let acc8 = 0;
+            for (let i = 0; i < smpLength; i++) {
+              let sample = raw[i] ?? 0;
+              if (isDelta) {
+                // delta: add signed byte, result stays in signed 8-bit range
+                acc8 = (acc8 + ((sample << 24) >> 24)) & 0xFF;
+                sample = acc8;
+              } else if (isUnsigned) {
+                // unsigned → signed: flip bit 7
+                sample = (sample ^ 0x80) & 0xFF;
+              }
+              pcm8[i] = sample;
+            }
+            const sampleRate = c2freq > 0 ? c2freq : 8287;
+            const loopEndFrames = loopEnd > 0 ? Math.min(loopEnd, smpLength) : (hasLoop ? smpLength : 0);
+            wavBuf = pcm8ToWAV(pcm8, sampleRate, loopStart, loopEndFrames);
+          }
+        }
+
+        // MOD finetune: low nibble of finetune byte is 0-15 (MOD style: 8-15 = -8..-1)
+        const modFinetune = (finetune & 0x0F) >= 8 ? (finetune & 0x0F) - 16 : (finetune & 0x0F);
+        const defaultVol  = Math.min(64, volume);
+
+        instruments[smpNumber - 1] = {
+          id:        smpNumber,
+          name:      sName || `Sample ${smpNumber}`,
+          type:      'sample' as const,
+          synthType: 'Sampler' as const,
+          effects:   [],
+          volume:    defaultVol > 0 ? 20 * Math.log10(defaultVol / 64) : -60,
+          pan:       0,
+          ...(wavBuf ? {
+            sample: {
+              audioBuffer: wavBuf,
+              baseNote:    'C3',
+              detune:      0,
+              loop:        hasLoop,
+              loopType:    hasLoop ? 'forward' as const : 'off' as const,
+              loopStart,
+              loopEnd:     loopEnd > 0 ? loopEnd : (hasLoop ? smpLength : 0),
+              sampleRate:  c2freq > 0 ? c2freq : 8287,
+              reverse:     false,
+              playbackRate: 1.0,
+            },
+          } : {}),
+          metadata: {
+            modPlayback: {
+              usePeriodPlayback: true,
+              periodMultiplier:  3546895,
+              finetune:          modFinetune,
+              defaultVolume:     defaultVol,
+            },
+          },
+        } as unknown as InstrumentConfig;
       }
     }
   }
@@ -916,13 +1022,19 @@ function _parsePSM16(bytes: Uint8Array, filename: string): TrackerSong | null {
             if (cp + 2 > bodyEnd) break;
             const rawNote = u8(bytes, cp++);
             const instr   = u8(bytes, cp++);
-            cell.note      = Math.max(1, Math.min(120, rawNote + 36));
+            // PSM16 rawNote maps directly to our 1-indexed Amiga period system (no +36 offset).
+            // OpenMPT adds +36 for IT/XM convention; we don't need that for MOD-based export.
+            // Apply per-instrument note adjustment for non-standard c2freq values.
+            const noteAdj = (instr >= 1 && instr <= instrNoteAdjust.length)
+              ? (instrNoteAdjust[instr - 1] ?? 0) : 0;
+            cell.note      = Math.max(1, Math.min(120, rawNote + noteAdj));
             cell.instrument = instr;
           }
           if (chnFlag & VOL_FLAG) {
             if (cp >= bodyEnd) break;
             const vol = u8(bytes, cp++);
-            cell.volume = Math.min(64, vol);
+            // PSM16 vol 0..127 → clamp to 64, then convert to XM-style (0x10+v)
+            cell.volume = 0x10 + Math.min(64, vol);
           }
           if (chnFlag & EFF_FLAG) {
             if (cp + 2 > bodyEnd) break;

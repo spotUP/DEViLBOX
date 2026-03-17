@@ -258,6 +258,9 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
             const buf = exportMED(song);
             const baseName = (song.name || 'untitled').replace(/[^a-zA-Z0-9_-]/g, '_');
             result = { data: new Blob([buf], { type: 'application/octet-stream' }), filename: `${baseName}.mmd0`, warnings: [] };
+          } else if (preset.includes('hippelcoso') || format === 'HippelCoSo' as string) {
+            const { exportAsHippelCoSo } = await import('./HippelCoSoExporter');
+            result = await exportAsHippelCoSo(song);
           } else {
             // Fallback: UADE chip RAM readback (works for any running UADE format)
             try {

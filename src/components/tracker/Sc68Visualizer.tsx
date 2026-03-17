@@ -45,15 +45,19 @@ export const Sc68Visualizer: React.FC = () => {
     if (!ctx) return;
 
     if (!isPlaying) {
-      // Static background when stopped
-      const { width: w, height: h } = canvas;
-      ctx.fillStyle = YM_BG;
-      ctx.fillRect(0, 0, w, h);
-      ctx.fillStyle = '#445566';
-      ctx.font = '14px monospace';
-      ctx.textAlign = 'center';
-      ctx.fillText('ATARI ST \u2014 SC68/SNDH PLAYER', w / 2, h / 2);
-      return;
+      // RAF loop so the static background survives canvas resizes
+      const drawStopped = () => {
+        const { width: w, height: h } = canvas;
+        ctx.fillStyle = YM_BG;
+        ctx.fillRect(0, 0, w, h);
+        ctx.fillStyle = '#445566';
+        ctx.font = '14px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText('ATARI ST \u2014 SC68/SNDH PLAYER', w / 2, h / 2);
+        rafRef.current = requestAnimationFrame(drawStopped);
+      };
+      rafRef.current = requestAnimationFrame(drawStopped);
+      return () => cancelAnimationFrame(rafRef.current);
     }
 
     try { getToneEngine().enableAnalysers(); } catch { /* not ready */ }

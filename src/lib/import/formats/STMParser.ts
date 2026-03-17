@@ -47,6 +47,7 @@
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, ChannelData, TrackerCell, InstrumentConfig } from '@/types';
 import { createSamplerInstrument } from './AmigaUtils';
+import { convertST2TempoToBPM } from './EffectLookupTable';
 import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
 import { encodeSTMCell } from '@/engine/uade/encoders/STMEncoder';
 
@@ -241,7 +242,9 @@ export async function parseSTMFile(
   if (initTempo === 0) initTempo = 0x60;
 
   const initialSpeed = Math.max(1, initTempo >> 4);
-  const initialBPM   = 125; // ST2 BPM mode is non-standard; 125 is a safe playback default
+  // Convert STM's packed tempo byte to ProTracker BPM via OpenMPT's ConvertST2Tempo formula.
+  // (Snd_fx.cpp:6217 — ST2TempoFactor LUT + samples-per-tick → BPM calculation)
+  const initialBPM   = convertST2TempoToBPM(initTempo);
 
   // Sample headers (31 x 32 bytes starting at offset 48)
   const sampleHeaders: STMSampleHeader[] = [];

@@ -1140,21 +1140,20 @@ export async function tryRouteFormat(
 
   // ── PSM / PSM16 (Epic MegaGames MASI) (.psm) ─────────────────────────────
   // Handles both new PSM ("PSM " magic) and PSM16 ("PSM\xFE" magic).
-  // Falls through to libopenmpt on failure.
-  if (matchesExt(filename, ['psm'])) {
-    if (prefs.psm === 'native') {
-      try {
-        const { isPSMFormat, parsePSMFile } = await import('@lib/import/formats/PSMParser');
-        const bytes = new Uint8Array(buffer);
-        if (isPSMFormat(bytes)) {
-          const result = parsePSMFile(bytes, originalFileName);
-          if (result) return result;
-        }
-      } catch (err) {
-        console.warn(`[PSMParser] Native parse failed for ${filename}, falling back to libopenmpt:`, err);
+  // Uses native parser by default when the magic byte matches (Epic MegaGames format).
+  // ZXTune also uses .psm for ZX Spectrum; the magic check ensures the right parser fires.
+  if (matchesExt(filename, ['psm']) && prefs.psm !== 'uade') {
+    try {
+      const { isPSMFormat, parsePSMFile } = await import('@lib/import/formats/PSMParser');
+      const bytes = new Uint8Array(buffer);
+      if (isPSMFormat(bytes)) {
+        const result = parsePSMFile(bytes, originalFileName);
+        if (result) return result;
       }
+    } catch (err) {
+      console.warn(`[PSMParser] Native parse failed for ${filename}, falling back:`, err);
     }
-    // Fall through to libopenmpt
+    // Fall through to libopenmpt / ZXTune if magic didn't match
   }
 
   // ── AMS (Extreme's Tracker / Velvet Studio) ───────────────────────────────
@@ -1969,9 +1968,19 @@ export async function tryRouteFormat(
     const { parseUADEFile: parseUADE_scn } = await import('@lib/import/formats/UADEParser');
     return parseUADE_scn(buffer, toUADEPrefixName(originalFileName, ['scn']), 'classic', subsong, preScannedMeta);
   }
+  // ── SCUMM (.scumm) — native pattern display + UADE classic audio ─────────
+  // eagleplayer.conf: scumm.* prefix — self-contained 68k binary (player + data fused).
+  // BRA.W at offset 4 jumps to player code; music data between title string and player.
+  // Four voice event streams with absolute tick timestamps and Amiga period values.
   if (matchesExt(filename, ['scumm'])) {
-    const { parseUADEFile: parseUADE_scumm } = await import('@lib/import/formats/UADEParser');
-    return parseUADE_scumm(buffer, toUADEPrefixName(originalFileName, ['scumm']), 'classic', subsong, preScannedMeta);
+    const scummCtx = { ...ctx, originalFileName: toUADEPrefixName(originalFileName, ['scumm']) };
+    const { isSCUMMFormat, parseSCUMMFile } = await import('@lib/import/formats/SCUMMParser');
+    return withNativeThenUADE('scumm', scummCtx,
+      (buf: Uint8Array | ArrayBuffer, name: string) => {
+        if (isSCUMMFormat(buf)) return parseSCUMMFile(buf instanceof Uint8Array ? buf.buffer as ArrayBuffer : buf as ArrayBuffer, name);
+        return null;
+      },
+      'SCUMMParser', { injectUADE: true });
   }
   // AProSys (APS.* prefix) — ADRVPACK compressed; enhanced scan reads garbage from packed binary
   if (matchesExt(filename, ['aps'])) {
@@ -1983,10 +1992,7 @@ export async function tryRouteFormat(
     const { parseUADEFile: parseUADE_mok } = await import('@lib/import/formats/UADEParser');
     return parseUADE_mok(buffer, toUADEPrefixName(originalFileName, ['mok']), prefs.uade ?? 'enhanced', subsong, preScannedMeta);
   }
-  if (matchesExt(filename, ['ea'])) {
-    const { parseUADEFile: parseUADE_ea } = await import('@lib/import/formats/UADEParser');
-    return parseUADE_ea(buffer, toUADEPrefixName(originalFileName, ['ea']), prefs.uade ?? 'enhanced', subsong, preScannedMeta);
-  }
+  // EA handled below with native EarAcheParser + UADE classic injection
 
   // ── Mugician prefix (DMU.* / DMU2.* prefix) ──────────────────────────────
   // eagleplayer.conf: Mugician prefixes=dmu,mug  MugicianII prefixes=dmu2,mug2
@@ -2058,6 +2064,18 @@ export async function tryRouteFormat(
     return withNativeThenUADE('laxity', ctx,
       (buf: Uint8Array | ArrayBuffer, name: string) => { if (isLaxityFormat(buf as ArrayBuffer, name)) return parseLaxityFile(buf as ArrayBuffer, name); return null; },
       'LaxityParser', { injectUADE: true });
+  }
+
+  // ── EarAche (.ea) — native pattern display + UADE classic audio ──────────────
+  // eagleplayer.conf: EarAche  prefixes=ea  Magic: "EASO"
+  // Enhanced scan produces completely wrong notes (synthesis engine confuses the scanner).
+  // Use native EarAcheParser for pattern display; inject UADE classic for audio.
+  if (matchesExt(filename, ['ea'])) {
+    const eaCtx = { ...ctx, originalFileName: toUADEPrefixName(originalFileName, ['ea']) };
+    const { isEarAcheFormat, parseEarAcheFile } = await import('@lib/import/formats/EarAcheParser');
+    return withNativeThenUADE('earAche', eaCtx,
+      (buf: Uint8Array | ArrayBuffer, name: string) => { if (isEarAcheFormat(buf)) return parseEarAcheFile(buf as ArrayBuffer, name); return null; },
+      'EarAcheParser', { injectUADE: true });
   }
 
   // ── Music Maker 4V (mm4.* / sdata.* prefix) ──────────────────────────────

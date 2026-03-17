@@ -1405,6 +1405,22 @@ export class TrackerReplayer {
           }
         }
 
+        // Re-upload module samples (BRR for SNES, ADPCM for other chips) and reset
+        // each dispatch so the DSP initializes with the new song's sample data.
+        // This must happen every time a song plays — not just on first chip creation —
+        // because switching songs leaves stale samples from the previous song in WASM.
+        const moduleSamples = dispatchEngine.getModuleSamples();
+        if (moduleSamples && moduleSamples.length > 0) {
+          for (const chipId of chipIds) {
+            dispatchEngine.uploadModuleSamplesToPlatform(chipId);
+          }
+          // Reset all chips so the DSP re-initializes with new sampleMem contents
+          for (const chipId of chipIds) {
+            dispatchEngine.reset(chipId);
+          }
+          console.log(`[TrackerReplayer] WASM seq: uploaded ${moduleSamples.length} module samples + reset chips`);
+        }
+
         // Ensure the dispatch engine audio output is routed to speakers.
         // Normally routeNativeEngineOutput() handles this when a FurnaceDispatchSynth
         // is created, but in the WASM sequencer path we may not have one.

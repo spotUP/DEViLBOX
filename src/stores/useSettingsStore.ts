@@ -196,6 +196,8 @@ export interface FormatEnginePreferences {
   psm: FormatEngineChoice;              // .psm → PSMParser vs libopenmpt
   composer667: FormatEngineChoice;      // .667 → Composer667Parser vs libopenmpt
   kt: FormatEngineChoice;               // .kt/.ki → KlysParser (native klystrack)
+  earAche: FormatEngineChoice;          // .ea/ea.* → EarAcheParser vs UADE
+  scumm: FormatEngineChoice;            // .scumm/scumm.* → SCUMMParser vs UADE
   uade: UADEImportMode;        // UADE-only formats → enhanced (editable) vs classic (playback-only)
 }
 
@@ -434,9 +436,11 @@ export const useSettingsStore = create<SettingsStore>()(
         sawteeth: 'uade',           // SawteethParser — dedicated Sawteeth support
         fmTracker: 'uade',          // FMTrackerParser — dedicated FM Tracker support
         madTracker2: 'native',        // MadTracker2Parser — dedicated MadTracker 2 support
-        psm: 'uade',                // PSMParser — dedicated PSM/PSM16 support
+        psm: 'native',              // PSMParser — dedicated PSM/PSM16 support
         composer667: 'uade',        // Composer667Parser — dedicated Composer 667 support
         kt: 'native',                // KlysParser — native klystrack engine
+        earAche: 'native',           // EarAcheParser — native pattern display + UADE classic audio
+        scumm: 'native',             // SCUMMParser — native pattern display + UADE classic audio
         uade: 'enhanced',           // UADE formats — enhanced (editable) by default
       },
       performanceQuality: 'high',
@@ -644,7 +648,7 @@ export const useSettingsStore = create<SettingsStore>()(
     })),
     {
       name: 'devilbox-settings',
-      version: 3,
+      version: 4,
       migrate: (persistedState: unknown, version: number) => {
         const s = (persistedState ?? {}) as Record<string, unknown>;
         if (version < 2) {
@@ -655,6 +659,11 @@ export const useSettingsStore = create<SettingsStore>()(
           // v3: 88 format engine defaults changed from 'native' to 'uade'.
           // Clear persisted formatEngine so all formats get fresh defaults.
           delete s.formatEngine;
+        }
+        if (version < 4) {
+          // v4: PSM default changed from 'uade' to 'native' (native PSMParser).
+          const fe = s.formatEngine as Record<string, unknown> | undefined;
+          if (fe && fe.psm === 'uade') fe.psm = 'native';
         }
         return s;
       },
