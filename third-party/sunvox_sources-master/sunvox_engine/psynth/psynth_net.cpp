@@ -730,14 +730,14 @@ void psynth_render( int start_item, int buf_size, psynth_net *pnet )
 		    }
 		}
 
-		result =
-		    item->synth( item->data_ptr, 
+		// Guard: skip render for unknown module types (NULL synth = unsupported type)
+		result = item->synth ? item->synth( item->data_ptr,
 			start_item,
 			item->channels_in,
 			item->channels_out,
 			buf_size,
 			COMMAND_RENDER_REPLACE,
-			(void*)pnet );
+			(void*)pnet ) : 0;
 
 		if( mute && result )
 		{

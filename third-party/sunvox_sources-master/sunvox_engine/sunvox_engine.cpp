@@ -269,8 +269,8 @@ void sunvox_load_song( const UTF8_CHAR *name, sunvox_engine *s )
 	    if( g_block_id == 'PFFF' ) { pat_flags = get_integer(); goto bfound; }
 	    if( g_block_id == 'PXXX' ) { pat_x = get_integer(); goto bfound; }
 	    if( g_block_id == 'PYYY' ) { pat_y = get_integer(); goto bfound; }
-	    if( g_block_id == 'PFGC' ) { mem_copy( pat_fg, g_block_data, 3 ); goto bfound; }
-	    if( g_block_id == 'PBGC' ) { mem_copy( pat_bg, g_block_data, 3 ); goto bfound; }
+	    if( g_block_id == 'PFGC' ) { if( g_block_data ) mem_copy( pat_fg, g_block_data, 3 ); goto bfound; }
+	    if( g_block_id == 'PBGC' ) { if( g_block_data ) mem_copy( pat_bg, g_block_data, 3 ); goto bfound; }
 	    if( g_block_id == 'PEND' )
 	    {
 		//End of pattern. Create it:
@@ -355,14 +355,18 @@ void sunvox_load_song( const UTF8_CHAR *name, sunvox_engine *s )
 	    if( g_block_id == 'CHDT' )
 	    {
 		//Get chunk data:
-		chunks[ chunk_num ] = (char*)g_block_data; 
-		g_block_data = 0;
+		if( chunks && (unsigned)chunk_num < (unsigned)chunks_num ) //Safety: guard against out-of-order blocks
+		{
+		    chunks[ chunk_num ] = (char*)g_block_data;
+		    g_block_data = 0;
+		}
 		goto bfound;
 	    }
 	    if( g_block_id == 'CHFF' )
 	    {
 		//Get chunk flags:
-		chunk_flags[ chunk_num ] = get_integer();
+		if( chunk_flags && (unsigned)chunk_num < (unsigned)chunks_num ) //Safety: guard against out-of-order blocks
+		    chunk_flags[ chunk_num ] = get_integer();
 		goto bfound;
 	    }
 	    if( g_block_id == 'SEND' )
@@ -674,8 +678,11 @@ int sunvox_load_synth( int x, int y, const UTF8_CHAR *name, sunvox_engine *s )
 	    if( g_block_id == 'CHDT' )
 	    {
 		//Get chunk data:
-		chunks[ chunk_num ] = (char*)g_block_data; 
-		g_block_data = 0;
+		if( chunks && (unsigned)chunk_num < (unsigned)chunks_num ) //Safety: guard against out-of-order/unknown blocks
+		{
+		    chunks[ chunk_num ] = (char*)g_block_data;
+		    g_block_data = 0;
+		}
 		goto bfound2;
 	    }
 	    if( g_block_id == 'SEND' )
@@ -2079,7 +2086,9 @@ void sunvox_render_piece_of_sound(
 //##########################################
   
     //Get one tick size (one sample size = 256):
+    if( s->bpm <= 0 ) s->bpm = 125; //Safety guard: zero BPM would cause division-by-zero and infinite loop
     one_tick = ( ( ( freq * 60 ) << 8 ) / s->bpm ) / 24;
+    if( one_tick <= 0 ) one_tick = ( freq >> 2 ); //Safety guard: zero tick would cause infinite loop
     s->net->tick_size = one_tick;
     s->net->ticks_per_line = s->speed;
     //Main loop (render pieces of sound):
@@ -2492,7 +2501,9 @@ void sunvox_render_piece_of_sound(
 		s->cur_playing_pats[ p ] = -1;
 
 		//May be BPM was changed. Lets reinit internal variables:
+		if( s->bpm <= 0 ) s->bpm = 125; //Safety guard: prevent division-by-zero and infinite loop
 		one_tick = ( ( ( freq * 60 ) << 8 ) / s->bpm ) / 24;
+		if( one_tick <= 0 ) one_tick = ( freq >> 2 ); //Safety guard: prevent infinite loop
 		s->net->tick_size = one_tick;
 		s->net->ticks_per_line = s->speed;
 	    } //End of line handling
