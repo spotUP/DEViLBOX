@@ -48,6 +48,9 @@ export interface SystemPreset {
   amigaFormat?: boolean;       // true → Amiga hardware limits apply
   defaultBpm?: number;         // Override default 125 BPM
   compatibleSynthTypes?: string[]; // Allowed synth types for instrument filtering
+  /** Path to a minimal binary template file (relative to public/).
+   *  When set, "New Song" loads this file into UADE instead of creating a blank TrackerSong. */
+  templateFile?: string;
 }
 
 // Helper to generate numbered FM channels
@@ -1082,6 +1085,7 @@ export const SYSTEM_PRESETS: SystemPreset[] = [
     fileID: 0, fileID_DMF: 0, channels: 4, minChans: 4, maxChans: 4,
     isFM: false, isSTD: true, isCompound: false, waveWidth: 0, waveHeight: 256, vgmVersion: 0,
     amigaFormat: true, defaultBpm: 125,
+    templateFile: 'templates/protracker.mod',
     compatibleSynthTypes: ['Sampler'],
     channelDefs: [
       { name: 'Paula L1', shortName: 'L1', type: DivChanType.PCM },
@@ -1145,6 +1149,7 @@ export const SYSTEM_PRESETS: SystemPreset[] = [
     fileID: 0, fileID_DMF: 0, channels: 4, minChans: 4, maxChans: 4,
     isFM: false, isSTD: true, isCompound: false, waveWidth: 0, waveHeight: 256, vgmVersion: 0,
     amigaFormat: true, defaultBpm: 125,
+    templateFile: 'templates/sidmon2.sd2',
     compatibleSynthTypes: ['SidMonSynth', 'Sampler'],
     channelDefs: [
       { name: 'SIDMon L1', shortName: 'SL', type: DivChanType.PCM },
@@ -1200,6 +1205,38 @@ export const SYSTEM_PRESETS: SystemPreset[] = [
       { name: 'MED Mix', shortName: 'X2', type: DivChanType.PCM },
       { name: 'MED Mix', shortName: 'X3', type: DivChanType.PCM },
       { name: 'MED Mix', shortName: 'X4', type: DivChanType.PCM },
+    ],
+  },
+  {
+    id: 'uade_jamcracker',
+    name: 'Amiga / JamCracker',
+    description: 'JamCracker (BeEp) — 4-channel Amiga tracker with sample-based instruments.',
+    fileID: 0, fileID_DMF: 0, channels: 4, minChans: 4, maxChans: 4,
+    isFM: false, isSTD: true, isCompound: false, waveWidth: 0, waveHeight: 256, vgmVersion: 0,
+    amigaFormat: true, defaultBpm: 125,
+    templateFile: 'templates/jamcracker.jam',
+    compatibleSynthTypes: ['Sampler'],
+    channelDefs: [
+      { name: 'JC L1', shortName: 'JL', type: DivChanType.PCM },
+      { name: 'JC R1', shortName: 'JR', type: DivChanType.PCM },
+      { name: 'JC R2', shortName: 'JR', type: DivChanType.PCM },
+      { name: 'JC L2', shortName: 'JL', type: DivChanType.PCM },
+    ],
+  },
+  {
+    id: 'uade_pumatracker',
+    name: 'Amiga / PumaTracker',
+    description: 'PumaTracker — 4-channel Amiga tracker with RLE pattern compression.',
+    fileID: 0, fileID_DMF: 0, channels: 4, minChans: 4, maxChans: 4,
+    isFM: false, isSTD: true, isCompound: false, waveWidth: 0, waveHeight: 256, vgmVersion: 0,
+    amigaFormat: true, defaultBpm: 125,
+    templateFile: 'templates/pumatracker.puma',
+    compatibleSynthTypes: ['Sampler'],
+    channelDefs: [
+      { name: 'Puma L1', shortName: 'PL', type: DivChanType.PCM },
+      { name: 'Puma R1', shortName: 'PR', type: DivChanType.PCM },
+      { name: 'Puma R2', shortName: 'PR', type: DivChanType.PCM },
+      { name: 'Puma L2', shortName: 'PL', type: DivChanType.PCM },
     ],
   },
 

@@ -209,4 +209,6 @@ export const AMIGA_UADE_PRESET_IDS = new Set<string>([
   'uade_futurecomposer',
   'uade_hippelcoso',
   'uade_octamed',
+  'uade_jamcracker',
+  'uade_pumatracker',
 ]);
