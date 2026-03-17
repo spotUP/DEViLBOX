@@ -45,7 +45,7 @@ export function parseFredGrayFile(buffer: ArrayBuffer, filename: string): Tracke
   if (!isFredGrayFormat(buf, filename)) throw new Error('Not a Fred Gray module');
 
   const baseName = filename.split('/').pop() ?? filename;
-  const moduleName = baseName.replace(/^gray\./i, '') || baseName;
+  const moduleName = baseName.replace(/^gray\./i, '').replace(/\.gray$/i, '') || baseName;
 
   const instruments: InstrumentConfig[] = [{
     id: 1, name: 'Sample 1', type: 'synth' as const,

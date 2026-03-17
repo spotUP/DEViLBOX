@@ -252,7 +252,7 @@ export function parseJochenHippelSTFile(buffer: ArrayBuffer, filename: string): 
   if (!isJochenHippelSTFormat(buf)) throw new Error('Not a Jochen Hippel ST module');
 
   const baseName = filename.split('/').pop() ?? filename;
-  const moduleName = baseName.replace(/^hst\./i, '') || baseName;
+  const moduleName = baseName.replace(/^hst\./i, '').replace(/\.sog$/i, '') || baseName;
 
   const instruments: InstrumentConfig[] = [{
     id: 1, name: 'Sample 1', type: 'synth' as const,

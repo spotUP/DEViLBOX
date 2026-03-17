@@ -148,7 +148,7 @@ export function parseDavidHanneyFile(buffer: ArrayBuffer, filename: string): Tra
   // ── Module name from filename ─────────────────────────────────────────────
 
   const baseName = filename.split('/').pop() ?? filename;
-  const moduleName = baseName.replace(/^dh\./i, '') || baseName;
+  const moduleName = baseName.replace(/^dh\./i, '').replace(/\.dh$/i, '') || baseName;
 
   // ── Metadata from INFO chunk ──────────────────────────────────────────────
 

@@ -605,6 +605,29 @@ export async function startNativeEngines(
     }
   }
 
+  // --- SunVox song mode: suppress TrackerReplayer note triggers, start internal sequencer ---
+  // SunVox songs use SunVoxSynth with isSong=true. The SunVox engine runs its own internal
+  // sequencer, so TrackerReplayer must not drive individual note-on/off calls.
+  if (!muted) {
+    const sunvoxSongInsts = song.instruments.filter(
+      i => i.synthType === 'SunVoxSynth' && i.sunvox?.isSong === true,
+    );
+    if (sunvoxSongInsts.length > 0) {
+      suppressNotes = true;
+      for (const inst of sunvoxSongInsts) {
+        try {
+          const svSynth = toneEngine.getInstrument(inst.id, inst);
+          if (svSynth && 'triggerAttack' in svSynth) {
+            (svSynth as import('@/types/synth').DevilboxSynth).triggerAttack?.(60);
+            console.log('[NativeEngineRouting] SunVox song started (instrument', inst.id, ')');
+          }
+        } catch (err) {
+          console.error('[NativeEngineRouting] SunVox song start failed:', err);
+        }
+      }
+    }
+  }
+
   // --- Route native engine outputs through the stereo separation chain ---
   // In DJ mode, DeckEngine.loadSong() handles routing.
   if (!isDJDeck) {
@@ -671,6 +694,22 @@ export function stopNativeEngines(
         if (node) { try { node.disconnect(); } catch { /* ignored */ } }
       }
     }).catch(() => {});
+  }
+
+  // Stop SunVox song-mode instances
+  if (song) {
+    const toneEngine = getToneEngine();
+    const sunvoxSongInsts = song.instruments.filter(
+      i => i.synthType === 'SunVoxSynth' && i.sunvox?.isSong === true,
+    );
+    for (const inst of sunvoxSongInsts) {
+      try {
+        const svSynth = toneEngine.getInstrument(inst.id, inst);
+        if (svSynth && 'triggerRelease' in svSynth) {
+          (svSynth as import('@/types/synth').DevilboxSynth).triggerRelease?.();
+        }
+      } catch { /* ignored */ }
+    }
   }
 
   // Stop C64SIDEngine (instance-based)
