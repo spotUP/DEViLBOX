@@ -70,6 +70,23 @@ export function pcm8ToWAV(
   // waveform data to reach the minimum. This is semantically correct for
   // looping samples and harmless for one-shots.
   const MIN_SAMPLES = 512;
+  // Chrome also rejects WAV files with sample rates below ~3000 Hz.
+  // Amiga synthesis waveforms at period 856 play at ~2072 Hz — too low.
+  // Upsample by an integer factor so rate * factor >= MIN_RATE.
+  const MIN_RATE = 8000;
+  const upsampleFactor = rate < MIN_RATE ? Math.ceil(MIN_RATE / rate) : 1;
+  if (upsampleFactor > 1) {
+    const upLen = pcm.length * upsampleFactor;
+    const upPcm = new Uint8Array(upLen);
+    for (let i = 0; i < pcm.length; i++) {
+      const a = pcm[i];
+      const b = pcm[(i + 1) % pcm.length];
+      for (let k = 0; k < upsampleFactor; k++) {
+        upPcm[i * upsampleFactor + k] = Math.round(a + (b - a) * (k / upsampleFactor)) & 0xff;
+      }
+    }
+    return pcm8ToWAV(upPcm, rate * upsampleFactor, _loopStart * upsampleFactor, _loopEnd * upsampleFactor);
+  }
   const srcLen = pcm.length;
   if (srcLen === 0) {
     // Return a minimal valid silent WAV — browsers reject 0-sample WAVs
