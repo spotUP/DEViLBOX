@@ -22,6 +22,7 @@ import { isSupportedFormat, detectFormat } from '@/lib/import/FormatRegistry';
 import { isSupportedModule, type ModuleInfo } from '@/lib/import/ModuleLoader';
 import type { ImportOptions } from '@/components/dialogs/ImportModuleDialog';
 import type { UADEMetadata } from '@engine/uade/UADEEngine';
+import type { SunVoxSongMeta, SunVoxPatternData } from '@/engine/sunvox/SunVoxEngine';
 import { checkModlandFile } from '@/lib/modland/ModlandDetector';
 import { useModlandContributionModal } from '@/stores/useModlandContributionModal';
 import { parseSIDHeader } from '@/lib/sid/SIDHeaderParser';
@@ -651,6 +652,8 @@ async function loadSongFile(file: File, options: FileLoadOptions): Promise<FileL
   // Without this, React flushes after the reset and renders an empty (black) scene.
   let preReadBuffer: ArrayBuffer | null = null;
   let preSunVoxModules: Array<{ name: string; id: number; synthData: ArrayBuffer }> | null = null;
+  let preSunVoxPatterns: SunVoxPatternData[] | null = null;
+  let preSunVoxMeta: SunVoxSongMeta | null = null;
 
   if (filename.endsWith('.sunvox')) {
     preReadBuffer = await file.arrayBuffer();
@@ -684,20 +687,25 @@ async function loadSongFile(file: File, options: FileLoadOptions): Promise<FileL
         console.log('[SunVox] temp handle', tempHandle, '— loading song…');
         try {
           // loadSong internally slices the buffer before transfer — preReadBuffer stays intact.
-          await svEngine.loadSong(tempHandle, preReadBuffer!);
-          console.log('[SunVox] song loaded — fetching module list…');
-          const modules = await svEngine.getModules(tempHandle);
+          preSunVoxMeta = await svEngine.loadSong(tempHandle, preReadBuffer!);
+          console.log('[SunVox] song loaded — fetching module list and patterns…');
+          const [modules, patterns] = await Promise.all([
+            svEngine.getModules(tempHandle),
+            svEngine.getPatterns(tempHandle),
+          ]);
+          preSunVoxPatterns = patterns;
           // Module id=0 is always the "Output" bus — skip it.
+          // We only need id/name for channel labelling (no patch extraction needed
+          // since audio is driven by the song-mode SunVoxSynth, not per-module synths).
           const synthModules = modules.filter((m) => m.id > 0);
           console.log('[SunVox] modules:', synthModules.map((m) => `${m.id}:${m.name}`));
+          console.log('[SunVox] patterns:', patterns.length);
           if (synthModules.length > 0) {
-            preSunVoxModules = await Promise.all(
-              synthModules.map(async (mod) => {
-                console.log('[SunVox] saving synth for module', mod.id, mod.name);
-                const synthData = await svEngine.saveSynth(tempHandle, mod.id);
-                return { name: mod.name, id: mod.id, synthData };
-              })
-            );
+            preSunVoxModules = synthModules.map((mod) => ({
+              name: mod.name,
+              id: mod.id,
+              synthData: new ArrayBuffer(0), // unused — audio from song-mode synth
+            }));
           }
         } finally {
           svEngine.destroyHandle(tempHandle);
@@ -911,56 +919,84 @@ async function loadSongFile(file: File, options: FileLoadOptions): Promise<FileL
     const extractedModules = preSunVoxModules as SvoxModule[] | null;
 
     if (extractedModules && extractedModules.length > 0) {
-      // Module decomposition mode: one SunVoxSynth (synth mode) per module,
-      // one tracker channel per module, each with a trigger note at row 0.
-      const now = Date.now();
-      const channels = extractedModules.map((mod, idx) => {
-        useInstrumentStore.getState().createInstrument({
-          name: mod.name,
-          synthType: 'SunVoxSynth' as const,
-          sunvox: {
-            patchData: mod.synthData,
-            patchName: mod.name,
-            isSong: false,
-            controlValues: {} as Record<string, number>,
-          },
-        });
-        const instruments = useInstrumentStore.getState().instruments;
-        const instrumentIndex = instruments.length; // 1-based tracker index
-        const newInstrument = instruments[instruments.length - 1];
-        const rows = Array.from({ length: PATTERN_LEN }, (_, i) =>
-          i === 0
-            ? { note: 49, instrument: instrumentIndex, volume: 64, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 }
-            : { ...emptyRow }
-        );
-        return {
-          id: `ch-svox-${now}-${idx}`,
-          name: mod.name,
-          muted: false,
-          solo: false,
-          collapsed: false,
-          volume: 100,
-          pan: 0,
-          instrumentId: newInstrument.id,
-          color: '#facc15',
-          rows,
-        };
-      });
-
-      const pattern = {
-        id: `svox-${Date.now()}`,
+      // Song-mode SunVoxSynth drives audio — SunVox sequences its own internal
+      // graph, so we cannot extract individual modules and replay them in isolation
+      // (they lose their routing, effects, and inter-module connections).
+      // We create ONE song-mode instrument and suppress TrackerReplayer note triggers.
+      // The extracted module list is used only to name channels for display.
+      useInstrumentStore.getState().createInstrument({
         name,
-        length: PATTERN_LEN,
-        channels,
-      };
-      loadPatterns([pattern]);
+        synthType: 'SunVoxSynth' as const,
+        sunvox: {
+          patchData: preReadBuffer!,
+          patchName: name,
+          isSong: true,
+          controlValues: {} as Record<string, number>,
+        },
+      });
+      // Song instrument is always at index 1 (first instrument after reset)
+      const SONG_INSTR_IDX = 1;
+
+      // Build moduleId → name map for channel labelling
+      const moduleNameMap = new Map<number, string>(extractedModules.map(m => [m.id, m.name]));
+
+      // Set BPM from metadata if available
+      const meta = preSunVoxMeta as SunVoxSongMeta | null;
+      const bpm = meta?.bpm;
+      if (bpm && bpm > 0) useTransportStore.getState().setBPM(bpm);
+
+      // --- Build DEViLBOX patterns from real SunVox pattern data ---
+      const svPatterns = preSunVoxPatterns as SunVoxPatternData[] | null;
+      const channelColors = [
+        '#facc15', '#34d399', '#60a5fa', '#f472b6', '#a78bfa',
+        '#fb923c', '#38bdf8', '#4ade80', '#e879f9', '#fbbf24',
+      ];
+
+      let patternsToLoad;
+      if (svPatterns && svPatterns.length > 0) {
+        const sorted = [...svPatterns].sort((a, b) => a.x - b.x);
+        patternsToLoad = sorted.map((svPat, i) => {
+          const channels = Array.from({ length: svPat.tracks }, (_, t) => {
+            // Name channel by its most-used module
+            const modCounts = new Map<number, number>();
+            for (let l = 0; l < svPat.lines; l++) {
+              const ev = svPat.notes[t]?.[l];
+              if (ev && ev.module >= 1) modCounts.set(ev.module, (modCounts.get(ev.module) ?? 0) + 1);
+            }
+            let dominantMod = -1, maxCnt = 0;
+            for (const [id, cnt] of modCounts) { if (cnt > maxCnt) { maxCnt = cnt; dominantMod = id; } }
+            const chName = dominantMod >= 0 ? (moduleNameMap.get(dominantMod) ?? `Track ${t + 1}`) : `Track ${t + 1}`;
+
+            const rows = Array.from({ length: svPat.lines }, (_, l) => {
+              const ev = svPat.notes[t]?.[l];
+              if (!ev || (ev.note === 0 && ev.vel === 0 && ev.module < 0 && ev.ctl === 0)) return { ...emptyRow };
+              const volume = ev.vel === 0 ? 0 : Math.max(1, Math.round(ev.vel * 64 / 129));
+              const effTyp  = (ev.ctl >> 8) & 0xFF;
+              const effTyp2 = ev.ctl & 0xFF;
+              return { note: ev.note, instrument: SONG_INSTR_IDX, volume, effTyp, eff: effTyp > 0 ? ev.ctlVal : 0, effTyp2, eff2: effTyp2 > 0 ? ev.ctlVal : 0 };
+            });
+            return { id: `ch-svox-${Date.now()}-${i}-${t}`, name: chName, muted: false, solo: false, collapsed: false, volume: 100, pan: 0, instrumentId: SONG_INSTR_IDX, color: channelColors[t % channelColors.length], rows };
+          });
+          return { id: `svpat-${Date.now()}-${i}`, name: svPatterns.length > 1 ? `Pattern ${i + 1}` : name, length: svPat.lines, channels };
+        });
+      } else {
+        // Fallback: single pattern, one channel per module (display only)
+        const now = Date.now();
+        const channels = extractedModules.map((mod, idx) => {
+          const rows = Array.from({ length: PATTERN_LEN }, (_, i) =>
+            i === 0 ? { note: 49, instrument: SONG_INSTR_IDX, volume: 64, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 } : { ...emptyRow }
+          );
+          return { id: `ch-svox-${now}-${idx}`, name: mod.name, muted: false, solo: false, collapsed: false, volume: 100, pan: 0, instrumentId: SONG_INSTR_IDX, color: channelColors[idx % channelColors.length], rows };
+        });
+        patternsToLoad = [{ id: `svox-${Date.now()}`, name, length: PATTERN_LEN, channels }];
+      }
+
+      loadPatterns(patternsToLoad);
       setCurrentPattern(0);
-      // Create enough pattern order positions to cover ~10 minutes of playback.
-      // At default 125 BPM / 6 speed, one 256-row pattern ≈ 123s, so 5 positions ≈ 10 min.
-      setPatternOrder([0, 0, 0, 0, 0]);
+      setPatternOrder(patternsToLoad.map((_, i) => i));
       setMetadata({ name, author: '', description: `Imported from ${file.name} (${extractedModules.length} modules)` });
       applyEditorMode({});
-      return { success: true, message: `Loaded SunVox project: ${name} — ${extractedModules.length} module(s)` };
+      return { success: true, message: `Loaded SunVox: ${name} — ${patternsToLoad.length} pattern(s), ${extractedModules.length} modules` };
     }
 
     // Fallback: song mode — load the whole project as a single instrument.

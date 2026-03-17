@@ -26,6 +26,7 @@ export class SunVoxSynth implements DevilboxSynth {
   private _disposed = false;
   private _handle = -1;
   private _moduleId = -1;
+  private _loadPromise: Promise<void> | null = null;
 
   // Cached control values from the last setControl call, keyed by ctlId string.
   private _controlValues: Map<string, number> = new Map();
@@ -45,13 +46,15 @@ export class SunVoxSynth implements DevilboxSynth {
    * Creates an engine handle on first call.
    */
   async setModule(data: ArrayBuffer): Promise<void> {
-    await this.engine.ready();
-
-    if (this._handle < 0) {
-      this._handle = await this.engine.createHandle(this.audioContext.sampleRate);
-    }
-
-    this._moduleId = await this.engine.loadSynth(this._handle, data);
+    const p = (async () => {
+      await this.engine.ready();
+      if (this._handle < 0) {
+        this._handle = await this.engine.createHandle(this.audioContext.sampleRate);
+      }
+      this._moduleId = await this.engine.loadSynth(this._handle, data);
+    })();
+    this._loadPromise = p;
+    await p;
   }
 
   /**
@@ -59,13 +62,23 @@ export class SunVoxSynth implements DevilboxSynth {
    * Creates an engine handle on first call.
    */
   async setSong(data: ArrayBuffer): Promise<void> {
-    await this.engine.ready();
+    const p = (async () => {
+      await this.engine.ready();
+      if (this._handle < 0) {
+        this._handle = await this.engine.createHandle(this.audioContext.sampleRate);
+      }
+      await this.engine.loadSong(this._handle, data);
+    })();
+    this._loadPromise = p;
+    await p;
+  }
 
-    if (this._handle < 0) {
-      this._handle = await this.engine.createHandle(this.audioContext.sampleRate);
-    }
-
-    await this.engine.loadSong(this._handle, data);
+  /**
+   * Called by ToneEngine.ensureWASMSynthsReady — waits for the patch/song to finish
+   * loading before TrackerReplayer attempts to trigger playback.
+   */
+  async ensureInitialized(): Promise<void> {
+    if (this._loadPromise) await this._loadPromise;
   }
 
   // ── Parameter access ──────────────────────────────────────────────────────

@@ -25,6 +25,29 @@ export interface SunVoxModuleInfo {
   name: string;
 }
 
+export interface SunVoxSongMeta {
+  songName: string;
+  bpm: number;
+  speed: number;
+  patCount: number;
+}
+
+export interface SunVoxNoteEvent {
+  note: number;
+  vel: number;
+  module: number;  // 0-indexed (-1 = no module, 0 = Output)
+  ctl: number;     // CCXX: CC=high byte (controller), XX=low byte (effect)
+  ctlVal: number;
+}
+
+export interface SunVoxPatternData {
+  patIndex: number;
+  x: number;        // timeline position (in lines)
+  tracks: number;
+  lines: number;
+  notes: SunVoxNoteEvent[][];  // notes[track][line]
+}
+
 // ── Internal resolver types ──────────────────────────────────────────────────
 
 interface PendingResolvers<T> {
@@ -52,7 +75,8 @@ export class SunVoxEngine {
 
   // Promise queues for async responses — keyed by "type:handle" or just "type"
   private _handleQueue: Array<PendingResolvers<number>> = [];
-  private _songLoadedQueue: Map<number, PendingResolvers<void>> = new Map();
+  private _songLoadedQueue: Map<number, PendingResolvers<SunVoxSongMeta>> = new Map();
+  private _patternsQueue: Map<number, PendingResolvers<SunVoxPatternData[]>> = new Map();
   private _songSavedQueue: Map<number, PendingResolvers<ArrayBuffer>> = new Map();
   private _synthLoadedQueue: Map<number, PendingResolvers<number>> = new Map();
   private _synthSavedQueue: Map<string, PendingResolvers<ArrayBuffer>> = new Map();
@@ -214,6 +238,11 @@ export class SunVoxEngine {
     buffer?: ArrayBuffer;
     modules?: SunVoxModuleInfo[];
     controls?: SunVoxControl[];
+    patterns?: SunVoxPatternData[];
+    songName?: string;
+    bpm?: number;
+    speed?: number;
+    patCount?: number;
     message?: string;
   }): void {
     switch (data.type) {
@@ -236,7 +265,21 @@ export class SunVoxEngine {
         const resolver = this._songLoadedQueue.get(data.handle!);
         if (resolver) {
           this._songLoadedQueue.delete(data.handle!);
-          resolver.resolve();
+          resolver.resolve({
+            songName: data.songName ?? '',
+            bpm: data.bpm ?? 125,
+            speed: data.speed ?? 6,
+            patCount: data.patCount ?? 0,
+          });
+        }
+        break;
+      }
+
+      case 'patterns': {
+        const resolver = this._patternsQueue.get(data.handle!);
+        if (resolver) {
+          this._patternsQueue.delete(data.handle!);
+          resolver.resolve(data.patterns ?? []);
         }
         break;
       }
@@ -325,6 +368,9 @@ export class SunVoxEngine {
 
     for (const r of this._controlsQueue.values()) r.reject(err);
     this._controlsQueue.clear();
+
+    for (const r of this._patternsQueue.values()) r.reject(err);
+    this._patternsQueue.clear();
   }
 
   // ── Public API ─────────────────────────────────────────────────────────────
@@ -354,17 +400,29 @@ export class SunVoxEngine {
     this.workletNode?.port.postMessage({ type: 'destroy', handle });
   }
 
-  /** Load a .sunvox song file from an ArrayBuffer. Transfers ownership. */
-  async loadSong(handle: number, buffer: ArrayBuffer): Promise<void> {
+  /** Load a .sunvox song file from an ArrayBuffer. Returns song metadata. */
+  async loadSong(handle: number, buffer: ArrayBuffer): Promise<SunVoxSongMeta> {
     await this._initPromise;
     if (this._disposed || !this.workletNode) {
       throw new Error('[SunVoxEngine] Engine is disposed or not initialized');
     }
-    return new Promise<void>((resolve, reject) => {
+    return new Promise<SunVoxSongMeta>((resolve, reject) => {
       this._songLoadedQueue.set(handle, { resolve, reject });
       // Slice to keep the original buffer intact in the instrument store (IDB needs to clone it).
       const copy = buffer.slice(0);
       this.workletNode!.port.postMessage({ type: 'loadSong', handle, buffer: copy }, [copy]);
+    });
+  }
+
+  /** Read all patterns from a loaded .sunvox song. */
+  async getPatterns(handle: number): Promise<SunVoxPatternData[]> {
+    await this._initPromise;
+    if (this._disposed || !this.workletNode) {
+      throw new Error('[SunVoxEngine] Engine is disposed or not initialized');
+    }
+    return new Promise<SunVoxPatternData[]>((resolve, reject) => {
+      this._patternsQueue.set(handle, { resolve, reject });
+      this.workletNode!.port.postMessage({ type: 'getPatterns', handle });
     });
   }
 
