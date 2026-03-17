@@ -27,7 +27,7 @@ import { MidiExportPanel } from './MidiExportPanel';
 import { ModuleExportPanel } from './ModuleExportPanel';
 import { ChipExportPanel } from './ChipExportPanel';
 import { exportAsJamCracker } from './JamCrackerExporter';
-import { exportSongToSoundMon } from './soundMonExport';
+import { exportAsSoundMon } from './SoundMonExporter';
 import { saveAs } from 'file-saver';
 
 type ExportMode = 'song' | 'sfx' | 'instrument' | 'audio' | 'midi' | 'xm' | 'mod' | 'it' | 's3m' | 'chip' | 'nano' | 'fur' | 'native';
@@ -233,7 +233,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
           if (preset.includes('jamcracker') || format === 'JamCracker' as string) {
             result = await exportAsJamCracker(song);
           } else if (preset.includes('soundmon') || format === ('SMON' as string)) {
-            result = exportSongToSoundMon(song);
+            result = await exportAsSoundMon(song);
           } else if (preset.includes('protracker') || format === 'MOD') {
             const { exportSongToMOD } = await import('./modExport');
             const modResult = await exportSongToMOD(song, { bakeSynths: true });
