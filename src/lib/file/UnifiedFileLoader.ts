@@ -118,7 +118,7 @@ export async function importTrackerModule(
   engine.disposeAllInstruments();
 
   // ── Try OpenMPT WASM soundlib for PC tracker formats ──
-  const isOpenMPTFormat = /^(MOD|XM|IT|S3M)$/i.test(format) || /\.(mod|xm|it|s3m|mptm|mo3|med|mmd[0-3]|mmdc|okt|okta)$/i.test(info.file?.name || '');
+  const isOpenMPTFormat = /^(MOD|XM|IT|S3M)$/i.test(format) || /\.(mod|xm|it|s3m|mptm|mo3|med|mmd[0-3]|okt|okta)$/i.test(info.file?.name || '');
   if (info.arrayBuffer && isOpenMPTFormat) {
     try {
       const { parseWithOpenMPT } = await import('@lib/import/wasm/OpenMPTConverter');
