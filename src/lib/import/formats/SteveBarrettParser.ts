@@ -78,7 +78,7 @@ export function parseSteveBarrettFile(buffer: ArrayBuffer, filename: string): Tr
   if (!isSteveBarrettFormat(buf)) throw new Error('Not a Steve Barrett module');
 
   const baseName = filename.split('/').pop() ?? filename;
-  const moduleName = baseName.replace(/^sb\./i, '') || baseName;
+  const moduleName = baseName.replace(/^sb\./i, '').replace(/\.sb$/i, '') || baseName;
 
   const instruments: InstrumentConfig[] = [
     {

@@ -50,7 +50,7 @@ export function parseWallyBebenFile(buffer: ArrayBuffer, filename: string): Trac
   if (!isWallyBebenFormat(buf)) throw new Error('Not a Wally Beben module');
 
   const baseName = filename.split('/').pop() ?? filename;
-  const moduleName = baseName.replace(/^wb\./i, '') || baseName;
+  const moduleName = baseName.replace(/^wb\./i, '').replace(/\.wb$/i, '') || baseName;
 
   const instruments: InstrumentConfig[] = [
     {

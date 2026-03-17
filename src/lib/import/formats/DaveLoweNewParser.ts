@@ -148,7 +148,7 @@ export function parseDaveLoweNewFile(buffer: ArrayBuffer, filename: string): Tra
 
   const baseName = filename.split('/').pop() ?? filename;
   // Strip "DLN." prefix (case-insensitive)
-  const moduleName = baseName.replace(/^dln\./i, '') || baseName;
+  const moduleName = baseName.replace(/^dln\./i, '').replace(/\.dln$/i, '') || baseName;
 
   // ── Instrument placeholders ──────────────────────────────────────────────
 

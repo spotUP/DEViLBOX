@@ -134,7 +134,7 @@ export function parsePaulShieldsFile(buffer: ArrayBuffer, filename: string): Tra
   if (!isPaulShieldsFormat(buf)) throw new Error('Not a Paul Shields module');
 
   const baseName = filename.split('/').pop() ?? filename;
-  const moduleName = baseName.replace(/^ps\./i, '') || baseName;
+  const moduleName = baseName.replace(/^ps\./i, '').replace(/\.ps$/i, '') || baseName;
 
   const instruments: InstrumentConfig[] = [{
     id: 1, name: 'Sample 1', type: 'synth' as const,

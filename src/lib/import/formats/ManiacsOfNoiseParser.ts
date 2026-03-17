@@ -36,7 +36,7 @@ export function parseManiacsOfNoiseFile(buffer: ArrayBuffer, filename: string): 
   if (!isManiacsOfNoiseFormat(buffer, filename)) throw new Error('Not a Maniacs of Noise module');
 
   const baseName = filename.split('/').pop() ?? filename;
-  const moduleName = baseName.replace(/^mon\./i, '') || baseName;
+  const moduleName = baseName.replace(/^mon\./i, '').replace(/\.mon$/i, '') || baseName;
 
   const instruments: InstrumentConfig[] = [{
     id: 1, name: 'Sample 1', type: 'synth' as const,

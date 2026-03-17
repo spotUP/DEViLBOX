@@ -552,7 +552,7 @@ export function parseDigitalSoundStudioFile(bytes: Uint8Array, filename: string)
     const moduleName = filename.replace(/\.[^/.]+$/, '');
 
     return {
-      name: moduleName,
+      name: `${moduleName} [Digital Sound Studio]`,
       format: 'DSS' as TrackerFormat,
       patterns: trackerPatterns,
       instruments,

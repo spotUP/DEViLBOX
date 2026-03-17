@@ -207,7 +207,7 @@ export function parseDscFile(buffer: ArrayBuffer, filename: string): TrackerSong
   if (!isDscFormat(buf)) throw new Error('Not a Digital Sonix & Chrome module');
 
   const baseName = filename.split('/').pop() ?? filename;
-  const moduleName = baseName.replace(/^dsc\./i, '') || baseName;
+  const moduleName = baseName.replace(/^dsc\./i, '').replace(/\.dsc$/i, '') || baseName;
 
   const instruments: InstrumentConfig[] = [{
     id: 1, name: 'Sample 1', type: 'synth' as const,

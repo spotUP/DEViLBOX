@@ -126,8 +126,8 @@ export async function parseThomasHermannFile(
   // ── Module name from filename ─────────────────────────────────────────────
 
   const baseName = filename.split('/').pop() ?? filename;
-  // Strip "THM." prefix (case-insensitive)
-  const moduleName = baseName.replace(/^thm\./i, '') || baseName;
+  // Strip "THM." / "TW." prefix and ".thm" / ".tw" suffix (case-insensitive)
+  const moduleName = baseName.replace(/^thm\./i, '').replace(/^tw\./i, '').replace(/\.(thm|tw)$/i, '') || baseName;
 
   // ── Instrument placeholders ──────────────────────────────────────────────
 

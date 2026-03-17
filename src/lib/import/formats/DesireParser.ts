@@ -151,7 +151,7 @@ export function parseDesireFile(buffer: ArrayBuffer, filename: string): TrackerS
 
   const baseName = filename.split('/').pop() ?? filename;
   // Strip "DSR." prefix (case-insensitive)
-  const moduleName = baseName.replace(/^dsr\./i, '') || baseName;
+  const moduleName = baseName.replace(/^dsr\./i, '').replace(/\.dsr$/i, '') || baseName;
 
   // ── Instrument placeholders ──────────────────────────────────────────────
 

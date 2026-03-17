@@ -316,10 +316,12 @@ export async function tryRouteFormat(
 
   // ── Sonic Arranger SAS (.sas — suffix-form compiled binary) ──────────────
   // .sas files are suffix-form SonicArranger compiled replayers (sas.songname in UADE).
-  // UADE eagleplayer needs prefix form; pass as classic streaming (compiled binary).
   if (matchesExt(filename, ['sas'])) {
-    const { parseUADEFile: parseUADE_sas } = await import('@lib/import/formats/UADEParser');
-    return parseUADE_sas(buffer, toUADEPrefixName(originalFileName, ['sas']), 'classic', subsong, preScannedMeta);
+    const sasCtx = { ...ctx, originalFileName: toUADEPrefixName(originalFileName, ['sas']) };
+    const { parseSonicArrangerSasFile } = await import('@lib/import/formats/SimpleAmigaStubParser');
+    return withNativeThenUADE('sonicArrangerSas', sasCtx,
+      (buf: Uint8Array | ArrayBuffer, name: string) => parseSonicArrangerSasFile(buf as ArrayBuffer, name),
+      'SimpleAmigaStubParser', { injectUADE: true });
   }
 
   // ── InStereo! 2.0 (.is20 — unambiguous) ──────────────────────────────────
@@ -754,17 +756,13 @@ export async function tryRouteFormat(
   }
 
   // ── Sound Factory (.psf) ──────────────────────────────────────────────────
-  // Force UADE classic mode — SoundFactory has synth instruments that UADE enhanced
-  // mode can't extract as PCM. Classic mode uses UADESynth streaming for 1:1 audio.
-  // Normalize suffix-form to prefix form: axelf.psf → psf.axelf
+  // Stub parser for title + UADE classic audio. Normalize suffix-form: axelf.psf → psf.axelf
   if (matchesExt(filename, ['psf'])) {
-    const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
-    const psfBase = getBasename(filename);
-    const psfDot = psfBase.lastIndexOf('.');
-    const psfName = (psfDot > 0 && !psfBase.startsWith('psf.'))
-      ? `${psfBase.slice(psfDot + 1)}.${psfBase.slice(0, psfDot)}`
-      : originalFileName;
-    return parseUADEFile(buffer, psfName, 'classic', subsong, preScannedMeta);
+    const psfCtx = { ...ctx, originalFileName: toUADEPrefixName(originalFileName, ['psf']) };
+    const { parseSoundFactoryFile } = await import('@lib/import/formats/SimpleAmigaStubParser');
+    return withNativeThenUADE('soundFactory', psfCtx,
+      (buf: Uint8Array | ArrayBuffer, name: string) => parseSoundFactoryFile(buf as ArrayBuffer, name),
+      'SimpleAmigaStubParser', { injectUADE: true });
   }
 
   // ── Actionamics (.act) ────────────────────────────────────────────────────
@@ -942,7 +940,7 @@ export async function tryRouteFormat(
       const { isGDMFormat, parseGDMFile } = await import('@lib/import/formats/GDMParser');
       if (isGDMFormat(buffer)) return parseGDMFile(buffer, originalFileName);
     } catch (err) {
-      console.warn(`[GDMParser] Native parse failed for ${filename}, falling back to OpenMPT:`, err);
+      console.error(`[GDMParser] Native parse failed for ${filename}, falling back to OpenMPT:`, err);
     }
     // Fall through to libopenmpt
   }
@@ -1140,21 +1138,20 @@ export async function tryRouteFormat(
 
   // ── PSM / PSM16 (Epic MegaGames MASI) (.psm) ─────────────────────────────
   // Handles both new PSM ("PSM " magic) and PSM16 ("PSM\xFE" magic).
-  // Falls through to libopenmpt on failure.
-  if (matchesExt(filename, ['psm'])) {
-    if (prefs.psm === 'native') {
-      try {
-        const { isPSMFormat, parsePSMFile } = await import('@lib/import/formats/PSMParser');
-        const bytes = new Uint8Array(buffer);
-        if (isPSMFormat(bytes)) {
-          const result = parsePSMFile(bytes, originalFileName);
-          if (result) return result;
-        }
-      } catch (err) {
-        console.warn(`[PSMParser] Native parse failed for ${filename}, falling back to libopenmpt:`, err);
+  // Uses native parser by default when the magic byte matches (Epic MegaGames format).
+  // ZXTune also uses .psm for ZX Spectrum; the magic check ensures the right parser fires.
+  if (matchesExt(filename, ['psm']) && prefs.psm !== 'uade') {
+    try {
+      const { isPSMFormat, parsePSMFile } = await import('@lib/import/formats/PSMParser');
+      const bytes = new Uint8Array(buffer);
+      if (isPSMFormat(bytes)) {
+        const result = parsePSMFile(bytes, originalFileName);
+        if (result) return result;
       }
+    } catch (err) {
+      console.warn(`[PSMParser] Native parse failed for ${filename}, falling back:`, err);
     }
-    // Fall through to libopenmpt
+    // Fall through to libopenmpt / ZXTune if magic didn't match
   }
 
   // ── AMS (Extreme's Tracker / Velvet Studio) ───────────────────────────────
@@ -1290,19 +1287,23 @@ export async function tryRouteFormat(
   }
 
   // ── Leggless Music Editor (.lme / LME.*) ────────────────────────────────────
-  // Force UADE classic mode — LME has synth instruments that UADE enhanced mode
-  // can't extract as PCM. Classic mode uses UADESynth streaming for 1:1 audio.
+  // Stub parser for title + UADE classic audio.
   if (matchesExt(filename, ['lme'])) {
-    const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
-    return parseUADEFile(buffer, originalFileName, 'classic', subsong, preScannedMeta);
+    const lmeCtx = { ...ctx, originalFileName: toUADEPrefixName(originalFileName, ['lme']) };
+    const { parseLegglessFile } = await import('@lib/import/formats/SimpleAmigaStubParser');
+    return withNativeThenUADE('leggless', lmeCtx,
+      (buf: Uint8Array | ArrayBuffer, name: string) => parseLegglessFile(buf as ArrayBuffer, name),
+      'SimpleAmigaStubParser', { injectUADE: true });
   }
 
   // ── Mike Davies (MD.* / .md) ─────────────────────────────────────────────
-  // Compiled 68k synthesizer. UADE enhanced mode extracts wrong/garbled samples.
-  // Classic mode streams correct audio. Prefix-normalize for UADE replayer selection.
+  // Compiled 68k synthesizer. Stub parser for title + UADE classic audio.
   if (matchesExt(filename, ['md'])) {
-    const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
-    return parseUADEFile(buffer, toUADEPrefixName(originalFileName, ['md']), 'classic', subsong, preScannedMeta);
+    const mdCtx = { ...ctx, originalFileName: toUADEPrefixName(originalFileName, ['md']) };
+    const { parseMikeDaviesFile } = await import('@lib/import/formats/SimpleAmigaStubParser');
+    return withNativeThenUADE('mikeDavies', mdCtx,
+      (buf: Uint8Array | ArrayBuffer, name: string) => parseMikeDaviesFile(buf as ArrayBuffer, name),
+      'SimpleAmigaStubParser', { injectUADE: true });
   }
 
   // ── Medley (.ml / .mso) ───────────────────────────────────────────────────
@@ -1935,58 +1936,138 @@ export async function tryRouteFormat(
     return parseUADE_amc(buffer, toUADEPrefixName(originalFileName, ['amc']), prefs.uade ?? 'enhanced', subsong, preScannedMeta);
   }
 
-  // ── Tier 3 suffix-form → UADE prefix-form routing ────────────────────────
-  // eagleplayer.conf only registers these by prefixes=xxx (no suffix entries).
-  // Without conversion, UADE receives e.g. "boulderdash.spl" and can't find
-  // an eagleplayer → silent/failed audio. Convert to prefix form first.
-  //
-  // Compiled replayer formats (FORCE_CLASSIC_FORMATS) → classic streaming:
+  // ── Tier 3: Wanted Team Dave Lowe-derived formats ────────────────────────
+  // SOPROL (.spl), Riff Raff (.riff), Howie Davies (.hd), Beathoven (.bss):
+  // All are compiled 68k binaries ripped/converted by Wanted Team into a format
+  // "very similar to EaglePlayer's Dave Lowe format" (per their readmes).
+  // Detection: AmigaDOS HUNK_HEADER + format ID at 0x24.
+  // Native parser extracts song title + instrument names; UADE classic for audio.
   if (matchesExt(filename, ['spl'])) {
-    const { parseUADEFile: parseUADE_spl } = await import('@lib/import/formats/UADEParser');
-    return parseUADE_spl(buffer, toUADEPrefixName(originalFileName, ['spl']), 'classic', subsong, preScannedMeta);
+    const wtCtx = { ...ctx, originalFileName: toUADEPrefixName(originalFileName, ['spl']) };
+    const { isWantedTeamDaveLoweFormat, parseWantedTeamDaveLoweFile } =
+      await import('@lib/import/formats/WantedTeamDaveLoweParser');
+    return withNativeThenUADE('soprol', wtCtx,
+      (buf: Uint8Array | ArrayBuffer, name: string) => {
+        if (isWantedTeamDaveLoweFormat(buf)) return parseWantedTeamDaveLoweFile(buf instanceof Uint8Array ? buf.buffer as ArrayBuffer : buf as ArrayBuffer, name);
+        return null;
+      },
+      'WantedTeamDaveLoweParser', { injectUADE: true });
   }
   if (matchesExt(filename, ['riff'])) {
-    const { parseUADEFile: parseUADE_riff } = await import('@lib/import/formats/UADEParser');
-    return parseUADE_riff(buffer, toUADEPrefixName(originalFileName, ['riff']), 'classic', subsong, preScannedMeta);
+    const wtCtx = { ...ctx, originalFileName: toUADEPrefixName(originalFileName, ['riff']) };
+    const { isWantedTeamDaveLoweFormat, parseWantedTeamDaveLoweFile } =
+      await import('@lib/import/formats/WantedTeamDaveLoweParser');
+    return withNativeThenUADE('riffRaff', wtCtx,
+      (buf: Uint8Array | ArrayBuffer, name: string) => {
+        if (isWantedTeamDaveLoweFormat(buf)) return parseWantedTeamDaveLoweFile(buf instanceof Uint8Array ? buf.buffer as ArrayBuffer : buf as ArrayBuffer, name);
+        return null;
+      },
+      'WantedTeamDaveLoweParser', { injectUADE: true });
   }
   if (matchesExt(filename, ['hd'])) {
-    const { parseUADEFile: parseUADE_hd } = await import('@lib/import/formats/UADEParser');
-    return parseUADE_hd(buffer, toUADEPrefixName(originalFileName, ['hd']), 'classic', subsong, preScannedMeta);
-  }
-  if (matchesExt(filename, ['tw'])) {
-    const { parseUADEFile: parseUADE_tw } = await import('@lib/import/formats/UADEParser');
-    return parseUADE_tw(buffer, toUADEPrefixName(originalFileName, ['tw']), 'classic', subsong, preScannedMeta);
-  }
-  if (matchesExt(filename, ['dz'])) {
-    const { parseUADEFile: parseUADE_dz } = await import('@lib/import/formats/UADEParser');
-    return parseUADE_dz(buffer, toUADEPrefixName(originalFileName, ['dz']), 'classic', subsong, preScannedMeta);
+    const wtCtx = { ...ctx, originalFileName: toUADEPrefixName(originalFileName, ['hd']) };
+    const { isWantedTeamDaveLoweFormat, parseWantedTeamDaveLoweFile } =
+      await import('@lib/import/formats/WantedTeamDaveLoweParser');
+    return withNativeThenUADE('howieDavies', wtCtx,
+      (buf: Uint8Array | ArrayBuffer, name: string) => {
+        if (isWantedTeamDaveLoweFormat(buf)) return parseWantedTeamDaveLoweFile(buf instanceof Uint8Array ? buf.buffer as ArrayBuffer : buf as ArrayBuffer, name);
+        return null;
+      },
+      'WantedTeamDaveLoweParser', { injectUADE: true });
   }
   if (matchesExt(filename, ['bss'])) {
-    const { parseUADEFile: parseUADE_bss } = await import('@lib/import/formats/UADEParser');
-    return parseUADE_bss(buffer, toUADEPrefixName(originalFileName, ['bss']), 'classic', subsong, preScannedMeta);
+    const wtCtx = { ...ctx, originalFileName: toUADEPrefixName(originalFileName, ['bss']) };
+    const { isWantedTeamDaveLoweFormat, parseWantedTeamDaveLoweFile } =
+      await import('@lib/import/formats/WantedTeamDaveLoweParser');
+    return withNativeThenUADE('beathovenSynthesizer', wtCtx,
+      (buf: Uint8Array | ArrayBuffer, name: string) => {
+        if (isWantedTeamDaveLoweFormat(buf)) return parseWantedTeamDaveLoweFile(buf instanceof Uint8Array ? buf.buffer as ArrayBuffer : buf as ArrayBuffer, name);
+        return null;
+      },
+      'WantedTeamDaveLoweParser', { injectUADE: true });
   }
+  // ── Tier 3: Sean Connolly EMS format (.scn) ───────────────────────────────
+  // Self-contained 68k binary using EMS V3.01/V3.18/V5.xx (4 voices).
+  // Starts with BRA.L + embedded text header containing song title/credits.
+  // Native parser extracts song title from header; UADE classic for audio.
   if (matchesExt(filename, ['scn'])) {
-    const { parseUADEFile: parseUADE_scn } = await import('@lib/import/formats/UADEParser');
-    return parseUADE_scn(buffer, toUADEPrefixName(originalFileName, ['scn']), 'classic', subsong, preScannedMeta);
+    const scnCtx = { ...ctx, originalFileName: toUADEPrefixName(originalFileName, ['scn']) };
+    const { isSeanConnollyFormat, parseSeanConnollyFile } =
+      await import('@lib/import/formats/SeanConnollyParser');
+    return withNativeThenUADE('seanConnolly', scnCtx,
+      (buf: Uint8Array | ArrayBuffer, name: string) => {
+        if (isSeanConnollyFormat(buf)) {
+          return parseSeanConnollyFile(
+            buf instanceof Uint8Array ? buf.buffer as ArrayBuffer : buf as ArrayBuffer,
+            name,
+          );
+        }
+        return null;
+      },
+      'SeanConnollyParser', { injectUADE: true });
   }
+  // ── Thomas Hermann (.tw / TW.* prefix) ───────────────────────────────────
+  // .tw is the UADE eagleplayer prefix form of Thomas Hermann. The binary structure
+  // may differ from .thm files so isThomasHermannFormat may not match; use stub directly.
+  if (matchesExt(filename, ['tw'])) {
+    const twCtx = { ...ctx, originalFileName: toUADEPrefixName(originalFileName, ['tw']) };
+    const { parseThomasHermannFile: parseThomasHermannStub } = await import('@lib/import/formats/SimpleAmigaStubParser');
+    return withNativeThenUADE('thomasHermann', twCtx,
+      (buf: Uint8Array | ArrayBuffer, name: string) => parseThomasHermannStub(buf as ArrayBuffer, name),
+      'SimpleAmigaStubParser', { injectUADE: true });
+  }
+  // ── Darius Zendeh (.dz / DZ.* prefix) ────────────────────────────────────
+  // Stub parser: filename-based title + 4 placeholder instruments. UADE classic audio.
+  if (matchesExt(filename, ['dz'])) {
+    const dzCtx = { ...ctx, originalFileName: toUADEPrefixName(originalFileName, ['dz']) };
+    const { parseDariusZendehFile } = await import('@lib/import/formats/SimpleAmigaStubParser');
+    return withNativeThenUADE('dariusZendeh', dzCtx,
+      (buf: Uint8Array | ArrayBuffer, name: string) => parseDariusZendehFile(buf as ArrayBuffer, name),
+      'SimpleAmigaStubParser', { injectUADE: true });
+  }
+  // ── Mark II (.mk2 / .mkii / MK2.* prefix) ────────────────────────────────
+  // Stub parser: filename-based title + 4 placeholder instruments. UADE classic audio.
+  // Also caught by UADEPrefixParsers for prefix-form files; this handles suffix-form.
+  if (matchesExt(filename, ['mk2', 'mkii'])) {
+    const mk2Ctx = { ...ctx, originalFileName: toUADEPrefixName(originalFileName, ['mk2', 'mkii']) };
+    const { parseMarkIIFile } = await import('@lib/import/formats/SimpleAmigaStubParser');
+    return withNativeThenUADE('markII', mk2Ctx,
+      (buf: Uint8Array | ArrayBuffer, name: string) => parseMarkIIFile(buf as ArrayBuffer, name),
+      'SimpleAmigaStubParser', { injectUADE: true });
+  }
+  // ── SCUMM (.scumm) — native pattern display + UADE classic audio ─────────
+  // eagleplayer.conf: scumm.* prefix — self-contained 68k binary (player + data fused).
+  // BRA.W at offset 4 jumps to player code; music data between title string and player.
+  // Four voice event streams with absolute tick timestamps and Amiga period values.
   if (matchesExt(filename, ['scumm'])) {
-    const { parseUADEFile: parseUADE_scumm } = await import('@lib/import/formats/UADEParser');
-    return parseUADE_scumm(buffer, toUADEPrefixName(originalFileName, ['scumm']), 'classic', subsong, preScannedMeta);
+    const scummCtx = { ...ctx, originalFileName: toUADEPrefixName(originalFileName, ['scumm']) };
+    const { isSCUMMFormat, parseSCUMMFile } = await import('@lib/import/formats/SCUMMParser');
+    return withNativeThenUADE('scumm', scummCtx,
+      (buf: Uint8Array | ArrayBuffer, name: string) => {
+        if (isSCUMMFormat(buf)) return parseSCUMMFile(buf instanceof Uint8Array ? buf.buffer as ArrayBuffer : buf as ArrayBuffer, name);
+        return null;
+      },
+      'SCUMMParser', { injectUADE: true });
   }
-  // AProSys (APS.* prefix) — ADRVPACK compressed; enhanced scan reads garbage from packed binary
+  // AProSys (APS.* prefix) — ADRVPACK compressed; stub parser for title + UADE classic audio
   if (matchesExt(filename, ['aps'])) {
-    const { parseUADEFile: parseUADE_aps } = await import('@lib/import/formats/UADEParser');
-    return parseUADE_aps(buffer, toUADEPrefixName(originalFileName, ['aps']), 'classic', subsong, preScannedMeta);
+    const apsCtx = { ...ctx, originalFileName: toUADEPrefixName(originalFileName, ['aps']) };
+    const { parseAProSysFile } = await import('@lib/import/formats/SimpleAmigaStubParser');
+    return withNativeThenUADE('aProSys', apsCtx,
+      (buf: Uint8Array | ArrayBuffer, name: string) => parseAProSysFile(buf as ArrayBuffer, name),
+      'SimpleAmigaStubParser', { injectUADE: true });
   }
-  // Enhanced-scan capable formats (UADE_ONLY_PREFIXES) → enhanced scan:
+  // ── Silmarils (.mok / MOK.* prefix) ──────────────────────────────────────
+  // Stub parser: filename-based title + 3 placeholder instruments (3-voice MIDI clone).
+  // Enhanced scan gives garbled "mok [CIA unreliable...]" title due to MIDI clone format.
   if (matchesExt(filename, ['mok'])) {
-    const { parseUADEFile: parseUADE_mok } = await import('@lib/import/formats/UADEParser');
-    return parseUADE_mok(buffer, toUADEPrefixName(originalFileName, ['mok']), prefs.uade ?? 'enhanced', subsong, preScannedMeta);
+    const mokCtx = { ...ctx, originalFileName: toUADEPrefixName(originalFileName, ['mok']) };
+    const { parseSilmarilsFile } = await import('@lib/import/formats/SimpleAmigaStubParser');
+    return withNativeThenUADE('silmarils', mokCtx,
+      (buf: Uint8Array | ArrayBuffer, name: string) => parseSilmarilsFile(buf as ArrayBuffer, name),
+      'SimpleAmigaStubParser', { injectUADE: true });
   }
-  if (matchesExt(filename, ['ea'])) {
-    const { parseUADEFile: parseUADE_ea } = await import('@lib/import/formats/UADEParser');
-    return parseUADE_ea(buffer, toUADEPrefixName(originalFileName, ['ea']), prefs.uade ?? 'enhanced', subsong, preScannedMeta);
-  }
+  // EA handled below with native EarAcheParser + UADE classic injection
 
   // ── Mugician prefix (DMU.* / DMU2.* prefix) ──────────────────────────────
   // eagleplayer.conf: Mugician prefixes=dmu,mug  MugicianII prefixes=dmu2,mug2
@@ -2060,6 +2141,18 @@ export async function tryRouteFormat(
       'LaxityParser', { injectUADE: true });
   }
 
+  // ── EarAche (.ea) — native pattern display + UADE classic audio ──────────────
+  // eagleplayer.conf: EarAche  prefixes=ea  Magic: "EASO"
+  // Enhanced scan produces completely wrong notes (synthesis engine confuses the scanner).
+  // Use native EarAcheParser for pattern display; inject UADE classic for audio.
+  if (matchesExt(filename, ['ea'])) {
+    const eaCtx = { ...ctx, originalFileName: toUADEPrefixName(originalFileName, ['ea']) };
+    const { isEarAcheFormat, parseEarAcheFile } = await import('@lib/import/formats/EarAcheParser');
+    return withNativeThenUADE('earAche', eaCtx,
+      (buf: Uint8Array | ArrayBuffer, name: string) => { if (isEarAcheFormat(buf)) return parseEarAcheFile(buf as ArrayBuffer, name); return null; },
+      'EarAcheParser', { injectUADE: true });
+  }
+
   // ── Music Maker 4V (mm4.* / sdata.* prefix) ──────────────────────────────
   // eagleplayer.conf: MusicMaker_4V  prefixes=mm4,sdata
   if (matchesExt(filename, ['mm4', 'sdata'])) {
@@ -2095,8 +2188,11 @@ export async function tryRouteFormat(
   // eagleplayer.conf: ManiacsOfNoise  prefixes=mon
   // mon_old.* is handled above by the JeroenTel block.
   if (matchesExt(filename, ['mon']) && !matchesExt(filename, ['mon_old'])) {
-    const { parseUADEFile: parseUADE_mon } = await import('@lib/import/formats/UADEParser');
-    return parseUADE_mon(buffer, originalFileName, prefs.uade ?? 'enhanced', subsong, preScannedMeta);
+    const monCtx = { ...ctx, originalFileName: toUADEPrefixName(originalFileName, ['mon']) };
+    const { isManiacsOfNoiseFormat, parseManiacsOfNoiseFile } = await import('@lib/import/formats/ManiacsOfNoiseParser');
+    return withNativeThenUADE('maniacsOfNoise', monCtx,
+      (buf: Uint8Array | ArrayBuffer, name: string) => parseManiacsOfNoiseFile(buf as ArrayBuffer, name),
+      'ManiacsOfNoiseParser', { isFormat: (b: Uint8Array) => isManiacsOfNoiseFormat(b, filename), injectUADE: true });
   }
 
   // ── PxTone Collage / Tune (.ptcop, .pttune) ────────────────────────────
@@ -2171,6 +2267,16 @@ export async function tryRouteFormat(
     return withNativeThenUADE('davidHanney', ctx,
       (buf: Uint8Array | ArrayBuffer, name: string) => { if (isDavidHanneyFormat(buf as ArrayBuffer)) return parseDavidHanneyFile(buf as ArrayBuffer, name); return null; },
       'DavidHanneyParser', { injectUADE: true });
+  }
+
+  // ── ArtAndMagic (.aam / AAM.*) ───────────────────────────────────────────
+  // Stub parser for title + UADE classic audio.
+  if (matchesExt(filename, ['aam'])) {
+    const aamCtx = { ...ctx, originalFileName: toUADEPrefixName(originalFileName, ['aam']) };
+    const { parseArtAndMagicFile } = await import('@lib/import/formats/SimpleAmigaStubParser');
+    return withNativeThenUADE('artAndMagic', aamCtx,
+      (buf: Uint8Array | ArrayBuffer, name: string) => parseArtAndMagicFile(buf as ArrayBuffer, name),
+      'SimpleAmigaStubParser', { injectUADE: true });
   }
 
   // ── UADE-only prefix formats + catch-all ─────────────────────────────────
