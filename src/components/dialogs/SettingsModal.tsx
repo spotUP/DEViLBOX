@@ -165,6 +165,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
     setCustomBannerImage,
     wobbleWindows,
     setWobbleWindows,
+    welcomeJingleEnabled,
+    setWelcomeJingleEnabled,
   } = useSettingsStore();
 
   const { sampleBusGain, setSampleBusGain, synthBusGain, setSynthBusGain, autoGain, setAutoGain } = useAudioStore();
@@ -481,6 +483,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                       <span className="text-[9px] text-ft2-textDim font-mono">Band-limited (reduces aliasing)</span>
                     </div>
                     <Toggle label="" value={useBLEP} onChange={setUseBLEP} size="sm" />
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <div className="flex flex-col">
+                      <label className="text-ft2-text text-xs font-mono">Startup Jingle:</label>
+                      <span className="text-[9px] text-ft2-textDim font-mono">Disable when using MCP</span>
+                    </div>
+                    <Toggle label="" value={welcomeJingleEnabled} onChange={setWelcomeJingleEnabled} size="sm" />
                   </div>
                 </div>
               </section>
