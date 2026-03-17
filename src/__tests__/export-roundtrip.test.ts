@@ -390,3 +390,83 @@ describe('SoundMon real-file roundtrip', () => {
     expect(matchRate).toBeGreaterThanOrEqual(0.90);
   });
 });
+
+// ── HippelCoSo roundtrip tests ─────────────────────────────────────────────
+
+describe('HippelCoSo export roundtrip', () => {
+  it('should preserve notes through synthetic roundtrip', async () => {
+    const { exportAsHippelCoSo } = await import('@/lib/export/HippelCoSoExporter');
+    const { parseHippelCoSoFile } = await import('@/lib/import/formats/HippelCoSoParser');
+
+    const cells = new Map<string, TrackerCell>();
+    cells.set('0:0', makeCell(25, 1));   // C-2 on ch0
+    cells.set('1:0', makeCell(37, 1));   // C-3 on ch1
+    cells.set('0:8', makeCell(45, 1));   // A-3 on ch0 row 8 (CoSo notes >47 lose precision)
+
+    const song = makeMinimalSong({
+      patterns: [makePattern(16, 4, cells)],
+      instruments: [{
+        name: 'CoSo 1',
+        type: 'synth',
+        synthType: 'HippelCoSoSynth',
+        hippelCoso: {
+          fseq: [0, -31],
+          vseq: [64, -31],
+          volSpeed: 1,
+          vibSpeed: 0,
+          vibDepth: 0,
+          vibDelay: 0,
+        },
+        volume: -6,
+        pan: 0,
+      } as unknown as Partial<InstrumentConfig>],
+    });
+
+    const result = await exportAsHippelCoSo(song);
+    expect(result.data.size).toBeGreaterThan(32); // At least header
+
+    const buf = await blobToArrayBuffer(result.data);
+    const reimported = await parseHippelCoSoFile(buf, 'test.coso');
+
+    const p0 = reimported.patterns[0];
+    expect(p0.channels[0].rows[0].note).toBe(25);   // C-2
+    expect(p0.channels[1].rows[0].note).toBe(37);   // C-3
+    expect(p0.channels[0].rows[8].note).toBe(45);   // A-3
+  });
+
+  it('prehistoric_tale.hipc: parse → export → reparse preserves notes', async () => {
+    const { exportAsHippelCoSo } = await import('@/lib/export/HippelCoSoExporter');
+    const { parseHippelCoSoFile } = await import('@/lib/import/formats/HippelCoSoParser');
+    const fs = await import('fs');
+    const path = 'test/prehistoric_tale.hipc';
+    if (!fs.existsSync(path)) return;
+
+    const fileData = fs.readFileSync(path);
+    const buf = fileData.buffer.slice(fileData.byteOffset, fileData.byteOffset + fileData.byteLength);
+    const original = await parseHippelCoSoFile(buf, 'prehistoric_tale.hipc');
+
+    const exported = await exportAsHippelCoSo(original);
+    const reExportBuf = await blobToArrayBuffer(exported.data);
+    const reimported = await parseHippelCoSoFile(reExportBuf, 'roundtrip.coso');
+
+    expect(reimported.patterns.length).toBe(original.patterns.length);
+
+    let totalNotes = 0;
+    let matchedNotes = 0;
+    for (let p = 0; p < original.patterns.length; p++) {
+      for (let ch = 0; ch < 4; ch++) {
+        const origRows = original.patterns[p].channels[ch]?.rows ?? [];
+        const reRows = reimported.patterns[p]?.channels[ch]?.rows ?? [];
+        const len = Math.min(origRows.length, 16);
+        for (let r = 0; r < len; r++) {
+          if (origRows[r].note > 0) {
+            totalNotes++;
+            if (origRows[r].note === reRows[r]?.note) matchedNotes++;
+          }
+        }
+      }
+    }
+    const matchRate = totalNotes > 0 ? matchedNotes / totalNotes : 1;
+    expect(matchRate).toBeGreaterThanOrEqual(0.90);
+  });
+});
