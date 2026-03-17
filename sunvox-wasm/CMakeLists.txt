@@ -74,6 +74,19 @@ if(EMSCRIPTEN)
         "_sunvox_wasm_render"
         "_sunvox_wasm_play"
         "_sunvox_wasm_stop"
+        "_sunvox_wasm_get_song_name"
+        "_sunvox_wasm_get_bpm"
+        "_sunvox_wasm_get_speed"
+        "_sunvox_wasm_get_pattern_count"
+        "_sunvox_wasm_get_pattern_lines"
+        "_sunvox_wasm_get_pattern_flags"
+        "_sunvox_wasm_get_pattern_tracks"
+        "_sunvox_wasm_get_pattern_x"
+        "_sunvox_wasm_get_note"
+        "_sunvox_wasm_get_note_vel"
+        "_sunvox_wasm_get_note_module"
+        "_sunvox_wasm_get_note_ctl"
+        "_sunvox_wasm_get_note_ctl_val"
     )
 
     string(JOIN "," EXPORTED_FUNCTIONS_STR ${EXPORTED_FUNCTIONS})

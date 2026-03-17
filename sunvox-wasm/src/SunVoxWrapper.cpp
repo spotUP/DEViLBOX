@@ -511,6 +511,202 @@ void sunvox_wasm_render( int handle, float *outL, float *outR, int frames )
     }
 }
 
+/* ======================================================================== */
+/* Song metadata                                                             */
+/* ======================================================================== */
+
+/*
+ * sunvox_wasm_get_song_name
+ * Copy the song name into 'out' (null-terminated, up to out_len-1 chars).
+ */
+EMSCRIPTEN_KEEPALIVE
+void sunvox_wasm_get_song_name( int handle, char *out, int out_len )
+{
+    if ( !handle_valid( handle ) || !out || out_len <= 0 )
+        return;
+    out[ 0 ] = '\0';
+    const UTF8_CHAR *name = g_engines[ handle ].song_name;
+    if ( !name )
+        return;
+    strncpy( out, (const char *)name, (size_t)( out_len - 1 ) );
+    out[ out_len - 1 ] = '\0';
+}
+
+/*
+ * sunvox_wasm_get_bpm
+ * Return the current BPM.
+ */
+EMSCRIPTEN_KEEPALIVE
+int sunvox_wasm_get_bpm( int handle )
+{
+    if ( !handle_valid( handle ) )
+        return 125;
+    return g_engines[ handle ].bpm;
+}
+
+/*
+ * sunvox_wasm_get_speed
+ * Return the current speed (ticks per line).
+ */
+EMSCRIPTEN_KEEPALIVE
+int sunvox_wasm_get_speed( int handle )
+{
+    if ( !handle_valid( handle ) )
+        return 6;
+    return g_engines[ handle ].speed;
+}
+
+/*
+ * sunvox_wasm_get_pattern_count
+ * Return the total number of pattern slots (pats_num).
+ * Callers should use get_pattern_lines() > 0 to test if a slot is occupied.
+ */
+EMSCRIPTEN_KEEPALIVE
+int sunvox_wasm_get_pattern_count( int handle )
+{
+    if ( !handle_valid( handle ) )
+        return 0;
+    return g_engines[ handle ].pats_num;
+}
+
+/* ======================================================================== */
+/* Pattern data access                                                        */
+/* ======================================================================== */
+
+/*
+ * sunvox_wasm_get_pattern_lines
+ * Return the number of lines in pattern p, or 0 if the slot is empty.
+ */
+EMSCRIPTEN_KEEPALIVE
+int sunvox_wasm_get_pattern_lines( int handle, int p )
+{
+    if ( !handle_valid( handle ) )
+        return 0;
+    sunvox_engine *s = &g_engines[ handle ];
+    if ( p < 0 || p >= s->pats_num || !s->pats[ p ] )
+        return 0;
+    return s->pats[ p ]->lines;
+}
+
+/*
+ * sunvox_wasm_get_pattern_flags
+ * Return the flags for pattern p (see SUNVOX_PATTERN_FLAG_CLONE etc.).
+ */
+EMSCRIPTEN_KEEPALIVE
+int sunvox_wasm_get_pattern_flags( int handle, int p )
+{
+    if ( !handle_valid( handle ) )
+        return 0;
+    sunvox_engine *s = &g_engines[ handle ];
+    if ( p < 0 || p >= s->pats_num || !s->pats[ p ] )
+        return 0;
+    if ( !s->pats_info )
+        return 0;
+    return s->pats_info[ p ].flags;
+}
+
+/*
+ * sunvox_wasm_get_pattern_tracks
+ * Return the number of tracks (channels) in pattern p.
+ */
+EMSCRIPTEN_KEEPALIVE
+int sunvox_wasm_get_pattern_tracks( int handle, int p )
+{
+    if ( !handle_valid( handle ) )
+        return 0;
+    sunvox_engine *s = &g_engines[ handle ];
+    if ( p < 0 || p >= s->pats_num || !s->pats[ p ] )
+        return 0;
+    return s->pats[ p ]->channels;
+}
+
+/*
+ * sunvox_wasm_get_pattern_x
+ * Return the timeline X position (in lines) of pattern p.
+ */
+EMSCRIPTEN_KEEPALIVE
+int sunvox_wasm_get_pattern_x( int handle, int p )
+{
+    if ( !handle_valid( handle ) )
+        return 0;
+    sunvox_engine *s = &g_engines[ handle ];
+    if ( p < 0 || p >= s->pats_num || !s->pats_info )
+        return 0;
+    return s->pats_info[ p ].x;
+}
+
+/* ======================================================================== */
+/* Note data access (data layout: data[line * data_xsize + track])           */
+/* ======================================================================== */
+
+static const sunvox_note *get_note_ptr( sunvox_engine *s, int p, int track, int line )
+{
+    if ( p < 0 || p >= s->pats_num )
+        return NULL;
+    sunvox_pattern *pat = s->pats[ p ];
+    if ( !pat || !pat->data )
+        return NULL;
+    if ( track < 0 || track >= pat->channels )
+        return NULL;
+    if ( line < 0 || line >= pat->lines )
+        return NULL;
+    return &pat->data[ line * pat->data_xsize + track ];
+}
+
+/* note: 0=nothing, 1..127=note, 128=noteoff */
+EMSCRIPTEN_KEEPALIVE
+int sunvox_wasm_get_note( int handle, int p, int track, int line )
+{
+    if ( !handle_valid( handle ) )
+        return 0;
+    const sunvox_note *n = get_note_ptr( &g_engines[ handle ], p, track, line );
+    return n ? (int)n->note : 0;
+}
+
+/* vel: 1..129, 0=default */
+EMSCRIPTEN_KEEPALIVE
+int sunvox_wasm_get_note_vel( int handle, int p, int track, int line )
+{
+    if ( !handle_valid( handle ) )
+        return 0;
+    const sunvox_note *n = get_note_ptr( &g_engines[ handle ], p, track, line );
+    return n ? (int)n->vel : 0;
+}
+
+/* Returns 0-indexed module id, or -1 if no module. synth field is 1-indexed. */
+EMSCRIPTEN_KEEPALIVE
+int sunvox_wasm_get_note_module( int handle, int p, int track, int line )
+{
+    if ( !handle_valid( handle ) )
+        return -1;
+    const sunvox_note *n = get_note_ptr( &g_engines[ handle ], p, track, line );
+    if ( !n || n->synth == 0 )
+        return -1;
+    return (int)n->synth - 1;   /* convert from 1-indexed to 0-indexed */
+}
+
+/* ctl: CCXX (CC=controller number, XX=std effect) */
+EMSCRIPTEN_KEEPALIVE
+int sunvox_wasm_get_note_ctl( int handle, int p, int track, int line )
+{
+    if ( !handle_valid( handle ) )
+        return 0;
+    const sunvox_note *n = get_note_ptr( &g_engines[ handle ], p, track, line );
+    return n ? (int)n->ctl : 0;
+}
+
+/* ctl_val: controller value */
+EMSCRIPTEN_KEEPALIVE
+int sunvox_wasm_get_note_ctl_val( int handle, int p, int track, int line )
+{
+    if ( !handle_valid( handle ) )
+        return 0;
+    const sunvox_note *n = get_note_ptr( &g_engines[ handle ], p, track, line );
+    return n ? (int)n->ctl_val : 0;
+}
+
+/* ======================================================================== */
+
 /*
  * sunvox_wasm_play
  * Start playback from the current position.

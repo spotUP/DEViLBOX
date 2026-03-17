@@ -808,50 +808,21 @@ export async function loadFile(params: Record<string, unknown>): Promise<Record<
     // Create a File object (browser API)
     const file = new File([arrayBuffer], filename, { type: 'application/octet-stream' });
 
-    // Use the same import pipeline as the UI
-    const { importTrackerModule } = await import('../../lib/file/UnifiedFileLoader');
-    const { loadModuleFile } = await import('../../lib/import/ModuleLoader');
+    // Use the full UnifiedFileLoader pipeline (same as drag-and-drop in the UI).
+    // This correctly routes .sunvox, .fur, UADE formats, etc.
+    const { loadFile: unifiedLoadFile } = await import('../../lib/file/UnifiedFileLoader');
     const { detectFormat } = await import('../../lib/import/FormatRegistry');
 
-    // Detect format
     const format = detectFormat(filename);
-
-    // Try ModuleLoader first (handles native parsing for XM/MOD/FUR/DMF)
-    let moduleInfo;
-    try {
-      moduleInfo = await loadModuleFile(file);
-    } catch {
-      // If ModuleLoader fails, create minimal ModuleInfo for parseModuleToSong path
-      moduleInfo = {
-        metadata: {
-          title: filename,
-          type: format?.label || 'Unknown',
-          channels: 0,
-          patterns: 0,
-          orders: 0,
-          instruments: 0,
-          samples: 0,
-          duration: 0,
-          song: null,
-        },
-        arrayBuffer,
-        file,
-      };
-    }
-
-    // Ensure arrayBuffer is always available (needed by OpenMPT/native parsers)
-    if (!moduleInfo.arrayBuffer) {
-      moduleInfo.arrayBuffer = arrayBuffer;
-    }
-
-    // Import with default options (no yields — keeps state transition atomic
-    // so React doesn't render empty intermediate state causing stutter)
     const subsong = (params.subsong as number) ?? 0;
-    const useLibopenmpt = (params.useLibopenmpt as boolean) ?? true;
-    await importTrackerModule(moduleInfo as any, {
-      useLibopenmpt,
-      subsong,
-    });
+
+    const loadResult = await unifiedLoadFile(file, { subsong });
+    if (!loadResult.success) {
+      throw new Error(loadResult.error || `Failed to load ${filename}`);
+    }
+    if (loadResult.success === 'pending-confirmation') {
+      throw new Error(`${filename} requires user confirmation before loading`);
+    }
 
     // Read back the result from stores
     const trackerState = useTrackerStore.getState();
