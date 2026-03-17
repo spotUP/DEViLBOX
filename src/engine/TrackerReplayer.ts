@@ -230,6 +230,11 @@ export interface TrackerSong {
   linearPeriods?: boolean;
   // Display-only note offset (semitones) — adjusts note display without affecting playback
   noteDisplayOffset?: number;
+  // Per-song note offset applied during MOD export (semitones) — adjusts the
+  // note-to-period mapping without affecting internal playback or display.
+  // Used for S3M-origin formats (GDM/S3M) where OpenMPT notes are 60 semitones
+  // above ProTracker period-table indices (S3M octave 5 = ProTracker octave 0).
+  noteExportOffset?: number;
   // Furnace-specific timing/compat (optional)
   speed2?: number;
   hz?: number;
@@ -1403,6 +1408,22 @@ export class TrackerReplayer {
             await dispatchEngine.waitForChipCreated(chipId);
             if (gen !== this._playGeneration) return;
           }
+        }
+
+        // Re-upload module samples (BRR for SNES, ADPCM for other chips) and reset
+        // each dispatch so the DSP initializes with the new song's sample data.
+        // This must happen every time a song plays — not just on first chip creation —
+        // because switching songs leaves stale samples from the previous song in WASM.
+        const moduleSamples = dispatchEngine.getModuleSamples();
+        if (moduleSamples && moduleSamples.length > 0) {
+          for (const chipId of chipIds) {
+            dispatchEngine.uploadModuleSamplesToPlatform(chipId);
+          }
+          // Reset all chips so the DSP re-initializes with new sampleMem contents
+          for (const chipId of chipIds) {
+            dispatchEngine.reset(chipId);
+          }
+          console.log(`[TrackerReplayer] WASM seq: uploaded ${moduleSamples.length} module samples + reset chips`);
         }
 
         // Ensure the dispatch engine audio output is routed to speakers.
