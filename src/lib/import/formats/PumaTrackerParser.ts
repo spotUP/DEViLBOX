@@ -24,7 +24,9 @@
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, ChannelData, TrackerCell, InstrumentConfig } from '@/types';
 import type { UADEChipRamInfo } from '@/types/instrument';
+import type { UADEVariablePatternLayout } from '@/engine/uade/UADEPatternEncoder';
 import { createSamplerInstrument } from './AmigaUtils';
+import { pumaTrackerEncoder } from '@/engine/uade/encoders/PumaTrackerEncoder';
 
 // ── Binary helpers ────────────────────────────────────────────────────────────
 
@@ -317,6 +319,8 @@ export async function parsePumaTrackerFile(
   // After all patterns: another "patt" marker.
 
   const patternData: RawRow[][] = [];
+  const filePatternAddrs: number[] = [];
+  const filePatternSizes: number[] = [];
 
   for (let p = 0; p < numPatterns; p++) {
     if (!readMagic(view, pos, 'patt')) {
@@ -324,6 +328,7 @@ export async function parsePumaTrackerFile(
     }
     pos += 4;
 
+    const dataStart = pos; // byte offset of this pattern's RLE data
     const rows: RawRow[] = new Array(NUM_ROWS).fill(null).map(() => ({ noteX2: 0, instrEffect: 0, param: 0 }));
     let row = 0;
 
@@ -343,6 +348,8 @@ export async function parsePumaTrackerFile(
       row += runLen;
     }
 
+    filePatternAddrs.push(dataStart);
+    filePatternSizes.push(pos - dataStart);
     patternData.push(rows);
   }
 
@@ -633,6 +640,23 @@ export async function parsePumaTrackerFile(
   const songPositions = patterns.map((_, i) => i);
   const name          = songName.trim() || filename.replace(/\.[^/.]+$/, '');
 
+  // Build trackMap: trackerPatternIdx → [ch0 filePatIdx, ch1 filePatIdx, ...]
+  const trackMap: number[][] = orders.map(order =>
+    order.channels.map(ch => ch.pattern < numPatterns ? ch.pattern : -1),
+  );
+
+  const variableLayout: UADEVariablePatternLayout = {
+    formatId: 'pumaTracker',
+    numChannels: 4,
+    numFilePatterns: numPatterns,
+    rowsPerPattern: NUM_ROWS,
+    moduleSize: buffer.byteLength,
+    encoder: pumaTrackerEncoder,
+    filePatternAddrs,
+    filePatternSizes,
+    trackMap,
+  };
+
   return {
     name,
     format:          'MOD' as TrackerFormat,
@@ -646,5 +670,6 @@ export async function parsePumaTrackerFile(
     initialBPM:      125,
     linearPeriods:   false,
     pumaTrackerFileData: buffer.slice(0),
+    uadeVariableLayout: variableLayout,
   };
 }
