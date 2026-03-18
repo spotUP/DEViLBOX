@@ -147,8 +147,8 @@ function translateULTEffect(
     case 0x8: // Undefined
       return [EFF_NONE, PAR_NONE];
 
-    case 0x9: // Sample offset
-      return [XM_OFFSET, param];
+    case 0x9: // Sample offset — ULT param is multiplied by 4 (OpenMPT: offset = param * 4)
+      return [XM_OFFSET, Math.min(0xFF, param * 4)];
 
     case 0xA: // Volume slide — ULT only uses one nibble at a time
       if (param & 0xF0) {
@@ -159,8 +159,8 @@ function translateULTEffect(
     case 0xB: // Panning — param = (param & 0x0F) * 0x11 → 0x00–0xFF range
       return [0x08 /* XM set panning */, (param & 0x0F) * 0x11];
 
-    case 0xC: // Set volume (CMD_VOLUME8 — raw 0–255, clamp to 64 for XM)
-      return [XM_SET_VOLUME, Math.min(64, param)];
+    case 0xC: // Set volume (CMD_VOLUME8 — raw 0–255, scale to 0–64 for XM Cxx)
+      return [XM_SET_VOLUME, Math.round(param * 64 / 255)];
 
     case 0xD: // Pattern break — BCD encoded
       return [XM_PAT_BREAK, 10 * (param >> 4) + (param & 0x0F)];
@@ -540,6 +540,70 @@ export async function parseULTFile(
     }
   }
 
+  // ── Post-fix speed commands: Fxx with param=0 → speed=6 + tempo=125 ────────
+  // OpenMPT: if any speed command has param=0, replace with speed=6 and inject
+  // a tempo=125 command on the same row (matching UltraTracker's behavior).
+  let needsPostFix = false;
+  for (let pat = 0; pat < numPatterns && !needsPostFix; pat++) {
+    for (let ch = 0; ch < numChannels && !needsPostFix; ch++) {
+      for (let row = 0; row < ROWS_PER_PATTERN; row++) {
+        const cell = patternData[pat][ch][row];
+        if ((cell.effTyp === XM_SPEED && cell.eff === 0) ||
+            (cell.effTyp2 === XM_SPEED && cell.eff2 === 0)) {
+          needsPostFix = true;
+          break;
+        }
+      }
+    }
+  }
+  if (needsPostFix) {
+    for (let pat = 0; pat < numPatterns; pat++) {
+      for (let row = 0; row < ROWS_PER_PATTERN; row++) {
+        for (let ch = 0; ch < numChannels; ch++) {
+          const cell = patternData[pat][ch][row];
+          if (cell.effTyp === XM_SPEED && cell.eff === 0) {
+            // Replace Fxx param=0 with speed=6
+            cell.eff = 6;
+            // Inject tempo=125 into a free slot on this row
+            let injected = false;
+            for (let c2 = 0; c2 < numChannels; c2++) {
+              const target = patternData[pat][c2][row];
+              if (target.effTyp2 === 0 && target.eff2 === 0) {
+                target.effTyp2 = XM_TEMPO;
+                target.eff2    = 125;
+                injected = true;
+                break;
+              }
+            }
+            if (!injected) {
+              // Try primary effect slot on an empty channel
+              for (let c2 = 0; c2 < numChannels; c2++) {
+                const target = patternData[pat][c2][row];
+                if (c2 !== ch && target.effTyp === 0 && target.eff === 0) {
+                  target.effTyp = XM_TEMPO;
+                  target.eff    = 125;
+                  break;
+                }
+              }
+            }
+          }
+          if (cell.effTyp2 === XM_SPEED && cell.eff2 === 0) {
+            cell.eff2 = 6;
+            // Inject tempo=125 similarly
+            for (let c2 = 0; c2 < numChannels; c2++) {
+              const target = patternData[pat][c2][row];
+              if (target.effTyp === 0 && target.eff === 0) {
+                target.effTyp = XM_TEMPO;
+                target.eff    = 125;
+                break;
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
   const pcmDataStart = pos;
 
   // ── Sample PCM data ────────────────────────────────────────────────────────
@@ -696,8 +760,8 @@ export async function parseULTFile(
     songLength:      orderList.length,
     restartPosition: restartPos,
     numChannels,
-    initialSpeed:    4,    // UltraTracker default speed
-    initialBPM:      125,  // UltraTracker default BPM
+    initialSpeed:    6,    // OpenMPT default speed for ULT (no explicit default in format)
+    initialBPM:      125,  // OpenMPT default BPM for ULT
     linearPeriods:   false,
   };
 }
