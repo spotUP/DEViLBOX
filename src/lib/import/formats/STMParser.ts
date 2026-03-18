@@ -415,7 +415,10 @@ export async function parseSTMFile(
       } as InstrumentConfig;
     }
 
-    const pcm = raw.subarray(sampleFileOff, sampleFileOff + readLen);
+    // STM stores unsigned 8-bit PCM (center = 0x80). Convert to signed.
+    const unsigned = raw.subarray(sampleFileOff, sampleFileOff + readLen);
+    const pcm = new Uint8Array(unsigned.length);
+    for (let j = 0; j < unsigned.length; j++) pcm[j] = unsigned[j] ^ 0x80;
 
     // Loop active if: loopStart < length && loopEnd > loopStart && loopEnd != 0xFFFF
     const hasLoop =

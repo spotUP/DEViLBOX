@@ -362,7 +362,10 @@ export async function parse669File(
       loopEnd   = Math.min(hdr.loopEnd, hdr.length);
     }
 
-    const pcm = raw.subarray(startOff, endOff);
+    // 669 stores unsigned 8-bit PCM (center = 0x80). Convert to signed for createSamplerInstrument.
+    const unsigned = raw.subarray(startOff, endOff);
+    const pcm = new Uint8Array(unsigned.length);
+    for (let j = 0; j < unsigned.length; j++) pcm[j] = unsigned[j] ^ 0x80;
 
     return createSamplerInstrument(id, name, pcm, 64, SAMPLE_RATE, loopStart, loopEnd);
   });
@@ -390,7 +393,7 @@ export async function parse669File(
     restartPosition: effectiveRestart,
     numChannels:     NUM_CHANNELS,
     initialSpeed:    4,
-    initialBPM:      125,
+    initialBPM:      78,  // OpenMPT Load_669.cpp: Order().SetDefaultTempoInt(78)
     linearPeriods:   false,
     uadePatternLayout,
   };
