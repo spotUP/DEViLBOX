@@ -665,6 +665,22 @@ function exportToMOD(song: TrackerSong): ArrayBuffer {
         let effTyp = cell.effTyp ?? 0;
         let effParam = cell.eff ?? 0;
 
+        // MOD supports one effect per cell. Merge secondary effect if present.
+        const eff2Typ = cell.effTyp2 ?? 0;
+        const eff2Par = cell.eff2 ?? 0;
+        if (eff2Typ > 0) {
+          if (effTyp === 0) {
+            effTyp = eff2Typ;
+            effParam = eff2Par;
+          } else if (isGlobalEffect(eff2Typ) && !isGlobalEffect(effTyp)) {
+            effTyp = eff2Typ;
+            effParam = eff2Par;
+          } else if ((eff2Typ === 0x0D || eff2Typ === 0x0B) && effTyp === 0x0F) {
+            effTyp = eff2Typ;
+            effParam = eff2Par;
+          }
+        }
+
         // Convert XM effect types to MOD
         // XM and MOD share most effects 0-F
         if (effTyp > 15) {
