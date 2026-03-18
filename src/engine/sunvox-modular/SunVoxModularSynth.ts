@@ -22,6 +22,18 @@ let _sharedSongHandle = -1;
 let _sharedSongRefCount = 0;
 let _sharedSongInitPromise: Promise<void> | null = null;
 
+/** Force-reset shared state (call before loading a new song to prevent WASM crashes) */
+export function resetSharedSunVoxHandle(): void {
+  if (_sharedSongHandle >= 0) {
+    try {
+      SunVoxEngine.getInstance().destroyHandle(_sharedSongHandle);
+    } catch { /* already destroyed */ }
+  }
+  _sharedSongHandle = -1;
+  _sharedSongRefCount = 0;
+  _sharedSongInitPromise = null;
+}
+
 export class SunVoxModularSynth implements DevilboxSynth {
   readonly name = 'SunVoxModularSynth';
   readonly output: GainNode;
@@ -62,6 +74,13 @@ export class SunVoxModularSynth implements DevilboxSynth {
   /** Song mode: share a single WASM handle across all instances */
   private async _loadSongShared(data: ArrayBuffer, config: ModularPatchConfig): Promise<void> {
     await this.engine.ready();
+
+    // If a previous shared handle exists from a different song, destroy it first
+    if (_sharedSongHandle >= 0 && _sharedSongRefCount <= 0) {
+      this.engine.destroyHandle(_sharedSongHandle);
+      _sharedSongHandle = -1;
+      _sharedSongInitPromise = null;
+    }
 
     // First instance creates the shared handle; others wait for it
     if (_sharedSongHandle < 0 && !_sharedSongInitPromise) {
