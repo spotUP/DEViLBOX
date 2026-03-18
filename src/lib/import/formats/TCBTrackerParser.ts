@@ -281,11 +281,10 @@ export async function parseTCBTrackerFile(
     //     realLoopStart = length - rawLoopEnd
     //     realLoopEnd   = length
     let loopStart = 0;
-    let loopEnd   = length;
+    let loopEnd   = 0;
     if (rawLoopEnd !== 0 && rawLoopEnd < length) {
       loopStart = length - rawLoopEnd;
-    } else {
-      loopStart = 0;   // no loop
+      loopEnd   = length;
     }
 
     const name = instrNames[i] || `Sample ${i + 1}`;

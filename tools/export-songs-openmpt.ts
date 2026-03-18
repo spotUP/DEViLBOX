@@ -605,7 +605,8 @@ function exportToMOD(song: TrackerSong): ArrayBuffer {
         const offset = (p * 64 * numChannels + row * numChannels + ch) * 4;
 
         // Inject speed/BPM on first row of first pattern, first channel(s)
-        if (p === 0 && row === 0 && ch === 0) {
+        const firstPlayedPattern = song.songPositions?.[0] ?? 0;
+        if (p === firstPlayedPattern && row === 0 && ch === 0) {
           if (needSpeed) {
             // Check if this cell already has an effect
             const cell = pattern?.channels[ch]?.rows[row];
