@@ -295,7 +295,8 @@ class SunVoxProcessor extends AudioWorkletProcessor {
           m._sunvox_wasm_get_module_name(data.handle, i, outPtr, 256);
           const name = m.UTF8ToString(outPtr);
           // Get controls for this module
-          const ctlCount = m._sunvox_wasm_get_control_count(data.handle, i);
+          const ctlCountRaw = m._sunvox_wasm_get_control_count(data.handle, i);
+          const ctlCount = Math.min(ctlCountRaw, 32); // Cap to prevent blocking
           const controls = [];
           for (let c = 0; c < ctlCount; c++) {
             m._sunvox_wasm_get_control_name(data.handle, i, c, outPtr, 256);
