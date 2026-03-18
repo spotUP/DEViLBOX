@@ -248,7 +248,9 @@ export type SynthType =
   | 'MAMESWP00'         // Yamaha SWP00 AWM2 (32-voice ROM, Chamberlin filter)
   | 'MAMESWP20'         // Yamaha SWP20 AWM2 (32-voice ROM, approximated)
   | 'MAMERolandGP'      // Roland TC6116 PCM (28-channel, dual vol envelopes)
-  | 'MAMEMultiPCM';    // Yamaha YMW258-F MultiPCM (28-channel PCM, Sega Model 1/2)
+  | 'MAMEMultiPCM'    // Yamaha YMW258-F MultiPCM (28-channel PCM, Sega Model 1/2)
+  | 'StartrekkerAMSynth' // Startrekker AM synth (WASM replayer)
+  | 'SunVoxModular';   // SunVox WASM modular synthesizer with visual editor
 
 export type WaveformType = 'sine' | 'square' | 'sawtooth' | 'triangle' | 'noise';
 
