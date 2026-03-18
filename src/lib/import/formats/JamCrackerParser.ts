@@ -251,7 +251,7 @@ export async function parseJamCrackerFile(
       instruments.push({
         id: i + 1,
         name,
-        type: 'sample' as const,
+        type: 'synth' as const,
         synthType: 'JamCrackerSynth' as const,
         effects: [],
         volume: -60,

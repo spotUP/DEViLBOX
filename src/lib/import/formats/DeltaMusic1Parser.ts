@@ -470,9 +470,11 @@ export async function parseDeltaMusic1File(buffer: ArrayBuffer, filename: string
       // Store at PCM_BASE_RATE (8287 Hz) — Chrome requires ≥ 3000 Hz for decodeAudioData.
       // This waveform is used only for the instrument editor display; actual audio comes
       // from UADE via uadeEditableFileData injected by the routing layer.
-      const synthInst = createSamplerInstrument(id, `Synth ${i}`, pcmUint8, inst.volume, PCM_BASE_RATE, 0, waveLen);
-      // Attach DM1 config for future editor use, but keep synthType as 'Sampler'
-      // so the waveform PCM data routes through the native Tone.js sampler engine.
+      const synthInst = {
+        ...createSamplerInstrument(id, `Synth ${i}`, pcmUint8, inst.volume, PCM_BASE_RATE, 0, waveLen),
+        type: 'synth' as const,
+        synthType: 'DeltaMusic1Synth' as const,
+      } as InstrumentConfig;
       synthInst.deltaMusic1 = buildDM1Config(inst);
       if (chipRam) synthInst.uadeChipRam = chipRam;
       trackerInstruments.push(synthInst);

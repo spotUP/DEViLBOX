@@ -411,7 +411,11 @@ export function parseDeltaMusic2File(bytes: Uint8Array, filename: string): Track
       //   playbackRate = SYNTH_BASE_RATE × 2^((N − 37)/12)
       //   = (PAL_CLOCK/2/856) × 2^((N−37)/12)
       //   = PAL_CLOCK / (2 × periods[N])   [because periods[N] = 856 / 2^((N−37)/12)]
-      builtInstrument = createSamplerInstrument(id, `Synth ${i}`, pcmUint8, 64, SYNTH_BASE_RATE, 0, playLen);
+      builtInstrument = {
+        ...createSamplerInstrument(id, `Synth ${i}`, pcmUint8, 64, SYNTH_BASE_RATE, 0, playLen),
+        type: 'synth' as const,
+        synthType: 'DeltaMusic2Synth' as const,
+      } as InstrumentConfig;
     } else {
       // Placeholder (no sample data / no waveforms)
       builtInstrument = {
