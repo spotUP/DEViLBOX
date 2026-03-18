@@ -148,8 +148,6 @@ function sanitizeLabel(name: string): string {
   let safe = name.startsWith('.') ? '_' + name.slice(1) : name;
   // Escape C keywords by prefixing with underscore
   if (C_KEYWORDS.has(safe)) safe = '_' + safe;
-  // Replace characters invalid in C identifiers
-  safe = safe.replace(/[^a-zA-Z0-9_]/g, '_');
   return safe;
 }
 
@@ -712,10 +710,40 @@ export function emit(ast: AstNode[], resolved: ResolveResult, sourceFile?: strin
         }
       }
     }
-    // Scan all branch instructions.
+    // Scan all branch instructions, tracking scope with RTS-close boundaries.
     let scope: string | null = null;
-    for (const node of ast) {
-      if (node.kind === 'label' && funcLabels.has(node.name)) { scope = node.name; continue; }
+    let brScanLastReturn = false;
+    for (let bsi = 0; bsi < ast.length; bsi++) {
+      const node = ast[bsi];
+      if (node.kind === 'comment') continue;
+      if (node.kind === 'data' || node.kind === 'section') { scope = null; brScanLastReturn = false; continue; }
+      if (node.kind === 'label') {
+        if (funcLabels.has(node.name) || brScanLastReturn) {
+          scope = node.name;
+          // Promote post-RTS labels to funcLabels
+          if (!funcLabels.has(node.name) && brScanLastReturn && isFunctionLabel.has(node.name)) {
+            funcLabels.add(node.name);
+            cfgChanged = true;
+          }
+        }
+        brScanLastReturn = false;
+        continue;
+      }
+      if (node.kind === 'instruction') {
+        const brMn = node.mnemonic.toUpperCase();
+        if (brMn === 'RTS') {
+          let peekIdx = bsi + 1;
+          while (peekIdx < ast.length && ast[peekIdx].kind === 'comment') peekIdx++;
+          if (peekIdx < ast.length && ast[peekIdx].kind === 'label') brScanLastReturn = true;
+        } else if ((brMn === 'BRA' || brMn === 'JMP') && 'label' in (node.operands[0] ?? {})) {
+          const tgt = (node.operands[0] as any).label as string;
+          if (funcLabels.has(tgt)) {
+            let peekIdx = bsi + 1;
+            while (peekIdx < ast.length && ast[peekIdx].kind === 'comment') peekIdx++;
+            if (peekIdx < ast.length && ast[peekIdx].kind === 'label') brScanLastReturn = true;
+          }
+        }
+      }
       if (node.kind !== 'instruction') continue;
       // Pick the operand that holds the branch target label.
       let targetOp = BRANCH_MNEMS.has(node.mnemonic)  ? node.operands[0]

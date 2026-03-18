@@ -99,8 +99,18 @@ function emitRegSized(name: string, size: Size): string {
 }
 
 // Sanitize 68k local labels (starting with '.') to valid C identifiers.
+const C_KEYWORDS = new Set([
+  'auto', 'break', 'case', 'char', 'const', 'continue', 'default', 'do',
+  'double', 'else', 'enum', 'extern', 'float', 'for', 'goto', 'if',
+  'int', 'long', 'register', 'return', 'short', 'signed', 'sizeof', 'static',
+  'struct', 'switch', 'typedef', 'union', 'unsigned', 'void', 'volatile', 'while',
+  'inline', 'restrict', 'asm', 'bool', 'true', 'false', 'NULL',
+]);
+
 function sanitizeLabel(name: string): string {
-  return name.startsWith('.') ? '_' + name.slice(1) : name;
+  let safe = name.startsWith('.') ? '_' + name.slice(1) : name;
+  if (C_KEYWORDS.has(safe)) safe = '_' + safe;
+  return safe;
 }
 
 // Emit a source operand with the correct sub-word width.
