@@ -16,6 +16,7 @@ import {
   DEFAULT_SOUNDMON, DEFAULT_SIDMON, DEFAULT_DIGMUG, DEFAULT_FC, DEFAULT_DELTAMUSIC1, DEFAULT_DELTAMUSIC2, DEFAULT_FRED, DEFAULT_TFMX,
   DEFAULT_OCTAMED, DEFAULT_SIDMON1, DEFAULT_HIPPEL_COSO, DEFAULT_ROB_HUBBARD, DEFAULT_DAVID_WHITTAKER,
   DEFAULT_SONIC_ARRANGER,
+  DEFAULT_INSTEREO2,
   DEFAULT_SUPERCOLLIDER,
   DEFAULT_WOBBLE_BASS,
 } from '@typedefs/instrument';
@@ -72,6 +73,7 @@ const WAMControls = lazy(() => import('../controls/WAMControls').then(m => ({ de
 const VSTBridgePanel = lazy(() => import('../controls/VSTBridgePanel').then(m => ({ default: m.VSTBridgePanel })));
 const HarmonicSynthControls = lazy(() => import('../controls/HarmonicSynthControls').then(m => ({ default: m.HarmonicSynthControls })));
 const ModularSynthControls = lazy(() => import('../synths/modular/ModularSynthControls').then(m => ({ default: m.ModularSynthControls })));
+import { SunVoxModularEditor } from '../synths/modular/SunVoxModularEditor';
 const TonewheelOrganControls = lazy(() => import('../controls/TonewheelOrganControls').then(m => ({ default: m.TonewheelOrganControls })));
 const MelodicaControls = lazy(() => import('../controls/MelodicaControls').then(m => ({ default: m.MelodicaControls })));
 const VitalControls = lazy(() => import('../controls/VitalControls').then(m => ({ default: m.VitalControls })));
@@ -95,6 +97,9 @@ const DeltaMusic1Controls = lazy(() => import('../controls/DeltaMusic1Controls')
 const DeltaMusic2Controls = lazy(() => import('../controls/DeltaMusic2Controls').then(m => ({ default: m.DeltaMusic2Controls })));
 const SonicArrangerControls = lazy(() =>
   import('../controls/SonicArrangerControls').then(m => ({ default: m.SonicArrangerControls }))
+);
+const InStereo2Controls = lazy(() =>
+  import('../controls/InStereo2Controls').then(m => ({ default: m.InStereo2Controls }))
 );
 const SuperColliderEditor = lazy(() => import('../SuperColliderEditor').then(m => ({ default: m.SuperColliderEditor })));
 const GearmulatorEditor = lazy(() => import('../GearmulatorEditor').then(m => ({ default: m.GearmulatorEditor })));
@@ -121,7 +126,7 @@ const WavetableListEditor = lazy(() => import('./WavetableEditor').then(m => ({ 
 
 
 // Types
-export type EditorMode = 'generic' | 'tb303' | 'furnace' | 'buzzmachine' | 'sample' | 'dubsiren' | 'spacelaser' | 'v2' | 'sam' | 'synare' | 'mame' | 'mamechip' | 'dexed' | 'obxd' | 'wam' | 'tonewheelOrgan' | 'melodica' | 'vital' | 'odin2' | 'surge' | 'vstbridge' | 'harmonicsynth' | 'modular' | 'hively' | 'jamcracker' | 'soundmon' | 'sidmon' | 'digmug' | 'fc' | 'deltamusic1' | 'deltamusic2' | 'fred' | 'tfmx' | 'octamed' | 'sidmon1' | 'hippelcoso' | 'robhubbard' | 'davidwhittaker' | 'sonic-arranger' | 'musicline' | 'supercollider' | 'gearmulator' | 'wobblebass' | 'startrekker-am';
+export type EditorMode = 'generic' | 'tb303' | 'furnace' | 'buzzmachine' | 'sample' | 'dubsiren' | 'spacelaser' | 'v2' | 'sam' | 'synare' | 'mame' | 'mamechip' | 'dexed' | 'obxd' | 'wam' | 'tonewheelOrgan' | 'melodica' | 'vital' | 'odin2' | 'surge' | 'vstbridge' | 'harmonicsynth' | 'modular' | 'sunvox-modular' | 'hively' | 'jamcracker' | 'soundmon' | 'sidmon' | 'digmug' | 'fc' | 'deltamusic1' | 'deltamusic2' | 'fred' | 'tfmx' | 'octamed' | 'sidmon1' | 'hippelcoso' | 'robhubbard' | 'davidwhittaker' | 'sonic-arranger' | 'instereo2' | 'musicline' | 'supercollider' | 'gearmulator' | 'wobblebass' | 'startrekker-am';
 
 // ============================================================================
 // GEARMULATOR EDITOR SECTION
@@ -419,6 +424,13 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
       // Ignored — engine may not be initialized
     }
   }, [instrument.sonicArranger, instrument.id, handleChange]);
+
+  // Handle InStereo! 2.0 config updates
+  const handleInStereo2Change = useCallback((updates: Partial<typeof instrument.inStereo2>) => {
+    const current = instrument.inStereo2 || DEFAULT_INSTEREO2;
+    const newConfig = { ...current, ...updates };
+    handleChange({ inStereo2: newConfig });
+  }, [instrument.inStereo2, handleChange]);
 
   // Handle Space Laser config updates
   const handleSpaceLaserChange = useCallback((updates: Partial<typeof instrument.spaceLaser>) => {
@@ -930,6 +942,29 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
           <SonicArrangerControls
             config={saConfig}
             onChange={handleSonicArrangerChange}
+          />
+        </Suspense>
+      </div>
+    );
+  }
+
+  // ============================================================================
+  // INSTEREO! 2.0 EDITOR
+  // ============================================================================
+  if (editorMode === 'instereo2') {
+    const is20Config = deepMerge(DEFAULT_INSTEREO2, instrument.inStereo2 || {});
+    return (
+      <div className="synth-editor-container bg-gradient-to-b from-[#0a0a14] to-[#040408]">
+        <EditorHeader
+          instrument={instrument}
+          onChange={handleChange}
+          vizMode={vizMode}
+          onVizModeChange={setVizMode}
+        />
+        <Suspense fallback={<LoadingControls />}>
+          <InStereo2Controls
+            config={is20Config}
+            onChange={handleInStereo2Change}
           />
         </Suspense>
       </div>
@@ -2345,6 +2380,17 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
             />
           </Suspense>
         </div>
+      </div>
+    );
+  }
+
+  // ============================================================================
+  // SUNVOX MODULAR EDITOR
+  // ============================================================================
+  if (editorMode === 'sunvox-modular') {
+    return (
+      <div className="synth-editor-container flex flex-col h-full">
+        <SunVoxModularEditor config={instrument} onChange={handleChange} />
       </div>
     );
   }

@@ -283,6 +283,37 @@ class SunVoxProcessor extends AudioWorkletProcessor {
       case 'stop':
         if (m) m._sunvox_wasm_stop(data.handle);
         break;
+
+      // ── Module graph (uses available API — no type/connection info in this WASM) ──
+
+      case 'getModuleGraph': {
+        if (!m) break;
+        const count = m._sunvox_wasm_get_module_count(data.handle);
+        const outPtr = m._malloc(256);
+        const graphModules = [];
+        for (let i = 0; i < count; i++) {
+          m._sunvox_wasm_get_module_name(data.handle, i, outPtr, 256);
+          const name = m.UTF8ToString(outPtr);
+          // Get controls for this module
+          const ctlCount = m._sunvox_wasm_get_control_count(data.handle, i);
+          const controls = [];
+          for (let c = 0; c < ctlCount; c++) {
+            m._sunvox_wasm_get_control_name(data.handle, i, c, outPtr, 256);
+            controls.push({
+              name: m.UTF8ToString(outPtr),
+              min: m._sunvox_wasm_get_control_min(data.handle, i, c),
+              max: m._sunvox_wasm_get_control_max(data.handle, i, c),
+              value: m._sunvox_wasm_get_control_value(data.handle, i, c),
+            });
+          }
+          // Infer type from module name and control count (best effort without type API)
+          let typeName = i === 0 ? 'Output' : (ctlCount > 0 ? 'Analog generator' : 'Amplifier');
+          graphModules.push({ id: i, name, typeName, flags: 1, inputs: [], outputs: [], controls });
+        }
+        m._free(outPtr);
+        this.port.postMessage({ type: 'moduleGraph', handle: data.handle, modules: graphModules });
+        break;
+      }
     }
   }
 
