@@ -221,6 +221,15 @@ export const pluginSynthEntries: Record<string, SynthInfo> = {
     icon: 'Sun',
     color: 'text-yellow-400',
   },
+  SunVoxModular: {
+    type: 'SunVoxModular',
+    name: 'SunVox Modular',
+    shortName: 'SVM',
+    description: 'Visual modular editor with 41 SunVox module types — build patches with patch cables',
+    bestFor: ['Modular synth', 'Sound design', 'Complex patches', 'Subtractive', 'FM'],
+    icon: 'Sun',
+    color: 'text-yellow-500',
+  },
   SuperCollider: {
     type: 'SuperCollider',
     name: 'SuperCollider',
