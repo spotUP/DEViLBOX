@@ -1478,7 +1478,7 @@ export class ToneEngine {
       'HivelySynth', 'KlysSynth', 'MAMEVASynth', 'UADESynth',
       'GearmulatorVirus', 'GearmulatorVirusTI', 'GearmulatorMicroQ',
       'GearmulatorXT', 'GearmulatorNord', 'GearmulatorJP8000',
-      'WaveSabreSynth', 'OidosSynth', 'TunefishSynth',
+      'WaveSabreSynth', 'OidosSynth', 'TunefishSynth', 'SunVoxModular',
     ].includes(config.synthType || '');
     const isVSTBridge = !isWASMSynth && typeof config.synthType === 'string' && SYNTH_REGISTRY.has(config.synthType);
     const isSharedType = config.synthType === 'Sampler' || config.synthType === 'Player' || config.synthType === 'SunVoxSynth' || isMAME || isFurnace || isBuzzmachine || isWASMSynth || isVSTBridge;
@@ -2196,8 +2196,9 @@ export class ToneEngine {
       case 'SonicArrangerSynth':
       case 'DeltaMusic1Synth':
       case 'DeltaMusic2Synth':
-      // SunVox WASM patch player
+      // SunVox WASM patch player / modular editor
       case 'SunVoxSynth':
+      case 'SunVoxModular':
       // Gearmulator DSP56300 VA synths
       case 'GearmulatorVirus':
       case 'GearmulatorVirusTI':
