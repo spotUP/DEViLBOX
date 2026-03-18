@@ -113,7 +113,8 @@ function mapMTMEffect(cmd: number, param: number): { effTyp: number; eff: number
  */
 function mtmNoteToXM(rawNote: number): number {
   if (rawNote === 0) return 0;
-  return Math.min(rawNote, 96);
+  // OpenMPT: m.note = rawNote + 24 + NOTE_MIN = rawNote + 25
+  return Math.min(rawNote + 25, 96);
 }
 
 // -- Parser -------------------------------------------------------------------
