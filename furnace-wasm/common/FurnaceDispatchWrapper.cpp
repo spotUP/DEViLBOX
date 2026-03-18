@@ -3617,10 +3617,28 @@ void furnace_dispatch_render_samples(int handle) {
       DivSample* smp = it->second->engine.song.sample[i];
       if (smp) {
         // DivSample::render() is unavailable in WASM (sample.cpp not compiled).
-        // Inline format conversions for all chip-needed formats:
-        if (smp->depth == DIV_SAMPLE_DEPTH_16BIT && smp->data16 && smp->samples > 0) {
+        // Step 1: Ensure 16-bit data exists (convert from source depth if needed)
+        if (smp->samples > 0 && !smp->data16) {
           unsigned int n = smp->samples;
-          // 8-bit PCM (Amiga, PCE PCM, generic)
+          smp->data16 = new short[(n + 511) & (~0x1ff)];
+          smp->length16 = n * 2;
+          memset(smp->data16, 0, ((n + 511) & (~0x1ff)) * sizeof(short));
+          if (smp->depth == DIV_SAMPLE_DEPTH_8BIT && smp->data8) {
+            for (unsigned int j = 0; j < n; j++) smp->data16[j] = smp->data8[j] << 8;
+          } else if (smp->depth == 14 /* DIV_SAMPLE_DEPTH_12BIT */ && smp->data12) {
+            // 12-bit packed: 3 bytes per 2 samples
+            for (unsigned int j = 0, k = 0; j < n; j += 2, k += 3) {
+              if (k + 2 < (unsigned int)smp->length12) {
+                smp->data16[j] = (smp->data12[k] << 8) | (smp->data12[k + 1] & 0xF0);
+                if (j + 1 < n) smp->data16[j + 1] = (smp->data12[k + 2] << 8) | ((smp->data12[k + 1] << 4) & 0xF0);
+              }
+            }
+          }
+        }
+        // Step 2: Generate all target formats from 16-bit
+        if (smp->data16 && smp->samples > 0) {
+          unsigned int n = smp->samples;
+          // 8-bit PCM (Amiga, C140/C219, generic)
           if (!smp->data8) {
             smp->length8 = n;
             smp->data8 = new signed char[(n + 4095) & (~0xfff)];
