@@ -114,8 +114,7 @@ const server = createServer(async (req: IncomingMessage, res: ServerResponse) =>
       'Access-Control-Allow-Origin': '*',
     });
     res.write(':ok\n\n');
-    // Send current state snapshot on connect
-    res.write(`event: snapshot\ndata: ${JSON.stringify(state)}\n\n`);
+    res.write(`event: connected\ndata: "ok"\n\n`);
     sseClients.add(res);
     req.on('close', () => sseClients.delete(res));
     return;
