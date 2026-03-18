@@ -37,6 +37,7 @@
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, TrackerCell, InstrumentConfig } from '@/types';
+import type { InStereo2Config } from '@/types/instrument';
 import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
 import { encodeInStereo2Cell } from '@/engine/uade/encoders/InStereo2Encoder';
 import { createSamplerInstrument } from './AmigaUtils';
@@ -167,6 +168,14 @@ interface IS20Instrument {
   amfLength: number;
   amfRepeat: number;
   egMode: number;
+  egStartLen: number;
+  egStopRep: number;
+  egSpeedUp: number;
+  egSpeedDown: number;
+  adsrTable: number[];      // 128 unsigned bytes
+  lfoTable: number[];       // 128 signed bytes
+  arpeggios: { length: number; repeat: number; values: number[] }[];
+  egTable: number[];        // 128 unsigned bytes
   waveform1: Int8Array;
   waveform2: Int8Array;
 }
@@ -350,26 +359,34 @@ export function parseInStereo2File(bytes: Uint8Array, filename: string): Tracker
     // EnvelopeGeneratorMode: disabled if egEnabled==0; if egMode==0 → Calc, else → Free
     const effectiveEgMode = egEnabled === 0 ? 0 : (egMode === 0 ? 1 : 2);
 
-    const startLen  = u8(bytes, off++);
-    const stopRep   = u8(bytes, off++);
-    const speedUp   = u8(bytes, off++);
-    const speedDown = u8(bytes, off++);
+    const egStartLen  = u8(bytes, off++);
+    const egStopRep   = u8(bytes, off++);
+    const egSpeedUp   = u8(bytes, off++);
+    const egSpeedDown = u8(bytes, off++);
 
-    void startLen; void stopRep; void speedUp; void speedDown;
-
-    off += 19; // skip
+    off += 19; // skip reserved
 
     // ADSR table: 128 unsigned bytes
-    off += 128;
+    const adsrTable: number[] = [];
+    for (let j = 0; j < 128; j++) adsrTable.push(off < bytes.length ? u8(bytes, off++) : 0);
 
     // LFO table: 128 signed bytes
-    off += 128;
+    const lfoTable: number[] = [];
+    for (let j = 0; j < 128; j++) lfoTable.push(off < bytes.length ? s8(bytes[off++]) : 0);
 
     // 3 arpeggios × (1 length + 1 repeat + 14 values) = 3 × 16 = 48 bytes
-    off += 48;
+    const arpeggios: { length: number; repeat: number; values: number[] }[] = [];
+    for (let a = 0; a < 3; a++) {
+      const arpLen = off < bytes.length ? u8(bytes, off++) : 0;
+      const arpRep = off < bytes.length ? u8(bytes, off++) : 0;
+      const vals: number[] = [];
+      for (let v = 0; v < 14; v++) vals.push(off < bytes.length ? s8(bytes[off++]) : 0);
+      arpeggios.push({ length: arpLen, repeat: arpRep, values: vals });
+    }
 
-    // EGC table: 128 unsigned bytes
-    off += 128;
+    // EG table: 128 unsigned bytes
+    const egTable: number[] = [];
+    for (let j = 0; j < 128; j++) egTable.push(off < bytes.length ? u8(bytes, off++) : 0);
 
     // Waveform 1: 256 signed bytes
     const waveform1 = new Int8Array(256);
@@ -392,7 +409,10 @@ export function parseInStereo2File(bytes: Uint8Array, filename: string): Tracker
     synthInstruments.push({
       name, waveformLength, volume, vibratoDelay, vibratoSpeed, vibratoLevel,
       portamentoSpeed, adsrLength, adsrRepeat, sustainPoint, sustainSpeed,
-      amfLength, amfRepeat, egMode: effectiveEgMode, waveform1, waveform2,
+      amfLength, amfRepeat, egMode: effectiveEgMode,
+      egStartLen, egStopRep, egSpeedUp, egSpeedDown,
+      adsrTable, lfoTable, arpeggios, egTable,
+      waveform1, waveform2,
     });
   }
 
@@ -466,10 +486,42 @@ export function parseInStereo2File(bytes: Uint8Array, filename: string): Tracker
     }
     // Rate = C3_FREQ * waveformLength so one loop cycle = one period of C3
     const synthRate = Math.round(C3_FREQ * playLen);
+
+    // Build InStereo2Config for the synth editor
+    const is20Config: InStereo2Config = {
+      volume: instr.volume,
+      waveformLength: instr.waveformLength,
+      portamentoSpeed: instr.portamentoSpeed,
+      vibratoDelay: instr.vibratoDelay,
+      vibratoSpeed: instr.vibratoSpeed,
+      vibratoLevel: instr.vibratoLevel,
+      adsrLength: instr.adsrLength,
+      adsrRepeat: instr.adsrRepeat,
+      sustainPoint: instr.sustainPoint,
+      sustainSpeed: instr.sustainSpeed,
+      amfLength: instr.amfLength,
+      amfRepeat: instr.amfRepeat,
+      egMode: instr.egMode,
+      egStartLen: instr.egStartLen,
+      egStopRep: instr.egStopRep,
+      egSpeedUp: instr.egSpeedUp,
+      egSpeedDown: instr.egSpeedDown,
+      arpeggios: instr.arpeggios as InStereo2Config['arpeggios'],
+      adsrTable: instr.adsrTable,
+      lfoTable: instr.lfoTable,
+      egTable: instr.egTable,
+      waveform1: Array.from(instr.waveform1),
+      waveform2: Array.from(instr.waveform2),
+      name: instr.name || `Synth ${i}`,
+    };
+
     instrConfigs.push({
       ...createSamplerInstrument(id, instr.name || `Synth ${i}`, pcmUint8, instr.volume, synthRate, 0, playLen),
+      type: 'synth' as const,
+      synthType: 'InStereo2Synth' as const,
+      inStereo2: is20Config,
       uadeChipRam: syntChipRam,
-    });
+    } as unknown as InstrumentConfig);
   }
 
   // ── Build instrument number remap table ───────────────────────────────
