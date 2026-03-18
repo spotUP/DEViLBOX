@@ -13,6 +13,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { GripVertical, X, ChevronDown, ChevronRight } from 'lucide-react';
 import type { ModularModuleInstance, PortRef } from '../../../../../types/modular';
 import { ModuleRegistry } from '../../../../../engine/modular/ModuleRegistry';
+import { getSunVoxControlMeta } from '../../../../../engine/sunvox-modular/graphToConfig';
 import { JackPort } from './JackPort';
 import { Knob } from '../../../../controls/Knob';
 
@@ -100,6 +101,20 @@ export const ModulePanel: React.FC<ModulePanelProps> = ({
 
   const inputPorts = descriptor.ports.filter((p) => p.direction === 'input');
   const outputPorts = descriptor.ports.filter((p) => p.direction === 'output');
+
+  // SunVox dynamic controls: derive from ctl_* keys in module.parameters + metadata
+  const sunVoxControls = React.useMemo(() => {
+    if (descriptor.parameters.length > 0) return []; // Has static params, skip
+    const meta = getSunVoxControlMeta(module.id);
+    if (meta.length === 0) return [];
+    return meta.map((m) => ({
+      paramKey: `ctl_${m.id}`,
+      name: m.name,
+      min: m.min,
+      max: m.max,
+      value: module.parameters[`ctl_${m.id}`] ?? 0,
+    }));
+  }, [module.id, module.parameters, descriptor.parameters.length]);
 
   const handleClick = () => {
     onModuleClick(module.id);
@@ -216,7 +231,7 @@ export const ModulePanel: React.FC<ModulePanelProps> = ({
             </div>
           )}
 
-          {/* Parameters */}
+          {/* Parameters — static from descriptor */}
           {descriptor.parameters.length > 0 && (
             <div className="flex flex-col gap-2">
               <span className="text-xs text-text-muted uppercase">Parameters</span>
@@ -237,6 +252,31 @@ export const ModulePanel: React.FC<ModulePanelProps> = ({
                   </div>
                 ))}
               </div>
+            </div>
+          )}
+
+          {/* SunVox dynamic controls — shown when descriptor has no static params but module has ctl_* */}
+          {descriptor.parameters.length === 0 && sunVoxControls.length > 0 && (
+            <div className="flex flex-col gap-1">
+              {sunVoxControls.map((ctl) => (
+                <div key={ctl.paramKey} className="flex items-center gap-1.5">
+                  <span className="text-[9px] text-text-secondary w-16 truncate" title={ctl.name}>
+                    {ctl.name}
+                  </span>
+                  <input
+                    type="range"
+                    min={ctl.min}
+                    max={ctl.max}
+                    value={module.parameters[ctl.paramKey] ?? ctl.value}
+                    onChange={(e) => onParameterChange(module.id, ctl.paramKey, parseInt(e.target.value, 10))}
+                    className="flex-1 h-0.5 accent-accent-primary cursor-pointer"
+                    style={{ minWidth: 0 }}
+                  />
+                  <span className="text-[9px] text-text-muted w-8 text-right tabular-nums">
+                    {module.parameters[ctl.paramKey] ?? ctl.value}
+                  </span>
+                </div>
+              ))}
             </div>
           )}
 
