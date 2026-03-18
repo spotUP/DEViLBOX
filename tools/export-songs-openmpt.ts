@@ -1244,63 +1244,56 @@ const EXPORTS_DIR = join(SONGS_DIR, 'exports');
 
 const TEST_CASES: TestCase[] = [
   // === MOD / ProTracker ===
-  { file: 'mod/break the box.mod', format: 'MOD', parserModule: 'MODParser', parseFn: 'parseMODFile', isAsync: true, noteExportOffset: 36 },
+  { file: 'formats/a sleep so deep.mod', format: 'MOD', parserModule: 'MODParser', parseFn: 'parseMODFile', isAsync: true, noteExportOffset: 36 },
 
-  // === Amiga Formats (→ MOD, 4ch) ===
-  { file: 'ahx/amanda.ahx', format: 'AHX', parserModule: 'HivelyParser', parseFn: 'parseHivelyFile', isAsync: false, noteExportOffset: 36, xmNoteExportOffset: 12 },
+  // === AHX / Hively ===
+  { file: 'formats/aces_high.ahx', format: 'AHX', parserModule: 'HivelyParser', parseFn: 'parseHivelyFile', isAsync: false, noteExportOffset: 36, xmNoteExportOffset: 12 },
+  { file: 'formats/hexplosion.hvl', format: 'HVL', parserModule: 'HivelyParser', parseFn: 'parseHivelyFile', isAsync: false, noteExportOffset: 36, xmNoteExportOffset: 12 },
 
   // === PC Formats (→ XM) ===
-  // Note: these test files may not exist yet — tool skips missing files gracefully
-  { file: 'formats/test.xm', format: 'XM', parserModule: 'XMParser', parseFn: 'parseXMFile', isAsync: true, exportAs: 'xm' },
-  { file: 'formats/test.gdm', format: 'GDM', parserModule: 'GDMParser', parseFn: 'parseGDMFile', isAsync: true, exportAs: 'xm', xmRelNoteOffset: -12 },
-  { file: 'formats/test.s3m', format: 'S3M', parserModule: 'S3MParser', parseFn: 'parseS3MFile', isAsync: false, exportAs: 'xm', xmRelNoteOffset: -12 },
-  { file: 'formats/test.it', format: 'IT', parserModule: 'ITParser', parseFn: 'parseITFile', isAsync: false, exportAs: 'xm', xmRelNoteOffset: -12 },
-  { file: 'formats/test.stm', format: 'STM', parserModule: 'STMParser', parseFn: 'parseSTMFile', isAsync: true, exportAs: 'xm', xmRelNoteOffset: -12 },
-  { file: 'formats/test.669', format: '669', parserModule: 'Format669Parser', parseFn: 'parse669File', isAsync: true, exportAs: 'xm', xmRelNoteOffset: -12, bpm: 78 },
-  { file: 'formats/test.far', format: 'FAR', parserModule: 'FARParser', parseFn: 'parseFARFile', isAsync: true, exportAs: 'xm', xmRelNoteOffset: -12 },
-  { file: 'formats/test.ult', format: 'ULT', parserModule: 'ULTParser', parseFn: 'parseULTFile', isAsync: true, exportAs: 'xm', xmRelNoteOffset: -12, speed: 4 },
-  { file: 'formats/test.mtm', format: 'MTM', parserModule: 'MTMParser', parseFn: 'parseMTMFile', isAsync: true, exportAs: 'xm' },
-  { file: 'formats/test.psm', format: 'PSM', parserModule: 'PSMParser', parseFn: 'parsePSMFile', isAsync: false, args: 'bytes', exportAs: 'xm', xmRelNoteOffset: -12 },
-  { file: 'formats/test.med', format: 'MED', parserModule: 'MEDParser', parseFn: 'parseMEDFile', isAsync: false, noteExportOffset: 36 },
+  { file: 'formats/flo boarding - level 1.xm', format: 'XM', parserModule: 'XMParser', parseFn: 'parseXMFile', isAsync: true, exportAs: 'xm' },
+  { file: 'formats/andante.s3m', format: 'S3M', parserModule: 'S3MParser', parseFn: 'parseS3MFile', isAsync: false, exportAs: 'xm', xmRelNoteOffset: -12 },
+  { file: 'formats/nightmare on acid.s3m', format: 'S3M', parserModule: 'S3MParser', parseFn: 'parseS3MFile', isAsync: false, exportAs: 'xm', xmRelNoteOffset: -12 },
+  { file: 'formats/absm chain mod.it', format: 'IT', parserModule: 'ITParser', parseFn: 'parseITFile', isAsync: false, exportAs: 'xm', xmRelNoteOffset: -12 },
+  { file: 'formats/slideshow i.stm', format: 'STM', parserModule: 'STMParser', parseFn: 'parseSTMFile', isAsync: true, exportAs: 'xm', xmRelNoteOffset: -12 },
+  { file: 'formats/fonetag.669', format: '669', parserModule: 'Format669Parser', parseFn: 'parse669File', isAsync: true, exportAs: 'xm', xmRelNoteOffset: -12, bpm: 78 },
+  { file: 'formats/m31.far', format: 'FAR', parserModule: 'FARParser', parseFn: 'parseFARFile', isAsync: true, exportAs: 'xm', xmRelNoteOffset: -12 },
+  { file: 'formats/seasons.ult', format: 'ULT', parserModule: 'ULTParser', parseFn: 'parseULTFile', isAsync: true, exportAs: 'xm', xmRelNoteOffset: -12 },
+  { file: 'formats/anonymous in 4ce.mtm', format: 'MTM', parserModule: 'MTMParser', parseFn: 'parseMTMFile', isAsync: true, exportAs: 'xm' },
 
-  // === More Amiga Formats (→ MOD) ===
-  { file: 'formats/test.fc', format: 'FC', parserModule: 'FCParser', parseFn: 'parseFCFile', isAsync: false, noteExportOffset: 36 },
-  { file: 'formats/test.smon', format: 'SMON', parserModule: 'SoundMonParser', parseFn: 'parseSoundMonFile', isAsync: true, noteExportOffset: 36 },
-  { file: 'formats/test.okt', format: 'OKT', parserModule: 'OktalyzerParser', parseFn: 'parseOktalyzerFile', isAsync: false, noteExportOffset: 36, xmNoteExportOffset: 24 },
-  { file: 'formats/test.jam', format: 'JAM', parserModule: 'JamCrackerParser', parseFn: 'parseJamCrackerFile', isAsync: true, noteExportOffset: 36 },
-  { file: 'formats/test.dm1', format: 'DM1', parserModule: 'DeltaMusic1Parser', parseFn: 'parseDeltaMusic1File', isAsync: true, noteExportOffset: 36 },
-  { file: 'formats/test.dm2', format: 'DM2', parserModule: 'DeltaMusic2Parser', parseFn: 'parseDeltaMusic2File', isAsync: false, args: 'bytes', noteExportOffset: 36 },
-  { file: 'formats/test.dmu', format: 'DMUG', parserModule: 'DigitalMugicianParser', parseFn: 'parseDigitalMugicianFile', isAsync: true, noteExportOffset: 36 },
-  { file: 'formats/test.sid1', format: 'SIDMON1', parserModule: 'SidMon1Parser', parseFn: 'parseSidMon1File', isAsync: false, noteExportOffset: 36 },
-  { file: 'formats/test.is', format: 'IS1', parserModule: 'InStereo1Parser', parseFn: 'parseInStereo1File', isAsync: false, args: 'bytes', noteExportOffset: 36 },
-  { file: 'formats/test.is20', format: 'IS2', parserModule: 'InStereo2Parser', parseFn: 'parseInStereo2File', isAsync: false, args: 'bytes', noteExportOffset: 36 },
-  { file: 'formats/test.qc', format: 'QC', parserModule: 'QuadraComposerParser', parseFn: 'parseQuadraComposerFile', isAsync: true, noteExportOffset: 36 },
-  { file: 'formats/test.hipc', format: 'HIPC', parserModule: 'HippelCoSoParser', parseFn: 'parseHippelCoSoFile', isAsync: true, noteExportOffset: 36 },
-  { file: 'formats/test.aps', format: 'APS', parserModule: 'ActionamicsParser', parseFn: 'parseActionamicsFile', isAsync: false, args: 'bytes', noteExportOffset: 36 },
-  { file: 'formats/test.sa', format: 'SA', parserModule: 'SonicArrangerParser', parseFn: 'parseSonicArrangerFile', isAsync: true, noteExportOffset: 36 },
-  { file: 'formats/test.tw', format: 'TW', parserModule: 'SteveTurnerParser', parseFn: 'parseSteveTurnerFile', isAsync: false, noteExportOffset: 36 },
-  { file: 'formats/test.fp', format: 'FP', parserModule: 'FuturePlayerParser', parseFn: 'parseFuturePlayerFile', isAsync: false, noteExportOffset: 36 },
-  { file: 'formats/test.aon', format: 'AON', parserModule: 'ArtOfNoiseParser', parseFn: 'parseArtOfNoiseFile', isAsync: false, args: 'bytes' },
-  { file: 'formats/test.tcb', format: 'TCB', parserModule: 'TCBTrackerParser', parseFn: 'parseTCBTrackerFile', isAsync: true },
+  // === MED ===
+  { file: 'formats/med.sadman', format: 'MED', parserModule: 'MEDParser', parseFn: 'parseMEDFile', isAsync: false, noteExportOffset: 36 },
+  { file: 'formats/funky nightmare.mmd1', format: 'MED', parserModule: 'MEDParser', parseFn: 'parseMEDFile', isAsync: false, noteExportOffset: 36 },
+  { file: 'formats/universal monsters - dracula.mmd0', format: 'MED', parserModule: 'MEDParser', parseFn: 'parseMEDFile', isAsync: false, noteExportOffset: 36 },
+  { file: 'formats/bounty hunter - outro (remixed).mmd3', format: 'MED', parserModule: 'MEDParser', parseFn: 'parseMEDFile', isAsync: false, noteExportOffset: 36 },
 
-  // === More Amiga PCM-based Formats ===
-  { file: 'formats/test.sfx', format: 'SFX', parserModule: 'SoundFXParser', parseFn: 'parseSoundFXFile', isAsync: true, noteExportOffset: 36 },
-  { file: 'formats/test.digi', format: 'DIGI', parserModule: 'DigiBoosterParser', parseFn: 'parseDigiBoosterFile', isAsync: false, noteExportOffset: 36 },
-  { file: 'formats/test.dbm', format: 'DBM', parserModule: 'DigiBoosterProParser', parseFn: 'parseDigiBoosterProFile', isAsync: false, args: 'bytes', noteExportOffset: 36 },
-
-  // Additional formats as available
-  { file: 'formats/test.pt36', format: 'PT36', parserModule: 'PT36Parser', parseFn: 'parsePT36File', isAsync: true, noteExportOffset: 36 },
-  { file: 'formats/test.stp', format: 'STP', parserModule: 'STPParser', parseFn: 'parseSTPFile', isAsync: true, noteExportOffset: 36 },
-  { file: 'formats/test.ims', format: 'IMS', parserModule: 'IMSParser', parseFn: 'parseIMSFile', isAsync: true, noteExportOffset: 36 },
-  { file: 'formats/test.gmc', format: 'GMC', parserModule: 'GMCParser', parseFn: 'parseGMCFile', isAsync: true, noteExportOffset: 36 },
-  { file: 'formats/test.ice', format: 'ICE', parserModule: 'ICEParser', parseFn: 'parseICEFile', isAsync: true, noteExportOffset: 36 },
-  { file: 'formats/test.bd', format: 'BD', parserModule: 'BenDaglishSIDParser', parseFn: 'parseBenDaglishSIDFile', isAsync: true, noteExportOffset: 36 },
-  { file: 'formats/test.rhub', format: 'RHUB', parserModule: 'RobHubbardParser', parseFn: 'parseRobHubbardFile', isAsync: true, noteExportOffset: 36 },
-  { file: 'formats/test.sid2', format: 'SIDMON2', parserModule: 'SidMon2Parser', parseFn: 'parseSidMon2File', isAsync: true, noteExportOffset: 36 },
-  { file: 'formats/test.dl', format: 'DL', parserModule: 'DaveLoweParser', parseFn: 'parseDaveLoweFile', isAsync: true, noteExportOffset: 36 },
-  { file: 'formats/test.jp', format: 'JP', parserModule: 'JasonPageParser', parseFn: 'parseJasonPageFile', isAsync: true, noteExportOffset: 36 },
-  { file: 'formats/test.fred', format: 'FRED', parserModule: 'FredEditorParser', parseFn: 'parseFredEditorFile', isAsync: true, noteExportOffset: 36 },
-  { file: 'formats/test.nru', format: 'NRU', parserModule: 'NRUParser', parseFn: 'parseNRUFile', isAsync: true, noteExportOffset: 36 },
+  // === Amiga Synth Formats (→ MOD) ===
+  { file: 'formats/anthrox.fc', format: 'FC', parserModule: 'FCParser', parseFn: 'parseFCFile', isAsync: false, noteExportOffset: 36 },
+  { file: 'formats/adept.smod', format: 'FC', parserModule: 'FCParser', parseFn: 'parseFCFile', isAsync: false, noteExportOffset: 36 },
+  { file: 'formats/antidust.bp3', format: 'SMON', parserModule: 'SoundMonParser', parseFn: 'parseSoundMonFile', isAsync: true, noteExportOffset: 36 },
+  { file: 'formats/aquarivs.bp', format: 'SMON', parserModule: 'SoundMonParser', parseFn: 'parseSoundMonFile', isAsync: true, noteExportOffset: 36 },
+  { file: 'formats/45.okta', format: 'OKT', parserModule: 'OktalyzerParser', parseFn: 'parseOktalyzerFile', isAsync: false, noteExportOffset: 36, xmNoteExportOffset: 24 },
+  { file: 'formats/analogue_vibes.jam', format: 'JAM', parserModule: 'JamCrackerParser', parseFn: 'parseJamCrackerFile', isAsync: true, noteExportOffset: 36 },
+  { file: 'formats/crusaders1.dm', format: 'DM1', parserModule: 'DeltaMusic1Parser', parseFn: 'parseDeltaMusic1File', isAsync: true, noteExportOffset: 36 },
+  { file: 'formats/anthrox_intro.dm2', format: 'DM2', parserModule: 'DeltaMusic2Parser', parseFn: 'parseDeltaMusic2File', isAsync: false, args: 'bytes', noteExportOffset: 36 },
+  { file: 'formats/cockwise.mug', format: 'DMUG', parserModule: 'DigitalMugicianParser', parseFn: 'parseDigitalMugicianFile', isAsync: true, noteExportOffset: 36 },
+  { file: 'formats/snickle.mug2', format: 'DMUG', parserModule: 'DigitalMugicianParser', parseFn: 'parseDigitalMugicianFile', isAsync: true, noteExportOffset: 36 },
+  { file: 'formats/flight.dmu', format: 'DMUG', parserModule: 'DigitalMugicianParser', parseFn: 'parseDigitalMugicianFile', isAsync: true, noteExportOffset: 36 },
+  { file: 'formats/anarchy.sid1', format: 'SIDMON1', parserModule: 'SidMon1Parser', parseFn: 'parseSidMon1File', isAsync: false, noteExportOffset: 36 },
+  { file: 'formats/bruno_time.sid2', format: 'SIDMON2', parserModule: 'SidMon2Parser', parseFn: 'parseSidMon2File', isAsync: true, noteExportOffset: 36 },
+  { file: 'formats/fantasi8.is', format: 'IS1', parserModule: 'InStereo1Parser', parseFn: 'parseInStereo1File', isAsync: false, args: 'bytes', noteExportOffset: 36 },
+  { file: 'formats/stereo_feeling.is20', format: 'IS2', parserModule: 'InStereo2Parser', parseFn: 'parseInStereo2File', isAsync: false, args: 'bytes', noteExportOffset: 36 },
+  { file: 'formats/synth_corn.emod', format: 'QC', parserModule: 'QuadraComposerParser', parseFn: 'parseQuadraComposerFile', isAsync: true, noteExportOffset: 36 },
+  { file: 'formats/prehistoric_tale.hipc', format: 'HIPC', parserModule: 'HippelCoSoParser', parseFn: 'parseHippelCoSoFile', isAsync: true, noteExportOffset: 36 },
+  { file: 'formats/dynablaster.ast', format: 'APS', parserModule: 'ActionamicsParser', parseFn: 'parseActionamicsFile', isAsync: false, args: 'bytes', noteExportOffset: 36 },
+  { file: 'formats/almighty.sa', format: 'SA', parserModule: 'SonicArrangerParser', parseFn: 'parseSonicArrangerFile', isAsync: true, noteExportOffset: 36 },
+  { file: 'formats/offroad.jpo', format: 'TW', parserModule: 'SteveTurnerParser', parseFn: 'parseSteveTurnerFile', isAsync: false, noteExportOffset: 36 },
+  { file: 'formats/hybris.fp', format: 'FP', parserModule: 'FuturePlayerParser', parseFn: 'parseFuturePlayerFile', isAsync: false, noteExportOffset: 36 },
+  { file: 'formats/apb.dw', format: 'DW', parserModule: 'DavidWhittakerParser', parseFn: 'parseDavidWhittakerFile', isAsync: false, noteExportOffset: 36 },
+  { file: 'formats/action_section.aon', format: 'AON', parserModule: 'ArtOfNoiseParser', parseFn: 'parseArtOfNoiseFile', isAsync: false, args: 'bytes' },
+  { file: 'formats/cannonfodder.tcb', format: 'TCB', parserModule: 'TCBTrackerParser', parseFn: 'parseTCBTrackerFile', isAsync: true },
+  { file: 'formats/doxtro3.dss', format: 'DSS', parserModule: 'DigitalSoundStudioParser', parseFn: 'parseDigitalSoundStudioFile', isAsync: false, args: 'bytes', noteExportOffset: 36 },
+  { file: 'formats/baseheads.ma', format: 'MA', parserModule: 'MusicAssemblerParser', parseFn: 'parseMusicAssemblerFile', isAsync: false, args: 'bytes', noteExportOffset: 36 },
 ];
 
 // ============================================================================
