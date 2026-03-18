@@ -241,20 +241,22 @@ export class SunVoxModularSynth implements DevilboxSynth {
     return this.engine.saveSong(this._handle);
   }
 
+  // ── Sequencer control (used by NativeEngineRouting for song-mode playback) ──
+
+  startSequencer(): void {
+    void this._initPromise.then(() => {
+      if (!this._disposed && this._handle >= 0) this.engine.play(this._handle);
+    });
+  }
+
+  stopSequencer(): void {
+    if (this._handle >= 0) this.engine.stop(this._handle);
+  }
+
   // ── DevilboxSynth interface ─────────────────────────────────────────────
 
   triggerAttack(note?: string | number, _time?: number, velocity?: number): void {
-    if (this._disposed) return;
-
-    // Song mode: start SunVox internal sequencer (only first instance does this)
-    if (this._songData) {
-      void this._initPromise.then(() => {
-        if (!this._disposed && this._handle >= 0) this.engine.play(this._handle);
-      });
-      return;
-    }
-
-    if (this._handle < 0 || this._noteTargetSvId < 0) return;
+    if (this._disposed || this._handle < 0 || this._noteTargetSvId < 0) return;
 
     let midiNote: number;
     if (typeof note === 'string') midiNote = noteToMidi(note);
@@ -266,14 +268,7 @@ export class SunVoxModularSynth implements DevilboxSynth {
   }
 
   triggerRelease(_note?: string | number, _time?: number): void {
-    if (this._disposed) return;
-
-    if (this._songData) {
-      if (this._handle >= 0) this.engine.stop(this._handle);
-      return;
-    }
-
-    if (this._handle < 0 || this._noteTargetSvId < 0) return;
+    if (this._disposed || this._handle < 0 || this._noteTargetSvId < 0) return;
     this.engine.noteOff(this._handle, this._noteTargetSvId);
   }
 

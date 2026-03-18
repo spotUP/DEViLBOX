@@ -306,8 +306,36 @@ class SunVoxProcessor extends AudioWorkletProcessor {
               value: m._sunvox_wasm_get_control_value(data.handle, i, c),
             });
           }
-          // Infer type from module name and control count (best effort without type API)
-          let typeName = i === 0 ? 'Output' : (ctlCount > 0 ? 'Analog generator' : 'Amplifier');
+          // Infer module type from control names (best effort without native type API)
+          let typeName = 'Unknown';
+          if (i === 0) {
+            typeName = 'Output';
+          } else {
+            const ctlNames = controls.map(c => c.name.toLowerCase());
+            const has = (s) => ctlNames.some(n => n.includes(s));
+            if (has('waveform') && has('duty cycle')) typeName = 'Analog generator';
+            else if (has('fm algo') || (has('panning') && has('c.ratio') && ctlCount >= 10)) typeName = 'FM';
+            else if (has('freq') && has('boost') && has('bandwidth')) typeName = 'EQ';
+            else if (has('roll-off') && has('freq')) typeName = 'Filter Pro';
+            else if (has('type') && has('freq') && has('resonance') && !has('roll-off')) typeName = 'Filter';
+            else if (has('power') && has('type') && has('bit depth')) typeName = 'Distortion';
+            else if (has('dry') && has('wet') && has('delay') && !has('feedback')) typeName = 'Delay';
+            else if (has('dry') && has('wet') && has('feedback')) typeName = 'Echo';
+            else if (has('dry') && has('wet') && has('room size')) typeName = 'Reverb';
+            else if (has('dry') && has('wet') && has('lfo')) typeName = 'Flanger';
+            else if (has('dry') && has('wet') && has('channels')) typeName = 'Vibrato';
+            else if (has('attack') && has('release') && has('threshold')) typeName = 'Compressor';
+            else if (has('waveform') && has('generator') && !has('duty')) typeName = 'Generator';
+            else if (has('velocity') && has('waveform') && has('vol')) typeName = 'Kicker';
+            else if (has('volume') && has('panning') && ctlCount <= 6 && !has('waveform')) typeName = 'Amplifier';
+            else if (has('harmonic')) typeName = 'SpectraVoice';
+            else if (has('sample') && has('interpolation')) typeName = 'Sampler';
+            else if (has('freq') && has('amplitude') && has('duty') && ctlCount <= 4) typeName = 'LFO';
+            else if (has('attack') && has('decay') && has('sustain') && has('release') && ctlCount <= 8) typeName = 'ADSR';
+            else if (has('curve') && has('dc filter')) typeName = 'WaveShaper';
+            else if (ctlCount > 0) typeName = 'Generator';
+            else typeName = 'Amplifier';
+          }
           graphModules.push({ id: i, name, typeName, flags: 1, inputs: [], outputs: [], controls });
         }
         m._free(outPtr);

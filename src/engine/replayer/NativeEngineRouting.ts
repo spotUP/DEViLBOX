@@ -605,25 +605,43 @@ export async function startNativeEngines(
     }
   }
 
-  // --- SunVox song mode: suppress TrackerReplayer note triggers, start internal sequencer ---
-  // SunVox songs use SunVoxSynth with isSong=true. The SunVox engine runs its own internal
-  // sequencer, so TrackerReplayer must not drive individual note-on/off calls.
+  // --- SunVox song mode ---
+  // SunVoxSynth (old black-box player): start sequencer, suppress notes
+  // SunVoxModular (new modular editor): start sequencer for audio, but let replayer drive notes
   if (!muted) {
-    const sunvoxSongInsts = song.instruments.filter(
-      i => (i.synthType === 'SunVoxSynth' || i.synthType === 'SunVoxModular') && i.sunvox?.isSong === true,
+    // Old SunVoxSynth: keep original behavior (suppress notes, internal sequencer)
+    const svSynthInsts = song.instruments.filter(
+      i => i.synthType === 'SunVoxSynth' && i.sunvox?.isSong === true,
     );
-    if (sunvoxSongInsts.length > 0) {
+    if (svSynthInsts.length > 0) {
       suppressNotes = true;
-      for (const inst of sunvoxSongInsts) {
+      for (const inst of svSynthInsts) {
         try {
           const svSynth = toneEngine.getInstrument(inst.id, inst);
           if (svSynth && 'triggerAttack' in svSynth) {
             (svSynth as import('@/types/synth').DevilboxSynth).triggerAttack?.(60);
-            console.log('[NativeEngineRouting] SunVox song started (instrument', inst.id, ')');
           }
-        } catch (err) {
-          console.error('[NativeEngineRouting] SunVox song start failed:', err);
+        } catch { /* ignored */ }
+      }
+    }
+
+    // SunVoxModular: start the sequencer (for audio processing) but DON'T suppress notes
+    // TrackerReplayer drives note events to individual instruments via noteTargetModuleId
+    const svModularInsts = song.instruments.filter(
+      i => i.synthType === 'SunVoxModular' && i.sunvox?.isSong === true,
+    );
+    if (svModularInsts.length > 0) {
+      // Start sequencer on first instance (all share the same WASM handle)
+      try {
+        const firstSynth = toneEngine.getInstrument(svModularInsts[0].id, svModularInsts[0]);
+        if (firstSynth && 'startSequencer' in firstSynth) {
+          (firstSynth as import('@/engine/sunvox-modular/SunVoxModularSynth').SunVoxModularSynth).startSequencer();
+          console.log('[NativeEngineRouting] SunVox modular sequencer started');
         }
+      } catch { /* ignored */ }
+      // Pre-create all instrument synths so audio graph is connected
+      for (const inst of svModularInsts) {
+        toneEngine.getInstrument(inst.id, inst);
       }
     }
   }
@@ -705,7 +723,9 @@ export function stopNativeEngines(
     for (const inst of sunvoxSongInsts) {
       try {
         const svSynth = toneEngine.getInstrument(inst.id, inst);
-        if (svSynth && 'triggerRelease' in svSynth) {
+        if (svSynth && 'stopSequencer' in svSynth) {
+          (svSynth as import('@/engine/sunvox-modular/SunVoxModularSynth').SunVoxModularSynth).stopSequencer();
+        } else if (svSynth && 'triggerRelease' in svSynth) {
           (svSynth as import('@/types/synth').DevilboxSynth).triggerRelease?.();
         }
       } catch { /* ignored */ }

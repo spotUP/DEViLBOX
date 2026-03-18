@@ -55,6 +55,26 @@ export const SunVoxModularEditor: React.FC<SunVoxModularEditorProps> = ({ config
 
   const handlePatchChange = useCallback(
     (newPatch: ModularPatchConfig) => {
+      // Push parameter changes to WASM in real-time
+      const prev = prevPatchRef.current;
+      for (const mod of newPatch.modules) {
+        const prevMod = prev.modules.find(m => m.id === mod.id);
+        if (!prevMod) continue;
+        for (const [key, val] of Object.entries(mod.parameters)) {
+          if (prevMod.parameters[key] !== val && key.startsWith('ctl_')) {
+            const ctlId = parseInt(key.slice(4), 10);
+            void (async () => {
+              try {
+                const { getToneEngine } = await import('@/engine/ToneEngine');
+                const synth = getToneEngine().getInstrument(configRef.current.id, configRef.current);
+                if (synth && 'set' in synth) {
+                  (synth as SunVoxModularSynth).set(`${mod.id}.${ctlId}`, val as number);
+                }
+              } catch { /* ToneEngine not ready */ }
+            })();
+          }
+        }
+      }
       onChange({ sunvoxModular: { ...newPatch, backend: 'sunvox' } });
     },
     [onChange]
@@ -80,6 +100,30 @@ export const SunVoxModularEditor: React.FC<SunVoxModularEditorProps> = ({ config
         <span className="text-accent-primary font-bold">SunVox</span>
         <span>Modules: {patchConfig.modules.length}</span>
         <span>Connections: {patchConfig.connections.length}</span>
+        <div className="flex-1" />
+        <button
+          onClick={async () => {
+            try {
+              const { getToneEngine } = await import('@/engine/ToneEngine');
+              const synth = getToneEngine().getInstrument(configRef.current.id, configRef.current);
+              if (synth && 'save' in synth) {
+                const data = await (synth as SunVoxModularSynth).save();
+                const blob = new Blob([data], { type: 'application/octet-stream' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `${configRef.current.name || 'patch'}.sunvox`;
+                a.click();
+                URL.revokeObjectURL(url);
+              }
+            } catch (err) {
+              console.error('[SunVoxModularEditor] Save failed:', err);
+            }
+          }}
+          className="px-2 py-0.5 bg-dark-bgTertiary border border-dark-border rounded hover:bg-accent-primary/20 hover:border-accent-primary transition-colors text-text-secondary hover:text-text-primary"
+        >
+          Save .sunvox
+        </button>
       </div>
     </div>
   );
