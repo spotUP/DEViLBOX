@@ -25,6 +25,16 @@ export interface SunVoxModuleInfo {
   name: string;
 }
 
+export interface SunVoxModuleGraphEntry {
+  id: number;
+  name: string;
+  typeName: string;
+  flags: number;
+  inputs: number[];
+  outputs: number[];
+  controls: SunVoxControl[];
+}
+
 export interface SunVoxSongMeta {
   songName: string;
   bpm: number;
@@ -82,6 +92,11 @@ export class SunVoxEngine {
   private _synthSavedQueue: Map<string, PendingResolvers<ArrayBuffer>> = new Map();
   private _modulesQueue: Map<number, PendingResolvers<SunVoxModuleInfo[]>> = new Map();
   private _controlsQueue: Map<string, PendingResolvers<SunVoxControl[]>> = new Map();
+  private _newModuleQueue: Array<PendingResolvers<number>> = [];
+  private _removeModuleQueue: Map<string, PendingResolvers<void>> = new Map();
+  private _connectQueue: Map<string, PendingResolvers<number>> = new Map();
+  private _disconnectQueue: Map<string, PendingResolvers<number>> = new Map();
+  private _moduleGraphQueue: Map<number, PendingResolvers<SunVoxModuleGraphEntry[]>> = new Map();
 
   private constructor() {
     this.audioContext = getDevilboxAudioContext();
@@ -236,7 +251,7 @@ export class SunVoxEngine {
     handle?: number;
     moduleId?: number;
     buffer?: ArrayBuffer;
-    modules?: SunVoxModuleInfo[];
+    modules?: SunVoxModuleInfo[] | SunVoxModuleGraphEntry[];
     controls?: SunVoxControl[];
     patterns?: SunVoxPatternData[];
     songName?: string;
@@ -244,6 +259,9 @@ export class SunVoxEngine {
     speed?: number;
     patCount?: number;
     message?: string;
+    sourceId?: number;
+    destId?: number;
+    result?: number;
   }): void {
     switch (data.type) {
       case 'ready':
@@ -331,6 +349,42 @@ export class SunVoxEngine {
         break;
       }
 
+      case 'moduleCreated': {
+        const resolver = this._newModuleQueue.shift();
+        if (resolver) resolver.resolve(data.moduleId!);
+        break;
+      }
+
+      case 'moduleRemoved': {
+        const key = `${data.handle}:${data.moduleId}`;
+        const resolver = this._removeModuleQueue.get(key);
+        if (resolver) { this._removeModuleQueue.delete(key); resolver.resolve(); }
+        break;
+      }
+
+      case 'modulesConnected': {
+        const key = `${data.handle}:${data.sourceId}:${data.destId}`;
+        const resolver = this._connectQueue.get(key);
+        if (resolver) { this._connectQueue.delete(key); resolver.resolve(data.result ?? 0); }
+        break;
+      }
+
+      case 'modulesDisconnected': {
+        const key = `${data.handle}:${data.sourceId}:${data.destId}`;
+        const resolver = this._disconnectQueue.get(key);
+        if (resolver) { this._disconnectQueue.delete(key); resolver.resolve(data.result ?? 0); }
+        break;
+      }
+
+      case 'moduleGraph': {
+        const resolver = this._moduleGraphQueue.get(data.handle!);
+        if (resolver) {
+          this._moduleGraphQueue.delete(data.handle!);
+          resolver.resolve((data.modules as SunVoxModuleGraphEntry[]) ?? []);
+        }
+        break;
+      }
+
       case 'error': {
         const err = new Error(data.message ?? 'SunVox worklet error');
         console.error('[SunVoxEngine]', data.message);
@@ -371,6 +425,16 @@ export class SunVoxEngine {
 
     for (const r of this._patternsQueue.values()) r.reject(err);
     this._patternsQueue.clear();
+    for (const r of this._newModuleQueue) r.reject(err);
+    this._newModuleQueue.length = 0;
+    for (const r of this._removeModuleQueue.values()) r.reject(err);
+    this._removeModuleQueue.clear();
+    for (const r of this._connectQueue.values()) r.reject(err);
+    this._connectQueue.clear();
+    for (const r of this._disconnectQueue.values()) r.reject(err);
+    this._disconnectQueue.clear();
+    for (const r of this._moduleGraphQueue.values()) r.reject(err);
+    this._moduleGraphQueue.clear();
   }
 
   // ── Public API ─────────────────────────────────────────────────────────────
@@ -526,6 +590,60 @@ export class SunVoxEngine {
 
   stop(handle: number): void {
     this.sendMessage({ type: 'stop', handle });
+  }
+
+  // ── Module CRUD (for modular editor) ──────────────────────────────────────
+
+  async newModule(handle: number, moduleType: string): Promise<number> {
+    await this._initPromise;
+    if (this._disposed) throw new Error('[SunVoxEngine] not initialized');
+    return new Promise<number>((resolve, reject) => {
+      this._newModuleQueue.push({ resolve, reject });
+      this.workletNode!.port.postMessage({ type: 'newModule', handle, moduleType });
+    });
+  }
+
+  async removeModule(handle: number, moduleId: number): Promise<void> {
+    await this._initPromise;
+    if (this._disposed) throw new Error('[SunVoxEngine] not initialized');
+    const key = `${handle}:${moduleId}`;
+    return new Promise<void>((resolve, reject) => {
+      this._removeModuleQueue.set(key, { resolve, reject });
+      this.workletNode!.port.postMessage({ type: 'removeModule', handle, moduleId });
+    });
+  }
+
+  async connectModules(handle: number, sourceId: number, destId: number): Promise<number> {
+    await this._initPromise;
+    if (this._disposed) throw new Error('[SunVoxEngine] not initialized');
+    const key = `${handle}:${sourceId}:${destId}`;
+    return new Promise<number>((resolve, reject) => {
+      this._connectQueue.set(key, { resolve, reject });
+      this.workletNode!.port.postMessage({ type: 'connectModules', handle, sourceId, destId });
+    });
+  }
+
+  async disconnectModules(handle: number, sourceId: number, destId: number): Promise<number> {
+    await this._initPromise;
+    if (this._disposed) throw new Error('[SunVoxEngine] not initialized');
+    const key = `${handle}:${sourceId}:${destId}`;
+    return new Promise<number>((resolve, reject) => {
+      this._disconnectQueue.set(key, { resolve, reject });
+      this.workletNode!.port.postMessage({ type: 'disconnectModules', handle, sourceId, destId });
+    });
+  }
+
+  setModuleControl(handle: number, moduleId: number, ctlId: number, value: number): void {
+    this.workletNode?.port.postMessage({ type: 'setModuleControl', handle, moduleId, ctlId, value });
+  }
+
+  async getModuleGraph(handle: number): Promise<SunVoxModuleGraphEntry[]> {
+    await this._initPromise;
+    if (this._disposed) throw new Error('[SunVoxEngine] not initialized');
+    return new Promise<SunVoxModuleGraphEntry[]>((resolve, reject) => {
+      this._moduleGraphQueue.set(handle, { resolve, reject });
+      this.workletNode!.port.postMessage({ type: 'getModuleGraph', handle });
+    });
   }
 
   // ── Teardown ───────────────────────────────────────────────────────────────
