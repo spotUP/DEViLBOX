@@ -56,6 +56,11 @@ function snapToNearestPeriod(period: number): number {
   return best;
 }
 
+/** Returns true for effects that affect global playback (speed, tempo, position, break). */
+function isGlobalEffect(effTyp: number): boolean {
+  return effTyp === 0x0F || effTyp === 0x0B || effTyp === 0x0D;
+}
+
 /** Convert XM note value to MOD period. noteExportOffset is added before lookup. */
 function noteToMODPeriod(note: number, noteExportOffset: number): number {
   if (note === 0 || note === 97) return 0; // empty or note-off
@@ -829,11 +834,34 @@ function exportToXM(song: TrackerSong): ArrayBuffer {
           if (note > 96) note = 96;
         }
 
+        // XM supports one effect per cell. If cell has a secondary effect (effTyp2),
+        // merge them: prefer pattern break/position jump (critical for song structure)
+        // over speed/tempo (which can be moved to another channel).
+        let effTyp = cell.effTyp ?? 0;
+        let effPar = cell.eff ?? 0;
+        const eff2Typ = cell.effTyp2 ?? 0;
+        const eff2Par = cell.eff2 ?? 0;
+        if (eff2Typ > 0) {
+          if (effTyp === 0) {
+            // Primary empty — use secondary
+            effTyp = eff2Typ;
+            effPar = eff2Par;
+          } else if (isGlobalEffect(eff2Typ) && !isGlobalEffect(effTyp)) {
+            // Secondary is global, primary is local — swap
+            effTyp = eff2Typ;
+            effPar = eff2Par;
+          } else if ((eff2Typ === 0x0D || eff2Typ === 0x0B) && effTyp === 0x0F) {
+            // Secondary is pattern break/jump, primary is speed/tempo — prefer break
+            effTyp = eff2Typ;
+            effPar = eff2Par;
+          }
+        }
+
         cellData[cellPos] = note;
         cellData[cellPos + 1] = cell.instrument ?? 0;
         cellData[cellPos + 2] = cell.volume ?? 0;
-        cellData[cellPos + 3] = cell.effTyp ?? 0;
-        cellData[cellPos + 4] = cell.eff ?? 0;
+        cellData[cellPos + 3] = effTyp;
+        cellData[cellPos + 4] = effPar;
         cellPos += 5;
       }
     }
