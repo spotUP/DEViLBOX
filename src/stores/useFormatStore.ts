@@ -45,6 +45,7 @@ interface FormatStore {
   zxtuneFileData: ArrayBuffer | null;
   pumaTrackerFileData: ArrayBuffer | null;
   artOfNoiseFileData: ArrayBuffer | null;
+  startrekkerAMFileData: ArrayBuffer | null;
   bdFileData: ArrayBuffer | null;
   sd2FileData: ArrayBuffer | null;
   symphonieFileData: ArrayBuffer | null;
@@ -116,6 +117,7 @@ export const useFormatStore = create<FormatStore>()(
     zxtuneFileData: null,
     pumaTrackerFileData: null,
     artOfNoiseFileData: null,
+    startrekkerAMFileData: null,
     bdFileData: null,
     sd2FileData: null,
     symphonieFileData: null,
@@ -170,6 +172,7 @@ export const useFormatStore = create<FormatStore>()(
         state.zxtuneFileData = song.zxtuneFileData ?? null;
         state.pumaTrackerFileData = (song as any).pumaTrackerFileData ?? null;
         state.artOfNoiseFileData = (song as any).artOfNoiseFileData ?? null;
+        state.startrekkerAMFileData = (song as any).startrekkerAMFileData ?? null;
         state.bdFileData = (song as any).bdFileData ?? null;
         state.sd2FileData = (song as any).sd2FileData ?? null;
         state.symphonieFileData = (song as any).symphonieFileData ?? null;
@@ -253,6 +256,7 @@ export const useFormatStore = create<FormatStore>()(
       state.zxtuneFileData = null;
       state.pumaTrackerFileData = null;
       state.artOfNoiseFileData = null;
+      state.startrekkerAMFileData = null;
       state.bdFileData = null;
       state.sd2FileData = null;
       state.symphonieFileData = null;
