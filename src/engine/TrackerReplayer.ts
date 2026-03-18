@@ -293,6 +293,10 @@ export interface TrackerSong {
   bdFileData?: ArrayBuffer;
   /** Raw SidMon 2.0 (.sid2) binary for Sd2Engine WASM playback */
   sd2FileData?: ArrayBuffer;
+  /** Raw Startrekker AM (.am/.nt) binary for StartrekkerAMEngine WASM playback */
+  startrekkerAMFileData?: ArrayBuffer;
+  /** Raw Startrekker AM .nt synth data for StartrekkerAMEngine WASM playback */
+  startrekkerAMNtData?: ArrayBuffer;
   /** Raw file binary for UADE playback of editable formats (native parser provides patterns, UADE provides audio) */
   uadeEditableFileData?: ArrayBuffer;
   /** Original filename hint for UADE format detection */
