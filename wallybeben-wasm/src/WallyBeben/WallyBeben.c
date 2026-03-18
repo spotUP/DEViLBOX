@@ -20,6 +20,7 @@ static uint32_t a0,a1,a2,a3,a4,a5,a6,sp,pc;
 #define a7 sp  /* A7 is the stack pointer */
 static int flag_z=0, flag_n=0, flag_c=0, flag_v=0, flag_x=0;
 static uint16_t ccr = 0;  /* condition code register (for MOVE SR/CCR) */
+static uint16_t sr = 0;   /* status register (interrupt mask bits etc.) */
 
 /* -- Sub-register Accessors -------------------------------------------
  * W(d0) -- access the low 16 bits of d0 (read/write).
@@ -453,7 +454,7 @@ static inline void hw_write32(uint32_t addr, uint32_t val) {
 /* -- Packed Data Section -------------------------------------------- */
 /* All data labels packed into a single contiguous byte array matching
  * 68k memory layout. Accessor macros provide typed pointer access. */
-static uint8_t _ds[1032] = {
+uint8_t _ds[1032] = {
   0x24,0x56,0x45,0x52,0x3a,0x20,0x57,0x61,0x6c,0x6c,0x79,0x20,0x42,0x65,0x62,0x65,
   0x6e,0x20,0x70,0x6c,0x61,0x79,0x65,0x72,0x20,0x6d,0x6f,0x64,0x75,0x6c,0x65,0x20,
   0x56,0x31,0x2e,0x30,0x20,0x28,0x31,0x35,0x20,0x44,0x65,0x63,0x20,0x32,0x30,0x30,
@@ -550,30 +551,16 @@ static uint8_t _ds[1032] = {
 
 /* -- External Data Placeholders (INCBIN / external data) ------------- */
 /* Host must set these pointers to actual module data before playback. */
-static uint8_t* return = NULL;
-static uint8_t* hop = NULL;
-static uint8_t* _no_A = NULL;
-static uint8_t* _no_B = NULL;
-static uint8_t* _no_C = NULL;
-static uint8_t* _no_D = NULL;
 static uint8_t* _NoVoice1 = NULL;
 static uint8_t* _NoVoice2 = NULL;
 static uint8_t* _NoVoice3 = NULL;
 static uint8_t* _NoVoice4 = NULL;
-static uint8_t* NoChange = NULL;
-static uint8_t* Fault = NULL;
-static uint8_t* Short = NULL;
-static uint8_t* Found = NULL;
 static uint8_t* _dma2 = NULL;
 static uint8_t* _dma1 = NULL;
-static uint8_t* MoveqFormat = NULL;
 static uint8_t* FindIt0 = NULL;
 static uint8_t* FindIt1 = NULL;
 static uint8_t* FindIt2 = NULL;
 static uint8_t* FindIt6 = NULL;
-static uint8_t* MinVal = NULL;
-static uint8_t* RelocSongs = NULL;
-static uint8_t* RelocPos = NULL;
 static uint8_t* FindIt7 = NULL;
 static uint8_t* FindIt4 = NULL;
 static uint8_t* Ok1 = NULL;
@@ -581,38 +568,16 @@ static uint8_t* FindIt5 = NULL;
 static uint8_t* Back1 = NULL;
 static uint8_t* FindIt3 = NULL;
 static uint8_t* Back2 = NULL;
-static uint8_t* NewStyle = NULL;
 static uint8_t* Back3 = NULL;
-static uint8_t* FindLea = NULL;
-static uint8_t* RelocSamp = NULL;
-static uint8_t* Exit = NULL;
-static uint8_t* Next = NULL;
-static uint8_t* MinPtr = NULL;
-static uint8_t* MaxPtr = NULL;
-static uint8_t* NextPtr = NULL;
-static uint8_t* SamplesOK = NULL;
 static uint8_t* NextPtr1 = NULL;
 static uint8_t* Reloc2 = NULL;
 static uint8_t* Reloc1 = NULL;
 static uint8_t* Reloc3 = NULL;
-static uint8_t* Back = NULL;
-static uint8_t* Later = NULL;
-static uint8_t* NoHard = NULL;
-static uint8_t* NextLong = NULL;
-static uint8_t* InfoFound = NULL;
-static uint8_t* FindText = NULL;
-static uint8_t* ClearUPS = NULL;
-static uint8_t* FindEnd = NULL;
-static uint8_t* MaxLen = NULL;
-static uint8_t* NextPos = NULL;
 static uint8_t* NoEnd2 = NULL;
 static uint8_t* ClearUPS2 = NULL;
-static uint8_t* NoEnd = NULL;
 static uint8_t* test1 = NULL;
-static uint8_t* test = NULL;
 static uint8_t* test2 = NULL;
 static uint8_t* test3 = NULL;
-static uint8_t* SkipEnd = NULL;
 
 /* -- Forward Declarations -------------------------------------------- */
 static void ModuleChange(void);
@@ -624,22 +589,36 @@ static void Left2(void);
 static void SetTwo(void);
 static void SetAdr(void);
 static void SampleInit(void);
-static void Interrupt(void);
+void Interrupt(void);
 static void Code0(void);
 static void Patch0(void);
-static void Ex(void);
-static void Check2(void);
-static void SubSongRange(void);
-static void InitPlayer(void);
-static void EndPlayer(void);
-static void InitSound(void);
-static void EndSound(void);
-static void GetInfos(void);
-static void StructInit(void);
-static void SetVolume(void);
-static void SetBalance(void);
-static void SetVoices(void);
 static void GetPosition(void);
+static void SetVolume(void);
+static void SetVoices(void);
+static void StructInit(void);
+static void Check2(void);
+static void GetInfos(void);
+static void SubSongRange(void);
+void InitPlayer(void);
+void EndSound(void);
+static void _return(void);
+static void _error(void);
+static void fail(void);
+static void InitFail(void);
+static void Short(void);
+static void Skip(void);static void Code1(void);
+static void Code2(void);
+static void Code3(void);
+static void Code4(void);
+static void Code5(void);
+static void Code6(void);
+static void Code7(void);
+static void Code8(void);
+static void Code9(void);
+static void Ex(void);
+static void EndPlayer(void);
+void InitSound(void);
+static void SetBalance(void);
 
 
 /* ====================================================================
@@ -677,7 +656,7 @@ static void SampleInit(void) {
       flag_n = ((int32_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-  if (flag_z) goto return;  /* equal / zero */  /* BEQ.B	return */
+  if (flag_z) _return(); return;  /* equal / zero */  /* BEQ.B	return */
   {  /* MOVE.L	D0,A2 */
       uint32_t _mv = (uint32_t)(d0);
       a2 = _mv;
@@ -714,7 +693,7 @@ hop:
       flag_n = ((int32_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-  if (flag_z) goto return;  /* equal / zero */  /* BEQ.B	return */
+  if (flag_z) _return(); return;  /* equal / zero */  /* BEQ.B	return */
   {  /* MOVE.L	D0,A3 */
       uint32_t _mv = (uint32_t)(d0);
       a3 = _mv;
@@ -768,7 +747,7 @@ hop:
   a4 = (uint32_t)((int32_t)a4 + (int32_t)(int16_t)(8));  /* ADDQ.L	#8,A4 */
   if ((int16_t)(--d5) >= 0) goto hop;  /* DBF	D5,hop */
   d7 = (uint32_t)(int32_t)(int8_t)(0);  /* MOVEQ	#0,D7 */
-return:
+_return:
   {  /* MOVE.L	D7,D0 */
       uint32_t _mv = (uint32_t)(d7);
       d0 = _mv;
@@ -777,10 +756,14 @@ return:
       flag_v = 0; flag_c = 0;
     }
   return;  /* RTS */
-  /* ************************************************************************** */
-  /* *************************** EP_GetPositionNr ***************************** */
-  /* ************************************************************************** */
-GetPosition:
+}
+
+/* ************************************************************************** */
+/* *************************** EP_GetPositionNr ***************************** */
+/* ************************************************************************** */
+
+/* --- GetPosition --- */
+static void GetPosition(void) {
   d0 = (uint32_t)(int32_t)(int8_t)(0);  /* MOVEQ	#0,D0 */
   {  /* MOVE.L	VoicesPtr(PC),A0 */
       uint32_t _mv = (uint32_t)(READ32((uintptr_t)VoicesPtr));
@@ -798,10 +781,14 @@ GetPosition:
       flag_v = 0; flag_c = 0;
     }
   return;  /* RTS */
-  /* ************************************************************************** */
-  /* ******************* DTP_Volume DTP_Balance ******************************* */
-  /* ************************************************************************** */
-SetVolume:
+}
+
+/* ************************************************************************** */
+/* ******************* DTP_Volume DTP_Balance ******************************* */
+/* ************************************************************************** */
+
+/* --- SetVolume --- */
+static void SetVolume(void) {
 SetBalance:
   {  /* MOVE.W	dtg_SndLBal(A5),D0 */
       uint16_t _mv = (uint16_t)(READ16(a5 + (intptr_t)dtg_SndLBal));
@@ -810,7 +797,7 @@ SetBalance:
       flag_n = ((int16_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-  d0 = (uint32_t)((uint16_t)READ16(a5 + (intptr_t)dtg_SndVol) * (uint16_t)W(d0));  /* MULU.W	dtg_SndVol(A5),D0 */
+  d0 = (uint32_t)((uint16_t)(READ16(a5 + (intptr_t)dtg_SndVol)) * (uint16_t)W(d0));  /* MULU.W	dtg_SndVol(A5),D0 */
   W(d0) = (uint16_t)((uint32_t)(W(d0)) >> 6);  /* LSR.W	#6,D0 */
   {  /* MOVE.W	D0,LeftVolume */
       uint16_t _mv = (uint16_t)(W(d0));
@@ -826,7 +813,7 @@ SetBalance:
       flag_n = ((int16_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-  d0 = (uint32_t)((uint16_t)READ16(a5 + (intptr_t)dtg_SndVol) * (uint16_t)W(d0));  /* MULU.W	dtg_SndVol(A5),D0 */
+  d0 = (uint32_t)((uint16_t)(READ16(a5 + (intptr_t)dtg_SndVol)) * (uint16_t)W(d0));  /* MULU.W	dtg_SndVol(A5),D0 */
   W(d0) = (uint16_t)((uint32_t)(W(d0)) >> 6);  /* LSR.W	#6,D0 */
   {  /* MOVE.W	D0,RightVolume */
       uint16_t _mv = (uint16_t)(W(d0));
@@ -842,7 +829,7 @@ SetBalance:
 
 /* --- Left2 --- */
 static void Left2(void) {
-  d0 = (uint32_t)((uint16_t)LeftVolume * (uint16_t)W(d0));  /* MULU.W	LeftVolume(PC),D0 */
+  d0 = (uint32_t)((uint16_t)(READ16((uintptr_t)LeftVolume)) * (uint16_t)W(d0));  /* MULU.W	LeftVolume(PC),D0 */
   W(d0) &= READ16((uintptr_t)Voice4);  /* AND.W	Voice4(PC),D0 */
   W(d0) = (uint16_t)((uint32_t)(W(d0)) >> 6);  /* LSR.W	#6,D0 */
   {  /* MOVE.W	D0,UPS_Voice4Vol(A0) */
@@ -858,7 +845,7 @@ static void Left2(void) {
 
 /* --- Left1 --- */
 static void Left1(void) {
-  d0 = (uint32_t)((uint16_t)LeftVolume * (uint16_t)W(d0));  /* MULU.W	LeftVolume(PC),D0 */
+  d0 = (uint32_t)((uint16_t)(READ16((uintptr_t)LeftVolume)) * (uint16_t)W(d0));  /* MULU.W	LeftVolume(PC),D0 */
   W(d0) &= READ16((uintptr_t)Voice1);  /* AND.W	Voice1(PC),D0 */
   W(d0) = (uint16_t)((uint32_t)(W(d0)) >> 6);  /* LSR.W	#6,D0 */
   {  /* MOVE.W	D0,UPS_Voice1Vol(A0) */
@@ -874,7 +861,7 @@ static void Left1(void) {
 
 /* --- Right1 --- */
 static void Right1(void) {
-  d0 = (uint32_t)((uint16_t)RightVolume * (uint16_t)W(d0));  /* MULU.W	RightVolume(PC),D0 */
+  d0 = (uint32_t)((uint16_t)(READ16((uintptr_t)RightVolume)) * (uint16_t)W(d0));  /* MULU.W	RightVolume(PC),D0 */
   W(d0) &= READ16((uintptr_t)Voice2);  /* AND.W	Voice2(PC),D0 */
   W(d0) = (uint16_t)((uint32_t)(W(d0)) >> 6);  /* LSR.W	#6,D0 */
   {  /* MOVE.W	D0,UPS_Voice2Vol(A0) */
@@ -890,7 +877,7 @@ static void Right1(void) {
 
 /* --- Right2 --- */
 static void Right2(void) {
-  d0 = (uint32_t)((uint16_t)RightVolume * (uint16_t)W(d0));  /* MULU.W	RightVolume(PC),D0 */
+  d0 = (uint32_t)((uint16_t)(READ16((uintptr_t)RightVolume)) * (uint16_t)W(d0));  /* MULU.W	RightVolume(PC),D0 */
   W(d0) &= READ16((uintptr_t)Voice3);  /* AND.W	Voice3(PC),D0 */
   W(d0) = (uint16_t)((uint32_t)(W(d0)) >> 6);  /* LSR.W	#6,D0 */
   {  /* MOVE.W	D0,UPS_Voice3Vol(A0) */
@@ -1111,10 +1098,14 @@ _no_D:
     a0 = READ32_POST(sp);
     a2 = READ32_POST(sp);
   return;  /* RTS */
-  /* ************************************************************************** */
-  /* ***************************** EP_Voices  ********************************* */
-  /* ************************************************************************** */
-SetVoices:
+}
+
+/* ************************************************************************** */
+/* ***************************** EP_Voices  ********************************* */
+/* ************************************************************************** */
+
+/* --- SetVoices --- */
+static void SetVoices(void) {
   a0 = (uint32_t)(uintptr_t)Voice1;  /* LEA	Voice1(PC),A0 */
   a1 = (uint32_t)(uintptr_t)StructAdr;  /* LEA	StructAdr(PC),A1 */
   {  /* MOVE.W	#$FFFF,D1 */
@@ -1185,17 +1176,21 @@ _NoVoice4:
     }
   d0 = (uint32_t)(int32_t)(int8_t)(0);  /* MOVEQ	#0,D0 */
   return;  /* RTS */
-  /* ************************************************************************** */
-  /* ****************************** EP_StructInit ***************************** */
-  /* ************************************************************************** */
-StructInit:
-  a0 = (uint32_t)(uintptr_t)StructAdr;  /* LEA	StructAdr(PC),A0 */
-  return;  /* RTS */
-  /* ************************************************************************** */
-  /* *************************** EP_ModuleChange ****************************** */
-  /* ************************************************************************** */
 }
 
+/* ************************************************************************** */
+/* ****************************** EP_StructInit ***************************** */
+/* ************************************************************************** */
+
+/* --- StructInit --- */
+static void StructInit(void) {
+  a0 = (uint32_t)(uintptr_t)StructAdr;  /* LEA	StructAdr(PC),A0 */
+  return;  /* RTS */
+}
+
+/* ************************************************************************** */
+/* *************************** EP_ModuleChange ****************************** */
+/* ************************************************************************** */
 
 /* --- ModuleChange --- */
 static void ModuleChange(void) {
@@ -1278,10 +1273,14 @@ NoChange:
     }
   d0 = (uint32_t)(int32_t)(int8_t)(0);  /* MOVEQ	#0,D0 */
   return;  /* RTS */
-  /* ************************************************************************** */
-  /* ****************************** DTP_Check2 ******************************** */
-  /* ************************************************************************** */
-Check2:
+}
+
+/* ************************************************************************** */
+/* ****************************** DTP_Check2 ******************************** */
+/* ************************************************************************** */
+
+/* --- Check2 --- */
+static void Check2(void) {
   a0 = READ32(a5 + (intptr_t)dtg_ChkData);  /* MOVEA.L	dtg_ChkData(A5),A0 */
   d0 = (uint32_t)(int32_t)(int8_t)(-1);  /* MOVEQ	#-1,D0 */
   {  /* CMP.W	#$6000,(A0)+ */
@@ -1320,7 +1319,7 @@ Check2:
       flag_n = ((int8_t)(_tst) < 0);
       flag_c = 0; flag_v = 0;
     }
-  if (!flag_z) goto Short;  /* not equal / nonzero */  /* BNE.B	Short */
+  if (!flag_z) Short(); return;  /* not equal / nonzero */  /* BNE.B	Short */
   a1 = (uint32_t)((int32_t)a1 + (int32_t)(int16_t)(2));  /* ADDQ.L	#2,A1 */
 Short:
   {  /* CMP.W	#$4239,(A1) */
@@ -1393,10 +1392,14 @@ Found:
   d0 = (uint32_t)(int32_t)(int8_t)(0);  /* MOVEQ	#0,D0 */
 Fault:
   return;  /* RTS */
-  /* ************************************************************************** */
-  /* **************************** EP_Get_ModuleInfo *************************** */
-  /* ************************************************************************** */
-GetInfos:
+}
+
+/* ************************************************************************** */
+/* **************************** EP_Get_ModuleInfo *************************** */
+/* ************************************************************************** */
+
+/* --- GetInfos --- */
+static void GetInfos(void) {
   a0 = (uint32_t)(uintptr_t)InfoBuffer;  /* LEA	InfoBuffer(PC),A0 */
   return;  /* RTS */
 }
@@ -1406,7 +1409,7 @@ GetInfos:
 /* ************************************************************************** */
 
 /* --- Interrupt --- */
-static void Interrupt(void) {
+void Interrupt(void) {
   WRITE32_PRE(sp, a6);  /* MOVEM.L	D1,D2,D3,D4,D5,D6,D7,A0,A1,A2,A3,A4,A5,A6,-(SP) */
     WRITE32_PRE(sp, a5);
     WRITE32_PRE(sp, a4);
@@ -1490,10 +1493,14 @@ _dma2:
   d0 = READ32_POST(sp);  /* MOVEM.L	(SP)+,D0,D1 */
     d1 = READ32_POST(sp);
   return;  /* RTS */
-  /* ************************************************************************** */
-  /* **************************** DTP_SubSongRange **************************** */
-  /* ************************************************************************** */
-SubSongRange:
+}
+
+/* ************************************************************************** */
+/* **************************** DTP_SubSongRange **************************** */
+/* ************************************************************************** */
+
+/* --- SubSongRange --- */
+static void SubSongRange(void) {
   d0 = (uint32_t)(int32_t)(int8_t)(1);  /* MOVEQ	#1,D0 */
   {  /* MOVE.L	InfoBuffer+SubSongs(PC),D1 */
       uint32_t _mv = (uint32_t)(READ32((uintptr_t)InfoBuffer+SubSongs));
@@ -1503,10 +1510,14 @@ SubSongRange:
       flag_v = 0; flag_c = 0;
     }
   return;  /* RTS */
-  /* ************************************************************************** */
-  /* **************************** DTP_InitPlayer ****************************** */
-  /* ************************************************************************** */
-InitPlayer:
+}
+
+/* ************************************************************************** */
+/* **************************** DTP_InitPlayer ****************************** */
+/* ************************************************************************** */
+
+/* --- InitPlayer --- */
+void InitPlayer(void) {
   d0 = (uint32_t)(int32_t)(int8_t)(0);  /* MOVEQ	#0,D0 */
   a0 = READ32(a5 + (intptr_t)dtg_GetListData);  /* MOVEA.L	dtg_GetListData(A5),A0 */
   { uintptr_t _jt=(uintptr_t)(a0); if(_jt) ((void(*)(void))_jt)(); }  /* JSR	(A0) */
@@ -2909,16 +2920,24 @@ InfoFound:
   ModuleChange();  /* BSR.W	ModuleChange */
   a0 = READ32(a5 + (intptr_t)dtg_AudioAlloc);  /* MOVEA.L	dtg_AudioAlloc(A5),A0 */
   ((void(*)(void))(uintptr_t)a0)(); return;  /* JMP	(A0) */
-  /* ************************************************************************** */
-  /* **************************** DTP_EndPlayer ******************************* */
-  /* ************************************************************************** */
-EndPlayer:
+}
+
+/* ************************************************************************** */
+/* **************************** DTP_EndPlayer ******************************* */
+/* ************************************************************************** */
+
+/* --- EndPlayer --- */
+static void EndPlayer(void) {
   a0 = READ32(a5 + (intptr_t)dtg_AudioFree);  /* MOVEA.L	dtg_AudioFree(A5),A0 */
   ((void(*)(void))(uintptr_t)a0)(); return;  /* JMP	(A0) */
-  /* ************************************************************************** */
-  /* **************************** DTP_InitSound ******************************* */
-  /* ************************************************************************** */
-InitSound:
+}
+
+/* ************************************************************************** */
+/* **************************** DTP_InitSound ******************************* */
+/* ************************************************************************** */
+
+/* --- InitSound --- */
+void InitSound(void) {
   a0 = (uint32_t)(uintptr_t)StructAdr;  /* LEA	StructAdr(PC),A0 */
   a1 = (uint32_t)(a0 + (intptr_t)UPS_SizeOF);  /* LEA	UPS_SizeOF(A0),A1 */
 ClearUPS:
@@ -3055,10 +3074,14 @@ MaxLen:
   a0 = (uint32_t)(uintptr_t)EndFlag;  /* LEA	EndFlag(PC),A0 */
   hw_write16(a0, 0);  /* CLR.W	(A0) */
   return;  /* RTS */
-  /* ************************************************************************** */
-  /* **************************** DTP_EndSound ******************************** */
-  /* ************************************************************************** */
-EndSound:
+}
+
+/* ************************************************************************** */
+/* **************************** DTP_EndSound ******************************** */
+/* ************************************************************************** */
+
+/* --- EndSound --- */
+void EndSound(void) {
   a0 = (uint32_t)0xDFF000;  /* LEA	$DFF000,A0 */
   {  /* MOVE.W	#15,150(A0) */
       uint16_t _mv = (uint16_t)(15);
@@ -3097,9 +3120,9 @@ EndSound:
       flag_v = 0; flag_c = 0;
     }
   return;  /* RTS */
-  /* --------------- PatchTable for Wally Beben ------------------* */
 }
 
+/* --------------- PatchTable for Wally Beben ------------------* */
 /* DMA fix for Wally Beben (old) modules */
 
 /* --- Code0 --- */
@@ -3138,8 +3161,12 @@ static void Patch0(void) {
     }
   W(d1) ^= (uint16_t)(0x820F);  /* EOR.W	#$820F,D1 */
   return;  /* RTS */
-  /* Volume patch for Wally Beben modules */
-Code1:
+}
+
+/* Volume patch for Wally Beben modules */
+
+/* --- Code1 --- */
+static void Code1(void) {
   {  /* MOVE.W	D0,(A2) */
       uint16_t _mv = (uint16_t)(W(d0));
       hw_write16(a2, _mv);
@@ -3260,8 +3287,12 @@ Patch1:
       flag_v = 0; flag_c = 0;
     }
   return;  /* RTS */
-  /* SongEnd (stop) patch for Wally Beben modules */
-Code2:
+}
+
+/* SongEnd (stop) patch for Wally Beben modules */
+
+/* --- Code2 --- */
+static void Code2(void) {
   {  /* MOVE.W	D0,16(A5) */
       uint16_t _mv = (uint16_t)(W(d0));
       hw_write16(a5 + 16, _mv);
@@ -3334,16 +3365,24 @@ ClearUPS2:
 NoEnd2:
   WRITE8((uintptr_t)EndFlag, 0xFF);  /* ST	EndFlag */
   return;  /* RTS */
-  /* Length patch for Wally Beben modules */
-Code3:
+}
+
+/* Length patch for Wally Beben modules */
+
+/* --- Code3 --- */
+static void Code3(void) {
   d6 &= 0xFF;  /* ANDI.L	#$FF,D6 */
 Code3End:
 Patch3:
   d6 &= 0xFF;  /* AND.L	#$FF,D6 */
   SetTwo();  /* BSR.W	SetTwo */
   return;  /* RTS */
-  /* DMA wait patch for Wally Beben (new) modules */
-Code4:
+}
+
+/* DMA wait patch for Wally Beben (new) modules */
+
+/* --- Code4 --- */
+static void Code4(void) {
   {  /* MOVE.W	D1,$DFF096 */
       uint16_t _mv = (uint16_t)(W(d1));
       paula_dma_write((uint16_t)(_mv));
@@ -3379,8 +3418,12 @@ Patch4:
     }
   DMAWait();  /* BSR.W	DMAWait */
   return;  /* RTS */
-  /* SongEnd patch for Wally Beben modules */
-Code5:
+}
+
+/* SongEnd patch for Wally Beben modules */
+
+/* --- Code5 --- */
+static void Code5(void) {
   {  /* MOVE.B	12(A0),D0 */
       uint8_t _mv = (uint8_t)(READ8(a0 + 12));
       B(d0) = (uint8_t)_mv;
@@ -3502,8 +3545,12 @@ SkipEnd:
     a5 = READ32_POST(sp);
 NoEnd:
   return;  /* RTS */
-  /* DMA wait patch for Wally Beben (old) modules */
-Code6:
+}
+
+/* DMA wait patch for Wally Beben (old) modules */
+
+/* --- Code6 --- */
+static void Code6(void) {
   {  /* MOVE.W	D1,$DFF096 */
       uint16_t _mv = (uint16_t)(W(d1));
       paula_dma_write((uint16_t)(_mv));
@@ -3522,8 +3569,12 @@ Patch6:
     }
   DMAWait();  /* BSR.W	DMAWait */
   return;  /* RTS */
-  /* Address patch for Wally Beben (new) modules */
-Code7:
+}
+
+/* Address patch for Wally Beben (new) modules */
+
+/* --- Code7 --- */
+static void Code7(void) {
   a5 = (uint32_t)0xDFF0A0;  /* LEA	$DFF0A0,A5 */
   {  /* MOVE.L	0(A1),0(A5) */
       uint32_t _mv = (uint32_t)(READ32(a1 + 0 + (int16_t)W(d4)));
@@ -3565,8 +3616,12 @@ Patch7:
       flag_v = 0; flag_c = 0;
     }
   return;  /* RTS */
-  /* Address patch for Wally Beben (old) modules */
-Code8:
+}
+
+/* Address patch for Wally Beben (old) modules */
+
+/* --- Code8 --- */
+static void Code8(void) {
   a5 = (uint32_t)0xDFF0A0;  /* LEA	$DFF0A0,A5 */
   a5 = (uint32_t)((int32_t)a5 + (int32_t)(int16_t)(d6));  /* ADDA.L	D6,A5 */
 Code8End:
@@ -3596,8 +3651,12 @@ Patch8:
       flag_v = 0; flag_c = 0;
     }
   return;  /* RTS */
-  /* Repeat sample offset fix for Wally Beben (old) modules */
-Code9:
+}
+
+/* Repeat sample offset fix for Wally Beben (old) modules */
+
+/* --- Code9 --- */
+static void Code9(void) {
   d6 &= 0xFFF;  /* ANDI.L	#$FFF,D6 */
 Code9End:
 Patch9:
@@ -3609,8 +3668,17 @@ Patch9:
 static void _ds_init(void) {
   WRITE32((uintptr_t)(_ds + 80), (uint32_t)(uintptr_t)PlayerName);
   WRITE32((uintptr_t)(_ds + 88), (uint32_t)(uintptr_t)Creator);
+  WRITE32((uintptr_t)(_ds + 96), (uint32_t)(uintptr_t)Check2);
   WRITE32((uintptr_t)(_ds + 104), (uint32_t)(uintptr_t)Interrupt);
+  WRITE32((uintptr_t)(_ds + 112), (uint32_t)(uintptr_t)SubSongRange);
+  WRITE32((uintptr_t)(_ds + 120), (uint32_t)(uintptr_t)InitPlayer);
+  WRITE32((uintptr_t)(_ds + 144), (uint32_t)(uintptr_t)EndSound);
+  WRITE32((uintptr_t)(_ds + 152), (uint32_t)(uintptr_t)GetInfos);
   WRITE32((uintptr_t)(_ds + 160), (uint32_t)(uintptr_t)ModuleChange);
+  WRITE32((uintptr_t)(_ds + 168), (uint32_t)(uintptr_t)StructInit);
+  WRITE32((uintptr_t)(_ds + 176), (uint32_t)(uintptr_t)SetVolume);
+  WRITE32((uintptr_t)(_ds + 192), (uint32_t)(uintptr_t)SetVoices);
+  WRITE32((uintptr_t)(_ds + 200), (uint32_t)(uintptr_t)GetPosition);
   WRITE32((uintptr_t)(_ds + 208), (uint32_t)(uintptr_t)SampleInit);
   WRITE32((uintptr_t)(_ds + 478), (uint32_t)(uintptr_t)Prefix);
 }

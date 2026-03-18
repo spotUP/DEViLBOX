@@ -20,6 +20,7 @@ static uint32_t a0,a1,a2,a3,a4,a5,a6,sp,pc;
 #define a7 sp  /* A7 is the stack pointer */
 static int flag_z=0, flag_n=0, flag_c=0, flag_v=0, flag_x=0;
 static uint16_t ccr = 0;  /* condition code register (for MOVE SR/CCR) */
+static uint16_t sr = 0;   /* status register (interrupt mask bits etc.) */
 
 /* -- Sub-register Accessors -------------------------------------------
  * W(d0) -- access the low 16 bits of d0 (read/write).
@@ -466,7 +467,7 @@ static inline void hw_write32(uint32_t addr, uint32_t val) {
 /* -- Packed Data Section -------------------------------------------- */
 /* All data labels packed into a single contiguous byte array matching
  * 68k memory layout. Accessor macros provide typed pointer access. */
-static uint8_t _ds[1494] = {
+uint8_t _ds[1494] = {
   0x24,0x56,0x45,0x52,0x3a,0x20,0x44,0x61,0x76,0x65,0x20,0x4c,0x6f,0x77,0x65,0x20,
   0x70,0x6c,0x61,0x79,0x65,0x72,0x20,0x6d,0x6f,0x64,0x75,0x6c,0x65,0x20,0x56,0x31,
   0x2e,0x32,0x20,0x28,0x39,0x20,0x4a,0x75,0x6e,0x65,0x20,0x32,0x30,0x30,0x31,0x29,
@@ -604,53 +605,24 @@ static uint8_t _ds[1494] = {
 
 /* -- External Data Placeholders (INCBIN / external data) ------------- */
 /* Host must set these pointers to actual module data before playback. */
-static uint8_t* NoChange = NULL;
-static uint8_t* Old = NULL;
-static uint8_t* Skip = NULL;
 static uint8_t* Left1 = NULL;
 static uint8_t* Right1 = NULL;
 static uint8_t* Right2 = NULL;
 static uint8_t* Exit2 = NULL;
-static uint8_t* Ex = NULL;
-static uint8_t* _SetVoice = NULL;
 static uint8_t* _NoVoice1 = NULL;
 static uint8_t* _NoVoice2 = NULL;
 static uint8_t* _NoVoice3 = NULL;
 static uint8_t* _NoVoice4 = NULL;
-static uint8_t* return = NULL;
-static uint8_t* Empty = NULL;
-static uint8_t* hop = NULL;
-static uint8_t* fail = NULL;
-static uint8_t* InitFail = NULL;
-static uint8_t* SubEnd = NULL;
-static uint8_t* NextSub = NULL;
-static uint8_t* SkipSamples = NULL;
-static uint8_t* Patch = NULL;
-static uint8_t* SkipPatch = NULL;
-static uint8_t* Find = NULL;
 static uint8_t* NoMidwinter2 = NULL;
 static uint8_t* Fix_03 = NULL;
 static uint8_t* Fix_13 = NULL;
-static uint8_t* SkipInit = NULL;
-static uint8_t* ClearUPS = NULL;
-static uint8_t* NoLength = NULL;
-static uint8_t* FindZero = NULL;
-static uint8_t* MaxLength = NULL;
-static uint8_t* NextLength = NULL;
-static uint8_t* FindMaxLength = NULL;
 static uint8_t* NoInit2 = NULL;
-static uint8_t* NoSFX = NULL;
-static uint8_t* Standard = NULL;
 static uint8_t* lbC00089C = NULL;
-static uint8_t* SkipZero = NULL;
 static uint8_t* test1 = NULL;
-static uint8_t* test = NULL;
 static uint8_t* test2 = NULL;
 static uint8_t* test3 = NULL;
-static uint8_t* SkipEnd = NULL;
 static uint8_t* NoSFX2 = NULL;
 static uint8_t* Exit3 = NULL;
-static uint8_t* OKi = NULL;
 
 /* -- Forward Declarations -------------------------------------------- */
 static void ModuleChange(void);
@@ -663,23 +635,40 @@ static void SetLen(void);
 static void Patch8(void);
 static void SongEndTest(void);
 static void GetPosition(void);
-static void Interrupt(void);
+void Interrupt(void);
 static void Code0(void);
 static void Code0End(void);
 static void Code2End(void);
-static void Check1(void);
-static void Check3(void);
-static void SubSongRange(void);
-static void InitPlayer(void);
-static void EndPlayer(void);
-static void InitSound(void);
-static void EndSound(void);
-static void GetInfos(void);
-static void SampleInit(void);
 static void SetVolume(void);
-static void SetBalance(void);
 static void SetVoices(void);
 static void StructInit(void);
+static void SampleInit(void);
+static void Check1(void);
+static void fail(void);
+static void GetInfos(void);
+static void SubSongRange(void);
+void InitPlayer(void);
+static void EndPlayer(void);
+static void Code1(void);
+static void Code2(void);
+static void Code4(void);
+static void Code5(void);
+static void Code6(void);
+static void Code7(void);
+static void Code8(void);
+static void Code9(void);
+static void CodeA(void);
+static void CodeB(void);
+static void CodeC(void);
+static void Check3(void);
+void InitSound(void);
+void EndSound(void);
+static void _return(void);
+static void _error(void);
+static void fail(void);
+static void InitFail(void);
+static void Short(void);
+static void Skip(void);static void SetBalance(void);
 
 
 /* ====================================================================
@@ -717,11 +706,11 @@ static void GetPosition(void) {
     }
   d0 >>= 2;  /* LSR.L	#2,D0 */
   return;  /* RTS */
-  /* ************************************************************************** */
-  /* *************************** EP_ModuleChange ****************************** */
-  /* ************************************************************************** */
 }
 
+/* ************************************************************************** */
+/* *************************** EP_ModuleChange ****************************** */
+/* ************************************************************************** */
 
 /* --- ModuleChange --- */
 static void ModuleChange(void) {
@@ -821,10 +810,14 @@ NoChange:
     }
   d0 = (uint32_t)(int32_t)(int8_t)(0);  /* MOVEQ	#0,D0 */
   return;  /* RTS */
-  /* ************************************************************************** */
-  /* ******************* DTP_Volume DTP_Balance ******************************* */
-  /* ************************************************************************** */
-SetVolume:
+}
+
+/* ************************************************************************** */
+/* ******************* DTP_Volume DTP_Balance ******************************* */
+/* ************************************************************************** */
+
+/* --- SetVolume --- */
+static void SetVolume(void) {
 SetBalance:
   {  /* MOVE.W	dtg_SndLBal(A5),D0 */
       uint16_t _mv = (uint16_t)(READ16(a5 + (intptr_t)dtg_SndLBal));
@@ -833,7 +826,7 @@ SetBalance:
       flag_n = ((int16_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-  d0 = (uint32_t)((uint16_t)READ16(a5 + (intptr_t)dtg_SndVol) * (uint16_t)W(d0));  /* MULU.W	dtg_SndVol(A5),D0 */
+  d0 = (uint32_t)((uint16_t)(READ16(a5 + (intptr_t)dtg_SndVol)) * (uint16_t)W(d0));  /* MULU.W	dtg_SndVol(A5),D0 */
   W(d0) = (uint16_t)((uint32_t)(W(d0)) >> 6);  /* LSR.W	#6,D0 */
   {  /* MOVE.W	D0,LeftVolume */
       uint16_t _mv = (uint16_t)(W(d0));
@@ -849,7 +842,7 @@ SetBalance:
       flag_n = ((int16_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-  d0 = (uint32_t)((uint16_t)READ16(a5 + (intptr_t)dtg_SndVol) * (uint16_t)W(d0));  /* MULU.W	dtg_SndVol(A5),D0 */
+  d0 = (uint32_t)((uint16_t)(READ16(a5 + (intptr_t)dtg_SndVol)) * (uint16_t)W(d0));  /* MULU.W	dtg_SndVol(A5),D0 */
   W(d0) = (uint16_t)((uint32_t)(W(d0)) >> 6);  /* LSR.W	#6,D0 */
   {  /* MOVE.W	D0,RightVolume */
       uint16_t _mv = (uint16_t)(W(d0));
@@ -917,19 +910,19 @@ static void ChangeVolume(void) {
     }
   if (!flag_z) goto Exit2;  /* not equal / nonzero */  /* BNE.S	Exit2 */
 Left2:
-  d0 = (uint32_t)((uint16_t)LeftVolume * (uint16_t)W(d0));  /* MULU.W	LeftVolume(PC),D0 */
+  d0 = (uint32_t)((uint16_t)(READ16((uintptr_t)LeftVolume)) * (uint16_t)W(d0));  /* MULU.W	LeftVolume(PC),D0 */
   W(d0) &= READ16((uintptr_t)Voice4);  /* AND.W	Voice4(PC),D0 */
   goto Ex;  /* BRA.S	Ex */
 Left1:
-  d0 = (uint32_t)((uint16_t)LeftVolume * (uint16_t)W(d0));  /* MULU.W	LeftVolume(PC),D0 */
+  d0 = (uint32_t)((uint16_t)(READ16((uintptr_t)LeftVolume)) * (uint16_t)W(d0));  /* MULU.W	LeftVolume(PC),D0 */
   W(d0) &= READ16((uintptr_t)Voice1);  /* AND.W	Voice1(PC),D0 */
   goto Ex;  /* BRA.S	Ex */
 Right1:
-  d0 = (uint32_t)((uint16_t)RightVolume * (uint16_t)W(d0));  /* MULU.W	RightVolume(PC),D0 */
+  d0 = (uint32_t)((uint16_t)(READ16((uintptr_t)RightVolume)) * (uint16_t)W(d0));  /* MULU.W	RightVolume(PC),D0 */
   W(d0) &= READ16((uintptr_t)Voice2);  /* AND.W	Voice2(PC),D0 */
   goto Ex;  /* BRA.S	Ex */
 Right2:
-  d0 = (uint32_t)((uint16_t)RightVolume * (uint16_t)W(d0));  /* MULU.W	RightVolume(PC),D0 */
+  d0 = (uint32_t)((uint16_t)(READ16((uintptr_t)RightVolume)) * (uint16_t)W(d0));  /* MULU.W	RightVolume(PC),D0 */
   W(d0) &= READ16((uintptr_t)Voice3);  /* AND.W	Voice3(PC),D0 */
 Ex:
   W(d0) = (uint16_t)((uint32_t)(W(d0)) >> 6);  /* LSR.W	#6,D0 */
@@ -949,9 +942,9 @@ Exit2:
       flag_v = 0; flag_c = 0;
     }
   return;  /* RTS */
-  /* ------------------------------- Set Vol -------------------------------* */
 }
 
+/* ------------------------------- Set Vol -------------------------------* */
 
 /* --- SetVol --- */
 static void SetVol(void) {
@@ -1009,9 +1002,9 @@ _SetVoice:
       flag_v = 0; flag_c = 0;
     }
   return;  /* RTS */
-  /* ------------------------------- Set Adr -------------------------------* */
 }
 
+/* ------------------------------- Set Adr -------------------------------* */
 
 /* --- SetAdr --- */
 static void SetAdr(void) {
@@ -1069,9 +1062,9 @@ _SetVoice:
       flag_v = 0; flag_c = 0;
     }
   return;  /* RTS */
-  /* ------------------------------- Set Len -------------------------------* */
 }
 
+/* ------------------------------- Set Len -------------------------------* */
 
 /* --- SetLen --- */
 static void SetLen(void) {
@@ -1129,9 +1122,9 @@ _SetVoice:
       flag_v = 0; flag_c = 0;
     }
   return;  /* RTS */
-  /* ------------------------------- Set Per -------------------------------* */
 }
 
+/* ------------------------------- Set Per -------------------------------* */
 
 /* --- SetPer --- */
 static void SetPer(void) {
@@ -1189,10 +1182,14 @@ _SetVoice:
       flag_v = 0; flag_c = 0;
     }
   return;  /* RTS */
-  /* ************************************************************************** */
-  /* ***************************** EP_Voices  ********************************* */
-  /* ************************************************************************** */
-SetVoices:
+}
+
+/* ************************************************************************** */
+/* ***************************** EP_Voices  ********************************* */
+/* ************************************************************************** */
+
+/* --- SetVoices --- */
+static void SetVoices(void) {
   a0 = (uint32_t)(uintptr_t)Voice1;  /* LEA	Voice1(PC),A0 */
   a1 = (uint32_t)(uintptr_t)StructAdr;  /* LEA	StructAdr(PC),A1 */
   {  /* MOVE.W	#$FFFF,D1 */
@@ -1263,16 +1260,24 @@ _NoVoice4:
     }
   d0 = (uint32_t)(int32_t)(int8_t)(0);  /* MOVEQ	#0,D0 */
   return;  /* RTS */
-  /* ************************************************************************** */
-  /* ****************************** EP_StructInit ***************************** */
-  /* ************************************************************************** */
-StructInit:
+}
+
+/* ************************************************************************** */
+/* ****************************** EP_StructInit ***************************** */
+/* ************************************************************************** */
+
+/* --- StructInit --- */
+static void StructInit(void) {
   a0 = (uint32_t)(uintptr_t)StructAdr;  /* LEA	StructAdr(PC),A0 */
   return;  /* RTS */
-  /* ************************************************************************** */
-  /* ****************************** EP_SampleInit ***************************** */
-  /* ************************************************************************** */
-SampleInit:
+}
+
+/* ************************************************************************** */
+/* ****************************** EP_SampleInit ***************************** */
+/* ************************************************************************** */
+
+/* --- SampleInit --- */
+static void SampleInit(void) {
   d7 = (uint32_t)(int32_t)(int8_t)(EPR_NotEnoughMem);  /* MOVEQ	#EPR_NotEnoughMem,D7 */
   a3 = (uint32_t)(a5 + (intptr_t)EPG_SampleInfoStructure);  /* LEA	EPG_SampleInfoStructure(A5),A3 */
   {  /* MOVE.L	SampleInfoPtr(PC),D0 */
@@ -1282,7 +1287,7 @@ SampleInit:
       flag_n = ((int32_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-  if (flag_z) goto return;  /* equal / zero */  /* BEQ.B	return */
+  if (flag_z) _return(); return;  /* equal / zero */  /* BEQ.B	return */
   {  /* MOVE.L	D0,A0 */
       uint32_t _mv = (uint32_t)(d0);
       a0 = _mv;
@@ -1297,7 +1302,7 @@ SampleInit:
       flag_n = ((int32_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-  if (flag_z) goto return;  /* equal / zero */  /* BEQ.B	return */
+  if (flag_z) _return(); return;  /* equal / zero */  /* BEQ.B	return */
   {  /* SUBQ.L	#1,D5 */
       uint32_t _sr = (uint32_t)(d5 - 1);
       d5 = (uint32_t)_sr;
@@ -1313,7 +1318,7 @@ hop:
       flag_n = ((int32_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-  if (flag_z) goto return;  /* equal / zero */  /* BEQ.B	return */
+  if (flag_z) _return(); return;  /* equal / zero */  /* BEQ.B	return */
   {  /* MOVE.L	D0,A3 */
       uint32_t _mv = (uint32_t)(d0);
       a3 = _mv;
@@ -1382,7 +1387,7 @@ Empty:
   a0 = (uint32_t)(a0 + 14);  /* LEA	14(A0),A0 */
   if ((int16_t)(--d5) >= 0) goto hop;  /* DBF	D5,hop */
   d7 = (uint32_t)(int32_t)(int8_t)(0);  /* MOVEQ	#0,D7 */
-return:
+_return:
   {  /* MOVE.L	D7,D0 */
       uint32_t _mv = (uint32_t)(d7);
       d0 = _mv;
@@ -1391,10 +1396,14 @@ return:
       flag_v = 0; flag_c = 0;
     }
   return;  /* RTS */
-  /* ************************************************************************** */
-  /* ******************************* DTP_Check1 ******************************* */
-  /* ************************************************************************** */
-Check1:
+}
+
+/* ************************************************************************** */
+/* ******************************* DTP_Check1 ******************************* */
+/* ************************************************************************** */
+
+/* --- Check1 --- */
+static void Check1(void) {
   {  /* MOVE.L	DeliBase(PC),D0 */
       uint32_t _mv = (uint32_t)(READ32((uintptr_t)DeliBase));
       d0 = _mv;
@@ -1402,11 +1411,15 @@ Check1:
       flag_n = ((int32_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-  if (flag_z) goto fail;  /* equal / zero */  /* BEQ.B	fail */
-  /* ************************************************************************** */
-  /* ****************************** EP_Check3 ********************************* */
-  /* ************************************************************************** */
-Check3:
+  if (flag_z) { fail(); return; }  /* equal / zero */  /* BEQ.B	fail */
+}
+
+/* ************************************************************************** */
+/* ****************************** EP_Check3 ********************************* */
+/* ************************************************************************** */
+
+/* --- Check3 --- */
+static void Check3(void) {
   a0 = READ32(a5 + (intptr_t)dtg_ChkData);  /* MOVEA.L	dtg_ChkData(A5),A0 */
   {  /* CMP.L	#$000003F3,(A0) */
       int32_t _lhs = (int32_t)(READ32(a0));
@@ -1416,14 +1429,14 @@ Check3:
       flag_n = (_cmp < 0);
       flag_c = ((uint32_t)_lhs < (uint32_t)_rhs);
     }
-  if (!flag_z) goto fail;  /* not equal / nonzero */  /* BNE.B	fail */
+  if (!flag_z) { fail(); return; }  /* not equal / nonzero */  /* BNE.B	fail */
   {  /* TST.B	20(A0) */
       uint8_t _tst = (uint8_t)(READ8(a0 + 20));
       flag_z = (_tst == 0);
       flag_n = ((int8_t)(_tst) < 0);
       flag_c = 0; flag_v = 0;
     }
-  if (flag_z) goto fail;  /* equal / zero */  /* BEQ.B	fail */
+  if (flag_z) { fail(); return; }  /* equal / zero */  /* BEQ.B	fail */
   a0 = (uint32_t)(a0 + 32);  /* LEA	32(A0),A0 */
   {  /* CMP.L	#$70FF4E75,(A0)+ */
       int32_t _lhs = (int32_t)(READ32_POST(a0));
@@ -1433,7 +1446,7 @@ Check3:
       flag_n = (_cmp < 0);
       flag_c = ((uint32_t)_lhs < (uint32_t)_rhs);
     }
-  if (!flag_z) goto fail;  /* not equal / nonzero */  /* BNE.B	fail */
+  if (!flag_z) { fail(); return; }  /* not equal / nonzero */  /* BNE.B	fail */
   {  /* CMP.L	#$554e434c,(A0)+ */
       int32_t _lhs = (int32_t)(READ32_POST(a0));
       int32_t _rhs = (int32_t)(0x554e434c);
@@ -1442,7 +1455,7 @@ Check3:
       flag_n = (_cmp < 0);
       flag_c = ((uint32_t)_lhs < (uint32_t)_rhs);
     }
-  if (!flag_z) goto fail;  /* not equal / nonzero */  /* BNE.B	fail */
+  if (!flag_z) { fail(); return; }  /* not equal / nonzero */  /* BNE.B	fail */
   {  /* CMP.L	#$45415254,(A0)+ */
       int32_t _lhs = (int32_t)(READ32_POST(a0));
       int32_t _rhs = (int32_t)(0x45415254);
@@ -1451,21 +1464,21 @@ Check3:
       flag_n = (_cmp < 0);
       flag_c = ((uint32_t)_lhs < (uint32_t)_rhs);
     }
-  if (!flag_z) goto fail;  /* not equal / nonzero */  /* BNE.B	fail */
+  if (!flag_z) { fail(); return; }  /* not equal / nonzero */  /* BNE.B	fail */
   {  /* TST.L	(A0)+ */
       uint32_t _tst = (uint32_t)(READ32_POST(a0));
       flag_z = (_tst == 0);
       flag_n = ((int32_t)(_tst) < 0);
       flag_c = 0; flag_v = 0;
     }
-  if (flag_z) goto fail;  /* equal / zero */  /* BEQ.B	fail */
+  if (flag_z) { fail(); return; }  /* equal / zero */  /* BEQ.B	fail */
   {  /* TST.L	(A0)+ */
       uint32_t _tst = (uint32_t)(READ32_POST(a0));
       flag_z = (_tst == 0);
       flag_n = ((int32_t)(_tst) < 0);
       flag_c = 0; flag_v = 0;
     }
-  if (flag_z) goto fail;  /* equal / zero */  /* BEQ.B	fail */
+  if (flag_z) { fail(); return; }  /* equal / zero */  /* BEQ.B	fail */
   a0 = (uint32_t)((int32_t)a0 + (int32_t)(int16_t)(4));  /* ADDQ.L	#4,A0 */
   {  /* TST.L	(A0) */
       uint32_t _tst = (uint32_t)(READ32(a0));
@@ -1473,16 +1486,24 @@ Check3:
       flag_n = ((int32_t)(_tst) < 0);
       flag_c = 0; flag_v = 0;
     }
-  if (flag_z) goto fail;  /* equal / zero */  /* BEQ.B	fail */
+  if (flag_z) { fail(); return; }  /* equal / zero */  /* BEQ.B	fail */
   d0 = (uint32_t)(int32_t)(int8_t)(0);  /* MOVEQ	#0,D0 */
   return;  /* RTS */
-fail:
+}
+
+
+/* --- fail ---  (cross-function goto target) */
+static void fail(void) {
   d0 = (uint32_t)(int32_t)(int8_t)(-1);  /* MOVEQ	#-1,D0 */
   return;  /* RTS */
-  /* ************************************************************************** */
-  /* **************************** EP_Get_ModuleInfo *************************** */
-  /* ************************************************************************** */
-GetInfos:
+}
+
+/* ************************************************************************** */
+/* **************************** EP_Get_ModuleInfo *************************** */
+/* ************************************************************************** */
+
+/* --- GetInfos --- */
+static void GetInfos(void) {
   a0 = (uint32_t)(uintptr_t)InfoBuffer;  /* LEA	InfoBuffer(PC),A0 */
   return;  /* RTS */
 }
@@ -1492,7 +1513,7 @@ GetInfos:
 /* ************************************************************************** */
 
 /* --- Interrupt --- */
-static void Interrupt(void) {
+void Interrupt(void) {
   WRITE32_PRE(sp, d6);  /* MOVEM.L	D1,D2,D3,D4,D5,D6,-(SP) */
     WRITE32_PRE(sp, d5);
     WRITE32_PRE(sp, d4);
@@ -1530,10 +1551,14 @@ static void Interrupt(void) {
     d6 = READ32_POST(sp);
   d0 = (uint32_t)(int32_t)(int8_t)(0);  /* MOVEQ	#0,D0 */
   return;  /* RTS */
-  /* ************************************************************************** */
-  /* **************************** DTP_SubSongRange **************************** */
-  /* ************************************************************************** */
-SubSongRange:
+}
+
+/* ************************************************************************** */
+/* **************************** DTP_SubSongRange **************************** */
+/* ************************************************************************** */
+
+/* --- SubSongRange --- */
+static void SubSongRange(void) {
   d0 = (uint32_t)(int32_t)(int8_t)(1);  /* MOVEQ	#1,D0 */
   {  /* MOVE.L	InfoBuffer+SubSongs(PC),D1 */
       uint32_t _mv = (uint32_t)(READ32((uintptr_t)InfoBuffer+SubSongs));
@@ -1543,10 +1568,14 @@ SubSongRange:
       flag_v = 0; flag_c = 0;
     }
   return;  /* RTS */
-  /* ************************************************************************** */
-  /* **************************** DTP_InitPlayer ****************************** */
-  /* ************************************************************************** */
-InitPlayer:
+}
+
+/* ************************************************************************** */
+/* **************************** DTP_InitPlayer ****************************** */
+/* ************************************************************************** */
+
+/* --- InitPlayer --- */
+void InitPlayer(void) {
   {  /* MOVE.L	dtg_DOSBase(A5),A6 */
       uint32_t _mv = (uint32_t)(READ32(a5 + (intptr_t)dtg_DOSBase));
       a6 = _mv;
@@ -1563,7 +1592,7 @@ InitPlayer:
     }
   { uintptr_t _jt=(uintptr_t)(READ32(a6 + (intptr_t)_LVOLoadSeg)); if(_jt) ((void(*)(void))_jt)(); }  /* JSR	_LVOLoadSeg(A6) */
   d0 = d0 << 2;  /* LSL.L	#2,D0 */
-  if (flag_z) goto InitFail;  /* equal / zero */  /* BEQ.W	InitFail */
+  if (flag_z) InitFail(); return;  /* equal / zero */  /* BEQ.W	InitFail */
   {  /* ADDQ.L	#4,D0 */
       uint32_t _ar = (uint32_t)(d0 + 4);
       d0 = (uint32_t)_ar;
@@ -1956,13 +1985,21 @@ NoMidwinter2:
 SkipInit:
   a0 = READ32(a5 + (intptr_t)dtg_AudioAlloc);  /* MOVEA.L	dtg_AudioAlloc(A5),A0 */
   ((void(*)(void))(uintptr_t)a0)(); return;  /* JMP	(A0) */
-InitFail:
+}
+
+
+/* --- InitFail --- */
+void InitFail(void) {
   d0 = (uint32_t)(int32_t)(int8_t)(EPR_NotEnoughMem);  /* MOVEQ	#EPR_NotEnoughMem,D0 */
   return;  /* RTS */
-  /* ************************************************************************** */
-  /* **************************** DTP_EndPlayer ******************************* */
-  /* ************************************************************************** */
-EndPlayer:
+}
+
+/* ************************************************************************** */
+/* **************************** DTP_EndPlayer ******************************* */
+/* ************************************************************************** */
+
+/* --- EndPlayer --- */
+static void EndPlayer(void) {
   {  /* MOVE.L	dtg_DOSBase(A5),A6 */
       uint32_t _mv = (uint32_t)(READ32(a5 + (intptr_t)dtg_DOSBase));
       a6 = _mv;
@@ -1987,10 +2024,14 @@ EndPlayer:
   { uintptr_t _jt=(uintptr_t)(READ32(a6 + (intptr_t)_LVOUnLoadSeg)); if(_jt) ((void(*)(void))_jt)(); }  /* JSR	_LVOUnLoadSeg(A6) */
   a0 = READ32(a5 + (intptr_t)dtg_AudioFree);  /* MOVEA.L	dtg_AudioFree(A5),A0 */
   ((void(*)(void))(uintptr_t)a0)(); return;  /* JMP	(A0) */
-  /* ************************************************************************** */
-  /* **************************** DTP_InitSound ******************************* */
-  /* ************************************************************************** */
-InitSound:
+}
+
+/* ************************************************************************** */
+/* **************************** DTP_InitSound ******************************* */
+/* ************************************************************************** */
+
+/* --- InitSound --- */
+void InitSound(void) {
   a0 = (uint32_t)(uintptr_t)StructAdr;  /* LEA	StructAdr(PC),A0 */
   a1 = (uint32_t)(a0 + (intptr_t)UPS_SizeOF);  /* LEA	UPS_SizeOF(A0),A1 */
 ClearUPS:
@@ -2194,10 +2235,14 @@ NoSFX:
       flag_v = 0; flag_c = 0;
     }
   ((void(*)(void))(uintptr_t)a0)(); return;  /* JMP	(A0) */
-  /* ************************************************************************** */
-  /* **************************** DTP_EndSound ******************************** */
-  /* ************************************************************************** */
-EndSound:
+}
+
+/* ************************************************************************** */
+/* **************************** DTP_EndSound ******************************** */
+/* ************************************************************************** */
+
+/* --- EndSound --- */
+void EndSound(void) {
   {  /* MOVE.L	EndPtr(PC),D0 */
       uint32_t _mv = (uint32_t)(READ32((uintptr_t)EndPtr));
       d0 = _mv;
@@ -2214,7 +2259,11 @@ EndSound:
       flag_v = 0; flag_c = 0;
     }
   ((void(*)(void))(uintptr_t)a0)(); return;  /* JMP	(A0) */
-Standard:
+}
+
+
+/* --- Standard --- */
+static void Standard(void) {
   a0 = (uint32_t)0xDFF000;  /* LEA	$DFF000,A0 */
   {  /* MOVE.W	#15,150(A0) */
       uint16_t _mv = (uint16_t)(15);
@@ -2253,9 +2302,9 @@ Standard:
       flag_v = 0; flag_c = 0;
     }
   return;  /* RTS */
-  /* ----------------- PatchTable for Dave Lowe -------------------* */
 }
 
+/* ----------------- PatchTable for Dave Lowe -------------------* */
 /* Volume patch and fix (!!!) for Dave Lowe modules */
 /* Priority before patch 2 !!! */
 
@@ -2306,8 +2355,12 @@ Patch0:
 SkipZero:
   Patch1();  /* BSR.B	Patch1 */
   return;  /* RTS */
-  /* Volume patch for Dave Lowe modules */
-Code1:
+}
+
+/* Volume patch for Dave Lowe modules */
+
+/* --- Code1 --- */
+static void Code1(void) {
   {  /* MOVE.W	D0,8(A2) */
       uint16_t _mv = (uint16_t)(W(d0));
       hw_write16(a2 + 8, _mv);
@@ -2339,8 +2392,12 @@ static void Patch1(void) {
       flag_v = 0; flag_c = 0;
     }
   return;  /* RTS */
-  /* Volume patch for Dave Lowe modules */
-Code2:
+}
+
+/* Volume patch for Dave Lowe modules */
+
+/* --- Code2 --- */
+static void Code2(void) {
   {  /* MOVE.W	D0,8(A2) */
       uint16_t _mv = (uint16_t)(W(d0));
       hw_write16(a2 + 8, _mv);
@@ -2409,9 +2466,13 @@ Patch3:
       flag_v = 0; flag_c = 0;
     }
   return;  /* RTS */
-  /* Period patch for Dave Lowe modules */
-  /* Priority before patch C !!! */
-Code4:
+}
+
+/* Period patch for Dave Lowe modules */
+/* Priority before patch C !!! */
+
+/* --- Code4 --- */
+static void Code4(void) {
   {  /* MOVE.W	D0,6(A0) */
       uint16_t _mv = (uint16_t)(W(d0));
       hw_write16(a0 + 6, _mv);
@@ -2458,8 +2519,12 @@ Patch4:
       flag_v = 0; flag_c = 0;
     }
   return;  /* RTS */
-  /* Address/length patch for Dave Lowe modules */
-Code5:
+}
+
+/* Address/length patch for Dave Lowe modules */
+
+/* --- Code5 --- */
+static void Code5(void) {
   {  /* MOVE.L	38(A0),(A2) */
       uint32_t _mv = (uint32_t)(READ32(a0 + 38));
       hw_write32(a2, _mv);
@@ -2511,9 +2576,13 @@ Patch5:
   d0 = READ32_POST(sp);  /* MOVEM.L	(A7)+,D0,A1 */
     a1 = READ32_POST(sp);
   return;  /* RTS */
-  /* Volume patch for Dave Lowe modules */
-  /* Priority before patch 8 !!! */
-Code6:
+}
+
+/* Volume patch for Dave Lowe modules */
+/* Priority before patch 8 !!! */
+
+/* --- Code6 --- */
+static void Code6(void) {
   {  /* MOVE.W	D0,8(A2) */
       uint16_t _mv = (uint16_t)(W(d0));
       hw_write16(a2 + 8, _mv);
@@ -2541,24 +2610,28 @@ Patch6:
   SetVol();  /* BSR.W	SetVol */
   Patch8();  /* BSR.B	Patch8 */
   return;  /* RTS */
-  /* Address/length patch for Dave Lowe modules */
-  /* Unused because lame scopes output */
-  /* CodeX */
-  /* MOVE.L	$2C(A0),(A2) */
-  /* MOVE.W	$30(A0),4(A2) */
-  /* CodeXEnd */
-  /* PatchX */
-  /* movem.l	D0/A1,-(A7) */
-  /* move.l	$2C(A0),A1 */
-  /* move.l	A1,(A2) */
-  /* bsr.w	SetAdr */
-  /* move.w	$30(A0),D0 */
-  /* move.w	D0,4(A2) */
-  /* bsr.w	SetLen */
-  /* movem.l	(A7)+,D0/A1 */
-  /* rts */
-  /* Address/length patch for Dave Lowe modules */
-Code7:
+}
+
+/* Address/length patch for Dave Lowe modules */
+/* Unused because lame scopes output */
+/* CodeX */
+/* MOVE.L	$2C(A0),(A2) */
+/* MOVE.W	$30(A0),4(A2) */
+/* CodeXEnd */
+/* PatchX */
+/* movem.l	D0/A1,-(A7) */
+/* move.l	$2C(A0),A1 */
+/* move.l	A1,(A2) */
+/* bsr.w	SetAdr */
+/* move.w	$30(A0),D0 */
+/* move.w	D0,4(A2) */
+/* bsr.w	SetLen */
+/* movem.l	(A7)+,D0/A1 */
+/* rts */
+/* Address/length patch for Dave Lowe modules */
+
+/* --- Code7 --- */
+static void Code7(void) {
   {  /* MOVE.L	(A3)+,(A2) */
       uint32_t _mv = (uint32_t)(READ32_POST(a3));
       hw_write32(a2, _mv);
@@ -2610,8 +2683,12 @@ Patch7:
   d0 = READ32_POST(sp);  /* MOVEM.L	(A7)+,D0,A1 */
     a1 = READ32_POST(sp);
   return;  /* RTS */
-  /* Volume patch for Dave Lowe modules */
-Code8:
+}
+
+/* Volume patch for Dave Lowe modules */
+
+/* --- Code8 --- */
+static void Code8(void) {
   {  /* MOVE.W	(A1)+,8(A2) */
       uint16_t _mv = (uint16_t)(READ16_POST(a1));
       hw_write16(a2 + 8, _mv);
@@ -2664,8 +2741,12 @@ static void Patch8(void) {
       flag_v = 0; flag_c = 0;
     }
   return;  /* RTS */
-  /* Fix (!!!) for Dave Lowe modules */
-Code9:
+}
+
+/* Fix (!!!) for Dave Lowe modules */
+
+/* --- Code9 --- */
+static void Code9(void) {
   {  /* MOVE.W	#0,66(A0) */
       uint16_t _mv = (uint16_t)(0);
       hw_write16(a0 + 66, _mv);
@@ -2683,9 +2764,13 @@ Patch9:
       flag_v = 0; flag_c = 0;
     }
   return;  /* RTS */
-  /* SongEnd patch for Dave Lowe modules */
-  /* Priority before patch B !!! */
-CodeA:
+}
+
+/* SongEnd patch for Dave Lowe modules */
+/* Priority before patch B !!! */
+
+/* --- CodeA --- */
+static void CodeA(void) {
   {  /* MOVE.L	30(A0),26(A0) */
       uint32_t _mv = (uint32_t)(READ32(a0 + 30));
       hw_write32(a0 + 26, _mv);
@@ -2890,8 +2975,12 @@ SkipEnd:
   a1 = READ32_POST(sp);  /* MOVEM.L	(A7)+,A1,A5 */
     a5 = READ32_POST(sp);
   return;  /* RTS */
-  /* Position Counter patch for Dave Lowe modules */
-CodeB:
+}
+
+/* Position Counter patch for Dave Lowe modules */
+
+/* --- CodeB --- */
+static void CodeB(void) {
   {  /* ADDQ.L	#4,26(A0) */
       uint32_t _ar = (uint32_t)(READ32(a0 + 26) + 4);
       hw_write32(a0 + 26, (uint32_t)_ar);
@@ -2945,8 +3034,12 @@ Exit3:
       flag_v = 0; flag_c = 0;
     }
   return;  /* RTS */
-  /* SongEnd patch for Dave Lowe modules */
-CodeC:
+}
+
+/* SongEnd patch for Dave Lowe modules */
+
+/* --- CodeC --- */
+static void CodeC(void) {
   {  /* MOVE.W	(A1)+,2(A0) */
       uint16_t _mv = (uint16_t)(READ16_POST(a1));
       hw_write16(a0 + 2, _mv);
@@ -2986,16 +3079,25 @@ OKi:
       flag_n = ((int16_t)(_sr) < 0);
     }
   return;  /* RTS */
-  /* Midwinter2 patches */
 }
 
+/* Midwinter2 patches */
 /* Patch DC.L label references with runtime addresses */
 static void _ds_init(void) {
   WRITE32((uintptr_t)(_ds + 78), (uint32_t)(uintptr_t)PlayerName);
   WRITE32((uintptr_t)(_ds + 86), (uint32_t)(uintptr_t)Creator);
   WRITE32((uintptr_t)(_ds + 94), (uint32_t)(uintptr_t)DeliBase);
+  WRITE32((uintptr_t)(_ds + 102), (uint32_t)(uintptr_t)Check1);
   WRITE32((uintptr_t)(_ds + 118), (uint32_t)(uintptr_t)Interrupt);
+  WRITE32((uintptr_t)(_ds + 126), (uint32_t)(uintptr_t)SubSongRange);
+  WRITE32((uintptr_t)(_ds + 134), (uint32_t)(uintptr_t)InitPlayer);
+  WRITE32((uintptr_t)(_ds + 142), (uint32_t)(uintptr_t)EndPlayer);
+  WRITE32((uintptr_t)(_ds + 166), (uint32_t)(uintptr_t)GetInfos);
+  WRITE32((uintptr_t)(_ds + 174), (uint32_t)(uintptr_t)SampleInit);
   WRITE32((uintptr_t)(_ds + 182), (uint32_t)(uintptr_t)ModuleChange);
+  WRITE32((uintptr_t)(_ds + 190), (uint32_t)(uintptr_t)SetVolume);
+  WRITE32((uintptr_t)(_ds + 206), (uint32_t)(uintptr_t)SetVoices);
+  WRITE32((uintptr_t)(_ds + 214), (uint32_t)(uintptr_t)StructInit);
   WRITE32((uintptr_t)(_ds + 222), (uint32_t)(uintptr_t)GetPosition);
   WRITE32((uintptr_t)(_ds + 512), (uint32_t)(uintptr_t)Prefix);
   WRITE32((uintptr_t)(_ds + 1230), (uint32_t)(uintptr_t)Fiksik_1);
