@@ -227,6 +227,7 @@ export type SynthType =
   | 'SunVoxSynth'     // SunVox WASM patch player (.sunsynth / .sunvox)
   // Modular Synthesis
   | 'ModularSynth'    // Modular synthesizer with patch editor
+  | 'SunVoxModular'   // SunVox WASM modular synthesizer with visual editor
   // SuperCollider scripted synthesis
   | 'SuperCollider'  // SuperCollider SynthDef (scsynth WASM)
   // Gearmulator DSP56300 VA synths (Access Virus, Waldorf, Nord, Roland)

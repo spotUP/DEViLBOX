@@ -282,6 +282,8 @@ export interface InstrumentConfig {
   };
   // Modular Synthesis
   modularSynth?: import('../modular').ModularPatchConfig;
+  // SunVox Modular Synthesis
+  sunvoxModular?: import('../modular').ModularPatchConfig;
   // SuperCollider scripted synthesis
   superCollider?: SuperColliderConfig;
   // Gearmulator DSP56300 VA synths (Access Virus, Waldorf, Nord, Roland)
@@ -753,6 +755,21 @@ export const DEFAULT_SUNVOX: SunVoxConfig = {
   patchData: null,
   patchName: '',
   controlValues: {},
+};
+
+export const DEFAULT_SUNVOX_MODULAR_PATCH: import('../modular').ModularPatchConfig = {
+  modules: [
+    { id: 'sv_out', descriptorId: 'sv_output', parameters: {}, position: { x: 400, y: 200 } },
+    { id: 'sv_gen1', descriptorId: 'sv_analog_generator', parameters: {}, position: { x: 100, y: 100 } },
+    { id: 'sv_flt1', descriptorId: 'sv_filter', parameters: {}, position: { x: 250, y: 150 } },
+  ],
+  connections: [
+    { id: 'c1', source: { moduleId: 'sv_gen1', portId: 'output' }, target: { moduleId: 'sv_flt1', portId: 'input' }, amount: 1 },
+    { id: 'c2', source: { moduleId: 'sv_flt1', portId: 'output' }, target: { moduleId: 'sv_out', portId: 'input' }, amount: 1 },
+  ],
+  polyphony: 1,
+  viewMode: 'canvas',
+  backend: 'sunvox',
 };
 
 export const DEFAULT_SUPERSAW: SuperSawConfig = {

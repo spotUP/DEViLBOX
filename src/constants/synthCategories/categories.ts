@@ -376,6 +376,7 @@ export const SYNTH_CATEGORIES: SynthCategory[] = [
       SYNTH_INFO.Dexed,
       SYNTH_INFO.OBXd,
       SYNTH_INFO.SunVoxSynth,
+      SYNTH_INFO.SunVoxModular,
     ],
   },
   {

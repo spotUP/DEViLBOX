@@ -44,6 +44,7 @@ import { WaveSabreSynth } from './wavesabre/WaveSabreSynth';
 import type { WaveSabreSynthType } from '@typedefs/wavesabreInstrument';
 import { OidosSynth } from './oidos/OidosSynth';
 import { TunefishSynth } from './tunefish/TunefishSynth';
+import { SunVoxModularSynth } from './sunvox-modular/SunVoxModularSynth';
 
 // Sub-factory imports
 import { VOLUME_NORMALIZATION_OFFSETS } from './factories/volumeNormalization';
@@ -516,6 +517,15 @@ export class InstrumentFactory {
       case 'ModularSynth':
         instrument = createModularSynth(config);
         break;
+
+      case 'SunVoxModular': {
+        const svmPatch = config.sunvoxModular || {
+          modules: [], connections: [], polyphony: 1, viewMode: 'canvas' as const, backend: 'sunvox' as const,
+        };
+        const songData = config.sunvox?.isSong ? config.sunvox.patchData : null;
+        instrument = new SunVoxModularSynth(svmPatch, songData);
+        break;
+      }
 
       case 'ChiptuneModule':
         // ChiptuneModule requires module data - without it, fall back to basic synth
