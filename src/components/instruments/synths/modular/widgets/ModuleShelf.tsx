@@ -11,6 +11,7 @@ import { ModuleRegistry } from '../../../../../engine/modular/ModuleRegistry';
 
 interface ModuleShelfProps {
   onAddModule: (descriptorId: string) => void;
+  prefix?: string;
 }
 
 const CATEGORY_NAMES: Record<ModuleCategory, string> = {
@@ -21,12 +22,16 @@ const CATEGORY_NAMES: Record<ModuleCategory, string> = {
   envelope: 'Envelopes',
   utility: 'Utility',
   io: 'I/O',
+  control: 'Control',
 };
 
-export const ModuleShelf: React.FC<ModuleShelfProps> = ({ onAddModule }) => {
+export const ModuleShelf: React.FC<ModuleShelfProps> = ({ onAddModule, prefix }) => {
   const [isOpen, setIsOpen] = useState(false);
 
-  const allModules = ModuleRegistry.getAll();
+  let allModules = ModuleRegistry.getAll();
+  if (prefix) {
+    allModules = allModules.filter(m => m.id.startsWith(prefix));
+  }
 
   // Group modules by category
   const categories = Object.keys(CATEGORY_NAMES) as ModuleCategory[];
