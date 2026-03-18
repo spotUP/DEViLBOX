@@ -33,7 +33,8 @@ export type ModuleCategory =
   | 'modulator'   // LFO
   | 'envelope'    // ADSR
   | 'utility'     // Mixer, S&H, Delay
-  | 'io';         // MIDI-In, Output
+  | 'io'          // MIDI-In, Output
+  | 'control';    // SunVox control modules (Sound2Ctl, MultiCtl, etc.)
 
 /**
  * Port definition in a module descriptor
@@ -190,6 +191,7 @@ export interface ModularPatchConfig {
   polyphony: number;  // 1-8 voices
   viewMode: ModularViewMode;
   camera?: CanvasCamera;  // Canvas view only
+  backend?: 'webaudio' | 'sunvox';  // DSP backend (default: webaudio)
 }
 
 /**
