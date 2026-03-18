@@ -671,13 +671,44 @@ export function emit(ast: AstNode[], resolved: ResolveResult, sourceFile?: strin
   while (cfgChanged) {
     cfgChanged = false;
     // Recompute label → funcLabel scope with current funcLabels.
+    // Must account for RTS-close boundaries: after RTS or tail-call return
+    // followed by a label, the scope resets (the label starts a new function).
     const labelScope = new Map<string, string | null>();
     {
       let scope: string | null = null;
-      for (const node of ast) {
+      let lastWasReturn = false;
+      for (let si = 0; si < ast.length; si++) {
+        const node = ast[si];
+        if (node.kind === 'comment') continue;
+        if (node.kind === 'instruction') {
+          const mn = node.mnemonic.toUpperCase();
+          // Check if this instruction ends the current function
+          if (mn === 'RTS') {
+            lastWasReturn = true;
+          } else if ((mn === 'BRA' || mn === 'JMP') && 'label' in (node.operands[0] ?? {})) {
+            const target = (node.operands[0] as any).label as string;
+            if (funcLabels.has(target)) lastWasReturn = true;
+            else lastWasReturn = false;
+          } else {
+            lastWasReturn = false;
+          }
+        }
         if (node.kind === 'label') {
-          if (funcLabels.has(node.name)) scope = node.name;
-          else labelScope.set(node.name, scope);
+          if (funcLabels.has(node.name) || lastWasReturn) {
+            scope = node.name;
+            // If this label wasn't in funcLabels but follows a return, promote it
+            if (!funcLabels.has(node.name) && lastWasReturn && isFunctionLabel.has(node.name)) {
+              funcLabels.add(node.name);
+              cfgChanged = true;
+            }
+          } else {
+            labelScope.set(node.name, scope);
+          }
+          lastWasReturn = false;
+        }
+        if (node.kind === 'data' || node.kind === 'section') {
+          scope = null;
+          lastWasReturn = false;
         }
       }
     }
