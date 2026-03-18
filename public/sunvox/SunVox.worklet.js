@@ -47,8 +47,8 @@ class SunVoxProcessor extends AudioWorkletProcessor {
     };
   }
 
-  handleMessage(data) {
-    const m = this.wasm;
+  async handleMessage(data) {
+    let m = this.wasm;
     // Portable ASCII→pointer helper.
     // All paths we pass are pure ASCII (/tmp/input.sunvox etc.) so charCodeAt is correct.
     // Avoids relying on any Emscripten helper (allocateUTF8/stringToNewUTF8/lengthBytesUTF8
@@ -64,12 +64,35 @@ class SunVoxProcessor extends AudioWorkletProcessor {
       // ── Lifecycle ──────────────────────────────────────────────────────────
 
       case 'create': {
-        if (!m) {
-          console.error('[SunVox] create: WASM not loaded');
-          this.port.postMessage({ type: 'error', message: 'sunvox_wasm_create failed: WASM not loaded' });
+        if (!m || this._wasmCrashed) {
+          if (this._wasmCrashed && this._wasmBinary) {
+            // Auto-reinitialize WASM after a crash
+            console.warn('[SunVox] WASM crashed previously — reinitializing...');
+            this._wasmCrashed = false;
+            this.handles = {};
+            this.initialized = false;
+            this.wasm = null;
+            await this.initWasm(data.sampleRate, this._wasmBinary, null);
+            m = this.wasm;
+            if (!m) {
+              this.port.postMessage({ type: 'error', message: 'WASM reinit failed' });
+              break;
+            }
+          } else {
+            console.error('[SunVox] create: WASM not loaded');
+            this.port.postMessage({ type: 'error', message: 'sunvox_wasm_create failed: WASM not loaded' });
+            break;
+          }
+        }
+        let handle;
+        try {
+          handle = m._sunvox_wasm_create(data.sampleRate);
+        } catch (err) {
+          console.error('[SunVox] create crashed:', err.message, '— will reinit on next create');
+          this._wasmCrashed = true;
+          this.port.postMessage({ type: 'error', message: 'sunvox_wasm_create crashed: ' + err.message });
           break;
         }
-        let handle = m._sunvox_wasm_create(data.sampleRate);
         if (handle < 0) {
           // All 32 slots exhausted — likely stale handles from previous HMR/page reloads.
           // Destroy all handles we DON'T own and retry.
@@ -405,6 +428,8 @@ class SunVoxProcessor extends AudioWorkletProcessor {
       this.renderBufL = this.wasm._malloc(MAX_FRAMES * 4);
       this.renderBufR = this.wasm._malloc(MAX_FRAMES * 4);
 
+      this._wasmBinary = wasmBuffer; // Keep for reinit after crash
+      this._wasmCrashed = false;
       this.initialized = true;
       this.port.postMessage({ type: 'ready' });
     } catch (err) {
@@ -459,10 +484,12 @@ class SunVoxProcessor extends AudioWorkletProcessor {
           outputR[i] += heapF32[offR + i];
         }
       } catch (err) {
-        // WASM memory crash — remove this handle to prevent repeated crashes
-        console.error('[SunVox Worklet] Render crash on handle', hi, '— removing. Error:', err.message);
-        delete this.handles[h];
+        // WASM memory crash — remove ALL handles and flag for reinit
+        console.error('[SunVox Worklet] Render crash on handle', hi, '— clearing all handles. Error:', err.message);
+        this.handles = {};
+        this._wasmCrashed = true;
         this.port.postMessage({ type: 'error', message: 'RuntimeError: ' + err.message });
+        break; // Stop iterating handles
       }
     }
 
