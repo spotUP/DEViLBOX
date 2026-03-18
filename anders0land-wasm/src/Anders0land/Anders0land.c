@@ -629,6 +629,7 @@ static void _anon1(void) {
 
 /* --- SubSongRange --- */
 static void SubSongRange(void) {
+_top: ;
   d0 = (uint32_t)(int32_t)(int8_t)(0);  /* MOVEQ	#0,D0 */
   {  /* MOVE.L	InfoBuffer+SubSongs(PC),D1 */
       uint32_t _mv = (uint32_t)(READ32((uintptr_t)InfoBuffer+SubSongs));
@@ -653,6 +654,7 @@ static void SubSongRange(void) {
 
 /* --- SetVolume --- */
 static void SetVolume(void) {
+_top: ;
 SetBalance:
   {  /* MOVE.W	dtg_SndLBal(A5),D0 */
       uint16_t _mv = (uint16_t)(READ16(a5 + (intptr_t)dtg_SndLBal));
@@ -712,6 +714,7 @@ SetNew:
 
 /* --- ChangeVolume --- */
 static void ChangeVolume(void) {
+_top: ;
   {  /* MOVE.L	A4,-(SP) */
       uint32_t _mv = (uint32_t)(a4);
       WRITE32_PRE(sp, _mv);
@@ -904,6 +907,7 @@ SetIt:
 
 /* --- SetAdr --- */
 static void SetAdr(void) {
+_top: ;
   {  /* MOVE.L	A2,-(SP) */
       uint32_t _mv = (uint32_t)(a2);
       WRITE32_PRE(sp, _mv);
@@ -969,6 +973,7 @@ _SetVoice:
 
 /* --- SetLen --- */
 static void SetLen(void) {
+_top: ;
   {  /* MOVE.L	A1,-(SP) */
       uint32_t _mv = (uint32_t)(a1);
       WRITE32_PRE(sp, _mv);
@@ -1029,6 +1034,7 @@ _SetVoice:
 
 /* --- SetVoices --- */
 static void SetVoices(void) {
+_top: ;
   a0 = (uint32_t)(uintptr_t)Voice1;  /* LEA	Voice1(PC),A0 */
   a1 = (uint32_t)(uintptr_t)StructAdr;  /* LEA	StructAdr(PC),A1 */
   d1 = (uint32_t)(int32_t)(int8_t)(1);  /* MOVEQ	#1,D1 */
@@ -1102,6 +1108,7 @@ No_Voice4:
 
 /* --- StructInit --- */
 static void StructInit(void) {
+_top: ;
   a0 = (uint32_t)(uintptr_t)StructAdr;  /* LEA	StructAdr(PC),A0 */
   return;  /* RTS */
 }
@@ -1112,6 +1119,7 @@ static void StructInit(void) {
 
 /* --- SampleInit --- */
 static void SampleInit(void) {
+_top: ;
   d7 = (uint32_t)(int32_t)(int8_t)(EPR_NotEnoughMem);  /* MOVEQ	#EPR_NotEnoughMem,D7 */
   a3 = (uint32_t)(a5 + (intptr_t)EPG_SampleInfoStructure);  /* LEA	EPG_SampleInfoStructure(A5),A3 */
   {  /* MOVE.L	SongPtr(PC),D0 */
@@ -1256,6 +1264,7 @@ _return:
 
 /* --- GetPosition --- */
 static void GetPosition(void) {
+_top: ;
   d0 = (uint32_t)(int32_t)(int8_t)(0);  /* MOVEQ	#0,D0 */
   {  /* MOVE.B	lbL00062A+33(PC),D0 */
       uint8_t _mv = (uint8_t)(READ8((uintptr_t)lbL00062A+33));
@@ -1273,6 +1282,7 @@ static void GetPosition(void) {
 
 /* --- Check2 --- */
 static void Check2(void) {
+_top: ;
   {  /* MOVE.L	dtg_ChkData(A5),A0 */
       uint32_t _mv = (uint32_t)(READ32(a5 + (intptr_t)dtg_ChkData));
       a0 = _mv;
@@ -1425,6 +1435,7 @@ fault:
 
 /* --- InitPlayer --- */
 void InitPlayer(void) {
+_top: ;
   d0 = (uint32_t)(int32_t)(int8_t)(0);  /* MOVEQ	#0,D0 */
   {  /* MOVE.L	dtg_GetListData(A5),A0 */
       uint32_t _mv = (uint32_t)(READ32(a5 + (intptr_t)dtg_GetListData));
@@ -1710,6 +1721,7 @@ NoByte2:
 
 /* --- Short ---  (cross-function goto target) */
 static void Short(void) {
+_top: ;
   d0 = (uint32_t)(int32_t)(int8_t)(EPR_ModuleTooShort);  /* MOVEQ	#EPR_ModuleTooShort,D0 */
   return;  /* RTS */
 }
@@ -1720,6 +1732,7 @@ static void Short(void) {
 
 /* --- EndPlayer --- */
 static void EndPlayer(void) {
+_top: ;
   {  /* MOVE.L	dtg_AudioFree(A5),A0 */
       uint32_t _mv = (uint32_t)(READ32(a5 + (intptr_t)dtg_AudioFree));
       a0 = _mv;
@@ -1736,6 +1749,7 @@ static void EndPlayer(void) {
 
 /* --- Interrupt --- */
 void Interrupt(void) {
+_top: ;
   WRITE32_PRE(sp, d6);  /* MOVEM.L	D1,D2,D3,D4,D5,D6,-(SP) */
     WRITE32_PRE(sp, d5);
     WRITE32_PRE(sp, d4);
@@ -1771,6 +1785,7 @@ void Interrupt(void) {
 
 /* --- SongEndTest --- */
 static void SongEndTest(void) {
+_top: ;
   WRITE32_PRE(sp, a5);  /* MOVEM.L	A1,A5,-(A7) */
     WRITE32_PRE(sp, a1);
   a1 = (uint32_t)(uintptr_t)SongEnd;  /* LEA	SongEnd(PC),A1 */
@@ -1860,6 +1875,7 @@ SkipEnd:
 
 /* --- InitSound --- */
 void InitSound(void) {
+_top: ;
   a0 = (uint32_t)(uintptr_t)StructAdr;  /* LEA	StructAdr(PC),A0 */
   a1 = (uint32_t)(a0 + (intptr_t)UPS_SizeOF);  /* LEA	UPS_SizeOF(A0),A1 */
 ClearUPS:
@@ -1915,6 +1931,7 @@ ClearUPS:
 
 /* --- EndSound --- */
 void EndSound(void) {
+_top: ;
   a0 = (uint32_t)0xDFF000;  /* LEA	$DFF000,A0 */
   {  /* MOVE.W	#15,150(A0) */
       uint16_t _mv = (uint16_t)(15);
@@ -1969,6 +1986,7 @@ void EndSound(void) {
 
 /* --- Init ---  (cross-function goto target) */
 static void Init(void) {
+_top: ;
 lbC000062:
   a0 = (uint32_t)(uintptr_t)lbL00062A;  /* LEA	lbL00062A(PC),A0 */
   a1 = (uint32_t)(uintptr_t)lbL00069E;  /* LEA	lbL00069E(PC),A1 */
@@ -1989,6 +2007,7 @@ lbC000062:
 
 /* --- lbC000082 ---  (cross-function goto target) */
 static void lbC000082(void) {
+_top: ;
   /* hw $BFE001 */ (void)(READ32(0xBFE001) | (1u << (1 & 31)));  /* BSET	#1,$BFE001 */
   {  /* MOVE.W	#15,$DFF096 */
       uint16_t _mv = (uint16_t)(15);
@@ -2157,6 +2176,7 @@ lbC000114:
 
 /* --- Play --- */
 static void Play(void) {
+_top: ;
 lbC000132:
   a1 = (uint32_t)(uintptr_t)lbL00062A;  /* LEA	lbL00062A(PC),A1 */
   a5 = (uint32_t)(uintptr_t)lbL00069E;  /* LEA	lbL00069E(PC),A5 */
