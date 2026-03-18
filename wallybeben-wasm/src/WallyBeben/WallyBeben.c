@@ -551,16 +551,30 @@ uint8_t _ds[1032] = {
 
 /* -- External Data Placeholders (INCBIN / external data) ------------- */
 /* Host must set these pointers to actual module data before playback. */
+static uint8_t* _return = NULL;
+static uint8_t* hop = NULL;
+static uint8_t* _no_A = NULL;
+static uint8_t* _no_B = NULL;
+static uint8_t* _no_C = NULL;
+static uint8_t* _no_D = NULL;
 static uint8_t* _NoVoice1 = NULL;
 static uint8_t* _NoVoice2 = NULL;
 static uint8_t* _NoVoice3 = NULL;
 static uint8_t* _NoVoice4 = NULL;
+static uint8_t* NoChange = NULL;
+static uint8_t* Fault = NULL;
+static uint8_t* Short = NULL;
+static uint8_t* Found = NULL;
 static uint8_t* _dma2 = NULL;
 static uint8_t* _dma1 = NULL;
+static uint8_t* MoveqFormat = NULL;
 static uint8_t* FindIt0 = NULL;
 static uint8_t* FindIt1 = NULL;
 static uint8_t* FindIt2 = NULL;
 static uint8_t* FindIt6 = NULL;
+static uint8_t* MinVal = NULL;
+static uint8_t* RelocSongs = NULL;
+static uint8_t* RelocPos = NULL;
 static uint8_t* FindIt7 = NULL;
 static uint8_t* FindIt4 = NULL;
 static uint8_t* Ok1 = NULL;
@@ -568,16 +582,38 @@ static uint8_t* FindIt5 = NULL;
 static uint8_t* Back1 = NULL;
 static uint8_t* FindIt3 = NULL;
 static uint8_t* Back2 = NULL;
+static uint8_t* NewStyle = NULL;
 static uint8_t* Back3 = NULL;
+static uint8_t* FindLea = NULL;
+static uint8_t* RelocSamp = NULL;
+static uint8_t* Exit = NULL;
+static uint8_t* Next = NULL;
+static uint8_t* MinPtr = NULL;
+static uint8_t* MaxPtr = NULL;
+static uint8_t* NextPtr = NULL;
+static uint8_t* SamplesOK = NULL;
 static uint8_t* NextPtr1 = NULL;
 static uint8_t* Reloc2 = NULL;
 static uint8_t* Reloc1 = NULL;
 static uint8_t* Reloc3 = NULL;
+static uint8_t* Back = NULL;
+static uint8_t* Later = NULL;
+static uint8_t* NoHard = NULL;
+static uint8_t* NextLong = NULL;
+static uint8_t* InfoFound = NULL;
+static uint8_t* FindText = NULL;
+static uint8_t* ClearUPS = NULL;
+static uint8_t* FindEnd = NULL;
+static uint8_t* MaxLen = NULL;
+static uint8_t* NextPos = NULL;
 static uint8_t* NoEnd2 = NULL;
 static uint8_t* ClearUPS2 = NULL;
+static uint8_t* NoEnd = NULL;
 static uint8_t* test1 = NULL;
+static uint8_t* test = NULL;
 static uint8_t* test2 = NULL;
 static uint8_t* test3 = NULL;
+static uint8_t* SkipEnd = NULL;
 
 /* -- Forward Declarations -------------------------------------------- */
 static void ModuleChange(void);
@@ -600,13 +636,10 @@ static void Check2(void);
 static void GetInfos(void);
 static void SubSongRange(void);
 void InitPlayer(void);
+static void EndPlayer(void);
+void InitSound(void);
 void EndSound(void);
-static void _return(void);
-static void _error(void);
-static void fail(void);
-static void InitFail(void);
-static void Short(void);
-static void Skip(void);static void Code1(void);
+static void Code1(void);
 static void Code2(void);
 static void Code3(void);
 static void Code4(void);
@@ -616,8 +649,6 @@ static void Code7(void);
 static void Code8(void);
 static void Code9(void);
 static void Ex(void);
-static void EndPlayer(void);
-void InitSound(void);
 static void SetBalance(void);
 
 
@@ -656,7 +687,7 @@ static void SampleInit(void) {
       flag_n = ((int32_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-  if (flag_z) _return(); return;  /* equal / zero */  /* BEQ.B	return */
+  if (flag_z) goto _return;  /* equal / zero */  /* BEQ.B	return */
   {  /* MOVE.L	D0,A2 */
       uint32_t _mv = (uint32_t)(d0);
       a2 = _mv;
@@ -693,7 +724,7 @@ hop:
       flag_n = ((int32_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-  if (flag_z) _return(); return;  /* equal / zero */  /* BEQ.B	return */
+  if (flag_z) goto _return;  /* equal / zero */  /* BEQ.B	return */
   {  /* MOVE.L	D0,A3 */
       uint32_t _mv = (uint32_t)(d0);
       a3 = _mv;
@@ -1319,7 +1350,7 @@ static void Check2(void) {
       flag_n = ((int8_t)(_tst) < 0);
       flag_c = 0; flag_v = 0;
     }
-  if (!flag_z) Short(); return;  /* not equal / nonzero */  /* BNE.B	Short */
+  if (!flag_z) goto Short;  /* not equal / nonzero */  /* BNE.B	Short */
   a1 = (uint32_t)((int32_t)a1 + (int32_t)(int16_t)(2));  /* ADDQ.L	#2,A1 */
 Short:
   {  /* CMP.W	#$4239,(A1) */
@@ -3672,6 +3703,8 @@ static void _ds_init(void) {
   WRITE32((uintptr_t)(_ds + 104), (uint32_t)(uintptr_t)Interrupt);
   WRITE32((uintptr_t)(_ds + 112), (uint32_t)(uintptr_t)SubSongRange);
   WRITE32((uintptr_t)(_ds + 120), (uint32_t)(uintptr_t)InitPlayer);
+  WRITE32((uintptr_t)(_ds + 128), (uint32_t)(uintptr_t)EndPlayer);
+  WRITE32((uintptr_t)(_ds + 136), (uint32_t)(uintptr_t)InitSound);
   WRITE32((uintptr_t)(_ds + 144), (uint32_t)(uintptr_t)EndSound);
   WRITE32((uintptr_t)(_ds + 152), (uint32_t)(uintptr_t)GetInfos);
   WRITE32((uintptr_t)(_ds + 160), (uint32_t)(uintptr_t)ModuleChange);

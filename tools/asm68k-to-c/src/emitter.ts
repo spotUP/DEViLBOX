@@ -669,76 +669,84 @@ export function emit(ast: AstNode[], resolved: ResolveResult, sourceFile?: strin
   while (cfgChanged) {
     cfgChanged = false;
 
-    // Single unified pass: build label→scope map AND detect cross-function gotos
-    // simultaneously, with consistent RTS-close boundary tracking.
-    const labelScope = new Map<string, string | null>();
+    // Helper: run a scope-tracking pass over the AST, returning label→scope map.
+    // Accounts for RTS-close and indirect JMP boundaries.
+    function buildLabelScope(): Map<string, string | null> {
+      const ls = new Map<string, string | null>();
+      let sc: string | null = null;
+      let lwr = false;
+      for (let si = 0; si < ast.length; si++) {
+        const node = ast[si];
+        if (node.kind === 'comment') continue;
+        if (node.kind === 'data' || node.kind === 'section') { sc = null; lwr = false; continue; }
+        if (node.kind === 'label') {
+          if (funcLabels.has(node.name) || lwr) {
+            if (!funcLabels.has(node.name) && lwr && isFunctionLabel.has(node.name)) {
+              funcLabels.add(node.name);
+              cfgChanged = true;
+            }
+            sc = node.name;
+          } else {
+            ls.set(node.name, sc);
+          }
+          lwr = false;
+          continue;
+        }
+        if (node.kind === 'instruction') {
+          const mn = node.mnemonic.toUpperCase();
+          if (mn === 'RTS') {
+            let pi = si + 1;
+            while (pi < ast.length && ast[pi].kind === 'comment') pi++;
+            lwr = pi < ast.length && ast[pi].kind === 'label';
+          } else if (mn === 'BRA' || mn === 'JMP') {
+            const op0 = node.operands[0];
+            const isIndirect = op0?.kind === 'address';
+            const tgtLabel = op0?.kind === 'label_ref' ? op0.name : op0?.kind === 'pc_rel' ? op0.label : null;
+            const isToFunc = tgtLabel && (funcLabels.has(tgtLabel) || crossFuncGotos.has(tgtLabel));
+            if (isIndirect || isToFunc) {
+              let pi = si + 1;
+              while (pi < ast.length && ast[pi].kind === 'comment') pi++;
+              lwr = pi < ast.length && ast[pi].kind === 'label';
+            } else { lwr = false; }
+          } else { lwr = false; }
+        }
+      }
+      return ls;
+    }
+
+    // Pass 1: Build label→scope map (full forward pass so all labels are mapped)
+    const labelScope = buildLabelScope();
+
+    // Pass 2: Scan all branches, using the COMPLETE labelScope for cross-function detection
     let scope: string | null = null;
     let lastWasReturn = false;
-
     for (let si = 0; si < ast.length; si++) {
       const node = ast[si];
       if (node.kind === 'comment') continue;
-
-      if (node.kind === 'data' || node.kind === 'section') {
-        scope = null;
-        lastWasReturn = false;
-        continue;
-      }
-
+      if (node.kind === 'data' || node.kind === 'section') { scope = null; lastWasReturn = false; continue; }
       if (node.kind === 'label') {
-        // A label starts a new function scope if:
-        // 1. It's already in funcLabels (BSR/JSR target or export), OR
-        // 2. The previous code ended with RTS/tail-call (lastWasReturn)
-        if (funcLabels.has(node.name) || lastWasReturn) {
-          // Promote post-RTS labels to funcLabels so gotos to them become calls
-          if (!funcLabels.has(node.name) && lastWasReturn && isFunctionLabel.has(node.name)) {
-            funcLabels.add(node.name);
-            cfgChanged = true;
-          }
-          scope = node.name;
-        } else {
-          // Inline label within current function
-          labelScope.set(node.name, scope);
-        }
+        if (funcLabels.has(node.name) || lastWasReturn) { scope = node.name; }
         lastWasReturn = false;
         continue;
       }
-
       if (node.kind === 'instruction') {
         const mn = node.mnemonic.toUpperCase();
-
-        // Track RTS-close: if this instruction returns and the next node is a label,
-        // the next label will start a new function.
         if (mn === 'RTS') {
-          let peekIdx = si + 1;
-          while (peekIdx < ast.length && ast[peekIdx].kind === 'comment') peekIdx++;
-          if (peekIdx < ast.length && ast[peekIdx].kind === 'label') lastWasReturn = true;
-          else lastWasReturn = false;
+          let pi = si + 1;
+          while (pi < ast.length && ast[pi].kind === 'comment') pi++;
+          lastWasReturn = pi < ast.length && ast[pi].kind === 'label';
         } else if (mn === 'BRA' || mn === 'JMP') {
-          // Only close the function for:
-          // 1. JMP (An) — indirect jump through register (always a tail call/exit)
-          // 2. JMP d(An) — indirect jump through displacement
-          // 3. BRA/JMP to a known function label (tail call)
-          // DO NOT close for BRA to local labels (those are just gotos within the function)
           const op0 = node.operands[0];
-          const isIndirect = op0?.kind === 'address'; // JMP (A0), JMP d(An)
-          const tgtLabel = op0?.kind === 'label_ref' ? op0.name
-                         : op0?.kind === 'pc_rel'    ? op0.label
-                         : null;
-          const isToFunction = tgtLabel && (funcLabels.has(tgtLabel) || crossFuncGotos.has(tgtLabel));
-          if (isIndirect || isToFunction) {
-            let peekIdx = si + 1;
-            while (peekIdx < ast.length && ast[peekIdx].kind === 'comment') peekIdx++;
-            if (peekIdx < ast.length && ast[peekIdx].kind === 'label') lastWasReturn = true;
-            else lastWasReturn = false;
-          } else {
-            lastWasReturn = false;
-          }
-        } else {
-          lastWasReturn = false;
-        }
+          const isIndirect = op0?.kind === 'address';
+          const tgtLabel = op0?.kind === 'label_ref' ? op0.name : op0?.kind === 'pc_rel' ? op0.label : null;
+          const isToFunc = tgtLabel && (funcLabels.has(tgtLabel) || crossFuncGotos.has(tgtLabel));
+          if (isIndirect || isToFunc) {
+            let pi = si + 1;
+            while (pi < ast.length && ast[pi].kind === 'comment') pi++;
+            lastWasReturn = pi < ast.length && ast[pi].kind === 'label';
+          } else { lastWasReturn = false; }
+        } else { lastWasReturn = false; }
       }
-
       if (node.kind !== 'instruction') continue;
       // Pick the operand that holds the branch target label.
       let targetOp = BRANCH_MNEMS.has(node.mnemonic)  ? node.operands[0]
