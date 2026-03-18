@@ -3566,30 +3566,33 @@ void furnace_dispatch_set_sample(int handle, int sampleIndex, unsigned char* dat
 
   engine_set_sample(sampleIndex, sample);
 
-  // Sync to dispatch instance's song (renderSamples reads from song.sample)
-  auto sit = g_instances.find(handle);
-  if (sit != g_instances.end()) {
-    auto& songSamples = sit->second->engine.song.sample;
+  // Sync to ALL dispatch instances (multi-chip songs need samples on every chip)
+  for (auto& [h, inst] : g_instances) {
+    auto& songSamples = inst->engine.song.sample;
     if (sampleIndex >= (int)songSamples.size()) {
       songSamples.resize(sampleIndex + 1, nullptr);
     }
     songSamples[sampleIndex] = sample; // Borrowed reference (g_samples owns it)
-    sit->second->engine.song.sampleLen = (int)songSamples.size();
+    inst->engine.song.sampleLen = (int)songSamples.size();
 
     // Ensure at least one instrument exists in song.ins for chips that need it
-    // (e.g., MultiPCM's renderInstruments reads from song.ins)
-    auto& songIns = sit->second->engine.song.ins;
+    auto& songIns = inst->engine.song.ins;
     if (songIns.empty()) {
       DivInstrument* defaultIns = new DivInstrument();
-      defaultIns->amiga.initSample = 0; // Point to sample 0
-      defaultIns->amiga.useNoteMap = false; // Use initSample for all notes (don't use noteMap)
+      defaultIns->amiga.initSample = 0;
+      defaultIns->amiga.useNoteMap = false;
       songIns.push_back(defaultIns);
-      sit->second->engine.song.insLen = 1;
+      inst->engine.song.insLen = 1;
     }
   }
 
   // Mark sample as renderable (required for RF5C68 and other chips to include it in renderSamples())
-  sample->renderOn[0][0] = true;
+  // Enable sample rendering for ALL chip slots (multi-chip songs have sysID > 0)
+  for (int s = 0; s < DIV_MAX_SAMPLE_TYPE; s++) {
+    for (int c = 0; c < DIV_MAX_CHIPS; c++) {
+      sample->renderOn[s][c] = true;
+    }
+  }
 
   printf("[FurnaceDispatch] Loaded sample %d: %u samples, depth %d\n",
          sampleIndex, sample->samples, sample->depth);
@@ -3661,6 +3664,36 @@ void furnace_dispatch_render_samples(int handle) {
             smp->lengthVOX = (n + 1) / 2;
             smp->dataVOX = new unsigned char[smp->lengthVOX];
             oki_encode(smp->data16, smp->dataVOX, n);
+          }
+          // µ-law (C140 alternate mode)
+          if (!smp->dataMuLaw) {
+            smp->lengthMuLaw = n;
+            smp->dataMuLaw = new unsigned char[n];
+            for (unsigned int j = 0; j < n; j++) {
+              // Standard µ-law encoding from 16-bit PCM
+              int s = smp->data16[j];
+              int sign = (s >> 8) & 0x80;
+              if (sign) s = -s;
+              if (s > 32635) s = 32635;
+              s += 0x84;
+              int exponent = 7;
+              for (int expMask = 0x4000; (s & expMask) == 0 && exponent > 0; exponent--, expMask >>= 1) {}
+              int mantissa = (s >> (exponent + 3)) & 0x0F;
+              smp->dataMuLaw[j] = ~(sign | (exponent << 4) | mantissa);
+            }
+          }
+          // C219 signed-magnitude 8-bit
+          if (!smp->dataC219) {
+            smp->lengthC219 = n;
+            smp->dataC219 = new unsigned char[n];
+            for (unsigned int j = 0; j < n; j++) {
+              int s = smp->data16[j] >> 8; // reduce to 8-bit
+              if (s < 0) {
+                smp->dataC219[j] = 0x80 | ((-s) & 0x7F);
+              } else {
+                smp->dataC219[j] = s & 0x7F;
+              }
+            }
           }
         }
       }
