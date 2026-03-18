@@ -659,6 +659,12 @@ async function loadSongFile(file: File, options: FileLoadOptions): Promise<FileL
   if (filename.endsWith('.sunvox')) {
     preReadBuffer = await file.arrayBuffer();
 
+    // Reset shared WASM handle from any previous .sunvox song to prevent memory crashes
+    try {
+      const { resetSharedSunVoxHandle } = await import('@/engine/sunvox-modular/SunVoxModularSynth');
+      resetSharedSunVoxHandle();
+    } catch { /* not loaded yet */ }
+
     // Try to extract individual modules before the reset so we can create
     // one SunVoxSynth instrument per module (synth mode) instead of loading
     // the whole project as a single song-mode instrument.
