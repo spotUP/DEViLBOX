@@ -523,7 +523,8 @@ export class InstrumentFactory {
           modules: [], connections: [], polyphony: 1, viewMode: 'canvas' as const, backend: 'sunvox' as const,
         };
         const songData = config.sunvox?.isSong ? config.sunvox.patchData : null;
-        instrument = new SunVoxModularSynth(svmPatch, songData);
+        const noteTarget = config.sunvox?.noteTargetModuleId;
+        instrument = new SunVoxModularSynth(svmPatch, songData, noteTarget);
         break;
       }
 

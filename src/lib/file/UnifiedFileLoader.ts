@@ -922,30 +922,48 @@ async function loadSongFile(file: File, options: FileLoadOptions): Promise<FileL
     const extractedModules = preSunVoxModules as SvoxModule[] | null;
 
     if (extractedModules && extractedModules.length > 0) {
-      // SunVoxModular drives audio via SunVox WASM — we build a ModularPatchConfig
-      // from the extracted module graph so the modular editor shows the real layout.
-      const { sunvoxGraphToConfig } = await import('@/engine/sunvox-modular/graphToConfig');
-      const modularConfig = preSunVoxGraph
-        ? sunvoxGraphToConfig(preSunVoxGraph)
-        : { modules: [], connections: [], polyphony: 1, viewMode: 'canvas' as const, backend: 'sunvox' as const };
-      useInstrumentStore.getState().createInstrument({
-        name,
-        synthType: 'SunVoxModular' as const,
-        sunvoxModular: modularConfig,
-        sunvox: {
-          patchData: preReadBuffer!,
-          patchName: name,
-          isSong: true,
-          controlValues: {} as Record<string, number>,
-        },
-      });
-      // Select the newly created instrument so the editor shows it immediately
-      const newInsts = useInstrumentStore.getState().instruments;
-      if (newInsts.length > 0) {
-        useInstrumentStore.getState().setCurrentInstrument(newInsts[newInsts.length - 1].id);
+      const { sunvoxSubGraphForGenerator, findGeneratorModules } = await import('@/engine/sunvox-modular/graphToConfig');
+      const graph = preSunVoxGraph ?? [];
+
+      // Identify generator modules → one instrument each
+      const generators = findGeneratorModules(graph);
+      // Build SunVox module ID → instrument index (1-based) mapping
+      const svModToInstrIdx = new Map<number, number>();
+
+      if (generators.length > 0) {
+        for (let g = 0; g < generators.length; g++) {
+          const gen = generators[g];
+          const subGraph = sunvoxSubGraphForGenerator(graph, gen.id);
+          useInstrumentStore.getState().createInstrument({
+            name: gen.name || `SV Module ${gen.id}`,
+            synthType: 'SunVoxModular' as const,
+            sunvoxModular: subGraph,
+            sunvox: {
+              patchData: preReadBuffer!,
+              patchName: name,
+              isSong: true,
+              noteTargetModuleId: gen.id,
+              controlValues: {} as Record<string, number>,
+            },
+          });
+          const insts = useInstrumentStore.getState().instruments;
+          svModToInstrIdx.set(gen.id, insts[insts.length - 1].id);
+        }
+      } else {
+        // No generators found — create one song-mode instrument
+        useInstrumentStore.getState().createInstrument({
+          name,
+          synthType: 'SunVoxModular' as const,
+          sunvoxModular: { modules: [], connections: [], polyphony: 1, viewMode: 'canvas' as const, backend: 'sunvox' as const },
+          sunvox: { patchData: preReadBuffer!, patchName: name, isSong: true, controlValues: {} as Record<string, number> },
+        });
       }
-      // Song instrument is always at index 1 (first instrument after reset)
-      const SONG_INSTR_IDX = 1;
+
+      // Select first instrument
+      const allInsts = useInstrumentStore.getState().instruments;
+      if (allInsts.length > 0) {
+        useInstrumentStore.getState().setCurrentInstrument(allInsts[0].id);
+      }
 
       // Build moduleId → name map for channel labelling
       const moduleNameMap = new Map<number, string>(extractedModules.map(m => [m.id, m.name]));
@@ -967,7 +985,7 @@ async function loadSongFile(file: File, options: FileLoadOptions): Promise<FileL
         const sorted = [...svPatterns].sort((a, b) => a.x - b.x);
         patternsToLoad = sorted.map((svPat, i) => {
           const channels = Array.from({ length: svPat.tracks }, (_, t) => {
-            // Name channel by its most-used module
+            // Find dominant module for channel naming + instrument assignment
             const modCounts = new Map<number, number>();
             for (let l = 0; l < svPat.lines; l++) {
               const ev = svPat.notes[t]?.[l];
@@ -976,27 +994,32 @@ async function loadSongFile(file: File, options: FileLoadOptions): Promise<FileL
             let dominantMod = -1, maxCnt = 0;
             for (const [id, cnt] of modCounts) { if (cnt > maxCnt) { maxCnt = cnt; dominantMod = id; } }
             const chName = dominantMod >= 0 ? (moduleNameMap.get(dominantMod) ?? `Track ${t + 1}`) : `Track ${t + 1}`;
+            // Map channel to the instrument for its dominant module
+            const instrId = dominantMod >= 0 ? (svModToInstrIdx.get(dominantMod) ?? 1) : 1;
 
             const rows = Array.from({ length: svPat.lines }, (_, l) => {
               const ev = svPat.notes[t]?.[l];
               if (!ev || (ev.note === 0 && ev.vel === 0 && ev.module < 0 && ev.ctl === 0)) return { ...emptyRow };
               const volume = ev.vel === 0 ? 0 : Math.max(1, Math.round(ev.vel * 64 / 129));
+              // Map per-event module to instrument
+              const evInstrId = ev.module >= 1 ? (svModToInstrIdx.get(ev.module) ?? instrId) : instrId;
               const effTyp  = (ev.ctl >> 8) & 0xFF;
               const effTyp2 = ev.ctl & 0xFF;
-              return { note: ev.note, instrument: SONG_INSTR_IDX, volume, effTyp, eff: effTyp > 0 ? ev.ctlVal : 0, effTyp2, eff2: effTyp2 > 0 ? ev.ctlVal : 0 };
+              return { note: ev.note, instrument: evInstrId, volume, effTyp, eff: effTyp > 0 ? ev.ctlVal : 0, effTyp2, eff2: effTyp2 > 0 ? ev.ctlVal : 0 };
             });
-            return { id: `ch-svox-${Date.now()}-${i}-${t}`, name: chName, muted: false, solo: false, collapsed: false, volume: 100, pan: 0, instrumentId: SONG_INSTR_IDX, color: channelColors[t % channelColors.length], rows };
+            return { id: `ch-svox-${Date.now()}-${i}-${t}`, name: chName, muted: false, solo: false, collapsed: false, volume: 100, pan: 0, instrumentId: instrId, color: channelColors[t % channelColors.length], rows };
           });
           return { id: `svpat-${Date.now()}-${i}`, name: svPatterns.length > 1 ? `Pattern ${i + 1}` : name, length: svPat.lines, channels };
         });
       } else {
-        // Fallback: single pattern, one channel per module (display only)
+        // Fallback: single pattern with one channel per generator
         const now = Date.now();
-        const channels = extractedModules.map((mod, idx) => {
+        const channels = generators.map((gen, idx) => {
+          const instrId = svModToInstrIdx.get(gen.id) ?? 1;
           const rows = Array.from({ length: PATTERN_LEN }, (_, i) =>
-            i === 0 ? { note: 49, instrument: SONG_INSTR_IDX, volume: 64, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 } : { ...emptyRow }
+            i === 0 ? { note: 49, instrument: instrId, volume: 64, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 } : { ...emptyRow }
           );
-          return { id: `ch-svox-${now}-${idx}`, name: mod.name, muted: false, solo: false, collapsed: false, volume: 100, pan: 0, instrumentId: SONG_INSTR_IDX, color: channelColors[idx % channelColors.length], rows };
+          return { id: `ch-svox-${now}-${idx}`, name: gen.name, muted: false, solo: false, collapsed: false, volume: 100, pan: 0, instrumentId: instrId, color: channelColors[idx % channelColors.length], rows };
         });
         patternsToLoad = [{ id: `svox-${Date.now()}`, name, length: PATTERN_LEN, channels }];
       }
@@ -1004,9 +1027,9 @@ async function loadSongFile(file: File, options: FileLoadOptions): Promise<FileL
       loadPatterns(patternsToLoad);
       setCurrentPattern(0);
       setPatternOrder(patternsToLoad.map((_, i) => i));
-      setMetadata({ name, author: '', description: `Imported from ${file.name} (${extractedModules.length} modules)` });
+      setMetadata({ name, author: '', description: `Imported from ${file.name} (${generators.length} instruments, ${extractedModules.length} modules)` });
       applyEditorMode({});
-      return { success: true, message: `Loaded SunVox: ${name} — ${patternsToLoad.length} pattern(s), ${extractedModules.length} modules` };
+      return { success: true, message: `Loaded SunVox: ${name} — ${generators.length} instruments, ${patternsToLoad.length} pattern(s)` };
     }
 
     // Fallback: song mode — load the whole project as a single instrument.
