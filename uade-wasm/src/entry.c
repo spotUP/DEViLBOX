@@ -569,8 +569,13 @@ int uade_wasm_render(float *out_l, float *out_r, int frames) {
  * captures the full 4-channel Paula state into the ring buffer.
  * Reads audio_channel[] directly — same mechanism as uade_wasm_get_channel_snapshot().
  */
+static void rt_channel_log_tick(void);  /* forward declaration */
+
 void uade_wasm_on_cia_a_tick(void) {
     g_uade_tick_count++;
+
+    /* Real-time channel state logging (always runs when enabled) */
+    rt_channel_log_tick();
 
     if (!g_tick_snap_enabled) return;
 
@@ -1019,4 +1024,126 @@ int uade_wasm_add_extra_file(const char *filename, const uint8_t *data, size_t l
     fclose(f);
     fprintf(stderr, "[uade-wasm] Companion file written: %s (%zu bytes)\n", path, len);
     return 0;
+}
+
+/* ── 68k Register Access ───────────────────────────────────────────────── */
+
+/* The regstruct is defined in newcpu.h with many dependencies.
+ * We declare just the parts we need via the extern symbol 'regs'.
+ * The first 16 uint32s are D0-D7,A0-A7. PC follows at a known offset.
+ * We access it as raw memory to avoid header dependency issues. */
+struct _uade_regs_partial {
+    uint32_t regs[16];
+    /* After regs[16]: usp(4), isp(4), msp(4), sr(2), t1(1), t0(1), s(1), m(1), x(1), stopped(1), intmask(4) = 24 bytes */
+    /* Then: pc(4) at offset 16*4 + 24 = 88 */
+};
+extern struct _uade_regs_partial regs;
+
+/*
+ * Read a 68k register by index.
+ * Registers 0-7 = D0-D7 (data), 8-15 = A0-A7 (address), 16 = PC, 17 = SR.
+ */
+EMSCRIPTEN_KEEPALIVE
+uint32_t uade_wasm_get_register(int reg) {
+    if (reg >= 0 && reg <= 15) return regs.regs[reg];
+    if (reg == 16) {
+        /* PC is at byte offset 88 from start of regs struct */
+        uint8_t *base = (uint8_t *)&regs;
+        uint32_t pc;
+        memcpy(&pc, base + 88, 4);
+        return pc;
+    }
+    if (reg == 17) {
+        /* SR is at byte offset 76 (after regs[16] + usp + isp + msp = 64+4+4+4=76) */
+        uint8_t *base = (uint8_t *)&regs;
+        uint16_t sr;
+        memcpy(&sr, base + 76, 2);
+        return (uint32_t)sr;
+    }
+    return 0;
+}
+
+/*
+ * Read all 68k registers into caller buffer.
+ * Layout: D0-D7 (8), A0-A7 (8), PC (1), SR (1) = 18 uint32s
+ */
+EMSCRIPTEN_KEEPALIVE
+void uade_wasm_get_all_registers(uint32_t *out) {
+    for (int i = 0; i < 16; i++) out[i] = regs.regs[i];
+    uint8_t *base = (uint8_t *)&regs;
+    uint32_t pc; memcpy(&pc, base + 88, 4); out[16] = pc;
+    uint16_t sr; memcpy(&sr, base + 76, 2); out[17] = (uint32_t)sr;
+}
+
+/* ── Real-time per-tick channel state ring buffer ──────────────────────── */
+
+/*
+ * Per-tick channel state, captured during uade_wasm_render() on every CIA-A tick.
+ * This provides continuous channel state (not just during enhanced scan).
+ * The worklet can drain this to update the UI with per-channel instrument/note info.
+ */
+
+#define RT_CHAN_LOG_SIZE  512
+#define RT_CHAN_LOG_MASK  (RT_CHAN_LOG_SIZE - 1)
+
+typedef struct {
+    uint32_t tick;
+    uint16_t period[4];
+    uint8_t  volume[4];
+    uint32_t sample_ptr[4];
+    uint8_t  dma[4];
+} RtChannelState;
+
+static RtChannelState g_rt_chan_log[RT_CHAN_LOG_SIZE];
+static volatile uint32_t g_rt_chan_write = 0;
+static volatile uint32_t g_rt_chan_read  = 0;
+static int g_rt_chan_enabled = 0;
+
+EMSCRIPTEN_KEEPALIVE
+void uade_wasm_enable_rt_channel_log(int enable) {
+    g_rt_chan_enabled = enable ? 1 : 0;
+    if (enable) { g_rt_chan_read = 0; g_rt_chan_write = 0; }
+}
+
+/* Called from uade_wasm_on_cia_a_tick() — captures channel state every tick */
+static void rt_channel_log_tick(void) {
+    if (!g_rt_chan_enabled) return;
+    uint32_t idx = g_rt_chan_write & RT_CHAN_LOG_MASK;
+    RtChannelState *s = &g_rt_chan_log[idx];
+    s->tick = g_uade_tick_count;
+    for (int i = 0; i < 4; i++) {
+        s->period[i]     = (uint16_t)audio_channel[i].per;
+        s->volume[i]     = (uint8_t)audio_channel[i].vol;
+        s->sample_ptr[i] = (uint32_t)audio_channel[i].lc;
+        s->dma[i]        = dmaen(1 << i) ? 1 : 0;
+    }
+    g_rt_chan_write++;
+}
+
+/*
+ * Drain up to maxEntries from the real-time channel log.
+ * Output per entry (13 uint32s):
+ *   [0] = tick
+ *   [1..4] = (period<<16)|volume for channels 0-3
+ *   [5..8] = sample_ptr for channels 0-3
+ *   [9..12] = dma for channels 0-3
+ * Returns number of entries written.
+ */
+EMSCRIPTEN_KEEPALIVE
+int uade_wasm_get_rt_channel_log(uint32_t *out, int maxEntries) {
+    int count = 0;
+    while (count < maxEntries && g_rt_chan_read != g_rt_chan_write) {
+        uint32_t idx = g_rt_chan_read & RT_CHAN_LOG_MASK;
+        RtChannelState *s = &g_rt_chan_log[idx];
+        int base = count * 13;
+        out[base + 0] = s->tick;
+        for (int i = 0; i < 4; i++) {
+            out[base + 1 + i] = ((uint32_t)s->period[i] << 16) | s->volume[i];
+            out[base + 5 + i] = s->sample_ptr[i];
+            out[base + 9 + i] = s->dma[i];
+        }
+        g_rt_chan_read++;
+        count++;
+    }
+    return count;
 }
