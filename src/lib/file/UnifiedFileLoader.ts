@@ -654,6 +654,7 @@ async function loadSongFile(file: File, options: FileLoadOptions): Promise<FileL
   let preSunVoxModules: Array<{ name: string; id: number; synthData: ArrayBuffer }> | null = null;
   let preSunVoxPatterns: SunVoxPatternData[] | null = null;
   let preSunVoxMeta: SunVoxSongMeta | null = null;
+  let preSunVoxGraph: import('@/engine/sunvox/SunVoxEngine').SunVoxModuleGraphEntry[] | null = null;
 
   if (filename.endsWith('.sunvox')) {
     preReadBuffer = await file.arrayBuffer();
@@ -689,11 +690,13 @@ async function loadSongFile(file: File, options: FileLoadOptions): Promise<FileL
           // loadSong internally slices the buffer before transfer — preReadBuffer stays intact.
           preSunVoxMeta = await svEngine.loadSong(tempHandle, preReadBuffer!);
           console.log('[SunVox] song loaded — fetching module list and patterns…');
-          const [modules, patterns] = await Promise.all([
+          const [modules, patterns, moduleGraph] = await Promise.all([
             svEngine.getModules(tempHandle),
             svEngine.getPatterns(tempHandle),
+            svEngine.getModuleGraph(tempHandle),
           ]);
           preSunVoxPatterns = patterns;
+          preSunVoxGraph = moduleGraph;
           // Module id=0 is always the "Output" bus — skip it.
           // We only need id/name for channel labelling (no patch extraction needed
           // since audio is driven by the song-mode SunVoxSynth, not per-module synths).
@@ -919,14 +922,16 @@ async function loadSongFile(file: File, options: FileLoadOptions): Promise<FileL
     const extractedModules = preSunVoxModules as SvoxModule[] | null;
 
     if (extractedModules && extractedModules.length > 0) {
-      // Song-mode SunVoxSynth drives audio — SunVox sequences its own internal
-      // graph, so we cannot extract individual modules and replay them in isolation
-      // (they lose their routing, effects, and inter-module connections).
-      // We create ONE song-mode instrument and suppress TrackerReplayer note triggers.
-      // The extracted module list is used only to name channels for display.
+      // SunVoxModular drives audio via SunVox WASM — we build a ModularPatchConfig
+      // from the extracted module graph so the modular editor shows the real layout.
+      const { sunvoxGraphToConfig } = await import('@/engine/sunvox-modular/graphToConfig');
+      const modularConfig = preSunVoxGraph
+        ? sunvoxGraphToConfig(preSunVoxGraph)
+        : { modules: [], connections: [], polyphony: 1, viewMode: 'canvas' as const, backend: 'sunvox' as const };
       useInstrumentStore.getState().createInstrument({
         name,
-        synthType: 'SunVoxSynth' as const,
+        synthType: 'SunVoxModular' as const,
+        sunvoxModular: modularConfig,
         sunvox: {
           patchData: preReadBuffer!,
           patchName: name,
@@ -1003,7 +1008,8 @@ async function loadSongFile(file: File, options: FileLoadOptions): Promise<FileL
     const buffer = preReadBuffer!;
     useInstrumentStore.getState().createInstrument({
       name,
-      synthType: 'SunVoxSynth' as const,
+      synthType: 'SunVoxModular' as const,
+      sunvoxModular: { modules: [], connections: [], polyphony: 1, viewMode: 'canvas' as const, backend: 'sunvox' as const },
       sunvox: {
         patchData: buffer,
         patchName: name,

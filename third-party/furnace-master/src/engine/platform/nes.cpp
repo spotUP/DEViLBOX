@@ -1106,7 +1106,9 @@ void DivPlatformNES::quit() {
 }
 
 // initialization of important arrays
-DivPlatformNES::DivPlatformNES() {
+DivPlatformNES::DivPlatformNES():
+  useNP(false),
+  isE(false) {
   sampleOffDPCM=new unsigned int[32768];
   sampleLoaded=new bool[32768];
 }
