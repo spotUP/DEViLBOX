@@ -1,0 +1,26 @@
+CMakeFiles/CoreDesign.dir/CoreDesign_wrapper.c.o: \
+  /Users/spot/Code/DEViLBOX/coredesign-wasm/src/CoreDesign/CoreDesign_wrapper.c \
+  /Users/spot/Code/DEViLBOX/coredesign-wasm/src/CoreDesign/CoreDesign.h \
+  /Users/spot/Code/DEViLBOX/coredesign-wasm/src/CoreDesign/paula_soft.h \
+  /opt/homebrew/Cellar/emscripten/4.0.16/libexec/llvm/lib/clang/22/include/stdint.h \
+  /opt/homebrew/Cellar/emscripten/4.0.16/libexec/cache/sysroot/include/stdint.h \
+  /opt/homebrew/Cellar/emscripten/4.0.16/libexec/cache/sysroot/include/bits/alltypes.h \
+  /opt/homebrew/Cellar/emscripten/4.0.16/libexec/cache/sysroot/include/bits/stdint.h \
+  /opt/homebrew/Cellar/emscripten/4.0.16/libexec/cache/sysroot/include/compat/string.h \
+  /opt/homebrew/Cellar/emscripten/4.0.16/libexec/cache/sysroot/include/string.h \
+  /opt/homebrew/Cellar/emscripten/4.0.16/libexec/cache/sysroot/include/features.h \
+  /opt/homebrew/Cellar/emscripten/4.0.16/libexec/cache/sysroot/include/strings.h \
+  /opt/homebrew/Cellar/emscripten/4.0.16/libexec/cache/sysroot/include/compat/stdlib.h \
+  /opt/homebrew/Cellar/emscripten/4.0.16/libexec/cache/sysroot/include/stdlib.h \
+  /opt/homebrew/Cellar/emscripten/4.0.16/libexec/cache/sysroot/include/alloca.h \
+  /opt/homebrew/Cellar/emscripten/4.0.16/libexec/cache/sysroot/include/emscripten.h \
+  /opt/homebrew/Cellar/emscripten/4.0.16/libexec/cache/sysroot/include/emscripten/emscripten.h \
+  /opt/homebrew/Cellar/emscripten/4.0.16/libexec/cache/sysroot/include/emscripten/em_asm.h \
+  /opt/homebrew/Cellar/emscripten/4.0.16/libexec/cache/sysroot/include/emscripten/em_macros.h \
+  /opt/homebrew/Cellar/emscripten/4.0.16/libexec/cache/sysroot/include/emscripten/em_types.h \
+  /opt/homebrew/Cellar/emscripten/4.0.16/libexec/llvm/lib/clang/22/include/stdbool.h \
+  /opt/homebrew/Cellar/emscripten/4.0.16/libexec/cache/sysroot/include/stdbool.h \
+  /opt/homebrew/Cellar/emscripten/4.0.16/libexec/cache/sysroot/include/emscripten/em_js.h \
+  /opt/homebrew/Cellar/emscripten/4.0.16/libexec/cache/sysroot/include/emscripten/promise.h \
+  /opt/homebrew/Cellar/emscripten/4.0.16/libexec/cache/sysroot/include/emscripten/wget.h \
+  /opt/homebrew/Cellar/emscripten/4.0.16/libexec/cache/sysroot/include/emscripten/version.h
