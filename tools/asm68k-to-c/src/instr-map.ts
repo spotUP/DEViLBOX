@@ -482,7 +482,7 @@ export function emitInstruction(node: InstructionNode): string {
       return dst ? regWrite(dst, `${emitOperandRead(dst, s)} - ${srcRead} - flag_x`, s) : '';
 
     case 'MULS': return dst ? `${emitOperand(dst, 'L')} = (uint32_t)((int32_t)(int16_t)${emitOperand(ops[0], 'W')} * (int32_t)(int16_t)${emitOperand(dst, 'W')});` : '';
-    case 'MULU': return dst ? `${emitOperand(dst, 'L')} = (uint32_t)((uint16_t)${src} * (uint16_t)${emitOperand(dst, 'W')});` : '';
+    case 'MULU': return dst ? `${emitOperand(dst, 'L')} = (uint32_t)((uint16_t)(${srcRead}) * (uint16_t)${emitOperand(dst, 'W')});` : '';
     case 'DIVS': {
       if (!dst) return '';
       const dv = emitOperand(dst, 'L'), sv = src;
