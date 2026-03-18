@@ -194,10 +194,20 @@ function translateULTEffect(
     }
 
     case 0xF: // Speed / BPM
+      // ULT: param > 0x2F = tempo (BPM), param <= 0x2F = speed (ticks/row)
+      // XM: param >= 0x20 = tempo, param < 0x20 = speed (max 31)
       if (param > 0x2F) {
         return [XM_TEMPO, param];
       }
-      return [XM_SPEED, param];
+      if (param === 0) {
+        return [XM_SPEED, 6]; // postfix handles tempo=125 injection
+      }
+      if (param <= 0x1F) {
+        return [XM_SPEED, param]; // fits in XM speed range
+      }
+      // Params 0x20-0x2F (32-47): speed in ULT but BPM in XM.
+      // Can't represent speed>31 in XM. Use speed=31 as closest approximation.
+      return [XM_SPEED, 0x1F];
 
     default:
       return [EFF_NONE, PAR_NONE];
@@ -767,8 +777,8 @@ export async function parseULTFile(
     songLength:      orderList.length,
     restartPosition: restartPos,
     numChannels,
-    initialSpeed:    6,    // OpenMPT default speed for ULT (no explicit default in format)
-    initialBPM:      125,  // OpenMPT default BPM for ULT
+    initialSpeed:    4,    // ULT default — OpenMPT uses 6 internally but ULT tick rate differs
+    initialBPM:      125,  // UltraTracker default BPM
     linearPeriods:   false,
   };
 }
