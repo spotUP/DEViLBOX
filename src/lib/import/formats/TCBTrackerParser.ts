@@ -338,7 +338,7 @@ export async function parseTCBTrackerFile(
           const octave = noteByte >> 4;
           const semitone = noteByte & 0x0F;
           if (semitone < 12) {
-            xmNote = octave * 12 + semitone + 25 + noteOffset;
+            xmNote = octave * 12 + semitone + 37 + noteOffset;
           }
         }
 

@@ -172,7 +172,7 @@ const AON_PERIODS: number[][] = [
  * AON notes are 1-based in pattern data (0 = no note).
  */
 const AON_REFERENCE_NOTE_IDX = 24; // 0-based index in period table → period 856
-const AON_REFERENCE_XM_NOTE  = 13; // XM note 13 = C-1 (displays "C-1")
+const AON_REFERENCE_XM_NOTE  = 49; // Period 856 = MOD table idx 24 = XM note 49 (C-4)
 
 // ── Utility ────────────────────────────────────────────────────────────────
 
