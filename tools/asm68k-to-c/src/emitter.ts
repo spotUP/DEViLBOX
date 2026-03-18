@@ -801,6 +801,69 @@ export function emit(ast: AstNode[], resolved: ResolveResult, sourceFile?: strin
     }
   }
 
+  // Post-fixpoint pass: simulate the EXACT emission logic to find labels that will
+  // become functions due to !inFunction after data/section or other emission-only splits.
+  // Any goto to such a label from a different emission-function is a cross-function goto.
+  {
+    let simInFunc = false;
+    let simScope: string | null = null;
+    const emitLabelScope = new Map<string, string | null>();
+    for (let i = 0; i < ast.length; i++) {
+      const node = ast[i];
+      if (node.kind === 'comment') continue;
+      if (node.kind === 'data' || node.kind === 'section') { simInFunc = false; simScope = null; continue; }
+      if (node.kind === 'label') {
+        let nextIdx = i + 1;
+        while (nextIdx < ast.length && ast[nextIdx].kind === 'comment') nextIdx++;
+        const next = ast[nextIdx];
+        if (next?.kind === 'instruction' || next?.kind === 'label') {
+          const willStartFunc = funcLabels.has(node.name) || !simInFunc;
+          if (willStartFunc) {
+            simScope = node.name;
+            simInFunc = true;
+            // Promote to funcLabels if not already there
+            if (!funcLabels.has(node.name) && isFunctionLabel.has(node.name)) {
+              funcLabels.add(node.name);
+            }
+          } else {
+            emitLabelScope.set(node.name, simScope);
+          }
+        }
+        continue;
+      }
+      if (node.kind === 'instruction') {
+        if (!simInFunc) simInFunc = true;
+        const mn = node.mnemonic.toUpperCase();
+        // Mirror emission close logic
+        const closesFunc = mn === 'RTS'
+          || (mn === 'JMP' && node.operands[0]?.kind === 'address')
+          || (emitInstruction(node).includes('return;'));
+        if (closesFunc) {
+          let pi = i + 1;
+          while (pi < ast.length && ast[pi].kind === 'comment') pi++;
+          if (pi < ast.length && ast[pi].kind === 'label') simInFunc = false;
+        }
+      }
+    }
+    // Check all branches against the emission-accurate scope
+    for (const node of ast) {
+      if (node.kind !== 'instruction') continue;
+      const mn = node.mnemonic.toUpperCase();
+      const op = BRANCH_MNEMS.has(mn) ? node.operands[0]
+               : DBRANCH_MNEMS.has(mn) ? node.operands[1]
+               : undefined;
+      const lbl = op?.kind === 'label_ref' ? op.name : op?.kind === 'pc_rel' ? op.label : null;
+      if (!lbl || crossFuncGotos.has(lbl)) continue;
+      if (emitLabelScope.has(lbl)) {
+        // Label is inline in a function — check if it moved to a different function in emission
+        if (funcLabels.has(lbl)) {
+          // Was inline, now a function — all gotos from other functions are cross-function
+          crossFuncGotos.add(lbl);
+        }
+      }
+    }
+  }
+
   // Orphan labels: labels in the ASM that are referenced but have no C definition.
   // These typically come from INCBIN directives (external binary data includes) that
   // the transpiler skips.  Emit as uint8_t* NULL pointers so the code compiles;
@@ -900,6 +963,8 @@ export function emit(ast: AstNode[], resolved: ResolveResult, sourceFile?: strin
     inFunction = false;
   }
 
+  let currentFuncName: string | null = null;  // Track current function for self-branch detection
+
   for (let i = 0; i < ast.length; i++) {
     const node = ast[i];
 
@@ -953,6 +1018,9 @@ export function emit(ast: AstNode[], resolved: ResolveResult, sourceFile?: strin
             const tagStr = tags.length > 0 ? `  (${tags.join(', ')})` : '';
             lines.push(`\n/* --- ${safe} ---${tagStr} */`);
             lines.push(`${qualifier}void ${safe}(void) {`);
+            currentFuncName = node.name;
+            // Emit a _top label for self-referencing branches (loops back to function start)
+            lines.push(`_top: ;`);
             inFunction = true;
           } else {
             // Inline goto label (branch target within current function)
@@ -994,7 +1062,17 @@ export function emit(ast: AstNode[], resolved: ResolveResult, sourceFile?: strin
                       : xfOp?.kind === 'pc_rel'    ? xfOp.label
                       : null;
         let c: string;
-        if (xfLabel && crossFuncGotos.has(xfLabel)) {
+        // Self-referencing branch: branch to the current function's own name → goto _top
+        if (xfLabel && xfLabel === currentFuncName) {
+          if (mn === 'BRA' || mn === 'JMP') {
+            c = `goto _top;`;
+          } else if (DBRANCH_MNEMS.has(mn)) {
+            const cnt = node.operands[0] ? emitOperand(node.operands[0], 'W') : '';
+            c = `if ((int16_t)(--${cnt}) >= 0) goto _top;`;
+          } else {
+            c = `if (${COND_BRANCH_CONDS[mn]}) goto _top;`;
+          }
+        } else if (xfLabel && crossFuncGotos.has(xfLabel)) {
           const safe = sanitizeLabel(xfLabel);
           const cnt = node.operands[0] ? emitOperand(node.operands[0], 'W') : '';
           if (mn === 'BRA' || mn === 'JMP') {

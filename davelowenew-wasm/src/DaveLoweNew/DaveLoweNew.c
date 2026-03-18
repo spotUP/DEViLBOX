@@ -696,12 +696,9 @@ static uint8_t* _return = NULL;
 static uint8_t* EmptySamp = NULL;
 static uint8_t* hop = NULL;
 static uint8_t* Later = NULL;
-static uint8_t* fail = NULL;
 static uint8_t* Later1 = NULL;
 static uint8_t* FirstCheck = NULL;
 static uint8_t* Standard = NULL;
-static uint8_t* NextLong = NULL;
-static uint8_t* SecondCheck = NULL;
 static uint8_t* Later2 = NULL;
 static uint8_t* Play1 = NULL;
 static uint8_t* SkipPlay = NULL;
@@ -714,7 +711,6 @@ static uint8_t* One = NULL;
 static uint8_t* PutSub = NULL;
 static uint8_t* LastSub = NULL;
 static uint8_t* Next = NULL;
-static uint8_t* FindFirst = NULL;
 static uint8_t* InfoOK = NULL;
 static uint8_t* Last = NULL;
 static uint8_t* CheckInfo = NULL;
@@ -899,7 +895,10 @@ static void lbC00A438(void);
 static void lbC00A586(void);
 static void Exit4(void);
 void EndSound(void);
-static void lbC02322C(void);
+static void fail(void);
+static void NextLong(void);
+static void SecondCheck(void);
+static void FindFirst(void);static void lbC02322C(void);
 static void lbC023246(void);
 static void lbC023328(void);
 static void lbC023342(void);
@@ -968,6 +967,7 @@ static void _anon1(void) {
 
 /* --- GetPosition --- */
 static void GetPosition(void) {
+_top: ;
   {  /* MOVE.L	CurrentPos(PC),D0 */
       uint32_t _mv = (uint32_t)(READ32((uintptr_t)CurrentPos));
       d0 = _mv;
@@ -985,6 +985,7 @@ static void GetPosition(void) {
 
 /* --- SetVolume --- */
 static void SetVolume(void) {
+_top: ;
 SetBalance:
   {  /* MOVE.W	dtg_SndLBal(A5),D0 */
       uint16_t _mv = (uint16_t)(READ16(a5 + (intptr_t)dtg_SndLBal));
@@ -1025,6 +1026,7 @@ SetBalance:
 
 /* --- ChangeVolume --- */
 static void ChangeVolume(void) {
+_top: ;
   {  /* MOVE.L	D1,-(A7) */
       uint32_t _mv = (uint32_t)(d1);
       WRITE32_PRE(a7, _mv);
@@ -1115,6 +1117,7 @@ Exit2:
 
 /* --- SetVol --- */
 static void SetVol(void) {
+_top: ;
   {  /* MOVE.L	A0,-(A7) */
       uint32_t _mv = (uint32_t)(a0);
       WRITE32_PRE(a7, _mv);
@@ -1175,6 +1178,7 @@ _SetVoice:
 
 /* --- SetAdr --- */
 static void SetAdr(void) {
+_top: ;
   {  /* MOVE.L	A0,-(A7) */
       uint32_t _mv = (uint32_t)(a0);
       WRITE32_PRE(a7, _mv);
@@ -1235,6 +1239,7 @@ _SetVoice:
 
 /* --- SetLen --- */
 static void SetLen(void) {
+_top: ;
   {  /* MOVE.L	A0,-(A7) */
       uint32_t _mv = (uint32_t)(a0);
       WRITE32_PRE(a7, _mv);
@@ -1295,6 +1300,7 @@ _SetVoice:
 
 /* --- SetPer --- */
 static void SetPer(void) {
+_top: ;
   {  /* MOVE.L	A0,-(A7) */
       uint32_t _mv = (uint32_t)(a0);
       WRITE32_PRE(a7, _mv);
@@ -1357,6 +1363,7 @@ _SetVoice:
 
 /* --- SetVoices --- */
 static void SetVoices(void) {
+_top: ;
   a0 = (uint32_t)(uintptr_t)Voice1;  /* LEA	Voice1(PC),A0 */
   a1 = (uint32_t)(uintptr_t)StructAdr;  /* LEA	StructAdr(PC),A1 */
   {  /* MOVE.W	#$FFFF,D1 */
@@ -1435,6 +1442,7 @@ _NoVoice4:
 
 /* --- StructInit --- */
 static void StructInit(void) {
+_top: ;
   a0 = (uint32_t)(uintptr_t)StructAdr;  /* LEA	StructAdr(PC),A0 */
   return;  /* RTS */
 }
@@ -1445,6 +1453,7 @@ static void StructInit(void) {
 
 /* --- SampleInit --- */
 static void SampleInit(void) {
+_top: ;
   d7 = (uint32_t)(int32_t)(int8_t)(EPR_NotEnoughMem);  /* MOVEQ	#EPR_NotEnoughMem,D7 */
   a3 = (uint32_t)(a5 + (intptr_t)EPG_SampleInfoStructure);  /* LEA	EPG_SampleInfoStructure(A5),A3 */
   {  /* MOVE.L	SampleInfoPtr(PC),D0 */
@@ -1580,6 +1589,7 @@ _return:
 
 /* --- Check2 --- */
 static void Check2(void) {
+_top: ;
   {  /* MOVE.L	dtg_ChkData(A5),A0 */
       uint32_t _mv = (uint32_t)(READ32(a5 + (intptr_t)dtg_ChkData));
       a0 = _mv;
@@ -1612,7 +1622,7 @@ static void Check2(void) {
       flag_n = (_cmp < 0);
       flag_c = ((uint32_t)_lhs < (uint32_t)_rhs);
     }
-  if (!flag_z) goto fail;  /* not equal / nonzero */  /* BNE.B	fail */
+  if (!flag_z) fail(); return;  /* not equal / nonzero */  /* BNE.B	fail */
   {  /* TST.L	24(A0) */
       uint32_t _tst = (uint32_t)(READ32(a0 + 24));
       flag_z = (_tst == 0);
@@ -1639,7 +1649,7 @@ FirstCheck:
       flag_n = ((int16_t)(_tst) < 0);
       flag_c = 0; flag_v = 0;
     }
-  if (!flag_z) goto fail;  /* not equal / nonzero */  /* BNE.B	fail */
+  if (!flag_z) fail(); return;  /* not equal / nonzero */  /* BNE.B	fail */
   {  /* MOVE.W	(A1)+,D1 */
       uint16_t _mv = (uint16_t)(READ16_POST(a1));
       W(d1) = (uint16_t)_mv;
@@ -1647,10 +1657,10 @@ FirstCheck:
       flag_n = ((int16_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-  if (flag_n) goto fail;  /* minus / negative */  /* BMI.B	fail */
-  if (flag_z) goto fail;  /* equal / zero */  /* BEQ.B	fail */
+  if (flag_n) fail(); return;  /* minus / negative */  /* BMI.B	fail */
+  if (flag_z) fail(); return;  /* equal / zero */  /* BEQ.B	fail */
   flag_z = ((d1 & (1u << (0 & 31))) == 0);  /* BTST	#0,D1 */
-  if (!flag_z) goto fail;  /* not equal / nonzero */  /* BNE.B	fail */
+  if (!flag_z) fail(); return;  /* not equal / nonzero */  /* BNE.B	fail */
   if ((int16_t)(--d2) >= 0) goto FirstCheck;  /* DBF	D2,FirstCheck */
   d3 = (uint32_t)(int32_t)(int8_t)(3);  /* MOVEQ	#3,D3 */
 SecondCheck:
@@ -1675,7 +1685,7 @@ SecondCheck:
       flag_n = ((int16_t)(_tst) < 0);
       flag_c = 0; flag_v = 0;
     }
-  if (!flag_z) goto fail;  /* not equal / nonzero */  /* BNE.B	fail */
+  if (!flag_z) fail(); return;  /* not equal / nonzero */  /* BNE.B	fail */
   {  /* MOVE.W	(A1)+,D1 */
       uint16_t _mv = (uint16_t)(READ16_POST(a1));
       W(d1) = (uint16_t)_mv;
@@ -1683,10 +1693,10 @@ SecondCheck:
       flag_n = ((int16_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-  if (flag_n) goto fail;  /* minus / negative */  /* BMI.B	fail */
-  if (flag_z) goto fail;  /* equal / zero */  /* BEQ.B	fail */
+  if (flag_n) fail(); return;  /* minus / negative */  /* BMI.B	fail */
+  if (flag_z) fail(); return;  /* equal / zero */  /* BEQ.B	fail */
   flag_z = ((d1 & (1u << (0 & 31))) == 0);  /* BTST	#0,D1 */
-  if (!flag_z) goto fail;  /* not equal / nonzero */  /* BNE.B	fail */
+  if (!flag_z) fail(); return;  /* not equal / nonzero */  /* BNE.B	fail */
   a1 = (uint32_t)(a0 + 0 + d2);  /* LEA	0(A0),A1 */
   {  /* CMP.W	#$30,(A1) */
       int32_t _lhs = (int32_t)(READ16(a1));
@@ -1707,7 +1717,7 @@ Standard:
       flag_n = (_cmp < 0);
       flag_c = ((uint32_t)_lhs < (uint32_t)_rhs);
     }
-  if (!flag_z) goto NextLong;  /* not equal / nonzero */  /* BNE.B	NextLong */
+  if (!flag_z) NextLong(); return;  /* not equal / nonzero */  /* BNE.B	NextLong */
   a1 = (uint32_t)((int32_t)a1 + (int32_t)(int16_t)(6));  /* ADDQ.L	#6,A1 */
   {  /* CMP.W	#4,(A1)+ */
       int32_t _lhs = (int32_t)(READ16_POST(a1));
@@ -1723,7 +1733,8 @@ Standard:
 
 /* --- NextLong --- */
 static void NextLong(void) {
-  if ((int16_t)(--d2) >= 0) goto SecondCheck;  /* DBF	D2,SecondCheck */
+_top: ;
+  if ((int16_t)(--d2) >= 0) SecondCheck(); return;  /* DBF	D2,SecondCheck */
 fail:
   return;  /* RTS */
 }
@@ -1731,6 +1742,7 @@ fail:
 
 /* --- Found ---  (cross-function goto target) */
 static void Found(void) {
+_top: ;
   a2 = (uint32_t)(uintptr_t)TempValue;  /* LEA	TempValue(PC),A2 */
   {  /* MOVE.L	(A1),(A2)+ */
       uint32_t _mv = (uint32_t)(READ32(a1));
@@ -1759,6 +1771,7 @@ Later2:
 
 /* --- GetInfos --- */
 static void GetInfos(void) {
+_top: ;
   a0 = (uint32_t)(uintptr_t)InfoBuffer;  /* LEA	InfoBuffer(PC),A0 */
   return;  /* RTS */
 }
@@ -1769,6 +1782,7 @@ static void GetInfos(void) {
 
 /* --- Interrupt --- */
 void Interrupt(void) {
+_top: ;
   WRITE32_PRE(sp, d6);  /* MOVEM.L	D1,D2,D3,D4,D5,D6,-(SP) */
     WRITE32_PRE(sp, d5);
     WRITE32_PRE(sp, d4);
@@ -1816,6 +1830,7 @@ SkipPlay:
 
 /* --- SongEndTest --- */
 static void SongEndTest(void) {
+_top: ;
   WRITE32_PRE(sp, a5);  /* MOVEM.L	A1,A5,-(A7) */
     WRITE32_PRE(sp, a1);
   a1 = (uint32_t)(uintptr_t)SongEnd;  /* LEA	SongEnd(PC),A1 */
@@ -1956,6 +1971,7 @@ SkipEnd:
 
 /* --- SubSongRange --- */
 static void SubSongRange(void) {
+_top: ;
   d0 = (uint32_t)(int32_t)(int8_t)(1);  /* MOVEQ	#1,D0 */
   {  /* MOVE.L	InfoBuffer+SubSongs(PC),D1 */
       uint32_t _mv = (uint32_t)(READ32((uintptr_t)InfoBuffer+SubSongs));
@@ -1973,6 +1989,7 @@ static void SubSongRange(void) {
 
 /* --- InitPlayer --- */
 void InitPlayer(void) {
+_top: ;
   d0 = (uint32_t)(int32_t)(int8_t)(0);  /* MOVEQ	#0,D0 */
   a0 = READ32(a5 + (intptr_t)dtg_GetListData);  /* MOVEA.L	dtg_GetListData(A5),A0 */
   { uintptr_t _jt=(uintptr_t)(a0); if(_jt) ((void(*)(void))_jt)(); }  /* JSR	(A0) */
@@ -2102,6 +2119,7 @@ PutSub:
 
 /* --- FindFirst --- */
 static void FindFirst(void) {
+_top: ;
   {  /* MOVE.L	A1,A2 */
       uint32_t _mv = (uint32_t)(a1);
       a2 = _mv;
@@ -2119,7 +2137,7 @@ static void FindFirst(void) {
       flag_n = (_cmp < 0);
       flag_c = ((uint32_t)_lhs < (uint32_t)_rhs);
     }
-  if (flag_z) goto FindFirst;  /* equal / zero */  /* BEQ.B	FindFirst */
+  if (flag_z) goto _top;  /* equal / zero */  /* BEQ.B	FindFirst */
   {  /* CMP.W	#8,-2(A2) */
       int32_t _lhs = (int32_t)(READ16(a2 + -2));
       int32_t _rhs = (int32_t)(8);
@@ -2242,6 +2260,7 @@ NoFix:
 
 /* --- Wrong ---  (cross-function goto target) */
 static void Wrong(void) {
+_top: ;
   d0 = (uint32_t)(int32_t)(int8_t)(EPR_UnknownFormat);  /* MOVEQ	#EPR_UnknownFormat,D0 */
   return;  /* RTS */
 }
@@ -2252,6 +2271,7 @@ static void Wrong(void) {
 
 /* --- EndPlayer --- */
 static void EndPlayer(void) {
+_top: ;
   a0 = READ32(a5 + (intptr_t)dtg_AudioFree);  /* MOVEA.L	dtg_AudioFree(A5),A0 */
   ((void(*)(void))(uintptr_t)a0)(); return;  /* JMP	(A0) */
 }
@@ -2262,6 +2282,7 @@ static void EndPlayer(void) {
 
 /* --- InitSound --- */
 void InitSound(void) {
+_top: ;
   a0 = (uint32_t)(uintptr_t)StructAdr;  /* LEA	StructAdr(PC),A0 */
   a1 = (uint32_t)(a0 + (intptr_t)UPS_SizeOF);  /* LEA	UPS_SizeOF(A0),A1 */
 ClearUPS:
@@ -2445,6 +2466,7 @@ Osemka:
 
 /* --- EndSound --- */
 void EndSound(void) {
+_top: ;
   a0 = (uint32_t)(uintptr_t)CurrentFormat;  /* LEA	CurrentFormat(PC),A0 */
   {  /* TST.B	(A0) */
       uint8_t _tst = (uint8_t)(READ8(a0));
@@ -2452,7 +2474,7 @@ void EndSound(void) {
       flag_n = ((int8_t)(_tst) < 0);
       flag_c = 0; flag_v = 0;
     }
-  if (!flag_z) goto END;  /* not equal / nonzero */  /* BNE.W	END */
+  if (!flag_z) return;  /* not equal / nonzero */  /* BNE.W	END */
   End_2(); return;  /* BRA.W	End_2 */
 }
 
@@ -2465,6 +2487,7 @@ void EndSound(void) {
 
 /* --- SubSongPtr --- */
 static void SubSongPtr(void) {
+_top: ;
 }
 
 /* lbC022DE0	MOVE.L	A0,lbB022DDE */
@@ -2538,6 +2561,7 @@ static void SubSongPtr(void) {
 
 /* --- lbC022F68 --- */
 static void lbC022F68(void) {
+_top: ;
   /* SF	lbB022AAE */
   {  /* MOVE.W	#15,$DFF096 */
       uint16_t _mv = (uint16_t)(15);
@@ -2769,6 +2793,7 @@ static void lbC022F68(void) {
 
 /* --- Init ---  (cross-function goto target) */
 static void Init(void) {
+_top: ;
 lbC023098:
   {  /* MOVE.W	#1,lbW022DD6 */
       uint16_t _mv = (uint16_t)(1);
@@ -3052,6 +3077,7 @@ lbC02318A:
 
 /* --- Play --- */
 static void Play(void) {
+_top: ;
 lbC0231EA:
   {  /* TST.W	lbW022DD6 */
       uint16_t _tst = (uint16_t)(READ16((uintptr_t)lbW022DD6));
@@ -3066,6 +3092,7 @@ lbC0231EA:
 
 /* --- lbC0231F6 ---  (cross-function goto target) */
 static void lbC0231F6(void) {
+_top: ;
   WRITE32_PRE(sp, a6);  /* MOVEM.L	D0,D1,D2,D3,D4,D5,D6,A0,A1,A2,A3,A4,A5,A6,-(SP) */
     WRITE32_PRE(sp, a5);
     WRITE32_PRE(sp, a4);
@@ -3107,6 +3134,7 @@ static void lbC0231F6(void) {
 
 /* --- lbC02321C ---  (cross-function goto target) */
 static void lbC02321C(void) {
+_top: ;
   lbC02325A();  /* JSR	lbC02325A */
   lbC0232AE();  /* JSR	lbC0232AE */
   lbC0232F6(); return;  /* BRA.L	lbC0232F6 */
@@ -3115,12 +3143,14 @@ static void lbC02321C(void) {
 
 /* --- lbC02322C ---  (cross-function goto target) */
 static void lbC02322C(void) {
+_top: ;
   lbC023272();  /* JSR	lbC023272 */
 }
 
 
 /* --- lbC023232 ---  (cross-function goto target) */
 static void lbC023232(void) {
+_top: ;
   {  /* TST.W	lbW022DA4 */
       uint16_t _tst = (uint16_t)(READ16((uintptr_t)lbW022DA4));
       flag_z = (_tst == 0);
@@ -3135,6 +3165,7 @@ static void lbC023232(void) {
 
 /* --- lbC023246 ---  (cross-function goto target) */
 static void lbC023246(void) {
+_top: ;
   {  /* TST.W	lbW022DA4 */
       uint16_t _tst = (uint16_t)(READ16((uintptr_t)lbW022DA4));
       flag_z = (_tst == 0);
@@ -3149,6 +3180,7 @@ static void lbC023246(void) {
 
 /* --- lbC02325A --- */
 static void lbC02325A(void) {
+_top: ;
   a0 = (uint32_t)(uintptr_t)lbL0239F2;  /* LEA	lbL0239F2(PC),A0 */
   a2 = (uint32_t)(uintptr_t)lbL023C24;  /* LEA	lbL023C24(PC),A2 */
   {  /* MOVE.W	#0,D5 */
@@ -3165,6 +3197,7 @@ static void lbC02325A(void) {
 
 /* --- lbC023272 --- */
 static void lbC023272(void) {
+_top: ;
   a1 = READ32((uintptr_t)lbB022DDE);  /* MOVEA.L	lbB022DDE(PC),A1 */
   {  /* MOVE.W	2(A1),D0 */
       uint16_t _mv = (uint16_t)(READ16(a1 + 2));
@@ -3219,6 +3252,7 @@ static void lbC023272(void) {
 
 /* --- lbC0232AE --- */
 static void lbC0232AE(void) {
+_top: ;
   a0 = (uint32_t)(uintptr_t)lbW023B02;  /* LEA	lbW023B02(PC),A0 */
   a2 = (uint32_t)0xDFF0A0;  /* LEA	$DFF0A0,A2 */
   {  /* MOVE.W	#1,D5 */
@@ -3249,6 +3283,7 @@ static void lbC0232AE(void) {
 
 /* --- lbC0232D2 --- */
 static void lbC0232D2(void) {
+_top: ;
   a0 = (uint32_t)(uintptr_t)lbL0239F2;  /* LEA	lbL0239F2(PC),A0 */
   a2 = (uint32_t)0xDFF0A0;  /* LEA	$DFF0A0,A2 */
   {  /* MOVE.W	#1,D5 */
@@ -3279,6 +3314,7 @@ static void lbC0232D2(void) {
 
 /* --- lbC0232F6 ---  (cross-function goto target) */
 static void lbC0232F6(void) {
+_top: ;
   {  /* TST.W	lbW022DA6 */
       uint16_t _tst = (uint16_t)(READ16((uintptr_t)lbW022DA6));
       flag_z = (_tst == 0);
@@ -3306,6 +3342,7 @@ static void lbC0232F6(void) {
 
 /* --- lbC023318 ---  (cross-function goto target) */
 static void lbC023318(void) {
+_top: ;
   lbC023356();  /* JSR	lbC023356 */
   lbC0233AA();  /* JSR	lbC0233AA */
   lbC0233F2(); return;  /* BRA.L	lbC0233F2 */
@@ -3314,12 +3351,14 @@ static void lbC023318(void) {
 
 /* --- lbC023328 ---  (cross-function goto target) */
 static void lbC023328(void) {
+_top: ;
   lbC02336E();  /* JSR	lbC02336E */
 }
 
 
 /* --- lbC02332E ---  (cross-function goto target) */
 static void lbC02332E(void) {
+_top: ;
   {  /* TST.W	lbW022DA4 */
       uint16_t _tst = (uint16_t)(READ16((uintptr_t)lbW022DA4));
       flag_z = (_tst == 0);
@@ -3334,6 +3373,7 @@ static void lbC02332E(void) {
 
 /* --- lbC023342 ---  (cross-function goto target) */
 static void lbC023342(void) {
+_top: ;
   {  /* TST.W	lbW022DA4 */
       uint16_t _tst = (uint16_t)(READ16((uintptr_t)lbW022DA4));
       flag_z = (_tst == 0);
@@ -3348,6 +3388,7 @@ static void lbC023342(void) {
 
 /* --- lbC023356 --- */
 static void lbC023356(void) {
+_top: ;
   a0 = (uint32_t)(uintptr_t)lbL023A36;  /* LEA	lbL023A36(PC),A0 */
   a2 = (uint32_t)(uintptr_t)lbL023C24;  /* LEA	lbL023C24(PC),A2 */
   {  /* MOVE.W	#0,D5 */
@@ -3364,6 +3405,7 @@ static void lbC023356(void) {
 
 /* --- lbC02336E --- */
 static void lbC02336E(void) {
+_top: ;
   a1 = READ32((uintptr_t)lbB022DDE);  /* MOVEA.L	lbB022DDE(PC),A1 */
   {  /* MOVE.W	2(A1),D0 */
       uint16_t _mv = (uint16_t)(READ16(a1 + 2));
@@ -3418,6 +3460,7 @@ static void lbC02336E(void) {
 
 /* --- lbC0233AA --- */
 static void lbC0233AA(void) {
+_top: ;
   a0 = (uint32_t)(uintptr_t)lbW023B46;  /* LEA	lbW023B46(PC),A0 */
   a2 = (uint32_t)0xDFF0B0;  /* LEA	$DFF0B0,A2 */
   {  /* MOVE.W	#2,D5 */
@@ -3448,6 +3491,7 @@ static void lbC0233AA(void) {
 
 /* --- lbC0233CE --- */
 static void lbC0233CE(void) {
+_top: ;
   a0 = (uint32_t)(uintptr_t)lbL023A36;  /* LEA	lbL023A36(PC),A0 */
   a2 = (uint32_t)0xDFF0B0;  /* LEA	$DFF0B0,A2 */
   {  /* MOVE.W	#2,D5 */
@@ -3478,6 +3522,7 @@ static void lbC0233CE(void) {
 
 /* --- lbC0233F2 ---  (cross-function goto target) */
 static void lbC0233F2(void) {
+_top: ;
   {  /* TST.W	lbW022DA6 */
       uint16_t _tst = (uint16_t)(READ16((uintptr_t)lbW022DA6));
       flag_z = (_tst == 0);
@@ -3505,6 +3550,7 @@ static void lbC0233F2(void) {
 
 /* --- lbC023414 ---  (cross-function goto target) */
 static void lbC023414(void) {
+_top: ;
   lbC023452();  /* JSR	lbC023452 */
   lbC0234A6();  /* JSR	lbC0234A6 */
   lbC0234EE(); return;  /* BRA.L	lbC0234EE */
@@ -3513,12 +3559,14 @@ static void lbC023414(void) {
 
 /* --- lbC023424 ---  (cross-function goto target) */
 static void lbC023424(void) {
+_top: ;
   lbC02346A();  /* JSR	lbC02346A */
 }
 
 
 /* --- lbC02342A ---  (cross-function goto target) */
 static void lbC02342A(void) {
+_top: ;
   {  /* TST.W	lbW022DA4 */
       uint16_t _tst = (uint16_t)(READ16((uintptr_t)lbW022DA4));
       flag_z = (_tst == 0);
@@ -3533,6 +3581,7 @@ static void lbC02342A(void) {
 
 /* --- lbC02343E ---  (cross-function goto target) */
 static void lbC02343E(void) {
+_top: ;
   {  /* TST.W	lbW022DA4 */
       uint16_t _tst = (uint16_t)(READ16((uintptr_t)lbW022DA4));
       flag_z = (_tst == 0);
@@ -3547,6 +3596,7 @@ static void lbC02343E(void) {
 
 /* --- lbC023452 --- */
 static void lbC023452(void) {
+_top: ;
   a0 = (uint32_t)(uintptr_t)lbL023A7A;  /* LEA	lbL023A7A(PC),A0 */
   a2 = (uint32_t)(uintptr_t)lbL023C24;  /* LEA	lbL023C24(PC),A2 */
   {  /* MOVE.W	#0,D5 */
@@ -3563,6 +3613,7 @@ static void lbC023452(void) {
 
 /* --- lbC02346A --- */
 static void lbC02346A(void) {
+_top: ;
   a1 = READ32((uintptr_t)lbB022DDE);  /* MOVEA.L	lbB022DDE(PC),A1 */
   {  /* MOVE.W	2(A1),D0 */
       uint16_t _mv = (uint16_t)(READ16(a1 + 2));
@@ -3617,6 +3668,7 @@ static void lbC02346A(void) {
 
 /* --- lbC0234A6 --- */
 static void lbC0234A6(void) {
+_top: ;
   a0 = (uint32_t)(uintptr_t)lbW023B8A;  /* LEA	lbW023B8A(PC),A0 */
   a2 = (uint32_t)0xDFF0C0;  /* LEA	$DFF0C0,A2 */
   {  /* MOVE.W	#4,D5 */
@@ -3647,6 +3699,7 @@ static void lbC0234A6(void) {
 
 /* --- lbC0234CA --- */
 static void lbC0234CA(void) {
+_top: ;
   a0 = (uint32_t)(uintptr_t)lbL023A7A;  /* LEA	lbL023A7A(PC),A0 */
   a2 = (uint32_t)0xDFF0C0;  /* LEA	$DFF0C0,A2 */
   {  /* MOVE.W	#4,D5 */
@@ -3677,6 +3730,7 @@ static void lbC0234CA(void) {
 
 /* --- lbC0234EE ---  (cross-function goto target) */
 static void lbC0234EE(void) {
+_top: ;
   {  /* TST.W	lbW022DA6 */
       uint16_t _tst = (uint16_t)(READ16((uintptr_t)lbW022DA6));
       flag_z = (_tst == 0);
@@ -3745,6 +3799,7 @@ lbC02354A:
 
 /* --- lbC023550 --- */
 static void lbC023550(void) {
+_top: ;
   a0 = (uint32_t)(uintptr_t)lbL023ABE;  /* LEA	lbL023ABE(PC),A0 */
   a2 = (uint32_t)(uintptr_t)lbL023C24;  /* LEA	lbL023C24(PC),A2 */
   {  /* MOVE.W	#0,D5 */
@@ -3761,6 +3816,7 @@ static void lbC023550(void) {
 
 /* --- lbC023568 --- */
 static void lbC023568(void) {
+_top: ;
   a1 = READ32((uintptr_t)lbB022DDE);  /* MOVEA.L	lbB022DDE(PC),A1 */
   {  /* MOVE.W	2(A1),D0 */
       uint16_t _mv = (uint16_t)(READ16(a1 + 2));
@@ -3815,6 +3871,7 @@ static void lbC023568(void) {
 
 /* --- lbC0235A4 --- */
 static void lbC0235A4(void) {
+_top: ;
   a0 = (uint32_t)(uintptr_t)lbW023BCE;  /* LEA	lbW023BCE(PC),A0 */
   a2 = (uint32_t)0xDFF0D0;  /* LEA	$DFF0D0,A2 */
   {  /* MOVE.W	#8,D5 */
@@ -3845,6 +3902,7 @@ static void lbC0235A4(void) {
 
 /* --- lbC0235C8 --- */
 static void lbC0235C8(void) {
+_top: ;
   a0 = (uint32_t)(uintptr_t)lbL023ABE;  /* LEA	lbL023ABE(PC),A0 */
   a2 = (uint32_t)0xDFF0D0;  /* LEA	$DFF0D0,A2 */
   {  /* MOVE.W	#8,D5 */
@@ -3875,6 +3933,7 @@ static void lbC0235C8(void) {
 
 /* --- lbC0235EC --- */
 static void lbC0235EC(void) {
+_top: ;
   {  /* TST.W	(A0) */
       uint16_t _tst = (uint16_t)(READ16(a0));
       flag_z = (_tst == 0);
@@ -3888,6 +3947,7 @@ static void lbC0235EC(void) {
 
 /* --- lbC0235F4 ---  (cross-function goto target) */
 static void lbC0235F4(void) {
+_top: ;
   {  /* TST.W	2(A0) */
       uint16_t _tst = (uint16_t)(READ16(a0 + 2));
       flag_z = (_tst == 0);
@@ -3924,6 +3984,7 @@ static void lbC0235F4(void) {
 
 /* --- lbC023614 ---  (cross-function goto target) */
 static void lbC023614(void) {
+_top: ;
   WRITE16((uintptr_t)lbW022DD8, 0);  /* CLR.W	lbW022DD8 */
   {  /* MOVE.W	6(A0),D2 */
       uint16_t _mv = (uint16_t)(READ16(a0 + 6));
@@ -4189,6 +4250,7 @@ lbC0236CE:
 
 /* --- lbC0236E0 ---  (cross-function goto target) */
 static void lbC0236E0(void) {
+_top: ;
   a1 = READ32(a0 + 18);  /* MOVEA.L	18(A0),A1 */
   {  /* CMPI.W	#$FF,(A1) */
       int32_t _lhs = (int32_t)(READ16(a1));
@@ -4204,6 +4266,7 @@ static void lbC0236E0(void) {
 
 /* --- lbC0236EC ---  (cross-function goto target) */
 static void lbC0236EC(void) {
+_top: ;
   d0 = 0;  /* CLR.L	D0 */
   {  /* MOVE.W	(A1)+,D0 */
       uint16_t _mv = (uint16_t)(READ16_POST(a1));
@@ -4257,6 +4320,7 @@ lbC023708:
 
 /* --- lbC02372E ---  (cross-function goto target) */
 static void lbC02372E(void) {
+_top: ;
   a1 = (uint32_t)((int32_t)a1 - (int32_t)(int16_t)(2));  /* SUBQ.L	#2,A1 */
   lbC0236EC(); return;  /* BRA.L	lbC0236EC */
 }
@@ -4265,6 +4329,7 @@ static void lbC02372E(void) {
 
 /* --- lbC023736 ---  (cross-function goto target) */
 static void lbC023736(void) {
+_top: ;
   {  /* MOVE.W	#3,4(A0) */
       uint16_t _mv = (uint16_t)(3);
       hw_write16(a0 + 4, _mv);
@@ -4319,6 +4384,7 @@ static void lbC023736(void) {
 
 /* --- lbC023750 ---  (cross-function goto target) */
 static void lbC023750(void) {
+_top: ;
   {  /* MOVE.L	44(A0),(A2) */
       uint32_t _mv = (uint32_t)(READ32(a0 + 44));
       hw_write32(a2, _mv);
@@ -4352,6 +4418,7 @@ static void lbC023750(void) {
 
 /* --- lbC023768 ---  (cross-function goto target) */
 static void lbC023768(void) {
+_top: ;
   {  /* MOVE.W	#0,66(A0) */
       uint16_t _mv = (uint16_t)(0);
       hw_write16(a0 + 66, _mv);
@@ -4365,6 +4432,7 @@ static void lbC023768(void) {
 
 /* --- lbC023772 ---  (cross-function goto target) */
 static void lbC023772(void) {
+_top: ;
   {  /* MOVE.W	(A1)+,D0 */
       uint16_t _mv = (uint16_t)(READ16_POST(a1));
       W(d0) = (uint16_t)_mv;
@@ -4449,6 +4517,7 @@ static void lbC023772(void) {
 
 /* --- lbC0237AA ---  (cross-function goto target) */
 static void lbC0237AA(void) {
+_top: ;
   {  /* CMPI.W	#0,4(A0) */
       int32_t _lhs = (int32_t)(READ16(a0 + 4));
       int32_t _rhs = (int32_t)(0);
@@ -4464,6 +4533,7 @@ static void lbC0237AA(void) {
 
 /* --- lbC0237B8 ---  (cross-function goto target) */
 static void lbC0237B8(void) {
+_top: ;
   {  /* MOVE.W	D1,$DFF096 */
       uint16_t _mv = (uint16_t)(W(d1));
       paula_dma_write((uint16_t)(_mv));
@@ -4477,6 +4547,7 @@ static void lbC0237B8(void) {
 
 /* --- lbC0237C2 --- */
 static void lbC0237C2(void) {
+_top: ;
   /* MOVE.W	(A1)+,2(A0) */
   {  /* MOVE.W	(A1)+,D7 */
       uint16_t _mv = (uint16_t)(READ16_POST(a1));
@@ -4492,6 +4563,7 @@ static void lbC0237C2(void) {
 
 /* --- OKi ---  (cross-function goto target) */
 static void OKi(void) {
+_top: ;
   {  /* MOVE.W	D7,2(A0) */
       uint16_t _mv = (uint16_t)(W(d7));
       hw_write16(a0 + 2, _mv);
@@ -4532,6 +4604,7 @@ static void OKi(void) {
 
 /* --- lbC0237E0 ---  (cross-function goto target) */
 static void lbC0237E0(void) {
+_top: ;
   {  /* CMPI.W	#0,4(A0) */
       int32_t _lhs = (int32_t)(READ16(a0 + 4));
       int32_t _rhs = (int32_t)(0);
@@ -4553,6 +4626,7 @@ static void lbC0237E0(void) {
 
 /* --- lbC0237F0 ---  (cross-function goto target) */
 static void lbC0237F0(void) {
+_top: ;
   {  /* SUBQ.W	#1,2(A0) */
       uint16_t _sr = (uint16_t)(READ16(a0 + 2) - 1);
       hw_write16(a0 + 2, (uint16_t)_sr);
@@ -4565,6 +4639,7 @@ static void lbC0237F0(void) {
 
 /* --- lbC0237F8 ---  (cross-function goto target) */
 static void lbC0237F8(void) {
+_top: ;
   a3 = (uint32_t)(uintptr_t)lbL023804;  /* MOVEA.L	#lbL023804,A3 */
   {  /* CMP.W	#60,D0 */
       int32_t _lhs = (int32_t)(W(d0));
@@ -4584,6 +4659,7 @@ _ok:
 
 /* --- lbC023840 --- */
 static void lbC023840(void) {
+_top: ;
   /* NOP */  /* NOP */
   return;  /* RTS */
 }
@@ -4591,6 +4667,7 @@ static void lbC023840(void) {
 
 /* --- lbC023844 --- */
 static void lbC023844(void) {
+_top: ;
   {  /* MOVE.L	(A1),D0 */
       uint32_t _mv = (uint32_t)(READ32(a1));
       d0 = _mv;
@@ -4606,6 +4683,7 @@ static void lbC023844(void) {
 
 /* --- lbC023852 --- */
 static void lbC023852(void) {
+_top: ;
   /* hw $BFE001 */ (void)(READ32(0xBFE001) & ~(1u << (1 & 31)));  /* BCLR	#1,$BFE001 */
   lbC023772(); return;  /* BRA.L	lbC023772 */
 }
@@ -4613,6 +4691,7 @@ static void lbC023852(void) {
 
 /* --- lbC02385E --- */
 static void lbC02385E(void) {
+_top: ;
   /* hw $BFE001 */ (void)(READ32(0xBFE001) | (1u << (1 & 31)));  /* BSET	#1,$BFE001 */
   lbC023772(); return;  /* BRA.L	lbC023772 */
 }
@@ -4620,6 +4699,7 @@ static void lbC02385E(void) {
 
 /* --- lbC02386A --- */
 static void lbC02386A(void) {
+_top: ;
   {  /* MOVE.L	(A1)+,D0 */
       uint32_t _mv = (uint32_t)(READ32_POST(a1));
       d0 = _mv;
@@ -4694,6 +4774,7 @@ static void lbC02386A(void) {
 
 /* --- lbC023896 ---  (cross-function goto target) */
 static void lbC023896(void) {
+_top: ;
   {  /* MOVE.W	(A3)+,4(A0) */
       uint16_t _mv = (uint16_t)(READ16_POST(a3));
       hw_write16(a0 + 4, _mv);
@@ -4753,6 +4834,7 @@ static void lbC023896(void) {
 
 /* --- lbC0238C4 --- */
 static void lbC0238C4(void) {
+_top: ;
   a1 = READ32(a0 + 26);  /* MOVEA.L	26(A0),A1 */
   {  /* CMPI.L	#0,(A1) */
       int32_t _lhs = (int32_t)(READ32(a1));
@@ -4797,6 +4879,7 @@ static void lbC0238C4(void) {
 
 /* --- Exit3 ---  (cross-function goto target) */
 static void Exit3(void) {
+_top: ;
   {  /* ADDQ.L	#4,26(A0) */
       uint32_t _ar = (uint32_t)(READ32(a0 + 26) + 4);
       hw_write32(a0 + 26, (uint32_t)_ar);
@@ -4818,6 +4901,7 @@ static void Exit3(void) {
 
 /* --- lbC0238E6 --- */
 static void lbC0238E6(void) {
+_top: ;
   {  /* MOVE.L	(A1)+,D0 */
       uint32_t _mv = (uint32_t)(READ32_POST(a1));
       d0 = _mv;
@@ -4847,6 +4931,7 @@ static void lbC0238E6(void) {
 
 /* --- lbC0238FC --- */
 static void lbC0238FC(void) {
+_top: ;
   {  /* MOVE.L	(A1)+,8(A0) */
       uint32_t _mv = (uint32_t)(READ32_POST(a1));
       hw_write32(a0 + 8, _mv);
@@ -4867,6 +4952,7 @@ static void lbC0238FC(void) {
 
 /* --- lbC023908 --- */
 static void lbC023908(void) {
+_top: ;
   {  /* MOVE.W	#1,16(A0) */
       uint16_t _mv = (uint16_t)(1);
       hw_write16(a0 + 16, _mv);
@@ -4901,6 +4987,7 @@ static void lbC023908(void) {
 
 /* --- lbC02391E --- */
 static void lbC02391E(void) {
+_top: ;
   hw_write16(a0 + 8, 0);  /* CLR.W	8(A0) */
   lbC023772(); return;  /* BRA.L	lbC023772 */
 }
@@ -4908,6 +4995,7 @@ static void lbC02391E(void) {
 
 /* --- lbC023926 --- */
 static void lbC023926(void) {
+_top: ;
   hw_write16(a0 + 16, 0);  /* CLR.W	16(A0) */
   lbC023772(); return;  /* BRA.L	lbC023772 */
 }
@@ -4915,6 +5003,7 @@ static void lbC023926(void) {
 
 /* --- lbC02392E --- */
 static void lbC02392E(void) {
+_top: ;
   {  /* CMPI.W	#6,(A0) */
       int32_t _lhs = (int32_t)(READ16(a0));
       int32_t _rhs = (int32_t)(6);
@@ -4947,6 +5036,7 @@ static void lbC02392E(void) {
 
 /* --- lbC023946 --- */
 static void lbC023946(void) {
+_top: ;
   {  /* MOVE.W	D5,$DFF096 */
       uint16_t _mv = (uint16_t)(W(d5));
       paula_dma_write((uint16_t)(_mv));
@@ -4981,6 +5071,7 @@ static void lbC023946(void) {
 
 /* --- lbC023966 ---  (cross-function goto target) */
 static void lbC023966(void) {
+_top: ;
   {  /* MOVE.W	D5,$DFF096 */
       uint16_t _mv = (uint16_t)(W(d5));
       paula_dma_write((uint16_t)(_mv));
@@ -5015,6 +5106,7 @@ static void lbC023966(void) {
 
 /* --- lbC023986 ---  (cross-function goto target) */
 static void lbC023986(void) {
+_top: ;
   {  /* MOVE.W	D5,$DFF096 */
       uint16_t _mv = (uint16_t)(W(d5));
       paula_dma_write((uint16_t)(_mv));
@@ -5049,6 +5141,7 @@ static void lbC023986(void) {
 
 /* --- lbC0239A6 ---  (cross-function goto target) */
 static void lbC0239A6(void) {
+_top: ;
   {  /* MOVE.W	D5,$DFF096 */
       uint16_t _mv = (uint16_t)(W(d5));
       paula_dma_write((uint16_t)(_mv));
@@ -5083,6 +5176,7 @@ static void lbC0239A6(void) {
 
 /* --- lbC0239C6 --- */
 static void lbC0239C6(void) {
+_top: ;
   {  /* MOVE.W	#1,66(A0) */
       uint16_t _mv = (uint16_t)(1);
       hw_write16(a0 + 66, _mv);
@@ -5096,6 +5190,7 @@ static void lbC0239C6(void) {
 
 /* --- lbC0239D0 ---  (cross-function goto target) */
 static void lbC0239D0(void) {
+_top: ;
   a1 = (uint32_t)((int32_t)a1 + (int32_t)(int16_t)(4));  /* ADDQ.L	#4,A1 */
   {  /* MOVE.L	30(A0),26(A0) */
       uint32_t _mv = (uint32_t)(READ32(a0 + 30));
@@ -5255,6 +5350,7 @@ static void lbC0239D0(void) {
 
 /* --- SubSongPtr_2 --- */
 static void SubSongPtr_2(void) {
+_top: ;
 }
 
 /* ModulePtr */
@@ -5353,11 +5449,13 @@ static void SubSongPtr_2(void) {
 
 /* --- End_2 ---  (cross-function goto target) */
 static void End_2(void) {
+_top: ;
 }
 
 
 /* --- lbC0099D6 --- */
 static void lbC0099D6(void) {
+_top: ;
   {  /* MOVE.W	#15,$DFF096 */
       uint16_t _mv = (uint16_t)(15);
       paula_dma_write((uint16_t)(_mv));
@@ -5597,6 +5695,7 @@ static void lbC0099D6(void) {
 
 /* --- Init_2 ---  (cross-function goto target) */
 static void Init_2(void) {
+_top: ;
 lbC009B30:
   {  /* MOVE.W	#1,lbW00978A */
       uint16_t _mv = (uint16_t)(1);
@@ -5896,6 +5995,7 @@ lbC009C1E:
 
 /* --- Play_2 --- */
 static void Play_2(void) {
+_top: ;
 lbC009C7C:
   {  /* TST.W	lbW00978A */
       uint16_t _tst = (uint16_t)(READ16((uintptr_t)lbW00978A));
@@ -5910,6 +6010,7 @@ lbC009C7C:
 
 /* --- lbC009C88 ---  (cross-function goto target) */
 static void lbC009C88(void) {
+_top: ;
   d0 = (uint32_t)(int32_t)(int8_t)(1);  /* MOVEQ	#1,D0 */
   {  /* ADD.L	lbL0097CC(PC),D0 */
       uint32_t _ar = (uint32_t)(d0 + READ32((uintptr_t)lbL0097CC));
@@ -5983,6 +6084,7 @@ lbC009CAA:
 
 /* --- lbC009CD0 ---  (cross-function goto target) */
 static void lbC009CD0(void) {
+_top: ;
   lbC009D0C();  /* JSR	lbC009D0C */
   lbC009D76();  /* JSR	lbC009D76 */
   lbC009DDA(); return;  /* BRA.L	lbC009DDA */
@@ -5991,12 +6093,14 @@ static void lbC009CD0(void) {
 
 /* --- lbC009CE0 ---  (cross-function goto target) */
 static void lbC009CE0(void) {
+_top: ;
   lbC009D38();  /* JSR	lbC009D38 */
 }
 
 
 /* --- lbC009CE6 ---  (cross-function goto target) */
 static void lbC009CE6(void) {
+_top: ;
   {  /* TST.W	lbW009758 */
       uint16_t _tst = (uint16_t)(READ16((uintptr_t)lbW009758));
       flag_z = (_tst == 0);
@@ -6011,6 +6115,7 @@ static void lbC009CE6(void) {
 
 /* --- lbC009CF8 ---  (cross-function goto target) */
 static void lbC009CF8(void) {
+_top: ;
   {  /* TST.W	lbW009758 */
       uint16_t _tst = (uint16_t)(READ16((uintptr_t)lbW009758));
       flag_z = (_tst == 0);
@@ -6025,6 +6130,7 @@ static void lbC009CF8(void) {
 
 /* --- lbC009D0C --- */
 static void lbC009D0C(void) {
+_top: ;
   {  /* TST.W	lbW0097D4 */
       uint16_t _tst = (uint16_t)(READ16((uintptr_t)lbW0097D4));
       flag_z = (_tst == 0);
@@ -6038,6 +6144,7 @@ static void lbC009D0C(void) {
 
 /* --- lbC009D18 ---  (cross-function goto target) */
 static void lbC009D18(void) {
+_top: ;
   {  /* MOVE.L	lbL009792(PC),lbL0097A6 */
       uint32_t _mv = (uint32_t)(READ32((uintptr_t)lbL009792));
       WRITE32((uintptr_t)lbL0097A6, _mv);
@@ -6061,6 +6168,7 @@ static void lbC009D18(void) {
 
 /* --- lbC009D38 --- */
 static void lbC009D38(void) {
+_top: ;
   {  /* MOVE.W	lbW0097B2(PC),D0 */
       uint16_t _mv = (uint16_t)(READ16((uintptr_t)lbW0097B2));
       W(d0) = (uint16_t)_mv;
@@ -6136,6 +6244,7 @@ static void lbC009D38(void) {
 
 /* --- lbC009D76 --- */
 static void lbC009D76(void) {
+_top: ;
   {  /* MOVE.L	lbL0097BC(PC),lbL0097A6 */
       uint32_t _mv = (uint32_t)(READ32((uintptr_t)lbL0097BC));
       WRITE32((uintptr_t)lbL0097A6, _mv);
@@ -6173,6 +6282,7 @@ static void lbC009D76(void) {
 
 /* --- lbC009DA2 --- */
 static void lbC009DA2(void) {
+_top: ;
   {  /* TST.W	lbW0097D4 */
       uint16_t _tst = (uint16_t)(READ16((uintptr_t)lbW0097D4));
       flag_z = (_tst == 0);
@@ -6186,6 +6296,7 @@ static void lbC009DA2(void) {
 
 /* --- lbC009DAE ---  (cross-function goto target) */
 static void lbC009DAE(void) {
+_top: ;
   {  /* MOVE.L	lbL009792(PC),lbL0097A6 */
       uint32_t _mv = (uint32_t)(READ32((uintptr_t)lbL009792));
       WRITE32((uintptr_t)lbL0097A6, _mv);
@@ -6223,6 +6334,7 @@ static void lbC009DAE(void) {
 
 /* --- lbC009DDA ---  (cross-function goto target) */
 static void lbC009DDA(void) {
+_top: ;
   {  /* TST.W	lbW00975A */
       uint16_t _tst = (uint16_t)(READ16((uintptr_t)lbW00975A));
       flag_z = (_tst == 0);
@@ -6250,6 +6362,7 @@ static void lbC009DDA(void) {
 
 /* --- lbC009DFC ---  (cross-function goto target) */
 static void lbC009DFC(void) {
+_top: ;
   lbC009E38();  /* JSR	lbC009E38 */
   lbC009EA2();  /* JSR	lbC009EA2 */
   lbC009F06(); return;  /* BRA.L	lbC009F06 */
@@ -6258,12 +6371,14 @@ static void lbC009DFC(void) {
 
 /* --- lbC009E0C ---  (cross-function goto target) */
 static void lbC009E0C(void) {
+_top: ;
   lbC009E64();  /* JSR	lbC009E64 */
 }
 
 
 /* --- lbC009E12 ---  (cross-function goto target) */
 static void lbC009E12(void) {
+_top: ;
   {  /* TST.W	lbW009758 */
       uint16_t _tst = (uint16_t)(READ16((uintptr_t)lbW009758));
       flag_z = (_tst == 0);
@@ -6278,6 +6393,7 @@ static void lbC009E12(void) {
 
 /* --- lbC009E24 ---  (cross-function goto target) */
 static void lbC009E24(void) {
+_top: ;
   {  /* TST.W	lbW009758 */
       uint16_t _tst = (uint16_t)(READ16((uintptr_t)lbW009758));
       flag_z = (_tst == 0);
@@ -6292,6 +6408,7 @@ static void lbC009E24(void) {
 
 /* --- lbC009E38 --- */
 static void lbC009E38(void) {
+_top: ;
   {  /* TST.W	lbW0097D4 */
       uint16_t _tst = (uint16_t)(READ16((uintptr_t)lbW0097D4));
       flag_z = (_tst == 0);
@@ -6305,6 +6422,7 @@ static void lbC009E38(void) {
 
 /* --- lbC009E44 ---  (cross-function goto target) */
 static void lbC009E44(void) {
+_top: ;
   {  /* MOVE.L	lbL009792(PC),lbL0097A6 */
       uint32_t _mv = (uint32_t)(READ32((uintptr_t)lbL009792));
       WRITE32((uintptr_t)lbL0097A6, _mv);
@@ -6328,6 +6446,7 @@ static void lbC009E44(void) {
 
 /* --- lbC009E64 --- */
 static void lbC009E64(void) {
+_top: ;
   {  /* MOVE.W	lbW0097B4(PC),D0 */
       uint16_t _mv = (uint16_t)(READ16((uintptr_t)lbW0097B4));
       W(d0) = (uint16_t)_mv;
@@ -6403,6 +6522,7 @@ static void lbC009E64(void) {
 
 /* --- lbC009EA2 --- */
 static void lbC009EA2(void) {
+_top: ;
   {  /* MOVE.L	lbL0097C0(PC),lbL0097A6 */
       uint32_t _mv = (uint32_t)(READ32((uintptr_t)lbL0097C0));
       WRITE32((uintptr_t)lbL0097A6, _mv);
@@ -6440,6 +6560,7 @@ static void lbC009EA2(void) {
 
 /* --- lbC009ECE --- */
 static void lbC009ECE(void) {
+_top: ;
   {  /* TST.W	lbW0097D4 */
       uint16_t _tst = (uint16_t)(READ16((uintptr_t)lbW0097D4));
       flag_z = (_tst == 0);
@@ -6453,6 +6574,7 @@ static void lbC009ECE(void) {
 
 /* --- lbC009EDA ---  (cross-function goto target) */
 static void lbC009EDA(void) {
+_top: ;
   {  /* MOVE.L	lbL009792(PC),lbL0097A6 */
       uint32_t _mv = (uint32_t)(READ32((uintptr_t)lbL009792));
       WRITE32((uintptr_t)lbL0097A6, _mv);
@@ -6490,6 +6612,7 @@ static void lbC009EDA(void) {
 
 /* --- lbC009F06 ---  (cross-function goto target) */
 static void lbC009F06(void) {
+_top: ;
   {  /* TST.W	lbW00975A */
       uint16_t _tst = (uint16_t)(READ16((uintptr_t)lbW00975A));
       flag_z = (_tst == 0);
@@ -6517,6 +6640,7 @@ static void lbC009F06(void) {
 
 /* --- lbC009F28 ---  (cross-function goto target) */
 static void lbC009F28(void) {
+_top: ;
   lbC009F64();  /* JSR	lbC009F64 */
   lbC009FCE();  /* JSR	lbC009FCE */
   lbC00A032(); return;  /* BRA.L	lbC00A032 */
@@ -6525,12 +6649,14 @@ static void lbC009F28(void) {
 
 /* --- lbC009F38 ---  (cross-function goto target) */
 static void lbC009F38(void) {
+_top: ;
   lbC009F90();  /* JSR	lbC009F90 */
 }
 
 
 /* --- lbC009F3E ---  (cross-function goto target) */
 static void lbC009F3E(void) {
+_top: ;
   {  /* TST.W	lbW009758 */
       uint16_t _tst = (uint16_t)(READ16((uintptr_t)lbW009758));
       flag_z = (_tst == 0);
@@ -6545,6 +6671,7 @@ static void lbC009F3E(void) {
 
 /* --- lbC009F50 ---  (cross-function goto target) */
 static void lbC009F50(void) {
+_top: ;
   {  /* TST.W	lbW009758 */
       uint16_t _tst = (uint16_t)(READ16((uintptr_t)lbW009758));
       flag_z = (_tst == 0);
@@ -6559,6 +6686,7 @@ static void lbC009F50(void) {
 
 /* --- lbC009F64 --- */
 static void lbC009F64(void) {
+_top: ;
   {  /* TST.W	lbW0097D4 */
       uint16_t _tst = (uint16_t)(READ16((uintptr_t)lbW0097D4));
       flag_z = (_tst == 0);
@@ -6572,6 +6700,7 @@ static void lbC009F64(void) {
 
 /* --- lbC009F70 ---  (cross-function goto target) */
 static void lbC009F70(void) {
+_top: ;
   {  /* MOVE.L	lbL009792(PC),lbL0097A6 */
       uint32_t _mv = (uint32_t)(READ32((uintptr_t)lbL009792));
       WRITE32((uintptr_t)lbL0097A6, _mv);
@@ -6595,6 +6724,7 @@ static void lbC009F70(void) {
 
 /* --- lbC009F90 --- */
 static void lbC009F90(void) {
+_top: ;
   {  /* MOVE.W	lbW0097B6(PC),D0 */
       uint16_t _mv = (uint16_t)(READ16((uintptr_t)lbW0097B6));
       W(d0) = (uint16_t)_mv;
@@ -6670,6 +6800,7 @@ static void lbC009F90(void) {
 
 /* --- lbC009FCE --- */
 static void lbC009FCE(void) {
+_top: ;
   {  /* MOVE.L	lbL0097C4(PC),lbL0097A6 */
       uint32_t _mv = (uint32_t)(READ32((uintptr_t)lbL0097C4));
       WRITE32((uintptr_t)lbL0097A6, _mv);
@@ -6707,6 +6838,7 @@ static void lbC009FCE(void) {
 
 /* --- lbC009FFA --- */
 static void lbC009FFA(void) {
+_top: ;
   {  /* TST.W	lbW0097D4 */
       uint16_t _tst = (uint16_t)(READ16((uintptr_t)lbW0097D4));
       flag_z = (_tst == 0);
@@ -6720,6 +6852,7 @@ static void lbC009FFA(void) {
 
 /* --- lbC00A006 ---  (cross-function goto target) */
 static void lbC00A006(void) {
+_top: ;
   {  /* MOVE.L	lbL009792(PC),lbL0097A6 */
       uint32_t _mv = (uint32_t)(READ32((uintptr_t)lbL009792));
       WRITE32((uintptr_t)lbL0097A6, _mv);
@@ -6757,6 +6890,7 @@ static void lbC00A006(void) {
 
 /* --- lbC00A032 ---  (cross-function goto target) */
 static void lbC00A032(void) {
+_top: ;
   {  /* TST.W	lbW00975A */
       uint16_t _tst = (uint16_t)(READ16((uintptr_t)lbW00975A));
       flag_z = (_tst == 0);
@@ -6826,6 +6960,7 @@ lbC00A08C:
 
 /* --- lbC00A098 --- */
 static void lbC00A098(void) {
+_top: ;
   {  /* TST.W	lbW0097D4 */
       uint16_t _tst = (uint16_t)(READ16((uintptr_t)lbW0097D4));
       flag_z = (_tst == 0);
@@ -6839,6 +6974,7 @@ static void lbC00A098(void) {
 
 /* --- lbC00A0A4 ---  (cross-function goto target) */
 static void lbC00A0A4(void) {
+_top: ;
   {  /* MOVE.L	lbL009792(PC),lbL0097A6 */
       uint32_t _mv = (uint32_t)(READ32((uintptr_t)lbL009792));
       WRITE32((uintptr_t)lbL0097A6, _mv);
@@ -6862,6 +6998,7 @@ static void lbC00A0A4(void) {
 
 /* --- lbC00A0C4 --- */
 static void lbC00A0C4(void) {
+_top: ;
   {  /* MOVE.W	lbW0097B8(PC),D0 */
       uint16_t _mv = (uint16_t)(READ16((uintptr_t)lbW0097B8));
       W(d0) = (uint16_t)_mv;
@@ -6937,6 +7074,7 @@ static void lbC00A0C4(void) {
 
 /* --- lbC00A102 --- */
 static void lbC00A102(void) {
+_top: ;
   {  /* MOVE.L	lbL0097C8(PC),lbL0097A6 */
       uint32_t _mv = (uint32_t)(READ32((uintptr_t)lbL0097C8));
       WRITE32((uintptr_t)lbL0097A6, _mv);
@@ -6974,6 +7112,7 @@ static void lbC00A102(void) {
 
 /* --- lbC00A12E --- */
 static void lbC00A12E(void) {
+_top: ;
   {  /* TST.W	lbW0097D4 */
       uint16_t _tst = (uint16_t)(READ16((uintptr_t)lbW0097D4));
       flag_z = (_tst == 0);
@@ -6987,6 +7126,7 @@ static void lbC00A12E(void) {
 
 /* --- lbC00A13A ---  (cross-function goto target) */
 static void lbC00A13A(void) {
+_top: ;
   {  /* MOVE.L	lbL009792(PC),lbL0097A6 */
       uint32_t _mv = (uint32_t)(READ32((uintptr_t)lbL009792));
       WRITE32((uintptr_t)lbL0097A6, _mv);
@@ -7024,6 +7164,7 @@ static void lbC00A13A(void) {
 
 /* --- lbC00A166 --- */
 static void lbC00A166(void) {
+_top: ;
   {  /* TST.W	D0 */
       uint16_t _tst = (uint16_t)(W(d0));
       flag_z = (_tst == 0);
@@ -7047,6 +7188,7 @@ static void lbC00A166(void) {
 
 /* --- lbC00A17A ---  (cross-function goto target) */
 static void lbC00A17A(void) {
+_top: ;
   a1 = READ32((uintptr_t)lbL009796);  /* MOVEA.L	lbL009796(PC),A1 */
   return;  /* RTS */
 }
@@ -7054,6 +7196,7 @@ static void lbC00A17A(void) {
 
 /* --- lbC00A180 ---  (cross-function goto target) */
 static void lbC00A180(void) {
+_top: ;
   a1 = READ32((uintptr_t)lbL0097AA);  /* MOVEA.L	lbL0097AA(PC),A1 */
   return;  /* RTS */
 }
@@ -7061,6 +7204,7 @@ static void lbC00A180(void) {
 
 /* --- lbC00A186 --- */
 static void lbC00A186(void) {
+_top: ;
   {  /* TST.W	(A0) */
       uint16_t _tst = (uint16_t)(READ16(a0));
       flag_z = (_tst == 0);
@@ -7074,6 +7218,7 @@ static void lbC00A186(void) {
 
 /* --- lbC00A18E ---  (cross-function goto target) */
 static void lbC00A18E(void) {
+_top: ;
   {  /* TST.W	2(A0) */
       uint16_t _tst = (uint16_t)(READ16(a0 + 2));
       flag_z = (_tst == 0);
@@ -7110,6 +7255,7 @@ static void lbC00A18E(void) {
 
 /* --- lbC00A1AE ---  (cross-function goto target) */
 static void lbC00A1AE(void) {
+_top: ;
   WRITE16((uintptr_t)lbW00978C, 0);  /* CLR.W	lbW00978C */
   {  /* MOVE.W	6(A0),D2 */
       uint16_t _mv = (uint16_t)(READ16(a0 + 6));
@@ -7375,6 +7521,7 @@ lbC00A268:
 
 /* --- lbC00A27A ---  (cross-function goto target) */
 static void lbC00A27A(void) {
+_top: ;
   a1 = READ32(a0 + 18);  /* MOVEA.L	18(A0),A1 */
   {  /* CMPI.W	#$FF,(A1) */
       int32_t _lhs = (int32_t)(READ16(a1));
@@ -7390,6 +7537,7 @@ static void lbC00A27A(void) {
 
 /* --- lbC00A286 ---  (cross-function goto target) */
 static void lbC00A286(void) {
+_top: ;
   d0 = 0;  /* CLR.L	D0 */
   {  /* MOVE.W	(A1)+,D0 */
       uint16_t _mv = (uint16_t)(READ16_POST(a1));
@@ -7443,6 +7591,7 @@ lbC00A2A0:
 
 /* --- lbC00A2C4 ---  (cross-function goto target) */
 static void lbC00A2C4(void) {
+_top: ;
   a1 = (uint32_t)((int32_t)a1 - (int32_t)(int16_t)(2));  /* SUBQ.L	#2,A1 */
   lbC00A286(); return;  /* BRA.S	lbC00A286 */
 }
@@ -7451,6 +7600,7 @@ static void lbC00A2C4(void) {
 
 /* --- lbC00A2CA ---  (cross-function goto target) */
 static void lbC00A2CA(void) {
+_top: ;
   {  /* MOVE.W	#3,4(A0) */
       uint16_t _mv = (uint16_t)(3);
       hw_write16(a0 + 4, _mv);
@@ -7512,6 +7662,7 @@ static void lbC00A2CA(void) {
 
 /* --- lbC00A2EA ---  (cross-function goto target) */
 static void lbC00A2EA(void) {
+_top: ;
   {  /* MOVE.L	44(A0),(A2) */
       uint32_t _mv = (uint32_t)(READ32(a0 + 44));
       hw_write32(a2, _mv);
@@ -7545,6 +7696,7 @@ static void lbC00A2EA(void) {
 
 /* --- lbC00A302 ---  (cross-function goto target) */
 static void lbC00A302(void) {
+_top: ;
   {  /* MOVE.W	#0,66(A0) */
       uint16_t _mv = (uint16_t)(0);
       hw_write16(a0 + 66, _mv);
@@ -7558,6 +7710,7 @@ static void lbC00A302(void) {
 
 /* --- lbC00A30C ---  (cross-function goto target) */
 static void lbC00A30C(void) {
+_top: ;
   {  /* MOVE.W	(A1)+,D0 */
       uint16_t _mv = (uint16_t)(READ16_POST(a1));
       W(d0) = (uint16_t)_mv;
@@ -7642,6 +7795,7 @@ static void lbC00A30C(void) {
 
 /* --- lbC00A344 ---  (cross-function goto target) */
 static void lbC00A344(void) {
+_top: ;
   {  /* CMPI.W	#0,4(A0) */
       int32_t _lhs = (int32_t)(READ16(a0 + 4));
       int32_t _rhs = (int32_t)(0);
@@ -7657,6 +7811,7 @@ static void lbC00A344(void) {
 
 /* --- lbC00A352 ---  (cross-function goto target) */
 static void lbC00A352(void) {
+_top: ;
   {  /* MOVE.W	D1,$DFF096 */
       uint16_t _mv = (uint16_t)(W(d1));
       paula_dma_write((uint16_t)(_mv));
@@ -7677,6 +7832,7 @@ static void lbC00A352(void) {
 
 /* --- lbC00A364 --- */
 static void lbC00A364(void) {
+_top: ;
   /* MOVE.W	(A1)+,2(A0) */
   {  /* MOVE.W	(A1)+,D7 */
       uint16_t _mv = (uint16_t)(READ16_POST(a1));
@@ -7692,6 +7848,7 @@ static void lbC00A364(void) {
 
 /* --- OK_1 ---  (cross-function goto target) */
 static void OK_1(void) {
+_top: ;
   {  /* MOVE.W	D7,2(A0) */
       uint16_t _mv = (uint16_t)(W(d7));
       hw_write16(a0 + 2, _mv);
@@ -7732,6 +7889,7 @@ static void OK_1(void) {
 
 /* --- lbC00A382 ---  (cross-function goto target) */
 static void lbC00A382(void) {
+_top: ;
   {  /* CMPI.W	#0,4(A0) */
       int32_t _lhs = (int32_t)(READ16(a0 + 4));
       int32_t _rhs = (int32_t)(0);
@@ -7760,6 +7918,7 @@ static void lbC00A382(void) {
 
 /* --- lbC00A39A ---  (cross-function goto target) */
 static void lbC00A39A(void) {
+_top: ;
   {  /* SUBQ.W	#1,2(A0) */
       uint16_t _sr = (uint16_t)(READ16(a0 + 2) - 1);
       hw_write16(a0 + 2, (uint16_t)_sr);
@@ -7772,6 +7931,7 @@ static void lbC00A39A(void) {
 
 /* --- lbC00A3A2 ---  (cross-function goto target) */
 static void lbC00A3A2(void) {
+_top: ;
   a3 = (uint32_t)(uintptr_t)lbL00A3AE;  /* MOVEA.L	#lbL00A3AE,A3 */
   {  /* CMP.W	#60,D0 */
       int32_t _lhs = (int32_t)(W(d0));
@@ -7791,6 +7951,7 @@ _ok:
 
 /* --- lbC00A3EA --- */
 static void lbC00A3EA(void) {
+_top: ;
   /* NOP */  /* NOP */
   return;  /* RTS */
 }
@@ -7798,6 +7959,7 @@ static void lbC00A3EA(void) {
 
 /* --- lbC00A3EE --- */
 static void lbC00A3EE(void) {
+_top: ;
   {  /* MOVE.L	(A1),D0 */
       uint32_t _mv = (uint32_t)(READ32(a1));
       d0 = _mv;
@@ -7813,6 +7975,7 @@ static void lbC00A3EE(void) {
 
 /* --- lbC00A3FA --- */
 static void lbC00A3FA(void) {
+_top: ;
   /* hw $BFE001 */ (void)(READ32(0xBFE001) & ~(1u << (1 & 31)));  /* BCLR	#1,$BFE001 */
   lbC00A30C(); return;  /* BRA.L	lbC00A30C */
 }
@@ -7820,6 +7983,7 @@ static void lbC00A3FA(void) {
 
 /* --- lbC00A406 --- */
 static void lbC00A406(void) {
+_top: ;
   /* hw $BFE001 */ (void)(READ32(0xBFE001) | (1u << (1 & 31)));  /* BSET	#1,$BFE001 */
   lbC00A30C(); return;  /* BRA.L	lbC00A30C */
 }
@@ -7827,6 +7991,7 @@ static void lbC00A406(void) {
 
 /* --- lbC00A412 --- */
 static void lbC00A412(void) {
+_top: ;
   {  /* MOVE.L	(A1)+,D0 */
       uint32_t _mv = (uint32_t)(READ32_POST(a1));
       d0 = _mv;
@@ -7901,6 +8066,7 @@ static void lbC00A412(void) {
 
 /* --- lbC00A438 ---  (cross-function goto target) */
 static void lbC00A438(void) {
+_top: ;
   {  /* MOVE.W	(A3)+,4(A0) */
       uint16_t _mv = (uint16_t)(READ16_POST(a3));
       hw_write16(a0 + 4, _mv);
@@ -7960,6 +8126,7 @@ static void lbC00A438(void) {
 
 /* --- lbC00A460 --- */
 static void lbC00A460(void) {
+_top: ;
   a1 = READ32(a0 + 26);  /* MOVEA.L	26(A0),A1 */
   {  /* CMPI.L	#0,(A1) */
       int32_t _lhs = (int32_t)(READ32(a1));
@@ -8004,6 +8171,7 @@ static void lbC00A460(void) {
 
 /* --- Exit4 ---  (cross-function goto target) */
 static void Exit4(void) {
+_top: ;
   {  /* ADDQ.L	#4,26(A0) */
       uint32_t _ar = (uint32_t)(READ32(a0 + 26) + 4);
       hw_write32(a0 + 26, (uint32_t)_ar);
@@ -8025,6 +8193,7 @@ static void Exit4(void) {
 
 /* --- lbC00A47E --- */
 static void lbC00A47E(void) {
+_top: ;
   {  /* MOVE.L	(A1)+,D0 */
       uint32_t _mv = (uint32_t)(READ32_POST(a1));
       d0 = _mv;
@@ -8054,6 +8223,7 @@ static void lbC00A47E(void) {
 
 /* --- lbC00A492 --- */
 static void lbC00A492(void) {
+_top: ;
   {  /* MOVE.L	(A1)+,8(A0) */
       uint32_t _mv = (uint32_t)(READ32_POST(a1));
       hw_write32(a0 + 8, _mv);
@@ -8074,6 +8244,7 @@ static void lbC00A492(void) {
 
 /* --- lbC00A49E --- */
 static void lbC00A49E(void) {
+_top: ;
   {  /* MOVE.W	#1,16(A0) */
       uint16_t _mv = (uint16_t)(1);
       hw_write16(a0 + 16, _mv);
@@ -8108,6 +8279,7 @@ static void lbC00A49E(void) {
 
 /* --- lbC00A4B4 --- */
 static void lbC00A4B4(void) {
+_top: ;
   hw_write16(a0 + 8, 0);  /* CLR.W	8(A0) */
   lbC00A30C(); return;  /* BRA.L	lbC00A30C */
 }
@@ -8115,6 +8287,7 @@ static void lbC00A4B4(void) {
 
 /* --- lbC00A4BC --- */
 static void lbC00A4BC(void) {
+_top: ;
   hw_write16(a0 + 16, 0);  /* CLR.W	16(A0) */
   lbC00A30C(); return;  /* BRA.L	lbC00A30C */
 }
@@ -8122,6 +8295,7 @@ static void lbC00A4BC(void) {
 
 /* --- lbC00A4C4 --- */
 static void lbC00A4C4(void) {
+_top: ;
   {  /* CMPI.W	#6,(A0) */
       int32_t _lhs = (int32_t)(READ16(a0));
       int32_t _rhs = (int32_t)(6);
@@ -8154,6 +8328,7 @@ static void lbC00A4C4(void) {
 
 /* --- lbC00A4DC --- */
 static void lbC00A4DC(void) {
+_top: ;
   {  /* MOVE.W	D5,$DFF096 */
       uint16_t _mv = (uint16_t)(W(d5));
       paula_dma_write((uint16_t)(_mv));
@@ -8195,6 +8370,7 @@ static void lbC00A4DC(void) {
 
 /* --- lbC00A504 ---  (cross-function goto target) */
 static void lbC00A504(void) {
+_top: ;
   {  /* MOVE.W	D5,$DFF096 */
       uint16_t _mv = (uint16_t)(W(d5));
       paula_dma_write((uint16_t)(_mv));
@@ -8236,6 +8412,7 @@ static void lbC00A504(void) {
 
 /* --- lbC00A52C ---  (cross-function goto target) */
 static void lbC00A52C(void) {
+_top: ;
   {  /* MOVE.W	D5,$DFF096 */
       uint16_t _mv = (uint16_t)(W(d5));
       paula_dma_write((uint16_t)(_mv));
@@ -8277,6 +8454,7 @@ static void lbC00A52C(void) {
 
 /* --- lbC00A554 ---  (cross-function goto target) */
 static void lbC00A554(void) {
+_top: ;
   {  /* MOVE.W	D5,$DFF096 */
       uint16_t _mv = (uint16_t)(W(d5));
       paula_dma_write((uint16_t)(_mv));
@@ -8318,6 +8496,7 @@ static void lbC00A554(void) {
 
 /* --- lbC00A57C --- */
 static void lbC00A57C(void) {
+_top: ;
   {  /* MOVE.W	#1,66(A0) */
       uint16_t _mv = (uint16_t)(1);
       hw_write16(a0 + 66, _mv);
@@ -8331,6 +8510,7 @@ static void lbC00A57C(void) {
 
 /* --- lbC00A586 ---  (cross-function goto target) */
 static void lbC00A586(void) {
+_top: ;
   a1 = (uint32_t)((int32_t)a1 + (int32_t)(int16_t)(4));  /* ADDQ.L	#4,A1 */
   {  /* MOVE.L	30(A0),26(A0) */
       uint32_t _mv = (uint32_t)(READ32(a0 + 30));
