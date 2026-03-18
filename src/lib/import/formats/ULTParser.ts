@@ -28,6 +28,8 @@
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, ChannelData, TrackerCell, InstrumentConfig } from '@/types';
+import type { UADEVariablePatternLayout } from '@/engine/uade/UADEPatternEncoder';
+import { ultEncoder } from '@/engine/uade/encoders/ULTEncoder';
 import { createSamplerInstrument } from './AmigaUtils';
 
 // ── Binary helpers (little-endian throughout) ────────────────────────────────
