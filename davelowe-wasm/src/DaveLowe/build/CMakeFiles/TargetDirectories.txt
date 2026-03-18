@@ -1,0 +1,3 @@
+/Users/spot/Code/DEViLBOX/davelowe-wasm/src/DaveLowe/build/CMakeFiles/DaveLowe.dir
+/Users/spot/Code/DEViLBOX/davelowe-wasm/src/DaveLowe/build/CMakeFiles/edit_cache.dir
+/Users/spot/Code/DEViLBOX/davelowe-wasm/src/DaveLowe/build/CMakeFiles/rebuild_cache.dir

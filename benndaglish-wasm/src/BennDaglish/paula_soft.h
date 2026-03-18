@@ -23,6 +23,18 @@ void paula_reset(void);
 // Configure clock (call before render; default: PAL)
 void paula_set_clock(float paula_clock);
 
-// Render frames of F32 stereo interleaved audio at PAULA_RATE_PAL
-// Returns number of frames written
+// Set output sample rate (default: PAULA_RATE_PAL = 28150)
+void paula_set_output_rate(float rate);
+
+// Mixer: per-channel gain (0.0 = mute, 1.0 = unity). Applied on top of replayer volume.
+void paula_set_channel_gain(int ch, float gain);
+
+// Render frames of F32 stereo interleaved audio
 int paula_render(float* buffer, int frames);
+
+// Per-channel peak levels (0.0-1.0). Updated during paula_render().
+// Call paula_get_channel_levels() to read and reset peaks.
+void paula_get_channel_levels(float* out4);
+
+// Debug: dump channel state [dma, vol, step, pos, slen, hasPtr, hasNext, nextLen]
+void paula_debug_state(int ch, float* out8);

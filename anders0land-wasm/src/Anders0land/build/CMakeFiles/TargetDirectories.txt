@@ -1,0 +1,3 @@
+/Users/spot/Code/DEViLBOX/anders0land-wasm/src/Anders0land/build/CMakeFiles/Anders0land.dir
+/Users/spot/Code/DEViLBOX/anders0land-wasm/src/Anders0land/build/CMakeFiles/edit_cache.dir
+/Users/spot/Code/DEViLBOX/anders0land-wasm/src/Anders0land/build/CMakeFiles/rebuild_cache.dir
