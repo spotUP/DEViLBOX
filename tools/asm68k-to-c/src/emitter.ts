@@ -134,8 +134,22 @@ static inline void hw_write32(uint32_t addr, uint32_t val) {
 const C_IDENT = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
 // Sanitize 68k local labels (e.g. '.SetVoice') to valid C identifiers.
+const C_KEYWORDS = new Set([
+  'auto', 'break', 'case', 'char', 'const', 'continue', 'default', 'do',
+  'double', 'else', 'enum', 'extern', 'float', 'for', 'goto', 'if',
+  'int', 'long', 'register', 'return', 'short', 'signed', 'sizeof', 'static',
+  'struct', 'switch', 'typedef', 'union', 'unsigned', 'void', 'volatile', 'while',
+  // Common C library names that clash
+  'inline', 'restrict', 'asm', 'bool', 'true', 'false', 'NULL',
+]);
+
 function sanitizeLabel(name: string): string {
-  return name.startsWith('.') ? '_' + name.slice(1) : name;
+  let safe = name.startsWith('.') ? '_' + name.slice(1) : name;
+  // Escape C keywords by prefixing with underscore
+  if (C_KEYWORDS.has(safe)) safe = '_' + safe;
+  // Replace characters invalid in C identifiers
+  safe = safe.replace(/[^a-zA-Z0-9_]/g, '_');
+  return safe;
 }
 
 function emitData(node: DataNode, label: string | undefined, knownLabels: Set<string>): string {
@@ -934,6 +948,22 @@ export function emit(ast: AstNode[], resolved: ResolveResult, sourceFile?: strin
         } else {
           lines.push(`  ${c}${branchSuffix}${asmComment}`);
         }
+
+        // After RTS or tail-call (JMP/BRA that emits `return;`): close the current
+        // function so the next label starts a new function. This prevents EaglePlayer
+        // labels (InitPlayer, InitSound, etc.) from being emitted as goto labels
+        // inside a parent function.
+        const emittedReturn = c.includes('return;') || mn === 'RTS';
+        if (emittedReturn && inFunction) {
+          // Peek ahead: if the next meaningful node is a label, close this function
+          // so the label becomes a new function.
+          let peekIdx = i + 1;
+          while (peekIdx < ast.length && ast[peekIdx].kind === 'comment') peekIdx++;
+          if (peekIdx < ast.length && ast[peekIdx].kind === 'label') {
+            closeFunction();
+          }
+        }
+
         break;
       }
     }
