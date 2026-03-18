@@ -19,9 +19,11 @@ import { usePixiTheme } from '../../theme';
 import { PixiButton, PixiLabel, PixiKnob, PixiScrollView } from '../../components';
 import { ModuleRegistry } from '../../../engine/modular/ModuleRegistry';
 import { registerBuiltInModules } from '../../../engine/modular/modules';
+import { registerSunVoxModules } from '../../../engine/sunvox-modular/SunVoxModuleDescriptors';
 import type { ModularPatchConfig, ModularModuleInstance, ModularConnection, ModulePortDef, SignalType, PortRef, ModuleCategory } from '../../../types/modular';
 
 registerBuiltInModules();
+registerSunVoxModules();
 
 const STRIP_GAP = 4, PORT_R = 5, CELL = 22, HDR = 56;
 // Color-code: audio=green, CV=blue, gate=red, trigger=orange

@@ -958,7 +958,15 @@ export const PixiEditInstrumentModal: React.FC<PixiEditInstrumentModalProps> = (
                 height={CONTENT_H - TAB_BAR_H - PAD * 2}
               />
             )}
-            {activeTab === 'sound' && currentInstrument && currentInstrument.synthType !== 'ModularSynth' && (
+            {activeTab === 'sound' && currentInstrument && currentInstrument.synthType === 'SunVoxModular' && (
+              <PixiModularSynthEditor
+                config={currentInstrument.sunvoxModular || MODULAR_INIT_PATCH}
+                onChange={(patch) => { const inst = instRef.current; if (inst) updateInstrument(inst.id, { sunvoxModular: { ...patch, backend: 'sunvox' } }); }}
+                width={RIGHT_PANEL_W - PAD * 2}
+                height={CONTENT_H - TAB_BAR_H - PAD * 2}
+              />
+            )}
+            {activeTab === 'sound' && currentInstrument && currentInstrument.synthType !== 'ModularSynth' && currentInstrument.synthType !== 'SunVoxModular' && (
               isNativeWASMSynth(currentInstrument.synthType) && (SONG_ENGINE_SYNTH_TYPES.has(currentInstrument.synthType ?? '') || (!currentInstrument.sample?.url && !(currentInstrument.parameters as Record<string, unknown>)?.sampleUrl)) ? (
                 <NativeInstrumentPanel instrument={currentInstrument} onUpdate={updateInstrument} />
               ) : (
@@ -1124,6 +1132,7 @@ const SCControlsPanel: React.FC<{
 const NATIVE_WASM_SYNTH_TYPES = new Set([
   'HivelySynth', 'UADESynth', 'SymphonieSynth', 'MusicLineSynth',
   'JamCrackerSynth', 'FuturePlayerSynth', 'SonicArrangerSynth',
+  'InStereo2Synth',
   'SoundMonSynth', 'SidMonSynth', 'DigMugSynth', 'FCSynth', 'FredSynth',
   'TFMXSynth', 'OctaMEDSynth', 'SidMon1Synth', 'HippelCoSoSynth',
   'RobHubbardSynth', 'DavidWhittakerSynth', 'SunVoxSynth',
@@ -1132,6 +1141,7 @@ const NATIVE_WASM_SYNTH_TYPES = new Set([
 // Whole-song engine types — always show NativeInstrumentPanel even if sample data present
 const SONG_ENGINE_SYNTH_TYPES = new Set([
   'SymphonieSynth', 'UADESynth', 'MusicLineSynth', 'SonicArrangerSynth',
+  'InStereo2Synth',
   'SoundMonSynth', 'SidMonSynth', 'DigMugSynth', 'FCSynth', 'FredSynth',
   'TFMXSynth', 'OctaMEDSynth', 'SidMon1Synth', 'HippelCoSoSynth',
   'RobHubbardSynth', 'DavidWhittakerSynth', 'JamCrackerSynth',
