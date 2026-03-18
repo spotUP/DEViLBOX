@@ -475,6 +475,8 @@ export async function parseUADEFile(
     'scumm', // SCUMM — 68k compiled replayer, enhanced scan gives wrong audio
     'aps',   // AProSys — ADRVPACK-packed binary; scan produces garbage rows
     'sas',   // SonicArranger suffix-form compiled binary — scan crashes browser
+    'mso',   // Medley — enhanced scan crashes browser
+    'ml',    // Medley (alternate ext) — enhanced scan crashes browser
   ]);
   const SKIP_SCAN_PREFIXES = new Set(['dl', 'dl_deli', 'dln', 'rh',
     'sas',   // SonicArranger prefix-form — enhanced scan crashes browser
@@ -489,6 +491,7 @@ export async function parseUADEFile(
     'dns',   // Dynamic Synthesizer — compiled replayer (BRA code)
     'mk2', 'mkii', // MarkII — compiled 68k (MOVEM prolog); test file atron.mk2 confirmed
     'aps',   // AProSys — ADRVPACK-packed binary; scan produces garbage rows
+    'ash',   // AshleyHogg — compiled 68k replayer, enhanced scan crashes browser
   ]);
   // SKIP_SCAN formats are compiled/packed binaries where the Paula register scan either
   // hangs indefinitely or produces garbage rows. Skip scan regardless of mode.
@@ -974,6 +977,21 @@ export async function parseUADEFile(
     'scumm', // SCUMM — 68k compiled replayer (ManiacMansion music)
     'aps',   // AProSys — ADRVPACK-compressed format; enhanced scan reads garbage from packed binary
     'sas',   // SonicArranger suffix-form compiled binary — enhanced scan crashes browser
+    'mso',   // Medley — enhanced scan crashes browser; UADEEditableSynth handles audio
+    'ml',    // Medley (alternate ext) — same as mso
+    // Tier 4 compiled 68k replayer formats — enhanced scan produces beeps:
+    'gray',  // FredGray — compiled 68k replayer
+    'rho',   // RobHubbardST — compiled 68k replayer
+    'dln',   // DaveLoweNew — compiled 68k replayer
+    'jd',    // SpecialFX — compiled 68k replayer
+    'core',  // CoreDesign — compiled 68k replayer
+    'hot',   // AndersOland — compiled 68k replayer
+    'wb',    // WallyBeben — compiled 68k replayer
+    'dh',    // DavidHanney — compiled 68k replayer
+    'bd',    // BenDaglish — compiled 68k replayer
+    'bds',   // BenDaglish variant — compiled 68k replayer
+    'ex',    // FashionTracker — compiled 68k replayer
+    'sm',    // SoundMaster — compiled 68k replayer
   ]);
   if (mode === 'enhanced' && FORCE_CLASSIC_FORMATS.has(ext)) {
     console.log(`[UADEParser] ${ext.toUpperCase()} uses compiled replayer; forcing classic UADESynth streaming`);
@@ -993,6 +1011,20 @@ export async function parseUADEFile(
     'scumm', // SCUMM music — compiled replayer
     'dns',   // Dynamic Synthesizer — compiled replayer (BRA code)
     'mk2', 'mkii', // MarkII — compiled 68k replayer, MOVEM prolog
+    'ash',         // AshleyHogg — compiled 68k replayer, enhanced scan crashes browser
+    // Tier 4 compiled 68k replayer formats:
+    'gray',  // FredGray
+    'rho',   // RobHubbardST
+    'dln',   // DaveLoweNew
+    'jd',    // SpecialFX
+    'core',  // CoreDesign
+    'hot',   // AndersOland
+    'wb',    // WallyBeben
+    'dh',    // DavidHanney
+    'bd',    // BenDaglish
+    'bds',   // BenDaglish variant
+    'ex',    // FashionTracker
+    'sm',    // SoundMaster
   ]);
   if (mode === 'enhanced' && FORCE_CLASSIC_PREFIXES.has(prefix)) {
     console.log(`[UADEParser] ${prefix.toUpperCase()} uses prefix form; forcing classic UADESynth streaming`);

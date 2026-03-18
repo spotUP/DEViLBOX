@@ -16,18 +16,36 @@ import { useFormatStore } from './useFormatStore';
 // This is essential for WASM synth engines (FC, TFMX, etc.) whose audio
 // bypasses per-channel Tone.Channel nodes and routes through synthBus.
 function forwardReplayerMuteMask(channels: MixerChannelState[], isSoloing: boolean): void {
+  let mask = 0;
+  for (let i = 0; i < Math.min(channels.length, 16); i++) {
+    const effectiveMute = isSoloing ? !channels[i].soloed : channels[i].muted;
+    if (!effectiveMute) mask |= (1 << i);
+  }
   try {
-    // Lazy import to avoid circular deps
+    // Forward to TrackerReplayer (affects ToneEngine note triggering)
     const { getTrackerReplayer } = require('../engine/TrackerReplayer');
     const replayer = getTrackerReplayer();
-    let mask = 0;
-    for (let i = 0; i < Math.min(channels.length, 16); i++) {
-      const effectiveMute = isSoloing ? !channels[i].soloed : channels[i].muted;
-      if (!effectiveMute) mask |= (1 << i);
-    }
     replayer.setChannelMuteMask(mask);
   } catch {
     // Replayer not initialized yet
+  }
+  try {
+    // Forward to UADE engine if active (uses Paula hardware mute mask)
+    const { UADEEngine } = require('../engine/uade/UADEEngine');
+    if (UADEEngine.hasInstance()) {
+      UADEEngine.getInstance().setMuteMask(mask & 0x0F);
+    }
+  } catch {
+    // UADE not active
+  }
+  try {
+    // Forward to libopenmpt engine if active (DigiBooster, Symphonie, etc.)
+    const { LibopenmptEngine } = require('../engine/libopenmpt/LibopenmptEngine');
+    if (LibopenmptEngine.hasInstance()) {
+      LibopenmptEngine.getInstance().setMuteMask(mask);
+    }
+  } catch {
+    // LibopenmptEngine not active
   }
 }
 
@@ -90,6 +108,9 @@ export function getActiveGainEngine(): { setChannelGain(ch: number, gain: number
     } else if (fmt.artOfNoiseFileData) {
       const { ArtOfNoiseEngine } = require('../engine/artofnoise/ArtOfNoiseEngine');
       if (ArtOfNoiseEngine.hasInstance()) return ArtOfNoiseEngine.getInstance();
+    } else if (fmt.startrekkerAMFileData) {
+      const { StartrekkerAMEngine } = require('../engine/startrekker-am/StartrekkerAMEngine');
+      if (StartrekkerAMEngine.hasInstance()) return StartrekkerAMEngine.getInstance();
     }
   } catch {
     // Engine not ready

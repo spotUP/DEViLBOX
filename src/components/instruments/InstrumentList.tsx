@@ -158,14 +158,48 @@ export const InstrumentList: React.FC<InstrumentListProps> = memo(({
       // Ensure WASM synths are initialized before triggering
       await engine.ensureInstrumentReady(inst);
 
-      // SA synths now use FT2-style octave convention: SA period 428 = XM 49 = C4.
-      const isModSample = inst.metadata?.modPlayback?.usePeriodPlayback;
+      // For sample instruments, always use the baseNote for natural-pitch preview.
+      // Check both metadata.modPlayback and top-level modPlayback (OpenMPT puts it at top level).
+      const isModSample = inst.metadata?.modPlayback?.usePeriodPlayback
+        || (inst as any).modPlayback?.usePeriodPlayback;
+      const isSampleInst = inst.type === 'sample' || inst.synthType === 'Sampler' || inst.synthType === 'Player';
       const isBass = inst.synthType === 'TB303' || inst.name.toLowerCase().includes('bass');
-      const previewNote = isModSample
-        ? (inst.sample?.baseNote || 'C3')   // Natural pitch: playbackRate = 1.0
-        : (isBass ? 'C3' : 'C4');
+      const previewNote = (isSampleInst && inst.sample?.baseNote)
+        ? inst.sample.baseNote                // Always use the sample's natural pitch
+        : isModSample
+          ? (inst.sample?.baseNote || 'C3')
+          : (isBass ? 'C3' : 'C4');
 
       const now = Tone.now();
+
+      // Check if ToneEngine can create a playable instrument for this synth type.
+      // WASM-only types return null; empty Samplers (no sample data) can't produce sound.
+      // In both cases, fall back to a temporary oscillator for preview.
+      const toneInst = engine.getInstrument(inst.id, inst);
+      const isEmptySampler = toneInst && inst.synthType === 'Sampler' && !inst.sample?.url && !inst.sample?.audioBuffer;
+      const isUADESynth = inst.synthType === 'UADESynth';
+      if (!toneInst || isEmptySampler || isUADESynth) {
+        // Fallback: play a short oscillator tone for WASM-only instruments
+        const wfMap: Record<string, OscillatorType> = {
+          StartrekkerAMSynth: 'sine',
+          C64SID: 'square',
+          Sc68Synth: 'square',
+          UADESynth: 'triangle',
+          Sampler: 'triangle',  // empty Sampler fallback
+        };
+        const wf = wfMap[inst.synthType ?? ''] ?? 'triangle';
+        const osc = new Tone.Oscillator(Tone.Frequency(previewNote).toFrequency(), wf).toDestination();
+        const env = new Tone.AmplitudeEnvelope({ attack: 0.01, decay: 0.2, sustain: 0.3, release: 0.1 }).toDestination();
+        osc.connect(env);
+        osc.start(now);
+        env.triggerAttack(now);
+        previewTimeoutRef.current = window.setTimeout(() => {
+          env.triggerRelease(Tone.now());
+          setTimeout(() => { osc.stop(); osc.dispose(); env.dispose(); }, 200);
+        }, 400);
+        return;
+      }
+
       engine.triggerNoteAttack(inst.id, previewNote, now, 0.8, inst);
 
       // Samples play through immediately — 300ms is plenty.

@@ -123,6 +123,7 @@ export interface SoundMonConfig {
   vibratoSpeed: number;      // 0-63
   vibratoDepth: number;      // 0-63
   portamentoSpeed: number;   // 0-63 (0 = disabled)
+  wavePCM?: number[];        // Signed 8-bit PCM of the synth waveform (64 bytes)
   // PCM fields (type === 'pcm')
   pcmData?: Uint8Array;      // Raw 8-bit signed PCM
   loopStart?: number;        // Loop start in samples
@@ -198,6 +199,7 @@ export interface FCConfig {
   vibSpeed: number;          // 0-63
   vibDepth: number;          // 0-63
   arpTable: number[];        // 16 entries: semitone offsets
+  wavePCM?: number[];        // Signed 8-bit PCM of the initial waveform (32-64 bytes)
 }
 
 /**
@@ -393,6 +395,27 @@ export interface DavidWhittakerConfig {
   vibratoDepth?: number;
   volseq?: number[];
   frqseq?: number[];
+}
+
+/**
+ * StarTrekker AM synthesis configuration.
+ * 5-phase ADSR envelope + vibrato + waveform selection.
+ * Derived from the NT companion file (120-byte instrument blocks).
+ */
+export interface StartrekkerAMConfig {
+  waveform: number;         // 0=sine, 1=sawtooth, 2=square, 3=noise
+  basePeriod: number;       // NT[6]: initial amplitude (0-65535)
+  attackTarget: number;     // NT[8]: phase 1 target (signed 16-bit)
+  attackRate: number;       // NT[10]: phase 1 rate (signed 16-bit)
+  attack2Target: number;    // NT[12]: phase 2 target (signed 16-bit)
+  attack2Rate: number;      // NT[14]: phase 2 rate (signed 16-bit)
+  decayTarget: number;      // NT[16]: phase 3 target (signed 16-bit)
+  decayRate: number;        // NT[18]: phase 3 rate (signed 16-bit)
+  sustainCount: number;     // NT[20]: sustain duration in ticks
+  releaseRate: number;      // NT[24]: release rate (signed 16-bit)
+  vibFreqStep: number;      // NT[28]: vibrato frequency step
+  vibAmplitude: number;     // NT[30]: vibrato amplitude (signed 16-bit)
+  periodShift: number;      // NT[34]: period left-shift amount (0-15)
 }
 
 /**
