@@ -132,6 +132,11 @@ function isSonicArrangerType(synthType: SynthType): boolean {
   return synthType === 'SonicArrangerSynth';
 }
 
+/** Check if synth type is InStereo! 2.0 */
+function isInStereo2Type(synthType: SynthType): boolean {
+  return synthType === 'InStereo2Synth';
+}
+
 /** Get the editor mode for a synth type */
 function getEditorMode(synthType: SynthType): EditorMode {
   if (synthType === 'TB303' || synthType === 'Buzz3o3') return 'tb303';
@@ -153,6 +158,7 @@ function getEditorMode(synthType: SynthType): EditorMode {
   if (isSidMonType(synthType)) return 'sidmon';
   if (isDigMugType(synthType)) return 'digmug';
   if (isSonicArrangerType(synthType)) return 'sonic-arranger';
+  if (isInStereo2Type(synthType)) return 'instereo2';
   if (isFCType(synthType)) return 'fc';
   if (isDeltaMusic1Type(synthType)) return 'deltamusic1';
   if (isDeltaMusic2Type(synthType)) return 'deltamusic2';
@@ -165,6 +171,7 @@ function getEditorMode(synthType: SynthType): EditorMode {
   if (synthType === 'DavidWhittakerSynth') return 'davidwhittaker';
   if (synthType === 'HarmonicSynth') return 'harmonicsynth';
   if (synthType === 'ModularSynth') return 'modular';
+  if (synthType === 'SunVoxModular') return 'sunvox-modular';
   if (synthType === 'WAM') return 'wam';
   if (synthType === 'TonewheelOrgan') return 'tonewheelOrgan';
   if (synthType === 'Melodica') return 'melodica';
