@@ -201,6 +201,50 @@ See `docs/MCP_DEBUGGING_GUIDE.md` for complete tool reference, debugging workflo
 
 ---
 
+## Format Status Tracker — localhost:4444
+
+A live dashboard tracking format audit results. Server at `tools/format-server.ts`, dashboard at `tools/format-status.html`. State persisted to `tools/format-state.json`.
+
+**Start:** `npx tsx tools/format-server.ts &` — serves on port 4444.
+
+### Pushing Updates (live — browsers update instantly via SSE)
+
+```bash
+# Single entry
+curl -X POST http://localhost:4444/update \
+  -H 'Content-Type: application/json' \
+  -d '{"format":"fur-gameboy-cheap","auditStatus":"fixed","envCorr":0.993,"notes":"17/17 pass"}'
+
+# Bulk (preferred for batch operations)
+curl -X POST http://localhost:4444/push-updates \
+  -H 'Content-Type: application/json' \
+  -d '{"fur-gameboy-cheap":{"auditStatus":"fixed","envCorr":0.993,"notes":"17/17 pass"}}'
+```
+
+### Key Convention
+
+Audit entries: `fur-<chip>-<songname>` (e.g. `fur-gameboy-cheap`, `fur-nes-thecheetahmen`).
+New keys auto-create rows in the dashboard — no HTML changes needed.
+
+### Audit Data Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `auditStatus` | `"fixed"\|"fail"\|"unknown"` | Overall audit result |
+| `envCorr` | `number` (0-1) | Envelope correlation vs reference (>=0.90 = PASS) |
+| `rmsDbDiff` | `number` | RMS difference in dB |
+| `notes` | `string` | Free-text (e.g. "17/17 pass", "9 silent instruments") |
+
+### SSE Events (live push to browsers)
+
+- `event: update` — from `POST /update`
+- `event: bulk-update` — from `POST /push-updates`
+- `event: connected` — sent on SSE connect
+
+Full docs: `docs/FORMAT_STATUS_TRACKER.md`
+
+---
+
 ## CRITICAL: Knob/Control Handling Pattern
 
 **!!! ALWAYS USE THIS PATTERN FOR CONTROLS !!!**
