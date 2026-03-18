@@ -75,7 +75,8 @@ const ORDER_END         = 0xFF;
 const ORDER_RESTART     = 0xFE;
 
 // Alternating L/R panning per channel (mirrors OpenMPT's 0x30/0xD0 pattern)
-const CHANNEL_PAN = [-60, 60, 60, -60, -60, 60, 60, -60] as const;
+// OpenMPT: ChnSettings[chn].nPan = (chn & 1) ? 0xD0 : 0x30  →  LRLRLRLR pattern
+const CHANNEL_PAN = [-60, 60, -60, 60, -60, 60, -60, 60] as const;
 
 const EFF_PORTA_UP      = 0x01;
 const EFF_PORTA_DOWN    = 0x02;
