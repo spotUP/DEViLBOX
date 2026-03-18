@@ -384,7 +384,7 @@ const WASM_ENGINES: NativeEngineDescriptor[] = [
 
 /** Synth types routed through the stereo separation chain */
 const ROUTABLE_SYNTH_TYPES = new Set(
-  ['UADESynth', ...WASM_ENGINES.map(e => e.synthType)]
+  ['UADESynth', 'SunVoxSynth', 'SunVoxModular', ...WASM_ENGINES.map(e => e.synthType)]
 );
 
 // ---------------------------------------------------------------------------
@@ -610,7 +610,7 @@ export async function startNativeEngines(
   // sequencer, so TrackerReplayer must not drive individual note-on/off calls.
   if (!muted) {
     const sunvoxSongInsts = song.instruments.filter(
-      i => i.synthType === 'SunVoxSynth' && i.sunvox?.isSong === true,
+      i => (i.synthType === 'SunVoxSynth' || i.synthType === 'SunVoxModular') && i.sunvox?.isSong === true,
     );
     if (sunvoxSongInsts.length > 0) {
       suppressNotes = true;
@@ -700,7 +700,7 @@ export function stopNativeEngines(
   if (song) {
     const toneEngine = getToneEngine();
     const sunvoxSongInsts = song.instruments.filter(
-      i => i.synthType === 'SunVoxSynth' && i.sunvox?.isSong === true,
+      i => (i.synthType === 'SunVoxSynth' || i.synthType === 'SunVoxModular') && i.sunvox?.isSong === true,
     );
     for (const inst of sunvoxSongInsts) {
       try {
