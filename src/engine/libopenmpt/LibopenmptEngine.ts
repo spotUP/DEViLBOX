@@ -207,6 +207,18 @@ export class LibopenmptEngine {
     this.workletNode.port.postMessage({ cmd: 'unpause' });
   }
 
+  /** Hot-reload module data without restarting playback. Preserves position. */
+  hotReload(data: ArrayBuffer): void {
+    if (!this.workletNode) return;
+    this.workletNode.port.postMessage({ cmd: 'hotReload', val: data });
+  }
+
+  /** Set channel mute mask (bit N=1 means channel N is ACTIVE). */
+  setMuteMask(mask: number): void {
+    if (!this.workletNode) return;
+    this.workletNode.port.postMessage({ cmd: 'setMuteMask', val: mask });
+  }
+
   /** Seek to a specific order and row. */
   seekTo(order: number, row: number): void {
     if (!this.workletNode) return;

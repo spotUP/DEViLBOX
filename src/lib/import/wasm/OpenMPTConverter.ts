@@ -358,6 +358,14 @@ export async function parseWithOpenMPT(
           finetune: 0,
           relativeNote: 0,
         },
+        metadata: {
+          modPlayback: {
+            usePeriodPlayback: format === 'MOD',
+            periodMultiplier: 3546895,
+            finetune: 0,
+            defaultVolume: 64,
+          },
+        },
       } as InstrumentConfig);
     }
 
