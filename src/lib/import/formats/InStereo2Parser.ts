@@ -404,7 +404,9 @@ export function parseInStereo2File(bytes: Uint8Array, filename: string): Tracker
   // For the TrackerSong, we map sample instrNums to IDs 1..N and synth to N+1..
 
   const PAL_C3_RATE = Math.round(PAL_CLOCK / (2 * 214));  // ~8287 Hz
-  const SYNTH_RATE  = Math.round(PAL_CLOCK / (2 * 856));  // ~2072 Hz
+  // Synth rate: calculated per-instrument based on waveform length so that
+  // the fundamental matches C3 (130.8 Hz) at baseNote for correct preview pitch.
+  const C3_FREQ = 130.81;  // Hz
 
   // Build sample instruments (IDs 1..numberOfSamples)
   const instrConfigs: InstrumentConfig[] = [];
@@ -462,8 +464,10 @@ export function parseInStereo2File(bytes: Uint8Array, filename: string): Tracker
     for (let j = 0; j < playLen; j++) {
       pcmUint8[j] = wave[j % 256] & 0xff;
     }
+    // Rate = C3_FREQ * waveformLength so one loop cycle = one period of C3
+    const synthRate = Math.round(C3_FREQ * playLen);
     instrConfigs.push({
-      ...createSamplerInstrument(id, instr.name || `Synth ${i}`, pcmUint8, instr.volume, SYNTH_RATE, 0, playLen),
+      ...createSamplerInstrument(id, instr.name || `Synth ${i}`, pcmUint8, instr.volume, synthRate, 0, playLen),
       uadeChipRam: syntChipRam,
     });
   }
@@ -627,6 +631,7 @@ export function parseInStereo2File(bytes: Uint8Array, filename: string): Tracker
     initialSpeed: Math.max(1, song.startSpeed),
     initialBPM: tempo,
     linearPeriods: false,
+    noteExportOffset: 36,
     uadePatternLayout,
   };
 }
