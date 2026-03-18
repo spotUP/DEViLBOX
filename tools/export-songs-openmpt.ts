@@ -1294,6 +1294,11 @@ const TEST_CASES: TestCase[] = [
   { file: 'formats/cannonfodder.tcb', format: 'TCB', parserModule: 'TCBTrackerParser', parseFn: 'parseTCBTrackerFile', isAsync: true },
   { file: 'formats/doxtro3.dss', format: 'DSS', parserModule: 'DigitalSoundStudioParser', parseFn: 'parseDigitalSoundStudioFile', isAsync: false, args: 'bytes', noteExportOffset: 36 },
   { file: 'formats/baseheads.ma', format: 'MA', parserModule: 'MusicAssemblerParser', parseFn: 'parseMusicAssemblerFile', isAsync: false, args: 'bytes', noteExportOffset: 36 },
+
+  // === Previously missing formats (added from user) ===
+  { file: "formats/breakin's chipsong.gdm", format: 'GDM', parserModule: 'GDMParser', parseFn: 'parseGDMFile', isAsync: true, exportAs: 'xm', xmRelNoteOffset: -12 },
+  { file: 'formats/Epic Pinball - Song 0 - Title.psm', format: 'PSM', parserModule: 'PSMParser', parseFn: 'parsePSMFile', isAsync: false, args: 'bytes', exportAs: 'xm', xmRelNoteOffset: -12 },
+  { file: 'formats/harmonic disorder.ml', format: 'ML', parserModule: 'MusicLineParser', parseFn: 'parseMusicLineFile', isAsync: false, args: 'bytes', noteExportOffset: 36 },
 ];
 
 // ============================================================================
