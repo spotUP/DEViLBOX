@@ -79,6 +79,8 @@ export const ModularCanvasView: React.FC<ModularCanvasViewProps> = ({ config, on
         camera: newCamera,
       });
     }
+    // Recalculate port positions so patch cables follow modules after pan/zoom
+    recalculateAll();
   }, [cameraState]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Helper to convert screen-space container coords to world coords for cables
