@@ -633,6 +633,7 @@ static void _anon1(void) {
 
 /* --- GetPosition --- */
 static void GetPosition(void) {
+_top: ;
   {  /* MOVE.L	Base(PC),A0 */
       uint32_t _mv = (uint32_t)(READ32((uintptr_t)Base));
       a0 = _mv;
@@ -663,6 +664,7 @@ static void GetPosition(void) {
 
 /* --- SetVolume --- */
 static void SetVolume(void) {
+_top: ;
 SetBalance:
   {  /* MOVE.W	dtg_SndLBal(A5),D0 */
       uint16_t _mv = (uint16_t)(READ16(a5 + (intptr_t)dtg_SndLBal));
@@ -716,6 +718,7 @@ SetNew:
 
 /* --- ChangeVolume --- */
 static void ChangeVolume(void) {
+_top: ;
   {  /* CMPA.L	#$DFF0A0,A2 */
       int32_t _lhs = (int32_t)(a2);
       int32_t _rhs = (int32_t)(0xDFF0A0);
@@ -833,6 +836,7 @@ SetIt:
 
 /* --- SetVol --- */
 static void SetVol(void) {
+_top: ;
   {  /* MOVE.L	A0,-(A7) */
       uint32_t _mv = (uint32_t)(a0);
       WRITE32_PRE(a7, _mv);
@@ -893,6 +897,7 @@ _SetVoice:
 
 /* --- SetTwo --- */
 static void SetTwo(void) {
+_top: ;
   {  /* MOVE.L	A1,-(A7) */
       uint32_t _mv = (uint32_t)(a1);
       WRITE32_PRE(a7, _mv);
@@ -960,6 +965,7 @@ _SetVoice:
 
 /* --- SetPer --- */
 static void SetPer(void) {
+_top: ;
   WRITE32_PRE(sp, a1);  /* MOVEM.L	A0,A1,-(A7) */
     WRITE32_PRE(sp, a0);
   a0 = (uint32_t)(uintptr_t)StructAdr+UPS_Voice1Per;  /* LEA	StructAdr+UPS_Voice1Per(PC),A0 */
@@ -1014,6 +1020,7 @@ _SetVoice:
 
 /* --- SetVoices --- */
 static void SetVoices(void) {
+_top: ;
   a0 = (uint32_t)(uintptr_t)Voice1;  /* LEA	Voice1(PC),A0 */
   a1 = (uint32_t)(uintptr_t)StructAdr;  /* LEA	StructAdr(PC),A1 */
   d1 = (uint32_t)(int32_t)(int8_t)(1);  /* MOVEQ	#1,D1 */
@@ -1087,6 +1094,7 @@ No_Voice4:
 
 /* --- StructInit --- */
 static void StructInit(void) {
+_top: ;
   a0 = (uint32_t)(uintptr_t)StructAdr;  /* LEA	StructAdr(PC),A0 */
   return;  /* RTS */
 }
@@ -1097,6 +1105,7 @@ static void StructInit(void) {
 
 /* --- SampleInit --- */
 static void SampleInit(void) {
+_top: ;
   d7 = (uint32_t)(int32_t)(int8_t)(EPR_NotEnoughMem);  /* MOVEQ	#EPR_NotEnoughMem,D7 */
   a3 = (uint32_t)(a5 + (intptr_t)EPG_SampleInfoStructure);  /* LEA	EPG_SampleInfoStructure(A5),A3 */
   {  /* MOVE.L	SmpIn1SmpInfo(PC),D2 */
@@ -1146,6 +1155,7 @@ static void SampleInit(void) {
 
 /* --- l1 --- */
 static void l1(void) {
+_top: ;
   { uintptr_t _jt=(uintptr_t)(READ32(a5 + (intptr_t)ENPP_AllocSampleStruct)); if(_jt) ((void(*)(void))_jt)(); }  /* JSR	ENPP_AllocSampleStruct(A5) */
   {  /* MOVE.L	D0,(A3) */
       uint32_t _mv = (uint32_t)(d0);
@@ -1319,18 +1329,20 @@ NoName:
       flag_n = (_cmp < 0);
       flag_c = ((uint32_t)_lhs < (uint32_t)_rhs);
     }
-  if (!flag_z) goto l1;  /* not equal / nonzero */  /* BNE.B	l1 */
+  if (!flag_z) goto _top;  /* not equal / nonzero */  /* BNE.B	l1 */
 }
 
 
 /* --- Skip ---  (cross-function goto target) */
 static void Skip(void) {
+_top: ;
   d7 = (uint32_t)(int32_t)(int8_t)(0);  /* MOVEQ	#0,D7 */
 }
 
 
 /* --- _return ---  (cross-function goto target) */
 static void _return(void) {
+_top: ;
   {  /* MOVE.L	D7,D0 */
       uint32_t _mv = (uint32_t)(d7);
       d0 = _mv;
@@ -1347,6 +1359,7 @@ static void _return(void) {
 
 /* --- Check2 --- */
 static void Check2(void) {
+_top: ;
   a0 = READ32(a5 + (intptr_t)dtg_ChkData);  /* MOVEA.L	dtg_ChkData(A5),A0 */
   d0 = (uint32_t)(int32_t)(int8_t)(-1);  /* MOVEQ	#-1,D0 */
   {  /* CMP.W	#$6000,(A0)+ */
@@ -1456,6 +1469,7 @@ fail:
 
 /* --- GetInfos --- */
 static void GetInfos(void) {
+_top: ;
   a0 = (uint32_t)(uintptr_t)InfoBuffer;  /* LEA	InfoBuffer(PC),A0 */
   return;  /* RTS */
 }
@@ -1466,6 +1480,7 @@ static void GetInfos(void) {
 
 /* --- SubSongRange --- */
 static void SubSongRange(void) {
+_top: ;
   d0 = (uint32_t)(int32_t)(int8_t)(0);  /* MOVEQ	#0,D0 */
   {  /* MOVE.L	InfoBuffer+SubSongs(PC),D1 */
       uint32_t _mv = (uint32_t)(READ32((uintptr_t)InfoBuffer+SubSongs));
@@ -1489,6 +1504,7 @@ static void SubSongRange(void) {
 
 /* --- InitPlayer --- */
 void InitPlayer(void) {
+_top: ;
   d0 = (uint32_t)(int32_t)(int8_t)(0);  /* MOVEQ	#0,D0 */
   a0 = READ32(a5 + (intptr_t)dtg_GetListData);  /* MOVEA.L	dtg_GetListData(A5),A0 */
   { uintptr_t _jt=(uintptr_t)(a0); if(_jt) ((void(*)(void))_jt)(); }  /* JSR	(A0) */
@@ -1523,6 +1539,7 @@ void InitPlayer(void) {
 
 /* --- _l6 ---  (cross-function goto target) */
 static void _l6(void) {
+_top: ;
   {  /* CMP.L	#$D040D040,(A0) */
       int32_t _lhs = (int32_t)(READ32(a0));
       int32_t _rhs = (int32_t)(0xD040D040);
@@ -1533,13 +1550,14 @@ static void _l6(void) {
     }
   if (flag_z) { _ok4(); return; }  /* equal / zero */  /* BEQ.B	.ok4 */
   a0 = (uint32_t)((int32_t)a0 + (int32_t)(int16_t)(2));  /* ADDQ.L	#2,A0 */
-  if ((int16_t)(--W(d0)) >= 0) { _l6(); return; }  /* DBF	D0,.l6 */
+  if ((int16_t)(--W(d0)) >= 0) goto _top;  /* DBF	D0,.l6 */
   _error(); return;  /* BRA.W	.error */
 }
 
 
 /* --- _ok4 ---  (cross-function goto target) */
 static void _ok4(void) {
+_top: ;
   a0 = (uint32_t)((int32_t)a0 + (int32_t)(int16_t)(4));  /* ADDQ.L	#4,A0 */
   {  /* CMP.W	#$D040,(A0) */
       int32_t _lhs = (int32_t)(READ16(a0));
@@ -1574,12 +1592,14 @@ static void _ok4(void) {
 
 /* --- _l7 ---  (cross-function goto target) */
 static void _l7(void) {
+_top: ;
   d2 = (uint32_t)(int32_t)(int8_t)(3);  /* MOVEQ	#3,D2 */
 }
 
 
 /* --- _l8 ---  (cross-function goto target) */
 static void _l8(void) {
+_top: ;
   {  /* MOVE.W	(A1)+,D0 */
       uint16_t _mv = (uint16_t)(READ16_POST(a1));
       W(d0) = (uint16_t)_mv;
@@ -1595,7 +1615,7 @@ static void _l8(void) {
       flag_c = 0; flag_v = 0;
     }
   if (!flag_z) { _not_subsong(); return; }  /* not equal / nonzero */  /* BNE.B	.not_subsong */
-  if ((int16_t)(--W(d2)) >= 0) { _l8(); return; }  /* DBF	D2,.l8 */
+  if ((int16_t)(--W(d2)) >= 0) goto _top;  /* DBF	D2,.l8 */
   {  /* ADDQ.L	#1,D1 */
       uint32_t _ar = (uint32_t)(d1 + 1);
       d1 = (uint32_t)_ar;
@@ -1608,6 +1628,7 @@ static void _l8(void) {
 
 /* --- _not_subsong ---  (cross-function goto target) */
 static void _not_subsong(void) {
+_top: ;
   {  /* SUBQ.L	#1,D1 */
       uint32_t _sr = (uint32_t)(d1 - 1);
       d1 = (uint32_t)_sr;
@@ -1621,6 +1642,7 @@ static void _not_subsong(void) {
 
 /* --- _ok5 ---  (cross-function goto target) */
 static void _ok5(void) {
+_top: ;
   {  /* ADDQ.L	#1,D1 */
       uint32_t _ar = (uint32_t)(d1 + 1);
       d1 = (uint32_t)_ar;
@@ -1640,6 +1662,7 @@ static void _ok5(void) {
 
 /* --- _l9 ---  (cross-function goto target) */
 static void _l9(void) {
+_top: ;
   {  /* CMP.W	#$41FA,(A0)+ */
       int32_t _lhs = (int32_t)(READ16_POST(a0));
       int32_t _rhs = (int32_t)(0x41FA);
@@ -1649,13 +1672,14 @@ static void _l9(void) {
       flag_c = ((uint32_t)_lhs < (uint32_t)_rhs);
     }
   if (flag_z) { _ok6(); return; }  /* equal / zero */  /* BEQ.B	.ok6 */
-  if ((int16_t)(--W(d0)) >= 0) { _l9(); return; }  /* DBF	D0,.l9 */
+  if ((int16_t)(--W(d0)) >= 0) goto _top;  /* DBF	D0,.l9 */
   _error(); return;  /* BRA.W	.error */
 }
 
 
 /* --- _ok6 ---  (cross-function goto target) */
 static void _ok6(void) {
+_top: ;
   {  /* MOVE.L	A0,A1 */
       uint32_t _mv = (uint32_t)(a0);
       a1 = _mv;
@@ -1679,6 +1703,7 @@ static void _ok6(void) {
 
 /* --- _l10 ---  (cross-function goto target) */
 static void _l10(void) {
+_top: ;
   {  /* CMP.L	#$D040D040,(A0) */
       int32_t _lhs = (int32_t)(READ32(a0));
       int32_t _rhs = (int32_t)(0xD040D040);
@@ -1689,13 +1714,14 @@ static void _l10(void) {
     }
   if (flag_z) { _ok7(); return; }  /* equal / zero */  /* BEQ.B	.ok7 */
   a0 = (uint32_t)((int32_t)a0 + (int32_t)(int16_t)(2));  /* ADDQ.L	#2,A0 */
-  if ((int16_t)(--W(d0)) >= 0) { _l10(); return; }  /* DBF	D0,.l10 */
+  if ((int16_t)(--W(d0)) >= 0) goto _top;  /* DBF	D0,.l10 */
   _ok7a(); return;  /* BRA.B	.ok7a */
 }
 
 
 /* --- _ok7 ---  (cross-function goto target) */
 static void _ok7(void) {
+_top: ;
   a0 = (uint32_t)((int32_t)a0 + (int32_t)(int16_t)(4));  /* ADDQ.L	#4,A0 */
   {  /* CMP.W	#$41FA,(A0) */
       int32_t _lhs = (int32_t)(READ16(a0));
@@ -1729,12 +1755,14 @@ static void _ok7(void) {
 
 /* --- _ok7a ---  (cross-function goto target) */
 static void _ok7a(void) {
+_top: ;
   a0 = (uint32_t)((int32_t)a0 - (int32_t)(int16_t)(a0));  /* SUB.L	A0,A0 */
 }
 
 
 /* --- _ok8 ---  (cross-function goto target) */
 static void _ok8(void) {
+_top: ;
   {  /* MOVE.L	A0,(A6)+ */
       uint32_t _mv = (uint32_t)(a0);
       WRITE32_POST(a6, _mv);
@@ -1754,6 +1782,7 @@ static void _ok8(void) {
 
 /* --- _com1 ---  (cross-function goto target) */
 static void _com1(void) {
+_top: ;
   {  /* MOVE.L	(A0)+,D0 */
       uint32_t _mv = (uint32_t)(READ32_POST(a0));
       d0 = _mv;
@@ -1769,13 +1798,14 @@ static void _com1(void) {
       flag_n = ((int16_t)(_tst) < 0);
       flag_c = 0; flag_v = 0;
     }
-  if (flag_z) { _com1(); return; }  /* equal / zero */  /* BEQ.B	.com1 */
+  if (flag_z) goto _top;  /* equal / zero */  /* BEQ.B	.com1 */
   a0 = (uint32_t)((int32_t)a0 - (int32_t)(int16_t)(4));  /* SUBQ.L	#4,A0 */
 }
 
 
 /* --- _ok9 ---  (cross-function goto target) */
 static void _ok9(void) {
+_top: ;
   a0 = (uint32_t)((int32_t)a0 - (int32_t)(int16_t)(8));  /* SUBQ.L	#8,A0 */
   {  /* MOVE.L	A0,D0 */
       uint32_t _mv = (uint32_t)(a0);
@@ -1825,6 +1855,7 @@ static void _ok9(void) {
 
 /* --- _com2 ---  (cross-function goto target) */
 static void _com2(void) {
+_top: ;
   {  /* MOVE.L	(A0)+,D0 */
       uint32_t _mv = (uint32_t)(READ32_POST(a0));
       d0 = _mv;
@@ -1840,13 +1871,14 @@ static void _com2(void) {
       flag_n = ((int16_t)(_tst) < 0);
       flag_c = 0; flag_v = 0;
     }
-  if (flag_z) { _com2(); return; }  /* equal / zero */  /* BEQ.B	.com2 */
+  if (flag_z) goto _top;  /* equal / zero */  /* BEQ.B	.com2 */
   a0 = (uint32_t)((int32_t)a0 + (int32_t)(int16_t)(4));  /* ADDQ.L	#4,A0 */
 }
 
 
 /* --- _ok10 ---  (cross-function goto target) */
 static void _ok10(void) {
+_top: ;
   a0 = (uint32_t)((int32_t)a0 - (int32_t)(int16_t)(8));  /* SUBQ.L	#8,A0 */
   {  /* MOVE.L	A0,D0 */
       uint32_t _mv = (uint32_t)(a0);
@@ -1867,6 +1899,7 @@ static void _ok10(void) {
 
 /* --- _one_smp_info ---  (cross-function goto target) */
 static void _one_smp_info(void) {
+_top: ;
   {  /* ADD.L	D0,Samples(A4) */
       uint32_t _ar = (uint32_t)(READ32(a4 + (intptr_t)Samples) + d0);
       hw_write32(a4 + (intptr_t)Samples, (uint32_t)_ar);
@@ -1925,6 +1958,7 @@ static void _one_smp_info(void) {
 
 /* --- _l11 ---  (cross-function goto target) */
 static void _l11(void) {
+_top: ;
   {  /* ADDQ.L	#4,D0 */
       uint32_t _ar = (uint32_t)(d0 + 4);
       d0 = (uint32_t)_ar;
@@ -1963,7 +1997,7 @@ static void _l11(void) {
       flag_n = (_cmp < 0);
       flag_c = ((uint32_t)_lhs < (uint32_t)_rhs);
     }
-  if (flag_c) { _l11(); return; }  /* carry set / below */  /* BCS.B	.l11 */
+  if (flag_c) goto _top;  /* carry set / below */  /* BCS.B	.l11 */
   {  /* CMP.L	D1,D4 */
       int32_t _lhs = (int32_t)(d4);
       int32_t _rhs = (int32_t)(d1);
@@ -1988,13 +2022,14 @@ static void _l11(void) {
       flag_n = (_cmp < 0);
       flag_c = ((uint32_t)_lhs < (uint32_t)_rhs);
     }
-  if (flag_c) { _l11(); return; }  /* carry set / below */  /* BCS.B	.l11 */
+  if (flag_c) goto _top;  /* carry set / below */  /* BCS.B	.l11 */
   _l112(); return;  /* BRA.B	.l112 */
 }
 
 
 /* --- _l111 ---  (cross-function goto target) */
 static void _l111(void) {
+_top: ;
   {  /* MOVE.W	8(A2),D5 */
       uint16_t _mv = (uint16_t)(READ16(a2 + 8));
       W(d5) = (uint16_t)_mv;
@@ -2031,6 +2066,7 @@ static void _l111(void) {
 
 /* --- _l112 ---  (cross-function goto target) */
 static void _l112(void) {
+_top: ;
   {  /* MOVE.L	D4,D1 */
       uint32_t _mv = (uint32_t)(d4);
       d1 = _mv;
@@ -2051,6 +2087,7 @@ static void _l112(void) {
 
 /* --- _ok11 ---  (cross-function goto target) */
 static void _ok11(void) {
+_top: ;
   {  /* MOVE.L	SampleInfo1(PC),A1 */
       uint32_t _mv = (uint32_t)(READ32((uintptr_t)SampleInfo1));
       a1 = _mv;
@@ -2127,6 +2164,7 @@ static void _ok11(void) {
 
 /* --- _l12 ---  (cross-function goto target) */
 static void _l12(void) {
+_top: ;
   {  /* ADDQ.L	#4,D0 */
       uint32_t _ar = (uint32_t)(d0 + 4);
       d0 = (uint32_t)_ar;
@@ -2165,7 +2203,7 @@ static void _l12(void) {
       flag_n = (_cmp < 0);
       flag_c = ((uint32_t)_lhs < (uint32_t)_rhs);
     }
-  if (flag_c) { _l12(); return; }  /* carry set / below */  /* BCS.B	.l12 */
+  if (flag_c) goto _top;  /* carry set / below */  /* BCS.B	.l12 */
   {  /* CMP.L	D1,D4 */
       int32_t _lhs = (int32_t)(d4);
       int32_t _rhs = (int32_t)(d1);
@@ -2190,13 +2228,14 @@ static void _l12(void) {
       flag_n = (_cmp < 0);
       flag_c = ((uint32_t)_lhs < (uint32_t)_rhs);
     }
-  if (flag_c) { _l12(); return; }  /* carry set / below */  /* BCS.B	.l12 */
+  if (flag_c) goto _top;  /* carry set / below */  /* BCS.B	.l12 */
   _l114(); return;  /* BRA.B	.l114 */
 }
 
 
 /* --- _l113 ---  (cross-function goto target) */
 static void _l113(void) {
+_top: ;
   {  /* MOVE.W	8(A2),D5 */
       uint16_t _mv = (uint16_t)(READ16(a2 + 8));
       W(d5) = (uint16_t)_mv;
@@ -2233,6 +2272,7 @@ static void _l113(void) {
 
 /* --- _l114 ---  (cross-function goto target) */
 static void _l114(void) {
+_top: ;
   {  /* MOVE.L	D4,D1 */
       uint32_t _mv = (uint32_t)(d4);
       d1 = _mv;
@@ -2253,6 +2293,7 @@ static void _l114(void) {
 
 /* --- _ok13 ---  (cross-function goto target) */
 static void _ok13(void) {
+_top: ;
   {  /* MOVE.L	SampleInfo1(PC),A1 */
       uint32_t _mv = (uint32_t)(READ32((uintptr_t)SampleInfo1));
       a1 = _mv;
@@ -2291,6 +2332,7 @@ static void _ok13(void) {
 
 /* --- _ok12 ---  (cross-function goto target) */
 static void _ok12(void) {
+_top: ;
   /* wyliczenie najmniejszego offsetu dla sample info 1 i wyznaczenie smp adr */
   {  /* MOVE.L	SampleInfo1(PC),A0 */
       uint32_t _mv = (uint32_t)(READ32((uintptr_t)SampleInfo1));
@@ -2336,6 +2378,7 @@ static void _ok12(void) {
 
 /* --- _l14 ---  (cross-function goto target) */
 static void _l14(void) {
+_top: ;
   {  /* ADDQ.L	#4,D0 */
       uint32_t _ar = (uint32_t)(d0 + 4);
       d0 = (uint32_t)_ar;
@@ -2374,7 +2417,7 @@ static void _l14(void) {
       flag_n = (_cmp < 0);
       flag_c = ((uint32_t)_lhs < (uint32_t)_rhs);
     }
-  if (!flag_c) { _l14(); return; }  /* carry clear / above-or-equal */  /* BCC.B	.l14 */
+  if (!flag_c) goto _top;  /* carry clear / above-or-equal */  /* BCC.B	.l14 */
   {  /* CMP.L	D1,D4 */
       int32_t _lhs = (int32_t)(d4);
       int32_t _rhs = (int32_t)(d1);
@@ -2399,13 +2442,14 @@ static void _l14(void) {
       flag_n = (_cmp < 0);
       flag_c = ((uint32_t)_lhs < (uint32_t)_rhs);
     }
-  if (!flag_c) { _l14(); return; }  /* carry clear / above-or-equal */  /* BCC.B	.l14 */
+  if (!flag_c) goto _top;  /* carry clear / above-or-equal */  /* BCC.B	.l14 */
   _l16(); return;  /* BRA.B	.l16 */
 }
 
 
 /* --- _l15 ---  (cross-function goto target) */
 static void _l15(void) {
+_top: ;
   {  /* MOVE.W	8(A2),D5 */
       uint16_t _mv = (uint16_t)(READ16(a2 + 8));
       W(d5) = (uint16_t)_mv;
@@ -2418,6 +2462,7 @@ static void _l15(void) {
 
 /* --- _l16 ---  (cross-function goto target) */
 static void _l16(void) {
+_top: ;
   {  /* MOVE.L	D4,D1 */
       uint32_t _mv = (uint32_t)(d4);
       d1 = _mv;
@@ -2438,6 +2483,7 @@ static void _l16(void) {
 
 /* --- _ok14 ---  (cross-function goto target) */
 static void _ok14(void) {
+_top: ;
   {  /* MOVE.L	SampleInfo1(PC),A1 */
       uint32_t _mv = (uint32_t)(READ32((uintptr_t)SampleInfo1));
       a1 = _mv;
@@ -2506,6 +2552,7 @@ static void _ok14(void) {
 
 /* --- _l17 ---  (cross-function goto target) */
 static void _l17(void) {
+_top: ;
   {  /* ADDQ.L	#4,D0 */
       uint32_t _ar = (uint32_t)(d0 + 4);
       d0 = (uint32_t)_ar;
@@ -2544,7 +2591,7 @@ static void _l17(void) {
       flag_n = (_cmp < 0);
       flag_c = ((uint32_t)_lhs < (uint32_t)_rhs);
     }
-  if (!flag_c) { _l17(); return; }  /* carry clear / above-or-equal */  /* BCC.B	.l17 */
+  if (!flag_c) goto _top;  /* carry clear / above-or-equal */  /* BCC.B	.l17 */
   {  /* CMP.L	D1,D4 */
       int32_t _lhs = (int32_t)(d4);
       int32_t _rhs = (int32_t)(d1);
@@ -2569,13 +2616,14 @@ static void _l17(void) {
       flag_n = (_cmp < 0);
       flag_c = ((uint32_t)_lhs < (uint32_t)_rhs);
     }
-  if (!flag_c) { _l17(); return; }  /* carry clear / above-or-equal */  /* BCC.B	.l17 */
+  if (!flag_c) goto _top;  /* carry clear / above-or-equal */  /* BCC.B	.l17 */
   _l19(); return;  /* BRA.B	.l19 */
 }
 
 
 /* --- _l18 ---  (cross-function goto target) */
 static void _l18(void) {
+_top: ;
   {  /* MOVE.W	8(A2),D5 */
       uint16_t _mv = (uint16_t)(READ16(a2 + 8));
       W(d5) = (uint16_t)_mv;
@@ -2588,6 +2636,7 @@ static void _l18(void) {
 
 /* --- _l19 ---  (cross-function goto target) */
 static void _l19(void) {
+_top: ;
   {  /* MOVE.L	D4,D1 */
       uint32_t _mv = (uint32_t)(d4);
       d1 = _mv;
@@ -2608,6 +2657,7 @@ static void _l19(void) {
 
 /* --- _ok17 ---  (cross-function goto target) */
 static void _ok17(void) {
+_top: ;
   {  /* MOVE.L	SampleInfo1(PC),A1 */
       uint32_t _mv = (uint32_t)(READ32((uintptr_t)SampleInfo1));
       a1 = _mv;
@@ -2637,6 +2687,7 @@ static void _ok17(void) {
 
 /* --- _s17 ---  (cross-function goto target) */
 static void _s17(void) {
+_top: ;
   {  /* MOVE.L	(A6)+,D0 */
       uint32_t _mv = (uint32_t)(READ32_POST(a6));
       d0 = _mv;
@@ -2696,6 +2747,7 @@ static void _s17(void) {
 
 /* --- _FindLea ---  (cross-function goto target) */
 static void _FindLea(void) {
+_top: ;
   {  /* CMP.W	#$4DF9,(A0)+ */
       int32_t _lhs = (int32_t)(READ16_POST(a0));
       int32_t _rhs = (int32_t)(0x4DF9);
@@ -2704,7 +2756,7 @@ static void _FindLea(void) {
       flag_n = (_cmp < 0);
       flag_c = ((uint32_t)_lhs < (uint32_t)_rhs);
     }
-  if (!flag_z) { _FindLea(); return; }  /* not equal / nonzero */  /* BNE.B	.FindLea */
+  if (!flag_z) goto _top;  /* not equal / nonzero */  /* BNE.B	.FindLea */
   {  /* MOVE.L	SampleInfo1(PC),A2 */
       uint32_t _mv = (uint32_t)(READ32((uintptr_t)SampleInfo1));
       a2 = _mv;
@@ -2731,6 +2783,7 @@ static void _FindLea(void) {
 
 /* --- _Patch ---  (cross-function goto target) */
 static void _Patch(void) {
+_top: ;
   {  /* CMP.L	#$40E7007C,(A0) */
       int32_t _lhs = (int32_t)(READ32(a0));
       int32_t _rhs = (int32_t)(0x40E7007C);
@@ -2760,6 +2813,7 @@ static void _Patch(void) {
 
 /* --- _NoSR1 ---  (cross-function goto target) */
 static void _NoSR1(void) {
+_top: ;
   {  /* CMP.W	#$4E73,(A0) */
       int32_t _lhs = (int32_t)(READ16(a0));
       int32_t _rhs = (int32_t)(0x4E73);
@@ -2781,6 +2835,7 @@ static void _NoSR1(void) {
 
 /* --- _NoRTE ---  (cross-function goto target) */
 static void _NoRTE(void) {
+_top: ;
   {  /* CMP.L	#$248B3568,(A0) */
       int32_t _lhs = (int32_t)(READ32(a0));
       int32_t _rhs = (int32_t)(0x248B3568);
@@ -2820,6 +2875,7 @@ static void _NoRTE(void) {
 
 /* --- _No1 ---  (cross-function goto target) */
 static void _No1(void) {
+_top: ;
   {  /* CMP.L	#$35400008,(A0) */
       int32_t _lhs = (int32_t)(READ32(a0));
       int32_t _rhs = (int32_t)(0x35400008);
@@ -2859,6 +2915,7 @@ static void _No1(void) {
 
 /* --- _NoUp ---  (cross-function goto target) */
 static void _NoUp(void) {
+_top: ;
   a1 = (uint32_t)(uintptr_t)Patch2;  /* LEA	Patch2(PC),A1 */
   {  /* MOVE.L	D1,(A0)+ */
       uint32_t _mv = (uint32_t)(d1);
@@ -2880,6 +2937,7 @@ static void _NoUp(void) {
 
 /* --- _No3 ---  (cross-function goto target) */
 static void _No3(void) {
+_top: ;
   {  /* CMP.L	#$33400008,(A0) */
       int32_t _lhs = (int32_t)(READ32(a0));
       int32_t _rhs = (int32_t)(0x33400008);
@@ -2927,6 +2985,7 @@ static void _No3(void) {
 
 /* --- _No4 ---  (cross-function goto target) */
 static void _No4(void) {
+_top: ;
   {  /* CMP.L	#$35420008,(A0) */
       int32_t _lhs = (int32_t)(READ32(a0));
       int32_t _rhs = (int32_t)(0x35420008);
@@ -2965,6 +3024,7 @@ static void _No4(void) {
 
 /* --- _No5 ---  (cross-function goto target) */
 static void _No5(void) {
+_top: ;
   {  /* CMP.L	#$21C80070,(A0) */
       int32_t _lhs = (int32_t)(READ32(a0));
       int32_t _rhs = (int32_t)(0x21C80070);
@@ -2987,6 +3047,7 @@ static void _No5(void) {
 
 /* --- _No70 ---  (cross-function goto target) */
 static void _No70(void) {
+_top: ;
   {  /* CMP.W	#$46DF,(A0) */
       int32_t _lhs = (int32_t)(READ16(a0));
       int32_t _rhs = (int32_t)(0x46DF);
@@ -3008,12 +3069,14 @@ static void _No70(void) {
 
 /* --- _NoSR2 ---  (cross-function goto target) */
 static void _NoSR2(void) {
+_top: ;
   a0 = (uint32_t)((int32_t)a0 + (int32_t)(int16_t)(2));  /* ADDQ.L	#2,A0 */
 }
 
 
 /* --- _test ---  (cross-function goto target) */
 static void _test(void) {
+_top: ;
   {  /* CMP.L	A0,A2 */
       int32_t _lhs = (int32_t)(a2);
       int32_t _rhs = (int32_t)(a0);
@@ -3030,6 +3093,7 @@ static void _test(void) {
 
 /* --- _error ---  (cross-function goto target) */
 static void _error(void) {
+_top: ;
   d0 = (uint32_t)(int32_t)(int8_t)(EPR_CorruptModule);  /* MOVEQ	#EPR_CorruptModule,D0 */
   return;  /* RTS */
 }
@@ -3040,6 +3104,7 @@ static void _error(void) {
 
 /* --- EndPlayer --- */
 static void EndPlayer(void) {
+_top: ;
   a0 = READ32(a5 + (intptr_t)dtg_AudioFree);  /* MOVEA.L	dtg_AudioFree(A5),A0 */
   ((void(*)(void))(uintptr_t)a0)(); return;  /* JMP	(A0) */
 }
@@ -3050,6 +3115,7 @@ static void EndPlayer(void) {
 
 /* --- InitSound --- */
 void InitSound(void) {
+_top: ;
   a0 = (uint32_t)(uintptr_t)StructAdr;  /* LEA	StructAdr(PC),A0 */
   a1 = (uint32_t)(a0 + (intptr_t)UPS_SizeOF);  /* LEA	UPS_SizeOF(A0),A1 */
 ClearUPS:
@@ -3171,6 +3237,7 @@ CalcLen:
 
 /* --- LengthOK ---  (cross-function goto target) */
 static void LengthOK(void) {
+_top: ;
   a0 = (uint32_t)(uintptr_t)InfoBuffer;  /* LEA	InfoBuffer(PC),A0 */
   {  /* MOVE.L	D0,Length(A0) */
       uint32_t _mv = (uint32_t)(d0);
@@ -3185,6 +3252,7 @@ static void LengthOK(void) {
 
 /* --- Again ---  (cross-function goto target) */
 static void Again(void) {
+_top: ;
   {  /* MOVE.L	2(A2),D0 */
       uint32_t _mv = (uint32_t)(READ32(a2 + 2));
       d0 = _mv;
@@ -3207,6 +3275,7 @@ static void Again(void) {
 
 /* --- EndSound --- */
 void EndSound(void) {
+_top: ;
   ClearIntVector();  /* BSR.W	ClearIntVector */
   a0 = READ32((uintptr_t)ModulePtr);  /* MOVEA.L	ModulePtr(PC),A0 */
   ((void(*)(void))(uintptr_t)(a0 + 14))(); return;  /* JMP	14(A0) */
@@ -3218,6 +3287,7 @@ void EndSound(void) {
 
 /* --- Interrupt --- */
 void Interrupt(void) {
+_top: ;
   WRITE32_PRE(sp, a6);  /* MOVEM.L	D1,D2,D3,D4,D5,D6,D7,A0,A1,A2,A3,A4,A5,A6,-(A7) */
     WRITE32_PRE(sp, a5);
     WRITE32_PRE(sp, a4);
@@ -3302,6 +3372,7 @@ NoEnd:
 
 /* --- SetIntVector --- */
 static void SetIntVector(void) {
+_top: ;
   a6 = 4;  /* MOVEA.L	#4,A6 */
   a1 = (uint32_t)(uintptr_t)StructInt;  /* LEA	StructInt(PC),A1 */
   d0 = (uint32_t)(int32_t)(int8_t)(INTB_AUD0);  /* MOVEQ	#INTB_AUD0,D0 */
@@ -3349,6 +3420,7 @@ static void SetIntVector(void) {
 
 /* --- ClearIntVector --- */
 static void ClearIntVector(void) {
+_top: ;
   a6 = 4;  /* MOVEA.L	#4,A6 */
   a1 = READ32((uintptr_t)Channel0);  /* MOVEA.L	Channel0(PC),A1 */
   d0 = (uint32_t)(int32_t)(int8_t)(INTB_AUD0);  /* MOVEQ	#INTB_AUD0,D0 */
@@ -3367,6 +3439,7 @@ static void ClearIntVector(void) {
 
 /* --- Audio --- */
 static void Audio(void) {
+_top: ;
   W(d1) &= (uint16_t)(0x780);  /* AND.W	#$780,D1 */
   W(d1) &= READ16(a0 + 28);  /* AND.W	28(A0),D1 */
   {  /* MOVE.W	D1,154(A0) */
@@ -3398,6 +3471,7 @@ static void Audio(void) {
 
 /* --- Patch1 ---  (address-referenced) */
 static void Patch1(void) {
+_top: ;
   {  /* MOVE.L	A3,(A2) */
       uint32_t _mv = (uint32_t)(a3);
       hw_write32(a2, _mv);
@@ -3420,6 +3494,7 @@ static void Patch1(void) {
 
 /* --- Patch2 ---  (address-referenced) */
 static void Patch2(void) {
+_top: ;
   SetPer();  /* BSR.W	SetPer */
   ChangeVolume();  /* BSR.W	ChangeVolume */
   SetVol();  /* BSR.W	SetVol */
@@ -3437,6 +3512,7 @@ static void Patch2(void) {
 
 /* --- Patch3 ---  (address-referenced) */
 static void Patch3(void) {
+_top: ;
   {  /* MOVE.L	A2,-(SP) */
       uint32_t _mv = (uint32_t)(a2);
       WRITE32_PRE(sp, _mv);
@@ -3465,6 +3541,7 @@ static void Patch3(void) {
 
 /* --- New ---  (address-referenced) */
 static void New(void) {
+_top: ;
   {  /* MOVE.W	8(A3),D0 */
       uint16_t _mv = (uint16_t)(READ16(a3 + 8));
       W(d0) = (uint16_t)_mv;
@@ -3479,6 +3556,7 @@ static void New(void) {
 
 /* --- Patch4 ---  (address-referenced) */
 static void Patch4(void) {
+_top: ;
   SetPer();  /* BSR.W	SetPer */
   {  /* MOVE.L	D0,-(SP) */
       uint32_t _mv = (uint32_t)(d0);
@@ -3508,6 +3586,7 @@ static void Patch4(void) {
 
 /* --- New2 ---  (address-referenced) */
 static void New2(void) {
+_top: ;
   {  /* MOVE.W	D3,14(A1) */
       uint16_t _mv = (uint16_t)(W(d3));
       hw_write16(a1 + 14, _mv);
@@ -3523,6 +3602,7 @@ static void _ds_init(void) {
   WRITE32((uintptr_t)(_ds + 80), (uint32_t)(uintptr_t)PlayerName);
   WRITE32((uintptr_t)(_ds + 88), (uint32_t)(uintptr_t)Creator);
   WRITE32((uintptr_t)(_ds + 96), (uint32_t)(uintptr_t)Check2);
+  WRITE32((uintptr_t)(_ds + 104), (uint32_t)(uintptr_t)Interrupt);
   WRITE32((uintptr_t)(_ds + 112), (uint32_t)(uintptr_t)SubSongRange);
   WRITE32((uintptr_t)(_ds + 120), (uint32_t)(uintptr_t)InitPlayer);
   WRITE32((uintptr_t)(_ds + 128), (uint32_t)(uintptr_t)EndPlayer);
