@@ -992,6 +992,12 @@ export async function parseUADEFile(
     'bds',   // BenDaglish variant — compiled 68k replayer
     'ex',    // FashionTracker — compiled 68k replayer
     'sm',    // SoundMaster — compiled 68k replayer
+    // Tier 3 compiled/synthesis formats:
+    'mok',   // Silmarils — compiled 68k replayer
+    'pvp',   // PeterVerswyvelenPacker — compiled 68k replayer
+    'dns',   // DynamicSynthesizer — compiled 68k replayer
+    'vss',   // VoodooSupremeSynthesizer — synthesis-based
+    'synmod', // SynTracker — synthesis-based
   ]);
   if (mode === 'enhanced' && FORCE_CLASSIC_FORMATS.has(ext)) {
     console.log(`[UADEParser] ${ext.toUpperCase()} uses compiled replayer; forcing classic UADESynth streaming`);
@@ -1025,6 +1031,11 @@ export async function parseUADEFile(
     'bds',   // BenDaglish variant
     'ex',    // FashionTracker
     'sm',    // SoundMaster
+    'mok',   // Silmarils
+    'pvp',   // PeterVerswyvelenPacker
+    'dns',   // DynamicSynthesizer
+    'vss',   // VoodooSupremeSynthesizer
+    'synmod', // SynTracker
   ]);
   if (mode === 'enhanced' && FORCE_CLASSIC_PREFIXES.has(prefix)) {
     console.log(`[UADEParser] ${prefix.toUpperCase()} uses prefix form; forcing classic UADESynth streaming`);

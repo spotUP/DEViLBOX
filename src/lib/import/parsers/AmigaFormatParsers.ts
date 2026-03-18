@@ -1659,12 +1659,8 @@ export async function tryRouteFormat(
 
   // ── Peter Verswyvelen Packer (PVP.* prefix) ───────────────────────────────
   if (matchesExt(filename, ['pvp'])) {
-    const { isPeterVerswyvelenPackerFormat, parsePeterVerswyvelenPackerFile } = await import('@lib/import/formats/PeterVerswyvelenPackerParser');
-    // UADE eagleplayer expects prefix form: pvp.songname
-    const pvpCtx = { ...ctx, originalFileName: toUADEPrefixName(originalFileName, ['pvp']) };
-    return withNativeThenUADE('peterVerswyvelenPacker', pvpCtx,
-      (buf: Uint8Array | ArrayBuffer, name: string) => { if (isPeterVerswyvelenPackerFormat(buf as ArrayBuffer)) return parsePeterVerswyvelenPackerFile(buf as ArrayBuffer, name); return null; },
-      'PeterVerswyvelenPackerParser', { injectUADE: true });
+    const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
+    return parseUADEFile(buffer, toUADEPrefixName(originalFileName, ['pvp']), prefs.uade ?? 'enhanced', subsong, preScannedMeta);
   }
 
   // ── Wally Beben (WB.* prefix) ─────────────────────────────────────────────
@@ -2022,20 +2018,32 @@ export async function tryRouteFormat(
   // .tw is the UADE eagleplayer prefix form of Thomas Hermann. The binary structure
   // may differ from .thm files so isThomasHermannFormat may not match; use stub directly.
   if (matchesExt(filename, ['tw'])) {
-    const twCtx = { ...ctx, originalFileName: toUADEPrefixName(originalFileName, ['tw']) };
-    const { parseThomasHermannFile: parseThomasHermannStub } = await import('@lib/import/formats/SimpleAmigaStubParser');
-    return withNativeThenUADE('thomasHermann', twCtx,
-      (buf: Uint8Array | ArrayBuffer, name: string) => parseThomasHermannStub(buf as ArrayBuffer, name),
-      'SimpleAmigaStubParser', { injectUADE: true });
+    const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
+    return parseUADEFile(buffer, toUADEPrefixName(originalFileName, ['tw']), prefs.uade ?? 'enhanced', subsong, preScannedMeta);
   }
   // ── Darius Zendeh (.dz / DZ.* prefix) ────────────────────────────────────
   // Stub parser: filename-based title + 4 placeholder instruments. UADE classic audio.
   if (matchesExt(filename, ['dz'])) {
-    const dzCtx = { ...ctx, originalFileName: toUADEPrefixName(originalFileName, ['dz']) };
-    const { parseDariusZendehFile } = await import('@lib/import/formats/SimpleAmigaStubParser');
-    return withNativeThenUADE('dariusZendeh', dzCtx,
-      (buf: Uint8Array | ArrayBuffer, name: string) => parseDariusZendehFile(buf as ArrayBuffer, name),
-      'SimpleAmigaStubParser', { injectUADE: true });
+    const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
+    return parseUADEFile(buffer, toUADEPrefixName(originalFileName, ['dz']), prefs.uade ?? 'enhanced', subsong, preScannedMeta);
+  }
+
+  // ── Dynamic Synthesizer (.dns) ────────────────────────────────────────────
+  if (matchesExt(filename, ['dns'])) {
+    const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
+    return parseUADEFile(buffer, toUADEPrefixName(originalFileName, ['dns']), prefs.uade ?? 'enhanced', subsong, preScannedMeta);
+  }
+
+  // ── Voodoo Supreme Synthesizer (.vss) ─────────────────────────────────────
+  if (matchesExt(filename, ['vss'])) {
+    const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
+    return parseUADEFile(buffer, toUADEPrefixName(originalFileName, ['vss']), prefs.uade ?? 'enhanced', subsong, preScannedMeta);
+  }
+
+  // ── SynTracker (.synmod) ──────────────────────────────────────────────────
+  if (matchesExt(filename, ['synmod'])) {
+    const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
+    return parseUADEFile(buffer, toUADEPrefixName(originalFileName, ['synmod']), prefs.uade ?? 'enhanced', subsong, preScannedMeta);
   }
   // ── Mark II (.mk2 / .mkii / MK2.* prefix) ────────────────────────────────
   // Stub parser: filename-based title + 4 placeholder instruments. UADE classic audio.
@@ -2073,11 +2081,8 @@ export async function tryRouteFormat(
   // Stub parser: filename-based title + 3 placeholder instruments (3-voice MIDI clone).
   // Enhanced scan gives garbled "mok [CIA unreliable...]" title due to MIDI clone format.
   if (matchesExt(filename, ['mok'])) {
-    const mokCtx = { ...ctx, originalFileName: toUADEPrefixName(originalFileName, ['mok']) };
-    const { parseSilmarilsFile } = await import('@lib/import/formats/SimpleAmigaStubParser');
-    return withNativeThenUADE('silmarils', mokCtx,
-      (buf: Uint8Array | ArrayBuffer, name: string) => parseSilmarilsFile(buf as ArrayBuffer, name),
-      'SimpleAmigaStubParser', { injectUADE: true });
+    const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
+    return parseUADEFile(buffer, toUADEPrefixName(originalFileName, ['mok']), prefs.uade ?? 'enhanced', subsong, preScannedMeta);
   }
   // EA handled below with native EarAcheParser + UADE classic injection
 
