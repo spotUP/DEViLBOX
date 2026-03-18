@@ -1,0 +1,3 @@
+/Users/spot/Code/DEViLBOX/wallybeben-wasm/src/WallyBeben/build/CMakeFiles/WallyBeben.dir
+/Users/spot/Code/DEViLBOX/wallybeben-wasm/src/WallyBeben/build/CMakeFiles/edit_cache.dir
+/Users/spot/Code/DEViLBOX/wallybeben-wasm/src/WallyBeben/build/CMakeFiles/rebuild_cache.dir
