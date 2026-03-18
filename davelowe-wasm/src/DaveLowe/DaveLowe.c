@@ -605,24 +605,50 @@ uint8_t _ds[1494] = {
 
 /* -- External Data Placeholders (INCBIN / external data) ------------- */
 /* Host must set these pointers to actual module data before playback. */
+static uint8_t* NoChange = NULL;
+static uint8_t* Old = NULL;
+static uint8_t* Skip = NULL;
 static uint8_t* Left1 = NULL;
 static uint8_t* Right1 = NULL;
 static uint8_t* Right2 = NULL;
 static uint8_t* Exit2 = NULL;
+static uint8_t* Ex = NULL;
+static uint8_t* _SetVoice = NULL;
 static uint8_t* _NoVoice1 = NULL;
 static uint8_t* _NoVoice2 = NULL;
 static uint8_t* _NoVoice3 = NULL;
 static uint8_t* _NoVoice4 = NULL;
+static uint8_t* _return = NULL;
+static uint8_t* Empty = NULL;
+static uint8_t* hop = NULL;
+static uint8_t* SubEnd = NULL;
+static uint8_t* NextSub = NULL;
+static uint8_t* SkipSamples = NULL;
+static uint8_t* Patch = NULL;
+static uint8_t* SkipPatch = NULL;
+static uint8_t* Find = NULL;
 static uint8_t* NoMidwinter2 = NULL;
 static uint8_t* Fix_03 = NULL;
 static uint8_t* Fix_13 = NULL;
+static uint8_t* SkipInit = NULL;
+static uint8_t* ClearUPS = NULL;
+static uint8_t* NoLength = NULL;
+static uint8_t* FindZero = NULL;
+static uint8_t* MaxLength = NULL;
+static uint8_t* NextLength = NULL;
+static uint8_t* FindMaxLength = NULL;
 static uint8_t* NoInit2 = NULL;
+static uint8_t* NoSFX = NULL;
 static uint8_t* lbC00089C = NULL;
+static uint8_t* SkipZero = NULL;
 static uint8_t* test1 = NULL;
+static uint8_t* test = NULL;
 static uint8_t* test2 = NULL;
 static uint8_t* test3 = NULL;
+static uint8_t* SkipEnd = NULL;
 static uint8_t* NoSFX2 = NULL;
 static uint8_t* Exit3 = NULL;
+static uint8_t* OKi = NULL;
 
 /* -- Forward Declarations -------------------------------------------- */
 static void ModuleChange(void);
@@ -648,7 +674,11 @@ static void fail(void);
 static void GetInfos(void);
 static void SubSongRange(void);
 void InitPlayer(void);
+static void InitFail(void);
 static void EndPlayer(void);
+void InitSound(void);
+void EndSound(void);
+static void Standard(void);
 static void Code1(void);
 static void Code2(void);
 static void Code4(void);
@@ -661,14 +691,7 @@ static void CodeA(void);
 static void CodeB(void);
 static void CodeC(void);
 static void Check3(void);
-void InitSound(void);
-void EndSound(void);
-static void _return(void);
-static void _error(void);
-static void fail(void);
-static void InitFail(void);
-static void Short(void);
-static void Skip(void);static void SetBalance(void);
+static void SetBalance(void);
 
 
 /* ====================================================================
@@ -1287,7 +1310,7 @@ static void SampleInit(void) {
       flag_n = ((int32_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-  if (flag_z) _return(); return;  /* equal / zero */  /* BEQ.B	return */
+  if (flag_z) goto _return;  /* equal / zero */  /* BEQ.B	return */
   {  /* MOVE.L	D0,A0 */
       uint32_t _mv = (uint32_t)(d0);
       a0 = _mv;
@@ -1302,7 +1325,7 @@ static void SampleInit(void) {
       flag_n = ((int32_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-  if (flag_z) _return(); return;  /* equal / zero */  /* BEQ.B	return */
+  if (flag_z) goto _return;  /* equal / zero */  /* BEQ.B	return */
   {  /* SUBQ.L	#1,D5 */
       uint32_t _sr = (uint32_t)(d5 - 1);
       d5 = (uint32_t)_sr;
@@ -1318,7 +1341,7 @@ hop:
       flag_n = ((int32_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-  if (flag_z) _return(); return;  /* equal / zero */  /* BEQ.B	return */
+  if (flag_z) goto _return;  /* equal / zero */  /* BEQ.B	return */
   {  /* MOVE.L	D0,A3 */
       uint32_t _mv = (uint32_t)(d0);
       a3 = _mv;
@@ -1592,7 +1615,7 @@ void InitPlayer(void) {
     }
   { uintptr_t _jt=(uintptr_t)(READ32(a6 + (intptr_t)_LVOLoadSeg)); if(_jt) ((void(*)(void))_jt)(); }  /* JSR	_LVOLoadSeg(A6) */
   d0 = d0 << 2;  /* LSL.L	#2,D0 */
-  if (flag_z) InitFail(); return;  /* equal / zero */  /* BEQ.W	InitFail */
+  if (flag_z) { InitFail(); return; }  /* equal / zero */  /* BEQ.W	InitFail */
   {  /* ADDQ.L	#4,D0 */
       uint32_t _ar = (uint32_t)(d0 + 4);
       d0 = (uint32_t)_ar;
@@ -1988,8 +2011,8 @@ SkipInit:
 }
 
 
-/* --- InitFail --- */
-void InitFail(void) {
+/* --- InitFail ---  (cross-function goto target) */
+static void InitFail(void) {
   d0 = (uint32_t)(int32_t)(int8_t)(EPR_NotEnoughMem);  /* MOVEQ	#EPR_NotEnoughMem,D0 */
   return;  /* RTS */
 }
@@ -2250,7 +2273,7 @@ void EndSound(void) {
       flag_n = ((int32_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-  if (flag_z) goto Standard;  /* equal / zero */  /* BEQ.B	Standard */
+  if (flag_z) { Standard(); return; }  /* equal / zero */  /* BEQ.B	Standard */
   {  /* MOVE.L	D0,A0 */
       uint32_t _mv = (uint32_t)(d0);
       a0 = _mv;
@@ -2262,7 +2285,7 @@ void EndSound(void) {
 }
 
 
-/* --- Standard --- */
+/* --- Standard ---  (cross-function goto target) */
 static void Standard(void) {
   a0 = (uint32_t)0xDFF000;  /* LEA	$DFF000,A0 */
   {  /* MOVE.W	#15,150(A0) */
@@ -3092,6 +3115,8 @@ static void _ds_init(void) {
   WRITE32((uintptr_t)(_ds + 126), (uint32_t)(uintptr_t)SubSongRange);
   WRITE32((uintptr_t)(_ds + 134), (uint32_t)(uintptr_t)InitPlayer);
   WRITE32((uintptr_t)(_ds + 142), (uint32_t)(uintptr_t)EndPlayer);
+  WRITE32((uintptr_t)(_ds + 150), (uint32_t)(uintptr_t)InitSound);
+  WRITE32((uintptr_t)(_ds + 158), (uint32_t)(uintptr_t)EndSound);
   WRITE32((uintptr_t)(_ds + 166), (uint32_t)(uintptr_t)GetInfos);
   WRITE32((uintptr_t)(_ds + 174), (uint32_t)(uintptr_t)SampleInit);
   WRITE32((uintptr_t)(_ds + 182), (uint32_t)(uintptr_t)ModuleChange);

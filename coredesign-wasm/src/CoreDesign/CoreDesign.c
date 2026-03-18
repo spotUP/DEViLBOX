@@ -573,6 +573,7 @@ static uint8_t* No_Voice1 = NULL;
 static uint8_t* No_Voice2 = NULL;
 static uint8_t* No_Voice3 = NULL;
 static uint8_t* No_Voice4 = NULL;
+static uint8_t* _return = NULL;
 static uint8_t* hop = NULL;
 static uint8_t* Note = NULL;
 static uint8_t* NoRTE = NULL;
@@ -601,7 +602,9 @@ static void fail(void);
 static void GetInfos(void);
 static void SetAudioVector(void);
 void InitPlayer(void);
+static void InitFail(void);
 static void EndPlayer(void);
+void EndSound(void);
 static void Code1(void);
 static void Code2(void);
 static void Code3(void);
@@ -610,9 +613,7 @@ static void Code5(void);
 static void Code6(void);
 static void Check3(void);
 void InitSound(void);
-void EndSound(void);
-static void _return(void);
-static void InitFail(void);static void SetBalance(void);
+static void SetBalance(void);
 
 
 /* ====================================================================
@@ -1188,7 +1189,7 @@ static void SampleInit(void) {
       flag_n = ((int32_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-  if (flag_z) _return(); return;  /* equal / zero */  /* BEQ.B	return */
+  if (flag_z) goto _return;  /* equal / zero */  /* BEQ.B	return */
   {  /* MOVE.L	D0,A0 */
       uint32_t _mv = (uint32_t)(d0);
       a0 = _mv;
@@ -1203,7 +1204,7 @@ static void SampleInit(void) {
       flag_n = ((int32_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-  if (flag_z) _return(); return;  /* equal / zero */  /* BEQ.B	return */
+  if (flag_z) goto _return;  /* equal / zero */  /* BEQ.B	return */
   {  /* SUBQ.L	#1,D5 */
       uint32_t _sr = (uint32_t)(d5 - 1);
       d5 = (uint32_t)_sr;
@@ -1219,7 +1220,7 @@ hop:
       flag_n = ((int32_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-  if (flag_z) _return(); return;  /* equal / zero */  /* BEQ.B	return */
+  if (flag_z) goto _return;  /* equal / zero */  /* BEQ.B	return */
   {  /* MOVE.L	D0,A3 */
       uint32_t _mv = (uint32_t)(d0);
       a3 = _mv;
@@ -1864,8 +1865,8 @@ Note:
 }
 
 
-/* --- InitFail --- */
-void InitFail(void) {
+/* --- InitFail ---  (cross-function goto target) */
+static void InitFail(void) {
   d0 = (uint32_t)(int32_t)(int8_t)(EPR_NotEnoughMem);  /* MOVEQ	#EPR_NotEnoughMem,D0 */
   return;  /* RTS */
 }
@@ -2206,6 +2207,7 @@ static void _ds_init(void) {
   WRITE32((uintptr_t)(_ds + 128), (uint32_t)(uintptr_t)SubSongRange);
   WRITE32((uintptr_t)(_ds + 136), (uint32_t)(uintptr_t)InitPlayer);
   WRITE32((uintptr_t)(_ds + 144), (uint32_t)(uintptr_t)EndPlayer);
+  WRITE32((uintptr_t)(_ds + 160), (uint32_t)(uintptr_t)EndSound);
   WRITE32((uintptr_t)(_ds + 168), (uint32_t)(uintptr_t)GetInfos);
   WRITE32((uintptr_t)(_ds + 176), (uint32_t)(uintptr_t)SampleInit);
   WRITE32((uintptr_t)(_ds + 184), (uint32_t)(uintptr_t)ModuleChange);

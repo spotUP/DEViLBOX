@@ -507,22 +507,34 @@ uint8_t _ds[812] = {
 
 /* -- External Data Placeholders (INCBIN / external data) ------------- */
 /* Host must set these pointers to actual module data before playback. */
+static uint8_t* SetNew = NULL;
 static uint8_t* NoVoice1 = NULL;
 static uint8_t* Voice1On = NULL;
+static uint8_t* SetIt = NULL;
 static uint8_t* NoVoice2 = NULL;
 static uint8_t* Voice2On = NULL;
 static uint8_t* NoVoice3 = NULL;
 static uint8_t* Voice3On = NULL;
 static uint8_t* Voice4On = NULL;
+static uint8_t* _SetVoice = NULL;
 static uint8_t* No_Voice1 = NULL;
 static uint8_t* No_Voice2 = NULL;
 static uint8_t* No_Voice3 = NULL;
 static uint8_t* No_Voice4 = NULL;
+static uint8_t* _return = NULL;
+static uint8_t* hop = NULL;
+static uint8_t* fault = NULL;
+static uint8_t* Byte = NULL;
+static uint8_t* SkipByte = NULL;
 static uint8_t* NoByte1 = NULL;
 static uint8_t* NoByte2 = NULL;
+static uint8_t* NextByte = NULL;
 static uint8_t* test1 = NULL;
+static uint8_t* test = NULL;
 static uint8_t* test2 = NULL;
 static uint8_t* test3 = NULL;
+static uint8_t* SkipEnd = NULL;
+static uint8_t* ClearUPS = NULL;
 static uint8_t* lbC0000B4 = NULL;
 static uint8_t* lbC000114 = NULL;
 static uint8_t* lbC00017C = NULL;
@@ -581,18 +593,14 @@ static void StructInit(void);
 static void SampleInit(void);
 static void GetPosition(void);
 static void Check2(void);
+static void Short(void);
 static void EndPlayer(void);
+void Interrupt(void);
 void InitSound(void);
 static void Init(void);
 static void lbC000082(void);
-void Interrupt(void);
 void EndSound(void);
-static void _return(void);
-static void _error(void);
-static void fail(void);
-static void InitFail(void);
-static void Short(void);
-static void Skip(void);static void SetBalance(void);
+static void SetBalance(void);
 
 
 /* ====================================================================
@@ -1113,7 +1121,7 @@ static void SampleInit(void) {
       flag_n = ((int32_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-  if (flag_z) _return(); return;  /* equal / zero */  /* BEQ.B	return */
+  if (flag_z) goto _return;  /* equal / zero */  /* BEQ.B	return */
   {  /* MOVE.L	D0,A2 */
       uint32_t _mv = (uint32_t)(d0);
       a2 = _mv;
@@ -1159,7 +1167,7 @@ hop:
       flag_n = ((int32_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-  if (flag_z) _return(); return;  /* equal / zero */  /* BEQ.B	return */
+  if (flag_z) goto _return;  /* equal / zero */  /* BEQ.B	return */
   {  /* MOVE.L	D0,A3 */
       uint32_t _mv = (uint32_t)(d0);
       a3 = _mv;
@@ -1532,7 +1540,7 @@ void InitPlayer(void) {
       flag_n = (_cmp < 0);
       flag_c = ((uint32_t)_lhs < (uint32_t)_rhs);
     }
-  if (flag_n!=flag_v) Short(); return;  /* less than (signed) */  /* BLT.B	Short */
+  if (flag_n!=flag_v) { Short(); return; }  /* less than (signed) */  /* BLT.B	Short */
   {  /* MOVE.L	SongPtr(PC),A1 */
       uint32_t _mv = (uint32_t)(READ32((uintptr_t)SongPtr));
       a1 = _mv;
@@ -1700,7 +1708,7 @@ NoByte2:
 }
 
 
-/* --- Short --- */
+/* --- Short ---  (cross-function goto target) */
 static void Short(void) {
   d0 = (uint32_t)(int32_t)(int8_t)(EPR_ModuleTooShort);  /* MOVEQ	#EPR_ModuleTooShort,D0 */
   return;  /* RTS */
@@ -3421,9 +3429,11 @@ static void _ds_init(void) {
   WRITE32((uintptr_t)(_ds + 80), (uint32_t)(uintptr_t)PlayerName);
   WRITE32((uintptr_t)(_ds + 88), (uint32_t)(uintptr_t)Creator);
   WRITE32((uintptr_t)(_ds + 96), (uint32_t)(uintptr_t)Check2);
+  WRITE32((uintptr_t)(_ds + 104), (uint32_t)(uintptr_t)Interrupt);
   WRITE32((uintptr_t)(_ds + 112), (uint32_t)(uintptr_t)InitPlayer);
   WRITE32((uintptr_t)(_ds + 120), (uint32_t)(uintptr_t)EndPlayer);
   WRITE32((uintptr_t)(_ds + 128), (uint32_t)(uintptr_t)InitSound);
+  WRITE32((uintptr_t)(_ds + 136), (uint32_t)(uintptr_t)EndSound);
   WRITE32((uintptr_t)(_ds + 152), (uint32_t)(uintptr_t)SetVolume);
   WRITE32((uintptr_t)(_ds + 168), (uint32_t)(uintptr_t)SetVoices);
   WRITE32((uintptr_t)(_ds + 176), (uint32_t)(uintptr_t)StructInit);
