@@ -686,30 +686,48 @@ static uint8_t* Left1 = NULL;
 static uint8_t* Right1 = NULL;
 static uint8_t* Right2 = NULL;
 static uint8_t* Exit2 = NULL;
+static uint8_t* Ex = NULL;
+static uint8_t* _SetVoice = NULL;
 static uint8_t* _NoVoice1 = NULL;
 static uint8_t* _NoVoice2 = NULL;
 static uint8_t* _NoVoice3 = NULL;
 static uint8_t* _NoVoice4 = NULL;
+static uint8_t* _return = NULL;
+static uint8_t* EmptySamp = NULL;
+static uint8_t* hop = NULL;
+static uint8_t* Later = NULL;
+static uint8_t* fail = NULL;
 static uint8_t* Later1 = NULL;
+static uint8_t* FirstCheck = NULL;
+static uint8_t* Standard = NULL;
+static uint8_t* NextLong = NULL;
+static uint8_t* SecondCheck = NULL;
 static uint8_t* Later2 = NULL;
 static uint8_t* Play1 = NULL;
+static uint8_t* SkipPlay = NULL;
 static uint8_t* test1 = NULL;
+static uint8_t* test = NULL;
 static uint8_t* test2 = NULL;
 static uint8_t* test3 = NULL;
+static uint8_t* SkipEnd = NULL;
+static uint8_t* One = NULL;
+static uint8_t* PutSub = NULL;
+static uint8_t* LastSub = NULL;
+static uint8_t* Next = NULL;
+static uint8_t* FindFirst = NULL;
+static uint8_t* InfoOK = NULL;
+static uint8_t* Last = NULL;
+static uint8_t* CheckInfo = NULL;
+static uint8_t* NoFix = NULL;
+static uint8_t* ClearUPS = NULL;
+static uint8_t* Right = NULL;
+static uint8_t* FindMaxLength = NULL;
+static uint8_t* FindZero = NULL;
+static uint8_t* MaxLength = NULL;
+static uint8_t* NextLength = NULL;
+static uint8_t* Osemka = NULL;
 static uint8_t* lbC0230C8 = NULL;
 static uint8_t* lbC02318A = NULL;
-static uint8_t* lbC023246 = NULL;
-static uint8_t* lbC02322C = NULL;
-static uint8_t* lbC023232 = NULL;
-static uint8_t* lbC02321C = NULL;
-static uint8_t* lbC023342 = NULL;
-static uint8_t* lbC023328 = NULL;
-static uint8_t* lbC02332E = NULL;
-static uint8_t* lbC023318 = NULL;
-static uint8_t* lbC02343E = NULL;
-static uint8_t* lbC023424 = NULL;
-static uint8_t* lbC02342A = NULL;
-static uint8_t* lbC023414 = NULL;
 static uint8_t* lbC02353A = NULL;
 static uint8_t* lbC023520 = NULL;
 static uint8_t* lbC023526 = NULL;
@@ -724,23 +742,10 @@ static uint8_t* lbC023680 = NULL;
 static uint8_t* lbC023690 = NULL;
 static uint8_t* lbC0236B4 = NULL;
 static uint8_t* lbC023708 = NULL;
-static uint8_t* lbC023896 = NULL;
-static uint8_t* Exit3 = NULL;
+static uint8_t* _ok = NULL;
 static uint8_t* lbC009B5C = NULL;
 static uint8_t* lbC009C1E = NULL;
 static uint8_t* lbC009CAA = NULL;
-static uint8_t* lbC009CF8 = NULL;
-static uint8_t* lbC009CE0 = NULL;
-static uint8_t* lbC009CE6 = NULL;
-static uint8_t* lbC009CD0 = NULL;
-static uint8_t* lbC009E24 = NULL;
-static uint8_t* lbC009E0C = NULL;
-static uint8_t* lbC009E12 = NULL;
-static uint8_t* lbC009DFC = NULL;
-static uint8_t* lbC009F50 = NULL;
-static uint8_t* lbC009F38 = NULL;
-static uint8_t* lbC009F3E = NULL;
-static uint8_t* lbC009F28 = NULL;
 static uint8_t* lbC00A07C = NULL;
 static uint8_t* lbC00A064 = NULL;
 static uint8_t* lbC00A06A = NULL;
@@ -755,7 +760,6 @@ static uint8_t* lbC00A21A = NULL;
 static uint8_t* lbC00A22A = NULL;
 static uint8_t* lbC00A24E = NULL;
 static uint8_t* lbC00A2A0 = NULL;
-static uint8_t* Exit4 = NULL;
 
 /* -- Forward Declarations -------------------------------------------- */
 static void Play_2(void);
@@ -818,7 +822,10 @@ static void Found(void);
 static void GetInfos(void);
 static void SubSongRange(void);
 void InitPlayer(void);
+static void Wrong(void);
 static void EndPlayer(void);
+void InitSound(void);
+static void SubSongPtr(void);
 static void Init(void);
 static void lbC0231F6(void);
 static void lbC0232F6(void);
@@ -853,6 +860,9 @@ static void lbC00A504(void);
 static void lbC00A52C(void);
 static void lbC00A554(void);
 static void lbC00A57C(void);
+static void lbC02321C(void);
+static void lbC023318(void);
+static void lbC023414(void);
 static void lbC023768(void);
 static void lbC0237E0(void);
 static void lbC023750(void);
@@ -866,7 +876,12 @@ static void lbC023736(void);
 static void OKi(void);
 static void lbC0237F0(void);
 static void lbC023772(void);
+static void lbC023896(void);
 static void lbC0239D0(void);
+static void Exit3(void);
+static void lbC009CD0(void);
+static void lbC009DFC(void);
+static void lbC009F28(void);
 static void lbC00A302(void);
 static void lbC00A382(void);
 static void lbC00A2EA(void);
@@ -880,18 +895,19 @@ static void lbC00A2CA(void);
 static void OK_1(void);
 static void lbC00A39A(void);
 static void lbC00A30C(void);
-static void lbC00A586(void);
 static void lbC00A438(void);
-static void lbC00A460(void);
-static void lbC00A47E(void);
-void InitSound(void);
+static void lbC00A586(void);
+static void Exit4(void);
 void EndSound(void);
-static void _return(void);
-static void _error(void);
-static void fail(void);
-static void InitFail(void);
-static void Short(void);
-static void Skip(void);static void SetBalance(void);
+static void lbC02322C(void);
+static void lbC023246(void);
+static void lbC023328(void);
+static void lbC023342(void);
+static void lbC023424(void);
+static void lbC02343E(void);
+static void lbC0237C2(void);
+static void lbC023852(void);
+static void lbC02385E(void);
 static void lbC02386A(void);
 static void lbC0238C4(void);
 static void lbC0238E6(void);
@@ -899,19 +915,31 @@ static void lbC0238FC(void);
 static void lbC023908(void);
 static void lbC02391E(void);
 static void lbC023926(void);
-static void lbC0237C2(void);
 static void lbC02392E(void);
-static void lbC023852(void);
-static void lbC02385E(void);
+static void lbC009CE0(void);
+static void lbC009CF8(void);
+static void lbC009E0C(void);
+static void lbC009E24(void);
+static void lbC009F38(void);
+static void lbC009F50(void);
+static void lbC00A364(void);
+static void lbC00A3FA(void);
+static void lbC00A406(void);
 static void lbC00A412(void);
+static void lbC00A460(void);
+static void lbC00A47E(void);
 static void lbC00A492(void);
 static void lbC00A49E(void);
 static void lbC00A4B4(void);
 static void lbC00A4BC(void);
-static void lbC00A364(void);
 static void lbC00A4C4(void);
-static void lbC00A3FA(void);
-static void lbC00A406(void);
+static void lbC023232(void);
+static void lbC02332E(void);
+static void lbC02342A(void);
+static void lbC009CE6(void);
+static void lbC009E12(void);
+static void lbC009F3E(void);
+static void SetBalance(void);
 
 
 /* ====================================================================
@@ -1426,7 +1454,7 @@ static void SampleInit(void) {
       flag_n = ((int32_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-  if (flag_z) _return(); return;  /* equal / zero */  /* BEQ.B	return */
+  if (flag_z) goto _return;  /* equal / zero */  /* BEQ.B	return */
   {  /* MOVE.L	D0,A0 */
       uint32_t _mv = (uint32_t)(d0);
       a0 = _mv;
@@ -1441,7 +1469,7 @@ static void SampleInit(void) {
       flag_n = ((int32_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-  if (flag_z) _return(); return;  /* equal / zero */  /* BEQ.B	return */
+  if (flag_z) goto _return;  /* equal / zero */  /* BEQ.B	return */
   {  /* SUBQ.L	#1,D5 */
       uint32_t _sr = (uint32_t)(d5 - 1);
       d5 = (uint32_t)_sr;
@@ -1464,7 +1492,7 @@ hop:
       flag_n = ((int32_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-  if (flag_z) _return(); return;  /* equal / zero */  /* BEQ.B	return */
+  if (flag_z) goto _return;  /* equal / zero */  /* BEQ.B	return */
   {  /* MOVE.L	D0,A3 */
       uint32_t _mv = (uint32_t)(d0);
       a3 = _mv;
@@ -1584,7 +1612,7 @@ static void Check2(void) {
       flag_n = (_cmp < 0);
       flag_c = ((uint32_t)_lhs < (uint32_t)_rhs);
     }
-  if (!flag_z) fail(); return;  /* not equal / nonzero */  /* BNE.B	fail */
+  if (!flag_z) goto fail;  /* not equal / nonzero */  /* BNE.B	fail */
   {  /* TST.L	24(A0) */
       uint32_t _tst = (uint32_t)(READ32(a0 + 24));
       flag_z = (_tst == 0);
@@ -1611,7 +1639,7 @@ FirstCheck:
       flag_n = ((int16_t)(_tst) < 0);
       flag_c = 0; flag_v = 0;
     }
-  if (!flag_z) fail(); return;  /* not equal / nonzero */  /* BNE.B	fail */
+  if (!flag_z) goto fail;  /* not equal / nonzero */  /* BNE.B	fail */
   {  /* MOVE.W	(A1)+,D1 */
       uint16_t _mv = (uint16_t)(READ16_POST(a1));
       W(d1) = (uint16_t)_mv;
@@ -1619,10 +1647,10 @@ FirstCheck:
       flag_n = ((int16_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-  if (flag_n) fail(); return;  /* minus / negative */  /* BMI.B	fail */
-  if (flag_z) fail(); return;  /* equal / zero */  /* BEQ.B	fail */
+  if (flag_n) goto fail;  /* minus / negative */  /* BMI.B	fail */
+  if (flag_z) goto fail;  /* equal / zero */  /* BEQ.B	fail */
   flag_z = ((d1 & (1u << (0 & 31))) == 0);  /* BTST	#0,D1 */
-  if (!flag_z) fail(); return;  /* not equal / nonzero */  /* BNE.B	fail */
+  if (!flag_z) goto fail;  /* not equal / nonzero */  /* BNE.B	fail */
   if ((int16_t)(--d2) >= 0) goto FirstCheck;  /* DBF	D2,FirstCheck */
   d3 = (uint32_t)(int32_t)(int8_t)(3);  /* MOVEQ	#3,D3 */
 SecondCheck:
@@ -1647,7 +1675,7 @@ SecondCheck:
       flag_n = ((int16_t)(_tst) < 0);
       flag_c = 0; flag_v = 0;
     }
-  if (!flag_z) fail(); return;  /* not equal / nonzero */  /* BNE.B	fail */
+  if (!flag_z) goto fail;  /* not equal / nonzero */  /* BNE.B	fail */
   {  /* MOVE.W	(A1)+,D1 */
       uint16_t _mv = (uint16_t)(READ16_POST(a1));
       W(d1) = (uint16_t)_mv;
@@ -1655,10 +1683,10 @@ SecondCheck:
       flag_n = ((int16_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-  if (flag_n) fail(); return;  /* minus / negative */  /* BMI.B	fail */
-  if (flag_z) fail(); return;  /* equal / zero */  /* BEQ.B	fail */
+  if (flag_n) goto fail;  /* minus / negative */  /* BMI.B	fail */
+  if (flag_z) goto fail;  /* equal / zero */  /* BEQ.B	fail */
   flag_z = ((d1 & (1u << (0 & 31))) == 0);  /* BTST	#0,D1 */
-  if (!flag_z) fail(); return;  /* not equal / nonzero */  /* BNE.B	fail */
+  if (!flag_z) goto fail;  /* not equal / nonzero */  /* BNE.B	fail */
   a1 = (uint32_t)(a0 + 0 + d2);  /* LEA	0(A0),A1 */
   {  /* CMP.W	#$30,(A1) */
       int32_t _lhs = (int32_t)(READ16(a1));
@@ -2068,8 +2096,12 @@ PutSub:
       flag_n = (_cmp < 0);
       flag_c = ((uint32_t)_lhs < (uint32_t)_rhs);
     }
-  if (!flag_z) goto Wrong;  /* not equal / nonzero */  /* BNE.B	Wrong */
-FindFirst:
+  if (!flag_z) { Wrong(); return; }  /* not equal / nonzero */  /* BNE.B	Wrong */
+}
+
+
+/* --- FindFirst --- */
+static void FindFirst(void) {
   {  /* MOVE.L	A1,A2 */
       uint32_t _mv = (uint32_t)(a1);
       a2 = _mv;
@@ -2208,7 +2240,7 @@ NoFix:
 }
 
 
-/* --- Wrong --- */
+/* --- Wrong ---  (cross-function goto target) */
 static void Wrong(void) {
   d0 = (uint32_t)(int32_t)(int8_t)(EPR_UnknownFormat);  /* MOVEQ	#EPR_UnknownFormat,D0 */
   return;  /* RTS */
@@ -3054,46 +3086,54 @@ static void lbC0231F6(void) {
       flag_n = ((int16_t)(_tst) < 0);
       flag_c = 0; flag_v = 0;
     }
-  if (!flag_z) goto lbC023246;  /* not equal / nonzero */  /* BNE.L	lbC023246 */
+  if (!flag_z) { lbC023246(); return; }  /* not equal / nonzero */  /* BNE.L	lbC023246 */
   {  /* TST.L	lbL022DAA */
       uint32_t _tst = (uint32_t)(READ32((uintptr_t)lbL022DAA));
       flag_z = (_tst == 0);
       flag_n = ((int32_t)(_tst) < 0);
       flag_c = 0; flag_v = 0;
     }
-  if (!flag_z) goto lbC02322C;  /* not equal / nonzero */  /* BNE.L	lbC02322C */
+  if (!flag_z) { lbC02322C(); return; }  /* not equal / nonzero */  /* BNE.L	lbC02322C */
   {  /* TST.L	lbL022DBA */
       uint32_t _tst = (uint32_t)(READ32((uintptr_t)lbL022DBA));
       flag_z = (_tst == 0);
       flag_n = ((int32_t)(_tst) < 0);
       flag_c = 0; flag_v = 0;
     }
-  if (flag_z) goto lbC023246;  /* equal / zero */  /* BEQ.L	lbC023246 */
-  goto lbC023232;  /* BRA.L	lbC023232 */
-lbC02321C:
+  if (flag_z) { lbC023246(); return; }  /* equal / zero */  /* BEQ.L	lbC023246 */
+  lbC023232(); return;  /* BRA.L	lbC023232 */
+}
+
+
+/* --- lbC02321C ---  (cross-function goto target) */
+static void lbC02321C(void) {
   lbC02325A();  /* JSR	lbC02325A */
   lbC0232AE();  /* JSR	lbC0232AE */
   lbC0232F6(); return;  /* BRA.L	lbC0232F6 */
 }
 
 
-/* --- lbC02322C --- */
+/* --- lbC02322C ---  (cross-function goto target) */
 static void lbC02322C(void) {
   lbC023272();  /* JSR	lbC023272 */
-lbC023232:
+}
+
+
+/* --- lbC023232 ---  (cross-function goto target) */
+static void lbC023232(void) {
   {  /* TST.W	lbW022DA4 */
       uint16_t _tst = (uint16_t)(READ16((uintptr_t)lbW022DA4));
       flag_z = (_tst == 0);
       flag_n = ((int16_t)(_tst) < 0);
       flag_c = 0; flag_v = 0;
     }
-  if (flag_z) goto lbC02321C;  /* equal / zero */  /* BEQ.L	lbC02321C */
+  if (flag_z) { lbC02321C(); return; }  /* equal / zero */  /* BEQ.L	lbC02321C */
   lbC0232AE();  /* JSR	lbC0232AE */
   lbC0232F6(); return;  /* BRA.L	lbC0232F6 */
 }
 
 
-/* --- lbC023246 --- */
+/* --- lbC023246 ---  (cross-function goto target) */
 static void lbC023246(void) {
   {  /* TST.W	lbW022DA4 */
       uint16_t _tst = (uint16_t)(READ16((uintptr_t)lbW022DA4));
@@ -3245,46 +3285,54 @@ static void lbC0232F6(void) {
       flag_n = ((int16_t)(_tst) < 0);
       flag_c = 0; flag_v = 0;
     }
-  if (!flag_z) goto lbC023342;  /* not equal / nonzero */  /* BNE.L	lbC023342 */
+  if (!flag_z) { lbC023342(); return; }  /* not equal / nonzero */  /* BNE.L	lbC023342 */
   {  /* TST.L	lbL022DAE */
       uint32_t _tst = (uint32_t)(READ32((uintptr_t)lbL022DAE));
       flag_z = (_tst == 0);
       flag_n = ((int32_t)(_tst) < 0);
       flag_c = 0; flag_v = 0;
     }
-  if (!flag_z) goto lbC023328;  /* not equal / nonzero */  /* BNE.L	lbC023328 */
+  if (!flag_z) { lbC023328(); return; }  /* not equal / nonzero */  /* BNE.L	lbC023328 */
   {  /* TST.L	lbL022DBE */
       uint32_t _tst = (uint32_t)(READ32((uintptr_t)lbL022DBE));
       flag_z = (_tst == 0);
       flag_n = ((int32_t)(_tst) < 0);
       flag_c = 0; flag_v = 0;
     }
-  if (flag_z) goto lbC023342;  /* equal / zero */  /* BEQ.L	lbC023342 */
-  goto lbC02332E;  /* BRA.L	lbC02332E */
-lbC023318:
+  if (flag_z) { lbC023342(); return; }  /* equal / zero */  /* BEQ.L	lbC023342 */
+  lbC02332E(); return;  /* BRA.L	lbC02332E */
+}
+
+
+/* --- lbC023318 ---  (cross-function goto target) */
+static void lbC023318(void) {
   lbC023356();  /* JSR	lbC023356 */
   lbC0233AA();  /* JSR	lbC0233AA */
   lbC0233F2(); return;  /* BRA.L	lbC0233F2 */
 }
 
 
-/* --- lbC023328 --- */
+/* --- lbC023328 ---  (cross-function goto target) */
 static void lbC023328(void) {
   lbC02336E();  /* JSR	lbC02336E */
-lbC02332E:
+}
+
+
+/* --- lbC02332E ---  (cross-function goto target) */
+static void lbC02332E(void) {
   {  /* TST.W	lbW022DA4 */
       uint16_t _tst = (uint16_t)(READ16((uintptr_t)lbW022DA4));
       flag_z = (_tst == 0);
       flag_n = ((int16_t)(_tst) < 0);
       flag_c = 0; flag_v = 0;
     }
-  if (flag_z) goto lbC023318;  /* equal / zero */  /* BEQ.L	lbC023318 */
+  if (flag_z) { lbC023318(); return; }  /* equal / zero */  /* BEQ.L	lbC023318 */
   lbC0233AA();  /* JSR	lbC0233AA */
   lbC0233F2(); return;  /* BRA.L	lbC0233F2 */
 }
 
 
-/* --- lbC023342 --- */
+/* --- lbC023342 ---  (cross-function goto target) */
 static void lbC023342(void) {
   {  /* TST.W	lbW022DA4 */
       uint16_t _tst = (uint16_t)(READ16((uintptr_t)lbW022DA4));
@@ -3436,46 +3484,54 @@ static void lbC0233F2(void) {
       flag_n = ((int16_t)(_tst) < 0);
       flag_c = 0; flag_v = 0;
     }
-  if (!flag_z) goto lbC02343E;  /* not equal / nonzero */  /* BNE.L	lbC02343E */
+  if (!flag_z) { lbC02343E(); return; }  /* not equal / nonzero */  /* BNE.L	lbC02343E */
   {  /* TST.L	lbL022DB2 */
       uint32_t _tst = (uint32_t)(READ32((uintptr_t)lbL022DB2));
       flag_z = (_tst == 0);
       flag_n = ((int32_t)(_tst) < 0);
       flag_c = 0; flag_v = 0;
     }
-  if (!flag_z) goto lbC023424;  /* not equal / nonzero */  /* BNE.L	lbC023424 */
+  if (!flag_z) { lbC023424(); return; }  /* not equal / nonzero */  /* BNE.L	lbC023424 */
   {  /* TST.L	lbL022DC2 */
       uint32_t _tst = (uint32_t)(READ32((uintptr_t)lbL022DC2));
       flag_z = (_tst == 0);
       flag_n = ((int32_t)(_tst) < 0);
       flag_c = 0; flag_v = 0;
     }
-  if (flag_z) goto lbC02343E;  /* equal / zero */  /* BEQ.L	lbC02343E */
-  goto lbC02342A;  /* BRA.L	lbC02342A */
-lbC023414:
+  if (flag_z) { lbC02343E(); return; }  /* equal / zero */  /* BEQ.L	lbC02343E */
+  lbC02342A(); return;  /* BRA.L	lbC02342A */
+}
+
+
+/* --- lbC023414 ---  (cross-function goto target) */
+static void lbC023414(void) {
   lbC023452();  /* JSR	lbC023452 */
   lbC0234A6();  /* JSR	lbC0234A6 */
   lbC0234EE(); return;  /* BRA.L	lbC0234EE */
 }
 
 
-/* --- lbC023424 --- */
+/* --- lbC023424 ---  (cross-function goto target) */
 static void lbC023424(void) {
   lbC02346A();  /* JSR	lbC02346A */
-lbC02342A:
+}
+
+
+/* --- lbC02342A ---  (cross-function goto target) */
+static void lbC02342A(void) {
   {  /* TST.W	lbW022DA4 */
       uint16_t _tst = (uint16_t)(READ16((uintptr_t)lbW022DA4));
       flag_z = (_tst == 0);
       flag_n = ((int16_t)(_tst) < 0);
       flag_c = 0; flag_v = 0;
     }
-  if (flag_z) goto lbC023414;  /* equal / zero */  /* BEQ.L	lbC023414 */
+  if (flag_z) { lbC023414(); return; }  /* equal / zero */  /* BEQ.L	lbC023414 */
   lbC0234A6();  /* JSR	lbC0234A6 */
   lbC0234EE(); return;  /* BRA.L	lbC0234EE */
 }
 
 
-/* --- lbC02343E --- */
+/* --- lbC02343E ---  (cross-function goto target) */
 static void lbC02343E(void) {
   {  /* TST.W	lbW022DA4 */
       uint16_t _tst = (uint16_t)(READ16((uintptr_t)lbW022DA4));
@@ -4581,7 +4637,7 @@ static void lbC02386A(void) {
       flag_n = (_cmp < 0);
       flag_c = ((uint32_t)_lhs < (uint32_t)_rhs);
     }
-  if (!flag_z) goto lbC023896;  /* not equal / nonzero */  /* BNE.L	lbC023896 */
+  if (!flag_z) { lbC023896(); return; }  /* not equal / nonzero */  /* BNE.L	lbC023896 */
   {  /* MOVE.W	(A3)+,4(A0) */
       uint16_t _mv = (uint16_t)(READ16_POST(a3));
       hw_write16(a0 + 4, _mv);
@@ -4636,7 +4692,7 @@ static void lbC02386A(void) {
 }
 
 
-/* --- lbC023896 --- */
+/* --- lbC023896 ---  (cross-function goto target) */
 static void lbC023896(void) {
   {  /* MOVE.W	(A3)+,4(A0) */
       uint16_t _mv = (uint16_t)(READ16_POST(a3));
@@ -4715,7 +4771,7 @@ static void lbC0238C4(void) {
       flag_n = (_cmp < 0);
       flag_c = ((uint32_t)_lhs < (uint32_t)_rhs);
     }
-  if (!flag_z) goto Exit3;  /* not equal / nonzero */  /* BNE.B	Exit3 */
+  if (!flag_z) { Exit3(); return; }  /* not equal / nonzero */  /* BNE.B	Exit3 */
   {  /* MOVE.L	26(A0),D0 */
       uint32_t _mv = (uint32_t)(READ32(a0 + 26));
       d0 = _mv;
@@ -4736,7 +4792,11 @@ static void lbC0238C4(void) {
       flag_n = ((int32_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-Exit3:
+}
+
+
+/* --- Exit3 ---  (cross-function goto target) */
+static void Exit3(void) {
   {  /* ADDQ.L	#4,26(A0) */
       uint32_t _ar = (uint32_t)(READ32(a0 + 26) + 4);
       hw_write32(a0 + 26, (uint32_t)_ar);
@@ -5902,46 +5962,54 @@ lbC009CAA:
       flag_n = ((int16_t)(_tst) < 0);
       flag_c = 0; flag_v = 0;
     }
-  if (!flag_z) goto lbC009CF8;  /* not equal / nonzero */  /* BNE.L	lbC009CF8 */
+  if (!flag_z) { lbC009CF8(); return; }  /* not equal / nonzero */  /* BNE.L	lbC009CF8 */
   {  /* TST.L	lbL00975E */
       uint32_t _tst = (uint32_t)(READ32((uintptr_t)lbL00975E));
       flag_z = (_tst == 0);
       flag_n = ((int32_t)(_tst) < 0);
       flag_c = 0; flag_v = 0;
     }
-  if (!flag_z) goto lbC009CE0;  /* not equal / nonzero */  /* BNE.L	lbC009CE0 */
+  if (!flag_z) { lbC009CE0(); return; }  /* not equal / nonzero */  /* BNE.L	lbC009CE0 */
   {  /* TST.L	lbL00976E */
       uint32_t _tst = (uint32_t)(READ32((uintptr_t)lbL00976E));
       flag_z = (_tst == 0);
       flag_n = ((int32_t)(_tst) < 0);
       flag_c = 0; flag_v = 0;
     }
-  if (flag_z) goto lbC009CF8;  /* equal / zero */  /* BEQ.L	lbC009CF8 */
-  goto lbC009CE6;  /* BRA.L	lbC009CE6 */
-lbC009CD0:
+  if (flag_z) { lbC009CF8(); return; }  /* equal / zero */  /* BEQ.L	lbC009CF8 */
+  lbC009CE6(); return;  /* BRA.L	lbC009CE6 */
+}
+
+
+/* --- lbC009CD0 ---  (cross-function goto target) */
+static void lbC009CD0(void) {
   lbC009D0C();  /* JSR	lbC009D0C */
   lbC009D76();  /* JSR	lbC009D76 */
   lbC009DDA(); return;  /* BRA.L	lbC009DDA */
 }
 
 
-/* --- lbC009CE0 --- */
+/* --- lbC009CE0 ---  (cross-function goto target) */
 static void lbC009CE0(void) {
   lbC009D38();  /* JSR	lbC009D38 */
-lbC009CE6:
+}
+
+
+/* --- lbC009CE6 ---  (cross-function goto target) */
+static void lbC009CE6(void) {
   {  /* TST.W	lbW009758 */
       uint16_t _tst = (uint16_t)(READ16((uintptr_t)lbW009758));
       flag_z = (_tst == 0);
       flag_n = ((int16_t)(_tst) < 0);
       flag_c = 0; flag_v = 0;
     }
-  if (flag_z) goto lbC009CD0;  /* equal / zero */  /* BEQ.S	lbC009CD0 */
+  if (flag_z) { lbC009CD0(); return; }  /* equal / zero */  /* BEQ.S	lbC009CD0 */
   lbC009D76();  /* JSR	lbC009D76 */
   lbC009DDA(); return;  /* BRA.L	lbC009DDA */
 }
 
 
-/* --- lbC009CF8 --- */
+/* --- lbC009CF8 ---  (cross-function goto target) */
 static void lbC009CF8(void) {
   {  /* TST.W	lbW009758 */
       uint16_t _tst = (uint16_t)(READ16((uintptr_t)lbW009758));
@@ -6161,46 +6229,54 @@ static void lbC009DDA(void) {
       flag_n = ((int16_t)(_tst) < 0);
       flag_c = 0; flag_v = 0;
     }
-  if (!flag_z) goto lbC009E24;  /* not equal / nonzero */  /* BNE.L	lbC009E24 */
+  if (!flag_z) { lbC009E24(); return; }  /* not equal / nonzero */  /* BNE.L	lbC009E24 */
   {  /* TST.L	lbL009762 */
       uint32_t _tst = (uint32_t)(READ32((uintptr_t)lbL009762));
       flag_z = (_tst == 0);
       flag_n = ((int32_t)(_tst) < 0);
       flag_c = 0; flag_v = 0;
     }
-  if (!flag_z) goto lbC009E0C;  /* not equal / nonzero */  /* BNE.L	lbC009E0C */
+  if (!flag_z) { lbC009E0C(); return; }  /* not equal / nonzero */  /* BNE.L	lbC009E0C */
   {  /* TST.L	lbL009772 */
       uint32_t _tst = (uint32_t)(READ32((uintptr_t)lbL009772));
       flag_z = (_tst == 0);
       flag_n = ((int32_t)(_tst) < 0);
       flag_c = 0; flag_v = 0;
     }
-  if (flag_z) goto lbC009E24;  /* equal / zero */  /* BEQ.L	lbC009E24 */
-  goto lbC009E12;  /* BRA.L	lbC009E12 */
-lbC009DFC:
+  if (flag_z) { lbC009E24(); return; }  /* equal / zero */  /* BEQ.L	lbC009E24 */
+  lbC009E12(); return;  /* BRA.L	lbC009E12 */
+}
+
+
+/* --- lbC009DFC ---  (cross-function goto target) */
+static void lbC009DFC(void) {
   lbC009E38();  /* JSR	lbC009E38 */
   lbC009EA2();  /* JSR	lbC009EA2 */
   lbC009F06(); return;  /* BRA.L	lbC009F06 */
 }
 
 
-/* --- lbC009E0C --- */
+/* --- lbC009E0C ---  (cross-function goto target) */
 static void lbC009E0C(void) {
   lbC009E64();  /* JSR	lbC009E64 */
-lbC009E12:
+}
+
+
+/* --- lbC009E12 ---  (cross-function goto target) */
+static void lbC009E12(void) {
   {  /* TST.W	lbW009758 */
       uint16_t _tst = (uint16_t)(READ16((uintptr_t)lbW009758));
       flag_z = (_tst == 0);
       flag_n = ((int16_t)(_tst) < 0);
       flag_c = 0; flag_v = 0;
     }
-  if (flag_z) goto lbC009DFC;  /* equal / zero */  /* BEQ.S	lbC009DFC */
+  if (flag_z) { lbC009DFC(); return; }  /* equal / zero */  /* BEQ.S	lbC009DFC */
   lbC009EA2();  /* JSR	lbC009EA2 */
   lbC009F06(); return;  /* BRA.L	lbC009F06 */
 }
 
 
-/* --- lbC009E24 --- */
+/* --- lbC009E24 ---  (cross-function goto target) */
 static void lbC009E24(void) {
   {  /* TST.W	lbW009758 */
       uint16_t _tst = (uint16_t)(READ16((uintptr_t)lbW009758));
@@ -6420,46 +6496,54 @@ static void lbC009F06(void) {
       flag_n = ((int16_t)(_tst) < 0);
       flag_c = 0; flag_v = 0;
     }
-  if (!flag_z) goto lbC009F50;  /* not equal / nonzero */  /* BNE.L	lbC009F50 */
+  if (!flag_z) { lbC009F50(); return; }  /* not equal / nonzero */  /* BNE.L	lbC009F50 */
   {  /* TST.L	lbL009766 */
       uint32_t _tst = (uint32_t)(READ32((uintptr_t)lbL009766));
       flag_z = (_tst == 0);
       flag_n = ((int32_t)(_tst) < 0);
       flag_c = 0; flag_v = 0;
     }
-  if (!flag_z) goto lbC009F38;  /* not equal / nonzero */  /* BNE.L	lbC009F38 */
+  if (!flag_z) { lbC009F38(); return; }  /* not equal / nonzero */  /* BNE.L	lbC009F38 */
   {  /* TST.L	lbL009776 */
       uint32_t _tst = (uint32_t)(READ32((uintptr_t)lbL009776));
       flag_z = (_tst == 0);
       flag_n = ((int32_t)(_tst) < 0);
       flag_c = 0; flag_v = 0;
     }
-  if (flag_z) goto lbC009F50;  /* equal / zero */  /* BEQ.L	lbC009F50 */
-  goto lbC009F3E;  /* BRA.L	lbC009F3E */
-lbC009F28:
+  if (flag_z) { lbC009F50(); return; }  /* equal / zero */  /* BEQ.L	lbC009F50 */
+  lbC009F3E(); return;  /* BRA.L	lbC009F3E */
+}
+
+
+/* --- lbC009F28 ---  (cross-function goto target) */
+static void lbC009F28(void) {
   lbC009F64();  /* JSR	lbC009F64 */
   lbC009FCE();  /* JSR	lbC009FCE */
   lbC00A032(); return;  /* BRA.L	lbC00A032 */
 }
 
 
-/* --- lbC009F38 --- */
+/* --- lbC009F38 ---  (cross-function goto target) */
 static void lbC009F38(void) {
   lbC009F90();  /* JSR	lbC009F90 */
-lbC009F3E:
+}
+
+
+/* --- lbC009F3E ---  (cross-function goto target) */
+static void lbC009F3E(void) {
   {  /* TST.W	lbW009758 */
       uint16_t _tst = (uint16_t)(READ16((uintptr_t)lbW009758));
       flag_z = (_tst == 0);
       flag_n = ((int16_t)(_tst) < 0);
       flag_c = 0; flag_v = 0;
     }
-  if (flag_z) goto lbC009F28;  /* equal / zero */  /* BEQ.S	lbC009F28 */
+  if (flag_z) { lbC009F28(); return; }  /* equal / zero */  /* BEQ.S	lbC009F28 */
   lbC009FCE();  /* JSR	lbC009FCE */
   lbC00A032(); return;  /* BRA.L	lbC00A032 */
 }
 
 
-/* --- lbC009F50 --- */
+/* --- lbC009F50 ---  (cross-function goto target) */
 static void lbC009F50(void) {
   {  /* TST.W	lbW009758 */
       uint16_t _tst = (uint16_t)(READ16((uintptr_t)lbW009758));
@@ -7894,7 +7978,7 @@ static void lbC00A460(void) {
       flag_n = (_cmp < 0);
       flag_c = ((uint32_t)_lhs < (uint32_t)_rhs);
     }
-  if (!flag_z) goto Exit4;  /* not equal / nonzero */  /* BNE.B	Exit4 */
+  if (!flag_z) { Exit4(); return; }  /* not equal / nonzero */  /* BNE.B	Exit4 */
   {  /* MOVE.L	26(A0),D0 */
       uint32_t _mv = (uint32_t)(READ32(a0 + 26));
       d0 = _mv;
@@ -7915,7 +7999,11 @@ static void lbC00A460(void) {
       flag_n = ((int32_t)(_mv) < 0);
       flag_v = 0; flag_c = 0;
     }
-Exit4:
+}
+
+
+/* --- Exit4 ---  (cross-function goto target) */
+static void Exit4(void) {
   {  /* ADDQ.L	#4,26(A0) */
       uint32_t _ar = (uint32_t)(READ32(a0 + 26) + 4);
       hw_write32(a0 + 26, (uint32_t)_ar);
@@ -8502,6 +8590,8 @@ static void _ds_init(void) {
   WRITE32((uintptr_t)(_ds + 114), (uint32_t)(uintptr_t)SubSongRange);
   WRITE32((uintptr_t)(_ds + 122), (uint32_t)(uintptr_t)InitPlayer);
   WRITE32((uintptr_t)(_ds + 130), (uint32_t)(uintptr_t)EndPlayer);
+  WRITE32((uintptr_t)(_ds + 138), (uint32_t)(uintptr_t)InitSound);
+  WRITE32((uintptr_t)(_ds + 146), (uint32_t)(uintptr_t)EndSound);
   WRITE32((uintptr_t)(_ds + 154), (uint32_t)(uintptr_t)GetInfos);
   WRITE32((uintptr_t)(_ds + 162), (uint32_t)(uintptr_t)SampleInit);
   WRITE32((uintptr_t)(_ds + 170), (uint32_t)(uintptr_t)SetVolume);
@@ -8510,11 +8600,33 @@ static void _ds_init(void) {
   WRITE32((uintptr_t)(_ds + 202), (uint32_t)(uintptr_t)GetPosition);
   WRITE32((uintptr_t)(_ds + 416), (uint32_t)(uintptr_t)Prefix);
   WRITE32((uintptr_t)(_ds + 500), (uint32_t)(uintptr_t)lbC023840);
+  WRITE32((uintptr_t)(_ds + 504), (uint32_t)(uintptr_t)lbC02386A);
+  WRITE32((uintptr_t)(_ds + 508), (uint32_t)(uintptr_t)lbC0238C4);
+  WRITE32((uintptr_t)(_ds + 512), (uint32_t)(uintptr_t)lbC0238E6);
+  WRITE32((uintptr_t)(_ds + 516), (uint32_t)(uintptr_t)lbC0238FC);
+  WRITE32((uintptr_t)(_ds + 520), (uint32_t)(uintptr_t)lbC023908);
+  WRITE32((uintptr_t)(_ds + 524), (uint32_t)(uintptr_t)lbC02391E);
+  WRITE32((uintptr_t)(_ds + 528), (uint32_t)(uintptr_t)lbC023926);
+  WRITE32((uintptr_t)(_ds + 532), (uint32_t)(uintptr_t)lbC0237C2);
+  WRITE32((uintptr_t)(_ds + 536), (uint32_t)(uintptr_t)lbC02392E);
+  WRITE32((uintptr_t)(_ds + 540), (uint32_t)(uintptr_t)lbC02392E);
+  WRITE32((uintptr_t)(_ds + 544), (uint32_t)(uintptr_t)lbC023852);
+  WRITE32((uintptr_t)(_ds + 548), (uint32_t)(uintptr_t)lbC02385E);
   WRITE32((uintptr_t)(_ds + 552), (uint32_t)(uintptr_t)lbC0239C6);
   WRITE32((uintptr_t)(_ds + 556), (uint32_t)(uintptr_t)lbC023844);
   WRITE32((uintptr_t)(_ds + 1270), (uint32_t)(uintptr_t)lbC00A3EA);
+  WRITE32((uintptr_t)(_ds + 1274), (uint32_t)(uintptr_t)lbC00A412);
   WRITE32((uintptr_t)(_ds + 1278), (uint32_t)(uintptr_t)lbC00A460);
   WRITE32((uintptr_t)(_ds + 1282), (uint32_t)(uintptr_t)lbC00A47E);
+  WRITE32((uintptr_t)(_ds + 1286), (uint32_t)(uintptr_t)lbC00A492);
+  WRITE32((uintptr_t)(_ds + 1290), (uint32_t)(uintptr_t)lbC00A49E);
+  WRITE32((uintptr_t)(_ds + 1294), (uint32_t)(uintptr_t)lbC00A4B4);
+  WRITE32((uintptr_t)(_ds + 1298), (uint32_t)(uintptr_t)lbC00A4BC);
+  WRITE32((uintptr_t)(_ds + 1302), (uint32_t)(uintptr_t)lbC00A364);
+  WRITE32((uintptr_t)(_ds + 1306), (uint32_t)(uintptr_t)lbC00A4C4);
+  WRITE32((uintptr_t)(_ds + 1310), (uint32_t)(uintptr_t)lbC00A4C4);
+  WRITE32((uintptr_t)(_ds + 1314), (uint32_t)(uintptr_t)lbC00A3FA);
+  WRITE32((uintptr_t)(_ds + 1318), (uint32_t)(uintptr_t)lbC00A406);
   WRITE32((uintptr_t)(_ds + 1322), (uint32_t)(uintptr_t)lbC00A57C);
   WRITE32((uintptr_t)(_ds + 1326), (uint32_t)(uintptr_t)lbC00A3EE);
 }
