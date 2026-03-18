@@ -87,7 +87,7 @@ export function parseMIDILoricielFile(buffer: ArrayBuffer, filename: string): Tr
   if (!isMIDILoricielFormat(buf)) throw new Error('Not a MIDI Loriciel module');
 
   const baseName = filename.split('/').pop() ?? filename;
-  const moduleName = baseName.replace(/^midi\./i, '') || baseName;
+  const moduleName = baseName.replace(/^midi\./i, '').replace(/\.midi$/i, '') || baseName;
 
   const instruments: InstrumentConfig[] = [{
     id: 1, name: 'Sample 1', type: 'synth' as const,

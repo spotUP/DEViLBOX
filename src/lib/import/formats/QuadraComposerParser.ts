@@ -402,6 +402,7 @@ export async function parseQuadraComposerFile(
     initialSpeed: 6,
     initialBPM: Math.max(32, Math.min(255, initialBPM || 125)),
     linearPeriods: false,
+    noteExportOffset: 36,
     uadePatternLayout,
   };
 }

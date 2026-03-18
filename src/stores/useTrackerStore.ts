@@ -1524,7 +1524,6 @@ export const useTrackerStore = create<TrackerStore>()(
 
     setPatternOrder: (order) =>
       set((state) => {
-        console.warn('[TrackerStore] setPatternOrder called, length:', order.length);
         if (order.length > 0) {
           state.patternOrder = order;
           state.currentPositionIndex = 0;

@@ -1,12 +1,14 @@
 /**
- * SunVoxEngine.ts — Singleton AudioWorklet wrapper for SunVox WASM engine
+ * SunVoxEngine.ts — Singleton Worker+AudioWorklet wrapper for SunVox WASM engine
  *
- * Manages loading SunVox.wasm + SunVox.worklet.js and creating/communicating
- * with the AudioWorklet. Follows the HivelyEngine singleton pattern exactly.
+ * Architecture (Worker + SAB pattern, like Gearmulator):
+ *   SunVoxEngine (main thread)
+ *     → Worker (SunVox.worker.js) — runs WASM, renders into SharedArrayBuffer
+ *     → AudioWorkletNode (SunVox.worklet.js) — reads SAB, outputs to WebAudio
  *
- * Usage: call SunVoxEngine.getInstance() to get (or create) the singleton.
- * Async methods (createHandle, loadSong, etc.) send messages and await replies
- * via a Promise queue keyed by response type + optional handle.
+ * This decouples WASM from the audio thread. If WASM hangs or crashes, the
+ * Worker thread stalls but the audio thread (WorkletNode) just reads silence
+ * from the drained ring buffer. The tab never freezes.
  */
 
 import { getDevilboxAudioContext } from '@/utils/audio-context';
@@ -23,6 +25,16 @@ export interface SunVoxControl {
 export interface SunVoxModuleInfo {
   id: number;
   name: string;
+}
+
+export interface SunVoxModuleGraphEntry {
+  id: number;
+  name: string;
+  typeName: string;
+  flags: number;
+  inputs: number[];
+  outputs: number[];
+  controls: SunVoxControl[];
 }
 
 export interface SunVoxSongMeta {
@@ -59,12 +71,9 @@ interface PendingResolvers<T> {
 
 export class SunVoxEngine {
   private static instance: SunVoxEngine | null = null;
-  private static wasmBinary: ArrayBuffer | null = null;
-  private static jsCode: string | null = null;
-  private static loadedContexts: WeakSet<AudioContext> = new WeakSet();
-  private static initPromises: WeakMap<AudioContext, Promise<void>> = new WeakMap();
 
   private audioContext: AudioContext;
+  private worker: Worker | null = null;
   private workletNode: AudioWorkletNode | null = null;
   readonly output: GainNode;
 
@@ -73,7 +82,7 @@ export class SunVoxEngine {
   private _rejectInit: ((err: Error) => void) | null = null;
   private _disposed = false;
 
-  // Promise queues for async responses — keyed by "type:handle" or just "type"
+  // Promise queues for async responses — keyed by handle or "handle:moduleId"
   private _handleQueue: Array<PendingResolvers<number>> = [];
   private _songLoadedQueue: Map<number, PendingResolvers<SunVoxSongMeta>> = new Map();
   private _patternsQueue: Map<number, PendingResolvers<SunVoxPatternData[]>> = new Map();
@@ -82,6 +91,11 @@ export class SunVoxEngine {
   private _synthSavedQueue: Map<string, PendingResolvers<ArrayBuffer>> = new Map();
   private _modulesQueue: Map<number, PendingResolvers<SunVoxModuleInfo[]>> = new Map();
   private _controlsQueue: Map<string, PendingResolvers<SunVoxControl[]>> = new Map();
+  private _newModuleQueue: Array<PendingResolvers<number>> = [];
+  private _removeModuleQueue: Map<string, PendingResolvers<void>> = new Map();
+  private _connectQueue: Map<string, PendingResolvers<number>> = new Map();
+  private _disconnectQueue: Map<string, PendingResolvers<number>> = new Map();
+  private _moduleGraphQueue: Map<number, PendingResolvers<SunVoxModuleGraphEntry[]>> = new Map();
 
   private constructor() {
     this.audioContext = getDevilboxAudioContext();
@@ -112,14 +126,50 @@ export class SunVoxEngine {
 
   private async initialize(): Promise<void> {
     try {
-      console.log('[SunVoxEngine] ensureInitialized start');
-      await SunVoxEngine.ensureInitialized(this.audioContext);
-      console.log('[SunVoxEngine] ensureInitialized done, creating node');
-      this.createNode();
-      console.log('[SunVoxEngine] node created, init message sent');
+      const baseUrl = import.meta.env.BASE_URL || '/';
+
+      // Ensure AudioContext is running before addModule
+      if ((this.audioContext.state as string) !== 'running') {
+        this.audioContext.resume().catch(() => {});
+        for (let i = 0; i < 40 && (this.audioContext.state as string) !== 'running'; i++) {
+          await new Promise(resolve => setTimeout(resolve, 50));
+        }
+      }
+
+      // Register worklet (SAB reader — no WASM)
+      try {
+        await this.audioContext.audioWorklet.addModule(`${baseUrl}sunvox/SunVox.worklet.js`);
+      } catch {
+        // Already registered in this context — ignore
+      }
+
+      // Create AudioWorkletNode for SAB audio output
+      this.workletNode = new AudioWorkletNode(this.audioContext, 'sunvox-processor', {
+        outputChannelCount: [2],
+        numberOfOutputs: 1,
+      });
+      this.workletNode.connect(this.output);
+
+      // Create classic Worker — it loads SunVox WASM via importScripts and renders into SAB
+      // Cache-bust so Vite dev server always serves the latest worker script
+      this.worker = new Worker(`${baseUrl}sunvox/SunVox.worker.js?v=${Date.now()}`);
+      this.worker.onmessage = (e) => this.handleWorkerMessage(e.data);
+      this.worker.onerror = (e) => {
+        console.error('[SunVoxEngine] Worker error:', e);
+        const err = new Error(`SunVox worker error: ${e.message}`);
+        if (this._rejectInit) {
+          this._rejectInit(err);
+          this._rejectInit = null;
+          this._resolveInit = null;
+        }
+        this._rejectAll(err);
+      };
+
+      // Tell Worker to init WASM (Worker fetches SunVox.js/wasm itself via importScripts)
+      this.worker.postMessage({ type: 'init', sampleRate: this.audioContext.sampleRate });
+
     } catch (err) {
       console.error('[SunVoxEngine] Initialization failed:', err);
-      // Propagate to _initPromise so ready() rejects instead of hanging forever
       if (this._rejectInit) {
         this._rejectInit(err instanceof Error ? err : new Error(String(err)));
         this._rejectInit = null;
@@ -128,115 +178,14 @@ export class SunVoxEngine {
     }
   }
 
-  private static async ensureInitialized(context: AudioContext): Promise<void> {
-    if (this.loadedContexts.has(context)) return;
+  // ── Worker message dispatcher ──────────────────────────────────────────────
 
-    const existingPromise = this.initPromises.get(context);
-    if (existingPromise) return existingPromise;
-
-    const initPromise = (async () => {
-      const baseUrl = import.meta.env.BASE_URL || '/';
-
-      // AudioContext must be running for addModule to complete reliably.
-      // Fire-and-forget resume (never await — on iOS, awaiting resume() outside a
-      // synchronous gesture handler hangs forever). Poll briefly for state change.
-      // Cast to string: standardized-audio-context types AudioContextState without
-      // 'running' (uses 'interrupted' instead), causing TS2367 narrowing errors below.
-      if ((context.state as string) !== 'running') {
-        console.log('[SunVoxEngine] context suspended — resuming before addModule');
-        context.resume().catch(() => {});
-        // Give the context up to 2 s to reach 'running'. On desktop Chrome this
-        // takes < 10 ms; on iOS it requires a prior user gesture to succeed.
-        for (let i = 0; i < 40 && (context.state as string) !== 'running'; i++) {
-          await new Promise(resolve => setTimeout(resolve, 50));
-        }
-        if ((context.state as string) !== 'running') {
-          console.warn('[SunVoxEngine] AudioContext still suspended — addModule may hang');
-        }
-      }
-      console.log('[SunVoxEngine] calling addModule, context.state:', context.state);
-
-      // Register worklet module with this AudioContext
-      try {
-        await context.audioWorklet.addModule(`${baseUrl}sunvox/SunVox.worklet.js`);
-        console.log('[SunVoxEngine] addModule done');
-      } catch (e) {
-        // Module might already be registered in this context
-        console.warn('[SunVoxEngine] addModule threw (may be already registered):', e);
-      }
-
-      // Fetch WASM binary and JS glue code (cached across contexts)
-      console.log('[SunVoxEngine] fetching WASM + JS, cached:', !!this.wasmBinary);
-      if (!this.wasmBinary || !this.jsCode) {
-        const [wasmResponse, jsResponse] = await Promise.all([
-          fetch(`${baseUrl}sunvox/SunVox.wasm`),
-          fetch(`${baseUrl}sunvox/SunVox.js`),
-        ]);
-        console.log('[SunVoxEngine] fetch done, wasm ok:', wasmResponse.ok, 'js ok:', jsResponse.ok);
-
-        if (!wasmResponse.ok) throw new Error(`[SunVoxEngine] Failed to fetch SunVox.wasm: ${wasmResponse.status}`);
-        if (!jsResponse.ok) throw new Error(`[SunVoxEngine] Failed to fetch SunVox.js: ${jsResponse.status}`);
-
-        this.wasmBinary = await wasmResponse.arrayBuffer();
-
-        let code = await jsResponse.text();
-        // Transform Emscripten output for Function() execution inside the worklet
-        code = code
-          .replace(/import\.meta\.url/g, "'.'")
-          .replace(/export\s+default\s+\w+;?/g, '')
-          .replace(/var\s+wasmBinary;/, 'var wasmBinary = Module["wasmBinary"];')
-          // Mirror HEAPU8/HEAPF32 onto Module so the worklet can access them
-          // after memory grows (updateMemoryViews is closure-local in Emscripten)
-          .replace(
-            /HEAPU8=new Uint8Array\(b\);/,
-            'HEAPU8=new Uint8Array(b);Module["HEAPU8"]=HEAPU8;',
-          )
-          .replace(
-            /HEAPF32=new Float32Array\(b\);/,
-            'HEAPF32=new Float32Array(b);Module["HEAPF32"]=HEAPF32;',
-          );
-        this.jsCode = code;
-      }
-
-      this.loadedContexts.add(context);
-    })();
-
-    this.initPromises.set(context, initPromise);
-    return initPromise;
-  }
-
-  private createNode(): void {
-    const ctx = this.audioContext;
-
-    this.workletNode = new AudioWorkletNode(ctx, 'sunvox-processor', {
-      outputChannelCount: [2],
-      numberOfOutputs: 1,
-    });
-
-    this.workletNode.port.onmessage = (event) => {
-      this.handleWorkletMessage(event.data);
-    };
-
-    // Send WASM binary + JS glue code to the worklet for instantiation
-    // Send wasmBinary as Uint8Array for reliable structured clone transfer
-    this.workletNode.port.postMessage({
-      type: 'init',
-      sampleRate: ctx.sampleRate,
-      wasmBinary: SunVoxEngine.wasmBinary ? new Uint8Array(SunVoxEngine.wasmBinary) : null,
-      jsCode: SunVoxEngine.jsCode,
-    });
-
-    this.workletNode.connect(this.output);
-  }
-
-  // ── Worklet message dispatcher ─────────────────────────────────────────────
-
-  private handleWorkletMessage(data: {
+  private handleWorkerMessage(data: {
     type: string;
     handle?: number;
     moduleId?: number;
     buffer?: ArrayBuffer;
-    modules?: SunVoxModuleInfo[];
+    modules?: SunVoxModuleInfo[] | SunVoxModuleGraphEntry[];
     controls?: SunVoxControl[];
     patterns?: SunVoxPatternData[];
     songName?: string;
@@ -244,10 +193,19 @@ export class SunVoxEngine {
     speed?: number;
     patCount?: number;
     message?: string;
+    sab?: SharedArrayBuffer;
+    sourceId?: number;
+    destId?: number;
+    result?: number;
   }): void {
     switch (data.type) {
+
       case 'ready':
-        console.log('[SunVoxEngine] WASM ready');
+        // Worker is initialized — forward SAB to worklet, then resolve
+        if (data.sab && this.workletNode) {
+          this.workletNode.port.postMessage({ type: 'setSAB', sab: data.sab });
+        }
+        console.log('[SunVoxEngine] Worker ready, SAB forwarded to worklet');
         if (this._resolveInit) {
           this._resolveInit();
           this._resolveInit = null;
@@ -255,7 +213,7 @@ export class SunVoxEngine {
         }
         break;
 
-      case 'handle': {
+      case 'handleCreated': {
         const resolver = this._handleQueue.shift();
         if (resolver) resolver.resolve(data.handle!);
         break;
@@ -293,7 +251,7 @@ export class SunVoxEngine {
         break;
       }
 
-      case 'synthLoaded': {
+      case 'moduleLoaded': {
         const resolver = this._synthLoadedQueue.get(data.handle!);
         if (resolver) {
           this._synthLoadedQueue.delete(data.handle!);
@@ -331,16 +289,63 @@ export class SunVoxEngine {
         break;
       }
 
+      case 'moduleCreated': {
+        const resolver = this._newModuleQueue.shift();
+        if (resolver) resolver.resolve(data.moduleId!);
+        break;
+      }
+
+      case 'moduleRemoved': {
+        const key = `${data.handle}:${data.moduleId}`;
+        const resolver = this._removeModuleQueue.get(key);
+        if (resolver) {
+          this._removeModuleQueue.delete(key);
+          resolver.resolve();
+        }
+        break;
+      }
+
+      case 'modulesConnected': {
+        const key = `${data.handle}:${data.sourceId}:${data.destId}`;
+        const resolver = this._connectQueue.get(key);
+        if (resolver) {
+          this._connectQueue.delete(key);
+          resolver.resolve(data.result ?? 0);
+        }
+        break;
+      }
+
+      case 'modulesDisconnected': {
+        const key = `${data.handle}:${data.sourceId}:${data.destId}`;
+        const resolver = this._disconnectQueue.get(key);
+        if (resolver) {
+          this._disconnectQueue.delete(key);
+          resolver.resolve(data.result ?? 0);
+        }
+        break;
+      }
+
+      case 'moduleGraph': {
+        const resolver = this._moduleGraphQueue.get(data.handle!);
+        if (resolver) {
+          this._moduleGraphQueue.delete(data.handle!);
+          resolver.resolve((data.modules as SunVoxModuleGraphEntry[]) ?? []);
+        }
+        break;
+      }
+
+      case 'workerLog':
+        console.warn('[SunVoxEngine/Worker]', data.message);
+        break;
+
       case 'error': {
-        const err = new Error(data.message ?? 'SunVox worklet error');
+        const err = new Error(data.message ?? 'SunVox worker error');
         console.error('[SunVoxEngine]', data.message);
-        // Reject _initPromise if still pending
         if (this._rejectInit) {
           this._rejectInit(err);
           this._rejectInit = null;
           this._resolveInit = null;
         }
-        // Reject any other pending resolvers
         this._rejectAll(err);
         break;
       }
@@ -350,182 +355,190 @@ export class SunVoxEngine {
   private _rejectAll(err: Error): void {
     for (const r of this._handleQueue) r.reject(err);
     this._handleQueue.length = 0;
-
     for (const r of this._songLoadedQueue.values()) r.reject(err);
     this._songLoadedQueue.clear();
-
     for (const r of this._songSavedQueue.values()) r.reject(err);
     this._songSavedQueue.clear();
-
     for (const r of this._synthLoadedQueue.values()) r.reject(err);
     this._synthLoadedQueue.clear();
-
     for (const r of this._synthSavedQueue.values()) r.reject(err);
     this._synthSavedQueue.clear();
-
     for (const r of this._modulesQueue.values()) r.reject(err);
     this._modulesQueue.clear();
-
     for (const r of this._controlsQueue.values()) r.reject(err);
     this._controlsQueue.clear();
-
     for (const r of this._patternsQueue.values()) r.reject(err);
     this._patternsQueue.clear();
+    for (const r of this._newModuleQueue) r.reject(err);
+    this._newModuleQueue.length = 0;
+    for (const r of this._removeModuleQueue.values()) r.reject(err);
+    this._removeModuleQueue.clear();
+    for (const r of this._connectQueue.values()) r.reject(err);
+    this._connectQueue.clear();
+    for (const r of this._disconnectQueue.values()) r.reject(err);
+    this._disconnectQueue.clear();
+    for (const r of this._moduleGraphQueue.values()) r.reject(err);
+    this._moduleGraphQueue.clear();
   }
 
   // ── Public API ─────────────────────────────────────────────────────────────
 
-  /** Wait for WASM initialization to complete. */
   async ready(): Promise<void> {
     return this._initPromise;
   }
 
-  /**
-   * Create a new SunVox instance at the given sample rate.
-   * Returns the handle (integer ≥ 0) used for subsequent calls.
-   */
-  async createHandle(sampleRate: number): Promise<number> {
+  async createHandle(_sampleRate: number): Promise<number> {
     await this._initPromise;
-    if (this._disposed || !this.workletNode) {
-      throw new Error('[SunVoxEngine] Engine is disposed or not initialized');
-    }
+    if (this._disposed || !this.worker) throw new Error('[SunVoxEngine] not initialized');
     return new Promise<number>((resolve, reject) => {
       this._handleQueue.push({ resolve, reject });
-      this.workletNode!.port.postMessage({ type: 'create', sampleRate });
+      this.worker!.postMessage({ type: 'createHandle' });
     });
   }
 
-  /** Destroy a SunVox instance. Fire-and-forget. */
   destroyHandle(handle: number): void {
-    this.workletNode?.port.postMessage({ type: 'destroy', handle });
+    this.worker?.postMessage({ type: 'destroyHandle', handle });
   }
 
-  /** Load a .sunvox song file from an ArrayBuffer. Returns song metadata. */
   async loadSong(handle: number, buffer: ArrayBuffer): Promise<SunVoxSongMeta> {
     await this._initPromise;
-    if (this._disposed || !this.workletNode) {
-      throw new Error('[SunVoxEngine] Engine is disposed or not initialized');
-    }
+    if (this._disposed || !this.worker) throw new Error('[SunVoxEngine] not initialized');
     return new Promise<SunVoxSongMeta>((resolve, reject) => {
       this._songLoadedQueue.set(handle, { resolve, reject });
-      // Slice to keep the original buffer intact in the instrument store (IDB needs to clone it).
       const copy = buffer.slice(0);
-      this.workletNode!.port.postMessage({ type: 'loadSong', handle, buffer: copy }, [copy]);
+      this.worker!.postMessage({ type: 'loadSong', handle, buffer: copy }, [copy]);
     });
   }
 
-  /** Read all patterns from a loaded .sunvox song. */
   async getPatterns(handle: number): Promise<SunVoxPatternData[]> {
     await this._initPromise;
-    if (this._disposed || !this.workletNode) {
-      throw new Error('[SunVoxEngine] Engine is disposed or not initialized');
-    }
+    if (this._disposed || !this.worker) throw new Error('[SunVoxEngine] not initialized');
     return new Promise<SunVoxPatternData[]>((resolve, reject) => {
       this._patternsQueue.set(handle, { resolve, reject });
-      this.workletNode!.port.postMessage({ type: 'getPatterns', handle });
+      this.worker!.postMessage({ type: 'getPatterns', handle });
     });
   }
 
-  /** Save the current song to an ArrayBuffer. */
   async saveSong(handle: number): Promise<ArrayBuffer> {
     await this._initPromise;
-    if (this._disposed || !this.workletNode) {
-      throw new Error('[SunVoxEngine] Engine is disposed or not initialized');
-    }
+    if (this._disposed || !this.worker) throw new Error('[SunVoxEngine] not initialized');
     return new Promise<ArrayBuffer>((resolve, reject) => {
       this._songSavedQueue.set(handle, { resolve, reject });
-      this.workletNode!.port.postMessage({ type: 'saveSong', handle });
+      this.worker!.postMessage({ type: 'saveSong', handle });
     });
   }
 
-  /**
-   * Load a .sunsynth module file into the given SunVox instance.
-   * Returns the module_id assigned by SunVox.
-   */
   async loadSynth(handle: number, buffer: ArrayBuffer): Promise<number> {
     await this._initPromise;
-    if (this._disposed || !this.workletNode) {
-      throw new Error('[SunVoxEngine] Engine is disposed or not initialized');
-    }
+    if (this._disposed || !this.worker) throw new Error('[SunVoxEngine] not initialized');
     return new Promise<number>((resolve, reject) => {
       this._synthLoadedQueue.set(handle, { resolve, reject });
-      // Slice to keep the original buffer intact in the instrument store (IDB needs to clone it).
       const copy = buffer.slice(0);
-      this.workletNode!.port.postMessage({ type: 'loadSynth', handle, buffer: copy }, [copy]);
+      this.worker!.postMessage({ type: 'loadSynth', handle, buffer: copy }, [copy]);
     });
   }
 
-  /** Save a specific module as a .sunsynth ArrayBuffer. */
   async saveSynth(handle: number, moduleId: number): Promise<ArrayBuffer> {
     await this._initPromise;
-    if (this._disposed || !this.workletNode) {
-      throw new Error('[SunVoxEngine] Engine is disposed or not initialized');
-    }
+    if (this._disposed || !this.worker) throw new Error('[SunVoxEngine] not initialized');
     const key = `${handle}:${moduleId}`;
     return new Promise<ArrayBuffer>((resolve, reject) => {
       this._synthSavedQueue.set(key, { resolve, reject });
-      this.workletNode!.port.postMessage({ type: 'saveSynth', handle, moduleId });
+      this.worker!.postMessage({ type: 'saveSynth', handle, moduleId });
     });
   }
 
-  /** Get the list of modules (synthesizers, effects) in a SunVox instance. */
   async getModules(handle: number): Promise<SunVoxModuleInfo[]> {
     await this._initPromise;
-    if (this._disposed || !this.workletNode) {
-      throw new Error('[SunVoxEngine] Engine is disposed or not initialized');
-    }
+    if (this._disposed || !this.worker) throw new Error('[SunVoxEngine] not initialized');
     return new Promise<SunVoxModuleInfo[]>((resolve, reject) => {
       this._modulesQueue.set(handle, { resolve, reject });
-      this.workletNode!.port.postMessage({ type: 'getModules', handle });
+      this.worker!.postMessage({ type: 'getModules', handle });
     });
   }
 
-  /** Get the controls (parameters) of a specific module. */
   async getControls(handle: number, moduleId: number): Promise<SunVoxControl[]> {
     await this._initPromise;
-    if (this._disposed || !this.workletNode) {
-      throw new Error('[SunVoxEngine] Engine is disposed or not initialized');
-    }
+    if (this._disposed || !this.worker) throw new Error('[SunVoxEngine] not initialized');
     const key = `${handle}:${moduleId}`;
     return new Promise<SunVoxControl[]>((resolve, reject) => {
       this._controlsQueue.set(key, { resolve, reject });
-      this.workletNode!.port.postMessage({ type: 'getControls', handle, moduleId });
+      this.worker!.postMessage({ type: 'getControls', handle, moduleId });
     });
   }
 
-  /**
-   * Send an arbitrary message to the worklet.
-   * Use for fire-and-forget commands: noteOn, noteOff, setControl, play, stop.
-   */
-  sendMessage(msg: object, transfer?: Transferable[]): void {
-    if (!this.workletNode) return;
-    if (transfer && transfer.length > 0) {
-      this.workletNode.port.postMessage(msg, transfer);
-    } else {
-      this.workletNode.port.postMessage(msg);
-    }
+  /** Fire-and-forget: send a message directly to the worker. */
+  sendMessage(msg: object): void {
+    this.worker?.postMessage(msg);
   }
 
-  // ── Convenience fire-and-forget helpers ────────────────────────────────────
+  play(handle: number): void { this.worker?.postMessage({ type: 'play', handle }); }
+  stop(handle: number): void { this.worker?.postMessage({ type: 'stop', handle }); }
 
   noteOn(handle: number, moduleId: number, note: number, vel: number): void {
-    this.sendMessage({ type: 'noteOn', handle, moduleId, note, vel });
+    this.worker?.postMessage({ type: 'noteOn', handle, moduleId, note, vel });
   }
 
   noteOff(handle: number, moduleId: number): void {
-    this.sendMessage({ type: 'noteOff', handle, moduleId });
+    this.worker?.postMessage({ type: 'noteOff', handle, moduleId });
   }
 
   setControl(handle: number, moduleId: number, ctlId: number, value: number): void {
-    this.sendMessage({ type: 'setControl', handle, moduleId, ctlId, value });
+    this.worker?.postMessage({ type: 'setControl', handle, moduleId, ctlId, value });
   }
 
-  play(handle: number): void {
-    this.sendMessage({ type: 'play', handle });
+  // ── Module CRUD (for modular editor) ──────────────────────────────────────
+
+  async newModule(handle: number, moduleType: string): Promise<number> {
+    await this._initPromise;
+    if (this._disposed || !this.worker) throw new Error('[SunVoxEngine] not initialized');
+    return new Promise<number>((resolve, reject) => {
+      this._newModuleQueue.push({ resolve, reject });
+      this.worker!.postMessage({ type: 'newModule', handle, moduleType });
+    });
   }
 
-  stop(handle: number): void {
-    this.sendMessage({ type: 'stop', handle });
+  async removeModule(handle: number, moduleId: number): Promise<void> {
+    await this._initPromise;
+    if (this._disposed || !this.worker) throw new Error('[SunVoxEngine] not initialized');
+    const key = `${handle}:${moduleId}`;
+    return new Promise<void>((resolve, reject) => {
+      this._removeModuleQueue.set(key, { resolve, reject });
+      this.worker!.postMessage({ type: 'removeModule', handle, moduleId });
+    });
+  }
+
+  async connectModules(handle: number, sourceId: number, destId: number): Promise<number> {
+    await this._initPromise;
+    if (this._disposed || !this.worker) throw new Error('[SunVoxEngine] not initialized');
+    const key = `${handle}:${sourceId}:${destId}`;
+    return new Promise<number>((resolve, reject) => {
+      this._connectQueue.set(key, { resolve, reject });
+      this.worker!.postMessage({ type: 'connectModules', handle, sourceId, destId });
+    });
+  }
+
+  async disconnectModules(handle: number, sourceId: number, destId: number): Promise<number> {
+    await this._initPromise;
+    if (this._disposed || !this.worker) throw new Error('[SunVoxEngine] not initialized');
+    const key = `${handle}:${sourceId}:${destId}`;
+    return new Promise<number>((resolve, reject) => {
+      this._disconnectQueue.set(key, { resolve, reject });
+      this.worker!.postMessage({ type: 'disconnectModules', handle, sourceId, destId });
+    });
+  }
+
+  setModuleControl(handle: number, moduleId: number, ctlId: number, value: number): void {
+    this.worker?.postMessage({ type: 'setModuleControl', handle, moduleId, ctlId, value });
+  }
+
+  async getModuleGraph(handle: number): Promise<SunVoxModuleGraphEntry[]> {
+    await this._initPromise;
+    if (this._disposed || !this.worker) throw new Error('[SunVoxEngine] not initialized');
+    return new Promise<SunVoxModuleGraphEntry[]>((resolve, reject) => {
+      this._moduleGraphQueue.set(handle, { resolve, reject });
+      this.worker!.postMessage({ type: 'getModuleGraph', handle });
+    });
   }
 
   // ── Teardown ───────────────────────────────────────────────────────────────
@@ -533,7 +546,8 @@ export class SunVoxEngine {
   dispose(): void {
     this._disposed = true;
     this._rejectAll(new Error('SunVoxEngine disposed'));
-    this.workletNode?.port.postMessage({ type: 'dispose' });
+    this.worker?.terminate();
+    this.worker = null;
     this.workletNode?.disconnect();
     this.workletNode = null;
     if (SunVoxEngine.instance === this) {

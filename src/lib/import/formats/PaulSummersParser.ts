@@ -88,7 +88,7 @@ export function parsePaulSummersFile(buffer: ArrayBuffer, filename: string): Tra
   if (!isPaulSummersFormat(buf)) throw new Error('Not a Paul Summers module');
 
   const baseName = filename.split('/').pop() ?? filename;
-  const moduleName = baseName.replace(/^snk\./i, '') || baseName;
+  const moduleName = baseName.replace(/^snk\./i, '').replace(/\.snk$/i, '') || baseName;
 
   const instruments: InstrumentConfig[] = [
     {

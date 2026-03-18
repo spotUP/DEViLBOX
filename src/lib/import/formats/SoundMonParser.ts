@@ -453,6 +453,15 @@ export async function parseSoundMonFile(
       // LFO table provides vibrato parameters
       const hasLfo = synthInst.lfoControl > 0 && synthInst.lfoDepth > 0;
 
+      // Convert waveData (unsigned Uint8Array) to signed number[] for wavePCM
+      let wavePCM: number[] | undefined;
+      if (waveData && waveData.length > 0) {
+        wavePCM = new Array(waveData.length);
+        for (let j = 0; j < waveData.length; j++) {
+          wavePCM[j] = waveData[j] < 128 ? waveData[j] : waveData[j] - 256;
+        }
+      }
+
       const smConfig: SoundMonConfig = {
         type: 'synth',
         waveType: synthInst.table & 0x0F, // lower nibble as wave type index
@@ -471,6 +480,7 @@ export async function parseSoundMonFile(
         vibratoSpeed: hasLfo ? Math.min(63, synthInst.lfoSpeed) : 0,
         vibratoDepth: hasLfo ? Math.min(63, synthInst.lfoDepth) : 0,
         portamentoSpeed: 0,
+        wavePCM,
       };
 
       instrConfigs.push({
@@ -741,6 +751,7 @@ export async function parseSoundMonFile(
     initialSpeed: 6,
     initialBPM: 125,
     linearPeriods: false,
+    noteExportOffset: 36,
     uadePatternLayout,
   };
 }

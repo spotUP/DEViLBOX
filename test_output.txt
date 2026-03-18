@@ -1,0 +1,91 @@
+
+> devilbox@1.0.1 test
+> vitest run PumaTrackerParser.test.ts
+
+
+[1m[46m RUN [49m[22m [36mv4.0.18 [39m[90m/Users/spot/Code/DEViLBOX[39m
+
+[90mstdout[2m | src/lib/import/__tests__/PumaTrackerParser.test.ts[2m > [22m[2mparsePumaTrackerFile — muspe1.puma[2m > [22m[2mlogs format report
+[22m[39m╔════════════════════════════════════════
+║ FORMAT ANALYSIS: muspe1.puma
+║ Format: PumaTracker  Channels: 4  BPM: 125  Speed: 6  Periods: amiga
+║ Patterns: 20  Song length: 20
+║ Instruments: 14 total  (14 sample / 0 synth)
+║   PCM data: 14/14 have audio
+║   Loop types: forward×11, none×3
+║   Effects used: PortaUp(21), PortaDown(8), SetVolume(35), SetSpeed(1)
+║ Suggested editors: SampleEditor, LoopEditor
+╠────────────────────────────────────────
+║  #  1 "Instrument 1"  sample  1068b@16bit 8363Hz loop:forward
+║  #  2 "Instrument 2"  sample  1068b@16bit 8363Hz loop:forward
+║  #  3 "Instrument 3"  sample  1068b@16bit 8363Hz loop:forward
+║  #  4 "Instrument 4"  sample  1068b@16bit 8363Hz loop:forward
+║  #  5 "Instrument 5"  sample  2304b@16bit 8363Hz
+║  #  6 "Instrument 6"  sample  1068b@16bit 8363Hz loop:forward
+║  #  7 "Instrument 7"  sample  1068b@16bit 8363Hz loop:forward
+║  #  8 "Instrument 8"  sample  1068b@16bit 8363Hz loop:forward
+║  #  9 "Instrument 9"  sample  1068b@16bit 8363Hz loop:forward
+║  # 10 "Instrument 10"  sample  1068b@16bit 8363Hz loop:forward
+║  # 11 "Instrument 11"  sample  1068b@16bit 8363Hz loop:forward
+║  # 12 "Instrument 12"  sample  1068b@16bit 8363Hz loop:forward
+║  # 13 "Instrument 13"  sample  2520b@16bit 8363Hz
+║  # 14 "Instrument 14"  sample  3284b@16bit 8363Hz
+╚════════════════════════════════════════
+
+ [31m❯[39m src/lib/import/__tests__/PumaTrackerParser.test.ts [2m([22m[2m16 tests[22m[2m | [22m[31m1 failed[39m[2m)[22m[32m 72[2mms[22m[39m
+     [32m✓[39m detects muspe1.puma[32m 24[2mms[22m[39m
+     [32m✓[39m detects cyf-3-final-2.puma[32m 22[2mms[22m[39m
+     [32m✓[39m rejects all-zero buffer[32m 0[2mms[22m[39m
+     [32m✓[39m rejects buffer too small[32m 0[2mms[22m[39m
+     [32m✓[39m rejects buffer with wrong content[32m 0[2mms[22m[39m
+     [32m✓[39m parses without throwing[32m 4[2mms[22m[39m
+[31m     [31m×[31m returns format MOD[39m[32m 5[2mms[22m[39m
+     [32m✓[39m has 4 channels[32m 1[2mms[22m[39m
+     [32m✓[39m has at least one pattern[32m 1[2mms[22m[39m
+     [32m✓[39m has a valid song order[32m 2[2mms[22m[39m
+     [32m✓[39m has valid BPM and speed[32m 1[2mms[22m[39m
+     [32m✓[39m has instruments[32m 2[2mms[22m[39m
+     [32m✓[39m logs format report[32m 5[2mms[22m[39m
+     [32m✓[39m parses without throwing[32m 1[2mms[22m[39m
+     [32m✓[39m has 4 channels[32m 1[2mms[22m[39m
+     [32m✓[39m has at least one pattern[32m 1[2mms[22m[39m
+
+[31m⎯⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Tests 1 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m src/lib/import/__tests__/PumaTrackerParser.test.ts[2m > [22mparsePumaTrackerFile — muspe1.puma[2m > [22mreturns format MOD
+[31m[1mAssertionError[22m: expected 'PumaTracker' to be 'MOD' // Object.is equality[39m
+
+Expected: [32m"MOD"[39m
+Received: [31m"PumaTracker"[39m
+
+[36m [2m❯[22m src/lib/import/__tests__/PumaTrackerParser.test.ts:[2m55:25[22m[39m
+    [90m 53| [39m  [34mit[39m([32m'returns format MOD'[39m[33m,[39m [35masync[39m () [33m=>[39m {
+    [90m 54| [39m    const song = await parsePumaTrackerFile(loadAB(PUMA_FILE_1), 'musp…
+    [90m 55| [39m    [34mexpect[39m(song[33m.[39mformat)[33m.[39m[34mtoBe[39m([32m'MOD'[39m)[33m;[39m
+    [90m   | [39m                        [31m^[39m
+    [90m 56| [39m  })[33m;[39m
+    [90m 57| [39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m1 failed[39m[22m[2m | [22m[1m[32m15 passed[39m[22m[90m (16)[39m
+[2m   Start at [22m 11:34:06
+[2m   Duration [22m 647ms[2m (transform 64ms, setup 0ms, import 116ms, tests 72ms, environment 325ms)[22m
+
+Generated version.json: {
+  buildNumber: '2755',
+  buildHash: 'c99dcc731',
+  timestamp: '2026-03-13T10:34:06.769Z'
+}
+Generated version.json: {
+  buildNumber: '2755',
+  buildHash: 'c99dcc731',
+  timestamp: '2026-03-13T10:34:06.770Z'
+}
+Generated version.json: {
+  buildNumber: '2755',
+  buildHash: 'c99dcc731',
+  timestamp: '2026-03-13T10:34:06.773Z'
+}

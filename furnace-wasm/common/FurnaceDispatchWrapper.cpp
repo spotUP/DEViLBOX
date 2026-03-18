@@ -17,6 +17,15 @@
 #define EMSCRIPTEN_KEEPALIVE
 #endif
 
+// Sample format encoders (all compiled into WASM)
+extern "C" long brrEncode(short* buf, unsigned char* out, long len, long loopStart, unsigned char emphasis, unsigned char noFilter);
+extern "C" void yma_encode(short* buffer, unsigned char* outbuffer, long len);
+extern "C" void ymb_encode(short* buffer, unsigned char* outbuffer, long len);
+extern "C" void ymz_encode(short* buffer, unsigned char* outbuffer, long len);
+extern "C" void oki_encode(short* buffer, unsigned char* outbuffer, long len);
+extern "C" void oki6258_encode(short* buffer, unsigned char* outbuffer, long len);
+extern "C" void bs_encode(short* buffer, unsigned char* outbuffer, long len);
+
 // Forward declarations for DivEngineStub.cpp functions
 extern "C" {
   void engine_set_instrument(int index, DivInstrument* ins);
@@ -3603,7 +3612,64 @@ void furnace_dispatch_render_samples(int handle) {
     // Without this, SNES/SPC700 plays with empty sampleMem because dataBRR is NULL.
     for (int i = 0; i < sLen; i++) {
       DivSample* smp = it->second->engine.song.sample[i];
-      if (smp) smp->render(0xffffffff);
+      if (smp) {
+        // DivSample::render() is not available in WASM (sample.cpp not compiled).
+        // Do inline conversion from 16-bit → 8-bit for chips that need it (Amiga, etc.)
+        if (smp->depth == DIV_SAMPLE_DEPTH_16BIT && smp->data16 && smp->samples > 0 && !smp->data8) {
+          smp->length8 = smp->samples;
+          smp->data8 = new signed char[(smp->samples + 4095) & (~0xfff)];
+          for (unsigned int j = 0; j < smp->samples; j++) {
+            smp->data8[j] = smp->data16[j] >> 8;
+          }
+        }
+        // Render all sample formats chips may need (since DivSample::render() is unavailable)
+        if (smp->depth == DIV_SAMPLE_DEPTH_16BIT && smp->data16 && smp->samples > 0) {
+          unsigned int n = smp->samples;
+          // BRR (SNES)
+          if (!smp->dataBRR) {
+            int brrBufLen = (((n + 15) / 16) + 1) * 9;
+            smp->dataBRR = new unsigned char[brrBufLen];
+            memset(smp->dataBRR, 0, brrBufLen);
+            smp->lengthBRR = brrEncode(smp->data16, smp->dataBRR, n,
+              smp->loop ? smp->loopStart : 0, smp->brrEmphasis ? 1 : 0, 0);
+          }
+          // ADPCM-A (YM2610)
+          if (!smp->dataA) {
+            smp->lengthA = (n + 1) / 2;
+            smp->dataA = new unsigned char[smp->lengthA];
+            memset(smp->dataA, 0, smp->lengthA);
+            yma_encode(smp->data16, smp->dataA, n);
+          }
+          // ADPCM-B (YM2608/YM2610)
+          if (!smp->dataB) {
+            smp->lengthB = (n + 1) / 2;
+            smp->dataB = new unsigned char[smp->lengthB];
+            memset(smp->dataB, 0, smp->lengthB);
+            ymb_encode(smp->data16, smp->dataB, n);
+          }
+          // YMZ280B ADPCM
+          if (!smp->dataZ) {
+            smp->lengthZ = (n + 1) / 2;
+            smp->dataZ = new unsigned char[(smp->lengthZ + 3) & ~3];
+            memset(smp->dataZ, 0, (smp->lengthZ + 3) & ~3);
+            ymz_encode(smp->data16, smp->dataZ, n);
+          }
+          // QSound ADPCM
+          if (!smp->dataQSoundA) {
+            smp->lengthQSoundA = (n + 1) / 2;
+            smp->dataQSoundA = new unsigned char[smp->lengthQSoundA];
+            memset(smp->dataQSoundA, 0, smp->lengthQSoundA);
+            bs_encode(smp->data16, smp->dataQSoundA, n);
+          }
+          // MSM6295 VOX ADPCM
+          if (!smp->dataVOX) {
+            smp->lengthVOX = (n + 1) / 2;
+            smp->dataVOX = new unsigned char[smp->lengthVOX];
+            memset(smp->dataVOX, 0, smp->lengthVOX);
+            oki_encode(smp->data16, smp->dataVOX, n);
+          }
+        }
+      }
     }
     it->second->dispatch->renderSamples(0);
     printf("[FurnaceDispatch] renderSamples POST: handle=%d done\n", handle);

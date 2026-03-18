@@ -734,11 +734,6 @@ export async function parseGDMFile(
 
   // ── Assemble TrackerSong ───────────────────────────────────────────────────
 
-  // For S3M-origin GDM files the notes use OpenMPT numbering (C-0=1, C-5=61).
-  // When exporting to ProTracker MOD we must subtract 60 semitones so that
-  // S3M C-5 (note=61) → ProTracker C-0 (period=1712 = FreqS3MTable[0]).
-  const noteExportOffset = (originalFormat === 3) ? -60 : undefined;
-
   return {
     name:            songTitle,
     format:          trackerFormat,
@@ -751,7 +746,9 @@ export async function parseGDMFile(
     initialSpeed:    tempo  > 0 ? tempo  : 6,
     initialBPM:      bpm    > 0 ? bpm    : 125,
     linearPeriods,
-    ...(noteExportOffset !== undefined ? { noteExportOffset } : {}),
+    // GDM uses OpenMPT note numbering where C-5 speed applies at note 61,
+    // but XM's 8363 Hz is at note 49. Compensate on sample side to keep note names.
+    xmRelNoteOffset: -12,
   };
 }
 

@@ -126,7 +126,7 @@ export async function parseMagneticFieldsPackerFile(
 
   const baseName = filename.split('/').pop() ?? filename;
   // Strip "mfp." prefix (case-insensitive)
-  const moduleName = baseName.replace(/^mfp\./i, '') || baseName;
+  const moduleName = baseName.replace(/^mfp\./i, '').replace(/\.mfp$/i, '') || baseName;
 
   // ── Instrument placeholders ───────────────────────────────────────────────
 

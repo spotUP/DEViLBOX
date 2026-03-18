@@ -28,6 +28,7 @@
 #endif
 
 #include <emscripten.h>
+#include <emscripten/console.h>
 #include <cstring>
 #include <cstdlib>
 #include <cstdio>
@@ -122,8 +123,12 @@ int sunvox_wasm_create( int sample_rate )
     g_snd.channels = 2;
     g_snd.mode     = SOUND_MODE_FLOAT32;
 
+    emscripten_console_error("[WRAPPER] sunvox_wasm_create: about to init engine");
+
     memset( &g_engines[ h ], 0, sizeof( sunvox_engine ) );
     sunvox_engine_init( 0, &g_engines[ h ] );
+
+    emscripten_console_error("[WRAPPER] sunvox_wasm_create: engine initialized OK");
 
     g_engine_used[ h ]        = true;
     g_engine_sample_rate[ h ] = sample_rate;
@@ -151,10 +156,13 @@ void sunvox_wasm_destroy( int handle )
 EMSCRIPTEN_KEEPALIVE
 void sunvox_wasm_load_song( int handle, const char *path )
 {
+    emscripten_console_error("[WRAPPER] sunvox_wasm_load_song ENTRY");
     if ( !handle_valid( handle ) || !path )
         return;
 
+    emscripten_console_error("[WRAPPER] about to call sunvox_load_song");
     sunvox_load_song( (const UTF8_CHAR *)path, &g_engines[ handle ] );
+    emscripten_console_error("[WRAPPER] sunvox_load_song returned");
 }
 
 /*

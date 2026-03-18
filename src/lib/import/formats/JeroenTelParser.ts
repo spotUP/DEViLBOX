@@ -176,7 +176,7 @@ export async function parseJeroenTelFile(
   const baseName = (filename.split('/').pop() ?? filename);
   // Strip "jt." or "mon_old." prefix (case-insensitive)
   const moduleName =
-    baseName.replace(/^jt\./i, '').replace(/^mon_old\./i, '') || baseName;
+    baseName.replace(/^jt\./i, '').replace(/^mon_old\./i, '').replace(/\.jt$/i, '') || baseName;
 
   // ── Instrument count from scan ─────────────────────────────────────────────
 

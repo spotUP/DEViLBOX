@@ -166,7 +166,7 @@ export async function parseCustomMadeFile(
 
   const baseName = filename.split('/').pop() ?? filename;
   // Strip "cm.", "rk.", or "rkb." prefix (case-insensitive)
-  const moduleName = baseName.replace(/^(cm|rk|rkb)\./i, '') || baseName;
+  const moduleName = baseName.replace(/^(cm|rk|rkb)\./i, '').replace(/\.(cm|rk|rkb)$/i, '') || baseName;
 
   // ── Instrument placeholders ───────────────────────────────────────────────
 

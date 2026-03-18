@@ -152,7 +152,7 @@ export async function parseAnders0landFile(
 
   const baseName = filename.split('/').pop() ?? filename;
   // Strip "hot." prefix (case-insensitive)
-  const moduleName = baseName.replace(/^hot\./i, '') || baseName;
+  const moduleName = baseName.replace(/^hot\./i, '').replace(/\.hot$/i, '') || baseName;
 
   // ── Parse chunk offsets to extract metadata from mdt ──────────────────────
 

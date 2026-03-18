@@ -752,6 +752,7 @@ function parseInternal(bytes: Uint8Array, filename: string): TrackerSong | null 
     initialSpeed: speed,
     initialBPM: bpm,
     linearPeriods: false,
+    noteExportOffset: 36,
     uadeEditableFileData: bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer,
     uadeEditableFileName: filename,
     uadeVariableLayout: variableLayout,

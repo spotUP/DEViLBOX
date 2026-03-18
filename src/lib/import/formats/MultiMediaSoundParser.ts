@@ -106,7 +106,7 @@ export function parseMultiMediaSoundFile(buffer: ArrayBuffer, filename: string):
   const baseName = filename.split('/').pop() ?? filename;
   // Strip "MMS." or "SFX20." prefix (case-insensitive)
   const moduleName =
-    baseName.replace(/^mms\./i, '').replace(/^sfx20\./i, '') || baseName;
+    baseName.replace(/^mms\./i, '').replace(/^sfx20\./i, '').replace(/\.mms$/i, '').replace(/\.sfx20$/i, '') || baseName;
 
   // ── Instrument placeholder ────────────────────────────────────────────────
 

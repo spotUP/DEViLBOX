@@ -84,7 +84,7 @@ export function parseOnEscapeeFile(buffer: ArrayBuffer, filename: string): Track
   if (!isOnEscapeeFormat(buf)) throw new Error('Not an onEscapee module');
 
   const baseName = filename.split('/').pop() ?? filename;
-  const moduleName = baseName.replace(/^one\./i, '') || baseName;
+  const moduleName = baseName.replace(/^one\./i, '').replace(/\.one$/i, '') || baseName;
 
   const instruments: InstrumentConfig[] = [{
     id: 1, name: 'Sample 1', type: 'synth' as const,

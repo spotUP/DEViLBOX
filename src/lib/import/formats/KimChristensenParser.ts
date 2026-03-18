@@ -123,7 +123,7 @@ export function parseKimChristensenFile(buffer: ArrayBuffer, filename: string): 
   if (!isKimChristensenFormat(buf)) throw new Error('Not a Kim Christensen module');
 
   const baseName = filename.split('/').pop() ?? filename;
-  const moduleName = baseName.replace(/^kim\./i, '') || baseName;
+  const moduleName = baseName.replace(/^kim\./i, '').replace(/\.kim$/i, '') || baseName;
 
   const instruments: InstrumentConfig[] = [{
     id: 1, name: 'Sample 1', type: 'synth' as const,

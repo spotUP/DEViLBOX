@@ -674,6 +674,14 @@ export function convertHivelyToTrackerSong(mod: HivelyModule, fileName: string):
     initialSpeed: mod.defaultTempo,
     initialBPM: 125 * mod.speedMultiplier,
     linearPeriods: false, // HVL/AHX always use Amiga periods
+    // HVL/AHX note 1 = C-0 (XM note 1). MOD period table starts at note 25 (C-2).
+    // +24 aligns note 1 → note 25 for correct MOD periods.
+    // HVL/AHX note 1 = C-0 (XM note 1). +36 maps to MOD note 37 → period 1712,
+    // then clamped to 856 (C-1). Higher notes land at C-1 to B-3 naturally.
+    noteExportOffset: 36,
+    // For XM export (HVL >4ch): +12 aligns Amiga C-3 with XM C-4.
+    xmNoteExportOffset: 12,
+    xmRelNoteOffset: -12,
     hivelyMeta: {
       stereoMode: mod.stereoMode,
       mixGain: mod.mixGain,

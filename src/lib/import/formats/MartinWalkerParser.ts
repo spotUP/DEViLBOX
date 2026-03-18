@@ -217,7 +217,7 @@ export function parseMartinWalkerFile(buffer: ArrayBuffer, filename: string): Tr
   if (!isMartinWalkerFormat(buf)) throw new Error('Not a Martin Walker module');
 
   const baseName = filename.split('/').pop() ?? filename;
-  const moduleName = baseName.replace(/^(avp|mw)\./i, '') || baseName;
+  const moduleName = baseName.replace(/^(avp|mw)\./i, '').replace(/\.(avp|mw)$/i, '') || baseName;
 
   const instruments: InstrumentConfig[] = [{
     id: 1, name: 'Sample 1', type: 'synth' as const,

@@ -630,6 +630,7 @@ export function parseMEDFile(buffer: ArrayBuffer, filename: string): TrackerSong
     initialSpeed: tempo2 || 6,
     initialBPM: initialBPM,
     linearPeriods: false,
+    noteExportOffset: 36,
     uadePatternLayout,
   };
 }

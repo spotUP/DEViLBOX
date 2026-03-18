@@ -41,7 +41,7 @@ export function parseTitanicsPackerFile(buffer: ArrayBuffer, filename: string): 
   if (!isTitanicsPackerFormat(buf)) throw new Error('Not a Titanics Packer module');
 
   const baseName = filename.split('/').pop() ?? filename;
-  const moduleName = baseName.replace(/^TITS\./i, '') || baseName;
+  const moduleName = baseName.replace(/^TITS\./i, '').replace(/\.tits$/i, '') || baseName;
 
   const instruments: InstrumentConfig[] = [{
     id: 1, name: 'Sample 1', type: 'synth' as const,

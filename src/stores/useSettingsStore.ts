@@ -408,7 +408,7 @@ export const useSettingsStore = create<SettingsStore>()(
         fashionTracker: 'uade',       // FashionTrackerParser — dedicated Fashion Tracker support
         multiMediaSound: 'uade',      // MultiMediaSoundParser — dedicated MultiMedia Sound support
         seanConran: 'uade',           // SeanConranParser — dedicated Sean Conran support
-        thomasHermann: 'uade',        // ThomasHermannParser — dedicated Thomas Hermann support
+        thomasHermann: 'native',      // ThomasHermannParser — .tw stub extracts clean title + UADE classic audio
         titanicsPacker: 'uade',       // TitanicsPackerParser — dedicated Titanics Packer support
         krisHatlelid: 'uade',         // KrisHatlelidParser — dedicated Kris Hatlelid support
         ntsp: 'uade',                 // NTSPParser — dedicated NTSP System support

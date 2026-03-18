@@ -76,7 +76,7 @@ export function parseSoundPlayerFile(buffer: ArrayBuffer, filename: string): Tra
   if (!isSoundPlayerFormat(buf)) throw new Error('Not a Sound Player module');
 
   const baseName = (filename.split('/').pop() ?? filename).split('\\').pop() ?? filename;
-  const moduleName = baseName.replace(/^sjs\./i, '') || baseName;
+  const moduleName = baseName.replace(/^sjs\./i, '').replace(/\.sjs$/i, '') || baseName;
 
   const instruments: InstrumentConfig[] = [];
 

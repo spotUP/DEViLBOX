@@ -708,6 +708,8 @@ export async function parseDeltaMusic1File(buffer: ArrayBuffer, filename: string
     initialSpeed: 6,
     initialBPM: 125,
     linearPeriods: false,
+    // DM1 uses amigaNoteToXM (rawNote+12) → XM 13-48. MOD period table starts at 25.
+    noteExportOffset: 36,
     // uadePatternLayout omitted: native Sampler instruments handle audio directly.
     // UADE audio is unreliable for Delta Music — DM1Synth wavetable instruments
     // are now PCM Samplers; UADE chip RAM editing can be restored once audio works.

@@ -438,6 +438,9 @@ export async function parseJamCrackerFile(
     initialSpeed,
     initialBPM: 125,
     linearPeriods: false,
+    // amigaNoteToXM gives rawNote+12 (XM 13-48). MOD period table starts at note 25.
+    // +24 aligns Amiga C-1 (note 13) → MOD note 37 (period 1712 = C-1 extended).
+    noteExportOffset: 36,
     jamCrackerFileData: buffer.slice(0),
     uadePatternLayout,
   };

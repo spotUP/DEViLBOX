@@ -152,7 +152,7 @@ function parseMusicMakerFile(
   const buf = new Uint8Array(buffer);
 
   const baseName = filename.split('/').pop() ?? filename;
-  let moduleName = baseName.replace(/^(mm4|mm8|sdata)\./i, '') || baseName;
+  let moduleName = baseName.replace(/^(mm4|mm8|sdata)\./i, '').replace(/\.(mm4|mm8)$/i, '') || baseName;
 
   // Chunks are only present in IFF files; prefix-based legacy files have no IFF container.
   const isIFF = buf.length >= MIN_IFF_SIZE && readTag4(buf, 0) === 'FORM';

@@ -641,6 +641,8 @@ function assembleSong(
     initialSpeed,
     initialBPM:      INITIAL_BPM,
     linearPeriods:   false,   // FAR uses Amiga-style periods
+    // FAR_C5_SPEED = 16726 (2× base rate) causes relNote=+12 in XM export; compensate.
+    xmRelNoteOffset: -12,
     ...(uadeLayout ? { uadePatternLayout: uadeLayout } : {}),
   };
 }

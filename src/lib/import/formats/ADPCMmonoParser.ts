@@ -63,7 +63,7 @@ export function parseADPCMmonoFile(buffer: ArrayBuffer, filename: string): Track
   if (!isADPCMmonoFormat(buf, filename)) throw new Error('Not an ADPCM Mono module');
 
   const baseName = filename.split('/').pop() ?? filename;
-  const moduleName = baseName.replace(/^adpcm\./i, '') || baseName;
+  const moduleName = baseName.replace(/^adpcm\./i, '').replace(/\.adpcm$/i, '') || baseName;
 
   const instruments: InstrumentConfig[] = [{
     id: 1, name: 'Sample 1', type: 'synth' as const,

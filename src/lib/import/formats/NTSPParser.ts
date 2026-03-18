@@ -36,7 +36,7 @@ export function parseNTSPFile(buffer: ArrayBuffer, filename: string): TrackerSon
   if (!isNTSPFormat(buf)) throw new Error('Not a NTSP-system module');
 
   const baseName = filename.split('/').pop() ?? filename;
-  const moduleName = baseName.replace(/^two\./i, '') || baseName;
+  const moduleName = baseName.replace(/^two\./i, '').replace(/\.two$/i, '') || baseName;
 
   const instruments: InstrumentConfig[] = [{
     id: 1, name: 'Sample 1', type: 'synth' as const,

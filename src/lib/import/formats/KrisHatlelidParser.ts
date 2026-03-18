@@ -60,7 +60,7 @@ export function parseKrisHatlelidFile(buffer: ArrayBuffer, filename: string): Tr
   if (!isKrisHatlelidFormat(buf)) throw new Error('Not a Kris Hatlelid module');
 
   const baseName = filename.split('/').pop() ?? filename;
-  const moduleName = baseName.replace(/^KH\./i, '') || baseName;
+  const moduleName = baseName.replace(/^KH\./i, '').replace(/\.kh$/i, '') || baseName;
 
   const instruments: InstrumentConfig[] = [{
     id: 1, name: 'Sample 1', type: 'synth' as const,

@@ -293,7 +293,7 @@ export async function parseRobHubbardFile(
 
   // ── Module name from filename ─────────────────────────────────────────────
   const baseName = (filename.split('/').pop() ?? filename);
-  const moduleName = baseName.replace(/^rh\./i, '') || baseName;
+  const moduleName = baseName.replace(/^rh\./i, '').replace(/\.rh$/i, '') || baseName;
 
   // ── Extract sample configs ────────────────────────────────────────────────
   let blobResults: SampleBlobResult[] = [];

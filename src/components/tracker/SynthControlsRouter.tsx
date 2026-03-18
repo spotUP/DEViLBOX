@@ -105,6 +105,7 @@ const HarmonicSynthControls = lazy(() =>
 const ModularSynthControls = lazy(() =>
   import('@components/instruments/synths/modular/ModularSynthControls').then(m => ({ default: m.ModularSynthControls }))
 );
+import { SunVoxModularEditor } from '@components/instruments/synths/modular/SunVoxModularEditor';
 const TonewheelOrganControls = lazy(() =>
   import('@components/instruments/controls/TonewheelOrganControls').then(m => ({ default: m.TonewheelOrganControls }))
 );
@@ -309,6 +310,11 @@ export const SynthControlsRouter: React.FC<SynthControlsRouterProps> = ({ instru
     // ── ModularSynth ────────────────────────────────────────
     if (synthType === 'ModularSynth') {
       return <ModularSynthControls config={instrument} onChange={onUpdate} />;
+    }
+
+    // ── SunVox Modular ──────────────────────────────────────
+    if (synthType === 'SunVoxModular') {
+      return <SunVoxModularEditor config={instrument} onChange={onUpdate} />;
     }
 
     // ── VST-bridge synths ───────────────────────────────────

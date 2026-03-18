@@ -91,7 +91,7 @@ export function parseTomyTrackerFile(buffer: ArrayBuffer, filename: string): Tra
 
   const baseName = filename.split('/').pop() ?? filename;
   // Strip "SG." prefix (case-insensitive)
-  const moduleName = baseName.replace(/^sg\./i, '') || baseName;
+  const moduleName = baseName.replace(/^sg\./i, '').replace(/\.sg$/i, '') || baseName;
 
   // ── Pattern count from header ─────────────────────────────────────────────
 

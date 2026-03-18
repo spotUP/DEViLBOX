@@ -107,7 +107,7 @@ export function parsePeterVerswyvelenPackerFile(buffer: ArrayBuffer, filename: s
   if (!isPeterVerswyvelenPackerFormat(buf)) throw new Error('Not a Peter Verswyvelen Packer module');
 
   const baseName = (filename.split('/').pop() ?? filename).split('\\').pop() ?? filename;
-  const moduleName = baseName.replace(/^pvp\./i, '') || baseName;
+  const moduleName = baseName.replace(/^pvp\./i, '').replace(/\.pvp$/i, '') || baseName;
 
   const instruments: InstrumentConfig[] = [];
 

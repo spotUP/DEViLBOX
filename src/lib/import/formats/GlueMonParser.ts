@@ -96,7 +96,7 @@ export function parseGlueMonFile(buffer: ArrayBuffer, filename: string): Tracker
 
   // Fall back to the filename if the name field is empty
   const baseName = filename.split('/').pop() ?? filename;
-  const fileBaseName = baseName.replace(/^glue\./i, '').replace(/^gm\./i, '') || baseName;
+  const fileBaseName = baseName.replace(/^glue\./i, '').replace(/^gm\./i, '').replace(/\.glue$/i, '').replace(/\.gm$/i, '') || baseName;
 
   const moduleName = rawName || fileBaseName;
 

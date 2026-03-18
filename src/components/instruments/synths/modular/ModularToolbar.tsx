@@ -13,9 +13,11 @@ import { MODULAR_PRESETS } from '../../../../constants/modularPresets';
 interface ModularToolbarProps {
   config: ModularPatchConfig;
   onChange: (config: ModularPatchConfig) => void;
+  /** Optional prefix filter for ModuleShelf (e.g. "sv_" for SunVox modules) */
+  shelfPrefix?: string;
 }
 
-export const ModularToolbar: React.FC<ModularToolbarProps> = ({ config, onChange }) => {
+export const ModularToolbar: React.FC<ModularToolbarProps> = ({ config, onChange, shelfPrefix }) => {
   const handleAddModule = (descriptorId: string) => {
     const newModule = {
       id: `mod_${Date.now()}`,
@@ -58,44 +60,48 @@ export const ModularToolbar: React.FC<ModularToolbarProps> = ({ config, onChange
 
   return (
     <div className="flex items-center gap-3 px-4 py-2 bg-dark-bgSecondary border-b border-dark-border text-text-primary">
-      {/* Preset selector */}
-      <div className="flex items-center gap-2">
-        <span className="text-xs text-text-secondary">Preset:</span>
-        <select
-          onChange={(e) => handleLoadPreset(e.target.value)}
-          value=""
-          className="px-2 py-1 bg-dark-bgTertiary border border-dark-border rounded text-sm text-text-primary focus:outline-none focus:border-accent-primary"
-        >
-          <option value="" disabled className="bg-dark-bgSecondary">
-            Load preset...
-          </option>
-          <option value="init" className="bg-dark-bgSecondary">Init</option>
-          <option value="bass" className="bg-dark-bgSecondary">Bass</option>
-          <option value="pad" className="bg-dark-bgSecondary">Pad</option>
-          <option value="percussion" className="bg-dark-bgSecondary">Percussion</option>
-          <option value="fmBell" className="bg-dark-bgSecondary">FM Bell</option>
-          <option value="lead" className="bg-dark-bgSecondary">Lead</option>
-        </select>
-      </div>
+      {/* Preset selector — hidden for SunVox mode (uses different presets) */}
+      {!shelfPrefix && (
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-text-secondary">Preset:</span>
+          <select
+            onChange={(e) => handleLoadPreset(e.target.value)}
+            value=""
+            className="px-2 py-1 bg-dark-bgTertiary border border-dark-border rounded text-sm text-text-primary focus:outline-none focus:border-accent-primary"
+          >
+            <option value="" disabled className="bg-dark-bgSecondary">
+              Load preset...
+            </option>
+            <option value="init" className="bg-dark-bgSecondary">Init</option>
+            <option value="bass" className="bg-dark-bgSecondary">Bass</option>
+            <option value="pad" className="bg-dark-bgSecondary">Pad</option>
+            <option value="percussion" className="bg-dark-bgSecondary">Percussion</option>
+            <option value="fmBell" className="bg-dark-bgSecondary">FM Bell</option>
+            <option value="lead" className="bg-dark-bgSecondary">Lead</option>
+          </select>
+        </div>
+      )}
 
       {/* Add Module */}
-      <ModuleShelf onAddModule={handleAddModule} />
+      <ModuleShelf onAddModule={handleAddModule} prefix={shelfPrefix} />
 
-      {/* Polyphony selector */}
-      <div className="flex items-center gap-2">
-        <span className="text-xs text-text-secondary">Voices:</span>
-        <select
-          value={config.polyphony}
-          onChange={(e) => handlePolyphonyChange(parseInt(e.target.value, 10))}
-          className="px-2 py-1 bg-dark-bgTertiary border border-dark-border rounded text-sm text-text-primary focus:outline-none focus:border-accent-primary"
-        >
-          {[1, 2, 4, 8].map((n) => (
-            <option key={n} value={n} className="bg-dark-bgSecondary">
-              {n}
-            </option>
-          ))}
-        </select>
-      </div>
+      {/* Polyphony selector — hidden for SunVox (handles polyphony via MultiSynth) */}
+      {!shelfPrefix && (
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-text-secondary">Voices:</span>
+          <select
+            value={config.polyphony}
+            onChange={(e) => handlePolyphonyChange(parseInt(e.target.value, 10))}
+            className="px-2 py-1 bg-dark-bgTertiary border border-dark-border rounded text-sm text-text-primary focus:outline-none focus:border-accent-primary"
+          >
+            {[1, 2, 4, 8].map((n) => (
+              <option key={n} value={n} className="bg-dark-bgSecondary">
+                {n}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
 
       {/* View mode selector */}
       <div className="flex items-center gap-2">

@@ -197,6 +197,10 @@ function translateULTEffect(
       if (param > 0x2F) {
         return [XM_TEMPO, param];
       }
+      if (param === 0) {
+        // ULT speed=0 means "set speed to 6 and BPM to 125" (OpenMPT postFixSpeedCommands)
+        return [XM_SPEED, 6];
+      }
       return [XM_SPEED, param];
 
     default:
@@ -696,8 +700,10 @@ export async function parseULTFile(
     songLength:      orderList.length,
     restartPosition: restartPos,
     numChannels,
-    initialSpeed:    4,    // UltraTracker default speed
+    initialSpeed:    4,    // OpenMPT default for ULT (no speed command = 6 ticks/row)
     initialBPM:      125,  // UltraTracker default BPM
     linearPeriods:   false,
+    // ULT c5Speed = speed*2 causes relNote=+12 in XM export; compensate.
+    xmRelNoteOffset: -12,
   };
 }

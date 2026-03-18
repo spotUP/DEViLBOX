@@ -8,7 +8,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { readFile } from 'fs/promises';
-import { basename } from 'path';
+import { basename, dirname, join } from 'path';
 import { callBrowser } from './wsRelay';
 
 const API_BASE = `http://localhost:${process.env.PORT || 3001}`;
@@ -1147,11 +1147,28 @@ export function createMcpServer(): McpServer {
         const fileData = await readFile(p.path);
         const base64 = fileData.toString('base64');
         const filename = basename(p.path);
+
+        // Auto-scan for companion files (e.g. .nt for StarTrekker AM)
+        const companionFiles: Record<string, string> = {};
+        const dir = dirname(p.path);
+        const companionCandidates = [
+          `${p.path}.nt`,
+          join(dir, `${filename}.nt`),
+          join(dir, filename.replace(/\.[^.]+$/, '.nt')),
+        ];
+        for (const candidate of companionCandidates) {
+          try {
+            const compData = await readFile(candidate);
+            companionFiles[basename(candidate)] = compData.toString('base64');
+          } catch { /* not found */ }
+        }
+
         return textResult(await callBrowser('load_file', {
           filename,
           data: base64,
           subsong: p.subsong,
           useLibopenmpt: p.useLibopenmpt,
+          ...(Object.keys(companionFiles).length > 0 ? { companionFiles } : {}),
         }));
       } catch (e) {
         return textResult({ error: `Failed to read file: ${(e as Error).message}` });

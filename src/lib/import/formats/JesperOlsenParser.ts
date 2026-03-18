@@ -166,7 +166,7 @@ export function parseJesperOlsenFile(buffer: ArrayBuffer, filename: string): Tra
   if (!isJesperOlsenFormat(buf)) throw new Error('Not a Jesper Olsen module');
 
   const baseName = filename.split('/').pop() ?? filename;
-  const moduleName = baseName.replace(/^jo\./i, '') || baseName;
+  const moduleName = baseName.replace(/^jo\./i, '').replace(/\.jo$/i, '') || baseName;
 
   const instruments: InstrumentConfig[] = [{
     id: 1, name: 'Sample 1', type: 'synth' as const,

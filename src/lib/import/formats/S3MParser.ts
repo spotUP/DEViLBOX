@@ -553,5 +553,9 @@ export function parseS3MFile(buffer: ArrayBuffer, filename: string): TrackerSong
     initialSpeed,
     initialBPM,
     linearPeriods:   false,
+    // S3M C-5 = XM C-5 (note 61). XM plays note 61 at 16726 Hz but S3M
+    // plays it at c5speed (typically 8363 Hz). Compensate on the sample side
+    // so note names match the original.
+    xmRelNoteOffset: -12,
   };
 }

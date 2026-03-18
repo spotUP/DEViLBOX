@@ -539,6 +539,7 @@ export function parseInStereo1File(bytes: Uint8Array, filename: string): Tracker
     initialSpeed: Math.max(1, song.startSpeed),
     initialBPM: 125,
     linearPeriods: false,
+    noteExportOffset: 36,
     uadePatternLayout,
   };
 }
