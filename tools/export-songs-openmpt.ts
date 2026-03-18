@@ -504,7 +504,7 @@ function exportToMOD(song: TrackerSong): ArrayBuffer {
     const inst = song.instruments[i];
     if (!inst || !inst.sample?.audioBuffer) {
       // Empty sample slot
-      samples.push({ name: '', length: 0, finetune: 0, volume: 0, loopStart: 0, loopLen: 0, pcm: new Int8Array(0) });
+      samples.push({ name: '', length: 0, finetune: 0, volume: 0, loopStart: 0, loopLen: 1, pcm: new Int8Array(0) });
       continue;
     }
 
@@ -554,14 +554,14 @@ function exportToMOD(song: TrackerSong): ArrayBuffer {
 
     const lengthWords = pcm.length / 2;
     const finetune = inst.metadata?.modPlayback?.finetune ?? 0;
-    const volume = Math.min(64, inst.metadata?.modPlayback?.defaultVolume ?? inst.volume != null ? 64 : 64);
+    const defVol = inst.metadata?.modPlayback?.defaultVolume;
+    const volume = (typeof defVol === 'number' && defVol >= 0) ? Math.min(64, Math.round(defVol)) : 64;
 
     let loopStartWords = 0;
-    let loopLenWords = 0;
+    let loopLenWords = 1; // ProTracker convention: loopLen=1 word = no loop
     if (inst.sample.loop && loopEndFrames > loopStartFrames) {
       loopStartWords = Math.floor(loopStartFrames / 2);
-      loopLenWords = Math.floor((loopEndFrames - loopStartFrames) / 2);
-      if (loopLenWords < 1) loopLenWords = 0;
+      loopLenWords = Math.max(1, Math.floor((loopEndFrames - loopStartFrames) / 2));
     }
 
     samples.push({
@@ -926,7 +926,7 @@ function exportToXM(song: TrackerSong): ArrayBuffer {
         loopStart,
         loopLen,
         loopType,
-        volume: 64,
+        volume: (() => { const dv = inst.metadata?.modPlayback?.defaultVolume; return (typeof dv === 'number' && dv >= 0) ? Math.min(64, Math.round(dv)) : 64; })(),
         finetune: Math.max(-128, Math.min(127, finetune)),
         relNote: Math.max(-96, Math.min(95, relNote)),
         panning: 128,
