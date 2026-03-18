@@ -615,7 +615,14 @@ export async function parseULTFile(
   // loopStart / loopEnd are in *bytes*. For 16-bit samples, the C++ reference
   // divides by 2 to get frame indices. We store loop in bytes for our WAV builder.
 
-  let pcmCursor = pcmDataStart;
+  // Calculate actual PCM start: file size minus total sample data
+  let totalSampleBytes = 0;
+  for (const hdr of sampleHeaders) {
+    if (hdr.sizeEnd > hdr.sizeStart) totalSampleBytes += hdr.sizeEnd - hdr.sizeStart;
+  }
+  const pcmStart = buffer.byteLength - totalSampleBytes;
+
+  let pcmCursor = pcmStart;
   const samplePCM: (Uint8Array | null)[] = [];
 
   for (let s = 0; s < numSamples; s++) {
