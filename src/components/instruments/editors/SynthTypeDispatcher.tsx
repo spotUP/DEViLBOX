@@ -100,6 +100,7 @@ const SuperColliderEditor = lazy(() => import('../SuperColliderEditor').then(m =
 const GearmulatorEditor = lazy(() => import('../GearmulatorEditor').then(m => ({ default: m.GearmulatorEditor })));
 const GearmulatorHardware = lazy(() => import('../gearmulator/GearmulatorHardware').then(m => ({ default: m.GearmulatorHardware })));
 const WobbleBassControls = lazy(() => import('../controls/WobbleBassControls').then(m => ({ default: m.WobbleBassControls })));
+const StartrekkerAMControls = lazy(() => import('../controls/StartrekkerAMControls').then(m => ({ default: m.StartrekkerAMControls })));
 
 // Lazy-loaded hardware UI components
 const HivelyHardware = lazy(() => import('../hardware/HivelyHardware').then(m => ({ default: m.HivelyHardware })));
@@ -120,7 +121,7 @@ const WavetableListEditor = lazy(() => import('./WavetableEditor').then(m => ({ 
 
 
 // Types
-export type EditorMode = 'generic' | 'tb303' | 'furnace' | 'buzzmachine' | 'sample' | 'dubsiren' | 'spacelaser' | 'v2' | 'sam' | 'synare' | 'mame' | 'mamechip' | 'dexed' | 'obxd' | 'wam' | 'tonewheelOrgan' | 'melodica' | 'vital' | 'odin2' | 'surge' | 'vstbridge' | 'harmonicsynth' | 'modular' | 'hively' | 'jamcracker' | 'soundmon' | 'sidmon' | 'digmug' | 'fc' | 'deltamusic1' | 'deltamusic2' | 'fred' | 'tfmx' | 'octamed' | 'sidmon1' | 'hippelcoso' | 'robhubbard' | 'davidwhittaker' | 'sonic-arranger' | 'musicline' | 'supercollider' | 'gearmulator' | 'wobblebass';
+export type EditorMode = 'generic' | 'tb303' | 'furnace' | 'buzzmachine' | 'sample' | 'dubsiren' | 'spacelaser' | 'v2' | 'sam' | 'synare' | 'mame' | 'mamechip' | 'dexed' | 'obxd' | 'wam' | 'tonewheelOrgan' | 'melodica' | 'vital' | 'odin2' | 'surge' | 'vstbridge' | 'harmonicsynth' | 'modular' | 'hively' | 'jamcracker' | 'soundmon' | 'sidmon' | 'digmug' | 'fc' | 'deltamusic1' | 'deltamusic2' | 'fred' | 'tfmx' | 'octamed' | 'sidmon1' | 'hippelcoso' | 'robhubbard' | 'davidwhittaker' | 'sonic-arranger' | 'musicline' | 'supercollider' | 'gearmulator' | 'wobblebass' | 'startrekker-am';
 
 // ============================================================================
 // GEARMULATOR EDITOR SECTION
@@ -1338,6 +1339,32 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
             <WobbleBassControls
               config={wbConfig}
               onChange={(wb) => handleChange({ wobbleBass: wb })}
+            />
+          </Suspense>
+        </div>
+      </div>
+    );
+  }
+
+  // ============================================================================
+  // STARTREKKER AM EDITOR
+  // ============================================================================
+  if (editorMode === 'startrekker-am') {
+    return (
+      <div className="synth-editor-container bg-gradient-to-b from-[#001a1a] to-[#000808]">
+        <EditorHeader
+          instrument={instrument}
+          onChange={handleChange}
+          vizMode={vizMode}
+          onVizModeChange={setVizMode}
+        />
+        <div className="flex-1 min-h-0 overflow-y-auto">
+          <Suspense fallback={<LoadingControls />}>
+            <StartrekkerAMControls
+              config={instrument.startrekkerAM ?? null}
+              instrumentName={instrument.name}
+              instrumentId={instrument.id}
+              onChange={(am) => handleChange({ startrekkerAM: am })}
             />
           </Suspense>
         </div>

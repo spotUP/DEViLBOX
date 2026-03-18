@@ -47,7 +47,15 @@ function parseNoteString(noteStr: string): number | undefined {
 
 function resolveNote(note: unknown): number | undefined {
   if (typeof note === 'number') return note;
-  if (typeof note === 'string') return parseNoteString(note);
+  if (typeof note === 'string') {
+    // Strip surrounding quotes from double-serialized JSON strings
+    let s = note;
+    if (s.startsWith('"') && s.endsWith('"')) s = s.slice(1, -1);
+    // Try parsing as integer first (e.g. "49" → 49)
+    const asNum = parseInt(s, 10);
+    if (!isNaN(asNum) && String(asNum) === s) return asNum;
+    return parseNoteString(s);
+  }
   return undefined;
 }
 
@@ -805,6 +813,18 @@ export async function loadFile(params: Record<string, unknown>): Promise<Record<
     }
     const arrayBuffer = bytes.buffer;
 
+    // Decode companion files (e.g. .nt for StarTrekker AM)
+    const companionFilesRaw = params.companionFiles as Record<string, string> | undefined;
+    const companionFiles = new Map<string, ArrayBuffer>();
+    if (companionFilesRaw) {
+      for (const [name, b64] of Object.entries(companionFilesRaw)) {
+        const cStr = atob(b64);
+        const cBytes = new Uint8Array(cStr.length);
+        for (let i = 0; i < cStr.length; i++) cBytes[i] = cStr.charCodeAt(i);
+        companionFiles.set(name, cBytes.buffer);
+      }
+    }
+
     // Create a File object (browser API)
     const file = new File([arrayBuffer], filename, { type: 'application/octet-stream' });
 
@@ -816,13 +836,52 @@ export async function loadFile(params: Record<string, unknown>): Promise<Record<
     const format = detectFormat(filename);
     const subsong = (params.subsong as number) ?? 0;
 
-    const loadResult = await unifiedLoadFile(file, { subsong });
+    let loadResult = await unifiedLoadFile(file, { subsong, companionFiles: companionFiles.size > 0 ? companionFiles : undefined });
     if (!loadResult.success) {
       throw new Error(loadResult.error || `Failed to load ${filename}`);
     }
     if (loadResult.success === 'pending-confirmation') {
       throw new Error(`${filename} requires user confirmation before loading`);
     }
+    // For tracker modules that need the import dialog, bypass it and import directly.
+    // Use parseModuleToSong directly (bypasses loadModuleFile/libopenmpt) so that
+    // Amiga/UADE formats that libopenmpt can't read are handled by their native parsers.
+    if (loadResult.success === 'pending-import') {
+      const { parseModuleToSong } = await import('../../lib/import/parseModuleToSong');
+      const song = await parseModuleToSong(file, subsong, undefined, undefined, companionFiles.size > 0 ? companionFiles : undefined);
+      // Apply the parsed song into the stores (mirrors importTrackerModule internals for native-only path)
+      const { useTrackerStore: ts } = await import('../../stores/useTrackerStore');
+      const { useInstrumentStore: is } = await import('../../stores/useInstrumentStore');
+      const { useTransportStore: trs } = await import('../../stores/useTransportStore');
+      const { useProjectStore: ps } = await import('../../stores/useProjectStore');
+      const { useFormatStore: fs } = await import('../../stores/useFormatStore');
+      const { getToneEngine } = await import('../../engine/ToneEngine');
+      const engine = getToneEngine();
+
+      const trackerActions = ts.getState();
+      const instrActions = is.getState();
+      const transportActions = trs.getState();
+      const projectActions = ps.getState();
+      const formatActions = fs.getState();
+
+      if (trs.getState().isPlaying) trs.getState().stop();
+      engine.releaseAll();
+      trs.getState().reset();
+      ts.getState().reset();
+      is.getState().reset();
+      engine.disposeAllInstruments();
+
+      instrActions.loadInstruments(song.instruments);
+      trackerActions.loadPatterns(song.patterns);
+      if (song.songPositions) trackerActions.setPatternOrder(song.songPositions);
+      transportActions.setBPM(song.initialBPM ?? 125);
+      projectActions.setMetadata({ name: song.name });
+      formatActions.applyEditorMode(song);
+      loadResult = { success: true, message: 'imported' };
+    }
+
+    // Wait for any deferred state updates (loadInstruments uses queueMicrotask)
+    await new Promise<void>(resolve => queueMicrotask(resolve));
 
     // Read back the result from stores
     const trackerState = useTrackerStore.getState();

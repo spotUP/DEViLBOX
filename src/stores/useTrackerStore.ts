@@ -439,6 +439,33 @@ export const useTrackerStore = create<TrackerStore>()(
           }
         }
       } catch { /* UADE not active */ }
+      // Sync edit to StarTrekker AM WASM engine (direct MOD pattern cell write)
+      try {
+        const fmt = require('./useFormatStore').useFormatStore.getState();
+        if (fmt.startrekkerAMFileData) {
+          const fullCell = get().patterns[patternIndex]?.channels[channelIndex]?.rows[rowIndex];
+          if (fullCell) {
+            import('@engine/startrekker-am/StartrekkerAMEngine').then(({ StartrekkerAMEngine }) => {
+              if (!StartrekkerAMEngine.hasInstance()) return;
+              // Encode TrackerCell → ProTracker 4-byte format
+              const note = fullCell.note;
+              const instr = fullCell.instrument;
+              // Reverse the period lookup from the parser
+              const PERIOD_TABLE = [
+                856,808,762,720,678,640,604,570,538,508,480,453,
+                428,404,381,360,339,320,302,285,269,254,240,226,
+                214,202,190,180,170,160,151,143,135,127,120,113,
+              ];
+              const period = (note >= 1 && note <= 36) ? PERIOD_TABLE[note - 1] : 0;
+              const b0 = ((instr & 0xF0) | ((period >> 8) & 0x0F));
+              const b1 = (period & 0xFF);
+              const b2 = (((instr & 0x0F) << 4) | (fullCell.effTyp & 0x0F));
+              const b3 = (fullCell.eff & 0xFF);
+              StartrekkerAMEngine.getInstance().setPatternCell(patternIndex, rowIndex, channelIndex, b0, b1, b2, b3);
+            });
+          }
+        }
+      } catch { /* StarTrekker AM not active */ }
       // Sync edit to MusicLine WASM engine (debounced re-export)
       debouncedWasmEngineReexport();
     },
@@ -1497,6 +1524,7 @@ export const useTrackerStore = create<TrackerStore>()(
 
     setPatternOrder: (order) =>
       set((state) => {
+        console.warn('[TrackerStore] setPatternOrder called, length:', order.length);
         if (order.length > 0) {
           state.patternOrder = order;
           state.currentPositionIndex = 0;

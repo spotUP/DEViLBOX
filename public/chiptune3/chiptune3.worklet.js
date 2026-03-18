@@ -156,16 +156,42 @@ class MPT extends AudioWorkletProcessor {
 				if (!this.modulePtr) return
 				libopenmpt._openmpt_module_set_position_order_row(this.modulePtr, v.o, v.r)
 				break
-			/*
-			case 'toggleMute'
-				// openmpt_module_ext_get_interface(mod_ext, interface_id, interface, interface_size)
-				// openmpt_module_ext_interface_interactive
-				// set_channel_mute_status
-				// https://lib.openmpt.org/doc/group__libopenmpt__ext__c.html#ga0275a35da407cd092232a20d3535c9e4
-				if (!this.modulePtr) return
-				//const extPtr = libopenmpt.openmpt_module_ext_get_interface(mod_ext, interface_id, interface, interface_size)
+			case 'hotReload':
+				// Reload module data while preserving playback position
+				if (!this.modulePtr) { this.play(v, false); break }
+				{
+					const stack = libopenmpt.stackSave ? libopenmpt.stackSave() : 0
+					// Save current position
+					const curOrder = libopenmpt._openmpt_module_get_current_order(this.modulePtr)
+					const curRow = libopenmpt._openmpt_module_get_current_row(this.modulePtr)
+					const wasPaused = this.paused
+					// Reload
+					this.play(v, wasPaused)
+					// Restore position
+					if (this.modulePtr) {
+						libopenmpt._openmpt_module_set_position_order_row(this.modulePtr, curOrder, curRow)
+					}
+					if (stack) libopenmpt.stackRestore(stack)
+				}
 				break
-			*/
+			case 'setMuteMask':
+				// Set mute state for all channels via openmpt_module_ctl_set
+				if (!this.modulePtr || !libopenmpt.stackSave) break
+				{
+					const stack = libopenmpt.stackSave()
+					for (let ch = 0; ch < Math.min(this.channels, 16); ch++) {
+						const muted = (v & (1 << ch)) === 0
+						try {
+							libopenmpt._openmpt_module_ctl_set_boolean(
+								this.modulePtr,
+								asciiToStack('render.channel_mute.' + ch),
+								muted ? 1 : 0
+							)
+						} catch(e) { /* ctl may not exist in this build */ }
+					}
+					libopenmpt.stackRestore(stack)
+				}
+				break
 			case 'decodeAll':
 				this.decodeAll(v)
 				break

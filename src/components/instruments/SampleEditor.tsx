@@ -46,6 +46,7 @@ import { UADEEngine } from '../../engine/uade/UADEEngine';
 import { UADELiveParamsBar } from './controls/UADELiveParamsBar';
 import { UADEDebuggerPanel } from './controls/UADEDebuggerPanel';
 import { SampleLoopEditor } from './SampleLoopEditor';
+import { useInstrumentPlaybackState } from '../../hooks/useInstrumentPlaybackState';
 
 // ─── Props & types ─────────────────────────────────────────────────────
 
@@ -273,6 +274,19 @@ export const SampleEditor: React.FC<SampleEditorProps> = ({ instrument, onChange
     playbackRate,
     reverse,
   } = editorParams;
+
+  // ─── Song playback position for this instrument (WASM + ToneEngine) ─────────
+  const songPlayback = useInstrumentPlaybackState(
+    instrument.id, instrument.synthType, audioBuffer?.duration,
+  );
+  useEffect(() => {
+    if (songPlayback.isPlaying && songPlayback.position >= 0) {
+      setPlaybackPosition(songPlayback.position);
+      if (!isPlaying) setIsPlaying(true);
+    } else if (!songPlayback.isPlaying && isPlaying && playerRef.current?.state !== 'started') {
+      setPlaybackPosition(0);
+    }
+  }, [songPlayback.isPlaying, songPlayback.position, isPlaying, setIsPlaying, setPlaybackPosition]);
 
   // ─── Sync loop params from parameters → sample config ────────────
   // The sample editor writes loop settings to `parameters` (normalized 0-1),

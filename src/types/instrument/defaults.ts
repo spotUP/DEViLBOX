@@ -268,6 +268,8 @@ export interface InstrumentConfig {
   symphonie?: import('@/engine/symphonie/SymphoniePlaybackData').SymphoniePlaybackData;
   // SunVox WASM patch
   sunvox?: SunVoxConfig;
+  // StarTrekker AM synthesis (from NT companion file)
+  startrekkerAM?: import('./exotic').StartrekkerAMConfig;
   // Demoscene 4k/64k intro synths
   oidos?: import('../oidosInstrument').OidosInstrumentConfig;
   wavesabre?: import('../wavesabreInstrument').WaveSabreInstrumentConfig;

@@ -940,7 +940,7 @@ export async function tryRouteFormat(
       const { isGDMFormat, parseGDMFile } = await import('@lib/import/formats/GDMParser');
       if (isGDMFormat(buffer)) return parseGDMFile(buffer, originalFileName);
     } catch (err) {
-      console.error(`[GDMParser] Native parse failed for ${filename}, falling back to OpenMPT:`, err);
+      console.warn(`[GDMParser] Native parse failed for ${filename}, falling back to OpenMPT:`, err);
     }
     // Fall through to libopenmpt
   }
@@ -1622,11 +1622,8 @@ export async function tryRouteFormat(
 
   // ── Core Design (CORE.* prefix) ───────────────────────────────────────────
   if (matchesExt(filename, ['core'])) {
-    const { isCoreDesignFormat, parseCoreDesignFile } = await import('@lib/import/formats/CoreDesignParser');
-    const coreCtx = { ...ctx, originalFileName: toUADEPrefixName(originalFileName, ['core']) };
-    return withNativeThenUADE('coreDesign', coreCtx,
-      (buf: Uint8Array | ArrayBuffer, name: string) => { if (isCoreDesignFormat(buf as ArrayBuffer)) return parseCoreDesignFile(buf as ArrayBuffer, name); return null; },
-      'CoreDesignParser', { injectUADE: true });
+    const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
+    return parseUADEFile(buffer, toUADEPrefixName(originalFileName, ['core']), prefs.uade ?? 'enhanced', subsong, preScannedMeta);
   }
 
   // ── Janko Mrsic-Flogel (JMF.* prefix) ────────────────────────────────────
@@ -1640,10 +1637,8 @@ export async function tryRouteFormat(
 
   // ── Special FX (JD.* prefix) ──────────────────────────────────────────────
   if (matchesExt(filename, ['jd'])) {
-    const { isSpecialFXFormat, parseSpecialFXFile } = await import('@lib/import/formats/SpecialFXParser');
-    return withNativeThenUADE('specialFX', ctx,
-      (buf: Uint8Array | ArrayBuffer, name: string) => { if (isSpecialFXFormat(buf as ArrayBuffer)) return parseSpecialFXFile(buf as ArrayBuffer, name); return null; },
-      'SpecialFXParser', { injectUADE: true });
+    const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
+    return parseUADEFile(buffer, toUADEPrefixName(originalFileName, ['jd']), prefs.uade ?? 'enhanced', subsong, preScannedMeta);
   }
 
   // ── Sound Player / Steve Barrett (SJS.* prefix) ───────────────────────────
@@ -1674,10 +1669,8 @@ export async function tryRouteFormat(
 
   // ── Wally Beben (WB.* prefix) ─────────────────────────────────────────────
   if (matchesExt(filename, ['wb'])) {
-    const { isWallyBebenFormat, parseWallyBebenFile } = await import('@lib/import/formats/WallyBebenParser');
-    return withNativeThenUADE('wallyBeben', ctx,
-      (buf: Uint8Array | ArrayBuffer, name: string) => { if (isWallyBebenFormat(buf as ArrayBuffer)) return parseWallyBebenFile(buf as ArrayBuffer, name); return null; },
-      'WallyBebenParser', { injectUADE: true });
+    const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
+    return parseUADEFile(buffer, toUADEPrefixName(originalFileName, ['wb']), prefs.uade ?? 'enhanced', subsong, preScannedMeta);
   }
 
   // ── Steve Barrett (SB.* prefix) ───────────────────────────────────────────
@@ -1710,10 +1703,8 @@ export async function tryRouteFormat(
   // ── Dave Lowe New (DLN.* prefix) ──────────────────────────────────────────
   // New-style Dave Lowe Amiga format with table-based detection. UADE prefix: DLN.
   if (matchesExt(filename, ['dln'])) {
-    const { isDaveLoweNewFormat, parseDaveLoweNewFile } = await import('@lib/import/formats/DaveLoweNewParser');
-    return withNativeThenUADE('daveLowe', ctx,
-      (buf: Uint8Array | ArrayBuffer, name: string) => { if (isDaveLoweNewFormat(buf as ArrayBuffer)) return parseDaveLoweNewFile(buf as ArrayBuffer, name); return null; },
-      'DaveLoweNewParser', { injectUADE: true });
+    const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
+    return parseUADEFile(buffer, toUADEPrefixName(originalFileName, ['dln']), prefs.uade ?? 'enhanced', subsong, preScannedMeta);
   }
 
   // ── Martin Walker (AVP.* / MW.* prefix) ──────────────────────────────────
@@ -1762,14 +1753,8 @@ export async function tryRouteFormat(
   // ── Anders 0land (HOT.* prefix) ───────────────────────────────────────────
   // Amiga 3-chunk format (mpl/mdt/msm). UADE prefix: hot.
   if (matchesExt(filename, ['hot'])) {
-    const { isAnders0landFormat, parseAnders0landFile } = await import('@lib/import/formats/Anders0landParser');
-    // UADE and the native parser both require hot.* prefix naming.
-    // Remap extension-named files (e.g. "primemover.hot" → "hot.primemover").
-    const hotBase = (filename.split('/').pop() ?? filename).replace(/\.hot$/i, '');
-    const uadeCtx = { ...ctx, originalFileName: `hot.${hotBase}` };
-    return withNativeThenUADE('anders0land', uadeCtx,
-      async (buf: Uint8Array | ArrayBuffer, name: string) => { if (isAnders0landFormat(buf as ArrayBuffer, name)) return await parseAnders0landFile(buf as ArrayBuffer, name); return null; },
-      'Anders0landParser', { injectUADE: true });
+    const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
+    return parseUADEFile(buffer, toUADEPrefixName(originalFileName, ['hot']), prefs.uade ?? 'enhanced', subsong, preScannedMeta);
   }
 
   // ── Andrew Parton (BYE.* prefix) ──────────────────────────────────────────
@@ -1874,11 +1859,40 @@ export async function tryRouteFormat(
     return parseUADEFile(buffer, toUADEPrefixName(originalFileName, ['mxtx']), prefs.uade ?? 'enhanced', subsong, preScannedMeta);
   }
 
-  // ── AudioSculpture / Startrekker AM (.adsc, .mod_adsc4) ──────────────────────
-  // UADE eagleplayer requires prefix form: adsc.songname
+  // ── StarTrekker AM (.adsc) — native WASM engine ───────────────────────────────
+  // Two-file format: .adsc (MOD) + .adsc.nt or .mod.nt companion file.
+  // The companion NT file is searched in companionFiles map by filename heuristics.
   if (matchesExt(filename, ['adsc', 'mod_adsc4'])) {
-    const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
-    return parseUADEFile(buffer, toUADEPrefixName(originalFileName, ['adsc', 'mod_adsc4']), prefs.uade ?? 'enhanced', subsong, preScannedMeta);
+    const { parseStartrekkerAMFile } = await import('@lib/import/formats/StartrekkerAMParser');
+
+    // Look for companion NT file in companionFiles map
+    let ntBuffer: ArrayBuffer | null = null;
+    if (companionFiles && companionFiles.size > 0) {
+      // Try <filename>.nt, then <basename>.nt, then any .nt key
+      const candidates = [
+        `${originalFileName}.nt`,
+        `${originalFileName.replace(/\.(adsc|mod)$/i, '')}.nt`,
+      ];
+      for (const key of candidates) {
+        const found = companionFiles.get(key) ?? companionFiles.get(key.toLowerCase());
+        if (found) { ntBuffer = found; break; }
+      }
+      // Fallback: first .nt key in the map
+      if (!ntBuffer) {
+        for (const [key, val] of companionFiles.entries()) {
+          if (key.toLowerCase().endsWith('.nt')) { ntBuffer = val; break; }
+        }
+      }
+    }
+
+    let modAB: ArrayBuffer;
+    if (ArrayBuffer.isView(buffer)) {
+      const view = buffer as unknown as Uint8Array;
+      modAB = view.buffer.slice(view.byteOffset, view.byteOffset + view.byteLength) as ArrayBuffer;
+    } else {
+      modAB = buffer as ArrayBuffer;
+    }
+    return parseStartrekkerAMFile(modAB, originalFileName, ntBuffer);
   }
 
   // ── Maximum Effect (MAX.* prefix) ────────────────────────────────────────────
@@ -1915,10 +1929,8 @@ export async function tryRouteFormat(
 
   // ── Rob Hubbard ST (RHO.* prefix) ─────────────────────────────────────────
   if (matchesExt(filename, ['rho'])) {
-    const { isRobHubbardSTFormat, parseRobHubbardSTFile } = await import('@lib/import/formats/RobHubbardSTParser');
-    return withNativeThenUADE('robHubbardST', ctx,
-      (buf: Uint8Array | ArrayBuffer, name: string) => { if (isRobHubbardSTFormat(buf as ArrayBuffer)) return parseRobHubbardSTFile(buf as ArrayBuffer, name); return null; },
-      'RobHubbardSTParser', { injectUADE: true });
+    const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
+    return parseUADEFile(buffer, toUADEPrefixName(originalFileName, ['rho']), prefs.uade ?? 'enhanced', subsong, preScannedMeta);
   }
 
   // ── Rob Hubbard (RH.* prefix) ─────────────────────────────────────────────
@@ -2114,11 +2126,10 @@ export async function tryRouteFormat(
   // ── Fred Gray (gray.* prefix) ────────────────────────────────────────────
   // eagleplayer.conf: FredGray  prefixes=gray
   // Magic: "FREDGRAY" at byte offset 0x24.
+  // Use UADE enhanced scan for pattern/instrument extraction + audio.
   if (matchesExt(filename, ['gray'])) {
-    const { isFredGrayFormat, parseFredGrayFile } = await import('@lib/import/formats/FredGrayParser');
-    return withNativeThenUADE('fredGray', ctx,
-      (buf: Uint8Array | ArrayBuffer, name: string) => { if (isFredGrayFormat(buf as ArrayBuffer, name)) return parseFredGrayFile(buf as ArrayBuffer, name); return null; },
-      'FredGrayParser', { injectUADE: true });
+    const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
+    return parseUADEFile(buffer, toUADEPrefixName(originalFileName, ['gray']), prefs.uade ?? 'enhanced', subsong, preScannedMeta);
   }
 
   // ── Jason Brooke (jcbo.* / jcb.* / jb.* prefix) ─────────────────────────
@@ -2263,10 +2274,8 @@ export async function tryRouteFormat(
   // ── David Hanney (DH.* prefix) ────────────────────────────────────────────
   // Amiga music format by David Hanney (1992). Magic: "DSNGSEQU" at offset 0.
   if (matchesExt(filename, ['dh'])) {
-    const { isDavidHanneyFormat, parseDavidHanneyFile } = await import('@lib/import/formats/DavidHanneyParser');
-    return withNativeThenUADE('davidHanney', ctx,
-      (buf: Uint8Array | ArrayBuffer, name: string) => { if (isDavidHanneyFormat(buf as ArrayBuffer)) return parseDavidHanneyFile(buf as ArrayBuffer, name); return null; },
-      'DavidHanneyParser', { injectUADE: true });
+    const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
+    return parseUADEFile(buffer, toUADEPrefixName(originalFileName, ['dh']), prefs.uade ?? 'enhanced', subsong, preScannedMeta);
   }
 
   // ── ArtAndMagic (.aam / AAM.*) ───────────────────────────────────────────

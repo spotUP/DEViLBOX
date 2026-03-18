@@ -253,6 +253,7 @@ export const SYNTH_CATEGORIES: SynthCategory[] = [
       SYNTH_INFO.C64SID,
       SYNTH_INFO.KlysSynth,
       SYNTH_INFO.Sc68Synth,
+      SYNTH_INFO.StartrekkerAMSynth,
     ],
   },
   {

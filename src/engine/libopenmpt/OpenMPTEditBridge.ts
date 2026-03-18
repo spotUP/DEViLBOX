@@ -16,6 +16,29 @@ import type { SaveFormat } from '@lib/import/wasm/OpenMPTSoundlib';
 let _dirty = false;
 let _loaded = false;
 let _format: SaveFormat = 'mod';
+let _hotReloadTimer: ReturnType<typeof setTimeout> | null = null;
+const HOT_RELOAD_DEBOUNCE_MS = 150;
+
+/** Debounced hot-reload: serialize the soundlib and send to LibopenmptEngine. */
+function scheduleHotReload(): void {
+  if (_hotReloadTimer) clearTimeout(_hotReloadTimer);
+  _hotReloadTimer = setTimeout(async () => {
+    _hotReloadTimer = null;
+    if (!_loaded || !_dirty) return;
+    try {
+      const { LibopenmptEngine } = await import('@engine/libopenmpt/LibopenmptEngine');
+      if (!LibopenmptEngine.hasInstance()) return;
+      const osl = await import('@lib/import/wasm/OpenMPTSoundlib');
+      const data = await osl.saveModule(_format);
+      if (data) {
+        LibopenmptEngine.getInstance().hotReload(data);
+        _dirty = false;
+      }
+    } catch {
+      // Serialization or engine not available
+    }
+  }, HOT_RELOAD_DEBOUNCE_MS);
+}
 
 /** Map DEViLBOX note → OpenMPT note value */
 function mapNoteToOpenMPT(note: number): number {
@@ -167,6 +190,7 @@ export async function syncCellEdit(
   });
 
   _dirty = true;
+  scheduleHotReload();
 }
 
 /**
@@ -190,6 +214,7 @@ export async function syncCellClear(
   });
 
   _dirty = true;
+  scheduleHotReload();
 }
 
 /**
@@ -224,6 +249,7 @@ export async function syncFullPattern(
   }
 
   _dirty = true;
+  scheduleHotReload();
 }
 
 /**

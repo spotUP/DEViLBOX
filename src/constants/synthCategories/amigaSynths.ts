@@ -208,4 +208,13 @@ export const amigaSynthEntries: Record<string, SynthInfo> = {
     icon: 'Cpu',
     color: 'text-amber-400',
   },
+  StartrekkerAMSynth: {
+    type: 'StartrekkerAMSynth',
+    name: 'StarTrekker AM',
+    shortName: 'STAM',
+    description: 'StarTrekker AM synthesis — 4 waveforms (sine/saw/square/noise) with ADSR envelopes, vibrato and period shifting',
+    bestFor: ['Amiga', 'AM synthesis', 'StarTrekker'],
+    icon: 'Cpu',
+    color: 'text-cyan-400',
+  },
 };
