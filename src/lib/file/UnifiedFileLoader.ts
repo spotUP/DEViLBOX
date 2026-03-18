@@ -690,13 +690,21 @@ async function loadSongFile(file: File, options: FileLoadOptions): Promise<FileL
           // loadSong internally slices the buffer before transfer — preReadBuffer stays intact.
           preSunVoxMeta = await svEngine.loadSong(tempHandle, preReadBuffer!);
           console.log('[SunVox] song loaded — fetching module list and patterns…');
-          const [modules, patterns, moduleGraph] = await Promise.all([
+          const [modules, patterns] = await Promise.all([
             svEngine.getModules(tempHandle),
             svEngine.getPatterns(tempHandle),
-            svEngine.getModuleGraph(tempHandle),
           ]);
           preSunVoxPatterns = patterns;
-          preSunVoxGraph = moduleGraph;
+          // getModuleGraph can be slow for complex songs — timeout separately
+          try {
+            preSunVoxGraph = await Promise.race([
+              svEngine.getModuleGraph(tempHandle),
+              new Promise<never>((_, reject) => setTimeout(() => reject(new Error('getModuleGraph timed out')), 5000)),
+            ]);
+          } catch (graphErr) {
+            console.warn('[SunVox] Module graph extraction timed out, using basic module list');
+            preSunVoxGraph = null;
+          }
           // Module id=0 is always the "Output" bus — skip it.
           // We only need id/name for channel labelling (no patch extraction needed
           // since audio is driven by the song-mode SunVoxSynth, not per-module synths).
