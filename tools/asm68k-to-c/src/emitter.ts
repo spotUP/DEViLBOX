@@ -28,6 +28,7 @@ static uint32_t a0,a1,a2,a3,a4,a5,a6,sp,pc;
 #define a7 sp  /* A7 is the stack pointer */
 static int flag_z=0, flag_n=0, flag_c=0, flag_v=0, flag_x=0;
 static uint16_t ccr = 0;  /* condition code register (for MOVE SR/CCR) */
+static uint16_t sr = 0;   /* status register (interrupt mask bits etc.) */
 
 /* -- Sub-register Accessors -------------------------------------------
  * W(d0) -- access the low 16 bits of d0 (read/write).
@@ -610,8 +611,8 @@ export function emit(ast: AstNode[], resolved: ResolveResult, sourceFile?: strin
   }
 
   // Pre-pass: simulate the emitter's function boundary logic to find labels that
-  // will start functions due to !inFunction (after data/section nodes).  These
-  // implicit function entries must be in funcLabels for cross-function goto detection.
+  // will start functions due to !inFunction (after data/section nodes or after RTS).
+  // These implicit function entries must be in funcLabels for cross-function goto detection.
   {
     let simInFunc = false;
     for (let i = 0; i < ast.length; i++) {
@@ -619,6 +620,30 @@ export function emit(ast: AstNode[], resolved: ResolveResult, sourceFile?: strin
       if (node.kind === 'data' || node.kind === 'section') {
         simInFunc = false;
         continue;
+      }
+      // After RTS or tail-call return, the function closes → next label starts a new function
+      if (node.kind === 'instruction') {
+        const mn = node.mnemonic.toUpperCase();
+        if (mn === 'RTS') {
+          // Peek ahead for label
+          let peekIdx = i + 1;
+          while (peekIdx < ast.length && ast[peekIdx].kind === 'comment') peekIdx++;
+          if (peekIdx < ast.length && ast[peekIdx].kind === 'label') {
+            simInFunc = false;  // function closed after RTS
+          }
+        }
+        // Tail calls: BRA/JMP to a function label that emits "return;"
+        if ((mn === 'BRA' || mn === 'JMP') && 'label' in (node.operands[0] ?? {}) && (node.operands[0] as any).label) {
+          const target = (node.operands[0] as any).label as string;
+          if (funcLabels.has(target)) {
+            let peekIdx = i + 1;
+            while (peekIdx < ast.length && ast[peekIdx].kind === 'comment') peekIdx++;
+            if (peekIdx < ast.length && ast[peekIdx].kind === 'label') {
+              simInFunc = false;  // function closed after tail call
+            }
+          }
+        }
+        simInFunc = true;
       }
       if (node.kind === 'label' && isFunctionLabel.has(node.name)) {
         if (!simInFunc && !funcLabels.has(node.name)) {
