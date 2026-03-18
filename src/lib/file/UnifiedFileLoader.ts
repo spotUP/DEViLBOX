@@ -939,6 +939,11 @@ async function loadSongFile(file: File, options: FileLoadOptions): Promise<FileL
           controlValues: {} as Record<string, number>,
         },
       });
+      // Select the newly created instrument so the editor shows it immediately
+      const newInsts = useInstrumentStore.getState().instruments;
+      if (newInsts.length > 0) {
+        useInstrumentStore.getState().setCurrentInstrument(newInsts[newInsts.length - 1].id);
+      }
       // Song instrument is always at index 1 (first instrument after reset)
       const SONG_INSTR_IDX = 1;
 
@@ -1019,6 +1024,7 @@ async function loadSongFile(file: File, options: FileLoadOptions): Promise<FileL
     });
     const instruments = useInstrumentStore.getState().instruments;
     const newInstrument = instruments[instruments.length - 1];
+    useInstrumentStore.getState().setCurrentInstrument(newInstrument.id);
     const instrumentIndex = instruments.length; // 1-based tracker index
     const rows = Array.from({ length: PATTERN_LEN }, (_, i) =>
       i === 0
