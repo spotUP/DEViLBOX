@@ -23,7 +23,7 @@ import { createRequire } from 'module';
 const SAMPLE_RATE = 44100;
 const BUFFER_SIZE = 128;
 const TEST_DURATION_SECS = 1.0;   // render this long to detect audio
-const SILENCE_THRESHOLD = 0.0005; // RMS below this = silent
+const SILENCE_THRESHOLD = 0.00005; // RMS below this = silent (lowered to catch quiet instruments)
 const PROJECT_ROOT = join(dirname(new URL(import.meta.url).pathname), '../..');
 const WASM_JS_PATH = join(PROJECT_ROOT, 'public/furnace-dispatch/FurnaceDispatch.js');
 const WASM_BIN_PATH = join(PROJECT_ROOT, 'public/furnace-dispatch/FurnaceDispatch.wasm');
