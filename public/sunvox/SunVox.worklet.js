@@ -95,7 +95,7 @@ class SunVoxProcessor extends AudioWorkletProcessor {
         if (!m) break;
         const h = data.handle;
         if (this.handles[h]) {
-          m._sunvox_wasm_destroy(h);
+          try { m._sunvox_wasm_destroy(h); } catch { /* WASM may already be corrupted */ }
           delete this.handles[h];
         }
         break;
@@ -452,10 +452,17 @@ class SunVoxProcessor extends AudioWorkletProcessor {
         }
         continue;
       }
-      m._sunvox_wasm_render(hi, this.renderBufL, this.renderBufR, numSamples);
-      for (let i = 0; i < numSamples; i++) {
-        outputL[i] += heapF32[offL + i];
-        outputR[i] += heapF32[offR + i];
+      try {
+        m._sunvox_wasm_render(hi, this.renderBufL, this.renderBufR, numSamples);
+        for (let i = 0; i < numSamples; i++) {
+          outputL[i] += heapF32[offL + i];
+          outputR[i] += heapF32[offR + i];
+        }
+      } catch (err) {
+        // WASM memory crash — remove this handle to prevent repeated crashes
+        console.error('[SunVox Worklet] Render crash on handle', hi, '— removing. Error:', err.message);
+        delete this.handles[h];
+        this.port.postMessage({ type: 'error', message: 'RuntimeError: ' + err.message });
       }
     }
 
