@@ -151,7 +151,11 @@ export async function loadModuleFile(file: File): Promise<ModuleInfo> {
               // Load with libopenmpt for playback (skip for formats not supported by libopenmpt)
               let player: ChiptunePlayer | undefined;
               if (ext !== '.fur' && ext !== '.dmf' && ext !== '.xrns') {
-                player = await loadWithLibopenmpt(arrayBuffer);
+                try {
+                  player = await loadWithLibopenmpt(arrayBuffer);
+                } catch {
+                  // libopenmpt doesn't support this format — native parser + UADE will handle playback
+                }
               }
 
               resolve({

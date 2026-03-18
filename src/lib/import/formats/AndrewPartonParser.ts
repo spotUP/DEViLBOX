@@ -118,7 +118,7 @@ export async function parseAndrewPartonFile(
 
   const baseName = filename.split('/').pop() ?? filename;
   // Strip "bye." prefix (case-insensitive)
-  const moduleName = baseName.replace(/^bye\./i, '') || baseName;
+  const moduleName = baseName.replace(/^bye\./i, '').replace(/\.bye$/i, '') || baseName;
 
   // ── Instrument placeholders ───────────────────────────────────────────────
 

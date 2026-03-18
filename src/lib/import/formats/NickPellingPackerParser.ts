@@ -66,7 +66,7 @@ export function parseNickPellingPackerFile(buffer: ArrayBuffer, filename: string
   if (!isNickPellingPackerFormat(buf)) throw new Error('Not a Nick Pelling Packer module');
 
   const baseName = (filename.split('/').pop() ?? filename).split('\\').pop() ?? filename;
-  const moduleName = baseName.replace(/^npp\./i, '') || baseName;
+  const moduleName = baseName.replace(/^npp\./i, '').replace(/\.npp$/i, '') || baseName;
 
   const instruments: InstrumentConfig[] = [];
 

@@ -139,7 +139,7 @@ export function parseAshleyHoggFile(buffer: ArrayBuffer, filename: string): Trac
   if (!isAshleyHoggFormat(buf)) throw new Error('Not an Ashley Hogg module');
 
   const baseName = filename.split('/').pop() ?? filename;
-  const moduleName = baseName.replace(/^ash\./i, '') || baseName;
+  const moduleName = baseName.replace(/^ash\./i, '').replace(/\.ash$/i, '') || baseName;
 
   const instruments: InstrumentConfig[] = [{
     id: 1, name: 'Sample 1', type: 'synth' as const,

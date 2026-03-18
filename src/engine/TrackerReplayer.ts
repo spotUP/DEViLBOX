@@ -235,6 +235,11 @@ export interface TrackerSong {
   // Used for S3M-origin formats (GDM/S3M) where OpenMPT notes are 60 semitones
   // above ProTracker period-table indices (S3M octave 5 = ProTracker octave 0).
   noteExportOffset?: number;
+  // Per-song note offset for XM export (semitones). Separate from noteExportOffset
+  // because MOD period tables and XM linear frequency tables need different adjustments.
+  xmNoteExportOffset?: number;
+  // Per-song sample relNote offset for XM export (added to computed relNote per sample).
+  xmRelNoteOffset?: number;
   // Furnace-specific timing/compat (optional)
   speed2?: number;
   hz?: number;
@@ -289,6 +294,10 @@ export interface TrackerSong {
   pumaTrackerFileData?: ArrayBuffer;
   /** Raw Art of Noise (.aon) binary for ArtOfNoiseEngine WASM playback */
   artOfNoiseFileData?: ArrayBuffer;
+  /** Raw StarTrekker AM .mod binary for StartrekkerAMEngine WASM playback */
+  startrekkerAMFileData?: ArrayBuffer;
+  /** StarTrekker AM .nt companion file (AM instrument data) */
+  startrekkerAMNtData?: ArrayBuffer;
   /** Raw Ben Daglish (.bd) binary for BdEngine WASM playback */
   bdFileData?: ArrayBuffer;
   /** Raw SidMon 2.0 (.sid2) binary for Sd2Engine WASM playback */

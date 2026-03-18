@@ -566,6 +566,7 @@ export async function parseHippelCoSoFile(
     initialSpeed: 6,
     initialBPM: Math.max(32, Math.min(255, speedBPM)),
     linearPeriods: false,
+    noteExportOffset: 36,
     uadeVariableLayout: variableLayout,
   };
 }

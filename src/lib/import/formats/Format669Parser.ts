@@ -362,7 +362,12 @@ export async function parse669File(
       loopEnd   = Math.min(hdr.loopEnd, hdr.length);
     }
 
-    const pcm = raw.subarray(startOff, endOff);
+    // 669 PCM is 8-bit unsigned (center = 0x80).
+    // pcm8ToWAV expects signed two's complement (center = 0x00).
+    // Flip the MSB: unsigned 128 → signed 0, unsigned 0 → signed -128.
+    const unsigned = raw.subarray(startOff, endOff);
+    const pcm = new Uint8Array(unsigned.length);
+    for (let j = 0; j < unsigned.length; j++) pcm[j] = unsigned[j] ^ 0x80;
 
     return createSamplerInstrument(id, name, pcm, 64, SAMPLE_RATE, loopStart, loopEnd);
   });
@@ -390,8 +395,11 @@ export async function parse669File(
     restartPosition: effectiveRestart,
     numChannels:     NUM_CHANNELS,
     initialSpeed:    4,
-    initialBPM:      125,
+    initialBPM:      78,  // OpenMPT Load_669.cpp: Order().SetDefaultTempoInt(78)
     linearPeriods:   false,
+    // 669 uses OpenMPT note numbering (C-5=61) but XM plays note 61 at 16726 Hz.
+    // Compensate on sample side so note names match the original.
+    xmRelNoteOffset: -12,
     uadePatternLayout,
   };
 }

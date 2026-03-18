@@ -516,6 +516,9 @@ export function parseMusicLineFile(data: Uint8Array): TrackerSong | null {
     initialSpeed: speed,
     initialBPM: ciaTempoBPM(tempo),
     linearPeriods: false,
+    // Notes use mlNote + 24 for MOD period alignment. For XM, subtract 24 to
+    // bring notes back to the correct XM octave (Amiga C-3 ≈ XM C-4).
+    xmNoteExportOffset: -24,
     channelTrackTables: mappedTrackTables,
     channelSpeeds,
     channelGrooves,
@@ -666,9 +669,12 @@ function buildPattern(rawData: Uint8Array | undefined, _patIdx: number, partNum:
 
       if (noteRaw > 0) {
         // MusicLine note numbers: 25=C-1, 37=C-2, 49=C-3.
-        // XM note numbers:         1=C-0, 13=C-1, 25=C-2.
-        // ML note 25 → XM note 13 (C-1): mlNote - 12.
-        cell.note = Math.max(1, noteRaw - 12);
+        // In MOD export, XM note must produce the correct Amiga period:
+        //   ML C-1 (25) → period 856 → idx 24 → XM 49
+        //   ML C-2 (37) → period 428 → idx 36 → XM 61
+        //   ML C-3 (49) → period 214 → idx 48 → XM 73
+        // Formula: mlNote + 24.  Clamped to XM range 1-96.
+        cell.note = Math.max(1, Math.min(96, noteRaw + 24));
         // 0x00 and 0xFF are "no instrument change" sentinels; valid range 1–127
         if (instrRaw > 0 && instrRaw !== 0xFF) {
           cell.instrument = instrRaw;

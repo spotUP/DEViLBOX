@@ -517,6 +517,7 @@ export function parseSteveTurnerFile(buffer: ArrayBuffer, filename: string): Tra
     initialSpeed: subsongs[0]?.speed ?? 6,
     initialBPM: 125,
     linearPeriods: false,
+    noteExportOffset: 36,
     // Mark for UADE playback + subsong switching
     uadeEditableFileData: buffer.slice(0),
     uadeEditableFileName: filename,

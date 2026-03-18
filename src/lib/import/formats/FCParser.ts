@@ -639,6 +639,7 @@ function stubTrackerSong(filename: string, formatLabel: string): TrackerSong {
     initialSpeed: 6,
     initialBPM: 125,
     linearPeriods: false,
+    noteExportOffset: 36,
   };
 }
 
@@ -850,6 +851,28 @@ export function parseFCFile(buffer: ArrayBuffer, filename: string, moduleBase = 
       relLength  = Math.min(255, 8 * volSpeed);
     }
 
+    // Extract waveform PCM for the initial waveform
+    let wavePCM: number[] | undefined;
+    if (isFC14 && initialWaveNum < waveTablePCMs.length && waveTablePCMs[initialWaveNum].length > 0) {
+      // FC14: use custom wavetable PCM (already signed 8-bit in the file)
+      const raw = waveTablePCMs[initialWaveNum];
+      wavePCM = new Array(raw.length);
+      for (let i = 0; i < raw.length; i++) {
+        wavePCM[i] = raw[i] < 128 ? raw[i] : raw[i] - 256;
+      }
+    } else if (initialWaveNum >= 0 && initialWaveNum < 47) {
+      // FC13: extract from built-in FC13_WAVES table
+      let dataOffset = 47; // PCM data starts after 47 length values
+      for (let i = 0; i < initialWaveNum; i++) {
+        dataOffset += FC13_WAVES[i] * 2;
+      }
+      const byteLen = FC13_WAVES[initialWaveNum] * 2;
+      wavePCM = new Array(byteLen);
+      for (let i = 0; i < byteLen; i++) {
+        wavePCM[i] = FC13_WAVES[dataOffset + i]; // Already signed in FC13_WAVES
+      }
+    }
+
     return {
       waveNumber: initialWaveNum,
       synthTable,
@@ -857,6 +880,7 @@ export function parseFCFile(buffer: ArrayBuffer, filename: string, moduleBase = 
       atkLength, atkVolume, decLength, decVolume, sustVolume, relLength,
       vibDelay, vibSpeed, vibDepth,
       arpTable: new Array(16).fill(0),
+      wavePCM,
     };
   }
 
@@ -1227,6 +1251,7 @@ export function parseFCFile(buffer: ArrayBuffer, filename: string, moduleBase = 
     initialSpeed: sequences.length > 0 && sequences[0].speed > 0 ? sequences[0].speed : 3,
     initialBPM: Math.round(125 * 6 / (sequences.length > 0 && sequences[0].speed > 0 ? sequences[0].speed : 3)),
     linearPeriods: false,
+    noteExportOffset: 36,
     uadePatternLayout,
   };
 }

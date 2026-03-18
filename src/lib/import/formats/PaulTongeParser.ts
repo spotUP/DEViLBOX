@@ -105,7 +105,7 @@ export function parsePaulTongeFile(buffer: ArrayBuffer, filename: string): Track
   if (!isPaulTongeFormat(buf)) throw new Error('Not a Paul Tonge module');
 
   const baseName = filename.split('/').pop() ?? filename;
-  const moduleName = baseName.replace(/^pat\./i, '') || baseName;
+  const moduleName = baseName.replace(/^pat\./i, '').replace(/\.pat$/i, '') || baseName;
 
   const instruments: InstrumentConfig[] = [{
     id: 1, name: 'Sample 1', type: 'synth' as const,

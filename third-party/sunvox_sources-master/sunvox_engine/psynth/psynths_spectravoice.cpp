@@ -352,6 +352,7 @@ void recalc_samples( SYNTH_DATA *data, int synth_id, psynth_net *pnet )
     mem_off();
     int prev_ss = data->sample_size;
     data->sample_size = 4096 << data->ctl_sample_size;
+    if( data->sample_size <= 0 ) data->sample_size = 4096; // Guard: 32-bit overflow if ctl_sample_size>=20
     if( data->sample_size != prev_ss )
     {
 	if( data->samples[ 0 ] ) mem_free( data->samples[ 0 ] );

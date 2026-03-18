@@ -140,10 +140,11 @@ export function parseOktalyzerFile(buffer: ArrayBuffer, filename: string): Track
       }
 
       case 'PBOD': {
-        // Pattern body: 2-byte numRows, then rows * 8 channels * 4 bytes
+        // Pattern body: 2-byte numRows, then rows * numChans * 4 bytes
         const numRows = readU16BE(buf, dataStart);
         patternFileOffsets.push(dataStart + 2); // cell data starts after numRows
-        const numChans = 8; // Oktalyzer always has 8 channels
+        // Derive channel count from chunk size: (chunkSize - 2) / numRows / 4
+        const numChans = numRows > 0 ? Math.floor((chunkSize - 2) / numRows / 4) : 4;
         const cells: number[][] = [];
 
         for (let row = 0; row < numRows; row++) {
@@ -253,19 +254,22 @@ export function parseOktalyzerFile(buffer: ArrayBuffer, filename: string): Track
   // Build song order
   const songPositions = sequence.slice(0, songLength);
 
+  // Derive actual channel count from the first pattern (or fallback to 4)
+  const actualNumChannels = patterns.length > 0 ? patterns[0].channels : 4;
+
   const uadePatternLayout: UADEPatternLayout = {
     formatId: 'oktalyzer',
     patternDataFileOffset: 0, // overridden by getCellFileOffset
     bytesPerCell: 4,
     rowsPerPattern: 64,
-    numChannels: 8,
+    numChannels: actualNumChannels,
     numPatterns: trackerPatterns.length,
     moduleSize: buffer.byteLength,
     encodeCell: encodeOktalyzerCell,
     getCellFileOffset: (pattern: number, row: number, channel: number): number => {
       const cellDataStart = patternFileOffsets[pattern];
       if (cellDataStart === undefined) return 0;
-      return cellDataStart + row * 8 * 4 + channel * 4;
+      return cellDataStart + row * actualNumChannels * 4 + channel * 4;
     },
   };
 
@@ -277,11 +281,21 @@ export function parseOktalyzerFile(buffer: ArrayBuffer, filename: string): Track
     songPositions: songPositions.length > 0 ? songPositions : [0],
     songLength: songPositions.length || 1,
     restartPosition: 0,
-    numChannels: 8,
+    numChannels: actualNumChannels,
     initialSpeed: speed,
     initialBPM: 125,
     linearPeriods: false,
     uadePatternLayout,
+    // amigaNoteToXM maps rawNote 1→13 (XM C-1), but MOD period table index = note-25.
+    // MilkyTracker displays MOD periods with +1 octave vs our table labels.
+    // Net result: Oktalyzer notes land 3 octaves too low in MOD export without offset.
+    noteExportOffset: 36,
+    // For XM export: amigaNoteToXM gives rawNote+12. Amiga C-3 (period 214, ~8287 Hz)
+    // = rawNote 25 → XM 37. XM C-4 (note 49) = 8363 Hz. So +12 aligns pitch correctly.
+    xmNoteExportOffset: 24,
+    // Compensate sample pitch: +24 on notes shifts pitch up 2 octaves, -12 on relNote
+    // brings it back down 1, netting +1 octave which matches Amiga period-based playback.
+    xmRelNoteOffset: -12,
   };
 }
 

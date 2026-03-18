@@ -26,7 +26,7 @@ export const usePatternPlayback = () => {
     currentPositionIndex: s.currentPositionIndex,
     setCurrentPosition: s.setCurrentPosition,
     })));
-  const { channelTrackTables, channelSpeeds, channelGrooves, hivelyNative, hivelyFileData, hivelyMeta, musiclineFileData, c64SidFileData, jamCrackerFileData, futurePlayerFileData, preTrackerFileData, maFileData, hippelFileData, sonixFileData, pxtoneFileData, organyaFileData, eupFileData, ixsFileData, psycleFileData, sc68FileData, zxtuneFileData, pumaTrackerFileData, artOfNoiseFileData, bdFileData, sd2FileData, symphonieFileData, uadeEditableFileData, libopenmptFileData, furnaceNative, furnaceActiveSubsong } = useFormatStore(useShallow((s) => ({
+  const { channelTrackTables, channelSpeeds, channelGrooves, hivelyNative, hivelyFileData, hivelyMeta, musiclineFileData, c64SidFileData, jamCrackerFileData, futurePlayerFileData, preTrackerFileData, maFileData, hippelFileData, sonixFileData, pxtoneFileData, organyaFileData, eupFileData, ixsFileData, psycleFileData, sc68FileData, zxtuneFileData, pumaTrackerFileData, artOfNoiseFileData, startrekkerAMFileData, startrekkerAMNtData, bdFileData, sd2FileData, symphonieFileData, uadeEditableFileData, libopenmptFileData, furnaceNative, furnaceActiveSubsong } = useFormatStore(useShallow((s) => ({
     channelTrackTables: s.channelTrackTables,
     channelSpeeds: s.channelSpeeds,
     channelGrooves: s.channelGrooves,
@@ -50,6 +50,8 @@ export const usePatternPlayback = () => {
     zxtuneFileData: s.zxtuneFileData,
     pumaTrackerFileData: s.pumaTrackerFileData,
     artOfNoiseFileData: s.artOfNoiseFileData,
+    startrekkerAMFileData: s.startrekkerAMFileData,
+    startrekkerAMNtData: s.startrekkerAMNtData,
     bdFileData: s.bdFileData,
     sd2FileData: s.sd2FileData,
     symphonieFileData: s.symphonieFileData,
@@ -371,6 +373,8 @@ export const usePatternPlayback = () => {
           zxtuneFileData: zxtuneFileData ?? undefined,
           pumaTrackerFileData: pumaTrackerFileData ?? undefined,
           artOfNoiseFileData: artOfNoiseFileData ?? undefined,
+          startrekkerAMFileData: startrekkerAMFileData ?? undefined,
+          startrekkerAMNtData: startrekkerAMNtData ?? undefined,
           bdFileData: bdFileData ?? undefined,
           sd2FileData: sd2FileData ?? undefined,
           symphonieFileData: symphonieFileData ?? undefined,

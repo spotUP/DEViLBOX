@@ -100,7 +100,7 @@ export function parseMedleyFile(buffer: ArrayBuffer, filename: string): TrackerS
   const baseName = filename.split('/').pop() ?? filename;
   // Strip "MSO." prefix (case-insensitive) or ".ml" extension
   const moduleName =
-    baseName.replace(/^mso\./i, '').replace(/\.ml$/i, '') || baseName;
+    baseName.replace(/^mso\./i, '').replace(/\.ml$/i, '').replace(/\.mso$/i, '') || baseName;
 
   // ── Subsong count extraction ──────────────────────────────────────────────
 

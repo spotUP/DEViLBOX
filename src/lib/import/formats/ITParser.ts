@@ -964,5 +964,6 @@ export function parseITFile(buffer: ArrayBuffer, filename: string): TrackerSong 
     initialSpeed:    speed,
     initialBPM:      tempo,
     linearPeriods,
+    xmRelNoteOffset: -12,
   };
 }

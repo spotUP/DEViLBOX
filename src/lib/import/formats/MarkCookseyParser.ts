@@ -291,7 +291,7 @@ export async function parseMarkCookseyFile(
 
   const baseName = filename.split('/').pop()?.split('\\').pop() ?? filename;
   // Strip mc., mcr., mco. prefix (case-insensitive)
-  const moduleName = baseName.replace(/^mc[or]?\./i, '') || baseName;
+  const moduleName = baseName.replace(/^mc[or]?\./i, '').replace(/\.(mc|mcr|mco)$/i, '') || baseName;
 
   // ── Variant label ─────────────────────────────────────────────────────────
 

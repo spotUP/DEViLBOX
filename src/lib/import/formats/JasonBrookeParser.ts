@@ -36,7 +36,7 @@ export function parseJasonBrookeFile(buffer: ArrayBuffer, filename: string): Tra
 
   const baseName = filename.split('/').pop() ?? filename;
   // Strip any recognised prefix
-  const moduleName = baseName.replace(/^(jcbo|jcb|jb)\./i, '') || baseName;
+  const moduleName = baseName.replace(/^(jcbo|jcb|jb)\./i, '').replace(/\.(jcbo|jcb|jb)$/i, '') || baseName;
 
   const instruments: InstrumentConfig[] = [{
     id: 1, name: 'Sample 1', type: 'synth' as const,

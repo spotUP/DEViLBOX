@@ -44,7 +44,7 @@ export function parseSynthPackFile(buffer: ArrayBuffer, filename: string): Track
   if (!isSynthPackFormat(buf, filename)) throw new Error('Not a SynthPack module');
 
   const baseName = filename.split('/').pop() ?? filename;
-  const moduleName = baseName.replace(/^osp\./i, '') || baseName;
+  const moduleName = baseName.replace(/^osp\./i, '').replace(/\.osp$/i, '') || baseName;
 
   const instruments: InstrumentConfig[] = [{
     id: 1, name: 'Sample 1', type: 'synth' as const,

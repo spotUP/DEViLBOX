@@ -4,6 +4,18 @@
     Copyright (C) 2002 - 2008 Alex Zolotov <nightradio@gmail.com>
 */
 
+#include <stdio.h>
+/* Debug macros — disabled by default, enable with -DSUNVOX_WASM_DEBUG */
+#if defined(__EMSCRIPTEN__) && defined(SUNVOX_WASM_DEBUG)
+#define SV_DLOG(msg) do { fprintf(stderr, "[SunVox] " msg "\n"); } while(0)
+#define SV_DLOGI(msg, val) do { fprintf(stderr, "[SunVox] " msg " %d\n", (int)(val)); } while(0)
+#define SV_DLOGS(msg, val) do { fprintf(stderr, "[SunVox] " msg " %s\n", (val)); } while(0)
+#else
+#define SV_DLOG(msg)
+#define SV_DLOGI(msg, val)
+#define SV_DLOGS(msg, val)
+#endif
+
 #include "filesystem/v3nus_fs.h"
 #include "time/timemanager.h"
 #include "sound/sound.h"
@@ -202,19 +214,25 @@ int get_integer( void )
 
 void sunvox_load_song( const UTF8_CHAR *name, sunvox_engine *s )
 {
+    SV_DLOG("sunvox_load_song: start");
     sunvox_stop( s );
-    
+    SV_DLOG("sunvox_load_song: after stop");
+
     sound_stream_stop();
 
     sunvox_engine_close( s );
+    SV_DLOG("sunvox_load_song: after close");
     sunvox_engine_init( 0, s );
+    SV_DLOG("sunvox_load_song: after reinit");
     for( int sn = 1; sn < s->net->items_num; sn++ )
     {
 	if( s->net->items[ sn ].flags & PSYNTH_FLAG_EXISTS )
 	    psynth_remove_synth( sn, s->net );
     }
+    SV_DLOG("sunvox_load_song: after remove synths");
 
     V3_FILE f = v3_open( name, "rb" );
+    SV_DLOG("sunvox_load_song: after v3_open");
     if( f )
     {
 	void *pat_data = 0;
@@ -374,6 +392,7 @@ void sunvox_load_song( const UTF8_CHAR *name, sunvox_engine *s )
 		//End of synth:
 		if( first_synth )
 		{
+		    SV_DLOG("sunvox_load_song: SEND - OUTPUT module setup");
 		    //OUT is already created. Lets change it:
 		    s->net->items[ 0 ].finetune = s_finetune;
 		    s->net->items[ 0 ].relative_note = s_relative_note;
@@ -388,7 +407,9 @@ void sunvox_load_song( const UTF8_CHAR *name, sunvox_engine *s )
 		}
 		else
 		{
+		    SV_DLOGS("sunvox_load_song: SEND - adding synth", (const char*)s_name);
 		    int s_num = psynth_add_synth( s_synth, s_name, s_flags, s_x, s_y, 0, s->net );
+		    SV_DLOGI("sunvox_load_song: SEND - psynth_add_synth done, s_num=", s_num);
 		    if( s_flags == 0 )
 		    {
 			//Empty synth:
@@ -432,13 +453,20 @@ void sunvox_load_song( const UTF8_CHAR *name, sunvox_engine *s )
 			{
 			    s->net->items[ s_num ].flags &= ~PSYNTH_FLAG_EXISTS;
 			}
+			SV_DLOG("sunvox_load_song: SEND - calling setup_finished");
 			psynth_synth_setup_finished( s_num, s->net );
+			SV_DLOG("sunvox_load_song: SEND - setup_finished done");
 		    }
 		}
 		first_synth = 0;
 		s_links = 0;
 		s_flags = 0;
+		s_synth = 0;
 		c_num = 0;
+		chunk_num = 0;
+		chunks_num = 0;
+		chunks = 0;
+		chunk_flags = 0;
 	    }
 bfound:
 	    if( g_block_data )
@@ -1588,7 +1616,11 @@ void sunvox_stop( sunvox_engine *s )
     else
 	snote.note = NOTECMD_CLEAN_SYNTHS; //Second STOP will clean all synths
     sunvox_send_user_command( &snote, 0, s );
+#ifdef __EMSCRIPTEN__
+    s->playing = 0; // Single-threaded WASM: no other thread will clear playing, spin-wait hangs forever
+#else
     while( s->playing ) { /*still playing...*/ }
+#endif
     for( int i = 0; i < MAX_PLAYING_PATS; i++ ) 
 	remove_link_to_effects_for_playing_pattern( i, s );
 }

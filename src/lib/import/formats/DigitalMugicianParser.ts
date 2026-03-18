@@ -862,6 +862,7 @@ export async function parseDigitalMugicianFile(
     initialSpeed: songSpeed > 0 ? songSpeed : 6,
     initialBPM: 125,
     linearPeriods: false,
+    noteExportOffset: 36,
     // uadePatternLayout omitted: DigMugSynth instruments handle audio directly.
     // UADE audio is silent for Digital Mugician — DigMugSynth has its own WASM engine
     // that correctly emulates DM wavetable synthesis without UADE.

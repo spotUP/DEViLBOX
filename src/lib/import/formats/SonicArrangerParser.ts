@@ -958,6 +958,7 @@ export async function parseSonicArrangerFile(
     initialSpeed:    Math.max(1, song.startSpeed),
     initialBPM,
     linearPeriods:   false,
+    noteExportOffset: 36,
     uadePatternLayout,
   };
 }

@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-03-17T21:20:42.486Z
+ * Generated: 2026-03-18T18:32:32.578Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,10 +19,10 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.2993';
-export const BUILD_NUMBER = '2993';
-export const BUILD_HASH = '380171d71';
-export const BUILD_DATE = '2026-03-17';
+export const BUILD_VERSION = '1.0.3015';
+export const BUILD_NUMBER = '3015';
+export const BUILD_HASH = '296211efd';
+export const BUILD_DATE = '2026-03-18';
 
 // Full version (patch IS the build number, so no need to append)
 export const FULL_VERSION = BUILD_VERSION;
@@ -30,9 +30,103 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.2993',
+    version: '1.0.3015',
+    date: '2026-03-18',
+    changes: [
+      {
+        type: 'feature',
+        "description": "ALL 6 compiled 68k replayers build as WASM"
+      },
+      {
+        type: 'feature',
+        "description": "Two-pass scope analysis — 4/6 replayers compile clean"
+      },
+      {
+        type: 'fix',
+        "description": "Unified scope pass + indirect JMP function close"
+      },
+      {
+        type: 'fix',
+        "description": "Sync sanitizeLabel between emitter and instr-map"
+      },
+      {
+        type: 'feature',
+        "description": "3/6 compiled 68k replayers build as WASM"
+      },
+      {
+        type: 'feature',
+        "description": "Fix cross-function goto detection, Core Design WASM compiles"
+      },
+      {
+        type: 'fix',
+        "description": "Add sr register, improve RTS-close pre-pass simulation"
+      },
+      {
+        type: 'fix',
+        "description": "Escape C keywords, extract functions after RTS, fix MULU pointer cast"
+      },
+      {
+        type: 'improvement',
+        "description": "Wip(formats): transpile 6 compiled 68k replayers to C via asm68k-to-c"
+      },
+      {
+        type: 'fix',
+        "description": "Correct synth instrument preview pitch"
+      },
+      {
+        type: 'fix',
+        "description": "Route Tier 3 formats through UADE classic streaming"
+      },
+      {
+        type: 'feature',
+        "description": "StarTrekker AM WASM engine + cross-format editing/mute/preview fixes"
+      }
+    ]
+  },
+  {
+    version: '2026-03-17',
     date: '2026-03-17',
     changes: [
+      {
+        type: 'feature',
+        "description": "Add startup jingle toggle to Settings UI"
+      },
+      {
+        type: 'improvement',
+        "description": "Chore(generated): update changelog and file-manifest"
+      },
+      {
+        type: 'feature',
+        "description": "Chore(dev): add FORMAT_PORT=4444 to dev.sh startup and cleanup"
+      },
+      {
+        type: 'fix',
+        "description": "Correct note encoding and add noteExportOffset for S3M-origin files"
+      },
+      {
+        type: 'feature',
+        "description": "Add engine preferences for new Amiga formats + TrackerSong.noteExportOffset"
+      },
+      {
+        type: 'feature',
+        "description": "Extend FormatRegistry and FurnaceSongParser for new formats"
+      },
+      {
+        type: 'feature',
+        "description": "Add native parsers for 18 additional Amiga composer formats"
+      },
+      {
+        type: 'fix',
+        "description": "Use dataSize directly for BRR sample byte count"
+      },
+      {
+        type: 'feature',
+        "description": "Full song-mode integration with pattern data and MCP routing"
+      },
+      {
+        type: 'fix',
+        "description": "Prevent tab freeze and WASM crashes during song playback"
+      },
       {
         type: 'fix',
         "description": "Suppress libopenmpt WASM stderr to silence console spam"
@@ -142,94 +236,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'improvement',
         "description": "UADE: universal native export, enhanced effect detection"
-      },
-      {
-        type: 'improvement',
-        "description": "UADE: JamCracker encoder, DMA restart detection, improved pattern reconstruction"
-      },
-      {
-        type: 'fix',
-        "description": "Enable native pattern editing for SonicArranger by default"
-      },
-      {
-        type: 'fix',
-        "description": "Add mk2/mkii to skip-scan and force-classic prefix sets"
-      },
-      {
-        type: 'fix',
-        "description": "TCBTrackerParser note formula correction"
-      },
-      {
-        type: 'fix',
-        "description": "MEDParser MMD3 noteBaseTranspose (12 instead of 36)"
-      },
-      {
-        type: 'improvement',
-        "description": "Update project memory with multi-chip, scratch, and import fixes"
-      },
-      {
-        type: 'feature',
-        "description": "Startup jingle, GL AI panel input, jingle visualizer mode, pattern bar editor"
-      },
-      {
-        type: 'feature',
-        "description": "120s buffer, scroll wheel velocity, fader gain MIDI CC, scratch in VJView"
-      },
-      {
-        type: 'fix',
-        "description": "MED cell decode, MOD channel widths, TCB note offset, UADE routing"
-      },
-      {
-        type: 'fix',
-        "description": "Create all chips on song load, destroy stale chips between songs"
-      },
-      {
-        type: 'fix',
-        "description": "Channel bounds check in WASM dispatch + destroyChip API"
-      },
-      {
-        type: 'fix',
-        "description": "Envelope correlation export, float32 WAV, BRR field offsets"
-      },
-      {
-        type: 'feature',
-        "description": "Add console capture, evaluate_script, and play_fur tools"
-      },
-      {
-        type: 'fix',
-        "description": "Explicit number type for HWKnob onChange callback in MAMEGenericHardware"
-      },
-      {
-        type: 'fix',
-        "description": "Extend skip-scan/force-classic to suffix-form compiled replayer extensions"
-      },
-      {
-        type: 'fix',
-        "description": "Correct baseNote format from OpenMPT 'C-4' to Tone.js 'C4'"
-      },
-      {
-        type: 'fix',
-        "description": "Add .sa to skip-scan and force-classic for compiled binary SA files"
-      },
-      {
-        type: 'fix',
-        "description": "Swap instrument/note byte order per IFF EMOD spec"
-      },
-      {
-        type: 'fix',
-        "description": "Add compiled 68k replayer prefixes to skip-scan and force-classic"
-      },
-      {
-        type: 'improvement',
-        "description": "Prevent browser crashes: skip enhanced scan for compiled replayer formats"
-      },
-      {
-        type: 'fix',
-        "description": "Fix SonicArranger prefix-form crash: move sas to FORCE_CLASSIC_PREFIXES"
-      },
-      {
-        type: 'fix',
-        "description": "Fix InStereo! 2 wrong pattern speed: convert Hz tempo to BPM"
       }
     ]
   }

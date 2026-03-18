@@ -675,17 +675,28 @@ function parseMusicAssembler(bytes: Uint8Array, filename: string): TrackerSong |
     const si = sampleInfos[sIdx];
 
     if (si.lengthWords > 1 && si.lengthWords <= 128) {
-      // Synthesis wavetable — no real PCM; create synth placeholder
-      instrumentConfigs.push({
-        id:         instrId,
-        name:       si.name || `Instrument ${instrId}`,
-        type:       'synth' as const,
-        synthType:  'Synth' as const,
-        effects:    [],
-        volume:     0,
-        pan:        0,
-        oscillator: { type: 'sawtooth' as const, detune: 0, octave: 0 },
-      } as InstrumentConfig);
+      // Synthesis wavetable — extract PCM and create a looping sampler instrument
+      const lengthBytes = si.lengthWords * 2;
+      const dataOff     = si.dataOffset;
+
+      if (dataOff >= 0 && dataOff + lengthBytes <= bytes.length) {
+        const pcm = bytes.slice(dataOff, dataOff + lengthBytes);
+        instrumentConfigs.push(
+          createSamplerInstrument(instrId, si.name || `Wavetable ${sIdx}`, pcm, 64, PCM_BASE_RATE, 0, pcm.length)
+        );
+      } else {
+        // Data out of bounds — placeholder
+        instrumentConfigs.push({
+          id:         instrId,
+          name:       si.name || `Instrument ${instrId}`,
+          type:       'synth' as const,
+          synthType:  'Synth' as const,
+          effects:    [],
+          volume:     0,
+          pan:        0,
+          oscillator: { type: 'sawtooth' as const, detune: 0, octave: 0 },
+        } as InstrumentConfig);
+      }
     } else if (si.lengthWords > 128) {
       // PCM sample
       const lengthBytes = si.lengthWords * 2;

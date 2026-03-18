@@ -28,7 +28,7 @@ void apu_tick(struct NESAPU* a, int len) {
   if (rem>1) {
     // output now just in case
     int sample=(pulse_output(a)+tnd_output(a))<<6;
-    if (sample!=a->lastSample) {  
+    if (sample!=a->lastSample) {
       blip_add_delta(a->bb,a->timestamp,sample-a->lastSample);
       a->lastSample=sample;
     }

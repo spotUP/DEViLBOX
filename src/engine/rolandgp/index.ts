@@ -1,0 +1,1 @@
+export { RolandGPSynth } from './RolandGPSynth';

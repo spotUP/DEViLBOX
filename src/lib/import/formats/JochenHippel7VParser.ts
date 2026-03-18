@@ -196,7 +196,7 @@ export function parseJochenHippel7VFile(buffer: ArrayBuffer, filename: string): 
   if (!isJochenHippel7VFormat(buf)) throw new Error('Not a Jochen Hippel 7V module');
 
   const baseName = filename.split('/').pop() ?? filename;
-  const moduleName = baseName.replace(/^(hip7|s7g)\./i, '') || baseName;
+  const moduleName = baseName.replace(/^(hip7|s7g)\./i, '').replace(/\.(hip7|s7g)$/i, '') || baseName;
 
   const instruments: InstrumentConfig[] = [{
     id: 1, name: 'Sample 1', type: 'synth' as const,

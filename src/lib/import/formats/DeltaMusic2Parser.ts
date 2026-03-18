@@ -302,8 +302,16 @@ export function parseDeltaMusic2File(bytes: Uint8Array, filename: string): Track
     });
   }
 
-  // Advance offset past all instrument data (to breakOffset from instrumentDataBase)
-  off = instrumentDataBase + breakOffset;
+  // Advance offset past all instrument data.
+  // Each instrument is 88 bytes (6 + 15 + 15 + 2 + 1 + 1 + 48). The waveform section
+  // starts right after the last instrument's data. Track the furthest byte read.
+  let maxInstEnd = instrumentDataBase;
+  for (let i = 0; i < rawInstruments.length; i++) {
+    if (!rawInstruments[i]) continue;
+    const instEnd = instrumentDataBase + instrumentOffsets[i] + 88;
+    if (instEnd > maxInstEnd) maxInstEnd = instEnd;
+  }
+  off = maxInstEnd;
 
   // ── Waveform data ─────────────────────────────────────────────────────
   if (off + 4 > bytes.length) return null;
@@ -389,21 +397,38 @@ export function parseDeltaMusic2File(bytes: Uint8Array, filename: string): Track
       builtInstrument = createSamplerInstrument(id, `Sample ${i}`, pcmUint8, 64, PCM_BASE_RATE, loopStart, loopEnd);
     } else if (!inst.isSample && inst.sampleLength > 0 && waveforms.length > 0) {
       // ── Synth (waveform) instrument ───────────────────────────────────
-      // The first entry in inst.table gives the initial waveform index.
-      // 0xff = loop-back marker; any waveform index below that is valid.
-      const waveIdx = (inst.table[0] !== undefined && inst.table[0] !== 0xff)
-        ? inst.table[0]
-        : 0;
-      const clampedWave = Math.max(0, Math.min(waveIdx, waveforms.length - 1));
-      const waveform = waveforms[clampedWave];
-
-      // The DM2 player loops the waveform over [0, sampleLength) bytes.
-      // sampleLength is in bytes (already converted from words above).
+      // DM2 synth instruments cycle through waveforms listed in inst.table.
+      // Each table entry is a waveform index (0-based); 0xFF = end/loop marker.
+      // The characteristic DM2 sound comes from this waveform-table sweep.
       const playLen = Math.min(inst.sampleLength, 256);
-      const pcmUint8 = new Uint8Array(playLen);
-      for (let j = 0; j < playLen; j++) {
-        pcmUint8[j] = waveform[j % 256] & 0xff;
+
+      // Collect active table entries (before first 0xFF after which all are 0)
+      const activeEntries: number[] = [];
+      for (let j = 0; j < inst.table.length; j++) {
+        if (inst.table[j] === 0xFF) break;
+        activeEntries.push(Math.max(0, Math.min(inst.table[j], waveforms.length - 1)));
       }
+      if (activeEntries.length === 0) activeEntries.push(0);
+
+      // Remove trailing zeros to find the meaningful sweep length
+      let sweepLen = activeEntries.length;
+      while (sweepLen > 1 && activeEntries[sweepLen - 1] === 0 && activeEntries[sweepLen - 2] === 0) sweepLen--;
+      const sweep = activeEntries.slice(0, Math.max(1, sweepLen));
+
+      // Bake: one cycle per table entry, concatenated
+      const sections: Uint8Array[] = [];
+      for (const wIdx of sweep) {
+        const wave = waveforms[wIdx];
+        const cycle = new Uint8Array(playLen);
+        for (let j = 0; j < playLen; j++) cycle[j] = wave[j % 256] & 0xff;
+        sections.push(cycle);
+      }
+
+      // Concatenate all sections; loop on the full sweep
+      const totalLen = sections.reduce((s, a) => s + a.length, 0);
+      const pcmUint8 = new Uint8Array(totalLen);
+      let pcmOff = 0;
+      for (const sec of sections) { pcmUint8.set(sec, pcmOff); pcmOff += sec.length; }
 
       // Store at SYNTH_BASE_RATE (2072 Hz) with baseNote='C3' (XM note 37).
       // This ensures that DM2 note N (used directly as XM note N in patterns)
@@ -411,7 +436,7 @@ export function parseDeltaMusic2File(bytes: Uint8Array, filename: string): Track
       //   playbackRate = SYNTH_BASE_RATE × 2^((N − 37)/12)
       //   = (PAL_CLOCK/2/856) × 2^((N−37)/12)
       //   = PAL_CLOCK / (2 × periods[N])   [because periods[N] = 856 / 2^((N−37)/12)]
-      builtInstrument = createSamplerInstrument(id, `Synth ${i}`, pcmUint8, 64, SYNTH_BASE_RATE, 0, playLen);
+      builtInstrument = createSamplerInstrument(id, `Synth ${i}`, pcmUint8, 64, SYNTH_BASE_RATE, 0, totalLen);
     } else {
       // Placeholder (no sample data / no waveforms)
       builtInstrument = {
@@ -675,6 +700,9 @@ export function parseDeltaMusic2File(bytes: Uint8Array, filename: string): Track
     initialSpeed: speed,
     initialBPM: 125,
     linearPeriods: false,
+    // DM2 notes are direct period table indices (1-based). MOD period table
+    // starts at note 25. +24 aligns DM2 notes with correct MOD periods.
+    noteExportOffset: 36,
     uadePatternLayout,
   };
 }

@@ -526,6 +526,7 @@ export function parseSidMon1File(buffer: ArrayBuffer, filename: string, moduleBa
     initialSpeed: 6,
     initialBPM: 125,
     linearPeriods: false,
+    noteExportOffset: 36,
     // uadePatternLayout omitted: SidMon1Synth WASM engine handles audio directly.
     // UADE overrides and silences the native SidMon1Synth when uadePatternLayout is present.
   };

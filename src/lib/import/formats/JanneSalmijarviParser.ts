@@ -46,7 +46,7 @@ export function parseJanneSalmijarviFile(buffer: ArrayBuffer, filename: string):
   if (!isJanneSalmijarviFormat(buf)) throw new Error('Not a Janne Salmijarvi Optimizer module');
 
   const baseName = filename.split('/').pop() ?? filename;
-  const moduleName = baseName.replace(/^js\./i, '') || baseName;
+  const moduleName = baseName.replace(/^js\./i, '').replace(/\.js$/i, '') || baseName;
 
   const instruments: InstrumentConfig[] = [{
     id: 1, name: 'Sample 1', type: 'synth' as const,

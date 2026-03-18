@@ -233,6 +233,7 @@ export async function parseSTMFile(
   const verMinor    = u8(v, 31);
   let   initTempo   = u8(v, 32);
   const numPatterns = u8(v, 33);
+  const globalVolume = Math.min(u8(v, 34), 64);
 
   // For verMinor < 21, tempo is stored as decimal; convert to packed nibbles
   if (verMinor < 21) {
@@ -415,7 +416,10 @@ export async function parseSTMFile(
       } as InstrumentConfig;
     }
 
-    const pcm = raw.subarray(sampleFileOff, sampleFileOff + readLen);
+    // STM stores unsigned 8-bit PCM (center = 0x80). Convert to signed for createSamplerInstrument.
+    const unsigned = raw.subarray(sampleFileOff, sampleFileOff + readLen);
+    const pcm = new Uint8Array(unsigned.length);
+    for (let j = 0; j < unsigned.length; j++) pcm[j] = unsigned[j] ^ 0x80;
 
     // Loop active if: loopStart < length && loopEnd > loopStart && loopEnd != 0xFFFF
     const hasLoop =
@@ -427,11 +431,13 @@ export async function parseSTMFile(
     const loopEnd    = hasLoop ? hdr.loopEnd   : 0;
     const sampleRate = hdr.sampleRate > 0 ? hdr.sampleRate : 8363;
 
+    // Scale sample volume by global volume (0-64)
+    const scaledVol = Math.round(hdr.volume * Math.min(globalVolume, 64) / 64);
     return createSamplerInstrument(
       id,
       name,
       pcm,
-      hdr.volume,
+      scaledVol,
       sampleRate,
       loopStart,
       loopEnd,
@@ -461,6 +467,7 @@ export async function parseSTMFile(
     initialSpeed,
     initialBPM,
     linearPeriods:   false,
+    xmRelNoteOffset: -12,
     uadePatternLayout,
   };
 }

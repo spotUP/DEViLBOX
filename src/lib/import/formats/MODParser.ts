@@ -595,5 +595,11 @@ export async function parseMODFile(buffer: ArrayBuffer, filename: string): Promi
     initialSpeed,
     initialBPM,
     linearPeriods:   false, // MOD always uses Amiga periods
+    // MOD parser produces notes 1-36 (C-0..B-2). MOD exporter period table starts at note 25.
+    // +24 maps note 1 (C-0) → 25, note 13 (C-1, period 856) → 37 → idx 12 → period 1712.
+    // Correct roundtrip: note 13+24=37 → period 1712. But we need 856 at note 37...
+    // Actually: period 856 is at idx 24 → note 49. So note 13+24=37 → idx 12 → period 1712.
+    // That's still wrong. Need +36: note 13+36=49 → idx 24 → period 856. ✓
+    noteExportOffset: 36,
   };
 }

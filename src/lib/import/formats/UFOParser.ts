@@ -43,7 +43,7 @@ export function parseUFOFile(buffer: ArrayBuffer, filename: string): TrackerSong
   if (!isUFOFormat(buf)) throw new Error('Not a UFO module');
 
   const baseName = filename.split('/').pop() ?? filename;
-  const moduleName = baseName.replace(/^(?:mus|ufo)\./i, '') || baseName;
+  const moduleName = baseName.replace(/^(?:mus|ufo)\./i, '').replace(/\.(mus|ufo)$/i, '') || baseName;
 
   const instruments: InstrumentConfig[] = [{
     id: 1, name: 'Sample 1', type: 'synth' as const,

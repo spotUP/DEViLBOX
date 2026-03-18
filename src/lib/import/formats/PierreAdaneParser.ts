@@ -149,7 +149,7 @@ export function parsePierreAdaneFile(buffer: ArrayBuffer, filename: string): Tra
   if (!isPierreAdaneFormat(buf)) throw new Error('Not a Pierre Adane Packer module');
 
   const baseName = filename.split('/').pop() ?? filename;
-  const moduleName = baseName.replace(/^pap\./i, '') || baseName;
+  const moduleName = baseName.replace(/^pap\./i, '').replace(/\.pap$/i, '') || baseName;
 
   const instruments: InstrumentConfig[] = [{
     id: 1, name: 'Sample 1', type: 'synth' as const,

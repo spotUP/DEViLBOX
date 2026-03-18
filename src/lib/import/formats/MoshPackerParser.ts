@@ -63,7 +63,7 @@ export function parseMoshPackerFile(buffer: ArrayBuffer, filename: string): Trac
   if (!isMoshPackerFormat(buf)) throw new Error('Not a Mosh Packer module');
 
   const baseName = filename.split('/').pop() ?? filename;
-  const moduleName = baseName.replace(/^mosh\./i, '') || baseName;
+  const moduleName = baseName.replace(/^mosh\./i, '').replace(/\.mosh$/i, '') || baseName;
 
   const instruments: InstrumentConfig[] = [{
     id: 1, name: 'Sample 1', type: 'synth' as const,

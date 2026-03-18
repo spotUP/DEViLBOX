@@ -343,6 +343,20 @@ const WASM_ENGINES: NativeEngineDescriptor[] = [
     dynamicResolver: async () => (await import('@/engine/artofnoise/ArtOfNoiseEngine')).ArtOfNoiseEngine as unknown as WASMSingletonStatic,
   },
   {
+    key: 'StartrekkerAM',
+    synthType: 'StartrekkerAMSynth',
+    suppressNotes: true,
+    fileDataKey: 'startrekkerAMFileData',
+    formats: null,  // activate whenever startrekkerAMFileData exists
+    loadMethod: 'loadTune',
+    getLoadArgs: (song) => [song.startrekkerAMNtData ?? null],
+    supportsPause: false,
+    supportsResume: false,
+    needsDirectRouting: true,
+    staticRef: null,
+    dynamicResolver: async () => (await import('@/engine/startrekker-am/StartrekkerAMEngine')).StartrekkerAMEngine as unknown as WASMSingletonStatic,
+  },
+  {
     key: 'SidMon2',
     synthType: 'SidMon2Synth',
     suppressNotes: true,
@@ -384,7 +398,7 @@ const WASM_ENGINES: NativeEngineDescriptor[] = [
 
 /** Synth types routed through the stereo separation chain */
 const ROUTABLE_SYNTH_TYPES = new Set(
-  ['UADESynth', ...WASM_ENGINES.map(e => e.synthType)]
+  ['UADESynth', 'SunVoxSynth', 'SunVoxModular', ...WASM_ENGINES.map(e => e.synthType)]
 );
 
 // ---------------------------------------------------------------------------
@@ -610,7 +624,7 @@ export async function startNativeEngines(
   // sequencer, so TrackerReplayer must not drive individual note-on/off calls.
   if (!muted) {
     const sunvoxSongInsts = song.instruments.filter(
-      i => i.synthType === 'SunVoxSynth' && i.sunvox?.isSong === true,
+      i => (i.synthType === 'SunVoxSynth' || i.synthType === 'SunVoxModular') && i.sunvox?.isSong === true,
     );
     if (sunvoxSongInsts.length > 0) {
       suppressNotes = true;
@@ -700,7 +714,7 @@ export function stopNativeEngines(
   if (song) {
     const toneEngine = getToneEngine();
     const sunvoxSongInsts = song.instruments.filter(
-      i => i.synthType === 'SunVoxSynth' && i.sunvox?.isSong === true,
+      i => (i.synthType === 'SunVoxSynth' || i.synthType === 'SunVoxModular') && i.sunvox?.isSong === true,
     );
     for (const inst of sunvoxSongInsts) {
       try {

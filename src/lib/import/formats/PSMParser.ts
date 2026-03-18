@@ -111,6 +111,7 @@
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, ChannelData, TrackerCell, InstrumentConfig } from '@/types';
+import { createSamplerInstrument } from './AmigaUtils';
 
 // ── Little-endian binary helpers ──────────────────────────────────────────────
 
@@ -720,6 +721,7 @@ function _parseNewPSM(bytes: Uint8Array, filename: string): TrackerSong | null {
     initialSpeed,
     initialBPM,
     linearPeriods:   false,
+    xmRelNoteOffset: -12,
   };
 }
 
@@ -814,11 +816,19 @@ function _parsePSM16(bytes: Uint8Array, filename: string): TrackerSong | null {
   }
 
   // ── Samples ────────────────────────────────────────────────────────────────
-  // PSM16SampleHeader is 64 bytes:
-  //   filename[13], name[24], offset(4), memoffset(4), sampleNumber(2),
-  //   flags(1), length(4), loopStart(4), loopEnd(4), finetune(1), volume(1), c2freq(2)
-  // Total: 13+24+4+4+2+1+4+4+4+1+1+2 = 64 bytes
+  // PSM16SampleHeader (64 bytes, from OpenMPT Load_psm.cpp):
+  //   filename[13]  @0   name[24]     @13  offset(u32)  @37
+  //   memoffset(u32)@41  smpNumber(u16)@45 flags(u8)    @47
+  //   length(u32)  @48   loopStart(u32)@52 loopEnd(u32) @56
+  //   finetune(u8) @60   volume(u8)   @61  c2freq(u16)  @62
+  // Flags: 0x04=16bit, 0x08=unsigned, 0x10=delta, 0x20=pingpong, 0x80=loop
+  // If (flags & 0x7F)==0 → delta PCM (OpenMPT convention)
   const SAMPLE_HDR_SIZE = 64;
+  const SMP_16BIT   = 0x04;
+  const SMP_UNSIGNED = 0x08;
+  const SMP_DELTA   = 0x10;
+  const SMP_LOOP    = 0x80;
+  const SMP_MASK    = 0x7F;
   const instruments: InstrumentConfig[] = [];
 
   if (smpOffset > 4) {
@@ -828,33 +838,78 @@ function _parsePSM16(bytes: Uint8Array, filename: string): TrackerSong | null {
       for (let s = 0; s < numSamples; s++) {
         if (sp + SAMPLE_HDR_SIZE > bytes.length) break;
         const sName      = readString(bytes, sp + 13, 24);
-        const smpNumber  = u16le(bytes, sp + 41);
+        const pcmOffset  = u32le(bytes, sp + 37);
+        const smpNumber  = u16le(bytes, sp + 45);
+        const flags      = u8(bytes, sp + 47);
+        let   smpLength  = u32le(bytes, sp + 48);
+        const loopStart  = u32le(bytes, sp + 52);
+        const loopEnd    = u32le(bytes, sp + 56);
+        const volume     = Math.min(u8(bytes, sp + 61), 64);
+        const c2freq     = u16le(bytes, sp + 62);
         sp += SAMPLE_HDR_SIZE;
 
-        if (smpNumber > 0 && smpNumber < 256) {
-          // Extend array if needed
-          while (instruments.length < smpNumber) {
-            const idx = instruments.length + 1;
-            instruments.push({
-              id:        idx,
-              name:      `Sample ${idx}`,
-              type:      'sample' as const,
-              synthType: 'Sampler' as const,
-              effects:   [],
-              volume:    0,
-              pan:       0,
-            } as unknown as InstrumentConfig);
-          }
-          instruments[smpNumber - 1] = {
-            id:        smpNumber,
-            name:      sName || `Sample ${smpNumber}`,
-            type:      'sample' as const,
-            synthType: 'Sampler' as const,
-            effects:   [],
-            volume:    0,
-            pan:       0,
-          } as unknown as InstrumentConfig;
+        if (smpNumber < 1 || smpNumber >= 256) continue;
+
+        // Extend array with empty placeholders if needed
+        while (instruments.length < smpNumber) {
+          const idx = instruments.length + 1;
+          instruments.push({
+            id: idx, name: `Sample ${idx}`, type: 'sample' as const,
+            synthType: 'Sampler' as const, effects: [], volume: 0, pan: 0,
+          } as unknown as InstrumentConfig);
         }
+
+        const is16bit    = (flags & SMP_16BIT) !== 0;
+        const isUnsigned = (flags & SMP_UNSIGNED) !== 0;
+        const isDelta    = (flags & SMP_DELTA) !== 0 || (flags & SMP_MASK) === 0;
+        const hasLoop    = (flags & SMP_LOOP) !== 0 && loopEnd > loopStart;
+
+        // For 16-bit samples, length is in bytes; frame count = length / 2
+        const frameCount = is16bit ? Math.floor(smpLength / 2) : smpLength;
+
+        // Read raw PCM from file at the specified offset
+        if (pcmOffset + smpLength > bytes.length || smpLength === 0) {
+          // No valid PCM data — keep placeholder
+          instruments[smpNumber - 1] = {
+            id: smpNumber, name: sName || `Sample ${smpNumber}`,
+            type: 'sample' as const, synthType: 'Sampler' as const,
+            effects: [], volume: 0, pan: 0,
+          } as unknown as InstrumentConfig;
+          continue;
+        }
+
+        // Decode PCM to signed 8-bit
+        const pcm = new Uint8Array(frameCount);
+        if (is16bit) {
+          // 16-bit LE: take high byte, apply delta/unsigned as needed
+          let prev = 0;
+          for (let i = 0; i < frameCount; i++) {
+            let s16 = bytes[pcmOffset + i * 2] | (bytes[pcmOffset + i * 2 + 1] << 8);
+            if (s16 >= 32768) s16 -= 65536;
+            if (isDelta) { s16 = (prev + s16) & 0xFFFF; if (s16 >= 32768) s16 -= 65536; prev = s16; }
+            let s8 = (s16 >> 8) & 0xFF;
+            if (isUnsigned) s8 = s8 ^ 0x80;
+            pcm[i] = s8;
+          }
+        } else {
+          // 8-bit
+          let prev = 0;
+          for (let i = 0; i < frameCount; i++) {
+            let val = bytes[pcmOffset + i];
+            if (isDelta) { val = (prev + val) & 0xFF; prev = val; }
+            if (isUnsigned) val = val ^ 0x80;
+            pcm[i] = val;
+          }
+        }
+
+        const sampleRate = c2freq > 0 ? c2freq : 8363;
+        const lStart = hasLoop ? Math.min(loopStart, frameCount) : 0;
+        const lEnd   = hasLoop ? Math.min(loopEnd + 1, frameCount) : 0;
+
+        instruments[smpNumber - 1] = createSamplerInstrument(
+          smpNumber, sName || `Sample ${smpNumber}`, pcm,
+          volume, sampleRate, lStart, lEnd > lStart ? lEnd : 0,
+        );
       }
     }
   }
@@ -1006,6 +1061,7 @@ function _parsePSM16(bytes: Uint8Array, filename: string): TrackerSong | null {
     initialSpeed:    Math.max(1, songSpeed),
     initialBPM:      Math.max(32, songTempo),
     linearPeriods:   false,
+    xmRelNoteOffset: -12,
   };
 }
 

@@ -1,0 +1,52 @@
+<h2>Audio Quality — what matters most?</h2>
+<p class="subtitle">Pick everything you want improved (multi-select)</p>
+
+<div class="options" data-multiselect>
+  <div class="option" data-choice="aliasing" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Aliasing at Extreme Rates</h3>
+      <p>Fast forward / fast reverse sounds grainy or buzzy. High frequencies break up when the rate is pushed hard.</p>
+    </div>
+  </div>
+
+  <div class="option" data-choice="smoothing" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Rate Smoothing Tightness</h3>
+      <p>The 5ms rate smoothing makes direction changes feel slightly behind. Could be faster/adaptive without adding clicks.</p>
+    </div>
+  </div>
+
+  <div class="option" data-choice="clicks" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Clicks &amp; Pops</h3>
+      <p>Audible clicks when scratch starts, stops, or changes direction. The 1ms zero-crossing fade isn't always enough.</p>
+    </div>
+  </div>
+
+  <div class="option" data-choice="lookahead" onclick="toggleSelect(this)">
+    <div class="letter">D</div>
+    <div class="content">
+      <h3>Lookahead Gap</h3>
+      <p>The hardcoded 0.1s pre-roll means scratch always starts 100ms behind the live audio. Want it tighter or configurable.</p>
+    </div>
+  </div>
+
+  <div class="option" data-choice="pitch" onclick="toggleSelect(this)">
+    <div class="letter">E</div>
+    <div class="content">
+      <h3>Pitch Lock Mode</h3>
+      <p>Scratching changes both speed and pitch (realistic). Option to decouple them — stretch time without shifting pitch (like CDJs in "slip" mode).</p>
+    </div>
+  </div>
+
+  <div class="option" data-choice="interpolation" onclick="toggleSelect(this)">
+    <div class="letter">F</div>
+    <div class="content">
+      <h3>Interpolation Quality</h3>
+      <p>Currently cubic Hermite (good). Upgrade to sinc/windowed-sinc for higher quality at slow rates, or add oversampling.</p>
+    </div>
+  </div>
+</div>

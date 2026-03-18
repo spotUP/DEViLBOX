@@ -142,7 +142,7 @@ export async function parseBenDaglishFile(
 
   const baseName = filename.split('/').pop() ?? filename;
   // Strip ".bd" suffix or "bd." prefix (case-insensitive)
-  const moduleName = baseName.replace(/\.bd$/i, '').replace(/^bd\./i, '') || baseName;
+  const moduleName = baseName.replace(/\.bds$/i, '').replace(/\.bd$/i, '').replace(/^bds\./i, '').replace(/^bd\./i, '') || baseName;
 
   // ── Instrument placeholders ───────────────────────────────────────────────
   //

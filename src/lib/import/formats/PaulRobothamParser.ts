@@ -149,7 +149,7 @@ export function parsePaulRobothamFile(buffer: ArrayBuffer, filename: string): Tr
   if (!isPaulRobothamFormat(buf)) throw new Error('Not a Paul Robotham module');
 
   const baseName = filename.split('/').pop() ?? filename;
-  const moduleName = baseName.replace(/^dat\./i, '') || baseName;
+  const moduleName = baseName.replace(/^dat\./i, '').replace(/\.dat$/i, '') || baseName;
 
   const instruments: InstrumentConfig[] = [{
     id: 1, name: 'Sample 1', type: 'synth' as const,

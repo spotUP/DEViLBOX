@@ -141,7 +141,7 @@ export async function parseSeanConranFile(
 
   const baseName = filename.split('/').pop() ?? filename;
   // Strip "SCR." prefix (case-insensitive)
-  const moduleName = baseName.replace(/^scr\./i, '') || baseName;
+  const moduleName = baseName.replace(/^scr\./i, '').replace(/\.scr$/i, '') || baseName;
 
   // ── Instrument placeholders ──────────────────────────────────────────────
 

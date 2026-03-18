@@ -108,12 +108,12 @@ function mapMTMEffect(cmd: number, param: number): { effTyp: number; eff: number
 
 /**
  * Convert MTM raw note value (noteInstr >> 2) to XM note number.
- * MTM stores 0-based semitone index; XM note 1 = C-0.
+ * OpenMPT: m.note = rawNote + 24 + NOTE_MIN = rawNote + 25.
  * Returns 0 for empty.
  */
 function mtmNoteToXM(rawNote: number): number {
   if (rawNote === 0) return 0;
-  return Math.min(rawNote, 96);
+  return Math.min(rawNote + 25, 96);
 }
 
 // -- Parser -------------------------------------------------------------------

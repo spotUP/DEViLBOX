@@ -1,0 +1,32 @@
+#
+# GUARDIC (PSG)
+# (c)COMPILE
+# Made by ShaiWa
+#
+# To Enter Sound Test :
+# After title screen in hi-score screen push : <left>,<right>,<left>,<right>,<left>,<right>
+#
+Guardic PSG.kss::KSS,$02,Guardic - PSG (MSX) (C)Compile [ Tittle ],18,,0
+Guardic PSG.kss::KSS,$04,Guardic - PSG (MSX) (C)Compile [ Guardic Battle ],1:15,,3
+Guardic PSG.kss::KSS,$05,Guardic - PSG (MSX) (C)Compile [ 05 ],7,,0
+Guardic PSG.kss::KSS,$06,Guardic - PSG (MSX) (C)Compile [ Game Over ],7,,0
+Guardic PSG.kss::KSS,$07,Guardic - PSG (MSX) (C)Compile [ It's Your Choice ],40,,3
+Guardic PSG.kss::KSS,$0e,Guardic - PSG (MSX) (C)Compile [ 0E ],50,,3
+Guardic PSG.kss::KSS,$10,Guardic - PSG (MSX) (C)Compile [ 10 ],3,,0
+Guardic PSG.kss::KSS,$11,Guardic - PSG (MSX) (C)Compile [ Extra's Recieved ],3,,0
+Guardic PSG.kss::KSS,$12,Guardic - PSG (MSX) (C)Compile [ Guardian ],29,,3
+Guardic PSG.kss::KSS,$13,Guardic - PSG (MSX) (C)Compile [ High Score ],51,,3
+Guardic PSG.kss::KSS,$14,Guardic - PSG (MSX) (C)Compile [ 14 ],5,,0
+Guardic PSG.kss::KSS,$15,Guardic - PSG (MSX) (C)Compile [ 15 ],3,,0
+Guardic PSG.kss::KSS,$16,Guardic - PSG (MSX) (C)Compile [ Randar Theme ],32,,3
+Guardic PSG.kss::KSS,$17,Guardic - PSG (MSX) (C)Compile [ 17 ],15,,0
+
+Guardic PSG.kss::KSS,$01,Guardic - PSG (MSX) (C)Compile [ 01 ],3,,0
+Guardic PSG.kss::KSS,$03,Guardic - PSG (MSX) (C)Compile [ 03 ],2,,3
+Guardic PSG.kss::KSS,$08,Guardic - PSG (MSX) (C)Compile [ 08 ],2,,0
+Guardic PSG.kss::KSS,$09,Guardic - PSG (MSX) (C)Compile [ 09 ],2,,0
+Guardic PSG.kss::KSS,$0a,Guardic - PSG (MSX) (C)Compile [ 0A ],2,,0
+Guardic PSG.kss::KSS,$0b,Guardic - PSG (MSX) (C)Compile [ 0B ],2,,0
+Guardic PSG.kss::KSS,$0c,Guardic - PSG (MSX) (C)Compile [ 0C ],2,,3
+Guardic PSG.kss::KSS,$0d,Guardic - PSG (MSX) (C)Compile [ 0D ],2,,0
+Guardic PSG.kss::KSS,$0f,Guardic - PSG (MSX) (C)Compile [ 0F ],2,,0

@@ -86,7 +86,7 @@ function detectPrefix(basename: string): QuartetVariant {
 
 /** Strip the Quartet prefix from the basename to produce a human-readable song name. */
 function stripPrefix(basename: string): string {
-  return basename.replace(/^(qpa|sqt|qts)\./i, '') || basename;
+  return basename.replace(/^(qpa|sqt|qts)\./i, '').replace(/\.(qpa|sqt|qts)$/i, '') || basename;
 }
 
 // ── Per-variant binary detection ────────────────────────────────────────────

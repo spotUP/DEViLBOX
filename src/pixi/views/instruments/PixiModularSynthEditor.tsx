@@ -29,10 +29,10 @@ const SIG_CLR: Record<SignalType, number> = { audio: 0x44ff44, cv: 0x4488ff, gat
 type ViewMode = 'rack' | 'matrix' | 'canvas';
 
 // Category config matching DOM ModuleShelf
-const CATEGORY_ORDER: ModuleCategory[] = ['source', 'filter', 'amplifier', 'modulator', 'envelope', 'utility', 'io'];
+const CATEGORY_ORDER: ModuleCategory[] = ['source', 'filter', 'amplifier', 'modulator', 'envelope', 'utility', 'io', 'control'];
 const CATEGORY_NAMES: Record<ModuleCategory, string> = {
   source: 'Sources', filter: 'Filters', amplifier: 'Amplifiers',
-  modulator: 'Modulators', envelope: 'Envelopes', utility: 'Utility', io: 'I/O',
+  modulator: 'Modulators', envelope: 'Envelopes', utility: 'Utility', io: 'I/O', control: 'Control',
 };
 
 export interface PixiModularSynthEditorProps {

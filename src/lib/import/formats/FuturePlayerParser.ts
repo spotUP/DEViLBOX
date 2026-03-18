@@ -511,6 +511,7 @@ export function parseFuturePlayerFile(buffer: ArrayBuffer, filename: string): Tr
     initialSpeed,
     initialBPM,
     linearPeriods: false,
+    noteExportOffset: 36,
     futurePlayerFileData: buffer.slice(0),
   };
 }

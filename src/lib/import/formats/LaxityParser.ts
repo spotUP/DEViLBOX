@@ -50,7 +50,7 @@ export function parseLaxityFile(buffer: ArrayBuffer, filename: string): TrackerS
   if (!isLaxityFormat(buffer, filename)) throw new Error('Not a Laxity module');
 
   const baseName = filename.split('/').pop() ?? filename;
-  const moduleName = baseName.replace(/^(powt|pt)\./i, '') || baseName;
+  const moduleName = baseName.replace(/^(powt|pt)\./i, '').replace(/\.(powt|pt)$/i, '') || baseName;
 
   const instruments: InstrumentConfig[] = [{
     id: 1, name: 'Sample 1', type: 'synth' as const,

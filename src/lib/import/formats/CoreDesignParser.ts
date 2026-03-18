@@ -76,7 +76,7 @@ export function parseCoreDesignFile(buffer: ArrayBuffer, filename: string): Trac
   if (!isCoreDesignFormat(buf)) throw new Error('Not a Core Design module');
 
   const baseName = filename.split('/').pop() ?? filename;
-  const moduleName = baseName.replace(/^core\./i, '') || baseName;
+  const moduleName = baseName.replace(/^core\./i, '').replace(/\.core$/i, '') || baseName;
 
   const instruments: InstrumentConfig[] = [{
     id: 1, name: 'Sample 1', type: 'synth' as const,
