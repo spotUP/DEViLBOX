@@ -75,7 +75,7 @@
 <body>
 
 <h1>🎵 DEViLBOX Format Status Tracker</h1>
-<p class="subtitle">188 formats — click a family header to collapse/expand. Server is source of truth. <span id="connectionStatus" style="color:#4ade80">●</span> <span id="connectionText">Connecting...</span></p>
+<p class="subtitle"><span id="formatCount">188</span> formats — click a family header to collapse/expand. Server is source of truth. <span id="connectionStatus" style="color:#f87171">●</span> <span id="connectionText">Connecting...</span></p>
 
 <div class="controls">
   <input type="text" id="search" placeholder="Filter by name, key, or extension...">
@@ -273,579 +273,7 @@ const FORMATS = [
   {"key": "dmf", "label": "DefleMask / X-Tracker", "family": "furnace", "nativeParser": true, "uade": true, "openmptFb": false, "openmptPlay": false, "nativeOnly": false, "ext": ".dmf", "editable": true, "exportable": false},
   {"key": "fur", "label": "Furnace", "family": "furnace", "nativeParser": false, "uade": false, "openmptFb": false, "openmptPlay": false, "nativeOnly": true, "ext": ".fur", "editable": true, "exportable": true},
 
-  // Furnace Chip Synth Audit — NES demo songs
-  {"key": "fur-nes-bytesizedbop", "label": "Byte-Sized Bop", "family": "furnace-audit-nes", "chips": "NES"},
-  {"key": "fur-nes-famitune1", "label": "Famitune1", "family": "furnace-audit-nes", "chips": "NES+VRC6"},
-  {"key": "fur-nes-furnes", "label": "Fur_Nes", "family": "furnace-audit-nes", "chips": "NES"},
-  {"key": "fur-nes-futurereference", "label": "Future_Re-ference", "family": "furnace-audit-nes", "chips": "NES+VRC7"},
-  {"key": "fur-nes-riseagainst", "label": "Rise against the ashes", "family": "furnace-audit-nes", "chips": "NES+VRC6"},
-  {"key": "fur-nes-skysanctuary", "label": "Sky Sanctuary Zone", "family": "furnace-audit-nes", "chips": "NES+VRC7"},
-  {"key": "fur-nes-supercool", "label": "Super cool and awesome samurai", "family": "furnace-audit-nes", "chips": "NES"},
-  {"key": "fur-nes-superspaceinvaders", "label": "Super_Space_Invaders_Title", "family": "furnace-audit-nes", "chips": "NES"},
-  {"key": "fur-nes-thecheetahmen", "label": "The Cheetahmen", "family": "furnace-audit-nes", "chips": "NES"},
-  {"key": "fur-nes-theeast", "label": "The East", "family": "furnace-audit-nes", "chips": "NES+FDS"},
-  {"key": "fur-nes-blanketcritter", "label": "blanketcritter release ver", "family": "furnace-audit-nes", "chips": "5E01+C30"},
-  {"key": "fur-nes-carveyourownpath", "label": "carve_your_own_path", "family": "furnace-audit-nes", "chips": "NES+N163"},
-  {"key": "fur-nes-christmasfever", "label": "christmas-fever", "family": "furnace-audit-nes", "chips": "NES"},
-  {"key": "fur-nes-delarosamazapan", "label": "delarosamazapan", "family": "furnace-audit-nes", "chips": "NES+VRC7"},
-  {"key": "fur-nes-goingupastepatime", "label": "going_up_a_step_at_time", "family": "furnace-audit-nes", "chips": "NES+VRC6"},
-  {"key": "fur-nes-infinity", "label": "infinity", "family": "furnace-audit-nes", "chips": "NES+FDS"},
-  {"key": "fur-nes-oby1ingame", "label": "oby1_ingame", "family": "furnace-audit-nes", "chips": "NES+VRC6"},
-  {"key": "fur-nes-onesidedlove", "label": "one_sided_love", "family": "furnace-audit-nes", "chips": "NES+MMC5"},
-  {"key": "fur-nes-smashtv", "label": "smashtv", "family": "furnace-audit-nes", "chips": "NES+VRC6"},
-  {"key": "fur-nes-sweatsmile", "label": "sweatsmile_bossfight", "family": "furnace-audit-nes", "chips": "NES"},
-  {"key": "fur-nes-thebest1990", "label": "the_best-1990", "family": "furnace-audit-nes", "chips": "NES"},
-  {"key": "fur-nes-turtlebyte", "label": "turtle_byte", "family": "furnace-audit-nes", "chips": "NES"},
-
-  // UADE WASM Audio Audit — test-formats/ samples vs uade123 reference renders
-  {"key": "uade-afterburner.dl", "label": "afterburner.dl", "family": "uade-audit", "chips": "Dave Lowe"},
-  {"key": "uade-apb.dw", "label": "apb.dw", "family": "uade-audit", "chips": "David Whittaker"},
-  {"key": "uade-artura.bd", "label": "artura.bd", "family": "uade-audit", "chips": "Ben Daglish"},
-  {"key": "uade-ash.cj_in_the_usa", "label": "ash.cj_in_the_usa", "family": "uade-audit", "chips": "Ashley Hogg"},
-  {"key": "uade-dynablaster.ast", "label": "dynablaster.ast", "family": "uade-audit", "chips": "Andrew Parton"},
-  {"key": "uade-rick_dangerous.core", "label": "rick_dangerous.core", "family": "uade-audit", "chips": "Core Design"},
-  {"key": "uade-45.okta", "label": "45.okta", "family": "uade-audit", "chips": "Oktalyzer"},
-  {"key": "uade-aces_high.ahx", "label": "aces_high.ahx", "family": "uade-audit", "chips": "AHX"},
-  {"key": "uade-adept.smod", "label": "adept.smod", "family": "uade-audit", "chips": "Future Composer 1.3"},
-  {"key": "uade-analogue_vibes.jam", "label": "analogue_vibes.jam", "family": "uade-audit", "chips": "JamCracker"},
-  {"key": "uade-anthrox.fc", "label": "anthrox.fc", "family": "uade-audit", "chips": "Future Composer 1.4"},
-  {"key": "uade-anthrox_intro.dm2", "label": "anthrox_intro.dm2", "family": "uade-audit", "chips": "Delta Music 2"},
-  {"key": "uade-aquarivs.bp", "label": "aquarivs.bp", "family": "uade-audit", "chips": "BP SoundMon 2"},
-  {"key": "uade-aspar.fred", "label": "aspar.fred", "family": "uade-audit", "chips": "FredMon"},
-  {"key": "uade-bruno_time.sid2", "label": "bruno_time.sid2", "family": "uade-audit", "chips": "SidMon 2"},
-  {"key": "uade-chinese_chess.mon", "label": "chinese_chess.mon", "family": "uade-audit", "chips": "Maniacs Of Noise"},
-  {"key": "uade-commando.mc", "label": "commando.mc", "family": "uade-audit", "chips": "Mark Cooksey"},
-  {"key": "uade-crusaders1.dm", "label": "crusaders1.dm", "family": "uade-audit", "chips": "Delta Music"},
-  {"key": "uade-5th_gear.hip", "label": "5th_gear.hip", "family": "uade-audit", "chips": "Hippel"},
-  {"key": "uade-flight.dmu", "label": "flight.dmu", "family": "uade-audit", "chips": "Digital Mugician"},
-  {"key": "uade-prehistoric_tale.hipc", "label": "prehistoric_tale.hipc", "family": "uade-audit", "chips": "Hippel COSO"},
-  {"key": "uade-sanxion.rh", "label": "sanxion.rh", "family": "uade-audit", "chips": "Rob Hubbard"},
-  {"key": "uade-tusker_ingame.jt", "label": "tusker_ingame.jt", "family": "uade-audit", "chips": "Jeroen Tel"},
-  {"key": "uade-amberstar.hip7", "label": "amberstar.hip7", "family": "uade-audit", "chips": "Hippel 7V"},
-  {"key": "uade-antidust.bp3", "label": "antidust.bp3", "family": "uade-audit", "chips": "BP SoundMon 3"},
-  {"key": "uade-balrog.dln", "label": "balrog.dln", "family": "uade-audit", "chips": "Dave Lowe New"},
-  {"key": "uade-letsdance.bss", "label": "letsdance.bss", "family": "uade-audit", "chips": "Beathoven Synthesizer"},
-  {"key": "uade-angel_harp.mms", "label": "angel_harp.mms", "family": "uade-audit", "chips": "MultiMedia Sound"},
-  {"key": "uade-anarchy.sid1", "label": "anarchy.sid1", "family": "uade-audit", "chips": "SidMon 1"},
-  {"key": "uade-cockwise.mug", "label": "cockwise.mug", "family": "uade-audit", "chips": "Digital Mugician 2"},
-  {"key": "uade-flood.glue", "label": "flood.glue", "family": "uade-audit", "chips": "GlueMon"},
-  {"key": "uade-afterburner2.jb", "label": "afterburner2.jb", "family": "uade-audit", "chips": "Jason Brooke"},
-  {"key": "uade-baseheads.ma", "label": "baseheads.ma", "family": "uade-audit", "chips": "Music Assembler"},
-  {"key": "uade-blacklamp.gray", "label": "blacklamp.gray", "family": "uade-audit", "chips": "Fred Gray"},
-  {"key": "uade-newtek.bsi", "label": "newtek.bsi", "family": "uade-audit", "chips": "Future Composer BSI"},
-  {"key": "uade-synth_corn.emod", "label": "synth_corn.emod", "family": "uade-audit", "chips": "Quadra Composer"},
-  {"key": "uade-wicked.wb", "label": "wicked.wb", "family": "uade-audit", "chips": "Wally Beben"},
-  {"key": "uade-action.aps", "label": "action.aps", "family": "uade-audit", "chips": "AProSys"},
-  {"key": "uade-action_section.aon", "label": "action_section.aon", "family": "uade-audit", "chips": "Art Of Noise"},
-  {"key": "uade-atron.mk2", "label": "atron.mk2", "family": "uade-audit", "chips": "Mark II"},
-  {"key": "uade-beast_busters.ims", "label": "beast_busters.ims", "family": "uade-audit", "chips": "Images Music System"},
-  {"key": "uade-crash_and_burn.dz", "label": "crash_and_burn.dz", "family": "uade-audit", "chips": "Darius Zendeh"},
-  {"key": "uade-crockett8.mm8", "label": "crockett8.mm8", "family": "uade-audit", "chips": "MusicMaker V8"},
-  {"key": "uade-dragonsbreath.dsc", "label": "dragonsbreath.dsc", "family": "uade-audit", "chips": "Digital Sonix And Chrome"},
-  {"key": "uade-krymini.amc", "label": "krymini.amc", "family": "uade-audit", "chips": "AM Composer"},
-  {"key": "uade-3rdblock.ntp", "label": "3rdblock.ntp", "family": "uade-audit", "chips": "NovoTrade Packer"},
-  {"key": "uade-doxtro3.dss", "label": "doxtro3.dss", "family": "uade-audit", "chips": "Digital Sound Studio"},
-  {"key": "uade-primemover.hot", "label": "primemover.hot", "family": "uade-audit", "chips": "Anders Oland"},
-  {"key": "uade-chuckie_egg.tw", "label": "chuckie_egg.tw", "family": "uade-audit", "chips": "Sound Images"},
-  {"key": "uade-bladerunner.ea", "label": "bladerunner.ea", "family": "uade-audit", "chips": "EarAche"},
-  {"key": "uade-acid_housemix.sfx", "label": "acid_housemix.sfx", "family": "uade-audit", "chips": "Sound-FX"},
-  {"key": "uade-almighty.sa", "label": "almighty.sa", "family": "uade-audit", "chips": "Sonic Arranger"},
-  {"key": "uade-axelf.mm4", "label": "axelf.mm4", "family": "uade-audit", "chips": "MusicMaker V4"},
-  {"key": "uade-axelf.psf", "label": "axelf.psf", "family": "uade-audit", "chips": "Sound Factory"},
-  {"key": "uade-blazing_thunder.hd", "label": "blazing_thunder.hd", "family": "uade-audit", "chips": "Howie Davies"},
-  {"key": "uade-doofus.sm", "label": "doofus.sm", "family": "uade-audit", "chips": "Sound Master"},
-  {"key": "uade-fantasi8.is", "label": "fantasi8.is", "family": "uade-audit", "chips": "InStereo"},
-  {"key": "uade-flimbos_quest.sqt", "label": "flimbos_quest.sqt", "family": "uade-audit", "chips": "Quartet PSG"},
-  {"key": "uade-gyroscope.mon", "label": "gyroscope.mon", "family": "uade-audit", "chips": "Maniacs Of Noise"},
-  {"key": "uade-offroad.jpo", "label": "offroad.jpo", "family": "uade-audit", "chips": "Jason Page Old"},
-  {"key": "uade-qang.vss", "label": "qang.vss", "family": "uade-audit", "chips": "Voodoo Supreme Synthesizer"},
-  {"key": "uade-stereo_feeling.is20", "label": "stereo_feeling.is20", "family": "uade-audit", "chips": "InStereo 2.0"},
-  {"key": "uade-cannonfodder.tcb", "label": "cannonfodder.tcb", "family": "uade-audit", "chips": "TCB Tracker"},
-  {"key": "uade-fashionating1.ex", "label": "fashionating1.ex", "family": "uade-audit", "chips": "Fashion Tracker"},
-  {"key": "uade-lefetichemaya.mok", "label": "lefetichemaya.mok", "family": "uade-audit", "chips": "Silmarils"},
-  {"key": "uade-salten_crackers.synmod", "label": "salten_crackers.synmod", "family": "uade-audit", "chips": "SynTracker"},
-  {"key": "uade-airdriver.ss", "label": "airdriver.ss", "family": "uade-audit", "chips": "Speedy System"},
-  {"key": "uade-count_duckula.scr", "label": "count_duckula.scr", "family": "uade-audit", "chips": "Sean Conran"},
-  {"key": "uade-mco.aquestion", "label": "mco.aquestion", "family": "uade-audit", "chips": "Mark Cooksey Old"},
-  {"key": "uade-alien_storm.md", "label": "alien_storm.md", "family": "uade-audit", "chips": "Mike Davies"},
-  {"key": "uade-artificial_dreams.sb", "label": "artificial_dreams.sb", "family": "uade-audit", "chips": "Steve Barrett"},
-  {"key": "uade-bombfusion.riff", "label": "bombfusion.riff", "family": "uade-audit", "chips": "Riff Raff"},
-  {"key": "uade-agony.aam", "label": "agony.aam", "family": "uade-audit", "chips": "Art And Magic"},
-  {"key": "uade-hybris.fp", "label": "hybris.fp", "family": "uade-audit", "chips": "Future Player"},
-  {"key": "uade-inconvenient.sg", "label": "inconvenient.sg", "family": "uade-audit", "chips": "Tomy Tracker"},
-  {"key": "uade-airball.ps", "label": "airball.ps", "family": "uade-audit", "chips": "Paul Shields"},
-  {"key": "uade-batmanthemovie.doda", "label": "batmanthemovie.doda", "family": "uade-audit", "chips": "Special FX ST"},
-  {"key": "uade-battlecommand.jd", "label": "battlecommand.jd", "family": "uade-audit", "chips": "Special FX"},
-  {"key": "uade-boulderdash.spl", "label": "boulderdash.spl", "family": "uade-audit", "chips": "Sound Programming Language"},
-  {"key": "uade-digital_voyage.sas", "label": "digital_voyage.sas", "family": "uade-audit", "chips": "Speedy A1 System"},
-  {"key": "uade-fightingsoccer.snk", "label": "fightingsoccer.snk", "family": "uade-audit", "chips": "Paul Summers"},
-  {"key": "uade-ninjaspirit.lme", "label": "ninjaspirit.lme", "family": "uade-audit", "chips": "Leggless Music Editor"},
-  {"key": "uade-punisher.psa", "label": "punisher.psa", "family": "uade-audit", "chips": "Professional Sound Artists"},
-  {"key": "uade-surf_ninjas.scn", "label": "surf_ninjas.scn", "family": "uade-audit", "chips": "Sean Connolly"},
-  {"key": "uade-tearaway.dh", "label": "tearaway.dh", "family": "uade-audit", "chips": "David Hanney"},
-  {"key": "uade-maniac_mansion.scumm", "label": "maniac_mansion.scumm", "family": "uade-audit", "chips": "SCUMM"},
-  {"key": "uade-snickle.mug2", "label": "snickle.mug2", "family": "uade-audit", "chips": "Mugician II"},
-  {"key": "uade-captain_planet.mmdc", "label": "captain_planet.mmdc", "family": "uade-audit", "chips": "OctaMED MMDC"},
-  {"key": "uade-chubbygristle.bds", "label": "chubbygristle.bds", "family": "uade-audit", "chips": "Ben Daglish SID"},
-  {"key": "uade-adreamoffish.prt", "label": "adreamoffish.prt", "family": "uade-audit", "chips": "Pretracker"},
-
-  // Furnace Chip Synth Audit — Game Boy demo songs
-  {"key": "fur-gb-gbwaitforme", "label": "GB_WaitForMe", "family": "furnace-audit-gb", "chips": "GB"},
-  {"key": "fur-gb-onhold", "label": "On Hold", "family": "furnace-audit-gb", "chips": "GB"},
-  {"key": "fur-gb-pleasureoftension", "label": "Pleasure of Tension", "family": "furnace-audit-gb", "chips": "GB"},
-  {"key": "fur-gb-cheap", "label": "cheap", "family": "furnace-audit-gb", "chips": "GB"},
-  {"key": "fur-gb-contested", "label": "contested", "family": "furnace-audit-gb", "chips": "GB"},
-  {"key": "fur-gb-dancingtothedeath", "label": "dancing to the death", "family": "furnace-audit-gb", "chips": "GB"},
-  {"key": "fur-gb-lagtrain", "label": "lagtrain", "family": "furnace-audit-gb", "chips": "GB"},
-  {"key": "fur-gb-minos", "label": "minos", "family": "furnace-audit-gb", "chips": "GB"},
-  {"key": "fur-gb-puggsinspace", "label": "puggs in space", "family": "furnace-audit-gb", "chips": "GB"},
-  {"key": "fur-gb-spreadtro", "label": "spreadtro", "family": "furnace-audit-gb", "chips": "GB"},
-  {"key": "fur-gb-snowdin", "label": "snowdin", "family": "furnace-audit-gb", "chips": "GB"},
-  {"key": "fur-gb-finger", "label": "finger", "family": "furnace-audit-gb", "chips": "GB"},
-  {"key": "fur-gb-yourewelldoing", "label": "You're Doing Well!", "family": "furnace-audit-gb", "chips": "GB"},
-
-  // Furnace Chip Synth Audit — C64 (SID) demo songs
-  {"key": "fur-c64-c64junk", "label": "C64 junk", "family": "furnace-audit-c64", "chips": "SID"},
-  {"key": "fur-c64-chaostune", "label": "ChaosTune", "family": "furnace-audit-c64", "chips": "SID"},
-  {"key": "fur-c64-fairlightc64", "label": "FairlightC64", "family": "furnace-audit-c64", "chips": "SID"},
-  {"key": "fur-c64-hellcharger", "label": "Hellcharger", "family": "furnace-audit-c64", "chips": "SID"},
-  {"key": "fur-c64-lowbeatz", "label": "LowBeatz", "family": "furnace-audit-c64", "chips": "SID"},
-  {"key": "fur-c64-picohotcredits", "label": "PICOHOTCREDITS", "family": "furnace-audit-c64", "chips": "SID"},
-  {"key": "fur-c64-deadlock", "label": "deadlock", "family": "furnace-audit-c64", "chips": "SID"},
-  {"key": "fur-c64-yeah", "label": "yeah!", "family": "furnace-audit-c64", "chips": "SID"},
-
-  // Furnace Chip Synth Audit — Lynx (MIKEY) demo songs
-  {"key": "fur-lynx-chippylotus", "label": "chippylotus", "family": "furnace-audit-lynx", "chips": "MIKEY"},
-  {"key": "fur-lynx-inserttitlehere", "label": "insert_title_here", "family": "furnace-audit-lynx", "chips": "MIKEY"},
-  {"key": "fur-lynx-ledstorm", "label": "LedStorm", "family": "furnace-audit-lynx", "chips": "MIKEY"},
-  {"key": "fur-lynx-roadrashgrassvalley", "label": "Road_Rash_Grass_Valley", "family": "furnace-audit-lynx", "chips": "MIKEY"},
-  {"key": "fur-lynx-tyriancamanis", "label": "Tyrian-Camanis", "family": "furnace-audit-lynx", "chips": "MIKEY"},
-
-  // Furnace Chip Synth Audit — SN76489 demo songs
-  {"key": "fur-sn7-456nmti994a", "label": "456nm_TI994A", "family": "furnace-audit-sn7", "chips": "SN76489"},
-  {"key": "fur-sn7-flowofsn7", "label": "FlowOfSN7", "family": "furnace-audit-sn7", "chips": "SN76489"},
-  {"key": "fur-sn7-lastfreqsystem", "label": "Last Frecuency System", "family": "furnace-audit-sn7", "chips": "SN76489"},
-  {"key": "fur-sn7-nightmarketti994a", "label": "Night_Market_TI994A", "family": "furnace-audit-sn7", "chips": "SN76489"},
-  {"key": "fur-sn7-protaras", "label": "Protaras", "family": "furnace-audit-sn7", "chips": "SN76489"},
-  {"key": "fur-sn7-tidaltemptestzone", "label": "Tidal_Tempest_Zone", "family": "furnace-audit-sn7", "chips": "SN76489"},
-  {"key": "fur-sn7-updraftflight", "label": "Updraft Flight", "family": "furnace-audit-sn7", "chips": "SN76489"},
-  {"key": "fur-sn7-doorintosummer", "label": "doorintosummer", "family": "furnace-audit-sn7", "chips": "SN76489"},
-  {"key": "fur-sn7-ggsurfer", "label": "gg_silver_surfer_st1", "family": "furnace-audit-sn7", "chips": "SN76489"},
-  {"key": "fur-sn7-ggsoniccd", "label": "gg_soniccd_collision_chaos", "family": "furnace-audit-sn7", "chips": "SN76489"},
-  {"key": "fur-sn7-thunderblade", "label": "thunderblade-type-ii", "family": "furnace-audit-sn7", "chips": "SN76489"},
-
-  // Furnace Chip Synth Audit — AY-8910 demo songs
-  {"key": "fur-ay-jam", "label": "AY-3-8910_Jam", "family": "furnace-audit-ay", "chips": "AY-8910"},
-  {"key": "fur-ay-aymate", "label": "AyMate", "family": "furnace-audit-ay", "chips": "AY-8910"},
-  {"key": "fur-ay-driftingcolour", "label": "Drifting in Colour", "family": "furnace-audit-ay", "chips": "AY-8910"},
-  {"key": "fur-ay-flatwave", "label": "Flat Wave Society", "family": "furnace-audit-ay", "chips": "AY-8910"},
-  {"key": "fur-ay-secondaddition", "label": "Second_Addition", "family": "furnace-audit-ay", "chips": "AY-8910"},
-  {"key": "fur-ay-cardboardmywater", "label": "cardboardmywater", "family": "furnace-audit-ay", "chips": "AY-8910"},
-  {"key": "fur-ay-demoscenebeat", "label": "demoscenetypebeat", "family": "furnace-audit-ay", "chips": "AY-8910"},
-  {"key": "fur-ay-remarkmusic", "label": "remark_music", "family": "furnace-audit-ay", "chips": "AY-8910"},
-  {"key": "fur-ay-curseforest", "label": "the curse of the forest", "family": "furnace-audit-ay", "chips": "AY-8910"},
-  {"key": "fur-ay-vibezone", "label": "vibe_zone", "family": "furnace-audit-ay", "chips": "AY-8910"},
-
-  // Furnace Chip Synth Audit — PC Engine (HuC6280) demo songs
-  {"key": "fur-pce-contest2025", "label": "Contest thing 2025", "family": "furnace-audit-pce", "chips": "PCE"},
-  {"key": "fur-pce-fakegb", "label": "Fake Gameboy", "family": "furnace-audit-pce", "chips": "PCE"},
-  {"key": "fur-pce-finalfight", "label": "Final_Fight_Metro_City_Slums", "family": "furnace-audit-pce", "chips": "PCE"},
-  {"key": "fur-pce-madara", "label": "Ma-Da-Ra", "family": "furnace-audit-pce", "chips": "PCE"},
-  {"key": "fur-pce-peace", "label": "Peace", "family": "furnace-audit-pce", "chips": "PCE"},
-  {"key": "fur-pce-processingplant", "label": "Processing Plant 2025 Edit", "family": "furnace-audit-pce", "chips": "PCE"},
-  {"key": "fur-pce-warpdrive", "label": "Warpdrive_Engage", "family": "furnace-audit-pce", "chips": "PCE"},
-  {"key": "fur-pce-continuityerror", "label": "continuity_error", "family": "furnace-audit-pce", "chips": "PCE"},
-  {"key": "fur-pce-fdpcb", "label": "fd_PCB", "family": "furnace-audit-pce", "chips": "PCE"},
-  {"key": "fur-pce-pcengineasdmo", "label": "pcengineasdmo", "family": "furnace-audit-pce", "chips": "PCE"},
-
-  // Furnace Chip Synth Audit — Genesis (OPN2) demo songs
-  {"key": "fur-genesis-allgoodtimes", "label": "All Good Times", "family": "furnace-audit-genesis", "chips": "OPN2"},
-  {"key": "fur-genesis-chocfactory", "label": "ChocolateFactory", "family": "furnace-audit-genesis", "chips": "OPN2"},
-  {"key": "fur-genesis-equinoxintro", "label": "Equinox Intro", "family": "furnace-audit-genesis", "chips": "OPN2"},
-  {"key": "fur-genesis-fancypromenard", "label": "Fancy_Promenard", "family": "furnace-audit-genesis", "chips": "OPN2"},
-  {"key": "fur-genesis-kobitoshining", "label": "Kobito_of_the_Shining_Needle", "family": "furnace-audit-genesis", "chips": "OPN2"},
-  {"key": "fur-genesis-megadriveoverdrive", "label": "MegadriveOverdrive", "family": "furnace-audit-genesis", "chips": "OPN2"},
-  {"key": "fur-genesis-plokbeach", "label": "Plok_Beach", "family": "furnace-audit-genesis", "chips": "OPN2"},
-  {"key": "fur-genesis-puyo", "label": "Puyopuyo~n_DopplegangerArle", "family": "furnace-audit-genesis", "chips": "OPN2"},
-  {"key": "fur-genesis-raveofdoom", "label": "RaveOfDoom", "family": "furnace-audit-genesis", "chips": "OPN2"},
-  {"key": "fur-genesis-rubyillusions", "label": "RubyIllusions_Genesis", "family": "furnace-audit-genesis", "chips": "OPN2"},
-  {"key": "fur-genesis-shovelknight", "label": "Shovel_Knight_Title", "family": "furnace-audit-genesis", "chips": "OPN2"},
-  {"key": "fur-genesis-solarman", "label": "Solar_Man", "family": "furnace-audit-genesis", "chips": "OPN2"},
-  {"key": "fur-genesis-sparehalloween", "label": "SpareHalloween2", "family": "furnace-audit-genesis", "chips": "OPN2"},
-  {"key": "fur-genesis-stereotactics", "label": "Stereotactics_Rewritten", "family": "furnace-audit-genesis", "chips": "OPN2"},
-  {"key": "fur-genesis-darkstar", "label": "darkstar", "family": "furnace-audit-genesis", "chips": "OPN2"},
-  {"key": "fur-genesis-djtbmx", "label": "djtBMX_zweitrigger_bluesky", "family": "furnace-audit-genesis", "chips": "OPN2"},
-  {"key": "fur-genesis-electrickeet", "label": "Electric Keet - Imperfectionist", "family": "furnace-audit-genesis", "chips": "OPN2"},
-  {"key": "fur-genesis-eternallydoomed", "label": "eternallydoomedtogroove", "family": "furnace-audit-genesis", "chips": "OPN2"},
-  {"key": "fur-genesis-flatulencemtn", "label": "flatulence mountain's fm orchestra", "family": "furnace-audit-genesis", "chips": "OPN2"},
-  {"key": "fur-genesis-goldenshit", "label": "golden_shit", "family": "furnace-audit-genesis", "chips": "OPN2"},
-  {"key": "fur-genesis-highscorefollin", "label": "highscorefollin", "family": "furnace-audit-genesis", "chips": "OPN2"},
-  {"key": "fur-genesis-imaginarium", "label": "imaginarium", "family": "furnace-audit-genesis", "chips": "OPN2"},
-  {"key": "fur-genesis-mm5boss", "label": "mm5_boss", "family": "furnace-audit-genesis", "chips": "OPN2"},
-  {"key": "fur-genesis-newersonglol", "label": "newer_song_lol", "family": "furnace-audit-genesis", "chips": "OPN2"},
-  {"key": "fur-genesis-notime", "label": "notime", "family": "furnace-audit-genesis", "chips": "OPN2"},
-  {"key": "fur-genesis-shiningcrystal", "label": "shiningcrystal_cave", "family": "furnace-audit-genesis", "chips": "OPN2"},
-  {"key": "fur-genesis-serenity", "label": "the_serenity_of_lonliness", "family": "furnace-audit-genesis", "chips": "OPN2"},
-  {"key": "fur-genesis-waterfall", "label": "waterfall", "family": "furnace-audit-genesis", "chips": "OPN2"},
-  {"key": "fur-genesis-wwfrtw", "label": "wwfrtw_credits_arrange", "family": "furnace-audit-genesis", "chips": "OPN2"},
-
-  // Furnace Chip Synth Audit — SNES (SPC700) demo songs
-  {"key": "fur-snes-64kb", "label": "64kb", "family": "furnace-audit-snes", "chips": "SPC700"},
-  {"key": "fur-snes-breezy", "label": "Breezy", "family": "furnace-audit-snes", "chips": "SPC700"},
-  {"key": "fur-snes-cosmicwarehouse", "label": "Cosmic_Warehouse", "family": "furnace-audit-snes", "chips": "SPC700"},
-  {"key": "fur-snes-dearblue", "label": "Dear Blue SNES", "family": "furnace-audit-snes", "chips": "SPC700"},
-  {"key": "fur-snes-imucafe", "label": "IMU Cafe", "family": "furnace-audit-snes", "chips": "SPC700"},
-  {"key": "fur-snes-mm8frostman", "label": "MM8_Frost_Man", "family": "furnace-audit-snes", "chips": "SPC700"},
-  {"key": "fur-snes-manbowsmw", "label": "ManbowSMW", "family": "furnace-audit-snes", "chips": "SPC700"},
-  {"key": "fur-snes-snesfunk", "label": "SNES Funk", "family": "furnace-audit-snes", "chips": "SPC700"},
-  {"key": "fur-snes-sadness", "label": "Sadness", "family": "furnace-audit-snes", "chips": "SPC700"},
-  {"key": "fur-snes-sunkenlights", "label": "Sunken Lights", "family": "furnace-audit-snes", "chips": "SPC700"},
-  {"key": "fur-snes-unrealsnes", "label": "Unreal_Something_SNES", "family": "furnace-audit-snes", "chips": "SPC700"},
-  {"key": "fur-snes-wackyworkbench", "label": "Wacky Workbench Past SNES Remix", "family": "furnace-audit-snes", "chips": "SPC700"},
-  {"key": "fur-snes-xcdunes", "label": "XCDunes_SNES", "family": "furnace-audit-snes", "chips": "SPC700"},
-  {"key": "fur-snes-xchq", "label": "XCHQ_SPC700", "family": "furnace-audit-snes", "chips": "SPC700"},
-  {"key": "fur-snes-amalgam", "label": "amalgam", "family": "furnace-audit-snes", "chips": "SPC700"},
-  {"key": "fur-snes-analog", "label": "analog", "family": "furnace-audit-snes", "chips": "SPC700"},
-  {"key": "fur-snes-arbitrary", "label": "arbitrary", "family": "furnace-audit-snes", "chips": "SPC700"},
-  {"key": "fur-snes-aurora", "label": "aurora", "family": "furnace-audit-snes", "chips": "SPC700"},
-  {"key": "fur-snes-changeyourheart", "label": "changeyourheart", "family": "furnace-audit-snes", "chips": "SPC700"},
-  {"key": "fur-snes-encjslt", "label": "encjslt", "family": "furnace-audit-snes", "chips": "SPC700"},
-  {"key": "fur-snes-insultednoeffect", "label": "insultednoeffect", "family": "furnace-audit-snes", "chips": "SPC700"},
-  {"key": "fur-snes-segacd", "label": "segacd", "family": "furnace-audit-snes", "chips": "SPC700"},
-  {"key": "fur-snes-soundprocessingunit", "label": "sound processing unit", "family": "furnace-audit-snes", "chips": "SPC700"},
-  {"key": "fur-snes-spd10", "label": "spd10", "family": "furnace-audit-snes", "chips": "SPC700"},
-  {"key": "fur-snes-spd24", "label": "spd24", "family": "furnace-audit-snes", "chips": "SPC700"},
-  {"key": "fur-snes-tablewave", "label": "table wave", "family": "furnace-audit-snes", "chips": "SPC700"},
-  {"key": "fur-snes-tetristheme", "label": "tetristheme", "family": "furnace-audit-snes", "chips": "SPC700"},
-  {"key": "fur-snes-dreamwatch", "label": "time_of_the_dreamwatch", "family": "furnace-audit-snes", "chips": "SPC700"},
-  {"key": "fur-snes-verychillsnes", "label": "very chill snes", "family": "furnace-audit-snes", "chips": "SPC700"},
-  {"key": "fur-snes-wondersofsynthia", "label": "wonders_of_synthia", "family": "furnace-audit-snes", "chips": "SPC700"},
-
-  // Furnace Chip Synth Audit — OPL (OPL1/OPL2/OPL3/OPL4) demo songs
-  {"key": "fur-opl-aircombat", "label": "Air_Combat_Over_the_Vast_Mountain", "family": "furnace-audit-opl", "chips": "OPL"},
-  {"key": "fur-opl-contraduct", "label": "Contraduct Design OPL3 Cover", "family": "furnace-audit-opl", "chips": "OPL"},
-  {"key": "fur-opl-egyptianrule", "label": "Egyptian_Rule", "family": "furnace-audit-opl", "chips": "OPL"},
-  {"key": "fur-opl-memoriesoftriumph", "label": "Memories_of_Triumph", "family": "furnace-audit-opl", "chips": "OPL"},
-  {"key": "fur-opl-midnightdog", "label": "Midnight_Dog_Orchestra", "family": "furnace-audit-opl", "chips": "OPL"},
-  {"key": "fur-opl-moon", "label": "Moon", "family": "furnace-audit-opl", "chips": "OPL"},
-  {"key": "fur-opl-ohnosinewaves", "label": "Oh no, more sine waves", "family": "furnace-audit-opl", "chips": "OPL"},
-  {"key": "fur-opl-onesidedloveagain", "label": "One_Sided_Love_Again", "family": "furnace-audit-opl", "chips": "OPL"},
-  {"key": "fur-opl-perpetualmotion", "label": "Perpetual_Motion", "family": "furnace-audit-opl", "chips": "OPL"},
-  {"key": "fur-opl-phantombreaker", "label": "PhantomBreakerBattleGrounds OPL3", "family": "furnace-audit-opl", "chips": "OPL"},
-  {"key": "fur-opl-slidingonrainbow", "label": "Sliding_on_a_Rainbow", "family": "furnace-audit-opl", "chips": "OPL"},
-  {"key": "fur-opl-teaminnocent", "label": "TeamInnocent-BGM4-OPL3Plus", "family": "furnace-audit-opl", "chips": "OPL"},
-  {"key": "fur-opl-timeislost", "label": "Time_Is_Lost_OPL4", "family": "furnace-audit-opl", "chips": "OPL"},
-  {"key": "fur-opl-waterworldmap", "label": "Waterworld_-_Map", "family": "furnace-audit-opl", "chips": "OPL"},
-  {"key": "fur-opl-aspier", "label": "aspier", "family": "furnace-audit-opl", "chips": "OPL"},
-  {"key": "fur-opl-biganime", "label": "big anime kawaii oppai", "family": "furnace-audit-opl", "chips": "OPL"},
-  {"key": "fur-opl-femteknyl", "label": "femteknyl", "family": "furnace-audit-opl", "chips": "OPL"},
-  {"key": "fur-opl-fightflight", "label": "fight and flight", "family": "furnace-audit-opl", "chips": "OPL"},
-  {"key": "fur-opl-greenbikerdude", "label": "green_biker_dude_opl", "family": "furnace-audit-opl", "chips": "OPL"},
-  {"key": "fur-opl-homewfl", "label": "home_wfl_opl3", "family": "furnace-audit-opl", "chips": "OPL"},
-  {"key": "fur-opl-meleodic", "label": "meleodic", "family": "furnace-audit-opl", "chips": "OPL"},
-  {"key": "fur-opl-raincloudsunset", "label": "rain.cloud.sunset", "family": "furnace-audit-opl", "chips": "OPL"},
-  {"key": "fur-opl-foggycave", "label": "the_foggy_cave_in_the_darkness", "family": "furnace-audit-opl", "chips": "OPL"},
-
-  // Furnace Chip Synth Audit — OPM (YM2151) demo songs
-  {"key": "fur-opm-hopeforthedream", "label": "hope_for_the_dream", "family": "furnace-audit-opm", "chips": "OPM"},
-  {"key": "fur-opm-lagrangepoint", "label": "lagrange_point_2023", "family": "furnace-audit-opm", "chips": "OPM"},
-  {"key": "fur-opm-noiffex", "label": "noiffex", "family": "furnace-audit-opm", "chips": "OPM"},
-  {"key": "fur-opm-kingofcrisp", "label": "the_king_of_crisp", "family": "furnace-audit-opm", "chips": "OPM"},
-  {"key": "fur-opm-tintin", "label": "tintin", "family": "furnace-audit-opm", "chips": "OPM"},
-  {"key": "fur-opm-vortex", "label": "vortex", "family": "furnace-audit-opm", "chips": "OPM"},
-  {"key": "fur-opm-waterworldmap", "label": "waterworld_map", "family": "furnace-audit-opm", "chips": "OPM"},
-
-  // Furnace Chip Synth Audit — Atari 2600 (TIA) demo songs
-  {"key": "fur-a2600-balmeranda", "label": "Balmeranda", "family": "furnace-audit-a2600", "chips": "TIA"},
-  {"key": "fur-a2600-funkyafternoon", "label": "Funky_Afternoon", "family": "furnace-audit-a2600", "chips": "TIA"},
-  {"key": "fur-a2600-morepain", "label": "morepain", "family": "furnace-audit-a2600", "chips": "TIA"},
-  {"key": "fur-a2600-slamthedoor", "label": "Slam_the_Door", "family": "furnace-audit-a2600", "chips": "TIA"},
-  {"key": "fur-a2600-twin", "label": "twin", "family": "furnace-audit-a2600", "chips": "TIA"},
-  {"key": "fur-a2600-watchmytone", "label": "Watch My Tone", "family": "furnace-audit-a2600", "chips": "TIA"},
-
-  // Furnace Chip Synth Audit — Amiga (Paula) demo songs
-  {"key": "fur-amiga-awavepowerhouse", "label": "a_wave_powerhouse", "family": "furnace-audit-amiga", "chips": "Paula"},
-  {"key": "fur-amiga-brunotime", "label": "bruno_time", "family": "furnace-audit-amiga", "chips": "Paula"},
-  {"key": "fur-amiga-ibiza", "label": "Ibiza", "family": "furnace-audit-amiga", "chips": "Paula"},
-  {"key": "fur-amiga-m7vibe", "label": "m7 vibe", "family": "furnace-audit-amiga", "chips": "Paula"},
-  {"key": "fur-amiga-serendipid", "label": "serendipid", "family": "furnace-audit-amiga", "chips": "Paula"},
-  {"key": "fur-amiga-theamigamen", "label": "The Amigamen", "family": "furnace-audit-amiga", "chips": "Paula"},
-
-  // Furnace Chip Synth Audit — Arcade demo songs
-  {"key": "fur-arcade-basecamp", "label": "Basecamp", "family": "furnace-audit-arcade", "chips": "Arcade"},
-  {"key": "fur-arcade-changshadnb", "label": "Changsha_DnB_Inferno_NamcoNA1", "family": "furnace-audit-arcade", "chips": "NamcoNA1"},
-  {"key": "fur-arcade-closeencounter", "label": "close_encounter_NeoGeo", "family": "furnace-audit-arcade", "chips": "NeoGeo"},
-  {"key": "fur-arcade-crystaldimension", "label": "Crystal Dimension Section 2 WSG", "family": "furnace-audit-arcade", "chips": "NamcoWSG"},
-  {"key": "fur-arcade-destinyislands", "label": "Destiny_Islands_Irem_M92", "family": "furnace-audit-arcade", "chips": "IremM92"},
-  {"key": "fur-arcade-eekqsound", "label": "eek_qsound", "family": "furnace-audit-arcade", "chips": "QSound"},
-  {"key": "fur-arcade-eternalforest", "label": "Eternal_Forest_TaitoArcade", "family": "furnace-audit-arcade", "chips": "Taito"},
-  {"key": "fur-arcade-grapejelly", "label": "Grape_Jelly_Alpha5232", "family": "furnace-audit-arcade", "chips": "Alpha5232"},
-  {"key": "fur-arcade-hexionology", "label": "Hexionology", "family": "furnace-audit-arcade", "chips": "Arcade"},
-  {"key": "fur-arcade-icecapnamco", "label": "ice_cap_NamcoC30", "family": "furnace-audit-arcade", "chips": "NamcoC30"},
-  {"key": "fur-arcade-icewindsega", "label": "Ice_Wind_SegaPCM", "family": "furnace-audit-arcade", "chips": "SegaPCM"},
-  {"key": "fur-arcade-joyfulstart", "label": "JoyfulStart_Seta", "family": "furnace-audit-arcade", "chips": "SetaX1"},
-  {"key": "fur-arcade-lastday", "label": "last_day_of_summer_NamcoC15", "family": "furnace-audit-arcade", "chips": "NamcoC15"},
-  {"key": "fur-arcade-livingcrystal", "label": "living crystal cave", "family": "furnace-audit-arcade", "chips": "Arcade"},
-  {"key": "fur-arcade-marsbarnamsco", "label": "Mars_Bar_On_Mars_NamcoWSG", "family": "furnace-audit-arcade", "chips": "NamcoWSG"},
-  {"key": "fur-arcade-maxoverdrive", "label": "Maximum_Overdrive_NamcoWSG", "family": "furnace-audit-arcade", "chips": "NamcoWSG"},
-  {"key": "fur-arcade-phoenixnamco", "label": "Phoenix_cover_NamcoWSG", "family": "furnace-audit-arcade", "chips": "NamcoWSG"},
-  {"key": "fur-arcade-physicsexam", "label": "Physics_Exam_TaitoArcade", "family": "furnace-audit-arcade", "chips": "Taito"},
-  {"key": "fur-arcade-pointofnoreturn", "label": "Point_of_No_Return_SegaPCM", "family": "furnace-audit-arcade", "chips": "SegaPCM"},
-  {"key": "fur-arcade-qsoundsmile", "label": "QSound_smile", "family": "furnace-audit-arcade", "chips": "QSound"},
-  {"key": "fur-arcade-reprogrammed", "label": "REPROGRAMMED", "family": "furnace-audit-arcade", "chips": "Arcade"},
-  {"key": "fur-arcade-salamander", "label": "Salamander_Starfield", "family": "furnace-audit-arcade", "chips": "Arcade"},
-  {"key": "fur-arcade-shinya", "label": "SHIN_YA", "family": "furnace-audit-arcade", "chips": "Arcade"},
-  {"key": "fur-arcade-slowbrew", "label": "Slow Brew", "family": "furnace-audit-arcade", "chips": "Arcade"},
-  {"key": "fur-arcade-somecreatures", "label": "Some_Creatures_SegaPCM", "family": "furnace-audit-arcade", "chips": "SegaPCM"},
-  {"key": "fur-arcade-goodtimessega", "label": "The_Good_Times_SegaPCM", "family": "furnace-audit-arcade", "chips": "SegaPCM"},
-  {"key": "fur-arcade-machinessega", "label": "the_machines_are_socialising_SegaPCM", "family": "furnace-audit-arcade", "chips": "SegaPCM"},
-  {"key": "fur-arcade-toheart", "label": "ToHeart_QoH98_TPower", "family": "furnace-audit-arcade", "chips": "Arcade"},
-  {"key": "fur-arcade-trancetaito", "label": "trance_TaitoArcade", "family": "furnace-audit-arcade", "chips": "Taito"},
-  {"key": "fur-arcade-tubelectric", "label": "Tubelectric_Fictional_Arcade", "family": "furnace-audit-arcade", "chips": "Arcade"},
-  {"key": "fur-arcade-unowenwasher", "label": "U.N. Owen Was Her (NS2)", "family": "furnace-audit-arcade", "chips": "NS2"},
-  {"key": "fur-arcade-ut99run", "label": "UT99_Run_TaitoArcade", "family": "furnace-audit-arcade", "chips": "Taito"},
-  {"key": "fur-arcade-wsgloop", "label": "WSG_Loop_Tune_NamcoWSG", "family": "furnace-audit-arcade", "chips": "NamcoWSG"},
-
-  // Furnace Chip Synth Audit — AY8930 demo songs
-  {"key": "fur-ay8930-shuffle", "label": "AY8930Shuffle", "family": "furnace-audit-ay8930", "chips": "AY8930"},
-  {"key": "fur-ay8930-dutyfun", "label": "duty fun", "family": "furnace-audit-ay8930", "chips": "AY8930"},
-  {"key": "fur-ay8930-joyful", "label": "joyful", "family": "furnace-audit-ay8930", "chips": "AY8930"},
-  {"key": "fur-ay8930-obscure", "label": "Obscure_Temptation", "family": "furnace-audit-ay8930", "chips": "AY8930"},
-  {"key": "fur-ay8930-oneminutewaltz", "label": "One_Minute_Waltz", "family": "furnace-audit-ay8930", "chips": "AY8930"},
-  {"key": "fur-ay8930-playingonthestairs", "label": "Playing_On_The_Stairs", "family": "furnace-audit-ay8930", "chips": "AY8930"},
-  {"key": "fur-ay8930-powerfulsamplegenerator", "label": "powerful-sample-generator", "family": "furnace-audit-ay8930", "chips": "AY8930"},
-  {"key": "fur-ay8930-redplanet", "label": "Red_Planet", "family": "furnace-audit-ay8930", "chips": "AY8930"},
-
-  // Furnace Chip Synth Audit — ESFM demo songs
-  {"key": "fur-esfm-aaaa", "label": "AAAA", "family": "furnace-audit-esfm", "chips": "ESFM"},
-  {"key": "fur-esfm-actoffighter", "label": "act_of_fighter", "family": "furnace-audit-esfm", "chips": "ESFM"},
-  {"key": "fur-esfm-alcatraz", "label": "ALCATRAZ_ALWAYS", "family": "furnace-audit-esfm", "chips": "ESFM"},
-  {"key": "fur-esfm-campingjourney", "label": "CampingJourney", "family": "furnace-audit-esfm", "chips": "ESFM"},
-  {"key": "fur-esfm-cielosesfumados", "label": "cielos_esfumados", "family": "furnace-audit-esfm", "chips": "ESFM"},
-  {"key": "fur-esfm-deadline", "label": "Deadline", "family": "furnace-audit-esfm", "chips": "ESFM"},
-  {"key": "fur-esfm-devildetective", "label": "Devil_Detective", "family": "furnace-audit-esfm", "chips": "ESFM"},
-  {"key": "fur-esfm-doyouhearthat", "label": "do you hear that", "family": "furnace-audit-esfm", "chips": "ESFM"},
-  {"key": "fur-esfm-edgerunning", "label": "EdgeRunning_2078", "family": "furnace-audit-esfm", "chips": "ESFM"},
-  {"key": "fur-esfm-experiment", "label": "experiment", "family": "furnace-audit-esfm", "chips": "ESFM"},
-  {"key": "fur-esfm-fightingthedimensions", "label": "Fighting_the_Dimensions", "family": "furnace-audit-esfm", "chips": "ESFM"},
-  {"key": "fur-esfm-flashback", "label": "flashback", "family": "furnace-audit-esfm", "chips": "ESFM"},
-  {"key": "fur-esfm-frostydusk", "label": "frosty_dusk", "family": "furnace-audit-esfm", "chips": "ESFM"},
-  {"key": "fur-esfm-hauntedcastle", "label": "haunted_castle", "family": "furnace-audit-esfm", "chips": "ESFM"},
-  {"key": "fur-esfm-herwishes", "label": "her_wishes", "family": "furnace-audit-esfm", "chips": "ESFM"},
-  {"key": "fur-esfm-icantescapeyourmemory", "label": "I_Cant_Escape_Your_Memory", "family": "furnace-audit-esfm", "chips": "ESFM"},
-  {"key": "fur-esfm-justmeandbrain", "label": "Just_me_and_my_Brain", "family": "furnace-audit-esfm", "chips": "ESFM"},
-  {"key": "fur-esfm-kenstage", "label": "Ken_Stage", "family": "furnace-audit-esfm", "chips": "ESFM"},
-  {"key": "fur-esfm-ledstorm", "label": "ledstorm", "family": "furnace-audit-esfm", "chips": "ESFM"},
-  {"key": "fur-esfm-loneguitarist", "label": "loneguitarist", "family": "furnace-audit-esfm", "chips": "ESFM"},
-  {"key": "fur-esfm-magicianlake", "label": "Magician_Lake_Cover", "family": "furnace-audit-esfm", "chips": "ESFM"},
-  {"key": "fur-esfm-moonclosedspace", "label": "moon_closedspace", "family": "furnace-audit-esfm", "chips": "ESFM"},
-  {"key": "fur-esfm-napalmloader", "label": "Napalm-Loader", "family": "furnace-audit-esfm", "chips": "ESFM"},
-  {"key": "fur-esfm-pcbend", "label": "pcbend", "family": "furnace-audit-esfm", "chips": "ESFM"},
-  {"key": "fur-esfm-perilous059", "label": "Perilous059", "family": "furnace-audit-esfm", "chips": "ESFM"},
-  {"key": "fur-esfm-poetsi", "label": "Poets_I", "family": "furnace-audit-esfm", "chips": "ESFM"},
-  {"key": "fur-esfm-redial", "label": "Redial", "family": "furnace-audit-esfm", "chips": "ESFM"},
-  {"key": "fur-esfm-searchprincess", "label": "SearchPrincess", "family": "furnace-audit-esfm", "chips": "ESFM"},
-  {"key": "fur-esfm-secondstart", "label": "Second_Start", "family": "furnace-audit-esfm", "chips": "ESFM"},
-  {"key": "fur-esfm-sticker1", "label": "sticker1", "family": "furnace-audit-esfm", "chips": "ESFM"},
-  {"key": "fur-esfm-strangesunset", "label": "Strange_Sunset", "family": "furnace-audit-esfm", "chips": "ESFM"},
-  {"key": "fur-esfm-synthy", "label": "synthy", "family": "furnace-audit-esfm", "chips": "ESFM"},
-  {"key": "fur-esfm-tangenttosegue", "label": "Tangent_to_a_Segue", "family": "furnace-audit-esfm", "chips": "ESFM"},
-  {"key": "fur-esfm-theoneway", "label": "TheOneWayFuture", "family": "furnace-audit-esfm", "chips": "ESFM"},
-  {"key": "fur-esfm-unconscious", "label": "Unconscious_Unravelling", "family": "furnace-audit-esfm", "chips": "ESFM"},
-  {"key": "fur-esfm-unknownlocation", "label": "Unknown_Location", "family": "furnace-audit-esfm", "chips": "ESFM"},
-  {"key": "fur-esfm-wack", "label": "wack", "family": "furnace-audit-esfm", "chips": "ESFM"},
-  {"key": "fur-esfm-walkinthepark", "label": "WalkInThePark", "family": "furnace-audit-esfm", "chips": "ESFM"},
-  {"key": "fur-esfm-windfjords", "label": "WindFjordsESFM", "family": "furnace-audit-esfm", "chips": "ESFM"},
-  {"key": "fur-esfm-xevilsoul", "label": "x_evil_soul", "family": "furnace-audit-esfm", "chips": "ESFM"},
-
-  // Furnace Chip Synth Audit — MSX (OPLL/YM2413) demo songs
-  {"key": "fur-msx-2024botb", "label": "2024 BOTB MSX-MUSIC GRINDCORE", "family": "furnace-audit-msx", "chips": "OPLL"},
-  {"key": "fur-msx-21492413", "label": "21492413", "family": "furnace-audit-msx", "chips": "OPLL"},
-  {"key": "fur-msx-breezesensation", "label": "BREEZE_SENSATION", "family": "furnace-audit-msx", "chips": "OPLL"},
-  {"key": "fur-msx-gyrussstage2", "label": "Gyruss_Stage_2", "family": "furnace-audit-msx", "chips": "OPLL"},
-  {"key": "fur-msx-juicestand", "label": "Juice_Stand", "family": "furnace-audit-msx", "chips": "OPLL"},
-  {"key": "fur-msx-morningalarm", "label": "Morning_Alarm", "family": "furnace-audit-msx", "chips": "OPLL"},
-  {"key": "fur-msx-nemesis2", "label": "Nemesis2AirBattle", "family": "furnace-audit-msx", "chips": "OPLL"},
-  {"key": "fur-msx-opllhighandrisin", "label": "OPLL_High_and_Rising", "family": "furnace-audit-msx", "chips": "OPLL"},
-  {"key": "fur-msx-oplloperationplease", "label": "OPLL_OperationPleaseLeaveLeave", "family": "furnace-audit-msx", "chips": "OPLL"},
-  {"key": "fur-msx-portsun", "label": "Port Sun", "family": "furnace-audit-msx", "chips": "OPLL"},
-  {"key": "fur-msx-princessofthedead", "label": "Princess_of_the_Dead", "family": "furnace-audit-msx", "chips": "OPLL"},
-  {"key": "fur-msx-strikingtowards", "label": "Striking_Towards_Opposition", "family": "furnace-audit-msx", "chips": "OPLL"},
-  {"key": "fur-msx-supremacy", "label": "supremacy", "family": "furnace-audit-msx", "chips": "OPLL"},
-
-  // Furnace Chip Synth Audit — Multichip demo songs
-  {"key": "fur-multi-1bitbros", "label": "1_bit_bros", "family": "furnace-audit-multi", "chips": "Multi"},
-  {"key": "fur-multi-bandcamp", "label": "Bandcamp", "family": "furnace-audit-multi", "chips": "Multi"},
-  {"key": "fur-multi-betweenthecircuits", "label": "Between_the_Circuits", "family": "furnace-audit-multi", "chips": "Multi"},
-  {"key": "fur-multi-cryasuics", "label": "CR_yasui_cs", "family": "furnace-audit-multi", "chips": "Multi"},
-  {"key": "fur-multi-chipduelay", "label": "Chip_Duel_AY+SN", "family": "furnace-audit-multi", "chips": "AY+SN"},
-  {"key": "fur-multi-cossackstage", "label": "Cossack Stage Boss", "family": "furnace-audit-multi", "chips": "Multi"},
-  {"key": "fur-multi-entry2xsid", "label": "Entry_2xSID3+ES5506", "family": "furnace-audit-multi", "chips": "SID+ES5506"},
-  {"key": "fur-multi-famimega", "label": "FamiMega Aliance", "family": "furnace-audit-multi", "chips": "Multi"},
-  {"key": "fur-multi-fantasychipxmas", "label": "Fantasy_Chip_Christmas", "family": "furnace-audit-multi", "chips": "Multi"},
-  {"key": "fur-multi-fightagainstdark", "label": "Fight Against the Dark Matter", "family": "furnace-audit-multi", "chips": "Multi"},
-  {"key": "fur-multi-furnacetan", "label": "Furnace-tan VS the spirit", "family": "furnace-audit-multi", "chips": "Multi"},
-  {"key": "fur-multi-fusion", "label": "Fusion", "family": "furnace-audit-multi", "chips": "Multi"},
-  {"key": "fur-multi-holdon", "label": "HoldOn", "family": "furnace-audit-multi", "chips": "Multi"},
-  {"key": "fur-multi-jetpack", "label": "Jet_Pack_Adventure_GBAesque", "family": "furnace-audit-multi", "chips": "Multi"},
-  {"key": "fur-multi-megamaricirno", "label": "MegaMari-Cirno", "family": "furnace-audit-multi", "chips": "Multi"},
-  {"key": "fur-multi-melancholygirl", "label": "Melancholy_Girl_multichip", "family": "furnace-audit-multi", "chips": "Multi"},
-  {"key": "fur-multi-metalslug", "label": "MetalSlug_BaseCamp_SMS_TIA", "family": "furnace-audit-multi", "chips": "SMS+TIA"},
-  {"key": "fur-multi-namcoc30", "label": "Namco_C30_C219_Loop", "family": "furnace-audit-multi", "chips": "NamcoC30"},
-  {"key": "fur-multi-opl3segapcm", "label": "OPL3_SegaPCM_Xeno_Crisis", "family": "furnace-audit-multi", "chips": "OPL3+SegaPCM"},
-  {"key": "fur-multi-pinbot", "label": "PinBot-C30C140", "family": "furnace-audit-multi", "chips": "Multi"},
-  {"key": "fur-multi-sunsethillzone", "label": "Sunset Hill Zone Act 2", "family": "furnace-audit-multi", "chips": "Multi"},
-  {"key": "fur-multi-furnacesituation", "label": "The Furnace Situation Is Insane", "family": "furnace-audit-multi", "chips": "Multi"},
-  {"key": "fur-multi-theonlyway", "label": "TheOnlyWayIsForward", "family": "furnace-audit-multi", "chips": "Multi"},
-  {"key": "fur-multi-wakeupdance", "label": "WakeUpAndDance_MMC5_SM8521", "family": "furnace-audit-multi", "chips": "Multi"},
-  {"key": "fur-multi-alloldzero", "label": "all_old_zero_new", "family": "furnace-audit-multi", "chips": "Multi"},
-  {"key": "fur-multi-collab", "label": "collab", "family": "furnace-audit-multi", "chips": "Multi"},
-  {"key": "fur-multi-cueball", "label": "cueball", "family": "furnace-audit-multi", "chips": "Multi"},
-  {"key": "fur-multi-doubledragon", "label": "double-dragon-stage1", "family": "furnace-audit-multi", "chips": "Multi"},
-  {"key": "fur-multi-govfunding", "label": "government funding breakcore", "family": "furnace-audit-multi", "chips": "Multi"},
-  {"key": "fur-multi-invicibility", "label": "invicibility_mmc5_n163_fds", "family": "furnace-audit-multi", "chips": "NES+N163"},
-  {"key": "fur-multi-meteorshower", "label": "meteor_shower", "family": "furnace-audit-multi", "chips": "Multi"},
-  {"key": "fur-multi-noreturn", "label": "noreturn", "family": "furnace-audit-multi", "chips": "Multi"},
-  {"key": "fur-multi-one", "label": "one", "family": "furnace-audit-multi", "chips": "Multi"},
-  {"key": "fur-multi-opnyoureyes", "label": "opn your eyes", "family": "furnace-audit-multi", "chips": "Multi"},
-  {"key": "fur-multi-pontofnoreturn", "label": "pont of noreturn", "family": "furnace-audit-multi", "chips": "Multi"},
-  {"key": "fur-multi-ridiculous", "label": "ridiculous_game", "family": "furnace-audit-multi", "chips": "Multi"},
-  {"key": "fur-multi-satelliteinterconnects", "label": "satellite_interconnects", "family": "furnace-audit-multi", "chips": "Multi"},
-  {"key": "fur-multi-seconddimension", "label": "second_dimension_demo", "family": "furnace-audit-multi", "chips": "Multi"},
-  {"key": "fur-multi-silverlining", "label": "silverlining", "family": "furnace-audit-multi", "chips": "Multi"},
-  {"key": "fur-multi-skateordie", "label": "skate_or_die", "family": "furnace-audit-multi", "chips": "Multi"},
-  {"key": "fur-multi-splashingwater", "label": "splashingwater", "family": "furnace-audit-multi", "chips": "Multi"},
-  {"key": "fur-multi-steak", "label": "steak", "family": "furnace-audit-multi", "chips": "Multi"},
-  {"key": "fur-multi-sunlight", "label": "sunlight", "family": "furnace-audit-multi", "chips": "Multi"},
-  {"key": "fur-multi-superfantasyzone", "label": "super_fantasy_zone_mango", "family": "furnace-audit-multi", "chips": "Multi"},
-  {"key": "fur-multi-thetempest", "label": "the tempest's melody", "family": "furnace-audit-multi", "chips": "Multi"},
-  {"key": "fur-multi-track8n163", "label": "track8_n163_k053260", "family": "furnace-audit-multi", "chips": "Multi"},
-  {"key": "fur-multi-urgency", "label": "urgency", "family": "furnace-audit-multi", "chips": "Multi"},
-
-  // Furnace Chip Synth Audit — OPZ (YM2414) demo songs
-  {"key": "fur-opz-90lostmedia", "label": "'90 lost media", "family": "furnace-audit-opz", "chips": "OPZ"},
-  {"key": "fur-opz-clashingangelss", "label": "Clashing Angels", "family": "furnace-audit-opz", "chips": "OPZ"},
-  {"key": "fur-opz-flytolead", "label": "Fly to the Leaden Sky", "family": "furnace-audit-opz", "chips": "OPZ"},
-  {"key": "fur-opz-glacierbm0", "label": "Glacier BM0", "family": "furnace-audit-opz", "chips": "OPZ"},
-  {"key": "fur-opz-hedgehog", "label": "The Hedgehog Knows One Thing", "family": "furnace-audit-opz", "chips": "OPZ"},
-  {"key": "fur-opz-bongosandbase", "label": "The bongos and teh base OPZx2", "family": "furnace-audit-opz", "chips": "OPZ"},
-  {"key": "fur-opz-boost", "label": "boost", "family": "furnace-audit-opz", "chips": "OPZ"},
-  {"key": "fur-opz-goodbyemydreams", "label": "goodbye my dreams", "family": "furnace-audit-opz", "chips": "OPZ"},
-  {"key": "fur-opz-massivex", "label": "massive_x_opz", "family": "furnace-audit-opz", "chips": "OPZ"},
-  {"key": "fur-opz-mystgrove", "label": "myst_grove", "family": "furnace-audit-opz", "chips": "OPZ"},
-  {"key": "fur-opz-onlydream", "label": "only_dream_opz", "family": "furnace-audit-opz", "chips": "OPZ"},
-  {"key": "fur-opz-seaofcrises", "label": "sea of crises", "family": "furnace-audit-opz", "chips": "OPZ"},
-
-  // Furnace Chip Synth Audit — Virtual Boy (VSU) demo songs
-  {"key": "fur-vb-4dimensionalgoddes", "label": "4_dimensionnal_goddess", "family": "furnace-audit-vb", "chips": "VSU"},
-  {"key": "fur-vb-airfight", "label": "air_fight", "family": "furnace-audit-vb", "chips": "VSU"},
-  {"key": "fur-vb-blueseed", "label": "blueseed", "family": "furnace-audit-vb", "chips": "VSU"},
-  {"key": "fur-vb-cherryvertex", "label": "Cherry_Vertex", "family": "furnace-audit-vb", "chips": "VSU"},
-  {"key": "fur-vb-devilcrash", "label": "devil_crash", "family": "furnace-audit-vb", "chips": "VSU"},
-  {"key": "fur-vb-dimensional", "label": "Dimensional", "family": "furnace-audit-vb", "chips": "VSU"},
-  {"key": "fur-vb-doublepuzzle", "label": "Double_Puzzle_Trouble", "family": "furnace-audit-vb", "chips": "VSU"},
-  {"key": "fur-vb-doublingdown", "label": "DoublingDown", "family": "furnace-audit-vb", "chips": "VSU"},
-  {"key": "fur-vb-eekvb", "label": "eek", "family": "furnace-audit-vb", "chips": "VSU"},
-  {"key": "fur-vb-ghxmelodic", "label": "ghx_melodic", "family": "furnace-audit-vb", "chips": "VSU"},
-  {"key": "fur-vb-godrestye", "label": "God_Rest_Ye_Deadly_Gentlemen", "family": "furnace-audit-vb", "chips": "VSU"},
-  {"key": "fur-vb-grooveinvirtual", "label": "groove_in_the_virtual_realm", "family": "furnace-audit-vb", "chips": "VSU"},
-  {"key": "fur-vb-honeydippedkiwis", "label": "honeydippedkiwis", "family": "furnace-audit-vb", "chips": "VSU"},
-  {"key": "fur-vb-iridion3d", "label": "Iridion_3D_Stage_3", "family": "furnace-audit-vb", "chips": "VSU"},
-  {"key": "fur-vb-lafolia", "label": "La_Folia_ground_bass", "family": "furnace-audit-vb", "chips": "VSU"},
-  {"key": "fur-vb-lastninjasewer", "label": "lastninja-sewersloader", "family": "furnace-audit-vb", "chips": "VSU"},
-  {"key": "fur-vb-ln2street", "label": "LN2StreetLoader-VB", "family": "furnace-audit-vb", "chips": "VSU"},
-  {"key": "fur-vb-missionbreafing", "label": "mission_breafing", "family": "furnace-audit-vb", "chips": "VSU"},
-  {"key": "fur-vb-needforspeed2", "label": "needforspeed2semainmenu", "family": "furnace-audit-vb", "chips": "VSU"},
-  {"key": "fur-vb-nosuchthingvb", "label": "No_Such_Thing", "family": "furnace-audit-vb", "chips": "VSU"},
-  {"key": "fur-vb-professionalbeat", "label": "Professional_Beat", "family": "furnace-audit-vb", "chips": "VSU"},
-  {"key": "fur-vb-ravedancetune", "label": "Rave_Dancetune", "family": "furnace-audit-vb", "chips": "VSU"},
-  {"key": "fur-vb-redandblack", "label": "Red_And_Black_Orchid", "family": "furnace-audit-vb", "chips": "VSU"},
-  {"key": "fur-vb-redjoke", "label": "red_joke", "family": "furnace-audit-vb", "chips": "VSU"},
-  {"key": "fur-vb-redrevolver", "label": "Red_Revolver", "family": "furnace-audit-vb", "chips": "VSU"},
-  {"key": "fur-vb-redboas", "label": "redboas", "family": "furnace-audit-vb", "chips": "VSU"},
-  {"key": "fur-vb-redshift", "label": "redshift", "family": "furnace-audit-vb", "chips": "VSU"},
-  {"key": "fur-vb-redworld", "label": "Redworld", "family": "furnace-audit-vb", "chips": "VSU"},
-  {"key": "fur-vb-scarlethorizons", "label": "Scarlet_Horizons", "family": "furnace-audit-vb", "chips": "VSU"},
-  {"key": "fur-vb-seeingredfvb", "label": "SeeingRed", "family": "furnace-audit-vb", "chips": "VSU"},
-  {"key": "fur-vb-stuckterminology", "label": "StuckTerminologyRealVB", "family": "furnace-audit-vb", "chips": "VSU"},
-  {"key": "fur-vb-virtualnamachuukei", "label": "virtual_namachuukei", "family": "furnace-audit-vb", "chips": "VSU"},
-  {"key": "fur-vb-virtualpromises", "label": "Virtual_Promises", "family": "furnace-audit-vb", "chips": "VSU"},
-
-  // Furnace Chip Synth Audit — X68000 (OPM) demo songs
-  {"key": "fur-x68000-boomer", "label": "boomer", "family": "furnace-audit-x68000", "chips": "OPM"},
-  {"key": "fur-x68000-chromapoints", "label": "Chroma Points", "family": "furnace-audit-x68000", "chips": "OPM"},
-  {"key": "fur-x68000-gradients", "label": "gradients", "family": "furnace-audit-x68000", "chips": "OPM"},
-  {"key": "fur-x68000-ln2office", "label": "LN2_Office_Loader", "family": "furnace-audit-x68000", "chips": "OPM"},
-  {"key": "fur-x68000-optimistic", "label": "Optimistic", "family": "furnace-audit-x68000", "chips": "OPM"},
-  {"key": "fur-x68000-timeman", "label": "TimeMan", "family": "furnace-audit-x68000", "chips": "OPM"},
-  {"key": "fur-x68000-wickedexpress", "label": "Wicked_Express", "family": "furnace-audit-x68000", "chips": "OPM"},
-
-  // Furnace Chip Synth Audit — PC-98 (OPN) demo songs
-  {"key": "fur-pc98-atomicfailure", "label": "atomic_failure", "family": "furnace-audit-pc98", "chips": "OPN"},
-  {"key": "fur-pc98-bluenebula", "label": "Blue_Nebula", "family": "furnace-audit-pc98", "chips": "OPN"},
-  {"key": "fur-pc98-counterattack", "label": "Counterattack", "family": "furnace-audit-pc98", "chips": "OPN"},
-  {"key": "fur-pc98-ctmaintheme", "label": "CT_maintheme", "family": "furnace-audit-pc98", "chips": "OPN"},
-
-  // Furnace Chip Synth Audit — ZX Spectrum (AY-8912) demo songs
-  {"key": "fur-specs2-acidicjuice", "label": "acidic_juice_of_hell", "family": "furnace-audit-specs2", "chips": "AY-8912"},
-  {"key": "fur-specs2-atmosphere", "label": "atmosphere", "family": "furnace-audit-specs2", "chips": "AY-8912"},
-  {"key": "fur-specs2-backintoadventure", "label": "back_into_adventure", "family": "furnace-audit-specs2", "chips": "AY-8912"},
-  {"key": "fur-specs2-object", "label": "object", "family": "furnace-audit-specs2", "chips": "AY-8912"},
-  {"key": "fur-specs2-rastalinedub", "label": "rastaline_dub", "family": "furnace-audit-specs2", "chips": "AY-8912"},
-  {"key": "fur-specs2-spa", "label": "spa", "family": "furnace-audit-specs2", "chips": "AY-8912"},
-  {"key": "fur-specs2-thickbass", "label": "thick bass test", "family": "furnace-audit-specs2", "chips": "AY-8912"},
-  {"key": "fur-specs2-timfollin", "label": "Tim_Follin", "family": "furnace-audit-specs2", "chips": "AY-8912"},
-
-  // Furnace Chip Synth Audit — VIC-20 (VIC) demo songs
-  {"key": "fur-vic20-bluebolt", "label": "BlueBolt", "family": "furnace-audit-vic20", "chips": "VIC"},
-  {"key": "fur-vic20-h", "label": "h", "family": "furnace-audit-vic20", "chips": "VIC"},
-
-  // Furnace Chip Synth Audit — WonderSwan demo songs
-  {"key": "fur-ws-bullethell", "label": "Bullet_Hell", "family": "furnace-audit-ws", "chips": "X1-010/WS"},
-  {"key": "fur-ws-rustyqueen", "label": "Rusty_-_Queen_in_the_Dark_Night", "family": "furnace-audit-ws", "chips": "X1-010/WS"},
-  {"key": "fur-ws-sijofsjfsoeife", "label": "sijofsjfsoeife", "family": "furnace-audit-ws", "chips": "X1-010/WS"},
-  {"key": "fur-ws-spacestation", "label": "Space Station of Enormous Proportions", "family": "furnace-audit-ws", "chips": "X1-010/WS"},
-  {"key": "fur-ws-thesign", "label": "thesign_ws", "family": "furnace-audit-ws", "chips": "X1-010/WS"},
-  {"key": "fur-ws-timetrial", "label": "TimeTrial", "family": "furnace-audit-ws", "chips": "X1-010/WS"},
-
-  // Furnace Chip Synth Audit — Commander X16 (VERA+YM2151) demo songs
-  {"key": "fur-x16-cafe010editor", "label": "Cafe - 010 Editor 2.0kg", "family": "furnace-audit-x16", "chips": "VERA"},
-  {"key": "fur-x16-dancewithme", "label": "dance with me", "family": "furnace-audit-x16", "chips": "VERA"},
-  {"key": "fur-x16-exerionii", "label": "Exerion_II_Tune", "family": "furnace-audit-x16", "chips": "VERA"},
-  {"key": "fur-x16-her11", "label": "her11", "family": "furnace-audit-x16", "chips": "VERA"},
-  {"key": "fur-x16-identitybeliever", "label": "Identity_Believer", "family": "furnace-audit-x16", "chips": "VERA"},
-  {"key": "fur-x16-keygen19", "label": "keygen19", "family": "furnace-audit-x16", "chips": "VERA"},
-  {"key": "fur-x16-richca", "label": "richca", "family": "furnace-audit-x16", "chips": "VERA"},
-  {"key": "fur-x16-shadesofblue", "label": "Shades of Blue", "family": "furnace-audit-x16", "chips": "VERA"},
-  {"key": "fur-x16-tfvrise", "label": "TFV_Rise", "family": "furnace-audit-x16", "chips": "VERA"},
-  {"key": "fur-x16-turbografx16", "label": "turbografx-16 doskpop", "family": "furnace-audit-x16", "chips": "VERA"},
-  {"key": "fur-x16-watchingpaintdry", "label": "watching_paint_dry", "family": "furnace-audit-x16", "chips": "VERA"},
-
-  // Furnace Chip Synth Audit — YMZ280B (ADPCM) demo songs
-  {"key": "fur-ymz280b-evilevilsong", "label": "evilevilsong", "family": "furnace-audit-ymz280b", "chips": "YMZ280B"},
-  {"key": "fur-ymz280b-notreallyfm", "label": "notreallyfm", "family": "furnace-audit-ymz280b", "chips": "YMZ280B"},
-
-  // Furnace Chip Synth Audit — "blank" (misc/template) demo songs
-  {"key": "fur-blank-5amsunrise", "label": "5 AM Sunrise", "family": "furnace-audit-blank", "chips": "Various"},
-  {"key": "fur-blank-electricblanket", "label": "Electric Blanket", "family": "furnace-audit-blank", "chips": "Various"},
-  {"key": "fur-blank-electricalinteference", "label": "Electrical Inteference", "family": "furnace-audit-blank", "chips": "Various"},
-  {"key": "fur-blank-emotionalblackmail", "label": "emotional_blackmail", "family": "furnace-audit-blank", "chips": "Various"},
-  {"key": "fur-blank-emptyaquatic", "label": "Empty Aquatic", "family": "furnace-audit-blank", "chips": "Various"},
-  {"key": "fur-blank-enterthering", "label": "enterthering", "family": "furnace-audit-blank", "chips": "Various"},
-  {"key": "fur-blank-exquisiteinvitation", "label": "Exquisite Invitation", "family": "furnace-audit-blank", "chips": "Various"},
-  {"key": "fur-blank-nesdpcmonly", "label": "For the 19 bonus points NES DPCM only", "family": "furnace-audit-blank", "chips": "Various"},
-  {"key": "fur-blank-hopeinatimeofmonsters", "label": "hope_in_a_time_of_monsters", "family": "furnace-audit-blank", "chips": "Various"},
-  {"key": "fur-blank-map01", "label": "map01", "family": "furnace-audit-blank", "chips": "Various"},
-  {"key": "fur-blank-planetzero", "label": "Planet Zero-Algorima", "family": "furnace-audit-blank", "chips": "Various"},
-  {"key": "fur-blank-sambadosid", "label": "samba_do_SID", "family": "furnace-audit-blank", "chips": "Various"},
-  {"key": "fur-blank-sawvibes", "label": "sawvibes", "family": "furnace-audit-blank", "chips": "Various"},
-  {"key": "fur-blank-superinstrumentless", "label": "Super_Instrumentless_Echo_Synth", "family": "furnace-audit-blank", "chips": "Various"},
-  {"key": "fur-blank-survive", "label": "SURVIVE", "family": "furnace-audit-blank", "chips": "Various"},
-  {"key": "fur-blank-theemptyness", "label": "The Emptyness", "family": "furnace-audit-blank", "chips": "Various"},
-  {"key": "fur-blank-theydontknow", "label": "they dont know im empty inside", "family": "furnace-audit-blank", "chips": "Various"},
-  {"key": "fur-blank-wandering", "label": "Wandering", "family": "furnace-audit-blank", "chips": "Various"},
-  {"key": "fur-blank-waytoohard", "label": "waytoohard", "family": "furnace-audit-blank", "chips": "Various"},
-  {"key": "fur-blank-wheredidiputi", "label": "WHERE DID I PUT IT", "family": "furnace-audit-blank", "chips": "Various"},
+  // Audit entries (fur-*, uade-*) are loaded dynamically from server data via syncServerKeysToFormats()
 
   {"key": "xm", "label": "FastTracker II XM", "family": "libopenmpt", "nativeParser": true, "uade": false, "openmptFb": true, "openmptPlay": false, "nativeOnly": false, "ext": ".xm", "editable": true, "exportable": true},
   {"key": "it", "label": "Impulse Tracker", "family": "libopenmpt", "nativeParser": true, "uade": false, "openmptFb": true, "openmptPlay": false, "nativeOnly": false, "ext": ".it .mptm", "editable": true, "exportable": true},
@@ -894,9 +322,53 @@ const STATUS_OPTIONS = ['untested','works','partial','broken','silent','wrong-sy
 // Server is the source of truth. We load from server, save incremental updates to server.
 let savedState = {};
 
+// Map server key prefix → audit family name
+const CHIP_FAMILY_MAP = {
+  'gameboy': 'furnace-audit-gb', 'nes': 'furnace-audit-nes', 'c64': 'furnace-audit-c64',
+  'lynx': 'furnace-audit-lynx', 'sn7': 'furnace-audit-sn7', 'ay8910': 'furnace-audit-ay',
+  'pce': 'furnace-audit-pce', 'genesis': 'furnace-audit-genesis', 'snes': 'furnace-audit-snes',
+  'opl': 'furnace-audit-opl', 'opm': 'furnace-audit-opm', 'a2600': 'furnace-audit-a2600',
+  'amiga': 'furnace-audit-amiga', 'arcade': 'furnace-audit-arcade', 'ay8930': 'furnace-audit-ay8930',
+  'esfm': 'furnace-audit-esfm', 'msx': 'furnace-audit-msx', 'multichip': 'furnace-audit-multi',
+  'opz': 'furnace-audit-opz', 'virtualboy': 'furnace-audit-vb', 'x68000': 'furnace-audit-x68000',
+  'pc98': 'furnace-audit-pc98', 'specs2': 'furnace-audit-specs2', 'vic20': 'furnace-audit-vic20',
+  'wonderswan': 'furnace-audit-ws', 'x16': 'furnace-audit-x16', 'ymz280b': 'furnace-audit-ymz280b',
+  'blank': 'furnace-audit-blank', 'misc': 'furnace-audit-blank',
+};
+
+function syncServerKeysToFormats(serverData) {
+  const knownKeys = new Set(FORMATS.map(f => f.key));
+  for (const key of Object.keys(serverData)) {
+    if (knownKeys.has(key)) continue;
+    // fur-<chip>-<songname> → audit entry
+    if (key.startsWith('fur-')) {
+      const parts = key.split('-');
+      const chip = parts[1];
+      const songName = parts.slice(2).join('-');
+      const family = CHIP_FAMILY_MAP[chip] || 'furnace-audit-blank';
+      const label = songName.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+      const entry = { key, label, family, chips: chip };
+      FORMATS.push(entry);
+      if (!families[family]) families[family] = [];
+      families[family].push(entry);
+      knownKeys.add(key);
+    }
+    // uade-* → uade-audit entry
+    else if (key.startsWith('uade-')) {
+      const label = key.replace('uade-', '').replace(/_/g, ' ');
+      const entry = { key, label, family: 'uade-audit', chips: '' };
+      FORMATS.push(entry);
+      if (!families['uade-audit']) families['uade-audit'] = [];
+      families['uade-audit'].push(entry);
+      knownKeys.add(key);
+    }
+  }
+}
+
 // Load all data from server on page open
 fetch('/get-data').then(r => r.json()).then(serverData => {
   savedState = serverData || {};
+  syncServerKeysToFormats(savedState);
   render();
   updateStats();
   console.log(`[Init] Loaded ${Object.keys(savedState).length} entries from server`);
@@ -932,6 +404,13 @@ connectSSE();
 
 function applyUpdates(updates) {
   let count = 0;
+  let needsFullRender = false;
+  // Add any new keys to FORMATS so they get rows
+  const knownKeys = new Set(FORMATS.map(f => f.key));
+  for (const key of Object.keys(updates)) {
+    if (!knownKeys.has(key)) { needsFullRender = true; break; }
+  }
+  if (needsFullRender) syncServerKeysToFormats({ ...savedState, ...updates });
   for (const [key, data] of Object.entries(updates)) {
     savedState[key] = { ...(savedState[key] || {}), ...data };
     count++;
@@ -977,8 +456,9 @@ function applyUpdates(updates) {
     }
   }
   if (count > 0) {
+    if (needsFullRender) render();
     updateStats();
-    console.log(`[SSE] Applied ${count} updates`);
+    console.log(`[SSE] Applied ${count} updates${needsFullRender ? ' (full re-render: new keys)' : ''}`);
   }
 }
 
@@ -1206,18 +686,28 @@ function updateStats() {
   const nonAuditFmts = FORMATS.filter(f => !AUDIT_FAMILIES.has(f.family));
   nonAuditFmts.forEach(f => counts[getState(f.key).status]++);
 
-  // EnvCorr pass/fail counts (wav comparison audit)
-  const PASS_THRESHOLD = 0.90;
+  // Audit counts by auditStatus (fixed/fail/unknown)
   const auditFmts = FORMATS.filter(f => AUDIT_FAMILIES.has(f.family));
-  let auditPass = 0, auditFail = 0;
+  let auditFixed = 0, auditFail = 0, auditUnknown = 0;
+  auditFmts.forEach(f => {
+    const st = savedState[f.key] || {};
+    const as = st.auditStatus || 'unknown';
+    if (as === 'fixed') auditFixed++;
+    else if (as === 'fail') auditFail++;
+    else auditUnknown++;
+  });
+
+  // EnvCorr pass/fail counts (wav comparison)
+  const PASS_THRESHOLD = 0.90;
+  let envPass = 0, envFail = 0;
   auditFmts.forEach(f => {
     const st = savedState[f.key] || {};
     if (typeof st.envCorr === 'number') {
-      if (st.envCorr >= PASS_THRESHOLD) auditPass++; else auditFail++;
+      if (st.envCorr >= PASS_THRESHOLD) envPass++; else envFail++;
     }
   });
 
-  // Console audit counts (works/crashes from consoleAuditStatus field)
+  // Console audit counts
   let consoleWorks = 0, consoleCrashes = 0, consoleTested = 0;
   auditFmts.forEach(f => {
     const as = (savedState[f.key] || {}).consoleAuditStatus;
@@ -1225,19 +715,29 @@ function updateStats() {
     else if (as === 'crashes' || as === 'pageCrash' || as === 'fail') { consoleCrashes++; consoleTested++; }
   });
 
-  const colors = { untested: 'var(--dim)', works: 'var(--green)', partial: 'var(--yellow)', broken: 'var(--red)', silent: '#f97316', 'wrong-synth': 'var(--purple)', crashes: '#ef4444' };
+  // Update subtitle count
+  document.getElementById('formatCount').textContent = FORMATS.length;
+
+  const colors = { untested: 'var(--dim)', works: 'var(--green)', partial: 'var(--yellow)', broken: 'var(--red)', silent: '#f97316', 'wrong-synth': 'var(--purple)', crashes: '#ef4444', retest: '#22d3ee' };
 
   let html = '';
+  // Audit stats first (most prominent)
+  html += `<div class="stat" style="border-color:var(--green)"><div class="stat-val" style="color:var(--green)">${auditFixed}</div><div class="stat-label">audit fixed</div></div>`;
+  html += `<div class="stat" style="border-color:var(--red)"><div class="stat-val" style="color:var(--red)">${auditFail}</div><div class="stat-label">audit fail</div></div>`;
+  html += `<div class="stat"><div class="stat-val" style="color:var(--dim)">${auditUnknown}</div><div class="stat-label">audit unknown</div></div>`;
+  html += `<div class="stat"><div class="stat-val" style="color:var(--blue)">${auditFmts.length}</div><div class="stat-label">audit total</div></div>`;
+  // Separator
+  html += `<div style="width:1px;background:var(--border);margin:0 4px"></div>`;
+  // Format stats
   STATUS_OPTIONS.forEach(s => {
-    html += `<div class="stat"><div class="stat-val" style="color:${colors[s]}">${counts[s]}</div><div class="stat-label">${s}</div></div>`;
+    if (counts[s] > 0 || s === 'works' || s === 'untested') {
+      html += `<div class="stat"><div class="stat-val" style="color:${colors[s]}">${counts[s]}</div><div class="stat-label">${s}</div></div>`;
+    }
   });
-  html += `<div class="stat"><div class="stat-val" style="color:var(--accent)">${nonAuditFmts.length}</div><div class="stat-label">formats</div></div>`;
-  html += `<div class="stat"><div class="stat-val" style="color:var(--green)">${auditPass}</div><div class="stat-label">env pass</div></div>`;
-  html += `<div class="stat"><div class="stat-val" style="color:var(--red)">${auditFail}</div><div class="stat-label">env fail</div></div>`;
   if (consoleTested > 0) {
-    html += `<div class="stat"><div class="stat-val" style="color:var(--green)">${consoleWorks}</div><div class="stat-label">console ✓</div></div>`;
-    html += `<div class="stat"><div class="stat-val" style="color:#ef4444">${consoleCrashes}</div><div class="stat-label">console ✗</div></div>`;
-    html += `<div class="stat"><div class="stat-val" style="color:var(--dim)">${auditFmts.length - consoleTested}</div><div class="stat-label">untested</div></div>`;
+    html += `<div style="width:1px;background:var(--border);margin:0 4px"></div>`;
+    html += `<div class="stat"><div class="stat-val" style="color:var(--green)">${consoleWorks}</div><div class="stat-label">console ok</div></div>`;
+    html += `<div class="stat"><div class="stat-val" style="color:#ef4444">${consoleCrashes}</div><div class="stat-label">console crash</div></div>`;
   }
   document.getElementById('stats').innerHTML = html;
 }
