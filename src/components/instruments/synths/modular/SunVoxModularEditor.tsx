@@ -31,6 +31,9 @@ export const SunVoxModularEditor: React.FC<SunVoxModularEditorProps> = ({ config
   const prevPatchRef = useRef<ModularPatchConfig>(patchConfig);
 
   // Sync UI patch changes to the live SunVoxModularSynth
+  const configRef = useRef(config);
+  configRef.current = config;
+
   useEffect(() => {
     const prev = prevPatchRef.current;
     prevPatchRef.current = patchConfig;
@@ -40,7 +43,7 @@ export const SunVoxModularEditor: React.FC<SunVoxModularEditorProps> = ({ config
       try {
         const { getToneEngine } = await import('@/engine/ToneEngine');
         const toneEngine = getToneEngine();
-        const synth = toneEngine.getInstrument(config.id, config) as SunVoxModularSynth | null;
+        const synth = toneEngine.getInstrument(configRef.current.id, configRef.current) as SunVoxModularSynth | null;
         if (synth && typeof synth === 'object' && 'updatePatch' in synth) {
           await (synth as SunVoxModularSynth).updatePatch(prev, patchConfig);
         }
@@ -48,7 +51,7 @@ export const SunVoxModularEditor: React.FC<SunVoxModularEditorProps> = ({ config
         // ToneEngine not ready yet
       }
     })();
-  }, [patchConfig, config.id, config]);
+  }, [patchConfig]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handlePatchChange = useCallback(
     (newPatch: ModularPatchConfig) => {
