@@ -285,6 +285,45 @@ export interface SonicArrangerConfig {
 }
 
 /**
+ * InStereo! 2.0 synth instrument configuration.
+ * Wavetable synthesis with ADSR, LFO, EG (envelope generator), arpeggios,
+ * vibrato, and portamento. Two 256-byte waveforms per instrument.
+ */
+export interface InStereo2Config {
+  volume: number;           // 0-64
+  waveformLength: number;   // effective waveform length (2-256)
+  portamentoSpeed: number;  // 0-255
+  vibratoDelay: number;     // 0-255
+  vibratoSpeed: number;     // 0-255
+  vibratoLevel: number;     // 0-255
+  adsrLength: number;       // 0-127 (table playback length)
+  adsrRepeat: number;       // 0-127 (loop point within table)
+  sustainPoint: number;     // 0-127 (sustain hold position in ADSR)
+  sustainSpeed: number;     // 0-255 (sustain countdown speed)
+  amfLength: number;        // 0-127 (LFO/AMF table playback length)
+  amfRepeat: number;        // 0-127 (LFO/AMF loop point)
+  // Envelope Generator (EG)
+  egMode: number;           // 0=disabled, 1=calc, 2=free
+  egStartLen: number;       // EG start/length (calc mode)
+  egStopRep: number;        // EG stop/repeat (calc mode)
+  egSpeedUp: number;        // EG speed up (calc mode)
+  egSpeedDown: number;      // EG speed down (calc mode)
+  // Arpeggios (3 sub-tables, 14 values each)
+  arpeggios: [
+    { length: number; repeat: number; values: number[] },
+    { length: number; repeat: number; values: number[] },
+    { length: number; repeat: number; values: number[] },
+  ];
+  // Table data
+  adsrTable: number[];      // 128 unsigned bytes (volume envelope)
+  lfoTable: number[];       // 128 signed bytes (pitch modulation)
+  egTable: number[];        // 128 unsigned bytes (waveform envelope generator)
+  waveform1: number[];      // 256 signed bytes
+  waveform2: number[];      // 256 signed bytes
+  name: string;
+}
+
+/**
  * Fred Editor instrument configuration (real format — PWM synthesis).
  */
 export interface FredConfig {
@@ -426,4 +465,6 @@ export interface SunVoxConfig {
   patchName: string;
   isSong?: boolean;
   controlValues: Record<string, number>;
+  /** SunVox module ID to send note events to (for per-instrument targeting) */
+  noteTargetModuleId?: number;
 }

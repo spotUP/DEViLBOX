@@ -1,10 +1,8 @@
 /**
  * SunVoxModularSynth — DevilboxSynth bridging ModularPatchConfig to SunVox WASM.
  *
- * Owns a SunVox slot and maintains a bidirectional mapping between UI module IDs
- * (strings from ModularPatchConfig) and SunVox module IDs (ints from WASM).
- *
- * UI is source of truth — changes sync to SunVox WASM via the engine.
+ * For song mode (.sunvox files): multiple instances share a single WASM handle.
+ * Each instance targets a different generator module for note events.
  */
 
 import type { DevilboxSynth } from '@/types/synth';
@@ -19,6 +17,11 @@ const GENERATOR_TYPES = new Set([
   'Sampler', 'SpectraVoice', 'Vorbis player', 'Input',
 ]);
 
+/** Shared song-mode handle: all SunVoxModularSynth instances for the same song reuse this */
+let _sharedSongHandle = -1;
+let _sharedSongRefCount = 0;
+let _sharedSongInitPromise: Promise<void> | null = null;
+
 export class SunVoxModularSynth implements DevilboxSynth {
   readonly name = 'SunVoxModularSynth';
   readonly output: GainNode;
@@ -28,49 +31,70 @@ export class SunVoxModularSynth implements DevilboxSynth {
   private _disposed = false;
   private _handle = -1;
   private _initPromise: Promise<void>;
+  private _usesSharedHandle = false;
 
-  /** UI module ID (string) → SunVox module ID (int) */
   private uiToSv = new Map<string, number>();
-  /** SunVox module ID (int) → UI module ID (string) */
   private svToUi = new Map<number, string>();
-
-  /** The SunVox module ID to send note events to (first generator found) */
   private _noteTargetSvId = -1;
-
-  /** Optional raw .sunvox file data — when set, load the song instead of building from config */
   private _songData: ArrayBuffer | null = null;
 
-  constructor(patchConfig: ModularPatchConfig, songData?: ArrayBuffer | null) {
+  constructor(
+    patchConfig: ModularPatchConfig,
+    songData?: ArrayBuffer | null,
+    noteTargetModuleId?: number,
+  ) {
     this.audioContext = getDevilboxAudioContext();
     this.engine = SunVoxEngine.getInstance();
     this.output = this.engine.output;
     this._songData = songData ?? null;
 
+    if (noteTargetModuleId !== undefined && noteTargetModuleId >= 0) {
+      this._noteTargetSvId = noteTargetModuleId;
+    }
+
     if (this._songData) {
-      this._initPromise = this._loadSong(this._songData, patchConfig);
+      this._initPromise = this._loadSongShared(this._songData, patchConfig);
     } else {
       this._initPromise = this._buildGraph(patchConfig);
     }
   }
 
-  /** Load a .sunvox file and build UI↔SunVox ID mappings from the existing graph */
-  private async _loadSong(data: ArrayBuffer, config: ModularPatchConfig): Promise<void> {
+  /** Song mode: share a single WASM handle across all instances */
+  private async _loadSongShared(data: ArrayBuffer, config: ModularPatchConfig): Promise<void> {
     await this.engine.ready();
-    this._handle = await this.engine.createHandle(this.audioContext.sampleRate);
-    await this.engine.loadSong(this._handle, data);
 
+    // First instance creates the shared handle; others wait for it
+    if (_sharedSongHandle < 0 && !_sharedSongInitPromise) {
+      _sharedSongInitPromise = (async () => {
+        _sharedSongHandle = await this.engine.createHandle(this.audioContext.sampleRate);
+        await this.engine.loadSong(_sharedSongHandle, data);
+      })();
+    }
+    await _sharedSongInitPromise;
+
+    this._handle = _sharedSongHandle;
+    this._usesSharedHandle = true;
+    _sharedSongRefCount++;
+
+    // Build ID mappings from config modules
     for (const mod of config.modules) {
       const match = mod.id.match(/^sv_m(\d+)$/);
       if (match) {
         const svId = parseInt(match[1], 10);
         this.uiToSv.set(mod.id, svId);
         this.svToUi.set(svId, mod.id);
+      }
+    }
 
-        if (this._noteTargetSvId < 0 && svId > 0) {
-          const graph = await this.engine.getModuleGraph(this._handle);
-          const entry = graph.find(g => g.id === svId);
-          if (entry && this._isGenerator(entry.typeName)) {
+    // If no explicit target was set, find the first generator in this config
+    if (this._noteTargetSvId < 0) {
+      for (const mod of config.modules) {
+        const match = mod.id.match(/^sv_m(\d+)$/);
+        if (match) {
+          const svId = parseInt(match[1], 10);
+          if (svId > 0) {
             this._noteTargetSvId = svId;
+            break;
           }
         }
       }
@@ -97,11 +121,8 @@ export class SunVoxModularSynth implements DevilboxSynth {
       this.uiToSv.set(mod.id, svModId);
       this.svToUi.set(svModId, mod.id);
 
-      if (this._noteTargetSvId < 0) {
-        const desc = SV_ID_TO_TYPE_STRING.get(mod.descriptorId);
-        if (desc && this._isGenerator(desc)) {
-          this._noteTargetSvId = svModId;
-        }
+      if (this._noteTargetSvId < 0 && this._isGenerator(typeString)) {
+        this._noteTargetSvId = svModId;
       }
     }
 
@@ -142,7 +163,6 @@ export class SunVoxModularSynth implements DevilboxSynth {
     if (this._noteTargetSvId < 0 && this._isGenerator(typeString)) {
       this._noteTargetSvId = svModId;
     }
-
     return svModId;
   }
 
@@ -150,14 +170,10 @@ export class SunVoxModularSynth implements DevilboxSynth {
     await this._initPromise;
     const svModId = this.uiToSv.get(uiId);
     if (svModId === undefined || svModId === 0) return;
-
     await this.engine.removeModule(this._handle, svModId);
     this.uiToSv.delete(uiId);
     this.svToUi.delete(svModId);
-
-    if (this._noteTargetSvId === svModId) {
-      this._noteTargetSvId = -1;
-    }
+    if (this._noteTargetSvId === svModId) this._noteTargetSvId = -1;
   }
 
   async addConnection(sourceUiId: string, targetUiId: string): Promise<void> {
@@ -175,8 +191,6 @@ export class SunVoxModularSynth implements DevilboxSynth {
     if (srcSvId === undefined || dstSvId === undefined) return;
     await this.engine.disconnectModules(this._handle, srcSvId, dstSvId);
   }
-
-  // ── Patch sync ──────────────────────────────────────────────────────────
 
   async updatePatch(oldConfig: ModularPatchConfig, newConfig: ModularPatchConfig): Promise<void> {
     await this._initPromise;
@@ -207,7 +221,7 @@ export class SunVoxModularSynth implements DevilboxSynth {
     }
   }
 
-  // ── Module graph query ──────────────────────────────────────────────────
+  // ── Query ───────────────────────────────────────────────────────────────
 
   async getModuleGraph(): Promise<SunVoxModuleGraphEntry[]> {
     await this._initPromise;
@@ -219,11 +233,6 @@ export class SunVoxModularSynth implements DevilboxSynth {
     return this.uiToSv.get(uiId);
   }
 
-  setNoteTarget(uiId: string): void {
-    const svId = this.uiToSv.get(uiId);
-    if (svId !== undefined) this._noteTargetSvId = svId;
-  }
-
   // ── Save/Load ───────────────────────────────────────────────────────────
 
   async save(): Promise<ArrayBuffer> {
@@ -232,18 +241,12 @@ export class SunVoxModularSynth implements DevilboxSynth {
     return this.engine.saveSong(this._handle);
   }
 
-  async loadPatch(data: ArrayBuffer): Promise<SunVoxModuleGraphEntry[]> {
-    await this._initPromise;
-    if (this._handle < 0) throw new Error('[SunVoxModularSynth] No slot');
-    await this.engine.loadSong(this._handle, data);
-    return this.engine.getModuleGraph(this._handle);
-  }
-
   // ── DevilboxSynth interface ─────────────────────────────────────────────
 
   triggerAttack(note?: string | number, _time?: number, velocity?: number): void {
     if (this._disposed) return;
 
+    // Song mode: start SunVox internal sequencer (only first instance does this)
     if (this._songData) {
       void this._initPromise.then(() => {
         if (!this._disposed && this._handle >= 0) this.engine.play(this._handle);
@@ -293,10 +296,19 @@ export class SunVoxModularSynth implements DevilboxSynth {
   dispose(): void {
     if (this._disposed) return;
     this._disposed = true;
-    if (this._handle >= 0) {
+
+    if (this._usesSharedHandle) {
+      _sharedSongRefCount--;
+      if (_sharedSongRefCount <= 0) {
+        this.engine.destroyHandle(_sharedSongHandle);
+        _sharedSongHandle = -1;
+        _sharedSongRefCount = 0;
+        _sharedSongInitPromise = null;
+      }
+    } else if (this._handle >= 0) {
       this.engine.destroyHandle(this._handle);
-      this._handle = -1;
     }
+    this._handle = -1;
     this.uiToSv.clear();
     this.svToUi.clear();
   }
