@@ -1,0 +1,3 @@
+/Users/spot/Code/DEViLBOX/benndaglish-wasm/src/BennDaglish/build/CMakeFiles/BennDaglish.dir
+/Users/spot/Code/DEViLBOX/benndaglish-wasm/src/BennDaglish/build/CMakeFiles/edit_cache.dir
+/Users/spot/Code/DEViLBOX/benndaglish-wasm/src/BennDaglish/build/CMakeFiles/rebuild_cache.dir
