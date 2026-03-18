@@ -668,82 +668,77 @@ export function emit(ast: AstNode[], resolved: ResolveResult, sourceFile?: strin
   let cfgChanged = true;
   while (cfgChanged) {
     cfgChanged = false;
-    // Recompute label → funcLabel scope with current funcLabels.
-    // Must account for RTS-close boundaries: after RTS or tail-call return
-    // followed by a label, the scope resets (the label starts a new function).
+
+    // Single unified pass: build label→scope map AND detect cross-function gotos
+    // simultaneously, with consistent RTS-close boundary tracking.
     const labelScope = new Map<string, string | null>();
-    {
-      let scope: string | null = null;
-      let lastWasReturn = false;
-      for (let si = 0; si < ast.length; si++) {
-        const node = ast[si];
-        if (node.kind === 'comment') continue;
-        if (node.kind === 'instruction') {
-          const mn = node.mnemonic.toUpperCase();
-          // Check if this instruction ends the current function
-          if (mn === 'RTS') {
-            lastWasReturn = true;
-          } else if ((mn === 'BRA' || mn === 'JMP') && 'label' in (node.operands[0] ?? {})) {
-            const target = (node.operands[0] as any).label as string;
-            if (funcLabels.has(target)) lastWasReturn = true;
+    let scope: string | null = null;
+    let lastWasReturn = false;
+
+    for (let si = 0; si < ast.length; si++) {
+      const node = ast[si];
+      if (node.kind === 'comment') continue;
+
+      if (node.kind === 'data' || node.kind === 'section') {
+        scope = null;
+        lastWasReturn = false;
+        continue;
+      }
+
+      if (node.kind === 'label') {
+        // A label starts a new function scope if:
+        // 1. It's already in funcLabels (BSR/JSR target or export), OR
+        // 2. The previous code ended with RTS/tail-call (lastWasReturn)
+        if (funcLabels.has(node.name) || lastWasReturn) {
+          // Promote post-RTS labels to funcLabels so gotos to them become calls
+          if (!funcLabels.has(node.name) && lastWasReturn && isFunctionLabel.has(node.name)) {
+            funcLabels.add(node.name);
+            cfgChanged = true;
+          }
+          scope = node.name;
+        } else {
+          // Inline label within current function
+          labelScope.set(node.name, scope);
+        }
+        lastWasReturn = false;
+        continue;
+      }
+
+      if (node.kind === 'instruction') {
+        const mn = node.mnemonic.toUpperCase();
+
+        // Track RTS-close: if this instruction returns and the next node is a label,
+        // the next label will start a new function.
+        if (mn === 'RTS') {
+          let peekIdx = si + 1;
+          while (peekIdx < ast.length && ast[peekIdx].kind === 'comment') peekIdx++;
+          if (peekIdx < ast.length && ast[peekIdx].kind === 'label') lastWasReturn = true;
+          else lastWasReturn = false;
+        } else if (mn === 'BRA' || mn === 'JMP') {
+          // Only close the function for:
+          // 1. JMP (An) — indirect jump through register (always a tail call/exit)
+          // 2. JMP d(An) — indirect jump through displacement
+          // 3. BRA/JMP to a known function label (tail call)
+          // DO NOT close for BRA to local labels (those are just gotos within the function)
+          const op0 = node.operands[0];
+          const isIndirect = op0?.kind === 'address'; // JMP (A0), JMP d(An)
+          const tgtLabel = op0?.kind === 'label_ref' ? op0.name
+                         : op0?.kind === 'pc_rel'    ? op0.label
+                         : null;
+          const isToFunction = tgtLabel && (funcLabels.has(tgtLabel) || crossFuncGotos.has(tgtLabel));
+          if (isIndirect || isToFunction) {
+            let peekIdx = si + 1;
+            while (peekIdx < ast.length && ast[peekIdx].kind === 'comment') peekIdx++;
+            if (peekIdx < ast.length && ast[peekIdx].kind === 'label') lastWasReturn = true;
             else lastWasReturn = false;
           } else {
             lastWasReturn = false;
           }
-        }
-        if (node.kind === 'label') {
-          if (funcLabels.has(node.name) || lastWasReturn) {
-            scope = node.name;
-            // If this label wasn't in funcLabels but follows a return, promote it
-            if (!funcLabels.has(node.name) && lastWasReturn && isFunctionLabel.has(node.name)) {
-              funcLabels.add(node.name);
-              cfgChanged = true;
-            }
-          } else {
-            labelScope.set(node.name, scope);
-          }
-          lastWasReturn = false;
-        }
-        if (node.kind === 'data' || node.kind === 'section') {
-          scope = null;
+        } else {
           lastWasReturn = false;
         }
       }
-    }
-    // Scan all branch instructions, tracking scope with RTS-close boundaries.
-    let scope: string | null = null;
-    let brScanLastReturn = false;
-    for (let bsi = 0; bsi < ast.length; bsi++) {
-      const node = ast[bsi];
-      if (node.kind === 'comment') continue;
-      if (node.kind === 'data' || node.kind === 'section') { scope = null; brScanLastReturn = false; continue; }
-      if (node.kind === 'label') {
-        if (funcLabels.has(node.name) || brScanLastReturn) {
-          scope = node.name;
-          // Promote post-RTS labels to funcLabels
-          if (!funcLabels.has(node.name) && brScanLastReturn && isFunctionLabel.has(node.name)) {
-            funcLabels.add(node.name);
-            cfgChanged = true;
-          }
-        }
-        brScanLastReturn = false;
-        continue;
-      }
-      if (node.kind === 'instruction') {
-        const brMn = node.mnemonic.toUpperCase();
-        if (brMn === 'RTS') {
-          let peekIdx = bsi + 1;
-          while (peekIdx < ast.length && ast[peekIdx].kind === 'comment') peekIdx++;
-          if (peekIdx < ast.length && ast[peekIdx].kind === 'label') brScanLastReturn = true;
-        } else if ((brMn === 'BRA' || brMn === 'JMP') && 'label' in (node.operands[0] ?? {})) {
-          const tgt = (node.operands[0] as any).label as string;
-          if (funcLabels.has(tgt)) {
-            let peekIdx = bsi + 1;
-            while (peekIdx < ast.length && ast[peekIdx].kind === 'comment') peekIdx++;
-            if (peekIdx < ast.length && ast[peekIdx].kind === 'label') brScanLastReturn = true;
-          }
-        }
-      }
+
       if (node.kind !== 'instruction') continue;
       // Pick the operand that holds the branch target label.
       let targetOp = BRANCH_MNEMS.has(node.mnemonic)  ? node.operands[0]
@@ -1037,8 +1032,11 @@ export function emit(ast: AstNode[], resolved: ResolveResult, sourceFile?: strin
         // function so the next label starts a new function. This prevents EaglePlayer
         // labels (InitPlayer, InitSound, etc.) from being emitted as goto labels
         // inside a parent function.
-        const emittedReturn = c.includes('return;') || mn === 'RTS';
-        if (emittedReturn && inFunction) {
+        // After RTS, tail-call return, or indirect JMP: close the current function
+        // so the next label starts a new one. Don't close for BRA/JMP to local labels.
+        const isUnconditionalExit = mn === 'RTS' || c.includes('return;')
+          || ((mn === 'JMP') && node.operands[0]?.kind === 'address');  // JMP (An)
+        if (isUnconditionalExit && inFunction) {
           // Peek ahead: if the next meaningful node is a label, close this function
           // so the label becomes a new function.
           let peekIdx = i + 1;
