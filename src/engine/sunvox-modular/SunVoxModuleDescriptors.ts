@@ -23,12 +23,8 @@ function buildDescriptor(entry: typeof SUNVOX_MODULE_TYPES[number]): ModuleDescr
     ports.push({ id: 'output', name: 'Output', direction: 'output', signal: 'audio' });
   }
 
-  if (!entry.isGenerator) {
-    ports.push({ id: 'input', name: 'Input', direction: 'input', signal: 'audio' });
-  }
-
-  // Output module gets only an input port
-  if (isOutput) {
+  // Non-generators and Output module get an input port
+  if (!entry.isGenerator || isOutput) {
     ports.push({ id: 'input', name: 'Input', direction: 'input', signal: 'audio' });
   }
 
