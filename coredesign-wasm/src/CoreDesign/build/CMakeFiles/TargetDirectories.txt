@@ -1,0 +1,3 @@
+/Users/spot/Code/DEViLBOX/coredesign-wasm/src/CoreDesign/build/CMakeFiles/CoreDesign.dir
+/Users/spot/Code/DEViLBOX/coredesign-wasm/src/CoreDesign/build/CMakeFiles/edit_cache.dir
+/Users/spot/Code/DEViLBOX/coredesign-wasm/src/CoreDesign/build/CMakeFiles/rebuild_cache.dir
