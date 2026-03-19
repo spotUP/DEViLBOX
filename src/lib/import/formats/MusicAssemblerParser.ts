@@ -59,6 +59,8 @@
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, TrackerCell, InstrumentConfig } from '@/types';
+import type { UADEVariablePatternLayout } from '@/engine/uade/UADEPatternEncoder';
+import { musicAssemblerEncoder } from '@/engine/uade/encoders/MusicAssemblerEncoder';
 import { createSamplerInstrument } from './AmigaUtils';
 
 // ── Constants ─────────────────────────────────────────────────────────────
@@ -865,6 +867,51 @@ function parseMusicAssembler(bytes: Uint8Array, filename: string): TrackerSong |
 
   const baseName = filename.replace(/\.[^/.]+$/, '');
 
+  // ── Build uadeVariableLayout for chip RAM editing ─────────────────────────
+  // Each file-level track is a variable-length byte stream. Build the mapping
+  // from (trackerPatternIdx, channelIdx) → file track index.
+  const filePatternAddrs: number[] = [];
+  const filePatternSizes: number[] = [];
+
+  for (let i = 0; i < numberOfTracks; i++) {
+    const trackOff = tracksStartOffset + trackOffsetTable[i];
+    filePatternAddrs.push(trackOff >= 0 ? trackOff : 0);
+    filePatternSizes.push(tracks[i] ? tracks[i]!.length : 0);
+  }
+
+  // trackMap[trackerPatIdx][chIdx] = file-level track index
+  const trackMap: number[][] = [];
+  for (let posIdx = 0; posIdx < maxPositions; posIdx++) {
+    const chMap: number[] = [];
+    for (let v = 0; v < 4; v++) {
+      const pl = voicePosLists[v];
+      if (posIdx < pl.length) {
+        const entry = pl[posIdx];
+        if (entry.trackNumber !== 0xff && entry.trackNumber !== 0xfe &&
+            entry.trackNumber < numberOfTracks) {
+          chMap.push(entry.trackNumber);
+        } else {
+          chMap.push(-1);
+        }
+      } else {
+        chMap.push(-1);
+      }
+    }
+    trackMap.push(chMap);
+  }
+
+  const uadeVariableLayout: UADEVariablePatternLayout = {
+    formatId: 'musicAssembler',
+    numChannels: 4,
+    numFilePatterns: numberOfTracks,
+    rowsPerPattern: decodedTracks.map(t => Math.max(t.length, 1)),
+    moduleSize: bytes.length,
+    encoder: musicAssemblerEncoder,
+    filePatternAddrs,
+    filePatternSizes,
+    trackMap,
+  };
+
   return {
     name:            baseName,
     format:          'XM' as TrackerFormat,
@@ -877,5 +924,6 @@ function parseMusicAssembler(bytes: Uint8Array, filename: string): TrackerSong |
     initialSpeed:    primarySong.startSpeed || 6,
     initialBPM:      125,
     maFileData:      new Uint8Array(bytes).buffer.slice(0) as ArrayBuffer,
+    uadeVariableLayout,
   };
 }

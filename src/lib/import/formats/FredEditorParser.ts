@@ -14,7 +14,9 @@
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, ChannelData, TrackerCell } from '@/types';
 import type { InstrumentConfig, FredConfig, UADEChipRamInfo } from '@/types/instrument';
+import type { UADEVariablePatternLayout } from '@/engine/uade/UADEPatternEncoder';
 import { createSamplerInstrument } from './AmigaUtils';
+import { fredEditorEncoder } from '@/engine/uade/encoders/FredEditorEncoder';
 
 // ── Fred Editor period table (from FEPlayer.js) ─────────────────────────────
 // 6 octaves of 12 semitones = 72 entries. Used with relative tuning per sample.
@@ -725,6 +727,83 @@ export async function parseFredEditorFile(
   const moduleName = filename.replace(/\.[^/.]+$/, '');
   const initialSpeed = activeSong?.speed || 6;
 
+  // ── Build UADEVariablePatternLayout for chip RAM editing ────────────────
+  // Collect all unique pattern byte stream offsets, measure their sizes,
+  // and build the (trackerPatIdx, channelIdx) → filePatIdx mapping.
+
+  const uniqueOffsets: number[] = [];  // de-duped list of pattern stream offsets
+  const offsetToIdx = new Map<number, number>(); // patOffset → index in uniqueOffsets
+
+  if (activeSong && patternBytes.length > 0) {
+    const maxTrackLen = activeSong.length;
+    for (let trackPos = 0; trackPos < maxTrackLen; trackPos++) {
+      for (let ch = 0; ch < 4; ch++) {
+        const track = activeSong.tracks[ch];
+        if (!track || trackPos >= track.length) continue;
+        const patOffset = track[trackPos];
+        if (patOffset >= 32768) continue; // end/loop markers
+        if (!offsetToIdx.has(patOffset)) {
+          offsetToIdx.set(patOffset, uniqueOffsets.length);
+          uniqueOffsets.push(patOffset);
+        }
+      }
+    }
+  }
+
+  // Measure byte size of each pattern stream (scan to -128 end marker)
+  const filePatternAddrs: number[] = [];
+  const filePatternSizes: number[] = [];
+  for (const off of uniqueOffsets) {
+    filePatternAddrs.push(patternStart + off); // absolute file offset
+    let pos = off;
+    while (pos < patternBytes.length) {
+      const val = patternBytes[pos];
+      pos++;
+      if (val === 0x80) break; // -128 as unsigned = 0x80
+      // Commands that consume extra bytes:
+      if (val === 0x83) pos++;        // set sample: +1
+      else if (val === 0x82) pos++;   // set speed: +1
+      else if (val === 0x81) pos += 3; // portamento: +3
+      // Note values (1-127) and note off (0x84), duration (other negative): no extra bytes
+    }
+    filePatternSizes.push(pos - off);
+  }
+
+  // Build trackMap: trackerPatternIdx → [ch0 filePatIdx, ch1 filePatIdx, ...]
+  const trackMap: number[][] = [];
+  if (activeSong) {
+    const maxTrackLen = activeSong.length;
+    for (let trackPos = 0; trackPos < maxTrackLen; trackPos++) {
+      const chPats: number[] = [];
+      for (let ch = 0; ch < 4; ch++) {
+        const track = activeSong.tracks[ch];
+        if (!track || trackPos >= track.length) {
+          chPats.push(-1);
+          continue;
+        }
+        const patOffset = track[trackPos];
+        if (patOffset >= 32768) {
+          chPats.push(-1);
+          continue;
+        }
+        chPats.push(offsetToIdx.get(patOffset) ?? -1);
+      }
+      trackMap.push(chPats);
+    }
+  }
+
+  const variableLayout: UADEVariablePatternLayout = {
+    formatId: 'fredEditor',
+    numChannels: 4,
+    numFilePatterns: uniqueOffsets.length,
+    rowsPerPattern: 64,
+    moduleSize: buffer.byteLength,
+    encoder: fredEditorEncoder,
+    filePatternAddrs,
+    filePatternSizes,
+    trackMap,
+  };
+
   return {
     name: moduleName,
     format: 'MOD' as TrackerFormat,
@@ -737,6 +816,7 @@ export async function parseFredEditorFile(
     initialSpeed,
     initialBPM: 125,
     linearPeriods: false,
+    uadeVariableLayout: variableLayout,
   };
 }
 

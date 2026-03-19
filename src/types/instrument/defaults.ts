@@ -71,6 +71,7 @@ import type {
   OctaMEDConfig,
   DavidWhittakerConfig,
   SunVoxConfig,
+  InStereo2Config,
 } from './exotic';
 import type {
   DrumMachineConfig,
@@ -258,6 +259,8 @@ export interface InstrumentConfig {
   deltaMusic1?: DeltaMusic1Config;
   deltaMusic2?: DeltaMusic2Config;
   sonicArranger?: SonicArrangerConfig;
+  inStereo2?: InStereo2Config;
+  inStereo1?: InStereo2Config;  // IS10 reuses IS20 config shape
   fred?: FredConfig;
   tfmx?: TFMXConfig;
   hippelCoso?: HippelCoSoConfig;
@@ -652,6 +655,37 @@ export const DEFAULT_SONIC_ARRANGER: SonicArrangerConfig = {
   allWaveforms: [],
 
   name: 'SA Synth',
+};
+
+export const DEFAULT_INSTEREO2: InStereo2Config = {
+  volume: 64,
+  waveformLength: 256,
+  portamentoSpeed: 0,
+  vibratoDelay: 0,
+  vibratoSpeed: 0,
+  vibratoLevel: 0,
+  adsrLength: 0,
+  adsrRepeat: 0,
+  sustainPoint: 0,
+  sustainSpeed: 0,
+  amfLength: 0,
+  amfRepeat: 0,
+  egMode: 0,        // disabled
+  egStartLen: 0,
+  egStopRep: 0,
+  egSpeedUp: 0,
+  egSpeedDown: 0,
+  arpeggios: [
+    { length: 0, repeat: 0, values: new Array(14).fill(0) },
+    { length: 0, repeat: 0, values: new Array(14).fill(0) },
+    { length: 0, repeat: 0, values: new Array(14).fill(0) },
+  ],
+  adsrTable: new Array(128).fill(255),   // flat max volume
+  lfoTable: new Array(128).fill(0),      // no pitch mod
+  egTable: new Array(128).fill(0),       // no EG
+  waveform1: new Array(256).fill(0),
+  waveform2: new Array(256).fill(0),
+  name: 'IS20 Synth',
 };
 
 export const DEFAULT_FRED: FredConfig = {

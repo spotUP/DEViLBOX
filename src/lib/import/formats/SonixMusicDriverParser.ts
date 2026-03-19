@@ -41,7 +41,9 @@
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, ChannelData, TrackerCell, InstrumentConfig } from '@/types';
+import type { UADEVariablePatternLayout } from '@/engine/uade/UADEPatternEncoder';
 import { idGenerator } from '@utils/idGenerator';
+import { sonixEncoder } from '@/engine/uade/encoders/SonixMusicDriverEncoder';
 
 // ── Constants ─────────────────────────────────────────────────────────────
 
@@ -556,6 +558,40 @@ function parseSnxBinary(buf: Uint8Array, filename: string): TrackerSong {
   const baseName = (filename.split('/').pop() ?? filename).replace(/^snx\./i, '');
   const patterns = buildPatterns(channelFlat, filename, 4);
 
+  // Build UADEVariablePatternLayout for chip RAM editing.
+  // SNX has 4 voice event streams packed sequentially starting at byte 20.
+  // Each voice stream is treated as a separate file-level pattern.
+  const NUM_CHANNELS = 4;
+  const voiceStreamStart = 20;
+  const filePatternAddrs: number[] = [];
+  const filePatternSizes: number[] = [];
+  let streamOffset = voiceStreamStart;
+  for (let ch = 0; ch < NUM_CHANNELS; ch++) {
+    filePatternAddrs.push(streamOffset);
+    filePatternSizes.push(sectionLengths[ch]);
+    streamOffset += sectionLengths[ch];
+  }
+
+  // trackMap: each TrackerSong pattern maps its channels to file-level voice streams.
+  // Voice stream ch is shared across all TrackerSong patterns for that channel.
+  const trackMap: number[][] = patterns.map(() =>
+    Array.from({ length: NUM_CHANNELS }, (_, ch) => ch),
+  );
+
+  const rowsPerPattern = patterns.map(p => p.length);
+
+  const uadeVariableLayout: UADEVariablePatternLayout = {
+    formatId: 'sonixMusicDriver',
+    numChannels: NUM_CHANNELS,
+    numFilePatterns: NUM_CHANNELS, // one file-level stream per voice
+    rowsPerPattern,
+    moduleSize: fileSize,
+    encoder: sonixEncoder,
+    filePatternAddrs,
+    filePatternSizes,
+    trackMap,
+  };
+
   return {
     name:           `${baseName} [SNX]`,
     format:         'MOD' as TrackerFormat,
@@ -564,10 +600,13 @@ function parseSnxBinary(buf: Uint8Array, filename: string): TrackerSong {
     songPositions:  patterns.map((_, i) => i),
     songLength:     patterns.length,
     restartPosition: 0,
-    numChannels:    4,
+    numChannels:    NUM_CHANNELS,
     initialSpeed:   6,
     initialBPM:     125,
     linearPeriods:  false,
+    uadeEditableFileData: buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer,
+    uadeEditableFileName: filename,
+    uadeVariableLayout,
   };
 }
 

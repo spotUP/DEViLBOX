@@ -53,7 +53,9 @@ import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, ChannelData, TrackerCell } from '@/types';
 import type { ParsedSample, ParsedInstrument } from '@/types/tracker';
 import type { InstrumentConfig } from '@/types/instrument';
+import type { UADEVariablePatternLayout } from '@/engine/uade/UADEPatternEncoder';
 import { convertToInstrument } from '../InstrumentConverter';
+import { s3mEncoder } from '@/engine/uade/encoders/S3MEncoder';
 
 // ── Binary helpers ────────────────────────────────────────────────────────────
 
@@ -472,6 +474,9 @@ export function parseS3MFile(buffer: ArrayBuffer, filename: string): TrackerSong
   // ── Patterns ──
   const patterns: Pattern[] = [];
   const patIndexToArrayIdx = new Map<number, number>();
+  // Track file-level pattern addresses and sizes for uadeVariableLayout
+  const filePatternAddrs: number[] = [];
+  const filePatternSizes: number[] = [];
 
   const referencedPats = new Set<number>(orders);
   for (let i = 0; i < patNum; i++) referencedPats.add(i);
@@ -481,6 +486,8 @@ export function parseS3MFile(buffer: ArrayBuffer, filename: string): TrackerSong
   for (const patIdx of allPatIdxs) {
     if (patIdx >= patternParapointers.length || patternParapointers[patIdx] === 0) {
       patIndexToArrayIdx.set(patIdx, patterns.length);
+      filePatternAddrs.push(0);
+      filePatternSizes.push(0);
       patterns.push(makeEmptyPattern(patIdx, numChannels, filename, maxPatIdx, smpNum));
       continue;
     }
@@ -488,11 +495,15 @@ export function parseS3MFile(buffer: ArrayBuffer, filename: string): TrackerSong
     const patOff = patternParapointers[patIdx] * 16;
     if (patOff + 2 > buffer.byteLength) {
       patIndexToArrayIdx.set(patIdx, patterns.length);
+      filePatternAddrs.push(0);
+      filePatternSizes.push(0);
       patterns.push(makeEmptyPattern(patIdx, numChannels, filename, maxPatIdx, smpNum));
       continue;
     }
 
     const packedLen = u16le(v, patOff);
+    filePatternAddrs.push(patOff + 2); // data starts after the 2-byte length
+    filePatternSizes.push(packedLen);
     const rowData   = raw.subarray(patOff + 2, patOff + 2 + packedLen);
     const cells     = decodeS3MPattern(rowData, numChannels);
 
@@ -541,6 +552,24 @@ export function parseS3MFile(buffer: ArrayBuffer, filename: string): TrackerSong
   }
   if (songPositions.length === 0) songPositions.push(0);
 
+  // Build trackMap: all channels of the same tracker pattern share the same file pattern.
+  // trackMap[trackerPatIdx][chIdx] = filePatIdx (same for all channels in packed formats)
+  const trackMap: number[][] = patterns.map((_, arrIdx) => {
+    return Array.from({ length: numChannels }, () => arrIdx);
+  });
+
+  const uadeVariableLayout: UADEVariablePatternLayout = {
+    formatId: 's3m',
+    numChannels,
+    numFilePatterns: patterns.length,
+    rowsPerPattern: ROWS_PER_PATTERN,
+    moduleSize: buffer.byteLength,
+    encoder: s3mEncoder,
+    filePatternAddrs,
+    filePatternSizes,
+    trackMap,
+  };
+
   return {
     name:            songName.replace(/\0/g, '').trim() || filename.replace(/\.[^/.]+$/, ''),
     format:          'S3M' as TrackerFormat,
@@ -553,5 +582,6 @@ export function parseS3MFile(buffer: ArrayBuffer, filename: string): TrackerSong
     initialSpeed,
     initialBPM,
     linearPeriods:   false,
+    uadeVariableLayout,
   };
 }

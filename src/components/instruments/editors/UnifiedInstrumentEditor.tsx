@@ -132,9 +132,9 @@ function isSonicArrangerType(synthType: SynthType): boolean {
   return synthType === 'SonicArrangerSynth';
 }
 
-/** Check if synth type is InStereo! 2.0 */
+/** Check if synth type is InStereo! 2.0 or 1.0 */
 function isInStereo2Type(synthType: SynthType): boolean {
-  return synthType === 'InStereo2Synth';
+  return synthType === 'InStereo2Synth' || synthType === 'InStereo1Synth';
 }
 
 /** Get the editor mode for a synth type */
@@ -240,12 +240,16 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
     unbakeInstrument(instrument.id);
   };
 
+  const synthEditorMode = getEditorMode(instrument.synthType);
   const editorMode = instrument.metadata?.mlSynthConfig
     ? 'musicline'
-    // Native WASM synths with sample data attached get the sample editor
-    : (instrument.sample?.url || (instrument.parameters as Record<string, unknown>)?.sampleUrl)
-      ? 'sample'
-      : getEditorMode(instrument.synthType);
+    // If synthType has a dedicated editor, use it even if sample data is attached
+    // (Amiga synth formats attach waveform PCM for preview but should show synth editor)
+    : (synthEditorMode !== 'generic' && synthEditorMode !== 'sample')
+      ? synthEditorMode
+      : (instrument.sample?.url || (instrument.parameters as Record<string, unknown>)?.sampleUrl)
+        ? 'sample'
+        : synthEditorMode;
 
   // Auto-switch tabs when synth type changes
   useEffect(() => {

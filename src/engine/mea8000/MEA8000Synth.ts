@@ -88,7 +88,7 @@ export class MEA8000Synth extends MAMEBaseSynth {
 
   // Vowel sequence state
   private _vowelSequence: string[] = [];
-  private _vowelLoopSingle = true;
+  private _vowelLoopSingle = false;
   private _vowelIndex = 0;
 
   constructor() {
@@ -221,10 +221,17 @@ export class MEA8000Synth extends MAMEBaseSynth {
     const frames = phonemesToMEA8000Frames(tokens);
     if (frames.length === 0) return;
 
-    const speechFrames: SpeechFrame<MEA8000Frame>[] = frames.map(f => ({
-      data: f,
-      durationMs: f.durationMs,
-    }));
+    // Filter out noise-only frames (stops/fricatives)
+    const speechFrames: SpeechFrame<MEA8000Frame>[] = frames
+      .filter(f => !f.noise)
+      .map(f => ({ data: f, durationMs: f.durationMs }));
+    if (speechFrames.length === 0) return;
+
+    // Pre-set first frame before noteOn
+    const first = speechFrames[0].data;
+    this.setFormants(first.f1, first.f2, first.f3);
+    this.setNoiseMode(first.noise);
+    this.setBandwidth(first.bw);
 
     // Start voice directly (not via triggerAttack to avoid recursion)
     this.workletNode.port.postMessage({

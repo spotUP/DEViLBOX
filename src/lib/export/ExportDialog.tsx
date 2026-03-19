@@ -228,13 +228,14 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
 
           const preset = useUIStore.getState().activeSystemPreset || '';
           const format = song.format;
+          const layoutFormatId = song.uadePatternLayout?.formatId || song.uadeVariableLayout?.formatId || '';
           let result: { data: Blob; filename: string; warnings: string[] } | null = null;
 
           if (preset.includes('jamcracker') || format === 'JamCracker' as string) {
             result = await exportAsJamCracker(song);
           } else if (preset.includes('soundmon') || format === ('SMON' as string)) {
             result = await exportAsSoundMon(song);
-          } else if (preset.includes('protracker') || format === 'MOD') {
+          } else if (preset.includes('protracker') || (format === 'MOD' && !layoutFormatId)) {
             const { exportSongToMOD } = await import('./modExport');
             const modResult = await exportSongToMOD(song, { bakeSynths: true });
             result = { data: modResult.blob, filename: modResult.filename, warnings: modResult.warnings };
@@ -258,6 +259,139 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
             const buf = exportMED(song);
             const baseName = (song.name || 'untitled').replace(/[^a-zA-Z0-9_-]/g, '_');
             result = { data: new Blob([buf], { type: 'application/octet-stream' }), filename: `${baseName}.mmd0`, warnings: [] };
+          } else if (format === 'HVL' as string || format === 'AHX' as string || layoutFormatId === 'hivelyHVL' || layoutFormatId === 'hivelyAHX') {
+            const { exportAsHively } = await import('./HivelyExporter');
+            const hvlFormat = (format === 'AHX' || layoutFormatId === 'hivelyAHX') ? 'ahx' : 'hvl';
+            result = exportAsHively(song, { format: hvlFormat });
+          } else if (format === 'DIGI' as string || layoutFormatId === 'digiBooster') {
+            const { exportDigiBooster } = await import('./DigiBoosterExporter');
+            const buf = exportDigiBooster(song);
+            const baseName = (song.name || 'untitled').replace(/[^a-zA-Z0-9_-]/g, '_');
+            result = { data: new Blob([new Uint8Array(buf)], { type: 'application/octet-stream' }), filename: `${baseName}.dbm`, warnings: [] };
+          } else if (format === 'OKT' as string || layoutFormatId === 'oktalyzer') {
+            const { exportOktalyzer } = await import('./OktalyzerExporter');
+            const buf = exportOktalyzer(song);
+            const baseName = (song.name || 'untitled').replace(/[^a-zA-Z0-9_-]/g, '_');
+            result = { data: new Blob([new Uint8Array(buf)], { type: 'application/octet-stream' }), filename: `${baseName}.okt`, warnings: [] };
+          } else if (format === 'KT' as string || layoutFormatId === 'klystrack') {
+            const { exportAsKlystrack } = await import('./KlysExporter');
+            result = await exportAsKlystrack(song);
+          } else if (layoutFormatId === 'musicLine') {
+            const { exportMusicLineFile } = await import('./MusicLineExporter');
+            const buf = exportMusicLineFile(song);
+            const baseName = (song.name || 'untitled').replace(/[^a-zA-Z0-9_-]/g, '_');
+            result = { data: new Blob([new Uint8Array(buf)], { type: 'application/octet-stream' }), filename: `${baseName}.ml`, warnings: [] };
+          } else if (layoutFormatId === 'musicAssembler') {
+            const { exportAsMusicAssembler } = await import('./MusicAssemblerExporter');
+            result = await exportAsMusicAssembler(song);
+          } else if (layoutFormatId === 'futurePlayer') {
+            const { exportAsFuturePlayer } = await import('./FuturePlayerExporter');
+            result = await exportAsFuturePlayer(song);
+          } else if (layoutFormatId === 'digitalSymphony') {
+            const { exportDigitalSymphony } = await import('./DigitalSymphonyExporter');
+            const buf = exportDigitalSymphony(song);
+            const baseName = (song.name || 'untitled').replace(/[^a-zA-Z0-9_-]/g, '_');
+            result = { data: new Blob([new Uint8Array(buf)], { type: 'application/octet-stream' }), filename: `${baseName}.dsym`, warnings: [] };
+          } else if (layoutFormatId === 'amosMusicBank') {
+            const { exportAMOSMusicBank } = await import('./AMOSMusicBankExporter');
+            const buf = exportAMOSMusicBank(song);
+            const baseName = (song.name || 'untitled').replace(/[^a-zA-Z0-9_-]/g, '_');
+            result = { data: new Blob([new Uint8Array(buf)], { type: 'application/octet-stream' }), filename: `${baseName}.abk`, warnings: [] };
+          } else if (layoutFormatId === 'hippelCoSo') {
+            const { exportAsHippelCoSo } = await import('./HippelCoSoExporter');
+            result = await exportAsHippelCoSo(song);
+          } else if (layoutFormatId === 'symphoniePro' || song.symphonieFileData) {
+            const { exportSymphonieProFile } = await import('./SymphonieProExporter');
+            const buf = exportSymphonieProFile(song);
+            const baseName = (song.name || 'untitled').replace(/[^a-zA-Z0-9_-]/g, '_');
+            result = { data: new Blob([new Uint8Array(buf)], { type: 'application/octet-stream' }), filename: `${baseName}.symmod`, warnings: [] };
+          } else if (format === 'IS10' as string || layoutFormatId === 'inStereo1') {
+            const { exportInStereo1 } = await import('./InStereo1Exporter');
+            result = await exportInStereo1(song);
+          } else if (layoutFormatId === 'inStereo2') {
+            const { exportInStereo2 } = await import('./InStereo2Exporter');
+            result = await exportInStereo2(song);
+          } else if (layoutFormatId === 'deltaMusic1') {
+            const { exportDeltaMusic1 } = await import('./DeltaMusic1Exporter');
+            result = await exportDeltaMusic1(song);
+          } else if (layoutFormatId === 'deltaMusic2') {
+            const { exportDeltaMusic2 } = await import('./DeltaMusic2Exporter');
+            result = await exportDeltaMusic2(song);
+          } else if (layoutFormatId === 'digitalMugician') {
+            const { exportDigitalMugician } = await import('./DigitalMugicianExporter');
+            result = await exportDigitalMugician(song);
+          } else if (layoutFormatId === 'sidmon1') {
+            const { exportSidMon1 } = await import('./SidMon1Exporter');
+            result = await exportSidMon1(song);
+          } else if (layoutFormatId === 'sonicArranger') {
+            const { exportSonicArranger } = await import('./SonicArrangerExporter');
+            result = await exportSonicArranger(song);
+          } else if (layoutFormatId === 'tfmx') {
+            const { exportTFMX } = await import('./TFMXExporter');
+            result = await exportTFMX(song);
+          } else if (layoutFormatId === 'fredEditor') {
+            const { exportFredEditor } = await import('./FredEditorExporter');
+            result = await exportFredEditor(song);
+          } else if (layoutFormatId === 'soundfx') {
+            const { exportSoundFX } = await import('./SoundFXExporter');
+            result = await exportSoundFX(song);
+          } else if (layoutFormatId === 'tcbTracker') {
+            const { exportTCBTracker } = await import('./TCBTrackerExporter');
+            result = await exportTCBTracker(song);
+          } else if (layoutFormatId === 'gameMusicCreator') {
+            const { exportGameMusicCreator } = await import('./GameMusicCreatorExporter');
+            result = await exportGameMusicCreator(song);
+          } else if (layoutFormatId === 'quadraComposer') {
+            const { exportQuadraComposer } = await import('./QuadraComposerExporter');
+            result = await exportQuadraComposer(song);
+          } else if (layoutFormatId === 'activisionPro') {
+            const { exportActivisionPro } = await import('./ActivisionProExporter');
+            result = await exportActivisionPro(song);
+          } else if (layoutFormatId === 'digiBoosterPro') {
+            const { exportDigiBoosterPro } = await import('./DigiBoosterProExporter');
+            result = await exportDigiBoosterPro(song);
+          } else if (layoutFormatId === 'faceTheMusic') {
+            const { exportFaceTheMusic } = await import('./FaceTheMusicExporter');
+            result = await exportFaceTheMusic(song);
+          } else if (layoutFormatId === 'sawteeth') {
+            const { exportSawteeth } = await import('./SawteethExporter');
+            result = await exportSawteeth(song);
+          } else if (layoutFormatId === 'earAche') {
+            const { exportEarAche } = await import('./EarAcheExporter');
+            result = await exportEarAche(song);
+          } else if (layoutFormatId === 'iffSmus') {
+            const { exportIffSmus } = await import('./IffSmusExporter');
+            result = await exportIffSmus(song);
+          } else if (layoutFormatId === 'actionamics') {
+            const { exportActionamics } = await import('./ActionamicsExporter');
+            result = await exportActionamics(song);
+          } else if (layoutFormatId === 'soundFactory') {
+            const { exportSoundFactory } = await import('./SoundFactoryExporter');
+            result = await exportSoundFactory(song);
+          } else if (layoutFormatId === 'synthesis') {
+            const { exportSynthesis } = await import('./SynthesisExporter');
+            result = await exportSynthesis(song);
+          } else if (layoutFormatId === 'soundControl') {
+            const { exportSoundControl } = await import('./SoundControlExporter');
+            result = await exportSoundControl(song);
+          } else if (layoutFormatId === 'c67') {
+            const { exportCDFM67 } = await import('./CDFM67Exporter');
+            result = await exportCDFM67(song);
+          } else if (layoutFormatId === 'zoundMonitor') {
+            const { exportZoundMonitor } = await import('./ZoundMonitorExporter');
+            result = await exportZoundMonitor(song);
+          } else if (layoutFormatId === 'chuckBiscuits') {
+            const { exportChuckBiscuits } = await import('./ChuckBiscuitsExporter');
+            result = await exportChuckBiscuits(song);
+          } else if (layoutFormatId === 'composer667') {
+            const { exportComposer667 } = await import('./Composer667Exporter');
+            result = await exportComposer667(song);
+          } else if (layoutFormatId === 'kris') {
+            const { exportKRIS } = await import('./KRISExporter');
+            result = await exportKRIS(song);
+          } else if (layoutFormatId === 'nru') {
+            const { exportNRU } = await import('./NRUExporter');
+            result = await exportNRU(song);
           } else {
             // Fallback: UADE chip RAM readback (works for any running UADE format)
             try {
@@ -625,7 +759,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                       <div className="font-mono text-sm font-semibold">Furnace</div>
                     </button>
                   )}
-                  {(editorMode === 'jamcracker' || editorMode === 'classic') && (
+                  {(editorMode === 'jamcracker' || editorMode === 'classic' || editorMode === 'hively' || editorMode === 'klystrack' || editorMode === 'musicline') && (
                     <button
                       onClick={() => setExportMode('native')}
                       className={`
@@ -805,9 +939,11 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                     </div>
                     <div className="bg-dark-bg border border-dark-border rounded-lg p-3">
                       <p className="text-xs font-mono text-text-primary leading-relaxed">
-                        Exports as the original Amiga tracker format (JamCracker .jam, SoundMon .bp, ProTracker .mod,
-                        Future Composer .fc, SidMon II .sd2, PumaTracker .puma, OctaMED .mmd0).
-                        All formats have full from-scratch serializers; chip RAM readback is available as fallback.
+                        Exports as the original tracker format with all edits preserved.
+                        Supports 30+ formats including JamCracker, SoundMon, ProTracker, Future Composer,
+                        SidMon, PumaTracker, OctaMED, Hively/AHX, DigiBooster, Oktalyzer, Klystrack,
+                        InStereo, DeltaMusic, Digital Mugician, Sonic Arranger, TFMX, Fred Editor,
+                        SoundFX, TCB Tracker, and more. Chip RAM readback is available as fallback.
                       </p>
                     </div>
                   </div>

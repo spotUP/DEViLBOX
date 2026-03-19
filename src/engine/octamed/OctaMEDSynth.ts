@@ -112,6 +112,16 @@ export class OctaMEDSynth implements DevilboxSynth {
     return buf.buffer;
   }
 
+  /** Re-upload instrument config to running WASM synth (for live parameter editing) */
+  updateConfig(config: OctaMEDConfig): void {
+    if (this._disposed || this._playerHandle < 0) return;
+    const blob = OctaMEDSynth.serializeInstrument(config);
+    this.engine.sendMessage(
+      { type: 'setInstrument', handle: this._playerHandle, buffer: blob },
+      [blob],
+    );
+  }
+
   triggerAttack(note?: string | number, _time?: number, _velocity?: number): void {
     if (this._disposed || this._playerHandle < 0) return;
 

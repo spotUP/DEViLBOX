@@ -67,7 +67,7 @@ export class VotraxSynth extends MAMEBaseSynth {
 
   // Vowel sequence state
   private _vowelSequence: string[] = [];
-  private _vowelLoopSingle = true;
+  private _vowelLoopSingle = false;
   private _vowelIndex = 0;
 
   constructor() {
@@ -222,8 +222,11 @@ export class VotraxSynth extends MAMEBaseSynth {
       data: f,
       durationMs: f.durationMs,
     }));
+    if (speechFrames.length === 0) return;
 
-    // Start voice directly (not via triggerAttack to avoid recursion)
+    // Pre-set first phone before noteOn
+    this.writePhone(speechFrames[0].data.phone);
+
     this.workletNode.port.postMessage({
       type: 'noteOn',
       note,

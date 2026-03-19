@@ -34,6 +34,8 @@ import { getPresetsForSynthType } from '@constants/synthPresets/allPresets';
 import type { SynthType } from '@typedefs/instrument';
 import type { InstrumentConfig, EffectConfig } from '@typedefs/instrument';
 import { PixiModularSynthEditor } from '../views/instruments/PixiModularSynthEditor';
+import { PixiAmigaSynthPanel } from '../views/instruments/PixiAmigaSynthPanel';
+import { AMIGA_SYNTH_LAYOUTS } from '../views/instruments/amigaSynthLayouts';
 import type { ModularPatchConfig } from '@typedefs/modular';
 import { MODULAR_INIT_PATCH } from '@constants/modularPresets';
 
@@ -1132,20 +1134,21 @@ const SCControlsPanel: React.FC<{
 const NATIVE_WASM_SYNTH_TYPES = new Set([
   'HivelySynth', 'UADESynth', 'SymphonieSynth', 'MusicLineSynth',
   'JamCrackerSynth', 'FuturePlayerSynth', 'SonicArrangerSynth',
-  'InStereo2Synth',
+  'InStereo2Synth', 'InStereo1Synth',
   'SoundMonSynth', 'SidMonSynth', 'DigMugSynth', 'FCSynth', 'FredSynth',
   'TFMXSynth', 'OctaMEDSynth', 'SidMon1Synth', 'HippelCoSoSynth',
   'RobHubbardSynth', 'DavidWhittakerSynth', 'SunVoxSynth',
+  'DeltaMusic1Synth', 'DeltaMusic2Synth', 'StartrekkerAMSynth',
 ]);
 
 // Whole-song engine types — always show NativeInstrumentPanel even if sample data present
 const SONG_ENGINE_SYNTH_TYPES = new Set([
   'SymphonieSynth', 'UADESynth', 'MusicLineSynth', 'SonicArrangerSynth',
-  'InStereo2Synth',
+  'InStereo2Synth', 'InStereo1Synth',
   'SoundMonSynth', 'SidMonSynth', 'DigMugSynth', 'FCSynth', 'FredSynth',
   'TFMXSynth', 'OctaMEDSynth', 'SidMon1Synth', 'HippelCoSoSynth',
   'RobHubbardSynth', 'DavidWhittakerSynth', 'JamCrackerSynth',
-  'FuturePlayerSynth',
+  'FuturePlayerSynth', 'DeltaMusic1Synth', 'DeltaMusic2Synth', 'StartrekkerAMSynth',
 ]);
 
 function isNativeWASMSynth(synthType?: string): boolean {
@@ -1162,6 +1165,11 @@ const NativeInstrumentPanel: React.FC<{
   }
   if (instrument.synthType === 'FuturePlayerSynth') {
     return <FuturePlayerPanel instrument={instrument} />;
+  }
+  // Generic Amiga synth panel for all formats with layout descriptors
+  const amigaLayout = instrument.synthType ? AMIGA_SYNTH_LAYOUTS[instrument.synthType] : undefined;
+  if (amigaLayout) {
+    return <PixiAmigaSynthPanel layout={amigaLayout} instrument={instrument} onUpdate={onUpdate} />;
   }
   return <GenericNativePanel instrument={instrument} />;
 };

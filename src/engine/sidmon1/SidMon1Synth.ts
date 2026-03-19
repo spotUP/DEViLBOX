@@ -75,6 +75,16 @@ export class SidMon1Synth implements DevilboxSynth {
     );
   }
 
+  /** Re-upload instrument config to running WASM synth (for live parameter editing) */
+  updateConfig(config: SidMon1Config): void {
+    if (this._disposed || this._playerHandle < 0) return;
+    const blob = serializeSidMon1Config(config);
+    this.engine.sendMessage(
+      { type: 'loadInstrument', handle: this._playerHandle, buffer: blob },
+      [blob],
+    );
+  }
+
   triggerAttack(note?: string | number, _time?: number, velocity?: number): void {
     if (this._disposed || this._playerHandle < 0) return;
 

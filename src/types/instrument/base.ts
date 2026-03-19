@@ -220,6 +220,8 @@ export type SynthType =
   | 'DeltaMusic1Synth' // Delta Music 1.0 (4-channel Amiga wavetable + ADSR synthesis)
   | 'DeltaMusic2Synth' // Delta Music 2.0 (4-channel Amiga wavetable + vol/vib table synthesis)
   | 'SonicArrangerSynth' // Sonic Arranger (18-mode wavetable synthesis + ADSR/AMF tables)
+  | 'InStereo2Synth'     // InStereo! 2.0 (wavetable synthesis + ADSR/LFO/EG tables)
+  | 'InStereo1Synth'     // InStereo! 1.0 (wavetable synthesis + ADSR/EGC tables)
   | 'JamCrackerSynth' // JamCracker Pro (transpiled 68k replayer + Paula emulation WASM)
   | 'FuturePlayerSynth' // Future Player (transpiled 68k replayer + Paula emulation WASM)
   | 'KlysSynth'       // Klystrack chiptune synth (klystron WASM engine)
@@ -249,6 +251,9 @@ export type SynthType =
   | 'MAMESWP20'         // Yamaha SWP20 AWM2 (32-voice ROM, approximated)
   | 'MAMERolandGP'      // Roland TC6116 PCM (28-channel, dual vol envelopes)
   | 'MAMEMultiPCM'    // Yamaha YMW258-F MultiPCM (28-channel PCM, Sega Model 1/2)
+  | 'MAMES14001A'     // SSi TSI S14001A delta modulation speech (Berzerk)
+  | 'MAMEVLM5030'     // Sanyo VLM5030 LPC speech (Konami arcade)
+  | 'MAMEHC55516'     // Harris HC55516 CVSD speech codec (Williams/Bally)
   | 'StartrekkerAMSynth' // Startrekker AM synth (WASM replayer)
   | 'SunVoxModular';   // SunVox WASM modular synthesizer with visual editor
 

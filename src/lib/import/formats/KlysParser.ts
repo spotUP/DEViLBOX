@@ -11,6 +11,8 @@
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, TrackerCell, ChannelData, InstrumentConfig, KlysNativeData } from '@/types';
+import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
+import { encodeKlysCell } from '@/engine/uade/encoders/KlysEncoder';
 
 const SONG_SIG = 'cyd!song';
 const INST_SIG = 'cyd!inst';
@@ -291,6 +293,23 @@ export function parseKlystrack(buf: ArrayBuffer): TrackerSong {
 
   const format: TrackerFormat = 'KT';
 
+  // Build pattern layout for editing infrastructure.
+  // Klystrack patterns are stored in WASM memory; we provide the encoder
+  // so the editing infrastructure knows how to serialize cells.
+  // patternDataFileOffset = 0 (WASM-managed); offsets computed by WASM callback.
+  const bytesPerCell = 6;
+  const defaultStepsPerPat = 64;
+  const uadePatternLayout: UADEPatternLayout = {
+    formatId: 'klystrack',
+    patternDataFileOffset: 0,
+    bytesPerCell,
+    rowsPerPattern: defaultStepsPerPat,
+    numChannels,
+    numPatterns: numPatterns,
+    moduleSize: buf.byteLength,
+    encodeCell: encodeKlysCell,
+  };
+
   return {
     name: title || 'Untitled',
     format,
@@ -306,5 +325,6 @@ export function parseKlystrack(buf: ArrayBuffer): TrackerSong {
     hz: songRate,
     klysNative,
     klysFileData: buf.slice(0), // copy for WASM
+    uadePatternLayout,
   };
 }

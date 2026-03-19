@@ -51,7 +51,9 @@
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { InstrumentConfig } from '@/types';
 import type { RobHubbardConfig, UADEChipRamInfo } from '@/types/instrument';
+import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
 import { DEFAULT_ROB_HUBBARD } from '@/types/instrument';
+import { encodeRobHubbardCell } from '@/engine/uade/encoders/RobHubbardEncoder';
 
 // ── Constants ───────────────────────────────────────────────────────────────
 
@@ -391,6 +393,28 @@ export async function parseRobHubbardFile(
     ? ` (${extractedCount}/${MAX_INSTRUMENTS} smp extracted)`
     : ` (${MAX_INSTRUMENTS} smp)`;
 
+  // ── Build uadePatternLayout for chip RAM editing ──────────────────────────
+  // RH modules are compiled 68k executables — pattern data is embedded in
+  // player code, so patternDataFileOffset is 0.  getCellFileOffset provides
+  // a standard row-major layout relative to the module base for potential
+  // chip RAM patching once the real data offset is resolved at runtime.
+  const NUM_CHANNELS = 4;
+  const ROWS = 64;
+  const uadePatternLayout: UADEPatternLayout = {
+    formatId: 'robHubbard',
+    patternDataFileOffset: 0,
+    bytesPerCell: 4,
+    rowsPerPattern: ROWS,
+    numChannels: NUM_CHANNELS,
+    numPatterns: 1,
+    moduleSize: buffer.byteLength,
+    encodeCell: encodeRobHubbardCell,
+    getCellFileOffset: (pattern: number, row: number, channel: number): number => {
+      const patternByteSize = ROWS * NUM_CHANNELS * 4;
+      return pattern * patternByteSize + row * NUM_CHANNELS * 4 + channel * 4;
+    },
+  };
+
   return {
     name: `${moduleName} [Rob Hubbard]${extractNote}`,
     format: 'MOD' as TrackerFormat,
@@ -405,5 +429,6 @@ export async function parseRobHubbardFile(
     linearPeriods: false,
     uadeEditableFileData: buffer.slice(0) as ArrayBuffer,
     uadeEditableFileName: filename,
+    uadePatternLayout,
   };
 }

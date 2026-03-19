@@ -16,6 +16,8 @@
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { InstrumentConfig } from '@/types';
+import type { UADEVariablePatternLayout } from '@/engine/uade/UADEPatternEncoder';
+import { encodeFuturePlayerPattern } from '@/engine/uade/encoders/FuturePlayerEncoder';
 
 // ── Binary helpers ─────────────────────────────────────────────────────────
 
@@ -499,6 +501,49 @@ export function parseFuturePlayerFile(buffer: ArrayBuffer, filename: string): Tr
     ? `${moduleName} by ${authorName} [Future Player]`
     : `${moduleName} [Future Player]`;
 
+  // ── Build uadeVariableLayout for chip RAM editing ─────────────────────────
+  // FP stores 4 independent voice streams. Each voice stream is a single
+  // file-level "pattern". trackMap maps (trackerPatIdx, chIdx) -> voice index.
+  const voiceStreamAddrs = sub.voiceSeqPtrs.map(ptr => {
+    // Convert voice seq pointer (code-relative) back to raw file offset
+    // by finding the hunk header size
+    const hdrCode = stripHunkHeader(rawBuf);
+    const hdrOffset = rawBuf.length - hdrCode.length;
+    // The voiceSeqPtrs are code-relative offsets used during linearization
+    return hdrOffset + ptr;
+  });
+
+  // Estimate voice stream sizes from linearized row counts
+  const voiceStreamSizes = voiceRows.map(rows => {
+    // Each note = 2 bytes (note + duration), plus command bytes
+    // Conservative estimate: 2 bytes per non-empty row + overhead
+    let nonEmpty = 0;
+    for (const r of rows) {
+      if (r.note > 0 || r.effTyp > 0) nonEmpty++;
+    }
+    return Math.max(nonEmpty * 4, 64); // minimum 64 bytes
+  });
+
+  const trackMap: number[][] = [];
+  for (let pidx = 0; pidx < numPatterns; pidx++) {
+    trackMap.push([0, 1, 2, 3]); // all tracker patterns map to the 4 voice streams
+  }
+
+  const uadeVariableLayout: UADEVariablePatternLayout = {
+    formatId: 'futurePlayer',
+    numChannels: 4,
+    numFilePatterns: 4, // one file pattern per voice stream
+    rowsPerPattern: ROWS_PER_PATTERN,
+    moduleSize: rawBuf.length,
+    encoder: {
+      formatId: 'futurePlayer',
+      encodePattern: encodeFuturePlayerPattern,
+    },
+    filePatternAddrs: voiceStreamAddrs,
+    filePatternSizes: voiceStreamSizes,
+    trackMap,
+  };
+
   return {
     name: displayName,
     format: 'FuturePlayer' as TrackerFormat,
@@ -512,5 +557,6 @@ export function parseFuturePlayerFile(buffer: ArrayBuffer, filename: string): Tr
     initialBPM,
     linearPeriods: false,
     futurePlayerFileData: buffer.slice(0),
+    uadeVariableLayout,
   };
 }

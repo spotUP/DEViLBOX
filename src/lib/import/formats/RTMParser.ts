@@ -33,7 +33,9 @@
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, ChannelData, TrackerCell, InstrumentConfig } from '@/types';
+import type { UADEVariablePatternLayout } from '@/engine/uade/UADEPatternEncoder';
 import { createSamplerInstrument } from './AmigaUtils';
+import { rtmEncoder } from '@/engine/uade/encoders/RTMEncoder';
 
 // ── Binary helpers ────────────────────────────────────────────────────────────
 
@@ -480,6 +482,9 @@ export async function parseRTMFile(
 
   // ── Patterns ────────────────────────────────────────────────────────────────
   const patterns: Pattern[] = [];
+  const patternFileAddrs: number[] = [];
+  const patternFileSizes: number[] = [];
+  const patternRowCounts: number[] = [];
 
   for (let pat = 0; pat < numPatterns; pat++) {
     if (cursor + OBJ_HDR_SIZE > buffer.byteLength) break;
@@ -496,8 +501,11 @@ export async function parseRTMFile(
     const packedStart = cursor;
     cursor           += patHdr.packedSize;
     const packedEnd   = cursor;
+    patternFileAddrs.push(packedStart);
+    patternFileSizes.push(patHdr.packedSize);
 
     const numRows = Math.max(1, patHdr.numRows);
+    patternRowCounts.push(numRows);
 
     // Allocate empty grid: grid[row][channel]
     const grid: TrackerCell[][] = Array.from({ length: numRows }, () =>
@@ -745,5 +753,18 @@ export async function parseRTMFile(
     initialSpeed:    songHdr.speed,
     initialBPM:      songHdr.tempo,
     linearPeriods:   (songHdr.flags & SONG_LINEAR_SLIDES) !== 0,
+    uadeVariableLayout: {
+      formatId: 'rtm',
+      numChannels,
+      numFilePatterns: numPatterns,
+      rowsPerPattern: patternRowCounts,
+      moduleSize: buffer.byteLength,
+      encoder: rtmEncoder,
+      filePatternAddrs: patternFileAddrs,
+      filePatternSizes: patternFileSizes,
+      trackMap: Array.from({ length: numPatterns }, (_, p) =>
+        Array.from({ length: numChannels }, (__, _ch) => p),
+      ),
+    } satisfies UADEVariablePatternLayout,
   };
 }

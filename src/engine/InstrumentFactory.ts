@@ -110,6 +110,9 @@ import {
   createMAMESWP00,
   createMAMESWP20,
   createMAMERolandGP,
+  createMAMES14001A,
+  createMAMEVLM5030,
+  createMAMEHC55516,
 } from './factories/CommunitySynthFactory';
 
 // Re-export standalone functions (preserves existing import paths)
@@ -512,6 +515,15 @@ export class InstrumentFactory {
         break;
       case 'MAMERolandGP':
         instrument = createMAMERolandGP(config);
+        break;
+      case 'MAMES14001A':
+        instrument = createMAMES14001A(config);
+        break;
+      case 'MAMEVLM5030':
+        instrument = createMAMEVLM5030(config);
+        break;
+      case 'MAMEHC55516':
+        instrument = createMAMEHC55516(config);
         break;
 
       case 'ModularSynth':

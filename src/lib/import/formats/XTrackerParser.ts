@@ -36,7 +36,9 @@
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, ChannelData, TrackerCell, InstrumentConfig } from '@/types';
+import type { UADEVariablePatternLayout } from '@/engine/uade/UADEPatternEncoder';
 import { createSamplerInstrument } from './AmigaUtils';
+import { xTrackerEncoder } from '@/engine/uade/encoders/XTrackerEncoder';
 
 // ── Binary helpers (little-endian throughout) ────────────────────────────────
 
@@ -994,14 +996,19 @@ function parseXTrackerFileInternal(bytes: Uint8Array, filename: string): Tracker
   // Extract per-pattern raw data sub-chunks
   const headerSize = fileVersion < 3 ? 9 : 8;
   const patternRawData: Uint8Array[] = [];
+  const dmfPatternFileAddrs: number[] = [];
+  const dmfPatternFileSizes: number[] = [];
   {
     let ppos = 3; // after DMFPatterns header
+    const pattBaseOffset = pattChunk.data.byteOffset; // absolute file offset of PATT payload
     for (let p = 0; p < numPatterns; p++) {
       if (ppos + headerSize > pattChunk.data.length) break;
       // patternLength is last 4 bytes of the header
       const patLength = u32le(pv, ppos + headerSize - 4);
       const total = headerSize + patLength;
       if (ppos + total > pattChunk.data.length) break;
+      dmfPatternFileAddrs.push(pattBaseOffset + ppos);
+      dmfPatternFileSizes.push(total);
       patternRawData.push(pattChunk.data.subarray(ppos, ppos + total));
       ppos += total;
     }
@@ -1328,5 +1335,18 @@ function parseXTrackerFileInternal(bytes: Uint8Array, filename: string): Tracker
     initialSpeed:    initSpeed,
     initialBPM:      initBPM,
     linearPeriods:   true,                    // X-Tracker uses linear slides
+    uadeVariableLayout: {
+      formatId: 'dmf',
+      numChannels: numTracks + 1,
+      numFilePatterns: patternRawData.length,
+      rowsPerPattern: 64,
+      moduleSize: bytes.length,
+      encoder: xTrackerEncoder,
+      filePatternAddrs: dmfPatternFileAddrs,
+      filePatternSizes: dmfPatternFileSizes,
+      trackMap: Array.from({ length: patterns.length }, (_, p) =>
+        Array.from({ length: numTracks + 1 }, (__, _ch) => p < patternRawData.length ? p : -1),
+      ),
+    } satisfies UADEVariablePatternLayout,
   };
 }

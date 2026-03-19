@@ -48,6 +48,9 @@ export const SYNTH_CATEGORIES: SynthCategory[] = [
       SYNTH_INFO.MAMESP0250,
       SYNTH_INFO.MAMEMEA8000,
       SYNTH_INFO.MAMEUPD931,
+      SYNTH_INFO.MAMES14001A,
+      SYNTH_INFO.MAMEVLM5030,
+      SYNTH_INFO.MAMEHC55516,
     ],
   },
   {
@@ -254,6 +257,13 @@ export const SYNTH_CATEGORIES: SynthCategory[] = [
       SYNTH_INFO.KlysSynth,
       SYNTH_INFO.Sc68Synth,
       SYNTH_INFO.StartrekkerAMSynth,
+      SYNTH_INFO.SonicArrangerSynth,
+      SYNTH_INFO.InStereo2Synth,
+      SYNTH_INFO.InStereo1Synth,
+      SYNTH_INFO.DeltaMusic1Synth,
+      SYNTH_INFO.DeltaMusic2Synth,
+      SYNTH_INFO.JamCrackerSynth,
+      SYNTH_INFO.FuturePlayerSynth,
     ],
   },
   {
