@@ -1875,7 +1875,22 @@ export function createMcpServer(): McpServer {
     {
       outputPath: z.string().optional().describe('Absolute path to save the exported file to disk (optional — if omitted, only returns base64)'),
     },
-    (p) => call('export_native', p),
+    async (p) => {
+      const result = await call('export_native', {});
+      // Save to disk server-side if outputPath provided
+      if (p.outputPath && result?.content?.[0]?.type === 'text') {
+        const parsed = JSON.parse(result.content[0].text);
+        if (parsed.nativeBase64) {
+          const fs = await import('fs');
+          const buf = Buffer.from(parsed.nativeBase64, 'base64');
+          fs.writeFileSync(p.outputPath, buf);
+          parsed.savedTo = p.outputPath;
+          delete parsed.nativeBase64; // Don't send huge base64 back when saving to disk
+          return { content: [{ type: 'text' as const, text: JSON.stringify(parsed) }] };
+        }
+      }
+      return result;
+    },
   );
 
   // ═══════════════════════════════════════════════════════════════════════════════
