@@ -50,7 +50,18 @@ class UADEProcessor extends AudioWorkletProcessor {
         break;
 
       case 'load':
-        this._load(data.buffer, data.filenameHint, data.subsong || 0, data.skipScan || false);
+        await this._load(data.buffer, data.filenameHint, data.subsong || 0, data.skipScan || false);
+        break;
+
+      case 'reinit':
+        // Preemptive reinit — called from import dialog to avoid delay during playback
+        if (this._hasRendered && this._wasmBinary) {
+          console.log('[UADE.worklet] Preemptive reinit requested');
+          this._wasm = null;
+          this._ready = false;
+          this._hasRendered = false;
+          await this._init(this._sampleRate, this._wasmBinary, null);
+        }
         break;
 
       case 'addCompanionFile':
