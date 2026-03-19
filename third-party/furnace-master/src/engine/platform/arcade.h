@@ -86,6 +86,7 @@ class DivPlatformArcade: public DivPlatformOPM {
     const char** getRegisterSheet();
     int init(DivEngine* parent, int channels, int sugRate, const DivConfig& flags);
     void quit();
+    DivPlatformArcade();
     ~DivPlatformArcade();
 };
 #endif

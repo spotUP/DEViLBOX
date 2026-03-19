@@ -544,5 +544,9 @@ void DivPlatformFDS::quit() {
   }
 }
 
+DivPlatformFDS::DivPlatformFDS():
+  useNP(false) {
+}
+
 DivPlatformFDS::~DivPlatformFDS() {
 }

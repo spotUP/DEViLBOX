@@ -1046,5 +1046,9 @@ void DivPlatformArcade::quit() {
   }
 }
 
+DivPlatformArcade::DivPlatformArcade():
+  useYMFM(false) {
+}
+
 DivPlatformArcade::~DivPlatformArcade() {
 }
