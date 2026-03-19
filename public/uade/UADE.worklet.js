@@ -619,14 +619,14 @@ class UADEProcessor extends AudioWorkletProcessor {
       // Keep a copy so _scanSubsong() can reload without transferring back from main thread
       this._lastData = data;
       this._lastHint = filenameHint;
-      // Always reinit WASM if a song has been loaded before.
-      // UADE's IPC state machine gets corrupted after playing/scanning a song.
-      if (this._hasLoaded && this._wasmBinary) {
+      // Reinit WASM only if the engine has rendered audio (played a song).
+      // Scan-only loads don't corrupt the engine badly enough to need reinit.
+      if (this._hasRendered && this._wasmBinary) {
         console.log('[UADE.worklet] Reinitializing WASM for clean load...');
         try {
           this._wasm = null;
           this._ready = false;
-          this._hasLoaded = false;
+          this._hasRendered = false;
           await this._init(this._sampleRate, this._wasmBinary, null);
           if (!this._wasm || !this._ready) {
             this.port.postMessage({ type: 'error', message: 'WASM reinit failed' });
@@ -641,7 +641,6 @@ class UADEProcessor extends AudioWorkletProcessor {
 
       let ret = this._loadIntoWasm(data, filenameHint);
       console.log('[UADE.worklet] _uade_wasm_load returned: ' + ret);
-      this._hasLoaded = true;
 
       if (ret !== 0) {
         const abortInfo = this._lastAbortReason ? ' (abort: ' + this._lastAbortReason + ')' : '';
@@ -1786,6 +1785,7 @@ class UADEProcessor extends AudioWorkletProcessor {
 
     try {
       // Render audio into WASM-allocated float32 buffers
+      this._hasRendered = true;
       const ret = this._wasm._uade_wasm_render(this._ptrL, this._ptrR, frames);
 
       if (ret === 0) {
