@@ -543,17 +543,15 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
                     : uadeInitPhase === 'compiled' ? 'UADE compiled, instantiating…'
                     : uadeInitPhase === 'instantiating' ? 'Instantiating UADE…'
                     : uadeInitPhase === 'instantiated' ? 'Initializing UADE engine…'
-                    : 'Parsing Pattern Data…'}
+                    : 'Analyzing module…'}
                 </span>
               </div>
-              {uadeInitProgress > 0 && uadeInitProgress < 100 && (
-                <div className="w-full h-1.5 bg-dark-bgTertiary rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-accent-primary rounded-full transition-all duration-300"
-                    style={{ width: `${uadeInitProgress}%` }}
-                  />
-                </div>
-              )}
+              <div className="w-full h-1.5 bg-dark-bgTertiary rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-accent-primary rounded-full transition-all duration-300"
+                  style={{ width: `${uadeInitProgress > 0 ? uadeInitProgress : 5}%` }}
+                />
+              </div>
             </div>
           )}
 
