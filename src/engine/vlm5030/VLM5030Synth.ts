@@ -69,6 +69,7 @@ export class VLM5030Synth extends MAMEBaseSynth {
   // ROM state
   private _romData: Uint8Array | null = null;
   private _romSentToWasm = false;
+  private _currentRomWord = 0;
 
   constructor() {
     super();
@@ -129,6 +130,15 @@ export class VLM5030Synth extends MAMEBaseSynth {
 
   protected writeKeyOn(note: number, velocity: number): void {
     if (!this.workletNode || this._disposed) return;
+
+    // ROM speech mode: trigger ROM word on note-on
+    if (this._romSentToWasm && this._mode === 1) {
+      // Map MIDI note to ROM word: C2(36)=word0, C#2=word1, etc.
+      // Or use current romWord selection
+      const wordIndex = note >= 36 ? Math.min(note - 36, 59) : this._currentRomWord;
+      this.speakWord(wordIndex);
+      return;
+    }
 
     if (this._mode === 1) {
       if (this._singMode && this._vowelSequence.length > 0) {
@@ -324,7 +334,7 @@ export class VLM5030Synth extends MAMEBaseSynth {
     if (param === 'mode') this._mode = value >= 1 ? 1 : 0;
     if (param === 'sing_mode') this._singMode = value >= 1;
     if (param === 'vowelLoopSingle') this._vowelLoopSingle = value >= 1;
-    if (param === 'romWord') this.speakWord(Math.round(value));
+    if (param === 'romWord') { this._currentRomWord = Math.round(value); this.speakWord(this._currentRomWord); }
   }
 
   setTextParam(key: string, value: string): void {
