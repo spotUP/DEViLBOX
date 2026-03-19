@@ -477,6 +477,8 @@ export async function parseUADEFile(
     'sas',   // SonicArranger suffix-form compiled binary — scan crashes browser
     'mso',   // Medley — enhanced scan crashes browser
     'ml',    // Medley (alternate ext) — enhanced scan crashes browser
+    'sun',   // SunTronic/TSM — compiled 68k synth, enhanced scan corrupts engine
+    'tsm',   // SunTronic/TSM — suffix-form variant
   ]);
   const SKIP_SCAN_PREFIXES = new Set(['dl', 'dl_deli', 'dln', 'rh',
     'sas',   // SonicArranger prefix-form — enhanced scan crashes browser
@@ -492,6 +494,7 @@ export async function parseUADEFile(
     'mk2', 'mkii', // MarkII — compiled 68k (MOVEM prolog); test file atron.mk2 confirmed
     'aps',   // AProSys — ADRVPACK-packed binary; scan produces garbage rows
     'ash',   // AshleyHogg — compiled 68k replayer, enhanced scan crashes browser
+    'tsm',   // SunTronic/TSM — compiled 68k synth replayer, enhanced scan corrupts engine state
   ]);
   // SKIP_SCAN formats are compiled/packed binaries where the Paula register scan either
   // hangs indefinitely or produces garbage rows. Skip scan regardless of mode.
