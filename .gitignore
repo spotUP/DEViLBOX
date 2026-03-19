@@ -60,6 +60,9 @@ public/roms/gearmulator/
 public/roms/**/*.zip
 public/roms/**/*.BIN
 public/roms/**/*.bin
+public/roms/berzerk/
+public/roms/trackfld/
+public/roms/sinistar/
 *.zip
 
 # NDA documents
