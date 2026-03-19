@@ -508,16 +508,14 @@ export const PixiImportModuleDialog: React.FC<PixiImportModuleDialogProps> = ({
                 : uadeInitPhase === 'compiled' ? 'UADE compiled, instantiating…'
                 : uadeInitPhase === 'instantiating' ? 'Instantiating UADE…'
                 : uadeInitPhase === 'instantiated' ? 'Initializing UADE engine…'
-                : 'Parsing Pattern Data…'}
+                : 'Analyzing module…'}
               size="sm"
               color="textMuted"
             />
-            {uadeInitProgress > 0 && uadeInitProgress < 100 && (
-              <layoutContainer layout={{ width: 300, height: 4 }}>
-                <layoutContainer layout={{ width: 300, height: 4, backgroundColor: blendColor(theme.bg.color, theme.accent.color, 0.15), borderRadius: 2 }} />
-                <layoutContainer layout={{ width: Math.round(300 * uadeInitProgress / 100), height: 4, backgroundColor: theme.accent.color, borderRadius: 2, position: 'absolute' }} />
-              </layoutContainer>
-            )}
+            <layoutContainer layout={{ width: 300, height: 4 }}>
+              <layoutContainer layout={{ width: 300, height: 4, backgroundColor: blendColor(theme.bg.color, theme.accent.color, 0.15), borderRadius: 2 }} />
+              <layoutContainer layout={{ width: Math.max(15, Math.round(300 * (uadeInitProgress > 0 ? uadeInitProgress : 5) / 100)), height: 4, backgroundColor: theme.accent.color, borderRadius: 2, position: 'absolute' }} />
+            </layoutContainer>
           </layoutContainer>
         )}
 
