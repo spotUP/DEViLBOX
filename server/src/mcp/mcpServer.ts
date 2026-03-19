@@ -1742,6 +1742,7 @@ export function createMcpServer(): McpServer {
           { tool: 'export_pattern_text', description: 'Export pattern as tracker text or CSV' },
           { tool: 'export_midi', description: 'Export pattern/song to MIDI (base64)' },
           { tool: 'export_mod', description: 'Export loaded song to ProTracker MOD (base64); bakes OctaMED synths to PCM' },
+          { tool: 'export_native', description: 'Export loaded song to its native format (55+ formats) with edits preserved' },
         ],
         'Utility': [
           { tool: 'get_mcp_help', description: 'This help listing' },
@@ -1866,6 +1867,15 @@ export function createMcpServer(): McpServer {
       format: z.enum(['mod', 'xm', 'it', 's3m']).optional().describe('Output format (default: mod)'),
     },
     (p) => call('export_mod', p),
+  );
+
+  server.tool(
+    'export_native',
+    'Export the loaded song to its native tracker format (e.g. HVL, FC, OKT, TFMX, etc.) with all edits preserved. Returns base64-encoded file data. Supports 55+ formats with dedicated serializers plus chip RAM readback fallback for UADE formats. Optionally saves to disk via outputPath.',
+    {
+      outputPath: z.string().optional().describe('Absolute path to save the exported file to disk (optional — if omitted, only returns base64)'),
+    },
+    (p) => call('export_native', p),
   );
 
   // ═══════════════════════════════════════════════════════════════════════════════

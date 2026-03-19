@@ -2045,6 +2045,188 @@ export async function exportMod(params: Record<string, unknown>): Promise<Record
   }
 }
 
+/** Export the loaded song to its native format, returning base64-encoded data.
+ *  Uses the same format-specific routing as the Export Dialog's "Native" tab. */
+export async function exportNative(params: Record<string, unknown>): Promise<Record<string, unknown>> {
+  try {
+    const outputPath = params.outputPath as string | undefined;
+    const { getTrackerReplayer } = await import('../../engine/TrackerReplayer');
+    const song = getTrackerReplayer().getSong();
+    if (!song) return { error: 'No song loaded' };
+
+    const format = song.format;
+    const layoutFormatId = song.uadePatternLayout?.formatId || song.uadeVariableLayout?.formatId || '';
+    let result: { data: Blob; filename: string; warnings: string[] } | null = null;
+    const baseName = (song.name || 'untitled').replace(/[^a-zA-Z0-9_-]/g, '_');
+    const blobType = 'application/octet-stream';
+
+    // ── Format-specific exporters (same routing as ExportDialog case 'native') ──
+    if (format === 'JamCracker' as string) {
+      const { exportAsJamCracker } = await import('../../lib/export/JamCrackerExporter');
+      result = await exportAsJamCracker(song);
+    } else if (format === ('SMON' as string)) {
+      const { exportAsSoundMon } = await import('../../lib/export/SoundMonExporter');
+      result = await exportAsSoundMon(song);
+    } else if (format === 'MOD' && !layoutFormatId) {
+      const { exportSongToMOD } = await import('../../lib/export/modExport');
+      const modResult = await exportSongToMOD(song, { bakeSynths: true });
+      result = { data: modResult.blob, filename: modResult.filename, warnings: modResult.warnings };
+    } else if (format === 'FC' as string) {
+      const { exportFC } = await import('../../lib/export/FCExporter');
+      const buf = exportFC(song);
+      result = { data: new Blob([buf], { type: blobType }), filename: `${baseName}.fc`, warnings: [] };
+    } else if (format === 'SidMon2' as string) {
+      const { exportSidMon2File } = await import('../../lib/export/SidMon2Exporter');
+      const buf = await exportSidMon2File(song);
+      result = { data: new Blob([buf], { type: blobType }), filename: `${baseName}.sd2`, warnings: [] };
+    } else if (format === 'PumaTracker' as string) {
+      const { exportPumaTrackerFile } = await import('../../lib/export/PumaTrackerExporter');
+      const buf = exportPumaTrackerFile(song);
+      result = { data: new Blob([buf as unknown as Uint8Array<ArrayBuffer>], { type: blobType }), filename: `${baseName}.puma`, warnings: [] };
+    } else if (format === 'OctaMED' as string) {
+      const { exportMED } = await import('../../lib/export/MEDExporter');
+      const buf = exportMED(song);
+      result = { data: new Blob([buf], { type: blobType }), filename: `${baseName}.mmd0`, warnings: [] };
+    } else if (format === 'HVL' as string || format === 'AHX' as string || layoutFormatId === 'hivelyHVL' || layoutFormatId === 'hivelyAHX') {
+      const { exportAsHively } = await import('../../lib/export/HivelyExporter');
+      const hvlFmt = (format === 'AHX' || layoutFormatId === 'hivelyAHX') ? 'ahx' : 'hvl';
+      result = exportAsHively(song, { format: hvlFmt });
+    } else if (format === 'DIGI' as string || layoutFormatId === 'digiBooster') {
+      const { exportDigiBooster } = await import('../../lib/export/DigiBoosterExporter');
+      const buf = exportDigiBooster(song);
+      result = { data: new Blob([new Uint8Array(buf)], { type: blobType }), filename: `${baseName}.dbm`, warnings: [] };
+    } else if (format === 'OKT' as string || layoutFormatId === 'oktalyzer') {
+      const { exportOktalyzer } = await import('../../lib/export/OktalyzerExporter');
+      const buf = exportOktalyzer(song);
+      result = { data: new Blob([new Uint8Array(buf)], { type: blobType }), filename: `${baseName}.okt`, warnings: [] };
+    } else if (format === 'KT' as string || layoutFormatId === 'klystrack') {
+      const { exportAsKlystrack } = await import('../../lib/export/KlysExporter');
+      result = await exportAsKlystrack(song);
+    } else if (format === 'IS10' as string || layoutFormatId === 'inStereo1') {
+      const { exportInStereo1 } = await import('../../lib/export/InStereo1Exporter');
+      result = await exportInStereo1(song);
+    } else {
+      // For all other formats, try dynamic lookup by layoutFormatId
+      const exporterMap: Record<string, { module: string; fn: string }> = {
+        musicLine: { module: 'MusicLineExporter', fn: 'exportMusicLineFile' },
+        musicAssembler: { module: 'MusicAssemblerExporter', fn: 'exportAsMusicAssembler' },
+        futurePlayer: { module: 'FuturePlayerExporter', fn: 'exportAsFuturePlayer' },
+        digitalSymphony: { module: 'DigitalSymphonyExporter', fn: 'exportDigitalSymphony' },
+        amosMusicBank: { module: 'AMOSMusicBankExporter', fn: 'exportAMOSMusicBank' },
+        hippelCoSo: { module: 'HippelCoSoExporter', fn: 'exportAsHippelCoSo' },
+        symphoniePro: { module: 'SymphonieProExporter', fn: 'exportSymphonieProFile' },
+        inStereo2: { module: 'InStereo2Exporter', fn: 'exportInStereo2' },
+        deltaMusic1: { module: 'DeltaMusic1Exporter', fn: 'exportDeltaMusic1' },
+        deltaMusic2: { module: 'DeltaMusic2Exporter', fn: 'exportDeltaMusic2' },
+        digitalMugician: { module: 'DigitalMugicianExporter', fn: 'exportDigitalMugician' },
+        sidmon1: { module: 'SidMon1Exporter', fn: 'exportSidMon1' },
+        sonicArranger: { module: 'SonicArrangerExporter', fn: 'exportSonicArranger' },
+        tfmx: { module: 'TFMXExporter', fn: 'exportTFMX' },
+        fredEditor: { module: 'FredEditorExporter', fn: 'exportFredEditor' },
+        soundfx: { module: 'SoundFXExporter', fn: 'exportSoundFX' },
+        tcbTracker: { module: 'TCBTrackerExporter', fn: 'exportTCBTracker' },
+        gameMusicCreator: { module: 'GameMusicCreatorExporter', fn: 'exportGameMusicCreator' },
+        quadraComposer: { module: 'QuadraComposerExporter', fn: 'exportQuadraComposer' },
+        activisionPro: { module: 'ActivisionProExporter', fn: 'exportActivisionPro' },
+        digiBoosterPro: { module: 'DigiBoosterProExporter', fn: 'exportDigiBoosterPro' },
+        faceTheMusic: { module: 'FaceTheMusicExporter', fn: 'exportFaceTheMusic' },
+        sawteeth: { module: 'SawteethExporter', fn: 'exportSawteeth' },
+        earAche: { module: 'EarAcheExporter', fn: 'exportEarAche' },
+        iffSmus: { module: 'IffSmusExporter', fn: 'exportIffSmus' },
+        actionamics: { module: 'ActionamicsExporter', fn: 'exportActionamics' },
+        soundFactory: { module: 'SoundFactoryExporter', fn: 'exportSoundFactory' },
+        synthesis: { module: 'SynthesisExporter', fn: 'exportSynthesis' },
+        soundControl: { module: 'SoundControlExporter', fn: 'exportSoundControl' },
+        c67: { module: 'CDFM67Exporter', fn: 'exportCDFM67' },
+        zoundMonitor: { module: 'ZoundMonitorExporter', fn: 'exportZoundMonitor' },
+        chuckBiscuits: { module: 'ChuckBiscuitsExporter', fn: 'exportChuckBiscuits' },
+        composer667: { module: 'Composer667Exporter', fn: 'exportComposer667' },
+        kris: { module: 'KRISExporter', fn: 'exportKRIS' },
+        nru: { module: 'NRUExporter', fn: 'exportNRU' },
+        ims: { module: 'IMSExporter', fn: 'exportIMS' },
+        stp: { module: 'STPExporter', fn: 'exportSTP' },
+        unic: { module: 'UNICExporter', fn: 'exportUNIC' },
+        dsm_dyn: { module: 'DSMDynExporter', fn: 'exportDSMDyn' },
+        scumm: { module: 'SCUMMExporter', fn: 'exportSCUMM' },
+        xmf: { module: 'XMFExporter', fn: 'exportXMF' },
+      };
+
+      const entry = exporterMap[layoutFormatId];
+      if (entry) {
+        const mod = await import(`../../lib/export/${entry.module}`);
+        const exportFn = mod[entry.fn];
+        const raw = await exportFn(song);
+        // Normalize result: some return ArrayBuffer/Uint8Array, others return { data, filename, warnings }
+        if (raw instanceof ArrayBuffer) {
+          result = { data: new Blob([new Uint8Array(raw)], { type: blobType }), filename: `${baseName}.bin`, warnings: [] };
+        } else if (raw instanceof Uint8Array) {
+          result = { data: new Blob([new Uint8Array(raw)], { type: blobType }), filename: `${baseName}.bin`, warnings: [] };
+        } else if (raw && typeof raw === 'object' && 'data' in raw) {
+          result = raw as { data: Blob; filename: string; warnings: string[] };
+        }
+      }
+    }
+
+    // Fallback: UADE chip RAM readback
+    if (!result) {
+      const { useFormatStore } = await import('../../stores/useFormatStore');
+      const { uadeEditableFileData, uadeEditableFileName } = useFormatStore.getState();
+      if (uadeEditableFileData) {
+        try {
+          const { UADEChipEditor } = await import('../../engine/uade/UADEChipEditor');
+          const { UADEEngine } = await import('../../engine/uade/UADEEngine');
+          if (UADEEngine.hasInstance()) {
+            const chipEditor = new UADEChipEditor(UADEEngine.getInstance());
+            const moduleSize = uadeEditableFileData.byteLength;
+            if (moduleSize > 0) {
+              const bytes = await chipEditor.readEditedModule(moduleSize);
+              const ext = (uadeEditableFileName || '').split('.').pop() || 'bin';
+              result = {
+                data: new Blob([new Uint8Array(bytes.buffer as ArrayBuffer, bytes.byteOffset, bytes.byteLength)], { type: blobType }),
+                filename: `${baseName}.${ext}`,
+                warnings: ['Exported via chip RAM readback'],
+              };
+            }
+          }
+        } catch { /* UADE not running */ }
+      }
+    }
+
+    if (!result) {
+      return { error: `No native exporter for format="${format}" layoutFormatId="${layoutFormatId}"` };
+    }
+
+    // Convert Blob to base64
+    const arrayBuf = await result.data.arrayBuffer();
+    const bytes = new Uint8Array(arrayBuf);
+
+    // Optionally write to disk
+    if (outputPath) {
+      const fs = await import('fs');
+      fs.writeFileSync(outputPath, bytes);
+    }
+
+    let binary = '';
+    const CHUNK = 8192;
+    for (let i = 0; i < bytes.length; i += CHUNK) {
+      binary += String.fromCharCode(...Array.from(bytes.subarray(i, Math.min(i + CHUNK, bytes.length))));
+    }
+    const base64 = btoa(binary);
+
+    return {
+      ok: true,
+      format: format,
+      layoutFormatId,
+      filename: result.filename,
+      sizeBytes: arrayBuf.byteLength,
+      warnings: result.warnings,
+      nativeBase64: base64,
+    };
+  } catch (e) {
+    return { error: `exportNative failed: ${(e as Error).message}` };
+  }
+}
+
 /** Run synth tests and return results — used by the format-status test report page */
 export async function runSynthTests(params: Record<string, unknown>): Promise<Record<string, unknown>> {
   const suite = (params.suite as string) ?? 'all';
