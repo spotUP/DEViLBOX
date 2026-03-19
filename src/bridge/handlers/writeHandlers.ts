@@ -2209,11 +2209,13 @@ export async function exportNative(_params: Record<string, unknown>): Promise<Re
       }
     }
 
-    // Fallback: UADE chip RAM readback
+    // Fallback: UADE chip RAM readback or raw file data
     if (!result) {
       const { useFormatStore } = await import('../../stores/useFormatStore');
       const { uadeEditableFileData, uadeEditableFileName } = useFormatStore.getState();
       if (uadeEditableFileData) {
+        const ext = (uadeEditableFileName || '').split('.').pop() || 'bin';
+        // Try chip RAM readback first (includes live edits)
         try {
           const { UADEChipEditor } = await import('../../engine/uade/UADEChipEditor');
           const { UADEEngine } = await import('../../engine/uade/UADEEngine');
@@ -2222,20 +2224,30 @@ export async function exportNative(_params: Record<string, unknown>): Promise<Re
             const moduleSize = uadeEditableFileData.byteLength;
             if (moduleSize > 0) {
               const bytes = await chipEditor.readEditedModule(moduleSize);
-              const ext = (uadeEditableFileName || '').split('.').pop() || 'bin';
               result = {
                 data: new Blob([new Uint8Array(bytes.buffer as ArrayBuffer, bytes.byteOffset, bytes.byteLength)], { type: blobType }),
                 filename: `${baseName}.${ext}`,
-                warnings: ['Exported via chip RAM readback'],
+                warnings: ['Exported via chip RAM readback (includes edits)'],
               };
             }
           }
-        } catch { /* UADE not running */ }
+        } catch { /* UADE engine not available */ }
+
+        // If chip RAM readback failed, return the original file data
+        if (!result) {
+          result = {
+            data: new Blob([new Uint8Array(uadeEditableFileData)], { type: blobType }),
+            filename: `${baseName}.${ext}`,
+            warnings: ['Exported original file data (no live edits — start playback first for chip RAM readback)'],
+          };
+        }
       }
     }
 
     if (!result) {
-      return { error: `No native exporter for format="${format}" layoutFormatId="${layoutFormatId}"` };
+      const { useFormatStore: diagStore } = await import('../../stores/useFormatStore');
+      const diagState = diagStore.getState();
+      return { error: `No native exporter for format="${format}" layoutFormatId="${layoutFormatId}" editorMode="${diagState.editorMode}" hasUadeFileData=${!!diagState.uadeEditableFileData} uadeFileName="${diagState.uadeEditableFileName || ''}" hasUadeEngine=${!!(await import('../../engine/uade/UADEEngine')).UADEEngine.hasInstance()}` };
     }
 
     // Convert Blob to base64
