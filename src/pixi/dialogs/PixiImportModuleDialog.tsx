@@ -203,6 +203,7 @@ export const PixiImportModuleDialog: React.FC<PixiImportModuleDialogProps> = ({
           setUadeInitPhase(phase);
         });
         await engine.ready();
+        await engine.reinitIfNeeded();
         unsubProgress();
         setUadeInitProgress(100);
 

@@ -177,14 +177,17 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
 
         // Skip pre-scan for synthetic/compiled 68k formats — the enhanced scan
         // corrupts UADE engine state, causing subsequent loads to fail.
-        // Initialize UADE engine with progress reporting (first init is slow ~2s)
+        // Initialize UADE engine with progress reporting
         const { UADEEngine } = await import('@engine/uade/UADEEngine');
         const engine = UADEEngine.getInstance();
         const unsubProgress = engine.onInitProgress((progress, phase) => {
           setUadeInitProgress(progress);
           setUadeInitPhase(phase);
         });
+        // First init or reinit after playback — progress bar shows during this
         await engine.ready();
+        // Reinit if engine played a song before — this is the slow part (~50ms with pre-compiled module)
+        await engine.reinitIfNeeded();
         unsubProgress();
         setUadeInitProgress(100);
 
