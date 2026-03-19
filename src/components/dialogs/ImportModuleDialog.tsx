@@ -168,6 +168,9 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
     setSelectedSubsong(0);
     setLoadedFileName(fname);
 
+    // Yield to React so the loading state renders before async work starts
+    await new Promise(r => setTimeout(r, 10));
+
     if (isUADEExclusive) {
       // UADE-exclusive format: libopenmpt cannot parse it; use UADEEngine directly
       try {
