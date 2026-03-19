@@ -2047,10 +2047,8 @@ export async function exportMod(params: Record<string, unknown>): Promise<Record
 
 /** Export the loaded song to its native format, returning base64-encoded data.
  *  Uses the same format-specific routing as the Export Dialog's "Native" tab. */
-export async function exportNative(params: Record<string, unknown>): Promise<Record<string, unknown>> {
+export async function exportNative(_params: Record<string, unknown>): Promise<Record<string, unknown>> {
   try {
-    const outputPath = params.outputPath as string | undefined;
-
     // Try the replayer first (has song if playback has been triggered)
     const { getTrackerReplayer } = await import('../../engine/TrackerReplayer');
     let song = getTrackerReplayer().getSong();
@@ -2239,12 +2237,6 @@ export async function exportNative(params: Record<string, unknown>): Promise<Rec
     // Convert Blob to base64
     const arrayBuf = await result.data.arrayBuffer();
     const bytes = new Uint8Array(arrayBuf);
-
-    // Optionally write to disk
-    if (outputPath) {
-      const fs = await import('fs');
-      fs.writeFileSync(outputPath, bytes);
-    }
 
     let binary = '';
     const CHUNK = 8192;
