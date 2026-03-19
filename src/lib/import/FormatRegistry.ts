@@ -2063,6 +2063,32 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
     uadeFallback: true,
   },
 
+  // ── SunTronic / TSM (The Sun Machine) ────────────────────────────────────
+  {
+    key: 'suntronic',
+    label: 'SunTronic',
+    description: 'SunTronic / TSM — The Sun Machine (Amiga synth exe, tsm.* prefix / .sun extension)',
+    family: 'amiga-native',
+    matchMode: 'both',
+    extRegex: /\.(sun|tsm)$/i,
+    prefixes: ['tsm.'],
+    prefKey: 'suntronic',
+    uadeFallback: true,
+  },
+
+  // ── SunTronic / TSM (The Sun Machine) ────────────────────────────────────
+  {
+    key: 'suntronic',
+    label: 'SunTronic',
+    description: 'SunTronic / TSM — The Sun Machine (Amiga synth exe)',
+    family: 'amiga-native',
+    matchMode: 'both',
+    extRegex: /\.(sun|tsm)$/i,
+    prefixes: ['tsm.'],
+    prefKey: 'suntronic',
+    uadeFallback: true,
+  },
+
   // ═══════════════════════════════════════════════════════════════════════════
   // DEMOSCENE FORMATS — Renoise XRNS with VSTi synth extraction
   // ═══════════════════════════════════════════════════════════════════════════
