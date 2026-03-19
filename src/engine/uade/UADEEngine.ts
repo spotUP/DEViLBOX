@@ -519,6 +519,32 @@ export class UADEEngine {
   }
 
   /**
+   * Preemptive reinit — call before loading a new song to avoid delay during playback.
+   * Only reinits if the engine has rendered audio (played a song). Returns a promise
+   * that resolves when reinit is complete, with progress reported via onInitProgress.
+   */
+  async reinitIfNeeded(): Promise<void> {
+    await this._initPromise;
+    if (!this.workletNode) return;
+    // Create a new init promise that resolves when the worklet sends 'ready'
+    return new Promise<void>((resolve) => {
+      const handler = (event: MessageEvent) => {
+        if (event.data.type === 'ready') {
+          this.workletNode!.port.removeEventListener('message', handler);
+          resolve();
+        }
+        if (event.data.type === 'initProgress' && this._onInitProgress) {
+          this._onInitProgress(event.data.progress, event.data.phase);
+        }
+      };
+      this.workletNode!.port.addEventListener('message', handler);
+      this.workletNode!.port.postMessage({ type: 'reinit' });
+      // If no reinit needed, worklet won't send 'ready' — resolve after short timeout
+      setTimeout(() => resolve(), 100);
+    });
+  }
+
+  /**
    * Load an exotic Amiga music file.
    * @param data - Raw file bytes
    * @param filenameHint - Original filename (used by UADE for format detection)
