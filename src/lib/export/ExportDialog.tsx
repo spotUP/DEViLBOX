@@ -392,6 +392,24 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
           } else if (layoutFormatId === 'nru') {
             const { exportNRU } = await import('./NRUExporter');
             result = await exportNRU(song);
+          } else if (layoutFormatId === 'ims') {
+            const { exportIMS } = await import('./IMSExporter');
+            result = await exportIMS(song);
+          } else if (layoutFormatId === 'stp') {
+            const { exportSTP } = await import('./STPExporter');
+            result = await exportSTP(song);
+          } else if (layoutFormatId === 'unic') {
+            const { exportUNIC } = await import('./UNICExporter');
+            result = await exportUNIC(song);
+          } else if (layoutFormatId === 'dsm_dyn') {
+            const { exportDSMDyn } = await import('./DSMDynExporter');
+            result = await exportDSMDyn(song);
+          } else if (layoutFormatId === 'scumm') {
+            const { exportSCUMM } = await import('./SCUMMExporter');
+            result = await exportSCUMM(song);
+          } else if (layoutFormatId === 'xmf') {
+            const { exportXMF } = await import('./XMFExporter');
+            result = await exportXMF(song);
           } else {
             // Fallback: UADE chip RAM readback (works for any running UADE format)
             try {
