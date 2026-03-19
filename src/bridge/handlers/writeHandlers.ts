@@ -2064,10 +2064,18 @@ export async function exportNative(_params: Record<string, unknown>): Promise<Re
 
       if (trackerState.patterns.length === 0) return { error: 'No song loaded' };
 
+      // Detect format from editorMode, uadeEditableFileName extension, or module data
+      const _uadeExt = (fmt.uadeEditableFileName || '').split('.').pop()?.toLowerCase() || '';
+      const _extMap: Record<string, string> = {
+        fc: 'FC', fc13: 'FC', fc14: 'FC', jam: 'JamCracker', bp: 'SMON', bp3: 'SMON',
+        okt: 'OKT', okta: 'OKT', digi: 'DIGI', dbm: 'DIGI', puma: 'PumaTracker',
+        med: 'OctaMED', mmd0: 'OctaMED', mmd1: 'OctaMED', mmd2: 'OctaMED', mmd3: 'OctaMED',
+        sid2: 'SidMon2', is10: 'IS10',
+      };
       const format = (fmt.editorMode === 'hively' ? (fmt.hivelyMeta?.version === 0 ? 'AHX' : 'HVL')
         : fmt.editorMode === 'klystrack' ? 'KT'
         : fmt.editorMode === 'musicline' ? 'MOD'
-        : fmt.originalModuleData?.format || 'MOD') as import('../../engine/TrackerReplayer').TrackerFormat;
+        : _extMap[_uadeExt] || fmt.originalModuleData?.format || 'MOD') as import('../../engine/TrackerReplayer').TrackerFormat;
 
       song = {
         name: projectState.metadata?.name ?? 'Untitled',
