@@ -253,12 +253,42 @@ int uade_wasm_init(int sample_rate) {
     return 0;
 }
 
+/* Track whether this is the first load (no reinit needed) */
+static int s_has_played = 0;
+
 EMSCRIPTEN_KEEPALIVE
 int uade_wasm_load(const uint8_t *data, size_t len, const char *filename_hint) {
     if (!s_state) return -1;
 
-    /* Mark as not playing (do NOT call uade_stop() — it does complex IPC
-     * that doesn't work in our synchronous WASM shim) */
+    /* ── Full reinit for second+ song loads ──
+     *
+     * The UADE 68k emulator maintains global state (CPU registers, memory,
+     * IPC protocol state machine) that doesn't fully reset between songs.
+     * After the first song plays, loading a second song fails because the
+     * IPC protocol state is corrupted. The only reliable fix is to destroy
+     * and recreate the entire UADE state.
+     */
+    if (s_has_played) {
+        fprintf(stderr, "[uade-wasm] Reinitializing UADE for new song...\n");
+        uade_cleanup_state(s_state);
+        s_state = NULL;
+
+        /* Recreate state */
+        struct uade_config *cfg = uade_new_config();
+        if (!cfg) return -1;
+        uade_config_set_option(cfg, UC_BASE_DIR, "/uade");
+        char freq_str[16];
+        snprintf(freq_str, sizeof(freq_str), "%d", s_sample_rate);
+        uade_config_set_option(cfg, UC_FREQUENCY, freq_str);
+        uade_config_set_option(cfg, UC_PANNING_VALUE, "1.0");
+        if (guarded_new_state(cfg) != 0) {
+            free(cfg);
+            return -1;
+        }
+        free(cfg);
+    }
+
+    /* Mark as not playing */
     s_playing = 0;
 
     /* Reset PCM buffer, frame counter, and tick counter */
@@ -270,9 +300,7 @@ int uade_wasm_load(const uint8_t *data, size_t len, const char *filename_hint) {
     /* Reset DMA restart detection state */
     for (int i = 0; i < 4; i++) { g_prev_lc[i] = 0; g_prev_dma[i] = 0; }
 
-    /* Write the file to MEMFS using the original filename so UADE can
-     * identify the format by filename pattern (e.g. TFMX needs "mdat.*").
-     * The file is placed in /uade/ alongside any companion files. */
+    /* Write the file to MEMFS */
     char vpath[512];
     snprintf(vpath, sizeof(vpath), "/uade/%s", filename_hint);
     FILE *f = fopen(vpath, "wb");
@@ -284,34 +312,15 @@ int uade_wasm_load(const uint8_t *data, size_t len, const char *filename_hint) {
     fclose(f);
     strlcpy(s_last_vpath, vpath, sizeof(s_last_vpath));
 
-    /* ── Reset IPC state for clean load ──
-     *
-     * Clears ring buffers (removes stale messages from previous play/stop
-     * cycles or failed loads), resets core phase, and sets IPC states to
-     * the expected pre-play configuration:
-     *   - Frontend IPC: S_STATE (2) — ready to send SCORE+player+module
-     *   - Core IPC: INITIAL_STATE (0) — first receive transitions to R_STATE
-     *   - Core phase: 2 (if hardware initialized) or 1 (first load)
-     *   - Ring buffers: empty
-     *
-     * Also reset frontend song state to avoid stale resource pointers.
-     */
+    /* Reset IPC state for clean load */
     uade_shim_reset_for_load();
-
-    /* Reset frontend song state (replaces uade_stop's resource cleanup) */
     memset(&s_state->song, 0, sizeof(s_state->song));
-    s_state->song.state = 0;  /* UADE_STATE_INVALID */
-
-    /* Reset IPC state machines */
-    s_state->ipc.state = 2;    /* UADE_S_STATE — frontend ready to send */
-    s_state->ipc.inputbytes = 0;  /* Clear any buffered partial messages */
-    uadecore_ipc.state = 0;    /* UADE_INITIAL_STATE — core awaits first receive */
+    s_state->song.state = 0;
+    s_state->ipc.state = 2;
+    s_state->ipc.inputbytes = 0;
+    uadecore_ipc.state = 0;
     uadecore_ipc.inputbytes = 0;
 
-    /* For the first load, CONFIG must be in CMD buffer for phase 1
-     * (hardware init). We cleared it above, so re-send it.
-     * For subsequent loads (hw already initialized, core phase=2),
-     * CONFIG is NOT needed — phase 2 reads SCORE directly. */
     {
         extern int uade_wasm_hw_initialized(void);
         if (!uade_wasm_hw_initialized()) {
@@ -322,17 +331,13 @@ int uade_wasm_load(const uint8_t *data, size_t len, const char *filename_hint) {
                                  &s_state->ipc) != 0) {
                 fprintf(stderr, "[uade-wasm] Failed to re-send CONFIG\n");
             }
-        } else {
         }
     }
 
-    /* Start playback from the MEMFS file (exit-guarded).
-     * Set CWD to /uade/ so that eagleplayers requesting companion files
-     * via relative paths (e.g. TFMX "smpl.xxx") resolve correctly. */
+    /* Start playback */
     chdir("/uade");
     int ret = guarded_play(vpath, -1);
     if (ret <= 0) {
-        /* Try from buffer directly */
         void *buf = malloc(len);
         if (buf) {
             memcpy(buf, data, len);
@@ -348,6 +353,7 @@ int uade_wasm_load(const uint8_t *data, size_t len, const char *filename_hint) {
 
     s_playing = 1;
     s_paused  = 0;
+    s_has_played = 1;
     return 0;
 }
 
