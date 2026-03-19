@@ -114,7 +114,7 @@
     "pass": false,
     "auditStatus": "fail",
     "divergeAt": 0.0037188208616780044,
-    "notes": "42/43 pass, 1 silent"
+    "notes": "43/43 pass"
   },
   "fur-arcade-changsha_dnb_inferno_namcona1": {
     "envCorr": 0.9364796286747843,
@@ -141,7 +141,7 @@
     "pass": false,
     "auditStatus": "fail",
     "divergeAt": 0.0009070294784580499,
-    "notes": "25/25 pass"
+    "notes": "13/25 pass, 12 silent"
   },
   "fur-arcade-grape_jelly_alpha5232": {
     "envCorr": 0.9734106248935408,
@@ -159,7 +159,7 @@
     "pass": false,
     "auditStatus": "fail",
     "divergeAt": 0.002471655328798186,
-    "notes": "17/18 pass, 1 silent"
+    "notes": "18/18 pass"
   },
   "fur-arcade-ice_wind_segapcm": {
     "envCorr": 0.042019094773800704,
@@ -231,7 +231,7 @@
     "pass": false,
     "auditStatus": "fail",
     "divergeAt": 0.0004988662131519275,
-    "notes": "0/38 pass, 38 silent"
+    "notes": "38/38 pass"
   },
   "fur-arcade-salamander_starfield": {
     "envCorr": 0.8939053371703068,
@@ -249,7 +249,7 @@
     "pass": false,
     "auditStatus": "fail",
     "divergeAt": 0.00036281179138321996,
-    "notes": "12/28 pass, 16 silent"
+    "notes": "20/28 pass, 8 silent"
   },
   "fur-arcade-the_good_times_segapcm": {
     "envCorr": 0.5842389871151501,
@@ -285,7 +285,7 @@
     "pass": false,
     "auditStatus": "fail",
     "divergeAt": 0.00018140589569160998,
-    "notes": "10/37 pass, 27 silent"
+    "notes": "19/37 pass, 18 silent"
   },
   "fur-arcade-wsg_loop_tune_namcowsg": {
     "envCorr": 0.9999999999998459,
@@ -312,7 +312,7 @@
     "pass": false,
     "auditStatus": "fail",
     "divergeAt": 0.0022675736961451248,
-    "notes": "28/34 pass, 6 silent"
+    "notes": "16/34 pass, 18 silent"
   },
   "fur-arcade-ice_cap_namcoc30": {
     "envCorr": 1.0000000000000002,
@@ -1661,7 +1661,7 @@
     "pass": false,
     "auditStatus": "fail",
     "divergeAt": 0.008458049886621315,
-    "notes": "0/15 pass, 15 silent"
+    "notes": "4/15 pass, 11 silent"
   },
   "fur-misc-yellow_desert_bifurcator": {
     "envCorr": 0.800933498503764,
@@ -1823,7 +1823,7 @@
     "pass": false,
     "auditStatus": "fail",
     "divergeAt": 0.00022675736961451248,
-    "notes": "7/19 pass, 12 silent"
+    "notes": "17/19 pass, 2 silent"
   },
   "fur-misc-midnight_freeze_bifurcator": {
     "envCorr": 0.9843291392404073,
@@ -2102,7 +2102,7 @@
     "pass": false,
     "auditStatus": "fail",
     "divergeAt": 0.0004761904761904762,
-    "notes": "52/53 pass, 1 silent"
+    "notes": "53/53 pass"
   },
   "fur-multichip-fantasy_chip_christmas": {
     "envCorr": 0.8602514339858457,
@@ -2192,7 +2192,7 @@
     "pass": false,
     "auditStatus": "fail",
     "divergeAt": 0.0003401360544217687,
-    "notes": "12/24 pass, 12 silent"
+    "notes": "24/24 pass"
   },
   "fur-multichip-opl3_segapcm_xeno_crisis__facility_area_2": {
     "envCorr": 0.20414797927133166,
@@ -2210,7 +2210,7 @@
     "pass": false,
     "auditStatus": "fail",
     "divergeAt": 0.00018140589569160998,
-    "notes": "18/34 pass, 16 silent"
+    "notes": "34/34 pass"
   },
   "fur-multichip-sunsethillzoneact2": {
     "envCorr": 0.21642961388609022,
@@ -2255,7 +2255,7 @@
     "pass": false,
     "auditStatus": "fail",
     "divergeAt": 0.01832199546485261,
-    "notes": "58/65 pass, 7 silent"
+    "notes": "65/65 pass"
   },
   "fur-multichip-cueball": {
     "envCorr": 0.9999125274823133,
@@ -2363,7 +2363,7 @@
     "pass": false,
     "auditStatus": "fail",
     "divergeAt": 8.884263038548752,
-    "notes": "24/36 pass, 12 silent"
+    "notes": "34/36 pass, 2 silent"
   },
   "fur-multichip-silverlining": {
     "envCorr": 0.8628613054794975,
@@ -3280,7 +3280,7 @@
     "pass": false,
     "auditStatus": "fail",
     "divergeAt": 0.004195011337868481,
-    "notes": "42/42 pass"
+    "notes": "38/42 pass, 4 silent"
   },
   "fur-snes-imucafé": {
     "envCorr": 0.3345562916413819,
@@ -3352,7 +3352,7 @@
     "pass": false,
     "auditStatus": "fail",
     "divergeAt": 0.0027437641723356007,
-    "notes": "1/13 pass, 12 silent"
+    "notes": "13/13 pass"
   },
   "fur-snes-xcdunes_snes": {
     "envCorr": 0.2821317831114868,
@@ -3433,7 +3433,7 @@
     "pass": false,
     "auditStatus": "fail",
     "divergeAt": 0.003038548752834467,
-    "notes": "22/23 pass, 1 silent"
+    "notes": "23/23 pass"
   },
   "fur-snes-segacd": {
     "envCorr": 0.35239482702945957,
@@ -4377,17 +4377,17 @@
     "notes": "MTM → XM"
   },
   "export-tcb-cannonfodder": {
-    "auditStatus": "fixed",
+    "auditStatus": "fail",
     "envCorr": 0.8625,
     "notes": "TCB → MOD"
   },
   "export-it-absm": {
-    "auditStatus": "unknown",
+    "auditStatus": "fail",
     "envCorr": 0.7082,
     "notes": "IT → XM"
   },
   "export-s3m-andante": {
-    "auditStatus": "unknown",
+    "auditStatus": "fail",
     "envCorr": 0.6063,
     "notes": "S3M → XM"
   },
@@ -4397,7 +4397,7 @@
     "notes": "669 → XM, tempo issues"
   },
   "export-stm-slideshow": {
-    "auditStatus": "unknown",
+    "auditStatus": "fail",
     "envCorr": 0.4156,
     "notes": "STM → XM, sounds OK despite score"
   },

@@ -66,9 +66,65 @@ export class HC55516Synth extends MAMEBaseSynth {
   private _presetLoopSingle = false;
   private _presetIndex = 0;
 
+  // ROM state
+  private _romData: Uint8Array | null = null;
+  private _romSentToWasm = false;
+
   constructor() {
     super();
     this.initSynth();
+  }
+
+  // ===========================================================================
+  // ROM/Bitstream Loading (matches TMS5220 pattern)
+  // ===========================================================================
+
+  /** Load CVSD bitstream data for authentic speech playback */
+  loadROM(_bank: number, data: Uint8Array): void {
+    this._romData = data;
+    this._romSentToWasm = false;
+    this.romLoaded = true;
+
+    if (this._isReady) {
+      this._sendROMToWasm();
+    }
+  }
+
+  private _sendROMToWasm(): void {
+    if (!this._romData || !this.workletNode || this._romSentToWasm) return;
+
+    const buffer = this._romData.buffer.slice(
+      this._romData.byteOffset,
+      this._romData.byteOffset + this._romData.byteLength
+    );
+
+    this.workletNode.port.postMessage(
+      { type: 'loadROM', romData: buffer },
+      [buffer]
+    );
+
+    this._romData = null;
+    this._romSentToWasm = true;
+    console.log('[HC55516] ROM data sent to WASM worklet');
+  }
+
+  protected override handleWorkletMessage(data: Record<string, unknown>): void {
+    super.handleWorkletMessage(data);
+    if (data.type === 'ready' && this.romLoaded && !this._romSentToWasm) {
+      this._sendROMToWasm();
+    }
+  }
+
+  /** Play CVSD bitstream from loaded data */
+  playBitstream(byteOffset = 0, byteLength = 0): void {
+    if (!this._romSentToWasm || !this.workletNode || this._disposed) return;
+    this.workletNode.port.postMessage({ type: 'playBitstream', byteOffset, byteLength });
+  }
+
+  /** Stop bitstream playback */
+  stopROMSpeaking(): void {
+    if (!this.workletNode || this._disposed) return;
+    this.workletNode.port.postMessage({ type: 'stopSpeaking' });
   }
 
   protected writeKeyOn(note: number, velocity: number): void {
@@ -169,12 +225,13 @@ export class HC55516Synth extends MAMEBaseSynth {
     const frames = phonemesToSP0250Frames(tokens);
     if (frames.length === 0) return;
 
-    const speechFrames: SpeechFrame<SP0250Frame>[] = frames
-      .filter(f => f.voiced)
-      .map(f => ({ data: f, durationMs: f.durationMs }));
+    const speechFrames: SpeechFrame<SP0250Frame>[] = frames.map(f => ({
+      data: f, durationMs: f.durationMs,
+    }));
     if (speechFrames.length === 0) return;
 
-    const first = speechFrames[0].data;
+    const firstVoiced = speechFrames.find(f => f.data.voiced);
+    const first = (firstVoiced ?? speechFrames[0]).data;
     this.setPreset(first.preset);
     this.setVoiced(first.voiced);
     this.setBrightness(first.brightness);
@@ -193,7 +250,9 @@ export class HC55516Synth extends MAMEBaseSynth {
       },
       () => {
         this._speechSequencer = null;
-        this.triggerRelease();
+        if (this.workletNode && !this._disposed) {
+          this.workletNode.port.postMessage({ type: 'allNotesOff' });
+        }
       }
     );
     this._speechSequencer.speak(speechFrames);
@@ -205,7 +264,9 @@ export class HC55516Synth extends MAMEBaseSynth {
       this._speechSequencer.stop();
       this._speechSequencer = null;
     }
-    if (wasSpeaking) this.triggerRelease();
+    if (wasSpeaking && this.workletNode && !this._disposed) {
+      this.workletNode.port.postMessage({ type: 'allNotesOff' });
+    }
   }
 
   get isSpeaking(): boolean {
@@ -309,7 +370,9 @@ export class HC55516Synth extends MAMEBaseSynth {
       () => {
         if (!this._presetLoopSingle) {
           this._speechSequencer = null;
-          this.triggerRelease();
+          if (this.workletNode && !this._disposed) {
+            this.workletNode.port.postMessage({ type: 'allNotesOff' });
+          }
         }
       }
     );

@@ -81,7 +81,10 @@ export class HivelySynthSim implements ISynthSimulator {
   private waveLength = 32;
   private currentWaveform!: Int8Array;
 
-  init(config: unknown, baseNote: number): void {
+  // Skip effects that MOD pattern data will provide
+  private skipPatternEffects = false;
+
+  init(config: unknown, baseNote: number, skipPatternEffects?: boolean): void {
     this.config = config as HivelyConfig;
     this.basePeriod = semitoneToAmigaPeriod(baseNote);
 
@@ -116,6 +119,8 @@ export class HivelySynthSim implements ISynthSimulator {
 
     // Generate initial waveform
     this.currentWaveform = generateAHXWaveform(this.currentWave, this.waveLength);
+
+    this.skipPatternEffects = skipPatternEffects ?? false;
   }
 
   tick(): SynthTickState {
@@ -153,8 +158,10 @@ export class HivelySynthSim implements ISynthSimulator {
       }
     }
 
-    // ── 5. Vibrato ───────────────────────────────────────────────────
-    this.processVibrato(cfg);
+    // ── 5. Vibrato (skip if MOD pattern provides 4xy) ────────────────
+    if (!this.skipPatternEffects) {
+      this.processVibrato(cfg);
+    }
 
     // ── 6. Generate waveform with current state ──────────────────────
     this.regenerateWaveform();

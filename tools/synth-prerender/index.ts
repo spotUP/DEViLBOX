@@ -84,6 +84,11 @@ export function bakeSynthInstruments(song: TrackerSong): void {
   const isHVL = song.format === 'HVL';
   const hvlSampleRate = isHVL ? 44100 : 8287;
 
+  // Formats whose parsers already map effects to MOD pattern columns —
+  // skip baking arpeggio/vibrato to avoid doubling with MOD player
+  const FORMATS_WITH_PATTERN_EFFECTS = ['FC', 'SoundMon', 'HVL', 'AHX', 'DigMug', 'DM1', 'DM2'];
+  const skipEffects = FORMATS_WITH_PATTERN_EFFECTS.includes(song.format ?? '');
+
   for (const inst of song.instruments) {
     // Skip instruments that already have real sample data
     if (inst.sample?.audioBuffer && inst.sample.audioBuffer.byteLength > 44) continue;
@@ -95,7 +100,7 @@ export function bakeSynthInstruments(song: TrackerSong): void {
     // Try format-specific simulators in priority order
     if (inst.hively) {
       const result = renderSynthInstrument(
-        hivelySim, inst.hively, 24, hvlSampleRate,
+        hivelySim, inst.hively, 24, hvlSampleRate, undefined, skipEffects,
       );
       attachSampleToInstrument(inst, result.pcm, result.loopStart, result.loopEnd, result.sampleRate);
       continue;
@@ -103,7 +108,7 @@ export function bakeSynthInstruments(song: TrackerSong): void {
 
     if (inst.fc) {
       const result = renderSynthInstrument(
-        fcSim, inst.fc, 24, DEFAULT_SAMPLE_RATE,
+        fcSim, inst.fc, 24, DEFAULT_SAMPLE_RATE, undefined, skipEffects,
       );
       attachSampleToInstrument(inst, result.pcm, result.loopStart, result.loopEnd, result.sampleRate);
       continue;
@@ -123,7 +128,7 @@ export function bakeSynthInstruments(song: TrackerSong): void {
         attachSampleToInstrument(inst, pcm, loopStart, loopEnd, 8287);
       } else {
         const result = renderSynthInstrument(
-          soundMonSim, inst.soundMon, 24, DEFAULT_SAMPLE_RATE,
+          soundMonSim, inst.soundMon, 24, DEFAULT_SAMPLE_RATE, undefined, skipEffects,
         );
         attachSampleToInstrument(inst, result.pcm, result.loopStart, result.loopEnd, result.sampleRate);
       }
@@ -133,7 +138,7 @@ export function bakeSynthInstruments(song: TrackerSong): void {
     if (inst.sidmon1) {
       if (!inst.sidmon1.mainWave || inst.sidmon1.mainWave.length === 0) continue;
       const result = renderSynthInstrument(
-        sidMon1Sim, inst.sidmon1, 24, DEFAULT_SAMPLE_RATE,
+        sidMon1Sim, inst.sidmon1, 24, DEFAULT_SAMPLE_RATE, undefined, skipEffects,
       );
       attachSampleToInstrument(inst, result.pcm, result.loopStart, result.loopEnd, result.sampleRate);
       continue;
@@ -141,7 +146,7 @@ export function bakeSynthInstruments(song: TrackerSong): void {
 
     if (inst.digMug) {
       const result = renderSynthInstrument(
-        digMugSim, inst.digMug, 24, DEFAULT_SAMPLE_RATE,
+        digMugSim, inst.digMug, 24, DEFAULT_SAMPLE_RATE, undefined, skipEffects,
       );
       attachSampleToInstrument(inst, result.pcm, result.loopStart, result.loopEnd, result.sampleRate);
       continue;
@@ -149,7 +154,7 @@ export function bakeSynthInstruments(song: TrackerSong): void {
 
     if (inst.hippelCoso) {
       const result = renderSynthInstrument(
-        hippelCoSoSim, inst.hippelCoso, 24, DEFAULT_SAMPLE_RATE,
+        hippelCoSoSim, inst.hippelCoso, 24, DEFAULT_SAMPLE_RATE, undefined, skipEffects,
       );
       attachSampleToInstrument(inst, result.pcm, result.loopStart, result.loopEnd, result.sampleRate);
       continue;
@@ -157,7 +162,7 @@ export function bakeSynthInstruments(song: TrackerSong): void {
 
     if (inst.davidWhittaker) {
       const result = renderSynthInstrument(
-        davidWhittakerSim, inst.davidWhittaker, 24, DEFAULT_SAMPLE_RATE,
+        davidWhittakerSim, inst.davidWhittaker, 24, DEFAULT_SAMPLE_RATE, undefined, skipEffects,
       );
       attachSampleToInstrument(inst, result.pcm, result.loopStart, result.loopEnd, result.sampleRate);
       continue;
@@ -165,7 +170,7 @@ export function bakeSynthInstruments(song: TrackerSong): void {
 
     if (inst.deltaMusic1 && !inst.deltaMusic1.isSample) {
       const result = renderSynthInstrument(
-        deltaMusic1Sim, inst.deltaMusic1, 24, DEFAULT_SAMPLE_RATE,
+        deltaMusic1Sim, inst.deltaMusic1, 24, DEFAULT_SAMPLE_RATE, undefined, skipEffects,
       );
       attachSampleToInstrument(inst, result.pcm, result.loopStart, result.loopEnd, result.sampleRate);
       continue;
@@ -173,7 +178,7 @@ export function bakeSynthInstruments(song: TrackerSong): void {
 
     if (inst.deltaMusic2 && !inst.deltaMusic2.isSample) {
       const result = renderSynthInstrument(
-        deltaMusic2Sim, inst.deltaMusic2, 24, DEFAULT_SAMPLE_RATE,
+        deltaMusic2Sim, inst.deltaMusic2, 24, DEFAULT_SAMPLE_RATE, undefined, skipEffects,
       );
       attachSampleToInstrument(inst, result.pcm, result.loopStart, result.loopEnd, result.sampleRate);
       continue;

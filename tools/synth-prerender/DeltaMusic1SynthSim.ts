@@ -37,7 +37,10 @@ export class DeltaMusic1SynthSim implements ISynthSimulator {
   // Waveform
   private waveform!: Int8Array;
 
-  init(config: unknown, baseNote: number): void {
+  // Skip effects that MOD pattern data will provide
+  private skipPatternEffects = false;
+
+  init(config: unknown, baseNote: number, skipPatternEffects?: boolean): void {
     this.config = config as DeltaMusic1Config;
     this.basePeriod = semitoneToAmigaPeriod(baseNote);
 
@@ -56,6 +59,8 @@ export class DeltaMusic1SynthSim implements ISynthSimulator {
     // Sawtooth waveform
     this.waveform = new Int8Array(32);
     for (let i = 0; i < 32; i++) this.waveform[i] = Math.round(127 - (255 * i / 31));
+
+    this.skipPatternEffects = skipPatternEffects ?? false;
   }
 
   tick(): SynthTickState {
@@ -64,8 +69,8 @@ export class DeltaMusic1SynthSim implements ISynthSimulator {
     // ── 1. ADSR ──────────────────────────────────────────────────────
     this.processADSR(cfg);
 
-    // ── 2. Arpeggio ──────────────────────────────────────────────────
-    if (cfg.arpeggio && cfg.arpeggio.length > 0) {
+    // ── 2. Arpeggio (skip if MOD pattern provides equivalent) ────────
+    if (cfg.arpeggio && cfg.arpeggio.length > 0 && !this.skipPatternEffects) {
       const tableDelay = cfg.tableDelay || 1;
       this.delayCounter++;
       if (this.delayCounter >= tableDelay) {

@@ -184,6 +184,27 @@ public:
         for (int s = 0; s < numSamples; s++) {
             float mixL = 0.0f, mixR = 0.0f;
 
+            // ROM bitstream playback (mono, centered)
+            if (m_romPlaying) {
+                if (m_romEnvLevel < 1.0f) {
+                    m_romEnvLevel += 0.002f;
+                    if (m_romEnvLevel > 1.0f) m_romEnvLevel = 1.0f;
+                }
+
+                m_romPhase += m_chipStep;
+                while (m_romPhase >= 1.0) {
+                    m_romPhase -= 1.0;
+                    m_romPrevSample = m_romCurrentSample;
+                    m_romCurrentSample = generateROMSample();
+                }
+
+                float t = (float)m_romPhase;
+                float sample = m_romPrevSample * (1.0f - t) + m_romCurrentSample * t;
+                mixL = sample * m_romEnvLevel;
+                mixR = sample * m_romEnvLevel;
+            }
+
+            // Polyphonic voice mode
             for (int v = 0; v < NUM_VOICES; v++) {
                 CVSDVoice& voi = m_voices[v];
                 if (!voi.active && voi.envLevel <= 0.001f) continue;
@@ -312,6 +333,38 @@ public:
     void setPreset(int preset) { setParameter(PARAM_PRESET, (float)preset); }
     void writeRegister(int, int) { }
 
+    // ===========================================================================
+    // ROM/Bitstream Loading (matches TMS5220 pattern)
+    // ===========================================================================
+
+    void loadROM(uintptr_t dataPtr, int size) {
+        m_romData = reinterpret_cast<const uint8_t*>(dataPtr);
+        m_romSize = size;
+    }
+
+    void playBitstream(int byteOffset, int byteLength) {
+        if (!m_romData || m_romSize == 0) return;
+        if (byteOffset < 0 || byteOffset >= m_romSize) return;
+        if (byteLength <= 0) byteLength = m_romSize - byteOffset;
+        if (byteOffset + byteLength > m_romSize) byteLength = m_romSize - byteOffset;
+
+        m_romPlaying = true;
+        m_romByteOffset = byteOffset;
+        m_romByteEnd = byteOffset + byteLength;
+        m_romBitIndex = 0;
+        m_romPhase = 0.0;
+        m_romPrevSample = 0.0f;
+        m_romCurrentSample = 0.0f;
+        m_romEnvLevel = 0.0f;
+        m_romShiftReg = 0;
+        m_romSylFilter = 0;
+        m_romIntFilter = 0;
+    }
+
+    void stopSpeaking() {
+        m_romPlaying = false;
+    }
+
 private:
     float generateCVSDSample(CVSDVoice& voi) {
         bool bit;
@@ -390,6 +443,49 @@ private:
         return oldest;
     }
 
+    // ===========================================================================
+    // ROM bitstream playback (CVSD data from ROM)
+    // ===========================================================================
+
+    float generateROMSample() {
+        if (!m_romPlaying) return 0.0f;
+
+        // Read bit from ROM bitstream
+        int bytePos = m_romByteOffset + (m_romBitIndex / 8);
+        if (bytePos >= m_romByteEnd) {
+            m_romPlaying = false;
+            return 0.0f;
+        }
+
+        int bitOff = m_romBitIndex % 8;
+        bool bit = (m_romData[bytePos] >> (7 - bitOff)) & 1;
+        m_romBitIndex++;
+
+        // Process through CVSD codec (same algorithm as preset mode)
+        m_romShiftReg = ((m_romShiftReg << 1) | (bit ? 1 : 0)) & SHIFTREG_MASK;
+        bool allSame = (m_romShiftReg == SHIFTREG_MASK) || (m_romShiftReg == 0);
+
+        if (allSame)
+            m_romSylFilter += HC55516_SYLADD;
+        else
+            m_romSylFilter = (m_romSylFilter * (int32_t)HC55516_SYLMASK) >> HC55516_SYLSHIFT;
+
+        if (m_romSylFilter < 0) m_romSylFilter = 0;
+        if (m_romSylFilter > 0x1FFFF) m_romSylFilter = 0x1FFFF;
+
+        int32_t step = m_romSylFilter >> HC55516_INTSHIFT;
+        if (bit) m_romIntFilter += step;
+        else     m_romIntFilter -= step;
+
+        float leakFactor = 0.99f - (1.0f - m_grittiness) * 0.04f;
+        m_romIntFilter = (int32_t)(m_romIntFilter * leakFactor);
+
+        if (m_romIntFilter > 0x7FFFF) m_romIntFilter = 0x7FFFF;
+        if (m_romIntFilter < -0x7FFFF) m_romIntFilter = -0x7FFFF;
+
+        return (float)m_romIntFilter / (float)0x7FFFF;
+    }
+
     int m_sampleRate = 44100;
     int m_chipRate = CHIP_RATE;
     double m_chipStep = 0.0;
@@ -401,6 +497,21 @@ private:
     int m_currentPreset = 0;
     uint32_t m_noteCounter = 0;
     float m_pitchBend = 0.0f;
+
+    // ROM/bitstream playback state
+    const uint8_t* m_romData = nullptr;
+    int m_romSize = 0;
+    bool m_romPlaying = false;
+    int m_romByteOffset = 0;
+    int m_romByteEnd = 0;
+    int m_romBitIndex = 0;
+    double m_romPhase = 0.0;
+    float m_romPrevSample = 0.0f;
+    float m_romCurrentSample = 0.0f;
+    float m_romEnvLevel = 0.0f;
+    uint8_t m_romShiftReg = 0;
+    int32_t m_romSylFilter = 0;
+    int32_t m_romIntFilter = 0;
 };
 
 } // namespace devilbox
@@ -422,6 +533,9 @@ EMSCRIPTEN_BINDINGS(HC55516Module) {
         .function("programChange", &HC55516Synth::programChange)
         .function("setVolume", &HC55516Synth::setVolume)
         .function("setPreset", &HC55516Synth::setPreset)
-        .function("writeRegister", &HC55516Synth::writeRegister);
+        .function("writeRegister", &HC55516Synth::writeRegister)
+        .function("loadROM", &HC55516Synth::loadROM)
+        .function("playBitstream", &HC55516Synth::playBitstream)
+        .function("stopSpeaking", &HC55516Synth::stopSpeaking);
 }
 #endif

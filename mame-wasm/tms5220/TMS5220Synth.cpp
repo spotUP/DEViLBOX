@@ -956,7 +956,7 @@ private:
         pitch_count_ &= 0x1FF;
 
         // Normalize to float (-1.0 to 1.0)
-        return clipped / 32768.0f;
+        return clipped / 16384.0f;
     }
 
     /** Advance the subcycle/PC/IP state machine (from MAME process())
@@ -1108,7 +1108,7 @@ private:
         while (raw > 16383) raw -= 32768;
         while (raw < -16384) raw += 32768;
         int16_t clipped = clip_analog((int16_t)raw);
-        return clipped / 32768.0f;
+        return clipped / 16384.0f;
     }
 
     float processMIDIVoice(MIDIVoice& v) {

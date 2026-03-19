@@ -221,14 +221,14 @@ export class MEA8000Synth extends MAMEBaseSynth {
     const frames = phonemesToMEA8000Frames(tokens);
     if (frames.length === 0) return;
 
-    // Filter out noise-only frames (stops/fricatives)
-    const speechFrames: SpeechFrame<MEA8000Frame>[] = frames
-      .filter(f => !f.noise)
-      .map(f => ({ data: f, durationMs: f.durationMs }));
+    const speechFrames: SpeechFrame<MEA8000Frame>[] = frames.map(f => ({
+      data: f, durationMs: f.durationMs,
+    }));
     if (speechFrames.length === 0) return;
 
-    // Pre-set first frame before noteOn
-    const first = speechFrames[0].data;
+    // Pre-set first non-noise frame before noteOn
+    const firstVoiced = speechFrames.find(f => !f.data.noise);
+    const first = (firstVoiced ?? speechFrames[0]).data;
     this.setFormants(first.f1, first.f2, first.f3);
     this.setNoiseMode(first.noise);
     this.setBandwidth(first.bw);
@@ -248,7 +248,9 @@ export class MEA8000Synth extends MAMEBaseSynth {
       },
       () => {
         this._speechSequencer = null;
-        this.triggerRelease();
+        if (this.workletNode && !this._disposed) {
+          this.workletNode.port.postMessage({ type: 'allNotesOff' });
+        }
       }
     );
     this._speechSequencer.speak(speechFrames);
@@ -261,7 +263,9 @@ export class MEA8000Synth extends MAMEBaseSynth {
       this._speechSequencer.stop();
       this._speechSequencer = null;
     }
-    if (wasSpeaking) this.triggerRelease();
+    if (wasSpeaking && this.workletNode && !this._disposed) {
+      this.workletNode.port.postMessage({ type: 'allNotesOff' });
+    }
   }
 
   /** Whether text-to-speech is currently playing */
@@ -383,7 +387,9 @@ export class MEA8000Synth extends MAMEBaseSynth {
       () => {
         if (!this._vowelLoopSingle) {
           this._speechSequencer = null;
-          this.triggerRelease();
+          if (this.workletNode && !this._disposed) {
+            this.workletNode.port.postMessage({ type: 'allNotesOff' });
+          }
         }
       }
     );

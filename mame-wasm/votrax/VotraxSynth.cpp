@@ -850,7 +850,7 @@ private:
         vn = applyFilter(voi.vn_5, voi.vn_6, voi.fx_a, voi.fx_b);
         shiftHist(vn, voi.vn_6);
 
-        return vn * 0.35;
+        return vn * 0.7;
     }
 
     // ========================================================================

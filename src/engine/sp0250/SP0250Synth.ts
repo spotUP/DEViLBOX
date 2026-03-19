@@ -215,18 +215,15 @@ export class SP0250Synth extends MAMEBaseSynth {
     const frames = phonemesToSP0250Frames(tokens);
     if (frames.length === 0) return;
 
-    // Filter out unvoiced frames (stops/fricatives) that produce noise bursts
-    // Speech synth sounds better with only voiced phonemes
-    const speechFrames: SpeechFrame<SP0250Frame>[] = frames
-      .filter(f => f.voiced)
-      .map(f => ({
-        data: f,
-        durationMs: f.durationMs,
-      }));
+    const speechFrames: SpeechFrame<SP0250Frame>[] = frames.map(f => ({
+      data: f,
+      durationMs: f.durationMs,
+    }));
     if (speechFrames.length === 0) return;
 
-    // Pre-set the first frame's parameters before starting the note
-    const first = speechFrames[0].data;
+    // Pre-set first voiced frame's parameters before starting the note
+    const firstVoiced = speechFrames.find(f => f.data.voiced);
+    const first = (firstVoiced ?? speechFrames[0]).data;
     this.setVowel(first.preset);
     this.setVoiced(first.voiced);
     this.setBrightness(first.brightness);
@@ -246,7 +243,10 @@ export class SP0250Synth extends MAMEBaseSynth {
       },
       () => {
         this._speechSequencer = null;
-        this.triggerRelease();
+        // Send allNotesOff directly to ensure WASM voices stop
+        if (this.workletNode && !this._disposed) {
+          this.workletNode.port.postMessage({ type: 'allNotesOff' });
+        }
       }
     );
     this._speechSequencer.speak(speechFrames);
@@ -259,7 +259,9 @@ export class SP0250Synth extends MAMEBaseSynth {
       this._speechSequencer.stop();
       this._speechSequencer = null;
     }
-    if (wasSpeaking) this.triggerRelease();
+    if (wasSpeaking && this.workletNode && !this._disposed) {
+      this.workletNode.port.postMessage({ type: 'allNotesOff' });
+    }
   }
 
   /** Whether text-to-speech is currently playing */
@@ -378,7 +380,9 @@ export class SP0250Synth extends MAMEBaseSynth {
       () => {
         if (!this._vowelLoopSingle) {
           this._speechSequencer = null;
-          this.triggerRelease();
+          if (this.workletNode && !this._disposed) {
+            this.workletNode.port.postMessage({ type: 'allNotesOff' });
+          }
         }
       }
     );

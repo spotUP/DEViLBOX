@@ -33,7 +33,10 @@ export class DeltaMusic2SynthSim implements ISynthSimulator {
   // Waveform
   private waveform!: Int8Array;
 
-  init(config: unknown, baseNote: number): void {
+  // Skip effects that MOD pattern data will provide
+  private skipPatternEffects = false;
+
+  init(config: unknown, baseNote: number, skipPatternEffects?: boolean): void {
     this.config = config as DeltaMusic2Config;
     this.basePeriod = semitoneToAmigaPeriod(baseNote);
 
@@ -62,6 +65,8 @@ export class DeltaMusic2SynthSim implements ISynthSimulator {
       this.waveform = new Int8Array(32);
       for (let i = 0; i < 32; i++) this.waveform[i] = Math.round(127 - (255 * i / 31));
     }
+
+    this.skipPatternEffects = skipPatternEffects ?? false;
   }
 
   tick(): SynthTickState {
@@ -70,8 +75,10 @@ export class DeltaMusic2SynthSim implements ISynthSimulator {
     // ── 1. Volume table processing ───────────────────────────────────
     this.processVolumeTable(cfg);
 
-    // ── 2. Vibrato table processing ──────────────────────────────────
-    this.processVibratoTable(cfg);
+    // ── 2. Vibrato table processing (skip if MOD pattern provides) ──
+    if (!this.skipPatternEffects) {
+      this.processVibratoTable(cfg);
+    }
 
     // ── 3. Pitch bend ────────────────────────────────────────────────
     if (cfg.pitchBend) {

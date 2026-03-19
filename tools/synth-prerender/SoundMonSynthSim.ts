@@ -46,7 +46,10 @@ export class SoundMonSynthSim implements ISynthSimulator {
   // Waveform morph
   private waveCounter = 0;
 
-  init(config: unknown, baseNote: number): void {
+  // Skip effects that MOD pattern data will provide
+  private skipPatternEffects = false;
+
+  init(config: unknown, baseNote: number, skipPatternEffects?: boolean): void {
     this.config = config as SoundMonConfig;
     this.basePeriod = semitoneToAmigaPeriod(baseNote);
 
@@ -79,6 +82,8 @@ export class SoundMonSynthSim implements ISynthSimulator {
     }
 
     this.waveCounter = 0;
+
+    this.skipPatternEffects = skipPatternEffects ?? false;
   }
 
   tick(): SynthTickState {
@@ -87,11 +92,15 @@ export class SoundMonSynthSim implements ISynthSimulator {
     // ── 1. ADSR envelope ──────────────────────────────────────────────
     this.processADSR(cfg);
 
-    // ── 2. Arpeggio ──────────────────────────────────────────────────
-    this.processArpeggio(cfg);
+    // ── 2. Arpeggio (skip if MOD pattern provides 0xy) ───────────────
+    if (!this.skipPatternEffects) {
+      this.processArpeggio(cfg);
+    }
 
-    // ── 3. Vibrato ───────────────────────────────────────────────────
-    this.processVibrato(cfg);
+    // ── 3. Vibrato (skip if MOD pattern provides 4xy) ──────────────
+    if (!this.skipPatternEffects) {
+      this.processVibrato(cfg);
+    }
 
     // ── 4. Waveform morph (simplified EG/FX) ─────────────────────────
     this.processWaveformMorph(cfg);

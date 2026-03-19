@@ -137,15 +137,15 @@ export const VOLUME_NORMALIZATION_OFFSETS: Record<string, number> = {
   'MAMESN76477': 5,      // Measured: -15.0dB → need +5dB
   'MAMEASC': 9,          // Measured: -16.6dB → target -10dB
   'MAMEES5503': 54,      // Measured: -15.6dB → target -10dB
-  'MAMEMEA8000': 8,      // Recalibrated 2026-02-28
+  'MAMEMEA8000': 20,     // Speech synth — needs high boost (low native output)
   'MAMESNKWave': 2,      // Recalibrated 2026-02-28
-  'MAMESP0250': 7,       // Recalibrated 2026-02-28
+  'MAMESP0250': 26,      // Speech synth — needs high boost (7-bit DAC, low native output)
   'MAMETMS36XX': -1,     // Recalibrated 2026-02-28
-  'MAMEVotrax': 12,      // Recalibrated 2026-02-28
+  'MAMEVotrax': 24,      // Speech synth — needs high boost (conservative analog scaling)
   'MAMEYMOPQ': 12,       // Measured: -12.7dB → target -10dB
   'MAMEUPD931': 18,      // Recalibrated 2026-02-28
   'MAMEUPD933': 16,      // Recalibrated 2026-02-28
-  'MAMETMS5220': 4,      // Recalibrated 2026-02-28
+  'MAMETMS5220': 30,     // Speech synth — needs high boost (14-bit DAC normalized)
   'MAMEYMF271': 14,      // Measured: -16.0dB → target -10dB
   'MAMETR707': 22,       // Measured 2026-02-07: -31.6dB → need +22dB
   'MAMEVASynth': 15,     // Measured: -13.0dB → target -10dB
@@ -157,6 +157,9 @@ export const VOLUME_NORMALIZATION_OFFSETS: Record<string, number> = {
   'MAMESWP00': 0,        // TBD — needs calibration once WASM is compiled
   'MAMESWP20': 0,        // TBD — needs calibration once WASM is compiled
   'MAMERolandGP': 0,     // TBD — needs calibration once WASM is compiled
+  'MAMES14001A': 32,     // Speech synth — 4-bit DAC, very low native output
+  'MAMEVLM5030': 34,     // Speech synth — LPC lattice, low native output
+  'MAMEHC55516': 30,     // Speech synth — CVSD codec, low native output
   'MAMEICS2115': 30,     // Recalibrated 2026-02-28
   'MAMEK054539': 19,     // Recalibrated 2026-02-28
   'MAMEC352': 17,        // Measured 2026-02-07: -26.7dB → need +17dB

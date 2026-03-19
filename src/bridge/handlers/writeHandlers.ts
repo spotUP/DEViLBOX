@@ -2064,10 +2064,23 @@ export async function exportNative(_params: Record<string, unknown>): Promise<Re
 
       if (trackerState.patterns.length === 0) return { error: 'No song loaded' };
 
+      // Detect format from editorMode, filename extension, or module data
+      const uadeFileName = fmt.uadeEditableFileName || '';
+      const uadeExt = uadeFileName.split('.').pop()?.toLowerCase() || '';
+      const uadePrefix = uadeFileName.split('.')[0]?.toLowerCase() || '';
+      const extToFormat: Record<string, string> = {
+        fc: 'FC', fc13: 'FC', fc14: 'FC', jam: 'JamCracker', bp: 'SMON', bp3: 'SMON',
+        okt: 'OKT', okta: 'OKT', digi: 'DIGI', dbm: 'DIGI', med: 'OctaMED', mmd0: 'OctaMED',
+        mmd1: 'OctaMED', mmd2: 'OctaMED', mmd3: 'OctaMED', sid1: 'MOD', sid2: 'SidMon2',
+        puma: 'PumaTracker', dm: 'MOD', dm1: 'MOD', dm2: 'MOD', dmu: 'MOD', mug: 'MOD',
+        mug2: 'MOD', sa: 'MOD', is: 'MOD', is10: 'IS10', is20: 'MOD', tcb: 'MOD',
+        emod: 'MOD', hipc: 'MOD', dsym: 'MOD', dss: 'MOD', '669': 'MOD', ast: 'MOD',
+        smod: 'SAW', ftm: 'MOD', sfx: 'MOD', gmc: 'MOD',
+      };
       const format = (fmt.editorMode === 'hively' ? (fmt.hivelyMeta?.version === 0 ? 'AHX' : 'HVL')
         : fmt.editorMode === 'klystrack' ? 'KT'
         : fmt.editorMode === 'musicline' ? 'MOD'
-        : fmt.originalModuleData?.format || 'MOD') as import('../../engine/TrackerReplayer').TrackerFormat;
+        : extToFormat[uadeExt] || extToFormat[uadePrefix] || fmt.originalModuleData?.format || 'MOD') as import('../../engine/TrackerReplayer').TrackerFormat;
 
       song = {
         name: projectState.metadata?.name ?? 'Untitled',

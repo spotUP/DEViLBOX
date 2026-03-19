@@ -34,7 +34,7 @@ export interface SynthTickState {
 /** Result of pre-rendering a synth instrument. */
 export interface PrerenderedSample {
   pcm: Int8Array;        // Full rendered sample (signed 8-bit)
-  sampleRate: number;    // Output sample rate (typically 16574)
+  sampleRate: number;    // Output sample rate (typically 8287)
   loopStart: number;     // Sustain loop start (sample offset)
   loopEnd: number;       // Sustain loop end (sample offset)
 }
@@ -50,8 +50,10 @@ export interface ISynthSimulator {
    * Reset state and start a new note.
    * @param config  Format-specific instrument config (FCConfig, SoundMonConfig, etc.)
    * @param baseNote  Base note as semitone index (0 = C-1, 12 = C-2, 24 = C-3)
+   * @param skipPatternEffects  When true, skip baking arpeggio/vibrato that the
+   *                            MOD pattern data already provides (avoids doubling)
    */
-  init(config: unknown, baseNote: number): void;
+  init(config: unknown, baseNote: number, skipPatternEffects?: boolean): void;
 
   /**
    * Advance one tick and return the new state.
@@ -65,8 +67,11 @@ export interface ISynthSimulator {
 /** PAL clock rate (Hz). Used for period-to-frequency conversion. */
 const PAL_CLOCK = 3546895;
 
-/** Default output sample rate: 2× Amiga (~16574 Hz). */
-export const DEFAULT_SAMPLE_RATE = 16574;
+/** Default output sample rate: Amiga PAL native rate for C-3 (~8287 Hz).
+ *  MOD format has no sample rate field — playback rate is purely determined
+ *  by the period value.  Rendering at 1× Amiga rate ensures pre-rendered
+ *  synth samples play at the correct pitch and envelope speed. */
+export const DEFAULT_SAMPLE_RATE = 8287;
 
 /** Max pre-render duration in ticks (50 Hz → ~4 seconds). */
 const MAX_TICKS = 200;
@@ -86,8 +91,9 @@ export function renderSynthInstrument(
   baseNote: number = 24,   // C-3 by default
   sampleRate: number = DEFAULT_SAMPLE_RATE,
   maxTicks: number = MAX_TICKS,
+  skipPatternEffects: boolean = false,
 ): PrerenderedSample {
-  sim.init(config, baseNote);
+  sim.init(config, baseNote, skipPatternEffects);
 
   const samplesPerTick = Math.round(sampleRate / 50); // 50 Hz PAL
   const maxSamples = maxTicks * samplesPerTick;
@@ -134,8 +140,10 @@ export function renderSynthInstrument(
         buf[totalSamples++] = 0;
       }
     } else {
-      // phaseInc = waveLen × PAL_CLOCK / (2 × period × sampleRate)
-      const phaseInc = (waveLen * PAL_CLOCK) / (2 * state.period * sampleRate);
+      // phaseInc = PAL_CLOCK / (2 × period × sampleRate)
+      // This is the number of waveform samples to advance per output sample,
+      // matching Amiga DMA behaviour: one waveform sample per DMA tick.
+      const phaseInc = PAL_CLOCK / (2 * state.period * sampleRate);
       const vol = state.volume / 64;
 
       for (let s = 0; s < samplesPerTick && totalSamples < maxSamples; s++) {

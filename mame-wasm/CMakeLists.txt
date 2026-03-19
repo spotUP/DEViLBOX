@@ -156,9 +156,24 @@ add_subdirectory(tr707)
 add_subdirectory(roland_sa)
 
 # ============================================================================
+# S14001A (SSi TSI) - Delta Modulation Speech IC (Berzerk)
+# ============================================================================
+add_subdirectory(s14001a)
+
+# ============================================================================
+# VLM5030 (Sanyo) - LPC Speech Synthesizer (Konami arcade)
+# ============================================================================
+add_subdirectory(vlm5030)
+
+# ============================================================================
+# HC55516 (Harris) - CVSD Speech Codec (Williams/Bally arcade)
+# ============================================================================
+add_subdirectory(hc55516)
+
+# ============================================================================
 # Combined build target
 # ============================================================================
 add_custom_target(all_mame_chips
-    DEPENDS SCSP_WASM AICA_WASM CEM3394_WASM YMF271_WASM K054539_WASM C352_WASM RF5C400_WASM ICS2115_WASM SN76477_WASM ES5503_WASM YMOPQ_WASM MSM5232_WASM ASTROCADE_WASM SNKWAVE_WASM SP0250_WASM VOTRAX_WASM TMS36XX_WASM MEA8000_WASM TMS5220_WASM UPD933_WASM TIA_WASM UPD931_WASM ASC_WASM VASYNTH_WASM TR707_WASM RolandSA_WASM
+    DEPENDS SCSP_WASM AICA_WASM CEM3394_WASM YMF271_WASM K054539_WASM C352_WASM RF5C400_WASM ICS2115_WASM SN76477_WASM ES5503_WASM YMOPQ_WASM MSM5232_WASM ASTROCADE_WASM SNKWAVE_WASM SP0250_WASM VOTRAX_WASM TMS36XX_WASM MEA8000_WASM TMS5220_WASM UPD933_WASM TIA_WASM UPD931_WASM ASC_WASM VASYNTH_WASM TR707_WASM RolandSA_WASM S14001A_WASM VLM5030_WASM HC55516_WASM
     COMMENT "Building all MAME sound chip emulators"
 )

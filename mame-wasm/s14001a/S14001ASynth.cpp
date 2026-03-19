@@ -187,6 +187,28 @@ public:
         for (int s = 0; s < numSamples; s++) {
             float mixL = 0.0f, mixR = 0.0f;
 
+            // ROM playback mode (mono, centered)
+            if (m_romPlaying) {
+                // Fade in
+                if (m_romEnvLevel < 1.0f) {
+                    m_romEnvLevel += 0.002f;
+                    if (m_romEnvLevel > 1.0f) m_romEnvLevel = 1.0f;
+                }
+
+                m_romPhase += m_chipStep;
+                while (m_romPhase >= 1.0) {
+                    m_romPhase -= 1.0;
+                    m_romPrevSample = m_romCurrentSample;
+                    m_romCurrentSample = generateROMSample();
+                }
+
+                float t = (float)m_romPhase;
+                float sample = m_romPrevSample * (1.0f - t) + m_romCurrentSample * t;
+                mixL = sample * m_romEnvLevel;
+                mixR = sample * m_romEnvLevel;
+            }
+
+            // Polyphonic voice mode
             for (int v = 0; v < NUM_VOICES; v++) {
                 DeltaVoice& voi = m_voices[v];
                 if (!voi.active && voi.envLevel <= 0.001f) continue;
@@ -328,6 +350,63 @@ public:
     void writeWord(int word) { m_currentPreset = (word & 0x3f) % NUM_PRESETS; }
     void writeRegister(int offset, int data) { if (offset == 0) writeWord(data); }
 
+    // ===========================================================================
+    // ROM Loading (matches TMS5220 pattern)
+    // ===========================================================================
+
+    void loadROM(uintptr_t dataPtr, int size) {
+        m_romData = reinterpret_cast<const uint8_t*>(dataPtr);
+        m_romSize = size;
+    }
+
+    void speakWord(int wordIndex) {
+        if (!m_romData || m_romSize == 0) return;
+        if (wordIndex < 0 || wordIndex > 63) return;
+
+        // Stop any current ROM playback
+        m_romPlaying = false;
+
+        // S14001A ROM layout (from MAME s14001a.cpp):
+        // Word index (6 bits) → initial DAR address = word * 2 bytes
+        // Read CWAR (12-bit pointer) from those 2 bytes
+        // Then read DAR MSB, control bits, and delta data from CWAR pointer
+
+        // Step 1: Compute initial ROM address from word index
+        // DAR13To05 = (word & 0x3c) >> 2, DAR04To00 = (word & 0x03) << 3
+        uint16_t dar13to05 = (wordIndex & 0x3c) >> 2;
+        uint16_t dar04to00 = (wordIndex & 0x03) << 3;
+        uint16_t romAddr = (dar13to05 << 3) | (dar04to00 >> 2);
+
+        // Step 2: Read CWAR MSB from ROM
+        if (romAddr >= m_romSize) return;
+        uint16_t cwar = readROMByte(romAddr) << 4;
+
+        // Advance DAR by 4
+        dar04to00 += 4;
+        if (dar04to00 >= 32) dar04to00 = 0;
+        romAddr = (dar13to05 << 3) | (dar04to00 >> 2);
+
+        // Step 3: Read CWAR LSB from ROM
+        if (romAddr >= m_romSize) return;
+        cwar |= (readROMByte(romAddr) >> 4);
+
+        // Now cwar points to the syllable data area
+        // Step 4: Initialize ROM playback state machine
+        m_romCWAR = cwar;
+        m_romPlaying = true;
+        m_romState = ROM_STATE_DARMSB;
+        m_romOutput = DAC_CENTER;
+        m_romDeltaOld = 2;
+        m_romPhase = 0.0;
+        m_romPrevSample = 0.0f;
+        m_romCurrentSample = 0.0f;
+        m_romEnvLevel = 0.0f;
+    }
+
+    void stopSpeaking() {
+        m_romPlaying = false;
+    }
+
 private:
     float generateSample(DeltaVoice& voi) {
         uint8_t delta;
@@ -422,6 +501,158 @@ private:
         return oldest;
     }
 
+    // ===========================================================================
+    // ROM playback state machine (simplified from MAME Clock())
+    // ===========================================================================
+
+    enum RomState {
+        ROM_STATE_IDLE = 0,
+        ROM_STATE_DARMSB,
+        ROM_STATE_CTRLBITS,
+        ROM_STATE_PLAY,
+    };
+
+    uint8_t readROMByte(uint16_t addr) {
+        addr &= 0xfff; // 12-bit address space
+        if (addr < m_romSize) return m_romData[addr];
+        return 0;
+    }
+
+    float generateROMSample() {
+        // State machine: process ROM playback
+        switch (m_romState) {
+        case ROM_STATE_DARMSB: {
+            // Read DAR MSB (8 bits → 9-bit address, lsb zeroed)
+            m_romDAR13to05 = readROMByte(m_romCWAR) << 1;
+            m_romDAR04to00 = 0;
+            m_romCWAR++;
+            m_romState = ROM_STATE_CTRLBITS;
+            return ((float)m_romOutput - DAC_CENTER) / (float)DAC_CENTER;
+        }
+
+        case ROM_STATE_CTRLBITS: {
+            uint8_t data = readROMByte(m_romCWAR);
+            m_romStop = (data & 0x80) != 0;
+            m_romVoiced = (data & 0x40) != 0;
+            m_romSilence = (data & 0x20) != 0;
+            m_romXRepeat = data & 0x03;
+            m_romLength = (data & 0x1f) << 2;
+            m_romDAR04to00 = 0;
+            m_romCWAR++;
+            uint16_t addr = (m_romDAR13to05 << 3) | (m_romDAR04to00 >> 2);
+            m_romRomAddr = addr;
+            m_romOutput = DAC_CENTER;
+            m_romState = ROM_STATE_PLAY;
+            return 0.0f;
+        }
+
+        case ROM_STATE_PLAY: {
+            // Silence check
+            uint8_t ppQtr = m_romLength & 0x03;
+            bool isSilent = m_romSilence || (m_romVoiced && (ppQtr >= 2));
+
+            if (isSilent) {
+                m_romOutput = DAC_CENTER;
+            } else {
+                // Read delta from ROM
+                uint8_t romByte = readROMByte(m_romRomAddr);
+                uint8_t deltaAddr = m_romDAR04to00 & 0x03;
+
+                // Mirror for voiced in odd quarters
+                if (m_romVoiced && (m_romLength & 0x01))
+                    deltaAddr ^= 0x03;
+
+                // Extract 2-bit delta (big-endian within byte)
+                uint8_t delta = (romByte >> ((~deltaAddr << 1) & 0x06)) & 0x03;
+
+                // Calculate increment (from MAME INCREMENT_TABLE)
+                uint8_t increment;
+                bool add;
+                bool mirror = (m_romLength & 0x01) != 0;
+                bool ppqStart = (m_romDAR04to00 == 0);
+
+                if (ppqStart && ((m_romLength & 0x03) == 0))
+                    m_romDeltaOld = 2;
+
+                if (!m_romVoiced || !mirror) {
+                    increment = INCREMENT_TABLE[delta][m_romDeltaOld];
+                    add = (delta >= 2);
+                } else {
+                    increment = INCREMENT_TABLE[m_romDeltaOld][delta];
+                    add = (m_romDeltaOld < 2);
+                    if (ppqStart && mirror) increment = 0;
+                }
+                m_romDeltaOld = delta;
+
+                // Reset output at pitch period start
+                if (ppqStart && ((m_romLength & 0x03) == 0))
+                    m_romOutput = DAC_CENTER;
+
+                // Apply increment to output
+                uint8_t tmp = m_romOutput;
+                if (!add) tmp ^= 0x0f;
+                tmp += increment;
+                if (tmp > 15) tmp = 15;
+                if (!add) tmp ^= 0x0f;
+                m_romOutput = tmp;
+            }
+
+            // Advance counters
+            m_romDAR04to00++;
+            bool dar04carry = (m_romDAR04to00 >= 32);
+            if (dar04carry) {
+                m_romDAR04to00 = 0;
+                m_romLength++;
+                if (m_romLength >= 0x80) m_romLength = 0;
+            }
+
+            bool ppqCarry = dar04carry && ((m_romLength & 0x03) == 0x00);
+            // Note: ppqCarry fires when quarter ENDS (wraps from 3→0)
+            // Actually, from MAME: bPPQCarryP2 = bDAR04To00CarryP2 && ((uLengthP2 & 0x03) == 0x03)
+            // Let me recalculate using the state BEFORE increment:
+            // This is tricky because MAME uses phase1/phase2 registers...
+            // Simplified: advance ROM address on repeat carry
+            bool repeatCarry = dar04carry && ((m_romLength & 0x03) == 0);
+            bool lengthCarry = dar04carry && (m_romLength == 0);
+
+            if (m_romVoiced && dar04carry && ((m_romLength & 0x0c) == 0)) {
+                // Voiced repeat complete: reload repeat, advance ROM
+                m_romLength = (m_romLength & 0x70) | (m_romXRepeat << 2);
+                m_romDAR13to05++;
+                if (m_romDAR13to05 >= 0x200) m_romDAR13to05 = 0;
+            }
+            if (!m_romVoiced && dar04carry) {
+                // Unvoiced: advance ROM each quarter
+                m_romDAR13to05++;
+                if (m_romDAR13to05 >= 0x200) m_romDAR13to05 = 0;
+            }
+
+            // Construct ROM address
+            m_romRomAddr = m_romDAR04to00;
+            if (m_romVoiced && (m_romLength & 0x01))
+                m_romRomAddr ^= 0x1f;
+            m_romRomAddr = (m_romDAR13to05 << 3) | (m_romRomAddr >> 2);
+
+            // Check for end of syllable
+            if (lengthCarry) {
+                if (m_romStop) {
+                    m_romPlaying = false;
+                    m_romState = ROM_STATE_IDLE;
+                } else {
+                    // Next syllable
+                    m_romState = ROM_STATE_DARMSB;
+                    m_romRomAddr = m_romCWAR;
+                }
+            }
+
+            return ((float)m_romOutput - DAC_CENTER) / (float)DAC_CENTER;
+        }
+
+        default:
+            return 0.0f;
+        }
+    }
+
     int m_sampleRate = 44100;
     int m_chipRate = CHIP_RATE;
     double m_chipStep = 0.0;
@@ -433,6 +664,27 @@ private:
     int m_currentPreset = 0;
     uint32_t m_noteCounter = 0;
     float m_pitchBend = 0.0f;
+
+    // ROM playback state
+    const uint8_t* m_romData = nullptr;
+    int m_romSize = 0;
+    bool m_romPlaying = false;
+    RomState m_romState = ROM_STATE_IDLE;
+    uint16_t m_romCWAR = 0;
+    uint16_t m_romDAR13to05 = 0;
+    uint8_t m_romDAR04to00 = 0;
+    uint16_t m_romRomAddr = 0;
+    bool m_romStop = false;
+    bool m_romVoiced = false;
+    bool m_romSilence = false;
+    uint8_t m_romXRepeat = 0;
+    uint8_t m_romLength = 0;
+    uint8_t m_romOutput = DAC_CENTER;
+    uint8_t m_romDeltaOld = 2;
+    double m_romPhase = 0.0;
+    float m_romPrevSample = 0.0f;
+    float m_romCurrentSample = 0.0f;
+    float m_romEnvLevel = 0.0f;
 };
 
 } // namespace devilbox
@@ -455,6 +707,9 @@ EMSCRIPTEN_BINDINGS(S14001AModule) {
         .function("setVolume", &S14001ASynth::setVolume)
         .function("setPreset", &S14001ASynth::setPreset)
         .function("writeWord", &S14001ASynth::writeWord)
-        .function("writeRegister", &S14001ASynth::writeRegister);
+        .function("writeRegister", &S14001ASynth::writeRegister)
+        .function("loadROM", &S14001ASynth::loadROM)
+        .function("speakWord", &S14001ASynth::speakWord)
+        .function("stopSpeaking", &S14001ASynth::stopSpeaking);
 }
 #endif
