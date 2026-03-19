@@ -148,6 +148,7 @@ import {
   exportPatternText,
   exportMidi,
   exportMod,
+  exportNative,
   clearConsoleErrors,
   evaluateScript,
 } from './handlers/writeHandlers';
@@ -360,6 +361,7 @@ const handlers: Record<string, Handler> = {
   export_pattern_text: exportPatternText,
   export_midi: exportMidi,
   export_mod: exportMod,
+  export_native: exportNative,
 
   // ─── Console Capture ────────────────────────────────────────────────────
   get_console_errors: () => getConsoleErrors(),
