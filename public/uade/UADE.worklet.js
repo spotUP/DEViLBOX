@@ -619,26 +619,29 @@ class UADEProcessor extends AudioWorkletProcessor {
       // Keep a copy so _scanSubsong() can reload without transferring back from main thread
       this._lastData = data;
       this._lastHint = filenameHint;
-      let ret = this._loadIntoWasm(data, filenameHint);
-      console.log('[UADE.worklet] _uade_wasm_load returned: ' + ret);
-
-      // If load failed, reinitialize the WASM module and retry once.
-      // UADE's IPC state machine gets corrupted after playing a song,
-      // so a second song load fails. Full WASM reinit fixes this.
-      if (ret !== 0 && this._wasmBinary) {
-        console.warn('[UADE.worklet] Load failed — reinitializing WASM and retrying...');
+      // Always reinit WASM if a song has been loaded before.
+      // UADE's IPC state machine gets corrupted after playing/scanning a song.
+      if (this._hasLoaded && this._wasmBinary) {
+        console.log('[UADE.worklet] Reinitializing WASM for clean load...');
         try {
           this._wasm = null;
           this._ready = false;
+          this._hasLoaded = false;
           await this._init(this._sampleRate, this._wasmBinary, null);
-          if (this._wasm && this._ready) {
-            ret = this._loadIntoWasm(data, filenameHint);
-            console.log('[UADE.worklet] Retry _uade_wasm_load returned: ' + ret);
+          if (!this._wasm || !this._ready) {
+            this.port.postMessage({ type: 'error', message: 'WASM reinit failed' });
+            return;
           }
         } catch (reinitErr) {
           console.error('[UADE.worklet] Reinit failed:', reinitErr.message);
+          this.port.postMessage({ type: 'error', message: 'WASM reinit failed: ' + reinitErr.message });
+          return;
         }
       }
+
+      let ret = this._loadIntoWasm(data, filenameHint);
+      console.log('[UADE.worklet] _uade_wasm_load returned: ' + ret);
+      this._hasLoaded = true;
 
       if (ret !== 0) {
         const abortInfo = this._lastAbortReason ? ' (abort: ' + this._lastAbortReason + ')' : '';
