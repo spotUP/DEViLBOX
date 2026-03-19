@@ -625,6 +625,24 @@ export const PixiExportDialog: React.FC<PixiExportDialogProps> = ({ isOpen, onCl
           } else if (layoutFmtId === 'nru') {
             const { exportNRU } = await import('@lib/export/NRUExporter');
             nativeResult = await exportNRU(song);
+          } else if (layoutFmtId === 'ims') {
+            const { exportIMS } = await import('@lib/export/IMSExporter');
+            nativeResult = await exportIMS(song);
+          } else if (layoutFmtId === 'stp') {
+            const { exportSTP } = await import('@lib/export/STPExporter');
+            nativeResult = await exportSTP(song);
+          } else if (layoutFmtId === 'unic') {
+            const { exportUNIC } = await import('@lib/export/UNICExporter');
+            nativeResult = await exportUNIC(song);
+          } else if (layoutFmtId === 'dsm_dyn') {
+            const { exportDSMDyn } = await import('@lib/export/DSMDynExporter');
+            nativeResult = await exportDSMDyn(song);
+          } else if (layoutFmtId === 'scumm') {
+            const { exportSCUMM } = await import('@lib/export/SCUMMExporter');
+            nativeResult = await exportSCUMM(song);
+          } else if (layoutFmtId === 'xmf') {
+            const { exportXMF } = await import('@lib/export/XMFExporter');
+            nativeResult = await exportXMF(song);
           }
 
           // Fallback: UADE chip RAM readback
