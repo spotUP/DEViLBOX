@@ -170,6 +170,28 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
         const buf = await file.arrayBuffer();
         // Fire-and-forget songdb lookup (non-blocking)
         lookupSongDB(computeSongDBHash(buf)).then(setSongDBInfo);
+
+        // Skip pre-scan for synthetic/compiled 68k formats — the enhanced scan
+        // corrupts UADE engine state, causing subsequent loads to fail.
+        const isSynthFormat = /\.(sun|tsm)$/i.test(fname);
+        if (isSynthFormat) {
+          setModuleInfo({
+            metadata: {
+              title: fname.replace(/\.[^/.]+$/, ''),
+              type: 'SunTronic/TSM',
+              channels: 4,
+              patterns: 1,
+              orders: 1,
+              instruments: 0,
+              samples: 0,
+              duration: 0,
+            },
+            arrayBuffer: buf,
+            file,
+          });
+          uadeScanActiveRef.current = false;
+        } else {
+
         const { UADEEngine } = await import('@engine/uade/UADEEngine');
         const engine = UADEEngine.getInstance();
         await engine.ready();
@@ -200,6 +222,7 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
           arrayBuffer: buf,
           file,
         });
+        } // close else (non-synth format)
       } catch (err) {
         // Don't show "Scan cancelled" as an error — that's expected from handleClose
         if (!(err instanceof Error && err.message === 'Scan cancelled')) {
