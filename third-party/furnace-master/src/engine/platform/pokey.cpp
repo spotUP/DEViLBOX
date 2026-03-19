@@ -559,5 +559,9 @@ void DivPlatformPOKEY::setAltASAP(bool value) {
   useAltASAP=value;
 }
 
+DivPlatformPOKEY::DivPlatformPOKEY():
+  useAltASAP(false) {
+}
+
 DivPlatformPOKEY::~DivPlatformPOKEY() {
 }
