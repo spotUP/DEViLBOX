@@ -3,6 +3,7 @@ import { MAMEBaseSynth } from '@engine/mame/MAMEBaseSynth';
 import { textToPhonemes, parsePhonemeString } from '@engine/speech/Reciter';
 import { SpeechSequencer, type SpeechFrame } from '@engine/speech/SpeechSequencer';
 import { type SP0250Frame, phonemesToSP0250Frames, samToSP0250 } from '@engine/speech/sp0250PhonemeMap';
+import { loadHC55516ROMs } from '@engine/mame/MAMEROMLoader';
 
 /**
  * HC55516 Parameter IDs (matching C++ enum)
@@ -73,6 +74,19 @@ export class HC55516Synth extends MAMEBaseSynth {
   constructor() {
     super();
     this.initSynth();
+  }
+
+  protected async initialize(): Promise<void> {
+    try {
+      const romData = await loadHC55516ROMs();
+      await super.initialize();
+      this.loadROM(0, romData);
+      this.romLoaded = true;
+      console.log(`[HC55516] ROM auto-loaded: ${romData.length} bytes`);
+    } catch {
+      console.log('[HC55516] Speech ROMs not found (optional)');
+      await super.initialize();
+    }
   }
 
   // ===========================================================================
@@ -306,6 +320,26 @@ export class HC55516Synth extends MAMEBaseSynth {
     if (param === 'mode') this._mode = value >= 1 ? 1 : 0;
     if (param === 'sing_mode') this._singMode = value >= 1;
     if (param === 'presetLoopSingle') this._presetLoopSingle = value >= 1;
+    if (param === 'romWord') this._playROMWord(Math.round(value));
+  }
+
+  /** Sinistar CVSD word table: [byteOffset, byteLength] in concatenated IC7+IC5+IC6+IC4 */
+  private static readonly SINISTAR_WORDS: Array<[number, number]> = [
+    [0x0000, 4737],  // 0: ROAR
+    [0x1281, 657],   // 1: I
+    [0x1512, 1071],  // 2: AM
+    [0x1941, 2257],  // 3: SINISTAR
+    [0x2212, 1777],  // 4: COWARD
+    [0x2903, 1100],  // 5: RUN
+    [0x2D4F, 1297],  // 6: LIVE
+    [0x3260, 1226],  // 7: HUNGER
+    [0x372A, 1625],  // 8: BEWARE
+  ];
+
+  private _playROMWord(index: number): void {
+    if (index < 0 || index >= HC55516Synth.SINISTAR_WORDS.length) return;
+    const [offset, length] = HC55516Synth.SINISTAR_WORDS[index];
+    this.playBitstream(offset, length);
   }
 
   setTextParam(key: string, value: string): void {

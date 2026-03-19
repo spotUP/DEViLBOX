@@ -676,3 +676,68 @@ export async function loadSWP20ROMs(): Promise<Uint8Array> {
 export async function loadRolandGPROMs(): Promise<Uint8Array> {
   return loadChipROMs(ROLANDGP_ROM_CONFIG);
 }
+
+// ============================================================================
+// Speech Synth ROM Configs
+// ============================================================================
+
+/**
+ * S14001A ROM configuration (Berzerk speech)
+ * Two 2KB voice ROMs concatenated = 4KB
+ */
+export const S14001A_ROM_CONFIG: ChipROMConfig = {
+  chipName: 'S14001A',
+  basePath: '/roms/berzerk',
+  zipFile: 'berzerk.zip',
+  combinedFile: 's14001a_speech.bin',
+  combinedSize: 4096,
+  files: [
+    { name: 'berzerk_r_vo_1c.1c', offset: 0, size: 2048, required: true },
+    { name: 'berzerk_r_vo_2c.2c', offset: 2048, size: 2048, required: true },
+  ],
+};
+
+/**
+ * VLM5030 ROM configuration (Track & Field speech)
+ * Single 8KB speech ROM
+ */
+export const VLM5030_ROM_CONFIG: ChipROMConfig = {
+  chipName: 'VLM5030',
+  basePath: '/roms/trackfld',
+  zipFile: 'trackfldc.zip',
+  combinedFile: 'c9_d15.bin',
+  combinedSize: 8192,
+  files: [
+    { name: 'c9_d15.bin', offset: 0, size: 8192, required: true },
+  ],
+};
+
+/**
+ * HC55516 ROM configuration (Sinistar speech)
+ * Four 4KB speech ROMs in address order: IC7($B000), IC5($C000), IC6($D000), IC4($E000)
+ */
+export const HC55516_ROM_CONFIG: ChipROMConfig = {
+  chipName: 'HC55516',
+  basePath: '/roms/sinistar',
+  zipFile: 'sinistar.zip',
+  combinedFile: 'sinistar_speech.bin',
+  combinedSize: 16384,
+  files: [
+    { name: 'speech.ic7', offset: 0, size: 4096, required: true },
+    { name: 'speech.ic5', offset: 4096, size: 4096, required: true },
+    { name: 'speech.ic6', offset: 8192, size: 4096, required: true },
+    { name: 'speech.ic4', offset: 12288, size: 4096, required: true },
+  ],
+};
+
+export async function loadS14001AROMs(): Promise<Uint8Array> {
+  return loadChipROMs(S14001A_ROM_CONFIG);
+}
+
+export async function loadVLM5030ROMs(): Promise<Uint8Array> {
+  return loadChipROMs(VLM5030_ROM_CONFIG);
+}
+
+export async function loadHC55516ROMs(): Promise<Uint8Array> {
+  return loadChipROMs(HC55516_ROM_CONFIG);
+}
