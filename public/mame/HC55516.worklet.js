@@ -62,6 +62,7 @@ class HC55516Processor extends AudioWorkletProcessor {
     this.initialized = false;
     this.bufferSize = 128;
     this.lastHeapBuffer = null;
+    this.romPtr = 0;
 
     this.port.onmessage = (event) => {
       this.handleMessage(event.data);
@@ -113,10 +114,34 @@ class HC55516Processor extends AudioWorkletProcessor {
       case 'setPanning':
         if (this.synth) this.synth.setParameter(4, data.pan);
         break;
+      // === ROM/Bitstream Commands ===
+      case 'loadROM':
+        this.loadROM(data.romData);
+        break;
+      case 'playBitstream':
+        if (this.synth) this.synth.playBitstream(data.byteOffset || 0, data.byteLength || 0);
+        break;
+      case 'stopSpeaking':
+        if (this.synth) this.synth.stopSpeaking();
+        break;
       case 'dispose':
         this.cleanup();
         break;
     }
+  }
+
+  loadROM(romData) {
+    if (!this.module || !this.synth) { console.error('[HC55516 Worklet] Cannot load ROM: synth not initialized'); return; }
+    if (this.romPtr) { this.module._free(this.romPtr); this.romPtr = 0; }
+    const size = romData.byteLength;
+    this.romPtr = this.module._malloc(size);
+    if (!this.romPtr) { console.error('[HC55516 Worklet] Failed to allocate WASM memory for ROM'); return; }
+    const romBytes = new Uint8Array(romData);
+    const heapView = new Uint8Array(this.module.wasmMemory ? this.module.wasmMemory.buffer : this.module.HEAPU8.buffer);
+    heapView.set(romBytes, this.romPtr);
+    this.synth.loadROM(this.romPtr, size);
+    console.log(`[HC55516 Worklet] ROM loaded: ${size} bytes at WASM ptr ${this.romPtr}`);
+    this.port.postMessage({ type: 'romLoaded', size });
   }
 
   async initSynth(data) {
@@ -155,6 +180,7 @@ class HC55516Processor extends AudioWorkletProcessor {
   }
 
   cleanup() {
+    if (this.module && this.romPtr) { this.module._free(this.romPtr); this.romPtr = 0; }
     if (this.module && this.outputPtrL) {
       this.module._free(this.outputPtrL);
       this.outputPtrL = 0;

@@ -43,6 +43,49 @@ enum VLM5030Param {
     PARAM_FORMANT_SHIFT = 5,
 };
 
+// VLM5030 coefficient tables for ROM frame decoding
+static const uint16_t ENERGY_TABLE[32] = {
+    0,  1,  2,  3,  5,  6,  7,  9,
+   11, 13, 15, 17, 19, 22, 24, 27,
+   31, 34, 38, 42, 47, 51, 57, 62,
+   68, 75, 82, 89, 98,107,116,127
+};
+static const uint8_t PITCH_TABLE[32] = {
+    0, 21, 22, 23, 24, 25, 26, 27,
+   28, 29, 31, 33, 35, 37, 39, 41,
+   43, 45, 49, 53, 57, 61, 65, 69,
+   73, 77, 85, 93,101,109,117,125
+};
+static const int16_t K1_TABLE[64] = {
+    390, 403, 414, 425, 434, 443, 450, 457,
+    463, 469, 474, 478, 482, 485, 488, 491,
+    494, 496, 498, 499, 501, 502, 503, 504,
+    505, 506, 507, 507, 508, 508, 509, 509,
+   -390,-376,-360,-344,-325,-305,-284,-261,
+   -237,-211,-183,-155,-125, -95, -64, -32,
+      0,  32,  64,  95, 125, 155, 183, 211,
+    237, 261, 284, 305, 325, 344, 360, 376
+};
+static const int16_t K2_TABLE[32] = {
+      0,  50, 100, 149, 196, 241, 284, 325,
+    362, 396, 426, 452, 473, 490, 502, 510,
+      0,-510,-502,-490,-473,-452,-426,-396,
+   -362,-325,-284,-241,-196,-149,-100, -50
+};
+static const int16_t K3_TABLE[16] = {
+    0, 64, 128, 192, 256, 320, 384, 448,
+   -512,-448,-384,-320,-256,-192,-128, -64
+};
+static const int16_t K5_TABLE[8] = {
+    0, 128, 256, 384, -512, -384, -256, -128
+};
+static const int8_t CHIRP_TABLE[52] = {
+    0, 127, 127, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0
+};
+
 // ============================================================================
 // Vowel presets with K coefficients scaled for the /512 lattice filter.
 //
@@ -148,6 +191,15 @@ public:
 
         for (int s = 0; s < numSamples; s++) {
             float mixL = 0.0f, mixR = 0.0f;
+
+            if (m_romPlaying) {
+                if (m_romEnvLevel < 1.0f) { m_romEnvLevel += 0.002f; if (m_romEnvLevel > 1.0f) m_romEnvLevel = 1.0f; }
+                m_romPhase += m_lpcStep;
+                while (m_romPhase >= 1.0) { m_romPhase -= 1.0; m_romPrevSample = m_romCurrentSample; m_romCurrentSample = generateROMSample(); }
+                float t = (float)m_romPhase;
+                float sample = m_romPrevSample * (1.0f - t) + m_romCurrentSample * t;
+                mixL = sample * m_romEnvLevel; mixR = sample * m_romEnvLevel;
+            }
 
             for (int v = 0; v < NUM_VOICES; v++) {
                 LPCVoice& voi = m_voices[v];
@@ -278,7 +330,100 @@ public:
     void setVowel(int preset) { setParameter(PARAM_VOWEL, (float)preset); }
     void writeRegister(int, int) { }
 
+    void loadROM(uintptr_t dataPtr, int size) {
+        m_romData = reinterpret_cast<const uint8_t*>(dataPtr);
+        m_romSize = size;
+    }
+    void speakWord(int wordIndex) {
+        if (!m_romData || m_romSize == 0) return;
+        int tableOffset = wordIndex * 2;
+        if (tableOffset + 1 >= m_romSize) return;
+        uint16_t addr = (m_romData[tableOffset] << 8) | m_romData[tableOffset + 1];
+        if (addr == 0 || (int)addr >= m_romSize) return;
+        speakAtAddress(addr);
+    }
+    void speakAtAddress(int byteAddr) {
+        if (!m_romData || m_romSize == 0 || byteAddr < 0 || byteAddr >= m_romSize) return;
+        m_romPlaying = true;
+        m_romAddr = byteAddr;
+        m_romPhase = 0.0; m_romPrevSample = 0.0f; m_romCurrentSample = 0.0f; m_romEnvLevel = 0.0f;
+        m_romSampleCount = 0; m_romFrameSize = 40; m_romInterpCount = 0; m_romPitchCount = 0;
+        std::memset(m_romX, 0, sizeof(m_romX));
+        std::memset(m_romCurrentK, 0, sizeof(m_romCurrentK));
+        std::memset(m_romOldK, 0, sizeof(m_romOldK));
+        m_romCurrentEnergy = 0; m_romOldEnergy = 0; m_romTargetEnergy = 0;
+        m_romCurrentPitch = 0; m_romOldPitch = 0; m_romTargetPitch = 0;
+        m_romLfsr = 0x7fff; m_romSilentFrames = 0;
+        parseROMFrame();
+    }
+    void stopSpeaking() { m_romPlaying = false; }
+
 private:
+    uint8_t readROMByte(int addr) {
+        if (addr >= 0 && addr < m_romSize) return m_romData[addr];
+        return 0;
+    }
+    uint16_t getROMBits(int startBit, int numBits) {
+        int bytePos = startBit / 8;
+        int bitOff = startBit & 7;
+        uint16_t val = readROMByte(bytePos);
+        if (bitOff + numBits > 8) val |= (uint16_t)readROMByte(bytePos + 1) << 8;
+        return (val >> bitOff) & ((1 << numBits) - 1);
+    }
+    void parseROMFrame() {
+        uint8_t cmd = readROMByte(m_romAddr);
+        if (cmd & 0x01) {
+            if (cmd & 0x02) { m_romPlaying = false; return; }
+            m_romSilentFrames = ((cmd >> 2) & 0x03) * 2 + 2;
+            m_romAddr++;
+            m_romOldEnergy = m_romCurrentEnergy; m_romCurrentEnergy = 0;
+            m_romInterpCount = 0; m_romSampleCount = m_romFrameSize;
+            return;
+        }
+        int bitBase = m_romAddr * 8;
+        m_romOldEnergy = m_romCurrentEnergy; m_romOldPitch = m_romCurrentPitch;
+        for (int i = 0; i < NUM_COEFFS; i++) m_romOldK[i] = m_romCurrentK[i];
+        uint8_t eIdx = getROMBits(bitBase+0,5)&31, pIdx = getROMBits(bitBase+5,5)&31;
+        m_romTargetEnergy = ENERGY_TABLE[eIdx]; m_romTargetPitch = PITCH_TABLE[pIdx];
+        m_romTargetK[0] = K1_TABLE[getROMBits(bitBase+10,6)&63];
+        m_romTargetK[1] = K2_TABLE[getROMBits(bitBase+16,5)&31];
+        m_romTargetK[2] = K3_TABLE[getROMBits(bitBase+21,4)&15];
+        m_romTargetK[3] = K3_TABLE[getROMBits(bitBase+25,4)&15];
+        for (int i = 4; i < 10; i++)
+            m_romTargetK[i] = K5_TABLE[getROMBits(bitBase+29+(i-4)*3,3)&7];
+        m_romAddr += 6; m_romInterpCount = 0; m_romSampleCount = m_romFrameSize; m_romSilentFrames = 0;
+    }
+    float generateROMSample() {
+        if (!m_romPlaying) return 0.0f;
+        if (m_romSilentFrames > 0) {
+            m_romSampleCount--;
+            if (m_romSampleCount <= 0) { m_romSilentFrames--; if (m_romSilentFrames <= 0) parseROMFrame(); else m_romSampleCount = m_romFrameSize; }
+            return 0.0f;
+        }
+        if (m_romSampleCount <= 0) {
+            m_romInterpCount++;
+            if (m_romInterpCount >= 4) { parseROMFrame(); if (!m_romPlaying) return 0.0f; }
+            else m_romSampleCount = m_romFrameSize;
+        }
+        float interpFrac = (float)m_romInterpCount / 4.0f;
+        uint16_t energy = (uint16_t)(m_romOldEnergy + (m_romTargetEnergy - m_romOldEnergy) * interpFrac);
+        uint8_t pitch = (uint8_t)(m_romOldPitch + (int)(m_romTargetPitch - m_romOldPitch) * interpFrac);
+        int16_t kI[NUM_COEFFS];
+        for (int i = 0; i < NUM_COEFFS; i++) kI[i] = (int16_t)(m_romOldK[i] + (m_romTargetK[i] - m_romOldK[i]) * interpFrac);
+        if (energy == 0) { m_romSampleCount--; return 0.0f; }
+        int32_t current_val;
+        if (pitch <= 1) { m_romLfsr ^= (m_romLfsr ^ (m_romLfsr >> 1)) << 15; m_romLfsr >>= 1; current_val = (m_romLfsr & 1) ? energy : -(int32_t)energy; }
+        else { current_val = (m_romPitchCount < 52) ? ((int32_t)CHIRP_TABLE[m_romPitchCount] * energy) / 128 : 0; }
+        int32_t u[11]; u[10] = current_val;
+        for (int i = 9; i >= 0; i--) u[i] = u[i+1] - ((-kI[i] * m_romX[i]) / 512);
+        for (int i = 9; i >= 1; i--) m_romX[i] = m_romX[i-1] + ((-kI[i-1] * u[i-1]) / 512);
+        m_romX[0] = u[0];
+        m_romPitchCount++; if (pitch > 0 && m_romPitchCount >= pitch) m_romPitchCount = 0;
+        m_romSampleCount--;
+        float sample = (float)u[0] / 512.0f;
+        return std::max(-1.0f, std::min(1.0f, sample));
+    }
+
     float generateLPCSample(LPCVoice& voi) {
         if (voi.currentEnergy == 0) return 0.0f;
 
@@ -370,6 +515,31 @@ private:
     int m_currentPreset = 0;
     uint32_t m_noteCounter = 0;
     float m_pitchBend = 0.0f;
+
+    const uint8_t* m_romData = nullptr;
+    int m_romSize = 0;
+    bool m_romPlaying = false;
+    int m_romAddr = 0;
+    double m_romPhase = 0.0;
+    float m_romPrevSample = 0.0f;
+    float m_romCurrentSample = 0.0f;
+    float m_romEnvLevel = 0.0f;
+    int m_romSampleCount = 0;
+    int m_romFrameSize = 40;
+    int m_romInterpCount = 0;
+    int m_romPitchCount = 0;
+    int m_romSilentFrames = 0;
+    uint16_t m_romLfsr = 0x7fff;
+    int32_t m_romX[NUM_COEFFS] = {};
+    uint16_t m_romCurrentEnergy = 0;
+    uint16_t m_romOldEnergy = 0;
+    uint16_t m_romTargetEnergy = 0;
+    uint8_t m_romCurrentPitch = 0;
+    uint8_t m_romOldPitch = 0;
+    uint8_t m_romTargetPitch = 0;
+    int16_t m_romCurrentK[NUM_COEFFS] = {};
+    int16_t m_romOldK[NUM_COEFFS] = {};
+    int16_t m_romTargetK[NUM_COEFFS] = {};
 };
 
 } // namespace devilbox
@@ -391,6 +561,10 @@ EMSCRIPTEN_BINDINGS(VLM5030Module) {
         .function("programChange", &VLM5030Synth::programChange)
         .function("setVolume", &VLM5030Synth::setVolume)
         .function("setVowel", &VLM5030Synth::setVowel)
-        .function("writeRegister", &VLM5030Synth::writeRegister);
+        .function("writeRegister", &VLM5030Synth::writeRegister)
+        .function("loadROM", &VLM5030Synth::loadROM)
+        .function("speakWord", &VLM5030Synth::speakWord)
+        .function("speakAtAddress", &VLM5030Synth::speakAtAddress)
+        .function("stopSpeaking", &VLM5030Synth::stopSpeaking);
 }
 #endif
