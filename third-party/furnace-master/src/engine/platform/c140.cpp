@@ -807,7 +807,8 @@ void DivPlatformC140::quit() {
 }
 
 // initialization of important arrays
-DivPlatformC140::DivPlatformC140() {
+DivPlatformC140::DivPlatformC140():
+  is219(false) {
   sampleOff=new unsigned int[32768];
   sampleLoaded=new bool[32768];
 }

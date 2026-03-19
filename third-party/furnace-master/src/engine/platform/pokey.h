@@ -83,6 +83,7 @@ class DivPlatformPOKEY: public DivDispatch {
     int init(DivEngine* parent, int channels, int sugRate, const DivConfig& flags);
     void quit();
     void setAltASAP(bool useAltASAP);
+    DivPlatformPOKEY();
     ~DivPlatformPOKEY();
 };
 
