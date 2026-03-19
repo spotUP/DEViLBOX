@@ -122,6 +122,19 @@ export class UADEEngine {
   private _initPromise: Promise<void>;
   private _resolveInit: (() => void) | null = null;
   private _rejectInit: ((err: Error) => void) | null = null;
+  private _initProgress = 0;
+  private _initPhase = '';
+  private _onInitProgress: ((progress: number, phase: string) => void) | null = null;
+
+  /** Subscribe to init progress updates (0-100). Returns unsubscribe function. */
+  onInitProgress(cb: (progress: number, phase: string) => void): () => void {
+    this._onInitProgress = cb;
+    return () => { this._onInitProgress = null; };
+  }
+
+  /** Current init progress (0-100) */
+  get initProgress(): number { return this._initProgress; }
+  get initPhase(): string { return this._initPhase; }
   private _loadPromise: Promise<UADEMetadata> | null = null;
   private _resolveLoad: ((meta: UADEMetadata) => void) | null = null;
   private _rejectLoad: ((err: Error) => void) | null = null;
@@ -261,6 +274,12 @@ export class UADEEngine {
             this._resolveInit = null;
             this._rejectInit = null;
           }
+          break;
+
+        case 'initProgress':
+          this._initProgress = data.progress ?? 0;
+          this._initPhase = data.phase ?? '';
+          if (this._onInitProgress) this._onInitProgress(data.progress, data.phase);
           break;
 
         case 'loaded':
