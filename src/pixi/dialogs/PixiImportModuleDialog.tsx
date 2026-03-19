@@ -130,6 +130,8 @@ export const PixiImportModuleDialog: React.FC<PixiImportModuleDialogProps> = ({
   const [moduleInfo, setModuleInfo] = useState<ModuleInfo | null>(null);
   const [loadedFileName, setLoadedFileName] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [uadeInitProgress, setUadeInitProgress] = useState(0);
+  const [uadeInitPhase, setUadeInitPhase] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [uadeMetadata, setUadeMetadata] = useState<UADEMetadata | null>(null);
@@ -192,9 +194,37 @@ export const PixiImportModuleDialog: React.FC<PixiImportModuleDialogProps> = ({
       try {
         const buf = await file.arrayBuffer();
         lookupSongDB(computeSongDBHash(buf)).then(setSongDBInfo);
+
+        // Initialize UADE engine with progress reporting
         const { UADEEngine } = await import('@/engine/uade/UADEEngine');
         const engine = UADEEngine.getInstance();
+        const unsubProgress = engine.onInitProgress((progress, phase) => {
+          setUadeInitProgress(progress);
+          setUadeInitPhase(phase);
+        });
         await engine.ready();
+        unsubProgress();
+        setUadeInitProgress(100);
+
+        // Skip pre-scan for synthetic/compiled 68k formats
+        const isSynthFormat = /\.(sun|tsm)$/i.test(fname);
+        if (isSynthFormat) {
+          setModuleInfo({
+            metadata: {
+              title: fname.replace(/\.[^/.]+$/, ''),
+              type: 'SunTronic/TSM',
+              channels: 4,
+              patterns: 1,
+              orders: 1,
+              instruments: 0,
+              samples: 0,
+              duration: 0,
+            },
+            arrayBuffer: buf,
+            file,
+          });
+          uadeScanActiveRef.current = false;
+        } else {
         uadeScanActiveRef.current = true;
         for (const companion of companions) {
           const companionBuf = await companion.arrayBuffer();
@@ -218,6 +248,7 @@ export const PixiImportModuleDialog: React.FC<PixiImportModuleDialogProps> = ({
           arrayBuffer: buf,
           file,
         });
+        } // close else (non-synth)
       } catch (err) {
         if (!(err instanceof Error && err.message === 'Scan cancelled')) {
           setError(err instanceof Error ? err.message : 'Failed to load UADE format');
@@ -468,10 +499,24 @@ export const PixiImportModuleDialog: React.FC<PixiImportModuleDialogProps> = ({
           </layoutContainer>
         )}
 
-        {/* ── Loading state ── */}
+        {/* ── Loading state with UADE init progress ── */}
         {isLoading && (
-          <layoutContainer layout={{ alignItems: 'center', justifyContent: 'center', height: 60 }}>
-            <PixiLabel text="Parsing Pattern Data…" size="sm" color="textMuted" />
+          <layoutContainer layout={{ flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: 60, gap: 6 }}>
+            <PixiLabel
+              text={uadeInitPhase === 'compiling' ? 'Compiling UADE engine…'
+                : uadeInitPhase === 'compiled' ? 'UADE compiled, instantiating…'
+                : uadeInitPhase === 'instantiating' ? 'Instantiating UADE…'
+                : uadeInitPhase === 'instantiated' ? 'Initializing UADE engine…'
+                : 'Parsing Pattern Data…'}
+              size="sm"
+              color="textMuted"
+            />
+            {uadeInitProgress > 0 && uadeInitProgress < 100 && (
+              <layoutContainer layout={{ width: 300, height: 4 }}>
+                <layoutContainer layout={{ width: 300, height: 4, backgroundColor: blendColor(theme.bg.color, theme.accent.color, 0.15), borderRadius: 2 }} />
+                <layoutContainer layout={{ width: Math.round(300 * uadeInitProgress / 100), height: 4, backgroundColor: theme.accent.color, borderRadius: 2, position: 'absolute' }} />
+              </layoutContainer>
+            )}
           </layoutContainer>
         )}
 
