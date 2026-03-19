@@ -49,6 +49,10 @@ kill_port "$COLLAB_PORT"
 kill_port "$MCP_PORT"
 kill_port "$FORMAT_PORT"
 kill_port "$FRONTEND_PORT"
+# Kill any orphaned tsx watch processes from a previous dev.sh run
+pkill -f "tsx watch collab-server" 2>/dev/null || true
+pkill -f "tsx watch src/index.ts" 2>/dev/null || true
+pkill -f "tsx.*format-server" 2>/dev/null || true
 
 # ── Cleanup on exit ────────────────────────────────────────────────────────────
 BACKEND_PID=""
@@ -58,9 +62,11 @@ FORMAT_PID=""
 cleanup() {
   echo ""
   log "Shutting down..."
-  [ -n "$BACKEND_PID" ] && kill "$BACKEND_PID" 2>/dev/null || true
-  [ -n "$COLLAB_PID" ]  && kill "$COLLAB_PID"  2>/dev/null || true
-  [ -n "$FORMAT_PID" ]  && kill "$FORMAT_PID"  2>/dev/null || true
+  # Kill entire process groups (not just the wrapper PIDs) to catch tsx watch children
+  [ -n "$BACKEND_PID" ] && kill -- -"$BACKEND_PID" 2>/dev/null || kill "$BACKEND_PID" 2>/dev/null || true
+  [ -n "$COLLAB_PID" ]  && kill -- -"$COLLAB_PID"  2>/dev/null || kill "$COLLAB_PID"  2>/dev/null || true
+  [ -n "$FORMAT_PID" ]  && kill -- -"$FORMAT_PID"  2>/dev/null || kill "$FORMAT_PID"  2>/dev/null || true
+  # Also kill any orphaned tsx/node processes on our ports
   kill_port "$BACKEND_PORT"
   kill_port "$COLLAB_PORT"
   kill_port "$MCP_PORT"
