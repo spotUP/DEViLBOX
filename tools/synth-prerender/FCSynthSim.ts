@@ -40,18 +40,22 @@ function generateDefaultWave(waveNum: number): Int8Array {
 
 // ── ADSR phases ─────────────────────────────────────────────────────────────
 
-const enum ADSRPhase { Attack, Decay, Sustain, Release, Done }
-
 // ── Simulator ───────────────────────────────────────────────────────────────
 
 export class FCSynthSim implements ISynthSimulator {
   private config!: FCConfig;
   private basePeriod = 428; // C-2 default
 
-  // ADSR
-  private adsrPhase = ADSRPhase.Attack;
-  private adsrTick = 0;
+  // Vol macro state (matches processVolMacro in FCParser.ts)
   private volume = 0;
+  private volStep = 0;
+  private volCtr = 1;
+  private volSpeed = 1;
+  private volSustain = 0;
+  private volBendSpeed = 0;
+  private volBendTime = 0;
+  private volBendFlag = 0;
+  private volDone = false;
 
   // Synth table
   private synthIdx = 0;
@@ -72,10 +76,16 @@ export class FCSynthSim implements ISynthSimulator {
     this.config = config as FCConfig;
     this.basePeriod = semitoneToAmigaPeriod(baseNote);
 
-    // ADSR
-    this.adsrPhase = ADSRPhase.Attack;
-    this.adsrTick = 0;
+    // Vol macro state
     this.volume = 0;
+    this.volStep = 0;
+    this.volCtr = 1;
+    this.volSpeed = this.config.volMacroSpeed ?? this.config.synthSpeed ?? 1;
+    this.volSustain = 0;
+    this.volBendSpeed = 0;
+    this.volBendTime = 0;
+    this.volBendFlag = 0;
+    this.volDone = false;
 
     // Synth table
     this.synthIdx = 0;
@@ -102,8 +112,8 @@ export class FCSynthSim implements ISynthSimulator {
   tick(): SynthTickState {
     const cfg = this.config;
 
-    // ── 1. ADSR envelope ──────────────────────────────────────────────
-    this.processADSR(cfg);
+    // ── 1. Volume macro (exact FC replayer processing) ─────────────────
+    this.processVolMacro(cfg);
 
     // ── 2. Synth table (waveform sequence) ────────────────────────────
     this.processSynthTable(cfg);
@@ -125,52 +135,99 @@ export class FCSynthSim implements ISynthSimulator {
     };
   }
 
-  private processADSR(cfg: FCConfig): void {
-    switch (this.adsrPhase) {
-      case ADSRPhase.Attack: {
-        const atkLen = cfg.atkLength || 1;
-        const atkVol = cfg.atkVolume ?? 64;
-        this.volume += atkVol / atkLen;
-        if (this.volume >= atkVol) {
-          this.volume = atkVol;
-          this.adsrPhase = ADSRPhase.Decay;
-          this.adsrTick = 0;
+  /**
+   * Process vol macro byte-by-byte, matching FCParser.ts processVolMacro() exactly.
+   * Handles: direct volume values, 0xE0 (loop), 0xE1 (end/hold),
+   *          0xE8 (sustain), 0xEA (volume slide).
+   */
+  private processVolMacro(cfg: FCConfig): void {
+    const vm = cfg.volMacroData;
+    if (!vm || vm.length === 0 || this.volDone) {
+      // Fallback to simple ADSR if no raw vol macro data
+      if (!vm || vm.length === 0) this.processADSRFallback(cfg);
+      return;
+    }
+
+    // Sustain hold
+    if (this.volSustain > 0) {
+      this.volSustain--;
+      return;
+    }
+
+    // Volume bend
+    if (this.volBendTime > 0) {
+      this.volBendFlag ^= 1;
+      if (this.volBendFlag) {
+        this.volBendTime--;
+        this.volume += this.volBendSpeed;
+        if (this.volume < 0) { this.volume = 0; this.volBendTime = 0; }
+        if (this.volume > 64) { this.volume = 64; this.volBendTime = 0; }
+      }
+      return;
+    }
+
+    // Speed counter
+    this.volCtr--;
+    if (this.volCtr > 0) return;
+    this.volCtr = this.volSpeed;
+
+    // Process vol macro byte sequence
+    let loopEffect: boolean;
+    do {
+      loopEffect = false;
+      if (this.volStep >= vm.length) { this.volDone = true; break; }
+
+      const info = vm[this.volStep];
+      if (info === 0xE1) { this.volDone = true; break; } // end — hold
+
+      switch (info) {
+        case 0xEA: // volume slide
+          if (this.volStep + 2 < vm.length) {
+            const raw = vm[this.volStep + 1];
+            this.volBendSpeed = raw < 128 ? raw : raw - 256; // signed
+            this.volBendTime = vm[this.volStep + 2];
+          }
+          this.volStep += 3;
+          // Apply first tick of bend immediately
+          this.volBendFlag ^= 1;
+          if (this.volBendFlag) {
+            this.volBendTime--;
+            this.volume += this.volBendSpeed;
+            if (this.volume < 0) { this.volume = 0; this.volBendTime = 0; }
+            if (this.volume > 64) { this.volume = 64; this.volBendTime = 0; }
+          }
+          break;
+
+        case 0xE8: // sustain
+          if (this.volStep + 1 < vm.length) {
+            this.volSustain = vm[this.volStep + 1];
+          }
+          this.volStep += 2;
+          break;
+
+        case 0xE0: { // loop
+          loopEffect = true;
+          const target = this.volStep + 1 < vm.length ? vm[this.volStep + 1] & 0x3F : 0;
+          this.volStep = Math.max(0, target - 5); // absolute offset → relative to data start
+          break;
         }
-        this.adsrTick++;
-        break;
+
+        default:
+          // Direct volume value (0-64)
+          this.volume = info;
+          this.volStep++;
+          break;
       }
-      case ADSRPhase.Decay: {
-        const decLen = cfg.decLength || 1;
-        const decVol = cfg.decVolume ?? 0;
-        const atkVol = cfg.atkVolume ?? 64;
-        this.volume -= (atkVol - decVol) / decLen;
-        if (this.volume <= decVol) {
-          this.volume = decVol;
-          this.adsrPhase = ADSRPhase.Sustain;
-          this.adsrTick = 0;
-        }
-        this.adsrTick++;
-        break;
-      }
-      case ADSRPhase.Sustain: {
-        const susVol = cfg.sustVolume ?? cfg.decVolume ?? 0;
-        this.volume = susVol;
-        // Sustain indefinitely for pre-render (loop detection will find it)
-        break;
-      }
-      case ADSRPhase.Release: {
-        const relLen = cfg.relLength || 1;
-        this.volume -= this.volume / relLen;
-        if (this.volume <= 0) {
-          this.volume = 0;
-          this.adsrPhase = ADSRPhase.Done;
-        }
-        this.adsrTick++;
-        break;
-      }
-      case ADSRPhase.Done:
-        this.volume = 0;
-        break;
+    } while (loopEffect);
+  }
+
+  /** Simple ADSR fallback when no raw vol macro data is available. */
+  private processADSRFallback(cfg: FCConfig): void {
+    const atkLen = cfg.atkLength || 1;
+    const atkVol = cfg.atkVolume ?? 64;
+    if (this.volume < atkVol) {
+      this.volume += atkVol / atkLen;
+      if (this.volume >= atkVol) this.volume = atkVol;
     }
   }
 

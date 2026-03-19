@@ -857,9 +857,17 @@ export function parseFCFile(buffer: ArrayBuffer, filename: string, moduleBase = 
       wavePCM.push(rawWave[i] < 128 ? rawWave[i] : rawWave[i] - 256);
     }
 
+    // Extract raw vol macro byte sequence (bytes 5..63) for accurate simulation
+    const volMacroData: number[] = [];
+    for (let i = 5; i < 64; i++) {
+      volMacroData.push(vm[i]);
+    }
+
     return {
       waveNumber: initialWaveNum,
       wavePCM: wavePCM.length > 0 ? wavePCM : undefined,
+      volMacroData,
+      volMacroSpeed: volSpeed,
       synthTable,
       synthSpeed: Math.max(1, Math.min(15, volSpeed)),
       atkLength, atkVolume, decLength, decVolume, sustVolume, relLength,

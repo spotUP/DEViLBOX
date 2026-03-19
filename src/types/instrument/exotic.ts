@@ -200,6 +200,8 @@ export interface FCConfig {
   vibDepth: number;          // 0-63
   arpTable: number[];        // 16 entries: semitone offsets
   wavePCM?: number[];        // Signed 8-bit PCM of the initial waveform (32-64 bytes)
+  volMacroData?: number[];   // Raw vol macro bytes (5..63): volume values + control codes
+  volMacroSpeed?: number;    // Vol macro speed (ticks per step)
 }
 
 /**
