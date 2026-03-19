@@ -2074,6 +2074,7 @@ export async function exportNative(_params: Record<string, unknown>): Promise<Re
       };
       const format = (fmt.editorMode === 'hively' ? (fmt.hivelyMeta?.version === 0 ? 'AHX' : 'HVL')
         : fmt.editorMode === 'klystrack' ? 'KT'
+        : fmt.editorMode === 'jamcracker' ? 'JamCracker'
         : fmt.editorMode === 'musicline' ? 'MOD'
         : _extMap[_uadeExt] || fmt.originalModuleData?.format || 'MOD') as import('../../engine/TrackerReplayer').TrackerFormat;
 
