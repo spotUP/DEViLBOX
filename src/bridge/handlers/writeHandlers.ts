@@ -2113,10 +2113,6 @@ export async function exportNative(_params: Record<string, unknown>): Promise<Re
     } else if (format === ('SMON' as string)) {
       const { exportAsSoundMon } = await import('../../lib/export/SoundMonExporter');
       result = await exportAsSoundMon(song);
-    } else if (format === 'MOD' && !layoutFormatId) {
-      const { exportSongToMOD } = await import('../../lib/export/modExport');
-      const modResult = await exportSongToMOD(song, { bakeSynths: true });
-      result = { data: modResult.blob, filename: modResult.filename, warnings: modResult.warnings };
     } else if (format === 'FC' as string) {
       const { exportFC } = await import('../../lib/export/FCExporter');
       const buf = exportFC(song);
