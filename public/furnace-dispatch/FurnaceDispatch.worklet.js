@@ -672,6 +672,7 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
       this.updateBufferViews();
 
       this.initialized = true;
+      this.wasmCrashed = false;
       this.port.postMessage({ type: 'ready' });
       console.log('[FurnaceDispatch Worklet] Ready');
 
@@ -688,6 +689,11 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
   }
 
   createChip(platformType, sr) {
+    if (this.wasmCrashed) {
+      console.warn('[FurnaceDispatch Worklet] Ignoring createChip — WASM module crashed');
+      this.port.postMessage({ type: 'error', message: 'Cannot create chip: WASM module crashed. Reload the page.' });
+      return;
+    }
     // If same platform chip already exists, reuse it (Furnace pattern: disCont[] reuse)
     if (this.chips.has(platformType)) {
       const existing = this.chips.get(platformType);
@@ -895,7 +901,7 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
   }
 
   process(inputs, outputs, parameters) {
-    if (!this.initialized || this.chips.size === 0 || !this.wasm) {
+    if (!this.initialized || this.chips.size === 0 || !this.wasm || this.wasmCrashed) {
       return true;
     }
 
@@ -949,6 +955,14 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
           } catch (e) {
             console.error('[FurnaceDispatch] seqTick WASM trap:', e);
             this.sequencerActive = false;
+            this.wasmCrashed = true;
+            // WASM state is corrupted after a trap — destroy all chips to prevent
+            // cascading crashes in tick/render calls.
+            for (const chip of this.chips.values()) {
+              try { this.wasm.destroy(chip.handle); } catch { /* already broken */ }
+            }
+            this.chips.clear();
+            this.port.postMessage({ type: 'error', message: 'WASM sequencer crashed: ' + (e.message || e) });
           }
         }
         // Always tick chips for macro processing and audio generation
