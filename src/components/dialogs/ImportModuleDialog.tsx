@@ -183,13 +183,7 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
         // when parseUADEFile is called later with this preScannedMeta.
         engine.enableTickSnapshots(true);
         engine.resetTickSnapshots();
-        // Convert .sun/.tsm files to tsm. prefix so UADE uses the correct eagleplayer
-        let uadeFileName = file.name;
-        if (/\.(sun|tsm)$/i.test(file.name)) {
-          const nameWithoutExt = file.name.replace(/\.(sun|tsm)$/i, '');
-          uadeFileName = `tsm.${nameWithoutExt}`;
-        }
-        const uadeMeta = await engine.load(buf, uadeFileName);
+        const uadeMeta = await engine.load(buf, file.name);
         setUadeMetadata(uadeMeta);
         // Create a minimal ModuleInfo so the Import button is enabled
         setModuleInfo({
