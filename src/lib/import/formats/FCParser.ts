@@ -850,8 +850,16 @@ export function parseFCFile(buffer: ArrayBuffer, filename: string, moduleBase = 
       relLength  = Math.min(255, 8 * volSpeed);
     }
 
+    // Extract the actual FC13 waveform PCM (unsigned → signed)
+    const rawWave = extractFC13Wave(initialWaveNum);
+    const wavePCM: number[] = [];
+    for (let i = 0; i < rawWave.length; i++) {
+      wavePCM.push(rawWave[i] < 128 ? rawWave[i] : rawWave[i] - 256);
+    }
+
     return {
       waveNumber: initialWaveNum,
+      wavePCM: wavePCM.length > 0 ? wavePCM : undefined,
       synthTable,
       synthSpeed: Math.max(1, Math.min(15, volSpeed)),
       atkLength, atkVolume, decLength, decVolume, sustVolume, relLength,
@@ -1225,7 +1233,8 @@ export function parseFCFile(buffer: ArrayBuffer, filename: string, moduleBase = 
     restartPosition: 0,
     numChannels: 4,
     initialSpeed: sequences.length > 0 && sequences[0].speed > 0 ? sequences[0].speed : 3,
-    initialBPM: Math.round(125 * 6 / (sequences.length > 0 && sequences[0].speed > 0 ? sequences[0].speed : 3)),
+    // FC speed maps directly to MOD ticks-per-row; VBlank is always 50 Hz
+    initialBPM: 125,
     linearPeriods: false,
     uadePatternLayout,
   };

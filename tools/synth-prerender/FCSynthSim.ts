@@ -10,6 +10,7 @@
 import type { FCConfig } from '../../src/types/instrument/exotic';
 import type { ISynthSimulator, SynthTickState } from './SynthSimulator';
 import { AMIGA_PERIODS, semitoneToAmigaPeriod } from './SynthSimulator';
+import { extractFC13Wave } from '../../src/lib/import/formats/FCParser';
 
 // ── Default waveforms ───────────────────────────────────────────────────────
 
@@ -182,15 +183,15 @@ export class FCSynthSim implements ISynthSimulator {
       this.synthCounter = 0;
       const entry = cfg.synthTable[this.synthIdx % cfg.synthTable.length];
       if (entry) {
-        // Switch waveform if entry specifies one
-        if (entry.waveNum !== undefined && entry.waveNum >= 0) {
-          // In FC, waveNum indexes into a shared waveform table.
-          // If wavePCM is the instrument's own wave, the synthTable
-          // just applies transposition. For the pre-renderer, we
-          // keep the current waveform and apply transposition.
-          if (entry.transposition !== 0) {
-            // Transposition modifies the arpeggio offset
-            // (handled via arpeggio table in real FC)
+        // Switch waveform from FC13 built-in wave table
+        if (entry.waveNum !== undefined && entry.waveNum >= 0 && entry.waveNum < 47) {
+          const raw = extractFC13Wave(entry.waveNum);
+          if (raw.length > 0) {
+            const wave = new Int8Array(raw.length);
+            for (let i = 0; i < raw.length; i++) {
+              wave[i] = raw[i] < 128 ? raw[i] : raw[i] - 256;
+            }
+            this.currentWaveform = wave;
           }
         }
       }

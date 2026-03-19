@@ -65,8 +65,11 @@ export interface ISynthSimulator {
 /** PAL clock rate (Hz). Used for period-to-frequency conversion. */
 const PAL_CLOCK = 3546895;
 
-/** Default output sample rate: 2× Amiga (~16574 Hz). */
-export const DEFAULT_SAMPLE_RATE = 16574;
+/** Default output sample rate: Amiga PAL native rate for C-3 (~8287 Hz).
+ *  MOD format has no sample rate field — playback rate is purely determined
+ *  by the period value.  Rendering at 1× Amiga rate ensures pre-rendered
+ *  synth samples play at the correct pitch and envelope speed. */
+export const DEFAULT_SAMPLE_RATE = 8287;
 
 /** Max pre-render duration in ticks (50 Hz → ~4 seconds). */
 const MAX_TICKS = 200;
@@ -134,8 +137,9 @@ export function renderSynthInstrument(
         buf[totalSamples++] = 0;
       }
     } else {
-      // phaseInc = waveLen × PAL_CLOCK / (2 × period × sampleRate)
-      const phaseInc = (waveLen * PAL_CLOCK) / (2 * state.period * sampleRate);
+      // phaseInc = PAL_CLOCK / (2 × period × sampleRate)
+      // One waveform sample per DMA tick, matching Amiga hardware.
+      const phaseInc = PAL_CLOCK / (2 * state.period * sampleRate);
       const vol = state.volume / 64;
 
       for (let s = 0; s < samplesPerTick && totalSamples < maxSamples; s++) {

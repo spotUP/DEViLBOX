@@ -552,7 +552,9 @@ export async function parseHippelCoSoFile(
   };
 
   const moduleName = filename.replace(/\.[^/.]+$/, '');
-  const speedBPM   = Math.round(song.speed > 0 ? (2500.0 / song.speed) : 125);
+  // CoSo speed = VBlanks per row.  With initialSpeed=6 (MOD ticks/row):
+  //   rows/sec = 50/cosoSpeed = (BPM * 2/5) / 6  →  BPM = 750 / cosoSpeed
+  const speedBPM   = Math.round(song.speed > 0 ? (750.0 / song.speed) : 125);
 
   return {
     name: `${moduleName} [Hippel CoSo]`,
