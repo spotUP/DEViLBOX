@@ -2053,59 +2053,24 @@ export async function exportNative(_params: Record<string, unknown>): Promise<Re
     const { getTrackerReplayer } = await import('../../engine/TrackerReplayer');
     let song = getTrackerReplayer().getSong();
 
-    // If replayer doesn't have a song, reconstruct from stores
-    if (!song) {
-      const trackerState = useTrackerStore.getState();
-      const instrumentState = useInstrumentStore.getState();
-      const projectState = useProjectStore.getState();
-      const transportState = (await import('../../stores/useTransportStore')).useTransportStore.getState();
-      const { useFormatStore } = await import('../../stores/useFormatStore');
-      const fmt = useFormatStore.getState();
+    // If replayer has a song, use dedicated serializers (full parsed data available).
+    // If not, fall through to chip RAM readback / raw file fallback (store-reconstructed
+    // songs lack format-specific native data needed by dedicated serializers).
+    const { useFormatStore } = await import('../../stores/useFormatStore');
+    const fmt = useFormatStore.getState();
+    const projectState = useProjectStore.getState();
+    const trackerState = useTrackerStore.getState();
 
-      if (trackerState.patterns.length === 0) return { error: 'No song loaded' };
+    if (!song && trackerState.patterns.length === 0) return { error: 'No song loaded' };
 
-      // Detect format from editorMode, uadeEditableFileName extension, or module data
-      const _uadeExt = (fmt.uadeEditableFileName || '').split('.').pop()?.toLowerCase() || '';
-      const _extMap: Record<string, string> = {
-        fc: 'FC', fc13: 'FC', fc14: 'FC', jam: 'JamCracker', bp: 'SMON', bp3: 'SMON',
-        okt: 'OKT', okta: 'OKT', digi: 'DIGI', dbm: 'DIGI', puma: 'PumaTracker',
-        med: 'OctaMED', mmd0: 'OctaMED', mmd1: 'OctaMED', mmd2: 'OctaMED', mmd3: 'OctaMED',
-        sid2: 'SidMon2', is10: 'IS10',
-      };
-      const format = (fmt.editorMode === 'hively' ? (fmt.hivelyMeta?.version === 0 ? 'AHX' : 'HVL')
-        : fmt.editorMode === 'klystrack' ? 'KT'
-        : fmt.editorMode === 'jamcracker' ? 'JamCracker'
-        : fmt.editorMode === 'musicline' ? 'MOD'
-        : _extMap[_uadeExt] || fmt.originalModuleData?.format || 'MOD') as import('../../engine/TrackerReplayer').TrackerFormat;
+    const baseName = ((song?.name || projectState.metadata?.name || 'untitled')).replace(/[^a-zA-Z0-9_-]/g, '_');
+    const blobType = 'application/octet-stream';
+    let result: { data: Blob; filename: string; warnings: string[] } | null = null;
 
-      song = {
-        name: projectState.metadata?.name ?? 'Untitled',
-        format,
-        patterns: trackerState.patterns,
-        instruments: instrumentState.instruments,
-        songPositions: trackerState.patternOrder ?? trackerState.patterns.map((_: unknown, i: number) => i),
-        songLength: trackerState.patternOrder?.length ?? trackerState.patterns.length,
-        restartPosition: 0,
-        numChannels: trackerState.patterns[0]?.channels?.length ?? 4,
-        initialSpeed: transportState.speed ?? 6,
-        initialBPM: transportState.bpm ?? 125,
-        // Format-specific native data from format store
-        hivelyNative: fmt.hivelyNative ?? undefined,
-        hivelyFileData: fmt.hivelyFileData ?? undefined,
-        hivelyMeta: fmt.hivelyMeta ?? undefined,
-        klysNative: fmt.klysNative ?? undefined,
-        klysFileData: fmt.klysFileData ?? undefined,
-        uadeEditableFileData: fmt.uadeEditableFileData ?? undefined,
-        uadeEditableFileName: fmt.uadeEditableFileName ?? undefined,
-        symphonieFileData: fmt.symphonieFileData ?? undefined,
-      } as import('../../engine/TrackerReplayer').TrackerSong;
-    }
-
+    // Only use dedicated serializers when we have the full song from the replayer
+    if (song) {
     const format = song.format;
     const layoutFormatId = song.uadePatternLayout?.formatId || song.uadeVariableLayout?.formatId || '';
-    let result: { data: Blob; filename: string; warnings: string[] } | null = null;
-    const baseName = (song.name || 'untitled').replace(/[^a-zA-Z0-9_-]/g, '_');
-    const blobType = 'application/octet-stream';
 
     // ── Format-specific exporters (same routing as ExportDialog case 'native') ──
     if (format === 'JamCracker' as string) {
@@ -2209,11 +2174,11 @@ export async function exportNative(_params: Record<string, unknown>): Promise<Re
         }
       }
     }
+    } // end if (song) — dedicated serializers
 
-    // Fallback: UADE chip RAM readback or raw file data
+    // Fallback: UADE chip RAM readback or raw file data (works without full song)
     if (!result) {
-      const { useFormatStore } = await import('../../stores/useFormatStore');
-      const { uadeEditableFileData, uadeEditableFileName } = useFormatStore.getState();
+      const { uadeEditableFileData, uadeEditableFileName } = fmt;
       if (uadeEditableFileData) {
         const ext = (uadeEditableFileName || '').split('.').pop() || 'bin';
         // Try chip RAM readback first (includes live edits)
@@ -2246,26 +2211,23 @@ export async function exportNative(_params: Record<string, unknown>): Promise<Re
     }
 
     if (!result) {
-      const { useFormatStore: diagStore } = await import('../../stores/useFormatStore');
-      const diagState = diagStore.getState();
-      return { error: `No native exporter for format="${format}" layoutFormatId="${layoutFormatId}" editorMode="${diagState.editorMode}" hasUadeFileData=${!!diagState.uadeEditableFileData} uadeFileName="${diagState.uadeEditableFileName || ''}" hasUadeEngine=${!!(await import('../../engine/uade/UADEEngine')).UADEEngine.hasInstance()}` };
+      return { error: `No native exporter available. editorMode="${fmt.editorMode}" hasUadeFileData=${!!fmt.uadeEditableFileData} uadeFileName="${fmt.uadeEditableFileName || ''}"` };
     }
 
     // Convert Blob to base64
     const arrayBuf = await result.data.arrayBuffer();
-    const bytes = new Uint8Array(arrayBuf);
+    const outBytes = new Uint8Array(arrayBuf);
 
     let binary = '';
     const CHUNK = 8192;
-    for (let i = 0; i < bytes.length; i += CHUNK) {
-      binary += String.fromCharCode(...Array.from(bytes.subarray(i, Math.min(i + CHUNK, bytes.length))));
+    for (let i = 0; i < outBytes.length; i += CHUNK) {
+      binary += String.fromCharCode(...Array.from(outBytes.subarray(i, Math.min(i + CHUNK, outBytes.length))));
     }
     const base64 = btoa(binary);
 
     return {
       ok: true,
-      format: format,
-      layoutFormatId,
+      format: song?.format ?? fmt.editorMode,
       filename: result.filename,
       sizeBytes: arrayBuf.byteLength,
       warnings: result.warnings,
