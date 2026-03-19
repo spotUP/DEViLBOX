@@ -109,7 +109,8 @@ export function renderSynthInstrument(
     const state = sim.tick();
 
     // Loop detection: hash of {volume, period, waveform CRC}
-    if (t >= MIN_TICKS_BEFORE_LOOP && loopStart < 0) {
+    // Only detect loops when volume > 0 (don't loop silence)
+    if (t >= MIN_TICKS_BEFORE_LOOP && loopStart < 0 && state.volume > 0) {
       const hash = hashTickState(state);
       const prevIdx = stateHashes.indexOf(hash);
       if (prevIdx >= 0 && prevIdx >= MIN_TICKS_BEFORE_LOOP) {
@@ -158,8 +159,10 @@ export function renderSynthInstrument(
   // Trim to actual length
   const pcm = new Int8Array(buf.buffer, 0, totalSamples);
 
-  // Fallback loop: if no loop detected, loop from 60% to end
-  if (loopStart < 0 && totalSamples > 0) {
+  // Fallback loop: if no loop detected and sample doesn't end with silence,
+  // loop from 60% to end. If the sample decays to silence (one-shot
+  // instrument), don't loop — let it play once and stop.
+  if (loopStart < 0 && totalSamples > 0 && silentTicks === 0) {
     loopStart = Math.floor(totalSamples * 0.6);
     loopEnd = totalSamples;
   }
