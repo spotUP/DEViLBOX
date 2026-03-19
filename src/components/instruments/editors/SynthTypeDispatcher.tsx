@@ -333,104 +333,69 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
   }, [handleChange]);
 
   // Handle JamCracker config updates
+  /** Helper: update an Amiga synth config and push live to the running WASM engine */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const updateAmigaSynth = useCallback((configKey: string, current: any, updates: any) => {
+    const newConfig = { ...current, ...updates };
+    handleChange({ [configKey]: newConfig });
+    try { getToneEngine().updateNativeSynthConfig(instrument.id, newConfig); } catch { /* engine not ready */ }
+  }, [instrument.id, handleChange]);
+
   const handleJamCrackerChange = useCallback((updates: Partial<typeof instrument.jamCracker>) => {
-    const current = instrument.jamCracker || DEFAULT_JAMCRACKER;
-    handleChange({ jamCracker: { ...current, ...updates } });
-  }, [instrument.jamCracker, handleChange]);
+    updateAmigaSynth('jamCracker', instrument.jamCracker || DEFAULT_JAMCRACKER, updates);
+  }, [instrument.jamCracker, updateAmigaSynth]);
 
-  // Handle SoundMon config updates
   const handleSoundMonChange = useCallback((updates: Partial<typeof instrument.soundMon>) => {
-    const current = instrument.soundMon || DEFAULT_SOUNDMON;
-    handleChange({ soundMon: { ...current, ...updates } });
-  }, [instrument.soundMon, handleChange]);
+    updateAmigaSynth('soundMon', instrument.soundMon || DEFAULT_SOUNDMON, updates);
+  }, [instrument.soundMon, updateAmigaSynth]);
 
-  // Handle SidMon config updates
   const handleSidMonChange = useCallback((updates: Partial<typeof instrument.sidMon>) => {
-    const current = instrument.sidMon || DEFAULT_SIDMON;
-    handleChange({ sidMon: { ...current, ...updates } });
-  }, [instrument.sidMon, handleChange]);
+    updateAmigaSynth('sidMon', instrument.sidMon || DEFAULT_SIDMON, updates);
+  }, [instrument.sidMon, updateAmigaSynth]);
 
-  // Handle DigMug config updates
   const handleDigMugChange = useCallback((updates: Partial<typeof instrument.digMug>) => {
-    const current = instrument.digMug || DEFAULT_DIGMUG;
-    handleChange({ digMug: { ...current, ...updates } });
-  }, [instrument.digMug, handleChange]);
+    updateAmigaSynth('digMug', instrument.digMug || DEFAULT_DIGMUG, updates);
+  }, [instrument.digMug, updateAmigaSynth]);
 
-  // Handle FC config updates
   const handleFCChange = useCallback((updates: Partial<typeof instrument.fc>) => {
-    const current = instrument.fc || DEFAULT_FC;
-    handleChange({ fc: { ...current, ...updates } });
-  }, [instrument.fc, handleChange]);
+    updateAmigaSynth('fc', instrument.fc || DEFAULT_FC, updates);
+  }, [instrument.fc, updateAmigaSynth]);
 
-  // Handle DeltaMusic1 config updates
   const handleDeltaMusic1Change = useCallback((updates: Partial<typeof instrument.deltaMusic1>) => {
-    const current = instrument.deltaMusic1 || DEFAULT_DELTAMUSIC1;
-    handleChange({ deltaMusic1: { ...current, ...updates } });
-  }, [instrument.deltaMusic1, handleChange]);
+    updateAmigaSynth('deltaMusic1', instrument.deltaMusic1 || DEFAULT_DELTAMUSIC1, updates);
+  }, [instrument.deltaMusic1, updateAmigaSynth]);
 
-  // Handle DeltaMusic2 config updates
   const handleDeltaMusic2Change = useCallback((updates: Partial<typeof instrument.deltaMusic2>) => {
-    const current = instrument.deltaMusic2 || DEFAULT_DELTAMUSIC2;
-    handleChange({ deltaMusic2: { ...current, ...updates } });
-  }, [instrument.deltaMusic2, handleChange]);
+    updateAmigaSynth('deltaMusic2', instrument.deltaMusic2 || DEFAULT_DELTAMUSIC2, updates);
+  }, [instrument.deltaMusic2, updateAmigaSynth]);
 
-  // Handle Fred config updates
   const handleFredChange = useCallback((updates: Partial<typeof instrument.fred>) => {
-    const current = instrument.fred || DEFAULT_FRED;
-    handleChange({ fred: { ...current, ...updates } });
-  }, [instrument.fred, handleChange]);
+    updateAmigaSynth('fred', instrument.fred || DEFAULT_FRED, updates);
+  }, [instrument.fred, updateAmigaSynth]);
 
-  // Handle OctaMED config updates
   const handleOctaMEDChange = useCallback((updates: Partial<typeof instrument.octamed>) => {
-    const current = instrument.octamed || DEFAULT_OCTAMED;
-    handleChange({ octamed: { ...current, ...updates } });
-  }, [instrument.octamed, handleChange]);
+    updateAmigaSynth('octamed', instrument.octamed || DEFAULT_OCTAMED, updates);
+  }, [instrument.octamed, updateAmigaSynth]);
 
-  // Handle SidMon 1.0 config updates
   const handleSidMon1Change = useCallback((updates: Partial<typeof instrument.sidmon1>) => {
-    const current = instrument.sidmon1 || DEFAULT_SIDMON1;
-    handleChange({ sidmon1: { ...current, ...updates } });
-  }, [instrument.sidmon1, handleChange]);
+    updateAmigaSynth('sidmon1', instrument.sidmon1 || DEFAULT_SIDMON1, updates);
+  }, [instrument.sidmon1, updateAmigaSynth]);
 
-  // Handle HippelCoSo config updates
   const handleHippelCoSoChange = useCallback((updates: Partial<typeof instrument.hippelCoso>) => {
-    const current = instrument.hippelCoso || DEFAULT_HIPPEL_COSO;
-    handleChange({ hippelCoso: { ...current, ...updates } });
-  }, [instrument.hippelCoso, handleChange]);
+    updateAmigaSynth('hippelCoso', instrument.hippelCoso || DEFAULT_HIPPEL_COSO, updates);
+  }, [instrument.hippelCoso, updateAmigaSynth]);
 
-  // Handle Rob Hubbard config updates
   const handleRobHubbardChange = useCallback((updates: Partial<typeof instrument.robHubbard>) => {
-    const current = instrument.robHubbard || DEFAULT_ROB_HUBBARD;
-    handleChange({ robHubbard: { ...current, ...updates } });
-  }, [instrument.robHubbard, handleChange]);
+    updateAmigaSynth('robHubbard', instrument.robHubbard || DEFAULT_ROB_HUBBARD, updates);
+  }, [instrument.robHubbard, updateAmigaSynth]);
 
-  // Handle David Whittaker config updates
   const handleDavidWhittakerChange = useCallback((updates: Partial<typeof instrument.davidWhittaker>) => {
-    const current = instrument.davidWhittaker || DEFAULT_DAVID_WHITTAKER;
-    handleChange({ davidWhittaker: { ...current, ...updates } });
-  }, [instrument.davidWhittaker, handleChange]);
+    updateAmigaSynth('davidWhittaker', instrument.davidWhittaker || DEFAULT_DAVID_WHITTAKER, updates);
+  }, [instrument.davidWhittaker, updateAmigaSynth]);
 
-  // Handle Sonic Arranger config updates
   const handleSonicArrangerChange = useCallback((updates: Partial<typeof instrument.sonicArranger>) => {
-    const current = instrument.sonicArranger || DEFAULT_SONIC_ARRANGER;
-    const newConfig = { ...current, ...updates };
-    handleChange({ sonicArranger: newConfig });
-
-    // Real-time update — re-upload instrument config to running WASM synth
-    try {
-      const engine = getToneEngine();
-      engine.updateSonicArrangerParameters(instrument.id, newConfig);
-    } catch {
-      // Ignored — engine may not be initialized
-    }
+    updateAmigaSynth('sonicArranger', instrument.sonicArranger || DEFAULT_SONIC_ARRANGER, updates);
   }, [instrument.sonicArranger, instrument.id, handleChange]);
-
-  // Handle InStereo! 2.0 config updates
-  const handleInStereo2Change = useCallback((updates: Partial<typeof instrument.inStereo2>) => {
-    const current = instrument.inStereo2 || DEFAULT_INSTEREO2;
-    const newConfig = { ...current, ...updates };
-    handleChange({ inStereo2: newConfig });
-  }, [instrument.inStereo2, handleChange]);
 
   // Handle Space Laser config updates
   const handleSpaceLaserChange = useCallback((updates: Partial<typeof instrument.spaceLaser>) => {
@@ -952,7 +917,11 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
   // INSTEREO! 2.0 EDITOR
   // ============================================================================
   if (editorMode === 'instereo2') {
-    const is20Config = deepMerge(DEFAULT_INSTEREO2, instrument.inStereo2 || {});
+    // IS10 reuses IS20 config shape, stored on inStereo1 key
+    const isConfig = instrument.synthType === 'InStereo1Synth'
+      ? deepMerge(DEFAULT_INSTEREO2, instrument.inStereo1 || {})
+      : deepMerge(DEFAULT_INSTEREO2, instrument.inStereo2 || {});
+    const configKey = instrument.synthType === 'InStereo1Synth' ? 'inStereo1' : 'inStereo2';
     return (
       <div className="synth-editor-container bg-gradient-to-b from-[#0a0a14] to-[#040408]">
         <EditorHeader
@@ -963,8 +932,11 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
         />
         <Suspense fallback={<LoadingControls />}>
           <InStereo2Controls
-            config={is20Config}
-            onChange={handleInStereo2Change}
+            config={isConfig}
+            onChange={(updates) => {
+              const current = (instrument as unknown as Record<string, unknown>)[configKey] as Record<string, unknown> || DEFAULT_INSTEREO2;
+              handleChange({ [configKey]: { ...current, ...updates } });
+            }}
           />
         </Suspense>
       </div>

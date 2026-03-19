@@ -111,6 +111,8 @@
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, ChannelData, TrackerCell, InstrumentConfig } from '@/types';
+import type { UADEVariablePatternLayout } from '@/engine/uade/UADEPatternEncoder';
+import { psmEncoder } from '@/engine/uade/encoders/PSMEncoder';
 
 // ── Little-endian binary helpers ──────────────────────────────────────────────
 
@@ -866,6 +868,9 @@ function _parsePSM16(bytes: Uint8Array, filename: string): TrackerSong | null {
   const PSM16_PAT_HDR = 4;
 
   const patterns: Pattern[] = [];
+  const patFileAddrs: number[] = [];
+  const patFileSizes: number[] = [];
+  const patRowCounts: number[] = [];
 
   if (patOffset > 4) {
     const patPos = patOffset - 4;
@@ -886,7 +891,12 @@ function _parsePSM16(bytes: Uint8Array, filename: string): TrackerSong | null {
         const bodyEnd  = pp + bodySize;
         if (bodyEnd > bytes.length) break;
 
+        // Track pattern data location for UADE variable layout
+        patFileAddrs.push(pp);
+        patFileSizes.push(bodySize);
+
         const clampedRows = Math.min(numRows, 256);
+        patRowCounts.push(clampedRows);
         const cellGrid: TrackerCell[][] = Array.from({ length: clampedRows }, (): TrackerCell[] =>
           Array.from({ length: numChannels }, (): TrackerCell => ({
             note: 0, instrument: 0, volume: 0,
@@ -994,6 +1004,24 @@ function _parsePSM16(bytes: Uint8Array, filename: string): TrackerSong | null {
 
   const baseName = filename.replace(/\.[^/.]+$/, '');
 
+  // Build uadeVariableLayout for chip RAM editing (PSM16 packed patterns)
+  const trackMap: number[][] = [];
+  for (let p = 0; p < patterns.length; p++) {
+    trackMap.push(Array.from({ length: numChannels }, () => p < patFileAddrs.length ? p : -1));
+  }
+
+  const uadeVariableLayout: UADEVariablePatternLayout = {
+    formatId: 'psm',
+    numChannels,
+    numFilePatterns: patFileAddrs.length,
+    rowsPerPattern: patRowCounts.length > 0 ? patRowCounts : 64,
+    moduleSize: bytes.length,
+    encoder: psmEncoder,
+    filePatternAddrs: patFileAddrs,
+    filePatternSizes: patFileSizes,
+    trackMap,
+  };
+
   return {
     name:            songName.trim() || baseName,
     format:          'S3M' as TrackerFormat,
@@ -1006,6 +1034,7 @@ function _parsePSM16(bytes: Uint8Array, filename: string): TrackerSong | null {
     initialSpeed:    Math.max(1, songSpeed),
     initialBPM:      Math.max(32, songTempo),
     linearPeriods:   false,
+    uadeVariableLayout,
   };
 }
 

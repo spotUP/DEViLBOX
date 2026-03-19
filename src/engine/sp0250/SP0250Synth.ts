@@ -74,7 +74,7 @@ export class SP0250Synth extends MAMEBaseSynth {
 
   // Vowel sequence state
   private _vowelSequence: string[] = [];
-  private _vowelLoopSingle = true;
+  private _vowelLoopSingle = false;
   private _vowelIndex = 0;
 
   constructor() {
@@ -215,10 +215,21 @@ export class SP0250Synth extends MAMEBaseSynth {
     const frames = phonemesToSP0250Frames(tokens);
     if (frames.length === 0) return;
 
-    const speechFrames: SpeechFrame<SP0250Frame>[] = frames.map(f => ({
-      data: f,
-      durationMs: f.durationMs,
-    }));
+    // Filter out unvoiced frames (stops/fricatives) that produce noise bursts
+    // Speech synth sounds better with only voiced phonemes
+    const speechFrames: SpeechFrame<SP0250Frame>[] = frames
+      .filter(f => f.voiced)
+      .map(f => ({
+        data: f,
+        durationMs: f.durationMs,
+      }));
+    if (speechFrames.length === 0) return;
+
+    // Pre-set the first frame's parameters before starting the note
+    const first = speechFrames[0].data;
+    this.setVowel(first.preset);
+    this.setVoiced(first.voiced);
+    this.setBrightness(first.brightness);
 
     // Start voice directly (not via triggerAttack to avoid recursion)
     this.workletNode.port.postMessage({

@@ -93,6 +93,16 @@ export class DigMugSynth implements DevilboxSynth {
     return this._initPromise ?? Promise.resolve();
   }
 
+  /** Re-upload instrument config to running WASM synth (for live parameter editing) */
+  updateConfig(config: DigMugConfig): void {
+    if (this._disposed || this._playerHandle < 0) return;
+    const blob = serializeDigMugConfig(config);
+    this.engine.sendMessage(
+      { type: 'loadInstrument', handle: this._playerHandle, buffer: blob },
+      [blob],
+    );
+  }
+
   triggerAttack(note?: string | number, _time?: number, velocity?: number): void {
     if (this._disposed || this._playerHandle < 0) return;
 

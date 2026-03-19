@@ -23,7 +23,7 @@ export class SAMSynth implements DevilboxSynth {
 
   // Vowel sequence state
   private _vowelSequence: string[] = [];
-  private _vowelLoopSingle = true;
+  private _vowelLoopSingle = false;
   private _vowelIndex = 0;
 
   constructor(config: SamConfig) {

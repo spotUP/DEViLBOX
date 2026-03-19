@@ -541,6 +541,11 @@ export async function parseUNICFile(
     numPatterns,
     moduleSize: buffer.byteLength,
     encodeCell: encodeUNICCell,
+    getCellFileOffset: (pattern: number, row: number, channel: number): number =>
+      HEADER_SIZE
+      + pattern * (ROWS_PER_PATTERN * NUM_CHANNELS * 3)
+      + row * (NUM_CHANNELS * 3)
+      + channel * 3,
   };
 
   return {

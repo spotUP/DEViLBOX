@@ -365,6 +365,10 @@ export async function parsePLMFile(
   // patternCells[chunkIdx][channelIdx][rowIdx] = TrackerCell
   const patternCells: Map<number, TrackerCell[][]> = new Map();
 
+  // Cell file offset map: "chunkIdx:rowInChunk:channel" -> file byte offset
+  // Built during parsing for getCellFileOffset closure.
+  const cellFileOffsets = new Map<string, number>();
+
   // Track highest absolute row written to trim the last pattern accurately.
   let maxAbsRow = 0;
 
@@ -418,6 +422,9 @@ export async function parsePLMFile(
         if (c >= writableChans) continue;
         const destCh = ord.y + c;
         if (destCh >= numChannels) continue;
+
+        // Record the file offset for this cell (for getCellFileOffset)
+        cellFileOffsets.set(`${chunkIdx}:${rowInChunk}:${destCh}`, cellOff);
 
         // Note encoding (from OpenMPT):
         //   noteByte == 0       → empty
@@ -577,6 +584,11 @@ export async function parsePLMFile(
     numPatterns,
     moduleSize: buffer.byteLength,
     encodeCell: encodePLMCell,
+    getCellFileOffset: (pattern: number, row: number, channel: number): number => {
+      // PLM uses a 2D canvas; resolve through the pre-built offset map
+      const key = `${pattern}:${row}:${channel}`;
+      return cellFileOffsets.get(key) ?? 0;
+    },
   };
 
   return {

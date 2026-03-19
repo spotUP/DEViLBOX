@@ -20,6 +20,7 @@ SynthRegistry.registerLazy(
     // Standalone WASM engines (CMI + 8 PCM/sampler chips)
     'MAMECMI', 'MAMEFZPCM', 'MAMEPS1SPU', 'MAMEMultiPCM',
     'MAMEZSG2', 'MAMEKS0164', 'MAMESWP00', 'MAMESWP20', 'MAMERolandGP',
+    'MAMES14001A', 'MAMEVLM5030', 'MAMEHC55516',
   ],
   () => import('./mame').then(() => {}),
 );

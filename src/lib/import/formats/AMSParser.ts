@@ -14,6 +14,8 @@
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, ChannelData, TrackerCell, InstrumentConfig } from '@/types';
+import type { UADEVariablePatternLayout } from '@/engine/uade/UADEPatternEncoder';
+import { amsEncoder } from '@/engine/uade/encoders/AMSEncoder';
 
 // ── Binary helpers (little-endian throughout) ─────────────────────────────────
 
@@ -810,21 +812,29 @@ function parseAMS1(bytes: Uint8Array, filename: string): TrackerSong | null {
 
   // ── Pattern data ─────────────────────────────────────────────────────────────
   const allPatternRows: (AMSCell[][] | null)[] = [];
+  const patFileAddrs: number[] = [];
+  const patFileSizes: number[] = [];
 
   for (let p = 0; p < numPats; p++) {
     if (pos + 4 > bytes.length) {
       allPatternRows.push(null);
+      patFileAddrs.push(0);
+      patFileSizes.push(0);
       continue;
     }
     const patLength = u32le(bytes, pos);
     pos += 4;
 
     if (pos + patLength > bytes.length || patLength === 0) {
+      patFileAddrs.push(pos);
+      patFileSizes.push(patLength);
       pos += patLength;
       allPatternRows.push(null);
       continue;
     }
 
+    patFileAddrs.push(pos);
+    patFileSizes.push(patLength);
     const patChunk = bytes.subarray(pos, pos + patLength);
     pos += patLength;
 
@@ -990,6 +1000,24 @@ function parseAMS1(bytes: Uint8Array, filename: string): TrackerSong | null {
     });
   }
 
+  // Build uadeVariableLayout for chip RAM editing
+  const trackMap: number[][] = [];
+  for (let p = 0; p < patterns.length; p++) {
+    trackMap.push(Array.from({ length: numChannels }, () => p < patFileAddrs.length ? p : -1));
+  }
+
+  const uadeVariableLayout: UADEVariablePatternLayout = {
+    formatId: 'ams',
+    numChannels,
+    numFilePatterns: patFileAddrs.length,
+    rowsPerPattern: 64,
+    moduleSize: bytes.length,
+    encoder: amsEncoder,
+    filePatternAddrs: patFileAddrs,
+    filePatternSizes: patFileSizes,
+    trackMap,
+  };
+
   return {
     name:            songName,
     format:          'IT' as TrackerFormat,  // AMS uses linear slides like IT
@@ -1002,6 +1030,7 @@ function parseAMS1(bytes: Uint8Array, filename: string): TrackerSong | null {
     initialSpeed:    6,
     initialBPM:      125,
     linearPeriods:   false,
+    uadeVariableLayout,
     metadata: {
       tracker: `Extreme's Tracker ${versionHigh}.${versionLow}`,
       format: 'AMS',
@@ -1272,12 +1301,16 @@ function parseAMS2(bytes: Uint8Array, filename: string): TrackerSong | null {
   const allPatternRows: (AMSCell[][] | null)[] = [];
   const patternNumRows: number[] = [];
   const patternNames: string[] = [];
+  const ams2PatFileAddrs: number[] = [];
+  const ams2PatFileSizes: number[] = [];
 
   for (let p = 0; p < numPats; p++) {
     if (pos + 4 > bytes.length) {
       allPatternRows.push(null);
       patternNumRows.push(64);
       patternNames.push(`Pattern ${p}`);
+      ams2PatFileAddrs.push(0);
+      ams2PatFileSizes.push(0);
       continue;
     }
 
@@ -1285,6 +1318,8 @@ function parseAMS2(bytes: Uint8Array, filename: string): TrackerSong | null {
     pos += 4;
 
     if (patLength < 2 || pos + patLength > bytes.length) {
+      ams2PatFileAddrs.push(pos);
+      ams2PatFileSizes.push(patLength);
       pos += Math.min(patLength, bytes.length - pos);
       allPatternRows.push(null);
       patternNumRows.push(64);
@@ -1305,6 +1340,10 @@ function parseAMS2(bytes: Uint8Array, filename: string): TrackerSong | null {
 
     const patternDataEnd = patStart + patLength;
     const remainingPatLen = patternDataEnd - pos;
+
+    // Track the actual pattern event data location (after header/name)
+    ams2PatFileAddrs.push(pos);
+    ams2PatFileSizes.push(remainingPatLen);
 
     if (remainingPatLen <= 0) {
       allPatternRows.push(null);
@@ -1545,6 +1584,24 @@ function parseAMS2(bytes: Uint8Array, filename: string): TrackerSong | null {
     });
   }
 
+  // Build uadeVariableLayout for chip RAM editing
+  const ams2TrackMap: number[][] = [];
+  for (let p = 0; p < patterns.length; p++) {
+    ams2TrackMap.push(Array.from({ length: NUM_CHANNELS }, () => p < ams2PatFileAddrs.length ? p : -1));
+  }
+
+  const uadeVariableLayout: UADEVariablePatternLayout = {
+    formatId: 'ams',
+    numChannels: NUM_CHANNELS,
+    numFilePatterns: ams2PatFileAddrs.length,
+    rowsPerPattern: patternNumRows.length > 0 ? patternNumRows : 64,
+    moduleSize: bytes.length,
+    encoder: amsEncoder,
+    filePatternAddrs: ams2PatFileAddrs,
+    filePatternSizes: ams2PatFileSizes,
+    trackMap: ams2TrackMap,
+  };
+
   return {
     name:            songName,
     format:          'IT' as TrackerFormat,
@@ -1557,6 +1614,7 @@ function parseAMS2(bytes: Uint8Array, filename: string): TrackerSong | null {
     initialSpeed,
     initialBPM,
     linearPeriods:   linearSlides,
+    uadeVariableLayout,
     metadata: {
       tracker: `Velvet Studio ${versionHigh}.${String(versionLow).padStart(2, '0')}`,
       format: 'AMS',

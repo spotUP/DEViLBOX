@@ -22,6 +22,8 @@
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, ChannelData, TrackerCell, InstrumentConfig } from '@/types';
+import type { UADEVariablePatternLayout } from '@/engine/uade/UADEPatternEncoder';
+import { amosMusicBankEncoder } from '@/engine/uade/encoders/AMOSMusicBankEncoder';
 import { createSamplerInstrument, periodToNoteIndex } from './AmigaUtils';
 
 // -- Binary helpers -----------------------------------------------------------
@@ -476,6 +478,62 @@ export async function parseAMOSMusicBankFile(
 
   if (songPositions.length === 0) songPositions.push(0);
 
+  // ── Build variable layout for UADE chip RAM editing ─────────────────────
+  // ABK patterns have 4 per-channel sub-patterns, each at a different offset
+  // from pattBase. The channel offset table is at pattBase + 2 + patIdx * 8.
+  const numABKChannels = 4;
+  const numFilePatterns = numPatterns * numABKChannels;
+  const trackMap: number[][] = [];
+  const filePatternAddrs: number[] = [];
+  const filePatternSizes: number[] = [];
+
+  // Collect all channel pattern offsets to compute sizes
+  const allOffsets: { fileIdx: number; absOff: number }[] = [];
+  for (let pIdx = 0; pIdx < numPatterns; pIdx++) {
+    const chPats: number[] = [];
+    const chanOffsetBase = pattBase + 2 + pIdx * 8;
+    for (let ch = 0; ch < numABKChannels; ch++) {
+      const filePatIdx = pIdx * numABKChannels + ch;
+      chPats.push(filePatIdx);
+      if (chanOffsetBase + (ch + 1) * 2 <= buffer.byteLength) {
+        const chanOff = u16(view, chanOffsetBase + ch * 2);
+        const absOff = pattBase + chanOff;
+        allOffsets.push({ fileIdx: filePatIdx, absOff });
+      } else {
+        allOffsets.push({ fileIdx: filePatIdx, absOff: 0 });
+      }
+    }
+    trackMap.push(chPats);
+  }
+
+  // Sort by offset to determine sizes (each pattern runs until the next)
+  const sorted = [...allOffsets].sort((a, b) => a.absOff - b.absOff);
+  const addrMap = new Map<number, number>();
+  const sizeMap = new Map<number, number>();
+  for (let i = 0; i < sorted.length; i++) {
+    const entry = sorted[i];
+    addrMap.set(entry.fileIdx, entry.absOff);
+    const nextOff = i + 1 < sorted.length ? sorted[i + 1].absOff : buffer.byteLength;
+    sizeMap.set(entry.fileIdx, Math.max(0, nextOff - entry.absOff));
+  }
+
+  for (let i = 0; i < numFilePatterns; i++) {
+    filePatternAddrs.push(addrMap.get(i) ?? 0);
+    filePatternSizes.push(sizeMap.get(i) ?? 256);
+  }
+
+  const variableLayout: UADEVariablePatternLayout = {
+    formatId: 'amosMusicBank',
+    numChannels: numABKChannels,
+    numFilePatterns,
+    rowsPerPattern: 64,
+    moduleSize: buffer.byteLength,
+    encoder: amosMusicBankEncoder,
+    filePatternAddrs,
+    filePatternSizes,
+    trackMap,
+  };
+
   return {
     name: songName,
     format: 'MOD' as TrackerFormat,
@@ -488,5 +546,6 @@ export async function parseAMOSMusicBankFile(
     initialSpeed: amosSpeed,
     initialBPM: 125,
     linearPeriods: false,
+    uadeVariableLayout: variableLayout,
   };
 }

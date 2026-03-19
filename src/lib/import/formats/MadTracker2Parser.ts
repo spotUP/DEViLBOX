@@ -68,6 +68,9 @@
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, ChannelData, TrackerCell, InstrumentConfig } from '@/types';
+import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
+import '@/engine/uade/encoders/MadTracker2Encoder';
+import { encodeMT2Cell } from '@/engine/uade/encoders/MadTracker2Encoder';
 
 // ── Little-endian binary helpers ──────────────────────────────────────────────
 
@@ -319,6 +322,9 @@ function _parseMadTracker2(bytes: Uint8Array, filename: string): TrackerSong | n
   const packedPatterns = (flags & FLAG_PACKED_PATTERNS) !== 0;
 
   const patterns: Pattern[] = [];
+  const patternChunkStarts: number[] = [];
+  const patternChunkSizes: number[] = [];
+  const patternRowCounts: number[] = [];
 
   for (let pat = 0; pat < numPatterns2; pat++) {
     if (pos + 6 > bytes.length) break;
@@ -331,6 +337,9 @@ function _parseMadTracker2(bytes: Uint8Array, filename: string): TrackerSong | n
     const chunkStart = pos;
     const chunkEnd   = pos + chunkSize;
     pos = chunkEnd;
+    patternChunkStarts.push(chunkStart);
+    patternChunkSizes.push(chunkSize);
+    patternRowCounts.push(numRows);
     if (chunkEnd > bytes.length) break;
 
     const clampedRows = Math.min(numRows, 256);
@@ -647,6 +656,22 @@ function _parseMadTracker2(bytes: Uint8Array, filename: string): TrackerSong | n
     initialSpeed:    clampedSpeed,
     initialBPM,
     linearPeriods:   true,
+    ...(packedPatterns ? {} : {
+      uadePatternLayout: {
+        formatId: 'mt2',
+        patternDataFileOffset: 0, // not used — getCellFileOffset overrides
+        bytesPerCell: CMD_SIZE,
+        rowsPerPattern: 64,
+        numChannels: totalChannels,
+        numPatterns: numPatterns2,
+        moduleSize: bytes.length,
+        encodeCell: encodeMT2Cell,
+        getCellFileOffset: (pattern: number, row: number, channel: number): number => {
+          const start = patternChunkStarts[pattern] ?? 0;
+          return start + (row * numChannels + channel) * CMD_SIZE;
+        },
+      } satisfies UADEPatternLayout,
+    }),
   };
 }
 

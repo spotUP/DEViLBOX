@@ -16,7 +16,9 @@ import type {
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, ChannelData, TrackerCell } from '@/types';
 import type { InstrumentConfig } from '@/types/instrument';
+import type { UADEVariablePatternLayout } from '@/engine/uade/UADEPatternEncoder';
 import { convertToInstrument } from '../InstrumentConverter';
+import { xmEncoder } from '@/engine/uade/encoders/XMEncoder';
 
 /**
  * XM File Header (80 bytes)
@@ -613,6 +615,24 @@ export function isXMFormat(buffer: ArrayBuffer): boolean {
 export async function parseXMFile(buffer: ArrayBuffer, filename: string): Promise<TrackerSong> {
   const { header, patterns: xmPatterns, instruments: parsedInstruments } = await parseXM(buffer);
 
+  // Re-scan pattern headers to get file offsets and packed data sizes for uadeVariableLayout.
+  const filePatternAddrs: number[] = [];
+  const filePatternSizes: number[] = [];
+  const rowsPerPatternArr: number[] = [];
+  {
+    const view = new DataView(buffer);
+    let off = 60 + header.headerSize;
+    for (let i = 0; i < header.patternCount; i++) {
+      const headerLength = view.getUint32(off, true);
+      const rowCount = view.getUint16(off + 5, true) || 64;
+      const packedDataSize = view.getUint16(off + 7, true);
+      filePatternAddrs.push(off + headerLength); // packed data starts after pattern header
+      filePatternSizes.push(packedDataSize);
+      rowsPerPatternArr.push(rowCount);
+      off += headerLength + packedDataSize;
+    }
+  }
+
   const emptyInst = (id: number, name: string): InstrumentConfig => ({
     id,
     name: name || `Instrument ${id}`,
@@ -665,6 +685,23 @@ export async function parseXMFile(buffer: ArrayBuffer, filename: string): Promis
 
   const songPositions = header.patternOrderTable.slice(0, header.songLength);
 
+  // Build trackMap: all channels of each pattern share the same file-pattern index
+  const trackMap: number[][] = patterns.map((_, patIdx) =>
+    Array.from({ length: header.channelCount }, () => patIdx),
+  );
+
+  const uadeVariableLayout: UADEVariablePatternLayout = {
+    formatId: 'xm',
+    numChannels: header.channelCount,
+    numFilePatterns: patterns.length,
+    rowsPerPattern: rowsPerPatternArr,
+    moduleSize: buffer.byteLength,
+    encoder: xmEncoder,
+    filePatternAddrs,
+    filePatternSizes,
+    trackMap,
+  };
+
   return {
     name:            header.moduleName.replace(/\0/g, '').trim() || filename.replace(/\.[^/.]+$/, ''),
     format:          'XM' as TrackerFormat,
@@ -677,5 +714,6 @@ export async function parseXMFile(buffer: ArrayBuffer, filename: string): Promis
     initialSpeed:    header.defaultTempo,
     initialBPM:      header.defaultBPM,
     linearPeriods:   !!(header.flags & 0x01),
+    uadeVariableLayout,
   };
 }

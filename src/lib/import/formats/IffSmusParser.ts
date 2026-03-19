@@ -44,6 +44,8 @@
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, ChannelData, TrackerCell, InstrumentConfig } from '@/types';
+import type { UADEVariablePatternLayout } from '@/engine/uade/UADEPatternEncoder';
+import { iffSmusEncoder } from '@/engine/uade/encoders/IffSmusEncoder';
 import { createSamplerInstrument } from './AmigaUtils';
 
 // -- Utility functions -------------------------------------------------------
@@ -324,6 +326,8 @@ export async function parseIffSmusFile(
   };
   const instruments: SmusInstrument[] = [];
   let trackNumber = 0;
+  const trackChunkOffsets: number[] = [];
+  const trackChunkSizes: number[] = [];
 
   while (pos + 8 <= fileLen) {
     const chunkId = readFourCC(buf, pos); pos += 4;
@@ -403,6 +407,8 @@ export async function parseIffSmusFile(
         }
         events.push({ type: EVENT_MARK, data: 0xff });
         moduleInfo.tracks[trackNumber] = { events };
+        trackChunkOffsets.push(chunkStart);
+        trackChunkSizes.push(chunkSize);
         trackNumber++;
         break;
       }
@@ -567,6 +573,27 @@ export async function parseIffSmusFile(
     ? (author ? `${songName} (${author})` : songName)
     : baseName;
 
+  // Build UADEVariablePatternLayout for editing infrastructure.
+  // SMUS tracks are event streams (variable-length); patterns in TrackerSong
+  // are derived by splitting flat cell arrays into 64-row patterns.
+  // Each TRAK chunk in the file is one channel's event stream.
+  // trackMap[patIdx][ch] = ch (each pattern covers all channels).
+  const smusTrackMap: number[][] = patterns.map(() =>
+    Array.from({ length: numCh }, (_, ch) => ch)
+  );
+
+  const uadeVariableLayout: UADEVariablePatternLayout = {
+    formatId: 'iffSmus',
+    numChannels: numCh,
+    numFilePatterns: trackChunkOffsets.length,
+    rowsPerPattern: 64,
+    moduleSize: buffer.byteLength,
+    encoder: iffSmusEncoder,
+    filePatternAddrs: trackChunkOffsets,
+    filePatternSizes: trackChunkSizes,
+    trackMap: smusTrackMap,
+  };
+
   return {
     name: `${displayName} [SMUS]`,
     format: 'MOD' as TrackerFormat,
@@ -579,6 +606,7 @@ export async function parseIffSmusFile(
     initialSpeed: speed,
     initialBPM: bpm,
     linearPeriods: false,
+    uadeVariableLayout,
   };
 }
 

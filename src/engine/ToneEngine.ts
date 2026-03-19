@@ -67,6 +67,7 @@ import {
   getChipSynthArpeggioStep as _getChipSynthArpeggioStep,
   isChipSynthArpeggioPlaying as _isChipSynthArpeggioPlaying,
   updateSonicArrangerParameters as _updateSonicArrangerParameters,
+  updateNativeSynthConfig as _updateNativeSynthConfig,
 } from './tone/SynthParameterUpdates';
 import {
   type ChannelRoutingContext,
@@ -1041,7 +1042,8 @@ export class ToneEngine {
       ['TB303', 'Buzz3o3', 'V2', 'Sam', 'Synare', 'DubSiren', 'SpaceLaser', 'Dexed', 'OBXd', 'Furnace', 'HivelySynth', 'UADESynth', 'SymphonieSynth', 'MusicLineSynth',
        'SoundMonSynth', 'SidMonSynth', 'DigMugSynth', 'FCSynth', 'FredSynth', 'TFMXSynth',
        'OctaMEDSynth', 'SidMon1Synth', 'HippelCoSoSynth', 'RobHubbardSynth', 'DavidWhittakerSynth',
-       'SonicArrangerSynth', 'SunVoxSynth', 'JamCrackerSynth', 'FuturePlayerSynth'].includes(c.synthType || '') ||
+       'SonicArrangerSynth', 'InStereo2Synth', 'InStereo1Synth', 'DeltaMusic1Synth', 'DeltaMusic2Synth',
+       'StartrekkerAMSynth', 'SunVoxSynth', 'JamCrackerSynth', 'FuturePlayerSynth'].includes(c.synthType || '') ||
       c.synthType?.startsWith('Furnace')
     );
     if (wasmConfigs.length === 0) return;
@@ -1469,11 +1471,11 @@ export class ToneEngine {
       // AudioWorklet WASM synths — use shared instances (one per instrument ID)
       // to avoid exhausting fixed player-handle pools across channels.
       'TB303', 'V2', 'Sam', 'DubSiren', 'SpaceLaser', 'Synare', 'Dexed', 'OBXd', 'WAM',
-      'SonicArrangerSynth', 'JamCrackerSynth', 'FuturePlayerSynth',
+      'SonicArrangerSynth', 'InStereo2Synth', 'InStereo1Synth', 'JamCrackerSynth', 'FuturePlayerSynth',
       'SoundMonSynth', 'SidMonSynth', 'SidMon1Synth',
       'DigMugSynth', 'DeltaMusic1Synth', 'DeltaMusic2Synth',
-      'FCSynth', 'TFMXSynth', 'SymphonieSynth', 'SunVoxSynth',
-      'FredSynth', 'HippelCoSoSynth', 'RobHubbardSynth',
+      'FCSynth', 'TFMXSynth', 'MusicLineSynth', 'SymphonieSynth', 'SunVoxSynth',
+      'FredSynth', 'HippelCoSoSynth', 'RobHubbardSynth', 'StartrekkerAMSynth',
       'OctaMEDSynth', 'DavidWhittakerSynth',
       'HivelySynth', 'KlysSynth', 'MAMEVASynth', 'UADESynth',
       'GearmulatorVirus', 'GearmulatorVirusTI', 'GearmulatorMicroQ',
@@ -2194,6 +2196,9 @@ export class ToneEngine {
       case 'RobHubbardSynth':
       case 'DavidWhittakerSynth':
       case 'SonicArrangerSynth':
+      case 'InStereo2Synth':
+      case 'InStereo1Synth':
+      case 'StartrekkerAMSynth':
       case 'DeltaMusic1Synth':
       case 'DeltaMusic2Synth':
       // SunVox WASM patch player / modular editor
@@ -4313,6 +4318,7 @@ export class ToneEngine {
   public updateToneJsSynthInPlace(instrumentId: number, config: InstrumentConfig): void { _updateToneJsSynthInPlace(this._synthCtx, instrumentId, config); }
   public updateBuzzmachineParameters(instrumentId: number, buzzmachine: NonNullable<InstrumentConfig['buzzmachine']>): void { _updateBuzzmachineParameters(this._synthCtx, instrumentId, buzzmachine); }
   public updateSonicArrangerParameters(instrumentId: number, config: NonNullable<InstrumentConfig['sonicArranger']>): void { _updateSonicArrangerParameters(this._synthCtx, instrumentId, config); }
+  public updateNativeSynthConfig(instrumentId: number, config: unknown): void { _updateNativeSynthConfig(this._synthCtx, instrumentId, config); }
   public async updateTB303Pedalboard(instrumentId: number, pedalboard: NonNullable<InstrumentConfig['tb303']>['pedalboard']): Promise<void> { return _updateTB303Pedalboard(this._synthCtx, instrumentId, pedalboard); }
   public updateChipSynthArpeggio(instrumentId: number, arpeggioConfig: NonNullable<InstrumentConfig['chipSynth']>['arpeggio']): void { _updateChipSynthArpeggio(this._synthCtx, instrumentId, arpeggioConfig); }
   public getChipSynthArpeggioStep(instrumentId: number): number { return _getChipSynthArpeggioStep(this._synthCtx, instrumentId); }

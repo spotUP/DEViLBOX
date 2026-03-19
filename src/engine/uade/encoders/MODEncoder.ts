@@ -55,6 +55,7 @@ export function encodeMODCell(cell: TrackerCell): Uint8Array {
 }
 
 // Register for all MOD-compatible formats
+registerPatternEncoder('mod', () => encodeMODCell);
 registerPatternEncoder('stk', () => encodeMODCell);
 registerPatternEncoder('gmc', () => encodeMODCell);
 registerPatternEncoder('ice', () => encodeMODCell);

@@ -6,7 +6,7 @@
  * for parameter edits; song-level structural changes require reload).
  */
 
-import type { UADEEngine } from './UADEEngine';
+import { UADEEngine } from './UADEEngine';
 import type { UADEPatternLayout } from './UADEPatternEncoder';
 import { getCellFileOffset } from './UADEPatternEncoder';
 import type { TrackerCell } from '@/types';
@@ -15,41 +15,48 @@ export class UADEChipEditor {
   private readonly engine: UADEEngine;
   constructor(engine: UADEEngine) { this.engine = engine; }
 
+  /** Check if UADE engine is active and safe for chip RAM operations. */
+  private get isActive(): boolean {
+    return UADEEngine.hasInstance();
+  }
+
   /** Read `length` raw bytes from chip RAM at `addr`. */
   readBytes(addr: number, length: number): Promise<Uint8Array> {
-    return this.engine.readMemory(addr, length);
+    if (!this.isActive) return Promise.resolve(new Uint8Array(length));
+    return this.engine.readMemory(addr, length).catch(() => new Uint8Array(length));
   }
 
   /** Write raw bytes to chip RAM at `addr`. */
   writeBytes(addr: number, data: Uint8Array): Promise<void> {
-    return this.engine.writeMemory(addr, data);
+    if (!this.isActive) return Promise.resolve();
+    return this.engine.writeMemory(addr, data).catch(() => {});
   }
 
   /** Read a big-endian unsigned 16-bit value. */
   async readU16(addr: number): Promise<number> {
-    const b = await this.engine.readMemory(addr, 2);
+    const b = await this.readBytes(addr, 2);
     return (b[0] << 8) | b[1];
   }
 
   /** Read a big-endian unsigned 32-bit value. */
   async readU32(addr: number): Promise<number> {
-    const b = await this.engine.readMemory(addr, 4);
+    const b = await this.readBytes(addr, 4);
     return ((b[0] << 24) | (b[1] << 16) | (b[2] << 8) | b[3]) >>> 0;
   }
 
   /** Write a big-endian unsigned 8-bit value. */
   writeU8(addr: number, value: number): Promise<void> {
-    return this.engine.writeMemory(addr, new Uint8Array([value & 0xFF]));
+    return this.writeBytes(addr, new Uint8Array([value & 0xFF]));
   }
 
   /** Write a big-endian unsigned 16-bit value. */
   writeU16(addr: number, value: number): Promise<void> {
-    return this.engine.writeMemory(addr, new Uint8Array([(value >> 8) & 0xFF, value & 0xFF]));
+    return this.writeBytes(addr, new Uint8Array([(value >> 8) & 0xFF, value & 0xFF]));
   }
 
   /** Write a big-endian unsigned 32-bit value. */
   writeU32(addr: number, value: number): Promise<void> {
-    return this.engine.writeMemory(addr, new Uint8Array([
+    return this.writeBytes(addr, new Uint8Array([
       (value >>> 24) & 0xFF, (value >>> 16) & 0xFF,
       (value >>> 8) & 0xFF, value & 0xFF,
     ]));
@@ -62,7 +69,7 @@ export class UADEChipEditor {
 
   /** Write a block of bytes at addr, reading the new values from `bytes`. */
   writeBlock(addr: number, bytes: number[]): Promise<void> {
-    return this.engine.writeMemory(addr, new Uint8Array(bytes));
+    return this.writeBytes(addr, new Uint8Array(bytes));
   }
 
   /**

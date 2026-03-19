@@ -44,7 +44,9 @@
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, ChannelData, TrackerCell, InstrumentConfig } from '@/types';
+import type { UADEVariablePatternLayout } from '@/engine/uade/UADEPatternEncoder';
 import { createSamplerInstrument } from './AmigaUtils';
+import { cdfm67Encoder } from '@/engine/uade/encoders/CDFM67Encoder';
 
 // ── Binary helpers ────────────────────────────────────────────────────────────
 
@@ -382,6 +384,19 @@ function parseInternal(bytes: Uint8Array, filename: string): TrackerSong | null 
     initialBPM:      DEFAULT_BPM,
     linearPeriods:   false,
     libopenmptFileData: bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer,
+    uadeVariableLayout: {
+      formatId: 'c67',
+      numChannels: NUM_CHANNELS,
+      numFilePatterns: NUM_PATTERNS,
+      rowsPerPattern: ROWS_PER_PATTERN,
+      moduleSize: bytes.length,
+      encoder: cdfm67Encoder,
+      filePatternAddrs: patOffsets.map(off => PAT_DATA_BASE + off),
+      filePatternSizes: patLengths,
+      trackMap: Array.from({ length: NUM_PATTERNS }, (_, p) =>
+        Array.from({ length: NUM_CHANNELS }, (__, _ch) => p),
+      ),
+    } satisfies UADEVariablePatternLayout,
   };
 }
 

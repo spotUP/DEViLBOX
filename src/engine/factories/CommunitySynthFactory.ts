@@ -70,6 +70,9 @@ import { KS0164Synth } from '../ks0164/KS0164Synth';
 import { SWP00Synth } from '../swp00/SWP00Synth';
 import { SWP20Synth } from '../swp20/SWP20Synth';
 import { RolandGPSynth } from '../rolandgp/RolandGPSynth';
+import { S14001ASynth } from '../s14001a/S14001ASynth';
+import { VLM5030Synth } from '../vlm5030/VLM5030Synth';
+import { HC55516Synth } from '../hc55516/HC55516Synth';
 import { ModularSynth } from '../modular/ModularSynth';
 import { DEFAULT_MODULAR_PATCH } from '@/types/modular';
 import { getNormalizedVolume } from './volumeNormalization';
@@ -1238,6 +1241,26 @@ export function createMAMERolandGP(config: InstrumentConfig): Tone.ToneAudioNode
   return synth as unknown as Tone.ToneAudioNode;
 }
 
+export function createMAMES14001A(config: InstrumentConfig): Tone.ToneAudioNode {
+  const synth = new S14001ASynth();
+  synth.output.gain.value = Tone.dbToGain(getNormalizedVolume('MAMES14001A', config.volume));
+  applyChipParameters(synth, config);
+  return synth as unknown as Tone.ToneAudioNode;
+}
+
+export function createMAMEVLM5030(config: InstrumentConfig): Tone.ToneAudioNode {
+  const synth = new VLM5030Synth();
+  synth.output.gain.value = Tone.dbToGain(getNormalizedVolume('MAMEVLM5030', config.volume));
+  applyChipParameters(synth, config);
+  return synth as unknown as Tone.ToneAudioNode;
+}
+
+export function createMAMEHC55516(config: InstrumentConfig): Tone.ToneAudioNode {
+  const synth = new HC55516Synth();
+  synth.output.gain.value = Tone.dbToGain(getNormalizedVolume('MAMEHC55516', config.volume));
+  applyChipParameters(synth, config);
+  return synth as unknown as Tone.ToneAudioNode;
+}
 
 export function createModularSynth(config: InstrumentConfig): DevilboxSynth {
   const patchConfig = config.modularSynth || DEFAULT_MODULAR_PATCH;

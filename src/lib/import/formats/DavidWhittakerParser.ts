@@ -25,7 +25,9 @@
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, TrackerCell, ChannelData, InstrumentConfig } from '@/types';
 import type { DavidWhittakerConfig, UADEChipRamInfo } from '@/types/instrument';
+import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
 import { DEFAULT_DAVID_WHITTAKER } from '@/types/instrument';
+import { encodeDavidWhittakerCell } from '@/engine/uade/encoders/DavidWhittakerEncoder';
 
 // ── Binary read helpers ───────────────────────────────────────────────────────
 
@@ -488,6 +490,27 @@ export function parseDavidWhittakerFile(buffer: ArrayBuffer, filename: string, m
   };
   const songPositions = [0];
 
+  // ── Build uadePatternLayout for chip RAM editing ──────────────────────────
+  // DW modules are compiled 68k executables — pattern data is embedded in
+  // player code, so patternDataFileOffset is 0.  getCellFileOffset provides
+  // a standard row-major layout relative to the module base for potential
+  // chip RAM patching once the real data offset is resolved at runtime.
+  const uadePatternLayout: UADEPatternLayout = {
+    formatId: 'davidWhittaker',
+    patternDataFileOffset: 0,
+    bytesPerCell: 4,
+    rowsPerPattern: ROWS,
+    numChannels: CHANNELS,
+    numPatterns: 1,
+    moduleSize: buffer.byteLength,
+    encodeCell: encodeDavidWhittakerCell,
+    getCellFileOffset: (pattern: number, row: number, channel: number): number => {
+      // Standard row-major layout: pattern * (rows * channels * 4) + row * channels * 4 + channel * 4
+      const patternByteSize = ROWS * CHANNELS * 4;
+      return pattern * patternByteSize + row * CHANNELS * 4 + channel * 4;
+    },
+  };
+
   return {
     name: baseName,
     format: 'XM' as TrackerFormat,
@@ -499,6 +522,7 @@ export function parseDavidWhittakerFile(buffer: ArrayBuffer, filename: string, m
     numChannels: CHANNELS,
     initialSpeed: 6,
     initialBPM: 125,
+    uadePatternLayout,
   };
 }
 

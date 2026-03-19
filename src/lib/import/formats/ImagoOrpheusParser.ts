@@ -47,7 +47,9 @@
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, ChannelData, TrackerCell, InstrumentConfig } from '@/types';
+import type { UADEVariablePatternLayout } from '@/engine/uade/UADEPatternEncoder';
 import { createSamplerInstrument } from './AmigaUtils';
+import { imagoOrpheusEncoder } from '@/engine/uade/encoders/ImagoOrpheusEncoder';
 
 // ── Binary helpers ────────────────────────────────────────────────────────────
 
@@ -314,10 +316,16 @@ function parseInternal(bytes: Uint8Array, filename: string): TrackerSong | null 
   // ── Patterns ──────────────────────────────────────────────────────────────
 
   const patterns: Pattern[] = [];
+  const patternFileAddrs: number[] = [];
+  const patternFileSizes: number[] = [];
+  const patternRowCounts: number[] = [];
 
   for (let pat = 0; pat < patNum; pat++) {
     if (cursor + 4 > bytes.length) {
       patterns.push(makeEmptyPattern(pat, numChannels, channelPan, filename));
+      patternFileAddrs.push(0);
+      patternFileSizes.push(0);
+      patternRowCounts.push(64);
       continue;
     }
 
@@ -326,6 +334,9 @@ function parseInternal(bytes: Uint8Array, filename: string): TrackerSong | null 
     cursor += 4;
 
     const dataEnd = cursor + chunkLen - 4; // chunkLen includes the 4-byte header
+    patternFileAddrs.push(cursor);
+    patternFileSizes.push(chunkLen - 4);
+    patternRowCounts.push(numRows);
 
     // Build channel row arrays
     const channelRows: TrackerCell[][] = Array.from({ length: numChannels }, () =>
@@ -567,6 +578,19 @@ function parseInternal(bytes: Uint8Array, filename: string): TrackerSong | null 
     initialSpeed:    tempo > 0 ? tempo : 6,
     initialBPM:      bpm >= 32 ? bpm : 125,
     linearPeriods:   linearSlides,
+    uadeVariableLayout: {
+      formatId: 'imf',
+      numChannels,
+      numFilePatterns: patNum,
+      rowsPerPattern: patternRowCounts,
+      moduleSize: bytes.length,
+      encoder: imagoOrpheusEncoder,
+      filePatternAddrs: patternFileAddrs,
+      filePatternSizes: patternFileSizes,
+      trackMap: Array.from({ length: patNum }, (_, p) =>
+        Array.from({ length: numChannels }, (__, _ch) => p),
+      ),
+    } satisfies UADEVariablePatternLayout,
   };
 }
 

@@ -42,7 +42,9 @@
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, ChannelData, TrackerCell, InstrumentConfig } from '@/types';
+import type { UADEVariablePatternLayout } from '@/engine/uade/UADEPatternEncoder';
 import { createSamplerInstrument } from './AmigaUtils';
+import { mdlEncoder } from '@/engine/uade/encoders/MDLEncoder';
 
 // ── Binary helpers ─────────────────────────────────────────────────────────────
 
@@ -553,6 +555,8 @@ export async function parseMDLFile(
   }
 
   const tracks: MDLTrack[] = []; // 1-based; index 0 = unused placeholder
+  const trackFileAddrs: number[] = [0]; // 1-based; slot 0 unused
+  const trackFileSizes: number[] = [0];
 
   const trChunk = chunks.get(CHUNK_TR);
   if (trChunk) {
@@ -567,6 +571,8 @@ export async function parseMDLFile(
         const trkSize = u16le(v, trOff);
         trOff += 2;
         const trkEnd = Math.min(trOff + trkSize, trEnd);
+        trackFileAddrs.push(trOff);
+        trackFileSizes.push(trkEnd - trOff);
         tracks.push({ data: raw.slice(trOff, trkEnd) });
         trOff += trkSize;
       }
@@ -576,6 +582,7 @@ export async function parseMDLFile(
   // ── Read patterns (PA chunk) ──────────────────────────────────────────────
 
   const patterns: Pattern[] = [];
+  const patternTrackMap: number[][] = [];
 
   const paChunk = chunks.get(CHUNK_PA);
   if (paChunk) {
@@ -611,6 +618,11 @@ export async function parseMDLFile(
           trackNums.push(u16le(v, paOff));
           paOff += 2;
         }
+        // Pad trackNums to numChannels for the trackMap
+        const paddedTrackNums = Array.from({ length: numChannels }, (_, i) =>
+          i < trackNums.length ? trackNums[i] : -1,
+        );
+        patternTrackMap.push(paddedTrackNums);
 
         // Build pattern grid
         // grid[row][chn] = TrackerCell
@@ -918,5 +930,16 @@ export async function parseMDLFile(
     initialSpeed:    Math.max(1, speed),
     initialBPM:      Math.max(4, tempo),
     linearPeriods:   false,
+    uadeVariableLayout: {
+      formatId: 'mdl',
+      numChannels,
+      numFilePatterns: tracks.length,
+      rowsPerPattern: 64, // nominal, actual varies
+      moduleSize: buffer.byteLength,
+      encoder: mdlEncoder,
+      filePatternAddrs: trackFileAddrs,
+      filePatternSizes: trackFileSizes,
+      trackMap: patternTrackMap,
+    } satisfies UADEVariablePatternLayout,
   };
 }

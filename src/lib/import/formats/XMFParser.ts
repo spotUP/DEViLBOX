@@ -535,6 +535,10 @@ function _parse(bytes: Uint8Array, filename: string): TrackerSong | null {
     numPatterns,
     moduleSize: bytes.length,
     encodeCell: encodeXMFCell,
+    getCellFileOffset: (pattern: number, row: number, channel: number): number =>
+      patternStart
+      + pattern * (ROWS_PER_PATTERN * numChannels * CELL_SIZE)
+      + (row * numChannels + channel) * CELL_SIZE,
   };
 
   return {

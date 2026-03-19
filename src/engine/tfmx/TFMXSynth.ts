@@ -67,6 +67,16 @@ export class TFMXSynth implements DevilboxSynth {
     );
   }
 
+  /** Re-upload instrument config to running WASM synth (for live parameter editing) */
+  updateConfig(config: TFMXConfig): void {
+    if (this._disposed || this._playerHandle < 0) return;
+    const blob = serializeTFMXConfig(config);
+    this.engine.sendMessage(
+      { type: 'loadInstrument', handle: this._playerHandle, buffer: blob },
+      [blob],
+    );
+  }
+
   triggerAttack(note?: string | number, _time?: number, velocity?: number): void {
     if (this._disposed || this._playerHandle < 0) return;
 

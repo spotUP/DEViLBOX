@@ -36,6 +36,9 @@ import { KS0164Synth } from '../../ks0164/KS0164Synth';
 import { SWP00Synth } from '../../swp00/SWP00Synth';
 import { SWP20Synth } from '../../swp20/SWP20Synth';
 import { RolandGPSynth } from '../../rolandgp/RolandGPSynth';
+import { S14001ASynth } from '../../s14001a/S14001ASynth';
+import { VLM5030Synth } from '../../vlm5030/VLM5030Synth';
+import { HC55516Synth } from '../../hc55516/HC55516Synth';
 
 const VOLUME_OFFSETS: Record<string, number> = {
   MAMEASC: 11, MAMEAstrocade: 18, MAMEC352: 17, MAMEES5503: 62,
@@ -51,6 +54,9 @@ const VOLUME_OFFSETS: Record<string, number> = {
   MAMESWP00: 0,     // TBD
   MAMESWP20: 0,     // TBD
   MAMERolandGP: 0,  // TBD
+  MAMES14001A: 32,
+  MAMEVLM5030: 34,
+  MAMEHC55516: 30,
 };
 
 function getNormalizedVolume(synthType: string, configVolume: number | undefined): number {
@@ -77,6 +83,7 @@ const SYNTH_CLASSES: Record<string, new () => any> = {
   UPD933Synth, VotraxSynth, YMF271Synth, YMOPQSynth, VASynthSynth, CMISynth,
   FZSynth, PS1SPUSynth, ZSG2Synth, KS0164Synth,
   SWP00Synth, SWP20Synth, RolandGPSynth,
+  S14001ASynth, VLM5030Synth, HC55516Synth,
 };
 
 interface MAMEChipDef {
@@ -114,6 +121,9 @@ const MAME_CHIPS: MAMEChipDef[] = [
   { id: 'MAMESWP00', name: 'Yamaha SWP00', className: 'SWP00Synth' },
   { id: 'MAMESWP20', name: 'Yamaha SWP20', className: 'SWP20Synth' },
   { id: 'MAMERolandGP', name: 'Roland GP TC6116', className: 'RolandGPSynth' },
+  { id: 'MAMES14001A', name: 'SSi TSI S14001A', className: 'S14001ASynth' },
+  { id: 'MAMEVLM5030', name: 'Sanyo VLM5030', className: 'VLM5030Synth' },
+  { id: 'MAMEHC55516', name: 'Harris HC55516', className: 'HC55516Synth' },
 ];
 
 for (const chip of MAME_CHIPS) {

@@ -28,6 +28,8 @@
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, TrackerCell, InstrumentConfig } from '@/types';
+import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
+import { encodeActivisionProCell } from '@/engine/uade/encoders/ActivisionProEncoder';
 import { createSamplerInstrument } from './AmigaUtils';
 
 // ── Constants ─────────────────────────────────────────────────────────────
@@ -525,11 +527,13 @@ function parseInternal(bytes: Uint8Array, filename: string): TrackerSong | null 
   }
 
   const tracks: (Uint8Array | null)[] = new Array(numberOfTracks).fill(null);
+  const trackFileStarts: number[] = new Array(numberOfTracks).fill(-1);
   for (let i = 0; i < trackOffsets.length; i++) {
     if (trackOffsets[i] < 0) continue;
     const trackOff = tracksOffset + trackOffsets[i];
     if (trackOff >= len) continue;
     tracks[i] = loadSingleTrack(bytes, trackOff, info.parseTrackVersion);
+    trackFileStarts[i] = trackOff;
   }
 
   // ── Envelopes ──────────────────────────────────────────────────────────
@@ -658,23 +662,39 @@ function parseInternal(bytes: Uint8Array, filename: string): TrackerSong | null 
   const primarySong = songInfoList[0];
   const trackerPatterns: Pattern[] = [];
 
+  // Build cell offset map: cellOffsetMap[patIdx][ch][row] = file offset
+  const cellOffsetMap: number[][][] = [];
+
   // Determine max position count across all 4 channels
   const maxPositions = Math.max(...primarySong.positionLists.map(pl => countPositions(pl)));
 
   for (let posIdx = 0; posIdx < maxPositions; posIdx++) {
     const channelRows: TrackerCell[][] = [[], [], [], []];
+    const patOffsets: number[][] = [[], [], [], []];
 
     for (let ch = 0; ch < 4; ch++) {
       const positionList = primarySong.positionLists[ch];
       const trackNum = getPositionTrackNumber(positionList, posIdx);
 
       const trackData = (trackNum >= 0 && trackNum < tracks.length) ? tracks[trackNum] : null;
-      const rows = decodeAvpTrack(trackData, instruments, info.parseTrackVersion);
+      const trackFileStart = (trackNum >= 0 && trackNum < trackFileStarts.length) ? trackFileStarts[trackNum] : -1;
+      const { rows, noteBytePositions } = decodeAvpTrack(trackData, instruments, info.parseTrackVersion);
+
+      // Compute file offsets from track-relative positions
+      for (const relPos of noteBytePositions) {
+        patOffsets[ch].push(relPos >= 0 && trackFileStart >= 0 ? trackFileStart + relPos : -1);
+      }
 
       // Pad to 64 rows
-      while (rows.length < 64) rows.push({ note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 });
+      while (rows.length < 64) {
+        rows.push({ note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 });
+        patOffsets[ch].push(-1);
+      }
       channelRows[ch] = rows.slice(0, 64);
+      patOffsets[ch] = patOffsets[ch].slice(0, 64);
     }
+
+    cellOffsetMap.push(patOffsets);
 
     trackerPatterns.push({
       id:     `pattern-${posIdx}`,
@@ -709,6 +729,26 @@ function parseInternal(bytes: Uint8Array, filename: string): TrackerSong | null 
 
   const moduleName = filename.replace(/\.[^/.]+$/, '');
 
+  // Build uadePatternLayout with getCellFileOffset for track indirection
+  const uadePatternLayout: UADEPatternLayout = {
+    formatId: 'activisionPro',
+    patternDataFileOffset: tracksOffset,
+    bytesPerCell: 1, // just the note+instrument byte
+    rowsPerPattern: 64,
+    numChannels: 4,
+    numPatterns: trackerPatterns.length,
+    moduleSize: bytes.byteLength,
+    encodeCell: encodeActivisionProCell,
+    getCellFileOffset: (pattern: number, row: number, channel: number): number => {
+      if (pattern < 0 || pattern >= cellOffsetMap.length) return -1;
+      const patOffsets = cellOffsetMap[pattern];
+      if (channel < 0 || channel >= patOffsets.length) return -1;
+      const chOffsets = patOffsets[channel];
+      if (row < 0 || row >= chOffsets.length) return -1;
+      return chOffsets[row];
+    },
+  };
+
   return {
     name:            moduleName,
     format:          'AVP' as TrackerFormat,
@@ -721,6 +761,7 @@ function parseInternal(bytes: Uint8Array, filename: string): TrackerSong | null 
     initialSpeed:    6,
     initialBPM:      125,
     linearPeriods:   false,
+    uadePatternLayout,
   };
 }
 
@@ -905,9 +946,10 @@ function decodeAvpTrack(
   data: Uint8Array | null,
   instruments: AvpInstrument[],
   parseTrackVersion: number,
-): TrackerCell[] {
+): { rows: TrackerCell[]; noteBytePositions: number[] } {
   const rows: TrackerCell[] = [];
-  if (!data) return rows;
+  const noteBytePositions: number[] = [];
+  if (!data) return { rows, noteBytePositions };
 
   const len = data.length;
   let pos = 0;
@@ -919,6 +961,7 @@ function decodeAvpTrack(
     if (dat === 0xff) break;
 
     let noteByte = 0;
+    let noteBytePos = -1; // position of the note byte within data[]
 
     if (parseTrackVersion === 3) {
       // Multi-byte note encoding: while high bit set, it's extended data
@@ -930,10 +973,12 @@ function decodeAvpTrack(
         dat = data[pos++];
       }
       noteByte = dat;
+      noteBytePos = pos - 1;
     } else if (parseTrackVersion === 4 || parseTrackVersion === 5) {
       if (dat === 0x81) {
         // Special: rest / no note
         noteByte = 0;
+        noteBytePos = pos - 1; // the 0x81 byte itself
       } else {
         while ((dat & 0x80) !== 0 && pos < len) {
           pos++;
@@ -941,6 +986,7 @@ function decodeAvpTrack(
           dat = data[pos++];
         }
         noteByte = dat;
+        noteBytePos = pos - 1;
       }
     } else {
       // v1/v2: if high bit → skip 1 (v2: skip 2) extra bytes
@@ -949,6 +995,7 @@ function decodeAvpTrack(
         if (parseTrackVersion === 2 && pos < len) pos++;
       }
       // Next byte is the row note byte
+      noteBytePos = pos;
       noteByte = pos < len ? data[pos++] : 0;
     }
 
@@ -969,9 +1016,10 @@ function decodeAvpTrack(
     }
 
     rows.push({ note: xmNote, instrument: instrId, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 });
+    noteBytePositions.push(noteBytePos);
   }
 
-  return rows;
+  return { rows, noteBytePositions };
 }
 
 // ── Helper ─────────────────────────────────────────────────────────────────

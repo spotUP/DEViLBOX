@@ -61,6 +61,8 @@ import type { TrackerSong } from '@/engine/TrackerReplayer';
 import type { Pattern, ChannelData, TrackerCell } from '@/types';
 import type { ParsedSample, ParsedInstrument } from '@/types/tracker';
 import type { InstrumentConfig } from '@/types/instrument';
+import type { UADEVariablePatternLayout } from '@/engine/uade/UADEPatternEncoder';
+import { stxEncoder } from '@/engine/uade/encoders/STXEncoder';
 import { convertToInstrument } from '../InstrumentConverter';
 
 // ── Binary helpers ────────────────────────────────────────────────────────────
@@ -591,11 +593,15 @@ export function parseSTXFile(buffer: ArrayBuffer, filename: string): TrackerSong
 
   const patterns: Pattern[] = [];
   const patIndexToArrayIdx = new Map<number, number>();
+  const stxPatFileAddrs: number[] = [];
+  const stxPatFileSizes: number[] = [];
 
   for (const patIdx of allPatIdxs) {
     if (patIdx >= patternParapointers.length || patternParapointers[patIdx] === 0) {
       patIndexToArrayIdx.set(patIdx, patterns.length);
       patterns.push(makeEmptyPattern(patIdx, NUM_CHANNELS, filename, maxPatIdx, numSamples));
+      stxPatFileAddrs.push(0);
+      stxPatFileSizes.push(0);
       continue;
     }
 
@@ -603,6 +609,8 @@ export function parseSTXFile(buffer: ArrayBuffer, filename: string): TrackerSong
     if (patOff + 2 > buffer.byteLength) {
       patIndexToArrayIdx.set(patIdx, patterns.length);
       patterns.push(makeEmptyPattern(patIdx, NUM_CHANNELS, filename, maxPatIdx, numSamples));
+      stxPatFileAddrs.push(0);
+      stxPatFileSizes.push(0);
       continue;
     }
 
@@ -630,6 +638,10 @@ export function parseSTXFile(buffer: ArrayBuffer, filename: string): TrackerSong
       // In practice STX patterns are small; 2048 bytes is well within reason.
       rowDataLen = Math.min(2048, buffer.byteLength - dataStart);
     }
+
+    // Track pattern data location for UADE variable layout
+    stxPatFileAddrs.push(dataStart);
+    stxPatFileSizes.push(rowDataLen);
 
     const rowData = raw.subarray(dataStart, dataStart + rowDataLen);
     const cells   = decodeSTXPattern(rowData, NUM_CHANNELS);
@@ -681,6 +693,24 @@ export function parseSTXFile(buffer: ArrayBuffer, filename: string): TrackerSong
   }
   if (songPositions.length === 0) songPositions.push(0);
 
+  // Build uadeVariableLayout for chip RAM editing
+  const stxTrackMap: number[][] = [];
+  for (let p = 0; p < patterns.length; p++) {
+    stxTrackMap.push(Array.from({ length: NUM_CHANNELS }, () => p < stxPatFileAddrs.length ? p : -1));
+  }
+
+  const uadeVariableLayout: UADEVariablePatternLayout = {
+    formatId: 'stx',
+    numChannels: NUM_CHANNELS,
+    numFilePatterns: stxPatFileAddrs.length,
+    rowsPerPattern: ROWS_PER_PATTERN,
+    moduleSize: buffer.byteLength,
+    encoder: stxEncoder,
+    filePatternAddrs: stxPatFileAddrs,
+    filePatternSizes: stxPatFileSizes,
+    trackMap: stxTrackMap,
+  };
+
   return {
     name:            songName.replace(/\0/g, '').trim() || filename.replace(/\.[^/.]+$/, ''),
     format:          'S3M',
@@ -693,5 +723,6 @@ export function parseSTXFile(buffer: ArrayBuffer, filename: string): TrackerSong
     initialSpeed,
     initialBPM,
     linearPeriods:   false,
+    uadeVariableLayout,
   };
 }
