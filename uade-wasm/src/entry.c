@@ -253,40 +253,9 @@ int uade_wasm_init(int sample_rate) {
     return 0;
 }
 
-/* Track whether this is the first load (no reinit needed) */
-static int s_has_played = 0;
-
 EMSCRIPTEN_KEEPALIVE
 int uade_wasm_load(const uint8_t *data, size_t len, const char *filename_hint) {
     if (!s_state) return -1;
-
-    /* ── Full reinit for second+ song loads ──
-     *
-     * The UADE 68k emulator maintains global state (CPU registers, memory,
-     * IPC protocol state machine) that doesn't fully reset between songs.
-     * After the first song plays, loading a second song fails because the
-     * IPC protocol state is corrupted. The only reliable fix is to destroy
-     * and recreate the entire UADE state.
-     */
-    if (s_has_played) {
-        fprintf(stderr, "[uade-wasm] Reinitializing UADE for new song...\n");
-        uade_cleanup_state(s_state);
-        s_state = NULL;
-
-        /* Recreate state */
-        struct uade_config *cfg = uade_new_config();
-        if (!cfg) return -1;
-        uade_config_set_option(cfg, UC_BASE_DIR, "/uade");
-        char freq_str[16];
-        snprintf(freq_str, sizeof(freq_str), "%d", s_sample_rate);
-        uade_config_set_option(cfg, UC_FREQUENCY, freq_str);
-        uade_config_set_option(cfg, UC_PANNING_VALUE, "1.0");
-        if (guarded_new_state(cfg) != 0) {
-            free(cfg);
-            return -1;
-        }
-        free(cfg);
-    }
 
     /* Mark as not playing */
     s_playing = 0;
@@ -353,7 +322,6 @@ int uade_wasm_load(const uint8_t *data, size_t len, const char *filename_hint) {
 
     s_playing = 1;
     s_paused  = 0;
-    s_has_played = 1;
     return 0;
 }
 
