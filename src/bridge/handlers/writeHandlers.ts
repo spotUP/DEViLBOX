@@ -2067,7 +2067,36 @@ export async function exportNative(_params: Record<string, unknown>): Promise<Re
     const blobType = 'application/octet-stream';
     let result: { data: Blob; filename: string; warnings: string[] } | null = null;
 
-    // Only use dedicated serializers when we have the full song from the replayer
+    // For formats with their own editorMode (hively, klystrack, jamcracker),
+    // reconstruct a minimal song from stores if the replayer doesn't have one.
+    // These formats store their native data in the format store.
+    if (!song && (fmt.editorMode === 'hively' || fmt.editorMode === 'klystrack' || fmt.editorMode === 'jamcracker')) {
+      const instrumentState = useInstrumentStore.getState();
+      const transportState = (await import('../../stores/useTransportStore')).useTransportStore.getState();
+      const format = (fmt.editorMode === 'hively' ? (fmt.hivelyMeta?.version === 0 ? 'AHX' : 'HVL')
+        : fmt.editorMode === 'klystrack' ? 'KT'
+        : 'JamCracker') as import('../../engine/TrackerReplayer').TrackerFormat;
+      song = {
+        name: projectState.metadata?.name ?? 'Untitled',
+        format,
+        patterns: trackerState.patterns,
+        instruments: instrumentState.instruments,
+        songPositions: trackerState.patternOrder ?? trackerState.patterns.map((_: unknown, i: number) => i),
+        songLength: trackerState.patternOrder?.length ?? trackerState.patterns.length,
+        restartPosition: 0,
+        numChannels: trackerState.patterns[0]?.channels?.length ?? 4,
+        initialSpeed: transportState.speed ?? 6,
+        initialBPM: transportState.bpm ?? 125,
+        hivelyNative: fmt.hivelyNative ?? undefined,
+        hivelyFileData: fmt.hivelyFileData ?? undefined,
+        hivelyMeta: fmt.hivelyMeta ?? undefined,
+        klysNative: fmt.klysNative ?? undefined,
+        klysFileData: fmt.klysFileData ?? undefined,
+        jamCrackerFileData: fmt.jamCrackerFileData ?? undefined,
+      } as import('../../engine/TrackerReplayer').TrackerSong;
+    }
+
+    // Only use dedicated serializers when we have a song (from replayer or reconstructed above)
     if (song) {
     const format = song.format;
     const layoutFormatId = song.uadePatternLayout?.formatId || song.uadeVariableLayout?.formatId || '';
