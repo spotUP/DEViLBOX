@@ -3,6 +3,7 @@ import { MAMEBaseSynth } from '@engine/mame/MAMEBaseSynth';
 import { textToPhonemes, parsePhonemeString } from '@engine/speech/Reciter';
 import { SpeechSequencer, type SpeechFrame } from '@engine/speech/SpeechSequencer';
 import { type SP0250Frame, phonemesToSP0250Frames, samToSP0250 } from '@engine/speech/sp0250PhonemeMap';
+import { loadS14001AROMs } from '@engine/mame/MAMEROMLoader';
 
 /**
  * S14001A Parameter IDs (matching C++ enum)
@@ -76,6 +77,19 @@ export class S14001ASynth extends MAMEBaseSynth {
   constructor() {
     super();
     this.initSynth();
+  }
+
+  protected async initialize(): Promise<void> {
+    try {
+      const romData = await loadS14001AROMs();
+      await super.initialize();
+      this.loadROM(0, romData);
+      this.romLoaded = true;
+      console.log(`[S14001A] ROM auto-loaded: ${romData.length} bytes`);
+    } catch {
+      console.log('[S14001A] Speech ROMs not found (optional)');
+      await super.initialize();
+    }
   }
 
   // ===========================================================================
@@ -330,6 +344,7 @@ export class S14001ASynth extends MAMEBaseSynth {
     if (param === 'mode') this._mode = value >= 1 ? 1 : 0;
     if (param === 'sing_mode') this._singMode = value >= 1;
     if (param === 'presetLoopSingle') this._presetLoopSingle = value >= 1;
+    if (param === 'romWord') this.speakWord(Math.round(value));
   }
 
   setTextParam(key: string, value: string): void {
