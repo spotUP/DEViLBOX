@@ -99,6 +99,8 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
   const [moduleInfo, setModuleInfo]     = useState<ModuleInfo | null>(null);
   const [loadedFileName, setLoadedFileName] = useState('');
   const [isLoading, setIsLoading]       = useState(false);
+  const [uadeInitProgress, setUadeInitProgress] = useState(0);
+  const [uadeInitPhase, setUadeInitPhase] = useState('');
   const [error, setError]               = useState<string | null>(null);
   const [isPlaying, setIsPlaying]       = useState(false);
   const [uadeMetadata, setUadeMetadata] = useState<UADEMetadata | null>(null);
@@ -194,7 +196,12 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
 
         const { UADEEngine } = await import('@engine/uade/UADEEngine');
         const engine = UADEEngine.getInstance();
+        const unsubProgress = engine.onInitProgress((progress, phase) => {
+          setUadeInitProgress(progress);
+          setUadeInitPhase(phase);
+        });
         await engine.ready();
+        unsubProgress();
         uadeScanActiveRef.current = true;
         // Register all companion files into UADE's virtual FS before loading the module
         for (const companion of companions) {
@@ -519,11 +526,25 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
             </div>
           )}
 
-          {/* Loading indicator */}
+          {/* Loading indicator with optional UADE init progress bar */}
           {isLoading && (
-            <div className="flex items-center gap-2">
-              <div className="w-4 h-4 border-2 border-accent-primary border-t-transparent rounded-full animate-spin" />
-              <span className="text-xs text-text-muted">Parsing Pattern Data…</span>
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 border-2 border-accent-primary border-t-transparent rounded-full animate-spin" />
+                <span className="text-xs text-text-muted">
+                  {uadeInitProgress > 0 && uadeInitProgress < 100
+                    ? `Initializing UADE engine… ${uadeInitPhase}`
+                    : 'Parsing Pattern Data…'}
+                </span>
+              </div>
+              {uadeInitProgress > 0 && uadeInitProgress < 100 && (
+                <div className="w-full h-1.5 bg-dark-bgTertiary rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-accent-primary rounded-full transition-all duration-300"
+                    style={{ width: `${uadeInitProgress}%` }}
+                  />
+                </div>
+              )}
             </div>
           )}
 

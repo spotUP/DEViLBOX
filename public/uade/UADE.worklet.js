@@ -506,10 +506,12 @@ class UADEProcessor extends AudioWorkletProcessor {
       // Pre-compile the WASM module on first init (slow ~2s).
       // On reinit, reuse the compiled module (fast ~50ms).
       if (!this._compiledModule && wasmBinary) {
+        this.port.postMessage({ type: 'initProgress', phase: 'compiling', progress: 10 });
         console.log('[UADE.worklet] Compiling WASM module (' + wasmBinary.byteLength + ' bytes)...');
         const t0 = performance.now();
         this._compiledModule = await WebAssembly.compile(wasmBinary);
         console.log('[UADE.worklet] WASM compiled in ' + Math.round(performance.now() - t0) + 'ms');
+        this.port.postMessage({ type: 'initProgress', phase: 'compiled', progress: 50 });
       }
 
       // Instantiate using pre-compiled module (fast) or raw binary (first time fallback)
@@ -538,9 +540,11 @@ class UADEProcessor extends AudioWorkletProcessor {
       } else if (wasmBinary) {
         emscriptenOpts.wasmBinary = wasmBinary;
       }
+      this.port.postMessage({ type: 'initProgress', phase: 'instantiating', progress: 60 });
       const t1 = performance.now();
       this._wasm = await globalThis.createUADE(emscriptenOpts);
       console.log('[UADE.worklet] WASM instantiated in ' + Math.round(performance.now() - t1) + 'ms');
+      this.port.postMessage({ type: 'initProgress', phase: 'instantiated', progress: 80 });
 
       // Allocate float32 buffers in WASM heap for audio output
       const frameBytes = this._outFrames * 4;  // float32
@@ -558,6 +562,7 @@ class UADEProcessor extends AudioWorkletProcessor {
       this._wasmBinary = wasmBinary; // Keep for reinit after load failure
       this._sampleRate = sampleRate || 44100;
       this._ready = true;
+      this.port.postMessage({ type: 'initProgress', phase: 'ready', progress: 100 });
       this.port.postMessage({ type: 'ready' });
     } catch (err) {
       let errMsg;
