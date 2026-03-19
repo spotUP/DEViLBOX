@@ -2085,16 +2085,12 @@ export async function tryRouteFormat(
     return parseUADEFile(buffer, toUADEPrefixName(originalFileName, ['mok']), prefs.uade ?? 'enhanced', subsong, preScannedMeta);
   }
   // ── SunTronic / TSM (.sun / .tsm / tsm.* prefix) ────────────────────────
-  // The Sun Machine — Amiga synthetic music exe. Always use classic streaming
-  // because TSM is a synth format — samples extracted by enhanced scan are just
-  // tiny waveform snippets, not the actual sound.
-  // Note: .sun → tsm.name (not sun.name) — UADE eagleplayer expects tsm. prefix
+  // The Sun Machine — Amiga synthetic music exe. Use UADE classic streaming
+  // with the ORIGINAL filename — UADE auto-detects the format by content.
+  // Using tsm. prefix forces TSMPlayer which rejects some file variants.
   if (matchesExt(filename, ['sun', 'tsm'])) {
-    const base = getBasename(originalFileName);
-    const nameWithoutExt = base.replace(/\.(sun|tsm)$/i, '');
-    const tsmPrefixName = `tsm.${nameWithoutExt}`;
     const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
-    return parseUADEFile(buffer, tsmPrefixName, 'classic', subsong, preScannedMeta);
+    return parseUADEFile(buffer, originalFileName, 'classic', subsong, preScannedMeta);
   }
 
   // EA handled below with native EarAcheParser + UADE classic injection
