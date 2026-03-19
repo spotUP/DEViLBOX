@@ -535,6 +535,8 @@ class UADEProcessor extends AudioWorkletProcessor {
       }
 
       console.log('[UADE.worklet] UADE engine initialized successfully');
+      this._wasmBinary = wasmBuffer; // Keep for reinit after load failure
+      this._sampleRate = sampleRate || 44100;
       this._ready = true;
       this.port.postMessage({ type: 'ready' });
     } catch (err) {
@@ -604,7 +606,7 @@ class UADEProcessor extends AudioWorkletProcessor {
     return ret;
   }
 
-  _load(buffer, filenameHint, subsongIndex = 0, skipScan = false) {
+  async _load(buffer, filenameHint, subsongIndex = 0, skipScan = false) {
     if (!this._wasm || !this._ready) {
       this.port.postMessage({ type: 'error', message: 'WASM not ready' });
       return;
@@ -617,8 +619,26 @@ class UADEProcessor extends AudioWorkletProcessor {
       // Keep a copy so _scanSubsong() can reload without transferring back from main thread
       this._lastData = data;
       this._lastHint = filenameHint;
-      const ret = this._loadIntoWasm(data, filenameHint);
+      let ret = this._loadIntoWasm(data, filenameHint);
       console.log('[UADE.worklet] _uade_wasm_load returned: ' + ret);
+
+      // If load failed, reinitialize the WASM module and retry once.
+      // UADE's IPC state machine gets corrupted after playing a song,
+      // so a second song load fails. Full WASM reinit fixes this.
+      if (ret !== 0 && this._wasmBinary) {
+        console.warn('[UADE.worklet] Load failed — reinitializing WASM and retrying...');
+        try {
+          this._wasm = null;
+          this._ready = false;
+          await this.initWasm(this._sampleRate, this._wasmBinary, null);
+          if (this._wasm && this._ready) {
+            ret = this._loadIntoWasm(data, filenameHint);
+            console.log('[UADE.worklet] Retry _uade_wasm_load returned: ' + ret);
+          }
+        } catch (reinitErr) {
+          console.error('[UADE.worklet] Reinit failed:', reinitErr.message);
+        }
+      }
 
       if (ret !== 0) {
         const abortInfo = this._lastAbortReason ? ' (abort: ' + this._lastAbortReason + ')' : '';
