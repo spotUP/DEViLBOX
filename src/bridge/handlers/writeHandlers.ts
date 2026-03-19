@@ -2050,9 +2050,49 @@ export async function exportMod(params: Record<string, unknown>): Promise<Record
 export async function exportNative(params: Record<string, unknown>): Promise<Record<string, unknown>> {
   try {
     const outputPath = params.outputPath as string | undefined;
+
+    // Try the replayer first (has song if playback has been triggered)
     const { getTrackerReplayer } = await import('../../engine/TrackerReplayer');
-    const song = getTrackerReplayer().getSong();
-    if (!song) return { error: 'No song loaded' };
+    let song = getTrackerReplayer().getSong();
+
+    // If replayer doesn't have a song, reconstruct from stores
+    if (!song) {
+      const trackerState = useTrackerStore.getState();
+      const instrumentState = useInstrumentStore.getState();
+      const projectState = useProjectStore.getState();
+      const transportState = (await import('../../stores/useTransportStore')).useTransportStore.getState();
+      const { useFormatStore } = await import('../../stores/useFormatStore');
+      const fmt = useFormatStore.getState();
+
+      if (trackerState.patterns.length === 0) return { error: 'No song loaded' };
+
+      const format = (fmt.editorMode === 'hively' ? (fmt.hivelyMeta?.version === 0 ? 'AHX' : 'HVL')
+        : fmt.editorMode === 'klystrack' ? 'KT'
+        : fmt.editorMode === 'musicline' ? 'MOD'
+        : fmt.originalModuleData?.format || 'MOD') as import('../../engine/TrackerReplayer').TrackerFormat;
+
+      song = {
+        name: projectState.metadata?.name ?? 'Untitled',
+        format,
+        patterns: trackerState.patterns,
+        instruments: instrumentState.instruments,
+        songPositions: trackerState.patternOrder ?? trackerState.patterns.map((_: unknown, i: number) => i),
+        songLength: trackerState.patternOrder?.length ?? trackerState.patterns.length,
+        restartPosition: 0,
+        numChannels: trackerState.patterns[0]?.channels?.length ?? 4,
+        initialSpeed: transportState.speed ?? 6,
+        initialBPM: transportState.bpm ?? 125,
+        // Format-specific native data from format store
+        hivelyNative: fmt.hivelyNative ?? undefined,
+        hivelyFileData: fmt.hivelyFileData ?? undefined,
+        hivelyMeta: fmt.hivelyMeta ?? undefined,
+        klysNative: fmt.klysNative ?? undefined,
+        klysFileData: fmt.klysFileData ?? undefined,
+        uadeEditableFileData: fmt.uadeEditableFileData ?? undefined,
+        uadeEditableFileName: fmt.uadeEditableFileName ?? undefined,
+        symphonieFileData: fmt.symphonieFileData ?? undefined,
+      } as import('../../engine/TrackerReplayer').TrackerSong;
+    }
 
     const format = song.format;
     const layoutFormatId = song.uadePatternLayout?.formatId || song.uadeVariableLayout?.formatId || '';
