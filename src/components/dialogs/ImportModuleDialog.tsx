@@ -175,6 +175,17 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
 
         // Skip pre-scan for synthetic/compiled 68k formats — the enhanced scan
         // corrupts UADE engine state, causing subsequent loads to fail.
+        // Initialize UADE engine with progress reporting (first init is slow ~2s)
+        const { UADEEngine } = await import('@engine/uade/UADEEngine');
+        const engine = UADEEngine.getInstance();
+        const unsubProgress = engine.onInitProgress((progress, phase) => {
+          setUadeInitProgress(progress);
+          setUadeInitPhase(phase);
+        });
+        await engine.ready();
+        unsubProgress();
+        setUadeInitProgress(100);
+
         const isSynthFormat = /\.(sun|tsm)$/i.test(fname);
         if (isSynthFormat) {
           setModuleInfo({
@@ -193,15 +204,6 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
           });
           uadeScanActiveRef.current = false;
         } else {
-
-        const { UADEEngine } = await import('@engine/uade/UADEEngine');
-        const engine = UADEEngine.getInstance();
-        const unsubProgress = engine.onInitProgress((progress, phase) => {
-          setUadeInitProgress(progress);
-          setUadeInitPhase(phase);
-        });
-        await engine.ready();
-        unsubProgress();
         uadeScanActiveRef.current = true;
         // Register all companion files into UADE's virtual FS before loading the module
         for (const companion of companions) {
