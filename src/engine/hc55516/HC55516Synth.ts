@@ -66,9 +66,47 @@ export class HC55516Synth extends MAMEBaseSynth {
   private _presetLoopSingle = false;
   private _presetIndex = 0;
 
+  // ROM state
+  private _romData: Uint8Array | null = null;
+  private _romSentToWasm = false;
+
   constructor() {
     super();
     this.initSynth();
+  }
+
+  // ===========================================================================
+  // ROM/Bitstream Loading
+  // ===========================================================================
+
+  loadROM(_bank: number, data: Uint8Array): void {
+    this._romData = data;
+    this._romSentToWasm = false;
+    this.romLoaded = true;
+    if (this._isReady) this._sendROMToWasm();
+  }
+
+  private _sendROMToWasm(): void {
+    if (!this._romData || !this.workletNode || this._romSentToWasm) return;
+    const buffer = this._romData.buffer.slice(this._romData.byteOffset, this._romData.byteOffset + this._romData.byteLength);
+    this.workletNode.port.postMessage({ type: 'loadROM', romData: buffer }, [buffer]);
+    this._romData = null;
+    this._romSentToWasm = true;
+  }
+
+  protected override handleWorkletMessage(data: Record<string, unknown>): void {
+    super.handleWorkletMessage(data);
+    if (data.type === 'ready' && this.romLoaded && !this._romSentToWasm) this._sendROMToWasm();
+  }
+
+  playBitstream(byteOffset = 0, byteLength = 0): void {
+    if (!this._romSentToWasm || !this.workletNode || this._disposed) return;
+    this.workletNode.port.postMessage({ type: 'playBitstream', byteOffset, byteLength });
+  }
+
+  stopROMSpeaking(): void {
+    if (!this.workletNode || this._disposed) return;
+    this.workletNode.port.postMessage({ type: 'stopSpeaking' });
   }
 
   protected writeKeyOn(note: number, velocity: number): void {

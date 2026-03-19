@@ -542,6 +542,11 @@ export const CHIP_SYNTH_DEFS: Record<string, ChipSynthDef> = {
     color: '#ef4444',
     presetCount: 8,
     presetNames: ['AH', 'EE', 'IH', 'OH', 'OO', 'NN', 'ZZ', 'HH'],
+    romConfig: {
+      requiredZip: '.bin (S14001A speech ROM, e.g. Berzerk)',
+      bankCount: 1,
+      romType: 's14001a',
+    },
     parameters: [
       { key: 'mode', label: 'Mode', group: 'Speech', type: 'select', min: 0, max: 1, default: 1, formatValue: 'int', options: [
         { value: 0, label: 'Tone' }, { value: 1, label: 'Speech' },
@@ -572,6 +577,11 @@ export const CHIP_SYNTH_DEFS: Record<string, ChipSynthDef> = {
     color: '#3b82f6',
     presetCount: 8,
     presetNames: ['AH', 'EE', 'IH', 'OH', 'OO', 'NN', 'SS', 'HH'],
+    romConfig: {
+      requiredZip: '.bin (VLM5030 speech ROM, e.g. Track & Field)',
+      bankCount: 1,
+      romType: 'vlm5030',
+    },
     parameters: [
       { key: 'mode', label: 'Mode', group: 'Speech', type: 'select', min: 0, max: 1, default: 1, formatValue: 'int', options: [
         { value: 0, label: 'Tone' }, { value: 1, label: 'Speech' },
@@ -602,6 +612,11 @@ export const CHIP_SYNTH_DEFS: Record<string, ChipSynthDef> = {
     color: '#a855f7',
     presetCount: 8,
     presetNames: ['AH', 'EE', 'IH', 'OH', 'OO', 'NN', 'ZZ', 'HH'],
+    romConfig: {
+      requiredZip: '.bin (HC55516 CVSD bitstream data, e.g. Sinistar)',
+      bankCount: 1,
+      romType: 'hc55516',
+    },
     parameters: [
       { key: 'mode', label: 'Mode', group: 'Speech', type: 'select', min: 0, max: 1, default: 1, formatValue: 'int', options: [
         { value: 0, label: 'Tone' }, { value: 1, label: 'Speech' },
