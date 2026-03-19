@@ -503,12 +503,19 @@ class UADEProcessor extends AudioWorkletProcessor {
         throw new Error('createUADE factory not available (jsCode=' + (jsCode ? 'present' : 'missing') + ')');
       }
 
-      // Instantiate the WASM module with the provided binary
-      console.log('[UADE.worklet] Calling createUADE() with wasmBinary=' + (wasmBinary ? wasmBinary.byteLength + ' bytes' : 'null'));
+      // Pre-compile the WASM module on first init (slow ~2s).
+      // On reinit, reuse the compiled module (fast ~50ms).
+      if (!this._compiledModule && wasmBinary) {
+        console.log('[UADE.worklet] Compiling WASM module (' + wasmBinary.byteLength + ' bytes)...');
+        const t0 = performance.now();
+        this._compiledModule = await WebAssembly.compile(wasmBinary);
+        console.log('[UADE.worklet] WASM compiled in ' + Math.round(performance.now() - t0) + 'ms');
+      }
+
+      // Instantiate using pre-compiled module (fast) or raw binary (first time fallback)
       this._lastAbortReason = null;
       const self = this;
-      this._wasm = await globalThis.createUADE({
-        wasmBinary,
+      const emscriptenOpts = {
         onAbort(reason) {
           console.error('[UADE.worklet] WASM aborted:', reason);
           self._lastAbortReason = reason;
@@ -519,8 +526,21 @@ class UADEProcessor extends AudioWorkletProcessor {
         printErr(text) {
           console.error('[UADE-stderr]', text);
         },
-      });
-      console.log('[UADE.worklet] WASM module instantiated');
+      };
+      if (this._compiledModule) {
+        // Fast path: instantiate from pre-compiled module
+        emscriptenOpts.instantiateWasm = (imports, successCallback) => {
+          WebAssembly.instantiate(this._compiledModule, imports).then(instance => {
+            successCallback(instance);
+          });
+          return {};
+        };
+      } else if (wasmBinary) {
+        emscriptenOpts.wasmBinary = wasmBinary;
+      }
+      const t1 = performance.now();
+      this._wasm = await globalThis.createUADE(emscriptenOpts);
+      console.log('[UADE.worklet] WASM instantiated in ' + Math.round(performance.now() - t1) + 'ms');
 
       // Allocate float32 buffers in WASM heap for audio output
       const frameBytes = this._outFrames * 4;  // float32
