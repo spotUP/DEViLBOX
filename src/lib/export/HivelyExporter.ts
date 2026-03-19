@@ -78,14 +78,15 @@ export function exportAsHively(
   options: HivelyExportOptions = {}
 ): HivelyExportResult {
   const warnings: string[] = [];
-  const exportFormat = options.format ?? 'hvl';
-  const isAHX = exportFormat === 'ahx';
+  let exportFormat = options.format ?? 'hvl';
   const moduleName = options.moduleName ?? song.name ?? 'Untitled';
 
   const numChannels = song.numChannels;
-  if (isAHX && numChannels > 4) {
-    warnings.push(`AHX format supports max 4 channels. Song has ${numChannels} channels — truncating.`);
+  if (exportFormat === 'ahx' && numChannels > 4) {
+    exportFormat = 'hvl';
+    warnings.push(`Auto-upgraded AHX → HVL (song has ${numChannels} channels, AHX supports max 4).`);
   }
+  const isAHX = exportFormat === 'ahx';
   const channelsToExport = isAHX ? Math.min(numChannels, 4) : numChannels;
 
   // Determine track length from patterns (use first pattern's row count)
