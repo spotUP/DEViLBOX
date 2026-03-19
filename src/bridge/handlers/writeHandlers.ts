@@ -2205,37 +2205,18 @@ export async function exportNative(_params: Record<string, unknown>): Promise<Re
     }
     } // end if (song) — dedicated serializers
 
-    // Fallback: UADE chip RAM readback or raw file data (works without full song)
+    // Fallback: return original file data from the format store.
+    // This is the raw binary as loaded from disk — identical to the original file.
+    // For live edits, use the UI export dialog (which has access to chip RAM readback).
     if (!result) {
       const { uadeEditableFileData, uadeEditableFileName } = fmt;
       if (uadeEditableFileData) {
         const ext = (uadeEditableFileName || '').split('.').pop() || 'bin';
-        // Try chip RAM readback first (includes live edits)
-        try {
-          const { UADEChipEditor } = await import('../../engine/uade/UADEChipEditor');
-          const { UADEEngine } = await import('../../engine/uade/UADEEngine');
-          if (UADEEngine.hasInstance()) {
-            const chipEditor = new UADEChipEditor(UADEEngine.getInstance());
-            const moduleSize = uadeEditableFileData.byteLength;
-            if (moduleSize > 0) {
-              const bytes = await chipEditor.readEditedModule(moduleSize);
-              result = {
-                data: new Blob([new Uint8Array(bytes.buffer as ArrayBuffer, bytes.byteOffset, bytes.byteLength)], { type: blobType }),
-                filename: `${baseName}.${ext}`,
-                warnings: ['Exported via chip RAM readback (includes edits)'],
-              };
-            }
-          }
-        } catch { /* UADE engine not available */ }
-
-        // If chip RAM readback failed, return the original file data
-        if (!result) {
-          result = {
-            data: new Blob([new Uint8Array(uadeEditableFileData)], { type: blobType }),
-            filename: `${baseName}.${ext}`,
-            warnings: ['Exported original file data (no live edits — start playback first for chip RAM readback)'],
-          };
-        }
+        result = {
+          data: new Blob([new Uint8Array(uadeEditableFileData)], { type: blobType }),
+          filename: `${baseName}.${ext}`,
+          warnings: [],
+        };
       }
     }
 
