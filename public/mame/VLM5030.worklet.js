@@ -61,6 +61,7 @@ class VLM5030Processor extends AudioWorkletProcessor {
     this.initialized = false;
     this.bufferSize = 128;
     this.lastHeapBuffer = null;
+    this.romPtr = 0;
 
     this.port.onmessage = (event) => {
       this.handleMessage(event.data);
@@ -112,10 +113,37 @@ class VLM5030Processor extends AudioWorkletProcessor {
       case 'setPanning':
         if (this.synth) this.synth.setParameter(4, data.pan);
         break;
+      // === ROM Speech Commands ===
+      case 'loadROM':
+        this.loadROM(data.romData);
+        break;
+      case 'speakWord':
+        if (this.synth) this.synth.speakWord(data.wordIndex);
+        break;
+      case 'speakAtAddress':
+        if (this.synth) this.synth.speakAtAddress(data.byteAddr);
+        break;
+      case 'stopSpeaking':
+        if (this.synth) this.synth.stopSpeaking();
+        break;
       case 'dispose':
         this.cleanup();
         break;
     }
+  }
+
+  loadROM(romData) {
+    if (!this.module || !this.synth) { console.error('[VLM5030 Worklet] Cannot load ROM: synth not initialized'); return; }
+    if (this.romPtr) { this.module._free(this.romPtr); this.romPtr = 0; }
+    const size = romData.byteLength;
+    this.romPtr = this.module._malloc(size);
+    if (!this.romPtr) { console.error('[VLM5030 Worklet] Failed to allocate WASM memory for ROM'); return; }
+    const romBytes = new Uint8Array(romData);
+    const heapView = new Uint8Array(this.module.wasmMemory ? this.module.wasmMemory.buffer : this.module.HEAPU8.buffer);
+    heapView.set(romBytes, this.romPtr);
+    this.synth.loadROM(this.romPtr, size);
+    console.log(`[VLM5030 Worklet] ROM loaded: ${size} bytes at WASM ptr ${this.romPtr}`);
+    this.port.postMessage({ type: 'romLoaded', size });
   }
 
   async initSynth(data) {
@@ -154,6 +182,7 @@ class VLM5030Processor extends AudioWorkletProcessor {
   }
 
   cleanup() {
+    if (this.module && this.romPtr) { this.module._free(this.romPtr); this.romPtr = 0; }
     if (this.module && this.outputPtrL) {
       this.module._free(this.outputPtrL);
       this.outputPtrL = 0;
