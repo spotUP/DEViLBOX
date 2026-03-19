@@ -160,6 +160,8 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
     setIsLoading(true);
     setError(null);
     setModuleInfo(null);
+    setUadeInitProgress(0);
+    setUadeInitPhase('');
     setUadeMetadata(null);
     setSongDBInfo(null);
     setSidHeader(null);
@@ -528,14 +530,16 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
             </div>
           )}
 
-          {/* Loading indicator with optional UADE init progress bar */}
+          {/* Loading indicator with UADE init progress bar */}
           {isLoading && (
             <div className="flex flex-col gap-2">
               <div className="flex items-center gap-2">
                 <div className="w-4 h-4 border-2 border-accent-primary border-t-transparent rounded-full animate-spin" />
                 <span className="text-xs text-text-muted">
-                  {uadeInitProgress > 0 && uadeInitProgress < 100
-                    ? `Initializing UADE engine… ${uadeInitPhase}`
+                  {uadeInitPhase === 'compiling' ? 'Compiling UADE engine…'
+                    : uadeInitPhase === 'compiled' ? 'UADE compiled, instantiating…'
+                    : uadeInitPhase === 'instantiating' ? 'Instantiating UADE…'
+                    : uadeInitPhase === 'instantiated' ? 'Initializing UADE engine…'
                     : 'Parsing Pattern Data…'}
                 </span>
               </div>
