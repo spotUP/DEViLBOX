@@ -535,7 +535,7 @@ class UADEProcessor extends AudioWorkletProcessor {
       }
 
       console.log('[UADE.worklet] UADE engine initialized successfully');
-      this._wasmBinary = wasmBuffer; // Keep for reinit after load failure
+      this._wasmBinary = wasmBinary; // Keep for reinit after load failure
       this._sampleRate = sampleRate || 44100;
       this._ready = true;
       this.port.postMessage({ type: 'ready' });
@@ -630,7 +630,7 @@ class UADEProcessor extends AudioWorkletProcessor {
         try {
           this._wasm = null;
           this._ready = false;
-          await this.initWasm(this._sampleRate, this._wasmBinary, null);
+          await this._init(this._sampleRate, this._wasmBinary, null);
           if (this._wasm && this._ready) {
             ret = this._loadIntoWasm(data, filenameHint);
             console.log('[UADE.worklet] Retry _uade_wasm_load returned: ' + ret);
