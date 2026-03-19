@@ -17,6 +17,7 @@ import { join, basename } from 'path';
 import type { TrackerSong } from '../src/engine/TrackerReplayer.ts';
 import type { InstrumentConfig } from '../src/types/instrument/defaults.ts';
 import type { Pattern, TrackerCell } from '../src/types/tracker.ts';
+import { bakeSynthInstruments } from './synth-prerender/index.ts';
 
 // ============================================================================
 // PERIOD TABLE & NOTE CONVERSION
@@ -1408,14 +1409,8 @@ async function processTestCase(tc: TestCase): Promise<{ ok: boolean; outPath?: s
       song.initialSpeed = tc.speed;
     }
 
-    // Bake synth instruments
-    if (song.instruments.some(i => i.hively)) {
-      bakeHivelyInstruments(song);
-    }
-    if (song.instruments.some(i => i.sidmon1)) {
-      bakeSidMon1Instruments(song);
-    }
-    bakeGenericSynthInstruments(song);
+    // Bake synth instruments (unified pre-renderer with tick simulation)
+    bakeSynthInstruments(song);
 
     // Decide export format
     let exportFormat: 'mod' | 'xm';
