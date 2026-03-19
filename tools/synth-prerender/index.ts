@@ -43,6 +43,7 @@ function attachSampleToInstrument(
   loopEnd: number,
   sampleRate: number,
 ): void {
+  const hasLoop = loopStart >= 0 && loopEnd > loopStart;
   const wavBuf = buildLoopingWAV(pcm, loopStart, loopEnd, sampleRate);
   if (!inst.sample) {
     inst.sample = {
@@ -50,10 +51,10 @@ function attachSampleToInstrument(
       url: '',
       baseNote: 'C-4',
       detune: 0,
-      loop: true,
-      loopStart,
-      loopEnd,
-      loopType: 'forward',
+      loop: hasLoop,
+      loopStart: hasLoop ? loopStart : 0,
+      loopEnd: hasLoop ? loopEnd : pcm.length,
+      loopType: hasLoop ? 'forward' : 'off',
       sampleRate,
       reverse: false,
       playbackRate: 1,
@@ -61,10 +62,10 @@ function attachSampleToInstrument(
   } else {
     inst.sample.audioBuffer = wavBuf;
     inst.sample.sampleRate = sampleRate;
-    inst.sample.loop = true;
-    inst.sample.loopStart = loopStart;
-    inst.sample.loopEnd = loopEnd;
-    inst.sample.loopType = 'forward';
+    inst.sample.loop = hasLoop;
+    inst.sample.loopStart = hasLoop ? loopStart : 0;
+    inst.sample.loopEnd = hasLoop ? loopEnd : pcm.length;
+    inst.sample.loopType = hasLoop ? 'forward' : 'off';
   }
 }
 
