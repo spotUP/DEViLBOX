@@ -96,6 +96,7 @@ export interface FormatEnginePreferences {
   chuckBiscuits: FormatEngineChoice;      // .cba → ChuckBiscuitsParser vs UADE
   speedySystem: FormatEngineChoice;       // .ss → SpeedySystemParser vs UADE
   tronic: FormatEngineChoice;             // .trc/.dp/.tro → TronicParser vs UADE
+  suntronic: FormatEngineChoice;          // .sun/.tsm → SunTronic/TSM via UADE
   digiBoosterPro: FormatEngineChoice;     // .dbm → DigiBoosterProParser vs UADE
   gameMusicCreator: FormatEngineChoice;   // .gmc → GameMusicCreatorParser vs UADE
   faceTheMusic: FormatEngineChoice;       // .ftm → FaceTheMusicParser vs UADE
@@ -358,6 +359,7 @@ export const useSettingsStore = create<SettingsStore>()(
         chuckBiscuits: 'uade',    // ChuckBiscuitsParser — dedicated Chuck Biscuits / Black Artist support
         speedySystem: 'uade',       // SpeedySystemParser — prefer UADE (DOC RAM samples required)
         tronic: 'uade',             // TronicParser — no native parser; always UADE
+        suntronic: 'uade',          // SunTronic/TSM — UADE only
         digiBoosterPro: 'native',   // DigiBoosterProParser — dedicated DigiBooster Pro (.dbm) support
         gameMusicCreator: 'uade',   // GameMusicCreatorParser — prefer UADE (complex synthesis)
         faceTheMusic: 'native',     // FaceTheMusicParser — native parser available
