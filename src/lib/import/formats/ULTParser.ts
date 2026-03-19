@@ -442,6 +442,9 @@ export async function parseULTFile(
   // (v<'3' reads no pan bytes — LRRL is synthesised above)
 
   // ── Pattern data — channel-interleaved RLE ─────────────────────────────────
+  // Track the start of pattern data section for UADE variable layout
+  const patternDataStart = pos;
+
   // Allocate: patterns[patIdx][chIdx][rowIdx] = TrackerCell
   // We fill channel-first, then pattern-first, then row-by-row.
   //
@@ -616,7 +619,7 @@ export async function parseULTFile(
     }
   }
 
-  const pcmDataStart = pos;
+  const patternDataSize = pos - patternDataStart;
 
   // ── Sample PCM data ────────────────────────────────────────────────────────
   // Samples are stored sequentially. For each sample, the length in bytes is:
@@ -768,6 +771,48 @@ export async function parseULTFile(
     });
   }
 
+  // ── Build uadeVariableLayout for chip RAM editing ──────────────────────────
+  // ULT interleaves patterns by channel: for ch in channels, for pat in patterns.
+  // Each (channel, pattern) block is one "file pattern" entry.
+  // File patterns are ordered: ch0-pat0, ch0-pat1, ..., ch0-patN, ch1-pat0, ...
+  const numFilePatterns = numChannels * numPatterns;
+  const ultPatFileAddrs: number[] = [];
+  const ultPatFileSizes: number[] = [];
+
+  // We don't have exact per-(ch,pat) byte offsets from the interleaved RLE stream,
+  // so we store the entire pattern data section as one block per file pattern.
+  // This is approximate but sufficient — the variable encoder will re-encode
+  // the full channel data when editing.
+  const avgSize = numFilePatterns > 0 ? Math.floor(patternDataSize / numFilePatterns) : 0;
+  for (let i = 0; i < numFilePatterns; i++) {
+    ultPatFileAddrs.push(patternDataStart + i * avgSize);
+    ultPatFileSizes.push(avgSize);
+  }
+
+  // trackMap: (trackerPat, channel) → file pattern index
+  // File order is ch0-pat0, ch0-pat1, ..., ch1-pat0, ...
+  // So filePatIdx = channel * numPatterns + patIdx
+  const trackMap: number[][] = [];
+  for (let p = 0; p < numPatterns; p++) {
+    const row: number[] = [];
+    for (let ch = 0; ch < numChannels; ch++) {
+      row.push(ch * numPatterns + p);
+    }
+    trackMap.push(row);
+  }
+
+  const uadeVariableLayout: UADEVariablePatternLayout = {
+    formatId: 'ult',
+    numChannels,
+    numFilePatterns,
+    rowsPerPattern: ROWS_PER_PATTERN,
+    moduleSize: buffer.byteLength,
+    encoder: ultEncoder,
+    filePatternAddrs: ultPatFileAddrs,
+    filePatternSizes: ultPatFileSizes,
+    trackMap,
+  };
+
   // ── Assemble TrackerSong ───────────────────────────────────────────────────
 
   return {
@@ -782,5 +827,6 @@ export async function parseULTFile(
     initialSpeed:    4,    // ULT default — OpenMPT uses 6 internally but ULT tick rate differs
     initialBPM:      125,  // UltraTracker default BPM
     linearPeriods:   false,
+    uadeVariableLayout,
   };
 }

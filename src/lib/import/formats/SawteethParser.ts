@@ -64,6 +64,8 @@
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, TrackerCell, InstrumentConfig } from '@/types';
+import type { UADEVariablePatternLayout } from '@/engine/uade/UADEPatternEncoder';
+import { encodeSawteethPattern } from '@/engine/uade/encoders/SawteethEncoder';
 
 // ── Constants ──────────────────────────────────────────────────────────────
 
@@ -566,6 +568,44 @@ export function parseSawteethFile(bytes: Uint8Array, filename: string): TrackerS
 
   void author;
 
+  // ── Build uadeVariableLayout for chip RAM editing ─────────────────────────
+  // Sawteeth stores Parts as variable-length step arrays (3 bytes per step).
+  // Each expanded channel is a flat row list derived from multiple parts.
+  // We treat each channel as a single file-level "pattern".
+  // Since parts are shared and the channel sequence adds transpose/dAmp,
+  // edits go back to the expanded row data (part-level editing not supported).
+
+  // Compute approximate file offsets for each channel's expanded data.
+  // The actual binary stores parts separately, not per-channel expanded data,
+  // so we use placeholder offsets. Real chip RAM patching would need part-level
+  // address resolution at runtime.
+  const filePatternAddrs: number[] = [];
+  const filePatternSizes: number[] = [];
+  for (let ch = 0; ch < channelCount; ch++) {
+    filePatternAddrs.push(0); // placeholder — resolved at runtime via chip RAM
+    filePatternSizes.push(expandedChannels[ch].length * 3); // 3 bytes per step
+  }
+
+  const trackMap: number[][] = [];
+  for (let pidx = 0; pidx < trackerPatterns.length; pidx++) {
+    trackMap.push(Array.from({ length: channelCount }, (_, ch) => ch));
+  }
+
+  const uadeVariableLayout: UADEVariablePatternLayout = {
+    formatId: 'sawteeth',
+    numChannels: channelCount,
+    numFilePatterns: channelCount,
+    rowsPerPattern: ROWS_PER_PATTERN,
+    moduleSize: bytes.length,
+    encoder: {
+      formatId: 'sawteeth',
+      encodePattern: encodeSawteethPattern,
+    },
+    filePatternAddrs,
+    filePatternSizes,
+    trackMap,
+  };
+
   return {
     name: moduleName,
     format: 'SAW' as TrackerFormat,
@@ -578,6 +618,7 @@ export function parseSawteethFile(bytes: Uint8Array, filename: string): TrackerS
     initialSpeed: 6,
     initialBPM: 125,
     linearPeriods: false,
+    uadeVariableLayout,
   };
 }
 

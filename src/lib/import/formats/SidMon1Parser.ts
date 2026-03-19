@@ -19,6 +19,8 @@
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, TrackerCell, InstrumentConfig } from '@/types';
 import type { SidMon1Config, UADEChipRamInfo } from '@/types/instrument';
+import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
+import { encodeSidMon1Cell } from '@/engine/uade/encoders/SidMon1Encoder';
 
 // ── Binary read helpers ───────────────────────────────────────────────────────
 
@@ -514,6 +516,32 @@ export function parseSidMon1File(buffer: ArrayBuffer, filename: string, moduleBa
 
   const moduleName = filename.replace(/\.[^/.]+$/, '');
 
+  // Build uadePatternLayout with getCellFileOffset for track/pattern indirection
+  const uadePatternLayout: UADEPatternLayout = {
+    formatId: 'sidmon1',
+    patternDataFileOffset: patDataOffset,
+    bytesPerCell: 5,
+    rowsPerPattern: ROWS_PER_PATTERN,
+    numChannels: CHANNELS,
+    numPatterns: songSteps,
+    moduleSize: buffer.byteLength,
+    encodeCell: encodeSidMon1Cell,
+    getCellFileOffset: (pattern: number, row: number, channel: number): number => {
+      // pattern = TrackerSong pattern index (= song step index)
+      // Resolve through track table: each step has CHANNELS tracks
+      const trackIdx = pattern * CHANNELS + channel;
+      const track = tracks[trackIdx];
+      if (!track) return 0;
+
+      // Track.pattern indexes into patternPtrs to get the row offset
+      const patPtr = patternPtrs[track.pattern];
+      if (patPtr === undefined) return 0;
+
+      // Each row is 5 bytes in the pattern data section
+      return patDataOffset + (patPtr + row) * 5;
+    },
+  };
+
   return {
     name: `${moduleName} [SidMon 1.0]`,
     format: 'MOD' as TrackerFormat,
@@ -526,8 +554,7 @@ export function parseSidMon1File(buffer: ArrayBuffer, filename: string, moduleBa
     initialSpeed: 6,
     initialBPM: 125,
     linearPeriods: false,
-    // uadePatternLayout omitted: SidMon1Synth WASM engine handles audio directly.
-    // UADE overrides and silences the native SidMon1Synth when uadePatternLayout is present.
+    uadePatternLayout,
   };
 }
 

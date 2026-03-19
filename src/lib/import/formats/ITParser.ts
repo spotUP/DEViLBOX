@@ -108,7 +108,9 @@ import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, ChannelData, TrackerCell } from '@/types';
 import type { ParsedSample, ParsedInstrument, EnvelopePoints, EnvelopePoint } from '@/types/tracker';
 import type { InstrumentConfig } from '@/types/instrument';
+import type { UADEVariablePatternLayout } from '@/engine/uade/UADEPatternEncoder';
 import { convertToInstrument } from '../InstrumentConverter';
+import { itEncoder } from '@/engine/uade/encoders/ITEncoder';
 
 // ── Binary helpers ────────────────────────────────────────────────────────────
 
@@ -881,6 +883,10 @@ export function parseITFile(buffer: ArrayBuffer, filename: string): TrackerSong 
   // ── Patterns ──
   const patterns: Pattern[] = [];
   const patIndexToArrayIdx  = new Map<number, number>();
+  // Track file-level pattern addresses and sizes for uadeVariableLayout
+  const filePatternAddrs: number[] = [];
+  const filePatternSizes: number[] = [];
+  const rowsPerPatternArr: number[] = [];
 
   const referencedPats = new Set<number>(orders);
   for (let i = 0; i < patNum; i++) referencedPats.add(i);
@@ -891,6 +897,9 @@ export function parseITFile(buffer: ArrayBuffer, filename: string): TrackerSong 
   for (const patIdx of allPatIdxs) {
     if (patIdx >= patternOffsets.length || patternOffsets[patIdx] === 0) {
       patIndexToArrayIdx.set(patIdx, patterns.length);
+      filePatternAddrs.push(0);
+      filePatternSizes.push(0);
+      rowsPerPatternArr.push(ROWS_PER_PATTERN);
       patterns.push(makeEmptyPattern(patIdx, numChannels, filename, maxPatIdx, numInst));
       continue;
     }
@@ -898,12 +907,18 @@ export function parseITFile(buffer: ArrayBuffer, filename: string): TrackerSong 
     const patOff = patternOffsets[patIdx];
     if (patOff + 8 > buffer.byteLength) {
       patIndexToArrayIdx.set(patIdx, patterns.length);
+      filePatternAddrs.push(0);
+      filePatternSizes.push(0);
+      rowsPerPatternArr.push(ROWS_PER_PATTERN);
       patterns.push(makeEmptyPattern(patIdx, numChannels, filename, maxPatIdx, numInst));
       continue;
     }
 
     const packedLen = u16le(v, patOff);
     const numRows   = u16le(v, patOff + 2) || ROWS_PER_PATTERN;
+    filePatternAddrs.push(patOff + 8); // data starts after 8-byte header
+    filePatternSizes.push(packedLen);
+    rowsPerPatternArr.push(numRows);
     const rowData   = raw.subarray(patOff + 8, patOff + 8 + packedLen);
     const cells     = decodeITPattern(rowData, numRows, numChannels);
 
@@ -952,6 +967,23 @@ export function parseITFile(buffer: ArrayBuffer, filename: string): TrackerSong 
   }
   if (songPositions.length === 0) songPositions.push(0);
 
+  // Build trackMap: all channels of each pattern share the same file-pattern index
+  const trackMap: number[][] = patterns.map((_, arrIdx) =>
+    Array.from({ length: numChannels }, () => arrIdx),
+  );
+
+  const uadeVariableLayout: UADEVariablePatternLayout = {
+    formatId: 'it',
+    numChannels,
+    numFilePatterns: patterns.length,
+    rowsPerPattern: rowsPerPatternArr,
+    moduleSize: buffer.byteLength,
+    encoder: itEncoder,
+    filePatternAddrs,
+    filePatternSizes,
+    trackMap,
+  };
+
   return {
     name:            songName.replace(/\0/g, '').trim() || filename.replace(/\.[^/.]+$/, ''),
     format:          'IT' as TrackerFormat,
@@ -964,5 +996,6 @@ export function parseITFile(buffer: ArrayBuffer, filename: string): TrackerSong 
     initialSpeed:    speed,
     initialBPM:      tempo,
     linearPeriods,
+    uadeVariableLayout,
   };
 }

@@ -688,6 +688,19 @@ export function updateSonicArrangerParameters(
   instrumentId: number,
   config: import('@typedefs/instrument').SonicArrangerConfig,
 ): void {
+  updateNativeSynthConfig(ctx, instrumentId, config);
+}
+
+/**
+ * Generic live parameter update for any native WASM synth with updateConfig().
+ * Works for all Amiga synth engines (FC, SoundMon, SidMon, DigMug, Fred, TFMX,
+ * HippelCoSo, RobHubbard, OctaMED, DavidWhittaker, DeltaMusic1/2, SonicArranger, InStereo).
+ */
+export function updateNativeSynthConfig(
+  ctx: SynthUpdateContext,
+  instrumentId: number,
+  config: unknown,
+): void {
   ctx.instruments.forEach((instrument, key) => {
     if (ctx.instrumentIdFromKey(key) === instrumentId && typeof (instrument as any).updateConfig === 'function') {
       (instrument as any).updateConfig(config);

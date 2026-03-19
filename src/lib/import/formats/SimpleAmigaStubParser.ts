@@ -6,17 +6,20 @@
 
 import type { TrackerSong } from '@engine/TrackerReplayer';
 import type { Pattern, InstrumentConfig, TrackerCell } from '@/types';
+import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
+import { encodeSimpleAmigaStubCell } from '@/engine/uade/encoders/SimpleAmigaStubEncoder';
 
 function emptyCell(): TrackerCell {
   return { note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 };
 }
 
-function makeStubSong(_buffer: ArrayBuffer, filename: string, formatName: string, channels: number = 4): TrackerSong {
+function makeStubSong(buffer: ArrayBuffer, filename: string, formatName: string, formatId: string, channels: number = 4): TrackerSong {
   const name = filename.replace(/\.[^.]+$/, '').replace(/^[^.]+\./, '');
+  const ROWS = 64;
   const pattern: Pattern = {
     id: 'pattern-0',
     name: 'Pattern 0',
-    length: 64,
+    length: ROWS,
     channels: Array.from({ length: channels }, (_, ch) => ({
       id: `channel-${ch}`,
       name: `${formatName} ${ch + 1}`,
@@ -27,7 +30,7 @@ function makeStubSong(_buffer: ArrayBuffer, filename: string, formatName: string
       pan: (ch === 0 || ch === 3) ? -50 : 50,
       instrumentId: null,
       color: null,
-      rows: Array.from({ length: 64 }, () => emptyCell()),
+      rows: Array.from({ length: ROWS }, () => emptyCell()),
     })),
   };
   const instruments: InstrumentConfig[] = Array.from({ length: channels }, (_, i) => ({
@@ -40,6 +43,17 @@ function makeStubSong(_buffer: ArrayBuffer, filename: string, formatName: string
     pan: 0,
   } as InstrumentConfig));
 
+  const uadePatternLayout: UADEPatternLayout = {
+    formatId,
+    patternDataFileOffset: 0,
+    bytesPerCell: 4,
+    rowsPerPattern: ROWS,
+    numChannels: channels,
+    numPatterns: 1,
+    moduleSize: buffer.byteLength,
+    encodeCell: encodeSimpleAmigaStubCell,
+  };
+
   return {
     name,
     format: 'MOD' as any,
@@ -51,33 +65,36 @@ function makeStubSong(_buffer: ArrayBuffer, filename: string, formatName: string
     numChannels: channels,
     initialSpeed: 6,
     initialBPM: 125,
+    uadeEditableFileData: buffer.slice(0) as ArrayBuffer,
+    uadeEditableFileName: filename,
+    uadePatternLayout,
   };
 }
 
 export function parseSonicArrangerSasFile(buffer: ArrayBuffer, filename: string): TrackerSong {
-  return makeStubSong(buffer, filename, 'SAS');
+  return makeStubSong(buffer, filename, 'SAS', 'sonicArrangerSas');
 }
 
 export function parseSoundFactoryFile(buffer: ArrayBuffer, filename: string): TrackerSong {
-  return makeStubSong(buffer, filename, 'PSF');
+  return makeStubSong(buffer, filename, 'PSF', 'soundFactoryStub');
 }
 
 export function parseLegglessFile(buffer: ArrayBuffer, filename: string): TrackerSong {
-  return makeStubSong(buffer, filename, 'LME');
+  return makeStubSong(buffer, filename, 'LME', 'leggless');
 }
 
 export function parseMikeDaviesFile(buffer: ArrayBuffer, filename: string): TrackerSong {
-  return makeStubSong(buffer, filename, 'MD');
+  return makeStubSong(buffer, filename, 'MD', 'mikeDavies');
 }
 
 export function parseMarkIIFile(buffer: ArrayBuffer, filename: string): TrackerSong {
-  return makeStubSong(buffer, filename, 'MK2');
+  return makeStubSong(buffer, filename, 'MK2', 'markII');
 }
 
 export function parseAProSysFile(buffer: ArrayBuffer, filename: string): TrackerSong {
-  return makeStubSong(buffer, filename, 'APS');
+  return makeStubSong(buffer, filename, 'APS', 'aProSys');
 }
 
 export function parseArtAndMagicFile(buffer: ArrayBuffer, filename: string): TrackerSong {
-  return makeStubSong(buffer, filename, 'AAM');
+  return makeStubSong(buffer, filename, 'AAM', 'artAndMagic');
 }

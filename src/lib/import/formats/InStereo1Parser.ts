@@ -42,6 +42,7 @@
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, TrackerCell, InstrumentConfig } from '@/types';
+import type { InStereo2Config } from '@/types/instrument';
 import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
 import { encodeInStereo1Cell } from '@/engine/uade/encoders/InStereo1Encoder';
 import { createSamplerInstrument } from './AmigaUtils';
@@ -218,11 +219,21 @@ export function parseInStereo1File(bytes: Uint8Array, filename: string): Tracker
 
   // ── EGC tables: numberOfEnvelopeGeneratorTables × EGC_TABLE_LEN bytes
   const egcTablesOff = off;
-  off += numberOfEnvelopeGeneratorTables * EGC_TABLE_LEN;
+  const egcTables: number[][] = [];
+  for (let i = 0; i < numberOfEnvelopeGeneratorTables; i++) {
+    const tbl: number[] = [];
+    for (let j = 0; j < EGC_TABLE_LEN; j++) tbl.push(off < bytes.length ? u8(bytes, off++) : 0);
+    egcTables.push(tbl);
+  }
 
   // ── ADSR tables: numberOfAdsrTables × ADSR_TABLE_LEN bytes ──────────
   const adsrTablesOff = off;
-  off += numberOfAdsrTables * ADSR_TABLE_LEN;
+  const adsrTables: number[][] = [];
+  for (let i = 0; i < numberOfAdsrTables; i++) {
+    const tbl: number[] = [];
+    for (let j = 0; j < ADSR_TABLE_LEN; j++) tbl.push(off < bytes.length ? u8(bytes, off++) : 0);
+    adsrTables.push(tbl);
+  }
 
   // ── Instrument info: numberOfInstruments × ~20 bytes each ───────────
   // Per InStereo10Worker.cs Load() method:
@@ -265,7 +276,12 @@ export function parseInStereo1File(bytes: Uint8Array, filename: string): Tracker
   }
 
   // ── Arpeggio tables: 16 × ARPEGGIO_TABLE_LEN bytes ──────────────────
-  off += 16 * ARPEGGIO_TABLE_LEN;
+  const arpTables: number[][] = [];
+  for (let i = 0; i < 16; i++) {
+    const tbl: number[] = [];
+    for (let j = 0; j < ARPEGGIO_TABLE_LEN; j++) tbl.push(off < bytes.length ? s8(bytes[off++]) : 0);
+    arpTables.push(tbl);
+  }
 
   // ── Sub-song info: numberOfSubSongs × 16 bytes ───────────────────────
   // Per InStereo10Worker.cs:
@@ -406,10 +422,52 @@ export function parseInStereo1File(bytes: Uint8Array, filename: string): Tracker
         for (let j = 0; j < playLen; j++) {
           pcmUint8[j] = wave[j % 256] & 0xff;
         }
+        // Build InStereo1 config from instrument params + shared tables
+        const adsrTbl = instr.adsrEnabled && instr.adsrTableNumber < adsrTables.length
+          ? adsrTables[instr.adsrTableNumber].slice(0, 128)
+          : new Array(128).fill(255);
+        const egcTbl = instr.egcTableNumber < egcTables.length
+          ? egcTables[instr.egcTableNumber]
+          : new Array(128).fill(0);
+
+        const is10Config: InStereo2Config = {
+          volume: instr.volume,
+          waveformLength: instr.waveformLength,
+          portamentoSpeed: instr.portamentoEnabled ? Math.abs(instr.portamentoSpeed) : 0,
+          vibratoDelay: instr.vibratoDelay,
+          vibratoSpeed: instr.vibratoSpeed,
+          vibratoLevel: instr.vibratoLevel,
+          adsrLength: instr.adsrEnabled ? Math.min(instr.adsrTableLength, 127) : 0,
+          adsrRepeat: 0,
+          sustainPoint: 0,
+          sustainSpeed: 0,
+          amfLength: 0,
+          amfRepeat: 0,
+          egMode: instr.egcMode,
+          egStartLen: instr.egcOffset,
+          egStopRep: 0,
+          egSpeedUp: 0,
+          egSpeedDown: 0,
+          arpeggios: [
+            { length: 0, repeat: 0, values: new Array(14).fill(0) },
+            { length: 0, repeat: 0, values: new Array(14).fill(0) },
+            { length: 0, repeat: 0, values: new Array(14).fill(0) },
+          ],
+          adsrTable: adsrTbl,
+          lfoTable: new Array(128).fill(0),
+          egTable: egcTbl,
+          waveform1: Array.from(wave),
+          waveform2: new Array(256).fill(0),
+          name: `Synth ${i}`,
+        };
+
         instrConfigs.push({
           ...createSamplerInstrument(id, `Synth ${i}`, pcmUint8, instr.volume, SYNTH_RATE, 0, playLen),
+          type: 'synth' as const,
+          synthType: 'InStereo1Synth' as const,
+          inStereo1: is10Config,
           uadeChipRam: chipRam,
-        });
+        } as unknown as InstrumentConfig);
       } else {
         instrConfigs.push({ ...makeSynthPlaceholder(id, `Synth ${i}`), uadeChipRam: chipRam });
       }

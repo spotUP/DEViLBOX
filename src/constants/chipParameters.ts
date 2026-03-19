@@ -533,6 +533,96 @@ export const CHIP_SYNTH_DEFS: Record<string, ChipSynthDef> = {
   },
 
   // =========================================================================
+  // MAMES14001A - SSi TSI S14001A Speech IC (Berzerk)
+  // =========================================================================
+  MAMES14001A: {
+    synthType: 'MAMES14001A',
+    name: 'S14001A',
+    subtitle: 'SSi TSI S14001A Delta Modulation Speech (Berzerk)',
+    color: '#ef4444',
+    presetCount: 8,
+    presetNames: ['AH', 'EE', 'IH', 'OH', 'OO', 'NN', 'ZZ', 'HH'],
+    parameters: [
+      { key: 'mode', label: 'Mode', group: 'Speech', type: 'select', min: 0, max: 1, default: 1, formatValue: 'int', options: [
+        { value: 0, label: 'Tone' }, { value: 1, label: 'Speech' },
+      ]},
+      { key: 'sing_mode', label: 'Sing Mode', group: 'Speech', type: 'toggle', min: 0, max: 1, default: 1 },
+      { key: 'speechText', label: 'Speech Text', group: 'Speech', type: 'text', default: 0, defaultText: 'INTRUDER ALERT', placeholder: 'Type text and press Speak' },
+      { key: 'vowelSequence', label: 'Vowel Editor', group: 'Speech', type: 'vowelEditor', default: 0 },
+      { key: 'volume', label: 'Volume', group: 'Output', type: 'knob', min: 0, max: 1, step: 0.01, default: 0.8, formatValue: 'percent' },
+      { key: 'preset', label: 'Vowel', group: 'Formants', type: 'select', min: 0, max: 7, default: 0, formatValue: 'int', options: [
+        { value: 0, label: 'AH' }, { value: 1, label: 'EE' }, { value: 2, label: 'IH' },
+        { value: 3, label: 'OH' }, { value: 4, label: 'OO' }, { value: 5, label: 'NN' },
+        { value: 6, label: 'ZZ' }, { value: 7, label: 'HH' },
+      ]},
+      { key: 'voiced', label: 'Voiced', group: 'Excitation', type: 'toggle', min: 0, max: 1, default: 1 },
+      { key: 'brightness', label: 'Brightness', group: 'Tone', type: 'knob', min: 0, max: 1, step: 0.01, default: 0.5, formatValue: 'percent' },
+      { key: 'delta_depth', label: 'Delta Depth', group: 'Tone', type: 'knob', min: 0, max: 1, step: 0.01, default: 1.0, formatValue: 'percent' },
+      { key: 'stereo_width', label: 'Stereo Width', group: 'Output', type: 'knob', min: 0, max: 1, step: 0.01, default: 0.3, formatValue: 'percent' },
+    ],
+  },
+
+  // =========================================================================
+  // MAMEVLM5030 - Sanyo VLM5030 LPC Speech (Konami)
+  // =========================================================================
+  MAMEVLM5030: {
+    synthType: 'MAMEVLM5030',
+    name: 'VLM5030',
+    subtitle: 'Sanyo VLM5030 LPC Speech (Konami Arcade)',
+    color: '#3b82f6',
+    presetCount: 8,
+    presetNames: ['AH', 'EE', 'IH', 'OH', 'OO', 'NN', 'SS', 'HH'],
+    parameters: [
+      { key: 'mode', label: 'Mode', group: 'Speech', type: 'select', min: 0, max: 1, default: 1, formatValue: 'int', options: [
+        { value: 0, label: 'Tone' }, { value: 1, label: 'Speech' },
+      ]},
+      { key: 'sing_mode', label: 'Sing Mode', group: 'Speech', type: 'toggle', min: 0, max: 1, default: 1 },
+      { key: 'speechText', label: 'Speech Text', group: 'Speech', type: 'text', default: 0, defaultText: 'READY SET GO', placeholder: 'Type text and press Speak' },
+      { key: 'vowelSequence', label: 'Vowel Editor', group: 'Speech', type: 'vowelEditor', default: 0 },
+      { key: 'volume', label: 'Volume', group: 'Output', type: 'knob', min: 0, max: 1, step: 0.01, default: 0.8, formatValue: 'percent' },
+      { key: 'vowel', label: 'Vowel', group: 'Formants', type: 'select', min: 0, max: 7, default: 0, formatValue: 'int', options: [
+        { value: 0, label: 'AH' }, { value: 1, label: 'EE' }, { value: 2, label: 'IH' },
+        { value: 3, label: 'OH' }, { value: 4, label: 'OO' }, { value: 5, label: 'NN' },
+        { value: 6, label: 'SS' }, { value: 7, label: 'HH' },
+      ]},
+      { key: 'voiced', label: 'Voiced', group: 'Excitation', type: 'toggle', min: 0, max: 1, default: 1 },
+      { key: 'brightness', label: 'Brightness', group: 'Formants', type: 'knob', min: 0, max: 1, step: 0.01, default: 0.5, formatValue: 'percent' },
+      { key: 'formant_shift', label: 'Formant Shift', group: 'Formants', type: 'knob', min: -1, max: 1, step: 0.01, default: 0, formatValue: 'percent' },
+      { key: 'stereo_width', label: 'Stereo Width', group: 'Output', type: 'knob', min: 0, max: 1, step: 0.01, default: 0.3, formatValue: 'percent' },
+    ],
+  },
+
+  // =========================================================================
+  // MAMEHC55516 - Harris HC55516 CVSD Speech (Williams/Bally)
+  // =========================================================================
+  MAMEHC55516: {
+    synthType: 'MAMEHC55516',
+    name: 'HC55516',
+    subtitle: 'Harris HC55516 CVSD Speech Codec (Williams/Bally)',
+    color: '#a855f7',
+    presetCount: 8,
+    presetNames: ['AH', 'EE', 'IH', 'OH', 'OO', 'NN', 'ZZ', 'HH'],
+    parameters: [
+      { key: 'mode', label: 'Mode', group: 'Speech', type: 'select', min: 0, max: 1, default: 1, formatValue: 'int', options: [
+        { value: 0, label: 'Tone' }, { value: 1, label: 'Speech' },
+      ]},
+      { key: 'sing_mode', label: 'Sing Mode', group: 'Speech', type: 'toggle', min: 0, max: 1, default: 1 },
+      { key: 'speechText', label: 'Speech Text', group: 'Speech', type: 'text', default: 0, defaultText: 'I HUNGER', placeholder: 'Type text and press Speak' },
+      { key: 'vowelSequence', label: 'Vowel Editor', group: 'Speech', type: 'vowelEditor', default: 0 },
+      { key: 'volume', label: 'Volume', group: 'Output', type: 'knob', min: 0, max: 1, step: 0.01, default: 0.8, formatValue: 'percent' },
+      { key: 'preset', label: 'Vowel', group: 'Formants', type: 'select', min: 0, max: 7, default: 0, formatValue: 'int', options: [
+        { value: 0, label: 'AH' }, { value: 1, label: 'EE' }, { value: 2, label: 'IH' },
+        { value: 3, label: 'OH' }, { value: 4, label: 'OO' }, { value: 5, label: 'NN' },
+        { value: 6, label: 'ZZ' }, { value: 7, label: 'HH' },
+      ]},
+      { key: 'voiced', label: 'Voiced', group: 'Excitation', type: 'toggle', min: 0, max: 1, default: 1 },
+      { key: 'brightness', label: 'Brightness', group: 'Tone', type: 'knob', min: 0, max: 1, step: 0.01, default: 0.5, formatValue: 'percent' },
+      { key: 'grittiness', label: 'Grittiness', group: 'Tone', type: 'knob', min: 0, max: 1, step: 0.01, default: 0.7, formatValue: 'percent' },
+      { key: 'stereo_width', label: 'Stereo Width', group: 'Output', type: 'knob', min: 0, max: 1, step: 0.01, default: 0.3, formatValue: 'percent' },
+    ],
+  },
+
+  // =========================================================================
   // MAMEYMF271 - Yamaha OPX 4-Op FM+PCM
   // =========================================================================
   MAMEYMF271: {

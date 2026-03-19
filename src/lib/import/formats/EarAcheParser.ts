@@ -7,6 +7,8 @@
 
 import type { TrackerSong } from '@engine/TrackerReplayer';
 import type { Pattern, InstrumentConfig, TrackerCell } from '@/types';
+import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
+import { encodeEarAcheCell } from '@/engine/uade/encoders/EarAcheEncoder';
 
 function emptyCell(): TrackerCell {
   return { note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 };
@@ -20,11 +22,13 @@ export function isEarAcheFormat(buffer: ArrayBuffer | Uint8Array): boolean {
 
 export function parseEarAcheFile(_buffer: ArrayBuffer, filename: string): TrackerSong {
   const name = filename.replace(/\.[^.]+$/, '').replace(/^[^.]+\./, '');
+  const NUM_CHANNELS = 4;
+  const ROWS = 64;
   const pattern: Pattern = {
     id: 'pattern-0',
     name: 'Pattern 0',
-    length: 64,
-    channels: Array.from({ length: 4 }, (_, ch) => ({
+    length: ROWS,
+    channels: Array.from({ length: NUM_CHANNELS }, (_, ch) => ({
       id: `channel-${ch}`,
       name: `EarAche ${ch + 1}`,
       muted: false,
@@ -34,7 +38,7 @@ export function parseEarAcheFile(_buffer: ArrayBuffer, filename: string): Tracke
       pan: (ch === 0 || ch === 3) ? -50 : 50,
       instrumentId: null,
       color: null,
-      rows: Array.from({ length: 64 }, () => emptyCell()),
+      rows: Array.from({ length: ROWS }, () => emptyCell()),
     })),
   };
   const instruments: InstrumentConfig[] = Array.from({ length: 4 }, (_, i) => ({
@@ -47,6 +51,23 @@ export function parseEarAcheFile(_buffer: ArrayBuffer, filename: string): Tracke
     pan: 0,
   } as InstrumentConfig));
 
+  // Build uadePatternLayout for chip RAM editing
+  // EarAche is a stub — pattern data offset is 0 until the format is fully parsed.
+  const uadePatternLayout: UADEPatternLayout = {
+    formatId: 'earAche',
+    patternDataFileOffset: 0,
+    bytesPerCell: 4,
+    rowsPerPattern: ROWS,
+    numChannels: NUM_CHANNELS,
+    numPatterns: 1,
+    moduleSize: _buffer.byteLength,
+    encodeCell: encodeEarAcheCell,
+    getCellFileOffset: (pat: number, row: number, channel: number): number => {
+      const patternByteSize = ROWS * NUM_CHANNELS * 4;
+      return pat * patternByteSize + row * NUM_CHANNELS * 4 + channel * 4;
+    },
+  };
+
   return {
     name,
     format: 'MOD' as any,
@@ -58,5 +79,6 @@ export function parseEarAcheFile(_buffer: ArrayBuffer, filename: string): Tracke
     numChannels: 4,
     initialSpeed: 6,
     initialBPM: 125,
+    uadePatternLayout,
   };
 }

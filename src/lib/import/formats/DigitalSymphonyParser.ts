@@ -65,6 +65,8 @@
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, ChannelData, TrackerCell, InstrumentConfig } from '@/types';
 import type { UADEChipRamInfo } from '@/types/instrument';
+import type { UADEVariablePatternLayout } from '@/engine/uade/UADEPatternEncoder';
+import { digitalSymphonyEncoder } from '@/engine/uade/encoders/DigitalSymphonyEncoder';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -888,6 +890,38 @@ function parseDigitalSymphonyFileImpl(bytes: Uint8Array, filename: string): Trac
   // ── Build TrackerSong ─────────────────────────────────────────────────────
   const songPositions = patterns.map((_, i) => i);
 
+  // ── Build variable layout for UADE chip RAM editing ─────────────────────
+  // Digital Symphony uses track indirection: sequence[patIdx * numChannels + ch] → trackIdx
+  // Each track is 256 bytes (64 rows × 4 bytes) stored contiguously in decompressed trackData.
+  const trackMap: number[][] = [];
+  for (let patIdx = 0; patIdx < numOrders; patIdx++) {
+    const chPats: number[] = [];
+    for (let ch = 0; ch < numChannels; ch++) {
+      const trackIdx = (sequence !== null) ? (sequence[patIdx * numChannels + ch] ?? 0) : 0;
+      chPats.push(trackIdx < numTracks ? trackIdx : -1);
+    }
+    trackMap.push(chPats);
+  }
+
+  const filePatternAddrs: number[] = [];
+  const filePatternSizes: number[] = [];
+  for (let t = 0; t < numTracks; t++) {
+    filePatternAddrs.push(t * BYTES_PER_TRACK);
+    filePatternSizes.push(BYTES_PER_TRACK);
+  }
+
+  const variableLayout: UADEVariablePatternLayout = {
+    formatId: 'digitalSymphony',
+    numChannels,
+    numFilePatterns: numTracks,
+    rowsPerPattern: ROWS_PER_TRACK,
+    moduleSize: bytes.length,
+    encoder: digitalSymphonyEncoder,
+    filePatternAddrs,
+    filePatternSizes,
+    trackMap,
+  };
+
   return {
     name:            songName,
     format:          'MOD' as TrackerFormat,
@@ -900,6 +934,7 @@ function parseDigitalSymphonyFileImpl(bytes: Uint8Array, filename: string): Trac
     initialSpeed:    6,
     initialBPM:      125,
     linearPeriods:   false,
+    uadeVariableLayout: variableLayout,
   };
 }
 

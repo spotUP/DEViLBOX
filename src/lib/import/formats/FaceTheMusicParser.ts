@@ -60,6 +60,8 @@
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, ChannelData, TrackerCell, InstrumentConfig } from '@/types';
 import type { UADEChipRamInfo } from '@/types/instrument';
+import type { UADEVariablePatternLayout } from '@/engine/uade/UADEPatternEncoder';
+import { faceTheMusicEncoder } from '@/engine/uade/encoders/FaceTheMusicEncoder';
 import { createSamplerInstrument } from './AmigaUtils';
 
 // ── Binary helpers ─────────────────────────────────────────────────────────────
@@ -199,6 +201,10 @@ export function parseFaceTheMusicFile(bytes: Uint8Array, filename: string): Trac
     ),
   );
 
+  // Track per-channel event stream file offsets and sizes
+  const channelStreamAddrs: number[] = [];
+  const channelStreamSizes: number[] = [];
+
   // Read each channel's event stream and place events into the grid.
   for (let chn = 0; chn < NUM_CHANNELS; chn++) {
     if (pos + 6 > bytes.byteLength) break;  // Need at least defaultSpacing + chunkSize
@@ -207,6 +213,10 @@ export function parseFaceTheMusicFile(bytes: Uint8Array, filename: string): Trac
     pos += 2;
     const chunkSize = u32be(view, pos);
     pos += 4;
+
+    // Record the file offset and size of this channel's event stream
+    channelStreamAddrs.push(pos);
+    channelStreamSizes.push(chunkSize);
 
     if (pos + chunkSize > bytes.byteLength) return null;
     const chunkEnd = pos + chunkSize;
@@ -471,6 +481,30 @@ export function parseFaceTheMusicFile(bytes: Uint8Array, filename: string): Trac
   const songPositions = patterns.map((_, i) => i);
   const songName = title.trim() || (artist.trim() ? `${artist.trim()}` : filename.replace(/\.[^/.]+$/, ''));
 
+  // ── Build uadeVariableLayout for chip RAM editing ─────────────────────────
+  // FTM stores one event stream per channel covering ALL measures.
+  // Each channel stream is a single file-level "pattern" that spans all measures.
+  // trackMap maps (trackerPatIdx, chIdx) → channel index (file pattern = channel).
+  const trackMap: number[][] = [];
+  for (let p = 0; p < patterns.length; p++) {
+    // All measures for channel N map to file pattern N
+    trackMap.push(Array.from({ length: NUM_CHANNELS }, (_, ch) =>
+      ch < channelStreamAddrs.length ? ch : -1
+    ));
+  }
+
+  const uadeVariableLayout: UADEVariablePatternLayout = {
+    formatId: 'faceTheMusic',
+    numChannels: NUM_CHANNELS,
+    numFilePatterns: channelStreamAddrs.length,
+    rowsPerPattern: rowsPerMeasure,
+    moduleSize: bytes.byteLength,
+    encoder: faceTheMusicEncoder,
+    filePatternAddrs: channelStreamAddrs,
+    filePatternSizes: channelStreamSizes,
+    trackMap,
+  };
+
   return {
     name:            songName,
     format:          'MOD' as TrackerFormat,
@@ -483,5 +517,6 @@ export function parseFaceTheMusicFile(bytes: Uint8Array, filename: string): Trac
     initialSpeed:    ticksPerRow,
     initialBPM,
     linearPeriods:   true,  // SONG_LINEARSLIDES per Load_ftm.cpp
+    uadeVariableLayout,
   };
 }

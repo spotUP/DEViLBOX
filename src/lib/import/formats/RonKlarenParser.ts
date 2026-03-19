@@ -69,6 +69,8 @@
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, TrackerCell, InstrumentConfig } from '@/types';
+import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
+import { encodeRonKlarenCell } from '@/engine/uade/encoders/RonKlarenEncoder';
 import { createSamplerInstrument } from './AmigaUtils';
 
 // ── Constants ──────────────────────────────────────────────────────────────
@@ -454,11 +456,13 @@ function parseInternal(bytes: Uint8Array, filename: string): TrackerSong | null 
   // A "track" in RK is an absolute file offset. We load each unique track once.
   const trackOffsetToIndex = new Map<number, number>();
   const trackDataArrays: Uint8Array[] = [];
+  const trackFileStarts: number[] = []; // file offset where each track's data begins
 
   function getOrLoadTrack(absOffset: number): number {
     if (trackOffsetToIndex.has(absOffset)) return trackOffsetToIndex.get(absOffset)!;
     const idx = trackDataArrays.length;
     trackOffsetToIndex.set(absOffset, idx);
+    trackFileStarts.push(absOffset);
     // Load single track: read bytes until 0xFF (EndOfTrack), each cmd has variable length
     const data: number[] = [];
     let off = absOffset;
@@ -682,23 +686,26 @@ function parseInternal(bytes: Uint8Array, filename: string): TrackerSong | null 
   // ── Decode tracks into note rows ───────────────────────────────────────
   interface RkRow { noteIdx: number; instrNum: number; }
 
-  function decodeTrackToRows(data: Uint8Array, numRows: number, transpose: number): RkRow[] {
+  function decodeTrackToRows(data: Uint8Array, numRows: number, transpose: number): { rows: RkRow[]; notePositions: number[] } {
     const rows: RkRow[] = [];
+    const notePositions: number[] = []; // position of note cmd byte within data[]
     let pos = 0;
     let currentInstr = 0;
     let pendingRows = 0;
 
-    function emitRow(noteIdx: number, instrId: number): void {
+    function emitRow(noteIdx: number, instrId: number, dataPos: number): void {
       rows.push({ noteIdx, instrNum: instrId });
+      notePositions.push(dataPos);
     }
 
     while (pos < data.length && rows.length < numRows) {
       if (pendingRows > 0) {
-        emitRow(0, 0);
+        emitRow(0, 0, -1); // duration-hold rows have no file position
         pendingRows--;
         continue;
       }
 
+      const cmdPos = pos; // position of the command byte
       const cmd = data[pos++];
 
       if (cmd === 0xff) {
@@ -722,7 +729,7 @@ function parseInternal(bytes: Uint8Array, filename: string): TrackerSong | null 
           // Portamento: emit note row with current period and wait
           const transposedEnd = Math.min(endNote + transpose, RK_PERIODS.length - 1);
           if (waitCount > 0) {
-            emitRow(transposedEnd, currentInstr);
+            emitRow(transposedEnd, currentInstr, cmdPos);
             pendingRows = waitCount * 4 - 2; // -1 for current row, -1 for trigger
             if (pendingRows < 0) pendingRows = 0;
           }
@@ -759,9 +766,9 @@ function parseInternal(bytes: Uint8Array, filename: string): TrackerSong | null 
         if (waitCount === 0) {
           // No wait — don't emit row, keep processing
           // This means the note is set but we continue reading (per NostalgicPlayer: return true)
-          emitRow(clampedNote, currentInstr);
+          emitRow(clampedNote, currentInstr, cmdPos);
         } else {
-          emitRow(clampedNote, currentInstr);
+          emitRow(clampedNote, currentInstr, cmdPos);
           pendingRows = waitCount * 4 - 2;
           if (pendingRows < 0) pendingRows = 0;
         }
@@ -770,8 +777,11 @@ function parseInternal(bytes: Uint8Array, filename: string): TrackerSong | null 
     }
 
     // Pad to numRows
-    while (rows.length < numRows) rows.push({ noteIdx: 0, instrNum: 0 });
-    return rows.slice(0, numRows);
+    while (rows.length < numRows) {
+      rows.push({ noteIdx: 0, instrNum: 0 });
+      notePositions.push(-1);
+    }
+    return { rows: rows.slice(0, numRows), notePositions: notePositions.slice(0, numRows) };
   }
 
   // ── Build TrackerSong patterns ─────────────────────────────────────────
@@ -786,9 +796,12 @@ function parseInternal(bytes: Uint8Array, filename: string): TrackerSong | null 
   const maxTrackEntries = Math.max(...primarySong.positions.map(p => p.length));
 
   const trackerPatterns: Pattern[] = [];
+  // Build cell offset map: cellOffsetMap[patIdx][ch][row] = file offset
+  const cellOffsetMap: number[][][] = [];
 
   for (let posIdx = 0; posIdx < maxTrackEntries; posIdx++) {
     const channelRows: TrackerCell[][] = Array.from({ length: 4 }, () => []);
+    const patOffsets: number[][] = Array.from({ length: 4 }, () => []);
 
     for (let ch = 0; ch < 4; ch++) {
       const posList = primarySong.positions[ch];
@@ -798,21 +811,17 @@ function parseInternal(bytes: Uint8Array, filename: string): TrackerSong | null 
         // Emit empty rows
         for (let r = 0; r < ROWS_PER_TRACK; r++) {
           channelRows[ch].push({ note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 });
+          patOffsets[ch].push(-1);
         }
         continue;
       }
 
       const trackData = trackDataArrays[entry.trackNumber];
-      const decodedRows = decodeTrackToRows(trackData, ROWS_PER_TRACK, entry.transpose);
+      const trackStart = trackFileStarts[entry.trackNumber];
+      const { rows: decodedRows, notePositions } = decodeTrackToRows(trackData, ROWS_PER_TRACK, entry.transpose);
 
-      for (const row of decodedRows) {
-        // Note byte in RK is 0-based index into period table; 0 means C-0 (lowest note)
-        // Actually in RK, the note byte is the period table index directly (no special 0=empty)
-        // But 0x80+ are effects. So note 0 means period[0] which is 6848 (very low).
-        // We treat 0 specially since there's no "no note" sentinel in the note range.
-        // Looking at ParseTrackNewNote: note byte comes BEFORE any check for 0 — so all
-        // values 0x00-0x7F are valid notes. A "rest" is conveyed by not writing a note byte.
-        // Since empty rows are padded, row.noteIdx=0 from padding → XM note 0 = rest.
+      for (let ri = 0; ri < decodedRows.length; ri++) {
+        const row = decodedRows[ri];
         const xmNoteFixed = row.noteIdx === 0 ? 0 : rkNoteToXM(row.noteIdx);
         const instrId = row.instrNum;
 
@@ -825,8 +834,14 @@ function parseInternal(bytes: Uint8Array, filename: string): TrackerSong | null 
           effTyp2: 0,
           eff2: 0,
         });
+
+        // Compute file offset from track-relative position
+        const relPos = notePositions[ri];
+        patOffsets[ch].push(relPos >= 0 && trackStart >= 0 ? trackStart + relPos : -1);
       }
     }
+
+    cellOffsetMap.push(patOffsets);
 
     trackerPatterns.push({
       id: `pattern-${posIdx}`,
@@ -891,6 +906,26 @@ function parseInternal(bytes: Uint8Array, filename: string): TrackerSong | null 
   // Typical: ciaValue=14187 → 50 Hz → 125 BPM (assuming speed=2)
   const bpm = ciaValue > 0 ? Math.round(709379 / ciaValue) : 125;
 
+  // Build uadePatternLayout with getCellFileOffset for track indirection
+  const uadePatternLayout: UADEPatternLayout = {
+    formatId: 'ronKlaren',
+    patternDataFileOffset: 0, // not used directly (getCellFileOffset overrides)
+    bytesPerCell: 2, // note(1) + waitCount(1)
+    rowsPerPattern: ROWS_PER_TRACK,
+    numChannels: 4,
+    numPatterns: trackerPatterns.length,
+    moduleSize: bytes.byteLength,
+    encodeCell: encodeRonKlarenCell,
+    getCellFileOffset: (pattern: number, row: number, channel: number): number => {
+      if (pattern < 0 || pattern >= cellOffsetMap.length) return -1;
+      const patOffsets = cellOffsetMap[pattern];
+      if (channel < 0 || channel >= patOffsets.length) return -1;
+      const chOffsets = patOffsets[channel];
+      if (row < 0 || row >= chOffsets.length) return -1;
+      return chOffsets[row];
+    },
+  };
+
   return {
     name: moduleName,
     format: 'RK' as TrackerFormat,
@@ -903,5 +938,6 @@ function parseInternal(bytes: Uint8Array, filename: string): TrackerSong | null 
     initialSpeed: 6,
     initialBPM: Math.max(32, Math.min(255, bpm)),
     linearPeriods: false,
+    uadePatternLayout,
   };
 }

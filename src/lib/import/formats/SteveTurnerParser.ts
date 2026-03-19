@@ -56,6 +56,8 @@
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { InstrumentConfig } from '@/types';
+import type { UADEVariablePatternLayout } from '@/engine/uade/UADEPatternEncoder';
+import { encodeSteveTurnerPattern } from '@/engine/uade/encoders/SteveTurnerEncoder';
 
 // ── Constants ─────────────────────────────────────────────────────────────
 
@@ -505,6 +507,47 @@ export function parseSteveTurnerFile(buffer: ArrayBuffer, filename: string): Tra
   // subsong 0 so the pattern cursor stays in sync with the audio. All patterns
   // remain available in the patterns array for the pattern list UI.
 
+  // ── Build uadeVariableLayout for chip RAM editing ─────────────────────────
+  // Steve Turner uses variable-length pattern blocks addressed via an offset
+  // table. Each channel decodes its own byte stream independently. We treat
+  // each channel's decoded event stream as a single file-level "pattern".
+  // The offset table provides per-pattern-block addresses but blocks are
+  // shared across channels via the position list, so we use placeholder
+  // addresses. Real chip RAM patching resolves at runtime.
+  const filePatternAddrs: number[] = [];
+  const filePatternSizes: number[] = [];
+  for (let ch = 0; ch < 4; ch++) {
+    // Use the position list start as the file pattern address
+    const wordOffset = subsongs[0]?.chanPosOffsets[ch] ?? 0;
+    const posListStart = wordOffset > 0 ? hdr.seqOffset + wordOffset : 0;
+    filePatternAddrs.push(posListStart);
+    // Estimate size: number of events * ~3 bytes avg + overhead
+    const numEvents = patterns[0]?.channels[ch]?.rows.filter(
+      (r: TrackerRow) => r.note > 0 || r.instrument > 0
+    ).length ?? 0;
+    filePatternSizes.push(Math.max(numEvents * 4, 64));
+  }
+
+  const trackMap: number[][] = [];
+  for (let si = 0; si < patterns.length; si++) {
+    trackMap.push([0, 1, 2, 3]); // each tracker pattern maps to the 4 channel streams
+  }
+
+  const uadeVariableLayout: UADEVariablePatternLayout = {
+    formatId: 'steveTurner',
+    numChannels: 4,
+    numFilePatterns: 4,
+    rowsPerPattern: patterns[0]?.length ?? 64,
+    moduleSize: buf.length,
+    encoder: {
+      formatId: 'steveTurner',
+      encodePattern: encodeSteveTurnerPattern,
+    },
+    filePatternAddrs,
+    filePatternSizes,
+    trackMap,
+  };
+
   const result: TrackerSong = {
     name: `${moduleName} [Steve Turner]`,
     format: 'MOD' as TrackerFormat,
@@ -524,6 +567,7 @@ export function parseSteveTurnerFile(buffer: ArrayBuffer, filename: string): Tra
       count: subsongs.length,
       speeds: subsongs.map(s => s.speed),
     } : undefined,
+    uadeVariableLayout,
   } as TrackerSong & { uadeEditableFileData?: ArrayBuffer; uadeEditableFileName?: string };
 
   // Count instrument entries actually used in INSTR table

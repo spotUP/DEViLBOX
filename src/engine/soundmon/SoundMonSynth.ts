@@ -75,6 +75,16 @@ export class SoundMonSynth implements DevilboxSynth {
     );
   }
 
+  /** Re-upload instrument config to running WASM synth (for live parameter editing) */
+  updateConfig(config: SoundMonConfig): void {
+    if (this._disposed || this._playerHandle < 0) return;
+    const blob = serializeSoundMonConfig(config);
+    this.engine.sendMessage(
+      { type: 'loadInstrument', handle: this._playerHandle, buffer: blob },
+      [blob],
+    );
+  }
+
   triggerAttack(note?: string | number, _time?: number, velocity?: number): void {
     if (this._disposed || this._playerHandle < 0) return;
 

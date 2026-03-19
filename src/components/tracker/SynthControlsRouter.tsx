@@ -7,6 +7,7 @@
 
 import React, { lazy, Suspense, useCallback } from 'react';
 import type { InstrumentConfig, MAMEConfig } from '@typedefs/instrument';
+import { getToneEngine } from '@engine/ToneEngine';
 import {
   DEFAULT_DUB_SIREN, DEFAULT_SPACE_LASER, DEFAULT_V2, DEFAULT_V2_SPEECH,
   DEFAULT_SYNARE, DEFAULT_DEXED, DEFAULT_OBXD, DEFAULT_SAM,
@@ -15,7 +16,7 @@ import {
   DEFAULT_SOUNDMON, DEFAULT_SIDMON, DEFAULT_DIGMUG, DEFAULT_FC,
   DEFAULT_DELTAMUSIC1, DEFAULT_DELTAMUSIC2, DEFAULT_FRED, DEFAULT_TFMX,
   DEFAULT_OCTAMED, DEFAULT_SIDMON1, DEFAULT_HIPPEL_COSO, DEFAULT_ROB_HUBBARD,
-  DEFAULT_DAVID_WHITTAKER, DEFAULT_SONIC_ARRANGER, DEFAULT_WOBBLE_BASS,
+  DEFAULT_DAVID_WHITTAKER, DEFAULT_SONIC_ARRANGER, DEFAULT_INSTEREO2, DEFAULT_WOBBLE_BASS,
   DEFAULT_FURNACE, DEFAULT_MAME_VFX, DEFAULT_MAME_DOC,
 } from '@typedefs/instrument';
 import { deepMerge } from '@lib/migration';
@@ -68,6 +69,9 @@ const DigMugControls = lazy(() =>
 );
 const SonicArrangerControls = lazy(() =>
   import('@components/instruments/controls/SonicArrangerControls').then(m => ({ default: m.SonicArrangerControls }))
+);
+const InStereo2Controls = lazy(() =>
+  import('@components/instruments/controls/InStereo2Controls').then(m => ({ default: m.InStereo2Controls }))
 );
 const FCControls = lazy(() =>
   import('@components/instruments/controls/FCControls').then(m => ({ default: m.FCControls }))
@@ -167,6 +171,14 @@ export const SynthControlsRouter: React.FC<SynthControlsRouterProps> = ({ instru
   // Debug: always log for debugging
   console.log(`[SynthControlsRouter] Routing: synthType=${synthType} id=${instrument.id} name="${instrument.name}" hasXrns=${!!instrument.xrns}`);
 
+  /** Wrap onUpdate to also push live config to running WASM synth engine */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const onUpdateLive = useCallback((configKey: string, cfg: any, updates: any) => {
+    const newConfig = { ...cfg, ...updates };
+    onUpdate({ [configKey]: newConfig });
+    try { getToneEngine().updateNativeSynthConfig(instrument.id, newConfig); } catch { /* engine not ready */ }
+  }, [instrument.id, onUpdate]);
+
   // Chip synth param change handler
   const handleChipParamChange = useCallback((name: string, value: number | string) => {
     const params = { ...(instrument.parameters as Record<string, unknown> || {}), [name]: value };
@@ -240,57 +252,65 @@ export const SynthControlsRouter: React.FC<SynthControlsRouterProps> = ({ instru
     // ── JamCracker ──────────────────────────────────────────
     if (synthType === 'JamCrackerSynth') {
       const cfg = deepMerge(DEFAULT_JAMCRACKER, instrument.jamCracker || {});
-      return <JamCrackerControls config={cfg} onChange={(u) => onUpdate({ jamCracker: { ...cfg, ...u } })} />;
+      return <JamCrackerControls config={cfg} onChange={(u) => onUpdateLive('jamCracker', cfg, u)} />;
     }
 
     // ── UADE tracker synths ─────────────────────────────────
     if (synthType === 'SoundMonSynth') {
       const cfg = deepMerge(DEFAULT_SOUNDMON, instrument.soundMon || {});
-      return <SoundMonControls config={cfg} onChange={(u) => onUpdate({ soundMon: { ...cfg, ...u } })} uadeChipRam={instrument.uadeChipRam} />;
+      return <SoundMonControls config={cfg} onChange={(u) => onUpdateLive('soundMon', cfg, u)} uadeChipRam={instrument.uadeChipRam} />;
     }
     if (synthType === 'SidMonSynth') {
       const cfg = deepMerge(DEFAULT_SIDMON, instrument.sidMon || {});
-      return <SidMonControls config={cfg} onChange={(u) => onUpdate({ sidMon: { ...cfg, ...u } })} uadeChipRam={instrument.uadeChipRam} />;
+      return <SidMonControls config={cfg} onChange={(u) => onUpdateLive('sidMon', cfg, u)} uadeChipRam={instrument.uadeChipRam} />;
     }
     if (synthType === 'DigMugSynth') {
       const cfg = deepMerge(DEFAULT_DIGMUG, instrument.digMug || {});
-      return <DigMugControls config={cfg} onChange={(u) => onUpdate({ digMug: { ...cfg, ...u } })} uadeChipRam={instrument.uadeChipRam} />;
+      return <DigMugControls config={cfg} onChange={(u) => onUpdateLive('digMug', cfg, u)} uadeChipRam={instrument.uadeChipRam} />;
     }
     if (synthType === 'SonicArrangerSynth') {
       const cfg = deepMerge(DEFAULT_SONIC_ARRANGER, instrument.sonicArranger || {});
-      return <SonicArrangerControls config={cfg} onChange={(u) => onUpdate({ sonicArranger: { ...cfg, ...u } })} />;
+      return <SonicArrangerControls config={cfg} onChange={(u) => onUpdateLive('sonicArranger', cfg, u)} />;
+    }
+    if (synthType === 'InStereo2Synth') {
+      const cfg = deepMerge(DEFAULT_INSTEREO2, instrument.inStereo2 || {});
+      return <InStereo2Controls config={cfg} onChange={(u) => onUpdateLive('inStereo2', cfg, u)} />;
+    }
+    if (synthType === 'InStereo1Synth') {
+      const cfg = deepMerge(DEFAULT_INSTEREO2, instrument.inStereo1 || {});
+      return <InStereo2Controls config={cfg} onChange={(u) => onUpdateLive('inStereo1', cfg, u)} />;
     }
     if (synthType === 'FCSynth') {
       const cfg = deepMerge(DEFAULT_FC, instrument.fc || {});
-      return <FCControls config={cfg} onChange={(u) => onUpdate({ fc: { ...cfg, ...u } })} uadeChipRam={instrument.uadeChipRam} />;
+      return <FCControls config={cfg} onChange={(u) => onUpdateLive('fc', cfg, u)} uadeChipRam={instrument.uadeChipRam} />;
     }
     if (synthType === 'DeltaMusic1Synth') {
       const cfg = deepMerge(DEFAULT_DELTAMUSIC1, instrument.deltaMusic1 || {});
-      return <DeltaMusic1Controls config={cfg} onChange={(u) => onUpdate({ deltaMusic1: { ...cfg, ...u } })} uadeChipRam={instrument.uadeChipRam} />;
+      return <DeltaMusic1Controls config={cfg} onChange={(u) => onUpdateLive('deltaMusic1', cfg, u)} uadeChipRam={instrument.uadeChipRam} />;
     }
     if (synthType === 'DeltaMusic2Synth') {
       const cfg = deepMerge(DEFAULT_DELTAMUSIC2, instrument.deltaMusic2 || {});
-      return <DeltaMusic2Controls config={cfg} onChange={(u) => onUpdate({ deltaMusic2: { ...cfg, ...u } })} uadeChipRam={instrument.uadeChipRam} />;
+      return <DeltaMusic2Controls config={cfg} onChange={(u) => onUpdateLive('deltaMusic2', cfg, u)} uadeChipRam={instrument.uadeChipRam} />;
     }
     if (synthType === 'FredSynth') {
       const cfg = deepMerge(DEFAULT_FRED, instrument.fred || {});
-      return <FredControls config={cfg} onChange={(u) => onUpdate({ fred: { ...cfg, ...u } })} uadeChipRam={instrument.uadeChipRam} />;
+      return <FredControls config={cfg} onChange={(u) => onUpdateLive('fred', cfg, u)} uadeChipRam={instrument.uadeChipRam} />;
     }
     if (synthType === 'TFMXSynth') {
       const cfg = deepMerge(DEFAULT_TFMX, instrument.tfmx || {});
-      return <TFMXControls config={cfg} onChange={(c) => onUpdate({ tfmx: c })} uadeChipRam={instrument.uadeChipRam} />;
+      return <TFMXControls config={cfg} onChange={(c) => onUpdateLive('tfmx', {}, c)} uadeChipRam={instrument.uadeChipRam} />;
     }
     if (synthType === 'OctaMEDSynth') {
       const cfg = deepMerge(DEFAULT_OCTAMED, instrument.octamed || {});
-      return <OctaMEDControls config={cfg} onChange={(u) => onUpdate({ octamed: { ...cfg, ...u } })} uadeChipRam={instrument.uadeChipRam} />;
+      return <OctaMEDControls config={cfg} onChange={(u) => onUpdateLive('octamed', cfg, u)} uadeChipRam={instrument.uadeChipRam} />;
     }
     if (synthType === 'SidMon1Synth') {
       const cfg = deepMerge(DEFAULT_SIDMON1, instrument.sidmon1 || {});
-      return <SidMon1Controls config={cfg} onChange={(u) => onUpdate({ sidmon1: { ...cfg, ...u } })} uadeChipRam={instrument.uadeChipRam} />;
+      return <SidMon1Controls config={cfg} onChange={(u) => onUpdateLive('sidmon1', cfg, u)} uadeChipRam={instrument.uadeChipRam} />;
     }
     if (synthType === 'HippelCoSoSynth') {
       const cfg = deepMerge(DEFAULT_HIPPEL_COSO, instrument.hippelCoso || {});
-      return <HippelCoSoControls config={cfg} onChange={(u) => onUpdate({ hippelCoso: { ...cfg, ...u } })} uadeChipRam={instrument.uadeChipRam} />;
+      return <HippelCoSoControls config={cfg} onChange={(u) => onUpdateLive('hippelCoso', cfg, u)} uadeChipRam={instrument.uadeChipRam} />;
     }
     if (synthType === 'RobHubbardSynth') {
       const cfg = deepMerge(DEFAULT_ROB_HUBBARD, instrument.robHubbard || {});

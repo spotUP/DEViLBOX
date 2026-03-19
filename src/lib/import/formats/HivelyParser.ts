@@ -17,6 +17,8 @@ import type {
   HivelyNativePosition,
   HivelyConfig,
 } from '@/types';
+import type { UADEPatternLayout, UADEVariablePatternLayout } from '@/engine/uade/UADEPatternEncoder';
+import { encodeAHXCell, hivelyHVLEncoder } from '@/engine/uade/encoders/HivelyEncoder';
 
 // ── HVL Internal Types ──────────────────────────────────────────────────────
 
@@ -94,6 +96,10 @@ export interface HivelyModule {
   tracks: HivelyStep[][];
   instruments: HivelyInstrument[];
   subsongs: number[];
+  /** File byte offset where each track's data starts (for pattern editing) */
+  trackFileOffsets: number[];
+  /** Byte size of each track's data in the file (for variable-length HVL tracks) */
+  trackFileSizes: number[];
 }
 
 // ── Text Decoder ─────────────────────────────────────────────────────────────
@@ -162,14 +168,19 @@ function parseAHX(buf: Uint8Array): HivelyModule {
   // Tracks
   const hasBlankTrack0 = (buf[6] & 0x80) === 0x80;
   const tracks: HivelyStep[][] = [];
+  const trackFileOffsets: number[] = [];
+  const trackFileSizes: number[] = [];
 
   for (let i = 0; i <= trkn; i++) {
     const steps: HivelyStep[] = [];
+    const trackStart = bptr;
     if (hasBlankTrack0 && i === 0) {
       for (let j = 0; j < trkl; j++) {
         steps.push({ note: 0, instrument: 0, fx: 0, fxParam: 0, fxb: 0, fxbParam: 0 });
       }
       tracks.push(steps);
+      trackFileOffsets.push(trackStart);
+      trackFileSizes.push(0); // blank track has no file data
       continue;
     }
 
@@ -183,6 +194,8 @@ function parseAHX(buf: Uint8Array): HivelyModule {
       bptr += 3;
     }
     tracks.push(steps);
+    trackFileOffsets.push(trackStart);
+    trackFileSizes.push(bptr - trackStart);
   }
 
   // Instruments
@@ -291,6 +304,8 @@ function parseAHX(buf: Uint8Array): HivelyModule {
     tracks,
     instruments,
     subsongs,
+    trackFileOffsets,
+    trackFileSizes,
   };
 }
 
@@ -344,14 +359,19 @@ function parseHVL(buf: Uint8Array): HivelyModule {
   // Tracks — HVL uses variable-length encoding (0x3f = empty step = 1 byte, otherwise 5 bytes)
   const hasBlankTrack0 = (buf[6] & 0x80) === 0x80;
   const tracks: HivelyStep[][] = [];
+  const trackFileOffsets: number[] = [];
+  const trackFileSizes: number[] = [];
 
   for (let i = 0; i <= trkn; i++) {
     const steps: HivelyStep[] = [];
+    const trackStart = bptr;
     if (hasBlankTrack0 && i === 0) {
       for (let j = 0; j < trkl; j++) {
         steps.push({ note: 0, instrument: 0, fx: 0, fxParam: 0, fxb: 0, fxbParam: 0 });
       }
       tracks.push(steps);
+      trackFileOffsets.push(trackStart);
+      trackFileSizes.push(0); // blank track has no file data
       continue;
     }
 
@@ -373,6 +393,8 @@ function parseHVL(buf: Uint8Array): HivelyModule {
       bptr += 5;
     }
     tracks.push(steps);
+    trackFileOffsets.push(trackStart);
+    trackFileSizes.push(bptr - trackStart);
   }
 
   // Instruments — 22 bytes header + 5 bytes per plist entry
@@ -470,6 +492,8 @@ function parseHVL(buf: Uint8Array): HivelyModule {
     tracks,
     instruments,
     subsongs,
+    trackFileOffsets,
+    trackFileSizes,
   };
 }
 
@@ -662,7 +686,10 @@ export function convertHivelyToTrackerSong(mod: HivelyModule, fileName: string):
   // Build native HivelyTracker data for format-specific editor
   const hivelyNative = buildHivelyNativeData(mod);
 
-  return {
+  // Build pattern layout for editing infrastructure
+  const layoutData = buildHivelyPatternLayout(mod);
+
+  const song: TrackerSong = {
     name: mod.name || fileName.replace(/\.[^/.]+$/, ''),
     format,
     patterns,
@@ -682,6 +709,80 @@ export function convertHivelyToTrackerSong(mod: HivelyModule, fileName: string):
     },
     hivelyNative,
   };
+
+  if (layoutData.type === 'fixed') {
+    song.uadePatternLayout = layoutData.layout as UADEPatternLayout;
+  } else {
+    song.uadeVariableLayout = layoutData.layout as UADEVariablePatternLayout;
+  }
+
+  return song;
+}
+
+/**
+ * Build a UADEPatternLayout (AHX, fixed 3-byte cells) or UADEVariablePatternLayout
+ * (HVL, variable-length 1/5-byte cells) for the editing infrastructure.
+ *
+ * Both formats use a track pool with position→track indirection.
+ * The TrackerSong patterns are flattened: pattern[posIdx] combines all channels.
+ * trackMap[posIdx][ch] → file track index.
+ */
+function buildHivelyPatternLayout(mod: HivelyModule): {
+  type: 'fixed' | 'variable';
+  layout: UADEPatternLayout | UADEVariablePatternLayout;
+} {
+  if (mod.format === 'AHX') {
+    // AHX: fixed 3 bytes per step. Track indirection via getCellFileOffset.
+    const bytesPerCell = 3;
+
+    // Build position→track mapping
+    // TrackerSong pattern posIdx maps to mod.positions[posIdx].track[ch]
+    const layout: UADEPatternLayout = {
+      formatId: 'hivelyAHX',
+      patternDataFileOffset: 0, // not used (getCellFileOffset overrides)
+      bytesPerCell,
+      rowsPerPattern: mod.trackLength,
+      numChannels: mod.channels,
+      numPatterns: mod.numPositions,
+      moduleSize: 0, // will be set by caller if needed
+
+      encodeCell: encodeAHXCell,
+
+      getCellFileOffset(pattern: number, row: number, channel: number): number {
+        // pattern = posIdx in TrackerSong
+        if (pattern >= mod.positions.length) return 0;
+        const trackIdx = mod.positions[pattern].track[channel];
+        if (trackIdx === undefined || trackIdx >= mod.trackFileOffsets.length) return 0;
+        const trackOffset = mod.trackFileOffsets[trackIdx];
+        if (mod.trackFileSizes[trackIdx] === 0) return 0; // blank track
+        return trackOffset + row * bytesPerCell;
+      },
+    };
+
+    return { type: 'fixed', layout };
+  }
+
+  // HVL: variable-length encoding. Use UADEVariablePatternLayout.
+  // Build trackMap: trackMap[posIdx][ch] = file track index
+  const trackMap: number[][] = [];
+  for (let posIdx = 0; posIdx < mod.numPositions; posIdx++) {
+    const pos = mod.positions[posIdx];
+    trackMap.push(pos.track.map(t => t));
+  }
+
+  const layout: UADEVariablePatternLayout = {
+    formatId: 'hivelyHVL',
+    numChannels: mod.channels,
+    numFilePatterns: mod.tracks.length,
+    rowsPerPattern: mod.trackLength,
+    moduleSize: 0,
+    encoder: hivelyHVLEncoder,
+    filePatternAddrs: mod.trackFileOffsets,
+    filePatternSizes: mod.trackFileSizes,
+    trackMap,
+  };
+
+  return { type: 'variable', layout };
 }
 
 /**

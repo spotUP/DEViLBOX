@@ -92,8 +92,8 @@ export const FCControls: React.FC<FCControlsProps> = ({ config, onChange, uadeCh
   const updWithChipRam = useCallback(
     (key: keyof FCConfig, value: FCConfig[keyof FCConfig], byteOffset: number) => {
       upd(key as Parameters<typeof upd>[0], value as Parameters<typeof upd>[1]);
-      if (uadeChipRam && typeof value === 'number') {
-        void getEditor().writeU8(uadeChipRam.instrBase + byteOffset, value & 0xFF);
+      if (uadeChipRam && typeof value === 'number' && UADEEngine.hasInstance()) {
+        void getEditor().writeU8(uadeChipRam.instrBase + byteOffset, value & 0xFF).catch(() => {});
       }
     },
     [upd, uadeChipRam, getEditor],
@@ -107,13 +107,13 @@ export const FCControls: React.FC<FCControlsProps> = ({ config, onChange, uadeCh
   const updADSRWithChipRam = useCallback(
     (key: keyof FCConfig, value: number) => {
       upd(key as Parameters<typeof upd>[0], value as Parameters<typeof upd>[1]);
-      if (uadeChipRam) {
+      if (uadeChipRam && UADEEngine.hasInstance()) {
         const newCfg = { ...configRef.current, [key]: value };
         const opcodes = encodeFCVolEnvelope(newCfg);
         // Write opcodes to bytes [5..63] — pad with 0xE1 (end) if shorter than 59
         const fullBuf = new Array(59).fill(0xE1);
         for (let i = 0; i < opcodes.length; i++) fullBuf[i] = opcodes[i];
-        void getEditor().writeBlock(uadeChipRam.instrBase + 5, fullBuf);
+        void getEditor().writeBlock(uadeChipRam.instrBase + 5, fullBuf).catch(() => {});
       }
     },
     [upd, uadeChipRam, getEditor],
@@ -127,14 +127,19 @@ export const FCControls: React.FC<FCControlsProps> = ({ config, onChange, uadeCh
   const writeFreqMacroToChipRam = useCallback(
     (newCfg: FCConfig) => {
       if (!uadeChipRam || !uadeChipRam.sections.freqMacros) return;
+      if (!UADEEngine.hasInstance()) return; // UADE not active — skip chip RAM write
       void (async () => {
-        const editor = getEditor();
-        // Read freqMacroIdx from vol macro byte[1]
-        const freqMacroIdxBytes = await editor.readBytes(uadeChipRam.instrBase + 1, 1);
-        const freqMacroIdx = freqMacroIdxBytes[0];
-        const freqMacroAddr = uadeChipRam.sections.freqMacros + freqMacroIdx * 64;
-        const encoded = encodeFCFreqMacro(newCfg.synthTable, newCfg.arpTable);
-        void editor.writeBlock(freqMacroAddr, Array.from(encoded));
+        try {
+          const editor = getEditor();
+          // Read freqMacroIdx from vol macro byte[1]
+          const freqMacroIdxBytes = await editor.readBytes(uadeChipRam.instrBase + 1, 1);
+          const freqMacroIdx = freqMacroIdxBytes[0];
+          const freqMacroAddr = uadeChipRam.sections.freqMacros + freqMacroIdx * 64;
+          const encoded = encodeFCFreqMacro(newCfg.synthTable, newCfg.arpTable);
+          void editor.writeBlock(freqMacroAddr, Array.from(encoded));
+        } catch {
+          // WASM not ready or module not loaded — ignore
+        }
       })();
     },
     [uadeChipRam, getEditor],

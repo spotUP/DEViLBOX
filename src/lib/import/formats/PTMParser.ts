@@ -42,6 +42,8 @@
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, ChannelData, TrackerCell, InstrumentConfig } from '@/types';
+import type { UADEVariablePatternLayout } from '@/engine/uade/UADEPatternEncoder';
+import { ptmEncoder } from '@/engine/uade/encoders/PTMEncoder';
 import { createSamplerInstrument } from './AmigaUtils';
 
 // ── Binary helpers ────────────────────────────────────────────────────────────
@@ -321,6 +323,8 @@ export async function parsePTMFile(
   //   b & 0x80         → volume byte follows (1 byte)
 
   const patterns: Pattern[] = [];
+  const patFileAddrs: number[] = [];
+  const patFileSizes: number[] = [];
 
   for (let pat = 0; pat < numPatterns; pat++) {
     // Build empty channels
@@ -356,6 +360,7 @@ export async function parsePTMFile(
     const patOffset = patOffsets[pat];
 
     if (patOffset !== 0 && patOffset + 1 < buffer.byteLength) {
+      patFileAddrs.push(patOffset);
       let pos = patOffset;
       let row = 0;
 
@@ -406,7 +411,7 @@ export async function parsePTMFile(
           // them for now (the reference implementation maps them to exotic
           // IT/S3M commands not needed for basic playback).
           if (command <= 0x0F) {
-            let effParam = param;
+            const effParam = param;
 
             // Global volume special case: command 0x0C treated as set-volume
             // inside PTM (CMD_GLOBALVOLUME is command 0x10 in OpenMPT's extra
@@ -426,6 +431,12 @@ export async function parsePTMFile(
           cell.volume = Math.min(vol, 64);
         }
       }
+
+      // Track size of consumed pattern data
+      patFileSizes.push(pos - patOffset);
+    } else {
+      patFileAddrs.push(0);
+      patFileSizes.push(0);
     }
 
     // Assign rows from grid into channels
@@ -538,6 +549,24 @@ export async function parsePTMFile(
     );
   }
 
+  // ── Build uadeVariableLayout for chip RAM editing ──────────────────────────
+  const trackMap: number[][] = [];
+  for (let p = 0; p < patterns.length; p++) {
+    trackMap.push(Array.from({ length: numChannels }, () => p < patFileAddrs.length ? p : -1));
+  }
+
+  const uadeVariableLayout: UADEVariablePatternLayout = {
+    formatId: 'ptm',
+    numChannels,
+    numFilePatterns: patFileAddrs.length,
+    rowsPerPattern: ROWS_PER_PATTERN,
+    moduleSize: buffer.byteLength,
+    encoder: ptmEncoder,
+    filePatternAddrs: patFileAddrs,
+    filePatternSizes: patFileSizes,
+    trackMap,
+  };
+
   // ── Assemble TrackerSong ───────────────────────────────────────────────────
 
   return {
@@ -552,5 +581,6 @@ export async function parsePTMFile(
     initialSpeed:    6,   // PTM has no speed field in header; 6 is the tracker default
     initialBPM:      125, // PTM has no BPM field in header; 125 is the DOS tracker default
     linearPeriods:   false,
+    uadeVariableLayout,
   };
 }

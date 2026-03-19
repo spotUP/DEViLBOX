@@ -52,6 +52,8 @@
 import type { TrackerSong } from '@/engine/TrackerReplayer';
 import type { Pattern, TrackerCell, ChannelData } from '@/types';
 import type { InstrumentConfig, UADEChipRamInfo } from '@/types/instrument';
+import type { UADEVariablePatternLayout } from '@/engine/uade/UADEPatternEncoder';
+import { musicLineEncoder } from '@/engine/uade/encoders/MusicLineEncoder';
 import { createSamplerInstrument } from './AmigaUtils';
 
 // ── Constants ──────────────────────────────────────────────────────────────
@@ -240,6 +242,8 @@ export function parseMusicLineFile(data: Uint8Array): TrackerSong | null {
 
   // Map from partNumber → decompressed PART data (1536 bytes)
   const partDataMap = new Map<number, Uint8Array>();
+  // Map from partNumber → { fileOffset, fileSize } for variable layout
+  const partFileInfo = new Map<number, { fileOffset: number; fileSize: number }>();
 
   // INST structs (raw, indexed by instrument order)
   interface InstData {
@@ -357,6 +361,7 @@ export function parseMusicLineFile(data: Uint8Array): TrackerSong | null {
 
       const { out: decompressed, consumed: rleConsumed } = decompressPart(data, rleStart, rleLen);
       partDataMap.set(partNumber, decompressed);
+      partFileInfo.set(partNumber, { fileOffset: dataStart, fileSize: 2 + rleConsumed });
 
       // CRITICAL: Some ML files store incorrect chunk sizes in the PART header.
       // Use actual bytes consumed by the RLE decompressor, not the declared size.
@@ -504,6 +509,34 @@ export function parseMusicLineFile(data: Uint8Array): TrackerSong | null {
   // numChannels = actual voice count from TUNE header (1-8).
   // Patterns are 1-channel (single-voice PARTs); the replayer reads channels[0]
   // of whichever PART each channel's track table points to.
+
+  // Build UADEVariablePatternLayout for editing infrastructure.
+  // MusicLine PARTs are RLE-compressed in the file; each decompresses to 128×12 bytes.
+  // Patterns in TrackerSong are 1-channel each (one per PART).
+  const filePatternAddrs: number[] = [];
+  const filePatternSizes: number[] = [];
+  for (const pn of sortedPartNumbers) {
+    const info = partFileInfo.get(pn);
+    filePatternAddrs.push(info?.fileOffset ?? 0);
+    filePatternSizes.push(info?.fileSize ?? 0);
+  }
+
+  // trackMap: each TrackerSong pattern is a single-channel PART.
+  // trackMap[patIdx][0] = patIdx (identity — each pattern IS one file pattern).
+  const trackMap: number[][] = sortedPartNumbers.map((_, idx) => [idx]);
+
+  const uadeVariableLayout: UADEVariablePatternLayout = {
+    formatId: 'musicLine',
+    numChannels: 1, // each PART is single-voice
+    numFilePatterns: sortedPartNumbers.length,
+    rowsPerPattern: PART_ROWS,
+    moduleSize: data.byteLength,
+    encoder: musicLineEncoder,
+    filePatternAddrs,
+    filePatternSizes,
+    trackMap,
+  };
+
   const song: TrackerSong = {
     name: songTitle || 'MusicLine Song',
     format: 'ML' as const,
@@ -519,6 +552,7 @@ export function parseMusicLineFile(data: Uint8Array): TrackerSong | null {
     channelTrackTables: mappedTrackTables,
     channelSpeeds,
     channelGrooves,
+    uadeVariableLayout,
   };
 
 

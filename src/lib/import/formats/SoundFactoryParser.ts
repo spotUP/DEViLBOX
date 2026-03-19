@@ -67,6 +67,8 @@
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, TrackerCell, InstrumentConfig } from '@/types';
+import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
+import { encodeSoundFactoryCell } from '@/engine/uade/encoders/SoundFactoryEncoder';
 import { createSamplerInstrument } from './AmigaUtils';
 
 // ── Constants ──────────────────────────────────────────────────────────────
@@ -484,6 +486,7 @@ export function parseSoundFactoryFile(bytes: Uint8Array, filename: string): Trac
     instrId: number;    // instrument ID (0 = no instrument)
     volume: number;     // 0-64
     duration: number;   // ticks
+    fileOffset: number; // absolute file offset of this opcode (-1 if none)
   }
 
   function extractNotesFromVoice(startOffset: number): NoteEvent[] {
@@ -508,9 +511,10 @@ export function parseSoundFactoryFile(bytes: Uint8Array, filename: string): Trac
           break;
         }
         if (offset + 2 > opcodes.length) break;
+        const noteFileOff = HEADER_SIZE + (offset - 1); // file offset of note opcode byte
         const duration = u16BE(opcodes, offset); offset += 2;
         const xmNote = psfNoteToXm(opcode);
-        events.push({ note: xmNote, instrId: currentInstrId, volume: currentVolume, duration });
+        events.push({ note: xmNote, instrId: currentInstrId, volume: currentVolume, duration, fileOffset: noteFileOff });
         continue;
       }
 
@@ -518,8 +522,9 @@ export function parseSoundFactoryFile(bytes: Uint8Array, filename: string): Trac
         case Op.Pause:
         case Op.StopAndPause: {
           if (offset + 2 > opcodes.length) return events;
+          const pauseFileOff = HEADER_SIZE + (offset - 1); // file offset of pause opcode
           const dur = u16BE(opcodes, offset); offset += 2;
-          events.push({ note: 0, instrId: 0, volume: 0, duration: dur });
+          events.push({ note: 0, instrId: 0, volume: 0, duration: dur, fileOffset: pauseFileOff });
           if (opcode === Op.StopAndPause) return events;
           break;
         }
@@ -678,8 +683,10 @@ export function parseSoundFactoryFile(bytes: Uint8Array, filename: string): Trac
 
   // Convert note events (with tick durations) to flat pattern rows
   // Duration of 1 tick = 1 row (simplification; actual tick depends on tempo)
-  function eventsToRows(events: NoteEvent[]): TrackerCell[] {
+  // Also build parallel file offset arrays for getCellFileOffset
+  function eventsToRows(events: NoteEvent[]): { rows: TrackerCell[]; offsets: number[] } {
     const rows: TrackerCell[] = [];
+    const offsets: number[] = [];
     for (const ev of events) {
       // First row has the note, remaining rows are empty
       rows.push({
@@ -691,14 +698,22 @@ export function parseSoundFactoryFile(bytes: Uint8Array, filename: string): Trac
         effTyp2: 0,
         eff2: 0,
       });
+      offsets.push(ev.fileOffset);
       for (let d = 1; d < ev.duration; d++) {
         rows.push(emptyCell());
+        offsets.push(-1); // duration-hold rows have no independent file offset
       }
     }
-    return rows.length > 0 ? rows : [emptyCell()];
+    if (rows.length === 0) {
+      rows.push(emptyCell());
+      offsets.push(-1);
+    }
+    return { rows, offsets };
   }
 
-  const flatChannelRows = channelEvents.map(eventsToRows);
+  const flatResults = channelEvents.map(eventsToRows);
+  const flatChannelRows = flatResults.map(r => r.rows);
+  const flatChannelOffsets = flatResults.map(r => r.offsets);
 
   // Calculate total rows
   const maxRows = Math.max(...flatChannelRows.map(r => r.length), 1);
@@ -755,6 +770,25 @@ export function parseSoundFactoryFile(bytes: Uint8Array, filename: string): Trac
 
   const moduleName = filename.replace(/\.[^/.]+$/, '');
 
+  // Build uadePatternLayout with getCellFileOffset for opcode stream editing
+  const uadePatternLayout: UADEPatternLayout = {
+    formatId: 'soundFactory',
+    patternDataFileOffset: HEADER_SIZE, // opcodes start at HEADER_SIZE
+    bytesPerCell: 3, // note(1) + duration(2) or pause(1) + duration(2)
+    rowsPerPattern: ROWS_PER_PATTERN,
+    numChannels: NUM_CHANNELS,
+    numPatterns: trackerPatterns.length,
+    moduleSize: bytes.byteLength,
+    encodeCell: encodeSoundFactoryCell,
+    getCellFileOffset: (pattern: number, row: number, channel: number): number => {
+      const globalRow = pattern * ROWS_PER_PATTERN + row;
+      if (channel < 0 || channel >= flatChannelOffsets.length) return -1;
+      const offsets = flatChannelOffsets[channel];
+      if (globalRow < 0 || globalRow >= offsets.length) return -1;
+      return offsets[globalRow];
+    },
+  };
+
   return {
     name: moduleName,
     format: 'PSF' as TrackerFormat,
@@ -767,6 +801,7 @@ export function parseSoundFactoryFile(bytes: Uint8Array, filename: string): Trac
     initialSpeed: 6,
     initialBPM: 125,
     linearPeriods: false,
+    uadePatternLayout,
   };
 }
 

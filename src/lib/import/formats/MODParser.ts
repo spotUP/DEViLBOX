@@ -13,7 +13,9 @@ import type {
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, ChannelData, TrackerCell } from '@/types';
 import type { InstrumentConfig } from '@/types/instrument';
+import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
 import { convertToInstrument } from '../InstrumentConverter';
+import { encodeMODCell } from '@/engine/uade/encoders/MODEncoder';
 
 /**
  * MOD File Header
@@ -583,6 +585,20 @@ export async function parseMODFile(buffer: ArrayBuffer, filename: string): Promi
   const initialSpeed  = metadata.modData?.initialSpeed ?? 6;
   const initialBPM    = metadata.modData?.initialBPM ?? 125;
 
+  // Build uadePatternLayout for file-level cell patching.
+  // MOD pattern data starts at byte 1084 (31-sample MODs).
+  // Fixed 4-byte cells, row-major: 4 channels x 4 bytes/row = 16 bytes/row, 64 rows = 1024 bytes/pattern.
+  const uadePatternLayout: UADEPatternLayout = {
+    formatId: 'mod',
+    patternDataFileOffset: 1084,
+    bytesPerCell: 4,
+    rowsPerPattern: 64,
+    numChannels: header.channelCount,
+    numPatterns: header.patternCount,
+    moduleSize: buffer.byteLength,
+    encodeCell: encodeMODCell,
+  };
+
   return {
     name:            header.title.replace(/\0/g, '').trim() || filename.replace(/\.[^/.]+$/, ''),
     format:          'MOD' as TrackerFormat,
@@ -595,5 +611,6 @@ export async function parseMODFile(buffer: ArrayBuffer, filename: string): Promi
     initialSpeed,
     initialBPM,
     linearPeriods:   false, // MOD always uses Amiga periods
+    uadePatternLayout,
   };
 }

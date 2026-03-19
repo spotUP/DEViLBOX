@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-03-17T21:20:42.486Z
+ * Generated: 2026-03-19T07:32:29.751Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,10 +19,10 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.2993';
-export const BUILD_NUMBER = '2993';
-export const BUILD_HASH = '380171d71';
-export const BUILD_DATE = '2026-03-17';
+export const BUILD_VERSION = '1.0.3067';
+export const BUILD_NUMBER = '3067';
+export const BUILD_HASH = '41eac0217';
+export const BUILD_DATE = '2026-03-19';
 
 // Full version (patch IS the build number, so no need to append)
 export const FULL_VERSION = BUILD_VERSION;
@@ -30,206 +30,214 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.2993',
-    date: '2026-03-17',
+    version: '1.0.3067',
+    date: '2026-03-19',
     changes: [
       {
         type: 'fix',
-        "description": "Suppress libopenmpt WASM stderr to silence console spam"
+        "description": "Fix Furnace WASM crash recovery: prevent cascading chip failures"
       },
       {
         type: 'fix',
-        "description": "Upsample sub-8kHz WAV in pcm8ToWAV to fix Chrome decode failures"
-      },
-      {
-        type: 'feature',
-        "description": "Add HippelCoSo from-scratch exporter + roundtrip tests"
+        "description": "Kill process groups and orphaned tsx watchers on dev.sh restart"
       },
       {
         type: 'improvement',
-        "description": "Wire all Amiga format exporters into Native export tab"
-      },
-      {
-        type: 'feature',
-        "description": "Add SoundMon exporter wrapper with chip RAM fallback"
+        "description": "Export audit: all 45 formats pass, WAV comparison results updated"
       },
       {
         type: 'fix',
-        "description": "Fix SoundMon exporter bugs + export roundtrip tests"
+        "description": "Convert 8-bit and 12-bit samples to 16-bit before encoding"
       },
       {
         type: 'fix',
-        "description": "Fix SidMon2 template header layout and PumaTracker loading path"
-      },
-      {
-        type: 'feature',
-        "description": "Add templates for SoundMon, HippelCoSo, Future Composer, OctaMED + chip RAM export fallback"
+        "description": "Auto-reinitialize WASM after memory crash"
       },
       {
         type: 'fix',
-        "description": "Inject UADE for QuadraComposer audio; fix EMS test files"
-      },
-      {
-        type: 'improvement',
-        "description": "From-scratch file builders for JamCracker and SoundMon, native export UI"
-      },
-      {
-        type: 'improvement',
-        "description": "Shrink template files: 1 pattern instead of 64"
-      },
-      {
-        type: 'feature',
-        "description": "New Song: template-based creation for exotic Amiga formats"
-      },
-      {
-        type: 'fix',
-        "description": "Fix MMDC prefix form and remove mmdc from OpenMPT path"
-      },
-      {
-        type: 'fix',
-        "description": "Fix PVP prefix routing and MED format parsing"
-      },
-      {
-        type: 'improvement',
-        "description": "UADE: variable-length encoders for SidMon2, PumaTracker, HippelCoSo, Actionamics"
+        "description": "Catch WASM render crashes to prevent tab freeze cascade"
       }
     ]
   },
   {
-    version: '2026-03-16',
-    date: '2026-03-16',
+    version: '2026-03-18',
+    date: '2026-03-18',
     changes: [
       {
         type: 'fix',
-        "description": "Add .sas suffix-form routing for SonicArranger compiled binary"
+        "description": "Prevent WASM memory crash when loading a second .sunvox file"
       },
       {
         type: 'fix',
-        "description": "Skip Paula scan for SKIP_SCAN formats regardless of mode"
+        "description": "Fix MOD exporter: merge secondary effects (effTyp2) like XM exporter"
+      },
+      {
+        type: 'fix',
+        "description": "Fix ULT timing: speed=4 default, clamp speed 32-47 for XM compat"
+      },
+      {
+        type: 'fix',
+        "description": "Prevent browser freeze on complex .sunvox files"
+      },
+      {
+        type: 'fix',
+        "description": "Fix XM exporter: merge secondary effects, prefer global commands"
       },
       {
         type: 'feature',
-        "description": "Add variable-length encoder infrastructure for RLE/packed formats"
+        "description": "Per-note triggering, real-time params, save, type detection"
+      },
+      {
+        type: 'fix',
+        "description": "Fix ULT sample data: use fileSize - totalSampleBytes for PCM offset"
       },
       {
         type: 'feature',
-        "description": "Add console audit badges and live envCorr bar updates to format-status"
+        "description": "Create one instrument per generator module with per-instrument sub-graphs"
       },
       {
         type: 'fix',
-        "description": "Fix MMD0Sample struct layout, transpose, tempo, and effect mapping"
+        "description": "Sample sync to all chips + MuLaw/C219 format converters"
       },
       {
         type: 'fix',
-        "description": "Convert Tier 3 suffix-form files to UADE prefix form before routing"
+        "description": "Set currentInstrumentId after .sunvox load so editor opens immediately"
+      },
+      {
+        type: 'fix',
+        "description": "Stop render loop in SunVoxModularEditor"
       },
       {
         type: 'improvement',
-        "description": "UADE: real-time score position tracking during playback"
+        "description": "Revert ULT sample offset change (sequential reading was correct)"
       },
       {
         type: 'fix',
-        "description": "Stop playback keeps pattern editor at current position"
+        "description": "Fix duplicate input port on Output module causing React key errors"
+      },
+      {
+        type: 'improvement',
+        "description": "Add format status tracker section to CLAUDE.md"
+      },
+      {
+        type: 'fix',
+        "description": "Fix effect mapping for 669, STM, ULT per OpenMPT reference"
+      },
+      {
+        type: 'improvement',
+        "description": "Update format status tracker guide with live SSE API and key conventions"
+      },
+      {
+        type: 'fix',
+        "description": "Live SSE updates + dynamic audit entries from server"
+      },
+      {
+        type: 'fix',
+        "description": "SSE event name mismatch for bulk updates"
+      },
+      {
+        type: 'fix',
+        "description": "Restore lowered silence threshold (0.00005) for quiet instruments"
       },
       {
         type: 'feature',
-        "description": "Enable native parsers by default for remaining 4 formats"
-      },
-      {
-        type: 'improvement',
-        "description": "UADE: declarative encoder factory for common cell layouts"
-      },
-      {
-        type: 'improvement',
-        "description": "UADE: universal native export, enhanced effect detection"
-      },
-      {
-        type: 'improvement',
-        "description": "UADE: JamCracker encoder, DMA restart detection, improved pattern reconstruction"
+        "description": "Show SunVox module controls as inline sliders"
       },
       {
         type: 'fix',
-        "description": "Enable native pattern editing for SonicArranger by default"
+        "description": "Fix TCB speed injection and sample loop detection"
       },
       {
         type: 'fix',
-        "description": "Add mk2/mkii to skip-scan and force-classic prefix sets"
+        "description": "Fix sample volumes, restore parser fixes, improve WAV correlation"
       },
       {
         type: 'fix',
-        "description": "TCBTrackerParser note formula correction"
+        "description": "Recalculate port positions on camera pan/zoom so cables follow modules"
       },
       {
         type: 'fix',
-        "description": "MEDParser MMD3 noteBaseTranspose (12 instead of 36)"
+        "description": "Fix MOD/XM volume export and empty sample loopLen"
       },
       {
-        type: 'improvement',
-        "description": "Update project memory with multi-chip, scratch, and import fixes"
+        type: 'fix',
+        "description": "Route SunVoxModular to modular editor in both DOM and Pixi UIs"
+      },
+      {
+        type: 'fix',
+        "description": "Restore lost parser fixes from session knowledge"
+      },
+      {
+        type: 'fix',
+        "description": "Complete synth test suite + NES/PCE/Amiga/SNES/TIA audio fixes"
       },
       {
         type: 'feature',
-        "description": "Startup jingle, GL AI panel input, jingle visualizer mode, pattern bar editor"
-      },
-      {
-        type: 'feature',
-        "description": "120s buffer, scroll wheel velocity, fader gain MIDI CC, scratch in VJView"
-      },
-      {
-        type: 'fix',
-        "description": "MED cell decode, MOD channel widths, TCB note offset, UADE routing"
-      },
-      {
-        type: 'fix',
-        "description": "Create all chips on song load, destroy stale chips between songs"
-      },
-      {
-        type: 'fix',
-        "description": "Channel bounds check in WASM dispatch + destroyChip API"
-      },
-      {
-        type: 'fix',
-        "description": "Envelope correlation export, float32 WAV, BRR field offsets"
-      },
-      {
-        type: 'feature',
-        "description": "Add console capture, evaluate_script, and play_fur tools"
-      },
-      {
-        type: 'fix',
-        "description": "Explicit number type for HWKnob onChange callback in MAMEGenericHardware"
-      },
-      {
-        type: 'fix',
-        "description": "Extend skip-scan/force-classic to suffix-form compiled replayer extensions"
-      },
-      {
-        type: 'fix',
-        "description": "Correct baseNote format from OpenMPT 'C-4' to Tone.js 'C4'"
-      },
-      {
-        type: 'fix',
-        "description": "Add .sa to skip-scan and force-classic for compiled binary SA files"
-      },
-      {
-        type: 'fix',
-        "description": "Swap instrument/note byte order per IFF EMOD spec"
-      },
-      {
-        type: 'fix',
-        "description": "Add compiled 68k replayer prefixes to skip-scan and force-classic"
+        "description": "Add GDM, PSM, Music-Line test songs and exports"
       },
       {
         type: 'improvement',
-        "description": "Prevent browser crashes: skip enhanced scan for compiled replayer formats"
+        "description": "Update export tool test cases with real filenames, export all 42 formats"
+      },
+      {
+        type: 'feature',
+        "description": "Add 42 test songs for export format verification"
+      },
+      {
+        type: 'feature',
+        "description": "Sample format files + SunVox modular module descriptors"
+      },
+      {
+        type: 'feature',
+        "description": "Console capture, SunVox modular editor, MOD exporter, Pixi views"
+      },
+      {
+        type: 'feature',
+        "description": "EarAche, SCUMM, Sean Connolly, WantedTeam stub parsers"
+      },
+      {
+        type: 'feature',
+        "description": "Startup jingle engine with pattern sequencer + visualizer"
+      },
+      {
+        type: 'feature',
+        "description": "New MAME chip synth engines + SunVox modular synth"
+      },
+      {
+        type: 'feature',
+        "description": "Add MAME chip hardware UIs (CMI, FZ, KS0164, PS1SPU, RolandGP, SWP00/20, ZSG2)"
       },
       {
         type: 'fix',
-        "description": "Fix SonicArranger prefix-form crash: move sas to FORCE_CLASSIC_PREFIXES"
+        "description": "TrackerReplayer + FormatStore + base types updates"
       },
       {
         type: 'fix',
-        "description": "Fix InStereo! 2 wrong pattern speed: convert Hz tempo to BPM"
+        "description": "NES useNP init + inline sample format conversion for all chips"
+      },
+      {
+        type: 'feature',
+        "description": "OpenMPT song export tool + exported MOD file"
+      },
+      {
+        type: 'fix',
+        "description": "UnifiedFileLoader improvements + NES platform fix"
+      },
+      {
+        type: 'feature',
+        "description": "Modular synth toolbar + SynthControlsRouter Tunefish routing"
+      },
+      {
+        type: 'fix',
+        "description": "ToneEngine synth routing + NativeEngineRouting updates"
+      },
+      {
+        type: 'feature',
+        "description": "Extended SunVox engine with subsong and control improvements"
+      },
+      {
+        type: 'feature',
+        "description": "Add Tunefish synth type + modular synth improvements"
       }
     ]
   }

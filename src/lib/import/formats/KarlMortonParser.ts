@@ -67,6 +67,8 @@
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, ChannelData, TrackerCell, InstrumentConfig } from '@/types';
 import type { UADEChipRamInfo } from '@/types/instrument';
+import type { UADEVariablePatternLayout } from '@/engine/uade/UADEPatternEncoder';
+import { karlMortonEncoder } from '@/engine/uade/encoders/KarlMortonEncoder';
 import { createSamplerInstrument } from './AmigaUtils';
 
 // ── Binary helpers ────────────────────────────────────────────────────────────
@@ -578,6 +580,42 @@ function parseInternal(bytes: Uint8Array, filename: string): TrackerSong | null 
 
   const songName = firstSong.name || filename.replace(/\.[^/.]+$/, '');
 
+  // ── Build variable layout for UADE chip RAM editing ─────────────────────
+  // KM patterns are dynamically split from a variable-length music stream.
+  // Each TrackerSong pattern+channel is a unique file-level pattern.
+  const numFilePatterns = patterns.length * numChannels;
+  const trackMap: number[][] = [];
+  const filePatternAddrs: number[] = [];
+  const filePatternSizes: number[] = [];
+
+  // Since the music data is variable-length encoded, file addresses are not
+  // directly computable per-pattern. We use the music data start as base
+  // and assign sequential indices. The actual per-pattern boundaries in the
+  // original stream cannot be precisely reconstructed, so we set addresses
+  // to 0 and sizes to the maximum re-encoded size.
+  for (let p = 0; p < patterns.length; p++) {
+    const chPats: number[] = [];
+    for (let ch = 0; ch < numChannels; ch++) {
+      const filePatIdx = p * numChannels + ch;
+      chPats.push(filePatIdx);
+      filePatternAddrs.push(firstSong.musicOffset + filePatIdx); // approximate
+      filePatternSizes.push(KM_PATTERN_LEN * 5); // max 5 bytes per row (note+instr+cmd+param)
+    }
+    trackMap.push(chPats);
+  }
+
+  const variableLayout: UADEVariablePatternLayout = {
+    formatId: 'karlMorton',
+    numChannels,
+    numFilePatterns,
+    rowsPerPattern: KM_PATTERN_LEN,
+    moduleSize: bytes.length,
+    encoder: karlMortonEncoder,
+    filePatternAddrs,
+    filePatternSizes,
+    trackMap,
+  };
+
   return {
     name:            songName,
     format:          'MOD' as TrackerFormat,
@@ -590,6 +628,7 @@ function parseInternal(bytes: Uint8Array, filename: string): TrackerSong | null 
     initialSpeed:    6,
     initialBPM:      125,
     linearPeriods:   false,
+    uadeVariableLayout: variableLayout,
   };
 }
 

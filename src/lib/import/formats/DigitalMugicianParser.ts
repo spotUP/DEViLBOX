@@ -19,6 +19,8 @@
 import type { TrackerSong } from '@/engine/TrackerReplayer';
 import type { Pattern, TrackerCell, InstrumentConfig } from '@/types';
 import type { DigMugConfig, UADEChipRamInfo } from '@/types/instrument';
+import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
+import { encodeDigitalMugicianCell } from '@/engine/uade/encoders/DigitalMugicianEncoder';
 import { arrayBufferToBase64 } from '@/lib/import/InstrumentConverter';
 
 // -- WAV helper for sample editor ------------------------------------------
@@ -640,6 +642,10 @@ export async function parseDigitalMugicianFile(
   // Track which pattern combinations we've already generated to deduplicate
   const patternCache = new Map<string, number>();
 
+  // Track the DM base row offset per channel for each TrackerSong pattern
+  // Used by getCellFileOffset to map (pattern, row, channel) → file offset
+  const patternChannelBaseRows: number[][] = [];
+
   for (let stepIdx = 0; stepIdx < numSteps; stepIdx++) {
     const trackBase = stepIdx * 4;
     if (trackBase + 3 >= song.tracks.length) break;
@@ -660,6 +666,9 @@ export async function parseDigitalMugicianFile(
     const patIdx = trackerPatterns.length;
     patternCache.set(cacheKey, patIdx);
     songPositions.push(patIdx);
+
+    // Record base row offsets for each channel (step.pattern is already <<6 = row offset)
+    patternChannelBaseRows.push([ch0.pattern, ch1.pattern, ch2.pattern, ch3.pattern]);
 
     // Build 4 channels x 64 rows
     const channelRows: TrackerCell[][] = [[], [], [], []];
@@ -850,6 +859,29 @@ export async function parseDigitalMugicianFile(
   // -- Module name from first song title or filename ------------------------
   const moduleName = song.title.trim() || filename.replace(/\.[^/.]+$/, '');
 
+  // Build uadePatternLayout with custom getCellFileOffset for DM's track indirection.
+  // DM pattern data is a flat pool of single-channel 4-byte cells at patternDataStart.
+  // Each TrackerSong pattern combines 4 channels, each referencing a different
+  // sub-pattern (base row offset) in the pool via the song's track sequence.
+  const numDMPatterns = Math.floor(totalPatternRows / 64);
+  const uadePatternLayout: UADEPatternLayout = {
+    formatId: 'digitalMugician',
+    patternDataFileOffset: patternDataStart,
+    bytesPerCell: 4,
+    rowsPerPattern: 64,
+    numChannels: 4,
+    numPatterns: numDMPatterns,
+    moduleSize: buf.byteLength,
+    encodeCell: encodeDigitalMugicianCell,
+    getCellFileOffset: (pattern: number, row: number, channel: number): number => {
+      if (pattern < 0 || pattern >= patternChannelBaseRows.length) return patternDataStart;
+      if (channel < 0 || channel >= 4) return patternDataStart;
+      // patternChannelBaseRows[pattern][channel] = base row index in the flat pool
+      const baseRow = patternChannelBaseRows[pattern][channel];
+      return patternDataStart + (baseRow + row) * 4;
+    },
+  };
+
   return {
     name: moduleName,
     format: 'MOD',
@@ -862,9 +894,7 @@ export async function parseDigitalMugicianFile(
     initialSpeed: songSpeed > 0 ? songSpeed : 6,
     initialBPM: 125,
     linearPeriods: false,
-    // uadePatternLayout omitted: DigMugSynth instruments handle audio directly.
-    // UADE audio is silent for Digital Mugician — DigMugSynth has its own WASM engine
-    // that correctly emulates DM wavetable synthesis without UADE.
+    uadePatternLayout,
   };
 }
 

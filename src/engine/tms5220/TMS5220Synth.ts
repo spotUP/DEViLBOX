@@ -104,7 +104,7 @@ export class TMS5220Synth extends MAMEBaseSynth {
 
   // Vowel sequence state
   private _vowelSequence: string[] = [];
-  private _vowelLoopSingle = true;
+  private _vowelLoopSingle = false;
   private _vowelIndex = 0;
 
   constructor() {

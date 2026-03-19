@@ -53,7 +53,9 @@
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, ChannelData, TrackerCell, InstrumentConfig } from '@/types';
+import type { UADEVariablePatternLayout } from '@/engine/uade/UADEPatternEncoder';
 import { createSamplerInstrument } from './AmigaUtils';
+import { gdmEncoder } from '@/engine/uade/encoders/GDMEncoder';
 
 // ── Binary helpers ─────────────────────────────────────────────────────────────
 
@@ -558,6 +560,9 @@ export async function parseGDMFile(
   // 64 rows per pattern, each row terminated by a 0x00 channel byte.
 
   const patterns: Pattern[] = [];
+  // Track file-level pattern addresses and sizes for uadeVariableLayout
+  const filePatternAddrs: number[] = [];
+  const filePatternSizes: number[] = [];
   let patCursor = patternOffset;
 
   for (let pIdx = 0; pIdx < numPatterns; pIdx++) {
@@ -569,12 +574,16 @@ export async function parseGDMFile(
     const chunkLen = patternLength > 2 ? patternLength - 2 : 0;
 
     if (chunkLen === 0 || patCursor + chunkLen > buffer.byteLength) {
+      filePatternAddrs.push(patCursor);
+      filePatternSizes.push(chunkLen);
       patCursor += chunkLen;
       // Push an empty pattern placeholder
       patterns.push(buildEmptyPattern(pIdx, numChannels, filename, numPatterns, sampleInfos.length));
       continue;
     }
 
+    filePatternAddrs.push(patCursor);
+    filePatternSizes.push(chunkLen);
     const chunkData  = bytes.subarray(patCursor, patCursor + chunkLen);
     patCursor       += chunkLen;
     const chunk      = new ChunkReader(chunkData);
@@ -739,6 +748,23 @@ export async function parseGDMFile(
   // S3M C-5 (note=61) → ProTracker C-0 (period=1712 = FreqS3MTable[0]).
   const noteExportOffset = (originalFormat === 3) ? -60 : undefined;
 
+  // Build trackMap: all channels of each pattern share the same file-pattern index
+  const trackMap: number[][] = patterns.map((_, patIdx) =>
+    Array.from({ length: numChannels }, () => patIdx),
+  );
+
+  const uadeVariableLayout: UADEVariablePatternLayout = {
+    formatId: 'gdm',
+    numChannels,
+    numFilePatterns: patterns.length,
+    rowsPerPattern: ROWS_PER_PATTERN,
+    moduleSize: buffer.byteLength,
+    encoder: gdmEncoder,
+    filePatternAddrs,
+    filePatternSizes,
+    trackMap,
+  };
+
   return {
     name:            songTitle,
     format:          trackerFormat,
@@ -751,6 +777,7 @@ export async function parseGDMFile(
     initialSpeed:    tempo  > 0 ? tempo  : 6,
     initialBPM:      bpm    > 0 ? bpm    : 125,
     linearPeriods,
+    uadeVariableLayout,
     ...(noteExportOffset !== undefined ? { noteExportOffset } : {}),
   };
 }

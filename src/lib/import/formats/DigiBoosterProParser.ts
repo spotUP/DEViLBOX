@@ -73,6 +73,8 @@
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, ChannelData, TrackerCell, InstrumentConfig, UADEChipRamInfo } from '@/types';
+import type { UADEVariablePatternLayout } from '@/engine/uade/UADEPatternEncoder';
+import { digiBoosterProEncoder } from '@/engine/uade/encoders/DigiBoosterProEncoder';
 
 // ── Binary reader ─────────────────────────────────────────────────────────────
 
@@ -738,7 +740,11 @@ function _parseDigiBoosterProFile(bytes: Uint8Array, filename: string): TrackerS
 
   // ── PATT chunk → patterns ─────────────────────────────────────────────────
   const pattData = firstChunk(chunkMap, 'PATT');
+  const pattChunkFileOffset = chunkMap.get('PATT')?.[0]?.fileOffset ?? 0;
   const patterns: Pattern[] = [];
+  const patFileAddrs: number[] = [];   // file offset of each pattern's packed data
+  const patFileSizes: number[] = [];   // packed data size of each pattern
+  const patRowCounts: number[] = [];   // rows per pattern
 
   if (pattData) {
     const r = new Reader(pattData);
@@ -755,6 +761,10 @@ function _parseDigiBoosterProFile(bytes: Uint8Array, filename: string): TrackerS
 
       const numRows    = r.u16be();
       const packedSize = r.u32be();
+      // Record file offset of packed data (relative to file start)
+      patFileAddrs.push(pattChunkFileOffset + r.pos);
+      patFileSizes.push(packedSize);
+      patRowCounts.push(numRows);
       if (!r.canRead(packedSize)) break;
       const patBytes = r.bytes(packedSize);
 
@@ -854,6 +864,28 @@ function _parseDigiBoosterProFile(bytes: Uint8Array, filename: string): TrackerS
   const validOrder = orderList.filter(idx => idx < patterns.length);
   const songPositions = validOrder.length > 0 ? validOrder : patterns.map((_, i) => i);
 
+  // ── Build uadeVariableLayout for chip RAM editing ──────────────────────────
+  // DBM packs ALL channels into one stream per pattern (not per-channel tracks).
+  // trackMap maps (trackerPatIdx, chIdx) → same file pattern index for all channels
+  // in that pattern, since they share one packed stream.
+  const trackMap: number[][] = [];
+  for (let p = 0; p < patterns.length; p++) {
+    // All channels in this pattern point to the same file pattern index
+    trackMap.push(Array.from({ length: numChannels }, () => p < patFileAddrs.length ? p : -1));
+  }
+
+  const uadeVariableLayout: UADEVariablePatternLayout = {
+    formatId: 'digiBoosterPro',
+    numChannels,
+    numFilePatterns: patFileAddrs.length,
+    rowsPerPattern: patRowCounts.length > 0 ? patRowCounts : 64,
+    moduleSize: bytes.length,
+    encoder: digiBoosterProEncoder,
+    filePatternAddrs: patFileAddrs,
+    filePatternSizes: patFileSizes,
+    trackMap,
+  };
+
   return {
     name:            songName,
     format:          'MOD' as TrackerFormat,
@@ -866,5 +898,6 @@ function _parseDigiBoosterProFile(bytes: Uint8Array, filename: string): TrackerS
     initialSpeed:    6,
     initialBPM:      125,
     linearPeriods:   false,
+    uadeVariableLayout,
   };
 }
