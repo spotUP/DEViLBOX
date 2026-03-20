@@ -132,6 +132,8 @@ function lerpFrame(from: TMS5220Frame, to: TMS5220Frame, t: number): TMS5220Fram
  */
 /** Phoneme categories */
 const STOPS = new Set(['P*', 'T*', 'K*', 'KX', 'B*', 'D*', 'G*', 'GX', 'Q*']);
+const VOICELESS_STOPS = new Set(['P*', 'T*', 'K*', 'KX']);
+const VOWELS = new Set(['IY', 'IH', 'EH', 'AE', 'AA', 'AH', 'AO', 'UH', 'AX', 'IX', 'ER', 'UX', 'OH']);
 const DIPHTHONGS: Record<string, [string, string]> = {
   'EY': ['EH', 'IY'], 'AY': ['AA', 'IY'], 'OY': ['AO', 'IY'],
   'AW': ['AA', 'UX'], 'OW': ['AO', 'UX'], 'UW': ['UX', 'UX'],
@@ -152,8 +154,18 @@ export function phonemesToTMS5220Frames(
     if (frame) {
       const energyBoost = token.stress >= 4 ? 2 : token.stress >= 2 ? 1 : 0;
       const pitchBoost = token.stress >= 4 ? 3 : token.stress >= 2 ? 1 : 0;
+      // Vowel reduction: unstressed vowels shorter + more central
+      let duration = frame.durationMs;
+      let k = [...frame.k];
+      if (VOWELS.has(token.code) && token.stress === 0) {
+        duration = Math.round(duration * 0.7);
+        k[0] = Math.round(k[0] + (16 - k[0]) * 0.3); // K1 toward neutral
+        k[1] = Math.round(k[1] + (14 - k[1]) * 0.3); // K2 toward neutral
+      }
       rawFrames.push({
         ...frame,
+        k,
+        durationMs: duration,
         energy: Math.min(14, frame.energy + energyBoost),
         pitch: frame.unvoiced ? 0 : Math.min(31, frame.pitch + pitchBoost),
       });
@@ -188,9 +200,14 @@ export function phonemesToTMS5220Frames(
       result.push(lerpFrame(prev, curr, 0.67));
     }
 
-    // Stop consonants: burst + ramp
+    // Stop consonants: burst + aspiration + ramp
     if (STOPS.has(code)) {
       result.push({ ...curr, durationMs: 15, energy: Math.min(14, curr.energy + 2) });
+      // Voiceless stops get brief aspiration (noise burst)
+      if (VOICELESS_STOPS.has(code)) {
+        const asp = samToTMS5220('/H');
+        if (asp) result.push({ ...asp, durationMs: 20, energy: Math.max(1, curr.energy - 1), unvoiced: true, pitch: 0 });
+      }
       result.push({ ...curr, durationMs: 15, energy: Math.max(1, curr.energy - 1) });
       continue;
     }
@@ -217,8 +234,18 @@ export function phonemesToTMS5220Frames(
       }
     }
 
+    // Energy envelope shaping for longer vowels
     const steadyMs = Math.max(25, curr.durationMs - 50);
-    result.push({ ...curr, durationMs: steadyMs });
+    if (steadyMs > 75 && VOWELS.has(code)) {
+      const attackMs = Math.round(steadyMs * 0.2);
+      const sustainMs = Math.round(steadyMs * 0.6);
+      const releaseMs = steadyMs - attackMs - sustainMs;
+      result.push({ ...curr, durationMs: attackMs, energy: Math.max(1, curr.energy - 2) });
+      result.push({ ...curr, durationMs: sustainMs });
+      result.push({ ...curr, durationMs: releaseMs, energy: Math.max(1, curr.energy - 3) });
+    } else {
+      result.push({ ...curr, durationMs: steadyMs });
+    }
   }
 
   return result;

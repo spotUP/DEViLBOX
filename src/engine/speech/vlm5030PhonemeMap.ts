@@ -127,6 +127,9 @@ function lerpFrame(from: VLM5030Frame, to: VLM5030Frame, t: number): VLM5030Fram
 
 /** Phoneme categories for energy shaping */
 const STOPS = new Set(['P*', 'T*', 'K*', 'KX', 'B*', 'D*', 'G*', 'GX', 'Q*']);
+const VOICELESS_STOPS = new Set(['P*', 'T*', 'K*', 'KX']);
+const FRICATIVES = new Set(['S*', 'SH', 'F*', 'TH', '/H', '/X', 'Z*', 'ZH', 'V*', 'DH']);
+const VOWELS = new Set(['IY', 'IH', 'EH', 'AE', 'AA', 'AH', 'AO', 'UH', 'AX', 'IX', 'ER', 'UX', 'OH']);
 const DIPHTHONGS: Record<string, [string, string]> = {
   'EY': ['EH', 'IY'], 'AY': ['AA', 'IY'], 'OY': ['AO', 'IY'],
   'AW': ['AA', 'UX'], 'OW': ['AO', 'UX'], 'UW': ['UX', 'UX'],
@@ -146,13 +149,27 @@ export function phonemesToVLM5030Frames(
   const rawFrames: VLM5030Frame[] = [];
   const tokenCodes: string[] = [];
 
-  for (const token of tokens) {
+  for (let ti = 0; ti < tokens.length; ti++) {
+    const token = tokens[ti];
     const frame = samToVLM5030(token.code);
     if (frame) {
       const energyBoost = token.stress >= 4 ? 3 : token.stress >= 2 ? 1 : 0;
       const pitchBoost = token.stress >= 4 ? 2 : token.stress >= 2 ? 1 : 0;
+
+      // Vowel reduction: unstressed vowels become shorter and more central
+      let duration = frame.durationMs;
+      let k = [...frame.k];
+      if (VOWELS.has(token.code) && token.stress === 0) {
+        duration = Math.round(duration * 0.7); // shorter
+        // Shift K0 toward neutral (index ~48) for schwa-like quality
+        k[0] = Math.round(k[0] + (48 - k[0]) * 0.3);
+        k[1] = Math.round(k[1] + (8 - k[1]) * 0.3);
+      }
+
       rawFrames.push({
         ...frame,
+        k,
+        durationMs: duration,
         energy: Math.min(31, frame.energy + energyBoost),
         pitch: frame.unvoiced ? 0 : Math.min(31, frame.pitch + pitchBoost),
       });
@@ -192,6 +209,13 @@ export function phonemesToVLM5030Frames(
     if (STOPS.has(code)) {
       // Burst: short high-energy frame
       result.push({ ...curr, durationMs: 15, energy: Math.min(31, curr.energy + 4) });
+      // Aspiration: voiceless stops (P/T/K) get a brief noise burst
+      if (VOICELESS_STOPS.has(code)) {
+        const aspFrame = samToVLM5030('/H'); // use /H (aspiration) formants
+        if (aspFrame) {
+          result.push({ ...aspFrame, durationMs: 20, energy: Math.min(31, curr.energy - 2), unvoiced: true, pitch: 0 });
+        }
+      }
       // Ramp down: lower energy
       result.push({ ...curr, durationMs: 15, energy: Math.max(1, curr.energy - 2) });
       continue;
@@ -220,9 +244,19 @@ export function phonemesToVLM5030Frames(
       }
     }
 
-    // Regular phoneme: steady state
+    // Regular phoneme: energy envelope shaping for longer phonemes
     const steadyMs = Math.max(25, curr.durationMs - 50);
-    result.push({ ...curr, durationMs: steadyMs });
+    if (steadyMs > 75 && VOWELS.has(code)) {
+      // Long vowels: attack (25%) → sustain (50%) → release (25%)
+      const attackMs = Math.round(steadyMs * 0.2);
+      const sustainMs = Math.round(steadyMs * 0.6);
+      const releaseMs = steadyMs - attackMs - sustainMs;
+      result.push({ ...curr, durationMs: attackMs, energy: Math.max(1, curr.energy - 3) });
+      result.push({ ...curr, durationMs: sustainMs });
+      result.push({ ...curr, durationMs: releaseMs, energy: Math.max(1, curr.energy - 4) });
+    } else {
+      result.push({ ...curr, durationMs: steadyMs });
+    }
   }
 
   return result;
