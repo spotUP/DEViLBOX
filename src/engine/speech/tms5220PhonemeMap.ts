@@ -137,10 +137,12 @@ export function phonemesToTMS5220Frames(
   for (const token of tokens) {
     const frame = samToTMS5220(token.code);
     if (frame) {
-      const energyBoost = token.stress >= 4 ? 2 : 0;
+      const energyBoost = token.stress >= 4 ? 2 : token.stress >= 2 ? 1 : 0;
+      const pitchBoost = token.stress >= 4 ? 3 : token.stress >= 2 ? 1 : 0;
       rawFrames.push({
         ...frame,
         energy: Math.min(14, frame.energy + energyBoost),
+        pitch: frame.unvoiced ? 0 : Math.min(31, frame.pitch + pitchBoost),
       });
     }
   }

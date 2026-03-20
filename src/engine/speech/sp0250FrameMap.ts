@@ -469,11 +469,13 @@ export function phonemesToSP0250LPCFrames(
   for (const token of tokens) {
     const frame = samToSP0250LPC(token.code);
     if (frame) {
-      // Boost amplitude for stressed syllables
-      const ampBoost = token.stress >= 4 ? 0x04 : 0;
+      // Boost amplitude and pitch for stressed syllables (prosody)
+      const ampBoost = token.stress >= 4 ? 0x04 : token.stress >= 2 ? 0x02 : 0;
+      const pitchBoost = token.stress >= 4 ? 4 : token.stress >= 2 ? 2 : 0;
       rawFrames.push({
         ...frame,
         amp: Math.min(0xFE, frame.amp + ampBoost),
+        pitch: frame.voiced ? Math.min(63, frame.pitch + pitchBoost) : 0,
       });
     }
   }

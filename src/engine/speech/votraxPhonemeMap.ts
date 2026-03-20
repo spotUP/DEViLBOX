@@ -27,6 +27,7 @@ export const VotraxPhoneme = {
 export interface VotraxFrame {
   phone: number;      // Votrax allophone index (0-63)
   durationMs: number; // Approximate duration in milliseconds
+  inflection?: number; // 0-3 pitch inflection (0=low, 3=high)
 }
 
 /**
@@ -158,7 +159,10 @@ export function samToVotrax(samCode: string): VotraxFrame[] | null {
     ' ': [{ phone: VotraxPhoneme.PA1, durationMs: dur(VotraxPhoneme.PA1) }],
   };
 
-  return map[samCode] ?? null;
+  const frames = map[samCode];
+  if (!frames) return null;
+  // Add default inflection (overridden by phonemesToVotraxFrames based on stress)
+  return frames.map(f => ({ ...f, inflection: f.inflection ?? 1 }));
 }
 
 /**
@@ -171,7 +175,11 @@ export function phonemesToVotraxFrames(
   for (const token of tokens) {
     const mapped = samToVotrax(token.code);
     if (mapped) {
-      frames.push(...mapped);
+      // Prosody: map SAM stress (0-8) to Votrax inflection (0-3)
+      const inflection = token.stress >= 6 ? 3 : token.stress >= 4 ? 2 : token.stress >= 2 ? 1 : 0;
+      for (const f of mapped) {
+        frames.push({ ...f, inflection });
+      }
     }
   }
   return frames;

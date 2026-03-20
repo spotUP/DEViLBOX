@@ -234,7 +234,10 @@ export class VotraxSynth extends MAMEBaseSynth {
     });
 
     this._speechSequencer = new SpeechSequencer<VotraxFrame>(
-      (frame) => this.writePhone(frame.phone),
+      (frame) => {
+        this.writePhone(frame.phone);
+        if (frame.inflection !== undefined) this.setInflection(frame.inflection);
+      },
       () => {
         this._speechSequencer = null;
         if (this.workletNode && !this._disposed) {
