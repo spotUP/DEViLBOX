@@ -168,6 +168,7 @@ function getEditorMode(synthType: SynthType): EditorMode {
   if (synthType === 'SidMon1Synth') return 'sidmon1';
   if (synthType === 'HippelCoSoSynth') return 'hippelcoso';
   if (synthType === 'RobHubbardSynth') return 'robhubbard';
+  if (synthType === 'SteveTurnerSynth') return 'steveturner';
   if (synthType === 'DavidWhittakerSynth') return 'davidwhittaker';
   if (synthType === 'HarmonicSynth') return 'harmonicsynth';
   if (synthType === 'ModularSynth') return 'modular';

@@ -23,6 +23,7 @@ import { TFMXSynth } from './tfmx/TFMXSynth';
 import { FredSynth } from './fred/FredSynth';
 import { HippelCoSoSynth } from './hippelcoso/HippelCoSoSynth';
 import { RobHubbardSynth } from './robhubbard/RobHubbardSynth';
+import { SteveTurnerSynth } from './steveturner/SteveTurnerSynth';
 import { SidMon1Synth } from './sidmon1/SidMon1Synth';
 import { OctaMEDSynth } from './octamed/OctaMEDSynth';
 import { DavidWhittakerSynth } from './davidwhittaker/DavidWhittakerSynth';
@@ -674,6 +675,14 @@ export class InstrumentFactory {
           );
         }
         instrument = hcSynth;
+        break;
+      }
+
+      case 'SteveTurnerSynth': {
+        const stSynth = new SteveTurnerSynth();
+        // Set 0-based instrument index for note preview
+        stSynth.setInstrumentIndex((config.id ?? 1) - 1);
+        instrument = stSynth;
         break;
       }
 

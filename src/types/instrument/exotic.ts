@@ -392,6 +392,32 @@ export interface RobHubbardConfig {
   sampleData: number[];
 }
 
+// ── Steve Turner ─────────────────────────────────────────────────────────────
+
+/**
+ * Steve Turner synthesizer configuration.
+ * Parameters correspond to the 48-byte instrument structure in the replayer.
+ */
+export interface SteveTurnerConfig {
+  priority: number;       // instrument priority level (0-255)
+  sampleIdx: number;      // sample index (0-29, or negative for synth)
+  initDelay: number;      // delay before note starts (0-255 ticks)
+  env1Duration: number;   // envelope segment 1 duration (0-255)
+  env1Delta: number;      // envelope segment 1 volume delta (-128..127)
+  env2Duration: number;   // envelope segment 2 duration (0-255)
+  env2Delta: number;      // envelope segment 2 volume delta (-128..127)
+  pitchShift: number;     // pitch right-shift amount (0-7)
+  oscCount: number;       // oscillation counter (0-65535)
+  oscDelta: number;       // oscillation volume delta (-128..127)
+  oscLoop: number;        // oscillation direction toggle count (0-255)
+  decayDelta: number;     // decay/release volume delta (-128..127)
+  numVibrato: number;     // number of vibrato table entries (0-5)
+  vibratoDelay: number;   // ticks before vibrato starts (0-255)
+  vibratoSpeed: number;   // ticks between vibrato depth changes (0-255)
+  vibratoMaxDepth: number;// maximum vibrato depth (0-255)
+  chain: number;          // instrument chain (0=none, 1-32=next instrument)
+}
+
 // ── SidMon 1.0 ──────────────────────────────────────────────────────────────
 
 export interface SidMon1Config {

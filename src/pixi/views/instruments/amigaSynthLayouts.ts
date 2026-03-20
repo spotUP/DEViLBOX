@@ -472,6 +472,38 @@ export const INSTEREO1_LAYOUT: AmigaSynthLayout = {
   ],
 };
 
+// ── Steve Turner ─────────────────────────────────────────────────────────────
+
+export const STEVE_TURNER_LAYOUT: AmigaSynthLayout = {
+  formatName: 'Steve Turner',
+  configKey: 'steveTurner',
+  sections: [
+    { type: 'knobs', label: 'ENVELOPE', knobs: [
+      { key: 'initDelay', label: 'Delay', min: 0, max: 255 },
+      { key: 'env1Duration', label: 'Seg1Dur', min: 0, max: 255 },
+      { key: 'env1Delta', label: 'Seg1Dlt', min: -128, max: 127 },
+      { key: 'env2Duration', label: 'Seg2Dur', min: 0, max: 255 },
+      { key: 'env2Delta', label: 'Seg2Dlt', min: -128, max: 127 },
+      { key: 'decayDelta', label: 'Decay', min: -128, max: 127 },
+    ]},
+    { type: 'knobs', label: 'OSCILLATION', knobs: [
+      { key: 'oscDelta', label: 'Delta', min: -128, max: 127 },
+      { key: 'oscLoop', label: 'Loop', min: 0, max: 255 },
+    ]},
+    { type: 'knobs', label: 'VIBRATO', knobs: [
+      { key: 'vibratoDelay', label: 'Delay', min: 0, max: 255 },
+      { key: 'vibratoSpeed', label: 'Speed', min: 0, max: 255 },
+      { key: 'vibratoMaxDepth', label: 'Depth', min: 0, max: 255 },
+      { key: 'pitchShift', label: 'Shift', min: 0, max: 7 },
+    ]},
+    { type: 'knobs', label: 'MISC', knobs: [
+      { key: 'priority', label: 'Prio', min: 0, max: 255 },
+      { key: 'sampleIdx', label: 'Sample', min: 0, max: 29 },
+      { key: 'chain', label: 'Chain', min: 0, max: 32 },
+    ]},
+  ],
+};
+
 /** Map synthType → layout descriptor */
 export const AMIGA_SYNTH_LAYOUTS: Record<string, AmigaSynthLayout> = {
   SonicArrangerSynth: SONIC_ARRANGER_LAYOUT,
@@ -486,6 +518,7 @@ export const AMIGA_SYNTH_LAYOUTS: Record<string, AmigaSynthLayout> = {
   TFMXSynth: TFMX_LAYOUT,
   HippelCoSoSynth: HIPPEL_COSO_LAYOUT,
   RobHubbardSynth: ROB_HUBBARD_LAYOUT,
+  SteveTurnerSynth: STEVE_TURNER_LAYOUT,
   OctaMEDSynth: OCTAMED_LAYOUT,
   DavidWhittakerSynth: DAVID_WHITTAKER_LAYOUT,
   DeltaMusic1Synth: DELTA_MUSIC1_LAYOUT,

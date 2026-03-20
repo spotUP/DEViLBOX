@@ -14,7 +14,7 @@ import {
   DEFAULT_HIVELY,
   DEFAULT_JAMCRACKER,
   DEFAULT_SOUNDMON, DEFAULT_SIDMON, DEFAULT_DIGMUG, DEFAULT_FC, DEFAULT_DELTAMUSIC1, DEFAULT_DELTAMUSIC2, DEFAULT_FRED, DEFAULT_TFMX,
-  DEFAULT_OCTAMED, DEFAULT_SIDMON1, DEFAULT_HIPPEL_COSO, DEFAULT_ROB_HUBBARD, DEFAULT_DAVID_WHITTAKER,
+  DEFAULT_OCTAMED, DEFAULT_SIDMON1, DEFAULT_HIPPEL_COSO, DEFAULT_ROB_HUBBARD, DEFAULT_STEVE_TURNER, DEFAULT_DAVID_WHITTAKER,
   DEFAULT_SONIC_ARRANGER,
   DEFAULT_INSTEREO2,
   DEFAULT_SUPERCOLLIDER,
@@ -91,6 +91,7 @@ const OctaMEDControls = lazy(() => import('../controls/OctaMEDControls').then(m 
 const SidMon1Controls = lazy(() => import('../controls/SidMon1Controls').then(m => ({ default: m.SidMon1Controls })));
 const HippelCoSoControls = lazy(() => import('../controls/HippelCoSoControls').then(m => ({ default: m.HippelCoSoControls })));
 const RobHubbardControls = lazy(() => import('../controls/RobHubbardControls').then(m => ({ default: m.RobHubbardControls })));
+const SteveTurnerControls = lazy(() => import('../controls/SteveTurnerControls').then(m => ({ default: m.SteveTurnerControls })));
 const DavidWhittakerControls = lazy(() => import('../controls/DavidWhittakerControls').then(m => ({ default: m.DavidWhittakerControls })));
 const MusicLineControls = lazy(() => import('../controls/MusicLineControls').then(m => ({ default: m.MusicLineControls })));
 const DeltaMusic1Controls = lazy(() => import('../controls/DeltaMusic1Controls').then(m => ({ default: m.DeltaMusic1Controls })));
@@ -126,7 +127,7 @@ const WavetableListEditor = lazy(() => import('./WavetableEditor').then(m => ({ 
 
 
 // Types
-export type EditorMode = 'generic' | 'tb303' | 'furnace' | 'buzzmachine' | 'sample' | 'dubsiren' | 'spacelaser' | 'v2' | 'sam' | 'synare' | 'mame' | 'mamechip' | 'dexed' | 'obxd' | 'wam' | 'tonewheelOrgan' | 'melodica' | 'vital' | 'odin2' | 'surge' | 'vstbridge' | 'harmonicsynth' | 'modular' | 'sunvox-modular' | 'hively' | 'jamcracker' | 'soundmon' | 'sidmon' | 'digmug' | 'fc' | 'deltamusic1' | 'deltamusic2' | 'fred' | 'tfmx' | 'octamed' | 'sidmon1' | 'hippelcoso' | 'robhubbard' | 'davidwhittaker' | 'sonic-arranger' | 'instereo2' | 'musicline' | 'supercollider' | 'gearmulator' | 'wobblebass' | 'startrekker-am';
+export type EditorMode = 'generic' | 'tb303' | 'furnace' | 'buzzmachine' | 'sample' | 'dubsiren' | 'spacelaser' | 'v2' | 'sam' | 'synare' | 'mame' | 'mamechip' | 'dexed' | 'obxd' | 'wam' | 'tonewheelOrgan' | 'melodica' | 'vital' | 'odin2' | 'surge' | 'vstbridge' | 'harmonicsynth' | 'modular' | 'sunvox-modular' | 'hively' | 'jamcracker' | 'soundmon' | 'sidmon' | 'digmug' | 'fc' | 'deltamusic1' | 'deltamusic2' | 'fred' | 'tfmx' | 'octamed' | 'sidmon1' | 'hippelcoso' | 'robhubbard' | 'steveturner' | 'davidwhittaker' | 'sonic-arranger' | 'instereo2' | 'musicline' | 'supercollider' | 'gearmulator' | 'wobblebass' | 'startrekker-am';
 
 // ============================================================================
 // GEARMULATOR EDITOR SECTION
@@ -388,6 +389,10 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
   const handleRobHubbardChange = useCallback((updates: Partial<typeof instrument.robHubbard>) => {
     updateAmigaSynth('robHubbard', instrument.robHubbard || DEFAULT_ROB_HUBBARD, updates);
   }, [instrument.robHubbard, updateAmigaSynth]);
+
+  const handleSteveTurnerChange = useCallback((updates: Partial<typeof instrument.steveTurner>) => {
+    updateAmigaSynth('steveTurner', instrument.steveTurner || DEFAULT_STEVE_TURNER, updates);
+  }, [instrument.steveTurner, updateAmigaSynth]);
 
   const handleDavidWhittakerChange = useCallback((updates: Partial<typeof instrument.davidWhittaker>) => {
     updateAmigaSynth('davidWhittaker', instrument.davidWhittaker || DEFAULT_DAVID_WHITTAKER, updates);
@@ -1153,6 +1158,30 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
             config={robHubbardConfig}
             onChange={handleRobHubbardChange}
             uadeChipRam={instrument.uadeChipRam}
+          />
+        </Suspense>
+      </div>
+    );
+  }
+
+  // ============================================================================
+  // STEVE TURNER EDITOR
+  // ============================================================================
+  if (editorMode === 'steveturner') {
+    const steveTurnerConfig = { ...DEFAULT_STEVE_TURNER, ...(instrument.steveTurner || {}) };
+    return (
+      <div className="synth-editor-container bg-gradient-to-b from-[#001a0a] to-[#000804]">
+        <EditorHeader
+          instrument={instrument}
+          onChange={handleChange}
+          vizMode={vizMode}
+          onVizModeChange={setVizMode}
+        />
+        <Suspense fallback={<LoadingControls />}>
+          <SteveTurnerControls
+            config={steveTurnerConfig}
+            onChange={handleSteveTurnerChange}
+            instrumentIndex={instrument.id}
           />
         </Suspense>
       </div>
