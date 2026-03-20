@@ -3,6 +3,7 @@ import { MAMEBaseSynth } from '@engine/mame/MAMEBaseSynth';
 import { textToPhonemes, parsePhonemeString } from '@engine/speech/Reciter';
 import { SpeechSequencer, type SpeechFrame } from '@engine/speech/SpeechSequencer';
 import { type SP0250Frame, phonemesToSP0250Frames, samToSP0250 } from '@engine/speech/sp0250PhonemeMap';
+import { type VLM5030Frame, phonemesToVLM5030Frames } from '@engine/speech/vlm5030PhonemeMap';
 import { loadVLM5030ROMs } from '@engine/mame/MAMEROMLoader';
 
 /**
@@ -254,19 +255,22 @@ export class VLM5030Synth extends MAMEBaseSynth {
     if (!phonemeStr) return;
 
     const tokens = parsePhonemeString(phonemeStr);
-    const frames = phonemesToSP0250Frames(tokens);
-    if (frames.length === 0) return;
 
-    // Pack into VLM5030 LPC frame buffer (12 bytes per frame, ~25ms each)
+    // Use VLM5030-specific phoneme map with per-phoneme K coefficients
+    const vlmFrames = phonemesToVLM5030Frames(tokens);
+    if (vlmFrames.length === 0) return;
+
+    // Pack into 12-byte WASM frames: [energyIdx, pitchIdx, k0..k9]
+    // Each frame is ~25ms at 8kHz LPC rate (40 samples / 4 interp steps)
     const frameList: number[][] = [];
-    for (const f of frames) {
-      const vowelFrame = VLM5030Synth.VOWEL_FRAMES[f.preset] ?? VLM5030Synth.VOWEL_FRAMES[0];
+    for (const f of vlmFrames) {
       const count = Math.max(1, Math.round(f.durationMs / 25));
+      const packed = [f.energy, f.unvoiced ? 0 : f.pitch, ...f.k];
       for (let i = 0; i < count; i++) {
-        frameList.push(vowelFrame);
+        frameList.push(packed);
       }
     }
-    // Add silence frame at end
+    // Silence frame at end
     frameList.push([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
 
     const numFrames = frameList.length;
@@ -278,7 +282,6 @@ export class VLM5030Synth extends MAMEBaseSynth {
       }
     }
 
-    // Send to WASM and play
     const buffer = data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength);
     this.workletNode.port.postMessage(
       { type: 'loadFrameBuffer', frameData: buffer, numFrames },
