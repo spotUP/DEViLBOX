@@ -463,6 +463,8 @@ function lerpFrame(from: SP0250LPCFrame, to: SP0250LPCFrame, t: number): SP0250L
  * Inserts transition frames between phonemes for smooth formant movement.
  */
 const STOPS = new Set(['P*', 'T*', 'K*', 'KX', 'B*', 'D*', 'G*', 'GX', 'Q*']);
+const VOICELESS_STOPS = new Set(['P*', 'T*', 'K*', 'KX']);
+const VOWELS = new Set(['IY', 'IH', 'EH', 'AE', 'AA', 'AH', 'AO', 'UH', 'AX', 'IX', 'ER', 'UX', 'OH']);
 const DIPHTHONGS: Record<string, [string, string]> = {
   'EY': ['EH', 'IY'], 'AY': ['AA', 'IY'], 'OY': ['AO', 'IY'],
   'AW': ['AA', 'UX'], 'OW': ['AO', 'UX'], 'UW': ['UX', 'UX'],
@@ -483,8 +485,14 @@ export function phonemesToSP0250LPCFrames(
     if (frame) {
       const ampBoost = token.stress >= 4 ? 0x04 : token.stress >= 2 ? 0x02 : 0;
       const pitchBoost = token.stress >= 4 ? 4 : token.stress >= 2 ? 2 : 0;
+      // Vowel reduction: unstressed vowels shorter
+      let duration = frame.durationMs;
+      if (VOWELS.has(token.code) && token.stress === 0) {
+        duration = Math.round(duration * 0.7);
+      }
       rawFrames.push({
         ...frame,
+        durationMs: duration,
         amp: Math.min(0xFE, frame.amp + ampBoost),
         pitch: frame.voiced ? Math.min(63, frame.pitch + pitchBoost) : 0,
       });
@@ -519,9 +527,13 @@ export function phonemesToSP0250LPCFrames(
       result.push(lerpFrame(prev, curr, 0.67));
     }
 
-    // Stop consonants: burst + ramp
+    // Stop consonants: burst + aspiration + ramp
     if (STOPS.has(code)) {
       result.push({ ...curr, durationMs: 15, amp: Math.min(0xFE, curr.amp + 0x06) });
+      if (VOICELESS_STOPS.has(code)) {
+        const asp = samToSP0250LPC('/H');
+        if (asp) result.push({ ...asp, durationMs: 20, amp: Math.max(1, curr.amp - 0x02), voiced: false, pitch: 0 });
+      }
       result.push({ ...curr, durationMs: 15, amp: Math.max(1, curr.amp - 0x02) });
       continue;
     }
@@ -548,8 +560,18 @@ export function phonemesToSP0250LPCFrames(
       }
     }
 
+    // Energy envelope for long vowels
     const steadyMs = Math.max(25, curr.durationMs - 50);
-    result.push({ ...curr, durationMs: steadyMs });
+    if (steadyMs > 75 && VOWELS.has(code)) {
+      const attackMs = Math.round(steadyMs * 0.2);
+      const sustainMs = Math.round(steadyMs * 0.6);
+      const releaseMs = steadyMs - attackMs - sustainMs;
+      result.push({ ...curr, durationMs: attackMs, amp: Math.max(1, curr.amp - 0x03) });
+      result.push({ ...curr, durationMs: sustainMs });
+      result.push({ ...curr, durationMs: releaseMs, amp: Math.max(1, curr.amp - 0x04) });
+    } else {
+      result.push({ ...curr, durationMs: steadyMs });
+    }
   }
 
   return result;

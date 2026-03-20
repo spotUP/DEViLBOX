@@ -1,0 +1,221 @@
+[
+  {
+    "file": "45.okta",
+    "format": "Oktalyzer",
+    "parseOk": true,
+    "exportOk": true,
+    "outFile": "45.exported.okt",
+    "outSize": 176494,
+    "origSize": 135162,
+    "warnings": []
+  },
+  {
+    "file": "aces_high.ahx",
+    "format": "AHX",
+    "parseOk": true,
+    "exportOk": true,
+    "outFile": "_451__-_ACES_HIGH.hvl",
+    "outSize": 29808,
+    "origSize": 26327,
+    "warnings": []
+  },
+  {
+    "file": "adept.smod",
+    "format": "Sawteeth",
+    "parseOk": false,
+    "exportOk": false,
+    "origSize": 3638,
+    "warnings": [],
+    "error": "Parser returned null"
+  },
+  {
+    "file": "almighty.sa",
+    "format": "Sonic Arranger",
+    "parseOk": false,
+    "exportOk": false,
+    "origSize": 93062,
+    "warnings": [],
+    "error": "First argument to DataView constructor must be an ArrayBuffer"
+  },
+  {
+    "file": "analogue_vibes.jam",
+    "format": "JamCracker",
+    "parseOk": false,
+    "exportOk": false,
+    "origSize": 48577,
+    "warnings": [],
+    "error": "Class extends value undefined is not a constructor or null"
+  },
+  {
+    "file": "anarchy.sid1",
+    "format": "SidMon 1",
+    "parseOk": true,
+    "exportOk": true,
+    "outFile": "anarchy.sid1",
+    "outSize": 4324,
+    "origSize": 30586,
+    "warnings": []
+  },
+  {
+    "file": "anthrox.fc",
+    "format": "Future Composer",
+    "parseOk": true,
+    "exportOk": true,
+    "outFile": "anthrox.exported.fc",
+    "outSize": 13588,
+    "origSize": 13724,
+    "warnings": []
+  },
+  {
+    "file": "anthrox_intro.dm2",
+    "format": "DeltaMusic 2",
+    "parseOk": false,
+    "exportOk": false,
+    "origSize": 20922,
+    "warnings": [],
+    "error": "Parser returned null"
+  },
+  {
+    "file": "antidust.bp3",
+    "format": "SoundMon",
+    "parseOk": false,
+    "exportOk": false,
+    "origSize": 13684,
+    "warnings": [],
+    "error": "Class extends value undefined is not a constructor or null"
+  },
+  {
+    "file": "aquarivs.bp",
+    "format": "SoundMon",
+    "parseOk": false,
+    "exportOk": false,
+    "origSize": 92962,
+    "warnings": [],
+    "error": "Class extends value undefined is not a constructor or null"
+  },
+  {
+    "file": "cannonfodder.tcb",
+    "format": "TCB Tracker",
+    "parseOk": true,
+    "exportOk": true,
+    "outFile": "tcb.cannonfodder.tcb",
+    "outSize": 245786,
+    "origSize": 246519,
+    "warnings": []
+  },
+  {
+    "file": "cockwise.mug",
+    "format": "Digital Mugician",
+    "parseOk": true,
+    "exportOk": true,
+    "outFile": "COCKWISE.dmu",
+    "outSize": 106062,
+    "origSize": 101736,
+    "warnings": []
+  },
+  {
+    "file": "crusaders1.dm",
+    "format": "DeltaMusic 1",
+    "parseOk": true,
+    "exportOk": true,
+    "outFile": "crusaders1.dm1",
+    "outSize": 7214,
+    "origSize": 6542,
+    "warnings": []
+  },
+  {
+    "file": "doxtro3.dss",
+    "format": "Digital Sound Studio",
+    "parseOk": false,
+    "exportOk": false,
+    "origSize": 131252,
+    "warnings": [],
+    "error": "Parser returned null"
+  },
+  {
+    "file": "dynablaster.ast",
+    "format": "Activision Pro",
+    "parseOk": false,
+    "exportOk": false,
+    "origSize": 140880,
+    "warnings": [],
+    "error": "Parser returned null"
+  },
+  {
+    "file": "fantasi8.is",
+    "format": "InStereo 2.0",
+    "parseOk": false,
+    "exportOk": false,
+    "origSize": 45656,
+    "warnings": [],
+    "error": "Parser returned null"
+  },
+  {
+    "file": "flight.dmu",
+    "format": "Digital Mugician",
+    "parseOk": true,
+    "exportOk": true,
+    "outFile": "FLIGHT.dmu",
+    "outSize": 9694,
+    "origSize": 10332,
+    "warnings": []
+  },
+  {
+    "file": "fonetag.669",
+    "format": "Composer 669",
+    "parseOk": false,
+    "exportOk": false,
+    "origSize": 60805,
+    "warnings": [],
+    "error": "Parser returned null"
+  },
+  {
+    "file": "hexplosion.hvl",
+    "format": "HivelyTracker",
+    "parseOk": true,
+    "exportOk": true,
+    "outFile": "Hexplosion_.hvl",
+    "outSize": 36514,
+    "origSize": 38965,
+    "warnings": []
+  },
+  {
+    "file": "prehistoric_tale.hipc",
+    "format": "Hippel CoSo",
+    "parseOk": false,
+    "exportOk": false,
+    "origSize": 24340,
+    "warnings": [],
+    "error": "Class extends value undefined is not a constructor or null"
+  },
+  {
+    "file": "snickle.mug2",
+    "format": "Digital Mugician",
+    "parseOk": true,
+    "exportOk": true,
+    "outFile": "SNICKLE.dmu",
+    "outSize": 74546,
+    "origSize": 78616,
+    "warnings": []
+  },
+  {
+    "file": "stereo_feeling.is20",
+    "format": "InStereo 2.0",
+    "parseOk": true,
+    "exportOk": true,
+    "outFile": "stereo_feeling.is20",
+    "outSize": 24380,
+    "origSize": 11172,
+    "warnings": []
+  },
+  {
+    "file": "synth_corn.emod",
+    "format": "Quadra Composer",
+    "parseOk": true,
+    "exportOk": true,
+    "outFile": "Synthcorn.emod",
+    "outSize": 40992,
+    "origSize": 39490,
+    "warnings": []
+  }
+]
