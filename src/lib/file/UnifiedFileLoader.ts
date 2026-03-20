@@ -713,14 +713,16 @@ async function loadSongFile(file: File, options: FileLoadOptions): Promise<FileL
             svEngine.getPatterns(extractHandle),
           ]);
           preSunVoxPatterns = patterns;
-          // getModuleGraph can be slow for complex songs — timeout separately
+          // getModuleGraph extracts full module types, inputs, outputs, controls
           try {
             preSunVoxGraph = await Promise.race([
               svEngine.getModuleGraph(extractHandle),
-              new Promise<never>((_, reject) => setTimeout(() => reject(new Error('getModuleGraph timed out')), 5000)),
+              new Promise<never>((_, reject) => setTimeout(() => reject(new Error('getModuleGraph timed out')), 10000)),
             ]);
+            console.log('[SunVox] module graph:', preSunVoxGraph?.length, 'entries',
+              preSunVoxGraph?.slice(0, 3).map(m => `${m.id}:${m.typeName}:${m.name}`));
           } catch (graphErr) {
-            console.warn('[SunVox] Module graph extraction timed out, using basic module list');
+            console.warn('[SunVox] Module graph extraction failed:', graphErr);
             preSunVoxGraph = null;
           }
           // Module id=0 is always the "Output" bus — skip it.
