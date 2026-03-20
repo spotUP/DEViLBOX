@@ -501,8 +501,11 @@ private:
         if (m_romCurrentPitch > 0 && m_romPitchCount >= m_romCurrentPitch)
             m_romPitchCount = 0;
 
-        // Output: clamp to ±512 range (MAME uses put_int_clamp with 512)
-        float sample = (float)u[0] / 512.0f;
+        // MAME uses put_int_clamp(0, sampindex, u[0], 512) which means
+        // output = u[0] / 512 clamped to ±1.0. But typical energy values
+        // are 0-127 and the filter doesn't amplify much, so actual peaks
+        // are ~0.1-0.3. Boost by 4x for audible output level.
+        float sample = (float)u[0] / 128.0f;
         return std::max(-1.0f, std::min(1.0f, sample));
     }
 
