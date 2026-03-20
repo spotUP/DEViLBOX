@@ -3,7 +3,7 @@ import { MAMEBaseSynth } from '@engine/mame/MAMEBaseSynth';
 import { textToPhonemes, parsePhonemeString } from '@engine/speech/Reciter';
 import { SpeechSequencer, type SpeechFrame } from '@engine/speech/SpeechSequencer';
 import { type SP0250Frame, samToSP0250 } from '@engine/speech/sp0250PhonemeMap';
-import { phonemesToVLM5030Frames } from '@engine/speech/vlm5030PhonemeMap';
+import { phonemesToVLM5030Frames, samToVLM5030 } from '@engine/speech/vlm5030PhonemeMap';
 import { loadVLM5030ROMs } from '@engine/mame/MAMEROMLoader';
 
 /**
@@ -389,12 +389,35 @@ export class VLM5030Synth extends MAMEBaseSynth {
     }
   }
 
-  private _speakSingleVowel(note: number, velocity: number): void {
+  private _speakSingleVowel(_note: number, _velocity: number): void {
     if (!this._isReady || !this.workletNode || this._disposed) return;
 
     const code = this._vowelSequence[this._vowelIndex % this._vowelSequence.length];
     this._vowelIndex++;
 
+    // Use VLM5030 phoneme map for frame buffer playback
+    const vlmFrame = samToVLM5030(code);
+    if (vlmFrame) {
+      this.stopSpeaking();
+      const count = this._vowelLoopSingle ? 40 : Math.max(1, Math.round(vlmFrame.durationMs / 25));
+      const packed = [vlmFrame.energy, vlmFrame.unvoiced ? 0 : vlmFrame.pitch, ...vlmFrame.k];
+      const numFrames = count + 1;
+      const data = new Uint8Array(numFrames * 12);
+      for (let i = 0; i < count; i++) {
+        for (let j = 0; j < 12; j++) data[i * 12 + j] = packed[j];
+      }
+      // silence at end
+      const buffer = data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength);
+      this.workletNode.port.postMessage({ type: 'loadFrameBuffer', frameData: buffer, numFrames }, [buffer]);
+      this.workletNode.port.postMessage({ type: 'speakFrameBuffer' });
+      this._phonemeSpeechActive = true;
+      this._phonemeSpeechTimer = setTimeout(() => {
+        this._phonemeSpeechTimer = null; this._phonemeSpeechActive = false;
+      }, numFrames * 25 + 100);
+      return;
+    }
+
+    // Fallback: old preset switching
     const frame = samToSP0250(code);
     if (!frame) return;
 
@@ -407,8 +430,8 @@ export class VLM5030Synth extends MAMEBaseSynth {
 
     this.workletNode.port.postMessage({
       type: 'noteOn',
-      note,
-      velocity: Math.floor(velocity * 127),
+      note: _note,
+      velocity: Math.floor(_velocity * 127),
     });
 
     this._speechSequencer = new SpeechSequencer<SP0250Frame>(
