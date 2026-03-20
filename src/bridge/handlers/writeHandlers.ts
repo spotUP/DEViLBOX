@@ -844,39 +844,47 @@ export async function loadFile(params: Record<string, unknown>): Promise<Record<
       throw new Error(`${filename} requires user confirmation before loading`);
     }
     // For tracker modules that need the import dialog, bypass it and import directly.
-    // Use parseModuleToSong directly (bypasses loadModuleFile/libopenmpt) so that
-    // Amiga/UADE formats that libopenmpt can't read are handled by their native parsers.
     if (loadResult.success === 'pending-import') {
-      const { parseModuleToSong } = await import('../../lib/import/parseModuleToSong');
-      const song = await parseModuleToSong(file, subsong, undefined, undefined, companionFiles.size > 0 ? companionFiles : undefined);
-      // Apply the parsed song into the stores (mirrors importTrackerModule internals for native-only path)
-      const { useTrackerStore: ts } = await import('../../stores/useTrackerStore');
-      const { useInstrumentStore: is } = await import('../../stores/useInstrumentStore');
-      const { useTransportStore: trs } = await import('../../stores/useTransportStore');
-      const { useProjectStore: ps } = await import('../../stores/useProjectStore');
-      const { useFormatStore: fs } = await import('../../stores/useFormatStore');
-      const { getToneEngine } = await import('../../engine/ToneEngine');
-      const engine = getToneEngine();
+      const useLib = params.useLibopenmpt === true;
+      const libopenmptExts = /\.(mod|xm|s3m|it|stm|669|far|ult|mtm|med|mmd[0-3]|okt|okta|gdm|psm)$/i;
+      const canUseLibopenmpt = useLib && libopenmptExts.test(filename);
 
-      const trackerActions = ts.getState();
-      const instrActions = is.getState();
-      const transportActions = trs.getState();
-      const projectActions = ps.getState();
-      const formatActions = fs.getState();
+      if (canUseLibopenmpt) {
+        // Use libopenmpt via the standard import pipeline (supports volume envelopes, etc.)
+        const { loadModuleFile } = await import('../../lib/import/ModuleLoader');
+        const { importTrackerModule } = await import('../../lib/file/UnifiedFileLoader');
+        const moduleInfo = await loadModuleFile(file);
+        await importTrackerModule(moduleInfo, {
+          useLibopenmpt: true,
+          subsong,
+          companionFiles: companionFiles.size > 0 ? companionFiles : undefined,
+        });
+      } else {
+        // Native parser path for Amiga/UADE formats that libopenmpt can't read
+        const { parseModuleToSong } = await import('../../lib/import/parseModuleToSong');
+        const song = await parseModuleToSong(file, subsong, undefined, undefined, companionFiles.size > 0 ? companionFiles : undefined);
+        const { useTrackerStore: ts } = await import('../../stores/useTrackerStore');
+        const { useInstrumentStore: is } = await import('../../stores/useInstrumentStore');
+        const { useTransportStore: trs } = await import('../../stores/useTransportStore');
+        const { useProjectStore: ps } = await import('../../stores/useProjectStore');
+        const { useFormatStore: fs } = await import('../../stores/useFormatStore');
+        const { getToneEngine } = await import('../../engine/ToneEngine');
+        const engine = getToneEngine();
 
-      if (trs.getState().isPlaying) trs.getState().stop();
-      engine.releaseAll();
-      trs.getState().reset();
-      ts.getState().reset();
-      is.getState().reset();
-      engine.disposeAllInstruments();
+        if (trs.getState().isPlaying) trs.getState().stop();
+        engine.releaseAll();
+        trs.getState().reset();
+        ts.getState().reset();
+        is.getState().reset();
+        engine.disposeAllInstruments();
 
-      instrActions.loadInstruments(song.instruments);
-      trackerActions.loadPatterns(song.patterns);
-      if (song.songPositions) trackerActions.setPatternOrder(song.songPositions);
-      transportActions.setBPM(song.initialBPM ?? 125);
-      projectActions.setMetadata({ name: song.name });
-      formatActions.applyEditorMode(song);
+        is.getState().loadInstruments(song.instruments);
+        ts.getState().loadPatterns(song.patterns);
+        if (song.songPositions) ts.getState().setPatternOrder(song.songPositions);
+        trs.getState().setBPM(song.initialBPM ?? 125);
+        ps.getState().setMetadata({ name: song.name });
+        fs.getState().applyEditorMode(song);
+      }
       loadResult = { success: true, message: 'imported' };
     }
 
