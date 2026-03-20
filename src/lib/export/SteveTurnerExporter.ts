@@ -50,7 +50,7 @@ export async function exportSteveTurner(
   const warnings: string[] = [];
 
   // ── Path 1: Original binary available — return verbatim ─────────────────
-  const fileData = (song as Record<string, unknown>).steveTurnerFileData as ArrayBuffer | undefined;
+  const fileData = song.steveTurnerFileData;
   if (fileData && fileData.byteLength > 0) {
     const baseName = sanitizeName(song.name);
     return {
