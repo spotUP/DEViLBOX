@@ -49,6 +49,19 @@ function forwardReplayerMuteMask(channels: MixerChannelState[], isSoloing: boole
   }
 }
 
+/** Check if the current song has SunVox modular instruments (song mode) */
+function hasSunVoxSongInstruments(): boolean {
+  try {
+    // Late-bound to avoid circular deps (useTrackerStore → useMixerStore)
+    const { useInstrumentStore } = require('./useInstrumentStore');
+    const instruments = useInstrumentStore.getState().instruments;
+    return instruments.some(
+      (i: { synthType?: string; sunvox?: { isSong?: boolean } }) =>
+        i.synthType === 'SunVoxModular' && i.sunvox?.isSong === true
+    );
+  } catch { return false; }
+}
+
 // Lazy references to WASM engines to avoid circular imports
 let _furnaceDispatchEngine: any = null;
 function getFurnaceDispatchEngine(): any {
@@ -105,7 +118,7 @@ export function getActiveGainEngine(): { setChannelGain(ch: number, gain: number
     } else if (fmt.pumaTrackerFileData) {
       const { PumaTrackerEngine } = require('../engine/pumatracker/PumaTrackerEngine');
       if (PumaTrackerEngine.hasInstance()) return PumaTrackerEngine.getInstance();
-    } else if (fmt.steveTurnerFileData || (() => { try { const { SteveTurnerEngine } = require('../engine/steveturner/SteveTurnerEngine'); return SteveTurnerEngine.hasInstance(); } catch { return false; } })()) {
+    } else if (fmt.steveTurnerFileData) {
       const { SteveTurnerEngine } = require('../engine/steveturner/SteveTurnerEngine');
       if (SteveTurnerEngine.hasInstance()) return SteveTurnerEngine.getInstance();
     } else if (fmt.artOfNoiseFileData) {
@@ -125,6 +138,49 @@ export function getActiveGainEngine(): { setChannelGain(ch: number, gain: number
  * Forward effective channel gain to the active WASM engine.
  * Computes gain from volume + mute/solo state and sends to the engine.
  */
+function forwardSunVoxModuleMute(channels: MixerChannelState[], isSoloing: boolean): void {
+  try {
+    // Lazy import to avoid circular deps at module level
+    const { SunVoxEngine } = require('../engine/sunvox/SunVoxEngine');
+    if (!SunVoxEngine.hasInstance()) return;
+    const engine = SunVoxEngine.getInstance();
+    const { getSharedSunVoxHandle } = require('../engine/sunvox-modular/SunVoxModularSynth');
+    const handle = getSharedSunVoxHandle();
+    if (handle < 0) return;
+
+    // Late-bound to avoid circular deps
+    const { useTrackerStore } = require('./useTrackerStore');
+    const { useInstrumentStore } = require('./useInstrumentStore');
+    const trackerState = useTrackerStore.getState();
+    const pattern = trackerState.patterns[trackerState.currentPatternIndex];
+    if (!pattern) return;
+    const instruments = useInstrumentStore.getState().instruments;
+
+    // Collect all SunVox module IDs and whether they should be muted
+    // A module is unmuted if ANY channel targeting it is unmuted
+    const moduleUnmuted = new Map<number, boolean>();
+    for (let i = 0; i < pattern.channels.length; i++) {
+      const ch = channels[i];
+      if (!ch) continue;
+      const instrId = pattern.channels[i]?.instrumentId;
+      const inst = instruments.find((ins: { id: number }) => ins.id === instrId);
+      if (!inst?.sunvox?.noteTargetModuleId) continue;
+      const modId = inst.sunvox.noteTargetModuleId as number;
+      const effectiveMute = isSoloing ? !ch.soloed : ch.muted;
+      if (!effectiveMute) moduleUnmuted.set(modId, true);
+      else if (!moduleUnmuted.has(modId)) moduleUnmuted.set(modId, false);
+    }
+
+    // Apply mute/unmute to each SunVox module
+    for (const [modId, unmuted] of moduleUnmuted) {
+      if (unmuted) engine.unmuteModule(handle, modId);
+      else engine.muteModule(handle, modId);
+    }
+  } catch (err) {
+    console.warn('[Mixer] forwardSunVoxModuleMute error:', err);
+  }
+}
+
 function forwardWasmChannelGain(ch: number, channels: MixerChannelState[], isSoloing: boolean): void {
   const fmt = useFormatStore.getState();
 
@@ -138,6 +194,12 @@ function forwardWasmChannelGain(ch: number, channels: MixerChannelState[], isSol
     } catch {
       // Engine not ready
     }
+    return;
+  }
+
+  // SunVox songs: mute/unmute at the module level inside the WASM
+  if (hasSunVoxSongInstruments()) {
+    forwardSunVoxModuleMute(channels, isSoloing);
     return;
   }
 
@@ -168,6 +230,12 @@ function forwardAllWasmChannelGains(channels: MixerChannelState[], isSoloing: bo
     } catch {
       // Engine not ready
     }
+    return;
+  }
+
+  // SunVox songs: mute/unmute at the module level
+  if (hasSunVoxSongInstruments()) {
+    forwardSunVoxModuleMute(channels, isSoloing);
     return;
   }
 

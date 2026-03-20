@@ -417,6 +417,7 @@ type TrackerPattern = {
   importMetadata: {
     sourceFormat: 'MOD'; sourceFile: string; importedAt: string;
     originalChannelCount: number; originalPatternCount: number; originalInstrumentCount: number;
+    modData?: { initialSpeed: number; initialBPM: number };
   };
 };
 
@@ -481,6 +482,10 @@ function buildPattern(
       originalChannelCount: 4,
       originalPatternCount: channelEvents[0]?.length ?? 0,
       originalInstrumentCount: 16,
+      modData: {
+        initialSpeed: _subsong.speed,
+        initialBPM: 250,
+      },
     },
   };
 }

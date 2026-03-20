@@ -115,6 +115,18 @@ class SteveTurnerProcessor extends AudioWorkletProcessor {
         }
         break;
 
+      case 'noteOn':
+        if (this.module && typeof this.module._player_note_on === 'function') {
+          this.module._player_note_on(data.instrument, data.note, data.velocity ?? 127);
+        }
+        break;
+
+      case 'noteOff':
+        if (this.module && typeof this.module._player_note_off === 'function') {
+          this.module._player_note_off();
+        }
+        break;
+
       case 'dispose':
         this.cleanup();
         break;

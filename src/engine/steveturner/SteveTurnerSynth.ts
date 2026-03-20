@@ -20,13 +20,8 @@ function ensureEngineLoaded(): Promise<SteveTurnerEngine> {
   if (!engineInitPromise) {
     engineInitPromise = (async () => {
       await engine.ready();
-      const { useFormatStore } = await import('@/stores/useFormatStore');
-      const data = useFormatStore.getState().steveTurnerFileData;
-      if (data) {
-        await engine.loadTune(data);
-        // Pause song ticks — only note preview should play
-        engine.pause();
-      }
+      // Engine may already be loaded and playing via startNativeEngines.
+      // Don't re-load or pause — just mark as ready for note preview.
       engineLoaded = true;
     })();
   }
