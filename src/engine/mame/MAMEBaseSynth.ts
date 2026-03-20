@@ -167,8 +167,9 @@ export abstract class MAMEBaseSynth implements DevilboxSynth, MAMEEffectTarget {
       // Handle messages from worklet
       const origHandler = this.workletNode.port.onmessage;
       this.workletNode.port.onmessage = (event) => {
+        if (this._disposed) return;
         this.handleWorkletMessage(event.data);
-        if (origHandler) origHandler.call(this.workletNode!.port, event);
+        if (origHandler && this.workletNode) origHandler.call(this.workletNode.port, event);
       };
 
       await readyPromise;
