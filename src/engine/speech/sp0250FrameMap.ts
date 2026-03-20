@@ -475,7 +475,8 @@ const DIPHTHONGS: Record<string, [string, string]> = {
  * sentence intonation, diphthong glides, and CV energy ramps.
  */
 export function phonemesToSP0250LPCFrames(
-  tokens: Array<{ code: string; stress: number }>
+  tokens: Array<{ code: string; stress: number }>,
+  question = false
 ): SP0250LPCFrame[] {
   const rawFrames: SP0250LPCFrame[] = [];
   const tokenCodes: string[] = [];
@@ -502,15 +503,16 @@ export function phonemesToSP0250LPCFrames(
 
   if (rawFrames.length === 0) return [];
 
-  // Sentence intonation: pitch drops in last 30%
+  // Sentence intonation
   const total = rawFrames.length;
   for (let i = 0; i < total; i++) {
     const f = rawFrames[i];
     if (f.voiced && f.pitch > 0) {
       const pos = i / total;
-      if (pos > 0.7) {
-        const drop = Math.round((pos - 0.7) / 0.3 * 5);
-        f.pitch = Math.max(1, f.pitch - drop);
+      if (question) {
+        if (pos > 0.7) { const rise = Math.round((pos - 0.7) / 0.3 * 6); f.pitch = Math.min(63, f.pitch + rise); }
+      } else {
+        if (pos > 0.7) { const drop = Math.round((pos - 0.7) / 0.3 * 5); f.pitch = Math.max(1, f.pitch - drop); }
       }
     }
   }

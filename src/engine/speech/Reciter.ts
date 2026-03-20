@@ -9,6 +9,25 @@ export interface PhonemeToken {
   stress: number; // 0-8 (0=no stress, 4-5=primary, 8=max emphasis)
 }
 
+/** Detect if text is a question (for rising intonation) */
+export function isQuestion(text: string): boolean {
+  return text.trim().endsWith('?');
+}
+
+/**
+ * Pre-process text to handle punctuation pauses.
+ * Inserts markers that become pause tokens in the phoneme stream.
+ * Strips punctuation that SAM can't handle.
+ */
+export function preprocessText(text: string): string {
+  return text
+    .replace(/[.!?]+\s*/g, ' . ')  // periods/exclamation/question → pause marker
+    .replace(/[,;:]+\s*/g, ' , ')  // commas/semicolons → short pause
+    .replace(/[—–]+/g, ' . ')      // dashes → pause
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 /**
  * Convert English text to a SAM phoneme string.
  * Wraps SamJs.convert() which is the Reciter from the original SAM speech synth.
@@ -70,6 +89,43 @@ const PHONEME_EXCEPTIONS: Record<string, string> = {
   'BUSY': 'BIHZIY',
   'BUILD': 'BIHLD',
   'BUILT': 'BIHLT',
+  'TROUBLE': 'TRAHBAHL',
+  'DOUBLE': 'DAHBAHL',
+  'TOUCH': 'TAHCH',
+  'YOUNG': 'YAHNG',
+  'COUNTRY': 'KAHNTRIHY',
+  'NOTHING': 'NAHTHING',
+  'ANOTHER': 'AHNAH/DHER',
+  'EVERY': 'EHVRIY',
+  'BEAUTIFUL': 'BYUWTIHFAHL',
+  'ANSWER': 'AENSER',
+  'SCIENCE': 'SAYAHNS',
+  'SPECIAL': 'SPEHSHAHL',
+  'OCEAN': 'OWSHAHN',
+  'ANCIENT': 'EYNSHAHNT',
+  'RECEIVE': 'RIHSIYV',
+  'BELIEVE': 'BIHLIYV',
+  'FRIEND': 'FREHND',
+  'WEIRD': 'WIYRD',
+  'HEART': 'HAART',
+  'BLOOD': 'BLAHD',
+  'FLOOD': 'FLAHD',
+  'STEAK': 'STEYK',
+  'BREAK': 'BREYK',
+  'GREAT': 'GREYT',
+  'CREATE': 'KRIYEYT',
+  'ZOMBIE': 'ZAAMBIY',
+  'ALIEN': 'EYLIYAHN',
+  'GALAXY': 'GAELAHKSIY',
+  'MISSILE': 'MIHSAHL',
+  'VEHICLE': 'VIYHIHKAHL',
+  'CIRCUIT': 'SERKIHT',
+  'SYSTEM': 'SIHSTAHM',
+  'ENGINE': 'EHNJAHN',
+  'DANGER': 'DEYNJER',
+  'WARRIOR': 'WOHRIYOHR',
+  'TREASURE': 'TREHZHER',
+  'ADVENTURE': 'AEDVEHNCHER',
   // Game/arcade terms
   'INTRUDER': 'IHNTRUWDER',
   'HUMANOID': 'HYUWMAHNOYD',
