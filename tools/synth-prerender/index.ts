@@ -203,7 +203,12 @@ function attachFCWaveformSample(
 
   if (waveform.length === 0) return;
 
-  const wavBuf = buildLoopingWAV(waveform, 0, waveform.length, 8287);
+  // Use 2× Amiga rate so the XM exporter computes relNote=+12 (one octave up).
+  // FC period indices map to notes via log2(3424/period)+1, which starts at C-1
+  // for period 1712. The XM sample needs to play one octave higher than the
+  // raw 8287 Hz rate to match the FC replayer's pitch.
+  const fcSampleRate = 16574;
+  const wavBuf = buildLoopingWAV(waveform, 0, waveform.length, fcSampleRate);
   const envelope = fcVolMacroToEnvelope(cfg);
 
   if (!inst.sample) {
@@ -216,13 +221,13 @@ function attachFCWaveformSample(
       loopStart: 0,
       loopEnd: waveform.length,
       loopType: 'forward',
-      sampleRate: 8287,
+      sampleRate: fcSampleRate,
       reverse: false,
       playbackRate: 1,
     };
   } else {
     inst.sample.audioBuffer = wavBuf;
-    inst.sample.sampleRate = 8287;
+    inst.sample.sampleRate = fcSampleRate;
     inst.sample.loop = true;
     inst.sample.loopStart = 0;
     inst.sample.loopEnd = waveform.length;
