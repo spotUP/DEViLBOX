@@ -370,6 +370,15 @@ function attachWaveformWithEnvelope(
     if (!inst.metadata) inst.metadata = {};
     inst.metadata.originalEnvelope = envelope;
   }
+
+  // Ensure XM sample volume is full (64) — the envelope handles volume shaping.
+  // Without this, formats like DM1 would use their config's peak volume (e.g., 1)
+  // as the XM sample volume, making instruments nearly silent.
+  if (!inst.metadata) inst.metadata = {};
+  if (!inst.metadata.modPlayback) inst.metadata.modPlayback = {};
+  inst.metadata.modPlayback.defaultVolume = 64;
+  // Clear the URL so the XM exporter uses the new audioBuffer, not the old data URL
+  if (inst.sample) inst.sample.url = '';
 }
 
 // ── Format-specific XM waveform + envelope helpers ──────────────────────────
@@ -440,12 +449,22 @@ function attachDeltaMusic1XM(inst: TrackerSong['instruments'][number], cfg: Delt
 }
 
 function attachDeltaMusic2XM(inst: TrackerSong['instruments'][number], cfg: DeltaMusic2Config): void {
+  // DM2's cfg.table is a wavetable SEQUENCE table (indices), NOT PCM data.
+  // Extract the actual waveform from the instrument's existing audioBuffer (WAV from parser).
   let wave: Int8Array;
-  if (cfg.table && cfg.table.length >= 32) {
-    wave = new Int8Array(32);
-    for (let i = 0; i < 32; i++) {
-      const v = cfg.table[i];
-      wave[i] = v > 127 ? v - 256 : v;
+  if (inst.sample?.audioBuffer && inst.sample.audioBuffer.byteLength > 44) {
+    // Parse WAV to get PCM, take first 32 samples as the waveform
+    const dv = new DataView(inst.sample.audioBuffer);
+    // WAV data starts at byte 44, 16-bit signed LE
+    const bitsPerSample = dv.getUint16(34, true);
+    const numSamples = Math.min(32, (inst.sample.audioBuffer.byteLength - 44) / (bitsPerSample / 8));
+    wave = new Int8Array(Math.max(numSamples, 4));
+    for (let i = 0; i < numSamples; i++) {
+      if (bitsPerSample === 16) {
+        wave[i] = dv.getInt16(44 + i * 2, true) >> 8; // 16-bit → 8-bit
+      } else {
+        wave[i] = dv.getUint8(44 + i) - 128; // unsigned 8-bit → signed
+      }
     }
   } else {
     wave = new Int8Array(32);
@@ -513,7 +532,8 @@ export function bakeSynthInstruments(song: TrackerSong, exportAs: 'mod' | 'xm' =
 
   for (const inst of song.instruments) {
     // Check if instrument has a synth config that XM envelope export can handle
-    const hasSynthConfig = !!(inst.fc || inst.soundMon || inst.sidmon1 || inst.digMug ||
+    const hasSynthConfig = !!(inst.fc || inst.soundMon || inst.sidmon1 ||
+      (inst.digMug && inst.digMug.waveformData && inst.digMug.waveformData.length > 0) ||
       inst.hippelCoso || inst.davidWhittaker ||
       (inst.deltaMusic1 && !inst.deltaMusic1.isSample) ||
       (inst.deltaMusic2 && !inst.deltaMusic2.isSample));
