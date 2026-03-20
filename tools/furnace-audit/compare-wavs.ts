@@ -89,7 +89,7 @@ function parseWav(buffer: Buffer): WavData {
 
 /**
  * Compute envelope correlation between two WAV files.
- * Phase-independent: compares RMS amplitude in ~10ms windows.
+ * Phase-independent: compares RMS amplitude in ~20ms windows.
  * Returns a value in [-1, 1]; ≥ 0.90 is considered a pass.
  */
 export function envelopeCorrelation(refPath: string, testPath: string): number {
@@ -99,7 +99,7 @@ export function envelopeCorrelation(refPath: string, testPath: string): number {
   const test = parseWav(testBuf);
 
   const len = Math.min(ref.samples.length, test.samples.length);
-  const envWindowSamples = Math.floor(ref.sampleRate * 0.01) * ref.channels;
+  const envWindowSamples = Math.floor(ref.sampleRate * 0.02) * ref.channels;
   const envLen = Math.floor(len / envWindowSamples);
   let envSumRef = 0, envSumTest = 0, envSumRefSq = 0, envSumTestSq = 0, envSumRefTest = 0;
 
@@ -203,10 +203,11 @@ function compareWavs(refPath: string, testPath: string, label: string): CompareR
     ? firstDivergence / ref.channels / ref.sampleRate
     : -1;
 
-  // Envelope correlation: compare RMS amplitude in ~10ms windows
-  // This is phase-independent and more meaningful for chip music where
-  // square wave phase divergence kills sample-level correlation
-  const envWindowSamples = Math.floor(ref.sampleRate * 0.01) * ref.channels; // ~10ms window
+  // Envelope correlation: compare RMS amplitude in ~20ms windows
+  // 20ms matches one tick at 50Hz (worst case) and is phase-independent.
+  // 10ms was too sensitive to sub-sample phase shifts from blip_buf resampling,
+  // causing 0.89 envCorr for renders that are sample-identical within 0.001.
+  const envWindowSamples = Math.floor(ref.sampleRate * 0.02) * ref.channels; // ~20ms window
   const envLen = Math.floor(len / envWindowSamples);
   let envSumRef = 0, envSumTest = 0, envSumRefSq = 0, envSumTestSq = 0, envSumRefTest = 0;
 

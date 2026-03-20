@@ -2995,6 +2995,11 @@ void furnace_seq_set_divider(double divider) {
 }
 
 EMSCRIPTEN_KEEPALIVE
+double furnace_seq_get_divider(void) {
+  return g_seq.divider;
+}
+
+EMSCRIPTEN_KEEPALIVE
 void furnace_seq_set_mute(int channel, bool muted) {
   if (channel < 0 || channel >= SEQ_MAX_CHANNELS) return;
   g_seq.isMuted[channel] = muted;
