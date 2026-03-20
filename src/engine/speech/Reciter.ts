@@ -15,9 +15,83 @@ export interface PhonemeToken {
  *
  * @returns Phoneme string (e.g., "HEHLOW WERLD") or false if conversion failed
  */
+/**
+ * Exception dictionary for words SAM's 1982 reciter gets wrong.
+ * Maps uppercase words to their correct SAM phoneme sequences.
+ */
+const PHONEME_EXCEPTIONS: Record<string, string> = {
+  // Common mispronunciations
+  'THE': '/DHAX',
+  'OF': 'AHV',
+  'ARE': 'AAR',
+  'WERE': 'WER',
+  'SAID': 'SEHD',
+  'HAVE': 'HHAEAV',
+  'DOES': 'DAHZ',
+  'DONE': 'DAHN',
+  'GONE': 'GAON',
+  'ONE': 'WAHN',
+  'TWO': 'TUW',
+  'THEIR': '/DHEHR',
+  'THERE': '/DHEHR',
+  'THEY': '/DHEY',
+  'WHAT': 'WAHT',
+  'WHERE': 'WEHR',
+  'WHO': 'HHUW',
+  'COULD': 'KUHD',
+  'WOULD': 'WUHD',
+  'SHOULD': 'SHUHD',
+  'THROUGH': '/THRUW',
+  'THOUGH': '/DHOW',
+  'ENOUGH': 'IYNAHF',
+  'TONGUE': 'TAHNG',
+  'QUEUE': 'KYUW',
+  'CORPS': 'KOHR',
+  'COLONEL': 'KERNUL',
+  // Tech/game terms
+  'ROBOT': 'ROWBAHT',
+  'LASER': 'LEYZER',
+  'CYBER': 'SAYBER',
+  'SYNTH': 'SIHNTH',
+  'AUDIO': 'AODIYOW',
+};
+
 export function textToPhonemes(text: string): string | false {
   try {
-    return SamJs.convert(text);
+    // Pre-process: replace exception words with phoneme overrides
+    const words = text.toUpperCase().split(/\s+/);
+    const processed: string[] = [];
+    const overrides: Map<number, string> = new Map();
+
+    for (let i = 0; i < words.length; i++) {
+      const phonemes = PHONEME_EXCEPTIONS[words[i]];
+      if (phonemes) {
+        overrides.set(i, phonemes);
+        processed.push(words[i]); // Keep original for SAM spacing
+      } else {
+        processed.push(words[i]);
+      }
+    }
+
+    // If no overrides, just use SAM directly
+    if (overrides.size === 0) {
+      return SamJs.convert(text);
+    }
+
+    // Process each word individually, replacing exceptions
+    const phonemeParts: string[] = [];
+    for (let i = 0; i < words.length; i++) {
+      if (overrides.has(i)) {
+        phonemeParts.push(overrides.get(i)!);
+      } else {
+        const wordPhonemes = SamJs.convert(words[i]);
+        if (wordPhonemes) {
+          phonemeParts.push(wordPhonemes.trim());
+        }
+      }
+    }
+
+    return phonemeParts.join(' ') || false;
   } catch {
     return false;
   }
