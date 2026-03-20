@@ -30,16 +30,24 @@
 
 namespace devilbox {
 
-static constexpr int CHIP_RATE = 16000;
+// Sinistar: 6800 CPU at 894.886 kHz, ~52.5 cycles per bit = ~17045 Hz
+static constexpr int CHIP_RATE = 17045;
 static constexpr int NUM_VOICES = 4;
 static constexpr int NUM_PRESETS = 8;
 static constexpr uint8_t SHIFTREG_MASK = 0x07;
 
-// HC55516 filter coefficients (from MAME)
-static constexpr int32_t HC55516_SYLADD = 0x0480;
-static constexpr uint32_t HC55516_SYLMASK = 0xfc00;
-static constexpr int32_t HC55516_SYLSHIFT = 10;
-static constexpr int32_t HC55516_INTSHIFT = 1;
+// HC55516 filter coefficients (from MAME hc55516.cpp constructor)
+// hc55516_device(... 0xfc0, 6, 0xfc1, 4)
+static constexpr uint32_t HC55516_SYLMASK  = 0xfc0;  // m_sylmask
+static constexpr int32_t  HC55516_SYLSHIFT = 6;       // m_sylshift
+static constexpr int32_t  HC55516_SYLADD   = 0xfc1;   // m_syladd (used on NON-coincidence)
+static constexpr int32_t  HC55516_INTSHIFT = 4;       // m_intshift
+
+// Sign-extend a value from 'bits' width to int32_t (matches MAME util::sext)
+static inline int32_t sext(int32_t value, int bits) {
+    int shift = 32 - bits;
+    return (value << shift) >> shift;
+}
 
 enum HC55516Param {
     PARAM_VOLUME = 0,
@@ -242,7 +250,7 @@ public:
         voi.prevSample = 0.0f;
         voi.currentSample = 0.0f;
         voi.shiftReg = 0;
-        voi.sylFilter = 0;
+        voi.sylFilter = 0x3f;  // MAME device_reset() value
         voi.intFilter = 0;
 
         float freq = 440.0f * std::pow(2.0f, (midiNote + m_pitchBend * 2.0f - 69) / 12.0f);
@@ -335,66 +343,136 @@ public:
         m_romByteEnd = byteOffset + byteLength;
         m_romBitIndex = 0;
         m_romPhase = 0.0; m_romPrevSample = 0.0f; m_romCurrentSample = 0.0f; m_romEnvLevel = 0.0f;
-        m_romShiftReg = 0; m_romSylFilter = 0; m_romIntFilter = 0;
+        m_romShiftReg = 0; m_romSylFilter = 0x3f; m_romIntFilter = 0;
     }
     void stopSpeaking() { m_romPlaying = false; }
 
 private:
+    // MAME-exact HC55516 CVSD process_bit(), called once per bit.
+    // MAME calls process_bit on BOTH rising and falling clock edges.
+    // We simulate both edges per bit here.
     float generateROMSample() {
         if (!m_romPlaying) return 0.0f;
         int bytePos = m_romByteOffset + (m_romBitIndex / 8);
         if (bytePos >= m_romByteEnd) { m_romPlaying = false; return 0.0f; }
         int bitOff = m_romBitIndex % 8;
-        bool bit = (m_romData[bytePos] >> (7 - bitOff)) & 1;
+        // Sinistar 6800 clocks bits out LSB-first via software PIA
+        bool bit = (m_romData[bytePos] >> bitOff) & 1;
         m_romBitIndex++;
+
+        // === RISING EDGE (active clock transition) ===
+        // MAME process_bit called with clock_state=true (rising)
+
+        // Freeze detection (MAME line 283) - computed fresh each call
+        bool frozen = ((m_romIntFilter >= 0x180) && !bit) ||
+                      ((m_romIntFilter <= -0x180) && bit);
+
+        // Shift the new bit into the 3-bit shift register
         m_romShiftReg = ((m_romShiftReg << 1) | (bit ? 1 : 0)) & SHIFTREG_MASK;
-        bool allSame = (m_romShiftReg == SHIFTREG_MASK) || (m_romShiftReg == 0);
-        if (allSame) m_romSylFilter += HC55516_SYLADD;
-        else m_romSylFilter = (m_romSylFilter * (int32_t)HC55516_SYLMASK) >> HC55516_SYLSHIFT;
-        if (m_romSylFilter < 0) m_romSylFilter = 0;
-        if (m_romSylFilter > 0x1FFFF) m_romSylFilter = 0x1FFFF;
-        int32_t step = m_romSylFilter >> HC55516_INTSHIFT;
-        if (bit) m_romIntFilter += step; else m_romIntFilter -= step;
-        float leakFactor = 0.99f - (1.0f - m_grittiness) * 0.04f;
-        m_romIntFilter = (int32_t)(m_romIntFilter * leakFactor);
-        if (m_romIntFilter > 0x7FFFF) m_romIntFilter = 0x7FFFF;
-        if (m_romIntFilter < -0x7FFFF) m_romIntFilter = -0x7FFFF;
-        return (float)m_romIntFilter / (float)0x7FFFF;
+
+        // Syllabic filter update (MAME lines 302-313)
+        if (((m_romShiftReg & SHIFTREG_MASK) == 0) ||
+            ((m_romShiftReg & SHIFTREG_MASK) == SHIFTREG_MASK))
+        {
+            // Coincidence: all same bits
+            if (!frozen)
+                m_romSylFilter += (int32_t)(((~m_romSylFilter) & HC55516_SYLMASK) >> HC55516_SYLSHIFT);
+        }
+        else
+        {
+            // Non-coincidence: mixed bits
+            if (!frozen)
+                m_romSylFilter += (int32_t)(((~m_romSylFilter) & HC55516_SYLMASK) >> HC55516_SYLSHIFT) + HC55516_SYLADD;
+        }
+        m_romSylFilter &= 0xfff;  // 12-bit register
+
+        // Integration leak term from active edge (MAME line 315)
+        {
+            int32_t sum = sext(((~m_romIntFilter) >> HC55516_INTSHIFT) + 1, 10);
+            if (!frozen)
+                m_romIntFilter = sext(m_romIntFilter + sum, 10);
+        }
+
+        // === FALLING EDGE (inactive clock transition) ===
+        // MAME process_bit called with clock_state=false (falling)
+
+        // Re-evaluate frozen with updated intFilter (MAME line 283 again)
+        frozen = ((m_romIntFilter >= 0x180) && !bit) ||
+                 ((m_romIntFilter <= -0x180) && bit);
+
+        // Integration step from syllabic filter (MAME lines 318-328)
+        {
+            int32_t sum2;
+            if (m_romShiftReg & 1)  // last bit was 1
+                sum2 = sext((~std::max((int32_t)2, m_romSylFilter >> 6)) + 1, 10);
+            else  // last bit was 0
+                sum2 = sext(std::max((int32_t)2, m_romSylFilter >> 6), 10);
+            if (!frozen)
+                m_romIntFilter = sext(m_romIntFilter + sum2, 10);
+        }
+
+        // Output scaling (MAME line 340)
+        // Scale 10-bit signed (-512..511) to 16-bit signed (-32768..32767)
+        int16_t next_sample = (int16_t)((m_romIntFilter << 6) |
+            (((m_romIntFilter & 0x3ff) ^ 0x200) >> 4));
+
+        return (float)next_sample / 32768.0f;
     }
 
+    // MAME-exact CVSD for preset/voice synthesis
     float generateCVSDSample(CVSDVoice& voi) {
         bool bit;
         if (voi.voiced) {
             int byteIdx = (voi.bitIndex / 8) % 32;
             int bitIdx = voi.bitIndex % 8;
-            bit = (voi.bitPattern[byteIdx] >> (7 - bitIdx)) & 1;
+            bit = (voi.bitPattern[byteIdx] >> bitIdx) & 1;  // LSB-first
         } else {
             voi.lfsr ^= (voi.lfsr ^ (voi.lfsr >> 1)) << 15;
             voi.lfsr >>= 1;
             bit = voi.lfsr & 1;
         }
 
+        // === RISING EDGE (active) ===
+        bool frozen = ((voi.intFilter >= 0x180) && !bit) ||
+                      ((voi.intFilter <= -0x180) && bit);
+
         voi.shiftReg = ((voi.shiftReg << 1) | (bit ? 1 : 0)) & SHIFTREG_MASK;
-        bool allSame = (voi.shiftReg == SHIFTREG_MASK) || (voi.shiftReg == 0);
 
-        if (allSame)
-            voi.sylFilter += HC55516_SYLADD;
+        // Syllabic filter (MAME lines 302-313)
+        if (((voi.shiftReg & SHIFTREG_MASK) == 0) ||
+            ((voi.shiftReg & SHIFTREG_MASK) == SHIFTREG_MASK))
+        {
+            if (!frozen)
+                voi.sylFilter += (int32_t)(((~voi.sylFilter) & HC55516_SYLMASK) >> HC55516_SYLSHIFT);
+        }
         else
-            voi.sylFilter = (voi.sylFilter * (int32_t)HC55516_SYLMASK) >> HC55516_SYLSHIFT;
+        {
+            if (!frozen)
+                voi.sylFilter += (int32_t)(((~voi.sylFilter) & HC55516_SYLMASK) >> HC55516_SYLSHIFT) + HC55516_SYLADD;
+        }
+        voi.sylFilter &= 0xfff;
 
-        if (voi.sylFilter < 0) voi.sylFilter = 0;
-        if (voi.sylFilter > 0x1FFFF) voi.sylFilter = 0x1FFFF;
+        // Leak term from active edge
+        {
+            int32_t sum = sext(((~voi.intFilter) >> HC55516_INTSHIFT) + 1, 10);
+            if (!frozen)
+                voi.intFilter = sext(voi.intFilter + sum, 10);
+        }
 
-        int32_t step = voi.sylFilter >> HC55516_INTSHIFT;
-        if (bit) voi.intFilter += step;
-        else     voi.intFilter -= step;
+        // === FALLING EDGE (inactive) ===
+        frozen = ((voi.intFilter >= 0x180) && !bit) ||
+                 ((voi.intFilter <= -0x180) && bit);
+        {
+            int32_t sum2;
+            if (voi.shiftReg & 1)
+                sum2 = sext((~std::max((int32_t)2, voi.sylFilter >> 6)) + 1, 10);
+            else
+                sum2 = sext(std::max((int32_t)2, voi.sylFilter >> 6), 10);
+            if (!frozen)
+                voi.intFilter = sext(voi.intFilter + sum2, 10);
+        }
 
-        float leakFactor = 0.99f - (1.0f - m_grittiness) * 0.04f;
-        voi.intFilter = (int32_t)(voi.intFilter * leakFactor);
-
-        if (voi.intFilter > 0x7FFFF) voi.intFilter = 0x7FFFF;
-        if (voi.intFilter < -0x7FFFF) voi.intFilter = -0x7FFFF;
-
+        // Advance bit position
         voi.bitCount++;
         if (voi.bitCount >= voi.bitsPerPeriod) {
             voi.bitCount = 0;
@@ -404,12 +482,15 @@ private:
             if (voi.bitIndex >= 256) voi.bitIndex = 0;
         }
 
-        return (float)voi.intFilter / (float)0x7FFFF;
+        // Output scaling (MAME line 340)
+        int16_t next_sample = (int16_t)((voi.intFilter << 6) |
+            (((voi.intFilter & 0x3ff) ^ 0x200) >> 4));
+        return (float)next_sample / 32768.0f;
     }
 
     void resetVoice(int v) {
         CVSDVoice& voi = m_voices[v];
-        voi.shiftReg = 0; voi.sylFilter = 0; voi.intFilter = 0;
+        voi.shiftReg = 0; voi.sylFilter = 0x3f; voi.intFilter = 0;
         voi.bitIndex = 0; voi.bitsPerPeriod = 256; voi.bitCount = 0;
         voi.lfsr = 0x7fff; voi.voiced = true; voi.gainScale = 1.0f;
         voi.midiNote = -1; voi.velocity = 0; voi.age = 0;
