@@ -51,8 +51,20 @@ function s8(v: number): number {
  * NOT sign-extended. In FlodJS all bytes are read unsigned, so the & 0x7F wrap
  * handles the full range including "negative" offsets stored as 0x80-0xFF.
  */
+/**
+ * Convert FC period table index to XM note number via actual Amiga period lookup.
+ * The FC period table is non-linear (indices 48-59 are padding, 60+ wrap),
+ * so we look up the actual period and convert to semitones.
+ */
 function fcPeriodIdxToXM(periodIdx: number): number {
-  return Math.max(1, Math.min(96, (periodIdx & 0x7F) + 1));
+  const idx = periodIdx & 0x7F;
+  const period = idx < FC_PERIODS.length ? FC_PERIODS[idx] : 113;
+  // Convert Amiga period → XM note: note = 12 * log2(3424/period) + 1
+  // period 3424 → C-0 (note 1), period 856 → C-2 (note 25),
+  // period 428 → C-3 (note 37), period 113 → ~B-4 (note 60)
+  const p = Math.max(113, Math.min(3424, period));
+  const note = Math.round(12 * Math.log2(3424 / p)) + 1;
+  return Math.max(1, Math.min(96, note));
 }
 
 // ── FC Period Table (from FlodJS FCPlayer) ────────────────────────────────
