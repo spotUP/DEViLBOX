@@ -2,7 +2,8 @@
 import { MAMEBaseSynth } from '@engine/mame/MAMEBaseSynth';
 import { textToPhonemes, parsePhonemeString } from '@engine/speech/Reciter';
 import { SpeechSequencer, type SpeechFrame } from '@engine/speech/SpeechSequencer';
-import { type SP0250Frame, phonemesToSP0250Frames, samToSP0250 } from '@engine/speech/sp0250PhonemeMap';
+import { type SP0250Frame, samToSP0250 } from '@engine/speech/sp0250PhonemeMap';
+import { phonemesToSP0250LPCFrames, samToSP0250LPC } from '@engine/speech/sp0250FrameMap';
 
 /**
  * SP0250 Parameter IDs (matching C++ enum)
@@ -66,6 +67,8 @@ export class SP0250Synth extends MAMEBaseSynth {
   protected readonly processorName = 'sp0250-processor';
 
   private _speechSequencer: SpeechSequencer<SP0250Frame> | null = null;
+  private _phonemeSpeechActive = false;
+  private _phonemeSpeechTimer: ReturnType<typeof setTimeout> | null = null;
 
   // Speech mode state
   private _mode: 0 | 1 = 1;       // 0=Tone, 1=Speech
@@ -202,8 +205,8 @@ export class SP0250Synth extends MAMEBaseSynth {
     this._startSpeechAtNote(text, 60, 0.8);
   }
 
-  /** Start speech at a specific MIDI note (avoids triggerAttack recursion) */
-  private _startSpeechAtNote(text: string, note: number, velocity: number): void {
+  /** Start speech at a specific MIDI note using frame buffer with per-phoneme LPC coefficients */
+  private _startSpeechAtNote(text: string, _note: number, _velocity: number): void {
     if (!this._isReady || !this.workletNode || this._disposed) return;
 
     this.stopSpeaking();
@@ -212,57 +215,67 @@ export class SP0250Synth extends MAMEBaseSynth {
     if (!phonemeStr) return;
 
     const tokens = parsePhonemeString(phonemeStr);
-    const frames = phonemesToSP0250Frames(tokens);
-    if (frames.length === 0) return;
 
-    // Keep all frames — unvoiced consonants are essential for intelligibility
-    const speechFrames: SpeechFrame<SP0250Frame>[] = frames
-      .map(f => ({
-        data: f,
-        durationMs: f.durationMs,
-      }));
-    if (speechFrames.length === 0) return;
+    // Use SP0250-specific LPC frame map with per-phoneme filter coefficients
+    const lpcFrames = phonemesToSP0250LPCFrames(tokens);
+    if (lpcFrames.length === 0) return;
 
-    // Pre-set the first frame's parameters before starting the note
-    const first = speechFrames[0].data;
-    this.setVowel(first.preset);
-    this.setVoiced(first.voiced);
-    this.setBrightness(first.brightness);
-
-    // Start voice directly (not via triggerAttack to avoid recursion)
-    this.workletNode.port.postMessage({
-      type: 'noteOn',
-      note,
-      velocity: Math.floor(velocity * 127),
-    });
-
-    this._speechSequencer = new SpeechSequencer<SP0250Frame>(
-      (frame) => {
-        this.setVowel(frame.preset);
-        this.setVoiced(frame.voiced);
-        this.setBrightness(frame.brightness);
-      },
-      () => {
-        this._speechSequencer = null;
-        this.triggerRelease();
+    // Pack into 15-byte WASM frames: [amp, pitch, voiced, F0, B0, F1, B1, F2, B2, F3, B3, F4, B4, F5, B5]
+    // Each frame is ~25ms at 10kHz LPC rate (250 samples)
+    const frameList: number[][] = [];
+    for (const f of lpcFrames) {
+      const count = Math.max(1, Math.round(f.durationMs / 25));
+      const packed = [f.amp, f.pitch, f.voiced ? 1 : 0, ...f.filterF.flatMap((fv, i) => [fv, f.filterB[i]])];
+      for (let i = 0; i < count; i++) {
+        frameList.push(packed);
       }
+    }
+    // Stop marker at end
+    frameList.push([0xFF, 0, 0, 0x80, 0x10, 0x80, 0x10, 0x80, 0x10, 0x80, 0x10, 0x80, 0x10, 0x80, 0x10]);
+
+    const numFrames = frameList.length;
+    const data = new Uint8Array(numFrames * 15);
+    for (let i = 0; i < numFrames; i++) {
+      const f = frameList[i];
+      for (let j = 0; j < 15; j++) {
+        data[i * 15 + j] = f[j];
+      }
+    }
+
+    const buffer = data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength);
+    this.workletNode.port.postMessage(
+      { type: 'loadFrameBuffer', frameData: buffer, numFrames },
+      [buffer]
     );
-    this._speechSequencer.speak(speechFrames);
+    this.workletNode.port.postMessage({ type: 'speakFrameBuffer' });
+
+    this._phonemeSpeechActive = true;
+    const totalMs = numFrames * 25 + 100;
+    this._phonemeSpeechTimer = setTimeout(() => {
+      this._phonemeSpeechTimer = null;
+      this._phonemeSpeechActive = false;
+    }, totalMs);
   }
 
   /** Stop current text-to-speech playback */
   stopSpeaking(): void {
-    const wasSpeaking = this._speechSequencer !== null;
     if (this._speechSequencer) {
       this._speechSequencer.stop();
       this._speechSequencer = null;
     }
-    if (wasSpeaking) this.triggerRelease();
+    this._phonemeSpeechActive = false;
+    if (this._phonemeSpeechTimer !== null) {
+      clearTimeout(this._phonemeSpeechTimer);
+      this._phonemeSpeechTimer = null;
+    }
+    if (this.workletNode && !this._disposed) {
+      this.workletNode.port.postMessage({ type: 'stopSpeaking' });
+    }
   }
 
   /** Whether text-to-speech is currently playing */
   get isSpeaking(): boolean {
-    return this._speechSequencer?.isSpeaking ?? false;
+    return this._phonemeSpeechActive || (this._speechSequencer?.isSpeaking ?? false);
   }
 
   // ===========================================================================
@@ -345,12 +358,38 @@ export class SP0250Synth extends MAMEBaseSynth {
   }
 
   /** Play a single vowel from the sequence at the given MIDI note */
-  private _speakSingleVowel(note: number, velocity: number): void {
+  private _speakSingleVowel(_note: number, _velocity: number): void {
     if (!this._isReady || !this.workletNode || this._disposed) return;
 
     const code = this._vowelSequence[this._vowelIndex % this._vowelSequence.length];
     this._vowelIndex++;
 
+    // Use SP0250 LPC frame map for frame buffer playback
+    const lpcFrame = samToSP0250LPC(code);
+    if (lpcFrame) {
+      this.stopSpeaking();
+      const count = this._vowelLoopSingle ? 40 : Math.max(1, Math.round(lpcFrame.durationMs / 25));
+      const packed = [lpcFrame.amp, lpcFrame.pitch, lpcFrame.voiced ? 1 : 0,
+        ...lpcFrame.filterF.flatMap((fv, i) => [fv, lpcFrame.filterB[i]])];
+      const numFrames = count + 1; // +1 for stop marker
+      const data = new Uint8Array(numFrames * 15);
+      for (let i = 0; i < count; i++) {
+        for (let j = 0; j < 15; j++) data[i * 15 + j] = packed[j];
+      }
+      // Stop marker at end (amp=0xFF)
+      data[count * 15] = 0xFF;
+      const buffer = data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength);
+      this.workletNode.port.postMessage({ type: 'loadFrameBuffer', frameData: buffer, numFrames }, [buffer]);
+      this.workletNode.port.postMessage({ type: 'speakFrameBuffer' });
+      this._phonemeSpeechActive = true;
+      this._phonemeSpeechTimer = setTimeout(() => {
+        this._phonemeSpeechTimer = null;
+        this._phonemeSpeechActive = false;
+      }, numFrames * 25 + 100);
+      return;
+    }
+
+    // Fallback: old preset switching
     const frame = samToSP0250(code);
     if (!frame) return;
 
@@ -363,8 +402,8 @@ export class SP0250Synth extends MAMEBaseSynth {
 
     this.workletNode.port.postMessage({
       type: 'noteOn',
-      note,
-      velocity: Math.floor(velocity * 127),
+      note: _note,
+      velocity: Math.floor(_velocity * 127),
     });
 
     this._speechSequencer = new SpeechSequencer<SP0250Frame>(

@@ -65,6 +65,7 @@ class SP0250Processor extends AudioWorkletProcessor {
     this.initialized = false;
     this.bufferSize = 128;
     this.lastHeapBuffer = null;
+    this.frameBufferPtr = 0;
 
     this.port.onmessage = (event) => {
       this.handleMessage(event.data);
@@ -119,10 +120,32 @@ class SP0250Processor extends AudioWorkletProcessor {
       case 'setVowel':
         if (this.synth) this.synth.setVowel(data.value);
         break;
+      // === Frame Buffer Speech Commands ===
+      case 'loadFrameBuffer':
+        this.loadFrameBuffer(data.frameData, data.numFrames);
+        break;
+      case 'speakFrameBuffer':
+        if (this.synth) this.synth.speakFrameBuffer();
+        break;
+      case 'stopSpeaking':
+        if (this.synth) this.synth.stopSpeaking();
+        break;
       case 'dispose':
         this.cleanup();
         break;
     }
+  }
+
+  loadFrameBuffer(frameData, numFrames) {
+    if (!this.module || !this.synth) return;
+    if (this.frameBufferPtr) { this.module._free(this.frameBufferPtr); this.frameBufferPtr = 0; }
+    const size = numFrames * 15;
+    this.frameBufferPtr = this.module._malloc(size);
+    if (!this.frameBufferPtr) return;
+    const bytes = new Uint8Array(frameData);
+    const heapView = new Uint8Array(this.module.wasmMemory ? this.module.wasmMemory.buffer : this.module.HEAPU8.buffer);
+    heapView.set(bytes, this.frameBufferPtr);
+    this.synth.loadFrameBuffer(this.frameBufferPtr, numFrames);
   }
 
   async initSynth(data) {
@@ -161,6 +184,7 @@ class SP0250Processor extends AudioWorkletProcessor {
   }
 
   cleanup() {
+    if (this.module && this.frameBufferPtr) { this.module._free(this.frameBufferPtr); this.frameBufferPtr = 0; }
     if (this.module && this.outputPtrL) {
       this.module._free(this.outputPtrL);
       this.outputPtrL = 0;
