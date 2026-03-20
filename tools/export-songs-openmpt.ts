@@ -1379,8 +1379,7 @@ const TEST_CASES: TestCase[] = [
 
   // === PC Tracker Formats (batch 2) ===
   { file: 'formats/invisibility.dbm', format: 'DBM', parserModule: 'DigiBoosterParser', parseFn: 'parseDigiBoosterFile', isAsync: false, exportAs: 'xm' },
-  // DigiBooster original (.digi "DIGI Booster module" magic) — needs OpenMPT (browser only), no Node.js path
-  // { file: 'formats/the_day_after.digi', format: 'DIGI', ... },
+  { file: 'formats/the_day_after.digi', format: 'DIGI', parserModule: 'DigiBoosterParser', parseFn: 'parseDigiBoosterFile', isAsync: false, exportAs: 'xm' },
   { file: 'formats/mayday.mdl', format: 'MDL', parserModule: 'MDLParser', parseFn: 'parseMDLFile', isAsync: true, exportAs: 'xm' },
   { file: 'formats/noname.stp', format: 'STP', parserModule: 'STPParser', parseFn: 'parseSTPFile', isAsync: true, exportAs: 'xm' },
   { file: 'formats/gimmekuh.gt2', format: 'GT2', parserModule: 'GraoumfTracker2Parser', parseFn: 'parseGraoumfTracker2File', isAsync: false, args: 'bytes', exportAs: 'xm' },
