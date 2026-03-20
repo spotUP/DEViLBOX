@@ -348,14 +348,18 @@ public:
         m_romPlaying = true;
         m_romAddr = byteAddr;
         m_romPhase = 0.0; m_romPrevSample = 0.0f; m_romCurrentSample = 0.0f; m_romEnvLevel = 0.0f;
-        m_romSampleCount = 0; m_romFrameSize = 40; m_romInterpCount = 0; m_romPitchCount = 0;
+        // MAME init: sample_count = frame_size, interp_count = FR_SIZE
+        // Do NOT call parseROMFrame here — it's called when interp_count reaches 0
+        m_romSampleCount = m_romFrameSize; m_romFrameSize = 40;
+        m_romInterpCount = FR_SIZE; m_romPitchCount = 0;
         std::memset(m_romX, 0, sizeof(m_romX));
         std::memset(m_romCurrentK, 0, sizeof(m_romCurrentK));
         std::memset(m_romOldK, 0, sizeof(m_romOldK));
-        m_romCurrentEnergy = 0; m_romOldEnergy = 0; m_romTargetEnergy = 0;
-        m_romCurrentPitch = 0; m_romOldPitch = 0; m_romTargetPitch = 0;
-        m_romLfsr = 0x7fff; m_romSilentFrames = 0;
-        parseROMFrame();
+        std::memset(m_romNewK, 0, sizeof(m_romNewK));
+        std::memset(m_romTargetK, 0, sizeof(m_romTargetK));
+        m_romCurrentEnergy = 0; m_romOldEnergy = 0; m_romNewEnergy = 0; m_romTargetEnergy = 0;
+        m_romCurrentPitch = 0; m_romOldPitch = 0; m_romNewPitch = 0; m_romTargetPitch = 0;
+        m_romLfsr = 0x7fff;
     }
     void stopSpeaking() { m_romPlaying = false; }
 
