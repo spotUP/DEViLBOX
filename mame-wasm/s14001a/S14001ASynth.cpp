@@ -411,54 +411,130 @@ private:
             return 0.0f;
         }
         case ROM_STATE_PLAY: {
-            uint8_t ppQtr = m_romLength & 0x03;
-            bool isSilent = m_romSilence || (m_romVoiced && (ppQtr >= 2));
-            if (isSilent) {
-                m_romOutput = DAC_CENTER;
+            // ================================================================
+            // MAME-exact S14001A PLAY state logic
+            // Matches Clock() lines 475-555 of s14001a.cpp
+            //
+            // CRITICAL: Carries must be computed from PRE-increment (P2) values,
+            // BEFORE any counter modifications. MAME uses a two-phase clock where
+            // phase 2 computes carries from latched P2 state, then phase 1 does
+            // the actual logic. We combine both phases but preserve the ordering.
+            // ================================================================
+
+            // --- Phase 2: compute carries from current (pre-increment) state ---
+            // MAME lines 385-388
+            bool bDAR04To00CarryP2 = (m_romDAR04to00 == 0x1f);
+            bool bPPQCarryP2       = bDAR04To00CarryP2 && ((m_romLength & 0x03) == 0x03);
+            bool bRepeatCarryP2    = bPPQCarryP2       && ((m_romLength & 0x0c) == 0x0c);
+            bool bLengthCarryP2    = bRepeatCarryP2    && ( m_romLength         == 0x7f);
+
+            // --- Phase 1: compute new output ---
+            // MAME lines 480-505 (Mux8To2 + CalculateIncrement + CalculateOutput)
+
+            uint8_t uPPQtrP2 = m_romLength & 0x03;
+            bool bPPQStartP2 = (m_romDAR04to00 == 0);
+
+            // Mux8To2: extract 2-bit delta from ROM byte (MAME lines 118-127)
+            uint8_t uDeltaAdrP2 = m_romDAR04to00 & 0x03;
+            if (m_romVoiced && (uPPQtrP2 & 0x01)) // mirroring
+                uDeltaAdrP2 ^= 0x03; // count backwards
+            uint8_t romByte = readROMByte(m_romRomAddr);
+            uint8_t uDeltaP2 = (romByte >> ((~uDeltaAdrP2 << 1) & 0x06)) & 0x03;
+
+            // CalculateIncrement (MAME lines 130-166)
+            uint8_t uDeltaOldP2 = m_romDeltaOld; // save pre-modification copy
+            if ((uPPQtrP2 == 0x00) && bPPQStartP2) // beginning of pitch period
+                uDeltaOldP2 = 0x02;
+
+            bool bMIRROR = (uPPQtrP2 & 0x01) != 0;
+            uint8_t uIncrementP2;
+            bool bAddP2;
+
+            if (!m_romVoiced || !bMIRROR) {
+                uIncrementP2 = INCREMENT_TABLE[uDeltaP2][uDeltaOldP2];
+                bAddP2       = (uDeltaP2 >= 0x02);
             } else {
-                uint8_t romByte = readROMByte(m_romRomAddr);
-                uint8_t deltaAddr = m_romDAR04to00 & 0x03;
-                if (m_romVoiced && (m_romLength & 0x01)) deltaAddr ^= 0x03;
-                uint8_t delta = (romByte >> ((~deltaAddr << 1) & 0x06)) & 0x03;
-                uint8_t increment; bool add;
-                bool mirror = (m_romLength & 0x01) != 0;
-                bool ppqStart = (m_romDAR04to00 == 0);
-                if (ppqStart && ((m_romLength & 0x03) == 0)) m_romDeltaOld = 2;
-                if (!m_romVoiced || !mirror) {
-                    increment = INCREMENT_TABLE[delta][m_romDeltaOld];
-                    add = (delta >= 2);
-                } else {
-                    increment = INCREMENT_TABLE[m_romDeltaOld][delta];
-                    add = (m_romDeltaOld < 2);
-                    if (ppqStart && mirror) increment = 0;
-                }
-                m_romDeltaOld = delta;
-                if (ppqStart && ((m_romLength & 0x03) == 0)) m_romOutput = DAC_CENTER;
-                uint8_t tmp = m_romOutput;
-                if (!add) tmp ^= 0x0f;
-                tmp += increment;
-                if (tmp > 15) tmp = 15;
-                if (!add) tmp ^= 0x0f;
-                m_romOutput = tmp;
+                uIncrementP2 = INCREMENT_TABLE[uDeltaOldP2][uDeltaP2];
+                bAddP2       = (uDeltaOldP2 < 0x02);
             }
+            uint8_t uDeltaOldP1 = uDeltaP2; // new deltaOld for next cycle
+            if (m_romVoiced && bPPQStartP2 && bMIRROR)
+                uIncrementP2 = 0; // no change when first starting mirroring
+
+            // CalculateOutput (MAME lines 169-198)
+            bool bSILENCE = (uPPQtrP2 & 0x02) != 0; // BIT(uPPQtr, 1)
+            uint8_t uOutputP1;
+
+            if (m_romSilence || (m_romVoiced && bSILENCE)) {
+                uOutputP1 = 7;
+            } else {
+                uint8_t uLOutput = m_romOutput;
+
+                // beginning of pitch period: reset output to 7
+                if ((uPPQtrP2 == 0x00) && bPPQStartP2)
+                    uLOutput = 7;
+
+                // adder with saturation
+                uint8_t uTmp = uLOutput;
+                if (!bAddP2)
+                    uTmp ^= 0x0f; // turns subtraction into addition
+                uTmp += uIncrementP2;
+                if (uTmp > 15)
+                    uTmp = 15;
+                if (!bAddP2)
+                    uTmp ^= 0x0f; // turns addition back to subtraction
+
+                uOutputP1 = uTmp;
+            }
+
+            // Latch new output and deltaOld
+            m_romOutput = uOutputP1;
+            m_romDeltaOld = uDeltaOldP1;
+
+            // --- Advance counters (MAME lines 507-535) ---
+            // These produce P1 values from P2 carries
+
             m_romDAR04to00++;
-            bool dar04carry = (m_romDAR04to00 >= 32);
-            if (dar04carry) { m_romDAR04to00 = 0; m_romLength++; if (m_romLength >= 0x80) m_romLength = 0; }
-            if (m_romVoiced && dar04carry && ((m_romLength & 0x0c) == 0)) {
-                m_romLength = (m_romLength & 0x70) | (m_romXRepeat << 2);
-                m_romDAR13to05++; if (m_romDAR13to05 >= 0x200) m_romDAR13to05 = 0;
+            if (bDAR04To00CarryP2) { // pitch period quarter end
+                m_romDAR04to00 = 0; // emulate 5 bit counter
+
+                m_romLength++; // lower two bits count quarter pitch periods
+                if (m_romLength >= 0x80)
+                    m_romLength = 0; // emulate 7 bit counter
             }
-            if (!m_romVoiced && dar04carry) {
-                m_romDAR13to05++; if (m_romDAR13to05 >= 0x200) m_romDAR13to05 = 0;
+
+            if (m_romVoiced && bRepeatCarryP2) { // repeat complete
+                m_romLength = (m_romLength & 0x70); // keep current "length"
+                m_romLength |= (m_romXRepeat << 2); // load repeat from external repeat
+                m_romDAR13to05++; // advances ROM address 8 bytes
+                if (m_romDAR13to05 >= 0x200)
+                    m_romDAR13to05 = 0; // emulate 9 bit counter
             }
+            if (!m_romVoiced && bDAR04To00CarryP2) {
+                // unvoiced advances each quarter pitch period
+                m_romDAR13to05++;
+                if (m_romDAR13to05 >= 0x200)
+                    m_romDAR13to05 = 0; // emulate 9 bit counter
+            }
+
+            // --- Construct ROM address (MAME lines 537-541) ---
             m_romRomAddr = m_romDAR04to00;
-            if (m_romVoiced && (m_romLength & 0x01)) m_romRomAddr ^= 0x1f;
+            if (m_romVoiced && (m_romLength & 0x01)) // mirroring
+                m_romRomAddr ^= 0x1f; // count backwards
             m_romRomAddr = (m_romDAR13to05 << 3) | (m_romRomAddr >> 2);
-            bool lengthCarry = dar04carry && (m_romLength == 0);
-            if (lengthCarry) {
-                if (m_romStop) { m_romPlaying = false; m_romState = ROM_STATE_IDLE; }
-                else { m_romState = ROM_STATE_DARMSB; m_romRomAddr = m_romCWAR; }
+
+            // --- Next state logic (MAME lines 543-554) ---
+            if (m_romStop && bLengthCarryP2) {
+                m_romState = ROM_STATE_IDLE;
+                // MAME goes to DELAY then IDLE; we skip DELAY since we
+                // don't need the extra clock cycle for external hardware
+                m_romPlaying = false;
+            } else if (bLengthCarryP2) {
+                m_romState = ROM_STATE_DARMSB;
+                m_romRomAddr = m_romCWAR; // output correct address for next syllable
             }
+            // else: stay in ROM_STATE_PLAY
+
             return ((float)m_romOutput - DAC_CENTER) / (float)DAC_CENTER;
         }
         default: return 0.0f;
