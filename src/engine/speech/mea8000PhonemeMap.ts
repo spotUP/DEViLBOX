@@ -190,7 +190,14 @@ export function phonemesToMEA8000Frames(
   for (const token of tokens) {
     const frame = samToMEA8000(token.code);
     if (frame) {
-      rawFrames.push(frame);
+      // Stressed syllables: slightly longer + wider bandwidth for emphasis
+      const durationScale = token.stress >= 4 ? 1.2 : token.stress >= 2 ? 1.1 : 1.0;
+      const bwShift = token.stress >= 4 ? -1 : 0; // narrower BW = more resonant
+      rawFrames.push({
+        ...frame,
+        durationMs: Math.round(frame.durationMs * durationScale),
+        bw: Math.max(0, frame.bw + bwShift),
+      });
     }
   }
 

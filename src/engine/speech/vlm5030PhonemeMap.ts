@@ -137,10 +137,13 @@ export function phonemesToVLM5030Frames(
   for (const token of tokens) {
     const frame = samToVLM5030(token.code);
     if (frame) {
-      const energyBoost = token.stress >= 4 ? 3 : 0;
+      const energyBoost = token.stress >= 4 ? 3 : token.stress >= 2 ? 1 : 0;
+      // Prosody: stressed syllables have slightly higher pitch
+      const pitchBoost = token.stress >= 4 ? 2 : token.stress >= 2 ? 1 : 0;
       rawFrames.push({
         ...frame,
         energy: Math.min(31, frame.energy + energyBoost),
+        pitch: frame.unvoiced ? 0 : Math.min(31, frame.pitch + pitchBoost),
       });
     }
   }
