@@ -125,45 +125,102 @@ function lerpFrame(from: VLM5030Frame, to: VLM5030Frame, t: number): VLM5030Fram
   };
 }
 
+/** Phoneme categories for energy shaping */
+const STOPS = new Set(['P*', 'T*', 'K*', 'KX', 'B*', 'D*', 'G*', 'GX', 'Q*']);
+const DIPHTHONGS: Record<string, [string, string]> = {
+  'EY': ['EH', 'IY'], 'AY': ['AA', 'IY'], 'OY': ['AO', 'IY'],
+  'AW': ['AA', 'UX'], 'OW': ['AO', 'UX'], 'UW': ['UX', 'UX'],
+};
+
 /**
- * Convert SAM PhonemeTokens to VLM5030 frames with coarticulation.
- * Inserts transition frames between phonemes for smooth formant movement.
+ * Convert SAM PhonemeTokens to VLM5030 frames with:
+ * - Per-phoneme LPC coefficients
+ * - Coarticulation (transition frames between phonemes)
+ * - Prosody (stress-based pitch/energy + sentence intonation)
+ * - Diphthong glides (smooth formant movement within diphthongs)
+ * - Consonant-vowel energy ramps (stops burst then ramp into vowels)
  */
 export function phonemesToVLM5030Frames(
   tokens: Array<{ code: string; stress: number }>
 ): VLM5030Frame[] {
-  // Map tokens to raw frames
   const rawFrames: VLM5030Frame[] = [];
+  const tokenCodes: string[] = [];
+
   for (const token of tokens) {
     const frame = samToVLM5030(token.code);
     if (frame) {
       const energyBoost = token.stress >= 4 ? 3 : token.stress >= 2 ? 1 : 0;
-      // Prosody: stressed syllables have slightly higher pitch
       const pitchBoost = token.stress >= 4 ? 2 : token.stress >= 2 ? 1 : 0;
       rawFrames.push({
         ...frame,
         energy: Math.min(31, frame.energy + energyBoost),
         pitch: frame.unvoiced ? 0 : Math.min(31, frame.pitch + pitchBoost),
       });
+      tokenCodes.push(token.code);
     }
   }
 
   if (rawFrames.length === 0) return [];
 
-  // Insert coarticulation transition frames between phonemes
+  // Sentence-level intonation: gradual pitch decline toward end
+  const totalFrames = rawFrames.length;
+  for (let i = 0; i < totalFrames; i++) {
+    const f = rawFrames[i];
+    if (!f.unvoiced && f.pitch > 0) {
+      // Last 30% of utterance: pitch drops by up to 3 indices
+      const pos = i / totalFrames;
+      if (pos > 0.7) {
+        const drop = Math.round((pos - 0.7) / 0.3 * 3);
+        f.pitch = Math.max(1, f.pitch - drop);
+      }
+    }
+  }
+
   const result: VLM5030Frame[] = [];
   for (let i = 0; i < rawFrames.length; i++) {
     const curr = rawFrames[i];
+    const code = tokenCodes[i];
 
-    // Add transition FROM previous phoneme (2 frames at 25/75%)
+    // Coarticulation: transition FROM previous phoneme
     if (i > 0) {
       const prev = rawFrames[i - 1];
       result.push(lerpFrame(prev, curr, 0.33));
       result.push(lerpFrame(prev, curr, 0.67));
     }
 
-    // Add the main phoneme frames (steady state)
-    // Reduce duration slightly to make room for transitions
+    // Consonant-vowel energy ramps: stops get brief burst then ramp
+    if (STOPS.has(code)) {
+      // Burst: short high-energy frame
+      result.push({ ...curr, durationMs: 15, energy: Math.min(31, curr.energy + 4) });
+      // Ramp down: lower energy
+      result.push({ ...curr, durationMs: 15, energy: Math.max(1, curr.energy - 2) });
+      continue;
+    }
+
+    // Diphthong glides: split into start→end formant glide
+    const diph = DIPHTHONGS[code];
+    if (diph) {
+      const startFrame = samToVLM5030(diph[0]);
+      const endFrame = samToVLM5030(diph[1]);
+      if (startFrame && endFrame) {
+        const totalMs = curr.durationMs;
+        const steps = Math.max(3, Math.round(totalMs / 30));
+        for (let s = 0; s < steps; s++) {
+          const t = s / (steps - 1);
+          result.push({
+            ...lerpFrame(
+              { ...startFrame, energy: curr.energy, pitch: curr.pitch, unvoiced: curr.unvoiced },
+              { ...endFrame, energy: curr.energy, pitch: curr.pitch, unvoiced: curr.unvoiced },
+              t
+            ),
+            durationMs: Math.round(totalMs / steps),
+          });
+        }
+        continue;
+      }
+    }
+
+    // Regular phoneme: steady state
     const steadyMs = Math.max(25, curr.durationMs - 50);
     result.push({ ...curr, durationMs: steadyMs });
   }

@@ -462,14 +462,25 @@ function lerpFrame(from: SP0250LPCFrame, to: SP0250LPCFrame, t: number): SP0250L
  * Convert SAM PhonemeTokens to SP0250 LPC frames with coarticulation.
  * Inserts transition frames between phonemes for smooth formant movement.
  */
+const STOPS = new Set(['P*', 'T*', 'K*', 'KX', 'B*', 'D*', 'G*', 'GX', 'Q*']);
+const DIPHTHONGS: Record<string, [string, string]> = {
+  'EY': ['EH', 'IY'], 'AY': ['AA', 'IY'], 'OY': ['AO', 'IY'],
+  'AW': ['AA', 'UX'], 'OW': ['AO', 'UX'], 'UW': ['UX', 'UX'],
+};
+
+/**
+ * Convert SAM PhonemeTokens to SP0250 LPC frames with coarticulation,
+ * sentence intonation, diphthong glides, and CV energy ramps.
+ */
 export function phonemesToSP0250LPCFrames(
   tokens: Array<{ code: string; stress: number }>
 ): SP0250LPCFrame[] {
   const rawFrames: SP0250LPCFrame[] = [];
+  const tokenCodes: string[] = [];
+
   for (const token of tokens) {
     const frame = samToSP0250LPC(token.code);
     if (frame) {
-      // Boost amplitude and pitch for stressed syllables (prosody)
       const ampBoost = token.stress >= 4 ? 0x04 : token.stress >= 2 ? 0x02 : 0;
       const pitchBoost = token.stress >= 4 ? 4 : token.stress >= 2 ? 2 : 0;
       rawFrames.push({
@@ -477,20 +488,64 @@ export function phonemesToSP0250LPCFrames(
         amp: Math.min(0xFE, frame.amp + ampBoost),
         pitch: frame.voiced ? Math.min(63, frame.pitch + pitchBoost) : 0,
       });
+      tokenCodes.push(token.code);
     }
   }
 
   if (rawFrames.length === 0) return [];
 
-  // Insert coarticulation transition frames
+  // Sentence intonation: pitch drops in last 30%
+  const total = rawFrames.length;
+  for (let i = 0; i < total; i++) {
+    const f = rawFrames[i];
+    if (f.voiced && f.pitch > 0) {
+      const pos = i / total;
+      if (pos > 0.7) {
+        const drop = Math.round((pos - 0.7) / 0.3 * 5);
+        f.pitch = Math.max(1, f.pitch - drop);
+      }
+    }
+  }
+
   const result: SP0250LPCFrame[] = [];
   for (let i = 0; i < rawFrames.length; i++) {
     const curr = rawFrames[i];
+    const code = tokenCodes[i];
 
+    // Coarticulation transitions
     if (i > 0) {
       const prev = rawFrames[i - 1];
       result.push(lerpFrame(prev, curr, 0.33));
       result.push(lerpFrame(prev, curr, 0.67));
+    }
+
+    // Stop consonants: burst + ramp
+    if (STOPS.has(code)) {
+      result.push({ ...curr, durationMs: 15, amp: Math.min(0xFE, curr.amp + 0x06) });
+      result.push({ ...curr, durationMs: 15, amp: Math.max(1, curr.amp - 0x02) });
+      continue;
+    }
+
+    // Diphthong glides
+    const diph = DIPHTHONGS[code];
+    if (diph) {
+      const sf = samToSP0250LPC(diph[0]);
+      const ef = samToSP0250LPC(diph[1]);
+      if (sf && ef) {
+        const steps = Math.max(3, Math.round(curr.durationMs / 30));
+        for (let s = 0; s < steps; s++) {
+          const t = s / (steps - 1);
+          result.push({
+            ...lerpFrame(
+              { ...sf, amp: curr.amp, pitch: curr.pitch, voiced: curr.voiced },
+              { ...ef, amp: curr.amp, pitch: curr.pitch, voiced: curr.voiced },
+              t
+            ),
+            durationMs: Math.round(curr.durationMs / steps),
+          });
+        }
+        continue;
+      }
     }
 
     const steadyMs = Math.max(25, curr.durationMs - 50);

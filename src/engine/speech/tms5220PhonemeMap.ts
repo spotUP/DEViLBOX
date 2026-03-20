@@ -130,10 +130,23 @@ function lerpFrame(from: TMS5220Frame, to: TMS5220Frame, t: number): TMS5220Fram
 /**
  * Convert SAM PhonemeTokens to TMS5220 frames with coarticulation transitions.
  */
+/** Phoneme categories */
+const STOPS = new Set(['P*', 'T*', 'K*', 'KX', 'B*', 'D*', 'G*', 'GX', 'Q*']);
+const DIPHTHONGS: Record<string, [string, string]> = {
+  'EY': ['EH', 'IY'], 'AY': ['AA', 'IY'], 'OY': ['AO', 'IY'],
+  'AW': ['AA', 'UX'], 'OW': ['AO', 'UX'], 'UW': ['UX', 'UX'],
+};
+
+/**
+ * Convert SAM PhonemeTokens to TMS5220 frames with coarticulation,
+ * sentence intonation, diphthong glides, and CV energy ramps.
+ */
 export function phonemesToTMS5220Frames(
   tokens: Array<{ code: string; stress: number }>
 ): TMS5220Frame[] {
   const rawFrames: TMS5220Frame[] = [];
+  const tokenCodes: string[] = [];
+
   for (const token of tokens) {
     const frame = samToTMS5220(token.code);
     if (frame) {
@@ -144,20 +157,64 @@ export function phonemesToTMS5220Frames(
         energy: Math.min(14, frame.energy + energyBoost),
         pitch: frame.unvoiced ? 0 : Math.min(31, frame.pitch + pitchBoost),
       });
+      tokenCodes.push(token.code);
     }
   }
 
   if (rawFrames.length === 0) return [];
 
-  // Insert coarticulation transition frames between phonemes
+  // Sentence intonation: pitch drops in last 30%
+  const total = rawFrames.length;
+  for (let i = 0; i < total; i++) {
+    const f = rawFrames[i];
+    if (!f.unvoiced && f.pitch > 0) {
+      const pos = i / total;
+      if (pos > 0.7) {
+        const drop = Math.round((pos - 0.7) / 0.3 * 4);
+        f.pitch = Math.max(1, f.pitch - drop);
+      }
+    }
+  }
+
   const result: TMS5220Frame[] = [];
   for (let i = 0; i < rawFrames.length; i++) {
     const curr = rawFrames[i];
+    const code = tokenCodes[i];
 
+    // Coarticulation transitions
     if (i > 0) {
       const prev = rawFrames[i - 1];
       result.push(lerpFrame(prev, curr, 0.33));
       result.push(lerpFrame(prev, curr, 0.67));
+    }
+
+    // Stop consonants: burst + ramp
+    if (STOPS.has(code)) {
+      result.push({ ...curr, durationMs: 15, energy: Math.min(14, curr.energy + 2) });
+      result.push({ ...curr, durationMs: 15, energy: Math.max(1, curr.energy - 1) });
+      continue;
+    }
+
+    // Diphthong glides
+    const diph = DIPHTHONGS[code];
+    if (diph) {
+      const sf = samToTMS5220(diph[0]);
+      const ef = samToTMS5220(diph[1]);
+      if (sf && ef) {
+        const steps = Math.max(3, Math.round(curr.durationMs / 30));
+        for (let s = 0; s < steps; s++) {
+          const t = s / (steps - 1);
+          result.push({
+            ...lerpFrame(
+              { ...sf, energy: curr.energy, pitch: curr.pitch, unvoiced: curr.unvoiced },
+              { ...ef, energy: curr.energy, pitch: curr.pitch, unvoiced: curr.unvoiced },
+              t
+            ),
+            durationMs: Math.round(curr.durationMs / steps),
+          });
+        }
+        continue;
+      }
     }
 
     const steadyMs = Math.max(25, curr.durationMs - 50);
