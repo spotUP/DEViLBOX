@@ -646,10 +646,10 @@ export async function startNativeEngines(
     );
     if (svModularInsts.length > 0) {
       suppressNotes = true;
-      // Pre-create all instrument synths so audio graph is connected
-      for (const inst of svModularInsts) {
-        toneEngine.getInstrument(inst.id, inst);
-      }
+      // Only connect the FIRST instrument to the audio graph — all SunVoxModular
+      // song-mode instances share the same WASM output GainNode. Connecting all N
+      // would sum the same signal N times, causing clipping.
+      toneEngine.getInstrument(svModularInsts[0].id, svModularInsts[0]);
       // Start sequencer on first instance (all share the same WASM handle)
       // Wait up to 10s for the shared song handle to load before starting playback.
       try {

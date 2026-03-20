@@ -644,7 +644,9 @@ export function parseSteveTurnerFile(buffer: ArrayBuffer, filename: string): Tra
     restartPosition: 0,
     numChannels: 4,
     initialSpeed: subsongs[0]?.speed ?? 6,
-    initialBPM: 125,
+    // Steve Turner timer $1BC0 = 100Hz (2× standard 50Hz VBlank).
+    // BPM 250 gives 250*2/5 = 100 ticks/sec, matching the engine.
+    initialBPM: 250,
     linearPeriods: false,
     // WASM engine playback (replaces UADE)
     steveTurnerFileData: buffer.slice(0),

@@ -379,7 +379,14 @@ export async function importTrackerModule(
     loadPatterns(song.patterns);
     setCurrentPattern(0);
     if (song.songPositions.length > 0) setPatternOrder(song.songPositions);
-    setOriginalModuleData(null);
+    // Store BPM/speed metadata so usePatternPlayback can read them via modData
+    setOriginalModuleData({
+      base64: '',
+      format: (song.format || 'UNKNOWN') as 'MOD' | 'XM' | 'IT' | 'S3M' | 'UNKNOWN',
+      initialBPM: song.initialBPM,
+      initialSpeed: song.initialSpeed,
+      songLength: song.songLength,
+    } as any);
     setBPM(song.initialBPM);
     setSpeed(song.initialSpeed);
     setMetadata({ name: song.name, author: '', description: `Imported from ${info.file?.name || 'module'}` });
@@ -1011,7 +1018,16 @@ async function loadSongFile(file: File, options: FileLoadOptions): Promise<FileL
       if (bpm && bpm > 0) useTransportStore.getState().setBPM(bpm);
 
       // --- Build DEViLBOX patterns from real SunVox pattern data ---
+      // SunVox uses a 2D timeline: patterns at (x, y) where x=time position,
+      // y=track offset. Patterns at the same x play simultaneously (different voices).
       const svPatterns = preSunVoxPatterns as SunVoxPatternData[] | null;
+      if (svPatterns) {
+        const xGroups = new Map<number, number>();
+        for (const p of svPatterns) { xGroups.set(p.x, (xGroups.get(p.x) ?? 0) + 1); }
+        console.log('[SunVox] pattern layout:', svPatterns.length, 'patterns,',
+          xGroups.size, 'unique x positions, tracks per pattern:',
+          svPatterns.slice(0, 10).map(p => `x=${p.x}:${p.tracks}t/${p.lines}l`));
+      }
       const channelColors = [
         '#facc15', '#34d399', '#60a5fa', '#f472b6', '#a78bfa',
         '#fb923c', '#38bdf8', '#4ade80', '#e879f9', '#fbbf24',

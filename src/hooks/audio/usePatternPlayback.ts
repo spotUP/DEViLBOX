@@ -60,10 +60,11 @@ export const usePatternPlayback = () => {
     furnaceActiveSubsong: s.furnaceActiveSubsong,
   })));
   const linearPeriods = useEditorStore((s) => s.linearPeriods);
-  const { isPlaying, isLooping, bpm, setCurrentRow, setCurrentRowThrottled } = useTransportStore(useShallow((s) => ({
+  const { isPlaying, isLooping, bpm, speed: transportSpeed, setCurrentRow, setCurrentRowThrottled } = useTransportStore(useShallow((s) => ({
     isPlaying: s.isPlaying,
     isLooping: s.isLooping,
     bpm: s.bpm,
+    speed: s.speed,
     setCurrentRow: s.setCurrentRow,
     setCurrentRowThrottled: s.setCurrentRowThrottled,
   })));
@@ -306,7 +307,7 @@ export const usePatternPlayback = () => {
             arrangement.clips,
             arrangement.tracks,
             patterns,
-            modData?.initialSpeed ?? 6,
+            modData?.initialSpeed ?? transportSpeed,
             useLoopBounds ? arrangement.view.loopStart! : undefined,
             useLoopBounds ? arrangement.view.loopEnd! : undefined,
           );
@@ -340,7 +341,7 @@ export const usePatternPlayback = () => {
           songLength: effectiveSongLength,
           restartPosition: 0,
           numChannels: effectiveNumChannels,
-          initialSpeed: modData?.initialSpeed ?? 6,
+          initialSpeed: modData?.initialSpeed ?? transportSpeed,
           initialBPM: modData?.initialBPM ?? bpmRef.current,
           // Period frequency mode (set by XM, IT, FTM, XTracker, etc. parsers)
           linearPeriods,
