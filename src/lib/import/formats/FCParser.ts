@@ -59,11 +59,11 @@ function s8(v: number): number {
 function fcPeriodIdxToXM(periodIdx: number): number {
   const idx = periodIdx & 0x7F;
   const period = idx < FC_PERIODS.length ? FC_PERIODS[idx] : 113;
-  // Convert Amiga period → XM note: note = 12 * log2(1712/period) + 1
-  // FC index 0 (period 1712) → C-0 (note 1), index 12 (856) → C-1 (note 13),
-  // index 24 (428) → C-2 (note 25), index 36 (214) → C-3 (note 37)
+  // Convert Amiga period → XM note: note = 12 * log2(3424/period) + 1
+  // FC index 0 (period 1712) → C-1 (note 13), index 12 (856) → C-2 (note 25),
+  // index 24 (428) → C-3 (note 37), index 36 (214) → C-4 (note 49)
   const p = Math.max(113, Math.min(3424, period));
-  const note = Math.round(12 * Math.log2(1712 / p)) + 1;
+  const note = Math.round(12 * Math.log2(3424 / p)) + 1;
   return Math.max(1, Math.min(96, note));
 }
 
