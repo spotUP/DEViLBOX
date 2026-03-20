@@ -57,6 +57,8 @@ export class VLM5030Synth extends MAMEBaseSynth {
   protected readonly processorName = 'vlm5030-processor';
 
   private _speechSequencer: SpeechSequencer<SP0250Frame> | null = null;
+  private _phonemeSpeechActive = false;
+  private _phonemeSpeechTimer: ReturnType<typeof setTimeout> | null = null;
 
   private _mode: 0 | 1 = 1;
   private _singMode = true;
@@ -227,7 +229,23 @@ export class VLM5030Synth extends MAMEBaseSynth {
     this._startSpeechAtNote(text, 60, 0.8);
   }
 
-  private _startSpeechAtNote(text: string, note: number, velocity: number): void {
+  /**
+   * VLM5030 LPC frame indices for each vowel preset.
+   * [energyIdx, pitchIdx, k0..k9] — indices into VLM5030 coefficient tables.
+   * Voiced vowels get pitch; unvoiced get pitch=0.
+   */
+  private static readonly VOWEL_FRAMES: Record<number, number[]> = {
+    0: [22, 14, 44, 5, 4, 2, 1, 0, 0, 0, 0, 0],  // AH
+    1: [20, 12, 36, 14, 6, 4, 2, 1, 0, 0, 0, 0],  // EE
+    2: [20, 13, 40, 10, 5, 3, 2, 1, 0, 0, 0, 0],  // IH
+    3: [22, 15, 48, 24, 3, 2, 1, 0, 0, 0, 0, 0],  // OH
+    4: [20, 17, 52, 26, 2, 1, 0, 0, 0, 0, 0, 0],  // OO
+    5: [18, 14, 42, 8, 10, 6, 3, 2, 1, 0, 0, 0],  // NN
+    6: [14,  0, 48, 4, 2, 1, 4, 3, 2, 1, 0, 0],   // SS (unvoiced)
+    7: [12,  0, 50, 3, 1, 0, 0, 0, 0, 0, 0, 0],   // HH (unvoiced)
+  };
+
+  private _startSpeechAtNote(text: string, _note: number, _velocity: number): void {
     if (!this._isReady || !this.workletNode || this._disposed) return;
 
     this.stopSpeaking();
@@ -239,47 +257,60 @@ export class VLM5030Synth extends MAMEBaseSynth {
     const frames = phonemesToSP0250Frames(tokens);
     if (frames.length === 0) return;
 
-    const speechFrames: SpeechFrame<SP0250Frame>[] = frames
-      .filter(f => f.voiced)
-      .map(f => ({ data: f, durationMs: f.durationMs }));
-    if (speechFrames.length === 0) return;
-
-    const first = speechFrames[0].data;
-    this.setVowel(first.preset);
-    this.setVoiced(first.voiced);
-    this.setBrightness(first.brightness);
-
-    this.workletNode.port.postMessage({
-      type: 'noteOn',
-      note,
-      velocity: Math.floor(velocity * 127),
-    });
-
-    this._speechSequencer = new SpeechSequencer<SP0250Frame>(
-      (frame) => {
-        this.setVowel(frame.preset);
-        this.setVoiced(frame.voiced);
-        this.setBrightness(frame.brightness);
-      },
-      () => {
-        this._speechSequencer = null;
-        this.triggerRelease();
+    // Pack into VLM5030 LPC frame buffer (12 bytes per frame, ~25ms each)
+    const frameList: number[][] = [];
+    for (const f of frames) {
+      const vowelFrame = VLM5030Synth.VOWEL_FRAMES[f.preset] ?? VLM5030Synth.VOWEL_FRAMES[0];
+      const count = Math.max(1, Math.round(f.durationMs / 25));
+      for (let i = 0; i < count; i++) {
+        frameList.push(vowelFrame);
       }
+    }
+    // Add silence frame at end
+    frameList.push([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+
+    const numFrames = frameList.length;
+    const data = new Uint8Array(numFrames * 12);
+    for (let i = 0; i < numFrames; i++) {
+      const f = frameList[i];
+      for (let j = 0; j < 12; j++) {
+        data[i * 12 + j] = f[j];
+      }
+    }
+
+    // Send to WASM and play
+    const buffer = data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength);
+    this.workletNode.port.postMessage(
+      { type: 'loadFrameBuffer', frameData: buffer, numFrames },
+      [buffer]
     );
-    this._speechSequencer.speak(speechFrames);
+    this.workletNode.port.postMessage({ type: 'speakFrameBuffer' });
+
+    this._phonemeSpeechActive = true;
+    const totalMs = numFrames * 25 + 100;
+    this._phonemeSpeechTimer = setTimeout(() => {
+      this._phonemeSpeechTimer = null;
+      this._phonemeSpeechActive = false;
+    }, totalMs);
   }
 
   stopSpeaking(): void {
-    const wasSpeaking = this._speechSequencer !== null;
     if (this._speechSequencer) {
       this._speechSequencer.stop();
       this._speechSequencer = null;
     }
-    if (wasSpeaking) this.triggerRelease();
+    this._phonemeSpeechActive = false;
+    if (this._phonemeSpeechTimer !== null) {
+      clearTimeout(this._phonemeSpeechTimer);
+      this._phonemeSpeechTimer = null;
+    }
+    if (this.workletNode && !this._disposed) {
+      this.workletNode.port.postMessage({ type: 'stopSpeaking' });
+    }
   }
 
   get isSpeaking(): boolean {
-    return this._speechSequencer?.isSpeaking ?? false;
+    return this._phonemeSpeechActive || (this._speechSequencer?.isSpeaking ?? false);
   }
 
   protected override processPendingCall(call: { method: string; args: unknown[] }): void {
@@ -339,6 +370,28 @@ export class VLM5030Synth extends MAMEBaseSynth {
     if (param === 'sing_mode') this._singMode = value >= 1;
     if (param === 'vowelLoopSingle') this._vowelLoopSingle = value >= 1;
     if (param === 'romWord') { this._currentRomWord = Math.round(value); this.speakWord(this._currentRomWord); }
+    if (param === 'romPhrase') this._playPhrase(Math.round(value));
+  }
+
+  /** Track & Field phrase sequences (word indices) */
+  private static readonly PHRASES: number[][] = [
+    [0, 1, 2],         // READY SET GO
+    [3, 4],            // 100 METER DASH
+    [18],              // NEW RECORD
+    [19],              // GAME OVER
+  ];
+
+  private _playPhrase(phraseIdx: number): void {
+    if (phraseIdx < 0 || phraseIdx >= VLM5030Synth.PHRASES.length) return;
+    const words = VLM5030Synth.PHRASES[phraseIdx];
+    let i = 0;
+    const playNext = () => {
+      if (i >= words.length) return;
+      this.speakWord(words[i]);
+      i++;
+      setTimeout(playNext, 600);
+    };
+    playNext();
   }
 
   setTextParam(key: string, value: string): void {
