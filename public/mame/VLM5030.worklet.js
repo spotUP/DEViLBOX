@@ -62,6 +62,7 @@ class VLM5030Processor extends AudioWorkletProcessor {
     this.bufferSize = 128;
     this.lastHeapBuffer = null;
     this.romPtr = 0;
+    this.frameBufferPtr = 0;
 
     this.port.onmessage = (event) => {
       this.handleMessage(event.data);
@@ -126,6 +127,12 @@ class VLM5030Processor extends AudioWorkletProcessor {
       case 'stopSpeaking':
         if (this.synth) this.synth.stopSpeaking();
         break;
+      case 'loadFrameBuffer':
+        this.loadFrameBuffer(data.frameData, data.numFrames);
+        break;
+      case 'speakFrameBuffer':
+        if (this.synth) this.synth.speakFrameBuffer();
+        break;
       case 'dispose':
         this.cleanup();
         break;
@@ -144,6 +151,18 @@ class VLM5030Processor extends AudioWorkletProcessor {
     this.synth.loadROM(this.romPtr, size);
     console.log(`[VLM5030 Worklet] ROM loaded: ${size} bytes at WASM ptr ${this.romPtr}`);
     this.port.postMessage({ type: 'romLoaded', size });
+  }
+
+  loadFrameBuffer(frameData, numFrames) {
+    if (!this.module || !this.synth) return;
+    if (this.frameBufferPtr) { this.module._free(this.frameBufferPtr); this.frameBufferPtr = 0; }
+    const size = numFrames * 12;
+    this.frameBufferPtr = this.module._malloc(size);
+    if (!this.frameBufferPtr) return;
+    const bytes = new Uint8Array(frameData);
+    const heapView = new Uint8Array(this.module.wasmMemory ? this.module.wasmMemory.buffer : this.module.HEAPU8.buffer);
+    heapView.set(bytes, this.frameBufferPtr);
+    this.synth.loadFrameBuffer(this.frameBufferPtr, numFrames);
   }
 
   async initSynth(data) {
@@ -182,6 +201,7 @@ class VLM5030Processor extends AudioWorkletProcessor {
   }
 
   cleanup() {
+    if (this.module && this.frameBufferPtr) { this.module._free(this.frameBufferPtr); this.frameBufferPtr = 0; }
     if (this.module && this.romPtr) { this.module._free(this.romPtr); this.romPtr = 0; }
     if (this.module && this.outputPtrL) {
       this.module._free(this.outputPtrL);

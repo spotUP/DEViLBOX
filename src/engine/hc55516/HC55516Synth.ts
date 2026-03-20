@@ -332,6 +332,31 @@ export class HC55516Synth extends MAMEBaseSynth {
     if (param === 'sing_mode') this._singMode = value >= 1;
     if (param === 'presetLoopSingle') this._presetLoopSingle = value >= 1;
     if (param === 'romWord') { this._currentRomWord = Math.round(value); this._playROMWord(this._currentRomWord); }
+    if (param === 'romPhrase') this._playPhrase(Math.round(value));
+  }
+
+  /** Sinistar phrase sequences (word indices into SINISTAR_WORDS) */
+  private static readonly PHRASES: number[][] = [
+    [1, 2, 3],   // I AM SINISTAR
+    [8, 1, 6],   // BEWARE I LIVE
+    [1, 7],      // I HUNGER
+    [8, 4],      // BEWARE COWARD
+    [5, 4],      // RUN COWARD
+    [5, 5, 5],   // RUN RUN RUN
+    [1, 7, 4],   // I HUNGER COWARD
+  ];
+
+  private _playPhrase(phraseIdx: number): void {
+    if (phraseIdx < 0 || phraseIdx >= HC55516Synth.PHRASES.length) return;
+    const words = HC55516Synth.PHRASES[phraseIdx];
+    let i = 0;
+    const playNext = () => {
+      if (i >= words.length) return;
+      this._playROMWord(words[i]);
+      i++;
+      setTimeout(playNext, 800);
+    };
+    playNext();
   }
 
   /** Sinistar CVSD word table: [byteOffset, byteLength] in concatenated IC7+IC5+IC6+IC4 */
