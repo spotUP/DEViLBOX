@@ -696,23 +696,27 @@ async function loadSongFile(file: File, options: FileLoadOptions): Promise<FileL
       console.log('[SunVox] engine ready');
 
       // Phase 2: extraction — timed separately from init.
+      // The extraction handle is DONATED to the shared song handle instead of
+      // being destroyed, avoiding the create/destroy/create cycle which corrupts
+      // WASM internal state for some songs.
       const doExtract = async () => {
         const sampleRate = getDevilboxAudioContext().sampleRate;
-        const tempHandle = await svEngine.createHandle(sampleRate);
-        console.log('[SunVox] temp handle', tempHandle, '— loading song…');
+        const extractHandle = await svEngine.createHandle(sampleRate);
+        console.log('[SunVox] extract handle', extractHandle, '— loading song…');
+        let extractOk = false;
         try {
           // loadSong internally slices the buffer before transfer — preReadBuffer stays intact.
-          preSunVoxMeta = await svEngine.loadSong(tempHandle, preReadBuffer!);
+          preSunVoxMeta = await svEngine.loadSong(extractHandle, preReadBuffer!);
           console.log('[SunVox] song loaded — fetching module list and patterns…');
           const [modules, patterns] = await Promise.all([
-            svEngine.getModules(tempHandle),
-            svEngine.getPatterns(tempHandle),
+            svEngine.getModules(extractHandle),
+            svEngine.getPatterns(extractHandle),
           ]);
           preSunVoxPatterns = patterns;
           // getModuleGraph can be slow for complex songs — timeout separately
           try {
             preSunVoxGraph = await Promise.race([
-              svEngine.getModuleGraph(tempHandle),
+              svEngine.getModuleGraph(extractHandle),
               new Promise<never>((_, reject) => setTimeout(() => reject(new Error('getModuleGraph timed out')), 5000)),
             ]);
           } catch (graphErr) {
@@ -732,8 +736,17 @@ async function loadSongFile(file: File, options: FileLoadOptions): Promise<FileL
               synthData: new ArrayBuffer(0), // unused — audio from song-mode synth
             }));
           }
+          extractOk = true;
         } finally {
-          svEngine.destroyHandle(tempHandle);
+          if (extractOk) {
+            // Donate the handle — _loadSongShared will reuse it instead of
+            // creating a new one (avoids WASM state corruption on handle reuse).
+            const { donatePreloadedHandle } = await import('@/engine/sunvox-modular/SunVoxModularSynth');
+            donatePreloadedHandle(extractHandle);
+            console.log('[SunVox] donated handle', extractHandle, 'for shared playback');
+          } else {
+            svEngine.destroyHandle(extractHandle);
+          }
         }
       };
 
