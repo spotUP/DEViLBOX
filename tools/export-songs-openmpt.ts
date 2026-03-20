@@ -902,6 +902,7 @@ function exportToXM(song: TrackerSong): ArrayBuffer {
   interface XMInstrumentData {
     name: string;
     samples: XMSampleData[];
+    metadata?: Record<string, unknown>;
   }
 
   const xmInstruments: XMInstrumentData[] = [];
@@ -982,6 +983,7 @@ function exportToXM(song: TrackerSong): ArrayBuffer {
     xmInstruments.push({
       name: (inst.name || '').slice(0, 22),
       samples: xmSamples,
+      metadata: inst.metadata,
     });
   }
 
@@ -1141,9 +1143,19 @@ function exportToXM(song: TrackerSong): ArrayBuffer {
       pos += 96;
 
       // Volume envelope points (48 bytes — 12 points × 4 bytes)
-      // Default: 2 points, full volume
-      dv.setUint16(pos, 0, true); dv.setUint16(pos + 2, 64, true);     // point 0: tick 0, vol 64
-      dv.setUint16(pos + 4, 1, true); dv.setUint16(pos + 6, 64, true); // point 1: tick 1, vol 64
+      const volEnv = (xinst.metadata as Record<string, unknown>)?.originalEnvelope as { enabled?: boolean; points?: Array<{tick: number; value: number}>; sustainPoint?: number | null; loopStartPoint?: number | null; loopEndPoint?: number | null } | undefined;
+      const volEnvPoints = volEnv?.enabled ? volEnv.points.slice(0, 12) : [];
+      if (volEnvPoints.length >= 2) {
+        for (let ep = 0; ep < 12; ep++) {
+          const pt = volEnvPoints[ep];
+          dv.setUint16(pos + ep * 4, pt?.tick ?? 0, true);
+          dv.setUint16(pos + ep * 4 + 2, pt?.value ?? 0, true);
+        }
+      } else {
+        // Default: 2 points, full volume
+        dv.setUint16(pos, 0, true); dv.setUint16(pos + 2, 64, true);
+        dv.setUint16(pos + 4, 1, true); dv.setUint16(pos + 6, 64, true);
+      }
       pos += 48;
 
       // Panning envelope points (48 bytes)
@@ -1152,20 +1164,20 @@ function exportToXM(song: TrackerSong): ArrayBuffer {
       pos += 48;
 
       // Number of volume points
-      out[pos] = 2;
+      out[pos] = volEnvPoints.length >= 2 ? volEnvPoints.length : 2;
       pos += 1;
       // Number of panning points
       out[pos] = 2;
       pos += 1;
 
       // Vol sustain point
-      out[pos] = 0;
+      out[pos] = volEnv?.sustainPoint ?? 0;
       pos += 1;
       // Vol loop start
-      out[pos] = 0;
+      out[pos] = volEnv?.loopStartPoint ?? 0;
       pos += 1;
       // Vol loop end
-      out[pos] = 0;
+      out[pos] = volEnv?.loopEndPoint ?? 0;
       pos += 1;
 
       // Pan sustain point
@@ -1178,8 +1190,15 @@ function exportToXM(song: TrackerSong): ArrayBuffer {
       out[pos] = 0;
       pos += 1;
 
-      // Volume type (0 = off)
-      out[pos] = 0;
+      // Volume type flags: bit 0=on, bit 1=sustain, bit 2=loop
+      let volType = 0;
+      if (volEnv?.enabled && volEnvPoints.length >= 2) {
+        volType |= 0x01; // ON
+        if (volEnv.sustainPoint !== null && volEnv.sustainPoint !== undefined) volType |= 0x02; // SUSTAIN
+        if (volEnv.loopStartPoint !== null && volEnv.loopStartPoint !== undefined &&
+            volEnv.loopEndPoint !== null && volEnv.loopEndPoint !== undefined) volType |= 0x04; // LOOP
+      }
+      out[pos] = volType;
       pos += 1;
       // Panning type (0 = off)
       out[pos] = 0;
@@ -1314,8 +1333,8 @@ const TEST_CASES: TestCase[] = [
   { file: 'formats/bounty hunter - outro (remixed).mmd3', format: 'MED', parserModule: 'MEDParser', parseFn: 'parseMEDFile', isAsync: false, noteExportOffset: 36 },
 
   // === Amiga Synth Formats (→ MOD) ===
-  { file: 'formats/anthrox.fc', format: 'FC', parserModule: 'FCParser', parseFn: 'parseFCFile', isAsync: false, noteExportOffset: 36 },
-  { file: 'formats/adept.smod', format: 'FC', parserModule: 'FCParser', parseFn: 'parseFCFile', isAsync: false, noteExportOffset: 36 },
+  { file: 'formats/anthrox.fc', format: 'FC', parserModule: 'FCParser', parseFn: 'parseFCFile', isAsync: false, exportAs: 'xm', xmRelNoteOffset: -12 },
+  { file: 'formats/adept.smod', format: 'FC', parserModule: 'FCParser', parseFn: 'parseFCFile', isAsync: false, exportAs: 'xm', xmRelNoteOffset: -12 },
   { file: 'formats/antidust.bp3', format: 'SMON', parserModule: 'SoundMonParser', parseFn: 'parseSoundMonFile', isAsync: true, noteExportOffset: 36 },
   { file: 'formats/aquarivs.bp', format: 'SMON', parserModule: 'SoundMonParser', parseFn: 'parseSoundMonFile', isAsync: true, noteExportOffset: 36 },
   { file: 'formats/45.okta', format: 'OKT', parserModule: 'OktalyzerParser', parseFn: 'parseOktalyzerFile', isAsync: false, noteExportOffset: 36, xmNoteExportOffset: 24 },
@@ -1409,9 +1428,6 @@ async function processTestCase(tc: TestCase): Promise<{ ok: boolean; outPath?: s
       song.initialSpeed = tc.speed;
     }
 
-    // Bake synth instruments (unified pre-renderer with tick simulation)
-    bakeSynthInstruments(song);
-
     // Decide export format
     let exportFormat: 'mod' | 'xm';
     if (tc.exportAs) {
@@ -1421,6 +1437,9 @@ async function processTestCase(tc: TestCase): Promise<{ ok: boolean; outPath?: s
     } else {
       exportFormat = 'mod';
     }
+
+    // Bake synth instruments (pass export format for XM envelope support)
+    bakeSynthInstruments(song, exportFormat);
 
     // Export
     let exportBuf: ArrayBuffer;
