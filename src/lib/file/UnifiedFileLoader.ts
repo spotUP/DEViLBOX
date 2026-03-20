@@ -1035,61 +1035,88 @@ async function loadSongFile(file: File, options: FileLoadOptions): Promise<FileL
 
       let patternsToLoad;
       if (svPatterns && svPatterns.length > 0) {
-        // Group SunVox patterns by x position — patterns at the same x play simultaneously
-        // and should be merged into one multi-channel tracker pattern.
-        const xGroups = new Map<number, typeof svPatterns>();
+        // ── SunVox timeline linearization ──
+        // SunVox patterns are placed on a 2D timeline at (x, y). At any time position,
+        // ALL patterns whose range [x, x+lines) covers that position play simultaneously.
+        // We linearize this into sequential tracker patterns by finding "change points"
+        // where the set of active patterns changes.
+
+        // Collect all change points (where any pattern starts or ends)
+        const changePoints = new Set<number>();
         for (const p of svPatterns) {
-          const group = xGroups.get(p.x) ?? [];
-          group.push(p);
-          xGroups.set(p.x, group);
+          changePoints.add(p.x);
+          changePoints.add(p.x + p.lines);
         }
-        const sortedXs = [...xGroups.keys()].sort((a, b) => a - b);
+        const sortedPoints = [...changePoints].sort((a, b) => a - b);
 
-        // Helper: build a channel from a SunVox pattern track
-        const buildChannel = (svPat: SunVoxPatternData, t: number, patIdx: number, chIdx: number, maxLines: number) => {
-          const modCounts = new Map<number, number>();
-          for (let l = 0; l < svPat.lines; l++) {
-            const ev = svPat.notes[t]?.[l];
-            if (ev && ev.module >= 1) modCounts.set(ev.module, (modCounts.get(ev.module) ?? 0) + 1);
-          }
-          let dominantMod = -1, maxCnt = 0;
-          for (const [id, cnt] of modCounts) { if (cnt > maxCnt) { maxCnt = cnt; dominantMod = id; } }
-          const chName = dominantMod >= 0 ? (moduleNameMap.get(dominantMod) ?? `Track ${chIdx + 1}`) : `Track ${chIdx + 1}`;
-          const instrId = dominantMod >= 0 ? (svModToInstrIdx.get(dominantMod) ?? 1) : 1;
-
-          const rows = Array.from({ length: maxLines }, (_, l) => {
-            if (l >= svPat.lines) return { ...emptyRow };
-            const ev = svPat.notes[t]?.[l];
-            if (!ev || (ev.note === 0 && ev.vel === 0 && ev.module < 0 && ev.ctl === 0)) return { ...emptyRow };
-            const volume = ev.vel === 0 ? 0 : Math.max(1, Math.round(ev.vel * 64 / 129));
-            const evInstrId = ev.module >= 1 ? (svModToInstrIdx.get(ev.module) ?? instrId) : instrId;
-            // SunVox note 128 = NOTE_OFF → DEViLBOX note 97
-            // SunVox notes 129-140 are special commands (ALL_NOTES_OFF, CLEAN_SYNTHS, etc.)
-            const note = ev.note === 128 ? 97 : (ev.note >= 129 ? 0 : ev.note);
-            // SunVox ctl = 0xCCEE: CC=controller+1, EE=effect code
-            // Map effect (EE) to primary column, controller (CC) to secondary
-            const ee = ev.ctl & 0xFF;            // effect code
-            const cc = (ev.ctl >> 8) & 0xFF;     // controller number + 1
-            return { note, instrument: evInstrId, volume, effTyp: ee, eff: ee > 0 ? ev.ctlVal : 0, effTyp2: cc, eff2: cc > 0 ? ev.ctlVal : 0 };
-          });
-          return { id: `ch-svox-${Date.now()}-${patIdx}-${chIdx}`, name: chName, muted: false, solo: false, collapsed: false, volume: 100, pan: 0, instrumentId: instrId, color: channelColors[chIdx % channelColors.length], rows };
+        // Helper: convert a SunVox event to a tracker row
+        const eventToRow = (ev: { note: number; vel: number; module: number; ctl: number; ctlVal: number } | undefined, fallbackInstrId: number) => {
+          if (!ev || (ev.note === 0 && ev.vel === 0 && ev.module < 0 && ev.ctl === 0)) return { ...emptyRow };
+          const volume = ev.vel === 0 ? 0 : Math.max(1, Math.round(ev.vel * 64 / 129));
+          const evInstrId = ev.module >= 1 ? (svModToInstrIdx.get(ev.module) ?? fallbackInstrId) : fallbackInstrId;
+          const note = ev.note === 128 ? 97 : (ev.note >= 129 ? 0 : ev.note);
+          const ee = ev.ctl & 0xFF;
+          const cc = (ev.ctl >> 8) & 0xFF;
+          return { note, instrument: evInstrId, volume, effTyp: ee, eff: ee > 0 ? ev.ctlVal : 0, effTyp2: cc, eff2: cc > 0 ? ev.ctlVal : 0 };
         };
 
-        patternsToLoad = sortedXs.map((x, patIdx) => {
-          const group = xGroups.get(x)!;
-          // Max lines across all patterns in this group
-          const maxLines = Math.max(...group.map(p => p.lines));
-          // Merge all tracks from all patterns into one channel list
-          const channels: ReturnType<typeof buildChannel>[] = [];
-          for (const svPat of group) {
+        // Build tracker patterns for each timeline segment
+        patternsToLoad = [];
+        for (let s = 0; s < sortedPoints.length - 1; s++) {
+          const segStart = sortedPoints[s];
+          const segEnd = sortedPoints[s + 1];
+          const segLen = segEnd - segStart;
+          if (segLen <= 0) continue;
+
+          // Find all active patterns during this segment
+          const active = svPatterns.filter(p => p.x < segEnd && p.x + p.lines > segStart);
+          if (active.length === 0) continue;
+
+          // Build channels from all active pattern tracks
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const channels: any[] = [];
+          for (const svPat of active) {
+            const patOffset = segStart - svPat.x; // where we are within this pattern
+
             for (let t = 0; t < svPat.tracks; t++) {
-              channels.push(buildChannel(svPat, t, patIdx, channels.length, maxLines));
+              // Find dominant module for channel naming
+              const modCounts = new Map<number, number>();
+              for (let l = 0; l < svPat.lines; l++) {
+                const ev = svPat.notes[t]?.[l];
+                if (ev && ev.module >= 1) modCounts.set(ev.module, (modCounts.get(ev.module) ?? 0) + 1);
+              }
+              let dominantMod = -1, maxCnt = 0;
+              for (const [id, cnt] of modCounts) { if (cnt > maxCnt) { maxCnt = cnt; dominantMod = id; } }
+              const chName = dominantMod >= 0 ? (moduleNameMap.get(dominantMod) ?? `Track ${channels.length + 1}`) : `Track ${channels.length + 1}`;
+              const instrId = dominantMod >= 0 ? (svModToInstrIdx.get(dominantMod) ?? 1) : 1;
+
+              const rows = Array.from({ length: segLen }, (_, l) => {
+                const patLine = patOffset + l;
+                if (patLine < 0 || patLine >= svPat.lines) return { ...emptyRow };
+                return eventToRow(svPat.notes[t]?.[patLine], instrId);
+              });
+              channels.push({
+                id: `ch-svox-${Date.now()}-${s}-${channels.length}`,
+                name: chName, muted: false, solo: false, collapsed: false,
+                volume: 100, pan: 0, instrumentId: instrId,
+                color: channelColors[channels.length % channelColors.length], rows,
+              });
             }
           }
-          // Use first pattern's name if available, otherwise generate one
-          const patName = group[0].patName || `Pattern ${patIdx + 1}`;
-          return { id: `svpat-${Date.now()}-${patIdx}`, name: patName, length: maxLines, channels };
-        });
+
+          if (channels.length > 0) {
+            // Name from first active pattern, or segment position
+            const patName = active[0].patName || `Seg ${segStart}`;
+            patternsToLoad.push({
+              id: `svpat-${Date.now()}-${s}`,
+              name: patName,
+              length: segLen,
+              channels,
+            });
+          }
+        }
+        console.log('[SunVox] linearized timeline:', patternsToLoad.length, 'segments from', svPatterns.length, 'patterns',
+          'channels:', patternsToLoad.slice(0, 5).map(p => `${p.name}:${p.channels.length}ch/${p.length}l`));
       } else {
         // Fallback: single pattern with one channel per generator
         const now = Date.now();
