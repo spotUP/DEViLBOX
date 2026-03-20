@@ -1,7 +1,0 @@
-{
-	"InstallScripts" : 
-	[
-		"/Users/spot/Code/DEViLBOX/mame-wasm/votrax/build/cmake_install.cmake"
-	],
-	"Parallel" : false
-}
