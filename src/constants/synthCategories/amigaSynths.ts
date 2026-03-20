@@ -91,6 +91,15 @@ export const amigaSynthEntries: Record<string, SynthInfo> = {
     icon: 'Disc',
     color: 'text-amber-500',
   },
+  SteveTurnerSynth: {
+    type: 'SteveTurnerSynth',
+    name: 'Steve Turner',
+    shortName: 'SteveTurner',
+    description: 'Steve Turner Amiga PCM synthesis with multi-phase envelope, vibrato table and pitch slide',
+    bestFor: ['Amiga game music', 'Off Road Racer', 'Steve Turner'],
+    icon: 'Disc',
+    color: 'text-green-500',
+  },
   SidMon1Synth: {
     type: 'SidMon1Synth',
     name: 'SidMon 1.0',

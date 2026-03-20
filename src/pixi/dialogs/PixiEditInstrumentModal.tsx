@@ -1137,7 +1137,7 @@ const NATIVE_WASM_SYNTH_TYPES = new Set([
   'InStereo2Synth', 'InStereo1Synth',
   'SoundMonSynth', 'SidMonSynth', 'DigMugSynth', 'FCSynth', 'FredSynth',
   'TFMXSynth', 'OctaMEDSynth', 'SidMon1Synth', 'HippelCoSoSynth',
-  'RobHubbardSynth', 'DavidWhittakerSynth', 'SunVoxSynth',
+  'RobHubbardSynth', 'SteveTurnerSynth', 'DavidWhittakerSynth', 'SunVoxSynth',
   'DeltaMusic1Synth', 'DeltaMusic2Synth', 'StartrekkerAMSynth',
 ]);
 
@@ -1147,7 +1147,7 @@ const SONG_ENGINE_SYNTH_TYPES = new Set([
   'InStereo2Synth', 'InStereo1Synth',
   'SoundMonSynth', 'SidMonSynth', 'DigMugSynth', 'FCSynth', 'FredSynth',
   'TFMXSynth', 'OctaMEDSynth', 'SidMon1Synth', 'HippelCoSoSynth',
-  'RobHubbardSynth', 'DavidWhittakerSynth', 'JamCrackerSynth',
+  'RobHubbardSynth', 'SteveTurnerSynth', 'DavidWhittakerSynth', 'JamCrackerSynth',
   'FuturePlayerSynth', 'DeltaMusic1Synth', 'DeltaMusic2Synth', 'StartrekkerAMSynth',
 ]);
 

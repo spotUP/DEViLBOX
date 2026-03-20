@@ -241,6 +241,7 @@ export const SYNTH_CATEGORIES: SynthCategory[] = [
       SYNTH_INFO.HivelySynth,
       SYNTH_INFO.HippelCoSoSynth,
       SYNTH_INFO.RobHubbardSynth,
+      SYNTH_INFO.SteveTurnerSynth,
       SYNTH_INFO.DavidWhittakerSynth,
       SYNTH_INFO.UADESynth,
       SYNTH_INFO.SoundMonSynth,

@@ -287,6 +287,8 @@ export interface TrackerSong {
   sc68FileData?: ArrayBuffer;
   /** Raw PumaTracker .puma binary for loading into the PumaTrackerEngine WASM */
   pumaTrackerFileData?: ArrayBuffer;
+  /** Raw Steve Turner binary for loading into the SteveTurnerEngine WASM */
+  steveTurnerFileData?: ArrayBuffer;
   /** Raw Art of Noise (.aon) binary for ArtOfNoiseEngine WASM playback */
   artOfNoiseFileData?: ArrayBuffer;
   /** Raw Ben Daglish (.bd) binary for BdEngine WASM playback */
