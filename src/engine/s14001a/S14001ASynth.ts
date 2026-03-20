@@ -81,15 +81,19 @@ export class S14001ASynth extends MAMEBaseSynth {
   }
 
   protected async initialize(): Promise<void> {
+    let romData: Uint8Array | null = null;
     try {
-      const romData = await loadS14001AROMs();
-      await super.initialize();
+      romData = await loadS14001AROMs();
+      console.log(`[S14001A] ROM fetched: ${romData.length} bytes`);
+    } catch (e) {
+      console.log('[S14001A] Speech ROMs not found (optional):', e);
+    }
+
+    await super.initialize();
+
+    if (romData) {
       this.loadROM(0, romData);
-      this.romLoaded = true;
-      console.log(`[S14001A] ROM auto-loaded: ${romData.length} bytes`);
-    } catch {
-      console.log('[S14001A] Speech ROMs not found (optional)');
-      await super.initialize();
+      console.log(`[S14001A] ROM sent to WASM, romLoaded=${this.romLoaded}, _isReady=${this._isReady}`);
     }
   }
 
