@@ -788,6 +788,24 @@ function applyVersionCompatFlags(version: number, systems: number[], chipFlags: 
         }
       }
     }
+
+    // OPL4 default mix levels (fur.cpp:2403-2413)
+    if (version < 242) {
+      if (sys === 72 || // OPL4
+          sys === 73) { // OPL4_DRUMS
+        setFlag(i, 'fmMixL', 7);
+        setFlag(i, 'fmMixR', 7);
+        setFlag(i, 'pcmMixL', 7);
+        setFlag(i, 'pcmMixR', 7);
+      }
+    }
+
+    // Namco 163 no wave pos latch (fur.cpp:2415-2422)
+    if (version < 244) {
+      if (sys === 31) { // N163
+        setFlag(i, 'posLatch', false);
+      }
+    }
   }
 }
 
@@ -1201,6 +1219,65 @@ export async function parseFurnaceSong(buffer: ArrayBuffer): Promise<FurnaceModu
   };
 
   if (version >= 240) {
+    // New format (INF2) — set DivCompatFlags defaults (song.cpp:1111-1161)
+    // CFLG block overrides these if present; if absent, defaults are correct
+    module.compatFlags = {
+      limitSlides: false,
+      linearPitch: 1,
+      pitchSlideSpeed: 4,
+      loopModality: 2,
+      delayBehavior: 2,
+      jumpTreatment: 0,
+      properNoiseLayout: true,
+      waveDutyIsVol: false,
+      resetMacroOnPorta: false,
+      legacyVolumeSlides: false,
+      compatibleArpeggio: false,
+      noteOffResetsSlides: true,
+      targetResetsSlides: true,
+      arpNonPorta: false,
+      algMacroBehavior: false,
+      brokenShortcutSlides: false,
+      ignoreDuplicateSlides: false,
+      stopPortaOnNoteOff: false,
+      continuousVibrato: false,
+      brokenDACMode: false,
+      oneTickCut: false,
+      newInsTriggersInPorta: true,
+      arp0Reset: true,
+      brokenSpeedSel: false,
+      noSlidesOnFirstTick: false,
+      rowResetsArpPos: false,
+      ignoreJumpAtEnd: false,
+      buggyPortaAfterSlide: false,
+      gbInsAffectsEnvelope: true,
+      sharedExtStat: true,
+      ignoreDACModeOutsideChannel: false,
+      e1e2AlsoTakePriority: false,
+      newSegaPCM: true,
+      fbPortaPause: false,
+      snDutyReset: false,
+      pitchMacroIsLinear: true,
+      oldOctaveBoundary: false,
+      noOPN2Vol: false,
+      newVolumeScaling: true,
+      volMacroLinger: true,
+      brokenOutVol: false,
+      brokenOutVol2: false,
+      e1e2StopOnSameNote: false,
+      brokenPortaArp: false,
+      snNoLowPeriods: false,
+      disableSampleMacro: false,
+      oldArpStrategy: false,
+      brokenPortaLegato: false,
+      brokenFMOff: false,
+      preNoteNoEffect: false,
+      oldDPCM: false,
+      resetArpPhaseOnNewNote: false,
+      ceilVolumeScaling: false,
+      oldAlwaysSetVolume: false,
+      oldSampleOffset: false,
+    };
     // New format (INF2)
     await parseNewFormat(reader, module, version);
   } else {
@@ -1346,8 +1423,12 @@ async function parseNewFormat(
         break;
       }
       case DIV_ELEMENT_COMPAT_FLAGS: {
-        reader.readUint32(); // Should be 1
-        reader.readUint32(); // Pointer (skip)
+        reader.readUint32(); // count (always 1)
+        const cfPtr = reader.readUint32();
+        if (cfPtr > 0) {
+          // Store pointer — we'll parse the CFLG block after the element table
+          (module as any)._compatFlagPtr = cfPtr;
+        }
         break;
       }
       case DIV_ELEMENT_COMMENTS: {
@@ -1402,6 +1483,36 @@ async function parseNewFormat(
       }
     }
   }
+
+  // Parse CFLG (compat flags) block — INF2 format stores compat flags as key=value string
+  // Upstream: song.cpp DivCompatFlags::readData reads "CFLG" + size + key=value string
+  const compatFlagPtr = (module as any)._compatFlagPtr as number | undefined;
+  if (compatFlagPtr && compatFlagPtr > 0) {
+    reader.seek(compatFlagPtr);
+    const cflgMagic = reader.readMagic(4);
+    if (cflgMagic === 'CFLG') {
+      reader.readUint32(); // block size
+      const flagStr = readString(reader);
+      // Parse key=value pairs into compatFlags
+      const compatFlags: Record<string, unknown> = {};
+      for (const line of flagStr.split('\n')) {
+        const eq = line.indexOf('=');
+        if (eq < 0) continue;
+        const key = line.substring(0, eq).trim();
+        const val = line.substring(eq + 1).trim();
+        if (val === 'true') compatFlags[key] = true;
+        else if (val === 'false') compatFlags[key] = false;
+        else {
+          const num = Number(val);
+          compatFlags[key] = isNaN(num) ? val : num;
+        }
+      }
+      // Merge CFLG values into defaults (don't replace — CFLG only stores non-default values)
+      Object.assign(module.compatFlags, compatFlags);
+      console.log(`[FurnaceSongParser] Parsed CFLG block: ${Object.keys(compatFlags).length} overrides merged into defaults`);
+    }
+  }
+  delete (module as any)._compatFlagPtr;
 
   // Apply version-specific compat flags (fur.cpp:2150-2400)
   if (module.chipFlags && module.chipFlags.length > 0) {
@@ -2841,6 +2952,34 @@ export function buildFurnaceNativeData(module: FurnaceModule): FurnaceNativeData
       });
     }
 
+    // YM2151 E5xx range scaling (fur.cpp:2372-2401)
+    // For files before version 236, E5xx effect values need range adaptation
+    if (module.version < 236) {
+      const sysEnums = module.systems.slice(0, module.systemLen).map(id => FILE_ID_TO_ENUM[id] ?? id);
+      let chOff = 0;
+      for (let si = 0; si < module.systemLen; si++) {
+        const chipChans = module.systemChans?.[si] || 0;
+        if (sysEnums[si] === 19) { // DIV_SYSTEM_YM2151
+          // Scale all E5xx effect values in YM2151 channels
+          for (let c = chOff; c < chOff + chipChans && c < channels.length; c++) {
+            for (const [, patData] of channels[c].patterns) {
+              for (const row of patData.rows) {
+                for (const fx of row.effects) {
+                  if (fx.cmd === 0xe5 && fx.val !== -1) {
+                    let newVal = (2 * ((fx.val & 0xff) - 0x80)) + 0x80;
+                    if (newVal < 0) newVal = 0;
+                    if (newVal > 0xff) newVal = 0xff;
+                    fx.val = newVal;
+                  }
+                }
+              }
+            }
+          }
+        }
+        chOff += chipChans;
+      }
+    }
+
     return {
       name: sub.name || `Subsong ${subIdx}`,
       patLen: sub.patLen,
@@ -2855,6 +2994,13 @@ export function buildFurnaceNativeData(module: FurnaceModule): FurnaceNativeData
       virtualTempoD: sub.virtualTempoD,
     };
   });
+
+  // Clamp linearPitch > 1 to 1 (fur.cpp:2424-2429)
+  // Partial pitch linearity (value 2) was removed from Furnace
+  const lp = module.compatFlags.linearPitch as number | undefined;
+  if (lp != null && lp > 1) {
+    module.compatFlags.linearPitch = 1;
+  }
 
   return {
     subsongs,
