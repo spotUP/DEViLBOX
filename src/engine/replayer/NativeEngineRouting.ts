@@ -330,6 +330,19 @@ const WASM_ENGINES: NativeEngineDescriptor[] = [
     dynamicResolver: async () => (await import('@/engine/pumatracker/PumaTrackerEngine')).PumaTrackerEngine as unknown as WASMSingletonStatic,
   },
   {
+    key: 'SteveTurner',
+    synthType: 'SteveTurnerSynth',
+    suppressNotes: true,
+    fileDataKey: 'steveTurnerFileData',
+    formats: null, // activate whenever steveTurnerFileData exists
+    loadMethod: 'loadTune',
+    supportsPause: false,
+    supportsResume: false,
+    needsDirectRouting: true,
+    staticRef: null,
+    dynamicResolver: async () => (await import('@/engine/steveturner/SteveTurnerEngine')).SteveTurnerEngine as unknown as WASMSingletonStatic,
+  },
+  {
     key: 'ArtOfNoise',
     synthType: 'ArtOfNoiseSynth',
     suppressNotes: true,
@@ -625,24 +638,31 @@ export async function startNativeEngines(
       }
     }
 
-    // SunVoxModular: start the sequencer (for audio processing) but DON'T suppress notes
-    // TrackerReplayer drives note events to individual instruments via noteTargetModuleId
+    // SunVoxModular: start the internal sequencer and suppress tracker note events.
+    // The SunVox WASM sequencer drives all module playback internally — tracker note
+    // events would conflict (noteOff from tracker silences notes started by sequencer).
     const svModularInsts = song.instruments.filter(
       i => i.synthType === 'SunVoxModular' && i.sunvox?.isSong === true,
     );
     if (svModularInsts.length > 0) {
-      // Start sequencer on first instance (all share the same WASM handle)
-      try {
-        const firstSynth = toneEngine.getInstrument(svModularInsts[0].id, svModularInsts[0]);
-        if (firstSynth && 'startSequencer' in firstSynth) {
-          (firstSynth as import('@/engine/sunvox-modular/SunVoxModularSynth').SunVoxModularSynth).startSequencer();
-          console.log('[NativeEngineRouting] SunVox modular sequencer started');
-        }
-      } catch { /* ignored */ }
+      suppressNotes = true;
       // Pre-create all instrument synths so audio graph is connected
       for (const inst of svModularInsts) {
         toneEngine.getInstrument(inst.id, inst);
       }
+      // Start sequencer on first instance (all share the same WASM handle)
+      // Wait up to 10s for the shared song handle to load before starting playback.
+      try {
+        const firstSynth = toneEngine.getInstrument(svModularInsts[0].id, svModularInsts[0]);
+        if (firstSynth && 'startSequencer' in firstSynth) {
+          const synth = firstSynth as import('@/engine/sunvox-modular/SunVoxModularSynth').SunVoxModularSynth;
+          await Promise.race([
+            synth.startSequencer(),
+            new Promise<void>(resolve => setTimeout(resolve, 10000)),
+          ]);
+          console.log('[NativeEngineRouting] SunVox modular sequencer started');
+        }
+      } catch { /* ignored */ }
     }
   }
 
