@@ -183,6 +183,7 @@ class SunVoxProcessor extends AudioWorkletProcessor {
         const h = data.handle;
         const patCount = m._sv_get_number_of_patterns(h);
         const patterns = [];
+        const seenDataPtrs = new Set(); // detect clone patterns (share same data pointer)
         for (let p = 0; p < patCount; p++) {
           const lines = m._sv_get_pattern_lines(h, p);
           if (lines <= 0) continue; // empty slot
@@ -192,6 +193,9 @@ class SunVoxProcessor extends AudioWorkletProcessor {
           // Get raw pattern data: 8 bytes per event (NN VV MM MM EE CC YY XX)
           const dataPtr = m._sv_get_pattern_data(h, p);
           if (!dataPtr) continue;
+          // Skip clone patterns (they share the same data pointer as the original)
+          if (seenDataPtrs.has(dataPtr)) continue;
+          seenDataPtrs.add(dataPtr);
           const notes = [];
           for (let t = 0; t < tracks; t++) {
             const col = [];
@@ -319,7 +323,7 @@ class SunVoxProcessor extends AudioWorkletProcessor {
 
       case 'play':
         if (m) {
-          m._sv_volume(data.handle, 128); // half volume to prevent clipping
+          m._sv_volume(data.handle, 256); // max volume (0-256)
           m._sv_play_from_beginning(data.handle);
           this._playReceived = true;
           this._debuggedNonZero = false;
