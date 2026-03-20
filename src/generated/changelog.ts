@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-03-20T10:26:18.832Z
+ * Generated: 2026-03-20T19:29:26.020Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.3113';
-export const BUILD_NUMBER = '3113';
-export const BUILD_HASH = '4afee6642';
+export const BUILD_VERSION = '1.0.3160';
+export const BUILD_NUMBER = '3160';
+export const BUILD_HASH = '61e72ed09';
 export const BUILD_DATE = '2026-03-20';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,193 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.3113',
+    version: '1.0.3160',
     date: '2026-03-20',
     changes: [
+      {
+        type: 'feature',
+        "description": "SP0250 frame buffer TTS + MEA8000 coarticulation"
+      },
+      {
+        type: 'fix',
+        "description": "Stop filtering out unvoiced consonants from TTS"
+      },
+      {
+        type: 'feature',
+        "description": "Add coarticulation transitions to TTS"
+      },
+      {
+        type: 'fix',
+        "description": "Remove unused imports and VOWEL_FRAMES"
+      },
+      {
+        type: 'feature',
+        "description": "Per-phoneme LPC coefficients for TTS"
+      },
+      {
+        type: 'feature',
+        "description": "Frame buffer TTS for VLM5030 + phrase builder for all"
+      },
+      {
+        type: 'fix',
+        "description": "Fix note=12 octave bug in old format patterns and CFLG merge"
+      },
+      {
+        type: 'fix',
+        "description": "Boost ROM speech output level (4x)"
+      },
+      {
+        type: 'fix',
+        "description": "Prevent infinite render loop from _updateRomStatus"
+      },
+      {
+        type: 'fix',
+        "description": "Guard worklet message handler against disposed synth"
+      },
+      {
+        type: 'fix',
+        "description": "Extract waveforms from sample data for DM1/DM2"
+      },
+      {
+        type: 'improvement',
+        "description": "Chore: update aces_high export and synth-prerender tool"
+      },
+      {
+        type: 'fix',
+        "description": "Remaining unstaged changes (loader, mixer, export tool)"
+      },
+      {
+        type: 'fix',
+        "description": "Decode data URL fallback for instruments without audioBuffer"
+      },
+      {
+        type: 'fix',
+        "description": "Add Steve Turner format to unified file loader"
+      },
+      {
+        type: 'fix',
+        "description": "Add Steve Turner engine to active gain engine routing"
+      },
+      {
+        type: 'fix',
+        "description": "Update instrument store _romsLoaded after auto-load"
+      },
+      {
+        type: 'improvement',
+        "description": "Chore: update MOD export files"
+      },
+      {
+        type: 'fix',
+        "description": "20ms envelope window and lock-step command comparator"
+      },
+      {
+        type: 'fix',
+        "description": "Worklet rendering improvements"
+      },
+      {
+        type: 'feature',
+        "description": "Add HC55516, S14001A, and VLM5030 WASM synths"
+      },
+      {
+        type: 'feature',
+        "description": "Add Steve Turner synth engine with WASM playback"
+      },
+      {
+        type: 'fix',
+        "description": "Fix DigMug/DM1/DM2 XM export issues"
+      },
+      {
+        type: 'fix',
+        "description": "Debug: add initialize() entry log to VLM5030"
+      },
+      {
+        type: 'improvement',
+        "description": "Chore: update generated files, WASM binaries, and format state"
+      },
+      {
+        type: 'fix',
+        "description": "Sequencer improvements and lock-step command debugging docs"
+      },
+      {
+        type: 'fix',
+        "description": "Reduce sv_volume from 256 to 128 to prevent clipping"
+      },
+      {
+        type: 'fix',
+        "description": "Set max volume on play, increase graph timeout, fix pattern count"
+      },
+      {
+        type: 'fix',
+        "description": "Fix ROM auto-load init flow to prevent double-init"
+      },
+      {
+        type: 'fix',
+        "description": "Don't skip synth instruments with existing samples for XM"
+      },
+      {
+        type: 'feature',
+        "description": "Upgrade to official SunVox Library v2.1.4d (699KB WASM)"
+      },
+      {
+        type: 'fix',
+        "description": "Match MAME init state for ROM playback"
+      },
+      {
+        type: 'fix',
+        "description": "Route load_file through libopenmpt when useLibopenmpt=true"
+      },
+      {
+        type: 'fix',
+        "description": "Add xmNoteExportOffset: 12 for correct octave in XM"
+      },
+      {
+        type: 'feature',
+        "description": "XM volume envelopes for all synth formats"
+      },
+      {
+        type: 'fix',
+        "description": "Improve song playback — donate handle, suppress notes, async start"
+      },
+      {
+        type: 'fix',
+        "description": "Use 2x sample rate for correct XM pitch mapping"
+      },
+      {
+        type: 'fix',
+        "description": "Revert to period base 3424 — frequency analysis confirms correct pitch"
+      },
+      {
+        type: 'fix',
+        "description": "Use period 1712 as base for note conversion (one octave down)"
+      },
+      {
+        type: 'fix',
+        "description": "Read frqTranspose as signed byte matching FlodJS"
+      },
+      {
+        type: 'fix',
+        "description": "1:1 MAME audit for S14001A and HC55516 ROM playback"
+      },
+      {
+        type: 'fix',
+        "description": "1:1 MAME ROM frame parser and excitation"
+      },
+      {
+        type: 'improvement',
+        "description": "Unify .sunvox import — remove separate dialog, load directly"
+      },
+      {
+        type: 'fix',
+        "description": "Convert period indices to notes via actual Amiga period lookup"
+      },
+      {
+        type: 'fix',
+        "description": "Use base notes and clear volume column for FC synth XM export"
+      },
+      {
+        type: 'fix',
+        "description": "Remove incorrect -12 relNote offset causing octave-low playback"
+      },
       {
         type: 'feature',
         "description": "XM export with volume envelopes for FC synth instruments"
@@ -50,194 +234,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'fix',
         "description": "Don't loop silence for one-shot instruments"
-      },
-      {
-        type: 'fix',
-        "description": "Auto-upgrade AHX to HVL when song has >4 channels"
-      },
-      {
-        type: 'fix',
-        "description": "Remove proprietary ROM files from git, add to gitignore"
-      },
-      {
-        type: 'feature',
-        "description": "Auto-load ROMs and add game word presets"
-      },
-      {
-        type: 'fix',
-        "description": "Yield to React render before async loading so progress bar shows"
-      },
-      {
-        type: 'fix',
-        "description": "Always show progress bar during loading, not just during init"
-      },
-      {
-        type: 'fix',
-        "description": "Preemptive reinit during import to eliminate playback delay"
-      },
-      {
-        type: 'fix',
-        "description": "Use actual vol macro byte processing instead of ADSR approximation"
-      },
-      {
-        type: 'fix',
-        "description": "Progress bar in both DOM and Pixi import dialogs with theme colors"
-      },
-      {
-        type: 'fix',
-        "description": "Use raw file data instead of chip RAM readback for MCP export"
-      },
-      {
-        type: 'fix',
-        "description": "Show init progress bar for all UADE formats including SunTronic"
-      },
-      {
-        type: 'feature',
-        "description": "Add ROM loading support for S14001A, VLM5030, HC55516"
-      },
-      {
-        type: 'fix',
-        "description": "Reconstruct song for hively/klystrack/jamcracker from stores"
-      },
-      {
-        type: 'fix',
-        "description": "Use chip RAM/raw file for classic formats, serializers only with full song"
-      },
-      {
-        type: 'feature',
-        "description": "Add init progress bar to import dialog"
-      },
-      {
-        type: 'fix',
-        "description": "Add jamcracker editorMode to format detection"
-      },
-      {
-        type: 'fix',
-        "description": "Fallback to raw file data when UADE engine isn't running"
-      },
-      {
-        type: 'fix',
-        "description": "Correct sample rate, phaseInc, BPM, and FC waveforms"
-      },
-      {
-        type: 'improvement',
-        "description": "Pre-compile WASM module for fast reinit (~50ms vs ~2.5s)"
-      },
-      {
-        type: 'fix',
-        "description": "Skip MOD export for UADE classic formats, use chip RAM readback"
-      },
-      {
-        type: 'fix',
-        "description": "Detect native format from uadeEditableFileName extension"
-      },
-      {
-        type: 'improvement',
-        "description": "Only reinit WASM after audio has been rendered, not after scans"
-      },
-      {
-        type: 'fix',
-        "description": "Always reinit WASM before every song load (not just on failure)"
-      },
-      {
-        type: 'fix',
-        "description": "Fix variable name errors in worklet reinit (wasmBuffer→wasmBinary, initWasm→_init)"
-      },
-      {
-        type: 'fix',
-        "description": "Reinit WASM module on second song load failure"
-      },
-      {
-        type: 'fix',
-        "description": "Save exported file server-side, not in browser"
-      },
-      {
-        type: 'fix',
-        "description": "Export_native reconstructs TrackerSong from stores when replayer is empty"
-      },
-      {
-        type: 'fix',
-        "description": "Full reinit of UADE state between song loads"
-      },
-      {
-        type: 'feature',
-        "description": "Add export_native tool for native format export via MCP"
-      },
-      {
-        type: 'fix',
-        "description": "Init uninitialized bools in POKEY and C140 constructors"
-      },
-      {
-        type: 'fix',
-        "description": "Skip UADE pre-scan for .sun/.tsm files entirely"
-      },
-      {
-        type: 'fix',
-        "description": "Use original filename for UADE auto-detection instead of tsm. prefix"
-      },
-      {
-        type: 'fix',
-        "description": "Use tsm. prefix for UADE pre-scan in import dialog"
-      },
-      {
-        type: 'fix',
-        "description": "Skip enhanced UADE scan for TSM format"
-      },
-      {
-        type: 'fix',
-        "description": "Use tsm. prefix (not sun.) for UADE eagleplayer lookup"
-      },
-      {
-        type: 'fix',
-        "description": "Use UADE classic streaming for TSM playback"
-      },
-      {
-        type: 'feature',
-        "description": "Add 8 more native format exporters and wire routing"
-      },
-      {
-        type: 'fix',
-        "description": "Route .sun/.tsm files through UADE with tsm. prefix conversion"
-      },
-      {
-        type: 'feature',
-        "description": "Add tick-by-tick synth pre-rendering for Amiga formats"
-      },
-      {
-        type: 'fix',
-        "description": "Add suntronic to FormatEnginePreferences"
-      },
-      {
-        type: 'feature',
-        "description": "Add new MAME chip sources, encoders, and export infrastructure"
-      },
-      {
-        type: 'feature',
-        "description": "New MAME chips, InStereo2 synth, format exporters, and misc fixes"
-      },
-      {
-        type: 'feature',
-        "description": "Add SunTronic/TSM support (.sun/.tsm via UADE)"
-      },
-      {
-        type: 'fix',
-        "description": "Init uninitialized bools in Arcade/FDS/Genesis constructors"
-      },
-      {
-        type: 'fix',
-        "description": "Fix Furnace WASM crash recovery: prevent cascading chip failures"
-      },
-      {
-        type: 'fix',
-        "description": "Kill process groups and orphaned tsx watchers on dev.sh restart"
-      },
-      {
-        type: 'improvement',
-        "description": "Export audit: all 45 formats pass, WAV comparison results updated"
-      },
-      {
-        type: 'fix',
-        "description": "Convert 8-bit and 12-bit samples to 16-bit before encoding"
       }
     ]
   }

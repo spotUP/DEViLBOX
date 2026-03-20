@@ -267,19 +267,20 @@ export class S14001ASynth extends MAMEBaseSynth {
       },
       () => {
         this._speechSequencer = null;
-        this.triggerRelease();
+        if (this.workletNode && !this._disposed) {
+          this.workletNode.port.postMessage({ type: 'allNotesOff' });
+        }
       }
     );
     this._speechSequencer.speak(speechFrames);
   }
 
   stopSpeaking(): void {
-    const wasSpeaking = this._speechSequencer !== null;
     if (this._speechSequencer) {
       this._speechSequencer.stop();
       this._speechSequencer = null;
     }
-    if (wasSpeaking) this.triggerRelease();
+    if (this.workletNode && !this._disposed) { this.workletNode.port.postMessage({ type: 'allNotesOff' }); }
   }
 
   get isSpeaking(): boolean {
@@ -420,7 +421,7 @@ export class S14001ASynth extends MAMEBaseSynth {
       () => {
         if (!this._presetLoopSingle) {
           this._speechSequencer = null;
-          this.triggerRelease();
+          if (this.workletNode && !this._disposed) { this.workletNode.port.postMessage({ type: 'allNotesOff' }); }
         }
       }
     );

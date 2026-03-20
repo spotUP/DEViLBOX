@@ -321,6 +321,17 @@ export function parseDeltaMusic2File(bytes: Uint8Array, filename: string): Track
     off += 256;
   }
 
+  // Backfill waveformPCM into dm2Config for XM export
+  for (const inst of rawInstruments) {
+    if (!inst || inst.isSample) continue;
+    const waveIdx = (inst.table[0] !== undefined && inst.table[0] !== 0xff)
+      ? inst.table[0] : 0;
+    const clamped = Math.max(0, Math.min(waveIdx, waveforms.length - 1));
+    if (clamped < waveforms.length) {
+      inst.dm2Config.waveformPCM = Array.from(waveforms[clamped]);
+    }
+  }
+
   // ── Skip 64 unknown bytes ─────────────────────────────────────────────
   off += 64;
 

@@ -415,7 +415,9 @@ export class SP0250Synth extends MAMEBaseSynth {
       () => {
         if (!this._vowelLoopSingle) {
           this._speechSequencer = null;
-          this.triggerRelease();
+          if (this.workletNode && !this._disposed) {
+            this.workletNode.port.postMessage({ type: 'allNotesOff' });
+          }
         }
       }
     );
