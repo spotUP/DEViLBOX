@@ -215,10 +215,8 @@ export class SP0250Synth extends MAMEBaseSynth {
     const frames = phonemesToSP0250Frames(tokens);
     if (frames.length === 0) return;
 
-    // Filter out unvoiced frames (stops/fricatives) that produce noise bursts
-    // Speech synth sounds better with only voiced phonemes
+    // Keep all frames — unvoiced consonants are essential for intelligibility
     const speechFrames: SpeechFrame<SP0250Frame>[] = frames
-      .filter(f => f.voiced)
       .map(f => ({
         data: f,
         durationMs: f.durationMs,

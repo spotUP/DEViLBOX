@@ -221,9 +221,8 @@ export class MEA8000Synth extends MAMEBaseSynth {
     const frames = phonemesToMEA8000Frames(tokens);
     if (frames.length === 0) return;
 
-    // Filter out noise-only frames (stops/fricatives)
+    // Keep all frames including noise (fricatives/stops are essential for intelligibility)
     const speechFrames: SpeechFrame<MEA8000Frame>[] = frames
-      .filter(f => !f.noise)
       .map(f => ({ data: f, durationMs: f.durationMs }));
     if (speechFrames.length === 0) return;
 
