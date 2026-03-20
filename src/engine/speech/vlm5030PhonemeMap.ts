@@ -111,21 +111,59 @@ export function samToVLM5030(samCode: string): VLM5030Frame | null {
 }
 
 /**
- * Convert SAM PhonemeTokens to VLM5030 frames.
+ * Interpolate between two frames for coarticulation.
+ * Returns a frame with values blended at ratio t (0=from, 1=to).
+ */
+function lerpFrame(from: VLM5030Frame, to: VLM5030Frame, t: number): VLM5030Frame {
+  const k = from.k.map((v, i) => Math.round(v + (to.k[i] - v) * t));
+  return {
+    k,
+    energy: Math.round(from.energy + (to.energy - from.energy) * t),
+    pitch: to.unvoiced ? 0 : Math.round(from.pitch + (to.pitch - from.pitch) * t),
+    unvoiced: t > 0.5 ? to.unvoiced : from.unvoiced,
+    durationMs: 25, // transition frame = 1 LPC frame
+  };
+}
+
+/**
+ * Convert SAM PhonemeTokens to VLM5030 frames with coarticulation.
+ * Inserts transition frames between phonemes for smooth formant movement.
  */
 export function phonemesToVLM5030Frames(
   tokens: Array<{ code: string; stress: number }>
 ): VLM5030Frame[] {
-  const frames: VLM5030Frame[] = [];
+  // Map tokens to raw frames
+  const rawFrames: VLM5030Frame[] = [];
   for (const token of tokens) {
     const frame = samToVLM5030(token.code);
     if (frame) {
       const energyBoost = token.stress >= 4 ? 3 : 0;
-      frames.push({
+      rawFrames.push({
         ...frame,
         energy: Math.min(31, frame.energy + energyBoost),
       });
     }
   }
-  return frames;
+
+  if (rawFrames.length === 0) return [];
+
+  // Insert coarticulation transition frames between phonemes
+  const result: VLM5030Frame[] = [];
+  for (let i = 0; i < rawFrames.length; i++) {
+    const curr = rawFrames[i];
+
+    // Add transition FROM previous phoneme (2 frames at 25/75%)
+    if (i > 0) {
+      const prev = rawFrames[i - 1];
+      result.push(lerpFrame(prev, curr, 0.33));
+      result.push(lerpFrame(prev, curr, 0.67));
+    }
+
+    // Add the main phoneme frames (steady state)
+    // Reduce duration slightly to make room for transitions
+    const steadyMs = Math.max(25, curr.durationMs - 50);
+    result.push({ ...curr, durationMs: steadyMs });
+  }
+
+  return result;
 }
