@@ -121,25 +121,17 @@ export const PixiRoot: React.FC = () => {
     }
   }, [setPendingTD3File]);
 
-  // Handler for SunVoxImportDialog
+  // Handler for SunVoxImportDialog (.sunsynth patches only)
   const handleSunVoxImportGL = useCallback(async (name: string, config: import('@/types/instrument').SunVoxConfig) => {
-    const file = pendingSunVoxFile;
     setPendingSunVoxFile(null);
     try {
-      if (config.isSong && file) {
-        const { loadFile } = await import('@lib/file/UnifiedFileLoader');
-        const result = await loadFile(file, { requireConfirmation: false });
-        if (result.success === true) notify.success(result.message);
-        else if (result.success === false) notify.error(result.error);
-      } else {
-        useInstrumentStore.getState().createInstrument({ name, synthType: 'SunVoxSynth', sunvox: config });
-        notify.success(`Imported SunVox patch: ${name}`);
-      }
+      useInstrumentStore.getState().createInstrument({ name, synthType: 'SunVoxSynth', sunvox: config });
+      notify.success(`Imported SunVox patch: ${name}`);
     } catch (err) {
-      notify.error('Failed to import SunVox file');
-      console.error('[PixiRoot] SunVox import failed:', err);
+      notify.error('Failed to import SunVox patch');
+      console.error('[PixiRoot] SunVox patch import failed:', err);
     }
-  }, [pendingSunVoxFile, setPendingSunVoxFile]);
+  }, [setPendingSunVoxFile]);
 
   // Handler for ImportModuleDialog (module/furnace/midi)
   const handleModuleImportGL = useCallback(async (info: ModuleInfo, options: ImportOptions) => {
