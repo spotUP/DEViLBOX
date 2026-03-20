@@ -390,7 +390,9 @@ export async function importTrackerModule(
     setBPM(song.initialBPM);
     setSpeed(song.initialSpeed);
     setMetadata({ name: song.name, author: '', description: `Imported from ${info.file?.name || 'module'}` });
+    console.log('[UnifiedFileLoader] steveTurnerFileData on song:', !!(song as any).steveTurnerFileData, 'size:', (song as any).steveTurnerFileData?.byteLength);
     applyEditorMode(song);
+    console.log('[UnifiedFileLoader] steveTurnerFileData in store after applyEditorMode:', !!useFormatStore.getState().steveTurnerFileData);
     if (song.c64SidFileData && useFormatStore.getState().editorMode === 'goattracker') {
       const gtStore = (await import('@/stores/useGTUltraStore')).useGTUltraStore.getState();
       const parts = song.name.split(' — ');
