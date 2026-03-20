@@ -381,6 +381,40 @@ function attachWaveformWithEnvelope(
   if (inst.sample) inst.sample.url = '';
 }
 
+/** Extract waveform PCM from an instrument's existing sample (audioBuffer or data URL). */
+function extractWaveFromSample(inst: TrackerSong['instruments'][number], maxSamples: number = 32): Int8Array | null {
+  let buf: ArrayBuffer | undefined = inst.sample?.audioBuffer;
+  if ((!buf || buf.byteLength === 0) && inst.sample?.url?.startsWith('data:')) {
+    const b64 = inst.sample.url.split(',')[1];
+    if (b64) {
+      const bin = atob(b64);
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      buf = bytes.buffer;
+    }
+  }
+  if (!buf || buf.byteLength <= 44) return null;
+
+  const dv = new DataView(buf);
+  const riff = String.fromCharCode(dv.getUint8(0), dv.getUint8(1), dv.getUint8(2), dv.getUint8(3));
+  if (riff !== 'RIFF') return null;
+
+  const bits = dv.getUint16(34, true);
+  const dataSize = buf.byteLength - 44;
+  const numSamples = Math.min(maxSamples, Math.floor(dataSize / (bits / 8)));
+  if (numSamples < 4) return null;
+
+  const wave = new Int8Array(numSamples);
+  for (let i = 0; i < numSamples; i++) {
+    if (bits === 16) {
+      wave[i] = dv.getInt16(44 + i * 2, true) >> 8;
+    } else {
+      wave[i] = dv.getUint8(44 + i) - 128;
+    }
+  }
+  return wave;
+}
+
 // ── Format-specific XM waveform + envelope helpers ──────────────────────────
 
 function attachSoundMonXM(inst: TrackerSong['instruments'][number], cfg: SoundMonConfig): void {
@@ -436,8 +470,12 @@ function attachHippelCoSoXM(inst: TrackerSong['instruments'][number], cfg: Hippe
 }
 
 function attachDeltaMusic1XM(inst: TrackerSong['instruments'][number], cfg: DeltaMusic1Config): void {
-  const wave = new Int8Array(32);
-  for (let i = 0; i < 32; i++) wave[i] = Math.round(127 - (255 * i / 31));
+  // Extract waveform from existing sample data, fallback to sawtooth
+  let wave = extractWaveFromSample(inst);
+  if (!wave) {
+    wave = new Int8Array(32);
+    for (let i = 0; i < 32; i++) wave[i] = Math.round(127 - (255 * i / 31));
+  }
 
   const vol = cfg.volume ?? 64;
   const atkTicks = Math.ceil(vol / Math.max(1, cfg.attackStep)) * Math.max(1, cfg.attackDelay);
@@ -450,23 +488,9 @@ function attachDeltaMusic1XM(inst: TrackerSong['instruments'][number], cfg: Delt
 
 function attachDeltaMusic2XM(inst: TrackerSong['instruments'][number], cfg: DeltaMusic2Config): void {
   // DM2's cfg.table is a wavetable SEQUENCE table (indices), NOT PCM data.
-  // Extract the actual waveform from the instrument's existing audioBuffer (WAV from parser).
-  let wave: Int8Array;
-  if (inst.sample?.audioBuffer && inst.sample.audioBuffer.byteLength > 44) {
-    // Parse WAV to get PCM, take first 32 samples as the waveform
-    const dv = new DataView(inst.sample.audioBuffer);
-    // WAV data starts at byte 44, 16-bit signed LE
-    const bitsPerSample = dv.getUint16(34, true);
-    const numSamples = Math.min(32, (inst.sample.audioBuffer.byteLength - 44) / (bitsPerSample / 8));
-    wave = new Int8Array(Math.max(numSamples, 4));
-    for (let i = 0; i < numSamples; i++) {
-      if (bitsPerSample === 16) {
-        wave[i] = dv.getInt16(44 + i * 2, true) >> 8; // 16-bit → 8-bit
-      } else {
-        wave[i] = dv.getUint8(44 + i) - 128; // unsigned 8-bit → signed
-      }
-    }
-  } else {
+  // Extract the actual waveform from the instrument's existing sample data.
+  let wave = extractWaveFromSample(inst);
+  if (!wave) {
     wave = new Int8Array(32);
     for (let i = 0; i < 32; i++) wave[i] = Math.round(127 - (255 * i / 31));
   }
