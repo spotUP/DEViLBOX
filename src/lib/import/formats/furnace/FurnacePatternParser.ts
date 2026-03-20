@@ -296,9 +296,9 @@ export function parsePattern(
         cell.note = MACRO_RELEASE;
         cell.octave = 0;
       } else if (cell.note === 12) {
-        // C of next octave (legacy .dmf format)
+        // C note (legacy .dmf format stores C as note=12 instead of note=0)
+        // Do NOT increment octave — upstream splitNoteToNote handles this
         cell.note = 12;
-        cell.octave++;
       } else if (cell.note >= 1 && cell.note <= 11) {
         // Standard notes: 1=C#, 2=D, etc.
         // Note: cell.note is already correct (1-12 maps to our note system)
@@ -340,13 +340,20 @@ export function convertFurnaceNoteValue(cell: FurnacePatternCell): number {
   if (cell.note === 180 || cell.note === 100) return 253; // Note off
   if (cell.note === 181 || cell.note === 101) return 254; // Release
   if (cell.note === 182 || cell.note === 102) return 255; // Macro release
-  // Normal note: Furnace stores notes as 1-12 (C#, D, D#, ..., B, C) + octave.
-  // Furnace C++ uses: flat = note + octave * 12 + 60.
-  // We store WITHOUT the +60 offset; convertFurnaceRow adds +1 for XM mapping.
-  // So our flat value = note + octave * 12, where C-0 = 0, C#0 = 1, ..., B-7 = 95.
-  if (cell.note >= 1 && cell.note <= 12) {
-    const octave = cell.octave > 127 ? cell.octave - 256 : cell.octave;
-    const val = octave * 12 + cell.note;
+  // Normal note: Furnace old format stores notes as 0-11 (C through B) + octave.
+  // note=0 with octave>0 is a "bug note" that upstream converts to note=12, octave-1.
+  // Upstream splitNoteToNote: flat = (note + octave * 12) + 60. We DON'T add +60 here
+  // because the headless renderer adds +60 when loading into the sequencer.
+  // Note=12 (C) wraps: treated as note 0 of the next octave per upstream convention.
+  if (cell.note >= 0 && cell.note <= 12 && !(cell.note === 0 && cell.octave === 0)) {
+    let note = cell.note;
+    let octave = cell.octave > 127 ? cell.octave - 256 : cell.octave;
+    // Handle note=0 octave!=0: upstream converts to note=12, octave-1 (fur.cpp:2074-2077)
+    if (note === 0 && octave !== 0) {
+      note = 12;
+      octave--;
+    }
+    const val = octave * 12 + note;
     return Math.max(0, Math.min(179, val));
   }
   // New format note values (0-179) — already decomposed via lookup tables
