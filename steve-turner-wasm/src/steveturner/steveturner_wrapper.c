@@ -61,7 +61,8 @@ int player_render(float *buffer, int frames) {
                 s_tick_accum -= s_samples_per_tick;
                 st_tick();
                 if (st_is_finished()) {
-                    s_finished = 1;
+                    // Loop: restart the current subsong instead of stopping
+                    st_set_subsong(1);
                     break;
                 }
             }
