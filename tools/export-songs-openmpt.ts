@@ -1333,8 +1333,8 @@ const TEST_CASES: TestCase[] = [
   { file: 'formats/bounty hunter - outro (remixed).mmd3', format: 'MED', parserModule: 'MEDParser', parseFn: 'parseMEDFile', isAsync: false, noteExportOffset: 36 },
 
   // === Amiga Synth Formats (→ MOD) ===
-  { file: 'formats/anthrox.fc', format: 'FC', parserModule: 'FCParser', parseFn: 'parseFCFile', isAsync: false, exportAs: 'xm', xmRelNoteOffset: -12 },
-  { file: 'formats/adept.smod', format: 'FC', parserModule: 'FCParser', parseFn: 'parseFCFile', isAsync: false, exportAs: 'xm', xmRelNoteOffset: -12 },
+  { file: 'formats/anthrox.fc', format: 'FC', parserModule: 'FCParser', parseFn: 'parseFCFile', isAsync: false, exportAs: 'xm' },
+  { file: 'formats/adept.smod', format: 'FC', parserModule: 'FCParser', parseFn: 'parseFCFile', isAsync: false, exportAs: 'xm' },
   { file: 'formats/antidust.bp3', format: 'SMON', parserModule: 'SoundMonParser', parseFn: 'parseSoundMonFile', isAsync: true, noteExportOffset: 36 },
   { file: 'formats/aquarivs.bp', format: 'SMON', parserModule: 'SoundMonParser', parseFn: 'parseSoundMonFile', isAsync: true, noteExportOffset: 36 },
   { file: 'formats/45.okta', format: 'OKT', parserModule: 'OktalyzerParser', parseFn: 'parseOktalyzerFile', isAsync: false, noteExportOffset: 36, xmNoteExportOffset: 24 },
