@@ -33,6 +33,7 @@ static constexpr int LPC_RATE = 8000;
 static constexpr int NUM_VOICES = 4;
 static constexpr int NUM_COEFFS = 10;
 static constexpr int NUM_PRESETS = 8;
+static constexpr int FR_SIZE = 4;  // Interpolation steps per frame
 
 enum VLM5030Param {
     PARAM_VOLUME = 0,
@@ -359,67 +360,144 @@ public:
     void stopSpeaking() { m_romPlaying = false; }
 
 private:
+    // ROM helpers — 1:1 from MAME vlm5030.cpp
     uint8_t readROMByte(int addr) {
         if (addr >= 0 && addr < m_romSize) return m_romData[addr];
         return 0;
     }
-    uint16_t getROMBits(int startBit, int numBits) {
-        int bytePos = startBit / 8;
-        int bitOff = startBit & 7;
-        uint16_t val = readROMByte(bytePos);
-        if (bitOff + numBits > 8) val |= (uint16_t)readROMByte(bytePos + 1) << 8;
-        return (val >> bitOff) & ((1 << numBits) - 1);
+
+    // get_bits: read N bits at bit offset sbit from m_romAddr (MAME-exact)
+    int getROMBits(int sbit, int bits) {
+        int offset = m_romAddr + (sbit >> 3);
+        int data = readROMByte(offset) | (readROMByte(offset + 1) << 8);
+        data >>= (sbit & 7);
+        data &= (0xff >> (8 - bits));
+        return data;
     }
-    void parseROMFrame() {
+
+    // parse_frame: 1:1 from MAME vlm5030.cpp lines 288-343
+    int parseROMFrame() {
+        // Save old parameters
+        m_romOldEnergy = m_romNewEnergy;
+        m_romOldPitch = m_romNewPitch;
+        for (int i = 0; i < NUM_COEFFS; i++)
+            m_romOldK[i] = m_romNewK[i];
+
+        // Command byte check
         uint8_t cmd = readROMByte(m_romAddr);
         if (cmd & 0x01) {
-            if (cmd & 0x02) { m_romPlaying = false; return; }
-            m_romSilentFrames = ((cmd >> 2) & 0x03) * 2 + 2;
+            // Extended frame
+            m_romNewEnergy = 0;
+            m_romNewPitch = 0;
+            for (int i = 0; i < NUM_COEFFS; i++) m_romNewK[i] = 0;
             m_romAddr++;
-            m_romOldEnergy = m_romCurrentEnergy; m_romCurrentEnergy = 0;
-            m_romInterpCount = 0; m_romSampleCount = m_romFrameSize;
-            return;
+            if (cmd & 0x02) {
+                // End of speech
+                return 0;
+            } else {
+                // Silent frame
+                int nums = ((cmd >> 2) + 1) * 2;
+                return nums * FR_SIZE;
+            }
         }
-        int bitBase = m_romAddr * 8;
-        m_romOldEnergy = m_romCurrentEnergy; m_romOldPitch = m_romCurrentPitch;
-        for (int i = 0; i < NUM_COEFFS; i++) m_romOldK[i] = m_romCurrentK[i];
-        uint8_t eIdx = getROMBits(bitBase+0,5)&31, pIdx = getROMBits(bitBase+5,5)&31;
-        m_romTargetEnergy = ENERGY_TABLE[eIdx]; m_romTargetPitch = PITCH_TABLE[pIdx];
-        m_romTargetK[0] = K1_TABLE[getROMBits(bitBase+10,6)&63];
-        m_romTargetK[1] = K2_TABLE[getROMBits(bitBase+16,5)&31];
-        m_romTargetK[2] = K3_TABLE[getROMBits(bitBase+21,4)&15];
-        m_romTargetK[3] = K3_TABLE[getROMBits(bitBase+25,4)&15];
-        for (int i = 4; i < 10; i++)
-            m_romTargetK[i] = K5_TABLE[getROMBits(bitBase+29+(i-4)*3,3)&7];
-        m_romAddr += 6; m_romInterpCount = 0; m_romSampleCount = m_romFrameSize; m_romSilentFrames = 0;
+
+        // Normal speech frame — bit layout from MAME (pitch first, then energy, then K9..K0)
+        m_romNewPitch  = PITCH_TABLE[getROMBits(1, 5)];
+        m_romNewEnergy = ENERGY_TABLE[getROMBits(6, 5)];
+        m_romNewK[9]   = K5_TABLE[getROMBits(11, 3) & 7];
+        m_romNewK[8]   = K5_TABLE[getROMBits(14, 3) & 7];
+        m_romNewK[7]   = K5_TABLE[getROMBits(17, 3) & 7];
+        m_romNewK[6]   = K5_TABLE[getROMBits(20, 3) & 7];
+        m_romNewK[5]   = K5_TABLE[getROMBits(23, 3) & 7];
+        m_romNewK[4]   = K5_TABLE[getROMBits(26, 3) & 7];
+        m_romNewK[3]   = K3_TABLE[getROMBits(29, 4) & 15];
+        m_romNewK[2]   = K3_TABLE[getROMBits(33, 4) & 15];
+        m_romNewK[1]   = K2_TABLE[getROMBits(37, 5) & 31];
+        m_romNewK[0]   = K1_TABLE[getROMBits(42, 6) & 63];
+
+        m_romAddr += 6;
+        return FR_SIZE;
     }
+
+    // sound_stream_update ROM path — 1:1 from MAME vlm5030.cpp lines 501-617
     float generateROMSample() {
         if (!m_romPlaying) return 0.0f;
-        if (m_romSilentFrames > 0) {
-            m_romSampleCount--;
-            if (m_romSampleCount <= 0) { m_romSilentFrames--; if (m_romSilentFrames <= 0) parseROMFrame(); else m_romSampleCount = m_romFrameSize; }
-            return 0.0f;
+
+        // Check new interpolation step or new frame
+        if (m_romSampleCount == 0) {
+            m_romSampleCount = m_romFrameSize;
+
+            if (m_romInterpCount == 0) {
+                // Parse next frame
+                int frameSamples = parseROMFrame();
+                if (frameSamples == 0) {
+                    // End of speech
+                    m_romPlaying = false;
+                    return 0.0f;
+                }
+                m_romInterpCount = frameSamples;
+
+                // Set old target as new start of frame
+                m_romCurrentEnergy = m_romOldEnergy;
+                m_romCurrentPitch = m_romOldPitch;
+                for (int i = 0; i < NUM_COEFFS; i++)
+                    m_romCurrentK[i] = m_romOldK[i];
+
+                // Set interpolation targets
+                if (m_romCurrentEnergy == 0) {
+                    m_romTargetEnergy = 0;
+                    m_romTargetPitch = m_romCurrentPitch;
+                    for (int i = 0; i < NUM_COEFFS; i++)
+                        m_romTargetK[i] = m_romCurrentK[i];
+                } else {
+                    m_romTargetEnergy = m_romNewEnergy;
+                    m_romTargetPitch = m_romNewPitch;
+                    for (int i = 0; i < NUM_COEFFS; i++)
+                        m_romTargetK[i] = m_romNewK[i];
+                }
+            }
+
+            // Interpolate: 25%, 50%, 75%, 100%
+            m_romInterpCount--;
+            int interpEffect = FR_SIZE - (m_romInterpCount % FR_SIZE);
+            m_romCurrentEnergy = m_romOldEnergy +
+                (m_romTargetEnergy - m_romOldEnergy) * interpEffect / FR_SIZE;
+            if (m_romOldPitch > 1)
+                m_romCurrentPitch = m_romOldPitch +
+                    (m_romTargetPitch - m_romOldPitch) * interpEffect / FR_SIZE;
+            for (int i = 0; i < NUM_COEFFS; i++)
+                m_romCurrentK[i] = m_romOldK[i] +
+                    (m_romTargetK[i] - m_romOldK[i]) * interpEffect / FR_SIZE;
         }
-        if (m_romSampleCount <= 0) {
-            m_romInterpCount++;
-            if (m_romInterpCount >= 4) { parseROMFrame(); if (!m_romPlaying) return 0.0f; }
-            else m_romSampleCount = m_romFrameSize;
-        }
-        float interpFrac = (float)m_romInterpCount / 4.0f;
-        uint16_t energy = (uint16_t)(m_romOldEnergy + (m_romTargetEnergy - m_romOldEnergy) * interpFrac);
-        uint8_t pitch = (uint8_t)(m_romOldPitch + (int)(m_romTargetPitch - m_romOldPitch) * interpFrac);
-        int16_t kI[NUM_COEFFS];
-        for (int i = 0; i < NUM_COEFFS; i++) kI[i] = (int16_t)(m_romOldK[i] + (m_romTargetK[i] - m_romOldK[i]) * interpFrac);
-        if (energy == 0) { m_romSampleCount--; return 0.0f; }
+
+        // Excitation source (MAME-exact: uses old_ for silence/unvoiced check)
         int32_t current_val;
-        if (pitch <= 1) { m_romLfsr ^= (m_romLfsr ^ (m_romLfsr >> 1)) << 15; m_romLfsr >>= 1; current_val = (m_romLfsr & 1) ? energy : -(int32_t)energy; }
-        else { current_val = (m_romPitchCount < 52) ? ((int32_t)CHIRP_TABLE[m_romPitchCount] * energy) / 128 : 0; }
-        int32_t u[11]; u[10] = current_val;
-        for (int i = 9; i >= 0; i--) u[i] = u[i+1] - ((-kI[i] * m_romX[i]) / 512);
-        for (int i = 9; i >= 1; i--) m_romX[i] = m_romX[i-1] + ((-kI[i-1] * u[i-1]) / 512);
+        if (m_romOldEnergy == 0) {
+            current_val = 0;
+        } else if (m_romOldPitch <= 1) {
+            // Unvoiced: noise
+            m_romLfsr = (m_romLfsr >> 1) ^ ((m_romLfsr & 1) ? 0xB800 : 0);
+            current_val = (m_romLfsr & 1) ? m_romCurrentEnergy : -(int32_t)m_romCurrentEnergy;
+        } else {
+            // Voiced: impulse train (NOT chirp — VLM5030 uses impulse)
+            current_val = (m_romPitchCount == 0) ? m_romCurrentEnergy : 0;
+        }
+
+        // 10-pole lattice filter (MAME-exact)
+        int32_t u[11];
+        u[10] = current_val;
+        for (int i = 9; i >= 0; i--)
+            u[i] = u[i + 1] - ((-m_romCurrentK[i] * m_romX[i]) / 512);
+        for (int i = 9; i >= 1; i--)
+            m_romX[i] = m_romX[i - 1] + ((-m_romCurrentK[i - 1] * u[i - 1]) / 512);
         m_romX[0] = u[0];
-        m_romPitchCount++; if (pitch > 0 && m_romPitchCount >= pitch) m_romPitchCount = 0;
+
         m_romSampleCount--;
+        m_romPitchCount++;
+        if (m_romCurrentPitch > 0 && m_romPitchCount >= m_romCurrentPitch)
+            m_romPitchCount = 0;
+
+        // Output: clamp to ±512 range (MAME uses put_int_clamp with 512)
         float sample = (float)u[0] / 512.0f;
         return std::max(-1.0f, std::min(1.0f, sample));
     }
@@ -531,15 +609,19 @@ private:
     int m_romSilentFrames = 0;
     uint16_t m_romLfsr = 0x7fff;
     int32_t m_romX[NUM_COEFFS] = {};
-    uint16_t m_romCurrentEnergy = 0;
+    // MAME uses 4 sets: new (just parsed), old (start of interp), target (end of interp), current (interpolated)
+    uint16_t m_romNewEnergy = 0;
     uint16_t m_romOldEnergy = 0;
     uint16_t m_romTargetEnergy = 0;
-    uint8_t m_romCurrentPitch = 0;
+    uint16_t m_romCurrentEnergy = 0;
+    uint8_t m_romNewPitch = 0;
     uint8_t m_romOldPitch = 0;
     uint8_t m_romTargetPitch = 0;
-    int16_t m_romCurrentK[NUM_COEFFS] = {};
+    uint8_t m_romCurrentPitch = 0;
+    int16_t m_romNewK[NUM_COEFFS] = {};
     int16_t m_romOldK[NUM_COEFFS] = {};
     int16_t m_romTargetK[NUM_COEFFS] = {};
+    int16_t m_romCurrentK[NUM_COEFFS] = {};
 };
 
 } // namespace devilbox

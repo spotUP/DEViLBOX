@@ -47,7 +47,6 @@ export const SYNTH_CATEGORIES: SynthCategory[] = [
       SYNTH_INFO.MAMEVotrax,
       SYNTH_INFO.MAMESP0250,
       SYNTH_INFO.MAMEMEA8000,
-      SYNTH_INFO.MAMEUPD931,
       SYNTH_INFO.MAMES14001A,
       SYNTH_INFO.MAMEVLM5030,
       SYNTH_INFO.MAMEHC55516,
@@ -69,7 +68,7 @@ export const SYNTH_CATEGORIES: SynthCategory[] = [
     id: 'vintage',
     name: 'Keys',
     description: 'Keyboard instruments',
-    synths: [SYNTH_INFO.Organ],
+    synths: [SYNTH_INFO.Organ, SYNTH_INFO.MAMEUPD931],
   },
   {
     id: 'samples',
