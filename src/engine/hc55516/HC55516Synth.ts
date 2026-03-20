@@ -78,15 +78,19 @@ export class HC55516Synth extends MAMEBaseSynth {
   }
 
   protected async initialize(): Promise<void> {
+    let romData: Uint8Array | null = null;
     try {
-      const romData = await loadHC55516ROMs();
-      await super.initialize();
+      romData = await loadHC55516ROMs();
+      console.log(`[HC55516] ROM fetched: ${romData.length} bytes`);
+    } catch (e) {
+      console.log('[HC55516] Speech ROMs not found (optional):', e);
+    }
+
+    await super.initialize();
+
+    if (romData) {
       this.loadROM(0, romData);
-      this.romLoaded = true;
-      console.log(`[HC55516] ROM auto-loaded: ${romData.length} bytes`);
-    } catch {
-      console.log('[HC55516] Speech ROMs not found (optional)');
-      await super.initialize();
+      console.log(`[HC55516] ROM sent to WASM, romLoaded=${this.romLoaded}, _isReady=${this._isReady}`);
     }
   }
 

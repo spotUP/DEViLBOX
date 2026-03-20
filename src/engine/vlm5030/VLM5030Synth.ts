@@ -77,15 +77,19 @@ export class VLM5030Synth extends MAMEBaseSynth {
   }
 
   protected async initialize(): Promise<void> {
+    let romData: Uint8Array | null = null;
     try {
-      const romData = await loadVLM5030ROMs();
-      await super.initialize();
+      romData = await loadVLM5030ROMs();
+      console.log(`[VLM5030] ROM fetched: ${romData.length} bytes`);
+    } catch (e) {
+      console.log('[VLM5030] Speech ROMs not found (optional):', e);
+    }
+
+    await super.initialize();
+
+    if (romData) {
       this.loadROM(0, romData);
-      this.romLoaded = true;
-      console.log(`[VLM5030] ROM auto-loaded: ${romData.length} bytes`);
-    } catch {
-      console.log('[VLM5030] Speech ROMs not found (optional)');
-      await super.initialize();
+      console.log(`[VLM5030] ROM sent to WASM, romLoaded=${this.romLoaded}, _isReady=${this._isReady}`);
     }
   }
 
