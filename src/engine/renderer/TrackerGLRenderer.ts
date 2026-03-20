@@ -476,6 +476,10 @@ export class TrackerGLRenderer {
 
     const numChannels = pattern.channels.length;
 
+    // Mute / solo dimming — compute once per frame
+    const anySolo = pattern.channels.some(ch => ch.solo);
+    const MUTED_ALPHA = 0.3;
+
     // Selection ranges
     const sel = selection;
     const minSelCh  = sel ? Math.min(sel.startChannel, sel.endChannel) : -1;
@@ -498,6 +502,11 @@ export class TrackerGLRenderer {
       if (chData.color) {
         const c = parseColor(chData.color);
         this.addRect(colX, 0, chW, height, [c[0], c[1], c[2], 0.03]);
+      }
+      // Muted / non-solo darkening overlay
+      const isDimmed = chData.muted || (anySolo && !chData.solo);
+      if (isDimmed) {
+        this.addRect(colX, 0, chW, height, [0, 0, 0, 0.45]);
       }
     }
 
@@ -639,6 +648,7 @@ export class TrackerGLRenderer {
       if (y + rowH < 0 || y > height) continue;
 
       const ghostAlpha = isGhostRow ? 0.35 : 1.0;
+      // Per-row alpha for ghost; per-channel mute alpha computed in channel loop below
       const isHL = rowIndex % hlInterval === 0;
 
       // Line number — use pre-computed hex/dec tables
@@ -671,6 +681,10 @@ export class TrackerGLRenderer {
         const cell = chData.rows[rowIndex];
         if (!cell) continue;
 
+        // Combined alpha: ghost dimming × mute/solo dimming
+        const chDimmed = chData.muted || (anySolo && !chData.solo);
+        const cellAlpha = ghostAlpha * (chDimmed ? MUTED_ALPHA : 1.0);
+
         const isCollapsed = chData.collapsed;
         const effectCols = chData.effectCols ?? 2;
         const chContentWidth = contentWidth + effectCols * (CHAR_WIDTH * 3 + 4);
@@ -680,7 +694,7 @@ export class TrackerGLRenderer {
         if (isCollapsed) {
           const noteHas = (cell.note ?? 0) > 0;
           const nc = lerpWhiteRGBA(noteHas ? colors.textNote : colors.textMuted, noteHas ? glow : 0);
-          this.setTmpColor(nc, ghostAlpha);
+          this.setTmpColor(nc, cellAlpha);
           this.addGlyphString(noteTable[cell.note ?? 0] ?? '---', x, gy, atlas, this.tmpColor, noteHas && bold);
           continue;
         }
@@ -693,7 +707,7 @@ export class TrackerGLRenderer {
             const val = cell.params[ci] ?? col.emptyValue;
             const isEmpty = val === col.emptyValue;
             const baseColor: [number, number, number, number] = isEmpty ? col.emptyColor : col.color;
-            this.setTmpColor(lerpWhiteRGBA(baseColor, isEmpty ? 0 : glow), ghostAlpha);
+            this.setTmpColor(lerpWhiteRGBA(baseColor, isEmpty ? 0 : glow), cellAlpha);
 
             let str: string;
             if (col.type === 'note') {
@@ -723,7 +737,7 @@ export class TrackerGLRenderer {
                      cellNote === 0 ? colors.textMuted
                      : cellNote === 97 ? colors.textEffect
                      : colors.textNote, noteHas ? glow : 0);
-            this.setTmpColor(nc, ghostAlpha);
+            this.setTmpColor(nc, cellAlpha);
             this.addGlyphString(noteTable[cellNote] ?? '---', x, gy, atlas, this.tmpColor, noteHas && bold);
           }
 
@@ -733,10 +747,10 @@ export class TrackerGLRenderer {
           // Instrument — use HEX_TABLE lookup
           const inst = cell.instrument ?? 0;
           if (inst !== 0) {
-            this.setTmpColor(lerpWhiteRGBA(colors.textInstrument, glow), ghostAlpha);
+            this.setTmpColor(lerpWhiteRGBA(colors.textInstrument, glow), cellAlpha);
             this.addGlyphString(HEX_TABLE[inst & 0xFF], px, gy, atlas, this.tmpColor, bold);
           } else if (!ui.blankEmpty) {
-            this.setTmpColor(lerpWhiteRGBA(colors.textMuted, 0), ghostAlpha);
+            this.setTmpColor(lerpWhiteRGBA(colors.textMuted, 0), cellAlpha);
             this.addGlyphString('..', px, gy, atlas, this.tmpColor, false);
           }
           px += CHAR_WIDTH * 2 + 4;
@@ -745,10 +759,10 @@ export class TrackerGLRenderer {
           const vol = cell.volume ?? 0;
           const hasVol = vol >= 0x10 && vol <= 0x50;
           if (hasVol) {
-            this.setTmpColor(lerpWhiteRGBA(colors.textVolume, glow), ghostAlpha);
+            this.setTmpColor(lerpWhiteRGBA(colors.textVolume, glow), cellAlpha);
             this.addGlyphString(HEX_TABLE[vol & 0xFF], px, gy, atlas, this.tmpColor, bold);
           } else if (!ui.blankEmpty) {
-            this.setTmpColor(lerpWhiteRGBA(colors.textMuted, 0), ghostAlpha);
+            this.setTmpColor(lerpWhiteRGBA(colors.textMuted, 0), cellAlpha);
             this.addGlyphString('..', px, gy, atlas, this.tmpColor, false);
           }
           px += CHAR_WIDTH * 2 + 4;
@@ -765,7 +779,7 @@ export class TrackerGLRenderer {
 
             const hasEff = colEffTyp !== 0 || colEff !== 0;
             if (hasEff) {
-              this.setTmpColor(lerpWhiteRGBA(colors.textEffect, glow), ghostAlpha);
+              this.setTmpColor(lerpWhiteRGBA(colors.textEffect, glow), cellAlpha);
               // Symphonie DSP effects: effTyp 0x50-0x54 → type letter + value
               let effStr: string;
               if (colEffTyp >= 0x50 && colEffTyp <= 0x54) {
@@ -776,7 +790,7 @@ export class TrackerGLRenderer {
               }
               this.addGlyphString(effStr, px, gy, atlas, this.tmpColor, bold);
             } else if (!ui.blankEmpty) {
-              this.setTmpColor(lerpWhiteRGBA(colors.textMuted, 0), ghostAlpha);
+              this.setTmpColor(lerpWhiteRGBA(colors.textMuted, 0), cellAlpha);
               this.addGlyphString('...', px, gy, atlas, this.tmpColor, false);
             }
             px += CHAR_WIDTH * 3 + 4;
@@ -793,7 +807,7 @@ export class TrackerGLRenderer {
               else if (flagVal === 3) { flagStr = 'M'; fc = colors.flagMute; }
               else if (flagVal === 4) { flagStr = 'H'; fc = colors.flagHammer; }
               if (flagVal || !ui.blankEmpty) {
-                this.setTmpColor(lerpWhiteRGBA(fc, flagVal ? glow : 0), ghostAlpha);
+                this.setTmpColor(lerpWhiteRGBA(fc, flagVal ? glow : 0), cellAlpha);
                 this.addGlyphString(flagStr, fx, gy, atlas, this.tmpColor, !!flagVal && bold);
               }
             };
@@ -808,7 +822,7 @@ export class TrackerGLRenderer {
             const p = Math.min(99, Math.max(0, cell.probability));
             const pc = p >= 75 ? PROB_COLORS[3] : p >= 50 ? PROB_COLORS[2] : p >= 25 ? PROB_COLORS[1] : PROB_COLORS[0];
             const probStr = ui.useHex ? HEX_TABLE[p] : DEC_TABLE[p];
-            this.setTmpColor(lerpWhiteRGBA(pc, glow), ghostAlpha);
+            this.setTmpColor(lerpWhiteRGBA(pc, glow), cellAlpha);
             this.addGlyphString(probStr, px, gy, atlas, this.tmpColor, bold);
           }
         } // end fixed-column path

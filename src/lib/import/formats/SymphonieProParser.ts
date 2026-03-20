@@ -583,14 +583,30 @@ export async function parseSymphonieProFile(
             sampleUrl: dataUrl,
           };
         }
+
+        // Populate per-instrument SymphonieConfig for the synth editor UI
+        inst['symphonie'] = {
+          type: si.type,
+          volume: si.volume,
+          tune: si.tune,
+          fineTune: si.fineTune,
+          noDsp: si.noDsp,
+          multiChannel: si.multiChannel,
+          loopStart: si.loopStart,
+          loopLen: si.loopLen,
+          numLoops: si.numLoops,
+          newLoopSystem: si.newLoopSystem,
+          sampledFrequency: si.sampledFrequency,
+        };
       }
     } catch (err) {
       console.warn('[SymphonieProParser] parseSymphonieForPlayback failed (sample editor data unavailable):', err);
     }
 
-    // Instruments are Sampler type — sample data available in editor, audio via libopenmpt.
+    // Set synthType to SymphonieSynth so the editor routes to SymphonieControls.
+    // Audio playback is still handled by libopenmpt via libopenmptFileData.
     for (let i = 0; i < song.instruments.length; i++) {
-      (song.instruments[i] as unknown as Record<string, unknown>)['synthType'] = 'Sampler';
+      (song.instruments[i] as unknown as Record<string, unknown>)['synthType'] = 'SymphonieSynth';
     }
 
     return song;

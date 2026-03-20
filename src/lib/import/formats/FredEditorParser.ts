@@ -817,6 +817,8 @@ export async function parseFredEditorFile(
     initialBPM: 125,
     linearPeriods: false,
     uadeVariableLayout: variableLayout,
+    // WASM engine playback (replaces UADE)
+    fredEditorWasmFileData: buffer.slice(0),
   };
 }
 

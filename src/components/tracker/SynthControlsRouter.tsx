@@ -16,7 +16,8 @@ import {
   DEFAULT_SOUNDMON, DEFAULT_SIDMON, DEFAULT_DIGMUG, DEFAULT_FC,
   DEFAULT_DELTAMUSIC1, DEFAULT_DELTAMUSIC2, DEFAULT_FRED, DEFAULT_TFMX,
   DEFAULT_OCTAMED, DEFAULT_SIDMON1, DEFAULT_HIPPEL_COSO, DEFAULT_ROB_HUBBARD, DEFAULT_STEVE_TURNER,
-  DEFAULT_DAVID_WHITTAKER, DEFAULT_SONIC_ARRANGER, DEFAULT_INSTEREO2, DEFAULT_WOBBLE_BASS,
+  DEFAULT_DAVID_WHITTAKER, DEFAULT_SONIC_ARRANGER, DEFAULT_INSTEREO2, DEFAULT_WOBBLE_BASS, DEFAULT_SYMPHONIE,
+  DEFAULT_FUTUREPLAYER,
   DEFAULT_FURNACE, DEFAULT_MAME_VFX, DEFAULT_MAME_DOC,
 } from '@typedefs/instrument';
 import { deepMerge } from '@lib/migration';
@@ -105,6 +106,12 @@ const SteveTurnerControls = lazy(() =>
 );
 const DavidWhittakerControls = lazy(() =>
   import('@components/instruments/controls/DavidWhittakerControls').then(m => ({ default: m.DavidWhittakerControls }))
+);
+const SymphonieControls = lazy(() =>
+  import('@components/instruments/controls/SymphonieControls').then(m => ({ default: m.SymphonieControls }))
+);
+const FuturePlayerControls = lazy(() =>
+  import('@components/instruments/controls/FuturePlayerControls').then(m => ({ default: m.FuturePlayerControls }))
 );
 const HarmonicSynthControls = lazy(() =>
   import('@components/instruments/controls/HarmonicSynthControls').then(m => ({ default: m.HarmonicSynthControls }))
@@ -326,6 +333,14 @@ export const SynthControlsRouter: React.FC<SynthControlsRouterProps> = ({ instru
     if (synthType === 'DavidWhittakerSynth') {
       const cfg = deepMerge(DEFAULT_DAVID_WHITTAKER, instrument.davidWhittaker || {});
       return <DavidWhittakerControls config={cfg} onChange={(u) => onUpdate({ davidWhittaker: { ...cfg, ...u } })} uadeChipRam={instrument.uadeChipRam} />;
+    }
+    if (synthType === 'SymphonieSynth') {
+      const cfg = deepMerge(DEFAULT_SYMPHONIE, instrument.symphonie || {});
+      return <SymphonieControls config={cfg} onChange={(u) => onUpdateLive('symphonie', cfg, u)} />;
+    }
+    if (synthType === 'FuturePlayerSynth') {
+      const cfg = deepMerge(DEFAULT_FUTUREPLAYER, instrument.futurePlayer || {});
+      return <FuturePlayerControls config={cfg} onChange={(u) => onUpdateLive('futurePlayer', cfg, u)} />;
     }
 
     // ── HarmonicSynth ───────────────────────────────────────

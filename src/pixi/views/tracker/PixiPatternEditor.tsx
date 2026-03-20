@@ -288,12 +288,15 @@ function renderGrid(g: GraphicsType, p: RenderParams, vStart: number): void {
     // Center-line highlight moved to renderOverlay to avoid grid redraw during scrolling
   }
 
+  const anySolo = p.channelSolo.some(Boolean);
+
   for (let ch = 0; ch < p.numChannels; ch++) {
     const colX = p.channelOffsets[ch] - p.scrollLeft;
     const chW = p.channelWidths[ch];
     if (colX + chW < 0 || colX > p.width) continue;
 
-    if (p.channelMuted[ch]) {
+    const isDimmed = p.channelMuted[ch] || (anySolo && !p.channelSolo[ch]);
+    if (isDimmed) {
       g.rect(colX, 0, chW, p.gridHeight);
       g.fill(FILL_BLACK_045);
     }

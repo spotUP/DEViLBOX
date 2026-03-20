@@ -632,12 +632,9 @@ export class InstrumentFactory {
       }
 
       case 'SymphonieSynth': {
+        // Symphonie Pro audio playback is handled by libopenmpt via libopenmptFileData.
+        // SymphonieSynth here is a stub for the instrument editor UI only.
         const symphSynth = new SymphonieSynth();
-        if (config.symphonie) {
-          symphSynth.load({ symphonie: config.symphonie }).catch((err: unknown) =>
-            console.error('[InstrumentFactory] Symphonie load failed:', err)
-          );
-        }
         instrument = symphSynth;
         break;
       }
@@ -683,6 +680,15 @@ export class InstrumentFactory {
         // Set 0-based instrument index for note preview
         stSynth.setInstrumentIndex((config.id ?? 1) - 1);
         instrument = stSynth;
+        break;
+      }
+
+      case 'FredEditorReplayerSynth': {
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        const { FredEditorReplayerSynth } = require('./fred/FredEditorReplayerSynth');
+        const ferSynth = new FredEditorReplayerSynth();
+        ferSynth.setInstrumentIndex((config.id ?? 1) - 1);
+        instrument = ferSynth;
         break;
       }
 

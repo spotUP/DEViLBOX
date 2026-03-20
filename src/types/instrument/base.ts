@@ -213,6 +213,7 @@ export type SynthType =
   | 'HippelCoSoSynth' // Jochen Hippel CoSo (frequency/volume sequence synthesis)
   | 'RobHubbardSynth' // Rob Hubbard (Amiga PCM sample + vibrato/wobble synthesis)
   | 'SteveTurnerSynth' // Steve Turner (Amiga PCM + multi-phase envelope + vibrato table)
+  | 'FredEditorReplayerSynth' // Fred Editor (WASM replayer — ADSR + arpeggio + PWM/blend)
   | 'SidMon1Synth'    // SidMon 1.0 (ADSR + arpeggio + wavetable synthesis)
   | 'OctaMEDSynth'   // OctaMED SynthInstr (vol/wf command table oscillator)
   | 'DavidWhittakerSynth' // David Whittaker (Amiga period-based frq/vol sequence synthesis)

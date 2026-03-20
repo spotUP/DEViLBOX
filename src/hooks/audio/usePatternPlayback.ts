@@ -26,7 +26,7 @@ export const usePatternPlayback = () => {
     currentPositionIndex: s.currentPositionIndex,
     setCurrentPosition: s.setCurrentPosition,
     })));
-  const { channelTrackTables, channelSpeeds, channelGrooves, hivelyNative, hivelyFileData, hivelyMeta, musiclineFileData, c64SidFileData, jamCrackerFileData, futurePlayerFileData, preTrackerFileData, maFileData, hippelFileData, sonixFileData, pxtoneFileData, organyaFileData, eupFileData, ixsFileData, psycleFileData, sc68FileData, zxtuneFileData, pumaTrackerFileData, steveTurnerFileData, artOfNoiseFileData, bdFileData, sd2FileData, symphonieFileData, uadeEditableFileData, libopenmptFileData, furnaceNative, furnaceActiveSubsong } = useFormatStore(useShallow((s) => ({
+  const { channelTrackTables, channelSpeeds, channelGrooves, hivelyNative, hivelyFileData, hivelyMeta, musiclineFileData, c64SidFileData, jamCrackerFileData, futurePlayerFileData, preTrackerFileData, maFileData, hippelFileData, sonixFileData, pxtoneFileData, organyaFileData, eupFileData, ixsFileData, psycleFileData, sc68FileData, zxtuneFileData, pumaTrackerFileData, steveTurnerFileData, sidmon1WasmFileData, fredEditorWasmFileData, artOfNoiseFileData, bdFileData, sd2FileData, symphonieFileData, uadeEditableFileData, libopenmptFileData, furnaceNative, furnaceActiveSubsong } = useFormatStore(useShallow((s) => ({
     channelTrackTables: s.channelTrackTables,
     channelSpeeds: s.channelSpeeds,
     channelGrooves: s.channelGrooves,
@@ -50,6 +50,8 @@ export const usePatternPlayback = () => {
     zxtuneFileData: s.zxtuneFileData,
     pumaTrackerFileData: s.pumaTrackerFileData,
     steveTurnerFileData: s.steveTurnerFileData,
+    sidmon1WasmFileData: s.sidmon1WasmFileData,
+    fredEditorWasmFileData: s.fredEditorWasmFileData,
     artOfNoiseFileData: s.artOfNoiseFileData,
     bdFileData: s.bdFileData,
     sd2FileData: s.sd2FileData,
@@ -373,6 +375,8 @@ export const usePatternPlayback = () => {
           zxtuneFileData: zxtuneFileData ?? undefined,
           pumaTrackerFileData: pumaTrackerFileData ?? undefined,
           steveTurnerFileData: steveTurnerFileData ?? undefined,
+          sidmon1WasmFileData: sidmon1WasmFileData ?? undefined,
+          fredEditorWasmFileData: fredEditorWasmFileData ?? undefined,
           artOfNoiseFileData: artOfNoiseFileData ?? undefined,
           bdFileData: bdFileData ?? undefined,
           sd2FileData: sd2FileData ?? undefined,

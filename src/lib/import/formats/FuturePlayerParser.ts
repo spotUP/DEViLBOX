@@ -16,6 +16,7 @@
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { InstrumentConfig } from '@/types';
+import type { FuturePlayerConfig } from '@/types/instrument/exotic';
 import type { UADEVariablePatternLayout } from '@/engine/uade/UADEPatternEncoder';
 import { encodeFuturePlayerPattern } from '@/engine/uade/encoders/FuturePlayerEncoder';
 
@@ -438,15 +439,75 @@ export function parseFuturePlayerFile(buffer: ArrayBuffer, filename: string): Tr
 
   // ── Build instruments list ──────────────────────────────────────────
 
-  // Read instrument metadata from binary for each discovered pointer
-  function getInstrumentMeta(instrPtr: number): { isWavetable: boolean; sampleSize: number } {
-    if (instrPtr === 0 || instrPtr + 16 > code.length) return { isWavetable: false, sampleSize: 0 };
+  // Read instrument metadata and detail parameters from binary
+  function extractInstrumentConfig(instrPtr: number): { meta: { isWavetable: boolean; sampleSize: number }; config: FuturePlayerConfig } | null {
+    if (instrPtr === 0 || instrPtr + 16 > code.length) return null;
     const sampInfoPtr = rd32(code, instrPtr + 8);
-    if (sampInfoPtr === 0 || sampInfoPtr + 14 > code.length) return { isWavetable: false, sampleSize: 0 };
+    if (sampInfoPtr === 0 || sampInfoPtr + 14 > code.length) return null;
     const wtFlag = rd8(code, sampInfoPtr + 8);
-    if (wtFlag !== 0) return { isWavetable: true, sampleSize: 0 };
-    const lenWords = rd16(code, sampInfoPtr + 4);
-    return { isWavetable: false, sampleSize: lenWords * 2 };
+    const isWavetable = wtFlag !== 0;
+    const lenWords = isWavetable ? 0 : rd16(code, sampInfoPtr + 4);
+    const sampleSize = lenWords * 2;
+
+    // Read detail pointer (instrPtr + 12)
+    const detailPtr = rd32(code, instrPtr + 12);
+    if (detailPtr === 0 || detailPtr + 0x3A > code.length) {
+      // No detail data available — return basic config
+      return {
+        meta: { isWavetable, sampleSize },
+        config: {
+          isWavetable,
+          volume: 64,
+          attackRate: 16, attackPeak: 255,
+          decayRate: 4, sustainLevel: 128,
+          sustainRate: 0, sustainTarget: 128,
+          releaseRate: 8,
+          pitchMod1Delay: 0, pitchMod1Shift: 0, pitchMod1Mode: 0, pitchMod1Negate: false, hasPitchMod1: false,
+          pitchMod2Delay: 0, pitchMod2Shift: 0, pitchMod2Mode: 0, pitchMod2Negate: false, hasPitchMod2: false,
+          sampleMod1Delay: 0, sampleMod1Shift: 0, sampleMod1Mode: 0, hasSampleMod1: false,
+          sampleMod2Delay: 0, sampleMod2Shift: 0, sampleMod2Mode: 0, hasSampleMod2: false,
+          sampleSize,
+        },
+      };
+    }
+
+    // Extract detail fields (offsets match FuturePlayer.c update_audio)
+    const config: FuturePlayerConfig = {
+      isWavetable,
+      volume: rd8(code, detailPtr + 0x08),
+      attackRate: rd8(code, detailPtr + 0x12),
+      attackPeak: rd8(code, detailPtr + 0x13),
+      decayRate: rd8(code, detailPtr + 0x14),
+      sustainLevel: rd8(code, detailPtr + 0x15),
+      sustainRate: rd8(code, detailPtr + 0x16),
+      sustainTarget: rd8(code, detailPtr + 0x17),
+      releaseRate: rd8(code, detailPtr + 0x18),
+      // Pitch mod 1
+      hasPitchMod1: rd32(code, detailPtr + 0x1A) !== 0,
+      pitchMod1Shift: rd8(code, detailPtr + 0x1E),
+      pitchMod1Delay: rd8(code, detailPtr + 0x1F),
+      pitchMod1Mode: rd8(code, detailPtr + 0x20),
+      pitchMod1Negate: rd8(code, detailPtr + 0x21) !== 0,
+      // Pitch mod 2
+      hasPitchMod2: rd32(code, detailPtr + 0x22) !== 0,
+      pitchMod2Shift: rd8(code, detailPtr + 0x26),
+      pitchMod2Delay: rd8(code, detailPtr + 0x27),
+      pitchMod2Mode: rd8(code, detailPtr + 0x28),
+      pitchMod2Negate: rd8(code, detailPtr + 0x29) !== 0,
+      // Sample mod 1
+      hasSampleMod1: rd32(code, detailPtr + 0x2A) !== 0,
+      sampleMod1Shift: rd8(code, detailPtr + 0x2E),
+      sampleMod1Delay: rd8(code, detailPtr + 0x2F),
+      sampleMod1Mode: rd8(code, detailPtr + 0x30),
+      // Sample mod 2
+      hasSampleMod2: rd32(code, detailPtr + 0x32) !== 0,
+      sampleMod2Shift: rd8(code, detailPtr + 0x36),
+      sampleMod2Delay: rd8(code, detailPtr + 0x37),
+      sampleMod2Mode: rd8(code, detailPtr + 0x38),
+      sampleSize,
+    };
+
+    return { meta: { isWavetable, sampleSize }, config };
   }
 
   // One FuturePlayerSynth per discovered instrument pointer
@@ -457,7 +518,10 @@ export function parseFuturePlayerFile(buffer: ArrayBuffer, filename: string): Tr
     // of engine.noteOn(), causing whole-song playback (audible as a double-beep).
     if (instrPtr === 0) return;
 
-    const meta = getInstrumentMeta(instrPtr);
+    const extracted = extractInstrumentConfig(instrPtr);
+    if (!extracted) return;
+
+    const { meta, config: fpConfig } = extracted;
 
     // Skip instruments with no audio data at all (no wavetable, no PCM sample).
     // These produce silence or a WASM-default tone that causes an unexpected beep.
@@ -473,6 +537,7 @@ export function parseFuturePlayerFile(buffer: ArrayBuffer, filename: string): Tr
       effects: [],
       volume: -6,
       pan: 0,
+      futurePlayer: fpConfig,
       metadata: { fpInstrPtr: instrPtr, fpIsWavetable: meta.isWavetable, fpSampleSize: meta.sampleSize },
     } as unknown as InstrumentConfig);
   });
