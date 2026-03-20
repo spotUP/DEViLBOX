@@ -50,6 +50,11 @@ export function resetSharedSunVoxHandle(): void {
  * Avoids the double create/destroy/create cycle which corrupts WASM state.
  * The handle must already have a song loaded via engine.loadSong().
  */
+/** Get the shared song handle slot number (-1 if none) */
+export function getSharedSunVoxHandle(): number {
+  return _sharedSongHandle;
+}
+
 export function donatePreloadedHandle(handle: number): void {
   _sharedSongHandle = handle;
   _sharedSongRefCount = 1; // prevent _loadSongShared cleanup from destroying it
@@ -329,6 +334,17 @@ export class SunVoxModularSynth implements DevilboxSynth {
   get(_param: string): number | undefined {
     return undefined;
   }
+
+  /** Sync a tracker cell edit to the SunVox WASM pattern data.
+   *  Pass -1 for any field to leave it unchanged. */
+  setPatternEvent(pat: number, track: number, line: number,
+    nn: number, vv: number, mm: number, ccee: number, xxyy: number): void {
+    if (this._disposed || this._handle < 0) return;
+    this.engine.setPatternEvent(this._handle, pat, track, line, nn, vv, mm, ccee, xxyy);
+  }
+
+  /** Get the WASM handle (for direct engine calls) */
+  getHandle(): number { return this._handle; }
 
   dispose(): void {
     if (this._disposed) return;

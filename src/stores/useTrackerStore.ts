@@ -80,6 +80,47 @@ function forwardWasmMuteStates(channels: { muted: boolean; solo: boolean }[]): v
     return;
   }
 
+  // SunVox songs: mute/unmute at the module level inside WASM
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { SunVoxEngine } = require('../engine/sunvox/SunVoxEngine');
+    if (SunVoxEngine.hasInstance()) {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { getSharedSunVoxHandle } = require('../engine/sunvox-modular/SunVoxModularSynth');
+      const handle = getSharedSunVoxHandle();
+      if (handle >= 0) {
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        const { useInstrumentStore } = require('./useInstrumentStore');
+        const instruments = useInstrumentStore.getState().instruments;
+        const state = useTrackerStore.getState();
+        const pattern = state.patterns[state.currentPatternIndex];
+        if (pattern) {
+          // Collect per-module mute state (unmuted if ANY channel for that module is unmuted)
+          const moduleUnmuted = new Map<number, boolean>();
+          for (let i = 0; i < pattern.channels.length; i++) {
+            const ch = channels[i];
+            if (!ch) continue;
+            const instrId = pattern.channels[i]?.instrumentId;
+            const inst = instruments.find((ins: { id: number }) => ins.id === instrId);
+            if (!inst?.sunvox?.noteTargetModuleId) continue;
+            const modId = inst.sunvox.noteTargetModuleId as number;
+            const effectiveMute = anySolo ? !ch.solo : ch.muted;
+            if (!effectiveMute) moduleUnmuted.set(modId, true);
+            else if (!moduleUnmuted.has(modId)) moduleUnmuted.set(modId, false);
+          }
+          const engine = SunVoxEngine.getInstance();
+          for (const [modId, unmuted] of moduleUnmuted) {
+            if (unmuted) engine.unmuteModule(handle, modId);
+            else engine.muteModule(handle, modId);
+          }
+        }
+        return;
+      }
+    }
+  } catch {
+    // SunVox not active
+  }
+
   // Other WASM engines use gain API (0 = muted, 1 = unmuted)
   try {
     const gainEngine = getGainEngine();

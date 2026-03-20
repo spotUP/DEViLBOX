@@ -54,6 +54,8 @@ class SunVoxProcessor extends AudioWorkletProcessor {
     this._wasmCrashed = false;
     this._wasmBinary = null;
     this._ticks = 0;
+    // Module mute state: Map<`${slot}:${modId}`, { savedVolCtlIdx, savedVolValue }>
+    this._mutedModules = new Map();
 
     this.port.onmessage = (event) => {
       if (event.data.type === 'init') {
@@ -183,41 +185,50 @@ class SunVoxProcessor extends AudioWorkletProcessor {
         const h = data.handle;
         const patCount = m._sv_get_number_of_patterns(h);
         const patterns = [];
-        const seenDataPtrs = new Set(); // detect clone patterns (share same data pointer)
+        const seenDataPtrs = new Map(); // dataPtr → first patIndex (for clone detection)
         for (let p = 0; p < patCount; p++) {
           const lines = m._sv_get_pattern_lines(h, p);
           if (lines <= 0) continue; // empty slot
           const tracks = m._sv_get_pattern_tracks(h, p);
           if (tracks <= 0) continue;
           const x = m._sv_get_pattern_x(h, p);
+          const y = m._sv_get_pattern_y(h, p);
+          // Get pattern name
+          const namePtr = m._sv_get_pattern_name(h, p);
+          const patName = namePtr ? m.UTF8ToString(namePtr) : '';
           // Get raw pattern data: 8 bytes per event (NN VV MM MM EE CC YY XX)
           const dataPtr = m._sv_get_pattern_data(h, p);
           if (!dataPtr) continue;
-          // Skip clone patterns (they share the same data pointer as the original)
-          if (seenDataPtrs.has(dataPtr)) continue;
-          seenDataPtrs.add(dataPtr);
+          // Detect clones (share same data pointer) but don't skip them —
+          // clones at different timeline positions are valid song structure
+          const cloneOf = seenDataPtrs.has(dataPtr) ? seenDataPtrs.get(dataPtr) : -1;
+          if (!seenDataPtrs.has(dataPtr)) seenDataPtrs.set(dataPtr, p);
           const notes = [];
           for (let t = 0; t < tracks; t++) {
             const col = [];
             for (let l = 0; l < lines; l++) {
               const off = dataPtr + (l * tracks + t) * 8;
-              const nn = m.HEAPU8[off];       // note
-              const vv = m.HEAPU8[off + 1];   // velocity
-              const mm = m.HEAPU8[off + 2] | (m.HEAPU8[off + 3] << 8); // module (16-bit)
-              const ee = m.HEAPU8[off + 4];   // effect (controller number high byte)
-              const cc = m.HEAPU8[off + 5];   // controller number low byte
-              const yy = m.HEAPU8[off + 6];   // value high byte
-              const xx = m.HEAPU8[off + 7];   // value low byte
-              const ctl = (ee << 8) | cc;
-              const ctlVal = (yy << 8) | xx;
+              const nn = m.HEAPU8[off];       // note (NN)
+              const vv = m.HEAPU8[off + 1];   // velocity (VV)
+              const mm = m.HEAPU8[off + 2] | (m.HEAPU8[off + 3] << 8); // module (MM, 16-bit LE)
+              const ee = m.HEAPU8[off + 4];   // effect code (EE)
+              const cc = m.HEAPU8[off + 5];   // controller number + 1 (CC)
+              const yy = m.HEAPU8[off + 6];   // ctl_val low byte (YY)
+              const xx = m.HEAPU8[off + 7];   // ctl_val high byte (XX)
+              // ctl = 0xCCEE (little-endian uint16: low byte=EE at offset 4, high byte=CC at offset 5)
+              const ctl = ee | (cc << 8);
+              // ctl_val = 0xXXYY (little-endian uint16: low byte=YY at offset 6, high byte=XX at offset 7)
+              const ctlVal = yy | (xx << 8);
               // Map module: SunVox uses 1-based (0=none), our system uses 0-based IDs
               const module = mm > 0 ? mm - 1 : -1;
               col.push({ note: nn, vel: vv, module, ctl, ctlVal });
             }
             notes.push(col);
           }
-          patterns.push({ patIndex: p, x, tracks, lines, notes });
+          patterns.push({ patIndex: p, x, y, tracks, lines, patName, cloneOf, notes });
         }
+        console.log('[SunVox Worklet] getPatterns:', patterns.length, 'non-empty patterns from', patCount, 'slots',
+          'tracks:', patterns.map(p => p.tracks).filter((v,i,a) => a.indexOf(v)===i).sort((a,b)=>a-b).join(','));
         this.port.postMessage({ type: 'patterns', handle: h, patterns });
         break;
       }
@@ -320,6 +331,55 @@ class SunVoxProcessor extends AudioWorkletProcessor {
       case 'setControl':
         if (m) m._sv_set_module_ctl_value(data.handle, data.moduleId, data.ctlId, data.value, 0);
         break;
+
+      case 'setPatternEvent': {
+        // Write a pattern event: sv_set_pattern_event(slot, pat, track, line, nn, vv, mm, ccee, xxyy)
+        // Only non-negative values are written (pass -1 to leave a field unchanged)
+        if (!m) break;
+        const rv = m._sv_set_pattern_event(
+          data.handle, data.pat, data.track, data.line,
+          data.nn ?? -1, data.vv ?? -1, data.mm ?? -1, data.ccee ?? -1, data.xxyy ?? -1
+        );
+        if (rv < 0) console.warn('[SunVox Worklet] sv_set_pattern_event failed:', rv);
+        break;
+      }
+
+      case 'muteModule': {
+        // Mute a module by finding its "Volume" controller, saving its value, and setting to min
+        if (!m) break;
+        const muteKey = `${data.handle}:${data.moduleId}`;
+        if (this._mutedModules.has(muteKey)) break; // already muted
+        // Find the "Volume" controller by name (case-insensitive)
+        const ctlCount = m._sv_get_number_of_module_ctls(data.handle, data.moduleId);
+        let volCtlIdx = -1;
+        for (let i = 0; i < ctlCount; i++) {
+          const name = m.UTF8ToString(m._sv_get_module_ctl_name(data.handle, data.moduleId, i));
+          if (name.toLowerCase() === 'volume') { volCtlIdx = i; break; }
+        }
+        if (volCtlIdx >= 0) {
+          const savedVal = m._sv_get_module_ctl_value(data.handle, data.moduleId, volCtlIdx, 0);
+          const minVal = m._sv_get_module_ctl_min(data.handle, data.moduleId, volCtlIdx, 0);
+          this._mutedModules.set(muteKey, { volCtlIdx, savedVal });
+          m._sv_set_module_ctl_value(data.handle, data.moduleId, volCtlIdx, minVal, 0);
+        } else {
+          // No Volume controller — use CLEAN_MODULE command to silence it
+          m._sv_send_event(data.handle, 0, 140, 0, data.moduleId + 1, 0, 0); // NOTECMD_CLEAN_MODULE=140
+          this._mutedModules.set(muteKey, { volCtlIdx: -1, savedVal: 0 });
+        }
+        break;
+      }
+
+      case 'unmuteModule': {
+        if (!m) break;
+        const unmuteKey = `${data.handle}:${data.moduleId}`;
+        const saved = this._mutedModules.get(unmuteKey);
+        if (!saved) break;
+        if (saved.volCtlIdx >= 0) {
+          m._sv_set_module_ctl_value(data.handle, data.moduleId, saved.volCtlIdx, saved.savedVal, 0);
+        }
+        this._mutedModules.delete(unmuteKey);
+        break;
+      }
 
       case 'play':
         if (m) {

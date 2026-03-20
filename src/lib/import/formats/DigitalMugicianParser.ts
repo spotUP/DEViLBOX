@@ -730,21 +730,26 @@ export async function parseDigitalMugicianFile(
 
         if (note > 0) {
           switch (val1) {
-            case 1: // Portamento
-              // effect byte < 64 is the pitch value for portamento target
-              // val2 is the portamento speed (signed)
-              if (val2 !== 0) {
-                if (val2 > 0) {
-                  // Portamento up (period decreases, pitch up)
-                  effTyp = 0x01; // Portamento up
-                  eff = Math.min(Math.abs(val2), 0xFF);
-                } else {
-                  // Portamento down (period increases, pitch down)
-                  effTyp = 0x02; // Portamento down
+            case 1: { // Portamento to note
+              // effect byte (0-63) is the target pitch index into DM_PERIODS.
+              // val2 is the portamento speed. Use XM effect 0x03 (Tone Portamento)
+              // which slides from the current note to the target note.
+              const targetPitch = effect; // 0-63, the raw effect byte
+              if (targetPitch >= 0 && targetPitch < DM_PERIODS.length) {
+                const targetNote = dmPeriodToXMNote(DM_PERIODS[targetPitch]);
+                if (targetNote > 0) {
+                  // Set the target note as the row's note (XM 0x03 slides TO this note)
+                  xmNote = targetNote;
+                  effTyp = 0x03; // Tone Portamento
                   eff = Math.min(Math.abs(val2), 0xFF);
                 }
+              } else if (val2 !== 0) {
+                // Fallback: no valid target, use portamento up/down
+                effTyp = val2 > 0 ? 0x01 : 0x02;
+                eff = Math.min(Math.abs(val2), 0xFF);
               }
               break;
+            }
             case 5: // Pattern length
               // No direct XM equivalent; could use pattern break
               break;

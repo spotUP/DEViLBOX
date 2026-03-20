@@ -237,7 +237,9 @@ export class VotraxSynth extends MAMEBaseSynth {
       (frame) => this.writePhone(frame.phone),
       () => {
         this._speechSequencer = null;
-        this.triggerRelease();
+        if (this.workletNode && !this._disposed) {
+          this.workletNode.port.postMessage({ type: 'allNotesOff' });
+        }
       }
     );
     this._speechSequencer.speak(speechFrames);
@@ -245,12 +247,11 @@ export class VotraxSynth extends MAMEBaseSynth {
 
   /** Stop current text-to-speech playback */
   stopSpeaking(): void {
-    const wasSpeaking = this._speechSequencer !== null;
     if (this._speechSequencer) {
       this._speechSequencer.stop();
       this._speechSequencer = null;
     }
-    if (wasSpeaking) this.triggerRelease();
+    if (this.workletNode && !this._disposed) { this.workletNode.port.postMessage({ type: 'allNotesOff' }); }
   }
 
   /** Whether text-to-speech is currently playing */
@@ -366,7 +367,7 @@ export class VotraxSynth extends MAMEBaseSynth {
       () => {
         if (!this._vowelLoopSingle) {
           this._speechSequencer = null;
-          this.triggerRelease();
+          if (this.workletNode && !this._disposed) { this.workletNode.port.postMessage({ type: 'allNotesOff' }); }
         }
       }
     );

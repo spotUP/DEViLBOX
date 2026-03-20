@@ -53,8 +53,11 @@ export interface SunVoxNoteEvent {
 export interface SunVoxPatternData {
   patIndex: number;
   x: number;        // timeline position (in lines)
+  y: number;        // vertical position on timeline
   tracks: number;
   lines: number;
+  patName: string;  // pattern name from sv_get_pattern_name
+  cloneOf: number;  // patIndex of original if clone, -1 if original
   notes: SunVoxNoteEvent[][];  // notes[track][line]
 }
 
@@ -585,6 +588,20 @@ export class SunVoxEngine {
     this.sendMessage({ type: 'setControl', handle, moduleId, ctlId, value });
   }
 
+  /** Write a pattern event to the SunVox WASM state. Pass -1 for fields to leave unchanged. */
+  setPatternEvent(handle: number, pat: number, track: number, line: number,
+    nn: number, vv: number, mm: number, ccee: number, xxyy: number): void {
+    this.sendMessage({ type: 'setPatternEvent', handle, pat, track, line, nn, vv, mm, ccee, xxyy });
+  }
+
+  muteModule(handle: number, moduleId: number): void {
+    this.sendMessage({ type: 'muteModule', handle, moduleId });
+  }
+
+  unmuteModule(handle: number, moduleId: number): void {
+    this.sendMessage({ type: 'unmuteModule', handle, moduleId });
+  }
+
   play(handle: number): void {
     this.sendMessage({ type: 'play', handle });
   }
@@ -635,7 +652,7 @@ export class SunVoxEngine {
   }
 
   setModuleControl(handle: number, moduleId: number, ctlId: number, value: number): void {
-    this.workletNode?.port.postMessage({ type: 'setModuleControl', handle, moduleId, ctlId, value });
+    this.sendMessage({ type: 'setControl', handle, moduleId, ctlId, value });
   }
 
   async getModuleGraph(handle: number): Promise<SunVoxModuleGraphEntry[]> {

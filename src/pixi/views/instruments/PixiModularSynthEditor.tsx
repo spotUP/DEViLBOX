@@ -20,6 +20,7 @@ import { PixiButton, PixiLabel, PixiKnob, PixiScrollView } from '../../component
 import { ModuleRegistry } from '../../../engine/modular/ModuleRegistry';
 import { registerBuiltInModules } from '../../../engine/modular/modules';
 import { registerSunVoxModules } from '../../../engine/sunvox-modular/SunVoxModuleDescriptors';
+import { getSunVoxControlMeta } from '../../../engine/sunvox-modular/graphToConfig';
 import type { ModularPatchConfig, ModularModuleInstance, ModularConnection, ModulePortDef, SignalType, PortRef, ModuleCategory } from '../../../types/modular';
 
 registerBuiltInModules();
@@ -228,7 +229,10 @@ interface RackViewProps {
 const getStripH = (mod: ModularModuleInstance, collapsed: boolean) => {
   if (collapsed) return 28;
   const desc = getDesc(mod.descriptorId);
-  const paramRows = Math.ceil((desc?.parameters.length ?? 0) / 4);
+  const paramCount = (desc?.parameters.length ?? 0) > 0
+    ? desc!.parameters.length
+    : getSunVoxControlMeta(mod.id).length;
+  const paramRows = Math.ceil(paramCount / 4);
   return Math.max(80, 28 + paramRows * 48 + 8);
 };
 
@@ -357,7 +361,13 @@ const ModuleStrip: React.FC<{
   const ins = desc.ports.filter((p) => p.direction === 'input');
   const outs = desc.ports.filter((p) => p.direction === 'output');
   const borderClr = isDropTarget ? theme.accent.color : selected ? theme.accent.color : theme.border.color;
-  const paramRows = Math.ceil(desc.parameters.length / 4);
+  // Use descriptor params, or fall back to SunVox dynamic control metadata
+  const params = desc.parameters.length > 0
+    ? desc.parameters
+    : getSunVoxControlMeta(mod.id).map(m => ({
+        id: `ctl_${m.id}`, name: m.name, min: m.min, max: m.max, default: 0,
+      }));
+  const paramRows = Math.ceil(params.length / 4);
   const bodyH = collapsed ? 0 : Math.max(52, paramRows * 48 + 8);
   const stripH = collapsed ? 28 : 28 + bodyH;
 
@@ -388,8 +398,8 @@ const ModuleStrip: React.FC<{
       {!collapsed && (
         <layoutContainer layout={{ flexDirection: 'row', height: bodyH, padding: 6, gap: 6, alignItems: 'flex-start' }}>
           <layoutContainer layout={{ flexDirection: 'row', gap: 4, flex: 1, flexWrap: 'wrap' }}>
-            {desc.parameters.map((p) => (
-              <PixiKnob key={p.id} value={mod.parameters[p.id] ?? p.default} min={p.min} max={p.max} onChange={(v) => onParam(mod.id, p.id, v)} label={p.name.slice(0, 6)} size="sm" unit={p.unit} />
+            {params.map((p) => (
+              <PixiKnob key={p.id} value={mod.parameters[p.id] ?? p.default} min={p.min} max={p.max} onChange={(v) => onParam(mod.id, p.id, v)} label={p.name.slice(0, 6)} size="sm" unit={'unit' in p ? (p as { unit?: string }).unit : undefined} />
             ))}
           </layoutContainer>
           <layoutContainer layout={{ flexDirection: 'row', gap: 8 }}>
@@ -726,7 +736,12 @@ const CanvasModuleCard: React.FC<{
   const outs = desc.ports.filter(p => p.direction === 'output');
   const sel = selectedModule === mod.id;
   const portCount = Math.max(ins.length, outs.length);
-  const keyParams = desc.parameters.slice(0, 3);
+  // Use descriptor params, or fall back to SunVox dynamic control metadata
+  const keyParams = desc.parameters.length > 0
+    ? desc.parameters.slice(0, 3)
+    : getSunVoxControlMeta(mod.id).slice(0, 3).map(m => ({
+        id: `ctl_${m.id}`, name: m.name, min: m.min, max: m.max, default: 0,
+      }));
   const cardH = CANVAS_HDR_H + Math.max(portCount * CANVAS_PORT_SP + 8, 40) + (keyParams.length > 0 ? 44 : 0);
 
   return (

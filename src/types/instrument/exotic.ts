@@ -225,6 +225,8 @@ export interface DeltaMusic1Config {
   arpeggio: number[];
   isSample: boolean;
   table: number[] | null;
+  /** Raw waveform pool bytes (sampleData from parser) for XM waveform extraction */
+  sampleData?: number[];
 }
 
 export interface DeltaMusic2VolEntry {
@@ -245,6 +247,8 @@ export interface DeltaMusic2Config {
   pitchBend: number;
   table: Uint8Array;
   isSample: boolean;
+  /** Selected waveform PCM (signed 8-bit, up to 256 bytes) for XM export */
+  waveformPCM?: number[];
 }
 
 /**

@@ -181,6 +181,7 @@ function buildDM1Config(inst: DM1Instrument): DeltaMusic1Config {
     arpeggio:      [...inst.arpeggio],
     isSample:      inst.isSample,
     table:         inst.table ? [...inst.table] : null,
+    sampleData:    inst.sampleData ? Array.from(inst.sampleData) : undefined,
   };
 }
 

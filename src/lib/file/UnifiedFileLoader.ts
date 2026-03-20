@@ -1026,7 +1026,7 @@ async function loadSongFile(file: File, options: FileLoadOptions): Promise<FileL
         for (const p of svPatterns) { xGroups.set(p.x, (xGroups.get(p.x) ?? 0) + 1); }
         console.log('[SunVox] pattern layout:', svPatterns.length, 'patterns,',
           xGroups.size, 'unique x positions, tracks per pattern:',
-          svPatterns.slice(0, 10).map(p => `x=${p.x}:${p.tracks}t/${p.lines}l`));
+          svPatterns.slice(0, 10).map(p => `pat${p.patIndex} "${p.patName}" x=${p.x} y=${p.y} ${p.tracks}t/${p.lines}l clone=${p.cloneOf}`));
       }
       const channelColors = [
         '#facc15', '#34d399', '#60a5fa', '#f472b6', '#a78bfa',
@@ -1063,9 +1063,14 @@ async function loadSongFile(file: File, options: FileLoadOptions): Promise<FileL
             if (!ev || (ev.note === 0 && ev.vel === 0 && ev.module < 0 && ev.ctl === 0)) return { ...emptyRow };
             const volume = ev.vel === 0 ? 0 : Math.max(1, Math.round(ev.vel * 64 / 129));
             const evInstrId = ev.module >= 1 ? (svModToInstrIdx.get(ev.module) ?? instrId) : instrId;
-            const effTyp  = (ev.ctl >> 8) & 0xFF;
-            const effTyp2 = ev.ctl & 0xFF;
-            return { note: ev.note, instrument: evInstrId, volume, effTyp, eff: effTyp > 0 ? ev.ctlVal : 0, effTyp2, eff2: effTyp2 > 0 ? ev.ctlVal : 0 };
+            // SunVox note 128 = NOTE_OFF → DEViLBOX note 97
+            // SunVox notes 129-140 are special commands (ALL_NOTES_OFF, CLEAN_SYNTHS, etc.)
+            const note = ev.note === 128 ? 97 : (ev.note >= 129 ? 0 : ev.note);
+            // SunVox ctl = 0xCCEE: CC=controller+1, EE=effect code
+            // Map effect (EE) to primary column, controller (CC) to secondary
+            const ee = ev.ctl & 0xFF;            // effect code
+            const cc = (ev.ctl >> 8) & 0xFF;     // controller number + 1
+            return { note, instrument: evInstrId, volume, effTyp: ee, eff: ee > 0 ? ev.ctlVal : 0, effTyp2: cc, eff2: cc > 0 ? ev.ctlVal : 0 };
           });
           return { id: `ch-svox-${Date.now()}-${patIdx}-${chIdx}`, name: chName, muted: false, solo: false, collapsed: false, volume: 100, pan: 0, instrumentId: instrId, color: channelColors[chIdx % channelColors.length], rows };
         };
@@ -1081,7 +1086,9 @@ async function loadSongFile(file: File, options: FileLoadOptions): Promise<FileL
               channels.push(buildChannel(svPat, t, patIdx, channels.length, maxLines));
             }
           }
-          return { id: `svpat-${Date.now()}-${patIdx}`, name: `Pattern ${patIdx + 1}`, length: maxLines, channels };
+          // Use first pattern's name if available, otherwise generate one
+          const patName = group[0].patName || `Pattern ${patIdx + 1}`;
+          return { id: `svpat-${Date.now()}-${patIdx}`, name: patName, length: maxLines, channels };
         });
       } else {
         // Fallback: single pattern with one channel per generator
