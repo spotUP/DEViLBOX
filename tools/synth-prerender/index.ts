@@ -7,12 +7,15 @@
  */
 
 import type { TrackerSong } from '../../src/engine/TrackerReplayer';
+import type { FCConfig } from '../../src/types/instrument/exotic';
+import type { EnvelopePoints, EnvelopePoint } from '../../src/types/tracker';
 import {
   renderSynthInstrument,
   buildLoopingWAV,
   DEFAULT_SAMPLE_RATE,
 } from './SynthSimulator';
 import { FCSynthSim } from './FCSynthSim';
+import { extractFC13Wave } from '../../src/lib/import/formats/FCParser';
 import { SoundMonSynthSim } from './SoundMonSynthSim';
 import { SidMon1SynthSim } from './SidMon1SynthSim';
 import { HivelySynthSim } from './HivelySynthSim';
@@ -69,6 +72,170 @@ function attachSampleToInstrument(
   }
 }
 
+// ── FC vol macro → XM envelope conversion ───────────────────────────────────
+
+/**
+ * Convert FC vol macro byte sequence into XM envelope points.
+ * Processes the same opcodes as the FC replayer: direct volume values,
+ * 0xE0 (loop), 0xE1 (end/hold), 0xE8 (sustain), 0xEA (volume slide).
+ */
+function fcVolMacroToEnvelope(cfg: FCConfig): EnvelopePoints | null {
+  const vm = cfg.volMacroData;
+  const speed = cfg.volMacroSpeed ?? cfg.synthSpeed ?? 1;
+  if (!vm || vm.length === 0) return null;
+
+  const points: EnvelopePoint[] = [];
+  let tick = 0;
+  let step = 0;
+  let lastVol = -1;
+  let loopTargetStep = -1; // For 0xE0 loop detection
+  let sustainTick = -1;
+
+  // Walk through the vol macro bytes, converting to envelope points
+  for (let iter = 0; iter < 200 && step < vm.length && points.length < 12; iter++) {
+    const info = vm[step];
+    if (info === 0xE1) break; // end — hold current volume
+
+    if (info === 0xE0) {
+      // Loop back — mark the loop target for XM envelope loop
+      if (step + 1 < vm.length) {
+        loopTargetStep = Math.max(0, (vm[step + 1] & 0x3F) - 5);
+      }
+      break; // Stop here, the loop will be set in XM envelope flags
+    }
+
+    if (info === 0xE8) {
+      // Sustain hold — mark sustain point
+      if (step + 1 < vm.length) {
+        sustainTick = tick;
+        // Add a sustain point at current volume if last point isn't already here
+        if (points.length > 0 && points[points.length - 1].tick !== tick) {
+          points.push({ tick, value: lastVol >= 0 ? lastVol : 0 });
+        }
+      }
+      step += 2;
+      continue;
+    }
+
+    if (info === 0xEA) {
+      // Volume slide — approximate as linear ramp
+      if (step + 2 < vm.length) {
+        const bendSpeed = vm[step + 1] < 128 ? vm[step + 1] : vm[step + 1] - 256;
+        const bendTime = vm[step + 2];
+        const endVol = Math.max(0, Math.min(64, (lastVol >= 0 ? lastVol : 64) + bendSpeed * bendTime));
+        tick += bendTime * speed;
+        points.push({ tick, value: endVol });
+        lastVol = endVol;
+      }
+      step += 3;
+      continue;
+    }
+
+    // Direct volume value (0-64)
+    if (info !== lastVol) {
+      points.push({ tick, value: Math.min(64, info) });
+      lastVol = info;
+    }
+    step++;
+    tick += speed;
+  }
+
+  if (points.length < 2) return null;
+
+  // Find the loop start point index (if 0xE0 loop was encountered)
+  let loopStartPoint: number | null = null;
+  let loopEndPoint: number | null = null;
+  if (loopTargetStep >= 0) {
+    // Find the envelope point closest to the loop target tick
+    // The loop target step is a vol macro index; we need to find the tick it corresponds to
+    let targetTick = 0;
+    for (let s = 0; s < loopTargetStep && s < vm.length; s++) {
+      const b = vm[s];
+      if (b === 0xE1) break;
+      if (b === 0xEA) { s += 2; targetTick += (vm[s] ?? 1) * speed; continue; }
+      if (b === 0xE8) { s += 1; continue; }
+      if (b === 0xE0) break;
+      targetTick += speed;
+    }
+    for (let i = 0; i < points.length; i++) {
+      if (points[i].tick >= targetTick) { loopStartPoint = i; break; }
+    }
+    loopEndPoint = points.length - 1;
+  }
+
+  // Find sustain point index
+  let sustainPoint: number | null = null;
+  if (sustainTick >= 0) {
+    for (let i = 0; i < points.length; i++) {
+      if (points[i].tick >= sustainTick) { sustainPoint = i; break; }
+    }
+  }
+
+  return {
+    enabled: true,
+    points,
+    sustainPoint,
+    loopStartPoint,
+    loopEndPoint,
+  };
+}
+
+/**
+ * Create a short looping waveform sample from FC config for XM export.
+ * The sample is just the raw waveform (no ADSR baked in) — the XM
+ * volume envelope handles the volume shaping separately.
+ */
+function attachFCWaveformSample(
+  inst: TrackerSong['instruments'][number],
+  cfg: FCConfig,
+): void {
+  // Get the actual waveform
+  let waveform: Int8Array;
+  if (cfg.wavePCM && cfg.wavePCM.length > 0) {
+    waveform = new Int8Array(cfg.wavePCM);
+  } else {
+    const raw = extractFC13Wave(cfg.waveNumber ?? 0);
+    waveform = new Int8Array(raw.length);
+    for (let i = 0; i < raw.length; i++) {
+      waveform[i] = raw[i] < 128 ? raw[i] : raw[i] - 256;
+    }
+  }
+
+  if (waveform.length === 0) return;
+
+  const wavBuf = buildLoopingWAV(waveform, 0, waveform.length, 8287);
+  const envelope = fcVolMacroToEnvelope(cfg);
+
+  if (!inst.sample) {
+    inst.sample = {
+      audioBuffer: wavBuf,
+      url: '',
+      baseNote: 'C-4',
+      detune: 0,
+      loop: true,
+      loopStart: 0,
+      loopEnd: waveform.length,
+      loopType: 'forward',
+      sampleRate: 8287,
+      reverse: false,
+      playbackRate: 1,
+    };
+  } else {
+    inst.sample.audioBuffer = wavBuf;
+    inst.sample.sampleRate = 8287;
+    inst.sample.loop = true;
+    inst.sample.loopStart = 0;
+    inst.sample.loopEnd = waveform.length;
+    inst.sample.loopType = 'forward';
+  }
+
+  // Store envelope in metadata for XM exporter
+  if (envelope) {
+    if (!inst.metadata) inst.metadata = {};
+    inst.metadata.originalEnvelope = envelope;
+  }
+}
+
 // ── Main entry point ────────────────────────────────────────────────────────
 
 /**
@@ -81,9 +248,10 @@ function attachSampleToInstrument(
  * Replaces the old bakeHivelyInstruments(), bakeSidMon1Instruments(),
  * and bakeGenericSynthInstruments() functions.
  */
-export function bakeSynthInstruments(song: TrackerSong): void {
+export function bakeSynthInstruments(song: TrackerSong, exportAs: 'mod' | 'xm' = 'mod'): void {
   const isHVL = song.format === 'HVL';
   const hvlSampleRate = isHVL ? 44100 : 8287;
+  const useXMEnvelopes = exportAs === 'xm';
 
   for (const inst of song.instruments) {
     // Skip instruments that already have real sample data
@@ -103,10 +271,16 @@ export function bakeSynthInstruments(song: TrackerSong): void {
     }
 
     if (inst.fc) {
-      const result = renderSynthInstrument(
-        fcSim, inst.fc, 24, DEFAULT_SAMPLE_RATE,
-      );
-      attachSampleToInstrument(inst, result.pcm, result.loopStart, result.loopEnd, result.sampleRate);
+      if (useXMEnvelopes) {
+        // XM: short looping waveform + volume envelope (ADSR independent of pitch)
+        attachFCWaveformSample(inst, inst.fc);
+      } else {
+        // MOD: pre-render with ADSR baked into PCM
+        const result = renderSynthInstrument(
+          fcSim, inst.fc, 24, DEFAULT_SAMPLE_RATE,
+        );
+        attachSampleToInstrument(inst, result.pcm, result.loopStart, result.loopEnd, result.sampleRate);
+      }
       continue;
     }
 
