@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-03-20T19:29:26.020Z
+ * Generated: 2026-03-20T21:49:54.017Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,9 +19,9 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.3160';
-export const BUILD_NUMBER = '3160';
-export const BUILD_HASH = '61e72ed09';
+export const BUILD_VERSION = '1.0.3166';
+export const BUILD_NUMBER = '3166';
+export const BUILD_HASH = 'd91924b31';
 export const BUILD_DATE = '2026-03-20';
 
 // Full version (patch IS the build number, so no need to append)
@@ -30,9 +30,33 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.3160',
+    version: '1.0.3166',
     date: '2026-03-20',
     changes: [
+      {
+        type: 'feature',
+        "description": "Vowel reduction, aspiration, energy envelopes, more words"
+      },
+      {
+        type: 'feature',
+        "description": "Add SAM reciter exception dictionary"
+      },
+      {
+        type: 'feature',
+        "description": "Sentence intonation, diphthong glides, CV energy ramps"
+      },
+      {
+        type: 'feature',
+        "description": "Add prosody (pitch/stress variation) to all speech synths"
+      },
+      {
+        type: 'improvement',
+        "description": "Chore: multi-agent updates — speech synths, exports, format audit state"
+      },
+      {
+        type: 'fix',
+        "description": "Mute/solo, speed, looping, note preview, live params"
+      },
       {
         type: 'feature',
         "description": "SP0250 frame buffer TTS + MEA8000 coarticulation"
@@ -204,36 +228,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         type: 'improvement',
         "description": "Unify .sunvox import — remove separate dialog, load directly"
-      },
-      {
-        type: 'fix',
-        "description": "Convert period indices to notes via actual Amiga period lookup"
-      },
-      {
-        type: 'fix',
-        "description": "Use base notes and clear volume column for FC synth XM export"
-      },
-      {
-        type: 'fix',
-        "description": "Remove incorrect -12 relNote offset causing octave-low playback"
-      },
-      {
-        type: 'feature',
-        "description": "XM export with volume envelopes for FC synth instruments"
-      }
-    ]
-  },
-  {
-    version: '2026-03-19',
-    date: '2026-03-19',
-    changes: [
-      {
-        type: 'fix',
-        "description": "MIDI notes trigger ROM words when ROM loaded"
-      },
-      {
-        type: 'fix',
-        "description": "Don't loop silence for one-shot instruments"
       }
     ]
   }

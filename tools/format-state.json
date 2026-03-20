@@ -135,7 +135,7 @@
     "notes": "18/18 pass"
   },
   "fur-arcade-destiny_islands_irem_m92": {
-    "envCorr": 0.36900634736767574,
+    "envCorr": 0.8357,
     "rmsDbDiff": -10.271664616204912,
     "correlation": 0.0903566703202153,
     "pass": false,
@@ -570,7 +570,7 @@
     "divergeAt": 69.3333560090703
   },
   "fur-blank-super_instrumentless_echo_synth_demonstration": {
-    "envCorr": 0.5915,
+    "envCorr": 0.6279,
     "rmsDbDiff": -26.241433508919513,
     "correlation": 0.011542568260700839,
     "pass": false,
@@ -3383,7 +3383,7 @@
     "notes": "18/18 pass"
   },
   "fur-snes-analog": {
-    "envCorr": 0.38383415534297705,
+    "envCorr": 0.4326,
     "rmsDbDiff": -12.486893833951262,
     "correlation": -0.001035534036159152,
     "pass": false,
@@ -3977,7 +3977,7 @@
     "notes": "49/53 pass, 4 silent"
   },
   "fur-x16-tfv_rise": {
-    "envCorr": 0.5192,
+    "envCorr": 0.4793,
     "rmsDbDiff": -18.824813308620257,
     "correlation": 0.043959051145875096,
     "pass": false,
