@@ -356,6 +356,30 @@ export class S14001ASynth extends MAMEBaseSynth {
     if (param === 'sing_mode') this._singMode = value >= 1;
     if (param === 'presetLoopSingle') this._presetLoopSingle = value >= 1;
     if (param === 'romWord') { this._currentRomWord = Math.round(value); this.speakWord(this._currentRomWord); }
+    if (param === 'romPhrase') this._playPhrase(Math.round(value));
+  }
+
+  /** Berzerk phrase sequences (word indices) */
+  private static readonly PHRASES: number[][] = [
+    [18, 8],                   // INTRUDER ALERT
+    [10, 15, 22, 23, 20],     // THE HUMANOID MUST NOT ESCAPE
+    [24, 25, 26, 27, 28],     // CHICKEN FIGHT LIKE A ROBOT
+    [16, 9, 11, 17],          // COINS DETECTED IN POCKET
+    [6, 10, 15],              // GET THE HUMANOID
+    [1, 10, 18],              // KILL THE INTRUDER
+  ];
+
+  private _playPhrase(phraseIdx: number): void {
+    if (phraseIdx < 0 || phraseIdx >= S14001ASynth.PHRASES.length) return;
+    const words = S14001ASynth.PHRASES[phraseIdx];
+    let i = 0;
+    const playNext = () => {
+      if (i >= words.length) return;
+      this.speakWord(words[i]);
+      i++;
+      setTimeout(playNext, 400); // ~400ms per word
+    };
+    playNext();
   }
 
   setTextParam(key: string, value: string): void {

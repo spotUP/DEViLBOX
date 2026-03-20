@@ -193,7 +193,7 @@ public:
         for (int s = 0; s < numSamples; s++) {
             float mixL = 0.0f, mixR = 0.0f;
 
-            if (m_romPlaying) {
+            if (m_romPlaying || m_fbPlaying) {
                 if (m_romEnvLevel < 1.0f) { m_romEnvLevel += 0.002f; if (m_romEnvLevel > 1.0f) m_romEnvLevel = 1.0f; }
                 m_romPhase += m_lpcStep;
                 while (m_romPhase >= 1.0) { m_romPhase -= 1.0; m_romPrevSample = m_romCurrentSample; m_romCurrentSample = generateROMSample(); }
@@ -361,7 +361,34 @@ public:
         m_romCurrentPitch = 0; m_romOldPitch = 0; m_romNewPitch = 0; m_romTargetPitch = 0;
         m_romLfsr = 0x7fff;
     }
-    void stopSpeaking() { m_romPlaying = false; }
+    void stopSpeaking() { m_romPlaying = false; m_fbPlaying = false; }
+
+    // Frame buffer mode: pre-packed LPC frames from TypeScript TTS pipeline
+    // Each frame is 12 bytes: [energyIdx, pitchIdx, k0..k9] as uint8 indices
+    void loadFrameBuffer(uintptr_t dataPtr, int numFrames) {
+        m_fbData = reinterpret_cast<const uint8_t*>(dataPtr);
+        m_fbCount = numFrames;
+        m_fbPos = 0;
+    }
+
+    void speakFrameBuffer() {
+        if (!m_fbData || m_fbCount <= 0) return;
+        m_fbPlaying = true;
+        m_fbPos = 0;
+        m_romPlaying = false; // Stop any ROM playback
+        m_romPhase = 0.0; m_romPrevSample = 0.0f; m_romCurrentSample = 0.0f;
+        m_romEnvLevel = 0.0f;
+        m_romSampleCount = m_romFrameSize; m_romFrameSize = 40;
+        m_romInterpCount = FR_SIZE; m_romPitchCount = 0;
+        std::memset(m_romX, 0, sizeof(m_romX));
+        std::memset(m_romCurrentK, 0, sizeof(m_romCurrentK));
+        std::memset(m_romOldK, 0, sizeof(m_romOldK));
+        std::memset(m_romNewK, 0, sizeof(m_romNewK));
+        std::memset(m_romTargetK, 0, sizeof(m_romTargetK));
+        m_romCurrentEnergy = 0; m_romOldEnergy = 0; m_romNewEnergy = 0; m_romTargetEnergy = 0;
+        m_romCurrentPitch = 0; m_romOldPitch = 0; m_romNewPitch = 0; m_romTargetPitch = 0;
+        m_romLfsr = 0x7fff;
+    }
 
 private:
     // ROM helpers — 1:1 from MAME vlm5030.cpp
@@ -379,7 +406,7 @@ private:
         return data;
     }
 
-    // parse_frame: 1:1 from MAME vlm5030.cpp lines 288-343
+    // parse_frame: reads from ROM (bit-packed) or frame buffer (pre-packed indices)
     int parseROMFrame() {
         // Save old parameters
         m_romOldEnergy = m_romNewEnergy;
@@ -387,25 +414,59 @@ private:
         for (int i = 0; i < NUM_COEFFS; i++)
             m_romOldK[i] = m_romNewK[i];
 
-        // Command byte check
+        // Frame buffer mode: read pre-packed indices from TypeScript
+        if (m_fbPlaying) {
+            if (m_fbPos >= m_fbCount) {
+                // End of frame buffer
+                m_fbPlaying = false;
+                return 0;
+            }
+            const uint8_t* frame = m_fbData + m_fbPos * 12;
+            uint8_t energyIdx = frame[0];
+            uint8_t pitchIdx = frame[1];
+
+            if (energyIdx == 0) {
+                // Silent frame
+                m_romNewEnergy = 0;
+                m_romNewPitch = 0;
+                for (int i = 0; i < NUM_COEFFS; i++) m_romNewK[i] = 0;
+                m_fbPos++;
+                return FR_SIZE;
+            }
+            if (energyIdx == 15) {
+                // Stop frame
+                m_fbPlaying = false;
+                return 0;
+            }
+
+            m_romNewEnergy = ENERGY_TABLE[energyIdx & 31];
+            m_romNewPitch = PITCH_TABLE[pitchIdx & 31];
+            m_romNewK[0] = K1_TABLE[frame[2] & 63];
+            m_romNewK[1] = K2_TABLE[frame[3] & 31];
+            m_romNewK[2] = K3_TABLE[frame[4] & 15];
+            m_romNewK[3] = K3_TABLE[frame[5] & 15];
+            m_romNewK[4] = K5_TABLE[frame[6] & 7];
+            m_romNewK[5] = K5_TABLE[frame[7] & 7];
+            m_romNewK[6] = K5_TABLE[frame[8] & 7];
+            m_romNewK[7] = K5_TABLE[frame[9] & 7];
+            m_romNewK[8] = K5_TABLE[frame[10] & 7];
+            m_romNewK[9] = K5_TABLE[frame[11] & 7];
+            m_fbPos++;
+            return FR_SIZE;
+        }
+
+        // ROM mode: bit-packed data (1:1 from MAME vlm5030.cpp lines 288-343)
         uint8_t cmd = readROMByte(m_romAddr);
         if (cmd & 0x01) {
-            // Extended frame
             m_romNewEnergy = 0;
             m_romNewPitch = 0;
             for (int i = 0; i < NUM_COEFFS; i++) m_romNewK[i] = 0;
             m_romAddr++;
-            if (cmd & 0x02) {
-                // End of speech
-                return 0;
-            } else {
-                // Silent frame
-                int nums = ((cmd >> 2) + 1) * 2;
-                return nums * FR_SIZE;
-            }
+            if (cmd & 0x02) return 0; // End of speech
+            int nums = ((cmd >> 2) + 1) * 2;
+            return nums * FR_SIZE;
         }
 
-        // Normal speech frame — bit layout from MAME (pitch first, then energy, then K9..K0)
         m_romNewPitch  = PITCH_TABLE[getROMBits(1, 5)];
         m_romNewEnergy = ENERGY_TABLE[getROMBits(6, 5)];
         m_romNewK[9]   = K5_TABLE[getROMBits(11, 3) & 7];
@@ -425,7 +486,7 @@ private:
 
     // sound_stream_update ROM path — 1:1 from MAME vlm5030.cpp lines 501-617
     float generateROMSample() {
-        if (!m_romPlaying) return 0.0f;
+        if (!m_romPlaying && !m_fbPlaying) return 0.0f;
 
         // Check new interpolation step or new frame
         if (m_romSampleCount == 0) {
@@ -437,6 +498,7 @@ private:
                 if (frameSamples == 0) {
                     // End of speech
                     m_romPlaying = false;
+                    m_fbPlaying = false;
                     return 0.0f;
                 }
                 m_romInterpCount = frameSamples;
@@ -629,6 +691,12 @@ private:
     int16_t m_romOldK[NUM_COEFFS] = {};
     int16_t m_romTargetK[NUM_COEFFS] = {};
     int16_t m_romCurrentK[NUM_COEFFS] = {};
+
+    // Frame buffer mode
+    const uint8_t* m_fbData = nullptr;
+    int m_fbCount = 0;
+    int m_fbPos = 0;
+    bool m_fbPlaying = false;
 };
 
 } // namespace devilbox
@@ -654,6 +722,8 @@ EMSCRIPTEN_BINDINGS(VLM5030Module) {
         .function("loadROM", &VLM5030Synth::loadROM)
         .function("speakWord", &VLM5030Synth::speakWord)
         .function("speakAtAddress", &VLM5030Synth::speakAtAddress)
-        .function("stopSpeaking", &VLM5030Synth::stopSpeaking);
+        .function("stopSpeaking", &VLM5030Synth::stopSpeaking)
+        .function("loadFrameBuffer", &VLM5030Synth::loadFrameBuffer)
+        .function("speakFrameBuffer", &VLM5030Synth::speakFrameBuffer);
 }
 #endif

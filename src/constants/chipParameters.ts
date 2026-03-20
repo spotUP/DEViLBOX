@@ -566,6 +566,14 @@ export const CHIP_SYNTH_DEFS: Record<string, ChipSynthDef> = {
         { value: 24, label: 'CHICKEN' }, { value: 25, label: 'FIGHT' }, { value: 26, label: 'LIKE' },
         { value: 27, label: 'A' }, { value: 28, label: 'ROBOT' },
       ]},
+      { key: 'romPhrase', label: 'Phrase', group: 'ROM Speech', type: 'select', min: 0, max: 5, default: 0, formatValue: 'int', options: [
+        { value: 0, label: 'INTRUDER ALERT' },
+        { value: 1, label: 'THE HUMANOID MUST NOT ESCAPE' },
+        { value: 2, label: 'CHICKEN FIGHT LIKE A ROBOT' },
+        { value: 3, label: 'COINS DETECTED IN POCKET' },
+        { value: 4, label: 'GET THE HUMANOID' },
+        { value: 5, label: 'KILL THE INTRUDER' },
+      ]},
       { key: 'volume', label: 'Volume', group: 'Output', type: 'knob', min: 0, max: 1, step: 0.01, default: 0.8, formatValue: 'percent' },
       { key: 'preset', label: 'Vowel', group: 'Formants', type: 'select', min: 0, max: 7, default: 0, formatValue: 'int', options: [
         { value: 0, label: 'AH' }, { value: 1, label: 'EE' }, { value: 2, label: 'IH' },
@@ -624,6 +632,12 @@ export const CHIP_SYNTH_DEFS: Record<string, ChipSynthDef> = {
         { value: 54, label: 'WORD 54' }, { value: 55, label: 'WORD 55' }, { value: 56, label: 'WORD 56' },
         { value: 57, label: 'WORD 57' }, { value: 58, label: 'WORD 58' }, { value: 59, label: 'WORD 59' },
       ]},
+      { key: 'romPhrase', label: 'Phrase', group: 'ROM Speech', type: 'select', min: 0, max: 3, default: 0, formatValue: 'int', options: [
+        { value: 0, label: 'READY SET GO' },
+        { value: 1, label: '100 METER DASH' },
+        { value: 2, label: 'NEW RECORD' },
+        { value: 3, label: 'GAME OVER' },
+      ]},
       { key: 'volume', label: 'Volume', group: 'Output', type: 'knob', min: 0, max: 1, step: 0.01, default: 0.8, formatValue: 'percent' },
       { key: 'vowel', label: 'Vowel', group: 'Formants', type: 'select', min: 0, max: 7, default: 0, formatValue: 'int', options: [
         { value: 0, label: 'AH' }, { value: 1, label: 'EE' }, { value: 2, label: 'IH' },
@@ -663,6 +677,15 @@ export const CHIP_SYNTH_DEFS: Record<string, ChipSynthDef> = {
         { value: 0, label: 'ROAR' }, { value: 1, label: 'I' }, { value: 2, label: 'AM' },
         { value: 3, label: 'SINISTAR' }, { value: 4, label: 'COWARD' }, { value: 5, label: 'RUN' },
         { value: 6, label: 'LIVE' }, { value: 7, label: 'HUNGER' }, { value: 8, label: 'BEWARE' },
+      ]},
+      { key: 'romPhrase', label: 'Phrase', group: 'ROM Speech', type: 'select', min: 0, max: 6, default: 0, formatValue: 'int', options: [
+        { value: 0, label: 'I AM SINISTAR' },
+        { value: 1, label: 'BEWARE I LIVE' },
+        { value: 2, label: 'I HUNGER' },
+        { value: 3, label: 'BEWARE COWARD' },
+        { value: 4, label: 'RUN COWARD' },
+        { value: 5, label: 'RUN RUN RUN' },
+        { value: 6, label: 'I HUNGER COWARD' },
       ]},
       { key: 'volume', label: 'Volume', group: 'Output', type: 'knob', min: 0, max: 1, step: 0.01, default: 0.8, formatValue: 'percent' },
       { key: 'preset', label: 'Vowel', group: 'Formants', type: 'select', min: 0, max: 7, default: 0, formatValue: 'int', options: [
