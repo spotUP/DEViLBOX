@@ -75,18 +75,26 @@ export abstract class MAMEBaseSynth implements DevilboxSynth, MAMEEffectTarget {
 
   /** Update the instrument store's _romsLoaded parameter (call after ROM auto-load) */
   protected _updateRomStatus(loaded: boolean): void {
-    import('../../stores/useInstrumentStore').then(({ useInstrumentStore }) => {
-      const store = useInstrumentStore.getState();
-      const inst = store.instruments.find((i: { synthType?: string }) =>
-        i.synthType === `MAME${this.chipName}`
-      );
-      if (inst) {
-        store.updateInstrument(inst.id, {
-          parameters: { ...(inst as { parameters?: Record<string, unknown> }).parameters, _romsLoaded: loaded ? 1 : 0 },
-        });
-      }
-    }).catch(() => {});
+    if (this._romStatusUpdated) return; // Prevent render loop
+    this._romStatusUpdated = true;
+    // Defer to next microtask to avoid synchronous re-render cascade
+    queueMicrotask(() => {
+      import('../../stores/useInstrumentStore').then(({ useInstrumentStore }) => {
+        const store = useInstrumentStore.getState();
+        const inst = store.instruments.find((i: { synthType?: string }) =>
+          i.synthType === `MAME${this.chipName}`
+        );
+        if (inst) {
+          const params = (inst as { parameters?: Record<string, unknown> }).parameters;
+          if (params?._romsLoaded === (loaded ? 1 : 0)) return; // Already set
+          store.updateInstrument(inst.id, {
+            parameters: { ...params, _romsLoaded: loaded ? 1 : 0 },
+          });
+        }
+      }).catch(() => {});
+    });
   }
+  private _romStatusUpdated = false;
 
   // Note state
   protected currentNote: number = 60;  // MIDI note
