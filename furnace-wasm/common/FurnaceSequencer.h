@@ -537,6 +537,9 @@ void furnace_seq_set_sample_rate(double sampleRate);
 // Set divider (tick rate, default 60.0).
 void furnace_seq_set_divider(double divider);
 
+// Get current divider (may change mid-song via effects 0xC0-0xC3/0xF0).
+double furnace_seq_get_divider(void);
+
 // Mute/unmute a channel.
 void furnace_seq_set_mute(int channel, bool muted);
 

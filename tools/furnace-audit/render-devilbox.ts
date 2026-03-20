@@ -62,6 +62,7 @@ interface WasmModule {
   _furnace_seq_set_speed_pattern(ptr: number, len: number): void;
   _furnace_seq_set_tempo(virtualN: number, virtualD: number): void;
   _furnace_seq_set_divider(hz: number): void;
+  _furnace_seq_get_divider(): number;
   _furnace_seq_set_dispatch_handle(handle: number): void;
   _furnace_seq_set_sample_rate(sr: number): void;
   _furnace_seq_set_compat_flags(flags: number, flagsExt: number, pitchSlideSpeed: number): void;
@@ -790,7 +791,7 @@ async function renderFurFile(furPath: string, outPath: string): Promise<RenderRe
     // Integer tick accumulator with clockDrift (matches Furnace playback.cpp:2004-2025)
     // cycles = samples until next tick; clockDrift accumulates fractional remainder
     let cycles = 0; // 0 means tick fires immediately on first iteration (matches Furnace)
-    const divider = tickRate;
+    let divider = tickRate; // may change mid-song via effects 0xC0-0xC3/0xF0
     let clockDrift = 0.0;
 
     // Helper: process one tick (sequencer + all chips)
@@ -859,6 +860,9 @@ async function renderFurFile(furPath: string, outPath: string): Promise<RenderRe
             }
             break;
           }
+          // Read current divider from sequencer (may change via effects 0xC0-0xC3/0xF0)
+          divider = wasm._furnace_seq_get_divider();
+          if (divider < 1) divider = 1;
           // Compute samples until next tick (integer + clockDrift, matches Furnace)
           cycles = Math.floor(SAMPLE_RATE / divider);
           clockDrift += SAMPLE_RATE % divider;
@@ -999,7 +1003,7 @@ function packDispatchCompatFlags(cf: Record<string, unknown>): Uint8Array {
   flags[i++] = (cf.buggyPortaAfterSlide as number) || 0;
   flags[i++] = (cf.gbInsAffectsEnvelope as number) || 0;
   flags[i++] = (cf.sharedExtStat as number) || 0;
-  flags[i++] = (cf.ignoreDACModeOutsideIntendedChannel as number) || 0;
+  flags[i++] = (cf.ignoreDACModeOutsideChannel as number) || 0;
   flags[i++] = (cf.e1e2AlsoTakePriority as number) || 0;
   flags[i++] = (cf.newSegaPCM as number) || 0;
   flags[i++] = (cf.fbPortaPause as number) || 0;

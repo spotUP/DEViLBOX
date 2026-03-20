@@ -340,6 +340,31 @@ When debugging or implementing Furnace chip synths, instruments, or imports:
 
 Reference code location: `/Users/spot/Code/Reference Code/furnace-master/src/engine/platform/`
 
+### Lock-Step Command Debugging (preferred method)
+
+**DO NOT compare WAV files to debug playback accuracy.** Instead, run both renderers in lock-step and compare dispatch commands tick-by-tick. The first mismatch reveals the exact bug.
+
+**Step 1 — Generate reference command log (upstream Furnace CLI):**
+```bash
+"/Users/spot/Code/Reference Code/furnace-master/build-headless/furnace" \
+  -output /dev/null -loops 0 -view commands \
+  "path/to/song.fur" 2>/dev/null | grep "^[[:space:]]*[0-9]" > /tmp/ref-cmds.txt
+```
+Format: `tick | chan: COMMAND_NAME(val1, val2)`
+
+**Step 2 — Generate DEViLBOX command log (WASM headless renderer):**
+```bash
+npx tsx tools/furnace-audit/render-devilbox.ts "path/to/song.fur" /dev/null --cmdlog
+```
+Creates `.cmdlog.txt` file. Format: `tick cmd chan val1 val2 ret`
+
+**Step 3 — Compare tick-by-tick:**
+Find the first tick where commands diverge. The diverging command reveals which effect, macro, or register write is handled differently.
+
+**Why this works:** WAV comparison is affected by blip_buf resampling phase artifacts (1-sample offset = 0.89 envCorr at 10ms). Command comparison is deterministic — any mismatch is a real bug in the sequencer or instrument loading.
+
+**Key insight from V2M debugging:** Running both implementations in lock-step with internal state comparison finds issues that would take hours to find via WAV comparison.
+
 *** IMPORTANT ***
 
 ---
