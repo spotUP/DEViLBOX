@@ -1052,6 +1052,18 @@ export function parseFCFile(buffer: ArrayBuffer, filename: string, moduleBase = 
         }
       }
 
+      // ── Capture base notes BEFORE macro simulation ──
+      // The freq macro adds frqTranspose which shifts notes wildly per-tick.
+      // For XM export (where vol envelope is separate), we want the BASE note
+      // without freq macro transposition. For UADE/MOD we keep the simulated note.
+      const baseNotes: number[] = [0, 0, 0, 0];
+      for (let ch = 0; ch < 4; ch++) {
+        if (triggered[ch]) {
+          const periodIdx = (voices[ch].note + seq.transpose[ch]) & 0x7F;
+          baseNotes[ch] = fcPeriodIdxToXM(periodIdx);
+        }
+      }
+
       // ── Run speed ticks of macro simulation ──
       for (let tick = 0; tick < currentSpeed; tick++) {
         for (let ch = 0; ch < 4; ch++) {
@@ -1067,11 +1079,20 @@ export function parseFCFile(buffer: ArrayBuffer, filename: string, moduleBase = 
         const fcPat = seq.pat[ch] < fcPatterns.length ? fcPatterns[seq.pat[ch]] : null;
         const fcNote = fcPat ? fcPat.note[row] : 0;
 
+        // Determine if this instrument is an FC synth (waveform >= 10)
+        const isFCSynth = voice.currentWaveform >= 10;
+
         let xmNote = 0;
         if (triggered[ch]) {
-          // Mirror FlodJS: periodIdx = (frqTranspose_unsigned + note + seqTranspose) & 0x7F
-          const periodIdx = (voice.frqTranspose + voice.note + seq.transpose[ch]) & 0x7F;
-          xmNote = fcPeriodIdxToXM(periodIdx);
+          if (isFCSynth) {
+            // FC synth: use base note (without freq macro transpose)
+            // The freq macro handles waveform switching, not pitch — pitch comes from the note
+            xmNote = baseNotes[ch];
+          } else {
+            // PCM: use simulated note (includes frqTranspose from freq macro)
+            const periodIdx = (voice.frqTranspose + voice.note + seq.transpose[ch]) & 0x7F;
+            xmNote = fcPeriodIdxToXM(periodIdx);
+          }
         } else if (fcNote === 0x49 || (fcPat && fcPat.val[row] === 0xF0)) {
           xmNote = 97; // note off
         }
@@ -1090,9 +1111,13 @@ export function parseFCFile(buffer: ArrayBuffer, filename: string, moduleBase = 
           }
         }
 
-        // Volume from simulation (0-64 → XM volume column 0x10-0x50)
-        const vol = Math.max(0, Math.min(64, voice.volume));
-        const xmVolume = (triggered[ch] || voice.enabled) ? (0x10 + vol) : 0;
+        // Volume: FC synth instruments use XM envelope, so skip volume column.
+        // PCM instruments keep simulated volume.
+        let xmVolume = 0;
+        if (!isFCSynth) {
+          const vol = Math.max(0, Math.min(64, voice.volume));
+          xmVolume = (triggered[ch] || voice.enabled) ? (0x10 + vol) : 0;
+        }
 
         // Effects: approximate vibrato and portamento as XM effects
         let effTyp = 0, eff = 0;
