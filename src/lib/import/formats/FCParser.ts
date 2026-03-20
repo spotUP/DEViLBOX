@@ -393,12 +393,12 @@ function processFreqMacro(voice: FCVoiceState, freqMacros: Uint8Array[]): void {
       }
 
       // Read freq transpose value (unless sustain or loop effect interrupted).
-      // Store as UNSIGNED byte (0-255), exactly as FlodJS does with readUbyte().
-      // The & 0x7F wrap in the period-index formula handles "negative" offsets
-      // stored as bytes 0x80-0xDF without any sign extension.
+      // Store as SIGNED byte (-128..127), matching FlodJS readByte().
+      // When frqTranspose < 0, it's an ABSOLUTE period index (note/transpose
+      // are NOT added). When >= 0, it's added to note + transpose.
       if (!loopSustain && !loopEffect) {
         if (voice.frqStep < 64) {
-          voice.frqTranspose = fm[voice.frqStep]; // unsigned, range 0-255
+          voice.frqTranspose = s8(fm[voice.frqStep]); // signed, range -128..127
           voice.frqStep++;
         }
       }
@@ -1064,15 +1064,31 @@ export function parseFCFile(buffer: ArrayBuffer, filename: string, moduleBase = 
         }
       }
 
-      // ── Capture base notes BEFORE macro simulation ──
-      // The freq macro adds frqTranspose which shifts notes wildly per-tick.
-      // For XM export (where vol envelope is separate), we want the BASE note
-      // without freq macro transposition. For UADE/MOD we keep the simulated note.
-      const baseNotes: number[] = [0, 0, 0, 0];
+      // ── Scan freq macro for stable transpose value ──
+      // The freq macro may have several zero-transpose bytes before reaching
+      // the actual pitch offset. We scan ahead to find it for correct note mapping.
+      const stableTranspose: number[] = [0, 0, 0, 0];
       for (let ch = 0; ch < 4; ch++) {
         if (triggered[ch]) {
-          const periodIdx = (voices[ch].note + seq.transpose[ch]) & 0x7F;
-          baseNotes[ch] = fcPeriodIdxToXM(periodIdx);
+          const v = voices[ch];
+          const fm = v.frqMacroIdx < freqMacros.length ? freqMacros[v.frqMacroIdx] : null;
+          if (fm) {
+            let step = 0;
+            for (let iter = 0; iter < 64 && step < 64; iter++) {
+              const b = fm[step];
+              if (b === 0xE1) break;
+              if (b === 0xE0) { step = (step + 1 < 64 ? fm[step + 1] : 0) & 0x3F; continue; }
+              if (b === 0xE2 || b === 0xE4) { step += 2; continue; }
+              if (b === 0xE3 || b === 0xEA) { step += 3; continue; }
+              if (b === 0xE7) { step += 2; continue; }
+              if (b === 0xE8) { step += 2; continue; }
+              if (b === 0xE9) { step += 3; continue; }
+              // Signed byte: values >= 128 are negative (absolute period index)
+              const sb = b < 128 ? b : b - 256;
+              if (sb !== 0) { stableTranspose[ch] = sb; break; }
+              step++;
+            }
+          }
         }
       }
 
@@ -1096,15 +1112,17 @@ export function parseFCFile(buffer: ArrayBuffer, filename: string, moduleBase = 
 
         let xmNote = 0;
         if (triggered[ch]) {
-          if (isFCSynth) {
-            // FC synth: use base note (without freq macro transpose)
-            // The freq macro handles waveform switching, not pitch — pitch comes from the note
-            xmNote = baseNotes[ch];
+          // Match FlodJS: if frqTranspose >= 0, add note + transpose.
+          // If < 0, use frqTranspose alone as absolute period index.
+          // Use stableTranspose when simulated frqTranspose is still 0.
+          const transpose = voice.frqTranspose !== 0 ? voice.frqTranspose : stableTranspose[ch];
+          let periodIdx: number;
+          if (transpose >= 0) {
+            periodIdx = (transpose + voice.note + seq.transpose[ch]) & 0x7F;
           } else {
-            // PCM: use simulated note (includes frqTranspose from freq macro)
-            const periodIdx = (voice.frqTranspose + voice.note + seq.transpose[ch]) & 0x7F;
-            xmNote = fcPeriodIdxToXM(periodIdx);
+            periodIdx = transpose & 0x7F; // absolute index, no note/transpose added
           }
+          xmNote = fcPeriodIdxToXM(periodIdx);
         } else if (fcNote === 0x49 || (fcPat && fcPat.val[row] === 0xF0)) {
           xmNote = 97; // note off
         }
