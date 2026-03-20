@@ -298,8 +298,12 @@ class SunVoxProcessor extends AudioWorkletProcessor {
 
       case 'play':
         if (m) {
+          // Stop first to reset playback position, then play from the beginning
+          m._sunvox_wasm_stop(data.handle);
           m._sunvox_wasm_play(data.handle);
           this._playReceived = true;
+          this._debuggedNonZero = false; // reset so we detect first audio after play
+          this._debugZeroCount = 0;
         }
         break;
 

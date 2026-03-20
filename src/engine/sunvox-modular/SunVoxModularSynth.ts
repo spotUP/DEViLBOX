@@ -45,6 +45,17 @@ export function resetSharedSunVoxHandle(): void {
   _sharedSongInitPromise = null;
 }
 
+/**
+ * Donate a pre-loaded handle to be used as the shared song handle.
+ * Avoids the double create/destroy/create cycle which corrupts WASM state.
+ * The handle must already have a song loaded via engine.loadSong().
+ */
+export function donatePreloadedHandle(handle: number): void {
+  _sharedSongHandle = handle;
+  _sharedSongRefCount = 1; // prevent _loadSongShared cleanup from destroying it
+  _sharedSongInitPromise = Promise.resolve(); // already loaded
+}
+
 export class SunVoxModularSynth implements DevilboxSynth {
   readonly name = 'SunVoxModularSynth';
   readonly output: GainNode;
@@ -93,7 +104,9 @@ export class SunVoxModularSynth implements DevilboxSynth {
       _sharedSongInitPromise = null;
     }
 
-    // First instance creates the shared handle; others wait for it
+    // First instance creates the shared handle; others wait for it.
+    // If donatePreloadedHandle() was called, the handle is already set and
+    // _sharedSongInitPromise is resolved — skip creation entirely.
     if (_sharedSongHandle < 0 && !_sharedSongInitPromise) {
       _sharedSongInitPromise = (async () => {
         _sharedSongHandle = await this.engine.createHandle(this.audioContext.sampleRate);
