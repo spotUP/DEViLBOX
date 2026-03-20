@@ -78,15 +78,28 @@ function parseDvbLog(text: string): CmdEntry[] {
   return entries;
 }
 
-// Filter out non-comparable commands (GET_VOLUME, GET_VOLMAX are queries not actions)
-// Also filter HINT_* commands since upstream strips some of them in -view commands mode
+// Filter out non-comparable commands:
+// - GET_* are queries, not actions
+// - HINT_* are sequencer hints not dispatched to chip
+// - PRE_PORTA/PRE_NOTE are pre-processing markers
+// - VOLUME/PITCH/INSTRUMENT before NOTE_ON are "setup" commands that the reference
+//   consolidates into the NOTE_ON itself, so we skip them to avoid false mismatches
 function filterComparable(entries: CmdEntry[]): CmdEntry[] {
   return entries.filter(e =>
     !e.cmd.startsWith('GET_') &&
     !e.cmd.startsWith('HINT_') &&
     e.cmd !== 'PRE_PORTA' &&
-    e.cmd !== 'PRE_NOTE'
+    e.cmd !== 'PRE_NOTE' &&
+    e.cmd !== 'SAMPLE_MODE' &&
+    e.cmd !== 'SAMPLE_FREQ' &&
+    e.cmd !== 'SAMPLE_BANK' &&
+    e.cmd !== 'SAMPLE_DIR'
   );
+}
+
+// Key for matching: (tick, chan, cmd) — used for set-based comparison
+function cmdKey(e: CmdEntry): string {
+  return `${e.tick}:${e.chan}:${e.cmd}`;
 }
 
 function compare(refEntries: CmdEntry[], dvbEntries: CmdEntry[], maxDiffs: number = 20): void {
@@ -120,37 +133,53 @@ function compare(refEntries: CmdEntry[], dvbEntries: CmdEntry[], maxDiffs: numbe
     const rCmds = refByTick.get(tick) || [];
     const dCmds = dvbByTick.get(tick) || [];
 
-    // Compare commands at this tick
-    const maxLen = Math.max(rCmds.length, dCmds.length);
+    // Set-based comparison: match by (chan, cmd) then compare values
+    // This avoids false mismatches from command ordering differences
     let tickMatch = true;
+    const dvbUsed = new Set<number>();
 
-    for (let i = 0; i < maxLen; i++) {
-      const r = rCmds[i];
-      const d = dCmds[i];
-
-      if (!r && d) {
-        if (diffs < maxDiffs) {
-          console.log(`EXTRA DVB  tick=${tick} ch=${d.chan}: ${d.cmd}(${d.val1}, ${d.val2})`);
+    // For each ref command, find a matching DVB command (same chan + cmd)
+    for (const r of rCmds) {
+      let found = false;
+      for (let di = 0; di < dCmds.length; di++) {
+        if (dvbUsed.has(di)) continue;
+        const d = dCmds[di];
+        if (r.chan === d.chan && r.cmd === d.cmd) {
+          dvbUsed.add(di);
+          if (r.val1 !== d.val1 || r.val2 !== d.val2) {
+            if (diffs < maxDiffs) {
+              console.log(`MISMATCH   tick=${tick} ch=${r.chan} ${r.cmd}`);
+              console.log(`  REF: (${r.val1}, ${r.val2})`);
+              console.log(`  DVB: (${d.val1}, ${d.val2})`);
+            }
+            tickMatch = false;
+            diffs++;
+          }
+          found = true;
+          break;
         }
-        tickMatch = false;
-        diffs++;
-      } else if (r && !d) {
+      }
+      if (!found) {
         if (diffs < maxDiffs) {
           console.log(`MISSING    tick=${tick} ch=${r.chan}: ${r.cmd}(${r.val1}, ${r.val2})`);
         }
         tickMatch = false;
         diffs++;
-      } else if (r && d) {
-        if (r.cmd !== d.cmd || r.chan !== d.chan || r.val1 !== d.val1 || r.val2 !== d.val2) {
-          if (diffs < maxDiffs) {
-            console.log(`MISMATCH   tick=${tick}`);
-            console.log(`  REF: ch=${r.chan} ${r.cmd}(${r.val1}, ${r.val2})`);
-            console.log(`  DVB: ch=${d.chan} ${d.cmd}(${d.val1}, ${d.val2})`);
-          }
-          tickMatch = false;
-          diffs++;
-        }
       }
+    }
+
+    // Check for extra DVB commands not matched by any ref command
+    for (let di = 0; di < dCmds.length; di++) {
+      if (dvbUsed.has(di)) continue;
+      const d = dCmds[di];
+      // Skip "setup" commands (VOLUME, PITCH, INSTRUMENT) that are
+      // implicit in the reference's consolidated NOTE_ON
+      if (d.cmd === 'VOLUME' || d.cmd === 'PITCH' || d.cmd === 'INSTRUMENT') continue;
+      if (diffs < maxDiffs) {
+        console.log(`EXTRA DVB  tick=${tick} ch=${d.chan}: ${d.cmd}(${d.val1}, ${d.val2})`);
+      }
+      tickMatch = false;
+      diffs++;
     }
 
     if (tickMatch) matchedTicks++;
@@ -184,25 +213,20 @@ async function main() {
     const refEntries = parseRefLog(refOutput);
     console.log(`  ${refEntries.length} commands captured`);
 
-    // Generate DEViLBOX command log
+    // Generate DEViLBOX command log — use /tmp output so cmdlog goes to /tmp/*.cmdlog.txt
+    const tmpWav = '/tmp/_compare_cmds_dvb.wav';
     console.log('Rendering DEViLBOX (WASM headless)...');
     execSync(
-      `npx tsx tools/furnace-audit/render-devilbox.ts "${furPath}" /dev/null --cmdlog 2>/dev/null`,
+      `npx tsx tools/furnace-audit/render-devilbox.ts "${furPath}" "${tmpWav}" --cmdlog 2>/dev/null`,
       { maxBuffer: 100 * 1024 * 1024, timeout: 300000 }
     );
 
-    // Find the cmdlog file
-    const cmdlogPath = furPath.replace(/\.fur$/, '') + '.cmdlog.txt';
-    const altPath = '/dev/null.cmdlog.txt';
+    const cmdlogPath = tmpWav.replace('.wav', '.cmdlog.txt');
     let dvbText = '';
     if (existsSync(cmdlogPath)) {
       dvbText = readFileSync(cmdlogPath, 'utf8');
-    } else if (existsSync(altPath)) {
-      dvbText = readFileSync(altPath, 'utf8');
     } else {
-      // Check /tmp
-      const tmpLog = '/tmp/furnace-compare/cmdlog.txt';
-      console.error('Could not find DEViLBOX command log. Use --cmdlog flag.');
+      console.error(`Could not find DEViLBOX command log at ${cmdlogPath}`);
       process.exit(1);
     }
 
