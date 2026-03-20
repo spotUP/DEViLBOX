@@ -245,7 +245,6 @@ export class S14001ASynth extends MAMEBaseSynth {
     if (frames.length === 0) return;
 
     const speechFrames: SpeechFrame<SP0250Frame>[] = frames
-      .filter(f => f.voiced)
       .map(f => ({ data: f, durationMs: f.durationMs }));
     if (speechFrames.length === 0) return;
 
