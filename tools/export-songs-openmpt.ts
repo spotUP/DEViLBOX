@@ -1407,10 +1407,8 @@ const TEST_CASES: TestCase[] = [
   { file: 'formats/dawnpatrol-sad.dat', format: 'PR', parserModule: 'PaulRobothamParser', parseFn: 'parsePaulRobothamFile', isAsync: false, noteExportOffset: 36 },
   { file: 'formats/bob4e.dum', format: 'INFO', parserModule: 'InfogramesParser', parseFn: 'parseInfogramesFile', isAsync: false, noteExportOffset: 36 },
   { file: 'formats/insects_in_space.jt', format: 'JT', parserModule: 'JeroenTelParser', parseFn: 'parseJeroenTelFile', isAsync: true, noteExportOffset: 36 },
-  // CustomMade / Anders0land — format detection heuristics reject all available test files
-  // These formats use voice-clear signatures / chunk-based detection that's very specific
-  // { file: 'formats/viking_child.cm', format: 'CM', ... },
-  // { file: 'formats/primemover_01.hot', format: 'AO', ... },
+  { file: 'formats/cm.viking_child', format: 'CM', parserModule: 'CustomMadeParser', parseFn: 'parseCustomMadeFile', isAsync: true, noteExportOffset: 36 },
+  { file: 'formats/hot.primemover_01', format: 'AO', parserModule: 'Anders0landParser', parseFn: 'parseAnders0landFile', isAsync: true, noteExportOffset: 36 },
   { file: 'formats/redoctober-sub-docking.ims', format: 'IMS', parserModule: 'ImagesMusicSystemParser', parseFn: 'parseImagesMusicSystemFile', isAsync: false, noteExportOffset: 36 },
   { file: 'formats/ghostbattle_gameover.hip7', format: 'HIP7', parserModule: 'JochenHippel7VParser', parseFn: 'parseJochenHippel7VFile', isAsync: false, noteExportOffset: 36 },
   // Synth Dream — parser expects "Synth4.0"/"Synth4.2" magic, test files don't have it
