@@ -512,10 +512,22 @@ export function bakeSynthInstruments(song: TrackerSong, exportAs: 'mod' | 'xm' =
   const useXMEnvelopes = exportAs === 'xm';
 
   for (const inst of song.instruments) {
-    // Skip instruments that already have real sample data
-    if (inst.sample?.audioBuffer && inst.sample.audioBuffer.byteLength > 44) continue;
-    // Skip instruments with sample URLs (loaded at runtime)
-    if (inst.sample?.url) continue;
+    // Check if instrument has a synth config that XM envelope export can handle
+    const hasSynthConfig = !!(inst.fc || inst.soundMon || inst.sidmon1 || inst.digMug ||
+      inst.hippelCoso || inst.davidWhittaker ||
+      (inst.deltaMusic1 && !inst.deltaMusic1.isSample) ||
+      (inst.deltaMusic2 && !inst.deltaMusic2.isSample));
+
+    // Skip instruments that already have real sample data —
+    // UNLESS we're targeting XM and the instrument has a synth config
+    // (XM envelope path replaces the pre-existing sample with a short looping waveform)
+    const xmOverride = useXMEnvelopes && hasSynthConfig;
+    if (inst.sample?.audioBuffer && inst.sample.audioBuffer.byteLength > 44) {
+      if (!xmOverride) continue;
+    }
+    // Skip instruments with sample URLs (loaded at runtime) —
+    // UNLESS XM envelope override applies
+    if (inst.sample?.url && !xmOverride) continue;
     // Skip raw binary data instruments
     if (inst.rawBinaryData && inst.rawBinaryData.length > 0) continue;
 
