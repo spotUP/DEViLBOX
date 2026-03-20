@@ -128,7 +128,7 @@ function lerpFrame(from: VLM5030Frame, to: VLM5030Frame, t: number): VLM5030Fram
 /** Phoneme categories for energy shaping */
 const STOPS = new Set(['P*', 'T*', 'K*', 'KX', 'B*', 'D*', 'G*', 'GX', 'Q*']);
 const VOICELESS_STOPS = new Set(['P*', 'T*', 'K*', 'KX']);
-const FRICATIVES = new Set(['S*', 'SH', 'F*', 'TH', '/H', '/X', 'Z*', 'ZH', 'V*', 'DH']);
+const _FRICATIVES = new Set(['S*', 'SH', 'F*', 'TH', '/H', '/X', 'Z*', 'ZH', 'V*', 'DH']); void _FRICATIVES;
 const VOWELS = new Set(['IY', 'IH', 'EH', 'AE', 'AA', 'AH', 'AO', 'UH', 'AX', 'IX', 'ER', 'UX', 'OH']);
 const DIPHTHONGS: Record<string, [string, string]> = {
   'EY': ['EH', 'IY'], 'AY': ['AA', 'IY'], 'OY': ['AO', 'IY'],
