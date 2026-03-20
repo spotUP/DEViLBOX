@@ -1,6 +1,6 @@
 
 import { MAMEBaseSynth } from '@engine/mame/MAMEBaseSynth';
-import { textToPhonemes, parsePhonemeString } from '@engine/speech/Reciter';
+import { textToPhonemes, parsePhonemeString, isQuestion, preprocessText } from '@engine/speech/Reciter';
 import { SpeechSequencer, type SpeechFrame } from '@engine/speech/SpeechSequencer';
 import { type SP0250Frame, samToSP0250 } from '@engine/speech/sp0250PhonemeMap';
 import { phonemesToVLM5030Frames, samToVLM5030 } from '@engine/speech/vlm5030PhonemeMap';
@@ -235,13 +235,14 @@ export class VLM5030Synth extends MAMEBaseSynth {
 
     this.stopSpeaking();
 
-    const phonemeStr = textToPhonemes(text);
+    const question = isQuestion(text);
+    const phonemeStr = textToPhonemes(preprocessText(text));
     if (!phonemeStr) return;
 
     const tokens = parsePhonemeString(phonemeStr);
 
     // Use VLM5030-specific phoneme map with per-phoneme K coefficients
-    const vlmFrames = phonemesToVLM5030Frames(tokens);
+    const vlmFrames = phonemesToVLM5030Frames(tokens, question);
     if (vlmFrames.length === 0) return;
 
     // Pack into 12-byte WASM frames: [energyIdx, pitchIdx, k0..k9]

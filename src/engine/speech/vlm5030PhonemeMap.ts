@@ -144,7 +144,8 @@ const DIPHTHONGS: Record<string, [string, string]> = {
  * - Consonant-vowel energy ramps (stops burst then ramp into vowels)
  */
 export function phonemesToVLM5030Frames(
-  tokens: Array<{ code: string; stress: number }>
+  tokens: Array<{ code: string; stress: number }>,
+  question = false
 ): VLM5030Frame[] {
   const rawFrames: VLM5030Frame[] = [];
   const tokenCodes: string[] = [];
@@ -179,16 +180,24 @@ export function phonemesToVLM5030Frames(
 
   if (rawFrames.length === 0) return [];
 
-  // Sentence-level intonation: gradual pitch decline toward end
+  // Sentence-level intonation
   const totalFrames = rawFrames.length;
   for (let i = 0; i < totalFrames; i++) {
     const f = rawFrames[i];
     if (!f.unvoiced && f.pitch > 0) {
-      // Last 30% of utterance: pitch drops by up to 3 indices
       const pos = i / totalFrames;
-      if (pos > 0.7) {
-        const drop = Math.round((pos - 0.7) / 0.3 * 3);
-        f.pitch = Math.max(1, f.pitch - drop);
+      if (question) {
+        // Questions: pitch rises in last 30%
+        if (pos > 0.7) {
+          const rise = Math.round((pos - 0.7) / 0.3 * 4);
+          f.pitch = Math.min(31, f.pitch + rise);
+        }
+      } else {
+        // Statements: pitch drops in last 30%
+        if (pos > 0.7) {
+          const drop = Math.round((pos - 0.7) / 0.3 * 3);
+          f.pitch = Math.max(1, f.pitch - drop);
+        }
       }
     }
   }
