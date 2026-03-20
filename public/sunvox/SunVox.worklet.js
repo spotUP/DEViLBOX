@@ -319,6 +319,7 @@ class SunVoxProcessor extends AudioWorkletProcessor {
 
       case 'play':
         if (m) {
+          m._sv_volume(data.handle, 256); // max volume (0-256)
           m._sv_play_from_beginning(data.handle);
           this._playReceived = true;
           this._debuggedNonZero = false;
